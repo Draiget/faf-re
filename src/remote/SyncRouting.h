@@ -61,6 +61,7 @@ namespace faf::remote
     Score,        // by army: the view and its allies whole, others their score (`lua/sim/score.lua:283`)
     ScoreAccum,   // everyone, with the view's own `focusArmyIndex` (`lua/sim/score.lua:284`)
     NukeLaunch,   // a list: allies whole, enemies without the location (`DefaultProjectileWeapon.lua:1078`)
+    Chat,         // a list of chat messages, each to whom `ChatUtils.IsLocalRecipient` lets it (game version 3840)
     Observers,    // nothing for a player: debug data, or written at focus -1 for observers alone
   };
 
@@ -70,8 +71,26 @@ namespace faf::remote
     ESyncRoute route;
   };
 
-  /** The FAF game version `SyncKeyRoutes` was audited on; running on another one is logged. */
-  inline constexpr std::string_view kSyncPolicyGameVersion = "3835";
+  /**
+   * The FAF game versions `SyncKeyRoutes` was validated on (plan WPR.5: their Lua's `Sync` keys audited, then the spy
+   * over fresh replays of the version). 3835 was the first; 3840 writes its keys and one more, `ChatMessages`
+   * (`ESyncRoute::Chat`), checked on 20 of its replays. On any other version a key the table doesn't know goes to
+   * observers only, so the dedicated server refuses one (plan WPR.32) unless told otherwise.
+   */
+  inline constexpr int kSyncPolicyGameVersions[] = {3835, 3840};
+  [[nodiscard]] constexpr bool SyncPolicyValidatedFor(
+    const int gameVersion
+  ) noexcept
+  {
+    for (const int version : kSyncPolicyGameVersions) {
+      if (version == gameVersion) {
+        return true;
+      }
+    }
+    return false;
+  }
+  /** "3835, 3840": the validated versions, for messages. */
+  [[nodiscard]] std::string SyncPolicyGameVersionsText();
   /** That version's keys (`.plans/dedicated-server/research/WP6.1-sync-keys.md`), sorted. */
   [[nodiscard]] std::span<const SSyncKeyRoute> SyncKeyRoutes() noexcept;
   /** The route of `key`, or `ESyncRoute::Observers` with `known` false. */
@@ -107,16 +126,36 @@ namespace faf::remote
     explicit CSyncRouter(std::size_t viewCount);
     ~CSyncRouter() override;
 
-    void SetIdTranslator(IdTranslator translator) { mTranslate = std::move(translator); }
+    void SetIdTranslator(
+      IdTranslator translator
+    )
+    {
+      mTranslate = std::move(translator);
+    }
     /** Each view's payloads go to `<prefix>_<view>.bin` too (`tools/sync-routing/compare.py`). */
-    void SetDumpPrefix(std::string prefix) { mDumpPrefix = std::move(prefix); }
+    void SetDumpPrefix(
+      std::string prefix
+    )
+    {
+      mDumpPrefix = std::move(prefix);
+    }
     /** Called when a beat's payloads are ready, with what they were written under still in place. */
-    void SetPayloadObserver(std::function<void(moho::Sim&)> observer) { mPayloadObserver = std::move(observer); }
+    void SetPayloadObserver(
+      std::function<void(moho::Sim&)> observer
+    )
+    {
+      mPayloadObserver = std::move(observer);
+    }
     /**
      * Plan WP13.6: called on the sim thread with a view whose command source has left every army (a defeat, once the
      * whole team is out and the game allows observers: `lua/sim/MatchState.lua` `ObserverAfterDeath`).
      */
-    void SetSourceGoneHandler(std::function<void(std::size_t view)> handler) { mSourceGone = std::move(handler); }
+    void SetSourceGoneHandler(
+      std::function<void(std::size_t view)> handler
+    )
+    {
+      mSourceGone = std::move(handler);
+    }
 
     [[nodiscard]] std::int32_t FocusForLua() const noexcept override;
     void EnterCommand(moho::Sim& sim) override;
@@ -129,22 +168,46 @@ namespace faf::remote
     void OnThreadEnded(lua_State* thread) override;
     void OnSyncTable(moho::Sim& sim, LuaPlus::LuaObject& syncTable, const moho::SSyncData& packet) override;
 
-    [[nodiscard]] std::size_t ViewCount() const noexcept { return mPlayers.size(); }
+    [[nodiscard]] std::size_t ViewCount() const noexcept
+    {
+      return mPlayers.size();
+    }
     /** `view`'s `Sync` table of the last beat, encoded as `LuaObject::ToByteStream` encodes one. */
-    [[nodiscard]] std::span<const std::uint8_t> Payload(const std::size_t view) const noexcept { return mPlayers[view].payload; }
+    [[nodiscard]] std::span<const std::uint8_t> Payload(
+      const std::size_t view
+    ) const noexcept
+    {
+      return mPlayers[view].payload;
+    }
     /** Whether sim Lua wrote `key` under this view's focus this beat. */
     [[nodiscard]] bool WroteUnderFocus(std::size_t view, const char* key) const;
     /** `view`'s print lines of the last beat. */
-    [[nodiscard]] const std::vector<std::string>& Prints(const std::size_t view) const noexcept { return mPlayers[view].prints; }
+    [[nodiscard]] const std::vector<std::string>& Prints(
+      const std::size_t view
+    ) const noexcept
+    {
+      return mPlayers[view].prints;
+    }
     /** Calls a fanned-out function made to an engine function not known to only read (should stay 0). */
-    [[nodiscard]] std::uint64_t FanOutViolations() const noexcept { return mFanOutViolations; }
+    [[nodiscard]] std::uint64_t FanOutViolations() const noexcept
+    {
+      return mFanOutViolations;
+    }
     /** Counts and logs one such call; on the sim's thread. */
     void NoteFanOutViolation(const char* name);
     /** Writes of keys `SyncKeyRoutes` doesn't list, which only observers get. */
-    [[nodiscard]] std::uint64_t UnknownKeyWrites() const noexcept { return mUnknownKeyWrites; }
+    [[nodiscard]] std::uint64_t UnknownKeyWrites() const noexcept
+    {
+      return mUnknownKeyWrites;
+    }
 
     /** The army `view` is focused on, or -1. Each starts on the army of its own index. */
-    [[nodiscard]] std::int32_t ViewArmy(const std::size_t view) const noexcept { return mPlayers[view].army; }
+    [[nodiscard]] std::int32_t ViewArmy(
+      const std::size_t view
+    ) const noexcept
+    {
+      return mPlayers[view].army;
+    }
     /** The first view focused on `army`, or -1. */
     [[nodiscard]] std::int32_t ViewOfArmy(std::int32_t army) const noexcept;
     /** At the next beat's sync, `view` moves to `army` (-1: an observer) as a lockstep client's focus does. */
@@ -152,16 +215,40 @@ namespace faf::remote
     /** At the next beat's sync, `view` is sent what a client needs after reconnecting. */
     void RequestResync(std::size_t view);
     /** The view whose focus is set now, or -1. */
-    [[nodiscard]] std::int32_t CurrentView() const noexcept { return mFrames.empty() ? -1 : mFrames.back().view; }
+    [[nodiscard]] std::int32_t CurrentView() const noexcept
+    {
+      return mFrames.empty() ? -1 : mFrames.back().view;
+    }
     /** `view`'s recall status is sent at this beat's sync. */
-    void MarkRecallStatus(const std::size_t view) noexcept { mPlayers[view].recallStatusTick = 0; }
+    void MarkRecallStatus(
+      const std::size_t view
+    ) noexcept
+    {
+      mPlayers[view].recallStatusTick = 0;
+    }
     /** While above 0, `SyncRecallStatus` is for the view whose focus is set, not its whole team. */
-    [[nodiscard]] int SingleViewRecallStatus() const noexcept { return mSingleViewRecallStatus; }
-    void AddSingleViewRecallStatus(const int delta) noexcept { mSingleViewRecallStatus += delta; }
+    [[nodiscard]] int SingleViewRecallStatus() const noexcept
+    {
+      return mSingleViewRecallStatus;
+    }
+    void AddSingleViewRecallStatus(
+      const int delta
+    ) noexcept
+    {
+      mSingleViewRecallStatus += delta;
+    }
     /** `ResyncRecallVoting`, for an army's defeat. */
-    [[nodiscard]] const LuaPlus::LuaObject& RecallResync() const noexcept { return mRecallResync; }
+    [[nodiscard]] const LuaPlus::LuaObject& RecallResync() const noexcept
+    {
+      return mRecallResync;
+    }
     /** While set, a thread forked with an army number is that army's recall vote. */
-    void SetForkingRecallVote(const bool forking) noexcept { mForkingRecallVote = forking; }
+    void SetForkingRecallVote(
+      const bool forking
+    ) noexcept
+    {
+      mForkingRecallVote = forking;
+    }
 
     /** From here to `LeaveView`, `Sync` and `GetFocusArmy()` are those of view `view` (-1: the sim's own). */
     void EnterView(moho::Sim& sim, std::int32_t view);
@@ -172,19 +259,22 @@ namespace faf::remote
     [[nodiscard]] std::int32_t SourceView(const moho::Sim& sim) const;
     /** Whether the army of `view` counts `army` as an ally, or is it. */
     [[nodiscard]] bool Allied(const moho::Sim& sim, std::size_t view, std::int32_t army) const;
-    [[nodiscard]] moho::Sim* CurrentSim() const noexcept { return mSim; }
+    [[nodiscard]] moho::Sim* CurrentSim() const noexcept
+    {
+      return mSim;
+    }
 
   private:
     /** One player's side of the routing. */
     struct SPlayerSync
     {
-      std::int32_t army = -1;         // what `GetFocusArmy()` returns under this view
-      std::int32_t source = -1;       // its client's command source, once known
-      bool sourceOnFocus = false;     // the focused army held that source when last looked at
+      std::int32_t army = -1;             // what `GetFocusArmy()` returns under this view
+      std::int32_t source = -1;           // its client's command source, once known
+      bool sourceOnFocus = false;         // the focused army held that source when last looked at
       std::int64_t recallStatusTick = -1; // the tick its recall status is next sent; -1: none due
-      LuaPlus::LuaObject context;     // the table writes under this player's focus go to
-      bool contextUsed = false;       // since the last beat
-      std::vector<std::uint8_t> body; // the entries of the beat's table so far
+      LuaPlus::LuaObject context;         // the table writes under this player's focus go to
+      bool contextUsed = false;           // since the last beat
+      std::vector<std::uint8_t> body;     // the entries of the beat's table so far
       std::vector<std::uint8_t> payload;
       std::vector<std::uint8_t> keyBody; // one key's entries, for a key routed entry by entry
       std::vector<std::string> prints;
@@ -202,9 +292,16 @@ namespace faf::remote
     void RouteReclaim(moho::Sim& sim, LuaPlus::LuaObject& key, LuaPlus::LuaObject& value);
     void ApplyMovesAndResyncs(moho::Sim& sim);
     void RouteKey(moho::Sim& sim, LuaPlus::LuaObject& key, std::string_view name, LuaPlus::LuaObject& value);
-    void RouteById(moho::Sim& sim, LuaPlus::LuaObject& key, std::string_view name, LuaPlus::LuaObject& value, ESyncRoute route);
+    void RouteById(
+      moho::Sim& sim,
+      LuaPlus::LuaObject& key,
+      std::string_view name,
+      LuaPlus::LuaObject& value,
+      ESyncRoute route
+    );
     void RouteScore(moho::Sim& sim, LuaPlus::LuaObject& key, LuaPlus::LuaObject& value);
     void RouteNukes(moho::Sim& sim, LuaPlus::LuaObject& key, LuaPlus::LuaObject& value);
+    void RouteChat(moho::Sim& sim, LuaPlus::LuaObject& key, LuaPlus::LuaObject& value);
     void RouteScoreAccum(LuaPlus::LuaObject& key, LuaPlus::LuaObject& value);
     void CloseKey(LuaPlus::LuaObject& key, std::string_view name);
 
@@ -212,11 +309,11 @@ namespace faf::remote
     std::vector<SFrame> mFrames;
     std::unordered_map<lua_State*, std::int32_t> mThreadViews; // threads that belong to one player
     std::vector<const void*> mOwnedThreadFunctions;            // what such a thread starts with
-    std::vector<std::pair<std::size_t, std::int32_t>> mMoves; // view, army: at the next sync
+    std::vector<std::pair<std::size_t, std::int32_t>> mMoves;  // view, army: at the next sync
     std::vector<std::size_t> mResyncs;
-    LuaPlus::LuaObject mRecallCooldown;   // `ArmyRecallRequestCooldown`, unwrapped
-    LuaPlus::LuaObject mRecallCannot;     // `SyncCannotRequestRecall`, unwrapped
-    LuaPlus::LuaObject mRecallResync;     // `ResyncRecallVoting`, wrapped
+    LuaPlus::LuaObject mRecallCooldown; // `ArmyRecallRequestCooldown`, unwrapped
+    LuaPlus::LuaObject mRecallCannot;   // `SyncCannotRequestRecall`, unwrapped
+    LuaPlus::LuaObject mRecallResync;   // `ResyncRecallVoting`, wrapped
 
     /** A prop's label not yet where it should be, by prop id. */
     struct SReclaimLabel
@@ -228,8 +325,8 @@ namespace faf::remote
       std::uint32_t pending = 0;       // views that don't have that yet, by bit
       std::uint32_t delivered = 0;     // views that hold a label for it, by bit
       bool gone = false;
-      bool listed = false;             // in `mReclaimPending`
-      bool fresh = false;              // written this beat
+      bool listed = false; // in `mReclaimPending`
+      bool fresh = false;  // written this beat
     };
     std::unordered_map<std::uint32_t, SReclaimLabel> mReclaim;
     std::vector<std::uint32_t> mReclaimPending;

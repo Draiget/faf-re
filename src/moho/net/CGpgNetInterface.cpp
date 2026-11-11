@@ -11,6 +11,10 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
+#if !FAFRE_PLATFORM_WINDOWS
+#include <spawn.h>
+#include <unistd.h> // environ
+#endif
 
 #include "Common.h"
 #include "gpg/core/containers/String.h"
@@ -415,20 +419,20 @@ void moho::GPGNET_ReportBottleneck(
 
   const char* bottleneckType = "unknown";
   switch (info.mType) {
-    case SClientBottleneckInfo::Nothing:
-      bottleneckType = "nothing";
-      break;
-    case SClientBottleneckInfo::Readiness:
-      bottleneckType = "readiness";
-      break;
-    case SClientBottleneckInfo::Data:
-      bottleneckType = "data";
-      break;
-    case SClientBottleneckInfo::Ack:
-      bottleneckType = "ack";
-      break;
-    default:
-      break;
+  case SClientBottleneckInfo::Nothing:
+    bottleneckType = "nothing";
+    break;
+  case SClientBottleneckInfo::Readiness:
+    bottleneckType = "readiness";
+    break;
+  case SClientBottleneckInfo::Data:
+    bottleneckType = "data";
+    break;
+  case SClientBottleneckInfo::Ack:
+    bottleneckType = "ack";
+    break;
+  default:
+    break;
   }
 
   fa::string impactedOwners{};
@@ -525,7 +529,10 @@ void moho::GPGNET_SubmitArmyStats(
 /**
  * Engine addition (issue #275), not in the binary.
  */
-void moho::GPGNET_ReportRejoinOffer(const fa::string& localSource, const fa::string& seats)
+void moho::GPGNET_ReportRejoinOffer(
+  const fa::string& localSource,
+  const fa::string& seats
+)
 {
   const boost::shared_ptr<CGpgNetInterface> active = GPGNET_GetPtr();
   if (!active) {
@@ -1014,9 +1021,7 @@ namespace
     const u_short port
   )
   {
-    return boost::function0<void>(
-      boost::bind(&CGpgNetInterface::ConnectThread, self, address, port)
-    );
+    return boost::function0<void>(boost::bind(&CGpgNetInterface::ConnectThread, self, address, port));
   }
 } // namespace
 
@@ -1039,9 +1044,7 @@ void CGpgNetInterface::Connect(
 
   mConnectionState = kNetStateConnecting;
 
-  boost::thread* const thread = new boost::thread(
-    MakeConnectThreadLaunchCallback(this, address, port)
-  );
+  boost::thread* const thread = new boost::thread(MakeConnectThreadLaunchCallback(this, address, port));
 
   boost::thread* const oldThread = mConnectThreadWorker;
   mConnectThreadWorker = thread;
@@ -1115,16 +1118,20 @@ namespace
    * construction half, see the Address list above) belongs to this same
    * chain -- an earlier DB-integrity pass mis-attributed it to
    * `CrtRuntimeHelpers.cpp` with no real citation there; corrected here.
-   * Address: 0x007BEEB0 (FUN_007BEEB0 -- `boost::detail::function::void_function_obj_invoker0<F, void>::invoke` for this heap-stored `F = bind_t<void, mf1<void, CGpgNetInterface, gpg::StrArg>, list2<value<CGpgNetInterface*>, value<std::string>>>` (the 40-byte clone: pmf `{fn +0x00, this-adjust +0x04}`, bound `this` +0x08, bound `std::string` +0x0C whose `_Myres` at +0x24 picks the inline or heap buffer handed over as the `StrArg`, then `(self->*pmf)(StrArg)`); no direct callers -- stored as the invoker slot (+4) of the static vtable at 0x01104140 (manager 0x007BEEE0) by 0x007BEA4B (FUN_007BE9F0) and by the second install at 0x007BECA5; formerly `DispatchSsoPayloadToDestinationRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+   * Address: 0x007BEEB0 (FUN_007BEEB0 -- `boost::detail::function::void_function_obj_invoker0<F, void>::invoke` for
+   * this heap-stored `F = bind_t<void, mf1<void, CGpgNetInterface, gpg::StrArg>, list2<value<CGpgNetInterface*>,
+   * value<std::string>>>` (the 40-byte clone: pmf `{fn +0x00, this-adjust +0x04}`, bound `this` +0x08, bound
+   * `std::string` +0x0C whose `_Myres` at +0x24 picks the inline or heap buffer handed over as the `StrArg`, then
+   * `(self->*pmf)(StrArg)`); no direct callers -- stored as the invoker slot (+4) of the static vtable at 0x01104140
+   * (manager 0x007BEEE0) by 0x007BEA4B (FUN_007BE9F0) and by the second install at 0x007BECA5; formerly
+   * `DispatchSsoPayloadToDestinationRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
    */
   [[nodiscard]] boost::function0<void> MakeConnectThreadLaunchCallback(
     CGpgNetInterface* const self,
     const fa::string& launchCommandTemplate
   )
   {
-    return boost::function0<void>(
-      boost::bind(&CGpgNetInterface::ConnectThread, self, launchCommandTemplate)
-    );
+    return boost::function0<void>(boost::bind(&CGpgNetInterface::ConnectThread, self, launchCommandTemplate));
   }
 } // namespace
 
@@ -1147,9 +1154,7 @@ void CGpgNetInterface::Connect(
 
   mConnectionState = kNetStateConnecting;
 
-  boost::thread* const thread = new boost::thread(
-    MakeConnectThreadLaunchCallback(this, launchCommandTemplate)
-  );
+  boost::thread* const thread = new boost::thread(MakeConnectThreadLaunchCallback(this, launchCommandTemplate));
 
   boost::thread* const oldThread = mConnectThreadWorker;
   mConnectThreadWorker = thread;
@@ -1595,10 +1600,10 @@ void CGpgNetInterface::Connected(
 LuaPlus::LuaObject* moho::NET_MakeNATTraversal(
   LuaPlus::LuaState* const state,
   LuaPlus::LuaObject* const out,
-  boost::weak_ptr<INetNATTraversalProvider>* const provider)
+  boost::weak_ptr<INetNATTraversalProvider>* const provider
+)
 {
-  LuaPlus::LuaObject metatable =
-    moho::CScrLuaMetatableFactory<INetNATTraversalProvider>::Instance().Get(state);
+  LuaPlus::LuaObject metatable = moho::CScrLuaMetatableFactory<INetNATTraversalProvider>::Instance().Get(state);
 
   ::new (static_cast<void*>(out)) LuaPlus::LuaObject();
 
@@ -1670,8 +1675,7 @@ void CGpgNetInterface::CreateLobby(
   (void)moho::NET_MakeNATTraversal(state, &natTraversal, &natProvider);
 
   LuaPlus::LuaFunction<LuaPlus::LuaObject> createLobbyFn(createLobby);
-  mLobbyObject =
-    createLobbyFn.Call_UDP(useUdp, localPort, playerName, playerUidText.c_str(), &natTraversal, natPort);
+  mLobbyObject = createLobbyFn.Call_UDP(useUdp, localPort, playerName, playerUidText.c_str(), &natTraversal, natPort);
 
   gpg::Logf("GPGNET: entering lobby state.");
   SNetCommandArg stateArg(fa::string("Lobby"));
@@ -1692,9 +1696,8 @@ void CGpgNetInterface::HostGame(
     throw std::runtime_error("Wrong number of arguments to HostGame command, expected 0 or 1");
   }
 
-  LuaPlus::LuaObject hostGameObj = moho::SCR_GetLuaTableFieldOrThrow(
-    mLobbyObject, "HostGame", "No lobby.", "Lobby method \"%s\" is unavailable."
-  );
+  LuaPlus::LuaObject hostGameObj =
+    moho::SCR_GetLuaTableFieldOrThrow(mLobbyObject, "HostGame", "No lobby.", "Lobby method \"%s\" is unavailable.");
   LuaPlus::LuaFunction<void> hostGame(hostGameObj);
 
   fa::string scenarioPath;
@@ -1722,9 +1725,8 @@ void CGpgNetInterface::JoinGame(
     throw std::runtime_error("Wrong number of arguments to JoinGame command, expected 3");
   }
 
-  LuaPlus::LuaObject joinGameObj = moho::SCR_GetLuaTableFieldOrThrow(
-    mLobbyObject, "JoinGame", "No lobby.", "Lobby method \"%s\" is unavailable."
-  );
+  LuaPlus::LuaObject joinGameObj =
+    moho::SCR_GetLuaTableFieldOrThrow(mLobbyObject, "JoinGame", "No lobby.", "Lobby method \"%s\" is unavailable.");
   LuaPlus::LuaFunction<void> joinGame(joinGameObj);
 
   const fa::string& hostAddress = ExpectedString(&args[0]);
@@ -1800,9 +1802,8 @@ void CGpgNetInterface::HasSupCom(
     throw std::runtime_error("Wrong number of arguments to SetHasSupcom command, expected 1");
   }
 
-  LuaPlus::LuaObject hasSupComObj = moho::SCR_GetLuaTableFieldOrThrow(
-    mLobbyObject, "SetHasSupcom", "No lobby.", "Lobby method \"%s\" is unavailable."
-  );
+  LuaPlus::LuaObject hasSupComObj =
+    moho::SCR_GetLuaTableFieldOrThrow(mLobbyObject, "SetHasSupcom", "No lobby.", "Lobby method \"%s\" is unavailable.");
   LuaPlus::LuaFunction<void> setHasSupCom(hasSupComObj);
   setHasSupCom(ExpectIntArg(*this, &args[0]));
 }
@@ -1897,20 +1898,16 @@ void CGpgNetInterface::EjectPlayer(
   if (targetClient == clientManager->GetLocalClient()) {
     clientManager->Disconnect();
 
-    const fa::string localizedMessage = Loc(
-      USER_GetLuaState(),
-      "<LOC Engine0016>You have been ejected due to connectivity issues."
-    );
+    const fa::string localizedMessage =
+      Loc(USER_GetLuaState(), "<LOC Engine0016>You have been ejected due to connectivity issues.");
     CON_Printf(localizedMessage.c_str());
     return;
   }
 
   targetClient->Eject();
 
-  const fa::string localizedMessage = Loc(
-    USER_GetLuaState(),
-    "<LOC Engine0017>%s has been ejected due to connectivity issues."
-  );
+  const fa::string localizedMessage =
+    Loc(USER_GetLuaState(), "<LOC Engine0017>%s has been ejected due to connectivity issues.");
   CON_Printf(localizedMessage.c_str(), targetClient->GetNickname().c_str());
 }
 
@@ -1952,10 +1949,7 @@ void CGpgNetInterface::ConnectThread(
 )
 {
   const fa::string loopbackAddress("127.0.0.1");
-  INetTCPServer* const createdServer = NET_CreateTCPServer(
-    NET_GetUInt32FromDottedOcted(loopbackAddress),
-    0
-  );
+  INetTCPServer* const createdServer = NET_CreateTCPServer(NET_GetUInt32FromDottedOcted(loopbackAddress), 0);
 
   INetTCPServer* const oldServer = mTcpServer;
   mTcpServer = createdServer;
@@ -1968,13 +1962,30 @@ void CGpgNetInterface::ConnectThread(
     return;
   }
 
-  STARTUPINFOA startupInfo{};
-  startupInfo.cb = sizeof(startupInfo);
-  PROCESS_INFORMATION processInformation{};
-
   const u_short localPort = mTcpServer->GetLocalPort();
   const fa::string listenerAddress = gpg::STR_Printf("127.0.0.1:%d", static_cast<int>(localPort));
   const fa::string launchCommand = gpg::STR_Printf(launchCommandTemplate.c_str(), listenerAddress.c_str());
+
+#if !FAFRE_PLATFORM_WINDOWS
+  // The Linux client (issue #255): the command line through the shell, as CreateProcess takes one
+  // command string; the child isn't waited for, as on Windows.
+  {
+    char shell[] = "/bin/sh";
+    char dashC[] = "-c";
+    std::vector<char> commandLine(launchCommand.c_str(), launchCommand.c_str() + launchCommand.size() + 1u);
+    char* const argv[] = {shell, dashC, commandLine.data(), nullptr};
+    pid_t child = 0;
+    const int spawnError = ::posix_spawn(&child, "/bin/sh", nullptr, nullptr, argv, environ);
+    if (spawnError != 0) {
+      gpg::Logf("CreateProcess() failed: %s", std::strerror(spawnError));
+      EnqueueCommand0("LaunchFailed", kNetStateTimedOut);
+      return;
+    }
+  }
+#else
+  STARTUPINFOA startupInfo{};
+  startupInfo.cb = sizeof(startupInfo);
+  PROCESS_INFORMATION processInformation{};
 
   std::vector<char> launchCommandBuffer(launchCommand.size() + 1u, '\0');
   if (!launchCommand.empty()) {
@@ -1983,16 +1994,7 @@ void CGpgNetInterface::ConnectThread(
   }
 
   const BOOL launchOk = ::CreateProcessA(
-    nullptr,
-    launchCommandBuffer.data(),
-    nullptr,
-    nullptr,
-    FALSE,
-    0,
-    nullptr,
-    nullptr,
-    &startupInfo,
-    &processInformation
+    nullptr, launchCommandBuffer.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &startupInfo, &processInformation
   );
 
   if (!launchOk) {
@@ -2004,6 +2006,7 @@ void CGpgNetInterface::ConnectThread(
 
   ::CloseHandle(processInformation.hProcess);
   ::CloseHandle(processInformation.hThread);
+#endif
 
   INetTCPSocket* const acceptedSocket = mTcpServer->Accept();
   INetTCPSocket* const oldSocket = mTcpSocket;
@@ -2120,10 +2123,14 @@ namespace
   constexpr const wchar_t* kGPGNetDevWorkingDir =
     L"C:\\work\\rts\\main\\code\\src\\Multiplayer\\MultiplayerClient\\bin\\Debug\\";
 
-  [[nodiscard]] bool TryLoadGPGNetPathFromRegistry(const char* const keyPath, std::wstring& outPath)
+  [[nodiscard]] bool TryLoadGPGNetPathFromRegistry(
+    const char* const keyPath,
+    std::wstring& outPath
+  )
   {
     std::array<std::uint8_t, 256> buffer{};
-    const std::uint32_t length = moho::PLAT_GetRegistryValue(keyPath, buffer.data(), static_cast<std::uint32_t>(buffer.size()));
+    const std::uint32_t length =
+      moho::PLAT_GetRegistryValue(keyPath, buffer.data(), static_cast<std::uint32_t>(buffer.size()));
     if (length == 0) {
       return false;
     }
@@ -2146,7 +2153,9 @@ namespace
  * Restores the x87 control word afterward and pushes the boolean launch
  * result back to Lua.
  */
-int moho::cfunc_LaunchGPGNetL(LuaPlus::LuaState* const state)
+int moho::cfunc_LaunchGPGNetL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -2155,6 +2164,13 @@ int moho::cfunc_LaunchGPGNetL(LuaPlus::LuaState* const state)
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 0, kLaunchGPGNetHelpText);
 
+#if !FAFRE_PLATFORM_WINDOWS
+  // GPG's GPGNet client is a Windows program; the Linux client (issue #255) has none to start.
+  gpg::Warnf("LaunchGPGNet: GPGNet is not available in the Linux client");
+  lua_pushboolean(rawState, 0);
+  (void)lua_gettop(rawState);
+  return 1;
+#else
   HWND ownerWindow = nullptr;
   if (moho::sMainWindow != nullptr) {
     ownerWindow = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(moho::sMainWindow->GetHandle()));
@@ -2202,6 +2218,7 @@ int moho::cfunc_LaunchGPGNetL(LuaPlus::LuaState* const state)
   lua_pushboolean(rawState, launched ? 1 : 0);
   (void)lua_gettop(rawState);
   return 1;
+#endif
 }
 
 /**
@@ -2211,7 +2228,9 @@ int moho::cfunc_LaunchGPGNetL(LuaPlus::LuaState* const state)
  * Unwraps the raw `lua_State` callback context and forwards to
  * `cfunc_LaunchGPGNetL`.
  */
-int moho::cfunc_LaunchGPGNet(lua_State* const luaContext)
+int moho::cfunc_LaunchGPGNet(
+  lua_State* const luaContext
+)
 {
   return cfunc_LaunchGPGNetL(SCR_ResolveBindingState(luaContext));
 }
@@ -2225,12 +2244,7 @@ int moho::cfunc_LaunchGPGNet(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_LaunchGPGNet_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    UserLuaInitSet(),
-    kLaunchGPGNetName,
-    &moho::cfunc_LaunchGPGNet,
-    nullptr,
-    "<global>",
-    kLaunchGPGNetHelpText
+    UserLuaInitSet(), kLaunchGPGNetName, &moho::cfunc_LaunchGPGNet, nullptr, "<global>", kLaunchGPGNetHelpText
   );
   return &binder;
 }

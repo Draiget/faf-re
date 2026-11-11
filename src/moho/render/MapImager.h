@@ -93,7 +93,7 @@ namespace moho
     void UpdateMeshStances();
 
   public:
-    fa::vector<MeshInstance*> mMeshInstances;          // +0x04
+    fa::vector<MeshInstance*> mMeshInstances; // +0x04
   };
 
 #if defined(MOHO_ABI_MSVC8_COMPAT)

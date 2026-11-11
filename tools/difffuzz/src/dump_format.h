@@ -17,7 +17,10 @@ namespace difffuzz
   /// NaN, as difffuzz tallies NaN-payload-only differences instead of failing
   /// them: which operand's payload an operation keeps follows the x87/SSE
   /// split and the compiler's operand order, which no source change pins down.
-  inline void CanonicalizeNans(std::uint32_t* words, const int count) noexcept
+  inline void CanonicalizeNans(
+    std::uint32_t* words,
+    const int count
+  ) noexcept
   {
     for (int i = 0; i < count; ++i) {
       if ((words[i] & 0x7F800000u) == 0x7F800000u && (words[i] & 0x007FFFFFu) != 0) {
@@ -32,7 +35,11 @@ namespace difffuzz
     std::uint64_t inHash = kHashSeed;
     std::uint64_t outHash = kHashSeed;
 
-    static std::uint64_t Mix(std::uint64_t hash, const std::uint32_t* words, const int count) noexcept
+    static std::uint64_t Mix(
+      std::uint64_t hash,
+      const std::uint32_t* words,
+      const int count
+    ) noexcept
     {
       for (int i = 0; i < count; ++i) {
         hash = (hash ^ words[i]) * 1099511628211ull;
@@ -43,15 +50,25 @@ namespace difffuzz
     /// Hashes iteration `done` (0-based) and writes the block's line after its
     /// last iteration or after iteration `iters - 1`.
     void Add(
-      std::FILE* out, const char* name, const unsigned long long done, const unsigned long long iters,
-      const std::uint32_t* in, const int inWords, const std::uint32_t* outWords, const int outCount
+      std::FILE* out,
+      const char* name,
+      const unsigned long long done,
+      const unsigned long long iters,
+      const std::uint32_t* in,
+      const int inWords,
+      const std::uint32_t* outWords,
+      const int outCount
     )
     {
       inHash = Mix(inHash, in, inWords);
       outHash = Mix(outHash, outWords, outCount);
       if ((done + 1) % kDumpBlock == 0 || done + 1 == iters) {
         std::fprintf(
-          out, "%s %llu %016llx %016llx\n", name, done / kDumpBlock, static_cast<unsigned long long>(inHash),
+          out,
+          "%s %llu %016llx %016llx\n",
+          name,
+          done / kDumpBlock,
+          static_cast<unsigned long long>(inHash),
           static_cast<unsigned long long>(outHash)
         );
         inHash = kHashSeed;
@@ -66,8 +83,13 @@ namespace difffuzz
   // from retail and faf_math_dump --values runs our function on each line's
   // inputs, so a difference names the input and both values.
   inline void WriteValueLine(
-    std::FILE* out, const char* name, const unsigned long long iteration, const std::uint32_t* in, const int inWords,
-    const std::uint32_t* outWords, const int outCount
+    std::FILE* out,
+    const char* name,
+    const unsigned long long iteration,
+    const std::uint32_t* in,
+    const int inWords,
+    const std::uint32_t* outWords,
+    const int outCount
   )
   {
     std::fprintf(out, "%s %llu", name, iteration);
@@ -83,7 +105,9 @@ namespace difffuzz
 
   /// A word worth a recorded case: a float NaN, infinity, denormal or -0, or
   /// an integer at the int range's edges (the x87 integer indefinite).
-  [[nodiscard]] inline bool IsSpecialWord(const std::uint32_t word) noexcept
+  [[nodiscard]] inline bool IsSpecialWord(
+    const std::uint32_t word
+  ) noexcept
   {
     const std::uint32_t exponent = word & 0x7F800000u;
     const std::uint32_t mantissa = word & 0x007FFFFFu;
@@ -101,7 +125,10 @@ namespace difffuzz
     int specialIn = 0;
     int specialOut = 0;
 
-    [[nodiscard]] static bool AnySpecial(const std::uint32_t* words, const int count) noexcept
+    [[nodiscard]] static bool AnySpecial(
+      const std::uint32_t* words,
+      const int count
+    ) noexcept
     {
       for (int i = 0; i < count; ++i) {
         if (IsSpecialWord(words[i])) {
@@ -112,7 +139,10 @@ namespace difffuzz
     }
 
     [[nodiscard]] bool Take(
-      const std::uint32_t* in, const int inWords, const std::uint32_t* outWords, const int outCount
+      const std::uint32_t* in,
+      const int inWords,
+      const std::uint32_t* outWords,
+      const int outCount
     ) noexcept
     {
       if (first < kValuesFirst) {

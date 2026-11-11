@@ -22,7 +22,10 @@ namespace
 
   struct CMauiControlTypeInfoBootstrap
   {
-    CMauiControlTypeInfoBootstrap() { moho::register_CMauiControlTypeInfoStartup(); }
+    CMauiControlTypeInfoBootstrap()
+    {
+      moho::register_CMauiControlTypeInfoStartup();
+    }
   };
   CMauiControlTypeInfoBootstrap gCMauiControlTypeInfoBootstrap;
   /**
@@ -37,7 +40,9 @@ namespace
    * CMauiControl -> CScriptObject; without it every Maui control handed to
    * gpg::RRef_CScriptObject trips the binary's "isDer" assertion.
    */
-  void AddCScriptObjectBase(gpg::RType& typeInfo)
+  void AddCScriptObjectBase(
+    gpg::RType& typeInfo
+  )
   {
     static gpg::RType* cached = nullptr;
     if (!cached) {
@@ -99,7 +104,9 @@ void moho::register_CMauiControlTypeInfoStartup()
   (void)AcquireCMauiControlTypeInfo();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CMauiControlTypeInfoStartup_6e4932, moho::register_CMauiControlTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CMauiControlTypeInfoStartup_6e4932,
+  moho::register_CMauiControlTypeInfoStartup
+)

@@ -36,9 +36,17 @@ namespace gpg
     /**
      * Construct as a singleton ring (self-linked).
      *
-     * Address: 0x009563D0 (FUN_009563D0 -- the node's own constructor -- both links point at itself for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `InitializePipeBufferNodeSelfLinked_A` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x009564D0 (FUN_009564D0 -- a second emission of that self-link for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `InitializePipeBufferNodeSelfLinked_B` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x00956580 (FUN_00956580 -- a third emission of that self-link for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `InitializePipeBufferNodeSelfLinked_C` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x009563D0 (FUN_009563D0 -- the node's own constructor -- both links point at itself for
+     * `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08
+     * followed by the 0x1000 payload); zero callers, unreachable; formerly `InitializePipeBufferNodeSelfLinked_A` in
+     * gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.) Address: 0x009564D0 (FUN_009564D0 -- a second
+     * emission of that self-link for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring;
+     * node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly
+     * `InitializePipeBufferNodeSelfLinked_B` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x00956580 (FUN_00956580 -- a third emission of that self-link for
+     * `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08
+     * followed by the 0x1000 payload); zero callers, unreachable; formerly `InitializePipeBufferNodeSelfLinked_C` in
+     * gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
      */
     DListItem() noexcept
       : mPrev{this}
@@ -57,7 +65,11 @@ namespace gpg
      * Address: 0x00447470 (FUN_00447470 -- `DeviceExitListener`'s listener
      *   node, from its constructor's unwind path; formerly
      *   `UnlinkAndResetDeviceListenerLink`.)
-     * Address: 0x00954960 (FUN_00954960 -- the 0x10-byte cell of `BuildClusterEdgeCosts`' 9x9 search grid (0x00954A40; links +0x00/+0x04, float cost +0x08, flags +0x0C, packed cell +0x0D): the element destructor it passes to `eh vector constructor iterator` (0x00954A64, with the ctor 0x00954940), to the grid teardowns at 0x00954AB3 / 0x009550A6, and to the unwind funclet's `eh vector destructor iterator` at 0x00B5F350; no direct callers; formerly `ResetIntrusiveLinkNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x00954960 (FUN_00954960 -- the 0x10-byte cell of `BuildClusterEdgeCosts`' 9x9 search grid (0x00954A40;
+     * links +0x00/+0x04, float cost +0x08, flags +0x0C, packed cell +0x0D): the element destructor it passes to `eh
+     * vector constructor iterator` (0x00954A64, with the ctor 0x00954940), to the grid teardowns at 0x00954AB3 /
+     * 0x009550A6, and to the unwind funclet's `eh vector destructor iterator` at 0x00B5F350; no direct callers;
+     * formerly `ResetIntrusiveLinkNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      */
     ~DListItem()
     {
@@ -66,12 +78,26 @@ namespace gpg
 
     /**
      * Cast this node to the owning T*.
-     * Address: 0x00956490 (FUN_00956490 -- an iterator slot copy for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `CopyPipeBufferNodeSlot_A` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x00956540 (FUN_00956540 -- a second emission of that slot copy for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `CopyPipeBufferNodeSlot_B` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x009564A0 (FUN_009564A0 -- an iterator slot assignment for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `SetPipeBufferNodeSlot_A` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x00956550 (FUN_00956550 -- a second emission of that slot assignment for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `SetPipeBufferNodeSlot_B` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x009565B0 (FUN_009565B0 -- the node's `mNext` written through a caller slot for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `StorePipeBufferNodeNext` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x009565C0 (FUN_009565C0 -- the node itself written through a caller slot for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `StorePipeBufferNodeSelf` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x00956490 (FUN_00956490 -- an iterator slot copy for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the
+     * pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers,
+     * unreachable; formerly `CopyPipeBufferNodeSlot_A` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed
+     * 2026-09-11.) Address: 0x00956540 (FUN_00956540 -- a second emission of that slot copy for
+     * `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08
+     * followed by the 0x1000 payload); zero callers, unreachable; formerly `CopyPipeBufferNodeSlot_B` in
+     * gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.) Address: 0x009564A0 (FUN_009564A0 -- an iterator
+     * slot assignment for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node
+     * `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly
+     * `SetPipeBufferNodeSlot_A` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.) Address: 0x00956550
+     * (FUN_00956550 -- a second emission of that slot assignment for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the
+     * pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers,
+     * unreachable; formerly `SetPipeBufferNodeSlot_B` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed
+     * 2026-09-11.) Address: 0x009565B0 (FUN_009565B0 -- the node's `mNext` written through a caller slot for
+     * `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08
+     * followed by the 0x1000 payload); zero callers, unreachable; formerly `StorePipeBufferNodeNext` in
+     * gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.) Address: 0x009565C0 (FUN_009565C0 -- the node
+     * itself written through a caller slot for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB
+     * buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly
+     * `StorePipeBufferNodeSelf` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
      */
     type* Get() noexcept
     {
@@ -87,8 +113,13 @@ namespace gpg
      */
     [[nodiscard]]
     /**
-     * Address: 0x00956480 (FUN_00956480 -- `ListIsUnlinked` -- `mNext == this` for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `IsPipeBufferNodeSelfLinked_A` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x009564E0 (FUN_009564E0 -- a second emission of that test for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `IsPipeBufferNodeSelfLinked_B` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x00956480 (FUN_00956480 -- `ListIsUnlinked` -- `mNext == this` for
+     * `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08
+     * followed by the 0x1000 payload); zero callers, unreachable; formerly `IsPipeBufferNodeSelfLinked_A` in
+     * gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.) Address: 0x009564E0 (FUN_009564E0 -- a second
+     * emission of that test for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node
+     * `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly
+     * `IsPipeBufferNodeSelfLinked_B` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
      */
     bool ListIsUnlinked() const noexcept
     {
@@ -111,9 +142,16 @@ namespace gpg
      *
      * Unconditional: neighbours adopt each other, then the node self-links.
      * No copy of this body tests for an already-unlinked node first.
-     * Address: 0x00956430 (FUN_00956430 -- `ListUnlink` -- neighbours adopt each other, then self-link, returning the successor for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `UnlinkPipeBufferNode_A` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x009564B0 (FUN_009564B0 -- a second emission of that unlink for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `UnlinkPipeBufferNode_B` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x00956590 (FUN_00956590 -- a third emission of that unlink for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `UnlinkPipeBufferNode_C` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x00956430 (FUN_00956430 -- `ListUnlink` -- neighbours adopt each other, then self-link, returning the
+     * successor for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev,
+     * next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `UnlinkPipeBufferNode_A` in
+     * gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.) Address: 0x009564B0 (FUN_009564B0 -- a second
+     * emission of that unlink for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring;
+     * node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly
+     * `UnlinkPipeBufferNode_B` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.) Address: 0x00956590
+     * (FUN_00956590 -- a third emission of that unlink for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe
+     * stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable;
+     * formerly `UnlinkPipeBufferNode_C` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
      */
     void ListUnlink() noexcept
     {
@@ -128,10 +166,17 @@ namespace gpg
      * Equivalent to: [... that->mPrev] <-> [this] <-> [that]
      * Store order as `CMessageDispatcher::PushReceiver` inlines it
      * (0x0047C3AC): unlink, own links, the anchor, then the old predecessor.
-     * Address: 0x00956450 (FUN_00956450 -- `ListLinkBefore` -- unlink, then splice ahead of the anchor for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `RelinkPipeBufferNodeBeforeAnchor` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x009564F0 (FUN_009564F0 -- a second emission of that splice for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `InsertPipeBufferNodeBeforeAnchor` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x00956450 (FUN_00956450 -- `ListLinkBefore` -- unlink, then splice ahead of the anchor for
+     * `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08
+     * followed by the 0x1000 payload); zero callers, unreachable; formerly `RelinkPipeBufferNodeBeforeAnchor` in
+     * gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.) Address: 0x009564F0 (FUN_009564F0 -- a second
+     * emission of that splice for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring;
+     * node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly
+     * `InsertPipeBufferNodeBeforeAnchor` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
      */
-    void ListLinkBefore(item_t* that) noexcept
+    void ListLinkBefore(
+      item_t* that
+    ) noexcept
     {
       ListUnlink();
       mPrev = that->mPrev;
@@ -144,7 +189,9 @@ namespace gpg
      * Insert this node immediately AFTER 'that' node.
      * Equivalent to: [that] <-> [this] <-> [that->mNext]
      */
-    void ListLinkAfter(item_t* that) noexcept
+    void ListLinkAfter(
+      item_t* that
+    ) noexcept
     {
       ListUnlink();
       mPrev = that;
@@ -158,11 +205,15 @@ namespace gpg
     // old routing of those through `static_cast<type*>` claimed the head was a
     // `T` and, for a node that is not `T`'s first base, shifted it by that
     // base's offset and back.
-    void ListLinkBefore(type* that) noexcept
+    void ListLinkBefore(
+      type* that
+    ) noexcept
     {
       ListLinkBefore(static_cast<item_t*>(that));
     }
-    void ListLinkAfter(type* that) noexcept
+    void ListLinkAfter(
+      type* that
+    ) noexcept
     {
       ListLinkAfter(static_cast<item_t*>(that));
     }
@@ -191,15 +242,26 @@ namespace gpg
       item_t* head{nullptr};
 
       iterator() = default;
-      iterator(item_t* p, item_t* h)
+      iterator(
+        item_t* p,
+        item_t* h
+      )
         : pos{p}
         , head{h}
       {}
 
       /**
-       * Address: 0x009563E0 (FUN_009563E0 -- `operator++` -- step the cursor to `mNext` for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `AdvancePipeBufferNodeCursor` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
-       * Address: 0x009563F0 (FUN_009563F0 -- `operator--` -- step the cursor to `mPrev` for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `RewindPipeBufferNodeCursor` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
-       * Address: 0x00956520 (FUN_00956520 -- the `mNext` read that step performs, on its own for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `GetPipeBufferNodeNext` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
+       * Address: 0x009563E0 (FUN_009563E0 -- `operator++` -- step the cursor to `mNext` for
+       * `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08
+       * followed by the 0x1000 payload); zero callers, unreachable; formerly `AdvancePipeBufferNodeCursor` in
+       * gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.) Address: 0x009563F0 (FUN_009563F0 --
+       * `operator--` -- step the cursor to `mPrev` for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's
+       * 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable;
+       * formerly `RewindPipeBufferNodeCursor` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
+       * Address: 0x00956520 (FUN_00956520 -- the `mNext` read that step performs, on its own for
+       * `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08
+       * followed by the 0x1000 payload); zero callers, unreachable; formerly `GetPipeBufferNodeNext` in
+       * gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
        */
       iterator& operator++() noexcept
       {
@@ -214,11 +276,15 @@ namespace gpg
       {
         return pos->Get();
       }
-      bool operator==(const iterator& rhs) const noexcept
+      bool operator==(
+        const iterator& rhs
+      ) const noexcept
       {
         return pos == rhs.pos && head == rhs.head;
       }
-      bool operator!=(const iterator& rhs) const noexcept
+      bool operator!=(
+        const iterator& rhs
+      ) const noexcept
       {
         return !(*this == rhs);
       }
@@ -230,7 +296,10 @@ namespace gpg
       const item_t* head{nullptr};
 
       const_iterator() = default;
-      const_iterator(const item_t* p, const item_t* h)
+      const_iterator(
+        const item_t* p,
+        const item_t* h
+      )
         : pos{p}
         , head{h}
       {}
@@ -248,11 +317,15 @@ namespace gpg
       {
         return pos->Get();
       }
-      bool operator==(const const_iterator& rhs) const noexcept
+      bool operator==(
+        const const_iterator& rhs
+      ) const noexcept
       {
         return pos == rhs.pos && head == rhs.head;
       }
-      bool operator!=(const const_iterator& rhs) const noexcept
+      bool operator!=(
+        const const_iterator& rhs
+      ) const noexcept
       {
         return !(*this == rhs);
       }
@@ -319,7 +392,9 @@ namespace gpg
     /**
      * Push at front: insert after head.
      */
-    void push_front(type* node) noexcept
+    void push_front(
+      type* node
+    ) noexcept
     {
       static_cast<item_t*>(node)->ListLinkAfter(this);
     }
@@ -327,7 +402,9 @@ namespace gpg
     /**
      * Push at back: insert before head.
      */
-    void push_back(type* node) noexcept
+    void push_back(
+      type* node
+    ) noexcept
     {
       static_cast<item_t*>(node)->ListLinkBefore(this);
     }
@@ -362,7 +439,9 @@ namespace gpg
      * (0x006E94DA): the two head links, the old front's and back's links
      * back to the new head, then this head self-links.
      */
-    void move_nodes_to(DList& pending) noexcept
+    void move_nodes_to(
+      DList& pending
+    ) noexcept
     {
       if (empty()) {
         return;
@@ -380,7 +459,9 @@ namespace gpg
      * leave `from` empty. Store order as `PathQueueImplSerializer`'s load
      * (0x00768AA8) inlines it.
      */
-    void splice_front(DList& from) noexcept
+    void splice_front(
+      DList& from
+    ) noexcept
     {
       item_t* const front = this->mNext;
       if (from.empty()) {
@@ -449,7 +530,9 @@ namespace gpg
         next = pos->mNext;
         return pos->Get();
       }
-      bool operator!=(const owner_safe_iterator& rhs) const noexcept
+      bool operator!=(
+        const owner_safe_iterator& rhs
+      ) const noexcept
       {
         return pos != rhs.pos;
       }

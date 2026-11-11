@@ -116,6 +116,15 @@
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "FAF_COVERAGE": "ON" }
     },
     {
+      "name": "linux-clang-x64-asan",
+      "displayName": "Linux clang x64 with AddressSanitizer (optimised, debug info; the asan workflow)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" },
+      "toolchainFile": "${sourceDir}/cmake/toolchains/linux-clang-x64.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "FAF_ASAN": "ON" }
+    },
+    {
       "name": "linux-clang-x64-release-pgogen",
       "displayName": "Linux clang x64 Release (records a profile, tools/pgo/record.sh)",
       "generator": "Ninja",
@@ -140,6 +149,7 @@
     { "name": "linux-clang-x64-release", "configurePreset": "linux-clang-x64-release" },
     { "name": "linux-clang-x64-release-plain", "configurePreset": "linux-clang-x64-release-plain" },
     { "name": "linux-clang-x64-release-pgogen", "configurePreset": "linux-clang-x64-release-pgogen" },
+    { "name": "linux-clang-x64-asan", "configurePreset": "linux-clang-x64-asan" },
     { "name": "clang-x64-release-coverage", "configurePreset": "clang-x64-release-coverage" },
     { "name": "linux-clang-x64-release-coverage", "configurePreset": "linux-clang-x64-release-coverage" }
   ]

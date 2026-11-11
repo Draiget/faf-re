@@ -60,7 +60,9 @@ namespace moho
    * What it does:
    * Adds `RBlueprint` as the reflected base class lane.
    */
-  void RMeshBlueprintTypeInfo::AddBaseRBlueprint(gpg::RType* const typeInfo)
+  void RMeshBlueprintTypeInfo::AddBaseRBlueprint(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::RBlueprint>(typeInfo);
   }
@@ -71,15 +73,27 @@ namespace moho
    * What it does:
    * Registers mesh-blueprint field descriptors and descriptions.
    */
-  void RMeshBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
+  void RMeshBlueprintTypeInfo::AddFields(
+    gpg::RType* const typeInfo
+  )
   {
-    gpg::RField* const lodsField = typeInfo->AddField<fa::vector<moho::RMeshBlueprintLOD>>("LODs", offsetof(RMeshBlueprint, mLods));
+    gpg::RField* const lodsField =
+      typeInfo->AddField<fa::vector<moho::RMeshBlueprintLOD>>("LODs", offsetof(RMeshBlueprint, mLods));
     lodsField->mFlags = 3;
     lodsField->mDesc = "List of LOD info";
-    typeInfo->AddField<float>("IconFadeInZoom", offsetof(RMeshBlueprint, mIconFadeInZoom), 3, "Zoom level at which to start fading in the strategic icon");
-    typeInfo->AddField<float>("SortOrder", offsetof(RMeshBlueprint, mSortOrder), 3, "Sort order of mesh we render smallest to largest");
+    typeInfo->AddField<float>(
+      "IconFadeInZoom",
+      offsetof(RMeshBlueprint, mIconFadeInZoom),
+      3,
+      "Zoom level at which to start fading in the strategic icon"
+    );
+    typeInfo->AddField<float>(
+      "SortOrder", offsetof(RMeshBlueprint, mSortOrder), 3, "Sort order of mesh we render smallest to largest"
+    );
     typeInfo->AddField<float>("UniformScale", offsetof(RMeshBlueprint, mUniformScale), 3, "Uniform scale factor");
-    typeInfo->AddField<bool>("StraddleWater", offsetof(RMeshBlueprint, mStraddleWater), 3, "Render both above and below the water.");
+    typeInfo->AddField<bool>(
+      "StraddleWater", offsetof(RMeshBlueprint, mStraddleWater), 3, "Render both above and below the water."
+    );
   }
 
   /**
@@ -109,4 +123,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_RMeshBlueprintTypeInfo_55474b, moho::register_RMeshBlueprintTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_RMeshBlueprintTypeInfo_55474b,
+  moho::register_RMeshBlueprintTypeInfo
+)

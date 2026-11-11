@@ -128,7 +128,7 @@ namespace gpg::gal
     void SetEffect(const EffectContext& context, ID3D10Effect* dxEffect);
 
   public:
-    EffectContext context_;    // +0x04 .. +0x67
+    EffectContext context_;            // +0x04 .. +0x67
     ID3D10Effect* dxEffect_ = nullptr; // +0x68
   };
 

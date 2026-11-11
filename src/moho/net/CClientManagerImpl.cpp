@@ -32,7 +32,9 @@
 using namespace moho;
 namespace
 {
-  float GetBottleneckUiTimestampMs(const CClientManagerImpl& manager)
+  float GetBottleneckUiTimestampMs(
+    const CClientManagerImpl& manager
+  )
   {
     // Low-dword float pun over Timer::mTime (binary reads only 4 of the 8 bytes).
     float out = 0.0f;
@@ -40,7 +42,10 @@ namespace
     return out;
   }
 
-  void SetBottleneckUiTimestampMs(CClientManagerImpl& manager, const float value)
+  void SetBottleneckUiTimestampMs(
+    CClientManagerImpl& manager,
+    const float value
+  )
   {
     // Low-dword float pun over Timer::mTime (binary writes only 4 of the 8 bytes).
     std::memcpy(&manager.mTimer2.mTime, &value, sizeof(value));
@@ -53,7 +58,10 @@ namespace
    * Returns whether at least one non-ejection-pending client is already
    * ejected/eject-pending or has queued through `beat`.
    */
-  bool ClientNeedsPartiallyQueuedBeatsUntil(CClientManagerImpl& manager, const int beat)
+  bool ClientNeedsPartiallyQueuedBeatsUntil(
+    CClientManagerImpl& manager,
+    const int beat
+  )
   {
     const std::size_t count = manager.mClients.size();
     if (count == 0u) {
@@ -85,7 +93,10 @@ namespace
    * for every beat, so it never stopped. For any real beat counts (peers fewer
    * than 2^31 beats apart) the result is the beat the loop reached.
    */
-  [[nodiscard]] int FurthestPartiallyQueuedBeat(CClientManagerImpl& manager, const int beat)
+  [[nodiscard]] int FurthestPartiallyQueuedBeat(
+    CClientManagerImpl& manager,
+    const int beat
+  )
   {
     std::uint32_t furthestAhead = 1u;
     for (CClientBase* const client : manager.mClients) {
@@ -110,7 +121,9 @@ namespace
  * What it does:
  * Initializes marshaller vtable and binds owner client-manager pointer.
  */
-CMarshaller::CMarshaller(CClientManagerImpl* manager)
+CMarshaller::CMarshaller(
+  CClientManagerImpl* manager
+)
   : mClientManager(manager)
 {}
 
@@ -175,7 +188,9 @@ CClientManagerImpl::CClientManagerImpl(
 /**
  * Engine addition (wld_PreciseSharedStart): see the declaration.
  */
-void CClientManagerImpl::NoteClientReady(const int clientIndex)
+void CClientManagerImpl::NoteClientReady(
+  const int clientIndex
+)
 {
   std::scoped_lock lock(mLock);
   mPeerFeatures->NoteReady(clientIndex, NET_SteadyClockMicroseconds());
@@ -184,7 +199,9 @@ void CClientManagerImpl::NoteClientReady(const int clientIndex)
 /**
  * Engine addition (wld_PreciseSharedStart): see the declaration.
  */
-std::int64_t CClientManagerImpl::EstimateSharedStartUs(const bool logDetails)
+std::int64_t CClientManagerImpl::EstimateSharedStartUs(
+  const bool logDetails
+)
 {
   struct SReadyTiming
   {
@@ -236,11 +253,20 @@ std::int64_t CClientManagerImpl::EstimateSharedStartUs(const bool logDetails)
       const float handledMs = static_cast<float>(timing.mHandledUs - start) * 0.001f;
       const float leftMs = static_cast<float>(timing.mLeftUs - start) * 0.001f;
       if (static_cast<CClientBase*>(mLocalClient) == mClients[timing.mIndex]) {
-        gpg::Logf("SharedStart: client %d (this one) queued its ready at %+.1f ms, it left at %+.1f ms",
-          static_cast<int>(timing.mIndex), handledMs, leftMs);
+        gpg::Logf(
+          "SharedStart: client %d (this one) queued its ready at %+.1f ms, it left at %+.1f ms",
+          static_cast<int>(timing.mIndex),
+          handledMs,
+          leftMs
+        );
       } else {
-        gpg::Logf("SharedStart: client %d's ready arrived at %+.1f ms, ping %.1f ms, so it left at %+.1f ms",
-          static_cast<int>(timing.mIndex), handledMs, timing.mPingMs, leftMs);
+        gpg::Logf(
+          "SharedStart: client %d's ready arrived at %+.1f ms, ping %.1f ms, so it left at %+.1f ms",
+          static_cast<int>(timing.mIndex),
+          handledMs,
+          timing.mPingMs,
+          leftMs
+        );
       }
     }
   }
@@ -297,7 +323,9 @@ void CClientManagerImpl::NoteDivergentOrders()
 /**
  * Engine addition, not in the binary: see the declaration.
  */
-bool CClientManagerImpl::OrdersAlteredFrom(const CommandSourceId source)
+bool CClientManagerImpl::OrdersAlteredFrom(
+  const CommandSourceId source
+)
 {
   std::scoped_lock lock(mLock);
   if (mStreamCheck == nullptr) {
@@ -335,7 +363,9 @@ CClientManagerImpl* moho::CLIENT_CreateClientManager(
  * Address: 0x006E5A90 (FUN_006E5A90)
  * Address: 0x102C0F90
  */
-void CMarshaller::SetCommandSource(const CommandSourceId sourceId)
+void CMarshaller::SetCommandSource(
+  const CommandSourceId sourceId
+)
 {
   CMessage message{ECmdStreamOp::CMDST_SetCommandSource};
   CMessageStream stream{message};
@@ -358,7 +388,10 @@ void CMarshaller::OnCommandSourceTerminated()
  * Address: 0x006E5C70 (FUN_006E5C70)
  * Address: 0x102C1170
  */
-void CMarshaller::VerifyChecksum(const gpg::MD5Digest& digest, const CSeqNo seqNo)
+void CMarshaller::VerifyChecksum(
+  const gpg::MD5Digest& digest,
+  const CSeqNo seqNo
+)
 {
   CMessage message{ECmdStreamOp::CMDST_VerifyChecksum};
   CMessageStream stream{message};
@@ -402,7 +435,10 @@ void CMarshaller::SingleStep()
  * Address: 0x102C1510
  */
 void CMarshaller::CreateUnit(
-  const std::uint32_t armyIndex, const RResId& blueprintId, const SCoordsVec2& pos, const float heading
+  const std::uint32_t armyIndex,
+  const RResId& blueprintId,
+  const SCoordsVec2& pos,
+  const float heading
 )
 {
   CMessage message{ECmdStreamOp::CMDST_CreateUnit};
@@ -419,7 +455,10 @@ void CMarshaller::CreateUnit(
  * Address: 0x006E61E0 (FUN_006E61E0)
  * Address: 0x102C1660
  */
-void CMarshaller::CreateProp(const char* blueprintPath, const Wm3::Vec3f& pos)
+void CMarshaller::CreateProp(
+  const char* blueprintPath,
+  const Wm3::Vec3f& pos
+)
 {
   CMessage message{ECmdStreamOp::CMDST_CreateProp};
   CMessageStream stream{message};
@@ -432,7 +471,9 @@ void CMarshaller::CreateProp(const char* blueprintPath, const Wm3::Vec3f& pos)
  * Address: 0x006E6320 (FUN_006E6320)
  * Address: 0x102C1780
  */
-void CMarshaller::DestroyEntity(const EntId entityId)
+void CMarshaller::DestroyEntity(
+  const EntId entityId
+)
 {
   CMessage message{ECmdStreamOp::CMDST_DestroyEntity};
   CMessageStream stream{message};
@@ -444,7 +485,10 @@ void CMarshaller::DestroyEntity(const EntId entityId)
  * Address: 0x006E6420 (FUN_006E6420)
  * Address: 0x102C1880
  */
-void CMarshaller::WarpEntity(const EntId entityId, const VTransform& transform)
+void CMarshaller::WarpEntity(
+  const EntId entityId,
+  const VTransform& transform
+)
 {
   CMessage message{ECmdStreamOp::CMDST_WarpEntity};
   CMessageStream stream{message};
@@ -457,7 +501,11 @@ void CMarshaller::WarpEntity(const EntId entityId, const VTransform& transform)
  * Address: 0x006E6560 (FUN_006E6560)
  * Address: 0x102C1990
  */
-void CMarshaller::ProcessInfoPair(const EntId entityId, const gpg::StrArg key, const gpg::StrArg value)
+void CMarshaller::ProcessInfoPair(
+  const EntId entityId,
+  const gpg::StrArg key,
+  const gpg::StrArg value
+)
 {
   CMessage message{ECmdStreamOp::CMDST_ProcessInfoPair};
   CMessageStream stream{message};
@@ -472,7 +520,9 @@ void CMarshaller::ProcessInfoPair(const EntId entityId, const gpg::StrArg key, c
  * Address: 0x102C1AD0
  */
 void CMarshaller::IssueCommand(
-  const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& commandData, const bool clear
+  const BVSet<EntId, EntIdUniverse>& entities,
+  const SSTICommandIssueData& commandData,
+  const bool clear
 )
 {
   CMessage message{ECmdStreamOp::CMDST_IssueCommand};
@@ -489,7 +539,9 @@ void CMarshaller::IssueCommand(
  * Address: 0x102C1BF0
  */
 void CMarshaller::IssueFactoryCommand(
-  const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& commandData, const bool clear
+  const BVSet<EntId, EntIdUniverse>& entities,
+  const SSTICommandIssueData& commandData,
+  const bool clear
 )
 {
   CMessage message{ECmdStreamOp::CMDST_IssueFactoryCommand};
@@ -505,7 +557,10 @@ void CMarshaller::IssueFactoryCommand(
  * Address: 0x006E6910 (FUN_006E6910)
  * Address: 0x102C1D10
  */
-void CMarshaller::IncreaseCommandCount(const CmdId cmdId, const int count)
+void CMarshaller::IncreaseCommandCount(
+  const CmdId cmdId,
+  const int count
+)
 {
   CMessage message{ECmdStreamOp::CMDST_IncreaseCommandCount};
   CMessageStream stream{message};
@@ -518,7 +573,10 @@ void CMarshaller::IncreaseCommandCount(const CmdId cmdId, const int count)
  * Address: 0x006E6A40 (FUN_006E6A40)
  * Address: 0x102C1E20
  */
-void CMarshaller::DecreaseCommandCount(const CmdId cmdId, const int count)
+void CMarshaller::DecreaseCommandCount(
+  const CmdId cmdId,
+  const int count
+)
 {
   CMessage message{ECmdStreamOp::CMDST_DecreaseCommandCount};
   CMessageStream stream{message};
@@ -531,7 +589,10 @@ void CMarshaller::DecreaseCommandCount(const CmdId cmdId, const int count)
  * Address: 0x006E6B70 (FUN_006E6B70)
  * Address: 0x102C1F30
  */
-void CMarshaller::SetCommandTarget(const CmdId cmdId, const SSTITarget& target)
+void CMarshaller::SetCommandTarget(
+  const CmdId cmdId,
+  const SSTITarget& target
+)
 {
   CMessage message{ECmdStreamOp::CMDST_SetCommandTarget};
   CMessageStream stream{message};
@@ -544,7 +605,10 @@ void CMarshaller::SetCommandTarget(const CmdId cmdId, const SSTITarget& target)
  * Address: 0x006E6C90 (FUN_006E6C90)
  * Address: 0x102C2040
  */
-void CMarshaller::SetCommandType(const CmdId cmdId, const EUnitCommandType type)
+void CMarshaller::SetCommandType(
+  const CmdId cmdId,
+  const EUnitCommandType type
+)
 {
   CMessage message{ECmdStreamOp::CMDST_SetCommandType};
   CMessageStream stream{message};
@@ -559,7 +623,9 @@ void CMarshaller::SetCommandType(const CmdId cmdId, const EUnitCommandType type)
  * Address: 0x102C2150
  */
 void CMarshaller::SetCommandCells(
-  const CmdId cmdId, const gpg::core::FastVector<SOCellPos>& cells, const Wm3::Vector3<float>& pos
+  const CmdId cmdId,
+  const gpg::core::FastVector<SOCellPos>& cells,
+  const Wm3::Vector3<float>& pos
 )
 {
   CMessage message{ECmdStreamOp::CMDST_SetCommandCells};
@@ -574,7 +640,10 @@ void CMarshaller::SetCommandCells(
  * Address: 0x006E6F30 (FUN_006E6F30)
  * Address: 0x102C22A0
  */
-void CMarshaller::RemoveCommandFromUnitQueue(const CmdId cmdId, const EntId entityId)
+void CMarshaller::RemoveCommandFromUnitQueue(
+  const CmdId cmdId,
+  const EntId entityId
+)
 {
   CMessage message{ECmdStreamOp::CMDST_RemoveCommandFromQueue};
   CMessageStream stream{message};
@@ -608,7 +677,10 @@ void CMarshaller::ExecuteDebugCommand(
  * Address: 0x006E71F0 (FUN_006E71F0)
  * Address: 0x102C24F0
  */
-void CMarshaller::ExecuteLuaInSim(const char* functionName, const LuaPlus::LuaObject& args)
+void CMarshaller::ExecuteLuaInSim(
+  const char* functionName,
+  const LuaPlus::LuaObject& args
+)
 {
   CMessage message{ECmdStreamOp::CMDST_ExecuteLuaInSim};
   CMessageStream stream{message};
@@ -624,7 +696,9 @@ void CMarshaller::ExecuteLuaInSim(const char* functionName, const LuaPlus::LuaOb
  * Address: 0x102C2620
  */
 void CMarshaller::LuaSimCallback(
-  const char* callbackName, const LuaPlus::LuaObject& args, const BVSet<EntId, EntIdUniverse>& entities
+  const char* callbackName,
+  const LuaPlus::LuaObject& args,
+  const BVSet<EntId, EntIdUniverse>& entities
 )
 {
   CMessage message{ECmdStreamOp::CMDST_LuaSimCallback};
@@ -641,7 +715,9 @@ void CMarshaller::LuaSimCallback(
  * Address: 0x006E7420 (FUN_006E7420)
  * Address: 0x102C2760
  */
-void CMarshaller::AdvanceBeat(const int beatDelta)
+void CMarshaller::AdvanceBeat(
+  const int beatDelta
+)
 {
   CMessage message{ECmdStreamOp::CMDST_Advance};
   CMessageStream stream{message};
@@ -663,7 +739,10 @@ void CMarshaller::EndGame()
  * Address: 0x006E7600 (FUN_006E7600)
  * Address: 0x102C2940
  */
-void CMarshaller::WriteEntIdSet(CMessageStream& stream, const BVSet<EntId, EntIdUniverse>& entities)
+void CMarshaller::WriteEntIdSet(
+  CMessageStream& stream,
+  const BVSet<EntId, EntIdUniverse>& entities
+)
 {
   const BVIntSet& bits = entities.Bits();
 
@@ -680,7 +759,10 @@ void CMarshaller::WriteEntIdSet(CMessageStream& stream, const BVSet<EntId, EntId
  * Address: 0x006E76C0 (FUN_006E76C0)
  * Address: 0x102C29D0
  */
-void CMarshaller::WriteCommandData(CMessageStream& stream, const SSTICommandIssueData& commandData)
+void CMarshaller::WriteCommandData(
+  CMessageStream& stream,
+  const SSTICommandIssueData& commandData
+)
 {
   stream.Write(commandData.nextCommandId);
   stream.Write(commandData.unk04);
@@ -714,7 +796,10 @@ void CMarshaller::WriteCommandData(CMessageStream& stream, const SSTICommandIssu
  * Address: 0x006E7890 (FUN_006E7890)
  * Address: 0x102C2B20
  */
-void CMarshaller::WriteTarget(CMessageStream& stream, const SSTITarget& target)
+void CMarshaller::WriteTarget(
+  CMessageStream& stream,
+  const SSTITarget& target
+)
 {
   const auto targetTypeWord = static_cast<std::int32_t>(target.mType);
   const auto targetTypeByte = static_cast<std::uint8_t>(targetTypeWord);
@@ -731,7 +816,10 @@ void CMarshaller::WriteTarget(CMessageStream& stream, const SSTITarget& target)
  * Address: 0x006E7940 (FUN_006E7940)
  * Address: <inlined in MohoEngine WriteCommandData/SetCommandCells>
  */
-void CMarshaller::WriteCells(CMessageStream& stream, const gpg::core::FastVector<SOCellPos>& cells)
+void CMarshaller::WriteCells(
+  CMessageStream& stream,
+  const gpg::core::FastVector<SOCellPos>& cells
+)
 {
   const auto count = static_cast<std::int32_t>(cells.Size());
   stream.Write(count);
@@ -772,7 +860,10 @@ CClientManagerImpl::~CClientManagerImpl()
  * Address: 0x0053E180 (FUN_0053E180)
  */
 IClient* CClientManagerImpl::CreateLocalClient(
-  const char* name, const int32_t index, const int32_t ownerId, const uint32_t sourceId
+  const char* name,
+  const int32_t index,
+  const int32_t ownerId,
+  const uint32_t sourceId
 )
 {
   BVIntSet commandSources{};
@@ -807,7 +898,10 @@ IClient* CClientManagerImpl::CreateNetClient(
  * Address: 0x0053E330 (FUN_0053E330)
  */
 IClient* CClientManagerImpl::CreateNullClient(
-  const char* name, const int32_t index, const int32_t ownerId, const uint32_t sourceId
+  const char* name,
+  const int32_t index,
+  const int32_t ownerId,
+  const uint32_t sourceId
 )
 {
   BVIntSet commandSources{};
@@ -821,7 +915,10 @@ IClient* CClientManagerImpl::CreateNullClient(
 /**
  * Address: 0x0053E400 (FUN_0053E400)
  */
-IClient* CClientManagerImpl::CreateReplayClient(gpg::Stream** replayStreamStorage, BVIntSet* set)
+IClient* CClientManagerImpl::CreateReplayClient(
+  gpg::Stream** replayStreamStorage,
+  BVIntSet* set
+)
 {
   const auto client = new CReplayClient(this, *set, *replayStreamStorage);
   if (mClients.empty()) {
@@ -852,7 +949,9 @@ size_t CClientManagerImpl::NumberOfClients()
 /**
  * Address: 0x0053BCE0 (FUN_0053BCE0)
  */
-IClient* CClientManagerImpl::GetClient(const int idx)
+IClient* CClientManagerImpl::GetClient(
+  const int idx
+)
 {
   std::scoped_lock lock(mLock);
   if (idx < 0 || static_cast<size_t>(idx) >= mClients.size()) {
@@ -864,7 +963,9 @@ IClient* CClientManagerImpl::GetClient(const int idx)
 /**
  * Address: 0x0053E470 (FUN_0053E470)
  */
-IClient* CClientManagerImpl::GetClientWithData(const int32_t ownerId)
+IClient* CClientManagerImpl::GetClientWithData(
+  const int32_t ownerId
+)
 {
   std::scoped_lock lock(mLock);
   for (CClientBase* const client : mClients) {
@@ -887,7 +988,9 @@ IClient* CClientManagerImpl::GetLocalClient()
 /**
  * Address: 0x0053BD20 (FUN_0053BD20)
  */
-void CClientManagerImpl::SetUIInterface(IClientMgrUIInterface* clientMgrInterface)
+void CClientManagerImpl::SetUIInterface(
+  IClientMgrUIInterface* clientMgrInterface
+)
 {
   std::scoped_lock lock(mLock);
   mInterface = clientMgrInterface;
@@ -932,7 +1035,9 @@ bool CClientManagerImpl::IsEveryoneReady()
 /**
  * Address: 0x0053E590 (FUN_0053E590)
  */
-void CClientManagerImpl::SetSimRate(const int rate)
+void CClientManagerImpl::SetSimRate(
+  const int rate
+)
 {
   if (!mAdjustableGameSpeed) {
     return;
@@ -993,7 +1098,9 @@ int CClientManagerImpl::GetSimRateRequested()
  * What it does:
  * Broadcasts `CLIMSG_IntParam` with a 32-bit payload to all managed clients.
  */
-void CClientManagerImpl::BroadcastIntParam(const int value)
+void CClientManagerImpl::BroadcastIntParam(
+  const int value
+)
 {
   std::scoped_lock lock(mLock);
   CMessage message{EClientMsg::CLIMSG_IntParam};
@@ -1005,7 +1112,9 @@ void CClientManagerImpl::BroadcastIntParam(const int value)
 /**
  * Address: 0x0053E990 (FUN_0053E990)
  */
-void CClientManagerImpl::ProcessClients(CMessage& msg)
+void CClientManagerImpl::ProcessClients(
+  CMessage& msg
+)
 {
   std::scoped_lock lock(mLock);
 
@@ -1029,7 +1138,9 @@ void CClientManagerImpl::ProcessClients(CMessage& msg)
  * Clients in eject-pending state are probed for oldest-eject bookkeeping but
  * do not block advancement.
  */
-bool CClientManagerImpl::ClientNeedsFullyQueuedBeatsUntil(const int beat)
+bool CClientManagerImpl::ClientNeedsFullyQueuedBeatsUntil(
+  const int beat
+)
 {
   const std::size_t count = mClients.size();
   if (count == 0u) {
@@ -1062,7 +1173,9 @@ bool CClientManagerImpl::ClientNeedsFullyQueuedBeatsUntil(const int beat)
  * What it does:
  * Returns whether every managed client is responsive for the requested beat.
  */
-bool CClientManagerImpl::EveryoneResponsiveSince(const int beat)
+bool CClientManagerImpl::EveryoneResponsiveSince(
+  const int beat
+)
 {
   // Engine addition: with net_CheckOrderStreams 2, once a stream reached
   // players differently no further beat runs here (CommandStreamCheck finds
@@ -1100,7 +1213,10 @@ namespace
 
   // net_LogBeatWaitMs: a beat that became available long after the one before
   // it waited on some player's data.
-  void NoteAvailableBeat(const int before, const int now)
+  void NoteAvailableBeat(
+    const int before,
+    const int now
+  )
   {
     if (now == before) {
       return;
@@ -1111,8 +1227,7 @@ namespace
       sTestBurstSent = false;
     }
     if (net_LogBeatWaitMs > 0 && sLastAvailableBeat >= 0 && sLastAvailableBeat == before) {
-      const long long waited =
-        std::chrono::duration_cast<std::chrono::milliseconds>(at - sLastAvailableAt).count();
+      const long long waited = std::chrono::duration_cast<std::chrono::milliseconds>(at - sLastAvailableAt).count();
       if (waited >= net_LogBeatWaitMs) {
         gpg::Logf("NET: beat %d available %lld ms after beat %d", now, waited, before);
       }
@@ -1139,7 +1254,10 @@ namespace
 
   // net_TestBurstBeat / net_TestBurstBytes: filler on the ordered stream to every
   // peer, incompressible so the deflated size on the wire is the given size.
-  void MaybeSendTestBurst(const fa::vector<CClientBase*>& clients, const int availableBeat)
+  void MaybeSendTestBurst(
+    const fa::vector<CClientBase*>& clients,
+    const int availableBeat
+  )
   {
     if (sTestBurstSent || net_TestBurstBeat < 0 || net_TestBurstBytes <= 0 || availableBeat < net_TestBurstBeat) {
       return;
@@ -1163,7 +1281,9 @@ namespace
       ++messages;
     }
     gpg::Logf(
-      "NET: test burst of %d bytes in %d messages sent to every peer at beat %d", net_TestBurstBytes, messages,
+      "NET: test burst of %d bytes in %d messages sent to every peer at beat %d",
+      net_TestBurstBytes,
+      messages,
       availableBeat
     );
   }
@@ -1186,8 +1306,10 @@ void CClientManagerImpl::DoBeat()
   if (mRejoinFeed != nullptr) {
     mRejoinFeed->Pump();
   }
-  if (mConnector != nullptr && (mRejoinFeed == nullptr || !mRejoinFeed->CatchingUp()) &&
-      mPeerFeatures->EveryoneSupports(*this, EPeerFeature::Rejoin)) {
+  if (
+    mConnector != nullptr && (mRejoinFeed == nullptr || !mRejoinFeed->CatchingUp()) &&
+    mPeerFeatures->EveryoneSupports(*this, EPeerFeature::Rejoin)
+  ) {
     REJOIN_ServeRestartedPeers(*this);
   }
 
@@ -1238,9 +1360,10 @@ void CClientManagerImpl::DoBeat()
 
   const SClientBottleneckInfo bottleneckInfo = GetBottleneckInfo();
   const float currentUiBottleneckTimeMs = GetBottleneckUiTimestampMs(*this);
-  if (((bottleneckInfo.mType == SClientBottleneckInfo::Nothing) ||
-       (currentUiBottleneckTimeMs > bottleneckInfo.mFloat)) &&
-      currentUiBottleneckTimeMs != 0.0f) {
+  if (
+    ((bottleneckInfo.mType == SClientBottleneckInfo::Nothing) || (currentUiBottleneckTimeMs > bottleneckInfo.mFloat)) &&
+    currentUiBottleneckTimeMs != 0.0f
+  ) {
     if (mInterface != nullptr) {
       mInterface->ReportBottleneckCleared();
     }
@@ -1248,8 +1371,9 @@ void CClientManagerImpl::DoBeat()
   }
 
   const float uiBottleneckTimeMs = GetBottleneckUiTimestampMs(*this);
-  if ((bottleneckInfo.mType != SClientBottleneckInfo::Nothing) &&
-      (bottleneckInfo.mFloat >= uiBottleneckTimeMs + 5000.0f)) {
+  if (
+    (bottleneckInfo.mType != SClientBottleneckInfo::Nothing) && (bottleneckInfo.mFloat >= uiBottleneckTimeMs + 5000.0f)
+  ) {
     SetBottleneckUiTimestampMs(*this, bottleneckInfo.mFloat);
     if (mInterface != nullptr) {
       mInterface->ReportBottleneck(bottleneckInfo);
@@ -1269,7 +1393,9 @@ void CClientManagerImpl::DoBeat()
 /**
  * Engine addition, not in the binary: see the declaration.
  */
-bool CClientManagerImpl::RejoinHoldsIssue(int& nextIssueBeat)
+bool CClientManagerImpl::RejoinHoldsIssue(
+  int& nextIssueBeat
+)
 {
   if (mRejoinFeed == nullptr) {
     return false;
@@ -1305,7 +1431,9 @@ int CClientManagerImpl::RejoinSkippedBeats()
 /**
  * Address: 0x0053EDA0 (FUN_0053EDA0)
  */
-void CClientManagerImpl::SelectEvent(HANDLE ev)
+void CClientManagerImpl::SelectEvent(
+  HANDLE ev
+)
 {
   std::scoped_lock lock(mLock);
   if (mConnector != nullptr) {
@@ -1317,7 +1445,9 @@ void CClientManagerImpl::SelectEvent(HANDLE ev)
 /**
  * Address: 0x0053EF90 (FUN_0053EF90)
  */
-void CClientManagerImpl::GetPartiallyQueuedBeat(int& out)
+void CClientManagerImpl::GetPartiallyQueuedBeat(
+  int& out
+)
 {
   std::scoped_lock lock(mLock);
   out = mPartiallyQueuedBeat;
@@ -1326,7 +1456,9 @@ void CClientManagerImpl::GetPartiallyQueuedBeat(int& out)
 /**
  * Address: 0x0053EFD0 (FUN_0053EFD0)
  */
-void CClientManagerImpl::GetAvailableBeat(int& out)
+void CClientManagerImpl::GetAvailableBeat(
+  int& out
+)
 {
   std::scoped_lock lock(mLock);
   out = mAvailableBeat;
@@ -1335,7 +1467,9 @@ void CClientManagerImpl::GetAvailableBeat(int& out)
 /**
  * Address: 0x0053F010 (FUN_0053F010)
  */
-void CClientManagerImpl::UpdateStates(const int beat)
+void CClientManagerImpl::UpdateStates(
+  const int beat
+)
 {
   {
     std::scoped_lock lock(mLock);
@@ -1377,7 +1511,9 @@ void CClientManagerImpl::UpdateStates(const int beat)
 /**
  * Address: 0x0053F4C0 (FUN_0053F4C0)
  */
-SSendStampWindow CClientManagerImpl::GetBetween(const int since)
+SSendStampWindow CClientManagerImpl::GetBetween(
+  const int since
+)
 {
   std::scoped_lock lock(mLock);
   const auto nowUs = static_cast<uint64_t>(mTimer3.ElapsedMicroseconds());

@@ -21,28 +21,36 @@ namespace
 
   /** A stream with no overrides: every slot is the base's. */
   class BareStream final : public gpg::Stream
-  {
-  };
+  {};
 
   /** A stream whose window the test sets, and whose virtual slots record what reached them. */
   class WindowStream final : public gpg::Stream
   {
   public:
-    void SetReadWindow(char* const begin, const std::size_t size)
+    void SetReadWindow(
+      char* const begin,
+      const std::size_t size
+    )
     {
       mReadStart = begin;
       mReadHead = begin;
       mReadEnd = begin + size;
     }
 
-    void SetWriteWindow(char* const begin, const std::size_t size)
+    void SetWriteWindow(
+      char* const begin,
+      const std::size_t size
+    )
     {
       mWriteStart = begin;
       mWriteHead = begin;
       mWriteEnd = begin + size;
     }
 
-    size_t VirtRead(char* const buf, const size_t len) override
+    size_t VirtRead(
+      char* const buf,
+      const size_t len
+    ) override
     {
       ++mVirtReads;
       const std::size_t take = (std::min)(len, mSource.size() - mSourcePos);
@@ -51,15 +59,25 @@ namespace
       return take;
     }
 
-    void VirtWrite(const char* const data, const size_t size) override
+    void VirtWrite(
+      const char* const data,
+      const size_t size
+    ) override
     {
       ++mVirtWrites;
       mSink.append(data, size);
     }
 
-    void VirtUnGetByte(const int value) override { mUngot = value; }
+    void VirtUnGetByte(
+      const int value
+    ) override
+    {
+      mUngot = value;
+    }
 
-    void VirtClose(const Mode mode) override
+    void VirtClose(
+      const Mode mode
+    ) override
     {
       mClosedMode = mode;
       if (mThrowOnClose) {
@@ -83,13 +101,18 @@ namespace
   };
 
   /** Everything a MemBufferStream holds, from its own buffer: what a reader would get from offset 0. */
-  std::string ContentOf(const gpg::MemBufferStream& stream)
+  std::string ContentOf(
+    const gpg::MemBufferStream& stream
+  )
   {
     const gpg::MemBuffer<const char> buffer = stream.GetConstBuffer();
     return std::string(buffer.begin(), stream.GetLength());
   }
 
-  std::string ReadAll(gpg::Stream& stream, const std::size_t chunk = 7u)
+  std::string ReadAll(
+    gpg::Stream& stream,
+    const std::size_t chunk = 7u
+  )
   {
     std::string out;
     std::string piece(chunk, '\0');
@@ -106,12 +129,17 @@ namespace
   // gpg::Stream base
   // ---------------------------------------------------------------------------------------------
 
-  TEST(GpgStream, BaseSlotsThrowUnsupportedOperation)
+  TEST(
+    GpgStream,
+    BaseSlotsThrowUnsupportedOperation
+  )
   {
     BareStream stream;
     char byte = 0;
     EXPECT_THROW((void)stream.VirtTell(gpg::Stream::ModeReceive), gpg::Stream::UnsupportedOperation);
-    EXPECT_THROW((void)stream.VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, 0), gpg::Stream::UnsupportedOperation);
+    EXPECT_THROW(
+      (void)stream.VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, 0), gpg::Stream::UnsupportedOperation
+    );
     EXPECT_THROW((void)stream.VirtRead(&byte, 1u), gpg::Stream::UnsupportedOperation);
     EXPECT_THROW((void)stream.VirtReadNonBlocking(&byte, 1u), gpg::Stream::UnsupportedOperation);
     EXPECT_THROW(stream.VirtUnGetByte(0), gpg::Stream::UnsupportedOperation);
@@ -123,7 +151,10 @@ namespace
     EXPECT_TRUE(stream.CloseNoThrow(gpg::Stream::ModeBoth));
   }
 
-  TEST(GpgStream, UnsupportedOperationCarriesItsMessage)
+  TEST(
+    GpgStream,
+    UnsupportedOperationCarriesItsMessage
+  )
   {
     try {
       BareStream stream;
@@ -134,7 +165,10 @@ namespace
     }
   }
 
-  TEST(GpgStream, CloseNoThrowTurnsAThrowIntoFalse)
+  TEST(
+    GpgStream,
+    CloseNoThrowTurnsAThrowIntoFalse
+  )
   {
     WindowStream stream;
     stream.mThrowOnClose = true;
@@ -144,7 +178,10 @@ namespace
     EXPECT_EQ(stream.mClosedMode, gpg::Stream::ModeReceive);
   }
 
-  TEST(GpgStream, ReadTakesTheWindowFirstAndFallsBackToVirtRead)
+  TEST(
+    GpgStream,
+    ReadTakesTheWindowFirstAndFallsBackToVirtRead
+  )
   {
     char window[] = {'a', 'b', 'c', 'd'};
     WindowStream stream;
@@ -168,7 +205,10 @@ namespace
     EXPECT_EQ(stream.mVirtReads, 1);
   }
 
-  TEST(GpgStream, GetByteCheckByteAndUnGetByte)
+  TEST(
+    GpgStream,
+    GetByteCheckByteAndUnGetByte
+  )
   {
     char window[] = {'\x01', '\xFE'};
     WindowStream stream;
@@ -193,7 +233,10 @@ namespace
     EXPECT_EQ(stream.CheckByte(), 255);
   }
 
-  TEST(GpgStream, WriteFillsTheWindowAndSendsWhatDoesNotFitToVirtWrite)
+  TEST(
+    GpgStream,
+    WriteFillsTheWindowAndSendsWhatDoesNotFitToVirtWrite
+  )
   {
     char window[8] = {};
     WindowStream stream;
@@ -214,7 +257,10 @@ namespace
     EXPECT_EQ(std::string_view(window, 5u), "abcde"sv);
   }
 
-  TEST(GpgStream, StringFormsWriteTheirTerminator)
+  TEST(
+    GpgStream,
+    StringFormsWriteTheirTerminator
+  )
   {
     char window[32] = {};
     WindowStream stream;
@@ -227,7 +273,10 @@ namespace
     EXPECT_EQ(std::string_view(window, 6u), std::string_view("hi\0yo\0", 6u));
   }
 
-  TEST(GpgStream, ScalarWritesAreLittleEndianRawBytes)
+  TEST(
+    GpgStream,
+    ScalarWritesAreLittleEndianRawBytes
+  )
   {
     char window[32] = {};
     WindowStream stream;
@@ -250,7 +299,10 @@ namespace
     EXPECT_EQ(full.mSink, std::string("\xFE\xFF\xFF\xFF", 4u));
   }
 
-  TEST(GpgStream, ReadNonBlockingFallsBackToVirtReadNonBlocking)
+  TEST(
+    GpgStream,
+    ReadNonBlockingFallsBackToVirtReadNonBlocking
+  )
   {
     WindowStream stream; // VirtReadNonBlocking is the base's, which forwards to VirtRead
     stream.mSource = "pq";
@@ -264,7 +316,10 @@ namespace
   // MemBuffer helpers
   // ---------------------------------------------------------------------------------------------
 
-  TEST(GpgMemBuffer, AllocIsZeroFilledAndSized)
+  TEST(
+    GpgMemBuffer,
+    AllocIsZeroFilledAndSized
+  )
   {
     const gpg::MemBuffer<char> buffer = gpg::AllocMemBuffer(100u);
     ASSERT_NE(buffer.data(), nullptr);
@@ -274,7 +329,10 @@ namespace
     }
   }
 
-  TEST(GpgMemBuffer, CopiesOwnTheirBytes)
+  TEST(
+    GpgMemBuffer,
+    CopiesOwnTheirBytes
+  )
   {
     std::string source = PatternBytes(33u);
     const gpg::MemBuffer<const char> copy = gpg::CopyMemBuffer(source.data(), source.size());
@@ -290,7 +348,10 @@ namespace
     EXPECT_EQ(gpg::CopyMemBuffer(nullptr, 4u).data(), nullptr);
   }
 
-  TEST(GpgMemBuffer, SubBufferSharesStorageAndChecksBounds)
+  TEST(
+    GpgMemBuffer,
+    SubBufferSharesStorageAndChecksBounds
+  )
   {
     gpg::MemBuffer<char> buffer = gpg::AllocMemBuffer(16u);
     for (std::size_t index = 0; index < 16u; ++index) {
@@ -314,7 +375,10 @@ namespace
     EXPECT_EQ(buffer.Size(), 16u);
   }
 
-  TEST(GpgMemBuffer, LoadFileToMemBufferReadsWhatWasWritten)
+  TEST(
+    GpgMemBuffer,
+    LoadFileToMemBufferReadsWhatWasWritten
+  )
   {
     const faf_core_tests::TempDir folder;
     const std::string path = folder.File("blob.bin");
@@ -334,7 +398,10 @@ namespace
   // MemBufferStream
   // ---------------------------------------------------------------------------------------------
 
-  TEST(GpgMemBufferStream, WriteThenReadBack)
+  TEST(
+    GpgMemBufferStream,
+    WriteThenReadBack
+  )
   {
     gpg::MemBufferStream stream(64u);
     EXPECT_EQ(stream.GetLength(), 0u);
@@ -348,7 +415,10 @@ namespace
     EXPECT_TRUE(stream.VirtAtEnd());
   }
 
-  TEST(GpgMemBufferStream, GrowsPastItsFirstCapacity)
+  TEST(
+    GpgMemBufferStream,
+    GrowsPastItsFirstCapacity
+  )
   {
     gpg::MemBufferStream stream(4u);
     const std::string bytes = PatternBytes(10000u, 3u);
@@ -361,7 +431,10 @@ namespace
     EXPECT_EQ(ReadAll(stream, 1000u), bytes);
   }
 
-  TEST(GpgMemBufferStream, InterleavedReadsSeeLaterWrites)
+  TEST(
+    GpgMemBufferStream,
+    InterleavedReadsSeeLaterWrites
+  )
   {
     gpg::MemBufferStream stream(8u);
     char out[16] = {};
@@ -374,7 +447,10 @@ namespace
     EXPECT_EQ(stream.VirtTell(gpg::Stream::ModeReceive), 12u);
   }
 
-  TEST(GpgMemBufferStream, TellReportsEachCursor)
+  TEST(
+    GpgMemBufferStream,
+    TellReportsEachCursor
+  )
   {
     gpg::MemBufferStream stream(32u);
     stream.Write("0123456789", 10u);
@@ -386,7 +462,10 @@ namespace
     EXPECT_THROW((void)stream.VirtTell(gpg::Stream::ModeNone), std::invalid_argument);
   }
 
-  TEST(GpgMemBufferStream, SeekReadCursorFromEachOrigin)
+  TEST(
+    GpgMemBufferStream,
+    SeekReadCursorFromEachOrigin
+  )
   {
     gpg::MemBufferStream stream(32u);
     stream.Write("0123456789", 10u);
@@ -408,7 +487,10 @@ namespace
     EXPECT_THROW((void)stream.Seek(static_cast<gpg::Stream::SeekOrigin>(7), 0), std::invalid_argument);
   }
 
-  TEST(GpgMemBufferStream, SeekingTheWriteCursorPastTheEndZeroFills)
+  TEST(
+    GpgMemBufferStream,
+    SeekingTheWriteCursorPastTheEndZeroFills
+  )
   {
     gpg::MemBufferStream stream(4u);
     stream.Write("abc", 3u);
@@ -423,7 +505,10 @@ namespace
     EXPECT_EQ(ContentOf(stream), std::string("aBc\0\0\0z", 7u));
   }
 
-  TEST(GpgMemBufferStream, SeekBothMovesBothCursors)
+  TEST(
+    GpgMemBufferStream,
+    SeekBothMovesBothCursors
+  )
   {
     gpg::MemBufferStream stream(16u);
     stream.Write("abcdef", 6u);
@@ -432,7 +517,10 @@ namespace
     EXPECT_EQ(stream.VirtTell(gpg::Stream::ModeSend), 2u);
   }
 
-  TEST(GpgMemBufferStream, ReadOnlyStreamRefusesWrites)
+  TEST(
+    GpgMemBufferStream,
+    ReadOnlyStreamRefusesWrites
+  )
   {
     const std::string bytes = "read only";
     const gpg::MemBuffer<const char> source = gpg::CopyMemBuffer(bytes.data(), bytes.size());
@@ -448,7 +536,10 @@ namespace
     EXPECT_EQ(ReadAll(stream), bytes);
   }
 
-  TEST(GpgMemBufferStream, ReadOnlyInitialLengthLimitsTheReadWindow)
+  TEST(
+    GpgMemBufferStream,
+    ReadOnlyInitialLengthLimitsTheReadWindow
+  )
   {
     const gpg::MemBuffer<const char> source = gpg::CopyMemBuffer("abcdefgh", 8u);
     gpg::MemBufferStream stream(source, 3u);
@@ -457,7 +548,10 @@ namespace
     EXPECT_THROW((void)gpg::MemBufferStream(source, 9u), std::invalid_argument);
   }
 
-  TEST(GpgMemBufferStream, WritableFromCallerBuffer)
+  TEST(
+    GpgMemBufferStream,
+    WritableFromCallerBuffer
+  )
   {
     gpg::MemBuffer<char> storage = gpg::AllocMemBuffer(16u);
     std::memcpy(storage.data(), "0123456789", 10u);
@@ -472,7 +566,10 @@ namespace
     EXPECT_THROW((void)gpg::MemBufferStream(storage, 17u), std::invalid_argument);
   }
 
-  TEST(GpgMemBufferStream, UnGetByteBeyondStartThrows)
+  TEST(
+    GpgMemBufferStream,
+    UnGetByteBeyondStartThrows
+  )
   {
     gpg::MemBufferStream stream(8u);
     stream.Write("q", 1u);
@@ -487,7 +584,10 @@ namespace
   // TextWriter / TextReader
   // ---------------------------------------------------------------------------------------------
 
-  std::string WriteText(const int mode, const std::string& text)
+  std::string WriteText(
+    const int mode,
+    const std::string& text
+  )
   {
     gpg::MemBufferStream stream(4u);
     gpg::TextWriter writer(&stream, mode);
@@ -495,18 +595,24 @@ namespace
     return ContentOf(stream);
   }
 
-  TEST(GpgTextIo, WriterLineEndingModes)
+  TEST(
+    GpgTextIo,
+    WriterLineEndingModes
+  )
   {
     const std::string mixed = "a\r\nb\nc\rd";
-    EXPECT_EQ(WriteText(0, mixed), mixed);         // raw
-    EXPECT_EQ(WriteText(1, mixed), "a\nb\nc\nd");  // LF
+    EXPECT_EQ(WriteText(0, mixed), mixed);              // raw
+    EXPECT_EQ(WriteText(1, mixed), "a\nb\nc\nd");       // LF
     EXPECT_EQ(WriteText(2, mixed), "a\r\nb\r\nc\r\nd"); // CR LF
-    EXPECT_EQ(WriteText(3, mixed), "a\rb\rc\rd");  // CR
+    EXPECT_EQ(WriteText(3, mixed), "a\rb\rc\rd");       // CR
     // A CR followed by a CR is two line ends.
     EXPECT_EQ(WriteText(1, "x\r\ry"), "x\n\ny");
   }
 
-  TEST(GpgTextIo, WriterStringFormsAndPrintf)
+  TEST(
+    GpgTextIo,
+    WriterStringFormsAndPrintf
+  )
   {
     gpg::MemBufferStream stream(4u);
     gpg::TextWriter writer(&stream, 2);
@@ -518,7 +624,10 @@ namespace
     EXPECT_EQ(ContentOf(stream), "one\r\ntwo\r\n42-three-beef\r\n\r\n");
   }
 
-  TEST(GpgTextIo, ReaderKeepsTerminatorsAsWrittenWithoutNormalizing)
+  TEST(
+    GpgTextIo,
+    ReaderKeepsTerminatorsAsWrittenWithoutNormalizing
+  )
   {
     const std::string text = "l1\nl2\r\nl3\rl4";
     const gpg::MemBuffer<const char> source = gpg::CopyMemBuffer(text.data(), text.size());
@@ -531,7 +640,10 @@ namespace
     EXPECT_EQ(reader.ReadLine().view(), ""sv);
   }
 
-  TEST(GpgTextIo, ReaderNormalizesCrAndCrLfToLf)
+  TEST(
+    GpgTextIo,
+    ReaderNormalizesCrAndCrLfToLf
+  )
   {
     const std::string text = "l1\nl2\r\nl3\rl4\r";
     const gpg::MemBuffer<const char> source = gpg::CopyMemBuffer(text.data(), text.size());
@@ -544,7 +656,10 @@ namespace
     EXPECT_EQ(reader.ReadLine().view(), ""sv);
   }
 
-  TEST(GpgTextIo, ReadByteNormalizes)
+  TEST(
+    GpgTextIo,
+    ReadByteNormalizes
+  )
   {
     const std::string text = "a\r\nb\rc";
     const gpg::MemBuffer<const char> source = gpg::CopyMemBuffer(text.data(), text.size());
@@ -558,7 +673,10 @@ namespace
     EXPECT_EQ(reader.ReadByte(), -1);
   }
 
-  TEST(GpgTextIo, WriterThenReaderRoundTrip)
+  TEST(
+    GpgTextIo,
+    WriterThenReaderRoundTrip
+  )
   {
     gpg::MemBufferStream stream(4u);
     gpg::TextWriter writer(&stream, 2);

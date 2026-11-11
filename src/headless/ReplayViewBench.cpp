@@ -12,14 +12,18 @@ namespace faf::headless
   namespace
   {
     [[nodiscard]] double MillisecondsBetween(
-      const std::chrono::steady_clock::time_point from, const std::chrono::steady_clock::time_point to
+      const std::chrono::steady_clock::time_point from,
+      const std::chrono::steady_clock::time_point to
     )
     {
       return std::chrono::duration<double, std::milli>(to - from).count();
     }
 
     /** "mean m p50 a p95 b p99 c max d <unit>" of `values` (sorted in place). */
-    [[nodiscard]] std::string Distribution(std::vector<double>& values, const char* const unit)
+    [[nodiscard]] std::string Distribution(
+      std::vector<double>& values,
+      const char* const unit
+    )
     {
       if (values.empty()) {
         return "no beats";
@@ -30,24 +34,36 @@ namespace faf::headless
       }
       std::sort(values.begin(), values.end());
       const auto at = [&values](const double share) {
-        return values[std::min(values.size() - 1u, static_cast<std::size_t>(share * static_cast<double>(values.size())))];
+        return values[std::min(
+          values.size() - 1u, static_cast<std::size_t>(share * static_cast<double>(values.size()))
+        )];
       };
       char text[160];
       std::snprintf(
-        text, sizeof(text), "mean %.2f p50 %.2f p95 %.2f p99 %.2f max %.2f %s", sum / static_cast<double>(values.size()),
-        at(0.50), at(0.95), at(0.99), values.back(), unit
+        text,
+        sizeof(text),
+        "mean %.2f p50 %.2f p95 %.2f p99 %.2f max %.2f %s",
+        sum / static_cast<double>(values.size()),
+        at(0.50),
+        at(0.95),
+        at(0.99),
+        values.back(),
+        unit
       );
       return text;
     }
   } // namespace
 
   CReplayViewBench::CReplayViewBench(
-    const std::string& path, const remote::wire::SContentTables& tables, const float mapSizeX, const float mapSizeZ,
+    const std::string& path,
+    const remote::wire::SContentTables& tables,
+    const float mapSizeX,
+    const float mapSizeZ,
     const bool check
   )
     : remote::CViewLanes(tables, mapSizeX, mapSizeZ)
   {
-    EnableIdMaps();       // the server's frames carry each view's own ids
+    EnableIdMaps();      // the server's frames carry each view's own ids
     SkipCivilianViews(); // and no client receives a civilian army's view
     EnableHeldFrames(check);
     EnablePhaseTimes();
@@ -78,7 +94,9 @@ namespace faf::headless
     moho::Sim::SetSyncObserver(nullptr);
   }
 
-  void CReplayViewBench::OnViewFrames(moho::Sim& sim)
+  void CReplayViewBench::OnViewFrames(
+    moho::Sim& sim
+  )
   {
     const auto sendStart = std::chrono::steady_clock::now();
     if (mSessionTables.HasPending()) {
@@ -102,15 +120,22 @@ namespace faf::headless
     }
   }
 
-  void CReplayViewBench::OnLuaRouterMade(remote::CSyncRouter& router)
+  void CReplayViewBench::OnLuaRouterMade(
+    remote::CSyncRouter& router
+  )
   {
     if (mLuaSpyOn) {
       mSyncSpy = std::make_unique<CReplaySyncSpy>(router);
-      router.SetPayloadObserver([this](moho::Sim& observed) { mSyncSpy->Check(observed); });
+      router.SetPayloadObserver([this](moho::Sim& observed) {
+        mSyncSpy->Check(observed);
+      });
     }
   }
 
-  void CReplayViewBench::OnLuaRouterBeat(moho::Sim& sim, remote::CSyncRouter& router)
+  void CReplayViewBench::OnLuaRouterBeat(
+    moho::Sim& sim,
+    remote::CSyncRouter& router
+  )
   {
     const auto beat = static_cast<std::int32_t>(sim.mCurBeat);
     for (const SLuaTestStep& step : mLuaMoves) {
@@ -151,8 +176,14 @@ namespace faf::headless
     mHaveLastFrames = true;
     if (mFile != nullptr) {
       std::fprintf(
-        mFile, "%u,%.3f,%.3f,%.3f,%llu,%llu\n", ViewBeat(), mBeat.buildMs, mBeat.sendMs, mBeat.intervalMs,
-        static_cast<unsigned long long>(entities), static_cast<unsigned long long>(bytes)
+        mFile,
+        "%u,%.3f,%.3f,%.3f,%llu,%llu\n",
+        ViewBeat(),
+        mBeat.buildMs,
+        mBeat.sendMs,
+        mBeat.intervalMs,
+        static_cast<unsigned long long>(entities),
+        static_cast<unsigned long long>(bytes)
       );
     }
   }
@@ -182,8 +213,13 @@ namespace faf::headless
     std::string summary;
     char text[200];
     std::snprintf(
-      text, sizeof(text), "view bench: %zu beats, %zu views (%s), %llu encode failures, %llu check differences, %.0f entities per beat",
-      mBeats.size(), mViews, Parallel() ? "parallel" : "serial", static_cast<unsigned long long>(mEncodeFailures),
+      text,
+      sizeof(text),
+      "view bench: %zu beats, %zu views (%s), %llu encode failures, %llu check differences, %.0f entities per beat",
+      mBeats.size(),
+      mViews,
+      Parallel() ? "parallel" : "serial",
+      static_cast<unsigned long long>(mEncodeFailures),
       static_cast<unsigned long long>(HeldMismatches()),
       mBeats.empty() ? 0.0 : static_cast<double>(mEntities) / static_cast<double>(mBeats.size() + 1u)
     );
@@ -195,17 +231,35 @@ namespace faf::headless
     summary += "; per client " + Distribution(perSecond, "B/s");
     if (PosesOn()) {
       const std::uint64_t beats = Poses().Beats() != 0u ? Poses().Beats() : 1u;
-      summary += "; poses: " + std::to_string(Poses().PosedUnits()) + " units with a pose at the end, "
-               + std::to_string(Poses().TotalChangedBones() / beats) + " bones changed a beat (all units), "
-               + std::to_string(Poses().TotalHookedUnits() / beats) + " units a beat read from the animation hook's marks";
+      summary += "; poses: " + std::to_string(Poses().PosedUnits()) + " units with a pose at the end, " +
+        std::to_string(Poses().TotalChangedBones() / beats) + " bones changed a beat (all units), " +
+        std::to_string(Poses().TotalHookedUnits() / beats) + " units a beat read from the animation hook's marks";
     }
     if (SessionTables() != nullptr) {
-      summary += "; session tables " + std::to_string(mTableRecords) + " records, " + std::to_string(mTableBytes / 1024u) + " KB";
+      summary += "; session tables " + std::to_string(mTableRecords) + " records, " +
+        std::to_string(mTableBytes / 1024u) + " KB";
     }
     if (PhaseTimesOn() && mPhaseBeats != 0u) {
       // Per beat, ms: each step's wall time on the sim thread; for a step done a view at a time, the
       // sum over views, the slowest view and the team views' part of the sum.
-      static constexpr const char* kNames[] = {"read", "read blocks", "read blips", "build", "write", "shared", "index", "facts", "keep", "poses", "tables", "frames", "release", "grid setup", "grids", "lua"};
+      static constexpr const char* kNames[] = {
+        "read",
+        "read blocks",
+        "read blips",
+        "build",
+        "write",
+        "shared",
+        "index",
+        "facts",
+        "keep",
+        "poses",
+        "tables",
+        "frames",
+        "release",
+        "grid setup",
+        "grids",
+        "lua"
+      };
       static_assert(std::size(kNames) == static_cast<std::size_t>(EViewPhase::Count));
       const double perBeat = 1000.0 / static_cast<double>(mPhaseBeats);
       double wall = 0.0;
@@ -216,12 +270,21 @@ namespace faf::headless
         std::snprintf(text, sizeof(text), " %s %.2f", kNames[phase], time.wall * perBeat);
         summary += text;
         if (time.viewSum > 0.0) {
-          std::snprintf(text, sizeof(text), " (views %.2f, slowest %.2f, teams %.2f)", time.viewSum * perBeat, time.viewMax * perBeat, time.teamViews * perBeat);
+          std::snprintf(
+            text,
+            sizeof(text),
+            " (views %.2f, slowest %.2f, teams %.2f)",
+            time.viewSum * perBeat,
+            time.viewMax * perBeat,
+            time.teamViews * perBeat
+          );
           summary += text;
         }
         summary += ";";
       }
-      std::snprintf(text, sizeof(text), " all %.2f; waiting for the last beat's views %.2f", wall * perBeat, mWaitSeconds * perBeat);
+      std::snprintf(
+        text, sizeof(text), " all %.2f; waiting for the last beat's views %.2f", wall * perBeat, mWaitSeconds * perBeat
+      );
       summary += text;
     }
     if (mSyncSpy != nullptr) {

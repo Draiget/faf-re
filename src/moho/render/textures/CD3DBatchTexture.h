@@ -52,7 +52,7 @@ namespace moho
      * pixels through `BuildTextureData`, and returns UV scale/border factors.
      */
     TextureSheetHandle&
-      GetTextureSheet(TextureSheetHandle& outTextureSheet, Wm3::Vector2f& outUvScale, Wm3::Vector2f& outUvBorder);
+    GetTextureSheet(TextureSheetHandle& outTextureSheet, Wm3::Vector2f& outUvScale, Wm3::Vector2f& outUvBorder);
 
     /**
      * Address: 0x00447120 (FUN_00447120)
@@ -71,7 +71,8 @@ namespace moho
     [[nodiscard]] std::uint32_t GetBorder() const;
 
     /**
-     * Address: 0x004478C0 (?FromSolidColor@CD3DBatchTexture@Moho@@SA?AV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@I@Z)
+     * Address: 0x004478C0
+     * (?FromSolidColor@CD3DBatchTexture@Moho@@SA?AV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@I@Z)
      *
      * What it does:
      * Returns one cached solid-color batch texture, creating it on first use.
@@ -99,7 +100,7 @@ namespace moho
      * instance with zero border.
      */
     [[nodiscard]] static boost::shared_ptr<CD3DBatchTexture>
-      FromDXT5(std::uint32_t width, std::uint32_t height, const void* dxt5Blocks, std::uint32_t sourcePitchBytes);
+    FromDXT5(std::uint32_t width, std::uint32_t height, const void* dxt5Blocks, std::uint32_t sourcePitchBytes);
 
     /**
      * Address: 0x00A82547 (_purecall slot)
@@ -173,6 +174,9 @@ namespace moho
   static_assert(offsetof(CD3DBatchTexture, mWidth) == 0x0C, "CD3DBatchTexture::mWidth offset must be 0x0C");
   static_assert(offsetof(CD3DBatchTexture, mHeight) == 0x10, "CD3DBatchTexture::mHeight offset must be 0x10");
   static_assert(offsetof(CD3DBatchTexture, mBorder) == 0x14, "CD3DBatchTexture::mBorder offset must be 0x14");
-  static_assert(offsetof(CD3DBatchTexture, mTextureSheet) == 0x18, "CD3DBatchTexture::mTextureSheet offset must be 0x18");
+  static_assert(
+    offsetof(CD3DBatchTexture, mTextureSheet) == 0x18,
+    "CD3DBatchTexture::mTextureSheet offset must be 0x18"
+  );
   static_assert(sizeof(CD3DBatchTexture) == 0x20, "CD3DBatchTexture size must be 0x20");
 } // namespace moho

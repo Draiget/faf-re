@@ -11,6 +11,7 @@
 #include "moho/console/CConCommand.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/mesh/MeshBatch.h"
+#include "moho/render/ID3DTextureSheet.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/resource/SScmFile.h"
@@ -27,6 +28,11 @@ namespace moho
   int ren_RayShadowDebug = 0;
   int ren_RayShadowTerrainStep = 0;
   int ren_RayShadowFailTest = 0;
+  // Engine addition (ren_RaySunAngle): soft shadows from a sun that is a disc, not a point.
+  float ren_RaySunAngle = 3.0f;
+  int ren_RaySoftRays = 4;
+  // Engine addition (ren_RayAlphaShadows): alpha-tested meshes (trees) in the scene too.
+  int ren_RayAlphaShadows = 1;
 
   namespace
   {
@@ -37,7 +43,8 @@ namespace moho
     );
     TConVar<float> gTConVar_ren_RayShadowTerrainBias(
       "ren_RayShadowTerrainBias",
-      "Ray-traced shadows: how far from the ground a ray must go before something shades the ground, in world units, near the camera.",
+      "Ray-traced shadows: how far from the ground a ray must go before something shades the ground, in world units, "
+      "near the camera.",
       &ren_RayShadowTerrainBias
     );
     TConVar<float> gTConVar_ren_RayShadowTerrainBiasFar(
@@ -54,7 +61,26 @@ namespace moho
       &ren_RayShadowDebug
     );
     TConVar<float> gTConVar_ren_RayShadowReach(
-      "ren_RayShadowReach", "Ray-traced shadows: the longest shadow ray, in world units.", &ren_RayShadowReach
+      "ren_RayShadowReach",
+      "Ray-traced shadows: the longest shadow ray, in world units.",
+      &ren_RayShadowReach
+    );
+    TConVar<float> gTConVar_ren_RaySunAngle(
+      "ren_RaySunAngle",
+      "Ray-traced shadows: the sun's angular radius in degrees; rays go to points over its disc, so a shadow is "
+      "sharp where its caster touches and softer further away. 0 gives hard shadows (one ray to the centre).",
+      &ren_RaySunAngle
+    );
+    TConVar<int> gTConVar_ren_RaySoftRays(
+      "ren_RaySoftRays",
+      "Ray-traced shadows with ren_RaySunAngle: rays per ground point (1-16); units use their own 5-tap filter.",
+      &ren_RaySoftRays
+    );
+    TConVar<int> gTConVar_ren_RayAlphaShadows(
+      "ren_RayAlphaShadows",
+      "Ray-traced shadows: trees and other meshes cut out by their texture's alpha are traced too (rays test the "
+      "texture where they meet them), instead of drawn into the shadow map. 1 on, 0 off.",
+      &ren_RayAlphaShadows
     );
     TConVar<int> gTConVar_ren_RayShadowFailTest(
       "ren_RayShadowFailTest",
@@ -77,7 +103,11 @@ namespace moho
     constexpr std::size_t kTerrainTilesPerFrame = 64U;
 
     /** Hash of `count` height samples, eight bytes at a time. */
-    [[nodiscard]] std::uint64_t HashHeights(const std::uint16_t* const samples, const std::size_t count, std::uint64_t hash)
+    [[nodiscard]] std::uint64_t HashHeights(
+      const std::uint16_t* const samples,
+      const std::size_t count,
+      std::uint64_t hash
+    )
     {
       constexpr std::uint64_t kMultiplier = 0x9E3779B97F4A7C15ULL;
       std::size_t i = 0U;
@@ -94,7 +124,10 @@ namespace moho
     }
 
     /** Inverse of a 4x4 row-major matrix (Gauss-Jordan in double); false when it is singular. */
-    [[nodiscard]] bool Invert4x4(const float (&in)[4][4], float (&out)[4][4])
+    [[nodiscard]] bool Invert4x4(
+      const float (&in)[4][4],
+      float (&out)[4][4]
+    )
     {
       double a[4][8]{};
       for (int r = 0; r < 4; ++r) {
@@ -139,7 +172,9 @@ namespace moho
       return true;
     }
 
-    void Publish(const float (&vectors)[gpg::gal::effects::kRayShadowVectors][4])
+    void Publish(
+      const float (&vectors)[gpg::gal::effects::kRayShadowVectors][4]
+    )
     {
       gpg::gal::effects::RayShadowConstants& constants = gpg::gal::effects::gRayShadows;
       if (std::memcmp(constants.vectors, vectors, sizeof(constants.vectors)) != 0) {
@@ -172,6 +207,7 @@ namespace moho
     const float off[gpg::gal::effects::kRayShadowVectors][4]{};
     Publish(off);
     gMeshDepthSkipsTraced = false;
+    gMeshDepthSkipsAlpha = false;
   }
 
   void RayScene::SweepMeshes()
@@ -188,12 +224,17 @@ namespace moho
     }
   }
 
-  RayScene::MeshPieces* RayScene::PiecesFor(const boost::shared_ptr<RScmResource>& resource, const bool skinned)
+  RayScene::MeshPieces* RayScene::PiecesFor(
+    const boost::shared_ptr<RScmResource>& resource,
+    const bool skinned,
+    const bool alpha
+  )
   {
     if (!resource || !resource->mFile) {
       return nullptr;
     }
-    const auto key = std::make_pair(static_cast<const RScmResource*>(resource.get()), skinned);
+    const auto key =
+      std::make_pair(static_cast<const RScmResource*>(resource.get()), (skinned ? 1 : 0) | (alpha ? 2 : 0));
     auto found = mMeshes.find(key);
     if (found != mMeshes.end()) {
       if (!found->second.resource.expired()) {
@@ -230,6 +271,7 @@ namespace moho
     }
 
     std::vector<float> positions;
+    std::vector<float> uvs;
     std::vector<std::uint32_t> pieceIndices;
     std::vector<std::uint32_t> remap(vertexCount, ~0U);
     for (std::uint32_t bone = 0U; bone < boneCount; ++bone) {
@@ -237,6 +279,7 @@ namespace moho
         continue;
       }
       positions.clear();
+      uvs.clear();
       pieceIndices.clear();
       std::fill(remap.begin(), remap.end(), ~0U);
       for (const std::uint32_t triangle : triangles[bone]) {
@@ -247,6 +290,8 @@ namespace moho
             positions.push_back(vertices[vertex].mLocalPositionX);
             positions.push_back(vertices[vertex].mLocalPositionY);
             positions.push_back(vertices[vertex].mLocalPositionZ);
+            uvs.push_back(vertices[vertex].mTexCoord0[0]);
+            uvs.push_back(vertices[vertex].mTexCoord0[1]);
           }
           pieceIndices.push_back(remap[vertex]);
         }
@@ -258,13 +303,20 @@ namespace moho
       desc.vertexCount = static_cast<std::uint32_t>(positions.size() / 3U);
       desc.indices = pieceIndices.data();
       desc.indexCount = static_cast<std::uint32_t>(pieceIndices.size());
+      if (alpha) {
+        desc.uvs = uvs.data(); // mesh.fx's texcoord0 (HardwareMeshBatch packs mTexCoord0 there)
+        desc.uvStride = 8U;
+      }
       mesh.pieces[bone] = mDevice->CreateRayGeometry(desc);
       mesh.incomplete = mesh.incomplete || mesh.pieces[bone] == 0U;
     }
     return &mMeshes.emplace(key, std::move(mesh)).first->second;
   }
 
-  void RayScene::AddMeshes(MeshRenderer& meshRenderer, const MeshBatchBucketTree& meshes)
+  void RayScene::AddMeshes(
+    MeshRenderer& meshRenderer,
+    const MeshBatchBucketTree& meshes
+  )
   {
     (void)meshRenderer;
     for (const MeshBatchBucket& bucket : meshes) {
@@ -272,8 +324,35 @@ namespace moho
         continue;
       }
       MeshLOD* const lod = bucket.first.mLod;
-      if (lod == nullptr || !MeshMaterialTraced(lod->mat)) {
+      if (lod == nullptr) {
         continue;
+      }
+      const bool alpha = ren_RayAlphaShadows > 0 && MeshMaterialAlphaTraced(lod->mat);
+      if (!alpha && !MeshMaterialTraced(lod->mat)) {
+        continue;
+      }
+      // An alpha-tested material: its albedo decides where rays pass (mesh.fx's DepthClip test).
+      std::uint32_t texture = 0U;
+      if (alpha) {
+        ID3DTextureSheet::TextureHandle albedo{};
+        if (lod->mat.mAlbedoSheet != nullptr) {
+          lod->mat.mAlbedoSheet->GetTexture(albedo);
+        }
+        if (!albedo) {
+          mAlphaMissing = true;
+          continue;
+        }
+        const auto known = std::find(mAlphaTextures.begin(), mAlphaTextures.end(), albedo);
+        if (known == mAlphaTextures.end()) {
+          if (mAlphaTextures.size() >= gpg::gal::kRayTextureSlots) {
+            mAlphaMissing = true; // the device's table is full: this one stays in the shadow map
+            continue;
+          }
+          mAlphaTextures.push_back(albedo);
+          texture = static_cast<std::uint32_t>(mAlphaTextures.size());
+        } else {
+          texture = static_cast<std::uint32_t>(known - mAlphaTextures.begin()) + 1U;
+        }
       }
       boost::shared_ptr<MeshBatch> batch;
       if (bucket.first.mIsStaticPose != 0) {
@@ -284,10 +363,10 @@ namespace moho
       if (!batch) {
         continue;
       }
-      MeshPieces* const pieces = PiecesFor(batch->mCurrentResource, batch->mUseBoneRemap != 0);
+      MeshPieces* const pieces = PiecesFor(batch->mCurrentResource, batch->mUseBoneRemap != 0, alpha);
       if (pieces == nullptr || pieces->incomplete || ren_RayShadowFailTest == 3) {
         // RenderDepth would leave it out of the map too: let the map keep the traced materials this frame.
-        mMeshesMissing = true;
+        (alpha ? mAlphaMissing : mMeshesMissing) = true;
       }
       if (pieces == nullptr) {
         continue;
@@ -309,13 +388,16 @@ namespace moho
           std::memcpy(ray.transform, m.data(), sizeof(ray.transform));
           ray.geometry = piece;
           ray.mask = gpg::gal::kRayMaskMesh;
+          ray.texture = texture;
           mInstances.push_back(ray);
         }
       }
     }
   }
 
-  void RayScene::AddTerrain(const CHeightField& field)
+  void RayScene::AddTerrain(
+    const CHeightField& field
+  )
   {
     if (field.data == nullptr || field.width < 2 || field.height < 2) {
       return;
@@ -362,8 +444,11 @@ namespace moho
           const int z1 = std::min(z0 + tileSpan, cellsZ);
           std::uint64_t hash = 1469598103934665603ULL;
           for (int z = z0; z <= z1; ++z) {
-            hash = HashHeights(field.data + (static_cast<std::size_t>(z) * static_cast<std::size_t>(field.width)) + x0,
-                               static_cast<std::size_t>(x1 - x0 + 1), hash);
+            hash = HashHeights(
+              field.data + (static_cast<std::size_t>(z) * static_cast<std::size_t>(field.width)) + x0,
+              static_cast<std::size_t>(x1 - x0 + 1),
+              hash
+            );
           }
           TerrainTile& tile = mTerrainTiles[index];
           if (tile.geometry != 0U && tile.hash == hash) {
@@ -384,7 +469,9 @@ namespace moho
           indices.clear();
           for (const int z : zs) {
             for (const int x : xs) {
-              const std::uint16_t raw = field.data[static_cast<std::size_t>(z) * static_cast<std::size_t>(field.width) + static_cast<std::size_t>(x)];
+              const std::uint16_t raw =
+                field.data
+                  [static_cast<std::size_t>(z) * static_cast<std::size_t>(field.width) + static_cast<std::size_t>(x)];
               positions.push_back(static_cast<float>(x));
               positions.push_back(static_cast<float>(raw) * (1.0f / 128.0f));
               positions.push_back(static_cast<float>(z));
@@ -416,10 +503,18 @@ namespace moho
         }
       }
       if (rebuilt != 0) {
-        gpg::Logf("Ray-traced shadows: %d terrain tiles built (%dx%d heights, every %d)", rebuilt, field.width, field.height, step);
+        gpg::Logf(
+          "Ray-traced shadows: %d terrain tiles built (%dx%d heights, every %d)",
+          rebuilt,
+          field.width,
+          field.height,
+          step
+        );
       }
     }
-    mTerrainComplete = std::all_of(mTerrainTiles.begin(), mTerrainTiles.end(), [](const TerrainTile& tile) { return tile.geometry != 0U; });
+    mTerrainComplete = std::all_of(mTerrainTiles.begin(), mTerrainTiles.end(), [](const TerrainTile& tile) {
+      return tile.geometry != 0U;
+    });
     if (!mTerrainComplete && mTerrainScanLeft == 0U) {
       mTerrainScanLeft = mTerrainTiles.size(); // retry the missing ones (built tiles hash the same and are kept)
     }
@@ -438,8 +533,12 @@ namespace moho
   }
 
   bool RayScene::Submit(
-    MeshRenderer& meshRenderer, const MeshBatchBucketTree& meshes, const CHeightField* const heightField, const GeomCamera3& lightCamera,
-    const GeomCamera3& viewCamera, const float (&sunDirection)[3]
+    MeshRenderer& meshRenderer,
+    const MeshBatchBucketTree& meshes,
+    const CHeightField* const heightField,
+    const GeomCamera3& lightCamera,
+    const GeomCamera3& viewCamera,
+    const float (&sunDirection)[3]
   )
   {
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
@@ -461,18 +560,30 @@ namespace moho
     }
     mInstances.clear();
     mMeshesMissing = false;
+    mAlphaMissing = ren_RayAlphaShadows <= 0;
+    mAlphaTextures.clear();
     mTerrainComplete = false;
     if (heightField != nullptr) {
       AddTerrain(*heightField);
     }
     AddMeshes(meshRenderer, meshes);
-    if (!device->SetRayInstances(mInstances.data(), static_cast<std::uint32_t>(mInstances.size())) || ren_RayShadowFailTest == 1) {
+    if (
+      !device->SetRayInstances(
+        mInstances.data(),
+        static_cast<std::uint32_t>(mInstances.size()),
+        mAlphaTextures.data(),
+        static_cast<std::uint32_t>(mAlphaTextures.size())
+      ) ||
+      ren_RayShadowFailTest == 1
+    ) {
       PublishOff();
       return false;
     }
     if (mLoggedFrames < 3U) {
       ++mLoggedFrames;
-      gpg::Logf("Ray-traced shadows: %u instances (%zu meshes known)", static_cast<unsigned>(mInstances.size()), mMeshes.size());
+      gpg::Logf(
+        "Ray-traced shadows: %u instances (%zu meshes known)", static_cast<unsigned>(mInstances.size()), mMeshes.size()
+      );
     }
 
     float viewProjection[4][4]{};
@@ -493,7 +604,9 @@ namespace moho
     vectors[5][1] = eye.y;
     vectors[5][2] = eye.z;
     vectors[5][3] = ren_RayShadowReach;
-    const float sunLength = std::sqrt(sunDirection[0] * sunDirection[0] + sunDirection[1] * sunDirection[1] + sunDirection[2] * sunDirection[2]);
+    const float sunLength = std::sqrt(
+      sunDirection[0] * sunDirection[0] + sunDirection[1] * sunDirection[1] + sunDirection[2] * sunDirection[2]
+    );
     if (sunLength < 1e-6f) {
       PublishOff();
       return false;
@@ -505,11 +618,16 @@ namespace moho
     // How far under the traced ground a drawn ground point can lie: half a unit per skipped sample of the
     // traced field, and terrain tessellation's deepest sinking (terrain_tess.fx's TerrainTessDepthScale);
     // a ray towards the sun leaves that depth after it over the sun's height.
-    const float under = 0.5f * static_cast<float>(std::max(mTerrainStep, 1) - 1) + (ren_TerrainTessellation ? 0.3f : 0.0f);
+    const float under =
+      0.5f * static_cast<float>(std::max(mTerrainStep, 1) - 1) + (ren_TerrainTessellation ? 0.3f : 0.0f);
     vectors[7][0] = under / std::max(vectors[6][1], 0.2f);
     vectors[7][1] = under; // ren_RayAo's rays (AmbientOcclusionRenderer)
+    const float sunAngle = std::clamp(ren_RaySunAngle, 0.0f, 20.0f);
+    vectors[7][2] = std::tan(sunAngle * 0.0174532925f);
+    vectors[7][3] = static_cast<float>(std::clamp(ren_RaySoftRays, 1, 16));
     Publish(vectors);
     gMeshDepthSkipsTraced = !mMeshesMissing;
+    gMeshDepthSkipsAlpha = !mAlphaMissing;
     return true;
   }
 } // namespace moho

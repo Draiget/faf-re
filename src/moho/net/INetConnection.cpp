@@ -10,7 +10,10 @@ using namespace moho;
  * What it does:
  * Stores a caller-provided byte span [start, end).
  */
-NetDataSpan::NetDataSpan(uint8_t* const begin, uint8_t* const finish) noexcept
+NetDataSpan::NetDataSpan(
+  uint8_t* const begin,
+  uint8_t* const finish
+) noexcept
   : start(begin)
   , end(finish)
 {}
@@ -22,7 +25,9 @@ NetDataSpan::NetDataSpan(uint8_t* const begin, uint8_t* const finish) noexcept
  * Creates a span over a message's whole wire buffer [mBuff.start_, mBuff.end_):
  * the 3-byte type/size header followed by the payload.
  */
-NetDataSpan::NetDataSpan(const CMessage& message) noexcept
+NetDataSpan::NetDataSpan(
+  const CMessage& message
+) noexcept
   : start(reinterpret_cast<std::uint8_t*>(message.mBuff.start_))
   , end(reinterpret_cast<std::uint8_t*>(message.mBuff.end_))
 {}
@@ -58,7 +63,9 @@ uint8_t* NetDataSpan::data() const noexcept
  * `lea edx,[esp+0x6C]; push edx; call [eax+0x10]` at 0x007C5E85 in
  * `CLobby::OnConnectionMade`, so the header travels with the payload.
  */
-void INetConnection::Write(const CMessage& message)
+void INetConnection::Write(
+  const CMessage& message
+)
 {
   NetDataSpan span(message);
   Write(&span);

@@ -203,7 +203,9 @@ namespace
   {
 
     const gpg::RRef nullOwner{};
-    archive->WritePointer<moho::Listener<moho::EAiNavigatorEvent>>(listener, gpg::TrackedPointerState::Unowned, ownerRef ? *ownerRef : nullOwner);
+    archive->WritePointer<moho::Listener<moho::EAiNavigatorEvent>>(
+      listener, gpg::TrackedPointerState::Unowned, ownerRef ? *ownerRef : nullOwner
+    );
     return archive;
   }
 
@@ -265,7 +267,9 @@ namespace
    * Upcasts one reflected source lane to `CAiNavigatorImpl` and returns the
    * resulting object pointer lane.
    */
-  [[maybe_unused]] [[nodiscard]] void* UpcastCAiNavigatorImplRefObject(gpg::RRef* const source)
+  [[maybe_unused]] [[nodiscard]] void* UpcastCAiNavigatorImplRefObject(
+    gpg::RRef* const source
+  )
   {
     if (!source) {
       return nullptr;
@@ -281,7 +285,9 @@ namespace
    * Upcasts one reflected source lane to `Listener<EAiNavigatorEvent>` and
    * returns the resulting object pointer lane.
    */
-  [[maybe_unused]] [[nodiscard]] void* UpcastListenerEAiNavigatorEventRefObject(gpg::RRef* const source)
+  [[maybe_unused]] [[nodiscard]] void* UpcastListenerEAiNavigatorEventRefObject(
+    gpg::RRef* const source
+  )
   {
     if (!source) {
       return nullptr;
@@ -296,7 +302,9 @@ namespace
    * What it does:
    * Returns the high byte from one 32-bit packed value lane.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint8_t ExtractPackedHighByte(const std::uint32_t value) noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint8_t ExtractPackedHighByte(
+    const std::uint32_t value
+  ) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
   }
@@ -330,9 +338,7 @@ void moho::RBroadcasterRType_EAiNavigatorEvent::SerLoad(
   gpg::RRef* const ownerRef
 )
 {
-  auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EAiNavigatorEvent>*>(
-    objectPtr
-  );
+  auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EAiNavigatorEvent>*>(objectPtr);
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(broadcaster != nullptr);
   if (!archive || !broadcaster) {
@@ -361,9 +367,7 @@ void moho::RBroadcasterRType_EAiNavigatorEvent::SerSave(
   gpg::RRef* const ownerRef
 )
 {
-  auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EAiNavigatorEvent>*>(
-    objectPtr
-  );
+  auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EAiNavigatorEvent>*>(objectPtr);
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(broadcaster != nullptr);
   if (!archive || !broadcaster) {
@@ -401,7 +405,9 @@ namespace
    * Releases one `SNavPath` storage pointer lane (`start`) and clears the
    * pointer triplet while preserving the leading metadata word.
    */
-  [[maybe_unused]] void ResetPathCellStorageTriplet(SNavPath& path) noexcept
+  [[maybe_unused]] void ResetPathCellStorageTriplet(
+    SNavPath& path
+  ) noexcept
   {
     if (path.start) {
       ::operator delete(path.start);
@@ -430,7 +436,9 @@ namespace
    * Allocates one contiguous SOCellPos span after validating the 32-bit byte
    * multiplication bound used by the original allocator lane.
    */
-  [[nodiscard]] SOCellPos* AllocatePathCellStorageChecked(const std::uint32_t count)
+  [[nodiscard]] SOCellPos* AllocatePathCellStorageChecked(
+    const std::uint32_t count
+  )
   {
     if (count != 0u && (std::numeric_limits<std::uint32_t>::max() / count) < sizeof(SOCellPos)) {
       throw std::bad_alloc();
@@ -446,7 +454,10 @@ namespace
    * Initializes one empty path span with exact capacity `count` and keeps the
    * start/finish pointers aligned to the allocated base.
    */
-  [[nodiscard]] bool InitializePathStorageExact(SNavPath& path, const std::uint32_t count)
+  [[nodiscard]] bool InitializePathStorageExact(
+    SNavPath& path,
+    const std::uint32_t count
+  )
   {
     if (count > kMaxPathCellCount) {
       ThrowPathCellVectorTooLong();
@@ -620,7 +631,11 @@ namespace
    * Writes `count` copies of one SOCellPos value into destination storage and
    * returns the remaining write count (always zero when finished).
    */
-  std::uint32_t FillCellsWithValue(std::uint32_t count, const SOCellPos& value, SOCellPos* destination) noexcept
+  std::uint32_t FillCellsWithValue(
+    std::uint32_t count,
+    const SOCellPos& value,
+    SOCellPos* destination
+  ) noexcept
   {
     std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
     while (count > 0u) {
@@ -664,7 +679,10 @@ namespace
     return CopyCellsForwardAllowNullStackBridge(destination, sourceBegin, sourceEnd);
   }
 
-  [[nodiscard]] std::size_t ComputeGrowthCapacity(const std::size_t currentCapacity, const std::size_t requiredCount)
+  [[nodiscard]] std::size_t ComputeGrowthCapacity(
+    const std::size_t currentCapacity,
+    const std::size_t requiredCount
+  )
   {
     std::size_t grown = 0;
     if (currentCapacity <= (kMaxPathCellCount / 2u)) {
@@ -706,7 +724,10 @@ namespace
    * Stores one 32-bit value through the supplied output pointer and returns the
    * destination pointer unchanged.
    */
-  [[nodiscard]] std::uint32_t* StoreDwordValue(std::uint32_t* const destination, const std::uint32_t value) noexcept
+  [[nodiscard]] std::uint32_t* StoreDwordValue(
+    std::uint32_t* const destination,
+    const std::uint32_t value
+  ) noexcept
   {
     if (destination) {
       *destination = value;
@@ -749,7 +770,9 @@ namespace
    * What it does:
    * Loads one 32-bit value from a source pointer.
    */
-  [[nodiscard]] std::uint32_t LoadDwordValue(const std::uint32_t* const source) noexcept
+  [[nodiscard]] std::uint32_t LoadDwordValue(
+    const std::uint32_t* const source
+  ) noexcept
   {
     return source ? *source : 0u;
   }
@@ -760,7 +783,9 @@ namespace
    * What it does:
    * Alias lane for loading one 32-bit value from a source pointer.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t LoadDwordValueAlias(const std::uint32_t* const source) noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint32_t LoadDwordValueAlias(
+    const std::uint32_t* const source
+  ) noexcept
   {
     return LoadDwordValue(source);
   }
@@ -771,7 +796,9 @@ namespace
    * What it does:
    * Secondary alias lane for loading one 32-bit value from a source pointer.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t LoadDwordValueAlias2(const std::uint32_t* const source) noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint32_t LoadDwordValueAlias2(
+    const std::uint32_t* const source
+  ) noexcept
   {
     return LoadDwordValue(source);
   }
@@ -867,7 +894,10 @@ namespace
    * What it does:
    * Computes the cell-span distance between two raw stored dword addresses.
    */
-  [[nodiscard]] std::int32_t CountPathCellSpan(const SOCellPos* const end, const SOCellPos* const begin) noexcept
+  [[nodiscard]] std::int32_t CountPathCellSpan(
+    const SOCellPos* const end,
+    const SOCellPos* const begin
+  ) noexcept
   {
     if (!end || !begin || end < begin) {
       return 0;
@@ -883,7 +913,9 @@ namespace
    * Zero-length fill bridge that preserves the legacy no-op call shape used by
    * the caller thunk lane.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t FillZeroCellsBridge(SOCellPos* const destination) noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint32_t FillZeroCellsBridge(
+    SOCellPos* const destination
+  ) noexcept
   {
     const SOCellPos zeroCell{};
     return FillCellsWithValue(0u, zeroCell, destination);
@@ -896,7 +928,9 @@ namespace
    * Zero-length copy bridge that preserves the legacy null-tolerant forward
    * copy call shape.
    */
-  [[maybe_unused]] [[nodiscard]] SOCellPos* CopyZeroCellRangeBridge(SOCellPos* const destination) noexcept
+  [[maybe_unused]] [[nodiscard]] SOCellPos* CopyZeroCellRangeBridge(
+    SOCellPos* const destination
+  ) noexcept
   {
     return CopyCellsForwardAllowNull(destination, nullptr, nullptr);
   }
@@ -907,7 +941,9 @@ namespace
    * What it does:
    * Secondary zero-length copy bridge for the same null-tolerant lane.
    */
-  [[maybe_unused]] [[nodiscard]] SOCellPos* CopyZeroCellRangeBridge2(SOCellPos* const destination) noexcept
+  [[maybe_unused]] [[nodiscard]] SOCellPos* CopyZeroCellRangeBridge2(
+    SOCellPos* const destination
+  ) noexcept
   {
     return CopyCellsForwardAllowNull(destination, nullptr, nullptr);
   }
@@ -918,7 +954,9 @@ namespace
    * What it does:
    * Extracts the high byte from one 32-bit packed lane value.
    */
-  [[maybe_unused]] [[nodiscard]] std::uint8_t ExtractArgumentHighByte(const std::uint32_t value) noexcept
+  [[maybe_unused]] [[nodiscard]] std::uint8_t ExtractArgumentHighByte(
+    const std::uint32_t value
+  ) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8u) & 0xFFu);
   }
@@ -1032,7 +1070,9 @@ void SNavPath::FreeStorage() noexcept
   capacity = nullptr;
 }
 
-void SNavPath::EnsureCapacity(const std::size_t requiredCount)
+void SNavPath::EnsureCapacity(
+  const std::size_t requiredCount
+)
 {
   if (requiredCount > kMaxPathCellCount) {
     ThrowPathCellVectorTooLong();
@@ -1071,7 +1111,9 @@ void SNavPath::EnsureCapacity(const std::size_t requiredCount)
  * Assigns one source span into this path storage and clears content when the
  * source is empty.
  */
-void SNavPath::AssignCopy(const SNavPath& src)
+void SNavPath::AssignCopy(
+  const SNavPath& src
+)
 {
   if (this == &src) {
     return;
@@ -1091,7 +1133,10 @@ void SNavPath::AssignCopy(const SNavPath& src)
   finish = CopyCellsForAssignBridge(start, src.start, src.start + count);
 }
 
-void SNavPath::AppendCells(const SOCellPos* const begin, const SOCellPos* const end)
+void SNavPath::AppendCells(
+  const SOCellPos* const begin,
+  const SOCellPos* const end
+)
 {
   if (!begin || !end || end <= begin) {
     return;
@@ -1118,7 +1163,10 @@ void SNavPath::AppendCells(const SOCellPos* const begin, const SOCellPos* const 
  * Prepends one cell range at path front, preserving existing ordering while
  * growing capacity when required.
  */
-void SNavPath::PrependCells(const SOCellPos* const begin, const SOCellPos* const end)
+void SNavPath::PrependCells(
+  const SOCellPos* const begin,
+  const SOCellPos* const end
+)
 {
   if (!begin || !end || end <= begin) {
     return;
@@ -1169,7 +1217,9 @@ void SNavPath::PrependCells(const SOCellPos* const begin, const SOCellPos* const
   capacity = newStorage + newCapacity;
 }
 
-void SNavPath::AppendCell(const SOCellPos& cell)
+void SNavPath::AppendCell(
+  const SOCellPos& cell
+)
 {
   if (!start || finish >= capacity) {
     (void)InsertCellCopiesAt(*this, finish ? finish : start, 1u, cell);
@@ -1196,7 +1246,9 @@ void SNavPath::EraseFrontCell() noexcept
   --finish;
 }
 
-void SNavPath::EraseFrontCells(std::int32_t count) noexcept
+void SNavPath::EraseFrontCells(
+  std::int32_t count
+) noexcept
 {
   while (count > 0 && CountInt() > 0) {
     EraseFrontCell();
@@ -1213,7 +1265,9 @@ gpg::RType* IAiNavigator::sType = nullptr;
  * Allocates one `CAiNavigatorLand` instance bound to `unit` and returns it as
  * the `IAiNavigator` interface pointer.
  */
-IAiNavigator* moho::AI_CreatePathingNavigator(Unit* const unit)
+IAiNavigator* moho::AI_CreatePathingNavigator(
+  Unit* const unit
+)
 {
   auto* const navigator = new (std::nothrow) CAiNavigatorLand(unit);
   return navigator;
@@ -1226,7 +1280,9 @@ IAiNavigator* moho::AI_CreatePathingNavigator(Unit* const unit)
  * Allocates one `CAiNavigatorAir` instance bound to `unit` and returns it as
  * the `IAiNavigator` interface pointer.
  */
-IAiNavigator* moho::AI_CreateAirNavigator(Unit* const unit)
+IAiNavigator* moho::AI_CreateAirNavigator(
+  Unit* const unit
+)
 {
   auto* const navigator = new (std::nothrow) CAiNavigatorAir(unit);
   return navigator;
@@ -1238,9 +1294,7 @@ IAiNavigator* moho::AI_CreateAirNavigator(Unit* const unit)
  * What it does:
  * Preserves the legacy global AI path-data clear hook as a deliberate no-op.
  */
-void moho::AI_ClearPathData()
-{
-}
+void moho::AI_ClearPathData() {}
 
 /**
  * Address: 0x005A2CF0 (FUN_005A2CF0, the body; the `Broadcaster` base's
@@ -1256,14 +1310,18 @@ IAiNavigator::~IAiNavigator() = default;
  * Loads IAiNavigator broadcaster listener payload through reflected
  * `Broadcaster<EAiNavigatorEvent>` metadata.
  */
-void IAiNavigator::MemberDeserialize(gpg::ReadArchive* const archive)
+void IAiNavigator::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
   }
 
   const gpg::RRef ownerRef{};
-  archive->Read(gpg::RTypeOf<Broadcaster<EAiNavigatorEvent>>(), static_cast<Broadcaster<EAiNavigatorEvent>*>(this), ownerRef);
+  archive->Read(
+    gpg::RTypeOf<Broadcaster<EAiNavigatorEvent>>(), static_cast<Broadcaster<EAiNavigatorEvent>*>(this), ownerRef
+  );
 }
 
 /**
@@ -1273,7 +1331,9 @@ void IAiNavigator::MemberDeserialize(gpg::ReadArchive* const archive)
  * Saves IAiNavigator broadcaster listener payload through reflected
  * `Broadcaster<EAiNavigatorEvent>` metadata.
  */
-void IAiNavigator::MemberSerialize(gpg::WriteArchive* const archive) const
+void IAiNavigator::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (!archive) {
     return;
@@ -1325,8 +1385,14 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(RegisterBroadcasterEAiNavigatorEventType_2f6ef0, RegisterBroadcasterEAiNavigatorEventType)
-GPG_PREREGISTER_INIT(RegisterListenerEAiNavigatorEventType_2f6ef0, RegisterListenerEAiNavigatorEventType)
+GPG_PREREGISTER_INIT(
+  RegisterBroadcasterEAiNavigatorEventType_2f6ef0,
+  RegisterBroadcasterEAiNavigatorEventType
+)
+GPG_PREREGISTER_INIT(
+  RegisterListenerEAiNavigatorEventType_2f6ef0,
+  RegisterListenerEAiNavigatorEventType
+)
 
 namespace moho
 {

@@ -5,6 +5,7 @@
 #include <deque>
 #include <mutex>
 #include <string>
+#include <vector>
 
 #include "gpg/core/utils/Logging.h"
 
@@ -39,6 +40,10 @@ namespace faf::editor
     /** How many warnings arrived since the start. */
     [[nodiscard]] int WarningCount() const;
 
+    /** From now until EndCapture the warnings (where the game's Lua errors arrive) are also kept apart. */
+    void BeginCapture();
+    [[nodiscard]] std::vector<std::string> EndCapture();
+
   private:
     struct Line
     {
@@ -53,6 +58,8 @@ namespace faf::editor
     const std::chrono::steady_clock::time_point mStart = std::chrono::steady_clock::now();
     std::FILE* mTimesFile = nullptr;
     int mWarnings = 0;
+    bool mCapturing = false;
+    std::vector<std::string> mCaptured;
     bool mAutoScroll = true;
     bool mShowTimes = false;
     char mFilter[128]{};

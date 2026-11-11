@@ -24,7 +24,11 @@
 namespace lua
 {
   /// sprintf(out, form, value) for one floating conversion, with Windows' NaN text.
-  inline int FormatNumberLikeWindowsCrt(char* const out, const char* const form, const double value)
+  inline int FormatNumberLikeWindowsCrt(
+    char* const out,
+    const char* const form,
+    const double value
+  )
   {
 #if !defined(_WIN32)
     std::uint64_t bits = 0;
@@ -57,7 +61,10 @@ namespace lua
   }
 
   /// strtod(text, end), with Windows' NaN spellings and values.
-  inline double ParseNumberLikeWindowsCrt(const char* const text, char** const end)
+  inline double ParseNumberLikeWindowsCrt(
+    const char* const text,
+    char** const end
+  )
   {
 #if !defined(_WIN32)
     const char* cursor = text;
@@ -69,14 +76,16 @@ namespace lua
       negative = *cursor == '-';
       ++cursor;
     }
-    const auto lower = [](const char c) { return (c >= 'A' && c <= 'Z') ? static_cast<char>(c + 32) : c; };
+    const auto lower = [](const char c) {
+      return (c >= 'A' && c <= 'Z') ? static_cast<char>(c + 32) : c;
+    };
     if (lower(cursor[0]) == 'n' && lower(cursor[1]) == 'a' && lower(cursor[2]) == 'n') {
       cursor += 3;
       std::uint64_t bits = 0x7FFFFFFFFFFFFFFFull;
       if (*cursor == '(') {
         const char* close = cursor + 1;
-        while ((*close >= '0' && *close <= '9') || (*close >= 'a' && *close <= 'z') || (*close >= 'A' && *close <= 'Z') ||
-               *close == '_') {
+        while ((*close >= '0' && *close <= '9') || (*close >= 'a' && *close <= 'z') ||
+               (*close >= 'A' && *close <= 'Z') || *close == '_') {
           ++close;
         }
         if (*close == ')') {

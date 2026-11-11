@@ -6,6 +6,6 @@
  */
 int HEADLESS_Main(int argc, char** argv);
 
-// Engine addition (replay timeline): set in the game's exe (GameEntry.cpp), and read by its WinMain, for `/replaykeyframes`.
-// The engine library holds WinMain and not the player, so its other users link without the player.
+// Engine addition (replay timeline): set in the game's exe (GameEntry.cpp), and read by its WinMain, for
+// `/replaykeyframes`. The engine library holds WinMain and not the player, so its other users link without the player.
 extern int (*gGameReplayPlayerMain)(int argc, char** argv);

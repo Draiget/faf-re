@@ -62,7 +62,9 @@ namespace moho
    * What it does:
    * Constructs one built-task child lane from parent command-dispatch context.
    */
-  CUnitGetBuiltTask::CUnitGetBuiltTask(CCommandTask* const parent)
+  CUnitGetBuiltTask::CUnitGetBuiltTask(
+    CCommandTask* const parent
+  )
     : CCommandTask(parent)
   {}
 
@@ -89,7 +91,11 @@ namespace moho
    * fields. Inlined into `gpg::SerSaveLoadHelper<CUnitGetBuiltTask>::Deserialize`
    * 0x0060A700.
    */
-  void CUnitGetBuiltTask::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
+  void CUnitGetBuiltTask::MemberDeserialize(
+    gpg::ReadArchive* const archive,
+    const int,
+    const gpg::RRef& ownerRef
+  )
   {
     archive->Read(gpg::RTypeOf<moho::CCommandTask>(), static_cast<CCommandTask*>(this), ownerRef);
   }
@@ -99,7 +105,11 @@ namespace moho
    * Saves the `CCommandTask` base. Inlined into
    * `gpg::SerSaveLoadHelper<CUnitGetBuiltTask>::Serialize` 0x0060A740.
    */
-  void CUnitGetBuiltTask::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef) const
+  void CUnitGetBuiltTask::MemberSerialize(
+    gpg::WriteArchive* const archive,
+    const int,
+    const gpg::RRef& ownerRef
+  ) const
   {
     archive->Write(gpg::RTypeOf<moho::CCommandTask>(), static_cast<const CCommandTask*>(this), ownerRef);
   }

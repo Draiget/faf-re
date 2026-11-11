@@ -18,53 +18,80 @@ namespace
   constexpr float kNear = 1.0f;
   constexpr float kFar = 1000.0f;
 
-  float Dot(const Wm3::Vector3f& a, const Wm3::Vector3f& b)
+  float Dot(
+    const Wm3::Vector3f& a,
+    const Wm3::Vector3f& b
+  )
   {
     return (a.x * b.x) + (a.y * b.y) + (a.z * b.z);
   }
 
-  Wm3::Vector3f Sub(const Wm3::Vector3f& a, const Wm3::Vector3f& b)
+  Wm3::Vector3f Sub(
+    const Wm3::Vector3f& a,
+    const Wm3::Vector3f& b
+  )
   {
     return {a.x - b.x, a.y - b.y, a.z - b.z};
   }
 
-  Wm3::Vector3f Add(const Wm3::Vector3f& a, const Wm3::Vector3f& b)
+  Wm3::Vector3f Add(
+    const Wm3::Vector3f& a,
+    const Wm3::Vector3f& b
+  )
   {
     return {a.x + b.x, a.y + b.y, a.z + b.z};
   }
 
-  Wm3::Vector3f Scale(const Wm3::Vector3f& a, const float s)
+  Wm3::Vector3f Scale(
+    const Wm3::Vector3f& a,
+    const float s
+  )
   {
     return {a.x * s, a.y * s, a.z * s};
   }
 
-  float Length(const Wm3::Vector3f& v)
+  float Length(
+    const Wm3::Vector3f& v
+  )
   {
     return std::sqrt(Dot(v, v));
   }
 
-  Wm3::Vector3f Rotated(const Wm3::Quaternionf& q, const Wm3::Vector3f& v)
+  Wm3::Vector3f Rotated(
+    const Wm3::Quaternionf& q,
+    const Wm3::Vector3f& v
+  )
   {
     Wm3::Vector3f out{};
     moho::MultQuadVec(&out, &v, &q);
     return out;
   }
 
-  Wm3::Quaternionf AxisAngle(const Wm3::Vector3f& axis, const float angle)
+  Wm3::Quaternionf AxisAngle(
+    const Wm3::Vector3f& axis,
+    const float angle
+  )
   {
     const float s = std::sin(angle * 0.5f);
     return Wm3::Quaternionf{std::cos(angle * 0.5f), axis.x * s, axis.y * s, axis.z * s};
   }
 
   // Distance from `p` to the infinite line through `line.pos` along the unit `line.dir`.
-  float DistanceToLine(const moho::GeomLine3& line, const Wm3::Vector3f& p)
+  float DistanceToLine(
+    const moho::GeomLine3& line,
+    const Wm3::Vector3f& p
+  )
   {
     const Wm3::Vector3f offset = Sub(p, line.pos);
     const Wm3::Vector3f along = Scale(line.dir, Dot(offset, line.dir));
     return Length(Sub(offset, along));
   }
 
-  bool Inside(const moho::CGeomSolid3& solid, const Wm3::Vector3f& p, const float slack = 0.0f)
+  bool Inside(
+    const moho::CGeomSolid3& solid,
+    const Wm3::Vector3f& p,
+    const float slack = 0.0f
+  )
   {
     for (const Wm3::Plane3f& plane : solid.planes_) {
       if (Dot(plane.Normal, p) - plane.Constant > slack) {
@@ -75,7 +102,11 @@ namespace
   }
 
   // A camera at `eye` turned by `orient`, looking down its own -z (the D3D projection's w = -z).
-  moho::GeomCamera3 MakeCamera(const Wm3::Vector3f& eye, const Wm3::Quaternionf& orient, const float aspect = 1.0f)
+  moho::GeomCamera3 MakeCamera(
+    const Wm3::Vector3f& eye,
+    const Wm3::Quaternionf& orient,
+    const float aspect = 1.0f
+  )
   {
     moho::VTransform transform{};
     transform.orient_ = orient;
@@ -86,7 +117,11 @@ namespace
     return camera;
   }
 
-  void ExpectNear3(const Wm3::Vector3f& actual, const Wm3::Vector3f& expected, const float tolerance)
+  void ExpectNear3(
+    const Wm3::Vector3f& actual,
+    const Wm3::Vector3f& expected,
+    const float tolerance
+  )
   {
     EXPECT_NEAR(actual.x, expected.x, tolerance);
     EXPECT_NEAR(actual.y, expected.y, tolerance);
@@ -94,7 +129,10 @@ namespace
   }
 } // namespace
 
-TEST(RenderGeomCamera, ProjectionMatrixMapsNearAndFarToDepthZeroAndOne)
+TEST(
+  RenderGeomCamera,
+  ProjectionMatrixMapsNearAndFarToDepthZeroAndOne
+)
 {
   const moho::VMatrix4 m = moho::VEC_D3DProjectionMatrixFOV(kFov, kFov, -kNear, -kFar, 1.0f);
   const float t = std::tan(kFov * 0.5f);
@@ -103,7 +141,9 @@ TEST(RenderGeomCamera, ProjectionMatrixMapsNearAndFarToDepthZeroAndOne)
   EXPECT_EQ(m.r[2].w, -1.0f);
   EXPECT_EQ(m.r[3].w, 0.0f);
 
-  const auto ndcDepth = [&m](const float viewZ) { return ((viewZ * m.r[2].z) + m.r[3].z) / (-viewZ); };
+  const auto ndcDepth = [&m](const float viewZ) {
+    return ((viewZ * m.r[2].z) + m.r[3].z) / (-viewZ);
+  };
   EXPECT_NEAR(ndcDepth(-kNear), 0.0f, 1.0e-5f);
   EXPECT_NEAR(ndcDepth(-kFar), 1.0f, 1.0e-5f);
   EXPECT_GT(ndcDepth(-10.0f), ndcDepth(-5.0f));
@@ -114,7 +154,10 @@ TEST(RenderGeomCamera, ProjectionMatrixMapsNearAndFarToDepthZeroAndOne)
   EXPECT_NEAR(wide.r[1].y, 2.0f / t, 1.0e-4f);
 }
 
-TEST(RenderGeomCamera, ProjectHitsTheFrustumEdgesAndCentre)
+TEST(
+  RenderGeomCamera,
+  ProjectHitsTheFrustumEdgesAndCentre
+)
 {
   const moho::GeomCamera3 camera = MakeCamera({0.0f, 0.0f, 0.0f}, Wm3::Quaternionf{1.0f, 0.0f, 0.0f, 0.0f});
   const float t = std::tan(kFov * 0.5f);
@@ -136,7 +179,10 @@ TEST(RenderGeomCamera, ProjectHitsTheFrustumEdgesAndCentre)
   EXPECT_NEAR(unit.y, 0.25f, 1.0e-5f);
 }
 
-TEST(RenderGeomCamera, UnprojectGivesARayThroughTheProjectedPoint)
+TEST(
+  RenderGeomCamera,
+  UnprojectGivesARayThroughTheProjectedPoint
+)
 {
   std::mt19937 rng(2024);
   std::uniform_real_distribution<float> lane(-1.0f, 1.0f);
@@ -187,7 +233,10 @@ TEST(RenderGeomCamera, UnprojectGivesARayThroughTheProjectedPoint)
   }
 }
 
-TEST(RenderGeomCamera, CentreRayIsTheViewDirection)
+TEST(
+  RenderGeomCamera,
+  CentreRayIsTheViewDirection
+)
 {
   const Wm3::Quaternionf orient = AxisAngle({0.0f, 1.0f, 0.0f}, 0.8f);
   const Wm3::Vector3f eye{100.0f, 40.0f, -20.0f};
@@ -210,7 +259,10 @@ TEST(RenderGeomCamera, CentreRayIsTheViewDirection)
   }
 }
 
-TEST(RenderGeomCamera, FrustumPlanesBoundTheView)
+TEST(
+  RenderGeomCamera,
+  FrustumPlanesBoundTheView
+)
 {
   const moho::GeomCamera3 camera = MakeCamera({0.0f, 0.0f, 0.0f}, Wm3::Quaternionf{1.0f, 0.0f, 0.0f, 0.0f});
   ASSERT_EQ(camera.solid2.planes_.Size(), 6u);
@@ -221,9 +273,9 @@ TEST(RenderGeomCamera, FrustumPlanesBoundTheView)
   const float t = std::tan(kFov * 0.5f);
   EXPECT_TRUE(Inside(camera.solid2, {0.0f, 0.0f, -10.0f}));
   EXPECT_TRUE(Inside(camera.solid2, {0.0f, 0.0f, -999.0f}));
-  EXPECT_FALSE(Inside(camera.solid2, {0.0f, 0.0f, -1001.0f}));   // past the far plane
-  EXPECT_FALSE(Inside(camera.solid2, {0.0f, 0.0f, -0.5f}));      // before the near plane
-  EXPECT_FALSE(Inside(camera.solid2, {0.0f, 0.0f, 10.0f}));      // behind
+  EXPECT_FALSE(Inside(camera.solid2, {0.0f, 0.0f, -1001.0f})); // past the far plane
+  EXPECT_FALSE(Inside(camera.solid2, {0.0f, 0.0f, -0.5f}));    // before the near plane
+  EXPECT_FALSE(Inside(camera.solid2, {0.0f, 0.0f, 10.0f}));    // behind
   EXPECT_FALSE(Inside(camera.solid2, {20.0f * t * 1.05f, 0.0f, -20.0f}));
   EXPECT_TRUE(Inside(camera.solid2, {20.0f * t * 0.95f, 0.0f, -20.0f}));
   EXPECT_FALSE(Inside(camera.solid2, {0.0f, -20.0f * t * 1.05f, -20.0f}));
@@ -235,7 +287,10 @@ TEST(RenderGeomCamera, FrustumPlanesBoundTheView)
   EXPECT_FALSE(camera.solid2.Intersects(Wm3::Sphere3f({500.0f, 0.0f, -50.0f}, 2.0f)));
 }
 
-TEST(RenderGeomCamera, ScreenRectangleUnprojectsToASubFrustum)
+TEST(
+  RenderGeomCamera,
+  ScreenRectangleUnprojectsToASubFrustum
+)
 {
   const moho::GeomCamera3 camera = MakeCamera({10.0f, 20.0f, 30.0f}, AxisAngle({1.0f, 0.0f, 0.0f}, -0.4f));
   gpg::Rect2f rect{};
@@ -256,11 +311,10 @@ TEST(RenderGeomCamera, ScreenRectangleUnprojectsToASubFrustum)
   for (int i = 0; i < 400; ++i) {
     const float d = 20.0f + (lane(rng) + 1.0f) * 200.0f;
     const float t = std::tan(kFov * 0.5f);
-    const Wm3::Vector3f world =
-      Add({10.0f, 20.0f, 30.0f}, Rotated(orient, {lane(rng) * d * t, lane(rng) * d * t, -d}));
+    const Wm3::Vector3f world = Add({10.0f, 20.0f, 30.0f}, Rotated(orient, {lane(rng) * d * t, lane(rng) * d * t, -d}));
     const Wm3::Vector2f s = camera.Project(world);
-    const bool margin = std::fabs(s.x - rect.x0) < 2.0f || std::fabs(s.x - rect.x1) < 2.0f
-                     || std::fabs(s.y - rect.z0) < 2.0f || std::fabs(s.y - rect.z1) < 2.0f;
+    const bool margin = std::fabs(s.x - rect.x0) < 2.0f || std::fabs(s.x - rect.x1) < 2.0f ||
+      std::fabs(s.y - rect.z0) < 2.0f || std::fabs(s.y - rect.z1) < 2.0f;
     if (margin) {
       continue;
     }
@@ -272,7 +326,10 @@ TEST(RenderGeomCamera, ScreenRectangleUnprojectsToASubFrustum)
   EXPECT_GT(outside, 10);
 }
 
-TEST(RenderGeomCamera, LodRowIsTheViewWidthAtThePointsDepth)
+TEST(
+  RenderGeomCamera,
+  LodRowIsTheViewWidthAtThePointsDepth
+)
 {
   moho::GeomCamera3 camera = MakeCamera({0.0f, 50.0f, 0.0f}, AxisAngle({0.0f, 1.0f, 0.0f}, 1.0f));
   const Wm3::Quaternionf orient = AxisAngle({0.0f, 1.0f, 0.0f}, 1.0f);
@@ -292,7 +349,10 @@ TEST(RenderGeomCamera, LodRowIsTheViewWidthAtThePointsDepth)
   EXPECT_NEAR(camera.viewport.r[2].w, camera.viewport.r[0].w * 0.5f / camera.viewport.r[3].z, 1.0e-6f);
 }
 
-TEST(RenderGeomCamera, MoveAndSetProjectionKeepTheOtherHalf)
+TEST(
+  RenderGeomCamera,
+  MoveAndSetProjectionKeepTheOtherHalf
+)
 {
   moho::GeomCamera3 camera = MakeCamera({0.0f, 0.0f, 0.0f}, Wm3::Quaternionf{1.0f, 0.0f, 0.0f, 0.0f});
   moho::VTransform moved{};
@@ -321,7 +381,10 @@ TEST(RenderGeomCamera, MoveAndSetProjectionKeepTheOtherHalf)
   EXPECT_EQ(defaults.solid1.planes_.Size(), 6u);
 }
 
-TEST(RenderGeomCamera, OrthographicProjectionIsPixelLinear)
+TEST(
+  RenderGeomCamera,
+  OrthographicProjectionIsPixelLinear
+)
 {
   moho::GeomCamera3 camera{};
   camera.ViewInitOrtho(600, 800, -1.0f, -100.0f);
@@ -335,7 +398,10 @@ TEST(RenderGeomCamera, OrthographicProjectionIsPixelLinear)
   EXPECT_NEAR(moved.y - origin.y, -50.0f, 1.0e-3f);
 }
 
-TEST(RenderGeomCamera, LookAtPlacesTheCamera)
+TEST(
+  RenderGeomCamera,
+  LookAtPlacesTheCamera
+)
 {
   moho::GeomCamera3 camera{};
   const Wm3::Vector3f eye{10.0f, 30.0f, -40.0f};
@@ -379,11 +445,20 @@ TEST(RenderGeomCamera, LookAtPlacesTheCamera)
   }
 }
 
-TEST(RenderGeomCamera, BoxProjectionEnclosesEveryCorner)
+TEST(
+  RenderGeomCamera,
+  BoxProjectionEnclosesEveryCorner
+)
 {
   const Wm3::Vector3f corners[8] = {
-    {1.0f, 2.0f, 3.0f}, {-4.0f, 0.0f, 1.0f}, {0.0f, 9.0f, 0.0f}, {2.0f, 2.0f, -7.0f},
-    {0.5f, 0.5f, 0.5f}, {3.0f, -1.0f, 2.0f}, {0.0f, 0.0f, 0.0f}, {1.0f, 1.0f, 8.0f},
+    {1.0f, 2.0f, 3.0f},
+    {-4.0f, 0.0f, 1.0f},
+    {0.0f, 9.0f, 0.0f},
+    {2.0f, 2.0f, -7.0f},
+    {0.5f, 0.5f, 0.5f},
+    {3.0f, -1.0f, 2.0f},
+    {0.0f, 0.0f, 0.0f},
+    {1.0f, 1.0f, 8.0f},
   };
   Wm3::AxisAlignedBox3f enclosed{};
   moho::EncloseCornerSet(&enclosed, corners);
@@ -416,7 +491,10 @@ TEST(RenderGeomCamera, BoxProjectionEnclosesEveryCorner)
   EXPECT_LT(projected.Max.z, 1.0f);
 }
 
-TEST(RenderGeomCamera, ViewportPixelProjectionMapsPixelCornersToNdcCorners)
+TEST(
+  RenderGeomCamera,
+  ViewportPixelProjectionMapsPixelCornersToNdcCorners
+)
 {
   moho::GeomCamera3 camera{};
   camera.viewport.r[3] = moho::Vector4f{0.0f, 0.0f, 640.7f, 480.2f}; // truncated to whole pixels

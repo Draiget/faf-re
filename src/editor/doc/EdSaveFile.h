@@ -21,7 +21,12 @@ namespace faf::editor
     [[nodiscard]] std::string Get(const std::string& key) const;
     /** Sets a property's value text, appending it when new. */
     void Set(const std::string& key, const std::string& value);
-    bool operator==(const SaveEntry& other) const { return name == other.name && properties == other.properties; }
+    bool operator==(
+      const SaveEntry& other
+    ) const
+    {
+      return name == other.name && properties == other.properties;
+    }
   };
 
   /** A marker or area value's numbers (`VECTOR3( 1, 2, 3 )` gives 1, 2, 3). */
@@ -32,12 +37,29 @@ namespace faf::editor
   std::string Vector3Value(double x, double y, double z);
   std::string RectangleValue(double x0, double y0, double x1, double y1);
   std::string StringValue(const std::string& text);
+  /** `FLOAT( 3.000000 )` and `BOOLEAN( true )`, as the game's saves write them. */
+  std::string FloatValue(double value);
+  std::string BooleanValue(bool value);
 
   /**
    * A map's `_save.lua` as the editor keeps it: the file's text, with the master chain's markers and the
    * areas parsed out. Text writes the file again: unchanged, or with only the blocks whose entries
    * changed written anew in the game's own layout, everything else as it was.
    */
+  /** A chain of `_save.lua`'s `Chains`: its name and its markers' names, in order (a route scripts and the AI follow).
+   */
+  struct MarkerChain
+  {
+    std::string name;
+    std::vector<std::string> markers;
+    bool operator==(
+      const MarkerChain& other
+    ) const
+    {
+      return name == other.name && markers == other.markers;
+    }
+  };
+
   /** Where a save entry was in the text: what came before it (space, banners), itself with its comma, its values. */
   struct SaveEntrySpan
   {
@@ -53,12 +75,42 @@ namespace faf::editor
     /** Parses the file's text; false (with `error`) when the blocks can't be found or read. */
     bool Parse(std::string text, std::string& error);
 
-    [[nodiscard]] std::vector<SaveEntry>& Markers() noexcept { return mMarkers; }
-    [[nodiscard]] std::vector<SaveEntry>& Areas() noexcept { return mAreas; }
-    [[nodiscard]] std::vector<SaveEntry>& Armies() noexcept { return mArmies; }
-    [[nodiscard]] const std::vector<SaveEntry>& Markers() const noexcept { return mMarkers; }
-    [[nodiscard]] const std::vector<SaveEntry>& Areas() const noexcept { return mAreas; }
-    [[nodiscard]] const std::vector<SaveEntry>& Armies() const noexcept { return mArmies; }
+    [[nodiscard]] std::vector<SaveEntry>& Markers() noexcept
+    {
+      return mMarkers;
+    }
+    [[nodiscard]] std::vector<SaveEntry>& Areas() noexcept
+    {
+      return mAreas;
+    }
+    [[nodiscard]] std::vector<SaveEntry>& Armies() noexcept
+    {
+      return mArmies;
+    }
+    [[nodiscard]] const std::vector<SaveEntry>& Markers() const noexcept
+    {
+      return mMarkers;
+    }
+    [[nodiscard]] const std::vector<SaveEntry>& Areas() const noexcept
+    {
+      return mAreas;
+    }
+    [[nodiscard]] const std::vector<SaveEntry>& Armies() const noexcept
+    {
+      return mArmies;
+    }
+    /** The `Chains` block's chains (written again, in the game's layout, only when they change). */
+    [[nodiscard]] std::vector<MarkerChain>& Chains() noexcept
+    {
+      return mChains;
+    }
+    [[nodiscard]] const std::vector<MarkerChain>& Chains() const noexcept
+    {
+      return mChains;
+    }
+    /** The chains as the game's saves write them, the entries at `indent` spaces, in these line ends. */
+    [[nodiscard]] static std::string
+    ChainsText(const std::vector<MarkerChain>& chains, int indent, const std::string& nl);
 
     /** The file's text with the current markers and areas. */
     [[nodiscard]] std::string Text() const;
@@ -66,7 +118,10 @@ namespace faf::editor
     [[nodiscard]] bool Changed() const;
     /** After the file was written: what it holds now is the text parsed. */
     void MarkSaved();
-    [[nodiscard]] bool Loaded() const noexcept { return !mText.empty(); }
+    [[nodiscard]] bool Loaded() const noexcept
+    {
+      return !mText.empty();
+    }
 
   private:
     struct Block
@@ -82,11 +137,15 @@ namespace faf::editor
      * changed entry with the same keys as its old text with only the changed values replaced, other entries written
      * in the game's layout with the file's line ends.
      */
-    std::string Rebuild(const Block& block, const std::vector<SaveEntry>& now, const std::vector<SaveEntry>& read) const;
+    std::string
+    Rebuild(const Block& block, const std::vector<SaveEntry>& now, const std::vector<SaveEntry>& read) const;
     std::string mText;
     Block mMarkerBlock;
     Block mAreaBlock;
     Block mArmyBlock;
+    Block mChainBlock;
+    std::vector<MarkerChain> mChains;
+    std::vector<MarkerChain> mChainsRead;
     std::vector<SaveEntry> mArmies;
     std::vector<SaveEntry> mArmiesRead;
     std::vector<SaveEntry> mMarkers;
@@ -98,12 +157,45 @@ namespace faf::editor
   /** A new army's entry for `_save.lua`'s Armies, as the game's saves write one (no units, no plans). */
   SaveEntry NewArmyEntry(const std::string& name);
 
+  /**
+   * An army's settings in `_save.lua`: personality, plans, color, faction, Economy's mass and energy (the starting
+   * resources FAF's InitializeArmies gives it), Alliances (each other army and 'Enemy', 'Ally' or 'Neutral').
+   */
+  struct ArmySettings
+  {
+    std::string personality;
+    std::string plans;
+    int color = 0;
+    int faction = 0;
+    double mass = 0.0;
+    double energy = 0.0;
+    std::vector<std::pair<std::string, std::string>> alliances;
+    bool operator==(
+      const ArmySettings& other
+    ) const
+    {
+      return personality == other.personality && plans == other.plans && color == other.color &&
+        faction == other.faction && mass == other.mass && energy == other.energy && alliances == other.alliances;
+    }
+  };
+  ArmySettings ReadArmySettings(const SaveEntry& army);
+  /**
+   * Puts into the entry what differs from what it holds, each value's own text kept around its number or string
+   * (Economy's mass and energy changed in place); Alliances written anew in the saves' layout.
+   */
+  void WriteArmySettings(SaveEntry& army, const ArmySettings& settings);
+
   /** A team of a `_scenario.lua`'s standard configuration: its name and its armies, in order. */
   struct ScenarioTeam
   {
     std::string name;
     std::vector<std::string> armies;
-    bool operator==(const ScenarioTeam& other) const { return name == other.name && armies == other.armies; }
+    bool operator==(
+      const ScenarioTeam& other
+    ) const
+    {
+      return name == other.name && armies == other.armies;
+    }
   };
   /** The teams of the scenario's `teams = { { name = 'FFA', armies = {...} }, ... }`, in order. */
   std::vector<ScenarioTeam> ScenarioTeams(const std::string& scenario);
@@ -112,6 +204,13 @@ namespace faf::editor
    * them; the text around it is kept.
    */
   std::string WithScenarioTeams(const std::string& scenario, const std::vector<ScenarioTeam>& teams);
+
+  /**
+   * The scenario's `reclaim = { mass, energy }` (FAForeverMapEditor writes the map's reclaim there) with these numbers,
+   * the rest of its text as it was; a scenario without one comes back unchanged (nothing in FAF's game code or client
+   * reads it, so none is added).
+   */
+  std::string WithScenarioReclaim(const std::string& scenario, double mass, double energy);
 
   /** The armies of a `_scenario.lua`'s first team (`armies = {'ARMY_1', ...}`), in order. */
   std::vector<std::string> ScenarioArmies(const std::string& scenario);
@@ -132,4 +231,11 @@ namespace faf::editor
    * `ScenarioUtils.InitializeArmies()`, or its area name replaced), or removed when `area` is empty.
    */
   std::string WithScriptPlayableArea(const std::string& script, const std::string& area);
+
+  /**
+   * The script with the map editor's effect decorations on (`on`: the MapEditorEffects function, which plays each
+   * `Effect` marker's effect on an entity of its own, and its call in OnPopulate after
+   * `ScenarioUtils.InitializeArmies()`) or off (both removed). The same text for a script that already has it as asked.
+   */
+  std::string WithScriptEffects(const std::string& script, bool on);
 } // namespace faf::editor

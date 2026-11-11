@@ -151,9 +151,8 @@ namespace moho
      * its members are loaded over it afterwards.
      * Inlined into `SerConstructHelper<CSimSoundManager>::Construct` 0x00761240.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * What it does:
@@ -161,7 +160,10 @@ namespace moho
      * Inlined into `SerSaveConstructHelper<CSimSoundManager>::SaveConstructArgs` 0x007610B0.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     /**
@@ -194,7 +196,8 @@ namespace moho
   static_assert(offsetof(CSimSoundManager, mOwnerSim) == 0x04, "CSimSoundManager::mOwnerSim offset must be 0x04");
   static_assert(offsetof(CSimSoundManager, mRequests) == 0x08, "CSimSoundManager::mRequests offset must be 0x08");
   static_assert(
-    offsetof(CSimSoundManager, mActiveLoops) == 0x718, "CSimSoundManager::mActiveLoops offset must be 0x718"
+    offsetof(CSimSoundManager, mActiveLoops) == 0x718,
+    "CSimSoundManager::mActiveLoops offset must be 0x718"
   );
   static_assert(sizeof(CSimSoundManager) == 0x720, "CSimSoundManager size must be 0x720");
 } // namespace moho

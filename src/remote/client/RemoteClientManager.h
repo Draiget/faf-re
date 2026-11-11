@@ -39,8 +39,16 @@ namespace faf::remote::client
     /** The server's latest about this client (name, owner and sources included). */
     void Update(const wire::SRosterEntry& entry);
     /** Where chat for this client goes from now on. */
-    void SetRelay(ChatRelay relay) { mRelay = std::move(relay); }
-    [[nodiscard]] const wire::SRosterEntry& Entry() const noexcept { return mEntry; }
+    void SetRelay(
+      ChatRelay relay
+    )
+    {
+      mRelay = std::move(relay);
+    }
+    [[nodiscard]] const wire::SRosterEntry& Entry() const noexcept
+    {
+      return mEntry;
+    }
 
     float GetStatusMetricA() override;
     float GetStatusMetricB() override;
@@ -71,7 +79,12 @@ namespace faf::remote::client
     CRemoteClientManager(CommandHandler onCommand, moho::IClientManager* standIn);
 
     /** A server session: told once, when the session has loaded and is ready (`Cleanup`), to tell the server. */
-    void SetLoadedHandler(std::function<void()> onLoaded) { mOnLoaded = std::move(onLoaded); }
+    void SetLoadedHandler(
+      std::function<void()> onLoaded
+    )
+    {
+      mOnLoaded = std::move(onLoaded);
+    }
     ~CRemoteClientManager() override;
 
     /** A command message for the server (the lockstep form sends it to every client). */
@@ -84,11 +97,16 @@ namespace faf::remote::client
      * stays, disconnected.
      */
     void ApplyRoster(const wire::SRoster& roster, CRosterClient::ChatRelay relay);
-    [[nodiscard]] bool HasRoster() const noexcept { return mHaveRoster; }
+    [[nodiscard]] bool HasRoster() const noexcept
+    {
+      return mHaveRoster;
+    }
     /** The roster's clients, those it dropped (disconnected) included. */
     [[nodiscard]] std::size_t RosterCount() const noexcept;
     /** The sim rate the server's frames carry (WP11.5): from now on `GetSimRate` answers it. */
-    void SetServerSimRate(int rate) noexcept
+    void SetServerSimRate(
+      int rate
+    ) noexcept
     {
       mServerSimRate = rate;
       mHaveServerSimRate = true;
@@ -98,7 +116,11 @@ namespace faf::remote::client
 
     moho::IClient* CreateLocalClient(const char* name, int idx, int32_t ownerId, unsigned int sourceId) override;
     moho::IClient* CreateNetClient(
-      const char* name, int idx, int32_t ownerId, unsigned int sourceId, moho::INetConnection* connection
+      const char* name,
+      int idx,
+      int32_t ownerId,
+      unsigned int sourceId,
+      moho::INetConnection* connection
     ) override;
     moho::IClient* CreateReplayClient(gpg::Stream** stream, moho::BVIntSet* sources) override;
     moho::IClient* CreateNullClient(const char* name, int idx, int32_t ownerId, unsigned int sourceId) override;

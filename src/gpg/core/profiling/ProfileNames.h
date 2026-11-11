@@ -3,8 +3,8 @@
 // Engine addition: names for Tracy zones known only at run time. Profile builds only
 // (TRACY_ENABLE); without Tracy nothing here exists and no caller compiles it in.
 #if defined(TRACY_ENABLE)
-#  include <string>
-#  include <unordered_map>
+#include <string>
+#include <unordered_map>
 
 namespace gpg::profiling
 {
@@ -20,7 +20,11 @@ namespace gpg::profiling
   }
 
   /** Records `function`'s name; the first binder of a function names it. */
-  inline void NameLuaCFunction(const void* const function, const char* const group, const char* const name)
+  inline void NameLuaCFunction(
+    const void* const function,
+    const char* const group,
+    const char* const name
+  )
   {
     if (function == nullptr || name == nullptr) {
       return;
@@ -30,7 +34,9 @@ namespace gpg::profiling
   }
 
   /** The zone name for a Lua C function: its binder's name, or a generic one. */
-  [[nodiscard]] inline const char* LuaCFunctionName(const void* const function)
+  [[nodiscard]] inline const char* LuaCFunctionName(
+    const void* const function
+  )
   {
     const auto& names = LuaCFunctionNames();
     const auto found = names.find(function);

@@ -11,21 +11,35 @@ namespace faf::netbridge
     constexpr std::int32_t kMaxArgs = 1 << 12;
     constexpr std::int32_t kMaxString = 64 << 20;
 
-    void PutInt(std::string& out, const std::int32_t v)
+    void PutInt(
+      std::string& out,
+      const std::int32_t v
+    )
     {
       const auto u = static_cast<std::uint32_t>(v);
-      const char b[4] = {static_cast<char>(u & 0xFF), static_cast<char>((u >> 8) & 0xFF),
-                         static_cast<char>((u >> 16) & 0xFF), static_cast<char>((u >> 24) & 0xFF)};
+      const char b[4] = {
+        static_cast<char>(u & 0xFF),
+        static_cast<char>((u >> 8) & 0xFF),
+        static_cast<char>((u >> 16) & 0xFF),
+        static_cast<char>((u >> 24) & 0xFF)
+      };
       out.append(b, 4);
     }
 
-    void PutString(std::string& out, const std::string& s)
+    void PutString(
+      std::string& out,
+      const std::string& s
+    )
     {
       PutInt(out, static_cast<std::int32_t>(s.size()));
       out += s;
     }
 
-    bool GetInt(const std::string& buf, std::size_t& pos, std::int32_t& v)
+    bool GetInt(
+      const std::string& buf,
+      std::size_t& pos,
+      std::int32_t& v
+    )
     {
       if (pos + 4 > buf.size()) {
         return false;
@@ -40,7 +54,9 @@ namespace faf::netbridge
     }
   } // namespace
 
-  std::string EncodeGpg(const GpgMessage& m)
+  std::string EncodeGpg(
+    const GpgMessage& m
+  )
   {
     std::string out;
     PutString(out, m.command);
@@ -56,7 +72,9 @@ namespace faf::netbridge
     return out;
   }
 
-  std::optional<GpgMessage> GpgDecoder::Next(bool* bad)
+  std::optional<GpgMessage> GpgDecoder::Next(
+    bool* bad
+  )
   {
     *bad = false;
     std::size_t pos = 0;
@@ -118,7 +136,9 @@ namespace faf::netbridge
     return m;
   }
 
-  std::string DescribeGpg(const GpgMessage& m)
+  std::string DescribeGpg(
+    const GpgMessage& m
+  )
   {
     std::string s = m.command;
     for (const GpgArg& a : m.args) {

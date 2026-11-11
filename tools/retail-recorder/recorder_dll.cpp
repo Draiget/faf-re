@@ -166,7 +166,7 @@ namespace
   {
     int hook;
     u32 callerRet;
-    u32 returnSlot; // address of the caller's return address: matches the exit even after an unwind
+    u32 returnSlot;        // address of the caller's return address: matches the exit even after an unwind
     CapturedCall captured; // filled only for a hook that still has probes to run
     bool record;
     u32 sequence;
@@ -174,7 +174,7 @@ namespace
     int valueCount;
     u32 values[kMaxValueWords];
     char text[128]; // watched call: the text at RETAIL_RECORDER_WATCH_TEXT_ARG
-    u32 pointee; // watched call: the word at RETAIL_RECORDER_WATCH_WORD_ARG
+    u32 pointee;    // watched call: the word at RETAIL_RECORDER_WATCH_WORD_ARG
   };
   constexpr int kMaxDepth = 512;
   __declspec(thread) PendingCall tPending[kMaxDepth];
@@ -186,20 +186,29 @@ namespace
   char gSetsPath[MAX_PATH] = {};
   unsigned gLinesSinceFlush = 0;
 
-
   extern "C" void CommonEntry();
   extern "C" void PostEntry();
 
-  [[nodiscard]] u32 RegisterValue(const EntryFrame* f, const int index)
+  [[nodiscard]] u32 RegisterValue(
+    const EntryFrame* f,
+    const int index
+  )
   {
     switch (index) {
-      case 0: return f->eax;
-      case 1: return f->ecx;
-      case 2: return f->edx;
-      case 3: return f->ebx;
-      case 4: return f->esi;
-      case 5: return f->edi;
-      default: return f->ebp;
+    case 0:
+      return f->eax;
+    case 1:
+      return f->ecx;
+    case 2:
+      return f->edx;
+    case 3:
+      return f->ebx;
+    case 4:
+      return f->esi;
+    case 5:
+      return f->edi;
+    default:
+      return f->ebp;
     }
   }
 
@@ -217,8 +226,8 @@ namespace
   bool gProbeMode = false;
   char gJournalPath[MAX_PATH] = {};
   constexpr u32 kProbeCallsPerFunction = 4; // real calls that get extra probes
-  constexpr int kMaxProbesPerCall = 256; // edge variants per real call
-  constexpr int kSnapshotWords = 16; // dwords captured per pointer argument
+  constexpr int kMaxProbesPerCall = 256;    // edge variants per real call
+  constexpr int kSnapshotWords = 16;        // dwords captured per pointer argument
 
   // Probes run only on the sim thread. The map-loader and worker threads
   // call hooked functions too (the loader alone makes far more than 10,000
@@ -305,7 +314,10 @@ namespace
     0x8000000000000000ull,
   };
 
-  void ProbeWrite(const char* text, const int length)
+  void ProbeWrite(
+    const char* text,
+    const int length
+  )
   {
     if (gOut == nullptr) {
       return;
@@ -325,7 +337,10 @@ namespace
   // A pointer argument's snapshot: the first kSnapshotWords dwords behind
   // the pointer, best effort (an unreadable page yields FFFFFFFF words, the
   // same marker the x87 empty-st0 path uses).
-  void SnapshotPointer(const u32 pointer, u32* words)
+  void SnapshotPointer(
+    const u32 pointer,
+    u32* words
+  )
   {
     for (int w = 0; w < kSnapshotWords; ++w) {
       words[w] = 0xFFFFFFFFu;
@@ -348,16 +363,16 @@ namespace
   // thread's stack. The offsets are the invoker's.
   struct ProbeFrame
   {
-    u32 regs[7];    // +0: eax ecx edx ebx esi edi ebp (RegisterValue order)
-    u32 target;     // +28: the hook's trampoline
-    u32 retKind;    // +32: the spec's result kind
-    u32 resultEdx;  // +36: filled by the invoker
-    u32 resultEax;  // +40
-    u32 resultSt0[2]; // +44: a float in [0], a double in [0..1]
+    u32 regs[7];                     // +0: eax ecx edx ebx esi edi ebp (RegisterValue order)
+    u32 target;                      // +28: the hook's trampoline
+    u32 retKind;                     // +32: the spec's result kind
+    u32 resultEdx;                   // +36: filled by the invoker
+    u32 resultEax;                   // +40
+    u32 resultSt0[2];                // +44: a float in [0], a double in [0..1]
     u32 stackArgs[kProbeStackWords]; // +52
-    u32 savedEsp;   // +116
-    u32 fcw;        // +120: the game's control word at the real call's entry
-    u32 mxcsr;      // +124
+    u32 savedEsp;                    // +116
+    u32 fcw;                         // +120: the game's control word at the real call's entry
+    u32 mxcsr;                       // +124
   };
   static_assert(sizeof(ProbeFrame) == 128);
 
@@ -395,10 +410,7 @@ namespace
         continue; // not probeable: never journalled
       }
       const int state = h.probeEnabled ? 0 : 1;
-      std::fprintf(
-        f, "0x%08X %ld %d %d\n", h.va, h.probesDone, state,
-        static_cast<int>(h.writes)
-      );
+      std::fprintf(f, "0x%08X %ld %d %d\n", h.va, h.probesDone, state, static_cast<int>(h.writes));
     }
     std::fclose(f);
     MoveFileExA(tmp, gJournalPath, MOVEFILE_REPLACE_EXISTING);
@@ -435,12 +447,16 @@ namespace
     std::fclose(f);
   }
 
-  [[nodiscard]] u32 CanonicalFloat(const u32 bits)
+  [[nodiscard]] u32 CanonicalFloat(
+    const u32 bits
+  )
   {
     return ((bits & 0x7F800000u) == 0x7F800000u && (bits & 0x007FFFFFu) != 0u) ? 0x7FC00000u : bits;
   }
 
-  void CanonicalDouble(u32* words)
+  void CanonicalDouble(
+    u32* words
+  )
   {
     if ((words[1] & 0x7FF00000u) == 0x7FF00000u && ((words[1] & 0x000FFFFFu) != 0u || words[0] != 0u)) {
       words[1] = 0x7FF80000u;
@@ -449,7 +465,9 @@ namespace
   }
 
   // One re-call under the guard. Returns the exception code, 0 when it returned.
-  DWORD ProbeOnce(ProbeFrame* const pf)
+  DWORD ProbeOnce(
+    ProbeFrame* const pf
+  )
   {
     const int depth = tDepth;
     tCurrentProbeFrame = pf;
@@ -460,35 +478,52 @@ namespace
     } __except (EXCEPTION_EXECUTE_HANDLER) {
       faultCode = GetExceptionCode();
       tDepth = depth; // the hooked callees the fault unwound never reached their exits
-      __asm fninit // PostEntry's fxrstor puts the game's state back
+      __asm fninit    // PostEntry's fxrstor puts the game's state back
     }
     tInProbe = false;
     return faultCode;
   }
 
   // Appends the result of the frame's last call to a line.
-  int AppendResult(char* out, const std::size_t size, int n, const Hook& hook, const ProbeFrame& pf)
+  int AppendResult(
+    char* out,
+    const std::size_t size,
+    int n,
+    const Hook& hook,
+    const ProbeFrame& pf
+  )
   {
     u32 result[2] = {pf.resultEax, pf.resultEdx};
     int resultWords = 0;
     switch (hook.ret) {
-      case kRetEax:
-      case kRetEaxPointer: resultWords = 1; break;
-      case kRetEdxEax: resultWords = 2; break;
-      case kRetAl: result[0] &= 0xFFu; resultWords = 1; break;
-      case kRetAx: result[0] &= 0xFFFFu; resultWords = 1; break;
-      case kRetSt0Float:
-      case kRetXmm0Float:
-        result[0] = CanonicalFloat(pf.resultSt0[0]);
-        resultWords = 1;
-        break;
-      case kRetSt0Double:
-        result[0] = pf.resultSt0[0];
-        result[1] = pf.resultSt0[1];
-        CanonicalDouble(result);
-        resultWords = 2;
-        break;
-      default: break;
+    case kRetEax:
+    case kRetEaxPointer:
+      resultWords = 1;
+      break;
+    case kRetEdxEax:
+      resultWords = 2;
+      break;
+    case kRetAl:
+      result[0] &= 0xFFu;
+      resultWords = 1;
+      break;
+    case kRetAx:
+      result[0] &= 0xFFFFu;
+      resultWords = 1;
+      break;
+    case kRetSt0Float:
+    case kRetXmm0Float:
+      result[0] = CanonicalFloat(pf.resultSt0[0]);
+      resultWords = 1;
+      break;
+    case kRetSt0Double:
+      result[0] = pf.resultSt0[0];
+      result[1] = pf.resultSt0[1];
+      CanonicalDouble(result);
+      resultWords = 2;
+      break;
+    default:
+      break;
     }
     for (int i = 0; i < resultWords; ++i) {
       n += std::snprintf(out + n, size - n, " %08X", result[i]);
@@ -496,20 +531,28 @@ namespace
     return n;
   }
 
-  int AppendArgs(char* out, const std::size_t size, int n, const Hook& hook, const ProbeFrame& pf)
+  int AppendArgs(
+    char* out,
+    const std::size_t size,
+    int n,
+    const Hook& hook,
+    const ProbeFrame& pf
+  )
   {
     for (const ArgSpec& a : hook.args) {
       for (int w = 0; w < a.words; ++w) {
-        const u32 argWord = (a.location & 0x80u) != 0u
-          ? pf.stackArgs[(a.location & 0x7Fu) + w]
-          : pf.regs[a.location];
+        const u32 argWord = (a.location & 0x80u) != 0u ? pf.stackArgs[(a.location & 0x7Fu) + w] : pf.regs[a.location];
         n += std::snprintf(out + n, size - n, " %08X", argWord);
       }
     }
     return n;
   }
 
-  [[nodiscard]] u32* ArgSlot(ProbeFrame& pf, const ArgSpec& a, const int word)
+  [[nodiscard]] u32* ArgSlot(
+    ProbeFrame& pf,
+    const ArgSpec& a,
+    const int word
+  )
   {
     return (a.location & 0x80u) != 0u ? &pf.stackArgs[(a.location & 0x7Fu) + word] : &pf.regs[a.location];
   }
@@ -522,7 +565,10 @@ namespace
   // plain argument. Guarded per probe: a fault is recorded as the variant's
   // result instead of killing the run.
   void RunProbes(
-    Hook& hook, const CapturedCall& captured, const u32 callIndex, const u32* realResult,
+    Hook& hook,
+    const CapturedCall& captured,
+    const u32 callIndex,
+    const u32* realResult,
     const int realResultWords
   )
   {
@@ -623,9 +669,7 @@ namespace
     for (u32 s = 0; s < snapCount; ++s) {
       u32 post[kSnapshotWords];
       SnapshotPointer(snapPointer[s], post);
-      n = std::snprintf(
-        out, sizeof(out), "S 0x%08X %u %d %08X pre", hook.va, callIndex, snapIndex[s], snapPointer[s]
-      );
+      n = std::snprintf(out, sizeof(out), "S 0x%08X %u %d %08X pre", hook.va, callIndex, snapIndex[s], snapPointer[s]);
       for (int w = 0; w < kSnapshotWords; ++w) {
         n += std::snprintf(out + n, sizeof(out) - n, " %08X", preSnaps[s][w]);
       }
@@ -727,7 +771,10 @@ load_and_enter:
     }
   }
 
-  void HashWord(u64& h, const u32 word)
+  void HashWord(
+    u64& h,
+    const u32 word
+  )
   {
     for (int i = 0; i < 4; ++i) {
       h ^= (word >> (8 * i)) & 0xFFu;
@@ -735,19 +782,27 @@ load_and_enter:
     }
   }
 
-  void SetLock(HashSet& set)
+  void SetLock(
+    HashSet& set
+  )
   {
     while (InterlockedExchange(&set.lock, 1) != 0) {
       SwitchToThread();
     }
   }
 
-  void SetUnlock(HashSet& set)
+  void SetUnlock(
+    HashSet& set
+  )
   {
     InterlockedExchange(&set.lock, 0);
   }
 
-  void SetPut(u64* const slots, const u32 capacity, const u64 hash)
+  void SetPut(
+    u64* const slots,
+    const u32 capacity,
+    const u64 hash
+  )
   {
     u32 at = static_cast<u32>(hash) & (capacity - 1u);
     while (slots[at] != 0u) {
@@ -756,13 +811,20 @@ load_and_enter:
     slots[at] = hash;
   }
 
-  [[nodiscard]] bool SetKeeps(const u32 level, const u64 hash)
+  [[nodiscard]] bool SetKeeps(
+    const u32 level,
+    const u64 hash
+  )
   {
     return level == 0u || (hash >> (64u - level)) == 0u;
   }
 
   // Rebuilds the table with `capacity` slots, keeping what `level` keeps.
-  void SetRebuild(HashSet& set, const u32 capacity, const u32 level)
+  void SetRebuild(
+    HashSet& set,
+    const u32 capacity,
+    const u32 level
+  )
   {
     auto* const slots = static_cast<u64*>(HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, capacity * sizeof(u64)));
     if (slots == nullptr) {
@@ -784,7 +846,10 @@ load_and_enter:
     set.count = count;
   }
 
-  void SetInsert(HashSet& set, u64 hash)
+  void SetInsert(
+    HashSet& set,
+    u64 hash
+  )
   {
     hash = hash != 0u ? hash : 1u; // 0 marks an empty slot
     SetLock(set);
@@ -855,12 +920,17 @@ load_and_enter:
     MoveFileExA(tmp, gSetsPath, MOVEFILE_REPLACE_EXISTING);
   }
 
-  void ReadWatchText(const u32 address, char* const out, const int size)
+  void ReadWatchText(
+    const u32 address,
+    char* const out,
+    const int size
+  )
   {
     int length = 0;
     __try {
       const char* const text = reinterpret_cast<const char*>(address);
-      while (length < size - 1 && ((text[length] >= 0x20 && text[length] < 0x7F) || text[length] == '\n' || text[length] == '\t')) {
+      while (length < size - 1 &&
+             ((text[length] >= 0x20 && text[length] < 0x7F) || text[length] == '\n' || text[length] == '\t')) {
         out[length] = text[length] < 0x20 ? ' ' : text[length];
         ++length;
       }
@@ -870,7 +940,9 @@ load_and_enter:
     out[length] = '\0';
   }
 
-  u32 ReadWatchWord(const u32 address)
+  u32 ReadWatchWord(
+    const u32 address
+  )
   {
     __try {
       return *reinterpret_cast<const u32*>(address);
@@ -879,7 +951,9 @@ load_and_enter:
     }
   }
 
-  extern "C" void __cdecl OnEntry(EntryFrame* frame)
+  extern "C" void __cdecl OnEntry(
+    EntryFrame* frame
+  )
   {
     const int hookIndex = static_cast<int>(frame->slot);
     Hook& hook = gHooks[static_cast<std::size_t>(hookIndex)];
@@ -922,8 +996,8 @@ load_and_enter:
     pending.record = gSpecMode || call < hook.recordAll || (call - hook.recordAll) % hook.thenEvery == 0u;
     for (const ArgSpec& arg : hook.args) {
       for (int w = 0; w < arg.words; ++w) {
-        u32 word = (arg.location & 0x80u) != 0u ? frame->args[(arg.location & 0x7Fu) + w]
-                                                : RegisterValue(frame, arg.location);
+        u32 word =
+          (arg.location & 0x80u) != 0u ? frame->args[(arg.location & 0x7Fu) + w] : RegisterValue(frame, arg.location);
         if (!arg.hashed) {
           continue;
         }
@@ -975,7 +1049,11 @@ load_and_enter:
     frame->callerRet = reinterpret_cast<u32>(&PostEntry);
   }
 
-  void St0Bits(const std::uint8_t* fxsave, const bool asDouble, u32* dest)
+  void St0Bits(
+    const std::uint8_t* fxsave,
+    const bool asDouble,
+    u32* dest
+  )
   {
     const unsigned fsw = *reinterpret_cast<const std::uint16_t*>(fxsave + 2);
     const unsigned top = (fsw >> 11) & 7u;
@@ -1003,7 +1081,10 @@ load_and_enter:
     }
   }
 
-  extern "C" void __cdecl OnExit(ExitFrame* frame, const std::uint8_t* fxsave)
+  extern "C" void __cdecl OnExit(
+    ExitFrame* frame,
+    const std::uint8_t* fxsave
+  )
   {
     // The call this return belongs to: entries above it were left by frames
     // that an exception or a longjmp unwound without returning.
@@ -1023,18 +1104,38 @@ load_and_enter:
     u32 result[2] = {0, 0};
     int resultWords = 0;
     switch (hook.ret) {
-      case kRetEax:
-      case kRetEaxPointer: result[0] = frame->eax; resultWords = 1; break;
-      case kRetEdxEax: result[0] = frame->eax; result[1] = frame->edx; resultWords = 2; break;
-      case kRetAl: result[0] = frame->eax & 0xFFu; resultWords = 1; break;
-      case kRetAx: result[0] = frame->eax & 0xFFFFu; resultWords = 1; break;
-      case kRetXmm0Float:
-        result[0] = CanonicalFloat(*reinterpret_cast<const u32*>(fxsave + 160)); // XMM0 in the image
-        resultWords = 1;
-        break;
-      case kRetSt0Float: St0Bits(fxsave, false, result); resultWords = 1; break;
-      case kRetSt0Double: St0Bits(fxsave, true, result); resultWords = 2; break;
-      default: break;
+    case kRetEax:
+    case kRetEaxPointer:
+      result[0] = frame->eax;
+      resultWords = 1;
+      break;
+    case kRetEdxEax:
+      result[0] = frame->eax;
+      result[1] = frame->edx;
+      resultWords = 2;
+      break;
+    case kRetAl:
+      result[0] = frame->eax & 0xFFu;
+      resultWords = 1;
+      break;
+    case kRetAx:
+      result[0] = frame->eax & 0xFFFFu;
+      resultWords = 1;
+      break;
+    case kRetXmm0Float:
+      result[0] = CanonicalFloat(*reinterpret_cast<const u32*>(fxsave + 160)); // XMM0 in the image
+      resultWords = 1;
+      break;
+    case kRetSt0Float:
+      St0Bits(fxsave, false, result);
+      resultWords = 1;
+      break;
+    case kRetSt0Double:
+      St0Bits(fxsave, true, result);
+      resultWords = 2;
+      break;
+    default:
+      break;
     }
 
     if (gSetsMode) {
@@ -1075,15 +1176,19 @@ load_and_enter:
       // function skipped while they run, so a probe that kills the process
       // past the handler is not repeated by the next run.
       const DWORD selfId = GetCurrentThreadId();
-      if (gLeaderThreadId == 0 && gProbeMode && tThreadCalls > kLeaderMinCalls
-          && GetTickCount64() - gLoadTick > kSimGracePeriodMs) {
+      if (
+        gLeaderThreadId == 0 && gProbeMode && tThreadCalls > kLeaderMinCalls &&
+        GetTickCount64() - gLoadTick > kSimGracePeriodMs
+      ) {
         // Claim the leadership if still open: the hottest thread reaches
         // this first, and a leader, once set, is never replaced.
         InterlockedCompareExchange(&gLeaderThreadId, static_cast<LONG>(selfId), 0);
       }
-      if (gProbeMode && static_cast<DWORD>(gLeaderThreadId) == selfId && hook.probeEnabled
-          && hook.probesDone < static_cast<LONG>(hook.probeBudget)
-          && static_cast<LONG64>(pending.sequence) >= hook.nextProbeCall) {
+      if (
+        gProbeMode && static_cast<DWORD>(gLeaderThreadId) == selfId && hook.probeEnabled &&
+        hook.probesDone < static_cast<LONG>(hook.probeBudget) &&
+        static_cast<LONG64>(pending.sequence) >= hook.nextProbeCall
+      ) {
         // Nested hooks reuse this pending slot during the probes.
         const CapturedCall captured = pending.captured;
         const u32 sequence = pending.sequence;
@@ -1165,15 +1270,20 @@ load_and_enter:
     }
   }
 
-  void WriteJump(std::uint8_t* at, const void* target)
+  void WriteJump(
+    std::uint8_t* at,
+    const void* target
+  )
   {
     at[0] = 0xE9;
-    const std::int32_t rel = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(target) -
-                                                       reinterpret_cast<std::intptr_t>(at + 5));
+    const std::int32_t rel =
+      static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(target) - reinterpret_cast<std::intptr_t>(at + 5));
     std::memcpy(at + 1, &rel, 4);
   }
 
-  bool LoadSpec(const char* path)
+  bool LoadSpec(
+    const char* path
+  )
   {
     std::FILE* f = std::fopen(path, "rb");
     if (f == nullptr) {
@@ -1364,7 +1474,9 @@ load_and_enter:
     MoveFileExA(tmp, gOutPath, MOVEFILE_REPLACE_EXISTING);
   }
 
-  DWORD WINAPI TableWriter(void*)
+  DWORD WINAPI TableWriter(
+    void*
+  )
   {
     for (;;) {
       Sleep(10000);
@@ -1378,7 +1490,10 @@ load_and_enter:
   using TerminateProcessFn = BOOL(WINAPI*)(HANDLE, UINT);
   TerminateProcessFn gRealTerminateProcess = nullptr;
 
-  BOOL WINAPI TerminateProcessHook(HANDLE process, const UINT code)
+  BOOL WINAPI TerminateProcessHook(
+    HANDLE process,
+    const UINT code
+  )
   {
     if (process == GetCurrentProcess()) {
       WriteSets();
@@ -1395,9 +1510,8 @@ load_and_enter:
     if (dir.VirtualAddress == 0u) {
       return;
     }
-    const void* const real = reinterpret_cast<const void*>(
-      GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "TerminateProcess")
-    );
+    const void* const real =
+      reinterpret_cast<const void*>(GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "TerminateProcess"));
     const auto* desc = reinterpret_cast<const IMAGE_IMPORT_DESCRIPTOR*>(base + dir.VirtualAddress);
     for (; desc->Name != 0u; ++desc) {
       auto* slot = reinterpret_cast<IMAGE_THUNK_DATA*>(base + desc->FirstThunk);
@@ -1418,7 +1532,9 @@ load_and_enter:
 
   // The launcher ends the game from outside 12 s after the replay is over, which
   // HookTerminateProcess cannot see, so a longer period loses the replay's last calls.
-  DWORD WINAPI SetsWriter(void*)
+  DWORD WINAPI SetsWriter(
+    void*
+  )
   {
     for (;;) {
       const bool last = WaitForSingleObject(gLastWriteWanted, 10000) == WAIT_OBJECT_0;
@@ -1437,7 +1553,9 @@ load_and_enter:
     }
   }
 
-  DWORD WINAPI JournalWriter(void*)
+  DWORD WINAPI JournalWriter(
+    void*
+  )
   {
     for (;;) {
       Sleep(10000);
@@ -1480,7 +1598,11 @@ load_and_enter:
   }
 } // namespace
 
-BOOL WINAPI DllMain(HINSTANCE, DWORD reason, LPVOID)
+BOOL WINAPI DllMain(
+  HINSTANCE,
+  DWORD reason,
+  LPVOID
+)
 {
   if (reason == DLL_PROCESS_ATTACH) {
     InitializeCriticalSection(&gWriterLock);

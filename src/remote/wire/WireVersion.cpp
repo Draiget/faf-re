@@ -12,7 +12,9 @@ namespace faf::remote::wire
     constexpr std::uint32_t kMaxLanesOnWire = 64u;
   } // namespace
 
-  const char* LaneName(const ELane lane) noexcept
+  const char* LaneName(
+    const ELane lane
+  ) noexcept
   {
     switch (lane) {
     case ELane::Entities:
@@ -33,7 +35,9 @@ namespace faf::remote::wire
     return "?";
   }
 
-  void SWireHello::Encode(BitWriter& writer) const
+  void SWireHello::Encode(
+    BitWriter& writer
+  ) const
   {
     writer.WriteBits(kHelloMagic, 32);
     writer.WriteBits(protocolVersion, 16);
@@ -45,7 +49,9 @@ namespace faf::remote::wire
     writer.WriteBits(static_cast<std::uint32_t>(contentHash >> 32), 32);
   }
 
-  std::optional<SWireHello> SWireHello::Decode(BitReader& reader)
+  std::optional<SWireHello> SWireHello::Decode(
+    BitReader& reader
+  )
   {
     if (reader.ReadBits(32) != kHelloMagic) {
       return std::nullopt;
@@ -74,12 +80,18 @@ namespace faf::remote::wire
     return hello;
   }
 
-  std::optional<std::string> WireIncompatibility(const SWireHello& local, const SWireHello& remote)
+  std::optional<std::string> WireIncompatibility(
+    const SWireHello& local,
+    const SWireHello& remote
+  )
   {
     char text[160];
     if (local.protocolVersion != remote.protocolVersion) {
       std::snprintf(
-        text, sizeof(text), "protocol version %u here, %u on the other side", local.protocolVersion,
+        text,
+        sizeof(text),
+        "protocol version %u here, %u on the other side",
+        local.protocolVersion,
         remote.protocolVersion
       );
       return std::string(text);
@@ -87,8 +99,12 @@ namespace faf::remote::wire
     for (std::size_t lane = 0; lane < kLaneCount; ++lane) {
       if (local.laneVersions[lane] != remote.laneVersions[lane]) {
         std::snprintf(
-          text, sizeof(text), "%s lane version %u here, %u on the other side", LaneName(static_cast<ELane>(lane)),
-          local.laneVersions[lane], remote.laneVersions[lane]
+          text,
+          sizeof(text),
+          "%s lane version %u here, %u on the other side",
+          LaneName(static_cast<ELane>(lane)),
+          local.laneVersions[lane],
+          remote.laneVersions[lane]
         );
         return std::string(text);
       }

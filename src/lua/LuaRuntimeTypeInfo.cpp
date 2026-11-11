@@ -416,7 +416,7 @@ namespace
   };
 
   LuaTypeInfoBootstrap gLuaRuntimeTypeInfoBootstrap;
-}
+} // namespace
 
 /**
  * Address: 0x00BEA1A0 (register_TStringTypeInfo)
@@ -481,225 +481,293 @@ void register_UdataTypeInfoStartup()
   static UdataTypeInfo sInstance;
 }
 
-
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_TStringTypeInfoStartup_8f60e9, register_TStringTypeInfoStartup)
-GPG_PREREGISTER_INIT(register_TableTypeInfoStartup_8f60e9, register_TableTypeInfoStartup)
-GPG_PREREGISTER_INIT(register_LClosureTypeInfoStartup_8f60e9, register_LClosureTypeInfoStartup)
-GPG_PREREGISTER_INIT(register_UpValTypeInfoStartup_8f60e9, register_UpValTypeInfoStartup)
-GPG_PREREGISTER_INIT(register_ProtoTypeInfoStartup_8f60e9, register_ProtoTypeInfoStartup)
-GPG_PREREGISTER_INIT(register_lua_StateTypeInfoStartup_8f60e9, register_lua_StateTypeInfoStartup)
-GPG_PREREGISTER_INIT(register_UdataTypeInfoStartup_8f60e9, register_UdataTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_TStringTypeInfoStartup_8f60e9,
+  register_TStringTypeInfoStartup
+)
+GPG_PREREGISTER_INIT(
+  register_TableTypeInfoStartup_8f60e9,
+  register_TableTypeInfoStartup
+)
+GPG_PREREGISTER_INIT(
+  register_LClosureTypeInfoStartup_8f60e9,
+  register_LClosureTypeInfoStartup
+)
+GPG_PREREGISTER_INIT(
+  register_UpValTypeInfoStartup_8f60e9,
+  register_UpValTypeInfoStartup
+)
+GPG_PREREGISTER_INIT(
+  register_ProtoTypeInfoStartup_8f60e9,
+  register_ProtoTypeInfoStartup
+)
+GPG_PREREGISTER_INIT(
+  register_lua_StateTypeInfoStartup_8f60e9,
+  register_lua_StateTypeInfoStartup
+)
+GPG_PREREGISTER_INIT(
+  register_UdataTypeInfoStartup_8f60e9,
+  register_UdataTypeInfoStartup
+)
 
-extern "C"
-{
-	TString* luaS_newlstr(lua_State* L, const char* str, std::size_t len);
-	Udata* luaS_newudata(lua_State* L, gpg::RType* type);
-	Table* luaH_new(lua_State* L, int narray, int lnhash);
-	const LuaPlus::TObject* luaH_getstr(Table* t, TString* key);
-	Closure* luaF_newLclosure(lua_State* L, int nelems, const LuaPlus::TObject* environment);
-	UpVal* luaF_newupval(lua_State* L);
-	Proto* luaF_newproto(lua_State* L);
-	lua_State* luaE_newthread(lua_State* L);
-	extern const LuaPlus::TObject luaO_nilobject;
+extern "C" {
+TString* luaS_newlstr(lua_State* L, const char* str, std::size_t len);
+Udata* luaS_newudata(lua_State* L, gpg::RType* type);
+Table* luaH_new(lua_State* L, int narray, int lnhash);
+const LuaPlus::TObject* luaH_getstr(Table* t, TString* key);
+Closure* luaF_newLclosure(lua_State* L, int nelems, const LuaPlus::TObject* environment);
+UpVal* luaF_newupval(lua_State* L);
+Proto* luaF_newproto(lua_State* L);
+lua_State* luaE_newthread(lua_State* L);
+extern const LuaPlus::TObject luaO_nilobject;
 }
 
 TString* ResolveSerializedNameForLuaObject(lua_State* const state, LuaPlus::Value value);
 
 void TString::MemberConstruct(
-	gpg::ReadArchive& archive, const int, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+  gpg::ReadArchive& archive,
+  const int,
+  const gpg::RRef& ownerRef,
+  gpg::SerConstructResult& result
 )
 {
-	lua_State* const state = ownerRef.TryUpcastLuaThreadState();
-	fa::string characters;
-	archive.ReadString(&characters);
-	result.SetOwned(gpg::MakeRRef(luaS_newlstr(state, characters.c_str(), characters.size())), 0u);
+  lua_State* const state = ownerRef.TryUpcastLuaThreadState();
+  fa::string characters;
+  archive.ReadString(&characters);
+  result.SetOwned(gpg::MakeRRef(luaS_newlstr(state, characters.c_str(), characters.size())), 0u);
 }
 
 /**
  * Address: 0x00921500 (FUN_00921500)
  */
 void TString::MemberSaveConstructArgs(
-	gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+  gpg::WriteArchive& archive,
+  const int,
+  const gpg::RRef&,
+  gpg::SerSaveConstructArgsResult& result
 )
 {
-	fa::string characters(str, len);
-	archive.WriteString(&characters);
-	result.SetOwned(0u);
+  fa::string characters(str, len);
+  archive.WriteString(&characters);
+  result.SetOwned(0u);
 }
 
 void Table::MemberConstruct(
-	gpg::ReadArchive& archive, const int, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+  gpg::ReadArchive& archive,
+  const int,
+  const gpg::RRef& ownerRef,
+  gpg::SerConstructResult& result
 )
 {
-	lua_State* const state = ownerRef.TryUpcastLuaThreadState();
+  lua_State* const state = ownerRef.TryUpcastLuaThreadState();
 
-	bool savedByName = false;
-	archive.ReadBool(&savedByName);
-	if (savedByName) {
-		TString* name = nullptr;
-		archive.ReadPointer(&name, &ownerRef);
+  bool savedByName = false;
+  archive.ReadBool(&savedByName);
+  if (savedByName) {
+    TString* name = nullptr;
+    archive.ReadPointer(&name, &ownerRef);
 
-		const LuaPlus::TObject* const objectsByName =
-			luaH_getstr(static_cast<Table*>(state->_gt.value.p), luaS_newlstr(state, "__serialize_object_for_name", 0x1Bu));
-		const LuaPlus::TObject* const named = (objectsByName->tt == LUA_TTABLE)
-			? luaH_getstr(static_cast<Table*>(objectsByName->value.p), name)
-			: &luaO_nilobject;
-		if (named->tt == LUA_TNIL) {
-			throw gpg::SerializationError("Named script object not found");
-		}
-		if (named->tt != LUA_TTABLE) {
-			throw gpg::SerializationError("Named script object was a table on save but isn't on load.");
-		}
+    const LuaPlus::TObject* const objectsByName =
+      luaH_getstr(static_cast<Table*>(state->_gt.value.p), luaS_newlstr(state, "__serialize_object_for_name", 0x1Bu));
+    const LuaPlus::TObject* const named = (objectsByName->tt == LUA_TTABLE)
+      ? luaH_getstr(static_cast<Table*>(objectsByName->value.p), name)
+      : &luaO_nilobject;
+    if (named->tt == LUA_TNIL) {
+      throw gpg::SerializationError("Named script object not found");
+    }
+    if (named->tt != LUA_TTABLE) {
+      throw gpg::SerializationError("Named script object was a table on save but isn't on load.");
+    }
 
-		result.SetOwned(gpg::MakeRRef(static_cast<Table*>(named->value.p)), 1u);
-		return;
-	}
+    result.SetOwned(gpg::MakeRRef(static_cast<Table*>(named->value.p)), 1u);
+    return;
+  }
 
-	int arraySize = 0;
-	archive.ReadInt(&arraySize);
-	lu_byte hashSizeLog2 = 0u;
-	archive.ReadUByte(&hashSizeLog2);
-	result.SetOwned(gpg::MakeRRef(luaH_new(state, arraySize, hashSizeLog2)), 0u);
+  int arraySize = 0;
+  archive.ReadInt(&arraySize);
+  lu_byte hashSizeLog2 = 0u;
+  archive.ReadUByte(&hashSizeLog2);
+  result.SetOwned(gpg::MakeRRef(luaH_new(state, arraySize, hashSizeLog2)), 0u);
 }
 
 /**
  * Address: 0x00921590 (FUN_00921590)
  */
 void Table::MemberSaveConstructArgs(
-	gpg::WriteArchive& archive, const int, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+  gpg::WriteArchive& archive,
+  const int,
+  const gpg::RRef& ownerRef,
+  gpg::SerSaveConstructArgsResult& result
 )
 {
-	lua_State* const state = ownerRef.TryUpcastLuaThreadState();
+  lua_State* const state = ownerRef.TryUpcastLuaThreadState();
 
-	LuaPlus::Value self{};
-	self.p = this;
-	if (TString* const name = ResolveSerializedNameForLuaObject(state, self)) {
-		archive.WriteBool(true);
-		archive.WritePointer(name, gpg::TrackedPointerState::Unowned, ownerRef);
-		result.SetOwned(1u);
-		return;
-	}
+  LuaPlus::Value self{};
+  self.p = this;
+  if (TString* const name = ResolveSerializedNameForLuaObject(state, self)) {
+    archive.WriteBool(true);
+    archive.WritePointer(name, gpg::TrackedPointerState::Unowned, ownerRef);
+    result.SetOwned(1u);
+    return;
+  }
 
-	archive.WriteBool(false);
-	archive.WriteInt(sizearray);
-	archive.WriteUByte(lsizenode);
-	result.SetOwned(0u);
+  archive.WriteBool(false);
+  archive.WriteInt(sizearray);
+  archive.WriteUByte(lsizenode);
+  result.SetOwned(0u);
 }
 
 void LClosure::MemberConstruct(
-	gpg::ReadArchive& archive, const int, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+  gpg::ReadArchive& archive,
+  const int,
+  const gpg::RRef& ownerRef,
+  gpg::SerConstructResult& result
 )
 {
-	lua_State* const state = ownerRef.TryUpcastLuaThreadState();
-	lu_byte upvalueCount = 0u;
-	archive.ReadUByte(&upvalueCount);
-	Closure* const closure = luaF_newLclosure(state, upvalueCount, &state->_gt);
-	result.SetOwned(gpg::MakeRRef(&closure->l), 0u);
+  lua_State* const state = ownerRef.TryUpcastLuaThreadState();
+  lu_byte upvalueCount = 0u;
+  archive.ReadUByte(&upvalueCount);
+  Closure* const closure = luaF_newLclosure(state, upvalueCount, &state->_gt);
+  result.SetOwned(gpg::MakeRRef(&closure->l), 0u);
 }
 
 void LClosure::MemberSaveConstructArgs(
-	gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+  gpg::WriteArchive& archive,
+  const int,
+  const gpg::RRef&,
+  gpg::SerSaveConstructArgsResult& result
 )
 {
-	archive.WriteUByte(nupvalues);
-	result.SetOwned(0u);
+  archive.WriteUByte(nupvalues);
+  result.SetOwned(0u);
 }
 
 void UpVal::MemberConstruct(
-	gpg::ReadArchive&, const int, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+  gpg::ReadArchive&,
+  const int,
+  const gpg::RRef& ownerRef,
+  gpg::SerConstructResult& result
 )
 {
-	result.SetOwned(gpg::MakeRRef(luaF_newupval(ownerRef.TryUpcastLuaThreadState())), 0u);
+  result.SetOwned(gpg::MakeRRef(luaF_newupval(ownerRef.TryUpcastLuaThreadState())), 0u);
 }
 
 void UpVal::MemberSaveConstructArgs(
-	gpg::WriteArchive&, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+  gpg::WriteArchive&,
+  const int,
+  const gpg::RRef&,
+  gpg::SerSaveConstructArgsResult& result
 )
 {
-	result.SetOwned(0u);
+  result.SetOwned(0u);
 }
 
-void UpVal::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
+void UpVal::MemberDeserialize(
+  gpg::ReadArchive* const archive,
+  const int,
+  const gpg::RRef& ownerRef
+)
 {
-	archive->Read(gpg::RTypeOf<LuaPlus::TObject>(), v, ownerRef);
+  archive->Read(gpg::RTypeOf<LuaPlus::TObject>(), v, ownerRef);
 }
 
-void UpVal::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef) const
+void UpVal::MemberSerialize(
+  gpg::WriteArchive* const archive,
+  const int,
+  const gpg::RRef& ownerRef
+) const
 {
-	archive->Write(gpg::RTypeOf<LuaPlus::TObject>(), v, ownerRef);
+  archive->Write(gpg::RTypeOf<LuaPlus::TObject>(), v, ownerRef);
 }
 
 void Proto::MemberConstruct(
-	gpg::ReadArchive&, const int, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+  gpg::ReadArchive&,
+  const int,
+  const gpg::RRef& ownerRef,
+  gpg::SerConstructResult& result
 )
 {
-	result.SetOwned(gpg::MakeRRef(luaF_newproto(ownerRef.TryUpcastLuaThreadState())), 0u);
+  result.SetOwned(gpg::MakeRRef(luaF_newproto(ownerRef.TryUpcastLuaThreadState())), 0u);
 }
 
 void Proto::MemberSaveConstructArgs(
-	gpg::WriteArchive&, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+  gpg::WriteArchive&,
+  const int,
+  const gpg::RRef&,
+  gpg::SerSaveConstructArgsResult& result
 )
 {
-	result.SetOwned(0u);
+  result.SetOwned(0u);
 }
 
 void lua_State::MemberConstruct(
-	gpg::ReadArchive& archive, const int, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+  gpg::ReadArchive& archive,
+  const int,
+  const gpg::RRef& ownerRef,
+  gpg::SerConstructResult& result
 )
 {
-	lua_State* const state = ownerRef.TryUpcastLuaThreadState();
-	bool isMainThread = false;
-	archive.ReadBool(&isMainThread);
-	if (isMainThread) {
-		result.SetUnowned(gpg::MakeRRef(state), 1u);
-		return;
-	}
-	result.SetOwned(gpg::MakeRRef(luaE_newthread(state)), 0u);
+  lua_State* const state = ownerRef.TryUpcastLuaThreadState();
+  bool isMainThread = false;
+  archive.ReadBool(&isMainThread);
+  if (isMainThread) {
+    result.SetUnowned(gpg::MakeRRef(state), 1u);
+    return;
+  }
+  result.SetOwned(gpg::MakeRRef(luaE_newthread(state)), 0u);
 }
 
 /**
  * Address: 0x00921630 (FUN_00921630)
  */
 void lua_State::MemberSaveConstructArgs(
-	gpg::WriteArchive& archive, const int, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+  gpg::WriteArchive& archive,
+  const int,
+  const gpg::RRef& ownerRef,
+  gpg::SerSaveConstructArgsResult& result
 )
 {
-	lua_State* const state = ownerRef.TryUpcastLuaThreadState();
-	if (l_G->mainthread != state) {
-		throw gpg::SerializationError("Consistency check failed: value.l_G->mainthread == &state");
-	}
+  lua_State* const state = ownerRef.TryUpcastLuaThreadState();
+  if (l_G->mainthread != state) {
+    throw gpg::SerializationError("Consistency check failed: value.l_G->mainthread == &state");
+  }
 
-	const bool isMainThread = (this == state);
-	archive.WriteBool(isMainThread);
-	if (isMainThread) {
-		result.SetUnowned(1u);
-		return;
-	}
+  const bool isMainThread = (this == state);
+  archive.WriteBool(isMainThread);
+  if (isMainThread) {
+    result.SetUnowned(1u);
+    return;
+  }
 
-	if (nCcalls != 0u) {
-		throw gpg::SerializationError("cannot save a Lua thread with active C calls");
-	}
-	result.SetOwned(0u);
+  if (nCcalls != 0u) {
+    throw gpg::SerializationError("cannot save a Lua thread with active C calls");
+  }
+  result.SetOwned(0u);
 }
 
 void Udata::MemberConstruct(
-	gpg::ReadArchive& archive, const int, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
+  gpg::ReadArchive& archive,
+  const int,
+  const gpg::RRef& ownerRef,
+  gpg::SerConstructResult& result
 )
 {
-	lua_State* const state = ownerRef.TryUpcastLuaThreadState();
-	const gpg::TypeHandle payloadType = archive.ReadTypeHandle();
-	result.SetOwned(gpg::MakeRRef(luaS_newudata(state, payloadType.type)), 0u);
+  lua_State* const state = ownerRef.TryUpcastLuaThreadState();
+  const gpg::TypeHandle payloadType = archive.ReadTypeHandle();
+  result.SetOwned(gpg::MakeRRef(luaS_newudata(state, payloadType.type)), 0u);
 }
 
 void Udata::MemberSaveConstructArgs(
-	gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+  gpg::WriteArchive& archive,
+  const int,
+  const gpg::RRef&,
+  gpg::SerSaveConstructArgsResult& result
 )
 {
-	archive.WriteRefCounts(reinterpret_cast<const gpg::RType*>(len));
-	result.SetOwned(0u);
+  archive.WriteRefCounts(reinterpret_cast<const gpg::RType*>(len));
+  result.SetOwned(0u);
 }
 
 /**
@@ -889,51 +957,51 @@ struct UdataConstruct : gpg::SerConstructHelper<Udata>
 
 namespace
 {
-	// Address: 0x00F8E89C -- process-global `TStringSaveConstruct` singleton.
-	TStringSaveConstruct gTStringSaveConstruct;
+  // Address: 0x00F8E89C -- process-global `TStringSaveConstruct` singleton.
+  TStringSaveConstruct gTStringSaveConstruct;
 
-	// Address: 0x00F8E704 -- process-global `TStringConstruct` singleton.
-	TStringConstruct gTStringConstruct;
+  // Address: 0x00F8E704 -- process-global `TStringConstruct` singleton.
+  TStringConstruct gTStringConstruct;
 
-	// Address: 0x00F8E934 -- process-global `TStringSerializer` singleton.
-	TStringSerializer gTStringSerializer;
+  // Address: 0x00F8E934 -- process-global `TStringSerializer` singleton.
+  TStringSerializer gTStringSerializer;
 
-	// Address: 0x00F8E87C -- process-global `TableSaveConstruct` singleton.
-	TableSaveConstruct gTableSaveConstruct;
+  // Address: 0x00F8E87C -- process-global `TableSaveConstruct` singleton.
+  TableSaveConstruct gTableSaveConstruct;
 
-	// Address: 0x00F8E9AC -- process-global `TableConstruct` singleton.
-	TableConstruct gTableConstruct;
+  // Address: 0x00F8E9AC -- process-global `TableConstruct` singleton.
+  TableConstruct gTableConstruct;
 
-	// Address: 0x00F8E88C -- process-global `LClosureSaveConstruct` singleton.
-	LClosureSaveConstruct gLClosureSaveConstruct;
+  // Address: 0x00F8E88C -- process-global `LClosureSaveConstruct` singleton.
+  LClosureSaveConstruct gLClosureSaveConstruct;
 
-	// Address: 0x00F8EB24 -- process-global `LClosureConstruct` singleton.
-	LClosureConstruct gLClosureConstruct;
+  // Address: 0x00F8EB24 -- process-global `LClosureConstruct` singleton.
+  LClosureConstruct gLClosureConstruct;
 
-	// Address: 0x00F8E924 -- process-global `UpValSaveConstruct` singleton.
-	UpValSaveConstruct gUpValSaveConstruct;
+  // Address: 0x00F8E924 -- process-global `UpValSaveConstruct` singleton.
+  UpValSaveConstruct gUpValSaveConstruct;
 
-	// Address: 0x00F8E7F4 -- process-global `UpValConstruct` singleton.
-	UpValConstruct gUpValConstruct;
+  // Address: 0x00F8E7F4 -- process-global `UpValConstruct` singleton.
+  UpValConstruct gUpValConstruct;
 
-	// Address: 0x00F8EA34 -- process-global `UpValSerializer` singleton.
-	UpValSerializer gUpValSerializer;
+  // Address: 0x00F8EA34 -- process-global `UpValSerializer` singleton.
+  UpValSerializer gUpValSerializer;
 
-	// Address: 0x00F8EA24 -- process-global `ProtoSaveConstruct` singleton.
-	ProtoSaveConstruct gProtoSaveConstruct;
+  // Address: 0x00F8EA24 -- process-global `ProtoSaveConstruct` singleton.
+  ProtoSaveConstruct gProtoSaveConstruct;
 
-	// Address: 0x00F8E740 -- process-global `ProtoConstruct` singleton.
-	ProtoConstruct gProtoConstruct;
+  // Address: 0x00F8E740 -- process-global `ProtoConstruct` singleton.
+  ProtoConstruct gProtoConstruct;
 
-	// Address: 0x00F8E6E0 -- process-global `lua_StateSaveConstruct` singleton.
-	lua_StateSaveConstruct glua_StateSaveConstruct;
+  // Address: 0x00F8E6E0 -- process-global `lua_StateSaveConstruct` singleton.
+  lua_StateSaveConstruct glua_StateSaveConstruct;
 
-	// Address: 0x00F8E754 -- process-global `lua_StateConstruct` singleton.
-	lua_StateConstruct glua_StateConstruct;
+  // Address: 0x00F8E754 -- process-global `lua_StateConstruct` singleton.
+  lua_StateConstruct glua_StateConstruct;
 
-	// Address: 0x00F8E86C -- process-global `UdataSaveConstruct` singleton.
-	UdataSaveConstruct gUdataSaveConstruct;
+  // Address: 0x00F8E86C -- process-global `UdataSaveConstruct` singleton.
+  UdataSaveConstruct gUdataSaveConstruct;
 
-	// Address: 0x00F8E718 -- process-global `UdataConstruct` singleton.
-	UdataConstruct gUdataConstruct;
+  // Address: 0x00F8E718 -- process-global `UdataConstruct` singleton.
+  UdataConstruct gUdataConstruct;
 } // namespace

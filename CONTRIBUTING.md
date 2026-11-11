@@ -39,6 +39,18 @@ Every engine function in `src/` was rebuilt from the original binary, and its be
 - Use named fields and real virtual calls, not pointer arithmetic or offsets (`*(int*)(p + 0x78)`).
 - No stub or placeholder functions.
 
+## Code format
+
+C and C++ code under `src/`, `tests/` and `tools/` is formatted with the repository's [.clang-format](.clang-format), using clang-format 22. The `Format` check fails a pull request when a line it adds or changes is not formatted. Lines the PR doesn't touch are not checked, so older code is not a reason to reformat whole files.
+
+Before pushing, format the lines your branch changes and commit the result:
+
+```sh
+git clang-format origin/master
+```
+
+`git clang-format` comes with LLVM (Windows: `C:\Program Files\LLVM\bin`), or with `pip install clang-format==22.1.8`, which is the version the check uses.
+
 ## Writing tests
 
 Use **GoogleTest (GTest)** for all unit and integration tests. Do not roll custom or ad-hoc test harnesses (such as custom `Check` loops, hand-rolled `gFailures` counters, or manual `main()` runners).

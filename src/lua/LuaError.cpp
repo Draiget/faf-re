@@ -11,8 +11,14 @@
  * stores `lua_state` in `L` and `errcode` in `code`.  The vtable is set by
  * the usual C++ construction sequence.
  */
-lua::lua_Error::lua_Error(lua_State* const lua_state, const int errcode, const char* const err)
-  : fa::runtime_error(err), L(lua_state), code(errcode)
+lua::lua_Error::lua_Error(
+  lua_State* const lua_state,
+  const int errcode,
+  const char* const err
+)
+  : fa::runtime_error(err)
+  , L(lua_state)
+  , code(errcode)
 {
   // Crash-report ring (deviation, documented): record the error so a later
   // crash report shows the failing script history. Log-only, bounded.
@@ -28,8 +34,13 @@ lua::lua_Error::lua_Error(lua_State* const lua_state, const int errcode, const c
  * luaG_errormsg uses: by the time it throws, the message - possibly rewritten
  * by a _TRACEBACK handler - is already sitting there.
  */
-lua::lua_Error::lua_Error(lua_State* const lua_state, const int errcode)
-  : fa::runtime_error(luaL_checklstring(lua_state, -1, nullptr)), L(lua_state), code(errcode)
+lua::lua_Error::lua_Error(
+  lua_State* const lua_state,
+  const int errcode
+)
+  : fa::runtime_error(luaL_checklstring(lua_state, -1, nullptr))
+  , L(lua_state)
+  , code(errcode)
 {
   // See the (state, errcode, err) overload for the diagnostics ring.
   RecordLuaError(lua_state, what());
@@ -43,10 +54,13 @@ lua::lua_Error::lua_Error(lua_State* const lua_state, const int errcode)
  * Copy-constructs one Lua error payload and preserves the source state's
  * `code` and `L` fields.
  */
-lua::lua_Error::lua_Error(const lua::lua_Error& error)
-  : fa::runtime_error(error), L(error.L), code(error.code)
-{
-}
+lua::lua_Error::lua_Error(
+  const lua::lua_Error& error
+)
+  : fa::runtime_error(error)
+  , L(error.L)
+  , code(error.code)
+{}
 
 /**
  * What it does:
@@ -62,10 +76,11 @@ lua::lua_Error::~lua_Error() = default;
  * What it does:
  * Copy-constructs one runtime-error lane from an existing Lua error payload.
  */
-lua_RuntimeError::lua_RuntimeError(const lua::lua_Error& error)
+lua_RuntimeError::lua_RuntimeError(
+  const lua::lua_Error& error
+)
   : lua::lua_Error(error)
-{
-}
+{}
 
 /**
  * Address: 0x00913170 (FUN_00913170, non-deleting dtor lane)
@@ -84,10 +99,11 @@ lua_RuntimeError::~lua_RuntimeError() = default;
  * What it does:
  * Copy-constructs one error-error lane from an existing Lua error payload.
  */
-lua_ErrorError::lua_ErrorError(const lua::lua_Error& error)
+lua_ErrorError::lua_ErrorError(
+  const lua::lua_Error& error
+)
   : lua::lua_Error(error)
-{
-}
+{}
 
 /**
  * Address: 0x009141B0 (FUN_009141B0, non-deleting dtor lane)
@@ -107,10 +123,11 @@ lua_ErrorError::~lua_ErrorError() = default;
  * Copies the base Lua error state into a syntax-error exception object and
  * leaves the derived syntax-error vtable installed.
  */
-lua_SyntaxError::lua_SyntaxError(const lua::lua_Error& error)
+lua_SyntaxError::lua_SyntaxError(
+  const lua::lua_Error& error
+)
   : lua::lua_Error(error)
-{
-}
+{}
 
 /**
  * Address: 0x009182D0 (FUN_009182D0, non-deleting dtor lane)
@@ -131,10 +148,11 @@ lua_SyntaxError::~lua_SyntaxError() = default;
  * What it does:
  * Copy-constructs one memory-error lane from an existing Lua error payload.
  */
-lua_MemError::lua_MemError(const lua::lua_Error& error)
+lua_MemError::lua_MemError(
+  const lua::lua_Error& error
+)
   : lua::lua_Error(error)
-{
-}
+{}
 
 /**
  * Address: 0x0091A1B0 (FUN_0091A1B0, non-deleting dtor lane)

@@ -18,7 +18,10 @@
 #include <new>
 #include <string>
 
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
 #include <d3d9.h>
+#endif
 
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/String.h"
@@ -26,7 +29,10 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/RenderProfiler.h"
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#endif
 #include "moho/console/CConCommand.h"
 #include "moho/effects/rendering/SEfxCurve.h"
 #include "moho/mesh/Mesh.h"
@@ -87,5 +93,11 @@
 #include "moho/terrain/MediumFidelityTerrain.h"
 #include "moho/ui/IUIManager.h"
 
-#define EVT_LOG_ADDITION_EVENT(fn)                                                                             DECLARE_EVENT_TABLE_ENTRY(                                                                                     moho::EVT_LOG_ADDITION, -1, -1,                                                                              (wxObjectEventFunction)(wxEventFunction)(moho::CLogAdditionEventFunction)&fn, (wxObject*)NULL              ),
-
+#define EVT_LOG_ADDITION_EVENT(fn)                                                                                     \
+  DECLARE_EVENT_TABLE_ENTRY(                                                                                           \
+    moho::EVT_LOG_ADDITION,                                                                                            \
+    -1,                                                                                                                \
+    -1,                                                                                                                \
+    (wxObjectEventFunction)(wxEventFunction)(moho::CLogAdditionEventFunction) & fn,                                    \
+    (wxObject*)NULL                                                                                                    \
+  ),

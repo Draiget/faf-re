@@ -21,10 +21,27 @@
 #define PARSE_NUMBER(text, end) std::strtod(text, end)
 #endif
 
-static inline float AsFloat(std::uint32_t u) { float f; std::memcpy(&f, &u, 4); return f; }
-static inline std::uint32_t AsBits(float f) { std::uint32_t u; std::memcpy(&u, &f, 4); return u; }
+static inline float AsFloat(
+  std::uint32_t u
+)
+{
+  float f;
+  std::memcpy(&f, &u, 4);
+  return f;
+}
+static inline std::uint32_t AsBits(
+  float f
+)
+{
+  std::uint32_t u;
+  std::memcpy(&u, &f, 4);
+  return u;
+}
 
-int main(int argc, char** argv)
+int main(
+  int argc,
+  char** argv
+)
 {
   const unsigned first = argc > 2 ? static_cast<unsigned>(std::strtoul(argv[1], nullptr, 10)) : 0u;
   const unsigned last = argc > 2 ? static_cast<unsigned>(std::strtoul(argv[2], nullptr, 10)) : 4095u;
@@ -44,9 +61,13 @@ int main(int argc, char** argv)
       parseHash = (parseHash ^ AsBits(parsed)) * 1099511628211ull;
       parseHash = (parseHash ^ static_cast<std::uint32_t>(end - text)) * 1099511628211ull;
     }
-    std::printf("format %llu %016llx\nparse %llu %016llx\n", static_cast<unsigned long long>(block),
-                static_cast<unsigned long long>(formatHash), static_cast<unsigned long long>(block),
-                static_cast<unsigned long long>(parseHash));
+    std::printf(
+      "format %llu %016llx\nparse %llu %016llx\n",
+      static_cast<unsigned long long>(block),
+      static_cast<unsigned long long>(formatHash),
+      static_cast<unsigned long long>(block),
+      static_cast<unsigned long long>(parseHash)
+    );
   }
   return 0;
 }

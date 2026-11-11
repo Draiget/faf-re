@@ -26,7 +26,11 @@ namespace
     std::atomic<bool> done{false};
   };
 
-  void OnCandidate(juice_agent_t*, const char* sdp, void* user)
+  void OnCandidate(
+    juice_agent_t*,
+    const char* sdp,
+    void* user
+  )
   {
     auto* g = static_cast<Gathered*>(user);
     std::printf("candidate: %s\n", sdp);
@@ -39,13 +43,19 @@ namespace
     }
   }
 
-  void OnGatheringDone(juice_agent_t*, void* user)
+  void OnGatheringDone(
+    juice_agent_t*,
+    void* user
+  )
   {
     static_cast<Gathered*>(user)->done = true;
   }
 } // namespace
 
-int main(int argc, char** argv)
+int main(
+  int argc,
+  char** argv
+)
 {
   if (argc != 3 && argc != 5) {
     std::fprintf(stderr, "usage: %s <host> <port> [<turn user> <turn password>]\n", argv[0]);
@@ -92,8 +102,13 @@ int main(int argc, char** argv)
   }
   juice_destroy(agent);
 
-  std::printf("gathering %s: host=%d srflx=%d relay=%d\n", gathered.done ? "done" : "timed out",
-              gathered.host.load(), gathered.srflx.load(), gathered.relay.load());
+  std::printf(
+    "gathering %s: host=%d srflx=%d relay=%d\n",
+    gathered.done ? "done" : "timed out",
+    gathered.host.load(),
+    gathered.srflx.load(),
+    gathered.relay.load()
+  );
   const bool ok = gathered.done && gathered.host > 0 && gathered.srflx > 0 && (!withTurn || gathered.relay > 0);
   std::printf("%s\n", ok ? "PASS" : "FAIL");
   return ok ? 0 : 1;

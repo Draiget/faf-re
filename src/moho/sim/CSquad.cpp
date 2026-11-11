@@ -23,11 +23,11 @@
 #include "moho/unit/core/Unit.h"
 
 #ifdef _MSC_VER
-#  include <string.h>
-#  define MOHO_STRICMP _stricmp
+#include <string.h>
+#define MOHO_STRICMP _stricmp
 #else
-#  include <strings.h>
-#  define MOHO_STRICMP strcasecmp
+#include <strings.h>
+#define MOHO_STRICMP strcasecmp
 #endif
 
 namespace moho
@@ -36,7 +36,10 @@ namespace moho
 
   namespace
   {
-    [[nodiscard]] EOccupancyCaps ClearSubCapsForWaterLayer(EOccupancyCaps caps, const ELayer layer) noexcept
+    [[nodiscard]] EOccupancyCaps ClearSubCapsForWaterLayer(
+      EOccupancyCaps caps,
+      const ELayer layer
+    ) noexcept
     {
       if (layer != LAYER_Water) {
         return caps;
@@ -70,9 +73,9 @@ namespace moho
    * 2026-09-22.
    */
   CSquad::CSquad()
-    : mSim(nullptr), mSquadClass(ESquadClass::Unassigned)
-  {
-  }
+    : mSim(nullptr)
+    , mSquadClass(ESquadClass::Unassigned)
+  {}
 
   /**
    * Address: 0x00723E70 (FUN_00723E70, Moho::CSquad::CSquad)
@@ -91,8 +94,13 @@ namespace moho
    * the back (so per-squad unit-set updates participate in the global entity
    * iteration lane).
    */
-  CSquad::CSquad(const ESquadClass squadClass, Sim* const sim, const char* const name)
-    : mSim(sim), mSquadClass(squadClass)
+  CSquad::CSquad(
+    const ESquadClass squadClass,
+    Sim* const sim,
+    const char* const name
+  )
+    : mSim(sim)
+    , mSquadClass(squadClass)
   {
     mUnits.ListResetLinks();
     if (name != nullptr) {
@@ -137,7 +145,9 @@ namespace moho
    * recomputed on next request.
    */
   CSquad* CSquad::AllocateOnPlatoon(
-    CPlatoon* const parentPlatoon, const ESquadClass squadClass, const char* const name
+    CPlatoon* const parentPlatoon,
+    const ESquadClass squadClass,
+    const char* const name
   )
   {
     parentPlatoon->mHasLuaList = false;
@@ -153,7 +163,9 @@ namespace moho
    * What it does:
    * Linear scan of `mUnits` for `unit`, inlined at its three platoon callers.
    */
-  bool CSquad::HasUnit(const Unit* const unit) const
+  bool CSquad::HasUnit(
+    const Unit* const unit
+  ) const
   {
     // Engine change (sim_SquadUnitSearch): the set is kept sorted by entity id, so its own binary
     // search answers the same question; the binary scans linearly.
@@ -174,7 +186,9 @@ namespace moho
    * What it does:
    * Erases the first entry that is `unit`; later entries move down one slot.
    */
-  void CSquad::RemoveUnit(Unit* const unit)
+  void CSquad::RemoveUnit(
+    Unit* const unit
+  )
   {
     auto& entries = mUnits.mVec;
     for (auto it = entries.begin(); it != entries.end(); ++it) {
@@ -191,7 +205,9 @@ namespace moho
    * What it does:
    * Removes each unit of `units` from this squad.
    */
-  void CSquad::RemoveUnits(const EntitySetTemplate<Unit>& units)
+  void CSquad::RemoveUnits(
+    const EntitySetTemplate<Unit>& units
+  )
   {
     for (Entity* const entity : units.mVec) {
       RemoveUnit(static_cast<Unit*>(entity));
@@ -205,7 +221,9 @@ namespace moho
    * Counts every live squad unit whose blueprint id matches `blueprintId`
    * case-insensitively.
    */
-  int CSquad::CountUnitsWithBP(const char* const blueprintId) const
+  int CSquad::CountUnitsWithBP(
+    const char* const blueprintId
+  ) const
   {
     int count = 0;
     for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
@@ -230,7 +248,9 @@ namespace moho
    * Counts every live squad unit whose blueprint category bit belongs to
    * `categorySet`.
    */
-  int CSquad::CountUnitsInCategory(const EntityCategorySet* const categorySet) const
+  int CSquad::CountUnitsInCategory(
+    const EntityCategorySet* const categorySet
+  ) const
   {
     int count = 0;
     for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
@@ -258,7 +278,9 @@ namespace moho
    * attacker controller reports that it can pick the supplied target entity.
    * Dead units and units without attacker controllers are skipped.
    */
-  bool CSquad::CanAttackTarget(Unit* const target)
+  bool CSquad::CanAttackTarget(
+    Unit* const target
+  )
   {
     Entity* const targetEntity = target != nullptr ? static_cast<Entity*>(target) : nullptr;
 
@@ -283,7 +305,9 @@ namespace moho
    * What it does:
    * Returns true as soon as one live unit is in `state`.
    */
-  bool CSquad::HasUnitWithState(const EUnitState state) const
+  bool CSquad::HasUnitWithState(
+    const EUnitState state
+  ) const
   {
     for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
       Unit* const unit = static_cast<Unit*>(*slot);
@@ -314,8 +338,10 @@ namespace moho
       }
 
       const CUnitCommandQueue* const commandQueue = unit->CommandQueue;
-      if (commandQueue != nullptr && !commandQueue->mCommandVec.empty()
-          && commandQueue->mCommandVec.front().GetObjectPtr() != nullptr) {
+      if (
+        commandQueue != nullptr && !commandQueue->mCommandVec.empty() &&
+        commandQueue->mCommandVec.front().GetObjectPtr() != nullptr
+      ) {
         return false;
       }
     }
@@ -329,7 +355,9 @@ namespace moho
    * Replaces the target-priority categories. Self-assignment is
    * `operator=`'s own first check.
    */
-  void CSquad::SetPrioritizedTargetList(const fa::vector<EntityCategorySet>& categories)
+  void CSquad::SetPrioritizedTargetList(
+    const fa::vector<EntityCategorySet>& categories
+  )
   {
     mCats = categories;
   }
@@ -371,7 +399,11 @@ namespace moho
    * against `blueprintId` and adds them to `outUnits` until `maxCount`
    * matches have been collected.
    */
-  void CSquad::AppendUnitsWithBP(const char* const blueprintId, const int maxCount, EntitySetTemplate<Unit>& outUnits)
+  void CSquad::AppendUnitsWithBP(
+    const char* const blueprintId,
+    const int maxCount,
+    EntitySetTemplate<Unit>& outUnits
+  )
   {
     int matchCount = 0;
     for (Entity* const* slot = mUnits.mVec.begin(); slot != mUnits.mVec.end(); ++slot) {
@@ -409,7 +441,9 @@ namespace moho
    * `categorySet` until `maxCount` accepted units have been added.
    */
   void CSquad::AppendUnitsInCategory(
-    const EntityCategorySet* const categorySet, const int maxCount, EntitySetTemplate<Unit>& outUnits
+    const EntityCategorySet* const categorySet,
+    const int maxCount,
+    EntitySetTemplate<Unit>& outUnits
   )
   {
     int matchCount = 0;
@@ -442,7 +476,9 @@ namespace moho
    * for `position`, and returns false as soon as one unit cannot satisfy its
    * motion-type occupancy-cap requirement.
    */
-  bool CSquad::FitsAt(const Wm3::Vec3f& position) const
+  bool CSquad::FitsAt(
+    const Wm3::Vec3f& position
+  ) const
   {
     COGrid* const occupancyGrid = mSim->mOGrid;
 
@@ -522,7 +558,9 @@ namespace moho
    * immediately; the fallback max-float lane only appears if the slot count
    * collapses to zero after traversal.
    */
-  Wm3::Vector3f* CSquad::GetCenter(Wm3::Vector3f* const outPos) const
+  Wm3::Vector3f* CSquad::GetCenter(
+    Wm3::Vector3f* const outPos
+  ) const
   {
     const std::ptrdiff_t slotCount = mUnits.mVec.end() - mUnits.mVec.begin();
     outPos->x = 0.0f;
@@ -568,7 +606,10 @@ namespace moho
    * Publishes this squad's member set as a Lua array. The whole body is the
    * shared entity-table fill, which is why the binary keeps it out of line.
    */
-  LuaPlus::LuaObject* CSquad::GetUnits(LuaPlus::LuaObject* const outTable, LuaPlus::LuaState* const state) const
+  LuaPlus::LuaObject* CSquad::GetUnits(
+    LuaPlus::LuaObject* const outTable,
+    LuaPlus::LuaState* const state
+  ) const
   {
     return FillLuaTableWithEntities(mUnits, outTable, state);
   }

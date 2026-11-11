@@ -263,7 +263,8 @@ namespace moho
   int cfunc_RemoveConsoleOutputRecieverL(LuaPlus::LuaState* state);
 
   static_assert(
-    offsetof(CLuaConOutputHandler, mCallback) == 0x10, "CLuaConOutputHandler::mCallback offset must be 0x10"
+    offsetof(CLuaConOutputHandler, mCallback) == 0x10,
+    "CLuaConOutputHandler::mCallback offset must be 0x10"
   );
   static_assert(sizeof(CLuaConOutputHandler) == 0x24, "CLuaConOutputHandler size must be 0x24");
   static_assert(

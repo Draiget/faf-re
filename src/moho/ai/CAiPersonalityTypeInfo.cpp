@@ -41,7 +41,9 @@ namespace
    * Registers `CScriptObject` as one reflected base lane for
    * `CAiPersonality` at offset `+0x00`.
    */
-  void AddCScriptObjectBaseToCAiPersonalityType(gpg::RType* const typeInfo)
+  void AddCScriptObjectBaseToCAiPersonalityType(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<CScriptObject>(typeInfo);
   }
@@ -95,9 +97,14 @@ namespace
   [[maybe_unused]] CAiPersonalityTypeInfoBootstrap gCAiPersonalityTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CAiPersonalityTypeInfo_7b34c0, moho::register_CAiPersonalityTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CAiPersonalityTypeInfo_7b34c0,
+  moho::register_CAiPersonalityTypeInfo
+)
 
-GPG_PREREGISTER_INIT(AcquireCAiPersonalityTypeInfo_7b34c0, AcquireCAiPersonalityTypeInfo)
+GPG_PREREGISTER_INIT(
+  AcquireCAiPersonalityTypeInfo_7b34c0,
+  AcquireCAiPersonalityTypeInfo
+)

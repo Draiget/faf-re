@@ -95,3 +95,48 @@ do
         WARN('faf-re lobby hook (WP17.6) not installed: ' .. tostring(problem))
     end
 end
+
+--- Engine addition (plan WP2.14): on a game server a launch is a request the server may refuse. FAF's TryLaunch
+--- flattens gameInfo (GameInfo.Flatten) and leaves windowed mode before it sends the launch, as a launch in a
+--- peer-to-peer lobby always goes ahead. Until the server answers, the lobby keeps running (its ping thread walks
+--- gameInfo.PlayerOptions:pairs() every second), so on a game server the host's game info is made whole again as soon
+--- as the launch is sent, as a joiner's lobby rebuilds the host's flat game info (GameInfo.CreateGameInfo).
+do
+    local function RestoreGameInfo()
+        if gameInfo and gameInfo.PlayerOptions and gameInfo.PlayerOptions.pairs == nil then
+            gameInfo = GameInfo.CreateGameInfo(LobbyComm.maxPlayerSlots, gameInfo)
+        end
+    end
+    local wrapped, problem = pcall(function()
+        local launch = TryLaunch
+        if type(launch) ~= 'function' then
+            error('TryLaunch is not a function here')
+        end
+        TryLaunch = function(skipNoObserversCheck)
+            launch(skipNoObserversCheck)
+            if rawget(_G, 'ServerLobbySession') then
+                local restored, why = pcall(RestoreGameInfo)
+                if not restored then
+                    WARN('faf-re lobby (WP2.14): the game info was not rebuilt after the launch: ' .. tostring(why))
+                end
+            end
+        end
+    end)
+    if not wrapped then
+        WARN('faf-re lobby (WP2.14): ' .. tostring(problem))
+    end
+
+    --- The game server refused the launch (`ELobbySignal::LaunchRefused`, sent to everyone in the lobby): back into the
+    --- lobby window (the host's TryLaunch and a joiner's `Launch` handler left it), and the reason in the chat.
+    function ServerLaunchRefused(text)
+        local restored, why = pcall(function()
+            RestoreGameInfo()
+            SetWindowedLobby(true)
+            UpdateGame()
+        end)
+        if not restored then
+            WARN('faf-re lobby (WP2.14): the lobby was not restored after a refused launch: ' .. tostring(why))
+        end
+        AddChatText(text)
+    end
+end

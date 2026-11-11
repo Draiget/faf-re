@@ -28,40 +28,78 @@ namespace faf_reflection_tests
   class Bytes
   {
   public:
-    Bytes& I32(const std::int32_t value) { return Raw(&value, 4u); }
-    Bytes& U32(const std::uint32_t value) { return Raw(&value, 4u); }
-    Bytes& F32(const float value) { return Raw(&value, 4u); }
-    Bytes& Str(const std::string_view text)
+    Bytes& I32(
+      const std::int32_t value
+    )
+    {
+      return Raw(&value, 4u);
+    }
+    Bytes& U32(
+      const std::uint32_t value
+    )
+    {
+      return Raw(&value, 4u);
+    }
+    Bytes& F32(
+      const float value
+    )
+    {
+      return Raw(&value, 4u);
+    }
+    Bytes& Str(
+      const std::string_view text
+    )
     {
       I32(static_cast<std::int32_t>(text.size()));
       mBytes.append(text);
       return *this;
     }
-    Bytes& Token(const char token)
+    Bytes& Token(
+      const char token
+    )
     {
       mBytes.push_back(token);
       return *this;
     }
     /** `{` and a type handle seen for the first time: -1, the name, the version. */
-    Bytes& NewObject(const std::string_view typeName, const std::int32_t version)
+    Bytes& NewObject(
+      const std::string_view typeName,
+      const std::int32_t version
+    )
     {
       return Token('{').I32(-1).Str(typeName).I32(version);
     }
     /** `{` and the index of a type handle already written. */
-    Bytes& KnownObject(const std::int32_t handleIndex) { return Token('{').I32(handleIndex); }
-    Bytes& End() { return Token('}'); }
-    Bytes& Append(const std::string& bytes)
+    Bytes& KnownObject(
+      const std::int32_t handleIndex
+    )
+    {
+      return Token('{').I32(handleIndex);
+    }
+    Bytes& End()
+    {
+      return Token('}');
+    }
+    Bytes& Append(
+      const std::string& bytes
+    )
     {
       mBytes.append(bytes);
       return *this;
     }
-    Bytes& Raw(const void* const data, const std::size_t size)
+    Bytes& Raw(
+      const void* const data,
+      const std::size_t size
+    )
     {
       mBytes.append(static_cast<const char*>(data), size);
       return *this;
     }
 
-    [[nodiscard]] const std::string& str() const noexcept { return mBytes; }
+    [[nodiscard]] const std::string& str() const noexcept
+    {
+      return mBytes;
+    }
 
   private:
     std::string mBytes;

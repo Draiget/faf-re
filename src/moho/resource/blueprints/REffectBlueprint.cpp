@@ -16,8 +16,7 @@ namespace moho
     , MedFidelity(1)
     , LowFidelity(1)
     , pad_0027(0)
-  {
-  }
+  {}
 
   /**
    * Address: 0x0050E650 (FUN_0050E650, scalar deleting dtor thunk)

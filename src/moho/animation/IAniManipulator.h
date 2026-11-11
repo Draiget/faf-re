@@ -53,7 +53,8 @@ namespace moho
   // inline bindings at +0x10. `offsetof` cannot name the container's members,
   // so the size assert carries the layout.
   static_assert(
-    sizeof(gpg::fastvector_n<SAniManipBinding, 2>) == 0x20, "watch-bone vector (2 inline bindings) size must be 0x20"
+    sizeof(gpg::fastvector_n<SAniManipBinding, 2>) == 0x20,
+    "watch-bone vector (2 inline bindings) size must be 0x20"
   );
 
   class IAniManipulator : public CScriptEvent
@@ -194,15 +195,15 @@ namespace moho
      * Address: 0x0063A710 (FUN_0063A710 -- writes it; formerly `SetRuntimeEnabledFlag`.)
      * Address: 0x0063A720 (FUN_0063A720 -- reads it; formerly `GetRuntimeEnabledFlag`.)
      */
-    bool mEnabled;                                       // +0x4C
-    std::uint8_t mEnabledPad[3]{};                       // +0x4D
+    bool mEnabled;                 // +0x4C
+    std::uint8_t mEnabledPad[3]{}; // +0x4D
     /// Address: 0x0062FD00 (FUN_0062FD00; formerly `GetRuntimeOwnerActor`.)
-    CAniActor* mOwnerActor;                              // +0x50
+    CAniActor* mOwnerActor; // +0x50
     /// Address: 0x0062FD10 (FUN_0062FD10; formerly `GetRuntimeOwnerSim`.)
-    Sim* mOwnerSim;                                      // +0x54
+    Sim* mOwnerSim; // +0x54
     /// Address: 0x0063A700 (FUN_0063A700; formerly `GetRuntimePrecedence`.)
-    std::int32_t mPrecedence;                            // +0x58
-    std::uint32_t mUnknown5C;                            // +0x5C
+    std::int32_t mPrecedence; // +0x58
+    std::uint32_t mUnknown5C; // +0x5C
     /**
      * Address: 0x0063B960 (FUN_0063B960 -- linear scan of `[begin, end)` for a
      *   binding whose `mBoneIndex` matches, returning bool; formerly
@@ -244,8 +245,12 @@ namespace moho
      * actor pose's foot/hip composite-transform vertical separation.
      */
     CFootPlantManipulator(
-      Unit* unit, int footBoneIndex, int kneeBoneIndex, int hipBoneIndex,
-      bool straightLegs, float maxFootFall
+      Unit* unit,
+      int footBoneIndex,
+      int kneeBoneIndex,
+      int hipBoneIndex,
+      bool straightLegs,
+      float maxFootFall
     );
 
     /**
@@ -289,16 +294,19 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
-    WeakPtr<Unit> mGoalUnit;         // +0x80
-    std::int32_t mFootBoneIndex;     // +0x88
-    std::int32_t mKneeBoneIndex;     // +0x8C
-    std::int32_t mHipBoneIndex;      // +0x90
-    bool mStraightLegs;              // +0x94
-    std::uint8_t mPad95_97[0x3]{};   // +0x95
-    float mMaxFootFall;              // +0x98
-    float mHalfLegSpan;              // +0x9C
+    WeakPtr<Unit> mGoalUnit;       // +0x80
+    std::int32_t mFootBoneIndex;   // +0x88
+    std::int32_t mKneeBoneIndex;   // +0x8C
+    std::int32_t mHipBoneIndex;    // +0x90
+    bool mStraightLegs;            // +0x94
+    std::uint8_t mPad95_97[0x3]{}; // +0x95
+    float mMaxFootFall;            // +0x98
+    float mHalfLegSpan;            // +0x9C
   };
-  static_assert(offsetof(CFootPlantManipulator, mGoalUnit) == 0x80, "CFootPlantManipulator::mGoalUnit offset must be 0x80");
+  static_assert(
+    offsetof(CFootPlantManipulator, mGoalUnit) == 0x80,
+    "CFootPlantManipulator::mGoalUnit offset must be 0x80"
+  );
   static_assert(
     offsetof(CFootPlantManipulator, mFootBoneIndex) == 0x88,
     "CFootPlantManipulator::mFootBoneIndex offset must be 0x88"
@@ -375,8 +383,11 @@ namespace moho
      * interpolation step.
      */
     CBoneEntityManipulator(
-      Entity* targetEntity, Unit* goalUnit,
-      int watchedBoneIndex, int referenceBoneIndex, bool markSkipInterp
+      Entity* targetEntity,
+      Unit* goalUnit,
+      int watchedBoneIndex,
+      int referenceBoneIndex,
+      bool markSkipInterp
     );
 
     /**
@@ -422,9 +433,9 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
-    WeakPtr<Unit> mGoalUnit;           // +0x80
-    WeakPtr<Entity> mTargetEntity;     // +0x88
-    std::int32_t mReferenceBoneIndex;  // +0x90
+    WeakPtr<Unit> mGoalUnit;          // +0x80
+    WeakPtr<Entity> mTargetEntity;    // +0x88
+    std::int32_t mReferenceBoneIndex; // +0x90
     /**
      * Address: 0x006346E0 (FUN_006346E0 -- a three-float copy into this field;
      *   formerly `CopyRuntimeVectorToSlot94`, written over an
@@ -433,7 +444,7 @@ namespace moho
      *   classes at once: this `mPivot`, and `CBuilderArmManipulator`'s
      *   `mHeading`/`mPitch` at `+0x88`/`+0x8C`. Zero callers, unreachable.)
      */
-    Wm3::Vector3f mPivot;              // +0x94
+    Wm3::Vector3f mPivot; // +0x94
 
   private:
     /**
@@ -457,10 +468,7 @@ namespace moho
     offsetof(CBoneEntityManipulator, mReferenceBoneIndex) == 0x90,
     "CBoneEntityManipulator::mReferenceBoneIndex offset must be 0x90"
   );
-  static_assert(
-    offsetof(CBoneEntityManipulator, mPivot) == 0x94,
-    "CBoneEntityManipulator::mPivot offset must be 0x94"
-  );
+  static_assert(offsetof(CBoneEntityManipulator, mPivot) == 0x94, "CBoneEntityManipulator::mPivot offset must be 0x94");
   static_assert(sizeof(CBoneEntityManipulator) == 0xA0, "CBoneEntityManipulator size must be 0xA0");
 
   /**
@@ -760,7 +768,8 @@ namespace moho
   };
 
   static_assert(
-    offsetof(IAniManipulator, mActorOrderLink) == 0x44, "IAniManipulator::mActorOrderLink offset must be 0x44"
+    offsetof(IAniManipulator, mActorOrderLink) == 0x44,
+    "IAniManipulator::mActorOrderLink offset must be 0x44"
   );
   static_assert(offsetof(IAniManipulator, mEnabled) == 0x4C, "IAniManipulator::mEnabled offset must be 0x4C");
   static_assert(offsetof(IAniManipulator, mOwnerActor) == 0x50, "IAniManipulator::mOwnerActor offset must be 0x50");

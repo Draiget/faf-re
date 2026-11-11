@@ -89,7 +89,13 @@ namespace faf::remote::net
   };
 
   /** A Hello answered: its Challenge, or a Reject for another version. */
-  [[nodiscard]] std::vector<std::uint8_t> AnswerHello(const std::uint8_t* data, std::size_t size, const CCookieJar& jar, std::uint64_t addressKey, std::uint64_t nowUs);
+  [[nodiscard]] std::vector<std::uint8_t> AnswerHello(
+    const std::uint8_t* data,
+    std::size_t size,
+    const CCookieJar& jar,
+    std::uint64_t addressKey,
+    std::uint64_t nowUs
+  );
 
   struct SConnectRequest
   {
@@ -108,7 +114,8 @@ namespace faf::remote::net
     std::vector<std::uint8_t> accept;
   };
 
-  /** A Connect whose cookie held, and the uid's token: empty when the proof doesn't hold or the exchange is degenerate. */
+  /** A Connect whose cookie held, and the uid's token: empty when the proof doesn't hold or the exchange is degenerate.
+   */
   [[nodiscard]] std::optional<SServerSession> AnswerConnect(const SConnectRequest& request, const Token& token);
 
   [[nodiscard]] std::vector<std::uint8_t> WriteReject(EHandshakeRefusal why);
@@ -122,7 +129,8 @@ namespace faf::remote::net
     CClientHandshake(const CClientHandshake&) = delete;
     CClientHandshake& operator=(const CClientHandshake&) = delete;
 
-    /** The Connect for a Challenge, which later Challenges repeat. Empty when it isn't a Challenge or no random came. */
+    /** The Connect for a Challenge, which later Challenges repeat. Empty when it isn't a Challenge or no random came.
+     */
     [[nodiscard]] std::vector<std::uint8_t> OnChallenge(const std::uint8_t* data, std::size_t size);
     /** The channel's keys from an Accept; empty when it isn't one for this Connect. */
     [[nodiscard]] std::optional<ChannelKeys> OnAccept(const std::uint8_t* data, std::size_t size) const;

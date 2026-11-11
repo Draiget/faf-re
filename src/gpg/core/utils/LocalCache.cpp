@@ -17,7 +17,10 @@ namespace gpg
       // As StartupHelpers' paths: the shell folder (the XDG one on Linux, platform/posix), then
       // std::filesystem, so the headless Linux build keeps the same caches.
       std::filesystem::path folder;
-      if (const char* const configured = std::getenv("FAF_SHADER_CACHE_DIR"); configured != nullptr && configured[0] != '\0') {
+      if (
+        const char* const configured = std::getenv("FAF_SHADER_CACHE_DIR");
+        configured != nullptr && configured[0] != '\0'
+      ) {
         folder = configured;
       } else {
         wchar_t localAppData[MAX_PATH]{};
@@ -34,13 +37,17 @@ namespace gpg
       try {
         path = folder.string();
       } catch (const std::system_error& conversion) {
-        gpg::Warnf("the cache directory's name doesn't fit the system code page (%s); nothing is cached", conversion.what());
+        gpg::Warnf(
+          "the cache directory's name doesn't fit the system code page (%s); nothing is cached", conversion.what()
+        );
         return std::string();
       }
       std::error_code error;
       std::filesystem::create_directories(folder, error);
       if (error) {
-        gpg::Warnf("cannot create the cache directory %s (%s); nothing is cached", path.c_str(), error.message().c_str());
+        gpg::Warnf(
+          "cannot create the cache directory %s (%s); nothing is cached", path.c_str(), error.message().c_str()
+        );
         return std::string();
       }
       if (path.back() != '\\' && path.back() != '/') {

@@ -89,4 +89,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_NavPathTypeInfo_10f919, moho::register_NavPathTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_NavPathTypeInfo_10f919,
+  moho::register_NavPathTypeInfo
+)

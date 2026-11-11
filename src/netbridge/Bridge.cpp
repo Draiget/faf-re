@@ -22,8 +22,7 @@ namespace faf::netbridge
     {
       const auto now = std::chrono::system_clock::now();
       const std::time_t t = std::chrono::system_clock::to_time_t(now);
-      const auto ms =
-        std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() % 1000;
+      const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() % 1000;
       std::tm tm{};
 #ifdef _WIN32
       localtime_s(&tm, &t);
@@ -37,7 +36,9 @@ namespace faf::netbridge
 
     // FaDataInputStream.readChunks: strings from the game get "/t" and "/n"
     // turned into tab and newline before they reach the client.
-    std::string GameString(std::string s)
+    std::string GameString(
+      std::string s
+    )
     {
       for (const auto& [from, to] : {std::pair<const char*, const char*>{"/t", "\t"}, {"/n", "\n"}}) {
         std::size_t pos = 0;
@@ -50,17 +51,26 @@ namespace faf::netbridge
     }
 
     // FaDataOutputStream.writeArgs: numbers become ints, strings strings.
-    GpgArg ArgFromJson(const JsonValue& v)
+    GpgArg ArgFromJson(
+      const JsonValue& v
+    )
     {
       switch (v.GetKind()) {
-        case JsonValue::Kind::Number: return GpgArg::Int(static_cast<std::int32_t>(v.AsInt()));
-        case JsonValue::Kind::Bool: return GpgArg::Int(v.AsBool() ? 1 : 0);
-        case JsonValue::Kind::String: return GpgArg::Str(v.AsString());
-        default: return GpgArg::Str(netlink::WriteJson(v));
+      case JsonValue::Kind::Number:
+        return GpgArg::Int(static_cast<std::int32_t>(v.AsInt()));
+      case JsonValue::Kind::Bool:
+        return GpgArg::Int(v.AsBool() ? 1 : 0);
+      case JsonValue::Kind::String:
+        return GpgArg::Str(v.AsString());
+      default:
+        return GpgArg::Str(netlink::WriteJson(v));
       }
     }
 
-    bool ParseU16(const char* s, std::uint16_t& out)
+    bool ParseU16(
+      const char* s,
+      std::uint16_t& out
+    )
     {
       char* end = nullptr;
       const long v = std::strtol(s, &end, 10);
@@ -72,7 +82,10 @@ namespace faf::netbridge
     }
   } // namespace
 
-  BridgeOptions ParseBridgeArgs(const int argc, char** argv)
+  BridgeOptions ParseBridgeArgs(
+    const int argc,
+    char** argv
+  )
   {
     BridgeOptions o;
     for (int i = 1; i < argc; ++i) {
@@ -125,8 +138,10 @@ namespace faf::netbridge
         o.statsIntervalSec = std::atoi(next());
       } else if (name == "--log-file") {
         o.logPath = next();
-      } else if (name == "--access-token" || name == "--icebreaker-base-url" || name == "--telemetry-server" ||
-                 name == "--ping-count" || name == "--acceptable-latency" || name == "--delay-ui") {
+      } else if (
+        name == "--access-token" || name == "--icebreaker-base-url" || name == "--telemetry-server" ||
+        name == "--ping-count" || name == "--acceptable-latency" || name == "--delay-ui"
+      ) {
         next(); // known to the launcher or the Java adapter, not used here
       }
       // Anything else (--debug-window, --info-window, unknown) is skipped.
@@ -134,7 +149,9 @@ namespace faf::netbridge
     return o;
   }
 
-  Logger::Logger(const std::string& path)
+  Logger::Logger(
+    const std::string& path
+  )
   {
     if (!path.empty()) {
       mFile = std::fopen(path.c_str(), "a");
@@ -148,7 +165,9 @@ namespace faf::netbridge
     }
   }
 
-  void Logger::Write(const std::string& line)
+  void Logger::Write(
+    const std::string& line
+  )
   {
     std::lock_guard lock(mMutex);
     const std::string text = Timestamp() + " " + line + "\n";
@@ -159,7 +178,13 @@ namespace faf::netbridge
     }
   }
 
-  Bridge::Bridge(BridgeOptions options, Logger& log) : mOptions(std::move(options)), mLog(log) {}
+  Bridge::Bridge(
+    BridgeOptions options,
+    Logger& log
+  )
+    : mOptions(std::move(options))
+    , mLog(log)
+  {}
 
   Bridge::~Bridge()
   {
@@ -200,10 +225,12 @@ namespace faf::netbridge
       return false;
     }
     mLobbyPort = mOptions.lobbyPort != 0 ? mOptions.lobbyPort : PickLobbyPort();
-    Log(std::string(kVersion) + ": player " + mOptions.login + " (" + std::to_string(mOptions.id) + "), game " +
-        std::to_string(mOptions.gameId) + ", RPC port " + std::to_string(LocalPort(mRpcListen)) + ", GPGNet port " +
-        std::to_string(LocalPort(mGpgListen)) + ", lobby port " + std::to_string(mLobbyPort) +
-        (mOptions.forceRelay ? ", relay only" : ""));
+    Log(
+      std::string(kVersion) + ": player " + mOptions.login + " (" + std::to_string(mOptions.id) + "), game " +
+      std::to_string(mOptions.gameId) + ", RPC port " + std::to_string(LocalPort(mRpcListen)) + ", GPGNet port " +
+      std::to_string(LocalPort(mGpgListen)) + ", lobby port " + std::to_string(mLobbyPort) +
+      (mOptions.forceRelay ? ", relay only" : "")
+    );
     return true;
   }
 
@@ -366,7 +393,9 @@ namespace faf::netbridge
     mQuit = true;
   }
 
-  void Bridge::WriteRpc(const JsonValue& msg)
+  void Bridge::WriteRpc(
+    const JsonValue& msg
+  )
   {
     if (mRpcClient == kInvalidSocket) {
       return;
@@ -377,7 +406,10 @@ namespace faf::netbridge
     }
   }
 
-  void Bridge::Respond(const std::int64_t id, const JsonValue& result)
+  void Bridge::Respond(
+    const std::int64_t id,
+    const JsonValue& result
+  )
   {
     JsonValue m = JsonValue::Object();
     m.Set("result", result);
@@ -386,7 +418,11 @@ namespace faf::netbridge
     WriteRpc(m);
   }
 
-  void Bridge::RespondError(const std::int64_t id, const int code, const std::string& message)
+  void Bridge::RespondError(
+    const std::int64_t id,
+    const int code,
+    const std::string& message
+  )
   {
     JsonValue err = JsonValue::Object();
     err.Set("code", code);
@@ -398,7 +434,10 @@ namespace faf::netbridge
     WriteRpc(m);
   }
 
-  void Bridge::Notify(const std::string& method, JsonValue params)
+  void Bridge::Notify(
+    const std::string& method,
+    JsonValue params
+  )
   {
     JsonValue m = JsonValue::Object();
     m.Set("method", method);
@@ -407,7 +446,9 @@ namespace faf::netbridge
     WriteRpc(m);
   }
 
-  void Bridge::HandleRpc(const JsonValue& msg)
+  void Bridge::HandleRpc(
+    const JsonValue& msg
+  )
   {
     const std::string& method = msg.Get("method").AsString();
     const JsonValue& params = msg.Get("params");
@@ -437,7 +478,9 @@ namespace faf::netbridge
       const std::string& login = params[0].AsString();
       const std::int64_t remote = params[1].AsInt();
       const std::string address = ConnectPeer(remote, login, false);
-      SendToGame({"JoinGame", {GpgArg::Str(address), GpgArg::Str(login), GpgArg::Int(static_cast<std::int32_t>(remote))}});
+      SendToGame(
+        {"JoinGame", {GpgArg::Str(address), GpgArg::Str(login), GpgArg::Int(static_cast<std::int32_t>(remote))}}
+      );
     } else if (method == "connectToPeer") {
       if (mGpgClient != kInvalidSocket && (mGameState == "Launching" || mGameState == "Ended")) {
         Log("game ended or in progress, ignoring connectToPeer");
@@ -497,7 +540,10 @@ namespace faf::netbridge
     }
   }
 
-  void Bridge::OnIceMsg(const std::int64_t remoteId, const JsonValue& msg)
+  void Bridge::OnIceMsg(
+    const std::int64_t remoteId,
+    const JsonValue& msg
+  )
   {
     if (mEnginePeers.count(remoteId) != 0) {
       const std::string text = msg.IsString() ? msg.AsString() : netlink::WriteJson(msg);
@@ -602,7 +648,11 @@ namespace faf::netbridge
     mGameEnded = false;
   }
 
-  std::string Bridge::ConnectPeer(const std::int64_t id, const std::string& login, const bool offerer)
+  std::string Bridge::ConnectPeer(
+    const std::int64_t id,
+    const std::string& login,
+    const bool offerer
+  )
   {
     if (!mEngineLinks) {
       return mOptions.gameAddress + ":" + std::to_string(AddPeer(id, login, offerer));
@@ -615,10 +665,14 @@ namespace faf::netbridge
     peer.login = login;
     peer.offerer = offerer;
     const std::string address = netlink::EngineAddressText(id);
-    Log("peer " + login + "(" + std::to_string(id) + "): link in the game, " + (offerer ? "offerer" : "answerer") +
-        ", game sends to " + address);
-    SendToGame({netlink::kCmdPeer,
-                {GpgArg::Int(static_cast<std::int32_t>(id)), GpgArg::Str(login), GpgArg::Int(offerer ? 1 : 0)}});
+    Log(
+      "peer " + login + "(" + std::to_string(id) + "): link in the game, " + (offerer ? "offerer" : "answerer") +
+      ", game sends to " + address
+    );
+    SendToGame(
+      {netlink::kCmdPeer,
+       {GpgArg::Int(static_cast<std::int32_t>(id)), GpgArg::Str(login), GpgArg::Int(offerer ? 1 : 0)}}
+    );
     return address;
   }
 
@@ -637,7 +691,9 @@ namespace faf::netbridge
     SendToGame({netlink::kCmdConfig, {GpgArg::Str(netlink::WriteJson(config))}}, false);
   }
 
-  bool Bridge::HandleEngineMessage(const GpgMessage& m)
+  bool Bridge::HandleEngineMessage(
+    const GpgMessage& m
+  )
   {
     if (m.command == netlink::kCmdHello) {
       const int version = m.args.empty() ? 0 : m.args[0].number;
@@ -680,7 +736,11 @@ namespace faf::netbridge
     return m.command.rfind("Netlink", 0) == 0;
   }
 
-  std::uint16_t Bridge::AddPeer(const std::int64_t id, const std::string& login, const bool offerer)
+  std::uint16_t Bridge::AddPeer(
+    const std::int64_t id,
+    const std::string& login,
+    const bool offerer
+  )
   {
     RemovePeer(id);
     auto peer = std::make_unique<Peer>();
@@ -750,23 +810,36 @@ namespace faf::netbridge
         raw->counters.OnReceived(data, size);
       }
       const sockaddr_in to = MakeAddress(mOptions.gameAddress.c_str(), mLobbyPort);
-      sendto(raw->udp, reinterpret_cast<const char*>(data), static_cast<int>(size), 0,
-             reinterpret_cast<const sockaddr*>(&to), sizeof(to));
+      sendto(
+        raw->udp,
+        reinterpret_cast<const char*>(data),
+        static_cast<int>(size),
+        0,
+        reinterpret_cast<const sockaddr*>(&to),
+        sizeof(to)
+      );
       ++raw->toGame;
     };
-    cb.onLog = [this, prefix](const std::string& t) { Log(prefix + t); };
+    cb.onLog = [this, prefix](const std::string& t) {
+      Log(prefix + t);
+    };
     peer->link = std::make_unique<netlink::Link>(lo, std::move(cb));
     if (mGameEnded) {
       peer->link->SetGameEnded();
     }
-    Log(prefix + (offerer ? "offerer" : "answerer") + ", game sends to " + mOptions.gameAddress + ":" + std::to_string(peer->port));
+    Log(
+      prefix + (offerer ? "offerer" : "answerer") + ", game sends to " + mOptions.gameAddress + ":" +
+      std::to_string(peer->port)
+    );
     peer->link->Start();
     const std::uint16_t port = peer->port;
     mPeers[id] = std::move(peer);
     return port;
   }
 
-  void Bridge::RemovePeer(const std::int64_t id)
+  void Bridge::RemovePeer(
+    const std::int64_t id
+  )
   {
     const auto it = mPeers.find(id);
     if (it == mPeers.end()) {
@@ -787,7 +860,9 @@ namespace faf::netbridge
     }
   }
 
-  void Bridge::ReadPeer(Peer& peer)
+  void Bridge::ReadPeer(
+    Peer& peer
+  )
   {
     char buf[2048];
     for (;;) {
@@ -815,7 +890,10 @@ namespace faf::netbridge
     }
   }
 
-  void Bridge::LogStats(Peer& peer, const char* when)
+  void Bridge::LogStats(
+    Peer& peer,
+    const char* when
+  )
   {
     const netlink::LinkStats ls = peer.link->GetStats();
     GameCounters c;
@@ -825,16 +903,27 @@ namespace faf::netbridge
     }
     const double lossPercent = c.LossPercent();
     char line[640];
-    std::snprintf(line, sizeof(line),
-                  "stats %s, peer %s(%lld) %s: rtt %.1f ms; to peer %llu datagrams, %llu game resends, %llu dropped "
-                  "while not connected, %llu copies; from peer %llu datagrams, %llu lost (%.2f%%), %llu repeats, "
-                  "%llu late",
-                  when, peer.login.c_str(), static_cast<long long>(peer.id),
-                  netlink::LinkStateName(peer.link->GetState()), ls.lastRttMs,
-                  static_cast<unsigned long long>(c.sent), static_cast<unsigned long long>(c.dataResends),
-                  static_cast<unsigned long long>(ls.dataDropped), static_cast<unsigned long long>(ls.duplicatesSent),
-                  static_cast<unsigned long long>(c.received), static_cast<unsigned long long>(c.lost), lossPercent,
-                  static_cast<unsigned long long>(c.repeats), static_cast<unsigned long long>(c.late));
+    std::snprintf(
+      line,
+      sizeof(line),
+      "stats %s, peer %s(%lld) %s: rtt %.1f ms; to peer %llu datagrams, %llu game resends, %llu dropped "
+      "while not connected, %llu copies; from peer %llu datagrams, %llu lost (%.2f%%), %llu repeats, "
+      "%llu late",
+      when,
+      peer.login.c_str(),
+      static_cast<long long>(peer.id),
+      netlink::LinkStateName(peer.link->GetState()),
+      ls.lastRttMs,
+      static_cast<unsigned long long>(c.sent),
+      static_cast<unsigned long long>(c.dataResends),
+      static_cast<unsigned long long>(ls.dataDropped),
+      static_cast<unsigned long long>(ls.duplicatesSent),
+      static_cast<unsigned long long>(c.received),
+      static_cast<unsigned long long>(c.lost),
+      lossPercent,
+      static_cast<unsigned long long>(c.repeats),
+      static_cast<unsigned long long>(c.late)
+    );
     std::string text = line;
     if (ls.webRtcSent > 0 || ls.onWebRtc) {
       // Issue #239: how many of the datagrams to the peer took the data channel.
@@ -907,7 +996,9 @@ namespace faf::netbridge
     mEnginePeers.clear();
   }
 
-  void Bridge::HandleGame(const GpgMessage& m)
+  void Bridge::HandleGame(
+    const GpgMessage& m
+  )
   {
     Log("from game: " + DescribeGpg(m));
     if (HandleEngineMessage(m)) {
@@ -917,10 +1008,15 @@ namespace faf::netbridge
       mGameState = m.args[0].text;
       if (mGameState == "Idle") {
         // GPGNetServer: CreateLobby <init mode> <lobby port> <login> <id> 1.
-        SendToGame({"CreateLobby",
-                    {GpgArg::Int(mInitMode), GpgArg::Int(mLobbyPort), GpgArg::Str(mOptions.login),
-                     GpgArg::Int(static_cast<std::int32_t>(mOptions.id)), GpgArg::Int(1)}},
-                   false);
+        SendToGame(
+          {"CreateLobby",
+           {GpgArg::Int(mInitMode),
+            GpgArg::Int(mLobbyPort),
+            GpgArg::Str(mOptions.login),
+            GpgArg::Int(static_cast<std::int32_t>(mOptions.id)),
+            GpgArg::Int(1)}},
+          false
+        );
       } else if (mGameState == "Lobby") {
         mGameInLobby = true;
         std::vector<GpgMessage> queued;
@@ -953,7 +1049,10 @@ namespace faf::netbridge
     Notify("onGpgNetMessageReceived", std::move(p));
   }
 
-  void Bridge::SendToGame(GpgMessage m, const bool waitForLobby)
+  void Bridge::SendToGame(
+    GpgMessage m,
+    const bool waitForLobby
+  )
   {
     // GPGNetServer.sendToGpgNet waits for the game's GameState Lobby.
     if (waitForLobby && (mGpgClient == kInvalidSocket || !mGameInLobby)) {
@@ -963,7 +1062,9 @@ namespace faf::netbridge
     WriteGame(m);
   }
 
-  void Bridge::WriteGame(const GpgMessage& m)
+  void Bridge::WriteGame(
+    const GpgMessage& m
+  )
   {
     if (mGpgClient == kInvalidSocket) {
       return;

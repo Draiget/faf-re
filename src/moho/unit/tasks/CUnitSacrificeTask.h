@@ -12,13 +12,12 @@ namespace gpg
 {
   class ReadArchive;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
   class CUnitCommand;
   class Unit;
-
 
   /**
    * Runtime owner for unit-sacrifice command task state.
@@ -109,13 +108,14 @@ namespace moho
     void OnEvent(ECommandEvent event) override;
 
   public:
-    CUnitCommand* mCommand; // +0x40
+    CUnitCommand* mCommand;    // +0x40
     WeakPtr<Unit> mTargetUnit; // +0x44
   };
 
   static_assert(sizeof(CUnitSacrificeTask) == 0x4C, "CUnitSacrificeTask size must be 0x4C");
   static_assert(offsetof(CUnitSacrificeTask, mCommand) == 0x40, "CUnitSacrificeTask::mCommand offset must be 0x40");
   static_assert(
-    offsetof(CUnitSacrificeTask, mTargetUnit) == 0x44, "CUnitSacrificeTask::mTargetUnit offset must be 0x44"
+    offsetof(CUnitSacrificeTask, mTargetUnit) == 0x44,
+    "CUnitSacrificeTask::mTargetUnit offset must be 0x44"
   );
 } // namespace moho

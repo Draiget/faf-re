@@ -126,7 +126,7 @@ namespace gpg
     void* object = nullptr;                                    // +0x00
     RType* type = nullptr;                                     // +0x04
     boost::shared_ptr<void> sharedPtr;                         // +0x08
-    TrackedPointerState state = TrackedPointerState::Reserved;  // +0x10
+    TrackedPointerState state = TrackedPointerState::Reserved; // +0x10
   };
   static_assert(offsetof(TrackedPointerInfo, sharedPtr) == 0x08, "TrackedPointerInfo::sharedPtr offset must be 0x08");
   static_assert(offsetof(TrackedPointerInfo, state) == 0x10, "TrackedPointerInfo::state offset must be 0x10");
@@ -190,10 +190,13 @@ namespace gpg
     template <class T>
     void SetShared(const boost::shared_ptr<T>& object, unsigned int flags);
 
-    TrackedPointerInfo mInfo{};  // +0x00
-    bool mLoadMembers = true;    // +0x14
+    TrackedPointerInfo mInfo{}; // +0x00
+    bool mLoadMembers = true;   // +0x14
   };
-  static_assert(offsetof(SerConstructResult, mLoadMembers) == 0x14, "SerConstructResult::mLoadMembers offset must be 0x14");
+  static_assert(
+    offsetof(SerConstructResult, mLoadMembers) == 0x14,
+    "SerConstructResult::mLoadMembers offset must be 0x14"
+  );
   static_assert(sizeof(SerConstructResult) == 0x18, "SerConstructResult size must be 0x18");
 
   /**
@@ -231,11 +234,12 @@ namespace gpg
      */
     void SetShared(unsigned int flags);
 
-    TrackedPointerState mOwnership = TrackedPointerState::Reserved;  // +0x00
+    TrackedPointerState mOwnership = TrackedPointerState::Reserved; // +0x00
     bool mWriteMembers = true;                                      // +0x04
   };
   static_assert(
-    offsetof(SerSaveConstructArgsResult, mWriteMembers) == 0x04, "SerSaveConstructArgsResult::mWriteMembers offset must be 0x04"
+    offsetof(SerSaveConstructArgsResult, mWriteMembers) == 0x04,
+    "SerSaveConstructArgsResult::mWriteMembers offset must be 0x04"
   );
   static_assert(sizeof(SerSaveConstructArgsResult) == 0x08, "SerSaveConstructArgsResult size must be 0x08");
 

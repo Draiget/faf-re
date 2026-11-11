@@ -17,7 +17,9 @@ namespace platform
    * larger of that bound and `sizeof(T)`.
    */
   template <class T = void>
-  [[nodiscard]] constexpr std::size_t BinaryObjectBytes(const std::size_t x86Bytes) noexcept
+  [[nodiscard]] constexpr std::size_t BinaryObjectBytes(
+    const std::size_t x86Bytes
+  ) noexcept
   {
 #if defined(_M_IX86)
     return x86Bytes;

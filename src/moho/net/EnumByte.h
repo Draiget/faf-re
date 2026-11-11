@@ -14,8 +14,8 @@ namespace moho
   {};
 
   template <class E>
-  struct IsU8Enum<E, std::enable_if_t<std::is_enum_v<E>>>
-    : std::bool_constant<std::is_same_v<std::underlying_type_t<E>, std::uint8_t>>
+  struct IsU8Enum<E, std::enable_if_t<std::is_enum_v<E>>> :
+    std::bool_constant<std::is_same_v<std::underlying_type_t<E>, std::uint8_t>>
   {};
 
   template <class E>
@@ -33,12 +33,16 @@ namespace moho
 
     EnumByte() noexcept = default;
 
-    explicit constexpr EnumByte(std::uint8_t v) noexcept
+    explicit constexpr EnumByte(
+      std::uint8_t v
+    ) noexcept
       : value(v)
     {}
 
     template <U8Enum E>
-    constexpr EnumByte(E e) noexcept
+    constexpr EnumByte(
+      E e
+    ) noexcept
       : value(static_cast<std::uint8_t>(e))
     {}
 
@@ -59,22 +63,34 @@ namespace moho
     }
 
     template <U8Enum E>
-    friend constexpr bool operator==(EnumByte t, E e) noexcept
+    friend constexpr bool operator==(
+      EnumByte t,
+      E e
+    ) noexcept
     {
       return t.value == static_cast<std::uint8_t>(e);
     }
     template <U8Enum E>
-    friend constexpr bool operator==(E e, EnumByte t) noexcept
+    friend constexpr bool operator==(
+      E e,
+      EnumByte t
+    ) noexcept
     {
       return t == e;
     }
     template <U8Enum E>
-    friend constexpr bool operator!=(EnumByte t, E e) noexcept
+    friend constexpr bool operator!=(
+      EnumByte t,
+      E e
+    ) noexcept
     {
       return !(t == e);
     }
     template <U8Enum E>
-    friend constexpr bool operator!=(E e, EnumByte t) noexcept
+    friend constexpr bool operator!=(
+      E e,
+      EnumByte t
+    ) noexcept
     {
       return !(t == e);
     }

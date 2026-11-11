@@ -95,4 +95,7 @@ void ETrailParamTypeInfo::Init()
 // gpg::LookupRType yet. The binary builds it from the same registrar block as
 // the beam/emitter param enums (FUN_00BDCEA0), so it is pre-registered with
 // them rather than left absent from the type map. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_ETrailParamTypeInfo_770dd0, moho::preregister_ETrailParamTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_ETrailParamTypeInfo_770dd0,
+  moho::preregister_ETrailParamTypeInfo
+)

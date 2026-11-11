@@ -122,10 +122,10 @@ namespace moho
     // The shoreline owns the database its cells register into: 0x90 bytes at
     // +0x04, which lands mCells exactly on +0x94. It used to be an 8-byte
     // handle plus an opaque mUnknown0C_93[0x88] tail.
-    SpatialDB<ShoreCell> mSpatialDb;                             // +0x04
-    fa::vector<boost::shared_ptr<ShoreCell>> mCells;          // +0x94
-    boost::shared_ptr<ID3DVertexSheet> mVertexSheet;             // +0xA4
-    std::int32_t mShorelineTris;                                 // +0xAC
+    SpatialDB<ShoreCell> mSpatialDb;                 // +0x04
+    fa::vector<boost::shared_ptr<ShoreCell>> mCells; // +0x94
+    boost::shared_ptr<ID3DVertexSheet> mVertexSheet; // +0xA4
+    std::int32_t mShorelineTris;                     // +0xAC
   };
 
   static_assert(offsetof(Shoreline, mSpatialDb) == 0x04, "Shoreline::mSpatialDb offset must be 0x04");

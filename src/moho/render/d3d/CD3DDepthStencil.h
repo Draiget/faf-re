@@ -100,15 +100,12 @@ namespace moho
     SurfaceHandle mSurface;                            // +0x24
   };
 
-  static_assert(
-    sizeof(CD3DDepthStencil::SurfaceHandle) == 0x08, "CD3DDepthStencil::SurfaceHandle size must be 0x08"
-  );
+  static_assert(sizeof(CD3DDepthStencil::SurfaceHandle) == 0x08, "CD3DDepthStencil::SurfaceHandle size must be 0x08");
   static_assert(offsetof(CD3DDepthStencil, mLink) == 0x04, "CD3DDepthStencil::mLink offset must be 0x04");
+  static_assert(offsetof(CD3DDepthStencil, mOwnerDevice) == 0x0C, "CD3DDepthStencil::mOwnerDevice offset must be 0x0C");
   static_assert(
-    offsetof(CD3DDepthStencil, mOwnerDevice) == 0x0C, "CD3DDepthStencil::mOwnerDevice offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CD3DDepthStencil, mDepthContext) == 0x10, "CD3DDepthStencil::mDepthContext offset must be 0x10"
+    offsetof(CD3DDepthStencil, mDepthContext) == 0x10,
+    "CD3DDepthStencil::mDepthContext offset must be 0x10"
   );
   static_assert(offsetof(CD3DDepthStencil, mSurface) == 0x24, "CD3DDepthStencil::mSurface offset must be 0x24");
   static_assert(sizeof(CD3DDepthStencil) == 0x2C, "CD3DDepthStencil size must be 0x2C");

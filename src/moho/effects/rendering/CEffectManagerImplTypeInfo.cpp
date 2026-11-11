@@ -61,7 +61,9 @@ namespace moho
    * IDA signature:
    * void __stdcall sub_66C220(gpg::RType *a1);
    */
-  void CEffectManagerImplTypeInfo::AddBase_IEffectManager(gpg::RType* const typeInfo)
+  void CEffectManagerImplTypeInfo::AddBase_IEffectManager(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBaseType(typeInfo, IEffectManager::StaticGetClass());
   }
@@ -106,4 +108,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CEffectManagerImplTypeInfo_00_3343ce, moho::register_CEffectManagerImplTypeInfo_00)
+GPG_PREREGISTER_INIT(
+  register_CEffectManagerImplTypeInfo_00_3343ce,
+  moho::register_CEffectManagerImplTypeInfo_00
+)

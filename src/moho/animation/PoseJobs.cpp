@@ -95,13 +95,17 @@ namespace moho
 
     thread_local const SPoseJobInputs* tJobInputs = nullptr;
 
-    [[nodiscard]] std::size_t SlotOf(const CAniActor* const actor) noexcept
+    [[nodiscard]] std::size_t SlotOf(
+      const CAniActor* const actor
+    ) noexcept
     {
       const auto bits = reinterpret_cast<std::uintptr_t>(actor);
       return static_cast<std::size_t>((bits >> 4) * 0x9E3779B97F4A7C15ull) & (kTableSize - 1u);
     }
 
-    [[nodiscard]] STicketEntry* FindEntry(const CAniActor* const actor) noexcept
+    [[nodiscard]] STicketEntry* FindEntry(
+      const CAniActor* const actor
+    ) noexcept
     {
       for (std::size_t slot = SlotOf(actor);; slot = (slot + 1u) & (kTableSize - 1u)) {
         STicketEntry& entry = sPoseJobs.mTable[slot];
@@ -114,7 +118,10 @@ namespace moho
       }
     }
 
-    void RememberTicket(const CAniActor* const actor, const std::int32_t ticket)
+    void RememberTicket(
+      const CAniActor* const actor,
+      const std::int32_t ticket
+    )
     {
       for (std::size_t slot = SlotOf(actor);; slot = (slot + 1u) & (kTableSize - 1u)) {
         STicketEntry& entry = sPoseJobs.mTable[slot];
@@ -131,7 +138,9 @@ namespace moho
       }
     }
 
-    void RunPoseJob(void* const context)
+    void RunPoseJob(
+      void* const context
+    )
     {
       const SPoseJob& job = *static_cast<const SPoseJob*>(context);
       tJobInputs = &job.mInputs;
@@ -159,7 +168,9 @@ namespace moho
     /// Lua reaches engine state only through C functions and finalizers: queued pose updates
     /// finish first. A collection (null) also releases the workers, so its parallel mark and sweep
     /// can use them.
-    void PoseJobsGate(const LuaCFunctionPtr function)
+    void PoseJobsGate(
+      const LuaCFunctionPtr function
+    )
     {
       if (function == nullptr) {
         CloseStream();
@@ -175,7 +186,9 @@ namespace moho
     /// Rotate, Slide, Slave, Animation and Storage read their own pose plus the inputs
     /// SPoseJobInputs copies; Aim and BuilderArm do on the ticks `IsPoseJobQuiet` accepts; any
     /// other manipulator reads other units or calls Lua.
-    [[nodiscard]] bool IsOwnPoseManipulator(const IAniManipulator& manipulator) noexcept
+    [[nodiscard]] bool IsOwnPoseManipulator(
+      const IAniManipulator& manipulator
+    ) noexcept
     {
       // Descriptor addresses, not type_info::operator==, which falls back to strcmp on the names
       // for every type that differs (__std_type_info_compare). The exe holds one descriptor per
@@ -198,7 +211,9 @@ namespace moho
      * signal only sets the manipulator's own `mTriggered` (CTaskEvent::EventSetSignaled); waiters
      * are added only by Lua's WaitFor, which the gate keeps out while jobs are pending.
      */
-    [[nodiscard]] bool IsQueueable(const IAniManipulator& manipulator)
+    [[nodiscard]] bool IsQueueable(
+      const IAniManipulator& manipulator
+    )
     {
       if (manipulator.mWaitLinks.mNext != &manipulator.mWaitLinks) {
         return false;
@@ -229,19 +244,27 @@ namespace moho
       return IsOwnPoseManipulator(manipulator);
     }
 
-    [[nodiscard]] bool CanQueue(const Unit& unit)
+    [[nodiscard]] bool CanQueue(
+      const Unit& unit
+    )
     {
       sQueueUnit = &unit;
       sSawStorage = false;
       // An 11-bone pose update allocates from the sim thread's block list in the sim's order (see SimBlockLane).
-      if (const CAniPose* const pose = unit.AniActor->mPose.get(); pose != nullptr && pose->mBones.size() == CAniPoseBoneArray::kBinaryLaneBones) {
+      if (
+        const CAniPose* const pose = unit.AniActor->mPose.get();
+        pose != nullptr && pose->mBones.size() == CAniPoseBoneArray::kBinaryLaneBones
+      ) {
         return false;
       }
       sAimCount = 0;
       return unit.AniActor->AllEnabledManipulators(&IsQueueable);
     }
 
-    void CaptureInputs(const Unit& unit, SPoseJobInputs& inputs)
+    void CaptureInputs(
+      const Unit& unit,
+      SPoseJobInputs& inputs
+    )
     {
       inputs.mUnit = &unit;
       inputs.mTransformOrient = unit.GetTransform().orient_;
@@ -271,13 +294,17 @@ namespace moho
     }
   } // namespace
 
-  const SPoseJobInputs* POSE_JobInputsFor(const Unit* const unit) noexcept
+  const SPoseJobInputs* POSE_JobInputsFor(
+    const Unit* const unit
+  ) noexcept
   {
     const SPoseJobInputs* const inputs = tJobInputs;
     return (inputs != nullptr && inputs->mUnit == unit) ? inputs : nullptr;
   }
 
-  const SPoseJobAim* POSE_JobAimFor(const CAimManipulator* const aim) noexcept
+  const SPoseJobAim* POSE_JobAimFor(
+    const CAimManipulator* const aim
+  ) noexcept
   {
     const SPoseJobInputs* const inputs = tJobInputs;
     if (inputs == nullptr) {
@@ -297,7 +324,9 @@ namespace moho
     return tJobInputs != nullptr;
   }
 
-  void POSE_UpdateManipulators(Unit& unit)
+  void POSE_UpdateManipulators(
+    Unit& unit
+  )
   {
     CAniActor* const actor = unit.AniActor;
     const bool queueable =
@@ -335,7 +364,9 @@ namespace moho
     }
   }
 
-  void POSE_WaitFor(const CAniActor* const actor)
+  void POSE_WaitFor(
+    const CAniActor* const actor
+  )
   {
     // Inside a pose job (on a worker, or stolen by the sim thread) the job reads only its own pose,
     // which it is writing: waiting there would wait for itself.

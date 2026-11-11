@@ -6,16 +6,30 @@
 #include <stdexcept>
 
 #include "moho/mesh/Mesh.h"
+#include "gpg/core/utils/Logging.h"
+#include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/ID3DTextureSheet.h"
+#include "moho/render/ID3DRenderTarget.h"
+#include "moho/misc/ID3DDeviceResources.h"
+#include "gpg/gal/TextureContext.h"
+#include "gpg/gal/Device.hpp"
 #include "moho/render/WRenViewport.h"
 
 namespace
 {
-  [[nodiscard]] bool Finite(const float value) noexcept
+  /** The thumbnail surfaces' side: `mov eax, 0x200` at 0x007EAB42, `push 0x200` at 0x007EABF2 and 0x007EAC75. */
+  constexpr std::uint32_t kThumbnailSurfaceSize = 0x200;
+
+  [[nodiscard]] bool Finite(
+    const float value
+  ) noexcept
   {
     return std::isfinite(value);
   }
 
-  [[nodiscard]] bool HasFiniteBounds(const moho::MeshInstance& meshInstance) noexcept
+  [[nodiscard]] bool HasFiniteBounds(
+    const moho::MeshInstance& meshInstance
+  ) noexcept
   {
     return Finite(meshInstance.xMin) && Finite(meshInstance.yMin) && Finite(meshInstance.zMin) &&
       Finite(meshInstance.xMax) && Finite(meshInstance.yMax) && Finite(meshInstance.zMax);
@@ -39,7 +53,9 @@ namespace
     return head;
   }
 
-  void DetachNode(moho::MeshThumbnailNode* const node) noexcept
+  void DetachNode(
+    moho::MeshThumbnailNode* const node
+  ) noexcept
   {
     node->prev->next = node->next;
     node->next->prev = node->prev;
@@ -53,7 +69,9 @@ namespace
    * What it does:
    * Increments queue size and throws `length_error` when size overflows.
    */
-  void IncrementQueueSizeOrThrow(std::uint32_t& size)
+  void IncrementQueueSizeOrThrow(
+    std::uint32_t& size
+  )
   {
     if (size == std::numeric_limits<std::uint32_t>::max()) {
       throw std::length_error("list<T> too long");
@@ -79,7 +97,8 @@ namespace
    * exception-safe and releases its own partial state on failure.
    */
   moho::MeshThumbnail* ConstructMeshThumbnailInAllocatedSlot(
-    moho::MeshThumbnail* const destination, const moho::MeshThumbnail& source
+    moho::MeshThumbnail* const destination,
+    const moho::MeshThumbnail& source
   )
   {
     if (destination == nullptr) {
@@ -100,7 +119,9 @@ namespace
    * allocation-then-copy sequence matches the release binary.
    */
   void InsertBefore(
-    moho::MeshThumbnailQueue& queue, moho::MeshThumbnailNode* const position, const moho::MeshThumbnail& value
+    moho::MeshThumbnailQueue& queue,
+    moho::MeshThumbnailNode* const position,
+    const moho::MeshThumbnail& value
   )
   {
     moho::MeshThumbnailNode* const node = new moho::MeshThumbnailNode{};
@@ -135,7 +156,8 @@ namespace
    * ran and ProjectBoxByMatrix (0x007E9AD0) had no caller.
    */
   [[nodiscard]] moho::GeomCamera3 BuildThumbnailCamera(
-    const moho::MeshInstance* const meshInstance, const Wm3::Vec3f& viewOffsetHint
+    const moho::MeshInstance* const meshInstance,
+    const Wm3::Vec3f& viewOffsetHint
   )
   {
     moho::GeomCamera3 camera{};
@@ -165,9 +187,7 @@ namespace
 
     const float eyeDistance = radius * 10.0f;
     const Wm3::Vector3f eye(
-      viewOffsetHint.x * eyeDistance,
-      viewOffsetHint.y * eyeDistance,
-      viewOffsetHint.z * eyeDistance
+      viewOffsetHint.x * eyeDistance, viewOffsetHint.y * eyeDistance, viewOffsetHint.z * eyeDistance
     );
     const Wm3::Vector3f up(0.0f, 1.0f, 0.0f);
 
@@ -185,12 +205,7 @@ namespace
     const float projectedHeight = projected.Max.Y() - projected.Min.Y();
     const float extent = std::max(projectedWidth, projectedHeight);
 
-    camera.ViewInitOrtho(
-      static_cast<std::int32_t>(extent),
-      static_cast<std::int32_t>(extent),
-      nearDepth,
-      farDepth
-    );
+    camera.ViewInitOrtho(static_cast<std::int32_t>(extent), static_cast<std::int32_t>(extent), nearDepth, farDepth);
     return camera;
   }
 
@@ -227,8 +242,10 @@ namespace
 namespace moho
 {
   /**
-   * Address: 0x007FA620 (FUN_007FA620, ?REN_RequestThumbnail@Moho@@YAIPBVRMeshBlueprint@1@ABV?$Quaternion@M@Wm3@@IABV?$Vector3@M@4@V?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$Rect2@M@gpg@@@Z)
-   * Mangled: ?REN_RequestThumbnail@Moho@@YAIPBVRMeshBlueprint@1@ABV?$Quaternion@M@Wm3@@IABV?$Vector3@M@4@V?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$Rect2@M@gpg@@@Z
+   * Address: 0x007FA620 (FUN_007FA620,
+   * ?REN_RequestThumbnail@Moho@@YAIPBVRMeshBlueprint@1@ABV?$Quaternion@M@Wm3@@IABV?$Vector3@M@4@V?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$Rect2@M@gpg@@@Z)
+   * Mangled:
+   * ?REN_RequestThumbnail@Moho@@YAIPBVRMeshBlueprint@1@ABV?$Quaternion@M@Wm3@@IABV?$Vector3@M@4@V?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$Rect2@M@gpg@@@Z
    *
    * What it does:
    * Copies one texture-sheet shared-pointer lane and forwards the thumbnail
@@ -244,8 +261,9 @@ namespace moho
   )
   {
     boost::shared_ptr<ID3DTextureSheet> retainedOutputSheet(outputSheet);
-    return ren_Viewport->mThumbnailRenderer
-      .PushRequest(blueprint, orientation, color, viewOffsetHint, retainedOutputSheet, outputRect);
+    return ren_Viewport->mThumbnailRenderer.PushRequest(
+      blueprint, orientation, color, viewOffsetHint, retainedOutputSheet, outputRect
+    );
   }
 
   /**
@@ -313,9 +331,29 @@ namespace moho
       return;
     }
 
-    // Recovered constants: 512x512 thumbnail surface, color format=2, depth format=3.
-    // Full D3D device/resource interface lifting is still in progress, so we keep
-    // this method as the explicit initialization seam.
+    // 0x007EAB14..0x007EACF4: three 512 x 512 surfaces. The read-back texture through the gal device's CreateTexture
+    // (vtable +0x28) with a context of source 2, usage 3, format 2, one mip level; the colour target (format 2) and
+    // the depth-stencil (format 3) through the device resources' CreateRenderTarget (+0x08) and CreateDepthStencil
+    // (+0x10).
+    CD3DDevice* const device = D3D_GetDevice();
+    if (device == nullptr || device->GetResources() == nullptr || device->GetGalDevice() == nullptr) {
+      return;
+    }
+    ID3DDeviceResources* const resources = device->GetResources();
+    gpg::gal::TextureContext context;
+    context.source_ = 2;
+    context.usage_ = 3;
+    context.format_ = 2;
+    context.mipmapLevels_ = 1;
+    context.width_ = kThumbnailSurfaceSize;
+    context.height_ = kThumbnailSurfaceSize;
+    mThumbnailTexture = device->GetGalDevice()->CreateTexture(&context);
+    ID3DDeviceResources::RenderTargetHandle colorTarget;
+    (void)resources->CreateRenderTarget(colorTarget, kThumbnailSurfaceSize, kThumbnailSurfaceSize, 2);
+    mColorTarget = colorTarget;
+    ID3DDeviceResources::DepthStencilHandle depthStencil;
+    (void)resources->CreateDepthStencil(depthStencil, kThumbnailSurfaceSize, kThumbnailSurfaceSize, 3);
+    mDepthStencil = depthStencil;
     mRenderResourcesInitialized = 1;
   }
 
@@ -425,7 +463,9 @@ namespace moho
    * What it does:
    * Renders one queued thumbnail entry and writes it into the destination texture sheet.
    */
-  bool MeshThumbnailRenderer::RenderThumbnail(MeshThumbnail& request)
+  bool MeshThumbnailRenderer::RenderThumbnail(
+    MeshThumbnail& request
+  )
   {
     if (request.meshInstance == nullptr) {
       return false;
@@ -441,20 +481,36 @@ namespace moho
       meshRenderer->RenderThumbnail(request.camera, request.meshInstance, mColorTarget.get(), mDepthStencil.get());
     }
 
-    if (request.outputSheet) {
-      // Binary flow copies the color target into the destination texture-sheet
-      // rect using device surface updates. The typed sheet/surface interface
-      // chain is being reconstructed in a follow-up pass.
-    }
-
-    // Texture-sheet upload sequence (surface acquire + device update) is still
-    // being lifted with typed D3D interfaces.
+    // 0x007EB7ED..0x007EB800: the instance is done with.
     delete request.meshInstance;
     request.meshInstance = nullptr;
+
+    // 0x007EB806..0x007EB919: the colour target read back into the thumbnail texture (gal Device +0x44,
+    // GetRenderTargetData), then that copied into the output sheet's rectangle (+0x4C, UpdateSurface, no source
+    // rect): the rectangle is the request's 0..1 rect times the sheet's dimensions (sheet vtable +0x04).
+    const boost::shared_ptr<ID3DTextureSheet> sheet = request.outputSheet;
+    gpg::gal::Device* const gal = gpg::gal::Device::GetInstance();
+    if (sheet && mColorTarget && mThumbnailTexture && gal != nullptr) {
+      Wm3::Vector3f dimensions{};
+      (void)sheet->GetDimensions(&dimensions);
+      RECT destination{};
+      destination.left = static_cast<LONG>(request.outputRect.x0 * dimensions.x);
+      destination.top = static_cast<LONG>(request.outputRect.z0 * dimensions.y);
+      destination.right = static_cast<LONG>(request.outputRect.x1 * dimensions.x);
+      destination.bottom = static_cast<LONG>(request.outputRect.z1 * dimensions.y);
+      ID3DRenderTarget::SurfaceHandle surface;
+      (void)mColorTarget->GetSurface(surface);
+      gal->GetRenderTargetData(surface, mThumbnailTexture);
+      ID3DTextureSheet::TextureHandle texture;
+      (void)sheet->GetTexture(texture);
+      gal->UpdateSurface(mThumbnailTexture, texture, nullptr, &destination);
+    }
     return true;
   }
 
-  void MeshThumbnailRenderer::ClearQueue(MeshThumbnailQueue& queue)
+  void MeshThumbnailRenderer::ClearQueue(
+    MeshThumbnailQueue& queue
+  )
   {
     if (queue.head == nullptr) {
       queue.size = 0;

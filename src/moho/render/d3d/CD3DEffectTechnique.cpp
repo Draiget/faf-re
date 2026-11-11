@@ -1,7 +1,9 @@
 ﻿#include "moho/render/d3d/CD3DEffectTechnique.h"
 #include <algorithm>
-#include <cstring>
+#include <cstdint>
+#include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <exception>
 #include <mutex>
 #include <new>
@@ -50,7 +52,6 @@ namespace moho
   {
     using Implementation = CD3DEffect::Technique::Implementation;
 
-
     using IntAnnotationTree = Implementation::IntAnnotationTree;
     using StringAnnotationTree = Implementation::StringAnnotationTree;
     using TechniqueSet = CD3DEffect::TechniqueSet;
@@ -62,7 +63,9 @@ namespace moho
      * edit needs saying out loud - the key the tree orders on is `mName`, and
      * nothing below touches it.
      */
-    [[nodiscard]] CD3DEffect::Technique& MutableTechnique(const TechniqueSet::iterator it) noexcept
+    [[nodiscard]] CD3DEffect::Technique& MutableTechnique(
+      const TechniqueSet::iterator it
+    ) noexcept
     {
       return const_cast<CD3DEffect::Technique&>(*it);
     }
@@ -110,7 +113,418 @@ technique TMsdfText
 }
 )fx";
 
-    [[nodiscard]] gpg::MemBuffer<char> AppendSource(const gpg::MemBuffer<char>& source, const char* const tail, const std::size_t tailBytes)
+  } // namespace
+
+  bool ren_EditorMeshOutline = false;
+
+  namespace
+  {
+    /**
+     * Engine addition (ren_EditorMeshOutline, the map editor's hovered prop): appended to FAF's `mesh.fx`, using its
+     * vertex inputs, `ComputeWorldMatrix`, `CompatSwizzle`, `albedoSampler`, matrices and NormalMappedAlpha's shaders.
+     * `EditorOutline`: the model's front faces pushed out along their normals by a share of their distance to the
+     * camera, so the rim is about the same width on the screen at any zoom, in the instance's colour, drawn after the
+     * water and before the effects with no depth test. An inverted hull (back faces) drew nothing on FAF's rocks, open
+     * domes sunk into the ground with no back faces seen from above, and its rim was under the terrain anyway.
+     * `EditorPropOver`, NormalMappedAlpha's passes after the effects with no depth test, then draws the prop again
+     * over the shell's middle, so only the rim stays. `EditorOutlineAlpha` cuts out by the albedo's alpha as the
+     * alpha-tested props do (trees' leaf cards), with the pass states NormalMappedAlpha uses.
+     */
+    constexpr const char kEditorOutlineSource[] = R"fx(
+
+VERTEXNORMAL_VERTEX EditorOutlineVS(
+    float3 position : POSITION0,
+    float3 normal : NORMAL0,
+    float3 UnusedTangent : TANGENT,
+    float3 UnusedBinormal : BINORMAL,
+    float4 texcoord0 : TEXCOORD0,
+    int boneIndex[4] : BLENDINDICES,
+    float3 row0 : TEXCOORD1,
+    float3 row1 : TEXCOORD2,
+    float3 row2 : TEXCOORD3,
+    float3 row3 : TEXCOORD4,
+    anim_t anim : TEXCOORD5,
+    float4 material : TEXCOORD6,
+    float4 color : COLOR0,
+    uniform float width,
+    uniform bool sway
+)
+{
+    VERTEXNORMAL_VERTEX vertex = (VERTEXNORMAL_VERTEX)0;
+    CompatSwizzle(color);
+    int bone = anim.y + boneIndex[0];
+    float4x4 worldMatrix = ComputeWorldMatrix( bone, row0, row1, row2, row3);
+    float4 world = mul( float4(position,1), worldMatrix);
+    if (sway) {
+        // UndulatingNormalMappedVS's wind, so the shell moves with a swaying tree.
+        float sinSq = sin( 0.05 * time - dot(windDirection, row3.xyz));
+        world.xyz += 0.003 * position.y * sinSq * sinSq * windDirection;
+    }
+    float3 worldNormal = normalize( mul( normal, (float3x3)worldMatrix));
+    float distance = abs( mul( world, viewMatrix).z);
+    world.xyz += worldNormal * distance * width;
+    vertex.position = mul( world, mul( viewMatrix, projMatrix));
+    vertex.texcoord0 = texcoord0;
+    vertex.color = color;
+    vertex.normal = worldNormal;
+    vertex.material = material;
+    return vertex;
+}
+
+float4 EditorOutlinePS( VERTEXNORMAL_VERTEX vertex) : COLOR0
+{
+    return float4( vertex.color.rgb, 1);
+}
+
+float4 EditorOutlineAlphaPS( VERTEXNORMAL_VERTEX vertex) : COLOR0
+{
+    return float4( vertex.color.rgb, tex2D( albedoSampler, vertex.texcoord0.xy).a);
+}
+
+// The shell: the prop's front faces pushed out, drawn after the water and before the effects over everything (no
+// depth test or write), so the rim shows even where the prop is sunk into the ground; EditorPropOver then draws the prop
+// again over its middle.
+technique EditorOutline_HighFidelity
+<
+    int fidelity = FIDELITY_HIGH;
+    string abstractTechnique = "EditorOutline";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+        VertexShader = compile vs_1_1 EditorOutlineVS(0.002, false);
+        PixelShader = compile ps_2_0 EditorOutlinePS();
+    }
+}
+
+technique EditorOutline_MedFidelity
+<
+    int fidelity = FIDELITY_MEDIUM;
+    string abstractTechnique = "EditorOutline";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+        VertexShader = compile vs_1_1 EditorOutlineVS(0.002, false);
+        PixelShader = compile ps_2_0 EditorOutlinePS();
+    }
+}
+
+technique EditorOutline_LowFidelity
+<
+    int fidelity = FIDELITY_LOW;
+    string abstractTechnique = "EditorOutline";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+        VertexShader = compile vs_1_1 EditorOutlineVS(0.002, false);
+        PixelShader = compile ps_2_0 EditorOutlinePS();
+    }
+}
+
+technique EditorOutlineAlpha_HighFidelity
+<
+    int fidelity = FIDELITY_HIGH;
+    string abstractTechnique = "EditorOutlineAlpha";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 EditorOutlineVS(0.002, false);
+        PixelShader = compile ps_2_0 EditorOutlineAlphaPS();
+    }
+}
+
+technique EditorOutlineAlpha_MedFidelity
+<
+    int fidelity = FIDELITY_MEDIUM;
+    string abstractTechnique = "EditorOutlineAlpha";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 EditorOutlineVS(0.002, false);
+        PixelShader = compile ps_2_0 EditorOutlineAlphaPS();
+    }
+}
+
+technique EditorOutlineAlpha_LowFidelity
+<
+    int fidelity = FIDELITY_LOW;
+    string abstractTechnique = "EditorOutlineAlpha";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 EditorOutlineVS(0.002, false);
+        PixelShader = compile ps_2_0 EditorOutlineAlphaPS();
+    }
+}
+
+technique EditorOutlineAlphaSway_HighFidelity
+<
+    int fidelity = FIDELITY_HIGH;
+    string abstractTechnique = "EditorOutlineAlphaSway";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 EditorOutlineVS(0.0007, true);
+        PixelShader = compile ps_2_0 EditorOutlineAlphaPS();
+    }
+}
+
+technique EditorOutlineAlphaSway_MedFidelity
+<
+    int fidelity = FIDELITY_MEDIUM;
+    string abstractTechnique = "EditorOutlineAlphaSway";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 EditorOutlineVS(0.0007, true);
+        PixelShader = compile ps_2_0 EditorOutlineAlphaPS();
+    }
+}
+
+technique EditorOutlineAlphaSway_LowFidelity
+<
+    int fidelity = FIDELITY_LOW;
+    string abstractTechnique = "EditorOutlineAlphaSway";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 EditorOutlineVS(0.0007, false);
+        PixelShader = compile ps_2_0 EditorOutlineAlphaPS();
+    }
+}
+
+// The prop again over the shell's middle: NormalMappedAlpha's passes (most props' shader), drawn after the effects,
+// without a depth test (drawn again, the prop's own depth didn't match closely enough to pass), so it shows over what
+// stands in front of it, as an editor's highlight does.
+technique EditorPropOver_HighFidelity
+<
+    int fidelity = FIDELITY_HIGH;
+    string abstractTechnique = "EditorPropOver";
+    int renderStage = STAGE_POSTWATER + STAGE_POSTEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 NormalMappedVS();
+        PixelShader = compile ps_2_a NormalMappedPS(false,false,true,  true, d3d_Greater, 0x80 );
+    }
+}
+
+technique EditorPropOver_MedFidelity
+<
+    int fidelity = FIDELITY_MEDIUM;
+    string abstractTechnique = "EditorPropOver";
+    int renderStage = STAGE_POSTWATER + STAGE_POSTEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 NormalMappedVS();
+        PixelShader = compile ps_2_a NormalMappedPS(false,false,false,  true, d3d_Greater, 0x80 );
+    }
+}
+
+technique EditorPropOver_LowFidelity
+<
+    int fidelity = FIDELITY_LOW;
+    string abstractTechnique = "EditorPropOver";
+    int renderStage = STAGE_POSTWATER + STAGE_POSTEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 VertexNormalVS();
+        PixelShader = compile ps_2_0 VertexNormalPS_LowFidelity( true, d3d_Greater, 0x80 );
+    }
+}
+
+// The swaying props (UndulatingNormalMappedAlpha: the trees) drawn again the same way, swaying as they do.
+technique EditorPropOverSway_HighFidelity
+<
+    int fidelity = FIDELITY_HIGH;
+    string abstractTechnique = "EditorPropOverSway";
+    int renderStage = STAGE_POSTWATER + STAGE_POSTEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 UndulatingNormalMappedVS();
+        PixelShader = compile ps_2_a NormalMappedPS(false,false,true,  true, d3d_Greater, 0x80 );
+    }
+}
+
+technique EditorPropOverSway_MedFidelity
+<
+    int fidelity = FIDELITY_MEDIUM;
+    string abstractTechnique = "EditorPropOverSway";
+    int renderStage = STAGE_POSTWATER + STAGE_POSTEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 UndulatingNormalMappedVS();
+        PixelShader = compile ps_2_a NormalMappedPS(false,false,false,  true, d3d_Greater, 0x80 );
+    }
+}
+
+technique EditorPropOverSway_LowFidelity
+<
+    int fidelity = FIDELITY_LOW;
+    string abstractTechnique = "EditorPropOverSway";
+    int renderStage = STAGE_POSTWATER + STAGE_POSTEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 VertexNormalVS();
+        PixelShader = compile ps_2_0 VertexNormalPS_LowFidelity( true, d3d_Greater, 0x80 );
+    }
+}
+
+)fx";
+
+    [[nodiscard]] gpg::MemBuffer<char> AppendSource(
+      const gpg::MemBuffer<char>& source,
+      const char* const tail,
+      const std::size_t tailBytes
+    )
     {
       const std::size_t sourceBytes = source.Size();
       gpg::MemBuffer<char> merged = gpg::AllocMemBuffer(sourceBytes + 1u + tailBytes);
@@ -129,11 +543,15 @@ technique TMsdfText
      * the file is missing.
      */
     [[nodiscard]] gpg::MemBuffer<const char> TerrainTessellationSource(
-      const gpg::gal::DeviceContext* const deviceContext, FWaitHandleSet* const waitHandleSet
+      const gpg::gal::DeviceContext* const deviceContext,
+      FWaitHandleSet* const waitHandleSet
     )
     {
-      if (deviceContext == nullptr || (deviceContext->mDeviceType != gpg::gal::DeviceApi::Direct3D12 &&
-                                       deviceContext->mDeviceType != gpg::gal::DeviceApi::Vulkan)) {
+      if (
+        deviceContext == nullptr ||
+        (deviceContext->mDeviceType != gpg::gal::DeviceApi::Direct3D12 &&
+         deviceContext->mDeviceType != gpg::gal::DeviceApi::Vulkan)
+      ) {
         return {};
       }
       fa::string mountedPath{};
@@ -157,7 +575,8 @@ technique TMsdfText
      * vertex shader, and /nobonetexture on the command line turns it off.
      */
     [[nodiscard]] bool WantsBoneTextureVariant(
-      const gpg::gal::DeviceContext* const deviceContext, const gpg::MemBuffer<const char>& source
+      const gpg::gal::DeviceContext* const deviceContext,
+      const gpg::MemBuffer<const char>& source
     )
     {
       constexpr std::string_view kMacroName = "FAF_BONE_TEXTURE";
@@ -204,12 +623,12 @@ technique TMsdfText
      *     the heap pointer. That capacity-versus-16 test one word higher is
      *     what pins lane+0x1C as myRes and therefore lane+0x18 as mySize.
      */
-    [[nodiscard]] bool HasConstructedLaneName(const Implementation& lane) noexcept
+    [[nodiscard]] bool HasConstructedLaneName(
+      const Implementation& lane
+    ) noexcept
     {
       return lane.mName.mySize != 0U;
     }
-
-
 
     /**
      * Address family:
@@ -235,7 +654,10 @@ technique TMsdfText
      * What it does:
      * Restores red-black invariants after linking one freshly allocated node.
      */
-    [[nodiscard]] bool IsDiskFileInfoNotOlder(const SDiskFileInfo& lhs, const SDiskFileInfo& rhs) noexcept
+    [[nodiscard]] bool IsDiskFileInfoNotOlder(
+      const SDiskFileInfo& lhs,
+      const SDiskFileInfo& rhs
+    ) noexcept
     {
       const LONG comparison = ::CompareFileTime(&lhs.mLastWriteTime, &rhs.mLastWriteTime);
       return comparison >= 0;
@@ -285,7 +707,9 @@ technique TMsdfText
       return *table;
     }
 
-    void ForgetEffectTechniques(const CD3DEffect* const effect)
+    void ForgetEffectTechniques(
+      const CD3DEffect* const effect
+    )
     {
       TechniqueMemoTable& table = GetTechniqueMemoTable();
       EffectTechniqueMemo dropped;
@@ -317,7 +741,9 @@ technique TMsdfText
    * What it does:
    * Initializes one implementation lane and copies one lane-name string.
    */
-  CD3DEffect::Technique::Implementation::Implementation(const fa::string& implementationName)
+  CD3DEffect::Technique::Implementation::Implementation(
+    const fa::string& implementationName
+  )
   {
     mName.assign(implementationName, 0U, fa::string::npos);
   }
@@ -392,9 +818,7 @@ technique TMsdfText
     return true;
   }
 
-  void CD3DEffect::Technique::Implementation::UnknownVirtualSlot()
-  {
-  }
+  void CD3DEffect::Technique::Implementation::UnknownVirtualSlot() {}
 
   /**
    * Address: 0x0042BE40 (FUN_0042BE40)
@@ -403,7 +827,9 @@ technique TMsdfText
    * What it does:
    * Initializes one technique with name text and three implementation lanes.
    */
-  CD3DEffect::Technique::Technique(const fa::string& techniqueName)
+  CD3DEffect::Technique::Technique(
+    const fa::string& techniqueName
+  )
   {
     mName.assign(techniqueName, 0U, fa::string::npos);
 
@@ -453,7 +879,9 @@ technique TMsdfText
     }
 
     std::optional<Implementation> sharedFallback{};
-    auto resolveSourceLane = [&](const std::uint32_t primary, const std::uint32_t secondary, const std::uint32_t tertiary) -> const Implementation* {
+    auto resolveSourceLane = [&](
+                               const std::uint32_t primary, const std::uint32_t secondary, const std::uint32_t tertiary
+                             ) -> const Implementation* {
       if (HasConstructedLaneName(lanes[primary])) {
         return &lanes[primary];
       }
@@ -504,9 +932,7 @@ technique TMsdfText
     , mFile{}
     , mEffect{}
     , mCurrentTechnique{}
-  {
-
-  }
+  {}
 
   /**
    * Address: 0x0042C520 (FUN_0042C520)
@@ -532,8 +958,6 @@ technique TMsdfText
     mFile.tidy(true, 0U);
     mName.tidy(true, 0U);
 
-
-
     while (mAttachedLinks != nullptr) {
       AttachedLink* const detached = mAttachedLinks;
       mAttachedLinks = detached->mNext;
@@ -548,7 +972,9 @@ technique TMsdfText
    * What it does:
    * Parses one sample-count argument and forwards it to the active D3D device.
    */
-  void CD3DEffect::CON_d3d_AntiAliasingSamples(const fa::vector<fa::string>& args)
+  void CD3DEffect::CON_d3d_AntiAliasingSamples(
+    const fa::vector<fa::string>& args
+  )
   {
     if (args.size() != 2U) {
       return;
@@ -575,7 +1001,9 @@ technique TMsdfText
    * Loads one effect source file, merges compatibility preamble state,
    * creates one gal effect object, and rebuilds fidelity definitions.
    */
-  bool CD3DEffect::InitEffectFromFile(const char* const effectFilePath)
+  bool CD3DEffect::InitEffectFromFile(
+    const char* const effectFilePath
+  )
   {
     const fa::string engineVersion = GetEngineVersion();
     ForgetEffectTechniques(this); // engine addition (ren_TechniqueMemo): the techniques belong to the old effect
@@ -586,8 +1014,8 @@ technique TMsdfText
       const gpg::gal::DeviceContext* const deviceContext = (device != nullptr) ? device->GetDeviceContext() : nullptr;
       const char* const compatResourcePath =
         (deviceContext != nullptr && gpg::gal::UsesD3D10EffectDialect(deviceContext->mDeviceType))
-          ? "/effects/d3d10states.compat"
-          : "/effects/d3d9states.compat";
+        ? "/effects/d3d10states.compat"
+        : "/effects/d3d9states.compat";
 
       FILE_EnsureWaitHandleSet();
       FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
@@ -627,8 +1055,25 @@ technique TMsdfText
       // does `msdfText`, the source with the MSDF technique appended, and
       // `terrainTess`, terrain.fx with the tessellated techniques appended.
       gpg::MemBuffer<const char> terrainTess{};
-      const auto createEffect = [&](const bool boneTexture, const bool msdfText = false, const bool withTerrainTess = false) {
-        const char* const variant = boneTexture ? ".bonetex." : (msdfText ? ".msdf." : (withTerrainTess ? ".tess." : "."));
+      const auto createEffect = [&](
+                                  const bool boneTexture,
+                                  const bool msdfText = false,
+                                  const bool withTerrainTess = false,
+                                  const bool editorOutline = false
+                                ) {
+        // The outline's appended text is the editor's own, not a file whose date the cache checks: its hash names its
+        // cache.
+        char outlineVariant[32];
+        if (editorOutline) {
+          std::uint32_t hash = 2166136261u;
+          for (const char c : std::string_view(kEditorOutlineSource, sizeof(kEditorOutlineSource) - 1u)) {
+            hash = (hash ^ static_cast<unsigned char>(c)) * 16777619u;
+          }
+          (void)std::snprintf(outlineVariant, sizeof(outlineVariant), ".edoutline%08x.", hash);
+        }
+        const char* const variant = boneTexture
+          ? ".bonetex."
+          : (msdfText ? ".msdf." : (withTerrainTess ? ".tess." : (editorOutline ? outlineVariant : ".")));
         const fa::string cachePath = cacheDirectory + "/" + mName + variant + engineVersion;
         SDiskFileInfo cacheInfo{};
         bool useCachePayload = false;
@@ -641,9 +1086,12 @@ technique TMsdfText
           effectMacros.push_back(gpg::gal::EffectMacro("FAF_BONE_TEXTURE", "1"));
         }
         const gpg::gal::EffectContext context(
-          useCachePayload, mFile.c_str(), cachePath.c_str(),
-          msdfText          ? AppendSource(mergedBuffer, kMsdfTechniqueSource, sizeof(kMsdfTechniqueSource) - 1u)
+          useCachePayload,
+          mFile.c_str(),
+          cachePath.c_str(),
+          msdfText            ? AppendSource(mergedBuffer, kMsdfTechniqueSource, sizeof(kMsdfTechniqueSource) - 1u)
             : withTerrainTess ? AppendSource(mergedBuffer, terrainTess.GetPtr(0U, 0U), terrainTess.Size())
+            : editorOutline   ? AppendSource(mergedBuffer, kEditorOutlineSource, sizeof(kEditorOutlineSource) - 1u)
                               : mergedBuffer,
           effectMacros
         );
@@ -690,17 +1138,61 @@ technique TMsdfText
             // twin that failed later would draw nothing in place of its pass.
             auto* const program = dynamic_cast<gpg::gal::ProgramEffect*>(mEffect.get());
             for (const char* const name :
-                 {"TTerrainTess", "TTerrainXPTess", "TTerrainGlowTess", "TTerrainNormalsTess", "TTerrainNormalsXPTess",
-                  "TTerrainBasisTess", "TTerrainBasisBiCubicTess"}) {
+                 {"TTerrainTess",
+                  "TTerrainXPTess",
+                  "TTerrainGlowTess",
+                  "TTerrainNormalsTess",
+                  "TTerrainNormalsXPTess",
+                  "TTerrainBasisTess",
+                  "TTerrainBasisBiCubicTess"}) {
               if (program == nullptr || !program->TechniqueCompiles(name)) {
-                throw std::runtime_error(std::string("technique ") + name + " of terrain_tess.fx did not compile (see the shader messages above)");
+                throw std::runtime_error(
+                  std::string("technique ") + name +
+                  " of terrain_tess.fx did not compile (see the shader messages above)"
+                );
               }
             }
-            gpg::Logf("terrain: tessellated techniques loaded (ren_TerrainTessellation %d)", ren_TerrainTessellation ? 1 : 0);
+            gpg::Logf(
+              "terrain: tessellated techniques loaded (ren_TerrainTessellation %d)", ren_TerrainTessellation ? 1 : 0
+            );
           } catch (const std::exception& exception) {
             gpg::Warnf("%s: %s; building it without terrain tessellation", effectFilePath, exception.what());
             mEffect.reset();
           }
+        }
+      }
+      // Engine addition (ren_EditorMeshOutline, the map editor only): mesh.fx with the outline techniques on its end.
+      // Every one is compiled here so a mistake shows at once and the meshes fall back to the plain effect.
+      if (!mEffect && ren_EditorMeshOutline && std::strcmp(mName.c_str(), "mesh") == 0) {
+        try {
+          createEffect(false, false, false, true);
+          auto* const program = dynamic_cast<gpg::gal::ProgramEffect*>(mEffect.get());
+          for (const char* const name :
+               {"EditorOutline_HighFidelity",
+                "EditorOutline_MedFidelity",
+                "EditorOutline_LowFidelity",
+                "EditorOutlineAlpha_HighFidelity",
+                "EditorOutlineAlpha_MedFidelity",
+                "EditorOutlineAlpha_LowFidelity",
+                "EditorPropOver_HighFidelity",
+                "EditorPropOver_MedFidelity",
+                "EditorPropOver_LowFidelity",
+                "EditorOutlineAlphaSway_HighFidelity",
+                "EditorOutlineAlphaSway_MedFidelity",
+                "EditorOutlineAlphaSway_LowFidelity",
+                "EditorPropOverSway_HighFidelity",
+                "EditorPropOverSway_MedFidelity",
+                "EditorPropOverSway_LowFidelity"}) {
+            if (program == nullptr || !program->TechniqueCompiles(name)) {
+              throw std::runtime_error(
+                std::string("technique ") + name + " did not compile (see the shader messages above)"
+              );
+            }
+          }
+          gpg::Logf("mesh: the editor's outline techniques loaded");
+        } catch (const std::exception& exception) {
+          gpg::Warnf("%s: %s; building it without the editor's outline", effectFilePath, exception.what());
+          mEffect.reset();
         }
       }
       if (!mEffect) {
@@ -742,18 +1234,14 @@ technique TMsdfText
         (void)GetImplAnnotation(&fidelityIndex, implementationName, fidelityToken);
         if (fidelityIndex < 0 || fidelityIndex > 2) {
           gpg::Warnf(
-            "technique %s in effect %s has incomplete definition",
-            abstractTechniqueName.c_str(),
-            mName.c_str()
+            "technique %s in effect %s has incomplete definition", abstractTechniqueName.c_str(), mName.c_str()
           );
           continue;
         }
 
         if (HasConstructedLaneName(lanes[fidelityIndex])) {
           gpg::Warnf(
-            "redundant implementation for technique %s in effect %s",
-            abstractTechniqueName.c_str(),
-            mName.c_str()
+            "redundant implementation for technique %s in effect %s", abstractTechniqueName.c_str(), mName.c_str()
           );
           continue;
         }
@@ -780,7 +1268,9 @@ technique TMsdfText
    * What it does:
    * Resolves one exact fidelity-definition node for the supplied technique.
    */
-  CD3DEffect::TechniqueSet::iterator CD3DEffect::GetFidelityDefinitions(const Technique& technique)
+  CD3DEffect::TechniqueSet::iterator CD3DEffect::GetFidelityDefinitions(
+    const Technique& technique
+  )
   {
     return mTechniques.find(technique);
   }
@@ -791,7 +1281,9 @@ technique TMsdfText
    * What it does:
    * Queries the current effect for valid techniques and appends their names.
    */
-  void CD3DEffect::EnumerateValidTechniques(fa::vector<fa::string>& outTechniqueNames)
+  void CD3DEffect::EnumerateValidTechniques(
+    fa::vector<fa::string>& outTechniqueNames
+  )
   {
     fa::vector<boost::shared_ptr<gpg::gal::EffectTechnique>> techniques{};
     mEffect->GetTechniques(techniques);
@@ -808,7 +1300,9 @@ technique TMsdfText
    * Selects one technique on the backing gal effect, preferring the current
    * fidelity implementation lane when present.
    */
-  void CD3DEffect::SetTechnique(const char* techniqueName)
+  void CD3DEffect::SetTechnique(
+    const char* techniqueName
+  )
   {
     // Engine addition (ren_TerrainTessellation): a terrain technique with a tessellated twin
     // "<name>Tess" (terrain_tess.fx, Direct3D 12 and Vulkan) draws through the twin.
@@ -828,7 +1322,10 @@ technique TMsdfText
       TechniqueMemoTable& table = GetTechniqueMemoTable();
       const std::lock_guard<std::mutex> lock(table.mutex);
       const auto found = table.effects.find(this);
-      if (found != table.effects.end() && found->second.galEffect == mEffect.get() && found->second.fidelity == memoFidelity) {
+      if (
+        found != table.effects.end() && found->second.galEffect == mEffect.get() &&
+        found->second.fidelity == memoFidelity
+      ) {
         for (const auto& [name, technique] : found->second.techniques) {
           if (name == techniqueName) {
             mCurrentTechnique = technique;
@@ -844,11 +1341,7 @@ technique TMsdfText
 
     auto selectAndWarnInvalid = [&]() {
       mCurrentTechnique = mEffect->GetTechnique(techniqueName);
-      gpg::Debugf(
-        "technique %s in effect %s has an invalid fidelity definition",
-        techniqueName,
-        mName.c_str()
-      );
+      gpg::Debugf("technique %s in effect %s has an invalid fidelity definition", techniqueName, mName.c_str());
     };
 
     if (definition == mTechniques.end()) {
@@ -885,7 +1378,8 @@ technique TMsdfText
 
   /**
    * Address: 0x0042D580 (FUN_0042D580)
-   * Mangled: ?GetImplAnnotation@CD3DEffect@Moho@@AAE_NAAHABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@1@Z
+   * Mangled:
+   * ?GetImplAnnotation@CD3DEffect@Moho@@AAE_NAAHABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@1@Z
    *
    * What it does:
    * Reads one integer annotation from one implementation technique lane.
@@ -905,7 +1399,8 @@ technique TMsdfText
 
   /**
    * Address: 0x0042D640 (FUN_0042D640)
-   * Mangled: ?GetIntegerAnnotation@CD3DEffect@Moho@@QAEHABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@0H@Z
+   * Mangled:
+   * ?GetIntegerAnnotation@CD3DEffect@Moho@@QAEHABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@0H@Z
    *
    * What it does:
    * Returns one integer annotation for the selected technique/fidelity lane,
@@ -944,7 +1439,8 @@ technique TMsdfText
 
   /**
    * Address: 0x0042D780 (FUN_0042D780)
-   * Mangled: ?GetImplAnnotation@CD3DEffect@Moho@@AAE_NAAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV34@1@Z
+   * Mangled:
+   * ?GetImplAnnotation@CD3DEffect@Moho@@AAE_NAAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV34@1@Z
    *
    * What it does:
    * Reads one string annotation from one implementation technique lane.
@@ -964,7 +1460,8 @@ technique TMsdfText
 
   /**
    * Address: 0x0042D840 (FUN_0042D840)
-   * Mangled: ?GetStringAnnotation@CD3DEffect@Moho@@QAE?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV34@00@Z
+   * Mangled:
+   * ?GetStringAnnotation@CD3DEffect@Moho@@QAE?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV34@00@Z
    *
    * What it does:
    * Returns one string annotation for the selected technique/fidelity lane,
@@ -1013,13 +1510,17 @@ technique TMsdfText
   }
 
   /**
-   * Address: 0x0042DA30 (FUN_0042DA30, ?SetTexture@CD3DEffect@Moho@@QAEXPBDV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@@Z)
+   * Address: 0x0042DA30 (FUN_0042DA30,
+   * ?SetTexture@CD3DEffect@Moho@@QAEXPBDV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@@Z)
    *
    * What it does:
    * Resolves one effect variable by name and binds one texture handle (or
    * clears the slot when texture is null).
    */
-  void CD3DEffect::SetTexture(const char* const variableName, boost::shared_ptr<ID3DTextureSheet> texture)
+  void CD3DEffect::SetTexture(
+    const char* const variableName,
+    boost::shared_ptr<ID3DTextureSheet> texture
+  )
   {
     const boost::shared_ptr<gpg::gal::EffectVariable> variable = mEffect->GetVariable(variableName);
 

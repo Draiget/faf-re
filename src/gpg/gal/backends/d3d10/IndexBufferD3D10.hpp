@@ -11,15 +11,18 @@
 #include "gpg/gal/IndexBuffer.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
 
-namespace gpg {
-namespace gal {
+namespace gpg
+{
+  namespace gal
+  {
     /**
      * VFTABLE: 0x00D43654
      * COL:  0x00E51060
      * Source hints:
      *  - c:\work\rts\main\code\src\libs\gpggal\IndexBufferD3D10.cpp
      */
-    class IndexBufferD3D10 : public IndexBuffer {
+    class IndexBufferD3D10 : public IndexBuffer
+    {
     public:
       /**
        * Address: 0x00901B80 (FUN_00901B80)
@@ -39,10 +42,10 @@ namespace gal {
        * Initializes one D3D10 index-buffer wrapper from context + native/staging handles.
        */
       IndexBufferD3D10(
-          const IndexBufferContext* context,
-          ID3D10Device* nativeDevice,
-          ID3D10Buffer* nativeBuffer,
-          ID3D10Buffer* stagingBuffer
+        const IndexBufferContext* context,
+        ID3D10Device* nativeDevice,
+        ID3D10Buffer* nativeBuffer,
+        ID3D10Buffer* stagingBuffer
       );
       /**
        * Address: 0x00901C90 (FUN_00901C90)
@@ -95,21 +98,30 @@ namespace gal {
       ID3D10Buffer* GetNativeBufferOrThrow();
 
     public:
-      IndexBufferContext context_{}; // +0x04
+      IndexBufferContext context_{};          // +0x04
       ID3D10Buffer* nativeBuffer_ = nullptr;  // +0x14
       ID3D10Buffer* stagingBuffer_ = nullptr; // +0x18 what Lock maps; Unlock copies it into nativeBuffer_
       ID3D10Device* nativeDevice_ = nullptr;  // +0x1C held (AddRef) for that copy
-      bool locked_ = false;           // +0x20
-      std::uint8_t lockPadding_[3]{}; // +0x21
-      void* mappedData_ = nullptr;    // +0x24
+      bool locked_ = false;                   // +0x20
+      std::uint8_t lockPadding_[3]{};         // +0x21
+      void* mappedData_ = nullptr;            // +0x24
     };
 
     static_assert(offsetof(IndexBufferD3D10, context_) == 0x04, "IndexBufferD3D10::context_ offset must be 0x04");
-    static_assert(offsetof(IndexBufferD3D10, nativeBuffer_) == 0x14, "IndexBufferD3D10::nativeBuffer_ offset must be 0x14");
-    static_assert(offsetof(IndexBufferD3D10, stagingBuffer_) == 0x18, "IndexBufferD3D10::stagingBuffer_ offset must be 0x18");
-    static_assert(offsetof(IndexBufferD3D10, nativeDevice_) == 0x1C, "IndexBufferD3D10::nativeDevice_ offset must be 0x1C");
+    static_assert(
+      offsetof(IndexBufferD3D10, nativeBuffer_) == 0x14,
+      "IndexBufferD3D10::nativeBuffer_ offset must be 0x14"
+    );
+    static_assert(
+      offsetof(IndexBufferD3D10, stagingBuffer_) == 0x18,
+      "IndexBufferD3D10::stagingBuffer_ offset must be 0x18"
+    );
+    static_assert(
+      offsetof(IndexBufferD3D10, nativeDevice_) == 0x1C,
+      "IndexBufferD3D10::nativeDevice_ offset must be 0x1C"
+    );
     static_assert(offsetof(IndexBufferD3D10, locked_) == 0x20, "IndexBufferD3D10::locked_ offset must be 0x20");
     static_assert(offsetof(IndexBufferD3D10, mappedData_) == 0x24, "IndexBufferD3D10::mappedData_ offset must be 0x24");
     static_assert(sizeof(IndexBufferD3D10) == 0x28, "IndexBufferD3D10 size must be 0x28");
-} // namespace gal
+  } // namespace gal
 } // namespace gpg

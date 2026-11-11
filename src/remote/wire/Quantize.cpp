@@ -17,7 +17,10 @@ namespace faf::remote::wire
     constexpr int kQuaternionComponentBits = 10;
     constexpr float kQuaternionComponentLimit = 0.70710678f;
 
-    [[nodiscard]] int BitsForSpan(const float span, const float step) noexcept
+    [[nodiscard]] int BitsForSpan(
+      const float span,
+      const float step
+    ) noexcept
     {
       int bits = 1;
       while (bits < 32 && static_cast<double>(1u << bits) * step < span) {
@@ -27,7 +30,9 @@ namespace faf::remote::wire
     }
   } // namespace
 
-  std::uint32_t SAxisQuantizer::Encode(const float value) const noexcept
+  std::uint32_t SAxisQuantizer::Encode(
+    const float value
+  ) const noexcept
   {
     if (!(value == value)) {
       return 0u;
@@ -44,13 +49,18 @@ namespace faf::remote::wire
     return scaled >= maxQuantized ? MaxQuantized() : static_cast<std::uint32_t>(scaled);
   }
 
-  float SAxisQuantizer::Decode(const std::uint32_t quantized) const noexcept
+  float SAxisQuantizer::Decode(
+    const std::uint32_t quantized
+  ) const noexcept
   {
     const std::uint32_t clamped = quantized > MaxQuantized() ? MaxQuantized() : quantized;
     return static_cast<float>(static_cast<double>(minValue) + static_cast<double>(clamped) * step);
   }
 
-  SPositionQuantizer SPositionQuantizer::ForMap(const float sizeX, const float sizeZ) noexcept
+  SPositionQuantizer SPositionQuantizer::ForMap(
+    const float sizeX,
+    const float sizeZ
+  ) noexcept
   {
     SPositionQuantizer quantizer{};
     quantizer.x = {-kPositionMargin, kPositionStep, BitsForSpan(sizeX + 2.0f * kPositionMargin, kPositionStep)};
@@ -59,7 +69,9 @@ namespace faf::remote::wire
     return quantizer;
   }
 
-  std::uint32_t PackQuaternion(const std::array<float, 4>& q) noexcept
+  std::uint32_t PackQuaternion(
+    const std::array<float, 4>& q
+  ) noexcept
   {
     int largest = 0;
     for (int i = 1; i < 4; ++i) {
@@ -69,7 +81,8 @@ namespace faf::remote::wire
     }
     const float sign = q[largest] < 0.0f ? -1.0f : 1.0f;
     const SAxisQuantizer component{
-      -kQuaternionComponentLimit, 2.0f * kQuaternionComponentLimit / ((1 << kQuaternionComponentBits) - 1),
+      -kQuaternionComponentLimit,
+      2.0f * kQuaternionComponentLimit / ((1 << kQuaternionComponentBits) - 1),
       kQuaternionComponentBits
     };
     std::uint32_t packed = static_cast<std::uint32_t>(largest);
@@ -84,10 +97,13 @@ namespace faf::remote::wire
     return packed;
   }
 
-  std::array<float, 4> UnpackQuaternion(const std::uint32_t packed) noexcept
+  std::array<float, 4> UnpackQuaternion(
+    const std::uint32_t packed
+  ) noexcept
   {
     const SAxisQuantizer component{
-      -kQuaternionComponentLimit, 2.0f * kQuaternionComponentLimit / ((1 << kQuaternionComponentBits) - 1),
+      -kQuaternionComponentLimit,
+      2.0f * kQuaternionComponentLimit / ((1 << kQuaternionComponentBits) - 1),
       kQuaternionComponentBits
     };
     const int largest = static_cast<int>(packed & 3u);
@@ -106,13 +122,17 @@ namespace faf::remote::wire
     return q;
   }
 
-  bool IsYawOnly(const std::array<float, 4>& q) noexcept
+  bool IsYawOnly(
+    const std::array<float, 4>& q
+  ) noexcept
   {
     constexpr float kTilt = 1.0e-4f;
     return std::fabs(q[0]) < kTilt && std::fabs(q[2]) < kTilt;
   }
 
-  std::uint32_t QuantizeYaw(const std::array<float, 4>& q) noexcept
+  std::uint32_t QuantizeYaw(
+    const std::array<float, 4>& q
+  ) noexcept
   {
     constexpr double kTurn = 6.283185307179586;
     double angle = 2.0 * std::atan2(static_cast<double>(q[1]), static_cast<double>(q[3]));
@@ -121,7 +141,9 @@ namespace faf::remote::wire
     return quantized & 0xFFFFu;
   }
 
-  std::array<float, 4> YawToQuaternion(const std::uint32_t yaw) noexcept
+  std::array<float, 4> YawToQuaternion(
+    const std::uint32_t yaw
+  ) noexcept
   {
     constexpr double kTurn = 6.283185307179586;
     const double half = 0.5 * kTurn * static_cast<double>(yaw & 0xFFFFu) / 65536.0;

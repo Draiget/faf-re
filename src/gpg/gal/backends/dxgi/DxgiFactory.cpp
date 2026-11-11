@@ -16,7 +16,9 @@ namespace gpg::gal::dxgi
     return (written > 0) ? std::string(utf8) : std::string("unknown adapter");
   }
 
-  std::uint32_t AdapterInfo::RefreshHz(const DXGI_MODE_DESC& mode) noexcept
+  std::uint32_t AdapterInfo::RefreshHz(
+    const DXGI_MODE_DESC& mode
+  ) noexcept
   {
     const DXGI_RATIONAL& rate = mode.RefreshRate;
     if (rate.Denominator == 0U) {
@@ -45,7 +47,11 @@ namespace gpg::gal::dxgi
     ComPtr<IDXGIFactory5> factory5;
     if (SUCCEEDED(mFactory.As(&factory5))) {
       BOOL allowTearing = FALSE;
-      if (SUCCEEDED(factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allowTearing, sizeof(allowTearing)))) {
+      if (
+        SUCCEEDED(
+          factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allowTearing, sizeof(allowTearing))
+        )
+      ) {
         mSupportsTearing = (allowTearing != FALSE);
       }
     }
@@ -53,7 +59,9 @@ namespace gpg::gal::dxgi
     return S_OK;
   }
 
-  void Factory::EnumerateAdapters(const DXGI_FORMAT modeFormat)
+  void Factory::EnumerateAdapters(
+    const DXGI_FORMAT modeFormat
+  )
   {
     mAdapters.clear();
     mModeFormat = modeFormat;
@@ -67,7 +75,9 @@ namespace gpg::gal::dxgi
       const HRESULT adapterResult = mFactory->EnumAdapters1(adapterIndex, &info.adapter);
       if (FAILED(adapterResult)) {
         if (adapterResult != DXGI_ERROR_NOT_FOUND) {
-          gpg::Warnf("dxgi: EnumAdapters1(%u) failed (HRESULT 0x%08lX)", adapterIndex, static_cast<unsigned long>(adapterResult));
+          gpg::Warnf(
+            "dxgi: EnumAdapters1(%u) failed (HRESULT 0x%08lX)", adapterIndex, static_cast<unsigned long>(adapterResult)
+          );
         }
         break;
       }
@@ -79,7 +89,9 @@ namespace gpg::gal::dxgi
         const HRESULT outputResult = info.adapter->EnumOutputs(outputIndex, &output.output);
         if (FAILED(outputResult)) {
           if (outputResult != DXGI_ERROR_NOT_FOUND) {
-            gpg::Warnf("dxgi: EnumOutputs(%u) failed (HRESULT 0x%08lX)", outputIndex, static_cast<unsigned long>(outputResult));
+            gpg::Warnf(
+              "dxgi: EnumOutputs(%u) failed (HRESULT 0x%08lX)", outputIndex, static_cast<unsigned long>(outputResult)
+            );
           }
           break;
         }

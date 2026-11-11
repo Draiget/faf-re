@@ -45,18 +45,27 @@ namespace faf::remote::net
     void Missing(std::uint64_t begin, std::uint64_t end, std::vector<StreamRange>& out) const;
     /** End of the range that starts at 0, or 0. */
     [[nodiscard]] std::uint64_t PrefixEnd() const noexcept;
-    [[nodiscard]] bool Empty() const noexcept { return mRanges.empty(); }
+    [[nodiscard]] bool Empty() const noexcept
+    {
+      return mRanges.empty();
+    }
     [[nodiscard]] StreamRange First() const noexcept;
-    [[nodiscard]] std::size_t RangeCount() const noexcept { return mRanges.size(); }
+    [[nodiscard]] std::size_t RangeCount() const noexcept
+    {
+      return mRanges.size();
+    }
 
   private:
-    std::map<std::uint64_t, std::uint64_t> mRanges;  // begin -> end
+    std::map<std::uint64_t, std::uint64_t> mRanges; // begin -> end
   };
 
   class ReliableSender
   {
   public:
-    ReliableSender(std::size_t maxInFlight, std::size_t maxMessage) noexcept
+    ReliableSender(
+      std::size_t maxInFlight,
+      std::size_t maxMessage
+    ) noexcept
       : mMaxInFlight(maxInFlight)
       , mMaxMessage(maxMessage)
     {}
@@ -77,20 +86,36 @@ namespace faf::remote::net
     void OnLost(const std::vector<StreamRange>& ranges);
 
     /** Bytes sent past the acked prefix (acked ranges above it included). */
-    [[nodiscard]] std::uint64_t InFlight() const noexcept { return mNextNew - mAcked.PrefixEnd(); }
-    /** Plan WP10.7: unacked bytes past the acked prefix at most, under maxInFlight (the channel's congestion window). */
-    void SetWindow(const std::uint64_t bytes) noexcept { mCongestionWindow = bytes; }
+    [[nodiscard]] std::uint64_t InFlight() const noexcept
+    {
+      return mNextNew - mAcked.PrefixEnd();
+    }
+    /** Plan WP10.7: unacked bytes past the acked prefix at most, under maxInFlight (the channel's congestion window).
+     */
+    void SetWindow(
+      const std::uint64_t bytes
+    ) noexcept
+    {
+      mCongestionWindow = bytes;
+    }
     /** Queued bytes not yet acked. */
-    [[nodiscard]] std::uint64_t Unacked() const noexcept { return mEnd - mAcked.PrefixEnd(); }
-    [[nodiscard]] std::uint64_t BytesResent() const noexcept { return mBytesResent; }
+    [[nodiscard]] std::uint64_t Unacked() const noexcept
+    {
+      return mEnd - mAcked.PrefixEnd();
+    }
+    [[nodiscard]] std::uint64_t BytesResent() const noexcept
+    {
+      return mBytesResent;
+    }
 
   private:
     void Compact();
 
     std::size_t mMaxInFlight;
-    std::uint64_t mCongestionWindow = ~std::uint64_t{0}; // plan WP10.7: the congestion window, when the channel keeps one
+    std::uint64_t mCongestionWindow =
+      ~std::uint64_t{0}; // plan WP10.7: the congestion window, when the channel keeps one
     std::size_t mMaxMessage;
-    std::vector<std::uint8_t> mBuffer;  // stream bytes from mBase to mEnd
+    std::vector<std::uint8_t> mBuffer; // stream bytes from mBase to mEnd
     std::uint64_t mBase = 0;
     std::uint64_t mEnd = 0;
     std::uint64_t mNextNew = 0;
@@ -102,7 +127,10 @@ namespace faf::remote::net
   class ReliableReceiver
   {
   public:
-    ReliableReceiver(std::size_t window, std::size_t maxMessage) noexcept
+    ReliableReceiver(
+      std::size_t window,
+      std::size_t maxMessage
+    ) noexcept
       : mWindow(window)
       , mMaxMessage(maxMessage)
     {}
@@ -119,8 +147,14 @@ namespace faf::remote::net
     bool Take(std::vector<std::uint8_t>& out);
 
     /** Out-of-order bytes held back for a gap. */
-    [[nodiscard]] std::size_t Held() const noexcept { return mHeldBytes; }
-    [[nodiscard]] std::uint64_t Delivered() const noexcept { return mDelivered; }
+    [[nodiscard]] std::size_t Held() const noexcept
+    {
+      return mHeldBytes;
+    }
+    [[nodiscard]] std::uint64_t Delivered() const noexcept
+    {
+      return mDelivered;
+    }
 
   private:
     [[nodiscard]] bool Append(const std::uint8_t* data, std::size_t size);
@@ -128,10 +162,10 @@ namespace faf::remote::net
 
     std::size_t mWindow;
     std::size_t mMaxMessage;
-    std::uint64_t mDelivered = 0;  // every byte below this arrived and went to mAssembly
-    std::map<std::uint64_t, std::vector<std::uint8_t>> mHeld;  // non-overlapping fragments
+    std::uint64_t mDelivered = 0;                             // every byte below this arrived and went to mAssembly
+    std::map<std::uint64_t, std::vector<std::uint8_t>> mHeld; // non-overlapping fragments
     std::size_t mHeldBytes = 0;
-    std::vector<std::uint8_t> mAssembly;  // contiguous bytes not yet cut into messages
+    std::vector<std::uint8_t> mAssembly; // contiguous bytes not yet cut into messages
     std::size_t mAssemblyPos = 0;
     std::deque<std::vector<std::uint8_t>> mMessages;
   };

@@ -103,14 +103,14 @@ namespace moho
      */
     ~RUnitBlueprintDisplay();
 
-    fa::string DisplayName;         // +0x00
-    RResId MeshBlueprint;              // +0x1C
-    fa::string PlaceholderMeshName; // +0x38
-    RResId IconName;                   // +0x54
-    float UniformScale;                // +0x70
-    std::uint8_t SpawnRandomRotation;  // +0x74
-    std::uint8_t HideLifebars;         // +0x75
-    std::uint8_t pad_0076_0078[0x02];  // +0x76
+    fa::string DisplayName;           // +0x00
+    RResId MeshBlueprint;             // +0x1C
+    fa::string PlaceholderMeshName;   // +0x38
+    RResId IconName;                  // +0x54
+    float UniformScale;               // +0x70
+    std::uint8_t SpawnRandomRotation; // +0x74
+    std::uint8_t HideLifebars;        // +0x75
+    std::uint8_t pad_0076_0078[0x02]; // +0x76
   };
 
   enum ERuleBPUnitMovementType : std::int32_t
@@ -241,49 +241,49 @@ namespace moho
      */
     ~RUnitBlueprintPhysics();
 
-    std::uint8_t FlattenSkirt;                                   // +0x00
-    std::uint8_t pad_0001_0004[0x03];                            // +0x01
-    float SkirtOffsetX;                                          // +0x04
-    float SkirtOffsetZ;                                          // +0x08
-    float SkirtSizeX;                                            // +0x0C
-    float SkirtSizeZ;                                            // +0x10
-    float MaxGroundVariation;                                    // +0x14
-    ERuleBPUnitMovementType MotionType;                          // +0x18
-    ERuleBPUnitMovementType AltMotionType;                       // +0x1C
-    std::uint8_t StandUpright;                                   // +0x20
-    std::uint8_t SinkLower;                                      // +0x21
-    std::uint8_t RotateBodyWhileMoving;                          // +0x22
-    std::uint8_t pad_0023_0024[0x01];                            // +0x23
-    float DiveSurfaceSpeed;                                      // +0x24
-    float MaxSpeed;                                              // +0x28
-    float MaxSpeedReverse;                                       // +0x2C
-    float MaxAcceleration;                                       // +0x30
-    float MaxBrake;                                              // +0x34
-    float MaxSteerForce;                                         // +0x38
-    float BankingSlope;                                          // +0x3C
-    float RollStability;                                         // +0x40
-    float RollDamping;                                           // +0x44
-    float WobbleFactor;                                          // +0x48
-    float WobbleSpeed;                                           // +0x4C
-    float TurnRadius;                                            // +0x50
-    float TurnRate;                                              // +0x54
-    float TurnFacingRate;                                        // +0x58
-    std::uint8_t RotateOnSpot;                                   // +0x5C
-    std::uint8_t pad_005D_0060[0x03];                            // +0x5D
-    float RotateOnSpotThreshold;                                 // +0x60
-    float Elevation;                                             // +0x64
-    float AttackElevation;                                       // +0x68
-    float CatchUpAcc;                                            // +0x6C
-    float BackUpDistance;                                        // +0x70
-    float LayerChangeOffsetHeight;                               // +0x74
-    float LayerTransitionDuration;                               // +0x78
-    std::int32_t BuildOnLayerCapsMask;                           // +0x7C (`ELayer` bitmask)
-    ERuleBPUnitBuildRestriction BuildRestriction;                // +0x80
-    const SFootprint* ResolvedFootprint;                         // +0x84
-    const SFootprint* ResolvedAltFootprint;                      // +0x88
-    float FuelUseTime;                                           // +0x8C
-    float FuelRechargeRate;                                      // +0x90
-    float GroundCollisionOffset;                                 // +0x94
+    std::uint8_t FlattenSkirt;                                // +0x00
+    std::uint8_t pad_0001_0004[0x03];                         // +0x01
+    float SkirtOffsetX;                                       // +0x04
+    float SkirtOffsetZ;                                       // +0x08
+    float SkirtSizeX;                                         // +0x0C
+    float SkirtSizeZ;                                         // +0x10
+    float MaxGroundVariation;                                 // +0x14
+    ERuleBPUnitMovementType MotionType;                       // +0x18
+    ERuleBPUnitMovementType AltMotionType;                    // +0x1C
+    std::uint8_t StandUpright;                                // +0x20
+    std::uint8_t SinkLower;                                   // +0x21
+    std::uint8_t RotateBodyWhileMoving;                       // +0x22
+    std::uint8_t pad_0023_0024[0x01];                         // +0x23
+    float DiveSurfaceSpeed;                                   // +0x24
+    float MaxSpeed;                                           // +0x28
+    float MaxSpeedReverse;                                    // +0x2C
+    float MaxAcceleration;                                    // +0x30
+    float MaxBrake;                                           // +0x34
+    float MaxSteerForce;                                      // +0x38
+    float BankingSlope;                                       // +0x3C
+    float RollStability;                                      // +0x40
+    float RollDamping;                                        // +0x44
+    float WobbleFactor;                                       // +0x48
+    float WobbleSpeed;                                        // +0x4C
+    float TurnRadius;                                         // +0x50
+    float TurnRate;                                           // +0x54
+    float TurnFacingRate;                                     // +0x58
+    std::uint8_t RotateOnSpot;                                // +0x5C
+    std::uint8_t pad_005D_0060[0x03];                         // +0x5D
+    float RotateOnSpotThreshold;                              // +0x60
+    float Elevation;                                          // +0x64
+    float AttackElevation;                                    // +0x68
+    float CatchUpAcc;                                         // +0x6C
+    float BackUpDistance;                                     // +0x70
+    float LayerChangeOffsetHeight;                            // +0x74
+    float LayerTransitionDuration;                            // +0x78
+    std::int32_t BuildOnLayerCapsMask;                        // +0x7C (`ELayer` bitmask)
+    ERuleBPUnitBuildRestriction BuildRestriction;             // +0x80
+    const SFootprint* ResolvedFootprint;                      // +0x84
+    const SFootprint* ResolvedAltFootprint;                   // +0x88
+    float FuelUseTime;                                        // +0x8C
+    float FuelRechargeRate;                                   // +0x90
+    float GroundCollisionOffset;                              // +0x94
     fa::vector<RUnitBlueprintOccupyRect> OccupyRects;         // +0x98
     fa::vector<RUnitBlueprintRaisedPlatform> RaisedPlatforms; // +0xA8
 
@@ -468,7 +468,7 @@ namespace moho
     float SurfaceThreatLevel;           // +0x10
     float SubThreatLevel;               // +0x14
     float EconomyThreatLevel;           // +0x18
-    fa::string ArmorType;            // +0x1C
+    fa::string ArmorType;               // +0x1C
     RUnitBlueprintDefenseShield Shield; // +0x38
   };
 
@@ -506,24 +506,24 @@ namespace moho
      */
     ~RUnitBlueprintAI();
 
-    float GuardScanRadius;                    // +0x00
-    float GuardReturnRadius;                  // +0x04
-    float StagingPlatformScanRadius;          // +0x08
-    std::uint8_t ShowAssistRangeOnSelect;     // +0x0C
-    std::uint8_t pad_000D_0010[0x03];         // +0x0D
-    fa::string GuardFormationName;         // +0x10
-    std::uint8_t NeedUnpack;                  // +0x2C
-    std::uint8_t InitialAutoMode;             // +0x2D
-    std::uint8_t pad_002E_0030[0x02];         // +0x2E
-    fa::string BeaconName;                 // +0x30
-    fa::vector<fa::string> TargetBones; // +0x4C
-    float RefuelingMultiplier;                // +0x5C
-    float RefuelingRepairAmount;              // +0x60
-    float RepairConsumeEnergy;                // +0x64
-    float RepairConsumeMass;                  // +0x68
-    std::uint8_t AutoSurfaceToAttack;         // +0x6C
-    std::uint8_t pad_006D_0070[0x03];         // +0x6D
-    float AttackAngle;                        // +0x70
+    float GuardScanRadius;                // +0x00
+    float GuardReturnRadius;              // +0x04
+    float StagingPlatformScanRadius;      // +0x08
+    std::uint8_t ShowAssistRangeOnSelect; // +0x0C
+    std::uint8_t pad_000D_0010[0x03];     // +0x0D
+    fa::string GuardFormationName;        // +0x10
+    std::uint8_t NeedUnpack;              // +0x2C
+    std::uint8_t InitialAutoMode;         // +0x2D
+    std::uint8_t pad_002E_0030[0x02];     // +0x2E
+    fa::string BeaconName;                // +0x30
+    fa::vector<fa::string> TargetBones;   // +0x4C
+    float RefuelingMultiplier;            // +0x5C
+    float RefuelingRepairAmount;          // +0x60
+    float RepairConsumeEnergy;            // +0x64
+    float RepairConsumeMass;              // +0x68
+    std::uint8_t AutoSurfaceToAttack;     // +0x6C
+    std::uint8_t pad_006D_0070[0x03];     // +0x6D
+    float AttackAngle;                    // +0x70
   };
 
   /**
@@ -546,9 +546,8 @@ namespace moho
      * weapon, owned by the blueprint. Inlined into
      * `SerConstructHelper<RUnitBlueprintWeapon>::Construct` 0x00522F40.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x00522E60 (FUN_00522E60)
@@ -557,13 +556,16 @@ namespace moho
      * Saves the owning unit blueprint (unowned) and this weapon's index.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     RUnitBlueprint* OwnerBlueprint;                 // +0x00
     std::uint32_t WeaponIndex;                      // +0x04
-    fa::string Label;                            // +0x08
-    fa::string DisplayName;                      // +0x24
+    fa::string Label;                               // +0x08
+    fa::string DisplayName;                         // +0x24
     UnitWeaponRangeCategory RangeCategory;          // +0x40
     std::uint8_t DummyWeapon;                       // +0x44
     std::uint8_t PrefersPrimaryWeaponTarget;        // +0x45
@@ -596,12 +598,12 @@ namespace moho
     float ProjectileLifetimeUsesMultiplier;         // +0x9C
     float Damage;                                   // +0xA0
     float DamageRadius;                             // +0xA4
-    fa::string DamageType;                       // +0xA8
+    fa::string DamageType;                          // +0xA8
     float RateOfFire;                               // +0xC4
     RResId ProjectileId;                            // +0xC8
     ERuleBPUnitWeaponBallisticArc BallisticArc;     // +0xE4
-    fa::string TargetRestrictOnlyAllow;          // +0xE8
-    fa::string TargetRestrictDisallow;           // +0x104
+    fa::string TargetRestrictOnlyAllow;             // +0xE8
+    fa::string TargetRestrictDisallow;              // +0x104
     std::uint8_t ManualFire;                        // +0x120
     std::uint8_t NukeWeapon;                        // +0x121
     std::uint8_t OverChargeWeapon;                  // +0x122
@@ -628,8 +630,8 @@ namespace moho
     std::uint8_t IgnoreIfDisabled;                  // +0x149
     std::uint8_t CannotAttackGround;                // +0x14A
     std::uint8_t pad_014B_014C[0x01];               // +0x14B
-    fa::string UIMinRangeVisualId;               // +0x14C
-    fa::string UIMaxRangeVisualId;               // +0x168
+    fa::string UIMinRangeVisualId;                  // +0x14C
+    fa::string UIMaxRangeVisualId;                  // +0x168
 
     /**
      * Address: 0x0051F4C0 (FUN_0051F4C0)
@@ -692,7 +694,7 @@ namespace moho
   struct RUnitBlueprintWeapons
   {
     fa::vector<RUnitBlueprintWeapon> WeaponBlueprints; // +0x00
-    std::uint32_t UnresolvedFaTailWord;                   // +0x10 (FA-only; semantics unresolved)
+    std::uint32_t UnresolvedFaTailWord;                // +0x10 (FA-only; semantics unresolved)
   };
 
   /**
@@ -728,25 +730,25 @@ namespace moho
      */
     ~RUnitBlueprintEconomy();
 
-    float BuildCostEnergy;                            // +0x00
-    float BuildCostMass;                              // +0x04
-    float BuildRate;                                  // +0x08
-    float BuildTime;                                  // +0x0C
-    float StorageEnergy;                              // +0x10
-    float StorageMass;                                // +0x14
-    std::uint8_t NaturalProducer;                     // +0x18
-    std::uint8_t pad_0019_001C[0x03];                 // +0x19
+    float BuildCostEnergy;                      // +0x00
+    float BuildCostMass;                        // +0x04
+    float BuildRate;                            // +0x08
+    float BuildTime;                            // +0x0C
+    float StorageEnergy;                        // +0x10
+    float StorageMass;                          // +0x14
+    std::uint8_t NaturalProducer;               // +0x18
+    std::uint8_t pad_0019_001C[0x03];           // +0x19
     fa::vector<fa::string> BuildableCategories; // +0x1C
     fa::vector<fa::string> RebuildBonusIds;     // +0x2C
-    std::uint32_t UnresolvedWord3C;                   // +0x3C
-    EntityCategorySet CategoryCache; // +0x40 (resolved BuildableCategories)
-    float InitialRallyX;                              // +0x68
-    float InitialRallyZ;                              // +0x6C
-    std::uint8_t NeedToFaceTargetToBuild;             // +0x70
-    std::uint8_t pad_0071_0074[0x03];                 // +0x71
-    float SacrificeMassMult;                          // +0x74
-    float SacrificeEnergyMult;                        // +0x78
-    float MaxBuildDistance;                           // +0x7C
+    std::uint32_t UnresolvedWord3C;             // +0x3C
+    EntityCategorySet CategoryCache;            // +0x40 (resolved BuildableCategories)
+    float InitialRallyX;                        // +0x68
+    float InitialRallyZ;                        // +0x6C
+    std::uint8_t NeedToFaceTargetToBuild;       // +0x70
+    std::uint8_t pad_0071_0074[0x03];           // +0x71
+    float SacrificeMassMult;                    // +0x74
+    float SacrificeEnergyMult;                  // +0x78
+    float MaxBuildDistance;                     // +0x7C
   };
 
   /**
@@ -768,9 +770,8 @@ namespace moho
      * own `RUnitBlueprint` (owned by the rules, so the archive may not delete it).
      * Inlined into `SerConstructHelper<RUnitBlueprint>::Construct` 0x00522CC0.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x00522BE0 (FUN_00522BE0)
@@ -780,7 +781,10 @@ namespace moho
      * `MemberConstruct` to look the blueprint up by.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     static gpg::RType* sPointerType;
@@ -929,19 +933,21 @@ namespace moho
     [[nodiscard]] gpg::Rect2f GetSkirtRect(const SCoordsVec2& position) const;
   };
 
-
   static_assert(
-    offsetof(RUnitBlueprintGeneral, UpgradesTo) == 0x08, "RUnitBlueprintGeneral::UpgradesTo offset must be 0x08"
+    offsetof(RUnitBlueprintGeneral, UpgradesTo) == 0x08,
+    "RUnitBlueprintGeneral::UpgradesTo offset must be 0x08"
   );
   static_assert(
-    offsetof(RUnitBlueprintGeneral, UpgradesFrom) == 0x24, "RUnitBlueprintGeneral::UpgradesFrom offset must be 0x24"
+    offsetof(RUnitBlueprintGeneral, UpgradesFrom) == 0x24,
+    "RUnitBlueprintGeneral::UpgradesFrom offset must be 0x24"
   );
   static_assert(
     offsetof(RUnitBlueprintGeneral, UpgradesFromBase) == 0x40,
     "RUnitBlueprintGeneral::UpgradesFromBase offset must be 0x40"
   );
   static_assert(
-    offsetof(RUnitBlueprintGeneral, SeedUnit) == 0x5C, "RUnitBlueprintGeneral::SeedUnit offset must be 0x5C"
+    offsetof(RUnitBlueprintGeneral, SeedUnit) == 0x5C,
+    "RUnitBlueprintGeneral::SeedUnit offset must be 0x5C"
   );
   static_assert(
     offsetof(RUnitBlueprintGeneral, QuickSelectPriority) == 0x78,
@@ -954,34 +960,41 @@ namespace moho
   );
   static_assert(sizeof(RUnitBlueprintGeneral) == 0x84, "RUnitBlueprintGeneral size must be 0x84");
   static_assert(
-    offsetof(RUnitBlueprintGeneral, CommandCaps) == 0x00, "RUnitBlueprintGeneral::CommandCaps offset must be 0x00"
+    offsetof(RUnitBlueprintGeneral, CommandCaps) == 0x00,
+    "RUnitBlueprintGeneral::CommandCaps offset must be 0x00"
   );
   static_assert(
-    offsetof(RUnitBlueprintGeneral, ToggleCaps) == 0x04, "RUnitBlueprintGeneral::ToggleCaps offset must be 0x04"
+    offsetof(RUnitBlueprintGeneral, ToggleCaps) == 0x04,
+    "RUnitBlueprintGeneral::ToggleCaps offset must be 0x04"
   );
 
   static_assert(
-    offsetof(RUnitBlueprintDisplay, DisplayName) == 0x00, "RUnitBlueprintDisplay::DisplayName offset must be 0x00"
+    offsetof(RUnitBlueprintDisplay, DisplayName) == 0x00,
+    "RUnitBlueprintDisplay::DisplayName offset must be 0x00"
   );
   static_assert(
-    offsetof(RUnitBlueprintDisplay, MeshBlueprint) == 0x1C, "RUnitBlueprintDisplay::MeshBlueprint offset must be 0x1C"
+    offsetof(RUnitBlueprintDisplay, MeshBlueprint) == 0x1C,
+    "RUnitBlueprintDisplay::MeshBlueprint offset must be 0x1C"
   );
   static_assert(
     offsetof(RUnitBlueprintDisplay, PlaceholderMeshName) == 0x38,
     "RUnitBlueprintDisplay::PlaceholderMeshName offset must be 0x38"
   );
   static_assert(
-    offsetof(RUnitBlueprintDisplay, IconName) == 0x54, "RUnitBlueprintDisplay::IconName offset must be 0x54"
+    offsetof(RUnitBlueprintDisplay, IconName) == 0x54,
+    "RUnitBlueprintDisplay::IconName offset must be 0x54"
   );
   static_assert(
-    offsetof(RUnitBlueprintDisplay, UniformScale) == 0x70, "RUnitBlueprintDisplay::UniformScale offset must be 0x70"
+    offsetof(RUnitBlueprintDisplay, UniformScale) == 0x70,
+    "RUnitBlueprintDisplay::UniformScale offset must be 0x70"
   );
   static_assert(
     offsetof(RUnitBlueprintDisplay, SpawnRandomRotation) == 0x74,
     "RUnitBlueprintDisplay::SpawnRandomRotation offset must be 0x74"
   );
   static_assert(
-    offsetof(RUnitBlueprintDisplay, HideLifebars) == 0x75, "RUnitBlueprintDisplay::HideLifebars offset must be 0x75"
+    offsetof(RUnitBlueprintDisplay, HideLifebars) == 0x75,
+    "RUnitBlueprintDisplay::HideLifebars offset must be 0x75"
   );
   static_assert(sizeof(RUnitBlueprintDisplay) == 0x78, "RUnitBlueprintDisplay size must be 0x78");
 
@@ -1010,10 +1023,12 @@ namespace moho
     "RUnitBlueprintOccupyRect::CenterOffsetZ offset must be 0x04"
   );
   static_assert(
-    offsetof(RUnitBlueprintOccupyRect, HalfSizeX) == 0x08, "RUnitBlueprintOccupyRect::HalfSizeX offset must be 0x08"
+    offsetof(RUnitBlueprintOccupyRect, HalfSizeX) == 0x08,
+    "RUnitBlueprintOccupyRect::HalfSizeX offset must be 0x08"
   );
   static_assert(
-    offsetof(RUnitBlueprintOccupyRect, HalfSizeZ) == 0x0C, "RUnitBlueprintOccupyRect::HalfSizeZ offset must be 0x0C"
+    offsetof(RUnitBlueprintOccupyRect, HalfSizeZ) == 0x0C,
+    "RUnitBlueprintOccupyRect::HalfSizeZ offset must be 0x0C"
   );
   static_assert(sizeof(RUnitBlueprintOccupyRect) == 0x10, "RUnitBlueprintOccupyRect size must be 0x10");
 
@@ -1044,32 +1059,40 @@ namespace moho
   static_assert(sizeof(RUnitBlueprintRaisedPlatform) == 0x30, "RUnitBlueprintRaisedPlatform size must be 0x30");
 
   static_assert(
-    offsetof(RUnitBlueprintPhysics, FlattenSkirt) == 0x00, "RUnitBlueprintPhysics::FlattenSkirt offset must be 0x00"
+    offsetof(RUnitBlueprintPhysics, FlattenSkirt) == 0x00,
+    "RUnitBlueprintPhysics::FlattenSkirt offset must be 0x00"
   );
   static_assert(
-    offsetof(RUnitBlueprintPhysics, SkirtOffsetX) == 0x04, "RUnitBlueprintPhysics::SkirtOffsetX offset must be 0x04"
+    offsetof(RUnitBlueprintPhysics, SkirtOffsetX) == 0x04,
+    "RUnitBlueprintPhysics::SkirtOffsetX offset must be 0x04"
   );
   static_assert(
-    offsetof(RUnitBlueprintPhysics, SkirtOffsetZ) == 0x08, "RUnitBlueprintPhysics::SkirtOffsetZ offset must be 0x08"
+    offsetof(RUnitBlueprintPhysics, SkirtOffsetZ) == 0x08,
+    "RUnitBlueprintPhysics::SkirtOffsetZ offset must be 0x08"
   );
   static_assert(
-    offsetof(RUnitBlueprintPhysics, SkirtSizeX) == 0x0C, "RUnitBlueprintPhysics::SkirtSizeX offset must be 0x0C"
+    offsetof(RUnitBlueprintPhysics, SkirtSizeX) == 0x0C,
+    "RUnitBlueprintPhysics::SkirtSizeX offset must be 0x0C"
   );
   static_assert(
-    offsetof(RUnitBlueprintPhysics, SkirtSizeZ) == 0x10, "RUnitBlueprintPhysics::SkirtSizeZ offset must be 0x10"
+    offsetof(RUnitBlueprintPhysics, SkirtSizeZ) == 0x10,
+    "RUnitBlueprintPhysics::SkirtSizeZ offset must be 0x10"
   );
   static_assert(
     offsetof(RUnitBlueprintPhysics, MaxGroundVariation) == 0x14,
     "RUnitBlueprintPhysics::MaxGroundVariation offset must be 0x14"
   );
   static_assert(
-    offsetof(RUnitBlueprintPhysics, MotionType) == 0x18, "RUnitBlueprintPhysics::MotionType offset must be 0x18"
+    offsetof(RUnitBlueprintPhysics, MotionType) == 0x18,
+    "RUnitBlueprintPhysics::MotionType offset must be 0x18"
   );
   static_assert(
-    offsetof(RUnitBlueprintPhysics, AltMotionType) == 0x1C, "RUnitBlueprintPhysics::AltMotionType offset must be 0x1C"
+    offsetof(RUnitBlueprintPhysics, AltMotionType) == 0x1C,
+    "RUnitBlueprintPhysics::AltMotionType offset must be 0x1C"
   );
   static_assert(
-    offsetof(RUnitBlueprintPhysics, Elevation) == 0x64, "RUnitBlueprintPhysics::Elevation offset must be 0x64"
+    offsetof(RUnitBlueprintPhysics, Elevation) == 0x64,
+    "RUnitBlueprintPhysics::Elevation offset must be 0x64"
   );
   static_assert(
     offsetof(RUnitBlueprintPhysics, BuildOnLayerCapsMask) == 0x7C,
@@ -1088,7 +1111,8 @@ namespace moho
     "RUnitBlueprintPhysics::ResolvedAltFootprint offset must be 0x88"
   );
   static_assert(
-    offsetof(RUnitBlueprintPhysics, FuelUseTime) == 0x8C, "RUnitBlueprintPhysics::FuelUseTime offset must be 0x8C"
+    offsetof(RUnitBlueprintPhysics, FuelUseTime) == 0x8C,
+    "RUnitBlueprintPhysics::FuelUseTime offset must be 0x8C"
   );
   static_assert(
     offsetof(RUnitBlueprintPhysics, FuelRechargeRate) == 0x90,
@@ -1099,7 +1123,8 @@ namespace moho
     "RUnitBlueprintPhysics::GroundCollisionOffset offset must be 0x94"
   );
   static_assert(
-    offsetof(RUnitBlueprintPhysics, OccupyRects) == 0x98, "RUnitBlueprintPhysics::OccupyRects offset must be 0x98"
+    offsetof(RUnitBlueprintPhysics, OccupyRects) == 0x98,
+    "RUnitBlueprintPhysics::OccupyRects offset must be 0x98"
   );
   static_assert(
     offsetof(RUnitBlueprintPhysics, RaisedPlatforms) == 0xA8,
@@ -1108,26 +1133,32 @@ namespace moho
   static_assert(sizeof(RUnitBlueprintPhysics) == 0xB8, "RUnitBlueprintPhysics size must be 0xB8");
 
   static_assert(
-    offsetof(RUnitBlueprintIntel, VisionRadius) == 0x00, "RUnitBlueprintIntel::VisionRadius offset must be 0x00"
+    offsetof(RUnitBlueprintIntel, VisionRadius) == 0x00,
+    "RUnitBlueprintIntel::VisionRadius offset must be 0x00"
   );
   static_assert(
     offsetof(RUnitBlueprintIntel, WaterVisionRadius) == 0x04,
     "RUnitBlueprintIntel::WaterVisionRadius offset must be 0x04"
   );
   static_assert(
-    offsetof(RUnitBlueprintIntel, RadarRadius) == 0x08, "RUnitBlueprintIntel::RadarRadius offset must be 0x08"
+    offsetof(RUnitBlueprintIntel, RadarRadius) == 0x08,
+    "RUnitBlueprintIntel::RadarRadius offset must be 0x08"
   );
   static_assert(
-    offsetof(RUnitBlueprintIntel, SonarRadius) == 0x0C, "RUnitBlueprintIntel::SonarRadius offset must be 0x0C"
+    offsetof(RUnitBlueprintIntel, SonarRadius) == 0x0C,
+    "RUnitBlueprintIntel::SonarRadius offset must be 0x0C"
   );
   static_assert(
-    offsetof(RUnitBlueprintIntel, OmniRadius) == 0x10, "RUnitBlueprintIntel::OmniRadius offset must be 0x10"
+    offsetof(RUnitBlueprintIntel, OmniRadius) == 0x10,
+    "RUnitBlueprintIntel::OmniRadius offset must be 0x10"
   );
   static_assert(
-    offsetof(RUnitBlueprintIntel, RadarStealth) == 0x14, "RUnitBlueprintIntel::RadarStealth offset must be 0x14"
+    offsetof(RUnitBlueprintIntel, RadarStealth) == 0x14,
+    "RUnitBlueprintIntel::RadarStealth offset must be 0x14"
   );
   static_assert(
-    offsetof(RUnitBlueprintIntel, SonarStealth) == 0x15, "RUnitBlueprintIntel::SonarStealth offset must be 0x15"
+    offsetof(RUnitBlueprintIntel, SonarStealth) == 0x15,
+    "RUnitBlueprintIntel::SonarStealth offset must be 0x15"
   );
   static_assert(offsetof(RUnitBlueprintIntel, Cloak) == 0x16, "RUnitBlueprintIntel::Cloak offset must be 0x16");
   static_assert(
@@ -1143,14 +1174,17 @@ namespace moho
     "RUnitBlueprintIntel::SonarStealthFieldRadius offset must be 0x1C"
   );
   static_assert(
-    offsetof(RUnitBlueprintIntel, CloakFieldRadius) == 0x20, "RUnitBlueprintIntel::CloakFieldRadius offset must be 0x20"
+    offsetof(RUnitBlueprintIntel, CloakFieldRadius) == 0x20,
+    "RUnitBlueprintIntel::CloakFieldRadius offset must be 0x20"
   );
   static_assert(offsetof(RUnitBlueprintIntel, JamRadius) == 0x24, "RUnitBlueprintIntel::JamRadius offset must be 0x24");
   static_assert(
-    offsetof(RUnitBlueprintIntel, JammerBlips) == 0x2C, "RUnitBlueprintIntel::JammerBlips offset must be 0x2C"
+    offsetof(RUnitBlueprintIntel, JammerBlips) == 0x2C,
+    "RUnitBlueprintIntel::JammerBlips offset must be 0x2C"
   );
   static_assert(
-    offsetof(RUnitBlueprintIntel, SpoofRadius) == 0x30, "RUnitBlueprintIntel::SpoofRadius offset must be 0x30"
+    offsetof(RUnitBlueprintIntel, SpoofRadius) == 0x30,
+    "RUnitBlueprintIntel::SpoofRadius offset must be 0x30"
   );
   static_assert(sizeof(RUnitBlueprintIntel) == 0x38, "RUnitBlueprintIntel size must be 0x38");
 
@@ -1158,16 +1192,19 @@ namespace moho
   static_assert(offsetof(RUnitBlueprintAir, Winged) == 0x01, "RUnitBlueprintAir::Winged offset must be 0x01");
   static_assert(offsetof(RUnitBlueprintAir, FlyInWater) == 0x02, "RUnitBlueprintAir::FlyInWater offset must be 0x02");
   static_assert(
-    offsetof(RUnitBlueprintAir, AutoLandTime) == 0x04, "RUnitBlueprintAir::AutoLandTime offset must be 0x04"
+    offsetof(RUnitBlueprintAir, AutoLandTime) == 0x04,
+    "RUnitBlueprintAir::AutoLandTime offset must be 0x04"
   );
   static_assert(offsetof(RUnitBlueprintAir, MaxAirspeed) == 0x08, "RUnitBlueprintAir::MaxAirspeed offset must be 0x08");
   static_assert(offsetof(RUnitBlueprintAir, MinAirspeed) == 0x0C, "RUnitBlueprintAir::MinAirspeed offset must be 0x0C");
   static_assert(offsetof(RUnitBlueprintAir, TurnSpeed) == 0x10, "RUnitBlueprintAir::TurnSpeed offset must be 0x10");
   static_assert(
-    offsetof(RUnitBlueprintAir, CombatTurnSpeed) == 0x14, "RUnitBlueprintAir::CombatTurnSpeed offset must be 0x14"
+    offsetof(RUnitBlueprintAir, CombatTurnSpeed) == 0x14,
+    "RUnitBlueprintAir::CombatTurnSpeed offset must be 0x14"
   );
   static_assert(
-    offsetof(RUnitBlueprintAir, StartTurnDistance) == 0x18, "RUnitBlueprintAir::StartTurnDistance offset must be 0x18"
+    offsetof(RUnitBlueprintAir, StartTurnDistance) == 0x18,
+    "RUnitBlueprintAir::StartTurnDistance offset must be 0x18"
   );
   static_assert(
     offsetof(RUnitBlueprintAir, TightTurnMultiplier) == 0x1C,
@@ -1181,13 +1218,16 @@ namespace moho
   static_assert(offsetof(RUnitBlueprintAir, BankFactor) == 0x28, "RUnitBlueprintAir::BankFactor offset must be 0x28");
   static_assert(offsetof(RUnitBlueprintAir, BankForward) == 0x2C, "RUnitBlueprintAir::BankForward offset must be 0x2C");
   static_assert(
-    offsetof(RUnitBlueprintAir, EngageDistance) == 0x30, "RUnitBlueprintAir::EngageDistance offset must be 0x30"
+    offsetof(RUnitBlueprintAir, EngageDistance) == 0x30,
+    "RUnitBlueprintAir::EngageDistance offset must be 0x30"
   );
   static_assert(
-    offsetof(RUnitBlueprintAir, BreakOffTrigger) == 0x34, "RUnitBlueprintAir::BreakOffTrigger offset must be 0x34"
+    offsetof(RUnitBlueprintAir, BreakOffTrigger) == 0x34,
+    "RUnitBlueprintAir::BreakOffTrigger offset must be 0x34"
   );
   static_assert(
-    offsetof(RUnitBlueprintAir, BreakOffDistance) == 0x38, "RUnitBlueprintAir::BreakOffDistance offset must be 0x38"
+    offsetof(RUnitBlueprintAir, BreakOffDistance) == 0x38,
+    "RUnitBlueprintAir::BreakOffDistance offset must be 0x38"
   );
   static_assert(
     offsetof(RUnitBlueprintAir, BreakOffIfNearNewTarget) == 0x3C,
@@ -1195,22 +1235,27 @@ namespace moho
   );
   static_assert(offsetof(RUnitBlueprintAir, KMove) == 0x40, "RUnitBlueprintAir::KMove offset must be 0x40");
   static_assert(
-    offsetof(RUnitBlueprintAir, KMoveDamping) == 0x44, "RUnitBlueprintAir::KMoveDamping offset must be 0x44"
+    offsetof(RUnitBlueprintAir, KMoveDamping) == 0x44,
+    "RUnitBlueprintAir::KMoveDamping offset must be 0x44"
   );
   static_assert(offsetof(RUnitBlueprintAir, KLift) == 0x48, "RUnitBlueprintAir::KLift offset must be 0x48");
   static_assert(
-    offsetof(RUnitBlueprintAir, KLiftDamping) == 0x4C, "RUnitBlueprintAir::KLiftDamping offset must be 0x4C"
+    offsetof(RUnitBlueprintAir, KLiftDamping) == 0x4C,
+    "RUnitBlueprintAir::KLiftDamping offset must be 0x4C"
   );
   static_assert(offsetof(RUnitBlueprintAir, KTurn) == 0x50, "RUnitBlueprintAir::KTurn offset must be 0x50");
   static_assert(
-    offsetof(RUnitBlueprintAir, KTurnDamping) == 0x54, "RUnitBlueprintAir::KTurnDamping offset must be 0x54"
+    offsetof(RUnitBlueprintAir, KTurnDamping) == 0x54,
+    "RUnitBlueprintAir::KTurnDamping offset must be 0x54"
   );
   static_assert(offsetof(RUnitBlueprintAir, KRoll) == 0x58, "RUnitBlueprintAir::KRoll offset must be 0x58");
   static_assert(
-    offsetof(RUnitBlueprintAir, KRollDamping) == 0x5C, "RUnitBlueprintAir::KRollDamping offset must be 0x5C"
+    offsetof(RUnitBlueprintAir, KRollDamping) == 0x5C,
+    "RUnitBlueprintAir::KRollDamping offset must be 0x5C"
   );
   static_assert(
-    offsetof(RUnitBlueprintAir, CirclingTurnMult) == 0x60, "RUnitBlueprintAir::CirclingTurnMult offset must be 0x60"
+    offsetof(RUnitBlueprintAir, CirclingTurnMult) == 0x60,
+    "RUnitBlueprintAir::CirclingTurnMult offset must be 0x60"
   );
   static_assert(
     offsetof(RUnitBlueprintAir, CirclingRadiusChangeMinRatio) == 0x64,
@@ -1233,10 +1278,12 @@ namespace moho
     "RUnitBlueprintAir::CirclingFlightChangeFrequency offset must be 0x74"
   );
   static_assert(
-    offsetof(RUnitBlueprintAir, CirclingDirChange) == 0x78, "RUnitBlueprintAir::CirclingDirChange offset must be 0x78"
+    offsetof(RUnitBlueprintAir, CirclingDirChange) == 0x78,
+    "RUnitBlueprintAir::CirclingDirChange offset must be 0x78"
   );
   static_assert(
-    offsetof(RUnitBlueprintAir, HoverOverAttack) == 0x79, "RUnitBlueprintAir::HoverOverAttack offset must be 0x79"
+    offsetof(RUnitBlueprintAir, HoverOverAttack) == 0x79,
+    "RUnitBlueprintAir::HoverOverAttack offset must be 0x79"
   );
   static_assert(
     offsetof(RUnitBlueprintAir, RandomBreakOffDistanceMult) == 0x7C,
@@ -1285,16 +1332,20 @@ namespace moho
     "RUnitBlueprintTransport::ClassSAttachSize offset must be 0x14"
   );
   static_assert(
-    offsetof(RUnitBlueprintTransport, AirClass) == 0x18, "RUnitBlueprintTransport::AirClass offset must be 0x18"
+    offsetof(RUnitBlueprintTransport, AirClass) == 0x18,
+    "RUnitBlueprintTransport::AirClass offset must be 0x18"
   );
   static_assert(
-    offsetof(RUnitBlueprintTransport, StorageSlots) == 0x1C, "RUnitBlueprintTransport::StorageSlots offset must be 0x1C"
+    offsetof(RUnitBlueprintTransport, StorageSlots) == 0x1C,
+    "RUnitBlueprintTransport::StorageSlots offset must be 0x1C"
   );
   static_assert(
-    offsetof(RUnitBlueprintTransport, DockingSlots) == 0x20, "RUnitBlueprintTransport::DockingSlots offset must be 0x20"
+    offsetof(RUnitBlueprintTransport, DockingSlots) == 0x20,
+    "RUnitBlueprintTransport::DockingSlots offset must be 0x20"
   );
   static_assert(
-    offsetof(RUnitBlueprintTransport, RepairRate) == 0x24, "RUnitBlueprintTransport::RepairRate offset must be 0x24"
+    offsetof(RUnitBlueprintTransport, RepairRate) == 0x24,
+    "RUnitBlueprintTransport::RepairRate offset must be 0x24"
   );
   static_assert(sizeof(RUnitBlueprintTransport) == 0x28, "RUnitBlueprintTransport size must be 0x28");
 
@@ -1309,37 +1360,44 @@ namespace moho
   static_assert(sizeof(RUnitBlueprintDefenseShield) == 0x08, "RUnitBlueprintDefenseShield size must be 0x08");
 
   static_assert(
-    offsetof(RUnitBlueprintDefense, MaxHealth) == 0x00, "RUnitBlueprintDefense::MaxHealth offset must be 0x00"
+    offsetof(RUnitBlueprintDefense, MaxHealth) == 0x00,
+    "RUnitBlueprintDefense::MaxHealth offset must be 0x00"
   );
   static_assert(offsetof(RUnitBlueprintDefense, Health) == 0x04, "RUnitBlueprintDefense::Health offset must be 0x04");
   static_assert(
-    offsetof(RUnitBlueprintDefense, RegenRate) == 0x08, "RUnitBlueprintDefense::RegenRate offset must be 0x08"
+    offsetof(RUnitBlueprintDefense, RegenRate) == 0x08,
+    "RUnitBlueprintDefense::RegenRate offset must be 0x08"
   );
   static_assert(
-    offsetof(RUnitBlueprintDefense, AirThreatLevel) == 0x0C, "RUnitBlueprintDefense::AirThreatLevel offset must be 0x0C"
+    offsetof(RUnitBlueprintDefense, AirThreatLevel) == 0x0C,
+    "RUnitBlueprintDefense::AirThreatLevel offset must be 0x0C"
   );
   static_assert(
     offsetof(RUnitBlueprintDefense, SurfaceThreatLevel) == 0x10,
     "RUnitBlueprintDefense::SurfaceThreatLevel offset must be 0x10"
   );
   static_assert(
-    offsetof(RUnitBlueprintDefense, SubThreatLevel) == 0x14, "RUnitBlueprintDefense::SubThreatLevel offset must be 0x14"
+    offsetof(RUnitBlueprintDefense, SubThreatLevel) == 0x14,
+    "RUnitBlueprintDefense::SubThreatLevel offset must be 0x14"
   );
   static_assert(
     offsetof(RUnitBlueprintDefense, EconomyThreatLevel) == 0x18,
     "RUnitBlueprintDefense::EconomyThreatLevel offset must be 0x18"
   );
   static_assert(
-    offsetof(RUnitBlueprintDefense, ArmorType) == 0x1C, "RUnitBlueprintDefense::ArmorType offset must be 0x1C"
+    offsetof(RUnitBlueprintDefense, ArmorType) == 0x1C,
+    "RUnitBlueprintDefense::ArmorType offset must be 0x1C"
   );
   static_assert(offsetof(RUnitBlueprintDefense, Shield) == 0x38, "RUnitBlueprintDefense::Shield offset must be 0x38");
   static_assert(sizeof(RUnitBlueprintDefense) == 0x40, "RUnitBlueprintDefense size must be 0x40");
 
   static_assert(
-    offsetof(RUnitBlueprintAI, GuardScanRadius) == 0x00, "RUnitBlueprintAI::GuardScanRadius offset must be 0x00"
+    offsetof(RUnitBlueprintAI, GuardScanRadius) == 0x00,
+    "RUnitBlueprintAI::GuardScanRadius offset must be 0x00"
   );
   static_assert(
-    offsetof(RUnitBlueprintAI, GuardReturnRadius) == 0x04, "RUnitBlueprintAI::GuardReturnRadius offset must be 0x04"
+    offsetof(RUnitBlueprintAI, GuardReturnRadius) == 0x04,
+    "RUnitBlueprintAI::GuardReturnRadius offset must be 0x04"
   );
   static_assert(
     offsetof(RUnitBlueprintAI, StagingPlatformScanRadius) == 0x08,
@@ -1350,71 +1408,87 @@ namespace moho
     "RUnitBlueprintAI::ShowAssistRangeOnSelect offset must be 0x0C"
   );
   static_assert(
-    offsetof(RUnitBlueprintAI, GuardFormationName) == 0x10, "RUnitBlueprintAI::GuardFormationName offset must be 0x10"
+    offsetof(RUnitBlueprintAI, GuardFormationName) == 0x10,
+    "RUnitBlueprintAI::GuardFormationName offset must be 0x10"
   );
   static_assert(offsetof(RUnitBlueprintAI, NeedUnpack) == 0x2C, "RUnitBlueprintAI::NeedUnpack offset must be 0x2C");
   static_assert(
-    offsetof(RUnitBlueprintAI, InitialAutoMode) == 0x2D, "RUnitBlueprintAI::InitialAutoMode offset must be 0x2D"
+    offsetof(RUnitBlueprintAI, InitialAutoMode) == 0x2D,
+    "RUnitBlueprintAI::InitialAutoMode offset must be 0x2D"
   );
   static_assert(offsetof(RUnitBlueprintAI, BeaconName) == 0x30, "RUnitBlueprintAI::BeaconName offset must be 0x30");
   static_assert(offsetof(RUnitBlueprintAI, TargetBones) == 0x4C, "RUnitBlueprintAI::TargetBones offset must be 0x4C");
   static_assert(
-    offsetof(RUnitBlueprintAI, RefuelingMultiplier) == 0x5C, "RUnitBlueprintAI::RefuelingMultiplier offset must be 0x5C"
+    offsetof(RUnitBlueprintAI, RefuelingMultiplier) == 0x5C,
+    "RUnitBlueprintAI::RefuelingMultiplier offset must be 0x5C"
   );
   static_assert(
     offsetof(RUnitBlueprintAI, RefuelingRepairAmount) == 0x60,
     "RUnitBlueprintAI::RefuelingRepairAmount offset must be 0x60"
   );
   static_assert(
-    offsetof(RUnitBlueprintAI, RepairConsumeEnergy) == 0x64, "RUnitBlueprintAI::RepairConsumeEnergy offset must be 0x64"
+    offsetof(RUnitBlueprintAI, RepairConsumeEnergy) == 0x64,
+    "RUnitBlueprintAI::RepairConsumeEnergy offset must be 0x64"
   );
   static_assert(
-    offsetof(RUnitBlueprintAI, RepairConsumeMass) == 0x68, "RUnitBlueprintAI::RepairConsumeMass offset must be 0x68"
+    offsetof(RUnitBlueprintAI, RepairConsumeMass) == 0x68,
+    "RUnitBlueprintAI::RepairConsumeMass offset must be 0x68"
   );
   static_assert(
-    offsetof(RUnitBlueprintAI, AutoSurfaceToAttack) == 0x6C, "RUnitBlueprintAI::AutoSurfaceToAttack offset must be 0x6C"
+    offsetof(RUnitBlueprintAI, AutoSurfaceToAttack) == 0x6C,
+    "RUnitBlueprintAI::AutoSurfaceToAttack offset must be 0x6C"
   );
   static_assert(offsetof(RUnitBlueprintAI, AttackAngle) == 0x70, "RUnitBlueprintAI::AttackAngle offset must be 0x70");
   static_assert(sizeof(RUnitBlueprintAI) == 0x74, "RUnitBlueprintAI size must be 0x74");
 
   static_assert(
-    offsetof(RUnitBlueprintWeapon, OwnerBlueprint) == 0x00, "RUnitBlueprintWeapon::OwnerBlueprint offset must be 0x00"
+    offsetof(RUnitBlueprintWeapon, OwnerBlueprint) == 0x00,
+    "RUnitBlueprintWeapon::OwnerBlueprint offset must be 0x00"
   );
   static_assert(
-    offsetof(RUnitBlueprintWeapon, WeaponIndex) == 0x04, "RUnitBlueprintWeapon::WeaponIndex offset must be 0x04"
+    offsetof(RUnitBlueprintWeapon, WeaponIndex) == 0x04,
+    "RUnitBlueprintWeapon::WeaponIndex offset must be 0x04"
   );
   static_assert(offsetof(RUnitBlueprintWeapon, Label) == 0x08, "RUnitBlueprintWeapon::Label offset must be 0x08");
   static_assert(
-    offsetof(RUnitBlueprintWeapon, DisplayName) == 0x24, "RUnitBlueprintWeapon::DisplayName offset must be 0x24"
+    offsetof(RUnitBlueprintWeapon, DisplayName) == 0x24,
+    "RUnitBlueprintWeapon::DisplayName offset must be 0x24"
   );
   static_assert(
-    offsetof(RUnitBlueprintWeapon, RangeCategory) == 0x40, "RUnitBlueprintWeapon::RangeCategory offset must be 0x40"
+    offsetof(RUnitBlueprintWeapon, RangeCategory) == 0x40,
+    "RUnitBlueprintWeapon::RangeCategory offset must be 0x40"
   );
   static_assert(
     offsetof(RUnitBlueprintWeapon, TargetCheckInterval) == 0x50,
     "RUnitBlueprintWeapon::TargetCheckInterval offset must be 0x50"
   );
   static_assert(
-    offsetof(RUnitBlueprintWeapon, MinRadius) == 0x58, "RUnitBlueprintWeapon::MinRadius offset must be 0x58"
+    offsetof(RUnitBlueprintWeapon, MinRadius) == 0x58,
+    "RUnitBlueprintWeapon::MinRadius offset must be 0x58"
   );
   static_assert(
-    offsetof(RUnitBlueprintWeapon, MaxRadius) == 0x5C, "RUnitBlueprintWeapon::MaxRadius offset must be 0x5C"
+    offsetof(RUnitBlueprintWeapon, MaxRadius) == 0x5C,
+    "RUnitBlueprintWeapon::MaxRadius offset must be 0x5C"
   );
   static_assert(
     offsetof(RUnitBlueprintWeapon, MaximumBeamLength) == 0x60,
     "RUnitBlueprintWeapon::MaximumBeamLength offset must be 0x60"
   );
   static_assert(
-    offsetof(RUnitBlueprintWeapon, EffectiveRadius) == 0x64, "RUnitBlueprintWeapon::EffectiveRadius offset must be 0x64"
+    offsetof(RUnitBlueprintWeapon, EffectiveRadius) == 0x64,
+    "RUnitBlueprintWeapon::EffectiveRadius offset must be 0x64"
   );
   static_assert(
-    offsetof(RUnitBlueprintWeapon, DamageType) == 0xA8, "RUnitBlueprintWeapon::DamageType offset must be 0xA8"
+    offsetof(RUnitBlueprintWeapon, DamageType) == 0xA8,
+    "RUnitBlueprintWeapon::DamageType offset must be 0xA8"
   );
   static_assert(
-    offsetof(RUnitBlueprintWeapon, ProjectileId) == 0xC8, "RUnitBlueprintWeapon::ProjectileId offset must be 0xC8"
+    offsetof(RUnitBlueprintWeapon, ProjectileId) == 0xC8,
+    "RUnitBlueprintWeapon::ProjectileId offset must be 0xC8"
   );
   static_assert(
-    offsetof(RUnitBlueprintWeapon, BallisticArc) == 0xE4, "RUnitBlueprintWeapon::BallisticArc offset must be 0xE4"
+    offsetof(RUnitBlueprintWeapon, BallisticArc) == 0xE4,
+    "RUnitBlueprintWeapon::BallisticArc offset must be 0xE4"
   );
   static_assert(
     offsetof(RUnitBlueprintWeapon, TargetRestrictOnlyAllow) == 0xE8,
@@ -1425,7 +1499,8 @@ namespace moho
     "RUnitBlueprintWeapon::TargetRestrictDisallow offset must be 0x104"
   );
   static_assert(
-    offsetof(RUnitBlueprintWeapon, TargetType) == 0x130, "RUnitBlueprintWeapon::TargetType offset must be 0x130"
+    offsetof(RUnitBlueprintWeapon, TargetType) == 0x130,
+    "RUnitBlueprintWeapon::TargetType offset must be 0x130"
   );
   static_assert(
     offsetof(RUnitBlueprintWeapon, BombDropThreshold) == 0x144,
@@ -1463,25 +1538,29 @@ namespace moho
   );
   static_assert(sizeof(RUnitBlueprintWeapons) == 0x14, "RUnitBlueprintWeapons size must be 0x14");
 
-
   static_assert(
     offsetof(RUnitBlueprintEconomy, BuildCostEnergy) == 0x00,
     "RUnitBlueprintEconomy::BuildCostEnergy offset must be 0x00"
   );
   static_assert(
-    offsetof(RUnitBlueprintEconomy, BuildCostMass) == 0x04, "RUnitBlueprintEconomy::BuildCostMass offset must be 0x04"
+    offsetof(RUnitBlueprintEconomy, BuildCostMass) == 0x04,
+    "RUnitBlueprintEconomy::BuildCostMass offset must be 0x04"
   );
   static_assert(
-    offsetof(RUnitBlueprintEconomy, BuildRate) == 0x08, "RUnitBlueprintEconomy::BuildRate offset must be 0x08"
+    offsetof(RUnitBlueprintEconomy, BuildRate) == 0x08,
+    "RUnitBlueprintEconomy::BuildRate offset must be 0x08"
   );
   static_assert(
-    offsetof(RUnitBlueprintEconomy, BuildTime) == 0x0C, "RUnitBlueprintEconomy::BuildTime offset must be 0x0C"
+    offsetof(RUnitBlueprintEconomy, BuildTime) == 0x0C,
+    "RUnitBlueprintEconomy::BuildTime offset must be 0x0C"
   );
   static_assert(
-    offsetof(RUnitBlueprintEconomy, StorageEnergy) == 0x10, "RUnitBlueprintEconomy::StorageEnergy offset must be 0x10"
+    offsetof(RUnitBlueprintEconomy, StorageEnergy) == 0x10,
+    "RUnitBlueprintEconomy::StorageEnergy offset must be 0x10"
   );
   static_assert(
-    offsetof(RUnitBlueprintEconomy, StorageMass) == 0x14, "RUnitBlueprintEconomy::StorageMass offset must be 0x14"
+    offsetof(RUnitBlueprintEconomy, StorageMass) == 0x14,
+    "RUnitBlueprintEconomy::StorageMass offset must be 0x14"
   );
   static_assert(
     offsetof(RUnitBlueprintEconomy, NaturalProducer) == 0x18,
@@ -1496,13 +1575,16 @@ namespace moho
     "RUnitBlueprintEconomy::RebuildBonusIds offset must be 0x2C"
   );
   static_assert(
-    offsetof(RUnitBlueprintEconomy, CategoryCache) == 0x40, "RUnitBlueprintEconomy::CategoryCache offset must be 0x40"
+    offsetof(RUnitBlueprintEconomy, CategoryCache) == 0x40,
+    "RUnitBlueprintEconomy::CategoryCache offset must be 0x40"
   );
   static_assert(
-    offsetof(RUnitBlueprintEconomy, InitialRallyX) == 0x68, "RUnitBlueprintEconomy::InitialRallyX offset must be 0x68"
+    offsetof(RUnitBlueprintEconomy, InitialRallyX) == 0x68,
+    "RUnitBlueprintEconomy::InitialRallyX offset must be 0x68"
   );
   static_assert(
-    offsetof(RUnitBlueprintEconomy, InitialRallyZ) == 0x6C, "RUnitBlueprintEconomy::InitialRallyZ offset must be 0x6C"
+    offsetof(RUnitBlueprintEconomy, InitialRallyZ) == 0x6C,
+    "RUnitBlueprintEconomy::InitialRallyZ offset must be 0x6C"
   );
   static_assert(
     offsetof(RUnitBlueprintEconomy, NeedToFaceTargetToBuild) == 0x70,

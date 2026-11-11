@@ -6,13 +6,19 @@
 
 namespace faf::server
 {
-  void CReplayLog::Append(const char* const data, const std::size_t size, const std::uint64_t nowUs)
+  void CReplayLog::Append(
+    const char* const data,
+    const std::size_t size,
+    const std::uint64_t nowUs
+  )
   {
     if (size == 0u) {
       return;
     }
     const std::scoped_lock lock(mLock);
-    mBytes.insert(mBytes.end(), reinterpret_cast<const std::uint8_t*>(data), reinterpret_cast<const std::uint8_t*>(data) + size);
+    mBytes.insert(
+      mBytes.end(), reinterpret_cast<const std::uint8_t*>(data), reinterpret_cast<const std::uint8_t*>(data) + size
+    );
     // A clock that went back still keeps the times in order, so `Read`'s search holds.
     const std::uint64_t at = mMarks.empty() ? nowUs : std::max(nowUs, mMarks.back().second);
     mMarks.emplace_back(mBytes.size(), at);
@@ -25,12 +31,18 @@ namespace faf::server
   }
 
   std::size_t CReplayLog::Read(
-    const std::size_t offset, const std::uint64_t untilUs, const std::size_t maxBytes, std::vector<std::uint8_t>& out
+    const std::size_t offset,
+    const std::uint64_t untilUs,
+    const std::size_t maxBytes,
+    std::vector<std::uint8_t>& out
   ) const
   {
     const std::scoped_lock lock(mLock);
     // The last write at or before `untilUs`: everything up to its end offset is old enough.
-    const auto after = std::upper_bound(mMarks.begin(), mMarks.end(), untilUs, [](const std::uint64_t time, const auto& mark) { return time < mark.second; });
+    const auto after =
+      std::upper_bound(mMarks.begin(), mMarks.end(), untilUs, [](const std::uint64_t time, const auto& mark) {
+      return time < mark.second;
+    });
     if (after == mMarks.begin()) {
       return 0u;
     }
@@ -39,7 +51,11 @@ namespace faf::server
       return 0u;
     }
     const std::size_t count = std::min(end - offset, maxBytes);
-    out.insert(out.end(), mBytes.begin() + static_cast<std::ptrdiff_t>(offset), mBytes.begin() + static_cast<std::ptrdiff_t>(offset + count));
+    out.insert(
+      out.end(),
+      mBytes.begin() + static_cast<std::ptrdiff_t>(offset),
+      mBytes.begin() + static_cast<std::ptrdiff_t>(offset + count)
+    );
     return count;
   }
 
@@ -55,7 +71,11 @@ namespace faf::server
     return mFinished;
   }
 
-  CReplayTee::CReplayTee(std::unique_ptr<gpg::Stream> inner, std::shared_ptr<CReplayLog> log, Clock clock)
+  CReplayTee::CReplayTee(
+    std::unique_ptr<gpg::Stream> inner,
+    std::shared_ptr<CReplayLog> log,
+    Clock clock
+  )
     : mInner(std::move(inner))
     , mLog(std::move(log))
     , mClock(std::move(clock))
@@ -69,7 +89,10 @@ namespace faf::server
     // `mInner` closes the replay file as it goes.
   }
 
-  void CReplayTee::VirtWrite(const char* const data, const std::size_t size)
+  void CReplayTee::VirtWrite(
+    const char* const data,
+    const std::size_t size
+  )
   {
     if (mInner) {
       mInner->Write(data, size);
@@ -86,7 +109,9 @@ namespace faf::server
     }
   }
 
-  void CReplayTee::VirtClose(const Mode mode)
+  void CReplayTee::VirtClose(
+    const Mode mode
+  )
   {
     if (mInner) {
       mInner->VirtClose(mode);

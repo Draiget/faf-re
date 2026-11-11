@@ -64,7 +64,10 @@ namespace gpg::gal::d3d12
     [[nodiscard]] std::uint64_t BusyBytes() const noexcept;
     /** Bytes in all pages, and their count (memory diagnostics). */
     [[nodiscard]] std::uint64_t PageBytes() const noexcept;
-    [[nodiscard]] std::size_t PageCount() const noexcept { return mPages.size(); }
+    [[nodiscard]] std::size_t PageCount() const noexcept
+    {
+      return mPages.size();
+    }
 
   private:
     struct Page
@@ -114,13 +117,26 @@ namespace gpg::gal::d3d12
     void Release() noexcept;
 
     /** False when `count` more do not fit. */
-    [[nodiscard]] bool Allocate(std::uint32_t count, D3D12_CPU_DESCRIPTOR_HANDLE& cpu, D3D12_GPU_DESCRIPTOR_HANDLE& gpu);
-    void Reset() noexcept { mUsed = 0U; }
+    [[nodiscard]] bool
+    Allocate(std::uint32_t count, D3D12_CPU_DESCRIPTOR_HANDLE& cpu, D3D12_GPU_DESCRIPTOR_HANDLE& gpu);
+    void Reset() noexcept
+    {
+      mUsed = 0U;
+    }
     /** Descriptors still free. */
-    [[nodiscard]] std::uint32_t Remaining() const noexcept { return mCapacity - mUsed; }
+    [[nodiscard]] std::uint32_t Remaining() const noexcept
+    {
+      return mCapacity - mUsed;
+    }
 
-    [[nodiscard]] ID3D12DescriptorHeap* Heap() const noexcept { return mHeap.Get(); }
-    [[nodiscard]] std::uint32_t Increment() const noexcept { return mIncrement; }
+    [[nodiscard]] ID3D12DescriptorHeap* Heap() const noexcept
+    {
+      return mHeap.Get();
+    }
+    [[nodiscard]] std::uint32_t Increment() const noexcept
+    {
+      return mIncrement;
+    }
 
   private:
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mHeap;
@@ -152,8 +168,11 @@ namespace gpg::gal::d3d12
      * Creates `desc` in a heap; false when it should be a committed resource instead (too large
      * for a heap, or the driver refused), and `outResource` is left empty.
      */
-    [[nodiscard]] bool Create(const D3D12_RESOURCE_DESC& desc, D3D12_RESOURCE_STATES state,
-                              Microsoft::WRL::ComPtr<ID3D12Resource>& outResource);
+    [[nodiscard]] bool Create(
+      const D3D12_RESOURCE_DESC& desc,
+      D3D12_RESOURCE_STATES state,
+      Microsoft::WRL::ComPtr<ID3D12Resource>& outResource
+    );
 
     /** Bytes in heaps, and bytes placed resources take in them (memory diagnostics). */
     [[nodiscard]] std::uint64_t HeapBytes() const noexcept;
@@ -177,7 +196,8 @@ namespace gpg::gal::d3d12
    * is the large buffer's, so a read asks for kSharedBufferRead, which every kind of reader shares.
    */
   inline constexpr D3D12_RESOURCE_STATES kSharedBufferRead = static_cast<D3D12_RESOURCE_STATES>(
-    D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER | D3D12_RESOURCE_STATE_INDEX_BUFFER | D3D12_RESOURCE_STATE_COPY_SOURCE
+    D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER | D3D12_RESOURCE_STATE_INDEX_BUFFER |
+    D3D12_RESOURCE_STATE_COPY_SOURCE
   );
 
   class SharedBufferAllocator
@@ -194,7 +214,10 @@ namespace gpg::gal::d3d12
 
     /** A range of `size` bytes; false when the buffer should have a resource of its own. */
     [[nodiscard]] bool Take(
-      std::uint64_t size, TrackedResource*& outResource, std::uint64_t& outOffset, Microsoft::WRL::ComPtr<IUnknown>& outOwner
+      std::uint64_t size,
+      TrackedResource*& outResource,
+      std::uint64_t& outOffset,
+      Microsoft::WRL::ComPtr<IUnknown>& outOwner
     );
 
   private:

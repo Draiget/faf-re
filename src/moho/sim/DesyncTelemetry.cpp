@@ -118,7 +118,11 @@ namespace moho
 
     /// `appendLogs`: the collector's `/v1/logs` goes after the path unless it ends with it; a dump
     /// endpoint is posted to as given.
-    [[nodiscard]] bool ParseEndpoint(const std::string& url, SEndpoint& out, const bool appendLogs = true)
+    [[nodiscard]] bool ParseEndpoint(
+      const std::string& url,
+      SEndpoint& out,
+      const bool appendLogs = true
+    )
     {
       std::string rest;
       if (url.compare(0, 7, "http://") == 0) {
@@ -139,9 +143,11 @@ namespace moho
         out.mPath.pop_back();
       }
       constexpr const char kLogs[] = "/v1/logs";
-      if (appendLogs
-          && (out.mPath.size() < sizeof(kLogs) - 1u
-              || out.mPath.compare(out.mPath.size() - (sizeof(kLogs) - 1u), std::string::npos, kLogs) != 0)) {
+      if (
+        appendLogs &&
+        (out.mPath.size() < sizeof(kLogs) - 1u ||
+         out.mPath.compare(out.mPath.size() - (sizeof(kLogs) - 1u), std::string::npos, kLogs) != 0)
+      ) {
         out.mPath += kLogs;
       }
       if (out.mPath.empty()) {
@@ -193,14 +199,18 @@ namespace moho
         Connect = reinterpret_cast<decltype(Connect)>(::GetProcAddress(module, "WinHttpConnect"));
         OpenRequest = reinterpret_cast<decltype(OpenRequest)>(::GetProcAddress(module, "WinHttpOpenRequest"));
         SendRequest = reinterpret_cast<decltype(SendRequest)>(::GetProcAddress(module, "WinHttpSendRequest"));
-        ReceiveResponse = reinterpret_cast<decltype(ReceiveResponse)>(::GetProcAddress(module, "WinHttpReceiveResponse"));
+        ReceiveResponse =
+          reinterpret_cast<decltype(ReceiveResponse)>(::GetProcAddress(module, "WinHttpReceiveResponse"));
         QueryHeaders = reinterpret_cast<decltype(QueryHeaders)>(::GetProcAddress(module, "WinHttpQueryHeaders"));
         CloseHandle = reinterpret_cast<decltype(CloseHandle)>(::GetProcAddress(module, "WinHttpCloseHandle"));
-        if (!Open || !SetTimeouts || !Connect || !OpenRequest || !SendRequest || !ReceiveResponse || !QueryHeaders
-            || !CloseHandle) {
+        if (
+          !Open || !SetTimeouts || !Connect || !OpenRequest || !SendRequest || !ReceiveResponse || !QueryHeaders ||
+          !CloseHandle
+        ) {
           return false;
         }
-        mSession = Open(L"faf-engine", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+        mSession =
+          Open(L"faf-engine", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
         if (mSession != nullptr) {
           (void)SetTimeouts(mSession, kTimeoutMs, kTimeoutMs, kTimeoutMs, kTimeoutMs);
         }
@@ -208,7 +218,9 @@ namespace moho
       }
     };
 
-    [[nodiscard]] std::wstring Widen(const std::string& text)
+    [[nodiscard]] std::wstring Widen(
+      const std::string& text
+    )
     {
       const int length = ::MultiByteToWideChar(CP_UTF8, 0, text.c_str(), static_cast<int>(text.size()), nullptr, 0);
       std::wstring out(static_cast<std::size_t>(length > 0 ? length : 0), L'\0');
@@ -220,7 +232,11 @@ namespace moho
 
     /// The HTTP status of one POST, or 0 when the request failed.
     [[nodiscard]] int Post(
-      SWinHttp& http, const SEndpoint& endpoint, const std::string& token, const std::string& body, const SPostKind& kind
+      SWinHttp& http,
+      const SEndpoint& endpoint,
+      const std::string& token,
+      const std::string& body,
+      const SPostKind& kind
     )
     {
       if (!http.Load()) {
@@ -231,8 +247,12 @@ namespace moho
         http.Connect(http.mSession, Widen(endpoint.mHost).c_str(), static_cast<INTERNET_PORT>(endpoint.mPort), 0);
       HINTERNET const request = connection == nullptr ? nullptr
                                                       : http.OpenRequest(
-                                                          connection, L"POST", Widen(endpoint.mPath).c_str(), nullptr,
-                                                          WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+                                                          connection,
+                                                          L"POST",
+                                                          Widen(endpoint.mPath).c_str(),
+                                                          nullptr,
+                                                          WINHTTP_NO_REFERER,
+                                                          WINHTTP_DEFAULT_ACCEPT_TYPES,
                                                           endpoint.mHttps ? WINHTTP_FLAG_SECURE : 0
                                                         );
       if (request != nullptr) {
@@ -243,17 +263,30 @@ namespace moho
         if (!token.empty()) {
           headers += L"Authorization: Bearer " + Widen(token) + L"\r\n";
         }
-        if (http.SendRequest(
-              request, headers.c_str(), static_cast<DWORD>(headers.size()), const_cast<char*>(body.data()),
-              static_cast<DWORD>(body.size()), static_cast<DWORD>(body.size()), 0
-            )
-            && http.ReceiveResponse(request, nullptr)) {
+        if (
+          http.SendRequest(
+            request,
+            headers.c_str(),
+            static_cast<DWORD>(headers.size()),
+            const_cast<char*>(body.data()),
+            static_cast<DWORD>(body.size()),
+            static_cast<DWORD>(body.size()),
+            0
+          ) &&
+          http.ReceiveResponse(request, nullptr)
+        ) {
           DWORD code = 0;
           DWORD size = sizeof(code);
-          if (http.QueryHeaders(
-                request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX, &code,
-                &size, WINHTTP_NO_HEADER_INDEX
-              )) {
+          if (
+            http.QueryHeaders(
+              request,
+              WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+              WINHTTP_HEADER_NAME_BY_INDEX,
+              &code,
+              &size,
+              WINHTTP_NO_HEADER_INDEX
+            )
+          ) {
             status = static_cast<int>(code);
           }
         }
@@ -287,7 +320,11 @@ namespace moho
 
     /// Plain HTTP over a socket; https needs the Windows build (no TLS library here).
     [[nodiscard]] int Post(
-      SWinHttp&, const SEndpoint& endpoint, const std::string& token, const std::string& body, const SPostKind& kind
+      SWinHttp&,
+      const SEndpoint& endpoint,
+      const std::string& token,
+      const std::string& body,
+      const SPostKind& kind
     )
     {
       if (endpoint.mHttps) {
@@ -309,9 +346,9 @@ namespace moho
         (void)::setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
         (void)::setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
         if (::connect(fd, address->ai_addr, address->ai_addrlen) == 0) {
-          std::string request = "POST " + endpoint.mPath + " HTTP/1.1\r\nHost: " + endpoint.mHost + ":"
-            + std::to_string(endpoint.mPort) + "\r\nContent-Type: " + kind.mContentType + "\r\nContent-Length: "
-            + std::to_string(body.size()) + "\r\nConnection: close\r\n" + kind.mHeaders;
+          std::string request = "POST " + endpoint.mPath + " HTTP/1.1\r\nHost: " + endpoint.mHost + ":" +
+            std::to_string(endpoint.mPort) + "\r\nContent-Type: " + kind.mContentType +
+            "\r\nContent-Length: " + std::to_string(body.size()) + "\r\nConnection: close\r\n" + kind.mHeaders;
           if (!token.empty()) {
             request += "Authorization: Bearer " + token + "\r\n";
           }
@@ -360,7 +397,9 @@ namespace moho
       return std::filesystem::current_path(error);
     }
 
-    [[nodiscard]] std::vector<std::filesystem::path> OutboxFiles(const std::filesystem::path& folder)
+    [[nodiscard]] std::vector<std::filesystem::path> OutboxFiles(
+      const std::filesystem::path& folder
+    )
     {
       std::vector<std::filesystem::path> files;
       std::error_code error;
@@ -375,9 +414,13 @@ namespace moho
 
     /// Whether the process that owns `file` (its pid follows the prefix) still runs: two clients
     /// that share a /log folder must not take each other's records.
-    [[nodiscard]] bool OwnerRunning(const std::filesystem::path& file, const unsigned long self)
+    [[nodiscard]] bool OwnerRunning(
+      const std::filesystem::path& file,
+      const unsigned long self
+    )
     {
-      const unsigned long pid = std::strtoul(file.filename().string().c_str() + sizeof(kOutboxPrefix) - 1u, nullptr, 10);
+      const unsigned long pid =
+        std::strtoul(file.filename().string().c_str() + sizeof(kOutboxPrefix) - 1u, nullptr, 10);
       if (pid == 0u || pid == self) {
         return false;
       }
@@ -426,7 +469,9 @@ namespace moho
         return *sender;
       }
 
-      void Queue(std::string body)
+      void Queue(
+        std::string body
+      )
       {
         {
           std::lock_guard<std::mutex> lock(mMutex);
@@ -440,10 +485,14 @@ namespace moho
       /// Waits until every queued record had its attempt, or `timeout` passed. On a timeout the
       /// process may exit next: the sender stops posting, writing and logging until the next record
       /// (the outbox file already holds everything, see `Attempt`).
-      void WaitIdle(const std::chrono::milliseconds timeout)
+      void WaitIdle(
+        const std::chrono::milliseconds timeout
+      )
       {
         std::unique_lock<std::mutex> lock(mMutex);
-        if (!mIdle.wait_for(lock, timeout, [this] { return !mStarted || (mIncoming.empty() && !mWorking && !mRetryOutbox); })) {
+        if (!mIdle.wait_for(lock, timeout, [this] {
+          return !mStarted || (mIncoming.empty() && !mWorking && !mRetryOutbox);
+        })) {
           mAbandoned = true;
         }
       }
@@ -464,7 +513,9 @@ namespace moho
       {
         if (!mStarted) {
           mStarted = true;
-          std::thread([this] { Run(); }).detach();
+          std::thread([this] {
+            Run();
+          }).detach();
         }
       }
 
@@ -492,7 +543,9 @@ namespace moho
           std::deque<std::string> incoming;
           {
             std::unique_lock<std::mutex> lock(mMutex);
-            mSignal.wait(lock, [this] { return !mIncoming.empty() || mRetryOutbox; });
+            mSignal.wait(lock, [this] {
+              return !mIncoming.empty() || mRetryOutbox;
+            });
             incoming.swap(mIncoming);
             mRetryOutbox = false;
             mWorking = true;
@@ -507,7 +560,10 @@ namespace moho
       }
 
       void Attempt(
-        const std::filesystem::path& path, std::vector<SOutboxEntry>& outbox, SWinHttp& http, std::deque<std::string>& incoming
+        const std::filesystem::path& path,
+        std::vector<SOutboxEntry>& outbox,
+        SWinHttp& http,
+        std::deque<std::string>& incoming
       )
       {
         for (std::string& body : incoming) {
@@ -525,8 +581,11 @@ namespace moho
         if (!ParseEndpoint(url, endpoint)) {
           const std::lock_guard<std::mutex> lock(mMutex);
           if (!mAbandoned) {
-            gpg::Warnf("Telemetry: endpoint \"%s\" is not http(s)://host[:port][/path]; %u record(s) kept", url.c_str(),
-                       static_cast<unsigned>(outbox.size()));
+            gpg::Warnf(
+              "Telemetry: endpoint \"%s\" is not http(s)://host[:port][/path]; %u record(s) kept",
+              url.c_str(),
+              static_cast<unsigned>(outbox.size())
+            );
           }
           return;
         }
@@ -555,8 +614,8 @@ namespace moho
             kind.mHeaders = "X-FAF-Dump: " + std::filesystem::path(file).filename().string() + "\r\n";
             kind.mTimeoutMs = kFileTimeoutMs;
             lastStatus = Post(http, dumpEndpoint, token, data, kind);
-            uploads += "Telemetry: dump " + std::filesystem::path(file).filename().string() + " (" + std::to_string(data.size())
-              + " bytes) posted, HTTP status " + std::to_string(lastStatus) + "\n";
+            uploads += "Telemetry: dump " + std::filesystem::path(file).filename().string() + " (" +
+              std::to_string(data.size()) + " bytes) posted, HTTP status " + std::to_string(lastStatus) + "\n";
           } else {
             const std::string request =
               "{\"resourceLogs\":[{\"resource\":" + ResourceJson() + ",\"scopeLogs\":[" + entry.mBody + "]}]}";
@@ -590,20 +649,28 @@ namespace moho
           begin = end + 1u;
         }
         gpg::Logf(
-          "Telemetry: %u record(s) sent, %u dropped, %u kept for a retry (last HTTP status %d)", sent, dropped,
-          static_cast<unsigned>(outbox.size()), lastStatus
+          "Telemetry: %u record(s) sent, %u dropped, %u kept for a retry (last HTTP status %d)",
+          sent,
+          dropped,
+          static_cast<unsigned>(outbox.size()),
+          lastStatus
         );
       }
 
       /// The file an outbox entry uploads, or empty for a record.
-      [[nodiscard]] static std::string UploadFile(const SOutboxEntry& entry)
+      [[nodiscard]] static std::string UploadFile(
+        const SOutboxEntry& entry
+      )
       {
-        return entry.mBody.compare(0, sizeof(kFilePrefix) - 1u, kFilePrefix) == 0 ? entry.mBody.substr(sizeof(kFilePrefix) - 1u)
-                                                                                    : std::string();
+        return entry.mBody.compare(0, sizeof(kFilePrefix) - 1u, kFilePrefix) == 0
+          ? entry.mBody.substr(sizeof(kFilePrefix) - 1u)
+          : std::string();
       }
 
       /// A dump leaves the disk with its outbox entry; the recorder's zip stays.
-      static void RemoveUploadFile(const SOutboxEntry& entry)
+      static void RemoveUploadFile(
+        const SOutboxEntry& entry
+      )
       {
         if (const std::string file = UploadFile(entry); !file.empty()) {
           std::error_code error;
@@ -611,7 +678,10 @@ namespace moho
         }
       }
 
-      [[nodiscard]] static bool ReadWholeFile(const std::string& path, std::string& out)
+      [[nodiscard]] static bool ReadWholeFile(
+        const std::string& path,
+        std::string& out
+      )
       {
         std::ifstream file(path, std::ios::binary);
         if (!file) {
@@ -627,7 +697,9 @@ namespace moho
         return mAbandoned;
       }
 
-      [[nodiscard]] static std::vector<SOutboxEntry> Load(const std::filesystem::path& path)
+      [[nodiscard]] static std::vector<SOutboxEntry> Load(
+        const std::filesystem::path& path
+      )
       {
         std::vector<SOutboxEntry> entries;
         std::ifstream file(path, std::ios::binary);
@@ -641,7 +713,10 @@ namespace moho
         return entries;
       }
 
-      static void Save(const std::filesystem::path& path, const std::vector<SOutboxEntry>& entries)
+      static void Save(
+        const std::filesystem::path& path,
+        const std::vector<SOutboxEntry>& entries
+      )
       {
         std::error_code error;
         if (entries.empty()) {
@@ -667,12 +742,15 @@ namespace moho
     [[nodiscard]] std::uint64_t NowUnixNano()
     {
       return static_cast<std::uint64_t>(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count()
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch())
+          .count()
       );
     }
   } // namespace
 
-  std::string TELEMETRY_JsonString(const std::string& text)
+  std::string TELEMETRY_JsonString(
+    const std::string& text
+  )
   {
     std::string out = "\"";
     for (const char c : text) {
@@ -706,7 +784,9 @@ namespace moho
     return out;
   }
 
-  void CTelemetryAttributes::Key(const char* const key)
+  void CTelemetryAttributes::Key(
+    const char* const key
+  )
   {
     if (!mJson.empty()) {
       mJson += ',';
@@ -714,25 +794,37 @@ namespace moho
     mJson += "{\"key\":" + TELEMETRY_JsonString(key) + ",\"value\":";
   }
 
-  void CTelemetryAttributes::Add(const char* const key, const std::string& value)
+  void CTelemetryAttributes::Add(
+    const char* const key,
+    const std::string& value
+  )
   {
     Key(key);
     mJson += "{\"stringValue\":" + TELEMETRY_JsonString(value) + "}}";
   }
 
-  void CTelemetryAttributes::Add(const char* const key, const std::int64_t value)
+  void CTelemetryAttributes::Add(
+    const char* const key,
+    const std::int64_t value
+  )
   {
     Key(key);
     mJson += "{\"intValue\":\"" + std::to_string(value) + "\"}}"; // int64 is a JSON string in OTLP
   }
 
-  void CTelemetryAttributes::AddBool(const char* const key, const bool value)
+  void CTelemetryAttributes::AddBool(
+    const char* const key,
+    const bool value
+  )
   {
     Key(key);
     mJson += value ? "{\"boolValue\":true}}" : "{\"boolValue\":false}}";
   }
 
-  void CTelemetryAttributes::AddDouble(const char* const key, const double value)
+  void CTelemetryAttributes::AddDouble(
+    const char* const key,
+    const double value
+  )
   {
     Key(key);
     char text[32];
@@ -776,11 +868,15 @@ namespace moho
         CSender::Get().RetryOutbox();
       }
     } else {
-      gpg::Logf("Telemetry: off, nothing is sent (%s)", telemetry_Enabled ? "no endpoint" : "no /telemetry on the command line");
+      gpg::Logf(
+        "Telemetry: off, nothing is sent (%s)", telemetry_Enabled ? "no endpoint" : "no /telemetry on the command line"
+      );
     }
   }
 
-  void TELEMETRY_WaitIdle(const int timeoutMs)
+  void TELEMETRY_WaitIdle(
+    const int timeoutMs
+  )
   {
     CSender::Get().WaitIdle(std::chrono::milliseconds(timeoutMs));
   }
@@ -795,7 +891,9 @@ namespace moho
     return TELEMETRY_IsOn() && !telemetry_DumpEndpoint.empty();
   }
 
-  void TELEMETRY_SendFile(const std::string& path)
+  void TELEMETRY_SendFile(
+    const std::string& path
+  )
   {
     if (!TELEMETRY_DumpUploadOn()) {
       return;
@@ -803,7 +901,9 @@ namespace moho
     CSender::Get().Queue(kFilePrefix + path);
   }
 
-  void TELEMETRY_Scrub(std::string& text)
+  void TELEMETRY_Scrub(
+    std::string& text
+  )
   {
     const std::string token = telemetry_Token.c_str();
     if (!token.empty()) {
@@ -815,10 +915,14 @@ namespace moho
     const auto folderAt = [&text](const std::size_t at) -> std::size_t {
       for (const char* const folder : kUserFolders) {
         const std::size_t length = std::strlen(folder);
-        if (text.size() - at >= length
-            && std::equal(folder, folder + length, text.begin() + static_cast<std::ptrdiff_t>(at), [](const char a, const char b) {
-                 return a == std::tolower(static_cast<unsigned char>(b));
-               })) {
+        if (
+          text.size() - at >= length &&
+          std::equal(
+            folder, folder + length, text.begin() + static_cast<std::ptrdiff_t>(at), [](const char a, const char b) {
+          return a == std::tolower(static_cast<unsigned char>(b));
+        }
+          )
+        ) {
           return length;
         }
       }
@@ -844,7 +948,9 @@ namespace moho
   }
 
   void TELEMETRY_Send(
-    const char* const eventName, const int severityNumber, const char* const severityText,
+    const char* const eventName,
+    const int severityNumber,
+    const char* const severityText,
     const CTelemetryAttributes& attributes
   )
   {
@@ -854,10 +960,10 @@ namespace moho
     const std::string now = std::to_string(NowUnixNano());
     CTelemetryAttributes withName = attributes;
     withName.Add("event.name", std::string(eventName));
-    std::string body = "{\"scope\":{\"name\":\"faf.desync\",\"version\":\"1\"},\"logRecords\":[{\"timeUnixNano\":\"" + now
-      + "\",\"observedTimeUnixNano\":\"" + now + "\",\"severityNumber\":" + std::to_string(severityNumber)
-      + ",\"severityText\":" + TELEMETRY_JsonString(severityText) + ",\"eventName\":" + TELEMETRY_JsonString(eventName)
-      + ",\"body\":{\"stringValue\":" + TELEMETRY_JsonString(eventName) + "},\"attributes\":[" + withName.Json() + "]}]}";
+    std::string body = "{\"scope\":{\"name\":\"faf.desync\",\"version\":\"1\"},\"logRecords\":[{\"timeUnixNano\":\"" +
+      now + "\",\"observedTimeUnixNano\":\"" + now + "\",\"severityNumber\":" + std::to_string(severityNumber) +
+      ",\"severityText\":" + TELEMETRY_JsonString(severityText) + ",\"eventName\":" + TELEMETRY_JsonString(eventName) +
+      ",\"body\":{\"stringValue\":" + TELEMETRY_JsonString(eventName) + "},\"attributes\":[" + withName.Json() + "]}]}";
     CSender::Get().Queue(std::move(body));
   }
 } // namespace moho

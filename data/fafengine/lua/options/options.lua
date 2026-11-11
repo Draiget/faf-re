@@ -269,6 +269,9 @@ end
 
 -- Ray-traced shadows (ren_RayTracedShadows) and ray-traced ambient occlusion (ren_RayAo), on Direct3D 12 and Vulkan
 -- devices that can trace rays. Shown only by an engine that has the commands, as the others.
+-- Ray-traced shadows and the explosion and weapon lights are off until the player turns them on. Their keys changed
+-- when the default went from on to off: the options screen saves every value, defaults too, so the old keys hold
+-- 1 for everyone who ran a build that had them on.
 do
     local function Supported(command)
         -- The engine's Lua reports C functions as 'cfunction'.
@@ -298,9 +301,9 @@ do
         end
         table.insert(video.items, position, {
             title = 'Ray-traced shadows',
-            key = 'ray_traced_shadows',
+            key = 'ray_traced_shadows_optin',
             type = 'toggle',
-            default = 1,
+            default = 0,
             tip = 'Sun shadows of the ground, units and buildings traced by ray: exact at every distance, and hills '
                 .. 'shade the ground. Needs a graphics card that can trace rays, on Direct3D 12 or Vulkan; '
                 .. 'elsewhere the shadow map stays.',
@@ -324,6 +327,44 @@ do
                     .. 'under each other, traced by ray instead of read from the screen.',
                 set = function(key, value, startup)
                     ConExecute('ren_RayAo ' .. tostring(value))
+                end,
+                custom = {
+                    states = {
+                        { text = '<LOC _On>', key = 1 },
+                        { text = '<LOC _Off>', key = 0 },
+                    },
+                },
+            })
+        end
+        if Supported('ren_DynamicLights') then
+            table.insert(video.items, math.min(position + 3, table.getn(video.items) + 1), {
+                title = 'Explosion and weapon lights',
+                key = 'dynamic_lights_optin',
+                type = 'toggle',
+                default = 0,
+                tip = 'Direct3D 12 and Vulkan: explosions, muzzle flashes, engines, projectiles and beams light the '
+                    .. 'ground and the units around them.',
+                set = function(key, value, startup)
+                    ConExecute('ren_DynamicLights ' .. tostring(value))
+                end,
+                custom = {
+                    states = {
+                        { text = '<LOC _On>', key = 1 },
+                        { text = '<LOC _Off>', key = 0 },
+                    },
+                },
+            })
+        end
+        if Supported('ren_RaySunAngle') then
+            table.insert(video.items, math.min(position + 2, table.getn(video.items) + 1), {
+                title = 'Soft ray-traced shadows',
+                key = 'ray_soft_shadows',
+                type = 'toggle',
+                default = 1,
+                tip = 'With ray-traced shadows on: the sun is a disc, not a point, so shadows are sharp where '
+                    .. 'they start and soften further from their caster.',
+                set = function(key, value, startup)
+                    ConExecute('ren_RaySunAngle ' .. ((value == 1) and '3' or '0'))
                 end,
                 custom = {
                     states = {

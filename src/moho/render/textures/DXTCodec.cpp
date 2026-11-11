@@ -10,7 +10,9 @@ namespace moho
     constexpr std::uint8_t kDxt5AlphaCodeTable[6] = {0, 2, 3, 4, 5, 1}; // byte_DFFFF4
     constexpr std::uint8_t kDxtColorCodeTable[5] = {1, 3, 2, 0, 0x0A};  // byte_DFFFFC
 
-    [[nodiscard]] std::uint32_t ExpandRgb565ToArgb8888(const std::uint16_t packed)
+    [[nodiscard]] std::uint32_t ExpandRgb565ToArgb8888(
+      const std::uint16_t packed
+    )
     {
       const std::uint32_t b5 = (packed & 0x001Fu);
       const std::uint32_t g6 = (packed >> 5u) & 0x003Fu;
@@ -23,7 +25,9 @@ namespace moho
       return 0xFF000000u | (r8 << 16u) | (g8 << 8u) | b8;
     }
 
-    [[nodiscard]] std::uint32_t ReadU32(const std::uint8_t* const bytes)
+    [[nodiscard]] std::uint32_t ReadU32(
+      const std::uint8_t* const bytes
+    )
     {
       // Unaligned u32 load from the DXT block byte stream.
       std::uint32_t value = 0;
@@ -37,7 +41,9 @@ namespace moho
    * Address: 0x004047D0 (FUN_004047D0, Moho::DXT_EncodeAlphaBlock)
    */
   std::uint64_t DXT_EncodeAlphaBlock(
-    const std::uint8_t* const source, const int horizontalStride, const int verticalStride
+    const std::uint8_t* const source,
+    const int horizontalStride,
+    const int verticalStride
   )
   {
     std::uint32_t minAlpha = 0xFFu;
@@ -106,7 +112,9 @@ namespace moho
   /**
    * Address: 0x00404960 (FUN_00404960, Moho::DXT_EncodeGreenBlock)
    */
-  std::uint64_t DXT_EncodeGreenBlock(const std::uint8_t* const source)
+  std::uint64_t DXT_EncodeGreenBlock(
+    const std::uint8_t* const source
+  )
   {
     std::int32_t minValue = 0xFF;
     std::int32_t maxValue = 0;
@@ -145,8 +153,8 @@ namespace moho
       shift += 2u;
     }
 
-    const std::uint32_t endpointBits =
-      8u * ((static_cast<std::uint32_t>(maxEndpoint) & 0xFCu) | ((static_cast<std::uint32_t>(minEndpoint) & 0xFCu) << 16u));
+    const std::uint32_t endpointBits = 8u *
+      ((static_cast<std::uint32_t>(maxEndpoint) & 0xFCu) | ((static_cast<std::uint32_t>(minEndpoint) & 0xFCu) << 16u));
     return (static_cast<std::uint64_t>(indexBits) << 32u) | endpointBits;
   }
 
@@ -154,7 +162,9 @@ namespace moho
    * Address: 0x00404B10 (FUN_00404B10, Moho::DXT_DecodeAlphaBlock)
    */
   void DXT_DecodeAlphaBlock(
-    const std::uint64_t alphaBlock, const DXTFormat format, std::uint8_t* const outAlpha16
+    const std::uint64_t alphaBlock,
+    const DXTFormat format,
+    std::uint8_t* const outAlpha16
   )
   {
     if (outAlpha16 == nullptr) {
@@ -163,70 +173,70 @@ namespace moho
 
     const std::uint8_t formatIndex = static_cast<std::uint8_t>(format);
     switch (formatIndex) {
-      case 1: {
-        const std::uint16_t alpha0 = static_cast<std::uint16_t>(alphaBlock & 0xFFFFu);
-        const std::uint16_t alpha1 = static_cast<std::uint16_t>((alphaBlock >> 16u) & 0xFFFFu);
-        if (alpha0 > alpha1) {
-          for (int i = 0; i < 16; ++i) {
-            outAlpha16[i] = 0xFFu;
-          }
-          return;
-        }
-
-        std::uint32_t bits = static_cast<std::uint32_t>((alphaBlock >> 32u) & 0xFFFFFFFFu);
+    case 1: {
+      const std::uint16_t alpha0 = static_cast<std::uint16_t>(alphaBlock & 0xFFFFu);
+      const std::uint16_t alpha1 = static_cast<std::uint16_t>((alphaBlock >> 16u) & 0xFFFFu);
+      if (alpha0 > alpha1) {
         for (int i = 0; i < 16; ++i) {
-          const std::uint8_t code = static_cast<std::uint8_t>(bits & 0x3u);
-          bits >>= 2u;
-          outAlpha16[i] = (code == 3u) ? 0u : 0xFFu;
+          outAlpha16[i] = 0xFFu;
         }
         return;
       }
 
-      case 2:
-      case 3: {
-        std::uint64_t bits = alphaBlock >> 16u;
-        for (int i = 0; i < 16; ++i) {
-          const std::uint8_t nibble = static_cast<std::uint8_t>(bits & 0xFu);
-          bits >>= 4u;
-          outAlpha16[i] = static_cast<std::uint8_t>((nibble << 4u) | nibble);
-        }
-        return;
+      std::uint32_t bits = static_cast<std::uint32_t>((alphaBlock >> 32u) & 0xFFFFFFFFu);
+      for (int i = 0; i < 16; ++i) {
+        const std::uint8_t code = static_cast<std::uint8_t>(bits & 0x3u);
+        bits >>= 2u;
+        outAlpha16[i] = (code == 3u) ? 0u : 0xFFu;
+      }
+      return;
+    }
+
+    case 2:
+    case 3: {
+      std::uint64_t bits = alphaBlock >> 16u;
+      for (int i = 0; i < 16; ++i) {
+        const std::uint8_t nibble = static_cast<std::uint8_t>(bits & 0xFu);
+        bits >>= 4u;
+        outAlpha16[i] = static_cast<std::uint8_t>((nibble << 4u) | nibble);
+      }
+      return;
+    }
+
+    case 4:
+    case 5: {
+      const std::uint8_t alpha0 = static_cast<std::uint8_t>(alphaBlock & 0xFFu);
+      const std::uint8_t alpha1 = static_cast<std::uint8_t>((alphaBlock >> 8u) & 0xFFu);
+
+      std::array<std::uint8_t, 8> palette{};
+      palette[0] = alpha0;
+      palette[1] = alpha1;
+      if (alpha0 <= alpha1) {
+        palette[2] = static_cast<std::uint8_t>((alpha1 + 4 * alpha0 + 2) / 5);
+        palette[3] = static_cast<std::uint8_t>((3 * alpha0 + 2 * alpha1 + 2) / 5);
+        palette[4] = static_cast<std::uint8_t>((2 * alpha0 + 3 * alpha1 + 2) / 5);
+        palette[5] = static_cast<std::uint8_t>((alpha0 + 4 * alpha1 + 2) / 5);
+        palette[6] = 0;
+        palette[7] = 0xFFu;
+      } else {
+        palette[2] = static_cast<std::uint8_t>((alpha1 + 6 * alpha0 + 3) / 7);
+        palette[3] = static_cast<std::uint8_t>((5 * alpha0 + 2 * alpha1 + 3) / 7);
+        palette[4] = static_cast<std::uint8_t>((4 * alpha0 + 3 * alpha1 + 3) / 7);
+        palette[5] = static_cast<std::uint8_t>((3 * alpha0 + 4 * alpha1 + 3) / 7);
+        palette[6] = static_cast<std::uint8_t>((2 * alpha0 + 5 * alpha1 + 3) / 7);
+        palette[7] = static_cast<std::uint8_t>((alpha0 + 6 * alpha1 + 3) / 7);
       }
 
-      case 4:
-      case 5: {
-        const std::uint8_t alpha0 = static_cast<std::uint8_t>(alphaBlock & 0xFFu);
-        const std::uint8_t alpha1 = static_cast<std::uint8_t>((alphaBlock >> 8u) & 0xFFu);
-
-        std::array<std::uint8_t, 8> palette{};
-        palette[0] = alpha0;
-        palette[1] = alpha1;
-        if (alpha0 <= alpha1) {
-          palette[2] = static_cast<std::uint8_t>((alpha1 + 4 * alpha0 + 2) / 5);
-          palette[3] = static_cast<std::uint8_t>((3 * alpha0 + 2 * alpha1 + 2) / 5);
-          palette[4] = static_cast<std::uint8_t>((2 * alpha0 + 3 * alpha1 + 2) / 5);
-          palette[5] = static_cast<std::uint8_t>((alpha0 + 4 * alpha1 + 2) / 5);
-          palette[6] = 0;
-          palette[7] = 0xFFu;
-        } else {
-          palette[2] = static_cast<std::uint8_t>((alpha1 + 6 * alpha0 + 3) / 7);
-          palette[3] = static_cast<std::uint8_t>((5 * alpha0 + 2 * alpha1 + 3) / 7);
-          palette[4] = static_cast<std::uint8_t>((4 * alpha0 + 3 * alpha1 + 3) / 7);
-          palette[5] = static_cast<std::uint8_t>((3 * alpha0 + 4 * alpha1 + 3) / 7);
-          palette[6] = static_cast<std::uint8_t>((2 * alpha0 + 5 * alpha1 + 3) / 7);
-          palette[7] = static_cast<std::uint8_t>((alpha0 + 6 * alpha1 + 3) / 7);
-        }
-
-        std::uint64_t bits = alphaBlock >> 16u;
-        for (int i = 0; i < 16; ++i) {
-          outAlpha16[i] = palette[static_cast<std::uint8_t>(bits & 0x7u)];
-          bits >>= 3u;
-        }
-        return;
+      std::uint64_t bits = alphaBlock >> 16u;
+      for (int i = 0; i < 16; ++i) {
+        outAlpha16[i] = palette[static_cast<std::uint8_t>(bits & 0x7u)];
+        bits >>= 3u;
       }
+      return;
+    }
 
-      default:
-        return;
+    default:
+      return;
     }
   }
 
@@ -234,7 +244,9 @@ namespace moho
    * Address: 0x00404D60 (FUN_00404D60, Moho::DXT_DecodeColorBlock)
    */
   void DXT_DecodeColorBlock(
-    const std::uint64_t colorBlock, const DXTFormat format, std::uint32_t* const outArgb16
+    const std::uint64_t colorBlock,
+    const DXTFormat format,
+    std::uint32_t* const outArgb16
   )
   {
     if (outArgb16 == nullptr) {
@@ -264,7 +276,7 @@ namespace moho
       const std::uint8_t r = static_cast<std::uint8_t>((c0r + c1r + 1) / 2);
       const std::uint8_t a = static_cast<std::uint8_t>((c0a + c1a + 1) / 2);
       palette[2] = static_cast<std::uint32_t>(b) | (static_cast<std::uint32_t>(g) << 8u) |
-                   (static_cast<std::uint32_t>(r) << 16u) | (static_cast<std::uint32_t>(a) << 24u);
+        (static_cast<std::uint32_t>(r) << 16u) | (static_cast<std::uint32_t>(a) << 24u);
       palette[3] = 0u;
     } else {
       const std::uint8_t b2 = static_cast<std::uint8_t>((c1b + 2 * c0b + 1) / 3);
@@ -277,9 +289,9 @@ namespace moho
       const std::uint8_t a3 = static_cast<std::uint8_t>((c0a + 2 * c1a + 1) / 3);
 
       palette[2] = static_cast<std::uint32_t>(b2) | (static_cast<std::uint32_t>(g2) << 8u) |
-                   (static_cast<std::uint32_t>(r2) << 16u) | (static_cast<std::uint32_t>(a2) << 24u);
+        (static_cast<std::uint32_t>(r2) << 16u) | (static_cast<std::uint32_t>(a2) << 24u);
       palette[3] = static_cast<std::uint32_t>(b3) | (static_cast<std::uint32_t>(g3) << 8u) |
-                   (static_cast<std::uint32_t>(r3) << 16u) | (static_cast<std::uint32_t>(a3) << 24u);
+        (static_cast<std::uint32_t>(r3) << 16u) | (static_cast<std::uint32_t>(a3) << 24u);
     }
 
     std::uint32_t codes = static_cast<std::uint32_t>(colorBlock >> 32u);

@@ -43,12 +43,18 @@ namespace moho
     FirstNonUnitFamily = 0x10000000u
   };
 
-  [[nodiscard]] constexpr EEntityIdBitMask operator|(const EEntityIdBitMask lhs, const EEntityIdBitMask rhs) noexcept
+  [[nodiscard]] constexpr EEntityIdBitMask operator|(
+    const EEntityIdBitMask lhs,
+    const EEntityIdBitMask rhs
+  ) noexcept
   {
     return static_cast<EEntityIdBitMask>(static_cast<std::uint32_t>(lhs) | static_cast<std::uint32_t>(rhs));
   }
 
-  [[nodiscard]] constexpr EEntityIdBitMask operator&(const EEntityIdBitMask lhs, const EEntityIdBitMask rhs) noexcept
+  [[nodiscard]] constexpr EEntityIdBitMask operator&(
+    const EEntityIdBitMask lhs,
+    const EEntityIdBitMask rhs
+  ) noexcept
   {
     return static_cast<EEntityIdBitMask>(static_cast<std::uint32_t>(lhs) & static_cast<std::uint32_t>(rhs));
   }
@@ -58,27 +64,37 @@ namespace moho
   constexpr std::uint32_t kEntityIdSourceIndexMask = 0xFFu;
   constexpr std::uint8_t kEntityIdSourceIndexInvalid = 0xFFu;
 
-  [[nodiscard]] constexpr std::uint32_t ToMask(const EEntityIdBitMask mask) noexcept
+  [[nodiscard]] constexpr std::uint32_t ToMask(
+    const EEntityIdBitMask mask
+  ) noexcept
   {
     return static_cast<std::underlying_type_t<EEntityIdBitMask>>(mask);
   }
 
-  [[nodiscard]] constexpr std::uint32_t ToRaw(const EEntityIdSentinel value) noexcept
+  [[nodiscard]] constexpr std::uint32_t ToRaw(
+    const EEntityIdSentinel value
+  ) noexcept
   {
     return static_cast<std::underlying_type_t<EEntityIdSentinel>>(value);
   }
 
-  [[nodiscard]] constexpr std::uint8_t ExtractEntityIdSourceIndex(const std::uint32_t entityId) noexcept
+  [[nodiscard]] constexpr std::uint8_t ExtractEntityIdSourceIndex(
+    const std::uint32_t entityId
+  ) noexcept
   {
     return static_cast<std::uint8_t>((entityId >> kEntityIdSourceShift) & kEntityIdSourceIndexMask);
   }
 
-  [[nodiscard]] constexpr std::uint32_t ExtractEntityIdFamilyNibble(const std::uint32_t entityId) noexcept
+  [[nodiscard]] constexpr std::uint32_t ExtractEntityIdFamilyNibble(
+    const std::uint32_t entityId
+  ) noexcept
   {
     return (entityId >> kEntityIdFamilyShift) & 0xFu;
   }
 
-  [[nodiscard]] constexpr EEntityIdFamily ClassifyEntityIdFamily(const std::uint32_t entityId) noexcept
+  [[nodiscard]] constexpr EEntityIdFamily ClassifyEntityIdFamily(
+    const std::uint32_t entityId
+  ) noexcept
   {
     switch (ExtractEntityIdFamilyNibble(entityId)) {
     case 0u:
@@ -96,15 +112,20 @@ namespace moho
     }
   }
 
-  [[nodiscard]] constexpr std::uint32_t
-  MakeEntityIdFamilySourceBits(const EEntityIdFamily family, const std::uint8_t sourceIndex) noexcept
+  [[nodiscard]] constexpr std::uint32_t MakeEntityIdFamilySourceBits(
+    const EEntityIdFamily family,
+    const std::uint8_t sourceIndex
+  ) noexcept
   {
     return (static_cast<std::uint32_t>(family) << kEntityIdFamilyShift) |
       (static_cast<std::uint32_t>(sourceIndex) << kEntityIdSourceShift);
   }
 
-  [[nodiscard]] constexpr std::uint32_t
-  MakeEntityId(const EEntityIdFamily family, const std::uint8_t sourceIndex, const std::uint32_t serial) noexcept
+  [[nodiscard]] constexpr std::uint32_t MakeEntityId(
+    const EEntityIdFamily family,
+    const std::uint8_t sourceIndex,
+    const std::uint32_t serial
+  ) noexcept
   {
     return MakeEntityIdFamilySourceBits(family, sourceIndex) | (serial & ToMask(EEntityIdBitMask::Serial));
   }

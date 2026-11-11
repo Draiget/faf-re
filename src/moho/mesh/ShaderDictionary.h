@@ -95,7 +95,7 @@ namespace moho
      * 0x1C key with colour/nil at `+0x28`/`+0x29`, which is a set and not a
      * map. Never inserted into anywhere in this binary.
      */
-    fa::set<fa::string> mDeprecatedNames{};                  // +0x04
+    fa::set<fa::string> mDeprecatedNames{}; // +0x04
 
     /**
      * Legacy annotation -> modern shader name. Node 0x48 -- its header
@@ -103,7 +103,7 @@ namespace moho
      * is 0x38, two 0x1C strings. `ResolveShaderAnnotationName` reads the
      * mapped name at `node+0x28`, which is exactly `pair::second`.
      */
-    fa::map<fa::string, fa::string> mRemaps{};             // +0x10
+    fa::map<fa::string, fa::string> mRemaps{}; // +0x10
 
     static_assert(sizeof(fa::set<fa::string>) == 0x0C, "the legacy set head is 0x0C");
     static_assert(sizeof(fa::map<fa::string, fa::string>) == 0x0C, "the legacy map head is 0x0C");

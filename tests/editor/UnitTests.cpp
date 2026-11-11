@@ -3,6 +3,7 @@
 // retail `_save.lua` round-trips byte for byte.
 
 #include "editor/doc/EdSaveFile.h"
+#include "TestEnv.h"
 #include "editor/doc/EdUnits.h"
 
 #include <gtest/gtest.h>
@@ -48,7 +49,10 @@ namespace
                 },
             })";
 
-  TEST(Units, AGroupReadsAndWritesBackAsTheGameWroteIt)
+  TEST(
+    Units,
+    AGroupReadsAndWritesBackAsTheGameWroteIt
+  )
   {
     faf::editor::UnitGroup group;
     std::string error;
@@ -64,7 +68,10 @@ namespace
     EXPECT_EQ(faf::editor::FormatUnitGroup(group, 12), kGroup);
   }
 
-  TEST(Units, AddedAndRemovedUnitsWriteAndReadBack)
+  TEST(
+    Units,
+    AddedAndRemovedUnitsWriteAndReadBack
+  )
   {
     faf::editor::UnitGroup group;
     std::string error;
@@ -99,7 +106,10 @@ namespace
     EXPECT_EQ(empty.groups[0].units.size(), 1u);
   }
 
-  TEST(Units, AnEmptyGroupAndBadText)
+  TEST(
+    Units,
+    AnEmptyGroupAndBadText
+  )
   {
     faf::editor::UnitGroup group;
     std::string error;
@@ -109,9 +119,13 @@ namespace
     EXPECT_FALSE(error.empty());
   }
 
-  TEST(Units, EveryRetailArmyRoundTrips)
+  TEST(
+    Units,
+    EveryRetailArmyRoundTrips
+  )
   {
-    const char* const folder = std::getenv("FAF_RETAIL_MAPS");
+    const std::string folderText = faf::editor::test::EnvText("FAF_RETAIL_MAPS");
+    const char* const folder = folderText.empty() ? nullptr : folderText.c_str();
     if (folder == nullptr) {
       GTEST_SKIP() << "FAF_RETAIL_MAPS is not set";
     }
@@ -132,7 +146,8 @@ namespace
         for (const faf::editor::SaveEntry& army : save.Armies()) {
           const std::string value = army.Get("Units");
           faf::editor::UnitGroup group;
-          ASSERT_TRUE(faf::editor::ParseUnitGroup(value, group, error)) << file.path() << " " << army.name << ": " << error;
+          ASSERT_TRUE(faf::editor::ParseUnitGroup(value, group, error))
+            << file.path() << " " << army.name << ": " << error;
           const std::string written = faf::editor::FormatUnitGroup(group, 12);
           if (written != value) {
             // Where they part, with a little around it.
@@ -141,8 +156,8 @@ namespace
               ++at;
             }
             const std::size_t from = at > 80 ? at - 80 : 0;
-            ADD_FAILURE() << file.path() << " " << army.name << " differs at " << at << " | written: " << written.substr(from, 160)
-                          << " | read: " << value.substr(from, 160);
+            ADD_FAILURE() << file.path() << " " << army.name << " differs at " << at
+                          << " | written: " << written.substr(from, 160) << " | read: " << value.substr(from, 160);
           }
           std::vector<const faf::editor::SaveUnit*> all;
           faf::editor::CollectUnits(group, all);
@@ -153,5 +168,47 @@ namespace
     }
     EXPECT_GT(armies, 0);
     std::printf("retail: %d armies, %d units round-tripped\n", armies, units);
+  }
+  TEST(
+    Units,
+    GroupsAreAddedRenamedMovedIntoAndRemoved
+  )
+  {
+    faf::editor::UnitGroup root;
+    std::string error;
+    ASSERT_TRUE(faf::editor::ParseUnitGroup(kGroup, root, error)) << error;
+    // A group beside GROUP_1 in INITIAL; a name taken there is refused.
+    ASSERT_TRUE(faf::editor::AddGroup(root, {"INITIAL"}, "Defense"));
+    EXPECT_FALSE(faf::editor::AddGroup(root, {"INITIAL"}, "Defense"));
+    // UNIT_334 into it.
+    EXPECT_EQ(faf::editor::MoveUnitsTo(root, {"UNIT_334", "UNIT_999"}, {"INITIAL", "Defense"}), 1);
+    EXPECT_EQ(
+      faf::editor::UnitNamesIn(*faf::editor::GroupAt(root, {"INITIAL", "Defense"})),
+      (std::vector<std::string>{"UNIT_334"})
+    );
+    EXPECT_EQ(
+      faf::editor::UnitNamesIn(*faf::editor::GroupAt(root, {"INITIAL", "GROUP_1"})),
+      (std::vector<std::string>{"UNIT_328"})
+    );
+    // Renamed, and still found under the new name only.
+    ASSERT_TRUE(faf::editor::RenameGroup(root, {"INITIAL", "Defense"}, "Defenses"));
+    EXPECT_EQ(faf::editor::GroupAt(root, {"INITIAL", "Defense"}), nullptr);
+    EXPECT_FALSE(faf::editor::RenameGroup(root, {"INITIAL", "Defenses"}, "GROUP_1"));
+    // Written and read again, the tree is the same.
+    faf::editor::UnitGroup again;
+    ASSERT_TRUE(faf::editor::ParseUnitGroup(faf::editor::FormatUnitGroup(root, 12), again, error)) << error;
+    EXPECT_TRUE(again == root);
+    // GROUP_1 removed: its unit goes up into INITIAL, in GROUP_1's place (before Defenses).
+    ASSERT_TRUE(faf::editor::RemoveGroup(root, {"INITIAL", "GROUP_1"}));
+    const faf::editor::UnitGroup& initial = *faf::editor::GroupAt(root, {"INITIAL"});
+    ASSERT_EQ(initial.order.size(), 2u);
+    EXPECT_EQ(initial.order[0].unit, 0);
+    EXPECT_EQ(initial.units[0].name, "UNIT_328");
+    EXPECT_EQ(initial.order[1].group, 0);
+    EXPECT_EQ(initial.groups[0].name, "Defenses");
+    EXPECT_EQ(faf::editor::UnitNamesIn(root), (std::vector<std::string>{"UNIT_328", "UNIT_334"}));
+    EXPECT_FALSE(faf::editor::RemoveGroup(root, {}));
+    ASSERT_TRUE(faf::editor::ParseUnitGroup(faf::editor::FormatUnitGroup(root, 12), again, error)) << error;
+    EXPECT_TRUE(again == root);
   }
 } // namespace

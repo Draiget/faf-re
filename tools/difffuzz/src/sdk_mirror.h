@@ -51,16 +51,30 @@ namespace mirror
   float COORDS_Pitch(const Wm3::Vector3f& velocity) noexcept;
   void AimSetFiringArc(AimArcLanes& self, AimFiringArc arc);
   void BuilderArmSetAimingArc(
-    BuilderArmArcLanes& self, float minHeading, float maxHeading, float headingMaxSlew, float minPitch, float maxPitch,
+    BuilderArmArcLanes& self,
+    float minHeading,
+    float maxHeading,
+    float headingMaxSlew,
+    float minPitch,
+    float maxPitch,
     float pitchMaxSlew
   );
   std::uint8_t BuilderArmUpdateTrackingAxis(
-    TrackLanes& self, const Wm3::Vector3f& targetDirection, float angleCenter, float angleHalfArc, float maxSlew,
+    TrackLanes& self,
+    const Wm3::Vector3f& targetDirection,
+    float angleCenter,
+    float angleHalfArc,
+    float maxSlew,
     std::uint8_t trackingModeFlags
   );
   std::uint8_t AimCheckTracking(
-    TrackLanes& self, const Wm3::Vector3f& targetDirection, float minAngleCenter, float maxAngleHalfRange,
-    float maxAngleSlew, float tolerance, std::uint8_t trackingModeFlags
+    TrackLanes& self,
+    const Wm3::Vector3f& targetDirection,
+    float minAngleCenter,
+    float maxAngleHalfRange,
+    float maxAngleSlew,
+    float tolerance,
+    std::uint8_t trackingModeFlags
   );
   float WrapPositiveModulo(float value, float range) noexcept;
 

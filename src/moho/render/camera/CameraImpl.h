@@ -25,7 +25,7 @@ namespace gpg
 {
   class RRef;
   class RType;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -37,17 +37,17 @@ namespace moho
 
   struct SCamShakeParams
   {
-    Wm3::Vec3f mCenter{};         // +0x00
-    float mMaxRange = 0.0f;       // +0x0C
+    Wm3::Vec3f mCenter{};   // +0x00
+    float mMaxRange = 0.0f; // +0x0C
     /// Shake magnitude at the epicentre. Named `mMinMagnitude` until the
     /// falloff at 0x007A67C0 was read: `(field@0x14 - field@0x10) * (dist /
     /// range) + field@0x10`, so this field is what a listener standing on the
     /// epicentre gets and is the LARGER of the two in normal use. The
     /// `ShakeCamera` Lua binding passes its `maxIntensity` argument here.
-    float mMagnitudeAtCenter = 0.0f;     // +0x10
+    float mMagnitudeAtCenter = 0.0f; // +0x10
     /// Shake magnitude out at `mMaxRange`; the binding's `minIntensity`.
-    float mMagnitudeAtMaxRange = 0.0f;   // +0x14
-    float mDuration = 0.0f;       // +0x18
+    float mMagnitudeAtMaxRange = 0.0f; // +0x14
+    float mDuration = 0.0f;            // +0x18
   };
 
   static_assert(sizeof(SCamShakeParams) == 0x1C, "SCamShakeParams size must be 0x1C");
@@ -194,12 +194,7 @@ namespace moho
     virtual void TargetEntityBox(UserEntity* entity, float seconds) = 0;
 
     /// Slot 12.
-    virtual void TargetEntities(
-      const WeakSet<UserEntity>& entities,
-      bool trackEntities,
-      float zoom,
-      float seconds
-    ) = 0;
+    virtual void TargetEntities(const WeakSet<UserEntity>& entities, bool trackEntities, float zoom, float seconds) = 0;
 
     /// Slot 13.
     virtual void TargetBox(const Wm3::AxisAlignedBox3f& targetBox, float seconds) = 0;
@@ -497,7 +492,8 @@ namespace moho
 
     /**
      * Address: 0x007A6E70 (FUN_007A6E70, Moho::CameraImpl::CameraSetAccType)
-     * Mangled: ?CameraSetAccType@CameraImpl@Moho@@QAEXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z
+     * Mangled:
+     * ?CameraSetAccType@CameraImpl@Moho@@QAEXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z
      *
      * What it does:
      * Applies one acceleration mode token (`Linear`, `FastInSlowOut`,
@@ -549,7 +545,8 @@ namespace moho
      */
     [[nodiscard]] GeomLine3 Unproject(const Wm3::Vector2f& screenPoint) const override;
     /**
-     * Address: 0x007A6BB0 (FUN_007A6BB0, ?CameraScreenToSurface@CameraImpl@Moho@@UBE?AV?$Vector3@M@Wm3@@ABV?$Vector2@M@4@@Z)
+     * Address: 0x007A6BB0 (FUN_007A6BB0,
+     * ?CameraScreenToSurface@CameraImpl@Moho@@UBE?AV?$Vector3@M@Wm3@@ABV?$Vector2@M@4@@Z)
      *
      * What it does:
      * Unprojects one screen-space point and resolves the terrain/water surface
@@ -565,7 +562,7 @@ namespace moho
      */
     void CameraReset() override;
     /**
-      * Alias of FUN_007A6BF0 (non-canonical helper lane).
+     * Alias of FUN_007A6BF0 (non-canonical helper lane).
      * Mangled: ?TargetNothing@CameraImpl@Moho@@UAEXXZ
      *
      * What it does:
@@ -601,12 +598,7 @@ namespace moho
      * Replaces camera target weak-list from one entity weak-set, then starts
      * tracked or untracked multi-entity target behavior.
      */
-    void TargetEntities(
-      const WeakSet<UserEntity>& entities,
-      bool trackEntities,
-      float zoom,
-      float seconds
-    ) override;
+    void TargetEntities(const WeakSet<UserEntity>& entities, bool trackEntities, float zoom, float seconds) override;
     /**
      * Address: 0x007A83E0 (FUN_007A83E0, Moho::CameraImpl::TargetBox)
      * Mangled: ?TargetBox@CameraImpl@Moho@@UAEXABV?$AxisAlignedBox3@M@Wm3@@M@Z
@@ -859,7 +851,8 @@ namespace moho
     [[nodiscard]] gpg::core::FastVectorInline<WeakPtr<UserEntity>>& GetAllSoundEntitiesInFrustum() override;
     /**
      * Address: 0x007A7900 (FUN_007A7900, Moho::CameraImpl::GetAllUnitsInFrustum)
-     * Mangled: ?GetAllUnitsInFrustum@CameraImpl@Moho@@UAEAAV?$fastvector_n@V?$WeakPtr@VUserEntity@Moho@@@Moho@@$0CI@@gpg@@XZ
+     * Mangled:
+     * ?GetAllUnitsInFrustum@CameraImpl@Moho@@UAEAAV?$fastvector_n@V?$WeakPtr@VUserEntity@Moho@@@Moho@@$0CI@@gpg@@XZ
      * Slot: 40 (vtable ??_7CameraImpl@Moho@@6B@ at 0x00E3C474, VTABLE_CONFIRMED via
      * ctor 0x007A7950)
      *
@@ -882,7 +875,8 @@ namespace moho
     [[nodiscard]] gpg::core::FastVectorInline<WeakPtr<UserEntity>>* GetAllUnitsInFrustum() override;
     /**
      * Address: 0x007A7910 (FUN_007A7910, Moho::CameraImpl::GetArmyUnitsInFrustum)
-     * Mangled: ?GetArmyUnitsInFrustum@CameraImpl@Moho@@UAEAAV?$fastvector_n@V?$WeakPtr@VUserEntity@Moho@@@Moho@@$0CI@@gpg@@XZ
+     * Mangled:
+     * ?GetArmyUnitsInFrustum@CameraImpl@Moho@@UAEAAV?$fastvector_n@V?$WeakPtr@VUserEntity@Moho@@@Moho@@$0CI@@gpg@@XZ
      * Slot: 41 (vtable ??_7CameraImpl@Moho@@6B@ at 0x00E3C474, VTABLE_CONFIRMED via
      * ctor 0x007A7950)
      *
@@ -909,9 +903,6 @@ namespace moho
      */
     [[nodiscard]] Wm3::Vector3f GetTargetPosition() const override;
 
-
-
-
     /**
      * Address: 0x007A6DE0 (FUN_007A6DE0, Moho::CameraImpl::CameraHoldRotation)
      * Mangled: ?CameraHoldRotation@CameraImpl@Moho@@QAEXXZ
@@ -920,37 +911,6 @@ namespace moho
      * Arms camera rotation hold mode and clears any pending revert flag.
      */
     void CameraHoldRotation();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     /**
      * Address: 0x007A8E90 (FUN_007A8E90, Moho::CameraImpl::SetZoom)
@@ -963,10 +923,6 @@ namespace moho
      */
     void SetZoom(float zoom, float seconds);
 
-
-
-
-
     /**
      * Address: 0x007A8A20 (FUN_007A8A20, Moho::CameraImpl::TargetNoseCam)
      * Mangled: ?TargetNoseCam@CameraImpl@Moho@@QAEXABV?$WeakSet@VUserEntity@Moho@@@2@MMMM@Z
@@ -975,13 +931,8 @@ namespace moho
      * Targets one entity list in nose-camera mode with pitch-adjust, zoom,
      * transition seconds, and transition parameter lanes.
      */
-    void TargetNoseCam(
-      const WeakSet<UserEntity>& entities,
-      float pitchAdjust,
-      float zoom,
-      float seconds,
-      float transition
-    );
+    void
+    TargetNoseCam(const WeakSet<UserEntity>& entities, float pitchAdjust, float zoom, float seconds, float transition);
 
     /**
      * Address: 0x007A74C0 (FUN_007A74C0, Moho::CameraImpl::TimedMoveInit)
@@ -1032,10 +983,6 @@ namespace moho
      */
     void CalculateFOV();
 
-
-
-
-
     /**
      * Address: 0x007A6A30 (FUN_007A6A30, Moho::CameraImpl::SetTimeSource)
      * Mangled: ?SetTimeSource@CameraImpl@Moho@@QAEXW4ECamTimeSource@2@@Z
@@ -1057,66 +1004,66 @@ namespace moho
     // 0x0C (CScriptEvent base) + 0x10 (CScriptObject base) + 0x20.
     // -------------------------------------------------------------------------
 
-    fa::string mName{};                                     // +0x050
-    STIMap* mTerrainMap = nullptr;                             // +0x06C
-    GeomCamera3 mCam{};                                        // +0x070
-    float mVerticalZoomMetricScale = 0.0f;                     // +0x338
-    std::uint8_t mIsOrtho = 0;                                 // +0x33C
-    std::uint8_t mIsRotated = 0;                               // +0x33D
-    std::uint8_t mRevertRotation = 0;                          // +0x33E
-    std::uint8_t mPadding0x33F_ = 0;                           // +0x33F
-    float mFarFov = 0.0f;                                      // +0x340
-    float mFarPitch = 0.0f;                                    // +0x344
-    float mCurrentPitch = 0.0f;                                // +0x348
-    float mHeading = 0.0f;                                     // +0x34C
-    float mHeadingZoom = 0.0f;                                 // +0x350
-    float mTargetZoom = 0.0f;                                  // +0x354
-    float mNearZoom = 0.0f;                                    // +0x358
-    float mZoom = 0.0f;                                        // +0x35C
-    Wm3::Vec3f mOffset{};                                      // +0x360
-    Wm3::Vector2f mPivot{};                                    // +0x36C
-    float mHeadingRate = 0.0f;                                 // +0x374
-    float mZoomRate = 0.0f;                                    // +0x378
-    std::int32_t mTargetType = 0;                              // +0x37C
-    Wm3::Vec3f mTargetLocation{};                              // +0x380
-    Wm3::AxisAlignedBox3f mTargetBox{};                        // +0x38C
+    fa::string mName{};                    // +0x050
+    STIMap* mTerrainMap = nullptr;         // +0x06C
+    GeomCamera3 mCam{};                    // +0x070
+    float mVerticalZoomMetricScale = 0.0f; // +0x338
+    std::uint8_t mIsOrtho = 0;             // +0x33C
+    std::uint8_t mIsRotated = 0;           // +0x33D
+    std::uint8_t mRevertRotation = 0;      // +0x33E
+    std::uint8_t mPadding0x33F_ = 0;       // +0x33F
+    float mFarFov = 0.0f;                  // +0x340
+    float mFarPitch = 0.0f;                // +0x344
+    float mCurrentPitch = 0.0f;            // +0x348
+    float mHeading = 0.0f;                 // +0x34C
+    float mHeadingZoom = 0.0f;             // +0x350
+    float mTargetZoom = 0.0f;              // +0x354
+    float mNearZoom = 0.0f;                // +0x358
+    float mZoom = 0.0f;                    // +0x35C
+    Wm3::Vec3f mOffset{};                  // +0x360
+    Wm3::Vector2f mPivot{};                // +0x36C
+    float mHeadingRate = 0.0f;             // +0x374
+    float mZoomRate = 0.0f;                // +0x378
+    std::int32_t mTargetType = 0;          // +0x37C
+    Wm3::Vec3f mTargetLocation{};          // +0x380
+    Wm3::AxisAlignedBox3f mTargetBox{};    // +0x38C
     /// The entities the camera is framing or following. Each node's value is a
     /// `WeakPtr` pushed onto its entity's chain: `push_back` 0x007AE4E0,
     /// `clear` 0x007AE580, the head bought through 0x007AEFA0.
-    fa::list<WeakPtr<UserEntity>> mTargetEntities;          // +0x3A4
+    fa::list<WeakPtr<UserEntity>> mTargetEntities; // +0x3A4
     /// The entity being followed; a default iterator until the first target.
-    fa::list<WeakPtr<UserEntity>>::iterator mActiveTarget;  // +0x3B0
-    float mTargetTimeLeft = 0.0f;                              // +0x3B4
-    std::uint8_t mTargetTime = 0;                              // +0x3B8
-    std::uint8_t mPadding0x3B9_[3]{};                          // +0x3B9
-    std::int32_t mTimeSource = 0;                              // +0x3BC
-    CameraTimeSource* mTimeSources[2]{};                // +0x3C0 (System=0, Game=1)
-    float mLastFrameTime = 0.0f;                               // +0x3C8
-    std::uint8_t mEnableEaseInOut = 0;                         // +0x3CC
-    std::uint8_t mPadding0x3CD_[3]{};                          // +0x3CD
-    float mNoseCamPitchAdjust = 0.0f;                          // +0x3D0
-    Wm3::Vec3f mTimedMoveOffset{};                             // +0x3D4
-    float mTimedMoveZoom = 0.0f;                               // +0x3E0
-    float mTimedMoveDuration = 0.0f;                           // +0x3E4
-    float mTimedMoveTransitionParam = 0.0f;                    // +0x3E8
-    float mTimedMoveStartTime = 0.0f;                          // +0x3EC
-    float mTimedMovePitch = 0.0f;                              // +0x3F0
-    float mTimedMoveHeading = 0.0f;                            // +0x3F4
-    Wm3::Vec3f mHermiteOffsetStartDelta{};                     // +0x3F8
-    Wm3::Vec3f mHermiteOffsetEndDelta{};                       // +0x404
-    float mHermiteHeadingStartDelta = 0.0f;                    // +0x410
-    float mHermiteHeadingEndDelta = 0.0f;                      // +0x414
-    float mHermitePitchStartDelta = 0.0f;                      // +0x418
-    float mHermitePitchEndDelta = 0.0f;                        // +0x41C
-    float mHermiteZoomStartDelta = 0.0f;                       // +0x420
-    float mHermiteZoomEndDelta = 0.0f;                         // +0x424
-    SCamShakeState mCamShakeParams{};                          // +0x428
-    std::uint8_t mCanShake = 0;                                // +0x44C
-    std::uint8_t mPadding0x44D_[3]{};                          // +0x44D
-    std::int32_t mAccType = 0;                                 // +0x450
-    float mFrustumCacheTimer = 0.0f;                           // +0x454
-    float mFrustumCacheZoomMark = 0.0f;                        // +0x458
-    std::uint8_t mPadding0x45C_[4]{};                          // +0x45C
+    fa::list<WeakPtr<UserEntity>>::iterator mActiveTarget; // +0x3B0
+    float mTargetTimeLeft = 0.0f;                          // +0x3B4
+    std::uint8_t mTargetTime = 0;                          // +0x3B8
+    std::uint8_t mPadding0x3B9_[3]{};                      // +0x3B9
+    std::int32_t mTimeSource = 0;                          // +0x3BC
+    CameraTimeSource* mTimeSources[2]{};                   // +0x3C0 (System=0, Game=1)
+    float mLastFrameTime = 0.0f;                           // +0x3C8
+    std::uint8_t mEnableEaseInOut = 0;                     // +0x3CC
+    std::uint8_t mPadding0x3CD_[3]{};                      // +0x3CD
+    float mNoseCamPitchAdjust = 0.0f;                      // +0x3D0
+    Wm3::Vec3f mTimedMoveOffset{};                         // +0x3D4
+    float mTimedMoveZoom = 0.0f;                           // +0x3E0
+    float mTimedMoveDuration = 0.0f;                       // +0x3E4
+    float mTimedMoveTransitionParam = 0.0f;                // +0x3E8
+    float mTimedMoveStartTime = 0.0f;                      // +0x3EC
+    float mTimedMovePitch = 0.0f;                          // +0x3F0
+    float mTimedMoveHeading = 0.0f;                        // +0x3F4
+    Wm3::Vec3f mHermiteOffsetStartDelta{};                 // +0x3F8
+    Wm3::Vec3f mHermiteOffsetEndDelta{};                   // +0x404
+    float mHermiteHeadingStartDelta = 0.0f;                // +0x410
+    float mHermiteHeadingEndDelta = 0.0f;                  // +0x414
+    float mHermitePitchStartDelta = 0.0f;                  // +0x418
+    float mHermitePitchEndDelta = 0.0f;                    // +0x41C
+    float mHermiteZoomStartDelta = 0.0f;                   // +0x420
+    float mHermiteZoomEndDelta = 0.0f;                     // +0x424
+    SCamShakeState mCamShakeParams{};                      // +0x428
+    std::uint8_t mCanShake = 0;                            // +0x44C
+    std::uint8_t mPadding0x44D_[3]{};                      // +0x44D
+    std::int32_t mAccType = 0;                             // +0x450
+    float mFrustumCacheTimer = 0.0f;                       // +0x454
+    float mFrustumCacheZoomMark = 0.0f;                    // +0x458
+    std::uint8_t mPadding0x45C_[4]{};                      // +0x45C
 
     // The three frustum weak-entity lanes. The constructor at 0x007A7950
     // points each lane's `mView` at its own `mInlineStorage[0]` sentinel; the
@@ -1127,8 +1074,8 @@ namespace moho
     gpg::core::FastVectorN<WeakPtr<UserEntity>, 40> mFrustumLaneA;       // +0x460
     gpg::core::FastVectorN<WeakPtr<UserEntity>, 40> mFrustumLaneB;       // +0x5B0
     gpg::core::FastVectorN<WeakPtr<UserEntity>, 40> mArmyUnitsInFrustum; // +0x700
-    float mMaxZoomMult = 0.0f;                             // +0x850
-    std::uint8_t mPadding0x854_[4]{};                      // +0x854
+    float mMaxZoomMult = 0.0f;                                           // +0x850
+    std::uint8_t mPadding0x854_[4]{};                                    // +0x854
   };
 
   static_assert(offsetof(CameraImpl, mName) == 0x050, "CameraImpl::mName offset must be 0x050");
@@ -1174,10 +1121,7 @@ namespace moho
     offsetof(CameraImpl, mTimedMoveStartTime) == 0x3EC,
     "CameraImpl::mTimedMoveStartTime offset must be 0x3EC"
   );
-  static_assert(
-    offsetof(CameraImpl, mTimedMoveHeading) == 0x3F4,
-    "CameraImpl::mTimedMoveHeading offset must be 0x3F4"
-  );
+  static_assert(offsetof(CameraImpl, mTimedMoveHeading) == 0x3F4, "CameraImpl::mTimedMoveHeading offset must be 0x3F4");
   static_assert(
     offsetof(CameraImpl, mHermiteOffsetStartDelta) == 0x3F8,
     "CameraImpl::mHermiteOffsetStartDelta offset must be 0x3F8"

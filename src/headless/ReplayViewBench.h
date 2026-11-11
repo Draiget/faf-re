@@ -32,19 +32,47 @@ namespace faf::headless
   {
   public:
     /** `check`: `--view-bench-check`, each held frame is compared with the whole one (slow). */
-    CReplayViewBench(const std::string& path, const remote::wire::SContentTables& tables, float mapSizeX, float mapSizeZ, bool check);
+    CReplayViewBench(
+      const std::string& path,
+      const remote::wire::SContentTables& tables,
+      float mapSizeX,
+      float mapSizeZ,
+      bool check
+    );
     ~CReplayViewBench() override;
 
-    [[nodiscard]] bool IsOpen() const noexcept { return mFile != nullptr; }
+    [[nodiscard]] bool IsOpen() const noexcept
+    {
+      return mFile != nullptr;
+    }
     void Install();
     void Uninstall();
     /** `--spy` with `--lua-routing`: every Lua key each view receives is checked (ReplaySyncSpy.h). */
-    void EnableLuaSpy() noexcept { mLuaSpyOn = true; }
+    void EnableLuaSpy() noexcept
+    {
+      mLuaSpyOn = true;
+    }
     /** `--view-tables`: the session tables as a server keeps them, each beat's record written (and counted). */
-    void EnableBenchTables() noexcept { EnableSessionTables(mSessionTables); }
+    void EnableBenchTables() noexcept
+    {
+      EnableSessionTables(mSessionTables);
+    }
     /** `--lua-move-view` and `--lua-resync`: moves and resyncs at a beat, to test them on replays. */
-    void AddLuaMove(const std::int32_t beat, const std::size_t view, const std::int32_t army) { mLuaMoves.push_back({beat, view, army}); }
-    void AddLuaResync(const std::int32_t beat, const std::size_t view) { mLuaResyncs.push_back({beat, view, 0}); }
+    void AddLuaMove(
+      const std::int32_t beat,
+      const std::size_t view,
+      const std::int32_t army
+    )
+    {
+      mLuaMoves.push_back({beat, view, army});
+    }
+    void AddLuaResync(
+      const std::int32_t beat,
+      const std::size_t view
+    )
+    {
+      mLuaResyncs.push_back({beat, view, 0});
+    }
     [[nodiscard]] std::string Summary() const;
     /** Lanes that did not encode, and what the check found (should stay 0). */
     [[nodiscard]] std::uint64_t Failures() const noexcept;
@@ -70,12 +98,12 @@ namespace faf::headless
     std::uint64_t mTableRecords = 0;
     std::size_t mViews = 0; // views built on the last beat (civilian armies have none)
     std::vector<SBeat> mBeats;
-    SBeat mBeat{}; // this beat's, until `OnViewsFinished` adds it to them
+    SBeat mBeat{};                               // this beat's, until `OnViewsFinished` adds it to them
     std::vector<std::uint32_t> mClientBeatBytes; // one entry per client and beat
     std::uint64_t mEntities = 0;                 // in all frames, all beats
     double mLastBuildSeconds = 0.0;
     bool mHaveLastFrames = false;
-    double mWaitSeconds = 0.0;    // the sim thread's wait for the last beat's views to finish
+    double mWaitSeconds = 0.0;     // the sim thread's wait for the last beat's views to finish
     std::uint64_t mPhaseBeats = 0; // beats the phase times cover
     std::chrono::steady_clock::time_point mLastFrames{};
     std::uint64_t mEncodeFailures = 0;

@@ -23,7 +23,11 @@ namespace moho
    * `centre - scale / 2` (0x0087ECE0).
    */
   [[nodiscard]] inline ScriptedDecalCorner ScriptedDecalCornerForCentre(
-    const float centreX, const float centreZ, const float scaleX, const float scaleZ, const float heading
+    const float centreX,
+    const float centreZ,
+    const float scaleX,
+    const float scaleZ,
+    const float heading
   ) noexcept
   {
     if (heading == 0.0f) {

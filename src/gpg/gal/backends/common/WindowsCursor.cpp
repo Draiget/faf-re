@@ -8,6 +8,9 @@
 #include "gpg/gal/CursorContext.hpp"
 #include "gpg/gal/D3D9Utils.h"
 #include "gpg/gal/Texture.hpp"
+#if FAFRE_PLATFORM_POSIX
+#include "platform/posix/Win32WindowPosix.h" // the window system's cursor (issue #256)
+#endif
 
 namespace gpg::gal
 {
@@ -18,8 +21,22 @@ namespace gpg::gal
      * `BuildCursorIcon` (0x008F8130) builds it: rows bottom-up, in the DIB's
      * B,G,R,A order.
      */
-    HICON BuildCursorIcon(const int hotspotX, const int hotspotY, Texture& texture, const bool rgbaSource)
+    HICON BuildCursorIcon(
+      const int hotspotX,
+      const int hotspotY,
+      Texture& texture,
+      const bool rgbaSource
+    )
     {
+#if !FAFRE_PLATFORM_WINDOWS
+      // The window system makes the cursor (platform/posix/Win32WindowPosix.h, issue #256) from the
+      // pixels as the DIB below holds them.
+      if (platform::posix::gCreateCursorHook == nullptr) {
+        return nullptr;
+      }
+      std::uint32_t cursorPixels[32U * 32U]{};
+      void* const dibPixels = cursorPixels;
+#else
       BITMAPV5HEADER bitmapInfo{};
       bitmapInfo.bV5Size = sizeof(BITMAPV5HEADER);
       bitmapInfo.bV5Width = 32L;
@@ -34,12 +51,14 @@ namespace gpg::gal
 
       HDC const dc = ::GetDC(nullptr);
       void* dibPixels = nullptr;
-      HBITMAP const colorBitmap =
-        ::CreateDIBSection(dc, reinterpret_cast<const BITMAPINFO*>(&bitmapInfo), DIB_RGB_COLORS, &dibPixels, nullptr, 0U);
+      HBITMAP const colorBitmap = ::CreateDIBSection(
+        dc, reinterpret_cast<const BITMAPINFO*>(&bitmapInfo), DIB_RGB_COLORS, &dibPixels, nullptr, 0U
+      );
       ::ReleaseDC(nullptr, dc);
       if (colorBitmap == nullptr || dibPixels == nullptr) {
         return nullptr;
       }
+#endif
 
       const RECT wholeSurface{};
       const TextureLockRect lock = texture.Lock(0, wholeSurface, static_cast<int>(MohoD3DLockFlags::ReadOnly));
@@ -50,12 +69,16 @@ namespace gpg::gal
           reinterpret_cast<const std::uint32_t*>(sourceBytes + static_cast<std::size_t>(lock.pitch) * (31U - y));
         for (std::uint32_t x = 0U; x < 32U; ++x) {
           const std::uint32_t pixel = sourceRow[x];
-          destination[y * 32U + x] =
-            rgbaSource ? ((pixel & 0xFF00FF00U) | ((pixel & 0x000000FFU) << 16U) | ((pixel & 0x00FF0000U) >> 16U)) : pixel;
+          destination[y * 32U + x] = rgbaSource
+            ? ((pixel & 0xFF00FF00U) | ((pixel & 0x000000FFU) << 16U) | ((pixel & 0x00FF0000U) >> 16U))
+            : pixel;
         }
       }
       static_cast<void>(texture.Unlock(lock));
 
+#if !FAFRE_PLATFORM_WINDOWS
+      return static_cast<HICON>(platform::posix::gCreateCursorHook(cursorPixels, hotspotX, hotspotY));
+#else
       HBITMAP const maskBitmap = ::CreateBitmap(32, 32, 1U, 1U, nullptr);
       ICONINFO iconInfo{};
       iconInfo.fIcon = FALSE;
@@ -67,6 +90,7 @@ namespace gpg::gal
       ::DeleteObject(colorBitmap);
       ::DeleteObject(maskBitmap);
       return icon;
+#endif
     }
   } // namespace
 
@@ -85,10 +109,14 @@ namespace gpg::gal
     mCursorIcon = nullptr;
   }
 
-  HCURSOR WindowsCursor::SetCursor(const CursorContext& context)
+  HCURSOR WindowsCursor::SetCursor(
+    const CursorContext& context
+  )
   {
     HICON const icon = (context.texture_ != nullptr)
-      ? BuildCursorIcon(context.hotspotX_, context.hotspotY_, *context.texture_, mIsRgba != nullptr && mIsRgba(*context.texture_))
+      ? BuildCursorIcon(
+          context.hotspotX_, context.hotspotY_, *context.texture_, mIsRgba != nullptr && mIsRgba(*context.texture_)
+        )
       : nullptr;
     HICON const previousIcon = mCursorIcon;
     mCursorIcon = icon;
@@ -109,7 +137,9 @@ namespace gpg::gal
     return ::SetCursor(mCursorIcon);
   }
 
-  int WindowsCursor::ShowCursor(const bool show)
+  int WindowsCursor::ShowCursor(
+    const bool show
+  )
   {
     if (mCursorIcon == nullptr) {
       backend::ThrowError("WindowsCursor.cpp", __LINE__, "attempt to use uninitialized cursor");

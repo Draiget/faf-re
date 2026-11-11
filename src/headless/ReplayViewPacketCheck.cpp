@@ -22,13 +22,18 @@ namespace faf::headless
     {
     public:
       template <typename T>
-      void Add(const T& value) noexcept
+      void Add(
+        const T& value
+      ) noexcept
       {
         static_assert(std::is_arithmetic_v<T> || std::is_enum_v<T>);
         Bytes(&value, sizeof(value));
       }
 
-      void Bytes(const void* const data, const std::size_t size) noexcept
+      void Bytes(
+        const void* const data,
+        const std::size_t size
+      ) noexcept
       {
         const auto* const bytes = static_cast<const unsigned char*>(data);
         for (std::size_t i = 0; i < size; ++i) {
@@ -37,15 +42,26 @@ namespace faf::headless
         }
       }
 
-      void Text(const char* const text) noexcept { Bytes(text, text != nullptr ? std::strlen(text) + 1u : 0u); }
+      void Text(
+        const char* const text
+      ) noexcept
+      {
+        Bytes(text, text != nullptr ? std::strlen(text) + 1u : 0u);
+      }
 
-      [[nodiscard]] std::uint64_t Value() const noexcept { return mHash; }
+      [[nodiscard]] std::uint64_t Value() const noexcept
+      {
+        return mHash;
+      }
 
     private:
       std::uint64_t mHash = 0xCBF29CE484222325ull;
     };
 
-    void AddTransform(CDigest& digest, const moho::VTransform& transform) noexcept
+    void AddTransform(
+      CDigest& digest,
+      const moho::VTransform& transform
+    ) noexcept
     {
       digest.Add(transform.orient_.x);
       digest.Add(transform.orient_.y);
@@ -56,7 +72,10 @@ namespace faf::headless
       digest.Add(transform.pos_.z);
     }
 
-    void AddEntityBlock(CDigest& digest, const moho::SSTIEntityVariableData& data)
+    void AddEntityBlock(
+      CDigest& digest,
+      const moho::SSTIEntityVariableData& data
+    )
     {
       digest.Text(data.mMeshBlueprint != nullptr ? data.mMeshBlueprint->mBlueprintId.c_str() : nullptr);
       digest.Add(data.mScale.x);
@@ -87,7 +106,11 @@ namespace faf::headless
       digest.Add(data.mIntelAttributes.GetRange(moho::ENTATTR_Vision));
     }
 
-    void AddUnitBlock(CDigest& digest, const moho::SSTIUnitVariableData& data, const std::int32_t reconFlags)
+    void AddUnitBlock(
+      CDigest& digest,
+      const moho::SSTIUnitVariableData& data,
+      const std::int32_t reconFlags
+    )
     {
       digest.Add(reconFlags);
       digest.Add(data.mCreator);
@@ -124,7 +147,10 @@ namespace faf::headless
      * The army lane: every army's public fields and `mIsAlly`, plus the fields only the focus
      * army's own client reads (remote/ViewPackets.cpp, `ArmyRecordForView`) for `viewArmy` alone.
      */
-    [[nodiscard]] std::uint64_t ArmiesDigest(const fa::vector<moho::SSTIArmyVariableData>& armies, const std::int32_t viewArmy)
+    [[nodiscard]] std::uint64_t ArmiesDigest(
+      const fa::vector<moho::SSTIArmyVariableData>& armies,
+      const std::int32_t viewArmy
+    )
     {
       CDigest digest;
       const auto count = static_cast<std::uint32_t>(armies.size());
@@ -132,10 +158,12 @@ namespace faf::headless
       for (std::uint32_t index = 0; index < count; ++index) {
         const moho::SSTIArmyVariableData& army = armies[index];
         for (std::uint32_t other = 0; other < count; ++other) {
-          digest.Add(static_cast<std::uint8_t>(
-            (army.mNeutrals.Contains(other) ? 1u : 0u) | (army.mAllies.Contains(other) ? 2u : 0u)
-            | (army.mEnemies.Contains(other) ? 4u : 0u) | (army.mValidCommandSources.Contains(other) ? 8u : 0u)
-          ));
+          digest.Add(
+            static_cast<std::uint8_t>(
+              (army.mNeutrals.Contains(other) ? 1u : 0u) | (army.mAllies.Contains(other) ? 2u : 0u) |
+              (army.mEnemies.Contains(other) ? 4u : 0u) | (army.mValidCommandSources.Contains(other) ? 8u : 0u)
+            )
+          );
         }
         digest.Add(army.mIsAlly);
         digest.Add(army.mPlayerColorBgra);
@@ -166,7 +194,9 @@ namespace faf::headless
     }
 
     template <class TRecord>
-    [[nodiscard]] std::vector<const TRecord*> ById(const fa::vector<TRecord>& records)
+    [[nodiscard]] std::vector<const TRecord*> ById(
+      const fa::vector<TRecord>& records
+    )
     {
       std::vector<const TRecord*> sorted;
       sorted.reserve(records.size());
@@ -179,7 +209,9 @@ namespace faf::headless
       return sorted;
     }
 
-    [[nodiscard]] std::uint64_t IdsDigest(const fa::vector<moho::EntId>& ids)
+    [[nodiscard]] std::uint64_t IdsDigest(
+      const fa::vector<moho::EntId>& ids
+    )
     {
       std::vector<std::uint32_t> sorted;
       for (const moho::EntId id : ids) {
@@ -195,7 +227,10 @@ namespace faf::headless
   } // namespace
 
   CReplayViewPacketCheck::CReplayViewPacketCheck(
-    const std::int32_t army, const std::string& path, const std::string& entriesPath, const std::uint32_t entriesEvery
+    const std::int32_t army,
+    const std::string& path,
+    const std::string& entriesPath,
+    const std::uint32_t entriesEvery
   )
     : mArmy(army)
     , mWantEntries(!entriesPath.empty())
@@ -230,7 +265,10 @@ namespace faf::headless
     moho::Sim::SetSyncObserver(nullptr);
   }
 
-  void CReplayViewPacketCheck::OnBeatChanges(moho::Sim& sim, const moho::SSyncData& packet)
+  void CReplayViewPacketCheck::OnBeatChanges(
+    moho::Sim& sim,
+    const moho::SSyncData& packet
+  )
   {
     if (sim.mSyncFilter.focusArmy == -1) {
       remote::CViewPackets::OnBeatChanges(sim, packet); // rebuilds, then OnViewPackets
@@ -241,14 +279,20 @@ namespace faf::headless
     }
   }
 
-  void CReplayViewPacketCheck::OnViewPackets(moho::Sim& sim)
+  void CReplayViewPacketCheck::OnViewPackets(
+    moho::Sim& sim
+  )
   {
     if (mArmy >= 0 && mArmy < ArmyCount()) {
       WriteDigest(sim.mCurBeat, Packet(mArmy), true);
     }
   }
 
-  void CReplayViewPacketCheck::WriteDigest(const std::uint32_t beat, const moho::SSyncData& packet, const bool rebuilt)
+  void CReplayViewPacketCheck::WriteDigest(
+    const std::uint32_t beat,
+    const moho::SSyncData& packet,
+    const bool rebuilt
+  )
   {
     if (mFile == nullptr) {
       return;
@@ -263,7 +307,11 @@ namespace faf::headless
         CDigest own;
         addRecord(own);
         std::fprintf(
-          mEntries, "%u %c %08x %016llx\n", beat, lane, static_cast<std::uint32_t>(id),
+          mEntries,
+          "%u %c %08x %016llx\n",
+          beat,
+          lane,
+          static_cast<std::uint32_t>(id),
           static_cast<unsigned long long>(own.Value())
         );
       }
@@ -318,19 +366,28 @@ namespace faf::headless
       }
       std::sort(sorted.begin(), sorted.end());
       for (const std::uint32_t id : sorted) {
-        entry(lane, static_cast<moho::EntId>(id), [id](CDigest& digest) { digest.Add(id); });
+        entry(lane, static_cast<moho::EntId>(id), [id](CDigest& digest) {
+          digest.Add(id);
+        });
       }
     };
     idEntries('d', packet.mDeleteIds);
     idEntries('x', packet.mEraseIds);
 
     std::fprintf(
-      mFile, "%u %zu %zu %zu %zu %zu %zu %016llx %016llx %016llx %016llx %016llx %016llx %016llx\n", beat,
-      static_cast<std::size_t>(packet.mNewEntities.size()), static_cast<std::size_t>(packet.mNewUnits.size()),
-      static_cast<std::size_t>(packet.mEntityUpdates.size()), static_cast<std::size_t>(packet.mUnitUpdates.size()),
-      static_cast<std::size_t>(packet.mDeleteIds.size()), static_cast<std::size_t>(packet.mEraseIds.size()),
-      static_cast<unsigned long long>(creates.Value()), static_cast<unsigned long long>(unitCreates.Value()),
-      static_cast<unsigned long long>(entities.Value()), static_cast<unsigned long long>(units.Value()),
+      mFile,
+      "%u %zu %zu %zu %zu %zu %zu %016llx %016llx %016llx %016llx %016llx %016llx %016llx\n",
+      beat,
+      static_cast<std::size_t>(packet.mNewEntities.size()),
+      static_cast<std::size_t>(packet.mNewUnits.size()),
+      static_cast<std::size_t>(packet.mEntityUpdates.size()),
+      static_cast<std::size_t>(packet.mUnitUpdates.size()),
+      static_cast<std::size_t>(packet.mDeleteIds.size()),
+      static_cast<std::size_t>(packet.mEraseIds.size()),
+      static_cast<unsigned long long>(creates.Value()),
+      static_cast<unsigned long long>(unitCreates.Value()),
+      static_cast<unsigned long long>(entities.Value()),
+      static_cast<unsigned long long>(units.Value()),
       static_cast<unsigned long long>(IdsDigest(packet.mDeleteIds)),
       static_cast<unsigned long long>(IdsDigest(packet.mEraseIds)),
       static_cast<unsigned long long>(ArmiesDigest(packet.mArmyUpdates, mArmy))
@@ -341,8 +398,12 @@ namespace faf::headless
   {
     char text[160];
     std::snprintf(
-      text, sizeof(text), "view-packets: army %d, %llu beats written (%s)", mArmy,
-      static_cast<unsigned long long>(mBeats), mRebuilt ? "rebuilt from the change set" : "the sim's own packet"
+      text,
+      sizeof(text),
+      "view-packets: army %d, %llu beats written (%s)",
+      mArmy,
+      static_cast<unsigned long long>(mBeats),
+      mRebuilt ? "rebuilt from the change set" : "the sim's own packet"
     );
     return text;
   }

@@ -111,12 +111,8 @@ namespace moho
    * hemisphere, performs normalized linear interpolation, and writes into
    * `out`.
    */
-  Wm3::Quaternionf* QuatLERP(
-    const Wm3::Quaternionf* q1,
-    const Wm3::Quaternionf* q2,
-    Wm3::Quaternionf* out,
-    float amount
-  ) noexcept;
+  Wm3::Quaternionf*
+  QuatLERP(const Wm3::Quaternionf* q1, const Wm3::Quaternionf* q2, Wm3::Quaternionf* out, float amount) noexcept;
 
   /**
    * Address: 0x004EBC00 (FUN_004EBC00, Moho::SLERP)
@@ -136,11 +132,8 @@ namespace moho
    * is non-finite, and short-circuits to a copy of `q1` when both inputs
    * are already coincident. Writes the result into `*out` and returns it.
    */
-  Wm3::Quaternionf* SLERP(
-      const Wm3::Quaternionf* q2,
-      const Wm3::Quaternionf* q1,
-      Wm3::Quaternionf* out,
-      float t) noexcept;
+  Wm3::Quaternionf*
+  SLERP(const Wm3::Quaternionf* q2, const Wm3::Quaternionf* q1, Wm3::Quaternionf* out, float t) noexcept;
 
   /**
    * Address: 0x0069AA50 (FUN_0069AA50, func_QuatFromVecRot)
@@ -172,9 +165,8 @@ namespace moho
    * normalised `fallbackAxis` instead. Defined in `Sim.cpp`, next to its
    * `CDebugCanvas` callers.
    */
-  Wm3::Quaternionf* QuatCrossAdd(
-    Wm3::Quaternionf* dest, Wm3::Vector3f v1, Wm3::Vector3f v2, const Wm3::Vector3f& fallbackAxis
-  );
+  Wm3::Quaternionf*
+  QuatCrossAdd(Wm3::Quaternionf* dest, Wm3::Vector3f v1, Wm3::Vector3f v2, const Wm3::Vector3f& fallbackAxis);
 
   /**
    * Address: 0x006C1070 (FUN_006C1070)
@@ -183,11 +175,7 @@ namespace moho
    * Extracts one axis-angle representation from a quaternion, returning the
    * normalized axis in `axisOut` and angle (radians) in `angleRadiansOut`.
    */
-  void QuatToAxisAndAngle(
-    const Wm3::Quaternionf& quaternion,
-    Wm3::Vector3f* axisOut,
-    float* angleRadiansOut
-  ) noexcept;
+  void QuatToAxisAndAngle(const Wm3::Quaternionf& quaternion, Wm3::Vector3f* axisOut, float* angleRadiansOut) noexcept;
 
   /**
    * Address: 0x00697360 (FUN_00697360, func_VecToQuatB)
@@ -232,9 +220,7 @@ namespace moho
    * Multiplies two row-major 3x3 matrices (`result = a * b`), each three
    * consecutive `Wm3::Vector3f` rows. `result` must not alias `a`/`b`.
    */
-  Wm3::Vector3f* Multiply3x3RowMatrices(
-    Wm3::Vector3f* result, const Wm3::Vector3f* a, const Wm3::Vector3f* b
-  ) noexcept;
+  Wm3::Vector3f* Multiply3x3RowMatrices(Wm3::Vector3f* result, const Wm3::Vector3f* a, const Wm3::Vector3f* b) noexcept;
 
   /**
    * Address: 0x006D1E30 (FUN_006D1E30, sub_6D1E30)
@@ -242,9 +228,8 @@ namespace moho
    * Builds a row-major 3x3 rotation matrix (three `Wm3::Vector3f` rows) from
    * heading/pitch/roll Euler angles in radians (`headingY * pitchX * rollZ`).
    */
-  Wm3::Vector3f* BuildRotationMatrixFromEulerHPR(
-    Wm3::Vector3f* outMatrix, float heading, float pitch, float roll
-  ) noexcept;
+  Wm3::Vector3f*
+  BuildRotationMatrixFromEulerHPR(Wm3::Vector3f* outMatrix, float heading, float pitch, float roll) noexcept;
 
   /**
    * Address: 0x00452FD0 (FUN_00452FD0, func_QuatToMatrix)
@@ -267,7 +252,9 @@ namespace moho
    * pairs the same two products per lane and only scales by 2, which is
    * exact, so the operand order the copies differ in does not change a bit.
    */
-  [[nodiscard]] inline Wm3::Vector3f QuatForwardAxis(const Wm3::Quaternionf& q) noexcept
+  [[nodiscard]] inline Wm3::Vector3f QuatForwardAxis(
+    const Wm3::Quaternionf& q
+  ) noexcept
   {
     return Wm3::Vector3f{
       ((q.x * q.z) + (q.w * q.y)) * 2.0f,
@@ -283,9 +270,7 @@ namespace moho
    * Expands `quat` into a row-major rotation matrix and multiplies `vec` by
    * its three rows, storing the rotated vector in `dest`.
    */
-  Wm3::Vector3f* MultQuadVec(
-    Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat
-  );
+  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
 
   /**
    * Ordinary scalar-first Hamilton product: `.w` is the scalar, `(.x,.y,.z)`
@@ -327,7 +312,9 @@ namespace moho
    * constructor (0x0064A71D) and `ManipulatorUpdate` (0x0064AAD3).
    */
   Wm3::Quaternionf* BuildTiltShortestArcDelta(
-    const Wm3::Vector3f& targetNormal, Wm3::Quaternionf* outDelta, const Wm3::Vector3f& currentUp
+    const Wm3::Vector3f& targetNormal,
+    Wm3::Quaternionf* outDelta,
+    const Wm3::Vector3f& currentUp
   ) noexcept;
 
   /**

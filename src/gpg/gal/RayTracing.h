@@ -15,8 +15,12 @@
 #include <atomic>
 #include <cstdint>
 
+#include "boost/shared_ptr.h"
+
 namespace gpg::gal
 {
+  class Texture;
+
   /** Handle of one piece of ray geometry; 0 is none. */
   using RayGeometryId = std::uint32_t;
 
@@ -24,12 +28,22 @@ namespace gpg::gal
   struct RayGeometryDesc
   {
     const char* name = "";
-    const float* positions = nullptr;  ///< x, y, z of each vertex, `positionStride` bytes apart
+    const float* positions = nullptr; ///< x, y, z of each vertex, `positionStride` bytes apart
     std::uint32_t positionStride = 12U;
     std::uint32_t vertexCount = 0U;
     const std::uint32_t* indices = nullptr; ///< three per triangle
     std::uint32_t indexCount = 0U;
+    /**
+     * Engine addition (ren_RayAlphaShadows): texture coordinates, u and v per vertex `uvStride` bytes apart, for a
+     * piece whose surface is cut out by its texture's alpha (mesh.fx's DepthClip: alpha under 0.5 is a hole). Such a
+     * piece is not opaque: a ray that meets it asks its instance's texture whether the point is solid.
+     */
+    const float* uvs = nullptr;
+    std::uint32_t uvStride = 8U;
   };
+
+  /** Engine addition (ren_RayAlphaShadows): the most textures one frame's alpha-tested instances can use. */
+  inline constexpr std::uint32_t kRayTextureSlots = 64U;
 
   /**
    * Bumped whenever a device creates or releases its ray objects: geometry ids handed out before belong to
@@ -53,5 +67,10 @@ namespace gpg::gal
     float transform[3][4]{};
     RayGeometryId geometry = 0U;
     std::uint8_t mask = kRayMaskMesh;
+    /**
+     * For a piece made with `uvs`: 1 + the index of its texture in SetRayInstances's `textures` (the alpha
+     * decides where rays pass); 0 for an opaque piece.
+     */
+    std::uint32_t texture = 0U;
   };
 } // namespace gpg::gal

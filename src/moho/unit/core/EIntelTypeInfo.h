@@ -62,7 +62,6 @@ namespace moho
 
   static_assert(sizeof(EIntelTypeInfo) == 0x78, "EIntelTypeInfo size must be 0x78");
 
-
   /**
    * Address: 0x00BC7B90 (FUN_00BC7B90, register_EIntelTypeInfo)
    *

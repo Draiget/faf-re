@@ -50,19 +50,24 @@ namespace moho
    * name's `_Tidy`-then-assign, the category filter's word-vector rebind, and
    * a straight copy of the three colours and two radius pairs. No source line
    * of its own - `mRangeProfiles[name] = profile` is what reaches it.
-   * Address: 0x007EE860 (FUN_007EE860 -- the implicit destructor: the category-word set rebinds to its inline block and the extractor string tidies. Twelve callers, every erase and tidy of the two containers that hold one; callers 0x007EE5A0, 0x007EFD00, 0x007F1490; formerly `ResetRangeRenderProfileTransientState` in RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
-   * Address: 0x007EE8B0 (FUN_007EE8B0 -- the copy constructor: the string is assigned, the category-word set rebinds through `ResetFrom`, the colours and radii copy field by field. Eight callers; callers 0x007EE5A0, 0x007F3330, 0x007F3430; formerly `CopyRangeRenderProfileTransientState` in RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
+   * Address: 0x007EE860 (FUN_007EE860 -- the implicit destructor: the category-word set rebinds to its inline block and
+   * the extractor string tidies. Twelve callers, every erase and tidy of the two containers that hold one; callers
+   * 0x007EE5A0, 0x007EFD00, 0x007F1490; formerly `ResetRangeRenderProfileTransientState` in RangeRenderer.cpp (RULE
+   * ONE), removed 2026-09-11.) Address: 0x007EE8B0 (FUN_007EE8B0 -- the copy constructor: the string is assigned, the
+   * category-word set rebinds through `ResetFrom`, the colours and radii copy field by field. Eight callers; callers
+   * 0x007EE5A0, 0x007F3330, 0x007F3430; formerly `CopyRangeRenderProfileTransientState` in RangeRenderer.cpp (RULE
+   * ONE), removed 2026-09-11.)
    */
   struct SRangeRenderProfile
   {
-    fa::string mExtractorName;                  // +0x00
-    std::uint32_t mReserved1C = 0u;                // +0x1C
-    EntityCategorySet mCategoryFilter;         // +0x20
-    RangeRingColor mBuildRingColor;                // +0x48
-    RangeRingColor mSelectedRingColor;             // +0x58
-    RangeRingColor mHighlightedRingColor;          // +0x68
-    RangeRingRadiusParams mInnerRingParams;        // +0x78
-    RangeRingRadiusParams mOuterRingParams;        // +0x80
+    fa::string mExtractorName;              // +0x00
+    std::uint32_t mReserved1C = 0u;         // +0x1C
+    EntityCategorySet mCategoryFilter;      // +0x20
+    RangeRingColor mBuildRingColor;         // +0x48
+    RangeRingColor mSelectedRingColor;      // +0x58
+    RangeRingColor mHighlightedRingColor;   // +0x68
+    RangeRingRadiusParams mInnerRingParams; // +0x78
+    RangeRingRadiusParams mOuterRingParams; // +0x80
   };
 
   static_assert(offsetof(SRangeRenderProfile, mExtractorName) == 0x00, "SRangeRenderProfile::mExtractorName");
@@ -70,7 +75,8 @@ namespace moho
   static_assert(offsetof(SRangeRenderProfile, mBuildRingColor) == 0x48, "SRangeRenderProfile::mBuildRingColor");
   static_assert(offsetof(SRangeRenderProfile, mSelectedRingColor) == 0x58, "SRangeRenderProfile::mSelectedRingColor");
   static_assert(
-    offsetof(SRangeRenderProfile, mHighlightedRingColor) == 0x68, "SRangeRenderProfile::mHighlightedRingColor"
+    offsetof(SRangeRenderProfile, mHighlightedRingColor) == 0x68,
+    "SRangeRenderProfile::mHighlightedRingColor"
   );
   static_assert(offsetof(SRangeRenderProfile, mInnerRingParams) == 0x78, "SRangeRenderProfile::mInnerRingParams");
   static_assert(offsetof(SRangeRenderProfile, mOuterRingParams) == 0x80, "SRangeRenderProfile::mOuterRingParams");
@@ -91,7 +97,8 @@ namespace moho
   using SRangeRenderProfileMap = fa::map<fa::string, SRangeRenderProfile>;
   static_assert(sizeof(SRangeRenderProfileMap) == 0x0C, "SRangeRenderProfileMap size must be 0x0C");
   static_assert(
-    sizeof(SRangeRenderProfileMap::value_type) == 0xA8, "SRangeRenderProfileMap::value_type size must be 0xA8"
+    sizeof(SRangeRenderProfileMap::value_type) == 0xA8,
+    "SRangeRenderProfileMap::value_type size must be 0xA8"
   );
 
   /**
@@ -172,17 +179,15 @@ namespace moho
     void ResetRenderResources() noexcept;
 
   private:
-
-
   public:
-    SRangeRenderProfileMap mRangeProfiles;                             // +0x04
-    fa::vector<SRangeRenderProfile> mVisibleProfiles;              // +0x10
-    std::uint32_t mIndexCount;                                        // +0x20
-    std::uint32_t mVertexCount;                                       // +0x24
-    RenderGeometryBuffers mGeometry;                                  // +0x28
-    std::uint32_t mDynamicRingVertexCount;                            // +0x40
+    SRangeRenderProfileMap mRangeProfiles;                          // +0x04
+    fa::vector<SRangeRenderProfile> mVisibleProfiles;               // +0x10
+    std::uint32_t mIndexCount;                                      // +0x20
+    std::uint32_t mVertexCount;                                     // +0x24
+    RenderGeometryBuffers mGeometry;                                // +0x28
+    std::uint32_t mDynamicRingVertexCount;                          // +0x40
     boost::shared_ptr<gpg::gal::VertexBuffer> mDynamicVertexBuffer; // +0x44
-    CRenFrame mFrame;                                                 // +0x4C
+    CRenFrame mFrame;                                               // +0x4C
   };
 
   static_assert(offsetof(RangeRenderer, mRangeProfiles) == 0x04, "RangeRenderer::mRangeProfiles");
@@ -190,9 +195,7 @@ namespace moho
   static_assert(offsetof(RangeRenderer, mIndexCount) == 0x20, "RangeRenderer::mIndexCount");
   static_assert(offsetof(RangeRenderer, mVertexCount) == 0x24, "RangeRenderer::mVertexCount");
   static_assert(offsetof(RangeRenderer, mGeometry) == 0x28, "RangeRenderer::mGeometry");
-  static_assert(
-    offsetof(RangeRenderer, mDynamicRingVertexCount) == 0x40, "RangeRenderer::mDynamicRingVertexCount"
-  );
+  static_assert(offsetof(RangeRenderer, mDynamicRingVertexCount) == 0x40, "RangeRenderer::mDynamicRingVertexCount");
   static_assert(offsetof(RangeRenderer, mDynamicVertexBuffer) == 0x44, "RangeRenderer::mDynamicVertexBuffer");
   static_assert(offsetof(RangeRenderer, mFrame) == 0x4C, "RangeRenderer::mFrame");
   static_assert(sizeof(RangeRenderer) == 0x94, "RangeRenderer size must be 0x94");

@@ -97,9 +97,8 @@ namespace moho
      * Builds a new `CAiPersonality` for an archive load and hands it back unowned; its
      * members are loaded over it afterwards.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x005B96A0 (FUN_005B96A0, Moho::CAiPersonality::MemberDeserialize)
@@ -120,47 +119,53 @@ namespace moho
   public:
     static gpg::RType* sType;
 
-    Sim* mSim;                                // +0x34
-    fa::string mPersonalityName;           // +0x38
-    fa::string mChatPersonality;           // +0x54
-    SAiPersonalityRange mArmySize;            // +0x70
-    SAiPersonalityRange mPlatoonSize;         // +0x78
-    SAiPersonalityRange mAttackFrequency;     // +0x80
-    SAiPersonalityRange mRepeatAttackFrequency; // +0x88
-    SAiPersonalityRange mCounterForces;       // +0x90
-    SAiPersonalityRange mIntelGathering;      // +0x98
-    SAiPersonalityRange mCoordinatedAttacks;  // +0xA0
-    SAiPersonalityRange mExpansionDriven;     // +0xA8
-    SAiPersonalityRange mTechAdvancement;     // +0xB0
-    SAiPersonalityRange mUpgradesDriven;      // +0xB8
-    SAiPersonalityRange mDefenseDriven;       // +0xC0
-    SAiPersonalityRange mEconomyDriven;       // +0xC8
-    SAiPersonalityRange mFactoryTycoon;       // +0xD0
-    SAiPersonalityRange mIntelBuildingTycoon; // +0xD8
-    SAiPersonalityRange mSuperWeaponTendency; // +0xE0
-    fa::vector<fa::string> mFavouriteStructures; // +0xE8
-    SAiPersonalityRange mAirUnitsEmphasis;            // +0xF8
-    SAiPersonalityRange mTankUnitsEmphasis;           // +0x100
-    SAiPersonalityRange mBotUnitsEmphasis;            // +0x108
-    SAiPersonalityRange mSeaUnitsEmphasis;            // +0x110
-    SAiPersonalityRange mSpecialtyForcesEmphasis;     // +0x118
-    SAiPersonalityRange mSupportUnitsEmphasis;        // +0x120
-    SAiPersonalityRange mDirectDamageEmphasis;        // +0x128
-    SAiPersonalityRange mIndirectDamageEmphasis;      // +0x130
-    fa::vector<fa::string> mFavouriteUnits;     // +0x138
-    SAiPersonalityRange mSurvivalEmphasis;            // +0x148
-    SAiPersonalityRange mTeamSupport;                 // +0x150
-    SAiPersonalityRange mFormationUse;                // +0x158
-    SAiPersonalityRange mTargetSpread;                // +0x160
-    SAiPersonalityRange mQuittingTendency;            // +0x168
-    SAiPersonalityRange mChatFrequency;               // +0x170
-    float mDifficulty;                                // +0x178
+    Sim* mSim;                                    // +0x34
+    fa::string mPersonalityName;                  // +0x38
+    fa::string mChatPersonality;                  // +0x54
+    SAiPersonalityRange mArmySize;                // +0x70
+    SAiPersonalityRange mPlatoonSize;             // +0x78
+    SAiPersonalityRange mAttackFrequency;         // +0x80
+    SAiPersonalityRange mRepeatAttackFrequency;   // +0x88
+    SAiPersonalityRange mCounterForces;           // +0x90
+    SAiPersonalityRange mIntelGathering;          // +0x98
+    SAiPersonalityRange mCoordinatedAttacks;      // +0xA0
+    SAiPersonalityRange mExpansionDriven;         // +0xA8
+    SAiPersonalityRange mTechAdvancement;         // +0xB0
+    SAiPersonalityRange mUpgradesDriven;          // +0xB8
+    SAiPersonalityRange mDefenseDriven;           // +0xC0
+    SAiPersonalityRange mEconomyDriven;           // +0xC8
+    SAiPersonalityRange mFactoryTycoon;           // +0xD0
+    SAiPersonalityRange mIntelBuildingTycoon;     // +0xD8
+    SAiPersonalityRange mSuperWeaponTendency;     // +0xE0
+    fa::vector<fa::string> mFavouriteStructures;  // +0xE8
+    SAiPersonalityRange mAirUnitsEmphasis;        // +0xF8
+    SAiPersonalityRange mTankUnitsEmphasis;       // +0x100
+    SAiPersonalityRange mBotUnitsEmphasis;        // +0x108
+    SAiPersonalityRange mSeaUnitsEmphasis;        // +0x110
+    SAiPersonalityRange mSpecialtyForcesEmphasis; // +0x118
+    SAiPersonalityRange mSupportUnitsEmphasis;    // +0x120
+    SAiPersonalityRange mDirectDamageEmphasis;    // +0x128
+    SAiPersonalityRange mIndirectDamageEmphasis;  // +0x130
+    fa::vector<fa::string> mFavouriteUnits;       // +0x138
+    SAiPersonalityRange mSurvivalEmphasis;        // +0x148
+    SAiPersonalityRange mTeamSupport;             // +0x150
+    SAiPersonalityRange mFormationUse;            // +0x158
+    SAiPersonalityRange mTargetSpread;            // +0x160
+    SAiPersonalityRange mQuittingTendency;        // +0x168
+    SAiPersonalityRange mChatFrequency;           // +0x170
+    float mDifficulty;                            // +0x178
   };
 
   static_assert(sizeof(CAiPersonality) == 0x17C, "CAiPersonality size must be 0x17C");
   static_assert(offsetof(CAiPersonality, mSim) == 0x34, "CAiPersonality::mSim offset must be 0x34");
-  static_assert(offsetof(CAiPersonality, mPersonalityName) == 0x38, "CAiPersonality::mPersonalityName offset must be 0x38");
-  static_assert(offsetof(CAiPersonality, mChatPersonality) == 0x54, "CAiPersonality::mChatPersonality offset must be 0x54");
+  static_assert(
+    offsetof(CAiPersonality, mPersonalityName) == 0x38,
+    "CAiPersonality::mPersonalityName offset must be 0x38"
+  );
+  static_assert(
+    offsetof(CAiPersonality, mChatPersonality) == 0x54,
+    "CAiPersonality::mChatPersonality offset must be 0x54"
+  );
   static_assert(offsetof(CAiPersonality, mArmySize) == 0x70, "CAiPersonality::mArmySize offset must be 0x70");
   static_assert(
     offsetof(CAiPersonality, mSuperWeaponTendency) == 0xE0,
@@ -171,20 +176,24 @@ namespace moho
     "CAiPersonality::mFavouriteStructures offset must be 0xE8"
   );
   static_assert(
-    offsetof(CAiPersonality, mAirUnitsEmphasis) == 0xF8, "CAiPersonality::mAirUnitsEmphasis offset must be 0xF8"
+    offsetof(CAiPersonality, mAirUnitsEmphasis) == 0xF8,
+    "CAiPersonality::mAirUnitsEmphasis offset must be 0xF8"
   );
   static_assert(
     offsetof(CAiPersonality, mIndirectDamageEmphasis) == 0x130,
     "CAiPersonality::mIndirectDamageEmphasis offset must be 0x130"
   );
   static_assert(
-    offsetof(CAiPersonality, mFavouriteUnits) == 0x138, "CAiPersonality::mFavouriteUnits offset must be 0x138"
+    offsetof(CAiPersonality, mFavouriteUnits) == 0x138,
+    "CAiPersonality::mFavouriteUnits offset must be 0x138"
   );
   static_assert(
-    offsetof(CAiPersonality, mSurvivalEmphasis) == 0x148, "CAiPersonality::mSurvivalEmphasis offset must be 0x148"
+    offsetof(CAiPersonality, mSurvivalEmphasis) == 0x148,
+    "CAiPersonality::mSurvivalEmphasis offset must be 0x148"
   );
   static_assert(
-    offsetof(CAiPersonality, mChatFrequency) == 0x170, "CAiPersonality::mChatFrequency offset must be 0x170"
+    offsetof(CAiPersonality, mChatFrequency) == 0x170,
+    "CAiPersonality::mChatFrequency offset must be 0x170"
   );
   static_assert(offsetof(CAiPersonality, mDifficulty) == 0x178, "CAiPersonality::mDifficulty offset must be 0x178");
 
@@ -201,7 +210,8 @@ namespace moho
 
   protected:
     /**
-     * Address: 0x005B9620 (FUN_005B9620, ?Create@?$CScrLuaMetatableFactory@VCAiPersonality@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
+     * Address: 0x005B9620 (FUN_005B9620,
+     * ?Create@?$CScrLuaMetatableFactory@VCAiPersonality@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
      */
     LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override;
 

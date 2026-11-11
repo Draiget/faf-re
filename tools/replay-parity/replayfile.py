@@ -178,7 +178,19 @@ def replay_body_info(data):
     mod_list = [{"name": str(v.get("name")), "uid": str(v.get("uid")), "version": v.get("version")}
                 for v in mods.values() if isinstance(v, dict)]
     return {"version": version, "scmap": scmap, "map": folder.group(1).lower() if folder else None,
-            "mods": mod_list}
+            "mods": mod_list, "matchmaker": started_by_matchmaker(data, pos + 8 + size)}
+
+
+def started_by_matchmaker(data, pos):
+    """Whether the matchmaker's lobby started the game, from the scenario table at pos (after the
+    sim mods): only it sets GameOptions.Divisions (AutolobbyController.lua, 3835 and 3840), and the
+    custom lobby (lobby.lua) never does. A table that can't be read counts as the custom lobby's."""
+    try:
+        scenario, _ = lua_value(data, pos + 4)
+    except (ValueError, IndexError, struct.error):
+        return False
+    options = scenario.get("Options") if isinstance(scenario, dict) else None
+    return isinstance(options, dict) and "Divisions" in options
 
 
 def live_client_desync(recorded, beat, sim, theirs):

@@ -58,7 +58,9 @@ namespace moho
    * Registers `SFootprint` as this type's reflected base at offset 0, looking
    * its type up once into `SFootprint::sType` (0x010C6D94).
    */
-  void SNamedFootprintTypeInfo::AddBase_SFootprint(gpg::RType* const typeInfo)
+  void SNamedFootprintTypeInfo::AddBase_SFootprint(
+    gpg::RType* const typeInfo
+  )
   {
     if (SFootprint::sType == nullptr) {
       SFootprint::sType = gpg::LookupRType(typeid(SFootprint));
@@ -76,7 +78,9 @@ namespace moho
    * The `SFootprint` base, then `Name` (`AddField_string` 0x0050E1F0) and
    * `Index` (`AddField_int` 0x004EDC10).
    */
-  void SNamedFootprintTypeInfo::AddFields(gpg::RType* const typeInfo)
+  void SNamedFootprintTypeInfo::AddFields(
+    gpg::RType* const typeInfo
+  )
   {
     AddBase_SFootprint(typeInfo);
     typeInfo->AddField<fa::string>("Name", offsetof(SNamedFootprint, mName));
@@ -137,5 +141,11 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_SNamedFootprintTypeInfoStartup_dd003b, moho::register_SNamedFootprintTypeInfoStartup)
-GPG_PREREGISTER_INIT(register_SNamedFootprintListTypeInfoStartup_dd003b, moho::register_SNamedFootprintListTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_SNamedFootprintTypeInfoStartup_dd003b,
+  moho::register_SNamedFootprintTypeInfoStartup
+)
+GPG_PREREGISTER_INIT(
+  register_SNamedFootprintListTypeInfoStartup_dd003b,
+  moho::register_SNamedFootprintListTypeInfoStartup
+)

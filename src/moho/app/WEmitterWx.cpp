@@ -143,7 +143,9 @@ namespace
    * Shrinks a numeric field to a third of its default width. The constructor
    * calls it (window in esi) for each of the six fields before adding it.
    */
-  void NarrowToThird(wxWindow* const window)
+  void NarrowToThird(
+    wxWindow* const window
+  )
   {
     int width = 0;
     int height = 0;
@@ -151,7 +153,9 @@ namespace
     window->SetSize(-1, -1, width / 3, height, wxSIZE_USE_EXISTING);
   }
 
-  const char* BoolString(const bool value)
+  const char* BoolString(
+    const bool value
+  )
   {
     return value ? "true" : "false";
   }
@@ -234,7 +238,9 @@ moho::WCurveEditor::WCurveEditor(
 /**
  * Address: 0x00661700 (FUN_00661700)
  */
-void moho::WCurveEditor::SetName(const wxString& name)
+void moho::WCurveEditor::SetName(
+  const wxString& name
+)
 {
   mCaption = name;
 }
@@ -242,7 +248,9 @@ void moho::WCurveEditor::SetName(const wxString& name)
 /**
  * Address: 0x00661710 (FUN_00661710)
  */
-void moho::WCurveEditor::SetScriptName(const wxString& scriptName)
+void moho::WCurveEditor::SetScriptName(
+  const wxString& scriptName
+)
 {
   mScriptName = scriptName;
 }
@@ -250,7 +258,9 @@ void moho::WCurveEditor::SetScriptName(const wxString& scriptName)
 /**
  * Address: 0x00661720 (FUN_00661720)
  */
-void moho::WCurveEditor::ResetCurveXRange(const float rangeMax)
+void moho::WCurveEditor::ResetCurveXRange(
+  const float rangeMax
+)
 {
   mViewTimeMin = 0.0f;
   mViewTimeMax = rangeMax;
@@ -267,7 +277,11 @@ void moho::WCurveEditor::ResetCurveXRange(const float rangeMax)
  * into the visible range and the tangent is stored as given. The curve's Y
  * bounds are rederived afterwards.
  */
-void moho::WCurveEditor::MoveSelectedKeyTo(const float time, const float value, const float tangent)
+void moho::WCurveEditor::MoveSelectedKeyTo(
+  const float time,
+  const float value,
+  const float tangent
+)
 {
   Wm3::Vector3f* const key = mSelectedKey;
   if (key == mCurve.mKeys.end()) {
@@ -302,7 +316,9 @@ void moho::WCurveEditor::MoveSelectedKeyTo(const float time, const float value, 
  * The XRange is the curve's upper time bound (`mBoundsMax.x`). The binary
  * passes the writer in the stack slot and `this` in edi.
  */
-void moho::WCurveEditor::WriteCurveScript(gpg::TextWriter& writer) const
+void moho::WCurveEditor::WriteCurveScript(
+  gpg::TextWriter& writer
+) const
 {
   writer.Printf(
     "\t%s = {\n\t\tXRange = %.2f,\n\t\tKeys = {\n",
@@ -318,7 +334,9 @@ void moho::WCurveEditor::WriteCurveScript(gpg::TextWriter& writer) const
 /**
  * Address: 0x006617A0 (FUN_006617A0)
  */
-void moho::WCurveEditor::ZoomValueAxisByWheel(wxMouseEvent& event)
+void moho::WCurveEditor::ZoomValueAxisByWheel(
+  wxMouseEvent& event
+)
 {
   const float valueDelta = static_cast<float>(event.m_wheelRotation) / (mViewValueScale * 5.0f) * 0.5f;
   const float zoomedMin = mViewValueMin + valueDelta;
@@ -335,7 +353,9 @@ void moho::WCurveEditor::ZoomValueAxisByWheel(wxMouseEvent& event)
 /**
  * Address: 0x00661820 (FUN_00661820)
  */
-void moho::WCurveEditor::OnMouseDown(wxMouseEvent& event)
+void moho::WCurveEditor::OnMouseDown(
+  wxMouseEvent& event
+)
 {
   mLastMouseX = event.m_x;
   mLastMouseY = event.m_y;
@@ -365,7 +385,9 @@ void moho::WCurveEditor::OnMouseDown(wxMouseEvent& event)
 /**
  * Address: 0x00661900 (FUN_00661900)
  */
-void moho::WCurveEditor::OnMouseMove(wxMouseEvent& event)
+void moho::WCurveEditor::OnMouseMove(
+  wxMouseEvent& event
+)
 {
   const int mouseX = event.m_x;
   const int mouseY = event.m_y;
@@ -417,7 +439,9 @@ void moho::WCurveEditor::OnMouseMove(wxMouseEvent& event)
 /**
  * Address: 0x00661A50 (FUN_00661A50)
  */
-void moho::WCurveEditor::OnMouseUp(wxMouseEvent&)
+void moho::WCurveEditor::OnMouseUp(
+  wxMouseEvent&
+)
 {
   mActiveDragButton = kCurveDragNone;
   if (mMouseCaptured) {
@@ -431,7 +455,9 @@ void moho::WCurveEditor::OnMouseUp(wxMouseEvent&)
 /**
  * Address: 0x00661A90 (FUN_00661A90)
  */
-void moho::WCurveEditor::OnCurveKeyEdit(wxMouseEvent& event)
+void moho::WCurveEditor::OnCurveKeyEdit(
+  wxMouseEvent& event
+)
 {
   Wm3::Vector3f point;
   point.x = mViewTimeMin + static_cast<float>(event.m_x) / mViewTimeScale;
@@ -469,7 +495,10 @@ void moho::WCurveEditor::OnCurveKeyEdit(wxMouseEvent& event)
  * column back to the earlier one. GDI leaves a line's last pixel out, so the
  * direction is kept.
  */
-void moho::WCurveEditor::DrawKeyEnvelopeSpan(wxDC& dc, const Wm3::Vector3f* const key) const
+void moho::WCurveEditor::DrawKeyEnvelopeSpan(
+  wxDC& dc,
+  const Wm3::Vector3f* const key
+) const
 {
   wxPoint envelope[6];
   dc.SetPen(*wxRED_PEN);
@@ -516,7 +545,10 @@ void moho::WCurveEditor::DrawKeyEnvelopeSpan(wxDC& dc, const Wm3::Vector3f* cons
 /**
  * Address: 0x00662180 (FUN_00662180)
  */
-void moho::WCurveEditor::DrawKeyHandle(wxDC& dc, const Wm3::Vector3f* const key) const
+void moho::WCurveEditor::DrawKeyHandle(
+  wxDC& dc,
+  const Wm3::Vector3f* const key
+) const
 {
   if (key == mSelectedKey) {
     dc.SetPen(*wxCYAN_PEN);
@@ -537,7 +569,9 @@ void moho::WCurveEditor::DrawKeyHandle(wxDC& dc, const Wm3::Vector3f* const key)
  * own GetTextExtent: time bounds centred on the left and right edges, value
  * bounds centred on the bottom and top edges, and the caption top left.
  */
-void moho::WCurveEditor::OnPaint(wxPaintEvent&)
+void moho::WCurveEditor::OnPaint(
+  wxPaintEvent&
+)
 {
   wxPaintDC dc(this);
 
@@ -587,14 +621,17 @@ void moho::WCurveEditor::OnPaint(wxPaintEvent&)
 /**
  * Address: 0x00662570 (FUN_00662570, nullsub_1719)
  */
-void moho::WCurveEditor::IgnoreEvent(wxMouseEvent&)
-{
-}
+void moho::WCurveEditor::IgnoreEvent(
+  wxMouseEvent&
+)
+{}
 
 /**
  * Address: 0x00669E40 (FUN_00669E40)
  */
-void moho::WCurveEditor::AssignCurve(const SEfxCurve& source)
+void moho::WCurveEditor::AssignCurve(
+  const SEfxCurve& source
+)
 {
   mCurve = source;
   mSelectedKey = mCurve.mKeys.end();
@@ -605,16 +642,37 @@ void moho::WCurveEditor::AssignCurve(const SEfxCurve& source)
 
 // Table 0x00DFEF70 = {&wxControl::sm_eventTable (0x00D54D70), rows 0x00F59CB8};
 // GetEventTable (0x00662660) comes with it.
-BEGIN_EVENT_TABLE(moho::WCurveEditor, wxControl)
-  EVT_PAINT(moho::WCurveEditor::OnPaint)
-  EVT_LEFT_DOWN(moho::WCurveEditor::OnMouseDown)
-  EVT_MIDDLE_DOWN(moho::WCurveEditor::OnMouseDown)
-  EVT_RIGHT_DOWN(moho::WCurveEditor::OnCurveKeyEdit)
-  EVT_LEFT_UP(moho::WCurveEditor::OnMouseUp)
-  EVT_MIDDLE_UP(moho::WCurveEditor::OnMouseUp)
-  EVT_MOTION(moho::WCurveEditor::OnMouseMove)
-  EVT_MOUSEWHEEL(moho::WCurveEditor::ZoomValueAxisByWheel)
-  EVT_ENTER_WINDOW(moho::WCurveEditor::IgnoreEvent)
+BEGIN_EVENT_TABLE(
+  moho::WCurveEditor,
+  wxControl
+)
+EVT_PAINT(
+  moho::WCurveEditor::OnPaint
+)
+EVT_LEFT_DOWN(
+  moho::WCurveEditor::OnMouseDown
+)
+EVT_MIDDLE_DOWN(
+  moho::WCurveEditor::OnMouseDown
+)
+EVT_RIGHT_DOWN(
+  moho::WCurveEditor::OnCurveKeyEdit
+)
+EVT_LEFT_UP(
+  moho::WCurveEditor::OnMouseUp
+)
+EVT_MIDDLE_UP(
+  moho::WCurveEditor::OnMouseUp
+)
+EVT_MOTION(
+  moho::WCurveEditor::OnMouseMove
+)
+EVT_MOUSEWHEEL(
+  moho::WCurveEditor::ZoomValueAxisByWheel
+)
+EVT_ENTER_WINDOW(
+  moho::WCurveEditor::IgnoreEvent
+)
 END_EVENT_TABLE()
 
 // ---------------------------------------------------------------------------
@@ -661,7 +719,12 @@ moho::WCurveEditorPanel::WCurveEditorPanel(
   const auto addField = [this, fieldSizer](const int id, const wxChar* const label, const float value) {
     fieldSizer->Add(new wxStaticText(this, -1, label, wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3);
     wxTextCtrl* const text = new wxTextCtrl(
-      this, id, wxString::Format(wxT("%f"), static_cast<double>(value)), wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER
+      this,
+      id,
+      wxString::Format(wxT("%f"), static_cast<double>(value)),
+      wxDefaultPosition,
+      wxDefaultSize,
+      wxTE_PROCESS_ENTER
     );
     fieldSizer->Add(text, 0, wxALL, 1);
     return text;
@@ -708,7 +771,9 @@ void moho::WCurveEditorPanel::RefreshFieldsFromCurve()
  * whole string fails, as the binary's does). The value-range pair is only
  * applied when the span stays at least 0.1.
  */
-void moho::WCurveEditorPanel::OnCurveFieldCommitted(wxCommandEvent& event)
+void moho::WCurveEditorPanel::OnCurveFieldCommitted(
+  wxCommandEvent& event
+)
 {
   if (!mFieldsLive) {
     event.Skip();
@@ -760,12 +825,30 @@ void moho::WCurveEditorPanel::OnCurveFieldCommitted(wxCommandEvent& event)
 // Table 0x00DFEF78 = {&wxPanel::sm_eventTable (0x00D5A910), rows 0x00F59D80};
 // GetEventTable (0x006638A0) comes with it. The destructors are the compiler's
 // (0x00663870 deleting).
-BEGIN_EVENT_TABLE(moho::WCurveEditorPanel, wxPanel)
-  EVT_TEXT_ENTER(kKeyTimeFieldId, moho::WCurveEditorPanel::OnCurveFieldCommitted)
-  EVT_TEXT_ENTER(kKeyValueFieldId, moho::WCurveEditorPanel::OnCurveFieldCommitted)
-  EVT_TEXT_ENTER(kKeyTangentFieldId, moho::WCurveEditorPanel::OnCurveFieldCommitted)
-  EVT_TEXT_ENTER(kViewValueMinFieldId, moho::WCurveEditorPanel::OnCurveFieldCommitted)
-  EVT_TEXT_ENTER(kViewValueMaxFieldId, moho::WCurveEditorPanel::OnCurveFieldCommitted)
+BEGIN_EVENT_TABLE(
+  moho::WCurveEditorPanel,
+  wxPanel
+)
+EVT_TEXT_ENTER(
+  kKeyTimeFieldId,
+  moho::WCurveEditorPanel::OnCurveFieldCommitted
+)
+EVT_TEXT_ENTER(
+  kKeyValueFieldId,
+  moho::WCurveEditorPanel::OnCurveFieldCommitted
+)
+EVT_TEXT_ENTER(
+  kKeyTangentFieldId,
+  moho::WCurveEditorPanel::OnCurveFieldCommitted
+)
+EVT_TEXT_ENTER(
+  kViewValueMinFieldId,
+  moho::WCurveEditorPanel::OnCurveFieldCommitted
+)
+EVT_TEXT_ENTER(
+  kViewValueMaxFieldId,
+  moho::WCurveEditorPanel::OnCurveFieldCommitted
+)
 END_EVENT_TABLE()
 
 // ---------------------------------------------------------------------------
@@ -774,9 +857,19 @@ END_EVENT_TABLE()
 /**
  * Address: 0x00663900 (FUN_00663900, Moho::WEmitterWx::WEmitterWx)
  */
-moho::WEmitterWx::WEmitterWx(UserEntity* const attachEntity, const Wm3::Vector3f& spawnPosition, const char* const boneName)
+moho::WEmitterWx::WEmitterWx(
+  UserEntity* const attachEntity,
+  const Wm3::Vector3f& spawnPosition,
+  const char* const boneName
+)
   : WWinManagedFrame(
-      nullptr, -1, wxT("Emitter Editor"), wxDefaultPosition, wxSize(800, 600), wxDEFAULT_FRAME_STYLE, wxT("MohoFrame")
+      nullptr,
+      -1,
+      wxT("Emitter Editor"),
+      wxDefaultPosition,
+      wxSize(800, 600),
+      wxDEFAULT_FRAME_STYLE,
+      wxT("MohoFrame")
     )
   , mRepeatTimeControl(nullptr)
   , mTimeSlider(nullptr)
@@ -863,18 +956,24 @@ moho::WEmitterWx::WEmitterWx(UserEntity* const attachEntity, const Wm3::Vector3f
   wxBoxSizer* const bottomRow = new wxBoxSizer(wxHORIZONTAL);
   mainSizer->Add(bottomRow, 0, wxEXPAND | wxALL, 2);
 
-  topRow->Add(new wxStaticText(this, -1, wxT("Life Time"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3);
+  topRow->Add(
+    new wxStaticText(this, -1, wxT("Life Time"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3
+  );
   mLifetimeControl = new wxTextCtrl(this, kLifetimeFieldId, wxT("-1"));
   NarrowToThird(mLifetimeControl);
   topRow->Add(mLifetimeControl, 0, wxALL, 3);
 
   mCachedRepeatTime = 1.0;
-  topRow->Add(new wxStaticText(this, -1, wxT("Repeat Time"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3);
+  topRow->Add(
+    new wxStaticText(this, -1, wxT("Repeat Time"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3
+  );
   mRepeatTimeControl = new wxTextCtrl(this, kRepeatTimeFieldId, wxT("50.0"));
   NarrowToThird(mRepeatTimeControl);
   topRow->Add(mRepeatTimeControl, 0, wxALL, 3);
 
-  topRow->Add(new wxStaticText(this, -1, wxT("Blend Mode"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3);
+  topRow->Add(
+    new wxStaticText(this, -1, wxT("Blend Mode"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3
+  );
   mBlendModeChoice = new wxComboBox(this, kEffectChoiceId);
   mBlendModeChoice->Append(wxT("Alpha Blend"));
   mBlendModeChoice->Append(wxT("Modulate Inverse"));
@@ -885,7 +984,9 @@ moho::WEmitterWx::WEmitterWx(UserEntity* const attachEntity, const Wm3::Vector3f
   mBlendModeChoice->SetSelection(3);
   topRow->Add(mBlendModeChoice, 0, wxALL, 3);
 
-  topRow->Add(new wxStaticText(this, -1, wxT("Fidelity"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3);
+  topRow->Add(
+    new wxStaticText(this, -1, wxT("Fidelity"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3
+  );
   mFidelityChoice = new wxComboBox(this, kEffectChoiceId);
   mFidelityChoice->Append(wxT("Low"));
   mFidelityChoice->Append(wxT("Medium"));
@@ -897,23 +998,32 @@ moho::WEmitterWx::WEmitterWx(UserEntity* const attachEntity, const Wm3::Vector3f
   mFidelityChoice->SetSelection(6);
   topRow->Add(mFidelityChoice, 0, wxALL, 3);
 
-  bottomRow->Add(new wxStaticText(this, -1, wxT("Frame Count"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3);
+  bottomRow->Add(
+    new wxStaticText(this, -1, wxT("Frame Count"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3
+  );
   mTextureFrameCountControl = new wxTextCtrl(this, kFrameCountFieldId, wxT("1"));
   NarrowToThird(mTextureFrameCountControl);
   bottomRow->Add(mTextureFrameCountControl, 0, wxALL, 3);
 
-  bottomRow->Add(new wxStaticText(this, -1, wxT("Strip Count"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3);
+  bottomRow->Add(
+    new wxStaticText(this, -1, wxT("Strip Count"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3
+  );
   mTextureStripCountControl = new wxTextCtrl(this, kStripCountFieldId, wxT("1"));
   NarrowToThird(mTextureStripCountControl);
   bottomRow->Add(mTextureStripCountControl, 0, wxALL, 3);
 
-  bottomRow->Add(new wxStaticText(this, -1, wxT("Sort Order"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3);
+  bottomRow->Add(
+    new wxStaticText(this, -1, wxT("Sort Order"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3
+  );
   mSortOrderControl = new wxTextCtrl(this, kSortOrderFieldId, wxT("0"));
   NarrowToThird(mSortOrderControl);
   bottomRow->Add(mSortOrderControl, 0, wxALL, 3);
 
   bottomRow->Add(
-    new wxStaticText(this, -1, wxT("LOD Cutoff Distance"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3
+    new wxStaticText(this, -1, wxT("LOD Cutoff Distance"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle),
+    0,
+    wxALL,
+    3
   );
   mLodCutoffControl = new wxTextCtrl(this, kLodCutoffFieldId, wxT("100"));
   NarrowToThird(mLodCutoffControl);
@@ -923,11 +1033,15 @@ moho::WEmitterWx::WEmitterWx(UserEntity* const attachEntity, const Wm3::Vector3f
   mPlayingCheckBox->SetValue(true);
   bottomRow->Add(mPlayingCheckBox, 0, wxALL, 3);
 
-  topRow->Add(new wxStaticText(this, -1, wxT("Texture:"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3);
+  topRow->Add(
+    new wxStaticText(this, -1, wxT("Texture:"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3
+  );
   mTextureNameControl = new wxStaticText(this, -1, mTexturePath, wxDefaultPosition, wxDefaultSize, kFieldLabelStyle);
   topRow->Add(mTextureNameControl, 0, wxALL, 3);
 
-  bottomRow->Add(new wxStaticText(this, -1, wxT("Ramp:"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3);
+  bottomRow->Add(
+    new wxStaticText(this, -1, wxT("Ramp:"), wxDefaultPosition, wxDefaultSize, kFieldLabelStyle), 0, wxALL, 3
+  );
   mRampNameControl = new wxStaticText(this, -1, mRampTexturePath, wxDefaultPosition, wxDefaultSize, kFieldLabelStyle);
   bottomRow->Add(mRampNameControl, 0, wxALL, 3);
 
@@ -946,8 +1060,10 @@ moho::WEmitterWx::WEmitterWx(UserEntity* const attachEntity, const Wm3::Vector3f
   wxBoxSizer* pageSizer = nullptr;
   for (int curve = 0; curve < EMITTER_LAST_CURVE; ++curve) {
     const SEmitterCurveEditorDesc& desc = kEmitterCurveEditors[curve];
-    if (curve == EMITTER_XDIR_CURVE || curve == EMITTER_VELOCITY_CURVE || curve == EMITTER_SIZE_CURVE
-        || curve == EMITTER_BEGINSIZE_CURVE || curve == EMITTER_FRAMERATE_CURVE) {
+    if (
+      curve == EMITTER_XDIR_CURVE || curve == EMITTER_VELOCITY_CURVE || curve == EMITTER_SIZE_CURVE ||
+      curve == EMITTER_BEGINSIZE_CURVE || curve == EMITTER_FRAMERATE_CURVE
+    ) {
       page = new wxPanel(notebook);
       pageSizer = new wxBoxSizer(wxVERTICAL);
       page->SetAutoLayout(true);
@@ -1002,7 +1118,10 @@ const char* moho::WEmitterWx::BlueprintNameOrNull() const
 /**
  * Address: 0x006671F0 (FUN_006671F0)
  */
-void moho::WEmitterWx::ApplyTextFieldParam(wxTextCtrl* const field, const std::int32_t parameter)
+void moho::WEmitterWx::ApplyTextFieldParam(
+  wxTextCtrl* const field,
+  const std::int32_t parameter
+)
 {
   double value;
   field->GetValue().ToDouble(&value);
@@ -1012,7 +1131,11 @@ void moho::WEmitterWx::ApplyTextFieldParam(wxTextCtrl* const field, const std::i
 /**
  * Address: 0x00667290 (FUN_00667290)
  */
-void moho::WEmitterWx::ApplyMenuFlagParam(wxMenu* const menu, const std::int32_t commandId, const std::int32_t parameter)
+void moho::WEmitterWx::ApplyMenuFlagParam(
+  wxMenu* const menu,
+  const std::int32_t commandId,
+  const std::int32_t parameter
+)
 {
   if (menu->IsChecked(commandId)) {
     mPreviewEffect.GetObjectPtr()->SetFloatParam(parameter, 1.0f);
@@ -1040,7 +1163,8 @@ void moho::WEmitterWx::RefreshPreviewEmitter()
     IEffect* effect;
     if (mAttachedUnit.GetObjectPtr() != nullptr) {
       const int bone = mAttachedUnit.GetObjectPtr()->ResolveBoneIndex(mBoneName.c_str());
-      effect = mSim->mEffectManager->CreateAttachedEmitter(mAttachedUnit.GetObjectPtr(), bone, BlueprintNameOrNull(), -1);
+      effect =
+        mSim->mEffectManager->CreateAttachedEmitter(mAttachedUnit.GetObjectPtr(), bone, BlueprintNameOrNull(), -1);
     } else {
       effect = mSim->mEffectManager->CreateEmitter(mSpawnPosition, BlueprintNameOrNull(), -1);
     }
@@ -1133,8 +1257,7 @@ void moho::WEmitterWx::LoadFromEffect()
     RResId blueprintId;
     gpg::STR_SetFilename(&blueprintId.name, BlueprintNameOrNull());
     if (const REffectBlueprint* const blueprint = mSim->mRules->GetEffectBlueprint(blueprintId)) {
-      const int fidelity =
-        ((blueprint->HighFidelity * 2 | blueprint->MedFidelity) * 2 | blueprint->LowFidelity);
+      const int fidelity = ((blueprint->HighFidelity * 2 | blueprint->MedFidelity) * 2 | blueprint->LowFidelity);
       mFidelityChoice->SetSelection(fidelity - 1);
     }
   }
@@ -1178,7 +1301,9 @@ void moho::WEmitterWx::LoadFromEffect()
 /**
  * Address: 0x00668180 (FUN_00668180)
  */
-void moho::WEmitterWx::OnSettingChanged(wxCommandEvent&)
+void moho::WEmitterWx::OnSettingChanged(
+  wxCommandEvent&
+)
 {
   for (unsigned int i = 0; i < mCurvePanels.size(); ++i) {
     mCurvePanels[i]->RefreshFieldsFromCurve();
@@ -1189,7 +1314,9 @@ void moho::WEmitterWx::OnSettingChanged(wxCommandEvent&)
 /**
  * Address: 0x006681D0 (FUN_006681D0)
  */
-void moho::WEmitterWx::OnPlayingToggled(wxCommandEvent&)
+void moho::WEmitterWx::OnPlayingToggled(
+  wxCommandEvent&
+)
 {
   if (mPreviewEffect.GetObjectPtr() == nullptr) {
     return;
@@ -1201,7 +1328,9 @@ void moho::WEmitterWx::OnPlayingToggled(wxCommandEvent&)
 /**
  * Address: 0x00668240 (FUN_00668240)
  */
-void moho::WEmitterWx::OnTimeSliderTrack(wxScrollEvent&)
+void moho::WEmitterWx::OnTimeSliderTrack(
+  wxScrollEvent&
+)
 {
   if (mPreviewEffect.GetObjectPtr() == nullptr) {
     return;
@@ -1212,13 +1341,16 @@ void moho::WEmitterWx::OnTimeSliderTrack(wxScrollEvent&)
 /**
  * Address: 0x00668290 (FUN_00668290)
  */
-void moho::WEmitterWx::OnTimeSliderUpdateUI(wxUpdateUIEvent&)
+void moho::WEmitterWx::OnTimeSliderUpdateUI(
+  wxUpdateUIEvent&
+)
 {
   if (mPreviewEffect.GetObjectPtr() == nullptr) {
     return;
   }
 
-  int tick = static_cast<int>(fa::fmod(mPreviewEffect.GetObjectPtr()->GetFloatParam(EFFECT_TICKCOUNT), mCachedRepeatTime));
+  int tick =
+    static_cast<int>(fa::fmod(mPreviewEffect.GetObjectPtr()->GetFloatParam(EFFECT_TICKCOUNT), mCachedRepeatTime));
   if (mCachedRepeatTime >= mPreviewEffect.GetObjectPtr()->GetFloatParam(EFFECT_TICKCOUNT)) {
     tick = static_cast<int>(mPreviewEffect.GetObjectPtr()->GetFloatParam(EFFECT_TICKCOUNT));
   }
@@ -1235,7 +1367,10 @@ void moho::WEmitterWx::OnTimeSliderUpdateUI(wxUpdateUIEvent&)
  * mask. A missing effect only warns; a file that cannot be opened is skipped
  * silently.
  */
-void moho::WEmitterWx::WriteBlueprintScript(const wxString& path, const wxString& blueprintId)
+void moho::WEmitterWx::WriteBlueprintScript(
+  const wxString& path,
+  const wxString& blueprintId
+)
 {
   RefreshPreviewEmitter();
   if (mPreviewEffect.GetObjectPtr() == nullptr) {
@@ -1273,7 +1408,9 @@ void moho::WEmitterWx::WriteBlueprintScript(const wxString& path, const wxString
   writer.Printf("\tOnlyEmitOnWater = %s,\n", flag(EFFECT_ONLYEMITONWATER));
   writer.Printf("\tParticleResistance = %s,\n", flag(EFFECT_PARTICLERESISTANCE));
   writer.Printf("\tInterpolateEmission = %s,\n", flag(EFFECT_INTERPOLATE_EMISSION));
-  writer.Printf("\tTextureStripcount = %.2f,\n", mPreviewEffect.GetObjectPtr()->GetFloatParam(EFFECT_TEXTURE_STRIPCOUNT));
+  writer.Printf(
+    "\tTextureStripcount = %.2f,\n", mPreviewEffect.GetObjectPtr()->GetFloatParam(EFFECT_TEXTURE_STRIPCOUNT)
+  );
   writer.Printf("\tSortOrder = %.2f,\n", mPreviewEffect.GetObjectPtr()->GetFloatParam(EFFECT_SORTORDER));
 
   const int fidelity = mFidelityChoice->GetSelection() + 1;
@@ -1315,16 +1452,120 @@ void moho::WEmitterWx::WriteBlueprintScript(const wxString& path, const wxString
  * and falls into Save. The texture and ramp entries convert the chosen file
  * to a VFS path, show it and refresh; the check items refresh.
  */
-void moho::WEmitterWx::OnMenuCommand(wxCommandEvent& event)
+void moho::WEmitterWx::OnMenuCommand(
+  wxCommandEvent& event
+)
 {
   switch (event.GetId()) {
-    case ID_EMITTER_OPEN: {
+  case ID_EMITTER_OPEN: {
+    fa::string emittersRoot;
+    (void)DISK_GetVFS()->FindFile(&emittersRoot, "/effects/Emitters", nullptr);
+    mBlueprintDirectory = gpg::STR_Utf8ToWide(emittersRoot.c_str()).c_str();
+
+    wxFileDialog* const dialog = new wxFileDialog(
+      this,
+      wxT("Select Blueprint"),
+      mBlueprintDirectory,
+      wxEmptyString,
+      wxT("*.bp"),
+      wxOPEN | wxCHANGE_DIR,
+      wxDefaultPosition
+    );
+    if (dialog->ShowModal() != wxID_OK) {
+      return;
+    }
+
+    mBlueprintDirectory = dialog->GetDirectory();
+    mBlueprintFileName = dialog->GetFilename();
+    if (!mBlueprintFileName.Matches(wxT("*.bp"))) {
+      wxMessageDialog* const badName =
+        new wxMessageDialog(this, wxT("You didn't open a valid blueprint"), wxT("Bad name!"), wxOK, wxDefaultPosition);
+      badName->ShowModal();
+      return;
+    }
+
+    mBlueprintPath = dialog->GetPath();
+    const wxString unusedBaseName = mBlueprintFileName.BeforeLast(wxT('_'));
+
+    IEffect* const previousEffect = mPreviewEffect.GetObjectPtr();
+    const wxString previousPath = mBlueprintPath;
+    mPreviewEffect.Set(nullptr);
+
+    {
+      fa::string mountedPath;
+      (void)DISK_GetVFS()->ToMountedPath(&mountedPath, gpg::STR_WideToUtf8(mBlueprintPath.c_str()).c_str());
+      mBlueprintName = mountedPath;
+    }
+
+    if (mAttachedUnit.GetObjectPtr() != nullptr) {
+      REffectBlueprint* blueprint;
+      {
+        RResId blueprintId;
+        gpg::STR_InitFilename(&blueprintId.name, BlueprintNameOrNull());
+        blueprint = mSim->mRules->GetEffectBlueprint(blueprintId);
+      }
+      if (blueprint == nullptr) {
+        gpg::Warnf(gpg::STR_Printf("%s: %s", DISK_GetLastError().c_str(), mBlueprintName.c_str()).c_str());
+      } else if (blueprint->IsBeam() != nullptr) {
+        gpg::Warnf("Sorry, beams are not supported at the moment");
+      } else if (blueprint->IsTrail() != nullptr) {
+        gpg::Warnf("Sorry, trails are not supported at the moment");
+      } else if (blueprint->IsEmitter() != nullptr) {
+        const int bone = mAttachedUnit.GetObjectPtr()->ResolveBoneIndex(mBoneName.c_str());
+        mPreviewEffect.Set(
+          mSim->mEffectManager->CreateAttachedEmitter(mAttachedUnit.GetObjectPtr(), bone, BlueprintNameOrNull(), -1)
+        );
+      }
+    } else {
+      REffectBlueprint* blueprint;
+      {
+        RResId blueprintId;
+        gpg::STR_InitFilename(&blueprintId.name, BlueprintNameOrNull());
+        blueprint = mSim->mRules->GetEffectBlueprint(blueprintId);
+      }
+      if (blueprint == nullptr) {
+        gpg::Warnf(gpg::STR_Printf("%s: %s", DISK_GetLastError().c_str(), mBlueprintName.c_str()).c_str());
+      } else if (blueprint->IsEmitter() != nullptr) {
+        mPreviewEffect.Set(mSim->mEffectManager->CreateEmitter(mSpawnPosition, BlueprintNameOrNull(), -1));
+      } else if (blueprint->IsBeam() != nullptr) {
+        gpg::Warnf("Sorry, beams are not supported at the moment");
+      } else if (blueprint->IsTrail() != nullptr) {
+        gpg::Warnf("Sorry, trails are not supported at the moment");
+      }
+    }
+
+    if (mPreviewEffect.GetObjectPtr() == nullptr) {
+      mPreviewEffect.Set(previousEffect);
+      mBlueprintPath = previousPath;
+      RefreshPreviewEmitter();
+    } else {
+      if (previousEffect != nullptr) {
+        previousEffect->mManager->DestroyEffect(previousEffect);
+      }
+      LoadFromEffect();
+      SetTitle(mBlueprintPath);
+    }
+    return;
+  }
+
+  case ID_EMITTER_SAVE_AS:
+    mBlueprintPath = wxT("");
+    mBlueprintFileName = wxT("");
+    [[fallthrough]];
+
+  case ID_EMITTER_SAVE: {
+    if (mBlueprintFileName.IsEmpty()) {
       fa::string emittersRoot;
       (void)DISK_GetVFS()->FindFile(&emittersRoot, "/effects/Emitters", nullptr);
       mBlueprintDirectory = gpg::STR_Utf8ToWide(emittersRoot.c_str()).c_str();
 
       wxFileDialog* const dialog = new wxFileDialog(
-        this, wxT("Select Blueprint"), mBlueprintDirectory, wxEmptyString, wxT("*.bp"), wxOPEN | wxCHANGE_DIR,
+        this,
+        wxT("Choose a file to save as."),
+        mBlueprintDirectory,
+        wxEmptyString,
+        wxT("*.bp"),
+        wxSAVE,
         wxDefaultPosition
       );
       if (dialog->ShowModal() != wxID_OK) {
@@ -1333,178 +1574,85 @@ void moho::WEmitterWx::OnMenuCommand(wxCommandEvent& event)
 
       mBlueprintDirectory = dialog->GetDirectory();
       mBlueprintFileName = dialog->GetFilename();
+      mBlueprintPath = dialog->GetPath();
       if (!mBlueprintFileName.Matches(wxT("*.bp"))) {
+        mBlueprintFileName = wxT("");
+        mBlueprintPath = wxT("");
         wxMessageDialog* const badName = new wxMessageDialog(
-          this, wxT("You didn't open a valid blueprint"), wxT("Bad name!"), wxOK, wxDefaultPosition
+          this, wxT("Since this is a blueprint you must save as *.bp"), wxT("Bad name!"), wxOK, wxDefaultPosition
         );
         badName->ShowModal();
-        return;
       }
+    }
 
-      mBlueprintPath = dialog->GetPath();
-      const wxString unusedBaseName = mBlueprintFileName.BeforeLast(wxT('_'));
+    WriteBlueprintScript(mBlueprintPath, mBlueprintFileName.BeforeLast(wxT('_')));
+    SetTitle(mBlueprintPath);
+    return;
+  }
 
-      IEffect* const previousEffect = mPreviewEffect.GetObjectPtr();
-      const wxString previousPath = mBlueprintPath;
-      mPreviewEffect.Set(nullptr);
+  case ID_EMITTER_OPEN_TEXTURE: {
+    fa::string texturesRoot;
+    (void)DISK_GetVFS()->FindFile(&texturesRoot, "/textures/particles", nullptr);
+    mTextureDirectory = gpg::STR_Utf8ToWide(texturesRoot.c_str()).c_str();
 
-      {
-        fa::string mountedPath;
-        (void)DISK_GetVFS()->ToMountedPath(&mountedPath, gpg::STR_WideToUtf8(mBlueprintPath.c_str()).c_str());
-        mBlueprintName = mountedPath;
-      }
-
-      if (mAttachedUnit.GetObjectPtr() != nullptr) {
-        REffectBlueprint* blueprint;
-        {
-          RResId blueprintId;
-          gpg::STR_InitFilename(&blueprintId.name, BlueprintNameOrNull());
-          blueprint = mSim->mRules->GetEffectBlueprint(blueprintId);
-        }
-        if (blueprint == nullptr) {
-          gpg::Warnf(gpg::STR_Printf("%s: %s", DISK_GetLastError().c_str(), mBlueprintName.c_str()).c_str());
-        } else if (blueprint->IsBeam() != nullptr) {
-          gpg::Warnf("Sorry, beams are not supported at the moment");
-        } else if (blueprint->IsTrail() != nullptr) {
-          gpg::Warnf("Sorry, trails are not supported at the moment");
-        } else if (blueprint->IsEmitter() != nullptr) {
-          const int bone = mAttachedUnit.GetObjectPtr()->ResolveBoneIndex(mBoneName.c_str());
-          mPreviewEffect.Set(
-            mSim->mEffectManager->CreateAttachedEmitter(mAttachedUnit.GetObjectPtr(), bone, BlueprintNameOrNull(), -1)
-          );
-        }
-      } else {
-        REffectBlueprint* blueprint;
-        {
-          RResId blueprintId;
-          gpg::STR_InitFilename(&blueprintId.name, BlueprintNameOrNull());
-          blueprint = mSim->mRules->GetEffectBlueprint(blueprintId);
-        }
-        if (blueprint == nullptr) {
-          gpg::Warnf(gpg::STR_Printf("%s: %s", DISK_GetLastError().c_str(), mBlueprintName.c_str()).c_str());
-        } else if (blueprint->IsEmitter() != nullptr) {
-          mPreviewEffect.Set(mSim->mEffectManager->CreateEmitter(mSpawnPosition, BlueprintNameOrNull(), -1));
-        } else if (blueprint->IsBeam() != nullptr) {
-          gpg::Warnf("Sorry, beams are not supported at the moment");
-        } else if (blueprint->IsTrail() != nullptr) {
-          gpg::Warnf("Sorry, trails are not supported at the moment");
-        }
-      }
-
-      if (mPreviewEffect.GetObjectPtr() == nullptr) {
-        mPreviewEffect.Set(previousEffect);
-        mBlueprintPath = previousPath;
-        RefreshPreviewEmitter();
-      } else {
-        if (previousEffect != nullptr) {
-          previousEffect->mManager->DestroyEffect(previousEffect);
-        }
-        LoadFromEffect();
-        SetTitle(mBlueprintPath);
-      }
+    wxFileDialog* const dialog = new wxFileDialog(
+      this, wxT("Select Particle Texture"), mTextureDirectory, wxEmptyString, wxT("*.dds"), wxOPEN, wxDefaultPosition
+    );
+    if (dialog->ShowModal() != wxID_OK) {
       return;
     }
 
-    case ID_EMITTER_SAVE_AS:
-      mBlueprintPath = wxT("");
-      mBlueprintFileName = wxT("");
-      [[fallthrough]];
+    mTextureDirectory = dialog->GetDirectory();
+    mTexturePath = dialog->GetPath();
 
-    case ID_EMITTER_SAVE: {
-      if (mBlueprintFileName.IsEmpty()) {
-        fa::string emittersRoot;
-        (void)DISK_GetVFS()->FindFile(&emittersRoot, "/effects/Emitters", nullptr);
-        mBlueprintDirectory = gpg::STR_Utf8ToWide(emittersRoot.c_str()).c_str();
+    fa::string mountedPath;
+    (void)DISK_GetVFS()->ToMountedPath(&mountedPath, gpg::STR_WideToUtf8(mTexturePath.c_str()).c_str());
+    mTexturePath = gpg::STR_Utf8ToWide(mountedPath.c_str()).c_str();
+    mTextureNameControl->SetLabel(mTexturePath);
+    RefreshPreviewEmitter();
+    return;
+  }
 
-        wxFileDialog* const dialog = new wxFileDialog(
-          this, wxT("Choose a file to save as."), mBlueprintDirectory, wxEmptyString, wxT("*.bp"), wxSAVE,
-          wxDefaultPosition
-        );
-        if (dialog->ShowModal() != wxID_OK) {
-          return;
-        }
+  case ID_EMITTER_OPEN_RAMP: {
+    fa::string texturesRoot;
+    (void)DISK_GetVFS()->FindFile(&texturesRoot, "/textures/particles", nullptr);
+    mTextureDirectory = gpg::STR_Utf8ToWide(texturesRoot.c_str()).c_str();
 
-        mBlueprintDirectory = dialog->GetDirectory();
-        mBlueprintFileName = dialog->GetFilename();
-        mBlueprintPath = dialog->GetPath();
-        if (!mBlueprintFileName.Matches(wxT("*.bp"))) {
-          mBlueprintFileName = wxT("");
-          mBlueprintPath = wxT("");
-          wxMessageDialog* const badName = new wxMessageDialog(
-            this, wxT("Since this is a blueprint you must save as *.bp"), wxT("Bad name!"), wxOK, wxDefaultPosition
-          );
-          badName->ShowModal();
-        }
-      }
-
-      WriteBlueprintScript(mBlueprintPath, mBlueprintFileName.BeforeLast(wxT('_')));
-      SetTitle(mBlueprintPath);
+    wxFileDialog* const dialog = new wxFileDialog(
+      this, wxT("Select Ramp Texture"), mTextureDirectory, wxEmptyString, wxT("*.dds"), wxOPEN, wxDefaultPosition
+    );
+    if (dialog->ShowModal() != wxID_OK) {
       return;
     }
 
-    case ID_EMITTER_OPEN_TEXTURE: {
-      fa::string texturesRoot;
-      (void)DISK_GetVFS()->FindFile(&texturesRoot, "/textures/particles", nullptr);
-      mTextureDirectory = gpg::STR_Utf8ToWide(texturesRoot.c_str()).c_str();
+    mTextureDirectory = dialog->GetDirectory();
+    mRampTexturePath = dialog->GetPath();
 
-      wxFileDialog* const dialog = new wxFileDialog(
-        this, wxT("Select Particle Texture"), mTextureDirectory, wxEmptyString, wxT("*.dds"), wxOPEN, wxDefaultPosition
-      );
-      if (dialog->ShowModal() != wxID_OK) {
-        return;
-      }
+    fa::string mountedPath;
+    (void)DISK_GetVFS()->ToMountedPath(&mountedPath, gpg::STR_WideToUtf8(mRampTexturePath.c_str()).c_str());
+    mRampTexturePath = gpg::STR_Utf8ToWide(mountedPath.c_str()).c_str();
+    mRampNameControl->SetLabel(mRampTexturePath);
+    RefreshPreviewEmitter();
+    return;
+  }
 
-      mTextureDirectory = dialog->GetDirectory();
-      mTexturePath = dialog->GetPath();
+  case ID_EMITTER_LOCAL_VELOCITY:
+  case ID_EMITTER_LOCAL_ACCELERATION:
+  case ID_EMITTER_GRAVITY:
+  case ID_EMITTER_ALIGN_ROTATION:
+  case ID_EMITTER_INTERPOLATE_EMISSION:
+  case ID_EMITTER_ALIGN_TO_BONE:
+  case ID_EMITTER_FLAT:
+  case ID_EMITTER_EMIT_IF_VISIBLE:
+  case ID_EMITTER_CATCHUP_EMIT:
+  case ID_EMITTER_CREATE_IF_VISIBLE:
+  case ID_EMITTER_SNAP_TO_WATERLINE:
+  case ID_EMITTER_ONLY_EMIT_ON_WATER:
+    RefreshPreviewEmitter();
+    return;
 
-      fa::string mountedPath;
-      (void)DISK_GetVFS()->ToMountedPath(&mountedPath, gpg::STR_WideToUtf8(mTexturePath.c_str()).c_str());
-      mTexturePath = gpg::STR_Utf8ToWide(mountedPath.c_str()).c_str();
-      mTextureNameControl->SetLabel(mTexturePath);
-      RefreshPreviewEmitter();
-      return;
-    }
-
-    case ID_EMITTER_OPEN_RAMP: {
-      fa::string texturesRoot;
-      (void)DISK_GetVFS()->FindFile(&texturesRoot, "/textures/particles", nullptr);
-      mTextureDirectory = gpg::STR_Utf8ToWide(texturesRoot.c_str()).c_str();
-
-      wxFileDialog* const dialog = new wxFileDialog(
-        this, wxT("Select Ramp Texture"), mTextureDirectory, wxEmptyString, wxT("*.dds"), wxOPEN, wxDefaultPosition
-      );
-      if (dialog->ShowModal() != wxID_OK) {
-        return;
-      }
-
-      mTextureDirectory = dialog->GetDirectory();
-      mRampTexturePath = dialog->GetPath();
-
-      fa::string mountedPath;
-      (void)DISK_GetVFS()->ToMountedPath(&mountedPath, gpg::STR_WideToUtf8(mRampTexturePath.c_str()).c_str());
-      mRampTexturePath = gpg::STR_Utf8ToWide(mountedPath.c_str()).c_str();
-      mRampNameControl->SetLabel(mRampTexturePath);
-      RefreshPreviewEmitter();
-      return;
-    }
-
-    case ID_EMITTER_LOCAL_VELOCITY:
-    case ID_EMITTER_LOCAL_ACCELERATION:
-    case ID_EMITTER_GRAVITY:
-    case ID_EMITTER_ALIGN_ROTATION:
-    case ID_EMITTER_INTERPOLATE_EMISSION:
-    case ID_EMITTER_ALIGN_TO_BONE:
-    case ID_EMITTER_FLAT:
-    case ID_EMITTER_EMIT_IF_VISIBLE:
-    case ID_EMITTER_CATCHUP_EMIT:
-    case ID_EMITTER_CREATE_IF_VISIBLE:
-    case ID_EMITTER_SNAP_TO_WATERLINE:
-    case ID_EMITTER_ONLY_EMIT_ON_WATER:
-      RefreshPreviewEmitter();
-      return;
-
-    default:
-      return;
+  default:
+    return;
   }
 }
 
@@ -1513,15 +1661,51 @@ void moho::WEmitterWx::OnMenuCommand(wxCommandEvent& event)
 // wxEVT_COMMAND_TEXT_UPDATED (wxListCtrl::MSWCommand raises it for EN_UPDATE).
 // The menu range stops at 684, so Enable Particle Resistance (685) toggles
 // without a refresh.
-BEGIN_EVENT_TABLE(moho::WEmitterWx, moho::WWinManagedFrame)
-  EVT_TEXT(kLifetimeFieldId, moho::WEmitterWx::OnSettingChanged)
-  EVT_TEXT(kRepeatTimeFieldId, moho::WEmitterWx::OnSettingChanged)
-  EVT_TEXT(kFrameCountFieldId, moho::WEmitterWx::OnSettingChanged)
-  EVT_COMBOBOX(kEffectChoiceId, moho::WEmitterWx::OnSettingChanged)
-  EVT_CHECKBOX(kPlayingCheckBoxId, moho::WEmitterWx::OnPlayingToggled)
-  EVT_COMMAND_SCROLL_THUMBTRACK(kTimeSliderId, moho::WEmitterWx::OnTimeSliderTrack)
-  EVT_UPDATE_UI(kTimeSliderId, moho::WEmitterWx::OnTimeSliderUpdateUI)
-  EVT_TEXT(kLodCutoffFieldId, moho::WEmitterWx::OnSettingChanged)
-  EVT_COMMAND_RANGE(kFirstCurveEditorId, kViewValueMaxFieldId, wxEVT_COMMAND_BUTTON_CLICKED, moho::WEmitterWx::OnSettingChanged)
-  EVT_MENU_RANGE(666, ID_EMITTER_ONLY_EMIT_ON_WATER, moho::WEmitterWx::OnMenuCommand)
+BEGIN_EVENT_TABLE(
+  moho::WEmitterWx,
+  moho::WWinManagedFrame
+)
+EVT_TEXT(
+  kLifetimeFieldId,
+  moho::WEmitterWx::OnSettingChanged
+)
+EVT_TEXT(
+  kRepeatTimeFieldId,
+  moho::WEmitterWx::OnSettingChanged
+)
+EVT_TEXT(
+  kFrameCountFieldId,
+  moho::WEmitterWx::OnSettingChanged
+)
+EVT_COMBOBOX(
+  kEffectChoiceId,
+  moho::WEmitterWx::OnSettingChanged
+)
+EVT_CHECKBOX(
+  kPlayingCheckBoxId,
+  moho::WEmitterWx::OnPlayingToggled
+)
+EVT_COMMAND_SCROLL_THUMBTRACK(
+  kTimeSliderId,
+  moho::WEmitterWx::OnTimeSliderTrack
+)
+EVT_UPDATE_UI(
+  kTimeSliderId,
+  moho::WEmitterWx::OnTimeSliderUpdateUI
+)
+EVT_TEXT(
+  kLodCutoffFieldId,
+  moho::WEmitterWx::OnSettingChanged
+)
+EVT_COMMAND_RANGE(
+  kFirstCurveEditorId,
+  kViewValueMaxFieldId,
+  wxEVT_COMMAND_BUTTON_CLICKED,
+  moho::WEmitterWx::OnSettingChanged
+)
+EVT_MENU_RANGE(
+  666,
+  ID_EMITTER_ONLY_EMIT_ON_WATER,
+  moho::WEmitterWx::OnMenuCommand
+)
 END_EVENT_TABLE()

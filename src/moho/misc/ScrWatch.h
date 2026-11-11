@@ -61,7 +61,7 @@ namespace moho
     [[nodiscard]] fa::string GetValue() const;
 
   public:
-    fa::string name; // +0x04
+    fa::string name;        // +0x04
     LuaPlus::LuaObject obj; // +0x20
   };
 

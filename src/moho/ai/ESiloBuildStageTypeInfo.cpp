@@ -105,9 +105,14 @@ namespace
   [[maybe_unused]] ESiloBuildStageReflectionBootstrap gESiloBuildStageReflectionBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_ESiloBuildStageTypeInfo_ea41ff, moho::register_ESiloBuildStageTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_ESiloBuildStageTypeInfo_ea41ff,
+  moho::register_ESiloBuildStageTypeInfo
+)
 
-GPG_PREREGISTER_INIT(AcquireESiloBuildStageTypeInfo_ea41ff, AcquireESiloBuildStageTypeInfo)
+GPG_PREREGISTER_INIT(
+  AcquireESiloBuildStageTypeInfo_ea41ff,
+  AcquireESiloBuildStageTypeInfo
+)

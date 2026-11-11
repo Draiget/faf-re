@@ -73,9 +73,7 @@ namespace
     gpg::RRef* const ownerRef
   )
   {
-    auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EFormationdStatus>*>(
-      objectPtr
-    );
+    auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EFormationdStatus>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(broadcaster != nullptr);
     if (archive == nullptr || broadcaster == nullptr) {
@@ -108,9 +106,7 @@ namespace
     gpg::RRef* const
   )
   {
-    auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EFormationdStatus>*>(
-      objectPtr
-    );
+    auto* const broadcaster = reinterpret_cast<moho::Broadcaster<moho::EFormationdStatus>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(broadcaster != nullptr);
     if (archive == nullptr || broadcaster == nullptr) {
@@ -120,10 +116,14 @@ namespace
     const gpg::RRef nullOwner{};
 
     for (moho::Listener<moho::EFormationdStatus>* const listener : broadcaster->mListeners.owners()) {
-      archive->WritePointer<moho::Listener<moho::EFormationdStatus>>(listener, gpg::TrackedPointerState::Unowned, nullOwner);
+      archive->WritePointer<moho::Listener<moho::EFormationdStatus>>(
+        listener, gpg::TrackedPointerState::Unowned, nullOwner
+      );
     }
 
-    archive->WritePointer<moho::Listener<moho::EFormationdStatus>>(nullptr, gpg::TrackedPointerState::Unowned, nullOwner);
+    archive->WritePointer<moho::Listener<moho::EFormationdStatus>>(
+      nullptr, gpg::TrackedPointerState::Unowned, nullOwner
+    );
   }
 
   /**
@@ -133,9 +133,13 @@ namespace
    * Registers `Broadcaster<EFormationdStatus>` as one reflected base of
    * `IFormationInstance` at offset `+0x08`.
    */
-  void AddBroadcasterEFormationdStatusBaseToIFormationInstanceType(gpg::RType* const typeInfo)
+  void AddBroadcasterEFormationdStatusBaseToIFormationInstanceType(
+    gpg::RType* const typeInfo
+  )
   {
-    gpg::AddReflectedBase<moho::Broadcaster<moho::EFormationdStatus>>(typeInfo, gpg::BaseSubobjectOffset<moho::IFormationInstance, moho::Broadcaster<moho::EFormationdStatus>>());
+    gpg::AddReflectedBase<moho::Broadcaster<moho::EFormationdStatus>>(
+      typeInfo, gpg::BaseSubobjectOffset<moho::IFormationInstance, moho::Broadcaster<moho::EFormationdStatus>>()
+    );
   }
 
   class SUnitOffsetInfoTypeInfo final : public gpg::RType
@@ -259,7 +263,8 @@ namespace
     "SUnitOffsetInfoSerializerHelperNode::mSerSaveFunc offset must be 0x10"
   );
   static_assert(
-    sizeof(SUnitOffsetInfoSerializerHelperNode) == 0x14, "SUnitOffsetInfoSerializerHelperNode size must be 0x14"
+    sizeof(SUnitOffsetInfoSerializerHelperNode) == 0x14,
+    "SUnitOffsetInfoSerializerHelperNode size must be 0x14"
   );
 
   /// Demangled: gpg::SerSaveLoadHelper<class Moho::SOffsetInfo>
@@ -315,9 +320,7 @@ namespace
     offsetof(SOffsetInfoSerializerHelperNode, mSerSaveFunc) == 0x10,
     "SOffsetInfoSerializerHelperNode::mSerSaveFunc offset must be 0x10"
   );
-  static_assert(
-    sizeof(SOffsetInfoSerializerHelperNode) == 0x14, "SOffsetInfoSerializerHelperNode size must be 0x14"
-  );
+  static_assert(sizeof(SOffsetInfoSerializerHelperNode) == 0x14, "SOffsetInfoSerializerHelperNode size must be 0x14");
 
   /// Demangled: gpg::SerSaveLoadHelper<class Moho::IFormationInstance>
   struct IFormationInstanceSerializerHelperNode : public gpg::SerHelperBase
@@ -661,11 +664,14 @@ namespace
      * MemberSerialize` hands this type its first member). `Init` below sets
      * `size_ = 0x0C`, the `{proxy, head, size}` map footprint.
      */
-    static void SerSave(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
+    static void SerSave(
+      gpg::WriteArchive* const archive,
+      const std::intptr_t objectPtr,
+      const int,
+      gpg::RRef* const ownerRef
+    )
     {
-      const auto* const mapObject = reinterpret_cast<const UnitOffsetMap*>(
-        objectPtr
-      );
+      const auto* const mapObject = reinterpret_cast<const UnitOffsetMap*>(objectPtr);
       if (!archive || !mapObject) {
         return;
       }
@@ -691,7 +697,8 @@ namespace
      * Address: 0x0056D9D0 (FUN_0056D9D0, gpg::RMapType_EntId_SUnitOffsetInfo::SerLoad)
      *
      * IDA signature:
-     * gpg::RType *__cdecl sub_56D9D0(gpg::ReadArchive *archive, std::intptr_t objectPtr, int version, gpg::RRef *ownerRef);
+     * gpg::RType *__cdecl sub_56D9D0(gpg::ReadArchive *archive, std::intptr_t objectPtr, int version, gpg::RRef
+     * *ownerRef);
      *
      * What it does:
      * Read mirror of `SerSave`: empties the map (the inlined `_Tree::clear`
@@ -703,11 +710,14 @@ namespace
      * unlinked again by the scratch destructor at loop end -- the map node's
      * own copy owns the membership from then on.
      */
-    static void SerLoad(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
+    static void SerLoad(
+      gpg::ReadArchive* const archive,
+      const std::intptr_t objectPtr,
+      const int,
+      gpg::RRef* const ownerRef
+    )
     {
-      auto* const mapObject = reinterpret_cast<UnitOffsetMap*>(
-        objectPtr
-      );
+      auto* const mapObject = reinterpret_cast<UnitOffsetMap*>(objectPtr);
       if (!archive) {
         return;
       }
@@ -821,11 +831,14 @@ namespace
      * Serializes one `std::map<EntId,SCoordsVec2>` payload by writing key/value
      * pairs with the reflected EntId and SCoordsVec2 descriptors.
      */
-    static void SerSave(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
+    static void SerSave(
+      gpg::WriteArchive* const archive,
+      const std::intptr_t objectPtr,
+      const int,
+      gpg::RRef* const ownerRef
+    )
     {
-      const auto* const mapObject = reinterpret_cast<const CoordMap*>(
-        objectPtr
-      );
+      const auto* const mapObject = reinterpret_cast<const CoordMap*>(objectPtr);
       if (!archive || !mapObject) {
         return;
       }
@@ -855,11 +868,14 @@ namespace
      * destination map, reads an element count, then reads that many
      * reflected EntId/SCoordsVec2 pairs, inserting each by key.
      */
-    static void SerLoad(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
+    static void SerLoad(
+      gpg::ReadArchive* const archive,
+      const std::intptr_t objectPtr,
+      const int,
+      gpg::RRef* const ownerRef
+    )
     {
-      auto* const mapObject = reinterpret_cast<CoordMap*>(
-        objectPtr
-      );
+      auto* const mapObject = reinterpret_cast<CoordMap*>(objectPtr);
       if (!archive) {
         return;
       }
@@ -929,7 +945,9 @@ namespace
    * rather than dispatching a virtual, because this descriptor has no
    * `RIndexed` sub-object; the typed `size()` accessor is that same word.
    */
-  fa::string RMapType_EntId_SUnitOffsetInfo::GetLexical(const gpg::RRef& ref) const
+  fa::string RMapType_EntId_SUnitOffsetInfo::GetLexical(
+    const gpg::RRef& ref
+  ) const
   {
     const fa::string base = gpg::RType::GetLexical(ref);
     const auto* const mapObject = static_cast<const UnitOffsetMap*>(ref.mObj);
@@ -947,7 +965,8 @@ namespace
    */
   const char* RBroadcasterRType_EFormationdStatus::GetName() const
   {
-    static const fa::string sName = gpg::STR_Printf("Broadcaster<%s>", gpg::RTypeOf<moho::EFormationdStatus>()->GetName());
+    static const fa::string sName =
+      gpg::STR_Printf("Broadcaster<%s>", gpg::RTypeOf<moho::EFormationdStatus>()->GetName());
     return sName.c_str();
   }
 
@@ -989,7 +1008,9 @@ namespace
    * rather than dispatching a virtual, because this descriptor has no
    * `RIndexed` sub-object; the typed `size()` accessor is that same word.
    */
-  fa::string RMapType_EntId_SCoordsVec2::GetLexical(const gpg::RRef& ref) const
+  fa::string RMapType_EntId_SCoordsVec2::GetLexical(
+    const gpg::RRef& ref
+  ) const
   {
     const fa::string base = gpg::RType::GetLexical(ref);
     const auto* const mapObject = static_cast<const CoordMap*>(ref.mObj);
@@ -1031,7 +1052,10 @@ namespace
   /// binary emits the same null-guarded Write/Read at every field; lifting it
   /// keeps the eighteen call sites readable.
   void WriteFormationField(
-    gpg::WriteArchive* const archive, gpg::RType* const type, const void* const field, const gpg::RRef& ownerRef
+    gpg::WriteArchive* const archive,
+    gpg::RType* const type,
+    const void* const field,
+    const gpg::RRef& ownerRef
   )
   {
     GPG_ASSERT(type != nullptr);
@@ -1041,7 +1065,10 @@ namespace
   }
 
   void ReadFormationField(
-    gpg::ReadArchive* const archive, gpg::RType* const type, void* const field, const gpg::RRef& ownerRef
+    gpg::ReadArchive* const archive,
+    gpg::RType* const type,
+    void* const field,
+    const gpg::RRef& ownerRef
   )
   {
     GPG_ASSERT(type != nullptr);
@@ -1066,7 +1093,9 @@ namespace
    * 0x0056DF43.
    */
 
-  [[nodiscard]] gpg::RRef MakeSimRef(moho::Sim* sim)
+  [[nodiscard]] gpg::RRef MakeSimRef(
+    moho::Sim* sim
+  )
   {
     gpg::RRef out{};
     gpg::RType* const staticType = gpg::RTypeOf<moho::Sim>();
@@ -1097,7 +1126,10 @@ namespace
     return out;
   }
 
-  [[nodiscard]] moho::Sim* ReadPointerSim(gpg::ReadArchive* const archive, const gpg::RRef& ownerRef)
+  [[nodiscard]] moho::Sim* ReadPointerSim(
+    gpg::ReadArchive* const archive,
+    const gpg::RRef& ownerRef
+  )
   {
     if (!archive) {
       return nullptr;
@@ -1132,7 +1164,11 @@ namespace
     throw gpg::SerializationError(message.c_str());
   }
 
-  void WritePointerSim(gpg::WriteArchive* const archive, moho::Sim* const sim, const gpg::RRef& ownerRef)
+  void WritePointerSim(
+    gpg::WriteArchive* const archive,
+    moho::Sim* const sim,
+    const gpg::RRef& ownerRef
+  )
   {
     if (!archive) {
       return;
@@ -1158,7 +1194,9 @@ namespace
 
   /// Wraps a heading difference into `(-pi, pi]`, the way every orientation
   /// compare in this file does it.
-  [[nodiscard]] float WrapAngle(const float angle) noexcept
+  [[nodiscard]] float WrapAngle(
+    const float angle
+  ) noexcept
   {
     if (angle > kPi) {
       return angle - kTwoPi;
@@ -1174,17 +1212,21 @@ namespace
   /// and subtracts the second straight off the x87 stack (`fsubr`), so only
   /// the first is rounded before the subtraction (0x00568FDF..0x00568FFC,
   /// 0x0059B5C7..0x0059B5E8).
-  [[nodiscard]] float HeadingDifference(const Wm3::Quatf& q, const float dirX, const float dirZ) noexcept
+  [[nodiscard]] float HeadingDifference(
+    const Wm3::Quatf& q,
+    const float dirX,
+    const float dirZ
+  ) noexcept
   {
-    return fa::Atan2Difference(
-      (q.z * q.x + q.y * q.w) * 2.0f, 1.0f - (q.y * q.y + q.x * q.x) * 2.0f, dirX, dirZ
-    );
+    return fa::Atan2Difference((q.z * q.x + q.y * q.w) * 2.0f, 1.0f - (q.y * q.y + q.x * q.x) * 2.0f, dirX, dirZ);
   }
 
   /// Rotation about the Y axis by `angle`, stored scalar-first: the shape
   /// `UpdateFormation` writes into `mOrientationChange` and `Update` builds
   /// for each unit's heading correction.
-  [[nodiscard]] Wm3::Quatf YawQuaternion(const float angle) noexcept
+  [[nodiscard]] Wm3::Quatf YawQuaternion(
+    const float angle
+  ) noexcept
   {
     const float halfAngle = angle * 0.5f;
     const float sinHalf = fa::sin(halfAngle);
@@ -1192,14 +1234,19 @@ namespace
   }
 
   /// Flat (XZ) distance between two positions, `sqrtf(dz*dz + dx*dx)`.
-  [[nodiscard]] float FlatDistance(const Wm3::Vec3f& a, const Wm3::Vec3f& b) noexcept
+  [[nodiscard]] float FlatDistance(
+    const Wm3::Vec3f& a,
+    const Wm3::Vec3f& b
+  ) noexcept
   {
     const float dx = a.x - b.x;
     const float dz = a.z - b.z;
     return std::sqrt(dz * dz + dx * dx);
   }
 
-  [[nodiscard]] moho::Unit* UnitOf(const moho::WeakPtr<moho::IUnit>& link) noexcept
+  [[nodiscard]] moho::Unit* UnitOf(
+    const moho::WeakPtr<moho::IUnit>& link
+  ) noexcept
   {
     return static_cast<moho::Unit*>(link.GetObjectPtr());
   }
@@ -1215,7 +1262,9 @@ namespace
    * covers only the air layer (0x005689B4..0x005689BE: `this+0xFC`, one
    * pass), so a ground group is never merged with itself.
    */
-  void MergeOverlappingOffsetInfos(moho::CFormationInstance& formation)
+  void MergeOverlappingOffsetInfos(
+    moho::CFormationInstance& formation
+  )
   {
     if (formation.mCommandType == moho::EUnitCommandType::UNITCOMMAND_Guard) {
       return;
@@ -1254,7 +1303,9 @@ namespace
    * overlap box it intersects.
    */
   [[nodiscard]] moho::Unit* ResolveGroupLeader(
-    moho::CFormationInstance& formation, const std::int32_t layer, moho::SOffsetInfo& info
+    moho::CFormationInstance& formation,
+    const std::int32_t layer,
+    moho::SOffsetInfo& info
   )
   {
     moho::Unit* leader = info.GetLeader();
@@ -1277,7 +1328,9 @@ namespace
    * guard formations the unit that leader is guarding instead.
    */
   [[nodiscard]] moho::Unit* GetOffsetInfoLeader(
-    const std::int32_t layer, moho::CAiFormationInstance& formation, moho::SOffsetInfo& info
+    const std::int32_t layer,
+    moho::CAiFormationInstance& formation,
+    moho::SOffsetInfo& info
   )
   {
     moho::Unit* const leader = ResolveGroupLeader(formation, layer, info);
@@ -1299,7 +1352,9 @@ namespace
    * it: `RemoveDeadUnits` -> `CleanupFormation` -> `UpdateFormation`, in that
    * order (see 0x0059AEA8 / 0x0059AEAF / 0x0059AEB5).
    */
-  void RefreshFormationPlanIfRequested(moho::CFormationInstance& formation)
+  void RefreshFormationPlanIfRequested(
+    moho::CFormationInstance& formation
+  )
   {
     if (formation.mPlanUpdate == 0u) {
       return;
@@ -1318,7 +1373,11 @@ namespace
    * Converts one world-space slot position to footprint-anchored grid cell
    * coordinates and asks `COORDS_CanMoveAt` whether the unit can occupy it.
    */
-  [[nodiscard]] bool UnitCanMoveAt(moho::Unit* const unit, const moho::SCoordsVec2& position, moho::COGrid* const grid)
+  [[nodiscard]] bool UnitCanMoveAt(
+    moho::Unit* const unit,
+    const moho::SCoordsVec2& position,
+    moho::COGrid* const grid
+  )
   {
     const moho::SFootprint& footprint = unit->GetFootprint();
     // FUN_007212B0 converts both coordinates with bare fistp and never calls
@@ -1369,10 +1428,10 @@ namespace
    */
   struct SFormationRunScriptUnitDesc
   {
-    moho::Unit* unit;              // +0x00
-    Wm3::Vec3f relative;           // +0x04
-    Wm3::Vec3f relativeRotated;    // +0x10
-    float weight;                  // +0x1C (constant 1.0f in the shipped binary)
+    moho::Unit* unit;           // +0x00
+    Wm3::Vec3f relative;        // +0x04
+    Wm3::Vec3f relativeRotated; // +0x10
+    float weight;               // +0x1C (constant 1.0f in the shipped binary)
   };
   static_assert(sizeof(SFormationRunScriptUnitDesc) == 0x20, "SFormationRunScriptUnitDesc size must be 0x20");
 
@@ -1405,11 +1464,11 @@ namespace
      */
     SFormationRunScriptCandidate& operator=(const SFormationRunScriptCandidate&) = default;
 
-    Wm3::Vec3f position;                  // +0x00
-    Wm3::Vec3f anchorDelta;               // +0x0C
-    float distanceSq;                     // +0x18 (sort key)
-    float weight;                         // +0x1C
-    moho::EntityCategorySet category;     // +0x20 (0x28 bytes)
+    Wm3::Vec3f position;              // +0x00
+    Wm3::Vec3f anchorDelta;           // +0x0C
+    float distanceSq;                 // +0x18 (sort key)
+    float weight;                     // +0x1C
+    moho::EntityCategorySet category; // +0x20 (0x28 bytes)
   };
   static_assert(sizeof(SFormationRunScriptCandidate) == 0x48, "SFormationRunScriptCandidate size must be 0x48");
 
@@ -1474,7 +1533,9 @@ namespace moho
    * Axis-aligned overlap test of the two groups' `mCenter +/- mExtent`
    * boxes, X first, then Z.
    */
-  bool SOffsetInfo::Overlaps(const SOffsetInfo& other) const noexcept
+  bool SOffsetInfo::Overlaps(
+    const SOffsetInfo& other
+  ) const noexcept
   {
     // Each test only rejects on an ordered `lo > hi` (comiss/ja at 0x00568917,
     // 0x0056892C, 0x00568957, 0x00568964), so a NaN bound counts as overlap.
@@ -1532,7 +1593,10 @@ namespace moho
    * appended groups from one default-constructed prototype (built at
    * 0x0056C1B3, torn down at 0x0056C1D2 around the `Resize` at 0x0056C1C6).
    */
-  void SetFastVectorSOffsetInfoCount(void* const vector, const int count)
+  void SetFastVectorSOffsetInfoCount(
+    void* const vector,
+    const int count
+  )
   {
     auto& groups = *static_cast<gpg::fastvector_n<SOffsetInfo, 2>*>(vector);
     groups.Resize(static_cast<std::size_t>(count), SOffsetInfo());
@@ -1551,7 +1615,12 @@ namespace moho
    * 0x0056DF17) -- then deserializes each group through `ReadArchive::Read`
    * with the element descriptor cached in `SOffsetInfo::sType` (0x0056DF43).
    */
-  void LoadFastVectorSOffsetInfo(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorSOffsetInfo(
+    gpg::ReadArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const groups = reinterpret_cast<gpg::fastvector_n<SOffsetInfo, 2>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -1578,7 +1647,12 @@ namespace moho
    * Writes one reflected `fastvector<SOffsetInfo>` payload as archive count
    * plus per-group reflected serialization, mirroring `LoadFastVectorSOffsetInfo`.
    */
-  void SaveFastVectorSOffsetInfo(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void SaveFastVectorSOffsetInfo(
+    gpg::WriteArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const groups = reinterpret_cast<gpg::fastvector_n<SOffsetInfo, 2>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -1608,7 +1682,10 @@ namespace moho
    * (0x0056C3B3-0x0056C3D3) before calling the resize (0x0056D650, the
    * `fastvector_n<SAssignedLocInfo,16>::Resize` emission for this element).
    */
-  void SetFastVectorSAssignedLocInfoCount(void* const vector, const int count)
+  void SetFastVectorSAssignedLocInfoCount(
+    void* const vector,
+    const int count
+  )
   {
     auto& slots = *static_cast<gpg::fastvector_n<SAssignedLocInfo, 16>*>(vector);
     slots.Resize(static_cast<std::size_t>(count), SAssignedLocInfo{});
@@ -1622,7 +1699,12 @@ namespace moho
    * `fastvector<SAssignedLocInfo>` filling appended entries from a zeroed
    * prototype, then deserializes each 0x10 entry through `ReadArchive::Read`.
    */
-  void LoadFastVectorSAssignedLocInfo(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorSAssignedLocInfo(
+    gpg::ReadArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const slots = reinterpret_cast<gpg::fastvector_n<SAssignedLocInfo, 16>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -1650,7 +1732,12 @@ namespace moho
    * count plus per-entry reflected serialization, mirroring
    * `LoadFastVectorSAssignedLocInfo`.
    */
-  void SaveFastVectorSAssignedLocInfo(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void SaveFastVectorSAssignedLocInfo(
+    gpg::WriteArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const slots = reinterpret_cast<gpg::fastvector_n<SAssignedLocInfo, 16>*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -1683,8 +1770,7 @@ namespace moho
     : mPos(position)
     , mSize(size)
     , mLayer(layer)
-  {
-  }
+  {}
 
   /**
    * Address: 0x00570E20 (FUN_00570E20, Moho::SAssignedLocInfo::MemberDeserialize)
@@ -1692,7 +1778,10 @@ namespace moho
    * What it does:
    * Loads one assigned slot: position, footprint size and layer.
    */
-  void SAssignedLocInfo::MemberDeserialize(SAssignedLocInfo* const slot, gpg::ReadArchive* const archive)
+  void SAssignedLocInfo::MemberDeserialize(
+    SAssignedLocInfo* const slot,
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive || !slot) {
       return;
@@ -1715,7 +1804,10 @@ namespace moho
    * What it does:
    * Stores one assigned slot: position, footprint size and layer.
    */
-  void SAssignedLocInfo::MemberSerialize(const SAssignedLocInfo* const slot, gpg::WriteArchive* const archive)
+  void SAssignedLocInfo::MemberSerialize(
+    const SAssignedLocInfo* const slot,
+    gpg::WriteArchive* const archive
+  )
   {
     if (!archive || !slot) {
       return;
@@ -1739,7 +1831,9 @@ namespace moho
    * Loads one unit slot: weak-unit link, leader priority, 2D offset, 3D
    * target position, heading angle, both distances and the weight.
    */
-  void SUnitOffsetInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SUnitOffsetInfo::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -1780,7 +1874,9 @@ namespace moho
    * Stores one unit slot: weak-unit link, leader priority, 2D offset, 3D
    * target position, heading angle, both distances and the weight.
    */
-  void SUnitOffsetInfo::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SUnitOffsetInfo::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;
@@ -1822,7 +1918,9 @@ namespace moho
    * pairs, both flags, both scalars and the leader weak-link, each through
    * its reflected RTTI serializer.
    */
-  void SOffsetInfo::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SOffsetInfo::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;
@@ -1892,7 +1990,9 @@ namespace moho
    * coordinate pairs, two flags, two scalars and the leader weak-link, each
    * through its reflected RTTI serializer.
    */
-  void SOffsetInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SOffsetInfo::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -1967,7 +2067,9 @@ namespace moho
    * fixed order. `mSim` and the trailing word are runtime-only and deliberately
    * not written - a loaded formation re-binds them from its owner.
    */
-  void CFormationInstance::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CFormationInstance::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     GPG_ASSERT(archive != nullptr);
     if (archive == nullptr) {
@@ -2013,7 +2115,9 @@ namespace moho
    * The two owning references come back through typed pointer readers, which
    * is what re-establishes tracking for the Lua state and the game rules.
    */
-  void CFormationInstance::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CFormationInstance::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (archive == nullptr) {
@@ -2158,7 +2262,10 @@ namespace moho
    * What it does:
    * Base implementation: no leader distance, always zero.
    */
-  float CFormationInstance::GetDistFromLeader(Unit* const, SOffsetInfo* const)
+  float CFormationInstance::GetDistFromLeader(
+    Unit* const,
+    SOffsetInfo* const
+  )
   {
     return 0.0f;
   }
@@ -2170,7 +2277,10 @@ namespace moho
    * What it does:
    * Base implementation: every unit has priority 1.
    */
-  std::int32_t CFormationInstance::GetPriority(Unit* const, SOffsetInfo* const)
+  std::int32_t CFormationInstance::GetPriority(
+    Unit* const,
+    SOffsetInfo* const
+  )
   {
     return 1;
   }
@@ -2183,7 +2293,11 @@ namespace moho
    * Base implementation: zero formation speed; `CAiFormationInstance`
    * overrides it with the group-relative speed computation.
    */
-  float CFormationInstance::CalcFormationSpeed(Unit* const, float* const, SOffsetInfo* const)
+  float CFormationInstance::CalcFormationSpeed(
+    Unit* const,
+    float* const,
+    SOffsetInfo* const
+  )
   {
     return 0.0f;
   }
@@ -2195,7 +2309,10 @@ namespace moho
    * What it does:
    * Base implementation: no leader, always null.
    */
-  Unit* CFormationInstance::GetLeader(Unit* const, SOffsetInfo* const)
+  Unit* CFormationInstance::GetLeader(
+    Unit* const,
+    SOffsetInfo* const
+  )
   {
     return nullptr;
   }
@@ -2208,7 +2325,11 @@ namespace moho
    * Base implementation: hands `pos` straight back through `dest` without
    * consulting the assigned-slot table.
    */
-  SCoordsVec2* CFormationInstance::FindSlotFor(SCoordsVec2* const dest, const SCoordsVec2* const pos, Unit* const)
+  SCoordsVec2* CFormationInstance::FindSlotFor(
+    SCoordsVec2* const dest,
+    const SCoordsVec2* const pos,
+    Unit* const
+  )
   {
     *dest = *pos;
     return dest;
@@ -2243,7 +2364,9 @@ namespace moho
   static_assert(sizeof(CAiFormationInstance) <= SimBlockLane::kBlockBytes);
 #endif
 
-  void* CAiFormationInstance::operator new(const std::size_t size)
+  void* CAiFormationInstance::operator new(
+    const std::size_t size
+  )
   {
     if (void* const block = operator new(size, std::nothrow)) {
       return block;
@@ -2251,7 +2374,10 @@ namespace moho
     throw std::bad_alloc();
   }
 
-  void* CAiFormationInstance::operator new(const std::size_t size, const std::nothrow_t&) noexcept
+  void* CAiFormationInstance::operator new(
+    const std::size_t size,
+    const std::nothrow_t&
+  ) noexcept
   {
     // x86 runs the recovered binary allocator (malloc_0, 0x00958B20), whose per-thread 896-byte lane formations share
     // with projectiles and others; a list of our own would override that order (26916583 fails at beat 4900 with one).
@@ -2263,7 +2389,10 @@ namespace moho
     return ::operator new(size, std::nothrow);
   }
 
-  void CAiFormationInstance::operator delete(void* const block, const std::size_t size) noexcept
+  void CAiFormationInstance::operator delete(
+    void* const block,
+    const std::size_t size
+  ) noexcept
   {
     if (block == nullptr) {
       return;
@@ -2279,7 +2408,10 @@ namespace moho
     ::operator delete(block);
   }
 
-  void CAiFormationInstance::operator delete(void* const block, const std::nothrow_t&) noexcept
+  void CAiFormationInstance::operator delete(
+    void* const block,
+    const std::nothrow_t&
+  ) noexcept
   {
     operator delete(block, sizeof(CAiFormationInstance));
   }
@@ -2301,8 +2433,7 @@ namespace moho
   CAiFormationInstance::CAiFormationInstance()
     : CFormationInstance()
     , mSim(nullptr)
-  {
-  }
+  {}
 
   /**
    * Inlined into `CAiFormationDBImpl::NewFormation` (0x0059C120,
@@ -2327,8 +2458,7 @@ namespace moho
   )
     : CFormationInstance(rules, commandType, state, units, name, coords, orientation)
     , mSim(sim)
-  {
-  }
+  {}
 
   /**
    * Address: 0x0059A500 (FUN_0059A500, ??1CAiFormationInstance@Moho@@QAE@@Z)
@@ -2359,7 +2489,9 @@ namespace moho
    * Reads the serialized base-formation payload, then restores `mSim` as an
    * unowned tracked pointer.
    */
-  void CAiFormationInstance::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CAiFormationInstance::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -2391,7 +2523,9 @@ namespace moho
    * Writes the serialized base-formation payload, then saves `mSim` as an
    * unowned tracked pointer.
    */
-  void CAiFormationInstance::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CAiFormationInstance::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;
@@ -2418,7 +2552,9 @@ namespace moho
    * What it does:
    * Copies the formation centre into `outCoords`.
    */
-  SCoordsVec2* CFormationInstance::GetCoords(SCoordsVec2* const outCoords) const
+  SCoordsVec2* CFormationInstance::GetCoords(
+    SCoordsVec2* const outCoords
+  ) const
   {
     outCoords->x = mCoords.x;
     outCoords->z = mCoords.z;
@@ -2433,7 +2569,9 @@ namespace moho
    * `lahf` pair at 0x00569A4C treats NaN as different, i.e. plain `!=`)
    * and is not NaN itself, dropping every assigned slot and both caches.
    */
-  void CFormationInstance::SetCoords(const SCoordsVec2& coords)
+  void CFormationInstance::SetCoords(
+    const SCoordsVec2& coords
+  )
   {
     if (mCoords.x != coords.x || mCoords.z != coords.z) {
       if (!std::isnan(coords.x) && !std::isnan(coords.z)) {
@@ -2531,8 +2669,8 @@ namespace moho
       return nullptr;
     }
 
-    return new (storage) CFormationInstance(
-      rules, EUnitCommandType::UNITCOMMAND_None, state, units, name, coords, orientation);
+    return new (storage)
+      CFormationInstance(rules, EUnitCommandType::UNITCOMMAND_None, state, units, name, coords, orientation);
   }
 
   /**
@@ -2636,7 +2774,9 @@ namespace moho
    * Classifies the unit into its formation layer: air-motion blueprints get
    * layer 1, everything else layer 0. The value indexes `mOffsetInfo`.
    */
-  std::int32_t CFormationInstance::GetLayer(Unit* const unit) const
+  std::int32_t CFormationInstance::GetLayer(
+    Unit* const unit
+  ) const
   {
     const bool isAirLayer = unit->GetBlueprint()->Physics.MotionType == RULEUMT_Air;
     return isAirLayer ? kAirFormationLayer : kGroundFormationLayer;
@@ -2650,7 +2790,9 @@ namespace moho
    * unit's entity id (`std::map::find`, 0x0056AFE0), warning and returning
    * null when none does.
    */
-  SOffsetInfo* CFormationInstance::GetOffsetInfo(Unit* const unit)
+  SOffsetInfo* CFormationInstance::GetOffsetInfo(
+    Unit* const unit
+  )
   {
     for (SOffsetInfo& info : mOffsetInfo[GetLayer(unit)]) {
       if (info.mUnitOffsets.find(unit->GetEntityId()) != info.mUnitOffsets.end()) {
@@ -2732,7 +2874,10 @@ namespace moho
    * when any were claimed, then releases the per-layer scratch list (its
    * destructor: `sub_56D3C0` plus the heap free).
    */
-  void CFormationInstance::Setup(gpg::fastvector_n<WeakPtr<IUnit>, 4>& candidateUnits, const std::int32_t layerIndex)
+  void CFormationInstance::Setup(
+    gpg::fastvector_n<WeakPtr<IUnit>, 4>& candidateUnits,
+    const std::int32_t layerIndex
+  )
   {
     gpg::fastvector_n<WeakPtr<IUnit>, 4> layerUnits{};
     PreRunScript(layerUnits, candidateUnits, layerIndex);
@@ -2775,7 +2920,10 @@ namespace moho
    *     left unassigned, and appends the finished group to
    *     `mOffsetInfo[layerIndex]` (`push_back`, 0x0056B590).
    */
-  void CFormationInstance::RunScript(gpg::fastvector_n<WeakPtr<IUnit>, 4>& units, const std::int32_t layerIndex)
+  void CFormationInstance::RunScript(
+    gpg::fastvector_n<WeakPtr<IUnit>, 4>& units,
+    const std::int32_t layerIndex
+  )
   {
     // Phase 1 (0x00567364-0x005673B9). The binary does not null-check the
     // resolved unit -- every caller (Setup, via PreRunScript) guarantees
@@ -2944,9 +3092,7 @@ namespace moho
       const EntId entityId = bestUnit->GetEntityId();
       if (group.mUnitOffsets.find(entityId) != group.mUnitOffsets.end()) {
         gpg::Warnf(
-          "HASH duplicated on %p in formation %p",
-          static_cast<const void*>(bestUnit),
-          static_cast<const void*>(this)
+          "HASH duplicated on %p in formation %p", static_cast<const void*>(bestUnit), static_cast<const void*>(this)
         );
       }
 
@@ -3024,8 +3170,9 @@ namespace moho
       const RUnitBlueprint* const blueprint = unit->GetBlueprint();
       std::int32_t footprintSize;
       if (blueprint->Physics.MotionType == RULEUMT_Air) {
-        footprintSize = (static_cast<std::int32_t>(blueprint->mFootprint.mSizeX)
-                        + static_cast<std::int32_t>(blueprint->mFootprint.mSizeZ)) / 2;
+        footprintSize = (static_cast<std::int32_t>(blueprint->mFootprint.mSizeX) +
+                         static_cast<std::int32_t>(blueprint->mFootprint.mSizeZ)) /
+          2;
       } else {
         // 0x00568DC5: the ground path reads the blueprint footprint bytes at
         // +0xD8/+0xD9 off the IUnit::GetBlueprint result and keeps the larger
@@ -3149,8 +3296,10 @@ namespace moho
 
       const RUnitBlueprint* const blueprint = unit->GetBlueprint();
       SOCellPos cell{};
-      cell.x = static_cast<std::int16_t>(std::lrintf(position.x - static_cast<float>(blueprint->mFootprint.mSizeX) * 0.5f));
-      cell.z = static_cast<std::int16_t>(std::lrintf(position.z - static_cast<float>(blueprint->mFootprint.mSizeZ) * 0.5f));
+      cell.x =
+        static_cast<std::int16_t>(std::lrintf(position.x - static_cast<float>(blueprint->mFootprint.mSizeX) * 0.5f));
+      cell.z =
+        static_cast<std::int16_t>(std::lrintf(position.z - static_cast<float>(blueprint->mFootprint.mSizeZ) * 0.5f));
       *dest = cell;
     }
     return dest;
@@ -3167,7 +3316,11 @@ namespace moho
    * a mobile unit and its own position for an immobile one, cached through
    * the map's `operator[]` (`sub_56B6C0`).
    */
-  SCoordsVec2* CFormationInstance::GetOffsetPosition(SCoordsVec2* const dest, Unit* const unit, SOffsetInfo* info)
+  SCoordsVec2* CFormationInstance::GetOffsetPosition(
+    SCoordsVec2* const dest,
+    Unit* const unit,
+    SOffsetInfo* info
+  )
   {
     RefreshFormationPlanIfRequested(*this);
 
@@ -3213,7 +3366,11 @@ namespace moho
    * `SUnitOffsetInfo::mTargetPos`, falling back to the unit's own position
    * while that is still zero or the unit has no slot in `info`.
    */
-  Wm3::Vec3f* CFormationInstance::GetTargetPosition(Wm3::Vec3f* const out, Unit* const unit, SOffsetInfo* info)
+  Wm3::Vec3f* CFormationInstance::GetTargetPosition(
+    Wm3::Vec3f* const out,
+    Unit* const unit,
+    SOffsetInfo* info
+  )
   {
     if (unit == nullptr || unit->IsDead()) {
       *out = Wm3::Vec3f::ZERO;
@@ -3238,7 +3395,9 @@ namespace moho
    * duplicate or appends a fresh link (the temporary `WeakPtr<IUnit>` at
    * 0x0056A26A pushed and destroyed) and flags the plan for a rebuild.
    */
-  void CFormationInstance::AddUnit(Unit* const unit)
+  void CFormationInstance::AddUnit(
+    Unit* const unit
+  )
   {
     if (unit == nullptr || unit->IsDead()) {
       return;
@@ -3267,7 +3426,9 @@ namespace moho
    * cached leader when it was this unit, then erases the unit's link from
    * `mUnits` (`sub_5725A0` shift plus the tail unlink).
    */
-  void CFormationInstance::RemoveUnit(Unit* const unit)
+  void CFormationInstance::RemoveUnit(
+    Unit* const unit
+  )
   {
     if (unit == nullptr) {
       return;
@@ -3301,7 +3462,10 @@ namespace moho
    * True when a group of the unit's layer holds its entity id, or -- with
    * `checkAll` -- when `mUnits` links it.
    */
-  bool CFormationInstance::Contains(Unit* const unit, const bool checkAll) const
+  bool CFormationInstance::Contains(
+    Unit* const unit,
+    const bool checkAll
+  ) const
   {
     if (unit == nullptr) {
       return false;
@@ -3334,7 +3498,9 @@ namespace moho
    * (`sub_5725A0` shift plus the tail unlink) and noting whether
    * `checkForUnit` was met among the survivors.
    */
-  bool CFormationInstance::RemoveDeadUnits(Unit* const checkForUnit)
+  bool CFormationInstance::RemoveDeadUnits(
+    Unit* const checkForUnit
+  )
   {
     bool found = false;
     for (auto it = mUnits.begin(); it != mUnits.end();) {
@@ -3358,7 +3524,10 @@ namespace moho
    * What it does:
    * The formation forward vector for a placed unit, zero otherwise.
    */
-  Wm3::Vec3f* CFormationInstance::GetForwardVector(Wm3::Vec3f* const out, Unit* const unit) const
+  Wm3::Vec3f* CFormationInstance::GetForwardVector(
+    Wm3::Vec3f* const out,
+    Unit* const unit
+  ) const
   {
     if (Contains(unit, false)) {
       *out = mForwardVector;
@@ -3376,7 +3545,9 @@ namespace moho
    * group lookup fails). Otherwise: whether every group of both layers is
    * in formation.
    */
-  bool CFormationInstance::IsInFormation(Unit* const unit) const
+  bool CFormationInstance::IsInFormation(
+    Unit* const unit
+  ) const
   {
     if (unit != nullptr && !unit->IsDead() && Contains(unit, false)) {
       if (SOffsetInfo* const info = const_cast<CFormationInstance*>(this)->GetOffsetInfo(unit)) {
@@ -3422,7 +3593,9 @@ namespace moho
    * Stores a changed scale (the `ucomiss`/`lahf` pair at 0x0056A4FE is a
    * plain `!=`) and requests a plan rebuild.
    */
-  void CFormationInstance::SetScale(const float scale)
+  void CFormationInstance::SetScale(
+    const float scale
+  )
   {
     if (mScale != scale) {
       mScale = scale;
@@ -3438,7 +3611,9 @@ namespace moho
    * for a zero orientation or a plain `Move` command) and requests a plan
    * rebuild.
    */
-  void CFormationInstance::SetOrientation(const Wm3::Quatf& orientation)
+  void CFormationInstance::SetOrientation(
+    const Wm3::Quatf& orientation
+  )
   {
     if (orientation == mOrientation) {
       return;
@@ -3459,7 +3634,9 @@ namespace moho
    * What it does:
    * Copies the current orientation into `outOrientation`.
    */
-  Wm3::Quatf* CFormationInstance::GetOrientation(Wm3::Quatf* const outOrientation) const
+  Wm3::Quatf* CFormationInstance::GetOrientation(
+    Wm3::Quatf* const outOrientation
+  ) const
   {
     *outOrientation = mOrientation;
     return outOrientation;
@@ -3483,7 +3660,10 @@ namespace moho
    * The unit's `SUnitOffsetInfo::mDistFromLeader` (node +0x38), zero when
    * `info` is null or has no slot for the unit.
    */
-  float CAiFormationInstance::GetDistFromLeader(Unit* const unit, SOffsetInfo* const info)
+  float CAiFormationInstance::GetDistFromLeader(
+    Unit* const unit,
+    SOffsetInfo* const info
+  )
   {
     if (info == nullptr) {
       return 0.0f;
@@ -3501,7 +3681,10 @@ namespace moho
    * slot, or a non-positive weight; otherwise `10 * (int)mWeight`, floored
    * at 1.
    */
-  std::int32_t CAiFormationInstance::GetPriority(Unit* const unit, SOffsetInfo* info)
+  std::int32_t CAiFormationInstance::GetPriority(
+    Unit* const unit,
+    SOffsetInfo* info
+  )
   {
     Unit* const runtimeUnit = unit->IsUnit();
     if (runtimeUnit == nullptr) {
@@ -3588,7 +3771,10 @@ namespace moho
    * with an air group following the first overlapping ground group's
    * leader instead (`ResolveGroupLeader`).
    */
-  Unit* CAiFormationInstance::GetLeader(Unit* const unit, SOffsetInfo* const info)
+  Unit* CAiFormationInstance::GetLeader(
+    Unit* const unit,
+    SOffsetInfo* const info
+  )
   {
     if (mCommandType == EUnitCommandType::UNITCOMMAND_Guard && unit->IsUnit() != nullptr) {
       return unit->IsUnit()->GuardedUnitRef.GetObjectPtr();
@@ -3655,9 +3841,7 @@ namespace moho
           continue;
         }
 
-        float minDistToTarget = mCommandType == EUnitCommandType::UNITCOMMAND_Guard
-          ? 0.0f
-          : gpg::pInf;
+        float minDistToTarget = mCommandType == EUnitCommandType::UNITCOMMAND_Guard ? 0.0f : gpg::pInf;
         float maxDistToTarget = 0.0f;
 
         // The leader's goal (0x0059AEF6-0x0059B033, air tail at 0x0059B5B7).
@@ -3748,8 +3932,8 @@ namespace moho
           } else {
             const float distToLeader = FlatDistance(unit->GetPosition(), leader->GetPosition());
             const bool leaderOffSlot = std::sqrt(
-                                         static_cast<double>(leaderCellDx) * static_cast<double>(leaderCellDx)
-                                         + static_cast<double>(leaderCellDz) * static_cast<double>(leaderCellDz)
+                                         static_cast<double>(leaderCellDx) * static_cast<double>(leaderCellDx) +
+                                         static_cast<double>(leaderCellDz) * static_cast<double>(leaderCellDz)
                                        ) >= 5.0;
             if (leaderOffSlot || mCommandType == EUnitCommandType::UNITCOMMAND_Guard) {
               SCoordsVec2 offsetPos{};
@@ -3802,8 +3986,9 @@ namespace moho
           }
 
           const Wm3::Vec3f& unitPos = unit->GetPosition();
-          const float distToTarget =
-            std::sqrt((unitPos.x - target.x) * (unitPos.x - target.x) + (unitPos.z - target.z) * (unitPos.z - target.z));
+          const float distToTarget = std::sqrt(
+            (unitPos.x - target.x) * (unitPos.x - target.x) + (unitPos.z - target.z) * (unitPos.z - target.z)
+          );
           unitInfo.mDistToTarget = distToTarget;
           if (distToTarget <= minDistToTarget) {
             minDistToTarget = distToTarget;
@@ -3858,8 +4043,8 @@ namespace moho
           (void)mapData->mHeightField->GetElevation(formationPos.x, formationPos.z);
           const Wm3::Vec3f& unitPos = unit->GetPosition();
           const float distance = std::sqrt(
-            (unitPos.z - formationPos.z) * (unitPos.z - formationPos.z)
-            + (unitPos.x - formationPos.x) * (unitPos.x - formationPos.x)
+            (unitPos.z - formationPos.z) * (unitPos.z - formationPos.z) +
+            (unitPos.x - formationPos.x) * (unitPos.x - formationPos.x)
           );
           if (distance > arrivalThreshold) {
             inFormation = false;
@@ -3867,18 +4052,16 @@ namespace moho
           }
 
           const CUnitCommandQueue* const queue = unit->IsUnit()->CommandQueue;
-          const CUnitCommand* const nextCommand = queue->mCommandVec.size() >= 2u
-            ? queue->mCommandVec[1].GetObjectPtr()
-            : nullptr;
+          const CUnitCommand* const nextCommand =
+            queue->mCommandVec.size() >= 2u ? queue->mCommandVec[1].GetObjectPtr() : nullptr;
           if (nextCommand != nullptr && IsSpeedThroughBusyCommandType(nextCommand->mVarDat.mCmdType)) {
             continue;
           }
 
           if (mForwardVector != Wm3::Vec3f::ZERO) {
             const Wm3::Quatf& q = unit->GetTransform().orient_;
-            const float facing = mForwardVector.z * (1.0f - (q.y * q.y + q.x * q.x) * 2.0f)
-              + mForwardVector.y * ((q.z * q.y - q.w * q.x) * 2.0f)
-              + ((q.w * q.y + q.z * q.x) * 2.0f) * mForwardVector.x;
+            const float facing = mForwardVector.z * (1.0f - (q.y * q.y + q.x * q.x) * 2.0f) +
+              mForwardVector.y * ((q.z * q.y - q.w * q.x) * 2.0f) + ((q.w * q.y + q.z * q.x) * 2.0f) * mForwardVector.x;
             if (facing < 0.94999999f) {
               inFormation = false;
               break;
@@ -3907,13 +4090,19 @@ namespace moho
    * finds nothing, a busy follow-up command keeps `pos` (without reserving
    * it), and anything else falls back to the unit's own position.
    */
-  SCoordsVec2* CAiFormationInstance::FindSlotFor(SCoordsVec2* const dest, const SCoordsVec2* const pos, Unit* const unit)
+  SCoordsVec2* CAiFormationInstance::FindSlotFor(
+    SCoordsVec2* const dest,
+    const SCoordsVec2* const pos,
+    Unit* const unit
+  )
   {
     Unit* const runtimeUnit = unit->IsUnit();
     std::int32_t layer = 0;
-    if (runtimeUnit == nullptr || runtimeUnit->IsDead() || runtimeUnit->CommandQueue == nullptr
-        || mCommandType == EUnitCommandType::UNITCOMMAND_Guard || mScale < 1.0f
-        || (layer = GetLayer(unit)) == kAirFormationLayer) {
+    if (
+      runtimeUnit == nullptr || runtimeUnit->IsDead() || runtimeUnit->CommandQueue == nullptr ||
+      mCommandType == EUnitCommandType::UNITCOMMAND_Guard || mScale < 1.0f ||
+      (layer = GetLayer(unit)) == kAirFormationLayer
+    ) {
       *dest = *pos;
       return dest;
     }
@@ -3946,8 +4135,10 @@ namespace moho
       }
     }
 
-    if (const CUnitCommand* const nextCommand = runtimeUnit->CommandQueue->GetNextCommand();
-        nextCommand != nullptr && IsSpeedThroughBusyCommandType(nextCommand->mVarDat.mCmdType)) {
+    if (
+      const CUnitCommand* const nextCommand = runtimeUnit->CommandQueue->GetNextCommand();
+      nextCommand != nullptr && IsSpeedThroughBusyCommandType(nextCommand->mVarDat.mCmdType)
+    ) {
       *dest = *pos;
       return dest;
     }
@@ -3992,13 +4183,34 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_SUnitOffsetInfoTypeInfo_12dfcf, moho::preregister_SUnitOffsetInfoTypeInfo)
-GPG_PREREGISTER_INIT(preregister_SAssignedLocInfoTypeInfo_12dfcf, moho::preregister_SAssignedLocInfoTypeInfo)
-GPG_PREREGISTER_INIT(preregister_IFormationInstanceTypeInfo_12dfcf, moho::preregister_IFormationInstanceTypeInfo)
-GPG_PREREGISTER_INIT(preregister_RMapType_EntId_SUnitOffsetInfo_12dfcf, moho::preregister_RMapType_EntId_SUnitOffsetInfo)
-GPG_PREREGISTER_INIT(preregister_RBroadcasterRType_EFormationdStatus_12dfcf, moho::preregister_RBroadcasterRType_EFormationdStatus)
-GPG_PREREGISTER_INIT(preregister_RListenerRType_EFormationdStatus_12dfcf, moho::preregister_RListenerRType_EFormationdStatus)
-GPG_PREREGISTER_INIT(preregister_RMapType_EntId_SCoordsVec2_12dfcf, moho::preregister_RMapType_EntId_SCoordsVec2)
+GPG_PREREGISTER_INIT(
+  preregister_SUnitOffsetInfoTypeInfo_12dfcf,
+  moho::preregister_SUnitOffsetInfoTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  preregister_SAssignedLocInfoTypeInfo_12dfcf,
+  moho::preregister_SAssignedLocInfoTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  preregister_IFormationInstanceTypeInfo_12dfcf,
+  moho::preregister_IFormationInstanceTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  preregister_RMapType_EntId_SUnitOffsetInfo_12dfcf,
+  moho::preregister_RMapType_EntId_SUnitOffsetInfo
+)
+GPG_PREREGISTER_INIT(
+  preregister_RBroadcasterRType_EFormationdStatus_12dfcf,
+  moho::preregister_RBroadcasterRType_EFormationdStatus
+)
+GPG_PREREGISTER_INIT(
+  preregister_RListenerRType_EFormationdStatus_12dfcf,
+  moho::preregister_RListenerRType_EFormationdStatus
+)
+GPG_PREREGISTER_INIT(
+  preregister_RMapType_EntId_SCoordsVec2_12dfcf,
+  moho::preregister_RMapType_EntId_SCoordsVec2
+)
 
 namespace moho
 {

@@ -47,4 +47,3 @@ namespace moho
   static_assert(offsetof(SBlackListInfo, mEntity) == 0x00, "SBlackListInfo::mEntity offset must be 0x00");
   static_assert(offsetof(SBlackListInfo, mValue) == 0x08, "SBlackListInfo::mValue offset must be 0x08");
 } // namespace moho
-

@@ -13,18 +13,31 @@ namespace
 
   // ComputeCorner: position + u * sx * (cos h, sin h) + v * sz * (-sin h, cos h).
   void Corner(
-    const moho::ScriptedDecalCorner& at, const float sx, const float sz, const float h, const float u, const float v,
-    float& x, float& z
+    const moho::ScriptedDecalCorner& at,
+    const float sx,
+    const float sz,
+    const float h,
+    const float u,
+    const float v,
+    float& x,
+    float& z
   )
   {
     x = at.x + v * (-sz * std::sin(h)) + u * (sx * std::cos(h));
     z = at.z + v * (sz * std::cos(h)) + u * (sx * std::sin(h));
   }
 
-  void CheckCentre(const float cx, const float cz, const float sx, const float sz, const float h)
+  void CheckCentre(
+    const float cx,
+    const float cz,
+    const float sx,
+    const float sz,
+    const float h
+  )
   {
-    SCOPED_TRACE(testing::Message() << "centre (" << cx << ", " << cz << ") scale (" << sx << ", " << sz
-                                    << ") heading " << h);
+    SCOPED_TRACE(
+      testing::Message() << "centre (" << cx << ", " << cz << ") scale (" << sx << ", " << sz << ") heading " << h
+    );
     const moho::ScriptedDecalCorner corner = moho::ScriptedDecalCornerForCentre(cx, cz, sx, sz, h);
     float x = 0.0f;
     float z = 0.0f;
@@ -35,7 +48,10 @@ namespace
 } // namespace
 
 // Heading 0 is the binary's centre - scale / 2 (0x0087ECE0), bit for bit.
-TEST(ScriptedDecalPlacement, HeadingZeroMatchesBinary)
+TEST(
+  ScriptedDecalPlacement,
+  HeadingZeroMatchesBinary
+)
 {
   const moho::ScriptedDecalCorner corner = moho::ScriptedDecalCornerForCentre(100.0f, 50.0f, 4.0f, 10.0f, 0.0f);
   EXPECT_EQ(corner.x, 98.0f);
@@ -43,7 +59,10 @@ TEST(ScriptedDecalPlacement, HeadingZeroMatchesBinary)
 }
 
 // The middle of the quad is the centre at every heading, for square and long decals.
-TEST(ScriptedDecalPlacement, CentreStaysAtEveryHeading)
+TEST(
+  ScriptedDecalPlacement,
+  CentreStaysAtEveryHeading
+)
 {
   const float headings[] = {0.0f, 0.3f, 0.785398f, 1.570796f, 2.5f, 3.141593f, -1.2f, 7.0f};
   for (const float h : headings) {
@@ -54,7 +73,10 @@ TEST(ScriptedDecalPlacement, CentreStaysAtEveryHeading)
 }
 
 // A quarter turn swaps the extents: the x edge runs along +z, the z edge along -x.
-TEST(ScriptedDecalPlacement, QuarterTurnSwapsExtents)
+TEST(
+  ScriptedDecalPlacement,
+  QuarterTurnSwapsExtents
+)
 {
   const float h = 1.5707963f;
   const moho::ScriptedDecalCorner corner = moho::ScriptedDecalCornerForCentre(0.0f, 0.0f, 4.0f, 10.0f, h);

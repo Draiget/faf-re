@@ -81,7 +81,8 @@ namespace moho
      * Allocates one `CEconRequest`, resets intrusive links/economy values, and
      * publishes the object as an unowned construct result.
      */
-    static void MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x00774A60 (FUN_00774A60, Moho::CEconRequest::MemberDeserialize)
@@ -197,9 +198,8 @@ namespace moho
      * Builds a default economy event for an archive load and hands it back
      * unowned; its members are loaded over it afterwards.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x00776010 (FUN_00776010)
@@ -231,12 +231,12 @@ namespace moho
      */
     [[nodiscard]] static gpg::RType* GetPointerType();
 
-    Unit* mUnit;                             // +0x50
-    SEconValue mRequestedPerTick;            // +0x54
-    CEconRequest* mRequest;                  // +0x5C
-    LuaPlus::LuaObject mProgressCallback;    // +0x60
-    std::int32_t mRemainingTicks;            // +0x74
-    std::int32_t mTotalTicks;                // +0x78
+    Unit* mUnit;                          // +0x50
+    SEconValue mRequestedPerTick;         // +0x54
+    CEconRequest* mRequest;               // +0x5C
+    LuaPlus::LuaObject mProgressCallback; // +0x60
+    std::int32_t mRemainingTicks;         // +0x74
+    std::int32_t mTotalTicks;             // +0x78
   };
 
   /**
@@ -311,7 +311,7 @@ namespace moho
   using EconomyEventIsDone_LuaFuncDef = ::moho::CScrLuaBinder;
 
   /**
-    * Alias of FUN_00775630 (non-canonical helper lane).
+   * Alias of FUN_00775630 (non-canonical helper lane).
    */
   int cfunc_CreateEconomyEvent(lua_State* luaContext);
 
@@ -329,7 +329,7 @@ namespace moho
   CScrLuaInitForm* func_CreateEconomyEvent_LuaFuncDef();
 
   /**
-    * Alias of FUN_00775910 (non-canonical helper lane).
+   * Alias of FUN_00775910 (non-canonical helper lane).
    */
   int cfunc_RemoveEconomyEvent(lua_State* luaContext);
 
@@ -347,7 +347,7 @@ namespace moho
   CScrLuaInitForm* func_RemoveEconomyEvent_LuaFuncDef();
 
   /**
-    * Alias of FUN_00775A40 (non-canonical helper lane).
+   * Alias of FUN_00775A40 (non-canonical helper lane).
    */
   int cfunc_EconomyEventIsDone(lua_State* luaContext);
 
@@ -373,18 +373,21 @@ namespace moho
 #if defined(MOHO_STRICT_LAYOUT_ASSERTS)
   static_assert(offsetof(CEconomyEvent, mUnit) == 0x50, "CEconomyEvent::mUnit offset must be 0x50");
   static_assert(
-    offsetof(CEconomyEvent, mRequestedPerTick) == 0x54, "CEconomyEvent::mRequestedPerTick offset must be 0x54"
+    offsetof(CEconomyEvent, mRequestedPerTick) == 0x54,
+    "CEconomyEvent::mRequestedPerTick offset must be 0x54"
   );
   static_assert(offsetof(CEconomyEvent, mRequest) == 0x5C, "CEconomyEvent::mRequest offset must be 0x5C");
   static_assert(
-    offsetof(CEconomyEvent, mProgressCallback) == 0x60, "CEconomyEvent::mProgressCallback offset must be 0x60"
+    offsetof(CEconomyEvent, mProgressCallback) == 0x60,
+    "CEconomyEvent::mProgressCallback offset must be 0x60"
   );
   static_assert(offsetof(CEconomyEvent, mRemainingTicks) == 0x74, "CEconomyEvent::mRemainingTicks offset must be 0x74");
   static_assert(offsetof(CEconomyEvent, mTotalTicks) == 0x78, "CEconomyEvent::mTotalTicks offset must be 0x78");
   static_assert(sizeof(CEconomyEvent) == 0x7C, "CEconomyEvent size must be 0x7C");
 #endif
   static_assert(
-    sizeof(CScrLuaMetatableFactory<CEconomyEvent>) == 0x08, "CScrLuaMetatableFactory<CEconomyEvent> size must be 0x08"
+    sizeof(CScrLuaMetatableFactory<CEconomyEvent>) == 0x08,
+    "CScrLuaMetatableFactory<CEconomyEvent> size must be 0x08"
   );
   static_assert(sizeof(CEconomyEventTypeInfo) == 0x64, "CEconomyEventTypeInfo size must be 0x64");
 } // namespace moho

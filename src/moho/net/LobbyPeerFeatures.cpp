@@ -39,13 +39,13 @@ namespace
 
   // Checks every style. The matching private key is not in this repository.
   constexpr StylePublicKey kStylePublicKey = {
-    0xa4, 0x97, 0xd0, 0xa2, 0x6d, 0xc4, 0xbb, 0x65,
-    0x84, 0xa9, 0xbe, 0x14, 0xb2, 0x95, 0x61, 0xf0,
-    0x40, 0x01, 0x85, 0x39, 0xaa, 0x5c, 0x26, 0xb3,
-    0x54, 0xe2, 0x2c, 0xc8, 0x66, 0xfd, 0xad, 0x58,
+    0xa4, 0x97, 0xd0, 0xa2, 0x6d, 0xc4, 0xbb, 0x65, 0x84, 0xa9, 0xbe, 0x14, 0xb2, 0x95, 0x61, 0xf0,
+    0x40, 0x01, 0x85, 0x39, 0xaa, 0x5c, 0x26, 0xb3, 0x54, 0xe2, 0x2c, 0xc8, 0x66, 0xfd, 0xad, 0x58,
   };
 
-  [[nodiscard]] int HexDigit(const char c) noexcept
+  [[nodiscard]] int HexDigit(
+    const char c
+  ) noexcept
   {
     if (c >= '0' && c <= '9') {
       return c - '0';
@@ -60,7 +60,10 @@ namespace
   }
 
   template <std::size_t N>
-  [[nodiscard]] bool ParseHex(const std::string& text, std::array<std::uint8_t, N>& out) noexcept
+  [[nodiscard]] bool ParseHex(
+    const std::string& text,
+    std::array<std::uint8_t, N>& out
+  ) noexcept
   {
     if (text.size() != N * 2u) {
       return false;
@@ -76,7 +79,9 @@ namespace
     return true;
   }
 
-  [[nodiscard]] std::string FormatColor(const StyleColor& color)
+  [[nodiscard]] std::string FormatColor(
+    const StyleColor& color
+  )
   {
     char text[7];
     std::snprintf(text, sizeof(text), "%02x%02x%02x", color[0], color[1], color[2]);
@@ -102,17 +107,24 @@ namespace
   // installs the next one before the old one goes.
   const CLobbyPeerFeatures* sSlotStyles = nullptr;
 
-  void PushField(lua_State* const state, const int tableIndex, const char* const name)
+  void PushField(
+    lua_State* const state,
+    const int tableIndex,
+    const char* const name
+  )
   {
     // Relative to the top before the push; the globals table's index is absolute.
-    const int table = tableIndex < 0 && tableIndex != LUA_GLOBALSINDEX ? lua_gettop(state) + tableIndex + 1 : tableIndex;
+    const int table =
+      tableIndex < 0 && tableIndex != LUA_GLOBALSINDEX ? lua_gettop(state) + tableIndex + 1 : tableIndex;
     lua_pushstring(state, name);
     lua_gettable(state, table);
   }
 
   // Pushes the lobby script's module table, or returns false with nothing pushed.
   // Looked up, not imported: autolobby games never load that script.
-  [[nodiscard]] bool PushLobbyModule(lua_State* const state)
+  [[nodiscard]] bool PushLobbyModule(
+    lua_State* const state
+  )
   {
     PushField(state, LUA_GLOBALSINDEX, "__modules");
     if (lua_type(state, -1) != LUA_TTABLE) {
@@ -131,7 +143,10 @@ namespace
   // Pushes the script's file-local GUI, an upvalue of its SetSlotInfo (the function
   // at the absolute or upvalue index `function`, or the one wrapped by it). False with
   // nothing pushed if not found.
-  [[nodiscard]] bool PushLobbyGui(lua_State* const state, const int function)
+  [[nodiscard]] bool PushLobbyGui(
+    lua_State* const state,
+    const int function
+  )
   {
     const int top = lua_gettop(state);
     int script = function;
@@ -159,7 +174,12 @@ namespace
   }
 
   // GUI.slots[slot].name:SetTitleTextColor(style). A failure costs the colour only.
-  void PaintSlot(lua_State* const state, const int function, const double slot, const std::string& style)
+  void PaintSlot(
+    lua_State* const state,
+    const int function,
+    const double slot,
+    const std::string& style
+  )
   {
     const int top = lua_gettop(state);
     if (PushLobbyGui(state, function) && lua_type(state, -1) == LUA_TTABLE) {
@@ -186,7 +206,9 @@ namespace
   // Stands in for the lobby script's SetSlotInfo(slotNum, playerInfo): the script's
   // function is upvalue 1. It sets the name's colour by the slot's state, so a style
   // goes on after it, over the host, player and local colours.
-  int SetSlotInfoWithStyle(lua_State* const state)
+  int SetSlotInfoWithStyle(
+    lua_State* const state
+  )
   {
     const int argumentCount = lua_gettop(state);
     lua_pushvalue(state, lua_upvalueindex(1));
@@ -215,7 +237,9 @@ namespace
   }
 } // namespace
 
-CLobbyPeerFeatures::CLobbyPeerFeatures(const CLobby& lobby)
+CLobbyPeerFeatures::CLobbyPeerFeatures(
+  const CLobby& lobby
+)
   : mLobby(lobby)
 {
   LoadKey();
@@ -228,7 +252,9 @@ CLobbyPeerFeatures::~CLobbyPeerFeatures()
   }
 }
 
-void CLobbyPeerFeatures::InstallSlotStyles(lua_State* const state)
+void CLobbyPeerFeatures::InstallSlotStyles(
+  lua_State* const state
+)
 {
   sSlotStyles = this;
 
@@ -247,7 +273,10 @@ void CLobbyPeerFeatures::InstallSlotStyles(lua_State* const state)
   lua_settop(state, top);
 }
 
-void CLobbyPeerFeatures::PaintPeer(lua_State* const state, const std::int32_t uid) const
+void CLobbyPeerFeatures::PaintPeer(
+  lua_State* const state,
+  const std::int32_t uid
+) const
 {
   const std::string style = StyleOf(uid);
   const int top = lua_gettop(state);
@@ -299,7 +328,9 @@ void CLobbyPeerFeatures::LoadKey()
   mLocalStyle = color;
 }
 
-void CLobbyPeerFeatures::PeerEstablished(const SPeer& peer)
+void CLobbyPeerFeatures::PeerEstablished(
+  const SPeer& peer
+)
 {
   mPeers[peer.uid] = SLobbyPeer{};
 
@@ -314,7 +345,11 @@ void CLobbyPeerFeatures::PeerEstablished(const SPeer& peer)
   peer.peerConnection->Write(message);
 }
 
-bool CLobbyPeerFeatures::Receive(const SPeer& peer, const std::int32_t localUid, CMessage& message)
+bool CLobbyPeerFeatures::Receive(
+  const SPeer& peer,
+  const std::int32_t localUid,
+  CMessage& message
+)
 {
   const auto size = static_cast<std::size_t>(message.GetMessageSize());
   const char* const payload = message.mBuff.start_ + 3;
@@ -331,8 +366,11 @@ bool CLobbyPeerFeatures::Receive(const SPeer& peer, const std::int32_t localUid,
     }
     state.announced = true;
     gpg::Logf(
-      "PEERS: lobby player %d:%s runs our engine, features %016llx, build %s", peer.uid, peer.playerName.c_str(),
-      static_cast<unsigned long long>(state.announcement.mask), state.announcement.build.c_str()
+      "PEERS: lobby player %d:%s runs our engine, features %016llx, build %s",
+      peer.uid,
+      peer.playerName.c_str(),
+      static_cast<unsigned long long>(state.announcement.mask),
+      state.announcement.build.c_str()
     );
 
     if ((state.announcement.mask & PeerFeatureBit(EPeerFeature::SignedStyle)) != 0u) {
@@ -394,13 +432,17 @@ bool CLobbyPeerFeatures::Receive(const SPeer& peer, const std::int32_t localUid,
   return false;
 }
 
-bool CLobbyPeerFeatures::PeerRunsOurEngine(const std::int32_t uid) const
+bool CLobbyPeerFeatures::PeerRunsOurEngine(
+  const std::int32_t uid
+) const
 {
   const auto found = mPeers.find(uid);
   return found != mPeers.end() && found->second.announced;
 }
 
-std::string CLobbyPeerFeatures::StyleOf(const std::int32_t uid) const
+std::string CLobbyPeerFeatures::StyleOf(
+  const std::int32_t uid
+) const
 {
   if (uid == mLobby.localUid) {
     return mKey != nullptr ? FormatColor(mLocalStyle) : std::string{};

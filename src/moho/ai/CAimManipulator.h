@@ -51,14 +51,10 @@ namespace moho
 
   static_assert(offsetof(CAimFiringArc, mMinHeading) == 0x00, "CAimFiringArc::mMinHeading offset must be 0x00");
   static_assert(offsetof(CAimFiringArc, mMaxHeading) == 0x04, "CAimFiringArc::mMaxHeading offset must be 0x04");
-  static_assert(
-    offsetof(CAimFiringArc, mHeadingMaxSlew) == 0x08, "CAimFiringArc::mHeadingMaxSlew offset must be 0x08"
-  );
+  static_assert(offsetof(CAimFiringArc, mHeadingMaxSlew) == 0x08, "CAimFiringArc::mHeadingMaxSlew offset must be 0x08");
   static_assert(offsetof(CAimFiringArc, mMinPitch) == 0x0C, "CAimFiringArc::mMinPitch offset must be 0x0C");
   static_assert(offsetof(CAimFiringArc, mMaxPitch) == 0x10, "CAimFiringArc::mMaxPitch offset must be 0x10");
-  static_assert(
-    offsetof(CAimFiringArc, mPitchMaxSlew) == 0x14, "CAimFiringArc::mPitchMaxSlew offset must be 0x14"
-  );
+  static_assert(offsetof(CAimFiringArc, mPitchMaxSlew) == 0x14, "CAimFiringArc::mPitchMaxSlew offset must be 0x14");
   static_assert(sizeof(CAimFiringArc) == 0x18, "CAimFiringArc size must be 0x18");
 
   /// The `pi/180` constant at 0x00DFF090, which every degree-taking aim path in
@@ -112,7 +108,12 @@ namespace moho
      * from the turret bone's local orientation.
      */
     CAimManipulator(
-      UnitWeapon* weapon, Sim* sim, const char* label, std::uint32_t boneA, std::int32_t boneB, std::int32_t boneMuzzle
+      UnitWeapon* weapon,
+      Sim* sim,
+      const char* label,
+      std::uint32_t boneA,
+      std::int32_t boneB,
+      std::int32_t boneMuzzle
     );
 
     /**
@@ -229,7 +230,10 @@ namespace moho
      * Reads the current heading in radians. Inlined into
      * `cfunc_CAimManipulatorGetHeadingPitchL`.
      */
-    [[nodiscard]] float GetHeading() const noexcept { return mHeading; }
+    [[nodiscard]] float GetHeading() const noexcept
+    {
+      return mHeading;
+    }
 
     /**
      * Address: 0x0062FE80 (FUN_0062FE80, `movss xmm0, [eax+0xBC]; ret`)
@@ -238,7 +242,10 @@ namespace moho
      * Reads the current pitch in radians. Inlined into
      * `cfunc_CAimManipulatorGetHeadingPitchL`.
      */
-    [[nodiscard]] float GetPitch() const noexcept { return mPitch; }
+    [[nodiscard]] float GetPitch() const noexcept
+    {
+      return mPitch;
+    }
 
     /**
      * Address: 0x0062FE90 (FUN_0062FE90, `movss [eax+0xB8], xmm0;
@@ -248,7 +255,10 @@ namespace moho
      * Writes both aim angles in radians. Inlined into
      * `cfunc_CAimManipulatorSetHeadingPitchL`.
      */
-    void SetHeadingPitch(const float heading, const float pitch) noexcept
+    void SetHeadingPitch(
+      const float heading,
+      const float pitch
+    ) noexcept
     {
       mHeading = heading;
       mPitch = pitch;
@@ -262,7 +272,9 @@ namespace moho
      * Stores the heading offset, converting degrees to radians against the same
      * `0x00DFF090` constant the inlined copy at 0x00632B85 multiplies by.
      */
-    void SetAimHeadingOffset(const float degrees) noexcept
+    void SetAimHeadingOffset(
+      const float degrees
+    ) noexcept
     {
       mHeadingOffset = degrees * kAimDegreesToRadians;
     }
@@ -274,7 +286,10 @@ namespace moho
      * Reports whether the last tracking step ended inside firing tolerance.
      * Inlined into `cfunc_CAimManipulatorOnTargetL`.
      */
-    [[nodiscard]] bool OnTarget() const noexcept { return mOnTarget; }
+    [[nodiscard]] bool OnTarget() const noexcept
+    {
+      return mOnTarget;
+    }
 
     /**
      * Address: 0x0062FE60 (FUN_0062FE60, `mov [eax+0xE4], ecx; ret`)
@@ -284,7 +299,12 @@ namespace moho
      * Inlined into `cfunc_CAimManipulatorSetResetPoseTimeL`, which scales the
      * Lua seconds argument by 10 first.
      */
-    void SetResetPoseTime(const std::int32_t ticks) noexcept { mResetPoseTime = ticks; }
+    void SetResetPoseTime(
+      const std::int32_t ticks
+    ) noexcept
+    {
+      mResetPoseTime = ticks;
+    }
 
     /**
      * Address: 0x00630750 (FUN_00630750, `mov [eax+0xB4], cl;
@@ -297,7 +317,9 @@ namespace moho
      * flag of the same name at +0x4C. Inlined into
      * `cfunc_CAimManipulatorSetEnabledL`.
      */
-    void SetEnabled(const bool enabled) noexcept
+    void SetEnabled(
+      const bool enabled
+    ) noexcept
     {
       mEnabled = enabled;
       mOnTarget = false;
@@ -402,36 +424,36 @@ namespace moho
     // the end of the heap block, 0x90 bytes of it, once per manipulator: one
     // is created for every turreted unit in the session.
     // -----------------------------------------------------------------------
-    WeakPtr<Unit> mUnit{};                                 // +0x80
-    WeakPtr<UnitWeapon> mWeapon{};                         // +0x88
-    fa::string mLabel{};                                // +0x90
-    RUnitBlueprintWeapon* mUnitWepBlueprint = nullptr;     // +0xAC
+    WeakPtr<Unit> mUnit{};                                     // +0x80
+    WeakPtr<UnitWeapon> mWeapon{};                             // +0x88
+    fa::string mLabel{};                                       // +0x90
+    RUnitBlueprintWeapon* mUnitWepBlueprint = nullptr;         // +0xAC
     RProjectileBlueprintPhysics* mProjPhysBlueprint = nullptr; // +0xB0
-    bool mEnabled = false;                                 // +0xB4
+    bool mEnabled = false;                                     // +0xB4
     std::uint8_t mPadB5ToB7[0x3]{};
-    float mHeading = 0.0f;                                 // +0xB8
-    float mPitch = 0.0f;                                   // +0xBC
-    std::int32_t mMuzzleBone = 0;                          // +0xC0
-    bool mIsTracking = false;                              // +0xC4
+    float mHeading = 0.0f;        // +0xB8
+    float mPitch = 0.0f;          // +0xBC
+    std::int32_t mMuzzleBone = 0; // +0xC0
+    bool mIsTracking = false;     // +0xC4
     std::uint8_t mPadC5ToC7[0x3]{};
-    float mMinHeading = 0.0f;                              // +0xC8
-    float mMaxHeading = 0.0f;                              // +0xCC
-    float mHeadingMaxSlew = 0.0f;                          // +0xD0
-    float mMinPitch = 0.0f;                                // +0xD4
-    float mMaxPitch = 0.0f;                                // +0xD8
-    float mPitchMaxSlew = 0.0f;                            // +0xDC
-    bool mOnTarget = false;                                // +0xE0
-    bool mUnknownBoolE1 = false;                           // +0xE1
+    float mMinHeading = 0.0f;     // +0xC8
+    float mMaxHeading = 0.0f;     // +0xCC
+    float mHeadingMaxSlew = 0.0f; // +0xD0
+    float mMinPitch = 0.0f;       // +0xD4
+    float mMaxPitch = 0.0f;       // +0xD8
+    float mPitchMaxSlew = 0.0f;   // +0xDC
+    bool mOnTarget = false;       // +0xE0
+    bool mUnknownBoolE1 = false;  // +0xE1
     std::uint8_t mPadE2ToE3[0x2]{};
-    std::int32_t mResetPoseTime = 0;                       // +0xE4
-    std::int32_t mResetTime = 0;                           // +0xE8
+    std::int32_t mResetPoseTime = 0; // +0xE4
+    std::int32_t mResetTime = 0;     // +0xE8
     // The two bone rotations, cached so a tick that does not recompute them
     // can re-apply the last one. `mHeadingRot` turns watched bone 0 about Y,
     // `mPitchRot` turns watched bone 1 about X; both are seeded to identity by
     // each constructor.
-    Wm3::Quaternionf mHeadingRot{};                        // +0xEC
-    Wm3::Quaternionf mPitchRot{};                          // +0xFC
-    float mHeadingOffset = 0.0f;                           // +0x10C
+    Wm3::Quaternionf mHeadingRot{}; // +0xEC
+    Wm3::Quaternionf mPitchRot{};   // +0xFC
+    float mHeadingOffset = 0.0f;    // +0x10C
   };
 
   static_assert(sizeof(CAimManipulator) == 0x110, "moho::CAimManipulator size must be 0x110");
@@ -444,7 +466,10 @@ namespace moho
   );
   static_assert(offsetof(CAimManipulator, mHeading) == 0xB8, "CAimManipulator::mHeading offset must be 0xB8");
   static_assert(offsetof(CAimManipulator, mMinHeading) == 0xC8, "CAimManipulator::mMinHeading offset must be 0xC8");
-  static_assert(offsetof(CAimManipulator, mResetPoseTime) == 0xE4, "CAimManipulator::mResetPoseTime offset must be 0xE4");
+  static_assert(
+    offsetof(CAimManipulator, mResetPoseTime) == 0xE4,
+    "CAimManipulator::mResetPoseTime offset must be 0xE4"
+  );
   static_assert(offsetof(CAimManipulator, mHeadingRot) == 0xEC, "CAimManipulator::mHeadingRot offset must be 0xEC");
   static_assert(offsetof(CAimManipulator, mPitchRot) == 0xFC, "CAimManipulator::mPitchRot offset must be 0xFC");
   static_assert(
@@ -461,7 +486,8 @@ namespace moho
   protected:
     /**
      * Address: 0x00632C40 (FUN_00632C40)
-     * Mangled: ?Create@?$CScrLuaMetatableFactory@VCAimManipulator@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z
+     * Mangled:
+     * ?Create@?$CScrLuaMetatableFactory@VCAimManipulator@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z
      *
      * What it does:
      * Creates the `CAimManipulator` Lua metatable through

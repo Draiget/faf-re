@@ -36,7 +36,6 @@ namespace
   }
 } // namespace
 
-
 namespace moho
 {
   /**

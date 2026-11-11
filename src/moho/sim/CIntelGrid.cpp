@@ -41,7 +41,9 @@ namespace
   }
 
   template <class TTypeInfo>
-  void ResetTypeInfoVectors(TTypeInfo& typeInfo) noexcept
+  void ResetTypeInfoVectors(
+    TTypeInfo& typeInfo
+  ) noexcept
   {
     typeInfo.fields_ = fa::vector<gpg::RField>{};
     typeInfo.bases_ = fa::vector<gpg::RField>{};
@@ -54,7 +56,9 @@ namespace
    * Executes one non-deleting `gpg::RType` base-teardown lane for
    * `CIntelGridTypeInfo`.
    */
-  [[maybe_unused]] void cleanup_CIntelGridTypeInfoRTypeBase(moho::CIntelGridTypeInfo* const typeInfo) noexcept
+  [[maybe_unused]] void cleanup_CIntelGridTypeInfoRTypeBase(
+    moho::CIntelGridTypeInfo* const typeInfo
+  ) noexcept
   {
     if (typeInfo == nullptr) {
       return;
@@ -67,12 +71,18 @@ namespace
   // and multiplies every coordinate by that reciprocal (mulss); it never
   // divides the coordinate itself, so the scaled value rounds like `v * (1/g)`.
   // Then the inlined floor (0x005BE0AA, 0x005BE0D6) or ceil (0x005BE103, 0x005BE130).
-  [[nodiscard]] std::int32_t FloorScaledToGridCell(const std::int32_t value, const float reciprocal) noexcept
+  [[nodiscard]] std::int32_t FloorScaledToGridCell(
+    const std::int32_t value,
+    const float reciprocal
+  ) noexcept
   {
     return fa::FloorToIntX87(static_cast<float>(value) * reciprocal);
   }
 
-  [[nodiscard]] std::int32_t CeilScaledToGridCell(const std::int32_t value, const float reciprocal) noexcept
+  [[nodiscard]] std::int32_t CeilScaledToGridCell(
+    const std::int32_t value,
+    const float reciprocal
+  ) noexcept
   {
     return fa::CeilToIntX87(static_cast<float>(value) * reciprocal);
   }
@@ -92,7 +102,10 @@ namespace
    * Converts world-space rect bounds into grid-space bounds using floor for
    * min coordinates and ceil for max coordinates.
    */
-  [[nodiscard]] gpg::Rect2i RectToGridCellBounds(const gpg::Rect2<int>& rect, const std::int32_t gridSize) noexcept
+  [[nodiscard]] gpg::Rect2i RectToGridCellBounds(
+    const gpg::Rect2<int>& rect,
+    const std::int32_t gridSize
+  ) noexcept
   {
     const float reciprocal = 1.0f / static_cast<float>(gridSize);
     gpg::Rect2i out{};
@@ -103,7 +116,9 @@ namespace
     return out;
   }
 
-  [[nodiscard]] gpg::RRef MakeCIntelGridRef(moho::CIntelGrid* const object) noexcept
+  [[nodiscard]] gpg::RRef MakeCIntelGridRef(
+    moho::CIntelGrid* const object
+  ) noexcept
   {
     gpg::RRef out{};
     out.mObj = object;
@@ -129,7 +144,10 @@ namespace
     return archive;
   }
 
-  [[nodiscard]] moho::STIMap* ReadUnownedSTIMapPointer(gpg::ReadArchive* const archive, const gpg::RRef& ownerRef)
+  [[nodiscard]] moho::STIMap* ReadUnownedSTIMapPointer(
+    gpg::ReadArchive* const archive,
+    const gpg::RRef& ownerRef
+  )
   {
     if (!archive) {
       return nullptr;
@@ -174,19 +192,18 @@ namespace
    * Address: 0x005089C0 (FUN_005089C0, STIMap unowned pointer write helper)
    */
   [[maybe_unused]] [[nodiscard]] gpg::WriteArchive* WriteUnownedSTIMapPointerVariant1(
-    moho::STIMap* const* const mapSlot, gpg::WriteArchive* const archive, const gpg::RRef& ownerRef
+    moho::STIMap* const* const mapSlot,
+    gpg::WriteArchive* const archive,
+    const gpg::RRef& ownerRef
   )
   {
     return WriteUnownedPointerSlot_UsingRRefBuilder(
-      mapSlot,
-      archive,
-      ownerRef,
-      [](gpg::RRef* const outRef, moho::STIMap* const value) {
-        if (!outRef) {
-          return;
-        }
-        (void)gpg::RRef_STIMap(outRef, value);
+      mapSlot, archive, ownerRef, [](gpg::RRef* const outRef, moho::STIMap* const value) {
+      if (!outRef) {
+        return;
       }
+      (void)gpg::RRef_STIMap(outRef, value);
+    }
     );
   }
 
@@ -194,7 +211,9 @@ namespace
    * Address: 0x00508A40 (FUN_00508A40, STIMap unowned pointer read helper)
    */
   [[maybe_unused]] [[nodiscard]] gpg::ReadArchive* ReadUnownedSTIMapPointerVariant1(
-    const gpg::RRef& ownerRef, gpg::ReadArchive* const archive, moho::STIMap** const mapSlot
+    const gpg::RRef& ownerRef,
+    gpg::ReadArchive* const archive,
+    moho::STIMap** const mapSlot
   )
   {
     if (mapSlot) {
@@ -207,7 +226,8 @@ namespace
    * Address: 0x00508A50 (FUN_00508A50, CIntelGrid RRef fill helper)
    */
   [[maybe_unused]] [[nodiscard]] gpg::RRef* FillCIntelGridRef(
-    moho::CIntelGrid* const value, gpg::RRef* const outRef
+    moho::CIntelGrid* const value,
+    gpg::RRef* const outRef
   )
   {
     return gpg::RRef_CIntelGrid(outRef, value);
@@ -217,7 +237,9 @@ namespace
    * Address: 0x00508E50 (FUN_00508E50, STIMap unowned pointer read helper duplicate)
    */
   [[maybe_unused]] [[nodiscard]] gpg::ReadArchive* ReadUnownedSTIMapPointerVariant2(
-    const gpg::RRef& ownerRef, moho::STIMap** const mapSlot, gpg::ReadArchive* const archive
+    const gpg::RRef& ownerRef,
+    moho::STIMap** const mapSlot,
+    gpg::ReadArchive* const archive
   )
   {
     return ReadUnownedSTIMapPointerVariant1(ownerRef, archive, mapSlot);
@@ -227,7 +249,9 @@ namespace
    * Address: 0x00508E60 (FUN_00508E60, STIMap unowned pointer write helper duplicate)
    */
   [[maybe_unused]] void WriteUnownedSTIMapPointerVariant2(
-    moho::STIMap* const* const mapSlot, gpg::WriteArchive* const archive, const gpg::RRef& ownerRef
+    moho::STIMap* const* const mapSlot,
+    gpg::WriteArchive* const archive,
+    const gpg::RRef& ownerRef
   )
   {
     (void)WriteUnownedSTIMapPointerVariant1(mapSlot, archive, ownerRef);
@@ -243,10 +267,16 @@ namespace moho
    * What it does:
    * Binds map source, allocates byte coverage grid, and sets delayed-update
    * storage to empty.
-   * Address: 0x00507890 (FUN_00507890 -- a linker-retained copy of this constructor's grid allocation (`width * height` bytes, zero-filled) writing a `{data, width, height}` triple; zero callers, unreachable. Formerly `AllocateByteRasterZeroed` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
-   * Address: 0x00507F00 (FUN_00507F00 -- the same allocation without the zero fill; zero callers, unreachable. Formerly `AllocateByteRasterUninitialized`, removed.)
+   * Address: 0x00507890 (FUN_00507890 -- a linker-retained copy of this constructor's grid allocation (`width * height`
+   * bytes, zero-filled) writing a `{data, width, height}` triple; zero callers, unreachable. Formerly
+   * `AllocateByteRasterZeroed` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.) Address: 0x00507F00
+   * (FUN_00507F00 -- the same allocation without the zero fill; zero callers, unreachable. Formerly
+   * `AllocateByteRasterUninitialized`, removed.)
    */
-  CIntelGrid::CIntelGrid(const STIMap* const map, const std::uint32_t size)
+  CIntelGrid::CIntelGrid(
+    const STIMap* const map,
+    const std::uint32_t size
+  )
   {
     mMapData = const_cast<STIMap*>(map);
     const CHeightField* const heightField = mMapData ? mMapData->mHeightField.get() : nullptr;
@@ -277,7 +307,12 @@ namespace moho
   /**
    * Inlined into `SerConstructHelper<CIntelGrid>::Construct` 0x005073C0.
    */
-  void CIntelGrid::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CIntelGrid::MemberConstruct(
+    gpg::ReadArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     const gpg::RRef owner{};
     STIMap* map = nullptr;
@@ -299,7 +334,9 @@ namespace moho
    * What it does:
    * Checks one integer grid cell directly against bounds and visibility storage.
    */
-  bool CIntelGrid::IsVisible(const Wm3::Vector2i& gridCell) const
+  bool CIntelGrid::IsVisible(
+    const Wm3::Vector2i& gridCell
+  ) const
   {
     const std::uint32_t x = static_cast<std::uint32_t>(gridCell.x);
     const std::uint32_t z = static_cast<std::uint32_t>(gridCell.y);
@@ -320,7 +357,9 @@ namespace moho
    * Converts world-space position into one grid cell and forwards to the
    * integer-grid visibility lane.
    */
-  bool CIntelGrid::IsVisible(const Wm3::Vec3f& position) const
+  bool CIntelGrid::IsVisible(
+    const Wm3::Vec3f& position
+  ) const
   {
     const GridPos gridPosition(const_cast<Wm3::Vec3f*>(&position), static_cast<int>(mGridSize));
     return IsVisible(gridPosition.x, gridPosition.z);
@@ -338,7 +377,10 @@ namespace moho
    * Converts world-space rectangle to grid-cell bounds and returns true when any
    * covered cell in the intel grid is non-zero.
    */
-  bool CIntelGrid::IsVisible(const gpg::Rect2<int>& rect, const bool /*unused*/) const
+  bool CIntelGrid::IsVisible(
+    const gpg::Rect2<int>& rect,
+    const bool /*unused*/
+  ) const
   {
     if (!mGrid || mGridSize == 0u || mWidth == 0u || mHeight == 0u) {
       return false;
@@ -380,7 +422,10 @@ namespace moho
   /**
    * Address: 0x00507670 (FUN_00507670, ?AddCircle@CIntelGrid@Moho@@QAEXABV?$Vector3@M@Wm3@@I@Z)
    */
-  void CIntelGrid::AddCircle(const Wm3::Vec3f& position, const std::uint32_t radius)
+  void CIntelGrid::AddCircle(
+    const Wm3::Vec3f& position,
+    const std::uint32_t radius
+  )
   {
 
     Raster(position, radius / mGridSize, true);
@@ -389,7 +434,10 @@ namespace moho
   /**
    * Address: 0x00507690 (FUN_00507690, ?SubtractCircle@CIntelGrid@Moho@@QAEXABV?$Vector3@M@Wm3@@I@Z)
    */
-  void CIntelGrid::SubtractCircle(const Wm3::Vec3f& position, const std::uint32_t radius)
+  void CIntelGrid::SubtractCircle(
+    const Wm3::Vec3f& position,
+    const std::uint32_t radius
+  )
   {
     Raster(position, radius / mGridSize, false);
   }
@@ -397,7 +445,10 @@ namespace moho
   /**
    * Address: 0x005076B0 (FUN_005076B0, ?DelayedSubtractCircle@CIntelGrid@Moho@@QAEXABV?$Vector3@M@Wm3@@I@Z)
    */
-  void CIntelGrid::DelayedSubtractCircle(const Wm3::Vec3f& position, const std::uint32_t radius)
+  void CIntelGrid::DelayedSubtractCircle(
+    const Wm3::Vec3f& position,
+    const std::uint32_t radius
+  )
   {
     SDelayedSubVizInfo update{};
     update.mLastPos = position;
@@ -410,7 +461,9 @@ namespace moho
   /**
    * Address: 0x005077B0 (FUN_005077B0, ?Tick@CIntelGrid@Moho@@QAEXH@Z)
    */
-  void CIntelGrid::Tick(const std::int32_t dTicks)
+  void CIntelGrid::Tick(
+    const std::int32_t dTicks
+  )
   {
     if (mUpdateList.empty()) {
       return;
@@ -434,7 +487,9 @@ namespace moho
   /**
    * Address: 0x00507880 (FUN_00507880, ?UpdateChecksum@CIntelGrid@Moho@@QAEXAAVMD5Context@gpg@@@Z)
    */
-  void CIntelGrid::UpdateChecksum(gpg::MD5Context& /*context*/)
+  void CIntelGrid::UpdateChecksum(
+    gpg::MD5Context& /*context*/
+  )
   {
     // Binary implementation is an explicit no-op (`retn`).
   }
@@ -444,7 +499,10 @@ namespace moho
    * ?MemberSaveConstructArgs@CIntelGrid@Moho@@AAEXAAVWriteArchive@gpg@@HABVRRef@4@AAVSerSaveConstructArgsResult@4@@Z)
    */
   void CIntelGrid::MemberSaveConstructArgs(
-    gpg::WriteArchive& archive, int /*version*/, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+    gpg::WriteArchive& archive,
+    int /*version*/,
+    const gpg::RRef& ownerRef,
+    gpg::SerSaveConstructArgsResult& result
   )
   {
     (void)WriteUnownedSTIMapPointerVariant1(&mMapData, &archive, ownerRef);
@@ -455,7 +513,11 @@ namespace moho
   /**
    * Address: 0x00507540 (FUN_00507540, ?Raster@CIntelGrid@Moho@@AAEXABV?$Vector3@M@Wm3@@I_N@Z)
    */
-  void CIntelGrid::Raster(const Wm3::Vec3f& position, const std::uint32_t radiusInCells, const bool doAdd)
+  void CIntelGrid::Raster(
+    const Wm3::Vec3f& position,
+    const std::uint32_t radiusInCells,
+    const bool doAdd
+  )
   {
     Wm3::Vec3f mutablePos = position;
     GridPos gridPos(&mutablePos, static_cast<std::int32_t>(mGridSize));
@@ -551,8 +613,10 @@ namespace moho
     constexpr std::int32_t kRowMajorMaxRadius = 1 << 15;
     constexpr std::int32_t kRowMajorMaxCenter = 1 << 24;
     const std::int32_t columnCount = xMax - x;
-    if (sim_IntelRasterRows && columnCount <= kRowMajorMaxColumns && radius >= 0 && radius <= kRowMajorMaxRadius &&
-        gridPos.z >= -kRowMajorMaxCenter && gridPos.z <= kRowMajorMaxCenter) {
+    if (
+      sim_IntelRasterRows && columnCount <= kRowMajorMaxColumns && radius >= 0 && radius <= kRowMajorMaxRadius &&
+      gridPos.z >= -kRowMajorMaxCenter && gridPos.z <= kRowMajorMaxCenter
+    ) {
       std::int32_t zBegin[kRowMajorMaxColumns];
       std::int32_t zEnd[kRowMajorMaxColumns];
       std::int32_t widest = 0;
@@ -657,7 +721,10 @@ namespace gpg
   /**
    * Address: 0x00509200 (FUN_00509200, gpg::RRef_CIntelGrid)
    */
-  gpg::RRef* RRef_CIntelGrid(gpg::RRef* const outRef, moho::CIntelGrid* const value)
+  gpg::RRef* RRef_CIntelGrid(
+    gpg::RRef* const outRef,
+    moho::CIntelGrid* const value
+  )
   {
     if (!outRef) {
       return nullptr;
@@ -683,7 +750,10 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CIntelGridTypeInfo_d0037a, moho::register_CIntelGridTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CIntelGridTypeInfo_d0037a,
+  moho::register_CIntelGridTypeInfo
+)
 
 namespace moho
 {

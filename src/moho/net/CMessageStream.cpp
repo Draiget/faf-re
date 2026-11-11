@@ -28,7 +28,10 @@ CMessageStream::~CMessageStream() = default;
  * What it does:
  * Copies at most `len` bytes from read window and advances `mReadHead`.
  */
-size_t CMessageStream::VirtRead(char* buff, size_t len)
+size_t CMessageStream::VirtRead(
+  char* buff,
+  size_t len
+)
 {
   const size_t readable = static_cast<size_t>(mReadEnd - mReadHead);
   if (len > readable) {
@@ -60,7 +63,10 @@ bool CMessageStream::VirtAtEnd()
  * What it does:
  * Writes into payload window, appends overflow into message buffer, then rebinds pointers.
  */
-void CMessageStream::VirtWrite(const char* data, const size_t size)
+void CMessageStream::VirtWrite(
+  const char* data,
+  const size_t size
+)
 {
   if (mWriteStart == nullptr) {
     throw std::logic_error("Can't write to a read-only message.");
@@ -96,7 +102,9 @@ void CMessageStream::VirtWrite(const char* data, const size_t size)
  * What it does:
  * Constructs a read/write stream over message payload bytes.
  */
-CMessageStream::CMessageStream(CMessage& msg)
+CMessageStream::CMessageStream(
+  CMessage& msg
+)
   : Stream()
   , mMessage(&msg)
 {
@@ -117,7 +125,9 @@ CMessageStream::CMessageStream(CMessage& msg)
  * What it does:
  * Constructs a read-only stream over message payload bytes.
  */
-CMessageStream::CMessageStream(CMessage* msg)
+CMessageStream::CMessageStream(
+  CMessage* msg
+)
   : Stream()
   , mMessage(msg)
 {
@@ -137,7 +147,10 @@ CMessageStream::CMessageStream(CMessage* msg)
  * What it does:
  * Optional access-mode wrapper over the binary read/write ctor.
  */
-CMessageStream::CMessageStream(CMessage& msg, const Access access)
+CMessageStream::CMessageStream(
+  CMessage& msg,
+  const Access access
+)
   : CMessageStream(msg)
 {
   if (access == Access::kReadOnly) {
@@ -153,7 +166,10 @@ CMessageStream::CMessageStream(CMessage& msg, const Access access)
  * What it does:
  * Optional access-mode wrapper over the binary read-only ctor.
  */
-CMessageStream::CMessageStream(CMessage* msg, const Access access)
+CMessageStream::CMessageStream(
+  CMessage* msg,
+  const Access access
+)
   : CMessageStream(msg)
 {
   if (access == Access::kReadWrite) {
@@ -163,7 +179,9 @@ CMessageStream::CMessageStream(CMessage* msg, const Access access)
   }
 }
 
-std::pair<char*, char*> CMessageStream::PayloadWindow(CMessage& m) noexcept
+std::pair<char*, char*> CMessageStream::PayloadWindow(
+  CMessage& m
+) noexcept
 {
   char* const payloadBegin = m.mBuff.start_ + kHeaderSize;
   const std::size_t messageSize = m.GetSize();
@@ -171,7 +189,10 @@ std::pair<char*, char*> CMessageStream::PayloadWindow(CMessage& m) noexcept
   return {payloadBegin, payloadBegin + payloadSize};
 }
 
-void CMessageStream::RebindToPayloadUnchecked(const std::ptrdiff_t readOff, const std::ptrdiff_t writeOffPlus) noexcept
+void CMessageStream::RebindToPayloadUnchecked(
+  const std::ptrdiff_t readOff,
+  const std::ptrdiff_t writeOffPlus
+) noexcept
 {
   auto [begin, end] = PayloadWindow(*mMessage);
 

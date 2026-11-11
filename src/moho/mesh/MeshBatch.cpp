@@ -147,7 +147,9 @@ namespace moho
       if (mMaxInstancesPerDraw == 0 && !HardwareMeshBatch::UsesBoneTexture()) {
         gpg::Warnf(
           "Mesh \"%s\" has %d skinned bones but the GPU skinning palette holds %d; it will not be drawn.",
-          currentResource->mName.c_str(), mBoneCount, kPaletteSlots
+          currentResource->mName.c_str(),
+          mBoneCount,
+          kPaletteSlots
         );
       }
 
@@ -207,8 +209,7 @@ namespace moho
     // default literal, so the default is taken as 0 - the same value the
     // sibling "renderStage" lookup in Mesh.cpp passes.
     CD3DEffect* const meshEffect = resources->FindEffect("mesh");
-    mParameterAnnotation =
-      meshEffect->GetIntegerAnnotation(lod->mat.mShaderAnnotation, fa::string("parameter"), 0);
+    mParameterAnnotation = meshEffect->GetIntegerAnnotation(lod->mat.mShaderAnnotation, fa::string("parameter"), 0);
   }
 
   /**
@@ -234,7 +235,10 @@ namespace moho
    * What it does:
    * Dispatches instance rendering in derived-defined batch slices.
    */
-  void MeshBatch::Render(const fa::vector<MeshInstance*>& meshInstances, const bool reflectedOnly)
+  void MeshBatch::Render(
+    const fa::vector<MeshInstance*>& meshInstances,
+    const bool reflectedOnly
+  )
   {
     MeshInstance** const begin = meshInstances.begin();
     MeshInstance** const end = meshInstances.end();

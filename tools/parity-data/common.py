@@ -42,9 +42,14 @@ def map_url(folder):
 GAME_URL = "https://content.faforever.com/faf/updaterNew/updates_faf_files/%s"
 
 # docs/PR_REPLAY_CHECK.md (also tools/replay-parity/parity.py).
-CORE_SET = [26902315, 26930624, 26943656, 26883423, 26881085, 26928211, 26989770, 26897073]
+# One list for every game version: a run keeps the ids its version's corpus holds (plan.py). Game version 3835's first
+# (docs/PR_REPLAY_CHECK.md), then 3840's, picked from replay parity run 42771586614 (all pass, played to game over).
+CORE_SET = [26902315, 26930624, 26943656, 26883423, 26881085, 26928211, 26989770, 26897073,
+            28016454, 28063699, 28059028, 28070914, 28058778, 28038031, 28013263, 28041625]
 EXTENDED_SET = [26975290, 26953273, 27034831, 26917867, 26876279, 26935800, 26898759,
-                27004084, 26915859, 26905122]
+                27004084, 26915859, 26905122,
+                28035761, 28004977, 28012666, 28094872, 28011154, 28052742, 28072694, 28005584, 28072023,
+                28010105]
 
 # Corpus columns (corpus/<version>.tsv.gz, one replay per line, made by corpus.py build).
 # map_kind: retail (a map the game ships) or cached (a top vault map), both in the maps cache,
@@ -117,7 +122,7 @@ def check_replay(raw, game_version):
         body = replay_body_info(data)
     except Exception as exc:
         return {}, "unreadable: %s" % str(exc)[:80], None
-    info = {"map": body["map"], "m28": None, "players": summary["players"]}
+    info = {"map": body["map"], "m28": None, "players": summary["players"], "matchmaker": body["matchmaker"]}
     if summary["mod"] != "faf":
         return info, "featured mod %s" % summary["mod"], None
     if body["version"] != "Supreme Commander v1.50.%d" % game_version:
@@ -129,6 +134,11 @@ def check_replay(raw, game_version):
             return info, "sim mod %s" % mod["name"], None
     if not body["map"]:
         return info, "map path %s" % body["scmap"], None
+    # The content server has no generated maps. corpus.py skips them by the header's mapname, which
+    # can name another map than the one played (27989110: header adaptive_pillars_of_sand.v0001,
+    # replay neroxis_map_generator_1.22.2_...), so the map download failed with 404 every night.
+    if body["map"].startswith("neroxis_map_generator"):
+        return info, "generated map %s" % body["map"], None
     try:
         info["beats"] = replay_beats(data)
     except (ValueError, IndexError):

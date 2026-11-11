@@ -105,7 +105,8 @@ function Get-InstallText([string]$a, [hashtable]$t) {
       '     init_faf.lua finds fa_path.lua one folder up).',
       '  2. Copy these from C:\ProgramData\FAForever\bin into bin_x64:',
       '     init_faf.lua, SupComDataPath.lua, SupComDataPathFAF.lua, tahoma.ttf, tahomabd.ttf',
-      '     (and any other init_*.lua you use).',
+      '     An /init file that is not in bin_x64 is read from bin, so featured-mod init files',
+      '     (init_nomads.lua, init_coop.lua, ...) that the client writes there need no copy.',
       '  3. Unzip this package into bin_x64, keeping the fafengine folder as is.'
     )
   }

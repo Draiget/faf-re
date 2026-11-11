@@ -32,7 +32,10 @@ namespace moho
    * Runs base entity-blueprint construction with `(owner, resId)` and
    * restores prop blueprint display/defense/economy defaults.
    */
-  RPropBlueprint::RPropBlueprint(RRuleGameRules* const owner, const RResId& resId)
+  RPropBlueprint::RPropBlueprint(
+    RRuleGameRules* const owner,
+    const RResId& resId
+  )
     : REntityBlueprint(owner, resId)
     , Display()
     , Defense()
@@ -113,7 +116,12 @@ namespace moho
 
 namespace moho
 {
-  void RPropBlueprint::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void RPropBlueprint::MemberConstruct(
+    gpg::ReadArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     RRuleGameRules* rules = nullptr;
     const gpg::RRef owner{};
@@ -129,7 +137,10 @@ namespace moho
    * Address: 0x0051DBB0 (FUN_0051DBB0)
    */
   void RPropBlueprint::MemberSaveConstructArgs(
-    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+    gpg::WriteArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerSaveConstructArgsResult& result
   )
   {
     archive.WritePointer(mOwner, gpg::TrackedPointerState::Unowned, gpg::RRef{});

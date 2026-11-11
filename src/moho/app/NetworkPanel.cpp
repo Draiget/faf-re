@@ -69,7 +69,13 @@ namespace moho
     struct Box
     {
       float left = 0, top = 0, right = 0, bottom = 0;
-      [[nodiscard]] bool Has(const float x, const float y) const { return x >= left && x < right && y >= top && y < bottom; }
+      [[nodiscard]] bool Has(
+        const float x,
+        const float y
+      ) const
+      {
+        return x >= left && x < right && y >= top && y < bottom;
+      }
     };
 
     struct Click
@@ -78,8 +84,8 @@ namespace moho
       {
         Tab,
         SelectPeer,
-        Reconnect,   // one peer; with a choice, that path
-        AllPeers,    // every peer, with the choice
+        Reconnect, // one peer; with a choice, that path
+        AllPeers,  // every peer, with the choice
         Close,
         CopyDiagnostics,
         LogFolder,
@@ -113,7 +119,7 @@ namespace moho
       std::optional<Box> panel; // as last drawn
       float headWidth = 0.0f;   // the head size it was drawn at
       float headHeight = 0.0f;
-      std::vector<Hit> hits;    // as last drawn
+      std::vector<Hit> hits; // as last drawn
       std::optional<Hit> pressed;
       bool leftDown = false;  // a left press the panel took: it takes the release too
       bool otherDown = false; // likewise for the right and middle buttons
@@ -162,19 +168,27 @@ namespace moho
       return registered ? "Consolas" : "Courier New";
     }
 
-    [[nodiscard]] std::string Format(const char* format, const double value)
+    [[nodiscard]] std::string Format(
+      const char* format,
+      const double value
+    )
     {
       char buf[64];
       std::snprintf(buf, sizeof(buf), format, value);
       return buf;
     }
 
-    [[nodiscard]] std::string PeerName(const SNetlinkPeerInfo& p)
+    [[nodiscard]] std::string PeerName(
+      const SNetlinkPeerInfo& p
+    )
     {
       return p.login + " (" + std::to_string(p.id) + ")";
     }
 
-    [[nodiscard]] std::string Cut(const std::string& text, const int columns)
+    [[nodiscard]] std::string Cut(
+      const std::string& text,
+      const int columns
+    )
     {
       if (static_cast<int>(text.size()) <= columns) {
         return text;
@@ -209,7 +223,11 @@ namespace moho
     class Builder
     {
     public:
-      explicit Builder(const int columns) : mColumns(columns) {}
+      explicit Builder(
+        const int columns
+      )
+        : mColumns(columns)
+      {}
 
       Line& NewLine()
       {
@@ -218,20 +236,32 @@ namespace moho
         return mLines.back();
       }
 
-      void Text(const std::string& text, const std::uint32_t color = kText)
+      void Text(
+        const std::string& text,
+        const std::uint32_t color = kText
+      )
       {
         Current().items.push_back({mColumn, Cut(text, mColumns - mColumn), color, std::nullopt, false, false});
         mColumn += static_cast<int>(text.size());
       }
 
-      void TextAt(const int column, const std::string& text, const std::uint32_t color = kText)
+      void TextAt(
+        const int column,
+        const std::string& text,
+        const std::uint32_t color = kText
+      )
       {
         mColumn = column;
         Text(text, color);
       }
 
       // "[ label ]"; wraps to a new line when it doesn't fit.
-      void Button(const std::string& label, const Click& click, const bool active = false, const bool disabled = false)
+      void Button(
+        const std::string& label,
+        const Click& click,
+        const bool active = false,
+        const bool disabled = false
+      )
       {
         const int width = static_cast<int>(label.size()) + 2;
         if (mColumn > 0 && mColumn + width > mColumns) {
@@ -243,7 +273,9 @@ namespace moho
       }
 
       // Buttons flush right on the current line.
-      void RightButtons(const std::vector<std::pair<std::string, Click>>& buttons)
+      void RightButtons(
+        const std::vector<std::pair<std::string, Click>>& buttons
+      )
       {
         int width = 0;
         for (const auto& [label, click] : buttons) {
@@ -255,11 +287,20 @@ namespace moho
         }
       }
 
-      [[nodiscard]] std::vector<Line>& Lines() { return mLines; }
-      [[nodiscard]] int Columns() const { return mColumns; }
+      [[nodiscard]] std::vector<Line>& Lines()
+      {
+        return mLines;
+      }
+      [[nodiscard]] int Columns() const
+      {
+        return mColumns;
+      }
 
     private:
-      Line& Current() { return mLines.empty() ? NewLine() : mLines.back(); }
+      Line& Current()
+      {
+        return mLines.empty() ? NewLine() : mLines.back();
+      }
 
       int mColumns;
       int mColumn = 0;
@@ -267,7 +308,9 @@ namespace moho
     };
 
     /** Plan WP10.10: a server-mode game's bytes from the server by lane: the last seconds' rate and the total. */
-    [[nodiscard]] bool BuildServerLanes(Builder& b)
+    [[nodiscard]] bool BuildServerLanes(
+      Builder& b
+    )
     {
       using faf::remote::client::CServerLaneMeter;
       using faf::remote::client::EServerLane;
@@ -283,24 +326,40 @@ namespace moho
         total += lanes.total[lane];
       }
       b.NewLine();
-      std::snprintf(text, sizeof(text), "Server: %llu views, %.1f KB/s, %.1f MB in all", static_cast<unsigned long long>(lanes.views),
-                    rate / 1024.0, static_cast<double>(total) / 1048576.0);
+      std::snprintf(
+        text,
+        sizeof(text),
+        "Server: %llu views, %.1f KB/s, %.1f MB in all",
+        static_cast<unsigned long long>(lanes.views),
+        rate / 1024.0,
+        static_cast<double>(total) / 1048576.0
+      );
       b.Text(text, kHeading);
       b.NewLine();
       std::snprintf(text, sizeof(text), "  %-10s %10s %10s %7s", "lane", "KB/s", "MB", "share");
       b.Text(text, kDim);
       for (std::size_t lane = 0; lane < faf::remote::client::kServerLaneCount; ++lane) {
         b.NewLine();
-        std::snprintf(text, sizeof(text), "  %-10s %10.1f %10.2f %6.1f%%", faf::remote::client::ServerLaneName(static_cast<EServerLane>(lane)),
-                      lanes.perSecond[lane] / 1024.0, static_cast<double>(lanes.total[lane]) / 1048576.0,
-                      total != 0u ? 100.0 * static_cast<double>(lanes.total[lane]) / static_cast<double>(total) : 0.0);
+        std::snprintf(
+          text,
+          sizeof(text),
+          "  %-10s %10.1f %10.2f %6.1f%%",
+          faf::remote::client::ServerLaneName(static_cast<EServerLane>(lane)),
+          lanes.perSecond[lane] / 1024.0,
+          static_cast<double>(lanes.total[lane]) / 1048576.0,
+          total != 0u ? 100.0 * static_cast<double>(lanes.total[lane]) / static_cast<double>(total) : 0.0
+        );
         b.Text(text);
       }
       b.NewLine();
       return true;
     }
 
-    void BuildPeers(Builder& b, const SNetlinkSnapshot& view, const std::optional<std::int64_t> selected)
+    void BuildPeers(
+      Builder& b,
+      const SNetlinkSnapshot& view,
+      const std::optional<std::int64_t> selected
+    )
     {
       const bool serverGame = BuildServerLanes(b);
       if (view.mode.empty() && serverGame) {
@@ -399,12 +458,19 @@ namespace moho
         }
       }
       b.NewLine();
-      b.TextAt(2, view.forceRelay ? "This game takes relayed candidates only (/nativenetrelay)." :
-                                    "Auto: every candidate type first, fewer after failed attempts, as FAF's adapter.",
-               kDim);
+      b.TextAt(
+        2,
+        view.forceRelay ? "This game takes relayed candidates only (/nativenetrelay)."
+                        : "Auto: every candidate type first, fewer after failed attempts, as FAF's adapter.",
+        kDim
+      );
     }
 
-    void BuildLog(Builder& b, const SNetlinkSnapshot& view, int& scroll)
+    void BuildLog(
+      Builder& b,
+      const SNetlinkSnapshot& view,
+      int& scroll
+    )
     {
       const std::string file = NETDIAG_LogFilePath();
       b.NewLine();
@@ -431,13 +497,18 @@ namespace moho
       b.Button("Older", older, false, first == 0);
       b.Button("Newer", newer, false, scroll == 0);
       b.Button("Copy log", copy, false, total == 0);
-      b.Text(total == 0 ? " no network log lines yet" :
-                          " lines " + std::to_string(first + 1) + "-" + std::to_string(last) + " of " + std::to_string(total) +
-                            " (mouse wheel scrolls)",
-             kDim);
+      b.Text(
+        total == 0 ? " no network log lines yet"
+                   : " lines " + std::to_string(first + 1) + "-" + std::to_string(last) + " of " +
+            std::to_string(total) + " (mouse wheel scrolls)",
+        kDim
+      );
     }
 
-    void BuildServers(Builder& b, const SNetlinkSnapshot& view)
+    void BuildServers(
+      Builder& b,
+      const SNetlinkSnapshot& view
+    )
     {
       if (view.mode.empty()) {
         b.NewLine();
@@ -486,87 +557,101 @@ namespace moho
       b.Button("No relay", all(choice), false, view.peers.empty() || view.forceRelay);
     }
 
-    void Flash(PanelState& state, std::string text)
+    void Flash(
+      PanelState& state,
+      std::string text
+    )
     {
       state.flash = std::move(text);
       state.flashUntil = Clock::now() + std::chrono::seconds(4);
     }
 
     // A click on the panel. Main thread; no panel lock held.
-    void Apply(const Click& click, void* const window)
+    void Apply(
+      const Click& click,
+      void* const window
+    )
     {
       PanelState& state = State();
       switch (click.kind) {
-        case Click::Kind::Tab: {
-          std::lock_guard lock(state.mutex);
-          state.tab = click.tab;
-          return;
+      case Click::Kind::Tab: {
+        std::lock_guard lock(state.mutex);
+        state.tab = click.tab;
+        return;
+      }
+      case Click::Kind::SelectPeer: {
+        std::lock_guard lock(state.mutex);
+        state.selected =
+          state.selected && *state.selected == click.peer ? std::nullopt : std::optional<std::int64_t>(click.peer);
+        return;
+      }
+      case Click::Kind::Reconnect: {
+        const nl::PathChoice* const choice = click.choice ? &*click.choice : nullptr;
+        const bool ok = NETLINK_ReconnectPeer(click.peer, choice);
+        std::lock_guard lock(state.mutex);
+        Flash(
+          state,
+          ok ? "Reconnecting " + click.peerName + (choice ? ", " + nl::PathChoiceText(*choice) : "")
+             : click.peerName + " has no link any more"
+        );
+        return;
+      }
+      case Click::Kind::AllPeers: {
+        int n = 0;
+        for (const SNetlinkPeerInfo& p : NETLINK_GetSnapshot().peers) {
+          n += NETLINK_ReconnectPeer(p.id, click.choice ? &*click.choice : nullptr) ? 1 : 0;
         }
-        case Click::Kind::SelectPeer: {
-          std::lock_guard lock(state.mutex);
-          state.selected = state.selected && *state.selected == click.peer ? std::nullopt
-                                                                           : std::optional<std::int64_t>(click.peer);
-          return;
+        std::lock_guard lock(state.mutex);
+        Flash(
+          state,
+          "Reconnecting " + std::to_string(n) + " peers, " +
+            (click.choice ? nl::PathChoiceText(*click.choice) : std::string("as they were"))
+        );
+        return;
+      }
+      case Click::Kind::Close:
+        net_ShowPanel = false;
+        return;
+      case Click::Kind::CopyDiagnostics: {
+        const bool ok = NETDIAG_CopyText(window, NETDIAG_Text());
+        gpg::Logf("NETLINK: panel: diagnostics %s", ok ? "copied to the clipboard" : "not copied");
+        std::lock_guard lock(state.mutex);
+        Flash(state, ok ? "Diagnostics copied to the clipboard" : "The clipboard is busy, try again");
+        return;
+      }
+      case Click::Kind::LogFolder: {
+        const std::string result = NETDIAG_OpenLogFolder(window);
+        std::lock_guard lock(state.mutex);
+        Flash(state, result);
+        return;
+      }
+      case Click::Kind::CopyLog: {
+        std::string text;
+        for (const std::string& line : NETLINK_GetSnapshot().log) {
+          text += line + "\r\n";
         }
-        case Click::Kind::Reconnect: {
-          const nl::PathChoice* const choice = click.choice ? &*click.choice : nullptr;
-          const bool ok = NETLINK_ReconnectPeer(click.peer, choice);
-          std::lock_guard lock(state.mutex);
-          Flash(state, ok ? "Reconnecting " + click.peerName + (choice ? ", " + nl::PathChoiceText(*choice) : "") :
-                            click.peerName + " has no link any more");
-          return;
-        }
-        case Click::Kind::AllPeers: {
-          int n = 0;
-          for (const SNetlinkPeerInfo& p : NETLINK_GetSnapshot().peers) {
-            n += NETLINK_ReconnectPeer(p.id, click.choice ? &*click.choice : nullptr) ? 1 : 0;
-          }
-          std::lock_guard lock(state.mutex);
-          Flash(state, "Reconnecting " + std::to_string(n) + " peers, " +
-                         (click.choice ? nl::PathChoiceText(*click.choice) : std::string("as they were")));
-          return;
-        }
-        case Click::Kind::Close:
-          net_ShowPanel = false;
-          return;
-        case Click::Kind::CopyDiagnostics: {
-          const bool ok = NETDIAG_CopyText(window, NETDIAG_Text());
-          gpg::Logf("NETLINK: panel: diagnostics %s", ok ? "copied to the clipboard" : "not copied");
-          std::lock_guard lock(state.mutex);
-          Flash(state, ok ? "Diagnostics copied to the clipboard" : "The clipboard is busy, try again");
-          return;
-        }
-        case Click::Kind::LogFolder: {
-          const std::string result = NETDIAG_OpenLogFolder(window);
-          std::lock_guard lock(state.mutex);
-          Flash(state, result);
-          return;
-        }
-        case Click::Kind::CopyLog: {
-          std::string text;
-          for (const std::string& line : NETLINK_GetSnapshot().log) {
-            text += line + "\r\n";
-          }
-          const bool ok = NETDIAG_CopyText(window, text);
-          std::lock_guard lock(state.mutex);
-          Flash(state, ok ? "Network log copied to the clipboard" : "The clipboard is busy, try again");
-          return;
-        }
-        case Click::Kind::LogOlder: {
-          std::lock_guard lock(state.mutex);
-          state.logScroll += kLogLines / 2;
-          return;
-        }
-        case Click::Kind::LogNewer: {
-          std::lock_guard lock(state.mutex);
-          state.logScroll = std::max(0, state.logScroll - kLogLines / 2);
-          return;
-        }
+        const bool ok = NETDIAG_CopyText(window, text);
+        std::lock_guard lock(state.mutex);
+        Flash(state, ok ? "Network log copied to the clipboard" : "The clipboard is busy, try again");
+        return;
+      }
+      case Click::Kind::LogOlder: {
+        std::lock_guard lock(state.mutex);
+        state.logScroll += kLogLines / 2;
+        return;
+      }
+      case Click::Kind::LogNewer: {
+        std::lock_guard lock(state.mutex);
+        state.logScroll = std::max(0, state.logScroll - kLogLines / 2);
+        return;
+      }
       }
     }
   } // namespace
 
-  std::string NETPANEL_PathText(const SNetlinkPeerInfo& p)
+  std::string NETPANEL_PathText(
+    const SNetlinkPeerInfo& p
+  )
   {
     if (!p.connected || p.localType.empty()) {
       return "-";
@@ -575,7 +660,11 @@ namespace moho
     return std::string(relayed ? "relayed" : "direct") + " (" + p.localType + "/" + p.remoteType + ")";
   }
 
-  void NETPANEL_DrawServerLanes(CD3DPrimBatcher* const batcher, const float right, const float top)
+  void NETPANEL_DrawServerLanes(
+    CD3DPrimBatcher* const batcher,
+    const float right,
+    const float top
+  )
   {
     using faf::remote::client::CServerLaneMeter;
     using faf::remote::client::EServerLane;
@@ -598,8 +687,13 @@ namespace moho
     std::snprintf(text, sizeof(text), "server %.1f KB/s", rate / 1024.0);
     lines.emplace_back(text);
     for (std::size_t lane = 0; lane < faf::remote::client::kServerLaneCount; ++lane) {
-      std::snprintf(text, sizeof(text), "%s %.1f KB/s", faf::remote::client::ServerLaneName(static_cast<EServerLane>(lane)),
-                    lanes.perSecond[lane] / 1024.0);
+      std::snprintf(
+        text,
+        sizeof(text),
+        "%s %.1f KB/s",
+        faf::remote::client::ServerLaneName(static_cast<EServerLane>(lane)),
+        lanes.perSecond[lane] / 1024.0
+      );
       lines.emplace_back(text);
     }
     const float rowStep = font->mHeight + font->mExternalLeading;
@@ -613,16 +707,24 @@ namespace moho
     constexpr std::uint32_t kBackdrop = 0xC0000000u;
     batcher->SetTexture(CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu));
     batcher->DrawQuad(
-      {left, top - kPad, 0.0f, kBackdrop, 0.0f, 0.0f}, {right + kPad, top - kPad, 0.0f, kBackdrop, 0.0f, 0.0f},
-      {right + kPad, bottom, 0.0f, kBackdrop, 0.0f, 0.0f}, {left, bottom, 0.0f, kBackdrop, 0.0f, 0.0f}
+      {left, top - kPad, 0.0f, kBackdrop, 0.0f, 0.0f},
+      {right + kPad, top - kPad, 0.0f, kBackdrop, 0.0f, 0.0f},
+      {right + kPad, bottom, 0.0f, kBackdrop, 0.0f, 0.0f},
+      {left, bottom, 0.0f, kBackdrop, 0.0f, 0.0f}
     );
     const Vector3f xAxis{1.0f, 0.0f, 0.0f};
     const Vector3f yAxis{0.0f, -1.0f, 0.0f};
     for (std::size_t r = 0; r < lines.size(); ++r) {
       const float x = right - font->GetAdvance(lines[r].c_str(), -1);
       (void)font->Render(
-        lines[r].c_str(), batcher, {x, top + rowStep * static_cast<float>(r) + font->mAscent, 0.0f}, xAxis, yAxis,
-        r == 0 ? kHeading : kText, 0.0f, gpg::NaN
+        lines[r].c_str(),
+        batcher,
+        {x, top + rowStep * static_cast<float>(r) + font->mAscent, 0.0f},
+        xAxis,
+        yAxis,
+        r == 0 ? kHeading : kText,
+        0.0f,
+        gpg::NaN
       );
     }
     rawFont.release();
@@ -633,7 +735,11 @@ namespace moho
     net_ShowPanel = !net_ShowPanel;
   }
 
-  void NETPANEL_Draw(CD3DPrimBatcher* const batcher, const float headWidth, const float headHeight)
+  void NETPANEL_Draw(
+    CD3DPrimBatcher* const batcher,
+    const float headWidth,
+    const float headHeight
+  )
   {
     PanelState& state = State();
     if (!net_ShowPanel || batcher == nullptr) {
@@ -679,9 +785,9 @@ namespace moho
 
     Builder b(columns);
     b.NewLine();
-    const std::string title = view.mode.empty() ? "Network" :
-                                                  "Network: " + view.mode + " links, " + std::to_string(view.peers.size()) +
-                                                    " peer" + (view.peers.size() == 1 ? "" : "s");
+    const std::string title = view.mode.empty() ? "Network"
+                                                : "Network: " + view.mode + " links, " +
+        std::to_string(view.peers.size()) + " peer" + (view.peers.size() == 1 ? "" : "s");
     b.Text(title, kHeading);
     Click diag;
     diag.kind = Click::Kind::CopyDiagnostics;
@@ -722,8 +828,10 @@ namespace moho
     const auto quad = [&](const Box& box, const std::uint32_t color) {
       batcher->SetTexture(white);
       batcher->DrawQuad(
-        {box.left, box.top, 0.0f, color, 0.0f, 0.0f}, {box.right, box.top, 0.0f, color, 0.0f, 0.0f},
-        {box.right, box.bottom, 0.0f, color, 0.0f, 0.0f}, {box.left, box.bottom, 0.0f, color, 0.0f, 0.0f}
+        {box.left, box.top, 0.0f, color, 0.0f, 0.0f},
+        {box.right, box.top, 0.0f, color, 0.0f, 0.0f},
+        {box.right, box.bottom, 0.0f, color, 0.0f, 0.0f},
+        {box.left, box.bottom, 0.0f, color, 0.0f, 0.0f}
       );
     };
     quad({left, top, right, bottom}, 0xD0000000u);
@@ -748,7 +856,9 @@ namespace moho
         const float x = left + kPad + static_cast<float>(item.column) * charWidth;
         std::uint32_t color = item.disabled ? 0xFF707070u : item.color;
         if (item.click) {
-          const Box box{x, lineTop + 1.0f, x + static_cast<float>(item.text.size()) * charWidth, lineTop + rowStep - 1.0f};
+          const Box box{
+            x, lineTop + 1.0f, x + static_cast<float>(item.text.size()) * charWidth, lineTop + rowStep - 1.0f
+          };
           const bool hover = !item.disabled && box.Has(mouseX, mouseY);
           quad(box, item.disabled ? 0xFF282828u : hover ? 0xFF4A6088u : item.active ? 0xFF2E5A36u : 0xFF33394Au);
           if (!item.disabled) {
@@ -819,55 +929,57 @@ namespace moho
         return std::nullopt;
       };
       switch (message) {
-        case kMouseMove:
-          return false; // the game keeps its cursor
-        case kLeftDown:
-        case kLeftDouble:
-          if (!onPanel) {
-            return false;
-          }
-          state.leftDown = true;
-          state.pressed = hitAt();
-          return true;
-        case kLeftUp: {
-          if (!state.leftDown) {
-            return false; // a press the game took
-          }
-          state.leftDown = false;
-          const std::optional<Hit> hit = hitAt();
-          if (hit && state.pressed && hit->box.left == state.pressed->box.left && hit->box.top == state.pressed->box.top) {
-            clicked = hit->click;
-          }
-          state.pressed.reset();
-          taken = true;
-          break;
-        }
-        case kRightDown:
-        case kRightDouble:
-        case kMiddleDown:
-        case kMiddleDouble:
-          if (!onPanel) {
-            return false;
-          }
-          state.otherDown = true;
-          return true;
-        case kRightUp:
-        case kMiddleUp:
-          if (!state.otherDown) {
-            return false;
-          }
-          state.otherDown = false;
-          return true;
-        case kWheel:
-          if (!onPanel) {
-            return false;
-          }
-          if (state.tab == Tab::Log) {
-            state.logScroll = std::max(0, state.logScroll + (wheel > 0 ? 3 : -3));
-          }
-          return true;
-        default:
+      case kMouseMove:
+        return false; // the game keeps its cursor
+      case kLeftDown:
+      case kLeftDouble:
+        if (!onPanel) {
           return false;
+        }
+        state.leftDown = true;
+        state.pressed = hitAt();
+        return true;
+      case kLeftUp: {
+        if (!state.leftDown) {
+          return false; // a press the game took
+        }
+        state.leftDown = false;
+        const std::optional<Hit> hit = hitAt();
+        if (
+          hit && state.pressed && hit->box.left == state.pressed->box.left && hit->box.top == state.pressed->box.top
+        ) {
+          clicked = hit->click;
+        }
+        state.pressed.reset();
+        taken = true;
+        break;
+      }
+      case kRightDown:
+      case kRightDouble:
+      case kMiddleDown:
+      case kMiddleDouble:
+        if (!onPanel) {
+          return false;
+        }
+        state.otherDown = true;
+        return true;
+      case kRightUp:
+      case kMiddleUp:
+        if (!state.otherDown) {
+          return false;
+        }
+        state.otherDown = false;
+        return true;
+      case kWheel:
+        if (!onPanel) {
+          return false;
+        }
+        if (state.tab == Tab::Log) {
+          state.logScroll = std::max(0, state.logScroll + (wheel > 0 ? 3 : -3));
+        }
+        return true;
+      default:
+        return false;
       }
     }
     if (clicked) {

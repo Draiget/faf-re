@@ -18,7 +18,9 @@ namespace gpg::gal
     /** True when the texture's locked bytes are R,G,B,A (else B,G,R,A, D3D9's order). */
     using RgbaQuery = bool (*)(Texture& texture);
 
-    explicit WindowsCursor(RgbaQuery isRgba) noexcept
+    explicit WindowsCursor(
+      RgbaQuery isRgba
+    ) noexcept
       : mIsRgba(isRgba)
     {}
     WindowsCursor(const WindowsCursor&) = delete;

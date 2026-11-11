@@ -31,7 +31,9 @@ using namespace moho;
  * Allocates one `CAiTransportImpl` bound to `unit` and returns it through the
  * `IAiTransport` interface lane.
  */
-IAiTransport* moho::AI_CreateTransport(Unit* const unit)
+IAiTransport* moho::AI_CreateTransport(
+  Unit* const unit
+)
 {
   auto* const impl = new (std::nothrow) CAiTransportImpl(unit);
   return impl ? static_cast<IAiTransport*>(impl) : nullptr;
@@ -63,7 +65,8 @@ namespace moho
     static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-     * Address: 0x005ECC40 (FUN_005ECC40, moho::RBroadcasterRType_EAiTransportEvent::RBroadcasterRType_EAiTransportEvent)
+     * Address: 0x005ECC40 (FUN_005ECC40,
+     * moho::RBroadcasterRType_EAiTransportEvent::RBroadcasterRType_EAiTransportEvent)
      *
      * What it does:
      * Constructs and preregisters the broadcaster RTTI lane for
@@ -185,7 +188,8 @@ namespace gpg
   {
   public:
     /**
-     * Address: 0x005ECD70 (FUN_005ECD70, gpg::RVectorType_SAiReservedTransportBone::RVectorType_SAiReservedTransportBone)
+     * Address: 0x005ECD70 (FUN_005ECD70,
+     * gpg::RVectorType_SAiReservedTransportBone::RVectorType_SAiReservedTransportBone)
      *
      * What it does:
      * Constructs and preregisters reflection metadata for
@@ -389,19 +393,27 @@ namespace
   }
 
   template <class TObject>
-  [[nodiscard]] TObject* PointerFromArchiveInt(const std::intptr_t objectPtr)
+  [[nodiscard]] TObject* PointerFromArchiveInt(
+    const std::intptr_t objectPtr
+  )
   {
     return reinterpret_cast<TObject*>(objectPtr);
   }
 
   template <class TObject>
-  [[nodiscard]] const TObject* ConstPointerFromArchiveInt(const std::intptr_t objectPtr)
+  [[nodiscard]] const TObject* ConstPointerFromArchiveInt(
+    const std::intptr_t objectPtr
+  )
   {
     return reinterpret_cast<const TObject*>(objectPtr);
   }
 
   template <class TVector>
-  [[nodiscard]] fa::string MakeVectorLexical(const gpg::RType* const ownerType, const gpg::RRef& ref, const TVector* vec)
+  [[nodiscard]] fa::string MakeVectorLexical(
+    const gpg::RType* const ownerType,
+    const gpg::RRef& ref,
+    const TVector* vec
+  )
   {
     const fa::string base = ownerType != nullptr ? ownerType->gpg::RType::GetLexical(ref) : fa::string("vector");
     const int size = vec ? static_cast<int>(vec->size()) : 0;
@@ -476,7 +488,9 @@ void moho::RBroadcasterRType_EAiTransportEvent::SerSave(
   const gpg::RRef nullOwner{};
 
   for (moho::Listener<moho::EAiTransportEvent>* const listener : broadcaster->mListeners.owners()) {
-    archive->WritePointer<moho::Listener<moho::EAiTransportEvent>>(listener, gpg::TrackedPointerState::Unowned, nullOwner);
+    archive->WritePointer<moho::Listener<moho::EAiTransportEvent>>(
+      listener, gpg::TrackedPointerState::Unowned, nullOwner
+    );
   }
 
   archive->WritePointer<moho::Listener<moho::EAiTransportEvent>>(nullptr, gpg::TrackedPointerState::Unowned, nullOwner);
@@ -560,7 +574,9 @@ const char* gpg::RVectorType_int::GetName() const
  * Appends `size=<count>` suffix to the base lexical representation for one
  * `vector<int>` payload.
  */
-fa::string gpg::RVectorType_int::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_int::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   return MakeVectorLexical(this, ref, static_cast<const IntVector*>(ref.mObj));
 }
@@ -591,7 +607,12 @@ void gpg::RVectorType_int::Init()
  * Deserializes one integer vector from archive lanes and replaces destination
  * storage in one assignment.
  */
-void gpg::RVectorType_int::SerLoad(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const)
+void gpg::RVectorType_int::SerLoad(
+  gpg::ReadArchive* const archive,
+  const std::intptr_t objectPtr,
+  const int,
+  gpg::RRef* const
+)
 {
   auto* const storage = PointerFromArchiveInt<IntVector>(objectPtr);
   GPG_ASSERT(archive != nullptr);
@@ -620,7 +641,12 @@ void gpg::RVectorType_int::SerLoad(gpg::ReadArchive* const archive, const std::i
  * What it does:
  * Serializes one integer vector payload element-by-element.
  */
-void gpg::RVectorType_int::SerSave(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const)
+void gpg::RVectorType_int::SerSave(
+  gpg::WriteArchive* const archive,
+  const std::intptr_t objectPtr,
+  const int,
+  gpg::RRef* const
+)
 {
   const auto* const storage = ConstPointerFromArchiveInt<IntVector>(objectPtr);
   GPG_ASSERT(archive != nullptr);
@@ -636,7 +662,10 @@ void gpg::RVectorType_int::SerSave(gpg::WriteArchive* const archive, const std::
   }
 }
 
-gpg::RRef gpg::RVectorType_int::SubscriptIndex(void* const obj, const int ind) const
+gpg::RRef gpg::RVectorType_int::SubscriptIndex(
+  void* const obj,
+  const int ind
+) const
 {
   auto* const storage = static_cast<IntVector*>(obj);
   gpg::RRef out{};
@@ -650,13 +679,18 @@ gpg::RRef gpg::RVectorType_int::SubscriptIndex(void* const obj, const int ind) c
   return out;
 }
 
-size_t gpg::RVectorType_int::GetCount(void* const obj) const
+size_t gpg::RVectorType_int::GetCount(
+  void* const obj
+) const
 {
   const auto* const storage = static_cast<const IntVector*>(obj);
   return storage ? storage->size() : 0u;
 }
 
-void gpg::RVectorType_int::SetCount(void* const obj, const int count) const
+void gpg::RVectorType_int::SetCount(
+  void* const obj,
+  const int count
+) const
 {
   auto* const storage = static_cast<IntVector*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -706,7 +740,9 @@ const char* gpg::RVectorType_SAiReservedTransportBone::GetName() const
  * Appends `size=<count>` suffix to the base lexical representation for one
  * `vector<SAiReservedTransportBone>` payload.
  */
-fa::string gpg::RVectorType_SAiReservedTransportBone::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_SAiReservedTransportBone::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   return MakeVectorLexical(this, ref, static_cast<const ReservedTransportBoneVector*>(ref.mObj));
 }
@@ -811,7 +847,10 @@ void gpg::RVectorType_SAiReservedTransportBone::SerSave(
   }
 }
 
-gpg::RRef gpg::RVectorType_SAiReservedTransportBone::SubscriptIndex(void* const obj, const int ind) const
+gpg::RRef gpg::RVectorType_SAiReservedTransportBone::SubscriptIndex(
+  void* const obj,
+  const int ind
+) const
 {
   auto* const storage = static_cast<ReservedTransportBoneVector*>(obj);
   gpg::RRef out{};
@@ -825,13 +864,18 @@ gpg::RRef gpg::RVectorType_SAiReservedTransportBone::SubscriptIndex(void* const 
   return out;
 }
 
-size_t gpg::RVectorType_SAiReservedTransportBone::GetCount(void* const obj) const
+size_t gpg::RVectorType_SAiReservedTransportBone::GetCount(
+  void* const obj
+) const
 {
   const auto* const storage = static_cast<const ReservedTransportBoneVector*>(obj);
   return storage ? storage->size() : 0u;
 }
 
-void gpg::RVectorType_SAiReservedTransportBone::SetCount(void* const obj, const int count) const
+void gpg::RVectorType_SAiReservedTransportBone::SetCount(
+  void* const obj,
+  const int count
+) const
 {
   auto* const storage = static_cast<ReservedTransportBoneVector*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -880,7 +924,9 @@ const char* gpg::RVectorType_SAttachPoint::GetName() const
  * Appends `size=<count>` suffix to the base lexical representation for one
  * `vector<SAttachPoint>` payload.
  */
-fa::string gpg::RVectorType_SAttachPoint::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_SAttachPoint::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   return MakeVectorLexical(this, ref, static_cast<const AttachPointVector*>(ref.mObj));
 }
@@ -910,7 +956,12 @@ void gpg::RVectorType_SAttachPoint::Init()
  * What it does:
  * Deserializes attach-point vector payload and replaces destination storage.
  */
-void gpg::RVectorType_SAttachPoint::SerLoad(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const)
+void gpg::RVectorType_SAttachPoint::SerLoad(
+  gpg::ReadArchive* const archive,
+  const std::intptr_t objectPtr,
+  const int,
+  gpg::RRef* const
+)
 {
   auto* const storage = PointerFromArchiveInt<AttachPointVector>(objectPtr);
   GPG_ASSERT(archive != nullptr);
@@ -976,7 +1027,10 @@ void gpg::RVectorType_SAttachPoint::SerSave(
   }
 }
 
-gpg::RRef gpg::RVectorType_SAttachPoint::SubscriptIndex(void* const obj, const int ind) const
+gpg::RRef gpg::RVectorType_SAttachPoint::SubscriptIndex(
+  void* const obj,
+  const int ind
+) const
 {
   auto* const storage = static_cast<AttachPointVector*>(obj);
   gpg::RRef out{};
@@ -990,13 +1044,18 @@ gpg::RRef gpg::RVectorType_SAttachPoint::SubscriptIndex(void* const obj, const i
   return out;
 }
 
-size_t gpg::RVectorType_SAttachPoint::GetCount(void* const obj) const
+size_t gpg::RVectorType_SAttachPoint::GetCount(
+  void* const obj
+) const
 {
   const auto* const storage = static_cast<const AttachPointVector*>(obj);
   return storage ? storage->size() : 0u;
 }
 
-void gpg::RVectorType_SAttachPoint::SetCount(void* const obj, const int count) const
+void gpg::RVectorType_SAttachPoint::SetCount(
+  void* const obj,
+  const int count
+) const
 {
   auto* const storage = static_cast<AttachPointVector*>(obj);
   GPG_ASSERT(storage != nullptr);

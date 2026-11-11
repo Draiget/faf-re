@@ -1,0 +1,86 @@
+name: Format
+
+# Every C/C++ line a pull request adds or changes must already be formatted with the repo's .clang-format.
+# Lines the PR does not touch are not checked, so older code that predates the rule does not fail it.
+# Runs on pull requests only; pushes to master are not checked.
+#
+# pull_request_target runs this file and .clang-format as they are on the base branch, so a PR cannot loosen
+# the check it is held to. The PR's commits are fetched as data and only read by clang-format; nothing from
+# the PR is built or run.
+#
+# Fix a failure locally (clang-format 22, as pinned below):
+#   git clang-format origin/master
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: format-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  clang-format:
+    name: clang-format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install clang-format
+        run: python -m pip install --disable-pip-version-check clang-format==22.1.8
+
+      - name: Check the lines the PR changes
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -u
+          git fetch --no-tags --quiet origin "+refs/pull/${PR_NUMBER}/head:refs/remotes/pr/head"
+          base=$(git merge-base "$BASE_SHA" "$HEAD_SHA")
+          clang-format --version
+          echo "checking lines changed between ${base} and ${HEAD_SHA}"
+
+          set +e
+          git clang-format --style file \
+            --extensions c,cc,cpp,cxx,h,hh,hpp,hxx,inl \
+            --diff "$base" "$HEAD_SHA" -- src tests tools > format.diff 2> format.err
+          rc=$?
+          set -e
+
+          if [ "$rc" -eq 0 ]; then
+            echo "All changed lines are formatted."
+            exit 0
+          fi
+          if ! grep -q '^diff --git' format.diff; then
+            echo "::error::git clang-format failed (exit $rc)"
+            cat format.err format.diff
+            exit 1
+          fi
+
+          files=$(grep '^diff --git' format.diff | sed -E 's#^diff --git a/(.*) b/.*#\1#')
+          count=$(echo "$files" | wc -l)
+          for f in $files; do
+            echo "::error file=${f}::lines changed by this PR are not formatted with .clang-format"
+          done
+          cat format.diff
+          {
+            echo "### clang-format: ${count} file(s) need formatting"
+            echo
+            echo 'Run `git clang-format origin/master` (clang-format 22) and push the result. Only the lines this PR changes are checked.'
+            echo
+            echo '```diff'
+            head -c 60000 format.diff
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1

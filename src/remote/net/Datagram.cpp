@@ -4,7 +4,10 @@ namespace faf::remote::net
 {
   namespace
   {
-    void Put32(std::uint8_t* out, const std::uint32_t value) noexcept
+    void Put32(
+      std::uint8_t* out,
+      const std::uint32_t value
+    ) noexcept
     {
       out[0] = static_cast<std::uint8_t>(value);
       out[1] = static_cast<std::uint8_t>(value >> 8);
@@ -12,14 +15,19 @@ namespace faf::remote::net
       out[3] = static_cast<std::uint8_t>(value >> 24);
     }
 
-    std::uint32_t Get32(const std::uint8_t* in) noexcept
+    std::uint32_t Get32(
+      const std::uint8_t* in
+    ) noexcept
     {
       return static_cast<std::uint32_t>(in[0]) | (static_cast<std::uint32_t>(in[1]) << 8) |
-             (static_cast<std::uint32_t>(in[2]) << 16) | (static_cast<std::uint32_t>(in[3]) << 24);
+        (static_cast<std::uint32_t>(in[2]) << 16) | (static_cast<std::uint32_t>(in[3]) << 24);
     }
   } // namespace
 
-  void WriteHeader(const DatagramHeader& header, std::uint8_t* const out) noexcept
+  void WriteHeader(
+    const DatagramHeader& header,
+    std::uint8_t* const out
+  ) noexcept
   {
     out[0] = kDatagramTag;
     out[1] = header.flags;
@@ -30,7 +38,11 @@ namespace faf::remote::net
     out[15] = static_cast<std::uint8_t>(header.ackDelay >> 8);
   }
 
-  bool ReadHeader(const std::uint8_t* const data, const std::size_t size, DatagramHeader& out) noexcept
+  bool ReadHeader(
+    const std::uint8_t* const data,
+    const std::size_t size,
+    DatagramHeader& out
+  ) noexcept
   {
     if (size < kHeaderSize || data[0] != kDatagramTag || (data[1] & ~kKnownFlags) != 0) {
       return false;
@@ -43,7 +55,9 @@ namespace faf::remote::net
     return out.sequence != 0;
   }
 
-  ReceiveWindow::Verdict ReceiveWindow::Check(const std::uint32_t sequence) const noexcept
+  ReceiveWindow::Verdict ReceiveWindow::Check(
+    const std::uint32_t sequence
+  ) const noexcept
   {
     if (sequence == 0) {
       return Verdict::TooOld;
@@ -57,7 +71,9 @@ namespace faf::remote::net
     return mSeen.test(sequence % kSize) ? Verdict::Duplicate : Verdict::New;
   }
 
-  void ReceiveWindow::Accept(const std::uint32_t sequence) noexcept
+  void ReceiveWindow::Accept(
+    const std::uint32_t sequence
+  ) noexcept
   {
     if (sequence > mNewest) {
       // The slots between the old newest and this one now stand for sequences not received.
@@ -79,7 +95,7 @@ namespace faf::remote::net
     for (std::uint32_t i = 0; i < 32; ++i) {
       const std::uint32_t back = i + 1;
       if (back >= mNewest) {
-        break;  // sequence 0 and below were never sent
+        break; // sequence 0 and below were never sent
       }
       if (mSeen.test((mNewest - back) % kSize)) {
         bits |= 1u << i;
@@ -88,7 +104,9 @@ namespace faf::remote::net
     return bits;
   }
 
-  std::uint32_t ReceiveWindow::BitsDownFrom(const std::uint32_t top) const noexcept
+  std::uint32_t ReceiveWindow::BitsDownFrom(
+    const std::uint32_t top
+  ) const noexcept
   {
     std::uint32_t bits = 0;
     for (std::uint32_t i = 0; i < 32 && i < top; ++i) {
@@ -100,7 +118,9 @@ namespace faf::remote::net
     return bits;
   }
 
-  std::size_t VarintSize(std::uint64_t value) noexcept
+  std::size_t VarintSize(
+    std::uint64_t value
+  ) noexcept
   {
     std::size_t size = 1;
     while (value >= 0x80) {
@@ -110,7 +130,9 @@ namespace faf::remote::net
     return size;
   }
 
-  void ByteWriter::Varint(std::uint64_t value)
+  void ByteWriter::Varint(
+    std::uint64_t value
+  )
   {
     while (value >= 0x80) {
       mOut.push_back(static_cast<std::uint8_t>(value | 0x80));
@@ -146,7 +168,9 @@ namespace faf::remote::net
     return 0;
   }
 
-  const std::uint8_t* ByteReader::Bytes(const std::size_t size) noexcept
+  const std::uint8_t* ByteReader::Bytes(
+    const std::size_t size
+  ) noexcept
   {
     if (mFailed || size > mSize - mPos) {
       mFailed = true;

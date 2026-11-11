@@ -83,8 +83,7 @@ void EAiAttackerEventTypeInfo::AddEnums()
 {
   mPrefix = "AIATTACKEVENT_";
   AddEnum(
-    StripPrefix("AIATTACKEVENT_AcquiredDesiredTarget"),
-    static_cast<std::int32_t>(AIATTACKEVENT_AcquiredDesiredTarget)
+    StripPrefix("AIATTACKEVENT_AcquiredDesiredTarget"), static_cast<std::int32_t>(AIATTACKEVENT_AcquiredDesiredTarget)
   );
   AddEnum(StripPrefix("AIATTACKEVENT_OutOfRange"), static_cast<std::int32_t>(AIATTACKEVENT_OutOfRange));
   AddEnum(StripPrefix("AIATTACKEVENT_Success"), static_cast<std::int32_t>(AIATTACKEVENT_Success));
@@ -115,7 +114,9 @@ void moho::register_EAiAttackerEventTypeInfo()
   (void)AcquireEAiAttackerEventTypeInfo();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_EAiAttackerEventTypeInfo_eef8ca, moho::register_EAiAttackerEventTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_EAiAttackerEventTypeInfo_eef8ca,
+  moho::register_EAiAttackerEventTypeInfo
+)

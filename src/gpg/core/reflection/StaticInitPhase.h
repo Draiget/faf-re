@@ -42,15 +42,13 @@
  */
 
 #if defined(_WIN32)
-#define GPG_PREREGISTER_INIT(TAG, FN)                                              \
-  static void __cdecl gGpgPreRegisterThunk_##TAG()                                 \
-  {                                                                                \
-    (void)FN();                                                                    \
-  }                                                                                \
-  __pragma(section(".CRT$XCL", read))                                              \
-  extern "C" __declspec(allocate(".CRT$XCL")) void(__cdecl* const                  \
-                                                   gGpgPreRegisterInit_##TAG)() =  \
-    &gGpgPreRegisterThunk_##TAG;
+#define GPG_PREREGISTER_INIT(TAG, FN)                                                                                  \
+  static void __cdecl gGpgPreRegisterThunk_##TAG()                                                                     \
+  {                                                                                                                    \
+    (void)FN();                                                                                                        \
+  }                                                                                                                    \
+  __pragma(section(".CRT$XCL", read)) extern "C"                                                                       \
+    __declspec(allocate(".CRT$XCL")) void(__cdecl* const gGpgPreRegisterInit_##TAG)() = &gGpgPreRegisterThunk_##TAG;
 #else
 /*
  * Engine addition (dedicated-server plan WPL.5, WPL.18): the same phase on ELF. A
@@ -58,9 +56,9 @@
  * the unprioritised `.init_array` that holds ordinary dynamic initializers; among
  * themselves they run in link order, as the `.CRT$XCL` entries do.
  */
-#define GPG_PREREGISTER_INIT(TAG, FN)                                              \
-  __attribute__((constructor(101))) static void gGpgPreRegisterThunk_##TAG()       \
-  {                                                                                \
-    (void)FN();                                                                    \
+#define GPG_PREREGISTER_INIT(TAG, FN)                                                                                  \
+  __attribute__((constructor(101))) static void gGpgPreRegisterThunk_##TAG()                                           \
+  {                                                                                                                    \
+    (void)FN();                                                                                                        \
   }
 #endif

@@ -35,7 +35,9 @@ namespace moho::resource_reflection
   void AddBase(gpg::RType* ownerType, gpg::RType* baseType);
 
   void RegisterSerializeCallbacks(
-    gpg::RType* typeInfo, gpg::RType::load_func_t loadCallback, gpg::RType::save_func_t saveCallback
+    gpg::RType* typeInfo,
+    gpg::RType::load_func_t loadCallback,
+    gpg::RType::save_func_t saveCallback
   );
 
 } // namespace moho::resource_reflection

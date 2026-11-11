@@ -27,7 +27,7 @@ namespace gpg::gal::effects
 
     std::uint32_t id = 0;
     std::uint32_t location = 0;
-    std::uint32_t locations = 1;     // arrays take one location per element
+    std::uint32_t locations = 1; // arrays take one location per element
     std::uint32_t components = 4;
     Component component = Component::Float;
     std::string semantic;            // upper case, without the index ("TEXCOORD")
@@ -60,6 +60,7 @@ namespace gpg::gal::effects
 
   /** Returns `code` with each input variable's Location replaced by `locations[id]` where present. */
   [[nodiscard]] std::vector<std::uint8_t> PatchSpirvInputLocations(
-    const std::vector<std::uint8_t>& code, const std::map<std::uint32_t, std::uint32_t>& locations
+    const std::vector<std::uint8_t>& code,
+    const std::map<std::uint32_t, std::uint32_t>& locations
   );
 } // namespace gpg::gal::effects

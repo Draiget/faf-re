@@ -48,7 +48,7 @@ namespace moho
   struct SSyncData;
   struct SSTIEntityVariableData;
   struct SSTIUnitVariableData;
-}
+} // namespace moho
 
 namespace faf::remote
 {
@@ -78,7 +78,9 @@ namespace faf::remote
    * session's name table, sorted by name id.
    */
   void ReadUnitStats(
-    moho::Stats<moho::StatItem>& stats, wire::CSessionTableWriters& session, std::vector<wire::SUnitStat>& out
+    moho::Stats<moho::StatItem>& stats,
+    wire::CSessionTableWriters& session,
+    std::vector<wire::SUnitStat>& out
   );
 
   /** A frame's unit block, written into a unit update's data. */
@@ -96,12 +98,16 @@ namespace faf::remote
     static constexpr std::size_t kModes = 3;
 
     /** `EUserEntityVisibilityMode` is one bit per mode. */
-    [[nodiscard]] static std::size_t ModeIndex(const moho::EUserEntityVisibilityMode mode) noexcept
+    [[nodiscard]] static std::size_t ModeIndex(
+      const moho::EUserEntityVisibilityMode mode
+    ) noexcept
     {
       return static_cast<std::size_t>(std::countr_zero(static_cast<std::uint32_t>(mode)));
     }
     /** A view shows the entity in `mode`. Only the first view of a mode writes. */
-    void UseMode(const moho::EUserEntityVisibilityMode mode) noexcept
+    void UseMode(
+      const moho::EUserEntityVisibilityMode mode
+    ) noexcept
     {
       const auto bit = static_cast<std::uint8_t>(mode);
       if ((modes.load(std::memory_order_relaxed) & bit) == 0u) {
@@ -144,22 +150,43 @@ namespace faf::remote
     /** Whether `entity`'s record can be shared now: it names no sound and no underlay. */
     [[nodiscard]] static bool Shareable(const moho::Entity& entity) noexcept;
     /** The session a blip record's names are interned in (its unit detail's custom name and range visuals). */
-    void SetSessionTables(wire::CSessionTableWriters* session) noexcept { mSession = session; }
+    void SetSessionTables(
+      wire::CSessionTableWriters* session
+    ) noexcept
+    {
+      mSession = session;
+    }
 
     /** A new beat with `changedCount` changed entities; what the last beat replaced is free again. */
     void BeginBeat(std::size_t changedCount);
     /** The update of the change set's `index`th entity. */
-    [[nodiscard]] SSharedUpdate& Update(const std::size_t index) noexcept { return mUpdates[index]; }
+    [[nodiscard]] SSharedUpdate& Update(
+      const std::size_t index
+    ) noexcept
+    {
+      return mUpdates[index];
+    }
     /** Makes the records the views asked for (`UseMode`), on the sim's workers with `parallel`. */
     void Build(const std::vector<SChangedEntity>& changed, bool parallel);
 
     /** `count` blip records for this beat; none moves until the next call. */
     void ReserveBlipRecords(std::size_t count);
-    [[nodiscard]] SBlipRecord& BlipRecord(const std::size_t index) noexcept { return mBlipRecords[index]; }
+    [[nodiscard]] SBlipRecord& BlipRecord(
+      const std::size_t index
+    ) noexcept
+    {
+      return mBlipRecords[index];
+    }
     /** One `army`'s update of `blip`; `block` is scratch. Reads only the sim. The blip must be `Shareable`. */
     void FillBlipRecord(
-      SBlipRecord& out, moho::SSTIEntityVariableData& block, moho::ReconBlip& blip, bool requestRefreshUI, std::size_t army,
-      moho::EUserEntityVisibilityMode mode, std::uint32_t vision, bool hasVision
+      SBlipRecord& out,
+      moho::SSTIEntityVariableData& block,
+      moho::ReconBlip& blip,
+      bool requestRefreshUI,
+      std::size_t army,
+      moho::EUserEntityVisibilityMode mode,
+      std::uint32_t vision,
+      bool hasVision
     ) const;
 
   private:
@@ -181,7 +208,7 @@ namespace faf::remote
     gpg::core::ChunkedVector<wire::SEntityRecord> mRecords;
     gpg::core::ChunkedVector<SBlipRecord> mBlipRecords;
     std::vector<std::uint32_t> mFree;
-    std::vector<std::uint32_t> mReplaced; // this beat's old records, free from the next beat on
+    std::vector<std::uint32_t> mReplaced;          // this beat's old records, free from the next beat on
     gpg::core::FlatGenerationMap<SEntry> mEntries; // by entity id
     std::unique_ptr<SSharedUpdate[]> mUpdates;
     std::size_t mUpdateCapacity = 0;
@@ -197,20 +224,20 @@ namespace faf::remote
     /** What every view reads of the entity, once a beat. */
     struct STarget
     {
-      SSharedUpdate* shared = nullptr;  // a plain entity or prop: its records for all views
+      SSharedUpdate* shared = nullptr; // a plain entity or prop: its records for all views
       moho::Entity* entity = nullptr;
-      moho::Unit* unit = nullptr;       // the entity as a unit, or
-      moho::ReconBlip* blip = nullptr;  // as a blip
-      bool requestRefreshUI = false;    // `mRequestRefreshUI` as the sync walk found it
+      moho::Unit* unit = nullptr;      // the entity as a unit, or
+      moho::ReconBlip* blip = nullptr; // as a blip
+      bool requestRefreshUI = false;   // `mRequestRefreshUI` as the sync walk found it
     };
 
     const STarget* target = nullptr;
     const SBlipRecord* blipRecord = nullptr; // a blip: its update for this view, if it could be shared
-    std::uint32_t vision = 0; // a blip: the vision range the view last copied from its creator
-    std::uint8_t mode = 0;    // `EUserEntityVisibilityMode`
-    std::uint8_t army = 0;    // the view's army (a blip's recon record)
-    bool hasVision = false;   // whether it ever did
-    bool created = false;     // with `shared`: the view creates it now (`CreateInterface`)
+    std::uint32_t vision = 0;                // a blip: the vision range the view last copied from its creator
+    std::uint8_t mode = 0;                   // `EUserEntityVisibilityMode`
+    std::uint8_t army = 0;                   // the view's army (a blip's recon record)
+    bool hasVision = false;                  // whether it ever did
+    bool created = false;                    // with `shared`: the view creates it now (`CreateInterface`)
 
     [[nodiscard]] moho::EUserEntityVisibilityMode Mode() const noexcept
     {
@@ -223,7 +250,10 @@ namespace faf::remote
    * and children from the live attach info, the view's visibility mode and flag, the refresh flag.
    */
   void WriteEntityBlockForView(
-    moho::SSTIEntityVariableData& data, moho::Entity& entity, moho::EUserEntityVisibilityMode mode, bool requestRefreshUI
+    moho::SSTIEntityVariableData& data,
+    moho::Entity& entity,
+    moho::EUserEntityVisibilityMode mode,
+    bool requestRefreshUI
   );
 
   /**
@@ -239,7 +269,9 @@ namespace faf::remote
      * rectangles (`SSyncData::mPlayableRectUpdates`) with the heights `field` holds there.
      */
     void Collect(
-      moho::CSimResources* resources, const moho::CHeightField* field, std::span<const gpg::Rect2i> rects,
+      moho::CSimResources* resources,
+      const moho::CHeightField* field,
+      std::span<const gpg::Rect2i> rects,
       wire::CSessionTableWriters& session
     );
     /**
@@ -247,11 +279,20 @@ namespace faf::remote
      * client makes on its own copy (ground following). The sim's own field may be ahead of the frames when the
      * sim runs ahead of them (loopback, replays).
      */
-    [[nodiscard]] const moho::CHeightField* SentTerrain() const noexcept { return mSentTerrain.get(); }
+    [[nodiscard]] const moho::CHeightField* SentTerrain() const noexcept
+    {
+      return mSentTerrain.get();
+    }
     /** Beats with more resource deposits than the session record may carry (should stay 0). */
-    [[nodiscard]] std::uint64_t DepositOverflows() const noexcept { return mDepositOverflows; }
+    [[nodiscard]] std::uint64_t DepositOverflows() const noexcept
+    {
+      return mDepositOverflows;
+    }
     /** Terrain edits the session record could not carry (should stay 0). */
-    [[nodiscard]] std::uint64_t TerrainEditOverflows() const noexcept { return mTerrainEditOverflows; }
+    [[nodiscard]] std::uint64_t TerrainEditOverflows() const noexcept
+    {
+      return mTerrainEditOverflows;
+    }
 
   private:
     std::uint64_t mDepositOverflows = 0;
@@ -279,23 +320,38 @@ namespace faf::remote
      * interned again only when its items change.
      */
     void Refresh(
-      std::span<const std::uint32_t> ids, std::span<moho::Entity* const> entities, wire::CSessionTableWriters& session,
+      std::span<const std::uint32_t> ids,
+      std::span<moho::Entity* const> entities,
+      wire::CSessionTableWriters& session,
       bool parallel
     );
     /**
      * Each tree is read every `beats` beats, a share of them each beat (a new tree at once): a unit's stats reach its
      * views up to `beats - 1` beats late. Plan #118: reading every unit's stats every beat cost 2 ms of a 16-seat beat.
      */
-    void SetReadEvery(const std::uint32_t beats) noexcept { mReadEvery = beats == 0u ? 1u : beats; }
-    [[nodiscard]] std::uint32_t ReadEvery() const noexcept { return mReadEvery; }
+    void SetReadEvery(
+      const std::uint32_t beats
+    ) noexcept
+    {
+      mReadEvery = beats == 0u ? 1u : beats;
+    }
+    [[nodiscard]] std::uint32_t ReadEvery() const noexcept
+    {
+      return mReadEvery;
+    }
     /** `tree`'s stats as of this beat, or null when it was not read (a dead unit's blip reads its own). */
-    [[nodiscard]] const SStats* Find(const Tree* tree) const
+    [[nodiscard]] const SStats* Find(
+      const Tree* tree
+    ) const
     {
       const auto found = mByTree.find(tree);
       return found != mByTree.end() ? &found->second->value : nullptr;
     }
     /** The trees whose stats changed this beat, or were read for the first time. */
-    [[nodiscard]] const std::vector<const Tree*>& Changed() const noexcept { return mChanged; }
+    [[nodiscard]] const std::vector<const Tree*>& Changed() const noexcept
+    {
+      return mChanged;
+    }
 
   private:
     struct STree
@@ -333,7 +389,9 @@ namespace faf::remote
   {
   public:
     CViewFrameBuilder(
-      const wire::SContentTables& tables, const wire::SFrameCodec& codec, std::uint32_t orphanBeats = kDefaultOrphanBeats
+      const wire::SContentTables& tables,
+      const wire::SFrameCodec& codec,
+      std::uint32_t orphanBeats = kDefaultOrphanBeats
     );
 
     /**
@@ -341,7 +399,10 @@ namespace faf::remote
      * frames name no sounds and no underlays. With `collectEdits` `Apply` also queues the beat's deposits
      * and terrain edits there; views that share a session leave that to one `CSessionEditCollector`.
      */
-    void SetSessionTables(wire::CSessionTableWriters* session, const bool collectEdits = true) noexcept
+    void SetSessionTables(
+      wire::CSessionTableWriters* session,
+      const bool collectEdits = true
+    ) noexcept
     {
       mSession = session;
       mCollectEdits = collectEdits;
@@ -350,7 +411,12 @@ namespace faf::remote
      * Unit stats read once a beat for every view (`CSharedUnitStats`): a unit's stats then come from there
      * instead of each view reading the sim's tree again.
      */
-    void SetSharedStats(const CSharedUnitStats* stats) noexcept { mSharedStats = stats; }
+    void SetSharedStats(
+      const CSharedUnitStats* stats
+    ) noexcept
+    {
+      mSharedStats = stats;
+    }
 
     /**
      * Applies one packet's entity lanes to the world the frames are built from. The sim's unit
@@ -363,16 +429,23 @@ namespace faf::remote
     void ReleaseDropped();
 
     /** The frame of the world as it stands, stamped with `beat` and the next frame id. */
-    [[nodiscard]] wire::SViewFrame Build(std::uint32_t beat)
+    [[nodiscard]] wire::SViewFrame Build(
+      std::uint32_t beat
+    )
     {
-      return Build(beat, [](const wire::SEntityRecord&) { return true; });
+      return Build(beat, [](const wire::SEntityRecord&) {
+        return true;
+      });
     }
     /**
      * `Build`, less the records `keep` refuses; it is asked in ascending id order, and a refused
      * record is never copied (plan WPR.35).
      */
     template <class Keep>
-    [[nodiscard]] wire::SViewFrame Build(const std::uint32_t beat, Keep&& keep)
+    [[nodiscard]] wire::SViewFrame Build(
+      const std::uint32_t beat,
+      Keep&& keep
+    )
     {
       wire::SViewFrame frame = StartFrame(beat);
       FillFrame(frame, keep);
@@ -383,7 +456,10 @@ namespace faf::remote
     [[nodiscard]] wire::SViewFrame StartFrame(std::uint32_t beat);
     /** Adds the world's records `keep` accepts to `frame`. */
     template <class Keep>
-    void FillFrame(wire::SViewFrame& frame, Keep&& keep) const
+    void FillFrame(
+      wire::SViewFrame& frame,
+      Keep&& keep
+    ) const
     {
       frame.entities.reserve(mWorldIndex.size());
       for (const SWorldEntry& entry : mWorldIndex) {
@@ -404,12 +480,24 @@ namespace faf::remote
      * Plan WPR.35: from now on `TouchedIds` and `ErasedRecords` say which records changed since
      * `ClearChanges`, for a caller that keeps its frame between beats.
      */
-    void TrackChanges() noexcept { mTrackChanges = true; }
+    void TrackChanges() noexcept
+    {
+      mTrackChanges = true;
+    }
     /** Ids of the records created or changed; an id can be listed more than once. */
-    [[nodiscard]] const std::vector<std::uint32_t>& TouchedIds() const noexcept { return mTouchedIds; }
-    [[nodiscard]] const std::vector<SErasedRecord>& ErasedRecords() const noexcept { return mErasedRecords; }
+    [[nodiscard]] const std::vector<std::uint32_t>& TouchedIds() const noexcept
+    {
+      return mTouchedIds;
+    }
+    [[nodiscard]] const std::vector<SErasedRecord>& ErasedRecords() const noexcept
+    {
+      return mErasedRecords;
+    }
     /** Ids that got a record in a new slot; it may have left again (`ErasedRecords`). */
-    [[nodiscard]] const std::vector<std::uint32_t>& NewRecordIds() const noexcept { return mNewRecordIds; }
+    [[nodiscard]] const std::vector<std::uint32_t>& NewRecordIds() const noexcept
+    {
+      return mNewRecordIds;
+    }
     void ClearChanges() noexcept
     {
       mTouchedIds.clear();
@@ -420,7 +508,9 @@ namespace faf::remote
      * Plan WPR.35: for a caller that holds no copy of `slot`'s record because its own would be
      * equal. The first change of a beat to a watched slot first saves the record (`RecordBefore`).
      */
-    void WatchRecord(const std::uint32_t slot)
+    void WatchRecord(
+      const std::uint32_t slot
+    )
     {
       if (mWatched.size() <= slot) {
         mWatched.resize(mWorldSlots.size(), 0u);
@@ -428,23 +518,32 @@ namespace faf::remote
       }
       mWatched[slot] = 1u;
     }
-    void UnwatchRecord(const std::uint32_t slot) noexcept
+    void UnwatchRecord(
+      const std::uint32_t slot
+    ) noexcept
     {
       if (slot < mWatched.size()) {
         mWatched[slot] = 0u;
       }
     }
     /** What a watched `slot` held before this beat's changes; null if it was not changed. */
-    [[nodiscard]] const wire::SEntityRecord* RecordBefore(const std::uint32_t slot) const noexcept
+    [[nodiscard]] const wire::SEntityRecord* RecordBefore(
+      const std::uint32_t slot
+    ) const noexcept
     {
       return slot < mBeforeRecords.size() ? mBeforeRecords[slot] : nullptr;
     }
     /** Lets go of last beat's saved records; before this beat's changes. */
     void ClearBefore() noexcept;
     /** How many slots records can lie in (a slot is below this). */
-    [[nodiscard]] std::size_t SlotCount() const noexcept { return mWorldSlots.size(); }
+    [[nodiscard]] std::size_t SlotCount() const noexcept
+    {
+      return mWorldSlots.size();
+    }
     /** The ids of the world's units (entity family 0, the index's first ids), ascending, appended to `out`. */
-    void AppendUnitIds(std::vector<std::uint32_t>& out) const
+    void AppendUnitIds(
+      std::vector<std::uint32_t>& out
+    ) const
     {
       for (const SWorldEntry& entry : mWorldIndex) {
         if (entry.id >= 0x10000000u) {
@@ -455,14 +554,19 @@ namespace faf::remote
     }
     /** `visit(id, slot)` for every record, in ascending id order, without reading the records. */
     template <class Visit>
-    void ForEachRecord(Visit&& visit) const
+    void ForEachRecord(
+      Visit&& visit
+    ) const
     {
       for (const SWorldEntry& entry : mWorldIndex) {
         visit(entry.id, entry.slot);
       }
     }
     /** The slot of `id`'s record, if the world has one. */
-    [[nodiscard]] bool FindSlot(const std::uint32_t id, std::uint32_t& slot) const
+    [[nodiscard]] bool FindSlot(
+      const std::uint32_t id,
+      std::uint32_t& slot
+    ) const
     {
       const auto found = LowerBound(id);
       if (found == mWorldIndex.end() || found->id != id) {
@@ -472,7 +576,11 @@ namespace faf::remote
       return true;
     }
     /** `FindSlot` for ids in ascending order: `cursor` starts at 0 and stays between calls. */
-    [[nodiscard]] bool FindSlotFrom(std::size_t& cursor, const std::uint32_t id, std::uint32_t& slot) const
+    [[nodiscard]] bool FindSlotFrom(
+      std::size_t& cursor,
+      const std::uint32_t id,
+      std::uint32_t& slot
+    ) const
     {
       cursor = SeekWorld(cursor, id);
       if (cursor == mWorldIndex.size() || mWorldIndex[cursor].id != id) {
@@ -481,24 +589,52 @@ namespace faf::remote
       slot = mWorldIndex[cursor].slot;
       return true;
     }
-    [[nodiscard]] const wire::SEntityRecord& RecordAt(const std::uint32_t slot) const { return *mWorldSlots[slot]; }
+    [[nodiscard]] const wire::SEntityRecord& RecordAt(
+      const std::uint32_t slot
+    ) const
+    {
+      return *mWorldSlots[slot];
+    }
 
-    [[nodiscard]] const wire::SFrameCodec& Codec() const noexcept { return mCodec; }
-    [[nodiscard]] std::size_t EntityCount() const noexcept { return mWorldIndex.size(); }
+    [[nodiscard]] const wire::SFrameCodec& Codec() const noexcept
+    {
+      return mCodec;
+    }
+    [[nodiscard]] std::size_t EntityCount() const noexcept
+    {
+      return mWorldIndex.size();
+    }
     /** Whether the client still holds a record of `id` (orphans included). */
-    [[nodiscard]] bool Holds(const std::uint32_t id) const
+    [[nodiscard]] bool Holds(
+      const std::uint32_t id
+    ) const
     {
       const auto found = LowerBound(id);
       return found != mWorldIndex.end() && found->id == id;
     }
     /** Creations whose blueprint is missing from the content tables (should stay 0). */
-    [[nodiscard]] std::uint64_t UnknownBlueprints() const noexcept { return mUnknownBlueprints; }
+    [[nodiscard]] std::uint64_t UnknownBlueprints() const noexcept
+    {
+      return mUnknownBlueprints;
+    }
     /** Underlay textures that are not plain file textures (should stay 0). */
-    [[nodiscard]] std::uint64_t UnknownUnderlays() const noexcept { return mUnknownUnderlays; }
+    [[nodiscard]] std::uint64_t UnknownUnderlays() const noexcept
+    {
+      return mUnknownUnderlays;
+    }
     /** `CSessionEditCollector`'s, with `collectEdits`. */
-    [[nodiscard]] std::uint64_t DepositOverflows() const noexcept { return mEdits.DepositOverflows(); }
-    [[nodiscard]] const moho::CHeightField* SentTerrain() const noexcept { return mEdits.SentTerrain(); }
-    [[nodiscard]] std::uint64_t TerrainEditOverflows() const noexcept { return mEdits.TerrainEditOverflows(); }
+    [[nodiscard]] std::uint64_t DepositOverflows() const noexcept
+    {
+      return mEdits.DepositOverflows();
+    }
+    [[nodiscard]] const moho::CHeightField* SentTerrain() const noexcept
+    {
+      return mEdits.SentTerrain();
+    }
+    [[nodiscard]] std::uint64_t TerrainEditOverflows() const noexcept
+    {
+      return mEdits.TerrainEditOverflows();
+    }
 
   private:
     /** One record of the world: its id and where it lies in `mWorldSlots`. */
@@ -508,11 +644,15 @@ namespace faf::remote
       std::uint32_t slot;
     };
 
-    [[nodiscard]] std::vector<SWorldEntry>::const_iterator LowerBound(const std::uint32_t id) const
+    [[nodiscard]] std::vector<SWorldEntry>::const_iterator LowerBound(
+      const std::uint32_t id
+    ) const
     {
-      return std::lower_bound(mWorldIndex.begin(), mWorldIndex.end(), id, [](const SWorldEntry& entry, const std::uint32_t value) {
+      return std::lower_bound(
+        mWorldIndex.begin(), mWorldIndex.end(), id, [](const SWorldEntry& entry, const std::uint32_t value) {
         return entry.id < value;
-      });
+      }
+      );
     }
     static constexpr std::uint32_t kNoLocal = 0xFFFFFFFFu;
 
@@ -520,7 +660,10 @@ namespace faf::remote
      * Where `id` is or belongs in the index, looking forward from `from`: a beat's updates come in
      * ascending id order and lie close together. An id before `from` searches from the start.
      */
-    [[nodiscard]] std::size_t SeekWorld(std::size_t from, const std::uint32_t id) const
+    [[nodiscard]] std::size_t SeekWorld(
+      std::size_t from,
+      const std::uint32_t id
+    ) const
     {
       const std::size_t size = mWorldIndex.size();
       if (from > size || (from > 0u && mWorldIndex[from - 1u].id >= id)) {
@@ -534,9 +677,10 @@ namespace faf::remote
       const std::size_t end = from + step < size ? from + step + 1u : size;
       const auto first = mWorldIndex.begin() + static_cast<std::ptrdiff_t>(from);
       const auto last = mWorldIndex.begin() + static_cast<std::ptrdiff_t>(end);
-      return static_cast<std::size_t>(
-        std::lower_bound(first, last, id, [](const SWorldEntry& entry, const std::uint32_t value) { return entry.id < value; }) - mWorldIndex.begin()
-      );
+      return static_cast<
+        std::size_t>(std::lower_bound(first, last, id, [](const SWorldEntry& entry, const std::uint32_t value) {
+        return entry.id < value;
+      }) - mWorldIndex.begin());
     }
 
     /** A watched slot's record is about to change. */
@@ -563,33 +707,33 @@ namespace faf::remote
     std::vector<SWorldEntry> mWorldIndex;
     gpg::core::ChunkedVector<const wire::SEntityRecord*> mWorldSlots; // a shared record or a local one
     std::vector<std::uint32_t> mFreeSlots;
-    gpg::core::ChunkedVector<wire::SEntityRecord> mLocalRecords;      // this view's own records
-    std::vector<std::uint32_t> mLocalSlots;                           // per slot: index into them, or `kNoLocal`
+    gpg::core::ChunkedVector<wire::SEntityRecord> mLocalRecords; // this view's own records
+    std::vector<std::uint32_t> mLocalSlots;                      // per slot: index into them, or `kNoLocal`
     std::vector<std::uint32_t> mFreeLocal;
     bool mTrackChanges = false;
     std::vector<std::uint32_t> mTouchedIds;
     std::vector<SErasedRecord> mErasedRecords;
     std::vector<std::uint32_t> mNewRecordIds;
-    std::vector<std::uint8_t> mWatched;                  // per slot
+    std::vector<std::uint8_t> mWatched;                     // per slot
     std::vector<const wire::SEntityRecord*> mBeforeRecords; // per slot: before this beat's changes, or null
-    std::vector<std::uint32_t> mBeforeSlots;             // the slots with one
-    gpg::core::ChunkedVector<wire::SEntityRecord> mBefore; // the local ones among them, which change in place
-    std::map<std::uint32_t, std::uint32_t> mOrphanedAt; // id -> beat of its erase
+    std::vector<std::uint32_t> mBeforeSlots;                // the slots with one
+    gpg::core::ChunkedVector<wire::SEntityRecord> mBefore;  // the local ones among them, which change in place
+    std::map<std::uint32_t, std::uint32_t> mOrphanedAt;     // id -> beat of its erase
     std::map<std::uint32_t, boost::shared_ptr<moho::Stats<moho::StatItem>>> mUnitStats; // the sim's live trees
     // With `mSharedStats`: the ids of each tree's records, and the records whose stats aren't set yet.
     std::unordered_multimap<const moho::Stats<moho::StatItem>*, std::uint32_t> mStatsIds;
     std::vector<std::uint32_t> mFreshStats;
-    std::vector<boost::shared_ptr<moho::Stats<moho::StatItem>>> mDroppedStats;          // until `ReleaseDropped`
+    std::vector<boost::shared_ptr<moho::Stats<moho::StatItem>>> mDroppedStats; // until `ReleaseDropped`
     std::uint32_t mNextFrameId = 1;
     std::uint64_t mUnknownBlueprints = 0;
     std::uint64_t mUnknownUnderlays = 0;
     CSessionEditCollector mEdits; // with `mCollectEdits`
     bool mCollectEdits = true;
     const CSharedUnitStats* mSharedStats = nullptr;
-    moho::SSTIEntityVariableData mBlockScratch;  // a direct update's entity block
-    CUnderlayPathReader mUnderlays;              // the entities' underlay paths, as of this beat
-    wire::SUnitDetail mDetailScratch;            // a unit update's detail, before it is compared
-    std::vector<wire::SUnitStat> mStatsScratch;  // a unit's stats, likewise
+    moho::SSTIEntityVariableData mBlockScratch; // a direct update's entity block
+    CUnderlayPathReader mUnderlays;             // the entities' underlay paths, as of this beat
+    wire::SUnitDetail mDetailScratch;           // a unit update's detail, before it is compared
+    std::vector<wire::SUnitStat> mStatsScratch; // a unit's stats, likewise
     wire::CSessionTableWriters* mSession = nullptr;
 
     void DropStats(std::uint32_t id);
@@ -599,7 +743,12 @@ namespace faf::remote
   class CHeightFieldGround final : public wire::IGroundHeight
   {
   public:
-    void SetField(const moho::CHeightField* field) noexcept { mField = field; }
+    void SetField(
+      const moho::CHeightField* field
+    ) noexcept
+    {
+      mField = field;
+    }
     [[nodiscard]] float HeightAt(float x, float z) const noexcept override;
 
   private:
@@ -615,19 +764,36 @@ namespace faf::remote
   class CDeadReckoner
   {
   public:
-    explicit CDeadReckoner(const wire::SReckoningScheme& scheme) noexcept
+    explicit CDeadReckoner(
+      const wire::SReckoningScheme& scheme
+    ) noexcept
       : mScheme(scheme)
     {}
 
     /** `codec.deadReckoning` must be on; orientations are reckoned with `codec.orientationReckoning`. */
     void Apply(wire::SViewFrame& frame, const wire::SFrameCodec& codec);
 
-    [[nodiscard]] const wire::SReckoningScheme& Scheme() const noexcept { return mScheme; }
-    [[nodiscard]] std::uint32_t Tolerance() const noexcept { return mScheme.tolerance; }
-    [[nodiscard]] std::uint64_t Reanchors() const noexcept { return mReanchors; }
-    [[nodiscard]] std::uint64_t OrientationReanchors() const noexcept { return mOrientationReanchors; }
+    [[nodiscard]] const wire::SReckoningScheme& Scheme() const noexcept
+    {
+      return mScheme;
+    }
+    [[nodiscard]] std::uint32_t Tolerance() const noexcept
+    {
+      return mScheme.tolerance;
+    }
+    [[nodiscard]] std::uint64_t Reanchors() const noexcept
+    {
+      return mReanchors;
+    }
+    [[nodiscard]] std::uint64_t OrientationReanchors() const noexcept
+    {
+      return mOrientationReanchors;
+    }
     /** Re-anchors that made the position follow the terrain. */
-    [[nodiscard]] std::uint64_t GroundAnchors() const noexcept { return mGroundAnchors; }
+    [[nodiscard]] std::uint64_t GroundAnchors() const noexcept
+    {
+      return mGroundAnchors;
+    }
 
     /** What the re-anchors were (to tune the schemes, WP7.8). */
     struct SReanchorCauses
@@ -636,10 +802,13 @@ namespace faf::remote
       std::uint64_t verticalOnly = 0;
       std::uint64_t both = 0;
       std::uint64_t units = 0;
-      std::uint64_t stopped = 0;          // the position did not move on the last beat
-      std::uint64_t afterBeats[4]{};      // beats since the anchor: 1, 2-3, 4-9, 10 or more
+      std::uint64_t stopped = 0;     // the position did not move on the last beat
+      std::uint64_t afterBeats[4]{}; // beats since the anchor: 1, 2-3, 4-9, 10 or more
     };
-    [[nodiscard]] const SReanchorCauses& Causes() const noexcept { return mCauses; }
+    [[nodiscard]] const SReanchorCauses& Causes() const noexcept
+    {
+      return mCauses;
+    }
 
   private:
     struct SSent

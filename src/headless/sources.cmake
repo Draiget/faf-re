@@ -8,6 +8,7 @@
 # those switches (#if FAF_SERVER_MODE in the rest). The Linux build is always server mode.
 
 set(FAF_HEADLESS_SOURCES
+  headless/BotObservation.cpp
   headless/ReplayBoneStats.cpp
   headless/ReplayChangeSetCheck.cpp
   headless/ReplayCommandCheck.cpp
@@ -21,6 +22,7 @@ set(FAF_HEADLESS_SOURCES
   headless/ReplayViewPacketCheck.cpp
   headless/ReplaySyncSpy.cpp
   headless/SessionLoad.cpp
+  headless/StateDigest.cpp
   headless/ReplayViewBench.cpp
   headless/ReplayViewFrameStats.cpp
   headless/HeadlessEntry.cpp

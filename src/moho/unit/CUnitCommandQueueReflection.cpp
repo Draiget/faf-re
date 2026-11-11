@@ -57,7 +57,9 @@ namespace moho
   /**
    * Address: 0x006F8C50 (FUN_006F8C50, Moho::CUnitCommandQueueTypeInfo::AddBase_Broadcaster_EUnitCommandQueueStatus)
    */
-  void CUnitCommandQueueTypeInfo::AddBase_Broadcaster_EUnitCommandQueueStatus(gpg::RType* const typeInfo)
+  void CUnitCommandQueueTypeInfo::AddBase_Broadcaster_EUnitCommandQueueStatus(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RType* baseType = register_Broadcaster_EUnitCommandQueueStatus_RType();
     if (baseType == nullptr) {
@@ -78,7 +80,10 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CUnitCommandQueueTypeInfo_856820, moho::register_CUnitCommandQueueTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CUnitCommandQueueTypeInfo_856820,
+  moho::register_CUnitCommandQueueTypeInfo
+)
 
 namespace moho
 {

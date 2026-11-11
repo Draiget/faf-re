@@ -11,7 +11,7 @@ namespace gpg
   class RType;
   class ReadArchive;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -113,7 +113,8 @@ namespace moho
   static_assert(offsetof(CRandomStream, twister) == 0x0000, "CRandomStream::twister offset must be 0x0000");
   static_assert(offsetof(CRandomStream, marsagliaPair) == 0x09C4, "CRandomStream::marsagliaPair offset must be 0x09C4");
   static_assert(
-    offsetof(CRandomStream, hasMarsagliaPair) == 0x09C8, "CRandomStream::hasMarsagliaPair offset must be 0x09C8"
+    offsetof(CRandomStream, hasMarsagliaPair) == 0x09C8,
+    "CRandomStream::hasMarsagliaPair offset must be 0x09C8"
   );
   static_assert(sizeof(CRandomStream) == 0x9CC, "CRandomStream size must be 0x9CC");
 } // namespace moho

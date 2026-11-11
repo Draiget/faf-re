@@ -48,11 +48,11 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
-    CArmyStatItem* mItem;                                   // +0x00
-    ETriggerOperator mOp;                                   // +0x04
-    BVSet<const RBlueprint*, EntityCategoryHelper> mCat;    // +0x08
-    float mVal;                                             // +0x30
-    std::uint8_t mPad34[0x04];                              // +0x34
+    CArmyStatItem* mItem;                                // +0x00
+    ETriggerOperator mOp;                                // +0x04
+    BVSet<const RBlueprint*, EntityCategoryHelper> mCat; // +0x08
+    float mVal;                                          // +0x30
+    std::uint8_t mPad34[0x04];                           // +0x34
   };
 
   struct STrigger
@@ -69,7 +69,7 @@ namespace moho
     STrigger();
 
     /**
-       * Address: 0x00711A90 (FUN_00711A90)
+     * Address: 0x00711A90 (FUN_00711A90)
      *
      * What it does:
      * Releases condition category bit-storage lanes, resets fastvector storage to inline, and clears trigger name.
@@ -90,9 +90,9 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
-    fa::string mName;                                    // +0x00
-    std::uint32_t mUnk1C;                                   // +0x1C
-    gpg::fastvector_n<SCondition, 2> mConditions;           // +0x20 (0x10 header + two inline conditions)
+    fa::string mName;                             // +0x00
+    std::uint32_t mUnk1C;                         // +0x1C
+    gpg::fastvector_n<SCondition, 2> mConditions; // +0x20 (0x10 header + two inline conditions)
   };
   static_assert(sizeof(gpg::fastvector_n<SCondition, 2>) == 0x80, "fastvector_n<SCondition, 2> size must be 0x80");
 

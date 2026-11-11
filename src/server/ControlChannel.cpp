@@ -10,7 +10,9 @@ namespace faf::server
 {
   namespace
   {
-    [[nodiscard]] int HexDigit(const char c) noexcept
+    [[nodiscard]] int HexDigit(
+      const char c
+    ) noexcept
     {
       if (c >= '0' && c <= '9') {
         return c - '0';
@@ -24,12 +26,16 @@ namespace faf::server
       return -1;
     }
 
-    [[nodiscard]] bool IsSpace(const char c) noexcept
+    [[nodiscard]] bool IsSpace(
+      const char c
+    ) noexcept
     {
       return c == ' ' || c == '\t' || c == '\r' || c == '\n';
     }
 
-    [[nodiscard]] std::array<std::uint8_t, 24> FrameNonce(const std::uint64_t counter) noexcept
+    [[nodiscard]] std::array<std::uint8_t, 24> FrameNonce(
+      const std::uint64_t counter
+    ) noexcept
     {
       std::array<std::uint8_t, 24> nonce{};
       for (int i = 0; i < 8; ++i) {
@@ -44,7 +50,10 @@ namespace faf::server
     constexpr std::string_view kServiceToServer = "faf-control c2s";
   } // namespace
 
-  bool ReadControlKey(std::string_view text, ControlKey& out) noexcept
+  bool ReadControlKey(
+    std::string_view text,
+    ControlKey& out
+  ) noexcept
   {
     while (!text.empty() && IsSpace(text.front())) {
       text.remove_prefix(1);
@@ -66,7 +75,11 @@ namespace faf::server
     return true;
   }
 
-  CControlChannel::CControlChannel(const ControlKey& key, const EControlRole role, const ControlNonce& ownNonce) noexcept
+  CControlChannel::CControlChannel(
+    const ControlKey& key,
+    const EControlRole role,
+    const ControlNonce& ownNonce
+  ) noexcept
     : mKey(key)
     , mRole(role)
     , mOwnNonce(ownNonce)
@@ -89,7 +102,10 @@ namespace faf::server
     return mRole == EControlRole::Service ? mOwnNonce : mPeerNonce;
   }
 
-  void CControlChannel::Derive(const std::string_view label, std::uint8_t* const out) const noexcept
+  void CControlChannel::Derive(
+    const std::string_view label,
+    std::uint8_t* const out
+  ) const noexcept
   {
     // label | server nonce | service nonce, keyed with the control key, 32 bytes.
     std::array<std::uint8_t, 32 + 2 * 24> input{};
@@ -100,7 +116,9 @@ namespace faf::server
     crypto_wipe(input.data(), input.size());
   }
 
-  ControlProof CControlChannel::Proof(const ControlNonce& peerNonce) noexcept
+  ControlProof CControlChannel::Proof(
+    const ControlNonce& peerNonce
+  ) noexcept
   {
     mPeerNonce = peerNonce;
     mHavePeerNonce = true;
@@ -109,7 +127,9 @@ namespace faf::server
     return proof;
   }
 
-  bool CControlChannel::CheckPeerProof(const ControlProof& proof) noexcept
+  bool CControlChannel::CheckPeerProof(
+    const ControlProof& proof
+  ) noexcept
   {
     if (!mHavePeerNonce || mReady) {
       return false;
@@ -128,7 +148,9 @@ namespace faf::server
     return true;
   }
 
-  std::vector<std::uint8_t> CControlChannel::Seal(const std::span<const std::uint8_t> message)
+  std::vector<std::uint8_t> CControlChannel::Seal(
+    const std::span<const std::uint8_t> message
+  )
   {
     if (!mReady || message.size() > kMaxControlMessageBytes) {
       return {};
@@ -140,11 +162,22 @@ namespace faf::server
     }
     const auto nonce = FrameNonce(mSent++);
     std::uint8_t* const cipher = frame.data() + kControlLengthBytes;
-    crypto_aead_lock(cipher, cipher + message.size(), mSendKey.data(), nonce.data(), frame.data(), kControlLengthBytes, message.data(), message.size());
+    crypto_aead_lock(
+      cipher,
+      cipher + message.size(),
+      mSendKey.data(),
+      nonce.data(),
+      frame.data(),
+      kControlLengthBytes,
+      message.data(),
+      message.size()
+    );
     return frame;
   }
 
-  bool CControlChannel::Feed(const std::span<const std::uint8_t> bytes)
+  bool CControlChannel::Feed(
+    const std::span<const std::uint8_t> bytes
+  )
   {
     if (!mReady) {
       return false;
@@ -167,7 +200,11 @@ namespace faf::server
       const std::size_t size = sealed - kControlTagBytes;
       std::vector<std::uint8_t> plain(size);
       const auto nonce = FrameNonce(mReceived);
-      if (crypto_aead_unlock(plain.data(), cipher + size, mReceiveKey.data(), nonce.data(), header, kControlLengthBytes, cipher, size) != 0) {
+      if (
+        crypto_aead_unlock(
+          plain.data(), cipher + size, mReceiveKey.data(), nonce.data(), header, kControlLengthBytes, cipher, size
+        ) != 0
+      ) {
         return false;
       }
       ++mReceived;
@@ -178,7 +215,9 @@ namespace faf::server
     return true;
   }
 
-  bool CControlChannel::Take(std::vector<std::uint8_t>& message)
+  bool CControlChannel::Take(
+    std::vector<std::uint8_t>& message
+  )
   {
     if (mMessages.empty()) {
       return false;

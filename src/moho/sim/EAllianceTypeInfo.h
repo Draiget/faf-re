@@ -64,7 +64,6 @@ namespace moho
 
   static_assert(sizeof(EAllianceTypeInfo) == 0x78, "EAllianceTypeInfo size must be 0x78");
 
-
   /**
    * Address: 0x00BC7A10 (FUN_00BC7A10, register_EAllianceTypeInfo)
    *

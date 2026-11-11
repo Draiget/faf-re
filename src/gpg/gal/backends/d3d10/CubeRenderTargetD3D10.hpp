@@ -7,13 +7,16 @@
 #include "gpg/gal/CubeRenderTarget.hpp"
 #include "gpg/gal/CubeRenderTargetContext.hpp"
 
-namespace gpg {
-namespace gal {
+namespace gpg
+{
+  namespace gal
+  {
     /**
      * VFTABLE: 0x00D4300C
      * COL:  0x00E50BE8
      */
-    class CubeRenderTargetD3D10 : public CubeRenderTarget {
+    class CubeRenderTargetD3D10 : public CubeRenderTarget
+    {
     public:
       /**
        * Address: 0x008F7F30 (FUN_008F7F30)
@@ -55,7 +58,10 @@ namespace gal {
       CubeRenderTargetContext context_{}; // +0x04
     };
 
-    static_assert(offsetof(CubeRenderTargetD3D10, context_) == 0x04, "CubeRenderTargetD3D10::context_ offset must be 0x04");
+    static_assert(
+      offsetof(CubeRenderTargetD3D10, context_) == 0x04,
+      "CubeRenderTargetD3D10::context_ offset must be 0x04"
+    );
     static_assert(sizeof(CubeRenderTargetD3D10) == 0x10, "CubeRenderTargetD3D10 size must be 0x10");
-} // namespace gal
+  } // namespace gal
 } // namespace gpg

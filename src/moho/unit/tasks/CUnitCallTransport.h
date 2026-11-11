@@ -91,7 +91,10 @@ namespace moho
     offsetof(CUnitCallTransport, mHasBeamupDestination) == 0x38,
     "CUnitCallTransport::mHasBeamupDestination offset must be 0x38"
   );
-  static_assert(offsetof(CUnitCallTransport, mBeamupTime) == 0x3C, "CUnitCallTransport::mBeamupTime offset must be 0x3C");
+  static_assert(
+    offsetof(CUnitCallTransport, mBeamupTime) == 0x3C,
+    "CUnitCallTransport::mBeamupTime offset must be 0x3C"
+  );
   static_assert(
     offsetof(CUnitCallTransport, mSourceTransform) == 0x40,
     "CUnitCallTransport::mSourceTransform offset must be 0x40"

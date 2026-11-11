@@ -16,12 +16,19 @@ namespace
     return sInstance;
   }
 
-  struct Bootstrap { Bootstrap() { register_voidTypeInfoStartup(); } };
+  struct Bootstrap
+  {
+    Bootstrap()
+    {
+      register_voidTypeInfoStartup();
+    }
+  };
   Bootstrap gBootstrap;
-}
+} // namespace
 
 /** Address: 0x008DF9E0 */
-voidTypeInfo::voidTypeInfo() : gpg::RType()
+voidTypeInfo::voidTypeInfo()
+  : gpg::RType()
 {
   gpg::PreRegisterRType(typeid(void), this);
 }
@@ -29,7 +36,10 @@ voidTypeInfo::voidTypeInfo() : gpg::RType()
 voidTypeInfo::~voidTypeInfo() = default;
 
 /** Address: 0x008DFA60 */
-const char* voidTypeInfo::GetName() const { return "void"; }
+const char* voidTypeInfo::GetName() const
+{
+  return "void";
+}
 
 /** Address: 0x008DFA50 */
 void voidTypeInfo::Init()
@@ -45,7 +55,9 @@ void register_voidTypeInfoStartup()
   (void)Acquire();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_voidTypeInfoStartup_e05f0b, register_voidTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_voidTypeInfoStartup_e05f0b,
+  register_voidTypeInfoStartup
+)

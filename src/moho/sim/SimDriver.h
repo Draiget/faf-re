@@ -52,9 +52,6 @@ namespace moho
   class CSimResources;
   class CDebugCanvas;
 
-
-
-
   /**
    * One replicated unit-variable update record queued by the `Unit` /
    * `ReconBlip` overrides of `SyncInterface` (FUN_006AC3A0 / FUN_005BEFB0) onto
@@ -99,8 +96,8 @@ namespace moho
    */
   struct SEntityPoseUpdateEntry
   {
-    EntId mEntityId = 0;                  // +0x00
-    boost::shared_ptr<CAniPose> mPose;    // +0x04
+    EntId mEntityId = 0;               // +0x00
+    boost::shared_ptr<CAniPose> mPose; // +0x04
   };
 
   /**
@@ -122,11 +119,14 @@ namespace moho
 
   struct SSyncPublishedCommandPacket
   {
-    CmdId commandId = 0;                       // +0x00
-    std::int32_t reserved = 0;                 // +0x04
-    SSTICommandVariableData variableData{};    // +0x08
+    CmdId commandId = 0;                    // +0x00
+    std::int32_t reserved = 0;              // +0x04
+    SSTICommandVariableData variableData{}; // +0x08
   };
-  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SSyncPublishedCommandPacket) == 0x78, "SSyncPublishedCommandPacket size must be 0x78");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    sizeof(SSyncPublishedCommandPacket) == 0x78,
+    "SSyncPublishedCommandPacket size must be 0x78"
+  );
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SSyncPublishedCommandPacket, variableData) == 0x08,
     "SSyncPublishedCommandPacket::variableData offset must be 0x08"
@@ -141,25 +141,28 @@ namespace moho
    */
   struct SCreateUnitConstantData
   {
-    std::uint8_t mBuildStateTag = 0;                  // +0x00
-    std::uint8_t pad_01_03[0x03]{};                   // +0x01
-    boost::shared_ptr<Stats<StatItem>> mStatsRoot;    // +0x04
-    std::uint8_t mFake = 0;                           // +0x0C
-    std::uint8_t pad_0D_0F[0x03]{};                   // +0x0D
+    std::uint8_t mBuildStateTag = 0;               // +0x00
+    std::uint8_t pad_01_03[0x03]{};                // +0x01
+    boost::shared_ptr<Stats<StatItem>> mStatsRoot; // +0x04
+    std::uint8_t mFake = 0;                        // +0x0C
+    std::uint8_t pad_0D_0F[0x03]{};                // +0x0D
   };
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SCreateUnitConstantData) == 0x10, "SCreateUnitConstantData size must be 0x10");
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SCreateUnitConstantData, mStatsRoot) == 0x04,
     "SCreateUnitConstantData::mStatsRoot offset must be 0x04"
   );
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SCreateUnitConstantData, mFake) == 0x0C, "SCreateUnitConstantData::mFake offset must be 0x0C");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SCreateUnitConstantData, mFake) == 0x0C,
+    "SCreateUnitConstantData::mFake offset must be 0x0C"
+  );
 
   /**
    * One unit/recon create packet queued by `Entity::CreateInterface` overrides.
    */
   struct SCreateUnitParams : SCreateEntityParams
   {
-    SCreateUnitConstantData mConstDat{};          // +0x0C
+    SCreateUnitConstantData mConstDat{}; // +0x0C
   };
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SCreateUnitParams) == 0x1C, "SCreateUnitParams size must be 0x1C");
   FAF_RUNTIME_LAYOUT_ASSERT(
@@ -191,16 +194,14 @@ namespace moho
      * moho/entity/SSTIEntityVariableData.cpp (RULE ONE), removed 2026-09-22.)
      */
     EntId mEntityId = static_cast<EntId>(0xF0000000u); // +0x00, EEntityIdSentinel::Invalid
-    std::uint32_t mReserved04 = 0;             // +0x04
-    SSTIEntityVariableData mVariableData{};    // +0x08
+    std::uint32_t mReserved04 = 0;                     // +0x04
+    SSTIEntityVariableData mVariableData{};            // +0x08
   };
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SEntityVariableUpdateEntry, mVariableData) == 0x08,
     "SEntityVariableUpdateEntry::mVariableData offset must be 0x08"
   );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    sizeof(SEntityVariableUpdateEntry) == 0xD8, "SEntityVariableUpdateEntry size must be 0xD8"
-  );
+  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SEntityVariableUpdateEntry) == 0xD8, "SEntityVariableUpdateEntry size must be 0xD8");
 
   /**
    * How many elements the last beat's packet carried in each of its five
@@ -224,41 +225,41 @@ namespace moho
    */
   struct SSyncData
   {
-    int32_t mCurBeat = 0;                                   // +0x000
-    int32_t mFocusArmy = -1;                                // +0x004
-    int32_t mCurTick = 0;                                   // +0x008
-    bool mAdvanced = false;                                 // +0x00C
-    std::uint8_t pad_000D_0010[0x03]{};                     // +0x00D
-    gpg::Stream* mStream = nullptr;                         // +0x010
-    std::uint8_t pad_0014_0018[0x04]{};                     // +0x014
+    int32_t mCurBeat = 0;               // +0x000
+    int32_t mFocusArmy = -1;            // +0x004
+    int32_t mCurTick = 0;               // +0x008
+    bool mAdvanced = false;             // +0x00C
+    std::uint8_t pad_000D_0010[0x03]{}; // +0x00D
+    gpg::Stream* mStream = nullptr;     // +0x010
+    std::uint8_t pad_0014_0018[0x04]{}; // +0x014
     /// Inline audio-request queue handed straight to
     /// `IUserSoundManager::UpdateSoundRequests`. 0x10 of vector head plus
     /// eight inline 0x1C-byte requests is the whole 0xF0.
     gpg::core::FastVectorN<SAudioRequest, 8> mAudioRequests; // +0x018
-    fa::vector<SSTIArmyConstantData> mNewGrids;          // +0x108
-    fa::vector<SSTIArmyVariableData> mArmyUpdates;       // +0x118
-    fa::vector<SCreateEntityParams> mNewEntities;        // +0x128
-    fa::vector<SCreateUnitParams> mNewUnits;             // +0x138
-    fa::vector<SEntityVariableUpdateEntry> mEntityUpdates; // +0x148
-    fa::vector<SUnitVariableUpdateEntry> mUnitUpdates;   // +0x158
-    fa::vector<EntId> mDeleteIds;                        // +0x168
-    fa::vector<EntId> mEraseIds;                         // +0x178
+    fa::vector<SSTIArmyConstantData> mNewGrids;              // +0x108
+    fa::vector<SSTIArmyVariableData> mArmyUpdates;           // +0x118
+    fa::vector<SCreateEntityParams> mNewEntities;            // +0x128
+    fa::vector<SCreateUnitParams> mNewUnits;                 // +0x138
+    fa::vector<SEntityVariableUpdateEntry> mEntityUpdates;   // +0x148
+    fa::vector<SUnitVariableUpdateEntry> mUnitUpdates;       // +0x158
+    fa::vector<EntId> mDeleteIds;                            // +0x168
+    fa::vector<EntId> mEraseIds;                             // +0x178
     /// Consumed by `CWldSession::DoBeat` as the new-command run (60-byte records).
     fa::vector<SSTICommandConstantData> mPublishedCommandDescriptors; // +0x188
     /// Consumed by `CWldSession::DoBeat` as the command-update run (120-byte records).
     fa::vector<SSyncPublishedCommandPacket> mPublishedCommandPackets; // +0x198
     /// Consumed by `CWldSession::DoBeat` as the delete-command id run.
-    fa::vector<CmdId> mPendingCommandEventRemovals;      // +0x1A8
+    fa::vector<CmdId> mPendingCommandEventRemovals; // +0x1A8
     /// Consumed by `CWldSession::DoBeat` as the erase-command id run.
-    fa::vector<CmdId> mPendingReleasedCommandIds;        // +0x1B8
-    boost::shared_ptr<void> mParticleBuffer;                // +0x1C8
+    fa::vector<CmdId> mPendingReleasedCommandIds; // +0x1B8
+    boost::shared_ptr<void> mParticleBuffer;      // +0x1C8
     /// Handed straight to `CDecalManager::AddDecals` / `RemoveDecals` by
     /// `CWldSession::DoBeat`; the removal run carries decal handles, not
     /// entity ids.
-    fa::vector<SDecalInfo> mAddDecals;                   // +0x1D0
-    fa::vector<std::uint32_t> mRemoveDecals;             // +0x1E0
-    fa::vector<SCamShakeParams> mCamShakeParams;         // +0x1F0
-    fa::vector<SCamFollowParams> mFollowCameras;         // +0x200
+    fa::vector<SDecalInfo> mAddDecals;           // +0x1D0
+    fa::vector<std::uint32_t> mRemoveDecals;     // +0x1E0
+    fa::vector<SCamShakeParams> mCamShakeParams; // +0x1F0
+    fa::vector<SCamFollowParams> mFollowCameras; // +0x200
     /// Allied-upgrade notifications for this beat. `Sim::Sync` swaps
     /// `Sim::mAllyUpgradeNotifications` (`Sim+0x09D8`) into this lane at
     /// 0x00747A60 -- `[ebx+9DCh/9E0h/9E4h]` against `[eax+214h/218h/21Ch]`.
@@ -267,27 +268,27 @@ namespace moho
     /// pinned by the swap's source, which is a
     /// `fa::vector<SUpgradeNotifyPair>`.
     fa::vector<SUpgradeNotifyPair> mAllyUpgradeNotifications; // +0x210
-    fa::vector<SEntityPoseUpdateEntry> mPoseUpdates;     // +0x220
-    fa::vector<gpg::Rect2i> mPlayableRectUpdates;        // +0x230
-    fa::vector<SDesyncInfo> mDesyncs;                    // +0x240
-    int32_t mPausedBy = -1;                                 // +0x250
-    fa::string mSubmitArmyStats;                         // +0x254
-    bool mGameOver = false;                                 // +0x270
-    bool mFogOfWar = false;                                 // +0x271
-    std::uint8_t pad_0272_0274[0x02]{};                     // +0x272
-    boost::SharedPtrRaw<CHeightField> mTerrainUpdate;       // +0x274
-    boost::SharedPtrRaw<CSimResources> mSimResources;       // +0x27C
-    fa::vector<fa::string> mPrintField;               // +0x284
+    fa::vector<SEntityPoseUpdateEntry> mPoseUpdates;          // +0x220
+    fa::vector<gpg::Rect2i> mPlayableRectUpdates;             // +0x230
+    fa::vector<SDesyncInfo> mDesyncs;                         // +0x240
+    int32_t mPausedBy = -1;                                   // +0x250
+    fa::string mSubmitArmyStats;                              // +0x254
+    bool mGameOver = false;                                   // +0x270
+    bool mFogOfWar = false;                                   // +0x271
+    std::uint8_t pad_0272_0274[0x02]{};                       // +0x272
+    boost::SharedPtrRaw<CHeightField> mTerrainUpdate;         // +0x274
+    boost::SharedPtrRaw<CSimResources> mSimResources;         // +0x27C
+    fa::vector<fa::string> mPrintField;                       // +0x284
     /// Copied wholesale onto `CWldSession::mSyncExtraUnitData` by
     /// `CWldSession::DoBeat` via `fa::vector<SExtraUnitData>::operator=`
     /// (0x00895214, FUN_007530C0, `legacy/containers/Vector.h`). Previously
     /// mistyped `fa::vector<SyncInlineVector>`; see the field-level note
     /// on `CWldSession::mSyncExtraUnitData` (`CWldSession.h`) for the full
     /// citation-correction evidence.
-    fa::vector<SExtraUnitData> mSyncExtraUnitData;  // +0x294
-    boost::SharedPtrRaw<CDebugCanvas> mTickDebugCanvas;     // +0x2A4
-    boost::SharedPtrRaw<CDebugCanvas> mBeatDebugCanvas;     // +0x2AC
-    std::uint8_t pad_02B4_02B8[0x04]{};                     // +0x2B4
+    fa::vector<SExtraUnitData> mSyncExtraUnitData;      // +0x294
+    boost::SharedPtrRaw<CDebugCanvas> mTickDebugCanvas; // +0x2A4
+    boost::SharedPtrRaw<CDebugCanvas> mBeatDebugCanvas; // +0x2AC
+    std::uint8_t pad_02B4_02B8[0x04]{};                 // +0x2B4
 
     /**
      * Address: 0x00748370 (FUN_00748370, ??0SSyncData@Moho@@QAE@@Z)
@@ -375,58 +376,34 @@ namespace moho
     offsetof(SSyncData, mPendingReleasedCommandIds) == 0x1B8,
     "SSyncData::mPendingReleasedCommandIds offset must be 0x1B8"
   );
-  static_assert(
-    offsetof(SSyncData, mParticleBuffer) == 0x1C8, "SSyncData::mParticleBuffer offset must be 0x1C8"
-  );
+  static_assert(offsetof(SSyncData, mParticleBuffer) == 0x1C8, "SSyncData::mParticleBuffer offset must be 0x1C8");
   static_assert(offsetof(SSyncData, mAddDecals) == 0x1D0, "SSyncData::mAddDecals offset must be 0x1D0");
   static_assert(offsetof(SSyncData, mRemoveDecals) == 0x1E0, "SSyncData::mRemoveDecals offset must be 0x1E0");
-  static_assert(
-    offsetof(SSyncData, mCamShakeParams) == 0x1F0, "SSyncData::mCamShakeParams offset must be 0x1F0"
-  );
-  static_assert(
-    offsetof(SSyncData, mFollowCameras) == 0x200, "SSyncData::mFollowCameras offset must be 0x200"
-  );
+  static_assert(offsetof(SSyncData, mCamShakeParams) == 0x1F0, "SSyncData::mCamShakeParams offset must be 0x1F0");
+  static_assert(offsetof(SSyncData, mFollowCameras) == 0x200, "SSyncData::mFollowCameras offset must be 0x200");
   static_assert(offsetof(SSyncData, mPoseUpdates) == 0x220, "SSyncData::mPoseUpdates offset must be 0x220");
   static_assert(
-    offsetof(SSyncData, mPlayableRectUpdates) == 0x230, "SSyncData::mPlayableRectUpdates offset must be 0x230"
+    offsetof(SSyncData, mPlayableRectUpdates) == 0x230,
+    "SSyncData::mPlayableRectUpdates offset must be 0x230"
   );
   static_assert(offsetof(SSyncData, mDesyncs) == 0x240, "SSyncData::mDesyncs offset must be 0x240");
   static_assert(offsetof(SSyncData, mPausedBy) == 0x250, "SSyncData::mPausedBy offset must be 0x250");
-  static_assert(
-    offsetof(SSyncData, mSubmitArmyStats) == 0x254, "SSyncData::mSubmitArmyStats offset must be 0x254"
-  );
+  static_assert(offsetof(SSyncData, mSubmitArmyStats) == 0x254, "SSyncData::mSubmitArmyStats offset must be 0x254");
   static_assert(offsetof(SSyncData, mGameOver) == 0x270, "SSyncData::mGameOver offset must be 0x270");
   static_assert(offsetof(SSyncData, mFogOfWar) == 0x271, "SSyncData::mFogOfWar offset must be 0x271");
-  static_assert(
-    offsetof(SSyncData, mTerrainUpdate) == 0x274, "SSyncData::mTerrainUpdate offset must be 0x274"
-  );
-  static_assert(
-    offsetof(SSyncData, mSimResources) == 0x27C, "SSyncData::mSimResources offset must be 0x27C"
-  );
+  static_assert(offsetof(SSyncData, mTerrainUpdate) == 0x274, "SSyncData::mTerrainUpdate offset must be 0x274");
+  static_assert(offsetof(SSyncData, mSimResources) == 0x27C, "SSyncData::mSimResources offset must be 0x27C");
   static_assert(offsetof(SSyncData, mPrintField) == 0x284, "SSyncData::mPrintField offset must be 0x284");
-  static_assert(
-    offsetof(SSyncData, mTickDebugCanvas) == 0x2A4, "SSyncData::mTickDebugCanvas offset must be 0x2A4"
-  );
-  static_assert(
-    offsetof(SSyncData, mBeatDebugCanvas) == 0x2AC, "SSyncData::mBeatDebugCanvas offset must be 0x2AC"
-  );
+  static_assert(offsetof(SSyncData, mTickDebugCanvas) == 0x2A4, "SSyncData::mTickDebugCanvas offset must be 0x2A4");
+  static_assert(offsetof(SSyncData, mBeatDebugCanvas) == 0x2AC, "SSyncData::mBeatDebugCanvas offset must be 0x2AC");
   static_assert(sizeof(SSyncData) == 0x2B8, "SSyncData size must be 0x2B8");
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SSyncData, mEntityUpdates) == 0x148,
     "SSyncData::mEntityUpdates offset must be 0x148"
   );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SSyncData, mUnitUpdates) == 0x158,
-    "SSyncData::mUnitUpdates offset must be 0x158"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SSyncData, mDeleteIds) == 0x168,
-    "SSyncData::mDeleteIds offset must be 0x168"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(SSyncData, mEraseIds) == 0x178,
-    "SSyncData::mEraseIds offset must be 0x178"
-  );
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SSyncData, mUnitUpdates) == 0x158, "SSyncData::mUnitUpdates offset must be 0x158");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SSyncData, mDeleteIds) == 0x168, "SSyncData::mDeleteIds offset must be 0x168");
+  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SSyncData, mEraseIds) == 0x178, "SSyncData::mEraseIds offset must be 0x178");
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(SSyncData, mPublishedCommandDescriptors) == 0x188,
     "SSyncData::mPublishedCommandDescriptors offset must be 0x188"
@@ -451,7 +428,6 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SSyncData, mGameOver) == 0x270, "SSyncData::mGameOver offset must be 0x270");
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SSyncData) == 0x2B8, "SSyncData size must be 0x2B8");
 
-
   /**
    * Address: 0x005C38E0 (FUN_005C38E0)
    *
@@ -471,8 +447,8 @@ namespace moho
    * to the stored element. Mirrors the binary's push-default / write-id /
    * `SSTIEntityVariableData::operator=` sequence at 0x0067A35B..0x0067A3B5.
    */
-  SEntityVariableUpdateEntry* QueueEntityVariableUpdate(
-    SSyncData* syncData, EntId entityId, const SSTIEntityVariableData& variableData);
+  SEntityVariableUpdateEntry*
+  QueueEntityVariableUpdate(SSyncData* syncData, EntId entityId, const SSTIEntityVariableData& variableData);
 
   /**
    * Address: 0x005C39A0 (FUN_005C39A0, mUnitUpdates push-default lane) + the
@@ -488,8 +464,8 @@ namespace moho
    * by the caller afterward, exactly as the binary does. Mirrors
    * `QueueEntityVariableUpdate`.
    */
-  SUnitVariableUpdateEntry* QueueUnitVariableUpdate(
-    SSyncData* syncData, EntId entityId, const SSTIUnitVariableData& variableData);
+  SUnitVariableUpdateEntry*
+  QueueUnitVariableUpdate(SSyncData* syncData, EntId entityId, const SSTIUnitVariableData& variableData);
 
   /**
    * Sets the trailing recon-flag word (`SUnitVariableUpdateEntry::mReconFlags`,
@@ -526,7 +502,10 @@ namespace moho
     ~SSyncDataQueue();
 
     bool Empty() const;
-    [[nodiscard]] uint32_t Size() const noexcept { return static_cast<uint32_t>(mSyncdat.size()); }
+    [[nodiscard]] uint32_t Size() const noexcept
+    {
+      return static_cast<uint32_t>(mSyncdat.size());
+    }
     void PushBack(SSyncData* data);
     SSyncData* PopFront();
 
@@ -737,7 +716,9 @@ namespace moho
      * Address: 0x0073CC10 (FUN_0073CC10)
      */
     CmdId IssueFactoryCommand(
-      const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& data, bool clear
+      const BVSet<EntId, EntIdUniverse>& entities,
+      const SSTICommandIssueData& data,
+      bool clear
     ) override;
     /**
      * Address: 0x0073CCB0 (FUN_0073CCB0)
@@ -759,7 +740,9 @@ namespace moho
      * Address: 0x0073CF30 (FUN_0073CF30)
      */
     CmdId SetCommandCells(
-      CmdId id, const gpg::core::FastVector<SOCellPos>& cells, const Wm3::Vector3<float>& target
+      CmdId id,
+      const gpg::core::FastVector<SOCellPos>& cells,
+      const Wm3::Vector3<float>& target
     ) override;
     /**
      * Address: 0x0073CFD0 (FUN_0073CFD0)
@@ -773,7 +756,9 @@ namespace moho
      * Address: 0x0073D110 (FUN_0073D110)
      */
     CmdId LuaSimCallback(
-      const char* fnName, const LuaPlus::LuaObject& args, const BVSet<EntId, EntIdUniverse>& entities
+      const char* fnName,
+      const LuaPlus::LuaObject& args,
+      const BVSet<EntId, EntIdUniverse>& entities
     ) override;
     /**
      * Address: 0x0073D1B0 (FUN_0073D1B0)
@@ -816,15 +801,27 @@ namespace moho
     DWORD PerformNextEvent();
 
     // ---- diagnostics-only readouts (crash report section; no behaviour) ----
-    [[nodiscard]] int32_t DiagDispatchBeat() const { return mDispatchBeat; }
-    [[nodiscard]] int32_t DiagNextIssueBeat() const { return mNextIssueBeat; }
-    [[nodiscard]] EDriverState DiagDriverState() const { return mState; }
+    [[nodiscard]] int32_t DiagDispatchBeat() const
+    {
+      return mDispatchBeat;
+    }
+    [[nodiscard]] int32_t DiagNextIssueBeat() const
+    {
+      return mNextIssueBeat;
+    }
+    [[nodiscard]] EDriverState DiagDriverState() const
+    {
+      return mState;
+    }
 
     /// Engine addition (headless, plan WPR.12): the sim, read-only. headless reads a beat's
     /// checksum from `Sim::mSimHashes` after taking that beat's packet off the queue; the sim
     /// wrote it before queueing the packet and rewrites the slot only 128 beats later. Inline
     /// and unused by the client: no layout or code change in main.
-    [[nodiscard]] const Sim* GetSimForReplayCheck() const noexcept { return mSim.get(); }
+    [[nodiscard]] const Sim* GetSimForReplayCheck() const noexcept
+    {
+      return mSim.get();
+    }
 
   private:
     /**
@@ -911,26 +908,26 @@ namespace moho
     // client manager, sim. The constructor's unwind funclets (0x00BBB908..
     // 0x00BBB945) destroy the same members through their smart-pointer
     // destructors when a later initialiser throws.
-    boost::scoped_ptr<Sim> mSim;                          // +0x04
-    fa::auto_ptr<CClientManagerImpl> mClientManager;   // +0x08
-    fa::auto_ptr<gpg::Stream> mStream;                 // +0x0C
-    boost::shared_ptr<LaunchInfoBase> mLaunchInfo;        // +0x10
-    uint32_t mCommandSourceId = 0;                 // +0x18
-    int32_t mLastDequeuedBeat = -1;                // +0x1C
-    int32_t mDispatchBeat = 1;                     // +0x20
+    boost::scoped_ptr<Sim> mSim;                     // +0x04
+    fa::auto_ptr<CClientManagerImpl> mClientManager; // +0x08
+    fa::auto_ptr<gpg::Stream> mStream;               // +0x0C
+    boost::shared_ptr<LaunchInfoBase> mLaunchInfo;   // +0x10
+    uint32_t mCommandSourceId = 0;                   // +0x18
+    int32_t mLastDequeuedBeat = -1;                  // +0x1C
+    int32_t mDispatchBeat = 1;                       // +0x20
     // The next beat the issue thread will hand to the marshaller. The command
     // methods hand this same number back to their caller as the "cookie" for
     // the command they just issued - it is the beat that command lands on.
-    int32_t mNextIssueBeat = 1;                    // +0x24
-    boost::scoped_ptr<CMarshaller> mMarshaller;    // +0x28
-    boost::scoped_ptr<CDecoder> mDecoder;          // +0x2C
+    int32_t mNextIssueBeat = 1;                 // +0x24
+    boost::scoped_ptr<CMarshaller> mMarshaller; // +0x28
+    boost::scoped_ptr<CDecoder> mDecoder;       // +0x2C
     // Constructed and destroyed in place: `boost::mutex::mutex` at 0x0073B5F0,
     // `~mutex` at 0x0073BB1A, both on `this+0x30`.
-    boost::mutex mLock;                            // +0x30
-    boost::thread* mSimThread = nullptr;           // +0x38
-    int32_t mOutstandingRequests = 1;              // +0x3C
-    gpg::time::Timer mTimer;                       // +0x40
-    HANDLE mConnectionEvent = nullptr;             // +0x48
+    boost::mutex mLock;                  // +0x30
+    boost::thread* mSimThread = nullptr; // +0x38
+    int32_t mOutstandingRequests = 1;    // +0x3C
+    gpg::time::Timer mTimer;             // +0x40
+    HANDLE mConnectionEvent = nullptr;   // +0x48
     // +0x4C..+0x4F: compiler-inserted alignment before 8-byte cycle timestamp.
     int64_t mLastSyncCycleTime = 0; // +0x50
     bool mStopSimThread = false;    // +0x58
@@ -947,17 +944,17 @@ namespace moho
     HANDLE mSyncDataAvailableEvent = nullptr;    // +0xA4
     bool mInterlockedMode = false;               // +0xA8
     // +0xA9..+0xAB: compiler-inserted alignment before int32.
-    int32_t mInterlockRefCount = 0;                   // +0xAC
-    SSyncFilter mPendingSyncFilter;                   // +0xB0
-    SSyncFilter mActiveSyncFilter;                    // +0x120
+    int32_t mInterlockRefCount = 0;           // +0xAC
+    SSyncFilter mPendingSyncFilter;           // +0xB0
+    SSyncFilter mActiveSyncFilter;            // +0x120
     ISaveRequest* mSaveGameRequest = nullptr; // +0x190
-    bool mWantsToSave = false;                        // +0x194
+    bool mWantsToSave = false;                // +0x194
     // +0x195..+0x197: compiler-inserted alignment before 4-byte aligned flag group.
     alignas(4) bool mSaveRequestUsesSuggestedName = false; // +0x198
     // +0x199..+0x19B: compiler-inserted alignment before string.
-    fa::string mPendingSaveName; // +0x19C
-    NetSpeeds mSimSpeedSamples;     // +0x1B8
-    int32_t mCurrentSimRate = 10;   // +0x228
+    fa::string mPendingSaveName;  // +0x19C
+    NetSpeeds mSimSpeedSamples;   // +0x1B8
+    int32_t mCurrentSimRate = 10; // +0x228
   };
 
   struct CSimDriverLayoutAssertions
@@ -967,12 +964,21 @@ namespace moho
     FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mMarshaller) == 0x28, "mMarshaller offset mismatch");
     FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mLastSyncCycleTime) == 0x50, "mLastSyncCycleTime offset mismatch");
     FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mStopSimThread) == 0x58, "mStopSimThread offset mismatch");
-    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mFirstCommandCycleTime) == 0x60, "mFirstCommandCycleTime offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(
+      offsetof(CSimDriver, mFirstCommandCycleTime) == 0x60,
+      "mFirstCommandCycleTime offset mismatch"
+    );
     FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mSimBusy) == 0x68, "mSimBusy offset mismatch");
     FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mCreateSimThread) == 0x6C, "mCreateSimThread offset mismatch");
-    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mStopCreateSimThread) == 0x70, "mStopCreateSimThread offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(
+      offsetof(CSimDriver, mStopCreateSimThread) == 0x70,
+      "mStopCreateSimThread offset mismatch"
+    );
     FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mState) == 0x8C, "mState offset mismatch");
-    FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mSyncDataAvailableEvent) == 0xA4, "mSyncDataAvailableEvent offset mismatch");
+    FAF_RUNTIME_LAYOUT_ASSERT(
+      offsetof(CSimDriver, mSyncDataAvailableEvent) == 0xA4,
+      "mSyncDataAvailableEvent offset mismatch"
+    );
     FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mInterlockedMode) == 0xA8, "mInterlockedMode offset mismatch");
     FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mInterlockRefCount) == 0xAC, "mInterlockRefCount offset mismatch");
     FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mPendingSyncFilter) == 0xB0, "mPendingSyncFilter offset mismatch");
@@ -980,7 +986,8 @@ namespace moho
     FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mSaveGameRequest) == 0x190, "mSaveGameRequest offset mismatch");
     FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mWantsToSave) == 0x194, "mWantsToSave offset mismatch");
     FAF_RUNTIME_LAYOUT_ASSERT(
-      offsetof(CSimDriver, mSaveRequestUsesSuggestedName) == 0x198, "mSaveRequestUsesSuggestedName offset mismatch"
+      offsetof(CSimDriver, mSaveRequestUsesSuggestedName) == 0x198,
+      "mSaveRequestUsesSuggestedName offset mismatch"
     );
     FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mPendingSaveName) == 0x19C, "mPendingSaveName offset mismatch");
     FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CSimDriver, mSimSpeedSamples) == 0x1B8, "mSimSpeedSamples offset mismatch");
@@ -1093,9 +1100,8 @@ namespace moho
    * CSimDriver::DrawNetworkStats. moho/sim/SimDriverNetworkStats.cpp (client) sets it during
    * static initialisation; without a client there is nothing to draw on.
    */
-  using SimDriverNetworkStatsDrawHook = void (*)(
-    CSimDriver& driver, CD3DPrimBatcher* batcher, float anchorX, float anchorY, float scaleX, float scaleY
-  );
+  using SimDriverNetworkStatsDrawHook =
+    void (*)(CSimDriver& driver, CD3DPrimBatcher* batcher, float anchorX, float anchorY, float scaleX, float scaleY);
   extern SimDriverNetworkStatsDrawHook sSimDriverNetworkStatsDraw;
 
 } // namespace moho

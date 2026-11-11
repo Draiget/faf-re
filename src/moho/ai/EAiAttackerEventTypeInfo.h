@@ -51,7 +51,6 @@ namespace moho
     void AddEnums();
   };
 
-
   /**
    * Address: 0x00BCE750 (FUN_00BCE750, sub_BCE750)
    *

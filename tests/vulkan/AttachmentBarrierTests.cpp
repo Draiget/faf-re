@@ -25,9 +25,13 @@ namespace
 #endif
   }
 
-  class VulkanAttachmentBarrier : public testing::TestWithParam<AttachmentCase> {};
+  class VulkanAttachmentBarrier : public testing::TestWithParam<AttachmentCase>
+  {};
 
-  TEST_P(VulkanAttachmentBarrier, AttachmentWritesBecomeVisibleToReadsAndWrites)
+  TEST_P(
+    VulkanAttachmentBarrier,
+    AttachmentWritesBecomeVisibleToReadsAndWrites
+  )
   {
     const auto& c = GetParam();
     const auto barrier = gpg::gal::vulkan::AttachmentWriteBarrier(TestImage(), c.layout, c.aspect);
@@ -37,7 +41,10 @@ namespace
     EXPECT_EQ(barrier.dstAccessMask, c.read | c.write);
   }
 
-  TEST_P(VulkanAttachmentBarrier, KeepsLayoutAndCurrentAttachmentSubresource)
+  TEST_P(
+    VulkanAttachmentBarrier,
+    KeepsLayoutAndCurrentAttachmentSubresource
+  )
   {
     const auto& c = GetParam();
     const auto image = TestImage();
@@ -57,16 +64,30 @@ namespace
   }
 
   INSTANTIATE_TEST_SUITE_P(
-    ColorDepthStencil, VulkanAttachmentBarrier,
+    ColorDepthStencil,
+    VulkanAttachmentBarrier,
     testing::Values(
-      AttachmentCase{VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT,
-                     VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                     VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT},
-      AttachmentCase{VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT,
-                     VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-                     VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT},
-      AttachmentCase{VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                     VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
-                     VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-                     VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT}));
-}
+      AttachmentCase{
+        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
+        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
+      },
+      AttachmentCase{
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        VK_IMAGE_ASPECT_DEPTH_BIT,
+        VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+        VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+        VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+      },
+      AttachmentCase{
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
+        VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+        VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+        VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+      }
+    )
+  );
+} // namespace

@@ -20,12 +20,16 @@
 
 namespace
 {
-  std::string Str(const fa::string& value)
+  std::string Str(
+    const fa::string& value
+  )
   {
     return value.c_str();
   }
 
-  std::string StateName(const moho::ENetworkPlayerState state)
+  std::string StateName(
+    const moho::ENetworkPlayerState state
+  )
   {
     fa::string out;
     moho::ENetworkPlayerStateToStr(state, out);
@@ -36,7 +40,10 @@ namespace
 // The ping ring (0x0048BEC0): 25 slots with one kept free, so it holds the newest 24 samples; Append returns 1 on
 // the write that wraps the ring. Median and jitter (0x0048BF00, 0x0048BF60) sort the held samples and take the
 // element at count / 2; jitter first takes each sample's distance from the center.
-TEST(NetCore, PingRingKeepsTheNewest24AndTakesTheMiddleElement)
+TEST(
+  NetCore,
+  PingRingKeepsTheNewest24AndTakesTheMiddleElement
+)
 {
   moho::NetSpeeds speeds;
   int wraps = 0;
@@ -57,12 +64,15 @@ TEST(NetCore, PingRingKeepsTheNewest24AndTakesTheMiddleElement)
   for (const float sample : {40.0f, 10.0f, 30.0f, 20.0f}) {
     (void)even.Append(sample);
   }
-  EXPECT_EQ(even.Median(), 30.0f); // sorted 10 20 30 40, element 2: the upper middle
+  EXPECT_EQ(even.Median(), 30.0f);      // sorted 10 20 30 40, element 2: the upper middle
   EXPECT_EQ(even.Jitter(25.0f), 15.0f); // 15 5 5 15 sorted 5 5 15 15, element 2
 }
 
 // The player state names (table at 0x00DFEB14); a value past them prints as a number (0x007C0560).
-TEST(NetCore, PlayerStateNames)
+TEST(
+  NetCore,
+  PlayerStateNames
+)
 {
   using moho::ENetworkPlayerState;
   EXPECT_EQ(StateName(ENetworkPlayerState::kUnknown), "Unknown");
@@ -76,7 +86,10 @@ TEST(NetCore, PlayerStateNames)
 }
 
 // Protocol names both ways (0x0047EC90, 0x0047ED50): case-insensitive on the way in, domain_error for anything else.
-TEST(NetCore, ProtocolNamesRoundTrip)
+TEST(
+  NetCore,
+  ProtocolNamesRoundTrip
+)
 {
   using moho::ENetProtocolType;
   for (const ENetProtocolType protocol : {ENetProtocolType::kNone, ENetProtocolType::kTcp, ENetProtocolType::kUdp}) {
@@ -90,7 +103,10 @@ TEST(NetCore, ProtocolNamesRoundTrip)
 }
 
 // Dotted addresses (0x004801C0 "%d.%d.%d.%d", 0x00480200 folding each token in with acc << 8 | atoi).
-TEST(NetCore, DottedAddressesRoundTrip)
+TEST(
+  NetCore,
+  DottedAddressesRoundTrip
+)
 {
   EXPECT_EQ(Str(moho::NET_GetDottedOctetFromUInt32(0xC0A80102u)), "192.168.1.2");
   EXPECT_EQ(Str(moho::NET_GetDottedOctetFromUInt32(0u)), "0.0.0.0");
@@ -103,10 +119,13 @@ TEST(NetCore, DottedAddressesRoundTrip)
 
 // The peer features announcement: kind 0, a format byte, the mask, then this build's name; anything shorter or of
 // another kind is not one.
-TEST(NetCore, PeerAnnouncementRoundTrips)
+TEST(
+  NetCore,
+  PeerAnnouncementRoundTrips
+)
 {
   const std::uint64_t mask = moho::PeerFeatureBit(moho::EPeerFeature::OrderStreamCheck) |
-                             moho::PeerFeatureBit(moho::EPeerFeature::Rejoin) | (std::uint64_t{1} << 63);
+    moho::PeerFeatureBit(moho::EPeerFeature::Rejoin) | (std::uint64_t{1} << 63);
   moho::CMessage message(moho::EClientMsg::CLIMSG_PeerFeatures);
   {
     moho::CMessageStream stream(message);
@@ -130,7 +149,10 @@ TEST(NetCore, PeerAnnouncementRoundTrips)
   EXPECT_EQ(read.build.size(), size - 11u);
 }
 
-TEST(NetCore, RejoinStageNames)
+TEST(
+  NetCore,
+  RejoinStageNames
+)
 {
   using moho::ERejoinStage;
   EXPECT_STREQ(moho::RejoinStageName(ERejoinStage::None), "");
@@ -143,7 +165,10 @@ TEST(NetCore, RejoinStageNames)
 
 // What a client knows of its peers before any announcement: no features, the seats it ejected found by address,
 // a rejoin's stage as noted, the first ready time kept, and no proof accepted from a seat whose key never came.
-TEST(NetCore, PeerBookkeepingWithoutAnnouncements)
+TEST(
+  NetCore,
+  PeerBookkeepingWithoutAnnouncements
+)
 {
   moho::CPeerFeatures peers(3u);
   EXPECT_FALSE(peers.PeerSupports(1, moho::EPeerFeature::Rejoin));
@@ -179,7 +204,10 @@ TEST(NetCore, PeerBookkeepingWithoutAnnouncements)
 // The seat key (issue #275). Run with `/rejoinkeyfile <file>` (ctest passes one in the build folder), so the test
 // never touches the key a real game keeps in the temp folder. A signature answers its own challenge, seat and peer
 // only, and a key read back from the file signs as the one made.
-TEST(NetCore, SeatKeySignsOnlyItsOwnChallenge)
+TEST(
+  NetCore,
+  SeatKeySignsOnlyItsOwnChallenge
+)
 {
   fa::vector<fa::string> args;
   if (!moho::CFG_GetArgOption("/rejoinkeyfile", 1, &args) || args.empty()) {

@@ -20,7 +20,13 @@ namespace faf::editor
    * words, square or of `expectWidth` x `expectHeight`; anything else (PNG, BMP, TIFF, ...) is read
    * through the Windows imaging component as 16-bit grey (an 8-bit image's values spread over 16 bits).
    */
-  bool ReadHeightImage(const std::filesystem::path& file, int expectWidth, int expectHeight, HeightImage& out, std::string& error);
+  bool ReadHeightImage(
+    const std::filesystem::path& file,
+    int expectWidth,
+    int expectHeight,
+    HeightImage& out,
+    std::string& error
+  );
 
   /** Writes a height image by its extension: `.raw` / `.r16` as 16-bit little-endian words, `.png` as 16-bit grey. */
   bool WriteHeightImage(const std::filesystem::path& file, const HeightImage& image, std::string& error);

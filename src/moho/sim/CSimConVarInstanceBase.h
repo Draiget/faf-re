@@ -20,19 +20,22 @@ namespace moho
 {
   namespace detail
   {
-    [[nodiscard]] inline bool ParseBoolToken(const std::string_view token, bool& outValue) noexcept
+    [[nodiscard]] inline bool ParseBoolToken(
+      const std::string_view token,
+      bool& outValue
+    ) noexcept
     {
       const char* const text = token.data();
       if (
-        token == "1" || gpg::STR_EqualsNoCase(text, "true") || gpg::STR_EqualsNoCase(text, "on")
-        || gpg::STR_EqualsNoCase(text, "yes")
+        token == "1" || gpg::STR_EqualsNoCase(text, "true") || gpg::STR_EqualsNoCase(text, "on") ||
+        gpg::STR_EqualsNoCase(text, "yes")
       ) {
         outValue = true;
         return true;
       }
       if (
-        token == "0" || gpg::STR_EqualsNoCase(text, "false") || gpg::STR_EqualsNoCase(text, "off")
-        || gpg::STR_EqualsNoCase(text, "no")
+        token == "0" || gpg::STR_EqualsNoCase(text, "false") || gpg::STR_EqualsNoCase(text, "off") ||
+        gpg::STR_EqualsNoCase(text, "no")
       ) {
         outValue = false;
         return true;
@@ -42,7 +45,10 @@ namespace moho
     }
 
     template <typename T>
-    [[nodiscard]] bool ParseSimConValue(const std::string& token, T& outValue)
+    [[nodiscard]] bool ParseSimConValue(
+      const std::string& token,
+      T& outValue
+    )
     {
       if constexpr (std::is_same_v<T, bool>) {
         bool parsed = false;
@@ -58,8 +64,10 @@ namespace moho
         if (endPtr == token.c_str() || (endPtr && *endPtr != '\0') || errno == ERANGE) {
           return false;
         }
-        if (parsed < static_cast<long>(std::numeric_limits<int>::min()) ||
-            parsed > static_cast<long>(std::numeric_limits<int>::max())) {
+        if (
+          parsed < static_cast<long>(std::numeric_limits<int>::min()) ||
+          parsed > static_cast<long>(std::numeric_limits<int>::max())
+        ) {
           return false;
         }
         outValue = static_cast<int>(parsed);
@@ -92,7 +100,10 @@ namespace moho
     }
 
     template <typename T>
-    void LogSimConValue(const char* const name, const T& value)
+    void LogSimConValue(
+      const char* const name,
+      const T& value
+    )
     {
       if constexpr (std::is_same_v<T, bool>) {
         gpg::Logf("bool %s == %s", name ? name : "", value ? "on" : "off");
@@ -199,7 +210,9 @@ namespace moho
   class TSimConVarInstance : public CSimConVarInstanceBase
   {
   public:
-    int HandleConsoleCommand(void* commandArgs) override
+    int HandleConsoleCommand(
+      void* commandArgs
+    ) override
     {
       auto* const args = static_cast<CSimConCommand::ParsedCommandArgs*>(commandArgs);
       if (args != nullptr && args->size() >= 2u) {
@@ -215,7 +228,9 @@ namespace moho
     }
 
     /**
-     * Address: 0x007359F0 (FUN_007359F0 -- `TSimConVarInstance<unsigned char>::GetValueStorage`, `lea eax,[ecx+8]; ret`; vtable 0x00E32B48 slot 2, that vtable written by 0x00735400 and 0x00735980; formerly `GetInlineLane08RuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x007359F0 (FUN_007359F0 -- `TSimConVarInstance<unsigned char>::GetValueStorage`, `lea eax,[ecx+8];
+     * ret`; vtable 0x00E32B48 slot 2, that vtable written by 0x00735400 and 0x00735980; formerly
+     * `GetInlineLane08RuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      *
      * What it does:
      * Returns the address of the typed value (`mValue`, +0x08).
@@ -225,7 +240,9 @@ namespace moho
       return &mValue;
     }
 
-    gpg::RRef* GetValueRef(gpg::RRef* outRef) override
+    gpg::RRef* GetValueRef(
+      gpg::RRef* outRef
+    ) override
     {
       if (!outRef) {
         return nullptr;
@@ -386,11 +403,16 @@ namespace moho
   ) noexcept;
 
   static_assert(
-    offsetof(TSimConVarInstance<bool>, mValue) == 0x08, "TSimConVarInstance<bool>::mValue offset must be 0x08"
+    offsetof(TSimConVarInstance<bool>, mValue) == 0x08,
+    "TSimConVarInstance<bool>::mValue offset must be 0x08"
   );
-  static_assert(offsetof(TSimConVarInstance<int>, mValue) == 0x08, "TSimConVarInstance<int>::mValue offset must be 0x08");
   static_assert(
-    offsetof(TSimConVarInstance<float>, mValue) == 0x08, "TSimConVarInstance<float>::mValue offset must be 0x08"
+    offsetof(TSimConVarInstance<int>, mValue) == 0x08,
+    "TSimConVarInstance<int>::mValue offset must be 0x08"
+  );
+  static_assert(
+    offsetof(TSimConVarInstance<float>, mValue) == 0x08,
+    "TSimConVarInstance<float>::mValue offset must be 0x08"
   );
   static_assert(
     offsetof(TSimConVarInstance<std::uint8_t>, mValue) == 0x08,

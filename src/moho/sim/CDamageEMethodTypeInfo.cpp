@@ -49,10 +49,14 @@ namespace moho
   /**
    * Address: 0x00738470 (FUN_00738470, Moho::CDamageEMethodTypeInfo::AddEnums)
    */
-  void CDamageEMethodTypeInfo::AddEnums(gpg::REnumType* const typeInfo)
+  void CDamageEMethodTypeInfo::AddEnums(
+    gpg::REnumType* const typeInfo
+  )
   {
     typeInfo->mPrefix = "CDamage::";
-    typeInfo->AddEnum(typeInfo->StripPrefix("CDamage::SINGLE_TARGET"), static_cast<std::int32_t>(CDamage_SINGLE_TARGET));
+    typeInfo->AddEnum(
+      typeInfo->StripPrefix("CDamage::SINGLE_TARGET"), static_cast<std::int32_t>(CDamage_SINGLE_TARGET)
+    );
     typeInfo->AddEnum(typeInfo->StripPrefix("CDamage::AREA_EFFECT"), static_cast<std::int32_t>(CDamage_AREA_EFFECT));
     typeInfo->AddEnum(typeInfo->StripPrefix("CDamage::RING_EFFECT"), static_cast<std::int32_t>(CDamage_RING_EFFECT));
   }
@@ -92,9 +96,14 @@ namespace
   [[maybe_unused]] CDamageEMethodTypeInfoBootstrap gCDamageEMethodTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CDamageEMethodTypeInfo_ca3e35, moho::register_CDamageEMethodTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CDamageEMethodTypeInfo_ca3e35,
+  moho::register_CDamageEMethodTypeInfo
+)
 
-GPG_PREREGISTER_INIT(preregister_CDamageEMethodTypeInfo_ca3e35, moho::preregister_CDamageEMethodTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_CDamageEMethodTypeInfo_ca3e35,
+  moho::preregister_CDamageEMethodTypeInfo
+)

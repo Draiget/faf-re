@@ -2,7 +2,9 @@
 // for operators and tests. Linux.
 //
 //   faf_server_control --server <ip:port> --key <file> --op <status|force_start|pause|resume|eject|allow|disallow>
-//                      [--uid <n>] [--reason <text>] [--address <a.b.c.d>] [--options <Key=Value,...>] [--results <army=victory|defeat|draw,...>] [--count <n>] [--token <text>] [--name <text>] [--watch <seconds>] [--wrong-key]
+//                      [--uid <n>] [--reason <text>] [--address <a.b.c.d>] [--options <Key=Value,...>] [--results
+//                      <army=victory|defeat|draw,...>] [--count <n>] [--token <text>] [--name <text>] [--watch
+//                      <seconds>] [--wrong-key]
 //
 // Prints the reply, then the events (the server's console lines) until --watch seconds have passed. --wrong-key flips
 // one bit of the key, to check the server refuses it. Exit: 0 the request was answered ok, 1 refused, 2 no
@@ -32,7 +34,11 @@ namespace
 {
   using faf::server::CControlChannel;
 
-  [[nodiscard]] bool ReadExactly(const int socket, std::uint8_t* out, std::size_t size)
+  [[nodiscard]] bool ReadExactly(
+    const int socket,
+    std::uint8_t* out,
+    std::size_t size
+  )
   {
     while (size > 0u) {
       const ssize_t got = ::recv(socket, out, size, 0);
@@ -45,7 +51,11 @@ namespace
     return true;
   }
 
-  [[nodiscard]] bool SendAll(const int socket, const std::uint8_t* data, std::size_t size)
+  [[nodiscard]] bool SendAll(
+    const int socket,
+    const std::uint8_t* data,
+    std::size_t size
+  )
   {
     while (size > 0u) {
       const ssize_t sent = ::send(socket, data, size, MSG_NOSIGNAL);
@@ -58,7 +68,9 @@ namespace
     return true;
   }
 
-  [[nodiscard]] std::string Quote(const std::string& text)
+  [[nodiscard]] std::string Quote(
+    const std::string& text
+  )
   {
     std::string out = "\"";
     for (const char c : text) {
@@ -71,7 +83,10 @@ namespace
   }
 } // namespace
 
-int main(int argc, char** argv)
+int main(
+  int argc,
+  char** argv
+)
 {
   std::string server;
   std::string keyPath;
@@ -131,8 +146,15 @@ int main(int argc, char** argv)
   std::ifstream keyFile(keyPath);
   std::stringstream keyText;
   keyText << keyFile.rdbuf();
-  if (op.empty() || !faf::remote::net::ParseEndpoint(server, at) || !keyFile || !faf::server::ReadControlKey(keyText.str(), key)) {
-    std::fprintf(stderr, "usage: faf_server_control --server <ip:port> --key <file> --op <op> [--uid n] [--reason text] [--watch s] [--wrong-key]\n");
+  if (
+    op.empty() || !faf::remote::net::ParseEndpoint(server, at) || !keyFile ||
+    !faf::server::ReadControlKey(keyText.str(), key)
+  ) {
+    std::fprintf(
+      stderr,
+      "usage: faf_server_control --server <ip:port> --key <file> --op <op> [--uid n] [--reason text] [--watch s] "
+      "[--wrong-key]\n"
+    );
     return 4;
   }
   if (wrongKey) {
@@ -192,7 +214,8 @@ int main(int argc, char** argv)
     request += ",\"name\":" + Quote(nameText);
   }
   request += "}";
-  const std::vector<std::uint8_t> frame = channel.Seal(std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(request.data()), request.size()));
+  const std::vector<std::uint8_t> frame =
+    channel.Seal(std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(request.data()), request.size()));
   if (!SendAll(socket, frame.data(), frame.size())) {
     std::printf("control: the request didn't go\n");
     return 2;

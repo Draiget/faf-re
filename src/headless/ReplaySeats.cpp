@@ -17,7 +17,9 @@ namespace faf::headless
   } // namespace
 
   CReplaySeatFeed::CReplaySeatFeed(
-    const moho::LaunchInfoBase& launchInfo, std::unique_ptr<gpg::Stream> recording, moho::CClientManagerImpl*& manager
+    const moho::LaunchInfoBase& launchInfo,
+    std::unique_ptr<gpg::Stream> recording,
+    moho::CClientManagerImpl*& manager
   )
   {
     const auto& sources = launchInfo.mCommandSources.mSrcs;
@@ -57,7 +59,9 @@ namespace faf::headless
       remote::CServerClient& seat = remote::CServerClient::Create(
         *manager, sources[index].mName.c_str(), seatIndex, seatIndex, static_cast<std::uint32_t>(index)
       );
-      seat.SetBeatHook([this](remote::CServerClient& beatSeat, const std::int32_t beat) { Deliver(beatSeat, beat); });
+      seat.SetBeatHook([this](remote::CServerClient& beatSeat, const std::int32_t beat) {
+        Deliver(beatSeat, beat);
+      });
       seat.MarkLoaded();
       mSeats.push_back(&seat);
     }
@@ -65,7 +69,10 @@ namespace faf::headless
     manager->CreateLocalClient("Server", serverIndex, serverIndex, kNoCommandSource);
   }
 
-  void CReplaySeatFeed::Deliver(remote::CServerClient& seat, const std::int32_t beat)
+  void CReplaySeatFeed::Deliver(
+    remote::CServerClient& seat,
+    const std::int32_t beat
+  )
   {
     const auto index = static_cast<std::size_t>(seat.GetIndex());
     std::vector<SOp>& ops = mOps[index];
@@ -117,9 +124,9 @@ namespace faf::headless
 
   std::string CReplaySeatFeed::Report() const
   {
-    std::string report = "seats: " + std::to_string(mSeats.size()) + ", " + std::to_string(mAccepted.load()) + " commands taken, "
-                       + std::to_string(mFromServer.load()) + " checksums, " + std::to_string(mEjected.load()) + " ejected, "
-                       + std::to_string(mLostToEject.load()) + " lost to an ejection, refused:";
+    std::string report = "seats: " + std::to_string(mSeats.size()) + ", " + std::to_string(mAccepted.load()) +
+      " commands taken, " + std::to_string(mFromServer.load()) + " checksums, " + std::to_string(mEjected.load()) +
+      " ejected, " + std::to_string(mLostToEject.load()) + " lost to an ejection, refused:";
     bool anyRefused = false;
     for (std::size_t op = 0; op < mRefused.size(); ++op) {
       if (const std::uint64_t count = mRefused[op].load(); count != 0u) {

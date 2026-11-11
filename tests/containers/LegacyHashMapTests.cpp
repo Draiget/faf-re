@@ -19,7 +19,9 @@
 namespace
 {
   template <class HashMap>
-  [[nodiscard]] std::vector<std::pair<int, int>> SortedPairs(HashMap& m)
+  [[nodiscard]] std::vector<std::pair<int, int>> SortedPairs(
+    HashMap& m
+  )
   {
     std::vector<std::pair<int, int>> out;
     for (auto it = m.begin(); it != m.end(); ++it) {
@@ -31,7 +33,10 @@ namespace
 
   /** Every element of the table is found at its own node, and the reference agrees. */
   [[nodiscard]] ::testing::AssertionResult LookupsAgree(
-    fa::hash_map<int, int>& m, const std::unordered_map<int, int>& ref, const int keyRange)
+    fa::hash_map<int, int>& m,
+    const std::unordered_map<int, int>& ref,
+    const int keyRange
+  )
   {
     if (m.size() != ref.size()) {
       return ::testing::AssertionFailure() << "size " << m.size() << " vs " << ref.size();
@@ -66,7 +71,11 @@ namespace
     return ::testing::AssertionSuccess();
   }
 
-  void RunHashMapRandomOps(const unsigned seed, const int steps, const int keyRange)
+  void RunHashMapRandomOps(
+    const unsigned seed,
+    const int steps,
+    const int keyRange
+  )
   {
     std::mt19937 rng(seed);
     fa::hash_map<int, int> m;
@@ -142,7 +151,10 @@ namespace
   }
 } // namespace
 
-TEST(FaHashValue, IsTheParkMillerStep)
+TEST(
+  FaHashValue,
+  IsTheParkMillerStep
+)
 {
   // Schrage's method for 16807 * key mod (2^31 - 1).
   EXPECT_EQ(fa::hash_value(0L), 0u);
@@ -155,21 +167,28 @@ TEST(FaHashValue, IsTheParkMillerStep)
   }
 }
 
-TEST(FaHashValue, CompareHashesIntegersAndPointersWithTheSeed)
+TEST(
+  FaHashValue,
+  CompareHashesIntegersAndPointersWithTheSeed
+)
 {
   const fa::hash_compare<unsigned int> ints;
   EXPECT_EQ(ints(5u), fa::hash_value(static_cast<long>(static_cast<std::size_t>(5u) ^ fa::hash_seed)));
   int object = 0;
   const fa::hash_compare<int*> pointers;
   EXPECT_EQ(
-    pointers(&object), fa::hash_value(static_cast<long>(reinterpret_cast<std::uintptr_t>(&object) ^ fa::hash_seed)));
+    pointers(&object), fa::hash_value(static_cast<long>(reinterpret_cast<std::uintptr_t>(&object) ^ fa::hash_seed))
+  );
   EXPECT_TRUE(ints(1u, 2u));
   EXPECT_FALSE(ints(2u, 1u));
   EXPECT_EQ(fa::hash_compare<int>::bucket_size, 4u);
   EXPECT_EQ(fa::hash_compare<int>::min_buckets, 8u);
 }
 
-TEST(FaHashMap, EmptyMap)
+TEST(
+  FaHashMap,
+  EmptyMap
+)
 {
   fa::hash_map<int, int> m;
   EXPECT_TRUE(m.empty());
@@ -180,21 +199,30 @@ TEST(FaHashMap, EmptyMap)
   EXPECT_EQ(m.erase(3), 0u);
 }
 
-TEST(FaHashMap, RandomOpsMatchUnorderedMapFewKeys)
+TEST(
+  FaHashMap,
+  RandomOpsMatchUnorderedMapFewKeys
+)
 {
   for (unsigned seed = 1; seed <= 3; ++seed) {
     RunHashMapRandomOps(seed, 3000, 50);
   }
 }
 
-TEST(FaHashMap, RandomOpsMatchUnorderedMapManyKeys)
+TEST(
+  FaHashMap,
+  RandomOpsMatchUnorderedMapManyKeys
+)
 {
   for (unsigned seed = 11; seed <= 12; ++seed) {
     RunHashMapRandomOps(seed, 6000, 3000);
   }
 }
 
-TEST(FaHashMap, GrowsThroughManySplits)
+TEST(
+  FaHashMap,
+  GrowsThroughManySplits
+)
 {
   fa::hash_map<int, int> m;
   std::unordered_map<int, int> ref;
@@ -212,7 +240,10 @@ TEST(FaHashMap, GrowsThroughManySplits)
   ASSERT_TRUE(LookupsAgree(m, ref, 10007));
 }
 
-TEST(FaHashMap, EraseOfEverythingClearsAndCanBeReused)
+TEST(
+  FaHashMap,
+  EraseOfEverythingClearsAndCanBeReused
+)
 {
   fa::hash_map<int, int> m;
   for (int i = 0; i < 300; ++i) {
@@ -231,7 +262,10 @@ TEST(FaHashMap, EraseOfEverythingClearsAndCanBeReused)
   EXPECT_TRUE(LookupsAgree(m, ref, 300));
 }
 
-TEST(FaHashMap, SubscriptInsertsAValueInitialisedEntry)
+TEST(
+  FaHashMap,
+  SubscriptInsertsAValueInitialisedEntry
+)
 {
   fa::hash_map<int, int> m;
   EXPECT_EQ(m[7], 0);
@@ -240,7 +274,10 @@ TEST(FaHashMap, SubscriptInsertsAValueInitialisedEntry)
   EXPECT_EQ(m.size(), 1u);
 }
 
-TEST(FaHashMap, MoveKeepsTheBuckets)
+TEST(
+  FaHashMap,
+  MoveKeepsTheBuckets
+)
 {
   fa::hash_map<int, int> m;
   std::unordered_map<int, int> ref;
@@ -260,7 +297,10 @@ TEST(FaHashMap, MoveKeepsTheBuckets)
 // list iterators as it is: they still point into the source's list, and the copy's lookups walk
 // the source's nodes (a dangling walk once the source is gone). MSVC8's _Hash copy rebuilds the
 // buckets (_Copy). Minimal input: a hash_map {1: 1}; copy.find(1) returns the source's node.
-TEST(FaHashMap, DISABLED_CopyFindsItsOwnElements)
+TEST(
+  FaHashMap,
+  DISABLED_CopyFindsItsOwnElements
+)
 {
   fa::hash_map<int, int> m;
   for (int i = 0; i < 20; ++i) {
@@ -278,7 +318,10 @@ TEST(FaHashMap, DISABLED_CopyFindsItsOwnElements)
   }
 }
 
-TEST(FaHashSet, RandomOpsWithPointerKeys)
+TEST(
+  FaHashSet,
+  RandomOpsWithPointerKeys
+)
 {
   std::vector<int> objects(400);
   std::mt19937 rng(5);
@@ -313,7 +356,10 @@ TEST(FaHashSet, RandomOpsWithPointerKeys)
   }
 }
 
-TEST(FaHashSet, UnsignedKeys)
+TEST(
+  FaHashSet,
+  UnsignedKeys
+)
 {
   fa::hash_set<std::uintptr_t> s;
   for (std::uintptr_t i = 0; i < 1000; ++i) {

@@ -13,7 +13,9 @@
  * `CreateArmies`/`PostInitialize`. See the class declaration for the ordered
  * list of subsystems constructed here.
  */
-void Sim::Setup(LaunchInfoNew* const info)
+void Sim::Setup(
+  LaunchInfoNew* const info
+)
 {
   mCheatsEnabled = info->mCheatsEnabled;
   SIM_ResetFlattenLog(); // engine addition (replay keyframes)
@@ -70,9 +72,8 @@ void Sim::Setup(LaunchInfoNew* const info)
     // string made GetString raise a Lua error out of sim construction; such an
     // army is named by its slot the way FAF names armies.
     const LuaPlus::LuaObject armyNameObject = armySetup["ArmyName"];
-    const fa::string armyName = armyNameObject.IsString()
-      ? fa::string(armyNameObject.GetString())
-      : gpg::STR_Printf("ARMY_%d", static_cast<int>(armyIndex + 1));
+    const fa::string armyName = armyNameObject.IsString() ? fa::string(armyNameObject.GetString())
+                                                          : gpg::STR_Printf("ARMY_%d", static_cast<int>(armyIndex + 1));
     armySetupTable.SetObject(armyName.c_str(), armySetup);
   }
   scenarioInfo.SetObject("ArmySetup", armySetupTable);
@@ -116,8 +117,9 @@ void Sim::Setup(LaunchInfoNew* const info)
   // ownership into the member (which starts null).
   {
     auto* const newResources = new CSimResources();
-    boost::SharedPtrRaw<CSimResources> owningResources(
-      newResources, [](CSimResources* const p) noexcept { delete p; });
+    boost::SharedPtrRaw<CSimResources> owningResources(newResources, [](CSimResources* const p) noexcept {
+      delete p;
+    });
     mSimResources.px = owningResources.px;
     mSimResources.pi = owningResources.pi;
     owningResources.px = nullptr;
@@ -221,7 +223,9 @@ void Sim::Setup(LaunchInfoNew* const info)
  * game) or `Load` (saved game). Throws `std::runtime_error` when the launch info
  * is neither a `LaunchInfoNew` nor a `LaunchInfoLoad`.
  */
-Sim* Sim::Create(const boost::SharedPtrRaw<LaunchInfoBase>& launchInfo)
+Sim* Sim::Create(
+  const boost::SharedPtrRaw<LaunchInfoBase>& launchInfo
+)
 {
   LaunchInfoBase* const info = launchInfo.px;
 
@@ -240,8 +244,7 @@ Sim* Sim::Create(const boost::SharedPtrRaw<LaunchInfoBase>& launchInfo)
     return sim;
   }
 
-  const fa::string message =
-    gpg::STR_Printf("Unknown subclass of LaunchInfoBase: %s", typeid(*info).name());
+  const fa::string message = gpg::STR_Printf("Unknown subclass of LaunchInfoBase: %s", typeid(*info).name());
   throw std::runtime_error(message.c_str());
 }
 
@@ -418,8 +421,7 @@ void Sim::CreateArmies(
   mArmiesList.resize(armyCount);
 
   for (std::size_t armyIndex = 0; armyIndex < armyCount; ++armyIndex) {
-    const bool isFocusArmy =
-      (static_cast<std::int32_t>(armyIndex) == mSyncFilter.focusArmy);
+    const bool isFocusArmy = (static_cast<std::int32_t>(armyIndex) == mSyncFilter.focusArmy);
 
     CArmyImpl* const army = AllocateScenarioArmy(
       this,
@@ -455,7 +457,9 @@ void Sim::CreateArmies(
  * global Lua function `InitializePrebuiltUnits` once for each non-civilian
  * army using the army name string.
  */
-void Sim::PostInitialize(const LuaPlus::LuaObject& launchOptions)
+void Sim::PostInitialize(
+  const LuaPlus::LuaObject& launchOptions
+)
 {
   const LuaPlus::LuaObject prebuiltUnitsOption = launchOptions["PrebuiltUnits"];
   if (prebuiltUnitsOption.IsNil()) {
@@ -511,7 +515,9 @@ CDebugCanvas* Sim::GetDebugCanvas()
  * Unlinks one entity-set node from its current ring and inserts it into the
  * sim EntityDB registered-set list.
  */
-void Sim::RegisterEntitySet(EntitySetBase* const set)
+void Sim::RegisterEntitySet(
+  EntitySetBase* const set
+)
 {
   if (!set || !mEntityDB) {
     return;

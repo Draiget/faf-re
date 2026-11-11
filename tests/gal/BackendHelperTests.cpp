@@ -37,7 +37,10 @@ namespace
   class ScopedEnvironment
   {
   public:
-    ScopedEnvironment(const char* const name, const char* const value)
+    ScopedEnvironment(
+      const char* const name,
+      const char* const value
+    )
       : mName(name)
     {
       if (const char* const previous = std::getenv(name)) {
@@ -46,7 +49,10 @@ namespace
       }
       _putenv_s(name, value);
     }
-    ~ScopedEnvironment() { _putenv_s(mName.c_str(), mHadPrevious ? mPrevious.c_str() : ""); }
+    ~ScopedEnvironment()
+    {
+      _putenv_s(mName.c_str(), mHadPrevious ? mPrevious.c_str() : "");
+    }
     ScopedEnvironment(const ScopedEnvironment&) = delete;
     ScopedEnvironment& operator=(const ScopedEnvironment&) = delete;
 
@@ -64,7 +70,9 @@ namespace
   };
 
   template <class Call>
-  Thrown Catch(Call&& call)
+  Thrown Catch(
+    Call&& call
+  )
   {
     Thrown thrown;
     try {
@@ -78,28 +86,42 @@ namespace
   }
 } // namespace
 
-TEST(GalBackendErrors, ErrorsCarryFileLineAndTheHresultText)
+TEST(
+  GalBackendErrors,
+  ErrorsCarryFileLineAndTheHresultText
+)
 {
-  const Thrown hresult = Catch([] { backend::ThrowHresult("DeviceD3D12.cpp", 42, E_OUTOFMEMORY); });
+  const Thrown hresult = Catch([] {
+    backend::ThrowHresult("DeviceD3D12.cpp", 42, E_OUTOFMEMORY);
+  });
   EXPECT_EQ(hresult.file, "DeviceD3D12.cpp");
   EXPECT_EQ(hresult.line, 42);
   EXPECT_EQ(hresult.message, "HRESULT 0x8007000E (Ran out of memory)");
 
-  const Thrown plain = Catch([] { backend::ThrowError(nullptr, 3, nullptr); });
+  const Thrown plain = Catch([] {
+    backend::ThrowError(nullptr, 3, nullptr);
+  });
   EXPECT_EQ(plain.file, "");
   EXPECT_EQ(plain.line, 3);
   EXPECT_EQ(plain.message, "");
 
   EXPECT_NO_THROW(backend::CheckHresult("x.cpp", 1, S_OK));
   EXPECT_NO_THROW(backend::CheckHresult("x.cpp", 1, S_FALSE));
-  const Thrown failed = Catch([] { backend::CheckHresult("x.cpp", 7, E_FAIL); });
+  const Thrown failed = Catch([] {
+    backend::CheckHresult("x.cpp", 7, E_FAIL);
+  });
   EXPECT_EQ(failed.line, 7);
   EXPECT_EQ(failed.message, "HRESULT 0x80004005 (An undetermined error occurred)");
-  const Thrown unknown = Catch([] { backend::CheckHresult("x.cpp", 8, static_cast<HRESULT>(0x80FF0001UL)); });
+  const Thrown unknown = Catch([] {
+    backend::CheckHresult("x.cpp", 8, static_cast<HRESULT>(0x80FF0001UL));
+  });
   EXPECT_EQ(unknown.message, "HRESULT 0x80FF0001 (n/a)");
 }
 
-TEST(GalBackendErrors, SetupFailureSwitchNamesBackends)
+TEST(
+  GalBackendErrors,
+  SetupFailureSwitchNamesBackends
+)
 {
   {
     const ScopedEnvironment unset("FAF_GAL_FAIL_SETUP", "");
@@ -131,7 +153,10 @@ TEST(GalBackendErrors, SetupFailureSwitchNamesBackends)
   }
 }
 
-TEST(GalBackendErrors, DiagnosticSwitchesDefaultToDirect3D9Behaviour)
+TEST(
+  GalBackendErrors,
+  DiagnosticSwitchesDefaultToDirect3D9Behaviour
+)
 {
   // Both are read once per process; they only differ when the switches were set at start.
   const char* const centres = std::getenv("FAF_GAL_D3D10_PIXEL_CENTRES");
@@ -144,7 +169,10 @@ TEST(GalBackendErrors, DiagnosticSwitchesDefaultToDirect3D9Behaviour)
   }
 }
 
-TEST(GalLockShadow, TheGuardBandCatchesWritesPastTheLockedRange)
+TEST(
+  GalLockShadow,
+  TheGuardBandCatchesWritesPastTheLockedRange
+)
 {
   constexpr std::uint8_t kGuard = 0xA5U;
   const std::uint64_t before = backend::LockShadow::TotalBytes();
@@ -196,7 +224,10 @@ TEST(GalLockShadow, TheGuardBandCatchesWritesPastTheLockedRange)
   EXPECT_EQ(backend::LockShadow::TotalBytes(), before) << "the destructor gives the bytes back";
 }
 
-TEST(GalPipelineMemo, FindsOnlyStoredInputs)
+TEST(
+  GalPipelineMemo,
+  FindsOnlyStoredInputs
+)
 {
   struct Inputs
   {
@@ -240,7 +271,10 @@ TEST(GalPipelineMemo, FindsOnlyStoredInputs)
   EXPECT_EQ(memo.Find(last), 0x10000U + 499U) << "the latest store of a slot is found";
 }
 
-TEST(GalRuntimeInfo, DriverVersionsAreFourSixteenBitFields)
+TEST(
+  GalRuntimeInfo,
+  DriverVersionsAreFourSixteenBitFields
+)
 {
   EXPECT_EQ(gpg::gal::common::FormatWindowsDriverVersion(0x001F000D00110E4CULL), "31.13.17.3660");
   EXPECT_EQ(gpg::gal::common::FormatWindowsDriverVersion(0U), "0.0.0.0");
@@ -253,7 +287,10 @@ TEST(GalRuntimeInfo, DriverVersionsAreFourSixteenBitFields)
   EXPECT_NO_THROW(gpg::gal::common::LogRuntimeInfo("D3D12", info));
 }
 
-TEST(GalHalfFloat, ExactValuesAndSpecialCases)
+TEST(
+  GalHalfFloat,
+  ExactValuesAndSpecialCases
+)
 {
   using gpg::gal::FloatToHalf;
   EXPECT_EQ(FloatToHalf(0.0f), 0x0000U);
@@ -279,7 +316,10 @@ TEST(GalHalfFloat, ExactValuesAndSpecialCases)
   EXPECT_EQ(FloatToHalf(-std::ldexp(1.0f, -30)), 0x8000U);
 }
 
-TEST(GalHalfFloat, RoundsToNearestAndHalfwayDown)
+TEST(
+  GalHalfFloat,
+  RoundsToNearestAndHalfwayDown
+)
 {
   using gpg::gal::FloatToHalf;
   EXPECT_EQ(FloatToHalf(0.1f), 0x2E66U);
@@ -294,7 +334,10 @@ TEST(GalHalfFloat, RoundsToNearestAndHalfwayDown)
   EXPECT_EQ(FloatToHalf(2049.0f + 1.0f / 256.0f), 0x6801U);
 }
 
-TEST(GalStringUtils, CompareIsBoundedAndNormalised)
+TEST(
+  GalStringUtils,
+  CompareIsBoundedAndNormalised
+)
 {
   using gpg::gal::STR_Compare;
   EXPECT_EQ(STR_Compare("abcd", "abcd", 4U), 0);
@@ -312,7 +355,10 @@ TEST(GalStringUtils, CompareIsBoundedAndNormalised)
   EXPECT_EQ(STR_Compare("abc", "abd", 3U), -1);
 }
 
-TEST(GalStringUtils, FindInRangeWantsAnExactMatch)
+TEST(
+  GalStringUtils,
+  FindInRangeWantsAnExactMatch
+)
 {
   fa::string names[3] = {fa::string("alpha"), fa::string("beta"), fa::string("alphabet")};
   fa::string* const begin = names;
@@ -330,7 +376,10 @@ TEST(GalStringUtils, FindInRangeWantsAnExactMatch)
   EXPECT_EQ(gpg::gal::STR_FindInRange(begin, begin, &search), begin) << "an empty range";
 }
 
-TEST(GalStateCache, OnlyAChangedValueNeedsADeviceCall)
+TEST(
+  GalStateCache,
+  OnlyAChangedValueNeedsADeviceCall
+)
 {
   gpg::gal::StateCache<_D3DRENDERSTATETYPE, unsigned int> cache;
   EXPECT_TRUE(cache.Update(D3DRS_ZENABLE, 1U)) << "the first value of a state";

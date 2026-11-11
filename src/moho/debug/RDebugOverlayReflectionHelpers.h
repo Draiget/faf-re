@@ -8,7 +8,10 @@
 namespace moho::debug_reflection
 {
   [[nodiscard]]
-  inline gpg::RType* ResolveCachedType(gpg::RType*& cachedType, const std::type_info& typeInfo)
+  inline gpg::RType* ResolveCachedType(
+    gpg::RType*& cachedType,
+    const std::type_info& typeInfo
+  )
   {
     return gpg::CachedLookup(cachedType, typeInfo);
   }
@@ -24,14 +27,18 @@ namespace moho::debug_reflection
 
   template <typename TObject>
   [[nodiscard]]
-  gpg::RType* ResolveObjectType(gpg::RType*& cachedType)
+  gpg::RType* ResolveObjectType(
+    gpg::RType*& cachedType
+  )
   {
     return cachedType ? cachedType : ResolveCachedType(cachedType, typeid(TObject));
   }
 
   template <typename TObject>
   [[nodiscard]]
-  gpg::RRef NewRef(gpg::RType*& cachedType)
+  gpg::RRef NewRef(
+    gpg::RType*& cachedType
+  )
   {
     TObject* const object = new (std::nothrow) TObject();
     return MakeRef(object, ResolveObjectType<TObject>(cachedType));
@@ -39,7 +46,10 @@ namespace moho::debug_reflection
 
   template <typename TObject>
   [[nodiscard]]
-  gpg::RRef CtrRef(void* objectStorage, gpg::RType*& cachedType)
+  gpg::RRef CtrRef(
+    void* objectStorage,
+    gpg::RType*& cachedType
+  )
   {
     auto* const object = static_cast<TObject*>(objectStorage);
     if (object != nullptr) {
@@ -49,13 +59,17 @@ namespace moho::debug_reflection
   }
 
   template <typename TObject>
-  void Delete(void* objectStorage)
+  void Delete(
+    void* objectStorage
+  )
   {
     delete static_cast<TObject*>(objectStorage);
   }
 
   template <typename TObject>
-  void Destruct(void* objectStorage)
+  void Destruct(
+    void* objectStorage
+  )
   {
     auto* const object = static_cast<TObject*>(objectStorage);
     if (object != nullptr) {

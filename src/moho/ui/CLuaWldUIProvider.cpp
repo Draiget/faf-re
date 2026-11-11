@@ -59,8 +59,7 @@ namespace
 
     return static_cast<moho::CLuaWldUIProvider*>(upcast.mObj);
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x0086A530 (??0CLuaWldUIProvider@Moho@@QAE@@Z, Moho::CLuaWldUIProvider::CLuaWldUIProvider)

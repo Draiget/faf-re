@@ -74,7 +74,9 @@ namespace
     return type;
   }
 
-  [[nodiscard]] moho::CUnitCommand* ResolveQueueHeadCommand(moho::Unit* const unit)
+  [[nodiscard]] moho::CUnitCommand* ResolveQueueHeadCommand(
+    moho::Unit* const unit
+  )
   {
     if (unit == nullptr || unit->CommandQueue == nullptr || unit->CommandQueue->mCommandVec.empty()) {
       return nullptr;
@@ -220,7 +222,9 @@ namespace moho
    * What it does:
    * Stores one blueprint pointer lane and returns this task.
    */
-  CUnitMobileBuildTask* CUnitMobileBuildTask::SetBlueprint(const RUnitBlueprint* const blueprint) noexcept
+  CUnitMobileBuildTask* CUnitMobileBuildTask::SetBlueprint(
+    const RUnitBlueprint* const blueprint
+  ) noexcept
   {
     mBlueprint = blueprint;
     return this;
@@ -298,10 +302,10 @@ namespace moho
     const int maxX = minX + static_cast<int>(sizeX);
     const int maxZ = minZ + static_cast<int>(sizeZ);
 
-    Wm3::Vector3f boxCenter{static_cast<float>(maxX + minX) * 0.5f, mBuildPosition.y,
-                            static_cast<float>(maxZ + minZ) * 0.5f};
-    Wm3::Vector3f boxExtents{static_cast<float>(maxX - minX) * 0.5f, 1000.0f,
-                             static_cast<float>(maxZ - minZ) * 0.5f};
+    Wm3::Vector3f boxCenter{
+      static_cast<float>(maxX + minX) * 0.5f, mBuildPosition.y, static_cast<float>(maxZ + minZ) * 0.5f
+    };
+    Wm3::Vector3f boxExtents{static_cast<float>(maxX - minX) * 0.5f, 1000.0f, static_cast<float>(maxZ - minZ) * 0.5f};
     const VAxes3 boxAxes{Wm3::Quaternionf(1.0f, 0.0f, 0.0f, 0.0f)};
     const Wm3::Box3f queryBox{boxCenter, &boxAxes.vX, &boxExtents.x};
 
@@ -362,8 +366,10 @@ namespace moho
       const LuaPlus::LuaObject e4{};
       // 0x005F7311..0x005F732B: the script runs on the builder (`mUnit`), which
       // is the class that defines GetRebuildBonus -- the wreck has no such method.
-      if (!mUnit->RunScriptMultiRet("GetRebuildBonus", results, bpLua, e1, e2, e3, e4) ||
-          (results.end() - results.begin()) != 1) {
+      if (
+        !mUnit->RunScriptMultiRet("GetRebuildBonus", results, bpLua, e1, e2, e3, e4) ||
+        (results.end() - results.begin()) != 1
+      ) {
         // 0x005F73D7..0x005F7429: after the warning the failure path falls into
         // the common exit, which returns the nearest prop, so a builder without
         // GetRebuildBonus (a build drone's DummyUnit class) reclaims the wreck.
@@ -392,69 +398,21 @@ namespace moho
   int CUnitMobileBuildTask::Execute()
   {
     switch (mTaskState) {
-      case TASKSTATE_Preparing: {
-        if (!CheckBuildRestriction(mBlueprint, &mBuildRect, &mBuildHelper)) {
-          return -1;
-        }
-        if (Entity* const obstruction = FindObstructingPropToReclaim(); obstruction != nullptr) {
-          CAiTarget reclaimTarget{};
-          reclaimTarget.UpdateTarget(obstruction);
-          IssueReclaimTask(this, reclaimTarget);
-          return 1;
-        }
-        if (mUnit->IsMobile()) {
-          const Wm3::Vec3f& startPos = mUnit->GetPosition();
-          const SCoordsVec2 startCoords{startPos.x, startPos.z};
-          const bool fits =
-            mUnit->GetFootprint().FitsAt(startCoords, *mSim->mOGrid) != static_cast<EOccupancyCaps>(0u);
-
-          const Wm3::Vec3f& builderPos = mUnit->GetPosition();
-          const float ddx = builderPos.x - mBuildPosition.x;
-          const float ddz = builderPos.z - mBuildPosition.z;
-          const SFootprint& fp = mUnit->GetFootprint();
-          const std::uint8_t maxFp = fp.mSizeX > fp.mSizeZ ? fp.mSizeX : fp.mSizeZ;
-          const float skX = mBlueprint->Physics.SkirtSizeX;
-          const float skZ = mBlueprint->Physics.SkirtSizeZ;
-          const float maxSkirt = skZ > skX ? skZ : skX;
-          const float range = (std::sqrt(ddx * ddx + ddz * ddz) - static_cast<float>(maxFp)) - maxSkirt;
-
-          const gpg::Rect2f builderSkirt = mUnit->GetSkirtRect();
-          const bool outOfRange = range > mUnit->GetBlueprint()->Economy.MaxBuildDistance;
-          const bool overlaps = mBuildSkirt.OverlapsInclusive(builderSkirt);
-          if (!fits || outOfRange || overlaps) {
-            // 0x005F7616..0x006184BF grows the exclusion rect by one cell on
-            // all four sides before handing it to `Unit::PrepareMove`:
-            //
-            //   0x005F7640  subss xmm1, xmm0   ; x0 - 1.0   (ds:a7 == 1.0f)
-            //   0x005F765D  subss xmm1, xmm0   ; z0 - 1.0
-            //   0x005F7673  addss xmm1, xmm0   ; x1 + 1.0
-            //   0x005F768D  addss xmm1, xmm0   ; z1 + 1.0
-            //
-            // Only the middle two were recovered, so the builder was allowed
-            // to park flush against the structure on the -X and +Z sides
-            // instead of keeping the one cell of clearance the original left.
-            gpg::Rect2f moveSkirt = mBuildSkirt;
-            moveSkirt.x0 = moveSkirt.x0 - 1.0f;
-            moveSkirt.z0 = moveSkirt.z0 - 1.0f;
-            moveSkirt.x1 = moveSkirt.x1 + 1.0f;
-            moveSkirt.z1 = moveSkirt.z1 + 1.0f;
-            Wm3::Vector3f moveTarget{mBuildPosition.x, mBuildPosition.y, mBuildPosition.z};
-            const bool useWholeMap = mUnit->ArmyRef->UseWholeMap();
-            (void)mUnit->PrepareMove(1, &moveTarget, &moveSkirt, useWholeMap);
-            const SCoordsVec2 moveCoords{moveTarget.x, moveTarget.z};
-            const SFootprint& moveFp = mUnit->GetFootprint();
-            gpg::Rect2i reserveRect{};
-            COORDS_ToGridRect(&reserveRect, moveCoords, moveFp.mSizeX, moveFp.mSizeZ);
-            mUnit->ReserveOgridRect(reserveRect);
-            const SOCellPos goalCell = mUnit->GetFootprint().ToCellPos(moveTarget);
-            NewMoveTask(SNavGoal(goalCell), this, 0, nullptr, 0);
-          }
-        }
-        mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+    case TASKSTATE_Preparing: {
+      if (!CheckBuildRestriction(mBlueprint, &mBuildRect, &mBuildHelper)) {
+        return -1;
+      }
+      if (Entity* const obstruction = FindObstructingPropToReclaim(); obstruction != nullptr) {
+        CAiTarget reclaimTarget{};
+        reclaimTarget.UpdateTarget(obstruction);
+        IssueReclaimTask(this, reclaimTarget);
         return 1;
       }
+      if (mUnit->IsMobile()) {
+        const Wm3::Vec3f& startPos = mUnit->GetPosition();
+        const SCoordsVec2 startCoords{startPos.x, startPos.z};
+        const bool fits = mUnit->GetFootprint().FitsAt(startCoords, *mSim->mOGrid) != static_cast<EOccupancyCaps>(0u);
 
-      case TASKSTATE_Waiting: {
         const Wm3::Vec3f& builderPos = mUnit->GetPosition();
         const float ddx = builderPos.x - mBuildPosition.x;
         const float ddz = builderPos.z - mBuildPosition.z;
@@ -464,201 +422,252 @@ namespace moho
         const float skZ = mBlueprint->Physics.SkirtSizeZ;
         const float maxSkirt = skZ > skX ? skZ : skX;
         const float range = (std::sqrt(ddx * ddx + ddz * ddz) - static_cast<float>(maxFp)) - maxSkirt;
-        if (range > mUnit->GetBlueprint()->Economy.MaxBuildDistance ||
-            !CheckBuildRestriction(mBlueprint, &mBuildRect, &mBuildHelper)) {
+
+        const gpg::Rect2f builderSkirt = mUnit->GetSkirtRect();
+        const bool outOfRange = range > mUnit->GetBlueprint()->Economy.MaxBuildDistance;
+        const bool overlaps = mBuildSkirt.OverlapsInclusive(builderSkirt);
+        if (!fits || outOfRange || overlaps) {
+          // 0x005F7616..0x006184BF grows the exclusion rect by one cell on
+          // all four sides before handing it to `Unit::PrepareMove`:
+          //
+          //   0x005F7640  subss xmm1, xmm0   ; x0 - 1.0   (ds:a7 == 1.0f)
+          //   0x005F765D  subss xmm1, xmm0   ; z0 - 1.0
+          //   0x005F7673  addss xmm1, xmm0   ; x1 + 1.0
+          //   0x005F768D  addss xmm1, xmm0   ; z1 + 1.0
+          //
+          // Only the middle two were recovered, so the builder was allowed
+          // to park flush against the structure on the -X and +Z sides
+          // instead of keeping the one cell of clearance the original left.
+          gpg::Rect2f moveSkirt = mBuildSkirt;
+          moveSkirt.x0 = moveSkirt.x0 - 1.0f;
+          moveSkirt.z0 = moveSkirt.z0 - 1.0f;
+          moveSkirt.x1 = moveSkirt.x1 + 1.0f;
+          moveSkirt.z1 = moveSkirt.z1 + 1.0f;
+          Wm3::Vector3f moveTarget{mBuildPosition.x, mBuildPosition.y, mBuildPosition.z};
+          const bool useWholeMap = mUnit->ArmyRef->UseWholeMap();
+          (void)mUnit->PrepareMove(1, &moveTarget, &moveSkirt, useWholeMap);
+          const SCoordsVec2 moveCoords{moveTarget.x, moveTarget.z};
+          const SFootprint& moveFp = mUnit->GetFootprint();
+          gpg::Rect2i reserveRect{};
+          COORDS_ToGridRect(&reserveRect, moveCoords, moveFp.mSizeX, moveFp.mSizeZ);
+          mUnit->ReserveOgridRect(reserveRect);
+          const SOCellPos goalCell = mUnit->GetFootprint().ToCellPos(moveTarget);
+          NewMoveTask(SNavGoal(goalCell), this, 0, nullptr, 0);
+        }
+      }
+      mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+      return 1;
+    }
+
+    case TASKSTATE_Waiting: {
+      const Wm3::Vec3f& builderPos = mUnit->GetPosition();
+      const float ddx = builderPos.x - mBuildPosition.x;
+      const float ddz = builderPos.z - mBuildPosition.z;
+      const SFootprint& fp = mUnit->GetFootprint();
+      const std::uint8_t maxFp = fp.mSizeX > fp.mSizeZ ? fp.mSizeX : fp.mSizeZ;
+      const float skX = mBlueprint->Physics.SkirtSizeX;
+      const float skZ = mBlueprint->Physics.SkirtSizeZ;
+      const float maxSkirt = skZ > skX ? skZ : skX;
+      const float range = (std::sqrt(ddx * ddx + ddz * ddz) - static_cast<float>(maxFp)) - maxSkirt;
+      if (
+        range > mUnit->GetBlueprint()->Economy.MaxBuildDistance ||
+        !CheckBuildRestriction(mBlueprint, &mBuildRect, &mBuildHelper)
+      ) {
+        return -1;
+      }
+      if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr) {
+        // 0x005F786F..0x005F78A6 aims at the middle of the target's collision
+        // box, not at anything horizontal:
+        //
+        //   movss xmm0, [eax+0B0h]      ; REntityBlueprint::mSizeY
+        //   mulss xmm0, ds:flt_E4F724   ; * 0.5
+        //   addss xmm0, [eax+0CCh]      ; + mCollisionOffsetY
+        //   addss xmm0, xmm2            ; + mBuildPosition.y
+        //
+        // The recovered form read `Physics.SkirtSizeX`/`SkirtSizeZ` (+0x284
+        // and +0x288) instead, i.e. it fed two ground-plane extents into a
+        // height, so the build beam pointed at the wrong altitude for every
+        // structure whose skirt and mesh height disagree.
+        const float aimY = (mBlueprint->mSizeY * 0.5f) + mBlueprint->mCollisionOffsetY + mBuildPosition.y;
+        builder->BuilderSetAimTarget(Wm3::Vector3f{mBuildPosition.x, aimY, mBuildPosition.z});
+      }
+      mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+      mUnit->mUnitVarDat.mUnitStates |= kUnitStateBuildingMask;
+      return 0;
+    }
+
+    case TASKSTATE_Starting: {
+      if (!mUnit->GetBlueprint()->Economy.NeedToFaceTargetToBuild) {
+        mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+        return 0;
+      }
+      const VTransform& transform = mUnit->GetTransform();
+      const VAxes3 axes{transform.orient_};
+      // 0x005F7916 builds the basis at `esp+40h`, then 0x005F791F and
+      // 0x005F7934 sample `esp+58h` and `esp+60h` - +0x18 and +0x20 into it,
+      // i.e. `vZ.x` and `vZ.z`. `vZ` is the unit's forward lane (`vX` at
+      // +0x00 is its right lane), so reading `vX` here compared the builder's
+      // sideways axis against the direction to the site: the dot product was
+      // near zero whenever the unit was actually facing the spot, and the
+      // task kept re-issuing a facing turn instead of starting work.
+      // 0x005F7948: the flattened forward goes through `NormalizeVectorInto`
+      // (0x0044F7E0, zero only at length 0); the direction to the site
+      // through Wm3 `Normalize` (0x00452AF0) at 0x005F7989.
+      const Wm3::Vector3f flatForward{axes.vZ.x, 0.0f, axes.vZ.z};
+      Wm3::Vector3f forward{};
+      (void)NormalizeVectorInto(&forward, flatForward);
+      const Wm3::Vec3f& builderPos = mUnit->GetPosition();
+      Wm3::Vector3f toTarget{mBuildPosition.x - builderPos.x, 0.0f, mBuildPosition.z - builderPos.z};
+      (void)toTarget.Normalize();
+      // 0x005F7990-0x005F79B8: summed `(z + y) + x`.
+      const float dot = ((forward.z * toTarget.z) + (forward.y * toTarget.y)) + (forward.x * toTarget.x);
+      const Wm3::Vector3f zeroFacing{0.0f, 0.0f, 0.0f};
+      if (dot > 0.94999999f) {
+        mUnit->UnitMotion->SetFacing(zeroFacing);
+        mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+        return 0;
+      }
+      mUnit->UnitMotion->SetFacing(toTarget);
+      return 1;
+    }
+
+    case TASKSTATE_Processing: {
+      if (mPlacementRetryCount > 10 || !CheckBuildRestriction(mBlueprint, &mBuildRect, &mBuildHelper)) {
+        return -1;
+      }
+      if (Unit* const seed = FindExistingSeedUnitOnSite(); seed != nullptr) {
+        if (!seed->IsBeingBuilt()) {
           return -1;
         }
-        if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr) {
-          // 0x005F786F..0x005F78A6 aims at the middle of the target's collision
-          // box, not at anything horizontal:
-          //
-          //   movss xmm0, [eax+0B0h]      ; REntityBlueprint::mSizeY
-          //   mulss xmm0, ds:flt_E4F724   ; * 0.5
-          //   addss xmm0, [eax+0CCh]      ; + mCollisionOffsetY
-          //   addss xmm0, xmm2            ; + mBuildPosition.y
-          //
-          // The recovered form read `Physics.SkirtSizeX`/`SkirtSizeZ` (+0x284
-          // and +0x288) instead, i.e. it fed two ground-plane extents into a
-          // height, so the build beam pointed at the wrong altitude for every
-          // structure whose skirt and mesh height disagree.
-          const float aimY =
-            (mBlueprint->mSizeY * 0.5f) + mBlueprint->mCollisionOffsetY + mBuildPosition.y;
-          builder->BuilderSetAimTarget(Wm3::Vector3f{mBuildPosition.x, aimY, mBuildPosition.z});
-        }
+        mBuildUnit.Set(seed);
+        mBuildHelper.SetFocus(mBuildUnit.GetObjectPtr());
         mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
-        mUnit->mUnitVarDat.mUnitStates |= kUnitStateBuildingMask;
         return 0;
       }
 
-      case TASKSTATE_Starting: {
-        if (!mUnit->GetBlueprint()->Economy.NeedToFaceTargetToBuild) {
-          mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
-          return 0;
-        }
-        const VTransform& transform = mUnit->GetTransform();
-        const VAxes3 axes{transform.orient_};
-        // 0x005F7916 builds the basis at `esp+40h`, then 0x005F791F and
-        // 0x005F7934 sample `esp+58h` and `esp+60h` - +0x18 and +0x20 into it,
-        // i.e. `vZ.x` and `vZ.z`. `vZ` is the unit's forward lane (`vX` at
-        // +0x00 is its right lane), so reading `vX` here compared the builder's
-        // sideways axis against the direction to the site: the dot product was
-        // near zero whenever the unit was actually facing the spot, and the
-        // task kept re-issuing a facing turn instead of starting work.
-        // 0x005F7948: the flattened forward goes through `NormalizeVectorInto`
-        // (0x0044F7E0, zero only at length 0); the direction to the site
-        // through Wm3 `Normalize` (0x00452AF0) at 0x005F7989.
-        const Wm3::Vector3f flatForward{axes.vZ.x, 0.0f, axes.vZ.z};
-        Wm3::Vector3f forward{};
-        (void)NormalizeVectorInto(&forward, flatForward);
-        const Wm3::Vec3f& builderPos = mUnit->GetPosition();
-        Wm3::Vector3f toTarget{mBuildPosition.x - builderPos.x, 0.0f, mBuildPosition.z - builderPos.z};
-        (void)toTarget.Normalize();
-        // 0x005F7990-0x005F79B8: summed `(z + y) + x`.
-        const float dot = ((forward.z * toTarget.z) + (forward.y * toTarget.y)) + (forward.x * toTarget.x);
-        const Wm3::Vector3f zeroFacing{0.0f, 0.0f, 0.0f};
-        if (dot > 0.94999999f) {
-          mUnit->UnitMotion->SetFacing(zeroFacing);
-          mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
-          return 0;
-        }
-        mUnit->UnitMotion->SetFacing(toTarget);
-        return 1;
-      }
-
-      case TASKSTATE_Processing: {
-        if (mPlacementRetryCount > 10 || !CheckBuildRestriction(mBlueprint, &mBuildRect, &mBuildHelper)) {
-          return -1;
-        }
-        if (Unit* const seed = FindExistingSeedUnitOnSite(); seed != nullptr) {
-          if (!seed->IsBeingBuilt()) {
-            return -1;
-          }
-          mBuildUnit.Set(seed);
-          mBuildHelper.SetFocus(mBuildUnit.GetObjectPtr());
-          mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
-          return 0;
-        }
-
-        SOccupationResult occupation{};
-        const SCoordsVec2 buildCoords{mBuildPosition.x, mBuildPosition.z};
-        if (!func_LocationIsFree(*mBlueprint, *mSim->mOGrid, buildCoords, occupation)) {
-          return -1;
-        }
-        if (!Sim::LocationIsFree(mSim, mUnit, &mBuildRect, 0)) {
-          // Two of the four sides, and this is faithful - do not "fix" it into
-          // the symmetric grow the `PrepareMove` site above uses. 0x005F7B43
-          // reads `rect.x0` into eax, 0x005F7B4C/50 do `sub [rect+4], 1` and
-          // `add [rect+8], 1` (z0 and x1 per gpg::Rect2's {x0,z0,x1,z1}), and
-          // then 0x005F7B54/56 do `sub eax,1` immediately followed by
-          // `add eax,1` before storing eax back to `rect.x0` - a net no-op, and
-          // `rect.z1` is never touched at all. A register round-trip like that
-          // is what MSVC emits when the source names one member twice, so the
-          // original almost certainly meant to write `z1` on its third line and
-          // wrote `x0` again. The evacuation rect is consequently lopsided in
-          // the shipped game, and a unit sitting just off the -X or +Z edge is
-          // not asked to move.
-          gpg::Rect2i footprintRect = mBlueprint->GetFootprintRect(buildCoords);
-          footprintRect.z0 -= 1;
-          footprintRect.x1 += 1;
-          SIM_TryToBuild(mSim, mUnit->ArmyRef, &footprintRect, 0);
-          ++mPlacementRetryCount;
-          return 50;
-        }
-        if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr && !builder->BuilderGetOnTarget()) {
-          return 1;
-        }
-        if (mUnit->mUnitVarDat.mIsPaused) {
-          return 10;
-        }
-
-        const RUnitBlueprint* spawnBlueprint = mBlueprint;
-        if (!mBlueprint->General.SeedUnit.name.empty()) {
-          // 0x005F7C00 normalises the seed id through `STR_SetFilename` into a
-          // scoped temporary before handing it to the rules lookup, the same
-          // shape the build-drag run uses at 0x008235A5. Copying the raw
-          // blueprint string skipped that, so a seed id that is not already
-          // filename-normalised missed in the rules table.
-          RResId seedBlueprintId{};
-          (void)gpg::STR_SetFilename(&seedBlueprintId.name, gpg::StrArg(mBlueprint->General.SeedUnit.name.c_str()));
-          spawnBlueprint = mSim->mRules->GetUnitBlueprint(seedBlueprintId);
-        }
-
-        CSimConVarInstanceBase* const instaBuildVar = mSim->GetSimVar(&moho::gSimConVar_ai_InstaBuild);
-        void* const instaBuildStorage = instaBuildVar != nullptr ? instaBuildVar->GetValueStorage() : nullptr;
-        const bool instaBuild =
-          instaBuildStorage != nullptr && (*reinterpret_cast<const std::uint8_t*>(instaBuildStorage) != 0u);
-
-        const std::int32_t layer = mUnit->mVarDat.mLayerMask;
-        const VTransform spawnTransform{mBuildPosition, mBuildOrientation};
-        SUnitConstructionParams params(layer, spawnTransform, mUnit->ArmyRef, spawnBlueprint, mUnit, instaBuild);
-        Unit* const newUnit = mSim->CreateUnitForScript(params, true);
-        mBuildUnit.Set(newUnit);
-        Unit* const spawned = mBuildUnit.GetObjectPtr();
-        if (spawned == nullptr) {
-          return 10;
-        }
-        spawned->mUnitVarDat.mUnitStates |= kUnitStateNoReclaimMask;
-
-        if (Entity* const pending = mPendingBuildEntity.GetObjectPtr(); pending != nullptr) {
-          pending->Destroy();
-          mPendingBuildEntity.Set(nullptr);
-        }
-        if (!mBlueprint->General.SeedUnit.name.empty()) {
-          // 0x005F7D39-0x005F7D47: the callback argument is the *target*
-          // blueprint id (RBlueprint+0x08), not the seed unit id.
-          const char* blueprintId = mBlueprint->mBlueprintId.c_str();
-          spawned->CallbackStr("OnSeedUnitBuilt", &blueprintId);
-        }
-        mBuildHelper.SetFocus(spawned);
-        mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
-        return 1;
-      }
-
-      case TASKSTATE_Complete: {
-        if (!mBuildHelper.IsGood()) {
-          return -1;
-        }
-        if (mUnit->mUnitVarDat.mIsPaused) {
-          return 10;
-        }
-        if (!mBuildHelper.UpdateWorkProgress()) {
-          return 1;
-        }
-        Unit* const builtUnit = mBuildUnit.GetObjectPtr();
-        const Wm3::Vector3f zeroDir{0.0f, 0.0f, 0.0f};
-        if (builtUnit != nullptr && !mBlueprint->General.SeedUnit.name.empty()) {
-          EntitySetTemplate<Unit> dispatchSet{};
-          (void)dispatchSet.Add(builtUnit);
-          SSTICommandIssueData issueData(EUnitCommandType::UNITCOMMAND_Upgrade);
-          issueData.mBlueprint = const_cast<RUnitBlueprint*>(mBlueprint);
-          (void)IssueCommandToSelectedUnits(mSim, dispatchSet, issueData, true);
-        } else if (builtUnit != nullptr && builtUnit->AiBuilder != nullptr &&
-                   builtUnit->AiBuilder->BuilderIsFactory() &&
-                   mBuildDirection != zeroDir) {
-          EntitySetTemplate<Unit> dispatchSet{};
-          (void)dispatchSet.Add(builtUnit);
-          const Wm3::Vec3f& unitPos = builtUnit->GetPosition();
-          const Wm3::Vector3f rallyPos{unitPos.x + mBuildDirection.x, unitPos.y + mBuildDirection.y,
-                                       unitPos.z + mBuildDirection.z};
-          SSTICommandIssueData moveData(EUnitCommandType::UNITCOMMAND_Move);
-          moveData.mTarget.mType = EAiTargetType::AITARGET_Ground;
-          moveData.mTarget.mEnt = -268435456;
-          moveData.mTarget.mPos = rallyPos;
-          // 0x005F7FF0-0x005F8002: `push 1; push set; push sim; call UNIT_IssueFactoryCommand`.
-          (void)IssueFactoryCommandToSelectedUnits(mSim, dispatchSet, moveData, true);
-        }
-        if (builtUnit != nullptr) {
-          builtUnit->mUnitVarDat.mUnitStates &= ~kUnitStateNoReclaimMask;
-        }
-        mBuildUnit.UnlinkFromOwnerChain();
-        mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+      SOccupationResult occupation{};
+      const SCoordsVec2 buildCoords{mBuildPosition.x, mBuildPosition.z};
+      if (!func_LocationIsFree(*mBlueprint, *mSim->mOGrid, buildCoords, occupation)) {
         return -1;
       }
+      if (!Sim::LocationIsFree(mSim, mUnit, &mBuildRect, 0)) {
+        // Two of the four sides, and this is faithful - do not "fix" it into
+        // the symmetric grow the `PrepareMove` site above uses. 0x005F7B43
+        // reads `rect.x0` into eax, 0x005F7B4C/50 do `sub [rect+4], 1` and
+        // `add [rect+8], 1` (z0 and x1 per gpg::Rect2's {x0,z0,x1,z1}), and
+        // then 0x005F7B54/56 do `sub eax,1` immediately followed by
+        // `add eax,1` before storing eax back to `rect.x0` - a net no-op, and
+        // `rect.z1` is never touched at all. A register round-trip like that
+        // is what MSVC emits when the source names one member twice, so the
+        // original almost certainly meant to write `z1` on its third line and
+        // wrote `x0` again. The evacuation rect is consequently lopsided in
+        // the shipped game, and a unit sitting just off the -X or +Z edge is
+        // not asked to move.
+        gpg::Rect2i footprintRect = mBlueprint->GetFootprintRect(buildCoords);
+        footprintRect.z0 -= 1;
+        footprintRect.x1 += 1;
+        SIM_TryToBuild(mSim, mUnit->ArmyRef, &footprintRect, 0);
+        ++mPlacementRetryCount;
+        return 50;
+      }
+      if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr && !builder->BuilderGetOnTarget()) {
+        return 1;
+      }
+      if (mUnit->mUnitVarDat.mIsPaused) {
+        return 10;
+      }
 
-      default:
-        gpg::HandleAssertFailure(
-          "Reached the supposably unreachable.", 856, "c:\\work\\rts\\main\\code\\src\\sim\\AiUnitBuild.cpp");
+      const RUnitBlueprint* spawnBlueprint = mBlueprint;
+      if (!mBlueprint->General.SeedUnit.name.empty()) {
+        // 0x005F7C00 normalises the seed id through `STR_SetFilename` into a
+        // scoped temporary before handing it to the rules lookup, the same
+        // shape the build-drag run uses at 0x008235A5. Copying the raw
+        // blueprint string skipped that, so a seed id that is not already
+        // filename-normalised missed in the rules table.
+        RResId seedBlueprintId{};
+        (void)gpg::STR_SetFilename(&seedBlueprintId.name, gpg::StrArg(mBlueprint->General.SeedUnit.name.c_str()));
+        spawnBlueprint = mSim->mRules->GetUnitBlueprint(seedBlueprintId);
+      }
+
+      CSimConVarInstanceBase* const instaBuildVar = mSim->GetSimVar(&moho::gSimConVar_ai_InstaBuild);
+      void* const instaBuildStorage = instaBuildVar != nullptr ? instaBuildVar->GetValueStorage() : nullptr;
+      const bool instaBuild =
+        instaBuildStorage != nullptr && (*reinterpret_cast<const std::uint8_t*>(instaBuildStorage) != 0u);
+
+      const std::int32_t layer = mUnit->mVarDat.mLayerMask;
+      const VTransform spawnTransform{mBuildPosition, mBuildOrientation};
+      SUnitConstructionParams params(layer, spawnTransform, mUnit->ArmyRef, spawnBlueprint, mUnit, instaBuild);
+      Unit* const newUnit = mSim->CreateUnitForScript(params, true);
+      mBuildUnit.Set(newUnit);
+      Unit* const spawned = mBuildUnit.GetObjectPtr();
+      if (spawned == nullptr) {
+        return 10;
+      }
+      spawned->mUnitVarDat.mUnitStates |= kUnitStateNoReclaimMask;
+
+      if (Entity* const pending = mPendingBuildEntity.GetObjectPtr(); pending != nullptr) {
+        pending->Destroy();
+        mPendingBuildEntity.Set(nullptr);
+      }
+      if (!mBlueprint->General.SeedUnit.name.empty()) {
+        // 0x005F7D39-0x005F7D47: the callback argument is the *target*
+        // blueprint id (RBlueprint+0x08), not the seed unit id.
+        const char* blueprintId = mBlueprint->mBlueprintId.c_str();
+        spawned->CallbackStr("OnSeedUnitBuilt", &blueprintId);
+      }
+      mBuildHelper.SetFocus(spawned);
+      mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+      return 1;
+    }
+
+    case TASKSTATE_Complete: {
+      if (!mBuildHelper.IsGood()) {
         return -1;
+      }
+      if (mUnit->mUnitVarDat.mIsPaused) {
+        return 10;
+      }
+      if (!mBuildHelper.UpdateWorkProgress()) {
+        return 1;
+      }
+      Unit* const builtUnit = mBuildUnit.GetObjectPtr();
+      const Wm3::Vector3f zeroDir{0.0f, 0.0f, 0.0f};
+      if (builtUnit != nullptr && !mBlueprint->General.SeedUnit.name.empty()) {
+        EntitySetTemplate<Unit> dispatchSet{};
+        (void)dispatchSet.Add(builtUnit);
+        SSTICommandIssueData issueData(EUnitCommandType::UNITCOMMAND_Upgrade);
+        issueData.mBlueprint = const_cast<RUnitBlueprint*>(mBlueprint);
+        (void)IssueCommandToSelectedUnits(mSim, dispatchSet, issueData, true);
+      } else if (
+        builtUnit != nullptr && builtUnit->AiBuilder != nullptr && builtUnit->AiBuilder->BuilderIsFactory() &&
+        mBuildDirection != zeroDir
+      ) {
+        EntitySetTemplate<Unit> dispatchSet{};
+        (void)dispatchSet.Add(builtUnit);
+        const Wm3::Vec3f& unitPos = builtUnit->GetPosition();
+        const Wm3::Vector3f rallyPos{
+          unitPos.x + mBuildDirection.x, unitPos.y + mBuildDirection.y, unitPos.z + mBuildDirection.z
+        };
+        SSTICommandIssueData moveData(EUnitCommandType::UNITCOMMAND_Move);
+        moveData.mTarget.mType = EAiTargetType::AITARGET_Ground;
+        moveData.mTarget.mEnt = -268435456;
+        moveData.mTarget.mPos = rallyPos;
+        // 0x005F7FF0-0x005F8002: `push 1; push set; push sim; call UNIT_IssueFactoryCommand`.
+        (void)IssueFactoryCommandToSelectedUnits(mSim, dispatchSet, moveData, true);
+      }
+      if (builtUnit != nullptr) {
+        builtUnit->mUnitVarDat.mUnitStates &= ~kUnitStateNoReclaimMask;
+      }
+      mBuildUnit.UnlinkFromOwnerChain();
+      mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+      return -1;
+    }
+
+    default:
+      gpg::HandleAssertFailure(
+        "Reached the supposably unreachable.", 856, "c:\\work\\rts\\main\\code\\src\\sim\\AiUnitBuild.cpp"
+      );
+      return -1;
     }
   }
 
@@ -727,7 +736,9 @@ namespace moho
    * `Unit+0x150` is `Entity+0x148`. The task deliberately goes through the
    * unit rather than its own `CCommandTask::mSim`.
    */
-  void CUnitMobileBuildTask::OnEvent(const ECommandEvent event)
+  void CUnitMobileBuildTask::OnEvent(
+    const ECommandEvent event
+  )
   {
     (void)event;
 
@@ -759,8 +770,12 @@ namespace moho
     const Wm3::Vec3f targetPos = mCommand->mTarget.GetTargetPosGun(false);
 
     const SOCellPos originCell{
-      static_cast<std::int16_t>(static_cast<std::int32_t>(std::lrintf(targetPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f)))),
-      static_cast<std::int16_t>(static_cast<std::int32_t>(std::lrintf(targetPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f))))
+      static_cast<std::int16_t>(
+        static_cast<std::int32_t>(std::lrintf(targetPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f)))
+      ),
+      static_cast<std::int16_t>(
+        static_cast<std::int32_t>(std::lrintf(targetPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)))
+      )
     };
 
     mBuildPosition = COORDS_ToWorldPos(
@@ -774,14 +789,12 @@ namespace moho
     // 0x005F8250..0x005F82D3: the occupancy rectangle, re-snapped from the
     // *new* build position rather than reusing `originCell` - the shipped body
     // reloads the blueprint and both footprint bytes for this second pass.
-    const auto rectX0 = static_cast<std::int32_t>(
-      static_cast<std::int16_t>(static_cast<std::int32_t>(std::lrintf(
-        mBuildPosition.x - (static_cast<float>(footprint.mSizeX) * 0.5f))))
-    );
-    const auto rectZ0 = static_cast<std::int32_t>(
-      static_cast<std::int16_t>(static_cast<std::int32_t>(std::lrintf(
-        mBuildPosition.z - (static_cast<float>(footprint.mSizeZ) * 0.5f))))
-    );
+    const auto rectX0 = static_cast<std::int32_t>(static_cast<std::int16_t>(
+      static_cast<std::int32_t>(std::lrintf(mBuildPosition.x - (static_cast<float>(footprint.mSizeX) * 0.5f)))
+    ));
+    const auto rectZ0 = static_cast<std::int32_t>(static_cast<std::int16_t>(
+      static_cast<std::int32_t>(std::lrintf(mBuildPosition.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)))
+    ));
 
     mBuildRect.x0 = rectX0;
     mBuildRect.z0 = rectZ0;
@@ -821,7 +834,8 @@ namespace moho
       return nullptr;
     }
 
-    auto guard = std::unique_ptr<CUnitMobileBuildTask, void (*)(CUnitMobileBuildTask*)>(raw, [](CUnitMobileBuildTask* p) {
+    auto guard =
+      std::unique_ptr<CUnitMobileBuildTask, void (*)(CUnitMobileBuildTask*)>(raw, [](CUnitMobileBuildTask* p) {
       ::operator delete(p);
     });
 
@@ -841,7 +855,9 @@ namespace moho
    * typed `ReadPointer_*` slots; the placement-retry counter through the
    * virtual `ReadInt` slot.
    */
-  void CUnitMobileBuildTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CUnitMobileBuildTask::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -897,7 +913,9 @@ namespace moho
    * unowned raw pointer; the placement-retry counter is written through the
    * virtual `WriteInt` slot.
    */
-  void CUnitMobileBuildTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CUnitMobileBuildTask::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;

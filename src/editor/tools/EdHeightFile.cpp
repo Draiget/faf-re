@@ -16,19 +16,27 @@ namespace faf::editor
 {
   namespace
   {
-    [[nodiscard]] std::string Lower(std::string text)
+    [[nodiscard]] std::string Lower(
+      std::string text
+    )
     {
-      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
       return text;
     }
 
-    [[nodiscard]] bool IsRaw(const std::filesystem::path& file)
+    [[nodiscard]] bool IsRaw(
+      const std::filesystem::path& file
+    )
     {
       const std::string extension = Lower(file.extension().string());
       return extension == ".raw" || extension == ".r16";
     }
 
-    [[nodiscard]] std::string HResultText(const HRESULT result)
+    [[nodiscard]] std::string HResultText(
+      const HRESULT result
+    )
     {
       char text[32];
       (void)std::snprintf(text, sizeof(text), "0x%08lX", static_cast<unsigned long>(result));
@@ -65,11 +73,23 @@ namespace faf::editor
           p->Release();
         }
       }
-      T** operator&() { return &p; }
-      T* operator->() const { return p; }
+      T** operator&()
+      {
+        return &p;
+      }
+      T* operator->() const
+      {
+        return p;
+      }
     };
 
-    bool ReadRaw(const std::filesystem::path& file, const int expectWidth, const int expectHeight, HeightImage& out, std::string& error)
+    bool ReadRaw(
+      const std::filesystem::path& file,
+      const int expectWidth,
+      const int expectHeight,
+      HeightImage& out,
+      std::string& error
+    )
     {
       std::ifstream in(file, std::ios::binary | std::ios::ate);
       if (!in) {
@@ -80,13 +100,17 @@ namespace faf::editor
       const std::size_t count = bytes / 2;
       int width = 0;
       int height = 0;
-      if (expectWidth > 0 && expectHeight > 0 && count == static_cast<std::size_t>(expectWidth) * static_cast<std::size_t>(expectHeight)) {
+      if (
+        expectWidth > 0 && expectHeight > 0 &&
+        count == static_cast<std::size_t>(expectWidth) * static_cast<std::size_t>(expectHeight)
+      ) {
         width = expectWidth;
         height = expectHeight;
       } else {
         const auto side = static_cast<int>(std::lround(std::sqrt(static_cast<double>(count))));
         if (bytes % 2 != 0 || static_cast<std::size_t>(side) * static_cast<std::size_t>(side) != count || side < 2) {
-          error = file.filename().string() + " is " + std::to_string(bytes) + " bytes: not a square of 16-bit heights, nor the map's size";
+          error = file.filename().string() + " is " + std::to_string(bytes) +
+            " bytes: not a square of 16-bit heights, nor the map's size";
           return false;
         }
         width = side;
@@ -108,14 +132,20 @@ namespace faf::editor
       return true;
     }
 
-    bool ReadImage(const std::filesystem::path& file, HeightImage& out, std::string& error)
+    bool ReadImage(
+      const std::filesystem::path& file,
+      HeightImage& out,
+      std::string& error
+    )
     {
       const ComScope com;
       ComPtr<IWICImagingFactory> factory;
       HRESULT hr = ::CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory.p));
       ComPtr<IWICBitmapDecoder> decoder;
       if (SUCCEEDED(hr)) {
-        hr = factory->CreateDecoderFromFilename(file.wstring().c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &decoder);
+        hr = factory->CreateDecoderFromFilename(
+          file.wstring().c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &decoder
+        );
       }
       ComPtr<IWICBitmapFrameDecode> frame;
       if (SUCCEEDED(hr)) {
@@ -126,7 +156,9 @@ namespace faf::editor
         hr = factory->CreateFormatConverter(&converter);
       }
       if (SUCCEEDED(hr)) {
-        hr = converter->Initialize(frame.p, GUID_WICPixelFormat16bppGray, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom);
+        hr = converter->Initialize(
+          frame.p, GUID_WICPixelFormat16bppGray, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom
+        );
       }
       UINT width = 0;
       UINT height = 0;
@@ -140,7 +172,9 @@ namespace faf::editor
       out.width = static_cast<int>(width);
       out.height = static_cast<int>(height);
       out.words.resize(static_cast<std::size_t>(width) * height);
-      hr = converter->CopyPixels(nullptr, width * 2, static_cast<UINT>(out.words.size() * 2), reinterpret_cast<BYTE*>(out.words.data()));
+      hr = converter->CopyPixels(
+        nullptr, width * 2, static_cast<UINT>(out.words.size() * 2), reinterpret_cast<BYTE*>(out.words.data())
+      );
       if (FAILED(hr)) {
         error = "can't read the pixels of " + file.filename().string() + " (" + HResultText(hr) + ")";
         return false;
@@ -148,7 +182,11 @@ namespace faf::editor
       return true;
     }
 
-    bool WritePng(const std::filesystem::path& file, const HeightImage& image, std::string& error)
+    bool WritePng(
+      const std::filesystem::path& file,
+      const HeightImage& image,
+      std::string& error
+    )
     {
       const ComScope com;
       ComPtr<IWICImagingFactory> factory;
@@ -185,8 +223,12 @@ namespace faf::editor
         hr = E_FAIL;
       }
       if (SUCCEEDED(hr)) {
-        hr = frame->WritePixels(static_cast<UINT>(image.height), static_cast<UINT>(image.width) * 2, static_cast<UINT>(image.words.size() * 2),
-                                reinterpret_cast<BYTE*>(const_cast<std::uint16_t*>(image.words.data())));
+        hr = frame->WritePixels(
+          static_cast<UINT>(image.height),
+          static_cast<UINT>(image.width) * 2,
+          static_cast<UINT>(image.words.size() * 2),
+          reinterpret_cast<BYTE*>(const_cast<std::uint16_t*>(image.words.data()))
+        );
       }
       if (SUCCEEDED(hr)) {
         hr = frame->Commit();
@@ -202,15 +244,28 @@ namespace faf::editor
     }
   } // namespace
 
-  bool ReadHeightImage(const std::filesystem::path& file, const int expectWidth, const int expectHeight, HeightImage& out, std::string& error)
+  bool ReadHeightImage(
+    const std::filesystem::path& file,
+    const int expectWidth,
+    const int expectHeight,
+    HeightImage& out,
+    std::string& error
+  )
   {
     out = {};
     return IsRaw(file) ? ReadRaw(file, expectWidth, expectHeight, out, error) : ReadImage(file, out, error);
   }
 
-  bool WriteHeightImage(const std::filesystem::path& file, const HeightImage& image, std::string& error)
+  bool WriteHeightImage(
+    const std::filesystem::path& file,
+    const HeightImage& image,
+    std::string& error
+  )
   {
-    if (image.width < 1 || image.height < 1 || image.words.size() != static_cast<std::size_t>(image.width) * static_cast<std::size_t>(image.height)) {
+    if (
+      image.width < 1 || image.height < 1 ||
+      image.words.size() != static_cast<std::size_t>(image.width) * static_cast<std::size_t>(image.height)
+    ) {
       error = "no heights to write";
       return false;
     }
@@ -235,7 +290,11 @@ namespace faf::editor
     return WritePng(file, image, error);
   }
 
-  HeightImage ResampleHeights(const HeightImage& image, const int width, const int height)
+  HeightImage ResampleHeights(
+    const HeightImage& image,
+    const int width,
+    const int height
+  )
   {
     if (image.width == width && image.height == height) {
       return image;
@@ -247,7 +306,9 @@ namespace faf::editor
     const double stepX = width > 1 ? static_cast<double>(image.width - 1) / (width - 1) : 0.0;
     const double stepZ = height > 1 ? static_cast<double>(image.height - 1) / (height - 1) : 0.0;
     const auto at = [&](const int x, const int z) {
-      return static_cast<double>(image.words[static_cast<std::size_t>(z) * static_cast<std::size_t>(image.width) + static_cast<std::size_t>(x)]);
+      return static_cast<double>(
+        image.words[static_cast<std::size_t>(z) * static_cast<std::size_t>(image.width) + static_cast<std::size_t>(x)]
+      );
     };
     for (int z = 0; z < height; ++z) {
       const double pz = z * stepZ;
@@ -259,7 +320,8 @@ namespace faf::editor
         const int x0 = std::min(image.width - 1, static_cast<int>(px));
         const int x1 = std::min(image.width - 1, x0 + 1);
         const double fx = px - x0;
-        const double value = (at(x0, z0) * (1.0 - fx) + at(x1, z0) * fx) * (1.0 - fz) + (at(x0, z1) * (1.0 - fx) + at(x1, z1) * fx) * fz;
+        const double value =
+          (at(x0, z0) * (1.0 - fx) + at(x1, z0) * fx) * (1.0 - fz) + (at(x0, z1) * (1.0 - fx) + at(x1, z1) * fx) * fz;
         out.words[static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)] =
           static_cast<std::uint16_t>(std::lround(std::clamp(value, 0.0, 65535.0)));
       }
@@ -267,7 +329,10 @@ namespace faf::editor
     return out;
   }
 
-  void ScaleHeights(HeightImage& image, const float scale)
+  void ScaleHeights(
+    HeightImage& image,
+    const float scale
+  )
   {
     if (scale == 1.0f) {
       return;

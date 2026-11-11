@@ -20,10 +20,11 @@ namespace gpg::gal
    * addresses above are the out-of-line copies the compiler kept.
    */
   template <class T>
-  void SafeRelease(T*& object)
+  void SafeRelease(
+    T*& object
+  )
   {
-    if (object != nullptr)
-    {
+    if (object != nullptr) {
       object->Release();
     }
     object = nullptr;

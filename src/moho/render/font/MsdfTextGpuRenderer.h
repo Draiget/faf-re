@@ -48,7 +48,7 @@ namespace moho
     float mV[4] = {};
     std::uint32_t mColor[4] = {}; // ARGB
     float mZ = 0.0f;
-    float mPixelRange = 0.0f;     // screen pixels covered by the distance range; 0 for an image quad
+    float mPixelRange = 0.0f; // screen pixels covered by the distance range; 0 for an image quad
     float mUnused[2] = {};
   };
   static_assert(sizeof(MsdfUiQuad) == 96, "MsdfUiQuad must match QuadInstance");
@@ -74,8 +74,11 @@ namespace moho
      * through the batcher: the path is off, or the caller draws with a technique other than the UI's.
      */
     [[nodiscard]] bool QueueImageQuad(
-      CD3DPrimBatcher& batcher, const CD3DPrimBatcher::Vertex& topLeft, const CD3DPrimBatcher::Vertex& topRight,
-      const CD3DPrimBatcher::Vertex& bottomRight, const CD3DPrimBatcher::Vertex& bottomLeft
+      CD3DPrimBatcher& batcher,
+      const CD3DPrimBatcher::Vertex& topLeft,
+      const CD3DPrimBatcher::Vertex& topRight,
+      const CD3DPrimBatcher::Vertex& bottomRight,
+      const CD3DPrimBatcher::Vertex& bottomLeft
     );
 
     /** Draws the pending quads. */
@@ -93,7 +96,7 @@ namespace moho
     CD3DPrimBatcher* mBatcher = nullptr;        // whose atlas and matrices the pending quads use
     VMatrix4 mComposite{};
     float mAlphaMultiplier = 1.0f;
-    std::uint32_t mNextQuad = 0u;               // where the next upload goes in the buffer
+    std::uint32_t mNextQuad = 0u; // where the next upload goes in the buffer
     // The last technique seen by QueueImageQuad and whether quads may join under it. Selecting a technique
     // makes a new object, so this compares by pointer once and by name only when that changes.
     boost::shared_ptr<gpg::gal::EffectTechnique> mCheckedTechnique;

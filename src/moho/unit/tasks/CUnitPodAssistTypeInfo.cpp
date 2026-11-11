@@ -23,7 +23,9 @@ namespace
     return sInstance;
   }
 
-  [[nodiscard]] gpg::RRef MakeCUnitPodAssistRef(moho::CUnitPodAssist* const object)
+  [[nodiscard]] gpg::RRef MakeCUnitPodAssistRef(
+    moho::CUnitPodAssist* const object
+  )
   {
     return gpg::RRef{object, gpg::RTypeOf<moho::CUnitPodAssist>()};
   }
@@ -74,7 +76,9 @@ namespace moho
   /**
    * Address: 0x0061E6F0 (FUN_0061E6F0, Moho::CUnitPodAssistTypeInfo::AddBase_CCommandTask)
    */
-  void __stdcall CUnitPodAssistTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void __stdcall CUnitPodAssistTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CCommandTask>(typeInfo);
   }
@@ -91,7 +95,9 @@ namespace moho
   /**
    * Address: 0x0061E660 (FUN_0061E660, Moho::CUnitPodAssistTypeInfo::CtrRef)
    */
-  gpg::RRef CUnitPodAssistTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitPodAssistTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const object = gpg::ConstructInStorage<moho::CUnitPodAssist>(objectStorage);
 
@@ -101,7 +107,9 @@ namespace moho
   /**
    * Address: 0x0061E640 (FUN_0061E640, Moho::CUnitPodAssistTypeInfo::Delete)
    */
-  void CUnitPodAssistTypeInfo::Delete(void* const objectStorage)
+  void CUnitPodAssistTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<moho::CUnitPodAssist*>(objectStorage);
   }
@@ -109,7 +117,9 @@ namespace moho
   /**
    * Address: 0x0061E6E0 (FUN_0061E6E0, Moho::CUnitPodAssistTypeInfo::Destruct)
    */
-  void CUnitPodAssistTypeInfo::Destruct(void* const objectStorage)
+  void CUnitPodAssistTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     auto* const object = static_cast<moho::CUnitPodAssist*>(objectStorage);
     if (!object) {
@@ -128,7 +138,9 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CUnitPodAssistTypeInfo_77e443, moho::register_CUnitPodAssistTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CUnitPodAssistTypeInfo_77e443,
+  moho::register_CUnitPodAssistTypeInfo
+)

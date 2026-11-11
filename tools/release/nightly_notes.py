@@ -59,7 +59,7 @@ def parity_line():
         text += " on Linux x64: " + ", ".join("%d %s" % (n, k.replace("expected-", "expected ")) for n, k in shown if n)
         if new:
             text += ". New failures: " + ", ".join(str(i) for i in new)
-        text += ". What is expected is [listed with why](%s/blob/%s/tools/parity-data/expected/3835.json)" % (REPO, os.environ["SHA"])
+        text += ". What is expected is [listed with why](%s/tree/%s/tools/parity-data/expected), one file per game version" % (REPO, os.environ["SHA"])
     return text + "."
 
 
@@ -93,6 +93,7 @@ def main():
               "## Install", "",
               "- **x64:** extract `faf-engine-%s-x64.zip` into the folder you run the x64 engine from. `INSTALL.txt` inside lists the steps." % tag,
               "- **x86:** extract `faf-engine-%s-x86.zip` into FAF's `bin` folder." % tag,
+              "- **Linux x64 (native, Vulkan; glibc 2.39 or newer):** extract `faf-engine-%s-linux-x64.tar.gz` into a folder of its own. `INSTALL.txt` inside lists the steps; it plays with the rebuilt engine on Windows or Linux, not with the original exe." % tag,
               "- `main_x64.exe` and `main.exe` are the same exes on their own, for updating an install that already has the rest of the zip.",
               "- The `.pdb` files are optional, but crash reports are much more useful with them. Crash reports are written next to the exe as `faf_crash_<date>.txt`; please attach them with your log.",
               "", "SHA-256:", "", "```", sums, "```", ""]

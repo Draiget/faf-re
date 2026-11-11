@@ -33,7 +33,6 @@
 #include "moho/sim/SimWorkerPool.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 
-
 namespace moho
 {
   // Debug console flags defined in EffectLuaStartupRegistrations.cpp. Each makes its effect class
@@ -80,8 +79,8 @@ namespace moho
     /// sim_ParallelEffects: what one chunk of effect ticks produced, committed after the chunk.
     struct SEffectTickChunk
     {
-      SParticleBuffer mParticles;          // the chunk's particle, trail and beam appends
-      std::vector<IEffect*> mDestroyed;    // its DestroyEffect calls, in call order
+      SParticleBuffer mParticles;       // the chunk's particle, trail and beam appends
+      std::vector<IEffect*> mDestroyed; // its DestroyEffect calls, in call order
     };
 
     // Effects per chunk. Chunk boundaries depend only on this and the effect count.
@@ -94,7 +93,9 @@ namespace moho
 
     /// The classes whose OnTick is known to write only the effect itself, the particle buffer and
     /// the destroyed list (through DestroyEffect on itself).
-    [[nodiscard]] bool TicksOnWorkers(IEffect* const effect)
+    [[nodiscard]] bool TicksOnWorkers(
+      IEffect* const effect
+    )
     {
       const std::type_info& type = typeid(*effect);
       return type == typeid(CEfxEmitter) || type == typeid(CEfxTrailEmitter) || type == typeid(CEfxBeam);
@@ -102,7 +103,10 @@ namespace moho
 
     /// Appends `source` to `target` one push_back at a time, as the serial walk does, and empties it.
     template <class T>
-    void AppendInOrder(fa::vector<T>& target, fa::vector<T>& source)
+    void AppendInOrder(
+      fa::vector<T>& target,
+      fa::vector<T>& source
+    )
     {
       for (const T& value : source) {
         target.push_back(value);
@@ -124,20 +128,24 @@ namespace moho
       return fa::string("/textures/particles/") + textureName + ".dds";
     }
 
-    [[nodiscard]] bool IsBlueprintEnabledForCurrentFidelity(const REffectBlueprint* const blueprint)
+    [[nodiscard]] bool IsBlueprintEnabledForCurrentFidelity(
+      const REffectBlueprint* const blueprint
+    )
     {
       if (blueprint == nullptr) {
         return true;
       }
 
-      const int enabledMask = static_cast<int>(blueprint->LowFidelity)
-        | (static_cast<int>(blueprint->MedFidelity) << 1)
-        | (static_cast<int>(blueprint->HighFidelity) << 2);
+      const int enabledMask = static_cast<int>(blueprint->LowFidelity) |
+        (static_cast<int>(blueprint->MedFidelity) << 1) | (static_cast<int>(blueprint->HighFidelity) << 2);
       return (enabledMask & (1 << graphics_Fidelity)) != 0;
     }
 
     template <class TEffect>
-    [[nodiscard]] TEffect* LinkActiveEffect(TDatList<IEffect, void>& activeEffects, TEffect* const effect)
+    [[nodiscard]] TEffect* LinkActiveEffect(
+      TDatList<IEffect, void>& activeEffects,
+      TEffect* const effect
+    )
     {
       if (effect == nullptr) {
         return nullptr;
@@ -147,7 +155,10 @@ namespace moho
       return effect;
     }
 
-    [[nodiscard]] REmitterBlueprint* LookupEmitterBlueprint(Sim* const sim, const char* const blueprintName)
+    [[nodiscard]] REmitterBlueprint* LookupEmitterBlueprint(
+      Sim* const sim,
+      const char* const blueprintName
+    )
     {
       if (sim == nullptr || sim->mRules == nullptr || blueprintName == nullptr) {
         return nullptr;
@@ -157,7 +168,10 @@ namespace moho
       return RULE_FindEmitterBlueprintByName(sim->mRules, blueprintName);
     }
 
-    [[nodiscard]] RTrailBlueprint* LookupTrailBlueprint(Sim* const sim, const char* const blueprintName)
+    [[nodiscard]] RTrailBlueprint* LookupTrailBlueprint(
+      Sim* const sim,
+      const char* const blueprintName
+    )
     {
       if (sim == nullptr || sim->mRules == nullptr || blueprintName == nullptr) {
         return nullptr;
@@ -190,7 +204,11 @@ namespace moho
      * `CreateEmitterAtBone` emitter (mass-storage blinking lights most
      * visibly) high in the air, far from its unit.
      */
-    void ApplyBoneTransformToEffect(CEffectImpl& effect, Entity* const entity, const int boneIndex)
+    void ApplyBoneTransformToEffect(
+      CEffectImpl& effect,
+      Entity* const entity,
+      const int boneIndex
+    )
     {
       const VTransform boneTransform = entity->GetBoneWorldTransform(boneIndex);
       effect.mMatrix.Set(boneTransform.orient_, boneTransform.pos_);
@@ -205,7 +223,10 @@ namespace moho
      * position lane into effect param slot `0` (`SetNParam(...,3)`), then
      * advances one interpolation step.
      */
-    void ApplyEntityWorldPositionToEffect(CEffectImpl& effect, const Entity& entity)
+    void ApplyEntityWorldPositionToEffect(
+      CEffectImpl& effect,
+      const Entity& entity
+    )
     {
       // A quaternion followed by a position, 0x1C bytes: that is `VTransform`,
       // which is also exactly what `entity.mVarDat.mCurTransform` already is.
@@ -225,12 +246,13 @@ namespace moho
    * Initializes one effect-manager implementation object by binding the
    * owning `Sim` lane and self-linking both intrusive effect lists.
    */
-  CEffectManagerImpl::CEffectManagerImpl(Sim* const sim)
+  CEffectManagerImpl::CEffectManagerImpl(
+    Sim* const sim
+  )
     : mSim(sim)
     , mActiveEffects()
     , mDestroyedEffects()
-  {
-  }
+  {}
 
   /**
    * Address: 0x0066B400 (FUN_0066B400, Moho::CEffectManagerImpl::dtr thunk)
@@ -307,8 +329,8 @@ namespace moho
     }
 
     CEffectImpl* const effect = LinkActiveEffect(
-      mActiveEffects,
-      new (std::nothrow) CEfxEmitter(this, Wm3::Vector3<float>(0.0f, 0.0f, 0.0f), armyIndex, blueprint));
+      mActiveEffects, new (std::nothrow) CEfxEmitter(this, Wm3::Vector3<float>(0.0f, 0.0f, 0.0f), armyIndex, blueprint)
+    );
     if (effect == nullptr) {
       return nullptr;
     }
@@ -340,8 +362,8 @@ namespace moho
     }
 
     CEffectImpl* const effect = LinkActiveEffect(
-      mActiveEffects,
-      new (std::nothrow) CEfxEmitter(this, Wm3::Vector3<float>(0.0f, 0.0f, 0.0f), armyIndex, blueprint));
+      mActiveEffects, new (std::nothrow) CEfxEmitter(this, Wm3::Vector3<float>(0.0f, 0.0f, 0.0f), armyIndex, blueprint)
+    );
     if (effect == nullptr) {
       return nullptr;
     }
@@ -372,8 +394,8 @@ namespace moho
     }
 
     CEffectImpl* const effect = LinkActiveEffect(
-      mActiveEffects,
-      new (std::nothrow) CEfxEmitter(this, Wm3::Vector3<float>(0.0f, 0.0f, 0.0f), armyIndex, blueprint));
+      mActiveEffects, new (std::nothrow) CEfxEmitter(this, Wm3::Vector3<float>(0.0f, 0.0f, 0.0f), armyIndex, blueprint)
+    );
     if (effect == nullptr) {
       return nullptr;
     }
@@ -404,8 +426,8 @@ namespace moho
     }
 
     CEffectImpl* const effect = LinkActiveEffect(
-      mActiveEffects,
-      new (std::nothrow) CEfxEmitter(this, Wm3::Vector3<float>(0.0f, 0.0f, 0.0f), armyIndex, blueprint));
+      mActiveEffects, new (std::nothrow) CEfxEmitter(this, Wm3::Vector3<float>(0.0f, 0.0f, 0.0f), armyIndex, blueprint)
+    );
     if (effect == nullptr) {
       return nullptr;
     }
@@ -439,8 +461,7 @@ namespace moho
     // The binary seeds the trail emitter from a zeroed initial emit position and
     // relies on the blueprint ctor to publish lifetime/length/textures + scale.
     const float initialPosition[3] = {0.0f, 0.0f, 0.0f};
-    CEfxTrailEmitter* const effect =
-      new (std::nothrow) CEfxTrailEmitter(this, initialPosition, blueprint, armyIndex);
+    CEfxTrailEmitter* const effect = new (std::nothrow) CEfxTrailEmitter(this, initialPosition, blueprint, armyIndex);
     if (effect == nullptr) {
       return nullptr;
     }
@@ -458,7 +479,9 @@ namespace moho
   /**
    * Address: 0x0066B230 (FUN_0066B230, Moho::CEffectManagerImpl::DestroyEffect)
    */
-  void CEffectManagerImpl::DestroyEffect(IEffect* const effect)
+  void CEffectManagerImpl::DestroyEffect(
+    IEffect* const effect
+  )
   {
     if (effect == nullptr) {
       return;
@@ -478,7 +501,9 @@ namespace moho
     bool gEffectsLifetimeOnly = false;
   } // namespace
 
-  void EFFECT_SetLifetimeOnly(const bool lifetimeOnly) noexcept
+  void EFFECT_SetLifetimeOnly(
+    const bool lifetimeOnly
+  ) noexcept
   {
     gEffectsLifetimeOnly = lifetimeOnly;
   }
@@ -517,8 +542,10 @@ namespace moho
 
   bool CEffectManagerImpl::TickParallel()
   {
-    if (!sim_ParallelEffects || !CSimWorkerPool::ParallelEnabled() || dbg_EfxBeams || dbg_Emitter || dbg_Trail ||
-        tEffectTickChunk != nullptr) {
+    if (
+      !sim_ParallelEffects || !CSimWorkerPool::ParallelEnabled() || dbg_EfxBeams || dbg_Emitter || dbg_Trail ||
+      tEffectTickChunk != nullptr
+    ) {
       return false;
     }
 
@@ -548,8 +575,16 @@ namespace moho
     CSimWorkerPool::Get().ParallelFor(count, kEffectTickGrain, [](const std::size_t begin, const std::size_t end) {
       struct SChunkScope
       {
-        explicit SChunkScope(SEffectTickChunk* const chunk) noexcept { tEffectTickChunk = chunk; }
-        ~SChunkScope() { tEffectTickChunk = nullptr; }
+        explicit SChunkScope(
+          SEffectTickChunk* const chunk
+        ) noexcept
+        {
+          tEffectTickChunk = chunk;
+        }
+        ~SChunkScope()
+        {
+          tEffectTickChunk = nullptr;
+        }
       } scope(sEffectTickChunks[begin / kEffectTickGrain].get());
       for (std::size_t i = begin; i < end; ++i) {
         sEffectTickSnapshot[i]->OnTick();
@@ -580,7 +615,8 @@ namespace moho
     if ((++sParallelEffectTicks % 5000u) == 0u) {
       gpg::Logf(
         "sim_ParallelEffects: %llu effect ticks on workers (this one: %zu effects)",
-        static_cast<unsigned long long>(sParallelEffectTicks), count
+        static_cast<unsigned long long>(sParallelEffectTicks),
+        count
       );
     }
     return true;
@@ -619,8 +655,7 @@ namespace moho
     const int armyIndex
   )
   {
-    const fa::string primaryPath =
-      BuildParticleTexturePath(texturePrimary, "/textures/particles/beam_white_01.dds");
+    const fa::string primaryPath = BuildParticleTexturePath(texturePrimary, "/textures/particles/beam_white_01.dds");
 
     if (textureSecondary.empty()) {
       return;
@@ -662,7 +697,10 @@ namespace moho
   /**
    * Address: 0x006560E0 (FUN_006560E0, Moho::CEffectManagerImpl::CreateBeam)
    */
-  IEffect* CEffectManagerImpl::CreateBeam(const RBeamBlueprint* const beamBlueprint, const int armyIndex)
+  IEffect* CEffectManagerImpl::CreateBeam(
+    const RBeamBlueprint* const beamBlueprint,
+    const int armyIndex
+  )
   {
     CEfxBeam* const effect = new (std::nothrow) CEfxBeam(this, beamBlueprint, armyIndex);
     if (effect == nullptr) {
@@ -682,7 +720,9 @@ namespace moho
   /**
    * Address: 0x00656020 (FUN_00656020, Moho::CEffectManagerImpl::CreateBeam)
    */
-  IEffect* CEffectManagerImpl::CreateBeam(const SCreateBeamParams& params)
+  IEffect* CEffectManagerImpl::CreateBeam(
+    const SCreateBeamParams& params
+  )
   {
     // The create-params ctor applies every beam render parameter (endpoints,
     // colour, length, thickness, UV shift, repeat rate, LOD cutoff, texture, and
@@ -773,7 +813,12 @@ namespace moho
 
 namespace moho
 {
-  void CEffectManagerImpl::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CEffectManagerImpl::MemberConstruct(
+    gpg::ReadArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     Sim* sim = nullptr;
     const gpg::RRef owner{};
@@ -785,7 +830,10 @@ namespace moho
    * Address: 0x0066BA60 (FUN_0066BA60)
    */
   void CEffectManagerImpl::MemberSaveConstructArgs(
-    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+    gpg::WriteArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerSaveConstructArgsResult& result
   )
   {
     archive.WritePointer(GetSim(), gpg::TrackedPointerState::Unowned, gpg::RRef{});

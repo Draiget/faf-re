@@ -17,7 +17,7 @@ namespace gpg
    * runtime-derived owner type and adjusting the base subobject pointer.
    */
   RRef* RRef_IFormationInstance(RRef* out, moho::IFormationInstance* value);
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -104,7 +104,10 @@ namespace moho
     static void SerSave(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
   };
 
-  static_assert(sizeof(RCountedPtrType<moho::IFormationInstance>) == 0x68, "RCountedPtrType<IFormationInstance> size must be 0x68");
+  static_assert(
+    sizeof(RCountedPtrType<moho::IFormationInstance>) == 0x68,
+    "RCountedPtrType<IFormationInstance> size must be 0x68"
+  );
 
   /**
    * Address: 0x00BD9030 (FUN_00BD9030, register_IFormationInstanceCountedPtrReflection)

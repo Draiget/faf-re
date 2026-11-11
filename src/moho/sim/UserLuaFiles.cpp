@@ -2,49 +2,60 @@
 
 namespace
 {
-  [[nodiscard]] fa::string BuildSpecialFilePathDirectory(const moho::ESpecialFileType type)
+  [[nodiscard]] fa::string BuildSpecialFilePathDirectory(
+    const moho::ESpecialFileType type
+  )
   {
     switch (type) {
-      case moho::ESpecialFileType::SaveGame:
-      case moho::ESpecialFileType::CampaignSave:
-        return USER_GetSaveGameDir();
-      case moho::ESpecialFileType::Replay:
-        return USER_GetReplayDir();
-      case moho::ESpecialFileType::Screenshot:
-        return USER_GetScreenshotDir();
+    case moho::ESpecialFileType::SaveGame:
+    case moho::ESpecialFileType::CampaignSave:
+      return USER_GetSaveGameDir();
+    case moho::ESpecialFileType::Replay:
+      return USER_GetReplayDir();
+    case moho::ESpecialFileType::Screenshot:
+      return USER_GetScreenshotDir();
     }
     return fa::string{};
   }
-  [[nodiscard]] fa::string BuildSpecialFilePathExtension(const moho::ESpecialFileType type)
+  [[nodiscard]] fa::string BuildSpecialFilePathExtension(
+    const moho::ESpecialFileType type
+  )
   {
     switch (type) {
-      case moho::ESpecialFileType::SaveGame:
-        return USER_GetSaveGameExt();
-      case moho::ESpecialFileType::Replay:
-        return USER_GetReplayExt();
-      case moho::ESpecialFileType::Screenshot:
-        return fa::string("bmp");
-      case moho::ESpecialFileType::CampaignSave:
-        return USER_GetCampaignSaveExt();
+    case moho::ESpecialFileType::SaveGame:
+      return USER_GetSaveGameExt();
+    case moho::ESpecialFileType::Replay:
+      return USER_GetReplayExt();
+    case moho::ESpecialFileType::Screenshot:
+      return fa::string("bmp");
+    case moho::ESpecialFileType::CampaignSave:
+      return USER_GetCampaignSaveExt();
     }
     return fa::string{};
   }
   constexpr const char* kCopyCurrentReplayHelpText =
     "CopyCurrentReplay(string profile, string newFilename) - copy the current replay to another file";
   constexpr const char* kGetSpecialFileInfoHelpText =
-    "table GetSpecialFileInfo(string profileName, string basename, string type) - get information on a profile based file, nil if unable to find";
+    "table GetSpecialFileInfo(string profileName, string basename, string type) - get information on a profile based "
+    "file, nil if unable to find";
   constexpr const char* kGetSpecialFilePathHelpText =
-    "string GetSpecialFilePath(string profilename, string filename, string type) - Given the base name of a special file, retuns the complete path";
+    "string GetSpecialFilePath(string profilename, string filename, string type) - Given the base name of a special "
+    "file, retuns the complete path";
   constexpr const char* kGetSpecialFilesHelpText =
-    "table GetSpecialFiles(string type)- returns a table of strings which are the names of files in special locations (currently SaveFile, Replay)";
+    "table GetSpecialFiles(string type)- returns a table of strings which are the names of files in special locations "
+    "(currently SaveFile, Replay)";
   constexpr const char* kGetSpecialFolderHelpText = "string GetSpecialFolder(string type)";
   constexpr const char* kRemoveProfileDirectoriesHelpText =
     "RemoveProfileDirectories(string profile) - Removes the profile directory and all special files";
   constexpr const char* kRemoveSpecialFileHelpText =
     "RemoveSpecialFile(string profilename, string basename, string type) - remove a profile based file from the disc";
-  [[noreturn]] void ThrowInvalidSpecialFileType(const char* const lexical)
+  [[noreturn]] void ThrowInvalidSpecialFileType(
+    const char* const lexical
+  )
   {
-    throw std::runtime_error(gpg::STR_Printf("Invalid special file type %s", lexical != nullptr ? lexical : "").to_std());
+    throw std::runtime_error(
+      gpg::STR_Printf("Invalid special file type %s", lexical != nullptr ? lexical : "").to_std()
+    );
   }
   [[nodiscard]] bool TryParseSpecialFileType(
     const char* const lexical,
@@ -82,8 +93,7 @@ namespace
 
     return false;
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x008440A0 (FUN_008440A0, cfunc_GetSpecialFiles)
@@ -91,7 +101,9 @@ namespace
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_GetSpecialFilesL`.
  */
-int moho::cfunc_GetSpecialFiles(lua_State* const luaContext)
+int moho::cfunc_GetSpecialFiles(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetSpecialFilesL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -122,7 +134,9 @@ moho::CScrLuaInitForm* moho::func_GetSpecialFiles_LuaFuncDef()
  * Resolves one special-file type and returns a Lua table containing grouped
  * profile file basenames plus directory/extension metadata.
  */
-int moho::cfunc_GetSpecialFilesL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetSpecialFilesL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -179,7 +193,9 @@ int moho::cfunc_GetSpecialFilesL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_GetSpecialFilePathL`.
  */
-int moho::cfunc_GetSpecialFilePath(lua_State* const luaContext)
+int moho::cfunc_GetSpecialFilePath(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetSpecialFilePathL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -210,7 +226,9 @@ moho::CScrLuaInitForm* moho::func_GetSpecialFilePath_LuaFuncDef()
  * Resolves `(profile, filename, specialType)` and pushes one absolute
  * user-special-file path (`directory\\profile\\filename.extension`).
  */
-int moho::cfunc_GetSpecialFilePathL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetSpecialFilePathL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -257,7 +275,9 @@ int moho::cfunc_GetSpecialFilePathL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_GetSpecialFolderL`.
  */
-int moho::cfunc_GetSpecialFolder(lua_State* const luaContext)
+int moho::cfunc_GetSpecialFolder(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetSpecialFolderL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -287,7 +307,9 @@ moho::CScrLuaInitForm* moho::func_GetSpecialFolder_LuaFuncDef()
  * What it does:
  * Resolves one special-file type and pushes the matching root folder path.
  */
-int moho::cfunc_GetSpecialFolderL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetSpecialFolderL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -319,7 +341,9 @@ int moho::cfunc_GetSpecialFolderL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_RemoveSpecialFileL`.
  */
-int moho::cfunc_RemoveSpecialFile(lua_State* const luaContext)
+int moho::cfunc_RemoveSpecialFile(
+  lua_State* const luaContext
+)
 {
   return cfunc_RemoveSpecialFileL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -349,7 +373,9 @@ moho::CScrLuaInitForm* moho::func_RemoveSpecialFile_LuaFuncDef()
  * What it does:
  * Builds one profile-scoped special-file path and recycles it from disk.
  */
-int moho::cfunc_RemoveSpecialFileL(LuaPlus::LuaState* const state)
+int moho::cfunc_RemoveSpecialFileL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -372,21 +398,21 @@ int moho::cfunc_RemoveSpecialFileL(LuaPlus::LuaState* const state)
   fa::string directory;
   fa::string extension;
   switch (specialFileType) {
-    case moho::ESpecialFileType::SaveGame:
-      directory = USER_GetSaveGameDir();
-      extension = USER_GetSaveGameExt();
-      break;
-    case moho::ESpecialFileType::Replay:
-      directory = USER_GetReplayDir();
-      extension = USER_GetReplayExt();
-      break;
-    case moho::ESpecialFileType::CampaignSave:
-      directory = USER_GetSaveGameDir();
-      extension = USER_GetCampaignSaveExt();
-      break;
-    case moho::ESpecialFileType::Screenshot:
-    default:
-      ThrowInvalidSpecialFileType(specialFileTypeLexical);
+  case moho::ESpecialFileType::SaveGame:
+    directory = USER_GetSaveGameDir();
+    extension = USER_GetSaveGameExt();
+    break;
+  case moho::ESpecialFileType::Replay:
+    directory = USER_GetReplayDir();
+    extension = USER_GetReplayExt();
+    break;
+  case moho::ESpecialFileType::CampaignSave:
+    directory = USER_GetSaveGameDir();
+    extension = USER_GetCampaignSaveExt();
+    break;
+  case moho::ESpecialFileType::Screenshot:
+  default:
+    ThrowInvalidSpecialFileType(specialFileTypeLexical);
   }
 
   const LuaPlus::LuaStackObject profileArg(state, 1);
@@ -412,7 +438,9 @@ int moho::cfunc_RemoveSpecialFileL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_GetSpecialFileInfoL`.
  */
-int moho::cfunc_GetSpecialFileInfo(lua_State* const luaContext)
+int moho::cfunc_GetSpecialFileInfo(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetSpecialFileInfoL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -443,7 +471,9 @@ moho::CScrLuaInitForm* moho::func_GetSpecialFileInfo_LuaFuncDef()
  * Returns metadata table for one profile-scoped special file, or `nil` when
  * the file does not exist.
  */
-int moho::cfunc_GetSpecialFileInfoL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetSpecialFileInfoL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -466,21 +496,21 @@ int moho::cfunc_GetSpecialFileInfoL(LuaPlus::LuaState* const state)
   fa::string directory;
   fa::string extension;
   switch (specialFileType) {
-    case moho::ESpecialFileType::SaveGame:
-      directory = USER_GetSaveGameDir();
-      extension = USER_GetSaveGameExt();
-      break;
-    case moho::ESpecialFileType::Replay:
-      directory = USER_GetReplayDir();
-      extension = USER_GetReplayExt();
-      break;
-    case moho::ESpecialFileType::CampaignSave:
-      directory = USER_GetSaveGameDir();
-      extension = USER_GetCampaignSaveExt();
-      break;
-    case moho::ESpecialFileType::Screenshot:
-    default:
-      ThrowInvalidSpecialFileType(specialFileTypeLexical);
+  case moho::ESpecialFileType::SaveGame:
+    directory = USER_GetSaveGameDir();
+    extension = USER_GetSaveGameExt();
+    break;
+  case moho::ESpecialFileType::Replay:
+    directory = USER_GetReplayDir();
+    extension = USER_GetReplayExt();
+    break;
+  case moho::ESpecialFileType::CampaignSave:
+    directory = USER_GetSaveGameDir();
+    extension = USER_GetCampaignSaveExt();
+    break;
+  case moho::ESpecialFileType::Screenshot:
+  default:
+    ThrowInvalidSpecialFileType(specialFileTypeLexical);
   }
 
   const LuaPlus::LuaStackObject profileArg(state, 1);
@@ -544,7 +574,9 @@ int moho::cfunc_GetSpecialFileInfoL(LuaPlus::LuaState* const state)
  * Unwraps Lua callback context and dispatches to
  * `cfunc_RemoveProfileDirectoriesL`.
  */
-int moho::cfunc_RemoveProfileDirectories(lua_State* const luaContext)
+int moho::cfunc_RemoveProfileDirectories(
+  lua_State* const luaContext
+)
 {
   return cfunc_RemoveProfileDirectoriesL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -575,7 +607,9 @@ moho::CScrLuaInitForm* moho::func_RemoveProfileDirectories_LuaFuncDef()
  * Recycles replay/save profile-scoped directories and companion lanes for one
  * profile string.
  */
-int moho::cfunc_RemoveProfileDirectoriesL(LuaPlus::LuaState* const state)
+int moho::cfunc_RemoveProfileDirectoriesL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -608,7 +642,9 @@ int moho::cfunc_RemoveProfileDirectoriesL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_CopyCurrentReplayL`.
  */
-int moho::cfunc_CopyCurrentReplay(lua_State* const luaContext)
+int moho::cfunc_CopyCurrentReplay(
+  lua_State* const luaContext
+)
 {
   return cfunc_CopyCurrentReplayL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -639,7 +675,9 @@ moho::CScrLuaInitForm* moho::func_CopyCurrentReplay_LuaFuncDef()
  * Copies the localized `LastGame` replay from one profile lane to a new replay
  * filename in that profile.
  */
-int moho::cfunc_CopyCurrentReplayL(LuaPlus::LuaState* const state)
+int moho::cfunc_CopyCurrentReplayL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;

@@ -25,7 +25,10 @@ namespace faf::remote::client
     }
   } // namespace
 
-  void NoteSessionBeat(moho::CWldSession& session, const moho::SSyncData& beat)
+  void NoteSessionBeat(
+    moho::CWldSession& session,
+    const moho::SSyncData& beat
+  )
   {
     if (!Enabled()) {
       return;
@@ -65,8 +68,14 @@ namespace faf::remote::client
       armies += (armies.empty() ? "" : " ") + std::to_string(count);
     }
     gpg::Logf(
-      "session summary beat %d%s: entities %zu, units %zu [%s], orphans %zu, unit health %.1f", beat.mCurBeat,
-      gameOver ? " (game over)" : "", entities, units, armies.c_str(), orphans, unitHealth
+      "session summary beat %d%s: entities %zu, units %zu [%s], orphans %zu, unit health %.1f",
+      beat.mCurBeat,
+      gameOver ? " (game over)" : "",
+      entities,
+      units,
+      armies.c_str(),
+      orphans,
+      unitHealth
     );
   }
 } // namespace faf::remote::client

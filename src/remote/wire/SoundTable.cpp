@@ -9,7 +9,10 @@ namespace faf::remote::wire
 {
   namespace
   {
-    void WriteString(BitWriter& writer, const std::string& text)
+    void WriteString(
+      BitWriter& writer,
+      const std::string& text
+    )
     {
       writer.WriteVarUint(static_cast<std::uint32_t>(text.size()));
       for (const char c : text) {
@@ -17,7 +20,10 @@ namespace faf::remote::wire
       }
     }
 
-    [[nodiscard]] bool ReadString(BitReader& reader, std::string& text)
+    [[nodiscard]] bool ReadString(
+      BitReader& reader,
+      std::string& text
+    )
     {
       const std::uint32_t size = reader.ReadVarUint();
       if (!reader.Ok() || size > CSoundTableReader::kMaxNameBytes || size * 8u > reader.BitsLeft()) {
@@ -33,7 +39,9 @@ namespace faf::remote::wire
     }
   } // namespace
 
-  CSoundTableWriter::SInterned CSoundTableWriter::Intern(const SSoundEntry& entry)
+  CSoundTableWriter::SInterned CSoundTableWriter::Intern(
+    const SSoundEntry& entry
+  )
   {
     const auto key = std::make_tuple(entry.bank, entry.cue, entry.lodCutoff, entry.rpcLoop);
     if (const auto it = mIds.find(key); it != mIds.end()) {
@@ -45,7 +53,10 @@ namespace faf::remote::wire
     return {id, true};
   }
 
-  void CSoundTableWriter::WriteEntry(const std::uint32_t id, BitWriter& writer) const
+  void CSoundTableWriter::WriteEntry(
+    const std::uint32_t id,
+    BitWriter& writer
+  ) const
   {
     const SSoundEntry& entry = mEntries.at(id);
     writer.WriteVarUint(id);
@@ -55,7 +66,9 @@ namespace faf::remote::wire
     WriteString(writer, entry.rpcLoop);
   }
 
-  bool CSoundTableReader::ReadEntry(BitReader& reader)
+  bool CSoundTableReader::ReadEntry(
+    BitReader& reader
+  )
   {
     const std::uint32_t id = reader.ReadVarUint();
     if (!reader.Ok() || id != mEntries.size() || mEntries.size() >= kMaxEntries) {
@@ -63,15 +76,19 @@ namespace faf::remote::wire
       return false;
     }
     SSoundEntry entry;
-    if (!ReadString(reader, entry.bank) || !ReadString(reader, entry.cue) || !ReadString(reader, entry.lodCutoff)
-        || !ReadString(reader, entry.rpcLoop)) {
+    if (
+      !ReadString(reader, entry.bank) || !ReadString(reader, entry.cue) || !ReadString(reader, entry.lodCutoff) ||
+      !ReadString(reader, entry.rpcLoop)
+    ) {
       return false;
     }
     mEntries.push_back(std::move(entry));
     return true;
   }
 
-  const SSoundEntry* CSoundTableReader::Find(const std::uint32_t id) const noexcept
+  const SSoundEntry* CSoundTableReader::Find(
+    const std::uint32_t id
+  ) const noexcept
   {
     return id < mEntries.size() ? &mEntries[id] : nullptr;
   }

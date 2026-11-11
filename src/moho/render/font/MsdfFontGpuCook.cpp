@@ -443,7 +443,10 @@ void CookFontCS(uint3 id : SV_DispatchThreadID)
       return cooker;
     }
 
-    [[nodiscard]] bool EnsureResources(Cooker& cooker, gpg::gal::Device& device)
+    [[nodiscard]] bool EnsureResources(
+      Cooker& cooker,
+      gpg::gal::Device& device
+    )
     {
       if (cooker.mDevice == &device && cooker.mProgram && cooker.mEdges && cooker.mOutput) {
         return true;
@@ -473,7 +476,11 @@ void CookFontCS(uint3 id : SV_DispatchThreadID)
     }
 
     /** One batch: as many glyphs as stay inside the budgets, at least one. */
-    void RunBatch(Cooker& cooker, gpg::gal::Device& device, Job& job)
+    void RunBatch(
+      Cooker& cooker,
+      gpg::gal::Device& device,
+      Job& job
+    )
     {
       const std::vector<SMsdfGpuGlyph>& glyphs = job.mPlan->GpuGlyphs();
       const std::vector<SMsdfGpuEdge>& edges = job.mPlan->GpuEdges();
@@ -494,21 +501,26 @@ void CookFontCS(uint3 id : SV_DispatchThreadID)
         if (glyph.mWidth <= 0) {
           continue;
         }
-        const std::uint32_t glyphTexels = static_cast<std::uint32_t>(glyph.mWidth) * static_cast<std::uint32_t>(glyph.mHeight);
+        const std::uint32_t glyphTexels =
+          static_cast<std::uint32_t>(glyph.mWidth) * static_cast<std::uint32_t>(glyph.mHeight);
         if (glyphTexels > kMaxBatchTexels || glyph.mEdgeCount > kMaxBatchEdges) {
           job.mFailed = true;
           job.mError = "a glyph is too large for a batch";
           return;
         }
         const std::uint64_t glyphCost = static_cast<std::uint64_t>(glyphTexels) * glyph.mEdgeCount;
-        if (!batch.empty()
-            && (texels + glyphTexels > kMaxBatchTexels || cooker.mBatchEdges.size() + glyph.mEdgeCount > kMaxBatchEdges
-                || cost + glyphCost > kMaxBatchCost)) {
+        if (
+          !batch.empty() &&
+          (texels + glyphTexels > kMaxBatchTexels || cooker.mBatchEdges.size() + glyph.mEdgeCount > kMaxBatchEdges ||
+           cost + glyphCost > kMaxBatchCost)
+        ) {
           break;
         }
         batch.push_back({next, static_cast<std::uint32_t>(cooker.mBatchEdges.size()), texels});
         cooker.mBatchEdges.insert(
-          cooker.mBatchEdges.end(), edges.begin() + glyph.mFirstEdge, edges.begin() + glyph.mFirstEdge + glyph.mEdgeCount
+          cooker.mBatchEdges.end(),
+          edges.begin() + glyph.mFirstEdge,
+          edges.begin() + glyph.mFirstEdge + glyph.mEdgeCount
         );
         texels += glyphTexels;
         cost += glyphCost;
@@ -518,12 +530,19 @@ void CookFontCS(uint3 id : SV_DispatchThreadID)
         return;
       }
 
-      device.UpdateGpuBuffer(*cooker.mEdges, 0u, static_cast<std::uint32_t>(cooker.mBatchEdges.size()), cooker.mBatchEdges.data());
+      device.UpdateGpuBuffer(
+        *cooker.mEdges, 0u, static_cast<std::uint32_t>(cooker.mBatchEdges.size()), cooker.mBatchEdges.data()
+      );
       for (const BatchGlyph& item : batch) {
         const SMsdfGpuGlyph& glyph = glyphs[item.mGlyph];
         const DispatchParams params{
-          item.mFirstEdge, glyph.mEdgeCount, static_cast<std::uint32_t>(glyph.mWidth), static_cast<std::uint32_t>(glyph.mHeight),
-          item.mOffset, job.mPlan->RangeTexels(), {0.0f, 0.0f}
+          item.mFirstEdge,
+          glyph.mEdgeCount,
+          static_cast<std::uint32_t>(glyph.mWidth),
+          static_cast<std::uint32_t>(glyph.mHeight),
+          item.mOffset,
+          job.mPlan->RangeTexels(),
+          {0.0f, 0.0f}
         };
         gpg::gal::GpuDispatch dispatch{};
         dispatch.program = cooker.mProgram.get();
@@ -545,7 +564,8 @@ void CookFontCS(uint3 id : SV_DispatchThreadID)
       for (const BatchGlyph& item : batch) {
         const SMsdfGpuGlyph& glyph = glyphs[item.mGlyph];
         const std::size_t count = static_cast<std::size_t>(glyph.mWidth) * static_cast<std::size_t>(glyph.mHeight) * 4u;
-        const auto first = cooker.mReadBack.begin() + static_cast<std::ptrdiff_t>(static_cast<std::size_t>(item.mOffset) * 4u);
+        const auto first =
+          cooker.mReadBack.begin() + static_cast<std::ptrdiff_t>(static_cast<std::size_t>(item.mOffset) * 4u);
         job.mFields[item.mGlyph].assign(first, first + static_cast<std::ptrdiff_t>(count));
       }
     }
@@ -558,7 +578,10 @@ void CookFontCS(uint3 id : SV_DispatchThreadID)
     );
   }
 
-  bool MSDF_CookOnGpu(MsdfCookPlan& plan, std::string& error)
+  bool MSDF_CookOnGpu(
+    MsdfCookPlan& plan,
+    std::string& error
+  )
   {
     Job job;
     job.mPlan = &plan;
@@ -630,7 +653,13 @@ void CookFontCS(uint3 id : SV_DispatchThreadID)
     cooker.mWake.notify_all();
   }
 
-  void MSDF_LogAtlasComparison(const char* const name, const SMsdfFontAtlas& gpu, const SMsdfFontAtlas& cpu, const double gpuMs, const double cpuMs)
+  void MSDF_LogAtlasComparison(
+    const char* const name,
+    const SMsdfFontAtlas& gpu,
+    const SMsdfFontAtlas& cpu,
+    const double gpuMs,
+    const double cpuMs
+  )
   {
     if (gpu.mPixels.size() != cpu.mPixels.size()) {
       gpg::Warnf("MSDF compare %s: the atlases have different sizes", name);
@@ -667,10 +696,19 @@ void CookFontCS(uint3 id : SV_DispatchThreadID)
       edgeMedianOver8 += (std::abs(medianB - 128) < 32 && std::abs(medianA - medianB) > 8) ? 1u : 0u;
     }
     gpg::Logf(
-      "MSDF compare %s: GPU %.1f ms, CPU %.1f ms; largest channel difference %d, alpha %d; %llu of %llu texels differ by over 8; "
+      "MSDF compare %s: GPU %.1f ms, CPU %.1f ms; largest channel difference %d, alpha %d; %llu of %llu texels differ "
+      "by over 8; "
       "%llu of %llu inked texels change sides; %llu near the outline move by over 8",
-      name, gpuMs, cpuMs, largest, largestAlpha, static_cast<unsigned long long>(over8), static_cast<unsigned long long>(texels),
-      static_cast<unsigned long long>(shapeDiffers), static_cast<unsigned long long>(ink), static_cast<unsigned long long>(edgeMedianOver8)
+      name,
+      gpuMs,
+      cpuMs,
+      largest,
+      largestAlpha,
+      static_cast<unsigned long long>(over8),
+      static_cast<unsigned long long>(texels),
+      static_cast<unsigned long long>(shapeDiffers),
+      static_cast<unsigned long long>(ink),
+      static_cast<unsigned long long>(edgeMedianOver8)
     );
   }
 } // namespace moho

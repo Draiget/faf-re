@@ -19,7 +19,9 @@ namespace
    * Registers `IFormationInstance` as one reflected base lane for
    * `CFormationInstance` at offset `+0x00`.
    */
-  void AddIFormationInstanceBaseToCFormationInstanceType(gpg::RType* const typeInfo)
+  void AddIFormationInstanceBaseToCFormationInstanceType(
+    gpg::RType* const typeInfo
+  )
   {
     if (!IFormationInstance::sType) {
       IFormationInstance::sType = gpg::LookupRType(typeid(IFormationInstance));
@@ -75,4 +77,7 @@ void moho::register_CFormationInstanceTypeInfo()
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every
 // consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CFormationInstanceTypeInfo_4a1f9d, moho::register_CFormationInstanceTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CFormationInstanceTypeInfo_4a1f9d,
+  moho::register_CFormationInstanceTypeInfo
+)

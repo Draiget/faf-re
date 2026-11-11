@@ -62,5 +62,29 @@ namespace faf::editor
    */
   std::vector<CheckIssue> CheckMarkers(const MarkerCheckInput& input);
 
+  /** One prop for the symmetry check: its blueprint, place and reclaim mass. */
+  struct PropPoint
+  {
+    std::string blueprint;
+    float x = 0.0f;
+    float z = 0.0f;
+    float mass = 0.0f;
+  };
+
+  /**
+   * The props' symmetry: a prop with no prop of its blueprint within `reach` of one of its symmetric copies is
+   * unmatched (its reclaim isn't the same for every player). Returns a summary (a warning when unmatched props hold
+   * mass, else a note; none when all match) and the first `listed` unmatched props, each at its place.
+   */
+  std::vector<CheckIssue> CheckPropSymmetry(
+    const std::vector<PropPoint>& props,
+    Symmetry symmetry,
+    int turns,
+    int width,
+    int height,
+    float reach = 2.0f,
+    std::size_t listed = 20
+  );
+
   const char* CheckLevelName(CheckIssue::Level level);
 } // namespace faf::editor

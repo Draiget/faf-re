@@ -18,4 +18,7 @@ namespace gpg
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_SharedPtrCAniPoseTypeStartup_4971d6, gpg::preregister_SharedPtrCAniPoseTypeStartup)
+GPG_PREREGISTER_INIT(
+  preregister_SharedPtrCAniPoseTypeStartup_4971d6,
+  gpg::preregister_SharedPtrCAniPoseTypeStartup
+)

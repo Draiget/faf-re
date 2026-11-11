@@ -60,7 +60,9 @@ namespace moho
    * What it does:
    * Adds `REntityBlueprint` as the reflected base class lane.
    */
-  void RProjectileBlueprintTypeInfo::AddBaseREntityBlueprint(gpg::RType* const typeInfo)
+  void RProjectileBlueprintTypeInfo::AddBaseREntityBlueprint(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::REntityBlueprint>(typeInfo);
   }
@@ -71,18 +73,23 @@ namespace moho
    * What it does:
    * Registers projectile-blueprint field descriptors and descriptions.
    */
-  void RProjectileBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
+  void RProjectileBlueprintTypeInfo::AddFields(
+    gpg::RType* const typeInfo
+  )
   {
     typeInfo->AddField<fa::string>("DevStatus", offsetof(RProjectileBlueprint, DevStatus), 3, "Development Status");
-    gpg::RField* const displayField = typeInfo->AddField<moho::RProjectileBlueprintDisplay>("Display", offsetof(RProjectileBlueprint, Display));
+    gpg::RField* const displayField =
+      typeInfo->AddField<moho::RProjectileBlueprintDisplay>("Display", offsetof(RProjectileBlueprint, Display));
     displayField->mFlags = 3;
     displayField->mDesc = "Display information for the Projectile";
 
-    gpg::RField* const economyField = typeInfo->AddField<moho::RProjectileBlueprintEconomy>("Economy", offsetof(RProjectileBlueprint, Economy));
+    gpg::RField* const economyField =
+      typeInfo->AddField<moho::RProjectileBlueprintEconomy>("Economy", offsetof(RProjectileBlueprint, Economy));
     economyField->mFlags = 3;
     economyField->mDesc = "Economy information for the unit";
 
-    gpg::RField* const physicsField = typeInfo->AddField<moho::RProjectileBlueprintPhysics>("Physics", offsetof(RProjectileBlueprint, Physics));
+    gpg::RField* const physicsField =
+      typeInfo->AddField<moho::RProjectileBlueprintPhysics>("Physics", offsetof(RProjectileBlueprint, Physics));
     physicsField->mFlags = 3;
     physicsField->mDesc = "Physics information for the Projectile";
   }
@@ -114,4 +121,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_RProjectileBlueprintTypeInfo_ed1a04, moho::register_RProjectileBlueprintTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_RProjectileBlueprintTypeInfo_ed1a04,
+  moho::register_RProjectileBlueprintTypeInfo
+)

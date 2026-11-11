@@ -11,7 +11,8 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x0051B9A0 (FUN_0051B9A0, Moho::RProjectileBlueprintDisplayTypeInfo::RProjectileBlueprintDisplayTypeInfo)
+     * Address: 0x0051B9A0 (FUN_0051B9A0,
+     * Moho::RProjectileBlueprintDisplayTypeInfo::RProjectileBlueprintDisplayTypeInfo)
      *
      * What it does:
      * Constructs and preregisters the reflection descriptor for
@@ -58,7 +59,8 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x0051BBA0 (FUN_0051BBA0, Moho::RProjectileBlueprintEconomyTypeInfo::RProjectileBlueprintEconomyTypeInfo)
+     * Address: 0x0051BBA0 (FUN_0051BBA0,
+     * Moho::RProjectileBlueprintEconomyTypeInfo::RProjectileBlueprintEconomyTypeInfo)
      *
      * What it does:
      * Constructs and preregisters the reflection descriptor for
@@ -105,7 +107,8 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x0051BD30 (FUN_0051BD30, Moho::RProjectileBlueprintPhysicsTypeInfo::RProjectileBlueprintPhysicsTypeInfo)
+     * Address: 0x0051BD30 (FUN_0051BD30,
+     * Moho::RProjectileBlueprintPhysicsTypeInfo::RProjectileBlueprintPhysicsTypeInfo)
      *
      * What it does:
      * Constructs and preregisters the reflection descriptor for
@@ -170,12 +173,15 @@ namespace moho
   void register_RProjectileBlueprintPhysicsTypeInfo();
 
   static_assert(
-    sizeof(RProjectileBlueprintDisplayTypeInfo) == 0x64, "RProjectileBlueprintDisplayTypeInfo size must be 0x64"
+    sizeof(RProjectileBlueprintDisplayTypeInfo) == 0x64,
+    "RProjectileBlueprintDisplayTypeInfo size must be 0x64"
   );
   static_assert(
-    sizeof(RProjectileBlueprintEconomyTypeInfo) == 0x64, "RProjectileBlueprintEconomyTypeInfo size must be 0x64"
+    sizeof(RProjectileBlueprintEconomyTypeInfo) == 0x64,
+    "RProjectileBlueprintEconomyTypeInfo size must be 0x64"
   );
   static_assert(
-    sizeof(RProjectileBlueprintPhysicsTypeInfo) == 0x64, "RProjectileBlueprintPhysicsTypeInfo size must be 0x64"
+    sizeof(RProjectileBlueprintPhysicsTypeInfo) == 0x64,
+    "RProjectileBlueprintPhysicsTypeInfo size must be 0x64"
   );
 } // namespace moho

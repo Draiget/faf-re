@@ -10,15 +10,24 @@ namespace moho
   /**
    * What it does:
    * One time-interval lane consumed by the particle render work-item cursor.
-   * Address: 0x004A00A0 (FUN_004A00A0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SParticleRenderInterval` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `CopySingleDwordPairIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x004A00C0 (FUN_004A00C0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SParticleRenderInterval` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `CopySingleDwordPairIfDestinationPresentDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x004A06D0 (FUN_004A06D0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SParticleRenderInterval` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `CopySingleDwordPairIfDestinationPresentDuplicateB` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x004A06F0 (FUN_004A06F0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SParticleRenderInterval` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `CopySingleDwordPairIfDestinationPresentDuplicateC` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x004A00A0 (FUN_004A00A0 -- the compiler-generated copy constructor (placement copy into a raw slot) of
+   * `SParticleRenderInterval` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly
+   * `CopySingleDwordPairIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x004A00C0 (FUN_004A00C0 -- the compiler-generated copy constructor (placement copy into a raw slot) of
+   * `SParticleRenderInterval` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly
+   * `CopySingleDwordPairIfDestinationPresentDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x004A06D0 (FUN_004A06D0 -- the compiler-generated copy constructor (placement copy into a
+   * raw slot) of `SParticleRenderInterval` as emitted for its `fa::vector` instantiation; zero callers, unreachable;
+   * formerly `CopySingleDwordPairIfDestinationPresentDuplicateB` in moho/particles/CWorldParticles.cpp (RULE ONE),
+   * removed 2026-09-10.) Address: 0x004A06F0 (FUN_004A06F0 -- the compiler-generated copy constructor (placement copy
+   * into a raw slot) of `SParticleRenderInterval` as emitted for its `fa::vector` instantiation; zero callers,
+   * unreachable; formerly `CopySingleDwordPairIfDestinationPresentDuplicateC` in moho/particles/CWorldParticles.cpp
+   * (RULE ONE), removed 2026-09-10.)
    */
   struct SParticleRenderInterval
   {
-    float beginFrame = 0.0F;   // +0x00
-    float lifeFrames = 0.0F;   // +0x04
+    float beginFrame = 0.0F; // +0x00
+    float lifeFrames = 0.0F; // +0x04
   };
 
   static_assert(
@@ -38,11 +47,11 @@ namespace moho
    */
   struct SParticleRenderWorkItem
   {
-    void* mParticleBuffer = nullptr;                              // +0x00
-    fa::vector<SParticleRenderInterval> mIntervals;      // +0x04
-    std::uint32_t mIntervalCursor = 0U;                           // +0x14
-    std::uint32_t mRenderStartIndex = 0U;                         // +0x18
-    std::uint32_t mIntervalCapacityHint = 0U;                     // +0x1C
+    void* mParticleBuffer = nullptr;                // +0x00
+    fa::vector<SParticleRenderInterval> mIntervals; // +0x04
+    std::uint32_t mIntervalCursor = 0U;             // +0x14
+    std::uint32_t mRenderStartIndex = 0U;           // +0x18
+    std::uint32_t mIntervalCapacityHint = 0U;       // +0x1C
   };
 
   static_assert(
@@ -74,14 +83,11 @@ namespace moho
    */
   struct STrailBucketEntry
   {
-    std::uint8_t mKeyLane[0x34]{};               // +0x00
-    fa::vector<SWorldTrail> mTrails;     // +0x34
+    std::uint8_t mKeyLane[0x34]{};   // +0x00
+    fa::vector<SWorldTrail> mTrails; // +0x34
   };
 
-  static_assert(
-    offsetof(STrailBucketEntry, mTrails) == 0x34,
-    "STrailBucketEntry::mTrails offset must be 0x34"
-  );
+  static_assert(offsetof(STrailBucketEntry, mTrails) == 0x34, "STrailBucketEntry::mTrails offset must be 0x34");
   static_assert(sizeof(STrailBucketEntry) == 0x44, "STrailBucketEntry size must be 0x44");
 
   /**

@@ -25,7 +25,9 @@ namespace moho
    * then emits `{center.x, center.z, 0, radius}`.
    */
   bool IntelExtractor::Range(
-    SRangeExtractionPayload* const outRange, const RUnitBlueprint* const unitBlueprint, const Wm3::Vec3f& center
+    SRangeExtractionPayload* const outRange,
+    const RUnitBlueprint* const unitBlueprint,
+    const Wm3::Vec3f& center
   ) const
   {
     const float radarRange = static_cast<float>(unitBlueprint->Intel.RadarRadius);
@@ -45,7 +47,9 @@ namespace moho
    * selects max active range, then emits `{interp.x, interp.z, 0, range}`.
    */
   bool IntelExtractor::Extract(
-    SRangeExtractionPayload* const outRange, const UserEntity* const userEntity, const float interpolationAlpha
+    SRangeExtractionPayload* const outRange,
+    const UserEntity* const userEntity,
+    const float interpolationAlpha
   ) const
   {
     float omniRange = 0.0f;

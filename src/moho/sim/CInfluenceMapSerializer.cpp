@@ -30,7 +30,11 @@ namespace moho
    * Address: 0x0071F330 (FUN_0071F330, sub_71F330)
    * Address: 0x0071E2F0 (FUN_0071E2F0)
    */
-  void CInfluenceMap::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& /*ownerRef*/)
+  void CInfluenceMap::MemberDeserialize(
+    gpg::ReadArchive* const archive,
+    const int,
+    const gpg::RRef& /*ownerRef*/
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -53,11 +57,7 @@ namespace moho
     archive->ReadInt(&mWidth);
     archive->ReadInt(&mHeight);
     archive->ReadInt(&mGridSize);
-    archive->Read(
-      gpg::CachedLookup<fa::map<std::uint32_t, std::int32_t>>(gBlipCellMapType),
-      &mBlipCells,
-      owner
-    );
+    archive->Read(gpg::CachedLookup<fa::map<std::uint32_t, std::int32_t>>(gBlipCellMapType), &mBlipCells, owner);
     archive->Read(gpg::CachedLookup<fa::vector<moho::InfluenceGrid>>(gInfluenceGridVectorType), &mMapEntries, owner);
   }
 
@@ -65,7 +65,11 @@ namespace moho
    * Address: 0x0071F400 (FUN_0071F400, sub_71F400)
    * Address: 0x0071E300 (FUN_0071E300)
    */
-  void CInfluenceMap::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& /*ownerRef*/)
+  void CInfluenceMap::MemberSerialize(
+    gpg::WriteArchive* const archive,
+    const int,
+    const gpg::RRef& /*ownerRef*/
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -82,11 +86,7 @@ namespace moho
     archive->WriteInt(mWidth);
     archive->WriteInt(mHeight);
     archive->WriteInt(mGridSize);
-    archive->Write(
-      gpg::CachedLookup<fa::map<std::uint32_t, std::int32_t>>(gBlipCellMapType),
-      &mBlipCells,
-      owner
-    );
+    archive->Write(gpg::CachedLookup<fa::map<std::uint32_t, std::int32_t>>(gBlipCellMapType), &mBlipCells, owner);
     archive->Write(gpg::CachedLookup<fa::vector<moho::InfluenceGrid>>(gInfluenceGridVectorType), &mMapEntries, owner);
   }
 } // namespace moho

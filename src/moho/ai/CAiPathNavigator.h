@@ -200,37 +200,37 @@ namespace moho
   public:
     static gpg::RType* sType;
 
-    EAiPathNavigatorState mState;        // +0x0C
-    CAiPathFinder* mPathFinder;          // +0x10
-    SNavPath mPath;                      // +0x14
-    SOCellPos mCurrentPos;               // +0x24
-    SOCellPos mTargetPos;                // +0x28
-    std::uint32_t mLastBlockedCell;      // +0x2C
-    SAiNavigatorGoal mGoal;              // +0x30
-    std::uint32_t mLastPathLayerToken;   // +0x54
-    Sim* mSim;                           // +0x58
-    std::int32_t mLastPathNodeIndex;     // +0x5C
-    std::int32_t mPathSearchFailCount;   // +0x60
-    std::int32_t mPathRetryDelayFrames;  // +0x64
+    EAiPathNavigatorState mState;             // +0x0C
+    CAiPathFinder* mPathFinder;               // +0x10
+    SNavPath mPath;                           // +0x14
+    SOCellPos mCurrentPos;                    // +0x24
+    SOCellPos mTargetPos;                     // +0x28
+    std::uint32_t mLastBlockedCell;           // +0x2C
+    SAiNavigatorGoal mGoal;                   // +0x30
+    std::uint32_t mLastPathLayerToken;        // +0x54
+    Sim* mSim;                                // +0x58
+    std::int32_t mLastPathNodeIndex;          // +0x5C
+    std::int32_t mPathSearchFailCount;        // +0x60
+    std::int32_t mPathRetryDelayFrames;       // +0x64
     std::int32_t mNoForwardDistanceFailCount; // +0x68
-    float mRepathDistanceThreshold;      // +0x6C
-    std::int32_t mLastRepathTick;        // +0x70
-    std::int32_t mNoProgressTickCount;   // +0x74
-    std::int32_t mLastFormationSyncTick; // +0x78
-    WeakPtr<Unit> mLeaderLink;           // +0x7C
-    Wm3::Vector3f mLeaderTargetPos;      // +0x84
-    std::uint8_t mIsInFormation;         // +0x90
-    std::uint8_t mLeaderBusy;            // +0x91 (leader builder busy gate)
-    std::uint8_t mHasLeaderTargetPos;    // +0x92
-    std::uint8_t mHasForwardProbe;       // +0x93
-    std::uint8_t mRepathRequested;       // +0x94
-    std::uint8_t mUseExtendedPathProbe;  // +0x95
-    std::uint8_t mTargetWithinOneCell;   // +0x96
-    std::uint8_t mPad97;                 // +0x97
-    std::int32_t mPathRequestMode;       // +0x98
-    std::int32_t mPathRequestCountdown;  // +0x9C
-    std::int32_t mTickBucket7;           // +0xA0
-    std::int32_t mTickBucket13;          // +0xA4
+    float mRepathDistanceThreshold;           // +0x6C
+    std::int32_t mLastRepathTick;             // +0x70
+    std::int32_t mNoProgressTickCount;        // +0x74
+    std::int32_t mLastFormationSyncTick;      // +0x78
+    WeakPtr<Unit> mLeaderLink;                // +0x7C
+    Wm3::Vector3f mLeaderTargetPos;           // +0x84
+    std::uint8_t mIsInFormation;              // +0x90
+    std::uint8_t mLeaderBusy;                 // +0x91 (leader builder busy gate)
+    std::uint8_t mHasLeaderTargetPos;         // +0x92
+    std::uint8_t mHasForwardProbe;            // +0x93
+    std::uint8_t mRepathRequested;            // +0x94
+    std::uint8_t mUseExtendedPathProbe;       // +0x95
+    std::uint8_t mTargetWithinOneCell;        // +0x96
+    std::uint8_t mPad97;                      // +0x97
+    std::int32_t mPathRequestMode;            // +0x98
+    std::int32_t mPathRequestCountdown;       // +0x9C
+    std::int32_t mTickBucket7;                // +0xA0
+    std::int32_t mTickBucket13;               // +0xA4
   };
 
   static_assert(sizeof(CAiPathNavigator) == 0xA8, "CAiPathNavigator size must be 0xA8");
@@ -243,10 +243,12 @@ namespace moho
   static_assert(offsetof(CAiPathNavigator, mSim) == 0x58, "CAiPathNavigator::mSim offset must be 0x58");
   static_assert(offsetof(CAiPathNavigator, mLeaderLink) == 0x7C, "CAiPathNavigator::mLeaderLink offset must be 0x7C");
   static_assert(
-    offsetof(CAiPathNavigator, mLeaderTargetPos) == 0x84, "CAiPathNavigator::mLeaderTargetPos offset must be 0x84"
+    offsetof(CAiPathNavigator, mLeaderTargetPos) == 0x84,
+    "CAiPathNavigator::mLeaderTargetPos offset must be 0x84"
   );
   static_assert(
-    offsetof(CAiPathNavigator, mIsInFormation) == 0x90, "CAiPathNavigator::mIsInFormation offset must be 0x90"
+    offsetof(CAiPathNavigator, mIsInFormation) == 0x90,
+    "CAiPathNavigator::mIsInFormation offset must be 0x90"
   );
   static_assert(offsetof(CAiPathNavigator, mLeaderBusy) == 0x91, "CAiPathNavigator::mLeaderBusy offset must be 0x91");
   static_assert(
@@ -254,10 +256,12 @@ namespace moho
     "CAiPathNavigator::mHasLeaderTargetPos offset must be 0x92"
   );
   static_assert(
-    offsetof(CAiPathNavigator, mHasForwardProbe) == 0x93, "CAiPathNavigator::mHasForwardProbe offset must be 0x93"
+    offsetof(CAiPathNavigator, mHasForwardProbe) == 0x93,
+    "CAiPathNavigator::mHasForwardProbe offset must be 0x93"
   );
   static_assert(
-    offsetof(CAiPathNavigator, mRepathRequested) == 0x94, "CAiPathNavigator::mRepathRequested offset must be 0x94"
+    offsetof(CAiPathNavigator, mRepathRequested) == 0x94,
+    "CAiPathNavigator::mRepathRequested offset must be 0x94"
   );
   static_assert(
     offsetof(CAiPathNavigator, mUseExtendedPathProbe) == 0x95,
@@ -276,7 +280,10 @@ namespace moho
     "CAiPathNavigator::mPathRequestCountdown offset must be 0x9C"
   );
   static_assert(offsetof(CAiPathNavigator, mTickBucket7) == 0xA0, "CAiPathNavigator::mTickBucket7 offset must be 0xA0");
-  static_assert(offsetof(CAiPathNavigator, mTickBucket13) == 0xA4, "CAiPathNavigator::mTickBucket13 offset must be 0xA4");
+  static_assert(
+    offsetof(CAiPathNavigator, mTickBucket13) == 0xA4,
+    "CAiPathNavigator::mTickBucket13 offset must be 0xA4"
+  );
 
   class CScrLuaInitForm;
 

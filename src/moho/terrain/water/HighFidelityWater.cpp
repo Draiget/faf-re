@@ -23,7 +23,9 @@
 namespace
 {
   template <typename T>
-  void DeleteOwned(T*& lane) noexcept
+  void DeleteOwned(
+    T*& lane
+  ) noexcept
   {
     if (lane == nullptr) {
       return;
@@ -65,7 +67,9 @@ namespace moho
       float z;
     };
 
-    [[nodiscard]] WaterExtents2D GetWaterMapExtents(const IWldTerrainRes& terrainResource)
+    [[nodiscard]] WaterExtents2D GetWaterMapExtents(
+      const IWldTerrainRes& terrainResource
+    )
     {
       const CHeightField* const field = terrainResource.mMap->mHeightField.get();
       const float halfWidth = static_cast<float>((field->width - 1) >> 1);
@@ -73,14 +77,21 @@ namespace moho
       return {halfWidth * 2.0f, halfHeight * 2.0f};
     }
 
-    void SetShaderVarMem(ShaderVar& shaderVar, const std::uint32_t floatCount, const float* const values)
+    void SetShaderVarMem(
+      ShaderVar& shaderVar,
+      const std::uint32_t floatCount,
+      const float* const values
+    )
     {
       if (shaderVar.Exists()) {
         shaderVar.mEffectVariable->SetFloatArray(floatCount, values);
       }
     }
 
-    void BindTextureShaderVar(ShaderVar& shaderVar, const boost::shared_ptr<ID3DTextureSheet>& texture)
+    void BindTextureShaderVar(
+      ShaderVar& shaderVar,
+      const boost::shared_ptr<ID3DTextureSheet>& texture
+    )
     {
       shaderVar.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(texture));
     }
@@ -102,10 +113,7 @@ namespace moho
       ID3DDeviceResources::DynamicTextureSheetHandle lookupTexture{};
       ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
       (void)resources->CreateDynamicTextureSheet2(
-        lookupTexture,
-        kFresnelLookupTextureSize,
-        kFresnelLookupTextureSize,
-        kFresnelLookupTextureFormatToken
+        lookupTexture, kFresnelLookupTextureSize, kFresnelLookupTextureSize, kFresnelLookupTextureFormatToken
       );
 
       std::uint32_t pitchBytes = 0U;
@@ -147,7 +155,9 @@ namespace moho
      * Updates the shared `water2` world-to-view and projection matrix lanes
      * from the active camera.
      */
-    void ApplyWater2CameraMatrices(const GeomCamera3& camera)
+    void ApplyWater2CameraMatrices(
+      const GeomCamera3& camera
+    )
     {
       GetWater2WorldToViewShaderVar().SetMatrix4x4(&camera.view);
       GetWater2ProjectionShaderVar().SetMatrix4x4(&camera.projection);
@@ -170,7 +180,9 @@ namespace moho
    * Builds one high-fidelity water quad vertex/index-sheet pair from the
    * current terrain map extents and water elevation.
    */
-  bool HighFidelityWater::InitVerts(IWldTerrainRes* const terrainResource)
+  bool HighFidelityWater::InitVerts(
+    IWldTerrainRes* const terrainResource
+  )
   {
     mTerrainRes = terrainResource;
     STIMap* const terrainMap = terrainResource->mMap;
@@ -251,7 +263,9 @@ namespace moho
    * Binds `water2/TWaterLayAlphaMask`, updates camera matrices, binds utility
    * texture C from the terrain resource, and renders the cached water quad.
    */
-  bool HighFidelityWater::RenderWaterLayerAlphaMask(const GeomCamera3* const camera)
+  bool HighFidelityWater::RenderWaterLayerAlphaMask(
+    const GeomCamera3* const camera
+  )
   {
     ApplyWater2CameraMatrices(*camera);
 
@@ -322,14 +336,13 @@ namespace moho
     GetWater2TimeShaderVar().SetFloat(static_cast<float>(tick) + tickLerp);
 
     const WaterShaderNumericState& shaderState = shaderProperties->mNumericState;
-    if (mCachedFresnelBias != shaderState.mFresnelBias || mCachedFresnelPower != shaderState.mFresnelPower ||
-        mCachedSunShininess != shaderState.mSunShininess ||
-        mCachedSunReflectionAmount != shaderState.mSunReflectionAmount || mFresnelLookupTexture.px == nullptr) {
+    if (
+      mCachedFresnelBias != shaderState.mFresnelBias || mCachedFresnelPower != shaderState.mFresnelPower ||
+      mCachedSunShininess != shaderState.mSunShininess ||
+      mCachedSunReflectionAmount != shaderState.mSunReflectionAmount || mFresnelLookupTexture.px == nullptr
+    ) {
       const auto fresnelLookupTexture = BuildFresnelLookupTexture(
-        shaderState.mFresnelBias,
-        shaderState.mFresnelPower,
-        shaderState.mSunShininess,
-        shaderState.mSunReflectionAmount
+        shaderState.mFresnelBias, shaderState.mFresnelPower, shaderState.mSunShininess, shaderState.mSunReflectionAmount
       );
       const boost::shared_ptr<ID3DTextureSheet> fresnelBaseTexture =
         boost::static_pointer_cast<ID3DTextureSheet>(fresnelLookupTexture);
@@ -341,10 +354,7 @@ namespace moho
       mCachedSunReflectionAmount = shaderState.mSunReflectionAmount;
     }
 
-    BindTextureShaderVar(
-      GetWater2FresnelLookupShaderVar(),
-      boost::SharedPtrFromRawRetained(mFresnelLookupTexture)
-    );
+    BindTextureShaderVar(GetWater2FresnelLookupShaderVar(), boost::SharedPtrFromRawRetained(mFresnelLookupTexture));
 
     SetShaderVarMem(GetWater2WaterColorShaderVar(), 3U, shaderState.mWaterColor);
     SetShaderVarMem(GetWater2WaterLerpShaderVar(), 2U, shaderState.mWaterLerp);

@@ -10,7 +10,7 @@ namespace gpg
 {
   class BinaryReader;
   class BinaryWriter;
-}
+} // namespace gpg
 
 namespace moho
 {

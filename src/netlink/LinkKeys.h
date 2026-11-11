@@ -39,8 +39,14 @@ namespace faf::netlink
 
     // A new pair from the system's random source; false when it has none.
     [[nodiscard]] bool Generate();
-    [[nodiscard]] bool IsSet() const { return mSet; }
-    const LinkPublicKey& Public() const { return mPublic; }
+    [[nodiscard]] bool IsSet() const
+    {
+      return mSet;
+    }
+    const LinkPublicKey& Public() const
+    {
+      return mPublic;
+    }
     // Wipes the secret.
     void Clear();
 

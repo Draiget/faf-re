@@ -48,7 +48,9 @@ namespace
    * Address: 0x00508B30 (FUN_00508B30, delayed-sub-viz typed read helper)
    */
   gpg::ReadArchive* ReadDelayedSubVizInfoViaRTypeVariant1(
-    gpg::ReadArchive* const archive, void* const object, const gpg::RRef* const ownerRef
+    gpg::ReadArchive* const archive,
+    void* const object,
+    const gpg::RRef* const ownerRef
   )
   {
     gpg::RType* const elementType = gpg::CachedLookup<moho::SDelayedSubVizInfo>(moho::SDelayedSubVizInfo::sType);
@@ -62,7 +64,9 @@ namespace
    * Address: 0x00508E90 (FUN_00508E90, delayed-sub-viz typed read helper duplicate)
    */
   [[maybe_unused]] void ReadDelayedSubVizInfoViaRTypeVariant2(
-    gpg::ReadArchive* const archive, void* const object, const gpg::RRef* const ownerRef
+    gpg::ReadArchive* const archive,
+    void* const object,
+    const gpg::RRef* const ownerRef
   )
   {
     (void)ReadDelayedSubVizInfoViaRTypeVariant1(archive, object, ownerRef);
@@ -72,7 +76,9 @@ namespace
    * Address: 0x00508BA0 (FUN_00508BA0, delayed-sub-viz typed write helper)
    */
   gpg::WriteArchive* WriteDelayedSubVizInfoViaRTypeVariant1(
-    gpg::WriteArchive* const archive, const void* const object, const gpg::RRef* const ownerRef
+    gpg::WriteArchive* const archive,
+    const void* const object,
+    const gpg::RRef* const ownerRef
   )
   {
     gpg::RType* const elementType = gpg::CachedLookup<moho::SDelayedSubVizInfo>(moho::SDelayedSubVizInfo::sType);
@@ -86,7 +92,9 @@ namespace
    * Address: 0x00508EC0 (FUN_00508EC0, delayed-sub-viz typed write helper duplicate)
    */
   [[maybe_unused]] void WriteDelayedSubVizInfoViaRTypeVariant2(
-    gpg::WriteArchive* const archive, const void* const object, const gpg::RRef* const ownerRef
+    gpg::WriteArchive* const archive,
+    const void* const object,
+    const gpg::RRef* const ownerRef
   )
   {
     (void)WriteDelayedSubVizInfoViaRTypeVariant1(archive, object, ownerRef);
@@ -96,7 +104,8 @@ namespace
    * Address: 0x00508AD0 (FUN_00508AD0, delayed-sub-viz RRef fill helper)
    */
   [[maybe_unused]] gpg::RRef* FillDelayedSubVizRef(
-    moho::SDelayedSubVizInfo* const value, gpg::RRef* const outRef
+    moho::SDelayedSubVizInfo* const value,
+    gpg::RRef* const outRef
   )
   {
     return gpg::RRef_SDelayedSubVizInfo(outRef, value);
@@ -109,7 +118,12 @@ namespace
    * Loads delayed-sub-viz vector elements from archive and replaces destination
    * storage.
    */
-  void LoadSDelayedSubVizInfoVector(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void LoadSDelayedSubVizInfoVector(
+    gpg::ReadArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const out = reinterpret_cast<DelayedSubVizVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -145,7 +159,12 @@ namespace
    * What it does:
    * Saves delayed-sub-viz vector payload to archive element-by-element.
    */
-  void SaveSDelayedSubVizInfoVector(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void SaveSDelayedSubVizInfoVector(
+    gpg::WriteArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const source = reinterpret_cast<const DelayedSubVizVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -230,7 +249,9 @@ namespace moho
   /**
    * Address: 0x005088F0 (FUN_005088F0, Moho::SDelayedSubVizInfo::MemberDeserialize)
    */
-  void SDelayedSubVizInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SDelayedSubVizInfo::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -247,7 +268,9 @@ namespace moho
   /**
    * Address: 0x00508950 (FUN_00508950, Moho::SDelayedSubVizInfo::MemberSerialize)
    */
-  void SDelayedSubVizInfo::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SDelayedSubVizInfo::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -274,8 +297,8 @@ namespace moho
    * (0x00507010 / 0x00507020 / 0x00507CC0) are now
    * `gpg::SerSaveLoadHelper<SDelayedSubVizInfo>`'s own template bodies
    * (Reflection.h); `Init()` caches its `RType*` on
-   * `SDelayedSubVizInfo::sType`, same slot `gpg::CachedLookup<moho::SDelayedSubVizInfo>(moho::SDelayedSubVizInfo::sType)`
-   * above already uses.
+   * `SDelayedSubVizInfo::sType`, same slot
+   * `gpg::CachedLookup<moho::SDelayedSubVizInfo>(moho::SDelayedSubVizInfo::sType)` above already uses.
    */
   void register_SDelayedSubVizInfoSerializer()
   {
@@ -299,7 +322,10 @@ namespace moho
 /**
  * Address: 0x00509410 (FUN_00509410, gpg::RRef_SDelayedSubVizInfo)
  */
-gpg::RRef* gpg::RRef_SDelayedSubVizInfo(gpg::RRef* const outRef, moho::SDelayedSubVizInfo* const value)
+gpg::RRef* gpg::RRef_SDelayedSubVizInfo(
+  gpg::RRef* const outRef,
+  moho::SDelayedSubVizInfo* const value
+)
 {
   if (!outRef) {
     return nullptr;
@@ -319,15 +345,16 @@ gpg::RRef* gpg::RRef_SDelayedSubVizInfo(gpg::RRef* const outRef, moho::SDelayedS
  */
 const char* gpg::RVectorType<moho::SDelayedSubVizInfo>::GetName() const
 {
-  static const fa::string sName =
-    gpg::STR_Printf("vector<%s>", moho::SDelayedSubVizInfo::StaticGetClass()->GetName());
+  static const fa::string sName = gpg::STR_Printf("vector<%s>", moho::SDelayedSubVizInfo::StaticGetClass()->GetName());
   return sName.c_str();
 }
 
 /**
  * Address: 0x00507B60 (FUN_00507B60, gpg::RVectorType_SDelayedSubVizInfo::GetLexical)
  */
-fa::string gpg::RVectorType<moho::SDelayedSubVizInfo>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType<moho::SDelayedSubVizInfo>::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
@@ -346,7 +373,9 @@ const gpg::RIndexed* gpg::RVectorType<moho::SDelayedSubVizInfo>::IsIndexed() con
  */
 void gpg::RVectorType<moho::SDelayedSubVizInfo>::Init()
 {
-  static_assert(sizeof(fa::vector<moho::SDelayedSubVizInfo>) == 0x10, "fa::vector<moho::SDelayedSubVizInfo> is 0x10 bytes on x86");
+  static_assert(
+    sizeof(fa::vector<moho::SDelayedSubVizInfo>) == 0x10, "fa::vector<moho::SDelayedSubVizInfo> is 0x10 bytes on x86"
+  );
   size_ = sizeof(fa::vector<moho::SDelayedSubVizInfo>);
   version_ = 1;
   serLoadFunc_ = &LoadSDelayedSubVizInfoVector;
@@ -356,7 +385,10 @@ void gpg::RVectorType<moho::SDelayedSubVizInfo>::Init()
 /**
  * Address: 0x00507C50 (FUN_00507C50, gpg::RVectorType_SDelayedSubVizInfo::SubscriptIndex)
  */
-gpg::RRef gpg::RVectorType<moho::SDelayedSubVizInfo>::SubscriptIndex(void* const obj, const int ind) const
+gpg::RRef gpg::RVectorType<moho::SDelayedSubVizInfo>::SubscriptIndex(
+  void* const obj,
+  const int ind
+) const
 {
   auto* const storage = static_cast<DelayedSubVizVector*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -376,7 +408,9 @@ gpg::RRef gpg::RVectorType<moho::SDelayedSubVizInfo>::SubscriptIndex(void* const
 /**
  * Address: 0x00507C00 (FUN_00507C00, gpg::RVectorType_SDelayedSubVizInfo::GetCount)
  */
-size_t gpg::RVectorType<moho::SDelayedSubVizInfo>::GetCount(void* const obj) const
+size_t gpg::RVectorType<moho::SDelayedSubVizInfo>::GetCount(
+  void* const obj
+) const
 {
   if (!obj) {
     return 0u;
@@ -388,7 +422,10 @@ size_t gpg::RVectorType<moho::SDelayedSubVizInfo>::GetCount(void* const obj) con
 /**
  * Address: 0x00507C30 (FUN_00507C30, gpg::RVectorType_SDelayedSubVizInfo::SetCount)
  */
-void gpg::RVectorType<moho::SDelayedSubVizInfo>::SetCount(void* const obj, const int count) const
+void gpg::RVectorType<moho::SDelayedSubVizInfo>::SetCount(
+  void* const obj,
+  const int count
+) const
 {
   auto* const storage = static_cast<DelayedSubVizVector*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -403,7 +440,16 @@ void gpg::RVectorType<moho::SDelayedSubVizInfo>::SetCount(void* const obj, const
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_SDelayedSubVizInfoTypeInfo_b03a7d, moho::preregister_SDelayedSubVizInfoTypeInfo)
-GPG_PREREGISTER_INIT(register_SDelayedSubVizInfoVectorType_b03a7d, moho::register_SDelayedSubVizInfoVectorType)
+GPG_PREREGISTER_INIT(
+  preregister_SDelayedSubVizInfoTypeInfo_b03a7d,
+  moho::preregister_SDelayedSubVizInfoTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_SDelayedSubVizInfoVectorType_b03a7d,
+  moho::register_SDelayedSubVizInfoVectorType
+)
 
-GPG_PREREGISTER_INIT(ConstructAndRegisterDelayedSubVizVectorType_b03a7d, ConstructAndRegisterDelayedSubVizVectorType)
+GPG_PREREGISTER_INIT(
+  ConstructAndRegisterDelayedSubVizVectorType_b03a7d,
+  ConstructAndRegisterDelayedSubVizVectorType
+)

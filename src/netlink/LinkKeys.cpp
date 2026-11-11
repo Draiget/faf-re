@@ -17,7 +17,9 @@ namespace faf::netlink
 
     constexpr char kHex[] = "0123456789abcdef";
 
-    int HexValue(const char c)
+    int HexValue(
+      const char c
+    )
     {
       if (c >= '0' && c <= '9') {
         return c - '0';
@@ -52,7 +54,10 @@ namespace faf::netlink
     mSet = false;
   }
 
-  std::optional<remote::net::ChannelKeys> LinkKeyPair::Derive(const LinkPublicKey& peer, const bool offerer) const
+  std::optional<remote::net::ChannelKeys> LinkKeyPair::Derive(
+    const LinkPublicKey& peer,
+    const bool offerer
+  ) const
   {
     if (!mSet) {
       return std::nullopt;
@@ -96,7 +101,9 @@ namespace faf::netlink
     return answerer;
   }
 
-  std::string KeyMarkFor(const LinkPublicKey& key)
+  std::string KeyMarkFor(
+    const LinkPublicKey& key
+  )
   {
     std::string out(kKeyMark);
     out.reserve(out.size() + 2 * key.size());
@@ -107,7 +114,10 @@ namespace faf::netlink
     return out;
   }
 
-  std::optional<LinkPublicKey> KeyFromUfrag(std::string_view ufrag, const std::string_view prefix)
+  std::optional<LinkPublicKey> KeyFromUfrag(
+    std::string_view ufrag,
+    const std::string_view prefix
+  )
   {
     if (prefix.empty() || ufrag.substr(0, prefix.size()) != prefix) {
       return std::nullopt;

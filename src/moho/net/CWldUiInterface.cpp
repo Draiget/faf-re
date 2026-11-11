@@ -62,7 +62,9 @@ namespace
    * the chat. The text is passed as a value, never spliced into Lua source:
    * it holds player names.
    */
-  void ShowOrdersDifferNotice(const fa::string& text)
+  void ShowOrdersDifferNotice(
+    const fa::string& text
+  )
   {
     moho::CON_Printf("%s", text.c_str());
 
@@ -82,7 +84,6 @@ namespace
     }
   }
 } // namespace
-
 
 namespace moho
 {
@@ -161,7 +162,9 @@ namespace moho
    * unreferenced the same way) rather than folded into this call site without
    * evidence.
    */
-  void CWldUiInterface::NoteDisconnect(const CClientBase* const client)
+  void CWldUiInterface::NoteDisconnect(
+    const CClientBase* const client
+  )
   {
     const fa::string nickname = client->GetNickname();
     boost::function<void(), std::allocator<void>> callback = boost::bind(&ConPrintClientDisconnected, nickname);
@@ -174,7 +177,10 @@ namespace moho
    * What it does:
    * Nothing: the game UI ignores eject requests (`ret 8`).
    */
-  void CWldUiInterface::NoteEjectRequest(const CClientBase* const target, const CClientBase* const requester)
+  void CWldUiInterface::NoteEjectRequest(
+    const CClientBase* const target,
+    const CClientBase* const requester
+  )
   {
     (void)target;
     (void)requester;
@@ -297,7 +303,10 @@ namespace moho
    * `bin/external/ForgedAlliance.exe`). Left `skip` rather than folded into
    * this call site without evidence.
    */
-  void CWldUiInterface::ReceiveChat(const CClientBase* const sender, const gpg::MemBuffer<const char>& data)
+  void CWldUiInterface::ReceiveChat(
+    const CClientBase* const sender,
+    const gpg::MemBuffer<const char>& data
+  )
   {
     const fa::string nickname = sender->GetNickname();
     boost::function<void(), std::allocator<void>> callback = boost::bind(&func_ReceiveChat, nickname, data);
@@ -329,7 +338,10 @@ namespace moho
    * rather than a closure object -- expressed here the same way to keep this
    * call site the one that actually instantiates the cited manager/invoker pair.
    */
-  void CWldUiInterface::NoteGameSpeedChanged(const CClientBase* const client, const std::int32_t gameSpeed)
+  void CWldUiInterface::NoteGameSpeedChanged(
+    const CClientBase* const client,
+    const std::int32_t gameSpeed
+  )
   {
     // `value<unsigned int>` in the bind_t RTTI: the index is bound unsigned.
     const auto clientIndex = static_cast<std::uint32_t>(client->GetIndex());
@@ -344,7 +356,9 @@ namespace moho
    * What it does:
    * Forwards one client-bottleneck snapshot to the GPGNet reporting lane.
    */
-  void CWldUiInterface::ReportBottleneck(const SClientBottleneckInfo& info)
+  void CWldUiInterface::ReportBottleneck(
+    const SClientBottleneckInfo& info
+  )
   {
     GPGNET_ReportBottleneck(info);
   }
@@ -363,7 +377,10 @@ namespace moho
   /**
    * Engine addition (issue #275), not in the binary.
    */
-  void CWldUiInterface::NoteRejoinOffer(const fa::string& localSource, const fa::string& seats)
+  void CWldUiInterface::NoteRejoinOffer(
+    const fa::string& localSource,
+    const fa::string& seats
+  )
   {
     GPGNET_ReportRejoinOffer(localSource, seats);
   }
@@ -373,7 +390,10 @@ namespace moho
    * as NoteDisconnect does.
    */
   void CWldUiInterface::NoteOrdersDiffer(
-    const fa::string& sender, const fa::string& reporter, const bool selfReport, const bool stopped
+    const fa::string& sender,
+    const fa::string& reporter,
+    const bool selfReport,
+    const bool stopped
   )
   {
     fa::string text = selfReport

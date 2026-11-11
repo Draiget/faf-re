@@ -26,7 +26,6 @@
 #include "moho/ui/SDebugLine.h"
 #include "gpg/core/reflection/Reflection.h"
 
-
 namespace moho
 {
   // Debug console flag defined in EffectLuaStartupRegistrations.cpp
@@ -37,7 +36,9 @@ namespace moho
 namespace
 {
   template <typename TType>
-  [[nodiscard]] gpg::RType* ResolveCachedType(gpg::RType*& cached)
+  [[nodiscard]] gpg::RType* ResolveCachedType(
+    gpg::RType*& cached
+  )
   {
     if (!cached) {
       cached = gpg::LookupRType(typeid(TType));
@@ -47,12 +48,18 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] float ProjectViewportDepthRow1(const moho::VMatrix4& viewport, const Wm3::Vec3f& point) noexcept
+  [[nodiscard]] float ProjectViewportDepthRow1(
+    const moho::VMatrix4& viewport,
+    const Wm3::Vec3f& point
+  ) noexcept
   {
     return (point.x * viewport.r[1].x) + (point.y * viewport.r[1].y) + (point.z * viewport.r[1].z) + viewport.r[1].w;
   }
 
-  [[nodiscard]] Wm3::Sphere3f MakeSphere(const Wm3::Vec3f& center, const float radius) noexcept
+  [[nodiscard]] Wm3::Sphere3f MakeSphere(
+    const Wm3::Vec3f& center,
+    const float radius
+  ) noexcept
   {
     Wm3::Sphere3f sphere{};
     sphere.Center = center;
@@ -60,7 +67,10 @@ namespace
     return sphere;
   }
 
-  [[nodiscard]] Wm3::Vec3f Midpoint(const Wm3::Vec3f& a, const Wm3::Vec3f& b) noexcept
+  [[nodiscard]] Wm3::Vec3f Midpoint(
+    const Wm3::Vec3f& a,
+    const Wm3::Vec3f& b
+  ) noexcept
   {
     return {
       (a.x + b.x) * 0.5f,
@@ -69,7 +79,10 @@ namespace
     };
   }
 
-  [[nodiscard]] Wm3::Sphere3f BuildSegmentMidpointSphere(const Wm3::Vec3f& start, const Wm3::Vec3f& end) noexcept
+  [[nodiscard]] Wm3::Sphere3f BuildSegmentMidpointSphere(
+    const Wm3::Vec3f& start,
+    const Wm3::Vec3f& end
+  ) noexcept
   {
     const Wm3::Vec3f center = Midpoint(start, end);
     const float dx = end.x - center.x;
@@ -78,7 +91,9 @@ namespace
     return MakeSphere(center, std::sqrt((dx * dx) + (dy * dy) + (dz * dz)));
   }
 
-  [[nodiscard]] moho::CArmyImpl* ResolveFocusArmy(moho::Sim* const sim) noexcept
+  [[nodiscard]] moho::CArmyImpl* ResolveFocusArmy(
+    moho::Sim* const sim
+  ) noexcept
   {
     if (!sim) {
       return nullptr;
@@ -97,31 +112,43 @@ namespace
     return armiesBegin[focusArmyIndex];
   }
 
-  [[nodiscard]] moho::Entity* ResolveAttachEntity(const moho::SEntAttachInfo& attachInfo) noexcept
+  [[nodiscard]] moho::Entity* ResolveAttachEntity(
+    const moho::SEntAttachInfo& attachInfo
+  ) noexcept
   {
     return attachInfo.GetAttachTargetEntity();
   }
 
-  [[nodiscard]] bool IsAttachmentInvalid(const moho::Entity* const entity) noexcept
+  [[nodiscard]] bool IsAttachmentInvalid(
+    const moho::Entity* const entity
+  ) noexcept
   {
     return entity == nullptr || entity->DestroyQueuedFlag != 0u;
   }
 
-  [[nodiscard]] Wm3::Vec3f FetchVectorParam(moho::CEfxBeam& beam, const std::int32_t paramIndex)
+  [[nodiscard]] Wm3::Vec3f FetchVectorParam(
+    moho::CEfxBeam& beam,
+    const std::int32_t paramIndex
+  )
   {
     Wm3::Vec3f value{};
     beam.GetVectorParam(&value, paramIndex);
     return value;
   }
 
-  [[nodiscard]] Wm3::Vec3f ApplyPoint(const moho::VTransform& transform, const Wm3::Vec3f& point)
+  [[nodiscard]] Wm3::Vec3f ApplyPoint(
+    const moho::VTransform& transform,
+    const Wm3::Vec3f& point
+  )
   {
     Wm3::Vec3f out{};
     transform.Apply(point, &out);
     return out;
   }
 
-  void SetIdentityTransform(moho::VTransform& transform) noexcept
+  void SetIdentityTransform(
+    moho::VTransform& transform
+  ) noexcept
   {
     transform.orient_.w = 1.0f;
     transform.orient_.x = 0.0f;
@@ -146,7 +173,9 @@ namespace moho
    * resolving and caching the `CEffectImpl` reflection type on first use.
    */
   void ReadCEfxBeamBaseEffectImplAdapter(
-    gpg::ReadArchive* const archive, void* const object, const gpg::RRef& owner
+    gpg::ReadArchive* const archive,
+    void* const object,
+    const gpg::RRef& owner
   )
   {
     gpg::RType* type = CEffectImpl::sType;
@@ -165,7 +194,9 @@ namespace moho
    * resolving and caching the `CEffectImpl` reflection type on first use.
    */
   void WriteCEfxBeamBaseEffectImplAdapter(
-    gpg::WriteArchive* const archive, const void* const object, const gpg::RRef& owner
+    gpg::WriteArchive* const archive,
+    const void* const object,
+    const gpg::RRef& owner
   )
   {
     gpg::RType* type = CEffectImpl::sType;
@@ -184,7 +215,9 @@ namespace moho
    * resolving and caching the attach-info reflection type on first use.
    */
   void ReadCEfxBeamAttachInfoAdapter(
-    gpg::ReadArchive* const archive, void* const object, const gpg::RRef& owner
+    gpg::ReadArchive* const archive,
+    void* const object,
+    const gpg::RRef& owner
   )
   {
     archive->Read(gpg::CachedLookup<moho::SEntAttachInfo>(moho::SEntAttachInfo::sType), object, owner);
@@ -198,7 +231,9 @@ namespace moho
    * resolving and caching the attach-info reflection type on first use.
    */
   void WriteCEfxBeamAttachInfoAdapter(
-    gpg::WriteArchive* const archive, const void* const object, const gpg::RRef& owner
+    gpg::WriteArchive* const archive,
+    const void* const object,
+    const gpg::RRef& owner
   )
   {
     archive->Write(gpg::CachedLookup<moho::SEntAttachInfo>(moho::SEntAttachInfo::sType), object, owner);
@@ -212,7 +247,9 @@ namespace moho
    * caching the beam-payload reflection type on first use.
    */
   void ReadCEfxBeamWorldBeamAdapter(
-    gpg::ReadArchive* const archive, void* const object, const gpg::RRef& owner
+    gpg::ReadArchive* const archive,
+    void* const object,
+    const gpg::RRef& owner
   )
   {
     gpg::RType* type = SWorldBeam::sType;
@@ -231,7 +268,9 @@ namespace moho
    * caching the beam-payload reflection type on first use.
    */
   void WriteCEfxBeamWorldBeamAdapter(
-    gpg::WriteArchive* const archive, const void* const object, const gpg::RRef& owner
+    gpg::WriteArchive* const archive,
+    const void* const object,
+    const gpg::RRef& owner
   )
   {
     gpg::RType* type = SWorldBeam::sType;
@@ -271,7 +310,10 @@ namespace moho
    * texture-scale lane), the shared start/end colour, the beam texture, thickness
    * (from width), UV shift and repeat rate, and the blend mode -- then Reset().
    */
-  CEfxBeam::CEfxBeam(CEffectManagerImpl* const manager, const SCreateBeamParams& params)
+  CEfxBeam::CEfxBeam(
+    CEffectManagerImpl* const manager,
+    const SCreateBeamParams& params
+  )
     : CEffectImpl(manager, params.mAttachArmyIndex)
     , mBlendMode(0)
     , mVisible(false)
@@ -379,7 +421,9 @@ namespace moho
   /**
    * Address: 0x00658A10 (FUN_00658A10, Moho::CEfxBeam::MemberDeserialize)
    */
-  void CEfxBeam::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CEfxBeam::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -398,7 +442,9 @@ namespace moho
   /**
    * Address: 0x00658B10 (FUN_00658B10, Moho::CEfxBeam::MemberSerialize)
    */
-  void CEfxBeam::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CEfxBeam::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;
@@ -421,7 +467,9 @@ namespace moho
    * Performs frustum/depth rejection for beam endpoints and resolves focused
    * army LOS visibility through recon DB probes.
    */
-  bool CEfxBeam::CanSeeCam(const GeomCamera3* const camera)
+  bool CEfxBeam::CanSeeCam(
+    const GeomCamera3* const camera
+  )
   {
     const float maxDepth = mParams.start_[20];
 
@@ -438,8 +486,10 @@ namespace moho
         }
       }
 
-      if (!camera->solid2.Intersects(MakeSphere(mBeam.mStart, 15.0f))
-          && !camera->solid2.Intersects(MakeSphere(mBeam.mEnd, 15.0f))) {
+      if (
+        !camera->solid2.Intersects(MakeSphere(mBeam.mStart, 15.0f)) &&
+        !camera->solid2.Intersects(MakeSphere(mBeam.mEnd, 15.0f))
+      ) {
         mLastUpdate = 0u;
         return false;
       }
@@ -482,7 +532,8 @@ namespace moho
     }
 
     CAiReconDBImpl* const reconDb = focusArmy->GetReconDB();
-    const bool startVisible = reconDb->ReconCanDetect(mBeam.mCurStart.pos_, static_cast<int>(RECON_LOSNow)) != RECON_None;
+    const bool startVisible =
+      reconDb->ReconCanDetect(mBeam.mCurStart.pos_, static_cast<int>(RECON_LOSNow)) != RECON_None;
     mVisible = startVisible || reconDb->BeamIsVisible(mBeam);
 
     return mVisible;
@@ -590,8 +641,10 @@ namespace moho
 
       if (mIsNew) {
         Entity* const classificationEntity = ResolveAttachEntity(mEntityInfo);
-        if (classificationEntity != nullptr && !classificationEntity->IsCollisionBeam() &&
-            !classificationEntity->IsProjectile() && !classificationEntity->IsUnit()) {
+        if (
+          classificationEntity != nullptr && !classificationEntity->IsCollisionBeam() &&
+          !classificationEntity->IsProjectile() && !classificationEntity->IsUnit()
+        ) {
           mIsNew = false;
           return true;
         }
@@ -635,7 +688,10 @@ namespace moho
    * Tail-forwards one CEfxBeam deserialize thunk alias into
    * `CEfxBeam::MemberDeserialize`.
    */
-  void DeserializeCEfxBeamThunkVariantA(CEfxBeam* const object, gpg::ReadArchive* const archive)
+  void DeserializeCEfxBeamThunkVariantA(
+    CEfxBeam* const object,
+    gpg::ReadArchive* const archive
+  )
   {
     if (!object) {
       return;
@@ -651,7 +707,10 @@ namespace moho
    * Tail-forwards a second CEfxBeam deserialize thunk alias into
    * `CEfxBeam::MemberDeserialize`.
    */
-  void DeserializeCEfxBeamThunkVariantB(CEfxBeam* const object, gpg::ReadArchive* const archive)
+  void DeserializeCEfxBeamThunkVariantB(
+    CEfxBeam* const object,
+    gpg::ReadArchive* const archive
+  )
   {
     if (!object) {
       return;
@@ -668,7 +727,10 @@ namespace moho
    * Tail-forwards one CEfxBeam serialize thunk alias into
    * `CEfxBeam::MemberSerialize`.
    */
-  void SerializeCEfxBeamThunkVariantA(const CEfxBeam* const object, gpg::WriteArchive* const archive)
+  void SerializeCEfxBeamThunkVariantA(
+    const CEfxBeam* const object,
+    gpg::WriteArchive* const archive
+  )
   {
     if (!object) {
       return;
@@ -684,7 +746,10 @@ namespace moho
    * Tail-forwards a second CEfxBeam serialize thunk alias into
    * `CEfxBeam::MemberSerialize`.
    */
-  void SerializeCEfxBeamThunkVariantB(const CEfxBeam* const object, gpg::WriteArchive* const archive)
+  void SerializeCEfxBeamThunkVariantB(
+    const CEfxBeam* const object,
+    gpg::WriteArchive* const archive
+  )
   {
     if (!object) {
       return;

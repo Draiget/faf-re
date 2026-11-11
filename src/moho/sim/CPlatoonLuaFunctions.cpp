@@ -71,7 +71,9 @@ namespace
     Unknown = -1,
   };
 
-  [[nodiscard]] PlatoonThreatType ParsePlatoonThreatType(const char* const threatTypeName) noexcept
+  [[nodiscard]] PlatoonThreatType ParsePlatoonThreatType(
+    const char* const threatTypeName
+  ) noexcept
   {
     if (threatTypeName == nullptr) {
       return PlatoonThreatType::Unknown;
@@ -119,28 +121,33 @@ namespace
   ) noexcept
   {
     switch (threatType) {
-      case PlatoonThreatType::Air:
-        return blueprint.Defense.AirThreatLevel + totalThreat;
-      case PlatoonThreatType::Surface:
-        return blueprint.Defense.SurfaceThreatLevel + totalThreat;
-      case PlatoonThreatType::Sub:
-        return blueprint.Defense.SubThreatLevel + totalThreat;
-      case PlatoonThreatType::Economy:
-        return blueprint.Defense.EconomyThreatLevel + totalThreat;
-      case PlatoonThreatType::Unknown:
-      default:
-        return (((blueprint.Defense.AirThreatLevel + totalThreat) + blueprint.Defense.SurfaceThreatLevel)
-                + blueprint.Defense.SubThreatLevel)
-          + blueprint.Defense.EconomyThreatLevel;
+    case PlatoonThreatType::Air:
+      return blueprint.Defense.AirThreatLevel + totalThreat;
+    case PlatoonThreatType::Surface:
+      return blueprint.Defense.SurfaceThreatLevel + totalThreat;
+    case PlatoonThreatType::Sub:
+      return blueprint.Defense.SubThreatLevel + totalThreat;
+    case PlatoonThreatType::Economy:
+      return blueprint.Defense.EconomyThreatLevel + totalThreat;
+    case PlatoonThreatType::Unknown:
+    default:
+      return (((blueprint.Defense.AirThreatLevel + totalThreat) + blueprint.Defense.SurfaceThreatLevel) +
+              blueprint.Defense.SubThreatLevel) +
+        blueprint.Defense.EconomyThreatLevel;
     }
   }
 
-  [[nodiscard]] bool IsThreatCandidateUnit(const moho::Unit* const unit) noexcept
+  [[nodiscard]] bool IsThreatCandidateUnit(
+    const moho::Unit* const unit
+  ) noexcept
   {
     return unit && !unit->IsDead() && !unit->DestroyQueued();
   }
 
-  [[nodiscard]] float ReadSquaredRadiusArg(LuaPlus::LuaState* const state, const int stackIndex)
+  [[nodiscard]] float ReadSquaredRadiusArg(
+    LuaPlus::LuaState* const state,
+    const int stackIndex
+  )
   {
     LuaPlus::LuaStackObject radiusArg(state, stackIndex);
     if (lua_type(state->m_state, stackIndex) != kLuaNumberTypeTag) {
@@ -188,7 +195,7 @@ namespace
 
     return static_cast<moho::CUnitCommand*>(upcast.mObj);
   }
-}
+} // namespace
 
 namespace moho
 {
@@ -254,7 +261,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_CPlatoonIsOpponentAIRunningL`.
    */
-  int cfunc_CPlatoonIsOpponentAIRunning(lua_State* const luaContext)
+  int cfunc_CPlatoonIsOpponentAIRunning(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonIsOpponentAIRunningL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -284,7 +293,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonGetPersonalityL`.
    */
-  int cfunc_CPlatoonGetPersonality(lua_State* const luaContext)
+  int cfunc_CPlatoonGetPersonality(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonGetPersonalityL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -296,7 +307,9 @@ namespace moho
    * Resolves one platoon and pushes the owning brain personality object, or
    * `nil` when no personality exists.
    */
-  int cfunc_CPlatoonGetPersonalityL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonGetPersonalityL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kGetPersonalityHelpText);
 
@@ -339,7 +352,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonGetBrainL`.
    */
-  int cfunc_CPlatoonGetBrain(lua_State* const luaContext)
+  int cfunc_CPlatoonGetBrain(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonGetBrainL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -350,7 +365,9 @@ namespace moho
    * What it does:
    * Resolves one platoon and pushes the owning army-brain Lua object.
    */
-  int cfunc_CPlatoonGetBrainL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonGetBrainL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kGetBrainHelpText);
 
@@ -385,7 +402,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonGetFactionIndexL`.
    */
-  int cfunc_CPlatoonGetFactionIndex(lua_State* const luaContext)
+  int cfunc_CPlatoonGetFactionIndex(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonGetFactionIndexL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -397,7 +416,9 @@ namespace moho
    * Resolves one platoon and returns one-based faction index from the owning
    * army brain.
    */
-  int cfunc_CPlatoonGetFactionIndexL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonGetFactionIndexL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kGetFactionIndexHelpText);
 
@@ -436,7 +457,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_CPlatoonUniquelyNamePlatoonL`.
    */
-  int cfunc_CPlatoonUniquelyNamePlatoon(lua_State* const luaContext)
+  int cfunc_CPlatoonUniquelyNamePlatoon(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonUniquelyNamePlatoonL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -467,7 +490,9 @@ namespace moho
    * Resolves `(platoon, uniqueName)` and stores the provided platoon unique
    * name when argument #2 is a string.
    */
-  int cfunc_CPlatoonUniquelyNamePlatoonL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonUniquelyNamePlatoonL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 2, kUniquelyNamePlatoonHelpText);
 
@@ -489,7 +514,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_CPlatoonGetPlatoonUniqueNameL`.
    */
-  int cfunc_CPlatoonGetPlatoonUniqueName(lua_State* const luaContext)
+  int cfunc_CPlatoonGetPlatoonUniqueName(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonGetPlatoonUniqueNameL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -519,7 +546,9 @@ namespace moho
    * What it does:
    * Resolves one platoon and pushes its unique-name string.
    */
-  int cfunc_CPlatoonGetPlatoonUniqueNameL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonGetPlatoonUniqueNameL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kGetPlatoonUniqueNameHelpText);
 
@@ -537,7 +566,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonGetAIPlanL`.
    */
-  int cfunc_CPlatoonGetAIPlan(lua_State* const luaContext)
+  int cfunc_CPlatoonGetAIPlan(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonGetAIPlanL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -567,7 +598,9 @@ namespace moho
    * What it does:
    * Resolves one platoon and pushes the owning army-brain AI-plan string.
    */
-  int cfunc_CPlatoonGetAIPlanL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonGetAIPlanL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kGetAIPlanHelpText);
 
@@ -587,7 +620,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_CPlatoonSwitchAIPlanL`.
    */
-  int cfunc_CPlatoonSwitchAIPlan(lua_State* const luaContext)
+  int cfunc_CPlatoonSwitchAIPlan(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonSwitchAIPlanL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -618,7 +653,9 @@ namespace moho
    * Resolves `(platoon, planName)` and switches AI plan when argument #2 is
    * a string.
    */
-  int cfunc_CPlatoonSwitchAIPlanL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonSwitchAIPlanL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 2, kSwitchAIPlanHelpText);
 
@@ -640,7 +677,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_CPlatoonGetPlatoonPositionL`.
    */
-  int cfunc_CPlatoonGetPlatoonPosition(lua_State* const luaContext)
+  int cfunc_CPlatoonGetPlatoonPosition(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonGetPlatoonPositionL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -652,7 +691,9 @@ namespace moho
    * Returns the mean position of the platoon's units, or nil when it has
    * none.
    */
-  int cfunc_CPlatoonGetPlatoonPositionL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonGetPlatoonPositionL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kGetPlatoonPositionHelpText);
 
@@ -705,7 +746,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_CPlatoonGetSquadPositionL`.
    */
-  int cfunc_CPlatoonGetSquadPosition(lua_State* const luaContext)
+  int cfunc_CPlatoonGetSquadPosition(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonGetSquadPositionL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -717,7 +760,9 @@ namespace moho
    * Resolves `(platoon, squadClass)` and returns the average world position
    * of units currently present in the selected squad.
    */
-  int cfunc_CPlatoonGetSquadPositionL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonGetSquadPositionL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 2, kGetSquadPositionHelpText);
 
@@ -778,7 +823,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonGetSquadUnitsL`.
    */
-  int cfunc_CPlatoonGetSquadUnits(lua_State* const luaContext)
+  int cfunc_CPlatoonGetSquadUnits(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonGetSquadUnitsL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -790,7 +837,9 @@ namespace moho
    * Resolves `(platoon, squadClass)` and returns a Lua array of unit objects
    * for members currently present in the selected squad.
    */
-  int cfunc_CPlatoonGetSquadUnitsL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonGetSquadUnitsL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 2, kGetSquadUnitsHelpText);
 
@@ -847,7 +896,9 @@ namespace moho
    * What it does:
    * Resolves one platoon and returns the `AI_RunOpponentAI` sim-convar state.
    */
-  int cfunc_CPlatoonIsOpponentAIRunningL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonIsOpponentAIRunningL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kIsOpponentAIRunningHelpText);
 
@@ -858,8 +909,8 @@ namespace moho
     Sim* const sim = army ? army->GetSim() : nullptr;
 
     CSimConVarBase* const runOpponentAiConVar = &moho::gSimConVar_AI_RunOpponentAI;
-    CSimConVarInstanceBase* const runOpponentAiVar = (sim && runOpponentAiConVar) ? sim->GetSimVar(runOpponentAiConVar)
-                                                                                   : nullptr;
+    CSimConVarInstanceBase* const runOpponentAiVar =
+      (sim && runOpponentAiConVar) ? sim->GetSimVar(runOpponentAiConVar) : nullptr;
     const void* const runOpponentAiStorage = runOpponentAiVar ? runOpponentAiVar->GetValueStorage() : nullptr;
     const bool shouldRunOpponentAi =
       runOpponentAiStorage && (*reinterpret_cast<const std::uint8_t*>(runOpponentAiStorage) != 0u);
@@ -875,7 +926,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonCanConsiderFormingPlatoonL`.
    */
-  int cfunc_CPlatoonCanConsiderFormingPlatoon(lua_State* const luaContext)
+  int cfunc_CPlatoonCanConsiderFormingPlatoon(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonCanConsiderFormingPlatoonL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -887,7 +940,9 @@ namespace moho
    * Validates one `CPlatoon` method call and returns whether arg#3 matches
    * the first element of arg#2 case-insensitively.
    */
-  int cfunc_CPlatoonCanConsiderFormingPlatoonL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonCanConsiderFormingPlatoonL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -921,7 +976,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonDisbandOnIdleL`.
    */
-  int cfunc_CPlatoonDisbandOnIdle(lua_State* const luaContext)
+  int cfunc_CPlatoonDisbandOnIdle(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonDisbandOnIdleL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -932,7 +989,9 @@ namespace moho
    * What it does:
    * Resolves one `CPlatoon` object from Lua and sets its disband-on-idle flag.
    */
-  int cfunc_CPlatoonDisbandOnIdleL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonDisbandOnIdleL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kDisbandOnIdleHelpText);
 
@@ -967,7 +1026,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonIsCommandsActiveL`.
    */
-  int cfunc_CPlatoonIsCommandsActive(lua_State* const luaContext)
+  int cfunc_CPlatoonIsCommandsActive(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonIsCommandsActiveL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -979,7 +1040,9 @@ namespace moho
    * Resolves `(platoon, commandsTable)` and returns true when any listed
    * command object is currently live.
    */
-  int cfunc_CPlatoonIsCommandsActiveL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonIsCommandsActiveL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 2, kIsCommandsActiveHelpText);
 
@@ -1027,7 +1090,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonIsAttackingL`.
    */
-  int cfunc_CPlatoonIsAttacking(lua_State* const luaContext)
+  int cfunc_CPlatoonIsAttacking(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonIsAttackingL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1058,7 +1123,9 @@ namespace moho
    * Resolves `(platoon, squadClass)` and returns whether any unit in that
    * squad currently has `UNITSTATE_Attacking`.
    */
-  int cfunc_CPlatoonIsAttackingL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonIsAttackingL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 2, kIsAttackingHelpText);
 
@@ -1088,7 +1155,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonIsMovingL`.
    */
-  int cfunc_CPlatoonIsMoving(lua_State* const luaContext)
+  int cfunc_CPlatoonIsMoving(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonIsMovingL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1119,7 +1188,9 @@ namespace moho
    * Resolves `(platoon, squadClass)` and returns whether any unit in that
    * squad currently has `UNITSTATE_Moving`.
    */
-  int cfunc_CPlatoonIsMovingL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonIsMovingL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 2, kIsMovingHelpText);
 
@@ -1149,7 +1220,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonIsPatrollingL`.
    */
-  int cfunc_CPlatoonIsPatrolling(lua_State* const luaContext)
+  int cfunc_CPlatoonIsPatrolling(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonIsPatrollingL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1180,7 +1253,9 @@ namespace moho
    * Resolves `(platoon, squadClass)` and returns whether any unit in that
    * squad currently has `UNITSTATE_Patrolling`.
    */
-  int cfunc_CPlatoonIsPatrollingL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonIsPatrollingL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 2, kIsPatrollingHelpText);
 
@@ -1210,7 +1285,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonIsFerryingL`.
    */
-  int cfunc_CPlatoonIsFerrying(lua_State* const luaContext)
+  int cfunc_CPlatoonIsFerrying(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonIsFerryingL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1241,7 +1318,9 @@ namespace moho
    * Resolves `(platoon, squadClass)` and returns whether any unit in that
    * squad currently has `UNITSTATE_Ferrying`.
    */
-  int cfunc_CPlatoonIsFerryingL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonIsFerryingL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 2, kIsFerryingHelpText);
 
@@ -1271,7 +1350,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonGetPlatoonUnitsL`.
    */
-  int cfunc_CPlatoonGetPlatoonUnits(lua_State* const luaContext)
+  int cfunc_CPlatoonGetPlatoonUnits(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonGetPlatoonUnitsL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1302,7 +1383,9 @@ namespace moho
    * Resolves one platoon and returns a cached Lua table containing all
    * currently tracked platoon units.
    */
-  int cfunc_CPlatoonGetPlatoonUnitsL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonGetPlatoonUnitsL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kGetPlatoonUnitsHelpText);
 
@@ -1375,7 +1458,9 @@ namespace moho
    * the callback returns `false`; otherwise it returns `true` when at least one
    * unit was counted across all specs.
    */
-  int cfunc_CPlatoonCanFormPlatoonL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonCanFormPlatoonL(
+    LuaPlus::LuaState* const state
+  )
   {
     const int argumentCount = lua_gettop(state->m_state);
     if (argumentCount < 3 || argumentCount > 5) {
@@ -1412,7 +1497,7 @@ namespace moho
     for (int specIndex = 1; specIndex <= templateCount; ++specIndex) {
       const LuaPlus::LuaObject squadSpec = templatesObject[specIndex];
       if (!squadSpec.IsTable()) {
-        continue;  // skip the leading name/plan string entries
+        continue; // skip the leading name/plan string entries
       }
 
       const LuaPlus::LuaObject unitFilter = squadSpec[1];
@@ -1507,7 +1592,9 @@ namespace moho
    * them out of any prior platoon, and assigns them into the matching squad
    * (created if absent). Returns the new platoon's Lua object.
    */
-  int cfunc_CPlatoonFormPlatoonL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonFormPlatoonL(
+    LuaPlus::LuaState* const state
+  )
   {
     const int argumentCount = lua_gettop(state->m_state);
     if (argumentCount < 3 || argumentCount > 5) {
@@ -1533,7 +1620,7 @@ namespace moho
     for (int specIndex = 1; specIndex <= templateCount; ++specIndex) {
       const LuaPlus::LuaObject squadSpec = templatesObject[specIndex];
       if (!squadSpec.IsTable()) {
-        continue;  // skip the leading name/plan string entries
+        continue; // skip the leading name/plan string entries
       }
 
       const LuaPlus::LuaObject unitFilter = squadSpec[1];
@@ -1615,8 +1702,8 @@ namespace moho
           nearbyUnits.begin(),
           nearbyUnits.end(),
           [](const PlatoonUnitSearchEntry& lhs, const PlatoonUnitSearchEntry& rhs) noexcept {
-            return lhs.distanceSq < rhs.distanceSq;
-          }
+          return lhs.distanceSq < rhs.distanceSq;
+        }
         );
 
         int added = 0;
@@ -1651,7 +1738,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonCanFormPlatoonL`.
    */
-  int cfunc_CPlatoonCanFormPlatoon(lua_State* const luaContext)
+  int cfunc_CPlatoonCanFormPlatoon(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonCanFormPlatoonL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1681,7 +1770,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonFormPlatoonL`.
    */
-  int cfunc_CPlatoonFormPlatoon(lua_State* const luaContext)
+  int cfunc_CPlatoonFormPlatoon(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonFormPlatoonL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1713,7 +1804,9 @@ namespace moho
    * entries into a temporary prioritized-category vector, then replaces the
    * matching squad's prioritized target list.
    */
-  int cfunc_CPlatoonSetPrioritizedTargetListL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonSetPrioritizedTargetListL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 3, kSetPrioritizedTargetListHelpText);
 
@@ -1737,7 +1830,9 @@ namespace moho
       const int categoryCount = categoryTable.GetCount();
       for (int categoryIndex = 1; categoryIndex <= categoryCount; ++categoryIndex) {
         const LuaPlus::LuaObject categoryObject = categoryTable[categoryIndex];
-        if (EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject); categorySet != nullptr) {
+        if (
+          EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject); categorySet != nullptr
+        ) {
           // Route per-T push_back through the canonical helper (FUN_006DB010)
           // so the MSVC8 vector<EntityCategorySet>::push_back template
           // emission symbol shape is preserved.
@@ -1758,7 +1853,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_CPlatoonSetPrioritizedTargetListL`.
    */
-  int cfunc_CPlatoonSetPrioritizedTargetList(lua_State* const luaContext)
+  int cfunc_CPlatoonSetPrioritizedTargetList(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonSetPrioritizedTargetListL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1788,7 +1885,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonFindPrioritizedUnitL`.
    */
-  int cfunc_CPlatoonFindPrioritizedUnit(lua_State* const luaContext)
+  int cfunc_CPlatoonFindPrioritizedUnit(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonFindPrioritizedUnitL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1823,7 +1922,9 @@ namespace moho
    * from Lua, calls `CPlatoon::FindPrioritizedUnit`, and pushes the found unit's
    * Lua object (or nil).
    */
-  int cfunc_CPlatoonFindPrioritizedUnitL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonFindPrioritizedUnitL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 6, kFindPrioritizedUnitHelpText);
 
@@ -1879,7 +1980,9 @@ namespace moho
    * Resolves `(platoon, squadClass, alliance, canAttack, category)` from Lua and
    * returns the nearest matching unit to the requested squad center.
    */
-  int cfunc_CPlatoonFindClosestUnitL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonFindClosestUnitL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 5, kFindClosestUnitHelpText);
 
@@ -1929,7 +2032,9 @@ namespace moho
    * Twin of `cfunc_CPlatoonFindClosestUnitL` selecting the furthest matching
    * unit from the requested squad center (COMPARE_Furthest).
    */
-  int cfunc_CPlatoonFindFurthestUnitL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonFindFurthestUnitL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 5, kFindFurthestUnitHelpText);
 
@@ -1979,7 +2084,9 @@ namespace moho
    * Twin of `cfunc_CPlatoonFindClosestUnitL` selecting the highest build-value
    * matching unit (COMPARE_HighestValue).
    */
-  int cfunc_CPlatoonFindHighestValueUnitL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonFindHighestValueUnitL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 5, kFindHighestValueUnitHelpText);
 
@@ -2030,7 +2137,9 @@ namespace moho
    * (`CAiBrain::CenterOfArmy`) instead of a squad center, calling the leaf query
    * directly with COMPARE_Closest.
    */
-  int cfunc_CPlatoonFindClosestUnitToBaseL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonFindClosestUnitToBaseL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 5, kFindClosestUnitToBaseHelpText);
 
@@ -2083,7 +2192,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonFindClosestUnitL`.
    */
-  int cfunc_CPlatoonFindClosestUnit(lua_State* const luaContext)
+  int cfunc_CPlatoonFindClosestUnit(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonFindClosestUnitL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2113,7 +2224,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonFindClosestUnitToBaseL`.
    */
-  int cfunc_CPlatoonFindClosestUnitToBase(lua_State* const luaContext)
+  int cfunc_CPlatoonFindClosestUnitToBase(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonFindClosestUnitToBaseL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2143,7 +2256,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonFindFurthestUnitL`.
    */
-  int cfunc_CPlatoonFindFurthestUnit(lua_State* const luaContext)
+  int cfunc_CPlatoonFindFurthestUnit(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonFindFurthestUnitL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2173,7 +2288,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonFindHighestValueUnitL`.
    */
-  int cfunc_CPlatoonFindHighestValueUnit(lua_State* const luaContext)
+  int cfunc_CPlatoonFindHighestValueUnit(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonFindHighestValueUnitL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2208,7 +2325,9 @@ namespace moho
    * the requested class, and forwards the target to `CSquad::CanAttackTarget`.
    * When the class is absent the Lua callback returns no values.
    */
-  int cfunc_CPlatoonCanAttackTargetL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonCanAttackTargetL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 3, kCanAttackTargetHelpText);
 
@@ -2246,7 +2365,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonCanAttackTargetL`.
    */
-  int cfunc_CPlatoonCanAttackTarget(lua_State* const luaContext)
+  int cfunc_CPlatoonCanAttackTarget(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonCanAttackTargetL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2276,7 +2397,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonStopL`.
    */
-  int cfunc_CPlatoonStop(lua_State* const luaContext)
+  int cfunc_CPlatoonStop(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonStopL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2288,17 +2411,14 @@ namespace moho
    * Resolves `(platoon [, squadClass])` and dispatches `CPlatoon::Stop` with
    * default squad class `6` (all squads) when arg#2 is omitted.
    */
-  int cfunc_CPlatoonStopL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonStopL(
+    LuaPlus::LuaState* const state
+  )
   {
     const int argumentCount = lua_gettop(state->m_state);
     if (argumentCount < 1 || argumentCount > 2) {
       LuaPlus::LuaState::Error(
-        state,
-        "%s\n  expected between %d and %d args, but got %d",
-        kStopHelpText,
-        1,
-        2,
-        argumentCount
+        state, "%s\n  expected between %d and %d args, but got %d", kStopHelpText, 1, 2, argumentCount
       );
     }
 
@@ -2353,11 +2473,15 @@ namespace moho
    * `CPlatoon::AttackTarget`, returning the issued commands as a Lua array. The
    * squad class defaults to the all-classes sentinel; arg 3 overrides it.
    */
-  int cfunc_CPlatoonAttackTargetL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonAttackTargetL(
+    LuaPlus::LuaState* const state
+  )
   {
     const int argumentCount = lua_gettop(state->m_state);
     if (argumentCount < 2 || argumentCount > 3) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected between %d and %d args, but got %d", kAttackTargetHelpText, 2, 3, argumentCount);
+      LuaPlus::LuaState::Error(
+        state, "%s\n  expected between %d and %d args, but got %d", kAttackTargetHelpText, 2, 3, argumentCount
+      );
     }
 
     const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
@@ -2408,7 +2532,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonAttackTargetL`.
    */
-  int cfunc_CPlatoonAttackTarget(lua_State* const luaContext)
+  int cfunc_CPlatoonAttackTarget(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonAttackTargetL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2443,11 +2569,15 @@ namespace moho
    * move via `CPlatoon::MoveToTarget`, returning the issued commands as a Lua
    * array. The squad class defaults to the all-classes sentinel; arg 4 overrides.
    */
-  int cfunc_CPlatoonMoveToTargetL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonMoveToTargetL(
+    LuaPlus::LuaState* const state
+  )
   {
     const int argumentCount = lua_gettop(state->m_state);
     if (argumentCount < 2 || argumentCount > 4) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected between %d and %d args, but got %d", kMoveToTargetHelpText, 2, 4, argumentCount);
+      LuaPlus::LuaState::Error(
+        state, "%s\n  expected between %d and %d args, but got %d", kMoveToTargetHelpText, 2, 4, argumentCount
+      );
     }
 
     const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
@@ -2501,7 +2631,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonMoveToTargetL`.
    */
-  int cfunc_CPlatoonMoveToTarget(lua_State* const luaContext)
+  int cfunc_CPlatoonMoveToTarget(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonMoveToTargetL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2536,11 +2668,15 @@ namespace moho
    * and issues the move via `CPlatoon::MoveToLocation`, returning the issued
    * commands as a Lua array. The squad class defaults to the all-classes sentinel.
    */
-  int cfunc_CPlatoonMoveToLocationL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonMoveToLocationL(
+    LuaPlus::LuaState* const state
+  )
   {
     const int argumentCount = lua_gettop(state->m_state);
     if (argumentCount < 2 || argumentCount > 4) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected between %d and %d args, but got %d", kMoveToLocationHelpText, 2, 4, argumentCount);
+      LuaPlus::LuaState::Error(
+        state, "%s\n  expected between %d and %d args, but got %d", kMoveToLocationHelpText, 2, 4, argumentCount
+      );
     }
 
     const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
@@ -2600,7 +2736,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonMoveToLocationL`.
    */
-  int cfunc_CPlatoonMoveToLocation(lua_State* const luaContext)
+  int cfunc_CPlatoonMoveToLocation(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonMoveToLocationL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2632,11 +2770,20 @@ namespace moho
    * aggressive-move orders via `CPlatoon::AggressiveMoveToLocation`, returns the
    * issued commands as a Lua array, then releases the weak command links.
    */
-  int cfunc_CPlatoonAggressiveMoveToLocationL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonAggressiveMoveToLocationL(
+    LuaPlus::LuaState* const state
+  )
   {
     const int argumentCount = lua_gettop(state->m_state);
     if (argumentCount < 2 || argumentCount > 3) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected between %d and %d args, but got %d", kAggressiveMoveToLocationHelpText, 2, 3, argumentCount);
+      LuaPlus::LuaState::Error(
+        state,
+        "%s\n  expected between %d and %d args, but got %d",
+        kAggressiveMoveToLocationHelpText,
+        2,
+        3,
+        argumentCount
+      );
     }
 
     const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
@@ -2690,7 +2837,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonAggressiveMoveToLocationL`.
    */
-  int cfunc_CPlatoonAggressiveMoveToLocation(lua_State* const luaContext)
+  int cfunc_CPlatoonAggressiveMoveToLocation(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonAggressiveMoveToLocationL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2722,7 +2871,9 @@ namespace moho
    * via `CPlatoon::FerryToLocation`, returns the issued commands as a Lua array,
    * then releases the weak command links.
    */
-  int cfunc_CPlatoonFerryToLocationL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonFerryToLocationL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 2, kFerryToLocationHelpText);
 
@@ -2764,7 +2915,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonFerryToLocationL`.
    */
-  int cfunc_CPlatoonFerryToLocation(lua_State* const luaContext)
+  int cfunc_CPlatoonFerryToLocation(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonFerryToLocationL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2794,7 +2947,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonLoadUnitsL`.
    */
-  int cfunc_CPlatoonLoadUnits(lua_State* const luaContext)
+  int cfunc_CPlatoonLoadUnits(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonLoadUnitsL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2829,7 +2984,9 @@ namespace moho
    * builds a Lua array of resulting command objects, and unlinks temporary
    * weak command links before returning.
    */
-  int cfunc_CPlatoonLoadUnitsL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonLoadUnitsL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 2, kLoadUnitsHelpText);
 
@@ -2871,7 +3028,9 @@ namespace moho
    * `CPlatoon::UnloadUnitsAtLocation`, returns the issued commands as a Lua array,
    * then releases the weak command links.
    */
-  int cfunc_CPlatoonUnloadUnitsAtLocationL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonUnloadUnitsAtLocationL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 3, kUnloadUnitsAtLocationHelpText);
 
@@ -2916,7 +3075,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonUnloadUnitsAtLocationL`.
    */
-  int cfunc_CPlatoonUnloadUnitsAtLocation(lua_State* const luaContext)
+  int cfunc_CPlatoonUnloadUnitsAtLocation(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonUnloadUnitsAtLocationL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2948,7 +3109,9 @@ namespace moho
    * via `CPlatoon::UnloadAllAtLocation`, returns the issued commands as a Lua
    * array, then releases the weak command links.
    */
-  int cfunc_CPlatoonUnloadAllAtLocationL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonUnloadAllAtLocationL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 2, kUnloadAllAtLocationHelpText);
 
@@ -2990,7 +3153,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonUnloadAllAtLocationL`.
    */
-  int cfunc_CPlatoonUnloadAllAtLocation(lua_State* const luaContext)
+  int cfunc_CPlatoonUnloadAllAtLocation(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonUnloadAllAtLocationL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -3025,11 +3190,15 @@ namespace moho
    * issues the patrol via `CPlatoon::Patrol`. The squad class defaults to the
    * all-classes sentinel and is only read from arg 3 when supplied.
    */
-  int cfunc_CPlatoonPatrolL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonPatrolL(
+    LuaPlus::LuaState* const state
+  )
   {
     const int argumentCount = lua_gettop(state->m_state);
     if (argumentCount < 2 || argumentCount > 3) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected between %d and %d args, but got %d", kPatrolHelpText, 2, 3, argumentCount);
+      LuaPlus::LuaState::Error(
+        state, "%s\n  expected between %d and %d args, but got %d", kPatrolHelpText, 2, 3, argumentCount
+      );
     }
 
     const LuaPlus::LuaObject platoonObject(LuaPlus::LuaStackObject(state, 1));
@@ -3064,7 +3233,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonPatrolL`.
    */
-  int cfunc_CPlatoonPatrol(lua_State* const luaContext)
+  int cfunc_CPlatoonPatrol(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonPatrolL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -3096,17 +3267,14 @@ namespace moho
    * platoon via `CPlatoon::GuardTarget`, returns the issued commands as a
    * Lua array, then releases the weak command links.
    */
-  int cfunc_CPlatoonGuardTargetL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonGuardTargetL(
+    LuaPlus::LuaState* const state
+  )
   {
     const int argumentCount = lua_gettop(state->m_state);
     if (argumentCount < 2 || argumentCount > 3) {
       LuaPlus::LuaState::Error(
-        state,
-        "%s\n  expected between %d and %d args, but got %d",
-        kGuardTargetHelpText,
-        2,
-        3,
-        argumentCount
+        state, "%s\n  expected between %d and %d args, but got %d", kGuardTargetHelpText, 2, 3, argumentCount
       );
     }
 
@@ -3159,7 +3327,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonGuardTargetL`.
    */
-  int cfunc_CPlatoonGuardTarget(lua_State* const luaContext)
+  int cfunc_CPlatoonGuardTarget(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonGuardTargetL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -3190,7 +3360,9 @@ namespace moho
    * Parses `(platoon, [squadClass])`, and when the platoon is still alive,
    * destroys the selected squads via `CPlatoon::DestroySquads`.
    */
-  int cfunc_CPlatoonDestroyL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonDestroyL(
+    LuaPlus::LuaState* const state
+  )
   {
     const int argumentCount = lua_gettop(state->m_state);
     if (argumentCount < 1 || argumentCount > 2) {
@@ -3228,7 +3400,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonDestroyL`.
    */
-  int cfunc_CPlatoonDestroy(lua_State* const luaContext)
+  int cfunc_CPlatoonDestroy(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonDestroyL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -3259,7 +3433,9 @@ namespace moho
    * Parses `(platoon)`, gathers the platoon's ferry beacons via
    * `CPlatoon::GetFerryBeacons`, and returns them as a Lua array of unit objects.
    */
-  int cfunc_CPlatoonGetFerryBeaconsL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonGetFerryBeaconsL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kGetFerryBeaconsHelpText);
 
@@ -3293,7 +3469,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonGetFerryBeaconsL`.
    */
-  int cfunc_CPlatoonGetFerryBeacons(lua_State* const luaContext)
+  int cfunc_CPlatoonGetFerryBeacons(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonGetFerryBeaconsL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -3325,7 +3503,9 @@ namespace moho
    * and the beacon unit, issues the load orders via `CPlatoon::UseFerryBeacon`,
    * returns the issued commands as a Lua array, then releases the weak command links.
    */
-  int cfunc_CPlatoonUseFerryBeaconL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonUseFerryBeaconL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 3, kUseFerryBeaconHelpText);
 
@@ -3367,7 +3547,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonUseFerryBeaconL`.
    */
-  int cfunc_CPlatoonUseFerryBeacon(lua_State* const luaContext)
+  int cfunc_CPlatoonUseFerryBeacon(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonUseFerryBeaconL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -3399,17 +3581,14 @@ namespace moho
    * orders via `CPlatoon::UseTeleporter`, returns the issued commands as a Lua
    * array, then releases the weak command links.
    */
-  int cfunc_CPlatoonUseTeleporterL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonUseTeleporterL(
+    LuaPlus::LuaState* const state
+  )
   {
     const int argumentCount = lua_gettop(state->m_state);
     if (argumentCount < 2 || argumentCount > 3) {
       LuaPlus::LuaState::Error(
-        state,
-        "%s\n  expected between %d and %d args, but got %d",
-        kUseTeleporterHelpText,
-        2,
-        3,
-        argumentCount
+        state, "%s\n  expected between %d and %d args, but got %d", kUseTeleporterHelpText, 2, 3, argumentCount
       );
     }
 
@@ -3462,7 +3641,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonUseTeleporterL`.
    */
-  int cfunc_CPlatoonUseTeleporter(lua_State* const luaContext)
+  int cfunc_CPlatoonUseTeleporter(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonUseTeleporterL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -3493,7 +3674,9 @@ namespace moho
    * Resolves `(platoon, formationName)` from Lua, maps `"None"` to empty text,
    * and stores the formation override.
    */
-  int cfunc_CPlatoonSetPlatoonFormationOverrideL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonSetPlatoonFormationOverrideL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 2, kSetPlatoonFormationOverrideHelpText);
 
@@ -3522,7 +3705,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonSetPlatoonFormationOverrideL`.
    */
-  int cfunc_CPlatoonSetPlatoonFormationOverride(lua_State* const luaContext)
+  int cfunc_CPlatoonSetPlatoonFormationOverride(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonSetPlatoonFormationOverrideL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -3552,7 +3737,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonGetPlatoonLifetimeStatsL`.
    */
-  int cfunc_CPlatoonGetPlatoonLifetimeStats(lua_State* const luaContext)
+  int cfunc_CPlatoonGetPlatoonLifetimeStats(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonGetPlatoonLifetimeStatsL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -3564,7 +3751,9 @@ namespace moho
    * Resolves one platoon and pushes its four lifetime stats (kills, losses, damage dealt, damage received), or
    * `nil` when the platoon object is absent.
    */
-  int cfunc_CPlatoonGetPlatoonLifetimeStatsL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonGetPlatoonLifetimeStatsL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kGetPlatoonLifetimeStatsHelpText);
 
@@ -3612,7 +3801,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonCalculatePlatoonThreatL`.
    */
-  int cfunc_CPlatoonCalculatePlatoonThreat(lua_State* const luaContext)
+  int cfunc_CPlatoonCalculatePlatoonThreat(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonCalculatePlatoonThreatL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -3624,7 +3815,9 @@ namespace moho
    * Resolves `(platoon, threatType, category)` and returns total threat across
    * live platoon units matching the requested category.
    */
-  int cfunc_CPlatoonCalculatePlatoonThreatL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonCalculatePlatoonThreatL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 3, kCalculatePlatoonThreatHelpText);
 
@@ -3692,7 +3885,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_CPlatoonCalculatePlatoonThreatAroundPositionL`.
    */
-  int cfunc_CPlatoonCalculatePlatoonThreatAroundPosition(lua_State* const luaContext)
+  int cfunc_CPlatoonCalculatePlatoonThreatAroundPosition(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonCalculatePlatoonThreatAroundPositionL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -3704,7 +3899,9 @@ namespace moho
    * Resolves `(platoon, threatType, category, position, radius)` and returns
    * category-filtered threat from live platoon units within 2D radius.
    */
-  int cfunc_CPlatoonCalculatePlatoonThreatAroundPositionL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonCalculatePlatoonThreatAroundPositionL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 5, kCalculatePlatoonThreatAroundPositionHelpText);
 
@@ -3783,7 +3980,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_CPlatoonPlatoonCategoryCountAroundPositionL`.
    */
-  int cfunc_CPlatoonPlatoonCategoryCountAroundPosition(lua_State* const luaContext)
+  int cfunc_CPlatoonPlatoonCategoryCountAroundPosition(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonPlatoonCategoryCountAroundPositionL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -3795,7 +3994,9 @@ namespace moho
    * Resolves `(platoon, category, position, radius)` and counts live platoon
    * units matching the category within 2D radius.
    */
-  int cfunc_CPlatoonPlatoonCategoryCountAroundPositionL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonPlatoonCategoryCountAroundPositionL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 4, kPlatoonCategoryCountAroundPositionHelpText);
 
@@ -3863,7 +4064,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonPlatoonCategoryCountL`.
    */
-  int cfunc_CPlatoonPlatoonCategoryCount(lua_State* const luaContext)
+  int cfunc_CPlatoonPlatoonCategoryCount(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPlatoonPlatoonCategoryCountL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -3875,7 +4078,9 @@ namespace moho
    * Resolves `(platoon, category)` and counts live platoon units matching
    * that category.
    */
-  int cfunc_CPlatoonPlatoonCategoryCountL(LuaPlus::LuaState* const state)
+  int cfunc_CPlatoonPlatoonCategoryCountL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 2, kPlatoonCategoryCountHelpText);
 
@@ -3926,5 +4131,4 @@ namespace moho
     );
     return &binder;
   }
-}
-
+} // namespace moho

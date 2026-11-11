@@ -63,7 +63,9 @@ namespace
    * Registers `Moho::CCommandTask` as a reflected base of `typeInfo`
    * at subobject offset 0x00.
    */
-  void AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     AddBaseIfPresent(typeInfo, gpg::RTypeOf<CCommandTask>(), 0x00);
   }
@@ -76,9 +78,15 @@ namespace
    * Registers `Moho::IAiCommandDispatch` as a reflected base of `typeInfo`
    * at subobject offset 0x30.
    */
-  void AddBase_IAiCommandDispatch(gpg::RType* const typeInfo)
+  void AddBase_IAiCommandDispatch(
+    gpg::RType* const typeInfo
+  )
   {
-    AddBaseIfPresent(typeInfo, gpg::RTypeOf<IAiCommandDispatch>(), gpg::BaseSubobjectOffset<IAiCommandDispatchImpl, IAiCommandDispatch>());
+    AddBaseIfPresent(
+      typeInfo,
+      gpg::RTypeOf<IAiCommandDispatch>(),
+      gpg::BaseSubobjectOffset<IAiCommandDispatchImpl, IAiCommandDispatch>()
+    );
   }
 
   /**
@@ -89,9 +97,15 @@ namespace
    * Registers `Moho::Listener<EUnitCommandQueueStatus>` as a reflected base of `typeInfo`
    * at subobject offset 0x34.
    */
-  void AddBase_Listener_EUnitCommandQueueStatus(gpg::RType* const typeInfo)
+  void AddBase_Listener_EUnitCommandQueueStatus(
+    gpg::RType* const typeInfo
+  )
   {
-    AddBaseIfPresent(typeInfo, gpg::RTypeOf<Listener<EUnitCommandQueueStatus>>(), gpg::BaseSubobjectOffset<IAiCommandDispatchImpl, Listener<EUnitCommandQueueStatus>>());
+    AddBaseIfPresent(
+      typeInfo,
+      gpg::RTypeOf<Listener<EUnitCommandQueueStatus>>(),
+      gpg::BaseSubobjectOffset<IAiCommandDispatchImpl, Listener<EUnitCommandQueueStatus>>()
+    );
   }
 
 } // namespace
@@ -135,9 +149,14 @@ namespace
   [[maybe_unused]] IAiCommandDispatchImplTypeInfoBootstrap gIAiCommandDispatchImplTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_IAiCommandDispatchImplTypeInfo_aaf8a9, moho::register_IAiCommandDispatchImplTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_IAiCommandDispatchImplTypeInfo_aaf8a9,
+  moho::register_IAiCommandDispatchImplTypeInfo
+)
 
-GPG_PREREGISTER_INIT(construct_IAiCommandDispatchImplTypeInfo_aaf8a9, construct_IAiCommandDispatchImplTypeInfo)
+GPG_PREREGISTER_INIT(
+  construct_IAiCommandDispatchImplTypeInfo_aaf8a9,
+  construct_IAiCommandDispatchImplTypeInfo
+)

@@ -76,13 +76,18 @@ namespace moho
   /**
    * Address: 0x0067B240 (FUN_0067B240, Moho::ENT_GetImpactType)
    */
-  EImpactType ENT_GetImpactType(Sim* const sim, Entity* const entity, const Wm3::Vector3f& hitPosition)
+  EImpactType ENT_GetImpactType(
+    Sim* const sim,
+    Entity* const entity,
+    const Wm3::Vector3f& hitPosition
+  )
   {
     static constexpr std::uint32_t kShieldEntityMask = 0xF0000000u;
     static constexpr std::uint32_t kShieldEntityTag = 0x40000000u;
 
     const STIMap* const mapData = sim->mMapData;
-    const float waterElevation = mapData->GetWaterElevationAt(hitPosition.x, hitPosition.z); // engine addition: per position
+    const float waterElevation =
+      mapData->GetWaterElevationAt(hitPosition.x, hitPosition.z); // engine addition: per position
 
     if (waterElevation > hitPosition.y) {
       if (entity == nullptr) {
@@ -130,33 +135,35 @@ namespace moho
   /**
    * Address: 0x0067B320 (FUN_0067B320, Moho::ENT_GetImpactTypeString)
    */
-  const char* ENT_GetImpactTypeString(const EImpactType impactType)
+  const char* ENT_GetImpactTypeString(
+    const EImpactType impactType
+  )
   {
     switch (impactType) {
-      case IMPACT_Terrain:
-        return "Terrain";
-      case IMPACT_Water:
-        return "Water";
-      case IMPACT_Air:
-        return "Air";
-      case IMPACT_Underwater:
-        return "Underwater";
-      case IMPACT_Projectile:
-        return "Projectile";
-      case IMPACT_ProjectileUnderwater:
-        return "ProjectileUnderwater";
-      case IMPACT_Prop:
-        return "Prop";
-      case IMPACT_Shield:
-        return "Shield";
-      case IMPACT_Unit:
-        return "Unit";
-      case IMPACT_UnitAir:
-        return "UnitAir";
-      case IMPACT_UnitUnderwater:
-        return "UnitUnderwater";
-      default:
-        return "Unknown";
+    case IMPACT_Terrain:
+      return "Terrain";
+    case IMPACT_Water:
+      return "Water";
+    case IMPACT_Air:
+      return "Air";
+    case IMPACT_Underwater:
+      return "Underwater";
+    case IMPACT_Projectile:
+      return "Projectile";
+    case IMPACT_ProjectileUnderwater:
+      return "ProjectileUnderwater";
+    case IMPACT_Prop:
+      return "Prop";
+    case IMPACT_Shield:
+      return "Shield";
+    case IMPACT_Unit:
+      return "Unit";
+    case IMPACT_UnitAir:
+      return "UnitAir";
+    case IMPACT_UnitUnderwater:
+      return "UnitUnderwater";
+    default:
+      return "Unknown";
     }
   }
 
@@ -211,10 +218,7 @@ namespace moho
     AddEnum(StripPrefix("IMPACT_Air"), static_cast<std::int32_t>(IMPACT_Air));
     AddEnum(StripPrefix("IMPACT_Underwater"), static_cast<std::int32_t>(IMPACT_Underwater));
     AddEnum(StripPrefix("IMPACT_Projectile"), static_cast<std::int32_t>(IMPACT_Projectile));
-    AddEnum(
-      StripPrefix("IMPACT_ProjectileUnderwater"),
-      static_cast<std::int32_t>(IMPACT_ProjectileUnderwater)
-    );
+    AddEnum(StripPrefix("IMPACT_ProjectileUnderwater"), static_cast<std::int32_t>(IMPACT_ProjectileUnderwater));
     AddEnum(StripPrefix("IMPACT_Prop"), static_cast<std::int32_t>(IMPACT_Prop));
     AddEnum(StripPrefix("IMPACT_Shield"), static_cast<std::int32_t>(IMPACT_Shield));
     AddEnum(StripPrefix("IMPACT_Unit"), static_cast<std::int32_t>(IMPACT_Unit));
@@ -244,9 +248,14 @@ namespace
   [[maybe_unused]] EImpactTypeTypeInfoBootstrap gEImpactTypeTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_EImpactTypeTypeInfo_c2a1f9, moho::register_EImpactTypeTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_EImpactTypeTypeInfo_c2a1f9,
+  moho::register_EImpactTypeTypeInfo
+)
 
-GPG_PREREGISTER_INIT(ConstructEImpactTypeTypeInfoInternal_c2a1f9, ConstructEImpactTypeTypeInfoInternal)
+GPG_PREREGISTER_INIT(
+  ConstructEImpactTypeTypeInfoInternal_c2a1f9,
+  ConstructEImpactTypeTypeInfoInternal
+)

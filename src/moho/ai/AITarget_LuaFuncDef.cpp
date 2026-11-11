@@ -32,7 +32,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_AITargetL`.
    */
-  int cfunc_AITarget(lua_State* const luaContext)
+  int cfunc_AITarget(
+    lua_State* const luaContext
+  )
   {
     return cfunc_AITargetL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -44,7 +46,9 @@ namespace moho
    * Builds one `CAiTarget` from optional Lua arg#1 (`Entity` object or
    * position table) and returns the Lua target object payload.
    */
-  int cfunc_AITargetL(LuaPlus::LuaState* const state)
+  int cfunc_AITargetL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -89,12 +93,7 @@ namespace moho
   void func_AITarget_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      moho::SCR_CoreLuaInitSet(),
-      "AITarget",
-      &cfunc_AITarget,
-      nullptr,
-      "<global>",
-      kAITargetLuaHelpText
+      moho::SCR_CoreLuaInitSet(), "AITarget", &cfunc_AITarget, nullptr, "<global>", kAITargetLuaHelpText
     );
     (void)binder;
   }

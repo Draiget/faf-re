@@ -30,7 +30,9 @@ namespace
 
   struct SetKey
   {
-    [[nodiscard]] const int& operator()(const int& v) const noexcept
+    [[nodiscard]] const int& operator()(
+      const int& v
+    ) const noexcept
     {
       return v;
     }
@@ -39,7 +41,9 @@ namespace
   struct MapKey
   {
     template <class Pair>
-    [[nodiscard]] const int& operator()(const Pair& v) const noexcept
+    [[nodiscard]] const int& operator()(
+      const Pair& v
+    ) const noexcept
     {
       return v.first;
     }
@@ -57,13 +61,20 @@ namespace
     const RbNode<V>* previous = nullptr;
     std::string error;
 
-    RbWalk(const RbNode<V>* const h, const KeyOf k, const Less l)
+    RbWalk(
+      const RbNode<V>* const h,
+      const KeyOf k,
+      const Less l
+    )
       : head(h)
       , keyOf(k)
       , less(l)
     {}
 
-    void Walk(const RbNode<V>* const n, const int blacks)
+    void Walk(
+      const RbNode<V>* const n,
+      const int blacks
+    )
     {
       if (!error.empty()) {
         return;
@@ -88,7 +99,10 @@ namespace
         error = "a right child whose parent link is wrong";
         return;
       }
-      if (n->color == fa::detail::kRbRed && (n->left->color == fa::detail::kRbRed || n->right->color == fa::detail::kRbRed)) {
+      if (
+        n->color == fa::detail::kRbRed &&
+        (n->left->color == fa::detail::kRbRed || n->right->color == fa::detail::kRbRed)
+      ) {
         error = "a red node with a red child";
         return;
       }
@@ -110,7 +124,11 @@ namespace
   /** The red-black and header invariants of an fa tree whose head is `head`. */
   template <class V, class KeyOf, class Less = std::less<int>>
   [[nodiscard]] ::testing::AssertionResult IsValidRbTree(
-    const RbNode<V>* const head, const std::size_t size, const KeyOf keyOf, const Less less = Less{})
+    const RbNode<V>* const head,
+    const std::size_t size,
+    const KeyOf keyOf,
+    const Less less = Less{}
+  )
   {
     if (head == nullptr || head->isNil == 0) {
       return ::testing::AssertionFailure() << "the head is not the nil node";
@@ -146,7 +164,9 @@ namespace
   }
 
   template <class Map>
-  [[nodiscard]] std::vector<std::pair<int, int>> Pairs(const Map& m)
+  [[nodiscard]] std::vector<std::pair<int, int>> Pairs(
+    const Map& m
+  )
   {
     std::vector<std::pair<int, int>> out;
     for (auto it = m.begin(); it != m.end(); ++it) {
@@ -156,24 +176,37 @@ namespace
   }
 
   template <class Set>
-  [[nodiscard]] std::vector<int> StdValues(const Set& s)
+  [[nodiscard]] std::vector<int> StdValues(
+    const Set& s
+  )
   {
     return std::vector<int>(s.begin(), s.end());
   }
 
-  [[nodiscard]] std::size_t Pick(std::mt19937& rng, const std::size_t maxInclusive)
+  [[nodiscard]] std::size_t Pick(
+    std::mt19937& rng,
+    const std::size_t maxInclusive
+  )
   {
     return std::uniform_int_distribution<std::size_t>(0, maxInclusive)(rng);
   }
 
   /** The position of `it` from `begin`, or -1 for `end`. */
   template <class It>
-  [[nodiscard]] std::ptrdiff_t Offset(It begin, const It it, const It end)
+  [[nodiscard]] std::ptrdiff_t Offset(
+    It begin,
+    const It it,
+    const It end
+  )
   {
     return it == end ? -1 : std::distance(begin, it);
   }
 
-  void RunSetRandomOps(const unsigned seed, const int steps, const unsigned keyRange)
+  void RunSetRandomOps(
+    const unsigned seed,
+    const int steps,
+    const unsigned keyRange
+  )
   {
     std::mt19937 rng(seed);
     fa::set<int> s;
@@ -278,7 +311,10 @@ namespace
   }
 } // namespace
 
-TEST(FaSet, EmptySet)
+TEST(
+  FaSet,
+  EmptySet
+)
 {
   const fa::set<int> s;
   EXPECT_TRUE(s.empty());
@@ -290,21 +326,30 @@ TEST(FaSet, EmptySet)
   EXPECT_TRUE(IsValidRbTree(s.end().node(), 0, SetKey{}));
 }
 
-TEST(FaSet, RandomOpsMatchStdSetSmallKeyRange)
+TEST(
+  FaSet,
+  RandomOpsMatchStdSetSmallKeyRange
+)
 {
   for (unsigned seed = 1; seed <= 3; ++seed) {
     RunSetRandomOps(seed, 3000, 40u);
   }
 }
 
-TEST(FaSet, RandomOpsMatchStdSetLargeKeyRange)
+TEST(
+  FaSet,
+  RandomOpsMatchStdSetLargeKeyRange
+)
 {
   for (unsigned seed = 11; seed <= 12; ++seed) {
     RunSetRandomOps(seed, 3000, 100000u);
   }
 }
 
-TEST(FaSet, SequentialInsertAndEraseKeepTheTreeBalanced)
+TEST(
+  FaSet,
+  SequentialInsertAndEraseKeepTheTreeBalanced
+)
 {
   fa::set<int> s;
   for (int i = 0; i < 2000; ++i) {
@@ -326,7 +371,10 @@ TEST(FaSet, SequentialInsertAndEraseKeepTheTreeBalanced)
   EXPECT_EQ(*last, 2999);
 }
 
-TEST(FaSet, IteratorsStayValidAcrossOtherInsertsAndErases)
+TEST(
+  FaSet,
+  IteratorsStayValidAcrossOtherInsertsAndErases
+)
 {
   fa::set<int> s;
   for (int i = 0; i < 200; ++i) {
@@ -348,7 +396,10 @@ TEST(FaSet, IteratorsStayValidAcrossOtherInsertsAndErases)
   }
 }
 
-TEST(FaSet, IterationBothWays)
+TEST(
+  FaSet,
+  IterationBothWays
+)
 {
   fa::set<int> s;
   for (const int k : {5, 3, 9, 1, 7}) {
@@ -367,7 +418,10 @@ TEST(FaSet, IterationBothWays)
   EXPECT_EQ(*post, 1);
 }
 
-TEST(FaSet, EraseOfTheEndThrows)
+TEST(
+  FaSet,
+  EraseOfTheEndThrows
+)
 {
   fa::set<int> s;
   s.insert(1);
@@ -375,7 +429,10 @@ TEST(FaSet, EraseOfTheEndThrows)
   EXPECT_EQ(s.size(), 1u);
 }
 
-TEST(FaSet, EraseOfEverythingClearsAndCanBeReused)
+TEST(
+  FaSet,
+  EraseOfEverythingClearsAndCanBeReused
+)
 {
   fa::set<int> s;
   for (int i = 0; i < 50; ++i) {
@@ -388,7 +445,10 @@ TEST(FaSet, EraseOfEverythingClearsAndCanBeReused)
   EXPECT_EQ(Values(s), std::vector<int>{4});
 }
 
-TEST(FaSet, CopyMoveSwapAndSelfAssignment)
+TEST(
+  FaSet,
+  CopyMoveSwapAndSelfAssignment
+)
 {
   const std::vector<int> keys{4, 8, 15, 16, 23, 42};
   fa::set<int> a(keys.begin(), keys.end());
@@ -414,7 +474,10 @@ TEST(FaSet, CopyMoveSwapAndSelfAssignment)
   EXPECT_EQ(Values(a), keys);
 }
 
-TEST(FaSet, CustomComparator)
+TEST(
+  FaSet,
+  CustomComparator
+)
 {
   fa::set<int, std::greater<int>> s;
   for (const int k : {3, 1, 2}) {
@@ -428,7 +491,10 @@ TEST(FaSet, CustomComparator)
 
 // --- multiset ----------------------------------------------------------------------------------
 
-TEST(FaMultiset, RandomOpsMatchStdMultiset)
+TEST(
+  FaMultiset,
+  RandomOpsMatchStdMultiset
+)
 {
   for (unsigned seed = 1; seed <= 3; ++seed) {
     std::mt19937 rng(seed);
@@ -507,7 +573,10 @@ TEST(FaMultiset, RandomOpsMatchStdMultiset)
 // (copy_from in RbTree.h), so a copied multiset or multimap loses every duplicate key. MSVC8's
 // _Tree copies the structure (_Copy) and keeps them, as std:: does. Minimal input: a multiset
 // {1, 1}; its copy is {1}.
-TEST(FaMultiset, DISABLED_CopyKeepsDuplicates)
+TEST(
+  FaMultiset,
+  DISABLED_CopyKeepsDuplicates
+)
 {
   fa::multiset<int> s;
   s.insert(1);
@@ -521,7 +590,10 @@ TEST(FaMultiset, DISABLED_CopyKeepsDuplicates)
 
 // --- map ---------------------------------------------------------------------------------------
 
-TEST(FaMap, RandomOpsMatchStdMap)
+TEST(
+  FaMap,
+  RandomOpsMatchStdMap
+)
 {
   for (unsigned seed = 1; seed <= 4; ++seed) {
     std::mt19937 rng(seed);
@@ -608,13 +680,20 @@ TEST(FaMap, RandomOpsMatchStdMap)
         const fa::map<int, int>& constMap = m;
         const std::map<int, int>& constRef = ref;
         ASSERT_EQ(m.count(key), ref.count(key));
-        ASSERT_EQ(Offset(constMap.begin(), constMap.find(key), constMap.end()), Offset(constRef.begin(), constRef.find(key), constRef.end()));
+        ASSERT_EQ(
+          Offset(constMap.begin(), constMap.find(key), constMap.end()),
+          Offset(constRef.begin(), constRef.find(key), constRef.end())
+        );
         ASSERT_EQ(Offset(m.begin(), m.lower_bound(key), m.end()), Offset(ref.begin(), ref.lower_bound(key), ref.end()));
         ASSERT_EQ(Offset(m.begin(), m.upper_bound(key), m.end()), Offset(ref.begin(), ref.upper_bound(key), ref.end()));
         const auto range = constMap.equal_range(key);
         const auto refRange = ref.equal_range(key);
-        ASSERT_EQ(Offset(constMap.begin(), range.first, constMap.end()), Offset(ref.begin(), refRange.first, ref.end()));
-        ASSERT_EQ(Offset(constMap.begin(), range.second, constMap.end()), Offset(ref.begin(), refRange.second, ref.end()));
+        ASSERT_EQ(
+          Offset(constMap.begin(), range.first, constMap.end()), Offset(ref.begin(), refRange.first, ref.end())
+        );
+        ASSERT_EQ(
+          Offset(constMap.begin(), range.second, constMap.end()), Offset(ref.begin(), refRange.second, ref.end())
+        );
         break;
       }
       case 10:
@@ -656,7 +735,10 @@ TEST(FaMap, RandomOpsMatchStdMap)
   }
 }
 
-TEST(FaMap, SubscriptInsertsAValueInitialisedEntry)
+TEST(
+  FaMap,
+  SubscriptInsertsAValueInitialisedEntry
+)
 {
   fa::map<int, int> m;
   EXPECT_EQ(m[5], 0);
@@ -667,7 +749,10 @@ TEST(FaMap, SubscriptInsertsAValueInitialisedEntry)
   EXPECT_NE(m.header_ptr(), nullptr);
 }
 
-TEST(FaMap, CopyIsDeepAndEqual)
+TEST(
+  FaMap,
+  CopyIsDeepAndEqual
+)
 {
   fa::map<int, int> m;
   for (int i = 0; i < 100; ++i) {
@@ -685,7 +770,10 @@ TEST(FaMap, CopyIsDeepAndEqual)
 
 // --- multimap ----------------------------------------------------------------------------------
 
-TEST(FaMultimap, RandomOpsMatchStdMultimap)
+TEST(
+  FaMultimap,
+  RandomOpsMatchStdMultimap
+)
 {
   for (unsigned seed = 1; seed <= 3; ++seed) {
     std::mt19937 rng(seed);
@@ -748,7 +836,10 @@ TEST(FaMultimap, RandomOpsMatchStdMultimap)
   }
 }
 
-TEST(FaMultimap, HintedInsertsKeepTheKeysInOrder)
+TEST(
+  FaMultimap,
+  HintedInsertsKeepTheKeysInOrder
+)
 {
   std::mt19937 rng(17);
   fa::multimap<int, int> m;
@@ -770,7 +861,10 @@ TEST(FaMultimap, HintedInsertsKeepTheKeysInOrder)
   EXPECT_EQ(got, expected);
 }
 
-TEST(FaMultimap, MoveAndSwap)
+TEST(
+  FaMultimap,
+  MoveAndSwap
+)
 {
   fa::multimap<int, int> a;
   a.insert({1, 1});
@@ -789,7 +883,10 @@ TEST(FaMultimap, MoveAndSwap)
 
 // Bug: the copy re-inserts with insert_unique (see FaMultiset.DISABLED_CopyKeepsDuplicates).
 // Minimal input: {1: 1, 1: 2}; its copy is {1: 1}.
-TEST(FaMultimap, DISABLED_CopyKeepsDuplicates)
+TEST(
+  FaMultimap,
+  DISABLED_CopyKeepsDuplicates
+)
 {
   fa::multimap<int, int> m;
   m.insert({1, 1});
@@ -808,7 +905,10 @@ namespace
   };
 
   /** An unbalanced search tree on `head` in the layout Tree.h walks: null children. */
-  void BuildSearchTree(fa::Head& head, const std::vector<int>& keys)
+  void BuildSearchTree(
+    fa::Head& head,
+    const std::vector<int>& keys
+  )
   {
     fa::reset_empty(&head);
     for (const int key : keys) {
@@ -842,7 +942,9 @@ namespace
     }
   }
 
-  [[nodiscard]] std::vector<int> WalkKeys(fa::Head& head)
+  [[nodiscard]] std::vector<int> WalkKeys(
+    fa::Head& head
+  )
   {
     std::vector<int> keys;
     for (fa::NodeBase* n = fa::leftmost(&head); n != fa::end(&head); n = fa::next(n, &head)) {
@@ -852,7 +954,9 @@ namespace
   }
 
   /** Frees a tree built by BuildSearchTree, children first. */
-  void FreeSubtree(fa::NodeBase* const n)
+  void FreeSubtree(
+    fa::NodeBase* const n
+  )
   {
     if (n == nullptr) {
       return;
@@ -862,7 +966,9 @@ namespace
     delete static_cast<KeyNode*>(n);
   }
 
-  void FreeSearchTree(fa::Head& head)
+  void FreeSearchTree(
+    fa::Head& head
+  )
   {
     if (head.parent != &head) {
       FreeSubtree(head.parent);
@@ -874,7 +980,9 @@ namespace
   struct RecordingDeleter
   {
     static inline std::vector<fa::NodeBase*> handed;
-    void operator()(fa::NodeBase* const n) const
+    void operator()(
+      fa::NodeBase* const n
+    ) const
     {
       handed.push_back(n);
     }
@@ -889,14 +997,19 @@ namespace
 
   struct FreeingDeleter
   {
-    void operator()(fa::NodeBase* const n) const noexcept
+    void operator()(
+      fa::NodeBase* const n
+    ) const noexcept
     {
       delete static_cast<KeyNode*>(n);
     }
   };
 } // namespace
 
-TEST(FaTree, NextWalksASearchTreeInOrder)
+TEST(
+  FaTree,
+  NextWalksASearchTreeInOrder
+)
 {
   std::mt19937 rng(3);
   for (int round = 0; round < 300; ++round) {
@@ -928,24 +1041,32 @@ TEST(FaTree, NextWalksASearchTreeInOrder)
   }
 }
 
-TEST(FaTree, EraseRangeVisitsEachNodeOfTheRange)
+TEST(
+  FaTree,
+  EraseRangeVisitsEachNodeOfTheRange
+)
 {
   fa::Head head{};
   BuildSearchTree(head, {50, 20, 70, 10, 30, 60, 80});
   fa::NodeBase* first = fa::leftmost(&head);
-  first = fa::next(first, &head);  // 20
+  first = fa::next(first, &head); // 20
   fa::NodeBase* last = first;
   for (int i = 0; i < 3; ++i) {
-    last = fa::next(last, &head);  // 30, 50, 60
+    last = fa::next(last, &head); // 30, 50, 60
   }
   std::vector<int> visited;
-  fa::erase_range(&head, first, last, [&visited](fa::NodeBase* const n) { visited.push_back(static_cast<KeyNode*>(n)->key); });
+  fa::erase_range(&head, first, last, [&visited](fa::NodeBase* const n) {
+    visited.push_back(static_cast<KeyNode*>(n)->key);
+  });
   EXPECT_EQ(visited, (std::vector<int>{20, 30, 50}));
   FreeSearchTree(head);
   fa::clear_all(static_cast<fa::Head*>(nullptr), [](fa::NodeBase*) {});
 }
 
-TEST(FaTree, EmbeddedTreeHandsEveryNodeToItsDeleter)
+TEST(
+  FaTree,
+  EmbeddedTreeHandsEveryNodeToItsDeleter
+)
 {
   RecordingDeleter::handed.clear();
   {
@@ -967,7 +1088,10 @@ TEST(FaTree, EmbeddedTreeHandsEveryNodeToItsDeleter)
 // of a node without a right child, and in order those parents were destroyed already. With a
 // deleter that frees, the walk reads freed nodes. Minimal input: root 50 with right child 70;
 // after 50 is freed, next(70) reads 50->right. MSVC8's _Erase frees children first.
-TEST(FaTree, DISABLED_ClearAllWithAFreeingDeleter)
+TEST(
+  FaTree,
+  DISABLED_ClearAllWithAFreeingDeleter
+)
 {
   fa::EmbeddedTree<FreeingDeleter> tree;
   BuildSearchTree(*tree.head(), {50, 70, 60, 80, 20});
@@ -975,7 +1099,10 @@ TEST(FaTree, DISABLED_ClearAllWithAFreeingDeleter)
   EXPECT_EQ(fa::root(tree.head()), tree.head());
 }
 
-TEST(FaTree, SentinelLowerBoundMatchesTheSet)
+TEST(
+  FaTree,
+  SentinelLowerBoundMatchesTheSet
+)
 {
   using Node = RbNode<int>;
   std::mt19937 rng(23);
@@ -985,32 +1112,58 @@ TEST(FaTree, SentinelLowerBoundMatchesTheSet)
       s.insert(static_cast<int>(rng() % 200u));
     }
     Node* const head = s.end().node();
-    const auto nodeLess = [](const Node& n, const int key) { return n.value < key; };
+    const auto nodeLess = [](const Node& n, const int key) {
+      return n.value < key;
+    };
     for (int key = -1; key <= 201; ++key) {
       ASSERT_EQ((fa::lower_bound_node<Node, &Node::isNil>(head, key, nodeLess)), s.lower_bound(key).node()) << key;
       // With only a node-less-than-key test it cannot reject a greater node: it is lower_bound
       // (see DISABLED_FindEqualOrHeadGivesTheHeadForAnAbsentKey).
-      ASSERT_EQ((fa::find_equal_or_head_node<Node, &Node::isNil>(head, key, nodeLess)), s.lower_bound(key).node()) << key;
-      ASSERT_EQ((fa::lower_bound_node<Node, &Node::parent, &Node::left, &Node::right, &Node::isNil>(head, key, nodeLess)),
-                s.lower_bound(key).node());
+      ASSERT_EQ((fa::find_equal_or_head_node<Node, &Node::isNil>(head, key, nodeLess)), s.lower_bound(key).node())
+        << key;
+      ASSERT_EQ(
+        (fa::lower_bound_node<Node, &Node::parent, &Node::left, &Node::right, &Node::isNil>(head, key, nodeLess)),
+        s.lower_bound(key).node()
+      );
     }
   }
   const fa::MemberSentinelTree<Node, &Node::parent, &Node::left, &Node::right, &Node::isNil> none{nullptr};
   EXPECT_FALSE(none.valid());
-  EXPECT_EQ(none.lower_bound(1, [](const Node&, int) { return false; }), nullptr);
-  EXPECT_EQ(none.find_equal_or_head(1, [](const Node&, int) { return false; }), nullptr);
+  EXPECT_EQ(
+    none.lower_bound(
+      1,
+      [](const Node&, int) {
+    return false;
+  }
+    ),
+    nullptr
+  );
+  EXPECT_EQ(
+    none.find_equal_or_head(
+      1,
+      [](const Node&, int) {
+    return false;
+  }
+    ),
+    nullptr
+  );
 }
 
 // Bug (no callers in src/): find_equal_or_head returns the lower bound even when its key is
 // greater than the one searched, because the only test it has is node < key, and its final
 // `nodeLessThanKey(*candidate, key)` is always false for a lower bound. Minimal input: a set {5}
 // and key 3: it returns the node of 5, not the head.
-TEST(FaTree, DISABLED_FindEqualOrHeadGivesTheHeadForAnAbsentKey)
+TEST(
+  FaTree,
+  DISABLED_FindEqualOrHeadGivesTheHeadForAnAbsentKey
+)
 {
   using Node = RbNode<int>;
   fa::set<int> s;
   s.insert(5);
   Node* const head = s.end().node();
-  const auto nodeLess = [](const Node& n, const int key) { return n.value < key; };
+  const auto nodeLess = [](const Node& n, const int key) {
+    return n.value < key;
+  };
   EXPECT_EQ((fa::find_equal_or_head_node<Node, &Node::isNil>(head, 3, nodeLess)), head);
 }

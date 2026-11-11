@@ -53,7 +53,11 @@ namespace
   // Crash-safe primitives (no allocation: fixed buffers, plain fprintf)
   // ------------------------------------------------------------------
 
-  void DumpLine(std::FILE* const sink, const char* const format, ...)
+  void DumpLine(
+    std::FILE* const sink,
+    const char* const format,
+    ...
+  )
   {
     if (sink == nullptr) {
       return;
@@ -66,65 +70,90 @@ namespace
     std::fflush(sink);
   }
 
-  bool IsPlausiblePointer(const void* const p)
+  bool IsPlausiblePointer(
+    const void* const p
+  )
   {
     const auto address = reinterpret_cast<std::uintptr_t>(p);
     return address > 0x10000 && static_cast<std::uint64_t>(address) < 0x7FFFFFFFFFFFULL;
   }
 
-  const char* LuaTypeName(const int tt)
+  const char* LuaTypeName(
+    const int tt
+  )
   {
     switch (tt) {
-      case LUA_TNIL: return "nil";
-      case LUA_TBOOLEAN: return "boolean";
-      case LUA_TLIGHTUSERDATA: return "lightuserdata";
-      case LUA_TNUMBER: return "number";
-      case LUA_TSTRING: return "string";
-      case LUA_TTABLE: return "table";
-      case LUA_CFUNCTION: return "cfunction"; // tag 6 in this fork
-      case LUA_TFUNCTION: return "function";
-      case LUA_TUSERDATA: return "userdata";
-      case LUA_TTHREAD: return "thread";
-      case LUA_TPROTO: return "proto";
-      case LUA_TUPVALUE: return "upvalue";
-      default: return "?";
+    case LUA_TNIL:
+      return "nil";
+    case LUA_TBOOLEAN:
+      return "boolean";
+    case LUA_TLIGHTUSERDATA:
+      return "lightuserdata";
+    case LUA_TNUMBER:
+      return "number";
+    case LUA_TSTRING:
+      return "string";
+    case LUA_TTABLE:
+      return "table";
+    case LUA_CFUNCTION:
+      return "cfunction"; // tag 6 in this fork
+    case LUA_TFUNCTION:
+      return "function";
+    case LUA_TUSERDATA:
+      return "userdata";
+    case LUA_TTHREAD:
+      return "thread";
+    case LUA_TPROTO:
+      return "proto";
+    case LUA_TUPVALUE:
+      return "upvalue";
+    default:
+      return "?";
     }
   }
 
   // Renders one TObject into a fixed buffer, allocation-free.
-  void DescribeTObject(const LuaPlus::TObject& object, char* const out, const std::size_t outBytes)
+  void DescribeTObject(
+    const LuaPlus::TObject& object,
+    char* const out,
+    const std::size_t outBytes
+  )
   {
     switch (object.tt) {
-      case LUA_TNIL:
-        (void)std::snprintf(out, outBytes, "nil");
-        break;
-      case LUA_TBOOLEAN:
-        (void)std::snprintf(out, outBytes, "%s", object.value.b ? "true" : "false");
-        break;
-      case LUA_TNUMBER:
-        (void)std::snprintf(out, outBytes, "%g", static_cast<double>(object.value.n));
-        break;
-      case LUA_TSTRING: {
-        const auto* const string = static_cast<const TString*>(object.value.p);
-        if (!IsPlausiblePointer(string)) {
-          (void)std::snprintf(out, outBytes, "string(<bad %p>)", static_cast<void*>(object.value.p));
-          break;
-        }
-        std::size_t length = string->len;
-        if (length > 64) {
-          length = 64; // preview only
-        }
-        (void)std::snprintf(out, outBytes, "\"%.*s\"", static_cast<int>(length), string->str);
+    case LUA_TNIL:
+      (void)std::snprintf(out, outBytes, "nil");
+      break;
+    case LUA_TBOOLEAN:
+      (void)std::snprintf(out, outBytes, "%s", object.value.b ? "true" : "false");
+      break;
+    case LUA_TNUMBER:
+      (void)std::snprintf(out, outBytes, "%g", static_cast<double>(object.value.n));
+      break;
+    case LUA_TSTRING: {
+      const auto* const string = static_cast<const TString*>(object.value.p);
+      if (!IsPlausiblePointer(string)) {
+        (void)std::snprintf(out, outBytes, "string(<bad %p>)", static_cast<void*>(object.value.p));
         break;
       }
-      default:
-        (void)std::snprintf(out, outBytes, "%s(%p)", LuaTypeName(object.tt), static_cast<void*>(object.value.p));
-        break;
+      std::size_t length = string->len;
+      if (length > 64) {
+        length = 64; // preview only
+      }
+      (void)std::snprintf(out, outBytes, "\"%.*s\"", static_cast<int>(length), string->str);
+      break;
+    }
+    default:
+      (void)std::snprintf(out, outBytes, "%s(%p)", LuaTypeName(object.tt), static_cast<void*>(object.value.p));
+      break;
     }
   }
 
   // The frame's source chunk name, guarded (chunk names are TString*).
-  void DescribeSource(const Proto* const proto, char* const out, const std::size_t outBytes)
+  void DescribeSource(
+    const Proto* const proto,
+    char* const out,
+    const std::size_t outBytes
+  )
   {
     out[0] = '\0';
     if (proto == nullptr || !IsPlausiblePointer(proto)) {
@@ -147,30 +176,41 @@ namespace
   // Table corruption finders (FADeepProbe #3 parity, on typed layouts)
   // ------------------------------------------------------------------
 
-  bool NodeKeyIsNil(const Node& node)
+  bool NodeKeyIsNil(
+    const Node& node
+  )
   {
     return node.KeyIs(LUA_TNIL);
   }
 
-  bool NodeValueIsNil(const Node& node)
+  bool NodeValueIsNil(
+    const Node& node
+  )
   {
     return node.i_val.tt == LUA_TNIL;
   }
 
-  void DumpSuspectTable(std::FILE* const sink, const Table* const table)
+  void DumpSuspectTable(
+    std::FILE* const sink,
+    const Table* const table
+  )
   {
     if (!IsPlausiblePointer(table)) {
       DumpLine(sink, "    suspect table: <bad pointer %p>", static_cast<const void*>(table));
       return;
     }
 
-    const int nodeCount = (table->lsizenode > 0 && table->lsizenode < 20)
-                            ? (1 << table->lsizenode)
-                            : (table->lsizenode == 0 ? 0 : -1);
+    const int nodeCount =
+      (table->lsizenode > 0 && table->lsizenode < 20) ? (1 << table->lsizenode) : (table->lsizenode == 0 ? 0 : -1);
     DumpLine(
-      sink, "    table %p: flags=%d lsizenode=%u nodes=%d array=%d sizearray=%d metatable=%p",
-      static_cast<const void*>(table), static_cast<int>(table->flags), static_cast<unsigned>(table->lsizenode),
-      nodeCount, static_cast<int>(table->array != nullptr), table->sizearray,
+      sink,
+      "    table %p: flags=%d lsizenode=%u nodes=%d array=%d sizearray=%d metatable=%p",
+      static_cast<const void*>(table),
+      static_cast<int>(table->flags),
+      static_cast<unsigned>(table->lsizenode),
+      nodeCount,
+      static_cast<int>(table->array != nullptr),
+      table->sizearray,
       static_cast<const void*>(table->metatable)
     );
 
@@ -190,14 +230,14 @@ namespace
       DescribeTObject(node.Key(), keyText, sizeof(keyText));
       DescribeTObject(node.i_val, valueText, sizeof(valueText));
       DumpLine(
-        sink, "    node[%d] key=%s value=%s next=%p", i, keyText, valueText,
-        static_cast<const void*>(node.Next())
+        sink, "    node[%d] key=%s value=%s next=%p", i, keyText, valueText, static_cast<const void*>(node.Next())
       );
     }
     if (nilKeyNodes != 0) {
       DumpLine(
-        sink, "    !! %d node(s) with nil key and non-nil value - Lua never creates these; "
-              "stray write signature",
+        sink,
+        "    !! %d node(s) with nil key and non-nil value - Lua never creates these; "
+        "stray write signature",
         nilKeyNodes
       );
     }
@@ -211,7 +251,11 @@ namespace
   // registers. Exact opcode ranges are not needed: the crash handler only
   // sees the faulting native address, so the trigger is the table value
   // present in the frame's top slots (dumped below when found).
-  void DumpTableOperandsInFrame(std::FILE* const sink, const lua_State* const state, const CallInfo* const ci)
+  void DumpTableOperandsInFrame(
+    std::FILE* const sink,
+    const lua_State* const state,
+    const CallInfo* const ci
+  )
   {
     if (state == nullptr || ci == nullptr || !IsPlausiblePointer(state->stack)) {
       return;
@@ -238,8 +282,12 @@ namespace
 
   // Up to 8 register previews for one frame - the values the crashing
   // line was actually operating on, not just the innermost frame's.
-  void DumpFrameRegisters(std::FILE* const sink, const int index, const std::ptrdiff_t frame,
-                          const CallInfo* const ci)
+  void DumpFrameRegisters(
+    std::FILE* const sink,
+    const int index,
+    const std::ptrdiff_t frame,
+    const CallInfo* const ci
+  )
   {
     if (!IsPlausiblePointer(ci->base) || !IsPlausiblePointer(ci->top) || ci->top <= ci->base) {
       return;
@@ -251,8 +299,14 @@ namespace
     const std::ptrdiff_t printed = (slots < 8) ? slots : 8;
 
     char line[512] = {};
-    int written = std::snprintf(line, sizeof(line), "  VM %d frame %lld regs(%lld):", index,
-                                static_cast<long long>(frame), static_cast<long long>(slots));
+    int written = std::snprintf(
+      line,
+      sizeof(line),
+      "  VM %d frame %lld regs(%lld):",
+      index,
+      static_cast<long long>(frame),
+      static_cast<long long>(slots)
+    );
     for (std::ptrdiff_t s = 0; s < printed && written > 0; ++s) {
       char valueText[96] = {};
       DescribeTObject(ci->base[s], valueText, sizeof(valueText));
@@ -270,7 +324,11 @@ namespace
   // lanes for LUA_TTHREAD objects and dump each live coroutine's frames.
   void DescribeVmInternal(std::FILE* sink, lua_State* state, int index, bool followLstate);
 
-  void DumpCoroutines(std::FILE* const sink, const lua_State* const state, const int index)
+  void DumpCoroutines(
+    std::FILE* const sink,
+    const lua_State* const state,
+    const int index
+  )
   {
     const global_State* const g = state->l_G;
     const GCObject* lanes[2] = {g->rootgc, g->rootgc1};
@@ -289,10 +347,12 @@ namespace
           // Same global state, not the root, and not already covered by
           // the lstate follow in DescribeVm.
           if (thread != state && thread->l_G == g) {
-            if (thread->ci != nullptr && thread->ci > thread->base_ci
-                && IsPlausiblePointer(thread->stack)) {
+            if (thread->ci != nullptr && thread->ci > thread->base_ci && IsPlausiblePointer(thread->stack)) {
               DumpLine(
-                sink, "  VM %d coroutine %p (%td frame(s)):", index, static_cast<const void*>(thread),
+                sink,
+                "  VM %d coroutine %p (%td frame(s)):",
+                index,
+                static_cast<const void*>(thread),
                 static_cast<long long>(thread->ci - thread->base_ci)
               );
               // Same frame rendering; lstate follow suppressed - it points
@@ -311,7 +371,9 @@ namespace
   }
 
   // Display name for a registry slot, or a stable fallback.
-  const char* VmNameAt(const int index)
+  const char* VmNameAt(
+    const int index
+  )
   {
     VmRegistry& registry = VmRegistryInstance();
     if (index >= 0 && index < kMaxLuaVms && registry.names[index][0] != '\0') {
@@ -322,7 +384,11 @@ namespace
     return fallback;
   }
 
-  void DescribeVm(std::FILE* const sink, lua_State* const state, const int index)
+  void DescribeVm(
+    std::FILE* const sink,
+    lua_State* const state,
+    const int index
+  )
   {
     if (IsPlausiblePointer(state)) {
       VmRegistry& registry = VmRegistryInstance();
@@ -332,7 +398,10 @@ namespace
         // hint, not a claim that Lua is executing right now.
         const bool lastActive = IsPlausiblePointer(state->l_G) && state->l_G->lstate == state;
         DumpLine(
-          sink, "  %s: opened on tid %lu (root was last active: %s)", VmNameAt(index), registry.threadIds[index],
+          sink,
+          "  %s: opened on tid %lu (root was last active: %s)",
+          VmNameAt(index),
+          registry.threadIds[index],
           lastActive ? "yes" : "no - see coroutine below"
         );
       }
@@ -340,7 +409,12 @@ namespace
     DescribeVmInternal(sink, state, index, true);
   }
 
-  void DescribeVmInternal(std::FILE* const sink, lua_State* const state, const int index, const bool followLstate)
+  void DescribeVmInternal(
+    std::FILE* const sink,
+    lua_State* const state,
+    const int index,
+    const bool followLstate
+  )
   {
     if (!IsPlausiblePointer(state)) {
       DumpLine(sink, "%s: <bad pointer>", VmNameAt(index));
@@ -349,8 +423,7 @@ namespace
 
     DumpLine(sink, "%s: %p", VmNameAt(index), static_cast<void*>(state));
 
-    if (!IsPlausiblePointer(state->l_G) || !IsPlausiblePointer(state->stack)
-        || !IsPlausiblePointer(state->base_ci)) {
+    if (!IsPlausiblePointer(state->l_G) || !IsPlausiblePointer(state->stack) || !IsPlausiblePointer(state->base_ci)) {
       DumpLine(sink, "  VM %d: header sanity failed (partially destroyed?)", index);
       return;
     }
@@ -361,8 +434,9 @@ namespace
     // as well. It is also the validity signal for the live-pc pointer: once
     // luaV_execute has returned, ci->pc points into a dead frame.
     lua_State* const runningThread = state->l_G->lstate;
-    if (followLstate && IsPlausiblePointer(runningThread) && runningThread != state
-        && runningThread->l_G == state->l_G) {
+    if (
+      followLstate && IsPlausiblePointer(runningThread) && runningThread != state && runningThread->l_G == state->l_G
+    ) {
       DumpLine(sink, "  VM %d: running on coroutine thread %p", index, static_cast<void*>(runningThread));
       DescribeVmInternal(sink, runningThread, index, true);
     }
@@ -373,14 +447,12 @@ namespace
     CallInfo* const baseCi = state->base_ci;
     CallInfo* const currentCi = state->ci;
     if (!IsPlausiblePointer(currentCi) || currentCi < baseCi) {
-      DumpLine(sink, "  VM %d: bad ci %p (base %p)", index, static_cast<void*>(currentCi),
-               static_cast<void*>(baseCi));
+      DumpLine(sink, "  VM %d: bad ci %p (base %p)", index, static_cast<void*>(currentCi), static_cast<void*>(baseCi));
       return;
     }
     const std::ptrdiff_t frameCount = currentCi - baseCi;
     if (frameCount > 200) {
-      DumpLine(sink, "  VM %d: ci chain implausible (%td frames); skipping", index,
-               static_cast<long long>(frameCount));
+      DumpLine(sink, "  VM %d: ci chain implausible (%td frames); skipping", index, static_cast<long long>(frameCount));
       return;
     }
 
@@ -437,13 +509,17 @@ namespace
       }
 
       if (frameState >= 3) { // C function / special frames have no Lua source
-        DumpLine(
-          sink, "  VM %d frame %td: <C or suspended> state=%d", index, static_cast<long long>(f), frameState
-        );
+        DumpLine(sink, "  VM %d frame %td: <C or suspended> state=%d", index, static_cast<long long>(f), frameState);
       } else {
         DumpLine(
-          sink, "  VM %d frame %td: %s:%d (lineDefined=%d, %s)", index, static_cast<long long>(f), source, line,
-          proto->lineDefined, pcKind
+          sink,
+          "  VM %d frame %td: %s:%d (lineDefined=%d, %s)",
+          index,
+          static_cast<long long>(f),
+          source,
+          line,
+          proto->lineDefined,
+          pcKind
         );
         DumpFrameRegisters(sink, index, f, ci);
         if (f == 0) {
@@ -452,13 +528,14 @@ namespace
       }
     }
     if (frameCount > printed) {
-      DumpLine(sink, "  VM %d: ... %td outer frame(s) elided", index,
-               static_cast<long long>(frameCount - printed));
+      DumpLine(sink, "  VM %d: ... %td outer frame(s) elided", index, static_cast<long long>(frameCount - printed));
     }
 
     // Top-of-stack preview (the innermost frame's registers).
-    if (IsPlausiblePointer(currentCi->base) && IsPlausiblePointer(state->top)
-        && state->top > currentCi->base && (state->top - currentCi->base) <= 250) {
+    if (
+      IsPlausiblePointer(currentCi->base) && IsPlausiblePointer(state->top) && state->top > currentCi->base &&
+      (state->top - currentCi->base) <= 250
+    ) {
       const int slots = static_cast<int>(state->top - currentCi->base);
       const int printedSlots = (slots < 16) ? slots : 16;
       DumpLine(sink, "  VM %d stack top: %d slot(s), first %d:", index, slots, printedSlots);
@@ -493,17 +570,21 @@ namespace lua
     // Registers the Lua section with the crash reporter at load time, so any
     // fatal path after static init includes the Lua dump without an explicit
     // startup call in engine code.
-    void WriteLuaCrashSectionAdapter(std::FILE* const sink, const gpg::diag::CrashSectionInfo& info)
+    void WriteLuaCrashSectionAdapter(
+      std::FILE* const sink,
+      const gpg::diag::CrashSectionInfo& info
+    )
     {
       WriteLuaCrashSection(sink, info.faultAddress, info.accessTarget);
     }
 
-    const bool sLuaCrashSectionRegistered =
-      (gpg::diag::AddCrashSection("Lua", &WriteLuaCrashSectionAdapter), true);
+    const bool sLuaCrashSectionRegistered = (gpg::diag::AddCrashSection("Lua", &WriteLuaCrashSectionAdapter), true);
 
   } // namespace
 
-  void RegisterLuaVm(lua_State* const state)
+  void RegisterLuaVm(
+    lua_State* const state
+  )
   {
     if (state == nullptr) {
       return;
@@ -524,11 +605,15 @@ namespace lua
     // Field-useful: a crash report with "registered VMs: 0" then becomes
     // checkable against this line - either no VM ever opened on this run
     // (early crash) or the registry is broken.
-    gpg::diag::DiagLine("[LUA] VM opened: %p (tid %lu, total %d)", state, ::GetCurrentThreadId(),
-                        static_cast<int>(count + 1));
+    gpg::diag::DiagLine(
+      "[LUA] VM opened: %p (tid %lu, total %d)", state, ::GetCurrentThreadId(), static_cast<int>(count + 1)
+    );
   }
 
-  void NameLuaVm(lua_State* const state, const char* const name)
+  void NameLuaVm(
+    lua_State* const state,
+    const char* const name
+  )
   {
     if (state == nullptr || name == nullptr) {
       return;
@@ -543,7 +628,10 @@ namespace lua
     }
   }
 
-  void RecordLuaError(lua_State* const state, const char* const message)
+  void RecordLuaError(
+    lua_State* const state,
+    const char* const message
+  )
   {
     if (message == nullptr) {
       return;
@@ -555,8 +643,9 @@ namespace lua
     const LONG count = registry.activeCount;
     for (LONG i = 0; i < count && i < kMaxLuaVms; ++i) {
       const lua_State* const registered = static_cast<lua_State*>(registry.states[i]);
-      if (registered != nullptr && IsPlausiblePointer(state) && state->l_G != nullptr
-          && state->l_G == registered->l_G) {
+      if (
+        registered != nullptr && IsPlausiblePointer(state) && state->l_G != nullptr && state->l_G == registered->l_G
+      ) {
         vmName = VmNameAt(static_cast<int>(i));
         break;
       }
@@ -569,8 +658,9 @@ namespace lua
     const char* const newline = std::strchr(message, '\n');
     const std::size_t length =
       (newline != nullptr) ? static_cast<std::size_t>(newline - message) : std::strlen(message);
-    (void)::strncpy_s(gErrorRing[slot].message, sizeof(gErrorRing[slot].message), message,
-                      (length < 239) ? length : 239);
+    (void)::strncpy_s(
+      gErrorRing[slot].message, sizeof(gErrorRing[slot].message), message, (length < 239) ? length : 239
+    );
     gErrorRing[slot].message[(length < 239) ? length : 239] = '\0';
     (void)::InterlockedIncrement(&gErrorRingHead);
     if (gErrorRingCount < kMaxErrorRecords) {
@@ -578,7 +668,9 @@ namespace lua
     }
   }
 
-  void UnregisterLuaVm(lua_State* const state)
+  void UnregisterLuaVm(
+    lua_State* const state
+  )
   {
     if (state == nullptr) {
       return;
@@ -600,7 +692,9 @@ namespace lua
     }
   }
 
-  void SetThreadActiveLuaVm(lua_State* const)
+  void SetThreadActiveLuaVm(
+    lua_State* const
+  )
   {
     // The per-thread active flag is folded into RegisterLuaVm's threadIds
     // for creation; the running-thread correlation is reported through
@@ -608,7 +702,11 @@ namespace lua
     // dump reads directly. Reserved for the Phase 4 watch/probe work.
   }
 
-  void WriteLuaCrashSection(std::FILE* const sink, const void* const faultAddress, const void* const accessTarget)
+  void WriteLuaCrashSection(
+    std::FILE* const sink,
+    const void* const faultAddress,
+    const void* const accessTarget
+  )
   {
     VmRegistry& registry = VmRegistryInstance();
     const LONG count = registry.activeCount;
@@ -640,7 +738,10 @@ namespace lua
     }
   }
 
-  void AnnotateLuaAddress(std::FILE* const sink, const void* const address)
+  void AnnotateLuaAddress(
+    std::FILE* const sink,
+    const void* const address
+  )
   {
     if (sink == nullptr || address == nullptr) {
       return;
@@ -657,8 +758,13 @@ namespace lua
       const auto stackEnd = stackBegin + static_cast<std::uintptr_t>(state->stacksize) * sizeof(LuaPlus::TObject);
       if (target >= stackBegin && target < stackEnd) {
         const std::size_t slot = (target - stackBegin) / sizeof(LuaPlus::TObject);
-        DumpLine(sink, "address %p is VM %d stack slot %llu", address, static_cast<int>(i),
-                 static_cast<unsigned long long>(slot));
+        DumpLine(
+          sink,
+          "address %p is VM %d stack slot %llu",
+          address,
+          static_cast<int>(i),
+          static_cast<unsigned long long>(slot)
+        );
         return;
       }
     }

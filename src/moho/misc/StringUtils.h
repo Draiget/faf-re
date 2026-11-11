@@ -36,7 +36,8 @@ namespace moho
   bool IsNameIgnored(const fa::string& ignoreList, const char* name);
 
   /**
-   * Address: 0x0050E010 (FUN_0050E010, ?BP_ShortId@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV23@@Z)
+   * Address: 0x0050E010 (FUN_0050E010,
+   * ?BP_ShortId@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV23@@Z)
    *
    * What it does:
    * Returns the substring between the slash and dot lookup lanes used by

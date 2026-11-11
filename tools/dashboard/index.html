@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>FAF Server Dashboard</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233563e9'/%3E%3Cpath d='M9 23V9h12M9 16h9' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32"><path d="M9 23V9h12M9 16h9" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </span>
+        <div class="brand-text">
+          <h1>FAF Server</h1>
+          <span class="brand-sub" id="brand-sub">Dedicated server dashboard</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span id="stream-pill" class="pill pill-stream" hidden><span class="pill-dot" aria-hidden="true"></span><span id="stream-text">Events</span></span>
+        <span id="connection" class="pill pill-idle" role="status" aria-live="polite"><span class="pill-dot" aria-hidden="true"></span><span id="connection-text">Not connected</span></span>
+        <button id="theme" class="icon-btn" type="button" aria-label="Theme: automatic" title="Theme: automatic"></button>
+      </div>
+    </header>
+
+    <main id="main" class="page" tabindex="-1">
+      <section class="card connect-card" aria-labelledby="connect-title">
+        <div class="connect-head">
+          <div class="connect-heading">
+            <h2 id="connect-title">Server</h2>
+            <span id="connect-summary" class="dim connect-summary">Enter the REST address and admin token</span>
+          </div>
+          <button id="connect-toggle" class="btn ghost small" type="button" aria-expanded="true" aria-controls="connect-form" hidden>Change</button>
+        </div>
+        <form id="connect-form" class="connect-form" novalidate>
+          <div class="field">
+            <label for="url">REST address</label>
+            <input id="url" type="url" spellcheck="false" autocomplete="url" placeholder="http://127.0.0.1:27181" />
+          </div>
+          <div class="field">
+            <label for="token">Admin token</label>
+            <input id="token" type="password" autocomplete="off" spellcheck="false" />
+          </div>
+          <button id="connect" class="btn primary" type="submit">Connect</button>
+        </form>
+        <p id="connect-error" class="form-error" role="alert" hidden></p>
+      </section>
+
+      <div id="host-view" class="host-columns" hidden>
+        <div class="host-main">
+          <section id="lobby-created" class="card created" aria-live="polite" hidden></section>
+
+          <section id="new-lobby" class="card new-lobby" aria-labelledby="new-lobby-title" hidden>
+            <div class="card-head">
+              <h2 id="new-lobby-title">New lobby</h2>
+              <button id="lobby-cancel" class="btn ghost small" type="button">Cancel</button>
+            </div>
+            <form id="lobby-form" class="lobby-form" novalidate>
+              <div class="form-section">
+                <div class="field">
+                  <label for="lobby-name">Lobby name</label>
+                  <input id="lobby-name" autocomplete="off" spellcheck="false" />
+                </div>
+              </div>
+
+              <div class="form-section">
+                <div class="section-head"><h3 id="map-title">Map</h3><span class="dim" id="map-count"></span></div>
+                <label class="sr-only" for="map-search">Search maps</label>
+                <input id="map-search" type="search" placeholder="Search maps by name or id" spellcheck="false" />
+                <div id="map-list" class="map-list" role="radiogroup" aria-labelledby="map-title"></div>
+                <div id="map-selected" class="map-selected" aria-live="polite"></div>
+              </div>
+
+              <div class="form-section">
+                <div class="section-head"><h3>Seats</h3><span class="dim" id="seat-count"></span></div>
+                <div id="seat-rows" class="seat-rows"></div>
+                <button id="seat-add" class="btn small add-seat" type="button">Add a seat</button>
+              </div>
+
+              <div class="form-section">
+                <div class="section-head"><h3>Observers</h3><span class="dim" id="observer-count"></span></div>
+                <p class="dim small section-help">Each observer gets a watch line of their own, which the game opens as a live replay of this lobby's game. Referees watch live; the others see it with the delay below.</p>
+                <div id="observer-rows" class="observer-rows"></div>
+                <button id="observer-add" class="btn small add-seat" type="button">Add an observer</button>
+                <div id="observer-delay-field" class="field cores-field" hidden>
+                  <label for="observer-delay">Delay for observers (s)</label>
+                  <input id="observer-delay" type="number" min="0" max="3600" value="0" inputmode="numeric" />
+                </div>
+              </div>
+
+              <div class="form-section">
+                <div class="section-head"><h3>Game options</h3></div>
+                <div id="option-grid" class="option-grid"></div>
+              </div>
+
+              <div class="form-section">
+                <div class="section-head"><h3 id="control-title">Lobby control</h3></div>
+                <div class="choice-cards" role="radiogroup" aria-labelledby="control-title">
+                  <label class="choice">
+                    <input type="radio" name="lobby-control" value="player" checked />
+                    <span class="choice-body"><strong>A player hosts</strong><span>The first human hosts the lobby in their game and presses Launch.</span></span>
+                  </label>
+                  <label class="choice">
+                    <input type="radio" name="lobby-control" value="organiser" />
+                    <span class="choice-body"><strong>Organiser starts it</strong><span>Nobody hosts: start it from here, or it starts once every player is ready.</span></span>
+                  </label>
+                </div>
+                <div class="field-pair even">
+                  <div class="field">
+                    <label for="lobby-swr">Start when all are ready, after (s) <span class="dim">0 = off</span></label>
+                    <input id="lobby-swr" type="number" min="0" value="10" inputmode="numeric" />
+                  </div>
+                  <div class="field">
+                    <label for="lobby-minutes">Lobby stays open for (min)</label>
+                    <input id="lobby-minutes" type="number" min="1" value="60" inputmode="numeric" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-section">
+                <div class="section-head"><h3>CPUs</h3></div>
+                <label class="switch">
+                  <input id="cpu-auto" type="checkbox" role="switch" checked />
+                  <span class="switch-track" aria-hidden="true"></span>
+                  <span>Auto: the host picks the least loaded CPUs</span>
+                </label>
+                <div id="cpu-cores-field" class="field cores-field">
+                  <label for="cpu-cores">Cores</label>
+                  <input id="cpu-cores" type="number" min="1" value="1" inputmode="numeric" />
+                </div>
+                <p id="cpu-summary" class="cpu-summary" hidden></p>
+                <div id="hint-box" class="hint-box"></div>
+                <ul id="cpu-warnings" class="warnings" aria-live="polite"></ul>
+              </div>
+
+              <div class="form-actions">
+                <button id="lobby-submit" class="btn primary" type="submit">Start the lobby</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="card" aria-labelledby="lobbies-title">
+            <div class="card-head">
+              <h2 id="lobbies-title">Lobbies</h2>
+              <div class="head-tools">
+                <span class="dim" id="lobbies-meta"></span>
+                <button id="lobby-new" class="btn primary small" type="button">New lobby</button>
+              </div>
+            </div>
+            <div id="lobbies" class="lobby-grid"></div>
+            <div id="lobbies-empty" class="empty big-empty">
+              <p class="empty-title">No lobbies running</p>
+              <p class="dim">The host starts with none. Each lobby is its own server, pinned to the CPUs you pick.</p>
+              <button id="lobbies-empty-new" class="btn primary" type="button">New lobby</button>
+            </div>
+          </section>
+        </div>
+
+        <aside class="host-side" aria-label="Machine">
+          <section class="card machine" aria-labelledby="host-name">
+            <p class="eyebrow">Host</p>
+            <h2 id="host-name" class="hero-title">Host</h2>
+            <p id="host-model" class="dim host-model"></p>
+            <dl id="host-tiles" class="tiles host-tiles"></dl>
+          </section>
+          <section class="card" aria-labelledby="heat-title">
+            <div class="card-head">
+              <h2 id="heat-title">CPU load</h2>
+              <div class="heat-legend" aria-hidden="true"><span>0%</span><span class="legend-bar"></span><span>100%</span></div>
+            </div>
+            <p class="dim small heat-selection" id="heat-selection"></p>
+            <div id="heatmap" class="heatmap"></div>
+            <div class="btn-row heat-actions">
+              <button id="heat-clear" class="btn small" type="button" hidden>Clear</button>
+              <button id="heat-new" class="btn primary small" type="button" hidden>New lobby</button>
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      <nav id="lobby-bar" class="card lobby-bar" aria-label="Lobby" hidden>
+        <a href="#/" class="btn ghost small back-link"><span aria-hidden="true">‹</span> Host overview</a>
+        <div class="lobby-bar-text">
+          <strong id="lobby-bar-name"></strong>
+          <span id="lobby-bar-meta" class="dim"></span>
+        </div>
+        <span id="lobby-bar-state"></span>
+      </nav>
+
+      <div id="server-view" class="columns">
+        <div class="col-main">
+          <section id="hero" class="card hero" aria-labelledby="hero-title" data-phase="none">
+            <div class="hero-top">
+              <div class="hero-heading">
+                <p class="eyebrow" id="hero-eyebrow">Status</p>
+                <h2 id="hero-title" class="hero-title">Not connected</h2>
+                <div class="badges" id="hero-badges"></div>
+              </div>
+              <div class="clock-block" id="clock-block" hidden>
+                <span class="clock-label">Game time</span>
+                <span class="clock" id="clock">00:00</span>
+              </div>
+              <div class="countdown" id="countdown" role="timer" aria-labelledby="countdown-label" hidden>
+                <svg class="ring" viewBox="0 0 120 120" aria-hidden="true">
+                  <circle class="ring-track" cx="60" cy="60" r="52" />
+                  <circle class="ring-progress" id="countdown-ring" cx="60" cy="60" r="52" />
+                </svg>
+                <div class="countdown-center">
+                  <span class="countdown-value" id="countdown-value">0</span>
+                  <span class="countdown-unit">s</span>
+                </div>
+                <span class="countdown-label" id="countdown-label">Starting in</span>
+              </div>
+            </div>
+            <dl class="tiles" id="hero-tiles"></dl>
+            <p class="sr-only" id="countdown-announce" aria-live="polite" aria-atomic="true"></p>
+          </section>
+
+          <section id="armies-card" class="card" aria-labelledby="armies-title" hidden>
+            <div class="card-head">
+              <h2 id="armies-title">Live game</h2>
+              <span class="dim" id="armies-meta"></span>
+            </div>
+            <div id="armies" class="teams"></div>
+          </section>
+
+          <section class="card seats-card" aria-labelledby="seats-title">
+            <div class="card-head">
+              <h2 id="seats-title">Seats</h2>
+              <span class="dim" id="seats-meta"></span>
+            </div>
+            <div id="seats" class="seat-grid" role="group" aria-label="Seats; select one to pick it for the player controls"></div>
+            <p id="seats-empty" class="empty">Connect to see the seats.</p>
+          </section>
+
+          <section class="card events-card" aria-labelledby="events-title">
+            <div class="card-head wrap">
+              <h2 id="events-title">Events</h2>
+              <div class="events-tools">
+                <label class="sr-only" for="event-search">Filter events by text</label>
+                <input id="event-search" class="search" type="search" placeholder="Filter…" spellcheck="false" />
+                <button id="events-clear" class="btn ghost small" type="button">Clear</button>
+              </div>
+            </div>
+            <div class="filters" id="event-filters" role="group" aria-label="Show event kinds"></div>
+            <ol id="events" class="timeline" aria-label="Event timeline, newest first"></ol>
+            <p id="events-empty" class="empty">No events yet.</p>
+          </section>
+        </div>
+
+        <aside class="col-side" aria-label="Control">
+          <section class="card controls" aria-labelledby="controls-title">
+            <div class="card-head">
+              <h2 id="controls-title">Control</h2>
+              <span class="dim" id="controls-meta">connect first</span>
+            </div>
+            <fieldset id="controls" class="controls-set" disabled>
+              <legend class="sr-only">Control ops</legend>
+
+              <div class="group" data-phase="lobby">
+                <div class="group-head"><h3>Lobby</h3><span class="phase-tag">lobby only</span></div>
+                <button class="btn primary block" type="button" data-op="force_start">Start the game now</button>
+                <div class="field">
+                  <label for="options">Game options</label>
+                  <div class="input-row">
+                    <input id="options" placeholder="Key=Value,Key=Value" spellcheck="false" />
+                    <button class="btn" type="button" data-op="set_options">Set</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="group" data-phase="game">
+                <div class="group-head"><h3>Game</h3><span class="phase-tag">game only</span></div>
+                <div class="btn-row">
+                  <button class="btn" type="button" data-op="pause">Pause</button>
+                  <button class="btn" type="button" data-op="resume">Resume</button>
+                </div>
+                <div class="field">
+                  <label for="results">Results <span class="dim">(optional; with them the game counts as ended)</span></label>
+                  <input id="results" placeholder="1=victory,2=defeat" spellcheck="false" />
+                </div>
+                <div class="field">
+                  <label for="end-reason">Reason</label>
+                  <input id="end-reason" placeholder="why the game ends" />
+                </div>
+                <button class="btn danger block" type="button" data-op="end">End the game…</button>
+              </div>
+
+              <div class="group">
+                <div class="group-head"><h3>Players</h3></div>
+                <div class="field-pair">
+                  <div class="field">
+                    <label for="seat-pick">Seat</label>
+                    <select id="seat-pick"><option value="">Choose a seat</option></select>
+                  </div>
+                  <div class="field narrow">
+                    <label for="player-uid">uid</label>
+                    <input id="player-uid" type="number" inputmode="numeric" />
+                  </div>
+                </div>
+                <div class="segmented" role="radiogroup" aria-label="Player op">
+                  <label><input type="radio" name="player-op" value="eject" checked /><span>Eject</span></label>
+                  <label><input type="radio" name="player-op" value="set_player" /><span>Set player</span></label>
+                  <label><input type="radio" name="player-op" value="substitute" /><span>Substitute</span></label>
+                  <label><input type="radio" name="player-op" value="extend_timeouts" /><span>Timeouts</span></label>
+                </div>
+                <div class="op-panel" data-panel="eject">
+                  <div class="field">
+                    <label for="eject-reason">Reason</label>
+                    <input id="eject-reason" placeholder="shown to the player" />
+                  </div>
+                  <button class="btn danger block" type="button" data-op="eject">Eject…</button>
+                </div>
+                <div class="op-panel" data-panel="set_player" hidden>
+                  <div class="field">
+                    <label for="player-options">Player options <span class="dim">(lobby)</span></label>
+                    <input id="player-options" placeholder="Team=2,Faction=1" spellcheck="false" />
+                  </div>
+                  <button class="btn block" type="button" data-op="set_player">Set player options</button>
+                </div>
+                <div class="op-panel" data-panel="substitute" hidden>
+                  <div class="field">
+                    <label for="sub-name">New player's name</label>
+                    <input id="sub-name" spellcheck="false" />
+                  </div>
+                  <div class="field">
+                    <label for="sub-token">New player's token</label>
+                    <input id="sub-token" spellcheck="false" autocomplete="off" />
+                  </div>
+                  <button class="btn block" type="button" data-op="substitute">Substitute <span class="dim">(game)</span></button>
+                </div>
+                <div class="op-panel" data-panel="extend_timeouts" hidden>
+                  <div class="field">
+                    <label for="timeouts-count">Extra pauses</label>
+                    <input id="timeouts-count" type="number" inputmode="numeric" min="1" value="1" />
+                  </div>
+                  <button class="btn block" type="button" data-op="extend_timeouts">Extend timeouts <span class="dim">(game)</span></button>
+                </div>
+              </div>
+
+              <div class="group">
+                <div class="group-head"><h3>Network</h3></div>
+                <div class="field">
+                  <label for="address">IPv4 address <span class="dim">(handshake allowlist)</span></label>
+                  <input id="address" placeholder="a.b.c.d" spellcheck="false" inputmode="decimal" />
+                </div>
+                <div class="btn-row">
+                  <button class="btn" type="button" data-op="allow">Allow</button>
+                  <button class="btn" type="button" data-op="disallow">Disallow</button>
+                </div>
+              </div>
+            </fieldset>
+          </section>
+        </aside>
+      </div>
+    </main>
+
+    <div id="toasts" class="toasts" aria-live="polite" aria-relevant="additions"></div>
+
+    <dialog id="confirm" class="dialog" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+      <form method="dialog">
+        <h2 id="confirm-title">Are you sure?</h2>
+        <p id="confirm-text"></p>
+        <div class="dialog-actions">
+          <button class="btn" type="submit" value="cancel" autofocus>Cancel</button>
+          <button class="btn danger" type="submit" value="ok" id="confirm-ok">Confirm</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

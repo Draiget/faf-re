@@ -11,7 +11,10 @@ namespace faf::remote
 {
   namespace
   {
-    void AppendKeys(const moho::RRuleGameRulesBlueprintMap& map, std::vector<std::string>& names)
+    void AppendKeys(
+      const moho::RRuleGameRulesBlueprintMap& map,
+      std::vector<std::string>& names
+    )
     {
       for (const auto& [id, blueprint] : map) {
         if (blueprint != nullptr) {
@@ -21,7 +24,9 @@ namespace faf::remote
     }
   } // namespace
 
-  wire::SContentTables BuildContentTables(moho::RRuleGameRules& rules)
+  wire::SContentTables BuildContentTables(
+    moho::RRuleGameRules& rules
+  )
   {
     std::vector<std::string> blueprints;
     AppendKeys(rules.GetUnitBlueprints(), blueprints);

@@ -22,17 +22,26 @@ namespace faf::netlink
     // With RelayOnly: only this TURN server's relay ("host:port"); empty: any of them.
     std::string turnServer;
 
-    bool operator==(const PathChoice& other) const { return mode == other.mode && turnServer == other.turnServer; }
+    bool operator==(
+      const PathChoice& other
+    ) const
+    {
+      return mode == other.mode && turnServer == other.turnServer;
+    }
   };
 
   // "auto", "relay only", "relay via host:port", "no relay".
-  [[nodiscard]] inline std::string PathChoiceText(const PathChoice& choice)
+  [[nodiscard]] inline std::string PathChoiceText(
+    const PathChoice& choice
+  )
   {
     switch (choice.mode) {
-      case PathChoice::Mode::RelayOnly:
-        return choice.turnServer.empty() ? "relay only" : "relay via " + choice.turnServer;
-      case PathChoice::Mode::NoRelay: return "no relay";
-      default: return "auto";
+    case PathChoice::Mode::RelayOnly:
+      return choice.turnServer.empty() ? "relay only" : "relay via " + choice.turnServer;
+    case PathChoice::Mode::NoRelay:
+      return "no relay";
+    default:
+      return "auto";
     }
   }
 } // namespace faf::netlink

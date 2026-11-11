@@ -4,7 +4,8 @@ namespace moho
 {
   /**
    * Address: 0x00585AB0 (FUN_00585AB0, Moho::SUnitConstructionParams::SUnitConstructionParams)
-   * Mangled: ??0SUnitConstructionParams@Moho@@QAE@HABUdeprecated_struct_VecQuatB@@PAVCArmyImpl@1@PAVRUnitBlueprint@1@PAVUnit@1@E@Z
+   * Mangled:
+   * ??0SUnitConstructionParams@Moho@@QAE@HABUdeprecated_struct_VecQuatB@@PAVCArmyImpl@1@PAVRUnitBlueprint@1@PAVUnit@1@E@Z
    *
    * What it does:
    * Initializes one unit-construction payload from full transform/layer/owner

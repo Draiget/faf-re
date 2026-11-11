@@ -4,7 +4,7 @@ namespace LuaPlus
 {
   class LuaObject;
   class LuaState;
-}
+} // namespace LuaPlus
 
 struct lua_State;
 

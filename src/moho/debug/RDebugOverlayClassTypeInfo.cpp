@@ -32,7 +32,9 @@ namespace moho
   /**
    * Address: 0x006526F0 (FUN_006526F0, Moho::RDebugOverlayClassTypeInfo::AddBase_RType)
    */
-  void RDebugOverlayClassTypeInfo::AddBase_RType(gpg::RType* const typeInfo)
+  void RDebugOverlayClassTypeInfo::AddBase_RType(
+    gpg::RType* const typeInfo
+  )
   {
     debug_reflection::AddBaseRType(typeInfo);
   }

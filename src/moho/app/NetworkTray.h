@@ -21,7 +21,7 @@ namespace moho
   // shell refuses; returns what happened.
   [[nodiscard]] std::string NETDIAG_OpenLogFolder(void* owner);
   [[nodiscard]] std::string NETDIAG_LogFilePath(); // the game's /log file, empty without one
-  [[nodiscard]] std::string NETDIAG_Text(); // the build, every link, the log file, the network log lines
+  [[nodiscard]] std::string NETDIAG_Text();        // the build, every link, the log file, the network log lines
   [[nodiscard]] bool NETDIAG_CopyText(void* owner, const std::string& text);
 
   // Shows the icon from now until NETTRAY_Stop or the end of the process.

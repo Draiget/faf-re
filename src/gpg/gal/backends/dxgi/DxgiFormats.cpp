@@ -65,7 +65,9 @@ namespace gpg::gal::dxgi
     };
   } // namespace
 
-  DXGI_FORMAT TextureFormatToDxgi(const std::uint32_t galFormat) noexcept
+  DXGI_FORMAT TextureFormatToDxgi(
+    const std::uint32_t galFormat
+  ) noexcept
   {
     for (const FormatPair& pair : kTextureFormats) {
       if (pair.gal == galFormat) {
@@ -75,7 +77,9 @@ namespace gpg::gal::dxgi
     return DXGI_FORMAT_UNKNOWN;
   }
 
-  std::uint32_t DxgiToTextureFormat(const DXGI_FORMAT format) noexcept
+  std::uint32_t DxgiToTextureFormat(
+    const DXGI_FORMAT format
+  ) noexcept
   {
     for (const FormatPair& pair : kTextureFormats) {
       if (pair.dxgi == format) {
@@ -85,7 +89,9 @@ namespace gpg::gal::dxgi
     return 20U;
   }
 
-  DXGI_FORMAT RenderTargetFormatToDxgi(const std::uint32_t galFormat) noexcept
+  DXGI_FORMAT RenderTargetFormatToDxgi(
+    const std::uint32_t galFormat
+  ) noexcept
   {
     for (const FormatPair& pair : kRenderTargetFormats) {
       if (pair.gal == galFormat) {
@@ -95,7 +101,9 @@ namespace gpg::gal::dxgi
     return DXGI_FORMAT_UNKNOWN;
   }
 
-  std::uint32_t DxgiToRenderTargetFormat(const DXGI_FORMAT format) noexcept
+  std::uint32_t DxgiToRenderTargetFormat(
+    const DXGI_FORMAT format
+  ) noexcept
   {
     for (const FormatPair& pair : kRenderTargetFormats) {
       if (pair.dxgi == format) {
@@ -105,7 +113,10 @@ namespace gpg::gal::dxgi
     return 8U;
   }
 
-  DepthFormats DepthStencilFormatToDxgi(const std::uint32_t galFormat, const bool sampled) noexcept
+  DepthFormats DepthStencilFormatToDxgi(
+    const std::uint32_t galFormat,
+    const bool sampled
+  ) noexcept
   {
     // gal depth formats are D3D9's (`kDepthStencilFormatToD3D`): 1 D32,
     // 2 D15S1, 3 D24S8, 4 D24X8, 5 D24X4S4, 6 D16. DXGI has D32, D24S8 and D16.
@@ -132,13 +143,17 @@ namespace gpg::gal::dxgi
     return formats;
   }
 
-  bool IsBlockCompressed(const DXGI_FORMAT format) noexcept
+  bool IsBlockCompressed(
+    const DXGI_FORMAT format
+  ) noexcept
   {
     return (format >= DXGI_FORMAT_BC1_TYPELESS && format <= DXGI_FORMAT_BC5_SNORM) ||
       (format >= DXGI_FORMAT_BC6H_TYPELESS && format <= DXGI_FORMAT_BC7_UNORM_SRGB);
   }
 
-  std::uint32_t FormatElementBytes(const DXGI_FORMAT format) noexcept
+  std::uint32_t FormatElementBytes(
+    const DXGI_FORMAT format
+  ) noexcept
   {
     switch (format) {
     case DXGI_FORMAT_R32G32B32A32_TYPELESS:
@@ -243,7 +258,11 @@ namespace gpg::gal::dxgi
     }
   }
 
-  LevelLayout ComputeLevelLayout(const DXGI_FORMAT format, const std::uint32_t width, const std::uint32_t height) noexcept
+  LevelLayout ComputeLevelLayout(
+    const DXGI_FORMAT format,
+    const std::uint32_t width,
+    const std::uint32_t height
+  ) noexcept
   {
     const std::uint32_t elementBytes = FormatElementBytes(format);
     LevelLayout layout{};

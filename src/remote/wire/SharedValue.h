@@ -19,12 +19,20 @@ namespace faf::remote::wire
   public:
     TSharedValue() = default;
 
-    explicit TSharedValue(T value)
+    explicit TSharedValue(
+      T value
+    )
       : mValue(std::make_shared<const T>(std::move(value)))
     {}
 
-    [[nodiscard]] const T& operator*() const noexcept { return mValue ? *mValue : Default(); }
-    [[nodiscard]] const T* operator->() const noexcept { return &**this; }
+    [[nodiscard]] const T& operator*() const noexcept
+    {
+      return mValue ? *mValue : Default();
+    }
+    [[nodiscard]] const T* operator->() const noexcept
+    {
+      return &**this;
+    }
 
     /** The value to change, no longer shared with any other holder. */
     [[nodiscard]] T& Edit()
@@ -37,7 +45,9 @@ namespace faf::remote::wire
     }
 
     /** Replaces the value unless it is equal already (keeping the sharing); whether it did. */
-    bool Assign(const T& value)
+    bool Assign(
+      const T& value
+    )
     {
       if (**this == value) {
         return false;
@@ -50,7 +60,9 @@ namespace faf::remote::wire
      * Holds `other`'s value, sharing its pointer, so the next call with the same pointer compares nothing;
      * whether the value differed.
      */
-    bool Share(const TSharedValue& other)
+    bool Share(
+      const TSharedValue& other
+    )
     {
       if (mValue == other.mValue) {
         return false;
@@ -59,7 +71,9 @@ namespace faf::remote::wire
       mValue = other.mValue;
       return changed;
     }
-    [[nodiscard]] bool operator==(const TSharedValue& other) const noexcept
+    [[nodiscard]] bool operator==(
+      const TSharedValue& other
+    ) const noexcept
     {
       return mValue == other.mValue || **this == *other;
     }

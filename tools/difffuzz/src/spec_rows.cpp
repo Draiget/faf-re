@@ -14,7 +14,11 @@ namespace difffuzz
   {
     using u32 = std::uint32_t;
 
-    bool ReadSpec(const char* path, File& out, std::string& error)
+    bool ReadSpec(
+      const char* path,
+      File& out,
+      std::string& error
+    )
     {
       std::FILE* f = std::fopen(path, "rb");
       if (f == nullptr) {
@@ -23,8 +27,7 @@ namespace difffuzz
       }
       char magic[4] = {};
       u32 count = 0;
-      if (std::fread(magic, 1, 4, f) != 4 || std::memcmp(magic, "RRS1", 4) != 0
-          || std::fread(&count, 4, 1, f) != 1) {
+      if (std::fread(magic, 1, 4, f) != 4 || std::memcmp(magic, "RRS1", 4) != 0 || std::fread(&count, 4, 1, f) != 1) {
         std::fclose(f);
         error = "not an RRS1 file (run tools/retail-recorder/spec.py)";
         return false;
@@ -56,7 +59,9 @@ namespace difffuzz
     }
 
     void SelectValueRows(
-      const File& file, std::vector<Row>& rows, std::vector<std::pair<std::string, int>>& skippedWhy
+      const File& file,
+      std::vector<Row>& rows,
+      std::vector<std::pair<std::string, int>>& skippedWhy
     )
     {
       const auto skip = [&skippedWhy](const char* why) {
@@ -137,7 +142,9 @@ namespace difffuzz
     /// spec file marks an argument float when the prototype says so, but the
     /// Hex-Rays prototypes cannot be trusted for the register/stack split, so
     /// every word draws both kinds).
-    [[nodiscard]] u32 GenSpecWord(Rng& rng)
+    [[nodiscard]] u32 GenSpecWord(
+      Rng& rng
+    )
     {
       const u32 mode = rng.Below(100);
       if (mode < 12) {
@@ -156,7 +163,11 @@ namespace difffuzz
       return GenFloat(rng);
     }
 
-    void GenSpecInputs(Rng& rng, u32* in, const int words)
+    void GenSpecInputs(
+      Rng& rng,
+      u32* in,
+      const int words
+    )
     {
       for (int i = 0; i < words; ++i) {
         in[i] = GenSpecWord(rng);

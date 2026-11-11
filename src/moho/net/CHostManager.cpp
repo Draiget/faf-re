@@ -19,7 +19,9 @@ namespace
    * What it does:
    * Formats one Win32 system message into a reusable wide-buffer lane.
    */
-  [[nodiscard]] WCHAR* FormatSystemMessageWide(const DWORD messageId) noexcept
+  [[nodiscard]] WCHAR* FormatSystemMessageWide(
+    const DWORD messageId
+  ) noexcept
   {
     static WCHAR messageFormatBuffer[0x400]{};
     FormatMessageW(
@@ -38,7 +40,9 @@ namespace
 /**
  * Address: 0x0047F8A0 (FUN_0047F8A0, struct_Host::struct_Host)
  */
-Host::Host(const fa::string& name)
+Host::Host(
+  const fa::string& name
+)
   : TDatListItem<Host, void>{}
   , mName{}
   , mMapNodeBackLink(nullptr)
@@ -60,7 +64,9 @@ void Host::ResetNameAndUnlink() noexcept
 /**
  * Address: 0x0047FB50 (FUN_0047FB50, struct_Host::operator delete)
  */
-void Host::DestroyHeapNode(Host* const host) noexcept
+void Host::DestroyHeapNode(
+  Host* const host
+) noexcept
 {
   if (host == nullptr) {
     return;
@@ -103,7 +109,9 @@ CHostManager::~CHostManager()
  * Thunk lane that forwards one host-manager teardown request into
  * `FUN_0047FA40`.
  */
-[[maybe_unused]] void DestroyHostManagerAdapter(CHostManager* const manager) noexcept
+[[maybe_unused]] void DestroyHostManagerAdapter(
+  CHostManager* const manager
+) noexcept
 {
   if (manager != nullptr) {
     manager->~CHostManager();
@@ -119,7 +127,13 @@ CHostManager::~CHostManager()
  * What it does:
  * Resolves "host[:port]" via getaddrinfo(AF_INET), returning host-order IPv4 and port.
  */
-bool moho::NET_GetAddrInfo(const char* str, const u_short defaultPort, const bool isTcp, u_long& address, u_short& port)
+bool moho::NET_GetAddrInfo(
+  const char* str,
+  const u_short defaultPort,
+  const bool isTcp,
+  u_long& address,
+  u_short& port
+)
 {
   if (!str) {
     return false;
@@ -189,7 +203,9 @@ bool moho::NET_GetAddrInfo(const char* str, const u_short defaultPort, const boo
  * Returns cached hostname for host-order IPv4 address and refreshes MRU order.
  * On miss, resolves name, inserts a new cache entry, and evicts LRU entries past cap.
  */
-fa::string CHostManager::GetHostName(const std::uint32_t host)
+fa::string CHostManager::GetHostName(
+  const std::uint32_t host
+)
 {
   {
     std::lock_guard<std::mutex> lock(mLock);
@@ -221,13 +237,18 @@ fa::string CHostManager::GetHostName(const std::uint32_t host)
   return resolvedName;
 }
 
-fa::string& CHostManager::GetHostName(const std::uint32_t host, fa::string& out)
+fa::string& CHostManager::GetHostName(
+  const std::uint32_t host,
+  fa::string& out
+)
 {
   out = GetHostName(host);
   return out;
 }
 
-void CHostManager::Touch(Host& h) noexcept
+void CHostManager::Touch(
+  Host& h
+) noexcept
 {
   auto& node = static_cast<TDatListItem<Host, void>&>(h);
   node.ListLinkAfter(&mHostList);
@@ -260,7 +281,9 @@ void CHostManager::EvictIfNeeded() noexcept
   }
 }
 
-auto CHostManager::FindByValue(const Host* h) -> CHostManager::HostMap::iterator
+auto CHostManager::FindByValue(
+  const Host* h
+) -> CHostManager::HostMap::iterator
 {
   for (auto it = mHosts.begin(); it != mHosts.end(); ++it) {
     if (it->second == h) {
@@ -270,7 +293,9 @@ auto CHostManager::FindByValue(const Host* h) -> CHostManager::HostMap::iterator
   return mHosts.end();
 }
 
-fa::string CHostManager::ResolveHostName(const std::uint32_t host)
+fa::string CHostManager::ResolveHostName(
+  const std::uint32_t host
+)
 {
   sockaddr_in sockAddr{};
   sockAddr.sin_family = AF_INET;

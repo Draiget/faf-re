@@ -28,7 +28,7 @@ namespace gpg
   class SerConstructResult;
   struct SerHelperBase;
   class SerSaveConstructArgsResult;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -44,7 +44,7 @@ namespace gpg
    * Builds one typed reflection reference for a `CIntelGrid*` pointer.
    */
   gpg::RRef* RRef_CIntelGrid(gpg::RRef* outRef, moho::CIntelGrid* value);
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -63,9 +63,10 @@ namespace moho
      * `CopyDelayedSubVizInfoVariant1` in SDelayedSubVizInfoReflection.cpp,
      * removed 2026-09-10.)
      * Address: 0x00508B10 (FUN_00508B10 -- forwarding copy of the same body; formerly `CopyDelayedSubVizInfoVariant2`.)
-     * Address: 0x00509880 (FUN_00509880 -- the same implicit copy, formerly `CopyDelayedSubVizInfoUnchecked`; zero callers, unreachable.)
-     * Address: 0x005098A0 (FUN_005098A0 -- the same implicit copy behind a null guard, formerly `CopyDelayedSubVizInfoIfNotNullVariant1`; zero callers, unreachable.)
-     * Address: 0x00509A40 (FUN_00509A40 -- forwarding copy of 0x005098A0, formerly `CopyDelayedSubVizInfoIfNotNullVariant2`; zero callers, unreachable.)
+     * Address: 0x00509880 (FUN_00509880 -- the same implicit copy, formerly `CopyDelayedSubVizInfoUnchecked`; zero
+     * callers, unreachable.) Address: 0x005098A0 (FUN_005098A0 -- the same implicit copy behind a null guard, formerly
+     * `CopyDelayedSubVizInfoIfNotNullVariant1`; zero callers, unreachable.) Address: 0x00509A40 (FUN_00509A40 --
+     * forwarding copy of 0x005098A0, formerly `CopyDelayedSubVizInfoIfNotNullVariant2`; zero callers, unreachable.)
      */
     Wm3::Vec3f mLastPos;          // +0x00
     float mRadius;                // +0x0C
@@ -96,11 +97,17 @@ namespace moho
   public:
     /**
      * What it does:
-     * Nothing: the construct hook rebuilds the grid from its map and size; the cells are not archived. `gpg::SerSaveLoadHelper<CIntelGrid>::Deserialize`
-     * 0x00507490 and `Serialize` 0x005074A0 are a bare `ret`.
+     * Nothing: the construct hook rebuilds the grid from its map and size; the cells are not archived.
+     * `gpg::SerSaveLoadHelper<CIntelGrid>::Deserialize` 0x00507490 and `Serialize` 0x005074A0 are a bare `ret`.
      */
-    void MemberDeserialize(gpg::ReadArchive*) {}
-    void MemberSerialize(gpg::WriteArchive*) const {}
+    void MemberDeserialize(
+      gpg::ReadArchive*
+    )
+    {}
+    void MemberSerialize(
+      gpg::WriteArchive*
+    ) const
+    {}
 
     inline static gpg::RType* sType = nullptr;
 
@@ -129,15 +136,16 @@ namespace moho
      * Reads the map and the cell size and builds a grid on them for an archive
      * load. Inlined into `SerConstructHelper<CIntelGrid>::Construct` 0x005073C0.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x005BE150 (FUN_005BE150, ?IsVisible@CIntelGrid@Moho@@QBE_NHH@Z)
-     * Address: 0x00506EA0 (FUN_00506EA0 -- `mWidth - 1` through a grid pointer slot, the bounds arithmetic this method inlines; zero callers, unreachable. Formerly `ByteRasterMaxXFromSlot` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
-     * Address: 0x00506EB0 (FUN_00506EB0 -- `mHeight - 1`, likewise; formerly `ByteRasterMaxYFromSlot`.)
-     * Address: 0x00507900 (FUN_00507900 -- `mGrid + x + z * mWidth`, the cell address this method inlines; formerly `ByteRasterAddressAt`.)
+     * Address: 0x00506EA0 (FUN_00506EA0 -- `mWidth - 1` through a grid pointer slot, the bounds arithmetic this method
+     * inlines; zero callers, unreachable. Formerly `ByteRasterMaxXFromSlot` in SDelayedSubVizInfoReflection.cpp,
+     * removed 2026-09-10.) Address: 0x00506EB0 (FUN_00506EB0 -- `mHeight - 1`, likewise; formerly
+     * `ByteRasterMaxYFromSlot`.) Address: 0x00507900 (FUN_00507900 -- `mGrid + x + z * mWidth`, the cell address this
+     * method inlines; formerly `ByteRasterAddressAt`.)
      *
      * What it does:
      * Returns true when `(x,z)` is inside the intel grid bounds and the cell
@@ -148,7 +156,10 @@ namespace moho
      * test it against up to a dozen grids, do not pay a call per grid. Same
      * body, same result.
      */
-    [[nodiscard]] bool IsVisible(const std::int32_t x, const std::int32_t z) const
+    [[nodiscard]] bool IsVisible(
+      const std::int32_t x,
+      const std::int32_t z
+    ) const
     {
       if (x < 0 || z < 0) {
         return false;
@@ -248,7 +259,10 @@ namespace moho
      * payload for serializer construct callback.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     /**
@@ -281,14 +295,13 @@ namespace moho
      */
     void Raster(const Wm3::Vec3f& position, std::uint32_t radiusInCells, bool doAdd);
 
-
   public:
-    STIMap* mMapData;                            // +0x00
-    boost::scoped_array<std::int8_t> mGrid;      // +0x04
-    std::uint32_t mWidth;                        // +0x08
-    std::uint32_t mHeight;                       // +0x0C
-    fa::vector<SDelayedSubVizInfo> mUpdateList;   // +0x10
-    std::uint32_t mGridSize;                     // +0x20
+    STIMap* mMapData;                           // +0x00
+    boost::scoped_array<std::int8_t> mGrid;     // +0x04
+    std::uint32_t mWidth;                       // +0x08
+    std::uint32_t mHeight;                      // +0x0C
+    fa::vector<SDelayedSubVizInfo> mUpdateList; // +0x10
+    std::uint32_t mGridSize;                    // +0x20
   };
 
   /**

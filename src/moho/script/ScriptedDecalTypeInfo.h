@@ -38,4 +38,3 @@ namespace moho
 
   static_assert(sizeof(ScriptedDecalTypeInfo) == 0x64, "ScriptedDecalTypeInfo size must be 0x64");
 } // namespace moho
-

@@ -26,7 +26,9 @@ namespace
    * Executes one non-deleting `gpg::RType` base-teardown lane for
    * `REffectBlueprintTypeInfo`.
    */
-  [[maybe_unused]] void cleanup_REffectBlueprintTypeInfoRTypeBase(TypeInfo* const typeInfo) noexcept
+  [[maybe_unused]] void cleanup_REffectBlueprintTypeInfoRTypeBase(
+    TypeInfo* const typeInfo
+  ) noexcept
   {
     gpg::ClearTypeLists(typeInfo);
   }
@@ -67,20 +69,22 @@ namespace moho
   }
 
   /**
- * Address: 0x00510CF0 (FUN_00510CF0, Moho::REffectBlueprintTypeInfo::AddBase_RObject)
- *
- * What it does:
- * Registers `gpg::RObject` as this type's reflected base at offset 0 - single
- * inheritance, so the sub-object starts where the object does.
- */
-void REffectBlueprintTypeInfo::AddBase_RObject(gpg::RType* typeInfo)
-{
-  gpg::RType* const rObjectType = gpg::RTypeOf<gpg::RObject>();
-  gpg::RField baseField(rObjectType->GetName(), rObjectType, 0);
-  typeInfo->AddBase(baseField);
-}
+   * Address: 0x00510CF0 (FUN_00510CF0, Moho::REffectBlueprintTypeInfo::AddBase_RObject)
+   *
+   * What it does:
+   * Registers `gpg::RObject` as this type's reflected base at offset 0 - single
+   * inheritance, so the sub-object starts where the object does.
+   */
+  void REffectBlueprintTypeInfo::AddBase_RObject(
+    gpg::RType* typeInfo
+  )
+  {
+    gpg::RType* const rObjectType = gpg::RTypeOf<gpg::RObject>();
+    gpg::RField baseField(rObjectType->GetName(), rObjectType, 0);
+    typeInfo->AddBase(baseField);
+  }
 
-/**
+  /**
    * Address: 0x0050F080 (FUN_0050F080)
    *
    * What it does:
@@ -121,4 +125,7 @@ void REffectBlueprintTypeInfo::AddBase_RObject(gpg::RType* typeInfo)
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_REffectBlueprintTypeInfo_ccecba, moho::register_REffectBlueprintTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_REffectBlueprintTypeInfo_ccecba,
+  moho::register_REffectBlueprintTypeInfo
+)

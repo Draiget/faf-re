@@ -62,12 +62,12 @@ namespace faf::headless
     struct SCounts
     {
       std::uint64_t checked = 0;
-      std::uint64_t published = 0;     // published by the sim and by the oracle
-      std::uint64_t onlyOracle = 0;    // the oracle publishes, the sim has no interface
-      std::uint64_t onlySim = 0;       // the sim has an interface, the oracle does not publish
-      std::uint64_t modeDiffers = 0;   // both published, different visibility mode
-      std::uint64_t sent = 0;          // published by both and `CanViewSee` (the server sends it)
-      std::uint64_t meshShown = 0;     // published by both and `ViewShowsMesh` (the client draws it)
+      std::uint64_t published = 0;   // published by the sim and by the oracle
+      std::uint64_t onlyOracle = 0;  // the oracle publishes, the sim has no interface
+      std::uint64_t onlySim = 0;     // the sim has an interface, the oracle does not publish
+      std::uint64_t modeDiffers = 0; // both published, different visibility mode
+      std::uint64_t sent = 0;        // published by both and `CanViewSee` (the server sends it)
+      std::uint64_t meshShown = 0;   // published by both and `ViewShowsMesh` (the client draws it)
     };
 
     void OnSyncWalkDone(moho::Sim& sim, const moho::SSyncData& packet) override;

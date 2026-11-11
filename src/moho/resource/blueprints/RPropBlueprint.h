@@ -73,9 +73,8 @@ namespace moho
      * own `RPropBlueprint` (owned by the rules, so the archive may not delete it).
      * Inlined into `SerConstructHelper<RPropBlueprint>::Construct` 0x0051DC90.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x0051DBB0 (FUN_0051DBB0)
@@ -85,7 +84,10 @@ namespace moho
      * `MemberConstruct` to look the blueprint up by.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     RPropBlueprintDisplay Display; // +0x017C
@@ -152,17 +154,21 @@ namespace moho
   static_assert(sizeof(RPropBlueprintEconomy) == 0x08, "RPropBlueprintEconomy size must be 0x08");
 
   static_assert(
-    offsetof(RPropBlueprintDisplay, MeshBlueprint) == 0x00, "RPropBlueprintDisplay::MeshBlueprint offset must be 0x00"
+    offsetof(RPropBlueprintDisplay, MeshBlueprint) == 0x00,
+    "RPropBlueprintDisplay::MeshBlueprint offset must be 0x00"
   );
   static_assert(
-    offsetof(RPropBlueprintDisplay, UniformScale) == 0x1C, "RPropBlueprintDisplay::UniformScale offset must be 0x1C"
+    offsetof(RPropBlueprintDisplay, UniformScale) == 0x1C,
+    "RPropBlueprintDisplay::UniformScale offset must be 0x1C"
   );
   static_assert(
-    offsetof(RPropBlueprintDefense, MaxHealth) == 0x00, "RPropBlueprintDefense::MaxHealth offset must be 0x00"
+    offsetof(RPropBlueprintDefense, MaxHealth) == 0x00,
+    "RPropBlueprintDefense::MaxHealth offset must be 0x00"
   );
   static_assert(offsetof(RPropBlueprintDefense, Health) == 0x04, "RPropBlueprintDefense::Health offset must be 0x04");
   static_assert(
-    offsetof(RPropBlueprintEconomy, ReclaimMassMax) == 0x00, "RPropBlueprintEconomy::ReclaimMassMax offset must be 0x00"
+    offsetof(RPropBlueprintEconomy, ReclaimMassMax) == 0x00,
+    "RPropBlueprintEconomy::ReclaimMassMax offset must be 0x00"
   );
   static_assert(
     offsetof(RPropBlueprintEconomy, ReclaimEnergyMax) == 0x04,

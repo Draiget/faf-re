@@ -56,7 +56,10 @@ namespace
     return &sColorLuaState;
   }
 
-  [[nodiscard]] std::uint32_t ResolvePlayerColorByIndex(LuaPlus::LuaState* const state, const int colorIndex)
+  [[nodiscard]] std::uint32_t ResolvePlayerColorByIndex(
+    LuaPlus::LuaState* const state,
+    const int colorIndex
+  )
   {
     LuaPlus::LuaObject* const gameColorsRoot = moho::GetColors();
 
@@ -66,7 +69,10 @@ namespace
     return moho::SCR_DecodeColor(state, colorObject);
   }
 
-  [[nodiscard]] std::uint32_t ResolveArmyColorByIndex(LuaPlus::LuaState* const state, const int colorIndex)
+  [[nodiscard]] std::uint32_t ResolveArmyColorByIndex(
+    LuaPlus::LuaState* const state,
+    const int colorIndex
+  )
   {
     LuaPlus::LuaObject* const gameColorsRoot = moho::GetColors();
 
@@ -76,7 +82,10 @@ namespace
     return moho::SCR_DecodeColor(state, colorObject);
   }
 
-  [[nodiscard]] std::uint32_t ResolveGameColorField(LuaPlus::LuaState* const state, const char* const fieldName)
+  [[nodiscard]] std::uint32_t ResolveGameColorField(
+    LuaPlus::LuaState* const state,
+    const char* const fieldName
+  )
   {
     LuaPlus::LuaObject* const gameColorsRoot = moho::GetColors();
 
@@ -85,7 +94,10 @@ namespace
     return moho::SCR_DecodeColor(state, colorObject);
   }
 
-  [[nodiscard]] fa::string ResolvePlayerColorNameByIndex(LuaPlus::LuaState* const /*state*/, const int colorIndex)
+  [[nodiscard]] fa::string ResolvePlayerColorNameByIndex(
+    LuaPlus::LuaState* const /*state*/,
+    const int colorIndex
+  )
   {
     LuaPlus::LuaObject* const gameColorsRoot = moho::GetColors();
 
@@ -95,7 +107,9 @@ namespace
     return fa::string(colorObject.GetString());
   }
 
-  [[nodiscard]] std::uint32_t ResolvePlayerColorCount(LuaPlus::LuaState* const /*state*/)
+  [[nodiscard]] std::uint32_t ResolvePlayerColorCount(
+    LuaPlus::LuaState* const /*state*/
+  )
   {
     LuaPlus::LuaObject* const gameColorsRoot = moho::GetColors();
 
@@ -168,7 +182,9 @@ namespace moho
    * Resolves one configured player color entry by index and decodes it into
    * packed ARGB.
    */
-  std::uint32_t GetPlayerColor(const int idx)
+  std::uint32_t GetPlayerColor(
+    const int idx
+  )
   {
     const auto colorLock = LockColorLuaState();
     LuaPlus::LuaState* const colorState = GetColorLuaState();
@@ -184,7 +200,9 @@ namespace moho
    * Resolves one configured army color entry by index and decodes it into
    * packed ARGB.
    */
-  std::uint32_t GetArmyColor(const int idx)
+  std::uint32_t GetArmyColor(
+    const int idx
+  )
   {
     const auto colorLock = LockColorLuaState();
     LuaPlus::LuaState* const colorState = GetColorLuaState();
@@ -192,14 +210,17 @@ namespace moho
   }
 
   /**
-   * Address: 0x00506A30 (FUN_00506A30, ?GetPlayerColorName@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@H@Z)
+   * Address: 0x00506A30 (FUN_00506A30,
+   * ?GetPlayerColorName@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@H@Z)
    *
    * int idx
    *
    * What it does:
    * Returns one player-color token string from the game color table.
    */
-  fa::string GetPlayerColorName(const int idx)
+  fa::string GetPlayerColorName(
+    const int idx
+  )
   {
     const auto colorLock = LockColorLuaState();
     LuaPlus::LuaState* const colorState = GetColorLuaState();
@@ -254,7 +275,9 @@ namespace moho
    * Scans the configured army-color table and returns the first index whose
    * decoded color matches `packedColor`; defaults to `3` when not found.
    */
-  int func_GetColorIndex(const int packedColor)
+  int func_GetColorIndex(
+    const int packedColor
+  )
   {
     const auto colorLock = LockColorLuaState();
     LuaPlus::LuaState* const colorState = GetColorLuaState();
@@ -362,7 +385,9 @@ namespace moho
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_CreateInitialArmyUnitL`.
    */
-  int cfunc_CreateInitialArmyUnit(lua_State* const luaContext)
+  int cfunc_CreateInitialArmyUnit(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreateInitialArmyUnitL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -373,7 +398,9 @@ namespace moho
    * What it does:
    * Unwraps raw Lua callback context and forwards to `cfunc_SetArmyColorIndexL`.
    */
-  int cfunc_SetArmyColorIndex(lua_State* const luaContext)
+  int cfunc_SetArmyColorIndex(
+    lua_State* const luaContext
+  )
   {
     return cfunc_SetArmyColorIndexL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -385,7 +412,9 @@ namespace moho
    * Reads `(army, colorIndex)`, resolves one configured player color by index,
    * and writes both army color lanes.
    */
-  int cfunc_SetArmyColorIndexL(LuaPlus::LuaState* const state)
+  int cfunc_SetArmyColorIndexL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -415,7 +444,9 @@ namespace moho
    * What it does:
    * Unwraps raw Lua callback context and forwards to `cfunc_AddBuildRestrictionL`.
    */
-  int cfunc_AddBuildRestriction(lua_State* const luaContext)
+  int cfunc_AddBuildRestriction(
+    lua_State* const luaContext
+  )
   {
     return cfunc_AddBuildRestrictionL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -427,7 +458,9 @@ namespace moho
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_RemoveBuildRestrictionL`.
    */
-  int cfunc_RemoveBuildRestriction(lua_State* const luaContext)
+  int cfunc_RemoveBuildRestriction(
+    lua_State* const luaContext
+  )
   {
     return cfunc_RemoveBuildRestrictionL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -439,7 +472,9 @@ namespace moho
    * Reads `(army, initialUnitName)`, resolves one unit blueprint from rules,
    * and creates one initial unit at that army start position.
    */
-  int cfunc_CreateInitialArmyUnitL(LuaPlus::LuaState* const state)
+  int cfunc_CreateInitialArmyUnitL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -479,12 +514,7 @@ namespace moho
     army->GetArmyStartPos(startPosition);
 
     SUnitConstructionParams constructionParams{
-      0,
-      Wm3::Vector3f{startPosition.x, 0.0f, startPosition.y},
-      army,
-      blueprint,
-      nullptr,
-      true
+      0, Wm3::Vector3f{startPosition.x, 0.0f, startPosition.y}, army, blueprint, nullptr, true
     };
     constructionParams.mTransform.orient_.w = 1.0f;
     constructionParams.mTransform.orient_.x = 0.0f;
@@ -514,7 +544,6 @@ namespace moho
       LuaPlus::LuaState::Error(state, "SetArmyStart() failed");
     }
 
-
     unit->mLuaObj.PushStack(state);
     return 1;
   }
@@ -525,7 +554,9 @@ namespace moho
    * What it does:
    * Reads `(army, categorySet)` and applies one build restriction to that army.
    */
-  int cfunc_AddBuildRestrictionL(LuaPlus::LuaState* const state)
+  int cfunc_AddBuildRestrictionL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -549,7 +580,9 @@ namespace moho
    * Reads `(army, categorySet)` and removes one build restriction from that
    * army.
    */
-  int cfunc_RemoveBuildRestrictionL(LuaPlus::LuaState* const state)
+  int cfunc_RemoveBuildRestrictionL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;

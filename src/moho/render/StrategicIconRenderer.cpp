@@ -32,7 +32,8 @@ namespace moho
   TConVar<int> gTConVar_ren_GpuIcons(
     "ren_GpuIcons",
     "Draw strategic icons with one instanced draw per view from a persistent GPU buffer instead of the "
-    "prim batcher. -1 (auto, the default) turns it on where the backend has verified this path, 1 wherever it can, 0 never.",
+    "prim batcher. -1 (auto, the default) turns it on where the backend has verified this path, 1 wherever it can, 0 "
+    "never.",
     &ren_GpuIcons
   );
 
@@ -40,7 +41,8 @@ namespace moho
     "ren_GpuIconClassify",
     "With ren_GpuIcons and ui_IconRecords: decide which units get a strategic icon, in which run, and "
     "where, in a compute shader from per-unit records uploaded when a sync beat changes them, then draw "
-    "them with one indirect draw per view. Same icons in the same order as the CPU classification. -1 (auto, the default) turns it on where the backend has verified this path, 1 wherever it can, 0 never.",
+    "them with one indirect draw per view. Same icons in the same order as the CPU classification. -1 (auto, the "
+    "default) turns it on where the backend has verified this path, 1 wherever it can, 0 never.",
     &ren_GpuIconClassify
   );
 
@@ -67,7 +69,10 @@ namespace moho
     gpg::gal::Device* sDeviceOfResources = nullptr;
   } // namespace
 
-  void StrategicIconInstance::SetPosition(const float screenX, const float screenY) noexcept
+  void StrategicIconInstance::SetPosition(
+    const float screenX,
+    const float screenY
+  ) noexcept
   {
     // The CPU path's corners are floored screen points; whole pixels fit 16 bits
     // for anything near the viewport, and farther points draw nothing either way.
@@ -78,7 +83,10 @@ namespace moho
     mPosition = clamp16(screenX) | (clamp16(screenY) << 16U);
   }
 
-  void StrategicIconInstance::SetLayer(const std::uint32_t layer, const std::uint16_t slot) noexcept
+  void StrategicIconInstance::SetLayer(
+    const std::uint32_t layer,
+    const std::uint16_t slot
+  ) noexcept
   {
     std::uint32_t& packed = layer < 2U ? mLayers01 : mLayers23;
     const std::uint32_t shift = (layer & 1U) * 16U;
@@ -136,13 +144,17 @@ namespace moho
     return mProgram != nullptr;
   }
 
-  std::uint16_t StrategicIconRenderer::FindSlot(const CD3DBatchTexture* const texture) const noexcept
+  std::uint16_t StrategicIconRenderer::FindSlot(
+    const CD3DBatchTexture* const texture
+  ) const noexcept
   {
     const auto found = mSlotByTexture.find(texture);
     return found != mSlotByTexture.end() ? found->second : StrategicIconInstance::kNoLayer;
   }
 
-  std::uint16_t StrategicIconRenderer::AddSlot(const boost::shared_ptr<CD3DBatchTexture>& texture)
+  std::uint16_t StrategicIconRenderer::AddSlot(
+    const boost::shared_ptr<CD3DBatchTexture>& texture
+  )
   {
     if (!texture) {
       return StrategicIconInstance::kNoLayer;
@@ -163,7 +175,9 @@ namespace moho
     return slot;
   }
 
-  bool StrategicIconRenderer::RefreshAtlasSlots(CD3DPrimBatcher& batcher)
+  bool StrategicIconRenderer::RefreshAtlasSlots(
+    CD3DPrimBatcher& batcher
+  )
   {
     CD3DTextureBatcher& atlas = *batcher.mTextureBatcher;
     // CD3DPrimBatcher::SetTexture sends a texture this large around the atlas.
@@ -229,7 +243,9 @@ namespace moho
     mUploadedIconScale = ui_StrategicIconScale;
   }
 
-  StrategicIconRenderer::ViewStream& StrategicIconRenderer::StreamFor(const void* const viewKey)
+  StrategicIconRenderer::ViewStream& StrategicIconRenderer::StreamFor(
+    const void* const viewKey
+  )
   {
     for (ViewStream& stream : mStreams) {
       if (stream.mViewKey == viewKey) {
@@ -237,14 +253,18 @@ namespace moho
         return stream;
       }
     }
-    std::erase_if(mStreams, [this](const ViewStream& stream) { return mFrame - stream.mLastUsedFrame > kStreamIdleDraws; });
+    std::erase_if(mStreams, [this](const ViewStream& stream) {
+      return mFrame - stream.mLastUsedFrame > kStreamIdleDraws;
+    });
     ViewStream& stream = mStreams.emplace_back();
     stream.mViewKey = viewKey;
     stream.mLastUsedFrame = mFrame;
     return stream;
   }
 
-  gpg::gal::Texture* StrategicIconRenderer::PrepareDraw(CD3DPrimBatcher& batcher)
+  gpg::gal::Texture* StrategicIconRenderer::PrepareDraw(
+    CD3DPrimBatcher& batcher
+  )
   {
     if (!RefreshAtlasSlots(batcher)) {
       return nullptr;
@@ -265,7 +285,9 @@ namespace moho
   }
 
   bool StrategicIconRenderer::Draw(
-    CD3DPrimBatcher& batcher, const void* const viewKey, const std::span<const StrategicIconInstance> instances
+    CD3DPrimBatcher& batcher,
+    const void* const viewKey,
+    const std::span<const StrategicIconInstance> instances
   )
   {
     if (!mSupported || batcher.mTextureBatcher == nullptr) {
@@ -345,7 +367,9 @@ namespace moho
     return mClassifyProgram != nullptr && mCompactProgram != nullptr && mDrawArgs != nullptr;
   }
 
-  bool StrategicIconRenderer::EnsureClassifyCapacity(const std::uint32_t count)
+  bool StrategicIconRenderer::EnsureClassifyCapacity(
+    const std::uint32_t count
+  )
   {
     if (count <= mClassifyCapacity && mStaged != nullptr) {
       return true;
@@ -407,7 +431,10 @@ namespace moho
       // Never empty, so the buffer always exists.
       static const std::uint32_t kNoSelection = 0U;
       const bool empty = selectionBits.empty();
-      if (stream.mSelection.Update(empty ? &kNoSelection : selectionBits.data(), empty ? 1U : selectionBits.size()) == nullptr) {
+      if (
+        stream.mSelection.Update(empty ? &kNoSelection : selectionBits.data(), empty ? 1U : selectionBits.size()) ==
+        nullptr
+      ) {
         return false;
       }
       stream.mSelectionVersion = selectionVersion;
@@ -456,7 +483,9 @@ namespace moho
     return true;
   }
 
-  bool StrategicIconRenderer::ReadBackClassified(std::vector<StrategicIconInstance>& out)
+  bool StrategicIconRenderer::ReadBackClassified(
+    std::vector<StrategicIconInstance>& out
+  )
   {
     out.clear();
     if (!mClassifySupported || mLastClassifiedSources == 0U) {

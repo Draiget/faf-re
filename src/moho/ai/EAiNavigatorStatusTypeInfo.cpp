@@ -148,4 +148,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_EAiNavigatorStatusTypeInfo_cb0714, moho::register_EAiNavigatorStatusTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_EAiNavigatorStatusTypeInfo_cb0714,
+  moho::register_EAiNavigatorStatusTypeInfo
+)

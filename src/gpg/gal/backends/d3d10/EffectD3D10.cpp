@@ -12,7 +12,10 @@ namespace gpg::gal
    * Starts from an empty context and a null effect, then adopts the caller's
    * through `SetEffect`.
    */
-  EffectD3D10::EffectD3D10(const EffectContext& context, ID3D10Effect* const dxEffect)
+  EffectD3D10::EffectD3D10(
+    const EffectContext& context,
+    ID3D10Effect* const dxEffect
+  )
   {
     SetEffect(context, dxEffect);
   }
@@ -37,7 +40,10 @@ namespace gpg::gal
    * the copied source buffer (the four words at this+0x48..+0x54, releasing
    * the shared owner at +0x4C first).
    */
-  void EffectD3D10::SetEffect(const EffectContext& context, ID3D10Effect* const dxEffect)
+  void EffectD3D10::SetEffect(
+    const EffectContext& context,
+    ID3D10Effect* const dxEffect
+  )
   {
     Reset();
     context_ = context;
@@ -79,7 +85,9 @@ namespace gpg::gal
    * 0x0094BE69), on a temporary whose constructor the binary inlines around
    * `shared_count(EffectTechniqueD3D10*)` 0x0094B6C0.
    */
-  void EffectD3D10::GetTechniques(fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques)
+  void EffectD3D10::GetTechniques(
+    fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques
+  )
   {
     if (dxEffect_ == nullptr) {
       ThrowGalError("EffectD3D10.cpp", 52, "invalid effect");
@@ -118,7 +126,9 @@ namespace gpg::gal
    * Wraps the effect variable called `variableName`; throws when the effect
    * or the variable is missing.
    */
-  boost::shared_ptr<EffectVariable> EffectD3D10::GetVariable(const char* const variableName)
+  boost::shared_ptr<EffectVariable> EffectD3D10::GetVariable(
+    const char* const variableName
+  )
   {
     if (dxEffect_ == nullptr) {
       ThrowGalError("EffectD3D10.cpp", 79, "invalid effect");
@@ -145,7 +155,9 @@ namespace gpg::gal
    * Wraps the technique called `techniqueName`; throws when the effect or
    * the technique is missing.
    */
-  boost::shared_ptr<EffectTechnique> EffectD3D10::GetTechnique(const char* const techniqueName)
+  boost::shared_ptr<EffectTechnique> EffectD3D10::GetTechnique(
+    const char* const techniqueName
+  )
   {
     if (dxEffect_ == nullptr) {
       ThrowGalError("EffectD3D10.cpp", 89, "invalid effect");
@@ -181,5 +193,4 @@ namespace gpg::gal
    * No-op D3D10 effect lost-device slot.
    */
   void EffectD3D10::OnLost() {}
-}
-
+} // namespace gpg::gal

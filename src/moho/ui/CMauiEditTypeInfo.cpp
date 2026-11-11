@@ -22,7 +22,10 @@ namespace
 
   struct CMauiEditTypeInfoBootstrap
   {
-    CMauiEditTypeInfoBootstrap() { moho::register_CMauiEditTypeInfoStartup(); }
+    CMauiEditTypeInfoBootstrap()
+    {
+      moho::register_CMauiEditTypeInfoStartup();
+    }
   };
   CMauiEditTypeInfoBootstrap gCMauiEditTypeInfoBootstrap;
 
@@ -37,7 +40,9 @@ namespace
    * `RType::IsDerivedFrom` cannot walk from it to CScriptObject and every
    * reflected reference built from a CMauiEdit fails its upcast.
    */
-  void AddCMauiControlBase(gpg::RType& typeInfo)
+  void AddCMauiControlBase(
+    gpg::RType& typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CMauiControl>(&typeInfo);
   }
@@ -98,4 +103,7 @@ void moho::register_CMauiEditTypeInfoStartup()
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every
 // consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CMauiEditTypeInfoStartup_78ee90, moho::register_CMauiEditTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CMauiEditTypeInfoStartup_78ee90,
+  moho::register_CMauiEditTypeInfoStartup
+)

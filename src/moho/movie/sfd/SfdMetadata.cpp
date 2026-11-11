@@ -27,8 +27,10 @@ namespace moho::sfd
     // Diagnostic only: inspect bounded private_stream_2 packet candidates, never
     // demux media or interpret unconfirmed CRITAGS/AINF/subtitle layouts here.
     for (std::size_t i = 0; i + 6 <= data.size(); ++i) {
-      if (data[i] != std::byte{0} || data[i + 1] != std::byte{0} || data[i + 2] != std::byte{1} ||
-          data[i + 3] != std::byte{0xbf})
+      if (
+        data[i] != std::byte{0} || data[i + 1] != std::byte{0} || data[i + 2] != std::byte{1} ||
+        data[i + 3] != std::byte{0xbf}
+      )
         continue;
       const auto length = static_cast<std::uint16_t>(
         (std::to_integer<unsigned>(data[i + 4]) << 8) | std::to_integer<unsigned>(data[i + 5])

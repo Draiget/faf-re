@@ -38,7 +38,9 @@ namespace moho
     // Round a skirt-rect (Rect2f) outward by 1 into an ogrid cell rect:
     // floor(low-1) / ceil(high+1). Mirrors the frndint sequences in FUN_0062B200
     // (exactly floor/ceil after the +/-1 bias).
-    [[nodiscard]] gpg::Rect2i SkirtRectToCellRect(const gpg::Rect2f& skirt) noexcept
+    [[nodiscard]] gpg::Rect2i SkirtRectToCellRect(
+      const gpg::Rect2f& skirt
+    ) noexcept
     {
       gpg::Rect2i out{};
       out.x0 = fa::FloorToIntX87(skirt.x0 - 1.0f);
@@ -50,12 +52,17 @@ namespace moho
 
     // Footprint cell rect centered on `posXZ`, truncating to int16 as the binary's
     // WORD casts do. Mirrors FUN_0062B200 0x62B64B..0x62B6DB.
-    [[nodiscard]] gpg::Rect2i FootprintCellRect(const RUnitBlueprint& blueprint, const SCoordsVec2& posXZ) noexcept
+    [[nodiscard]] gpg::Rect2i FootprintCellRect(
+      const RUnitBlueprint& blueprint,
+      const SCoordsVec2& posXZ
+    ) noexcept
     {
-      const int fx0 =
-        static_cast<std::int16_t>(static_cast<int>(std::lrintf(posXZ.x - static_cast<float>(blueprint.mFootprint.mSizeX) * 0.5f)));
-      const int fz0 =
-        static_cast<std::int16_t>(static_cast<int>(std::lrintf(posXZ.z - static_cast<float>(blueprint.mFootprint.mSizeZ) * 0.5f)));
+      const int fx0 = static_cast<std::int16_t>(
+        static_cast<int>(std::lrintf(posXZ.x - static_cast<float>(blueprint.mFootprint.mSizeX) * 0.5f))
+      );
+      const int fz0 = static_cast<std::int16_t>(
+        static_cast<int>(std::lrintf(posXZ.z - static_cast<float>(blueprint.mFootprint.mSizeZ) * 0.5f))
+      );
       gpg::Rect2i out{};
       out.x0 = static_cast<std::int16_t>(fx0);
       out.z0 = static_cast<std::int16_t>(fz0);
@@ -101,8 +108,10 @@ namespace moho
     initialProbe.z = tryPos->z;
 
     bool needSpiral = false;
-    if (!sim->mMapData->IsWithin(initialProbe, borderf, wholeMap) ||
-        !func_LocationIsFree(*blueprint, *grid, *tryPos, occupation)) {
+    if (
+      !sim->mMapData->IsWithin(initialProbe, borderf, wholeMap) ||
+      !func_LocationIsFree(*blueprint, *grid, *tryPos, occupation)
+    ) {
       needSpiral = true;
     } else if (doCoerce) {
       gpg::Rect2i loc{};
@@ -144,15 +153,16 @@ namespace moho
             probe.y = 0.0f;
             probe.z = tryPos->z;
 
-            if (sim->mMapData->IsWithin(probe, borderf, wholeMap) &&
-                func_LocationIsFree(*blueprint, *grid, candidate, occupation)) {
+            if (
+              sim->mMapData->IsWithin(probe, borderf, wholeMap) &&
+              func_LocationIsFree(*blueprint, *grid, candidate, occupation)
+            ) {
               if (!doCoerce) {
                 found = true;
                 break;
               }
-              gpg::Rect2i cellRect =
-                useSkirt ? SkirtRectToCellRect(blueprint->GetSkirtRect(candidate))
-                         : FootprintCellRect(*blueprint, candidate);
+              gpg::Rect2i cellRect = useSkirt ? SkirtRectToCellRect(blueprint->GetSkirtRect(candidate))
+                                              : FootprintCellRect(*blueprint, candidate);
               if (Sim::LocationIsFree(sim, nullptr, &cellRect, 0)) {
                 found = true;
                 break;
@@ -190,17 +200,23 @@ namespace
   constexpr std::uint64_t kUnitStateMaskTeleporting = 0x0000000000080000ull;
   constexpr std::int16_t kInvalidCellPosComponent = static_cast<std::int16_t>(0x8000);
 
-  [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept
+  [[nodiscard]] moho::ETaskState NextTaskState(
+    const moho::ETaskState state
+  ) noexcept
   {
     return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
   }
 
-  [[nodiscard]] bool IsZeroVector(const Wm3::Vector3f& value) noexcept
+  [[nodiscard]] bool IsZeroVector(
+    const Wm3::Vector3f& value
+  ) noexcept
   {
     return value.x == 0.0f && value.y == 0.0f && value.z == 0.0f;
   }
 
-  [[nodiscard]] bool IsValidCellPos(const moho::SOCellPos& cellPos) noexcept
+  [[nodiscard]] bool IsValidCellPos(
+    const moho::SOCellPos& cellPos
+  ) noexcept
   {
     return cellPos.x != kInvalidCellPosComponent && cellPos.z != kInvalidCellPosComponent;
   }
@@ -210,7 +226,10 @@ namespace
     return gpg::Rect2f{0.0f, 0.0f, 0.0f, 0.0f};
   }
 
-  [[nodiscard]] gpg::Rect2i BuildOgridRectFromWorldPos(const moho::Unit* const unit, const Wm3::Vector3f& worldPos) noexcept
+  [[nodiscard]] gpg::Rect2i BuildOgridRectFromWorldPos(
+    const moho::Unit* const unit,
+    const Wm3::Vector3f& worldPos
+  ) noexcept
   {
     const moho::SFootprint& footprint = unit->GetFootprint();
     const moho::SOCellPos cellPos = footprint.ToCellPos(worldPos);
@@ -223,14 +242,15 @@ namespace
     };
   }
 
-  [[nodiscard]] int FailTeleportCallTaskTick(moho::CUnitCallTeleport* const task) noexcept
+  [[nodiscard]] int FailTeleportCallTaskTick(
+    moho::CUnitCallTeleport* const task
+  ) noexcept
   {
     if (task != nullptr && task->mTaskState == moho::TASKSTATE_Complete) {
       task->mCompletedSuccessfully = true;
     }
     return -1;
   }
-
 
 } // namespace
 
@@ -246,7 +266,9 @@ namespace moho
    * Builds one ground-target payload from world position, clears entity-link
    * lanes, and resets target-point/mobile flags.
    */
-  CAiTarget CUnitCallTeleport::BuildGroundTeleportTarget(const Wm3::Vector3f& worldPos) noexcept
+  CAiTarget CUnitCallTeleport::BuildGroundTeleportTarget(
+    const Wm3::Vector3f& worldPos
+  ) noexcept
   {
     CAiTarget target{};
     target.targetType = EAiTargetType::AITARGET_Ground;
@@ -287,90 +309,93 @@ namespace moho
 
     const bool isAssignedForPickup = transport->TransportIsUnitAssignedForPickup(mUnit);
     switch (mTaskState) {
-      case TASKSTATE_Preparing: {
-        if (!transportUnit->IsUnitState(UNITSTATE_TransportLoading)) {
-          return 10;
-        }
-
-        if (transportUnit->CommandQueue->GetCurrentCommand() != mUnit->CommandQueue->GetCurrentCommand()) {
-          return 10;
-        }
-
-        mTaskState = NextTaskState(mTaskState);
-        return 3;
+    case TASKSTATE_Preparing: {
+      if (!transportUnit->IsUnitState(UNITSTATE_TransportLoading)) {
+        return 10;
       }
 
-      case TASKSTATE_Waiting: {
-        if (!isAssignedForPickup) {
-          Wm3::Vector3f pickupPos = transportUnit->GetPosition();
-          gpg::Rect2f moveSkirt = ZeroRect2f();
-          const bool useWholeMap = mUnit->ArmyRef->UseWholeMap();
-          if (!PrepareMove(0, mUnit, &pickupPos, &moveSkirt, useWholeMap)) {
-            return -1;
-          }
-
-          mUnit->ReserveOgridRect(BuildOgridRectFromWorldPos(mUnit, pickupPos));
-          mIsOccupying = true;
-          NewMoveTask(SNavGoal(mUnit->GetFootprint().ToCellPos(pickupPos)), this, 0, nullptr, 0);
-        }
-
-        mTaskState = NextTaskState(mTaskState);
-        return 1;
+      if (transportUnit->CommandQueue->GetCurrentCommand() != mUnit->CommandQueue->GetCurrentCommand()) {
+        return 10;
       }
 
-      case TASKSTATE_Starting: {
-        if (mIsOccupying) {
-          mUnit->FreeOgridRect();
-          mIsOccupying = false;
-        }
+      mTaskState = NextTaskState(mTaskState);
+      return 3;
+    }
 
-        if (!isAssignedForPickup) {
-          return 1;
-        }
-
-        mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskWaitingForTransport;
-        const SOCellPos attachCell = transport->TransportGetAttachPosition(mUnit);
-        if (!IsValidCellPos(attachCell)) {
+    case TASKSTATE_Waiting: {
+      if (!isAssignedForPickup) {
+        Wm3::Vector3f pickupPos = transportUnit->GetPosition();
+        gpg::Rect2f moveSkirt = ZeroRect2f();
+        const bool useWholeMap = mUnit->ArmyRef->UseWholeMap();
+        if (!PrepareMove(0, mUnit, &pickupPos, &moveSkirt, useWholeMap)) {
           return -1;
         }
 
-        NewMoveTask(SNavGoal(attachCell), this, 0, nullptr, 0);
-        mTaskState = NextTaskState(mTaskState);
-        return 0;
-      }
-
-      case TASKSTATE_Processing: {
-        if (!transport->TransportIsTeleportBeaconReady()) {
-          return 10;
-        }
-
-        transport->TransportAttachUnit(mUnit);
-        teleportDestination = transport->TransportGetTeleportDest();
-
-        gpg::Rect2f moveSkirt = ZeroRect2f();
-        const bool useWholeMap = mUnit->ArmyRef->UseWholeMap();
-        (void)PrepareMove(0, mUnit, &teleportDestination, &moveSkirt, useWholeMap);
-
-        mUnit->ReserveOgridRect(BuildOgridRectFromWorldPos(mUnit, teleportDestination));
+        mUnit->ReserveOgridRect(BuildOgridRectFromWorldPos(mUnit, pickupPos));
         mIsOccupying = true;
+        NewMoveTask(SNavGoal(mUnit->GetFootprint().ToCellPos(pickupPos)), this, 0, nullptr, 0);
+      }
 
-        CAiTarget teleportTarget = BuildGroundTeleportTarget(teleportDestination);
-        const VTransform& sourceTransform = mUnit->GetTransform();
-        (void)CUnitTeleportTask::Create(&teleportTarget, this, transportUnit, &sourceTransform);
+      mTaskState = NextTaskState(mTaskState);
+      return 1;
+    }
 
-        mTaskState = NextTaskState(mTaskState);
+    case TASKSTATE_Starting: {
+      if (mIsOccupying) {
+        mUnit->FreeOgridRect();
+        mIsOccupying = false;
+      }
+
+      if (!isAssignedForPickup) {
         return 1;
       }
 
-      default:
-        return 1;
+      mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskWaitingForTransport;
+      const SOCellPos attachCell = transport->TransportGetAttachPosition(mUnit);
+      if (!IsValidCellPos(attachCell)) {
+        return -1;
+      }
+
+      NewMoveTask(SNavGoal(attachCell), this, 0, nullptr, 0);
+      mTaskState = NextTaskState(mTaskState);
+      return 0;
+    }
+
+    case TASKSTATE_Processing: {
+      if (!transport->TransportIsTeleportBeaconReady()) {
+        return 10;
+      }
+
+      transport->TransportAttachUnit(mUnit);
+      teleportDestination = transport->TransportGetTeleportDest();
+
+      gpg::Rect2f moveSkirt = ZeroRect2f();
+      const bool useWholeMap = mUnit->ArmyRef->UseWholeMap();
+      (void)PrepareMove(0, mUnit, &teleportDestination, &moveSkirt, useWholeMap);
+
+      mUnit->ReserveOgridRect(BuildOgridRectFromWorldPos(mUnit, teleportDestination));
+      mIsOccupying = true;
+
+      CAiTarget teleportTarget = BuildGroundTeleportTarget(teleportDestination);
+      const VTransform& sourceTransform = mUnit->GetTransform();
+      (void)CUnitTeleportTask::Create(&teleportTarget, this, transportUnit, &sourceTransform);
+
+      mTaskState = NextTaskState(mTaskState);
+      return 1;
+    }
+
+    default:
+      return 1;
     }
   }
 
   /**
    * Address: 0x00600E90 (FUN_00600E90, ??0CUnitCallTeleport@Moho@@QAE@@Z)
    */
-  CUnitCallTeleport::CUnitCallTeleport(CCommandTask* const parentTask, Unit* const targetUnit)
+  CUnitCallTeleport::CUnitCallTeleport(
+    CCommandTask* const parentTask,
+    Unit* const targetUnit
+  )
     : CCommandTask(parentTask)
     , mTargetTransportUnit(targetUnit)
   {
@@ -409,7 +434,10 @@ namespace moho
       transportUnit->AiTransport->TransportRemoveFromWaitingList(mUnit);
     }
 
-    if (!mCompletedSuccessfully && transportUnit != nullptr && transportUnit->AiTransport != nullptr && !transportUnit->IsDead()) {
+    if (
+      !mCompletedSuccessfully && transportUnit != nullptr && transportUnit->AiTransport != nullptr &&
+      !transportUnit->IsDead()
+    ) {
       transportUnit->AiTransport->TransportRemovePickupUnit(mUnit, true);
     }
 
@@ -527,10 +555,8 @@ namespace moho
         Unit* const beaconUnit = mTeleportBeaconUnit.GetObjectPtr();
         // 0x0060AC7A: the second test is IUnit slot 11 (`DestroyQueued`).
         if (beaconUnit != nullptr && !beaconUnit->IsDead() && !beaconUnit->DestroyQueued()) {
-          const bool readyForFinalize =
-            (mUnit == beaconUnit)
-            || (beaconUnit->AiTransport == nullptr)
-            || beaconUnit->AiTransport->TransportIsTeleportBeaconReady();
+          const bool readyForFinalize = (mUnit == beaconUnit) || (beaconUnit->AiTransport == nullptr) ||
+            beaconUnit->AiTransport->TransportIsTeleportBeaconReady();
           if (readyForFinalize) {
             if (mUnit != nullptr && mUnit->IsUnitState(UNITSTATE_Immobile)) {
               return 1;
@@ -599,7 +625,9 @@ namespace moho
    * trampolines (`FUN_0060C570`, `FUN_0060AA10`) that forward unmodified to
    * this body for cross-TU references; no separate source is emitted.
    */
-  void CUnitTeleportTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CUnitTeleportTask::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -629,7 +657,9 @@ namespace moho
    * trampolines (`FUN_0060C9A0`, `FUN_0060AA20`) that forward unmodified to
    * this body for cross-TU references; no separate source is emitted.
    */
-  void CUnitTeleportTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CUnitTeleportTask::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;
@@ -649,7 +679,11 @@ namespace moho
    * Loads base command-task state plus teleport-task weak-unit and status
    * flags from archive data.
    */
-  void CUnitCallTeleport::MemberDeserialize(gpg::ReadArchive* const archive, int, const gpg::RRef&)
+  void CUnitCallTeleport::MemberDeserialize(
+    gpg::ReadArchive* const archive,
+    int,
+    const gpg::RRef&
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -670,7 +704,11 @@ namespace moho
    * Saves base command-task state plus teleport-task weak-unit and status
    * flags into archive data.
    */
-  void CUnitCallTeleport::MemberSerialize(gpg::WriteArchive* const archive, int, const gpg::RRef&) const
+  void CUnitCallTeleport::MemberSerialize(
+    gpg::WriteArchive* const archive,
+    int,
+    const gpg::RRef&
+  ) const
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -738,7 +776,10 @@ namespace gpg
    * Builds one typed reflection reference for `moho::CUnitCallTeleport*`,
    * preserving dynamic-derived ownership and base-offset adjustment.
    */
-  gpg::RRef* RRef_CUnitCallTeleport(gpg::RRef* const outRef, moho::CUnitCallTeleport* const value)
+  gpg::RRef* RRef_CUnitCallTeleport(
+    gpg::RRef* const outRef,
+    moho::CUnitCallTeleport* const value
+  )
   {
     return gpg::WriteDerivedRef(outRef, value);
   }

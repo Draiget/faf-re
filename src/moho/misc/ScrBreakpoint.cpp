@@ -165,9 +165,9 @@ moho::ScrBreakpoint::ScrBreakpoint(
   const fa::string& breakpointName,
   const int lineNumber
 )
-  : enabled(true),
-    name(),
-    line(lineNumber)
+  : enabled(true)
+  , name()
+  , line(lineNumber)
 {
   name.assign(breakpointName, 0U, fa::string::npos);
 }
@@ -218,7 +218,9 @@ fa::string moho::ScrBreakpoint::AsString() const
  * Parses one serialized `enabled:line:name` string and applies parsed state
  * when all three lanes are present.
  */
-void moho::ScrBreakpoint::FromString(const fa::string& serializedBreakpoint)
+void moho::ScrBreakpoint::FromString(
+  const fa::string& serializedBreakpoint
+)
 {
   const char* cursor = serializedBreakpoint.c_str();
   fa::string token;

@@ -40,4 +40,3 @@ namespace moho
 
   static_assert(sizeof(SAudioRequestTypeInfo) == 0x64, "SAudioRequestTypeInfo size must be 0x64");
 } // namespace moho
-

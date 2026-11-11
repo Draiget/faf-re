@@ -1,0 +1,61 @@
+name: AddressSanitizer
+
+# The Linux tests built with AddressSanitizer (the linux-clang-x64-asan preset, FAF_ASAN in
+# cmake/FafLinux.cmake): every out-of-bounds access, use after free or double free a test reaches
+# stops it with a report naming the access, where the block was allocated and where it was freed.
+# The x64 small-block pool is off in this build by itself (src/gpg/core/utils/Global.cpp), so ASan
+# sees every block. Leak reports are off: the engine keeps some objects for the whole run on purpose.
+# Replays under ASan need the retail data the Replay parity workflow decrypts, so they stay a manual
+# run for now: headless from this preset plays a replay as the release build does.
+on:
+  push:
+    branches: [master]
+    # The map editor isn't part of the Linux build; its frequent pushes would cancel every run.
+    paths: ['src/**', 'tests/**', 'cmake/**', 'CMakeLists.txt', 'CMakePresets.json', '.github/workflows/asan.yml',
+            '!src/editor/**', '!tests/editor/**']
+  schedule:
+    - cron: '30 1 * * *'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit, branch or tag to build and test
+        required: true
+        default: master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: asan-${{ inputs.ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          persist-credentials: false
+      # The pinned toolchain (cmake/toolchains/linux-clang-pins.cmake), and the sanitizer runtime.
+      - run: |
+          bash .github/scripts/apt-mirrors.sh  # a mirror that does not resolve is dropped first
+          sudo apt-get update
+          v=1:18.1.3-1ubuntu1
+          sudo apt-get install -y --no-install-recommends ninja-build \
+            clang-18=$v lld-18=$v llvm-18=$v libc++-18-dev=$v libc++abi-18-dev=$v libunwind-18-dev=$v \
+            libclang-rt-18-dev=$v
+      - uses: actions/cache/restore@v6
+        with:
+          path: dependencies/.downloads
+          key: deps-${{ hashFiles('cmake/FafDependencies.cmake') }}
+      - run: cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3;boost_1_34_1;googletest;zstd;monocypher" -P cmake/FafDependencies.cmake
+      - run: cmake --preset linux-clang-x64-asan
+      # The default build, every GoogleTest program (faf_tests, cmake/FafTests.cmake) and headless.
+      - run: cmake --build build/linux-clang-x64-asan --target all faf_tests headless
+      - name: ctest with AddressSanitizer
+        env:
+          ASAN_OPTIONS: detect_leaks=0:halt_on_error=1:abort_on_error=0:print_summary=1
+          FAF_SMALLPOOL: "0"
+        run: ctest --test-dir build/linux-clang-x64-asan --output-on-failure -j 4 --timeout 1800

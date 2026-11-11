@@ -55,7 +55,10 @@ namespace moho
     virtual bool IsDepositAt(gpg::Rect2i* pos, EDepositType type) = 0;
     virtual bool IsDepositAtPoint(Wm3::Vec3f* pos, Wm3::Vec2i* size, EDepositType type) = 0;
     virtual void DepositCollides(
-      CGeomSolid3* solid, CHeightField* field, gpg::fastvector<ResourceDeposit>* outDeposits, EDepositType type
+      CGeomSolid3* solid,
+      CHeightField* field,
+      gpg::fastvector<ResourceDeposit>* outDeposits,
+      EDepositType type
     ) = 0;
     virtual bool DepositIsInArea(EDepositType type, gpg::Rect2i* area) = 0;
     virtual bool DepositIsInAreaPoint(EDepositType type, Wm3::Vec3f* pos, Wm3::Vec2i* size) = 0;
@@ -63,7 +66,8 @@ namespace moho
     virtual bool AreaHasDeposit(EDepositType type, gpg::Rect2f* area) = 0;
 
     /**
-     * Address: 0x00546CD0 (FUN_00546CD0, ?Translate@IResources@Moho@@SA?AW4EResourceType@2@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
+     * Address: 0x00546CD0 (FUN_00546CD0,
+     * ?Translate@IResources@Moho@@SA?AW4EResourceType@2@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
      *
      * What it does:
      * Maps one deposit-type string to its `EDepositType` enum lane (`""`,

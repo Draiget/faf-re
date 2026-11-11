@@ -10,7 +10,9 @@
 
 namespace
 {
-  [[nodiscard]] moho::IEffect* DecodeTrackedIEffect(const gpg::TrackedPointerInfo& tracked)
+  [[nodiscard]] moho::IEffect* DecodeTrackedIEffect(
+    const gpg::TrackedPointerInfo& tracked
+  )
   {
     if (!tracked.object) {
       return nullptr;
@@ -23,7 +25,10 @@ namespace
     return static_cast<moho::IEffect*>(upcast.mObj);
   }
 
-  [[nodiscard]] moho::IEffect* ReadOwnedIEffectPointer(gpg::ReadArchive* const archive, const gpg::RRef& ownerRef)
+  [[nodiscard]] moho::IEffect* ReadOwnedIEffectPointer(
+    gpg::ReadArchive* const archive,
+    const gpg::RRef& ownerRef
+  )
   {
     gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
     if (!tracked.object) {
@@ -39,7 +44,11 @@ namespace
     return DecodeTrackedIEffect(tracked);
   }
 
-  void WriteOwnedIEffectPointer(gpg::WriteArchive* const archive, moho::IEffect* const effect, const gpg::RRef& ownerRef)
+  void WriteOwnedIEffectPointer(
+    gpg::WriteArchive* const archive,
+    moho::IEffect* const effect,
+    const gpg::RRef& ownerRef
+  )
   {
     gpg::WriteRawPointer(archive, gpg::MakeRRef(effect), gpg::TrackedPointerState::Owned, ownerRef);
   }
@@ -55,7 +64,9 @@ namespace moho
    * Reads owned `IEffect` pointers from archive until null terminator and
    * relinks each effect into `CEffectManagerImpl::mActiveEffects`.
    */
-  void CEffectManagerImpl::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CEffectManagerImpl::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -77,7 +88,9 @@ namespace moho
    * Writes `mActiveEffects` entries as owned tracked pointers, followed by a
    * null-pointer terminator.
    */
-  void CEffectManagerImpl::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CEffectManagerImpl::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;

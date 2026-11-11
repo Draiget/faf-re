@@ -51,7 +51,10 @@ namespace moho
   /**
    * Address: 0x00447D90 (FUN_00447D90)
    */
-  bool CopyBatchTextureDataFromMemBuffer(SBatchTextureData& outData, const gpg::MemBuffer<char>& sourceBuffer)
+  bool CopyBatchTextureDataFromMemBuffer(
+    SBatchTextureData& outData,
+    const gpg::MemBuffer<char>& sourceBuffer
+  )
   {
     if (sourceBuffer.mBegin == nullptr) {
       return false;
@@ -63,4 +66,4 @@ namespace moho
     std::copy_n(sourceBuffer.mBegin, sourceBytes, outData.mDxt5Blocks.begin());
     return true;
   }
-}
+} // namespace moho

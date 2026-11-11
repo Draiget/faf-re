@@ -76,7 +76,9 @@ namespace
   [[maybe_unused]] ID3DTextureSheetTypeInfoBootstrap gID3DTextureSheetTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_ID3DTextureSheetTypeInfo_d04b8a, moho::register_ID3DTextureSheetTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_ID3DTextureSheetTypeInfo_d04b8a,
+  moho::register_ID3DTextureSheetTypeInfo
+)

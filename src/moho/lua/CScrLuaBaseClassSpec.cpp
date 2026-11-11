@@ -3,8 +3,9 @@
 namespace moho
 {
   /**
-   * Address: 0x005BD5E0 (FUN_005BD5E0, ??0CScrLuaBaseClassSpec@Moho@@QAE@AAVCScrLuaInitFormSet@1@PAVCScrLuaObjectFactory@1@1PBD2@Z)
-   * Address: 0x10015A90 (FUN_10015A90)
+   * Address: 0x005BD5E0 (FUN_005BD5E0,
+   * ??0CScrLuaBaseClassSpec@Moho@@QAE@AAVCScrLuaInitFormSet@1@PAVCScrLuaObjectFactory@1@1PBD2@Z) Address: 0x10015A90
+   * (FUN_10015A90)
    *
    * What it does:
    * Initializes a "base" class specification form and wires both class factories.
@@ -27,7 +28,9 @@ namespace moho
    * What it does:
    * Copy-constructs base-class spec metadata and factory pointers.
    */
-  CScrLuaBaseClassSpec::CScrLuaBaseClassSpec(const CScrLuaBaseClassSpec& other)
+  CScrLuaBaseClassSpec::CScrLuaBaseClassSpec(
+    const CScrLuaBaseClassSpec& other
+  )
     : CScrLuaInitForm(other)
     , mDerivedClassFactory(other.mDerivedClassFactory)
     , mBaseClassFactory(other.mBaseClassFactory)
@@ -40,7 +43,9 @@ namespace moho
    * What it does:
    * Pushes the base class table into the derived class table at index GetN()+1.
    */
-  void CScrLuaBaseClassSpec::Run(LuaPlus::LuaState* const state)
+  void CScrLuaBaseClassSpec::Run(
+    LuaPlus::LuaState* const state
+  )
   {
     LuaPlus::LuaObject derivedClassTable = mDerivedClassFactory->Get(state);
     LuaPlus::LuaObject baseClassTable = mBaseClassFactory->Get(state);

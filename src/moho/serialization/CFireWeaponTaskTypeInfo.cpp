@@ -6,7 +6,8 @@
 
 #include "gpg/core/utils/Global.h"
 #include "moho/task/CTask.h"
-#include "moho/unit/tasks/CFireWeaponTask.h"
+#include "moho/unit/tasks/CFireWeaponTask.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -68,7 +69,9 @@ namespace moho
   /**
    * Address: 0x006DD350 (FUN_006DD350, Moho::CFireWeaponTaskTypeInfo::AddBase_CTask)
    */
-  void __stdcall CFireWeaponTaskTypeInfo::AddBase_CTask(gpg::RType* const typeInfo)
+  void __stdcall CFireWeaponTaskTypeInfo::AddBase_CTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RType* taskType = CTask::sType;
     if (!taskType) {
@@ -92,7 +95,9 @@ namespace moho
   /**
    * Address: 0x006DD090 (FUN_006DD090, Moho::CFireWeaponTaskTypeInfo::CtrRef)
    */
-  gpg::RRef CFireWeaponTaskTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CFireWeaponTaskTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const task = gpg::ConstructInStorage<CFireWeaponTask>(objectStorage);
     return gpg::RRef{task, gpg::LookupRType(typeid(CFireWeaponTask))};
@@ -101,7 +106,9 @@ namespace moho
   /**
    * Address: 0x006DD070 (FUN_006DD070, Moho::CFireWeaponTaskTypeInfo::Delete)
    */
-  void CFireWeaponTaskTypeInfo::Delete(void* const objectStorage)
+  void CFireWeaponTaskTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CFireWeaponTask*>(objectStorage);
   }
@@ -109,7 +116,9 @@ namespace moho
   /**
    * Address: 0x006DD100 (FUN_006DD100, Moho::CFireWeaponTaskTypeInfo::Destruct)
    */
-  void CFireWeaponTaskTypeInfo::Destruct(void* const objectStorage)
+  void CFireWeaponTaskTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     auto* const task = static_cast<CFireWeaponTask*>(objectStorage);
     if (!task) {
@@ -128,7 +137,9 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CFireWeaponTaskTypeInfo_cd5fe2, moho::register_CFireWeaponTaskTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CFireWeaponTaskTypeInfo_cd5fe2,
+  moho::register_CFireWeaponTaskTypeInfo
+)

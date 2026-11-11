@@ -9,8 +9,9 @@
 namespace
 {
 
-
-  [[nodiscard]] moho::CStratumMaterial& AssignTextureDefaults(moho::CStratumMaterial& material) noexcept
+  [[nodiscard]] moho::CStratumMaterial& AssignTextureDefaults(
+    moho::CStratumMaterial& material
+  ) noexcept
   {
     material.mPath.clear();
     material.mScaleX = 1.0f;
@@ -22,7 +23,11 @@ namespace
     return material;
   }
 
-  void SetTexturePathAndSize(moho::CStratumMaterial& material, const char* const path, const float size) noexcept
+  void SetTexturePathAndSize(
+    moho::CStratumMaterial& material,
+    const char* const path,
+    const float size
+  ) noexcept
   {
     material.mPath.assign(path != nullptr ? path : "");
     material.mSize = size;
@@ -50,7 +55,9 @@ namespace moho
    * What it does:
    * Retains the source texture-sheet handle and deep-copies the layer path.
    */
-  CStratumMaterial::CStratumMaterial(const CStratumMaterial& source)
+  CStratumMaterial::CStratumMaterial(
+    const CStratumMaterial& source
+  )
     : mPath(source.mPath)
     , mScaleX(source.mScaleX)
     , mScaleY(source.mScaleY)
@@ -69,7 +76,10 @@ namespace moho
    * Loads the backing terrain texture when needed and derives layer scale from
    * the provided map bounds.
    */
-  void CStratumMaterial::SetSize(const Wm3::Vector2f& maxSize, CStratumMaterial& material)
+  void CStratumMaterial::SetSize(
+    const Wm3::Vector2f& maxSize,
+    CStratumMaterial& material
+  )
   {
     if (material.mTextureSheet.px == nullptr && !material.mPath.empty()) {
       if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
@@ -156,7 +166,9 @@ namespace moho
    * Copies the shader name, shared mask handles, and each layer descriptor
    * while retaining shared texture ownership.
    */
-  StratumMaterial::StratumMaterial(const StratumMaterial& source)
+  StratumMaterial::StratumMaterial(
+    const StratumMaterial& source
+  )
     : byte0(source.byte0)
     , byte1(source.byte1)
     , pad02_03{0, 0}
@@ -210,7 +222,9 @@ namespace moho
    * What it does:
    * Applies world-map dimensions to every non-empty terrain layer.
    */
-  void StratumMaterial::SetSizeTo(IWldTerrainRes* const terrainRes)
+  void StratumMaterial::SetSizeTo(
+    IWldTerrainRes* const terrainRes
+  )
   {
     if (terrainRes == nullptr) {
       return;

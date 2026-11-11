@@ -133,6 +133,8 @@ set(_faf_main_options
 # Switches off the Win32 layout static_asserts where they don't apply (see the
 # header).
 list(APPEND _faf_main_options /FIplatform/LayoutAsserts.h)
+# FAFRE_PLATFORM_WINDOWS and the other platform macros (see the header).
+list(APPEND _faf_main_options /FIplatform/PlatformDefines.h)
 if(NOT FAF_TARGET_ARCH STREQUAL "x64")
   # Keeps sqrt a CRT call under the sim's _PC_24 x87 control word (see the
   # header and cmake/FafCodegen.cmake).

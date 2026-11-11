@@ -96,7 +96,9 @@ namespace moho
    * `unk74` are both written to `1`; and the embedded
    * `LuaPlus::LuaObject` is default-constructed.
    */
-  SSTICommandIssueData::SSTICommandIssueData(const EUnitCommandType commandType)
+  SSTICommandIssueData::SSTICommandIssueData(
+    const EUnitCommandType commandType
+  )
     : nextCommandId(-1)
     , unk04(-1)
     , mIndex(-1)
@@ -115,8 +117,7 @@ namespace moho
     , mLuaState(nullptr)
     , mUnitCommand(nullptr)
     , mCommandQueue(nullptr)
-  {
-  }
+  {}
 
   /**
    * Address: 0x006E5400 (FUN_006E5400, ??0SSTICommandIssueData@Moho@@QAEABU01@@Z)
@@ -129,7 +130,9 @@ namespace moho
    * Copy-constructs every command-issue payload lane, including fastvector
    * cell storage and embedded Lua object state.
    */
-  SSTICommandIssueData::SSTICommandIssueData(const SSTICommandIssueData& other)
+  SSTICommandIssueData::SSTICommandIssueData(
+    const SSTICommandIssueData& other
+  )
     : nextCommandId(other.nextCommandId)
     , unk04(other.unk04)
     , mIndex(other.mIndex)

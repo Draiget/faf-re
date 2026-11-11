@@ -151,7 +151,9 @@ namespace moho
      * Marshals `CMDST_IssueCommand` (entity set + command data + clear flag).
      */
     void IssueCommand(
-      const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& commandData, bool clear
+      const BVSet<EntId, EntIdUniverse>& entities,
+      const SSTICommandIssueData& commandData,
+      bool clear
     ) override;
 
     /**
@@ -162,7 +164,9 @@ namespace moho
      * Marshals `CMDST_IssueFactoryCommand` (entity set + command data + clear flag).
      */
     void IssueFactoryCommand(
-      const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& commandData, bool clear
+      const BVSet<EntId, EntIdUniverse>& entities,
+      const SSTICommandIssueData& commandData,
+      bool clear
     ) override;
 
     /**
@@ -209,7 +213,9 @@ namespace moho
      * Marshals `CMDST_SetCommandCells` (`CmdId`, cell list, target position).
      */
     void SetCommandCells(
-      CmdId cmdId, const gpg::core::FastVector<SOCellPos>& cells, const Wm3::Vector3<float>& pos
+      CmdId cmdId,
+      const gpg::core::FastVector<SOCellPos>& cells,
+      const Wm3::Vector3<float>& pos
     ) override;
 
     /**
@@ -238,7 +244,9 @@ namespace moho
      * Marshals `CMDST_LuaSimCallback` (callback, Lua args, entity set).
      */
     void LuaSimCallback(
-      const char* callbackName, const LuaPlus::LuaObject& args, const BVSet<EntId, EntIdUniverse>& entities
+      const char* callbackName,
+      const LuaPlus::LuaObject& args,
+      const BVSet<EntId, EntIdUniverse>& entities
     ) override;
 
     /**
@@ -329,12 +337,7 @@ namespace moho
      * Initializes client-manager runtime state, client vector storage, and
      * timing/connectivity lanes.
      */
-    CClientManagerImpl(
-      std::size_t clientCount,
-      INetConnector* connector,
-      int gameSpeed,
-      bool adjustableGameSpeed
-    );
+    CClientManagerImpl(std::size_t clientCount, INetConnector* connector, int gameSpeed, bool adjustableGameSpeed);
 
     /**
      * Address: 0x0053E050 (FUN_0053E050, scalar deleting dtor thunk)
@@ -357,9 +360,8 @@ namespace moho
      * Address: 0x0053E260
      * Slot: 2
      */
-    virtual IClient* CreateNetClient(
-      const char* name, int32_t index, int32_t ownerId, uint32_t sourceId, INetConnection* connection
-    );
+    virtual IClient*
+    CreateNetClient(const char* name, int32_t index, int32_t ownerId, uint32_t sourceId, INetConnection* connection);
 
     /**
      * Address: 0x0053E400
@@ -630,20 +632,20 @@ namespace moho
   };
 
   static_assert(offsetof(CClientManagerImpl, mLock) == 0x40C, "CClientManagerImpl::mLock offset must be 0x40C");
+  static_assert(offsetof(CClientManagerImpl, mClients) == 0x41C, "CClientManagerImpl::mClients offset must be 0x41C");
   static_assert(
-    offsetof(CClientManagerImpl, mClients) == 0x41C, "CClientManagerImpl::mClients offset must be 0x41C"
+    offsetof(CClientManagerImpl, mConnector) == 0x42C,
+    "CClientManagerImpl::mConnector offset must be 0x42C"
   );
-  static_assert(
-    offsetof(CClientManagerImpl, mConnector) == 0x42C, "CClientManagerImpl::mConnector offset must be 0x42C"
-  );
-  static_assert(
-    offsetof(CClientManagerImpl, mStream) == 0x18470, "CClientManagerImpl::mStream offset must be 0x18470"
-  );
+  static_assert(offsetof(CClientManagerImpl, mStream) == 0x18470, "CClientManagerImpl::mStream offset must be 0x18470");
   static_assert(
     offsetof(CClientManagerImpl, mLastEmittedCommandSource) == 0x184B8,
     "CClientManagerImpl::mLastEmittedCommandSource offset must be 0x184B8"
   );
-  static_assert(offsetof(CClientManagerImpl, mInDoBeat) == 0x184BC, "CClientManagerImpl::mInDoBeat offset must be 0x184BC");
+  static_assert(
+    offsetof(CClientManagerImpl, mInDoBeat) == 0x184BC,
+    "CClientManagerImpl::mInDoBeat offset must be 0x184BC"
+  );
   static_assert(
     offsetof(CClientManagerImpl, mDispatchedTimer) == 0x184C0,
     "CClientManagerImpl::mDispatchedTimer offset must be 0x184C0"
@@ -658,7 +660,11 @@ namespace moho
    * What it does:
    * Allocates and constructs one `CClientManagerImpl`.
    */
-  CClientManagerImpl*
-  CLIENT_CreateClientManager(std::size_t clientCount, INetConnector* connector, int gameSpeed, bool adjustableGameSpeed);
+  CClientManagerImpl* CLIENT_CreateClientManager(
+    std::size_t clientCount,
+    INetConnector* connector,
+    int gameSpeed,
+    bool adjustableGameSpeed
+  );
 
 } // namespace moho

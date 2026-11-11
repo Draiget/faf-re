@@ -81,9 +81,14 @@ namespace
   [[maybe_unused]] IAiSiloBuildTypeInfoBootstrap gIAiSiloBuildTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_IAiSiloBuildTypeInfo_64276a, moho::register_IAiSiloBuildTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_IAiSiloBuildTypeInfo_64276a,
+  moho::register_IAiSiloBuildTypeInfo
+)
 
-GPG_PREREGISTER_INIT(AcquireIAiSiloBuildTypeInfo_64276a, AcquireIAiSiloBuildTypeInfo)
+GPG_PREREGISTER_INIT(
+  AcquireIAiSiloBuildTypeInfo_64276a,
+  AcquireIAiSiloBuildTypeInfo
+)

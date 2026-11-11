@@ -22,7 +22,7 @@ namespace gpg
   class RRef;
   class RType;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -74,7 +74,7 @@ namespace moho
     ~CUnitCommand() override;
 
     /**
-       * Address: 0x006E81B0 (FUN_006E81B0)
+     * Address: 0x006E81B0 (FUN_006E81B0)
      *
      * What it does:
      * Initializes one command from issue payload lanes, updates sim command
@@ -83,7 +83,7 @@ namespace moho
     CUnitCommand(Sim* sim, const SSTICommandIssueData& issueData);
 
     /**
-       * Address: 0x006E81B0 (FUN_006E81B0)
+     * Address: 0x006E81B0 (FUN_006E81B0)
      *
      * What it does:
      * Initializes one command from issue payload lanes while forcing the
@@ -92,7 +92,8 @@ namespace moho
     CUnitCommand(Sim* sim, const SSTICommandIssueData& issueData, CmdId resolvedCommandId);
 
     /**
-     * Address: 0x006E7D40 (FUN_006E7D40, ?GetCoordinateWith@CUnitCommand@Moho@@QBE?AV?$vector@V?$WeakPtr@VCUnitCommand@Moho@@@Moho@@V?$allocator@V?$WeakPtr@VCUnitCommand@Moho@@@Moho@@@std@@@std@@XZ)
+     * Address: 0x006E7D40 (FUN_006E7D40,
+     * ?GetCoordinateWith@CUnitCommand@Moho@@QBE?AV?$vector@V?$WeakPtr@VCUnitCommand@Moho@@@Moho@@V?$allocator@V?$WeakPtr@VCUnitCommand@Moho@@@Moho@@@std@@@std@@XZ)
      *
      * What it does:
      * Returns a by-value snapshot of this command's coordinating-order weak links.
@@ -106,9 +107,8 @@ namespace moho
      * Allocates one `CUnitCommand`, default-constructs it, and returns it as an
      * unowned construct result.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x006ECB80 (FUN_006ECB80, Moho::CUnitCommand::MemberDeserialize)
@@ -371,7 +371,8 @@ namespace moho
   // DestroyInternal (0x006E8500) releases [+0x118] and unlinks the weak node at
   // [+0x120], which is mTarget's targetEntity (CAiTarget +0x04).
   static_assert(
-    offsetof(CUnitCommand, mFormationInstance) == 0x118, "CUnitCommand::mFormationInstance offset must be 0x118"
+    offsetof(CUnitCommand, mFormationInstance) == 0x118,
+    "CUnitCommand::mFormationInstance offset must be 0x118"
   );
   static_assert(offsetof(CUnitCommand, mTarget) == 0x11C, "CUnitCommand::mTarget offset must be 0x11C");
 

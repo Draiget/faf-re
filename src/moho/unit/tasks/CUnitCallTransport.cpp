@@ -31,24 +31,33 @@ namespace
   [[maybe_unused]] constexpr float kPi = 3.1415927f;
   constexpr std::int16_t kInvalidCellPosComponent = static_cast<std::int16_t>(0x8000);
 
-  [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept
+  [[nodiscard]] moho::ETaskState NextTaskState(
+    const moho::ETaskState state
+  ) noexcept
   {
     return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
   }
 
-  [[nodiscard]] bool IsValidCellPos(const moho::SOCellPos& cellPos) noexcept
+  [[nodiscard]] bool IsValidCellPos(
+    const moho::SOCellPos& cellPos
+  ) noexcept
   {
     return cellPos.x != kInvalidCellPosComponent && cellPos.z != kInvalidCellPosComponent;
   }
 
-  [[nodiscard]] float HorizontalDistanceXZ(const Wm3::Vector3f& lhs, const Wm3::Vector3f& rhs) noexcept
+  [[nodiscard]] float HorizontalDistanceXZ(
+    const Wm3::Vector3f& lhs,
+    const Wm3::Vector3f& rhs
+  ) noexcept
   {
     const float dx = lhs.x - rhs.x;
     const float dz = lhs.z - rhs.z;
     return std::sqrt((dx * dx) + (dz * dz));
   }
 
-  [[nodiscard]] const char* BlueprintIdOrUnknown(const moho::Unit* const unit) noexcept
+  [[nodiscard]] const char* BlueprintIdOrUnknown(
+    const moho::Unit* const unit
+  ) noexcept
   {
     if (!unit) {
       return "<unknown>";
@@ -61,7 +70,6 @@ namespace
 
     return blueprint->mBlueprintId.c_str();
   }
-
 
 } // namespace
 
@@ -133,108 +141,107 @@ namespace moho
 
     IAiTransport* const transport = transportUnit->AiTransport;
     switch (mTaskState) {
-      case TASKSTATE_Preparing: {
-        const bool transportReadyToLoad =
-          transportUnit->IsUnitState(UNITSTATE_TransportLoading) && !transportUnit->IsUnitState(UNITSTATE_HoldingPattern);
-        const bool commandHeadsMatch =
-          transportUnit->CommandQueue->GetCurrentCommand() == mUnit->CommandQueue->GetCurrentCommand();
-        const bool transportAssistMoving = transportUnit->IsUnitState(UNITSTATE_AssistMoving);
-        if (transportReadyToLoad && (commandHeadsMatch || transportAssistMoving)) {
-          mTaskState = NextTaskState(mTaskState);
-          return 3;
-        }
-
-        return 10;
-      }
-
-      case TASKSTATE_Waiting: {
-        if (!transport->TransportIsUnitAssignedForPickup(mUnit)) {
-          return -1;
-        }
-
-        mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskWaitingForTransport;
-        const SOCellPos targetCell =
-          transport->TransportIsReadyForUnit(mUnit) ? transport->TransportGetAttachPosition(mUnit)
-                                                    : transport->TransportGetPickupUnitPos(mUnit);
-        if (!IsValidCellPos(targetCell)) {
-          return -1;
-        }
-
+    case TASKSTATE_Preparing: {
+      const bool transportReadyToLoad =
+        transportUnit->IsUnitState(UNITSTATE_TransportLoading) && !transportUnit->IsUnitState(UNITSTATE_HoldingPattern);
+      const bool commandHeadsMatch =
+        transportUnit->CommandQueue->GetCurrentCommand() == mUnit->CommandQueue->GetCurrentCommand();
+      const bool transportAssistMoving = transportUnit->IsUnitState(UNITSTATE_AssistMoving);
+      if (transportReadyToLoad && (commandHeadsMatch || transportAssistMoving)) {
         mTaskState = NextTaskState(mTaskState);
-        NewMoveTask(SNavGoal(targetCell), this, 0, nullptr, 0);
+        return 3;
+      }
+
+      return 10;
+    }
+
+    case TASKSTATE_Waiting: {
+      if (!transport->TransportIsUnitAssignedForPickup(mUnit)) {
+        return -1;
+      }
+
+      mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskWaitingForTransport;
+      const SOCellPos targetCell = transport->TransportIsReadyForUnit(mUnit)
+        ? transport->TransportGetAttachPosition(mUnit)
+        : transport->TransportGetPickupUnitPos(mUnit);
+      if (!IsValidCellPos(targetCell)) {
+        return -1;
+      }
+
+      mTaskState = NextTaskState(mTaskState);
+      NewMoveTask(SNavGoal(targetCell), this, 0, nullptr, 0);
+      return 1;
+    }
+
+    case TASKSTATE_Starting: {
+      if (!transport->TransportIsReadyForUnit(mUnit)) {
         return 1;
       }
 
-      case TASKSTATE_Starting: {
-        if (!transport->TransportIsReadyForUnit(mUnit)) {
-          return 1;
-        }
+      const Wm3::Vector3f attachBonePosition = transport->TransportGetAttachBonePosition(mUnit);
+      const float distanceToAttachPoint = HorizontalDistanceXZ(mUnit->GetPosition(), attachBonePosition);
 
-        const Wm3::Vector3f attachBonePosition = transport->TransportGetAttachBonePosition(mUnit);
-        const float distanceToAttachPoint = HorizontalDistanceXZ(mUnit->GetPosition(), attachBonePosition);
+      const SFootprint& transportFootprint = transportUnit->GetFootprint();
+      const float transportExtent = static_cast<float>(std::max(transportFootprint.mSizeX, transportFootprint.mSizeZ));
+      // 0x005FFF56 `comiss` + `jbe`: a NaN distance counts as near enough.
+      if (!(distanceToAttachPoint > (transportExtent * 2.0f))) {
+        static constexpr Wm3::Vector3f kZeroFacing{0.0f, 0.0f, 0.0f};
+        mUnit->UnitMotion->SetFacing(kZeroFacing);
+        mUnit->UnitMotion->mHeight = gpg::pInf;
 
-        const SFootprint& transportFootprint = transportUnit->GetFootprint();
-        const float transportExtent =
-          static_cast<float>(std::max(transportFootprint.mSizeX, transportFootprint.mSizeZ));
-        // 0x005FFF56 `comiss` + `jbe`: a NaN distance counts as near enough.
-        if (!(distanceToAttachPoint > (transportExtent * 2.0f))) {
-          static constexpr Wm3::Vector3f kZeroFacing{0.0f, 0.0f, 0.0f};
-          mUnit->UnitMotion->SetFacing(kZeroFacing);
-          mUnit->UnitMotion->mHeight = gpg::pInf;
-
-          mSourceTransform = mUnit->GetTransform();
-          mDestinationTransform = transport->TransportGetAttachBoneTransform(mUnit);
-          mUnit->StartTransportBeamUp(mTargetTransportUnit, transport->TransportGetAttachBone(mUnit));
-          mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskTeleporting;
-          mTaskState = NextTaskState(mTaskState);
-          return 1;
-        }
-
-        if (++mArrivalTickOrSequence > 5) {
-          return -1;
-        }
-
-        mTaskState = static_cast<ETaskState>(static_cast<std::int32_t>(mTaskState) - 1);
-        return 0;
-      }
-
-      case TASKSTATE_Processing: {
-        if (mBeamupTime <= 1.0f) {
-          (void)mUnit->RunScript("OnStopTransportBeamUp");
-          mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskTeleporting;
-          if (transport->TransportAttachUnit(mUnit)) {
-            mHasBeamupDestination = true;
-          }
-          return -1;
-        }
-
-        const float blend = (fa::cos(mBeamupTime * kPi * 0.1f) * 0.5f) + 0.5f;
+        mSourceTransform = mUnit->GetTransform();
         mDestinationTransform = transport->TransportGetAttachBoneTransform(mUnit);
-
-        if (const RUnitBlueprint* const blueprint = mUnit->GetBlueprint(); blueprint != nullptr) {
-          mDestinationTransform.pos_.y -= blueprint->mSizeY;
-        }
-
-        VTransform interpolated{};
-        interpolated.pos_.x =
-          mSourceTransform.pos_.x + ((mDestinationTransform.pos_.x - mSourceTransform.pos_.x) * blend);
-        interpolated.pos_.y =
-          mSourceTransform.pos_.y + ((mDestinationTransform.pos_.y - mSourceTransform.pos_.y) * blend);
-        interpolated.pos_.z =
-          mSourceTransform.pos_.z + ((mDestinationTransform.pos_.z - mSourceTransform.pos_.z) * blend);
-        // 0x006000DC-0x00600171: func_QuatLERP (0x004EBA80) with
-        // q1@eax = &mDestinationTransform (+0x5C), q2@ecx = &mSourceTransform
-        // (+0x40), out@ebx = the local transform's orientation.
-        (void)QuatLERP(&mDestinationTransform.orient_, &mSourceTransform.orient_, &interpolated.orient_, blend);
-
-        mUnit->SetPendingTransform(interpolated, 1.0f);
-        mUnit->AdvanceCoords();
-        mBeamupTime -= 1.0f;
+        mUnit->StartTransportBeamUp(mTargetTransportUnit, transport->TransportGetAttachBone(mUnit));
+        mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskTeleporting;
+        mTaskState = NextTaskState(mTaskState);
         return 1;
       }
 
-      default:
-        return 1;
+      if (++mArrivalTickOrSequence > 5) {
+        return -1;
+      }
+
+      mTaskState = static_cast<ETaskState>(static_cast<std::int32_t>(mTaskState) - 1);
+      return 0;
+    }
+
+    case TASKSTATE_Processing: {
+      if (mBeamupTime <= 1.0f) {
+        (void)mUnit->RunScript("OnStopTransportBeamUp");
+        mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskTeleporting;
+        if (transport->TransportAttachUnit(mUnit)) {
+          mHasBeamupDestination = true;
+        }
+        return -1;
+      }
+
+      const float blend = (fa::cos(mBeamupTime * kPi * 0.1f) * 0.5f) + 0.5f;
+      mDestinationTransform = transport->TransportGetAttachBoneTransform(mUnit);
+
+      if (const RUnitBlueprint* const blueprint = mUnit->GetBlueprint(); blueprint != nullptr) {
+        mDestinationTransform.pos_.y -= blueprint->mSizeY;
+      }
+
+      VTransform interpolated{};
+      interpolated.pos_.x =
+        mSourceTransform.pos_.x + ((mDestinationTransform.pos_.x - mSourceTransform.pos_.x) * blend);
+      interpolated.pos_.y =
+        mSourceTransform.pos_.y + ((mDestinationTransform.pos_.y - mSourceTransform.pos_.y) * blend);
+      interpolated.pos_.z =
+        mSourceTransform.pos_.z + ((mDestinationTransform.pos_.z - mSourceTransform.pos_.z) * blend);
+      // 0x006000DC-0x00600171: func_QuatLERP (0x004EBA80) with
+      // q1@eax = &mDestinationTransform (+0x5C), q2@ecx = &mSourceTransform
+      // (+0x40), out@ebx = the local transform's orientation.
+      (void)QuatLERP(&mDestinationTransform.orient_, &mSourceTransform.orient_, &interpolated.orient_, blend);
+
+      mUnit->SetPendingTransform(interpolated, 1.0f);
+      mUnit->AdvanceCoords();
+      mBeamupTime -= 1.0f;
+      return 1;
+    }
+
+    default:
+      return 1;
     }
   }
 
@@ -266,7 +273,10 @@ namespace moho
    * transport weak pointer, snapshots transport transform lanes, and sets
    * owner-unit transport-pending state.
    */
-  CUnitCallTransport::CUnitCallTransport(CCommandTask* const parentTask, Unit* const transportUnit)
+  CUnitCallTransport::CUnitCallTransport(
+    CCommandTask* const parentTask,
+    Unit* const transportUnit
+  )
     : CCommandTask(parentTask)
     , mTargetTransportUnit(transportUnit)
   {
@@ -301,7 +311,11 @@ namespace moho
    * Loads base command-task state, transport weak pointer, beamup flags, and
    * two transform lanes for one `CUnitCallTransport` object.
    */
-  void CUnitCallTransport::MemberDeserialize(gpg::ReadArchive* const archive, int, const gpg::RRef&)
+  void CUnitCallTransport::MemberDeserialize(
+    gpg::ReadArchive* const archive,
+    int,
+    const gpg::RRef&
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -325,7 +339,11 @@ namespace moho
    * Saves base command-task state, transport weak pointer, beamup flags, and
    * two transform lanes for one `CUnitCallTransport` object.
    */
-  void CUnitCallTransport::MemberSerialize(gpg::WriteArchive* const archive, int, const gpg::RRef&) const
+  void CUnitCallTransport::MemberSerialize(
+    gpg::WriteArchive* const archive,
+    int,
+    const gpg::RRef&
+  ) const
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -349,7 +367,10 @@ namespace moho
    * Validates one candidate transport and allocates a call-transport task when
    * legal, otherwise emits an illegal-transport warning.
    */
-  void NewCallTransportCommand(CCommandTask* const parentTask, Unit* const transportUnit)
+  void NewCallTransportCommand(
+    CCommandTask* const parentTask,
+    Unit* const transportUnit
+  )
   {
     if (!transportUnit || transportUnit->IsDead()) {
       return;
@@ -373,7 +394,10 @@ namespace gpg
    * Builds one typed reflection reference for `moho::CUnitCallTransport*`,
    * preserving dynamic-derived ownership and base-offset adjustment.
    */
-  gpg::RRef* RRef_CUnitCallTransport(gpg::RRef* const outRef, moho::CUnitCallTransport* const value)
+  gpg::RRef* RRef_CUnitCallTransport(
+    gpg::RRef* const outRef,
+    moho::CUnitCallTransport* const value
+  )
   {
     return gpg::WriteDerivedRef(outRef, value);
   }

@@ -11,7 +11,7 @@ namespace
    * (`sConsoleOutputHandlers` in the binary).
    */
   moho::ConOutputHandlerList gConsoleOutputHandlers;
-}
+} // namespace
 
 /**
  * Address: 0x0041E8F0 (FUN_0041E8F0)

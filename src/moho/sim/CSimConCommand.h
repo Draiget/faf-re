@@ -83,14 +83,17 @@ namespace moho
     virtual CSimConCommand* Identity();
 
   public:
-    const char* mName;           // +0x04
+    const char* mName;                // +0x04
     std::uint8_t mAllowWithoutCheats; // +0x08; nonzero bypasses CheatsEnabled()
-    std::uint8_t mPad09[3];      // +0x09
+    std::uint8_t mPad09[3];           // +0x09
   };
 
   static_assert(sizeof(CSimConCommand) == 0x0C, "CSimConCommand size must be 0x0C");
   static_assert(offsetof(CSimConCommand, mName) == 0x04, "CSimConCommand::mName offset must be 0x04");
-  static_assert(offsetof(CSimConCommand, mAllowWithoutCheats) == 0x08, "CSimConCommand::mAllowWithoutCheats offset must be 0x08");
+  static_assert(
+    offsetof(CSimConCommand, mAllowWithoutCheats) == 0x08,
+    "CSimConCommand::mAllowWithoutCheats offset must be 0x08"
+  );
 
   /**
    * What it does:

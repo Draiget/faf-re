@@ -25,7 +25,9 @@ IAiSiloBuild::IAiSiloBuild() = default;
  * Allocates one `CAiSiloBuildImpl` bound to `unit` and returns it through the
  * `IAiSiloBuild` interface lane.
  */
-IAiSiloBuild* moho::AI_CreateSiloBuilder(Unit* const unit)
+IAiSiloBuild* moho::AI_CreateSiloBuilder(
+  Unit* const unit
+)
 {
   auto* const impl = new (std::nothrow) CAiSiloBuildImpl(unit);
   return impl ? static_cast<IAiSiloBuild*>(impl) : nullptr;

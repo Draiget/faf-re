@@ -28,7 +28,9 @@ IAiBuilder::~IAiBuilder() = default;
  * Allocates one `CAiBuilderImpl` for `unit` and returns it as the
  * `IAiBuilder` interface pointer.
  */
-IAiBuilder* moho::AI_CreateBuilder(Unit* const unit)
+IAiBuilder* moho::AI_CreateBuilder(
+  Unit* const unit
+)
 {
   auto* const builder = new (std::nothrow) CAiBuilderImpl(unit);
   return builder;

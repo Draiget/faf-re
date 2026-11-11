@@ -55,11 +55,8 @@ namespace
    *
    * Console object: 0x00F5A810.
    */
-  moho::TConVar<bool> gTConVar_range_RenderSelected(
-    "range_RenderSelected",
-    kRangeConVarNoDescription,
-    &moho::range_RenderSelected
-  );
+  moho::TConVar<bool>
+    gTConVar_range_RenderSelected("range_RenderSelected", kRangeConVarNoDescription, &moho::range_RenderSelected);
 
   /**
    * Address: 0x00BE0B10 (FUN_00BE0B10, dynamic initializer for `gTConVar_range_RenderHighlighted`)
@@ -79,11 +76,8 @@ namespace
    *
    * Console object: 0x00F5A830.
    */
-  moho::TConVar<bool> gTConVar_range_RenderBuild(
-    "range_RenderBuild",
-    kRangeConVarNoDescription,
-    &moho::range_RenderBuild
-  );
+  moho::TConVar<bool>
+    gTConVar_range_RenderBuild("range_RenderBuild", kRangeConVarNoDescription, &moho::range_RenderBuild);
 
   /**
    * NOT IN THE ORIGINAL BINARY - no console object exists for this in the
@@ -150,11 +144,7 @@ namespace
    *
    * Console object: 0x00F5A840.
    */
-  moho::TConVar<bool> gTConVar_range_Fill(
-    "range_Fill",
-    kRangeConVarNoDescription,
-    &moho::range_Fill
-  );
+  moho::TConVar<bool> gTConVar_range_Fill("range_Fill", kRangeConVarNoDescription, &moho::range_Fill);
 
   /**
    * Address: 0x00BE0BD0 (FUN_00BE0BD0, dynamic initializer for `gTConVar_range_InnerThicknessCoeff`)
@@ -186,9 +176,5 @@ namespace
    *
    * Console object: 0x00F5A9F8.
    */
-  moho::TConVar<bool> gTConVar_ren_Ranges(
-    "ren_Ranges",
-    kRangeConVarNoDescription,
-    &moho::ren_Ranges
-  );
+  moho::TConVar<bool> gTConVar_ren_Ranges("ren_Ranges", kRangeConVarNoDescription, &moho::ren_Ranges);
 } // namespace

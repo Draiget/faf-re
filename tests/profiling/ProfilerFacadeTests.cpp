@@ -2,7 +2,10 @@
 #include <gtest/gtest.h>
 #include <string>
 
-TEST(Existing_ProfilerFacade, FacadeMacros)
+TEST(
+  Existing_ProfilerFacade,
+  FacadeMacros
+)
 {
   FAF_PROFILE_FRAME("TestFrame");
   FAF_PROFILE_FRAME_DEFAULT();

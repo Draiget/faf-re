@@ -48,7 +48,9 @@ namespace
    * Captures caller `EIP/ESP/EBP` seed registers for `StackWalk` when no
    * external context record is supplied.
    */
-  [[maybe_unused]] void CaptureStackWalkSeedRegisters(StackWalkSeedRegisters* const outRegisters)
+  [[maybe_unused]] void CaptureStackWalkSeedRegisters(
+    StackWalkSeedRegisters* const outRegisters
+  )
   {
 #if defined(_M_IX86)
     if (outRegisters == nullptr) {
@@ -131,14 +133,18 @@ namespace
    * Assigns the global error-report output directory from one zero-terminated
    * wide source.
    */
-  [[maybe_unused]] std::wstring* AssignErrorReportOutputDirFromNullTerminatedInput(const wchar_t* const source)
+  [[maybe_unused]] std::wstring* AssignErrorReportOutputDirFromNullTerminatedInput(
+    const wchar_t* const source
+  )
   {
     return AssignWideStringFromNullTerminatedInput(GetLegacyErrorReportOutputDirStorage(), source);
   }
   class CrashReportAttachmentRegistry
   {
   public:
-    void SetOutputDir(const wchar_t* const outputDir)
+    void SetOutputDir(
+      const wchar_t* const outputDir
+    )
     {
       std::lock_guard<std::mutex> lock(mutex_);
       AssignErrorReportOutputDirFromNullTerminatedInput(outputDir);
@@ -155,7 +161,9 @@ namespace
       return outputDir_;
     }
 
-    void RegisterFile(const wchar_t* const file)
+    void RegisterFile(
+      const wchar_t* const file
+    )
     {
       if (file == nullptr || file[0] == L'\0') {
         return;
@@ -181,7 +189,10 @@ namespace
     }
 
     [[nodiscard]]
-    bool GetFileByOneBasedIndex(const std::uint32_t oneBasedIndex, std::wstring* const outFile) const
+    bool GetFileByOneBasedIndex(
+      const std::uint32_t oneBasedIndex,
+      std::wstring* const outFile
+    ) const
     {
       if (oneBasedIndex == 0 || outFile == nullptr) {
         return false;
@@ -232,13 +243,12 @@ namespace
   }
   constexpr DWORD kPlatformSymbolHandlerOptions =
     SYMOPT_FAIL_CRITICAL_ERRORS | // suppress critical-error UI while probing symbols.
-    SYMOPT_LOAD_LINES | // include source line records for resolved addresses.
-    SYMOPT_DEFERRED_LOADS | // lazily load module symbols as needed.
-    SYMOPT_UNDNAME; // undecorate C++ names in symbol output.
+    SYMOPT_LOAD_LINES |           // include source line records for resolved addresses.
+    SYMOPT_DEFERRED_LOADS |       // lazily load module symbols as needed.
+    SYMOPT_UNDNAME;               // undecorate C++ names in symbol output.
   bool sMohoEngineMuexInitialized = false;
   bool sSymbolHandlerInitialized = false;
 } // namespace
-
 
 // Engine addition (dedicated-server plan WPL.4), declared in WinApp.h.
 moho::OkBoxPresenterHook moho::sOkBoxPresenter = nullptr;
@@ -302,7 +312,9 @@ void moho::PLAT_Exit()
  * Sets the root path used by crash-report attachments and ensures the path
  * ends with one trailing `\\`.
  */
-void moho::PLAT_InitErrorReportOutputDir(const wchar_t* const outputDir)
+void moho::PLAT_InitErrorReportOutputDir(
+  const wchar_t* const outputDir
+)
 {
   sCrashReportAttachments.SetOutputDir(outputDir);
 }
@@ -315,7 +327,9 @@ void moho::PLAT_InitErrorReportOutputDir(const wchar_t* const outputDir)
  * Adds a crash-report attachment path if it is non-empty and not already
  * present in the report file list.
  */
-void moho::PLAT_RegisterFileForErrorReport(const wchar_t* const file)
+void moho::PLAT_RegisterFileForErrorReport(
+  const wchar_t* const file
+)
 {
   sCrashReportAttachments.RegisterFile(file);
 }
@@ -329,7 +343,9 @@ void moho::PLAT_RegisterFileForErrorReport(const wchar_t* const file)
  * (or current thread context when null).
  */
 std::uint32_t moho::PLAT_GetCallStack(
-  void* const contextRecord, const std::uint32_t maxFrames, std::uintptr_t* const outFrames
+  void* const contextRecord,
+  const std::uint32_t maxFrames,
+  std::uintptr_t* const outFrames
 )
 {
   if (outFrames == nullptr || maxFrames == 0) {
@@ -369,17 +385,19 @@ std::uint32_t moho::PLAT_GetCallStack(
 
   std::uint32_t frameCount = 0;
   while (frameCount < maxFrames) {
-    if (::StackWalk(
-          IMAGE_FILE_MACHINE_I386,
-          ::GetCurrentProcess(),
-          ::GetCurrentThread(),
-          &stackFrame,
-          nullptr,
-          nullptr,
-          ::SymFunctionTableAccess,
-          ::SymGetModuleBase,
-          nullptr
-        ) == FALSE) {
+    if (
+      ::StackWalk(
+        IMAGE_FILE_MACHINE_I386,
+        ::GetCurrentProcess(),
+        ::GetCurrentThread(),
+        &stackFrame,
+        nullptr,
+        nullptr,
+        ::SymFunctionTableAccess,
+        ::SymGetModuleBase,
+        nullptr
+      ) == FALSE
+    ) {
       break;
     }
 
@@ -416,17 +434,19 @@ std::uint32_t moho::PLAT_GetCallStack(
 
   std::uint32_t frameCount = 0;
   while (frameCount < maxFrames) {
-    if (::StackWalk64(
-          IMAGE_FILE_MACHINE_AMD64,
-          ::GetCurrentProcess(),
-          ::GetCurrentThread(),
-          &stackFrame,
-          &context,
-          nullptr,
-          ::SymFunctionTableAccess64,
-          ::SymGetModuleBase64,
-          nullptr
-        ) == FALSE) {
+    if (
+      ::StackWalk64(
+        IMAGE_FILE_MACHINE_AMD64,
+        ::GetCurrentProcess(),
+        ::GetCurrentThread(),
+        &stackFrame,
+        &context,
+        nullptr,
+        ::SymFunctionTableAccess64,
+        ::SymGetModuleBase64,
+        nullptr
+      ) == FALSE
+    ) {
       break;
     }
 
@@ -460,7 +480,10 @@ std::uint32_t moho::PLAT_GetCallStack(
  * What it does:
  * Resolves one callstack address into symbol/file/line metadata when available.
  */
-bool moho::PLAT_GetSymbolInfo(const std::uintptr_t address, SPlatSymbolInfo* const outInfo)
+bool moho::PLAT_GetSymbolInfo(
+  const std::uintptr_t address,
+  SPlatSymbolInfo* const outInfo
+)
 {
   if (outInfo == nullptr) {
     return false;
@@ -510,12 +533,7 @@ bool moho::PLAT_GetSymbolInfo(const std::uintptr_t address, SPlatSymbolInfo* con
 fa::string moho::SPlatSymbolInfo::FormatResolvedLine() const
 {
   return gpg::STR_Printf(
-    "%s + %zu bytes (%s(%u) + %u bytes)",
-    symbol.c_str(),
-    symDis,
-    filename.c_str(),
-    lineNum,
-    lineDis
+    "%s + %zu bytes (%s(%u) + %u bytes)", symbol.c_str(), symDis, filename.c_str(), lineNum, lineDis
   );
 }
 
@@ -528,7 +546,9 @@ fa::string moho::SPlatSymbolInfo::FormatResolvedLine() const
  * Formats callstack entries from `[firstFrame, endFrame)` into text lines.
  */
 fa::string moho::PLAT_FormatCallstack(
-  std::int32_t firstFrame, const std::int32_t endFrame, const std::uintptr_t* const frames
+  std::int32_t firstFrame,
+  const std::int32_t endFrame,
+  const std::uintptr_t* const frames
 )
 {
   fa::string formatted;
@@ -548,7 +568,8 @@ fa::string moho::PLAT_FormatCallstack(
       assembled.append(symbolInfo.FormatResolvedLine().c_str());
       assembled.append("\r\n");
     } else {
-      const fa::string line = gpg::STR_Printf("\tUnknown symbol (address %p)\r\n", reinterpret_cast<const void*>(frames[frameIndex]));
+      const fa::string line =
+        gpg::STR_Printf("\tUnknown symbol (address %p)\r\n", reinterpret_cast<const void*>(frames[frameIndex]));
       assembled.append(line.c_str());
     }
   }
@@ -566,7 +587,10 @@ fa::string moho::PLAT_FormatCallstack(
  * Converts one decorated symbol into undecorated text under the shared
  * symbol-handler mutex, with optional underscore stripping.
  */
-fa::string moho::PLAT_UnDecorateSymbolName(const char* const name, const bool stripLeadingUnderscore)
+fa::string moho::PLAT_UnDecorateSymbolName(
+  const char* const name,
+  const bool stripLeadingUnderscore
+)
 {
   std::lock_guard<std::recursive_mutex> lock(GetSymHandlerMutex());
 
@@ -625,7 +649,10 @@ fa::string moho::WIN_GetLastError()
  * Displays a UTF-8 message box using the active engine main window as owner
  * when available.
  */
-void moho::WIN_OkBox(const gpg::StrArg caption, const gpg::StrArg text)
+void moho::WIN_OkBox(
+  const gpg::StrArg caption,
+  const gpg::StrArg text
+)
 {
   // Engine addition (dedicated-server plan WPL.4, WPR.12): the box itself is the
   // client's (sOkBoxPresenter, WinApp.cpp: the binary's MessageBoxW owned by the

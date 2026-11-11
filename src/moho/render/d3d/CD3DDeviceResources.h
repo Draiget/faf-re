@@ -67,8 +67,7 @@ namespace moho
      * What it does:
      * Creates one render-target wrapper and links it into the render-target lane.
      */
-    RenderTargetHandle&
-      CreateRenderTarget(RenderTargetHandle& outTarget, int width, int height, int format) override;
+    RenderTargetHandle& CreateRenderTarget(RenderTargetHandle& outTarget, int width, int height, int format) override;
 
     /**
      * Address: 0x00440E10 (FUN_00440E10)
@@ -76,8 +75,7 @@ namespace moho
      * What it does:
      * Compatibility lane that forwards context payload into `CreateRenderTarget`.
      */
-    RenderTargetHandle&
-      Func3(RenderTargetHandle& outTarget, const gpg::gal::RenderTargetContext& context) override;
+    RenderTargetHandle& Func3(RenderTargetHandle& outTarget, const gpg::gal::RenderTargetContext& context) override;
 
     /**
      * Address: 0x00440F80 (FUN_00440F80)
@@ -86,7 +84,7 @@ namespace moho
      * Creates one depth-stencil wrapper and links it into depth-stencil lane.
      */
     DepthStencilHandle&
-      CreateDepthStencil(DepthStencilHandle& outDepthStencil, int width, int height, int format) override;
+    CreateDepthStencil(DepthStencilHandle& outDepthStencil, int width, int height, int format) override;
 
     /**
      * Address: 0x00441080 (FUN_00441080)
@@ -104,7 +102,7 @@ namespace moho
      * into the matching availability list.
      */
     CD3DVertexSheet*
-      NewVertexSheet(std::uint32_t streamUsageToken, int streamFrequencyToken, CD3DVertexFormat* vertexFormat) override;
+    NewVertexSheet(std::uint32_t streamUsageToken, int streamFrequencyToken, CD3DVertexFormat* vertexFormat) override;
 
     /**
      * Address: 0x004412E0 (FUN_004412E0)
@@ -120,8 +118,12 @@ namespace moho
      * What it does:
      * Creates one vertex-stream wrapper from format lane metadata.
      */
-    CD3DVertexStream*
-      Func5(std::uint32_t dynamicUsageToken, int formatElementIndex, int streamWidth, CD3DVertexFormat* vertexFormat) override;
+    CD3DVertexStream* Func5(
+      std::uint32_t dynamicUsageToken,
+      int formatElementIndex,
+      int streamWidth,
+      CD3DVertexFormat* vertexFormat
+    ) override;
 
     /**
      * Address: 0x00441260 (FUN_00441260)
@@ -174,7 +176,7 @@ namespace moho
      * Creates one in-memory texture resource wrapper from location+blob payload.
      */
     TextureResourceHandle&
-      GetTextureSheet(TextureResourceHandle& outTexture, const char* location, void* data, std::size_t size) override;
+    GetTextureSheet(TextureResourceHandle& outTexture, const char* location, void* data, std::size_t size) override;
 
     /**
      * Address: 0x00441900 (FUN_00441900)
@@ -184,7 +186,7 @@ namespace moho
      * recreates the backing texture.
      */
     DynamicTextureSheetHandle&
-      CreateDynamicTextureSheet2(DynamicTextureSheetHandle& outSheet, int width, int height, int format) override;
+    CreateDynamicTextureSheet2(DynamicTextureSheetHandle& outSheet, int width, int height, int format) override;
 
     /**
      * Address: 0x00441AB0 (FUN_00441AB0)
@@ -193,7 +195,7 @@ namespace moho
      * Creates one non-archive dynamic texture sheet and recreates its texture.
      */
     DynamicTextureSheetHandle&
-      NewDynamicTextureSheet(DynamicTextureSheetHandle& outSheet, int width, int height, int format) override;
+    NewDynamicTextureSheet(DynamicTextureSheetHandle& outSheet, int width, int height, int format) override;
 
     /**
      * Address: 0x00441BE0 (FUN_00441BE0)
@@ -202,7 +204,7 @@ namespace moho
      * Creates one archive-mode dynamic texture sheet and recreates its texture.
      */
     DynamicTextureSheetHandle&
-      CreateDynamicTextureSheet(DynamicTextureSheetHandle& outSheet, int width, int height, int format) override;
+    CreateDynamicTextureSheet(DynamicTextureSheetHandle& outSheet, int width, int height, int format) override;
 
     /**
      * Address: 0x00441D20 (FUN_00441D20)
@@ -211,9 +213,7 @@ namespace moho
      * Accepts a shader fill request and returns success. The original backend
      * leaves the texture unchanged and releases its copied strong handle.
      */
-    bool FillDynamicTexture(
-      const char* shaderName, const char* shaderSource, DynamicTextureSheetHandle sheet
-    ) override;
+    bool FillDynamicTexture(const char* shaderName, const char* shaderSource, DynamicTextureSheetHandle sheet) override;
 
     /**
      * Address: 0x00441D60 (FUN_00441D60)
@@ -317,31 +317,61 @@ namespace moho
     void DevResInitResources();
 
   public:
-    std::int32_t mMipSkipLevels;                              // +0x34
-    CD3DDevice* mDevice;                                      // +0x38
-    CD3DVertexSheet mVertexSheet1;                            // +0x3C
-    CD3DVertexSheet mVertexSheet2;                            // +0x7C
-    CD3DIndexSheet mIndexSheet1;                              // +0xBC
-    CD3DIndexSheet mIndexSheet2;                              // +0xE4
-    CD3DRenderTarget mRenderTarget;                           // +0x10C
-    CD3DDepthStencil mDepthStencil;                           // +0x134
-    TDatListItem<RD3DTextureResource, void> mTextureList;     // +0x160
-    CD3DDynamicTextureSheet mTextureSheet;                    // +0x168
-    fa::vector<CD3DVertexFormat*> mVertexFormats;          // +0x1D8
-    fa::vector<CD3DEffect*> mEffects;                      // +0x1E8
+    std::int32_t mMipSkipLevels;                          // +0x34
+    CD3DDevice* mDevice;                                  // +0x38
+    CD3DVertexSheet mVertexSheet1;                        // +0x3C
+    CD3DVertexSheet mVertexSheet2;                        // +0x7C
+    CD3DIndexSheet mIndexSheet1;                          // +0xBC
+    CD3DIndexSheet mIndexSheet2;                          // +0xE4
+    CD3DRenderTarget mRenderTarget;                       // +0x10C
+    CD3DDepthStencil mDepthStencil;                       // +0x134
+    TDatListItem<RD3DTextureResource, void> mTextureList; // +0x160
+    CD3DDynamicTextureSheet mTextureSheet;                // +0x168
+    fa::vector<CD3DVertexFormat*> mVertexFormats;         // +0x1D8
+    fa::vector<CD3DEffect*> mEffects;                     // +0x1E8
   };
 
-  static_assert(offsetof(CD3DDeviceResources, mMipSkipLevels) == 0x34, "CD3DDeviceResources::mMipSkipLevels offset must be 0x34");
+  static_assert(
+    offsetof(CD3DDeviceResources, mMipSkipLevels) == 0x34,
+    "CD3DDeviceResources::mMipSkipLevels offset must be 0x34"
+  );
   static_assert(offsetof(CD3DDeviceResources, mDevice) == 0x38, "CD3DDeviceResources::mDevice offset must be 0x38");
-  static_assert(offsetof(CD3DDeviceResources, mVertexSheet1) == 0x3C, "CD3DDeviceResources::mVertexSheet1 offset must be 0x3C");
-  static_assert(offsetof(CD3DDeviceResources, mVertexSheet2) == 0x7C, "CD3DDeviceResources::mVertexSheet2 offset must be 0x7C");
-  static_assert(offsetof(CD3DDeviceResources, mIndexSheet1) == 0xBC, "CD3DDeviceResources::mIndexSheet1 offset must be 0xBC");
-  static_assert(offsetof(CD3DDeviceResources, mIndexSheet2) == 0xE4, "CD3DDeviceResources::mIndexSheet2 offset must be 0xE4");
-  static_assert(offsetof(CD3DDeviceResources, mRenderTarget) == 0x10C, "CD3DDeviceResources::mRenderTarget offset must be 0x10C");
-  static_assert(offsetof(CD3DDeviceResources, mDepthStencil) == 0x134, "CD3DDeviceResources::mDepthStencil offset must be 0x134");
-  static_assert(offsetof(CD3DDeviceResources, mTextureList) == 0x160, "CD3DDeviceResources::mTextureList offset must be 0x160");
-  static_assert(offsetof(CD3DDeviceResources, mTextureSheet) == 0x168, "CD3DDeviceResources::mTextureSheet offset must be 0x168");
-  static_assert(offsetof(CD3DDeviceResources, mVertexFormats) == 0x1D8, "CD3DDeviceResources::mVertexFormats offset must be 0x1D8");
+  static_assert(
+    offsetof(CD3DDeviceResources, mVertexSheet1) == 0x3C,
+    "CD3DDeviceResources::mVertexSheet1 offset must be 0x3C"
+  );
+  static_assert(
+    offsetof(CD3DDeviceResources, mVertexSheet2) == 0x7C,
+    "CD3DDeviceResources::mVertexSheet2 offset must be 0x7C"
+  );
+  static_assert(
+    offsetof(CD3DDeviceResources, mIndexSheet1) == 0xBC,
+    "CD3DDeviceResources::mIndexSheet1 offset must be 0xBC"
+  );
+  static_assert(
+    offsetof(CD3DDeviceResources, mIndexSheet2) == 0xE4,
+    "CD3DDeviceResources::mIndexSheet2 offset must be 0xE4"
+  );
+  static_assert(
+    offsetof(CD3DDeviceResources, mRenderTarget) == 0x10C,
+    "CD3DDeviceResources::mRenderTarget offset must be 0x10C"
+  );
+  static_assert(
+    offsetof(CD3DDeviceResources, mDepthStencil) == 0x134,
+    "CD3DDeviceResources::mDepthStencil offset must be 0x134"
+  );
+  static_assert(
+    offsetof(CD3DDeviceResources, mTextureList) == 0x160,
+    "CD3DDeviceResources::mTextureList offset must be 0x160"
+  );
+  static_assert(
+    offsetof(CD3DDeviceResources, mTextureSheet) == 0x168,
+    "CD3DDeviceResources::mTextureSheet offset must be 0x168"
+  );
+  static_assert(
+    offsetof(CD3DDeviceResources, mVertexFormats) == 0x1D8,
+    "CD3DDeviceResources::mVertexFormats offset must be 0x1D8"
+  );
   static_assert(offsetof(CD3DDeviceResources, mEffects) == 0x1E8, "CD3DDeviceResources::mEffects offset must be 0x1E8");
   static_assert(sizeof(CD3DDeviceResources) == 0x1F8, "CD3DDeviceResources size must be 0x1F8");
 } // namespace moho

@@ -23,8 +23,10 @@
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 
-namespace gpg {
-namespace gal {
+namespace gpg
+{
+  namespace gal
+  {
     class Device;
     class OutputContext;
     class CursorContext;
@@ -61,7 +63,8 @@ namespace gal {
      * Log/code strings:
      *  - unknown error
      */
-    class DeviceD3D10 : public Device {
+    class DeviceD3D10 : public Device
+    {
     public:
       /**
        * Address: 0x00900450 (FUN_00900450)
@@ -221,8 +224,8 @@ namespace gal {
        * `CopyResource`.
        */
       void GetRenderTargetData(
-          const boost::shared_ptr<RenderTarget>& source,
-          const boost::shared_ptr<Texture>& destination
+        const boost::shared_ptr<RenderTarget>& source,
+        const boost::shared_ptr<Texture>& destination
       ) override;
       /**
        * Address: 0x008FC290
@@ -233,10 +236,10 @@ namespace gal {
        * otherwise draws the source into the destination through the RTT effect.
        */
       void StretchRect(
-          const boost::shared_ptr<RenderTarget>& source,
-          const boost::shared_ptr<RenderTarget>& destination,
-          const RECT* sourceRect,
-          const RECT* destinationRect
+        const boost::shared_ptr<RenderTarget>& source,
+        const boost::shared_ptr<RenderTarget>& destination,
+        const RECT* sourceRect,
+        const RECT* destinationRect
       ) override;
       /**
        * Address: 0x008FBDF0
@@ -248,10 +251,10 @@ namespace gal {
        * destination rectangle's top-left corner is used.
        */
       void UpdateSurface(
-          const boost::shared_ptr<Texture>& source,
-          const boost::shared_ptr<Texture>& destination,
-          const RECT* sourceRect,
-          const RECT* destinationRect
+        const boost::shared_ptr<Texture>& source,
+        const boost::shared_ptr<Texture>& destination,
+        const RECT* sourceRect,
+        const RECT* destinationRect
       ) override;
       /**
        * Address: 0x008F8700
@@ -260,10 +263,8 @@ namespace gal {
        * What it does:
        * D3D10 cannot save a cube target (`ret 8`).
        */
-      void SaveCubeRenderTarget(
-          const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
-          const fa::string& filePath
-      ) override;
+      void
+      SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) override;
       /**
        * Address: 0x008FC9B0
        * Slot: 21
@@ -273,9 +274,9 @@ namespace gal {
        * `fileFormat`.
        */
       void SaveRenderTarget(
-          const boost::shared_ptr<RenderTarget>& renderTarget,
-          const fa::string& filePath,
-          int fileFormat
+        const boost::shared_ptr<RenderTarget>& renderTarget,
+        const fa::string& filePath,
+        int fileFormat
       ) override;
       /**
        * Address: 0x008FC6B0
@@ -286,10 +287,10 @@ namespace gal {
        * non-null.
        */
       void SaveTexture(
-          const boost::shared_ptr<Texture>& texture,
-          const fa::string& filePath,
-          int fileFormat,
-          gpg::MemBuffer<char>* outBuffer
+        const boost::shared_ptr<Texture>& texture,
+        const fa::string& filePath,
+        int fileFormat,
+        gpg::MemBuffer<char>* outBuffer
       ) override;
       /**
        * Address: 0x008FCAC0
@@ -301,11 +302,11 @@ namespace gal {
        * into caller `MemBuffer`, writing decoded width/height lanes.
        */
       void GetTexture2D(
-          const void* sourceData,
-          std::uint32_t sourceBytes,
-          gpg::MemBuffer<char>* outTextureData,
-          std::uint32_t* outWidth,
-          int* outHeight
+        const void* sourceData,
+        std::uint32_t sourceBytes,
+        gpg::MemBuffer<char>* outTextureData,
+        std::uint32_t* outWidth,
+        int* outHeight
       ) override;
       /**
        * Address: 0x008FA260
@@ -316,10 +317,8 @@ namespace gal {
        * Resets caller weak-handle output lane and consumes one temporary shared-handle
        * argument by value.
        */
-      boost::weak_ptr<void>* Func7(
-          boost::weak_ptr<void>* outWeakHandle,
-          boost::shared_ptr<void> temporarySharedHandle
-      ) override;
+      boost::weak_ptr<void>*
+      Func7(boost::weak_ptr<void>* outWeakHandle, boost::shared_ptr<void> temporarySharedHandle) override;
       /**
        * Address: 0x008F8710
        * Slot: 26
@@ -437,12 +436,12 @@ namespace gal {
        * Clears the bound colour and/or depth-stencil views.
        */
       void Clear(
-          bool clearColor,
-          bool clearDepth,
-          bool clearStencil,
-          std::uint32_t packedColor,
-          float depth,
-          int stencil
+        bool clearColor,
+        bool clearDepth,
+        bool clearStencil,
+        std::uint32_t packedColor,
+        float depth,
+        int stencil
       ) override;
       /**
        * Address: 0x008F95F0
@@ -469,10 +468,10 @@ namespace gal {
        * Binds one vertex stream and records its frequency.
        */
       void SetVertexBuffer(
-          std::uint32_t streamSlot,
-          boost::shared_ptr<VertexBuffer> vertexBuffer,
-          int streamFrequencyToken,
-          int startVertex
+        std::uint32_t streamSlot,
+        boost::shared_ptr<VertexBuffer> vertexBuffer,
+        int streamFrequencyToken,
+        int startVertex
       ) override;
       /**
        * Address: 0x008F9760
@@ -645,9 +644,8 @@ namespace gal {
        * two targets differ in size or format. The views `OMGetRenderTargets`
        * hands back are never released - the binary leaks one reference each.
        */
-      void StretchRectBlit(
-        UINT width, UINT height, ID3D10RenderTargetView* destination, ID3D10ShaderResourceView* source
-      );
+      void
+      StretchRectBlit(UINT width, UINT height, ID3D10RenderTargetView* destination, ID3D10ShaderResourceView* source);
 
       /**
        * Address: 0x008F8860 (FUN_008F8860)
@@ -707,40 +705,43 @@ namespace gal {
       // Layout recovered from the constructor at 0x008FE5D0 and the 0x128-byte
       // allocation in `func_CreateDeviceD3D`. Each lane is named for what the
       // code that fills it stores there, not for what an overlay called it.
-      HMODULE mD3D10Module = nullptr;                                 // +0x24  LoadLibraryA("d3d10.dll")
-      HMODULE mD3DX10Module = nullptr;                                // +0x28  LoadLibraryA("d3dx10.dll")
-      HMODULE mDXGIModule = nullptr;                                  // +0x2C  LoadLibraryA("dxgi.dll")
-      D3D10CreateDeviceFn mD3D10CreateDevice = nullptr;               // +0x30
-      D3D10CreateBlobFn mD3D10CreateBlob = nullptr;                   // +0x34
+      HMODULE mD3D10Module = nullptr;                                           // +0x24  LoadLibraryA("d3d10.dll")
+      HMODULE mD3DX10Module = nullptr;                                          // +0x28  LoadLibraryA("d3dx10.dll")
+      HMODULE mDXGIModule = nullptr;                                            // +0x2C  LoadLibraryA("dxgi.dll")
+      D3D10CreateDeviceFn mD3D10CreateDevice = nullptr;                         // +0x30
+      D3D10CreateBlobFn mD3D10CreateBlob = nullptr;                             // +0x34
       D3DX10CreateEffectFromMemoryFn mD3DX10CreateEffectFromMemory = nullptr;   // +0x38
       D3DX10CreateTextureFromMemoryFn mD3DX10CreateTextureFromMemory = nullptr; // +0x3C
-      D3DX10SaveTextureToFileFn mD3DX10SaveTextureToFileA = nullptr;  // +0x40
-      D3DX10SaveTextureToMemoryFn mD3DX10SaveTextureToMemory = nullptr; // +0x44
-      CreateDXGIFactoryFn mCreateDXGIFactory = nullptr;               // +0x48
-      int mCurThreadId = 0;                                           // +0x4C
-      fa::vector<fa::string> mLog{};                            // +0x50
-      DeviceContext mDeviceContext{DeviceApi::Unset};                 // +0x60
-      fa::vector<AdapterD3D10> mAdapters{};                        // +0x94
-      fa::vector<IDXGISwapChain*> mSwapChains{};                   // +0xA4
-      boost::shared_ptr<PipelineStateD3D10> mPipelineState{};         // +0xB4
-      IDXGIFactory* mDXGIFactory = nullptr;                           // +0xBC
-      ID3D10Device* mDevice = nullptr;                                // +0xC0
-      ID3D10Effect* mSignatureEffect = nullptr;                       // +0xC4  from kSignaturePreambleEffectSource
-      ID3D10Effect* mRttEffect = nullptr;                             // +0xC8  from kRttEffectSource
-      ID3D10EffectTechnique* mRttTechnique = nullptr;                 // +0xCC  GetTechniqueByName("RTT")
-      ID3D10Buffer* mRttQuadVertexBuffer = nullptr;                   // +0xD0
-      ID3D10InputLayout* mRttInputLayout = nullptr;                   // +0xD4
+      D3DX10SaveTextureToFileFn mD3DX10SaveTextureToFileA = nullptr;            // +0x40
+      D3DX10SaveTextureToMemoryFn mD3DX10SaveTextureToMemory = nullptr;         // +0x44
+      CreateDXGIFactoryFn mCreateDXGIFactory = nullptr;                         // +0x48
+      int mCurThreadId = 0;                                                     // +0x4C
+      fa::vector<fa::string> mLog{};                                            // +0x50
+      DeviceContext mDeviceContext{DeviceApi::Unset};                           // +0x60
+      fa::vector<AdapterD3D10> mAdapters{};                                     // +0x94
+      fa::vector<IDXGISwapChain*> mSwapChains{};                                // +0xA4
+      boost::shared_ptr<PipelineStateD3D10> mPipelineState{};                   // +0xB4
+      IDXGIFactory* mDXGIFactory = nullptr;                                     // +0xBC
+      ID3D10Device* mDevice = nullptr;                                          // +0xC0
+      ID3D10Effect* mSignatureEffect = nullptr;       // +0xC4  from kSignaturePreambleEffectSource
+      ID3D10Effect* mRttEffect = nullptr;             // +0xC8  from kRttEffectSource
+      ID3D10EffectTechnique* mRttTechnique = nullptr; // +0xCC  GetTechniqueByName("RTT")
+      ID3D10Buffer* mRttQuadVertexBuffer = nullptr;   // +0xD0
+      ID3D10InputLayout* mRttInputLayout = nullptr;   // +0xD4
       // The frequency `SetVertexBuffer` was last given for each input slot;
       // the draws read slot 0's as the instance count. Not written by the
       // constructor (its stores skip +0xD8..+0x117); `Setup` clears all
       // sixteen before anything reads them.
-      std::int32_t mStreamFrequencies[16];                            // +0xD8
-      OutputContext* mHeadOutputContexts = nullptr;                   // +0x118 new[]'d, one per head
-      CursorD3D10 mCursor{};                                          // +0x11C
+      std::int32_t mStreamFrequencies[16];          // +0xD8
+      OutputContext* mHeadOutputContexts = nullptr; // +0x118 new[]'d, one per head
+      CursorD3D10 mCursor{};                        // +0x11C
     };
 
     static_assert(offsetof(DeviceD3D10, mD3D10Module) == 0x24, "DeviceD3D10::mD3D10Module offset must be 0x24");
-    static_assert(offsetof(DeviceD3D10, mCreateDXGIFactory) == 0x48, "DeviceD3D10::mCreateDXGIFactory offset must be 0x48");
+    static_assert(
+      offsetof(DeviceD3D10, mCreateDXGIFactory) == 0x48,
+      "DeviceD3D10::mCreateDXGIFactory offset must be 0x48"
+    );
     static_assert(offsetof(DeviceD3D10, mCurThreadId) == 0x4C, "DeviceD3D10::mCurThreadId offset must be 0x4C");
     static_assert(offsetof(DeviceD3D10, mLog) == 0x50, "DeviceD3D10::mLog offset must be 0x50");
     static_assert(offsetof(DeviceD3D10, mDeviceContext) == 0x60, "DeviceD3D10::mDeviceContext offset must be 0x60");
@@ -751,9 +752,15 @@ namespace gal {
     static_assert(offsetof(DeviceD3D10, mDevice) == 0xC0, "DeviceD3D10::mDevice offset must be 0xC0");
     static_assert(offsetof(DeviceD3D10, mSignatureEffect) == 0xC4, "DeviceD3D10::mSignatureEffect offset must be 0xC4");
     static_assert(offsetof(DeviceD3D10, mRttInputLayout) == 0xD4, "DeviceD3D10::mRttInputLayout offset must be 0xD4");
-    static_assert(offsetof(DeviceD3D10, mStreamFrequencies) == 0xD8, "DeviceD3D10::mStreamFrequencies offset must be 0xD8");
-    static_assert(offsetof(DeviceD3D10, mHeadOutputContexts) == 0x118, "DeviceD3D10::mHeadOutputContexts offset must be 0x118");
+    static_assert(
+      offsetof(DeviceD3D10, mStreamFrequencies) == 0xD8,
+      "DeviceD3D10::mStreamFrequencies offset must be 0xD8"
+    );
+    static_assert(
+      offsetof(DeviceD3D10, mHeadOutputContexts) == 0x118,
+      "DeviceD3D10::mHeadOutputContexts offset must be 0x118"
+    );
     static_assert(offsetof(DeviceD3D10, mCursor) == 0x11C, "DeviceD3D10::mCursor offset must be 0x11C");
     static_assert(sizeof(DeviceD3D10) == 0x128, "DeviceD3D10 size must be 0x128");
-} // namespace gal
+  } // namespace gal
 } // namespace gpg

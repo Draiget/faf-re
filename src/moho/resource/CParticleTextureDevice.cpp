@@ -17,8 +17,9 @@ namespace moho
    * Lazily resolves one texture resource from device resources by path and
    * returns retained shared ownership.
    */
-  CParticleTexture::TextureResourceHandle&
-  CParticleTexture::GetTexture(TextureResourceHandle& outTexture)
+  CParticleTexture::TextureResourceHandle& CParticleTexture::GetTexture(
+    TextureResourceHandle& outTexture
+  )
   {
     if (!mTextureResource) {
       CD3DDevice* const device = D3D_GetDevice();

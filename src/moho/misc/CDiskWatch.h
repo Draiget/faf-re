@@ -17,7 +17,7 @@ namespace moho
 
   struct SDiskWatchEvent
   {
-    fa::string mPath;          // +0x00
+    fa::string mPath;             // +0x00
     std::int32_t mActionCode;     // +0x1C
     std::uint32_t mTimestampLow;  // +0x20
     std::uint32_t mTimestampHigh; // +0x24
@@ -25,11 +25,11 @@ namespace moho
 
   struct SDiskWatchOverlapped
   {
-    std::uintptr_t mInternal;      // +0x00
-    std::uintptr_t mInternalHigh;  // +0x04
-    std::uint32_t mOffset;         // +0x08
-    std::uint32_t mOffsetHigh;     // +0x0C
-    void* mEventHandle;            // +0x10
+    std::uintptr_t mInternal;     // +0x00
+    std::uintptr_t mInternalHigh; // +0x04
+    std::uint32_t mOffset;        // +0x08
+    std::uint32_t mOffsetHigh;    // +0x0C
+    void* mEventHandle;           // +0x10
   };
 
   class CDiskDirWatch
@@ -74,12 +74,12 @@ namespace moho
     void DoRead();
 
   public:
-    CDiskWatch* mOwner;                // +0x00
+    CDiskWatch* mOwner;                         // +0x00
     fa::vector<SDiskWatchEvent> mPendingEvents; // +0x04
-    fa::string mDirectoryPath;      // +0x14
-    void* mDirectoryHandle;            // +0x30
+    fa::string mDirectoryPath;                  // +0x14
+    void* mDirectoryHandle;                     // +0x30
     fa::vector<std::uint8_t> mReadBuffer;       // +0x34
-    SDiskWatchOverlapped mReadOverlapped;   // +0x44
+    SDiskWatchOverlapped mReadOverlapped;       // +0x44
   };
 
   /**
@@ -135,7 +135,6 @@ namespace moho
     void OnEvent(const SDiskWatchEvent& event) override;
 
   public:
-
     /**
      * Address: 0x00461D00 (FUN_00461D00, ?FilterEvent@CDiskWatchListener@Moho@@UAE_NABUSDiskWatchEvent@2@@Z)
      */
@@ -159,9 +158,9 @@ namespace moho
     void CopyAndClearPendingChanges(fa::vector<SDiskWatchEvent>& outEvents);
 
   public:
-    CDiskWatch* mWatch;                           // +0x0C
-    fa::vector<SDiskWatchEvent> mEvents;       // +0x10
-    fa::vector<fa::string> mPatterns;       // +0x20
+    CDiskWatch* mWatch;                  // +0x0C
+    fa::vector<SDiskWatchEvent> mEvents; // +0x10
+    fa::vector<fa::string> mPatterns;    // +0x20
   };
 
   class CDiskWatch
@@ -232,7 +231,8 @@ namespace moho
 
   private:
     /**
-     * Address: 0x00463180 (FUN_00463180, ?EnablePrivilege@CDiskWatch@Moho@@ABE_NABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@_N@Z)
+     * Address: 0x00463180 (FUN_00463180,
+     * ?EnablePrivilege@CDiskWatch@Moho@@ABE_NABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@_N@Z)
      *
      * What it does:
      * Opens the current process token and enables/disables one named privilege.
@@ -251,11 +251,11 @@ namespace moho
     void WatchQuery();
 
   public:
-    Broadcaster<const SDiskWatchEvent&> mListeners;    // +0x00
-    void* mUnknown08;                                  // +0x08
-    gpg::core::SharedLock mLock;                       // +0x0C
-    std::uint8_t mOpaque10[0x08];                      // +0x10
-    DiskWatchMap mDirWatchMap;                         // +0x18
+    Broadcaster<const SDiskWatchEvent&> mListeners; // +0x00
+    void* mUnknown08;                               // +0x08
+    gpg::core::SharedLock mLock;                    // +0x0C
+    std::uint8_t mOpaque10[0x08];                   // +0x10
+    DiskWatchMap mDirWatchMap;                      // +0x18
   };
 
   /**
@@ -298,7 +298,10 @@ namespace moho
   static_assert(sizeof(CDiskDirWatch) == 0x58, "CDiskDirWatch size must be 0x58");
   static_assert(offsetof(CDiskDirWatch, mPendingEvents) == 0x04, "CDiskDirWatch::mPendingEvents offset must be 0x04");
   static_assert(offsetof(CDiskDirWatch, mDirectoryPath) == 0x14, "CDiskDirWatch::mDirectoryPath offset must be 0x14");
-  static_assert(offsetof(CDiskDirWatch, mDirectoryHandle) == 0x30, "CDiskDirWatch::mDirectoryHandle offset must be 0x30");
+  static_assert(
+    offsetof(CDiskDirWatch, mDirectoryHandle) == 0x30,
+    "CDiskDirWatch::mDirectoryHandle offset must be 0x30"
+  );
   static_assert(offsetof(CDiskDirWatch, mReadBuffer) == 0x34, "CDiskDirWatch::mReadBuffer offset must be 0x34");
   static_assert(offsetof(CDiskDirWatch, mReadOverlapped) == 0x44, "CDiskDirWatch::mReadOverlapped offset must be 0x44");
   static_assert(sizeof(CDiskWatchListener) == 0x30, "CDiskWatchListener size must be 0x30");
@@ -306,17 +309,13 @@ namespace moho
   static_assert(offsetof(CDiskWatchListener, mEvents) == 0x10, "CDiskWatchListener::mEvents offset must be 0x10");
   static_assert(offsetof(CDiskWatchListener, mPatterns) == 0x20, "CDiskWatchListener::mPatterns offset must be 0x20");
 
-
-
   static_assert(sizeof(CDiskWatch::DiskWatchMap) == 0x0C, "CDiskWatch::DiskWatchMap size must be 0x0C");
   static_assert(
-    sizeof(CDiskWatch::DiskWatchMap::value_type) == 0x20, "CDiskWatch::DiskWatchMap::value_type size must be 0x20"
+    sizeof(CDiskWatch::DiskWatchMap::value_type) == 0x20,
+    "CDiskWatch::DiskWatchMap::value_type size must be 0x20"
   );
 
   static_assert(sizeof(CDiskWatch) == 0x24, "CDiskWatch size must be 0x24");
   static_assert(offsetof(CDiskWatch, mLock) == 0x0C, "CDiskWatch::mLock offset must be 0x0C");
-  static_assert(
-    offsetof(CDiskWatch, mDirWatchMap) == 0x18,
-    "CDiskWatch::mDirWatchMap offset must be 0x18"
-  );
+  static_assert(offsetof(CDiskWatch, mDirWatchMap) == 0x18, "CDiskWatch::mDirWatchMap offset must be 0x18");
 } // namespace moho

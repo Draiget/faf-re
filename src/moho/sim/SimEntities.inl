@@ -11,7 +11,10 @@
  * What it does:
  * Applies army unit-cap checks and creates a Unit when caps allow.
  */
-Unit* Sim::CreateUnit(const SUnitConstructionParams& params, const bool doCallback)
+Unit* Sim::CreateUnit(
+  const SUnitConstructionParams& params,
+  const bool doCallback
+)
 {
   if (!params.mArmy || !params.mBlueprint) {
     return nullptr;
@@ -32,7 +35,10 @@ Unit* Sim::CreateUnit(const SUnitConstructionParams& params, const bool doCallba
   return new Unit(params);
 }
 
-Unit* Sim::CreateUnitForScript(const SUnitConstructionParams& params, const bool doCallback)
+Unit* Sim::CreateUnitForScript(
+  const SUnitConstructionParams& params,
+  const bool doCallback
+)
 {
   return CreateUnit(params, doCallback);
 }
@@ -42,7 +48,9 @@ Unit* Sim::CreateUnitForScript(const SUnitConstructionParams& params, const bool
  * the declaration in Sim.h for the evidence that no unit-cap gate stands in
  * front of it.
  */
-Unit* Sim::CreateInitialArmyUnit(const SUnitConstructionParams& params)
+Unit* Sim::CreateInitialArmyUnit(
+  const SUnitConstructionParams& params
+)
 {
   if (!params.mArmy || !params.mBlueprint) {
     return nullptr;
@@ -68,7 +76,10 @@ Unit* Sim::CreateInitialArmyUnit(const SUnitConstructionParams& params)
  * Returns the replacement Unit, or nullptr when the source is dead/destroy-queued
  * or the new army is over its unit cap.
  */
-Unit* Sim::TransferUnit(Unit* const unit, CArmyImpl* const newArmy)
+Unit* Sim::TransferUnit(
+  Unit* const unit,
+  CArmyImpl* const newArmy
+)
 {
   if (!unit || unit->IsDead() || unit->DestroyQueued()) {
     return nullptr;
@@ -115,7 +126,9 @@ Unit* Sim::TransferUnit(Unit* const unit, CArmyImpl* const newArmy)
         continue;
       }
       Unit* const child = attachedEntity->IsUnit();
-      if (!child || !attachedEntity->IsMobile() || attachedEntity->mVarDat.mIsDead || attachedEntity->DestroyQueuedFlag) {
+      if (
+        !child || !attachedEntity->IsMobile() || attachedEntity->mVarDat.mIsDead || attachedEntity->DestroyQueuedFlag
+      ) {
         continue;
       }
       detachedChildren.push_back(attachedEntity->IsUnit());
@@ -142,12 +155,7 @@ Unit* Sim::TransferUnit(Unit* const unit, CArmyImpl* const newArmy)
   const RUnitBlueprint* const sourceBlueprint = unit->GetBlueprint();
 
   SUnitConstructionParams params(
-    static_cast<std::int32_t>(sourceLayer),
-    sourceTransform,
-    newArmy,
-    sourceBlueprint,
-    nullptr,
-    true
+    static_cast<std::int32_t>(sourceLayer), sourceTransform, newArmy, sourceBlueprint, nullptr, true
   );
   // The transfer path forces fixed-elevation on unconditionally (the layer==0 gate
   // that the shared ctor applies is not present in the shipped transfer code).
@@ -240,7 +248,12 @@ Unit* Sim::TransferUnit(Unit* const unit, CArmyImpl* const newArmy)
  * Cheat-gated unit creation entrypoint; resolves unit blueprint, builds construction params,
  * and forwards into Sim::CreateUnit(const SUnitConstructionParams&, bool).
  */
-void Sim::CreateUnit(const uint32_t armyIndex, const RResId& blueprintId, const SCoordsVec2& pos, const float heading)
+void Sim::CreateUnit(
+  const uint32_t armyIndex,
+  const RResId& blueprintId,
+  const SCoordsVec2& pos,
+  const float heading
+)
 {
   if (!CheatsEnabled()) {
     return;
@@ -265,14 +278,7 @@ void Sim::CreateUnit(const uint32_t armyIndex, const RResId& blueprintId, const 
     return;
   }
 
-  SUnitConstructionParams params(
-    0,
-    BuildUnitSpawnTransform(pos, heading),
-    army,
-    blueprint,
-    nullptr,
-    true
-  );
+  SUnitConstructionParams params(0, BuildUnitSpawnTransform(pos, heading), army, blueprint, nullptr, true);
   // 0x00748BE7 clears only the elevation byte (+0x25). mUseLayerOverride stays 1
   // from the ctor, so the Unit ctor keeps the requested heading instead of
   // resetting it (or drawing a random yaw for SpawnRandomRotation blueprints).
@@ -289,7 +295,10 @@ void Sim::CreateUnit(const uint32_t armyIndex, const RResId& blueprintId, const 
  * unrotated. Formerly split into a free `SpawnPropByBlueprint`, which added a
  * null/empty-blueprint early-out the binary does not have.
  */
-void Sim::CreateProp(const char* const blueprint, const Wm3::Vec3f& loc)
+void Sim::CreateProp(
+  const char* const blueprint,
+  const Wm3::Vec3f& loc
+)
 {
   if (!CheatsEnabled()) {
     return;
@@ -308,7 +317,9 @@ void Sim::CreateProp(const char* const blueprint, const Wm3::Vec3f& loc)
  * Looks up an entity by id, validates command-source ownership, then
  * destroys the entity through `Entity::Destroy()`.
  */
-void Sim::DestroyEntity(const EntId entityId)
+void Sim::DestroyEntity(
+  const EntId entityId
+)
 {
   Entity* entity = FindEntityById(mEntityDB, entityId);
   if (!entity || !OkayToMessWith(entity)) {
@@ -321,7 +332,10 @@ void Sim::DestroyEntity(const EntId entityId)
 /**
  * Address: 0x00748CD0 (FUN_00748CD0, ?WarpEntity@Sim@Moho@@UAEXVEntId@2@ABVVTransform@2@@Z)
  */
-void Sim::WarpEntity(const EntId entityId, const VTransform& transform)
+void Sim::WarpEntity(
+  const EntId entityId,
+  const VTransform& transform
+)
 {
   if (!CheatsEnabled()) {
     return;
@@ -341,7 +355,11 @@ void Sim::WarpEntity(const EntId entityId, const VTransform& transform)
  * What it does:
  * Applies one UI/info key-value command lane to a controllable live unit.
  */
-void Sim::ProcessInfoPair(const EntId entityId, const gpg::StrArg key, const gpg::StrArg val)
+void Sim::ProcessInfoPair(
+  const EntId entityId,
+  const gpg::StrArg key,
+  const gpg::StrArg val
+)
 {
   Entity* const entity = FindEntityById(mEntityDB, entityId);
   if (!entity || !OkayToMessWith(entity) || entity->mVarDat.mIsDead != 0u) {
@@ -479,7 +497,10 @@ void Sim::ProcessInfoPair(const EntId entityId, const gpg::StrArg key, const gpg
  * function (the LuaFunction constructor raises that), is logged instead of
  * reaching the command decoder.
  */
-void Sim::ExecuteLuaInSim(const char* const functionName, const LuaPlus::LuaObject& args)
+void Sim::ExecuteLuaInSim(
+  const char* const functionName,
+  const LuaPlus::LuaObject& args
+)
 {
   if (!CheatsEnabled()) {
     return;
@@ -505,14 +526,17 @@ void Sim::ExecuteLuaInSim(const char* const functionName, const LuaPlus::LuaObje
 // here can never satisfy it - it was one of the /FORCE-swallowed LNK2019s.
 
 /**
- * Address: 0x00749B60 (FUN_00749B60, ?LuaSimCallback@Sim@Moho@@UAEXPBDABVLuaObject@LuaPlus@@ABV?$BVSet@HUEntIdUniverse@Moho@@@2@@Z)
+ * Address: 0x00749B60 (FUN_00749B60,
+ * ?LuaSimCallback@Sim@Moho@@UAEXPBDABVLuaObject@LuaPlus@@ABV?$BVSet@HUEntIdUniverse@Moho@@@2@@Z)
  *
  * What it does:
  * Imports `/lua/SimCallbacks.lua`, resolves `DoCallback`, builds an optional
  * selected-unit table, then executes `DoCallback(callbackName,args,units)`.
  */
 void Sim::LuaSimCallback(
-  const char* callbackName, const LuaPlus::LuaObject& args, const BVSet<EntId, EntIdUniverse>& entities
+  const char* callbackName,
+  const LuaPlus::LuaObject& args,
+  const BVSet<EntId, EntIdUniverse>& entities
 )
 {
   LuaPlus::LuaObject selectedUnits(mLuaState);
@@ -737,8 +761,10 @@ int Sim::dbg(
     return 0;
   }
 
-  if (RDebugOverlay* const existingOverlay = FindDebugOverlayInstanceByType(*sim, *selectedType);
-      existingOverlay != nullptr) {
+  if (
+    RDebugOverlay* const existingOverlay = FindDebugOverlayInstanceByType(*sim, *selectedType);
+    existingOverlay != nullptr
+  ) {
     RemoveDebugOverlayInstance(*existingOverlay);
     return 0;
   }
@@ -996,8 +1022,6 @@ namespace
     });
   }
 }
-
-
 
 /**
  * Address: 0x0075EE50 (FUN_0075EE50, Moho::Sim::DumpUnits)

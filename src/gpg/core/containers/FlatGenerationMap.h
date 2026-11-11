@@ -31,7 +31,9 @@ namespace gpg::core
     static constexpr unsigned kMaxCapacityLog2 = 31;
 
     /** Starts with 2^capacityLog2 slots (1 to kMaxCapacityLog2). */
-    explicit FlatGenerationMap(const unsigned capacityLog2 = kDefaultCapacityLog2)
+    explicit FlatGenerationMap(
+      const unsigned capacityLog2 = kDefaultCapacityLog2
+    )
       : mSlots(std::size_t{1} << capacityLog2)
       , mMask((std::size_t{1} << capacityLog2) - 1)
       , mShift(kHashBits - capacityLog2)
@@ -40,7 +42,9 @@ namespace gpg::core
     }
 
     /** The value stored for `key` since the last Clear(), or null. */
-    [[nodiscard]] TValue* Find(const std::uint32_t key) noexcept
+    [[nodiscard]] TValue* Find(
+      const std::uint32_t key
+    ) noexcept
     {
       // Terminates: the map is never more than half full, so an empty slot follows.
       for (std::size_t i = Bucket(key);; i = Next(i)) {
@@ -55,7 +59,10 @@ namespace gpg::core
     }
 
     /** Stores `value` for `key`, which must not be in the map. */
-    TValue& Insert(const std::uint32_t key, const TValue& value)
+    TValue& Insert(
+      const std::uint32_t key,
+      const TValue& value
+    )
     {
       assert(Find(key) == nullptr && "FlatGenerationMap::Insert: the key is already in the map");
       if ((mCount + 1) * kSlotsPerEntry > mSlots.size()) {
@@ -66,7 +73,9 @@ namespace gpg::core
     }
 
     /** Removes `key` if it is in the map; the entries probed past it move up, so no marker stays behind. */
-    void Erase(const std::uint32_t key) noexcept
+    void Erase(
+      const std::uint32_t key
+    ) noexcept
     {
       std::size_t hole = Bucket(key);
       for (;; hole = Next(hole)) {
@@ -126,14 +135,24 @@ namespace gpg::core
       TValue value{};
     };
 
-    [[nodiscard]] std::size_t Bucket(const std::uint32_t key) const noexcept
+    [[nodiscard]] std::size_t Bucket(
+      const std::uint32_t key
+    ) const noexcept
     {
       return static_cast<std::size_t>((key * kFibonacciMultiplier) >> mShift);
     }
 
-    [[nodiscard]] std::size_t Next(const std::size_t index) const noexcept { return (index + 1) & mMask; }
+    [[nodiscard]] std::size_t Next(
+      const std::size_t index
+    ) const noexcept
+    {
+      return (index + 1) & mMask;
+    }
 
-    TValue& Place(const std::uint32_t key, const TValue& value) noexcept
+    TValue& Place(
+      const std::uint32_t key,
+      const TValue& value
+    ) noexcept
     {
       std::size_t i = Bucket(key);
       while (mSlots[i].generation == mGeneration) {

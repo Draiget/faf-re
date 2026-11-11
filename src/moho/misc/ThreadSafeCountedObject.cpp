@@ -13,4 +13,3 @@ namespace moho
    */
   ThreadSafeCountedObject::~ThreadSafeCountedObject() = default;
 } // namespace moho
-

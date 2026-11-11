@@ -2,12 +2,15 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <exception>
 #include <cstdlib>
 #include <memory>
+#include <mutex>
 #include <span>
 #include <string_view>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -32,7 +35,6 @@ namespace gpg
   void Logf(const char* fmt, ...);
 } // namespace gpg
 
-
 namespace faf::remote
 {
   namespace
@@ -42,16 +44,29 @@ namespace faf::remote
     constexpr std::size_t kMaxTokenLength = 1024;
 
     constexpr std::array<const char*, 8> kLockstepStartupFlags{
-      "/hostgame", "/joingame", "/gpgnet", "/replay", "/load", "/scenario", "/map", "/perf",
+      "/hostgame",
+      "/joingame",
+      "/gpgnet",
+      "/replay",
+      "/load",
+      "/scenario",
+      "/map",
+      "/perf",
     };
 
-    [[nodiscard]] bool IsTokenText(const std::string_view token)
+    [[nodiscard]] bool IsTokenText(
+      const std::string_view token
+    )
     {
-      return !token.empty() && token.size() <= kMaxTokenLength
-          && std::ranges::all_of(token, [](const char c) { return c > ' ' && c < 0x7F; });
+      return !token.empty() && token.size() <= kMaxTokenLength && std::ranges::all_of(token, [](const char c) {
+        return c > ' ' && c < 0x7F;
+      });
     }
 
-    [[nodiscard]] bool ReadOneArg(const char* const option, std::string& value)
+    [[nodiscard]] bool ReadOneArg(
+      const char* const option,
+      std::string& value
+    )
     {
       fa::vector<fa::string> args;
       if (!moho::CFG_GetArgOption(option, 1, &args) || args.empty()) {
@@ -62,7 +77,10 @@ namespace faf::remote
     }
   } // namespace
 
-  EServerConnectArgs ReadServerConnectArgs(SServerConnectRequest& request, std::string& error)
+  EServerConnectArgs ReadServerConnectArgs(
+    SServerConnectRequest& request,
+    std::string& error
+  )
   {
     if (!moho::CFG_GetArgOption("/connectserver", 0, nullptr)) {
       return EServerConnectArgs::Absent;
@@ -109,36 +127,52 @@ namespace faf::remote
     [[nodiscard]] std::uint64_t NowUs() noexcept
     {
       return static_cast<std::uint64_t>(
-        std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count()
+        std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch())
+          .count()
       );
     }
 
     /**
      * The client's channel to the server as the lobby uses it: lobby frames in arrival order (`CLobbyInbox`: a server
-     * signal holds back the frames after it), the rest kept for the game's session.
+     * signal holds back the frames after it), the rest kept for the game's session. Its methods take one lock: the
+     * stall cover (`CoverStall`) moves the link from its own thread while the game's thread is busy.
      */
     class CLinkRelayChannel final : public IRelayChannel
     {
     public:
-      explicit CLinkRelayChannel(net::CClientLink& link)
+      explicit CLinkRelayChannel(
+        net::CClientLink& link
+      )
         : mLink(link)
       {}
 
-      void SendLobbyFrame(const std::span<const std::uint8_t> frame) override { (void)mLink.SendReliable(frame.data(), frame.size()); }
-
-      bool TakeLobbyFrame(std::vector<std::uint8_t>& frame) override
+      void SendLobbyFrame(
+        const std::span<const std::uint8_t> frame
+      ) override
       {
+        const std::scoped_lock lock(mLock);
+        (void)mLink.SendReliable(frame.data(), frame.size());
+      }
+
+      bool TakeLobbyFrame(
+        std::vector<std::uint8_t>& frame
+      ) override
+      {
+        const std::scoped_lock lock(mLock);
         Pump();
         return mInbox.TakeLobbyFrame(frame);
       }
 
       bool Up() const override
       {
+        const std::scoped_lock lock(mLock);
         const net::CClientLink::EState state = mLink.State();
         return state == net::CClientLink::EState::Connected || state == net::CClientLink::EState::Connecting;
       }
 
-      void TakeGone(std::vector<std::int32_t>& uids) override
+      void TakeGone(
+        std::vector<std::int32_t>& uids
+      ) override
       {
         uids.insert(uids.end(), mGone.begin(), mGone.end());
         mGone.clear();
@@ -151,19 +185,33 @@ namespace faf::remote
       }
 
       /** One connector at a time: false while the last one handed out is alive. */
-      [[nodiscard]] bool TakeConnectorSlot() { return !std::exchange(mConnectorLive, true); }
-
-      [[nodiscard]] bool TakeSignal(net::SLobbySignal& signal)
+      [[nodiscard]] bool TakeConnectorSlot()
       {
+        return !std::exchange(mConnectorLive, true);
+      }
+
+      [[nodiscard]] bool TakeSignal(
+        net::SLobbySignal& signal
+      )
+      {
+        const std::scoped_lock lock(mLock);
         Pump();
         return mInbox.TakeSignal(signal);
       }
 
-      void MarkGone(const std::int32_t uid) { mGone.push_back(uid); }
+      void MarkGone(
+        const std::int32_t uid
+      )
+      {
+        mGone.push_back(uid);
+      }
 
       /** The next message for the game's session (not a lobby frame), in arrival order. */
-      [[nodiscard]] bool TakeGameMessage(std::vector<std::uint8_t>& message)
+      [[nodiscard]] bool TakeGameMessage(
+        std::vector<std::uint8_t>& message
+      )
       {
+        const std::scoped_lock lock(mLock);
         Pump();
         if (mForGameNext >= mForGame.size()) {
           mForGame.clear();
@@ -174,16 +222,63 @@ namespace faf::remote
         return true;
       }
 
-      void SendGameMessage(const std::span<const std::uint8_t> message) { (void)mLink.SendReliable(message.data(), message.size()); }
+      void SendGameMessage(
+        const std::span<const std::uint8_t> message
+      )
+      {
+        const std::scoped_lock lock(mLock);
+        (void)mLink.SendReliable(message.data(), message.size());
+      }
 
       /** The link moves (keepalives, acknowledgements); what arrives waits in order for its taker. */
-      void KeepAlive() { Pump(); }
+      void KeepAlive()
+      {
+        const std::scoped_lock lock(mLock);
+        Pump();
+      }
+
+      /**
+       * Called by the stall cover's thread every `kStallCheckMs`: moves the link when the game's thread hasn't for
+       * `kStallStartUs`, up to `kStallCoverUs` into the stall. FAF's lobby screen is built in one Lua call that takes
+       * seconds (a window's 6-8 s, measured 2026-11-09); with no keepalives the server took the player for away
+       * (`--lobby-away-seconds`, 6 s) and handed the lobby's host role to the next player. FAF's own lobby links stay
+       * up the same way: `CNetUDPConnector` runs on its own thread. A game thread stuck for longer than the cover is
+       * let go, so the server still sees a hung client as away.
+       */
+      void CoverStall()
+      {
+        const std::scoped_lock lock(mLock);
+        const std::uint64_t now = NowUs();
+        const std::uint64_t stalledUs = now - mLastPumpUs;
+        if (mLastPumpUs == 0 || stalledUs < kStallStartUs || stalledUs > kStallCoverUs) {
+          return;
+        }
+        if (!mStallSaid) {
+          mStallSaid = true;
+          gpg::Logf("Server session: the game's thread is busy; the link to the server is kept up meanwhile.");
+        }
+        mLink.Pump(now);
+        TakeArrived();
+      }
+
+      static constexpr int kStallCheckMs = 100;
 
     private:
-      // The lobby pulls every frame, and the session's task too: the link moves here.
+      static constexpr std::uint64_t kStallStartUs = 250'000;
+      static constexpr std::uint64_t kStallCoverUs = 30'000'000;
+
+      // The lobby pulls every frame, and the session's task too: the link moves here. The caller holds `mLock`.
       void Pump()
       {
-        mLink.Pump(NowUs());
+        const std::uint64_t now = NowUs();
+        mLastPumpUs = now;
+        mStallSaid = false;
+        mLink.Pump(now);
+        TakeArrived();
+      }
+
+      void TakeArrived()
+      {
         while (mLink.TakeReliable(mMessage)) {
           if (!mMessage.empty() && mMessage[0] == static_cast<std::uint8_t>(net::ESeatMessage::Lobby)) {
             mInbox.Push(std::move(mMessage));
@@ -194,6 +289,9 @@ namespace faf::remote
         }
       }
 
+      mutable std::mutex mLock;
+      std::uint64_t mLastPumpUs = 0; // 0: not pumped by the game's thread yet
+      bool mStallSaid = false;
       net::CClientLink& mLink;
       CLobbyInbox mInbox;
       std::vector<std::uint8_t> mMessage;
@@ -203,18 +301,46 @@ namespace faf::remote
       bool mConnectorLive = false;
     };
 
-    /** One server session: the link, the channel the lobby uses over it. */
+    /** One server session: the link, the channel the lobby uses over it, the thread that covers the game's stalls. */
     struct SServerSession
     {
-      SServerSession(const std::int32_t uid, const net::Token& token, const net::SEndpoint& server)
+      SServerSession(
+        const std::int32_t uid,
+        const net::Token& token,
+        const net::SEndpoint& server
+      )
         : uid(uid)
         , link(uid, token, server)
         , channel(link)
       {}
 
+      SServerSession(const SServerSession&) = delete;
+      SServerSession& operator=(const SServerSession&) = delete;
+
+      ~SServerSession()
+      {
+        stopCover.store(true);
+        if (stallCover.joinable()) {
+          stallCover.join();
+        }
+      }
+
+      /** Once connected: from here on the link is only touched through `channel`. */
+      void StartStallCover()
+      {
+        stallCover = std::thread([this] {
+          while (!stopCover.load()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(CLinkRelayChannel::kStallCheckMs));
+            channel.CoverStall();
+          }
+        });
+      }
+
       std::int32_t uid;
       net::CClientLink link;
       CLinkRelayChannel channel;
+      std::atomic<bool> stopCover{false};
+      std::thread stallCover;
     };
 
     std::unique_ptr<SServerSession> sSession;
@@ -231,7 +357,10 @@ namespace faf::remote
     return new CServerRelayConnector(sSession->channel); // `CLobby` destroys it, which frees the slot
   }
 
-  void ReportServerContent(moho::RRuleGameRules& rules, const std::string& gameMods)
+  void ReportServerContent(
+    moho::RRuleGameRules& rules,
+    const std::string& gameMods
+  )
   {
     if (sSession == nullptr) {
       return;
@@ -240,19 +369,21 @@ namespace faf::remote
     const std::vector<std::uint8_t> message = EncodeContentReport(report);
     sSession->channel.SendGameMessage(message);
     gpg::Logf(
-      "Server session: content reported: blueprints %016llx, mods %016llx", static_cast<unsigned long long>(report.blueprints),
+      "Server session: content reported: blueprints %016llx, mods %016llx",
+      static_cast<unsigned long long>(report.blueprints),
       static_cast<unsigned long long>(report.mods)
     );
 
-    // Plan WP17.8: each mod it runs. The sim mods are the launch's; the UI mods FAF's `lua/mods.lua` `GetUiMods()` lists
-    // (each with `uid` and `version`). A Lua without it reports none.
+    // Plan WP17.8: each mod it runs. The sim mods are the launch's; the UI mods FAF's `lua/mods.lua` `GetUiMods()`
+    // lists (each with `uid` and `version`). A Lua without it reports none.
     std::vector<SModEntry> mods;
     for (std::string& uid : ReadModUids(gameMods)) {
       mods.push_back(SModEntry{false, std::move(uid), {}});
     }
     try {
       LuaPlus::LuaState* const state = moho::USER_GetLuaState();
-      const LuaPlus::LuaObject module = state != nullptr ? moho::SCR_Import(state, "/lua/mods.lua") : LuaPlus::LuaObject{};
+      const LuaPlus::LuaObject module =
+        state != nullptr ? moho::SCR_Import(state, "/lua/mods.lua") : LuaPlus::LuaObject{};
       const LuaPlus::LuaObject getUiMods = module.IsTable() ? module["GetUiMods"] : LuaPlus::LuaObject{};
       if (getUiMods.IsFunction()) {
         LuaPlus::LuaFunction<LuaPlus::LuaObject> call(getUiMods);
@@ -265,7 +396,13 @@ namespace faf::remote
           const LuaPlus::LuaObject uid = info["uid"];
           const LuaPlus::LuaObject version = info["version"];
           if (uid.IsString()) {
-            mods.push_back(SModEntry{true, uid.GetString(), version.IsString() || version.IsNumber() ? std::string(version.ToString()) : std::string()});
+            mods.push_back(
+              SModEntry{
+                true,
+                uid.GetString(),
+                version.IsString() || version.IsNumber() ? std::string(version.ToString()) : std::string()
+              }
+            );
           }
         }
       }
@@ -273,23 +410,31 @@ namespace faf::remote
       gpg::Warnf("Server session: the UI mods couldn't be read: %s", error.what());
     }
     sSession->channel.SendGameMessage(EncodeModReport(mods));
-    const auto ui = static_cast<std::size_t>(std::count_if(mods.begin(), mods.end(), [](const SModEntry& mod) { return mod.ui; }));
+    const auto ui = static_cast<std::size_t>(std::count_if(mods.begin(), mods.end(), [](const SModEntry& mod) {
+      return mod.ui;
+    }));
     gpg::Logf("Server session: mods reported: %zu sim, %zu UI", mods.size() - ui, ui);
   }
 
-  bool TakeServerLobbySignal(net::SLobbySignal& signal)
+  bool TakeServerLobbySignal(
+    net::SLobbySignal& signal
+  )
   {
     return sSession != nullptr && sSession->channel.TakeSignal(signal);
   }
 
-  void EndServerLobbyPeer(const std::int32_t uid)
+  void EndServerLobbyPeer(
+    const std::int32_t uid
+  )
   {
     if (sSession != nullptr) {
       sSession->channel.MarkGone(uid);
     }
   }
 
-  bool SendServerLaunchRequest(const std::span<const std::uint8_t> configuration)
+  bool SendServerLaunchRequest(
+    const std::span<const std::uint8_t> configuration
+  )
   {
     if (sSession == nullptr) {
       return false;
@@ -304,7 +449,9 @@ namespace faf::remote
     return true;
   }
 
-  bool TakeServerGameMessage(std::vector<std::uint8_t>& message)
+  bool TakeServerGameMessage(
+    std::vector<std::uint8_t>& message
+  )
   {
     return sSession != nullptr && sSession->channel.TakeGameMessage(message);
   }
@@ -316,7 +463,9 @@ namespace faf::remote
     }
   }
 
-  bool SendServerGameMessage(const std::span<const std::uint8_t> message)
+  bool SendServerGameMessage(
+    const std::span<const std::uint8_t> message
+  )
   {
     if (sSession == nullptr) {
       return false;
@@ -335,7 +484,9 @@ namespace faf::remote
     return sSession != nullptr && sSession->channel.Up();
   }
 
-  EServerSessionStart StartServerSessionFromCommandLine(bool (*const startLobbyUi)())
+  EServerSessionStart StartServerSessionFromCommandLine(
+    bool (*const startLobbyUi)()
+  )
   {
     SServerConnectRequest request;
     std::string error;
@@ -354,7 +505,9 @@ namespace faf::remote
     // Plan WP12.1: the channel first (one handshake, the token), then the lobby over it.
     net::SEndpoint server;
     if (!net::ParseEndpoint(request.endpoint, server)) {
-      moho::WIN_OkBox("Ack!", ("The game server's address must be an IPv4 address and port: \"" + request.endpoint + "\".").c_str());
+      moho::WIN_OkBox(
+        "Ack!", ("The game server's address must be an IPv4 address and port: \"" + request.endpoint + "\".").c_str()
+      );
       return EServerSessionStart::Failed;
     }
     sSession = std::make_unique<SServerSession>(request.uid, net::MakeToken(request.token), server);
@@ -376,12 +529,17 @@ namespace faf::remote
     if (sSession->link.State() != net::CClientLink::EState::Connected) {
       const auto refusal = sSession->link.Refusal();
       moho::WIN_OkBox(
-        "Ack!", ("The game server refused this player" + (refusal ? " (reason " + std::to_string(static_cast<int>(*refusal)) + ")" : std::string()) + ".").c_str()
+        "Ack!",
+        ("The game server refused this player" +
+         (refusal ? " (reason " + std::to_string(static_cast<int>(*refusal)) + ")" : std::string()) + ".")
+          .c_str()
       );
       sSession.reset();
       return EServerSessionStart::Failed;
     }
     gpg::Logf("Server session: connected to %s", request.endpoint.c_str());
+    sSession->channel.KeepAlive(); // the stall cover counts from the game thread's last pump
+    sSession->StartStallCover();
 
     // The front end waits for the server's lobby signals (plan WP2.12): a task the UI side runs takes them and makes
     // the lobby as GPGNet's commands would (moho/app/ServerLobbyUi.h); `InternalCreateLobby` takes

@@ -1,0 +1,815 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Draiget/faf-re/blob/master/docs/gpgnet/gpgnet-messages.schema.json",
+  "title": "GPGNet messages",
+  "description": "Messages between Forged Alliance and the FAF client / ICE adapter / lobby server over GPGNet, in the JSON form the client exchanges with the lobby server: {\"command\": <name>, \"target\": \"game\", \"args\": [...]}. Each argument also names its GPGNet wire tag in x-gpgnet-tag (0 int32, 1 string, 2 data). Explained in docs/GPGNET_MESSAGES.md.",
+  "oneOf": [
+    { "$ref": "#/$defs/FromGame" },
+    { "$ref": "#/$defs/ToGame" }
+  ],
+  "$defs": {
+    "FromGame": {
+      "description": "Every message the game sends.",
+      "oneOf": [
+        { "$ref": "#/$defs/FromGame.GameState" },
+        { "$ref": "#/$defs/FromGame.GameOption" },
+        { "$ref": "#/$defs/FromGame.PlayerOption" },
+        { "$ref": "#/$defs/FromGame.AIOption" },
+        { "$ref": "#/$defs/FromGame.ClearSlot" },
+        { "$ref": "#/$defs/FromGame.GameMods" },
+        { "$ref": "#/$defs/FromGame.GameFull" },
+        { "$ref": "#/$defs/FromGame.Chat" },
+        { "$ref": "#/$defs/FromGame.Disconnected" },
+        { "$ref": "#/$defs/FromGame.LaunchStatus" },
+        { "$ref": "#/$defs/FromGame.EstablishedPeer" },
+        { "$ref": "#/$defs/FromGame.DisconnectedPeer" },
+        { "$ref": "#/$defs/FromGame.GameResult" },
+        { "$ref": "#/$defs/FromGame.JsonStats" },
+        { "$ref": "#/$defs/FromGame.EnforceRating" },
+        { "$ref": "#/$defs/FromGame.GameEnded" },
+        { "$ref": "#/$defs/FromGame.TeamkillHappened" },
+        { "$ref": "#/$defs/FromGame.TeamkillReport" },
+        { "$ref": "#/$defs/FromGame.OperationComplete" },
+        { "$ref": "#/$defs/FromGame.Rehost" },
+        { "$ref": "#/$defs/FromGame.BEAT" },
+        { "$ref": "#/$defs/FromGame.Bottleneck" },
+        { "$ref": "#/$defs/FromGame.BottleneckCleared" },
+        { "$ref": "#/$defs/FromGame.Desync" },
+        { "$ref": "#/$defs/FromGame.Stats" },
+        { "$ref": "#/$defs/FromGame.ProcessNatPacket" }
+      ]
+    },
+    "ToGame": {
+      "description": "Every message the game accepts.",
+      "oneOf": [
+        { "$ref": "#/$defs/ToGame.Connected" },
+        { "$ref": "#/$defs/ToGame.CreateLobby" },
+        { "$ref": "#/$defs/ToGame.HostGame" },
+        { "$ref": "#/$defs/ToGame.JoinGame" },
+        { "$ref": "#/$defs/ToGame.ConnectToPeer" },
+        { "$ref": "#/$defs/ToGame.DisconnectFromPeer" },
+        { "$ref": "#/$defs/ToGame.HasSupcom" },
+        { "$ref": "#/$defs/ToGame.HasForgedAlliance" },
+        { "$ref": "#/$defs/ToGame.SendNatPacket" },
+        { "$ref": "#/$defs/ToGame.EjectPlayer" },
+        { "$ref": "#/$defs/ToGame.Test" }
+      ]
+    },
+
+    "Envelope": {
+      "type": "object",
+      "required": ["command", "args"],
+      "properties": {
+        "command": { "type": "string" },
+        "target": { "const": "game", "description": "Set when the message travels between the client and the lobby server." },
+        "args": { "type": "array" }
+      }
+    },
+    "Int32": {
+      "description": "Wire tag 0. GpgNetSend truncates Lua numbers toward zero and sends booleans as 1 or 0.",
+      "type": "integer",
+      "minimum": -2147483648,
+      "maximum": 2147483647,
+      "x-gpgnet-tag": 0
+    },
+    "String": {
+      "description": "Wire tag 1: uint32 length and the bytes.",
+      "type": "string",
+      "x-gpgnet-tag": 1
+    },
+    "Data": {
+      "description": "Wire tag 2: uint32 length and raw bytes. GpgNetSend never produces it.",
+      "type": "string",
+      "contentEncoding": "base64",
+      "x-gpgnet-tag": 2
+    },
+    "Flag": {
+      "description": "A Lua boolean: 1 true, 0 false.",
+      "$ref": "#/$defs/Int32",
+      "enum": [0, 1]
+    },
+    "UidText": {
+      "description": "A FAF user id as decimal text, as the lobby holds peer ids.",
+      "$ref": "#/$defs/String",
+      "pattern": "^[0-9]+$"
+    },
+    "Endpoint": {
+      "description": "host:port",
+      "$ref": "#/$defs/String",
+      "pattern": "^[^:]+:[0-9]+$"
+    },
+    "OptionValue": {
+      "description": "The value as the lobby holds it: lobby option values are strings, slot fields are numbers or strings, booleans arrive as 1/0.",
+      "oneOf": [
+        { "$ref": "#/$defs/String" },
+        { "$ref": "#/$defs/Int32" }
+      ]
+    },
+
+    "FromGame.GameState": {
+      "title": "GameState",
+      "description": "The game's state. The engine sends Idle when the GPGNet connection is up and Lobby after CreateLobby; the lobby sends Launching. The lobby server also accepts Ended, which the game itself never sends.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "GameState" },
+        "args": {
+          "prefixItems": [
+            { "$ref": "#/$defs/String", "enum": ["Idle", "Lobby", "Launching"] }
+          ],
+          "minItems": 1,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "GameState", "target": "game", "args": ["Launching"] }]
+    },
+    "FromGame.GameOption": {
+      "title": "GameOption",
+      "description": "One game option set by the host.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "GameOption" },
+        "args": {
+          "prefixItems": [
+            { "$ref": "#/$defs/String", "description": "key: a lobby option key, or ScenarioFile, Slots, RestrictedCategories" },
+            { "$ref": "#/$defs/OptionValue", "description": "value: ScenarioFile is the map path, Slots an int, RestrictedCategories 1/0 for 'any restriction set'" }
+          ],
+          "minItems": 2,
+          "items": false
+        }
+      },
+      "examples": [
+        { "command": "GameOption", "target": "game", "args": ["Victory", "demoralization"] },
+        { "command": "GameOption", "target": "game", "args": ["ScenarioFile", "/maps/scmp_009/scmp_009_scenario.lua"] },
+        { "command": "GameOption", "target": "game", "args": ["Slots", 8] },
+        { "command": "GameOption", "target": "game", "args": ["RestrictedCategories", 0] }
+      ]
+    },
+    "FromGame.PlayerOption": {
+      "title": "PlayerOption",
+      "description": "One field of a human player's slot, sent by the host.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "PlayerOption" },
+        "args": {
+          "prefixItems": [
+            { "$ref": "#/$defs/UidText", "description": "ownerId: the player's FAF user id" },
+            { "$ref": "#/$defs/String", "description": "key: Faction, Color, Team, StartSpot, Army, or any slot field the player changed (Ready, PlayerColor, ...)" },
+            { "$ref": "#/$defs/OptionValue", "description": "value" }
+          ],
+          "minItems": 3,
+          "items": false
+        }
+      },
+      "examples": [
+        { "command": "PlayerOption", "target": "game", "args": ["123456", "Faction", 2] },
+        { "command": "PlayerOption", "target": "game", "args": ["123456", "StartSpot", -1] }
+      ]
+    },
+    "FromGame.AIOption": {
+      "title": "AIOption",
+      "description": "One field of an AI slot, sent by the host.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "AIOption" },
+        "args": {
+          "prefixItems": [
+            { "$ref": "#/$defs/String", "description": "aiName: the slot's PlayerName" },
+            { "$ref": "#/$defs/String", "description": "key: same keys as PlayerOption" },
+            { "$ref": "#/$defs/OptionValue", "description": "value" }
+          ],
+          "minItems": 3,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "AIOption", "target": "game", "args": ["AI: Adaptive", "Team", 3] }]
+    },
+    "FromGame.ClearSlot": {
+      "title": "ClearSlot",
+      "description": "The host emptied a slot.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "ClearSlot" },
+        "args": {
+          "prefixItems": [{ "$ref": "#/$defs/Int32", "description": "slot: 1..16", "minimum": 1, "maximum": 16 }],
+          "minItems": 1,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "ClearSlot", "target": "game", "args": [3] }]
+    },
+    "FromGame.GameMods": {
+      "title": "GameMods",
+      "description": "The host's sim mods: first the count, then (when there are any) their uids.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "GameMods" },
+        "args": {
+          "oneOf": [
+            {
+              "prefixItems": [
+                { "$ref": "#/$defs/String", "const": "activated" },
+                { "$ref": "#/$defs/Int32", "description": "count", "minimum": 0 }
+              ],
+              "minItems": 2,
+              "items": false
+            },
+            {
+              "prefixItems": [
+                { "$ref": "#/$defs/String", "const": "uids" },
+                { "$ref": "#/$defs/String", "description": "space-separated mod uids" }
+              ],
+              "minItems": 2,
+              "items": false
+            }
+          ]
+        }
+      },
+      "examples": [
+        { "command": "GameMods", "target": "game", "args": ["activated", 1] },
+        { "command": "GameMods", "target": "game", "args": ["uids", "e7846e9b-23a4-4b95-ae3a-fb69b289a585"] }
+      ]
+    },
+    "FromGame.GameFull": {
+      "title": "GameFull",
+      "description": "Every open slot is taken. The FAF client handles it; the lobby server ignores it.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "GameFull" },
+        "args": { "maxItems": 0 }
+      },
+      "examples": [{ "command": "GameFull", "target": "game", "args": [] }]
+    },
+    "FromGame.Chat": {
+      "title": "Chat",
+      "description": "A lobby chat line.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "Chat" },
+        "args": {
+          "prefixItems": [{ "$ref": "#/$defs/String", "description": "text" }],
+          "minItems": 1,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "Chat", "target": "game", "args": ["gl hf"] }]
+    },
+    "FromGame.Disconnected": {
+      "title": "Disconnected",
+      "description": "A peer left the lobby. The lobby server only logs it.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "Disconnected" },
+        "args": {
+          "prefixItems": [{ "$ref": "#/$defs/UidText", "description": "uid" }],
+          "minItems": 1,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "Disconnected", "target": "game", "args": ["123456"] }]
+    },
+    "FromGame.LaunchStatus": {
+      "title": "LaunchStatus",
+      "description": "Automatch lobby only: the local peer's launch status.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "LaunchStatus" },
+        "args": {
+          "prefixItems": [
+            { "$ref": "#/$defs/String", "enum": ["Connecting", "Missing local peers", "Rejoining", "Ready", "Ejected", "Rejected", "Failed"] }
+          ],
+          "minItems": 1,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "LaunchStatus", "target": "game", "args": ["Ready"] }]
+    },
+    "FromGame.EstablishedPeer": {
+      "title": "EstablishedPeer",
+      "description": "Automatch lobby only: connected to a peer. May repeat for the same peer.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "EstablishedPeer" },
+        "args": {
+          "prefixItems": [{ "$ref": "#/$defs/UidText", "description": "peerId" }],
+          "minItems": 1,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "EstablishedPeer", "target": "game", "args": ["123456"] }]
+    },
+    "FromGame.DisconnectedPeer": {
+      "title": "DisconnectedPeer",
+      "description": "Automatch lobby only: lost a peer, which may be rejoining.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "DisconnectedPeer" },
+        "args": {
+          "prefixItems": [{ "$ref": "#/$defs/UidText", "description": "peerId" }],
+          "minItems": 1,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "DisconnectedPeer", "target": "game", "args": ["123456"] }]
+    },
+    "FromGame.GameResult": {
+      "title": "GameResult",
+      "description": "One army's result, sent by every client when the army is decided. The server splits the text on spaces: the last two words are result and score, any words before them are kept as metadata.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "GameResult" },
+        "args": {
+          "prefixItems": [
+            { "$ref": "#/$defs/Int32", "description": "army: 1-based army index", "minimum": 1 },
+            { "$ref": "#/$defs/String", "description": "result: what today's FAF Lua sends", "enum": ["victory 10", "defeat -10", "draw 0"] }
+          ],
+          "minItems": 2,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "GameResult", "target": "game", "args": [1, "victory 10"] }]
+    },
+    "FromGame.JsonStats": {
+      "title": "JsonStats",
+      "description": "End-of-game army statistics, sent once by every client.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "JsonStats" },
+        "args": {
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/String",
+              "description": "A JSON document",
+              "contentMediaType": "application/json",
+              "contentSchema": { "$ref": "#/$defs/JsonStatsPayload" }
+            }
+          ],
+          "minItems": 1,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "JsonStats", "target": "game", "args": ["{\"stats\":[{\"name\":\"Player1\",\"type\":\"Human\",\"faction\":1,\"general\":{\"score\":5370,\"lastupdatetick\":18240,\"currentunits\":87,\"currentcap\":1000,\"kills\":{\"count\":11,\"mass\":18483.28,\"energy\":5002463},\"built\":{\"count\":19,\"mass\":532,\"energy\":4160},\"lost\":{\"count\":1,\"mass\":18000,\"energy\":5000000}},\"units\":{\"land\":{\"kills\":3,\"built\":12,\"lost\":1},\"cdr\":{\"kills\":1,\"built\":0,\"lost\":0},\"sacu\":{\"kills\":0,\"built\":0,\"lost\":0}},\"blueprints\":{\"uel0001\":{\"kills\":1,\"built\":0,\"lost\":0,\"lowest_health\":4210.5}},\"resources\":{\"massin\":{\"total\":1004.2,\"rate\":0.8,\"reclaimed\":120,\"reclaimRate\":0},\"massout\":{\"total\":950,\"rate\":0.7,\"excess\":12},\"energyin\":{\"total\":10129.7,\"rate\":4,\"reclaimed\":0,\"reclaimRate\":0},\"energyout\":{\"total\":9800,\"rate\":3.9,\"excess\":300},\"storage\":{\"storedMass\":54,\"storedEnergy\":330,\"maxMass\":650,\"maxEnergy\":4000}}}]}"] }]
+    },
+    "FromGame.EnforceRating": {
+      "title": "EnforceRating",
+      "description": "Rate the game even if it ends early.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "EnforceRating" },
+        "args": { "maxItems": 0 }
+      },
+      "examples": [{ "command": "EnforceRating", "target": "game", "args": [] }]
+    },
+    "FromGame.GameEnded": {
+      "title": "GameEnded",
+      "description": "The simulation has ended.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "GameEnded" },
+        "args": { "maxItems": 0 }
+      },
+      "examples": [{ "command": "GameEnded", "target": "game", "args": [] }]
+    },
+    "FromGame.TeamkillHappened": {
+      "title": "TeamkillHappened",
+      "description": "An ACU was killed by an ally. Sent by every client.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "TeamkillHappened" },
+        "args": { "$ref": "#/$defs/TeamkillArgs" }
+      },
+      "examples": [{ "command": "TeamkillHappened", "target": "game", "args": [412, "123456", "Victim", "654321", "Killer"] }]
+    },
+    "FromGame.TeamkillReport": {
+      "title": "TeamkillReport",
+      "description": "The victim pressed Report in the teamkill dialog. Same arguments as TeamkillHappened; the lobby server ignores it.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "TeamkillReport" },
+        "args": { "$ref": "#/$defs/TeamkillArgs" }
+      },
+      "examples": [{ "command": "TeamkillReport", "target": "game", "args": [412, "123456", "Victim", "654321", "Killer"] }]
+    },
+    "TeamkillArgs": {
+      "prefixItems": [
+        { "$ref": "#/$defs/Int32", "description": "time: game seconds, truncated" },
+        { "$ref": "#/$defs/TeamkillPlayerId", "description": "victim id" },
+        { "$ref": "#/$defs/String", "description": "victim name, or '-'" },
+        { "$ref": "#/$defs/TeamkillPlayerId", "description": "killer id" },
+        { "$ref": "#/$defs/String", "description": "killer name, or '-'" }
+      ],
+      "minItems": 5,
+      "items": false
+    },
+    "TeamkillPlayerId": {
+      "description": "The player's FAF user id as text, or the int 0 when the army has no client (an AI).",
+      "oneOf": [
+        { "$ref": "#/$defs/UidText" },
+        { "$ref": "#/$defs/Int32", "const": 0 }
+      ]
+    },
+    "FromGame.OperationComplete": {
+      "title": "OperationComplete",
+      "description": "Co-op: the mission was completed.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "OperationComplete" },
+        "args": {
+          "prefixItems": [
+            { "$ref": "#/$defs/Flag", "description": "all primary objectives done" },
+            { "$ref": "#/$defs/Flag", "description": "all secondary objectives done" },
+            { "$ref": "#/$defs/String", "description": "time: GetGameTime(), the formatted game time" }
+          ],
+          "minItems": 3,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "OperationComplete", "target": "game", "args": [1, 0, "00:42:17"] }]
+    },
+    "FromGame.Rehost": {
+      "title": "Rehost",
+      "description": "The player chose Rehost after the game. The lobby server ignores it.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "Rehost" },
+        "args": { "maxItems": 0 }
+      },
+      "examples": [{ "command": "Rehost", "target": "game", "args": [] }]
+    },
+    "FromGame.BEAT": {
+      "title": "BEAT",
+      "description": "Periodic game progress from the in-game UI. The lobby server has no handler for it.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "BEAT" },
+        "args": {
+          "prefixItems": [
+            { "$ref": "#/$defs/Int32", "description": "GameTick()" },
+            { "$ref": "#/$defs/Int32", "description": "GetGameSpeed()" }
+          ],
+          "minItems": 2,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "BEAT", "target": "game", "args": [6000, 0] }]
+    },
+    "FromGame.Bottleneck": {
+      "title": "Bottleneck",
+      "description": "The engine is waiting on other clients. All four arguments are strings.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "Bottleneck" },
+        "args": {
+          "prefixItems": [
+            { "$ref": "#/$defs/String", "description": "kind", "enum": ["nothing", "readiness", "data", "ack", "unknown"] },
+            { "$ref": "#/$defs/String", "description": "beat number", "pattern": "^[0-9]+$" },
+            { "$ref": "#/$defs/String", "description": "comma-separated user ids of the clients waited on", "pattern": "^([0-9]+(,[0-9]+)*)?$" },
+            { "$ref": "#/$defs/String", "description": "milliseconds, one decimal", "pattern": "^-?[0-9]+\\.[0-9]$" }
+          ],
+          "minItems": 4,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "Bottleneck", "target": "game", "args": ["data", "19508", "517268,516974,344419", "5980.1"] }]
+    },
+    "FromGame.BottleneckCleared": {
+      "title": "BottleneckCleared",
+      "description": "The engine stopped waiting.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "BottleneckCleared" },
+        "args": { "maxItems": 0 }
+      },
+      "examples": [{ "command": "BottleneckCleared", "target": "game", "args": [] }]
+    },
+    "FromGame.Desync": {
+      "title": "Desync",
+      "description": "The sim checksum differs from another client's. Repeats while the game stays desynced; the server records each player's first report.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "Desync" },
+        "args": {
+          "prefixItems": [
+            { "$ref": "#/$defs/Int32", "description": "beat" },
+            { "$ref": "#/$defs/Int32", "description": "army: the index in the engine's desync record" },
+            { "$ref": "#/$defs/String", "description": "MD5 checksum, hex", "pattern": "^[0-9a-f]{32}$" },
+            { "$ref": "#/$defs/String", "description": "the other MD5 checksum, hex", "pattern": "^[0-9a-f]{32}$" }
+          ],
+          "minItems": 4,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "Desync", "target": "game", "args": [1234, 1, "9e107d9d372bb6826bd81d3542a419d6", "e4d909c290d0fb1ca068ffaddf22cbd0"] }]
+    },
+    "FromGame.Stats": {
+      "title": "Stats",
+      "description": "Retail's XML army statistics, sent when sim Lua calls SubmitXMLArmyStats(). FAF's Lua never calls it and the lobby server has no handler; JsonStats replaced it.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "Stats" },
+        "args": {
+          "prefixItems": [
+            { "$ref": "#/$defs/String", "description": "<?xml ...?><GameStats>...</GameStats>", "contentMediaType": "application/xml" }
+          ],
+          "minItems": 1,
+          "items": false
+        }
+      }
+    },
+    "FromGame.ProcessNatPacket": {
+      "title": "ProcessNatPacket",
+      "description": "A UDP packet that arrived on the game port and was not game traffic, handed to the adapter for NAT traversal.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "ProcessNatPacket" },
+        "args": {
+          "prefixItems": [
+            { "$ref": "#/$defs/Endpoint", "description": "sender, ip:port" },
+            { "$ref": "#/$defs/Data", "description": "packet bytes" }
+          ],
+          "minItems": 2,
+          "items": false
+        }
+      }
+    },
+
+    "ToGame.Connected": {
+      "title": "Connected",
+      "description": "The engine queues this to itself when the GPGNet socket connects and answers it with GameState Idle. Must have no arguments.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "Connected" },
+        "args": { "maxItems": 0 }
+      }
+    },
+    "ToGame.CreateLobby": {
+      "title": "CreateLobby",
+      "description": "Open the lobby screen. The ICE adapter sends it when the game reports GameState Idle; the game answers GameState Lobby.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "CreateLobby" },
+        "args": {
+          "prefixItems": [
+            { "$ref": "#/$defs/Int32", "description": "lobby mode: 0 normal lobby, 1 automatch lobby (Lua's autolaunch)", "enum": [0, 1] },
+            { "$ref": "#/$defs/Int32", "description": "local UDP port for game traffic" },
+            { "$ref": "#/$defs/String", "description": "player name" },
+            { "$ref": "#/$defs/Int32", "description": "player's FAF user id" },
+            { "$ref": "#/$defs/Int32", "description": "NAT traversal flag; the ICE adapter sends 1" }
+          ],
+          "minItems": 5,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "CreateLobby", "args": [0, 6112, "Player1", 123456, 1] }]
+    },
+    "ToGame.HostGame": {
+      "title": "HostGame",
+      "description": "Host the game. The engine turns the map folder name into /maps/<name>/<name>_scenario.lua.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "HostGame" },
+        "args": {
+          "prefixItems": [{ "$ref": "#/$defs/String", "description": "map folder name" }],
+          "maxItems": 1,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "HostGame", "args": ["scmp_009"] }]
+    },
+    "ToGame.JoinGame": {
+      "title": "JoinGame",
+      "description": "Join the host's lobby. The lobby server sends [hostName, hostUid]; the ICE adapter adds its local relay endpoint in front.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "JoinGame" },
+        "args": {
+          "prefixItems": [
+            { "$ref": "#/$defs/Endpoint", "description": "where the host can be reached" },
+            { "$ref": "#/$defs/String", "description": "host's name" },
+            { "$ref": "#/$defs/Int32", "description": "host's FAF user id" }
+          ],
+          "minItems": 3,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "JoinGame", "args": ["127.0.0.1:52001", "HostPlayer", 654321] }]
+    },
+    "ToGame.ConnectToPeer": {
+      "title": "ConnectToPeer",
+      "description": "Connect to another player. The lobby server sends [name, uid, offer]; the ICE adapter sends the game [endpoint, name, uid].",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "ConnectToPeer" },
+        "args": {
+          "prefixItems": [
+            { "$ref": "#/$defs/Endpoint", "description": "where the peer can be reached" },
+            { "$ref": "#/$defs/String", "description": "peer's name" },
+            { "$ref": "#/$defs/Int32", "description": "peer's FAF user id" }
+          ],
+          "minItems": 3,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "ConnectToPeer", "args": ["127.0.0.1:52002", "OtherPlayer", 111111] }]
+    },
+    "ToGame.DisconnectFromPeer": {
+      "title": "DisconnectFromPeer",
+      "description": "Drop the link to a player.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "DisconnectFromPeer" },
+        "args": {
+          "prefixItems": [{ "$ref": "#/$defs/Int32", "description": "peer's FAF user id" }],
+          "minItems": 1,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "DisconnectFromPeer", "args": [111111] }]
+    },
+    "ToGame.HasSupcom": {
+      "title": "HasSupcom",
+      "description": "Calls the lobby's SetHasSupcom(value).",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "HasSupcom" },
+        "args": {
+          "prefixItems": [{ "$ref": "#/$defs/Int32" }],
+          "minItems": 1,
+          "items": false
+        }
+      }
+    },
+    "ToGame.HasForgedAlliance": {
+      "title": "HasForgedAlliance",
+      "description": "Calls the lobby's SetHasForgedAlliance(value).",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "HasForgedAlliance" },
+        "args": {
+          "prefixItems": [{ "$ref": "#/$defs/Int32" }],
+          "minItems": 1,
+          "items": false
+        }
+      }
+    },
+    "ToGame.SendNatPacket": {
+      "title": "SendNatPacket",
+      "description": "Send raw bytes from the game's UDP port, for NAT traversal.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "SendNatPacket" },
+        "args": {
+          "prefixItems": [
+            { "$ref": "#/$defs/Endpoint", "description": "destination ip:port" },
+            { "$ref": "#/$defs/Data", "description": "packet bytes; must be wire tag 2" }
+          ],
+          "minItems": 2,
+          "items": false
+        }
+      }
+    },
+    "ToGame.EjectPlayer": {
+      "title": "EjectPlayer",
+      "description": "During a game: eject the client with this user id (or disconnect, when it is the local one).",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "EjectPlayer" },
+        "args": {
+          "prefixItems": [{ "$ref": "#/$defs/Int32", "description": "FAF user id" }],
+          "minItems": 1,
+          "items": false
+        }
+      },
+      "examples": [{ "command": "EjectPlayer", "args": [111111] }]
+    },
+    "ToGame.Test": {
+      "title": "Test",
+      "description": "Debug: the game logs each argument with its type.",
+      "$ref": "#/$defs/Envelope",
+      "properties": {
+        "command": { "const": "Test" }
+      }
+    },
+
+    "JsonStatsPayload": {
+      "title": "JsonStats payload",
+      "description": "The JSON document inside JsonStats: lua/sim/score.lua's ArmyScore table at game over, encoded by lua/system/dkson.lua.",
+      "type": "object",
+      "required": ["stats"],
+      "properties": {
+        "stats": {
+          "description": "One entry per non-civilian army in army index order. A civilian army between two players leaves a null.",
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/ArmyStats" },
+              { "type": "null" }
+            ]
+          }
+        }
+      }
+    },
+    "ArmyStats": {
+      "type": "object",
+      "required": ["name", "type", "faction", "general", "units", "resources"],
+      "properties": {
+        "name": { "type": "string", "description": "brain.Nickname" },
+        "type": { "enum": ["Human", "AI"], "description": "brain.BrainType" },
+        "faction": { "type": "integer", "description": "brain:GetFactionIndex(): 1 UEF, 2 Aeon, 3 Cybran, 4 Seraphim" },
+        "Defeated": { "type": "number", "description": "Present once the army is defeated: game seconds + 15, later -1." },
+        "general": {
+          "type": "object",
+          "properties": {
+            "score": { "type": "integer", "description": "CalculateBrainScore(brain)" },
+            "lastupdatetick": { "type": "integer" },
+            "currentunits": { "type": "number", "description": "army stat UnitCap_Current" },
+            "currentcap": { "type": "number", "description": "army stat UnitCap_MaxCap" },
+            "kills": { "$ref": "#/$defs/CountMassEnergy", "description": "Enemies_Killed, Enemies_MassValue_Destroyed, Enemies_EnergyValue_Destroyed" },
+            "built": { "$ref": "#/$defs/CountMassEnergy", "description": "Units_History, Units_MassValue_Built, Units_EnergyValue_Built" },
+            "lost": { "$ref": "#/$defs/CountMassEnergy", "description": "Units_Killed, Units_MassValue_Lost, Units_EnergyValue_Lost" }
+          }
+        },
+        "units": {
+          "type": "object",
+          "description": "Per category. land, air, naval, cdr, experimental, structures are kept during the game; transportation, sacu, engineer, tech1, tech2, tech3 are added at game over.",
+          "propertyNames": {
+            "enum": ["land", "air", "naval", "cdr", "experimental", "structures", "transportation", "sacu", "engineer", "tech1", "tech2", "tech3"]
+          },
+          "additionalProperties": { "$ref": "#/$defs/KillsBuiltLost" }
+        },
+        "blueprints": {
+          "type": "object",
+          "description": "Units the server's achievements count, only those the army has a record for: ACUs, T3 air superiority fighters, experimentals, Mercy, Fire Beetle.",
+          "propertyNames": {
+            "enum": [
+              "ual0001", "url0001", "uel0001", "xsl0001",
+              "uaa0303", "ura0303", "uea0303", "xsa0303",
+              "xab1401", "uaa0310", "ual0401", "uas0401", "xab2307",
+              "ueb2401", "uel0401", "xeb2402", "ues0401",
+              "ura0401", "url0401", "url0402", "xrl0403",
+              "xsb2401", "xsa0402", "xsl0401",
+              "daa0206", "xrl0302"
+            ]
+          },
+          "additionalProperties": {
+            "allOf": [{ "$ref": "#/$defs/KillsBuiltLost" }],
+            "properties": {
+              "lowest_health": { "type": "number", "description": "ACUs only: the lowest health the ACU had" }
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "massin": { "$ref": "#/$defs/ResourceIn" },
+            "energyin": { "$ref": "#/$defs/ResourceIn" },
+            "massout": { "$ref": "#/$defs/ResourceOut" },
+            "energyout": { "$ref": "#/$defs/ResourceOut" },
+            "storage": {
+              "type": "object",
+              "properties": {
+                "storedMass": { "type": "number" },
+                "storedEnergy": { "type": "number" },
+                "maxMass": { "type": "number" },
+                "maxEnergy": { "type": "number" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "CountMassEnergy": {
+      "type": "object",
+      "properties": {
+        "count": { "type": "number" },
+        "mass": { "type": "number" },
+        "energy": { "type": "number" }
+      }
+    },
+    "KillsBuiltLost": {
+      "type": "object",
+      "required": ["kills", "built", "lost"],
+      "properties": {
+        "kills": { "type": "number" },
+        "built": { "type": "number" },
+        "lost": { "type": "number" }
+      }
+    },
+    "ResourceIn": {
+      "type": "object",
+      "properties": {
+        "total": { "type": "number" },
+        "rate": { "type": "number" },
+        "reclaimed": { "type": "number" },
+        "reclaimRate": { "type": "number" }
+      }
+    },
+    "ResourceOut": {
+      "type": "object",
+      "properties": {
+        "total": { "type": "number" },
+        "rate": { "type": "number" },
+        "excess": { "type": "number" }
+      }
+    }
+  }
+}

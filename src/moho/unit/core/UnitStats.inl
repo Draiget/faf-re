@@ -1,24 +1,35 @@
 // Part of Unit.cpp, included there: stats.
 
-StatItem* Unit::GetStat(gpg::StrArg name, const std::string&)
+StatItem* Unit::GetStat(
+  gpg::StrArg name,
+  const std::string&
+)
 {
   return moho::ResolveStatString(mConstDat.mStatsRoot.get(), name);
 }
 
 // 0x006A4B70
-StatItem* Unit::GetStat(gpg::StrArg name, const float&)
+StatItem* Unit::GetStat(
+  gpg::StrArg name,
+  const float&
+)
 {
   return moho::ResolveStatFloat(mConstDat.mStatsRoot.get(), name);
 }
 
 // 0x006A4B50
-StatItem* Unit::GetStat(gpg::StrArg name, const int&)
+StatItem* Unit::GetStat(
+  gpg::StrArg name,
+  const int&
+)
 {
   return moho::ResolveStatByMode(mConstDat.mStatsRoot.get(), name, 1);
 }
 
 // 0x006A4B30
-StatItem* Unit::GetStat(gpg::StrArg name)
+StatItem* Unit::GetStat(
+  gpg::StrArg name
+)
 {
   return moho::ResolveStatByMode(mConstDat.mStatsRoot.get(), name, 0);
 }
@@ -29,7 +40,9 @@ StatItem* Unit::GetStat(gpg::StrArg name)
  * What it does:
  * Stores the auto-mode flag and dispatches the matching script callback.
  */
-void Unit::SetAutoMode(const bool enabled)
+void Unit::SetAutoMode(
+  const bool enabled
+)
 {
   mUnitVarDat.mAutoMode = enabled;
   CallbackStr(enabled ? "OnAutoModeOn" : "OnAutoModeOff");
@@ -41,7 +54,9 @@ void Unit::SetAutoMode(const bool enabled)
  * What it does:
  * Stores the auto-surface-mode flag.
  */
-void Unit::SetAutoSurfaceMode(const bool enabled)
+void Unit::SetAutoSurfaceMode(
+  const bool enabled
+)
 {
   mUnitVarDat.mAutoSurfaceMode = enabled;
 }
@@ -74,7 +89,9 @@ bool Unit::IsAutoSurfaceMode() const
  * What it does:
  * Copies a caller-provided name into the unit custom-name lane.
  */
-void Unit::SetCustomName(const std::string name)
+void Unit::SetCustomName(
+  const std::string name
+)
 {
   mUnitVarDat.mCustomName = name.c_str();
 }
@@ -97,7 +114,10 @@ std::string Unit::GetCustomName() const
  * Gathers nearby non-mobile same-army same-layer structures and appends
  * those whose skirt rectangles overlap `unit`.
  */
-EntitySetTemplate<Unit>* Unit::CollectAllOverlapping(EntitySetTemplate<Unit>* const outSet, Unit* const unit)
+EntitySetTemplate<Unit>* Unit::CollectAllOverlapping(
+  EntitySetTemplate<Unit>* const outSet,
+  Unit* const unit
+)
 {
   if (outSet == nullptr) {
     return nullptr;
@@ -181,8 +201,10 @@ void Unit::LookForStructureRebuilder()
       continue;
     }
 
-    if (rebuilder->IsDead() || rebuilder->DestroyQueued() || rebuilder->IsBeingBuilt() || rebuilder->AiBuilder == nullptr ||
-        rebuilder->CommandQueue == nullptr) {
+    if (
+      rebuilder->IsDead() || rebuilder->DestroyQueued() || rebuilder->IsBeingBuilt() ||
+      rebuilder->AiBuilder == nullptr || rebuilder->CommandQueue == nullptr
+    ) {
       continue;
     }
 

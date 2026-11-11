@@ -6,7 +6,8 @@
 #include "moho/misc/Listener.h"
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/ECommandEvent.h"
-#include "moho/unit/tasks/CUnitMobileBuildTask.h"
+#include "moho/unit/tasks/CUnitMobileBuildTask.h"
+
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -81,7 +82,9 @@ namespace moho
    * What it does:
    * Registers `CCommandTask` as the primary reflection base.
    */
-  void __stdcall CUnitMobileBuildTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void __stdcall CUnitMobileBuildTaskTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CCommandTask>(typeInfo);
   }
@@ -93,9 +96,13 @@ namespace moho
    * Registers `Listener<ECommandEvent>` as the secondary reflection base at
    * offset `0x34`.
    */
-  void __stdcall CUnitMobileBuildTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const typeInfo)
+  void __stdcall CUnitMobileBuildTaskTypeInfo::AddBase_Listener_ECommandEvent(
+    gpg::RType* const typeInfo
+  )
   {
-    gpg::AddReflectedBase<moho::Listener<moho::ECommandEvent>>(typeInfo, gpg::BaseSubobjectOffset<CUnitMobileBuildTask, Listener<ECommandEvent>>());
+    gpg::AddReflectedBase<moho::Listener<moho::ECommandEvent>>(
+      typeInfo, gpg::BaseSubobjectOffset<CUnitMobileBuildTask, Listener<ECommandEvent>>()
+    );
   }
 
   /**
@@ -120,7 +127,9 @@ namespace moho
    * Constructs one `CUnitMobileBuildTask` in caller-provided storage and
    * returns its typed reflection reference.
    */
-  gpg::RRef CUnitMobileBuildTaskTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitMobileBuildTaskTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const task = gpg::ConstructInStorage<CUnitMobileBuildTask>(objectStorage);
     gpg::RRef ref{};
@@ -134,7 +143,9 @@ namespace moho
    * What it does:
    * Deletes one heap-owned `CUnitMobileBuildTask`.
    */
-  void CUnitMobileBuildTaskTypeInfo::Delete(void* const objectStorage)
+  void CUnitMobileBuildTaskTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CUnitMobileBuildTask*>(objectStorage);
   }
@@ -146,7 +157,9 @@ namespace moho
    * Runs the non-deleting `CUnitMobileBuildTask` destructor body on placement
    * storage.
    */
-  void CUnitMobileBuildTaskTypeInfo::Destruct(void* const objectStorage)
+  void CUnitMobileBuildTaskTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     static_cast<CUnitMobileBuildTask*>(objectStorage)->~CUnitMobileBuildTask();
   }
@@ -160,7 +173,9 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CUnitMobileBuildTaskTypeInfo_bffe0b, moho::register_CUnitMobileBuildTaskTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CUnitMobileBuildTaskTypeInfo_bffe0b,
+  moho::register_CUnitMobileBuildTaskTypeInfo
+)

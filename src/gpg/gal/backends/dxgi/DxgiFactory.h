@@ -32,7 +32,10 @@ namespace gpg::gal::dxgi
     DXGI_ADAPTER_DESC1 desc{};
     std::vector<OutputInfo> outputs;
 
-    [[nodiscard]] bool IsSoftware() const noexcept { return (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0U; }
+    [[nodiscard]] bool IsSoftware() const noexcept
+    {
+      return (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0U;
+    }
     /** The adapter's description as UTF-8 for the log. */
     [[nodiscard]] std::string Name() const;
     /** Refresh rate in whole hertz for one mode; 0 when the mode leaves it open. */
@@ -65,14 +68,35 @@ namespace gpg::gal::dxgi
 
     void Release() noexcept;
 
-    [[nodiscard]] IDXGIFactory1* Get() const noexcept { return mFactory.Get(); }
-    [[nodiscard]] IDXGIFactory2* Get2() const noexcept { return mFactory2.Get(); }
-    [[nodiscard]] const std::vector<AdapterInfo>& Adapters() const noexcept { return mAdapters; }
-    [[nodiscard]] DXGI_FORMAT ModeFormat() const noexcept { return mModeFormat; }
+    [[nodiscard]] IDXGIFactory1* Get() const noexcept
+    {
+      return mFactory.Get();
+    }
+    [[nodiscard]] IDXGIFactory2* Get2() const noexcept
+    {
+      return mFactory2.Get();
+    }
+    [[nodiscard]] const std::vector<AdapterInfo>& Adapters() const noexcept
+    {
+      return mAdapters;
+    }
+    [[nodiscard]] DXGI_FORMAT ModeFormat() const noexcept
+    {
+      return mModeFormat;
+    }
 
-    [[nodiscard]] bool SupportsFlipSequential() const noexcept { return mFactory2 != nullptr; }
-    [[nodiscard]] bool SupportsFlipDiscard() const noexcept { return mSupportsFlipDiscard; }
-    [[nodiscard]] bool SupportsTearing() const noexcept { return mSupportsTearing; }
+    [[nodiscard]] bool SupportsFlipSequential() const noexcept
+    {
+      return mFactory2 != nullptr;
+    }
+    [[nodiscard]] bool SupportsFlipDiscard() const noexcept
+    {
+      return mSupportsFlipDiscard;
+    }
+    [[nodiscard]] bool SupportsTearing() const noexcept
+    {
+      return mSupportsTearing;
+    }
 
   private:
     Microsoft::WRL::ComPtr<IDXGIFactory1> mFactory;

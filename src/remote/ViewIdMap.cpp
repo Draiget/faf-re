@@ -14,11 +14,23 @@ namespace faf::remote
     constexpr std::uint32_t kCommandSerialMask = 0x00FFFFFFu;
     constexpr std::uint32_t kViewCommandTop = 0x80000000u; // the sim's own top byte; never a client's source
 
-    [[nodiscard]] constexpr std::uint32_t Family(const std::uint32_t id) noexcept { return id >> 28u; }
-    [[nodiscard]] constexpr std::uint32_t Source(const std::uint32_t id) noexcept { return (id >> 20u) & 0xFFu; }
+    [[nodiscard]] constexpr std::uint32_t Family(
+      const std::uint32_t id
+    ) noexcept
+    {
+      return id >> 28u;
+    }
+    [[nodiscard]] constexpr std::uint32_t Source(
+      const std::uint32_t id
+    ) noexcept
+    {
+      return (id >> 20u) & 0xFFu;
+    }
   } // namespace
 
-  bool CViewIdMap::MapsEntity(const std::uint32_t simId) const noexcept
+  bool CViewIdMap::MapsEntity(
+    const std::uint32_t simId
+  ) const noexcept
   {
     const std::uint32_t family = Family(simId);
     if (family == kFamilyReconBlip) {
@@ -31,7 +43,9 @@ namespace faf::remote
     return source >= 32u || ((mKeptSources >> source) & 1u) == 0u;
   }
 
-  std::uint32_t CViewIdMap::Entity(const std::uint32_t simId)
+  std::uint32_t CViewIdMap::Entity(
+    const std::uint32_t simId
+  )
   {
     if (!MapsEntity(simId)) {
       return simId;
@@ -54,7 +68,10 @@ namespace faf::remote
     return viewId;
   }
 
-  std::uint32_t CViewIdMap::Command(const std::uint32_t simId, const OwnCommandTest& isOwnCommand)
+  std::uint32_t CViewIdMap::Command(
+    const std::uint32_t simId,
+    const OwnCommandTest& isOwnCommand
+  )
   {
     if (isOwnCommand(simId)) {
       return simId;
@@ -75,7 +92,10 @@ namespace faf::remote
     return viewId;
   }
 
-  void CViewIdMap::TranslateRecord(wire::SEntityRecord& record, const OwnCommandTest& isOwnCommand)
+  void CViewIdMap::TranslateRecord(
+    wire::SEntityRecord& record,
+    const OwnCommandTest& isOwnCommand
+  )
   {
     record.id = Entity(record.id);
     if (record.appearance.attachParent != wire::SAppearance::kNoAttachParent) {
@@ -93,10 +113,12 @@ namespace faf::remote
     const auto foreignCommand = [&isOwnCommand](const std::int32_t command) {
       return !isOwnCommand(static_cast<std::uint32_t>(command));
     };
-    if (!MapsEntity(shared.creator) && !MapsEntity(shared.selectionInheritor) && !MapsEntity(shared.focusUnit)
-        && !MapsEntity(shared.guardedUnit) && !MapsEntity(shared.targetBlip)
-        && std::none_of(shared.commands.begin(), shared.commands.end(), foreignCommand)
-        && std::none_of(shared.buildQueue.begin(), shared.buildQueue.end(), foreignCommand)) {
+    if (
+      !MapsEntity(shared.creator) && !MapsEntity(shared.selectionInheritor) && !MapsEntity(shared.focusUnit) &&
+      !MapsEntity(shared.guardedUnit) && !MapsEntity(shared.targetBlip) &&
+      std::none_of(shared.commands.begin(), shared.commands.end(), foreignCommand) &&
+      std::none_of(shared.buildQueue.begin(), shared.buildQueue.end(), foreignCommand)
+    ) {
       return;
     }
     wire::SUnitDetail detail = shared;
@@ -114,17 +136,24 @@ namespace faf::remote
     (void)record.unit.detail.Assign(detail);
   }
 
-  void CViewIdMap::Translate(wire::SViewFrame& frame, const OwnCommandTest& isOwnCommand)
+  void CViewIdMap::Translate(
+    wire::SViewFrame& frame,
+    const OwnCommandTest& isOwnCommand
+  )
   {
     for (wire::SEntityRecord& record : frame.entities) {
       TranslateRecord(record, isOwnCommand);
     }
-    std::sort(frame.entities.begin(), frame.entities.end(), [](const wire::SEntityRecord& a, const wire::SEntityRecord& b) {
+    std::sort(
+      frame.entities.begin(), frame.entities.end(), [](const wire::SEntityRecord& a, const wire::SEntityRecord& b) {
       return a.id < b.id;
-    });
+    }
+    );
   }
 
-  void CViewIdMap::RetireEntities(const std::span<const std::uint32_t> simIds)
+  void CViewIdMap::RetireEntities(
+    const std::span<const std::uint32_t> simIds
+  )
   {
     for (const std::uint32_t simId : simIds) {
       if (const auto found = mEntityToView.find(simId); found != mEntityToView.end()) {
@@ -136,7 +165,9 @@ namespace faf::remote
     }
   }
 
-  void CViewIdMap::RetireCommands(const std::span<const std::uint32_t> simIds)
+  void CViewIdMap::RetireCommands(
+    const std::span<const std::uint32_t> simIds
+  )
   {
     for (const std::uint32_t simId : simIds) {
       if (const auto found = mCommandToView.find(simId); found != mCommandToView.end()) {
@@ -147,7 +178,9 @@ namespace faf::remote
     }
   }
 
-  void CViewIdMap::RetireNewCommandsUnless(const std::function<bool(std::uint32_t simId)>& alive)
+  void CViewIdMap::RetireNewCommandsUnless(
+    const std::function<bool(std::uint32_t simId)>& alive
+  )
   {
     for (const std::uint32_t simId : mNewCommands) {
       if (!alive(simId)) {
@@ -157,7 +190,9 @@ namespace faf::remote
     mNewCommands.clear();
   }
 
-  void CViewIdMap::AdvanceTo(const std::uint32_t beat)
+  void CViewIdMap::AdvanceTo(
+    const std::uint32_t beat
+  )
   {
     mBeat = beat;
     while (!mGrace.empty() && mGrace.front().until <= beat) {
@@ -171,7 +206,10 @@ namespace faf::remote
     }
   }
 
-  bool CViewIdMap::EntityToSim(const std::uint32_t viewId, std::uint32_t& simId) const
+  bool CViewIdMap::EntityToSim(
+    const std::uint32_t viewId,
+    std::uint32_t& simId
+  ) const
   {
     if (!MapsEntity(viewId)) {
       simId = viewId; // never renumbered: the view sees the sim's id
@@ -185,7 +223,10 @@ namespace faf::remote
     return true;
   }
 
-  bool CViewIdMap::EntityToView(const std::uint32_t simId, std::uint32_t& viewId) const
+  bool CViewIdMap::EntityToView(
+    const std::uint32_t simId,
+    std::uint32_t& viewId
+  ) const
   {
     if (!MapsEntity(simId)) {
       viewId = simId;
@@ -200,7 +241,9 @@ namespace faf::remote
   }
 
   bool CViewIdMap::CommandToView(
-    const std::uint32_t simId, const OwnCommandTest& isOwnCommand, std::uint32_t& viewId
+    const std::uint32_t simId,
+    const OwnCommandTest& isOwnCommand,
+    std::uint32_t& viewId
   ) const
   {
     if (isOwnCommand(simId)) {
@@ -215,7 +258,10 @@ namespace faf::remote
     return true;
   }
 
-  bool CViewIdMap::EntityToHeldView(const std::uint32_t simId, std::uint32_t& viewId) const
+  bool CViewIdMap::EntityToHeldView(
+    const std::uint32_t simId,
+    std::uint32_t& viewId
+  ) const
   {
     if (EntityToView(simId, viewId)) {
       return true;
@@ -229,7 +275,9 @@ namespace faf::remote
   }
 
   bool CViewIdMap::CommandToHeldView(
-    const std::uint32_t simId, const OwnCommandTest& isOwnCommand, std::uint32_t& viewId
+    const std::uint32_t simId,
+    const OwnCommandTest& isOwnCommand,
+    std::uint32_t& viewId
   ) const
   {
     if (CommandToView(simId, isOwnCommand, viewId)) {
@@ -243,7 +291,10 @@ namespace faf::remote
     return true;
   }
 
-  bool CViewIdMap::CommandToSim(const std::uint32_t viewId, std::uint32_t& simId) const
+  bool CViewIdMap::CommandToSim(
+    const std::uint32_t viewId,
+    std::uint32_t& simId
+  ) const
   {
     const auto found = mCommandToSim.find(viewId);
     if (found != mCommandToSim.end()) {

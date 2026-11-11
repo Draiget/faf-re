@@ -9,7 +9,7 @@ namespace moho
 {
   class CWldSession;
   struct SSyncData;
-}
+} // namespace moho
 
 namespace faf::remote::client
 {

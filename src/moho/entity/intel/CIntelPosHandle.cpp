@@ -28,7 +28,9 @@ namespace
 {
 
   [[nodiscard]]
-  gpg::RRef MakeSharedIntelGridRef(moho::CIntelGrid* const intelGrid)
+  gpg::RRef MakeSharedIntelGridRef(
+    moho::CIntelGrid* const intelGrid
+  )
   {
     gpg::RRef out{};
     out.mObj = intelGrid;
@@ -43,7 +45,11 @@ namespace
    * (the sub-cell position never enters it), so equal cells mean an equal
    * footprint. Built with the same `GridPos` constructor Raster uses.
    */
-  [[nodiscard]] bool RasterCellUnchanged(Wm3::Vec3f lastPos, Wm3::Vec3f movedPos, const std::uint32_t gridSize) noexcept
+  [[nodiscard]] bool RasterCellUnchanged(
+    Wm3::Vec3f lastPos,
+    Wm3::Vec3f movedPos,
+    const std::uint32_t gridSize
+  ) noexcept
   {
     const moho::GridPos lastCell(&lastPos, static_cast<int>(gridSize));
     const moho::GridPos movedCell(&movedPos, static_cast<int>(gridSize));
@@ -62,7 +68,10 @@ namespace
    * `CAiReconDBImpl::kIntelGridCellSize` cells. Both sizes are checked
    * whenever they differ, so the test holds for either kind.
    */
-  [[nodiscard]] bool MoveKeepsRasterFootprint(const moho::CIntelPosHandle& handle, const Wm3::Vec3f& newPos) noexcept
+  [[nodiscard]] bool MoveKeepsRasterFootprint(
+    const moho::CIntelPosHandle& handle,
+    const Wm3::Vec3f& newPos
+  ) noexcept
   {
     constexpr std::uint32_t kCounterIntelCellSize = moho::CAiReconDBImpl::kIntelGridCellSize;
     if (const moho::CIntelGrid* const grid = handle.mGrid.px; grid != nullptr) {
@@ -99,7 +108,9 @@ namespace
   )
   {
     if (newPos != entry->mLastPos || requestedRadius != entry->mRadius) {
-      if (moho::sim_IntelSameCellMove && requestedRadius == entry->mRadius && MoveKeepsRasterFootprint(*entry, newPos)) {
+      if (
+        moho::sim_IntelSameCellMove && requestedRadius == entry->mRadius && MoveKeepsRasterFootprint(*entry, newPos)
+      ) {
         entry->mLastPos = newPos;
         return;
       }
@@ -132,7 +143,10 @@ namespace moho
    * Initializes intel-position handle state and retains one shared reference
    * to the bound intel-grid owner.
    */
-  CIntelPosHandle::CIntelPosHandle(const std::uint32_t radius, const boost::SharedPtrRaw<CIntelGrid>& intelGrid)
+  CIntelPosHandle::CIntelPosHandle(
+    const std::uint32_t radius,
+    const boost::SharedPtrRaw<CIntelGrid>& intelGrid
+  )
     : mGrid{}
   {
     mLastPos = {};
@@ -164,7 +178,9 @@ namespace moho
    * Rebuilds grid coverage at a new world position when the value differs
    * from the cached position.
    */
-  void CIntelPosHandle::Update(const Wm3::Vec3f& pos)
+  void CIntelPosHandle::Update(
+    const Wm3::Vec3f& pos
+  )
   {
     RebuildEntityPositionWatchCoverage(this, pos, mRadius);
   }
@@ -176,7 +192,10 @@ namespace moho
    * Updates stored world position and refreshes grid coverage when movement
    * exceeds threshold or periodic refresh timeout is reached.
    */
-  std::int32_t CIntelPosHandle::UpdatePos(const std::int32_t curTick, const Wm3::Vec3f& newPos)
+  std::int32_t CIntelPosHandle::UpdatePos(
+    const std::int32_t curTick,
+    const Wm3::Vec3f& newPos
+  )
   {
     if (mEnabled != 0u) {
       const float dx = newPos.x - mLastPos.x;
@@ -205,7 +224,10 @@ namespace moho
    * Updates visualized position immediately when enabled (or writes raw
    * position when disabled), then stores `curTick` as last-update tick.
    */
-  void CIntelPosHandle::UpdatePosImmediate(const std::int32_t curTick, const Wm3::Vec3f& newPos)
+  void CIntelPosHandle::UpdatePosImmediate(
+    const std::int32_t curTick,
+    const Wm3::Vec3f& newPos
+  )
   {
     if (mEnabled != 0u) {
       Update(newPos);
@@ -224,7 +246,9 @@ namespace moho
    * Rebuilds active grid coverage when the requested radius differs from the
    * current one, preserving the existing world position.
    */
-  void CIntelPosHandle::ChangeRadius(const std::int32_t newRadius)
+  void CIntelPosHandle::ChangeRadius(
+    const std::int32_t newRadius
+  )
   {
     RebuildEntityPositionWatchCoverage(this, mLastPos, static_cast<std::uint32_t>(newRadius));
   }
@@ -242,7 +266,9 @@ namespace moho
    * Deserializes base position-watch fields (`mLastPos`, `mRadius`,
    * `mEnabled`, `mGrid`, `mLastTickUpdated`) from archive payload.
    */
-  void CIntelPosHandle::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CIntelPosHandle::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -291,7 +317,9 @@ namespace moho
    * Serializes base position-watch fields (`mLastPos`, `mRadius`, `mEnabled`,
    * `mGrid`, `mLastTickUpdated`) into archive payload.
    */
-  void CIntelPosHandle::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CIntelPosHandle::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -395,7 +423,9 @@ namespace moho
    * Runs non-virtual destructor body and conditionally frees the object
    * allocation when `shouldDelete & 1` is set.
    */
-  void CIntelPosHandle::Destroy(const int shouldDelete)
+  void CIntelPosHandle::Destroy(
+    const int shouldDelete
+  )
   {
     this->CIntelPosHandle::~CIntelPosHandle();
     if ((shouldDelete & 1) != 0) {
@@ -409,7 +439,12 @@ namespace moho
   /**
    * Address: 0x0076F350 (FUN_0076F350)
    */
-  void CIntelPosHandle::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CIntelPosHandle::MemberConstruct(
+    gpg::ReadArchive&,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     result.SetUnowned(gpg::MakeRRef(new CIntelPosHandle(0u, boost::SharedPtrRaw<CIntelGrid>{})), 0u);
   }

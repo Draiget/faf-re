@@ -119,48 +119,47 @@ namespace moho
       bool skipDynamicLimits
     ) noexcept;
 
-    float mMaxSpeed;                 // +0x00
-    float mMaxReverseSpeed;          // +0x04
-    float mMaxAcceleration;          // +0x08
-    float mMaxBrake;                 // +0x0C
-    float mMaxSteer;                 // +0x10
-    float mInvTurnRadius;            // +0x14
-    float mTurnRate;                 // +0x18
-    float mTurnFacingRate;           // +0x1C
-    float mDeltaX;                   // +0x20
-    float mDeltaZ;                   // +0x24
-    Wm3::Vector2f mForwardXZ;        // +0x28
-    float mDistance;                 // +0x30
-    float mDistanceSq;               // +0x34
-    std::uint8_t mRotateOnSpot;      // +0x38
-    std::uint8_t pad_39_3B[0x03]{};  // +0x39
-    float mRotateOnSpotThreshold;    // +0x3C
+    float mMaxSpeed;                // +0x00
+    float mMaxReverseSpeed;         // +0x04
+    float mMaxAcceleration;         // +0x08
+    float mMaxBrake;                // +0x0C
+    float mMaxSteer;                // +0x10
+    float mInvTurnRadius;           // +0x14
+    float mTurnRate;                // +0x18
+    float mTurnFacingRate;          // +0x1C
+    float mDeltaX;                  // +0x20
+    float mDeltaZ;                  // +0x24
+    Wm3::Vector2f mForwardXZ;       // +0x28
+    float mDistance;                // +0x30
+    float mDistanceSq;              // +0x34
+    std::uint8_t mRotateOnSpot;     // +0x38
+    std::uint8_t pad_39_3B[0x03]{}; // +0x39
+    float mRotateOnSpotThreshold;   // +0x3C
   };
 
   static_assert(offsetof(SteeringParams, mMaxSpeed) == 0x00, "SteeringParams::mMaxSpeed offset must be 0x00");
   static_assert(
-    offsetof(SteeringParams, mMaxReverseSpeed) == 0x04, "SteeringParams::mMaxReverseSpeed offset must be 0x04"
+    offsetof(SteeringParams, mMaxReverseSpeed) == 0x04,
+    "SteeringParams::mMaxReverseSpeed offset must be 0x04"
   );
   static_assert(
-    offsetof(SteeringParams, mMaxAcceleration) == 0x08, "SteeringParams::mMaxAcceleration offset must be 0x08"
+    offsetof(SteeringParams, mMaxAcceleration) == 0x08,
+    "SteeringParams::mMaxAcceleration offset must be 0x08"
   );
   static_assert(offsetof(SteeringParams, mMaxBrake) == 0x0C, "SteeringParams::mMaxBrake offset must be 0x0C");
   static_assert(offsetof(SteeringParams, mMaxSteer) == 0x10, "SteeringParams::mMaxSteer offset must be 0x10");
-  static_assert(
-    offsetof(SteeringParams, mInvTurnRadius) == 0x14, "SteeringParams::mInvTurnRadius offset must be 0x14"
-  );
+  static_assert(offsetof(SteeringParams, mInvTurnRadius) == 0x14, "SteeringParams::mInvTurnRadius offset must be 0x14");
   static_assert(offsetof(SteeringParams, mTurnRate) == 0x18, "SteeringParams::mTurnRate offset must be 0x18");
   static_assert(
-    offsetof(SteeringParams, mTurnFacingRate) == 0x1C, "SteeringParams::mTurnFacingRate offset must be 0x1C"
+    offsetof(SteeringParams, mTurnFacingRate) == 0x1C,
+    "SteeringParams::mTurnFacingRate offset must be 0x1C"
   );
   static_assert(offsetof(SteeringParams, mDeltaX) == 0x20, "SteeringParams::mDeltaX offset must be 0x20");
   static_assert(offsetof(SteeringParams, mDeltaZ) == 0x24, "SteeringParams::mDeltaZ offset must be 0x24");
   static_assert(offsetof(SteeringParams, mForwardXZ) == 0x28, "SteeringParams::mForwardXZ offset must be 0x28");
   static_assert(offsetof(SteeringParams, mDistance) == 0x30, "SteeringParams::mDistance offset must be 0x30");
   static_assert(offsetof(SteeringParams, mDistanceSq) == 0x34, "SteeringParams::mDistanceSq offset must be 0x34");
-  static_assert(
-    offsetof(SteeringParams, mRotateOnSpot) == 0x38, "SteeringParams::mRotateOnSpot offset must be 0x38"
-  );
+  static_assert(offsetof(SteeringParams, mRotateOnSpot) == 0x38, "SteeringParams::mRotateOnSpot offset must be 0x38");
   static_assert(
     offsetof(SteeringParams, mRotateOnSpotThreshold) == 0x3C,
     "SteeringParams::mRotateOnSpotThreshold offset must be 0x3C"
@@ -213,8 +212,8 @@ namespace moho
     // (`PredictCollisionForSteerings` 0x00597BE5 / 0x00597CA9), and the
     // serializer names the `WeakPtr<Unit>` type. It was an `SCollisionLink`
     // look-alike read through a `WeakPtr<IUnit>` cast.
-    WeakPtr<Unit> mUnit;    // +0x00
-    Wm3::Vector3f mPos;     // +0x08
+    WeakPtr<Unit> mUnit;           // +0x00
+    Wm3::Vector3f mPos;            // +0x08
     ECollisionType mCollisionType; // +0x14
     std::int32_t mTickGate;        // +0x18 (used as sim-tick gate when mCollisionType == COLLISIONTYPE_1)
 
@@ -238,9 +237,7 @@ namespace moho
   static_assert(sizeof(SCollisionInfo) == 0x1C, "SCollisionInfo size must be 0x1C");
   static_assert(offsetof(SCollisionInfo, mUnit) == 0x00, "SCollisionInfo::mUnit offset must be 0x00");
   static_assert(offsetof(SCollisionInfo, mPos) == 0x08, "SCollisionInfo::mPos offset must be 0x08");
-  static_assert(
-    offsetof(SCollisionInfo, mCollisionType) == 0x14, "SCollisionInfo::mCollisionType offset must be 0x14"
-  );
+  static_assert(offsetof(SCollisionInfo, mCollisionType) == 0x14, "SCollisionInfo::mCollisionType offset must be 0x14");
   static_assert(offsetof(SCollisionInfo, mTickGate) == 0x18, "SCollisionInfo::mTickGate offset must be 0x18");
 
   /**
@@ -258,10 +255,10 @@ namespace moho
   {
     static gpg::RType* sType;
 
-    Wm3::Vector3f mOldPosition; // +0x00
+    Wm3::Vector3f mOldPosition;  // +0x00
     Wm3::Vector3f mOldDirection; // +0x0C
-    Wm3::Vector3f mOldVelocity; // +0x18
-    EPathPointState mState; // +0x24
+    Wm3::Vector3f mOldVelocity;  // +0x18
+    EPathPointState mState;      // +0x24
 
     /**
      * Address: 0x005B5530 (FUN_005B5530, Moho::SContinueInfo::MemberDeserialize)
@@ -283,28 +280,16 @@ namespace moho
   using SPathSplineContinuationInfo = SContinueInfo;
 
   static_assert(sizeof(SContinueInfo) == 0x28, "SContinueInfo size must be 0x28");
-  static_assert(
-    offsetof(SContinueInfo, mOldPosition) == 0x00,
-    "SContinueInfo::mOldPosition offset must be 0x00"
-  );
-  static_assert(
-    offsetof(SContinueInfo, mOldDirection) == 0x0C,
-    "SContinueInfo::mOldDirection offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SContinueInfo, mOldVelocity) == 0x18,
-    "SContinueInfo::mOldVelocity offset must be 0x18"
-  );
-  static_assert(
-    offsetof(SContinueInfo, mState) == 0x24,
-    "SContinueInfo::mState offset must be 0x24"
-  );
+  static_assert(offsetof(SContinueInfo, mOldPosition) == 0x00, "SContinueInfo::mOldPosition offset must be 0x00");
+  static_assert(offsetof(SContinueInfo, mOldDirection) == 0x0C, "SContinueInfo::mOldDirection offset must be 0x0C");
+  static_assert(offsetof(SContinueInfo, mOldVelocity) == 0x18, "SContinueInfo::mOldVelocity offset must be 0x18");
+  static_assert(offsetof(SContinueInfo, mState) == 0x24, "SContinueInfo::mState offset must be 0x24");
 
   class CAiPathSpline
   {
   public:
     /**
-       * Address: 0x005B2550 (FUN_005B2550)
+     * Address: 0x005B2550 (FUN_005B2550)
      */
     CAiPathSpline();
 
@@ -348,7 +333,7 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
     /**
-      * Alias of FUN_005B2550 (non-canonical helper lane).
+     * Alias of FUN_005B2550 (non-canonical helper lane).
      *
      * What it does:
      * Releases heap-backed node storage and restores inline buffer ownership.
@@ -356,7 +341,7 @@ namespace moho
     void ResetNodesToInline();
 
     /**
-      * Alias of FUN_005965E0 (non-canonical helper lane).
+     * Alias of FUN_005965E0 (non-canonical helper lane).
      *
      * What it does:
      * Returns node pointer for an index if it is within `mNodeCount`; otherwise null.
@@ -365,7 +350,7 @@ namespace moho
     CPathPoint* TryGetNode(std::uint32_t index);
 
     /**
-      * Alias of FUN_005965E0 (non-canonical helper lane).
+     * Alias of FUN_005965E0 (non-canonical helper lane).
      */
     [[nodiscard]]
     const CPathPoint* TryGetNode(std::uint32_t index) const;
@@ -375,24 +360,26 @@ namespace moho
 
     // 0x00..0x23F
     gpg::core::FastVectorN<CPathPoint, 20> nodes;
-    std::uint32_t mCurrentNodeIndex;      // +0x240
-    std::uint32_t mNodeCount;             // +0x244
-    EPathType mPathType;                  // +0x248
-    SContinueInfo mContinuation;          // +0x24C
-    std::uint32_t mTailWord;              // +0x274 (semantic unresolved)
+    std::uint32_t mCurrentNodeIndex; // +0x240
+    std::uint32_t mNodeCount;        // +0x244
+    EPathType mPathType;             // +0x248
+    SContinueInfo mContinuation;     // +0x24C
+    std::uint32_t mTailWord;         // +0x274 (semantic unresolved)
   };
 
-  static_assert(sizeof(gpg::core::FastVectorN<CPathPoint, 20>) == 0x240, "FastVectorN<CPathPoint,20> size must be 0x240");
+  static_assert(
+    sizeof(gpg::core::FastVectorN<CPathPoint, 20>) == 0x240,
+    "FastVectorN<CPathPoint,20> size must be 0x240"
+  );
   static_assert(sizeof(CAiPathSpline) == 0x278, "CAiPathSpline size must be 0x278");
   static_assert(offsetof(CAiPathSpline, nodes) == 0x00, "CAiPathSpline::nodes offset must be 0x00");
   static_assert(
-    offsetof(CAiPathSpline, mCurrentNodeIndex) == 0x240, "CAiPathSpline::mCurrentNodeIndex offset must be 0x240"
+    offsetof(CAiPathSpline, mCurrentNodeIndex) == 0x240,
+    "CAiPathSpline::mCurrentNodeIndex offset must be 0x240"
   );
   static_assert(offsetof(CAiPathSpline, mNodeCount) == 0x244, "CAiPathSpline::mNodeCount offset must be 0x244");
   static_assert(offsetof(CAiPathSpline, mPathType) == 0x248, "CAiPathSpline::mPathType offset must be 0x248");
-  static_assert(
-    offsetof(CAiPathSpline, mContinuation) == 0x24C, "CAiPathSpline::mContinuation offset must be 0x24C"
-  );
+  static_assert(offsetof(CAiPathSpline, mContinuation) == 0x24C, "CAiPathSpline::mContinuation offset must be 0x24C");
   static_assert(offsetof(CAiPathSpline, mTailWord) == 0x274, "CAiPathSpline::mTailWord offset must be 0x274");
 
   class SCollisionInfoTypeInfo : public gpg::RType
@@ -471,7 +458,6 @@ namespace moho
     [[nodiscard]] const char* GetName() const override;
     void Init() override;
   };
-
 
   /**
    * VFTABLE: 0x00E2107C

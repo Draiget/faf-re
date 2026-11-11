@@ -21,43 +21,64 @@
 #include <vector>
 
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-extern "C" int luaO_log2(unsigned int x);           // src/lua/LuaObject.cpp, extern "C" block
+extern "C" int luaO_log2(unsigned int x);            // src/lua/LuaObject.cpp, extern "C" block
 extern "C" unsigned int luaO_int2fb(unsigned int x); // src/lua/LuaObject.cpp, extern "C" block
 #include "lua/LuaArena.h"
 #include "lua/LuaRuntimeTypes.h"
-extern "C" const LuaPlus::TObject luaO_nilobject;                          // src/lua/LuaObject.cpp, extern "C" block
-extern "C" const LuaPlus::TObject* luaH_getstr(Table* t, TString* key);     // src/lua/LuaObject.cpp, extern "C" block
-extern "C" const LuaPlus::TObject* luaH_getnum(Table* t, int key);          // src/lua/LuaObject.cpp, extern "C" block
-extern "C" const LuaPlus::TObject* luaH_get(Table* t, const LuaPlus::TObject* key); // src/lua/LuaObject.cpp, extern "C" block
-extern "C" Node* luaH_mainposition(const Table* t, const LuaPlus::TObject* key);     // src/lua/LuaObject.cpp, extern "C" block
-extern "C" int luaV_equalval(lua_State* L, const LuaPlus::TObject* l, const LuaPlus::TObject* r); // src/lua/LuaObject.cpp, extern "C" block
-extern "C" int luaH_index(lua_State* L, Table* t, const LuaPlus::TObject* key);      // src/lua/LuaObject.cpp, extern "C" block
-extern "C" int luaH_next(lua_State* L, Table* t, LuaPlus::TObject* key);             // src/lua/LuaObject.cpp, extern "C" block
-extern "C" LuaPlus::TObject* luaH_set(lua_State* L, Table* t, const LuaPlus::TObject* key); // src/lua/LuaObject.cpp, extern "C" block
-extern "C" LuaPlus::TObject* luaH_setnum(lua_State* L, Table* t, int key);          // src/lua/LuaObject.cpp, extern "C" block
-extern "C" int luaV_lessthan(lua_State* L, const LuaPlus::TObject* l, const LuaPlus::TObject* r); // src/lua/LuaObject.cpp, extern "C" block
-extern "C" LuaPlus::TObject* luaA_index(lua_State* L, int idx);                      // src/lua/LuaObject.cpp, extern "C" block
-extern "C" LuaPlus::TObject* negindex(lua_State* L, int idx);                        // src/lua/LuaObject.cpp, extern "C" block
-extern "C" int lua_type(lua_State* L, int idx);                                      // src/lua/LuaObject.cpp, extern "C" block
-extern "C" int lua_gettop(lua_State* L);                                             // src/lua/LuaObject.cpp, extern "C" block
-extern "C" void lua_settop(lua_State* L, int idx);                                   // src/lua/LuaObject.cpp, extern "C" block
-extern "C" void lua_pushvalue(lua_State* L, int idx);                                // src/lua/LuaObject.cpp, extern "C" block
-extern "C" float lua_tonumber(lua_State* L, int idx);                                // src/lua/LuaObject.cpp, extern "C" block
-extern "C" void lua_rawgeti(lua_State* L, int idx, int n);                           // src/lua/LuaObject.cpp, extern "C" block
-extern "C" void lua_pushnumber(lua_State* L, float n);                               // src/lua/LuaObject.cpp, extern "C" block
-extern "C" int lua_next(lua_State* L, int idx);                                      // src/lua/LuaObject.cpp, extern "C" block
-extern "C" const LuaPlus::TObject* luaT_gettm(Table* events, int event, TString* ename); // src/lua/LuaObject.cpp, extern "C" block
-extern "C" const LuaPlus::TObject* luaV_index(lua_State* L, const LuaPlus::TObject* t, const LuaPlus::TObject* key, int loop); // src/lua/LuaObject.cpp
-extern "C" const LuaPlus::TObject* luaV_gettable(lua_State* L, const LuaPlus::TObject* t, const LuaPlus::TObject* key, int loop); // src/lua/LuaObject.cpp
-extern "C" void luaV_settable(lua_State* L, const LuaPlus::TObject* t, LuaPlus::TObject* key, LuaPlus::TObject* val); // src/lua/LuaObject.cpp
-extern "C" int lua_toboolean(lua_State* L, int idx);                                 // src/lua/LuaObject.cpp, extern "C" block
-extern "C" int lua_isnumber(lua_State* L, int idx);                                  // src/lua/LuaObject.cpp, extern "C" block
-extern "C" void lua_pushnil(lua_State* L);                                           // src/lua/LuaObject.cpp, extern "C" block
-extern "C" void lua_pushboolean(lua_State* L, int b);                                // src/lua/LuaObject.cpp, extern "C" block
-extern "C" void lua_rawget(lua_State* L, int idx);                                   // src/lua/LuaObject.cpp, extern "C" block
-extern "C" void lua_rawseti(lua_State* L, int idx, int n);                           // src/lua/LuaObject.cpp, extern "C" block
-extern "C" void lua_rawset(lua_State* L, int idx);                                   // src/lua/LuaObject.cpp, extern "C" block
-extern "C" void computesizes(int ntotal, int* narray, int* nhash, const int* nums);  // src/lua/LuaObject.cpp, extern "C" block
+extern "C" const LuaPlus::TObject luaO_nilobject;                       // src/lua/LuaObject.cpp, extern "C" block
+extern "C" const LuaPlus::TObject* luaH_getstr(Table* t, TString* key); // src/lua/LuaObject.cpp, extern "C" block
+extern "C" const LuaPlus::TObject* luaH_getnum(Table* t, int key);      // src/lua/LuaObject.cpp, extern "C" block
+extern "C" const LuaPlus::TObject*
+luaH_get(Table* t, const LuaPlus::TObject* key); // src/lua/LuaObject.cpp, extern "C" block
+extern "C" Node*
+luaH_mainposition(const Table* t, const LuaPlus::TObject* key); // src/lua/LuaObject.cpp, extern "C" block
+extern "C" int luaV_equalval(
+  lua_State* L,
+  const LuaPlus::TObject* l,
+  const LuaPlus::TObject* r
+); // src/lua/LuaObject.cpp, extern "C" block
+extern "C" int
+luaH_index(lua_State* L, Table* t, const LuaPlus::TObject* key);         // src/lua/LuaObject.cpp, extern "C" block
+extern "C" int luaH_next(lua_State* L, Table* t, LuaPlus::TObject* key); // src/lua/LuaObject.cpp, extern "C" block
+extern "C" LuaPlus::TObject*
+luaH_set(lua_State* L, Table* t, const LuaPlus::TObject* key);             // src/lua/LuaObject.cpp, extern "C" block
+extern "C" LuaPlus::TObject* luaH_setnum(lua_State* L, Table* t, int key); // src/lua/LuaObject.cpp, extern "C" block
+extern "C" int luaV_lessthan(
+  lua_State* L,
+  const LuaPlus::TObject* l,
+  const LuaPlus::TObject* r
+);                                                              // src/lua/LuaObject.cpp, extern "C" block
+extern "C" LuaPlus::TObject* luaA_index(lua_State* L, int idx); // src/lua/LuaObject.cpp, extern "C" block
+extern "C" LuaPlus::TObject* negindex(lua_State* L, int idx);   // src/lua/LuaObject.cpp, extern "C" block
+extern "C" int lua_type(lua_State* L, int idx);                 // src/lua/LuaObject.cpp, extern "C" block
+extern "C" int lua_gettop(lua_State* L);                        // src/lua/LuaObject.cpp, extern "C" block
+extern "C" void lua_settop(lua_State* L, int idx);              // src/lua/LuaObject.cpp, extern "C" block
+extern "C" void lua_pushvalue(lua_State* L, int idx);           // src/lua/LuaObject.cpp, extern "C" block
+extern "C" float lua_tonumber(lua_State* L, int idx);           // src/lua/LuaObject.cpp, extern "C" block
+extern "C" void lua_rawgeti(lua_State* L, int idx, int n);      // src/lua/LuaObject.cpp, extern "C" block
+extern "C" void lua_pushnumber(lua_State* L, float n);          // src/lua/LuaObject.cpp, extern "C" block
+extern "C" int lua_next(lua_State* L, int idx);                 // src/lua/LuaObject.cpp, extern "C" block
+extern "C" const LuaPlus::TObject*
+luaT_gettm(Table* events, int event, TString* ename); // src/lua/LuaObject.cpp, extern "C" block
+extern "C" const LuaPlus::TObject*
+luaV_index(lua_State* L, const LuaPlus::TObject* t, const LuaPlus::TObject* key, int loop); // src/lua/LuaObject.cpp
+extern "C" const LuaPlus::TObject*
+luaV_gettable(lua_State* L, const LuaPlus::TObject* t, const LuaPlus::TObject* key, int loop); // src/lua/LuaObject.cpp
+extern "C" void luaV_settable(
+  lua_State* L,
+  const LuaPlus::TObject* t,
+  LuaPlus::TObject* key,
+  LuaPlus::TObject* val
+);                                                         // src/lua/LuaObject.cpp
+extern "C" int lua_toboolean(lua_State* L, int idx);       // src/lua/LuaObject.cpp, extern "C" block
+extern "C" int lua_isnumber(lua_State* L, int idx);        // src/lua/LuaObject.cpp, extern "C" block
+extern "C" void lua_pushnil(lua_State* L);                 // src/lua/LuaObject.cpp, extern "C" block
+extern "C" void lua_pushboolean(lua_State* L, int b);      // src/lua/LuaObject.cpp, extern "C" block
+extern "C" void lua_rawget(lua_State* L, int idx);         // src/lua/LuaObject.cpp, extern "C" block
+extern "C" void lua_rawseti(lua_State* L, int idx, int n); // src/lua/LuaObject.cpp, extern "C" block
+extern "C" void lua_rawset(lua_State* L, int idx);         // src/lua/LuaObject.cpp, extern "C" block
+extern "C" void
+computesizes(int ntotal, int* narray, int* nhash, const int* nums); // src/lua/LuaObject.cpp, extern "C" block
 #include "moho/sim/CollisionShape.h"
 #include "moho/entity/Entity.h"
 #include "moho/sim/CIntelGrid.h"
@@ -82,10 +103,18 @@ namespace difffuzz
   {
     using u32 = std::uint32_t;
 
-    [[nodiscard]] float F(const u32* in, const int i) noexcept { return FromBits(in[i]); }
-    void Put(u32* out, const int i, const float f) noexcept { out[i] = Bits(f); }
+    [[nodiscard]] float F(
+      const u32* in,
+      const int i
+    ) noexcept
+    {
+      return FromBits(in[i]);
+    }
 
-    [[nodiscard]] float NearFloat(Rng& rng, const double value)
+    [[nodiscard]] float NearFloat(
+      Rng& rng,
+      const double value
+    )
     {
       const u32 bits = Bits(static_cast<float>(value));
       return FromBits(bits + rng.Below(7) - 3u);
@@ -100,18 +129,24 @@ namespace difffuzz
 
     enum FieldShape : u32
     {
-      kShapeFlat,       // one level everywhere: every triangle edge ties
-      kShapeRandom,     // every sample a random word, 0..0xFFFF
-      kShapeRolling,    // a gentle slope plus small noise, the usual map
-      kShapeTerraced,   // a few plateaus with cliffs between them
-      kShapeExtremes,   // 0 and 0xFFFF in a checkerboard
-      kShapeDiagonal,   // a function of x + z or x - z: ridges along the cell diagonals
+      kShapeFlat,     // one level everywhere: every triangle edge ties
+      kShapeRandom,   // every sample a random word, 0..0xFFFF
+      kShapeRolling,  // a gentle slope plus small noise, the usual map
+      kShapeTerraced, // a few plateaus with cliffs between them
+      kShapeExtremes, // 0 and 0xFFFF in a checkerboard
+      kShapeDiagonal, // a function of x + z or x - z: ridges along the cell diagonals
       kShapeCount
     };
 
     /// Fills the samples from the seed and shape with 32-bit integer arithmetic
     /// only, so every build and platform fills the same field.
-    void FillFieldSamples(std::uint16_t* samples, const int sampleW, const int sampleH, const u32 seed, const u32 shape)
+    void FillFieldSamples(
+      std::uint16_t* samples,
+      const int sampleW,
+      const int sampleH,
+      const u32 seed,
+      const u32 shape
+    )
     {
       u32 state = seed | 1u;
       const auto next = [&state]() noexcept {
@@ -158,7 +193,10 @@ namespace difffuzz
     /// wide (0x00476138..0x00476153) but UpdateBounds over the whole field
     /// writes column (cells + 1) >> 1 - 1 = cells >> 1, one past it, in retail
     /// and in ours alike.
-    void GenFieldSpec(Rng& rng, u32* in)
+    void GenFieldSpec(
+      Rng& rng,
+      u32* in
+    )
     {
       const u32 sizeMode = rng.Below(100);
       // 2..64 cells a side: a 1-cell field has no tier grid (0x00476090 makes
@@ -176,7 +214,10 @@ namespace difffuzz
 
     /// A coordinate across a side of `cells` cells: inside, on and near the
     /// sample lines and the cell centres, past the edges, or any float.
-    [[nodiscard]] float GenFieldAxis(Rng& rng, const u32 cells)
+    [[nodiscard]] float GenFieldAxis(
+      Rng& rng,
+      const u32 cells
+    )
     {
       const u32 mode = rng.Below(100);
       const double size = static_cast<double>(cells);
@@ -199,7 +240,10 @@ namespace difffuzz
 
     /// Retail's field: its constructor, the samples, and UpdateBounds over the
     /// whole field as the sim does after loading a map (Sim.cpp, fullBounds).
-    void BuildRetailField(RetailField& field, const u32* spec)
+    void BuildRetailField(
+      RetailField& field,
+      const u32* spec
+    )
     {
       std::memset(field.bytes, 0, sizeof(field.bytes));
       const int cellsW = static_cast<int>(spec[0]);
@@ -214,7 +258,9 @@ namespace difffuzz
     /// ~CHeightField (0x004784F0): delete[] each tier's two grids (+0x00,
     /// +0x0C in a 0x18-byte tier), the tier array (+0x10 begin, +0x14 end)
     /// and the samples (+0x00), all through retail's operator delete.
-    void FreeRetailField(RetailField& field)
+    void FreeRetailField(
+      RetailField& field
+    )
     {
       unsigned char* begin;
       unsigned char* end;
@@ -237,12 +283,16 @@ namespace difffuzz
     struct Fnv
     {
       std::uint64_t h = 0xCBF29CE484222325ull;
-      void Add16(const std::uint16_t v) noexcept
+      void Add16(
+        const std::uint16_t v
+      ) noexcept
       {
         h = (h ^ (v & 0xFFu)) * 0x100000001B3ull;
         h = (h ^ (v >> 8)) * 0x100000001B3ull;
       }
-      void Add32(const u32 v) noexcept
+      void Add32(
+        const u32 v
+      ) noexcept
       {
         Add16(static_cast<std::uint16_t>(v));
         Add16(static_cast<std::uint16_t>(v >> 16));
@@ -250,7 +300,10 @@ namespace difffuzz
     };
 
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void BuildOurField(moho::CHeightField& field, const u32* spec)
+    void BuildOurField(
+      moho::CHeightField& field,
+      const u32* spec
+    )
     {
       FillFieldSamples(field.data, static_cast<int>(spec[0]) + 1, static_cast<int>(spec[1]) + 1, spec[2], spec[3]);
       field.UpdateBounds(gpg::Rect2i{0, 0, 0x7FFFFFFF, 0x7FFFFFFF});
@@ -262,7 +315,10 @@ namespace difffuzz
     // are refilled from the second seed, and UpdateBounds runs over the rect
     // (SetElevationRect's pattern: only the rect's tiers move). out = tier
     // count, then an FNV hash of every tier's dimensions and min/max words.
-    [[nodiscard]] int GenRectEdge(Rng& rng, const u32 cells)
+    [[nodiscard]] int GenRectEdge(
+      Rng& rng,
+      const u32 cells
+    )
     {
       const u32 mode = rng.Below(100);
       if (mode < 70) {
@@ -276,7 +332,10 @@ namespace difffuzz
       }
       return static_cast<int>(rng.U32());
     }
-    void GenUpdateBounds(Rng& rng, u32* in)
+    void GenUpdateBounds(
+      Rng& rng,
+      u32* in
+    )
     {
       GenFieldSpec(rng, in);
       in[4] = rng.U32();
@@ -293,7 +352,10 @@ namespace difffuzz
       in[8] = static_cast<u32>(GenRectEdge(rng, in[0]));
       in[9] = static_cast<u32>(GenRectEdge(rng, in[1]));
     }
-    void UpdateBoundsRetail(const u32* in, u32* out)
+    void UpdateBoundsRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailField field;
       BuildRetailField(field, in);
@@ -329,7 +391,10 @@ namespace difffuzz
       out[2] = static_cast<u32>(hash.h >> 32);
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void UpdateBoundsOurs(const u32* in, u32* out)
+    void UpdateBoundsOurs(
+      const u32* in,
+      u32* out
+    )
     {
       moho::CHeightField field(static_cast<int>(in[0]), static_cast<int>(in[1]));
       BuildOurField(field, in);
@@ -370,15 +435,22 @@ namespace difffuzz
     // finite limit replaces that (0x004778B1) and the other axis' bound is
     // gone. Starts stay within 2^20 and direction lanes are 0 or at least
     // 2^-100, so every limit is under 2^121 and finite.
-    [[nodiscard]] bool WalkableStart(const float v)
+    [[nodiscard]] bool WalkableStart(
+      const float v
+    )
     {
       return std::fabs(v) <= 1048576.0f;
     }
-    [[nodiscard]] bool WalkableDirection(const float v)
+    [[nodiscard]] bool WalkableDirection(
+      const float v
+    )
     {
       return v == 0.0f || (std::isfinite(v) && std::fabs(v) >= 7.88860905e-31f); // 2^-100
     }
-    [[nodiscard]] float WalkableFieldAxis(Rng& rng, const u32 cells)
+    [[nodiscard]] float WalkableFieldAxis(
+      Rng& rng,
+      const u32 cells
+    )
     {
       float v;
       do {
@@ -387,7 +459,10 @@ namespace difffuzz
       return v;
     }
 
-    void GenIntersection(Rng& rng, u32* in)
+    void GenIntersection(
+      Rng& rng,
+      u32* in
+    )
     {
       GenFieldSpec(rng, in);
       const double cellsW = static_cast<double>(in[0]);
@@ -508,7 +583,10 @@ namespace difffuzz
       in[10] = Bits(closest);
       in[11] = Bits(farthest);
     }
-    void IntersectionRetail(const u32* in, u32* out)
+    void IntersectionRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailField field;
       BuildRetailField(field, in);
@@ -522,12 +600,15 @@ namespace difffuzz
       std::memcpy(out + 3, res, sizeof(res));
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void IntersectionOurs(const u32* in, u32* out)
+    void IntersectionOurs(
+      const u32* in,
+      u32* out
+    )
     {
       moho::CHeightField field(static_cast<int>(in[0]), static_cast<int>(in[1]));
       BuildOurField(field, in);
       moho::GeomLine3 line{};
-      std::memcpy(&line, in + 4, sizeof(line));
+      std::memcpy(static_cast<void*>(&line), in + 4, sizeof(line));
       moho::CGeomHitResult res{};
       std::memcpy(&res, &kCanary, 4);
       std::memcpy(&res.v1, &kCanary, 4);
@@ -540,13 +621,19 @@ namespace difffuzz
 
     // CHeightField::GetNormal 0x0069A620: in = field spec, x, z. out = the
     // normalised gradient.
-    void GenNormal(Rng& rng, u32* in)
+    void GenNormal(
+      Rng& rng,
+      u32* in
+    )
     {
       GenFieldSpec(rng, in);
       in[4] = Bits(GenFieldAxis(rng, in[0]));
       in[5] = Bits(GenFieldAxis(rng, in[1]));
     }
-    void NormalRetail(const u32* in, u32* out)
+    void NormalRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailField field;
       BuildRetailField(field, in);
@@ -556,7 +643,10 @@ namespace difffuzz
       std::memcpy(out, normal, sizeof(normal));
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void NormalOurs(const u32* in, u32* out)
+    void NormalOurs(
+      const u32* in,
+      u32* out
+    )
     {
       moho::CHeightField field(static_cast<int>(in[0]), static_cast<int>(in[1]));
       BuildOurField(field, in);
@@ -570,7 +660,10 @@ namespace difffuzz
     // any float (NaN, infinite, denormal). The clip walks no cells, so the
     // inputs the Intersection row must avoid are safe here. out = the result,
     // then min and max as the clip left them.
-    void GenClip(Rng& rng, u32* in)
+    void GenClip(
+      Rng& rng,
+      u32* in
+    )
     {
       GenIntersection(rng, in);
       for (int lane = 4; lane < 12; ++lane) {
@@ -579,7 +672,10 @@ namespace difffuzz
         }
       }
     }
-    void ClipRetail(const u32* in, u32* out)
+    void ClipRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailField field;
       BuildRetailField(field, in);
@@ -591,14 +687,17 @@ namespace difffuzz
       out[2] = range[1];
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void ClipOurs(const u32* in, u32* out)
+    void ClipOurs(
+      const u32* in,
+      u32* out
+    )
     {
       moho::CHeightField field(static_cast<int>(in[0]), static_cast<int>(in[1]));
       BuildOurField(field, in);
       Wm3::Vec3f pos;
       Wm3::Vec3f dir;
-      std::memcpy(&pos, in + 4, 12);
-      std::memcpy(&dir, in + 7, 12);
+      std::memcpy(static_cast<void*>(&pos), in + 4, 12);
+      std::memcpy(static_cast<void*>(&dir), in + 7, 12);
       float min = F(in, 10);
       float max = F(in, 11);
       const bool clipped = field.ClipSegmentToWorld(pos, dir, min, max);
@@ -613,7 +712,10 @@ namespace difffuzz
     // min/max grid n-1. Retail indexes the tier vector without a bound
     // (0x00475C0E), so the tier stays within the field's count; x and z go
     // anywhere, both sides clamp them. out = min and max in world units.
-    [[nodiscard]] u32 TierCount(const u32 cellsW, const u32 cellsH)
+    [[nodiscard]] u32 TierCount(
+      const u32 cellsW,
+      const u32 cellsH
+    )
     {
       u32 v = (cellsW < cellsH ? cellsH : cellsW) - 1u;
       u32 count = 0;
@@ -623,7 +725,10 @@ namespace difffuzz
       }
       return count;
     }
-    [[nodiscard]] u32 GenTierCoord(Rng& rng, const u32 cells)
+    [[nodiscard]] u32 GenTierCoord(
+      Rng& rng,
+      const u32 cells
+    )
     {
       const u32 mode = rng.Below(100);
       if (mode < 80) {
@@ -634,14 +739,20 @@ namespace difffuzz
       }
       return rng.U32();
     }
-    void GenTierBounds(Rng& rng, u32* in)
+    void GenTierBounds(
+      Rng& rng,
+      u32* in
+    )
     {
       GenFieldSpec(rng, in);
       in[4] = GenTierCoord(rng, in[0]);
       in[5] = GenTierCoord(rng, in[1]);
       in[6] = rng.Below(TierCount(in[0], in[1]) + 1u);
     }
-    void TierBoundsRetail(const u32* in, u32* out)
+    void TierBoundsRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailField field;
       BuildRetailField(field, in);
@@ -654,7 +765,10 @@ namespace difffuzz
       out[1] = bounds[1];
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void TierBoundsOurs(const u32* in, u32* out)
+    void TierBoundsOurs(
+      const u32* in,
+      u32* out
+    )
     {
       moho::CHeightField field(static_cast<int>(in[0]), static_cast<int>(in[1]));
       BuildOurField(field, in);
@@ -704,7 +818,12 @@ namespace difffuzz
     };
 
     /// threat[14], decay[14], then armies x 14, in that order on both sides.
-    void ExpandThreatLanes(const u32 seed, const u32 mode, const u32 armies, float* lanes)
+    void ExpandThreatLanes(
+      const u32 seed,
+      const u32 mode,
+      const u32 armies,
+      float* lanes
+    )
     {
       ThreatLaneSource source{seed != 0u ? seed : 0x9E3779B9u, mode};
       const int count = kThreatLanes * static_cast<int>(2u + armies);
@@ -719,7 +838,12 @@ namespace difffuzz
     };
     static_assert(sizeof(float) * kThreatLanes == 0x38);
 
-    void BuildRetailInfluenceGrid(RetailInfluenceGrid& grid, const float* lanes, float* armyLanes, const u32 armies)
+    void BuildRetailInfluenceGrid(
+      RetailInfluenceGrid& grid,
+      const float* lanes,
+      float* armyLanes,
+      const u32 armies
+    )
     {
       std::memset(grid.bytes, 0, sizeof(grid.bytes));
       std::memcpy(grid.bytes + 0x1C, lanes, 0x38);
@@ -738,7 +862,10 @@ namespace difffuzz
     // mode. Types run past the jump table's 0..14 (both ends); an army is
     // negative (the all-armies sum) or inside the vector, since the binary
     // indexes it without a bound (0x00715788). out = the threat.
-    void GenGetThreat(Rng& rng, u32* in)
+    void GenGetThreat(
+      Rng& rng,
+      u32* in
+    )
     {
       in[0] = rng.Below(19) - 2u;
       in[2] = rng.Below(kMaxThreatArmies + 1u);
@@ -753,7 +880,10 @@ namespace difffuzz
       in[3] = rng.U32();
       in[4] = rng.Below(3);
     }
-    void GetThreatRetail(const u32* in, u32* out)
+    void GetThreatRetail(
+      const u32* in,
+      u32* out
+    )
     {
       float lanes[kThreatLanes * (2 + kMaxThreatArmies)];
       ExpandThreatLanes(in[3], in[4], in[2], lanes);
@@ -763,7 +893,11 @@ namespace difffuzz
       out[0] = retail::InfluenceGetThreatBits(grid.bytes, static_cast<int>(in[0]), static_cast<int>(in[1]));
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void BuildOurInfluenceGrid(moho::InfluenceGrid& grid, const float* lanes, const u32 armies)
+    void BuildOurInfluenceGrid(
+      moho::InfluenceGrid& grid,
+      const float* lanes,
+      const u32 armies
+    )
     {
       std::memcpy(&grid.threat, lanes, 0x38);
       std::memcpy(&grid.decay, lanes + kThreatLanes, 0x38);
@@ -772,7 +906,10 @@ namespace difffuzz
         std::memcpy(&grid.threats[a], lanes + kThreatLanes * (2u + a), 0x38);
       }
     }
-    void GetThreatOurs(const u32* in, u32* out)
+    void GetThreatOurs(
+      const u32* in,
+      u32* out
+    )
     {
       float lanes[kThreatLanes * (2 + kMaxThreatArmies)];
       ExpandThreatLanes(in[3], in[4], in[2], lanes);
@@ -787,12 +924,18 @@ namespace difffuzz
 
     // InfluenceGrid::DecayInfluence 0x00715130: in = seed, mode. out = the
     // 14 threat lanes after one decay step.
-    void GenDecayInfluence(Rng& rng, u32* in)
+    void GenDecayInfluence(
+      Rng& rng,
+      u32* in
+    )
     {
       in[0] = rng.U32();
       in[1] = rng.Below(3);
     }
-    void DecayInfluenceRetail(const u32* in, u32* out)
+    void DecayInfluenceRetail(
+      const u32* in,
+      u32* out
+    )
     {
       float lanes[kThreatLanes * 2];
       ExpandThreatLanes(in[0], in[1], 0u, lanes);
@@ -802,7 +945,10 @@ namespace difffuzz
       std::memcpy(out, grid.bytes + 0x1C, 0x38);
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void DecayInfluenceOurs(const u32* in, u32* out)
+    void DecayInfluenceOurs(
+      const u32* in,
+      u32* out
+    )
     {
       float lanes[kThreatLanes * 2];
       ExpandThreatLanes(in[0], in[1], 0u, lanes);
@@ -819,14 +965,21 @@ namespace difffuzz
     // (left as it was when forward has no length). Forward is a random
     // heading, parallel to up (the collapsed cross product), zero or tiny, or
     // any floats.
-    [[nodiscard]] float AnyOrRange(Rng& rng, const double lo, const double hi)
+    [[nodiscard]] float AnyOrRange(
+      Rng& rng,
+      const double lo,
+      const double hi
+    )
     {
       if (rng.Chance(10)) {
         return GenFloat(rng);
       }
       return static_cast<float>(rng.Range(lo, hi));
     }
-    void GenLookAt(Rng& rng, u32* in)
+    void GenLookAt(
+      Rng& rng,
+      u32* in
+    )
     {
       const u32 mode = rng.Below(100);
       float up[3];
@@ -867,7 +1020,10 @@ namespace difffuzz
         in[3 + i] = Bits(forward[i]);
       }
     }
-    void LookAtRetail(const u32* in, u32* out)
+    void LookAtRetail(
+      const u32* in,
+      u32* out
+    )
     {
       u32 axes[9];
       for (u32& lane : axes) {
@@ -877,18 +1033,21 @@ namespace difffuzz
       std::memcpy(out, axes, sizeof(axes));
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void LookAtOurs(const u32* in, u32* out)
+    void LookAtOurs(
+      const u32* in,
+      u32* out
+    )
     {
       Wm3::Vector3f up;
       Wm3::Vector3f forward;
-      std::memcpy(&up, in, 12);
-      std::memcpy(&forward, in + 3, 12);
+      std::memcpy(static_cast<void*>(&up), in, 12);
+      std::memcpy(static_cast<void*>(&forward), in + 3, 12);
       moho::VAxes3 axes;
       u32 canary[9];
       for (u32& lane : canary) {
         lane = kCanary;
       }
-      std::memcpy(&axes, canary, sizeof(canary));
+      std::memcpy(static_cast<void*>(&axes), canary, sizeof(canary));
       moho::VEC_LookAt(up, forward, &axes);
       std::memcpy(out, &axes, sizeof(canary));
     }
@@ -897,13 +1056,19 @@ namespace difffuzz
 
     // VEC_Mul4x3 0x004EE710: in = lhs[16], rhs[16] (row-major, 4 floats a
     // row); out = the 16 output lanes, the w lanes left as they were.
-    void GenMul4x3(Rng& rng, u32* in)
+    void GenMul4x3(
+      Rng& rng,
+      u32* in
+    )
     {
       for (int i = 0; i < 32; ++i) {
         in[i] = Bits(AnyOrRange(rng, -4.0, 4.0));
       }
     }
-    void Mul4x3Retail(const u32* in, u32* out)
+    void Mul4x3Retail(
+      const u32* in,
+      u32* out
+    )
     {
       u32 result[16];
       for (u32& lane : result) {
@@ -913,18 +1078,21 @@ namespace difffuzz
       std::memcpy(out, result, sizeof(result));
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void Mul4x3Ours(const u32* in, u32* out)
+    void Mul4x3Ours(
+      const u32* in,
+      u32* out
+    )
     {
       moho::VMatrix4 lhs;
       moho::VMatrix4 rhs;
       moho::VMatrix4 result;
-      std::memcpy(&lhs, in, 64);
-      std::memcpy(&rhs, in + 16, 64);
+      std::memcpy(static_cast<void*>(&lhs), in, 64);
+      std::memcpy(static_cast<void*>(&rhs), in + 16, 64);
       u32 canary[16];
       for (u32& lane : canary) {
         lane = kCanary;
       }
-      std::memcpy(&result, canary, sizeof(canary));
+      std::memcpy(static_cast<void*>(&result), canary, sizeof(canary));
       moho::VEC_Mul4x3(lhs, result, rhs);
       std::memcpy(out, &result, sizeof(canary));
     }
@@ -944,7 +1112,12 @@ namespace difffuzz
     // in = cellsW, cellsH, seed, x, z; out = blocking (0 or 1).
     constexpr std::size_t kMapBytes = 0x1544;
 
-    void ExpandTerrainBytes(const u32 seed, const u32 count, std::uint8_t* types, std::uint8_t* blocking)
+    void ExpandTerrainBytes(
+      const u32 seed,
+      const u32 count,
+      std::uint8_t* types,
+      std::uint8_t* blocking
+    )
     {
       u32 s = seed != 0u ? seed : 0x2545F491u;
       auto next = [&s]() {
@@ -960,7 +1133,10 @@ namespace difffuzz
         blocking[t] = (next() % 5u) == 0u ? 1u : 0u;
       }
     }
-    [[nodiscard]] u32 GenMapCoord(Rng& rng, const u32 cells)
+    [[nodiscard]] u32 GenMapCoord(
+      Rng& rng,
+      const u32 cells
+    )
     {
       const u32 mode = rng.Below(100);
       if (mode < 70) {
@@ -974,7 +1150,10 @@ namespace difffuzz
       }
       return rng.U32();
     }
-    void GenBlocking(Rng& rng, u32* in)
+    void GenBlocking(
+      Rng& rng,
+      u32* in
+    )
     {
       in[0] = 2u + rng.Below(63);
       in[1] = 2u + rng.Below(63);
@@ -982,7 +1161,10 @@ namespace difffuzz
       in[3] = GenMapCoord(rng, in[0]);
       in[4] = GenMapCoord(rng, in[1]);
     }
-    void BlockingRetail(const u32* in, u32* out)
+    void BlockingRetail(
+      const u32* in,
+      u32* out
+    )
     {
       std::vector<std::uint8_t> types(static_cast<std::size_t>(in[0]) * in[1]);
       std::vector<std::uint8_t> map(kMapBytes, 0);
@@ -998,7 +1180,10 @@ namespace difffuzz
       out[0] = retail::MapIsBlockingTerrain(map.data(), in[3], in[4]);
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void BlockingOurs(const u32* in, u32* out)
+    void BlockingOurs(
+      const u32* in,
+      u32* out
+    )
     {
       moho::STIMap map(in[0], in[1]);
       ExpandTerrainBytes(in[2], in[0] * in[1], map.mTerrainType.data, map.mBlocking);
@@ -1014,7 +1199,10 @@ namespace difffuzz
     // (+0x1534) and mWaterElevation (+0x1538).
     // in = cellsW cellsH seed shape waterOn waterElevation x z caps maxSlope
     // minWaterDepth maxWaterDepth; out = the caps byte.
-    void GenOccupancyCaps(Rng& rng, u32* in)
+    void GenOccupancyCaps(
+      Rng& rng,
+      u32* in
+    )
     {
       in[0] = 2u + rng.Below(63);
       in[1] = 2u + rng.Below(63);
@@ -1029,7 +1217,10 @@ namespace difffuzz
       in[10] = Bits(AnyOrRange(rng, -50.0, 300.0));
       in[11] = Bits(AnyOrRange(rng, -50.0, 300.0));
     }
-    void FillFootprintBytes(const u32* in, std::uint8_t* footprint)
+    void FillFootprintBytes(
+      const u32* in,
+      std::uint8_t* footprint
+    )
     {
       std::memset(footprint, 0, 16);
       footprint[0] = 1;
@@ -1039,7 +1230,10 @@ namespace difffuzz
       std::memcpy(footprint + 8, &in[10], 4);
       std::memcpy(footprint + 12, &in[11], 4);
     }
-    void OccupancyCapsRetail(const u32* in, u32* out)
+    void OccupancyCapsRetail(
+      const u32* in,
+      u32* out
+    )
     {
       const int sampleW = static_cast<int>(in[0]) + 1;
       const int sampleH = static_cast<int>(in[1]) + 1;
@@ -1050,7 +1244,8 @@ namespace difffuzz
       ExpandTerrainBytes(in[2] ^ 0x5A5A5A5Au, static_cast<u32>(types.size()), types.data(), map.data() + 0x1434);
       // x86 only at run time (the retail call); the x64 build compiles it unused.
       const u32 field[3] = {
-        static_cast<u32>(reinterpret_cast<std::uintptr_t>(samples.data())), static_cast<u32>(sampleW),
+        static_cast<u32>(reinterpret_cast<std::uintptr_t>(samples.data())),
+        static_cast<u32>(sampleW),
         static_cast<u32>(sampleH)
       };
       const void* const fieldPtr = field;
@@ -1067,7 +1262,10 @@ namespace difffuzz
       out[0] = retail::MapOccupancyCaps(map.data(), pos, footprint);
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void OccupancyCapsOurs(const u32* in, u32* out)
+    void OccupancyCapsOurs(
+      const u32* in,
+      u32* out
+    )
     {
       moho::STIMap map(in[0], in[1]);
       moho::CHeightField* const field = map.mHeightField.get();
@@ -1095,7 +1293,10 @@ namespace difffuzz
     // sides. Retail's map is the OccupancyCaps buffer (height field at +0,
     // water at +0x1534/+0x1538); ours a real STIMap.
     // in = cellsW cellsH seed shape waterOn waterElevation; out = the ratio.
-    void GenWaterRatio(Rng& rng, u32* in)
+    void GenWaterRatio(
+      Rng& rng,
+      u32* in
+    )
     {
       in[0] = 2u + rng.Below(71);
       in[1] = 2u + rng.Below(71);
@@ -1104,7 +1305,10 @@ namespace difffuzz
       in[4] = rng.Chance(70) ? 1u : 0u;
       in[5] = Bits(AnyOrRange(rng, -10.0, 520.0));
     }
-    void WaterRatioRetail(const u32* in, u32* out)
+    void WaterRatioRetail(
+      const u32* in,
+      u32* out
+    )
     {
       const int sampleW = static_cast<int>(in[0]) + 1;
       const int sampleH = static_cast<int>(in[1]) + 1;
@@ -1113,7 +1317,8 @@ namespace difffuzz
       std::vector<std::uint8_t> map(kMapBytes, 0);
       // x86 only at run time (the retail call); the x64 build compiles it unused.
       const u32 field[3] = {
-        static_cast<u32>(reinterpret_cast<std::uintptr_t>(samples.data())), static_cast<u32>(sampleW),
+        static_cast<u32>(reinterpret_cast<std::uintptr_t>(samples.data())),
+        static_cast<u32>(sampleW),
         static_cast<u32>(sampleH)
       };
       const void* const fieldPtr = field;
@@ -1123,7 +1328,10 @@ namespace difffuzz
       out[0] = retail::MapWaterRatio(map.data());
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void WaterRatioOurs(const u32* in, u32* out)
+    void WaterRatioOurs(
+      const u32* in,
+      u32* out
+    )
     {
       moho::STIMap map(in[0], in[1]);
       moho::CHeightField* const field = map.mHeightField.get();
@@ -1144,7 +1352,10 @@ namespace difffuzz
     // STIMap.
     // in = cellsW cellsH seed shape waterOn waterElev x z layer sizeX sizeZ;
     // out = pos[3].
-    void GenToWorldPos(Rng& rng, u32* in)
+    void GenToWorldPos(
+      Rng& rng,
+      u32* in
+    )
     {
       in[0] = 2u + rng.Below(63);
       in[1] = 2u + rng.Below(63);
@@ -1158,7 +1369,10 @@ namespace difffuzz
       in[9] = rng.Chance(90) ? rng.Below(11) : rng.U32();
       in[10] = rng.Chance(90) ? rng.Below(11) : rng.U32();
     }
-    void ToWorldPosRetail(const u32* in, u32* out)
+    void ToWorldPosRetail(
+      const u32* in,
+      u32* out
+    )
     {
       const int sampleW = static_cast<int>(in[0]) + 1;
       const int sampleH = static_cast<int>(in[1]) + 1;
@@ -1167,7 +1381,8 @@ namespace difffuzz
       std::vector<std::uint8_t> map(kMapBytes, 0);
       // x86 only at run time (the retail call); the x64 build compiles it unused.
       const u32 field[3] = {
-        static_cast<u32>(reinterpret_cast<std::uintptr_t>(samples.data())), static_cast<u32>(sampleW),
+        static_cast<u32>(reinterpret_cast<std::uintptr_t>(samples.data())),
+        static_cast<u32>(sampleW),
         static_cast<u32>(sampleH)
       };
       const void* const fieldPtr = field;
@@ -1176,11 +1391,16 @@ namespace difffuzz
       std::memcpy(map.data() + 0x1538, &in[5], 4);
       const std::int16_t pos[2] = {static_cast<std::int16_t>(in[6]), static_cast<std::int16_t>(in[7])};
       float world[3] = {};
-      retail::CoordsToWorldPos(pos, map.data(), world, in[8] & 0xFFu, static_cast<int>(in[9]), static_cast<int>(in[10]));
+      retail::CoordsToWorldPos(
+        pos, map.data(), world, in[8] & 0xFFu, static_cast<int>(in[9]), static_cast<int>(in[10])
+      );
       std::memcpy(out, world, 12);
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void ToWorldPosOurs(const u32* in, u32* out)
+    void ToWorldPosOurs(
+      const u32* in,
+      u32* out
+    )
     {
       moho::STIMap map(in[0], in[1]);
       moho::CHeightField* const field = map.mHeightField.get();
@@ -1208,7 +1428,10 @@ namespace difffuzz
     // gridSize == 0 early-out is unreachable here (sizes 1..16).
     // in = cellsW cellsH gridSize seed density rect[4]; out = visible.
     [[nodiscard]] u32 GenRectInt(Rng& rng);
-    void GenIntelRect(Rng& rng, u32* in)
+    void GenIntelRect(
+      Rng& rng,
+      u32* in
+    )
     {
       in[0] = 2u + rng.Below(127);
       in[1] = 2u + rng.Below(127);
@@ -1221,7 +1444,11 @@ namespace difffuzz
         in[5 + i] = rng.Chance(85) ? static_cast<u32>(static_cast<int>(rng.Below(cells + 40u)) - 20) : GenRectInt(rng);
       }
     }
-    void FillIntelCells(const u32* in, std::int8_t* cells, const u32 count)
+    void FillIntelCells(
+      const u32* in,
+      std::int8_t* cells,
+      const u32 count
+    )
     {
       u32 s = in[3] != 0u ? in[3] : 0x2545F491u;
       for (u32 i = 0; i < count; ++i) {
@@ -1229,10 +1456,14 @@ namespace difffuzz
         s ^= s >> 17;
         s ^= s << 5;
         const u32 roll = s % 100u;
-        cells[i] = roll < in[4] ? static_cast<std::int8_t>(1 + (s >> 8) % 3) : (roll < in[4] + 5u ? static_cast<std::int8_t>(-1) : 0);
+        cells[i] = roll < in[4] ? static_cast<std::int8_t>(1 + (s >> 8) % 3)
+                                : (roll < in[4] + 5u ? static_cast<std::int8_t>(-1) : 0);
       }
     }
-    void IntelRectRetail(const u32* in, u32* out)
+    void IntelRectRetail(
+      const u32* in,
+      u32* out
+    )
     {
       const u32 width = in[0] / in[2];
       const u32 height = in[1] / in[2];
@@ -1247,7 +1478,10 @@ namespace difffuzz
       out[0] = retail::IntelGridIsVisibleRect(grid.data(), &in[5]);
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void IntelRectOurs(const u32* in, u32* out)
+    void IntelRectOurs(
+      const u32* in,
+      u32* out
+    )
     {
       moho::STIMap map(in[0], in[1]);
       moho::CIntelGrid grid(&map, in[2]);
@@ -1273,7 +1507,12 @@ namespace difffuzz
     // caps of 0x000000FF is left out (ours reads it as OC_ANY).
     // in = the OccupancyCapsOfFootprintAt words, then fpFlags caps gridSeed
     // terrainPct waterPct gridW gridH; out = the caps byte.
-    void FillOccupationWords(u32 seed, const u32 percent, const u32 count, u32* words)
+    void FillOccupationWords(
+      u32 seed,
+      const u32 percent,
+      const u32 count,
+      u32* words
+    )
     {
       u32 s = seed != 0u ? seed : 0x2545F491u;
       for (u32 i = 0; i < count; ++i) {
@@ -1289,11 +1528,16 @@ namespace difffuzz
         words[i] = word;
       }
     }
-    [[nodiscard]] u32 OccupationWordCount(const u32* in)
+    [[nodiscard]] u32 OccupationWordCount(
+      const u32* in
+    )
     {
       return in[17] * ((in[18] + 31u) >> 5);
     }
-    void GenOccupyFilter(Rng& rng, u32* in)
+    void GenOccupyFilter(
+      Rng& rng,
+      u32* in
+    )
     {
       GenOccupancyCaps(rng, in);
       in[12] = rng.Below(256);
@@ -1304,7 +1548,10 @@ namespace difffuzz
       in[17] = rng.Chance(80) ? in[0] : rng.Below(71);
       in[18] = rng.Chance(80) ? in[1] : rng.Below(71);
     }
-    void OccupyFilterRetail(const u32* in, u32* out)
+    void OccupyFilterRetail(
+      const u32* in,
+      u32* out
+    )
     {
       const int sampleW = static_cast<int>(in[0]) + 1;
       const int sampleH = static_cast<int>(in[1]) + 1;
@@ -1315,7 +1562,8 @@ namespace difffuzz
       ExpandTerrainBytes(in[2] ^ 0x5A5A5A5Au, static_cast<u32>(types.size()), types.data(), map.data() + 0x1434);
       // x86 only at run time (the retail call); the x64 build compiles it unused.
       const u32 field[3] = {
-        static_cast<u32>(reinterpret_cast<std::uintptr_t>(samples.data())), static_cast<u32>(sampleW),
+        static_cast<u32>(reinterpret_cast<std::uintptr_t>(samples.data())),
+        static_cast<u32>(sampleW),
         static_cast<u32>(sampleH)
       };
       const void* const fieldPtr = field;
@@ -1355,7 +1603,10 @@ namespace difffuzz
       out[0] = retail::OccupyFilter(footprint, grid.data(), pos, in[13]);
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void OccupyFilterOurs(const u32* in, u32* out)
+    void OccupyFilterOurs(
+      const u32* in,
+      u32* out
+    )
     {
       moho::STIMap map(in[0], in[1]);
       moho::CHeightField* const field = map.mHeightField.get();
@@ -1420,7 +1671,9 @@ namespace difffuzz
       std::int16_t pos[2] = {};
       std::uint8_t footprint[16] = {};
 
-      explicit RetailOccupancyWorld(const u32* in)
+      explicit RetailOccupancyWorld(
+        const u32* in
+      )
         : samples(static_cast<std::size_t>(in[0] + 1u) * (in[1] + 1u))
         , types(static_cast<std::size_t>(in[0]) * in[1])
         , map(kMapBytes, 0)
@@ -1470,18 +1723,27 @@ namespace difffuzz
         footprint[3] = static_cast<std::uint8_t>(in[12]);
       }
     };
-    void GenFootprintWorld(Rng& rng, u32* in)
+    void GenFootprintWorld(
+      Rng& rng,
+      u32* in
+    )
     {
       GenOccupyFilter(rng, in);
       in[19] = 1u + rng.Below(8);
       in[20] = 1u + rng.Below(8);
     }
-    void MobileCheckRetail(const u32* in, u32* out)
+    void MobileCheckRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailOccupancyWorld w(in);
       out[0] = retail::OccupyMobileCheck(w.pos, w.footprint, w.map.data()) & 0xFFu;
     }
-    void FootprintFitsRetail(const u32* in, u32* out)
+    void FootprintFitsRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailOccupancyWorld w(in);
       out[0] = retail::OccupyFootprintFits(w.grid.data(), w.pos, w.footprint, in[13]);
@@ -1496,7 +1758,9 @@ namespace difffuzz
       moho::SOCellPos pos{};
       moho::SFootprint footprint{};
 
-      explicit OursOccupancyWorld(const u32* in)
+      explicit OursOccupancyWorld(
+        const u32* in
+      )
         : map(in[0], in[1])
         , simStore(sizeof(moho::Sim) / sizeof(std::max_align_t) + 1u)
         , gridStore(sizeof(moho::COGrid) / sizeof(std::max_align_t) + 1u)
@@ -1533,12 +1797,18 @@ namespace difffuzz
         std::memcpy(&footprint, bytes, sizeof(bytes));
       }
     };
-    void MobileCheckOurs(const u32* in, u32* out)
+    void MobileCheckOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursOccupancyWorld w(in);
       out[0] = static_cast<u32>(moho::OCCUPY_MobileCheck(w.footprint, w.map, w.pos));
     }
-    void FootprintFitsOurs(const u32* in, u32* out)
+    void FootprintFitsOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursOccupancyWorld w(in);
       const auto caps = static_cast<moho::EOccupancyCaps>(in[13] == 0xFFFFFFFFu ? 0xFFu : in[13]);
@@ -1554,7 +1824,10 @@ namespace difffuzz
     // map, edx = pos, [border] [wholeMap], caller-popped, al = inside.
     // in = cellsW cellsH x0 z0 x1 z1 posX posY posZ border wholeMap; out = inside.
     [[nodiscard]] u32 GenRectInt(Rng& rng);
-    void GenIsWithin(Rng& rng, u32* in)
+    void GenIsWithin(
+      Rng& rng,
+      u32* in
+    )
     {
       in[0] = 2u + rng.Below(63);
       in[1] = 2u + rng.Below(63);
@@ -1568,7 +1841,10 @@ namespace difffuzz
       in[9] = rng.Chance(30) ? 0u : Bits(AnyOrRange(rng, 0.0, 10.0));
       in[10] = rng.Chance(50) ? 1u : 0u;
     }
-    void IsWithinRetail(const u32* in, u32* out)
+    void IsWithinRetail(
+      const u32* in,
+      u32* out
+    )
     {
       const u32 field[3] = {0u, in[0] + 1u, in[1] + 1u};
       std::vector<std::uint8_t> map(kMapBytes, 0);
@@ -1578,7 +1854,10 @@ namespace difffuzz
       out[0] = retail::MapIsWithin(map.data(), &in[6], F(in, 9), in[10]);
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void IsWithinOurs(const u32* in, u32* out)
+    void IsWithinOurs(
+      const u32* in,
+      u32* out
+    )
     {
       moho::STIMap map(in[0], in[1]);
       map.mPlayableRect.x0 = static_cast<int>(in[2]);
@@ -1599,7 +1878,9 @@ namespace difffuzz
     // Sim storage with only these members written (the real ones need a unit
     // and a whole sim) and a real STIMap, called non-virtually.
     // in = useWholeMap inside span x z x0 z0 x1 z1; out = in bounds (0 or 1).
-    [[nodiscard]] u32 GenRectInt(Rng& rng)
+    [[nodiscard]] u32 GenRectInt(
+      Rng& rng
+    )
     {
       const u32 mode = rng.Below(100);
       if (mode < 75) {
@@ -1613,7 +1894,10 @@ namespace difffuzz
       }
       return rng.U32();
     }
-    void GenPathInBounds(Rng& rng, u32* in)
+    void GenPathInBounds(
+      Rng& rng,
+      u32* in
+    )
     {
       in[0] = rng.Chance(80) ? 0u : rng.Below(256);
       in[1] = rng.Chance(15) ? 0u : (rng.Chance(80) ? 1u : rng.Below(256));
@@ -1621,14 +1905,19 @@ namespace difffuzz
       in[2] = spanMode < 70 ? rng.Below(16) : (spanMode < 85 ? rng.Below(1u << 25) : rng.U32());
       for (int i = 3; i < 5; ++i) {
         const u32 mode = rng.Below(100);
-        in[i] = mode < 60 ? rng.Below(1100) : (mode < 80 ? 0x7FFDu + rng.Below(6) : (mode < 90 ? 0xFFFFu - rng.Below(4) : rng.Below(0x10000)));
+        in[i] = mode < 60
+          ? rng.Below(1100)
+          : (mode < 80 ? 0x7FFDu + rng.Below(6) : (mode < 90 ? 0xFFFFu - rng.Below(4) : rng.Below(0x10000)));
       }
       in[5] = GenRectInt(rng);
       in[6] = GenRectInt(rng);
       in[7] = rng.Chance(80) ? in[5] + rng.Below(1100) : GenRectInt(rng);
       in[8] = rng.Chance(80) ? in[6] + rng.Below(1100) : GenRectInt(rng);
     }
-    void PathInBoundsRetail(const u32* in, u32* out)
+    void PathInBoundsRetail(
+      const u32* in,
+      u32* out
+    )
     {
       std::vector<std::uint8_t> map(0x18, 0);
       std::memcpy(map.data() + 0x08, &in[5], 16);
@@ -1647,7 +1936,10 @@ namespace difffuzz
       out[0] = retail::PathFinderIsInBounds(finder.data(), from, to, &cost);
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void PathInBoundsOurs(const u32* in, u32* out)
+    void PathInBoundsOurs(
+      const u32* in,
+      u32* out
+    )
     {
       moho::STIMap map(2, 2);
       map.mPlayableRect.x0 = static_cast<int>(in[5]);
@@ -1686,9 +1978,14 @@ namespace difffuzz
     // (ours used to sign-extend them through an int16 SOCellPos).
     // in = searchType probe anchorX anchorZ goal[8] history count rects[12]
     // rect[4]; out = search.
-    void GenShouldSearchRect(Rng& rng, u32* in)
+    void GenShouldSearchRect(
+      Rng& rng,
+      u32* in
+    )
     {
-      const auto coord = [&rng]() { return static_cast<u32>(static_cast<int>(rng.Below(48)) - 8); };
+      const auto coord = [&rng]() {
+        return static_cast<u32>(static_cast<int>(rng.Below(48)) - 8);
+      };
       in[0] = rng.Chance(50) ? 0u : 1u + rng.Below(3);
       in[1] = rng.Chance(80) ? 0u : 1u;
       in[2] = rng.Chance(95) ? rng.Below(40) : rng.Below(0x10000);
@@ -1704,7 +2001,10 @@ namespace difffuzz
         in[i] = coord();
       }
     }
-    void ShouldSearchRectRetail(const u32* in, u32* out)
+    void ShouldSearchRectRetail(
+      const u32* in,
+      u32* out
+    )
     {
       std::vector<std::uint8_t> finder(0x7C, 0);
       std::memcpy(finder.data() + 0x60, &in[0], 4);
@@ -1714,7 +2014,9 @@ namespace difffuzz
       std::memcpy(finder.data() + 0x3C, &in[4], 32);
       // Ring list: the head node, then count nodes of next, prev, rect.
       std::vector<std::uint8_t> nodes(0x18 * 4, 0);
-      const auto addr = [&nodes](const u32 i) { return static_cast<u32>(reinterpret_cast<std::uintptr_t>(nodes.data()) + i * 0x18u); };
+      const auto addr = [&nodes](const u32 i) {
+        return static_cast<u32>(reinterpret_cast<std::uintptr_t>(nodes.data()) + i * 0x18u);
+      };
       const u32 count = in[12];
       for (u32 i = 0; i <= count; ++i) {
         const u32 next = addr(i == count ? 0u : i + 1u);
@@ -1731,7 +2033,10 @@ namespace difffuzz
       out[0] = retail::PathFinderShouldSearchRect(finder.data(), &in[25]);
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void ShouldSearchRectOurs(const u32* in, u32* out)
+    void ShouldSearchRectOurs(
+      const u32* in,
+      u32* out
+    )
     {
       std::vector<std::max_align_t> store(sizeof(moho::CAiPathFinder) / sizeof(std::max_align_t) + 1u);
       auto* const finder = reinterpret_cast<moho::CAiPathFinder*>(store.data());
@@ -1760,7 +2065,9 @@ namespace difffuzz
     // where SSE rounds it once, so inputs keep products out of the denormal
     // range (the game passes whole cell counts).
     // in = a b; out = the distance.
-    [[nodiscard]] u32 GenOctileLane(Rng& rng)
+    [[nodiscard]] u32 GenOctileLane(
+      Rng& rng
+    )
     {
       const u32 mode = rng.Below(100);
       if (mode < 50) {
@@ -1775,17 +2082,26 @@ namespace difffuzz
       }
       return Bits(static_cast<float>(rng.Range(-1.0e30, 1.0e30)));
     }
-    void GenOctile(Rng& rng, u32* in)
+    void GenOctile(
+      Rng& rng,
+      u32* in
+    )
     {
       in[0] = GenOctileLane(rng);
       in[1] = GenOctileLane(rng);
     }
-    void OctileRetail(const u32* in, u32* out)
+    void OctileRetail(
+      const u32* in,
+      u32* out
+    )
     {
       out[0] = Bits(retail::OctileDistanceCore(F(in, 0), F(in, 1)));
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void OctileOurs(const u32* in, u32* out)
+    void OctileOurs(
+      const u32* in,
+      u32* out
+    )
     {
       out[0] = Bits(moho::ComputeOctileDistanceCore(F(in, 0), F(in, 1)));
     }
@@ -1798,7 +2114,10 @@ namespace difffuzz
     // so narray < 2^24 reads at most 26 buckets.
     // in = ntotal narray nums[26]; out = narray nhash.
     constexpr int kSizeBuckets = 26;
-    void GenComputeSizes(Rng& rng, u32* in)
+    void GenComputeSizes(
+      Rng& rng,
+      u32* in
+    )
     {
       u32 sum = 0;
       for (int i = 0; i < kSizeBuckets; ++i) {
@@ -1810,7 +2129,10 @@ namespace difffuzz
       in[1] = rng.Chance(80) ? sum : rng.Below(sum + 8u);
       in[0] = in[1] + rng.Below(64);
     }
-    void ComputeSizesRetail(const u32* in, u32* out)
+    void ComputeSizesRetail(
+      const u32* in,
+      u32* out
+    )
     {
       int nums[32] = {};
       std::memcpy(nums, &in[2], sizeof(int) * kSizeBuckets);
@@ -1821,7 +2143,10 @@ namespace difffuzz
       out[1] = static_cast<u32>(nhash);
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void ComputeSizesOurs(const u32* in, u32* out)
+    void ComputeSizesOurs(
+      const u32* in,
+      u32* out
+    )
     {
       int nums[32] = {};
       std::memcpy(nums, &in[2], sizeof(int) * kSizeBuckets);
@@ -1840,11 +2165,16 @@ namespace difffuzz
     // box, ebx = out, eax = out. NaN and huge bounds take fistp's integer
     // indefinite.
     // in = min[3] max[3]; out = startX | startZ << 16, width | height << 16.
-    [[nodiscard]] u32 GenBoxLane(Rng& rng)
+    [[nodiscard]] u32 GenBoxLane(
+      Rng& rng
+    )
     {
       return rng.Chance(85) ? Bits(static_cast<float>(rng.Range(-200.0, 4200.0))) : Bits(GenFloat(rng));
     }
-    void GenAABoxToRect(Rng& rng, u32* in)
+    void GenAABoxToRect(
+      Rng& rng,
+      u32* in
+    )
     {
       for (int i = 0; i < 6; ++i) {
         in[i] = GenBoxLane(rng);
@@ -1855,7 +2185,10 @@ namespace difffuzz
         }
       }
     }
-    void AABoxToRectRetail(const u32* in, u32* out)
+    void AABoxToRectRetail(
+      const u32* in,
+      u32* out
+    )
     {
       std::uint16_t rect[4] = {0x1111, 0x2222, 0x3333, 0x4444};
       retail::AABoxToRect(in, rect);
@@ -1863,10 +2196,13 @@ namespace difffuzz
       out[1] = rect[2] | (static_cast<u32>(rect[3]) << 16);
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void AABoxToRectOurs(const u32* in, u32* out)
+    void AABoxToRectOurs(
+      const u32* in,
+      u32* out
+    )
     {
       Wm3::AxisAlignedBox3f box;
-      std::memcpy(&box, in, 24);
+      std::memcpy(static_cast<void*>(&box), in, 24);
       moho::CollisionDBRect rect{0x1111, 0x2222, 0x3333, 0x4444};
       moho::func_AABoxToRect(&rect, box);
       out[0] = rect.mStartX | (static_cast<u32>(rect.mStartZ) << 16);
@@ -1910,7 +2246,11 @@ namespace difffuzz
       std::vector<std::uint8_t> valueNil;    // per node: a free node, or a dead key whose value went nil
       std::vector<std::uint8_t> arrayNil;    // per array slot
     };
-    [[nodiscard]] u32 LuaMainPosition(const LuaTableDesc& d, const u32 tt, const u32 bits)
+    [[nodiscard]] u32 LuaMainPosition(
+      const LuaTableDesc& d,
+      const u32 tt,
+      const u32 bits
+    )
     {
       const u32 size = 1u << d.lsizenode;
       switch (tt) {
@@ -1930,7 +2270,12 @@ namespace difffuzz
         return bits % ((size - 1u) | 1u);
       }
     }
-    [[nodiscard]] bool LuaSameKey(const u32 tt, const u32 bits, const u32 otherTt, const u32 otherBits)
+    [[nodiscard]] bool LuaSameKey(
+      const u32 tt,
+      const u32 bits,
+      const u32 otherTt,
+      const u32 otherBits
+    )
     {
       if (tt != otherTt) {
         return false;
@@ -1943,7 +2288,11 @@ namespace difffuzz
       }
       return bits == otherBits;
     }
-    [[nodiscard]] u32 LuaNumberKeyBits(Rng& rng, const u32 sizearray, const u32 nodes)
+    [[nodiscard]] u32 LuaNumberKeyBits(
+      Rng& rng,
+      const u32 sizearray,
+      const u32 nodes
+    )
     {
       const u32 mode = rng.Below(100);
       float n = 0.0f;
@@ -1966,7 +2315,11 @@ namespace difffuzz
     // ldexp (x87 on Win32) rounds a denormal result twice under precision 24:
     // a key the generator picked from its table was then missing from the
     // row's (luaH_next's retail call raised "invalid key for `next'").
-    [[nodiscard]] u32 LuaBuilderNumberBits(Rng& rng, const u32 sizearray, const u32 nodes)
+    [[nodiscard]] u32 LuaBuilderNumberBits(
+      Rng& rng,
+      const u32 sizearray,
+      const u32 nodes
+    )
     {
       const u32 mode = rng.Below(100);
       if (mode < 60) {
@@ -1983,7 +2336,10 @@ namespace difffuzz
       }
       return rng.U32(); // any bits: NaN, infinities and denormals as words
     }
-    void BuildLuaTable(const u32* in, LuaTableDesc& d)
+    void BuildLuaTable(
+      const u32* in,
+      LuaTableDesc& d
+    )
     {
       Rng rng(in[0] ^ 0x1A2B3C4Du);
       d.sizearray = in[1];
@@ -2064,7 +2420,10 @@ namespace difffuzz
         d.arrayNil[i] = values.Chance(20) ? 1u : 0u;
       }
     }
-    void GenLuaTableBase(Rng& rng, u32* in)
+    void GenLuaTableBase(
+      Rng& rng,
+      u32* in
+    )
     {
       in[0] = rng.U32();
       in[1] = rng.Chance(30) ? 0u : rng.Below(13);
@@ -2073,12 +2432,18 @@ namespace difffuzz
       in[3] = rng.Chance(20) ? size : rng.Below(size + 1u);
       in[4] = 1u + rng.Below(12);
     }
-    void GenLuaGetStr(Rng& rng, u32* in)
+    void GenLuaGetStr(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaTableBase(rng, in);
       in[5] = rng.Below(in[4] + 1u); // the last pool string is never a key
     }
-    void GenLuaGetNum(Rng& rng, u32* in)
+    void GenLuaGetNum(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaTableBase(rng, in);
       const u32 mode = rng.Below(100);
@@ -2094,13 +2459,17 @@ namespace difffuzz
         in[5] = rng.U32();
       }
     }
-    void GenLuaGet(Rng& rng, u32* in)
+    void GenLuaGet(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaTableBase(rng, in);
       const u32 mode = rng.Below(100);
       if (mode < 40) {
         in[5] = kLuaNumber;
-        in[6] = rng.Chance(80) ? LuaNumberKeyBits(rng, in[1], 1u << in[2]) : (rng.Chance(50) ? Bits(-2147483648.0f) : Bits(AnyOrRange(rng, -3.0e9, 3.0e9)));
+        in[6] = rng.Chance(80) ? LuaNumberKeyBits(rng, in[1], 1u << in[2])
+                               : (rng.Chance(50) ? Bits(-2147483648.0f) : Bits(AnyOrRange(rng, -3.0e9, 3.0e9)));
       } else if (mode < 70) {
         in[5] = kLuaString;
         in[6] = rng.Below(in[4] + 1u);
@@ -2121,11 +2490,16 @@ namespace difffuzz
     struct RetailLuaTable
     {
       std::vector<std::uint8_t> table, nodes, array, strings;
-      [[nodiscard]] u32 Addr(const std::vector<std::uint8_t>& v, const std::size_t at) const
+      [[nodiscard]] u32 Addr(
+        const std::vector<std::uint8_t>& v,
+        const std::size_t at
+      ) const
       {
         return static_cast<u32>(reinterpret_cast<std::uintptr_t>(v.data()) + at);
       }
-      explicit RetailLuaTable(const LuaTableDesc& d)
+      explicit RetailLuaTable(
+        const LuaTableDesc& d
+      )
         : table(0x24, 0)
         , nodes(static_cast<std::size_t>(d.keyTt.size()) * 0x14, 0)
         , array(static_cast<std::size_t>(d.sizearray) * 8 + 8, 0)
@@ -2162,7 +2536,9 @@ namespace difffuzz
         std::memcpy(table.data() + 0x14, &nodeAddr, 4);
         std::memcpy(table.data() + 0x20, &d.sizearray, 4);
       }
-      [[nodiscard]] u32 Slot(const u32 result) const
+      [[nodiscard]] u32 Slot(
+        const u32 result
+      ) const
       {
         if (result == 0x00D463FCu) {
           return 0xFFFFFFFFu; // luaO_nilobject
@@ -2174,21 +2550,30 @@ namespace difffuzz
         return (result - Addr(nodes, 0) - 8u) / 0x14u;
       }
     };
-    void LuaGetStrRetail(const u32* in, u32* out)
+    void LuaGetStrRetail(
+      const u32* in,
+      u32* out
+    )
     {
       LuaTableDesc d;
       BuildLuaTable(in, d);
       const RetailLuaTable t(d);
       out[0] = t.Slot(retail::LuaHGetStr(t.table.data(), t.strings.data() + in[5] * 0x20u));
     }
-    void LuaGetNumRetail(const u32* in, u32* out)
+    void LuaGetNumRetail(
+      const u32* in,
+      u32* out
+    )
     {
       LuaTableDesc d;
       BuildLuaTable(in, d);
       const RetailLuaTable t(d);
       out[0] = t.Slot(retail::LuaHGetNum(t.table.data(), static_cast<int>(in[5])));
     }
-    void LuaGetRetail(const u32* in, u32* out)
+    void LuaGetRetail(
+      const u32* in,
+      u32* out
+    )
     {
       LuaTableDesc d;
       BuildLuaTable(in, d);
@@ -2202,7 +2587,10 @@ namespace difffuzz
     // a tag other than boolean, number or string hashes its value word as a
     // pointer (0x00926FE7, 0x0092700E), so those carry small plain words, the
     // same on retail's x86 and ours. out = the node index.
-    void GenLuaMainPosition(Rng& rng, u32* in)
+    void GenLuaMainPosition(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaTableBase(rng, in);
       in[5] = rng.Chance(85) ? kLuaBoolean + rng.Below(4) : rng.Below(9);
@@ -2214,7 +2602,10 @@ namespace difffuzz
         in[6] = rng.Chance(70) ? rng.Below(1000) : rng.U32();
       }
     }
-    void LuaMainPositionRetail(const u32* in, u32* out)
+    void LuaMainPositionRetail(
+      const u32* in,
+      u32* out
+    )
     {
       LuaTableDesc d;
       BuildLuaTable(in, d);
@@ -2232,7 +2623,10 @@ namespace difffuzz
     // only, so the state (null here) is never read. Value words stay 32-bit,
     // so ours' x64 pointers carry no high bits.
     // in = tag left right; out = equal (0 or 1).
-    void GenLuaEqualVal(Rng& rng, u32* in)
+    void GenLuaEqualVal(
+      Rng& rng,
+      u32* in
+    )
     {
       in[0] = rng.Chance(90) ? rng.Below(12) : rng.U32();
       if (in[0] == kLuaNumber) {
@@ -2244,7 +2638,10 @@ namespace difffuzz
         in[2] = in[0] == 5u || in[0] == 8u || rng.Chance(40) ? in[1] : (rng.Chance(50) ? rng.Below(4) : rng.U32());
       }
     }
-    void LuaEqualValRetail(const u32* in, u32* out)
+    void LuaEqualValRetail(
+      const u32* in,
+      u32* out
+    )
     {
       const u32 left[2] = {in[0], in[1]};
       const u32 right[2] = {in[0], in[2]};
@@ -2258,13 +2655,18 @@ namespace difffuzz
     // init would set up, and other same-tag pairs to __lt through the state,
     // so the rows pass different tags or two numbers only.
     // in = tagLeft tagRight left right; out = less (0 or 1).
-    void GenLuaLessThan(Rng& rng, u32* in)
+    void GenLuaLessThan(
+      Rng& rng,
+      u32* in
+    )
     {
       if (rng.Chance(55)) {
         in[0] = in[1] = kLuaNumber;
         in[2] = rng.Chance(60) ? LuaNumberKeyBits(rng, 8, 8) : Bits(GenFloat(rng));
         const u32 mode = rng.Below(100);
-        in[3] = mode < 25 ? in[2] : (mode < 35 ? in[2] ^ 0x80000000u : (mode < 50 ? in[2] + 1u : (mode < 60 ? in[2] - 1u : Bits(GenFloat(rng)))));
+        in[3] = mode < 25 ? in[2]
+                          : (mode < 35 ? in[2] ^ 0x80000000u
+                                       : (mode < 50 ? in[2] + 1u : (mode < 60 ? in[2] - 1u : Bits(GenFloat(rng)))));
         return;
       }
       in[0] = rng.Chance(90) ? rng.Below(12) : rng.U32();
@@ -2274,7 +2676,10 @@ namespace difffuzz
       in[2] = rng.U32();
       in[3] = rng.U32();
     }
-    void LuaLessThanRetail(const u32* in, u32* out)
+    void LuaLessThanRetail(
+      const u32* in,
+      u32* out
+    )
     {
       const u32 left[2] = {in[0], in[2]};
       const u32 right[2] = {in[1], in[3]};
@@ -2292,7 +2697,11 @@ namespace difffuzz
     // in = seed sizearray lsizenode fill pool keyTt keyBits.
     // out = index; or ret keyTt keyBits valTt valBits (a string key as its
     // pool index).
-    void PickPresentKey(Rng& rng, const LuaTableDesc& d, u32* key)
+    void PickPresentKey(
+      Rng& rng,
+      const LuaTableDesc& d,
+      u32* key
+    )
     {
       key[0] = kLuaNil;
       key[1] = 0u;
@@ -2319,14 +2728,20 @@ namespace difffuzz
         key[1] = d.keyBits[i];
       }
     }
-    void GenLuaTraverse(Rng& rng, u32* in)
+    void GenLuaTraverse(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaTableBase(rng, in);
       LuaTableDesc d;
       BuildLuaTable(in, d);
       PickPresentKey(rng, d, in + 5);
     }
-    void LuaIndexRetail(const u32* in, u32* out)
+    void LuaIndexRetail(
+      const u32* in,
+      u32* out
+    )
     {
       LuaTableDesc d;
       BuildLuaTable(in, d);
@@ -2334,7 +2749,10 @@ namespace difffuzz
       const u32 key[2] = {in[5], in[5] == kLuaString ? t.Addr(t.strings, in[6] * 0x20u) : in[6]};
       out[0] = retail::LuaHIndex(nullptr, t.table.data(), key);
     }
-    void LuaNextRetail(const u32* in, u32* out)
+    void LuaNextRetail(
+      const u32* in,
+      u32* out
+    )
     {
       LuaTableDesc d;
       BuildLuaTable(in, d);
@@ -2353,7 +2771,10 @@ namespace difffuzz
     // a nil or NaN one raises, both through the state, so the rows pass held
     // keys only (array slots 1..sizearray count as held) and a null state.
     // in = seed sizearray lsizenode fill pool keyTt keyBits; out = slot flags.
-    void GenLuaSet(Rng& rng, u32* in)
+    void GenLuaSet(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaTableBase(rng, in);
       LuaTableDesc d;
@@ -2367,7 +2788,10 @@ namespace difffuzz
         in[6] = Bits(1.0f);
       }
     }
-    void LuaSetRetail(const u32* in, u32* out)
+    void LuaSetRetail(
+      const u32* in,
+      u32* out
+    )
     {
       LuaTableDesc d;
       BuildLuaTable(in, d);
@@ -2382,14 +2806,20 @@ namespace difffuzz
     // integer keys the table holds: 1..sizearray, or a whole-number hash key.
     // in = seed sizearray lsizenode fill pool key; out = slot flags.
     void GenLuaSetNumKey(Rng& rng, u32* in);
-    void GenLuaSetNum(Rng& rng, u32* in)
+    void GenLuaSetNum(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaTableBase(rng, in);
       GenLuaSetNumKey(rng, in);
     }
     // An integer key the table of in[0..4] holds, into in[5] (in[1] raised to
     // 1 when the table holds none).
-    void GenLuaSetNumKey(Rng& rng, u32* in)
+    void GenLuaSetNumKey(
+      Rng& rng,
+      u32* in
+    )
     {
       LuaTableDesc d;
       BuildLuaTable(in, d);
@@ -2397,8 +2827,10 @@ namespace difffuzz
       for (u32 i = 0; i < d.keyTt.size(); ++i) {
         float n = 0.0f;
         std::memcpy(&n, &d.keyBits[i], 4);
-        if (d.keyTt[i] == kLuaNumber && n >= -2147483648.0f && n < 2147483648.0f &&
-            static_cast<float>(static_cast<int>(n)) == n) {
+        if (
+          d.keyTt[i] == kLuaNumber && n >= -2147483648.0f && n < 2147483648.0f &&
+          static_cast<float>(static_cast<int>(n)) == n
+        ) {
           held.push_back(static_cast<u32>(static_cast<int>(n)));
         }
       }
@@ -2411,7 +2843,10 @@ namespace difffuzz
         in[5] = 1u;
       }
     }
-    void LuaSetNumRetail(const u32* in, u32* out)
+    void LuaSetNumRetail(
+      const u32* in,
+      u32* out
+    )
     {
       LuaTableDesc d;
       BuildLuaTable(in, d);
@@ -2451,7 +2886,10 @@ namespace difffuzz
       u32 slotTt[kLuaStackSlots] = {}, slotBits[kLuaStackSlots] = {};
       u32 upTt[8] = {}, upBits[8] = {};
     };
-    void BuildLuaStack(const u32* in, LuaStackDesc& s)
+    void BuildLuaStack(
+      const u32* in,
+      LuaStackDesc& s
+    )
     {
       Rng rng(in[5] ^ 0x51A7C0DEu);
       s.base = in[6];
@@ -2459,7 +2897,8 @@ namespace difffuzz
       s.upvalues = in[8];
       const auto value = [&rng](u32& tt, u32& bits) {
         tt = rng.Below(4); // nil, boolean, light userdata, number: plain words
-        bits = tt == kLuaNumber ? Bits(static_cast<float>(static_cast<int>(rng.Below(200)) - 100) * 0.25f) : rng.Below(1000);
+        bits =
+          tt == kLuaNumber ? Bits(static_cast<float>(static_cast<int>(rng.Below(200)) - 100) * 0.25f) : rng.Below(1000);
       };
       for (u32 i = 0; i < kLuaStackSlots; ++i) {
         value(s.slotTt[i], s.slotBits[i]);
@@ -2468,7 +2907,10 @@ namespace difffuzz
         value(s.upTt[i], s.upBits[i]);
       }
     }
-    void GenLuaStackBase(Rng& rng, u32* in)
+    void GenLuaStackBase(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaTableBase(rng, in);
       in[5] = rng.U32();
@@ -2480,7 +2922,12 @@ namespace difffuzz
     // stack: positive up to the stack's end, top-relative down to its start,
     // the two pseudo-indices, upvalues (some past the count), registry
     // integer slots.
-    [[nodiscard]] u32 GenLuaStackIndex(Rng& rng, const u32* in, const bool positive, const bool nonNull)
+    [[nodiscard]] u32 GenLuaStackIndex(
+      Rng& rng,
+      const u32* in,
+      const bool positive,
+      const bool nonNull
+    )
     {
       const u32 base = in[6], top = in[7], upvalues = in[8];
       const u32 mode = rng.Below(100);
@@ -2498,28 +2945,42 @@ namespace difffuzz
       }
       if (mode < 85) {
         if (nonNull) {
-          return upvalues > 0u ? static_cast<u32>(-10001 - 1 - static_cast<int>(rng.Below(upvalues))) : static_cast<u32>(-10001);
+          return upvalues > 0u ? static_cast<u32>(-10001 - 1 - static_cast<int>(rng.Below(upvalues)))
+                               : static_cast<u32>(-10001);
         }
         return rng.Chance(85) ? static_cast<u32>(-10002 - static_cast<int>(rng.Below(8))) : static_cast<u32>(-20000);
       }
       return static_cast<u32>(-40001 - static_cast<int>(rng.Below(in[1] + 3u * (1u << in[2]) + 4u)));
     }
-    void GenLuaIndexAny(Rng& rng, u32* in)
+    void GenLuaIndexAny(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaStackBase(rng, in);
       in[9] = GenLuaStackIndex(rng, in, true, false);
     }
-    void GenLuaIndexNeg(Rng& rng, u32* in)
+    void GenLuaIndexNeg(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaStackBase(rng, in);
       in[9] = GenLuaStackIndex(rng, in, false, false);
     }
-    void GenLuaSetTop(Rng& rng, u32* in)
+    void GenLuaSetTop(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaStackBase(rng, in);
-      in[9] = rng.Chance(60) ? rng.Below(kLuaStackSlots - in[6]) : static_cast<u32>(-1 - static_cast<int>(rng.Below(in[7] + 2u)));
+      in[9] = rng.Chance(60) ? rng.Below(kLuaStackSlots - in[6])
+                             : static_cast<u32>(-1 - static_cast<int>(rng.Below(in[7] + 2u)));
     }
-    void GenLuaPushValue(Rng& rng, u32* in)
+    void GenLuaPushValue(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaStackBase(rng, in);
       in[9] = GenLuaStackIndex(rng, in, true, true);
@@ -2531,17 +2992,24 @@ namespace difffuzz
       RetailLuaTable registry;
       std::vector<std::uint8_t> state, global, frame, stack, closure;
 
-      [[nodiscard]] static u32 Addr(const std::vector<std::uint8_t>& v, const std::size_t at)
+      [[nodiscard]] static u32 Addr(
+        const std::vector<std::uint8_t>& v,
+        const std::size_t at
+      )
       {
         return static_cast<u32>(reinterpret_cast<std::uintptr_t>(v.data()) + at);
       }
-      [[nodiscard]] static LuaTableDesc Table(const u32* in)
+      [[nodiscard]] static LuaTableDesc Table(
+        const u32* in
+      )
       {
         LuaTableDesc d;
         BuildLuaTable(in, d);
         return d;
       }
-      explicit RetailLuaStack(const u32* in)
+      explicit RetailLuaStack(
+        const u32* in
+      )
         : tableDesc(Table(in))
         , registry(tableDesc)
         , state(0x48, 0)
@@ -2589,7 +3057,9 @@ namespace difffuzz
         std::memcpy(state.data() + 0x30, &table, 4);
         std::memcpy(state.data() + 0x34, &kGlobalsWord, 4);
       }
-      [[nodiscard]] u32 Classify(const u32 p) const
+      [[nodiscard]] u32 Classify(
+        const u32 p
+      ) const
       {
         const u32 stackAddr = Addr(stack, 0);
         if (p == 0u) {
@@ -2617,7 +3087,11 @@ namespace difffuzz
       }
       // Stack slot `index` set to a key of the registry table (a string key's
       // bits are its pool index).
-      void SetSlot(const u32 index, const u32 tt, const u32 bits)
+      void SetSlot(
+        const u32 index,
+        const u32 tt,
+        const u32 bits
+      )
       {
         const u32 word = tt == kLuaString ? registry.Addr(registry.strings, bits * 0x20u) : bits;
         std::memcpy(stack.data() + index * 8, &tt, 4);
@@ -2637,7 +3111,10 @@ namespace difffuzz
       }
       // The pushed or written slot's tt and value word, a string as its pool
       // index and the registry table as a constant.
-      void Value(const u32 index, u32* out) const
+      void Value(
+        const u32 index,
+        u32* out
+      ) const
       {
         std::memcpy(&out[0], stack.data() + index * 8, 4);
         std::memcpy(&out[1], stack.data() + index * 8 + 4, 4);
@@ -2648,27 +3125,42 @@ namespace difffuzz
         }
       }
     };
-    void LuaIndexAnyRetail(const u32* in, u32* out)
+    void LuaIndexAnyRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailLuaStack s(in);
       out[0] = s.Classify(retail::LuaAIndex(s.state.data(), static_cast<int>(in[9])));
     }
-    void LuaNegIndexRetail(const u32* in, u32* out)
+    void LuaNegIndexRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailLuaStack s(in);
       out[0] = s.Classify(retail::LuaNegIndex(s.state.data(), static_cast<int>(in[9])));
     }
-    void LuaTypeRetail(const u32* in, u32* out)
+    void LuaTypeRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailLuaStack s(in);
       out[0] = retail::LuaType(s.state.data(), static_cast<int>(in[9]));
     }
-    void LuaGetTopRetail(const u32* in, u32* out)
+    void LuaGetTopRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailLuaStack s(in);
       out[0] = retail::LuaGetTop(s.state.data());
     }
-    void LuaSetTopRetail(const u32* in, u32* out)
+    void LuaSetTopRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailLuaStack s(in);
       retail::LuaSetTop(s.state.data(), static_cast<int>(in[9]));
@@ -2677,7 +3169,10 @@ namespace difffuzz
         std::memcpy(&out[1 + i], s.stack.data() + (in[6] + in[7] + i) % kLuaStackSlots * 8, 4);
       }
     }
-    void LuaPushValueRetail(const u32* in, u32* out)
+    void LuaPushValueRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailLuaStack s(in);
       u32 top = 0;
@@ -2698,14 +3193,20 @@ namespace difffuzz
     // Events stay in 0..31, where ours' int shift is defined; flags start
     // from any byte, so the OR shows.
     // in = seed sizearray lsizenode fill pool event key flags; out = slot flags.
-    void GenLuaGetTm(Rng& rng, u32* in)
+    void GenLuaGetTm(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaTableBase(rng, in);
       in[5] = rng.Chance(80) ? rng.Below(16) : rng.Below(32);
       in[6] = rng.Below(in[4] + 1u);
       in[7] = rng.Chance(30) ? 0u : rng.Below(256);
     }
-    void LuaGetTmRetail(const u32* in, u32* out)
+    void LuaGetTmRetail(
+      const u32* in,
+      u32* out
+    )
     {
       LuaTableDesc d;
       BuildLuaTable(in, d);
@@ -2726,24 +3227,38 @@ namespace difffuzz
     // luaH_next with the key at top - 1, then push (more) or pop (done); the
     // key slot holds a key the registry holds, or nil.
     // in = the stack words, then idx | key | number bits | keyTt keyBits.
-    void GenLuaToNumber(Rng& rng, u32* in)
+    void GenLuaToNumber(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaStackBase(rng, in);
       in[9] = GenLuaStackIndex(rng, in, true, false);
     }
-    void GenLuaRawGetI(Rng& rng, u32* in)
+    void GenLuaRawGetI(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaStackBase(rng, in);
       in[9] = static_cast<u32>(-10000);
       const u32 mode = rng.Below(100);
-      in[10] = mode < 50 ? rng.Below(in[1] + 2u) : (mode < 85 ? static_cast<u32>(static_cast<int>(rng.Below(3u * (1u << in[2]) + 8u)) - 4) : rng.U32());
+      in[10] = mode < 50
+        ? rng.Below(in[1] + 2u)
+        : (mode < 85 ? static_cast<u32>(static_cast<int>(rng.Below(3u * (1u << in[2]) + 8u)) - 4) : rng.U32());
     }
-    void GenLuaPushNumber(Rng& rng, u32* in)
+    void GenLuaPushNumber(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaStackBase(rng, in);
       in[9] = Bits(GenFloat(rng));
     }
-    void GenLuaNext(Rng& rng, u32* in)
+    void GenLuaNext(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaStackBase(rng, in);
       in[7] = in[7] > 0u ? in[7] : 1u; // the key slot sits at top - 1
@@ -2752,19 +3267,28 @@ namespace difffuzz
       BuildLuaTable(in, d);
       PickPresentKey(rng, d, in + 10);
     }
-    void LuaToNumberRetail(const u32* in, u32* out)
+    void LuaToNumberRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailLuaStack s(in);
       out[0] = Bits(retail::LuaToNumber(s.state.data(), static_cast<int>(in[9])));
     }
-    void LuaRawGetIRetail(const u32* in, u32* out)
+    void LuaRawGetIRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailLuaStack s(in);
       retail::LuaRawGetI(s.state.data(), static_cast<int>(in[9]), static_cast<int>(in[10]));
       out[0] = s.TopSlot();
       s.Value(in[6] + in[7], out + 1);
     }
-    void LuaPushNumberRetail(const u32* in, u32* out)
+    void LuaPushNumberRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailLuaStack s(in);
       retail::LuaPushNumber(s.state.data(), F(in, 9));
@@ -2782,7 +3306,10 @@ namespace difffuzz
     // (nil and NaN resolve to nil through luaH_getany).
     // in = the stack words, then keyTt keyBits flags loop tmname0; out = slot
     // flags.
-    void GenLuaGetTable(Rng& rng, u32* in)
+    void GenLuaGetTable(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaStackBase(rng, in);
       LuaTableDesc d;
@@ -2812,7 +3339,10 @@ namespace difffuzz
       in[13] = names[rng.Below(static_cast<u32>(names.size()))];
     }
     template <bool Index>
-    void LuaGetTableRetail(const u32* in, u32* out)
+    void LuaGetTableRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailLuaStack s(in);
       const u32 tableAddr = s.registry.Addr(s.registry.table, 0);
@@ -2836,7 +3366,10 @@ namespace difffuzz
     // a nil value, and the key one t holds (luaH_set never allocates).
     // in = the stack words, then keyTt keyBits valTt valBits tmname1; out =
     // flags, the slot that changed (none 0xFFFFFFFF), FNV-1a of every value.
-    void GenLuaSetTable(Rng& rng, u32* in)
+    void GenLuaSetTable(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaStackBase(rng, in);
       LuaTableDesc d;
@@ -2851,7 +3384,8 @@ namespace difffuzz
         BuildLuaTable(in, d);
       }
       in[11] = rng.Below(4);
-      in[12] = in[11] == kLuaNumber ? Bits(static_cast<float>(static_cast<int>(rng.Below(200)) - 100) * 0.25f) : rng.Below(1000);
+      in[12] = in[11] == kLuaNumber ? Bits(static_cast<float>(static_cast<int>(rng.Below(200)) - 100) * 0.25f)
+                                    : rng.Below(1000);
       std::vector<u32> names(1, in[4]);
       for (u32 k = 0; k < in[4]; ++k) {
         bool live = false;
@@ -2866,7 +3400,12 @@ namespace difffuzz
     }
     // Every value word of a table in node then array order: the changed
     // slot's code and an FNV-1a fold.
-    void LuaTableValueDiff(const std::vector<u32>& before, const std::vector<u32>& after, const u32 nodes, u32* out)
+    void LuaTableValueDiff(
+      const std::vector<u32>& before,
+      const std::vector<u32>& after,
+      const u32 nodes,
+      u32* out
+    )
     {
       out[0] = 0xFFFFFFFFu;
       u32 hash = 0x811C9DC5u;
@@ -2879,7 +3418,10 @@ namespace difffuzz
       }
       out[1] = hash;
     }
-    void LuaSetTableRetail(const u32* in, u32* out)
+    void LuaSetTableRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailLuaStack s(in);
       const u32 tableAddr = s.registry.Addr(s.registry.table, 0);
@@ -2921,12 +3463,18 @@ namespace difffuzz
     // the key at top - 2 and pops two: held keys only (a missing one
     // allocates through the state).
     // in = the stack words, then idx | b | key words.
-    void GenLuaPushBoolean(Rng& rng, u32* in)
+    void GenLuaPushBoolean(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaStackBase(rng, in);
       in[9] = rng.Chance(50) ? rng.Below(2) : rng.U32();
     }
-    void GenLuaRawGet(Rng& rng, u32* in)
+    void GenLuaRawGet(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaStackBase(rng, in);
       in[7] = in[7] > 0u ? in[7] : 1u;
@@ -2940,7 +3488,10 @@ namespace difffuzz
         in[11] = in[10] == kLuaString ? in[4] : (in[10] == kLuaNumber ? Bits(GenFloat(rng)) : rng.Below(1000));
       }
     }
-    void GenLuaRawSetI(Rng& rng, u32* in)
+    void GenLuaRawSetI(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaStackBase(rng, in);
       in[7] = in[7] > 0u ? in[7] : 1u;
@@ -2950,7 +3501,10 @@ namespace difffuzz
       in[1] = setnum[1];
       in[10] = setnum[5];
     }
-    void GenLuaRawSet(Rng& rng, u32* in)
+    void GenLuaRawSet(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLuaStackBase(rng, in);
       in[7] = in[7] > 1u ? in[7] : 2u;
@@ -2966,31 +3520,46 @@ namespace difffuzz
         in[11] = Bits(1.0f);
       }
     }
-    void LuaToBooleanRetail(const u32* in, u32* out)
+    void LuaToBooleanRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailLuaStack s(in);
       out[0] = retail::LuaToBoolean(s.state.data(), static_cast<int>(in[9]));
     }
-    void LuaIsNumberRetail(const u32* in, u32* out)
+    void LuaIsNumberRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailLuaStack s(in);
       out[0] = retail::LuaIsNumber(s.state.data(), static_cast<int>(in[9]));
     }
-    void LuaPushNilRetail(const u32* in, u32* out)
+    void LuaPushNilRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailLuaStack s(in);
       retail::LuaPushNil(s.state.data());
       out[0] = s.TopSlot();
       s.Value(in[6] + in[7], out + 1);
     }
-    void LuaPushBooleanRetail(const u32* in, u32* out)
+    void LuaPushBooleanRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailLuaStack s(in);
       retail::LuaPushBoolean(s.state.data(), static_cast<int>(in[9]));
       out[0] = s.TopSlot();
       s.Value(in[6] + in[7], out + 1);
     }
-    void LuaRawGetRetail(const u32* in, u32* out)
+    void LuaRawGetRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailLuaStack s(in);
       s.SetSlot(in[6] + in[7] - 1u, in[10], in[11]);
@@ -2998,7 +3567,10 @@ namespace difffuzz
       out[0] = s.TopSlot();
       s.Value(in[6] + in[7] - 1u, out + 1);
     }
-    void LuaRawSetIRetail(const u32* in, u32* out)
+    void LuaRawSetIRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailLuaStack s(in);
       const std::vector<u32> before = s.TableValues();
@@ -3007,7 +3579,10 @@ namespace difffuzz
       out[1] = s.registry.table[0x08];
       LuaTableValueDiff(before, s.TableValues(), static_cast<u32>(s.tableDesc.keyTt.size()), out + 2);
     }
-    void LuaRawSetRetail(const u32* in, u32* out)
+    void LuaRawSetRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailLuaStack s(in);
       s.SetSlot(in[6] + in[7] - 2u, in[10], in[11]);
@@ -3017,7 +3592,10 @@ namespace difffuzz
       out[1] = s.registry.table[0x08];
       LuaTableValueDiff(before, s.TableValues(), static_cast<u32>(s.tableDesc.keyTt.size()), out + 2);
     }
-    void LuaNextRetail2(const u32* in, u32* out)
+    void LuaNextRetail2(
+      const u32* in,
+      u32* out
+    )
     {
       RetailLuaStack s(in);
       s.SetSlot(in[6] + in[7] - 1u, in[10], in[11]);
@@ -3034,10 +3612,13 @@ namespace difffuzz
       using value_type = T;
       LuaFixtureAllocator() = default;
       template <class U>
-      LuaFixtureAllocator(const LuaFixtureAllocator<U>&) noexcept
-      {
-      }
-      [[nodiscard]] T* allocate(const std::size_t count)
+      LuaFixtureAllocator(
+        const LuaFixtureAllocator<U>&
+      ) noexcept
+      {}
+      [[nodiscard]] T* allocate(
+        const std::size_t count
+      )
       {
 #if INTPTR_MAX == INT32_MAX
         return std::allocator<T>{}.allocate(count);
@@ -3045,7 +3626,10 @@ namespace difffuzz
         return static_cast<T*>(lua::ArenaAllocate(count * sizeof(T)));
 #endif
       }
-      void deallocate(T* const block, const std::size_t count) noexcept
+      void deallocate(
+        T* const block,
+        const std::size_t count
+      ) noexcept
       {
 #if INTPTR_MAX == INT32_MAX
         std::allocator<T>{}.deallocate(block, count);
@@ -3055,7 +3639,9 @@ namespace difffuzz
 #endif
       }
       template <class U>
-      bool operator==(const LuaFixtureAllocator<U>&) const noexcept
+      bool operator==(
+        const LuaFixtureAllocator<U>&
+      ) const noexcept
       {
         return true;
       }
@@ -3072,7 +3658,9 @@ namespace difffuzz
       std::vector<LuaFixtureStore> strings;
       Table* table = nullptr;
 
-      explicit OursLuaTable(const LuaTableDesc& d)
+      explicit OursLuaTable(
+        const LuaTableDesc& d
+      )
         : tableStore(sizeof(Table) / sizeof(std::uint64_t) + 1u)
         , nodes(d.keyTt.size())
         , array(d.sizearray + 1u)
@@ -3108,11 +3696,15 @@ namespace difffuzz
         table->node = nodes.data();
         table->sizearray = static_cast<int>(d.sizearray);
       }
-      [[nodiscard]] TString* String(const std::size_t i)
+      [[nodiscard]] TString* String(
+        const std::size_t i
+      )
       {
         return reinterpret_cast<TString*>(strings[i].data());
       }
-      [[nodiscard]] u32 Slot(const LuaPlus::TObject* const result) const
+      [[nodiscard]] u32 Slot(
+        const LuaPlus::TObject* const result
+      ) const
       {
         if (result == &luaO_nilobject) {
           return 0xFFFFFFFFu;
@@ -3126,21 +3718,30 @@ namespace difffuzz
         return static_cast<u32>((asNode - reinterpret_cast<const std::uint8_t*>(nodes.data())) / sizeof(Node));
       }
     };
-    void LuaGetStrOurs(const u32* in, u32* out)
+    void LuaGetStrOurs(
+      const u32* in,
+      u32* out
+    )
     {
       LuaTableDesc d;
       BuildLuaTable(in, d);
       OursLuaTable t(d);
       out[0] = t.Slot(luaH_getstr(t.table, t.String(in[5])));
     }
-    void LuaGetNumOurs(const u32* in, u32* out)
+    void LuaGetNumOurs(
+      const u32* in,
+      u32* out
+    )
     {
       LuaTableDesc d;
       BuildLuaTable(in, d);
       OursLuaTable t(d);
       out[0] = t.Slot(luaH_getnum(t.table, static_cast<int>(in[5])));
     }
-    void LuaGetOurs(const u32* in, u32* out)
+    void LuaGetOurs(
+      const u32* in,
+      u32* out
+    )
     {
       LuaTableDesc d;
       BuildLuaTable(in, d);
@@ -3156,7 +3757,10 @@ namespace difffuzz
       }
       out[0] = t.Slot(luaH_get(t.table, &key));
     }
-    void LuaMainPositionOurs(const u32* in, u32* out)
+    void LuaMainPositionOurs(
+      const u32* in,
+      u32* out
+    )
     {
       LuaTableDesc d;
       BuildLuaTable(in, d);
@@ -3172,7 +3776,10 @@ namespace difffuzz
       }
       out[0] = static_cast<u32>(luaH_mainposition(t.table, &key) - t.nodes.data());
     }
-    void LuaEqualValOurs(const u32* in, u32* out)
+    void LuaEqualValOurs(
+      const u32* in,
+      u32* out
+    )
     {
       LuaPlus::TObject left;
       LuaPlus::TObject right;
@@ -3181,7 +3788,10 @@ namespace difffuzz
       right.value.p = reinterpret_cast<void*>(static_cast<std::uintptr_t>(in[2]));
       out[0] = static_cast<u32>(luaV_equalval(nullptr, &left, &right));
     }
-    void LuaLessThanOurs(const u32* in, u32* out)
+    void LuaLessThanOurs(
+      const u32* in,
+      u32* out
+    )
     {
       LuaPlus::TObject left;
       LuaPlus::TObject right;
@@ -3191,7 +3801,12 @@ namespace difffuzz
       right.value.p = reinterpret_cast<void*>(static_cast<std::uintptr_t>(in[3]));
       out[0] = static_cast<u32>(luaV_lessthan(nullptr, &left, &right));
     }
-    void SetLuaKey(OursLuaTable& t, const u32 tt, const u32 bits, LuaPlus::TObject& key)
+    void SetLuaKey(
+      OursLuaTable& t,
+      const u32 tt,
+      const u32 bits,
+      LuaPlus::TObject& key
+    )
     {
       key.tt = static_cast<int>(tt);
       if (tt == kLuaString) {
@@ -3200,7 +3815,10 @@ namespace difffuzz
         key.value.p = reinterpret_cast<void*>(static_cast<std::uintptr_t>(bits));
       }
     }
-    void LuaIndexOurs(const u32* in, u32* out)
+    void LuaIndexOurs(
+      const u32* in,
+      u32* out
+    )
     {
       LuaTableDesc d;
       BuildLuaTable(in, d);
@@ -3209,7 +3827,10 @@ namespace difffuzz
       SetLuaKey(t, in[5], in[6], key);
       out[0] = static_cast<u32>(luaH_index(nullptr, t.table, &key));
     }
-    void LuaNextOurs(const u32* in, u32* out)
+    void LuaNextOurs(
+      const u32* in,
+      u32* out
+    )
     {
       LuaTableDesc d;
       BuildLuaTable(in, d);
@@ -3232,7 +3853,10 @@ namespace difffuzz
       out[3] = static_cast<u32>(key[1].tt);
       out[4] = word(key[1]);
     }
-    void LuaSetOurs(const u32* in, u32* out)
+    void LuaSetOurs(
+      const u32* in,
+      u32* out
+    )
     {
       LuaTableDesc d;
       BuildLuaTable(in, d);
@@ -3242,7 +3866,10 @@ namespace difffuzz
       out[0] = t.Slot(luaH_set(nullptr, t.table, &key));
       out[1] = static_cast<std::uint8_t>(t.table->flags);
     }
-    void LuaSetNumOurs(const u32* in, u32* out)
+    void LuaSetNumOurs(
+      const u32* in,
+      u32* out
+    )
     {
       LuaTableDesc d;
       BuildLuaTable(in, d);
@@ -3261,22 +3888,32 @@ namespace difffuzz
       global_State* global = nullptr;
       CClosure* closure = nullptr;
 
-      [[nodiscard]] static LuaTableDesc Table(const u32* in)
+      [[nodiscard]] static LuaTableDesc Table(
+        const u32* in
+      )
       {
         LuaTableDesc d;
         BuildLuaTable(in, d);
         return d;
       }
-      [[nodiscard]] static std::size_t Blocks(const std::size_t bytes)
+      [[nodiscard]] static std::size_t Blocks(
+        const std::size_t bytes
+      )
       {
         return bytes / sizeof(std::uint64_t) + 1u;
       }
-      static void Set(LuaPlus::TObject& o, const u32 tt, const u32 bits)
+      static void Set(
+        LuaPlus::TObject& o,
+        const u32 tt,
+        const u32 bits
+      )
       {
         o.tt = static_cast<int>(tt);
         o.value.p = reinterpret_cast<void*>(static_cast<std::uintptr_t>(bits));
       }
-      explicit OursLuaStack(const u32* in)
+      explicit OursLuaStack(
+        const u32* in
+      )
         : tableDesc(Table(in))
         , registry(tableDesc)
         , stateStore(Blocks(sizeof(lua_State)))
@@ -3316,7 +3953,9 @@ namespace difffuzz
         state->stack = stack.data();
         Set(state->_gt, kLuaTable, kGlobalsWord);
       }
-      [[nodiscard]] u32 Classify(const LuaPlus::TObject* const p) const
+      [[nodiscard]] u32 Classify(
+        const LuaPlus::TObject* const p
+      ) const
       {
         if (p == nullptr) {
           return 0u;
@@ -3330,12 +3969,17 @@ namespace difffuzz
         if (p == &state->_gt) {
           return 0x201u;
         }
-        if (p >= &closure->upvalue_m1[0] && p <= &closure->upvalue_m1[8]) {
-          return 0x300u + static_cast<u32>(p - &closure->upvalue_m1[0]);
+        // upvalue_m1 is declared [1] and allocated longer (Lua's trailing array): read through a pointer.
+        if (const LuaPlus::TObject* const upvalues = closure->upvalue_m1; p >= upvalues && p <= upvalues + 8) {
+          return 0x300u + static_cast<u32>(p - upvalues);
         }
         return registry.Slot(p);
       }
-      void SetSlot(const u32 index, const u32 tt, const u32 bits)
+      void SetSlot(
+        const u32 index,
+        const u32 tt,
+        const u32 bits
+      )
       {
         stack[index].tt = static_cast<int>(tt);
         stack[index].value.p = tt == kLuaString ? static_cast<void*>(registry.String(bits))
@@ -3356,7 +4000,10 @@ namespace difffuzz
         }
         return v;
       }
-      void Value(const u32 index, u32* out)
+      void Value(
+        const u32 index,
+        u32* out
+      )
       {
         const LuaPlus::TObject& o = stack[index];
         out[0] = static_cast<u32>(o.tt);
@@ -3372,7 +4019,10 @@ namespace difffuzz
         }
       }
     };
-    void LuaGetTmOurs(const u32* in, u32* out)
+    void LuaGetTmOurs(
+      const u32* in,
+      u32* out
+    )
     {
       LuaTableDesc d;
       BuildLuaTable(in, d);
@@ -3382,19 +4032,28 @@ namespace difffuzz
       out[0] = slot == nullptr ? 0xEEEE0000u : t.Slot(slot);
       out[1] = static_cast<std::uint8_t>(t.table->flags);
     }
-    void LuaToNumberOurs(const u32* in, u32* out)
+    void LuaToNumberOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursLuaStack s(in);
       out[0] = Bits(lua_tonumber(s.state, static_cast<int>(in[9])));
     }
-    void LuaRawGetIOurs(const u32* in, u32* out)
+    void LuaRawGetIOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursLuaStack s(in);
       lua_rawgeti(s.state, static_cast<int>(in[9]), static_cast<int>(in[10]));
       out[0] = s.Classify(s.state->top);
       s.Value(in[6] + in[7], out + 1);
     }
-    void LuaPushNumberOurs(const u32* in, u32* out)
+    void LuaPushNumberOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursLuaStack s(in);
       lua_pushnumber(s.state, F(in, 9));
@@ -3402,7 +4061,10 @@ namespace difffuzz
       s.Value(in[6] + in[7], out + 1);
     }
     template <bool Index>
-    void LuaGetTableOurs(const u32* in, u32* out)
+    void LuaGetTableOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursLuaStack s(in);
       Table* const table = s.registry.table;
@@ -3421,7 +4083,10 @@ namespace difffuzz
       out[0] = s.registry.Slot(slot);
       out[1] = static_cast<std::uint8_t>(table->flags);
     }
-    void LuaSetTableOurs(const u32* in, u32* out)
+    void LuaSetTableOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursLuaStack s(in);
       Table* const table = s.registry.table;
@@ -3457,31 +4122,46 @@ namespace difffuzz
       out[0] = static_cast<std::uint8_t>(table->flags);
       LuaTableValueDiff(before, values(), static_cast<u32>(s.registry.nodes.size()), out + 1);
     }
-    void LuaToBooleanOurs(const u32* in, u32* out)
+    void LuaToBooleanOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursLuaStack s(in);
       out[0] = static_cast<u32>(lua_toboolean(s.state, static_cast<int>(in[9])));
     }
-    void LuaIsNumberOurs(const u32* in, u32* out)
+    void LuaIsNumberOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursLuaStack s(in);
       out[0] = static_cast<u32>(lua_isnumber(s.state, static_cast<int>(in[9])));
     }
-    void LuaPushNilOurs(const u32* in, u32* out)
+    void LuaPushNilOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursLuaStack s(in);
       lua_pushnil(s.state);
       out[0] = s.Classify(s.state->top);
       s.Value(in[6] + in[7], out + 1);
     }
-    void LuaPushBooleanOurs(const u32* in, u32* out)
+    void LuaPushBooleanOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursLuaStack s(in);
       lua_pushboolean(s.state, static_cast<int>(in[9]));
       out[0] = s.Classify(s.state->top);
       s.Value(in[6] + in[7], out + 1);
     }
-    void LuaRawGetOurs(const u32* in, u32* out)
+    void LuaRawGetOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursLuaStack s(in);
       s.SetSlot(in[6] + in[7] - 1u, in[10], in[11]);
@@ -3489,7 +4169,10 @@ namespace difffuzz
       out[0] = s.Classify(s.state->top);
       s.Value(in[6] + in[7] - 1u, out + 1);
     }
-    void LuaRawSetIOurs(const u32* in, u32* out)
+    void LuaRawSetIOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursLuaStack s(in);
       const std::vector<u32> before = s.TableValues();
@@ -3498,7 +4181,10 @@ namespace difffuzz
       out[1] = static_cast<std::uint8_t>(s.registry.table->flags);
       LuaTableValueDiff(before, s.TableValues(), static_cast<u32>(s.tableDesc.keyTt.size()), out + 2);
     }
-    void LuaRawSetOurs(const u32* in, u32* out)
+    void LuaRawSetOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursLuaStack s(in);
       s.SetSlot(in[6] + in[7] - 2u, in[10], in[11]);
@@ -3508,7 +4194,10 @@ namespace difffuzz
       out[1] = static_cast<std::uint8_t>(s.registry.table->flags);
       LuaTableValueDiff(before, s.TableValues(), static_cast<u32>(s.tableDesc.keyTt.size()), out + 2);
     }
-    void LuaNextOurs2(const u32* in, u32* out)
+    void LuaNextOurs2(
+      const u32* in,
+      u32* out
+    )
     {
       OursLuaStack s(in);
       s.SetSlot(in[6] + in[7] - 1u, in[10], in[11]);
@@ -3517,27 +4206,42 @@ namespace difffuzz
       s.Value(in[6] + in[7] - 1u, out + 2);
       s.Value(in[6] + in[7], out + 4);
     }
-    void LuaIndexAnyOurs(const u32* in, u32* out)
+    void LuaIndexAnyOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursLuaStack s(in);
       out[0] = s.Classify(luaA_index(s.state, static_cast<int>(in[9])));
     }
-    void LuaNegIndexOurs(const u32* in, u32* out)
+    void LuaNegIndexOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursLuaStack s(in);
       out[0] = s.Classify(negindex(s.state, static_cast<int>(in[9])));
     }
-    void LuaTypeOurs(const u32* in, u32* out)
+    void LuaTypeOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursLuaStack s(in);
       out[0] = static_cast<u32>(lua_type(s.state, static_cast<int>(in[9])));
     }
-    void LuaGetTopOurs(const u32* in, u32* out)
+    void LuaGetTopOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursLuaStack s(in);
       out[0] = static_cast<u32>(lua_gettop(s.state));
     }
-    void LuaSetTopOurs(const u32* in, u32* out)
+    void LuaSetTopOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursLuaStack s(in);
       lua_settop(s.state, static_cast<int>(in[9]));
@@ -3546,7 +4250,10 @@ namespace difffuzz
         out[1 + i] = static_cast<u32>(s.stack[(in[6] + in[7] + i) % kLuaStackSlots].tt);
       }
     }
-    void LuaPushValueOurs(const u32* in, u32* out)
+    void LuaPushValueOurs(
+      const u32* in,
+      u32* out
+    )
     {
       OursLuaStack s(in);
       const LuaPlus::TObject* const top = s.state->top;
@@ -3569,21 +4276,28 @@ namespace difffuzz
     // sometimes any float (NaN, infinite, huge) or any int in the edge words.
     constexpr int kLineWords = 11;
 
-    [[nodiscard]] float GenLineCoord(Rng& rng)
+    [[nodiscard]] float GenLineCoord(
+      Rng& rng
+    )
     {
       if (rng.Chance(12)) {
         return GenFloat(rng);
       }
       return static_cast<float>(rng.Range(-64.0, 1100.0));
     }
-    [[nodiscard]] u32 GenLineStep(Rng& rng)
+    [[nodiscard]] u32 GenLineStep(
+      Rng& rng
+    )
     {
       if (rng.Chance(5)) {
         return rng.U32();
       }
       return 1u << rng.Below(7);
     }
-    void GenLineStruct(Rng& rng, u32* line)
+    void GenLineStruct(
+      Rng& rng,
+      u32* line
+    )
     {
       for (int i = 0; i < 6; ++i) {
         line[i] = Bits(GenLineCoord(rng));
@@ -3600,14 +4314,20 @@ namespace difffuzz
 
     // InitGridTraversalLine 0x0040D860: in = step, xEnd, xStart, zStart, zEnd;
     // out = the 11 words of the line.
-    void GenLineInit(Rng& rng, u32* in)
+    void GenLineInit(
+      Rng& rng,
+      u32* in
+    )
     {
       in[0] = GenLineStep(rng);
       for (int i = 1; i < 5; ++i) {
         in[i] = Bits(GenLineCoord(rng));
       }
     }
-    void LineInitRetail(const u32* in, u32* out)
+    void LineInitRetail(
+      const u32* in,
+      u32* out
+    )
     {
       u32 line[kLineWords];
       for (u32& w : line) {
@@ -3620,30 +4340,45 @@ namespace difffuzz
     // AdvanceGridTraversalEdge 0x00475FD0: in = a line; out = the line after
     // one step. GetGridTraversalCell 0x00476050: out = x, z.
     // IsGridTraversalBeyondEnd 0x00476070: out = 0 or 1.
-    void GenLine(Rng& rng, u32* in)
+    void GenLine(
+      Rng& rng,
+      u32* in
+    )
     {
       GenLineStruct(rng, in);
     }
-    void LineAdvanceRetail(const u32* in, u32* out)
+    void LineAdvanceRetail(
+      const u32* in,
+      u32* out
+    )
     {
       u32 line[kLineWords];
       std::memcpy(line, in, sizeof(line));
       retail::GridLineAdvance(line);
       std::memcpy(out, line, sizeof(line));
     }
-    void LineCellRetail(const u32* in, u32* out)
+    void LineCellRetail(
+      const u32* in,
+      u32* out
+    )
     {
       u32 xz[2] = {kCanary, kCanary};
       retail::GridLineCell(in, xz);
       out[0] = xz[0];
       out[1] = xz[1];
     }
-    void LineBeyondEndRetail(const u32* in, u32* out)
+    void LineBeyondEndRetail(
+      const u32* in,
+      u32* out
+    )
     {
       out[0] = static_cast<u32>(retail::GridLineBeyondEnd(in));
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void LineInitOurs(const u32* in, u32* out)
+    void LineInitOurs(
+      const u32* in,
+      u32* out
+    )
     {
       moho::GridTraversalLine line;
       u32 canary[kLineWords];
@@ -3654,14 +4389,20 @@ namespace difffuzz
       moho::InitGridTraversalLine(line, static_cast<std::int32_t>(in[0]), F(in, 1), F(in, 2), F(in, 3), F(in, 4));
       std::memcpy(out, &line, sizeof(line));
     }
-    void LineAdvanceOurs(const u32* in, u32* out)
+    void LineAdvanceOurs(
+      const u32* in,
+      u32* out
+    )
     {
       moho::GridTraversalLine line;
       std::memcpy(&line, in, sizeof(line));
       moho::AdvanceGridTraversalEdge(line);
       std::memcpy(out, &line, sizeof(line));
     }
-    void LineCellOurs(const u32* in, u32* out)
+    void LineCellOurs(
+      const u32* in,
+      u32* out
+    )
     {
       moho::GridTraversalLine line;
       std::memcpy(&line, in, sizeof(line));
@@ -3671,7 +4412,10 @@ namespace difffuzz
       out[0] = static_cast<u32>(x);
       out[1] = static_cast<u32>(z);
     }
-    void LineBeyondEndOurs(const u32* in, u32* out)
+    void LineBeyondEndOurs(
+      const u32* in,
+      u32* out
+    )
     {
       moho::GridTraversalLine line;
       std::memcpy(&line, in, sizeof(line));
@@ -3686,7 +4430,9 @@ namespace difffuzz
     // the sim's scripts touch; luaO_int2fb 0x0091A4E0 packs a table size into a
     // byte for OP_NEWTABLE. in = x; out = the result. x is 0, 1, a power of two
     // or one off it, near the limits, small, or any word.
-    [[nodiscard]] u32 GenSizeWord(Rng& rng)
+    [[nodiscard]] u32 GenSizeWord(
+      Rng& rng
+    )
     {
       const u32 mode = rng.Below(100);
       if (mode < 30) {
@@ -3701,24 +4447,39 @@ namespace difffuzz
       }
       return rng.U32();
     }
-    void GenLuaSize(Rng& rng, u32* in)
+    void GenLuaSize(
+      Rng& rng,
+      u32* in
+    )
     {
       in[0] = GenSizeWord(rng);
     }
-    void LuaLog2Retail(const u32* in, u32* out)
+    void LuaLog2Retail(
+      const u32* in,
+      u32* out
+    )
     {
       out[0] = retail::LuaLog2(in[0]);
     }
-    void LuaInt2FbRetail(const u32* in, u32* out)
+    void LuaInt2FbRetail(
+      const u32* in,
+      u32* out
+    )
     {
       out[0] = retail::LuaInt2Fb(in[0]);
     }
 #if defined(DIFFFUZZ_ENGINE_LINKED)
-    void LuaLog2Ours(const u32* in, u32* out)
+    void LuaLog2Ours(
+      const u32* in,
+      u32* out
+    )
     {
       out[0] = static_cast<u32>(luaO_log2(in[0]));
     }
-    void LuaInt2FbOurs(const u32* in, u32* out)
+    void LuaInt2FbOurs(
+      const u32* in,
+      u32* out
+    )
     {
       out[0] = luaO_int2fb(in[0]);
     }
@@ -3733,7 +4494,10 @@ namespace difffuzz
     // in = width, height, then fill ops of (x0, z0, w, h, fill).
     constexpr int kFillOps = 3;
 
-    [[nodiscard]] int GenGridEdge(Rng& rng, const u32 size)
+    [[nodiscard]] int GenGridEdge(
+      Rng& rng,
+      const u32 size
+    )
     {
       const u32 mode = rng.Below(100);
       if (mode < 85) {
@@ -3747,7 +4511,10 @@ namespace difffuzz
       }
       return static_cast<int>(rng.U32());
     }
-    [[nodiscard]] int GenGridExtent(Rng& rng, const u32 size)
+    [[nodiscard]] int GenGridExtent(
+      Rng& rng,
+      const u32 size
+    )
     {
       const u32 mode = rng.Below(100);
       if (mode < 85) {
@@ -3759,7 +4526,10 @@ namespace difffuzz
       return static_cast<int>(rng.U32());
     }
     /// in[0..1] = width, height (1..80; often 32k +- 1 rows, the word seams).
-    void GenGrid(Rng& rng, u32* in)
+    void GenGrid(
+      Rng& rng,
+      u32* in
+    )
     {
       const u32 mode = rng.Below(100);
       in[0] = 1u + rng.Below(80);
@@ -3784,32 +4554,50 @@ namespace difffuzz
     {
       unsigned char bytes[16]; // ptr, size, width, height
     };
-    void BuildRetailGrid(RetailBitArray& grid, const u32* in)
+    void BuildRetailGrid(
+      RetailBitArray& grid,
+      const u32* in
+    )
     {
       std::memset(grid.bytes, 0, sizeof(grid.bytes));
       retail::BitArrayConstruct(&grid, in[0], in[1]);
       for (int op = 0; op < kFillOps; ++op) {
         const u32* const o = in + 2 + 5 * op;
         retail::BitArrayFillRect(
-          &grid, static_cast<int>(o[0]), static_cast<int>(o[1]), static_cast<int>(o[2]), static_cast<int>(o[3]),
+          &grid,
+          static_cast<int>(o[0]),
+          static_cast<int>(o[1]),
+          static_cast<int>(o[2]),
+          static_cast<int>(o[3]),
           static_cast<int>(o[4])
         );
       }
     }
-    void FreeRetailGrid(RetailBitArray& grid)
+    void FreeRetailGrid(
+      RetailBitArray& grid
+    )
     {
       void* words;
       std::memcpy(&words, grid.bytes, 4);
       retail::OperatorDelete(words);
     }
-    void BuildOurGrid(gpg::BitArray2D& grid, const u32* in)
+    void BuildOurGrid(
+      gpg::BitArray2D& grid,
+      const u32* in
+    )
     {
       for (int op = 0; op < kFillOps; ++op) {
         const u32* const o = in + 2 + 5 * op;
-        grid.FillRect(static_cast<int>(o[0]), static_cast<int>(o[1]), static_cast<int>(o[2]), static_cast<int>(o[3]), o[4] != 0u);
+        grid.FillRect(
+          static_cast<int>(o[0]), static_cast<int>(o[1]), static_cast<int>(o[2]), static_cast<int>(o[3]), o[4] != 0u
+        );
       }
     }
-    void HashGrid(const std::int32_t* words, const int size, u32* out)
+    void HashGrid(
+      const std::int32_t* words,
+      const int size,
+      u32* out
+    )
     {
       Fnv hash;
       for (int i = 0; i < size; ++i) {
@@ -3822,7 +4610,10 @@ namespace difffuzz
 
     // BitArray2D::FillRect 0x008D8370 (constructor 0x008D82F0): out = word
     // count and a hash of the words after the fills.
-    void FillRectRetail(const u32* in, u32* out)
+    void FillRectRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailBitArray grid;
       BuildRetailGrid(grid, in);
@@ -3833,7 +4624,10 @@ namespace difffuzz
       HashGrid(words, size, out);
       FreeRetailGrid(grid);
     }
-    void FillRectOurs(const u32* in, u32* out)
+    void FillRectOurs(
+      const u32* in,
+      u32* out
+    )
     {
       gpg::BitArray2D grid(in[0], in[1]);
       BuildOurGrid(grid, in);
@@ -3841,7 +4635,10 @@ namespace difffuzz
     }
 
     // BitArray2D::GetRectOr 0x008D8460: in += x0, z0, w, h, disallowNegative.
-    void GenGetRectOr(Rng& rng, u32* in)
+    void GenGetRectOr(
+      Rng& rng,
+      u32* in
+    )
     {
       GenGrid(rng, in);
       in[kGridQuery + 0] = static_cast<u32>(GenGridEdge(rng, in[0]));
@@ -3850,28 +4647,46 @@ namespace difffuzz
       in[kGridQuery + 3] = static_cast<u32>(GenGridExtent(rng, in[1]));
       in[kGridQuery + 4] = rng.Chance(50) ? 1u : 0u;
     }
-    void GetRectOrRetail(const u32* in, u32* out)
+    void GetRectOrRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailBitArray grid;
       BuildRetailGrid(grid, in);
       const u32* const q = in + kGridQuery;
       out[0] = static_cast<u32>(retail::BitArrayGetRectOr(
-        &grid, static_cast<int>(q[0]), static_cast<int>(q[1]), static_cast<int>(q[2]), static_cast<int>(q[3]),
+        &grid,
+        static_cast<int>(q[0]),
+        static_cast<int>(q[1]),
+        static_cast<int>(q[2]),
+        static_cast<int>(q[3]),
         static_cast<int>(q[4])
       ));
       FreeRetailGrid(grid);
     }
-    void GetRectOrOurs(const u32* in, u32* out)
+    void GetRectOrOurs(
+      const u32* in,
+      u32* out
+    )
     {
       gpg::BitArray2D grid(in[0], in[1]);
       BuildOurGrid(grid, in);
       const u32* const q = in + kGridQuery;
-      out[0] = grid.GetRectOr(static_cast<int>(q[0]), static_cast<int>(q[1]), static_cast<int>(q[2]), static_cast<int>(q[3]), q[4] != 0u) ? 1u : 0u;
+      out[0] =
+        grid.GetRectOr(
+          static_cast<int>(q[0]), static_cast<int>(q[1]), static_cast<int>(q[2]), static_cast<int>(q[3]), q[4] != 0u
+        )
+        ? 1u
+        : 0u;
     }
 
     // BitArray2D::GetRectNeg 0x00720580: in += a rect x0, z0, x1, z1 (x1/z1
     // exclusive), as the build-site check passes a footprint.
-    void GenGetRectNeg(Rng& rng, u32* in)
+    void GenGetRectNeg(
+      Rng& rng,
+      u32* in
+    )
     {
       GenGrid(rng, in);
       const int x0 = GenGridEdge(rng, in[0]);
@@ -3883,14 +4698,20 @@ namespace difffuzz
       in[kGridQuery + 2] = static_cast<u32>(x0) + static_cast<u32>(w);
       in[kGridQuery + 3] = static_cast<u32>(z0) + static_cast<u32>(h);
     }
-    void GetRectNegRetail(const u32* in, u32* out)
+    void GetRectNegRetail(
+      const u32* in,
+      u32* out
+    )
     {
       RetailBitArray grid;
       BuildRetailGrid(grid, in);
       out[0] = static_cast<u32>(retail::BitArrayGetRectNeg(&grid, in + kGridQuery));
       FreeRetailGrid(grid);
     }
-    void GetRectNegOurs(const u32* in, u32* out)
+    void GetRectNegOurs(
+      const u32* in,
+      u32* out
+    )
     {
       gpg::BitArray2D grid(in[0], in[1]);
       BuildOurGrid(grid, in);
@@ -3905,74 +4726,695 @@ namespace difffuzz
     // New rows go at the end: a row's random stream comes from its index in
     // AllTargets (math rows first).
     const Target kSimTargets[] = {
-      {"CHeightField::UpdateBounds", 0x00476BB0, "moho/sim/STIMap.cpp CHeightField::UpdateBounds", 10, 3, "cellsW cellsH seed shape seed2 shape2 x0 z0 x1 z1", "tiers hash[2]", GenUpdateBounds, UpdateBoundsRetail, ENGINE_ONLY(UpdateBoundsOurs), true},
-      {"CHeightField::Intersection", 0x00476F30, "moho/sim/STIMap.cpp CHeightField::Intersection", 12, 5, "cellsW cellsH seed shape pos[3] dir[3] closest farthest", "point[3] distance v1", GenIntersection, IntersectionRetail, ENGINE_ONLY(IntersectionOurs)},
-      {"CHeightField::GetNormal", 0x0069A620, "moho/sim/STIMap.cpp CHeightField::GetNormal", 6, 3, "cellsW cellsH seed shape x z", "normal[3]", GenNormal, NormalRetail, ENGINE_ONLY(NormalOurs)},
-      {"BitArray2D::FillRect", 0x008D8370, "gpg/core/containers/BitArray2D.cpp BitArray2D::FillRect", kGridQuery, 3, "width height (x0 z0 w h fill)[3]", "size hash[2]", GenGrid, FillRectRetail, FillRectOurs, true},
-      {"BitArray2D::GetRectOr", 0x008D8460, "gpg/core/containers/BitArray2D.cpp BitArray2D::GetRectOr", kGridQuery + 5, 1, "width height (x0 z0 w h fill)[3] x0 z0 w h disallowNegative", "ret", GenGetRectOr, GetRectOrRetail, GetRectOrOurs, true},
-      {"BitArray2D::GetRectNeg", 0x00720580, "gpg/core/containers/BitArray2D.cpp BitArray2D::GetRectNeg", kGridQuery + 4, 1, "width height (x0 z0 w h fill)[3] x0 z0 x1 z1", "ret", GenGetRectNeg, GetRectNegRetail, GetRectNegOurs, true},
+      {"CHeightField::UpdateBounds",
+       0x00476BB0,
+       "moho/sim/STIMap.cpp CHeightField::UpdateBounds",
+       10,
+       3,
+       "cellsW cellsH seed shape seed2 shape2 x0 z0 x1 z1",
+       "tiers hash[2]",
+       GenUpdateBounds,
+       UpdateBoundsRetail,
+       ENGINE_ONLY(UpdateBoundsOurs),
+       true},
+      {"CHeightField::Intersection",
+       0x00476F30,
+       "moho/sim/STIMap.cpp CHeightField::Intersection",
+       12,
+       5,
+       "cellsW cellsH seed shape pos[3] dir[3] closest farthest",
+       "point[3] distance v1",
+       GenIntersection,
+       IntersectionRetail,
+       ENGINE_ONLY(IntersectionOurs)},
+      {"CHeightField::GetNormal",
+       0x0069A620,
+       "moho/sim/STIMap.cpp CHeightField::GetNormal",
+       6,
+       3,
+       "cellsW cellsH seed shape x z",
+       "normal[3]",
+       GenNormal,
+       NormalRetail,
+       ENGINE_ONLY(NormalOurs)},
+      {"BitArray2D::FillRect",
+       0x008D8370,
+       "gpg/core/containers/BitArray2D.cpp BitArray2D::FillRect",
+       kGridQuery,
+       3,
+       "width height (x0 z0 w h fill)[3]",
+       "size hash[2]",
+       GenGrid,
+       FillRectRetail,
+       FillRectOurs,
+       true},
+      {"BitArray2D::GetRectOr",
+       0x008D8460,
+       "gpg/core/containers/BitArray2D.cpp BitArray2D::GetRectOr",
+       kGridQuery + 5,
+       1,
+       "width height (x0 z0 w h fill)[3] x0 z0 w h disallowNegative",
+       "ret",
+       GenGetRectOr,
+       GetRectOrRetail,
+       GetRectOrOurs,
+       true},
+      {"BitArray2D::GetRectNeg",
+       0x00720580,
+       "gpg/core/containers/BitArray2D.cpp BitArray2D::GetRectNeg",
+       kGridQuery + 4,
+       1,
+       "width height (x0 z0 w h fill)[3] x0 z0 x1 z1",
+       "ret",
+       GenGetRectNeg,
+       GetRectNegRetail,
+       GetRectNegOurs,
+       true},
       // Appended: each row's stream is seeded by its index.
-      {"CHeightField::ClipSegmentToWorld", 0x004776E0, "moho/sim/STIMap.cpp CHeightField::ClipSegmentToWorld", 12, 3, "cellsW cellsH seed shape pos[3] dir[3] min max", "ret min max", GenClip, ClipRetail, ENGINE_ONLY(ClipOurs)},
-      {"CHeightField::GetTierBounds", 0x00475DA0, "moho/sim/STIMap.cpp CHeightField::GetTierBounds", 7, 2, "cellsW cellsH seed shape x z tier", "min max", GenTierBounds, TierBoundsRetail, ENGINE_ONLY(TierBoundsOurs)},
-      {"InfluenceGrid::GetThreat", 0x00715750, "moho/sim/CInfluenceMap.cpp InfluenceGrid::GetThreat", 5, 1, "type army armies seed mode", "threat", GenGetThreat, GetThreatRetail, ENGINE_ONLY(GetThreatOurs)},
-      {"InfluenceGrid::DecayInfluence", 0x00715130, "moho/sim/CInfluenceMap.cpp InfluenceGrid::DecayInfluence", 2, 14, "seed mode", "threat[14]", GenDecayInfluence, DecayInfluenceRetail, ENGINE_ONLY(DecayInfluenceOurs)},
-      {"VEC_LookAt", 0x004ECBD0, "moho/math/MathReflection.cpp VEC_LookAt", 6, 9, "up[3] forward[3]", "axes[9]", GenLookAt, LookAtRetail, ENGINE_ONLY(LookAtOurs)},
-      {"VEC_Mul4x3", 0x004EE710, "moho/math/MathReflection.cpp VEC_Mul4x3", 32, 16, "lhs[16] rhs[16]", "out[16]", GenMul4x3, Mul4x3Retail, ENGINE_ONLY(Mul4x3Ours)},
-      {"luaO_log2", 0x0091A510, "lua/LuaObject.cpp luaO_log2", 1, 1, "x", "r", GenLuaSize, LuaLog2Retail, ENGINE_ONLY(LuaLog2Ours), true},
-      {"luaO_int2fb", 0x0091A4E0, "lua/LuaObject.cpp luaO_int2fb", 1, 1, "x", "r", GenLuaSize, LuaInt2FbRetail, ENGINE_ONLY(LuaInt2FbOurs), true},
-      {"InitGridTraversalLine", 0x0040D860, "moho/sim/COGrid.cpp InitGridTraversalLine", 5, kLineWords, "step xEnd xStart zStart zEnd", "line[11]", GenLineInit, LineInitRetail, ENGINE_ONLY(LineInitOurs)},
-      {"AdvanceGridTraversalEdge", 0x00475FD0, "moho/sim/COGrid.cpp AdvanceGridTraversalEdge", kLineWords, kLineWords, "line[11]", "line[11]", GenLine, LineAdvanceRetail, ENGINE_ONLY(LineAdvanceOurs)},
-      {"GetGridTraversalCell", 0x00476050, "moho/sim/COGrid.cpp GetGridTraversalCell", kLineWords, 2, "line[11]", "x z", GenLine, LineCellRetail, ENGINE_ONLY(LineCellOurs), true},
-      {"IsGridTraversalBeyondEnd", 0x00476070, "moho/sim/COGrid.cpp IsGridTraversalBeyondEnd", kLineWords, 1, "line[11]", "beyond", GenLine, LineBeyondEndRetail, ENGINE_ONLY(LineBeyondEndOurs), true},
-      {"STIMap::IsBlockingTerrain", 0x00577F20, "moho/sim/STIMap.cpp STIMap::IsBlockingTerrain", 5, 1, "cellsW cellsH seed x z", "blocking", GenBlocking, BlockingRetail, ENGINE_ONLY(BlockingOurs), true},
-      {"STIMap::OccupancyCapsOfFootprintAt", 0x00564DF0, "moho/sim/STIMap.cpp STIMap::OccupancyCapsOfFootprintAt", 12, 1, "cellsW cellsH seed shape waterOn waterElev x z caps maxSlope minDepth maxDepth", "caps", GenOccupancyCaps, OccupancyCapsRetail, ENGINE_ONLY(OccupancyCapsOurs), true},
-      {"OCCUPY_Filter", 0x00720920, "moho/sim/STIMap.cpp OCCUPY_Filter", 19, 1, "cellsW cellsH seed shape waterOn waterElev x z fpCaps maxSlope minDepth maxDepth fpFlags caps gridSeed terrainPct waterPct gridW gridH", "caps", GenOccupyFilter, OccupyFilterRetail, ENGINE_ONLY(OccupyFilterOurs), true},
-      {"CAiPathFinder::IsInBounds", 0x005AA680, "moho/ai/CAiPathFinder.cpp CAiPathFinder::IsInBounds", 9, 1, "useWholeMap inside span x z x0 z0 x1 z1", "inBounds", GenPathInBounds, PathInBoundsRetail, ENGINE_ONLY(PathInBoundsOurs), true},
-      {"luaH_getstr", 0x009274D0, "lua/LuaObject.cpp luaH_getstr", 6, 1, "seed sizearray lsizenode fill pool key", "slot", GenLuaGetStr, LuaGetStrRetail, ENGINE_ONLY(LuaGetStrOurs), true},
-      {"luaH_getnum", 0x00927450, "lua/LuaObject.cpp luaH_getnum", 6, 1, "seed sizearray lsizenode fill pool key", "slot", GenLuaGetNum, LuaGetNumRetail, ENGINE_ONLY(LuaGetNumOurs), true},
-      {"luaH_get", 0x00927510, "lua/LuaObject.cpp luaH_get", 7, 1, "seed sizearray lsizenode fill pool keyTt keyBits", "slot", GenLuaGet, LuaGetRetail, ENGINE_ONLY(LuaGetOurs), true},
-      {"luaH_mainposition", 0x00926F70, "lua/LuaObject.cpp luaH_mainposition", 7, 1, "seed sizearray lsizenode fill pool keyTt keyBits", "node", GenLuaMainPosition, LuaMainPositionRetail, ENGINE_ONLY(LuaMainPositionOurs), true},
-      {"luaV_equalval", 0x00929810, "lua/LuaObject.cpp luaV_equalval", 3, 1, "tag left right", "equal", GenLuaEqualVal, LuaEqualValRetail, ENGINE_ONLY(LuaEqualValOurs), true},
-      {"luaH_index", 0x00927610, "lua/LuaObject.cpp luaH_index", 7, 1, "seed sizearray lsizenode fill pool keyTt keyBits", "index", GenLuaTraverse, LuaIndexRetail, ENGINE_ONLY(LuaIndexOurs), true},
-      {"luaH_next", 0x009276A0, "lua/LuaObject.cpp luaH_next", 7, 5, "seed sizearray lsizenode fill pool keyTt keyBits", "ret keyTt keyBits valTt valBits", GenLuaTraverse, LuaNextRetail, ENGINE_ONLY(LuaNextOurs), true},
-      {"luaH_set", 0x00927560, "lua/LuaObject.cpp luaH_set", 7, 2, "seed sizearray lsizenode fill pool keyTt keyBits", "slot flags", GenLuaSet, LuaSetRetail, ENGINE_ONLY(LuaSetOurs), true},
-      {"luaH_setnum", 0x00927AC0, "lua/LuaObject.cpp luaH_setnum", 6, 2, "seed sizearray lsizenode fill pool key", "slot flags", GenLuaSetNum, LuaSetNumRetail, ENGINE_ONLY(LuaSetNumOurs), true},
-      {"luaV_lessthan", 0x009296F0, "lua/LuaObject.cpp luaV_lessthan", 4, 1, "tagLeft tagRight left right", "less", GenLuaLessThan, LuaLessThanRetail, ENGINE_ONLY(LuaLessThanOurs), true},
-      {"luaA_index", 0x0090C3D0, "lua/LuaObject.cpp luaA_index", 10, 1, "seed sizearray lsizenode fill pool stateSeed base top upvalues idx", "slot", GenLuaIndexAny, LuaIndexAnyRetail, ENGINE_ONLY(LuaIndexAnyOurs), true},
-      {"negindex", 0x0090C340, "lua/LuaObject.cpp negindex", 10, 1, "seed sizearray lsizenode fill pool stateSeed base top upvalues idx", "slot", GenLuaIndexNeg, LuaNegIndexRetail, ENGINE_ONLY(LuaNegIndexOurs), true},
-      {"lua_type", 0x0090C740, "lua/LuaObject.cpp lua_type", 10, 1, "seed sizearray lsizenode fill pool stateSeed base top upvalues idx", "type", GenLuaIndexAny, LuaTypeRetail, ENGINE_ONLY(LuaTypeOurs), true},
-      {"lua_gettop", 0x0090C590, "lua/LuaObject.cpp lua_gettop", 10, 1, "seed sizearray lsizenode fill pool stateSeed base top upvalues idx", "top", GenLuaIndexAny, LuaGetTopRetail, ENGINE_ONLY(LuaGetTopOurs), true},
-      {"lua_settop", 0x0090C5A0, "lua/LuaObject.cpp lua_settop", 10, 9, "seed sizearray lsizenode fill pool stateSeed base top upvalues idx", "top tt[8]", GenLuaSetTop, LuaSetTopRetail, ENGINE_ONLY(LuaSetTopOurs), true},
-      {"lua_pushvalue", 0x0090C6E0, "lua/LuaObject.cpp lua_pushvalue", 10, 3, "seed sizearray lsizenode fill pool stateSeed base top upvalues idx", "top tt bits", GenLuaPushValue, LuaPushValueRetail, ENGINE_ONLY(LuaPushValueOurs), true},
-      {"lua_tonumber", 0x0090C9F0, "lua/LuaObject.cpp lua_tonumber", 10, 1, "seed sizearray lsizenode fill pool stateSeed base top upvalues idx", "number", GenLuaToNumber, LuaToNumberRetail, ENGINE_ONLY(LuaToNumberOurs)},
-      {"lua_rawgeti", 0x0090D0A0, "lua/LuaObject.cpp lua_rawgeti", 11, 3, "seed sizearray lsizenode fill pool stateSeed base top upvalues idx n", "top tt bits", GenLuaRawGetI, LuaRawGetIRetail, ENGINE_ONLY(LuaRawGetIOurs), true},
-      {"lua_pushnumber", 0x0090CD40, "lua/LuaObject.cpp lua_pushnumber", 10, 3, "seed sizearray lsizenode fill pool stateSeed base top upvalues n", "top tt bits", GenLuaPushNumber, LuaPushNumberRetail, ENGINE_ONLY(LuaPushNumberOurs), true},
-      {"lua_next", 0x0090D6D0, "lua/LuaObject.cpp lua_next", 12, 6, "seed sizearray lsizenode fill pool stateSeed base top upvalues idx keyTt keyBits", "ret top keyTt keyBits valTt valBits", GenLuaNext, LuaNextRetail2, ENGINE_ONLY(LuaNextOurs2), true},
-      {"luaT_gettm", 0x00928420, "lua/LuaObject.cpp luaT_gettm", 8, 2, "seed sizearray lsizenode fill pool event key flags", "slot flags", GenLuaGetTm, LuaGetTmRetail, ENGINE_ONLY(LuaGetTmOurs), true},
-      {"luaV_gettable", 0x009293E0, "lua/LuaObject.cpp luaV_gettable", 14, 2, "seed sizearray lsizenode fill pool stateSeed base top upvalues keyTt keyBits flags loop tmname0", "slot flags", GenLuaGetTable, LuaGetTableRetail<false>, ENGINE_ONLY(LuaGetTableOurs<false>), true},
-      {"luaV_index", 0x00929BF0, "lua/LuaObject.cpp luaV_index", 14, 2, "seed sizearray lsizenode fill pool stateSeed base top upvalues keyTt keyBits flags loop tmname0", "slot flags", GenLuaGetTable, LuaGetTableRetail<true>, ENGINE_ONLY(LuaGetTableOurs<true>), true},
-      {"luaV_settable", 0x00929450, "lua/LuaObject.cpp luaV_settable", 14, 3, "seed sizearray lsizenode fill pool stateSeed base top upvalues keyTt keyBits valTt valBits tmname1", "flags changedSlot valueHash", GenLuaSetTable, LuaSetTableRetail, ENGINE_ONLY(LuaSetTableOurs), true},
-      {"lua_toboolean", 0x0090CA40, "lua/LuaObject.cpp lua_toboolean", 10, 1, "seed sizearray lsizenode fill pool stateSeed base top upvalues idx", "bool", GenLuaIndexAny, LuaToBooleanRetail, ENGINE_ONLY(LuaToBooleanOurs), true},
-      {"lua_isnumber", 0x0090C7A0, "lua/LuaObject.cpp lua_isnumber", 10, 1, "seed sizearray lsizenode fill pool stateSeed base top upvalues idx", "isnumber", GenLuaIndexAny, LuaIsNumberRetail, ENGINE_ONLY(LuaIsNumberOurs), true},
-      {"lua_pushnil", 0x0090CD00, "lua/LuaObject.cpp lua_pushnil", 10, 3, "seed sizearray lsizenode fill pool stateSeed base top upvalues -", "top tt bits", GenLuaIndexAny, LuaPushNilRetail, ENGINE_ONLY(LuaPushNilOurs), true},
-      {"lua_pushboolean", 0x0090CF80, "lua/LuaObject.cpp lua_pushboolean", 10, 3, "seed sizearray lsizenode fill pool stateSeed base top upvalues b", "top tt bits", GenLuaPushBoolean, LuaPushBooleanRetail, ENGINE_ONLY(LuaPushBooleanOurs), true},
-      {"lua_rawget", 0x0090D050, "lua/LuaObject.cpp lua_rawget", 12, 3, "seed sizearray lsizenode fill pool stateSeed base top upvalues idx keyTt keyBits", "top tt bits", GenLuaRawGet, LuaRawGetRetail, ENGINE_ONLY(LuaRawGetOurs), true},
-      {"lua_rawseti", 0x0090D2F0, "lua/LuaObject.cpp lua_rawseti", 11, 4, "seed sizearray lsizenode fill pool stateSeed base top upvalues idx n", "top flags changedSlot valueHash", GenLuaRawSetI, LuaRawSetIRetail, ENGINE_ONLY(LuaRawSetIOurs), true},
-      {"lua_rawset", 0x0090D2A0, "lua/LuaObject.cpp lua_rawset", 12, 4, "seed sizearray lsizenode fill pool stateSeed base top upvalues idx keyTt keyBits", "top flags changedSlot valueHash", GenLuaRawSet, LuaRawSetRetail, ENGINE_ONLY(LuaRawSetOurs), true},
-      {"CalculateMapWaterRatio", 0x0062D7E0, "moho/ai/CAiBrain.cpp CalculateMapWaterRatio", 6, 1, "cellsW cellsH seed shape waterOn waterElev", "ratio", GenWaterRatio, WaterRatioRetail, ENGINE_ONLY(WaterRatioOurs)},
-      {"OCCUPY_MobileCheck", 0x00564AB0, "moho/sim/STIMap.cpp OCCUPY_MobileCheck", 21, 1, "cellsW cellsH seed shape waterOn waterElev x z fpCaps maxSlope minDepth maxDepth fpFlags caps gridSeed terrainPct waterPct gridW gridH sizeX sizeZ", "caps", GenFootprintWorld, MobileCheckRetail, ENGINE_ONLY(MobileCheckOurs), true},
-      {"OCCUPY_FootprintFits", 0x007209E0, "moho/sim/STIMap.cpp OCCUPY_FootprintFits", 21, 1, "cellsW cellsH seed shape waterOn waterElev x z fpCaps maxSlope minDepth maxDepth fpFlags caps gridSeed terrainPct waterPct gridW gridH sizeX sizeZ", "caps", GenFootprintWorld, FootprintFitsRetail, ENGINE_ONLY(FootprintFitsOurs), true},
-      {"STIMap::IsWithin", 0x0062CA60, "moho/sim/STIMap.cpp STIMap::IsWithin", 11, 1, "cellsW cellsH x0 z0 x1 z1 pos[3] border wholeMap", "inside", GenIsWithin, IsWithinRetail, ENGINE_ONLY(IsWithinOurs), true},
-      {"CAiPathFinder::ShouldSearchRect", 0x005AA860, "moho/ai/CAiPathFinder.cpp CAiPathFinder::ShouldSearchRect", 29, 1, "searchType probe anchorX anchorZ goal[8] count history[12] rect[4]", "search", GenShouldSearchRect, ShouldSearchRectRetail, ENGINE_ONLY(ShouldSearchRectOurs), true},
-      {"ComputeOctileDistanceCore", 0x005A9D60, "moho/ai/CAiPathFinder.cpp ComputeOctileDistanceCore", 2, 1, "a b", "distance", GenOctile, OctileRetail, ENGINE_ONLY(OctileOurs)},
-      {"computesizes", 0x00927090, "lua/LuaObject.cpp computesizes", 2 + kSizeBuckets, 2, "ntotal narray nums[26]", "narray nhash", GenComputeSizes, ComputeSizesRetail, ENGINE_ONLY(ComputeSizesOurs), true},
-      {"func_AABoxToRect", 0x004FCBE0, "moho/sim/COGrid.cpp func_AABoxToRect", 6, 2, "min[3] max[3]", "startX|startZ width|height", GenAABoxToRect, AABoxToRectRetail, ENGINE_ONLY(AABoxToRectOurs), true},
-      {"COORDS_ToWorldPos", 0x0050B0F0, "moho/entity/Entity.cpp COORDS_ToWorldPos", 11, 3, "cellsW cellsH seed shape waterOn waterElev x z layer sizeX sizeZ", "pos[3]", GenToWorldPos, ToWorldPosRetail, ENGINE_ONLY(ToWorldPosOurs)},
-      {"CIntelGrid::IsVisible(rect)", 0x005BE210, "moho/sim/CIntelGrid.cpp CIntelGrid::IsVisible", 9, 1, "cellsW cellsH gridSize seed density rect[4]", "visible", GenIntelRect, IntelRectRetail, ENGINE_ONLY(IntelRectOurs), true},
+      {"CHeightField::ClipSegmentToWorld",
+       0x004776E0,
+       "moho/sim/STIMap.cpp CHeightField::ClipSegmentToWorld",
+       12,
+       3,
+       "cellsW cellsH seed shape pos[3] dir[3] min max",
+       "ret min max",
+       GenClip,
+       ClipRetail,
+       ENGINE_ONLY(ClipOurs)},
+      {"CHeightField::GetTierBounds",
+       0x00475DA0,
+       "moho/sim/STIMap.cpp CHeightField::GetTierBounds",
+       7,
+       2,
+       "cellsW cellsH seed shape x z tier",
+       "min max",
+       GenTierBounds,
+       TierBoundsRetail,
+       ENGINE_ONLY(TierBoundsOurs)},
+      {"InfluenceGrid::GetThreat",
+       0x00715750,
+       "moho/sim/CInfluenceMap.cpp InfluenceGrid::GetThreat",
+       5,
+       1,
+       "type army armies seed mode",
+       "threat",
+       GenGetThreat,
+       GetThreatRetail,
+       ENGINE_ONLY(GetThreatOurs)},
+      {"InfluenceGrid::DecayInfluence",
+       0x00715130,
+       "moho/sim/CInfluenceMap.cpp InfluenceGrid::DecayInfluence",
+       2,
+       14,
+       "seed mode",
+       "threat[14]",
+       GenDecayInfluence,
+       DecayInfluenceRetail,
+       ENGINE_ONLY(DecayInfluenceOurs)},
+      {"VEC_LookAt",
+       0x004ECBD0,
+       "moho/math/MathReflection.cpp VEC_LookAt",
+       6,
+       9,
+       "up[3] forward[3]",
+       "axes[9]",
+       GenLookAt,
+       LookAtRetail,
+       ENGINE_ONLY(LookAtOurs)},
+      {"VEC_Mul4x3",
+       0x004EE710,
+       "moho/math/MathReflection.cpp VEC_Mul4x3",
+       32,
+       16,
+       "lhs[16] rhs[16]",
+       "out[16]",
+       GenMul4x3,
+       Mul4x3Retail,
+       ENGINE_ONLY(Mul4x3Ours)},
+      {"luaO_log2",
+       0x0091A510,
+       "lua/LuaObject.cpp luaO_log2",
+       1,
+       1,
+       "x",
+       "r",
+       GenLuaSize,
+       LuaLog2Retail,
+       ENGINE_ONLY(LuaLog2Ours),
+       true},
+      {"luaO_int2fb",
+       0x0091A4E0,
+       "lua/LuaObject.cpp luaO_int2fb",
+       1,
+       1,
+       "x",
+       "r",
+       GenLuaSize,
+       LuaInt2FbRetail,
+       ENGINE_ONLY(LuaInt2FbOurs),
+       true},
+      {"InitGridTraversalLine",
+       0x0040D860,
+       "moho/sim/COGrid.cpp InitGridTraversalLine",
+       5,
+       kLineWords,
+       "step xEnd xStart zStart zEnd",
+       "line[11]",
+       GenLineInit,
+       LineInitRetail,
+       ENGINE_ONLY(LineInitOurs)},
+      {"AdvanceGridTraversalEdge",
+       0x00475FD0,
+       "moho/sim/COGrid.cpp AdvanceGridTraversalEdge",
+       kLineWords,
+       kLineWords,
+       "line[11]",
+       "line[11]",
+       GenLine,
+       LineAdvanceRetail,
+       ENGINE_ONLY(LineAdvanceOurs)},
+      {"GetGridTraversalCell",
+       0x00476050,
+       "moho/sim/COGrid.cpp GetGridTraversalCell",
+       kLineWords,
+       2,
+       "line[11]",
+       "x z",
+       GenLine,
+       LineCellRetail,
+       ENGINE_ONLY(LineCellOurs),
+       true},
+      {"IsGridTraversalBeyondEnd",
+       0x00476070,
+       "moho/sim/COGrid.cpp IsGridTraversalBeyondEnd",
+       kLineWords,
+       1,
+       "line[11]",
+       "beyond",
+       GenLine,
+       LineBeyondEndRetail,
+       ENGINE_ONLY(LineBeyondEndOurs),
+       true},
+      {"STIMap::IsBlockingTerrain",
+       0x00577F20,
+       "moho/sim/STIMap.cpp STIMap::IsBlockingTerrain",
+       5,
+       1,
+       "cellsW cellsH seed x z",
+       "blocking",
+       GenBlocking,
+       BlockingRetail,
+       ENGINE_ONLY(BlockingOurs),
+       true},
+      {"STIMap::OccupancyCapsOfFootprintAt",
+       0x00564DF0,
+       "moho/sim/STIMap.cpp STIMap::OccupancyCapsOfFootprintAt",
+       12,
+       1,
+       "cellsW cellsH seed shape waterOn waterElev x z caps maxSlope minDepth maxDepth",
+       "caps",
+       GenOccupancyCaps,
+       OccupancyCapsRetail,
+       ENGINE_ONLY(OccupancyCapsOurs),
+       true},
+      {"OCCUPY_Filter",
+       0x00720920,
+       "moho/sim/STIMap.cpp OCCUPY_Filter",
+       19,
+       1,
+       "cellsW cellsH seed shape waterOn waterElev x z fpCaps maxSlope minDepth maxDepth fpFlags caps gridSeed "
+       "terrainPct waterPct gridW gridH",
+       "caps",
+       GenOccupyFilter,
+       OccupyFilterRetail,
+       ENGINE_ONLY(OccupyFilterOurs),
+       true},
+      {"CAiPathFinder::IsInBounds",
+       0x005AA680,
+       "moho/ai/CAiPathFinder.cpp CAiPathFinder::IsInBounds",
+       9,
+       1,
+       "useWholeMap inside span x z x0 z0 x1 z1",
+       "inBounds",
+       GenPathInBounds,
+       PathInBoundsRetail,
+       ENGINE_ONLY(PathInBoundsOurs),
+       true},
+      {"luaH_getstr",
+       0x009274D0,
+       "lua/LuaObject.cpp luaH_getstr",
+       6,
+       1,
+       "seed sizearray lsizenode fill pool key",
+       "slot",
+       GenLuaGetStr,
+       LuaGetStrRetail,
+       ENGINE_ONLY(LuaGetStrOurs),
+       true},
+      {"luaH_getnum",
+       0x00927450,
+       "lua/LuaObject.cpp luaH_getnum",
+       6,
+       1,
+       "seed sizearray lsizenode fill pool key",
+       "slot",
+       GenLuaGetNum,
+       LuaGetNumRetail,
+       ENGINE_ONLY(LuaGetNumOurs),
+       true},
+      {"luaH_get",
+       0x00927510,
+       "lua/LuaObject.cpp luaH_get",
+       7,
+       1,
+       "seed sizearray lsizenode fill pool keyTt keyBits",
+       "slot",
+       GenLuaGet,
+       LuaGetRetail,
+       ENGINE_ONLY(LuaGetOurs),
+       true},
+      {"luaH_mainposition",
+       0x00926F70,
+       "lua/LuaObject.cpp luaH_mainposition",
+       7,
+       1,
+       "seed sizearray lsizenode fill pool keyTt keyBits",
+       "node",
+       GenLuaMainPosition,
+       LuaMainPositionRetail,
+       ENGINE_ONLY(LuaMainPositionOurs),
+       true},
+      {"luaV_equalval",
+       0x00929810,
+       "lua/LuaObject.cpp luaV_equalval",
+       3,
+       1,
+       "tag left right",
+       "equal",
+       GenLuaEqualVal,
+       LuaEqualValRetail,
+       ENGINE_ONLY(LuaEqualValOurs),
+       true},
+      {"luaH_index",
+       0x00927610,
+       "lua/LuaObject.cpp luaH_index",
+       7,
+       1,
+       "seed sizearray lsizenode fill pool keyTt keyBits",
+       "index",
+       GenLuaTraverse,
+       LuaIndexRetail,
+       ENGINE_ONLY(LuaIndexOurs),
+       true},
+      {"luaH_next",
+       0x009276A0,
+       "lua/LuaObject.cpp luaH_next",
+       7,
+       5,
+       "seed sizearray lsizenode fill pool keyTt keyBits",
+       "ret keyTt keyBits valTt valBits",
+       GenLuaTraverse,
+       LuaNextRetail,
+       ENGINE_ONLY(LuaNextOurs),
+       true},
+      {"luaH_set",
+       0x00927560,
+       "lua/LuaObject.cpp luaH_set",
+       7,
+       2,
+       "seed sizearray lsizenode fill pool keyTt keyBits",
+       "slot flags",
+       GenLuaSet,
+       LuaSetRetail,
+       ENGINE_ONLY(LuaSetOurs),
+       true},
+      {"luaH_setnum",
+       0x00927AC0,
+       "lua/LuaObject.cpp luaH_setnum",
+       6,
+       2,
+       "seed sizearray lsizenode fill pool key",
+       "slot flags",
+       GenLuaSetNum,
+       LuaSetNumRetail,
+       ENGINE_ONLY(LuaSetNumOurs),
+       true},
+      {"luaV_lessthan",
+       0x009296F0,
+       "lua/LuaObject.cpp luaV_lessthan",
+       4,
+       1,
+       "tagLeft tagRight left right",
+       "less",
+       GenLuaLessThan,
+       LuaLessThanRetail,
+       ENGINE_ONLY(LuaLessThanOurs),
+       true},
+      {"luaA_index",
+       0x0090C3D0,
+       "lua/LuaObject.cpp luaA_index",
+       10,
+       1,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues idx",
+       "slot",
+       GenLuaIndexAny,
+       LuaIndexAnyRetail,
+       ENGINE_ONLY(LuaIndexAnyOurs),
+       true},
+      {"negindex",
+       0x0090C340,
+       "lua/LuaObject.cpp negindex",
+       10,
+       1,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues idx",
+       "slot",
+       GenLuaIndexNeg,
+       LuaNegIndexRetail,
+       ENGINE_ONLY(LuaNegIndexOurs),
+       true},
+      {"lua_type",
+       0x0090C740,
+       "lua/LuaObject.cpp lua_type",
+       10,
+       1,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues idx",
+       "type",
+       GenLuaIndexAny,
+       LuaTypeRetail,
+       ENGINE_ONLY(LuaTypeOurs),
+       true},
+      {"lua_gettop",
+       0x0090C590,
+       "lua/LuaObject.cpp lua_gettop",
+       10,
+       1,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues idx",
+       "top",
+       GenLuaIndexAny,
+       LuaGetTopRetail,
+       ENGINE_ONLY(LuaGetTopOurs),
+       true},
+      {"lua_settop",
+       0x0090C5A0,
+       "lua/LuaObject.cpp lua_settop",
+       10,
+       9,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues idx",
+       "top tt[8]",
+       GenLuaSetTop,
+       LuaSetTopRetail,
+       ENGINE_ONLY(LuaSetTopOurs),
+       true},
+      {"lua_pushvalue",
+       0x0090C6E0,
+       "lua/LuaObject.cpp lua_pushvalue",
+       10,
+       3,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues idx",
+       "top tt bits",
+       GenLuaPushValue,
+       LuaPushValueRetail,
+       ENGINE_ONLY(LuaPushValueOurs),
+       true},
+      {"lua_tonumber",
+       0x0090C9F0,
+       "lua/LuaObject.cpp lua_tonumber",
+       10,
+       1,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues idx",
+       "number",
+       GenLuaToNumber,
+       LuaToNumberRetail,
+       ENGINE_ONLY(LuaToNumberOurs)},
+      {"lua_rawgeti",
+       0x0090D0A0,
+       "lua/LuaObject.cpp lua_rawgeti",
+       11,
+       3,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues idx n",
+       "top tt bits",
+       GenLuaRawGetI,
+       LuaRawGetIRetail,
+       ENGINE_ONLY(LuaRawGetIOurs),
+       true},
+      {"lua_pushnumber",
+       0x0090CD40,
+       "lua/LuaObject.cpp lua_pushnumber",
+       10,
+       3,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues n",
+       "top tt bits",
+       GenLuaPushNumber,
+       LuaPushNumberRetail,
+       ENGINE_ONLY(LuaPushNumberOurs),
+       true},
+      {"lua_next",
+       0x0090D6D0,
+       "lua/LuaObject.cpp lua_next",
+       12,
+       6,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues idx keyTt keyBits",
+       "ret top keyTt keyBits valTt valBits",
+       GenLuaNext,
+       LuaNextRetail2,
+       ENGINE_ONLY(LuaNextOurs2),
+       true},
+      {"luaT_gettm",
+       0x00928420,
+       "lua/LuaObject.cpp luaT_gettm",
+       8,
+       2,
+       "seed sizearray lsizenode fill pool event key flags",
+       "slot flags",
+       GenLuaGetTm,
+       LuaGetTmRetail,
+       ENGINE_ONLY(LuaGetTmOurs),
+       true},
+      {"luaV_gettable",
+       0x009293E0,
+       "lua/LuaObject.cpp luaV_gettable",
+       14,
+       2,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues keyTt keyBits flags loop tmname0",
+       "slot flags",
+       GenLuaGetTable,
+       LuaGetTableRetail<false>,
+       ENGINE_ONLY(LuaGetTableOurs<false>),
+       true},
+      {"luaV_index",
+       0x00929BF0,
+       "lua/LuaObject.cpp luaV_index",
+       14,
+       2,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues keyTt keyBits flags loop tmname0",
+       "slot flags",
+       GenLuaGetTable,
+       LuaGetTableRetail<true>,
+       ENGINE_ONLY(LuaGetTableOurs<true>),
+       true},
+      {"luaV_settable",
+       0x00929450,
+       "lua/LuaObject.cpp luaV_settable",
+       14,
+       3,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues keyTt keyBits valTt valBits tmname1",
+       "flags changedSlot valueHash",
+       GenLuaSetTable,
+       LuaSetTableRetail,
+       ENGINE_ONLY(LuaSetTableOurs),
+       true},
+      {"lua_toboolean",
+       0x0090CA40,
+       "lua/LuaObject.cpp lua_toboolean",
+       10,
+       1,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues idx",
+       "bool",
+       GenLuaIndexAny,
+       LuaToBooleanRetail,
+       ENGINE_ONLY(LuaToBooleanOurs),
+       true},
+      {"lua_isnumber",
+       0x0090C7A0,
+       "lua/LuaObject.cpp lua_isnumber",
+       10,
+       1,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues idx",
+       "isnumber",
+       GenLuaIndexAny,
+       LuaIsNumberRetail,
+       ENGINE_ONLY(LuaIsNumberOurs),
+       true},
+      {"lua_pushnil",
+       0x0090CD00,
+       "lua/LuaObject.cpp lua_pushnil",
+       10,
+       3,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues -",
+       "top tt bits",
+       GenLuaIndexAny,
+       LuaPushNilRetail,
+       ENGINE_ONLY(LuaPushNilOurs),
+       true},
+      {"lua_pushboolean",
+       0x0090CF80,
+       "lua/LuaObject.cpp lua_pushboolean",
+       10,
+       3,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues b",
+       "top tt bits",
+       GenLuaPushBoolean,
+       LuaPushBooleanRetail,
+       ENGINE_ONLY(LuaPushBooleanOurs),
+       true},
+      {"lua_rawget",
+       0x0090D050,
+       "lua/LuaObject.cpp lua_rawget",
+       12,
+       3,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues idx keyTt keyBits",
+       "top tt bits",
+       GenLuaRawGet,
+       LuaRawGetRetail,
+       ENGINE_ONLY(LuaRawGetOurs),
+       true},
+      {"lua_rawseti",
+       0x0090D2F0,
+       "lua/LuaObject.cpp lua_rawseti",
+       11,
+       4,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues idx n",
+       "top flags changedSlot valueHash",
+       GenLuaRawSetI,
+       LuaRawSetIRetail,
+       ENGINE_ONLY(LuaRawSetIOurs),
+       true},
+      {"lua_rawset",
+       0x0090D2A0,
+       "lua/LuaObject.cpp lua_rawset",
+       12,
+       4,
+       "seed sizearray lsizenode fill pool stateSeed base top upvalues idx keyTt keyBits",
+       "top flags changedSlot valueHash",
+       GenLuaRawSet,
+       LuaRawSetRetail,
+       ENGINE_ONLY(LuaRawSetOurs),
+       true},
+      {"CalculateMapWaterRatio",
+       0x0062D7E0,
+       "moho/ai/CAiBrain.cpp CalculateMapWaterRatio",
+       6,
+       1,
+       "cellsW cellsH seed shape waterOn waterElev",
+       "ratio",
+       GenWaterRatio,
+       WaterRatioRetail,
+       ENGINE_ONLY(WaterRatioOurs)},
+      {"OCCUPY_MobileCheck",
+       0x00564AB0,
+       "moho/sim/STIMap.cpp OCCUPY_MobileCheck",
+       21,
+       1,
+       "cellsW cellsH seed shape waterOn waterElev x z fpCaps maxSlope minDepth maxDepth fpFlags caps gridSeed "
+       "terrainPct waterPct gridW gridH sizeX sizeZ",
+       "caps",
+       GenFootprintWorld,
+       MobileCheckRetail,
+       ENGINE_ONLY(MobileCheckOurs),
+       true},
+      {"OCCUPY_FootprintFits",
+       0x007209E0,
+       "moho/sim/STIMap.cpp OCCUPY_FootprintFits",
+       21,
+       1,
+       "cellsW cellsH seed shape waterOn waterElev x z fpCaps maxSlope minDepth maxDepth fpFlags caps gridSeed "
+       "terrainPct waterPct gridW gridH sizeX sizeZ",
+       "caps",
+       GenFootprintWorld,
+       FootprintFitsRetail,
+       ENGINE_ONLY(FootprintFitsOurs),
+       true},
+      {"STIMap::IsWithin",
+       0x0062CA60,
+       "moho/sim/STIMap.cpp STIMap::IsWithin",
+       11,
+       1,
+       "cellsW cellsH x0 z0 x1 z1 pos[3] border wholeMap",
+       "inside",
+       GenIsWithin,
+       IsWithinRetail,
+       ENGINE_ONLY(IsWithinOurs),
+       true},
+      {"CAiPathFinder::ShouldSearchRect",
+       0x005AA860,
+       "moho/ai/CAiPathFinder.cpp CAiPathFinder::ShouldSearchRect",
+       29,
+       1,
+       "searchType probe anchorX anchorZ goal[8] count history[12] rect[4]",
+       "search",
+       GenShouldSearchRect,
+       ShouldSearchRectRetail,
+       ENGINE_ONLY(ShouldSearchRectOurs),
+       true},
+      {"ComputeOctileDistanceCore",
+       0x005A9D60,
+       "moho/ai/CAiPathFinder.cpp ComputeOctileDistanceCore",
+       2,
+       1,
+       "a b",
+       "distance",
+       GenOctile,
+       OctileRetail,
+       ENGINE_ONLY(OctileOurs)},
+      {"computesizes",
+       0x00927090,
+       "lua/LuaObject.cpp computesizes",
+       2 + kSizeBuckets,
+       2,
+       "ntotal narray nums[26]",
+       "narray nhash",
+       GenComputeSizes,
+       ComputeSizesRetail,
+       ENGINE_ONLY(ComputeSizesOurs),
+       true},
+      {"func_AABoxToRect",
+       0x004FCBE0,
+       "moho/sim/COGrid.cpp func_AABoxToRect",
+       6,
+       2,
+       "min[3] max[3]",
+       "startX|startZ width|height",
+       GenAABoxToRect,
+       AABoxToRectRetail,
+       ENGINE_ONLY(AABoxToRectOurs),
+       true},
+      {"COORDS_ToWorldPos",
+       0x0050B0F0,
+       "moho/entity/Entity.cpp COORDS_ToWorldPos",
+       11,
+       3,
+       "cellsW cellsH seed shape waterOn waterElev x z layer sizeX sizeZ",
+       "pos[3]",
+       GenToWorldPos,
+       ToWorldPosRetail,
+       ENGINE_ONLY(ToWorldPosOurs)},
+      {"CIntelGrid::IsVisible(rect)",
+       0x005BE210,
+       "moho/sim/CIntelGrid.cpp CIntelGrid::IsVisible",
+       9,
+       1,
+       "cellsW cellsH gridSize seed density rect[4]",
+       "visible",
+       GenIntelRect,
+       IntelRectRetail,
+       ENGINE_ONLY(IntelRectOurs),
+       true},
     };
   } // namespace
 
-  const Target* AllTargets(int& count)
+  const Target* AllTargets(
+    int& count
+  )
   {
     static const std::vector<Target> all = [] {
       int mathCount = 0;

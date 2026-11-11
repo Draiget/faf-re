@@ -70,17 +70,33 @@ namespace faf::remote
   class CCommandIdRewriter : public moho::ICommandSink
   {
   public:
-    explicit CCommandIdRewriter(moho::ICommandSink& next) noexcept
+    explicit CCommandIdRewriter(
+      moho::ICommandSink& next
+    ) noexcept
       : mNext(next)
     {}
 
-    [[nodiscard]] std::uint64_t Commands() const noexcept { return mCommands; }
-    [[nodiscard]] std::uint64_t IdsRewritten() const noexcept { return mIdsRewritten; }
-    [[nodiscard]] std::uint64_t Dropped() const noexcept { return mDropped; }
+    [[nodiscard]] std::uint64_t Commands() const noexcept
+    {
+      return mCommands;
+    }
+    [[nodiscard]] std::uint64_t IdsRewritten() const noexcept
+    {
+      return mIdsRewritten;
+    }
+    [[nodiscard]] std::uint64_t Dropped() const noexcept
+    {
+      return mDropped;
+    }
     /** The last dropped command's message name and the id that dropped it. */
-    [[nodiscard]] const std::string& LastDrop() const noexcept { return mLastDrop; }
+    [[nodiscard]] const std::string& LastDrop() const noexcept
+    {
+      return mLastDrop;
+    }
     /** Issued commands passed on whose target was a recon blip, by command type (plan WP5.12). */
-    [[nodiscard]] std::uint64_t BlipTargets(moho::EUnitCommandType type) const noexcept
+    [[nodiscard]] std::uint64_t BlipTargets(
+      moho::EUnitCommandType type
+    ) const noexcept
     {
       const auto index = static_cast<std::size_t>(type);
       return index < mBlipTargets.size() ? mBlipTargets[index] : 0u;
@@ -98,25 +114,35 @@ namespace faf::remote
     void WarpEntity(moho::EntId entityId, const moho::VTransform& transform) override;
     void ProcessInfoPair(moho::EntId entityId, gpg::StrArg key, gpg::StrArg value) override;
     void IssueCommand(
-      const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities, const moho::SSTICommandIssueData& data, bool clear
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities,
+      const moho::SSTICommandIssueData& data,
+      bool clear
     ) override;
     void IssueFactoryCommand(
-      const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities, const moho::SSTICommandIssueData& data, bool clear
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities,
+      const moho::SSTICommandIssueData& data,
+      bool clear
     ) override;
     void IncreaseCommandCount(moho::CmdId id, int count) override;
     void DecreaseCommandCount(moho::CmdId id, int count) override;
     void SetCommandTarget(moho::CmdId id, const moho::SSTITarget& target) override;
     void SetCommandType(moho::CmdId id, moho::EUnitCommandType type) override;
     void SetCommandCells(
-      moho::CmdId id, const gpg::core::FastVector<moho::SOCellPos>& cells, const Wm3::Vector3<float>& target
+      moho::CmdId id,
+      const gpg::core::FastVector<moho::SOCellPos>& cells,
+      const Wm3::Vector3<float>& target
     ) override;
     void RemoveCommandFromUnitQueue(moho::CmdId id, moho::EntId unitId) override;
     void ExecuteLuaInSim(const char* lua, const LuaPlus::LuaObject& args) override;
     void LuaSimCallback(
-      const char* name, const LuaPlus::LuaObject& args, const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities
+      const char* name,
+      const LuaPlus::LuaObject& args,
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities
     ) override;
     void ExecuteDebugCommand(
-      const char* command, const Wm3::Vector3<float>& position, uint32_t army,
+      const char* command,
+      const Wm3::Vector3<float>& position,
+      uint32_t army,
       const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities
     ) override;
     void AdvanceBeat(int beats) override;
@@ -126,20 +152,30 @@ namespace faf::remote
      * Values in sim callbacks' Lua arguments, outside the marked fields, that have the form of a
      * renumbered id (`LooksRenumbered`): passed as they are, counted, and the first few logged.
      */
-    [[nodiscard]] std::uint64_t UnmarkedIds() const noexcept { return mUnmarkedIds; }
+    [[nodiscard]] std::uint64_t UnmarkedIds() const noexcept
+    {
+      return mUnmarkedIds;
+    }
 
   protected:
     /** The id as `next` gets it, in place; false refuses it (the command is dropped). */
     [[nodiscard]] virtual bool RewriteEntity(std::uint32_t& id) = 0;
     [[nodiscard]] virtual bool RewriteCommand(std::uint32_t& id) = 0;
     /** Whether a command may name this id, as sent, as its target. */
-    [[nodiscard]] virtual bool AllowTarget(std::uint32_t id)
+    [[nodiscard]] virtual bool AllowTarget(
+      std::uint32_t id
+    )
     {
       (void)id;
       return true;
     }
     /** Whether an unmarked Lua value is worth logging as an id (none by default). */
-    [[nodiscard]] virtual bool LooksRenumbered(std::uint32_t value) const { return false; }
+    [[nodiscard]] virtual bool LooksRenumbered(
+      [[maybe_unused]] std::uint32_t value
+    ) const
+    {
+      return false;
+    }
 
   private:
     using EntitySet = moho::BVSet<moho::EntId, moho::EntIdUniverse>;
@@ -173,7 +209,9 @@ namespace faf::remote
    * driver never stores it (0x0073B43D jumps over the copy).
    */
   [[nodiscard]] std::uint32_t TranslateSelectionMask(
-    const CViewIdMap& map, const moho::SSyncFilterMaskBlock& in, moho::SSyncFilterMaskBlock& out,
+    const CViewIdMap& map,
+    const moho::SSyncFilterMaskBlock& in,
+    moho::SSyncFilterMaskBlock& out,
     const std::function<bool(std::uint32_t simId)>& known
   );
 
@@ -181,23 +219,53 @@ namespace faf::remote
   class CInboundIdTranslator final : public CCommandIdRewriter
   {
   public:
-    CInboundIdTranslator(moho::ICommandSink& next, const CViewIdMap& map) noexcept
+    CInboundIdTranslator(
+      moho::ICommandSink& next,
+      const CViewIdMap& map
+    ) noexcept
       : CCommandIdRewriter(next)
       , mMap(&map)
     {}
 
     /** The view the commands come from (a client's army). */
-    void SetMap(const CViewIdMap& map) noexcept { mMap = &map; }
+    void SetMap(
+      const CViewIdMap& map
+    ) noexcept
+    {
+      mMap = &map;
+    }
     /** Asks whether the view holds an id that isn't renumbered, for a target. None: every target goes through. */
-    void SetHeldTest(std::function<bool(std::uint32_t id)> held) { mHeld = std::move(held); }
+    void SetHeldTest(
+      std::function<bool(std::uint32_t id)> held
+    )
+    {
+      mHeld = std::move(held);
+    }
 
   protected:
-    [[nodiscard]] bool RewriteEntity(std::uint32_t& id) override { return mMap->EntityToSim(id, id); }
-    [[nodiscard]] bool RewriteCommand(std::uint32_t& id) override { return mMap->CommandToSim(id, id); }
+    [[nodiscard]] bool RewriteEntity(
+      std::uint32_t& id
+    ) override
+    {
+      return mMap->EntityToSim(id, id);
+    }
+    [[nodiscard]] bool RewriteCommand(
+      std::uint32_t& id
+    ) override
+    {
+      return mMap->CommandToSim(id, id);
+    }
     /** A renumbered id is the map's to say. */
-    [[nodiscard]] bool AllowTarget(const std::uint32_t id) override { return !mHeld || mMap->MapsEntity(id) || mHeld(id); }
+    [[nodiscard]] bool AllowTarget(
+      const std::uint32_t id
+    ) override
+    {
+      return !mHeld || mMap->MapsEntity(id) || mHeld(id);
+    }
     /** A blip or foreign projectile id of this view, as only a view id can be. */
-    [[nodiscard]] bool LooksRenumbered(const std::uint32_t value) const override
+    [[nodiscard]] bool LooksRenumbered(
+      const std::uint32_t value
+    ) const override
     {
       std::uint32_t simId = 0;
       return mMap->MapsEntity(value) && mMap->EntityToSim(value, simId);

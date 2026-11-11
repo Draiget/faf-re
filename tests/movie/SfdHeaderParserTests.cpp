@@ -14,7 +14,9 @@ using namespace moho::sfd;
 namespace
 {
   // A 192x192, 150-frame, 29.97 fps stream header starting at `base`.
-  std::vector<std::byte> Fixture(const std::size_t base)
+  std::vector<std::byte> Fixture(
+    const std::size_t base
+  )
   {
     std::vector<std::byte> bytes(base + 2048);
     auto put = [&](const std::size_t offset, const unsigned value) {
@@ -38,7 +40,10 @@ namespace
   }
 } // namespace
 
-TEST(SfdHeaderParser, RelocatedHeaderParses)
+TEST(
+  SfdHeaderParser,
+  RelocatedHeaderParses
+)
 {
   for (const std::size_t base : {0U, 37U, 2048U, 4096U, 8192U}) {
     SCOPED_TRACE(testing::Message() << "base " << base);
@@ -52,7 +57,10 @@ TEST(SfdHeaderParser, RelocatedHeaderParses)
   }
 }
 
-TEST(SfdHeaderParser, TruncatedHeaderIsRefused)
+TEST(
+  SfdHeaderParser,
+  TruncatedHeaderIsRefused
+)
 {
   for (const std::size_t base : {0U, 37U, 2048U, 4096U, 8192U}) {
     const auto bytes = Fixture(base);
@@ -63,7 +71,10 @@ TEST(SfdHeaderParser, TruncatedHeaderIsRefused)
   }
 }
 
-TEST(SfdHeaderParser, CompositionModeFollowsTheEffect)
+TEST(
+  SfdHeaderParser,
+  CompositionModeFollowsTheEffect
+)
 {
   for (const std::size_t base : {0U, 37U, 2048U, 4096U, 8192U}) {
     auto bytes = Fixture(base);
@@ -79,7 +90,10 @@ TEST(SfdHeaderParser, CompositionModeFollowsTheEffect)
   }
 }
 
-TEST(SfdHeaderParser, MalformedMetadataIsRefused)
+TEST(
+  SfdHeaderParser,
+  MalformedMetadataIsRefused
+)
 {
   const auto bytes = Fixture(0);
   HeaderInfo h;
@@ -93,7 +107,10 @@ TEST(SfdHeaderParser, MalformedMetadataIsRefused)
 }
 
 // Random bytes, half of them over a valid header: refused or parsed, never a crash.
-TEST(SfdHeaderParser, RandomInputDoesNotCrash)
+TEST(
+  SfdHeaderParser,
+  RandomInputDoesNotCrash
+)
 {
   const auto bytes = Fixture(0);
   HeaderInfo h;

@@ -71,7 +71,9 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CBuildTaskHelperTypeInfo_c85ec8, moho::register_CBuildTaskHelperTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CBuildTaskHelperTypeInfo_c85ec8,
+  moho::register_CBuildTaskHelperTypeInfo
+)

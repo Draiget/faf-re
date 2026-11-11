@@ -54,8 +54,6 @@ namespace moho
     void Init() override;
   };
 
-
-
   /**
    * Address: 0x00BD6330 (FUN_00BD6330, register_EProjectileImpactEventTypeInfo)
    *

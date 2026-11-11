@@ -77,7 +77,10 @@ namespace gpg::gal
     boost::shared_ptr<VertexFormat> CreateVertexFormat(std::uint32_t formatCode) override;
     boost::shared_ptr<VertexBuffer> CreateVertexBuffer(const VertexBufferContext* context) override;
     boost::shared_ptr<IndexBuffer> CreateIndexBuffer(const IndexBufferContext* context) override;
-    void GetRenderTargetData(const boost::shared_ptr<RenderTarget>& source, const boost::shared_ptr<Texture>& destination) override;
+    void GetRenderTargetData(
+      const boost::shared_ptr<RenderTarget>& source,
+      const boost::shared_ptr<Texture>& destination
+    ) override;
     void StretchRect(
       const boost::shared_ptr<RenderTarget>& source,
       const boost::shared_ptr<RenderTarget>& destination,
@@ -90,15 +93,28 @@ namespace gpg::gal
       const RECT* sourceRect,
       const RECT* destinationRect
     ) override;
-    void SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) override;
-    void SaveRenderTarget(const boost::shared_ptr<RenderTarget>& renderTarget, const fa::string& filePath, int fileFormat) override;
+    void
+    SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) override;
+    void SaveRenderTarget(
+      const boost::shared_ptr<RenderTarget>& renderTarget,
+      const fa::string& filePath,
+      int fileFormat
+    ) override;
     void SaveTexture(
-      const boost::shared_ptr<Texture>& texture, const fa::string& filePath, int fileFormat, gpg::MemBuffer<char>* outBuffer
+      const boost::shared_ptr<Texture>& texture,
+      const fa::string& filePath,
+      int fileFormat,
+      gpg::MemBuffer<char>* outBuffer
     ) override;
     void GetTexture2D(
-      const void* sourceData, std::uint32_t sourceBytes, gpg::MemBuffer<char>* outTextureData, std::uint32_t* outWidth, int* outHeight
+      const void* sourceData,
+      std::uint32_t sourceBytes,
+      gpg::MemBuffer<char>* outTextureData,
+      std::uint32_t* outWidth,
+      int* outHeight
     ) override;
-    boost::weak_ptr<void>* Func7(boost::weak_ptr<void>* outWeakHandle, boost::shared_ptr<void> temporarySharedHandle) override;
+    boost::weak_ptr<void>*
+    Func7(boost::weak_ptr<void>* outWeakHandle, boost::shared_ptr<void> temporarySharedHandle) override;
     void Reset(DeviceContext* context) override;
     void Reset() override;
     int TestCooperativeLevel() override;
@@ -111,11 +127,21 @@ namespace gpg::gal
     void SetViewport(const D3DVIEWPORT9* viewport) override;
     void GetViewport(D3DVIEWPORT9* outViewport) override;
     void ClearTarget(const OutputContext* context) override;
-    void Clear(bool clearColor, bool clearDepth, bool clearStencil, std::uint32_t packedColor, float depth, int stencil) override;
+    void Clear(
+      bool clearColor,
+      bool clearDepth,
+      bool clearStencil,
+      std::uint32_t packedColor,
+      float depth,
+      int stencil
+    ) override;
     void ClearTextures() override;
     void SetVertexDeclaration(boost::shared_ptr<VertexFormat> vertexFormat) override;
     void SetVertexBuffer(
-      std::uint32_t streamSlot, boost::shared_ptr<VertexBuffer> vertexBuffer, int streamFrequencyToken, int startVertex
+      std::uint32_t streamSlot,
+      boost::shared_ptr<VertexBuffer> vertexBuffer,
+      int streamFrequencyToken,
+      int startVertex
     ) override;
     void SetBufferIndices(boost::shared_ptr<IndexBuffer> indexBuffer) override;
     void SetFogState(bool enable, const Matrix* projection, float fogStart, float fogEnd, int fogColor) override;
@@ -140,17 +166,27 @@ namespace gpg::gal
     bool ReadGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, void* out) override;
     void ReleaseBufferCopy(VertexBuffer& buffer) override;
     void ReleaseBufferCopy(IndexBuffer& buffer) override;
+    void CopyWrittenOnly(VertexBuffer& buffer) override;
     void CopyLockedRangeOnly(VertexBuffer& buffer) override;
     void CopyLockedRangeOnly(IndexBuffer& buffer) override;
     bool CopyVertexBufferRegion(
-      VertexBuffer& destination, std::uint32_t destinationOffset, VertexBuffer& source, std::uint32_t sourceOffset, std::uint32_t byteCount
+      VertexBuffer& destination,
+      std::uint32_t destinationOffset,
+      VertexBuffer& source,
+      std::uint32_t sourceOffset,
+      std::uint32_t byteCount
     ) override;
     /** Destroys a GPU program's modules and pipelines once the GPU is done with them. */
     void RetireProgram(GpuProgramVulkan& program);
     // Ray tracing (RayTracingVulkan.cpp)
     RayGeometryId CreateRayGeometry(const RayGeometryDesc& desc) override;
     void DestroyRayGeometry(RayGeometryId geometry) override;
-    bool SetRayInstances(const RayInstance* instances, std::uint32_t count) override;
+    bool SetRayInstances(
+      const RayInstance* instances,
+      std::uint32_t count,
+      const boost::shared_ptr<Texture>* textures,
+      std::uint32_t textureCount
+    ) override;
 
     // effects::PassBinder
     void BindPass(effects::EffectProgram& program, std::uint32_t technique, std::uint32_t pass) override;
@@ -159,9 +195,18 @@ namespace gpg::gal
     [[nodiscard]] bool SupportsVertexTextureFormat(std::uint32_t textureFormat);
 
     // ---- services for the resources ----------------------------------------
-    [[nodiscard]] VkDevice Native() const noexcept { return mDevice; }
-    [[nodiscard]] std::recursive_mutex& Mutex() noexcept { return mMutex; }
-    [[nodiscard]] std::uint64_t RecordingSerial() const noexcept { return mSubmittedSerial + 1U; }
+    [[nodiscard]] VkDevice Native() const noexcept
+    {
+      return mDevice;
+    }
+    [[nodiscard]] std::recursive_mutex& Mutex() noexcept
+    {
+      return mMutex;
+    }
+    [[nodiscard]] std::uint64_t RecordingSerial() const noexcept
+    {
+      return mSubmittedSerial + 1U;
+    }
     /** The image of swap chain `swapChain` the frame draws into. */
     [[nodiscard]] std::uint32_t AcquiredImage(std::uint32_t swapChain);
 
@@ -169,8 +214,20 @@ namespace gpg::gal
     [[nodiscard]] vulkan::TrackedBuffer CreateDeviceBuffer(VkDeviceSize bytes, VkBufferUsageFlags usage);
     void UploadBuffer(vulkan::TrackedBuffer& destination, VkDeviceSize offset, const void* data, VkDeviceSize bytes);
     /** Uploads one level of one layer; `data` holds tightly packed rows (blocks for BC formats). */
-    void UploadImageLevel(vulkan::TrackedImage& destination, DXGI_FORMAT format, std::uint32_t level, std::uint32_t layer, const void* data);
-    void ReadImageLevel(vulkan::TrackedImage& source, DXGI_FORMAT format, std::uint32_t level, std::uint32_t layer, std::vector<std::uint8_t>& bytes);
+    void UploadImageLevel(
+      vulkan::TrackedImage& destination,
+      DXGI_FORMAT format,
+      std::uint32_t level,
+      std::uint32_t layer,
+      const void* data
+    );
+    void ReadImageLevel(
+      vulkan::TrackedImage& source,
+      DXGI_FORMAT format,
+      std::uint32_t level,
+      std::uint32_t layer,
+      std::vector<std::uint8_t>& bytes
+    );
     void ReadImage(vulkan::TrackedImage& source, DXGI_FORMAT format, imaging::Image& image);
     /** Destroys the image (and its view) once the GPU is done with the commands recorded so far. */
     void Retire(vulkan::TrackedImage& image, VkImageView view);
@@ -193,7 +250,7 @@ namespace gpg::gal
       effects::EffectProgram* program = nullptr;
       const effects::CompiledEntry* vertexShader = nullptr;
       const effects::CompiledEntry* pixelShader = nullptr;
-      const effects::CompiledEntry* hullShader = nullptr;   // engine addition: a tessellated pass (both set)
+      const effects::CompiledEntry* hullShader = nullptr; // engine addition: a tessellated pass (both set)
       const effects::CompiledEntry* domainShader = nullptr;
       RenderState state;
       VkDescriptorSet textures = VK_NULL_HANDLE;
@@ -201,7 +258,7 @@ namespace gpg::gal
       std::uint32_t constantsOffset = 0;          // ren_VulkanDynamicConstants: the bind offset in `constants`
       const std::uint8_t* constantsCpu = nullptr; // the same snapshot, CPU side (upload memory)
       std::uint32_t constantsBytes = 0;
-      std::uint64_t constantsSerial = 0;          // the submission whose upload memory holds it
+      std::uint64_t constantsSerial = 0;                             // the submission whose upload memory holds it
       const std::vector<effects::TextureBinding>* sampled = nullptr; // in the effect's state
     };
 
@@ -238,7 +295,7 @@ namespace gpg::gal
       std::uint64_t serial = 0;
       std::vector<VkDescriptorPool> descriptorPools;
       std::uint32_t descriptorPool = 0;
-      std::vector<VkSemaphore> acquire; // one per swap chain
+      std::vector<VkSemaphore> acquire;       // one per swap chain
       std::vector<VkDescriptorPool> gpuPools; // GPU-driven sets (GpuDrivenVulkan.cpp)
       std::uint32_t gpuPool = 0;
       /// ren_VulkanDynamicConstants: one dynamic constant set per (upload buffer, range), from this frame's pools.
@@ -300,7 +357,8 @@ namespace gpg::gal
     [[nodiscard]] VkDeviceSize ConstantAlignment() const noexcept;
     /** A set 1 ($Globals) descriptor set reading `bytes` of `upload`. */
     /** A set for $Globals in `upload`; with dynamic constants `offset` is the bind offset, otherwise 0. */
-    [[nodiscard]] VkDescriptorSet ConstantSet(const vulkan::UploadAllocation& upload, VkDeviceSize bytes, std::uint32_t& offset);
+    [[nodiscard]] VkDescriptorSet
+    ConstantSet(const vulkan::UploadAllocation& upload, VkDeviceSize bytes, std::uint32_t& offset);
     /** Binds set 1 (the pass's $Globals) with the layout and offset of the frame's constant mode. */
     void BindConstantSet(VkDescriptorSet set, std::uint32_t offset);
     [[nodiscard]] VkPipelineLayout EffectPipelineLayout() const noexcept
@@ -318,7 +376,8 @@ namespace gpg::gal
     [[nodiscard]] const effects::SpirvInterface& InterfaceOf(const effects::CompiledEntry& entry);
     [[nodiscard]] VkPipeline PipelineFor(const BoundPass& pass, VkPrimitiveTopology topology);
     [[nodiscard]] bool PrepareDraw(std::uint32_t topologyToken, bool indexed);
-    [[nodiscard]] VkImageView TargetView(VkFormat& format, vulkan::TrackedImage*& image, std::uint32_t& width, std::uint32_t& height);
+    [[nodiscard]] VkImageView
+    TargetView(VkFormat& format, vulkan::TrackedImage*& image, std::uint32_t& width, std::uint32_t& height);
     void Trace(const char* format, ...);
     void DumpBackBufferIfDue();
     void LogMemoryIfDue();
@@ -334,7 +393,13 @@ namespace gpg::gal
     void EndProfileFrame();
     void CollectProfileFrames();
 
-    void CopyImage(vulkan::TrackedImage& source, vulkan::TrackedImage& destination, const RECT* sourceRect, const RECT* destinationRect, bool scale);
+    void CopyImage(
+      vulkan::TrackedImage& source,
+      vulkan::TrackedImage& destination,
+      const RECT* sourceRect,
+      const RECT* destinationRect,
+      bool scale
+    );
 
     // ---- core objects --------------------------------------------------------
     int mCurThreadId = 0;
@@ -354,8 +419,8 @@ namespace gpg::gal
     bool mAnisotropy = false;
     bool mWireframeSupported = false;
     bool mTessellationSupported = false; // engine addition: tessellated passes draw only with it
-    bool mMemoryBudget = false; // VK_EXT_memory_budget enabled
-    std::string mDriverName;    // VkPhysicalDeviceDriverProperties driverName + driverInfo
+    bool mMemoryBudget = false;          // VK_EXT_memory_budget enabled
+    std::string mDriverName;             // VkPhysicalDeviceDriverProperties driverName + driverInfo
     VkFormat mDepthStencilFormat = VK_FORMAT_D24_UNORM_S8_UINT;
 
     vulkan::MemoryAllocator mMemory;
@@ -374,9 +439,9 @@ namespace gpg::gal
     VkPipelineLayout mDynamicPipelineLayout = VK_NULL_HANDLE;
     bool mDynamicConstants = false; ///< latched from gVulkanDynamicConstants between frames
     VkPipelineCache mPipelineCache = VK_NULL_HANDLE;
-    vulkan::TrackedImage mNullImages[3];   // 2D, cube, 3D
+    vulkan::TrackedImage mNullImages[3]; // 2D, cube, 3D
     VkImageView mNullViews[3]{};
-    vulkan::TrackedBuffer mZeroBuffer;     // feeds the vertex inputs a format lacks
+    vulkan::TrackedBuffer mZeroBuffer; // feeds the vertex inputs a format lacks
     VkSampler mDefaultSampler = VK_NULL_HANDLE;
     std::map<std::string, VkSampler> mSamplers;
     std::unordered_map<std::uint64_t, VkShaderModule> mModules;
@@ -388,7 +453,7 @@ namespace gpg::gal
     {
       std::uint64_t vertexKey;
       std::uint64_t pixelKey;
-      std::uint64_t hullKey;   // 0 when the pass is not tessellated
+      std::uint64_t hullKey; // 0 when the pass is not tessellated
       std::uint64_t domainKey;
       std::uint32_t format;
       std::uint32_t sampleMask;
@@ -470,6 +535,10 @@ namespace gpg::gal
       VkAccelerationStructureKHR structure = VK_NULL_HANDLE;
       VkDeviceAddress address = 0U;
       RayRange range;
+      // Engine addition (ren_RayAlphaShadows): where an alpha-tested piece's indices and texture coordinates sit in
+      // mRayAttributes; ~0 for an opaque piece.
+      VkDeviceSize indexOffset = ~0ULL;
+      VkDeviceSize uvOffset = ~0ULL;
     };
     struct RayGarbage
     {
@@ -478,6 +547,7 @@ namespace gpg::gal
       RayBuffer buffer;
       RayRange range;
       VkDescriptorSet set = VK_NULL_HANDLE;
+      std::vector<boost::shared_ptr<Texture>> textures; // a retired set's alpha textures
     };
     [[nodiscard]] bool CreateRayBuffer(VkDeviceSize bytes, VkBufferUsageFlags usage, bool host, RayBuffer& out);
     void DestroyRayBuffer(RayBuffer& buffer) noexcept;
@@ -485,10 +555,15 @@ namespace gpg::gal
     void CollectRayGarbage(bool all);
     [[nodiscard]] bool RayArenaAllocate(VkDeviceSize bytes, RayRange& out);
     void RayArenaFree(const RayRange& range);
-    [[nodiscard]] std::uint8_t* RayInput(VkDeviceSize bytes, VkDeviceAddress& address);
+    [[nodiscard]] std::uint8_t*
+    RayInput(VkDeviceSize bytes, VkDeviceAddress& address, VkBuffer* buffer = nullptr, VkDeviceSize* offset = nullptr);
     [[nodiscard]] bool EnsureRayScratch(VkDeviceSize bytes);
-    void RayBarrier(VkPipelineStageFlags2 sourceStages, VkAccessFlags2 sourceAccess, VkPipelineStageFlags2 destinationStages,
-                    VkAccessFlags2 destinationAccess);
+    void RayBarrier(
+      VkPipelineStageFlags2 sourceStages,
+      VkAccessFlags2 sourceAccess,
+      VkPipelineStageFlags2 destinationStages,
+      VkAccessFlags2 destinationAccess
+    );
     void CreateRayTracingObjects();
     void ReleaseRayTracingObjects() noexcept;
     bool BuildRayScene();
@@ -497,6 +572,20 @@ namespace gpg::gal
     VkDescriptorSetLayout mRayLayout = VK_NULL_HANDLE;
     VkDescriptorPool mRayPool = VK_NULL_HANDLE;
     VkDescriptorSet mRaySet = VK_NULL_HANDLE;
+    // Engine addition (ren_RayAlphaShadows): set 2's bindings 1-4 (RayTracingVulkan.cpp WriteRaySet): the alpha-tested
+    // pieces' indices and texture coordinates (host-visible storage buffer), one record per scene instance (index
+    // offset, uv offset, texture slot, 1 when alpha-tested), their textures, a linear wrapping sampler.
+    RayBuffer mRayAttributes;
+    std::vector<RayBuffer> mRayAttributesOld; // grown out of; retired once set 2 no longer points at them
+    VkDeviceSize mRayAttributesUsed = 0U;
+    std::vector<std::uint32_t> mRayRecords;
+    std::vector<boost::shared_ptr<Texture>> mRayTextures;
+    std::vector<boost::shared_ptr<Texture>> mRaySetTextures;
+    VkSampler mRaySampler = VK_NULL_HANDLE;
+    RayInputChunk* mRayRecordsChunk = nullptr;
+    bool AppendRayAttributes(const void* data, VkDeviceSize bytes, VkDeviceSize& offset);
+    /** A new set 2 for the current scene, records and textures; the previous one is retired. */
+    bool WriteRaySet();
     VkAccelerationStructureKHR mTlas = VK_NULL_HANDLE;
     RayBuffer mTlasBuffer;
     RayBuffer mRayScratch;
@@ -510,7 +599,7 @@ namespace gpg::gal
     std::vector<VkAccelerationStructureInstanceKHR> mRayInstances;
     VkDescriptorSetLayout mGpuSetLayout = VK_NULL_HANDLE;
     VkPipelineLayout mGpuPipelineLayout = VK_NULL_HANDLE;
-    VkSampler mGpuSamplers[3]{}; // by GpuSampler
+    VkSampler mGpuSamplers[3]{};          // by GpuSampler
     vulkan::TrackedBuffer mGpuNullBuffer; // unbound t0..t3 and u0..u1
 
     struct TimedRegion

@@ -17,7 +17,10 @@
 
 namespace
 {
-  [[nodiscard]] std::string Text(const std::size_t n, const char first = 'a')
+  [[nodiscard]] std::string Text(
+    const std::size_t n,
+    const char first = 'a'
+  )
   {
     std::string out;
     for (std::size_t i = 0; i < n; ++i) {
@@ -27,7 +30,9 @@ namespace
   }
 
   /** The invariants every fa::string keeps, whatever its contents. */
-  [[nodiscard]] ::testing::AssertionResult IsWellFormed(const fa::string& s)
+  [[nodiscard]] ::testing::AssertionResult IsWellFormed(
+    const fa::string& s
+  )
   {
     if (!s.basic_sanity()) {
       return ::testing::AssertionFailure() << "basic_sanity() is false";
@@ -47,13 +52,19 @@ namespace
     return ::testing::AssertionSuccess();
   }
 
-  [[nodiscard]] std::size_t Pick(std::mt19937& rng, const std::size_t maxInclusive)
+  [[nodiscard]] std::size_t Pick(
+    std::mt19937& rng,
+    const std::size_t maxInclusive
+  )
   {
     return std::uniform_int_distribution<std::size_t>(0, maxInclusive)(rng);
   }
 } // namespace
 
-TEST(FaString, DefaultIsEmptyAndInline)
+TEST(
+  FaString,
+  DefaultIsEmptyAndInline
+)
 {
   const fa::string s;
   EXPECT_TRUE(s.empty());
@@ -64,7 +75,10 @@ TEST(FaString, DefaultIsEmptyAndInline)
   EXPECT_TRUE(IsWellFormed(s));
 }
 
-TEST(FaString, ConstructorsAtTheInlineBoundary)
+TEST(
+  FaString,
+  ConstructorsAtTheInlineBoundary
+)
 {
   for (const std::size_t n : {0u, 1u, 14u, 15u, 16u, 17u, 100u}) {
     SCOPED_TRACE(n);
@@ -89,7 +103,10 @@ TEST(FaString, ConstructorsAtTheInlineBoundary)
   EXPECT_TRUE(backwards.empty());
 }
 
-TEST(FaString, CopyAndAssignBetweenInlineAndHeap)
+TEST(
+  FaString,
+  CopyAndAssignBetweenInlineAndHeap
+)
 {
   const fa::string shortText("short");
   const fa::string longText(Text(40));
@@ -114,7 +131,10 @@ TEST(FaString, CopyAndAssignBetweenInlineAndHeap)
   EXPECT_EQ(self.view(), Text(30));
 }
 
-TEST(FaString, MoveLeavesTheSourceEmptyAndInline)
+TEST(
+  FaString,
+  MoveLeavesTheSourceEmptyAndInline
+)
 {
   fa::string heap(Text(50));
   const char* const storage = heap.c_str();
@@ -132,7 +152,10 @@ TEST(FaString, MoveLeavesTheSourceEmptyAndInline)
   EXPECT_EQ(heap.view(), "reused");
 }
 
-TEST(FaString, GrowthFollowsMsvc8)
+TEST(
+  FaString,
+  GrowthFollowsMsvc8
+)
 {
   // MSVC8's _Grow: the new capacity is need | 15, or capacity + capacity / 2 when need | 15
   // is less than half again the old capacity.
@@ -148,7 +171,10 @@ TEST(FaString, GrowthFollowsMsvc8)
   EXPECT_EQ(s.size(), 200u);
 }
 
-TEST(FaString, SelfAppendAcrossTheInlineBoundary)
+TEST(
+  FaString,
+  SelfAppendAcrossTheInlineBoundary
+)
 {
   fa::string s("abcdefghij");
   s += s;
@@ -161,7 +187,10 @@ TEST(FaString, SelfAppendAcrossTheInlineBoundary)
   EXPECT_TRUE(IsWellFormed(s));
 }
 
-TEST(FaString, RandomOpsMatchStdString)
+TEST(
+  FaString,
+  RandomOpsMatchStdString
+)
 {
   for (unsigned seed = 1; seed <= 6; ++seed) {
     std::mt19937 rng(seed);
@@ -307,7 +336,10 @@ TEST(FaString, RandomOpsMatchStdString)
   }
 }
 
-TEST(FaString, FindMatchesStdString)
+TEST(
+  FaString,
+  FindMatchesStdString
+)
 {
   std::mt19937 rng(77);
   for (int step = 0; step < 3000; ++step) {
@@ -336,7 +368,10 @@ TEST(FaString, FindMatchesStdString)
   EXPECT_EQ(s.find(nullptr, 1, 0), 1u);
 }
 
-TEST(FaString, CompareAndEquality)
+TEST(
+  FaString,
+  CompareAndEquality
+)
 {
   std::mt19937 rng(5);
   for (int step = 0; step < 2000; ++step) {
@@ -345,7 +380,9 @@ TEST(FaString, CompareAndEquality)
     const fa::string lhs(a.c_str());
     const fa::string rhs(b.c_str());
     const int expected = a.compare(b);
-    const auto sign = [](const int v) { return (v > 0) - (v < 0); };
+    const auto sign = [](const int v) {
+      return (v > 0) - (v < 0);
+    };
     ASSERT_EQ(sign(lhs.compare(std::string_view{b})), sign(expected)) << a << " vs " << b;
     ASSERT_EQ(sign(lhs.compare(b.c_str())), sign(expected));
     ASSERT_EQ(lhs < rhs, a < b);
@@ -367,7 +404,10 @@ TEST(FaString, CompareAndEquality)
   EXPECT_EQ(fa::string("ab").compare(0, 2, nullptr, 3), 1);
 }
 
-TEST(FaString, EqualsNoCaseFoldsAsciiOnly)
+TEST(
+  FaString,
+  EqualsNoCaseFoldsAsciiOnly
+)
 {
   const fa::string s("Hello World");
   EXPECT_TRUE(s.equals_no_case("hello world"));
@@ -378,7 +418,10 @@ TEST(FaString, EqualsNoCaseFoldsAsciiOnly)
   EXPECT_FALSE(fa::string("\xC4").equals_no_case("\xE4"));
 }
 
-TEST(FaString, AssignWithAPositionPastTheEndThrows)
+TEST(
+  FaString,
+  AssignWithAPositionPastTheEndThrows
+)
 {
   const fa::string source("abc");
   fa::string target("keep");
@@ -389,7 +432,10 @@ TEST(FaString, AssignWithAPositionPastTheEndThrows)
   EXPECT_EQ(target.view(), "b");
 }
 
-TEST(FaString, AssignFromItselfWithAnOffset)
+TEST(
+  FaString,
+  AssignFromItselfWithAnOffset
+)
 {
   fa::string s(Text(30));
   s.assign(s, 10, 5);
@@ -400,7 +446,10 @@ TEST(FaString, AssignFromItselfWithAnOffset)
   EXPECT_TRUE(s.empty());
 }
 
-TEST(FaString, ResetAndAssignReleasesTheOldBuffer)
+TEST(
+  FaString,
+  ResetAndAssignReleasesTheOldBuffer
+)
 {
   fa::string s(Text(40));
   const fa::string source("tiny");
@@ -412,7 +461,10 @@ TEST(FaString, ResetAndAssignReleasesTheOldBuffer)
   EXPECT_EQ(s.view(), "tiny");
 }
 
-TEST(FaString, AssignInplaceOnlyWithinTheCapacity)
+TEST(
+  FaString,
+  AssignInplaceOnlyWithinTheCapacity
+)
 {
   fa::string s("abc");
   EXPECT_TRUE(s.assign_inplace("0123456789ABCDE"));
@@ -421,7 +473,10 @@ TEST(FaString, AssignInplaceOnlyWithinTheCapacity)
   EXPECT_EQ(s.view(), "0123456789ABCDE");
 }
 
-TEST(FaString, OwnedAssignmentsGiveExactCapacities)
+TEST(
+  FaString,
+  OwnedAssignmentsGiveExactCapacities
+)
 {
   fa::string s("abc");
   s.assign_owned(std::string_view{Text(20)});
@@ -432,14 +487,17 @@ TEST(FaString, OwnedAssignmentsGiveExactCapacities)
   EXPECT_TRUE(s.is_sso());
   s.assign_owned_strong(std::string_view{Text(33)});
   EXPECT_EQ(s.capacity(), 33u);
-  s.assign_owned_strong(s.view().substr(3, 4));  // a view of itself, copied before the swap
+  s.assign_owned_strong(s.view().substr(3, 4)); // a view of itself, copied before the swap
   EXPECT_EQ(s.view(), Text(33).substr(3, 4));
   s.assign_owned_strong(static_cast<const char*>(nullptr));
   EXPECT_TRUE(s.empty());
   EXPECT_TRUE(IsWellFormed(s));
 }
 
-TEST(FaString, TidyKeepsAPrefixInline)
+TEST(
+  FaString,
+  TidyKeepsAPrefixInline
+)
 {
   fa::string s(Text(30));
   s.tidy(true, 5u);
@@ -451,7 +509,10 @@ TEST(FaString, TidyKeepsAPrefixInline)
   EXPECT_EQ(s.size(), 15u);
 }
 
-TEST(FaString, ConcatenationOperators)
+TEST(
+  FaString,
+  ConcatenationOperators
+)
 {
   const fa::string a("abc");
   const fa::string b(Text(20));
@@ -467,7 +528,10 @@ TEST(FaString, ConcatenationOperators)
   EXPECT_EQ(fa::string("ab")[1], 'b');
 }
 
-TEST(FaString, ScopedStringOwnsItsCopy)
+TEST(
+  FaString,
+  ScopedStringOwnsItsCopy
+)
 {
   const fa::scoped_string fromChars("hello");
   EXPECT_EQ(fromChars.view(), "hello");

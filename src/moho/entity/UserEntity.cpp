@@ -34,8 +34,10 @@ namespace
   constexpr std::uint32_t kIntelRangeMagnitudeMask = 0x7FFFFFFFu;
   constexpr std::uint32_t kIntelEnabledBit = 0x80000000u;
 
-  [[nodiscard]] std::int32_t
-  BuildSpatialDbRoutingMaskFromEntityId(const std::uint32_t entityId, const std::uint8_t sourceIndex) noexcept
+  [[nodiscard]] std::int32_t BuildSpatialDbRoutingMaskFromEntityId(
+    const std::uint32_t entityId,
+    const std::uint8_t sourceIndex
+  ) noexcept
   {
     // Family routes object class; low byte preserves source index.
     switch (moho::ClassifyEntityIdFamily(entityId)) {
@@ -52,7 +54,11 @@ namespace
   }
 
   // 0x00416F60
-  [[nodiscard]] bool ContainsCell(const moho::VisibilityRect& rect, const std::int32_t x, const std::int32_t z)
+  [[nodiscard]] bool ContainsCell(
+    const moho::VisibilityRect& rect,
+    const std::int32_t x,
+    const std::int32_t z
+  )
   {
     return x >= rect.minX && x < rect.maxX && z >= rect.minZ && z < rect.maxZ;
   }
@@ -69,12 +75,18 @@ namespace
    * What it does:
    * Rebinds one `boost::shared_ptr<CAniPose>` to the supplied pose pointer.
    */
-  void CreateCAniPoseSharedPtr(moho::CAniPose* const pose, boost::shared_ptr<moho::CAniPose>& out)
+  void CreateCAniPoseSharedPtr(
+    moho::CAniPose* const pose,
+    boost::shared_ptr<moho::CAniPose>& out
+  )
   {
     out.reset(pose);
   }
 
-  void CopyPoseState(moho::CAniPose& dst, const moho::CAniPose& src)
+  void CopyPoseState(
+    moho::CAniPose& dst,
+    const moho::CAniPose& src
+  )
   {
     dst.mScale = src.mScale;
     dst.mLocalTransform = src.mLocalTransform;
@@ -125,23 +137,31 @@ namespace
     return true;
   }
 
-  [[nodiscard]] std::uint32_t GetVisionRange(const moho::SSTIEntityVariableData& variableData) noexcept
+  [[nodiscard]] std::uint32_t GetVisionRange(
+    const moho::SSTIEntityVariableData& variableData
+  ) noexcept
   {
     return variableData.mIntelAttributes.vision & kIntelRangeMagnitudeMask;
   }
 
-  [[nodiscard]] bool IsVisionEnabled(const moho::SSTIEntityVariableData& variableData) noexcept
+  [[nodiscard]] bool IsVisionEnabled(
+    const moho::SSTIEntityVariableData& variableData
+  ) noexcept
   {
     return (variableData.mIntelAttributes.vision & kIntelEnabledBit) != 0u;
   }
 
-  [[nodiscard]] float ClampUnitInterval(const float value) noexcept
+  [[nodiscard]] float ClampUnitInterval(
+    const float value
+  ) noexcept
   {
     return std::clamp(value, 0.0f, 1.0f);
   }
 
-  [[nodiscard]] moho::EAlliance
-  ResolveSelectionAlliance(const moho::UserArmy* const viewingArmy, const moho::UserArmy* const targetArmy) noexcept
+  [[nodiscard]] moho::EAlliance ResolveSelectionAlliance(
+    const moho::UserArmy* const viewingArmy,
+    const moho::UserArmy* const targetArmy
+  ) noexcept
   {
     if (!viewingArmy || !targetArmy) {
       return moho::ALLIANCE_Neutral;
@@ -168,8 +188,10 @@ namespace
   }
 
   constexpr std::uint32_t kSelectionBracketEnemyVisibleMask = 0x10u;
-  constexpr const char* kSelectionBracketNeutralTexture = "/textures/ui/common/game/selection/selection_brackets_neutral.dds";
-  constexpr const char* kSelectionBracketEnemyTexture = "/textures/ui/common/game/selection/selection_brackets_enemy.dds";
+  constexpr const char* kSelectionBracketNeutralTexture =
+    "/textures/ui/common/game/selection/selection_brackets_neutral.dds";
+  constexpr const char* kSelectionBracketEnemyTexture =
+    "/textures/ui/common/game/selection/selection_brackets_enemy.dds";
   constexpr const char* kSelectionBracketAlliedTexture =
     "/textures/ui/common/game/selection/selection_brackets_player_highlighted.dds";
 } // namespace
@@ -179,7 +201,10 @@ namespace moho
   /**
    * Address: 0x008B85E0 (FUN_008B85E0, ??0UserEntity@Moho@@QAE@AAVCWldSession@1@ABUSCreateEntityParams@1@@Z)
    */
-  UserEntity::UserEntity(CWldSession& session, const SCreateEntityParams& createParams)
+  UserEntity::UserEntity(
+    CWldSession& session,
+    const SCreateEntityParams& createParams
+  )
     : WeakObject()
     , mSession(&session)
     , mSpatialDbEntry{}
@@ -262,7 +287,10 @@ namespace moho
   /**
    * Address: 0x008B8CD0 (FUN_008B8CD0, ?Tick@UserEntity@Moho@@UAEXVCSeqNo@2@@Z)
    */
-  void UserEntity::Tick(const std::int32_t /*seqNo*/) {}
+  void UserEntity::Tick(
+    const std::int32_t /*seqNo*/
+  )
+  {}
 
   /**
    * Address: 0x008B84D0 (FUN_008B84D0, ?IsUserUnit@UserEntity@Moho@@UBEPBVUserUnit@2@XZ)
@@ -327,23 +355,26 @@ namespace moho
    * Applies one replicated variable-data snapshot, refreshes mesh/pose and
    * spatial-db state, then updates fog-of-war vision handle tracking.
    */
-  void UserEntity::UpdateEntityData(const SSTIEntityVariableData& variableData)
+  void UserEntity::UpdateEntityData(
+    const SSTIEntityVariableData& variableData
+  )
   {
     SEntityDataUpdate update = BeginEntityDataUpdate(variableData);
     ApplyEntityDataUpdate(variableData, update);
     FinishEntityDataUpdate(variableData, update);
   }
 
-  UserEntity::SEntityDataUpdate UserEntity::BeginEntityDataUpdate(const SSTIEntityVariableData& variableData)
+  UserEntity::SEntityDataUpdate UserEntity::BeginEntityDataUpdate(
+    const SSTIEntityVariableData& variableData
+  )
   {
     SEntityDataUpdate update{};
-    update.mRequiresMeshRebuild =
-      (mMeshInstance == nullptr && variableData.mMeshBlueprint != nullptr) ||
+    update.mRequiresMeshRebuild = (mMeshInstance == nullptr && variableData.mMeshBlueprint != nullptr) ||
       (variableData.mMeshBlueprint != mVariableData.mMeshBlueprint) ||
       (variableData.mScmResource.get() != mVariableData.mScmResource.get());
 
-    update.mScaleChanged = mMeshInstance != nullptr && mMeshInstance->isStaticPose == 0u &&
-      mMeshInstance->scale != variableData.mScale;
+    update.mScaleChanged =
+      mMeshInstance != nullptr && mMeshInstance->isStaticPose == 0u && mMeshInstance->scale != variableData.mScale;
 
     // 0x008B8F46..0x008B8F98: exact tests throughout -- `CompareArrays` on each
     // position (0x004F0A50) and orientation (0x004F0B40), then `ucomiss` on the
@@ -390,7 +421,10 @@ namespace moho
     return update;
   }
 
-  void UserEntity::ApplyEntityDataUpdate(const SSTIEntityVariableData& variableData, SEntityDataUpdate& update)
+  void UserEntity::ApplyEntityDataUpdate(
+    const SSTIEntityVariableData& variableData,
+    SEntityDataUpdate& update
+  )
   {
     mVariableData = variableData;
 
@@ -445,7 +479,10 @@ namespace moho
     }
   }
 
-  void UserEntity::FinishEntityDataUpdate(const SSTIEntityVariableData& variableData, const SEntityDataUpdate& update)
+  void UserEntity::FinishEntityDataUpdate(
+    const SSTIEntityVariableData& variableData,
+    const SEntityDataUpdate& update
+  )
   {
     if (update.mMeshBoundsDirty && mMeshInstance != nullptr) {
       mMeshInstance->RepublishStanceBounds();
@@ -500,13 +537,17 @@ namespace moho
     mVisionHandle->Update(currentPosition, previousPosition, static_cast<float>(visionRange), alliedVisibility);
   }
 
-  bool UserEntity::EntityDataUpdateRunsLua(const SSTIEntityVariableData& variableData) const
+  bool UserEntity::EntityDataUpdateRunsLua(
+    const SSTIEntityVariableData& variableData
+  ) const
   {
     return IsUserUnit() != nullptr && mVariableData.mHealth > variableData.mHealth && mArmy != nullptr &&
       mSession != nullptr && mArmy == mSession->GetFocusUserArmy();
   }
 
-  bool UserEntity::EntityDataUpdateIsLocal(const SSTIEntityVariableData& variableData) const
+  bool UserEntity::EntityDataUpdateIsLocal(
+    const SSTIEntityVariableData& variableData
+  ) const
   {
     const bool requiresMeshRebuild = (mMeshInstance == nullptr && variableData.mMeshBlueprint != nullptr) ||
       (variableData.mMeshBlueprint != mVariableData.mMeshBlueprint) ||
@@ -531,7 +572,9 @@ namespace moho
    * Updates the cached transform when interpolation input changes by blending
    * current/last replicated transforms, then returns cached transform by value.
    */
-  VTransform UserEntity::GetInterpolatedTransform(const float interpolationAlpha) const
+  VTransform UserEntity::GetInterpolatedTransform(
+    const float interpolationAlpha
+  ) const
   {
     if (interpolationAlpha != mLastInterpAmt) {
       const float clampedAlpha = ClampUnitInterval(mVariableData.mCurImpactValue * interpolationAlpha);
@@ -568,11 +611,13 @@ namespace moho
     const float clampedAlpha = ClampUnitInterval(mVariableData.mCurImpactValue * interpolationAlpha);
 
     if (outScrollU != nullptr) {
-      *outScrollU = mVariableData.mScrollBeatStart.x + ((mVariableData.mScrollBeatEnd.x - mVariableData.mScrollBeatStart.x) * clampedAlpha);
+      *outScrollU = mVariableData.mScrollBeatStart.x +
+        ((mVariableData.mScrollBeatEnd.x - mVariableData.mScrollBeatStart.x) * clampedAlpha);
     }
 
     if (outScrollV != nullptr) {
-      *outScrollV = mVariableData.mScrollBeatStart.y + ((mVariableData.mScrollBeatEnd.y - mVariableData.mScrollBeatStart.y) * clampedAlpha);
+      *outScrollV = mVariableData.mScrollBeatStart.y +
+        ((mVariableData.mScrollBeatEnd.y - mVariableData.mScrollBeatStart.y) * clampedAlpha);
     }
 
     return this;
@@ -585,7 +630,9 @@ namespace moho
    * Returns interpolated world-position lanes extracted from
    * `GetInterpolatedTransform(interpolationAlpha)`.
    */
-  Wm3::Vec3f UserEntity::GetInterpolatedPosition(const float interpolationAlpha) const
+  Wm3::Vec3f UserEntity::GetInterpolatedPosition(
+    const float interpolationAlpha
+  ) const
   {
     const VTransform interpolated = GetInterpolatedTransform(interpolationAlpha);
     return interpolated.pos_;
@@ -598,7 +645,9 @@ namespace moho
    * Returns current render-oriented bounds from mesh interpolation state when
    * mesh data exists, otherwise synthesizes a transform-aligned half-unit box.
    */
-  Wm3::Box3f UserEntity::GetRenderSphere(const float interpolationAlpha) const
+  Wm3::Box3f UserEntity::GetRenderSphere(
+    const float interpolationAlpha
+  ) const
   {
     if (mMeshInstance != nullptr) {
       mMeshInstance->UpdateInterpolatedFields();
@@ -647,7 +696,9 @@ namespace moho
    * Builds mesh instance from current mesh blueprint/scale and, for unit-pose
    * paths, creates primary/secondary CAniPose instances from the mesh skeleton.
    */
-  void UserEntity::CreateMeshInstance(const bool forUnitPose)
+  void UserEntity::CreateMeshInstance(
+    const bool forUnitPose
+  )
   {
     mMeshInstance = MeshRenderer::GetInstance()->CreateMeshInstance(
       mSession->mGameTick,
@@ -708,7 +759,9 @@ namespace moho
    * dynamic meshes to static-pose mode when required, then updates mesh stance
    * and spatial-db swept bounds.
    */
-  void UserEntity::SetPose(const boost::shared_ptr<CAniPose>& pose)
+  void UserEntity::SetPose(
+    const boost::shared_ptr<CAniPose>& pose
+  )
   {
     if (mMeshInstance == nullptr) {
       return;
@@ -725,11 +778,7 @@ namespace moho
     mPoseSecondary = pose;
 
     mMeshInstance->SetStance(
-      mVariableData.mCurTransform,
-      mVariableData.mLastTransform,
-      forceRefresh,
-      mPosePrimary,
-      mPoseSecondary
+      mVariableData.mCurTransform, mVariableData.mLastTransform, forceRefresh, mPosePrimary, mPoseSecondary
     );
 
     const Wm3::AxisAlignedBox3f sweptBounds = mMeshInstance->GetSweptAlignedBox();
@@ -772,7 +821,9 @@ namespace moho
    * Selects one selection-bracket texture from alliance relation, and suppresses
    * enemy brackets when the user-unit intel-state visibility bit is clear.
    */
-  boost::shared_ptr<CD3DBatchTexture> UserEntity::GetSelectionBracketTexture(const UserArmy* const viewingArmy) const
+  boost::shared_ptr<CD3DBatchTexture> UserEntity::GetSelectionBracketTexture(
+    const UserArmy* const viewingArmy
+  ) const
   {
     const EAlliance alliance = ResolveSelectionAlliance(viewingArmy, mArmy);
 
@@ -878,7 +929,9 @@ namespace moho
    * Address: 0x008B97C0 (FUN_008B97C0,
    * ?IsInCategory@UserEntity@Moho@@QBE_NABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
    */
-  bool UserEntity::IsInCategory(const fa::string& category) const
+  bool UserEntity::IsInCategory(
+    const fa::string& category
+  ) const
   {
     if (!mSession || !mParams.mBlueprint) {
       return false;

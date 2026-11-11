@@ -14,7 +14,11 @@ namespace
 {
   using Rect16 = moho::ITesselator::Rect16;
 
-  Rect16 RectAt(const std::uint16_t x, const std::uint16_t z, const std::uint16_t height = 0)
+  Rect16 RectAt(
+    const std::uint16_t x,
+    const std::uint16_t z,
+    const std::uint16_t height = 0
+  )
   {
     Rect16 rect{};
     rect.xPos = x;
@@ -51,7 +55,10 @@ namespace
       mTesselator = std::make_unique<moho::CTesselator>(&mField);
     }
 
-    static std::uint16_t Sample(const int x, const int z)
+    static std::uint16_t Sample(
+      const int x,
+      const int z
+    )
     {
       return static_cast<std::uint16_t>(100 * x + z);
     }
@@ -65,14 +72,20 @@ namespace
 } // namespace
 
 // The terrain effect's HeightScale: heights are stored in 1/128 units (0x0080D2E0 loads 0.0078125).
-TEST_F(TesselatorFixture, HeightScaleIsOneHundredTwentyEighth)
+TEST_F(
+  TesselatorFixture,
+  HeightScaleIsOneHundredTwentyEighth
+)
 {
   EXPECT_EQ(mTesselator->GetHeightScale(), 0.0078125f);
 }
 
 // A rect added at (x, z) is found there through the 512 x 512 lookup ring; another rect landing in the same
 // slot (coordinates equal modulo 512) takes the slot over, and the first no longer answers (0x0080BA30).
-TEST_F(TesselatorFixture, LookupFindsTheLatestRectInEachSlot)
+TEST_F(
+  TesselatorFixture,
+  LookupFindsTheLatestRectInEachSlot
+)
 {
   EXPECT_EQ(mTesselator->AddRect(RectAt(10, 20)), 0u);
   EXPECT_EQ(mTesselator->AddRect(RectAt(11, 20)), 1u);
@@ -87,7 +100,10 @@ TEST_F(TesselatorFixture, LookupFindsTheLatestRectInEachSlot)
 
 // GetIndexAt samples the heightfield at the cell times 2^size, clamped to the field, stores the height in the
 // rect's xSize (word * 1/128 * 128), and hands back the cached index on the next request (0x0080D230).
-TEST_F(TesselatorFixture, IndexAtSamplesClampsAndCaches)
+TEST_F(
+  TesselatorFixture,
+  IndexAtSamplesClampsAndCaches
+)
 {
   const std::uint16_t first = mTesselator->GetIndexAt(1, 3, 5); // sample (6, 10)
   const Rect16 sampled = mTesselator->GetRectCacheData()[first];
@@ -115,15 +131,21 @@ TEST_F(TesselatorFixture, IndexAtSamplesClampsAndCaches)
 
 // A collision quad adds four rects (x, height * 128, z, 1) and the two triangles {2, 1, 0} and {1, 2, 3}
 // (0x0080C120 through 0x0080D2F0), reporting where they start.
-TEST_F(TesselatorFixture, CollisionQuadAddsFourRectsAndTwoTriangles)
+TEST_F(
+  TesselatorFixture,
+  CollisionQuadAddsFourRectsAndTwoTriangles
+)
 {
   ASSERT_EQ(mTesselator->AddRect(RectAt(1, 1)), 0u); // something before, so the starts are not zero
-  const Wm3::Vector3f corners[4] = {{10.0f, 1.5f, 20.0f}, {11.0f, 2.0f, 20.0f}, {10.0f, 2.5f, 21.0f}, {11.0f, 3.0f, 21.0f}};
+  const Wm3::Vector3f corners[4] = {
+    {10.0f, 1.5f, 20.0f}, {11.0f, 2.0f, 20.0f}, {10.0f, 2.5f, 21.0f}, {11.0f, 3.0f, 21.0f}
+  };
   std::int32_t indexStart = -1;
   std::uint32_t indexCount = 0;
   std::int32_t rectStart = -1;
   std::uint32_t lastRect = 0;
-  const std::uint16_t* const last = mTesselator->EmitCollisionQuad(corners, &indexStart, &indexCount, &rectStart, &lastRect);
+  const std::uint16_t* const last =
+    mTesselator->EmitCollisionQuad(corners, &indexStart, &indexCount, &rectStart, &lastRect);
 
   EXPECT_EQ(rectStart, 1);
   EXPECT_EQ(lastRect, 4u);
@@ -147,10 +169,15 @@ TEST_F(TesselatorFixture, CollisionQuadAddsFourRectsAndTwoTriangles)
 }
 
 // The cache holds at most 65000 rects; past that AddRect stores nothing and answers the last index (0x0080C850).
-TEST_F(TesselatorFixture, CacheStopsAtSixtyFiveThousandRects)
+TEST_F(
+  TesselatorFixture,
+  CacheStopsAtSixtyFiveThousandRects
+)
 {
   for (std::uint32_t i = 0; i < 65000u; ++i) {
-    ASSERT_EQ(mTesselator->AddRect(RectAt(static_cast<std::uint16_t>(i % 256), static_cast<std::uint16_t>(i / 256))), i);
+    ASSERT_EQ(
+      mTesselator->AddRect(RectAt(static_cast<std::uint16_t>(i % 256), static_cast<std::uint16_t>(i / 256))), i
+    );
   }
   EXPECT_EQ(mTesselator->AddRect(RectAt(300, 300)), 64999u);
   EXPECT_EQ(mTesselator->GetRectCacheCount(), 65000);

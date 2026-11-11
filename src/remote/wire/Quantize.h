@@ -21,7 +21,10 @@ namespace faf::remote::wire
     /** Clamped to the range; NaN maps to 0. */
     [[nodiscard]] std::uint32_t Encode(float value) const noexcept;
     [[nodiscard]] float Decode(std::uint32_t quantized) const noexcept;
-    [[nodiscard]] std::uint32_t MaxQuantized() const noexcept { return (1u << bits) - 1u; }
+    [[nodiscard]] std::uint32_t MaxQuantized() const noexcept
+    {
+      return (1u << bits) - 1u;
+    }
   };
 
   /** World positions: x and z over the map plus a margin, y over terrain and flight heights. */

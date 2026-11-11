@@ -171,13 +171,17 @@ namespace moho
      * Weak references to an army link into `mWeakRefs`, a member rather than a
      * base, so the army names it for `WeakPtr<UserArmy>`.
      */
-    [[nodiscard]] static WeakObject* WeakLinkHeadOf(UserArmy* const army) noexcept
+    [[nodiscard]] static WeakObject* WeakLinkHeadOf(
+      UserArmy* const army
+    ) noexcept
     {
       return army != nullptr ? &army->mWeakRefs : nullptr;
     }
 
     /** The army whose `mWeakRefs` is `head`: the member-to-owner step (`head - 0x1E0` on x86). */
-    [[nodiscard]] static UserArmy* FromWeakLinkHead(WeakObject* const head) noexcept
+    [[nodiscard]] static UserArmy* FromWeakLinkHead(
+      WeakObject* const head
+    ) noexcept
     {
       return head != nullptr
         ? reinterpret_cast<UserArmy*>(reinterpret_cast<std::byte*>(head) - offsetof(UserArmy, mWeakRefs))
@@ -221,15 +225,20 @@ namespace moho
     "UserArmy::mVarDat.mAllies offset must be 0xE0"
   );
   static_assert(
-    offsetof(UserArmy, mVarDat) + offsetof(SSTIArmyVariableData, mAllies) + offsetof(BVIntSet, mReservedMetaWord) == 0xE4,
+    offsetof(UserArmy, mVarDat) + offsetof(SSTIArmyVariableData, mAllies) + offsetof(BVIntSet, mReservedMetaWord) ==
+      0xE4,
     "UserArmy::mVarDat.mAllies.mReservedMetaWord offset must be 0xE4"
   );
   static_assert(
-    offsetof(UserArmy, mVarDat) + offsetof(SSTIArmyVariableData, mAllies) + offsetof(BVIntSet, mWords) + offsetof(decltype(BVIntSet::mWords), start_) == 0xE8,
+    offsetof(UserArmy, mVarDat) + offsetof(SSTIArmyVariableData, mAllies) + offsetof(BVIntSet, mWords) +
+        offsetof(decltype(BVIntSet::mWords), start_) ==
+      0xE8,
     "UserArmy::mVarDat.mAllies word start offset must be 0xE8"
   );
   static_assert(
-    offsetof(UserArmy, mVarDat) + offsetof(SSTIArmyVariableData, mAllies) + offsetof(BVIntSet, mWords) + offsetof(decltype(BVIntSet::mWords), end_) == 0xEC,
+    offsetof(UserArmy, mVarDat) + offsetof(SSTIArmyVariableData, mAllies) + offsetof(BVIntSet, mWords) +
+        offsetof(decltype(BVIntSet::mWords), end_) ==
+      0xEC,
     "UserArmy::mVarDat.mAllies word end offset must be 0xEC"
   );
   static_assert(offsetof(UserArmy, mWeakRefs) == 0x1E0, "UserArmy::mWeakRefs offset must be 0x1E0");

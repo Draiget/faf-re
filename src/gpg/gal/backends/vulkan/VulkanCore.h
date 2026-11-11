@@ -65,7 +65,10 @@ namespace gpg::gal::vulkan
     [[nodiscard]] std::uint64_t BusyBytes() const noexcept;
     /** Bytes and count of the pages held (memory diagnostics). */
     [[nodiscard]] std::uint64_t PageBytes() const noexcept;
-    [[nodiscard]] std::size_t PageCount() const noexcept { return mPages.size(); }
+    [[nodiscard]] std::size_t PageCount() const noexcept
+    {
+      return mPages.size();
+    }
 
   private:
     struct Page

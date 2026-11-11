@@ -74,7 +74,10 @@ namespace
   [[maybe_unused]] constexpr int kSerializationConstructLine = 231;
 
   template <class TObject>
-  [[nodiscard]] gpg::RRef MakeStaticRef(TObject* const object, gpg::RType* const staticType) noexcept
+  [[nodiscard]] gpg::RRef MakeStaticRef(
+    TObject* const object,
+    gpg::RType* const staticType
+  ) noexcept
   {
     gpg::RRef out{};
     out.mObj = object;
@@ -105,7 +108,9 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] moho::CEconRequest* RequestFromNode(moho::TDatListItem<void, void>* const node) noexcept
+  [[nodiscard]] moho::CEconRequest* RequestFromNode(
+    moho::TDatListItem<void, void>* const node
+  ) noexcept
   {
     return reinterpret_cast<moho::CEconRequest*>(node);
   }
@@ -173,12 +178,20 @@ namespace moho
   /**
    * Address: 0x00772FC0 (FUN_00772FC0)
    */
-  void CEconomy::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CEconomy::MemberConstruct(
+    gpg::ReadArchive&,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     result.SetUnowned(gpg::MakeRRef(new CEconomy()), 0u);
   }
 
-  CEconomy::CEconomy(Sim* const sim, const std::int32_t armyIndex)
+  CEconomy::CEconomy(
+    Sim* const sim,
+    const std::int32_t armyIndex
+  )
   {
     mSim = sim;
     mIndex = armyIndex;
@@ -209,29 +222,43 @@ namespace moho
     constexpr float kTicksPerSecond = 10.0f;
 
     /// `mRequested - mGranted`, clamped at zero per lane, as at 0x00771BC0.
-    [[nodiscard]] SEconValue OutstandingRequest(const CEconRequest& request) noexcept
+    [[nodiscard]] SEconValue OutstandingRequest(
+      const CEconRequest& request
+    ) noexcept
     {
       const float energy = request.mRequested.energy - request.mGranted.energy;
       const float mass = request.mRequested.mass - request.mGranted.mass;
       return SEconValue{energy > 0.0f ? energy : 0.0f, mass > 0.0f ? mass : 0.0f};
     }
 
-    [[nodiscard]] float Lane(const SEconValue& value, const std::size_t lane) noexcept
+    [[nodiscard]] float Lane(
+      const SEconValue& value,
+      const std::size_t lane
+    ) noexcept
     {
       return lane == kEnergyLane ? value.energy : value.mass;
     }
 
-    [[nodiscard]] float& Lane(SEconValue& value, const std::size_t lane) noexcept
+    [[nodiscard]] float& Lane(
+      SEconValue& value,
+      const std::size_t lane
+    ) noexcept
     {
       return lane == kEnergyLane ? value.energy : value.mass;
     }
 
-    [[nodiscard]] float Lane(const SEconPair& value, const std::size_t lane) noexcept
+    [[nodiscard]] float Lane(
+      const SEconPair& value,
+      const std::size_t lane
+    ) noexcept
     {
       return lane == kEnergyLane ? value.ENERGY : value.MASS;
     }
 
-    [[nodiscard]] float& Lane(SEconPair& value, const std::size_t lane) noexcept
+    [[nodiscard]] float& Lane(
+      SEconPair& value,
+      const std::size_t lane
+    ) noexcept
     {
       return lane == kEnergyLane ? value.ENERGY : value.MASS;
     }
@@ -243,7 +270,10 @@ namespace moho
      * unsigned-64 conversion -- the same sequence `SEconTotals::MaxStorageOf`
      * (0x00585920) compiles to -- not a sign-bit mask.
      */
-    [[nodiscard]] float MaxStorage(const SEconTotals& totals, const std::size_t lane) noexcept
+    [[nodiscard]] float MaxStorage(
+      const SEconTotals& totals,
+      const std::size_t lane
+    ) noexcept
     {
       return static_cast<float>(lane == kEnergyLane ? totals.mMaxStorage.ENERGY : totals.mMaxStorage.MASS);
     }
@@ -251,7 +281,10 @@ namespace moho
     /// `sim.mArmiesList[index]`, or null when out of range. The binary
     /// open-codes this check at each of its three army lookups (0x00771C58,
     /// 0x00772012, 0x00772411) and dereferences the result unchecked.
-    [[nodiscard]] CArmyImpl* ArmyAtEconomyIndex(const Sim& sim, const std::int32_t index) noexcept
+    [[nodiscard]] CArmyImpl* ArmyAtEconomyIndex(
+      const Sim& sim,
+      const std::int32_t index
+    ) noexcept
     {
       if (index < 0 || static_cast<std::size_t>(index) >= sim.mArmiesList.size()) {
         return nullptr;
@@ -263,14 +296,18 @@ namespace moho
     /// and 0x0077218F) hands the army's `CEconomy` out under the older
     /// `CSimArmyEconomyInfo` description of the same 0x60-byte object, which
     /// `CArmyImpl`'s constructor allocates as a `CEconomy`.
-    [[nodiscard]] CEconomy* EconomyOf(CArmyImpl& army)
+    [[nodiscard]] CEconomy* EconomyOf(
+      CArmyImpl& army
+    )
     {
       return reinterpret_cast<CEconomy*>(army.GetEconomy());
     }
 
     /// True while either lane of `economy` stores less than its cap: the test
     /// an ally has to pass to be offered overflow (0x0077213C).
-    [[nodiscard]] bool HasStorageRoom(const CEconomy& economy) noexcept
+    [[nodiscard]] bool HasStorageRoom(
+      const CEconomy& economy
+    ) noexcept
     {
       for (std::size_t lane = 0u; lane < kLaneCount; ++lane) {
         if (Lane(economy.mTotals.mStored, lane) < MaxStorage(economy.mTotals, lane)) {
@@ -283,7 +320,11 @@ namespace moho
     /// Stores `value` into one float army stat. Each "set" publish inlines this:
     /// resolve the item through `func_GetArmyStat2`, mark it float, then swap
     /// the new bits into the primary slot with a compare-exchange loop.
-    void SetFloatStat(CArmyStats& stats, const char* const statPath, const float value)
+    void SetFloatStat(
+      CArmyStats& stats,
+      const char* const statPath,
+      const float value
+    )
     {
       CArmyStatItem* const item = ResolveArmyStatItemCachedCreate(&stats, statPath);
       item->SynchronizeAsFloat();
@@ -294,14 +335,21 @@ namespace moho
     /// Adds `value` into one float army stat. The "accumulate" publishes inline
     /// the same resolve and mark, then the compare-exchange add that
     /// `StatItem::AddFloat` is.
-    void AddFloatStat(CArmyStats& stats, const char* const statPath, float value)
+    void AddFloatStat(
+      CArmyStats& stats,
+      const char* const statPath,
+      float value
+    )
     {
       CArmyStatItem* const item = ResolveArmyStatItemCachedCreate(&stats, statPath);
       item->SynchronizeAsFloat();
       (void)item->AddFloat(&value);
     }
 
-    void SetFloatStatDirect(CArmyStatItem* const item, const float value)
+    void SetFloatStatDirect(
+      CArmyStatItem* const item,
+      const float value
+    )
     {
       if (item == nullptr) {
         return;
@@ -311,7 +359,10 @@ namespace moho
       (void)item->SetInt(&bits);
     }
 
-    void AddFloatStatDirect(CArmyStatItem* const item, float value)
+    void AddFloatStatDirect(
+      CArmyStatItem* const item,
+      float value
+    )
     {
       if (item == nullptr) {
         return;
@@ -348,7 +399,9 @@ namespace moho
       CArmyStatItem* accumExcessEnergy{nullptr};
       CArmyStatItem* accumExcessMass{nullptr};
 
-      void Initialize(CArmyStats& s)
+      void Initialize(
+        CArmyStats& s
+      )
       {
         stats = &s;
         totalProducedMass = ResolveArmyStatItemCachedCreate(&s, "Economy_TotalProduced_Mass");
@@ -381,7 +434,9 @@ namespace moho
     static SEconStatCache sEconStatCaches[16]{};
   } // namespace
 
-  void ForgetCachedEconomyStats(const CArmyStats& stats) noexcept
+  void ForgetCachedEconomyStats(
+    const CArmyStats& stats
+  ) noexcept
   {
     for (SEconStatCache& cache : sEconStatCaches) {
       if (cache.stats == &stats) {
@@ -432,7 +487,9 @@ namespace moho
    * after the jump at 0x007722C4, so everything from the ally share loop on
    * has to be read from the PE.
    */
-  void ProcessArmyEconomy(CEconomy& economy)
+  void ProcessArmyEconomy(
+    CEconomy& economy
+  )
   {
     // Pass one: pool outstanding demand, splitting requests that still want
     // both lanes from those down to one (0x00771BE8 counts the non-zero lanes).
@@ -462,9 +519,7 @@ namespace moho
       }
     }
 
-    SEconValue available{
-      economy.mTotals.mStored.ENERGY + banked.energy, economy.mTotals.mStored.MASS + banked.mass
-    };
+    SEconValue available{economy.mTotals.mStored.ENERGY + banked.energy, economy.mTotals.mStored.MASS + banked.mass};
 
     const SEconValue totalDemand{
       dualLaneDemand.energy + singleLaneDemand.energy, dualLaneDemand.mass + singleLaneDemand.mass
@@ -483,8 +538,7 @@ namespace moho
     }
 
     SEconValue remaining{
-      available.energy - dualLaneDemand.energy * dualLaneRatio,
-      available.mass - dualLaneDemand.mass * dualLaneRatio
+      available.energy - dualLaneDemand.energy * dualLaneRatio, available.mass - dualLaneDemand.mass * dualLaneRatio
     };
     remaining.energy = remaining.energy > 0.0f ? remaining.energy : 0.0f;
     remaining.mass = remaining.mass > 0.0f ? remaining.mass : 0.0f;
@@ -530,8 +584,7 @@ namespace moho
     // serves a single-lane request on the limiting lane at the pooled ratio.
     economy.mTotals.mLastUseActual.ENERGY =
       dualLaneDemand.energy * dualLaneRatio + singleLaneDemand.energy * singleLaneRatio;
-    economy.mTotals.mLastUseActual.MASS =
-      dualLaneDemand.mass * dualLaneRatio + singleLaneDemand.mass * singleLaneRatio;
+    economy.mTotals.mLastUseActual.MASS = dualLaneDemand.mass * dualLaneRatio + singleLaneDemand.mass * singleLaneRatio;
 
     economy.mTotals.mIncome.ENERGY = economy.mResources.energy;
     economy.mTotals.mIncome.MASS = economy.mResources.mass;
@@ -628,8 +681,7 @@ namespace moho
       AddFloatStatDirect(cache.sharedMass, shared.mass);
       AddFloatStatDirect(cache.sharedEnergy, shared.energy);
       SetFloatStatDirect(
-        cache.trendMass,
-        (economy.mPendingResources.mass - economy.mTotals.mLastUseRequested.MASS) * kTicksPerSecond
+        cache.trendMass, (economy.mPendingResources.mass - economy.mTotals.mLastUseRequested.MASS) * kTicksPerSecond
       );
       SetFloatStatDirect(
         cache.trendEnergy,
@@ -639,8 +691,7 @@ namespace moho
         cache.ratioMass, maxStorage.mass > 0.0f ? economy.mTotals.mStored.MASS / maxStorage.mass : 0.0f
       );
       SetFloatStatDirect(
-        cache.ratioEnergy,
-        maxStorage.energy > 0.0f ? economy.mTotals.mStored.ENERGY / maxStorage.energy : 0.0f
+        cache.ratioEnergy, maxStorage.energy > 0.0f ? economy.mTotals.mStored.ENERGY / maxStorage.energy : 0.0f
       );
       stats.SetUnitStatGreaterFloat(cache.peakStorageMass, maxStorage.mass);
       stats.SetUnitStatGreaterFloat(cache.peakStorageEnergy, maxStorage.energy);
@@ -693,7 +744,6 @@ namespace moho
     economy.mPendingResources = SEconValue{0.0f, 0.0f};
   }
 
-
   /**
    * Address: 0x007731B0 (FUN_007731B0, Moho::CEconomy::SerializeRequests)
    *
@@ -701,10 +751,12 @@ namespace moho
    * Writes economy-request intrusive-list pointers in reverse link order and
    * appends one null pointer terminator.
    */
-void CEconomy::SerializeRequests(gpg::WriteArchive* const archive) const
-{
-  if (archive == nullptr) {
-    return;
+  void CEconomy::SerializeRequests(
+    gpg::WriteArchive* const archive
+  ) const
+  {
+    if (archive == nullptr) {
+      return;
     }
 
     const gpg::RRef nullOwner{};
@@ -713,31 +765,33 @@ void CEconomy::SerializeRequests(gpg::WriteArchive* const archive) const
       archive->WritePointer<moho::CEconRequest>(RequestFromNode(node), gpg::TrackedPointerState::Unowned, nullOwner);
     }
 
-  archive->WritePointer<moho::CEconRequest>(nullptr, gpg::TrackedPointerState::Unowned, nullOwner);
-}
-
-/**
- * Address: 0x00773130 (FUN_00773130, Moho::CEconomy::DeserializeRequests)
- *
- * What it does:
- * Reads CEconRequest intrusive nodes from archive and links each request into
- * `mConsumptionData` until one null terminator is encountered.
- */
-void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
-{
-  if (archive == nullptr) {
-    return;
+    archive->WritePointer<moho::CEconRequest>(nullptr, gpg::TrackedPointerState::Unowned, nullOwner);
   }
 
-  gpg::RRef ownerRef{};
-  CEconRequest* request = nullptr;
-  (void)archive->ReadPointer(&request, &ownerRef);
-  while (request != nullptr) {
-    request->mNode.ListLinkAfter(&mConsumptionData);
-    ownerRef = gpg::RRef{};
+  /**
+   * Address: 0x00773130 (FUN_00773130, Moho::CEconomy::DeserializeRequests)
+   *
+   * What it does:
+   * Reads CEconRequest intrusive nodes from archive and links each request into
+   * `mConsumptionData` until one null terminator is encountered.
+   */
+  void CEconomy::DeserializeRequests(
+    gpg::ReadArchive* const archive
+  )
+  {
+    if (archive == nullptr) {
+      return;
+    }
+
+    gpg::RRef ownerRef{};
+    CEconRequest* request = nullptr;
     (void)archive->ReadPointer(&request, &ownerRef);
+    while (request != nullptr) {
+      request->mNode.ListLinkAfter(&mConsumptionData);
+      ownerRef = gpg::RRef{};
+      (void)archive->ReadPointer(&request, &ownerRef);
+    }
   }
-}
 
   /**
    * Address: 0x00774730 (FUN_00774730, Moho::CEconomy::MemberDeserialize)
@@ -746,7 +800,9 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
    * Deserializes Sim owner, index/value lanes, totals, owned extra-storage
    * pointer, sharing flag, and request list lanes from archive input.
    */
-  void CEconomy::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CEconomy::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -781,7 +837,9 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
    * Serializes Sim owner, index/value lanes, totals, storage pointer ownership,
    * sharing flag, then emits the intrusive CEconRequest chain terminator.
    */
-  void CEconomy::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CEconomy::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;
@@ -790,10 +848,7 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
     const gpg::RRef nullOwner{};
 
     gpg::WriteRawPointer(
-      archive,
-      MakeStaticRef(mSim, gpg::RTypeOf<moho::Sim>()),
-      gpg::TrackedPointerState::Unowned,
-      nullOwner
+      archive, MakeStaticRef(mSim, gpg::RTypeOf<moho::Sim>()), gpg::TrackedPointerState::Unowned, nullOwner
     );
 
     archive->WriteInt(mIndex);
@@ -801,12 +856,7 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
     archive->Write(CachedSEconValueType(), &mPendingResources, nullOwner);
     archive->Write(CachedSEconTotalsType(), &mTotals, nullOwner);
 
-    gpg::WriteRawPointer(
-      archive,
-      gpg::MakeRRef(mExtraStorage.get()),
-      gpg::TrackedPointerState::Owned,
-      nullOwner
-    );
+    gpg::WriteRawPointer(archive, gpg::MakeRRef(mExtraStorage.get()), gpg::TrackedPointerState::Owned, nullOwner);
 
     archive->WriteBool(mResourceSharing != 0u);
     SerializeRequests(archive);
@@ -819,7 +869,9 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
    * Reads five `SEconPair` lanes through the reflected `SEconValue` type,
    * then reads `mMaxStorage` as two u64 lanes (`ENERGY`, `MASS`).
    */
-  void SEconTotals::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SEconTotals::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     const gpg::RRef nullOwner{};
     gpg::RType* const econValueType = CachedSEconValueType();
@@ -844,7 +896,9 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
    * u64 max-storage energy/mass fields through the archive's WriteUInt64
    * virtual slot. Mirrors the binary's lazy LookupRType caching sequence.
    */
-  void SEconTotals::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SEconTotals::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     const gpg::RRef nullOwner{};
 
@@ -865,7 +919,9 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
    * What it does:
    * Returns selected max-storage resource lane as a floating-point scalar.
    */
-  double SEconTotals::MaxStorageOf(const EEconResource resource) const noexcept
+  double SEconTotals::MaxStorageOf(
+    const EEconResource resource
+  ) const noexcept
   {
     const std::uint64_t* const maxStorageLanes = &mMaxStorage.ENERGY;
     return static_cast<double>(maxStorageLanes[static_cast<std::uint32_t>(resource)]);
@@ -874,8 +930,14 @@ void CEconomy::DeserializeRequests(gpg::ReadArchive* const archive)
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_SEconValueTypeInfo_e739f5, moho::preregister_SEconValueTypeInfo)
-GPG_PREREGISTER_INIT(preregister_SEconTotalsTypeInfo_e739f5, moho::preregister_SEconTotalsTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_SEconValueTypeInfo_e739f5,
+  moho::preregister_SEconValueTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  preregister_SEconTotalsTypeInfo_e739f5,
+  moho::preregister_SEconTotalsTypeInfo
+)
 
 namespace moho
 {
@@ -941,7 +1003,9 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<SEconValue>::Deserialize` 0x00563C50.
    */
-  void SEconValue::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SEconValue::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -953,7 +1017,9 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<SEconValue>::Serialize` 0x00563C80.
    */
-  void SEconValue::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SEconValue::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;

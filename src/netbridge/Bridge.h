@@ -150,7 +150,12 @@ namespace faf::netbridge
     void OnIceMsg(std::int64_t remoteId, const netlink::JsonValue& msg);
     netlink::JsonValue Status() const;
     std::uint16_t PickLobbyPort() const;
-    void Log(const std::string& line) { mLog.Write(line); }
+    void Log(
+      const std::string& line
+    )
+    {
+      mLog.Write(line);
+    }
     void LogStats(Peer& peer, const char* when);
 
     BridgeOptions mOptions;

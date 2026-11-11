@@ -50,7 +50,6 @@ namespace moho
 namespace
 {
 
-
   /**
    * Address: 0x005F45F0 (FUN_005F45F0)
    *
@@ -120,17 +119,20 @@ namespace
 
   [[maybe_unused]] CUnitAttackTargetTaskSerializerStartupBootstrap gCUnitAttackTargetTaskSerializerStartupBootstrap;
 
-
-  [[nodiscard]] int RoundToCellCoord(const float value) noexcept
+  [[nodiscard]] int RoundToCellCoord(
+    const float value
+  ) noexcept
   {
     return static_cast<int>(std::lrintf(value));
   }
 
-
-  [[nodiscard]] bool HasEntityMoved(const moho::Entity& entity) noexcept
+  [[nodiscard]] bool HasEntityMoved(
+    const moho::Entity& entity
+  ) noexcept
   {
-    return entity.mVarDat.mCurTransform.pos_.x != entity.mVarDat.mLastTransform.pos_.x || entity.mVarDat.mCurTransform.pos_.y != entity.mVarDat.mLastTransform.pos_.y
-      || entity.mVarDat.mCurTransform.pos_.z != entity.mVarDat.mLastTransform.pos_.z;
+    return entity.mVarDat.mCurTransform.pos_.x != entity.mVarDat.mLastTransform.pos_.x ||
+      entity.mVarDat.mCurTransform.pos_.y != entity.mVarDat.mLastTransform.pos_.y ||
+      entity.mVarDat.mCurTransform.pos_.z != entity.mVarDat.mLastTransform.pos_.z;
   }
 
   constexpr const char* kAttackTaskAssertText = "Reached the supposably unreachable.";
@@ -217,7 +219,6 @@ namespace moho
     : CAttackTargetTask()
   {
 
-
     mDispatchTask = nullptr;
     mCommand = nullptr;
     mFormation = nullptr;
@@ -252,7 +253,6 @@ namespace moho
   )
     : CAttackTargetTask(dispatchTask)
   {
-
 
     mDispatchTask = dispatchTask;
     mCommand = nullptr;
@@ -336,7 +336,9 @@ namespace moho
         const int weaponCount = attacker->GetWeaponCount();
         for (int weaponIndex = 0; weaponIndex < weaponCount; ++weaponIndex) {
           UnitWeapon* const weapon = attacker->GetWeapon(weaponIndex);
-          if (weapon != nullptr && weapon->mWeaponBlueprint != nullptr && weapon->mWeaponBlueprint->OverChargeWeapon != 0u) {
+          if (
+            weapon != nullptr && weapon->mWeaponBlueprint != nullptr && weapon->mWeaponBlueprint->OverChargeWeapon != 0u
+          ) {
             mWeapon = weapon;
             (void)weapon->RunScript("OnEnableWeapon");
             break;
@@ -345,8 +347,7 @@ namespace moho
       }
     }
 
-    mHasMobileTarget =
-      (mTarget.targetEntity.GetObjectPtr() != nullptr && mTarget.targetIsMobile) ? 1u : 0u;
+    mHasMobileTarget = (mTarget.targetEntity.GetObjectPtr() != nullptr && mTarget.targetIsMobile) ? 1u : 0u;
 
     UpdatePos();
 
@@ -424,7 +425,10 @@ namespace moho
    * half-weapon-radius extents, then dispatches it through the owner
    * `IAiNavigator`.
    */
-  void CUnitAttackTargetTask::SetWeaponGoal(const Wm3::Vector3f& targetPosition, UnitWeapon* const weapon)
+  void CUnitAttackTargetTask::SetWeaponGoal(
+    const Wm3::Vector3f& targetPosition,
+    UnitWeapon* const weapon
+  )
   {
     IAiNavigator* const navigator = static_cast<moho::CCommandTask*>(this)->mUnit->AiNavigator;
     if (navigator == nullptr || weapon == nullptr || weapon->mWeaponBlueprint == nullptr) {
@@ -454,7 +458,9 @@ namespace moho
    * Builds one single-cell navigator goal around the provided map cell and
    * dispatches it through the owner unit navigator.
    */
-  void CUnitAttackTargetTask::SetPosGoal(const SOCellPos& targetCell)
+  void CUnitAttackTargetTask::SetPosGoal(
+    const SOCellPos& targetCell
+  )
   {
     IAiNavigator* const navigator = static_cast<moho::CCommandTask*>(this)->mUnit->AiNavigator;
     if (navigator == nullptr) {
@@ -496,7 +502,9 @@ namespace moho
    * Converts one world-space position to owner-footprint cell origin and
    * routes it through `SetPosGoal`.
    */
-  void CUnitAttackTargetTask::SetPosGoalFromWorldPosition(const Wm3::Vector3f& position)
+  void CUnitAttackTargetTask::SetPosGoalFromWorldPosition(
+    const Wm3::Vector3f& position
+  )
   {
     const SFootprint& footprint = static_cast<moho::CCommandTask*>(this)->mUnit->GetFootprint();
 
@@ -513,7 +521,9 @@ namespace moho
    * Returns true when horizontal distance from owner to target cache is
    * below `distance`.
    */
-  bool CUnitAttackTargetTask::IsWithinHorizontalDistance(const float distance) const
+  bool CUnitAttackTargetTask::IsWithinHorizontalDistance(
+    const float distance
+  ) const
   {
     const Wm3::Vector3f unitPos = static_cast<const moho::CCommandTask*>(this)->mUnit->GetPosition();
 
@@ -585,7 +595,9 @@ namespace moho
       mFormation->SetCoords(targetCoords);
 
       SOCellPos adjustedPosition{};
-      mFormation->GetAdjustedFormationPosition(&adjustedPosition, static_cast<moho::CCommandTask*>(this)->mUnit, nullptr);
+      mFormation->GetAdjustedFormationPosition(
+        &adjustedPosition, static_cast<moho::CCommandTask*>(this)->mUnit, nullptr
+      );
       SetPosGoal(adjustedPosition);
       return;
     }
@@ -594,7 +606,9 @@ namespace moho
     // navigator's destination unit. The raw weak link is read, so a recon blip
     // is handed over as itself.
     if (Entity* const targetEntity = mTarget.targetEntity.GetObjectPtr(); targetEntity != nullptr) {
-      if (IAiNavigator* const navigator = static_cast<moho::CCommandTask*>(this)->mUnit->AiNavigator; navigator != nullptr) {
+      if (
+        IAiNavigator* const navigator = static_cast<moho::CCommandTask*>(this)->mUnit->AiNavigator; navigator != nullptr
+      ) {
         navigator->SetDestUnit(targetEntity);
       }
     }
@@ -635,7 +649,9 @@ namespace moho
     CAiAttackerImpl* const attacker = unit->AiAttacker;
     const RUnitBlueprint* const blueprint = unit->GetBlueprint();
 
-    if (unit->IsUnitState(UNITSTATE_Immobile) && blueprint != nullptr && blueprint->AI.NeedUnpack && attacker != nullptr) {
+    if (
+      unit->IsUnitState(UNITSTATE_Immobile) && blueprint != nullptr && blueprint->AI.NeedUnpack && attacker != nullptr
+    ) {
       CAiTarget clearTarget{};
       attacker->SetDesiredTarget(&clearTarget);
     }
@@ -695,8 +711,7 @@ namespace moho
           SetPosGoal(adjustedPosition);
         }
       } else {
-        const Wm3::Vector3f targetPosition = mTarget.HasTarget() ? mTarget.GetTargetPosGun(false)
-                                                                           : mTargetPosition;
+        const Wm3::Vector3f targetPosition = mTarget.HasTarget() ? mTarget.GetTargetPosGun(false) : mTargetPosition;
         SetPosGoalFromWorldPosition(targetPosition);
       }
     } else {
@@ -713,8 +728,7 @@ namespace moho
       }
 
       if (mHasMobileTarget == 0u) {
-        const Wm3::Vector3f targetPosition = mTarget.HasTarget() ? mTarget.GetTargetPosGun(false)
-                                                                           : mTargetPosition;
+        const Wm3::Vector3f targetPosition = mTarget.HasTarget() ? mTarget.GetTargetPosGun(false) : mTargetPosition;
         SetPosGoalFromWorldPosition(targetPosition);
       } else {
         // 0x005F32EF tests `CAiTarget::HasTarget` *before* looking at the entity
@@ -745,8 +759,9 @@ namespace moho
         // text "1048", reached as a vtable.
         if (!mTarget.HasTarget()) {
           SetPosGoalFromWorldPosition(mTargetPosition);
-        } else if (Entity* const destinationEntity = mTarget.targetEntity.GetObjectPtr();
-                   destinationEntity != nullptr) {
+        } else if (
+          Entity* const destinationEntity = mTarget.targetEntity.GetObjectPtr(); destinationEntity != nullptr
+        ) {
           if (IAiNavigator* const navigator = unit->AiNavigator; navigator != nullptr) {
             navigator->SetDestUnit(destinationEntity);
           }
@@ -767,7 +782,9 @@ namespace moho
    * updates dispatch-result output lanes where required, and wakes the owner
    * task thread for immediate state-machine execution.
    */
-  void CUnitAttackTargetTask::HandleAiAttackerEvent(const EAiAttackerEvent event)
+  void CUnitAttackTargetTask::HandleAiAttackerEvent(
+    const EAiAttackerEvent event
+  )
   {
     CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     if (commandTask->mTaskState == TASKSTATE_5) {
@@ -776,54 +793,54 @@ namespace moho
 
     if (mTarget.HasTarget()) {
       switch (static_cast<std::int32_t>(event)) {
-        case 1:
-          commandTask->mTaskState = TASKSTATE_Complete;
-          break;
+      case 1:
+        commandTask->mTaskState = TASKSTATE_Complete;
+        break;
 
-        case 2:
-        case 4:
-          if (commandTask->mUnit->IsMobile()) {
-            commandTask->mTaskState = TASKSTATE_Waiting;
-          } else {
-            *commandTask->mDispatchResult = static_cast<EAiResult>(2);
-            commandTask->mTaskState = TASKSTATE_5;
-          }
-          break;
-
-        case 3:
-          if (commandTask->mUnit->IsMobile()) {
-            *commandTask->mDispatchResult = static_cast<EAiResult>(2);
-            commandTask->mTaskState = TASKSTATE_5;
-          } else {
-            commandTask->mTaskState = TASKSTATE_Complete;
-          }
-          break;
-
-        case 5:
+      case 2:
+      case 4:
+        if (commandTask->mUnit->IsMobile()) {
+          commandTask->mTaskState = TASKSTATE_Waiting;
+        } else {
           *commandTask->mDispatchResult = static_cast<EAiResult>(2);
           commandTask->mTaskState = TASKSTATE_5;
-          break;
+        }
+        break;
 
-        case 6:
-          commandTask->mTaskState = TASKSTATE_Waiting;
-          break;
-
-        case 7:
-          if (commandTask->mUnit->IsMobile()) {
-            commandTask->mTaskState = TASKSTATE_Starting;
-          } else {
-            *commandTask->mDispatchResult = static_cast<EAiResult>(2);
-            commandTask->mTaskState = TASKSTATE_5;
-          }
-          break;
-
-        case 8:
-          *commandTask->mDispatchResult = static_cast<EAiResult>(1);
+      case 3:
+        if (commandTask->mUnit->IsMobile()) {
+          *commandTask->mDispatchResult = static_cast<EAiResult>(2);
           commandTask->mTaskState = TASKSTATE_5;
-          break;
+        } else {
+          commandTask->mTaskState = TASKSTATE_Complete;
+        }
+        break;
 
-        default:
-          break;
+      case 5:
+        *commandTask->mDispatchResult = static_cast<EAiResult>(2);
+        commandTask->mTaskState = TASKSTATE_5;
+        break;
+
+      case 6:
+        commandTask->mTaskState = TASKSTATE_Waiting;
+        break;
+
+      case 7:
+        if (commandTask->mUnit->IsMobile()) {
+          commandTask->mTaskState = TASKSTATE_Starting;
+        } else {
+          *commandTask->mDispatchResult = static_cast<EAiResult>(2);
+          commandTask->mTaskState = TASKSTATE_5;
+        }
+        break;
+
+      case 8:
+        *commandTask->mDispatchResult = static_cast<EAiResult>(1);
+        commandTask->mTaskState = TASKSTATE_5;
+        break;
+
+      default:
+        break;
       }
     } else {
       commandTask->mTaskState = commandTask->mUnit->IsMobile() ? TASKSTATE_Processing : TASKSTATE_5;
@@ -840,7 +857,9 @@ namespace moho
    * attacker desired-target state for valid command/sim combinations, and
    * wakes owner-thread flow.
    */
-  void CUnitAttackTargetTask::HandleCommandEvent(const ECommandEvent)
+  void CUnitAttackTargetTask::HandleCommandEvent(
+    const ECommandEvent
+  )
   {
     CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     if (mCommand == nullptr) {
@@ -915,7 +934,9 @@ namespace moho
    * Updates owner attacker desired-target payload and relinks this task into
    * the attacker event-list lane when the entity target changed.
    */
-  bool CUnitAttackTargetTask::UpdateAttacker(CAiTarget* const desiredTarget)
+  bool CUnitAttackTargetTask::UpdateAttacker(
+    CAiTarget* const desiredTarget
+  )
   {
     CAiAttackerImpl* const attacker = static_cast<moho::CCommandTask*>(this)->mUnit->AiAttacker;
     if (attacker == nullptr) {
@@ -931,8 +952,10 @@ namespace moho
     // AITARGET_None, no CAcquireTargetTask ever assigned the weapon a target,
     // and attack-ground silently did nothing.
     CAiTarget* const currentDesiredTarget = attacker->GetDesiredTarget();
-    if (desiredTarget != nullptr && currentDesiredTarget != nullptr
-        && desiredTarget->HasSameTargetEntity(*currentDesiredTarget)) {
+    if (
+      desiredTarget != nullptr && currentDesiredTarget != nullptr &&
+      desiredTarget->HasSameTargetEntity(*currentDesiredTarget)
+    ) {
       attacker->ResetReportingState();
       return false;
     }
@@ -949,7 +972,9 @@ namespace moho
    * Deserializes base command-task state, attack-task pointer lanes, target
    * payload, and boolean state flags.
    */
-  void CUnitAttackTargetTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CUnitAttackTargetTask::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -990,7 +1015,9 @@ namespace moho
    * Serializes base command-task state, attack-task pointer lanes, target
    * payload, and boolean state flags.
    */
-  void CUnitAttackTargetTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CUnitAttackTargetTask::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;
@@ -1062,9 +1089,8 @@ namespace moho
     }
 
     const RUnitBlueprint* const blueprint = unit->GetBlueprint();
-    const bool autoSurfaceAttackMode =
-      blueprint != nullptr && blueprint->AI.AutoSurfaceToAttack != 0u
-      && blueprint->Physics.MotionType == RULEUMT_SurfacingSub && unit->mVarDat.mLayerMask == LAYER_Sub;
+    const bool autoSurfaceAttackMode = blueprint != nullptr && blueprint->AI.AutoSurfaceToAttack != 0u &&
+      blueprint->Physics.MotionType == RULEUMT_SurfacingSub && unit->mVarDat.mLayerMask == LAYER_Sub;
 
     const bool directFireCategory = unit->IsInCategory("DIRECTFIRE");
 
@@ -1083,247 +1109,249 @@ namespace moho
     }
 
     switch (commandTask->mTaskState) {
-      case TASKSTATE_Preparing: {
-        CUnitCommand* const command = mCommand;
-        if (command == nullptr) {
-          return -1;
+    case TASKSTATE_Preparing: {
+      CUnitCommand* const command = mCommand;
+      if (command == nullptr) {
+        return -1;
+      }
+
+      if (command->IsCoordinating() && !command->IsDone()) {
+        return 10;
+      }
+
+      commandTask->mTaskState = TASKSTATE_Waiting;
+      return 0;
+    }
+
+    case TASKSTATE_Waiting:
+      if (unit->IsMobile()) {
+        const bool noTarget = mTarget.NoTarget();
+        if (autoSurfaceAttackMode && weapon == nullptr && mTarget.HasTarget() && !noTarget) {
+          if (!unit->IsAutoSurfaceMode()) {
+            return -1;
+          }
+
+          const SOCellPos targetCell = unit->GetFootprint().ToCellPos(unit->GetPosition());
+          SAiNavigatorGoal surfaceGoal(targetCell);
+          surfaceGoal.mLayer = LAYER_Water;
+          if (unit->AiCommandDispatch != nullptr) {
+            unit->AiCommandDispatch->SetNewTargetLayer(surfaceGoal);
+          }
         }
 
-        if (command->IsCoordinating() && !command->IsDone()) {
-          return 10;
-        }
-
-        commandTask->mTaskState = TASKSTATE_Waiting;
+        Update();
+        commandTask->mTaskState = TASKSTATE_Processing;
         return 0;
       }
 
-      case TASKSTATE_Waiting:
-        if (unit->IsMobile()) {
-          const bool noTarget = mTarget.NoTarget();
-          if (autoSurfaceAttackMode && weapon == nullptr && mTarget.HasTarget() && !noTarget) {
-            if (!unit->IsAutoSurfaceMode()) {
-              return -1;
-            }
+      (void)UpdateAttacker(&mTarget);
+      commandTask->mTaskState = TASKSTATE_Complete;
+      return 0;
 
-            const SOCellPos targetCell = unit->GetFootprint().ToCellPos(unit->GetPosition());
-            SAiNavigatorGoal surfaceGoal(targetCell);
-            surfaceGoal.mLayer = LAYER_Water;
-            if (unit->AiCommandDispatch != nullptr) {
-              unit->AiCommandDispatch->SetNewTargetLayer(surfaceGoal);
-            }
+    case TASKSTATE_Starting:
+      if (attacker == nullptr) {
+        return -1;
+      }
+
+      if (!attacker->IsTooClose(&mTarget)) {
+        Update();
+        commandTask->mTaskState = TASKSTATE_Processing;
+        return 0;
+      }
+
+      {
+        const Wm3::Vector3f targetPosition = mTarget.GetTargetPosGun(false);
+        Wm3::Vector3f moveOffset = unit->GetPosition() - targetPosition;
+        if (blueprint != nullptr) {
+          (void)VecSetLength(&moveOffset, blueprint->AI.GuardScanRadius);
+        }
+
+        Wm3::Vector3f movePosition = mTarget.GetTargetPosGun(false) + moveOffset;
+        gpg::Rect2f moveSkirt{};
+        const bool useWholeMap = (unit->ArmyRef != nullptr) ? unit->ArmyRef->UseWholeMap() : false;
+        (void)PrepareMove(0, unit, &movePosition, &moveSkirt, useWholeMap);
+
+        if (navigator != nullptr) {
+          const SOCellPos moveCell = unit->GetFootprint().ToCellPos(movePosition);
+          navigator->SetGoal(SNavGoal(moveCell));
+
+          if (
+            unit->IsUnitState(UNITSTATE_Immobile) && blueprint != nullptr && blueprint->AI.NeedUnpack &&
+            attacker != nullptr
+          ) {
+            CAiTarget clearTarget{};
+            attacker->SetDesiredTarget(&clearTarget);
+          }
+        }
+      }
+      return 10;
+
+    case TASKSTATE_Processing: {
+      if (mFormation != nullptr) {
+        Unit* const formationLead = unit->mInfoCache.mFormationLeadRef.GetObjectPtr();
+        if (formationLead != unit && mIgnoreFormationUpdates != 0u) {
+          if (!HasFormationLeadDesiredTarget()) {
+            return 1;
+          }
+
+          mFormation = nullptr;
+          mIgnoreFormationUpdates = 0u;
+          if (navigator != nullptr) {
+            navigator->IgnoreFormation(true);
           }
 
           Update();
-          commandTask->mTaskState = TASKSTATE_Processing;
-          return 0;
+          return 1;
         }
+      }
 
-        (void)UpdateAttacker(&mTarget);
-        commandTask->mTaskState = TASKSTATE_Complete;
-        return 0;
-
-      case TASKSTATE_Starting:
-        if (attacker == nullptr) {
+      const bool noTarget = mTarget.NoTarget();
+      if (!mTarget.HasTarget() || noTarget) {
+        if (navigator == nullptr || (attacker != nullptr && attacker->VectorIsWithinAttackRange(&mTargetPosition))) {
           return -1;
         }
 
-        if (!attacker->IsTooClose(&mTarget)) {
+        if (navigator->GetStatus() == AINAVSTATUS_Idle) {
           Update();
-          commandTask->mTaskState = TASKSTATE_Processing;
-          return 0;
+        }
+        return 1;
+      }
+
+      const bool targetInWeaponRange =
+        attacker != nullptr && attacker->TargetIsWithinWeaponAttackRange(weapon, &mTarget);
+      const float engageDistance = (blueprint != nullptr) ? blueprint->Air.EngageDistance : 0.0f;
+
+      if (!targetInWeaponRange && !IsWithinHorizontalDistance(engageDistance)) {
+        if (attacker != nullptr && attacker->IsTooClose(&mTarget)) {
+          commandTask->mTaskState = TASKSTATE_Starting;
+          return 1;
         }
 
-        {
+        if (navigator != nullptr && navigator->GetStatus() == AINAVSTATUS_Idle) {
+          Update();
+          return 1;
+        }
+
+        if (mHasMobileTarget != 0u) {
           const Wm3::Vector3f targetPosition = mTarget.GetTargetPosGun(false);
-          Wm3::Vector3f moveOffset = unit->GetPosition() - targetPosition;
-          if (blueprint != nullptr) {
-            (void)VecSetLength(&moveOffset, blueprint->AI.GuardScanRadius);
-          }
+          const float deltaX = mTargetPosition.x - targetPosition.x;
+          const float deltaY = mTargetPosition.y - targetPosition.y;
+          const float deltaZ = mTargetPosition.z - targetPosition.z;
+          // 0x005F3B14: sums (dz*dz + dy*dy) + dx*dx.
+          const float distance = std::sqrt(((deltaZ * deltaZ) + (deltaY * deltaY)) + (deltaX * deltaX));
+          const float threshold = (blueprint != nullptr && blueprint->Air.CanFly != 0u) ? 2.0f : 10.0f;
 
-          Wm3::Vector3f movePosition = mTarget.GetTargetPosGun(false) + moveOffset;
-          gpg::Rect2f moveSkirt{};
-          const bool useWholeMap = (unit->ArmyRef != nullptr) ? unit->ArmyRef->UseWholeMap() : false;
-          (void)PrepareMove(0, unit, &movePosition, &moveSkirt, useWholeMap);
-
-          if (navigator != nullptr) {
-            const SOCellPos moveCell = unit->GetFootprint().ToCellPos(movePosition);
-            navigator->SetGoal(SNavGoal(moveCell));
-
-            if (unit->IsUnitState(UNITSTATE_Immobile) && blueprint != nullptr && blueprint->AI.NeedUnpack && attacker != nullptr)
-            {
-              CAiTarget clearTarget{};
-              attacker->SetDesiredTarget(&clearTarget);
+          if (distance > threshold) {
+            const Wm3::Vector3f candidatePosition = mTarget.GetTargetPosGun(false);
+            if (!UnitWontFitAt(candidatePosition, unit)) {
+              RefreshNavigationGoal();
+              UpdatePos();
             }
           }
+        }
+
+        return 1;
+      }
+
+      if (attacker == nullptr) {
+        if (navigator == nullptr) {
+          return -1;
+        }
+
+        if (navigator->GetStatus() == AINAVSTATUS_Idle) {
+          Update();
+        }
+        return 1;
+      }
+
+      if (!attacker->CanAttackTarget(&mTarget)) {
+        return -1;
+      }
+
+      mFormation = nullptr;
+      mIgnoreFormationUpdates = 0u;
+      if (navigator != nullptr) {
+        navigator->IgnoreFormation(true);
+      }
+
+      (void)UpdateAttacker(&mTarget);
+
+      if (mWeapon == nullptr) {
+        return -2;
+      }
+
+      mWeapon->SetTarget(&mTarget);
+      commandTask->mTaskState = TASKSTATE_Complete;
+      return 1;
+    }
+
+    case TASKSTATE_Complete:
+      if (blueprint != nullptr && blueprint->Air.CanFly == 0u) {
+        AbortNavigation();
+      }
+
+      if (blueprint != nullptr && blueprint->AI.AttackAngle > 0.0f && mTarget.HasTarget()) {
+        const VTransform& transform = unit->GetTransform();
+        const float forwardX =
+          ((transform.orient_.w * transform.orient_.y) + (transform.orient_.z * transform.orient_.x)) * 2.0f;
+        // Forward-axis z is `1 - (y*y + x*x) * 2` (same column as
+        // Entity:GetHeading, 0x0068F968); z*z + y*y is the X axis' x.
+        const float forwardZ =
+          1.0f - (((transform.orient_.y * transform.orient_.y) + (transform.orient_.x * transform.orient_.x)) * 2.0f);
+
+        // 0x005F3CD4: `NormalizeVectorInto` (0x0044F7E0) -- zero only when the
+        // length is not positive, where `Vector3f::Normalize` zeroes at 1e-6.
+        Wm3::Vector3f toTarget{};
+        (void)NormalizeVectorInto(&toTarget, mTarget.GetTargetPosGun(false) - unit->GetPosition());
+
+        float rollRadians = blueprint->AI.AttackAngle * 0.017453292f;
+        // 0x005F3CFD `comiss` + `jbe`: NaN takes the negative roll.
+        if (!(((toTarget.z * forwardX) - (forwardZ * toTarget.x)) > 0.0f)) {
+          rollRadians = -rollRadians;
+        }
+
+        const Wm3::Vector3f rollAxis{0.0f, 1.0f, 0.0f};
+        Wm3::Quaternionf rollRotation{};
+        (void)EulerRollToQuat(&rollAxis, &rollRotation, rollRadians);
+
+        Wm3::Vector3f facing{};
+        (void)MultQuadVec(&facing, &toTarget, &rollRotation);
+        if (unit->UnitMotion != nullptr) {
+          unit->UnitMotion->SetFacing(facing);
         }
         return 10;
+      }
 
-      case TASKSTATE_Processing: {
-        if (mFormation != nullptr) {
-          Unit* const formationLead = unit->mInfoCache.mFormationLeadRef.GetObjectPtr();
-          if (formationLead != unit && mIgnoreFormationUpdates != 0u) {
-            if (!HasFormationLeadDesiredTarget()) {
-              return 1;
-            }
+      if (mWeapon == nullptr) {
+        return -2;
+      }
 
-            mFormation = nullptr;
-            mIgnoreFormationUpdates = 0u;
-            if (navigator != nullptr) {
-              navigator->IgnoreFormation(true);
-            }
+      if (!mWeapon->RunScriptBool("CanWeaponFire")) {
+        return 10;
+      }
 
-            Update();
-            return 1;
-          }
-        }
-
-        const bool noTarget = mTarget.NoTarget();
-        if (!mTarget.HasTarget() || noTarget) {
-          if (navigator == nullptr || (attacker != nullptr && attacker->VectorIsWithinAttackRange(&mTargetPosition))) {
-            return -1;
-          }
-
-          if (navigator->GetStatus() == AINAVSTATUS_Idle) {
-            Update();
-          }
-          return 1;
-        }
-
-        const bool targetInWeaponRange =
-          attacker != nullptr && attacker->TargetIsWithinWeaponAttackRange(weapon, &mTarget);
-        const float engageDistance = (blueprint != nullptr) ? blueprint->Air.EngageDistance : 0.0f;
-
-        if (!targetInWeaponRange && !IsWithinHorizontalDistance(engageDistance)) {
-          if (attacker != nullptr && attacker->IsTooClose(&mTarget)) {
-            commandTask->mTaskState = TASKSTATE_Starting;
-            return 1;
-          }
-
-          if (navigator != nullptr && navigator->GetStatus() == AINAVSTATUS_Idle) {
-            Update();
-            return 1;
-          }
-
-          if (mHasMobileTarget != 0u) {
-            const Wm3::Vector3f targetPosition = mTarget.GetTargetPosGun(false);
-            const float deltaX = mTargetPosition.x - targetPosition.x;
-            const float deltaY = mTargetPosition.y - targetPosition.y;
-            const float deltaZ = mTargetPosition.z - targetPosition.z;
-            // 0x005F3B14: sums (dz*dz + dy*dy) + dx*dx.
-            const float distance = std::sqrt(((deltaZ * deltaZ) + (deltaY * deltaY)) + (deltaX * deltaX));
-            const float threshold = (blueprint != nullptr && blueprint->Air.CanFly != 0u) ? 2.0f : 10.0f;
-
-            if (distance > threshold) {
-              const Wm3::Vector3f candidatePosition = mTarget.GetTargetPosGun(false);
-              if (!UnitWontFitAt(candidatePosition, unit)) {
-                RefreshNavigationGoal();
-                UpdatePos();
-              }
-            }
-          }
-
-          return 1;
-        }
-
-        if (attacker == nullptr) {
-          if (navigator == nullptr) {
-            return -1;
-          }
-
-          if (navigator->GetStatus() == AINAVSTATUS_Idle) {
-            Update();
-          }
-          return 1;
-        }
-
-        if (!attacker->CanAttackTarget(&mTarget)) {
-          return -1;
-        }
-
-        mFormation = nullptr;
-        mIgnoreFormationUpdates = 0u;
-        if (navigator != nullptr) {
-          navigator->IgnoreFormation(true);
-        }
-
-        (void)UpdateAttacker(&mTarget);
-
-        if (mWeapon == nullptr) {
-          return -2;
-        }
-
-        mWeapon->SetTarget(&mTarget);
-        commandTask->mTaskState = TASKSTATE_Complete;
+      // 0x005F3E09: `cmp byte ptr [weapon+0x174],0` -- the aim-reachable flag (SetAimReachable), not mCanFire.
+      if (HasEntityMoved(*unit) && unit->IsMobile() && mWeapon->mUnknown174 == 0u) {
+        Update();
+        commandTask->mTaskState = TASKSTATE_Processing;
         return 1;
       }
 
-      case TASKSTATE_Complete:
-        if (blueprint != nullptr && blueprint->Air.CanFly == 0u) {
-          AbortNavigation();
-        }
+      if (mWeapon->mEnabled != 0u && UnitWeapon::CanFire(mWeapon, &mTarget)) {
+        mWeapon->Fire();
+        commandTask->mTaskState = TASKSTATE_5;
+        return 10;
+      }
 
-        if (blueprint != nullptr && blueprint->AI.AttackAngle > 0.0f && mTarget.HasTarget()) {
-          const VTransform& transform = unit->GetTransform();
-          const float forwardX = ((transform.orient_.w * transform.orient_.y) + (transform.orient_.z * transform.orient_.x))
-            * 2.0f;
-          // Forward-axis z is `1 - (y*y + x*x) * 2` (same column as
-          // Entity:GetHeading, 0x0068F968); z*z + y*y is the X axis' x.
-          const float forwardZ =
-            1.0f - (((transform.orient_.y * transform.orient_.y) + (transform.orient_.x * transform.orient_.x)) * 2.0f);
+      return 1;
 
-          // 0x005F3CD4: `NormalizeVectorInto` (0x0044F7E0) -- zero only when the
-          // length is not positive, where `Vector3f::Normalize` zeroes at 1e-6.
-          Wm3::Vector3f toTarget{};
-          (void)NormalizeVectorInto(&toTarget, mTarget.GetTargetPosGun(false) - unit->GetPosition());
+    case TASKSTATE_5:
+      AbortNavigation();
+      return -1;
 
-          float rollRadians = blueprint->AI.AttackAngle * 0.017453292f;
-          // 0x005F3CFD `comiss` + `jbe`: NaN takes the negative roll.
-          if (!(((toTarget.z * forwardX) - (forwardZ * toTarget.x)) > 0.0f)) {
-            rollRadians = -rollRadians;
-          }
-
-          const Wm3::Vector3f rollAxis{0.0f, 1.0f, 0.0f};
-          Wm3::Quaternionf rollRotation{};
-          (void)EulerRollToQuat(&rollAxis, &rollRotation, rollRadians);
-
-          Wm3::Vector3f facing{};
-          (void)MultQuadVec(&facing, &toTarget, &rollRotation);
-          if (unit->UnitMotion != nullptr) {
-            unit->UnitMotion->SetFacing(facing);
-          }
-          return 10;
-        }
-
-        if (mWeapon == nullptr) {
-          return -2;
-        }
-
-        if (!mWeapon->RunScriptBool("CanWeaponFire")) {
-          return 10;
-        }
-
-        // 0x005F3E09: `cmp byte ptr [weapon+0x174],0` -- the aim-reachable flag (SetAimReachable), not mCanFire.
-        if (HasEntityMoved(*unit) && unit->IsMobile() && mWeapon->mUnknown174 == 0u) {
-          Update();
-          commandTask->mTaskState = TASKSTATE_Processing;
-          return 1;
-        }
-
-        if (mWeapon->mEnabled != 0u && UnitWeapon::CanFire(mWeapon, &mTarget)) {
-          mWeapon->Fire();
-          commandTask->mTaskState = TASKSTATE_5;
-          return 10;
-        }
-
-        return 1;
-
-      case TASKSTATE_5:
-        AbortNavigation();
-        return -1;
-
-      default:
-        gpg::HandleAssertFailure(kAttackTaskAssertText, kAttackTaskAssertLine, kAttackTaskSourcePath);
-        return -1;
+    default:
+      gpg::HandleAssertFailure(kAttackTaskAssertText, kAttackTaskAssertLine, kAttackTaskSourcePath);
+      return -1;
     }
   }
 } // namespace moho

@@ -80,9 +80,14 @@ LEGACY_VAULT = os.path.join(REPO, "tmp", "Supreme Commander Forged Alliance")
 UA = {"User-Agent": "faf-re-replay-parity/1.0"}
 
 # docs/PR_REPLAY_CHECK.md: core set first, extended set next, everything else after.
-CORE_SET = [26902315, 26930624, 26943656, 26883423, 26881085, 26928211, 26989770, 26897073]
+# One list for every game version: a run keeps the ids its version's corpus holds (plan.py). Game version 3835's first
+# (docs/PR_REPLAY_CHECK.md), then 3840's, picked from replay parity run 42771586614 (all pass, played to game over).
+CORE_SET = [26902315, 26930624, 26943656, 26883423, 26881085, 26928211, 26989770, 26897073,
+            28016454, 28063699, 28059028, 28070914, 28058778, 28038031, 28013263, 28041625]
 EXTENDED_SET = [26975290, 26953273, 27034831, 26917867, 26876279, 26935800, 26898759,
-                27004084, 26915859, 26905122]
+                27004084, 26915859, 26905122,
+                28035761, 28004977, 28012666, 28094872, 28011154, 28052742, 28072694, 28005584, 28072023,
+                28010105]
 
 DEFAULT_CONFIG = {
     # What plays the replays: "headless", the console replay player (headless_x64.exe: the

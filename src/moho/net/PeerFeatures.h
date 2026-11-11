@@ -45,7 +45,9 @@ namespace moho
     std::string build;
   };
 
-  [[nodiscard]] constexpr std::uint64_t PeerFeatureBit(const EPeerFeature feature) noexcept
+  [[nodiscard]] constexpr std::uint64_t PeerFeatureBit(
+    const EPeerFeature feature
+  ) noexcept
   {
     return std::uint64_t{1} << static_cast<std::uint8_t>(feature);
   }

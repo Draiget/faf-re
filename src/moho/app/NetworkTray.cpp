@@ -55,7 +55,9 @@ namespace moho
     constexpr UINT kCmdDiagnostics = 3;
     constexpr UINT kCmdReconnectFirst = 100;
 
-    [[nodiscard]] std::wstring Wide(const std::string& text)
+    [[nodiscard]] std::wstring Wide(
+      const std::string& text
+    )
     {
       if (text.empty()) {
         return {};
@@ -66,7 +68,9 @@ namespace moho
       return out;
     }
 
-    [[nodiscard]] std::string RttText(const SNetlinkPeerInfo& p)
+    [[nodiscard]] std::string RttText(
+      const SNetlinkPeerInfo& p
+    )
     {
       if (p.rttMs < 0) {
         return "-";
@@ -76,13 +80,17 @@ namespace moho
       return buf;
     }
 
-    [[nodiscard]] bool Relayed(const SNetlinkPeerInfo& p)
+    [[nodiscard]] bool Relayed(
+      const SNetlinkPeerInfo& p
+    )
     {
       return p.connected && (p.localType == "relay" || p.remoteType == "relay");
     }
 
     // "Network (native): 2 up, 1 relayed, 1 lost": the tooltip and the menu's first line.
-    [[nodiscard]] std::string StatusText(const SNetlinkSnapshot& view)
+    [[nodiscard]] std::string StatusText(
+      const SNetlinkSnapshot& view
+    )
     {
       if (view.mode.empty()) {
         return "Network: the launcher's ICE adapter runs the links";
@@ -98,12 +106,14 @@ namespace moho
       if (view.peers.empty()) {
         return "Network (" + view.mode + "): no peers yet";
       }
-      return "Network (" + view.mode + "): " + std::to_string(up) + " up, " + std::to_string(relayed) +
-             " relayed, " + std::to_string(lost) + " lost";
+      return "Network (" + view.mode + "): " + std::to_string(up) + " up, " + std::to_string(relayed) + " relayed, " +
+        std::to_string(lost) + " lost";
     }
 
     // "&1 " .. "&9 ", then "&a " ..: a key for each peer in the Reconnect menu.
-    [[nodiscard]] std::string Mnemonic(const std::size_t index)
+    [[nodiscard]] std::string Mnemonic(
+      const std::size_t index
+    )
     {
       if (index >= 9 + 26) {
         return {};
@@ -112,7 +122,9 @@ namespace moho
       return std::string("&") + key + " ";
     }
 
-    [[nodiscard]] std::string PeerName(const SNetlinkPeerInfo& p)
+    [[nodiscard]] std::string PeerName(
+      const SNetlinkPeerInfo& p
+    )
     {
       return p.login + " (" + std::to_string(p.id) + ")";
     }
@@ -140,7 +152,9 @@ namespace moho
       return slash == std::wstring::npos ? out : out.substr(0, slash);
     }
 
-    [[nodiscard]] std::string Narrow(const std::wstring& text)
+    [[nodiscard]] std::string Narrow(
+      const std::wstring& text
+    )
     {
       const int n = ::WideCharToMultiByte(CP_UTF8, 0, text.c_str(), -1, nullptr, 0, nullptr, nullptr);
       std::string out(static_cast<std::size_t>(n > 0 ? n - 1 : 0), '\0');
@@ -150,11 +164,13 @@ namespace moho
 
     // What a bug report needs: the build, every link with its counts, the log file
     // and the latest network log lines.
-    [[nodiscard]] std::string DiagnosticsText(const SNetlinkSnapshot& view)
+    [[nodiscard]] std::string DiagnosticsText(
+      const SNetlinkSnapshot& view
+    )
     {
       std::string out;
       out += std::string("faf-re ") + gpg::diag::BuildDescribe() + " (" + gpg::diag::BuildCommitShort() + ", " +
-             gpg::diag::BuildArch() + ")\r\n";
+        gpg::diag::BuildArch() + ")\r\n";
       char when[64] = {};
       const std::time_t now = std::time(nullptr);
       std::tm local{};
@@ -169,14 +185,18 @@ namespace moho
       for (const SNetlinkPeerInfo& p : view.peers) {
         char counts[256];
         std::snprintf(
-          counts, sizeof(counts), "sent %llu, received %llu, lost %llu (%.2f %%), resends %llu",
-          static_cast<unsigned long long>(p.sent), static_cast<unsigned long long>(p.received),
-          static_cast<unsigned long long>(p.lost), p.lossPercent, static_cast<unsigned long long>(p.resends)
+          counts,
+          sizeof(counts),
+          "sent %llu, received %llu, lost %llu (%.2f %%), resends %llu",
+          static_cast<unsigned long long>(p.sent),
+          static_cast<unsigned long long>(p.received),
+          static_cast<unsigned long long>(p.lost),
+          p.lossPercent,
+          static_cast<unsigned long long>(p.resends)
         );
         out += "peer " + PeerName(p) + ": " + p.state + ", attempts " + std::to_string(p.attempts) + ", " +
-               NETPANEL_PathText(p) + " (picked: " + faf::netlink::PathChoiceText(p.choice) + "), round trip " +
-               RttText(p) + ", lane " +
-               (p.onLane ? (p.laneEncrypted ? "encrypted" : "plain") : "off") + ", " + counts + "\r\n";
+          NETPANEL_PathText(p) + " (picked: " + faf::netlink::PathChoiceText(p.choice) + "), round trip " + RttText(p) +
+          ", lane " + (p.onLane ? (p.laneEncrypted ? "encrypted" : "plain") : "off") + ", " + counts + "\r\n";
       }
       if (!view.log.empty()) {
         out += "latest network log lines:\r\n";
@@ -187,7 +207,10 @@ namespace moho
       return out;
     }
 
-    bool CopyToClipboard(const HWND owner, const std::string& text)
+    bool CopyToClipboard(
+      const HWND owner,
+      const std::string& text
+    )
     {
       const std::wstring wide = Wide(text);
       if (!::OpenClipboard(owner)) {
@@ -214,7 +237,9 @@ namespace moho
     // shell can refuse: a game run as another user than the desktop's gets "access
     // denied". Then the path goes on the clipboard instead. Returns what happened,
     // for the panel and the log.
-    std::string OpenLogFolder(const HWND owner)
+    std::string OpenLogFolder(
+      const HWND owner
+    )
     {
       const std::wstring log = LogFilePath();
       const bool haveLog = !log.empty() && ::GetFileAttributesW(log.c_str()) != INVALID_FILE_ATTRIBUTES;
@@ -238,7 +263,7 @@ namespace moho
         char code[16];
         std::snprintf(code, sizeof(code), "0x%08lX", static_cast<unsigned long>(hr));
         result = std::string("Explorer refused (") + code + ")" +
-                 (copied ? "; the log file's path is on the clipboard" : "; the log file is " + Narrow(target));
+          (copied ? "; the log file's path is on the clipboard" : "; the log file is " + Narrow(target));
       }
       gpg::Logf("NETLINK: log folder: %s (%s)", result.c_str(), Narrow(target).c_str());
       return result;
@@ -247,7 +272,10 @@ namespace moho
     class Tray
     {
     public:
-      ~Tray() { Stop(); }
+      ~Tray()
+      {
+        Stop();
+      }
 
       void Start()
       {
@@ -256,7 +284,9 @@ namespace moho
           return;
         }
         mStop = false;
-        mThread = std::thread([this] { Run(); });
+        mThread = std::thread([this] {
+          Run();
+        });
       }
 
       void Stop()
@@ -277,7 +307,12 @@ namespace moho
       }
 
     private:
-      static LRESULT CALLBACK WndProc(const HWND hwnd, const UINT msg, const WPARAM wp, const LPARAM lp)
+      static LRESULT CALLBACK WndProc(
+        const HWND hwnd,
+        const UINT msg,
+        const WPARAM wp,
+        const LPARAM lp
+      )
       {
         if (msg == WM_NCCREATE) {
           const auto* const cs = reinterpret_cast<const CREATESTRUCTW*>(lp);
@@ -287,7 +322,12 @@ namespace moho
         return self != nullptr ? self->Handle(hwnd, msg, wp, lp) : ::DefWindowProcW(hwnd, msg, wp, lp);
       }
 
-      LRESULT Handle(const HWND hwnd, const UINT msg, const WPARAM wp, const LPARAM lp)
+      LRESULT Handle(
+        const HWND hwnd,
+        const UINT msg,
+        const WPARAM wp,
+        const LPARAM lp
+      )
       {
         if (msg == mTaskbarCreated && mTaskbarCreated != 0) {
           mShown = false; // Explorer restarted: add the icon again
@@ -344,8 +384,8 @@ namespace moho
         mTaskbarCreated = ::RegisterWindowMessageW(L"TaskbarCreated");
         // A hidden top-level window, not a message-only one: only top-level
         // windows hear TaskbarCreated when Explorer restarts.
-        const HWND hwnd = ::CreateWindowExW(0, kClass, L"faf-re network", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr,
-                                            instance, this);
+        const HWND hwnd =
+          ::CreateWindowExW(0, kClass, L"faf-re network", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, instance, this);
         if (hwnd == nullptr) {
           gpg::Logf("NETLINK: no tray icon, CreateWindowEx failed (%lu)", ::GetLastError());
           return;
@@ -377,7 +417,9 @@ namespace moho
         mHwnd = nullptr;
       }
 
-      void Update(const HWND hwnd)
+      void Update(
+        const HWND hwnd
+      )
       {
         if (!net_TrayIcon) {
           RemoveIcon(hwnd);
@@ -407,7 +449,11 @@ namespace moho
       }
 
       // A notification from the icon (a balloon, or a toast on Windows 10 and later).
-      void Notify(const HWND hwnd, const std::string& title, const std::string& text)
+      void Notify(
+        const HWND hwnd,
+        const std::string& title,
+        const std::string& text
+      )
       {
         if (!mShown) {
           return;
@@ -423,7 +469,9 @@ namespace moho
         ::Shell_NotifyIconW(NIM_MODIFY, &nid);
       }
 
-      void RemoveIcon(const HWND hwnd)
+      void RemoveIcon(
+        const HWND hwnd
+      )
       {
         if (!mShown) {
           return;
@@ -438,28 +486,36 @@ namespace moho
         gpg::Logf("NETLINK: tray icon removed");
       }
 
-      void ShowMenu(const HWND hwnd)
+      void ShowMenu(
+        const HWND hwnd
+      )
       {
         const SNetlinkSnapshot view = NETLINK_GetSnapshot();
         const HMENU menu = ::CreatePopupMenu();
         ::AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, Wide(StatusText(view)).c_str());
         for (const SNetlinkPeerInfo& p : view.peers) {
-          const std::string line = "    " + PeerName(p) + ": " + p.state + ", " + NETPANEL_PathText(p) + ", " +
-                                   RttText(p);
+          const std::string line =
+            "    " + PeerName(p) + ": " + p.state + ", " + NETPANEL_PathText(p) + ", " + RttText(p);
           ::AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, Wide(line).c_str());
         }
         ::AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-        ::AppendMenuW(menu, MF_STRING | (net_ShowPanel ? MF_CHECKED : MF_UNCHECKED), kCmdPanel,
-                      L"&Network panel\tCtrl+Shift+F11");
+        ::AppendMenuW(
+          menu, MF_STRING | (net_ShowPanel ? MF_CHECKED : MF_UNCHECKED), kCmdPanel, L"&Network panel\tCtrl+Shift+F11"
+        );
         const HMENU reconnect = ::CreatePopupMenu();
         std::vector<std::int64_t> ids;
         for (const SNetlinkPeerInfo& p : view.peers) {
-          ::AppendMenuW(reconnect, MF_STRING, kCmdReconnectFirst + static_cast<UINT>(ids.size()),
-                        Wide(Mnemonic(ids.size()) + PeerName(p)).c_str());
+          ::AppendMenuW(
+            reconnect,
+            MF_STRING,
+            kCmdReconnectFirst + static_cast<UINT>(ids.size()),
+            Wide(Mnemonic(ids.size()) + PeerName(p)).c_str()
+          );
           ids.push_back(p.id);
         }
-        ::AppendMenuW(menu, MF_POPUP | (ids.empty() ? MF_GRAYED : 0u), reinterpret_cast<UINT_PTR>(reconnect),
-                      L"&Reconnect");
+        ::AppendMenuW(
+          menu, MF_POPUP | (ids.empty() ? MF_GRAYED : 0u), reinterpret_cast<UINT_PTR>(reconnect), L"&Reconnect"
+        );
         ::AppendMenuW(menu, MF_STRING, kCmdLogFolder, L"Open &log folder");
         ::AppendMenuW(menu, MF_STRING, kCmdDiagnostics, L"&Copy diagnostics");
 
@@ -468,9 +524,9 @@ namespace moho
         POINT at{};
         ::GetCursorPos(&at);
         mInMenu = true;
-        const UINT cmd = static_cast<UINT>(::TrackPopupMenu(
-          menu, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY, at.x, at.y, 0, hwnd, nullptr
-        ));
+        const UINT cmd = static_cast<UINT>(
+          ::TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY, at.x, at.y, 0, hwnd, nullptr)
+        );
         mInMenu = false;
         ::PostMessageW(hwnd, WM_NULL, 0, 0);
         ::DestroyMenu(menu); // and the submenu with it
@@ -490,8 +546,11 @@ namespace moho
         } else if (cmd == kCmdDiagnostics) {
           const std::string text = DiagnosticsText(NETLINK_GetSnapshot());
           const bool ok = CopyToClipboard(hwnd, text);
-          gpg::Logf("NETLINK: tray: diagnostics %s (%d bytes)", ok ? "copied to the clipboard" : "not copied",
-                    static_cast<int>(text.size()));
+          gpg::Logf(
+            "NETLINK: tray: diagnostics %s (%d bytes)",
+            ok ? "copied to the clipboard" : "not copied",
+            static_cast<int>(text.size())
+          );
         } else if (cmd >= kCmdReconnectFirst && cmd - kCmdReconnectFirst < ids.size()) {
           const std::int64_t id = ids[cmd - kCmdReconnectFirst];
           if (!NETLINK_ReconnectPeer(id)) {
@@ -520,7 +579,9 @@ namespace moho
     }
   } // namespace
 
-  std::string NETDIAG_OpenLogFolder(void* const owner)
+  std::string NETDIAG_OpenLogFolder(
+    void* const owner
+  )
   {
     return OpenLogFolder(static_cast<HWND>(owner));
   }
@@ -535,7 +596,10 @@ namespace moho
     return DiagnosticsText(NETLINK_GetSnapshot());
   }
 
-  bool NETDIAG_CopyText(void* const owner, const std::string& text)
+  bool NETDIAG_CopyText(
+    void* const owner,
+    const std::string& text
+  )
   {
     return CopyToClipboard(static_cast<HWND>(owner), text);
   }
@@ -557,7 +621,9 @@ namespace moho
 {
   void NETTRAY_Start() {}
   void NETTRAY_Stop() {}
-  std::string NETDIAG_OpenLogFolder(void*)
+  std::string NETDIAG_OpenLogFolder(
+    void*
+  )
   {
     return {};
   }
@@ -569,7 +635,10 @@ namespace moho
   {
     return {};
   }
-  bool NETDIAG_CopyText(void*, const std::string&)
+  bool NETDIAG_CopyText(
+    void*,
+    const std::string&
+  )
   {
     return false;
   }

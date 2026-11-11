@@ -30,7 +30,9 @@ namespace
    * implementation type, caching the descriptor in `IAiTransport::sType` on
    * first lookup.
    */
-  void AddBaseIAiTransportToCAiTransportImplTypeInfo(gpg::RType* const typeInfo)
+  void AddBaseIAiTransportToCAiTransportImplTypeInfo(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBaseViaSlot<IAiTransport>(typeInfo);
   }
@@ -89,4 +91,7 @@ void moho::register_CAiTransportImplTypeInfo()
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CAiTransportImplTypeInfo_aad447, moho::register_CAiTransportImplTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CAiTransportImplTypeInfo_aad447,
+  moho::register_CAiTransportImplTypeInfo
+)

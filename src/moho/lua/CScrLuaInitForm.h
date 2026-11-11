@@ -97,7 +97,8 @@ namespace moho
   static_assert(offsetof(CScrLuaInitFormSet, mSetName) == 0x00, "CScrLuaInitFormSet::mSetName offset must be 0x00");
   static_assert(offsetof(CScrLuaInitFormSet, mForms) == 0x04, "CScrLuaInitFormSet::mForms offset must be 0x04");
   static_assert(
-    offsetof(CScrLuaInitFormSet, mRegistered) == 0x08, "CScrLuaInitFormSet::mRegistered offset must be 0x08"
+    offsetof(CScrLuaInitFormSet, mRegistered) == 0x08,
+    "CScrLuaInitFormSet::mRegistered offset must be 0x08"
   );
   static_assert(offsetof(CScrLuaInitFormSet, mNextSet) == 0x0C, "CScrLuaInitFormSet::mNextSet offset must be 0x0C");
   static_assert(sizeof(CScrLuaInitFormSet) == 0x10, "CScrLuaInitFormSet size must be 0x10");

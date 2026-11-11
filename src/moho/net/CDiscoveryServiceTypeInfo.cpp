@@ -5,7 +5,8 @@
 #include <typeinfo>
 
 #include "moho/net/CDiscoveryService.h"
-#include "moho/script/CScriptObject.h"
+#include "moho/script/CScriptObject.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 using namespace moho;
@@ -51,7 +52,9 @@ namespace
    * Registers `CScriptObject` as one reflected `CDiscoveryService` base lane
    * at offset `+0x00`.
    */
-  void AddCScriptObjectBaseToCDiscoveryServiceType(gpg::RType* const typeInfo)
+  void AddCScriptObjectBaseToCDiscoveryServiceType(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<CScriptObject>(typeInfo);
   }
@@ -65,14 +68,21 @@ namespace
     return sInstance;
   }
 
-  struct Bootstrap { Bootstrap() { moho::register_CDiscoveryServiceTypeInfoStartup(); } };
+  struct Bootstrap
+  {
+    Bootstrap()
+    {
+      moho::register_CDiscoveryServiceTypeInfoStartup();
+    }
+  };
   Bootstrap gBootstrap;
 } // namespace
 
 /**
  * Address: 0x007BF500 (FUN_007BF500, Moho::CDiscoveryServiceTypeInfo::CDiscoveryServiceTypeInfo)
  */
-CDiscoveryServiceTypeInfo::CDiscoveryServiceTypeInfo() : gpg::RType()
+CDiscoveryServiceTypeInfo::CDiscoveryServiceTypeInfo()
+  : gpg::RType()
 {
   gpg::PreRegisterRType(typeid(CDiscoveryService), this);
 }
@@ -110,7 +120,9 @@ void moho::register_CDiscoveryServiceTypeInfoStartup()
   (void)Acquire();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CDiscoveryServiceTypeInfoStartup_4bf64c, moho::register_CDiscoveryServiceTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CDiscoveryServiceTypeInfoStartup_4bf64c,
+  moho::register_CDiscoveryServiceTypeInfoStartup
+)

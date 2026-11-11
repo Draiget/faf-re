@@ -48,4 +48,3 @@ namespace moho
   static_assert(sizeof(ESquadClassTypeInfo) == 0x78, "ESquadClassTypeInfo size must be 0x78");
 
 } // namespace moho
-

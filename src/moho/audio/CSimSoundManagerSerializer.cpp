@@ -28,8 +28,7 @@ namespace
     if (!type) {
       type = gpg::LookupRType(typeid(gpg::fastvector<moho::SAudioRequest>));
       if (type != nullptr && type->serSaveFunc_ == nullptr) {
-        type->serSaveFunc_ =
-          reinterpret_cast<gpg::RType::save_func_t>(&SerializeAudioRequestFastVector);
+        type->serSaveFunc_ = reinterpret_cast<gpg::RType::save_func_t>(&SerializeAudioRequestFastVector);
       }
     }
     return type;
@@ -53,13 +52,9 @@ namespace
       return;
     }
 
-    const auto* const requests = reinterpret_cast<const gpg::fastvector<moho::SAudioRequest>*>(
-      objectPtr
-    );
+    const auto* const requests = reinterpret_cast<const gpg::fastvector<moho::SAudioRequest>*>(objectPtr);
 
-    const unsigned int count = requests != nullptr
-      ? static_cast<unsigned int>(requests->end_ - requests->start_)
-      : 0u;
+    const unsigned int count = requests != nullptr ? static_cast<unsigned int>(requests->end_ - requests->start_) : 0u;
     archive->WriteUInt(count);
     if (count == 0u || requests == nullptr) {
       return;
@@ -78,9 +73,7 @@ namespace
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
       archive->Write(
-        requestType,
-        const_cast<moho::SAudioRequest*>(requests->start_ + static_cast<std::ptrdiff_t>(i)),
-        owner
+        requestType, const_cast<moho::SAudioRequest*>(requests->start_ + static_cast<std::ptrdiff_t>(i)), owner
       );
     }
   }
@@ -92,7 +85,10 @@ namespace
    * Reads unowned `HSound*` lanes until a null terminator and relinks each
    * handle into the `CSimSoundManager` active-loop intrusive list.
    */
-  void DeserializeCSimSoundManagerLoopList(moho::CSimSoundManager* const manager, gpg::ReadArchive* const archive)
+  void DeserializeCSimSoundManagerLoopList(
+    moho::CSimSoundManager* const manager,
+    gpg::ReadArchive* const archive
+  )
   {
     if (!manager || !archive) {
       return;
@@ -118,7 +114,10 @@ namespace
    * Serializes each active loop-handle pointer as one unowned tracked pointer
    * lane, then emits a null pointer terminator.
    */
-  void SerializeCSimSoundManagerLoopList(const moho::CSimSoundManager* const manager, gpg::WriteArchive* const archive)
+  void SerializeCSimSoundManagerLoopList(
+    const moho::CSimSoundManager* const manager,
+    gpg::WriteArchive* const archive
+  )
   {
     if (!manager || !archive) {
       return;
@@ -131,7 +130,9 @@ namespace
           const_cast<LoopNode*>(node)
         );
 
-      archive->WritePointer<moho::HSound>(const_cast<moho::HSound*>(sound), gpg::TrackedPointerState::Unowned, gpg::RRef{});
+      archive->WritePointer<moho::HSound>(
+        const_cast<moho::HSound*>(sound), gpg::TrackedPointerState::Unowned, gpg::RRef{}
+      );
     }
 
     archive->WritePointer<moho::HSound>(nullptr, gpg::TrackedPointerState::Unowned, gpg::RRef{});
@@ -148,7 +149,9 @@ namespace moho
    * Deserializes one `CSimSoundManager` lane by loading `ISoundManager` base
    * state, queued request vector lanes, then active-loop pointer lanes.
    */
-  void CSimSoundManager::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CSimSoundManager::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -168,7 +171,9 @@ namespace moho
    * Serializes one `CSimSoundManager` lane by writing `ISoundManager` base
    * state, queued request vector lanes, then active-loop pointer lanes.
    */
-  void CSimSoundManager::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CSimSoundManager::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;

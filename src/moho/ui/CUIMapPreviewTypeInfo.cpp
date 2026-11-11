@@ -22,7 +22,10 @@ namespace
 
   struct CUIMapPreviewTypeInfoBootstrap
   {
-    CUIMapPreviewTypeInfoBootstrap() { moho::register_CUIMapPreviewTypeInfoStartup(); }
+    CUIMapPreviewTypeInfoBootstrap()
+    {
+      moho::register_CUIMapPreviewTypeInfoStartup();
+    }
   };
   CUIMapPreviewTypeInfoBootstrap gCUIMapPreviewTypeInfoBootstrap;
 
@@ -37,7 +40,9 @@ namespace
    * `RType::IsDerivedFrom` cannot walk from it to CScriptObject and every
    * reflected reference built from a CUIMapPreview fails its upcast.
    */
-  void AddCMauiControlBase(gpg::RType& typeInfo)
+  void AddCMauiControlBase(
+    gpg::RType& typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CMauiControl>(&typeInfo);
   }
@@ -98,4 +103,7 @@ void moho::register_CUIMapPreviewTypeInfoStartup()
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every
 // consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CUIMapPreviewTypeInfoStartup_850620, moho::register_CUIMapPreviewTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CUIMapPreviewTypeInfoStartup_850620,
+  moho::register_CUIMapPreviewTypeInfoStartup
+)

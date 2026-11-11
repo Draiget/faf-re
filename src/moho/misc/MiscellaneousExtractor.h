@@ -24,8 +24,11 @@ namespace moho
      * What it does:
      * Emits the positive staging-platform or guard overlay range from blueprint AI data.
      */
-    [[nodiscard]] bool
-    Range(SRangeExtractionPayload* outRange, const RUnitBlueprint* unitBlueprint, const Wm3::Vec3f& center) const override;
+    [[nodiscard]] bool Range(
+      SRangeExtractionPayload* outRange,
+      const RUnitBlueprint* unitBlueprint,
+      const Wm3::Vec3f& center
+    ) const override;
 
     /**
      * Address: 0x007ED370 (FUN_007ED370, Moho::MiscellaneousExtractor::Extract)

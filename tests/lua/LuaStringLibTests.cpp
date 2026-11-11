@@ -11,10 +11,12 @@ namespace
   using faf_lua_tests::Contains;
 
   class LuaStringLib : public faf_lua_tests::LuaFixture
-  {
-  };
+  {};
 
-  TEST_F(LuaStringLib, LenSubCase)
+  TEST_F(
+    LuaStringLib,
+    LenSubCase
+  )
   {
     EXPECT_EQ(Num("return string.len('hello')"), 5.0);
     EXPECT_EQ(Num("return string.len('')"), 0.0);
@@ -34,7 +36,10 @@ namespace
     EXPECT_EQ(Str("return string.len(12345) .. ''"), "5"); // numbers convert to strings for string functions
   }
 
-  TEST_F(LuaStringLib, ByteAndChar)
+  TEST_F(
+    LuaStringLib,
+    ByteAndChar
+  )
   {
     EXPECT_EQ(Num("return string.byte('ABC')"), 65.0);
     EXPECT_EQ(Num("return string.byte('ABC', 2)"), 66.0);
@@ -49,7 +54,10 @@ namespace
     EXPECT_TRUE(Contains(ErrorOf("return string.char(-1)"), "invalid value"));
   }
 
-  TEST_F(LuaStringLib, FormatConversions)
+  TEST_F(
+    LuaStringLib,
+    FormatConversions
+  )
   {
     EXPECT_EQ(Str("return string.format('%d', 3.7)"), "3");
     EXPECT_EQ(Str("return string.format('%i|%d', -2, 0)"), "-2|0");
@@ -71,28 +79,42 @@ namespace
     EXPECT_EQ(Num("return string.len(string.format('<%s>', string.rep('z', 300)))"), 302.0);
   }
 
-  TEST_F(LuaStringLib, FormatErrors)
+  TEST_F(
+    LuaStringLib,
+    FormatErrors
+  )
   {
     EXPECT_TRUE(Contains(ErrorOf("return string.format('%y', 1)"), "invalid option to `format'"));
     EXPECT_TRUE(Contains(ErrorOf("return string.format('%123d', 1)"), "invalid format (width or precision too long)"));
     EXPECT_TRUE(Contains(ErrorOf("return string.format('%1$d', 1)"), "obsolete option (d$) to `format'"));
     EXPECT_TRUE(Contains(ErrorOf("return string.format('%d')"), "bad argument #2 to `format'"));
-    EXPECT_TRUE(Contains(ErrorOf("return string.format('%d', 'x')"), "bad argument #2 to `format' (number expected, got string)"));
+    EXPECT_TRUE(
+      Contains(ErrorOf("return string.format('%d', 'x')"), "bad argument #2 to `format' (number expected, got string)")
+    );
   }
 
   // %q writes a string Lua can read back (5.0 addquoted: \" \\ \n escaped, \0 as \000).
-  TEST_F(LuaStringLib, FormatQuoted)
+  TEST_F(
+    LuaStringLib,
+    FormatQuoted
+  )
   {
     EXPECT_EQ(Str("return string.format('%q', 'say \"hi\"\\\\')"), "\"say \\\"hi\\\"\\\\\"");
     EXPECT_EQ(Str("return string.format('%q', 'a\\nb')"), "\"a\\\nb\"");
     EXPECT_EQ(Str("return string.format('%q', 'z\\0z')"), "\"z\\000z\"");
-    EXPECT_TRUE(Bool("local s = 'tab\\t \"q\" back\\\\ nl\\n zero\\0 end' return loadstring('return ' .. string.format('%q', s))() == s"));
+    EXPECT_TRUE(Bool(
+      "local s = 'tab\\t \"q\" back\\\\ nl\\n zero\\0 end' return loadstring('return ' .. string.format('%q', s))() == "
+      "s"
+    ));
   }
 
   // Fork: %Q quotes with C escapes and \xNN for unprintable bytes (luaI_addquotedbinary
   // 0x009262C0), and %b<T> appends a number's raw little-endian bytes (str_format_helper
   // 0x00926690): F double, f float, d int32, w int16, b byte.
-  TEST_F(LuaStringLib, FormatForkConversions)
+  TEST_F(
+    LuaStringLib,
+    FormatForkConversions
+  )
   {
     EXPECT_EQ(Str("return string.format('%Q', 'a\\nb\"\\1')"), "\"a\\nb\\\"\\x01\"");
     EXPECT_TRUE(Bool("local s = 'x\\0\\255\\t\"' return loadstring('return ' .. string.format('%Q', s))() == s"));
@@ -105,7 +127,10 @@ namespace
     EXPECT_EQ(Str("return string.format('%bz', 1)"), ""); // unknown width: nothing
   }
 
-  TEST_F(LuaStringLib, FindPlainAndPatterns)
+  TEST_F(
+    LuaStringLib,
+    FindPlainAndPatterns
+  )
   {
     EXPECT_EQ(Str("local a, b = string.find('hello world', 'wor') return a .. ',' .. b"), "7,9");
     EXPECT_TRUE(Run("return string.find('hello', 'xyz')").IsNil());
@@ -121,10 +146,16 @@ namespace
     EXPECT_EQ(Str("local _, _, p = string.find('abc', '()b') return tostring(p)"), "2"); // position capture
   }
 
-  TEST_F(LuaStringLib, PatternClassesAndQuantifiers)
+  TEST_F(
+    LuaStringLib,
+    PatternClassesAndQuantifiers
+  )
   {
     const auto match = [this](const char* subject, const char* pattern) {
-      return Str(std::string("local s, e = string.find('") + subject + "', '" + pattern + "') return s and string.sub('" + subject + "', s, e) or 'nil'");
+      return Str(
+        std::string("local s, e = string.find('") + subject + "', '" + pattern + "') return s and string.sub('" +
+        subject + "', s, e) or 'nil'"
+      );
     };
     EXPECT_EQ(match("abc 123 def", "%d+"), "123");
     EXPECT_EQ(match("abc 123 def", "%a+"), "abc");
@@ -138,7 +169,7 @@ namespace
     EXPECT_EQ(match("abc", "[^ab]"), "c");
     EXPECT_EQ(match("a-b", "[%-]"), "-");
     EXPECT_EQ(match("aaa", "a*"), "aaa");
-    EXPECT_EQ(match("aaa", "a-"), "");   // lazy, empty
+    EXPECT_EQ(match("aaa", "a-"), ""); // lazy, empty
     EXPECT_EQ(match("<a><b>", "<.->"), "<a>");
     EXPECT_EQ(match("<a><b>", "<.*>"), "<a><b>");
     EXPECT_EQ(match("color colour", "colou?r"), "color");
@@ -148,7 +179,10 @@ namespace
     EXPECT_EQ(match("a.b", "%."), ".");
   }
 
-  TEST_F(LuaStringLib, PatternErrors)
+  TEST_F(
+    LuaStringLib,
+    PatternErrors
+  )
   {
     EXPECT_TRUE(Contains(ErrorOf("string.find('a', '[a')"), "malformed pattern (missing `]')"));
     EXPECT_TRUE(Contains(ErrorOf("string.find('a', '%')"), "malformed pattern (ends with `%')"));
@@ -160,7 +194,10 @@ namespace
     EXPECT_TRUE(Contains(ErrorOf("string.find(string.rep('a', 40), string.rep('(a)', 40))"), "too many captures"));
   }
 
-  TEST_F(LuaStringLib, Gsub)
+  TEST_F(
+    LuaStringLib,
+    Gsub
+  )
   {
     EXPECT_EQ(Str("local s, n = string.gsub('hello world', 'o', '0') return s .. n"), "hell0 w0rld2");
     EXPECT_EQ(Str("return (string.gsub('aaaa', 'a', 'b', 2))"), "bbaa");
@@ -168,7 +205,10 @@ namespace
     EXPECT_EQ(Str("return (string.gsub('abc', '(%w)', '%1%1'))"), "aabbcc");
     EXPECT_TRUE(Contains(ErrorOf("string.gsub('abc', '%w', '%0')"), "invalid capture index")); // %0 is 5.1
     EXPECT_EQ(Str("return (string.gsub('a', 'a', '%%'))"), "%");
-    EXPECT_EQ(Str("return (string.gsub('$name is $age', '%$(%w+)', function(k) return k == 'name' and 'Bob' or '42' end))"), "Bob is 42");
+    EXPECT_EQ(
+      Str("return (string.gsub('$name is $age', '%$(%w+)', function(k) return k == 'name' and 'Bob' or '42' end))"),
+      "Bob is 42"
+    );
     // 5.0: a function result that is not a string removes the match.
     EXPECT_EQ(Str("return (string.gsub('abc', 'b', function() end))"), "ac");
     // Fork: a number result counts as "not a string" too - add_s asks lua_isstring, which is true
@@ -178,15 +218,26 @@ namespace
     EXPECT_EQ(Str("local s, n = string.gsub('abc', '', '-') return s .. n"), "-a-b-c-4");
     EXPECT_EQ(Str("local s, n = string.gsub('aaa', '^a', 'b') return s .. n"), "baa1");
     EXPECT_EQ(Str("return (string.gsub('  trim me  ', '^%s*(.-)%s*$', '%1'))"), "trim me");
-    EXPECT_TRUE(Contains(ErrorOf("string.gsub('a', 'a', {})"), "bad argument #3 to `gsub' (string or function expected)"));
+    EXPECT_TRUE(
+      Contains(ErrorOf("string.gsub('a', 'a', {})"), "bad argument #3 to `gsub' (string or function expected)")
+    );
     EXPECT_TRUE(Contains(ErrorOf("string.gsub('a', 'a', '%2')"), "invalid capture index"));
     EXPECT_EQ(Str("return (string.gsub('abc', '.', string.upper))"), "ABC"); // a C function replaces too
   }
 
-  TEST_F(LuaStringLib, Gfind)
+  TEST_F(
+    LuaStringLib,
+    Gfind
+  )
   {
-    EXPECT_EQ(Str("local out = '' for w in string.gfind('one two three', '%a+') do out = out .. w .. ';' end return out"), "one;two;three;");
-    EXPECT_EQ(Str("local out = '' for k, v in string.gfind('a=1, b=2', '(%w+)=(%w+)') do out = out .. k .. v end return out"), "a1b2");
+    EXPECT_EQ(
+      Str("local out = '' for w in string.gfind('one two three', '%a+') do out = out .. w .. ';' end return out"),
+      "one;two;three;"
+    );
+    EXPECT_EQ(
+      Str("local out = '' for k, v in string.gfind('a=1, b=2', '(%w+)=(%w+)') do out = out .. k .. v end return out"),
+      "a1b2"
+    );
     EXPECT_EQ(Num("local n = 0 for w in string.gfind('', '%a+') do n = n + 1 end return n"), 0.0);
     EXPECT_EQ(Num("local n = 0 for w in string.gfind('abc', '') do n = n + 1 end return n"), 4.0);
   }

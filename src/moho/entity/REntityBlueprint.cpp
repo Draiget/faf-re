@@ -30,7 +30,10 @@ namespace moho
    * Runs base blueprint construction and seeds entity-blueprint physical,
    * footprint, life-bar, selection, and strategic-icon defaults.
    */
-  REntityBlueprint::REntityBlueprint(RRuleGameRules* const owner, const RResId& resId)
+  REntityBlueprint::REntityBlueprint(
+    RRuleGameRules* const owner,
+    const RResId& resId
+  )
     : mOwner(nullptr)
     , mBlueprintId()
     , mBlueprintLabel()
@@ -122,7 +125,9 @@ namespace moho
   namespace
   {
     // 0x005120A5..0x005120BC: the inlined float ceil; the low byte is stored.
-    [[nodiscard]] std::uint8_t RoundExtentUpToCellCount(const float extent) noexcept
+    [[nodiscard]] std::uint8_t RoundExtentUpToCellCount(
+      const float extent
+    ) noexcept
     {
       return static_cast<std::uint8_t>(fa::CeilToIntX87(extent));
     }
@@ -214,8 +219,7 @@ namespace moho
     const fa::string iconBasePath = fa::string(kStrategicIconDirectory) + mStrategicIconName;
 
     mStrategicIconRest = LoadStrategicIconTexture(iconBasePath + "_rest.dds", fa::string("'rest'"));
-    mStrategicIconSelected =
-      LoadStrategicIconTexture(iconBasePath + "_selected.dds", fa::string("'selected'"));
+    mStrategicIconSelected = LoadStrategicIconTexture(iconBasePath + "_selected.dds", fa::string("'selected'"));
     mStrategicIconOver = LoadStrategicIconTexture(iconBasePath + "_over.dds", fa::string("'over'"));
     mStrategicIconSelectedOver =
       LoadStrategicIconTexture(iconBasePath + "_selectedover.dds", fa::string("'selected over'"));
@@ -244,7 +248,9 @@ namespace moho
     return nullptr;
   }
 
-  LuaPlus::LuaObject REntityBlueprint::GetLuaBlueprint(LuaPlus::LuaState* const state) const
+  LuaPlus::LuaObject REntityBlueprint::GetLuaBlueprint(
+    LuaPlus::LuaState* const state
+  ) const
   {
     const auto* const baseBlueprint = reinterpret_cast<const RBlueprint*>(this);
     return baseBlueprint->GetLuaBlueprint(state);

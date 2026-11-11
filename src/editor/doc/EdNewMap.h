@@ -30,7 +30,8 @@ namespace faf::editor
     const char* name;
     int units;
   };
-  inline constexpr NewMapSize kNewMapSizes[] = {{"5 km", 256}, {"10 km", 512}, {"20 km", 1024}, {"40 km", 2048}, {"81 km", 4096}};
+  inline constexpr NewMapSize kNewMapSizes[] =
+    {{"5 km", 256}, {"10 km", 512}, {"20 km", 1024}, {"40 km", 2048}, {"81 km", 4096}};
   inline constexpr int kNewMapSizeCount = static_cast<int>(sizeof(kNewMapSizes) / sizeof(kNewMapSizes[0]));
   inline constexpr int kNewMapMaxPlayers = 16;
 

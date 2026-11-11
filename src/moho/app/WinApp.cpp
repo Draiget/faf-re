@@ -48,6 +48,9 @@
 #include "moho/core/Thread.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
+#if FAFRE_PLATFORM_POSIX
+#include "platform/posix/Win32WindowPosix.h" // the window system's clipboard (issue #256)
+#endif
 
 #pragma warning(push)
 #pragma warning(disable : 4996)
@@ -62,7 +65,9 @@
  * are the wxAppInitializer constructor out of line (`wxApp::m_appInitFn =
  * wxCreateApp`, the second returning the initializer).
  */
-IMPLEMENT_APP_NO_MAIN(moho::MohoApp)
+IMPLEMENT_APP_NO_MAIN(
+  moho::MohoApp
+)
 
 namespace moho
 {
@@ -78,8 +83,11 @@ namespace moho
    * constructor (0x004F38F0) and registers the exit-time destructor thunk
    * 0x00BF18D0, which calls ~CWinLogTarget (0x004F39B0).
    */
+#if FAFRE_PLATFORM_WINDOWS
+  // It feeds the log window, a developer window, Windows only (WxRuntimeTypes.h).
   CWinLogTarget sLogWindowTarget{};
-}
+#endif
+} // namespace moho
 
 namespace
 {
@@ -87,18 +95,22 @@ namespace
   constexpr float kInfiniteWakeupMs = std::numeric_limits<float>::infinity();
 
   moho::IWinApp* sSupComApp = nullptr;
+#if FAFRE_PLATFORM_WINDOWS
   HHOOK sWindowHook = nullptr;
+#endif
   gpg::time::Timer wakeupTimer;
   float wakeupTimerDur = kInfiniteWakeupMs;
+#if FAFRE_PLATFORM_WINDOWS
   [[maybe_unused]] constexpr DWORD kPlatformSymbolHandlerOptions =
     SYMOPT_FAIL_CRITICAL_ERRORS | // suppress critical-error UI while probing symbols.
-    SYMOPT_LOAD_LINES | // include source line records for resolved addresses.
-    SYMOPT_DEFERRED_LOADS | // lazily load module symbols as needed.
-    SYMOPT_UNDNAME; // undecorate C++ names in symbol output.
+    SYMOPT_LOAD_LINES |           // include source line records for resolved addresses.
+    SYMOPT_DEFERRED_LOADS |       // lazily load module symbols as needed.
+    SYMOPT_UNDNAME;               // undecorate C++ names in symbol output.
   static_assert(
     kPlatformSymbolHandlerOptions == 0x216u,
     "PLAT_Init symbol options must match recovered SymSetOptions(0x216)"
   );
+#endif
 
   /**
    * The splash screen WINX_InitSplash shows (0x010A9BE4), a VC8
@@ -107,22 +119,23 @@ namespace
    * by 0x00BC73E0) deletes what is left, and 0x004F7390 is `reset` out of
    * line.
    */
+#if FAFRE_PLATFORM_WINDOWS
   std::unique_ptr<wxSplashScreen> sSplashScreen;
 
   /** The PNG handler WINX_InitSplash installs on first use (0x010C6D48). */
   wxPNGHandler* sSplashPngHandler = nullptr;
+#endif
 
   using LegacyUnaryCdeclCallback = int(__cdecl*)(int value);
   using LegacyUnaryDispatchAdapter = int(__cdecl*)(LegacyUnaryCdeclCallback* callbackLane, int value);
   using LegacyTypeInfoLane = const std::type_info*;
-  using LegacyTypeInfoDispatchAdapter = LegacyTypeInfoLane* (__cdecl*)(
-    LegacyTypeInfoLane* sourceLane,
-    LegacyTypeInfoLane* destinationLane,
-    LegacyTypeInfoLane* queryLane
-  );
+  using LegacyTypeInfoDispatchAdapter = LegacyTypeInfoLane*(__cdecl*)(LegacyTypeInfoLane * sourceLane,
+                                                                      LegacyTypeInfoLane* destinationLane,
+                                                                      LegacyTypeInfoLane* queryLane);
   using LegacyCallbackLifecycleAdapter = int(__cdecl*)(void* sourceLane, void* destinationLane, int action);
 
-  struct LegacyCallbackPayloadLane {
+  struct LegacyCallbackPayloadLane
+  {
     LegacyCallbackLifecycleAdapter lifecycleAdapter;
     std::uint32_t reserved04;
     std::byte payload[0x18];
@@ -243,7 +256,8 @@ namespace
     LegacyCallbackPayloadLane** const destinationHeapLane
   )
   {
-    auto* const destinationLane = static_cast<LegacyCallbackPayloadLane*>(::operator new(sizeof(LegacyCallbackPayloadLane)));
+    auto* const destinationLane =
+      static_cast<LegacyCallbackPayloadLane*>(::operator new(sizeof(LegacyCallbackPayloadLane)));
 
     // Copy lifecycle adapter + payload bytes via the in-place lane copy
     // helper (FUN_004E81C0). This is the exact subroutine the binary calls
@@ -397,8 +411,7 @@ namespace
     void* mDeleterCallback;
     moho::STimeBarThreadInfo* mPayload;
   };
-  static_assert(sizeof(TssAdapterStimeBarThreadInfo) == 0x08,
-                "TssAdapterStimeBarThreadInfo size must be 0x08");
+  static_assert(sizeof(TssAdapterStimeBarThreadInfo) == 0x08, "TssAdapterStimeBarThreadInfo size must be 0x08");
 
   /**
    * Address: 0x004E8010 (FUN_004E8010)
@@ -454,10 +467,9 @@ namespace
       // adapter pair into it. The 1-element call to the byte-count throw-
       // capping allocator mirrors `sub_4E8170(1)` in the binary, which is
       // bounded at 32 bytes per element with `bad_alloc` on overflow.
-      LegacyCallbackPayloadLane* const sourceBuffer =
-        reinterpret_cast<LegacyCallbackPayloadLane*>(sourceLane);
-      auto* const adapterBuffer = static_cast<LegacyCallbackPayloadLane*>(
-        ::operator new(sizeof(LegacyCallbackPayloadLane)));
+      LegacyCallbackPayloadLane* const sourceBuffer = reinterpret_cast<LegacyCallbackPayloadLane*>(sourceLane);
+      auto* const adapterBuffer =
+        static_cast<LegacyCallbackPayloadLane*>(::operator new(sizeof(LegacyCallbackPayloadLane)));
       (void)CopyLegacyCallbackPayloadLaneIntoExisting(sourceBuffer, adapterBuffer);
       *destinationLane = reinterpret_cast<LegacyTypeInfoLane>(adapterBuffer);
       return;
@@ -466,8 +478,8 @@ namespace
     if (queryToken == 1u) {
       // kQueryDestroy: cleanly tear down the stored callback lane (run its
       // own kQueryReset op via the lifecycle adapter), then free the buffer.
-      auto* const adapterBuffer = const_cast<LegacyCallbackPayloadLane*>(
-        reinterpret_cast<const LegacyCallbackPayloadLane*>(*destinationLane));
+      auto* const adapterBuffer =
+        const_cast<LegacyCallbackPayloadLane*>(reinterpret_cast<const LegacyCallbackPayloadLane*>(*destinationLane));
       if (adapterBuffer != nullptr) {
         auto* const innerLane = reinterpret_cast<LegacyCallbackPayloadLane*>(adapterBuffer->payload);
         if (innerLane != nullptr) {
@@ -570,7 +582,9 @@ namespace
    * its address; the relationship is documented rather than re-wired
    * through fabricated stack-frame plumbing.
    */
-  [[maybe_unused]] void __cdecl LegacyDeleteTimeBarThreadInfoTssPayload(void* const value)
+  [[maybe_unused]] void __cdecl LegacyDeleteTimeBarThreadInfoTssPayload(
+    void* const value
+  )
   {
     if (value == nullptr) {
       return;
@@ -673,11 +687,8 @@ namespace
 
   // Forward declaration for the FUN_004E7D30 once-init publisher, used by the
   // FUN_004E7BA0 clear-path further down.
-  LegacyUnaryDispatchAdapter LegacyPublishTssAdapterDispatchPairOnce(
-    LegacyCallbackPayloadLane* const sourceCallback,
-    const int a2,
-    const char a3
-  );
+  LegacyUnaryDispatchAdapter
+  LegacyPublishTssAdapterDispatchPairOnce(LegacyCallbackPayloadLane* const sourceCallback, const int a2, const char a3);
 
   // Forward decl for LegacyManageTssAdapterFunctionSlot (FUN_004E7C50).
   bool LegacyManageTssAdapterFunctionSlot(
@@ -687,11 +698,8 @@ namespace
   );
 
   // Forward decl for LegacyClearAndPublishTssAdapterPair (FUN_004E7BA0).
-  LegacyUnaryDispatchAdapter* LegacyClearAndPublishTssAdapterPair(
-    LegacyCallbackPayloadLane* const sourceCallback,
-    const int a2,
-    const char a3
-  );
+  LegacyUnaryDispatchAdapter*
+  LegacyClearAndPublishTssAdapterPair(LegacyCallbackPayloadLane* const sourceCallback, const int a2, const char a3);
 
   LegacyCallbackLifecycleAdapter LegacyOnceInitAndAssignTimeBarCallbackBuffer(
     LegacyCallbackPayloadLane* const outBuffer,
@@ -710,12 +718,10 @@ namespace
 
     // FUN_004E7C50 manage path: heap-allocates the function buffer and
     // publishes the per-this lane pair pointer when manage succeeded.
-    const bool slotPublished = LegacyManageTssAdapterFunctionSlot(
-      outBuffer, sourceCallback, 0);
-    outBuffer->lifecycleAdapter =
-      slotPublished
-        ? reinterpret_cast<LegacyCallbackLifecycleAdapter>(&gLegacyTssAdapterUnaryDispatchAdapter)
-        : nullptr;
+    const bool slotPublished = LegacyManageTssAdapterFunctionSlot(outBuffer, sourceCallback, 0);
+    outBuffer->lifecycleAdapter = slotPublished
+      ? reinterpret_cast<LegacyCallbackLifecycleAdapter>(&gLegacyTssAdapterUnaryDispatchAdapter)
+      : nullptr;
 
     LegacyCallbackLifecycleAdapter result = nullptr;
     if (sourceCallback != nullptr) {
@@ -763,7 +769,8 @@ namespace
     }
 
     (void)LegacyOnceInitAndAssignTimeBarCallbackBuffer(
-      outSlot, &localBuffer, reinterpret_cast<const std::byte*>(&localCopyStorage));
+      outSlot, &localBuffer, reinterpret_cast<const std::byte*>(&localCopyStorage)
+    );
 
     if (sourceCallback != nullptr) {
       LegacyCallbackLifecycleAdapter const lifecycleAdapter = sourceCallback->lifecycleAdapter;
@@ -853,7 +860,8 @@ namespace
     }
 
     const bool result = LegacyAllocateAndFillTssAdapterPayload(
-      outBufferTail, &localBuffer, reinterpret_cast<const std::byte*>(&localCopyStorage));
+      outBufferTail, &localBuffer, reinterpret_cast<const std::byte*>(&localCopyStorage)
+    );
 
     if (sourceCallback != nullptr) {
       LegacyCallbackLifecycleAdapter const lifecycleAdapter = sourceCallback->lifecycleAdapter;
@@ -889,8 +897,7 @@ namespace
     if (sourceCallback != nullptr) {
       LegacyCallbackLifecycleAdapter const lifecycleAdapter = sourceCallback->lifecycleAdapter;
       if (lifecycleAdapter != nullptr) {
-        lifecycleAdapter(reinterpret_cast<void*>(&localKey),
-                         reinterpret_cast<void*>(localCopyStorage), 0);
+        lifecycleAdapter(reinterpret_cast<void*>(&localKey), reinterpret_cast<void*>(localCopyStorage), 0);
       }
     }
 
@@ -969,7 +976,6 @@ namespace
     return true;
   }
 
-
   [[maybe_unused]] const bool gWinAppBootstrap = []() {
     moho::register_startTime();
     moho::register_wakeupTimer();
@@ -1002,13 +1008,12 @@ namespace
   static_assert(sizeof(LegacyWideStringObject) == 0x1C, "LegacyWideStringObject size must be 0x1C");
 #endif
 
-  [[maybe_unused]] wchar_t* GetLegacyWideStringInlineBufferSubobject(LegacyWideStringObject* const value) noexcept
+  [[maybe_unused]] wchar_t* GetLegacyWideStringInlineBufferSubobject(
+    LegacyWideStringObject* const value
+  ) noexcept
   {
     return reinterpret_cast<wchar_t*>(&(value->storage));
   }
-
-
-
 
   /**
    * Address: 0x004A1820 (FUN_004A1820, sub_4A1820)
@@ -1038,7 +1043,6 @@ namespace
   {
     return AppendWideStringFromNullTerminatedInputA(destination, source);
   }
-
 
   /**
    * Address: 0x004A1850 (FUN_004A1850, sub_4A1850)
@@ -1185,7 +1189,10 @@ namespace
    * What it does:
    * Builds `lhs + rhs` for one wide-string plus wide-string pair.
    */
-  [[maybe_unused]] std::wstring BuildWideStringPlusWideString(const std::wstring& lhs, const std::wstring& rhs)
+  [[maybe_unused]] std::wstring BuildWideStringPlusWideString(
+    const std::wstring& lhs,
+    const std::wstring& rhs
+  )
   {
     std::wstring tmp(lhs);
     tmp.append(rhs, 0, std::wstring::npos);
@@ -1198,11 +1205,13 @@ namespace
    * What it does:
    * Forwards one C-string reverse-character search to CRT `strrchr`.
    */
-  [[maybe_unused]] char* FindLastCharacterInCString(char* const text, const int character) noexcept
+  [[maybe_unused]] char* FindLastCharacterInCString(
+    char* const text,
+    const int character
+  ) noexcept
   {
     return std::strrchr(text, character);
   }
-
 
   /**
    * Address: 0x004A33D0 (FUN_004A33D0, sub_4A33D0)
@@ -1210,7 +1219,9 @@ namespace
    * What it does:
    * Returns input value unchanged.
    */
-  [[maybe_unused]] int ReturnIdentityInt(const int value) noexcept
+  [[maybe_unused]] int ReturnIdentityInt(
+    const int value
+  ) noexcept
   {
     return value;
   }
@@ -1221,7 +1232,9 @@ namespace
    * What it does:
    * Returns high byte from low 16-bit lane of the input integer.
    */
-  [[maybe_unused]] std::uint8_t ExtractHighByteFromLowWord(const std::uint32_t value) noexcept
+  [[maybe_unused]] std::uint8_t ExtractHighByteFromLowWord(
+    const std::uint32_t value
+  ) noexcept
   {
     return static_cast<std::uint8_t>((value >> 8) & 0xFFu);
   }
@@ -1272,6 +1285,9 @@ namespace
     return outPair;
   }
 
+  // The registry, dxdiag, the Windows-key hook, the crash dialog and the structured-exception
+  // filter are Windows' (the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
   struct ParsedRegistryPath
   {
     HKEY rootKey = HKEY_CURRENT_USER;
@@ -1279,7 +1295,9 @@ namespace
     const char* valueName = nullptr;
   };
 
-  [[nodiscard]] HKEY ResolveRegistryRootKey(const char* const rootKeyName) noexcept
+  [[nodiscard]] HKEY ResolveRegistryRootKey(
+    const char* const rootKeyName
+  ) noexcept
   {
     if (rootKeyName == nullptr) {
       return HKEY_CURRENT_USER;
@@ -1308,7 +1326,9 @@ namespace
     return HKEY_CURRENT_USER;
   }
 
-  [[nodiscard]] ParsedRegistryPath ParseRegistryPathInPlace(char* const mutablePath) noexcept
+  [[nodiscard]] ParsedRegistryPath ParseRegistryPathInPlace(
+    char* const mutablePath
+  ) noexcept
   {
     ParsedRegistryPath parsed{};
     if (mutablePath == nullptr) {
@@ -1339,7 +1359,7 @@ namespace
     parsed.valueName = valueName;
     return parsed;
   }
-
+#endif // FAFRE_PLATFORM_WINDOWS: the registry
 
   /**
    * Address: 0x004A1CA0 (FUN_004A1CA0, sub_4A1CA0)
@@ -1349,7 +1369,9 @@ namespace
    * crash-report dxdiag launcher.
    */
   [[nodiscard]]
-  std::wstring BuildDxdiagCommandLine(const std::wstring& outputPath)
+  std::wstring BuildDxdiagCommandLine(
+    const std::wstring& outputPath
+  )
   {
     return BuildWideStringPlusWideLiteral(std::wstring(kDxdiagCommandPrefix), outputPath.c_str());
   }
@@ -1369,6 +1391,7 @@ namespace
    * Launches `dxdiag.exe` with an output path under the report directory, waits
    * up to 60 seconds for completion, then registers the file when it exists.
    */
+#if FAFRE_PLATFORM_WINDOWS
   void PLAT_CreateDxdiagForReport()
   {
     const std::wstring outputPath = GetErrorReportOutputDirSnapshot() + kDxdiagOutputFileName;
@@ -1381,18 +1404,20 @@ namespace
     startupInfo.cb = sizeof(startupInfo);
     PROCESS_INFORMATION processInformation{};
 
-    if (::CreateProcessW(
-          nullptr,
-          commandLine.data(),
-          nullptr,
-          nullptr,
-          FALSE,
-          0x4000020u,
-          nullptr,
-          nullptr,
-          &startupInfo,
-          &processInformation
-        ) != FALSE) {
+    if (
+      ::CreateProcessW(
+        nullptr,
+        commandLine.data(),
+        nullptr,
+        nullptr,
+        FALSE,
+        0x4000020u,
+        nullptr,
+        nullptr,
+        &startupInfo,
+        &processInformation
+      ) != FALSE
+    ) {
       (void)::WaitForSingleObject(processInformation.hProcess, 60000u);
       (void)::CloseHandle(processInformation.hProcess);
       (void)::CloseHandle(processInformation.hThread);
@@ -1403,6 +1428,7 @@ namespace
       moho::PLAT_RegisterFileForErrorReport(outputPath.c_str());
     }
   }
+#endif // FAFRE_PLATFORM_WINDOWS: dxdiag
 
   /**
    * Address: 0x004F2000 (FUN_004F2000, func_HasCorrectPlatform)
@@ -1439,7 +1465,9 @@ namespace
    * Applies x87 `frndint` rounding, then adjusts down by one when the original
    * value is below the rounded lane (floor-equivalent in default rounding mode).
    */
-  [[nodiscard]] int FloorFrndintAdjustDown(const float value) noexcept
+  [[nodiscard]] int FloorFrndintAdjustDown(
+    const float value
+  ) noexcept
   {
     const float rounded = std::nearbyintf(value);
     return static_cast<int>(rounded) + ((value < rounded) ? -1 : 0);
@@ -1461,6 +1489,14 @@ namespace
    */
   bool DispatchPendingMessage()
   {
+#if !FAFRE_PLATFORM_WINDOWS
+    // The window system's events, through the wx stand-in (issue #256).
+    if (!wxTheApp->Pending()) {
+      return false;
+    }
+    wxTheApp->Dispatch();
+    return true;
+#else
     MSG message{};
     if (::PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE) == FALSE) {
       return false;
@@ -1471,6 +1507,7 @@ namespace
     }
     wxTheApp->DoMessage(reinterpret_cast<WXMSG*>(&message));
     return true;
+#endif
   }
 
   DWORD ComputeWaitTimeoutMs()
@@ -1494,7 +1531,12 @@ namespace
    * Suppresses left/right Windows keys for low-level keyboard hook events when
    * app-level key suppression is enabled; otherwise forwards to next hook.
    */
-  LRESULT CALLBACK WindowHook(const int code, const WPARAM wParam, const LPARAM lParam)
+#if FAFRE_PLATFORM_WINDOWS
+  LRESULT CALLBACK WindowHook(
+    const int code,
+    const WPARAM wParam,
+    const LPARAM lParam
+  )
   {
     if (code == HC_ACTION && sSupComApp->AppDoSuppressWindowsKeys() && wParam >= WM_KEYDOWN && wParam <= WM_KEYUP) {
       const auto* const keyData = reinterpret_cast<const KBDLLHOOKSTRUCT*>(lParam);
@@ -1505,10 +1547,6 @@ namespace
 
     return ::CallNextHookEx(sWindowHook, code, wParam, lParam);
   }
-
-
-
-
 
   constexpr WORD kCrashDialogTemplateId = 0x7A;
   constexpr int kCrashTextControlId = 1065;
@@ -1546,7 +1584,9 @@ namespace
    * Converts lone `\n` bytes in one UTF-8 crash/body payload into CRLF
    * sequences while preserving existing `\r\n` pairs.
    */
-  [[nodiscard]] fa::string NormalizeDialogNewlines(const gpg::StrArg text)
+  [[nodiscard]] fa::string NormalizeDialogNewlines(
+    const gpg::StrArg text
+  )
   {
     const char* const source = text != nullptr ? text : "";
     std::string normalized;
@@ -1573,7 +1613,12 @@ namespace
    * Handles crash dialog init/commands, normalizes/copies UTF-8 crash text,
    * and routes copy/close/terminate control actions.
    */
-  INT_PTR CALLBACK CrashDialogProc(HWND hWnd, const UINT message, const WPARAM wParam, const LPARAM lParam)
+  INT_PTR CALLBACK CrashDialogProc(
+    HWND hWnd,
+    const UINT message,
+    const WPARAM wParam,
+    const LPARAM lParam
+  )
   {
     if (message == WM_INITDIALOG) {
       auto* const initData = reinterpret_cast<CrashDialogInitData*>(lParam);
@@ -1595,25 +1640,25 @@ namespace
     }
 
     switch (LOWORD(wParam)) {
-      case kCrashDisableButtonId:
-        (void)::EnableWindow(reinterpret_cast<HWND>(lParam), FALSE);
-        return TRUE;
-      case IDCANCEL:
-        ::TerminateProcess(::GetCurrentProcess(), 1u);
-        return TRUE;
-      case kCrashCopyButtonId: {
-        const auto* const initData = reinterpret_cast<const CrashDialogInitData*>(::GetWindowLongPtrW(hWnd, DWLP_USER));
-        if (initData != nullptr) {
-          const std::wstring bodyText = gpg::STR_Utf8ToWide(initData->body != nullptr ? initData->body : "");
-          (void)moho::WIN_CopyToClipboard(bodyText.c_str());
-        }
-        return TRUE;
+    case kCrashDisableButtonId:
+      (void)::EnableWindow(reinterpret_cast<HWND>(lParam), FALSE);
+      return TRUE;
+    case IDCANCEL:
+      ::TerminateProcess(::GetCurrentProcess(), 1u);
+      return TRUE;
+    case kCrashCopyButtonId: {
+      const auto* const initData = reinterpret_cast<const CrashDialogInitData*>(::GetWindowLongPtrW(hWnd, DWLP_USER));
+      if (initData != nullptr) {
+        const std::wstring bodyText = gpg::STR_Utf8ToWide(initData->body != nullptr ? initData->body : "");
+        (void)moho::WIN_CopyToClipboard(bodyText.c_str());
       }
-      case kCrashCloseButtonId:
-        ::EndDialog(hWnd, 0);
-        return TRUE;
-      default:
-        return FALSE;
+      return TRUE;
+    }
+    case kCrashCloseButtonId:
+      ::EndDialog(hWnd, 0);
+      return TRUE;
+    default:
+      return FALSE;
     }
   }
 
@@ -1654,7 +1699,9 @@ namespace
     ::CloseHandle(snapshot);
   }
 
-  void TryReportFault(_EXCEPTION_POINTERS* const exceptionInfo)
+  void TryReportFault(
+    _EXCEPTION_POINTERS* const exceptionInfo
+  )
   {
     if (exceptionInfo == nullptr) {
       return;
@@ -1669,8 +1716,7 @@ namespace
     }
 
     if (faultReportingModule != nullptr) {
-      const auto reportFault =
-        reinterpret_cast<ReportFaultFn>(::GetProcAddress(faultReportingModule, "ReportFault"));
+      const auto reportFault = reinterpret_cast<ReportFaultFn>(::GetProcAddress(faultReportingModule, "ReportFault"));
       if (reportFault != nullptr) {
         (void)reportFault(exceptionInfo, 0);
       }
@@ -1687,51 +1733,53 @@ namespace
    * What it does:
    * Maps Windows structured-exception codes to fixed symbolic names.
    */
-  const char* StructuredExceptionToString(const DWORD exceptionCode)
+  const char* StructuredExceptionToString(
+    const DWORD exceptionCode
+  )
   {
     switch (exceptionCode) {
-      case EXCEPTION_ACCESS_VIOLATION:
-        return "EXCEPTION_ACCESS_VIOLATION";
-      case EXCEPTION_DATATYPE_MISALIGNMENT:
-        return "EXCEPTION_DATATYPE_MISALIGNMENT";
-      case EXCEPTION_BREAKPOINT:
-        return "EXCEPTION_BREAKPOINT";
-      case EXCEPTION_SINGLE_STEP:
-        return "EXCEPTION_SINGLE_STEP";
-      case EXCEPTION_IN_PAGE_ERROR:
-        return "EXCEPTION_IN_PAGE_ERROR";
-      case EXCEPTION_ILLEGAL_INSTRUCTION:
-        return "EXCEPTION_ILLEGAL_INSTRUCTION";
-      case EXCEPTION_NONCONTINUABLE_EXCEPTION:
-        return "EXCEPTION_NONCONTINUABLE_EXCEPTION";
-      case EXCEPTION_INVALID_DISPOSITION:
-        return "EXCEPTION_INVALID_DISPOSITION";
-      case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
-        return "EXCEPTION_ARRAY_BOUNDS_EXCEEDED";
-      case EXCEPTION_FLT_DENORMAL_OPERAND:
-        return "EXCEPTION_FLT_DENORMAL_OPERAND";
-      case EXCEPTION_FLT_DIVIDE_BY_ZERO:
-        return "EXCEPTION_FLT_DIVIDE_BY_ZERO";
-      case EXCEPTION_FLT_INEXACT_RESULT:
-        return "EXCEPTION_FLT_INEXACT_RESULT";
-      case EXCEPTION_FLT_INVALID_OPERATION:
-        return "EXCEPTION_FLT_INVALID_OPERATION";
-      case EXCEPTION_FLT_OVERFLOW:
-        return "EXCEPTION_FLT_OVERFLOW";
-      case EXCEPTION_FLT_STACK_CHECK:
-        return "EXCEPTION_FLT_STACK_CHECK";
-      case EXCEPTION_FLT_UNDERFLOW:
-        return "EXCEPTION_FLT_UNDERFLOW";
-      case EXCEPTION_INT_DIVIDE_BY_ZERO:
-        return "EXCEPTION_INT_DIVIDE_BY_ZERO";
-      case EXCEPTION_INT_OVERFLOW:
-        return "EXCEPTION_INT_OVERFLOW";
-      case EXCEPTION_PRIV_INSTRUCTION:
-        return "EXCEPTION_PRIV_INSTRUCTION";
-      case EXCEPTION_STACK_OVERFLOW:
-        return "EXCEPTION_STACK_OVERFLOW";
-      default:
-        return "Unknown structured exception";
+    case EXCEPTION_ACCESS_VIOLATION:
+      return "EXCEPTION_ACCESS_VIOLATION";
+    case EXCEPTION_DATATYPE_MISALIGNMENT:
+      return "EXCEPTION_DATATYPE_MISALIGNMENT";
+    case EXCEPTION_BREAKPOINT:
+      return "EXCEPTION_BREAKPOINT";
+    case EXCEPTION_SINGLE_STEP:
+      return "EXCEPTION_SINGLE_STEP";
+    case EXCEPTION_IN_PAGE_ERROR:
+      return "EXCEPTION_IN_PAGE_ERROR";
+    case EXCEPTION_ILLEGAL_INSTRUCTION:
+      return "EXCEPTION_ILLEGAL_INSTRUCTION";
+    case EXCEPTION_NONCONTINUABLE_EXCEPTION:
+      return "EXCEPTION_NONCONTINUABLE_EXCEPTION";
+    case EXCEPTION_INVALID_DISPOSITION:
+      return "EXCEPTION_INVALID_DISPOSITION";
+    case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
+      return "EXCEPTION_ARRAY_BOUNDS_EXCEEDED";
+    case EXCEPTION_FLT_DENORMAL_OPERAND:
+      return "EXCEPTION_FLT_DENORMAL_OPERAND";
+    case EXCEPTION_FLT_DIVIDE_BY_ZERO:
+      return "EXCEPTION_FLT_DIVIDE_BY_ZERO";
+    case EXCEPTION_FLT_INEXACT_RESULT:
+      return "EXCEPTION_FLT_INEXACT_RESULT";
+    case EXCEPTION_FLT_INVALID_OPERATION:
+      return "EXCEPTION_FLT_INVALID_OPERATION";
+    case EXCEPTION_FLT_OVERFLOW:
+      return "EXCEPTION_FLT_OVERFLOW";
+    case EXCEPTION_FLT_STACK_CHECK:
+      return "EXCEPTION_FLT_STACK_CHECK";
+    case EXCEPTION_FLT_UNDERFLOW:
+      return "EXCEPTION_FLT_UNDERFLOW";
+    case EXCEPTION_INT_DIVIDE_BY_ZERO:
+      return "EXCEPTION_INT_DIVIDE_BY_ZERO";
+    case EXCEPTION_INT_OVERFLOW:
+      return "EXCEPTION_INT_OVERFLOW";
+    case EXCEPTION_PRIV_INSTRUCTION:
+      return "EXCEPTION_PRIV_INSTRUCTION";
+    case EXCEPTION_STACK_OVERFLOW:
+      return "EXCEPTION_STACK_OVERFLOW";
+    default:
+      return "Unknown structured exception";
     }
   }
 
@@ -1750,7 +1798,10 @@ namespace
    * line also goes here, and this file is flushed and closed line by line, so
    * a faulted process always leaves its symbolised stack on disk.
    */
-  void WriteCrashRecordLine(const char* const format, ...)
+  void WriteCrashRecordLine(
+    const char* const format,
+    ...
+  )
   {
     std::FILE* const file = std::fopen("crash_callstack.txt", "a");
     if (file == nullptr) {
@@ -1774,7 +1825,9 @@ namespace
    * all. Kept deliberately small and allocation-light - it runs inside an
    * exception filter, on a process that has already faulted.
    */
-  void LogCrashSummaryAndCallstack(_EXCEPTION_POINTERS* const exceptionInfo)
+  void LogCrashSummaryAndCallstack(
+    _EXCEPTION_POINTERS* const exceptionInfo
+  )
   {
     if (exceptionInfo == nullptr || exceptionInfo->ExceptionRecord == nullptr) {
       return;
@@ -1819,17 +1872,22 @@ namespace
     // raw address alone cannot be looked up in main.pdb afterwards.
     HMODULE faultModule = nullptr;
     char faultModulePath[MAX_PATH]{};
-    if (::GetModuleHandleExA(
-          GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-          static_cast<LPCSTR>(record.ExceptionAddress), &faultModule
-        ) != FALSE &&
-        ::GetModuleFileNameA(faultModule, faultModulePath, MAX_PATH) != 0u) {
+    if (
+      ::GetModuleHandleExA(
+        GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+        static_cast<LPCSTR>(record.ExceptionAddress),
+        &faultModule
+      ) != FALSE &&
+      ::GetModuleFileNameA(faultModule, faultModulePath, MAX_PATH) != 0u
+    ) {
       const char* moduleName = std::strrchr(faultModulePath, '\\');
       moduleName = moduleName != nullptr ? moduleName + 1 : faultModulePath;
       const std::uintptr_t moduleBase = reinterpret_cast<std::uintptr_t>(faultModule);
       const std::uintptr_t offset = faultAddress - moduleBase;
       gpg::Logf("CRASH: fault is %s+0x%zX (module base %p)", moduleName, offset, static_cast<void*>(faultModule));
-      WriteCrashRecordLine("CRASH: fault is %s+0x%zX (module base %p)", moduleName, offset, static_cast<void*>(faultModule));
+      WriteCrashRecordLine(
+        "CRASH: fault is %s+0x%zX (module base %p)", moduleName, offset, static_cast<void*>(faultModule)
+      );
     }
 
     std::uintptr_t stackFrames[64]{};
@@ -1846,8 +1904,7 @@ namespace
       return;
     }
 
-    const fa::string callstackText =
-      moho::PLAT_FormatCallstack(0, static_cast<std::int32_t>(frameCount), stackFrames);
+    const fa::string callstackText = moho::PLAT_FormatCallstack(0, static_cast<std::int32_t>(frameCount), stackFrames);
 
     // One Logf per frame. gpg::Logf formats through a bounded buffer, so a
     // single multi-line call silently loses everything past the first frame or
@@ -1897,7 +1954,9 @@ namespace
    * waiting for a report that never completes - a crash presented as a
    * silent freeze. The local report replaces it unconditionally.
    */
-  LONG WINAPI TopLevelExceptionFilter(_EXCEPTION_POINTERS* const exceptionInfo)
+  LONG WINAPI TopLevelExceptionFilter(
+    _EXCEPTION_POINTERS* const exceptionInfo
+  )
   {
     if (exceptionInfo == nullptr || exceptionInfo->ExceptionRecord == nullptr) {
       return EXCEPTION_CONTINUE_SEARCH;
@@ -1915,9 +1974,7 @@ namespace
     LogCrashSummaryAndCallstack(exceptionInfo);
 
     if (moho::sMainWindow != nullptr) {
-      (void)::DestroyWindow(
-        reinterpret_cast<HWND>(static_cast<std::uintptr_t>(moho::sMainWindow->GetHandle()))
-      );
+      (void)::DestroyWindow(reinterpret_cast<HWND>(static_cast<std::uintptr_t>(moho::sMainWindow->GetHandle())));
     }
 
     if (moho::CFG_GetArgOption("/bugreport", 0, nullptr)) {
@@ -1938,6 +1995,7 @@ namespace
     gpg::diag::ShowCrashReportDialog(gpg::diag::CrashLatestReportPath());
     return EXCEPTION_CONTINUE_SEARCH;
   }
+#endif // FAFRE_PLATFORM_WINDOWS: the Windows-key hook, the crash dialog and the exception filter
 
 } // namespace
 
@@ -1949,12 +2007,19 @@ namespace
  * allocating a movable global block, locking it, copying the data, and
  * publishing it under an exclusive open/empty/set/close cycle.
  */
-bool moho::WIN_CopyToClipboard(const wchar_t* const text)
+bool moho::WIN_CopyToClipboard(
+  const wchar_t* const text
+)
 {
   if (text == nullptr) {
     return false;
   }
 
+#if !FAFRE_PLATFORM_WINDOWS
+  // The window system's clipboard, in UTF-8 (platform/posix/Win32WindowPosix.h, issue #256).
+  return platform::posix::gSetClipboardTextHook != nullptr &&
+    platform::posix::gSetClipboardTextHook(gpg::STR_WideToUtf8(text).c_str());
+#else
   const std::size_t characterCount = std::wcslen(text) + 1;
   const std::size_t payloadBytes = characterCount * sizeof(wchar_t);
 
@@ -1988,6 +2053,7 @@ bool moho::WIN_CopyToClipboard(const wchar_t* const text)
 
   ::CloseClipboard();
   return true;
+#endif
 }
 
 /**
@@ -2060,7 +2126,9 @@ moho::CWaitHandleSet* moho::WIN_GetWaitHandleSet()
  * Converts non-negative relative timeout to an absolute wakeup deadline and
  * keeps only the earliest deadline; negative input requests immediate wake.
  */
-void moho::WIN_SetWakeupTimer(float milliseconds)
+void moho::WIN_SetWakeupTimer(
+  float milliseconds
+)
 {
   float resolvedWakeup = 0.0f;
   if (milliseconds >= 0.0f) {
@@ -2116,7 +2184,9 @@ wxWindow* moho::WIN_GetMainWindow()
  * What it does:
  * Updates the process-global main-window owner pointer.
  */
-void moho::WIN_SetMainWindow(wxWindow* const mainWindow)
+void moho::WIN_SetMainWindow(
+  wxWindow* const mainWindow
+)
 {
   sMainWindow = mainWindow;
 }
@@ -2129,13 +2199,19 @@ void moho::WIN_SetMainWindow(wxWindow* const mainWindow)
  * What it does:
  * Drives app bootstrap, frame pumping, and shutdown around the IWinApp interface.
  */
-void moho::WIN_AppExecute(IWinApp* const app)
+void moho::WIN_AppExecute(
+  IWinApp* const app
+)
 {
   if (app == nullptr) {
     return;
   }
 
   sSupComApp = app;
+#if !FAFRE_PLATFORM_WINDOWS
+  // No low-level keyboard hook: the window system keeps the desktop's keys (issue #256).
+  HMODULE const selfModule = ::GetModuleHandleW(nullptr);
+#else
   const HMODULE module = ::GetModuleHandleW(nullptr);
   sWindowHook = ::SetWindowsHookExW(WH_KEYBOARD_LL, &WindowHook, module, 0);
 
@@ -2145,6 +2221,7 @@ void moho::WIN_AppExecute(IWinApp* const app)
     reinterpret_cast<LPCWSTR>(&WindowHook),
     &selfModule
   );
+#endif
   // enterLoop = false: wx initialises and builds the MohoApp, and the loop
   // below pumps it (0x004F2117, wxEntry 0x00992FF0).
   wxEntry(reinterpret_cast<WXHINSTANCE>(selfModule), nullptr, nullptr, 0, false);
@@ -2245,15 +2322,16 @@ void moho::WIN_AppExecute(IWinApp* const app)
     wxApp::CleanUp();
   }
 
+#if FAFRE_PLATFORM_WINDOWS
   if (sWindowHook != nullptr) {
     ::UnhookWindowsHookEx(sWindowHook);
     sWindowHook = nullptr;
   }
+#endif
 
   RES_Exit();
   sSupComApp = nullptr;
 }
-
 
 /**
  * Address: 0x004A2D30 (FUN_004A2D30)
@@ -2263,9 +2341,11 @@ void moho::WIN_AppExecute(IWinApp* const app)
  */
 void moho::PLAT_CatchStructuredExceptions()
 {
+#if FAFRE_PLATFORM_WINDOWS
   (void)::SetUnhandledExceptionFilter(&TopLevelExceptionFilter);
+#endif
+  // Elsewhere crashes are signals, which gpg/core/diagnostics/posix/DiagnosticsPosix.cpp reports.
 }
-
 
 /**
  * Address: 0x0047A4F0 (FUN_0047A4F0)
@@ -2276,7 +2356,9 @@ void moho::PLAT_CatchStructuredExceptions()
  * Produces one UTF-8 log-history text blob consumed by crash/report export
  * paths. The current recovered logging backend already applies bounded history.
  */
-fa::string moho::LOG_GetRecentLines(const std::uint32_t maxLines)
+fa::string moho::LOG_GetRecentLines(
+  const std::uint32_t maxLines
+)
 {
   (void)maxLines;
   return gpg::GetRecentLogLines();
@@ -2293,9 +2375,8 @@ fa::string moho::LOG_GetRecentLines(const std::uint32_t maxLines)
 void moho::PLAT_CreateGameLogForReport()
 {
   const fa::string recentLogLines = LOG_GetRecentLines(0);
-  const char* const appShortName = (sSupComApp != nullptr && !sSupComApp->shortName.empty())
-                                     ? sSupComApp->shortName.c_str()
-                                     : "SupCom";
+  const char* const appShortName =
+    (sSupComApp != nullptr && !sSupComApp->shortName.empty()) ? sSupComApp->shortName.c_str() : "SupCom";
   const std::wstring logFilePrefix =
     BuildWideStringPlusWideString(GetErrorReportOutputDirSnapshot(), gpg::STR_Utf8ToWide(appShortName));
   const std::wstring logFilePath = BuildWideStringPlusWideLiteral(logFilePrefix, L".sclog");
@@ -2305,29 +2386,19 @@ void moho::PLAT_CreateGameLogForReport()
   if (logFileHandle == INVALID_HANDLE_VALUE) {
     const fa::string errorText = WIN_GetLastError();
     const fa::string utf8Path = gpg::STR_WideToUtf8(logFilePath.c_str());
-    gpg::Warnf(
-      "PLAT_CreateGameLogForReport(\"%s\") log file creation failed: %s",
-      utf8Path.c_str(),
-      errorText.c_str()
-    );
+    gpg::Warnf("PLAT_CreateGameLogForReport(\"%s\") log file creation failed: %s", utf8Path.c_str(), errorText.c_str());
     return;
   }
 
   DWORD bytesWritten = 0;
-  if (::WriteFile(
-        logFileHandle,
-        recentLogLines.c_str(),
-        static_cast<DWORD>(recentLogLines.size()),
-        &bytesWritten,
-        nullptr
-      ) == FALSE) {
+  if (
+    ::WriteFile(
+      logFileHandle, recentLogLines.c_str(), static_cast<DWORD>(recentLogLines.size()), &bytesWritten, nullptr
+    ) == FALSE
+  ) {
     const fa::string errorText = WIN_GetLastError();
     const fa::string utf8Path = gpg::STR_WideToUtf8(logFilePath.c_str());
-    gpg::Warnf(
-      "PLAT_CreateGameLogForReport(\"%s\") log file writing failed: %s",
-      utf8Path.c_str(),
-      errorText.c_str()
-    );
+    gpg::Warnf("PLAT_CreateGameLogForReport(\"%s\") log file writing failed: %s", utf8Path.c_str(), errorText.c_str());
     (void)::CloseHandle(logFileHandle);
     return;
   }
@@ -2335,7 +2406,6 @@ void moho::PLAT_CreateGameLogForReport()
   PLAT_RegisterFileForErrorReport(logFilePath.c_str());
   (void)::CloseHandle(logFileHandle);
 }
-
 
 /**
  * Address: 0x004A1F10 (FUN_004A1F10)
@@ -2355,6 +2425,14 @@ bool moho::PLAT_SetRegistryValue(
     return false;
   }
 
+#if !FAFRE_PLATFORM_WINDOWS
+  // No registry: the write fails as a key Windows refuses to create does (the Linux client, issue #255).
+  (void)data;
+  (void)dataSize;
+  (void)valueType;
+  gpg::Logf("PLAT_SetRegistryValue: Unable to create registry key \"%s\"", keyPath);
+  return false;
+#else
   // The shipped body builds a mutable copy of the path in a byte vector so
   // `ParseRegistryPathInPlace` can split it; the vector frees itself on every
   // return path, which is what the explicit teardown calls at each `return`
@@ -2367,29 +2445,18 @@ bool moho::PLAT_SetRegistryValue(
   const ParsedRegistryPath parsedPath = ParseRegistryPathInPlace(mutableKeyPath);
 
   HKEY openedKey = nullptr;
-  if (::RegCreateKeyExA(
-        parsedPath.rootKey,
-        parsedPath.subKey,
-        0,
-        nullptr,
-        0,
-        0xF003Fu,
-        nullptr,
-        &openedKey,
-        nullptr
-      ) != ERROR_SUCCESS) {
+  if (
+    ::RegCreateKeyExA(parsedPath.rootKey, parsedPath.subKey, 0, nullptr, 0, 0xF003Fu, nullptr, &openedKey, nullptr) !=
+    ERROR_SUCCESS
+  ) {
     gpg::Logf("PLAT_SetRegistryValue: Unable to create registry key \"%s\"", keyPath);
     return false;
   }
 
-  if (::RegSetValueExA(
-        openedKey,
-        parsedPath.valueName,
-        0,
-        valueType,
-        reinterpret_cast<const BYTE*>(data),
-        dataSize
-      ) != ERROR_SUCCESS) {
+  if (
+    ::RegSetValueExA(openedKey, parsedPath.valueName, 0, valueType, reinterpret_cast<const BYTE*>(data), dataSize) !=
+    ERROR_SUCCESS
+  ) {
     (void)::RegCloseKey(openedKey);
     gpg::Logf("PLAT_SetRegistryValue: Unable to write registry key \"%s\"", keyPath);
     return false;
@@ -2397,6 +2464,7 @@ bool moho::PLAT_SetRegistryValue(
 
   (void)::RegCloseKey(openedKey);
   return true;
+#endif
 }
 
 /**
@@ -2405,14 +2473,12 @@ bool moho::PLAT_SetRegistryValue(
  * What it does:
  * Writes one 32-bit DWORD registry value.
  */
-bool moho::PLAT_SetRegistryValueDword(const char* const keyPath, const std::uint32_t value)
+bool moho::PLAT_SetRegistryValueDword(
+  const char* const keyPath,
+  const std::uint32_t value
+)
 {
-  return PLAT_SetRegistryValue(
-    keyPath,
-    reinterpret_cast<const std::uint8_t*>(&value),
-    sizeof(value),
-    REG_DWORD
-  );
+  return PLAT_SetRegistryValue(keyPath, reinterpret_cast<const std::uint8_t*>(&value), sizeof(value), REG_DWORD);
 }
 
 /**
@@ -2422,7 +2488,10 @@ bool moho::PLAT_SetRegistryValueDword(const char* const keyPath, const std::uint
  * Writes one zero-terminated string registry value; null input writes an
  * empty string payload.
  */
-bool moho::PLAT_SetRegistryValueString(const char* const value, const char* const keyPath)
+bool moho::PLAT_SetRegistryValueString(
+  const char* const value,
+  const char* const keyPath
+)
 {
   const char* const safeValue = (value != nullptr) ? value : "";
   return PLAT_SetRegistryValue(
@@ -2441,7 +2510,9 @@ bool moho::PLAT_SetRegistryValueString(const char* const value, const char* cons
  * Binary behavior clamps read size to 0x100 bytes.
  */
 std::uint32_t moho::PLAT_GetRegistryValue(
-  const char* const keyPath, void* const outData, const std::uint32_t maxDataBytes
+  const char* const keyPath,
+  void* const outData,
+  const std::uint32_t maxDataBytes
 )
 {
   (void)maxDataBytes;
@@ -2449,6 +2520,11 @@ std::uint32_t moho::PLAT_GetRegistryValue(
     return 0;
   }
 
+#if !FAFRE_PLATFORM_WINDOWS
+  // No registry: nothing to read, as for a key Windows doesn't have (the Linux client, issue #255).
+  gpg::Logf("PLAT_GetRegistryValue: Unable to open registry key \"%s\"", keyPath);
+  return 0;
+#else
   // The shipped body builds a mutable copy of the path in a byte vector so
   // `ParseRegistryPathInPlace` can split it; the vector frees itself on every
   // return path, which is what the explicit teardown calls at each `return`
@@ -2467,14 +2543,11 @@ std::uint32_t moho::PLAT_GetRegistryValue(
   }
 
   DWORD bytesRead = 0x100u;
-  if (::RegQueryValueExA(
-        openedKey,
-        parsedPath.valueName,
-        nullptr,
-        nullptr,
-        reinterpret_cast<LPBYTE>(outData),
-        &bytesRead
-      ) != ERROR_SUCCESS) {
+  if (
+    ::RegQueryValueExA(
+      openedKey, parsedPath.valueName, nullptr, nullptr, reinterpret_cast<LPBYTE>(outData), &bytesRead
+    ) != ERROR_SUCCESS
+  ) {
     (void)::RegCloseKey(openedKey);
     gpg::Logf("PLAT_GetRegistryValue: Unable to read registry key \"%s\"", keyPath);
     return 0;
@@ -2482,6 +2555,7 @@ std::uint32_t moho::PLAT_GetRegistryValue(
 
   (void)::RegCloseKey(openedKey);
   return bytesRead;
+#endif
 }
 
 /**
@@ -2496,9 +2570,16 @@ std::uint32_t moho::PLAT_GetRegistryValue(
  */
 fa::string moho::WIN_GetClipboardText()
 {
-  const HWND ownerWindow = sMainWindow != nullptr
-    ? reinterpret_cast<HWND>(static_cast<std::uintptr_t>(sMainWindow->GetHandle()))
-    : nullptr;
+#if !FAFRE_PLATFORM_WINDOWS
+  // The window system's clipboard, in UTF-8 (platform/posix/Win32WindowPosix.h, issue #256).
+  if (platform::posix::gGetClipboardTextHook == nullptr) {
+    return {};
+  }
+  const std::string text = platform::posix::gGetClipboardTextHook();
+  return fa::string(text.c_str());
+#else
+  const HWND ownerWindow =
+    sMainWindow != nullptr ? reinterpret_cast<HWND>(static_cast<std::uintptr_t>(sMainWindow->GetHandle())) : nullptr;
 
   if (::IsClipboardFormatAvailable(CF_UNICODETEXT) == FALSE || ::OpenClipboard(ownerWindow) == FALSE) {
     return {};
@@ -2516,8 +2597,8 @@ fa::string moho::WIN_GetClipboardText()
 
   (void)::CloseClipboard();
   return clipboardText;
+#endif
 }
-
 
 /**
  * Address: 0x004F1190 (FUN_004F1190)
@@ -2538,11 +2619,11 @@ void moho::WIN_ShowCrashDialog(
   details << (summaryText != nullptr ? summaryText : "") << "\n\n";
 
   WCHAR programFileName[512]{};
-  if (::GetModuleFileNameW(
-        nullptr,
-        programFileName,
-        static_cast<DWORD>(sizeof(programFileName) / sizeof(programFileName[0]))
-      ) != 0) {
+  if (
+    ::GetModuleFileNameW(
+      nullptr, programFileName, static_cast<DWORD>(sizeof(programFileName) / sizeof(programFileName[0]))
+    ) != 0
+  ) {
     const fa::string programPath = gpg::STR_WideToUtf8(programFileName);
     details << "Program : " << programPath.c_str() << "\n";
   } else {
@@ -2554,11 +2635,17 @@ void moho::WIN_ShowCrashDialog(
   details << "Callstack:\n";
 
   void* contextRecord = nullptr;
+#if FAFRE_PLATFORM_WINDOWS
   if (exceptionInfo != nullptr) {
     contextRecord = exceptionInfo->ContextRecord;
   } else {
     skipCallstackFrames += 2;
   }
+#else
+  // Exception records are Windows'; elsewhere the call stack is this thread's own.
+  (void)exceptionInfo;
+  skipCallstackFrames += 2;
+#endif
 
   std::uintptr_t stackFrames[64]{};
   const std::uint32_t frameCount = PLAT_GetCallStack(contextRecord, 64, stackFrames);
@@ -2585,6 +2672,10 @@ void moho::WIN_ShowCrashDialog(
   details << recentLogLines.c_str();
 
   const std::string bodyText = details.str();
+#if !FAFRE_PLATFORM_WINDOWS
+  // The crash dialog is a Windows dialog resource: the same text in a message box.
+  WIN_OkBox(caption != nullptr ? caption : "Crash", bodyText.c_str());
+#else
   CrashDialogInitData dialogInit{
     caption != nullptr ? caption : "Crash",
     bodyText.c_str(),
@@ -2597,19 +2688,18 @@ void moho::WIN_ShowCrashDialog(
     &module
   );
 
-  if (module == nullptr || ::DialogBoxParamW(
-                            module,
-                            MAKEINTRESOURCEW(kCrashDialogTemplateId),
-                            nullptr,
-                            &CrashDialogProc,
-                            reinterpret_cast<LPARAM>(&dialogInit)
-                          ) == -1) {
+  if (
+    module == nullptr ||
+    ::DialogBoxParamW(
+      module, MAKEINTRESOURCEW(kCrashDialogTemplateId), nullptr, &CrashDialogProc, reinterpret_cast<LPARAM>(&dialogInit)
+    ) == -1
+  ) {
     const fa::string dialogError = WIN_GetLastError();
     gpg::Logf("DialogBoxParam failed: %s", dialogError.c_str());
     WIN_OkBox(dialogInit.caption, dialogInit.body);
   }
+#endif
 }
-
 
 /**
  * Address: 0x004F2900 (FUN_004F2900, ?WIN_YesNoBox@Moho@@YA_NVStrArg@gpg@@0@Z)
@@ -2618,11 +2708,13 @@ void moho::WIN_ShowCrashDialog(
  * Displays a UTF-8 yes/no message box and reports whether the user selected
  * `Yes`.
  */
-bool moho::WIN_YesNoBox(const gpg::StrArg caption, const gpg::StrArg text)
+bool moho::WIN_YesNoBox(
+  const gpg::StrArg caption,
+  const gpg::StrArg text
+)
 {
-  const HWND ownerWindow = sMainWindow != nullptr
-                             ? reinterpret_cast<HWND>(static_cast<std::uintptr_t>(sMainWindow->GetHandle()))
-                             : nullptr;
+  const HWND ownerWindow =
+    sMainWindow != nullptr ? reinterpret_cast<HWND>(static_cast<std::uintptr_t>(sMainWindow->GetHandle())) : nullptr;
   const std::wstring wideCaption = gpg::STR_Utf8ToWide(caption);
   const std::wstring wideText = gpg::STR_Utf8ToWide(text);
   return ::MessageBoxW(ownerWindow, wideText.c_str(), wideCaption.c_str(), 0x40004u) == IDYES;
@@ -2633,11 +2725,14 @@ namespace
   // Engine addition (dedicated-server plan WPL.4, WPR.12): WIN_OkBox's box
   // (moho/misc/WinPlatform.cpp), as the binary showed it (0x004F2800): owned by
   // the main window when there is one, MB_SETFOREGROUND.
-  void ShowOkBox(const gpg::StrArg caption, const gpg::StrArg text)
+  void ShowOkBox(
+    const gpg::StrArg caption,
+    const gpg::StrArg text
+  )
   {
     const HWND ownerWindow = moho::sMainWindow != nullptr
-                               ? reinterpret_cast<HWND>(static_cast<std::uintptr_t>(moho::sMainWindow->GetHandle()))
-                               : nullptr;
+      ? reinterpret_cast<HWND>(static_cast<std::uintptr_t>(moho::sMainWindow->GetHandle()))
+      : nullptr;
     const std::wstring wideCaption = gpg::STR_Utf8ToWide(caption);
     const std::wstring wideText = gpg::STR_Utf8ToWide(text);
     (void)::MessageBoxW(ownerWindow, wideText.c_str(), wideCaption.c_str(), 0x40000u);
@@ -2682,7 +2777,9 @@ namespace
   // Engine addition (dedicated-server plan WPL.4): sAppPumpStep, the loop body of
   // PausedMainThread::WaitUntilResumedAndDelete (moho/misc/PausedThread.cpp,
   // 0x004B45F0) before the move.
-  bool AppPumpStep(bool& processIdle)
+  bool AppPumpStep(
+    bool& processIdle
+  )
   {
     if (wxTheApp != nullptr && wxTheApp->Pending()) {
       wxTheApp->Dispatch();
@@ -2706,12 +2803,15 @@ namespace
  */
 void moho::WINX_Exit()
 {
+  // The managed dialogs are developer windows, Windows only (WxRuntimeTypes.h).
+#if FAFRE_PLATFORM_WINDOWS
   for (std::size_t index = 0; index < managedWindows.size(); ++index) {
     if (WWinManagedDialog* const dialog = managedWindows[index].GetObjectPtr(); dialog != nullptr) {
       (void)dialog->Destroy();
       managedWindows[index].UnlinkFromOwnerChain();
     }
   }
+#endif
 
   for (std::size_t index = 0; index < managedFrames.size(); ++index) {
     if (WWinManagedFrame* const frame = managedFrames[index].GetObjectPtr(); frame != nullptr) {
@@ -2728,7 +2828,10 @@ void moho::WINX_Exit()
  * Formats one UTF-8 vararg string through `gpg::STR_Va`, converts it to wide
  * text, and stores the result in caller-provided `wxString`.
  */
-wxString moho::WINX_Printf(const char* const format, ...)
+wxString moho::WINX_Printf(
+  const char* const format,
+  ...
+)
 {
   va_list args;
   va_start(args, format);
@@ -2749,8 +2852,14 @@ wxString moho::WINX_Printf(const char* const format, ...)
  * Initializes splash PNG handler state, clears any existing splash object,
  * then loads and creates a splash-screen runtime when the file is available.
  */
-void moho::WINX_InitSplash(const gpg::StrArg filename)
+void moho::WINX_InitSplash(
+  const gpg::StrArg filename
+)
 {
+#if !FAFRE_PLATFORM_WINDOWS
+  // No splash window on Linux yet (the window system is issue #256).
+  (void)filename;
+#else
   if (sSplashPngHandler == nullptr) {
     sSplashPngHandler = new wxPNGHandler();
     wxImage::AddHandler(sSplashPngHandler);
@@ -2787,6 +2896,7 @@ void moho::WINX_InitSplash(const gpg::StrArg filename)
     splashSize,
     wxSIMPLE_BORDER | wxSTAY_ON_TOP
   ));
+#endif
 }
 
 /**
@@ -2799,6 +2909,7 @@ void moho::WINX_InitSplash(const gpg::StrArg filename)
  */
 void moho::WINX_PrecreateLogWindow()
 {
+#if FAFRE_PLATFORM_WINDOWS
   if (sLogWindowTarget.dialog != nullptr) {
     return;
   }
@@ -2806,6 +2917,8 @@ void moho::WINX_PrecreateLogWindow()
   WWinLogWindow* const createdLogWindow = new WWinLogWindow();
   boost::mutex::scoped_lock lock(sLogWindowTarget.lock);
   sLogWindowTarget.dialog = createdLogWindow;
+#endif
+  // The log window is a developer window, Windows only (WxRuntimeTypes.h).
 }
 
 /**
@@ -2817,8 +2930,9 @@ void moho::WINX_PrecreateLogWindow()
  */
 void moho::WINX_ExitSplash()
 {
+#if FAFRE_PLATFORM_WINDOWS
   sSplashScreen.reset();
+#endif
 }
 
 #pragma warning(pop)
-

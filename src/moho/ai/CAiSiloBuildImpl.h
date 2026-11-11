@@ -13,7 +13,7 @@ namespace gpg
   class ReadArchive;
   class WriteArchive;
   class SerConstructResult;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -184,9 +184,8 @@ namespace moho
      * Allocates one silo-build implementation object for serializer construct
      * callbacks and publishes it to the construct result.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x005D1080 (FUN_005D1080, Moho::CAiSiloBuildImpl::MemberDeserialize)
@@ -207,20 +206,20 @@ namespace moho
   public:
     static gpg::RType* sType;
 
-    Unit* mUnit;                  // +0x04
-    SSiloBuildInfo mSiloInfo[2];  // +0x08
-    SSiloTypeList mSiloTypes;     // +0x20
-    CEconRequest* mRequest;       // +0x2C
-    ESiloBuildStage mState;       // +0x30
-    SEconValue mSegmentCost;      // +0x34
-    SEconValue mSegmentSpent;     // +0x3C
-    float mSegments;              // +0x44
+    Unit* mUnit;                 // +0x04
+    SSiloBuildInfo mSiloInfo[2]; // +0x08
+    SSiloTypeList mSiloTypes;    // +0x20
+    CEconRequest* mRequest;      // +0x2C
+    ESiloBuildStage mState;      // +0x30
+    SEconValue mSegmentCost;     // +0x34
+    SEconValue mSegmentSpent;    // +0x3C
+    float mSegments;             // +0x44
     // +0x48: an int in the 2007 build (`cvtsi2ss [ecx+48h]`, `add [ecx+48h], 1`).
     // The FAF hot-patches that replace SiloAssistWithResource (0x01291617) and
     // SiloTick's SBS_Active arm (0x0129155F), plus GiveNukeSiloAmmo's segment
     // setter (0x0128E97B), all read and write it as a float of fractional
     // segments. The unpatched serializers still move it with ReadInt/WriteInt.
-    float mCurSegments;           // +0x48
+    float mCurSegments; // +0x48
   };
 
   static_assert(sizeof(SSiloBuildInfo) == 0x0C, "SSiloBuildInfo size must be 0x0C");
@@ -232,7 +231,10 @@ namespace moho
   static_assert(offsetof(CAiSiloBuildImpl, mRequest) == 0x2C, "CAiSiloBuildImpl::mRequest offset must be 0x2C");
   static_assert(offsetof(CAiSiloBuildImpl, mState) == 0x30, "CAiSiloBuildImpl::mState offset must be 0x30");
   static_assert(offsetof(CAiSiloBuildImpl, mSegmentCost) == 0x34, "CAiSiloBuildImpl::mSegmentCost offset must be 0x34");
-  static_assert(offsetof(CAiSiloBuildImpl, mSegmentSpent) == 0x3C, "CAiSiloBuildImpl::mSegmentSpent offset must be 0x3C");
+  static_assert(
+    offsetof(CAiSiloBuildImpl, mSegmentSpent) == 0x3C,
+    "CAiSiloBuildImpl::mSegmentSpent offset must be 0x3C"
+  );
   static_assert(offsetof(CAiSiloBuildImpl, mSegments) == 0x44, "CAiSiloBuildImpl::mSegments offset must be 0x44");
   static_assert(offsetof(CAiSiloBuildImpl, mCurSegments) == 0x48, "CAiSiloBuildImpl::mCurSegments offset must be 0x48");
   static_assert(sizeof(CAiSiloBuildImpl) == 0x4C, "CAiSiloBuildImpl size must be 0x4C");

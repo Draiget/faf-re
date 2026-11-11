@@ -246,13 +246,8 @@ namespace moho
    * aspect lanes and returns it by value.
    */
   [[nodiscard]]
-  VMatrix4 VEC_D3DProjectionMatrixFOV(
-    float fovXRadians,
-    float fovYRadians,
-    float nearDepth,
-    float farDepth,
-    float aspectRatio
-  );
+  VMatrix4
+  VEC_D3DProjectionMatrixFOV(float fovXRadians, float fovYRadians, float nearDepth, float farDepth, float aspectRatio);
 
   /**
    * Address: 0x004EF6E0 (FUN_004EF6E0, ?VEC_LookAtMatrix@Moho@@YA?AUVMatrix4@1@ABV?$Vector3@M@Wm3@@00@Z)
@@ -261,12 +256,8 @@ namespace moho
    * Writes a right-handed view matrix built from `eye`/`target`/`up` vectors
    * into `dest` and returns `dest` for chaining callsites.
    */
-  VMatrix4* VEC_LookAtMatrix(
-    const Wm3::Vector3f& eye,
-    const Wm3::Vector3f& target,
-    VMatrix4* dest,
-    const Wm3::Vector3f& up
-  );
+  VMatrix4*
+  VEC_LookAtMatrix(const Wm3::Vector3f& eye, const Wm3::Vector3f& target, VMatrix4* dest, const Wm3::Vector3f& up);
 
   /**
    * Address: 0x004EF930 (FUN_004EF930, ?VEC_LookAtViewMatrix@Moho@@YA?AUVMatrix4@1@ABV?$Vector3@M@Wm3@@00@Z)
@@ -276,12 +267,8 @@ namespace moho
    * orientation rows from `VEC_LookAtMatrix` and composing translated row-3
    * lanes (`-dot(position, basisAxis)`).
    */
-  VMatrix4* VEC_LookAtViewMatrix(
-    const Wm3::Vector3f& eye,
-    const Wm3::Vector3f& target,
-    VMatrix4* dest,
-    const Wm3::Vector3f& up
-  );
+  VMatrix4*
+  VEC_LookAtViewMatrix(const Wm3::Vector3f& eye, const Wm3::Vector3f& target, VMatrix4* dest, const Wm3::Vector3f& up);
 
   /**
    * Address: 0x00858EA1..0x00858FD8 (inlined into Moho::CWldSession::DrawEconomyOverlay)
@@ -298,7 +285,9 @@ namespace moho
    * emit exactly this sequence of divides, so the original was one shared
    * helper the compiler inlined twice.
    */
-  [[nodiscard]] inline VMatrix4 MakeViewportPixelProjection(const GeomCamera3& camera) noexcept
+  [[nodiscard]] inline VMatrix4 MakeViewportPixelProjection(
+    const GeomCamera3& camera
+  ) noexcept
   {
     const float width = static_cast<float>(static_cast<std::int32_t>(camera.viewport.r[3].z));
     const float height = static_cast<float>(static_cast<std::int32_t>(camera.viewport.r[3].w));
@@ -309,12 +298,8 @@ namespace moho
     projection.r[0] = Vector4f{2.0f / width, 0.0f, 0.0f, 0.0f};
     projection.r[1] = Vector4f{0.0f, 2.0f / (kTopEdge - height), 0.0f, 0.0f};
     projection.r[2] = Vector4f{0.0f, 0.0f, -0.5f, 0.0f};
-    projection.r[3] = Vector4f{
-      (width / (kLeftEdge - width)) - (1.0f / width),
-      (height / height) + (1.0f / height),
-      0.5f,
-      1.0f
-    };
+    projection.r[3] =
+      Vector4f{(width / (kLeftEdge - width)) - (1.0f / width), (height / height) + (1.0f / height), 0.5f, 1.0f};
     return projection;
   }
 
@@ -343,10 +328,7 @@ namespace moho
    * box is not a box - transforming only min and max would be wrong for any
    * matrix with rotation or perspective.
    */
-  Wm3::AxisAlignedBox3f* ProjectBoxByMatrix(
-    const VMatrix4* matrix,
-    const Wm3::AxisAlignedBox3f* box,
-    Wm3::AxisAlignedBox3f* outBox
-  );
+  Wm3::AxisAlignedBox3f*
+  ProjectBoxByMatrix(const VMatrix4* matrix, const Wm3::AxisAlignedBox3f* box, Wm3::AxisAlignedBox3f* outBox);
 
 } // namespace moho

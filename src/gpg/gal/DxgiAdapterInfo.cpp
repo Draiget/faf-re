@@ -14,7 +14,9 @@ namespace gpg::gal
 {
   namespace
   {
-    [[nodiscard]] std::string Utf8(const wchar_t* const text)
+    [[nodiscard]] std::string Utf8(
+      const wchar_t* const text
+    )
     {
       const int bytes = ::WideCharToMultiByte(CP_UTF8, 0, text, -1, nullptr, 0, nullptr, nullptr);
       if (bytes <= 1) {
@@ -26,18 +28,27 @@ namespace gpg::gal
     }
 
     /** "a.b.c.d" from the 64-bit user-mode driver version DXGI and D3D9 both report. */
-    [[nodiscard]] std::string DriverVersionText(const std::uint64_t version)
+    [[nodiscard]] std::string DriverVersionText(
+      const std::uint64_t version
+    )
     {
       char text[48] = {};
       std::snprintf(
-        text, sizeof(text), "%u.%u.%u.%u", static_cast<unsigned>((version >> 48) & 0xFFFFU),
-        static_cast<unsigned>((version >> 32) & 0xFFFFU), static_cast<unsigned>((version >> 16) & 0xFFFFU),
+        text,
+        sizeof(text),
+        "%u.%u.%u.%u",
+        static_cast<unsigned>((version >> 48) & 0xFFFFU),
+        static_cast<unsigned>((version >> 32) & 0xFFFFU),
+        static_cast<unsigned>((version >> 16) & 0xFFFFU),
         static_cast<unsigned>(version & 0xFFFFU)
       );
       return text;
     }
 
-    void FillBudget(IDXGIAdapter* const adapter, DeviceRuntimeInfo& out)
+    void FillBudget(
+      IDXGIAdapter* const adapter,
+      DeviceRuntimeInfo& out
+    )
     {
       Microsoft::WRL::ComPtr<IDXGIAdapter3> adapter3;
       if (FAILED(adapter->QueryInterface(IID_PPV_ARGS(adapter3.GetAddressOf())))) {
@@ -55,7 +66,9 @@ namespace gpg::gal
       }
     }
 
-    [[nodiscard]] std::string DriverVersionOf(IDXGIAdapter* const adapter)
+    [[nodiscard]] std::string DriverVersionOf(
+      IDXGIAdapter* const adapter
+    )
     {
       LARGE_INTEGER version{};
       if (SUCCEEDED(adapter->CheckInterfaceSupport(__uuidof(IDXGIDevice), &version))) {
@@ -65,7 +78,10 @@ namespace gpg::gal
     }
   } // namespace
 
-  bool FillDxgiAdapterInfo(IDXGIAdapter* const adapter, DeviceRuntimeInfo& out)
+  bool FillDxgiAdapterInfo(
+    IDXGIAdapter* const adapter,
+    DeviceRuntimeInfo& out
+  )
   {
     if (adapter == nullptr) {
       return false;
@@ -83,14 +99,19 @@ namespace gpg::gal
     return true;
   }
 
-  bool FillDxgiAdapterMemoryByPciId(const std::uint32_t vendorId, const std::uint32_t deviceId, DeviceRuntimeInfo& out)
+  bool FillDxgiAdapterMemoryByPciId(
+    const std::uint32_t vendorId,
+    const std::uint32_t deviceId,
+    DeviceRuntimeInfo& out
+  )
   {
     Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
     if (FAILED(::CreateDXGIFactory1(IID_PPV_ARGS(factory.GetAddressOf())))) {
       return false;
     }
     Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
-    for (UINT index = 0U; factory->EnumAdapters1(index, adapter.ReleaseAndGetAddressOf()) != DXGI_ERROR_NOT_FOUND; ++index) {
+    for (UINT index = 0U; factory->EnumAdapters1(index, adapter.ReleaseAndGetAddressOf()) != DXGI_ERROR_NOT_FOUND;
+         ++index) {
       DXGI_ADAPTER_DESC1 desc{};
       if (FAILED(adapter->GetDesc1(&desc)) || desc.VendorId != vendorId || desc.DeviceId != deviceId) {
         continue;

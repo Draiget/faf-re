@@ -313,31 +313,31 @@ namespace moho
   public:
     static gpg::RType* sType;
 
-    std::uint8_t mGoalBoundaryFits; // +0x14
-    std::uint8_t mIsQueuedOnPathQueue;   // +0x15
-    std::uint8_t mUseGoalBoundaryProbe;  // +0x16
-    std::uint8_t mPad17;                 // +0x17
-    Unit* mUnit;                         // +0x18
-    const SFootprint* mFootprint;        // +0x1C
-    const SFootprint* mAltFootprint;     // +0x20
-    std::int32_t mPathLayerSelector;     // +0x24 (RUnitBlueprintPhysics::MotionType)
-    Sim* mSim;                           // +0x28
-    void* mPathQueueProxy;               // +0x2C (army path queue/pathfinder object)
-    COGrid* mOGrid;                      // +0x30
-    HPathCell mAnchorCell;               // +0x34
-    HPathCell mResultCell;               // +0x38
-    SAiNavigatorGoal mGoal;              // +0x3C
-    EAiPathSearchType mSearchType;       // +0x60
-    std::uint8_t mHasOccupancyMask;      // +0x64
-    std::uint8_t mHasPathResult;         // +0x65
-    std::uint8_t mPad66;                 // +0x66
-    std::uint8_t mPad67;                 // +0x67
-    SRectList mRecentSearchRects; // +0x68
-    std::uint8_t mUseWholeMap;           // +0x74
-    std::uint8_t mInsidePlayableRect;    // +0x75
-    std::uint8_t mPad76;                 // +0x76
-    std::uint8_t mPad77;                 // +0x77
-    std::uint32_t mMaxFootprintSpan;     // +0x78
+    std::uint8_t mGoalBoundaryFits;     // +0x14
+    std::uint8_t mIsQueuedOnPathQueue;  // +0x15
+    std::uint8_t mUseGoalBoundaryProbe; // +0x16
+    std::uint8_t mPad17;                // +0x17
+    Unit* mUnit;                        // +0x18
+    const SFootprint* mFootprint;       // +0x1C
+    const SFootprint* mAltFootprint;    // +0x20
+    std::int32_t mPathLayerSelector;    // +0x24 (RUnitBlueprintPhysics::MotionType)
+    Sim* mSim;                          // +0x28
+    void* mPathQueueProxy;              // +0x2C (army path queue/pathfinder object)
+    COGrid* mOGrid;                     // +0x30
+    HPathCell mAnchorCell;              // +0x34
+    HPathCell mResultCell;              // +0x38
+    SAiNavigatorGoal mGoal;             // +0x3C
+    EAiPathSearchType mSearchType;      // +0x60
+    std::uint8_t mHasOccupancyMask;     // +0x64
+    std::uint8_t mHasPathResult;        // +0x65
+    std::uint8_t mPad66;                // +0x66
+    std::uint8_t mPad67;                // +0x67
+    SRectList mRecentSearchRects;       // +0x68
+    std::uint8_t mUseWholeMap;          // +0x74
+    std::uint8_t mInsidePlayableRect;   // +0x75
+    std::uint8_t mPad76;                // +0x76
+    std::uint8_t mPad77;                // +0x77
+    std::uint32_t mMaxFootprintSpan;    // +0x78
   };
 
   static_assert(sizeof(HPathCell) == 0x04, "HPathCell size must be 0x04");
@@ -361,19 +361,21 @@ namespace moho
   static_assert(offsetof(CAiPathFinder, mGoal) == 0x3C, "CAiPathFinder::mGoal offset must be 0x3C");
   static_assert(offsetof(CAiPathFinder, mSearchType) == 0x60, "CAiPathFinder::mSearchType offset must be 0x60");
   static_assert(
-    offsetof(CAiPathFinder, mHasOccupancyMask) == 0x64, "CAiPathFinder::mHasOccupancyMask offset must be 0x64"
+    offsetof(CAiPathFinder, mHasOccupancyMask) == 0x64,
+    "CAiPathFinder::mHasOccupancyMask offset must be 0x64"
   );
+  static_assert(offsetof(CAiPathFinder, mHasPathResult) == 0x65, "CAiPathFinder::mHasPathResult offset must be 0x65");
   static_assert(
-    offsetof(CAiPathFinder, mHasPathResult) == 0x65, "CAiPathFinder::mHasPathResult offset must be 0x65"
-  );
-  static_assert(
-    offsetof(CAiPathFinder, mRecentSearchRects) == 0x68, "CAiPathFinder::mRecentSearchRects offset must be 0x68"
+    offsetof(CAiPathFinder, mRecentSearchRects) == 0x68,
+    "CAiPathFinder::mRecentSearchRects offset must be 0x68"
   );
   static_assert(offsetof(CAiPathFinder, mUseWholeMap) == 0x74, "CAiPathFinder::mUseWholeMap offset must be 0x74");
   static_assert(
-    offsetof(CAiPathFinder, mInsidePlayableRect) == 0x75, "CAiPathFinder::mInsidePlayableRect offset must be 0x75"
+    offsetof(CAiPathFinder, mInsidePlayableRect) == 0x75,
+    "CAiPathFinder::mInsidePlayableRect offset must be 0x75"
   );
   static_assert(
-    offsetof(CAiPathFinder, mMaxFootprintSpan) == 0x78, "CAiPathFinder::mMaxFootprintSpan offset must be 0x78"
+    offsetof(CAiPathFinder, mMaxFootprintSpan) == 0x78,
+    "CAiPathFinder::mMaxFootprintSpan offset must be 0x78"
   );
 } // namespace moho

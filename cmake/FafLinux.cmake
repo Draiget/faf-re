@@ -35,6 +35,19 @@ elseif(FAF_PGO_PROFILE)
   add_link_options(-flto=thin "-fprofile-use=${FAF_PGO_PROFILE}")
 endif()
 
+# AddressSanitizer (the linux-clang-x64-asan preset, the asan workflow): every target is built to stop
+# with a report at an out-of-bounds access, a use after free or a double free. Needs the sanitizer
+# runtime (package libclang-rt-18-dev). The x64 small-block pool hides blocks of 4 KB or less from
+# it, so an ASan build starts with the pool off (src/gpg/core/utils/Global.cpp).
+option(FAF_ASAN "Build with AddressSanitizer" OFF)
+if(FAF_ASAN)
+  if(FAF_PGO_GENERATE OR FAF_PGO_PROFILE)
+    message(FATAL_ERROR "FAF_ASAN builds without a profile: use the linux-clang-x64-asan preset.")
+  endif()
+  add_compile_options(-fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls)
+  add_link_options(-fsanitize=address)
+endif()
+
 if(NOT FAF_LINUX)
   message(FATAL_ERROR "cmake/FafLinux.cmake needs cmake/toolchains/linux-clang-x64.cmake.")
 endif()
@@ -127,19 +140,19 @@ endif()
 include("${PROJECT_SOURCE_DIR}/src/sources.cmake")
 include("${PROJECT_SOURCE_DIR}/src/sim_sources.cmake")
 
-# boost.thread 1.34.1 on pthreads: the Win32 TLS hooks are left out.
-list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "/libs/thread/src/tss_(dll|hooks|pe)\\.cpp$")
+# boost.thread 1.34.1 on pthreads: the Win32 TLS hooks are left out, and mutex.cpp is compiled by
+# src/platform/posix/BoostMutexPosix.cpp with recursive pthread mutexes, as Windows' critical
+# sections are (the engine takes some locks again on the thread that holds them).
+list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "/libs/thread/src/(tss_(dll|hooks|pe)|mutex)\\.cpp$")
 # The Windows platform services (call stacks, crash-report paths, message
 # boxes); the POSIX implementation of the same functions is plan WPL.5.
 list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^moho/misc/WinPlatform\\.cpp$")
 # The crash diagnostics on dbghelp, vectored exception handlers, minidumps and debug
 # registers; gpg/core/diagnostics/posix/DiagnosticsPosix.cpp implements their headers.
 list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^gpg/core/diagnostics/(CrashHooks|CrashReport|ProbeWatch)\\.cpp$")
-# The lockstep transport: Winsock sockets driven by WSAEventSelect. Linux replays and
-# serves games without it (the server has its own channel, plan D3); moho/net/Common.cpp's
-# connector factories fail here as on a Windows host without Winsock.
-# NetPeerTransport (issue #232) belongs to CNetUDPConnector and goes with it.
-list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^moho/net/(CNetDatagramSocketImpl|CNetTCPBuf|CNetTCPConnection|CNetTCPConnector|CNetTCPServerImpl|CNetUDPConnection|CNetUDPConnector|NetPeerTransport|INetDatagramSocket|INetTCPServer|INetTCPSocket)\\.cpp$")
+# The lockstep transport (moho/net's connectors and sockets) calls platform::net (issue #259):
+# the Winsock implementation is left out here, and the POSIX one is added to faf_sim below.
+list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^platform/windows/")
 
 set(_faf_sim_files "")
 foreach(_src IN LISTS FAF_SIM_SOURCES)
@@ -182,6 +195,13 @@ target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Math64.
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/gpg/gal/MatrixPortable.cpp")
 # The Win32 calls the shared code makes, on POSIX (plan WPL.5).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/Win32Shim.cpp")
+# boost.thread's mutex.cpp with recursive pthread mutexes (see the FILTER above).
+target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/BoostMutexPosix.cpp")
+set_property(SOURCE "${PROJECT_SOURCE_DIR}/src/platform/posix/BoostMutexPosix.cpp" APPEND PROPERTY
+  COMPILE_DEFINITIONS BOOST_THREAD_BUILD_LIB=1)
+set_property(SOURCE "${PROJECT_SOURCE_DIR}/src/platform/posix/BoostMutexPosix.cpp" APPEND PROPERTY COMPILE_OPTIONS -w)
+# platform::net (src/platform/Net.h) on BSD sockets, for moho/net's lockstep transport (issue #259).
+target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/NetPosix.cpp")
 # The crash diagnostics' headers on POSIX (plan WPL.5).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/gpg/core/diagnostics/posix/DiagnosticsPosix.cpp")
 # moho/misc/WinPlatform.cpp's platform services (call stacks, error text, message boxes) and
@@ -223,6 +243,8 @@ set(_faf_sim_options
   # The recovered tree's x86 layout asserts, off as on Windows x64 (see the
   # header).
   "SHELL:-include platform/LayoutAsserts.h"
+  # FAFRE_PLATFORM_LINUX and the other platform macros (see the header).
+  "SHELL:-include platform/PlatformDefines.h"
   # The Windows names the shared code uses (plan WPL.5).
   "SHELL:-include platform/PosixCompat.h"
   ${FAF_LINUX_MS_DIALECT}
@@ -244,6 +266,12 @@ foreach(_src IN LISTS _faf_sim_files)
 endforeach()
 include(FafPrecompiledHeaders)
 faf_precompile(faf_sim)
+
+# --- The game client (issue #255) ----------------------------------------------------------
+option(FAF_LINUX_CLIENT "Build the Linux game client (issue #255, not finished)" OFF)
+if(FAF_LINUX_CLIENT)
+  include(FafLinuxClient)
+endif()
 
 # --- faf_sim_math_tests (plan WPL.23) ---------------------------------------------------
 # The golden sim-math tests (tests/sim_math) on every faf_sim object, as Windows runs
@@ -315,6 +343,8 @@ add_executable(server
   "${PROJECT_SOURCE_DIR}/src/server/ServerMain.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ControlChannel.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ControlListener.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/RestListener.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ArmyBoard.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ReplayLog.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ObserverListener.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LiveReplaySender.cpp"
@@ -326,12 +356,14 @@ add_executable(server
   "${PROJECT_SOURCE_DIR}/src/server/ServerViews.cpp"
   "${PROJECT_SOURCE_DIR}/src/headless/SessionLoad.cpp"
   "${PROJECT_SOURCE_DIR}/src/headless/ReplayLuaState.cpp"
+  "${PROJECT_SOURCE_DIR}/src/headless/StateDigest.cpp"
 )
 target_link_libraries(server PRIVATE faf_sim faf_netchannel faf_monocypher)
 target_compile_definitions(server PRIVATE FAF_SERVER_MODE=1)
 target_link_options(server PRIVATE -Wl,--error-limit=0)
 
-add_executable(faf_server_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SpeedWatchTests.cpp")
+add_executable(faf_server_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SpeedWatchTests.cpp"
+  "${PROJECT_SOURCE_DIR}/tests/server/NftablesTests.cpp")
 target_include_directories(faf_server_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
 target_link_libraries(faf_server_tests PRIVATE gtest_main)
 add_test(NAME server_speed_watch COMMAND faf_server_tests)
@@ -339,8 +371,11 @@ add_test(NAME server_speed_watch COMMAND faf_server_tests)
 add_executable(faf_seat_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/server/SeatTests.cpp" "${PROJECT_SOURCE_DIR}/src/server/SeatIntake.cpp"
   "${PROJECT_SOURCE_DIR}/tests/server/ControlChannelTests.cpp"
   "${PROJECT_SOURCE_DIR}/tests/server/ReplayLogTests.cpp"
+  "${PROJECT_SOURCE_DIR}/tests/server/ArmyBoardTests.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/ArmyBoard.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ControlChannel.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ControlListener.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/RestListener.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ReplayLog.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LiveReplaySender.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/LobbyRelay.cpp"
@@ -374,6 +409,31 @@ target_link_libraries(faf_remote_tests PRIVATE faf_sim gtest_main)
 target_compile_definitions(faf_remote_tests PRIVATE FAF_SERVER_MODE=1)
 target_link_options(faf_remote_tests PRIVATE -Wl,--error-limit=0)
 add_test(NAME remote_wire COMMAND faf_remote_tests)
+
+# platform::net on BSD sockets (issue #259): loopback sockets and the socket events moho/net's
+# lockstep transport waits on.
+add_executable(faf_platform_net_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/net/PlatformNetTests.cpp")
+target_link_libraries(faf_platform_net_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_platform_net_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME platform_net COMMAND faf_platform_net_tests)
+# The Win32 shim's handles when one thread closes what another still uses, and its shell folders
+# (Windows' behaviour).
+add_executable(faf_win32_shim_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/linux/Win32ShimHandleTests.cpp"
+  "${PROJECT_SOURCE_DIR}/tests/linux/Win32ShimFolderTests.cpp")
+target_link_libraries(faf_win32_shim_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_win32_shim_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME win32_shim_handles COMMAND faf_win32_shim_tests)
+# Two CNetUDPConnectors in one process over loopback sockets and through peer transports, as
+# Windows runs them (tests/CMakeLists.txt).
+add_executable(faf_peer_transport_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/net/PeerTransportTests.cpp")
+target_link_libraries(faf_peer_transport_tests PRIVATE faf_sim gtest)
+target_link_options(faf_peer_transport_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME net_peer_transport COMMAND faf_peer_transport_tests)
+# A lost DATA packet's recovery over two connectors (issue #237), as Windows runs it.
+add_executable(faf_fast_retransmit_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/net/FastRetransmitTests.cpp")
+target_link_libraries(faf_fast_retransmit_tests PRIVATE faf_sim gtest_main)
+target_link_options(faf_fast_retransmit_tests PRIVATE -Wl,--error-limit=0)
+add_test(NAME net_fast_retransmit COMMAND faf_fast_retransmit_tests)
 
 # The libm gate (plan WPL.13): the faf_sim objects call no host libm transcendental outside
 # tests/linux/libm_allowlist.txt; headless is not built while one does.

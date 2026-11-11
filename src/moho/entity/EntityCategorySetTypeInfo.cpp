@@ -57,4 +57,3 @@ namespace moho
     serSaveFunc_ = &EntityCategory::SerSave;
   }
 } // namespace moho
-

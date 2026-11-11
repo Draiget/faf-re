@@ -12,7 +12,7 @@ namespace gpg
 {
   class ReadArchive;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -102,11 +102,11 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
-    SNavGoal mUnloadGoal;                     // 0x30
-    bool mIsStagingPlatform;                  // 0x54
-    bool mHasEligibleLoadedUnits;             // 0x55
-    std::uint8_t mPad56_57[2];                // 0x56
-    EntitySetTemplate<Unit> mLoadedUnits;      // 0x58
+    SNavGoal mUnloadGoal;                        // 0x30
+    bool mIsStagingPlatform;                     // 0x54
+    bool mHasEligibleLoadedUnits;                // 0x55
+    std::uint8_t mPad56_57[2];                   // 0x56
+    EntitySetTemplate<Unit> mLoadedUnits;        // 0x58
     WeakPtr<CUnitCommand> mOwnerCommandLinkLane; // 0x80
   };
 
@@ -120,9 +120,7 @@ namespace moho
     offsetof(CUnitUnloadUnits, mHasEligibleLoadedUnits) == 0x55,
     "CUnitUnloadUnits::mHasEligibleLoadedUnits offset must be 0x55"
   );
-  static_assert(
-    offsetof(CUnitUnloadUnits, mLoadedUnits) == 0x58, "CUnitUnloadUnits::mLoadedUnits offset must be 0x58"
-  );
+  static_assert(offsetof(CUnitUnloadUnits, mLoadedUnits) == 0x58, "CUnitUnloadUnits::mLoadedUnits offset must be 0x58");
   static_assert(
     offsetof(CUnitUnloadUnits, mOwnerCommandLinkLane) == 0x80,
     "CUnitUnloadUnits::mOwnerCommandLinkLane offset must be 0x80"

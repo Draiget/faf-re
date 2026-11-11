@@ -30,7 +30,9 @@ namespace
    * Default-constructs (seed 5489) a CRandomStream in caller storage before
    * wrapping it in an RTTI ref; 0x0040F4CB is the inlined default constructor.
    */
-  [[nodiscard]] gpg::RRef CtrRef(void* const storage)
+  [[nodiscard]] gpg::RRef CtrRef(
+    void* const storage
+  )
   {
     moho::CRandomStream* const stream = storage ? new (storage) moho::CRandomStream() : nullptr;
 
@@ -45,7 +47,9 @@ namespace
    * What it does:
    * Deletes a CRandomStream allocation when a reflected instance is released.
    */
-  void Delete(void* const storage)
+  void Delete(
+    void* const storage
+  )
   {
     if (!storage) {
       return;
@@ -60,7 +64,9 @@ namespace
    * What it does:
    * No-op destroy hook used by CRandomStream reflection metadata.
    */
-  void Destruct(void*)
+  void Destruct(
+    void*
+  )
   {}
 } // namespace
 

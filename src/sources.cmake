@@ -236,6 +236,7 @@ set(FAF_ENGINE_SOURCES
   moho/render/textures/SBatchTextureDataFactory.cpp
   moho/misc/FileWaitHandleSet.cpp
   moho/net/Common.cpp
+  platform/windows/NetWindows.cpp
   moho/net/NetConVars.cpp
   moho/net/NetPeerTransport.cpp
   moho/net/NetlinkPeers.cpp
@@ -925,6 +926,7 @@ set(FAF_ENGINE_SOURCES
   moho/render/CWldTerrainDecal.cpp
   moho/render/CDecalHandleTypeInfo.cpp
   moho/render/AmbientOcclusionRenderer.cpp
+  moho/render/DynamicLights.cpp
   moho/render/BoundaryRenderer.cpp
   moho/render/FxaaRenderer.cpp
   moho/render/PostRenderer.cpp

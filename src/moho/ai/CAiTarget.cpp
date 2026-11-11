@@ -35,24 +35,31 @@ namespace
   // second, unevidenced spelling of a lookup the engine already has, and the
   // two containers are maintained by different code paths, so they can
   // disagree about an id the tree still holds.
-  [[nodiscard]] Entity* FindEntityById(EntityDB* entityDb, const EntId entityId)
+  [[nodiscard]] Entity* FindEntityById(
+    EntityDB* entityDb,
+    const EntId entityId
+  )
   {
     return entityDb != nullptr ? entityDb->FindEntityById(static_cast<std::uint32_t>(entityId)) : nullptr;
   }
 
-  [[nodiscard]] const char* ToAiTargetTypeLexical(const EAiTargetType targetType) noexcept
+  [[nodiscard]] const char* ToAiTargetTypeLexical(
+    const EAiTargetType targetType
+  ) noexcept
   {
     switch (targetType) {
-      case EAiTargetType::AITARGET_Entity:
-        return "Entity";
-      case EAiTargetType::AITARGET_Ground:
-        return "Ground";
-      default:
-        return "None";
+    case EAiTargetType::AITARGET_Entity:
+      return "Entity";
+    case EAiTargetType::AITARGET_Ground:
+      return "Ground";
+    default:
+      return "None";
     }
   }
 
-  [[nodiscard]] EAiTargetType ParseAiTargetTypeLexical(const char* const lexical) noexcept
+  [[nodiscard]] EAiTargetType ParseAiTargetTypeLexical(
+    const char* const lexical
+  ) noexcept
   {
     if (!lexical) {
       return EAiTargetType::AITARGET_None;
@@ -87,18 +94,22 @@ gpg::RType* CAiTarget::sType = nullptr;
  * What it does:
  * Copy-constructs target payload/link state from another target object.
  */
-CAiTarget::CAiTarget(const CAiTarget& source)
+CAiTarget::CAiTarget(
+  const CAiTarget& source
+)
 {
   CopyFromLinkedTarget(source);
 }
 
 /**
-  * Alias of FUN_005D5670 (non-canonical helper lane).
+ * Alias of FUN_005D5670 (non-canonical helper lane).
  *
  * What it does:
  * Assigns payload/link state from another target object.
  */
-CAiTarget& CAiTarget::operator=(const CAiTarget& source)
+CAiTarget& CAiTarget::operator=(
+  const CAiTarget& source
+)
 {
   if (this == &source) {
     return *this;
@@ -120,12 +131,14 @@ CAiTarget::~CAiTarget()
 }
 
 /**
-  * Alias of FUN_005D5670 (non-canonical helper lane).
+ * Alias of FUN_005D5670 (non-canonical helper lane).
  *
  * What it does:
  * Core link/payload copier used by copy-ctor and assignment.
  */
-void CAiTarget::CopyFromLinkedTarget(const CAiTarget& source)
+void CAiTarget::CopyFromLinkedTarget(
+  const CAiTarget& source
+)
 {
   targetType = source.targetType;
   // `WeakPtr::operator=`: nothing when both name one chain, else unlink and
@@ -137,7 +150,7 @@ void CAiTarget::CopyFromLinkedTarget(const CAiTarget& source)
 }
 
 /**
-  * Alias of FUN_005D57E0 (non-canonical helper lane).
+ * Alias of FUN_005D57E0 (non-canonical helper lane).
  *
  * What it does:
  * Unlinks this target from owner weak-link slot chain.
@@ -153,7 +166,9 @@ void CAiTarget::UnlinkEntityTargetRef()
  * What it does:
  * Rebinds this target to `entity`, then recomputes mobility/target-point data.
  */
-CAiTarget* CAiTarget::UpdateTarget(Entity* const entity)
+CAiTarget* CAiTarget::UpdateTarget(
+  Entity* const entity
+)
 {
   targetType = EAiTargetType::AITARGET_Entity;
   targetEntity.ResetFromObject(entity);
@@ -229,7 +244,10 @@ CAiTarget* CAiTarget::SetTarget(
  * Parses one Lua target table; reads either `"EntityId"` for entity targets
  * or `"Position"` for ground targets.
  */
-CAiTarget* CAiTarget::GetLuaTarget(Sim* const sim, const LuaPlus::LuaObject& object)
+CAiTarget* CAiTarget::GetLuaTarget(
+  Sim* const sim,
+  const LuaPlus::LuaObject& object
+)
 {
   const LuaPlus::LuaObject typeObject = object.GetByName("Type");
   const char* const typeLexical = typeObject.GetString();
@@ -261,28 +279,28 @@ CAiTarget* CAiTarget::GetLuaTarget(Sim* const sim, const LuaPlus::LuaObject& obj
 bool CAiTarget::HasTarget() const
 {
   switch (targetType) {
-    case EAiTargetType::AITARGET_None:
+  case EAiTargetType::AITARGET_None:
+    return false;
+
+  case EAiTargetType::AITARGET_Entity: {
+    Entity* const entity = targetEntity.GetObjectPtr();
+    if (entity == nullptr) {
       return false;
-
-    case EAiTargetType::AITARGET_Entity: {
-      Entity* const entity = targetEntity.GetObjectPtr();
-      if (entity == nullptr) {
-        return false;
-      }
-
-      if (Unit* const unit = entity->IsUnit(); unit != nullptr) {
-        return !unit->IsDead();
-      }
-
-      if (ReconBlip* const reconBlip = entity->IsReconBlip(); reconBlip != nullptr) {
-        return reconBlip->mVarDat.mIsDead == 0u;
-      }
-
-      return true;
     }
 
-    case EAiTargetType::AITARGET_Ground:
-      return true;
+    if (Unit* const unit = entity->IsUnit(); unit != nullptr) {
+      return !unit->IsDead();
+    }
+
+    if (ReconBlip* const reconBlip = entity->IsReconBlip(); reconBlip != nullptr) {
+      return reconBlip->mVarDat.mIsDead == 0u;
+    }
+
+    return true;
+  }
+
+  case EAiTargetType::AITARGET_Ground:
+    return true;
   }
 
   return false;
@@ -295,7 +313,9 @@ bool CAiTarget::HasTarget() const
  * Returns true when this target and `other` both resolve to the same
  * non-sentinel entity target lane.
  */
-bool CAiTarget::HasSameTargetEntity(const CAiTarget& other) const
+bool CAiTarget::HasSameTargetEntity(
+  const CAiTarget& other
+) const
 {
   Entity* const thisEntity = targetEntity.GetObjectPtr();
   if (thisEntity == nullptr) {
@@ -346,7 +366,9 @@ bool CAiTarget::NoTarget() const
  * Returns whether this target currently resolves to a live entity in
  * `LAYER_Air`.
  */
-bool moho::CAiTargetEntityIsAirLayer(const CAiTarget& target) noexcept
+bool moho::CAiTargetEntityIsAirLayer(
+  const CAiTarget& target
+) noexcept
 {
   Entity* const entity = target.GetEntity();
   return entity != nullptr && entity->mVarDat.mLayerMask == LAYER_Air;
@@ -359,7 +381,9 @@ bool moho::CAiTargetEntityIsAirLayer(const CAiTarget& target) noexcept
  * Resolves one weapon-target world position from this target payload and
  * either uses exact live position lanes or selected target-point lanes.
  */
-Wm3::Vec3f CAiTarget::GetTargetPosGun(const bool useActualPos)
+Wm3::Vec3f CAiTarget::GetTargetPosGun(
+  const bool useActualPos
+)
 {
   if (targetType == EAiTargetType::AITARGET_Ground) {
     return position;
@@ -410,7 +434,10 @@ Wm3::Vec3f CAiTarget::GetTargetPosGun(const bool useActualPos)
  * `targetEntity.ownerLinkSlot` at +0x04 -- and `CAiTarget` is the only type in
  * the tree carrying a `WeakPtr<Entity>` at +0x04.
  */
-bool CAiTarget::IsInBounds(const bool wholeMap, const float border) const
+bool CAiTarget::IsInBounds(
+  const bool wholeMap,
+  const float border
+) const
 {
   const Entity* const entity = targetEntity.GetObjectPtr();
   if (entity == nullptr) {
@@ -455,7 +482,10 @@ Entity* CAiTarget::GetEntity() const
  *   entity hit payload,
  * - all other target types pass through unchanged.
  */
-bool CAiTarget::ImpactDidHitEntity(Entity* const entity, const EImpactType impactType)
+bool CAiTarget::ImpactDidHitEntity(
+  Entity* const entity,
+  const EImpactType impactType
+)
 {
   if (targetType == EAiTargetType::AITARGET_Entity) {
     if (entity == nullptr || impactType < EImpactType::IMPACT_Projectile) {
@@ -486,7 +516,9 @@ bool CAiTarget::ImpactDidHitEntity(Entity* const entity, const EImpactType impac
  * What it does:
  * Refreshes `targetIsMobile` by checking the target entity category bitset.
  */
-void CAiTarget::UpdateTargetIsMobile(Sim* const sim)
+void CAiTarget::UpdateTargetIsMobile(
+  Sim* const sim
+)
 {
   Entity* const entity = targetEntity.GetObjectPtr();
   if (!entity || !entity->BluePrint) {
@@ -536,37 +568,39 @@ void CAiTarget::PickTargetPoint()
  * What it does:
  * Decodes command-network `SSTITarget` payload into this runtime target object.
  */
-CAiTarget* CAiTarget::DecodeFromSSTITarget(const SSTITarget& source, Sim* const sim)
+CAiTarget* CAiTarget::DecodeFromSSTITarget(
+  const SSTITarget& source,
+  Sim* const sim
+)
 {
   targetEntity.ClearLinkState();
   targetIsMobile = false;
 
   switch (source.mType) {
-    case EAiTargetType::AITARGET_Entity: {
-      CAiTarget updated{};
-      Entity* const entity =
-        FindEntityById(sim ? sim->mEntityDB : nullptr, static_cast<EntId>(source.mEntityId));
-      updated.UpdateTarget(entity);
-      *this = updated;
-      break;
-    }
-    case EAiTargetType::AITARGET_Ground: {
-      CAiTarget updated{};
-      updated.targetType = EAiTargetType::AITARGET_Ground;
-      updated.position = source.mPos;
-      updated.targetPoint = -1;
-      updated.targetIsMobile = false;
-      *this = updated;
-      break;
-    }
-    default: {
-      CAiTarget updated{};
-      updated.targetType = EAiTargetType::AITARGET_None;
-      updated.targetPoint = -1;
-      updated.targetIsMobile = false;
-      *this = updated;
-      break;
-    }
+  case EAiTargetType::AITARGET_Entity: {
+    CAiTarget updated{};
+    Entity* const entity = FindEntityById(sim ? sim->mEntityDB : nullptr, static_cast<EntId>(source.mEntityId));
+    updated.UpdateTarget(entity);
+    *this = updated;
+    break;
+  }
+  case EAiTargetType::AITARGET_Ground: {
+    CAiTarget updated{};
+    updated.targetType = EAiTargetType::AITARGET_Ground;
+    updated.position = source.mPos;
+    updated.targetPoint = -1;
+    updated.targetIsMobile = false;
+    *this = updated;
+    break;
+  }
+  default: {
+    CAiTarget updated{};
+    updated.targetType = EAiTargetType::AITARGET_None;
+    updated.targetPoint = -1;
+    updated.targetIsMobile = false;
+    *this = updated;
+    break;
+  }
   }
 
   UpdateTargetIsMobile(sim);
@@ -579,7 +613,9 @@ CAiTarget* CAiTarget::DecodeFromSSTITarget(const SSTITarget& source, Sim* const 
  * What it does:
  * Encodes this runtime target object into command-network `SSTITarget` payload.
  */
-void CAiTarget::EncodeToSSTITarget(SSTITarget& out) const
+void CAiTarget::EncodeToSSTITarget(
+  SSTITarget& out
+) const
 {
   if (targetType == EAiTargetType::AITARGET_Entity) {
     out.mType = EAiTargetType::AITARGET_Entity;
@@ -611,7 +647,11 @@ void CAiTarget::EncodeToSSTITarget(SSTITarget& out) const
  * What it does:
  * Serializes one AI target payload into Lua table form.
  */
-void moho::SCR_ToLua_CAiTarget(LuaPlus::LuaObject& outObject, LuaPlus::LuaState* const state, const CAiTarget& target)
+void moho::SCR_ToLua_CAiTarget(
+  LuaPlus::LuaObject& outObject,
+  LuaPlus::LuaState* const state,
+  const CAiTarget& target
+)
 {
   outObject.AssignNewTable(state, 2, 0);
   outObject.SetString("Type", ToAiTargetTypeLexical(target.targetType));
@@ -635,7 +675,10 @@ void moho::SCR_ToLua_CAiTarget(LuaPlus::LuaObject& outObject, LuaPlus::LuaState*
  * What it does:
  * Parses one Lua target table (`Type` + payload fields) into `outTarget`.
  */
-void moho::SCR_FromLuaCopy_CAiTarget(CAiTarget& outTarget, const LuaPlus::LuaObject& object)
+void moho::SCR_FromLuaCopy_CAiTarget(
+  CAiTarget& outTarget,
+  const LuaPlus::LuaObject& object
+)
 {
   const LuaPlus::LuaObject typeObject = object.GetByName("Type");
   const EAiTargetType parsedType = ParseAiTargetTypeLexical(typeObject.GetString());
@@ -671,7 +714,9 @@ namespace moho
    * What it does:
    * Deserializes reflected CAiTarget payload fields in fixed binary order.
    */
-  void CAiTarget::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CAiTarget::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -692,7 +737,9 @@ namespace moho
    * What it does:
    * Serializes reflected CAiTarget payload fields in fixed binary order.
    */
-  void CAiTarget::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CAiTarget::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {

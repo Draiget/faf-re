@@ -13,7 +13,9 @@ namespace gpg::gal
    * 2^(shift - 14) in the subnormal range, rounds down. Values past the float16 range, infinities and NaNs
    * give +/-infinity; values below half the smallest subnormal give +/-0.
    */
-  [[nodiscard]] inline std::uint16_t FloatToHalf(const float value) noexcept
+  [[nodiscard]] inline std::uint16_t FloatToHalf(
+    const float value
+  ) noexcept
   {
     const std::uint32_t bits = std::bit_cast<std::uint32_t>(value);
     const std::uint32_t sign = (bits >> 16U) & 0x8000U;

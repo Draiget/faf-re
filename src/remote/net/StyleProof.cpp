@@ -13,7 +13,10 @@ namespace faf::remote::net
 
     using SignedBytes = std::array<std::uint8_t, sizeof(kDomain) + 4u + 4u + 32u + 3u>;
 
-    void PutUid(std::uint8_t* const out, const std::int32_t uid) noexcept
+    void PutUid(
+      std::uint8_t* const out,
+      const std::int32_t uid
+    ) noexcept
     {
       const auto value = static_cast<std::uint32_t>(uid);
       out[0] = static_cast<std::uint8_t>(value);
@@ -49,7 +52,10 @@ namespace faf::remote::net
     crypto_wipe(secret.data(), secret.size());
   }
 
-  void MakeStyleSigningKey(StyleSeed& seed, StyleSigningKey& key) noexcept
+  void MakeStyleSigningKey(
+    StyleSeed& seed,
+    StyleSigningKey& key
+  ) noexcept
   {
     crypto_eddsa_key_pair(key.secret.data(), key.publicKey.data(), seed.data());
   }

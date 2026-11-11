@@ -13,13 +13,18 @@
 
 namespace
 {
-  std::string Text(const std::vector<std::uint8_t>& bytes)
+  std::string Text(
+    const std::vector<std::uint8_t>& bytes
+  )
   {
     return std::string(bytes.begin(), bytes.end());
   }
 } // namespace
 
-TEST(ReplayLog, ReadsOnlyWhatIsOldEnough)
+TEST(
+  ReplayLog,
+  ReadsOnlyWhatIsOldEnough
+)
 {
   faf::server::CReplayLog log;
   log.Append("abc", 3u, 100u);
@@ -41,7 +46,10 @@ TEST(ReplayLog, ReadsOnlyWhatIsOldEnough)
   EXPECT_TRUE(log.Finished());
 }
 
-TEST(ReplayLog, AClockThatStepsBackKeepsTheOrder)
+TEST(
+  ReplayLog,
+  AClockThatStepsBackKeepsTheOrder
+)
 {
   faf::server::CReplayLog log;
   log.Append("x", 1u, 300u);
@@ -53,7 +61,10 @@ TEST(ReplayLog, AClockThatStepsBackKeepsTheOrder)
 }
 
 // Plan WP15.3: the live replay's address, as the engine's `gpgnet://` URIs are written.
-TEST(LiveReplay, ReadsGpgNetAddresses)
+TEST(
+  LiveReplay,
+  ReadsGpgNetAddresses
+)
 {
   const auto full = faf::server::ParseGpgNetAddress("gpgnet://replay.example.org:15001/12345/live.scfareplay");
   ASSERT_TRUE(full.has_value());
@@ -65,19 +76,30 @@ TEST(LiveReplay, ReadsGpgNetAddresses)
   EXPECT_EQ(noPort->port, 15000); // the engine's default
   EXPECT_EQ(noPort->path, "/9");
   EXPECT_EQ(faf::server::ParseGpgNetAddress("gpgnet://host")->path, "/");
-  for (const char* bad : {"http://host/x", "gpgnet://", "gpgnet://:15000/x", "gpgnet://host:0/x", "gpgnet://host:99999/x", "gpgnet://host:12a/x"}) {
+  for (const char* bad :
+       {"http://host/x",
+        "gpgnet://",
+        "gpgnet://:15000/x",
+        "gpgnet://host:0/x",
+        "gpgnet://host:99999/x",
+        "gpgnet://host:12a/x"}) {
     EXPECT_FALSE(faf::server::ParseGpgNetAddress(bad).has_value()) << bad;
   }
 }
 
-TEST(ReplayLog, TheTeeWritesTheFileAndTheLog)
+TEST(
+  ReplayLog,
+  TheTeeWritesTheFileAndTheLog
+)
 {
   auto file = std::make_unique<gpg::MemBufferStream>(64u);
   gpg::MemBufferStream* const fileView = file.get();
   auto log = std::make_shared<faf::server::CReplayLog>();
   std::uint64_t now = 1000u;
   {
-    faf::server::CReplayTee tee(std::move(file), log, [&now] { return now; });
+    faf::server::CReplayTee tee(std::move(file), log, [&now] {
+      return now;
+    });
     tee.Write("header", 6u);
     now = 2000u;
     tee.Write("beat1", 5u);

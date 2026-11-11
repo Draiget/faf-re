@@ -8,9 +8,7 @@ using namespace gpg;
 
 namespace
 {
-using PipeBufferNode = DListItem<PipeStreamBuffer, void>;
-
-
+  using PipeBufferNode = DListItem<PipeStreamBuffer, void>;
 
 } // namespace
 
@@ -21,21 +19,21 @@ using PipeBufferNode = DListItem<PipeStreamBuffer, void>;
  * Initializes lock/condition/list state and allocates the first 4KB stream buffer.
  */
 PipeStream::PipeStream()
-    : Stream(),
-      mLock(),
-      mClosed(false),
-      mCond(),
-      mBuff()
+  : Stream()
+  , mLock()
+  , mClosed(false)
+  , mCond()
+  , mBuff()
 {
-    auto* const first = new PipeStreamBuffer{};
-    mBuff.push_back(first);
+  auto* const first = new PipeStreamBuffer{};
+  mBuff.push_back(first);
 
-    mReadEnd = first->begin();
-    mReadHead = first->begin();
-    mReadStart = first->begin();
-    mWriteHead = first->begin();
-    mWriteStart = first->begin();
-    mWriteEnd = first->end();
+  mReadEnd = first->begin();
+  mReadHead = first->begin();
+  mReadStart = first->begin();
+  mWriteHead = first->begin();
+  mWriteStart = first->begin();
+  mWriteEnd = first->end();
 }
 
 /**
@@ -47,9 +45,9 @@ PipeStream::PipeStream()
  */
 PipeStream::~PipeStream()
 {
-    while (!mBuff.empty()) {
-        delete mBuff.pop_front();
-    }
+  while (!mBuff.empty()) {
+    delete mBuff.pop_front();
+  }
 }
 
 /**
@@ -58,9 +56,12 @@ PipeStream::~PipeStream()
  * What it does:
  * Blocking read wrapper forwarding to DoRead(..., true).
  */
-size_t PipeStream::VirtRead(char* dst, const size_t len)
+size_t PipeStream::VirtRead(
+  char* dst,
+  const size_t len
+)
 {
-    return DoRead(dst, len, /*doWait=*/true);
+  return DoRead(dst, len, /*doWait=*/true);
 }
 
 /**
@@ -69,9 +70,12 @@ size_t PipeStream::VirtRead(char* dst, const size_t len)
  * What it does:
  * Non-blocking read wrapper forwarding to DoRead(..., false).
  */
-size_t PipeStream::VirtReadNonBlocking(char* dst, const size_t len)
+size_t PipeStream::VirtReadNonBlocking(
+  char* dst,
+  const size_t len
+)
 {
-    return DoRead(dst, len, /*doWait=*/false);
+  return DoRead(dst, len, /*doWait=*/false);
 }
 
 /**
@@ -82,8 +86,8 @@ size_t PipeStream::VirtReadNonBlocking(char* dst, const size_t len)
  */
 bool PipeStream::VirtAtEnd()
 {
-    boost::mutex::scoped_lock lock(mLock);
-    return mClosed && (mReadHead == mReadEnd);
+  boost::mutex::scoped_lock lock(mLock);
+  return mClosed && (mReadHead == mReadEnd);
 }
 
 /**
@@ -92,48 +96,51 @@ bool PipeStream::VirtAtEnd()
  * What it does:
  * Appends bytes to chunk buffers, updates committed write boundary, and wakes readers.
  */
-void PipeStream::VirtWrite(const char* data, size_t size)
+void PipeStream::VirtWrite(
+  const char* data,
+  size_t size
+)
 {
-    boost::mutex::scoped_lock lock(mLock);
+  boost::mutex::scoped_lock lock(mLock);
 
-    if (mClosed) {
-    	// Matches engine semantics: throw on write-after-close.
-        throw std::runtime_error("Can't write to a pipe stream after output has been closed.");
+  if (mClosed) {
+    // Matches engine semantics: throw on write-after-close.
+    throw std::runtime_error("Can't write to a pipe stream after output has been closed.");
+  }
+
+  const size_t available = static_cast<size_t>(mWriteEnd - mWriteHead);
+  if (available < size) {
+    if (available != 0) {
+      // Raw byte-stream IO through the pipe buffer chain.
+      std::copy_n(data, available, mWriteHead);
+      data += available;
+      size -= available;
     }
 
-    const size_t available = static_cast<size_t>(mWriteEnd - mWriteHead);
-    if (available < size) {
-        if (available != 0) {
-            // Raw byte-stream IO through the pipe buffer chain.
-            std::copy_n(data, available, mWriteHead);
-            data += available;
-            size -= available;
-        }
-
-        while (size >= PipeStreamBuffer::kSize) {
-            auto* const chunk = new PipeStreamBuffer{};
-            mBuff.push_back(chunk);
-            // Raw byte-stream IO through the pipe buffer chain.
-            std::copy_n(data, PipeStreamBuffer::kSize, chunk->begin());
-            data += PipeStreamBuffer::kSize;
-            size -= PipeStreamBuffer::kSize;
-        }
-
-        auto* const tail = new PipeStreamBuffer{};
-        mBuff.push_back(tail);
-        // Raw byte-stream IO through the pipe buffer chain.
-        std::copy_n(data, size, tail->begin());
-        mWriteHead = tail->begin() + size;
-        mWriteStart = mWriteHead;
-        mWriteEnd = tail->end();
-    } else {
-        // Raw byte-stream IO through the pipe buffer chain.
-        std::copy_n(data, size, mWriteHead);
-        mWriteHead += size;
-        mWriteStart = mWriteHead;
+    while (size >= PipeStreamBuffer::kSize) {
+      auto* const chunk = new PipeStreamBuffer{};
+      mBuff.push_back(chunk);
+      // Raw byte-stream IO through the pipe buffer chain.
+      std::copy_n(data, PipeStreamBuffer::kSize, chunk->begin());
+      data += PipeStreamBuffer::kSize;
+      size -= PipeStreamBuffer::kSize;
     }
 
-    mCond.notify_all();
+    auto* const tail = new PipeStreamBuffer{};
+    mBuff.push_back(tail);
+    // Raw byte-stream IO through the pipe buffer chain.
+    std::copy_n(data, size, tail->begin());
+    mWriteHead = tail->begin() + size;
+    mWriteStart = mWriteHead;
+    mWriteEnd = tail->end();
+  } else {
+    // Raw byte-stream IO through the pipe buffer chain.
+    std::copy_n(data, size, mWriteHead);
+    mWriteHead += size;
+    mWriteStart = mWriteHead;
+  }
+
+  mCond.notify_all();
 }
 
 /**
@@ -144,17 +151,17 @@ void PipeStream::VirtWrite(const char* data, size_t size)
  */
 void PipeStream::VirtFlush()
 {
-    boost::mutex::scoped_lock lock(mLock);
+  boost::mutex::scoped_lock lock(mLock);
 
-    if (mClosed) {
-        throw std::runtime_error("Can't write to a pipe stream after output has been closed.");
-    }
+  if (mClosed) {
+    throw std::runtime_error("Can't write to a pipe stream after output has been closed.");
+  }
 
-    // In our implementation writes are immediately published; still keep parity:
-    if (mWriteHead != mWriteStart) {
-        mWriteStart = mWriteHead;
-        mCond.notify_all();
-    }
+  // In our implementation writes are immediately published; still keep parity:
+  if (mWriteHead != mWriteStart) {
+    mWriteStart = mWriteHead;
+    mCond.notify_all();
+  }
 }
 
 /**
@@ -163,18 +170,20 @@ void PipeStream::VirtFlush()
  * What it does:
  * Closes send lane when requested by mode and wakes blocked readers.
  */
-void PipeStream::VirtClose(const Mode mode)
+void PipeStream::VirtClose(
+  const Mode mode
+)
 {
-    // Keep compatibility: close write-end if requested
-    if ((mode & ModeSend) != 0) {
-        boost::mutex::scoped_lock lock(mLock);
-        if (!mClosed) {
-            mClosed = true;
-            // Publish whatever is currently written
-            mWriteStart = mWriteHead;
-            mCond.notify_all();
-        }
+  // Keep compatibility: close write-end if requested
+  if ((mode & ModeSend) != 0) {
+    boost::mutex::scoped_lock lock(mLock);
+    if (!mClosed) {
+      mClosed = true;
+      // Publish whatever is currently written
+      mWriteStart = mWriteHead;
+      mCond.notify_all();
     }
+  }
 }
 
 /**
@@ -185,7 +194,7 @@ void PipeStream::VirtClose(const Mode mode)
  */
 bool PipeStream::Empty()
 {
-    return (mReadHead == mReadEnd) && VirtAtEnd();
+  return (mReadHead == mReadEnd) && VirtAtEnd();
 }
 
 /**
@@ -196,35 +205,35 @@ bool PipeStream::Empty()
  */
 size_t PipeStream::GetLength()
 {
-    boost::mutex::scoped_lock lock(mLock);
+  boost::mutex::scoped_lock lock(mLock);
 
-    PipeStreamBuffer* const head = mBuff.front();
-    PipeStreamBuffer* const tail = mBuff.back();
-    if (!head || !tail) {
-        // no buffers - shouldn't happen
-    	return 0; 
-    }
+  PipeStreamBuffer* const head = mBuff.front();
+  PipeStreamBuffer* const tail = mBuff.back();
+  if (!head || !tail) {
+    // no buffers - shouldn't happen
+    return 0;
+  }
 
-    // Single-buffer fast path
-    if (head == tail) {
-        return static_cast<size_t>(mWriteStart - mReadHead);
-    }
+  // Single-buffer fast path
+  if (head == tail) {
+    return static_cast<size_t>(mWriteStart - mReadHead);
+  }
 
-    // Multi-buffer: sum leftover in head, full middles, and partial tail up to writeStart
-    size_t total = 0;
+  // Multi-buffer: sum leftover in head, full middles, and partial tail up to writeStart
+  size_t total = 0;
 
-    // Head buffer remainder
-    total += static_cast<size_t>(mReadEnd - mReadHead); // for head we keep mReadEnd = buffer->end()
+  // Head buffer remainder
+  total += static_cast<size_t>(mReadEnd - mReadHead); // for head we keep mReadEnd = buffer->end()
 
-    // Middle full buffers
-    const auto* tailItem = static_cast<const DListItem<PipeStreamBuffer>*>(tail);
-    for (const auto* n = head->mNext; n != tailItem; n = n->mNext) {
-        total += PipeStreamBuffer::kSize;
-    }
+  // Middle full buffers
+  const auto* tailItem = static_cast<const DListItem<PipeStreamBuffer>*>(tail);
+  for (const auto* n = head->mNext; n != tailItem; n = n->mNext) {
+    total += PipeStreamBuffer::kSize;
+  }
 
-    // Tail partial up to writeStart
-    total += static_cast<size_t>(mWriteStart - tail->begin());
-    return total;
+  // Tail partial up to writeStart
+  total += static_cast<size_t>(mWriteStart - tail->begin());
+  return total;
 }
 
 /**
@@ -233,58 +242,62 @@ size_t PipeStream::GetLength()
  * What it does:
  * Internal read loop that drains current buffers and optionally waits for new committed bytes.
  */
-size_t PipeStream::DoRead(char* dst, size_t len, const bool doWait)
+size_t PipeStream::DoRead(
+  char* dst,
+  size_t len,
+  const bool doWait
+)
 {
-    boost::mutex::scoped_lock lock(mLock);
-    size_t available = static_cast<size_t>(mReadEnd - mReadHead);
-    size_t copied = 0;
+  boost::mutex::scoped_lock lock(mLock);
+  size_t available = static_cast<size_t>(mReadEnd - mReadHead);
+  size_t copied = 0;
 
-    while (available < len) {
-        if (available != 0) {
-            // Raw byte-stream IO through the pipe buffer chain.
-            std::copy_n(mReadHead, available, dst);
-            dst += available;
-            copied += available;
-            len -= available;
-            mReadHead += available;
+  while (available < len) {
+    if (available != 0) {
+      // Raw byte-stream IO through the pipe buffer chain.
+      std::copy_n(mReadHead, available, dst);
+      dst += available;
+      copied += available;
+      len -= available;
+      mReadHead += available;
+    }
+
+    PipeStreamBuffer* const head = headNode();
+    PipeStreamBuffer* const tail = tailNode();
+
+    if (head == tail) {
+      if (mReadEnd != mWriteStart) {
+        mReadEnd = mWriteStart;
+      } else {
+        if (!doWait || mClosed) {
+          return copied;
         }
-
-        PipeStreamBuffer* const head = headNode();
-        PipeStreamBuffer* const tail = tailNode();
-
-        if (head == tail) {
-            if (mReadEnd != mWriteStart) {
-                mReadEnd = mWriteStart;
-            } else {
-                if (!doWait || mClosed) {
-                    return copied;
-                }
-                mCond.wait(lock);
-            }
+        mCond.wait(lock);
+      }
+    } else {
+      if (mReadEnd != head->end()) {
+        mReadEnd = head->end();
+      } else {
+        delete mBuff.pop_front();
+        PipeStreamBuffer* const next = headNode();
+        mReadHead = next->begin();
+        mReadStart = next->begin();
+        if (next != tailNode()) {
+          mReadEnd = next->end();
         } else {
-            if (mReadEnd != head->end()) {
-                mReadEnd = head->end();
-            } else {
-                delete mBuff.pop_front();
-                PipeStreamBuffer* const next = headNode();
-                mReadHead = next->begin();
-                mReadStart = next->begin();
-                if (next != tailNode()) {
-                    mReadEnd = next->end();
-                } else {
-                    mReadEnd = mWriteStart;
-                }
-            }
+          mReadEnd = mWriteStart;
         }
-
-        available = static_cast<size_t>(mReadEnd - mReadHead);
+      }
     }
 
-    if (len != 0) {
-        // Raw byte-stream IO through the pipe buffer chain.
-        std::copy_n(mReadHead, len, dst);
-        mReadHead += len;
-    }
+    available = static_cast<size_t>(mReadEnd - mReadHead);
+  }
 
-    return copied + len;
+  if (len != 0) {
+    // Raw byte-stream IO through the pipe buffer chain.
+    std::copy_n(mReadHead, len, dst);
+    mReadHead += len;
+  }
+
+  return copied + len;
 }

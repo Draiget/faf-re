@@ -10,7 +10,9 @@ namespace moho
    * What it does:
    * Returns true when both `x` and `y` lanes are not NaN.
    */
-  bool IsValidVector2f(const Wm3::Vector2f& value) noexcept
+  bool IsValidVector2f(
+    const Wm3::Vector2f& value
+  ) noexcept
   {
     return !std::isnan(value.x) && !std::isnan(value.y);
   }
@@ -21,7 +23,10 @@ namespace moho
    * What it does:
    * Returns squared Euclidean 2D distance between two Vector2f points.
    */
-  float DistanceSquared2D(const Wm3::Vector2f& from, const Wm3::Vector2f& to) noexcept
+  float DistanceSquared2D(
+    const Wm3::Vector2f& from,
+    const Wm3::Vector2f& to
+  ) noexcept
   {
     const float dx = to.x - from.x;
     const float dy = to.y - from.y;
@@ -34,7 +39,10 @@ namespace moho
    * What it does:
    * Returns Euclidean 2D distance between two Vector2f points.
    */
-  float Distance2D(const Wm3::Vector2f& from, const Wm3::Vector2f& to) noexcept
+  float Distance2D(
+    const Wm3::Vector2f& from,
+    const Wm3::Vector2f& to
+  ) noexcept
   {
     return std::sqrt(DistanceSquared2D(from, to));
   }

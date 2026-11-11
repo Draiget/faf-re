@@ -40,7 +40,6 @@ namespace moho
     void AddEnums();
   };
 
-
   static_assert(sizeof(EUnitState) == 0x04, "EUnitState size must be 0x04");
   static_assert(sizeof(EUnitStateTypeInfo) == 0x78, "EUnitStateTypeInfo size must be 0x78");
 

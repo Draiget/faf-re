@@ -75,7 +75,9 @@ namespace
   [[maybe_unused]] SParamKeyTypeInfoBootstrap gSParamKeyTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_SParamKeyTypeInfo_20c8e5, moho::register_SParamKeyTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_SParamKeyTypeInfo_20c8e5,
+  moho::register_SParamKeyTypeInfo
+)

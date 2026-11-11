@@ -61,7 +61,8 @@ namespace moho
     void AddLine(const Wm3::Vector3f& p0, const Wm3::Vector3f& p1, std::uint32_t depth);
 
     /**
-     * Address: 0x0044FD50 (FUN_0044FD50, ?AddContouredLine@CDebugCanvas@Moho@@QAEXABV?$Vector2@M@Wm3@@0IABVCHeightField@2@@Z)
+     * Address: 0x0044FD50 (FUN_0044FD50,
+     * ?AddContouredLine@CDebugCanvas@Moho@@QAEXABV?$Vector2@M@Wm3@@0IABVCHeightField@2@@Z)
      *
      * What it does:
      * Draws a 10-step terrain-conforming line by sampling `heightField` between two XZ points.
@@ -104,7 +105,8 @@ namespace moho
     );
 
     /**
-     * Address: 0x00450330 (FUN_00450330, ?AddWireCoords@CDebugCanvas@Moho@@QAEXABV?$Vector3@M@Wm3@@ABV?$Quaternion@M@4@M@Z)
+     * Address: 0x00450330 (FUN_00450330,
+     * ?AddWireCoords@CDebugCanvas@Moho@@QAEXABV?$Vector3@M@Wm3@@ABV?$Quaternion@M@4@M@Z)
      *
      * What it does:
      * Draws RGB orientation axes of length `axisLength` from `origin` rotated by `orientation`.

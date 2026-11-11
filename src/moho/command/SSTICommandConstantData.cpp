@@ -29,7 +29,6 @@ namespace
     }
   };
 
-
 } // namespace
 
 namespace moho
@@ -52,7 +51,9 @@ namespace moho
   /**
    * Address: 0x00554630 (FUN_00554630, Moho::SSTICommandConstantData::MemberDeserialize)
    */
-  void SSTICommandConstantData::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SSTICommandConstantData::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -79,7 +80,9 @@ namespace moho
   /**
    * Address: 0x005546C0 (FUN_005546C0, Moho::SSTICommandConstantData::MemberSerialize)
    */
-  void SSTICommandConstantData::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SSTICommandConstantData::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;
@@ -111,7 +114,10 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_SSTICommandConstantDataTypeInfo_0f3565, moho::preregister_SSTICommandConstantDataTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_SSTICommandConstantDataTypeInfo_0f3565,
+  moho::preregister_SSTICommandConstantDataTypeInfo
+)
 
 namespace moho
 {

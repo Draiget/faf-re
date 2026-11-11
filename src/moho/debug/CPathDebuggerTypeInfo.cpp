@@ -51,7 +51,9 @@ namespace moho
   /**
    * Address: 0x007B6260 (FUN_007B6260, Moho::CPathDebuggerTypeInfo::AddBase_CScriptObject)
    */
-  void CPathDebuggerTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
+  void CPathDebuggerTypeInfo::AddBase_CScriptObject(
+    gpg::RType* const typeInfo
+  )
   {
     debug_reflection::AddBaseCScriptObject(typeInfo);
   }
@@ -59,4 +61,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_CPathDebuggerTypeInfo_7700d8, moho::preregister_CPathDebuggerTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_CPathDebuggerTypeInfo_7700d8,
+  moho::preregister_CPathDebuggerTypeInfo
+)

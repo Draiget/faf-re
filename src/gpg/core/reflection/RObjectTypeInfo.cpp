@@ -16,12 +16,19 @@ namespace
     return sInstance;
   }
 
-  struct Bootstrap { Bootstrap() { gpg::register_RObjectTypeInfoStartup(); } };
+  struct Bootstrap
+  {
+    Bootstrap()
+    {
+      gpg::register_RObjectTypeInfoStartup();
+    }
+  };
   Bootstrap gBootstrap;
-}
+} // namespace
 
 /** Address: 0x008E0660 */
-gpg::RObjectTypeInfo::RObjectTypeInfo() : gpg::RType()
+gpg::RObjectTypeInfo::RObjectTypeInfo()
+  : gpg::RType()
 {
   gpg::PreRegisterRType(typeid(gpg::RObject), this);
 }
@@ -29,7 +36,10 @@ gpg::RObjectTypeInfo::RObjectTypeInfo() : gpg::RType()
 gpg::RObjectTypeInfo::~RObjectTypeInfo() = default;
 
 /** Address: 0x008E06D0 */
-const char* gpg::RObjectTypeInfo::GetName() const { return "RObject"; }
+const char* gpg::RObjectTypeInfo::GetName() const
+{
+  return "RObject";
+}
 
 /** Address: 0x008E06E0 */
 void gpg::RObjectTypeInfo::Init()
@@ -46,7 +56,9 @@ void gpg::register_RObjectTypeInfoStartup()
   (void)Acquire();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_RObjectTypeInfoStartup_ff3b37, gpg::register_RObjectTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_RObjectTypeInfoStartup_ff3b37,
+  gpg::register_RObjectTypeInfoStartup
+)

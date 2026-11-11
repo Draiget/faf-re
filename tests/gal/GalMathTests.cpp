@@ -18,24 +18,37 @@ namespace
 {
   constexpr float kTolerance = 1.0e-6f;
 
-  float At(const Matrix& m, const int row, const int column)
+  float At(
+    const Matrix& m,
+    const int row,
+    const int column
+  )
   {
     const float* const lane = &m.r[row].x;
     return lane[column];
   }
 
-  void ExpectMatrix(const Matrix& actual, const float (&expected)[16], const float tolerance = 0.0f)
+  void ExpectMatrix(
+    const Matrix& actual,
+    const float (&expected)[16],
+    const float tolerance = 0.0f
+  )
   {
     for (int index = 0; index < 16; ++index) {
       if (tolerance == 0.0f) {
         EXPECT_EQ(At(actual, index / 4, index % 4), expected[index]) << "row " << index / 4 << " column " << index % 4;
       } else {
-        EXPECT_NEAR(At(actual, index / 4, index % 4), expected[index], tolerance) << "row " << index / 4 << " column " << index % 4;
+        EXPECT_NEAR(At(actual, index / 4, index % 4), expected[index], tolerance)
+          << "row " << index / 4 << " column " << index % 4;
       }
     }
   }
 
-  void ExpectSame(const Matrix& actual, const Matrix& expected, const float tolerance)
+  void ExpectSame(
+    const Matrix& actual,
+    const Matrix& expected,
+    const float tolerance
+  )
   {
     for (int index = 0; index < 16; ++index) {
       EXPECT_NEAR(At(actual, index / 4, index % 4), At(expected, index / 4, index % 4), tolerance)
@@ -44,7 +57,13 @@ namespace
   }
 
   /** The row vector (x, y, z, 1) times `m`. */
-  void Transform(const Matrix& m, const float x, const float y, const float z, float (&out)[4])
+  void Transform(
+    const Matrix& m,
+    const float x,
+    const float y,
+    const float z,
+    float (&out)[4]
+  )
   {
     for (int column = 0; column < 4; ++column) {
       out[column] = x * At(m, 0, column) + y * At(m, 1, column) + z * At(m, 2, column) + At(m, 3, column);
@@ -54,7 +73,10 @@ namespace
   const float kIdentity[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 } // namespace
 
-TEST(GalMath, TranslationAndScalingLayouts)
+TEST(
+  GalMath,
+  TranslationAndScalingLayouts
+)
 {
   Matrix m{};
   EXPECT_EQ(math::translation(&m, 1.0f, -2.0f, 3.5f), &m);
@@ -63,7 +85,10 @@ TEST(GalMath, TranslationAndScalingLayouts)
   ExpectMatrix(m, {2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0.5f, 0, 0, 0, 0, 1});
 }
 
-TEST(GalMath, AxisRotationsMatchD3DX)
+TEST(
+  GalMath,
+  AxisRotationsMatchD3DX
+)
 {
   const float angle = 0.3f;
   const float c = std::cos(angle);
@@ -85,7 +110,10 @@ TEST(GalMath, AxisRotationsMatchD3DX)
   EXPECT_NEAR(point[3], 1.0f, kTolerance);
 }
 
-TEST(GalMath, ArbitraryAxisAndQuaternionAgreeWithTheAxisRotations)
+TEST(
+  GalMath,
+  ArbitraryAxisAndQuaternionAgreeWithTheAxisRotations
+)
 {
   const float angle = 1.1f;
   Matrix expected{};
@@ -118,7 +146,10 @@ TEST(GalMath, ArbitraryAxisAndQuaternionAgreeWithTheAxisRotations)
   ExpectMatrix(actual, kIdentity);
 }
 
-TEST(GalMath, ProductsTakeRowVectorsLeftToRight)
+TEST(
+  GalMath,
+  ProductsTakeRowVectorsLeftToRight
+)
 {
   Matrix translate{};
   Matrix scale{};
@@ -144,7 +175,10 @@ TEST(GalMath, ProductsTakeRowVectorsLeftToRight)
   ExpectSame(product, translate, 0.0f);
 }
 
-TEST(GalMath, InverseUndoesTheMatrix)
+TEST(
+  GalMath,
+  InverseUndoesTheMatrix
+)
 {
   Matrix m{};
   Matrix inverse{};
@@ -177,7 +211,10 @@ TEST(GalMath, InverseUndoesTheMatrix)
   ExpectSame(inPlace, inverse, 0.0f);
 }
 
-TEST(GalMath, ASingularMatrixLeavesTheOutputAsItWas)
+TEST(
+  GalMath,
+  ASingularMatrixLeavesTheOutputAsItWas
+)
 {
   Matrix singular{};
   math::scaling(&singular, 1.0f, 0.0f, 1.0f);

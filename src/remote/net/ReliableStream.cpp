@@ -11,7 +11,10 @@ namespace faf::remote::net
     constexpr std::size_t kCompactStep = 64 * 1024;
 
     void WriteChunk(
-      ByteWriter& out, const std::uint64_t offset, const std::uint8_t* const data, const std::size_t size
+      ByteWriter& out,
+      const std::uint64_t offset,
+      const std::uint8_t* const data,
+      const std::size_t size
     )
     {
       out.Byte(kChunkReliable);
@@ -23,7 +26,10 @@ namespace faf::remote::net
 
   // --- RangeSet -------------------------------------------------------------------------
 
-  void RangeSet::Add(std::uint64_t begin, std::uint64_t end)
+  void RangeSet::Add(
+    std::uint64_t begin,
+    std::uint64_t end
+  )
   {
     if (begin >= end) {
       return;
@@ -44,7 +50,10 @@ namespace faf::remote::net
     mRanges.emplace(begin, end);
   }
 
-  void RangeSet::Remove(const std::uint64_t begin, const std::uint64_t end)
+  void RangeSet::Remove(
+    const std::uint64_t begin,
+    const std::uint64_t end
+  )
   {
     if (begin >= end) {
       return;
@@ -75,7 +84,11 @@ namespace faf::remote::net
     }
   }
 
-  void RangeSet::Missing(const std::uint64_t begin, const std::uint64_t end, std::vector<StreamRange>& out) const
+  void RangeSet::Missing(
+    const std::uint64_t begin,
+    const std::uint64_t end,
+    std::vector<StreamRange>& out
+  ) const
   {
     std::uint64_t cursor = begin;
     auto it = mRanges.upper_bound(begin);
@@ -107,7 +120,10 @@ namespace faf::remote::net
 
   // --- ReliableSender -------------------------------------------------------------------
 
-  bool ReliableSender::Queue(const std::uint8_t* const data, const std::size_t size)
+  bool ReliableSender::Queue(
+    const std::uint8_t* const data,
+    const std::size_t size
+  )
   {
     if (size > mMaxMessage) {
       return false;
@@ -119,7 +135,11 @@ namespace faf::remote::net
     return true;
   }
 
-  void ReliableSender::Write(ByteWriter& out, std::size_t budget, std::vector<StreamRange>& sent)
+  void ReliableSender::Write(
+    ByteWriter& out,
+    std::size_t budget,
+    std::vector<StreamRange>& sent
+  )
   {
     // A chunk's header: type, offset and a length no larger than the budget.
     const auto headerSize = [&](const std::uint64_t offset) {
@@ -133,14 +153,17 @@ namespace faf::remote::net
         return;
       }
       const std::uint64_t size = std::min<std::uint64_t>(range.end - range.begin, budget - header);
-      WriteChunk(out, range.begin, &mBuffer[static_cast<std::size_t>(range.begin - mBase)], static_cast<std::size_t>(size));
+      WriteChunk(
+        out, range.begin, &mBuffer[static_cast<std::size_t>(range.begin - mBase)], static_cast<std::size_t>(size)
+      );
       mLost.Remove(range.begin, range.begin + size);
       sent.push_back({range.begin, range.begin + size});
       mBytesResent += size;
       budget -= header + static_cast<std::size_t>(size);
     }
 
-    const std::uint64_t limit = std::min<std::uint64_t>(mEnd, mAcked.PrefixEnd() + std::min<std::uint64_t>(mMaxInFlight, mCongestionWindow));
+    const std::uint64_t limit =
+      std::min<std::uint64_t>(mEnd, mAcked.PrefixEnd() + std::min<std::uint64_t>(mMaxInFlight, mCongestionWindow));
     while (mNextNew < limit) {
       const std::size_t header = headerSize(mNextNew);
       if (budget <= header) {
@@ -156,10 +179,14 @@ namespace faf::remote::net
 
   bool ReliableSender::HasPending() const noexcept
   {
-    return !mLost.Empty() || mNextNew < std::min<std::uint64_t>(mEnd, mAcked.PrefixEnd() + std::min<std::uint64_t>(mMaxInFlight, mCongestionWindow));
+    return !mLost.Empty() ||
+      mNextNew <
+      std::min<std::uint64_t>(mEnd, mAcked.PrefixEnd() + std::min<std::uint64_t>(mMaxInFlight, mCongestionWindow));
   }
 
-  void ReliableSender::OnAcked(const std::vector<StreamRange>& ranges)
+  void ReliableSender::OnAcked(
+    const std::vector<StreamRange>& ranges
+  )
   {
     for (const StreamRange& range : ranges) {
       mAcked.Add(range.begin, range.end);
@@ -168,7 +195,9 @@ namespace faf::remote::net
     Compact();
   }
 
-  void ReliableSender::OnLost(const std::vector<StreamRange>& ranges)
+  void ReliableSender::OnLost(
+    const std::vector<StreamRange>& ranges
+  )
   {
     std::vector<StreamRange> missing;
     for (const StreamRange& range : ranges) {
@@ -194,7 +223,11 @@ namespace faf::remote::net
 
   // --- ReliableReceiver -----------------------------------------------------------------
 
-  bool ReliableReceiver::OnFragment(std::uint64_t offset, const std::uint8_t* data, std::size_t size)
+  bool ReliableReceiver::OnFragment(
+    std::uint64_t offset,
+    const std::uint8_t* data,
+    std::size_t size
+  )
   {
     if (size == 0) {
       return true;
@@ -255,7 +288,10 @@ namespace faf::remote::net
     return true;
   }
 
-  bool ReliableReceiver::Append(const std::uint8_t* const data, const std::size_t size)
+  bool ReliableReceiver::Append(
+    const std::uint8_t* const data,
+    const std::size_t size
+  )
   {
     mAssembly.insert(mAssembly.end(), data, data + size);
     mDelivered += size;
@@ -279,7 +315,7 @@ namespace faf::remote::net
       }
       if (!complete) {
         if (header == 10) {
-          return false;  // a length longer than any varint
+          return false; // a length longer than any varint
         }
         break;
       }
@@ -300,7 +336,9 @@ namespace faf::remote::net
     return true;
   }
 
-  bool ReliableReceiver::Take(std::vector<std::uint8_t>& out)
+  bool ReliableReceiver::Take(
+    std::vector<std::uint8_t>& out
+  )
   {
     if (mMessages.empty()) {
       return false;

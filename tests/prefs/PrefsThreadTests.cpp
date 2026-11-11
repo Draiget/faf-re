@@ -30,13 +30,19 @@ namespace
   constexpr int kThreads = 4;
   constexpr int kKeysPerThread = 32;
 
-  fa::string KeyOf(const int thread, const int slot)
+  fa::string KeyOf(
+    const int thread,
+    const int slot
+  )
   {
     return gpg::STR_Printf("prefs_thread_test.t%d.k%d", thread, slot);
   }
 } // namespace
 
-TEST(Existing_PrefsThread, MultiThreadConcurrentAccess)
+TEST(
+  Existing_PrefsThread,
+  MultiThreadConcurrentAccess
+)
 {
   const char* const iterationsEnv = std::getenv("FAF_PREFS_ITERATIONS");
   const int iterations = iterationsEnv != nullptr && std::atoi(iterationsEnv) > 0 ? std::atoi(iterationsEnv) : 20000;
@@ -48,8 +54,7 @@ TEST(Existing_PrefsThread, MultiThreadConcurrentAccess)
   for (int t = 0; t < kThreads; ++t) {
     threads.emplace_back([&, t] {
       ++ready;
-      while (ready.load() < kThreads) {
-      }
+      while (ready.load() < kThreads) {}
       const fa::string missing("prefs_thread_test.missing");
       const fa::string fallback("fallback");
       for (int i = 0; i < iterations; ++i) {
@@ -86,5 +91,6 @@ TEST(Existing_PrefsThread, MultiThreadConcurrentAccess)
       }
     }
   }
-  EXPECT_EQ(wrong, 0) << wrong << " of " << (kThreads * kKeysPerThread) << " values wrong after " << kThreads << " threads x " << iterations << " iterations";
+  EXPECT_EQ(wrong, 0) << wrong << " of " << (kThreads * kKeysPerThread) << " values wrong after " << kThreads
+                      << " threads x " << iterations << " iterations";
 }

@@ -86,9 +86,8 @@ namespace moho
      * Builds a new `MotorFallDown` for an archive load and hands it back unowned; its
      * members are loaded over it afterwards.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x00696110 (FUN_00696110)
@@ -112,7 +111,10 @@ namespace moho
     offsetof(MotorFallDown, mFallDirectionRadians) == 0x38,
     "MotorFallDown::mFallDirectionRadians offset must be 0x38"
   );
-  static_assert(offsetof(MotorFallDown, mFallAngleRadians) == 0x3C, "MotorFallDown::mFallAngleRadians offset must be 0x3C");
+  static_assert(
+    offsetof(MotorFallDown, mFallAngleRadians) == 0x3C,
+    "MotorFallDown::mFallAngleRadians offset must be 0x3C"
+  );
   static_assert(offsetof(MotorFallDown, mFallDepth) == 0x40, "MotorFallDown::mFallDepth offset must be 0x40");
   static_assert(offsetof(MotorFallDown, mBreakOnWhack) == 0x44, "MotorFallDown::mBreakOnWhack offset must be 0x44");
   static_assert(sizeof(MotorFallDown) == 0x48, "MotorFallDown size must be 0x48");

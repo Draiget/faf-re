@@ -136,7 +136,8 @@ namespace moho
   static_assert(offsetof(CReplayClient, mReplayMessage) == 0x0E0, "CReplayClient::mReplayMessage offset must be 0x0E0");
   static_assert(offsetof(CReplayClient, mReplayBeat) == 0x138, "CReplayClient::mReplayBeat offset must be 0x138");
   static_assert(
-    offsetof(CReplayClient, mCurrentSourceAllowed) == 0x13C, "CReplayClient::mCurrentSourceAllowed offset must be 0x13C"
+    offsetof(CReplayClient, mCurrentSourceAllowed) == 0x13C,
+    "CReplayClient::mCurrentSourceAllowed offset must be 0x13C"
   );
   static_assert(offsetof(CReplayClient, mReplayThread) == 0x140, "CReplayClient::mReplayThread offset must be 0x140");
   static_assert(
@@ -144,7 +145,8 @@ namespace moho
     "CReplayClient::mReplayWorkerCondition offset must be 0x144"
   );
   static_assert(
-    offsetof(CReplayClient, mReplayPollRequested) == 0x15C, "CReplayClient::mReplayPollRequested offset must be 0x15C"
+    offsetof(CReplayClient, mReplayPollRequested) == 0x15C,
+    "CReplayClient::mReplayPollRequested offset must be 0x15C"
   );
   static_assert(
     offsetof(CReplayClient, mReplayThreadStopRequested) == 0x15D,

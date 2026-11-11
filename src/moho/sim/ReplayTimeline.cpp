@@ -2,6 +2,18 @@
 
 #include <algorithm>
 #include <atomic>
+#if !FAFRE_PLATFORM_WINDOWS
+#include <cerrno>
+#include <csignal>
+#include <cstring>
+#include <string>
+#include <vector>
+
+#include <sys/prctl.h>
+#include <sys/resource.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
 #include <chrono>
 #include <condition_variable>
 #include <cstdio>
@@ -48,7 +60,8 @@ namespace moho
     int replay_KeyframeEvery = 300;
     TConVar<int> gTConVar_replay_KeyframeEvery(
       "replay_KeyframeEvery",
-      "Ticks of a replay between the keyframes the viewer keeps to move back to (300: 30 seconds of game time), more when saves get slow. 0: none, "
+      "Ticks of a replay between the keyframes the viewer keeps to move back to (300: 30 seconds of game time), more "
+      "when saves get slow. 0: none, "
       "and moving back starts from the replay's beginning.",
       &replay_KeyframeEvery
     );
@@ -56,7 +69,8 @@ namespace moho
     int replay_KeyframeMaxMB = 2048;
     TConVar<int> gTConVar_replay_KeyframeMaxMB(
       "replay_KeyframeMaxMB",
-      "Disk space a replay's keyframes may take, compressed, in replay_keyframes next to the exe. Past it, every second "
+      "Disk space a replay's keyframes may take, compressed, in replay_keyframes next to the exe. Past it, every "
+      "second "
       "one of the older half goes, oldest first.",
       &replay_KeyframeMaxMB
     );
@@ -72,7 +86,8 @@ namespace moho
     bool replay_KeyframeQuietDisk = true;
     TConVar<bool> gTConVar_replay_KeyframeQuietDisk(
       "replay_KeyframeQuietDisk",
-      "The hidden process stays below normal priority and compresses keyframes as it saves them; the viewer's are marked temporary, so they stay in the "
+      "The hidden process stays below normal priority and compresses keyframes as it saves them; the viewer's are "
+      "marked temporary, so they stay in the "
       "system's file cache until compressed; their file work runs on a background thread; and the viewer's sim doesn't "
       "stop to save while the hidden process runs. Read for the hidden process when a replay opens.",
       &replay_KeyframeQuietDisk
@@ -121,7 +136,9 @@ namespace moho
     Clock::time_point sRunStart{};
     std::int32_t sRunStartTick = 0;
 
-    void NoteRunEnd(const std::int32_t tick)
+    void NoteRunEnd(
+      const std::int32_t tick
+    )
     {
       const double seconds = std::chrono::duration<double>(Clock::now() - sRunStart).count();
       if (tick - sRunStartTick >= kMinTicksToMeasure && seconds > 0.0) {
@@ -146,19 +163,25 @@ namespace moho
     bool sSeekTimed = false;
     std::int32_t sSeekFrom = 0;
 
-    void StartSeekClock(const std::int32_t from)
+    void StartSeekClock(
+      const std::int32_t from
+    )
     {
       sSeekAsked = Clock::now();
       sSeekTimed = true;
       sSeekFrom = from;
     }
 
-    void LogSeekArrival(const std::int32_t tick)
+    void LogSeekArrival(
+      const std::int32_t tick
+    )
     {
       if (sSeekTimed) {
         sSeekTimed = false;
         gpg::Logf(
-          "Replay timeline: from tick %d to %d in %.1f s", sSeekFrom, tick,
+          "Replay timeline: from tick %d to %d in %.1f s",
+          sSeekFrom,
+          tick,
           std::chrono::duration<double>(Clock::now() - sSeekAsked).count()
         );
       }
@@ -190,7 +213,8 @@ namespace moho
     [[nodiscard]] std::filesystem::path KeyframeDirectory()
     {
       std::error_code ignored;
-      std::filesystem::path directory = KeyframeRoot() / std::to_string(static_cast<unsigned long>(::GetCurrentProcessId()));
+      std::filesystem::path directory =
+        KeyframeRoot() / std::to_string(static_cast<unsigned long>(::GetCurrentProcessId()));
       std::filesystem::create_directories(directory, ignored);
       return directory;
     }
@@ -205,10 +229,15 @@ namespace moho
         const unsigned long owner = std::strtoul(entry.path().filename().string().c_str(), nullptr, 10);
         bool running = false;
         if (owner != 0u && owner != self) {
+#if !FAFRE_PLATFORM_WINDOWS
+          // The Linux client (issue #255): signal 0 only checks the process exists.
+          running = ::kill(static_cast<pid_t>(owner), 0) == 0 || errno == EPERM;
+#else
           if (HANDLE process = ::OpenProcess(SYNCHRONIZE, FALSE, owner); process != nullptr) {
             running = ::WaitForSingleObject(process, 0) == WAIT_TIMEOUT;
             ::CloseHandle(process);
           }
+#endif
         }
         if (!running) {
           leftovers.push_back(entry.path());
@@ -219,14 +248,20 @@ namespace moho
       }
     }
 
-    void RemoveFile(const std::string& path)
+    void RemoveFile(
+      const std::string& path
+    )
     {
       std::error_code ignored;
       std::filesystem::remove(path, ignored);
     }
 
     /** Copies `input` through zstd into `output`. False on any failure, or when `stop` is set. */
-    [[nodiscard]] bool CompressStream(std::FILE* const input, std::FILE* const output, const std::atomic<bool>& stop)
+    [[nodiscard]] bool CompressStream(
+      std::FILE* const input,
+      std::FILE* const output,
+      const std::atomic<bool>& stop
+    )
     {
       std::unique_ptr<ZSTD_CCtx, size_t (*)(ZSTD_CCtx*)> context(ZSTD_createCCtx(), &ZSTD_freeCCtx);
       if (!context) {
@@ -257,7 +292,10 @@ namespace moho
       return std::ferror(input) == 0;
     }
 
-    [[nodiscard]] bool DecompressStream(std::FILE* const input, std::FILE* const output)
+    [[nodiscard]] bool DecompressStream(
+      std::FILE* const input,
+      std::FILE* const output
+    )
     {
       std::unique_ptr<ZSTD_DCtx, size_t (*)(ZSTD_DCtx*)> context(ZSTD_createDCtx(), &ZSTD_freeDCtx);
       if (!context) {
@@ -312,7 +350,10 @@ namespace moho
     std::filesystem::path sPrepareScanFrom;
     std::filesystem::path sPrepareScanTo;
 
-    void CompressOneKeyframe(const std::int32_t tick, const std::string& plainPath)
+    void CompressOneKeyframe(
+      const std::int32_t tick,
+      const std::string& plainPath
+    )
     {
       SCompressedKeyframe done;
       done.tick = tick;
@@ -344,7 +385,10 @@ namespace moho
     }
 
     /** On the background thread, once a second: what the hidden process has finished moves up to the keyframes. */
-    void ScanPreparedKeyframes(const std::filesystem::path& from, const std::filesystem::path& to)
+    void ScanPreparedKeyframes(
+      const std::filesystem::path& from,
+      const std::filesystem::path& to
+    )
     {
       std::error_code ignored;
       std::vector<std::filesystem::path> finished;
@@ -448,7 +492,10 @@ namespace moho
       }
     }
 
-    void QueueKeyframeCompression(const std::int32_t tick, const std::string& plainPath)
+    void QueueKeyframeCompression(
+      const std::int32_t tick,
+      const std::string& plainPath
+    )
     {
       const std::lock_guard<std::mutex> lock(sCompressLock);
       sCompressQueue.emplace_back(tick, plainPath);
@@ -457,7 +504,9 @@ namespace moho
     }
 
     /** A delete can wait for the disk, and the main thread must not. */
-    void RemoveFileLater(const std::string& path)
+    void RemoveFileLater(
+      const std::string& path
+    )
     {
       const std::lock_guard<std::mutex> lock(sCompressLock);
       sRemoveQueue.push_back(path);
@@ -491,8 +540,13 @@ namespace moho
      * It has to keep client data: without it, entities have no position history and emitters no curves, and the
      * viewer's sim crashes on the first trail in view after the load.
      */
+#if !FAFRE_PLATFORM_WINDOWS
+    // The Linux client (issue #255): the hidden process's id; PR_SET_PDEATHSIG ends it with the game.
+    pid_t sPreparePid = 0;
+#else
     HANDLE sPrepareJob = nullptr;
     HANDLE sPrepareProcess = nullptr;
+#endif
     std::int32_t sPreparedTick = -1;
     bool sPrepareStartDue = false;
 
@@ -509,6 +563,13 @@ namespace moho
         const std::lock_guard<std::mutex> lock(sCompressLock);
         sPrepareScanning = false;
       }
+#if !FAFRE_PLATFORM_WINDOWS
+      if (sPreparePid > 0) {
+        (void)::kill(sPreparePid, SIGKILL);
+        (void)::waitpid(sPreparePid, nullptr, 0);
+        sPreparePid = 0;
+      }
+#else
       if (sPrepareProcess != nullptr) {
         ::TerminateProcess(sPrepareProcess, 0u);
         ::WaitForSingleObject(sPrepareProcess, 3000u);
@@ -519,6 +580,7 @@ namespace moho
         ::CloseHandle(sPrepareJob);
         sPrepareJob = nullptr;
       }
+#endif
     }
 
     void StartKeyframePreparation()
@@ -529,7 +591,10 @@ namespace moho
       }
       wchar_t exePath[MAX_PATH] = {};
       fa::vector<fa::string> initArgs;
-      if (::GetModuleFileNameW(nullptr, exePath, MAX_PATH) == 0 || !CFG_GetArgOption("/init", 1u, &initArgs) || initArgs.empty()) {
+      if (
+        ::GetModuleFileNameW(nullptr, exePath, MAX_PATH) == 0 || !CFG_GetArgOption("/init", 1u, &initArgs) ||
+        initArgs.empty()
+      ) {
         gpg::Logf("Replay timeline: no keyframes prepared ahead: no /init to give the hidden process");
         return;
       }
@@ -542,21 +607,90 @@ namespace moho
       std::snprintf(every, sizeof(every), "%d", replay_KeyframeEvery);
       char first[16];
       std::snprintf(first, sizeof(first), "%d", kFirstKeyframeTick);
-      const std::string command = "\"" + self.string() + "\" /replaykeyframes --keep-client-data --label prepare --replay \"" + sReplayPath + "\" /init \""
-        + initArgs[0].c_str() + "\" /nobugreport /nosound /log \"" + (directory / "prepare.log").string()
-        + "\" --keyframe-every " + every + " --keyframe-first " + first + " --keyframe-dir \"" + directory.string() + "\" --keyframe-prepare"
-        + (replay_KeyframeQuietDisk ? " --keyframe-quiet" : "");
+      const std::string command = "\"" + self.string() +
+        "\" /replaykeyframes --keep-client-data --label prepare --replay \"" + sReplayPath + "\" /init \"" +
+        initArgs[0].c_str() + "\" /nobugreport /nosound /log \"" + (directory / "prepare.log").string() +
+        "\" --keyframe-every " + every + " --keyframe-first " + first + " --keyframe-dir \"" + directory.string() +
+        "\" --keyframe-prepare" + (replay_KeyframeQuietDisk ? " --keyframe-quiet" : "");
 
+#if !FAFRE_PLATFORM_WINDOWS
+      // The same arguments as the command line above, without a shell in between, so the death signal
+      // reaches this exe itself. Lower priority, as BELOW_NORMAL_PRIORITY_CLASS.
+      (void)command;
+      const std::string logPath = (directory / "prepare.log").string();
+      const std::string directoryText = directory.string();
+      const std::string selfText = self.string();
+      const std::string folder = self.parent_path().string();
+      std::vector<std::string> arguments = {
+        selfText,
+        "/replaykeyframes",
+        "--keep-client-data",
+        "--label",
+        "prepare",
+        "--replay",
+        sReplayPath,
+        "/init",
+        initArgs[0].c_str(),
+        "/nobugreport",
+        "/nosound",
+        "/log",
+        logPath,
+        "--keyframe-every",
+        every,
+        "--keyframe-first",
+        first,
+        "--keyframe-dir",
+        directoryText,
+        "--keyframe-prepare"
+      };
+      if (replay_KeyframeQuietDisk) {
+        arguments.emplace_back("--keyframe-quiet");
+      }
+      std::vector<char*> argv;
+      for (std::string& argument : arguments) {
+        argv.push_back(argument.data());
+      }
+      argv.push_back(nullptr);
+      const pid_t parent = ::getpid();
+      const pid_t child = ::fork();
+      if (child == 0) {
+        (void)::prctl(PR_SET_PDEATHSIG, SIGKILL);
+        if (::getppid() != parent) {
+          ::_exit(0); // the game ended before the signal was armed
+        }
+        (void)::setpriority(PRIO_PROCESS, 0, 10);
+        (void)::chdir(folder.c_str());
+        ::execv(argv[0], argv.data());
+        ::_exit(127);
+      }
+      if (child < 0) {
+        gpg::Warnf(
+          "Replay timeline: no keyframes prepared ahead: can't start %s (%s)", selfText.c_str(), std::strerror(errno)
+        );
+        return;
+      }
+      sPreparePid = child;
+#else
       STARTUPINFOA startup{};
       startup.cb = sizeof(startup);
       PROCESS_INFORMATION process{};
       std::string mutableCommand = command;
       const std::string folder = self.parent_path().string();
       if (!::CreateProcessA(
-            nullptr, mutableCommand.data(), nullptr, nullptr, FALSE,
-            CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS | CREATE_SUSPENDED, nullptr, folder.c_str(), &startup, &process
+            nullptr,
+            mutableCommand.data(),
+            nullptr,
+            nullptr,
+            FALSE,
+            CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS | CREATE_SUSPENDED,
+            nullptr,
+            folder.c_str(),
+            &startup,
+            &process
           )) {
-        gpg::Warnf("Replay timeline: no keyframes prepared ahead: can't start %s (%lu)", self.string().c_str(), ::GetLastError());
+        gpg::Warnf(
+          "Replay timeline: no keyframes prepared ahead: can't start %s (%lu)", self.string().c_str(), ::GetLastError()
+        );
         return;
       }
       sPrepareJob = ::CreateJobObjectA(nullptr, nullptr);
@@ -569,6 +703,7 @@ namespace moho
       ::ResumeThread(process.hThread);
       ::CloseHandle(process.hThread);
       sPrepareProcess = process.hProcess;
+#endif
       {
         const std::lock_guard<std::mutex> lock(sCompressLock);
         sPrepareScanFrom = directory;
@@ -581,7 +716,9 @@ namespace moho
     }
 
     /** Takes in what the background thread has moved up from the hidden process: compressed like our own. */
-    [[nodiscard]] bool HaveKeyframeNear(const std::int32_t tick)
+    [[nodiscard]] bool HaveKeyframeNear(
+      const std::int32_t tick
+    )
     {
       const auto next = sKeyframes.lower_bound(tick - kKeyframeSameSpotTicks);
       return next != sKeyframes.end() && next->first <= tick + kKeyframeSameSpotTicks;
@@ -651,8 +788,10 @@ namespace moho
         }
       }
       gpg::Logf(
-        "Replay timeline: keyframes thinned to the %d MB budget: %d kept, %.0f MB", replay_KeyframeMaxMB,
-        static_cast<int>(sKeyframes.size()), static_cast<double>(sKeyframeBytes) / (1024.0 * 1024.0)
+        "Replay timeline: keyframes thinned to the %d MB budget: %d kept, %.0f MB",
+        replay_KeyframeMaxMB,
+        static_cast<int>(sKeyframes.size()),
+        static_cast<double>(sKeyframeBytes) / (1024.0 * 1024.0)
       );
     }
 
@@ -675,8 +814,10 @@ namespace moho
         }
         sKeyframeBytes = sKeyframeBytes - std::min(entry->second.bytes, sKeyframeBytes) + keyframe.bytes;
         gpg::Logf(
-          "Replay timeline: keyframe of tick %d compressed from %.1f to %.1f MB, %.0f MB kept", keyframe.tick,
-          static_cast<double>(entry->second.bytes) / (1024.0 * 1024.0), static_cast<double>(keyframe.bytes) / (1024.0 * 1024.0),
+          "Replay timeline: keyframe of tick %d compressed from %.1f to %.1f MB, %.0f MB kept",
+          keyframe.tick,
+          static_cast<double>(entry->second.bytes) / (1024.0 * 1024.0),
+          static_cast<double>(keyframe.bytes) / (1024.0 * 1024.0),
           static_cast<double>(sKeyframeBytes) / (1024.0 * 1024.0)
         );
         entry->second.path = keyframe.path;
@@ -686,8 +827,11 @@ namespace moho
       TrimKeyframes();
     }
 
-    /** A keyframe ready to read from its start: the plain file, or its compressed one unpacked into a file that goes when closed. */
-    [[nodiscard]] std::FILE* OpenKeyframeFile(const std::string& path)
+    /** A keyframe ready to read from its start: the plain file, or its compressed one unpacked into a file that goes
+     * when closed. */
+    [[nodiscard]] std::FILE* OpenKeyframeFile(
+      const std::string& path
+    )
     {
       std::FILE* file = nullptr;
       if (path.size() < 4u || path.compare(path.size() - 4u, 4u, ".zst") != 0) {
@@ -695,7 +839,8 @@ namespace moho
       }
       const auto start = Clock::now();
       static int sRestoreFileNumber = 0;
-      const std::string plainPath = (KeyframeDirectory() / ("restoring_" + std::to_string(++sRestoreFileNumber) + ".bin")).string();
+      const std::string plainPath =
+        (KeyframeDirectory() / ("restoring_" + std::to_string(++sRestoreFileNumber) + ".bin")).string();
       std::FILE* input = nullptr;
       if (fopen_s(&input, path.c_str(), "rb") != 0 || input == nullptr) {
         return nullptr;
@@ -722,7 +867,10 @@ namespace moho
     class CTimelineKeyframeRequest final : public ISaveRequest
     {
     public:
-      CTimelineKeyframeRequest(const Sim& sim, std::string path)
+      CTimelineKeyframeRequest(
+        const Sim& sim,
+        std::string path
+      )
         : mSim(sim)
         , mPath(std::move(path))
       {}
@@ -746,7 +894,9 @@ namespace moho
         return mArchive;
       }
 
-      void Save(const SSaveGameDispatchData& data) override
+      void Save(
+        const SSaveGameDispatchData& data
+      ) override
       {
         delete mArchive;
         mArchive = nullptr;
@@ -758,9 +908,7 @@ namespace moho
           const std::uintmax_t size = std::filesystem::file_size(mPath, ignored);
           sKeyframeBytes += ignored ? 0u : size;
           sKeyframes[mTick] = SKeyframeFile{mPath, ignored ? 0u : static_cast<std::uint64_t>(size)};
-          gpg::Logf(
-            "Replay timeline: keyframe of tick %d saved in %.2f s", mTick, sLastSaveSeconds
-          );
+          gpg::Logf("Replay timeline: keyframe of tick %d saved in %.2f s", mTick, sLastSaveSeconds);
           QueueKeyframeCompression(mTick, mPath);
         } else {
           gpg::Warnf("Replay timeline: a keyframe failed at tick %d: %s", mTick, data.saveName.c_str());
@@ -783,7 +931,10 @@ namespace moho
       gpg::WriteArchive* mArchive = nullptr;
     };
 
-    void StartFastForward(const CWldSession& session, const std::int32_t tick)
+    void StartFastForward(
+      const CWldSession& session,
+      const std::int32_t tick
+    )
     {
       sTargetTick = tick;
       sStartTick = session.mGameTick;
@@ -803,7 +954,9 @@ namespace moho
     }
 
     /** Asks for a new sim at the newest keyframe at or before `tick`, or at the replay's start. */
-    void RequestRestart(const std::int32_t tick)
+    void RequestRestart(
+      const std::int32_t tick
+    )
     {
       sRestoreFile.reset();
       sRestoreHeader = SSimKeyframeHeader{};
@@ -836,7 +989,10 @@ namespace moho
      * What a move from `current` does: true to load a keyframe, false to play the ticks in between. Back always loads.
      * Forward loads when the ticks a keyframe saves would take longer to play than it takes to load.
      */
-    bool SeekLoadsKeyframe(const std::int32_t current, const std::int32_t tick)
+    bool SeekLoadsKeyframe(
+      const std::int32_t current,
+      const std::int32_t tick
+    )
     {
       if (tick < current) {
         return true;
@@ -850,7 +1006,10 @@ namespace moho
     }
   } // namespace
 
-  fa::auto_ptr<SWldSessionInfo> REPLAY_SetupViewerSession(const char* const path, fa::string* const failureReason)
+  fa::auto_ptr<SWldSessionInfo> REPLAY_SetupViewerSession(
+    const char* const path,
+    fa::string* const failureReason
+  )
   {
     gVcrScanReplayLength = true;
     gVcrReplayBeats = 0;
@@ -891,7 +1050,10 @@ namespace moho
     return ticks;
   }
 
-  void REPLAY_SeekTo(CWldSession& session, std::int32_t tick)
+  void REPLAY_SeekTo(
+    CWldSession& session,
+    std::int32_t tick
+  )
   {
     if (!session.IsReplay || sReplayPath.empty()) {
       return;
@@ -926,7 +1088,10 @@ namespace moho
     StartFastForward(session, tick);
   }
 
-  EReplaySeekKind REPLAY_SeekKind(const CWldSession& session, const std::int32_t tick)
+  EReplaySeekKind REPLAY_SeekKind(
+    const CWldSession& session,
+    const std::int32_t tick
+  )
   {
     // While the sim is being replaced, the tick a new move would start from isn't known yet.
     if (!session.IsReplay || sReplayPath.empty() || sRestartWanted || sRestarting || tick == session.mGameTick) {
@@ -950,7 +1115,9 @@ namespace moho
     return sFastForwarding || sRestartWanted || sRestarting || sDeferredTarget >= 0;
   }
 
-  SReplaySeekProgress REPLAY_SeekProgress(const CWldSession& session)
+  SReplaySeekProgress REPLAY_SeekProgress(
+    const CWldSession& session
+  )
   {
     SReplaySeekProgress progress{};
     progress.targetTick = sDeferredTarget >= 0 ? sDeferredTarget : sTargetTick;
@@ -958,12 +1125,16 @@ namespace moho
     progress.restarting = sRestartWanted || (sRestarting && sHeldTick < 0);
     const std::int32_t span = sTargetTick - sStartTick;
     if ((sFastForwarding || sHeldTick >= 0) && span > 0) {
-      progress.progress = std::clamp(static_cast<float>(progress.currentTick - sStartTick) / static_cast<float>(span), 0.0f, 1.0f);
+      progress.progress =
+        std::clamp(static_cast<float>(progress.currentTick - sStartTick) / static_cast<float>(span), 0.0f, 1.0f);
     }
     return progress;
   }
 
-  void REPLAY_MainFrame(ISTIDriver& driver, CWldSession& session)
+  void REPLAY_MainFrame(
+    ISTIDriver& driver,
+    CWldSession& session
+  )
   {
     if (!session.IsReplay || sReplayPath.empty()) {
       return;
@@ -974,7 +1145,11 @@ namespace moho
       StartKeyframePreparation();
     }
     // Turned off while it runs: the CPU it uses comes back at once, and what it has written stays.
+#if !FAFRE_PLATFORM_WINDOWS
+    if (!replay_PrepareKeyframes && sPreparePid > 0) {
+#else
     if (!replay_PrepareKeyframes && sPrepareProcess != nullptr) {
+#endif
       TakePreparedKeyframes();
       StopKeyframePreparation();
     }
@@ -992,7 +1167,8 @@ namespace moho
       return;
     }
     const std::int32_t tick = session.mGameTick;
-    const std::int32_t spacing = std::max(replay_KeyframeEvery, static_cast<std::int32_t>(sLastSaveSeconds * kKeyframeTicksPerSaveSecond));
+    const std::int32_t spacing =
+      std::max(replay_KeyframeEvery, static_cast<std::int32_t>(sLastSaveSeconds * kKeyframeTicksPerSaveSecond));
     if (tick < (sLastKeyframeTick == 0 ? kFirstKeyframeTick : sLastKeyframeTick + spacing)) {
       return;
     }
@@ -1002,9 +1178,19 @@ namespace moho
       return;
     }
     // Or will be: a save stops the sim, which shows.
-    if (replay_KeyframeQuietDisk && sPrepareProcess != nullptr && ::WaitForSingleObject(sPrepareProcess, 0u) == WAIT_TIMEOUT) {
+#if !FAFRE_PLATFORM_WINDOWS
+    // Still running: waitpid reaps nothing yet.
+    if (replay_KeyframeQuietDisk && sPreparePid > 0 && ::waitpid(sPreparePid, nullptr, WNOHANG) == 0) {
       return;
     }
+#else
+    if (
+      replay_KeyframeQuietDisk && sPrepareProcess != nullptr &&
+      ::WaitForSingleObject(sPrepareProcess, 0u) == WAIT_TIMEOUT
+    ) {
+      return;
+    }
+#endif
     if (HaveKeyframeNear(tick)) {
       return;
     }
@@ -1024,7 +1210,10 @@ namespace moho
     return sFastForwarding ? sTargetTick : -1;
   }
 
-  void REPLAY_AfterFastForwardFrame(const CWldSession& session, const std::int32_t beatsApplied)
+  void REPLAY_AfterFastForwardFrame(
+    const CWldSession& session,
+    const std::int32_t beatsApplied
+  )
   {
     if (!sFastForwarding) {
       return;
@@ -1063,7 +1252,9 @@ namespace moho
     gSimBeatOrigin.store(0); // a later session in this process starts from its own
   }
 
-  void REPLAY_NoteHeldTick(const std::int32_t tick)
+  void REPLAY_NoteHeldTick(
+    const std::int32_t tick
+  )
   {
     if (sHeldTick < 0) {
       sStartTick = tick;
@@ -1075,16 +1266,22 @@ namespace moho
     sLastProgress = Clock::now();
   }
 
-  bool REPLAY_HoldIsDone(const std::size_t beatsHeld)
+  bool REPLAY_HoldIsDone(
+    const std::size_t beatsHeld
+  )
   {
     const bool stalled = std::chrono::duration<double>(Clock::now() - sLastProgress).count() > kFastForwardStallSeconds;
     return sHeldTick >= sTargetTick || beatsHeld >= kMaxHeldBeats || stalled;
   }
 
-  void REPLAY_SimRestarted(const CWldSession& session)
+  void REPLAY_SimRestarted(
+    const CWldSession& session
+  )
   {
     NoteRunEnd(session.mGameTick);
-    gpg::Logf("Replay timeline: a keyframe loads in %.1f s, and ticks play at %.0f a second", sLoadSeconds, sTicksPerSecond);
+    gpg::Logf(
+      "Replay timeline: a keyframe loads in %.1f s, and ticks play at %.0f a second", sLoadSeconds, sTicksPerSecond
+    );
     sRestarting = false;
     sHeldTick = -1;
     const std::int32_t tick = sTargetTick;
@@ -1112,7 +1309,8 @@ namespace moho
     sRestartWanted = false;
     const int skipBeats = sRestoreFile.get() != nullptr ? static_cast<int>(sRestoreHeader.beat) - 1 : 0;
     fa::string failure;
-    fa::auto_ptr<SWldSessionInfo> sessionInfo = VCR_SetupReplaySession(sReplayPath.c_str(), &failure, nullptr, skipBeats);
+    fa::auto_ptr<SWldSessionInfo> sessionInfo =
+      VCR_SetupReplaySession(sReplayPath.c_str(), &failure, nullptr, skipBeats);
     if (sessionInfo.get() == nullptr) {
       gpg::Warnf("Replay timeline: can't restart the replay: %s", failure.c_str());
       sRestoreFile.reset();
@@ -1123,7 +1321,9 @@ namespace moho
     return sessionInfo;
   }
 
-  void REPLAY_PrepareSession(SWldSessionInfo& sessionInfo)
+  void REPLAY_PrepareSession(
+    SWldSessionInfo& sessionInfo
+  )
   {
     sLaunchPending = false;
     // Not the viewer: a rejoining player's restore has just set the beat origin.

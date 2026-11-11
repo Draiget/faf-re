@@ -38,7 +38,9 @@ namespace moho
   /**
    * Address: 0x0061CAA0 (FUN_0061CAA0, Moho::CUnitPatrolTaskTypeInfo::AddBase_CCommandTask)
    */
-  void CUnitPatrolTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void CUnitPatrolTaskTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     static gpg::RType* sType = nullptr;
     if (!sType) {
@@ -50,7 +52,9 @@ namespace moho
   /**
    * Address: 0x0061CB00 (FUN_0061CB00, Moho::CUnitPatrolTaskTypeInfo::AddBase_Listener_ECommandEvent)
    */
-  void CUnitPatrolTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const typeInfo)
+  void CUnitPatrolTaskTypeInfo::AddBase_Listener_ECommandEvent(
+    gpg::RType* const typeInfo
+  )
   {
     static gpg::RType* sType = nullptr;
     if (!sType) {
@@ -64,7 +68,9 @@ namespace moho
    *
    * The binary spells it `Formationd`; kept so the symbol still matches.
    */
-  void CUnitPatrolTaskTypeInfo::AddBase_Listener_EFormationdStatus(gpg::RType* const typeInfo)
+  void CUnitPatrolTaskTypeInfo::AddBase_Listener_EFormationdStatus(
+    gpg::RType* const typeInfo
+  )
   {
     static gpg::RType* sType = nullptr;
     if (!sType) {
@@ -86,4 +92,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_CUnitPatrolTaskTypeInfo_fdce9d, moho::preregister_CUnitPatrolTaskTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_CUnitPatrolTaskTypeInfo_fdce9d,
+  moho::preregister_CUnitPatrolTaskTypeInfo
+)

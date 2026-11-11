@@ -138,14 +138,14 @@ namespace moho
     static gpg::RType* StaticGetClass();
 
   public:
-    std::int32_t mBlendMode;     // +0x190
-    bool mVisible;               // +0x194
-    std::uint8_t mPad195[0x03];  // +0x195
-    std::uint32_t mLastUpdate;   // +0x198
-    SEntAttachInfo mEnd;         // +0x19C
-    SWorldBeam mBeam;            // +0x1C8
-    bool mIsNew;                 // +0x294
-    std::uint8_t mPad295[0x03];  // +0x295
+    std::int32_t mBlendMode;    // +0x190
+    bool mVisible;              // +0x194
+    std::uint8_t mPad195[0x03]; // +0x195
+    std::uint32_t mLastUpdate;  // +0x198
+    SEntAttachInfo mEnd;        // +0x19C
+    SWorldBeam mBeam;           // +0x1C8
+    bool mIsNew;                // +0x294
+    std::uint8_t mPad295[0x03]; // +0x295
   };
 
   static_assert(offsetof(CEfxBeam, mBlendMode) == 0x190, "CEfxBeam::mBlendMode offset must be 0x190");

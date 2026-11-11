@@ -78,5 +78,4 @@ namespace moho
    */
   void DUMP_Frame(const fa::vector<fa::string>& args);
 
-
 } // namespace moho

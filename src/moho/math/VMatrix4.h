@@ -8,7 +8,7 @@ namespace gpg
   class RType;
   class ReadArchive;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -35,7 +35,9 @@ namespace moho
      * and CEfxTrailEmitter.cpp each carry an identical file-private copy of;
      * those three should migrate onto this member.
      */
-    [[nodiscard]] float ProjectViewportDepthRow1(const Wm3::Vector3f& point) const noexcept
+    [[nodiscard]] float ProjectViewportDepthRow1(
+      const Wm3::Vector3f& point
+    ) const noexcept
     {
       return (point.x * r[1].x) + (point.y * r[1].y) + (point.z * r[1].z) + r[1].w;
     }
@@ -47,7 +49,9 @@ namespace moho
      * (0x008282B0, 0x008288D0) both divide a style size/width by this to
      * keep on-screen size roughly constant with distance.
      */
-    [[nodiscard]] float ProjectViewportWidthRow2(const Wm3::Vector3f& point) const noexcept
+    [[nodiscard]] float ProjectViewportWidthRow2(
+      const Wm3::Vector3f& point
+    ) const noexcept
     {
       return (point.x * r[2].x) + (point.y * r[2].y) + (point.z * r[2].z) + r[2].w;
     }
@@ -155,7 +159,11 @@ namespace moho
     static const VMatrix4 sIdentity;
 
     /** Set translation (last row). */
-    void SetTranslation(float tx, float ty, float tz)
+    void SetTranslation(
+      float tx,
+      float ty,
+      float tz
+    )
     {
       r[3] = {tx, ty, tz, 1.0f};
     }
@@ -170,7 +178,9 @@ namespace moho
 #if MOHO_USE_SSE2
     /** Compile-time splat: Lane is template immediate for _mm_shuffle_ps. */
     template <int Lane>
-    static MOHO_FORCEINLINE __m128 splat(__m128 v)
+    static MOHO_FORCEINLINE __m128 splat(
+      __m128 v
+    )
     {
       static_assert(Lane >= 0 && Lane <= 3, "Lane out of range");
       return _mm_shuffle_ps(v, v, _MM_SHUFFLE(Lane, Lane, Lane, Lane));
@@ -180,7 +190,10 @@ namespace moho
     /**
      * Row-vector multiply: v_row * M.
      */
-    friend Vector4f operator*(const Vector4f& vRow, const VMatrix4& M)
+    friend Vector4f operator*(
+      const Vector4f& vRow,
+      const VMatrix4& M
+    )
     {
 #if MOHO_USE_SSE2
       const __m128 a = _mm_loadu_ps(&vRow.x);
@@ -210,7 +223,10 @@ namespace moho
     /**
      * Matrix multiply under row-vector convention: R = A * B (apply A then B).
      */
-    static VMatrix4 Multiply(const VMatrix4& A, const VMatrix4& B)
+    static VMatrix4 Multiply(
+      const VMatrix4& A,
+      const VMatrix4& B
+    )
     {
       VMatrix4 r{};
 #if MOHO_USE_SSE2
@@ -242,7 +258,9 @@ namespace moho
     /**
      * Transpose (useful if you prefer column-vector code paths somewhere).
      */
-    static VMatrix4 Transpose(const VMatrix4& M)
+    static VMatrix4 Transpose(
+      const VMatrix4& M
+    )
     {
       VMatrix4 T{};
 #if MOHO_USE_SSE2
@@ -267,7 +285,9 @@ namespace moho
     /**
      * Inverse for rigid transform (rotation+translation only, row-vector convention).
      */
-    static VMatrix4 InverseRigid(const VMatrix4& M)
+    static VMatrix4 InverseRigid(
+      const VMatrix4& M
+    )
     {
       VMatrix4 r{};
       // Transpose 3x3 rotation block (top-left), zero the last column.

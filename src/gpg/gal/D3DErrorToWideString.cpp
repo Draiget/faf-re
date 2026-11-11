@@ -12,18 +12,18 @@ namespace gpg
    * Maps DirectX/COM HRESULT values to the engine's static diagnostic text
    * table as wide-character literals, returning L"n/a" when no mapping exists.
    */
-const wchar_t* __stdcall D3DErrorToWideString(const long a1)
-{
-  const wchar_t *result; // eax
-
-  if ( a1 > -2005532092 )
+  const wchar_t* __stdcall D3DErrorToWideString(
+    const long a1
+  )
   {
-    if ( a1 <= -2005532042 )
-    {
-      if ( a1 == -2005532042 )
-        return L"An attempt was made to allocate non-local video memory from a device that does not support non-local video memory.";
-      switch ( a1 )
-      {
+    const wchar_t* result; // eax
+
+    if (a1 > -2005532092) {
+      if (a1 <= -2005532042) {
+        if (a1 == -2005532042)
+          return L"An attempt was made to allocate non-local video memory from a device that does not support "
+                 L"non-local video memory.";
+        switch (a1) {
         case -2005532091:
           result = L"An attempt was made to set the cooperative level when it was already set to exclusive.";
           break;
@@ -34,13 +34,15 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
           result = L"Can't duplicate primary & 3D surfaces, or surfaces that are implicitly created.";
           break;
         case -2005532088:
-          result = L"Surface was not locked.  An attempt to unlock a surface that was not locked at all, or by this proces"
-                   L"s, has been attempted.";
+          result =
+            L"Surface was not locked.  An attempt to unlock a surface that was not locked at all, or by this proces"
+            L"s, has been attempted.";
           break;
         case -2005532087:
-          result = L"Windows can not create any more DCs, or a DC was requested for a paltte-indexed surface when the surf"
-                   L"ace had no palette AND the display mode was not palette-indexed (in this case DirectDraw cannot selec"
-                   L"t a proper palette into the DC)";
+          result =
+            L"Windows can not create any more DCs, or a DC was requested for a paltte-indexed surface when the surf"
+            L"ace had no palette AND the display mode was not palette-indexed (in this case DirectDraw cannot selec"
+            L"t a proper palette into the DC)";
           break;
         case -2005532086:
           result = L"No DC was ever created for this surface.";
@@ -58,7 +60,8 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
           result = L"The display is currently in an unsupported mode";
           break;
         case -2005532081:
-          result = L"Operation could not be carried out because there is no mip-map texture mapping hardware present or available.";
+          result = L"Operation could not be carried out because there is no mip-map texture mapping hardware present "
+                   L"or available.";
           break;
         case -2005532080:
           result = L"The requested action could not be performed because the surface was of the wrong type.";
@@ -80,40 +83,43 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
           break;
         default:
           return L"n/a";
+        }
+        return result;
       }
-      return result;
-    }
-    if ( a1 > -2005396959 )
-    {
-      if ( a1 <= -2005336063 )
-      {
-        if ( a1 == -2005336063 )
-          return L"There are too many unique state objects.";
-        switch ( a1 )
-        {
+      if (a1 > -2005396959) {
+        if (a1 <= -2005336063) {
+          if (a1 == -2005336063)
+            return L"There are too many unique state objects.";
+          switch (a1) {
           case -2005396958:
             result = L"The file contains an invalid parameter control track.";
             break;
           case -2005396957:
-            result = L"A script written in AudioVBScript could not be read because it contained a statement that is not al"
-                     L"lowed by the AudioVBScript language.";
+            result =
+              L"A script written in AudioVBScript could not be read because it contained a statement that is not al"
+              L"lowed by the AudioVBScript language.";
             break;
           case -2005396956:
-            result = L"A script routine written in AudioVBScript failed because an invalid operation occurred.  For exampl"
-                     L"e, adding the number 3 to a segment object would produce this error.  So would attempting to call a"
-                     L" routine that doesn't exist.";
+            result =
+              L"A script routine written in AudioVBScript failed because an invalid operation occurred.  For exampl"
+              L"e, adding the number 3 to a segment object would produce this error.  So would attempting to call a"
+              L" routine that doesn't exist.";
             break;
           case -2005396955:
-            result = L"A script routine written in AudioVBScript failed because a function outside of a script failed to c"
-                     L"omplete. For example, a call to PlaySegment that fails to play because of low memory would return this error.";
+            result =
+              L"A script routine written in AudioVBScript failed because a function outside of a script failed to c"
+              L"omplete. For example, a call to PlaySegment that fails to play because of low memory would return this "
+              L"error.";
             break;
           case -2005396954:
-            result = L"The Performance has set up some PChannels using the AssignPChannel command, which makes it not capa"
-                     L"ble of supporting audio paths.";
+            result =
+              L"The Performance has set up some PChannels using the AssignPChannel command, which makes it not capa"
+              L"ble of supporting audio paths.";
             break;
           case -2005396953:
-            result = L"This is the inverse of the previous error. The Performance has set up some audio paths, which makes"
-                     L" is incompatible with the calls to allocate pchannels, etc. ";
+            result =
+              L"This is the inverse of the previous error. The Performance has set up some audio paths, which makes"
+              L" is incompatible with the calls to allocate pchannels, etc. ";
             break;
           case -2005396952:
             result = L"A segment or song was asked for its embedded audio path configuration, but there isn't any. ";
@@ -134,30 +140,25 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
             result = L"Invalid data was found in a RIFF file chunk.";
             break;
           case -2005396946:
-            result = L"Attempt was made to create an audiopath that sends to a global effects buffer which did not exist.";
+            result =
+              L"Attempt was made to create an audiopath that sends to a global effects buffer which did not exist.";
             break;
           case -2005396945:
             result = L"The file does not contain a valid container object.";
             break;
           default:
             return L"n/a";
+          }
+          return result;
         }
-        return result;
-      }
-      if ( a1 <= -931722305 )
-      {
-        if ( a1 == -931722305 )
-          return L"Z buffer has not been created";
-        if ( a1 > -1966669805 )
-        {
-          if ( a1 > -1072898029 )
-          {
-            if ( a1 > -1072898010 )
-            {
-              if ( a1 <= -931722310 )
-              {
-                switch ( a1 )
-                {
+        if (a1 <= -931722305) {
+          if (a1 == -931722305)
+            return L"Z buffer has not been created";
+          if (a1 > -1966669805) {
+            if (a1 > -1072898029) {
+              if (a1 > -1072898010) {
+                if (a1 <= -931722310) {
+                  switch (a1) {
                   case -931722310:
                     return L"The Device Index passed in is invalid";
                   case -1072897501:
@@ -168,11 +169,10 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
                     return L"Out of memory";
                   case -931722311:
                     return L"A NULL pointer was passed as a parameter";
+                  }
+                  return L"n/a";
                 }
-                return L"n/a";
-              }
-              switch ( a1 )
-              {
+                switch (a1) {
                 case -931722309:
                   return L"DirectDraw has not been created";
                 case -931722308:
@@ -181,16 +181,11 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
                   return L"Direct3D device has not been created";
                 default:
                   return L"Primary surface has not been created";
-              }
-            }
-            else if ( a1 == -1072898010 )
-            {
-              return L"Expecting: %1.";
-            }
-            else
-            {
-              switch ( a1 )
-              {
+                }
+              } else if (a1 == -1072898010) {
+                return L"Expecting: %1.";
+              } else {
+                switch (a1) {
                 case -1072898028:
                   result = L"Element content is invalid according to the DTD or schema.";
                   break;
@@ -198,7 +193,8 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
                   result = L"The attribute '%1' on this element is not defined in the DTD or schema.";
                   break;
                 case -1072898026:
-                  result = L"Attribute '%1' has a value that does not match the fixed value defined in the DTD or schema.";
+                  result =
+                    L"Attribute '%1' has a value that does not match the fixed value defined in the DTD or schema.";
                   break;
                 case -1072898025:
                   result = L"Attribute '%1' has an invalid value according to the DTD or schema.";
@@ -220,21 +216,16 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
                   break;
                 default:
                   return L"n/a";
+                }
               }
-            }
-          }
-          else
-          {
-            if ( a1 == -1072898029 )
-              return L"The name of the top-most element must match the name of the DOCTYPE declaration.";
-            if ( a1 <= -1072898046 )
-            {
-              if ( a1 == -1072898046 )
-                return L"Reference to undefined entity '%1'.";
-              if ( a1 > -1966669566 )
-              {
-                switch ( a1 )
-                {
+            } else {
+              if (a1 == -1072898029)
+                return L"The name of the top-most element must match the name of the DOCTYPE declaration.";
+              if (a1 <= -1072898046) {
+                if (a1 == -1072898046)
+                  return L"Reference to undefined entity '%1'.";
+                if (a1 > -1966669566) {
+                  switch (a1) {
                   case -1966669565:
                     return L"Missing an RPC curve.";
                   case -1966669564:
@@ -243,12 +234,9 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
                     return L"Unknown command.";
                   case -1966669562:
                     return L"Missing a DSP parameter.";
-                }
-              }
-              else
-              {
-                switch ( a1 )
-                {
+                  }
+                } else {
+                  switch (a1) {
                   case -1966669566:
                     return L"Missing a soundbank.";
                   case -1966669804:
@@ -259,12 +247,11 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
                     return L"The wavebank is not prepared.";
                   case -1966669567:
                     return L"Error writing a file during auditioning.";
+                  }
                 }
+                return L"n/a";
               }
-              return L"n/a";
-            }
-            switch ( a1 )
-            {
+              switch (a1) {
               case -1072898045:
                 result = L"Entity '%1' contains an infinite entity reference loop.";
                 break;
@@ -294,19 +281,14 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
                 break;
               default:
                 return L"n/a";
+              }
             }
-          }
-        }
-        else
-        {
-          if ( a1 == -1966669805 )
-            return L"No wavebank exists for desired operation.";
-          if ( a1 > -2003435509 )
-          {
-            if ( a1 > -1966669815 )
-            {
-              switch ( a1 )
-              {
+          } else {
+            if (a1 == -1966669805)
+              return L"No wavebank exists for desired operation.";
+            if (a1 > -2003435509) {
+              if (a1 > -1966669815) {
+                switch (a1) {
                 case -1966669814:
                   result = L"Invalid variable index.";
                   break;
@@ -336,16 +318,12 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
                   break;
                 default:
                   return L"n/a";
-              }
-            }
-            else
-            {
-              if ( a1 == -1966669815 )
-                return L"Global Settings not loaded.";
-              if ( a1 <= -1966669820 )
-              {
-                switch ( a1 )
-                {
+                }
+              } else {
+                if (a1 == -1966669815)
+                  return L"Global Settings not loaded.";
+                if (a1 <= -1966669820) {
+                  switch (a1) {
                   case -1966669820:
                     return L"No notification callback.";
                   case -2003435508:
@@ -356,11 +334,10 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
                     return L"The engine has not been initialized.";
                   case -1966669821:
                     return L"The engine has expired (demo or pre-release version).";
+                  }
+                  return L"n/a";
                 }
-                return L"n/a";
-              }
-              switch ( a1 )
-              {
+                switch (a1) {
                 case -1966669819:
                   return L"Notification already registered.";
                 case -1966669818:
@@ -369,21 +346,16 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
                   return L"Invalid data.";
                 default:
                   return L"Fail to play due to instance limit.";
+                }
               }
-            }
-          }
-          else
-          {
-            if ( a1 == -2003435509 )
-              return L"Failed to instantiate an effect.";
-            if ( a1 <= -2003435519 )
-            {
-              if ( a1 == -2003435519 )
-                return L"Method cannot be called before IXAudio2::Initialize.";
-              if ( a1 > -2005270522 )
-              {
-                switch ( a1 )
-                {
+            } else {
+              if (a1 == -2003435509)
+                return L"Failed to instantiate an effect.";
+              if (a1 <= -2003435519) {
+                if (a1 == -2003435519)
+                  return L"Method cannot be called before IXAudio2::Initialize.";
+                if (a1 > -2005270522) {
+                  switch (a1) {
                   case -2005270521:
                     return L"Device reset.";
                   case -2005270518:
@@ -391,22 +363,24 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
                   case -2005270496:
                     return L"An internal driver error occurred.";
                   case -2005270495:
-                    return L"The application attempted to perform an operation on an DXGI output that is only legal after "
+                    return L"The application attempted to perform an operation on an DXGI output that is only legal "
+                           L"after "
                            L"the output has been claimed for exclusive owenership.";
-                }
-              }
-              else
-              {
-                switch ( a1 )
-                {
+                  }
+                } else {
+                  switch (a1) {
                   case -2005270522:
                     return L"Device hung.";
                   case -2005270527:
-                    return L"The application has made an erroneous API call that it had enough information to avoid. This "
-                           L"error is intended to denote that the application should be altered to avoid the error. Use of"
-                           L" the debug version of the DXGI.DLL will provide run-time debug output with further information.";
+                    return L"The application has made an erroneous API call that it had enough information to avoid. "
+                           L"This "
+                           L"error is intended to denote that the application should be altered to avoid the error. "
+                           L"Use of"
+                           L" the debug version of the DXGI.DLL will provide run-time debug output with further "
+                           L"information.";
                   case -2005270526:
-                    return L"The item requested was not found. For GetPrivateData calls, this means that the specified GUI"
+                    return L"The item requested was not found. For GetPrivateData calls, this means that the specified "
+                           L"GUI"
                            L"D had not been previously associated with the object.";
                   case -2005270525:
                     return L"The specified size of the destination buffer is too small to hold the requested data.";
@@ -414,12 +388,11 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
                     return L"Unsupported.";
                   case -2005270523:
                     return L"Device removed.";
+                  }
                 }
+                return L"n/a";
               }
-              return L"n/a";
-            }
-            switch ( a1 )
-            {
+              switch (a1) {
               case -2003435518:
                 result = L"IXAudio2::Initialize was called redundantly.";
                 break;
@@ -449,17 +422,15 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
                 break;
               default:
                 return L"n/a";
+              }
             }
           }
+          return result;
         }
-        return result;
-      }
-      if ( a1 <= 0 )
-      {
-        if ( !a1 )
-          return L"The function completed successfully";
-        switch ( a1 )
-        {
+        if (a1 <= 0) {
+          if (!a1)
+            return L"The function completed successfully";
+          switch (a1) {
           case -931722304:
             result = L"Backbuffer has not been created";
             break;
@@ -546,15 +517,13 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
             break;
           default:
             return L"n/a";
+          }
+          return result;
         }
-        return result;
-      }
-      if ( a1 <= 262147 )
-      {
-        if ( a1 == 262147 )
-          return L"End of stream. Sample not updated.";
-        switch ( a1 )
-        {
+        if (a1 <= 262147) {
+          if (a1 == 262147)
+            return L"End of stream. Sample not updated.";
+          switch (a1) {
           case 1:
             result = L"Call successful, but returned FALSE";
             break;
@@ -583,35 +552,31 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
             break;
           default:
             return L"n/a";
+          }
+          return result;
         }
-        return result;
-      }
-      if ( a1 <= 262797 )
-      {
-        if ( a1 == 262797 )
-          return L"The seek into the movie was not frame accurate.";
-        if ( a1 > 262744 )
-        {
-          if ( a1 > 262760 )
-          {
-            switch ( a1 )
-            {
+        if (a1 <= 262797) {
+          if (a1 == 262797)
+            return L"The seek into the movie was not frame accurate.";
+          if (a1 > 262744) {
+            if (a1 > 262760) {
+              switch (a1) {
               case 262768:
                 return L"The stop time for the sample was not set.";
               case 262782:
-                return L"There was no preview pin available, so the capture pin output is being split to provide both capt"
+                return L"There was no preview pin available, so the capture pin output is being split to provide both "
+                       L"capt"
                        L"ure and preview.";
               case 262784:
-                return L"The current title was not a sequential set of chapters (PGC), and the returned timing information"
+                return L"The current title was not a sequential set of chapters (PGC), and the returned timing "
+                       L"information"
                        L" might not be continuous.";
               case 262796:
-                return L"The audio stream did not contain sufficient information to determine the contents of each channel.";
-            }
-          }
-          else
-          {
-            switch ( a1 )
-            {
+                return L"The audio stream did not contain sufficient information to determine the contents of each "
+                       L"channel.";
+              }
+            } else {
+              switch (a1) {
               case 262760:
                 return L"The graph can't be cued because of lack of or corrupt data.";
               case 262746:
@@ -622,32 +587,26 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
                 return L"This success code is reserved for internal purposes within ActiveMovie.";
               case 262759:
                 return L"The stream has been turned off.";
+              }
             }
-          }
-        }
-        else
-        {
-          if ( a1 == 262744 )
-            return L"Cannot play back the audio stream: no audio hardware is available.";
-          if ( a1 > 262725 )
-          {
-            switch ( a1 )
-            {
+          } else {
+            if (a1 == 262744)
+              return L"Cannot play back the audio stream: no audio hardware is available.";
+            if (a1 > 262725) {
+              switch (a1) {
               case 262726:
                 return L"Some connections have failed and have been deferred.";
               case 262736:
                 return L"The resource specified is no longer needed.";
               case 262740:
-                return L"A connection could not be made with the media type in the persistent graph, but has been made wit"
+                return L"A connection could not be made with the media type in the persistent graph, but has been made "
+                       L"wit"
                        L"h a negotiated media type.";
               case 262743:
                 return L"Cannot play back the video stream: no suitable decompressor could be found.";
-            }
-          }
-          else
-          {
-            switch ( a1 )
-            {
+              }
+            } else {
+              switch (a1) {
               case 262725:
                 return L"The file contained some property settings that were not used.";
               case 262403:
@@ -658,40 +617,41 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
                 return L"The state transition has not completed.";
               case 262722:
                 return L"Some of the streams in this movie are in an unsupported format.";
+              }
             }
           }
+          return L"n/a";
         }
-        return L"n/a";
-      }
-      if ( a1 <= 142086658 )
-      {
-        if ( a1 == 142086658 )
-          return L"Return value from IDirectMusicTrack::Play() which indicates to the segment that the track has no more d"
-                 L"ata after mtEnd.";
-        if ( a1 > 142082058 )
-        {
-          switch ( a1 )
-          {
+        if (a1 <= 142086658) {
+          if (a1 == 142086658)
+            return L"Return value from IDirectMusicTrack::Play() which indicates to the segment that the track has no "
+                   L"more d"
+                   L"ata after mtEnd.";
+          if (a1 > 142082058) {
+            switch (a1) {
             case 142086289:
-              return L"The object could only load partially. This can happen if some components are not registered properl"
-                     L"y, such as embedded tracks and tools. This can also happen if some content is missing. For example,"
+              return L"The object could only load partially. This can happen if some components are not registered "
+                     L"properl"
+                     L"y, such as embedded tracks and tools. This can also happen if some content is missing. For "
+                     L"example,"
                      L" if a segment uses a DLS collection that is not in the loader's current search directory.";
             case 142086290:
-              return L"Return value from IDirectMusicBand::Download() which indicates that some of the instruments safely "
-                     L"downloaded, but others failed. This usually occurs when some instruments are on PChannels not suppo"
+              return L"Return value from IDirectMusicBand::Download() which indicates that some of the instruments "
+                     L"safely "
+                     L"downloaded, but others failed. This usually occurs when some instruments are on PChannels not "
+                     L"suppo"
                      L"rted by the performance or port.";
             case 142086656:
-              return L"Return value from IDirectMusicTool::ProcessPMsg() which indicates to the performance that it should"
+              return L"Return value from IDirectMusicTool::ProcessPMsg() which indicates to the performance that it "
+                     L"should"
                      L" cue the PMsg again automatically.";
             case 142086657:
-              return L"Return value from IDirectMusicTool::ProcessPMsg() which indicates to the performance that it should"
+              return L"Return value from IDirectMusicTool::ProcessPMsg() which indicates to the performance that it "
+                     L"should"
                      L" free the PMsg automatically.";
-          }
-        }
-        else
-        {
-          switch ( a1 )
-          {
+            }
+          } else {
+            switch (a1) {
             case 142082058:
               return L"The call succeeded, but we had to substitute the 3D algorithm";
             case 1376261:
@@ -702,60 +662,72 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
               return L"Pending";
             case 141953135:
               return L"The call succeeded but there won't be any mipmaps generated";
+            }
           }
+          return L"n/a";
         }
-        return L"n/a";
-      }
-      if ( a1 <= 142086676 )
-      {
-        switch ( a1 )
-        {
+        if (a1 <= 142086676) {
+          switch (a1) {
           case 142086676:
-            return L"Returned from IDirectMusicPerformance::MIDIToMusic(),  and IDirectMusicPerformance::MusicToMIDI(), th"
-                   L"is indicates  that the note conversion generated a note value that is above 127, so it has been bumpe"
-                   L"d down one or more octaves to be in the proper MIDI range of 0 through 127.  Note that this is valid "
-                   L"for MIDIToMusic() when using play modes DMUS_PLAYMODE_FIXEDTOCHORD and DMUS_PLAYMODE_FIXEDTOKEY, both"
-                   L" of which store MIDI values in wMusicValue. With MusicToMIDI(), it is valid for all play modes. Ofcou"
+            return L"Returned from IDirectMusicPerformance::MIDIToMusic(),  and "
+                   L"IDirectMusicPerformance::MusicToMIDI(), th"
+                   L"is indicates  that the note conversion generated a note value that is above 127, so it has been "
+                   L"bumpe"
+                   L"d down one or more octaves to be in the proper MIDI range of 0 through 127.  Note that this is "
+                   L"valid "
+                   L"for MIDIToMusic() when using play modes DMUS_PLAYMODE_FIXEDTOCHORD and DMUS_PLAYMODE_FIXEDTOKEY, "
+                   L"both"
+                   L" of which store MIDI values in wMusicValue. With MusicToMIDI(), it is valid for all play modes. "
+                   L"Ofcou"
                    L"rse, DMUS_PLAYMODE_FIXED will never return this success code.";
           case 142086672:
             return L"Returned string has been truncated to fit the buffer size.";
           case 142086673:
-            return L"Returned from IDirectMusicGraph::StampPMsg(), this indicates that the PMsg is already stamped with th"
+            return L"Returned from IDirectMusicGraph::StampPMsg(), this indicates that the PMsg is already stamped "
+                   L"with th"
                    L"e last tool in the graph. The returned PMsg's tool pointer is now NULL.";
           case 142086674:
-            return L"Returned from IDirectMusicPerformance::MusicToMIDI(), this indicates  that no note has been calculate"
-                   L"d because the music value has the note  at a position higher than the top note of the chord. This app"
-                   L"lies only to DMUS_PLAYMODE_NORMALCHORD play mode. This success code indicates that the caller should "
+            return L"Returned from IDirectMusicPerformance::MusicToMIDI(), this indicates  that no note has been "
+                   L"calculate"
+                   L"d because the music value has the note  at a position higher than the top note of the chord. This "
+                   L"app"
+                   L"lies only to DMUS_PLAYMODE_NORMALCHORD play mode. This success code indicates that the caller "
+                   L"should "
                    L"not do anything with the note. It is not meant to be played against this chord.";
           case 142086675:
-            return L"Returned from IDirectMusicPerformance::MIDIToMusic(),  and IDirectMusicPerformance::MusicToMIDI(), th"
-                   L"is indicates  that the note conversion generated a note value that is below 0,  so it has been bumped"
-                   L" up one or more octaves to be in the proper MIDI range of 0 through 127.  Note that this is valid for"
-                   L" MIDIToMusic() when using play modes DMUS_PLAYMODE_FIXEDTOCHORD and DMUS_PLAYMODE_FIXEDTOKEY, both of"
-                   L" which store MIDI values in wMusicValue. With MusicToMIDI(), it is valid for all play modes. Ofcourse"
+            return L"Returned from IDirectMusicPerformance::MIDIToMusic(),  and "
+                   L"IDirectMusicPerformance::MusicToMIDI(), th"
+                   L"is indicates  that the note conversion generated a note value that is below 0,  so it has been "
+                   L"bumped"
+                   L" up one or more octaves to be in the proper MIDI range of 0 through 127.  Note that this is valid "
+                   L"for"
+                   L" MIDIToMusic() when using play modes DMUS_PLAYMODE_FIXEDTOCHORD and DMUS_PLAYMODE_FIXEDTOKEY, "
+                   L"both of"
+                   L" which store MIDI values in wMusicValue. With MusicToMIDI(), it is valid for all play modes. "
+                   L"Ofcourse"
                    L", DMUS_PLAYMODE_FIXED will never return this success code.";
+          }
+          return L"n/a";
+        }
+        switch (a1) {
+        case 142086677:
+          return L"Although the audio output from the port will be routed to the same device as the given DirectSound "
+                 L"buff"
+                 L"er, buffer controls such as pan and volume will not affect the output.";
+        case 142086678:
+          return L"The requested operation was not performed because during CollectGarbage the loader determined that "
+                 L"the "
+                 L"object had been released.";
+        case 142213121:
+          return L"The target window or output has been occluded. The application should suspend rendering operations "
+                 L"if possible.";
         }
         return L"n/a";
       }
-      switch ( a1 )
-      {
-        case 142086677:
-          return L"Although the audio output from the port will be routed to the same device as the given DirectSound buff"
-                 L"er, buffer controls such as pan and volume will not affect the output.";
-        case 142086678:
-          return L"The requested operation was not performed because during CollectGarbage the loader determined that the "
-                 L"object had been released.";
-        case 142213121:
-          return L"The target window or output has been occluded. The application should suspend rendering operations if possible.";
-      }
-      return L"n/a";
-    }
-    if ( a1 == -2005396959 )
-      return L"The file contains an invalid lyrics track.";
-    if ( a1 > -2005397240 )
-    {
-      switch ( a1 )
-      {
+      if (a1 == -2005396959)
+        return L"The file contains an invalid lyrics track.";
+      if (a1 > -2005397240) {
+        switch (a1) {
         case -2005397239:
           result = L"Wave chunks in DLS collection file are at incorrect offsets.";
           break;
@@ -832,7 +804,8 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
           result = L"An attempt was made to close the software synthesizer while it was already  open.";
           break;
         case -2005397199:
-          result = L"The operation could not be completed because the software synth has not  yet been fully configured.";
+          result =
+            L"The operation could not be completed because the software synth has not  yet been fully configured.";
           break;
         case -2005397198:
           result = L"The operation cannot be carried out while the synthesizer is active.";
@@ -841,8 +814,9 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
           result = L"An error occurred while attempting to read from the IStream* object.";
           break;
         case -2005397196:
-          result = L"The operation cannot be performed because the final instance of the DirectMusic object was released. "
-                   L"Ports cannot be used after final  release of the DirectMusic object.";
+          result =
+            L"The operation cannot be performed because the final instance of the DirectMusic object was released. "
+            L"Ports cannot be used after final  release of the DirectMusic object.";
           break;
         case -2005397195:
           result = L"There was no data in the referenced buffer.";
@@ -857,8 +831,10 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
           result = L"The given operation could not be carried out because the port is a render port.";
           break;
         case -2005397191:
-          result = L"The port could not be created because no DirectSound has been specified. Specify a DirectSound interf"
-                   L"ace via the IDirectMusic::SetDirectSound method; pass NULL to have DirectMusic manage usage of DirectSound.";
+          result =
+            L"The port could not be created because no DirectSound has been specified. Specify a DirectSound interf"
+            L"ace via the IDirectMusic::SetDirectSound method; pass NULL to have DirectMusic manage usage of "
+            L"DirectSound.";
           break;
         case -2005397190:
           result = L"The operation cannot be carried out while the port is active.";
@@ -876,8 +852,9 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
           result = L"IDirectMusic::SetDirectSound has already been called. It may not be changed while in use.";
           break;
         case -2005397185:
-          result = L"The given event is invalid (either it is not a valid MIDI message or it makes use of running status)."
-                   L" The event cannot be packed into the buffer.";
+          result =
+            L"The given event is invalid (either it is not a valid MIDI message or it makes use of running status)."
+            L" The event cannot be packed into the buffer.";
           break;
         case -2005397168:
           result = L"The IStream* object does not contain data supported by the loading object.";
@@ -889,28 +866,34 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
           result = L"The file does not contain a valid band.";
           break;
         case -2005397163:
-          result = L"The IStream* object's data does not have a track header as the first chunk, and therefore can not be "
-                   L"read by the segment object.";
+          result =
+            L"The IStream* object's data does not have a track header as the first chunk, and therefore can not be "
+            L"read by the segment object.";
           break;
         case -2005397162:
-          result = L"The IStream* object's data does not have a tool header as the first chunk, and therefore can not be r"
-                   L"ead by the graph object.";
+          result =
+            L"The IStream* object's data does not have a tool header as the first chunk, and therefore can not be r"
+            L"ead by the graph object.";
           break;
         case -2005397161:
-          result = L"The IStream* object's data contains an invalid track header (ckid is 0 and fccType is NULL,) and ther"
-                   L"efore can not be read by the segment object.";
+          result =
+            L"The IStream* object's data contains an invalid track header (ckid is 0 and fccType is NULL,) and ther"
+            L"efore can not be read by the segment object.";
           break;
         case -2005397160:
-          result = L"The IStream* object's data contains an invalid tool header (ckid is 0 and fccType is NULL,) and there"
-                   L"fore can not be read by the graph object.";
+          result =
+            L"The IStream* object's data contains an invalid tool header (ckid is 0 and fccType is NULL,) and there"
+            L"fore can not be read by the graph object.";
           break;
         case -2005397159:
-          result = L"The graph object was unable to load all tools from the IStream* object data. This may be due to error"
-                   L"s in the stream, or the tools being incorrectly registered on the client.";
+          result =
+            L"The graph object was unable to load all tools from the IStream* object data. This may be due to error"
+            L"s in the stream, or the tools being incorrectly registered on the client.";
           break;
         case -2005397152:
-          result = L"The segment object was unable to load all tracks from the IStream* object data. This may be due to er"
-                   L"rors in the stream, or the tracks being incorrectly registered on the client.";
+          result =
+            L"The segment object was unable to load all tracks from the IStream* object data. This may be due to er"
+            L"rors in the stream, or the tracks being incorrectly registered on the client.";
           break;
         case -2005397151:
           result = L"The object requested was not found (numerically equal to DMUS_E_NOT_FOUND)";
@@ -919,8 +902,9 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
           result = L"A required object is not initialized or failed to initialize.";
           break;
         case -2005397149:
-          result = L"The requested parameter type is currently disabled. Parameter types may be enabled and disabled by ce"
-                   L"rtain calls to SetParam().";
+          result =
+            L"The requested parameter type is currently disabled. Parameter types may be enabled and disabled by ce"
+            L"rtain calls to SetParam().";
           break;
         case -2005397148:
           result = L"The requested parameter type is not supported on the object.";
@@ -971,21 +955,26 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
           result = L"Segment initialization failed, most likely due to a critical memory situation.";
           break;
         case -2005396988:
-          result = L"The DMUS_PMSG has already been sent to the performance object via IDirectMusicPerformance::SendPMsg().";
+          result =
+            L"The DMUS_PMSG has already been sent to the performance object via IDirectMusicPerformance::SendPMsg().";
           break;
         case -2005396987:
-          result = L"The DMUS_PMSG was either not allocated by the performance via IDirectMusicPerformance::AllocPMsg(), o"
-                   L"r it was already freed via IDirectMusicPerformance::FreePMsg().";
+          result =
+            L"The DMUS_PMSG was either not allocated by the performance via IDirectMusicPerformance::AllocPMsg(), o"
+            L"r it was already freed via IDirectMusicPerformance::FreePMsg().";
           break;
         case -2005396986:
           result = L"The default system port could not be opened.";
           break;
         case -2005396985:
-          result = L"A call to MIDIToMusic() or MusicToMIDI() resulted in an error because the requested conversion could "
-                   L"not happen. This usually occurs when the provided DMUS_CHORD_KEY structure has an invalid chord or scale pattern.";
+          result =
+            L"A call to MIDIToMusic() or MusicToMIDI() resulted in an error because the requested conversion could "
+            L"not happen. This usually occurs when the provided DMUS_CHORD_KEY structure has an invalid chord or scale "
+            L"pattern.";
           break;
         case -2005396976:
-          result = L"DMUS_E_DESCEND_CHUNK_FAIL is returned when the end of the file  was reached before the desired chunk was found.";
+          result = L"DMUS_E_DESCEND_CHUNK_FAIL is returned when the end of the file  was reached before the desired "
+                   L"chunk was found.";
           break;
         case -2005396975:
           result = L"An attempt to use this object failed because it first needs to be loaded.";
@@ -997,16 +986,19 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
           result = L"A varient was used that had a type that is not supported by DirectMusic.";
           break;
         case -2005396971:
-          result = L"An error was encountered while parsing or executing the script. The pErrorInfo parameter (if supplied"
-                   L") was filled with information about the error.";
+          result =
+            L"An error was encountered while parsing or executing the script. The pErrorInfo parameter (if supplied"
+            L") was filled with information about the error.";
           break;
         case -2005396970:
-          result = L"Loading of oleaut32.dll failed.  VBScript and other activeX scripting languages require use of oleaut"
-                   L"32.dll.  On platforms where oleaut32.dll is not present, only the DirectMusicScript language, which d"
-                   L"oesn't require oleaut32.dll can be used.";
+          result =
+            L"Loading of oleaut32.dll failed.  VBScript and other activeX scripting languages require use of oleaut"
+            L"32.dll.  On platforms where oleaut32.dll is not present, only the DirectMusicScript language, which d"
+            L"oesn't require oleaut32.dll can be used.";
           break;
         case -2005396969:
-          result = L"An error occured while parsing a script loaded using LoadScript.  The script that was loaded contains an error.";
+          result = L"An error occured while parsing a script loaded using LoadScript.  The script that was loaded "
+                   L"contains an error.";
           break;
         case -2005396968:
           result = L"The script file is invalid.";
@@ -1027,28 +1019,25 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
           result = L"Attempt was made to set a script's variable by reference to a value that was not an object type.";
           break;
         case -2005396962:
-          result = L"Attempt was made to set a script's variable by value to an object that does not support a default value property.";
+          result = L"Attempt was made to set a script's variable by value to an object that does not support a default "
+                   L"value property.";
           break;
         case -2005396960:
           result = L"The file contains an invalid segment trigger track.";
           break;
         default:
           return L"n/a";
+        }
+        return result;
       }
-      return result;
-    }
-    if ( a1 == -2005397240 )
-      return L"Error parsing DLS collection. File is corrupt.";
-    if ( a1 <= -2005530595 )
-    {
-      if ( a1 == -2005530595 )
-        return L"Too many operations";
-      if ( a1 > -2005531771 )
-      {
-        if ( a1 > -2005530600 )
-        {
-          switch ( a1 )
-          {
+      if (a1 == -2005397240)
+        return L"Error parsing DLS collection. File is corrupt.";
+      if (a1 <= -2005530595) {
+        if (a1 == -2005530595)
+          return L"Too many operations";
+        if (a1 > -2005531771) {
+          if (a1 > -2005530600) {
+            switch (a1) {
             case -2005530599:
               return L"Unsupported color operation";
             case -2005530598:
@@ -1057,16 +1046,11 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
               return L"Unsupported alpha operation";
             default:
               return L"Unsupported alpha arg";
-          }
-        }
-        else if ( a1 == -2005530600 )
-        {
-          return L"Wrong texture format";
-        }
-        else
-        {
-          switch ( a1 )
-          {
+            }
+          } else if (a1 == -2005530600) {
+            return L"Wrong texture format";
+          } else {
+            switch (a1) {
             case -2005531770:
               result = L"Bad type";
               break;
@@ -1100,42 +1084,38 @@ const wchar_t* __stdcall D3DErrorToWideString(const long a1)
               result = L"Parse error";
               break;
             case -2005531759:
-LABEL_679:
+            LABEL_679:
               result = L"Bad array size";
               break;
             case -2005531758:
-LABEL_680:
+            LABEL_680:
               result = L"Bad data reference";
               break;
             case -2005531757:
-LABEL_681:
+            LABEL_681:
               result = L"No more objects";
               break;
             case -2005531756:
-LABEL_682:
+            LABEL_682:
               result = L"No more data";
               break;
             case -2005531755:
-LABEL_683:
+            LABEL_683:
               result = L"Bad cache file";
               break;
             default:
               return L"n/a";
+            }
           }
-        }
-      }
-      else
-      {
-        if ( a1 == -2005531771 )
-          return L"Bad value";
-        if ( a1 <= -2005531973 )
-        {
-          if ( a1 == -2005531973 )
-            return L"Surfaces created by one direct draw device cannot be used directly by another direct draw device.";
-          if ( a1 > -2005531980 )
-          {
-            switch ( a1 )
-            {
+        } else {
+          if (a1 == -2005531771)
+            return L"Bad value";
+          if (a1 <= -2005531973) {
+            if (a1 == -2005531973)
+              return L"Surfaces created by one direct draw device cannot be used directly by another direct draw "
+                     L"device.";
+            if (a1 > -2005531980) {
+              switch (a1) {
               case -2005531979:
                 return L"The mode test has switched to a new mode.";
               case -2005531978:
@@ -1146,12 +1126,9 @@ LABEL_683:
                 return L"The monitor does not have EDID data.";
               case -2005531975:
                 return L"The driver does not enumerate display mode refresh rates.";
-            }
-          }
-          else
-          {
-            switch ( a1 )
-            {
+              }
+            } else {
+              switch (a1) {
               case -2005531980:
                 return L"The mode test has finished executing.";
               case -2005532032:
@@ -1164,18 +1141,14 @@ LABEL_683:
                 return L"There is more data available than the specified buffer size could hold";
               case -2005531981:
                 return L"The data has expired and is therefore no longer valid.";
+              }
             }
+            return L"n/a";
           }
-          return L"n/a";
-        }
-        if ( a1 == -2005531772 )
-        {
-          return L"Bad object";
-        }
-        else
-        {
-          switch ( a1 )
-          {
+          if (a1 == -2005531772) {
+            return L"Bad object";
+          } else {
+            switch (a1) {
             case -2005531804:
               goto LABEL_679;
             case -2005531803:
@@ -1200,23 +1173,19 @@ LABEL_683:
               break;
             default:
               return L"n/a";
+            }
           }
         }
+        return result;
       }
-      return result;
-    }
-    if ( a1 <= -2005529765 )
-    {
-      if ( a1 == -2005529765 )
-        return L"Duplicate named fragment";
-      if ( a1 <= -2005530518 )
-      {
-        if ( a1 == -2005530518 )
-          return L"Not available";
-        if ( a1 > -2005530585 )
-        {
-          switch ( a1 )
-          {
+      if (a1 <= -2005529765) {
+        if (a1 == -2005529765)
+          return L"Duplicate named fragment";
+        if (a1 <= -2005530518) {
+          if (a1 == -2005530518)
+            return L"Not available";
+          if (a1 > -2005530585) {
+            switch (a1) {
             case -2005530522:
               return L"Not found";
             case -2005530521:
@@ -1225,12 +1194,9 @@ LABEL_683:
               return L"Device lost";
             case -2005530519:
               return L"Device not reset";
-          }
-        }
-        else
-        {
-          switch ( a1 )
-          {
+            }
+          } else {
+            switch (a1) {
             case -2005530585:
               return L"Driver internal error";
             case -2005530594:
@@ -1243,14 +1209,12 @@ LABEL_683:
               return L"Unsupported texture filter";
             case -2005530586:
               return L"Conflicting texture palette";
+            }
           }
+          return L"n/a";
         }
-        return L"n/a";
-      }
-      if ( a1 <= -2005529770 )
-      {
-        switch ( a1 )
-        {
+        if (a1 <= -2005529770) {
+          switch (a1) {
           case -2005529770:
             return L"Cannot attr sort";
           case -2005530517:
@@ -1263,42 +1227,37 @@ LABEL_683:
             return L"Can not modify index buffer";
           case -2005529771:
             return L"Invalid mesh";
+          }
+          return L"n/a";
         }
-        return L"n/a";
-      }
-      switch ( a1 )
-      {
+        switch (a1) {
         case -2005529769:
           return L"Skinning not supported";
         case -2005529768:
           return L"Too many influences";
         case -2005529767:
           return L"Invalid data";
+        }
+        return L"Loaded mesh has no data";
       }
-      return L"Loaded mesh has no data";
-    }
-    if ( a1 > -2005401430 )
-    {
-      if ( a1 > -2005397246 )
-      {
-        switch ( a1 )
-        {
+      if (a1 > -2005401430) {
+        if (a1 > -2005397246) {
+          switch (a1) {
           case -2005397245:
-            return L"The requested device is already in use (possibly by a non-DirectMusic client) and cannot be opened again.";
+            return L"The requested device is already in use (possibly by a non-DirectMusic client) and cannot be "
+                   L"opened again.";
           case -2005397244:
             return L"Buffer is not large enough for requested operation.";
           case -2005397243:
             return L"No buffer was prepared for the download data.";
           case -2005397242:
             return L"Download failed due to inability to access or create download buffer.";
-        }
-      }
-      else
-      {
-        switch ( a1 )
-        {
+          }
+        } else {
+          switch (a1) {
           case -2005397246:
-            return L"The requested operation cannot be performed while there are  instantiated ports in any process in the system.";
+            return L"The requested operation cannot be performed while there are  instantiated ports in any process in "
+                   L"the system.";
           case -2005401420:
             return L"Tried to create a DSBCAPS_CTRLFX buffer shorter than DSBSIZE_FX_MIN milliseconds";
           case -2005401410:
@@ -1308,62 +1267,54 @@ LABEL_683:
           case -2005401390:
             return L"The GUID specified in an audiopath file does not match a valid MIXIN buffer";
           case -2005397247:
-            return L"An unexpected error was returned from a device driver, indicating possible failure of the driver or hardware.";
+            return L"An unexpected error was returned from a device driver, indicating possible failure of the driver "
+                   L"or hardware.";
+          }
         }
+        return L"n/a";
       }
-      return L"n/a";
-    }
-    if ( a1 == -2005401430 )
-      return L"This object has not been initialized";
-    if ( a1 <= -2005401500 )
-    {
-      switch ( a1 )
-      {
+      if (a1 == -2005401430)
+        return L"This object has not been initialized";
+      if (a1 <= -2005401500) {
+        switch (a1) {
         case -2005401500:
           return L"The specified WAVE format is not supported";
         case -2005529764:
           return L"Can Not remove last item";
         case -2005401590:
-          return L"The call failed because resources (such as a priority level) were already being used by another caller";
+          return L"The call failed because resources (such as a priority level) were already being used by another "
+                 L"caller";
         case -2005401570:
           return L"The control (vol, pan, etc.) requested by the caller is not available";
         case -2005401550:
           return L"This call is not valid for the current state of this object";
         case -2005401530:
           return L"The caller does not have the priority level required for the function to succeed";
+        }
+        return L"n/a";
       }
-      return L"n/a";
+      if (a1 == -2005401480)
+        return L"No sound driver is available for use";
+      if (a1 != -2005401470) {
+        if (a1 == -2005401450)
+          return L"The buffer memory has been lost, and must be restored";
+        if (a1 == -2005401440)
+          return L"Another app has a higher priority level, preventing this call from succeeding";
+        return L"n/a";
+      }
+      return L"This object is already initialized";
     }
-    if ( a1 == -2005401480 )
-      return L"No sound driver is available for use";
-    if ( a1 != -2005401470 )
-    {
-      if ( a1 == -2005401450 )
-        return L"The buffer memory has been lost, and must be restored";
-      if ( a1 == -2005401440 )
-        return L"Another app has a higher priority level, preventing this call from succeeding";
-      return L"n/a";
-    }
-    return L"This object is already initialized";
-  }
-  if ( a1 == -2005532092 )
-    return L"returned when an overlay member is called for a non-overlay surface";
-  if ( a1 > -2146107092 )
-  {
-    if ( a1 > -2146073232 )
-    {
-      if ( a1 > -2005532342 )
-      {
-        if ( a1 <= -2005532135 )
-        {
-          if ( a1 == -2005532135 )
-            return L"vertical blank is in progress";
-          if ( a1 > -2005532242 )
-          {
-            if ( a1 > -2005532192 )
-            {
-              switch ( a1 )
-              {
+    if (a1 == -2005532092)
+      return L"returned when an overlay member is called for a non-overlay surface";
+    if (a1 > -2146107092) {
+      if (a1 > -2146073232) {
+        if (a1 > -2005532342) {
+          if (a1 <= -2005532135) {
+            if (a1 == -2005532135)
+              return L"vertical blank is in progress";
+            if (a1 > -2005532242) {
+              if (a1 > -2005532192) {
+                switch (a1) {
                 case -2005532182:
                   return L"Width requested by DirectDraw is too large.";
                 case -2005532162:
@@ -1372,75 +1323,71 @@ LABEL_683:
                   return L"Bitmask in the pixel format requested is unsupported by DirectDraw";
                 case -2005532151:
                   return L"The specified stream contains invalid data";
-              }
-            }
-            else
-            {
-              switch ( a1 )
-              {
+                }
+              } else {
+                switch (a1) {
                 case -2005532192:
                   return L"Size requested by DirectDraw is too large --  The individual height and width are OK.";
                 case -2005532237:
-                  return L"Access to this surface is being refused because no driver exists which can supply a pointer to "
-                         L"the surface. This is most likely to happen when attempting to lock the primary surface when no "
+                  return L"Access to this surface is being refused because no driver exists which can supply a pointer "
+                         L"to "
+                         L"the surface. This is most likely to happen when attempting to lock the primary surface when "
+                         L"no "
                          L"DCI provider is present. Will also happen on attempts to lock an optimized surface.";
                 case -2005532232:
                   return L"Access to Surface refused because Surface is obscured.";
                 case -2005532222:
-                  return L"Access to this surface is being refused because the surface is gone. The DIRECTDRAWSURFACE obje"
+                  return L"Access to this surface is being refused because the surface is gone. The DIRECTDRAWSURFACE "
+                         L"obje"
                          L"ct representing this surface should have Restore called on it.";
                 case -2005532212:
                   return L"The requested surface is not attached.";
                 case -2005532202:
                   return L"Height requested by DirectDraw is too large.";
+                }
               }
-            }
-          }
-          else
-          {
-            if ( a1 == -2005532242 )
-              return L"Access to this surface is being refused because the surface is already locked by another thread.";
-            if ( a1 > -2005532290 )
-            {
-              switch ( a1 )
-              {
+            } else {
+              if (a1 == -2005532242)
+                return L"Access to this surface is being refused because the surface is already locked by another "
+                       L"thread.";
+              if (a1 > -2005532290) {
+                switch (a1) {
                 case -2005532288:
                   return L"Can only have ony color key active at one time for overlays";
                 case -2005532285:
-                  return L"Access to this palette is being refused because the palette is already locked by another thread.";
+                  return L"Access to this palette is being refused because the palette is already locked by another "
+                         L"thread.";
                 case -2005532272:
                   return L"No src color key specified for this operation.";
                 case -2005532262:
                   return L"This surface is already attached to the surface it is being attached to.";
                 case -2005532252:
                   return L"This surface is already a dependency of the surface it is being made a dependency of.";
-              }
-            }
-            else
-            {
-              switch ( a1 )
-              {
+                }
+              } else {
+                switch (a1) {
                 case -2005532290:
                   return L"hardware does not support clipped overlays";
                 case -2005532337:
-                  return L"Operation could not be carried out because there is no hardware support for vertical blank sync"
+                  return L"Operation could not be carried out because there is no hardware support for vertical blank "
+                         L"sync"
                          L"hronized operations.";
                 case -2005532332:
                   return L"Operation could not be carried out because there is no hardware support for zbuffer blting.";
                 case -2005532322:
-                  return L"Overlay surfaces could not be z layered based on their BltOrder because the hardware does not s"
+                  return L"Overlay surfaces could not be z layered based on their BltOrder because the hardware does "
+                         L"not s"
                          L"upport z layering of overlays.";
                 case -2005532312:
                   return L"The hardware needed for the requested operation has already been allocated.";
                 case -2005532292:
                   return L"Out of video memory";
+                }
               }
             }
+            return L"n/a";
           }
-          return L"n/a";
-        }
-        switch ( a1 )
-        {
+          switch (a1) {
           case -2005532132:
             result = L"Was still drawing";
             break;
@@ -1457,7 +1404,8 @@ LABEL_683:
             result = L"A DirectDraw object representing this driver has already been created for this process.";
             break;
           case -2005532109:
-            result = L"A hardware only DirectDraw object creation was attempted but the driver did not support any hardware.";
+            result =
+              L"A hardware only DirectDraw object creation was attempted but the driver did not support any hardware.";
             break;
           case -2005532108:
             result = L"this process already has created a primary surface";
@@ -1475,14 +1423,17 @@ LABEL_683:
             result = L"No clipper object attached to surface object";
             break;
           case -2005532103:
-            result = L"Clipper notification requires an HWND or no HWND has previously been set as the CooperativeLevel HWND.";
+            result =
+              L"Clipper notification requires an HWND or no HWND has previously been set as the CooperativeLevel HWND.";
             break;
           case -2005532102:
-            result = L"HWND used by DirectDraw CooperativeLevel has been subclassed, this prevents DirectDraw from restoring state.";
+            result = L"HWND used by DirectDraw CooperativeLevel has been subclassed, this prevents DirectDraw from "
+                     L"restoring state.";
             break;
           case -2005532101:
-            result = L"The CooperativeLevel HWND has already been set. It can not be reset while the process has surfaces "
-                     L"or palettes created.";
+            result =
+              L"The CooperativeLevel HWND has already been set. It can not be reset while the process has surfaces "
+              L"or palettes created.";
             break;
           case -2005532100:
             result = L"No palette object attached to this surface.";
@@ -1503,44 +1454,44 @@ LABEL_683:
             result = L"returned when GetOverlayPosition is called on a hidden overlay";
             break;
           case -2005532094:
-            result = L"returned when GetOverlayPosition is called on a overlay that UpdateOverlay has never been called on"
-                     L" to establish a destionation.";
+            result =
+              L"returned when GetOverlayPosition is called on a overlay that UpdateOverlay has never been called on"
+              L" to establish a destionation.";
             break;
           case -2005532093:
-            result = L"returned when the position of the overlay on the destionation is no longer legal for that destionation.";
+            result = L"returned when the position of the overlay on the destionation is no longer legal for that "
+                     L"destionation.";
             break;
           default:
             return L"n/a";
+          }
+          return result;
         }
-        return result;
-      }
-      if ( a1 == -2005532342 )
-        return L"Operation could not be carried out because there is no texture mapping hardware present or available.";
-      if ( a1 > -2005532502 )
-      {
-        if ( a1 > -2005532432 )
-        {
-          if ( a1 > -2005532382 )
-          {
-            switch ( a1 )
-            {
+        if (a1 == -2005532342)
+          return L"Operation could not be carried out because there is no texture mapping hardware present or "
+                 L"available.";
+        if (a1 > -2005532502) {
+          if (a1 > -2005532432) {
+            if (a1 > -2005532382) {
+              switch (a1) {
               case -2005532362:
                 return L"Operation could not be carried out because there is no hardware support for stretching";
               case -2005532356:
-                return L"DirectDrawSurface is not in 4 bit color palette and the requested operation requires 4 bit color palette.";
+                return L"DirectDrawSurface is not in 4 bit color palette and the requested operation requires 4 bit "
+                       L"color palette.";
               case -2005532355:
-                return L"DirectDrawSurface is not in 4 bit color index palette and the requested operation requires 4 bit "
+                return L"DirectDrawSurface is not in 4 bit color index palette and the requested operation requires 4 "
+                       L"bit "
                        L"color index palette.";
               case -2005532352:
-                return L"DirectDraw Surface is not in 8 bit color mode and the requested operation requires 8 bit color.";
-            }
-          }
-          else
-          {
-            switch ( a1 )
-            {
+                return L"DirectDraw Surface is not in 8 bit color mode and the requested operation requires 8 bit "
+                       L"color.";
+              }
+            } else {
+              switch (a1) {
               case -2005532382:
-                return L"Operation could not be carried out because there is no rotation hardware present or available.";
+                return L"Operation could not be carried out because there is no rotation hardware present or "
+                       L"available.";
               case -2005532422:
                 return L"Operation could not be carried out because there is no hardware present or available.";
               case -2005532417:
@@ -1548,62 +1499,59 @@ LABEL_683:
               case -2005532412:
                 return L"Operation could not be carried out because there is no overlay hardware present or available.";
               case -2005532402:
-                return L"Operation could not be carried out because the source and destination rectangles are on the same "
+                return L"Operation could not be carried out because the source and destination rectangles are on the "
+                       L"same "
                        L"surface and overlap each other.";
               case -2005532392:
-                return L"Operation could not be carried out because there is no appropriate raster op hardware present or available.";
+                return L"Operation could not be carried out because there is no appropriate raster op hardware present "
+                       L"or available.";
+              }
             }
-          }
-        }
-        else
-        {
-          if ( a1 == -2005532432 )
-            return L"There is no GDI present.";
-          if ( a1 > -2005532460 )
-          {
-            switch ( a1 )
-            {
+          } else {
+            if (a1 == -2005532432)
+              return L"There is no GDI present.";
+            if (a1 > -2005532460) {
+              switch (a1) {
               case -2005532457:
                 return L"Surface doesn't currently have a color key";
               case -2005532452:
-                return L"Operation could not be carried out because there is no hardware support of the dest color key.";
+                return L"Operation could not be carried out because there is no hardware support of the dest color "
+                       L"key.";
               case -2005532450:
                 return L"No DirectDraw support possible with current display driver";
               case -2005532447:
-                return L"Operation requires the application to have exclusive mode but the application does not have exclusive mode.";
+                return L"Operation requires the application to have exclusive mode but the application does not have "
+                       L"exclusive mode.";
               case -2005532442:
                 return L"Flipping visible surfaces is not supported.";
-            }
-          }
-          else
-          {
-            switch ( a1 )
-            {
+              }
+            } else {
+              switch (a1) {
               case -2005532460:
                 return L"Create function called without DirectDraw object method SetCooperativeLevel being called.";
               case -2005532492:
-                return L"Operation could not be carried out because there is no alpha accleration hardware present or available.";
+                return L"Operation could not be carried out because there is no alpha accleration hardware present or "
+                       L"available.";
               case -2005532491:
                 return L"Operation could not be carried out because there is no stereo hardware present or available.";
               case -2005532490:
-                return L"Operation could not be carried out because there is no hardware present which supports stereo surfaces";
+                return L"Operation could not be carried out because there is no hardware present which supports stereo "
+                       L"surfaces";
               case -2005532467:
                 return L"no clip list available";
               case -2005532462:
-                return L"Operation could not be carried out because there is no color conversion hardware present or available.";
+                return L"Operation could not be carried out because there is no color conversion hardware present or "
+                       L"available.";
+              }
             }
           }
+          return L"n/a";
         }
-        return L"n/a";
-      }
-      if ( a1 == -2005532502 )
-        return L"There is no 3D present.";
-      if ( a1 > -2005532632 )
-      {
-        if ( a1 > -2005532552 )
-        {
-          switch ( a1 )
-          {
+        if (a1 == -2005532502)
+          return L"There is no 3D present.";
+        if (a1 > -2005532632) {
+          if (a1 > -2005532552) {
+            switch (a1) {
             case -2005532542:
               return L"DirectDraw received a pointer that was an invalid DIRECTDRAW object.";
             case -2005532527:
@@ -1612,12 +1560,9 @@ LABEL_683:
               return L"Rectangle provided was invalid.";
             case -2005532512:
               return L"Operation could not be carried out because one or more surfaces are locked";
-          }
-        }
-        else
-        {
-          switch ( a1 )
-          {
+            }
+          } else {
+            switch (a1) {
             case -2005532552:
               return L"DirectDraw does not support the requested mode";
             case -2005532617:
@@ -1630,16 +1575,14 @@ LABEL_683:
               return L"One or more of the caps bits passed to the callback are incorrect.";
             case -2005532562:
               return L"DirectDraw does not support provided Cliplist.";
+            }
           }
+          return L"n/a";
         }
-        return L"n/a";
-      }
-      if ( a1 == -2005532632 )
-        return L"Support is currently not available.";
-      if ( a1 <= -2146073040 )
-      {
-        switch ( a1 )
-        {
+        if (a1 == -2005532632)
+          return L"Support is currently not available.";
+        if (a1 <= -2146073040) {
+          switch (a1) {
           case -2146073040:
             return L"Timed out";
           case -2146073216:
@@ -1652,40 +1595,30 @@ LABEL_683:
             return L"Session full";
           case -2146073056:
             return L"Table full";
-        }
-        return L"n/a";
-      }
-      if ( a1 == -2146073024 )
-        return L"Uninitialized";
-      if ( a1 != -2146073008 )
-      {
-        if ( a1 != -2005532667 )
-        {
-          if ( a1 == -2005532662 )
-            return L"This surface can not be attached to the requested surface.";
-          if ( a1 == -2005532652 )
-            return L"This surface can not be detached from the requested surface.";
+          }
           return L"n/a";
         }
-        return L"This object is already initialized";
-      }
-    }
-    else
-    {
-      if ( a1 == -2146073232 )
-        return L"Player lost";
-      if ( a1 > -2146074320 )
-      {
-        if ( a1 <= -2146073792 )
-        {
-          if ( a1 != -2146073792 )
-          {
-            if ( a1 > -2146074064 )
-            {
-              if ( a1 > -2146073968 )
-              {
-                switch ( a1 )
-                {
+        if (a1 == -2146073024)
+          return L"Uninitialized";
+        if (a1 != -2146073008) {
+          if (a1 != -2005532667) {
+            if (a1 == -2005532662)
+              return L"This surface can not be attached to the requested surface.";
+            if (a1 == -2005532652)
+              return L"This surface can not be detached from the requested surface.";
+            return L"n/a";
+          }
+          return L"This object is already initialized";
+        }
+      } else {
+        if (a1 == -2146073232)
+          return L"Player lost";
+        if (a1 > -2146074320) {
+          if (a1 <= -2146073792) {
+            if (a1 != -2146073792) {
+              if (a1 > -2146074064) {
+                if (a1 > -2146073968) {
+                  switch (a1) {
                   case -2146073856:
                     return L"Invalid application";
                   case -2146073840:
@@ -1694,12 +1627,9 @@ LABEL_683:
                     return L"Invalid device address";
                   case -2146073808:
                     return L"Invalid end point";
-                }
-              }
-              else
-              {
-                switch ( a1 )
-                {
+                  }
+                } else {
+                  switch (a1) {
                   case -2146073968:
                     return L"Invalid address format";
                   case -2146074048:
@@ -1712,16 +1642,13 @@ LABEL_683:
                     return L"Host terminated session";
                   case -2146073984:
                     return L"Incomplete address";
+                  }
                 }
+                return L"n/a";
               }
-              return L"n/a";
-            }
-            if ( a1 != -2146074064 )
-            {
-              if ( a1 > -2146074240 )
-              {
-                switch ( a1 )
-                {
+              if (a1 != -2146074064) {
+                if (a1 > -2146074240) {
+                  switch (a1) {
                   case -2146074235:
                     return L"dpnsvr not available";
                   case -2146074224:
@@ -1732,12 +1659,9 @@ LABEL_683:
                     return L"Enum query too large";
                   case -2146074080:
                     return L"Enum response too large";
-                }
-              }
-              else
-              {
-                switch ( a1 )
-                {
+                  }
+                } else {
+                  switch (a1) {
                   case -2146074240:
                     return L"Does not exist";
                   case -2146074304:
@@ -1750,20 +1674,17 @@ LABEL_683:
                     return L"Conversion";
                   case -2146074251:
                     return L"Data too large";
+                  }
                 }
+                return L"n/a";
               }
-              return L"n/a";
+              return L"Exception";
             }
-            return L"Exception";
+            return L"Invalid flags";
           }
-          return L"Invalid flags";
-        }
-        if ( a1 > -2146073504 )
-        {
-          if ( a1 > -2146073312 )
-          {
-            switch ( a1 )
-            {
+          if (a1 > -2146073504) {
+            if (a1 > -2146073312) {
+              switch (a1) {
               case -2146073296:
                 return L"Not host";
               case -2146073280:
@@ -1772,12 +1693,9 @@ LABEL_683:
                 return L"Not registered";
               case -2146073248:
                 return L"Player already in group";
-            }
-          }
-          else
-          {
-            switch ( a1 )
-            {
+              }
+            } else {
+              switch (a1) {
               case -2146073312:
                 return L"Not allowed";
               case -2146073488:
@@ -1790,64 +1708,54 @@ LABEL_683:
                 return L"No more address components";
               case -2146073328:
                 return L"No response";
+              }
             }
+            return L"n/a";
           }
-          return L"n/a";
-        }
-        if ( a1 == -2146073504 )
-          return L"Invalid version";
-        if ( a1 > -2146073600 )
-        {
-          if ( a1 == -2146073584 )
-            return L"Invalid password";
-          if ( a1 != -2146073568 )
-          {
-            switch ( a1 )
-            {
+          if (a1 == -2146073504)
+            return L"Invalid version";
+          if (a1 > -2146073600) {
+            if (a1 == -2146073584)
+              return L"Invalid password";
+            if (a1 != -2146073568) {
+              switch (a1) {
               case -2146073552:
                 return L"Invalid priority";
               case -2146073536:
                 return L"Invalid string";
               case -2146073520:
                 return L"Invalid url";
+              }
+              return L"n/a";
             }
-            return L"n/a";
+            return L"Invalid player";
           }
-          return L"Invalid player";
-        }
-        if ( a1 != -2146073600 )
-        {
-          if ( a1 != -2146073776 )
-          {
-            if ( a1 != -2146073760 )
-            {
-              switch ( a1 )
-              {
+          if (a1 != -2146073600) {
+            if (a1 != -2146073776) {
+              if (a1 != -2146073760) {
+                switch (a1) {
                 case -2146073744:
                   return L"Invalid host address";
                 case -2146073728:
                   return L"Invalid instance";
                 case -2146073712:
                   return L"Invalid interface";
+                }
+                return L"n/a";
               }
-              return L"n/a";
+              return L"Invalid handle";
             }
-            return L"Invalid handle";
+            return L"Invalid group";
           }
-          return L"Invalid group";
+          return L"Invalid object";
         }
-        return L"Invalid object";
-      }
-      if ( a1 == -2146074320 )
-        return L"Cant create player";
-      if ( a1 > -2146107008 )
-      {
-        if ( a1 <= -2146074576 )
-        {
-          if ( a1 == -2146074576 )
-            return L"Aborted";
-          switch ( a1 )
-          {
+        if (a1 == -2146074320)
+          return L"Cant create player";
+        if (a1 > -2146107008) {
+          if (a1 <= -2146074576) {
+            if (a1 == -2146074576)
+              return L"Aborted";
+            switch (a1) {
             case -2146107005:
               result = L"Run setup";
               break;
@@ -1886,13 +1794,11 @@ LABEL_683:
               break;
             default:
               return L"n/a";
+            }
+            return result;
           }
-          return result;
-        }
-        if ( a1 <= -2146074496 )
-        {
-          switch ( a1 )
-          {
+          if (a1 <= -2146074496) {
+            switch (a1) {
             case -2146074496:
               return L"Already initialized";
             case -2146074560:
@@ -1903,25 +1809,22 @@ LABEL_683:
               return L"Already connected";
             case -2146074512:
               return L"Already disconnecting";
+            }
+            return L"n/a";
           }
-          return L"n/a";
+          if (a1 == -2146074480)
+            return L"Already registered";
+          if (a1 != -2146074368) {
+            if (a1 == -2146074352)
+              return L"Can not cancel";
+            if (a1 == -2146074336)
+              return L"Cant create group";
+            return L"n/a";
+          }
+          return L"Buffer too small";
         }
-        if ( a1 == -2146074480 )
-          return L"Already registered";
-        if ( a1 != -2146074368 )
-        {
-          if ( a1 == -2146074352 )
-            return L"Can not cancel";
-          if ( a1 == -2146074336 )
-            return L"Cant create group";
-          return L"n/a";
-        }
-        return L"Buffer too small";
-      }
-      if ( a1 != -2146107008 )
-      {
-        switch ( a1 )
-        {
+        if (a1 != -2146107008) {
+          switch (a1) {
           case -2146107090:
             result = L"No voice session";
             break;
@@ -1989,46 +1892,39 @@ LABEL_683:
             break;
           default:
             return L"n/a";
+          }
+          return result;
         }
-        return result;
       }
+      return L"User cancel";
     }
-    return L"User cancel";
-  }
-  if ( a1 == -2146107092 )
-    return L"Session lost";
-  if ( a1 > -2147220890 )
-  {
-    if ( a1 <= -2147220476 )
-    {
-      if ( a1 == -2147220476 )
-        return L"Seeking not supported for this object.";
-      if ( a1 > -2147220855 )
-      {
-        if ( a1 > -2147220736 )
-        {
-          if ( a1 > -2147220494 )
-          {
-            switch ( a1 )
-            {
+    if (a1 == -2146107092)
+      return L"Session lost";
+    if (a1 > -2147220890) {
+      if (a1 <= -2147220476) {
+        if (a1 == -2147220476)
+          return L"Seeking not supported for this object.";
+        if (a1 > -2147220855) {
+          if (a1 > -2147220736) {
+            if (a1 > -2147220494) {
+              switch (a1) {
               case -2147220481:
                 return L"Device installer errors.";
               case -2147220480:
                 return L"Registry entry or DLL for class installer invalid or class installer not found.";
               case -2147220479:
-                return L"The user cancelled the install operation. & The stream already has allocated samples and the surf"
+                return L"The user cancelled the install operation. & The stream already has allocated samples and the "
+                       L"surf"
                        L"ace doesn't match the sample format.";
               case -2147220478:
-                return L"The INF file for the selected device could not be found or is invalid or is damaged. & The specif"
+                return L"The INF file for the selected device could not be found or is invalid or is damaged. & The "
+                       L"specif"
                        L"ied purpose ID can't be used for the call.";
               case -2147220477:
                 return L"No stream can be found with the specified attributes.";
-            }
-          }
-          else
-          {
-            switch ( a1 )
-            {
+              }
+            } else {
+              switch (a1) {
               case -2147220494:
                 return L"A registry entry is corrupt.";
               case -2147220735:
@@ -2041,19 +1937,16 @@ LABEL_683:
                 return L"DIERR_DRIVERFIRST+4";
               case -2147220731:
                 return L"DIERR_DRIVERFIRST+5";
+              }
             }
+            return L"n/a";
           }
-          return L"n/a";
-        }
-        if ( a1 == -2147220736 )
-        {
-          return L"Device driver-specific codes. Unless the specific driver has been precisely identified, no meaning shou"
-                 L"ld be attributed to these values other than that the driver originated the error.";
-        }
-        else
-        {
-          switch ( a1 )
-          {
+          if (a1 == -2147220736) {
+            return L"Device driver-specific codes. Unless the specific driver has been precisely identified, no "
+                   L"meaning shou"
+                   L"ld be attributed to these values other than that the driver originated the error.";
+          } else {
+            switch (a1) {
             case -2147220854:
               result = L"The current parental level was too low.";
               break;
@@ -2067,8 +1960,9 @@ LABEL_683:
               result = L"The specified stream is disabled and cannot be selected.";
               break;
             case -2147220848:
-              result = L"The operation depends on the current title number, however the navigator has not yet entered the "
-                       L"VTSM or the title domains, so the 'current' title index is unknown.";
+              result =
+                L"The operation depends on the current title number, however the navigator has not yet entered the "
+                L"VTSM or the title domains, so the 'current' title index is unknown.";
               break;
             case -2147220847:
               result = L"The specified path does not point to a valid DVD disc.";
@@ -2077,40 +1971,39 @@ LABEL_683:
               result = L"There is currently no resume information.";
               break;
             case -2147220845:
-              result = L"This thread has already blocked this output pin.  There is no need to call IPinFlowControl::Block() again.";
+              result = L"This thread has already blocked this output pin.  There is no need to call "
+                       L"IPinFlowControl::Block() again.";
               break;
             case -2147220844:
-              result = L"IPinFlowControl::Block() has been called on another thread.  The current thread cannot make any a"
-                       L"ssumptions about this pin's block state.";
+              result =
+                L"IPinFlowControl::Block() has been called on another thread.  The current thread cannot make any a"
+                L"ssumptions about this pin's block state.";
               break;
             case -2147220843:
               result = L"An operation failed due to a certification failure.";
               break;
             default:
               return L"n/a";
+            }
           }
-        }
-      }
-      else if ( a1 == -2147220855 )
-      {
-        return L"Currently there is no GoUp (Annex J user function) program chain (PGC).";
-      }
-      else
-      {
-        switch ( a1 )
-        {
+        } else if (a1 == -2147220855) {
+          return L"Currently there is no GoUp (Annex J user function) program chain (PGC).";
+        } else {
+          switch (a1) {
           case -2147220887:
             result = L"The Video CD can't be read correctly by the device or is the data is corrupt.";
             break;
           case -2147220879:
-            result = L"There is not enough Video Memory at this display resolution and number of colors. Reducing resolution might help.";
+            result = L"There is not enough Video Memory at this display resolution and number of colors. Reducing "
+                     L"resolution might help.";
             break;
           case -2147220878:
             result = L"The VideoPort connection negotiation process has failed.";
             break;
           case -2147220877:
-            result = L"Either DirectDraw has not been installed or the Video Card capabilities are not suitable. Make sure"
-                     L" the display is not in 16 color mode.";
+            result =
+              L"Either DirectDraw has not been installed or the Video Card capabilities are not suitable. Make sure"
+              L" the display is not in 16 color mode.";
             break;
           case -2147220876:
             result = L"No VideoPort hardware is available, or the hardware is not responding.";
@@ -2125,8 +2018,9 @@ LABEL_683:
             result = L"This Operation is not permitted in the current domain.";
             break;
           case -2147220872:
-            result = L"The specified button is invalid or is not present at the current time, or there is no button presen"
-                     L"t at the specified location.";
+            result =
+              L"The specified button is invalid or is not present at the current time, or there is no button presen"
+              L"t at the specified location.";
             break;
           case -2147220871:
             result = L"DVD-Video playback graph has not been built yet.";
@@ -2141,7 +2035,8 @@ LABEL_683:
             result = L"Version number of DirectDraw not suitable. Make sure to install dx5 or higher version.";
             break;
           case -2147220867:
-            result = L"Copy protection cannot be enabled. Please make sure any other copy protected content is not being shown now.";
+            result = L"Copy protection cannot be enabled. Please make sure any other copy protected content is not "
+                     L"being shown now.";
             break;
           case -2147220865:
             result = L"This object cannot be used anymore as its time has expired.";
@@ -2172,22 +2067,18 @@ LABEL_683:
             break;
           default:
             return L"n/a";
+          }
         }
+        return result;
       }
-      return result;
-    }
-    if ( a1 <= -2147024887 )
-    {
-      if ( a1 == -2147024887 )
-        return L"The storage control block address is invalid.";
-      if ( a1 <= -2147219194 )
-      {
-        if ( a1 == -2147219194 )
-          return L"An error occurred when attempting to reset a device.";
-        if ( a1 > -2147220470 )
-        {
-          switch ( a1 )
-          {
+      if (a1 <= -2147024887) {
+        if (a1 == -2147024887)
+          return L"The storage control block address is invalid.";
+        if (a1 <= -2147219194) {
+          if (a1 == -2147219194)
+            return L"An error occurred when attempting to reset a device.";
+          if (a1 > -2147220470) {
+            switch (a1) {
             case -2147219199:
               return L"Could not initialize Direct3D.";
             case -2147219198:
@@ -2195,14 +2086,14 @@ LABEL_683:
             case -2147219197:
               return L"A media file could not be found.";
             case -2147219196:
-              return L"The device interface has a non-zero reference count, meaning that some objects were not released.";
+              return L"The device interface has a non-zero reference count, meaning that some objects were not "
+                     L"released.";
             case -2147219195:
               return L"An error occurred when attempting to create a device.";
+            }
+            return L"n/a";
           }
-          return L"n/a";
-        }
-        switch ( a1 )
-        {
+          switch (a1) {
           case -2147220470:
             return L"The object is not in running state.";
           case -2147220475:
@@ -2210,16 +2101,15 @@ LABEL_683:
           case -2147220474:
             return L"The sample is busy.";
           case -2147220473:
-            return L"The object can't accept the call because its initialize function or equivalent has not been called.";
+            return L"The object can't accept the call because its initialize function or equivalent has not been "
+                   L"called.";
           case -2147220472:
             return L"MS_E_SOURCEALREADYDEFINED";
+          }
+          return L"The stream type is not valid for this operation.";
         }
-        return L"The stream type is not valid for this operation.";
-      }
-      if ( a1 <= -2147024893 )
-      {
-        switch ( a1 )
-        {
+        if (a1 <= -2147024893) {
+          switch (a1) {
           case -2147024893:
             return L"The system cannot find the path specified.";
           case -2147219193:
@@ -2232,44 +2122,40 @@ LABEL_683:
             return L"The device was removed.";
           case -2147024894:
             return L"The system cannot find the file specified.";
+          }
+          return L"n/a";
         }
-        return L"n/a";
+        if (a1 == -2147024892)
+          return L"The system cannot open the file.";
+        if (a1 == -2147024891)
+          return L"Access is denied";
+        if (a1 != -2147024890) {
+          if (a1 == -2147024888)
+            return L"Not enough storage is available to process this command.";
+          return L"n/a";
+        }
+        return L"Invalid handle";
       }
-      if ( a1 == -2147024892 )
-        return L"The system cannot open the file.";
-      if ( a1 == -2147024891 )
-        return L"Access is denied";
-      if ( a1 != -2147024890 )
-      {
-        if ( a1 == -2147024888 )
-          return L"Not enough storage is available to process this command.";
-        return L"n/a";
-      }
-      return L"Invalid handle";
-    }
-    if ( a1 <= -2147023743 )
-    {
-      if ( a1 == -2147023743 )
-        return L"The application was written for an unsupported prerelease version of DirectInput.";
-      if ( a1 > -2147024866 )
-      {
-        switch ( a1 )
-        {
+      if (a1 <= -2147023743) {
+        if (a1 == -2147023743)
+          return L"The application was written for an unsupported prerelease version of DirectInput.";
+        if (a1 > -2147024866) {
+          switch (a1) {
           case -2147024809:
             return L"An invalid parameter was passed to the returning function";
           case -2147024777:
-            return L"The object could not be created due to an incompatible driver version or mismatched or incomplete driver components.";
+            return L"The object could not be created due to an incompatible driver version or mismatched or incomplete "
+                   L"driver components.";
           case -2147024726:
             return L"The operation cannot be performed while the device is acquired.";
           case -2147024637:
             return L"No more items.";
           case -2147023746:
             return L"The application requires a newer version of DirectInput.";
+          }
+          return L"n/a";
         }
-        return L"n/a";
-      }
-      switch ( a1 )
-      {
+        switch (a1) {
         case -2147024866:
           return L"Access to the device has been lost.  It must be re-acquired.";
         case -2147024886:
@@ -2280,55 +2166,46 @@ LABEL_683:
           return L"The operation cannot be performed unless the device is acquired.";
         case -2147024882:
           return L"Ran out of memory";
+        }
+        if (a1 != -2147024875)
+          return L"n/a";
+        return L"This object has not been initialized";
       }
-      if ( a1 != -2147024875 )
-        return L"n/a";
-      return L"This object has not been initialized";
-    }
-    if ( a1 <= -2146107272 )
-    {
-      if ( a1 != -2146107272 )
-      {
-        if ( a1 == -2147023728 )
-          return L"The specified property ID is not supported for the specified property set.";
-        if ( a1 == -2147023726 )
-          return L"The specified property set is not supported.";
-        if ( a1 != -2147023649 )
-        {
-          if ( a1 != -2146107362 )
-          {
-            if ( a1 == -2146107318 )
-              return L"Exception";
+      if (a1 <= -2146107272) {
+        if (a1 != -2146107272) {
+          if (a1 == -2147023728)
+            return L"The specified property ID is not supported for the specified property set.";
+          if (a1 == -2147023726)
+            return L"The specified property set is not supported.";
+          if (a1 != -2147023649) {
+            if (a1 != -2146107362) {
+              if (a1 == -2146107318)
+                return L"Exception";
+              return L"n/a";
+            }
+            return L"Buffer too small";
+          }
+          return L"This object is already initialized";
+        }
+        return L"Invalid flags";
+      }
+      if (a1 != -2146107262) {
+        if (a1 != -2146107257) {
+          if (a1 != -2146107247) {
+            if (a1 == -2146107242)
+              return L"Invalid handle";
             return L"n/a";
           }
-          return L"Buffer too small";
+          return L"Invalid group";
         }
-        return L"This object is already initialized";
+        return L"Invalid player";
       }
-      return L"Invalid flags";
+      return L"Invalid object";
     }
-    if ( a1 != -2146107262 )
-    {
-      if ( a1 != -2146107257 )
-      {
-        if ( a1 != -2146107247 )
-        {
-          if ( a1 == -2146107242 )
-            return L"Invalid handle";
-          return L"n/a";
-        }
-        return L"Invalid group";
-      }
-      return L"Invalid player";
-    }
-    return L"Invalid object";
-  }
-  if ( a1 == -2147220890 )
-    return L"Pins cannot connect due to not supporting the same transport.";
-  if ( a1 > -2147220957 )
-  {
-    switch ( a1 )
-    {
+    if (a1 == -2147220890)
+      return L"Pins cannot connect due to not supporting the same transport.";
+    if (a1 > -2147220957) {
+      switch (a1) {
       case -2147220956:
         result = L"The operation could not be performed because the filter is not stopped.";
         break;
@@ -2431,7 +2308,8 @@ LABEL_683:
       case -2147220907:
         return L"Cannot play back the video stream: no suitable decompressor could be found.";
       case -2147220906:
-        result = L"Cannot play back the audio stream: no audio hardware is available, or the hardware is not responding.";
+        result =
+          L"Cannot play back the audio stream: no audio hardware is available, or the hardware is not responding.";
         break;
       case -2147220903:
         return L"Cannot play back the video stream: format 'RPZA' is not supported.";
@@ -2451,7 +2329,8 @@ LABEL_683:
         result = L"Cannot perform the requested function on an object that is not in the filter graph.";
         break;
       case -2147220895:
-        result = L"Cannot get or set time related information on an object that is using a time format of TIME_FORMAT_NONE.";
+        result =
+          L"Cannot get or set time related information on an object that is using a time format of TIME_FORMAT_NONE.";
         break;
       case -2147220894:
         result = L"The connection cannot be made because the stream is read only and the filter alters the data.";
@@ -2464,16 +2343,12 @@ LABEL_683:
         break;
       default:
         return L"n/a";
-    }
-  }
-  else
-  {
-    if ( a1 == -2147220957 )
-      return L"The state changed while waiting to process the sample.";
-    if ( a1 > -2147220980 )
-    {
-      switch ( a1 )
-      {
+      }
+    } else {
+      if (a1 == -2147220957)
+        return L"The state changed while waiting to process the sample.";
+      if (a1 > -2147220980) {
+        switch (a1) {
         case -2147220979:
           result = L"The buffer is not big enough.";
           break;
@@ -2542,21 +2417,17 @@ LABEL_683:
           break;
         default:
           return L"n/a";
-      }
-    }
-    else
-    {
-      if ( a1 == -2147220980 )
-        return L"No buffer space has been set";
-      if ( a1 <= -2147220992 )
-      {
-        if ( a1 == -2147220992 )
-          return L"Unable to IDirectInputJoyConfig_Acquire because the user does not have sufficient privileges to change "
-                 L"the joystick configuration. & An invalid media type was specified";
-        if ( a1 > -2147467259 )
-        {
-          switch ( a1 )
-          {
+        }
+      } else {
+        if (a1 == -2147220980)
+          return L"No buffer space has been set";
+        if (a1 <= -2147220992) {
+          if (a1 == -2147220992)
+            return L"Unable to IDirectInputJoyConfig_Acquire because the user does not have sufficient privileges to "
+                   L"change "
+                   L"the joystick configuration. & An invalid media type was specified";
+          if (a1 > -2147467259) {
+            switch (a1) {
             case -2147418113:
               return L"Catastrophic failure";
             case -2147221232:
@@ -2567,12 +2438,9 @@ LABEL_683:
               return L"CoInitialize has not been called.";
             case -2147221007:
               return L"CoInitialize has already been called.";
-          }
-        }
-        else
-        {
-          switch ( a1 )
-          {
+            }
+          } else {
+            switch (a1) {
             case -2147467259:
               return L"An undetermined error occurred";
             case -2147483638:
@@ -2585,62 +2453,70 @@ LABEL_683:
               return L"Invalid pointer";
             case -2147467260:
               return L"Operation aborted";
+            }
           }
+          return L"n/a";
         }
-        return L"n/a";
-      }
-      switch ( a1 )
-      {
+        switch (a1) {
         case -2147220991:
           result = L"The device is full. & An invalid media subtype was specified.";
           break;
         case -2147220990:
-          result = L"Not all the requested information fit into the buffer. & This object can only be created as an aggregated object.";
+          result = L"Not all the requested information fit into the buffer. & This object can only be created as an "
+                   L"aggregated object.";
           break;
         case -2147220989:
           result = L"The effect is not downloaded. & The enumerator has become invalid.";
           break;
         case -2147220988:
-          result = L"The device cannot be reinitialized because there are still effects attached to it. & At least one of "
-                   L"the pins involved in the operation is already connected.";
+          result =
+            L"The device cannot be reinitialized because there are still effects attached to it. & At least one of "
+            L"the pins involved in the operation is already connected.";
           break;
         case -2147220987:
-          result = L"The operation cannot be performed unless the device is acquired in DISCL_EXCLUSIVE mode. & This opera"
-                   L"tion cannot be performed because the filter is active.";
+          result =
+            L"The operation cannot be performed unless the device is acquired in DISCL_EXCLUSIVE mode. & This opera"
+            L"tion cannot be performed because the filter is active.";
           break;
         case -2147220986:
-          result = L"The effect could not be downloaded because essential information is missing.  For example, no axes ha"
-                   L"ve been associated with the effect, or no type-specific information has been created. & One of the sp"
-                   L"ecified pins supports no media types.";
+          result =
+            L"The effect could not be downloaded because essential information is missing.  For example, no axes ha"
+            L"ve been associated with the effect, or no type-specific information has been created. & One of the sp"
+            L"ecified pins supports no media types.";
           break;
         case -2147220985:
-          result = L"Attempted to read buffered device data from a device that is not buffered. & There is no common media"
-                   L" type between these pins.";
+          result =
+            L"Attempted to read buffered device data from a device that is not buffered. & There is no common media"
+            L" type between these pins.";
           break;
         case -2147220984:
-          result = L"An attempt was made to modify parameters of an effect while it is playing.  Not all hardware devices "
-                   L"support altering the parameters of an effect while it is playing. & Two pins of the same direction ca"
-                   L"nnot be connected together.";
+          result =
+            L"An attempt was made to modify parameters of an effect while it is playing.  Not all hardware devices "
+            L"support altering the parameters of an effect while it is playing. & Two pins of the same direction ca"
+            L"nnot be connected together.";
           break;
         case -2147220983:
-          result = L"The operation could not be completed because the device is not plugged in. & The operation cannot be "
-                   L"performed because the pins are not connected.";
+          result =
+            L"The operation could not be completed because the device is not plugged in. & The operation cannot be "
+            L"performed because the pins are not connected.";
           break;
         case -2147220982:
-          result = L"SendDeviceData failed because more information was requested to be sent than can be sent to the devic"
-                   L"e.  Some devices have restrictions on how much data can be sent to them.  (For example, there might b"
-                   L"e a limit on the number of buttons that can be pressed at once.) & No sample buffer allocator is available.";
+          result =
+            L"SendDeviceData failed because more information was requested to be sent than can be sent to the devic"
+            L"e.  Some devices have restrictions on how much data can be sent to them.  (For example, there might b"
+            L"e a limit on the number of buttons that can be pressed at once.) & No sample buffer allocator is "
+            L"available.";
           break;
         case -2147220981:
-          result = L"A mapper file function failed because reading or writing the user or IHV settings file failed. & A ru"
-                   L"n-time error occurred.";
+          result =
+            L"A mapper file function failed because reading or writing the user or IHV settings file failed. & A ru"
+            L"n-time error occurred.";
           break;
         default:
           return L"n/a";
+        }
       }
     }
+    return result;
   }
-  return result;
-}
-}
-
+} // namespace gpg

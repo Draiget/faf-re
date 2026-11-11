@@ -197,16 +197,33 @@ namespace faf::remote::net
     /** Appends the datagrams to send now to `out`. */
     void Poll(std::uint64_t nowUs, std::vector<std::vector<std::uint8_t>>& out);
 
-    bool TakeReliable(std::vector<std::uint8_t>& out) { return mReceiver.Take(out); }
+    bool TakeReliable(
+      std::vector<std::uint8_t>& out
+    )
+    {
+      return mReceiver.Take(out);
+    }
     bool TakeUnreliable(std::vector<std::uint8_t>& out);
 
-    [[nodiscard]] ChannelState State() const noexcept { return mState; }
-    [[nodiscard]] const ChannelStats& Stats() const noexcept { return mStats; }
+    [[nodiscard]] ChannelState State() const noexcept
+    {
+      return mState;
+    }
+    [[nodiscard]] const ChannelStats& Stats() const noexcept
+    {
+      return mStats;
+    }
     /** Time since the last datagram accepted (or since the first Poll before any). */
     [[nodiscard]] std::uint64_t SinceLastReceivedUs(std::uint64_t nowUs) const noexcept;
     /** Reliable bytes queued and not yet acked by the peer. */
-    [[nodiscard]] std::uint64_t ReliableUnacked() const noexcept { return mSender.Unacked(); }
-    [[nodiscard]] std::size_t ReliableHeld() const noexcept { return mReceiver.Held(); }
+    [[nodiscard]] std::uint64_t ReliableUnacked() const noexcept
+    {
+      return mSender.Unacked();
+    }
+    [[nodiscard]] std::size_t ReliableHeld() const noexcept
+    {
+      return mReceiver.Held();
+    }
 
   private:
     struct SentDatagram
@@ -214,12 +231,12 @@ namespace faf::remote::net
       std::uint32_t sequence = 0;
       std::uint64_t sentUs = 0;
       bool acked = false;
-      bool lost = false;  // kept a while: a late ack takes the loss back
+      bool lost = false; // kept a while: a late ack takes the loss back
       bool lostByTime = false;
-      std::uint32_t lostBehind = 0;  // how far behind the largest acked it was counted lost
+      std::uint32_t lostBehind = 0; // how far behind the largest acked it was counted lost
       std::vector<StreamRange> reliable;
-      std::uint64_t reliableBytes = 0;       // plan WP10.7: the reliable bytes it carried, in flight until resolved
-      std::vector<std::uint32_t> redundant;  // lane sequences it carried
+      std::uint64_t reliableBytes = 0;      // plan WP10.7: the reliable bytes it carried, in flight until resolved
+      std::vector<std::uint32_t> redundant; // lane sequences it carried
     };
 
     struct AckBlock
@@ -259,7 +276,13 @@ namespace faf::remote::net
     ) const;
     void ProcessAcks(const DatagramHeader& header, const std::vector<AckBlock>& blocks, std::uint64_t nowUs);
     /** Acks every sequence top - i with bit i set in `bits` (i < span). */
-    bool AckDown(std::uint32_t top, std::uint64_t bits, std::uint32_t span, const DatagramHeader& header, std::uint64_t nowUs);
+    bool AckDown(
+      std::uint32_t top,
+      std::uint64_t bits,
+      std::uint32_t span,
+      const DatagramHeader& header,
+      std::uint64_t nowUs
+    );
     void WriteAckChunk(std::vector<std::uint8_t>& out) const;
     void Resolve(SentDatagram& sent, bool acked);
     void DropSettled(std::uint64_t nowUs);
@@ -283,9 +306,9 @@ namespace faf::remote::net
 
     // Sending.
     std::uint32_t mNextSequence = 1;
-    std::deque<SentDatagram> mSent;  // ack-eliciting datagrams not yet acked, by sequence
+    std::deque<SentDatagram> mSent; // ack-eliciting datagrams not yet acked, by sequence
     std::uint32_t mLargestAcked = 0;
-    std::uint32_t mBackoff = 0;  // retransmission timeouts in a row
+    std::uint32_t mBackoff = 0; // retransmission timeouts in a row
     // Plan WP10.7 (`ChannelConfig::congestionControl`): the window, the slow-start threshold, and when the last cut
     // was made (a loss of a datagram sent before it makes no second cut).
     double mCongestionBytes = 0.0;
@@ -296,11 +319,11 @@ namespace faf::remote::net
     bool mSentAny = false;
     ReliableSender mSender;
     std::deque<std::vector<std::uint8_t>> mUnreliableOut;
-    std::vector<bool> mRecentOutcomes;  // ring of the last 256 resolutions, true = lost
+    std::vector<bool> mRecentOutcomes; // ring of the last 256 resolutions, true = lost
     std::size_t mRecentNext = 0;
     std::size_t mRecentCount = 0;
     std::size_t mRecentLost = 0;
-    std::deque<LaneMessage> mLaneOut;  // by lane sequence
+    std::deque<LaneMessage> mLaneOut; // by lane sequence
     std::uint32_t mNextLaneSequence = 1;
     std::uint64_t mLastLaneRepeatUs = 0;
 
@@ -312,8 +335,8 @@ namespace faf::remote::net
     bool mStarted = false;
     bool mAckPending = false;
     std::uint64_t mAckDueUs = 0;
-    std::uint32_t mUnanswered = 0;   // ack-eliciting datagrams since the last datagram out
-    std::uint32_t mReportFrom = 0;   // lowest sequence received since then, 0 = none
+    std::uint32_t mUnanswered = 0; // ack-eliciting datagrams since the last datagram out
+    std::uint32_t mReportFrom = 0; // lowest sequence received since then, 0 = none
     ReliableReceiver mReceiver;
     std::deque<std::vector<std::uint8_t>> mUnreliableIn;
     ReceiveWindow mLaneIn;

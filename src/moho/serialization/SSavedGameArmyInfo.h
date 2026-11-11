@@ -36,7 +36,10 @@ namespace moho
     fa::string mPlayerName; // +0x00
   };
 
-  static_assert(offsetof(SSavedGameArmyInfo, mPlayerName) == 0x00, "SSavedGameArmyInfo::mPlayerName offset must be 0x00");
+  static_assert(
+    offsetof(SSavedGameArmyInfo, mPlayerName) == 0x00,
+    "SSavedGameArmyInfo::mPlayerName offset must be 0x00"
+  );
   static_assert(sizeof(SSavedGameArmyInfo) == 0x1C, "SSavedGameArmyInfo size must be 0x1C");
 
   /**

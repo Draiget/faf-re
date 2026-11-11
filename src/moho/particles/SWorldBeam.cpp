@@ -14,7 +14,9 @@ namespace
     return gpg::CachedLookup<moho::SWorldBeam::BlendMode>(moho::SWorldBeam::sBlendModeType);
   }
 
-  void InitializeIdentityBeamTransform(moho::VTransform& transform) noexcept
+  void InitializeIdentityBeamTransform(
+    moho::VTransform& transform
+  ) noexcept
   {
     transform.orient_.w = 1.0f;
     transform.orient_.x = 0.0f;
@@ -45,7 +47,9 @@ namespace moho
   /**
    * Address: 0x00490000 (FUN_00490000, Moho::SWorldBeam::MemberDeserialize)
    */
-  void SWorldBeam::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SWorldBeam::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -73,7 +77,9 @@ namespace moho
   /**
    * Address: 0x004902B0 (FUN_004902B0, Moho::SWorldBeam::MemberSerialize)
    */
-  void SWorldBeam::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SWorldBeam::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;

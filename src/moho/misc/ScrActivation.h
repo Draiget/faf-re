@@ -41,7 +41,7 @@ namespace moho
   public:
     fa::string file; // +0x04
     fa::string name; // +0x20
-    int line;           // +0x3C
+    int line;        // +0x3C
   };
 
   static_assert(offsetof(ScrActivation, file) == 0x04, "ScrActivation::file offset must be 0x04");

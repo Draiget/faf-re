@@ -13,7 +13,7 @@ namespace
     "int GetNumFrames() - returns the number of frames in the movie";
   constexpr const char* kCMauiMovieGetFrameRateHelpText =
     "number GetFrameRate() - returns the frame rate of the movie in FPS";
-}
+} // namespace
 
 gpg::RType* moho::CMauiMovie::sType = nullptr;
 
@@ -120,7 +120,6 @@ bool moho::CMauiMovie::LoadFile(
   if (moho::CFG_GetArgOption("/nomovie", 0u, nullptr)) {
     return false;
   }
-
 
   // Allocate + construct a fresh CMovie (binary: CMovie::operator new).
   moho::CMovie* newMovie = nullptr;

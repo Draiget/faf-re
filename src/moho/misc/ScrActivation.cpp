@@ -22,10 +22,12 @@ namespace
  * What it does:
  * Copy-constructs one script activation entry from another activation lane.
  */
-moho::ScrActivation::ScrActivation(const ScrActivation& other)
-  : file(),
-    name(),
-    line(0)
+moho::ScrActivation::ScrActivation(
+  const ScrActivation& other
+)
+  : file()
+  , name()
+  , line(0)
 {
   file.assign(other.file, 0U, fa::string::npos);
   name.assign(other.name, 0U, fa::string::npos);
@@ -46,9 +48,9 @@ moho::ScrActivation::ScrActivation(
   const fa::string& activationName,
   const int lineNumber
 )
-  : file(),
-    name(),
-    line(0)
+  : file()
+  , name()
+  , line(0)
 {
   file.assign(filePath, 0U, fa::string::npos);
   name.assign(activationName, 0U, fa::string::npos);

@@ -13,7 +13,8 @@ moho::SBlueprintLoaderContext& moho::BlueprintLoaderContext() noexcept
 }
 
 moho::BlueprintLoaderContextScope::BlueprintLoaderContextScope(
-  RRuleGameRulesImpl* const rules, CBackgroundTaskControl* const initHandler
+  RRuleGameRulesImpl* const rules,
+  CBackgroundTaskControl* const initHandler
 ) noexcept
 {
   SBlueprintLoaderContext& context = BlueprintLoaderContext();

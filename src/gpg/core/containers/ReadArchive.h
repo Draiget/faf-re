@@ -10,7 +10,7 @@
 #include "ArchiveSerialization.h"
 #include "boost/shared_ptr.h"
 #include "legacy/containers/Vector.h"
-#include "moho/path/PathTables.h"  // PathQueue::Impl is nested, so the enclosing class must be complete
+#include "moho/path/PathTables.h" // PathQueue::Impl is nested, so the enclosing class must be complete
 
 namespace fa
 {
@@ -130,7 +130,7 @@ namespace moho
   class Unit;
   class UnitWeapon;
   class EntitySetBase;
-}
+} // namespace moho
 
 namespace gpg
 {
@@ -334,9 +334,8 @@ namespace gpg
      * `moho::Listener<const moho::SNavPath&>`, throwing
      * `SerializationError` on pointee-type mismatch.
      */
-    ReadArchive* ReadPointer_Listener_NavPath(
-      moho::Listener<const moho::SNavPath&>** outValue, const gpg::RRef* ownerRef
-    );
+    ReadArchive*
+    ReadPointer_Listener_NavPath(moho::Listener<const moho::SNavPath&>** outValue, const gpg::RRef* ownerRef);
 
     /**
      * Address: 0x006EB9E0 (FUN_006EB9E0, gpg::ReadArchive::ReadPointerWeak_IFormationInstance)
@@ -399,7 +398,8 @@ namespace gpg
   ReadArchive* CreateBinaryReadArchive(const boost::shared_ptr<std::FILE>& file);
 
   /**
-   * Address: 0x00939800 (FUN_00939800, ?CreateTextReadArchive@gpg@@YAPAVReadArchive@1@ABV?$shared_ptr@Vistream@std@@@boost@@@Z)
+   * Address: 0x00939800 (FUN_00939800,
+   * ?CreateTextReadArchive@gpg@@YAPAVReadArchive@1@ABV?$shared_ptr@Vistream@std@@@boost@@@Z)
    *
    * What it does:
    * Creates one stream-backed concrete `ReadArchive` (TextReadArchive) for

@@ -147,7 +147,9 @@ float CNetUDPConnection::GetTime()
  * Queues bytes from NetDataSpan [start, end) into the pending output stream/filter,
  * schedules send deadline, updates queued-byte MD5/counters, and signals socket event.
  */
-void CNetUDPConnection::Write(NetDataSpan* data)
+void CNetUDPConnection::Write(
+  NetDataSpan* data
+)
 {
   const uint8_t* begin = data->start;
   const uint8_t* end = data->end;
@@ -161,8 +163,10 @@ void CNetUDPConnection::Write(NetDataSpan* data)
   }
 
   // Engine addition (wld_PreciseSharedStart): the ready message is timed when it leaves (SendPacket).
-  if (len != 0 && begin[0] == static_cast<uint8_t>(EClientMsg::CLIMSG_Ready) &&
-      std::find(gReadyAwaitingDeparture.begin(), gReadyAwaitingDeparture.end(), this) == gReadyAwaitingDeparture.end()) {
+  if (
+    len != 0 && begin[0] == static_cast<uint8_t>(EClientMsg::CLIMSG_Ready) &&
+    std::find(gReadyAwaitingDeparture.begin(), gReadyAwaitingDeparture.end(), this) == gReadyAwaitingDeparture.end()
+  ) {
     gReadyAwaitingDeparture.push_back(this);
   }
   // Schedule earliest send time once:
@@ -196,9 +200,7 @@ void CNetUDPConnection::Write(NetDataSpan* data)
     );
   }
 
-#if defined(_WIN32)
   mConnector->SignalSocketEvent();
-#endif
 }
 
 /**
@@ -226,9 +228,7 @@ void CNetUDPConnection::Close()
   mOutputShutdown = true;
   mOutputFlushPending = false;
 
-#if defined(_WIN32)
   mConnector->SignalSocketEvent();
-#endif
 }
 
 /**
@@ -255,12 +255,12 @@ void CNetUDPConnection::ScheduleDestroy()
   Close();
   mScheduleDestroy = true;
 
-#if defined(_WIN32)
   mConnector->SignalSocketEvent();
-#endif
 }
 
-void CNetUDPConnection::SetWindow(const uint16_t window)
+void CNetUDPConnection::SetWindow(
+  const uint16_t window
+)
 {
   boost::recursive_mutex::scoped_lock lock{mConnector->lock_};
   mWindow = window;
@@ -399,7 +399,11 @@ CNetUDPConnection::~CNetUDPConnection()
   );
   gReadyCarriers.erase(
     std::remove_if(
-      gReadyCarriers.begin(), gReadyCarriers.end(), [this](const SReadyCarrier& carrier) { return carrier.mConnection == this; }
+      gReadyCarriers.begin(),
+      gReadyCarriers.end(),
+      [this](const SReadyCarrier& carrier) {
+    return carrier.mConnection == this;
+  }
     ),
     gReadyCarriers.end()
   );
@@ -487,7 +491,9 @@ void CNetUDPConnection::CreateFilterStream()
  * Validates CONNECT handshake packets, updates nonce/compression handshake
  * state, and handles invalid state transitions.
  */
-bool CNetUDPConnection::ProcessConnect(const SNetPacket* packet)
+bool CNetUDPConnection::ProcessConnect(
+  const SNetPacket* packet
+)
 {
   const auto& pConnect = *reinterpret_cast<const SPacketBodyConnect*>(packet->data);
 
@@ -555,9 +561,7 @@ bool CNetUDPConnection::ProcessConnect(const SNetPacket* packet)
     mInputBuffer.Close(gpg::Stream::ModeBoth);
 
     if (mConnector->mSelectedEvent) {
-#if defined(_WIN32)
       SetEvent(mConnector->mSelectedEvent);
-#endif
     }
     return false;
   }
@@ -573,7 +577,9 @@ bool CNetUDPConnection::ProcessConnect(const SNetPacket* packet)
  * What it does:
  * Validates ANSWER handshake packets and completes negotiated receive setup.
  */
-void CNetUDPConnection::ProcessAnswer(const SNetPacket* packet)
+void CNetUDPConnection::ProcessAnswer(
+  const SNetPacket* packet
+)
 {
   const auto& pAnswer = *reinterpret_cast<const SPacketBodyAnswer*>(packet->data);
 
@@ -667,11 +673,9 @@ void CNetUDPConnection::ProcessAnswer(const SNetPacket* packet)
   // Binary rebinds/repurposes packet memory to this connection.
   AdoptPacket(packet);
 
-#if defined(_WIN32)
   if (mConnector->mSelectedEvent) {
     SetEvent(mConnector->mSelectedEvent);
   }
-#endif
 }
 
 /**
@@ -681,7 +685,9 @@ void CNetUDPConnection::ProcessAnswer(const SNetPacket* packet)
  * Validates peer ACK window, updates ping timing, releases acknowledged
  * reliable packets, and advances remote expected sequence tracker.
  */
-bool CNetUDPConnection::ProcessAckInternal(const SNetPacket* packet)
+bool CNetUDPConnection::ProcessAckInternal(
+  const SNetPacket* packet
+)
 {
   switch (mState) {
   case kNetStatePending: { // 0
@@ -798,7 +804,10 @@ bool CNetUDPConnection::ProcessAckInternal(const SNetPacket* packet)
  * resend time less the delay `SendPacket` added, which it computed before
  * counting that send.
  */
-void CNetUDPConnection::FastRetransmitFromMask(const uint16_t expected, const uint32_t earlyMask)
+void CNetUDPConnection::FastRetransmitFromMask(
+  const uint16_t expected,
+  const uint32_t earlyMask
+)
 {
   const int64_t now = mConnector->GetTime();
   const int64_t roundTripUs = std::max<int64_t>(5'000, static_cast<int64_t>(mPingTime * 1000.0f));
@@ -835,7 +844,9 @@ void CNetUDPConnection::FastRetransmitFromMask(const uint16_t expected, const ui
  * Applies ACK processing, inserts/filters incoming DATA by sequence window,
  * drains in-order payloads into input stream, and rebuilds early ACK mask.
  */
-void CNetUDPConnection::ProcessData(SNetPacket* packet)
+void CNetUDPConnection::ProcessData(
+  SNetPacket* packet
+)
 {
   if (!ProcessAckInternal(packet)) {
     return;
@@ -937,11 +948,9 @@ void CNetUDPConnection::ProcessData(SNetPacket* packet)
   EarlyRebuildAckMask(mExpectedSequenceNumber, mMask);
 
   // Signal connector event if progressed (matches SetEvent path in asm)
-#if defined(_WIN32)
   if (progressed && mConnector && mConnector->mSelectedEvent) {
     SetEvent(mConnector->mSelectedEvent);
   }
-#endif
 }
 
 /**
@@ -950,7 +959,9 @@ void CNetUDPConnection::ProcessData(SNetPacket* packet)
  * What it does:
  * ACK wrapper that refreshes last receive timestamp on successful ACK handling.
  */
-bool CNetUDPConnection::ProcessAck(const SNetPacket* packet)
+bool CNetUDPConnection::ProcessAck(
+  const SNetPacket* packet
+)
 {
   if (!ProcessAckInternal(packet)) {
     return false;
@@ -966,7 +977,9 @@ bool CNetUDPConnection::ProcessAck(const SNetPacket* packet)
  * What it does:
  * KEEPALIVE wrapper that applies ACK handling and updates response tracking.
  */
-bool CNetUDPConnection::ProcessKeepAlive(const SNetPacket* packet)
+bool CNetUDPConnection::ProcessKeepAlive(
+  const SNetPacket* packet
+)
 {
   if (!ProcessAckInternal(packet)) {
     return false;
@@ -984,7 +997,9 @@ bool CNetUDPConnection::ProcessKeepAlive(const SNetPacket* packet)
  * Processes remote GOODBYE by closing receive side and transitioning to errored
  * end-of-input state when needed.
  */
-bool CNetUDPConnection::ProcessGoodbye(const SNetPacket* packet)
+bool CNetUDPConnection::ProcessGoodbye(
+  const SNetPacket* packet
+)
 {
   if (!ProcessAckInternal(packet)) {
     return false;
@@ -1010,11 +1025,9 @@ bool CNetUDPConnection::ProcessGoodbye(const SNetPacket* packet)
     }
 
     mInputBuffer.Close(gpg::Stream::ModeBoth);
-#if defined(_WIN32)
     if (mConnector && mConnector->mSelectedEvent) {
       SetEvent(mConnector->mSelectedEvent);
     }
-#endif
   }
 
   return true;
@@ -1026,7 +1039,9 @@ bool CNetUDPConnection::ProcessGoodbye(const SNetPacket* packet)
  * What it does:
  * Calculates exponential resend delay (microseconds) clamped by net resend CVars.
  */
-int64_t CNetUDPConnection::CalcResendDelay(const SNetPacket* packet) const
+int64_t CNetUDPConnection::CalcResendDelay(
+  const SNetPacket* packet
+) const
 {
   return CalcResendDelayForCount(packet->mResendCount);
 }
@@ -1036,7 +1051,9 @@ int64_t CNetUDPConnection::CalcResendDelay(const SNetPacket* packet) const
  * addition, issue #237: FastRetransmitFromMask needs the count of the last
  * send, one below the packet's).
  */
-int64_t CNetUDPConnection::CalcResendDelayForCount(int rc) const
+int64_t CNetUDPConnection::CalcResendDelayForCount(
+  int rc
+) const
 {
   // Issue #237: at the game's packet rate no acknowledgement can show a loss
   // before the timer fires, so with the switch the timer itself follows the
@@ -1071,7 +1088,9 @@ int64_t CNetUDPConnection::CalcResendDelayForCount(int rc) const
  * Returns remaining send backlog budget in bytes (rate-shaped by net_MaxSendRate),
  * or 0 and clears mSendTime when the budget has expired.
  */
-int CNetUDPConnection::GetSentTime(const int64_t time)
+int CNetUDPConnection::GetSentTime(
+  const int64_t time
+)
 {
   if (mSendTime != 0) {
     const int result = mSendTime - (time - mLastSend.mTime) * net_MaxSendRate * 0.000001;
@@ -1095,7 +1114,10 @@ int CNetUDPConnection::GetSentTime(const int64_t time)
  * In FA this logic is inlined in CNetUDPConnector::SendData (0x0048AC40),
  * not a standalone method symbol.
  */
-int CNetUDPConnection::GetBacklogTimeout(const int64_t time, int32_t& timeout)
+int CNetUDPConnection::GetBacklogTimeout(
+  const int64_t time,
+  int32_t& timeout
+)
 {
   const int backlog = GetSentTime(time);
   if (backlog > net_MaxBacklog) {
@@ -1113,7 +1135,9 @@ int CNetUDPConnection::GetBacklogTimeout(const int64_t time, int32_t& timeout)
  * What it does:
  * Returns non-negative milliseconds until `time` relative to connector clock.
  */
-int CNetUDPConnection::TimeSince(const int64_t time) const
+int CNetUDPConnection::TimeSince(
+  const int64_t time
+) const
 {
   const int64_t since = (time - mConnector->GetTime()) / 1000;
   if (since < 0) {
@@ -1176,9 +1200,7 @@ int CNetUDPConnection::SendData()
     if (curTime - mLastRecv > 10'000'000) {
       if (net_DebugLevel) {
         gpg::Logf(
-          "CNetUDPConnection<%u,%s>::SendData(): connection timed out.",
-          mConnector->GetLocalPort(),
-          ToString().c_str()
+          "CNetUDPConnection<%u,%s>::SendData(): connection timed out.", mConnector->GetLocalPort(), ToString().c_str()
         );
       }
       mState = kNetStateTimedOut;
@@ -1223,8 +1245,10 @@ int CNetUDPConnection::SendData()
       // reason to wake, and an expired one would spin the same way.
       const bool windowOpen =
         static_cast<int16_t>(mNextSequenceNumber - mRemoteExpectedSequenceNumber) <= static_cast<int16_t>(mWindow);
-      if (mSendBy.mTime != 0 &&
-          (mInResponseTo != 0 || (windowOpen && (mPendingOutputData.GetLength() != 0 || mOutputFlushPending)))) {
+      if (
+        mSendBy.mTime != 0 &&
+        (mInResponseTo != 0 || (windowOpen && (mPendingOutputData.GetLength() != 0 || mOutputFlushPending)))
+      ) {
         since = ChooseTimeout(since, TimeSince(mSendBy.mTime));
       }
       return since;
@@ -1255,7 +1279,9 @@ int CNetUDPConnection::SendData()
  * Determines whether payload/EOF packet emission is due given send windows and
  * output flush state.
  */
-bool CNetUDPConnection::HasPacketWaiting(const int64_t nowUs)
+bool CNetUDPConnection::HasPacketWaiting(
+  const int64_t nowUs
+)
 {
   // Window check (16-bit arithmetic in asm)
   if (static_cast<int16_t>(mNextSequenceNumber - mRemoteExpectedSequenceNumber) > static_cast<int16_t>(mWindow)) {
@@ -1423,7 +1449,11 @@ SNetPacket* CNetUDPConnection::NewGoodbyePacket() const
  * Allocates/reuses a packet node, resets metadata, and fills transport header
  * fields with optional sequence inheritance.
  */
-SNetPacket* CNetUDPConnection::NewPacket(const bool inherit, const int size, const EPacketType state) const
+SNetPacket* CNetUDPConnection::NewPacket(
+  const bool inherit,
+  const int size,
+  const EPacketType state
+) const
 {
   // take from connector's pool or allocate
   SNetPacket* pkt;
@@ -1466,7 +1496,9 @@ SNetPacket* CNetUDPConnection::NewPacket(const bool inherit, const int size, con
  * Emits a packet to socket, updates resend/sequence/keepalive bookkeeping, and
  * records send diagnostics.
  */
-void CNetUDPConnection::SendPacket(SNetPacket* packet)
+void CNetUDPConnection::SendPacket(
+  SNetPacket* packet
+)
 {
   // Engine addition (wld_PreciseSharedStart): the first new payload after a queued ready message
   // carries it; a resend of older data goes before it and says nothing about it. A resend of the
@@ -1494,21 +1526,19 @@ void CNetUDPConnection::SendPacket(SNetPacket* packet)
   packet->header.mSerialNumber = mNextSerialNumber;
   packet->header.mInResponseTo = mInResponseTo;
 
-#if defined(_WIN32)
   sockaddr_in to{};
   to.sin_family = AF_INET;
   to.sin_port = htons(mPort);
   to.sin_addr.s_addr = htonl(mAddr);
-#else
-#error "Implement me on non-Windows platform!"
-#endif
 
   const auto payloadLen = static_cast<int>(packet->GetPayloadSize());
   const auto payload = static_cast<const char*>(packet->GetPayload());
   // Engine addition (issue #232): an in-process transport for this address.
-  if (!NET_PeerTransportsActive() ||
-      !NET_SendThroughPeerTransport(mConnector, mAddr, mPort, payload, static_cast<std::size_t>(payloadLen))) {
-    sendto(mConnector->socket_, payload, payloadLen, 0, reinterpret_cast<const sockaddr*>(&to), sizeof(to));
+  if (
+    !NET_PeerTransportsActive() ||
+    !NET_SendThroughPeerTransport(mConnector, mAddr, mPort, payload, static_cast<std::size_t>(payloadLen))
+  ) {
+    platform::net::SendTo(mConnector->socket_, payload, payloadLen, to);
   }
 
   const int64_t nowUs = mConnector->GetTime();
@@ -1805,7 +1835,9 @@ void CNetUDPConnection::Debug()
  * What it does:
  * Adopts peer serial as response target and schedules ACK deadline if idle.
  */
-void CNetUDPConnection::AdoptPacket(const SNetPacket* packet)
+void CNetUDPConnection::AdoptPacket(
+  const SNetPacket* packet
+)
 {
   mInResponseTo = packet->header.mSerialNumber;
 
@@ -1843,7 +1875,9 @@ void CNetUDPConnection::AbortInput()
  * What it does:
  * Updates rolling ping/jitter statistics from packet response serial timing.
  */
-void CNetUDPConnection::UpdatePingInfoFromPacket(const SNetPacket& packet)
+void CNetUDPConnection::UpdatePingInfoFromPacket(
+  const SNetPacket& packet
+)
 {
   if (!packet.header.mInResponseTo) {
     return;
@@ -1874,12 +1908,14 @@ void CNetUDPConnection::UpdatePingInfoFromPacket(const SNetPacket& packet)
 }
 
 /**
-  * Alias of FUN_00486DB0 (non-canonical helper lane).
+ * Alias of FUN_00486DB0 (non-canonical helper lane).
  *
  * What it does:
  * Inserts DATA packet into future-queue sorted by sequence and rejects duplicates.
  */
-bool CNetUDPConnection::InsertEarlySorted(SNetPacket* packet)
+bool CNetUDPConnection::InsertEarlySorted(
+  SNetPacket* packet
+)
 {
   // Walk list to find insertion point (first element with seq > p->seq).
   // 0x00486F0B scans before it unlinks: a duplicate must stay linked in the
@@ -1912,7 +1948,7 @@ bool CNetUDPConnection::InsertEarlySorted(SNetPacket* packet)
 }
 
 /**
-  * Alias of FUN_00486DB0 (non-canonical helper lane).
+ * Alias of FUN_00486DB0 (non-canonical helper lane).
  *
  * What it does:
  * Pops the oldest packet from the early/future queue.
@@ -1929,12 +1965,15 @@ SNetPacket* CNetUDPConnection::EarlyPopFront()
 }
 
 /**
-  * Alias of FUN_00486DB0 (non-canonical helper lane).
+ * Alias of FUN_00486DB0 (non-canonical helper lane).
  *
  * What it does:
  * Recomputes ACK early-mask bits from queued future packet sequences.
  */
-void CNetUDPConnection::EarlyRebuildAckMask(const uint16_t expected, uint32_t& mask)
+void CNetUDPConnection::EarlyRebuildAckMask(
+  const uint16_t expected,
+  uint32_t& mask
+)
 {
   mask = 0;
   for (const auto* cur : mEarlyPackets.owners()) {
@@ -1946,13 +1985,15 @@ void CNetUDPConnection::EarlyRebuildAckMask(const uint16_t expected, uint32_t& m
 }
 
 /**
-  * Alias of FUN_00486DB0 (non-canonical helper lane).
+ * Alias of FUN_00486DB0 (non-canonical helper lane).
  *
  * What it does:
  * Consumes one in-order DATA packet payload into input pipeline and advances
  * expected sequence/input-end state.
  */
-void CNetUDPConnection::ConsumePacketHeaderData(SNetPacket* packet)
+void CNetUDPConnection::ConsumePacketHeaderData(
+  SNetPacket* packet
+)
 {
   const uint16_t payloadLen = packet->header.mPayloadLength;
 
@@ -2020,19 +2061,23 @@ void CNetUDPConnection::ConsumePacketHeaderData(SNetPacket* packet)
  * What it does:
  * Compares expected and received 32-byte nonce lanes.
  */
-bool CNetUDPConnection::ReceiverNonceDiffers32(const char (&expected)[32], const char (&received)[32]) noexcept
+bool CNetUDPConnection::ReceiverNonceDiffers32(
+  const char (&expected)[32],
+  const char (&received)[32]
+) noexcept
 {
   return ByteArrayDiffers(expected, received);
 }
 
-
 /**
-  * Alias of FUN_00488D80 (non-canonical helper lane).
+ * Alias of FUN_00488D80 (non-canonical helper lane).
  *
  * What it does:
  * Inserts outbound DATA packet into resend queue ordered by scheduled send time.
  */
-void CNetUDPConnection::InsertUnAckedSorted(SNetPacket* packet)
+void CNetUDPConnection::InsertUnAckedSorted(
+  SNetPacket* packet
+)
 {
   // See InsertEarlySorted's comment: ListUnlinkSelf() returns `this`
   // (packet), not the OLD mNext ListUnlink() would return.
@@ -2047,4 +2092,3 @@ void CNetUDPConnection::InsertUnAckedSorted(SNetPacket* packet)
   // append at tail
   node->ListLinkBefore(mUnAckedPayloads.end().node());
 }
-

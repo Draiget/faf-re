@@ -64,7 +64,10 @@ namespace moho
     class const_iterator
     {
     public:
-      const_iterator(const U& universe, const BVIntSetIndex& index) noexcept
+      const_iterator(
+        const U& universe,
+        const BVIntSetIndex& index
+      ) noexcept
         : mUniverse(universe)
         , mIndex(index)
       {}
@@ -75,7 +78,10 @@ namespace moho
        *   [eax+0x14]`, the category universe's vtable slot 5. Zero callers;
        *   every use inlined it.)
        */
-      [[nodiscard]] T operator*() const { return mUniverse.FromIndex(mIndex.mValue); }
+      [[nodiscard]] T operator*() const
+      {
+        return mUniverse.FromIndex(mIndex.mValue);
+      }
 
       /**
        * Address: 0x00534940 (FUN_00534940 -- `mValue = mOwnerSet->GetNext(mValue)`,
@@ -94,8 +100,18 @@ namespace moho
        * Address: 0x00534970 (FUN_00534970 -- `cmp ecx,[edx+8] / setne al`,
        *   the value lanes only. Zero callers; ICF twin FUN_006E7A70 is `skip`.)
        */
-      [[nodiscard]] bool operator!=(const const_iterator& rhs) const noexcept { return mIndex.mValue != rhs.mIndex.mValue; }
-      [[nodiscard]] bool operator==(const const_iterator& rhs) const noexcept { return mIndex.mValue == rhs.mIndex.mValue; }
+      [[nodiscard]] bool operator!=(
+        const const_iterator& rhs
+      ) const noexcept
+      {
+        return mIndex.mValue != rhs.mIndex.mValue;
+      }
+      [[nodiscard]] bool operator==(
+        const const_iterator& rhs
+      ) const noexcept
+      {
+        return mIndex.mValue == rhs.mIndex.mValue;
+      }
 
     private:
       U mUniverse;          // +0x00
@@ -110,12 +126,24 @@ namespace moho
 
     BVSet() noexcept = default;
 
-    BVSet(const BVSet& other) : mUniverse(other.mUniverse), mReserved04(other.mReserved04), mBits(other.mBits) {}
+    BVSet(
+      const BVSet& other
+    )
+      : mUniverse(other.mUniverse)
+      , mReserved04(other.mReserved04)
+      , mBits(other.mBits)
+    {}
 
     /**
-     * Address: 0x0073B550 (FUN_0073B550 -- copy assignment for `BVSet<EntId, EntIdUniverse>` out of line: the empty universe emits nothing and +0x04 is not written, then `mBits = other.mBits` inline -- `mFirstWordIndex` (+0x08) and the word vector's `AssignFrom` 0x004028E0 (+0x10); no self-test; usercall this=ESI, source=EAX; emitted beside CSimDriver's ICommandSink members, zero callers, unreachable; formerly `CopyDwordAndFastVectorLane` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+     * Address: 0x0073B550 (FUN_0073B550 -- copy assignment for `BVSet<EntId, EntIdUniverse>` out of line: the empty
+     * universe emits nothing and +0x04 is not written, then `mBits = other.mBits` inline -- `mFirstWordIndex` (+0x08)
+     * and the word vector's `AssignFrom` 0x004028E0 (+0x10); no self-test; usercall this=ESI, source=EAX; emitted
+     * beside CSimDriver's ICommandSink members, zero callers, unreachable; formerly `CopyDwordAndFastVectorLane` in
+     * moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
      */
-    BVSet& operator=(const BVSet& other)
+    BVSet& operator=(
+      const BVSet& other
+    )
     {
       if (this != &other) {
         mUniverse = other.mUniverse;
@@ -125,14 +153,20 @@ namespace moho
       return *this;
     }
 
-    BVSet(BVSet&& other) noexcept
-      : mUniverse(other.mUniverse), mReserved04(other.mReserved04), mBits(other.mBits)
+    BVSet(
+      BVSet&& other
+    ) noexcept
+      : mUniverse(other.mUniverse)
+      , mReserved04(other.mReserved04)
+      , mBits(other.mBits)
     {
       other.mUniverse = U{};
       other.mReserved04 = 0u;
     }
 
-    BVSet& operator=(BVSet&& other) noexcept
+    BVSet& operator=(
+      BVSet&& other
+    ) noexcept
     {
       if (this != &other) {
         mUniverse = other.mUniverse;
@@ -167,8 +201,14 @@ namespace moho
      * relocate the orphan rather than retire it. `Bits().Count()` and
      * `Bits().RemoveAllFrom(...)` are what a caller writes.
      */
-    [[nodiscard]] const BVIntSet& Bits() const noexcept { return mBits; }
-    [[nodiscard]] BVIntSet& Bits() noexcept { return mBits; }
+    [[nodiscard]] const BVIntSet& Bits() const noexcept
+    {
+      return mBits;
+    }
+    [[nodiscard]] BVIntSet& Bits() noexcept
+    {
+      return mBits;
+    }
 
     /**
      * What `Add` returns: the set the value now sits in, its position there,
@@ -194,7 +234,9 @@ namespace moho
      * What it does:
      * Inserts `value` into the set.
      */
-    AddResult Add(const T value)
+    AddResult Add(
+      const T value
+    )
     {
       const BVIntSetAddResult added = mBits.Add(static_cast<unsigned int>(value));
       return AddResult{added.mOwnerSet, added, added.mWasInserted};
@@ -206,14 +248,18 @@ namespace moho
      * sim/UI code that walks selection/category sets.
      */
     template <class F>
-    void ForEachValue(F&& fn) const
+    void ForEachValue(
+      F&& fn
+    ) const
     {
       mBits.ForEachValue(std::forward<F>(fn));
     }
 
     // ---- legacy EntityCategorySet API surface (delegated to mBits) ----
 
-    void ResetToEmpty(const U& universe) noexcept
+    void ResetToEmpty(
+      const U& universe
+    ) noexcept
     {
       mUniverse = universe;
       mReserved04 = 0u;
@@ -230,11 +276,23 @@ namespace moho
       return static_cast<std::size_t>(end - begin);
     }
 
-    [[nodiscard]] bool Empty() const noexcept { return WordCount() == 0u; }
+    [[nodiscard]] bool Empty() const noexcept
+    {
+      return WordCount() == 0u;
+    }
 
-    [[nodiscard]] const std::uint32_t* WordData() const noexcept { return mBits.mWords.start_; }
-    [[nodiscard]] std::uint32_t* WordData() noexcept { return mBits.mWords.start_; }
-    [[nodiscard]] const std::uint32_t* WordEnd() const noexcept { return mBits.mWords.end_; }
+    [[nodiscard]] const std::uint32_t* WordData() const noexcept
+    {
+      return mBits.mWords.start_;
+    }
+    [[nodiscard]] std::uint32_t* WordData() noexcept
+    {
+      return mBits.mWords.start_;
+    }
+    [[nodiscard]] const std::uint32_t* WordEnd() const noexcept
+    {
+      return mBits.mWords.end_;
+    }
 
     /**
      * Address: 0x006E79D0 (FUN_006E79D0, BVSet<EntId,EntIdUniverse>::begin --
@@ -263,14 +321,15 @@ namespace moho
      * The storage word holding absolute word index `absoluteWordIndex`, or
      * `WordEnd()` when the set does not cover it.
      */
-    [[nodiscard]] const std::uint32_t* FindWord(const std::uint32_t absoluteWordIndex) const noexcept
+    [[nodiscard]] const std::uint32_t* FindWord(
+      const std::uint32_t absoluteWordIndex
+    ) const noexcept
     {
       if (absoluteWordIndex < mBits.mFirstWordIndex) {
         return WordEnd();
       }
 
-      const std::size_t localWordIndex =
-        static_cast<std::size_t>(absoluteWordIndex - mBits.mFirstWordIndex);
+      const std::size_t localWordIndex = static_cast<std::size_t>(absoluteWordIndex - mBits.mFirstWordIndex);
       if (localWordIndex >= WordCount()) {
         return WordEnd();
       }
@@ -278,7 +337,9 @@ namespace moho
       return WordData() + localWordIndex;
     }
 
-    [[nodiscard]] bool ContainsBit(const std::uint32_t categoryBitIndex) const noexcept
+    [[nodiscard]] bool ContainsBit(
+      const std::uint32_t categoryBitIndex
+    ) const noexcept
     {
       const std::uint32_t* const wordIt = FindWord(categoryBitIndex >> 5u);
       if (wordIt == WordEnd()) {

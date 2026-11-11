@@ -4,7 +4,10 @@
 #include "gpg/gal/D3D9Utils.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/Error.hpp"
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#endif
 
 namespace moho
 {
@@ -60,7 +63,9 @@ namespace moho
    * What it does:
    * Copies retained vertex-buffer ownership into caller storage.
    */
-  CD3DVertexStream::BufferHandle& CD3DVertexStream::GetBuffer(BufferHandle& outBuffer)
+  CD3DVertexStream::BufferHandle& CD3DVertexStream::GetBuffer(
+    BufferHandle& outBuffer
+  )
   {
     outBuffer = mBuffer;
     return outBuffer;

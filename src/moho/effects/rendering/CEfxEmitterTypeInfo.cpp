@@ -114,11 +114,11 @@ namespace moho
    * passes `nullptr` the constructor is skipped and the RRef is built
    * from a nullptr object pointer.
    */
-  gpg::RRef CEfxEmitterTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CEfxEmitterTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
-    auto* const object = (objectStorage != nullptr)
-      ? new (objectStorage) CEfxEmitter()
-      : nullptr;
+    auto* const object = (objectStorage != nullptr) ? new (objectStorage) CEfxEmitter() : nullptr;
     gpg::RRef ref{};
     gpg::RRef_CEfxEmitter(&ref, object);
     return ref;
@@ -132,7 +132,9 @@ namespace moho
    * scalar-deleting destructor (vtable slot for `~CEfxEmitter`),
    * which runs the destructor body and frees the storage block.
    */
-  void CEfxEmitterTypeInfo::Delete(void* const objectStorage)
+  void CEfxEmitterTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     if (objectStorage != nullptr) {
       delete static_cast<CEfxEmitter*>(objectStorage);
@@ -147,7 +149,9 @@ namespace moho
    * slot without freeing the backing storage. Used by the reflection
    * system when caller-owned storage must be retained after destruction.
    */
-  void CEfxEmitterTypeInfo::Destruct(void* const objectStorage)
+  void CEfxEmitterTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     if (objectStorage != nullptr) {
       static_cast<CEfxEmitter*>(objectStorage)->~CEfxEmitter();
@@ -161,13 +165,15 @@ namespace moho
    * Looks up the CEffectImpl reflection type and registers it as a base class
    * at offset 0 for this type.
    */
-  void CEfxEmitterTypeInfo::AddBase_CEffectImpl(gpg::RType* const typeInfo)
+  void CEfxEmitterTypeInfo::AddBase_CEffectImpl(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBaseType(typeInfo, CEffectImpl::StaticGetClass());
   }
 
   /**
-    * Alias of FUN_0065DFE0 (non-canonical helper lane).
+   * Alias of FUN_0065DFE0 (non-canonical helper lane).
    *
    * What it does:
    * Constructs/preregisters startup RTTI metadata for `moho::CEfxEmitter`.
@@ -193,4 +199,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CEfxEmitterTypeInfo_00_e6e4eb, moho::register_CEfxEmitterTypeInfo_00)
+GPG_PREREGISTER_INIT(
+  register_CEfxEmitterTypeInfo_00_e6e4eb,
+  moho::register_CEfxEmitterTypeInfo_00
+)

@@ -37,13 +37,17 @@ namespace
   }
 
   template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(TSerializer& serializer) noexcept
+  [[nodiscard]] gpg::SerHelperBase* SerializerSelfNode(
+    TSerializer& serializer
+  ) noexcept
   {
     return reinterpret_cast<gpg::SerHelperBase*>(&serializer.mHelperNext);
   }
 
   template <typename TSerializer>
-  void InitializeSerializerNode(TSerializer& serializer) noexcept
+  void InitializeSerializerNode(
+    TSerializer& serializer
+  ) noexcept
   {
     gpg::SerHelperBase* const self = SerializerSelfNode(serializer);
     serializer.mHelperNext = self;
@@ -51,7 +55,9 @@ namespace
   }
 
   template <typename TSerializer>
-  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(TSerializer& serializer) noexcept
+  [[nodiscard]] gpg::SerHelperBase* UnlinkSerializerNode(
+    TSerializer& serializer
+  ) noexcept
   {
     if (serializer.mHelperNext != nullptr && serializer.mHelperPrev != nullptr) {
       serializer.mHelperNext->mPrev = serializer.mHelperPrev;
@@ -123,7 +129,9 @@ void SPointVectorTypeInfo::Init()
  * What it does:
  * Reads both `Vector3<float>` lanes for `SPointVector` from the archive.
  */
-void SPointVector::MemberDeserialize(gpg::ReadArchive* const archive)
+void SPointVector::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   const gpg::RRef ownerRef{};
 
@@ -140,7 +148,9 @@ void SPointVector::MemberDeserialize(gpg::ReadArchive* const archive)
  * What it does:
  * Writes both `Vector3<float>` lanes for `SPointVector` into the archive.
  */
-void SPointVector::MemberSerialize(gpg::WriteArchive* const archive) const
+void SPointVector::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   const gpg::RRef ownerRef{};
 
@@ -171,7 +181,9 @@ const char* gpg::RVectorType<moho::SPointVector>::GetName() const
  * Returns one base lexical string plus `size=<count>` for reflected
  * `vector<SPointVector>` payloads.
  */
-fa::string gpg::RVectorType<moho::SPointVector>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType<moho::SPointVector>::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
@@ -288,7 +300,10 @@ void gpg::RVectorType<moho::SPointVector>::SerSave(
  * What it does:
  * Builds one reflected element reference at index `ind`.
  */
-gpg::RRef gpg::RVectorType<moho::SPointVector>::SubscriptIndex(void* const obj, const int ind) const
+gpg::RRef gpg::RVectorType<moho::SPointVector>::SubscriptIndex(
+  void* const obj,
+  const int ind
+) const
 {
   gpg::RRef out{};
   out = gpg::MakeRRef<moho::SPointVector>(nullptr);
@@ -311,7 +326,9 @@ gpg::RRef gpg::RVectorType<moho::SPointVector>::SubscriptIndex(void* const obj, 
  * What it does:
  * Returns element count for one reflected `vector<SPointVector>` payload.
  */
-size_t gpg::RVectorType<moho::SPointVector>::GetCount(void* const obj) const
+size_t gpg::RVectorType<moho::SPointVector>::GetCount(
+  void* const obj
+) const
 {
   const auto* const storage = static_cast<const SPointVectorVector*>(obj);
   return storage ? storage->size() : 0u;
@@ -327,7 +344,10 @@ size_t gpg::RVectorType<moho::SPointVector>::GetCount(void* const obj) const
  * Resizes one reflected `vector<SPointVector>` payload using zero
  * `SPointVector` fill on growth lanes.
  */
-void gpg::RVectorType<moho::SPointVector>::SetCount(void* const obj, const int count) const
+void gpg::RVectorType<moho::SPointVector>::SetCount(
+  void* const obj,
+  const int count
+) const
 {
   auto* const storage = static_cast<SPointVectorVector*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -401,9 +421,15 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_SPointVectorTypeInfo_169786, moho::register_SPointVectorTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_SPointVectorTypeInfo_169786,
+  moho::register_SPointVectorTypeInfo
+)
 
-GPG_PREREGISTER_INIT(register_SPointVectorVectorType_169786, moho::register_SPointVectorVectorType)
+GPG_PREREGISTER_INIT(
+  register_SPointVectorVectorType_169786,
+  moho::register_SPointVectorVectorType
+)
 
 namespace moho
 {

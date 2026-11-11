@@ -27,7 +27,9 @@ namespace
   };
 
   template <class E>
-  [[nodiscard]] E Make(const int v)
+  [[nodiscard]] E Make(
+    const int v
+  )
   {
     if constexpr (std::is_same_v<E, Wide>) {
       return Wide{static_cast<double>(v), -static_cast<double>(v)};
@@ -39,7 +41,9 @@ namespace
   }
 
   template <class E>
-  [[nodiscard]] int ValueOf(const E& e)
+  [[nodiscard]] int ValueOf(
+    const E& e
+  )
   {
     if constexpr (std::is_same_v<E, Wide>) {
       return static_cast<int>(e.value);
@@ -51,7 +55,9 @@ namespace
   }
 
   template <class E>
-  [[nodiscard]] std::vector<int> Contents(fa::deque<E>& d)
+  [[nodiscard]] std::vector<int> Contents(
+    fa::deque<E>& d
+  )
   {
     std::vector<int> out;
     for (auto it = d.begin(); it != d.end(); ++it) {
@@ -65,13 +71,18 @@ namespace
     return out;
   }
 
-  [[nodiscard]] std::vector<int> Contents(const std::deque<int>& d)
+  [[nodiscard]] std::vector<int> Contents(
+    const std::deque<int>& d
+  )
   {
     return std::vector<int>(d.begin(), d.end());
   }
 
   template <class E>
-  void RunDequeRandomOps(const unsigned seed, const int steps)
+  void RunDequeRandomOps(
+    const unsigned seed,
+    const int steps
+  )
   {
     std::mt19937 rng(seed);
     fa::deque<E> d;
@@ -149,7 +160,10 @@ namespace
   }
 } // namespace
 
-TEST(FaDeque, BlockSizeFollowsTheElementSize)
+TEST(
+  FaDeque,
+  BlockSizeFollowsTheElementSize
+)
 {
   EXPECT_EQ(fa::deque<char>::kBlockSize, 16u);
   EXPECT_EQ(fa::deque<std::int16_t>::kBlockSize, 8u);
@@ -158,7 +172,10 @@ TEST(FaDeque, BlockSizeFollowsTheElementSize)
   EXPECT_EQ(fa::deque<Wide>::kBlockSize, 1u);
 }
 
-TEST(FaDeque, EmptyDequeHasNoMap)
+TEST(
+  FaDeque,
+  EmptyDequeHasNoMap
+)
 {
   fa::deque<int> d;
   EXPECT_TRUE(d.empty());
@@ -167,7 +184,10 @@ TEST(FaDeque, EmptyDequeHasNoMap)
   EXPECT_THROW((void)d.at(0), std::out_of_range);
 }
 
-TEST(FaDeque, TheFirstPushAllocatesEightBlocks)
+TEST(
+  FaDeque,
+  TheFirstPushAllocatesEightBlocks
+)
 {
   fa::deque<int> back;
   back.push_back(1);
@@ -178,7 +198,10 @@ TEST(FaDeque, TheFirstPushAllocatesEightBlocks)
   EXPECT_EQ(front.front(), 1);
 }
 
-TEST(FaDeque, IteratorArithmetic)
+TEST(
+  FaDeque,
+  IteratorArithmetic
+)
 {
   fa::deque<int> d;
   for (int i = 0; i < 10; ++i) {
@@ -200,7 +223,10 @@ TEST(FaDeque, IteratorArithmetic)
   EXPECT_EQ(*it, 0);
 }
 
-TEST(FaDeque, ClearAndReleaseThenReuse)
+TEST(
+  FaDeque,
+  ClearAndReleaseThenReuse
+)
 {
   fa::deque<int> d;
   for (int i = 0; i < 50; ++i) {
@@ -214,33 +240,51 @@ TEST(FaDeque, ClearAndReleaseThenReuse)
   EXPECT_EQ(Contents(d), (std::vector<int>{2, 3}));
 }
 
-TEST(FaDeque, RandomOpsMatchStdDequeChar)
+TEST(
+  FaDeque,
+  RandomOpsMatchStdDequeChar
+)
 {
   RunDequeRandomOps<char>(1, 4000);
 }
 
-TEST(FaDeque, RandomOpsMatchStdDequeShort)
+TEST(
+  FaDeque,
+  RandomOpsMatchStdDequeShort
+)
 {
   RunDequeRandomOps<std::int16_t>(2, 4000);
 }
 
-TEST(FaDeque, RandomOpsMatchStdDequeInt)
+TEST(
+  FaDeque,
+  RandomOpsMatchStdDequeInt
+)
 {
   RunDequeRandomOps<int>(3, 4000);
   RunDequeRandomOps<int>(4, 4000);
 }
 
-TEST(FaDeque, RandomOpsMatchStdDequeDouble)
+TEST(
+  FaDeque,
+  RandomOpsMatchStdDequeDouble
+)
 {
   RunDequeRandomOps<double>(5, 4000);
 }
 
-TEST(FaDeque, RandomOpsMatchStdDequeWideElement)
+TEST(
+  FaDeque,
+  RandomOpsMatchStdDequeWideElement
+)
 {
   RunDequeRandomOps<Wide>(6, 4000);
 }
 
-TEST(FaDeque, RandomOpsMatchStdDequeTrackedElement)
+TEST(
+  FaDeque,
+  RandomOpsMatchStdDequeTrackedElement
+)
 {
   Tracked::ResetCounters();
   RunDequeRandomOps<Tracked>(7, 4000);
@@ -248,7 +292,10 @@ TEST(FaDeque, RandomOpsMatchStdDequeTrackedElement)
   EXPECT_EQ(Tracked::badAccesses, 0);
 }
 
-TEST(FaDeque, GrowsTheMapWhileWrappedAround)
+TEST(
+  FaDeque,
+  GrowsTheMapWhileWrappedAround
+)
 {
   // pop_front moves the offset forward, so the next pushes at the back wrap around the map
   // before it grows; the growth must keep the logical order.
@@ -279,7 +326,9 @@ namespace
   {
     static inline int destroyed = 0;
     int value = 0;
-    explicit Base(const int v)
+    explicit Base(
+      const int v
+    )
       : value(v)
     {}
     virtual ~Base()
@@ -290,18 +339,25 @@ namespace
 
   struct Derived : Base
   {
-    explicit Derived(const int v)
+    explicit Derived(
+      const int v
+    )
       : Base(v)
     {}
   };
 
-  [[nodiscard]] fa::auto_ptr<Derived> MakeDerived(const int v)
+  [[nodiscard]] fa::auto_ptr<Derived> MakeDerived(
+    const int v
+  )
   {
     return fa::auto_ptr<Derived>(new Derived(v));
   }
 } // namespace
 
-TEST(FaAutoPtr, OwnershipMovesOnCopyAndAssignment)
+TEST(
+  FaAutoPtr,
+  OwnershipMovesOnCopyAndAssignment
+)
 {
   Base::destroyed = 0;
   {
@@ -328,7 +384,10 @@ TEST(FaAutoPtr, OwnershipMovesOnCopyAndAssignment)
   EXPECT_EQ(Base::destroyed, 1);
 }
 
-TEST(FaAutoPtr, ResetReleaseAndSwap)
+TEST(
+  FaAutoPtr,
+  ResetReleaseAndSwap
+)
 {
   Base::destroyed = 0;
   fa::auto_ptr<Base> a(new Base(1));
@@ -361,7 +420,10 @@ TEST(FaAutoPtr, ResetReleaseAndSwap)
   EXPECT_FALSE(a == b);
 }
 
-TEST(FaAutoPtr, ConvertsFromDerivedThroughTheRef)
+TEST(
+  FaAutoPtr,
+  ConvertsFromDerivedThroughTheRef
+)
 {
   Base::destroyed = 0;
   {

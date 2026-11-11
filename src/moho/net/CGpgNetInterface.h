@@ -125,7 +125,9 @@ namespace moho
      * rather than `fa::string::operator=`'s self-assignment-safe
      * copy/swap path).
      */
-    SNetCommandArg& operator=(const SNetCommandArg& source)
+    SNetCommandArg& operator=(
+      const SNetCommandArg& source
+    )
     {
       mType = source.mType;
       mNum = source.mNum;
@@ -506,9 +508,7 @@ namespace moho
     boost::weak_ptr<INetNATTraversalHandler> mNATHandler;
   };
   static_assert(sizeof(CGpgNetInterface) == 0x70, "CGpgNetInterface size must be 0x70");
-  static_assert(
-    sizeof(CPullTask<CGpgNetInterface>) == 0x18, "CPullTask<CGpgNetInterface> size must be 0x18"
-  );
+  static_assert(sizeof(CPullTask<CGpgNetInterface>) == 0x18, "CPullTask<CGpgNetInterface> size must be 0x18");
 
   // FUN_007BB4E0 (boost::weak_ptr<INetNATTraversalHandler>(const shared_ptr&))
   // and FUN_007BC5C0 (the CGpgNetInterface->INetNATTraversalProvider aliasing
@@ -534,7 +534,8 @@ namespace moho
   LuaPlus::LuaObject* NET_MakeNATTraversal(
     LuaPlus::LuaState* state,
     LuaPlus::LuaObject* out,
-    boost::weak_ptr<INetNATTraversalProvider>* provider);
+    boost::weak_ptr<INetNATTraversalProvider>* provider
+  );
 
   /**
    * Address: 0x007B9470 (FUN_007B9470, Moho::GPGNET_SetPtr)

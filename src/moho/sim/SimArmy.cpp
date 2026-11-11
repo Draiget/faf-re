@@ -78,7 +78,9 @@ namespace moho
   /**
    * Address: 0x00703EA0 (FUN_00703EA0, Moho::SimArmy::MemberDeserialize)
    */
-  void SimArmy::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SimArmy::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     IArmy* const base = static_cast<IArmy*>(this);
     gpg::RType* type = IArmy::sType;
@@ -94,7 +96,9 @@ namespace moho
   /**
    * Address: 0x00703EF0 (FUN_00703EF0, Moho::SimArmy::MemberSerialize)
    */
-  void SimArmy::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SimArmy::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     const IArmy* const base = static_cast<const IArmy*>(this);
     gpg::RType* type = IArmy::sType;

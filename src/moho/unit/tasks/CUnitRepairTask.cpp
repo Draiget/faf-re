@@ -51,7 +51,9 @@ namespace moho
    * Deserializes repair-task runtime state in binary lane order: command-task
    * base, build-helper lane, command raw pointer, weak target lanes, then flags.
    */
-  void CUnitRepairTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CUnitRepairTask::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -76,7 +78,9 @@ namespace moho
    * Serializes repair-task runtime state in binary lane order: command-task
    * base, build-helper lane, command raw pointer, target weak lanes, then flags.
    */
-  void CUnitRepairTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CUnitRepairTask::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;
@@ -104,7 +108,11 @@ namespace moho
    * Builds the repair-task command/listener subobjects, initializes the shared
    * build helper, binds the target weak lane, and primes the repair mode flags.
    */
-  CUnitRepairTask::CUnitRepairTask(CCommandTask* const parentTask, Unit* const targetUnit, const bool isSiloBuild)
+  CUnitRepairTask::CUnitRepairTask(
+    CCommandTask* const parentTask,
+    Unit* const targetUnit,
+    const bool isSiloBuild
+  )
     : CCommandTask(parentTask)
     , Listener<ECommandEvent>()
     , mBuildHelper("Repair", mUnit)
@@ -127,14 +135,16 @@ namespace moho
     mTargetUnit.ResetFromObject(targetUnit);
 
     if (mUnit != nullptr) {
-      if (Unit* const target = mTargetUnit.GetObjectPtr(); target != nullptr && target->IsUnitState(UNITSTATE_Enhancing)) {
+      if (
+        Unit* const target = mTargetUnit.GetObjectPtr(); target != nullptr && target->IsUnitState(UNITSTATE_Enhancing)
+      ) {
         mUnit->RunScriptWeakUnit("InheritWork", mTargetUnit);
         mInheritingWork = true;
       }
     }
 
-    mGuardAssistMode = mUnit != nullptr
-      && (mUnit->IsUnitState(UNITSTATE_Guarding) || mUnit->IsUnitState(UNITSTATE_AssistingCommander));
+    mGuardAssistMode =
+      mUnit != nullptr && (mUnit->IsUnitState(UNITSTATE_Guarding) || mUnit->IsUnitState(UNITSTATE_AssistingCommander));
   }
 
   /**
@@ -283,7 +293,9 @@ namespace moho
     constexpr char kAiUnitBuildSource[] = "c:\\work\\rts\\main\\code\\src\\sim\\AiUnitBuild.cpp";
 
     // Larger XZ footprint extent of the owner unit (max(mSizeX, mSizeZ)).
-    [[nodiscard]] float LargerFootprintExtent(const SFootprint& footprint) noexcept
+    [[nodiscard]] float LargerFootprintExtent(
+      const SFootprint& footprint
+    ) noexcept
     {
       const std::uint8_t sizeX = footprint.mSizeX;
       const std::uint8_t sizeZ = footprint.mSizeZ;
@@ -291,7 +303,9 @@ namespace moho
     }
 
     // Larger skirt extent of the target blueprint (max(SkirtSizeX, SkirtSizeZ)).
-    [[nodiscard]] float LargerSkirtExtent(const RUnitBlueprint& blueprint) noexcept
+    [[nodiscard]] float LargerSkirtExtent(
+      const RUnitBlueprint& blueprint
+    ) noexcept
     {
       const float skirtX = blueprint.Physics.SkirtSizeX;
       const float skirtZ = blueprint.Physics.SkirtSizeZ;
@@ -305,7 +319,8 @@ namespace moho
       const Wm3::Vec3f& builderPos,
       const Wm3::Vec3f& targetPos,
       const SFootprint& builderFootprint,
-      const RUnitBlueprint& targetBlueprint) noexcept
+      const RUnitBlueprint& targetBlueprint
+    ) noexcept
     {
       const float dx = builderPos.x - targetPos.x;
       const float dz = builderPos.z - targetPos.z;
@@ -365,8 +380,7 @@ namespace moho
     // Fully healed: if nothing else keeps us busy and CanRepair() clears us, stop.
     if (target->mVarDat.mHealth == target->mVarDat.mMaxHealth) {
       if (mGuardAssistMode) {
-        if (mTaskState < TASKSTATE_Complete && !mIsSilo &&
-            !target->IsUnitState(UNITSTATE_Upgrading) && CanRepair()) {
+        if (mTaskState < TASKSTATE_Complete && !mIsSilo && !target->IsUnitState(UNITSTATE_Upgrading) && CanRepair()) {
           return -1;
         }
       } else if ((!target->IsBeingBuilt() || target->mVarDat.mFractionComplete == 1.0f) && CanRepair()) {
@@ -385,196 +399,196 @@ namespace moho
     }
 
     switch (mTaskState) {
-      case TASKSTATE_Preparing: {
-        // Off-map targets are unreachable unless this army uses the whole map.
-        if (!mUnit->ArmyRef->UseWholeMap()) {
-          STIMap* const mapData = mUnit->SimulationRef->mMapData;
-          if (!mapData->IsWithin(target->GetPosition(), 0.0f, false)) {
-            return 1;
-          }
-        }
-
-        // In guard/assist mode, re-home onto the FACTORY that is building the
-        // target, or onto the focus of an upgrading target.
-        if (mGuardAssistMode) {
-          bool retargetCreator = false;
-          if (target->IsBeingBuilt() && target->GetCreator() != nullptr) {
-            if (target->GetCreator()->IsInCategory("FACTORY")) {
-              retargetCreator = true;
-            }
-          }
-
-          if (retargetCreator) {
-            target = target->GetCreator();
-          } else if (target->IsUnitState(UNITSTATE_Upgrading)) {
-            if (Entity* const focus = target->GetFocusEntity(); focus != nullptr) {
-              if (Unit* const focusUnit = focus->IsUnit(); focusUnit != nullptr) {
-                mTargetUnit.ResetFromObject(focusUnit);
-                target = mTargetUnit.GetObjectPtr();
-              }
-            }
-          }
-        }
-
-        // If not yet in position, reserve the build footprint and, when the site
-        // does not fit or the target is out of build range, path into range.
-        if (!mInPosition && target != nullptr) {
-          const Wm3::Vec3f& builderPos = mUnit->GetPosition();
-          const SCoordsVec2 builderCoords{builderPos.x, builderPos.z};
-          const bool fits =
-            mUnit->GetFootprint().FitsAt(builderCoords, *mUnit->SimulationRef->mOGrid) != static_cast<EOccupancyCaps>(0u);
-
-          const RUnitBlueprint* const targetBlueprint = target->GetBlueprint();
-          const float rangeGap =
-            BuildRangeGap(mUnit->GetPosition(), target->GetPosition(), mUnit->GetFootprint(), *targetBlueprint);
-
-          if (!fits || rangeGap > mUnit->GetBlueprint()->Economy.MaxBuildDistance) {
-            gpg::Rect2f skirt = target->GetSkirtRect();
-            skirt.x0 -= 1.0f;
-            skirt.z0 -= 1.0f;
-            skirt.x1 += 1.0f;
-            skirt.z1 += 1.0f;
-
-            const Wm3::Vec3f& targetPos = target->GetPosition();
-            Wm3::Vector3f moveTarget{targetPos.x, targetPos.y, targetPos.z};
-            const bool useWholeMap = mUnit->ArmyRef->UseWholeMap();
-            (void)mUnit->PrepareMove(1, &moveTarget, &skirt, useWholeMap);
-
-            const SCoordsVec2 reserveCoords{moveTarget.x, moveTarget.z};
-            gpg::Rect2i reserveRect{};
-            COORDS_ToGridRect(&reserveRect, reserveCoords, mUnit->GetFootprint());
-            mUnit->ReserveOgridRect(reserveRect);
-
-            const SOCellPos goalCell = mUnit->GetFootprint().ToCellPos(moveTarget);
-            NewMoveTask(SNavGoal(goalCell), this, 0, nullptr, 0);
-          }
-        }
-
-        mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
-        return 0;
-      }
-
-      case TASKSTATE_Waiting: {
-        const bool wasMoving = !mInPosition;
-        mTaskState = TASKSTATE_Starting;
-
-        if (wasMoving) {
-          mUnit->FreeOgridRect();
-
-          bool retargetCreator = false;
-          if (target->IsBeingBuilt() && target->GetCreator() != nullptr) {
-            if (target->GetCreator()->IsInCategory("FACTORY")) {
-              retargetCreator = true;
-            }
-          }
-          if (retargetCreator) {
-            target = target->GetCreator();
-          }
-
-          const RUnitBlueprint* const targetBlueprint = target->GetBlueprint();
-          const float rangeGap =
-            BuildRangeGap(mUnit->GetPosition(), target->GetPosition(), mUnit->GetFootprint(), *targetBlueprint);
-          if (rangeGap > mUnit->GetBlueprint()->Economy.MaxBuildDistance) {
-            return -1;
-          }
-        }
-
-        if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
-          navigator->AbortMove();
-        }
-
-        mBuildTargetUnit.ResetFromObject(mTargetUnit.GetObjectPtr());
-
-        if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr) {
-          Unit* const buildTarget = mBuildTargetUnit.GetObjectPtr();
-          const VTransform boneTransform = buildTarget->GetBoneWorldTransform(-1);
-          builder->BuilderSetAimTarget(boneTransform.pos_);
-        }
-      }
-        [[fallthrough]];
-
-      case TASKSTATE_Starting: {
-        if (!mUnit->GetBlueprint()->Economy.NeedToFaceTargetToBuild) {
-          mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
-          return 0;
-        }
-
-        const VTransform& transform = mUnit->GetTransform();
-        const VAxes3 axes{transform.orient_};
-        // 0x005F9A82: the flattened forward goes through `NormalizeVectorInto`
-        // (0x0044F7E0, zero only at length 0), not Wm3 `Normalize`.
-        const Wm3::Vector3f flatForward{axes.vZ.x, 0.0f, axes.vZ.z};
-        Wm3::Vector3f forward{};
-        (void)NormalizeVectorInto(&forward, flatForward);
-
-        const Wm3::Vec3f& builderPos = mUnit->GetPosition();
-        const Wm3::Vec3f& targetPos = target->GetPosition();
-        Wm3::Vector3f toTarget{targetPos.x - builderPos.x, 0.0f, targetPos.z - builderPos.z};
-        (void)toTarget.Normalize();
-
-        // 0x005F9AD0..0x005F9AF8 sums the dot as `(z*z' + y*y') + x*x'`.
-        const float dot = ((forward.z * toTarget.z) + (forward.y * toTarget.y)) + (forward.x * toTarget.x);
-        if (dot > 0.94999999f) {
-          mUnit->UnitMotion->SetFacing(Wm3::Vector3f::Zero());
-          mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
-          return 0;
-        }
-        mUnit->UnitMotion->SetFacing(toTarget);
-        return 1;
-      }
-
-      case TASKSTATE_Processing: {
-        if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr && !builder->BuilderGetOnTarget()) {
+    case TASKSTATE_Preparing: {
+      // Off-map targets are unreachable unless this army uses the whole map.
+      if (!mUnit->ArmyRef->UseWholeMap()) {
+        STIMap* const mapData = mUnit->SimulationRef->mMapData;
+        if (!mapData->IsWithin(target->GetPosition(), 0.0f, false)) {
           return 1;
         }
-        if (mUnit->mUnitVarDat.mIsPaused) {
-          return 10;
+      }
+
+      // In guard/assist mode, re-home onto the FACTORY that is building the
+      // target, or onto the focus of an upgrading target.
+      if (mGuardAssistMode) {
+        bool retargetCreator = false;
+        if (target->IsBeingBuilt() && target->GetCreator() != nullptr) {
+          if (target->GetCreator()->IsInCategory("FACTORY")) {
+            retargetCreator = true;
+          }
         }
 
-        if (Unit* const buildTarget = mBuildTargetUnit.GetObjectPtr(); buildTarget != nullptr) {
-          buildTarget->mUnitVarDat.mUnitStates |= (1ull << static_cast<std::uint32_t>(UNITSTATE_NoReclaim));
-          mBuildHelper.SetFocus(buildTarget);
-        } else {
-          mBuildHelper.SetFocus(nullptr);
+        if (retargetCreator) {
+          target = target->GetCreator();
+        } else if (target->IsUnitState(UNITSTATE_Upgrading)) {
+          if (Entity* const focus = target->GetFocusEntity(); focus != nullptr) {
+            if (Unit* const focusUnit = focus->IsUnit(); focusUnit != nullptr) {
+              mTargetUnit.ResetFromObject(focusUnit);
+              target = mTargetUnit.GetObjectPtr();
+            }
+          }
         }
-        mBuildHelper.mIsSilo = mIsSilo;
+      }
 
-        mUnit->mUnitVarDat.mUnitStates |= (1ull << static_cast<std::uint32_t>(UNITSTATE_Repairing));
+      // If not yet in position, reserve the build footprint and, when the site
+      // does not fit or the target is out of build range, path into range.
+      if (!mInPosition && target != nullptr) {
+        const Wm3::Vec3f& builderPos = mUnit->GetPosition();
+        const SCoordsVec2 builderCoords{builderPos.x, builderPos.z};
+        const bool fits =
+          mUnit->GetFootprint().FitsAt(builderCoords, *mUnit->SimulationRef->mOGrid) != static_cast<EOccupancyCaps>(0u);
+
+        const RUnitBlueprint* const targetBlueprint = target->GetBlueprint();
+        const float rangeGap =
+          BuildRangeGap(mUnit->GetPosition(), target->GetPosition(), mUnit->GetFootprint(), *targetBlueprint);
+
+        if (!fits || rangeGap > mUnit->GetBlueprint()->Economy.MaxBuildDistance) {
+          gpg::Rect2f skirt = target->GetSkirtRect();
+          skirt.x0 -= 1.0f;
+          skirt.z0 -= 1.0f;
+          skirt.x1 += 1.0f;
+          skirt.z1 += 1.0f;
+
+          const Wm3::Vec3f& targetPos = target->GetPosition();
+          Wm3::Vector3f moveTarget{targetPos.x, targetPos.y, targetPos.z};
+          const bool useWholeMap = mUnit->ArmyRef->UseWholeMap();
+          (void)mUnit->PrepareMove(1, &moveTarget, &skirt, useWholeMap);
+
+          const SCoordsVec2 reserveCoords{moveTarget.x, moveTarget.z};
+          gpg::Rect2i reserveRect{};
+          COORDS_ToGridRect(&reserveRect, reserveCoords, mUnit->GetFootprint());
+          mUnit->ReserveOgridRect(reserveRect);
+
+          const SOCellPos goalCell = mUnit->GetFootprint().ToCellPos(moveTarget);
+          NewMoveTask(SNavGoal(goalCell), this, 0, nullptr, 0);
+        }
+      }
+
+      mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+      return 0;
+    }
+
+    case TASKSTATE_Waiting: {
+      const bool wasMoving = !mInPosition;
+      mTaskState = TASKSTATE_Starting;
+
+      if (wasMoving) {
+        mUnit->FreeOgridRect();
+
+        bool retargetCreator = false;
+        if (target->IsBeingBuilt() && target->GetCreator() != nullptr) {
+          if (target->GetCreator()->IsInCategory("FACTORY")) {
+            retargetCreator = true;
+          }
+        }
+        if (retargetCreator) {
+          target = target->GetCreator();
+        }
+
+        const RUnitBlueprint* const targetBlueprint = target->GetBlueprint();
+        const float rangeGap =
+          BuildRangeGap(mUnit->GetPosition(), target->GetPosition(), mUnit->GetFootprint(), *targetBlueprint);
+        if (rangeGap > mUnit->GetBlueprint()->Economy.MaxBuildDistance) {
+          return -1;
+        }
+      }
+
+      if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
+        navigator->AbortMove();
+      }
+
+      mBuildTargetUnit.ResetFromObject(mTargetUnit.GetObjectPtr());
+
+      if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr) {
+        Unit* const buildTarget = mBuildTargetUnit.GetObjectPtr();
+        const VTransform boneTransform = buildTarget->GetBoneWorldTransform(-1);
+        builder->BuilderSetAimTarget(boneTransform.pos_);
+      }
+    }
+      [[fallthrough]];
+
+    case TASKSTATE_Starting: {
+      if (!mUnit->GetBlueprint()->Economy.NeedToFaceTargetToBuild) {
         mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
         return 0;
       }
 
-      case TASKSTATE_Complete: {
-        // Attached targets skip the range gate (they cannot drift away).
-        if (!target->IsUnitState(UNITSTATE_Attached)) {
-          const RUnitBlueprint* const targetBlueprint = target->GetBlueprint();
-          const float rangeGap =
-            BuildRangeGap(mUnit->GetPosition(), target->GetPosition(), mUnit->GetFootprint(), *targetBlueprint);
-          if (rangeGap > (mUnit->GetBlueprint()->Economy.MaxBuildDistance * 2.0f)) {
-            return -1;
-          }
-        }
+      const VTransform& transform = mUnit->GetTransform();
+      const VAxes3 axes{transform.orient_};
+      // 0x005F9A82: the flattened forward goes through `NormalizeVectorInto`
+      // (0x0044F7E0, zero only at length 0), not Wm3 `Normalize`.
+      const Wm3::Vector3f flatForward{axes.vZ.x, 0.0f, axes.vZ.z};
+      Wm3::Vector3f forward{};
+      (void)NormalizeVectorInto(&forward, flatForward);
 
-        if (!mBuildHelper.UpdateWorkProgress()) {
-          // Not finished: keep working. The one exception is an inherited
-          // enhancement whose subject has stopped enhancing (0x005F9D1D tests
-          // UNITSTATE_Enhancing and returns 1 while it is still set).
-          if (!mInheritingWork) {
-            return 1;
-          }
-          Unit* const buildTarget = mBuildTargetUnit.GetObjectPtr();
-          if (buildTarget == nullptr || buildTarget->IsUnitState(UNITSTATE_Enhancing)) {
-            return 1;
-          }
-        }
+      const Wm3::Vec3f& builderPos = mUnit->GetPosition();
+      const Wm3::Vec3f& targetPos = target->GetPosition();
+      Wm3::Vector3f toTarget{targetPos.x - builderPos.x, 0.0f, targetPos.z - builderPos.z};
+      (void)toTarget.Normalize();
 
+      // 0x005F9AD0..0x005F9AF8 sums the dot as `(z*z' + y*y') + x*x'`.
+      const float dot = ((forward.z * toTarget.z) + (forward.y * toTarget.y)) + (forward.x * toTarget.x);
+      if (dot > 0.94999999f) {
+        mUnit->UnitMotion->SetFacing(Wm3::Vector3f::Zero());
         mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
-        return -1;
+        return 0;
+      }
+      mUnit->UnitMotion->SetFacing(toTarget);
+      return 1;
+    }
+
+    case TASKSTATE_Processing: {
+      if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr && !builder->BuilderGetOnTarget()) {
+        return 1;
+      }
+      if (mUnit->mUnitVarDat.mIsPaused) {
+        return 10;
       }
 
-      default:
-        gpg::HandleAssertFailure("Reached the supposably unreachable.", kRepairTaskAssertLine, kAiUnitBuildSource);
-        return -1;
+      if (Unit* const buildTarget = mBuildTargetUnit.GetObjectPtr(); buildTarget != nullptr) {
+        buildTarget->mUnitVarDat.mUnitStates |= (1ull << static_cast<std::uint32_t>(UNITSTATE_NoReclaim));
+        mBuildHelper.SetFocus(buildTarget);
+      } else {
+        mBuildHelper.SetFocus(nullptr);
+      }
+      mBuildHelper.mIsSilo = mIsSilo;
+
+      mUnit->mUnitVarDat.mUnitStates |= (1ull << static_cast<std::uint32_t>(UNITSTATE_Repairing));
+      mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+      return 0;
+    }
+
+    case TASKSTATE_Complete: {
+      // Attached targets skip the range gate (they cannot drift away).
+      if (!target->IsUnitState(UNITSTATE_Attached)) {
+        const RUnitBlueprint* const targetBlueprint = target->GetBlueprint();
+        const float rangeGap =
+          BuildRangeGap(mUnit->GetPosition(), target->GetPosition(), mUnit->GetFootprint(), *targetBlueprint);
+        if (rangeGap > (mUnit->GetBlueprint()->Economy.MaxBuildDistance * 2.0f)) {
+          return -1;
+        }
+      }
+
+      if (!mBuildHelper.UpdateWorkProgress()) {
+        // Not finished: keep working. The one exception is an inherited
+        // enhancement whose subject has stopped enhancing (0x005F9D1D tests
+        // UNITSTATE_Enhancing and returns 1 while it is still set).
+        if (!mInheritingWork) {
+          return 1;
+        }
+        Unit* const buildTarget = mBuildTargetUnit.GetObjectPtr();
+        if (buildTarget == nullptr || buildTarget->IsUnitState(UNITSTATE_Enhancing)) {
+          return 1;
+        }
+      }
+
+      mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
+      return -1;
+    }
+
+    default:
+      gpg::HandleAssertFailure("Reached the supposably unreachable.", kRepairTaskAssertLine, kAiUnitBuildSource);
+      return -1;
     }
   }
 
@@ -589,7 +603,9 @@ namespace moho
    * build-target lane, rebinds the target lane from the command's focus unit,
    * resets state to Preparing, and resumes the owning task thread.
    */
-  void CUnitRepairTask::OnEvent(ECommandEvent /*event*/)
+  void CUnitRepairTask::OnEvent(
+    ECommandEvent /*event*/
+  )
   {
     if (Unit* const buildTarget = mBuildTargetUnit.GetObjectPtr(); buildTarget != nullptr) {
       buildTarget->mUnitVarDat.mUnitStates &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_NoReclaim));

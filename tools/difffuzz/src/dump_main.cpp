@@ -12,6 +12,12 @@
 #include "legacy/math/X87Math.h"
 #include "platform/X87Precision.h"
 
+#if defined(_MSC_VER)
+#include <intrin.h>
+#else
+#include <cpuid.h>
+#endif
+
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -54,7 +60,10 @@ namespace
 #endif
   }
 
-  [[nodiscard]] bool Matches(const char* name, const char* filter)
+  [[nodiscard]] bool Matches(
+    const char* name,
+    const char* filter
+  )
   {
     if (filter == nullptr) {
       return true;
@@ -92,7 +101,43 @@ namespace
 #endif
   }
 
-  void PrintWords(const u32* words, const int count)
+  /// The CPU's vendor and brand string from cpuid (leaf 0, leaves 0x80000002-4), e.g. "AuthenticAMD AMD EPYC 7763".
+  std::string CpuName()
+  {
+    unsigned int regs[4] = {};
+    const auto query = [&regs](const unsigned int leaf) {
+#if defined(_MSC_VER)
+      int out[4] = {};
+      __cpuid(out, static_cast<int>(leaf));
+      std::memcpy(regs, out, sizeof(regs));
+#else
+      __cpuid(leaf, regs[0], regs[1], regs[2], regs[3]);
+#endif
+    };
+    query(0u);
+    char vendor[13] = {};
+    std::memcpy(vendor + 0, &regs[1], 4);
+    std::memcpy(vendor + 4, &regs[3], 4);
+    std::memcpy(vendor + 8, &regs[2], 4);
+    std::string name = vendor;
+    query(0x80000000u);
+    if (regs[0] >= 0x80000004u) {
+      char brand[49] = {};
+      for (unsigned int leaf = 0x80000002u; leaf <= 0x80000004u; ++leaf) {
+        query(leaf);
+        std::memcpy(brand + (leaf - 0x80000002u) * 16u, regs, 16);
+      }
+      std::string text = brand;
+      const std::size_t start = text.find_first_not_of(' ');
+      name += " " + (start == std::string::npos ? std::string{} : text.substr(start));
+    }
+    return name;
+  }
+
+  void PrintWords(
+    const u32* words,
+    const int count
+  )
   {
     for (int i = 0; i < count; ++i) {
       std::printf(" %08X", words[i]);
@@ -138,7 +183,9 @@ namespace
         if (still < kHangSeconds || tg == nullptr) {
           continue;
         }
-        std::printf("HANG %s iteration %llu: one call ran for %d s\n  input   ", tg->name, gIteration.load(), kHangSeconds);
+        std::printf(
+          "HANG %s iteration %llu: one call ran for %d s\n  input   ", tg->name, gIteration.load(), kHangSeconds
+        );
         PrintWords(gInput, tg->inWords);
         std::printf("  (%s)\n", tg->inLayout);
         std::fflush(stdout);
@@ -148,7 +195,13 @@ namespace
   }
 
   /// Our function's outputs for one input, in the simulation's FP environment.
-  void RunOurs(const Target& tg, const u32* in, u32* outWords, const bool strictNan, const unsigned long long iteration)
+  void RunOurs(
+    const Target& tg,
+    const u32* in,
+    u32* outWords,
+    const bool strictNan,
+    const unsigned long long iteration
+  )
   {
     std::memcpy(gInput, in, sizeof(u32) * tg.inWords);
     gIteration.store(iteration);
@@ -169,7 +222,9 @@ namespace
   /// Every line of the values file whose target matches the filter: our outputs
   /// for its inputs against retail's. A selected target with no line fails too
   /// (a new target needs a new values file). Returns the number of failures.
-  int CheckValues(const Options& opt)
+  int CheckValues(
+    const Options& opt
+  )
   {
     std::FILE* const file = std::fopen(opt.values, "rb");
     if (file == nullptr) {
@@ -260,8 +315,14 @@ namespace
       }
       if (inCount != tg.inWords || outCount != tg.outWords) {
         std::printf(
-          "BAD %s:%d: %s takes %d input and %d output words, the line has %d and %d\n", opt.values, lineNumber, tg.name,
-          tg.inWords, tg.outWords, inCount, outCount
+          "BAD %s:%d: %s takes %d input and %d output words, the line has %d and %d\n",
+          opt.values,
+          lineNumber,
+          tg.name,
+          tg.inWords,
+          tg.outWords,
+          inCount,
+          outCount
         );
         ++bad;
         continue;
@@ -299,12 +360,20 @@ namespace
       }
     }
     std::printf(
-      "faf_math_dump --values: %d cases over %d targets, %d differ or missing from %s\n", cases, covered, bad, opt.values
+      "faf_math_dump --values: %d cases over %d targets, %d differ or missing from %s\n",
+      cases,
+      covered,
+      bad,
+      opt.values
     );
     return bad;
   }
 
-  void Run(const Options& opt, std::FILE* out, int& ran)
+  void Run(
+    const Options& opt,
+    std::FILE* out,
+    int& ran
+  )
   {
     int targetCount = 0;
     const Target* const targets = difffuzz::AllTargets(targetCount);
@@ -336,7 +405,10 @@ namespace
   }
 
   /// "target block" -> the rest of the line, for every line of a dump file.
-  [[nodiscard]] bool ReadDump(std::FILE* file, std::map<std::string, std::string>& lines)
+  [[nodiscard]] bool ReadDump(
+    std::FILE* file,
+    std::map<std::string, std::string>& lines
+  )
   {
     char buffer[512];
     while (std::fgets(buffer, sizeof(buffer), file) != nullptr) {
@@ -359,7 +431,10 @@ namespace
 
   /// Every line this run wrote must be in the golden file with the same hashes.
   /// Returns the number of differing or missing lines.
-  int Check(std::FILE* produced, const char* goldenPath)
+  int Check(
+    std::FILE* produced,
+    const char* goldenPath
+  )
   {
     std::FILE* const golden = std::fopen(goldenPath, "rb");
     std::map<std::string, std::string> expected;
@@ -377,32 +452,90 @@ namespace
     if (!ReadDump(produced, actual)) {
       return -1;
     }
+    // cpu_variants.txt next to the golden file: "target block inputs outputs <CPU and why>" lines, outputs another CPU
+    // gives for the same inputs (an x87 transcendental rounding its last bit another way), as retail would there.
+    std::multimap<std::string, std::string> variants;
+    {
+      std::string path = goldenPath;
+      const std::size_t slash = path.find_last_of("/\\");
+      path = (slash == std::string::npos ? std::string{} : path.substr(0, slash + 1)) + "cpu_variants.txt";
+      if (std::FILE* const file = std::fopen(path.c_str(), "rb"); file != nullptr) {
+        std::map<std::string, std::string> lines;
+        char buffer[512];
+        while (std::fgets(buffer, sizeof(buffer), file) != nullptr) {
+          std::string line = buffer;
+          while (!line.empty() && (line.back() == '\n' || line.back() == '\r')) {
+            line.pop_back();
+          }
+          const std::size_t first = line.find(' ');
+          const std::size_t second = first == std::string::npos ? first : line.find(' ', first + 1);
+          if (!line.empty() && line[0] != '#' && second != std::string::npos) {
+            variants.emplace(line.substr(0, second), line.substr(second + 1));
+          }
+        }
+        std::fclose(file);
+      }
+    }
     int bad = 0;
     for (const auto& [key, hashes] : actual) {
       const auto it = expected.find(key);
+      const auto [variantFirst, variantLast] = variants.equal_range(key);
+      std::string variantNote;
+      for (auto variant = variantFirst; variant != variantLast; ++variant) {
+        // "inputs outputs note": the same 33 characters as a dump line's hashes, then the note.
+        if (
+          variant->second.size() >= hashes.size() && variant->second.compare(0, hashes.size(), hashes) == 0 &&
+          (variant->second.size() == hashes.size() || variant->second[hashes.size()] == ' ')
+        ) {
+          variantNote =
+            variant->second.size() > hashes.size() ? variant->second.substr(hashes.size() + 1) : "(no note)";
+        }
+      }
       if (it == expected.end()) {
-        std::printf("MISSING %s: not in %s (iterations past the golden file's, or a new target)\n", key.c_str(), goldenPath);
+        std::printf(
+          "MISSING %s: not in %s (iterations past the golden file's, or a new target)\n", key.c_str(), goldenPath
+        );
         ++bad;
+      } else if (it->second != hashes && !variantNote.empty() && it->second.substr(0, 16) == hashes.substr(0, 16)) {
+        std::printf(
+          "VARIANT %s: outputs as cpu_variants.txt lists them for %s (this CPU: %s)\n",
+          key.c_str(),
+          variantNote.c_str(),
+          CpuName().c_str()
+        );
       } else if (it->second != hashes) {
         const bool inputs = it->second.substr(0, 16) != hashes.substr(0, 16);
         std::printf(
-          "FAIL %s: %s differ (golden %s, here %s)\n", key.c_str(), inputs ? "inputs" : "outputs", it->second.c_str(),
+          "FAIL %s: %s differ (golden %s, here %s)\n",
+          key.c_str(),
+          inputs ? "inputs" : "outputs",
+          it->second.c_str(),
           hashes.c_str()
         );
         ++bad;
       }
     }
     std::printf("faf_math_dump --check: %zu blocks, %d differ from %s\n", actual.size(), bad, goldenPath);
+    if (bad > 0) {
+      // x87 transcendentals (fpatan, fsin, f2xm1, fyl2x) aren't specified to the last bit, so the CPU decides what a
+      // target built on them gives: name it, to tell a code change from a machine the golden file wasn't made on.
+      std::printf("faf_math_dump --check: this machine's CPU: %s\n", CpuName().c_str());
+    }
     return bad;
   }
 } // namespace
 
-int main(int argc, char** argv)
+int main(
+  int argc,
+  char** argv
+)
 {
   Options opt;
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
-    auto next = [&]() -> const char* { return i + 1 < argc ? argv[++i] : ""; };
+    auto next = [&]() -> const char* {
+      return i + 1 < argc ? argv[++i] : "";
+    };
     if (a == "--iters") {
       opt.iters = std::strtoull(next(), nullptr, 0);
     } else if (a == "--seed") {
@@ -427,8 +560,10 @@ int main(int argc, char** argv)
     }
   }
   const bool hashes = opt.out != nullptr || opt.check != nullptr;
-  if ((opt.out != nullptr && opt.check != nullptr) || (!hashes && opt.values == nullptr)
-      || (opt.check != nullptr && opt.lines) || (opt.values != nullptr && (opt.lines || opt.strictNan))) {
+  if (
+    (opt.out != nullptr && opt.check != nullptr) || (!hashes && opt.values == nullptr) ||
+    (opt.check != nullptr && opt.lines) || (opt.values != nullptr && (opt.lines || opt.strictNan))
+  ) {
     Usage();
     return 2;
   }
@@ -457,7 +592,11 @@ int main(int argc, char** argv)
   int ran = 0;
   Run(opt, out, ran);
   std::printf(
-    "faf_math_dump (%s): %d targets, %llu iterations each, seed 0x%llX%s\n", PlatformName(), ran, opt.iters, opt.seed,
+    "faf_math_dump (%s): %d targets, %llu iterations each, seed 0x%llX%s\n",
+    PlatformName(),
+    ran,
+    opt.iters,
+    opt.seed,
     opt.strictNan ? ", strict NaN" : ""
   );
   int result = ran == 0 ? 2 : 0;

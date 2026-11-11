@@ -19,7 +19,9 @@ namespace
    * Unlinks thread from current intrusive list, relinks it into owning stage
    * main-thread list, and clears staged flag.
    */
-  [[maybe_unused]] moho::CTaskThread* RelinkThreadToPrimaryStageList(moho::CTaskThread* const thread)
+  [[maybe_unused]] moho::CTaskThread* RelinkThreadToPrimaryStageList(
+    moho::CTaskThread* const thread
+  )
   {
     thread->ListLinkBefore(&thread->mStage->mThreads);
     thread->mStaged = false;
@@ -89,7 +91,16 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CTaskThreadTypeInfo_6a4218, moho::register_CTaskThreadTypeInfo)
-GPG_PREREGISTER_INIT(register_CTaskStageTypeInfo_6a4218, moho::register_CTaskStageTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CTaskThreadTypeInfo_6a4218,
+  moho::register_CTaskThreadTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_CTaskStageTypeInfo_6a4218,
+  moho::register_CTaskStageTypeInfo
+)
 
-GPG_PREREGISTER_INIT(InitializeCTaskThreadTypeInfoStorage_6a4218, InitializeCTaskThreadTypeInfoStorage)
+GPG_PREREGISTER_INIT(
+  InitializeCTaskThreadTypeInfoStorage_6a4218,
+  InitializeCTaskThreadTypeInfoStorage
+)

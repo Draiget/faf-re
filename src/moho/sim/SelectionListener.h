@@ -18,9 +18,7 @@ namespace moho
    * The session attach hook subscribes this listener to the session's
    * selection broadcaster (`session + 0x00`).
    */
-  class SelectionListener
-    : public ISessionListener
-    , public Listener<SSelectionEvent>
+  class SelectionListener : public ISessionListener, public Listener<SSelectionEvent>
   {
   public:
     /**

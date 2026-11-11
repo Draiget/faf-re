@@ -104,7 +104,9 @@ namespace
   using moho::Entity;
   using moho::Sim;
 
-  [[nodiscard]] const char* ResolveEntityBlueprintId(const Entity* const entity) noexcept
+  [[nodiscard]] const char* ResolveEntityBlueprintId(
+    const Entity* const entity
+  ) noexcept
   {
     if (entity == nullptr || entity->BluePrint == nullptr || entity->BluePrint->mBlueprintId.empty()) {
       return "";
@@ -133,7 +135,9 @@ namespace
    * Upcasts one reflected object reference to `RPropBlueprint` and returns
    * the typed pointer when compatible.
    */
-  [[maybe_unused]] [[nodiscard]] moho::RPropBlueprint* func_CastRPropBlueprint(const gpg::RRef& source)
+  [[maybe_unused]] [[nodiscard]] moho::RPropBlueprint* func_CastRPropBlueprint(
+    const gpg::RRef& source
+  )
   {
     gpg::RType* type = moho::RPropBlueprint::sType;
     if (!type) {
@@ -144,7 +148,7 @@ namespace
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, type);
     return static_cast<moho::RPropBlueprint*>(upcast.mObj);
   }
-}
+} // namespace
 
 namespace moho
 {
@@ -154,14 +158,15 @@ namespace moho
   int cfunc_EntityFallDownL(LuaPlus::LuaState* state);
   int cfunc_EntitySinkAway(lua_State* luaContext);
   int cfunc_EntitySinkAwayL(LuaPlus::LuaState* state);
-}
+} // namespace moho
 
 namespace moho
 {
-  Wm3::Vector3f* CopyEntityDrawScaleToVector( Wm3::Vector3f* const outScale, const Entity* const entity ) noexcept;
-  TDatListItem<Entity, EntityDirtyList>* SetEntityDrawScaleAndRelinkCoordNode( Entity* const entity, const Wm3::Vector3f* const drawScale ) noexcept;
+  Wm3::Vector3f* CopyEntityDrawScaleToVector(Wm3::Vector3f* const outScale, const Entity* const entity) noexcept;
+  TDatListItem<Entity, EntityDirtyList>*
+  SetEntityDrawScaleAndRelinkCoordNode(Entity* const entity, const Wm3::Vector3f* const drawScale) noexcept;
   CScrLuaInitForm* func__c_CreateEntity_LuaFuncDef();
   CScrLuaInitForm* func_EntityFallDown_LuaFuncDef();
   CScrLuaInitForm* func_EntitySinkAway_LuaFuncDef();
   CScrLuaInitForm* func_EntityPushOver_LuaFuncDef();
-}
+} // namespace moho

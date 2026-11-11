@@ -76,7 +76,9 @@ namespace
   [[maybe_unused]] CIntelPosHandleTypeInfoBootstrap gCIntelPosHandleTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CIntelPosHandleTypeInfo_d34bd8, moho::register_CIntelPosHandleTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CIntelPosHandleTypeInfo_d34bd8,
+  moho::register_CIntelPosHandleTypeInfo
+)

@@ -71,4 +71,3 @@ namespace moho
 
   static_assert(sizeof(CUnitCarrierLandTypeInfo) == 0x64, "CUnitCarrierLandTypeInfo size must be 0x64");
 } // namespace moho
-

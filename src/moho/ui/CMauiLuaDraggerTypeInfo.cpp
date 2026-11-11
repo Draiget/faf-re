@@ -23,7 +23,10 @@ namespace
 
   struct CMauiLuaDraggerTypeInfoBootstrap
   {
-    CMauiLuaDraggerTypeInfoBootstrap() { moho::register_CMauiLuaDraggerTypeInfoStartup(); }
+    CMauiLuaDraggerTypeInfoBootstrap()
+    {
+      moho::register_CMauiLuaDraggerTypeInfoStartup();
+    }
   };
   CMauiLuaDraggerTypeInfoBootstrap gCMauiLuaDraggerTypeInfoBootstrap;
 
@@ -37,7 +40,9 @@ namespace
    * `CScriptObject` reference `SCR_MakeScriptObjectRef` builds down to this
    * class.
    */
-  void AddCScriptObjectBase(gpg::RType& typeInfo)
+  void AddCScriptObjectBase(
+    gpg::RType& typeInfo
+  )
   {
     gpg::AddReflectedBaseViaSlot<moho::CScriptObject>(&typeInfo);
   }
@@ -107,4 +112,7 @@ void moho::register_CMauiLuaDraggerTypeInfoStartup()
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every
 // consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CMauiLuaDraggerTypeInfoStartup_078dc70, moho::register_CMauiLuaDraggerTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CMauiLuaDraggerTypeInfoStartup_078dc70,
+  moho::register_CMauiLuaDraggerTypeInfoStartup
+)

@@ -1,0 +1,3 @@
+# Third-party LuaPlus / Lua 5.0 headers (see LICENSE): kept as shipped, not reformatted.
+DisableFormat: true
+SortIncludes: Never

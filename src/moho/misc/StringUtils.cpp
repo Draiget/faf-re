@@ -7,7 +7,12 @@
 #include "legacy/containers/String.h"
 using namespace moho;
 
-void moho::TrimRange(const char* s, const size_t n, const char*& outBegin, const char*& outEnd)
+void moho::TrimRange(
+  const char* s,
+  const size_t n,
+  const char*& outBegin,
+  const char*& outEnd
+)
 {
   const char* b = s;
   const char* e = s + n;
@@ -21,7 +26,10 @@ void moho::TrimRange(const char* s, const size_t n, const char*& outBegin, const
   outEnd = e;
 }
 
-void moho::SplitByComma(const fa::string& src, fa::vector<fa::string>& out)
+void moho::SplitByComma(
+  const fa::string& src,
+  fa::vector<fa::string>& out
+)
 {
   const char* s = src.c_str();
   const size_t n = src.size();
@@ -51,7 +59,10 @@ void moho::SplitByComma(const fa::string& src, fa::vector<fa::string>& out)
   }
 }
 
-fa::string moho::Join(const fa::vector<fa::string>& items, const char* sep)
+fa::string moho::Join(
+  const fa::vector<fa::string>& items,
+  const char* sep
+)
 {
   fa::string out;
   if (items.empty()) {
@@ -75,7 +86,10 @@ fa::string moho::Join(const fa::vector<fa::string>& items, const char* sep)
   return out;
 }
 
-bool moho::IsNameIgnored(const fa::string& ignoreList, const char* name)
+bool moho::IsNameIgnored(
+  const fa::string& ignoreList,
+  const char* name
+)
 {
   if (!name || ignoreList.empty()) {
     return false;
@@ -95,13 +109,16 @@ bool moho::IsNameIgnored(const fa::string& ignoreList, const char* name)
 }
 
 /**
- * Address: 0x0050E010 (FUN_0050E010, ?BP_ShortId@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV23@@Z)
+ * Address: 0x0050E010 (FUN_0050E010,
+ * ?BP_ShortId@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV23@@Z)
  *
  * What it does:
  * Returns the path stem lane delimited by slash/dot markers using the same
  * index math as the original binary helper.
  */
-fa::string moho::BP_ShortId(const fa::string& idText)
+fa::string moho::BP_ShortId(
+  const fa::string& idText
+)
 {
   const std::string_view text = idText.view();
   const std::size_t slash = text.find_last_of('/');
@@ -143,11 +160,13 @@ bool moho::URI_Split(
     return false;
   }
 
-  auto assignOutputs = [&](const std::string& schemeValue,
-                           const std::string& authorityValue,
-                           const std::string& pathValue,
-                           const std::string& queryValue,
-                           const std::string& fragmentValue) {
+  auto assignOutputs = [&](
+                         const std::string& schemeValue,
+                         const std::string& authorityValue,
+                         const std::string& pathValue,
+                         const std::string& queryValue,
+                         const std::string& fragmentValue
+                       ) {
     scheme->assign_owned(schemeValue);
     authority->assign_owned(authorityValue);
     path->assign_owned(pathValue);

@@ -128,7 +128,7 @@ namespace moho
      * What it does:
      * Initializes stream pointers/mode around an already-connected socket.
      */
-    explicit CNetTCPBuf(SOCKET socket) noexcept;
+    explicit CNetTCPBuf(platform::net::Socket socket) noexcept;
 
   private:
     /**
@@ -163,11 +163,11 @@ namespace moho
     static constexpr size_t kChunkSize = kNetIoBufferSize;
     static constexpr size_t kBufferSize = 0x1000;
 
-    SOCKET mSocket{INVALID_SOCKET}; // +0x1C
-    std::uint32_t mMode{0};         // +0x20
-    std::uint8_t mFailed{0};        // +0x24
-    [[maybe_unused]] std::uint8_t mPad0x25{0};       // +0x25
-    char mBuffer[kBufferSize]{};    // +0x26
+    platform::net::Socket mSocket{platform::net::kInvalidSocket}; // +0x1C
+    std::uint32_t mMode{0};                                       // +0x20
+    std::uint8_t mFailed{0};                                      // +0x24
+    [[maybe_unused]] std::uint8_t mPad0x25{0};                    // +0x25
+    char mBuffer[kBufferSize]{};                                  // +0x26
   };
   static_assert(sizeof(CNetTCPBuf) == 0x1028, "CNetTCPBuf size must be 0x1028");
 } // namespace moho

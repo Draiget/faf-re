@@ -22,7 +22,9 @@ namespace moho
      * What it does:
      * Memory-maps a DDS file; an out-of-line wrapper over `DISK_MemoryMapFile`.
      */
-    [[nodiscard]] gpg::MemBuffer<const char> MapFromFile(const gpg::StrArg path)
+    [[nodiscard]] gpg::MemBuffer<const char> MapFromFile(
+      const gpg::StrArg path
+    )
     {
       return DISK_MemoryMapFile(path);
     }
@@ -31,7 +33,9 @@ namespace moho
      * What it does:
      * The texture file's bytes; both texture loaders inline this.
      */
-    [[nodiscard]] gpg::MemBuffer<const char> MapTextureFile(const gpg::StrArg path)
+    [[nodiscard]] gpg::MemBuffer<const char> MapTextureFile(
+      const gpg::StrArg path
+    )
     {
       gpg::MemBuffer<const char> data;
       data = _stricmp(FILE_Ext(path), "dds") == 0 ? MapFromFile(path) : DISK_MemoryMapFile(path);
@@ -55,7 +59,9 @@ namespace moho
   /**
    * Address: 0x0043DED0 (FUN_0043DED0)
    */
-  boost::shared_ptr<RD3DTextureResource> CD3DTextureResourceFactory::LoadImpl(const gpg::StrArg path)
+  boost::shared_ptr<RD3DTextureResource> CD3DTextureResourceFactory::LoadImpl(
+    const gpg::StrArg path
+  )
   {
     if (path != nullptr && path[0] != '\0') {
       const gpg::MemBuffer<const char> data = MapTextureFile(path);
@@ -72,7 +78,9 @@ namespace moho
   /**
    * Address: 0x0043E0C0 (FUN_0043E0C0)
    */
-  boost::shared_ptr<gpg::MemBuffer<const char>> CD3DTextureResourceFactory::PreloadImpl(const gpg::StrArg path)
+  boost::shared_ptr<gpg::MemBuffer<const char>> CD3DTextureResourceFactory::PreloadImpl(
+    const gpg::StrArg path
+  )
   {
     if (path != nullptr && path[0] != '\0') {
       const gpg::MemBuffer<const char> data = MapTextureFile(path);
@@ -87,7 +95,8 @@ namespace moho
    * Address: 0x0043E200 (FUN_0043E200)
    */
   boost::shared_ptr<RD3DTextureResource> CD3DTextureResourceFactory::LoadFromImpl(
-    const gpg::StrArg path, const boost::shared_ptr<gpg::MemBuffer<const char>> prefetchData
+    const gpg::StrArg path,
+    const boost::shared_ptr<gpg::MemBuffer<const char>> prefetchData
   )
   {
     boost::shared_ptr<RD3DTextureResource> resource(new RD3DTextureResource(path));

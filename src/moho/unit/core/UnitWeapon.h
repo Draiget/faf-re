@@ -64,7 +64,6 @@ namespace moho
   static_assert(offsetof(WeaponCollisionEntry, entity) == 0x00, "WeaponCollisionEntry::entity offset must be 0x00");
   static_assert(offsetof(WeaponCollisionEntry, dist) == 0x1C, "WeaponCollisionEntry::dist offset must be 0x1C");
 
-
   enum class ESolutionStatus : std::int32_t
   {
     TRS_Available = 0,
@@ -121,22 +120,31 @@ namespace moho
     CollisionBeamHelper(const CollisionBeamHelper&) = delete;
     CollisionBeamHelper& operator=(const CollisionBeamHelper&) = delete;
 
-    EImpactType mImpactType;     // +0x00
-    CAiTarget mTarget;           // +0x04
-    WeakPtr<Entity> mEntity;     // +0x24
-    Wm3::Vector3f mPos;          // +0x2C
-    float mBeamLength;           // +0x38
-    WeaponBeamLine mLine;        // +0x3C
-    float mLineScale;            // +0x54
+    EImpactType mImpactType; // +0x00
+    CAiTarget mTarget;       // +0x04
+    WeakPtr<Entity> mEntity; // +0x24
+    Wm3::Vector3f mPos;      // +0x2C
+    float mBeamLength;       // +0x38
+    WeaponBeamLine mLine;    // +0x3C
+    float mLineScale;        // +0x54
   };
   static_assert(sizeof(CollisionBeamHelper) == 0x58, "CollisionBeamHelper size must be 0x58");
-  static_assert(offsetof(CollisionBeamHelper, mImpactType) == 0x00, "CollisionBeamHelper::mImpactType offset must be 0x00");
+  static_assert(
+    offsetof(CollisionBeamHelper, mImpactType) == 0x00,
+    "CollisionBeamHelper::mImpactType offset must be 0x00"
+  );
   static_assert(offsetof(CollisionBeamHelper, mTarget) == 0x04, "CollisionBeamHelper::mTarget offset must be 0x04");
   static_assert(offsetof(CollisionBeamHelper, mEntity) == 0x24, "CollisionBeamHelper::mEntity offset must be 0x24");
   static_assert(offsetof(CollisionBeamHelper, mPos) == 0x2C, "CollisionBeamHelper::mPos offset must be 0x2C");
-  static_assert(offsetof(CollisionBeamHelper, mBeamLength) == 0x38, "CollisionBeamHelper::mBeamLength offset must be 0x38");
+  static_assert(
+    offsetof(CollisionBeamHelper, mBeamLength) == 0x38,
+    "CollisionBeamHelper::mBeamLength offset must be 0x38"
+  );
   static_assert(offsetof(CollisionBeamHelper, mLine) == 0x3C, "CollisionBeamHelper::mLine offset must be 0x3C");
-  static_assert(offsetof(CollisionBeamHelper, mLineScale) == 0x54, "CollisionBeamHelper::mLineScale offset must be 0x54");
+  static_assert(
+    offsetof(CollisionBeamHelper, mLineScale) == 0x54,
+    "CollisionBeamHelper::mLineScale offset must be 0x54"
+  );
 
   class UnitWeapon : public CScriptEvent
   {
@@ -251,9 +259,8 @@ namespace moho
      * Builds a new `UnitWeapon` for an archive load and hands it back unowned; its
      * members are loaded over it afterwards.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x006DF3A0 (FUN_006DF3A0, Moho::UnitWeapon::MemberDeserialize)
@@ -295,7 +302,12 @@ namespace moho
      * Rebinds the weapon to a skeleton bone. Inlined into the muzzle-bone
      * override in `ManipulatorLuaFunctionThunks.cpp`.
      */
-    void SetBone(const std::int32_t boneIndex) noexcept { mBone = boneIndex; }
+    void SetBone(
+      const std::int32_t boneIndex
+    ) noexcept
+    {
+      mBone = boneIndex;
+    }
 
     /**
      * Address: 0x0062FDD0 (FUN_0062FDD0, `mov [eax+0xF0], cl; ret`)
@@ -305,7 +317,12 @@ namespace moho
      * three times into `CAimManipulator` -- cleared on construction, raised on
      * destruction, and set from the on-target flag each update.
      */
-    void SetCanFire(const bool canFire) noexcept { mCanFire = canFire ? 1u : 0u; }
+    void SetCanFire(
+      const bool canFire
+    ) noexcept
+    {
+      mCanFire = canFire ? 1u : 0u;
+    }
 
     /**
      * Address: 0x0062FDA0 (FUN_0062FDA0, `mov [eax+0x174], cl; ret`)
@@ -319,7 +336,12 @@ namespace moho
      * given up. The flag keeps its `mUnknown174` field spelling for now --
      * renaming the member reaches five files and is its own change.
      */
-    void SetAimReachable(const bool reachable) noexcept { mUnknown174 = reachable ? 1u : 0u; }
+    void SetAimReachable(
+      const bool reachable
+    ) noexcept
+    {
+      mUnknown174 = reachable ? 1u : 0u;
+    }
 
     /**
      * Address: 0x0062FDB0 (FUN_0062FDB0, three `fld [eax+N]` / `fstp
@@ -329,7 +351,12 @@ namespace moho
      * Publishes the direction this weapon is currently aiming along, for the
      * firing and targeting paths to read back.
      */
-    void SetAimingAt(const Wm3::Vector3f& direction) noexcept { mAimingAt = direction; }
+    void SetAimingAt(
+      const Wm3::Vector3f& direction
+    ) noexcept
+    {
+      mAimingAt = direction;
+    }
 
     /**
      * Address: 0x006D64E0 (FUN_006D64E0, Moho::UnitWeapon::CreateProjectile)
@@ -527,32 +554,32 @@ namespace moho
     void AgeBlacklist();
 
   public:
-    Sim* mSim;                                  // +0x44
-    RUnitBlueprintWeapon* mWeaponBlueprint;     // +0x48
-    RProjectileBlueprint* mProjectileBlueprint; // +0x4C
-    IAiAttacker* mAttacker;                     // +0x50
-    CWeaponAttributes mAttributes;              // +0x54
-    Unit* mUnit;                                // +0xA0
-    std::int32_t mWeaponIndex;                  // +0xA4
-    std::int32_t mBone;                         // +0xA8
-    std::uint8_t mEnabled;                      // +0xAC
-    std::uint8_t mPadAD[3];                     // +0xAD
-    fa::string mLabel;                       // +0xB0
-    CAiTarget mTarget;                          // +0xCC
-    CFireWeaponTask* mFireWeaponTask;           // +0xEC
-    std::uint8_t mCanFire;                      // +0xF0
-    std::uint8_t mPadF1ToF7[7];                 // +0xF1
-    EntityCategorySet mCat1;                    // +0xF8
-    EntityCategorySet mCat2;                    // +0x120
-    ELayer mFireTargetLayerCaps;                // +0x148
-    float mFiringRandomness;                    // +0x14C
+    Sim* mSim;                                       // +0x44
+    RUnitBlueprintWeapon* mWeaponBlueprint;          // +0x48
+    RProjectileBlueprint* mProjectileBlueprint;      // +0x4C
+    IAiAttacker* mAttacker;                          // +0x50
+    CWeaponAttributes mAttributes;                   // +0x54
+    Unit* mUnit;                                     // +0xA0
+    std::int32_t mWeaponIndex;                       // +0xA4
+    std::int32_t mBone;                              // +0xA8
+    std::uint8_t mEnabled;                           // +0xAC
+    std::uint8_t mPadAD[3];                          // +0xAD
+    fa::string mLabel;                               // +0xB0
+    CAiTarget mTarget;                               // +0xCC
+    CFireWeaponTask* mFireWeaponTask;                // +0xEC
+    std::uint8_t mCanFire;                           // +0xF0
+    std::uint8_t mPadF1ToF7[7];                      // +0xF1
+    EntityCategorySet mCat1;                         // +0xF8
+    EntityCategorySet mCat2;                         // +0x120
+    ELayer mFireTargetLayerCaps;                     // +0x148
+    float mFiringRandomness;                         // +0x14C
     fa::vector<EntityCategorySet> mTargetPriorities; // +0x150
     fa::vector<SBlackListInfo> mBlacklist;           // +0x160
-    std::int32_t mUnknown170;                   // +0x170
-    std::uint8_t mUnknown174;                   // +0x174
-    std::uint8_t mPad175To177[3];               // +0x175
-    Wm3::Vector3f mAimingAt;                    // +0x178
-    std::int32_t mShotsAtTarget;                // +0x184
+    std::int32_t mUnknown170;                        // +0x170
+    std::uint8_t mUnknown174;                        // +0x174
+    std::uint8_t mPad175To177[3];                    // +0x175
+    Wm3::Vector3f mAimingAt;                         // +0x178
+    std::int32_t mShotsAtTarget;                     // +0x184
   };
 
   /**
@@ -1273,7 +1300,8 @@ namespace moho
 
   static_assert(offsetof(UnitWeapon, mWeaponBlueprint) == 0x48, "UnitWeapon::mWeaponBlueprint offset must be 0x48");
   static_assert(
-    offsetof(UnitWeapon, mProjectileBlueprint) == 0x4C, "UnitWeapon::mProjectileBlueprint offset must be 0x4C"
+    offsetof(UnitWeapon, mProjectileBlueprint) == 0x4C,
+    "UnitWeapon::mProjectileBlueprint offset must be 0x4C"
   );
   static_assert(offsetof(UnitWeapon, mAttributes) == 0x54, "UnitWeapon::mAttributes offset must be 0x54");
   static_assert(offsetof(UnitWeapon, mEnabled) == 0xAC, "UnitWeapon::mEnabled offset must be 0xAC");
@@ -1283,12 +1311,8 @@ namespace moho
     offsetof(UnitWeapon, mFireTargetLayerCaps) == 0x148,
     "UnitWeapon::mFireTargetLayerCaps offset must be 0x148"
   );
-  static_assert(
-    offsetof(UnitWeapon, mFiringRandomness) == 0x14C, "UnitWeapon::mFiringRandomness offset must be 0x14C"
-  );
-  static_assert(
-    offsetof(UnitWeapon, mTargetPriorities) == 0x150, "UnitWeapon::mTargetPriorities offset must be 0x150"
-  );
+  static_assert(offsetof(UnitWeapon, mFiringRandomness) == 0x14C, "UnitWeapon::mFiringRandomness offset must be 0x14C");
+  static_assert(offsetof(UnitWeapon, mTargetPriorities) == 0x150, "UnitWeapon::mTargetPriorities offset must be 0x150");
   static_assert(offsetof(UnitWeapon, mBlacklist) == 0x160, "UnitWeapon::mBlacklist offset must be 0x160");
   static_assert(offsetof(UnitWeapon, mAimingAt) == 0x178, "UnitWeapon::mAimingAt offset must be 0x178");
   static_assert(offsetof(UnitWeapon, mShotsAtTarget) == 0x184, "UnitWeapon::mShotsAtTarget offset must be 0x184");

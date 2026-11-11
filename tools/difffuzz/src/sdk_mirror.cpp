@@ -16,7 +16,10 @@
  * Address: 0x0044F880). Verbatim body.
  */
 Wm3::Quaternionf* moho::QuatCrossAdd(
-  Wm3::Quaternionf* const dest, Wm3::Vector3f v1, Wm3::Vector3f v2, const Wm3::Vector3f& fallbackAxis
+  Wm3::Quaternionf* const dest,
+  Wm3::Vector3f v1,
+  Wm3::Vector3f v2,
+  const Wm3::Vector3f& fallbackAxis
 )
 {
   Wm3::Vector3f::Normalize(&v1);
@@ -87,7 +90,9 @@ namespace mirror
    * Mirrors src\moho\entity\Entity.cpp:7791-7799 (moho::COORDS_Pitch,
    * Address: 0x0050B710). Verbatim body.
    */
-  float COORDS_Pitch(const Wm3::Vector3f& velocity) noexcept
+  float COORDS_Pitch(
+    const Wm3::Vector3f& velocity
+  ) noexcept
   {
     using moho::kHalfPi;
     const float length = std::sqrt((velocity.x * velocity.x) + (velocity.y * velocity.y) + (velocity.z * velocity.z));
@@ -99,7 +104,10 @@ namespace mirror
   }
 
   /// Mirrors src\moho\ai\CAimManipulator.cpp moho::CAimManipulator::SetFiringArc (0x00630CB0).
-  void AimSetFiringArc(AimArcLanes& self, const AimFiringArc arc)
+  void AimSetFiringArc(
+    AimArcLanes& self,
+    const AimFiringArc arc
+  )
   {
     self.mMinHeading = moho::NormalizeAngleSignedRadiansX87(fa::HalfSumX87(arc.mMinHeading, arc.mMaxHeading));
     self.mHeadingMaxSlew = arc.mHeadingMaxSlew;
@@ -272,7 +280,10 @@ namespace mirror
   }
 
   /// Mirrors src\moho\animation\CAnimTexture.cpp moho::WrapPositiveModulo (0x00422940).
-  float WrapPositiveModulo(const float value, const float range) noexcept
+  float WrapPositiveModulo(
+    const float value,
+    const float range
+  ) noexcept
   {
     float wrapped = static_cast<float>(fa::fmod(value, range));
     if ((0.0f > wrapped) != (0.0f > range)) {
@@ -284,7 +295,9 @@ namespace mirror
   // ---- fourth wave ----------------------------------------------------------
 
   /// Mirrors src\moho\sim\SimDriver.cpp moho::RATE_GameRateToSpeed (0x0055AE10).
-  int RATE_GameRateToSpeed(const float rate)
+  int RATE_GameRateToSpeed(
+    const float rate
+  )
   {
     const float speed = fa::IntrinsicLnQuotient(rate, 10.0) * 10.0f;
     const float nearest = std::nearbyint(speed);
@@ -294,13 +307,15 @@ namespace mirror
   }
 
   /// Mirrors src\gpg\core\algorithms\Cluster.cpp gpg::HaStar::Cluster::QuantizeEdgeCost (0x0092D8B0).
-  float QuantizeEdgeCost(const float a, const float b)
+  float QuantizeEdgeCost(
+    const float a,
+    const float b
+  )
   {
     const float scaled = fa::ScaledLnQuotient(a, b, 6.0f);
     const float nearest = std::nearbyint(scaled);
-    int quantized = static_cast<int>(
-      static_cast<std::uint32_t>(fa::RoundToInt(nearest)) + (scaled > nearest ? 1u : 0u)
-    );
+    int quantized =
+      static_cast<int>(static_cast<std::uint32_t>(fa::RoundToInt(nearest)) + (scaled > nearest ? 1u : 0u));
     if (quantized > 31) {
       quantized = 31;
     }
@@ -311,10 +326,18 @@ namespace mirror
   }
 
   /// Mirrors src\moho\entity\Entity.cpp moho::COORDS_ToGridRect (0x0050AFA0).
-  void COORDS_ToGridRect(int* const outRect, const float centerX, const float centerZ, const int sizeX, const int sizeZ)
+  void COORDS_ToGridRect(
+    int* const outRect,
+    const float centerX,
+    const float centerZ,
+    const int sizeX,
+    const int sizeZ
+  )
   {
-    const std::int16_t halfSizeX = static_cast<std::int16_t>(fa::RoundToInt(centerX - (static_cast<float>(sizeX) * 0.5f)));
-    const std::int16_t halfSizeZ = static_cast<std::int16_t>(fa::RoundToInt(centerZ - (static_cast<float>(sizeZ) * 0.5f)));
+    const std::int16_t halfSizeX =
+      static_cast<std::int16_t>(fa::RoundToInt(centerX - (static_cast<float>(sizeX) * 0.5f)));
+    const std::int16_t halfSizeZ =
+      static_cast<std::int16_t>(fa::RoundToInt(centerZ - (static_cast<float>(sizeZ) * 0.5f)));
     outRect[0] = halfSizeX;
     outRect[1] = halfSizeZ;
     outRect[2] = sizeX + halfSizeX;
@@ -322,7 +345,12 @@ namespace mirror
   }
 
   /// Mirrors src\moho\collision\CColPrimitiveBase.cpp ProjectBoxOntoAxis (0x00475550), anonymous namespace.
-  void ProjectBoxOntoAxis(const float* const box, const float* const axis, float* const outMin, float* const outMax) noexcept
+  void ProjectBoxOntoAxis(
+    const float* const box,
+    const float* const axis,
+    float* const outMin,
+    float* const outMax
+  ) noexcept
   {
     const float centerProjection = (axis[1] * box[1] + axis[2] * box[2]) + axis[0] * box[0];
     const float radius = fa::BoxRadiusOnAxisX87(box, axis);
@@ -331,7 +359,10 @@ namespace mirror
   }
 
   /// Mirrors src\moho\math\MathReflection.cpp moho::VAxes3::VAxes3(const Quaternionf&) (0x004EC590).
-  void VAxes3FromQuat(float* const outAxes, const Wm3::Quaternionf& orientation)
+  void VAxes3FromQuat(
+    float* const outAxes,
+    const Wm3::Quaternionf& orientation
+  )
   {
     const float twoW = orientation.w * 2.0f;
     const float twoX = orientation.x * 2.0f;
@@ -362,7 +393,11 @@ namespace mirror
   }
 
   /// Mirrors src\moho\math\MathReflection.cpp moho::VMatrix4::Set(quat, vec) (0x004EE980).
-  void VMatrix4Set(float* const outRows, const Wm3::Quaternionf& quat, const Wm3::Vector3f& vec)
+  void VMatrix4Set(
+    float* const outRows,
+    const Wm3::Quaternionf& quat,
+    const Wm3::Vector3f& vec
+  )
   {
     const float twoX = quat.x * 2.0f;
     const float twoY = quat.y * 2.0f;
@@ -401,7 +436,11 @@ namespace mirror
   /// (0x004FE2D0) with Wild Magic's ContAlignedBox (Containment\Wm3ContBox3.cpp:24-127, no
   /// validity mask) inlined: that TU needs half of Wild Magic. Its box has identity axes,
   /// and the radius still multiplies them in, as both the engine and retail do.
-  void AxisAlignedBoundsFromBox(const Wm3::Box3f& box, float* const outMin, float* const outMax)
+  void AxisAlignedBoundsFromBox(
+    const Wm3::Box3f& box,
+    float* const outMin,
+    float* const outMax
+  )
   {
     Wm3::Vector3f vertices[8];
     box.ComputeVertices(vertices);
@@ -433,7 +472,10 @@ namespace mirror
   namespace
   {
     /// Mirrors src\moho\sim\STIMap.cpp ClampIndex (anonymous namespace).
-    [[nodiscard]] int ClampIndex(const int value, const int limitInclusive) noexcept
+    [[nodiscard]] int ClampIndex(
+      const int value,
+      const int limitInclusive
+    ) noexcept
     {
       if (limitInclusive <= 0) {
         return 0;
@@ -449,7 +491,13 @@ namespace mirror
   } // namespace
 
   /// Mirrors src\moho\sim\STIMap.cpp moho::CHeightField::GetElevation (0x0044FB90).
-  float HeightFieldElevation(const std::uint16_t* const data, const int width, const int height, const float x, const float z)
+  float HeightFieldElevation(
+    const std::uint16_t* const data,
+    const int width,
+    const int height,
+    const float x,
+    const float z
+  )
   {
     const int fx = fa::FloorToIntX87(x);
     const int fz = fa::FloorToIntX87(z);
@@ -477,7 +525,12 @@ namespace mirror
 
   /// Mirrors src\moho\sim\CRandomStream.cpp CMersenneTwister::ShuffleState (0x0040EBB0),
   /// NextUInt32 (0x0040E9F0) and CRandomStream::FRand(lower, upper) (0x0051B5C0).
-  float RandomStreamFRand(std::uint32_t* const state, std::uint32_t& k, const float lower, const float upper)
+  float RandomStreamFRand(
+    std::uint32_t* const state,
+    std::uint32_t& k,
+    const float lower,
+    const float upper
+  )
   {
     constexpr std::uint32_t kStateWordCount = 0x270;
     constexpr std::uint32_t kTwistMiddle = 0x18D;
@@ -495,7 +548,8 @@ namespace mirror
         const std::uint32_t mixed = ((state[i + 1] ^ state[i]) & kLow31Mask) ^ state[i];
         state[i] = (mixed >> 1) ^ kTwistMagTable[mixed & 1u] ^ state[i - kTwistSplit];
       }
-      const std::uint32_t tailMixed = ((state[0] ^ state[kStateWordCount - 1]) & kLow31Mask) ^ state[kStateWordCount - 1];
+      const std::uint32_t tailMixed =
+        ((state[0] ^ state[kStateWordCount - 1]) & kLow31Mask) ^ state[kStateWordCount - 1];
       state[kStateWordCount - 1] = (tailMixed >> 1) ^ kTwistMagTable[tailMixed & 1u] ^ state[kTwistMiddle - 1];
       k = 0;
     }
@@ -510,12 +564,15 @@ namespace mirror
   }
 
   /// Mirrors src\moho\render\camera\VTransform.cpp moho::VTransform::Inverse (0x0046FBF0).
-  void VTransformInverse(const float* const transform, float* const outTransform)
+  void VTransformInverse(
+    const float* const transform,
+    float* const outTransform
+  )
   {
     Wm3::Quaternionf orient;
     Wm3::Vector3f pos;
-    std::memcpy(&orient, transform, sizeof(orient));
-    std::memcpy(&pos, transform + 4, sizeof(pos));
+    std::memcpy(static_cast<void*>(&orient), transform, sizeof(orient));
+    std::memcpy(static_cast<void*>(&pos), transform + 4, sizeof(pos));
 
     Wm3::Quaternionf invertedOrient;
     invertedOrient.w = orient.w;

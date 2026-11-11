@@ -19,7 +19,9 @@ namespace faf::remote::client
      * frames come as the sim makes them and are shown at once, so it is 0 and the skew stays 0,
      * as the lockstep driver's GetSimSpeed is.
      */
-    explicit CBeatClock(std::int64_t targetBacklog = 0) noexcept
+    explicit CBeatClock(
+      std::int64_t targetBacklog = 0
+    ) noexcept
       : mTargetBacklog(targetBacklog)
     {}
 
@@ -29,16 +31,33 @@ namespace faf::remote::client
     /** A frame arrived: its beat, the server's rate and clock, and the local clock (seconds). */
     void OnFrame(std::uint32_t beat, std::int32_t simRate, std::uint32_t serverMs, double localSeconds) noexcept;
     /** The session showed a beat (took a sync packet). */
-    void OnShown(std::uint32_t beat) noexcept { mShownBeat = beat; }
+    void OnShown(
+      std::uint32_t beat
+    ) noexcept
+    {
+      mShownBeat = beat;
+    }
 
-    [[nodiscard]] bool HasFrames() const noexcept { return mFrames != 0u; }
-    [[nodiscard]] std::int32_t ServerSimRate() const noexcept { return mSimRate; }
+    [[nodiscard]] bool HasFrames() const noexcept
+    {
+      return mFrames != 0u;
+    }
+    [[nodiscard]] std::int32_t ServerSimRate() const noexcept
+    {
+      return mSimRate;
+    }
     /** Beats a second the rate asks for: 10 * 10^(rate / 10). */
     [[nodiscard]] double ExpectedBeatsPerSecond() const noexcept;
     /** Measured on the server's clock, smoothed. */
-    [[nodiscard]] double ServerBeatsPerSecond() const noexcept { return mServerRate; }
+    [[nodiscard]] double ServerBeatsPerSecond() const noexcept
+    {
+      return mServerRate;
+    }
     /** Measured on the local clock (arrival), smoothed. */
-    [[nodiscard]] double ArrivalBeatsPerSecond() const noexcept { return mArrivalRate; }
+    [[nodiscard]] double ArrivalBeatsPerSecond() const noexcept
+    {
+      return mArrivalRate;
+    }
     /** Frames received that the session has not shown yet. */
     [[nodiscard]] std::int64_t Backlog() const noexcept;
     /**

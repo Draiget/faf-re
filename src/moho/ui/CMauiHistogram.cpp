@@ -7,7 +7,7 @@ namespace
   constexpr const char* kCMauiHistogramSetDataHelpText = "SetData(dataTable)";
   constexpr const char* kInternalCreateHistogramHelpText =
     "InternalCreateHistogram(luaobj,parent) -- For internal use by CreateHistogram()";
-}
+} // namespace
 
 gpg::RType* moho::CMauiHistogram::sType = nullptr;
 

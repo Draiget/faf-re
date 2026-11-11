@@ -75,9 +75,8 @@ namespace moho
      * Builds a new `MotorSinkAway` for an archive load and hands it back unowned; its
      * members are loaded over it afterwards.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x00697200 (FUN_00697200, Moho::MotorSinkAway::MemberDeserialize)

@@ -39,7 +39,9 @@ namespace
    * Computes 10^exponent by binary exponentiation over the bits of `exponent`.
    * Used to derive the grid-cell stride for one subdivision depth.
    */
-  [[nodiscard]] int IntegerPowerOfTen(unsigned int exponent) noexcept
+  [[nodiscard]] int IntegerPowerOfTen(
+    unsigned int exponent
+  ) noexcept
   {
     int base = 10;
     int result = 1;
@@ -151,7 +153,11 @@ namespace
   // Raw bit test used by FUN_0064F090 against the occupancy grid: no bounds
   // check (the caller guarantees the cell range), one bit per cell packed into
   // 32-bit words, row pitch `maskGrid.width` words.
-  [[nodiscard]] bool IsOccupancyLaneSet(const gpg::BitArray2D& maskGrid, unsigned int cellX, unsigned int cellZ) noexcept
+  [[nodiscard]] bool IsOccupancyLaneSet(
+    const gpg::BitArray2D& maskGrid,
+    unsigned int cellX,
+    unsigned int cellZ
+  ) noexcept
   {
     const std::uint32_t word =
       static_cast<std::uint32_t>(maskGrid.ptr[cellX + (cellZ >> 5) * static_cast<unsigned int>(maskGrid.width)]);
@@ -226,17 +232,19 @@ namespace
    * in that order. It had been transcribed here a second time as
    * `ResolveDebugGridColorByMode`.
    */
-  [[nodiscard]] std::int32_t ResolveGridDepthColor(unsigned int selector) noexcept
+  [[nodiscard]] std::int32_t ResolveGridDepthColor(
+    unsigned int selector
+  ) noexcept
   {
     switch (selector) {
-      case 0u:
-        return static_cast<std::int32_t>(0xFFFFFFFFu); // white
-      case 1u:
-        return static_cast<std::int32_t>(0xFFFF0000u); // red
-      case 2u:
-        return static_cast<std::int32_t>(0xFF00FF00u); // green
-      default:
-        return static_cast<std::int32_t>(0xFF0000FFu); // blue
+    case 0u:
+      return static_cast<std::int32_t>(0xFFFFFFFFu); // white
+    case 1u:
+      return static_cast<std::int32_t>(0xFFFF0000u); // red
+    case 2u:
+      return static_cast<std::int32_t>(0xFF00FF00u); // green
+    default:
+      return static_cast<std::int32_t>(0xFF0000FFu); // blue
     }
   }
 
@@ -257,15 +265,17 @@ namespace
    * behaviourally identical but emits the subtraction in the wrong place,
    * so the argument is spelled as the binary spells it.
    */
-  [[nodiscard]] float ResolveGridSubdivisionDistance(unsigned int level) noexcept
+  [[nodiscard]] float ResolveGridSubdivisionDistance(
+    unsigned int level
+  ) noexcept
   {
     switch (level) {
-      case 0u:
-        return 75.0f;
-      case 1u:
-        return 500.0f;
-      default:
-        return gpg::pInf;
+    case 0u:
+      return 75.0f;
+    case 1u:
+      return 500.0f;
+    default:
+      return gpg::pInf;
     }
   }
 
@@ -357,16 +367,7 @@ namespace
             const unsigned int childDepthZ = (subZ != z) ? (depth - 1u) : depthZ;
             const unsigned int childDepthX = (subX != x) ? (depth - 1u) : depthX;
             result = DrawGridCellRecursive(
-              subX,
-              subZ,
-              depth - 1u,
-              childDepthX,
-              childDepthZ,
-              activePlaneMask,
-              camera,
-              hf,
-              oGrid,
-              canvas
+              subX, subZ, depth - 1u, childDepthX, childDepthZ, activePlaneMask, camera, hf, oGrid, canvas
             );
           }
         }
@@ -464,7 +465,9 @@ namespace moho
    * then (if a debug canvas is active) recursively rasterizes the grid overlay
    * from the map's occupancy grid, height field, and current view frustum.
    */
-  void RDebugGrid::Tick(Sim* const sim)
+  void RDebugGrid::Tick(
+    Sim* const sim
+  )
   {
     if (sim == nullptr || sim->mMapData == nullptr) {
       return;

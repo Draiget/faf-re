@@ -1,35 +1,37 @@
 # Performance
 
-The rebuilt x64 engine plays the same games as retail `ForgedAlliance.exe`, bit for bit, and about **a quarter faster**.
+The rebuilt x64 engine plays the same games as retail `ForgedAlliance.exe`, bit for bit, in about **40 % less time**.
 
-*Snapshot: 24/10/2026.*
+*Snapshot: 10/11/2026, master f0e20932b.*
 
 ## Against retail
 
-Five FAF vault replays, played one at a time. Retail runs D3D9. Ours runs x64 with every switch at its default, 8 sim workers and D3D12. Time is wall-clock seconds from game 0:00 to the end of the replay. Every run matched every checksum the players recorded.
+Five FAF vault replays, played one at a time, retail and ours back to back in the same session. Retail runs D3D9. Ours runs x64 with every switch at its default, 8 sim workers and D3D12. Time is wall-clock seconds from game 0:00 to the end of the replay. Every run matched every checksum the players recorded.
 
-| Replay | Players | Game length | Retail | Ours | Faster by |
+| Replay | Players | Game length | Retail | Ours | Time saved |
 |---|---|---|---|---|---|
-| 26919967 | 12 | 46 min | 1675 s | 1125 s | **33 %** |
-| 26928802 | 8 | 39 min | 1123 s | 855 s | **24 %** |
-| 26935800 | 12 | 41 min | 1244 s | 1032 s | **17 %** |
-| 26997072 | 10 | 23 min | 180 s | 151 s | **16 %** |
-| 26923388 | 2 | 45 min | 189 s | 181 s | **4 %** |
+| 26919967 | 12 | 46 min | 1752 s | 964 s | **45 %** |
+| 26935800 | 12 | 41 min | 1560 s | 868 s | **44 %** |
+| 26928802 | 8 | 39 min | 1327 s | 834 s | **37 %** |
+| 26997072 | 10 | 23 min | 236 s | 170 s | **28 %** |
+| 26923388 | 2 | 45 min | 247 s | 191 s | **23 %** |
 
 | | Time saved | Speed |
 |---|---|---|
-| Least (small game, both near the game's speed cap) | 4 % | 1.04× |
-| Most | 33 % | 1.49× |
-| Average | 19 % | 1.25× |
-| All five together (4411 s → 3344 s) | 24 % | 1.32× |
+| Least (small game, both near the game's speed cap) | 23 % | 1.29× |
+| Most | 45 % | 1.82× |
+| Average | 35 % | 1.55× |
+| All five together (5122 s → 3027 s) | 41 % | 1.69× |
 
-The bigger the battle, the bigger the gain. In the heaviest stretch of the three large games (ticks 20,000–22,000) we are 23–38 % faster.
+The bigger the battle, the bigger the gain. In the heaviest stretch of the three large games (ticks 20,000–22,000) we take 39–50 % less time.
+
+The first run of this benchmark, on 23/10/2026 (master f2e650e8), saved 4–33 % per replay and 24 % over all five. Our own times have come down since (868 s against 1032 s on 26935800). Retail also took 5–25 % longer in this session than on 23/10 on the same replays, for a reason not looked into, which is why both are always measured in one session.
 
 A few more details:
 
-- **Without sim workers** our x64 is about 9 % faster than retail (26935800, D3D9).
-- **D3D9 is faster than D3D12 in a replay at full speed**: 924 s against 1032 s on 26935800.
-- **Memory**: we use 0.4–0.9 GB more than retail, because of 64-bit pointers and the D3D12 backend.
+- **Without sim workers** our x64 was about 9 % faster than retail (26935800, D3D9; 23/10/2026 run).
+- **D3D9 is faster than D3D12 in a replay at full speed**: 924 s against 1032 s on 26935800 (23/10/2026 run).
+- **Memory**: we use 0.8–1.2 GB more than retail at peak (1.3–2.3 GB against 0.6–1.1 GB private), because of 64-bit pointers and the D3D12 backend.
 - **Scale**: x86 runs out of address space at about 60,000 units. x64 was still running at 90,000.
 - **Multiplayer**: retail and our x64 played 30 minutes in one lobby without a desync, with and without sim workers.
 

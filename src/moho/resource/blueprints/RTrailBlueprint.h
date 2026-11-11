@@ -42,9 +42,8 @@ namespace moho
      * own `RTrailBlueprint` (owned by the rules, so the archive may not delete it).
      * Inlined into `SerConstructHelper<RTrailBlueprint>::Construct` 0x005100C0.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x0050FFE0 (FUN_0050FFE0)
@@ -54,7 +53,10 @@ namespace moho
      * `MemberConstruct` to look the blueprint up by.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     float Lifetime;                   // +0x28
@@ -67,8 +69,8 @@ namespace moho
     std::uint8_t CatchupEmit;         // +0x41
     std::uint8_t pad_0042_0044[0x02]; // +0x42
     float TextureRepeatRate;          // +0x44
-    fa::string RepeatTexture;      // +0x48
-    fa::string RampTexture;        // +0x64
+    fa::string RepeatTexture;         // +0x48
+    fa::string RampTexture;           // +0x64
     static gpg::RType* sType;
 
     /**
@@ -123,7 +125,8 @@ namespace moho
   static_assert(offsetof(RTrailBlueprint, EmitIfVisible) == 0x40, "RTrailBlueprint::EmitIfVisible offset must be 0x40");
   static_assert(offsetof(RTrailBlueprint, CatchupEmit) == 0x41, "RTrailBlueprint::CatchupEmit offset must be 0x41");
   static_assert(
-    offsetof(RTrailBlueprint, TextureRepeatRate) == 0x44, "RTrailBlueprint::TextureRepeatRate offset must be 0x44"
+    offsetof(RTrailBlueprint, TextureRepeatRate) == 0x44,
+    "RTrailBlueprint::TextureRepeatRate offset must be 0x44"
   );
   static_assert(offsetof(RTrailBlueprint, RepeatTexture) == 0x48, "RTrailBlueprint::RepeatTexture offset must be 0x48");
   static_assert(offsetof(RTrailBlueprint, RampTexture) == 0x64, "RTrailBlueprint::RampTexture offset must be 0x64");

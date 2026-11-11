@@ -25,10 +25,10 @@ namespace moho
     static gpg::RType* sType;
     static gpg::RType* sPointerType;
 
-    CTaskStage* mStage;                   // 0x0C
-    CTask* mTaskTop;                      // 0x10
-    int mPendingFrames;                   // 0x14
-    bool mStaged;                         // 0x18
+    CTaskStage* mStage; // 0x0C
+    CTask* mTaskTop;    // 0x10
+    int mPendingFrames; // 0x14
+    bool mStaged;       // 0x18
     // 0x19..0x1B: layout alignment bytes (no direct task-path field accesses recovered).
     std::uint8_t mAlignmentPad19[3];
 
@@ -86,9 +86,8 @@ namespace moho
      * Builds a new `CTaskThread` for an archive load and hands it back unowned; its
      * members are loaded over it afterwards.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x0040CF90 (FUN_0040CF90, Moho::CTaskThread::MemberDeserialize)
@@ -269,7 +268,9 @@ namespace moho
   /**
    * Engine addition: lets a staged or sleeping thread run again on the next tick.
    */
-  inline void WakeTaskThreadForImmediateTick(CTaskThread* const ownerThread)
+  inline void WakeTaskThreadForImmediateTick(
+    CTaskThread* const ownerThread
+  )
   {
     if (ownerThread == nullptr) {
       return;

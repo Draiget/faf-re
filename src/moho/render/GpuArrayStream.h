@@ -36,7 +36,10 @@ namespace moho
     /** Forgets the GPU copy (a new device). */
     void Reset() noexcept;
 
-    [[nodiscard]] gpg::gal::GpuBuffer* Buffer() const noexcept { return mBuffer.get(); }
+    [[nodiscard]] gpg::gal::GpuBuffer* Buffer() const noexcept
+    {
+      return mBuffer.get();
+    }
 
   private:
     const char* mName;

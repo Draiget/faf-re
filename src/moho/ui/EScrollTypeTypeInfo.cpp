@@ -146,4 +146,7 @@ namespace
 // Phase-1 pre-registration: CTextureScroller caches the reflected EScrollType
 // through gpg::LookupRType, so the descriptor must exist before that consumer
 // runs. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_EScrollTypeTypeInfo_7771b0, moho::preregister_EScrollTypeTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_EScrollTypeTypeInfo_7771b0,
+  moho::preregister_EScrollTypeTypeInfo
+)

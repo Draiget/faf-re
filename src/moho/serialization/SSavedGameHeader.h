@@ -63,12 +63,12 @@ namespace moho
      */
     ~SSavedGameHeader();
 
-    std::int32_t mVersion;                                // +0x00
-    fa::string mMapName;                               // +0x04
-    std::int32_t mFocusArmy;                              // +0x20
-    fa::vector<SSavedGameArmyInfo> mArmyInfo;          // +0x24
-    fa::string mScenarioInfoText;                      // +0x34
-    boost::SharedPtrRaw<LaunchInfoBase> mLaunchInfo;      // +0x50
+    std::int32_t mVersion;                           // +0x00
+    fa::string mMapName;                             // +0x04
+    std::int32_t mFocusArmy;                         // +0x20
+    fa::vector<SSavedGameArmyInfo> mArmyInfo;        // +0x24
+    fa::string mScenarioInfoText;                    // +0x34
+    boost::SharedPtrRaw<LaunchInfoBase> mLaunchInfo; // +0x50
   };
 
   static_assert(offsetof(SSavedGameHeader, mVersion) == 0x00, "SSavedGameHeader::mVersion offset must be 0x00");
@@ -76,7 +76,8 @@ namespace moho
   static_assert(offsetof(SSavedGameHeader, mFocusArmy) == 0x20, "SSavedGameHeader::mFocusArmy offset must be 0x20");
   static_assert(offsetof(SSavedGameHeader, mArmyInfo) == 0x24, "SSavedGameHeader::mArmyInfo offset must be 0x24");
   static_assert(
-    offsetof(SSavedGameHeader, mScenarioInfoText) == 0x34, "SSavedGameHeader::mScenarioInfoText offset must be 0x34"
+    offsetof(SSavedGameHeader, mScenarioInfoText) == 0x34,
+    "SSavedGameHeader::mScenarioInfoText offset must be 0x34"
   );
   static_assert(offsetof(SSavedGameHeader, mLaunchInfo) == 0x50, "SSavedGameHeader::mLaunchInfo offset must be 0x50");
   static_assert(sizeof(SSavedGameHeader) == 0x58, "SSavedGameHeader size must be 0x58");

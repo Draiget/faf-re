@@ -5,4 +5,3 @@
 // Compatibility surface:
 // The owning reconstructed declaration for `moho::CCollisionManipulatorSerializer`
 // lives in `moho/collision/CCollisionManipulator.h`.
-

@@ -11,7 +11,11 @@ namespace faf::remote::wire
     constexpr std::uint64_t kFnvOffset = 0xCBF29CE484222325ull;
     constexpr std::uint64_t kFnvPrime = 0x100000001B3ull;
 
-    void HashBytes(std::uint64_t& hash, const void* const data, const std::size_t size) noexcept
+    void HashBytes(
+      std::uint64_t& hash,
+      const void* const data,
+      const std::size_t size
+    ) noexcept
     {
       const auto* const bytes = static_cast<const std::uint8_t*>(data);
       for (std::size_t i = 0; i < size; ++i) {
@@ -20,7 +24,10 @@ namespace faf::remote::wire
       }
     }
 
-    void HashU64(std::uint64_t& hash, const std::uint64_t value) noexcept
+    void HashU64(
+      std::uint64_t& hash,
+      const std::uint64_t value
+    ) noexcept
     {
       std::uint8_t bytes[8];
       for (int i = 0; i < 8; ++i) {
@@ -30,7 +37,9 @@ namespace faf::remote::wire
     }
   } // namespace
 
-  std::string NormalizeContentName(const std::string_view name)
+  std::string NormalizeContentName(
+    const std::string_view name
+  )
   {
     std::string normalized(name);
     for (char& c : normalized) {
@@ -41,7 +50,9 @@ namespace faf::remote::wire
     return normalized;
   }
 
-  COrdinalTable COrdinalTable::Build(const std::span<const std::string> names)
+  COrdinalTable COrdinalTable::Build(
+    const std::span<const std::string> names
+  )
   {
     COrdinalTable table;
     table.mNames.reserve(names.size());
@@ -61,13 +72,17 @@ namespace faf::remote::wire
     return table;
   }
 
-  std::uint32_t COrdinalTable::Ordinal(const std::string_view name) const
+  std::uint32_t COrdinalTable::Ordinal(
+    const std::string_view name
+  ) const
   {
     const auto it = mIndex.find(NormalizeContentName(name));
     return it != mIndex.end() ? it->second : kNone;
   }
 
-  std::string_view COrdinalTable::Name(const std::uint32_t ordinal) const noexcept
+  std::string_view COrdinalTable::Name(
+    const std::uint32_t ordinal
+  ) const noexcept
   {
     return ordinal < mNames.size() ? std::string_view(mNames[ordinal]) : std::string_view{};
   }

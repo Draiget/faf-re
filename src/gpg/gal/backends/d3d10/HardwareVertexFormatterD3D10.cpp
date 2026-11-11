@@ -1,14 +1,18 @@
-#include "gpg/gal/backends/d3d10/D3D10Private.h"
+// Nothing here uses Direct3D 10: the formatter asks the active device for its vertex format, so
+// Direct3D 11, 12 and Vulkan use it too, and the Linux client links this file (issue #255).
+#include "gpg/gal/backends/d3d10/HardwareVertexFormatterD3D10.hpp"
+#include "gpg/gal/backends/d3d10/D3D10MatrixRows.h"
+#include "gpg/gal/Device.hpp"
+#include "gpg/gal/DeviceContext.hpp"
 
 namespace gpg::gal
 {
-namespace
-{
+  namespace
+  {
 
     constexpr std::uint32_t kHardwareVertexFormatToken = 14U;
     constexpr std::uint32_t kHardwareVertexStrideBase = 0x48U;
-}
-
+  } // namespace
 
   /**
    * Address: 0x0094D4F0 (FUN_0094D4F0, ??0HardwareVertexFormatterD3D10@gal@gpg@@QAE@@Z)
@@ -45,7 +49,9 @@ namespace
    * What it does:
    * Creates vertex format 14 on the active device (slot 14, `[vtbl+0x38]`).
    */
-  boost::shared_ptr<VertexFormat> HardwareVertexFormatterD3D10::CreateVertexFormat(const std::int32_t layoutVariant)
+  boost::shared_ptr<VertexFormat> HardwareVertexFormatterD3D10::CreateVertexFormat(
+    const std::int32_t layoutVariant
+  )
   {
     static_cast<void>(layoutVariant);
     return Device::GetInstance()->CreateVertexFormat(kHardwareVertexFormatToken);
@@ -88,7 +94,10 @@ namespace
       destination.color = source.color;
       destination.shaderTime = source.shaderTime;
       static_cast<void>(CopyMatrix4x3Rows(
-        destination.transform[0], destination.transform[1], destination.transform[2], destination.transform[3],
+        destination.transform[0],
+        destination.transform[1],
+        destination.transform[2],
+        destination.transform[3],
         source.transform
       ));
       destination.bonePaletteBase = source.bonePaletteBase;
@@ -124,5 +133,4 @@ namespace
     destination.texCoords[2] = source.texCoord1[0];
     destination.texCoords[3] = source.texCoord1[1];
   }
-}
-
+} // namespace gpg::gal

@@ -13,7 +13,10 @@ namespace moho
 {
   namespace
   {
-    [[nodiscard]] constexpr bool HasReconMask(const UserArmy::EReconGridMask value, const UserArmy::EReconGridMask flag)
+    [[nodiscard]] constexpr bool HasReconMask(
+      const UserArmy::EReconGridMask value,
+      const UserArmy::EReconGridMask flag
+    )
     {
       return (static_cast<std::uint8_t>(value) & static_cast<std::uint8_t>(flag)) != 0u;
     }
@@ -38,7 +41,10 @@ namespace moho
    * runtime registries up empty, and finally copies the sim-supplied constant
    * data over the payload.
    */
-  UserArmy::UserArmy(CWldSession* const session, const SSTIArmyConstantData& constantData)
+  UserArmy::UserArmy(
+    CWldSession* const session,
+    const SSTIArmyConstantData& constantData
+  )
     : SSTIArmyConstantData()
     , mVarDat()
     , mWeakRefs{}
@@ -138,7 +144,9 @@ namespace moho
   /**
    * Address: 0x005BD630 (FUN_005BD630, Moho::IArmy::IsAlly)
    */
-  bool UserArmy::IsAlly(const std::uint32_t armyIndex) const
+  bool UserArmy::IsAlly(
+    const std::uint32_t armyIndex
+  ) const
   {
     if (armyIndex == 0xFFFFFFFFu) {
       return false;
@@ -154,7 +162,9 @@ namespace moho
    * Enemy mirror of IsAlly — tests membership of `armyIndex` in this army's
    * enemy bit-set.
    */
-  bool UserArmy::IsEnemy(const std::uint32_t armyIndex) const
+  bool UserArmy::IsEnemy(
+    const std::uint32_t armyIndex
+  ) const
   {
     if (armyIndex == 0xFFFFFFFFu) {
       return false;
@@ -166,7 +176,11 @@ namespace moho
   /**
    * Address: 0x008B17F0 (FUN_008B17F0, Moho::UserArmy::CanSeeCell)
    */
-  bool UserArmy::CanSeeCell(const std::int32_t x, const std::int32_t z, const EReconGridMask gridMask) const
+  bool UserArmy::CanSeeCell(
+    const std::int32_t x,
+    const std::int32_t z,
+    const EReconGridMask gridMask
+  ) const
   {
     CIntelGrid* const exploredGrid = mVisionReconGrid.get();
     if (!exploredGrid) {
@@ -214,7 +228,10 @@ namespace moho
   /**
    * Address: 0x008B22B0 (FUN_008B22B0, Moho::UserArmy::CanSeePoint)
    */
-  bool UserArmy::CanSeePoint(const Wm3::Vec3f& worldPos, const EReconGridMask gridMask) const
+  bool UserArmy::CanSeePoint(
+    const Wm3::Vec3f& worldPos,
+    const EReconGridMask gridMask
+  ) const
   {
     CIntelGrid* const exploredGrid = mVisionReconGrid.get();
     if (!exploredGrid) {
@@ -237,7 +254,10 @@ namespace moho
    * Resolves one Lua user-army selector (1-based numeric index or army name)
    * to one `UserArmy*` in the active world session.
    */
-  UserArmy* USER_ResolveArmyFromLuaState(LuaPlus::LuaState* const state, const LuaPlus::LuaObject& armyObject)
+  UserArmy* USER_ResolveArmyFromLuaState(
+    LuaPlus::LuaState* const state,
+    const LuaPlus::LuaObject& armyObject
+  )
   {
     CWldSession* const session = WLD_GetActiveSession();
     if (!session) {
@@ -253,7 +273,9 @@ namespace moho
       const int zeroBasedArmy = requestedArmy - 1;
       if (zeroBasedArmy < 0) {
         LuaPlus::LuaState::Error(state, kInvalidArmyOneBasedMessage, requestedArmy);
-      } else if (zeroBasedArmy >= armyCount || (resolved = userArmies[static_cast<std::size_t>(zeroBasedArmy)]) == nullptr) {
+      } else if (
+        zeroBasedArmy >= armyCount || (resolved = userArmies[static_cast<std::size_t>(zeroBasedArmy)]) == nullptr
+      ) {
         LuaPlus::LuaState::Error(state, kInvalidArmyMessage, zeroBasedArmy);
       }
       return resolved;

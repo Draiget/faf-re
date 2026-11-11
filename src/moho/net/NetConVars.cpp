@@ -11,9 +11,9 @@
 
 namespace moho
 {
-  bool net_DebugCrash = false;                     // 0x010A6380
-  bool net_LogPackets = false;                     // 0x010A6381
-  int32_t net_DebugLevel = 0;                      // 0x010A6384
+  bool net_DebugCrash = false; // 0x010A6380
+  bool net_LogPackets = false; // 0x010A6381
+  int32_t net_DebugLevel = 0;  // 0x010A6384
   // Initial values are the .data words at those addresses in the shipped PE.
   int32_t net_AckDelay = 25;                       // 0x00F58DE0
   int32_t net_SendDelay = 25;                      // 0x00F58DE4
@@ -112,7 +112,8 @@ namespace moho
   {
     TConVar<int32_t> gTConVar_net_FastRetransmit(
       "net_FastRetransmit",
-      "1: resend a packet once the peer has received 3 later ones or after net_FastResendPings round trips, and acknowledge within net_FastAckDelay; 0 (default) is as shipped.",
+      "1: resend a packet once the peer has received 3 later ones or after net_FastResendPings round trips, and "
+      "acknowledge within net_FastAckDelay; 0 (default) is as shipped.",
       &net_FastRetransmit
     );
 
@@ -124,19 +125,22 @@ namespace moho
 
     TConVar<int32_t> gTConVar_net_FastAckDelay(
       "net_FastAckDelay",
-      "With net_FastRetransmit, acknowledge a received packet within this many ms, if net_AckDelay is longer (default 5).",
+      "With net_FastRetransmit, acknowledge a received packet within this many ms, if net_AckDelay is longer (default "
+      "5).",
       &net_FastAckDelay
     );
 
     TConVar<int32_t> gTConVar_net_NativeNet(
       "net_NativeNet",
-      "1: the game runs every peer link and the launcher talks to it directly (/nativenet); 0 (default) uses the launcher's ICE adapter.",
+      "1: the game runs every peer link and the launcher talks to it directly (/nativenet); 0 (default) uses the "
+      "launcher's ICE adapter.",
       &net_NativeNet
     );
 
     TConVar<int32_t> gTConVar_net_NativeNetWebRtc(
       "net_NativeNetWebRtc",
-      "In native mode, 1: move game datagrams onto a WebRTC data channel with peers running our build; 0 (default): ICE only.",
+      "In native mode, 1: move game datagrams onto a WebRTC data channel with peers running our build; 0 (default): "
+      "ICE only.",
       &net_NativeNetWebRtc
     );
 
@@ -148,7 +152,8 @@ namespace moho
 
     TConVar<int32_t> gTConVar_net_AdaptiveLagMax(
       "net_AdaptiveLagMax",
-      "Above 0: pauses raise this player's net_Lag up to this many ms, and quiet spells lower it again; 0 (default) keeps net_Lag as set.",
+      "Above 0: pauses raise this player's net_Lag up to this many ms, and quiet spells lower it again; 0 (default) "
+      "keeps net_Lag as set.",
       &net_AdaptiveLagMax
     );
 
@@ -160,7 +165,8 @@ namespace moho
 
     TConVar<int32_t> gTConVar_net_LogTraffic(
       "net_LogTraffic",
-      "Every this many beats log the UDP connections' packets, bytes, resends, acks and mean ping; 0 (default) logs nothing.",
+      "Every this many beats log the UDP connections' packets, bytes, resends, acks and mean ping; 0 (default) logs "
+      "nothing.",
       &net_LogTraffic
     );
 
@@ -178,19 +184,22 @@ namespace moho
 
     TConVar<int32_t> gTConVar_net_NativeNetRedundancy(
       "net_NativeNetRedundancy",
-      "In native mode, repeat each game datagram to peers running our build up to this many times until acked (default 2); 0 sends them plainly.",
+      "In native mode, repeat each game datagram to peers running our build up to this many times until acked (default "
+      "2); 0 sends them plainly.",
       &net_NativeNetRedundancy
     );
 
     TConVar<int32_t> gTConVar_net_NativeNetEncrypt(
       "net_NativeNetEncrypt",
-      "In native mode, 1 (default): encrypt the redundant lane with peers running our build that offer it too; 0 leaves it plain.",
+      "In native mode, 1 (default): encrypt the redundant lane with peers running our build that offer it too; 0 "
+      "leaves it plain.",
       &net_NativeNetEncrypt
     );
 
     TConVar<int32_t> gTConVar_net_InEngineLinks(
       "net_InEngineLinks",
-      "1: run the peer links in the game when the ICE adapter is faf-netbridge; 0 (default) leaves them to the adapter.",
+      "1: run the peer links in the game when the ICE adapter is faf-netbridge; 0 (default) leaves them to the "
+      "adapter.",
       &net_InEngineLinks
     );
 
@@ -287,13 +296,15 @@ namespace moho
      * Address: 0x00BC4EF0 (FUN_00BC4EF0, dynamic initializer for `gTConVar_net_AckDelay`)
      * Address: 0x00BEFB50 (FUN_00BEFB50, dynamic atexit destructor for `gTConVar_net_AckDelay`)
      */
-    TConVar<int32_t> gTConVar_net_AckDelay("net_AckDelay", "Number of milliseconds to delay before sending ACKs", &net_AckDelay);
+    TConVar<int32_t>
+      gTConVar_net_AckDelay("net_AckDelay", "Number of milliseconds to delay before sending ACKs", &net_AckDelay);
 
     /**
      * Address: 0x00BC4F30 (FUN_00BC4F30, dynamic initializer for `gTConVar_net_SendDelay`)
      * Address: 0x00BEFB80 (FUN_00BEFB80, dynamic atexit destructor for `gTConVar_net_SendDelay`)
      */
-    TConVar<int32_t> gTConVar_net_SendDelay("net_SendDelay", "Number of milliseconds to delay before sending Data", &net_SendDelay);
+    TConVar<int32_t>
+      gTConVar_net_SendDelay("net_SendDelay", "Number of milliseconds to delay before sending Data", &net_SendDelay);
 
     /**
      * Address: 0x00BC4F70 (FUN_00BC4F70, dynamic initializer for `gTConVar_net_LogPackets`)
@@ -305,43 +316,71 @@ namespace moho
      * Address: 0x00BC4FB0 (FUN_00BC4FB0, dynamic initializer for `gTConVar_net_MinResendDelay`)
      * Address: 0x00BEFBE0 (FUN_00BEFBE0, dynamic atexit destructor for `gTConVar_net_MinResendDelay`)
      */
-    TConVar<int32_t> gTConVar_net_MinResendDelay("net_MinResendDelay", "Minimum number of milliseconds to delay before resending a packet.", &net_MinResendDelay);
+    TConVar<int32_t> gTConVar_net_MinResendDelay(
+      "net_MinResendDelay",
+      "Minimum number of milliseconds to delay before resending a packet.",
+      &net_MinResendDelay
+    );
 
     /**
      * Address: 0x00BC4FF0 (FUN_00BC4FF0, dynamic initializer for `gTConVar_net_MaxResendDelay`)
      * Address: 0x00BEFC10 (FUN_00BEFC10, dynamic atexit destructor for `gTConVar_net_MaxResendDelay`)
      */
-    TConVar<int32_t> gTConVar_net_MaxResendDelay("net_MaxResendDelay", "Maximum number of milliseconds to delay before resending a packet.", &net_MaxResendDelay);
+    TConVar<int32_t> gTConVar_net_MaxResendDelay(
+      "net_MaxResendDelay",
+      "Maximum number of milliseconds to delay before resending a packet.",
+      &net_MaxResendDelay
+    );
 
     /**
      * Address: 0x00BC5030 (FUN_00BC5030, dynamic initializer for `gTConVar_net_MaxSendRate`)
      * Address: 0x00BEFC40 (FUN_00BEFC40, dynamic atexit destructor for `gTConVar_net_MaxSendRate`)
      */
-    TConVar<int32_t> gTConVar_net_MaxSendRate("net_MaxSendRate", "Maximum number of bytes to send per second to any one client.", &net_MaxSendRate);
+    TConVar<int32_t> gTConVar_net_MaxSendRate(
+      "net_MaxSendRate",
+      "Maximum number of bytes to send per second to any one client.",
+      &net_MaxSendRate
+    );
 
     /**
      * Address: 0x00BC5070 (FUN_00BC5070, dynamic initializer for `gTConVar_net_MaxBacklog`)
      * Address: 0x00BEFC70 (FUN_00BEFC70, dynamic atexit destructor for `gTConVar_net_MaxBacklog`)
      */
-    TConVar<int32_t> gTConVar_net_MaxBacklog("net_MaxBacklog", "Maximum number of bytes to backlog to any one client.", &net_MaxBacklog);
+    TConVar<int32_t> gTConVar_net_MaxBacklog(
+      "net_MaxBacklog",
+      "Maximum number of bytes to backlog to any one client.",
+      &net_MaxBacklog
+    );
 
     /**
      * Address: 0x00BC50B0 (FUN_00BC50B0, dynamic initializer for `gTConVar_net_CompressionMethod`)
      * Address: 0x00BEFCA0 (FUN_00BEFCA0, dynamic atexit destructor for `gTConVar_net_CompressionMethod`)
      */
-    TConVar<int32_t> gTConVar_net_CompressionMethod("net_CompressionMethod", "Compression method, 0=none, 1=deflate.  Only takes effect when connections are first established.", &net_CompressionMethod);
+    TConVar<int32_t> gTConVar_net_CompressionMethod(
+      "net_CompressionMethod",
+      "Compression method, 0=none, 1=deflate.  Only takes effect when connections are first established.",
+      &net_CompressionMethod
+    );
 
     /**
      * Address: 0x00BC50F0 (FUN_00BC50F0, dynamic initializer for `gTConVar_net_ResendPingMultiplier`)
      * Address: 0x00BEFCD0 (FUN_00BEFCD0, dynamic atexit destructor for `gTConVar_net_ResendPingMultiplier`)
      */
-    TConVar<float> gTConVar_net_ResendPingMultiplier("net_ResendPingMultiplier", "The resend delay is ping*new_ResendPingMultiplier+net_ResendDelayBias.", &net_ResendPingMultiplier);
+    TConVar<float> gTConVar_net_ResendPingMultiplier(
+      "net_ResendPingMultiplier",
+      "The resend delay is ping*new_ResendPingMultiplier+net_ResendDelayBias.",
+      &net_ResendPingMultiplier
+    );
 
     /**
      * Address: 0x00BC5130 (FUN_00BC5130, dynamic initializer for `gTConVar_net_ResendDelayBias`)
      * Address: 0x00BEFD00 (FUN_00BEFD00, dynamic atexit destructor for `gTConVar_net_ResendDelayBias`)
      */
-    TConVar<int32_t> gTConVar_net_ResendDelayBias("net_ResendDelayBias", "The resend delay is ping*new_ResendPingMultiplier+net_ResendDelayBias.", &net_ResendDelayBias);
+    TConVar<int32_t> gTConVar_net_ResendDelayBias(
+      "net_ResendDelayBias",
+      "The resend delay is ping*new_ResendPingMultiplier+net_ResendDelayBias.",
+      &net_ResendDelayBias
+    );
   } // namespace
 
   bool NET_FastRetransmitEnabled()
@@ -356,7 +395,9 @@ namespace moho
     return NET_FastRetransmitEnabled() ? std::min(net_AckDelay, net_FastAckDelay) : net_AckDelay;
   }
 
-  void NET_CountFastRetransmits(const int count)
+  void NET_CountFastRetransmits(
+    const int count
+  )
   {
     static std::atomic<std::uint64_t> sTotal{0};
     if (count <= 0) {
@@ -382,7 +423,9 @@ namespace moho
   void NET_NoteReadyLeftNow() noexcept
   {
     const std::int64_t nowUs = NET_SteadyClockMicroseconds();
-    gReadyDepartureUs.store(std::max(gReadyDepartureUs.load(std::memory_order_relaxed), nowUs), std::memory_order_relaxed);
+    gReadyDepartureUs.store(
+      std::max(gReadyDepartureUs.load(std::memory_order_relaxed), nowUs), std::memory_order_relaxed
+    );
   }
 
   void NET_ResetReadyDeparture() noexcept
@@ -392,6 +435,7 @@ namespace moho
 
   std::int64_t NET_SteadyClockMicroseconds() noexcept
   {
-    return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch())
+      .count();
   }
 } // namespace moho

@@ -29,7 +29,10 @@ namespace
   constexpr std::chrono::seconds kRejoinReportingSilenceSeconds{20};
 } // namespace
 
-void moho::WritePeerAnnouncement(CMessageStream& stream, const std::uint64_t mask)
+void moho::WritePeerAnnouncement(
+  CMessageStream& stream,
+  const std::uint64_t mask
+)
 {
   const char* const build = gpg::diag::BuildCommitShort();
   stream.Write(kPeerKindAnnounce);
@@ -38,7 +41,11 @@ void moho::WritePeerAnnouncement(CMessageStream& stream, const std::uint64_t mas
   stream.Write(build, std::strlen(build) + 1u);
 }
 
-bool moho::ReadPeerAnnouncement(const char* const payload, const std::size_t size, SPeerAnnouncement& out)
+bool moho::ReadPeerAnnouncement(
+  const char* const payload,
+  const std::size_t size,
+  SPeerAnnouncement& out
+)
 {
   if (size < kAnnounceFixedBytes || static_cast<std::uint8_t>(payload[0]) != kPeerKindAnnounce) {
     return false;
@@ -50,11 +57,15 @@ bool moho::ReadPeerAnnouncement(const char* const payload, const std::size_t siz
   return true;
 }
 
-CPeerFeatures::CPeerFeatures(const std::size_t clientCount)
+CPeerFeatures::CPeerFeatures(
+  const std::size_t clientCount
+)
   : mPeers(clientCount)
 {}
 
-std::uint64_t CPeerFeatures::LocalMask(const CClientManagerImpl& manager)
+std::uint64_t CPeerFeatures::LocalMask(
+  const CClientManagerImpl& manager
+)
 {
   std::uint64_t mask = 0;
   if (manager.mStreamCheck != nullptr) {
@@ -72,11 +83,16 @@ std::uint64_t CPeerFeatures::LocalMask(const CClientManagerImpl& manager)
   return mask;
 }
 
-void CPeerFeatures::SendKeyTo(CClientManagerImpl& manager, CNetClient& peer)
+void CPeerFeatures::SendKeyTo(
+  CClientManagerImpl& manager,
+  CNetClient& peer
+)
 {
   const auto index = static_cast<std::size_t>(peer.GetIndex());
-  if (index >= mPeers.size() || mPeers[index].keySent || !REJOIN_HasKey() ||
-      (LocalMask(manager) & PeerFeatureBit(EPeerFeature::Rejoin)) == 0u) {
+  if (
+    index >= mPeers.size() || mPeers[index].keySent || !REJOIN_HasKey() ||
+    (LocalMask(manager) & PeerFeatureBit(EPeerFeature::Rejoin)) == 0u
+  ) {
     return;
   }
   mPeers[index].keySent = true;
@@ -88,7 +104,9 @@ void CPeerFeatures::SendKeyTo(CClientManagerImpl& manager, CNetClient& peer)
   peer.Process(message);
 }
 
-void CPeerFeatures::Announce(CClientManagerImpl& manager)
+void CPeerFeatures::Announce(
+  CClientManagerImpl& manager
+)
 {
   if (net_PeerFeatures == 0) {
     return;
@@ -106,10 +124,17 @@ void CPeerFeatures::Announce(CClientManagerImpl& manager)
       }
     }
   }
-  gpg::Logf("PEERS: announced features %016llx, build %s", static_cast<unsigned long long>(LocalMask(manager)), gpg::diag::BuildCommitShort());
+  gpg::Logf(
+    "PEERS: announced features %016llx, build %s",
+    static_cast<unsigned long long>(LocalMask(manager)),
+    gpg::diag::BuildCommitShort()
+  );
 }
 
-void CPeerFeatures::AnnounceTo(CClientManagerImpl& manager, CNetClient& peer) const
+void CPeerFeatures::AnnounceTo(
+  CClientManagerImpl& manager,
+  CNetClient& peer
+) const
 {
   if (net_PeerFeatures == 0) {
     return;
@@ -122,7 +147,11 @@ void CPeerFeatures::AnnounceTo(CClientManagerImpl& manager, CNetClient& peer) co
   peer.Process(message);
 }
 
-void CPeerFeatures::Receive(CClientManagerImpl& manager, CNetClient& client, CMessage& message)
+void CPeerFeatures::Receive(
+  CClientManagerImpl& manager,
+  CNetClient& client,
+  CMessage& message
+)
 {
   const auto index = static_cast<std::size_t>(client.GetIndex());
   const auto size = static_cast<std::size_t>(message.GetMessageSize());
@@ -171,24 +200,34 @@ void CPeerFeatures::Receive(CClientManagerImpl& manager, CNetClient& client, CMe
   }
 
   gpg::Logf(
-    "PEERS: client %d:%s announced features %016llx, build %s", client.GetIndex(), client.GetNickname().c_str(),
-    static_cast<unsigned long long>(peer.announcement.mask), peer.announcement.build.c_str()
+    "PEERS: client %d:%s announced features %016llx, build %s",
+    client.GetIndex(),
+    client.GetNickname().c_str(),
+    static_cast<unsigned long long>(peer.announcement.mask),
+    peer.announcement.build.c_str()
   );
   gpg::Logf(
-    "PEERS: everyone supports OrderStreamCheck: %s", EveryoneSupports(manager, EPeerFeature::OrderStreamCheck) ? "yes" : "no"
+    "PEERS: everyone supports OrderStreamCheck: %s",
+    EveryoneSupports(manager, EPeerFeature::OrderStreamCheck) ? "yes" : "no"
   );
   if ((peer.announcement.mask & PeerFeatureBit(EPeerFeature::OrderStreamCheck)) != 0u) {
     // CClientBase compares this client's order stream reports from now on.
-    gpg::Logf("PEERS: client %d:%s's order stream reports are compared", client.GetIndex(), client.GetNickname().c_str());
+    gpg::Logf(
+      "PEERS: client %d:%s's order stream reports are compared", client.GetIndex(), client.GetNickname().c_str()
+    );
   }
   OfferRejoinToLauncher(manager);
 }
 
-void CPeerFeatures::OfferRejoinToLauncher(CClientManagerImpl& manager)
+void CPeerFeatures::OfferRejoinToLauncher(
+  CClientManagerImpl& manager
+)
 {
   // A game coming back makes none: its launcher has one from the first start.
-  if (mRejoinOffered || !EveryoneSupports(manager, EPeerFeature::Rejoin) || !CFG_GetArgOption(gpg::StrArg{"/rejoinoffer"}, 0u, nullptr) ||
-      CFG_GetArgOption(gpg::StrArg{"/rejoin"}, 0u, nullptr)) {
+  if (
+    mRejoinOffered || !EveryoneSupports(manager, EPeerFeature::Rejoin) ||
+    !CFG_GetArgOption(gpg::StrArg{"/rejoinoffer"}, 0u, nullptr) || CFG_GetArgOption(gpg::StrArg{"/rejoin"}, 0u, nullptr)
+  ) {
     return;
   }
   mRejoinOffered = true;
@@ -203,10 +242,18 @@ void CPeerFeatures::OfferRejoinToLauncher(CClientManagerImpl& manager)
     }
   }
   manager.mInterface->NoteRejoinOffer(gpg::STR_Printf("%d", manager.mLocalClient->GetIndex()), seats);
-  gpg::Logf("REJOIN: told the launcher this client could come back: source %d, %s", manager.mLocalClient->GetIndex(), seats.c_str());
+  gpg::Logf(
+    "REJOIN: told the launcher this client could come back: source %d, %s",
+    manager.mLocalClient->GetIndex(),
+    seats.c_str()
+  );
 }
 
-void CPeerFeatures::NoteRejoinEjected(const int clientIndex, const std::uint32_t address, const std::uint16_t port)
+void CPeerFeatures::NoteRejoinEjected(
+  const int clientIndex,
+  const std::uint32_t address,
+  const std::uint16_t port
+)
 {
   SPeer& peer = mPeers[static_cast<std::size_t>(clientIndex)];
   peer.ejected = true;
@@ -214,7 +261,10 @@ void CPeerFeatures::NoteRejoinEjected(const int clientIndex, const std::uint32_t
   peer.ejectedPort = port;
 }
 
-int CPeerFeatures::FindEjectedSeat(const std::uint32_t address, const std::uint16_t port) const
+int CPeerFeatures::FindEjectedSeat(
+  const std::uint32_t address,
+  const std::uint16_t port
+) const
 {
   for (std::size_t index = 0; index < mPeers.size(); ++index) {
     const SPeer& peer = mPeers[index];
@@ -225,13 +275,17 @@ int CPeerFeatures::FindEjectedSeat(const std::uint32_t address, const std::uint1
   return -1;
 }
 
-bool CPeerFeatures::HasRejoinKey(const int clientIndex) const
+bool CPeerFeatures::HasRejoinKey(
+  const int clientIndex
+) const
 {
   return clientIndex >= 0 && static_cast<std::size_t>(clientIndex) < mPeers.size() &&
     mPeers[static_cast<std::size_t>(clientIndex)].keyKnown;
 }
 
-SRejoinNonce CPeerFeatures::StartRejoinChallenge(const int clientIndex)
+SRejoinNonce CPeerFeatures::StartRejoinChallenge(
+  const int clientIndex
+)
 {
   SRejoinNonce nonce = REJOIN_MakeNonce();
   if (clientIndex >= 0 && static_cast<std::size_t>(clientIndex) < mPeers.size()) {
@@ -242,7 +296,11 @@ SRejoinNonce CPeerFeatures::StartRejoinChallenge(const int clientIndex)
   return nonce;
 }
 
-bool CPeerFeatures::CheckRejoinProof(const int clientIndex, const int localIndex, const SRejoinSignature& signature)
+bool CPeerFeatures::CheckRejoinProof(
+  const int clientIndex,
+  const int localIndex,
+  const SRejoinSignature& signature
+)
 {
   if (clientIndex < 0 || static_cast<std::size_t>(clientIndex) >= mPeers.size()) {
     return false;
@@ -257,20 +315,26 @@ bool CPeerFeatures::CheckRejoinProof(const int clientIndex, const int localIndex
   return good;
 }
 
-bool CPeerFeatures::RejoinProven(const int clientIndex) const
+bool CPeerFeatures::RejoinProven(
+  const int clientIndex
+) const
 {
   return clientIndex >= 0 && static_cast<std::size_t>(clientIndex) < mPeers.size() &&
     mPeers[static_cast<std::size_t>(clientIndex)].proven;
 }
 
-void CPeerFeatures::NoteRejoinLost(const int clientIndex)
+void CPeerFeatures::NoteRejoinLost(
+  const int clientIndex
+)
 {
   if (clientIndex >= 0 && static_cast<std::size_t>(clientIndex) < mPeers.size()) {
     mPeers[static_cast<std::size_t>(clientIndex)].rejoin = SRejoinStatus{ERejoinStage::Lost, -1.0f};
   }
 }
 
-void CPeerFeatures::NoteRejoinStarted(const int clientIndex)
+void CPeerFeatures::NoteRejoinStarted(
+  const int clientIndex
+)
 {
   if (clientIndex >= 0 && static_cast<std::size_t>(clientIndex) < mPeers.size()) {
     SPeer& peer = mPeers[static_cast<std::size_t>(clientIndex)];
@@ -281,7 +345,9 @@ void CPeerFeatures::NoteRejoinStarted(const int clientIndex)
   }
 }
 
-SRejoinStatus CPeerFeatures::RejoinStatus(const int clientIndex) const
+SRejoinStatus CPeerFeatures::RejoinStatus(
+  const int clientIndex
+) const
 {
   if (clientIndex < 0 || static_cast<std::size_t>(clientIndex) >= mPeers.size()) {
     return {};
@@ -289,19 +355,21 @@ SRejoinStatus CPeerFeatures::RejoinStatus(const int clientIndex) const
   const SPeer& peer = mPeers[static_cast<std::size_t>(clientIndex)];
   const auto silence = std::chrono::steady_clock::now() - peer.rejoinNoted;
   switch (peer.rejoin.stage) {
-    case ERejoinStage::None:
-    case ERejoinStage::Lost:
-      return peer.rejoin;
-    case ERejoinStage::Back:
-      return silence > kRejoinBackSeconds ? SRejoinStatus{} : peer.rejoin;
-    case ERejoinStage::Loading:
-      return silence > kRejoinSilenceSeconds ? SRejoinStatus{ERejoinStage::Lost, -1.0f} : peer.rejoin;
-    default:
-      return silence > kRejoinReportingSilenceSeconds ? SRejoinStatus{ERejoinStage::Lost, -1.0f} : peer.rejoin;
+  case ERejoinStage::None:
+  case ERejoinStage::Lost:
+    return peer.rejoin;
+  case ERejoinStage::Back:
+    return silence > kRejoinBackSeconds ? SRejoinStatus{} : peer.rejoin;
+  case ERejoinStage::Loading:
+    return silence > kRejoinSilenceSeconds ? SRejoinStatus{ERejoinStage::Lost, -1.0f} : peer.rejoin;
+  default:
+    return silence > kRejoinReportingSilenceSeconds ? SRejoinStatus{ERejoinStage::Lost, -1.0f} : peer.rejoin;
   }
 }
 
-float CPeerFeatures::RejoinSilenceSeconds(const int clientIndex) const
+float CPeerFeatures::RejoinSilenceSeconds(
+  const int clientIndex
+) const
 {
   if (clientIndex < 0 || static_cast<std::size_t>(clientIndex) >= mPeers.size()) {
     return 0.0f;
@@ -310,25 +378,30 @@ float CPeerFeatures::RejoinSilenceSeconds(const int clientIndex) const
   return std::chrono::duration<float>(silence).count();
 }
 
-const char* moho::RejoinStageName(const ERejoinStage stage)
+const char* moho::RejoinStageName(
+  const ERejoinStage stage
+)
 {
   switch (stage) {
-    case ERejoinStage::Lost:
-      return "lost";
-    case ERejoinStage::Transfer:
-      return "transfer";
-    case ERejoinStage::Loading:
-      return "loading";
-    case ERejoinStage::CatchingUp:
-      return "catchingUp";
-    case ERejoinStage::Back:
-      return "back";
-    default:
-      return "";
+  case ERejoinStage::Lost:
+    return "lost";
+  case ERejoinStage::Transfer:
+    return "transfer";
+  case ERejoinStage::Loading:
+    return "loading";
+  case ERejoinStage::CatchingUp:
+    return "catchingUp";
+  case ERejoinStage::Back:
+    return "back";
+  default:
+    return "";
   }
 }
 
-bool CPeerFeatures::PeerSupports(const int clientIndex, const EPeerFeature feature) const
+bool CPeerFeatures::PeerSupports(
+  const int clientIndex,
+  const EPeerFeature feature
+) const
 {
   if (clientIndex < 0 || static_cast<std::size_t>(clientIndex) >= mPeers.size()) {
     return false;
@@ -337,24 +410,35 @@ bool CPeerFeatures::PeerSupports(const int clientIndex, const EPeerFeature featu
   return peer.announced && (peer.announcement.mask & PeerFeatureBit(feature)) != 0;
 }
 
-std::int32_t CPeerFeatures::PeerAckDelayMs(const int clientIndex) const
+std::int32_t CPeerFeatures::PeerAckDelayMs(
+  const int clientIndex
+) const
 {
-  if (clientIndex < 0 || static_cast<std::size_t>(clientIndex) >= mPeers.size() ||
-      !mPeers[static_cast<std::size_t>(clientIndex)].announced) {
+  if (
+    clientIndex < 0 || static_cast<std::size_t>(clientIndex) >= mPeers.size() ||
+    !mPeers[static_cast<std::size_t>(clientIndex)].announced
+  ) {
     return NET_AckDelayMs();
   }
   return PeerSupports(clientIndex, EPeerFeature::FastAck) ? std::min(net_AckDelay, net_FastAckDelay) : net_AckDelay;
 }
 
-void CPeerFeatures::NoteReady(const int clientIndex, const std::int64_t handledUs)
+void CPeerFeatures::NoteReady(
+  const int clientIndex,
+  const std::int64_t handledUs
+)
 {
-  if (clientIndex >= 0 && static_cast<std::size_t>(clientIndex) < mPeers.size() &&
-      mPeers[static_cast<std::size_t>(clientIndex)].readyUs == 0) {
+  if (
+    clientIndex >= 0 && static_cast<std::size_t>(clientIndex) < mPeers.size() &&
+    mPeers[static_cast<std::size_t>(clientIndex)].readyUs == 0
+  ) {
     mPeers[static_cast<std::size_t>(clientIndex)].readyUs = handledUs;
   }
 }
 
-std::int64_t CPeerFeatures::ReadyUs(const int clientIndex) const
+std::int64_t CPeerFeatures::ReadyUs(
+  const int clientIndex
+) const
 {
   if (clientIndex < 0 || static_cast<std::size_t>(clientIndex) >= mPeers.size()) {
     return 0;
@@ -362,7 +446,10 @@ std::int64_t CPeerFeatures::ReadyUs(const int clientIndex) const
   return mPeers[static_cast<std::size_t>(clientIndex)].readyUs;
 }
 
-bool CPeerFeatures::EveryoneSupports(CClientManagerImpl& manager, const EPeerFeature feature) const
+bool CPeerFeatures::EveryoneSupports(
+  CClientManagerImpl& manager,
+  const EPeerFeature feature
+) const
 {
   if ((LocalMask(manager) & PeerFeatureBit(feature)) == 0) {
     return false;

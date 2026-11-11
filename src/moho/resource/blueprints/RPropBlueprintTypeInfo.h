@@ -52,7 +52,6 @@ namespace moho
      * Adds `REntityBlueprint` as the reflected base class lane.
      */
     static void AddBaseREntityBlueprint(gpg::RType* typeInfo);
-
   };
 
   /**

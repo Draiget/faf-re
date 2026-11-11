@@ -16,7 +16,9 @@ namespace moho
    * calls; mirrored here as `!std::isnan(...)` to preserve the exact
    * "reject NaN, accept infinities" semantic of the original.
    */
-  [[nodiscard]] bool IsValidVector3f(const Wm3::Vector3f& value) noexcept
+  [[nodiscard]] bool IsValidVector3f(
+    const Wm3::Vector3f& value
+  ) noexcept
   {
     return !std::isnan(value.x) && !std::isnan(value.y) && !std::isnan(value.z);
   }
@@ -28,7 +30,10 @@ namespace moho
    * Writes `source / |source|` into `dest`, or zero when the length is not
    * positive; the reciprocal is formed once and multiplied into each lane.
    */
-  Wm3::Vector3f* NormalizeVectorInto(Wm3::Vector3f* const dest, const Wm3::Vector3f& source) noexcept
+  Wm3::Vector3f* NormalizeVectorInto(
+    Wm3::Vector3f* const dest,
+    const Wm3::Vector3f& source
+  ) noexcept
   {
     const float length = std::sqrt((source.x * source.x) + (source.y * source.y) + (source.z * source.z));
     if (length > 0.0f) {
@@ -54,7 +59,10 @@ namespace moho
    * (0x005D1ECF..0x005D1EEC); `ScaleVectorByMaxLengthX87` reproduces that
    * rounding chain so lockstep paths match the shipped binary bit for bit.
    */
-  [[nodiscard]] bool VecLimitLengthTo(Wm3::Vector3f* const vector, const float maxLength) noexcept
+  [[nodiscard]] bool VecLimitLengthTo(
+    Wm3::Vector3f* const vector,
+    const float maxLength
+  ) noexcept
   {
     if (vector == nullptr) {
       return false;
@@ -76,7 +84,9 @@ namespace moho
    * Returns true when the vector squared-length is within `0.001f` of unit
    * length.
    */
-  bool IsUnitLengthVector3f(const Wm3::Vector3f& value) noexcept
+  bool IsUnitLengthVector3f(
+    const Wm3::Vector3f& value
+  ) noexcept
   {
     const float squaredLength = (value.x * value.x) + (value.y * value.y) + (value.z * value.z);
     return std::fabs(squaredLength - 1.0f) <= 0.001f;
@@ -88,7 +98,10 @@ namespace moho
    * What it does:
    * Returns squared Euclidean 3D distance between two Vector3f points.
    */
-  float DistanceSquared3D(const Wm3::Vector3f& from, const Wm3::Vector3f& to) noexcept
+  float DistanceSquared3D(
+    const Wm3::Vector3f& from,
+    const Wm3::Vector3f& to
+  ) noexcept
   {
     const float dx = to.x - from.x;
     const float dy = to.y - from.y;
@@ -104,7 +117,9 @@ namespace moho
    * Writes two consecutive Vector3f lanes from the shared zero-vector payload
    * and returns the destination pair base pointer.
    */
-  [[maybe_unused]] Wm3::Vector3f* InitializeZeroVector3fPair(Wm3::Vector3f* const destinationPair) noexcept
+  [[maybe_unused]] Wm3::Vector3f* InitializeZeroVector3fPair(
+    Wm3::Vector3f* const destinationPair
+  ) noexcept
   {
     static const Wm3::Vector3f kZeroVector{0.0f, 0.0f, 0.0f};
     destinationPair[0] = kZeroVector;
@@ -119,7 +134,9 @@ namespace moho
    * Returns the axis index (`0=x`, `1=y`, `2=z`) of the component
    * with greatest absolute magnitude.
    */
-  int VEC_LargestAxis(const Wm3::Vector3f& value) noexcept
+  int VEC_LargestAxis(
+    const Wm3::Vector3f& value
+  ) noexcept
   {
     const bool yDominatesX = std::fabs(value.y) > std::fabs(value.x);
     const int dominantAxis = yDominatesX ? 1 : 0;
@@ -140,7 +157,9 @@ namespace moho
    * Returns the planar heading angle in radians for one vector using
    * `atan2(x, z)`.
    */
-  float VEC_HeadingFromXZ(const Wm3::Vector3f* const value) noexcept
+  float VEC_HeadingFromXZ(
+    const Wm3::Vector3f* const value
+  ) noexcept
   {
     return fa::atan2(value->x, value->z);
   }
@@ -153,7 +172,10 @@ namespace moho
    * length. Returns false when the source vector has no positive squared
    * length.
    */
-  [[nodiscard]] bool VecSetLength(Wm3::Vector3f* const vector, const float targetLength)
+  [[nodiscard]] bool VecSetLength(
+    Wm3::Vector3f* const vector,
+    const float targetLength
+  )
   {
     const float x = vector->x;
     const float lengthSq = (x * x) + (vector->y * vector->y) + (vector->z * vector->z);
@@ -313,7 +335,11 @@ namespace moho
    * What it does:
    * Converts one axis+roll pair into quaternion lanes.
    */
-  Wm3::Quatf* EulerRollToQuat(const Wm3::Vector3f* const axis, Wm3::Quatf* const outQuaternion, const float roll)
+  Wm3::Quatf* EulerRollToQuat(
+    const Wm3::Vector3f* const axis,
+    Wm3::Quatf* const outQuaternion,
+    const float roll
+  )
   {
     const float halfRoll = roll * 0.5f;
     const float sinHalfRoll = fa::sinf(halfRoll);

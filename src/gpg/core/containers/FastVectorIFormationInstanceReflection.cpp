@@ -24,7 +24,12 @@ namespace
    * elements -- see `FastVector.h`'s `Resize()` citation, which documents the
    * same address for this exact specialization.
    */
-  void LoadFastVectorIFormationInstance(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void LoadFastVectorIFormationInstance(
+    gpg::ReadArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(objectPtr != 0);
@@ -53,7 +58,12 @@ namespace
    * archive count followed by per-lane `unowned` tracked-pointer writes built
    * from `gpg::RRef_IFormationInstance`.
    */
-  void SaveFastVectorIFormationInstance(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
+  void SaveFastVectorIFormationInstance(
+    gpg::WriteArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef*
+  )
   {
     GPG_ASSERT(archive != nullptr);
     GPG_ASSERT(objectPtr != 0);
@@ -149,7 +159,9 @@ const char* gpg::RFastVectorType<moho::IFormationInstance*>::GetName() const
 /**
  * Address: 0x0059CA40 (FUN_0059CA40, gpg::RFastVectorType_IFormationInstance_P::GetLexical)
  */
-fa::string gpg::RFastVectorType<moho::IFormationInstance*>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RFastVectorType<moho::IFormationInstance*>::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
@@ -168,7 +180,10 @@ const gpg::RIndexed* gpg::RFastVectorType<moho::IFormationInstance*>::IsIndexed(
  */
 void gpg::RFastVectorType<moho::IFormationInstance*>::Init()
 {
-  static_assert(sizeof(gpg::core::FastVectorInline<moho::IFormationInstance*>) == 0x10, "gpg::core::FastVectorInline<moho::IFormationInstance*> is 0x10 bytes on x86");
+  static_assert(
+    sizeof(gpg::core::FastVectorInline<moho::IFormationInstance*>) == 0x10,
+    "gpg::core::FastVectorInline<moho::IFormationInstance*> is 0x10 bytes on x86"
+  );
   size_ = sizeof(gpg::core::FastVectorInline<moho::IFormationInstance*>);
   version_ = 1;
   serLoadFunc_ = &LoadFastVectorIFormationInstance;
@@ -183,7 +198,10 @@ void gpg::RFastVectorType<moho::IFormationInstance*>::Init()
  * `fastvector<Moho::IFormationInstance*>[ind]`. The retail body performs no
  * bounds/null check before indexing, so this is left unconditional to match.
  */
-gpg::RRef gpg::RFastVectorType<moho::IFormationInstance*>::SubscriptIndex(void* obj, const int ind) const
+gpg::RRef gpg::RFastVectorType<moho::IFormationInstance*>::SubscriptIndex(
+  void* obj,
+  const int ind
+) const
 {
   auto& vec = *static_cast<gpg::core::FastVectorInline<moho::IFormationInstance*>*>(obj);
   gpg::RRef out{};
@@ -194,7 +212,9 @@ gpg::RRef gpg::RFastVectorType<moho::IFormationInstance*>::SubscriptIndex(void* 
 /**
  * Address: 0x0059CAE0 (FUN_0059CAE0, gpg::RFastVectorType_IFormationInstance_P::GetCount)
  */
-size_t gpg::RFastVectorType<moho::IFormationInstance*>::GetCount(void* obj) const
+size_t gpg::RFastVectorType<moho::IFormationInstance*>::GetCount(
+  void* obj
+) const
 {
   const auto& vec = *static_cast<const gpg::fastvector<moho::IFormationInstance*>*>(obj);
   return vec.size();
@@ -209,7 +229,10 @@ size_t gpg::RFastVectorType<moho::IFormationInstance*>::GetCount(void* obj) cons
  * `FUN_0059CE20` (see `FastVector.h`'s `Resize()` citation for the same
  * address under this exact class).
  */
-void gpg::RFastVectorType<moho::IFormationInstance*>::SetCount(void* obj, const int count) const
+void gpg::RFastVectorType<moho::IFormationInstance*>::SetCount(
+  void* obj,
+  const int count
+) const
 {
   auto& vec = *static_cast<gpg::core::FastVectorInline<moho::IFormationInstance*>*>(obj);
   vec.resize(static_cast<std::size_t>(count));
@@ -217,4 +240,7 @@ void gpg::RFastVectorType<moho::IFormationInstance*>::SetCount(void* obj, const 
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every
 // consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_RFastVectorType_IFormationInstance_59ded0, gpg::register_RFastVectorType_IFormationInstance)
+GPG_PREREGISTER_INIT(
+  register_RFastVectorType_IFormationInstance_59ded0,
+  gpg::register_RFastVectorType_IFormationInstance
+)

@@ -47,12 +47,18 @@ namespace faf::server
     CControlChannel(const CControlChannel&) = delete;
     CControlChannel& operator=(const CControlChannel&) = delete;
 
-    [[nodiscard]] const ControlNonce& OwnNonce() const noexcept { return mOwnNonce; }
+    [[nodiscard]] const ControlNonce& OwnNonce() const noexcept
+    {
+      return mOwnNonce;
+    }
     /** The peer's nonce has come: the proof to send it. */
     [[nodiscard]] ControlProof Proof(const ControlNonce& peerNonce) noexcept;
     /** The peer's proof: true when it holds the key, and from then on messages go both ways. */
     [[nodiscard]] bool CheckPeerProof(const ControlProof& proof) noexcept;
-    [[nodiscard]] bool Ready() const noexcept { return mReady; }
+    [[nodiscard]] bool Ready() const noexcept
+    {
+      return mReady;
+    }
 
     /** One message as a frame for the peer; empty before `Ready` or past `kMaxControlMessageBytes`. */
     [[nodiscard]] std::vector<std::uint8_t> Seal(std::span<const std::uint8_t> message);
@@ -78,7 +84,7 @@ namespace faf::server
     ControlKey mReceiveKey{};
     std::uint64_t mSent = 0;
     std::uint64_t mReceived = 0;
-    std::vector<std::uint8_t> mInbox;   // bytes of a frame not yet whole
+    std::vector<std::uint8_t> mInbox; // bytes of a frame not yet whole
     std::vector<std::vector<std::uint8_t>> mMessages;
   };
 } // namespace faf::server

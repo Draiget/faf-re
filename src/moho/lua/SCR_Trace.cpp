@@ -17,7 +17,9 @@ namespace
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_TraceL`.
  */
-int moho::cfunc_Trace(lua_State* const luaContext)
+int moho::cfunc_Trace(
+  lua_State* const luaContext
+)
 {
   return cfunc_TraceL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -29,7 +31,9 @@ int moho::cfunc_Trace(lua_State* const luaContext)
  * Validates one boolean argument for the `Trace` Lua API and returns no
  * Lua values.
  */
-int moho::cfunc_TraceL(LuaPlus::LuaState* const state)
+int moho::cfunc_TraceL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kTraceHelpText);
 
@@ -47,12 +51,7 @@ int moho::cfunc_TraceL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_Trace_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_CoreLuaInitSet(),
-    "Trace",
-    &moho::cfunc_Trace,
-    nullptr,
-    "<global>",
-    kTraceHelpText
+    moho::SCR_CoreLuaInitSet(), "Trace", &moho::cfunc_Trace, nullptr, "<global>", kTraceHelpText
   );
   return &binder;
 }

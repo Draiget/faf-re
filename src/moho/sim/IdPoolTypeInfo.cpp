@@ -25,7 +25,10 @@ namespace
   }
 
   template <class TObject>
-  [[nodiscard]] gpg::RRef MakeReflectionRef(TObject* const object, gpg::RType* const type)
+  [[nodiscard]] gpg::RRef MakeReflectionRef(
+    TObject* const object,
+    gpg::RType* const type
+  )
   {
     gpg::RRef ref{};
     ref.mObj = object;
@@ -33,7 +36,9 @@ namespace
     return ref;
   }
 
-  void DestroyIdPoolMembers(moho::IdPool& pool)
+  void DestroyIdPoolMembers(
+    moho::IdPool& pool
+  )
   {
     pool.mSubRes2.Reset();
     pool.mReleasedLows.mWords.ResetStorageToInline();
@@ -111,7 +116,9 @@ namespace moho
   /**
    * Address: 0x00404000 (FUN_00404000, Moho::IdPoolTypeInfo::CtrRef)
    */
-  gpg::RRef IdPoolTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef IdPoolTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const object = reinterpret_cast<IdPool*>(objectStorage);
     if (object) {
@@ -123,7 +130,9 @@ namespace moho
   /**
    * Address: 0x00403FC0 (FUN_00403FC0, Moho::IdPoolTypeInfo::Delete)
    */
-  void IdPoolTypeInfo::Delete(void* const objectStorage)
+  void IdPoolTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     auto* const object = reinterpret_cast<IdPool*>(objectStorage);
     if (!object) {
@@ -137,7 +146,9 @@ namespace moho
   /**
    * Address: 0x00404070 (FUN_00404070, Moho::IdPoolTypeInfo::Destruct)
    */
-  void IdPoolTypeInfo::Destruct(void* const objectStorage)
+  void IdPoolTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     auto* const object = reinterpret_cast<IdPool*>(objectStorage);
     if (!object) {
@@ -148,7 +159,9 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_IdPoolTypeInfo_7d0278, moho::register_IdPoolTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_IdPoolTypeInfo_7d0278,
+  moho::register_IdPoolTypeInfo
+)

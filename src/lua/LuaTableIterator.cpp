@@ -6,50 +6,54 @@ using namespace LuaPlus;
 
 namespace
 {
-	[[nodiscard]]
-	bool LuaTableIteratorNext(
-		LuaState* const state,
-		LuaObject* const tableObj,
-		LuaObject* const keyObj,
-		LuaObject* const valueObj)
-	{
-		if (state == nullptr || tableObj == nullptr || keyObj == nullptr || valueObj == nullptr) {
-			return false;
-		}
-		return LuaPlusH_next(state, tableObj, keyObj, valueObj) != 0;
-	}
+  [[nodiscard]]
+  bool LuaTableIteratorNext(
+    LuaState* const state,
+    LuaObject* const tableObj,
+    LuaObject* const keyObj,
+    LuaObject* const valueObj
+  )
+  {
+    if (state == nullptr || tableObj == nullptr || keyObj == nullptr || valueObj == nullptr) {
+      return false;
+    }
+    return LuaPlusH_next(state, tableObj, keyObj, valueObj) != 0;
+  }
 
-	[[noreturn]]
-	void ThrowInvalidIteratorState()
-	{
-		throw LuaAssertion("IsValid()");
-	}
-}
+  [[noreturn]]
+  void ThrowInvalidIteratorState()
+  {
+    throw LuaAssertion("IsValid()");
+  }
+} // namespace
 
 /**
  * Address: 0x00457A40 (FUN_00457A40)
  */
-LuaTableIterator::LuaTableIterator(LuaObject* const tableObj, const int doReset)
-	: m_tableObj(tableObj),
-	  m_keyObj(tableObj != nullptr ? tableObj->m_state : nullptr),
-	  m_valueObj(tableObj != nullptr ? tableObj->m_state : nullptr),
-	  m_isDone(false),
-	  m_pad2D{ 0, 0, 0 }
+LuaTableIterator::LuaTableIterator(
+  LuaObject* const tableObj,
+  const int doReset
+)
+  : m_tableObj(tableObj)
+  , m_keyObj(tableObj != nullptr ? tableObj->m_state : nullptr)
+  , m_valueObj(tableObj != nullptr ? tableObj->m_state : nullptr)
+  , m_isDone(false)
+  , m_pad2D{0, 0, 0}
 {
-	if (m_tableObj == nullptr || !m_tableObj->IsTable()) {
-		if (m_tableObj != nullptr) {
-			m_tableObj->TypeError("iterate");
-		}
-		m_isDone = true;
-		return;
-	}
+  if (m_tableObj == nullptr || !m_tableObj->IsTable()) {
+    if (m_tableObj != nullptr) {
+      m_tableObj->TypeError("iterate");
+    }
+    m_isDone = true;
+    return;
+  }
 
-	if (doReset != 0) {
-		m_keyObj.AssignNil(m_tableObj->m_state);
-		if (!LuaTableIteratorNext(m_tableObj->m_state, m_tableObj, &m_keyObj, &m_valueObj)) {
-			m_isDone = true;
-		}
-	}
+  if (doReset != 0) {
+    m_keyObj.AssignNil(m_tableObj->m_state);
+    if (!LuaTableIteratorNext(m_tableObj->m_state, m_tableObj, &m_keyObj, &m_valueObj)) {
+      m_isDone = true;
+    }
+  }
 }
 
 /**
@@ -62,15 +66,15 @@ LuaTableIterator::~LuaTableIterator() = default;
  */
 bool LuaTableIterator::Reset()
 {
-	if (m_tableObj == nullptr || m_tableObj->m_state == nullptr) {
-		m_isDone = true;
-		return false;
-	}
+  if (m_tableObj == nullptr || m_tableObj->m_state == nullptr) {
+    m_isDone = true;
+    return false;
+  }
 
-	m_keyObj.AssignNil(m_tableObj->m_state);
-	const bool hasNext = LuaTableIteratorNext(m_tableObj->m_state, m_tableObj, &m_keyObj, &m_valueObj);
-	m_isDone = !hasNext;
-	return hasNext;
+  m_keyObj.AssignNil(m_tableObj->m_state);
+  const bool hasNext = LuaTableIteratorNext(m_tableObj->m_state, m_tableObj, &m_keyObj, &m_valueObj);
+  m_isDone = !hasNext;
+  return hasNext;
 }
 
 /**
@@ -78,16 +82,16 @@ bool LuaTableIterator::Reset()
  */
 bool LuaTableIterator::Next()
 {
-	if (m_isDone) {
-		ThrowInvalidIteratorState();
-	}
+  if (m_isDone) {
+    ThrowInvalidIteratorState();
+  }
 
-	if (LuaTableIteratorNext(m_tableObj->m_state, m_tableObj, &m_keyObj, &m_valueObj)) {
-		return true;
-	}
+  if (LuaTableIteratorNext(m_tableObj->m_state, m_tableObj, &m_keyObj, &m_valueObj)) {
+    return true;
+  }
 
-	m_isDone = true;
-	return false;
+  m_isDone = true;
+  return false;
 }
 
 /**
@@ -95,7 +99,7 @@ bool LuaTableIterator::Next()
  */
 bool LuaTableIterator::IsValid() const
 {
-	return !m_isDone;
+  return !m_isDone;
 }
 
 /**
@@ -103,7 +107,7 @@ bool LuaTableIterator::IsValid() const
  */
 LuaTableIterator::operator bool() const
 {
-	return !m_isDone;
+  return !m_isDone;
 }
 
 /**
@@ -111,8 +115,8 @@ LuaTableIterator::operator bool() const
  */
 LuaTableIterator& LuaTableIterator::operator++()
 {
-	Next();
-	return *this;
+  Next();
+  return *this;
 }
 
 /**
@@ -120,10 +124,10 @@ LuaTableIterator& LuaTableIterator::operator++()
  */
 LuaObject& LuaTableIterator::GetKey()
 {
-	if (m_isDone) {
-		ThrowInvalidIteratorState();
-	}
-	return m_keyObj;
+  if (m_isDone) {
+    ThrowInvalidIteratorState();
+  }
+  return m_keyObj;
 }
 
 /**
@@ -131,8 +135,8 @@ LuaObject& LuaTableIterator::GetKey()
  */
 LuaObject& LuaTableIterator::GetValue()
 {
-	if (m_isDone) {
-		ThrowInvalidIteratorState();
-	}
-	return m_valueObj;
+  if (m_isDone) {
+    ThrowInvalidIteratorState();
+  }
+  return m_valueObj;
 }

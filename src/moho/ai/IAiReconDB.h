@@ -117,7 +117,8 @@ namespace moho
      *
      * VFTable SLOT: 6
      */
-    virtual void ReconGetBlips(const Wm3::Vec3f& center, float radius, gpg::core::FastVector<Entity*>* outBlips) const = 0;
+    virtual void
+    ReconGetBlips(const Wm3::Vec3f& center, float radius, gpg::core::FastVector<Entity*>* outBlips) const = 0;
 
     /**
      * Address: 0x005C1590 (FUN_005C1590)

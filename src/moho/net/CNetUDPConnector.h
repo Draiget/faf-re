@@ -93,7 +93,7 @@ namespace moho
      * Initializes connector runtime state, starts worker `Entry` thread, and
      * registers NAT traversal callback with provider.
      */
-    CNetUDPConnector(SOCKET sock, boost::weak_ptr<INetNATTraversalProvider>& prov);
+    CNetUDPConnector(platform::net::Socket sock, boost::weak_ptr<INetNATTraversalProvider>& prov);
 
     /**
      * In binary this does:
@@ -182,7 +182,7 @@ namespace moho
     void Pull() override;
 
     /**
-      * Alias of FUN_0048B7F0 (non-canonical helper lane).
+     * Alias of FUN_0048B7F0 (non-canonical helper lane).
      * Address: 0x0048B7F0 (FUN_0048B7F0, Moho::CNetUDPConnector::Push)
      * Slot: 9
      * Demangled: Moho::CNetUDPConnector::Push
@@ -324,7 +324,7 @@ namespace moho
     void Entry();
 
     /**
-      * Alias of FUN_0048AC40 (non-canonical helper lane).
+     * Alias of FUN_0048AC40 (non-canonical helper lane).
      */
     int32_t SendData();
 
@@ -341,7 +341,7 @@ namespace moho
     // +0x04  vptr(INetNATTraversalHandler)
 
     boost::recursive_mutex lock_;
-    SOCKET socket_{INVALID_SOCKET};
+    platform::net::Socket socket_{platform::net::kInvalidSocket};
     HANDLE event_{nullptr};
     boost::weak_ptr<INetNATTraversalProvider> mNatTraversalProvider;
     gpg::DList<CNetUDPConnection> mConnections;

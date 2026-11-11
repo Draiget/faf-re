@@ -48,7 +48,9 @@
 
 namespace
 {
-  void DestroyPlatoonPool(moho::ArmyPool& pool)
+  void DestroyPlatoonPool(
+    moho::ArmyPool& pool
+  )
   {
     // Address: 0x006FF9A0 (FUN_006FF9A0), platoon-pool destruction prefix.
     // Binary dispatches the slot-2 scalar deleting destructor per platoon,
@@ -62,7 +64,9 @@ namespace
 
   using IntrusiveListNode = moho::IntrusiveNode;
 
-  void UnlinkIntrusiveNode(IntrusiveListNode& node)
+  void UnlinkIntrusiveNode(
+    IntrusiveListNode& node
+  )
   {
     if (node.mNext != nullptr && node.mPrev != nullptr) {
       node.ListUnlink();
@@ -71,8 +75,6 @@ namespace
 
     node.ListResetLinks();
   }
-
-
 
   /**
    * Address: 0x00701A80 (FUN_00701A80)
@@ -86,12 +88,17 @@ namespace
    * pre-c63b909 layout, in which the traveller node had `mNext`/`mPrev`
    * transposed and the last two fields were mistaken for padding.
    */
-  void ReplacePathFinderOwnedPointer(void*& field, moho::PathQueue* const value)
+  void ReplacePathFinderOwnedPointer(
+    void*& field,
+    moho::PathQueue* const value
+  )
   {
     moho::PathQueue::Move(reinterpret_cast<moho::PathQueue**>(&field), value);
   }
 
-  void DestroyArmyEconomyInfo(moho::CSimArmyEconomyInfo*& economyInfo)
+  void DestroyArmyEconomyInfo(
+    moho::CSimArmyEconomyInfo*& economyInfo
+  )
   {
     if (economyInfo == nullptr) {
       return;
@@ -127,7 +134,10 @@ namespace
    * loop. Its sole caller, `~CArmyImpl`'s complete-object body
    * (FUN_006FF9A0 at 0x006FFA46), passes `UnitCategorySetsBegin`/`End`.
    */
-  void TeardownEntitySetRange(moho::EntitySetTemplate<moho::Unit>* const first, moho::EntitySetTemplate<moho::Unit>* const last)
+  void TeardownEntitySetRange(
+    moho::EntitySetTemplate<moho::Unit>* const first,
+    moho::EntitySetTemplate<moho::Unit>* const last
+  )
   {
     for (moho::EntitySetTemplate<moho::Unit>* it = first; it != last; ++it) {
       it->mVec.ResetStorageToInline();
@@ -142,7 +152,9 @@ namespace
     }
   }
 
-  [[nodiscard]] moho::SArmyVectorWithMeta* GetWordVectorWithMeta(moho::CArmyImpl* army)
+  [[nodiscard]] moho::SArmyVectorWithMeta* GetWordVectorWithMeta(
+    moho::CArmyImpl* army
+  )
   {
     // Evidence: FUN_006FDE70 targets (this + 0x17C): CArmyImpl::mVarDat.mWordVectorWithMeta.
     return &army->mVarDat.mWordVectorWithMeta;
@@ -169,7 +181,10 @@ namespace
   gpg::RType* gEntitySetTemplateUnitVectorType = nullptr;
 
   template <std::size_t NameCount>
-  [[nodiscard]] gpg::RType* ResolveTypeByNames(gpg::RType*& slot, const char* const (&typeNames)[NameCount])
+  [[nodiscard]] gpg::RType* ResolveTypeByNames(
+    gpg::RType*& slot,
+    const char* const (&typeNames)[NameCount]
+  )
   {
     if (slot) {
       return slot;
@@ -226,19 +241,24 @@ namespace
    * Upcasts one reflected reference lane to `CPlatoon` and returns the
    * resulting object pointer (or null on mismatch).
    */
-  [[nodiscard]] moho::CPlatoon* UpcastCPlatoonRef(const gpg::RRef& source)
+  [[nodiscard]] moho::CPlatoon* UpcastCPlatoonRef(
+    const gpg::RRef& source
+  )
   {
     return static_cast<moho::CPlatoon*>(gpg::REF_UpcastPtr(source, ResolveCPlatoonType()).mObj);
   }
 
   /**
-    * Alias of FUN_007040E0 (non-canonical helper lane).
+   * Alias of FUN_007040E0 (non-canonical helper lane).
    *
    * What it does:
    * Reads one tracked pointer lane, enforces owned-pointer transition
    * (`Unowned -> Owned`), and upcasts to `CPlatoon`.
    */
-  [[nodiscard]] moho::CPlatoon* ReadOwnedCPlatoonPointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
+  [[nodiscard]] moho::CPlatoon* ReadOwnedCPlatoonPointer(
+    gpg::ReadArchive* archive,
+    const gpg::RRef& ownerRef
+  )
   {
     gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
     if (!tracked.object) {
@@ -283,7 +303,11 @@ namespace
    * Writes one `CPlatoon` tracked-pointer lane as `Owned` through archive
    * pointer serialization.
    */
-  void WriteOwnedCPlatoonPointer(gpg::WriteArchive* archive, moho::CPlatoon* platoon, const gpg::RRef& ownerRef)
+  void WriteOwnedCPlatoonPointer(
+    gpg::WriteArchive* archive,
+    moho::CPlatoon* platoon,
+    const gpg::RRef& ownerRef
+  )
   {
     archive->WritePointer<moho::CPlatoon>(platoon, gpg::TrackedPointerState::Owned, ownerRef);
   }
@@ -297,7 +321,11 @@ namespace
    * Writes one `CPlatoon` tracked-pointer lane as `Unowned` through archive
    * pointer serialization.
    */
-  void WriteUnownedCPlatoonPointer(gpg::WriteArchive* archive, moho::CPlatoon* platoon, const gpg::RRef& ownerRef)
+  void WriteUnownedCPlatoonPointer(
+    gpg::WriteArchive* archive,
+    moho::CPlatoon* platoon,
+    const gpg::RRef& ownerRef
+  )
   {
     archive->WritePointer<moho::CPlatoon>(platoon, gpg::TrackedPointerState::Unowned, ownerRef);
   }
@@ -315,7 +343,10 @@ namespace
   }
 
   template <class TObject>
-  [[nodiscard]] gpg::RType* ResolveDynamicTypeOr(gpg::RType* const fallbackType, const TObject* const object)
+  [[nodiscard]] gpg::RType* ResolveDynamicTypeOr(
+    gpg::RType* const fallbackType,
+    const TObject* const object
+  )
   {
     if (object == nullptr) {
       return fallbackType;
@@ -330,7 +361,9 @@ namespace
     return fallbackType;
   }
 
-  void PromoteTrackedPointerToOwned(gpg::TrackedPointerInfo& tracked)
+  void PromoteTrackedPointerToOwned(
+    gpg::TrackedPointerInfo& tracked
+  )
   {
     if (tracked.object == nullptr) {
       return;
@@ -345,7 +378,10 @@ namespace
   }
 
   template <class TObject>
-  [[nodiscard]] TObject* DecodeTrackedPointer(const gpg::TrackedPointerInfo& tracked, gpg::RType* const expectedType)
+  [[nodiscard]] TObject* DecodeTrackedPointer(
+    const gpg::TrackedPointerInfo& tracked,
+    gpg::RType* const expectedType
+  )
   {
     if (tracked.object == nullptr) {
       return nullptr;
@@ -363,8 +399,12 @@ namespace
   }
 
   template <class TObject>
-  [[nodiscard]] TObject*
-  ReadPointerTyped(gpg::ReadArchive* const archive, const gpg::RRef& owner, gpg::RType* const expectedType, bool owned)
+  [[nodiscard]] TObject* ReadPointerTyped(
+    gpg::ReadArchive* const archive,
+    const gpg::RRef& owner,
+    gpg::RType* const expectedType,
+    bool owned
+  )
   {
     gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, owner);
     if (owned) {
@@ -389,7 +429,10 @@ namespace
   }
 
   template <class TObject>
-  void ReplaceDeleteOwnedPointer(TObject*& field, TObject* const value)
+  void ReplaceDeleteOwnedPointer(
+    TObject*& field,
+    TObject* const value
+  )
   {
     TObject* const prior = field;
     if (prior == value) {
@@ -400,7 +443,10 @@ namespace
     GPG_NONVIRTUAL_DESTROY(delete prior);
   }
 
-  void ReplaceEconomyOwnedPointer(moho::CSimArmyEconomyInfo*& field, moho::CSimArmyEconomyInfo* const value)
+  void ReplaceEconomyOwnedPointer(
+    moho::CSimArmyEconomyInfo*& field,
+    moho::CSimArmyEconomyInfo* const value
+  )
   {
     moho::CSimArmyEconomyInfo* prior = field;
     if (prior == value) {
@@ -411,12 +457,16 @@ namespace
     DestroyArmyEconomyInfo(prior);
   }
 
-  [[nodiscard]] moho::BVIntSet& CategoryWordRangeAsBitset(moho::EntityCategorySet& range) noexcept
+  [[nodiscard]] moho::BVIntSet& CategoryWordRangeAsBitset(
+    moho::EntityCategorySet& range
+  ) noexcept
   {
     return range.mBits;
   }
 
-  void MarkAllArmyUnitsNeedSyncGameData(moho::CArmyImpl& army)
+  void MarkAllArmyUnitsNeedSyncGameData(
+    moho::CArmyImpl& army
+  )
   {
     if (army.Simulation == nullptr || army.Simulation->mEntityDB == nullptr) {
       return;
@@ -436,13 +486,18 @@ namespace
     }
   }
 
-  void ResetArmyPoolPlatoons(moho::ArmyPool& pool)
+  void ResetArmyPoolPlatoons(
+    moho::ArmyPool& pool
+  )
   {
     // Address: 0x00701B70 (FUN_00701B70), initialization prefix.
     pool.platoons.RebindInlineNoFree();
   }
 
-  void ReserveArmyPoolPlatoons(moho::ArmyPool& pool, const std::size_t requiredCount)
+  void ReserveArmyPoolPlatoons(
+    moho::ArmyPool& pool,
+    const std::size_t requiredCount
+  )
   {
     auto& platoons = pool.platoons;
     const std::size_t currentCap = platoons.Capacity();
@@ -467,7 +522,10 @@ namespace
     platoons.AdoptRawBufferNoFree(newBegin, currentSize, requiredCount);
   }
 
-  void CopyArmyPoolPlatoons(moho::ArmyPool& dst, const moho::ArmyPool& src)
+  void CopyArmyPoolPlatoons(
+    moho::ArmyPool& dst,
+    const moho::ArmyPool& src
+  )
   {
     // Address: 0x00702CA0 (FUN_00702CA0), vector-copy helper semantics.
     if (&dst == &src) {
@@ -508,7 +566,9 @@ namespace
     dstPlatoons.SetSizeUnchecked(srcSize);
   }
 
-  [[nodiscard]] fa::string GetUnitUniqueName(const moho::Unit* unit)
+  [[nodiscard]] fa::string GetUnitUniqueName(
+    const moho::Unit* unit
+  )
   {
     if (unit == nullptr) {
       return fa::string();
@@ -521,7 +581,9 @@ namespace
     return entity->GetUniqueName();
   }
 
-  [[nodiscard]] fa::string GetSquadClassLexical(const moho::ESquadClass squadClass)
+  [[nodiscard]] fa::string GetSquadClassLexical(
+    const moho::ESquadClass squadClass
+  )
   {
     switch (squadClass) {
     case moho::ESquadClass::Unassigned:
@@ -545,7 +607,10 @@ namespace
     return fa::string(numeric);
   }
 
-  [[nodiscard]] moho::EntitySetTemplate<moho::Unit>* ResolveCategorySetForUnit(moho::CArmyImpl* army, moho::Unit* unit)
+  [[nodiscard]] moho::EntitySetTemplate<moho::Unit>* ResolveCategorySetForUnit(
+    moho::CArmyImpl* army,
+    moho::Unit* unit
+  )
   {
     if (army == nullptr || unit == nullptr) {
       return nullptr;
@@ -568,7 +633,10 @@ namespace
 
     const std::size_t relativeIndex = static_cast<std::size_t>(categoryBitIndex - army->UnitCategoryBaseIndex);
     moho::EntitySetTemplate<moho::Unit>* const target = setsBegin + relativeIndex;
-    if (moho::EntitySetTemplate<moho::Unit>* const setsEnd = army->UnitCategorySets.end(); setsEnd != nullptr && target >= setsEnd) {
+    if (
+      moho::EntitySetTemplate<moho::Unit>* const setsEnd = army->UnitCategorySets.end();
+      setsEnd != nullptr && target >= setsEnd
+    ) {
       return nullptr;
     }
 
@@ -589,7 +657,8 @@ namespace
     "CategoryRuleCursor::categoryOrdinals offset must be 0x04"
   );
   static_assert(
-    offsetof(CategoryRuleCursor, currentOrdinal) == 0x08, "CategoryRuleCursor::currentOrdinal offset must be 0x08"
+    offsetof(CategoryRuleCursor, currentOrdinal) == 0x08,
+    "CategoryRuleCursor::currentOrdinal offset must be 0x08"
   );
 
   /**
@@ -615,7 +684,9 @@ namespace
     return outCursor;
   }
 
-  [[nodiscard]] float GetUnitCapCost(const moho::Unit* unit)
+  [[nodiscard]] float GetUnitCapCost(
+    const moho::Unit* unit
+  )
   {
     if (unit == nullptr) {
       return 0.0f;
@@ -636,7 +707,11 @@ namespace
   constexpr const char* kArmyPoolName = "ArmyPool";
   constexpr const char* kOnDestroyScriptName = "OnDestroy";
 
-  void SetArmyFloatStatValue(moho::CArmyStats* const stats, const char* const statPath, const float value)
+  void SetArmyFloatStatValue(
+    moho::CArmyStats* const stats,
+    const char* const statPath,
+    const float value
+  )
   {
     if (stats == nullptr || statPath == nullptr || *statPath == '\0') {
       return;
@@ -651,13 +726,19 @@ namespace
     statItem->mPrimaryValueBits = std::bit_cast<std::int32_t>(value);
   }
 
-  [[nodiscard]] LuaPlus::LuaObject LuaField(const LuaPlus::LuaObject& table, const char* const key)
+  [[nodiscard]] LuaPlus::LuaObject LuaField(
+    const LuaPlus::LuaObject& table,
+    const char* const key
+  )
   {
     return table[key];
   }
 
-  [[nodiscard]] const char*
-  GetLuaStringField(const LuaPlus::LuaObject& table, const char* const key, const char* const fallback = "")
+  [[nodiscard]] const char* GetLuaStringField(
+    const LuaPlus::LuaObject& table,
+    const char* const key,
+    const char* const fallback = ""
+  )
   {
     LuaPlus::LuaObject value = LuaField(table, key);
     if (value.IsNil()) {
@@ -668,20 +749,30 @@ namespace
     return result != nullptr ? result : fallback;
   }
 
-  [[nodiscard]] int GetLuaIntegerField(const LuaPlus::LuaObject& table, const char* const key, const int fallback = 0)
+  [[nodiscard]] int GetLuaIntegerField(
+    const LuaPlus::LuaObject& table,
+    const char* const key,
+    const int fallback = 0
+  )
   {
     LuaPlus::LuaObject value = LuaField(table, key);
     return value.IsNil() ? fallback : value.GetInteger();
   }
 
-  [[nodiscard]] bool
-  GetLuaBooleanField(const LuaPlus::LuaObject& table, const char* const key, const bool fallback = false)
+  [[nodiscard]] bool GetLuaBooleanField(
+    const LuaPlus::LuaObject& table,
+    const char* const key,
+    const bool fallback = false
+  )
   {
     LuaPlus::LuaObject value = LuaField(table, key);
     return value.IsNil() ? fallback : value.GetBoolean();
   }
 
-  [[nodiscard]] LuaPlus::LuaObject LookupScenarioGlobal(moho::Sim* const sim, const char* const path)
+  [[nodiscard]] LuaPlus::LuaObject LookupScenarioGlobal(
+    moho::Sim* const sim,
+    const char* const path
+  )
   {
     if (sim == nullptr || sim->mLuaState == nullptr || path == nullptr) {
       return LuaPlus::LuaObject{};
@@ -706,14 +797,20 @@ namespace
     return present ? static_cast<float>(value.GetNumber()) : fallback;
   }
 
-  [[nodiscard]] int ReadScenarioGlobalInt(moho::Sim* const sim, const char* const path, const int fallback)
+  [[nodiscard]] int ReadScenarioGlobalInt(
+    moho::Sim* const sim,
+    const char* const path,
+    const int fallback
+  )
   {
     bool present = false;
     const float value = ReadScenarioGlobalNumber(sim, path, static_cast<float>(fallback), &present);
     return present ? static_cast<int>(value) : fallback;
   }
 
-  [[nodiscard]] int ResolveMapMaxExtent(const moho::Sim* const sim) noexcept
+  [[nodiscard]] int ResolveMapMaxExtent(
+    const moho::Sim* const sim
+  ) noexcept
   {
     const moho::CHeightField* const field =
       (sim != nullptr && sim->mMapData != nullptr) ? sim->mMapData->mHeightField.get() : nullptr;
@@ -726,12 +823,16 @@ namespace
     return std::max(widthExtent, heightExtent);
   }
 
-  [[nodiscard]] int ResolveInfluenceMapGridSize(const int mapMaxExtent) noexcept
+  [[nodiscard]] int ResolveInfluenceMapGridSize(
+    const int mapMaxExtent
+  ) noexcept
   {
     return std::max(32, mapMaxExtent / 16);
   }
 
-  [[nodiscard]] int ResolveDefaultPathCapacity(const int mapMaxExtent) noexcept
+  [[nodiscard]] int ResolveDefaultPathCapacity(
+    const int mapMaxExtent
+  ) noexcept
   {
     if (mapMaxExtent < 512) {
       return 500;
@@ -748,7 +849,9 @@ namespace
     return 20000;
   }
 
-  [[nodiscard]] int ResolveUnitCap(const LuaPlus::LuaObject& scenarioInfoOptions)
+  [[nodiscard]] int ResolveUnitCap(
+    const LuaPlus::LuaObject& scenarioInfoOptions
+  )
   {
     LuaPlus::LuaObject unitCap = LuaField(scenarioInfoOptions, "UnitCap");
     if (!unitCap.IsString()) {
@@ -768,7 +871,9 @@ namespace
   // byte is dropped and non-digits fold in the same way; the product is
   // `mul ax,bx` with ax = 600, zero-extended. An empty string would run the
   // `loop` 2^32 times in retail; it is not modelled.
-  [[nodiscard]] int ResolveNoRushTicks(const char* const noRushOption) noexcept
+  [[nodiscard]] int ResolveNoRushTicks(
+    const char* const noRushOption
+  ) noexcept
   {
     if (noRushOption == nullptr) {
       return 0;
@@ -824,7 +929,11 @@ namespace
     army.mVarDat.mNoRushOffset.y = offsetY;
   }
 
-  void ApplyPathCapacityScenarioOptions(moho::CArmyImpl& army, moho::Sim* const sim, const int mapMaxExtent)
+  void ApplyPathCapacityScenarioOptions(
+    moho::CArmyImpl& army,
+    moho::Sim* const sim,
+    const int mapMaxExtent
+  )
   {
     const int defaultPathCapacity = ResolveDefaultPathCapacity(mapMaxExtent);
     army.PathCapacityLand = defaultPathCapacity;
@@ -851,7 +960,9 @@ namespace
     source.release();
   }
 
-  void CopyReconGridsFromDatabase(moho::CArmyImpl& army)
+  void CopyReconGridsFromDatabase(
+    moho::CArmyImpl& army
+  )
   {
     moho::CAiReconDBImpl* const reconDb = army.AiReconDb;
     if (reconDb == nullptr) {
@@ -893,7 +1004,9 @@ namespace
    * extra heap allocation + tree-clone + cleanup overhead the binary
    * paid.
    */
-  void InitializeArmyUnitCategorySets(moho::CArmyImpl& army)
+  void InitializeArmyUnitCategorySets(
+    moho::CArmyImpl& army
+  )
   {
     army.UnitCategoryBaseIndex = std::numeric_limits<std::uint32_t>::max();
     army.UnitCategoryMaxIndex = 0u;
@@ -934,15 +1047,19 @@ namespace
     army.UnitCategoryMaxIndex = maxCategoryBit;
   }
 
-  void AssignAllUnitsCategoryFilter(moho::CArmyImpl& army)
+  void AssignAllUnitsCategoryFilter(
+    moho::CArmyImpl& army
+  )
   {
     if (army.Simulation == nullptr || army.Simulation->mRules == nullptr) {
       army.mVarDat.mCategoryFilterSet.ResetToEmpty(moho::EntityCategoryHelper{});
       return;
     }
 
-    if (const moho::EntityCategorySet* const allUnits = army.Simulation->mRules->GetEntityCategory("ALLUNITS");
-        allUnits != nullptr) {
+    if (
+      const moho::EntityCategorySet* const allUnits = army.Simulation->mRules->GetEntityCategory("ALLUNITS");
+      allUnits != nullptr
+    ) {
       army.mVarDat.mCategoryFilterSet = *allUnits;
     }
   }
@@ -951,17 +1068,23 @@ namespace
    * The queue's owner is the sim's `PathTables`; the queue reads its
    * per-footprint cluster maps back out of it during query setup.
    */
-  [[nodiscard]] moho::PathTables* PathQueueOwnerLane(const moho::Sim* const sim) noexcept
+  [[nodiscard]] moho::PathTables* PathQueueOwnerLane(
+    const moho::Sim* const sim
+  ) noexcept
   {
     return (sim != nullptr) ? sim->mPathTables : nullptr;
   }
 
-  [[nodiscard]] bool PlatoonDisbandsOnIdle(const moho::CPlatoon* const platoon)
+  [[nodiscard]] bool PlatoonDisbandsOnIdle(
+    const moho::CPlatoon* const platoon
+  )
   {
     return platoon != nullptr && platoon->mDisbandOnIdle;
   }
 
-  [[nodiscard]] bool IsPlatoonUniqueNameEmpty(const moho::CPlatoon* const platoon)
+  [[nodiscard]] bool IsPlatoonUniqueNameEmpty(
+    const moho::CPlatoon* const platoon
+  )
   {
     if (platoon == nullptr) {
       return true;
@@ -975,7 +1098,9 @@ namespace
    * `mUnits` element count (`mVec` end - begin) of every squad in
    * `mSquadList`.
    */
-  [[nodiscard]] std::size_t CountPlatoonUnits(const moho::CPlatoon* const platoon)
+  [[nodiscard]] std::size_t CountPlatoonUnits(
+    const moho::CPlatoon* const platoon
+  )
   {
     if (platoon == nullptr) {
       return 0u;
@@ -993,7 +1118,9 @@ namespace
     return unitCount;
   }
 
-  void RunPlatoonOnDestroyAndDelete(moho::CPlatoon* const platoon)
+  void RunPlatoonOnDestroyAndDelete(
+    moho::CPlatoon* const platoon
+  )
   {
     if (platoon == nullptr) {
       return;
@@ -1011,7 +1138,10 @@ namespace
    * `CArmyImpl::PathFinder` (+0x21C) holds the `PathQueue`, which the binary
    * loads into `ebx` immediately before the call.
    */
-  void ProcessArmyPathQueueBudget(void* const pathQueue, int budget)
+  void ProcessArmyPathQueueBudget(
+    void* const pathQueue,
+    int budget
+  )
   {
     if (pathQueue == nullptr) {
       return;
@@ -1191,8 +1321,10 @@ namespace moho
 
     // Evidence: FUN_006FF9A0 at 0x006FFA46 calls FUN_007056D0(begin, end)
     // once over the whole range, then frees the raw array block.
-    if (moho::EntitySetTemplate<moho::Unit>* const categorySetsBegin = UnitCategorySets.begin();
-        categorySetsBegin != nullptr) {
+    if (
+      moho::EntitySetTemplate<moho::Unit>* const categorySetsBegin = UnitCategorySets.begin();
+      categorySetsBegin != nullptr
+    ) {
       TeardownEntitySetRange(categorySetsBegin, UnitCategorySets.end());
       operator delete(categorySetsBegin);
     }
@@ -1250,7 +1382,9 @@ namespace moho
   /**
    * Address: 0x006FDC40 (FUN_006FDC40, Moho::CArmyImpl::SetArmyPlans)
    */
-  void CArmyImpl::SetArmyPlans(const fa::string& armyPlans)
+  void CArmyImpl::SetArmyPlans(
+    const fa::string& armyPlans
+  )
   {
     ArmyPlans.assign(armyPlans, 0, fa::string::npos);
   }
@@ -1286,7 +1420,9 @@ namespace moho
    * Runs one AI brain task tick for the army's AI, attacker, and reserved
    * thread stages.
    */
-  void AI_Tick(CArmyImpl* army)
+  void AI_Tick(
+    CArmyImpl* army
+  )
   {
     (void)army->GetSim();
 
@@ -1315,7 +1451,9 @@ namespace moho
   /**
    * Address: 0x007010B0 (FUN_007010B0, Moho::CArmyImpl::DeserializePlatoons)
    */
-  void CArmyImpl::DeserializePlatoons(gpg::ReadArchive* const archive)
+  void CArmyImpl::DeserializePlatoons(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -1335,7 +1473,9 @@ namespace moho
   /**
    * Address: 0x00701130 (FUN_00701130, Moho::CArmyImpl::SerializePlatoons)
    */
-  void CArmyImpl::SerializePlatoons(gpg::WriteArchive* const archive) const
+  void CArmyImpl::SerializePlatoons(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;
@@ -1352,7 +1492,9 @@ namespace moho
   /**
    * Address: 0x00705BE0 (FUN_00705BE0, Moho::CArmyImpl::MemberDeserialize)
    */
-  void CArmyImpl::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CArmyImpl::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -1366,11 +1508,15 @@ namespace moho
     ReplaceDeleteOwnedPointer(
       AiReconDb, ReadPointerTyped<CAiReconDBImpl>(archive, owner, ResolveCAiReconDBImplType(), true)
     );
-    ReplaceEconomyOwnedPointer(EconomyInfo, ReadPointerTyped<CSimArmyEconomyInfo>(archive, owner, ResolveCEconomyType(), true));
+    ReplaceEconomyOwnedPointer(
+      EconomyInfo, ReadPointerTyped<CSimArmyEconomyInfo>(archive, owner, ResolveCEconomyType(), true)
+    );
 
     archive->ReadString(&ArmyPlans);
 
-    ReplaceDeleteOwnedPointer(Stats, ReadPointerTyped<CArmyStats>(archive, owner, gpg::RTypeOf<moho::CArmyStats>(), true));
+    ReplaceDeleteOwnedPointer(
+      Stats, ReadPointerTyped<CArmyStats>(archive, owner, gpg::RTypeOf<moho::CArmyStats>(), true)
+    );
     ReplaceDeleteOwnedPointer(
       InfluenceMap, ReadPointerTyped<CInfluenceMap>(archive, owner, gpg::RTypeOf<moho::CInfluenceMap>(), true)
     );
@@ -1411,7 +1557,9 @@ namespace moho
   /**
    * Address: 0x00705E40 (FUN_00705E40, Moho::CArmyImpl::MemberSerialize)
    */
-  void CArmyImpl::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CArmyImpl::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;
@@ -1428,11 +1576,7 @@ namespace moho
       owner
     );
     WritePointerTyped(
-      archive,
-      AiBrain,
-      ResolveDynamicTypeOr(ResolveCAiBrainType(), AiBrain),
-      gpg::TrackedPointerState::Owned,
-      owner
+      archive, AiBrain, ResolveDynamicTypeOr(ResolveCAiBrainType(), AiBrain), gpg::TrackedPointerState::Owned, owner
     );
 
     gpg::RType* reconType = ResolveIAiReconDBType();
@@ -1440,20 +1584,10 @@ namespace moho
       reconType = ResolveCAiReconDBImplType();
     }
     WritePointerTyped(
-      archive,
-      AiReconDb,
-      ResolveDynamicTypeOr(reconType, AiReconDb),
-      gpg::TrackedPointerState::Owned,
-      owner
+      archive, AiReconDb, ResolveDynamicTypeOr(reconType, AiReconDb), gpg::TrackedPointerState::Owned, owner
     );
 
-    WritePointerTyped(
-      archive,
-      EconomyInfo,
-      ResolveCEconomyType(),
-      gpg::TrackedPointerState::Owned,
-      owner
-    );
+    WritePointerTyped(archive, EconomyInfo, ResolveCEconomyType(), gpg::TrackedPointerState::Owned, owner);
     archive->WriteString(const_cast<fa::string*>(&ArmyPlans));
 
     WritePointerTyped(
@@ -1537,7 +1671,9 @@ namespace moho
   /**
    * Address: 0x006FDCC0 (FUN_006FDCC0, Moho::CArmyImpl::SetArmyStart)
    */
-  void CArmyImpl::SetArmyStart(const Wm3::Vector2f& startPosition)
+  void CArmyImpl::SetArmyStart(
+    const Wm3::Vector2f& startPosition
+  )
   {
     mVarDat.mArmyStart = startPosition;
   }
@@ -1545,7 +1681,9 @@ namespace moho
   /**
    * Address: 0x006FDCE0 (FUN_006FDCE0, Moho::CArmyImpl::GetArmyStartPos)
    */
-  void CArmyImpl::GetArmyStartPos(Wm3::Vector2f& outStartPosition)
+  void CArmyImpl::GetArmyStartPos(
+    Wm3::Vector2f& outStartPosition
+  )
   {
     outStartPosition = mVarDat.mArmyStart;
   }
@@ -1553,7 +1691,10 @@ namespace moho
   /**
    * Address: 0x006FDF30 (FUN_006FDF30, Moho::CArmyImpl::SetAlliance)
    */
-  void CArmyImpl::SetAlliance(const std::uint32_t armyId, const int relationIndex)
+  void CArmyImpl::SetAlliance(
+    const std::uint32_t armyId,
+    const int relationIndex
+  )
   {
     BVIntSet* relationSets[3] = {&mVarDat.mNeutrals, &mVarDat.mAllies, &mVarDat.mEnemies};
 
@@ -1590,7 +1731,9 @@ namespace moho
    * What it does:
    * Updates per-army ally visibility against the current focused army id.
    */
-  void CArmyImpl::SetCanSee(const std::int32_t focusArmyIndex)
+  void CArmyImpl::SetCanSee(
+    const std::int32_t focusArmyIndex
+  )
   {
     if (focusArmyIndex < 0) {
       mVarDat.mIsAlly = 1u;
@@ -1614,7 +1757,10 @@ namespace moho
     }
 
     bool renderPlayableRect = false;
-    if (!moho::ReadSimConVarValue<bool>(Simulation, kConVarRenderDebugPlayableRect, renderPlayableRect) || !renderPlayableRect) {
+    if (
+      !moho::ReadSimConVarValue<bool>(Simulation, kConVarRenderDebugPlayableRect, renderPlayableRect) ||
+      !renderPlayableRect
+    ) {
       return;
     }
 
@@ -1730,9 +1876,8 @@ namespace moho
     }
 
     if (
-      Simulation != nullptr
-      && static_cast<std::uint32_t>(mConstDat.mArmyIndex) == (Simulation->mCurTick % 30u)
-      && InfluenceMap != nullptr
+      Simulation != nullptr && static_cast<std::uint32_t>(mConstDat.mArmyIndex) == (Simulation->mCurTick % 30u) &&
+      InfluenceMap != nullptr
     ) {
       FAF_PROFILE_ZONE_NAMED("Army::InfluenceMap");
       InfluenceMap->Update();
@@ -1798,7 +1943,9 @@ namespace moho
    * What it does:
    * Removes one platoon from this army and dispatches its `OnDestroy` script.
    */
-  void CArmyImpl::DisbandPlatoon(CPlatoon* platoon)
+  void CArmyImpl::DisbandPlatoon(
+    CPlatoon* platoon
+  )
   {
     CPlatoon* const armyPool = GetPlatoonByName(kArmyPoolName);
 
@@ -1825,7 +1972,9 @@ namespace moho
    * Locates one platoon by unique-name string, removes it from this army, and
    * dispatches its `OnDestroy` script.
    */
-  void CArmyImpl::DisbandPlatoonUniquelyNamed(const char* platoonName)
+  void CArmyImpl::DisbandPlatoonUniquelyNamed(
+    const char* platoonName
+  )
   {
     if (platoonName == nullptr) {
       return;
@@ -1856,7 +2005,10 @@ namespace moho
    * Removes all input units from their existing platoons, resolves one named
    * platoon, and appends those units into its unassigned squad lane.
    */
-  void CArmyImpl::AssignUnitsToPlatoon(const EntitySetTemplate<Unit>* const units, const char* const platoonName)
+  void CArmyImpl::AssignUnitsToPlatoon(
+    const EntitySetTemplate<Unit>* const units,
+    const char* const platoonName
+  )
   {
     RemoveUnitsFromPlatoons(units);
     CPlatoon* const platoon = GetPlatoonByName(platoonName);
@@ -1875,7 +2027,9 @@ namespace moho
    * Resolves the platoon currently owning one unit and removes that unit from
    * the first matching squad lane.
    */
-  void CArmyImpl::RemoveFromPlatoon(Unit* const unit)
+  void CArmyImpl::RemoveFromPlatoon(
+    Unit* const unit
+  )
   {
     ESquadClass squadClass = static_cast<ESquadClass>(0);
     CPlatoon* const platoon = GetPlatoonFor(unit, &squadClass);
@@ -1891,7 +2045,9 @@ namespace moho
    * Iterates one unit-set entity storage and detaches each decoded unit from
    * its owning platoon.
    */
-  void CArmyImpl::RemoveUnitsFromPlatoons(const EntitySetTemplate<Unit>* const units)
+  void CArmyImpl::RemoveUnitsFromPlatoons(
+    const EntitySetTemplate<Unit>* const units
+  )
   {
     // Each entry is the unit's `Entity` subobject; 0x00700743..0x0070074C is the
     // null-preserving derived cast back to `Unit*`.
@@ -1907,7 +2063,9 @@ namespace moho
    * Counts platoon lanes whose template-name string matches `templateName`
    * case-insensitively.
    */
-  int CArmyImpl::GetNumPlatoonsTemplateNamed(const char* const templateName)
+  int CArmyImpl::GetNumPlatoonsTemplateNamed(
+    const char* const templateName
+  )
   {
     // 0x00700787: the template name is the platoon's `mName` (+0x70).
     int count = 0;
@@ -1927,7 +2085,9 @@ namespace moho
    * Counts platoon lanes whose active plan string matches `planName`
    * case-insensitively.
    */
-  int CArmyImpl::GetNumPlatoonWithPlan(const char* const planName)
+  int CArmyImpl::GetNumPlatoonWithPlan(
+    const char* const planName
+  )
   {
     // 0x007007D7: the plan is the platoon's `mPlan` (+0x8C).
     int count = 0;
@@ -1943,7 +2103,9 @@ namespace moho
   /**
    * Address: 0x00700FC0 (FUN_00700FC0, Moho::CArmyImpl::OnCommandSourceTerminated)
    */
-  void CArmyImpl::OnCommandSourceTerminated(const std::uint32_t sourceId)
+  void CArmyImpl::OnCommandSourceTerminated(
+    const std::uint32_t sourceId
+  )
   {
     (void)mVarDat.mValidCommandSources.Remove(sourceId);
     if (mVarDat.mValidCommandSources.WordCount() == 0u && AiBrain != nullptr) {
@@ -1954,7 +2116,9 @@ namespace moho
   /**
    * Address: 0x00700080 (FUN_00700080, Moho::CArmyImpl::GetConstDat)
    */
-  SSTIArmyConstantData* CArmyImpl::CopyArmyConstantData(SSTIArmyConstantData* outBuffer)
+  SSTIArmyConstantData* CArmyImpl::CopyArmyConstantData(
+    SSTIArmyConstantData* outBuffer
+  )
   {
     if (outBuffer == nullptr) {
       return outBuffer;
@@ -1971,7 +2135,9 @@ namespace moho
   /**
    * Address: 0x00700240 (FUN_00700240, Moho::CArmyImpl::CopyArmyVariableData)
    */
-  SSTIArmyVariableData* CArmyImpl::CopyArmyVariableData(SSTIArmyVariableData* outBuffer)
+  SSTIArmyVariableData* CArmyImpl::CopyArmyVariableData(
+    SSTIArmyVariableData* outBuffer
+  )
   {
     // 0x00700243..0x0070025B: the economy's totals block goes into `mVarDat` whole: a 14-dword
     // `rep movsd` from `EconomyInfo + 0x18` to `this + 0x88`, so the 64-bit max-storage lanes keep
@@ -2035,7 +2201,9 @@ namespace moho
   /**
    * Address: 0x006FDDF0 (FUN_006FDDF0, Moho::CArmyImpl::SetUnknownSharedRef)
    */
-  boost::SharedPtrRaw<void>* CArmyImpl::SetUnknownSharedRef(boost::SharedPtrRaw<void>* value)
+  boost::SharedPtrRaw<void>* CArmyImpl::SetUnknownSharedRef(
+    boost::SharedPtrRaw<void>* value
+  )
   {
     if (value == nullptr) {
       return nullptr;
@@ -2049,7 +2217,9 @@ namespace moho
   /**
    * Address: 0x006FDE40 (FUN_006FDE40, Moho::CArmyImpl::GetUnknownSharedRef)
    */
-  boost::SharedPtrRaw<void>* CArmyImpl::GetUnknownSharedRef(boost::SharedPtrRaw<void>* outValue)
+  boost::SharedPtrRaw<void>* CArmyImpl::GetUnknownSharedRef(
+    boost::SharedPtrRaw<void>* outValue
+  )
   {
     if (outValue == nullptr) {
       return nullptr;
@@ -2063,7 +2233,9 @@ namespace moho
   /**
    * Address: 0x006FDE70 (FUN_006FDE70, Moho::CArmyImpl::SetUnknownVectorWithMeta)
    */
-  std::uint32_t CArmyImpl::SetUnknownVectorWithMeta(const SArmyVectorWithMeta* value)
+  std::uint32_t CArmyImpl::SetUnknownVectorWithMeta(
+    const SArmyVectorWithMeta* value
+  )
   {
     if (value == nullptr) {
       return 0;
@@ -2078,7 +2250,9 @@ namespace moho
   /**
    * Address: 0x006FDE90 (FUN_006FDE90, Moho::CArmyImpl::GetPlatoonsList)
    */
-  void CArmyImpl::GetPlatoonsList(ArmyPool& outPool)
+  void CArmyImpl::GetPlatoonsList(
+    ArmyPool& outPool
+  )
   {
     // Address: 0x006FDE90 (FUN_006FDE90)
     // - Calls 0x00701B70 to init `outPool` platoon-vector header.
@@ -2094,7 +2268,10 @@ namespace moho
    * Creates one platoon object owned by this army/sim and appends it to the
    * platoon pool vector.
    */
-  CPlatoon* CArmyImpl::MakePlatoon(const char* const platoonName, const char* const aiPlan)
+  CPlatoon* CArmyImpl::MakePlatoon(
+    const char* const platoonName,
+    const char* const aiPlan
+  )
   {
     CPlatoon* const platoon = CPlatoon::Create(Simulation, this, platoonName, aiPlan);
     PlatoonPool.platoons.PushBack(platoon);
@@ -2104,7 +2281,9 @@ namespace moho
   /**
    * Address: 0x00700470 (FUN_00700470, Moho::CArmyImpl::GetPlatoonByName)
    */
-  CPlatoon* CArmyImpl::GetPlatoonByName(const char* const platoonName)
+  CPlatoon* CArmyImpl::GetPlatoonByName(
+    const char* const platoonName
+  )
   {
     if (platoonName == nullptr) {
       return nullptr;
@@ -2126,7 +2305,10 @@ namespace moho
   /**
    * Address: 0x007004E0 (FUN_007004E0, Moho::CArmyImpl::GetPlatoonFor)
    */
-  CPlatoon* CArmyImpl::GetPlatoonFor(Unit* const queryUnit, ESquadClass* const outSquadClass)
+  CPlatoon* CArmyImpl::GetPlatoonFor(
+    Unit* const queryUnit,
+    ESquadClass* const outSquadClass
+  )
   {
     for (CPlatoon* const platoon : PlatoonPool.platoons) {
       if (platoon == nullptr || !platoon->IsInPlatoon(queryUnit)) {
@@ -2147,7 +2329,9 @@ namespace moho
    * Address: 0x00700A00 (FUN_00700A00, Moho::CArmyImpl::CountUnitsInBoundsXZ)
    */
   int CArmyImpl::CountUnitsInBoundsXZ(
-    const Wm3::Vector3f& minBounds, const Wm3::Vector3f& maxBounds, const EntitySetTemplate<Unit>& unitSet
+    const Wm3::Vector3f& minBounds,
+    const Wm3::Vector3f& maxBounds,
+    const EntitySetTemplate<Unit>& unitSet
   )
   {
     int count = 0;
@@ -2175,7 +2359,9 @@ namespace moho
    * - `<AIDebug_UnitName>_SquadClass`
    * - `<AIDebug_UnitName>_AIPlan`
    */
-  void CArmyImpl::UpdateAIDebugPlatoonStats(Unit* unit)
+  void CArmyImpl::UpdateAIDebugPlatoonStats(
+    Unit* unit
+  )
   {
     if (unit == nullptr || Stats == nullptr) {
       return;
@@ -2204,7 +2390,9 @@ namespace moho
   /**
    * Address: 0x00700E20 (FUN_00700E20, Moho::CArmyImpl::AddUnitToCategorySet)
    */
-  void CArmyImpl::AddUnitToCategorySet(Unit* unit)
+  void CArmyImpl::AddUnitToCategorySet(
+    Unit* unit
+  )
   {
     EntitySetTemplate<Unit>* const set = ResolveCategorySetForUnit(this, unit);
     if (set == nullptr) {
@@ -2217,7 +2405,9 @@ namespace moho
   /**
    * Address: 0x00700E70 (FUN_00700E70, Moho::CArmyImpl::ConsumeUnitFromCategorySet)
    */
-  bool CArmyImpl::ConsumeUnitFromCategorySet(Unit* unit)
+  bool CArmyImpl::ConsumeUnitFromCategorySet(
+    Unit* unit
+  )
   {
     EntitySetTemplate<Unit>* const set = ResolveCategorySetForUnit(this, unit);
     if (set == nullptr) {
@@ -2234,7 +2424,10 @@ namespace moho
    * Resets `outUnits`, then unions all per-category cached unit sets whose
    * blueprint ordinals are selected in `filterBuckets`.
    */
-  void* CArmyImpl::GetUnits(void* const outUnits, void* const filterBuckets)
+  void* CArmyImpl::GetUnits(
+    void* const outUnits,
+    void* const filterBuckets
+  )
   {
     auto* const resultSet = static_cast<EntitySetTemplate<Unit>*>(outUnits);
     if (resultSet == nullptr) {
@@ -2298,7 +2491,9 @@ namespace moho
    * capacity is exhausted. The slow body is the recovered helper
    * `fa::detail::LegacyVectorDwordInsertN` (FUN_007027A0).
    */
-  fa::vector<CArmyImpl*>* CArmyImpl::GetAlliedArmies(fa::vector<CArmyImpl*>* outArmyList)
+  fa::vector<CArmyImpl*>* CArmyImpl::GetAlliedArmies(
+    fa::vector<CArmyImpl*>* outArmyList
+  )
   {
     if (outArmyList == nullptr) {
       return nullptr;
@@ -2314,10 +2509,12 @@ namespace moho
       return outArmyList;
     }
 
-    const std::uint32_t wordCount = static_cast<std::uint32_t>(mVarDat.mAllies.mWords.end_ - mVarDat.mAllies.mWords.start_);
+    const std::uint32_t wordCount =
+      static_cast<std::uint32_t>(mVarDat.mAllies.mWords.end_ - mVarDat.mAllies.mWords.start_);
     for (std::uint32_t wordOffset = 0; wordOffset < wordCount; ++wordOffset) {
       // A BVIntSet word holds 32 army IDs, starting at mFirstWordIndex.
-      const std::int32_t absoluteWord = static_cast<std::int32_t>(mVarDat.mAllies.mFirstWordIndex) + static_cast<std::int32_t>(wordOffset);
+      const std::int32_t absoluteWord =
+        static_cast<std::int32_t>(mVarDat.mAllies.mFirstWordIndex) + static_cast<std::int32_t>(wordOffset);
       if (absoluteWord < 0) {
         continue;
       }
@@ -2363,7 +2560,9 @@ namespace moho
   /**
    * Address: 0x006FDD10 (FUN_006FDD10, Moho::CArmyImpl::SetUnitCap)
    */
-  void CArmyImpl::SetUnitCap(const float unitCap)
+  void CArmyImpl::SetUnitCap(
+    const float unitCap
+  )
   {
     UnitCapacity = unitCap;
   }
@@ -2379,7 +2578,9 @@ namespace moho
   /**
    * Address: 0x006FDD40 (FUN_006FDD40, Moho::CArmyImpl::SetUseUnitCap)
    */
-  void CArmyImpl::SetUseUnitCap(const bool useUnitCap)
+  void CArmyImpl::SetUseUnitCap(
+    const bool useUnitCap
+  )
   {
     IgnoreUnitCapFlag = static_cast<std::uint8_t>(useUnitCap);
   }
@@ -2387,7 +2588,9 @@ namespace moho
   /**
    * Address: 0x006FDEC0 (FUN_006FDEC0, Moho::CArmyImpl::SetIgnorePlayableRect)
    */
-  void CArmyImpl::SetIgnorePlayableRect(const bool ignorePlayableRect)
+  void CArmyImpl::SetIgnorePlayableRect(
+    const bool ignorePlayableRect
+  )
   {
     mVarDat.mUseWholeMap = static_cast<std::uint8_t>(ignorePlayableRect);
   }
@@ -2407,7 +2610,9 @@ namespace moho
    * Removes category bits from the army-level build-allow set and marks
    * all army units dirty for sync-game-data refresh.
    */
-  void CArmyImpl::AddBuildRestriction(void* const restriction)
+  void CArmyImpl::AddBuildRestriction(
+    void* const restriction
+  )
   {
     if (restriction == nullptr) {
       return;
@@ -2425,7 +2630,9 @@ namespace moho
    * Adds category bits back into the army-level build-allow set and marks
    * all army units dirty for sync-game-data refresh.
    */
-  void CArmyImpl::RemoveBuildRestriction(void* const restriction)
+  void CArmyImpl::RemoveBuildRestriction(
+    void* const restriction
+  )
   {
     if (restriction == nullptr) {
       return;
@@ -2439,7 +2646,9 @@ namespace moho
   /**
    * Address: 0x006FE290 (FUN_006FE290, Moho::CArmyImpl::SetNoRushTimer)
    */
-  void CArmyImpl::SetNoRushTimer(const float seconds)
+  void CArmyImpl::SetNoRushTimer(
+    const float seconds
+  )
   {
     mVarDat.mNoRushTimer = static_cast<std::int32_t>(seconds * 600.0f);
   }
@@ -2447,7 +2656,9 @@ namespace moho
   /**
    * Address: 0x006FE2B0 (FUN_006FE2B0, Moho::CArmyImpl::SetNoRushRadius)
    */
-  void CArmyImpl::SetNoRushRadius(const float radius)
+  void CArmyImpl::SetNoRushRadius(
+    const float radius
+  )
   {
     mVarDat.mNoRushRadius = radius;
   }
@@ -2455,7 +2666,10 @@ namespace moho
   /**
    * Address: 0x006FE2D0 (FUN_006FE2D0, Moho::CArmyImpl::SetNoRushOffset)
    */
-  void CArmyImpl::SetNoRushOffset(const float offsetX, const float offsetY)
+  void CArmyImpl::SetNoRushOffset(
+    const float offsetX,
+    const float offsetY
+  )
   {
     mVarDat.mNoRushOffset.x = offsetX;
     mVarDat.mNoRushOffset.y = offsetY;

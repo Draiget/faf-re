@@ -42,7 +42,6 @@ namespace moho
      * Registers `RUnitBlueprintGeneral` field descriptors and descriptions.
      */
     static void AddFields(gpg::RType* typeInfo);
-
   };
 
   class RUnitBlueprintDisplayTypeInfo : public gpg::RType
@@ -299,7 +298,6 @@ namespace moho
      * Registers `RUnitBlueprintDefense` field descriptors and descriptions.
      */
     static void AddFields(gpg::RType* typeInfo);
-
   };
 
   class RUnitBlueprintIntelTypeInfo : public gpg::RType
@@ -428,7 +426,6 @@ namespace moho
      * Registers `RUnitBlueprintWeapon` field descriptors and descriptions.
      */
     static void AddFields(gpg::RType* typeInfo);
-
   };
 
   /**

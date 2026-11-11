@@ -30,7 +30,9 @@ namespace moho
    * What it does:
    * Loads the reflected `WeakPtr<Entity>` lane and the trailing integer payload.
    */
-  void SBlackListInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SBlackListInfo::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -48,7 +50,9 @@ namespace moho
    * What it does:
    * Saves the reflected `WeakPtr<Entity>` lane and the trailing integer payload.
    */
-  void SBlackListInfo::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SBlackListInfo::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {

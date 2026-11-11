@@ -12,15 +12,20 @@
 
 namespace
 {
-  void IntersectCategoryWordRanges(moho::EntityCategorySet& lhs, const moho::EntityCategorySet& rhs)
+  void IntersectCategoryWordRanges(
+    moho::EntityCategorySet& lhs,
+    const moho::EntityCategorySet& rhs
+  )
   {
     lhs.mBits.IntersectWith(&rhs.mBits);
   }
 
-
-
-  [[nodiscard]] bool
-  NextSegmentToken(const char*& cursor, const char delimiter, const char*& tokenStart, const char*& tokenEnd) noexcept
+  [[nodiscard]] bool NextSegmentToken(
+    const char*& cursor,
+    const char delimiter,
+    const char*& tokenStart,
+    const char*& tokenEnd
+  ) noexcept
   {
     if (!cursor) {
       tokenStart = nullptr;
@@ -54,7 +59,11 @@ namespace
   }
 
   [[nodiscard]] bool NextBoundedToken(
-    const char*& cursor, const char* const end, const char delimiter, const char*& tokenStart, const char*& tokenEnd
+    const char*& cursor,
+    const char* const end,
+    const char delimiter,
+    const char*& tokenStart,
+    const char*& tokenEnd
   ) noexcept
   {
     if (!cursor || !end || cursor >= end) {
@@ -107,10 +116,13 @@ namespace
 
   std::atomic<std::uint32_t> gCategoryTableGeneration{1u};
 
-  [[nodiscard]] std::size_t CategoryCacheSlotOf(const char* const name, const void* const table) noexcept
+  [[nodiscard]] std::size_t CategoryCacheSlotOf(
+    const char* const name,
+    const void* const table
+  ) noexcept
   {
     const std::uint64_t key = static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(name)) ^
-                              (static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(table)) << 7u);
+      (static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(table)) << 7u);
     return static_cast<std::size_t>((key * 0x9E3779B97F4A7C15ull) >> 57u) & (kCategoryCacheSlots - 1u);
   }
 } // namespace
@@ -129,7 +141,6 @@ namespace moho
     gCategoryTableGeneration.fetch_add(1u, std::memory_order_relaxed);
   }
 
-
   /**
    * Address: 0x0052B1E0 (FUN_0052B1E0)
    *
@@ -140,7 +151,9 @@ namespace moho
    * Looks up category text in RRuleGameRulesImpl category map and returns
    * either mapped range or fallback range stored in lookup table.
    */
-  const EntityCategorySet* EntityCategoryLookupResolver::GetEntityCategory(const char* categoryName) const
+  const EntityCategorySet* EntityCategoryLookupResolver::GetEntityCategory(
+    const char* categoryName
+  ) const
   {
     // `RRuleGameRulesImpl` is the only class the binary dispatches slot 22 on,
     // and it does not derive from this synthetic interface, so reaching its
@@ -168,8 +181,10 @@ namespace moho
     SCategoryCacheSlot& slot = tCategoryCache[CategoryCacheSlotOf(categoryName, &lookup)];
     const std::uint32_t generation = gCategoryTableGeneration.load(std::memory_order_relaxed);
     const std::size_t mapSize = lookup.mCategoryMap.size();
-    if (slot.name == categoryName && slot.table == &lookup && slot.generation == generation &&
-        slot.mapSize == mapSize && std::strcmp(slot.text, categoryName) == 0) {
+    if (
+      slot.name == categoryName && slot.table == &lookup && slot.generation == generation && slot.mapSize == mapSize &&
+      std::strcmp(slot.text, categoryName) == 0
+    ) {
       return slot.result;
     }
 
@@ -204,8 +219,11 @@ namespace moho
    * built in place, seeded to empty with the table's word-universe handle, and
    * returned for chaining.
    */
-  EntityCategorySet*
-  ParseEntityCategory(const void* const categoryLookup, EntityCategorySet* const out, const char* const categoryExpression)
+  EntityCategorySet* ParseEntityCategory(
+    const void* const categoryLookup,
+    EntityCategorySet* const out,
+    const char* const categoryExpression
+  )
   {
     const auto* const lookupTable = static_cast<const EntityCategoryLookupTable*>(categoryLookup);
 

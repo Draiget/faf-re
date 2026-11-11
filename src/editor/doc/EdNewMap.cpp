@@ -12,18 +12,24 @@ namespace faf::editor
   {
     constexpr double kPi = 3.141592653589793;
 
-    [[nodiscard]] int SizeUnits(const NewMapSettings& settings)
+    [[nodiscard]] int SizeUnits(
+      const NewMapSettings& settings
+    )
     {
       return kNewMapSizes[std::clamp(settings.size, 0, kNewMapSizeCount - 1)].units;
     }
 
-    [[nodiscard]] int Players(const NewMapSettings& settings)
+    [[nodiscard]] int Players(
+      const NewMapSettings& settings
+    )
     {
       return std::clamp(settings.players, 1, kNewMapMaxPlayers);
     }
 
     /** The title for a Lua string in double quotes. */
-    [[nodiscard]] std::string Quoted(const std::string& text)
+    [[nodiscard]] std::string Quoted(
+      const std::string& text
+    )
     {
       std::string out = "\"";
       for (const char c : text) {
@@ -39,21 +45,29 @@ namespace faf::editor
       return out + "\"";
     }
 
-    [[nodiscard]] std::string Number(const double value)
+    [[nodiscard]] std::string Number(
+      const double value
+    )
     {
       char text[48];
       (void)std::snprintf(text, sizeof(text), "%g", value);
       return text;
     }
 
-    void AppendWord(std::vector<char>& out, const std::uint32_t value)
+    void AppendWord(
+      std::vector<char>& out,
+      const std::uint32_t value
+    )
     {
       char bytes[4];
       std::memcpy(bytes, &value, 4);
       out.insert(out.end(), bytes, bytes + 4);
     }
 
-    void AppendFloat(std::vector<char>& out, const float value)
+    void AppendFloat(
+      std::vector<char>& out,
+      const float value
+    )
     {
       char bytes[4];
       std::memcpy(bytes, &value, 4);
@@ -61,45 +75,52 @@ namespace faf::editor
     }
 
     /** One army's entry in the save file, as the game's own maps write it. */
-    void AppendArmy(std::string& text, const std::string& name)
+    void AppendArmy(
+      std::string& text,
+      const std::string& name
+    )
     {
       text += "        --[[                                                                           ]]--\n"
               "        --[[  Army                                                                     ]]--\n"
               "        --[[                                                                           ]]--\n"
-              "        ['" + name + "'] =  \n"
-              "        {\n"
-              "            personality = '',\n"
-              "            plans = '',\n"
-              "            color = 0,\n"
-              "            faction = 0,\n"
-              "            Economy = {\n"
-              "                mass = 0,\n"
-              "                energy = 0,\n"
-              "            },\n"
-              "            Alliances = {\n"
-              "            },\n"
-              "            ['Units'] = GROUP {\n"
-              "                orders = '',\n"
-              "                platoon = '',\n"
-              "                Units = {\n"
-              "                    ['INITIAL'] = GROUP {\n"
-              "                        orders = '',\n"
-              "                        platoon = '',\n"
-              "                        Units = {\n"
-              "                        },\n"
-              "                    },\n"
-              "                },\n"
-              "            },\n"
-              "            PlatoonBuilders = {\n"
-              "                next_platoon_builder_id = '0',\n"
-              "                Builders = {\n"
-              "                },\n"
-              "            },\n"
-              "        },\n";
+              "        ['" +
+        name +
+        "'] =  \n"
+        "        {\n"
+        "            personality = '',\n"
+        "            plans = '',\n"
+        "            color = 0,\n"
+        "            faction = 0,\n"
+        "            Economy = {\n"
+        "                mass = 0,\n"
+        "                energy = 0,\n"
+        "            },\n"
+        "            Alliances = {\n"
+        "            },\n"
+        "            ['Units'] = GROUP {\n"
+        "                orders = '',\n"
+        "                platoon = '',\n"
+        "                Units = {\n"
+        "                    ['INITIAL'] = GROUP {\n"
+        "                        orders = '',\n"
+        "                        platoon = '',\n"
+        "                        Units = {\n"
+        "                        },\n"
+        "                    },\n"
+        "                },\n"
+        "            },\n"
+        "            PlatoonBuilders = {\n"
+        "                next_platoon_builder_id = '0',\n"
+        "                Builders = {\n"
+        "                },\n"
+        "            },\n"
+        "        },\n";
     }
   } // namespace
 
-  std::vector<NewMapSpawn> NewMapSpawns(const NewMapSettings& settings)
+  std::vector<NewMapSpawn> NewMapSpawns(
+    const NewMapSettings& settings
+  )
   {
     const int players = Players(settings);
     const double size = SizeUnits(settings);
@@ -113,13 +134,18 @@ namespace faf::editor
     for (int i = 0; i < players; ++i) {
       // From the top (smallest z), going round clockwise as seen from above.
       const double angle = -kPi * 0.5 + 2.0 * kPi * i / players;
-      spawns.push_back({static_cast<float>(std::round((centre + radius * std::cos(angle)) * 2.0) * 0.5),
-                        static_cast<float>(std::round((centre + radius * std::sin(angle)) * 2.0) * 0.5)});
+      spawns.push_back(
+        {static_cast<float>(std::round((centre + radius * std::cos(angle)) * 2.0) * 0.5),
+         static_cast<float>(std::round((centre + radius * std::sin(angle)) * 2.0) * 0.5)}
+      );
     }
     return spawns;
   }
 
-  std::string NewMapScenarioText(const NewMapSettings& settings, const std::string& base)
+  std::string NewMapScenarioText(
+    const NewMapSettings& settings,
+    const std::string& base
+  )
   {
     const int size = SizeUnits(settings);
     const int players = Players(settings);
@@ -160,7 +186,9 @@ namespace faf::editor
     return text;
   }
 
-  std::string NewMapSaveText(const NewMapSettings& settings)
+  std::string NewMapSaveText(
+    const NewMapSettings& settings
+  )
   {
     const std::vector<NewMapSpawn> spawns = NewMapSpawns(settings);
     std::string text;
@@ -185,8 +213,8 @@ namespace faf::editor
       text += "                    ['type'] = STRING( 'Blank Marker' ),\n";
       text += "                    ['prop'] = STRING( '/env/common/props/markers/M_Blank_prop.bp' ),\n";
       text += "                    ['orientation'] = VECTOR3( 0, 0, 0 ),\n";
-      text += "                    ['position'] = VECTOR3( " + Number(spawns[i].x) + ", " + Number(settings.height) + ", " +
-              Number(spawns[i].z) + " ),\n";
+      text += "                    ['position'] = VECTOR3( " + Number(spawns[i].x) + ", " + Number(settings.height) +
+        ", " + Number(spawns[i].z) + " ),\n";
       text += "                },\n";
     }
     text += "            },\n"
@@ -200,10 +228,12 @@ namespace faf::editor
             "    next_platoon_id = '1',\n"
             "    Platoons = {\n"
             "    },\n"
-            "    next_army_id = '" + std::to_string(spawns.size() + 3) + "',\n"
-            "    next_group_id = '0',\n"
-            "    next_unit_id = '0',\n"
-            "    Armies = {\n";
+            "    next_army_id = '" +
+      std::to_string(spawns.size() + 3) +
+      "',\n"
+      "    next_group_id = '0',\n"
+      "    next_unit_id = '0',\n"
+      "    Armies = {\n";
     for (std::size_t i = 0; i < spawns.size(); ++i) {
       AppendArmy(text, "ARMY_" + std::to_string(i + 1));
     }
@@ -226,7 +256,9 @@ namespace faf::editor
            "end\n";
   }
 
-  std::vector<char> NewMapPreviewRecord(const NewMapSettings& settings)
+  std::vector<char> NewMapPreviewRecord(
+    const NewMapSettings& settings
+  )
   {
     constexpr std::uint32_t kSide = 256;
     const float size = static_cast<float>(SizeUnits(settings));
@@ -271,7 +303,9 @@ namespace faf::editor
         for (int dx = -3; dx <= 3; ++dx) {
           const int x = cx + dx;
           const int z = cz + dz;
-          if (dx * dx + dz * dz <= 9 && x >= 0 && z >= 0 && x < static_cast<int>(kSide) && z < static_cast<int>(kSide)) {
+          if (
+            dx * dx + dz * dz <= 9 && x >= 0 && z >= 0 && x < static_cast<int>(kSide) && z < static_cast<int>(kSide)
+          ) {
             pixels[static_cast<std::size_t>(z) * kSide + static_cast<std::size_t>(x)] = 0xFFFFFFFFu;
           }
         }

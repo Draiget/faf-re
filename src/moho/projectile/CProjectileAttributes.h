@@ -9,7 +9,7 @@ namespace gpg
   class ReadArchive;
   class WriteArchive;
   struct SerHelperBase;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -67,8 +67,14 @@ namespace moho
     static gpg::RType* sType;
   };
 
-  static_assert(offsetof(CProjectileAttributes, mBlueprint) == 0x00, "CProjectileAttributes::mBlueprint offset must be 0x00");
-  static_assert(offsetof(CProjectileAttributes, mMaxZigZag) == 0x04, "CProjectileAttributes::mMaxZigZag offset must be 0x04");
+  static_assert(
+    offsetof(CProjectileAttributes, mBlueprint) == 0x00,
+    "CProjectileAttributes::mBlueprint offset must be 0x00"
+  );
+  static_assert(
+    offsetof(CProjectileAttributes, mMaxZigZag) == 0x04,
+    "CProjectileAttributes::mMaxZigZag offset must be 0x04"
+  );
   static_assert(
     offsetof(CProjectileAttributes, mZigZagFrequency) == 0x08,
     "CProjectileAttributes::mZigZagFrequency offset must be 0x08"

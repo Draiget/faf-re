@@ -29,7 +29,9 @@ namespace moho
     return sInstance;
   }
 
-  LuaPlus::LuaObject CScrLuaMetatableFactory<CPathDebugger>::Create(LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject CScrLuaMetatableFactory<CPathDebugger>::Create(
+    LuaPlus::LuaState* const state
+  )
   {
     return SCR_CreateSimpleMetatable(state);
   }
@@ -64,7 +66,9 @@ namespace moho
   /**
    * Address: 0x007B5C90 (FUN_007B5C90)
    */
-  CPathDebugger::CPathDebugger(const LuaPlus::LuaObject& luaObject)
+  CPathDebugger::CPathDebugger(
+    const LuaPlus::LuaObject& luaObject
+  )
   {
     SetLuaObject(luaObject);
   }
@@ -97,7 +101,9 @@ namespace moho
    * Unwraps raw Lua callback context and forwards to
    * `cfunc__c_CreatePathDebuggerL`.
    */
-  int cfunc__c_CreatePathDebugger(lua_State* const luaContext)
+  int cfunc__c_CreatePathDebugger(
+    lua_State* const luaContext
+  )
   {
     return cfunc__c_CreatePathDebuggerL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -128,7 +134,9 @@ namespace moho
    * Validates `(luaobj, spec)` argument shape, creates one `CPathDebugger`
    * script object from the first argument, and pushes its Lua object.
    */
-  int cfunc__c_CreatePathDebuggerL(LuaPlus::LuaState* const state)
+  int cfunc__c_CreatePathDebuggerL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 2, kCreatePathDebuggerHelpText);
 
@@ -149,7 +157,9 @@ namespace moho
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_CPathDebuggerDestroyL`.
    */
-  int cfunc_CPathDebuggerDestroy(lua_State* const luaContext)
+  int cfunc_CPathDebuggerDestroy(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CPathDebuggerDestroyL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -180,7 +190,9 @@ namespace moho
    * Validates one `CPathDebugger` argument from Lua, resolves object ownership,
    * and deletes the script object when it is still alive.
    */
-  int cfunc_CPathDebuggerDestroyL(LuaPlus::LuaState* const state)
+  int cfunc_CPathDebuggerDestroyL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kCPathDebuggerDestroyHelpText);
 
@@ -217,8 +229,11 @@ namespace moho
   CScrLuaInitForm* register_moho_PathDebugger_methods_ClassBinder()
   {
     static CScrLuaClassBinder binder(
-      moho::SCR_UserLuaInitSet(), "moho.PathDebugger_methods", &CScrLuaMetatableFactory<CPathDebugger>::Instance(),
-      kCPathDebuggerLuaClassName, ""
+      moho::SCR_UserLuaInitSet(),
+      "moho.PathDebugger_methods",
+      &CScrLuaMetatableFactory<CPathDebugger>::Instance(),
+      kCPathDebuggerLuaClassName,
+      ""
     );
     return &binder;
   }

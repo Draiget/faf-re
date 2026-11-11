@@ -44,12 +44,14 @@ namespace moho
 
     TConVar<int> gTConVar_sim_FixAimLeadOncePerTick(
       "sim_FixAimLeadOncePerTick",
-      "FA-Binary-Patches #143: no velocity lead on a target that already moved this tick (-1 game version, 0 off, 1 on).",
+      "FA-Binary-Patches #143: no velocity lead on a target that already moved this tick (-1 game version, 0 off, 1 "
+      "on).",
       &sim_FixAimLeadOncePerTick
     );
     TConVar<int> gTConVar_sim_FixTargetPointCollisionCentre(
       "sim_FixTargetPointCollisionCentre",
-      "FA-Binary-Patches #145/#157: aim at the collision centre of a unit without target bones (-1 game version, 0 off, 1 on).",
+      "FA-Binary-Patches #145/#157: aim at the collision centre of a unit without target bones (-1 game version, 0 "
+      "off, 1 on).",
       &sim_FixTargetPointCollisionCentre
     );
     TConVar<int> gTConVar_sim_FixProjectileImpactBelowZero(
@@ -71,7 +73,8 @@ namespace moho
     TConVar<int> gTConVar_sim_FixProjectileMapEdgeCollision(
       "sim_FixProjectileMapEdgeCollision",
       "FA-Binary-Patches #180: a surface-colliding projectile outside the map hits the terrain extended from the "
-      "nearest map edge, instead of #154's impact below height 0 (-1 game version: no release has it yet, 0 off, 1 on).",
+      "nearest map edge, instead of #154's impact below height 0 (-1 game version: no release has it yet, 0 off, 1 "
+      "on).",
       &sim_FixProjectileMapEdgeCollision
     );
     TConVar<int> gTConVar_sim_FixWaterBodies(
@@ -83,9 +86,9 @@ namespace moho
 
     struct SFafSimFixInfo
     {
-      const char* mName;       ///< console variable
-      int mFirstGameVersion;   ///< first FAF game version whose exe carries the fix
-      const int* mSwitch;      ///< -1 / 0 / 1
+      const char* mName;     ///< console variable
+      int mFirstGameVersion; ///< first FAF game version whose exe carries the fix
+      const int* mSwitch;    ///< -1 / 0 / 1
     };
 
     // Game versions from the FAForever/fa changelogs: 3836 (2026-05-16) shipped #143, #145 and
@@ -111,12 +114,16 @@ namespace moho
     return sSessionGameVersion;
   }
 
-  void FAF_SetReplayGameVersion(const int gameVersion) noexcept
+  void FAF_SetReplayGameVersion(
+    const int gameVersion
+  ) noexcept
   {
     sReplayGameVersion = gameVersion;
   }
 
-  int FAF_ParseLuaVersionFile(const std::string_view text) noexcept
+  int FAF_ParseLuaVersionFile(
+    const std::string_view text
+  ) noexcept
   {
     constexpr std::string_view kKey = "local Version";
     for (std::size_t at = text.find(kKey); at != std::string_view::npos; at = text.find(kKey, at + 1)) {
@@ -165,7 +172,9 @@ namespace moho
     return kFafGameVersionOldestSupported;
   }
 
-  void FAF_BeginSession(const bool isReplay)
+  void FAF_BeginSession(
+    const bool isReplay
+  )
   {
     int gameVersion = 0;
     const char* source = "replay";
@@ -217,7 +226,9 @@ namespace moho
     );
   }
 
-  int FAF_ParseReplayGameVersion(std::string_view header) noexcept
+  int FAF_ParseReplayGameVersion(
+    std::string_view header
+  ) noexcept
   {
     constexpr std::string_view kPrefix = "Supreme Commander v1.50.";
     if (header.substr(0, kPrefix.size()) != kPrefix) {

@@ -5,8 +5,11 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/gal/D3D9Utils.h"
 #include "gpg/gal/Error.hpp"
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
+#endif
 #include "moho/render/d3d/CD3DDevice.h"
 
 namespace moho
@@ -73,7 +76,9 @@ namespace moho
    * What it does:
    * Copies retained texture width/height into caller output.
    */
-  Wm3::Vector3f* CD3DDynamicTextureSheet::GetDimensions(Wm3::Vector3f* const outDimensions)
+  Wm3::Vector3f* CD3DDynamicTextureSheet::GetDimensions(
+    Wm3::Vector3f* const outDimensions
+  )
   {
     if (outDimensions == nullptr) {
       return nullptr;
@@ -98,7 +103,9 @@ namespace moho
    * What it does:
    * Writes zeroed original-dimensions payload into caller output lane.
    */
-  Wm3::Vector2i* CD3DDynamicTextureSheet::GetOriginalDimensions(Wm3::Vector2i* const outDimensions)
+  Wm3::Vector2i* CD3DDynamicTextureSheet::GetOriginalDimensions(
+    Wm3::Vector2i* const outDimensions
+  )
   {
     if (outDimensions == nullptr) {
       return nullptr;
@@ -131,7 +138,9 @@ namespace moho
    * What it does:
    * Copies retained texture ownership into caller storage.
    */
-  CD3DDynamicTextureSheet::TextureHandle& CD3DDynamicTextureSheet::GetTexture(TextureHandle& outTexture)
+  CD3DDynamicTextureSheet::TextureHandle& CD3DDynamicTextureSheet::GetTexture(
+    TextureHandle& outTexture
+  )
   {
     outTexture = mTexture;
     return outTexture;
@@ -145,7 +154,10 @@ namespace moho
    * What it does:
    * Locks the full texture level and returns mapped pitch + byte pointer.
    */
-  bool CD3DDynamicTextureSheet::Lock(std::uint32_t* const outPitch, void** const outBits)
+  bool CD3DDynamicTextureSheet::Lock(
+    std::uint32_t* const outPitch,
+    void** const outBits
+  )
   {
     if (outPitch == nullptr || outBits == nullptr || mTexture.get() == nullptr) {
       return false;
@@ -221,7 +233,9 @@ namespace moho
    * states 2..3 and its `gpg::Die` handler at 0x0043EA72 match 0x00442940
    * instruction for instruction.
    */
-  bool CD3DDynamicTextureSheet::ReadFromArchive(gpg::BinaryReader* const reader)
+  bool CD3DDynamicTextureSheet::ReadFromArchive(
+    gpg::BinaryReader* const reader
+  )
   {
     if (reader == nullptr) {
       return false;
@@ -251,7 +265,10 @@ namespace moho
    * 0x0043EB96 (FuncInfo 0x00EDD9F8, try over state 1) hands the error's
    * file, line and text to `gpg::Die`.
    */
-  bool CD3DDynamicTextureSheet::SaveToArchive(gpg::Stream* const stream, const bool writeSizeHeader)
+  bool CD3DDynamicTextureSheet::SaveToArchive(
+    gpg::Stream* const stream,
+    const bool writeSizeHeader
+  )
   {
     if (stream == nullptr || mTexture.get() == nullptr) {
       return false;

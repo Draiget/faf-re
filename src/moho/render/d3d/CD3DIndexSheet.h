@@ -148,9 +148,9 @@ namespace moho
 
   public:
     TDatListItem<CD3DIndexSheet, void> mLink; // +0x04
-    CD3DDevice* mDevice;                       // +0x0C
-    BufferHandle mBuffer;                      // +0x10
-    gpg::gal::IndexBufferContext mContext;     // +0x18
+    CD3DDevice* mDevice;                      // +0x0C
+    BufferHandle mBuffer;                     // +0x10
+    gpg::gal::IndexBufferContext mContext;    // +0x18
   };
 
   static_assert(sizeof(CD3DIndexSheet::BufferHandle) == 0x08, "CD3DIndexSheet::BufferHandle size must be 0x08");

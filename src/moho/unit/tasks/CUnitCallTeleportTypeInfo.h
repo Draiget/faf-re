@@ -74,4 +74,3 @@ namespace moho
 
   static_assert(sizeof(CUnitCallTeleportTypeInfo) == 0x64, "CUnitCallTeleportTypeInfo size must be 0x64");
 } // namespace moho
-

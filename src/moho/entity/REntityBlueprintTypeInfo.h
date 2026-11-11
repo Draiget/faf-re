@@ -60,7 +60,6 @@ namespace moho
      * Registers `REntityBlueprint` field descriptors and descriptions.
      */
     static void AddFields(gpg::RType* typeInfo);
-
   };
 
   /**

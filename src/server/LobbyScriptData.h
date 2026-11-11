@@ -27,12 +27,17 @@ namespace faf::server
     };
 
     EKind kind = EKind::Nil;
-    std::uint8_t raw[4]{};                // a number's float, or a boolean's byte, as written
-    std::string text;                     // a string's
-    std::vector<SLuaBytesValue> keys;     // a table's, in the order written
-    std::vector<SLuaBytesValue> values;   // likewise
+    std::uint8_t raw[4]{};              // a number's float, or a boolean's byte, as written
+    std::string text;                   // a string's
+    std::vector<SLuaBytesValue> keys;   // a table's, in the order written
+    std::vector<SLuaBytesValue> values; // likewise
 
-    [[nodiscard]] bool IsString(std::string_view value) const noexcept { return kind == EKind::String && text == value; }
+    [[nodiscard]] bool IsString(
+      std::string_view value
+    ) const noexcept
+    {
+      return kind == EKind::String && text == value;
+    }
     /** The value under a string key of a table, or null. */
     [[nodiscard]] SLuaBytesValue* Field(std::string_view key) noexcept;
   };
@@ -68,7 +73,8 @@ namespace faf::server
   /**
    * Plan WP17.6: FAF's lobby script data from a player who isn't the lobby's host, in an organiser-run lobby, where the
    * organiser set slots, teams and the rest. `MovePlayer`, `RequestColor`, `RequestConvertToObserver` and
-   * `RequestConvertToPlayer` (lobby.lua's requests to the host) are refused; `{Type = 'PlayerOptions', Options = {...}}`
+   * `RequestConvertToPlayer` (lobby.lua's requests to the host) are refused; `{Type = 'PlayerOptions', Options =
+   * {...}}`
    * (`SetPlayerOptions`, the player's own slot) keeps only `Ready`. Anything else, unreadable bytes included, stays.
    */
   [[nodiscard]] EPlayerScript LimitPlayerScript(std::vector<std::uint8_t>& payload);
@@ -89,8 +95,13 @@ namespace faf::server
   [[nodiscard]] SLobbyFacts ReadLobbyFacts(std::span<const std::uint8_t> payload);
 
   /**
-   * Plan WP15.4: `bytes` (one table in the form above) with the number under the string key `key` of the top table set to
-   * `value`, into `out`. False, `out` untouched, when the bytes don't read or the key isn't a number there.
+   * Plan WP15.4: `bytes` (one table in the form above) with the number under the string key `key` of the top table set
+   * to `value`, into `out`. False, `out` untouched, when the bytes don't read or the key isn't a number there.
    */
-  [[nodiscard]] bool SetTableNumber(std::span<const std::uint8_t> bytes, std::string_view key, float value, std::vector<std::uint8_t>& out);
+  [[nodiscard]] bool SetTableNumber(
+    std::span<const std::uint8_t> bytes,
+    std::string_view key,
+    float value,
+    std::vector<std::uint8_t>& out
+  );
 } // namespace faf::server

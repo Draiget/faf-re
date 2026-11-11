@@ -48,7 +48,10 @@ namespace
    * `__index`) are read with `lua_tonumber`, so a missing or non-numeric
    * component is 0 and a numeric string converts. Leaves the stack as found.
    */
-  [[nodiscard]] Wm3::Vec3f ReadLuaVector3OrZero(lua_State* const luaState, const int stackIndex)
+  [[nodiscard]] Wm3::Vec3f ReadLuaVector3OrZero(
+    lua_State* const luaState,
+    const int stackIndex
+  )
   {
     Wm3::Vec3f vector{0.0f, 0.0f, 0.0f};
     if (!lua_istable(luaState, stackIndex)) {
@@ -74,7 +77,9 @@ namespace
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_OrientFromDirL`.
  */
-int moho::cfunc_OrientFromDir(lua_State* const luaContext)
+int moho::cfunc_OrientFromDir(
+  lua_State* const luaContext
+)
 {
   return cfunc_OrientFromDirL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -86,7 +91,9 @@ int moho::cfunc_OrientFromDir(lua_State* const luaContext)
  * Implements global `OrientFromDir(vector)` and returns a quaternion Lua
  * object.
  */
-int moho::cfunc_OrientFromDirL(LuaPlus::LuaState* const state)
+int moho::cfunc_OrientFromDirL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kOrientFromDirHelpText);
 
@@ -110,12 +117,7 @@ int moho::cfunc_OrientFromDirL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_OrientFromDir_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_CoreLuaInitSet(),
-    "OrientFromDir",
-    &moho::cfunc_OrientFromDir,
-    nullptr,
-    "<global>",
-    kOrientFromDirHelpText
+    moho::SCR_CoreLuaInitSet(), "OrientFromDir", &moho::cfunc_OrientFromDir, nullptr, "<global>", kOrientFromDirHelpText
   );
   return &binder;
 }
@@ -138,7 +140,9 @@ moho::CScrLuaInitForm* moho::register_OrientFromDir_LuaFuncDef()
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_EulerToQuaternionL`.
  */
-int moho::cfunc_EulerToQuaternion(lua_State* const luaContext)
+int moho::cfunc_EulerToQuaternion(
+  lua_State* const luaContext
+)
 {
   return cfunc_EulerToQuaternionL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -150,7 +154,9 @@ int moho::cfunc_EulerToQuaternion(lua_State* const luaContext)
  * Implements global `EulerToQuaternion(float roll, float pitch, float yaw)`
  * and returns a quaternion Lua object.
  */
-int moho::cfunc_EulerToQuaternionL(LuaPlus::LuaState* const state)
+int moho::cfunc_EulerToQuaternionL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 3, kEulerToQuaternionHelpText);
 
@@ -216,7 +222,9 @@ moho::CScrLuaInitForm* moho::register_EulerToQuaternion_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_MinLerpL`.
  */
-int moho::cfunc_MinLerp(lua_State* const luaContext)
+int moho::cfunc_MinLerp(
+  lua_State* const luaContext
+)
 {
   return cfunc_MinLerpL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -228,7 +236,9 @@ int moho::cfunc_MinLerp(lua_State* const luaContext)
  * Implements global `MinLerp(float alpha, quaternion L, quaternion R)` and
  * returns the shortest-path normalized lerp of the input quaternions.
  */
-int moho::cfunc_MinLerpL(LuaPlus::LuaState* const state)
+int moho::cfunc_MinLerpL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 3, kMinLerpHelpText);
 
@@ -265,12 +275,7 @@ int moho::cfunc_MinLerpL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_MinLerp_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_CoreLuaInitSet(),
-    "MinLerp",
-    &moho::cfunc_MinLerp,
-    nullptr,
-    "<global>",
-    kMinLerpHelpText
+    moho::SCR_CoreLuaInitSet(), "MinLerp", &moho::cfunc_MinLerp, nullptr, "<global>", kMinLerpHelpText
   );
   return &binder;
 }
@@ -292,7 +297,9 @@ moho::CScrLuaInitForm* moho::register_MinLerp_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_MinSlerpL`.
  */
-int moho::cfunc_MinSlerp(lua_State* const luaContext)
+int moho::cfunc_MinSlerp(
+  lua_State* const luaContext
+)
 {
   return cfunc_MinSlerpL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -304,7 +311,9 @@ int moho::cfunc_MinSlerp(lua_State* const luaContext)
  * Implements global `MinSlerp(float alpha, quaternion L, quaternion R)` and
  * returns the shortest-path spherical interpolation of the input quaternions.
  */
-int moho::cfunc_MinSlerpL(LuaPlus::LuaState* const state)
+int moho::cfunc_MinSlerpL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 3, kMinSlerpHelpText);
 
@@ -341,12 +350,7 @@ int moho::cfunc_MinSlerpL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_MinSlerp_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_CoreLuaInitSet(),
-    "MinSlerp",
-    &moho::cfunc_MinSlerp,
-    nullptr,
-    "<global>",
-    kMinSlerpHelpText
+    moho::SCR_CoreLuaInitSet(), "MinSlerp", &moho::cfunc_MinSlerp, nullptr, "<global>", kMinSlerpHelpText
   );
   return &binder;
 }
@@ -368,7 +372,9 @@ moho::CScrLuaInitForm* moho::register_MinSlerp_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_VectorL`.
  */
-int moho::cfunc_Vector(lua_State* const luaContext)
+int moho::cfunc_Vector(
+  lua_State* const luaContext
+)
 {
   return cfunc_VectorL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -379,7 +385,9 @@ int moho::cfunc_Vector(lua_State* const luaContext)
  * What it does:
  * Implements global `Vector(x, y, z)` and returns a Vector3f Lua object.
  */
-int moho::cfunc_VectorL(LuaPlus::LuaState* const state)
+int moho::cfunc_VectorL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 3, kVectorHelpText);
 
@@ -416,12 +424,7 @@ int moho::cfunc_VectorL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_Vector_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_CoreLuaInitSet(),
-    "Vector",
-    &moho::cfunc_Vector,
-    nullptr,
-    "<global>",
-    kVectorHelpText
+    moho::SCR_CoreLuaInitSet(), "Vector", &moho::cfunc_Vector, nullptr, "<global>", kVectorHelpText
   );
   return &binder;
 }
@@ -443,7 +446,9 @@ moho::CScrLuaInitForm* moho::register_Vector_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_Vector2L`.
  */
-int moho::cfunc_Vector2(lua_State* const luaContext)
+int moho::cfunc_Vector2(
+  lua_State* const luaContext
+)
 {
   return cfunc_Vector2L(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -454,7 +459,9 @@ int moho::cfunc_Vector2(lua_State* const luaContext)
  * What it does:
  * Implements global `Vector2(x, y)` and returns a Vector2f Lua object.
  */
-int moho::cfunc_Vector2L(LuaPlus::LuaState* const state)
+int moho::cfunc_Vector2L(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kVector2HelpText);
 
@@ -468,8 +475,9 @@ int moho::cfunc_Vector2L(LuaPlus::LuaState* const state)
     LuaPlus::LuaStackObject::TypeError(&yArg, "number");
   }
 
-  const Wm3::Vector2<float>
-    vector2{static_cast<float>(lua_tonumber(state->m_state, 1)), static_cast<float>(lua_tonumber(state->m_state, 2))};
+  const Wm3::Vector2<float> vector2{
+    static_cast<float>(lua_tonumber(state->m_state, 1)), static_cast<float>(lua_tonumber(state->m_state, 2))
+  };
   LuaPlus::LuaObject vectorObject = SCR_ToLua<Wm3::Vector2<float>>(state, vector2);
   vectorObject.PushStack(state);
   return 1;
@@ -484,12 +492,7 @@ int moho::cfunc_Vector2L(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_Vector2_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_CoreLuaInitSet(),
-    "Vector2",
-    &moho::cfunc_Vector2,
-    nullptr,
-    "<global>",
-    kVector2HelpText
+    moho::SCR_CoreLuaInitSet(), "Vector2", &moho::cfunc_Vector2, nullptr, "<global>", kVector2HelpText
   );
   return &binder;
 }
@@ -511,7 +514,9 @@ moho::CScrLuaInitForm* moho::register_Vector2_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_PointVectorL`.
  */
-int moho::cfunc_PointVector(lua_State* const luaContext)
+int moho::cfunc_PointVector(
+  lua_State* const luaContext
+)
 {
   return cfunc_PointVectorL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -523,7 +528,9 @@ int moho::cfunc_PointVector(lua_State* const luaContext)
  * Implements global `PointVector(px, py, pz, vx, vy, vz)` and returns one
  * `SPointVector` Lua object.
  */
-int moho::cfunc_PointVectorL(LuaPlus::LuaState* const state)
+int moho::cfunc_PointVectorL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 6, kPointVectorHelpText);
 
@@ -556,12 +563,7 @@ int moho::cfunc_PointVectorL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_PointVector_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_CoreLuaInitSet(),
-    "PointVector",
-    &moho::cfunc_PointVector,
-    nullptr,
-    "<global>",
-    kPointVectorHelpText
+    moho::SCR_CoreLuaInitSet(), "PointVector", &moho::cfunc_PointVector, nullptr, "<global>", kPointVectorHelpText
   );
   return &binder;
 }
@@ -583,7 +585,9 @@ moho::CScrLuaInitForm* moho::register_PointVector_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_RectL`.
  */
-int moho::cfunc_Rect(lua_State* const luaContext)
+int moho::cfunc_Rect(
+  lua_State* const luaContext
+)
 {
   return cfunc_RectL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -594,7 +598,9 @@ int moho::cfunc_Rect(lua_State* const luaContext)
  * What it does:
  * Implements global `Rect(x0, y0, x1, y1)` and returns a Rect2f Lua table.
  */
-int moho::cfunc_RectL(LuaPlus::LuaState* const state)
+int moho::cfunc_RectL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 4, kRectHelpText);
 
@@ -639,12 +645,7 @@ int moho::cfunc_RectL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_Rect_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_CoreLuaInitSet(),
-    "Rect",
-    &moho::cfunc_Rect,
-    nullptr,
-    "<global>",
-    kRectHelpText
+    moho::SCR_CoreLuaInitSet(), "Rect", &moho::cfunc_Rect, nullptr, "<global>", kRectHelpText
   );
   return &binder;
 }
@@ -666,7 +667,9 @@ moho::CScrLuaInitForm* moho::register_Rect_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_VDist3L`.
  */
-int moho::cfunc_VDist3(lua_State* const luaContext)
+int moho::cfunc_VDist3(
+  lua_State* const luaContext
+)
 {
   return cfunc_VDist3L(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -687,7 +690,9 @@ int moho::cfunc_VDist3(lua_State* const luaContext)
  * read raised. The arithmetic is unchanged - `(dx*dx + dy*dy) + dz*dz` in
  * float, then `sqrtf` (0x00452FC0) - so normal vectors give the same bits.
  */
-int moho::cfunc_VDist3L(LuaPlus::LuaState* const state)
+int moho::cfunc_VDist3L(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const luaState = state->m_state;
   const int argumentCount = lua_gettop(luaState);
@@ -715,12 +720,7 @@ int moho::cfunc_VDist3L(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_VDist3_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_CoreLuaInitSet(),
-    "VDist3",
-    &moho::cfunc_VDist3,
-    nullptr,
-    "<global>",
-    kVDist3HelpText
+    moho::SCR_CoreLuaInitSet(), "VDist3", &moho::cfunc_VDist3, nullptr, "<global>", kVDist3HelpText
   );
   return &binder;
 }
@@ -742,7 +742,9 @@ moho::CScrLuaInitForm* moho::register_VDist3_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_VDist3SqL`.
  */
-int moho::cfunc_VDist3Sq(lua_State* const luaContext)
+int moho::cfunc_VDist3Sq(
+  lua_State* const luaContext
+)
 {
   return cfunc_VDist3SqL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -753,7 +755,9 @@ int moho::cfunc_VDist3Sq(lua_State* const luaContext)
  * What it does:
  * Validates two `Vector3f` Lua arguments and returns squared 3D distance.
  */
-int moho::cfunc_VDist3SqL(LuaPlus::LuaState* const state)
+int moho::cfunc_VDist3SqL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kVDist3SqHelpText);
 
@@ -784,12 +788,7 @@ int moho::cfunc_VDist3SqL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_VDist3Sq_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_CoreLuaInitSet(),
-    "VDist3Sq",
-    &moho::cfunc_VDist3Sq,
-    nullptr,
-    "<global>",
-    kVDist3SqHelpText
+    moho::SCR_CoreLuaInitSet(), "VDist3Sq", &moho::cfunc_VDist3Sq, nullptr, "<global>", kVDist3SqHelpText
   );
   return &binder;
 }
@@ -811,7 +810,9 @@ moho::CScrLuaInitForm* moho::register_VDist3Sq_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_VDist2L`.
  */
-int moho::cfunc_VDist2(lua_State* const luaContext)
+int moho::cfunc_VDist2(
+  lua_State* const luaContext
+)
 {
   return cfunc_VDist2L(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -823,7 +824,9 @@ int moho::cfunc_VDist2(lua_State* const luaContext)
  * Validates `(x1, y1, x2, y2)` number arguments and returns Euclidean
  * 2D distance.
  */
-int moho::cfunc_VDist2L(LuaPlus::LuaState* const state)
+int moho::cfunc_VDist2L(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 4, kVDist2HelpText);
 
@@ -868,12 +871,7 @@ int moho::cfunc_VDist2L(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_VDist2_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_CoreLuaInitSet(),
-    "VDist2",
-    &moho::cfunc_VDist2,
-    nullptr,
-    "<global>",
-    kVDist2HelpText
+    moho::SCR_CoreLuaInitSet(), "VDist2", &moho::cfunc_VDist2, nullptr, "<global>", kVDist2HelpText
   );
   return &binder;
 }
@@ -895,7 +893,9 @@ moho::CScrLuaInitForm* moho::register_VDist2_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_VDist2SqL`.
  */
-int moho::cfunc_VDist2Sq(lua_State* const luaContext)
+int moho::cfunc_VDist2Sq(
+  lua_State* const luaContext
+)
 {
   return cfunc_VDist2SqL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -907,7 +907,9 @@ int moho::cfunc_VDist2Sq(lua_State* const luaContext)
  * Validates `(x1, y1, x2, y2)` number arguments and returns squared 2D
  * distance.
  */
-int moho::cfunc_VDist2SqL(LuaPlus::LuaState* const state)
+int moho::cfunc_VDist2SqL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 4, kVDist2SqHelpText);
 
@@ -951,12 +953,7 @@ int moho::cfunc_VDist2SqL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_VDist2Sq_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_CoreLuaInitSet(),
-    "VDist2Sq",
-    &moho::cfunc_VDist2Sq,
-    nullptr,
-    "<global>",
-    kVDist2SqHelpText
+    moho::SCR_CoreLuaInitSet(), "VDist2Sq", &moho::cfunc_VDist2Sq, nullptr, "<global>", kVDist2SqHelpText
   );
   return &binder;
 }
@@ -978,7 +975,9 @@ moho::CScrLuaInitForm* moho::register_VDist2Sq_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_VDotL`.
  */
-int moho::cfunc_VDot(lua_State* const luaContext)
+int moho::cfunc_VDot(
+  lua_State* const luaContext
+)
 {
   return cfunc_VDotL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -989,7 +988,9 @@ int moho::cfunc_VDot(lua_State* const luaContext)
  * What it does:
  * Validates two `Vector3f` Lua arguments and returns their dot product.
  */
-int moho::cfunc_VDotL(LuaPlus::LuaState* const state)
+int moho::cfunc_VDotL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kVDotHelpText);
 
@@ -1020,12 +1021,7 @@ int moho::cfunc_VDotL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_VDot_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_CoreLuaInitSet(),
-    "VDot",
-    &moho::cfunc_VDot,
-    nullptr,
-    "<global>",
-    kVDotHelpText
+    moho::SCR_CoreLuaInitSet(), "VDot", &moho::cfunc_VDot, nullptr, "<global>", kVDotHelpText
   );
   return &binder;
 }
@@ -1047,7 +1043,9 @@ moho::CScrLuaInitForm* moho::register_VDot_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_VDiffL`.
  */
-int moho::cfunc_VDiff(lua_State* const luaContext)
+int moho::cfunc_VDiff(
+  lua_State* const luaContext
+)
 {
   return cfunc_VDiffL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1058,7 +1056,9 @@ int moho::cfunc_VDiff(lua_State* const luaContext)
  * What it does:
  * Validates two `Vector3f` Lua arguments and returns their difference.
  */
-int moho::cfunc_VDiffL(LuaPlus::LuaState* const state)
+int moho::cfunc_VDiffL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kVDiffHelpText);
 
@@ -1087,12 +1087,7 @@ int moho::cfunc_VDiffL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_VDiff_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_CoreLuaInitSet(),
-    "VDiff",
-    &moho::cfunc_VDiff,
-    nullptr,
-    "<global>",
-    kVDiffHelpText
+    moho::SCR_CoreLuaInitSet(), "VDiff", &moho::cfunc_VDiff, nullptr, "<global>", kVDiffHelpText
   );
   return &binder;
 }
@@ -1114,7 +1109,9 @@ moho::CScrLuaInitForm* moho::register_VDiff_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_VAddL`.
  */
-int moho::cfunc_VAdd(lua_State* const luaContext)
+int moho::cfunc_VAdd(
+  lua_State* const luaContext
+)
 {
   return cfunc_VAddL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1125,7 +1122,9 @@ int moho::cfunc_VAdd(lua_State* const luaContext)
  * What it does:
  * Validates two `Vector3f` Lua arguments and returns their sum.
  */
-int moho::cfunc_VAddL(LuaPlus::LuaState* const state)
+int moho::cfunc_VAddL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kVAddHelpText);
 
@@ -1154,12 +1153,7 @@ int moho::cfunc_VAddL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_VAdd_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_CoreLuaInitSet(),
-    "VAdd",
-    &moho::cfunc_VAdd,
-    nullptr,
-    "<global>",
-    kVAddHelpText
+    moho::SCR_CoreLuaInitSet(), "VAdd", &moho::cfunc_VAdd, nullptr, "<global>", kVAddHelpText
   );
   return &binder;
 }
@@ -1181,7 +1175,9 @@ moho::CScrLuaInitForm* moho::register_VAdd_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_VMultL`.
  */
-int moho::cfunc_VMult(lua_State* const luaContext)
+int moho::cfunc_VMult(
+  lua_State* const luaContext
+)
 {
   return cfunc_VMultL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1192,7 +1188,9 @@ int moho::cfunc_VMult(lua_State* const luaContext)
  * What it does:
  * Multiplies one `Vector3f` by one scalar and returns the resulting vector.
  */
-int moho::cfunc_VMultL(LuaPlus::LuaState* const state)
+int moho::cfunc_VMultL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kVMultHelpText);
 
@@ -1221,7 +1219,9 @@ int moho::cfunc_VMultL(LuaPlus::LuaState* const state)
  */
 moho::CScrLuaInitForm* moho::func_VMult_LuaFuncDef()
 {
-  static CScrLuaBinder binder(moho::SCR_CoreLuaInitSet(), "VMult", &moho::cfunc_VMult, nullptr, "<global>", kVMultHelpText);
+  static CScrLuaBinder binder(
+    moho::SCR_CoreLuaInitSet(), "VMult", &moho::cfunc_VMult, nullptr, "<global>", kVMultHelpText
+  );
   return &binder;
 }
 
@@ -1242,7 +1242,9 @@ moho::CScrLuaInitForm* moho::register_VMult_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_VPerpDotL`.
  */
-int moho::cfunc_VPerpDot(lua_State* const luaContext)
+int moho::cfunc_VPerpDot(
+  lua_State* const luaContext
+)
 {
   return cfunc_VPerpDotL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1254,7 +1256,9 @@ int moho::cfunc_VPerpDot(lua_State* const luaContext)
  * Computes the 2D perpendicular-dot lane from two vectors:
  * `x1 * z2 - x2 * z1`.
  */
-int moho::cfunc_VPerpDotL(LuaPlus::LuaState* const state)
+int moho::cfunc_VPerpDotL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kVPerpDotHelpText);
 
@@ -1282,8 +1286,9 @@ int moho::cfunc_VPerpDotL(LuaPlus::LuaState* const state)
  */
 moho::CScrLuaInitForm* moho::func_VPerpDot_LuaFuncDef()
 {
-  static CScrLuaBinder
-    binder(moho::SCR_CoreLuaInitSet(), "VPerpDot", &moho::cfunc_VPerpDot, nullptr, "<global>", kVPerpDotHelpText);
+  static CScrLuaBinder binder(
+    moho::SCR_CoreLuaInitSet(), "VPerpDot", &moho::cfunc_VPerpDot, nullptr, "<global>", kVPerpDotHelpText
+  );
   return &binder;
 }
 
@@ -1304,7 +1309,9 @@ moho::CScrLuaInitForm* moho::register_VPerpDot_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_MATH_IRoundL`.
  */
-int moho::cfunc_MATH_IRound(lua_State* const luaContext)
+int moho::cfunc_MATH_IRound(
+  lua_State* const luaContext
+)
 {
   return cfunc_MATH_IRoundL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1316,7 +1323,9 @@ int moho::cfunc_MATH_IRound(lua_State* const luaContext)
  * Converts one numeric Lua argument to an integer lane and returns it as a
  * Lua number.
  */
-int moho::cfunc_MATH_IRoundL(LuaPlus::LuaState* const state)
+int moho::cfunc_MATH_IRoundL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kMathIRoundHelpText);
 
@@ -1342,8 +1351,9 @@ int moho::cfunc_MATH_IRoundL(LuaPlus::LuaState* const state)
  */
 moho::CScrLuaInitForm* moho::func_MATH_IRound_LuaFuncDef()
 {
-  static CScrLuaBinder
-    binder(moho::SCR_CoreLuaInitSet(), "MATH_IRound", &moho::cfunc_MATH_IRound, nullptr, "<global>", kMathIRoundHelpText);
+  static CScrLuaBinder binder(
+    moho::SCR_CoreLuaInitSet(), "MATH_IRound", &moho::cfunc_MATH_IRound, nullptr, "<global>", kMathIRoundHelpText
+  );
   return &binder;
 }
 
@@ -1364,7 +1374,9 @@ moho::CScrLuaInitForm* moho::register_MATH_IRound_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_MATH_lerpL`.
  */
-int moho::cfunc_MATH_lerp(lua_State* const luaContext)
+int moho::cfunc_MATH_lerp(
+  lua_State* const luaContext
+)
 {
   return cfunc_MATH_lerpL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1376,12 +1388,15 @@ int moho::cfunc_MATH_lerp(lua_State* const luaContext)
  * Implements `MATH_Lerp` Lua overloads:
  * `(s, a, b)` and `(s, sMin, sMax, a, b)`.
  */
-int moho::cfunc_MATH_lerpL(LuaPlus::LuaState* const state)
+int moho::cfunc_MATH_lerpL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount < 3 || argumentCount > 5) {
-    LuaPlus::LuaState::Error(state, "%s\n  expected between %d and %d args, but got %d", kMathLerpHelpText, 3, 5,
-                             argumentCount);
+    LuaPlus::LuaState::Error(
+      state, "%s\n  expected between %d and %d args, but got %d", kMathLerpHelpText, 3, 5, argumentCount
+    );
   }
 
   const int resolvedArgumentCount = lua_gettop(state->m_state);
@@ -1424,11 +1439,9 @@ int moho::cfunc_MATH_lerpL(LuaPlus::LuaState* const state)
     const float interpolation = static_cast<float>(interpolationArg.ToNumber());
     const float minimumInterpolation = static_cast<float>(minimumInterpolationArg.ToNumber());
     const float normalizedNumerator = interpolation - minimumInterpolation;
-    const float normalizedDenominator =
-      static_cast<float>(maximumInterpolationArg.ToNumber()) - minimumInterpolation;
+    const float normalizedDenominator = static_cast<float>(maximumInterpolationArg.ToNumber()) - minimumInterpolation;
 
-    const float result =
-      lowerBound + (upperBound - lowerBound) * (normalizedNumerator / normalizedDenominator);
+    const float result = lowerBound + (upperBound - lowerBound) * (normalizedNumerator / normalizedDenominator);
     lua_pushnumber(state->m_state, result);
     (void)lua_gettop(state->m_state);
     return 1;
@@ -1448,12 +1461,7 @@ int moho::cfunc_MATH_lerpL(LuaPlus::LuaState* const state)
 moho::CScrLuaInitForm* moho::func_MATH_Lerp_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_CoreLuaInitSet(),
-    "MATH_Lerp",
-    &moho::cfunc_MATH_lerp,
-    nullptr,
-    "<global>",
-    kMathLerpHelpText
+    moho::SCR_CoreLuaInitSet(), "MATH_Lerp", &moho::cfunc_MATH_lerp, nullptr, "<global>", kMathLerpHelpText
   );
   return &binder;
 }

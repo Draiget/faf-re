@@ -3,7 +3,10 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace LuaPlus { class LuaState; }
+namespace LuaPlus
+{
+  class LuaState;
+}
 struct lua_Debug;
 
 namespace moho
@@ -81,10 +84,10 @@ namespace moho
     [[nodiscard]] bool Resume() override;
 
   public:
-    void* mResumeEvent;          // +0x04
-    std::uint32_t mThreadId;     // +0x08
-    LuaPlus::LuaState* mLuaState;          // +0x0C
-    lua_Debug* mDebugFrame;          // +0x10
+    void* mResumeEvent;           // +0x04
+    std::uint32_t mThreadId;      // +0x08
+    LuaPlus::LuaState* mLuaState; // +0x0C
+    lua_Debug* mDebugFrame;       // +0x10
   };
 
   /**
@@ -142,10 +145,10 @@ namespace moho
     [[nodiscard]] bool Resume() override;
 
   public:
-    void* mResumeEvent;          // +0x04
-    std::uint32_t mThreadId;     // +0x08
-    LuaPlus::LuaState* mLuaState;          // +0x0C
-    lua_Debug* mDebugFrame;          // +0x10
+    void* mResumeEvent;           // +0x04
+    std::uint32_t mThreadId;      // +0x08
+    LuaPlus::LuaState* mLuaState; // +0x0C
+    lua_Debug* mDebugFrame;       // +0x10
   };
 
 #if INTPTR_MAX == INT32_MAX
@@ -157,7 +160,10 @@ namespace moho
   static_assert(offsetof(PausedMainThread, mDebugFrame) == 0x10, "PausedMainThread::mDebugFrame offset must be 0x10");
   static_assert(sizeof(PausedMainThread) == 0x14, "PausedMainThread size must be 0x14");
 
-  static_assert(offsetof(PausedChildThread, mResumeEvent) == 0x04, "PausedChildThread::mResumeEvent offset must be 0x04");
+  static_assert(
+    offsetof(PausedChildThread, mResumeEvent) == 0x04,
+    "PausedChildThread::mResumeEvent offset must be 0x04"
+  );
   static_assert(offsetof(PausedChildThread, mThreadId) == 0x08, "PausedChildThread::mThreadId offset must be 0x08");
   static_assert(offsetof(PausedChildThread, mLuaState) == 0x0C, "PausedChildThread::mLuaState offset must be 0x0C");
   static_assert(offsetof(PausedChildThread, mDebugFrame) == 0x10, "PausedChildThread::mDebugFrame offset must be 0x10");

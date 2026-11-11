@@ -9,7 +9,9 @@
 namespace
 {
   template <typename T>
-  [[nodiscard]] gpg::RType* ResolveSerializerType(gpg::RType*& cache)
+  [[nodiscard]] gpg::RType* ResolveSerializerType(
+    gpg::RType*& cache
+  )
   {
     if (cache == nullptr) {
       cache = gpg::LookupRType(typeid(T));
@@ -32,7 +34,9 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<SPropPriorityInfo>::Deserialize` 0x006F9BE0.
    */
-  void SPropPriorityInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SPropPriorityInfo::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -45,7 +49,9 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<SPropPriorityInfo>::Serialize` 0x006F9C10.
    */
-  void SPropPriorityInfo::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SPropPriorityInfo::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;

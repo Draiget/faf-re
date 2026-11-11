@@ -356,7 +356,8 @@ namespace moho
      * value, and the four child node indices or -1) and appending it to
      * `mSplitWorkQueue`, returning the new node's index (or -1 when rejected).
      */
-    [[nodiscard]] std::int32_t TesselateTile(std::int32_t x, std::int32_t z, std::int32_t tier, std::uint32_t* activePlaneMask);
+    [[nodiscard]] std::int32_t
+    TesselateTile(std::int32_t x, std::int32_t z, std::int32_t tier, std::uint32_t* activePlaneMask);
 
     /**
      * Shared leaf body for `TesselateTile`'s accept and depth-exhausted paths
@@ -396,16 +397,16 @@ namespace moho
       std::int32_t zoff
     );
 
-    CHeightField* mField;               // +0x04
-    GeomCamera3* mCam;                  // +0x08
-    std::uint32_t mWorkFlags;           // +0x0C
-    CGeomSolid3 mGeomSolid;             // +0x10
-    std::uint32_t mActivePlaneMask;     // +0x80
-    std::uint32_t mCornerSelectionMask; // +0x84
-    float mWaterElevation;              // +0x88
-    float mMinY;                        // +0x8C
-    gpg::core::FastVectorN<Rect16, 65000> mRectCache;             // +0x90
-    gpg::core::FastVectorN<std::uint16_t, 25> mCollisionRectLut;  // +0x7EFE0 (0x42 bytes, padded to 0x48)
+    CHeightField* mField;                                        // +0x04
+    GeomCamera3* mCam;                                           // +0x08
+    std::uint32_t mWorkFlags;                                    // +0x0C
+    CGeomSolid3 mGeomSolid;                                      // +0x10
+    std::uint32_t mActivePlaneMask;                              // +0x80
+    std::uint32_t mCornerSelectionMask;                          // +0x84
+    float mWaterElevation;                                       // +0x88
+    float mMinY;                                                 // +0x8C
+    gpg::core::FastVectorN<Rect16, 65000> mRectCache;            // +0x90
+    gpg::core::FastVectorN<std::uint16_t, 25> mCollisionRectLut; // +0x7EFE0 (0x42 bytes, padded to 0x48)
 
     /**
      * Index into `mCollisionRectLut` at which the terrain skirt's indices
@@ -461,7 +462,8 @@ namespace moho
   );
   static_assert(offsetof(CTesselator, mRectIndices) == 0xCD240, "CTesselator::mRectIndices offset must be 0xCD240");
   static_assert(
-    offsetof(CTesselator, mClipPolygonScratch) == 0xCD2D0, "CTesselator::mClipPolygonScratch offset must be 0xCD2D0"
+    offsetof(CTesselator, mClipPolygonScratch) == 0xCD2D0,
+    "CTesselator::mClipPolygonScratch offset must be 0xCD2D0"
   );
   static_assert(offsetof(CTesselator, mLookup) == 0xCD328, "CTesselator::mLookup offset must be 0xCD328");
   static_assert(sizeof(CTesselator) == 0x14D328, "CTesselator size must be 0x14D328");

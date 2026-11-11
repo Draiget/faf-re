@@ -132,9 +132,8 @@ namespace moho
      * Builds a new `CAiBrain` for an archive load and hands it back unowned; its
      * members are loaded over it afterwards.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x00583CB0 (FUN_00583CB0, Moho::CAiBrain::MemberDeserialize)
@@ -214,11 +213,8 @@ namespace moho
      * Scans this brain's non-mobile factory units and appends currently
      * available entries to `outSet`, optionally filtering by XZ range.
      */
-    EntitySetTemplate<Unit>* GetAvailableFactories(
-      EntitySetTemplate<Unit>* outSet,
-      const Wm3::Vector3f* referencePosition,
-      float maxDistance
-    );
+    EntitySetTemplate<Unit>*
+    GetAvailableFactories(EntitySetTemplate<Unit>* outSet, const Wm3::Vector3f* referencePosition, float maxDistance);
 
     /**
      * Address: 0x0057CBB0 (FUN_0057CBB0, Moho::CAiBrain::CanBuildStructureAt)
@@ -276,10 +272,10 @@ namespace moho
     CArmyImpl* mArmy;                              // +0x34
     CArmyImpl* mCurrentEnemy;                      // +0x38
     CAiPersonality* mPersonality;                  // +0x3C
-    fa::string mCurrentPlan;                    // +0x40
-    fa::vector<SPointVector> mAttackVectors;  // +0x5C
+    fa::string mCurrentPlan;                       // +0x40
+    fa::vector<SPointVector> mAttackVectors;       // +0x5C
     std::uint32_t mAttackVectorMeta6C;             // +0x6C (unknown; written/used outside recovered scope)
-    EntityCategorySet mBuildCategoryRange;     // +0x70
+    EntityCategorySet mBuildCategoryRange;         // +0x70
     SBuildStructurePositionMap mBuildStructureMap; // +0x98
     Sim* mSim;                                     // +0xA4
     CTaskStage* mAiThreadStage;                    // +0xA8
@@ -295,18 +291,12 @@ namespace moho
   static_assert(offsetof(CAiBrain, mCurrentPlan) == 0x40, "CAiBrain::mCurrentPlan offset must be 0x40");
   static_assert(offsetof(CAiBrain, mAttackVectors) == 0x5C, "CAiBrain::mAttackVectors offset must be 0x5C");
   static_assert(offsetof(CAiBrain, mAttackVectorMeta6C) == 0x6C, "CAiBrain::mAttackVectorMeta6C offset must be 0x6C");
-  static_assert(
-    offsetof(CAiBrain, mBuildCategoryRange) == 0x70, "CAiBrain::mBuildCategoryRange offset must be 0x70"
-  );
+  static_assert(offsetof(CAiBrain, mBuildCategoryRange) == 0x70, "CAiBrain::mBuildCategoryRange offset must be 0x70");
   static_assert(offsetof(CAiBrain, mBuildStructureMap) == 0x98, "CAiBrain::mBuildStructureMap offset must be 0x98");
   static_assert(offsetof(CAiBrain, mSim) == 0xA4, "CAiBrain::mSim offset must be 0xA4");
   static_assert(offsetof(CAiBrain, mAiThreadStage) == 0xA8, "CAiBrain::mAiThreadStage offset must be 0xA8");
-  static_assert(
-    offsetof(CAiBrain, mAttackerThreadStage) == 0xAC, "CAiBrain::mAttackerThreadStage offset must be 0xAC"
-  );
-  static_assert(
-    offsetof(CAiBrain, mReservedThreadStage) == 0xB0, "CAiBrain::mReservedThreadStage offset must be 0xB0"
-  );
+  static_assert(offsetof(CAiBrain, mAttackerThreadStage) == 0xAC, "CAiBrain::mAttackerThreadStage offset must be 0xAC");
+  static_assert(offsetof(CAiBrain, mReservedThreadStage) == 0xB0, "CAiBrain::mReservedThreadStage offset must be 0xB0");
   static_assert(offsetof(CAiBrain, mTailWord) == 0xB4, "CAiBrain::mTailWord offset must be 0xB4");
 
   /**
@@ -331,7 +321,8 @@ namespace moho
     const EntityCategorySet* categorySet,
     const Wm3::Vector3f& position,
     float dist,
-    EAlliance alliance);
+    EAlliance alliance
+  );
 
   /**
    * Address: 0x006934E0 (FUN_006934E0, func_FillLuaTableWithEntities)
@@ -344,7 +335,8 @@ namespace moho
   LuaPlus::LuaObject* FillLuaTableWithEntities(
     const EntitySetTemplate<Unit>& entities,
     LuaPlus::LuaObject* outTable,
-    LuaPlus::LuaState* state);
+    LuaPlus::LuaState* state
+  );
 
   /**
    * Address: 0x0057B480 (FUN_0057B480, func_GetNumUnitsAroundPoint)
@@ -359,7 +351,8 @@ namespace moho
     const EntityCategorySet* categorySet,
     const Wm3::Vector3f& position,
     float dist,
-    EAlliance alliance);
+    EAlliance alliance
+  );
 } // namespace moho
 
 /**
@@ -1232,7 +1225,7 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to
    * `cfunc_CAiBrainGetEconomyStoredRatioL`.
-  */
+   */
   int cfunc_CAiBrainGetEconomyStoredRatio(lua_State* luaContext);
 
   /**
@@ -2192,9 +2185,8 @@ namespace moho
    * `blueprintId`. Returns null when no candidate matches or the blueprint
    * id is unknown.
    */
-  [[nodiscard]] Unit* FindAvailableFactory(
-    const fa::vector<Unit*>& candidateList, const char* blueprintId, CAiBrain* brain
-  );
+  [[nodiscard]] Unit*
+  FindAvailableFactory(const fa::vector<Unit*>& candidateList, const char* blueprintId, CAiBrain* brain);
 
   class STIMap;
 

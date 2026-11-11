@@ -24,7 +24,9 @@ namespace moho
    * Creates gal vertex format `formatCode` on the active device (through
    * `VertexFormat::Create`, 0x0043CFE6) and keeps it.
    */
-  CD3DVertexFormat::CD3DVertexFormat(const std::uint32_t formatCode)
+  CD3DVertexFormat::CD3DVertexFormat(
+    const std::uint32_t formatCode
+  )
     : CD3DVertexFormat()
   {
     mFormat = gpg::gal::VertexFormat::Create(formatCode);
@@ -63,7 +65,9 @@ namespace moho
    * What it does:
    * Returns one retained vertex-element token by index.
    */
-  std::uint32_t CD3DVertexFormat::GetElement(const std::uint32_t elementIndex) const
+  std::uint32_t CD3DVertexFormat::GetElement(
+    const std::uint32_t elementIndex
+  ) const
   {
     const auto* const vertexFormat = mFormat.get();
     if (vertexFormat == nullptr) {

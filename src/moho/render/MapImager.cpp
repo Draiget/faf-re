@@ -3,7 +3,6 @@
 #include "moho/render/MapImager.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 
-
 #include "gpg/core/containers/String.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaRuntimeTypes.h"
@@ -28,8 +27,6 @@ namespace
   constexpr const char* kMapBorderClearHelpText = "MapBorderClear()";
   constexpr const char* kGlobalLuaClassName = "<global>";
 
-
-
   [[nodiscard]] moho::MapImager* ActiveViewportMapImager() noexcept
   {
     if (moho::ren_Viewport == nullptr) {
@@ -50,332 +47,346 @@ namespace
 namespace moho
 {
 
-/**
- * Address: 0x007D9BB0 (FUN_007D9BB0, Moho::MapImager::~MapImager)
- */
-MapImager::~MapImager()
-{
-  ClearBorder();
-}
-
-/**
- * Address: 0x007D9B90 (FUN_007D9B90, MapImager scalar deleting destructor)
- *
- * IDA signature:
- * Moho::MapImager *__thiscall Moho::MapImager::`scalar deleting dtor'(
- *   Moho::MapImager *this, char flags);
- *
- * What it does:
- * Vtable slot 0. Runs the MapImager teardown (border-mesh clear + retained
- * vector-storage release). The binary thunk additionally performs
- * `operator delete(this)` when the low bit of its deleting-flag argument is
- * set; MapImager is only ever destroyed as an embedded member (deleting flag
- * clear), so that lane is inert in the recovered model.
- */
-void MapImager::VirtualDtor()
-{
-  this->MapImager::~MapImager();
-}
-
-/**
- * Address: 0x007D9F00 (FUN_007D9F00)
- *
- * IDA signature:
- * void __usercall Moho::MapImager::ClearBorder(Moho::MapImager *a1@<edi>);
- *
- * What it does:
- * Obtains the MeshRenderer singleton, deletes every MeshInstance in the
- * border mesh list through its virtual destructor, then truncates the vector
- * (sets _Mylast back to _Myfirst, effectively clearing it).
- */
-void MapImager::ClearBorder()
-{
-  MeshRenderer::GetInstance();
-
-  for (auto* instance : mMeshInstances) {
-    delete instance;
+  /**
+   * Address: 0x007D9BB0 (FUN_007D9BB0, Moho::MapImager::~MapImager)
+   */
+  MapImager::~MapImager()
+  {
+    ClearBorder();
   }
 
-  mMeshInstances.clear();
-}
-
-/**
- * Address: 0x007D9C10 (FUN_007D9C10, Moho::MapImager::AddBorder)
- *
- * IDA signature:
- * void __stdcall Moho::MapImager::AddBorder(Moho::MapImager *arg0, std::string *arg4);
- *
- * What it does:
- * Resolves the active terrain blueprint, builds one border mesh instance from
- * the requested mesh blueprint name, and appends it to the border instance
- * vector when creation succeeds.
- */
-void MapImager::AddBorder(const fa::string& meshBlueprintPath)
-{
-  const CWldSession* const session = WLD_GetActiveSession();
-  if (session == nullptr || session->mRules == nullptr || session->mWldMap == nullptr || session->mWldMap->mTerrainRes == nullptr) {
-    return;
+  /**
+   * Address: 0x007D9B90 (FUN_007D9B90, MapImager scalar deleting destructor)
+   *
+   * IDA signature:
+   * Moho::MapImager *__thiscall Moho::MapImager::`scalar deleting dtor'(
+   *   Moho::MapImager *this, char flags);
+   *
+   * What it does:
+   * Vtable slot 0. Runs the MapImager teardown (border-mesh clear + retained
+   * vector-storage release). The binary thunk additionally performs
+   * `operator delete(this)` when the low bit of its deleting-flag argument is
+   * set; MapImager is only ever destroyed as an embedded member (deleting flag
+   * clear), so that lane is inert in the recovered model.
+   */
+  void MapImager::VirtualDtor()
+  {
+    this->MapImager::~MapImager();
   }
 
-  MeshRenderer* const meshRenderer = MeshRenderer::GetInstance();
-  if (meshRenderer == nullptr) {
-    return;
+  /**
+   * Address: 0x007D9F00 (FUN_007D9F00)
+   *
+   * IDA signature:
+   * void __usercall Moho::MapImager::ClearBorder(Moho::MapImager *a1@<edi>);
+   *
+   * What it does:
+   * Obtains the MeshRenderer singleton, deletes every MeshInstance in the
+   * border mesh list through its virtual destructor, then truncates the vector
+   * (sets _Mylast back to _Myfirst, effectively clearing it).
+   */
+  void MapImager::ClearBorder()
+  {
+    MeshRenderer::GetInstance();
+
+    for (auto* instance : mMeshInstances) {
+      delete instance;
+    }
+
+    mMeshInstances.clear();
   }
 
-  const STIMap* const terrainMap = session->mWldMap->mTerrainRes->mMap;
-  if (terrainMap == nullptr || terrainMap->mHeightField.get() == nullptr) {
-    return;
+  /**
+   * Address: 0x007D9C10 (FUN_007D9C10, Moho::MapImager::AddBorder)
+   *
+   * IDA signature:
+   * void __stdcall Moho::MapImager::AddBorder(Moho::MapImager *arg0, std::string *arg4);
+   *
+   * What it does:
+   * Resolves the active terrain blueprint, builds one border mesh instance from
+   * the requested mesh blueprint name, and appends it to the border instance
+   * vector when creation succeeds.
+   */
+  void MapImager::AddBorder(
+    const fa::string& meshBlueprintPath
+  )
+  {
+    const CWldSession* const session = WLD_GetActiveSession();
+    if (
+      session == nullptr || session->mRules == nullptr || session->mWldMap == nullptr ||
+      session->mWldMap->mTerrainRes == nullptr
+    ) {
+      return;
+    }
+
+    MeshRenderer* const meshRenderer = MeshRenderer::GetInstance();
+    if (meshRenderer == nullptr) {
+      return;
+    }
+
+    const STIMap* const terrainMap = session->mWldMap->mTerrainRes->mMap;
+    if (terrainMap == nullptr || terrainMap->mHeightField.get() == nullptr) {
+      return;
+    }
+
+    const Wm3::AxisAlignedBox3f terrainBounds = terrainMap->mHeightField->GetBounds3D();
+    const float elevationOffset = 0.0f;
+
+    const Wm3::Vec3f borderPosition{
+      (terrainBounds.Min.x + terrainBounds.Max.x) * 0.5f,
+      ((terrainBounds.Min.y + terrainBounds.Max.y) * 0.5f) + elevationOffset,
+      (terrainBounds.Min.z + terrainBounds.Max.z) * 0.5f,
+    };
+    const Wm3::Quaternionf borderOrientation = Wm3::Quaternionf::Identity();
+    const VTransform borderTransform(borderPosition, borderOrientation);
+
+    fa::string normalizedBlueprintPath{};
+    gpg::STR_CopyFilename(&normalizedBlueprintPath, &meshBlueprintPath);
+
+    RResId meshBlueprintId{};
+    meshBlueprintId.name = normalizedBlueprintPath;
+
+    RMeshBlueprint* const meshBlueprint = session->mRules->GetMeshBlueprint(meshBlueprintId);
+    if (meshBlueprint == nullptr) {
+      return;
+    }
+
+    const float borderScale = (terrainBounds.Max.x - terrainBounds.Min.x) * meshBlueprint->mUniformScale;
+    const Wm3::Vec3f borderScaleVec{borderScale, borderScale, borderScale};
+
+    MeshInstance* const instance =
+      meshRenderer->CreateMeshInstance(0, -1, meshBlueprint, borderScaleVec, false, boost::shared_ptr<MeshMaterial>{});
+    if (instance == nullptr) {
+      return;
+    }
+
+    instance->SetStance(borderTransform, borderTransform);
+    mMeshInstances.push_back(instance);
   }
 
-  const Wm3::AxisAlignedBox3f terrainBounds = terrainMap->mHeightField->GetBounds3D();
-  const float elevationOffset = 0.0f;
+  /**
+   * Address: 0x007D9DD0 (FUN_007D9DD0, ?UpdateMeshStances@MapImager@Moho@@QAEXXZ)
+   * Mangled: ?UpdateMeshStances@MapImager@Moho@@QAEXXZ
+   *
+   * IDA signature:
+   * void __stdcall Moho::MapImager::UpdateMeshStances(Moho::MapImager *this);
+   *
+   * What it does:
+   * Each frame, rebuilds the border mesh ground-plane transform from the active
+   * terrain's tier-0 bounds:
+   *   xMid = (Min.x + Max.x)/2
+   *   zMid = (Min.z + Max.z)/2
+   *   yMid = (Min.y + Max.y)/2 + CWldTerrainRes::GetImagerElevationOffset()
+   * then applies `{pos = (xMid, yMid, zMid), orient = identity}` as both the
+   * start and end stance for every tracked MeshInstance.
+   */
+  void MapImager::UpdateMeshStances()
+  {
+    const CWldSession* const session = WLD_GetActiveSession();
+    if (session == nullptr || session->mWldMap == nullptr) {
+      return;
+    }
 
-  const Wm3::Vec3f borderPosition{
-    (terrainBounds.Min.x + terrainBounds.Max.x) * 0.5f,
-    ((terrainBounds.Min.y + terrainBounds.Max.y) * 0.5f) + elevationOffset,
-    (terrainBounds.Min.z + terrainBounds.Max.z) * 0.5f,
-  };
-  const Wm3::Quaternionf borderOrientation = Wm3::Quaternionf::Identity();
-  const VTransform borderTransform(borderPosition, borderOrientation);
+    IWldTerrainRes* const terrainRes = session->mWldMap->mTerrainRes;
+    if (terrainRes == nullptr) {
+      return;
+    }
 
-  fa::string normalizedBlueprintPath{};
-  gpg::STR_CopyFilename(&normalizedBlueprintPath, &meshBlueprintPath);
+    STIMap* const terrainMap = terrainRes->mMap;
+    if (terrainMap == nullptr) {
+      return;
+    }
 
-  RResId meshBlueprintId{};
-  meshBlueprintId.name = normalizedBlueprintPath;
+    CHeightField* const heightField = terrainMap->mHeightField.get();
+    if (heightField == nullptr) {
+      return;
+    }
 
-  RMeshBlueprint* const meshBlueprint = session->mRules->GetMeshBlueprint(meshBlueprintId);
-  if (meshBlueprint == nullptr) {
-    return;
+    const CHeightFieldTier* const firstTier = heightField->mGrids.begin();
+    const std::int32_t tierCount =
+      firstTier != nullptr ? static_cast<std::int32_t>(heightField->mGrids.end() - firstTier) : 0;
+
+    const Wm3::AxisAlignedBox3f terrainBounds = heightField->GetTierBox(0, 0, tierCount);
+    const float elevationOffset = terrainRes->GetImagerElevationOffset();
+
+    const Wm3::Vec3f groundPlaneCenter{
+      (terrainBounds.Min.x + terrainBounds.Max.x) * 0.5f,
+      ((terrainBounds.Min.y + terrainBounds.Max.y) * 0.5f) + elevationOffset,
+      (terrainBounds.Min.z + terrainBounds.Max.z) * 0.5f,
+    };
+
+    VTransform groundStance{};
+    groundStance.pos_ = groundPlaneCenter;
+    groundStance.orient_ = Wm3::Quatf::Identity();
+
+    for (MeshInstance* const instance : mMeshInstances) {
+      instance->SetStance(groundStance, groundStance);
+    }
   }
 
-  const float borderScale = (terrainBounds.Max.x - terrainBounds.Min.x) * meshBlueprint->mUniformScale;
-  const Wm3::Vec3f borderScaleVec{borderScale, borderScale, borderScale};
-
-  MeshInstance* const instance =
-    meshRenderer->CreateMeshInstance(0, -1, meshBlueprint, borderScaleVec, false, boost::shared_ptr<MeshMaterial>{});
-  if (instance == nullptr) {
-    return;
+  /**
+   * Address: 0x007FA1E0 (FUN_007FA1E0, sub_7FA1E0)
+   *
+   * What it does:
+   * Adds one map-border blueprint to the active viewport map-imager lane when
+   * a render viewport is present.
+   */
+  void REN_AddBorderToActiveViewport(
+    const fa::string& meshBlueprintPath
+  )
+  {
+    if (MapImager* const mapImager = ActiveViewportMapImager(); mapImager != nullptr) {
+      mapImager->AddBorder(meshBlueprintPath);
+    }
   }
 
-  instance->SetStance(borderTransform, borderTransform);
-  mMeshInstances.push_back(instance);
-}
+  /**
+   * Address: 0x007FA720 (FUN_007FA720, Moho::REN_RenderShadowDebugOverlay)
+   *
+   * What it does:
+   * No-op shadow debug overlay callback lane retained for binary parity.
+   */
+  void REN_RenderShadowDebugOverlay() {}
 
-/**
- * Address: 0x007D9DD0 (FUN_007D9DD0, ?UpdateMeshStances@MapImager@Moho@@QAEXXZ)
- * Mangled: ?UpdateMeshStances@MapImager@Moho@@QAEXXZ
- *
- * IDA signature:
- * void __stdcall Moho::MapImager::UpdateMeshStances(Moho::MapImager *this);
- *
- * What it does:
- * Each frame, rebuilds the border mesh ground-plane transform from the active
- * terrain's tier-0 bounds:
- *   xMid = (Min.x + Max.x)/2
- *   zMid = (Min.z + Max.z)/2
- *   yMid = (Min.y + Max.y)/2 + CWldTerrainRes::GetImagerElevationOffset()
- * then applies `{pos = (xMid, yMid, zMid), orient = identity}` as both the
- * start and end stance for every tracked MeshInstance.
- */
-void MapImager::UpdateMeshStances()
-{
-  const CWldSession* const session = WLD_GetActiveSession();
-  if (session == nullptr || session->mWldMap == nullptr) {
-    return;
+  /**
+   * Address: 0x007F6560 (FUN_007F6560, Moho::REN_MapBorderAdd)
+   *
+   * What it does:
+   * Console callback that expects exactly two tokens and adds the requested
+   * border mesh blueprint to the active viewport's MapImager.
+   */
+  void REN_MapBorderAdd(
+    const fa::vector<fa::string>& args
+  )
+  {
+    if (args.size() != 2u) {
+      return;
+    }
+
+    if (moho::ren_Viewport == nullptr) {
+      return;
+    }
+
+    ActiveViewportMapImager()->AddBorder(*ConCommandArg(args, 1));
   }
 
-  IWldTerrainRes* const terrainRes = session->mWldMap->mTerrainRes;
-  if (terrainRes == nullptr) {
-    return;
+  /**
+   * Address: 0x007F65B0 (FUN_007F65B0, Moho::REN_MapBorderClear)
+   *
+   * What it does:
+   * Console callback that clears the active viewport's MapImager border
+   * decoration meshes when a viewport is present.
+   */
+  void REN_MapBorderClear(
+    const fa::vector<fa::string>& args
+  )
+  {
+    (void)args;
+    ClearActiveViewportMapBorder();
   }
 
-  STIMap* const terrainMap = terrainRes->mMap;
-  if (terrainMap == nullptr) {
-    return;
+  /**
+   * Address: 0x00848260 (FUN_00848260, cfunc_MapBorderAdd)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to `cfunc_MapBorderAddL`.
+   */
+  int cfunc_MapBorderAdd(
+    lua_State* const luaContext
+  )
+  {
+    return cfunc_MapBorderAddL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  CHeightField* const heightField = terrainMap->mHeightField.get();
-  if (heightField == nullptr) {
-    return;
+  /**
+   * Address: 0x00848280 (FUN_00848280, func_MapBorderAdd_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes global `MapBorderAdd(blueprintid)` Lua binder metadata into the
+   * user init set.
+   */
+  CScrLuaInitForm* func_MapBorderAdd_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      moho::SCR_UserLuaInitSet(),
+      kMapBorderAddName,
+      &moho::cfunc_MapBorderAdd,
+      nullptr,
+      kGlobalLuaClassName,
+      kMapBorderAddHelpText
+    );
+    return &binder;
   }
 
-  const CHeightFieldTier* const firstTier = heightField->mGrids.begin();
-  const std::int32_t tierCount = firstTier != nullptr
-                                   ? static_cast<std::int32_t>(heightField->mGrids.end() - firstTier)
-                                   : 0;
+  /**
+   * Address: 0x008482E0 (FUN_008482E0, cfunc_MapBorderAddL)
+   *
+   * What it does:
+   * Validates one string argument and asks the active viewport map-imager to
+   * add the requested border mesh blueprint.
+   */
+  int cfunc_MapBorderAddL(
+    LuaPlus::LuaState* const state
+  )
+  {
+    moho::SCR_ExpectExactArgs(state, 1, kMapBorderAddHelpText);
 
-  const Wm3::AxisAlignedBox3f terrainBounds = heightField->GetTierBox(0, 0, tierCount);
-  const float elevationOffset = terrainRes->GetImagerElevationOffset();
+    LuaPlus::LuaStackObject blueprintArg(state, 1);
+    const char* const blueprintId = lua_tostring(state->m_state, 1);
+    if (blueprintId == nullptr) {
+      blueprintArg.TypeError("string");
+    }
 
-  const Wm3::Vec3f groundPlaneCenter{
-    (terrainBounds.Min.x + terrainBounds.Max.x) * 0.5f,
-    ((terrainBounds.Min.y + terrainBounds.Max.y) * 0.5f) + elevationOffset,
-    (terrainBounds.Min.z + terrainBounds.Max.z) * 0.5f,
-  };
+    if (MapImager* const mapImager = ActiveViewportMapImager(); mapImager != nullptr) {
+      mapImager->AddBorder(fa::string(blueprintId));
+    }
 
-  VTransform groundStance{};
-  groundStance.pos_ = groundPlaneCenter;
-  groundStance.orient_ = Wm3::Quatf::Identity();
-
-  for (MeshInstance* const instance : mMeshInstances) {
-    instance->SetStance(groundStance, groundStance);
-  }
-}
-
-/**
- * Address: 0x007FA1E0 (FUN_007FA1E0, sub_7FA1E0)
- *
- * What it does:
- * Adds one map-border blueprint to the active viewport map-imager lane when
- * a render viewport is present.
- */
-void REN_AddBorderToActiveViewport(const fa::string& meshBlueprintPath)
-{
-  if (MapImager* const mapImager = ActiveViewportMapImager(); mapImager != nullptr) {
-    mapImager->AddBorder(meshBlueprintPath);
-  }
-}
-
-/**
- * Address: 0x007FA720 (FUN_007FA720, Moho::REN_RenderShadowDebugOverlay)
- *
- * What it does:
- * No-op shadow debug overlay callback lane retained for binary parity.
- */
-void REN_RenderShadowDebugOverlay()
-{
-}
-
-/**
- * Address: 0x007F6560 (FUN_007F6560, Moho::REN_MapBorderAdd)
- *
- * What it does:
- * Console callback that expects exactly two tokens and adds the requested
- * border mesh blueprint to the active viewport's MapImager.
- */
-void REN_MapBorderAdd(const fa::vector<fa::string>& args)
-{
-  if (args.size() != 2u) {
-    return;
+    return 0;
   }
 
-  if (moho::ren_Viewport == nullptr) {
-    return;
+  /**
+   * Address: 0x008483D0 (FUN_008483D0)
+   *
+   * IDA signature:
+   * int __cdecl cfunc_MapBorderClear(LuaPlus::LuaState *a1);
+   *
+   * What it does:
+   * Lua C function bound as global "MapBorderClear()". Takes zero arguments.
+   * If the global render viewport exists, clears its MapImager border meshes.
+   */
+  int cfunc_MapBorderClear(
+    lua_State* rawState
+  )
+  {
+    auto* state = LuaPlus::LuaState::CastState(rawState);
+
+    static constexpr const char* kHelpText = "MapBorderClear()";
+
+    moho::SCR_ExpectExactArgs(state, 0, kHelpText);
+
+    ClearActiveViewportMapBorder();
+    return 0;
   }
 
-  ActiveViewportMapImager()->AddBorder(*ConCommandArg(args, 1));
-}
-
-/**
- * Address: 0x007F65B0 (FUN_007F65B0, Moho::REN_MapBorderClear)
- *
- * What it does:
- * Console callback that clears the active viewport's MapImager border
- * decoration meshes when a viewport is present.
- */
-void REN_MapBorderClear(const fa::vector<fa::string>& args)
-{
-  (void)args;
-  ClearActiveViewportMapBorder();
-}
-
-/**
- * Address: 0x00848260 (FUN_00848260, cfunc_MapBorderAdd)
- *
- * What it does:
- * Unwraps raw Lua callback context and forwards to `cfunc_MapBorderAddL`.
- */
-int cfunc_MapBorderAdd(lua_State* const luaContext)
-{
-  return cfunc_MapBorderAddL(moho::SCR_ResolveBindingState(luaContext));
-}
-
-/**
- * Address: 0x00848280 (FUN_00848280, func_MapBorderAdd_LuaFuncDef)
- *
- * What it does:
- * Publishes global `MapBorderAdd(blueprintid)` Lua binder metadata into the
- * user init set.
- */
-CScrLuaInitForm* func_MapBorderAdd_LuaFuncDef()
-{
-  static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    kMapBorderAddName,
-    &moho::cfunc_MapBorderAdd,
-    nullptr,
-    kGlobalLuaClassName,
-    kMapBorderAddHelpText
-  );
-  return &binder;
-}
-
-/**
- * Address: 0x008482E0 (FUN_008482E0, cfunc_MapBorderAddL)
- *
- * What it does:
- * Validates one string argument and asks the active viewport map-imager to
- * add the requested border mesh blueprint.
- */
-int cfunc_MapBorderAddL(LuaPlus::LuaState* const state)
-{
-  moho::SCR_ExpectExactArgs(state, 1, kMapBorderAddHelpText);
-
-  LuaPlus::LuaStackObject blueprintArg(state, 1);
-  const char* const blueprintId = lua_tostring(state->m_state, 1);
-  if (blueprintId == nullptr) {
-    blueprintArg.TypeError("string");
+  /**
+   * Address: 0x00848420 (FUN_00848420, func_MapBorderClear_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes global Lua binder metadata for `MapBorderClear()` into the user
+   * init set.
+   */
+  CScrLuaInitForm* func_MapBorderClear_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      moho::SCR_UserLuaInitSet(),
+      kMapBorderClearName,
+      &moho::cfunc_MapBorderClear,
+      nullptr,
+      kGlobalLuaClassName,
+      kMapBorderClearHelpText
+    );
+    return &binder;
   }
-
-  if (MapImager* const mapImager = ActiveViewportMapImager(); mapImager != nullptr) {
-    mapImager->AddBorder(fa::string(blueprintId));
-  }
-
-  return 0;
-}
-
-/**
- * Address: 0x008483D0 (FUN_008483D0)
- *
- * IDA signature:
- * int __cdecl cfunc_MapBorderClear(LuaPlus::LuaState *a1);
- *
- * What it does:
- * Lua C function bound as global "MapBorderClear()". Takes zero arguments.
- * If the global render viewport exists, clears its MapImager border meshes.
- */
-int cfunc_MapBorderClear(lua_State* rawState)
-{
-  auto* state = LuaPlus::LuaState::CastState(rawState);
-
-  static constexpr const char* kHelpText = "MapBorderClear()";
-
-  moho::SCR_ExpectExactArgs(state, 0, kHelpText);
-
-  ClearActiveViewportMapBorder();
-  return 0;
-}
-
-/**
- * Address: 0x00848420 (FUN_00848420, func_MapBorderClear_LuaFuncDef)
- *
- * What it does:
- * Publishes global Lua binder metadata for `MapBorderClear()` into the user
- * init set.
- */
-CScrLuaInitForm* func_MapBorderClear_LuaFuncDef()
-{
-  static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    kMapBorderClearName,
-    &moho::cfunc_MapBorderClear,
-    nullptr,
-    kGlobalLuaClassName,
-    kMapBorderClearHelpText
-  );
-  return &binder;
-}
 
 } // namespace moho
 

@@ -29,14 +29,19 @@ namespace faf::headless
   class CReplaySyncSpy
   {
   public:
-    explicit CReplaySyncSpy(const remote::CSyncRouter& router) noexcept
+    explicit CReplaySyncSpy(
+      const remote::CSyncRouter& router
+    ) noexcept
       : mRouter(router)
     {}
 
     /** Checks every view's payload of this beat. */
     void Check(const moho::Sim& sim);
     /** What must stay 0. Unmarked ids are in `Summary`, for the policy's next audit. */
-    [[nodiscard]] std::uint64_t Failures() const noexcept { return mUnknownKeys + mOutsideAudience + mRawRenumbered + mDecodeFailures; }
+    [[nodiscard]] std::uint64_t Failures() const noexcept
+    {
+      return mUnknownKeys + mOutsideAudience + mRawRenumbered + mDecodeFailures;
+    }
     [[nodiscard]] std::string Summary() const;
 
   private:

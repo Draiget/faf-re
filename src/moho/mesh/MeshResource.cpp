@@ -61,7 +61,10 @@ namespace moho
    * stage a per-instance transform into an unaligned vertex record; the sixteen
    * scalar stores are what that emission looks like.
    */
-  VMatrix4* CopyTransform4x4(VMatrix4* const destination, const VMatrix4& source)
+  VMatrix4* CopyTransform4x4(
+    VMatrix4* const destination,
+    const VMatrix4& source
+  )
   {
     for (std::size_t row = 0; row < 4; ++row) {
       destination->r[row].x = source.r[row].x;
@@ -89,7 +92,6 @@ namespace moho
   // with `grep -rc` across `src`, and all three report `xrefs_total: 0`
   // with no code, data, vtable or RTTI reference in the binary either.
 
-
   /**
    * Address: 0x007E51E0 (FUN_007E51E0, boost::shared_ptr_MeshBatch::operator=)
    *
@@ -109,12 +111,14 @@ namespace moho
   // The shard/map/database types that used to be defined here now live in
   // moho/mesh/SpatialDb.h, so the owners that embed a SpatialDB<T> by value
   // can see its layout. Their bodies stay in this file.
-}
+} // namespace moho
 
 namespace
 {
 
-  [[nodiscard]] std::uintptr_t PointerOrderKey(const void* const ptr) noexcept
+  [[nodiscard]] std::uintptr_t PointerOrderKey(
+    const void* const ptr
+  ) noexcept
   {
     return reinterpret_cast<std::uintptr_t>(ptr);
   }
@@ -147,11 +151,10 @@ namespace
     resources->GetTexture(texture, textureName.c_str(), resourceWatcher, true);
     destination = texture;
   }
-}
+} // namespace
 
 namespace moho
 {
-
 
   /**
    * Address: 0x007DBEE0 (FUN_007DBEE0, ??0MeshMaterial@Moho@@QAE@XZ)
@@ -195,7 +198,9 @@ namespace moho
    * What it does:
    * Copies annotation/texture-sheet handles and runtime tags from one material.
    */
-  MeshMaterial& MeshMaterial::operator=(const MeshMaterial& rhs)
+  MeshMaterial& MeshMaterial::operator=(
+    const MeshMaterial& rhs
+  )
   {
     if (this == &rhs) {
       return *this;
@@ -223,8 +228,10 @@ namespace moho
    * What it does:
    * Builds one material from one mesh LOD blueprint descriptor.
    */
-  boost::shared_ptr<MeshMaterial>
-  MeshMaterial::Create(const RMeshBlueprintLOD& blueprintLod, CResourceWatcher* const resourceWatcher)
+  boost::shared_ptr<MeshMaterial> MeshMaterial::Create(
+    const RMeshBlueprintLOD& blueprintLod,
+    CResourceWatcher* const resourceWatcher
+  )
   {
     return Create(
       blueprintLod.mShaderName,
@@ -334,7 +341,10 @@ namespace moho
    * Initializes one runtime LOD from already-resolved resource/material
    * pointers and clears batch/runtime flag lanes.
    */
-  MeshLOD::MeshLOD(const boost::shared_ptr<RScmResource> resourceArg, const boost::shared_ptr<MeshMaterial> materialArg)
+  MeshLOD::MeshLOD(
+    const boost::shared_ptr<RScmResource> resourceArg,
+    const boost::shared_ptr<MeshMaterial> materialArg
+  )
     : useDissolve(0)
     , cutoff(1000.0f)
     , mat()
@@ -383,8 +393,8 @@ namespace moho
     staticBatch.reset();
     dynamicBatch.reset();
   }
-namespace
-{
+  namespace
+  {
     /**
      * Address: 0x007E8C70 (FUN_007E8C70, sub_7E8C70)
      *
@@ -424,8 +434,7 @@ namespace
 
       return new HardwareMeshBatch(lod, remapToReferenceResource, referenceResource, currentResource);
     }
-}
-
+  } // namespace
 
   /**
    * Address: 0x007DD220 (FUN_007DD220,
@@ -440,7 +449,9 @@ namespace
    * batch, then returns a retained copy in `outBatch`. The reference resource is
    * the LOD's `previousResource`, the current resource is `res`.
    */
-  boost::shared_ptr<MeshBatch>& MeshLOD::GetStaticBatch(boost::shared_ptr<MeshBatch>& outBatch)
+  boost::shared_ptr<MeshBatch>& MeshLOD::GetStaticBatch(
+    boost::shared_ptr<MeshBatch>& outBatch
+  )
   {
     if (!staticBatch) {
       MeshBatch* const built = BuildHardwareMeshBatchForLod(false, this, previousResource, res);
@@ -463,7 +474,9 @@ namespace
    * batch, then returns a retained copy in `outBatch`. Identical to
    * GetStaticBatch except the reference-resource bone remap is enabled.
    */
-  boost::shared_ptr<MeshBatch>& MeshLOD::GetSkinnedBatch(boost::shared_ptr<MeshBatch>& outBatch)
+  boost::shared_ptr<MeshBatch>& MeshLOD::GetSkinnedBatch(
+    boost::shared_ptr<MeshBatch>& outBatch
+  )
   {
     if (!dynamicBatch) {
       MeshBatch* const built = BuildHardwareMeshBatchForLod(true, this, previousResource, res);
@@ -479,7 +492,9 @@ namespace
    * What it does:
    * Stores one LOD cutoff distance threshold.
    */
-  void MeshLOD::SetCutoff(const float cutoffValue)
+  void MeshLOD::SetCutoff(
+    const float cutoffValue
+  )
   {
     cutoff = cutoffValue;
   }
@@ -539,14 +554,16 @@ namespace
     , unk2C(0)
     , lods()
     , unk3C(0)
-  {
-  }
+  {}
 
   /**
    * Address: 0x007DD680 (FUN_007DD680,
    * ??0Mesh@Moho@@QAE@PBVRMeshBlueprint@1@V?$shared_ptr@VMeshMaterial@Moho@@@boost@@@Z)
    */
-  Mesh::Mesh(const RMeshBlueprint* const blueprint, const boost::shared_ptr<MeshMaterial> materialArg)
+  Mesh::Mesh(
+    const RMeshBlueprint* const blueprint,
+    const boost::shared_ptr<MeshMaterial> materialArg
+  )
     : Mesh()
   {
     Load(blueprint, materialArg);
@@ -559,7 +576,10 @@ namespace
    * What it does:
    * Initializes one mesh with a pre-resolved resource/material LOD lane.
    */
-  Mesh::Mesh(const boost::shared_ptr<RScmResource> resourceArg, const boost::shared_ptr<MeshMaterial> materialArg)
+  Mesh::Mesh(
+    const boost::shared_ptr<RScmResource> resourceArg,
+    const boost::shared_ptr<MeshMaterial> materialArg
+  )
     : Mesh()
   {
     (void)CreateLOD(resourceArg, materialArg);
@@ -608,7 +628,10 @@ namespace
    * Address: 0x007DDB50 (FUN_007DDB50,
    * ?Load@Mesh@Moho@@AAEXPBVRMeshBlueprint@2@V?$shared_ptr@VMeshMaterial@Moho@@@boost@@@Z)
    */
-  void Mesh::Load(const RMeshBlueprint* const blueprint, const boost::shared_ptr<MeshMaterial> materialArg)
+  void Mesh::Load(
+    const RMeshBlueprint* const blueprint,
+    const boost::shared_ptr<MeshMaterial> materialArg
+  )
   {
     Clear();
     bp = blueprint;
@@ -636,7 +659,10 @@ namespace
    * Address: 0x007DDC50 (FUN_007DDC50,
    * ?CreateLOD@Mesh@Moho@@AAEPAVMeshLOD@2@ABVRMeshBlueprintLOD@2@V?$shared_ptr@VMeshMaterial@Moho@@@boost@@@Z)
    */
-  MeshLOD* Mesh::CreateLOD(const RMeshBlueprintLOD& blueprintLod, const boost::shared_ptr<MeshMaterial> materialArg)
+  MeshLOD* Mesh::CreateLOD(
+    const RMeshBlueprintLOD& blueprintLod,
+    const boost::shared_ptr<MeshMaterial> materialArg
+  )
   {
     boost::shared_ptr<RScmResource> previousResource;
     if (!lods.empty() && lods.front()) {
@@ -655,7 +681,10 @@ namespace
    * What it does:
    * Adds one direct resource/material-backed mesh LOD entry.
    */
-  MeshLOD* Mesh::CreateLOD(const boost::shared_ptr<RScmResource> resourceArg, const boost::shared_ptr<MeshMaterial> materialArg)
+  MeshLOD* Mesh::CreateLOD(
+    const boost::shared_ptr<RScmResource> resourceArg,
+    const boost::shared_ptr<MeshMaterial> materialArg
+  )
   {
     MeshLOD* const lod = new MeshLOD(resourceArg, materialArg);
     lods.push_back(lod);
@@ -676,7 +705,9 @@ namespace
   /**
    * Address: 0x007DD950 (FUN_007DD950, ?GetResource@Mesh@Moho@@QBE?AV?$shared_ptr@VRScmResource@Moho@@@boost@@H@Z)
    */
-  boost::shared_ptr<RScmResource> Mesh::GetResource(const std::int32_t /*lodIndex*/) const
+  boost::shared_ptr<RScmResource> Mesh::GetResource(
+    const std::int32_t /*lodIndex*/
+  ) const
   {
     MeshLOD* const* const begin = lods.begin();
     if (!begin || begin == lods.end() || !*begin) {
@@ -693,7 +724,9 @@ namespace
    * Walks mesh LODs in order and returns the first lane accepted by cutoff
    * and dissolve rules for the supplied distance.
    */
-  const MeshLOD* Mesh::ComputeLOD(const float distance) const
+  const MeshLOD* Mesh::ComputeLOD(
+    const float distance
+  ) const
   {
     MeshLOD* const* const begin = lods.begin();
     if (begin == nullptr) {
@@ -757,7 +790,9 @@ namespace
   /**
    * Address: 0x007DDFC0 (FUN_007DDFC0, ?OnResourceChanged@Mesh@Moho@@EAEXVStrArg@gpg@@@Z)
    */
-  void Mesh::OnResourceChanged(const gpg::StrArg /*resourcePath*/)
+  void Mesh::OnResourceChanged(
+    const gpg::StrArg /*resourcePath*/
+  )
   {
     // Binary path may resync global resource manager before reloading watched assets.
     Load(bp, material);
@@ -767,7 +802,10 @@ namespace
    * Address: 0x007DAF00 (FUN_007DAF00,
    * ??0MeshKey@Moho@@QAE@PBVRMeshBlueprint@1@V?$shared_ptr@VMeshMaterial@Moho@@@boost@@@Z)
    */
-  MeshKey::MeshKey(const RMeshBlueprint* const blueprint, const boost::shared_ptr<MeshMaterial> meshMaterial)
+  MeshKey::MeshKey(
+    const RMeshBlueprint* const blueprint,
+    const boost::shared_ptr<MeshMaterial> meshMaterial
+  )
     : blueprint(blueprint)
     , meshMaterial(meshMaterial)
   {}
@@ -775,7 +813,9 @@ namespace
   /**
    * Address: 0x007DF6E0 (FUN_007DF6E0, copy ctor)
    */
-  MeshKey::MeshKey(const MeshKey& rhs)
+  MeshKey::MeshKey(
+    const MeshKey& rhs
+  )
     : blueprint(rhs.blueprint)
     , meshMaterial(rhs.meshMaterial)
   {}
@@ -786,7 +826,9 @@ namespace
    */
   MeshKey::~MeshKey() = default;
 
-  bool MeshKey::Equals(const MeshKey& rhs) const noexcept
+  bool MeshKey::Equals(
+    const MeshKey& rhs
+  ) const noexcept
   {
     return !LessThan(rhs) && !rhs.LessThan(*this);
   }
@@ -803,7 +845,9 @@ namespace
    * What it does:
    * Orders keys lexicographically by (blueprint pointer, material object pointer).
    */
-  bool MeshKey::LessThan(const MeshKey& rhs) const noexcept
+  bool MeshKey::LessThan(
+    const MeshKey& rhs
+  ) const noexcept
   {
     const std::uintptr_t lhsBlueprint = PointerOrderKey(blueprint);
     const std::uintptr_t rhsBlueprint = PointerOrderKey(rhs.blueprint);
@@ -816,8 +860,8 @@ namespace
 
     return PointerOrderKey(meshMaterial.get()) < PointerOrderKey(rhs.meshMaterial.get());
   }
-namespace
-{
+  namespace
+  {
     /**
      * `Moho::RefCountedCache<MeshKey,Mesh>::Deleter` (address block on
      * `ConstructSharedMeshWithCacheEvictingDeleter`, Mesh.h). Erases the
@@ -831,7 +875,9 @@ namespace
       MeshRendererMeshCacheTree* tree;
       MeshKey key;
 
-      void operator()(Mesh* const mesh) const
+      void operator()(
+        Mesh* const mesh
+      ) const
       {
         if (tree != nullptr) {
           tree->erase(key);
@@ -839,16 +885,15 @@ namespace
         delete mesh;
       }
     };
-}
-
+  } // namespace
 
   void ConstructSharedMeshWithCacheEvictingDeleter(
     boost::shared_ptr<Mesh>& out,
     Mesh* const raw,
     MeshRendererMeshCacheTree& tree,
-    const MeshKey& key)
+    const MeshKey& key
+  )
   {
     out.reset(raw, MeshCacheEvictingDeleter{&tree, key});
   }
-}
-
+} // namespace moho

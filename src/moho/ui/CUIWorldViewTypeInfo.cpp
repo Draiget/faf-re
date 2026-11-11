@@ -22,7 +22,10 @@ namespace
 
   struct CUIWorldViewTypeInfoBootstrap
   {
-    CUIWorldViewTypeInfoBootstrap() { moho::register_CUIWorldViewTypeInfoStartup(); }
+    CUIWorldViewTypeInfoBootstrap()
+    {
+      moho::register_CUIWorldViewTypeInfoStartup();
+    }
   };
   CUIWorldViewTypeInfoBootstrap gCUIWorldViewTypeInfoBootstrap;
 
@@ -35,7 +38,9 @@ namespace
    * binary does. The lineage is what lets `REF_UpcastPtr` walk a control
    * reference down to this class.
    */
-  void AddCMauiControlBase(gpg::RType& typeInfo)
+  void AddCMauiControlBase(
+    gpg::RType& typeInfo
+  )
   {
     gpg::AddReflectedBaseViaSlot<moho::CMauiControl>(&typeInfo);
   }
@@ -98,4 +103,7 @@ void moho::register_CUIWorldViewTypeInfoStartup()
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every
 // consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CUIWorldViewTypeInfoStartup_086dca0, moho::register_CUIWorldViewTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CUIWorldViewTypeInfoStartup_086dca0,
+  moho::register_CUIWorldViewTypeInfoStartup
+)

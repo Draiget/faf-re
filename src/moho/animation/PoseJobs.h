@@ -39,18 +39,18 @@ namespace moho
   struct SPoseJobInputs
   {
     const Unit* mUnit = nullptr;
-    Wm3::Quatf mTransformOrient{};    // GetTransform().orient_
-    Wm3::Vec3f mVelocity{};           // GetVelocity()
-    Wm3::Quatf mCurOrient{};          // mVarDat.mCurTransform.orient_
-    Wm3::Quatf mLastOrient{};         // mVarDat.mLastTransform.orient_
-    bool mBeingBuilt = false;         // IsBeingBuilt()
-    bool mDead = false;               // IsDead()
-    bool mStunned = false;            // mUnitVarDat.mStunTicks != 0
-    bool mHasEconomy = false;         // ArmyRef and its economy exist
-    double mMaxStorageEnergy = 0.0;   // economy.MaxStorageOf(ECON_ENERGY)
-    double mMaxStorageMass = 0.0;     // economy.MaxStorageOf(ECON_MASS)
-    float mStoredEnergy = 0.0f;       // economy.mStored.ENERGY
-    float mStoredMass = 0.0f;         // economy.mStored.MASS
+    Wm3::Quatf mTransformOrient{};  // GetTransform().orient_
+    Wm3::Vec3f mVelocity{};         // GetVelocity()
+    Wm3::Quatf mCurOrient{};        // mVarDat.mCurTransform.orient_
+    Wm3::Quatf mLastOrient{};       // mVarDat.mLastTransform.orient_
+    bool mBeingBuilt = false;       // IsBeingBuilt()
+    bool mDead = false;             // IsDead()
+    bool mStunned = false;          // mUnitVarDat.mStunTicks != 0
+    bool mHasEconomy = false;       // ArmyRef and its economy exist
+    double mMaxStorageEnergy = 0.0; // economy.MaxStorageOf(ECON_ENERGY)
+    double mMaxStorageMass = 0.0;   // economy.MaxStorageOf(ECON_MASS)
+    float mStoredEnergy = 0.0f;     // economy.mStored.ENERGY
+    float mStoredMass = 0.0f;       // economy.mStored.MASS
     std::uint32_t mAimCount = 0;
     SPoseJobAim mAims[kPoseJobMaxAims]{};
   };

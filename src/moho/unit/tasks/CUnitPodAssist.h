@@ -11,7 +11,7 @@ namespace gpg
   class ReadArchive;
   class RType;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -23,7 +23,6 @@ namespace moho
   class CUnitPodAssist : public CCommandTask
   {
   public:
-
     /**
      * Address: 0x0061E5EA-0x0061E5F9, inlined into
      * `CUnitPodAssistTypeInfo::NewRef` (0x0061E5B0) and its `CtrRef` sibling:
@@ -136,8 +135,8 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
-    CCommandTask* mDispatchTask;   // 0x30
-    WeakPtr<Unit> mAssistTarget;   // 0x34
+    CCommandTask* mDispatchTask; // 0x30
+    WeakPtr<Unit> mAssistTarget; // 0x34
   };
 
   static_assert(sizeof(CUnitPodAssist) == 0x3C, "CUnitPodAssist size must be 0x3C");

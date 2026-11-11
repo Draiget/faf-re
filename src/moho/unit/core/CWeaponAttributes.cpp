@@ -9,7 +9,9 @@ namespace moho
   /**
    * Address: 0x006D3230 (FUN_006D3230, ??0CWeaponAttributes@Moho@@QAE@@Z)
    */
-  CWeaponAttributes::CWeaponAttributes(RUnitBlueprintWeapon* const blueprint)
+  CWeaponAttributes::CWeaponAttributes(
+    RUnitBlueprintWeapon* const blueprint
+  )
     : mBlueprint(blueprint)
     , mFiringTolerance(-1.0f)
     , mRateOfFire(-1.0f)
@@ -36,7 +38,9 @@ namespace moho
    * What it does:
    * Stores one firing-tolerance float lane.
    */
-  void CWeaponAttributes::SetFiringTolerance(const float firingTolerance)
+  void CWeaponAttributes::SetFiringTolerance(
+    const float firingTolerance
+  )
   {
     mFiringTolerance = firingTolerance;
   }
@@ -44,7 +48,9 @@ namespace moho
   /**
    * Address: 0x006D3340 (FUN_006D3340, Moho::CWeaponAttributes::SetType)
    */
-  void CWeaponAttributes::SetType(fa::string type)
+  void CWeaponAttributes::SetType(
+    fa::string type
+  )
   {
     mType.assign(type, 0u, fa::string::npos);
   }
@@ -52,7 +58,9 @@ namespace moho
   /**
    * Address: 0x006D32E0 (FUN_006D32E0)
    */
-  CWeaponAttributes* CWeaponAttributes::SetRateOfFire(const float value)
+  CWeaponAttributes* CWeaponAttributes::SetRateOfFire(
+    const float value
+  )
   {
     mRateOfFire = value;
     return this;
@@ -61,7 +69,9 @@ namespace moho
   /**
    * Address: 0x006D32F0 (FUN_006D32F0)
    */
-  CWeaponAttributes* CWeaponAttributes::SetMinRadius(const float value)
+  CWeaponAttributes* CWeaponAttributes::SetMinRadius(
+    const float value
+  )
   {
     mMinRadius = value;
     mMinRadiusSq = value * value;
@@ -71,7 +81,9 @@ namespace moho
   /**
    * Address: 0x006D3310 (FUN_006D3310)
    */
-  CWeaponAttributes* CWeaponAttributes::SetMaxRadius(const float value)
+  CWeaponAttributes* CWeaponAttributes::SetMaxRadius(
+    const float value
+  )
   {
     mMaxRadius = value;
     mMaxRadiusSq = value * value;
@@ -81,7 +93,9 @@ namespace moho
   /**
    * Address: 0x006D3330 (FUN_006D3330)
    */
-  CWeaponAttributes* CWeaponAttributes::SetMaxHeightDiff(const float value)
+  CWeaponAttributes* CWeaponAttributes::SetMaxHeightDiff(
+    const float value
+  )
   {
     mMaxHeightDiff = value;
     return this;
@@ -90,7 +104,9 @@ namespace moho
   /**
    * Address: 0x006D33A0 (FUN_006D33A0)
    */
-  CWeaponAttributes* CWeaponAttributes::SetDamageRadius(const float value)
+  CWeaponAttributes* CWeaponAttributes::SetDamageRadius(
+    const float value
+  )
   {
     mDamageRadius = value;
     return this;
@@ -99,7 +115,9 @@ namespace moho
   /**
    * Address: 0x006D33B0 (FUN_006D33B0)
    */
-  CWeaponAttributes* CWeaponAttributes::SetDamage(const float value)
+  CWeaponAttributes* CWeaponAttributes::SetDamage(
+    const float value
+  )
   {
     mDamage = value;
     return this;

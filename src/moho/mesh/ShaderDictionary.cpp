@@ -73,13 +73,17 @@ namespace moho
     return instance;
   }
 
-  const fa::string* ShaderDictionary::Lookup(const fa::string& requestedShaderName) const
+  const fa::string* ShaderDictionary::Lookup(
+    const fa::string& requestedShaderName
+  ) const
   {
     const fa::map<fa::string, fa::string>::const_iterator it = mRemaps.find(requestedShaderName);
     return it == mRemaps.end() ? nullptr : &it->second;
   }
 
-  bool ShaderDictionary::IsDeprecated(const fa::string& shaderName) const
+  bool ShaderDictionary::IsDeprecated(
+    const fa::string& shaderName
+  ) const
   {
     return mDeprecatedNames.find(shaderName) != mDeprecatedNames.end();
   }
@@ -110,7 +114,9 @@ namespace moho
    * that cannot be taken in this binary, because nothing inserts into that
    * set.
    */
-  fa::string ResolveShaderAnnotationName(const fa::string& shaderName)
+  fa::string ResolveShaderAnnotationName(
+    const fa::string& shaderName
+  )
   {
     const ShaderDictionary& dictionary = ShaderDictionary::Instance();
     const fa::string* const remapped = dictionary.Lookup(shaderName);

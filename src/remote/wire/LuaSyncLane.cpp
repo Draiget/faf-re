@@ -4,7 +4,11 @@
 
 namespace faf::remote::wire
 {
-  bool EncodeLuaSyncLane(const std::span<const std::uint8_t> table, const std::vector<std::string>& prints, BitWriter& writer)
+  bool EncodeLuaSyncLane(
+    const std::span<const std::uint8_t> table,
+    const std::vector<std::string>& prints,
+    BitWriter& writer
+  )
   {
     if (table.size() > kMaxLuaSyncBytes || prints.size() > kMaxLuaSyncLines) {
       return false;
@@ -22,7 +26,11 @@ namespace faf::remote::wire
     return true;
   }
 
-  bool DecodeLuaSyncLane(BitReader& reader, std::vector<std::uint8_t>& table, std::vector<std::string>& prints)
+  bool DecodeLuaSyncLane(
+    BitReader& reader,
+    std::vector<std::uint8_t>& table,
+    std::vector<std::string>& prints
+  )
   {
     const std::uint32_t tableSize = reader.ReadVarUint();
     if (!reader.Ok() || tableSize > kMaxLuaSyncBytes || tableSize > reader.BitsLeft() / 8u) {

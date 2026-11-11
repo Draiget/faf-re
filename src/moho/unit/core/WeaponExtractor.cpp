@@ -40,7 +40,8 @@ namespace moho
         continue;
       }
 
-      const float resolvedOuterRadius = ResolvePositiveRadius(weaponBlueprint.EffectiveRadius, weaponBlueprint.MaxRadius);
+      const float resolvedOuterRadius =
+        ResolvePositiveRadius(weaponBlueprint.EffectiveRadius, weaponBlueprint.MaxRadius);
       if (resolvedOuterRadius > outerRadius) {
         outerRadius = resolvedOuterRadius;
       }
@@ -67,7 +68,9 @@ namespace moho
    * Address: 0x007EC650 (FUN_007EC650, Moho::WeaponExtractor::Range)
    */
   bool WeaponExtractor::Range(
-    SRangeExtractionPayload* const outRange, const RUnitBlueprint* const unitBlueprint, const Wm3::Vec3f& center
+    SRangeExtractionPayload* const outRange,
+    const RUnitBlueprint* const unitBlueprint,
+    const Wm3::Vec3f& center
   ) const
   {
     if (!outRange || !unitBlueprint) {
@@ -87,7 +90,9 @@ namespace moho
    * Address: 0x007EC5B0 (FUN_007EC5B0, Moho::WeaponExtractor::Extract)
    */
   bool WeaponExtractor::Extract(
-    SRangeExtractionPayload* const outRange, const UserEntity* const userEntity, const float interpolationAlpha
+    SRangeExtractionPayload* const outRange,
+    const UserEntity* const userEntity,
+    const float interpolationAlpha
   ) const
   {
     if (!outRange || !userEntity) {

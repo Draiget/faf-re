@@ -96,15 +96,10 @@ namespace moho
     bool accepted = false;
 
     wxDirDialog directoryDialog(
-      nullptr,
-      wxT("Dump frames to"),
-      gpg::STR_Utf8ToWide(defaultDirectory.c_str()).c_str(),
-      wxDD_NEW_DIR_BUTTON
+      nullptr, wxT("Dump frames to"), gpg::STR_Utf8ToWide(defaultDirectory.c_str()).c_str(), wxDD_NEW_DIR_BUTTON
     );
     if (directoryDialog.ShowModal() == wxID_OK) {
-      dump_frameDumpName.assign(
-        gpg::STR_WideToUtf8(directoryDialog.GetPath().c_str()), 0, fa::string::npos
-      );
+      dump_frameDumpName.assign(gpg::STR_WideToUtf8(directoryDialog.GetPath().c_str()), 0, fa::string::npos);
       accepted = true;
     }
 
@@ -124,13 +119,13 @@ namespace moho
    *
    * The binary reads no command arguments here.
    */
-  void DUMP_Frames(const fa::vector<fa::string>& /*args*/)
+  void DUMP_Frames(
+    const fa::vector<fa::string>& /*args*/
+  )
   {
     if (dump_frameRate != 0) {
       dump_frameRate = 0;
-      CON_Printf(
-        "Frame dumping to '%s' stopped at frame %d", dump_frameDumpName.c_str(), dump_outputFrameNumber
-      );
+      CON_Printf("Frame dumping to '%s' stopped at frame %d", dump_frameDumpName.c_str(), dump_outputFrameNumber);
       return;
     }
 
@@ -156,7 +151,9 @@ namespace moho
    * The `.` test is the binary's `compare(0, size, ".", 1)` at 0x007F589F,
    * which is simply "this token is not exactly a dot".
    */
-  void DUMP_Frame(const fa::vector<fa::string>& args)
+  void DUMP_Frame(
+    const fa::vector<fa::string>& args
+  )
   {
 
     if (args.size() == 2u) {

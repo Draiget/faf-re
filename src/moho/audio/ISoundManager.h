@@ -50,8 +50,14 @@ namespace moho
      * Nothing: the interface has no archived state. `gpg::SerSaveLoadHelper<ISoundManager>::Deserialize`
      * 0x00760BD0 and `Serialize` 0x00760BE0 are a bare `ret`.
      */
-    void MemberDeserialize(gpg::ReadArchive*) {}
-    void MemberSerialize(gpg::WriteArchive*) const {}
+    void MemberDeserialize(
+      gpg::ReadArchive*
+    )
+    {}
+    void MemberSerialize(
+      gpg::WriteArchive*
+    ) const
+    {}
 
     /**
      * Address: 0x00760A60 (FUN_00760A60)

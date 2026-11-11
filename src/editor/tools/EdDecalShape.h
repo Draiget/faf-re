@@ -48,8 +48,8 @@ namespace faf::editor
    * turned along it, the next starting `length * (1 - overlap)` further on, until the curve ends (the last one may
    * pass its end). Empty for fewer than two points.
    */
-  std::vector<DecalFootprint> DecalsAlongPath(const std::vector<std::pair<float, float>>& points, float length, float width,
-                                              float overlap);
+  std::vector<DecalFootprint>
+  DecalsAlongPath(const std::vector<std::pair<float, float>>& points, float length, float width, float overlap);
 
   /** A short name for a decal type number ("albedo", "normals"...). */
   const char* DecalTypeName(int type);

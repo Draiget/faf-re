@@ -26,7 +26,8 @@ namespace moho
    * incoming depth-stencil surface ownership handle.
    */
   CD3DDepthStencil::CD3DDepthStencil(
-    CD3DDevice* const ownerDevice, const SurfaceHandle surface
+    CD3DDevice* const ownerDevice,
+    const SurfaceHandle surface
   )
     : mLink()
     , mOwnerDevice(ownerDevice)
@@ -66,7 +67,9 @@ namespace moho
    * What it does:
    * Copies retained depth-stencil surface ownership into caller storage.
    */
-  CD3DDepthStencil::SurfaceHandle& CD3DDepthStencil::GetSurface(SurfaceHandle& outSurface)
+  CD3DDepthStencil::SurfaceHandle& CD3DDepthStencil::GetSurface(
+    SurfaceHandle& outSurface
+  )
   {
     outSurface = mSurface;
     return outSurface;

@@ -128,9 +128,14 @@ namespace
   [[maybe_unused]] EAiTargetTypeTypeInfoBootstrap gEAiTargetTypeTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_EAiTargetTypeTypeInfo_f31c38, moho::register_EAiTargetTypeTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_EAiTargetTypeTypeInfo_f31c38,
+  moho::register_EAiTargetTypeTypeInfo
+)
 
-GPG_PREREGISTER_INIT(AcquireEAiTargetTypeTypeInfo_f31c38, AcquireEAiTargetTypeTypeInfo)
+GPG_PREREGISTER_INIT(
+  AcquireEAiTargetTypeTypeInfo_f31c38,
+  AcquireEAiTargetTypeTypeInfo
+)

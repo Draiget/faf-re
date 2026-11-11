@@ -156,8 +156,7 @@ namespace
    * inside `SelectionDragger3D::SetTextures` (0x00864950) - twice as the
    * `GetTexture` path and twice as the `SetName` payload.
    */
-  constexpr const char* kSelectionHighlightDecalTexturePath =
-    "/textures/ui/common/game/selection/selection.dds";
+  constexpr const char* kSelectionHighlightDecalTexturePath = "/textures/ui/common/game/selection/selection.dds";
 
   /**
    * Address: 0x00864A19-0x00864B1F and 0x00864B1F-0x00864C2D
@@ -249,7 +248,10 @@ namespace moho
    * constructor clearing its own `WeakObject` head, not a member of this
    * class - the compiler emits it from the base initializer.
    */
-  SelectionDragger::SelectionDragger(CameraImpl* const camera, CWldSession* const session)
+  SelectionDragger::SelectionDragger(
+    CameraImpl* const camera,
+    CWldSession* const session
+  )
     : mSess(session)
     , mCam(camera)
     , mX0(0.0f)
@@ -287,7 +289,9 @@ namespace moho
    * Runs dragger cleanup and conditionally frees this object when bit 0 of
    * `deleteFlags` is set.
    */
-  SelectionDragger* SelectionDragger::DeleteWithFlag(const std::uint8_t deleteFlags) noexcept
+  SelectionDragger* SelectionDragger::DeleteWithFlag(
+    const std::uint8_t deleteFlags
+  ) noexcept
   {
     this->~SelectionDragger();
     if ((deleteFlags & 1u) != 0u) {
@@ -333,10 +337,11 @@ namespace moho
    * (three constructor-anchored vtables all publish this exact body; neither
    * derived class overrides the slot).
    */
-  void SelectionDragger::DragRelease(const SMauiEventData* const eventData)
+  void SelectionDragger::DragRelease(
+    const SMauiEventData* const eventData
+  )
   {
     DragMove(eventData);
-
 
     if (!HasActiveSelectionDrag()) {
       if (moho::IsFactoryPreOrdersEnabled()) {
@@ -466,8 +471,8 @@ namespace moho
         scoredBox.Extent[0] *= blueprint->mSelectionMeshScaleZ;
 
         if (selectionSolid.Intersects(scoredBox)) {
-          const bool forceLowPriority = unit->mVariableData.mIsBeingBuilt == 1u
-            && unit->IsInCategory(fa::string("LOWSELECTPRIO", 13u));
+          const bool forceLowPriority =
+            unit->mVariableData.mIsBeingBuilt == 1u && unit->IsInCategory(fa::string("LOWSELECTPRIO", 13u));
           const std::int32_t priority = forceLowPriority ? 6 : blueprint->General.SelectionPriority;
           const std::uint32_t bucketIndex = (priority > 1) ? static_cast<std::uint32_t>(priority) : 1u;
 
@@ -515,7 +520,9 @@ namespace moho
    * — invoked indirectly through `delete dragger2D` callsites that go
    * through the SelectionDragger2D vtable.
    */
-  SelectionDragger2D* SelectionDragger2D::DeleteWithFlag(const std::uint8_t deleteFlags) noexcept
+  SelectionDragger2D* SelectionDragger2D::DeleteWithFlag(
+    const std::uint8_t deleteFlags
+  ) noexcept
   {
     this->~SelectionDragger2D();
     if ((deleteFlags & 1u) != 0u) {
@@ -524,7 +531,10 @@ namespace moho
     return this;
   }
 
-  SelectionDragger2D::SelectionDragger2D(CameraImpl* const camera, CWldSession* const session)
+  SelectionDragger2D::SelectionDragger2D(
+    CameraImpl* const camera,
+    CWldSession* const session
+  )
     : SelectionDragger(camera, session)
     , mStretch(0)
     , pad_0025{0, 0, 0}
@@ -577,15 +587,16 @@ namespace moho
    * which forwards the release event through the dragger's own `DragMove`
    * before resolving the selection.
    */
-  void SelectionDragger2D::DragMove(const SMauiEventData* const eventData)
+  void SelectionDragger2D::DragMove(
+    const SMauiEventData* const eventData
+  )
   {
     mX1 = eventData->mMousePos.x;
     mY1 = eventData->mMousePos.y;
 
     const float dragX = mX0 - mX1;
     const float dragY = mY0 - mY1;
-    const bool stretchedPastClick =
-      std::sqrt((dragX * dragX) + (dragY * dragY)) > kSelectionDragStretchThresholdPixels;
+    const bool stretchedPastClick = std::sqrt((dragX * dragX) + (dragY * dragY)) > kSelectionDragStretchThresholdPixels;
     // Latching `or`, not an assignment: once a drag has stretched it stays
     // stretched even if the cursor returns to the press point (0x00864E34).
     mStretch = static_cast<std::uint8_t>(mStretch | (stretchedPastClick ? 1u : 0u));
@@ -622,7 +633,9 @@ namespace moho
    * recovers the `IMauiDragger*` from its current-dragger intrusive link at
    * `+0x29C` and hands the prim batcher straight through.
    */
-  void SelectionDragger2D::Render(CD3DPrimBatcher* const batcher)
+  void SelectionDragger2D::Render(
+    CD3DPrimBatcher* const batcher
+  )
   {
     if (!HasActiveSelectionDrag()) {
       return;
@@ -698,7 +711,10 @@ namespace moho
    * (`func_NewSelectionDragger2D`/`NewSelectionDragger`, 0x00865880) always
    * supplies a live session.
    */
-  SelectionDragger3D::SelectionDragger3D(CameraImpl* const camera, CWldSession* const session)
+  SelectionDragger3D::SelectionDragger3D(
+    CameraImpl* const camera,
+    CWldSession* const session
+  )
     : SelectionDragger(camera, session)
     , mStretch(0)
     , pad_0025{0, 0, 0}
@@ -775,7 +791,9 @@ namespace moho
    * it chains into is the recovered 0x008641C0 body above, matching the
    * binary's `call sub_8641C0` at 0x00864C94.
    */
-  SelectionDragger3D* SelectionDragger3D::DeleteWithFlag(const std::uint8_t deleteFlags) noexcept
+  SelectionDragger3D* SelectionDragger3D::DeleteWithFlag(
+    const std::uint8_t deleteFlags
+  ) noexcept
   {
     this->~SelectionDragger3D();
     if ((deleteFlags & 1u) != 0u) {
@@ -807,15 +825,16 @@ namespace moho
    * dispatched at 0x008638A3 (`call edx`, `edx = [[this]+4]`) inside
    * `SelectionDragger::DragRelease` (0x00863870).
    */
-  void SelectionDragger3D::DragMove(const SMauiEventData* const eventData)
+  void SelectionDragger3D::DragMove(
+    const SMauiEventData* const eventData
+  )
   {
     const float cursorX = eventData->mMousePos.x;
     const float cursorY = eventData->mMousePos.y;
 
     const float dragX = cursorX - mX0;
     const float dragY = cursorY - mY0;
-    const bool stretchedPastClick =
-      std::sqrt((dragX * dragX) + (dragY * dragY)) > kSelectionDragStretchThresholdPixels;
+    const bool stretchedPastClick = std::sqrt((dragX * dragX) + (dragY * dragY)) > kSelectionDragStretchThresholdPixels;
     // Latching `or` (0x008643BD), not an assignment: once a drag has
     // stretched it stays stretched even if the cursor comes back.
     mStretch = static_cast<std::uint8_t>(mStretch | (stretchedPastClick ? 1u : 0u));
@@ -905,9 +924,7 @@ namespace moho
     }
 
     ID3DDeviceResources::TextureResourceHandle highlightTexture;
-    D3D_GetDevice()->GetResources()->GetTexture(
-      highlightTexture, kSelectionHighlightDecalTexturePath, nullptr, true
-    );
+    D3D_GetDevice()->GetResources()->GetTexture(highlightTexture, kSelectionHighlightDecalTexturePath, nullptr, true);
     mHighlightTexture = highlightTexture;
 
     // `mDecalManager` is the `IDecalManager*` the terrain resource handed out,
@@ -935,7 +952,9 @@ namespace moho
    * highlight through terrain decals updated by `DragMove`, not through the
    * shared prim batcher.
    */
-  void SelectionDragger3D::Render(CD3DPrimBatcher*)
+  void SelectionDragger3D::Render(
+    CD3DPrimBatcher*
+  )
   {}
 
   /**
@@ -1005,7 +1024,10 @@ namespace moho
    * spatial DB, imports them into `outSelection`, and prunes anything the
    * session is not allowed to select.
    */
-  void CollectSelectionDraggerEntities(WeakSet<UserEntity>& outSelection, SelectionDragger& dragger)
+  void CollectSelectionDraggerEntities(
+    WeakSet<UserEntity>& outSelection,
+    SelectionDragger& dragger
+  )
   {
     if (!dragger.HasActiveSelectionDrag()) {
       return;

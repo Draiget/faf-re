@@ -158,11 +158,11 @@ namespace moho
     /// The unit whose army economy drives the offset. Null on an instance
     /// built by the reflection construction paths, until deserialization
     /// binds one.
-    Unit* mUnit;                 // +0x80
+    Unit* mUnit; // +0x80
     /// The offset used when the tracked storage is empty.
-    Wm3::Vector3f mMax;          // +0x84
+    Wm3::Vector3f mMax; // +0x84
     /// The offset used when the tracked storage is full.
-    Wm3::Vector3f mMin;          // +0x90
+    Wm3::Vector3f mMin; // +0x90
     /// The offset actually applied this tick, eased toward the target.
     Wm3::Vector3f mCur;          // +0x9C
     EEconResource mResourceType; // +0xA8

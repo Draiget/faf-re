@@ -43,8 +43,11 @@ namespace faf::netlink
   class WebRtcChannel
   {
   public:
-    WebRtcChannel(WebRtcOptions options, std::function<void(const std::uint8_t*, std::size_t)> onData,
-                  std::function<void(const std::string&)> onLog);
+    WebRtcChannel(
+      WebRtcOptions options,
+      std::function<void(const std::uint8_t*, std::size_t)> onData,
+      std::function<void(const std::string&)> onLog
+    );
     ~WebRtcChannel();
     WebRtcChannel(const WebRtcChannel&) = delete;
     WebRtcChannel& operator=(const WebRtcChannel&) = delete;
@@ -55,9 +58,15 @@ namespace faf::netlink
     void OnSignal(const std::string& json);
     // Signals for the peer since the last call.
     std::vector<std::string> TakeSignals();
-    bool IsOpen() const { return mOpen.load(); }
+    bool IsOpen() const
+    {
+      return mOpen.load();
+    }
     // Whether it gave up (closed or failed); Link then stays on ICE.
-    bool HasFailed() const { return mFailed.load(); }
+    bool HasFailed() const
+    {
+      return mFailed.load();
+    }
     // One game datagram; false when the channel is not open.
     bool Send(const void* data, std::size_t size);
     void Close();

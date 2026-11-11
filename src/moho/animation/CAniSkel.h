@@ -24,10 +24,12 @@ namespace moho
   };
 
   static_assert(
-    offsetof(SAniSkelBoneNameIndex, mBoneName) == 0x00, "SAniSkelBoneNameIndex::mBoneName offset must be 0x00"
+    offsetof(SAniSkelBoneNameIndex, mBoneName) == 0x00,
+    "SAniSkelBoneNameIndex::mBoneName offset must be 0x00"
   );
   static_assert(
-    offsetof(SAniSkelBoneNameIndex, mBoneIndex) == 0x04, "SAniSkelBoneNameIndex::mBoneIndex offset must be 0x04"
+    offsetof(SAniSkelBoneNameIndex, mBoneIndex) == 0x04,
+    "SAniSkelBoneNameIndex::mBoneIndex offset must be 0x04"
   );
   static_assert(sizeof(SAniSkelBoneNameIndex) == 0x08, "SAniSkelBoneNameIndex size must be 0x08");
 
@@ -42,14 +44,14 @@ namespace moho
     // Layout is orient_ (w,x,y,z) at +0x08 and pos_ at +0x18, exactly the SCM bone
     // record's rotation lanes (+0x4C..+0x58) followed by its position lanes
     // (+0x40..+0x48), which CAniSkel's loader copies verbatim.
-    VTransform mLocalTransform;    // +0x08
-    VTransform mBoneTransform;     // +0x24
-    float mBoundsMinX;             // +0x40
-    float mBoundsMinY;             // +0x44
-    float mBoundsMinZ;             // +0x48
-    float mBoundsMaxX;             // +0x4C
-    float mBoundsMaxY;             // +0x50
-    float mBoundsMaxZ;             // +0x54
+    VTransform mLocalTransform; // +0x08
+    VTransform mBoneTransform;  // +0x24
+    float mBoundsMinX;          // +0x40
+    float mBoundsMinY;          // +0x44
+    float mBoundsMinZ;          // +0x48
+    float mBoundsMaxX;          // +0x4C
+    float mBoundsMaxY;          // +0x50
+    float mBoundsMaxZ;          // +0x54
   };
 
   static_assert(offsetof(SAniSkelBone, mBoneName) == 0x00, "SAniSkelBone::mBoneName offset must be 0x00");
@@ -159,7 +161,7 @@ namespace moho
     void CollectChildBoneIndices(std::int32_t parentBoneIndex, fa::vector<std::int32_t>& outIndices) const;
 
   public:
-    boost::shared_ptr<const SScmFile> mFile;               // +0x04
+    boost::shared_ptr<const SScmFile> mFile;            // +0x04
     fa::vector<SAniSkelBone> mBones;                    // +0x0C
     fa::vector<SAniSkelBoneNameIndex> mBoneNameToIndex; // +0x1C
 

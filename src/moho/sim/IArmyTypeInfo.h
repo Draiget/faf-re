@@ -47,4 +47,3 @@ namespace moho
    */
   void register_IArmyTypeInfo();
 } // namespace moho
-

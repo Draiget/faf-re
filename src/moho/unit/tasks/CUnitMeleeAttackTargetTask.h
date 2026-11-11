@@ -14,7 +14,7 @@ namespace gpg
 {
   class ReadArchive;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -68,11 +68,8 @@ namespace moho
      * Allocates one melee attack-target task and forwards into the
      * dispatch-bound constructor lane with formation-ignore disabled.
      */
-    [[nodiscard]] static CUnitMeleeAttackTargetTask* CreateRespectFormation(
-      CCommandTask* dispatchTask,
-      CAiTarget* target,
-      CAiFormationInstance* formation
-    );
+    [[nodiscard]] static CUnitMeleeAttackTargetTask*
+    CreateRespectFormation(CCommandTask* dispatchTask, CAiTarget* target, CAiFormationInstance* formation);
 
     /**
      * Address: 0x00615510 (FUN_00615510, Moho::CUnitMeleeAttackTargetTask::operator new)
@@ -81,11 +78,8 @@ namespace moho
      * Allocates one melee attack-target task and forwards into dispatch-bound
      * constructor lane with formation-ignore enabled.
      */
-    [[nodiscard]] static CUnitMeleeAttackTargetTask* Create(
-      CCommandTask* dispatchTask,
-      CAiTarget* target,
-      CAiFormationInstance* formation
-    );
+    [[nodiscard]] static CUnitMeleeAttackTargetTask*
+    Create(CCommandTask* dispatchTask, CAiTarget* target, CAiFormationInstance* formation);
 
     /**
      * Address: 0x00616C70 (FUN_00616C70, Moho::CUnitMeleeAttackTargetTask::TaskTick)
@@ -263,13 +257,24 @@ namespace moho
      * VFTable SLOT: 0 of the task's `Listener<EAiAttackerEvent>` sub-object
      * vtable, installed at +0x34 by the constructor at 0x00615690.
      */
-    void OnEvent(EAiAttackerEvent event) override { HandleAiAttackerEvent(event); }
+    void OnEvent(
+      EAiAttackerEvent event
+    ) override
+    {
+      HandleAiAttackerEvent(event);
+    }
 
     /**
      * VFTable SLOT: 0 of the task's `Listener<ECommandEvent>` sub-object
      * vtable, installed at +0x44 by the constructor at 0x00615690.
      */
-    void OnEvent(ECommandEvent event) override { HandleCommandEvent(event); }
+    void OnEvent(
+      ECommandEvent event
+    ) override
+    {
+      HandleCommandEvent(event);
+    }
+
   public:
     // +0x00..+0x4F are the bases: `CCommandTask`, the
     // attacker-event listener and the command-event listener.

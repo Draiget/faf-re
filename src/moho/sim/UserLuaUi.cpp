@@ -9,7 +9,9 @@ namespace
    * Checks whether `/sounds/voice/<language>` exists in the mounted virtual
    * file-system lane.
    */
-  [[nodiscard]] bool HasLocalizedVoiceDirectory(const fa::string& language)
+  [[nodiscard]] bool HasLocalizedVoiceDirectory(
+    const fa::string& language
+  )
   {
     const fa::string voiceDirectory = gpg::STR_Printf("/sounds/voice/%s", language.c_str());
     return FILE_GetFileInfo(voiceDirectory.c_str(), nullptr, false);
@@ -51,7 +53,9 @@ namespace
    * parsing whatever follows the string, and has no slot limit; this stops at
    * the terminator and after the palette's 32 slots.
    */
-  void ParseTeamColorPalette(const char* const text)
+  void ParseTeamColorPalette(
+    const char* const text
+  )
   {
     const char* cursor = text;
     for (std::size_t slot = 0; *cursor != '\0' && slot < moho::kTeamColorPaletteSize; ++slot) {
@@ -78,8 +82,7 @@ namespace
     }
   }
   constexpr const char* kUiLayerNotInitializedText = "UI layer has not been initialized.";
-}
-
+} // namespace
 
 /**
  * Address: 0x0083F000 (FUN_0083F000, func_EngineStartSplashScreens)
@@ -87,7 +90,9 @@ namespace
  * What it does:
  * Casts Lua callback state, validates zero args, and starts splash-screen UI.
  */
-int moho::func_EngineStartSplashScreens(lua_State* const luaContext)
+int moho::func_EngineStartSplashScreens(
+  lua_State* const luaContext
+)
 {
   LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
   moho::SCR_ExpectExactArgs(state, 0, kEngineStartSplashScreensHelpText);
@@ -121,7 +126,9 @@ moho::CScrLuaInitForm* moho::func_EngineStartSplashScreens_LuaFuncDef()
  * What it does:
  * Casts Lua callback state, validates zero args, and starts front-end UI.
  */
-int moho::cfunc_EngineStartFrontEndUI(lua_State* const luaContext)
+int moho::cfunc_EngineStartFrontEndUI(
+  lua_State* const luaContext
+)
 {
   LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
   moho::SCR_ExpectExactArgs(state, 0, kEngineStartFrontEndUIHelpText);
@@ -155,7 +162,9 @@ moho::CScrLuaInitForm* moho::func_EngineStartFrontEndUI_LuaFuncDef()
  * What it does:
  * Casts Lua callback state, validates zero args, and requests app shutdown.
  */
-int moho::cfunc_ExitApplication(lua_State* const luaContext)
+int moho::cfunc_ExitApplication(
+  lua_State* const luaContext
+)
 {
   LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
   moho::SCR_ExpectExactArgs(state, 0, kExitApplicationHelpText);
@@ -189,7 +198,9 @@ moho::CScrLuaInitForm* moho::func_ExitApplication_LuaFuncDef()
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_GetFrameL`.
  */
-int moho::cfunc_GetFrame(lua_State* const luaContext)
+int moho::cfunc_GetFrame(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetFrameL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -203,12 +214,7 @@ int moho::cfunc_GetFrame(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_GetFrame_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    "GetFrame",
-    &moho::cfunc_GetFrame,
-    nullptr,
-    "<global>",
-    kGetFrameHelpText
+    moho::SCR_UserLuaInitSet(), "GetFrame", &moho::cfunc_GetFrame, nullptr, "<global>", kGetFrameHelpText
   );
   return &binder;
 }
@@ -220,7 +226,9 @@ moho::CScrLuaInitForm* moho::func_GetFrame_LuaFuncDef()
  * Resolves one root UI frame index and pushes the corresponding Lua frame
  * object when it belongs to the same root Lua state.
  */
-int moho::cfunc_GetFrameL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetFrameL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -264,7 +272,9 @@ int moho::cfunc_GetFrameL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_ClearFrameL`.
  */
-int moho::cfunc_ClearFrame(lua_State* const luaContext)
+int moho::cfunc_ClearFrame(
+  lua_State* const luaContext
+)
 {
   return cfunc_ClearFrameL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -278,12 +288,7 @@ int moho::cfunc_ClearFrame(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_ClearFrame_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    "ClearFrame",
-    &moho::cfunc_ClearFrame,
-    nullptr,
-    "<global>",
-    kClearFrameHelpText
+    moho::SCR_UserLuaInitSet(), "ClearFrame", &moho::cfunc_ClearFrame, nullptr, "<global>", kClearFrameHelpText
   );
   return &binder;
 }
@@ -294,7 +299,9 @@ moho::CScrLuaInitForm* moho::func_ClearFrame_LuaFuncDef()
  * What it does:
  * Clears one frame by index or all frames when the optional argument is nil.
  */
-int moho::cfunc_ClearFrameL(LuaPlus::LuaState* const state)
+int moho::cfunc_ClearFrameL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -304,12 +311,7 @@ int moho::cfunc_ClearFrameL(LuaPlus::LuaState* const state)
   const int argumentCount = lua_gettop(rawState);
   if (argumentCount >= 2) {
     LuaPlus::LuaState::Error(
-      state,
-      "%s\n  expected between %d and %d args, but got %d",
-      kClearFrameHelpText,
-      0,
-      1,
-      argumentCount
+      state, "%s\n  expected between %d and %d args, but got %d", kClearFrameHelpText, 0, 1, argumentCount
     );
   }
 
@@ -337,7 +339,9 @@ int moho::cfunc_ClearFrameL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_GetNumRootFramesL`.
  */
-int moho::cfunc_GetNumRootFrames(lua_State* const luaContext)
+int moho::cfunc_GetNumRootFrames(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetNumRootFramesL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -367,7 +371,9 @@ moho::CScrLuaInitForm* moho::func_GetNumRootFrames_LuaFuncDef()
  * What it does:
  * Pushes the current root-frame count as a Lua number.
  */
-int moho::cfunc_GetNumRootFramesL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetNumRootFramesL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -393,7 +399,9 @@ int moho::cfunc_GetNumRootFramesL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_GetCurrentUIStateL`.
  */
-int moho::cfunc_GetCurrentUIState(lua_State* const luaContext)
+int moho::cfunc_GetCurrentUIState(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetCurrentUIStateL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -423,7 +431,9 @@ moho::CScrLuaInitForm* moho::func_GetCurrentUIState_LuaFuncDef()
  * What it does:
  * Pushes current UI-state lexical value (`splash`, `frontend`, or `game`).
  */
-int moho::cfunc_GetCurrentUIStateL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetCurrentUIStateL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -504,7 +514,9 @@ moho::CScrLuaInitForm* moho::func_GetDepositsAroundPointUser_LuaFuncDef()
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_GetMouseScreenPosL`.
  */
-int moho::cfunc_GetMouseScreenPos(lua_State* const luaContext)
+int moho::cfunc_GetMouseScreenPos(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetMouseScreenPosL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -534,7 +546,9 @@ moho::CScrLuaInitForm* moho::func_GetMouseScreenPos_LuaFuncDef()
  * What it does:
  * Pushes current screen-space mouse position as one Lua vector.
  */
-int moho::cfunc_GetMouseScreenPosL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetMouseScreenPosL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -562,7 +576,9 @@ int moho::cfunc_GetMouseScreenPosL(LuaPlus::LuaState* const state)
  * Any other argument count raises the engine's "expected 1 args" error under
  * the patch's own function name.
  */
-int moho::cfunc_CopyToClipboard(lua_State* const luaContext)
+int moho::cfunc_CopyToClipboard(
+  lua_State* const luaContext
+)
 {
   LuaPlus::LuaState* const state = SCR_ResolveBindingState(luaContext);
   const int argumentCount = lua_gettop(luaContext);
@@ -598,7 +614,9 @@ moho::CScrLuaInitForm* moho::func_CopyToClipboard_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_SetOverlayFiltersL`.
  */
-int moho::cfunc_SetOverlayFilters(lua_State* const luaContext)
+int moho::cfunc_SetOverlayFilters(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetOverlayFiltersL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -629,7 +647,9 @@ moho::CScrLuaInitForm* moho::func_SetOverlayFilters_LuaFuncDef()
  * Reads one Lua table of overlay filter strings and replaces
  * `CWldSession::mOverlayFilters`.
  */
-int moho::cfunc_SetOverlayFiltersL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetOverlayFiltersL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -665,7 +685,9 @@ int moho::cfunc_SetOverlayFiltersL(LuaPlus::LuaState* const state)
  * Retains legacy `RenderOverlayMilitary(bool)` argument validation and emits a
  * deprecation warning.
  */
-int moho::cfunc_RenderOverlayMilitary(lua_State* const luaContext)
+int moho::cfunc_RenderOverlayMilitary(
+  lua_State* const luaContext
+)
 {
   LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
   moho::SCR_ExpectExactArgs(state, 1, kRenderOverlayMilitaryHelpText);
@@ -699,7 +721,9 @@ moho::CScrLuaInitForm* moho::func_RenderOverlayMilitary_LuaFuncDef()
  * Retains legacy `RenderOverlayIntel(bool)` argument validation and emits a
  * deprecation warning.
  */
-int moho::cfunc_RenderOverlayIntel(lua_State* const luaContext)
+int moho::cfunc_RenderOverlayIntel(
+  lua_State* const luaContext
+)
 {
   LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
   moho::SCR_ExpectExactArgs(state, 1, kRenderOverlayIntelHelpText);
@@ -733,7 +757,9 @@ moho::CScrLuaInitForm* moho::func_RenderOverlayIntel_LuaFuncDef()
  * Unwraps Lua callback context and dispatches to
  * `cfunc_RenderOverlayEconomyL`.
  */
-int moho::cfunc_RenderOverlayEconomy(lua_State* const luaContext)
+int moho::cfunc_RenderOverlayEconomy(
+  lua_State* const luaContext
+)
 {
   return cfunc_RenderOverlayEconomyL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -764,7 +790,9 @@ moho::CScrLuaInitForm* moho::func_RenderOverlayEconomy_LuaFuncDef()
  * What it does:
  * Reads one Lua bool and updates the active user session economy-overlay flag.
  */
-int moho::cfunc_RenderOverlayEconomyL(LuaPlus::LuaState* const state)
+int moho::cfunc_RenderOverlayEconomyL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kRenderOverlayEconomyHelpText);
 
@@ -781,7 +809,9 @@ int moho::cfunc_RenderOverlayEconomyL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_TeamColorModeL`.
  */
-int moho::cfunc_TeamColorMode(lua_State* const luaContext)
+int moho::cfunc_TeamColorMode(
+  lua_State* const luaContext
+)
 {
   return cfunc_TeamColorModeL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -795,12 +825,7 @@ int moho::cfunc_TeamColorMode(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_TeamColorMode_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    "TeamColorMode",
-    &moho::cfunc_TeamColorMode,
-    nullptr,
-    "<global>",
-    kTeamColorModeHelpText
+    moho::SCR_UserLuaInitSet(), "TeamColorMode", &moho::cfunc_TeamColorMode, nullptr, "<global>", kTeamColorModeHelpText
   );
   return &binder;
 }
@@ -814,7 +839,9 @@ moho::CScrLuaInitForm* moho::func_TeamColorMode_LuaFuncDef()
  * "ffrrggbb,ffrrggbb,..." instead fills the per-army palette `teamcolors` in
  * army order and leaves the mode alone.
  */
-int moho::cfunc_TeamColorModeL(LuaPlus::LuaState* const state)
+int moho::cfunc_TeamColorModeL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kTeamColorModeHelpText);
 
@@ -840,7 +867,9 @@ int moho::cfunc_TeamColorModeL(LuaPlus::LuaState* const state)
  * Reads one Lua boolean, patches middle-mouse scrub opcodes to add/sub mode,
  * and preserves page protection around the patch write.
  */
-int moho::cfunc_SetInvertMidMouseButton(lua_State* const luaContext)
+int moho::cfunc_SetInvertMidMouseButton(
+  lua_State* const luaContext
+)
 {
   const int argumentCount = lua_gettop(luaContext);
   if (argumentCount != 1) {
@@ -887,7 +916,9 @@ moho::CScrLuaInitForm* moho::func_SetInvertMidMouseButton_LuaFuncDef()
  * What it does:
  * Unwraps Lua callback state and forwards to `cfunc_AudioSetLanguageUserL`.
  */
-int moho::cfunc_AudioSetLanguageUser(lua_State* const luaContext)
+int moho::cfunc_AudioSetLanguageUser(
+  lua_State* const luaContext
+)
 {
   return cfunc_AudioSetLanguageUserL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -918,7 +949,9 @@ moho::CScrLuaInitForm* moho::func_AudioSetLanguageUser_LuaFuncDef()
  * Validates one language code, then rebuilds localized voice/tutorial engines
  * when the normalized language tag changes and localized VO data exists.
  */
-int moho::cfunc_AudioSetLanguageUserL(LuaPlus::LuaState* const state)
+int moho::cfunc_AudioSetLanguageUserL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kAudioSetLanguageUserHelpText);
 
@@ -965,7 +998,9 @@ int moho::cfunc_AudioSetLanguageUserL(LuaPlus::LuaState* const state)
  * What it does:
  * Returns whether the requested localized voice directory exists.
  */
-int moho::cfunc_HasLocalizedVOUserL(LuaPlus::LuaState* const state)
+int moho::cfunc_HasLocalizedVOUserL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kHasLocalizedVOUserHelpText);
 
@@ -988,7 +1023,9 @@ int moho::cfunc_HasLocalizedVOUserL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback state and forwards to `cfunc_HasLocalizedVOUserL`.
  */
-int moho::cfunc_HasLocalizedVOUser(lua_State* const luaContext)
+int moho::cfunc_HasLocalizedVOUser(
+  lua_State* const luaContext
+)
 {
   return cfunc_HasLocalizedVOUserL(moho::SCR_ResolveBindingState(luaContext));
 }

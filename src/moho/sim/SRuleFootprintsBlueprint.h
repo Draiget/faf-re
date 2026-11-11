@@ -33,7 +33,8 @@ namespace moho
   };
 
   static_assert(
-    offsetof(SRuleFootprintsBlueprint, mFootprints) == 0x00, "SRuleFootprintsBlueprint::mFootprints offset must be 0x00"
+    offsetof(SRuleFootprintsBlueprint, mFootprints) == 0x00,
+    "SRuleFootprintsBlueprint::mFootprints offset must be 0x00"
   );
   static_assert(sizeof(SRuleFootprintsBlueprint) == 0x0C, "SRuleFootprintsBlueprint size must be 0x0C");
 

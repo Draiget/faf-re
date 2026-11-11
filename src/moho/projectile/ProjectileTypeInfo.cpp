@@ -3,7 +3,8 @@
 #include <typeinfo>
 
 #include "moho/entity/Entity.h"
-#include "moho/projectile/Projectile.h"
+#include "moho/projectile/Projectile.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -15,13 +16,16 @@ namespace
    * Publishes `Damage` and `DamageRadius` float reflection lanes for one
    * projectile type descriptor.
    */
-  gpg::RField* AddProjectileDamageFloatFields(gpg::RType* const typeInfo)
+  gpg::RField* AddProjectileDamageFloatFields(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RField* const damageField = typeInfo->AddField<float>("Damage", offsetof(moho::Projectile, mDamage));
     damageField->mFlags = 1;
     damageField->mDesc = "Damage per hit (configured by weapon)";
 
-    gpg::RField* const damageRadiusField = typeInfo->AddField<float>("DamageRadius", offsetof(moho::Projectile, mDamageRadius));
+    gpg::RField* const damageRadiusField =
+      typeInfo->AddField<float>("DamageRadius", offsetof(moho::Projectile, mDamageRadius));
     damageRadiusField->mFlags = 1;
     damageRadiusField->mDesc = "Radius to inflict damage within (configured by weapon)";
     return damageRadiusField;
@@ -46,7 +50,9 @@ namespace moho
    * Clears reflected base/field vector lanes for one `ProjectileTypeInfo`
    * instance while preserving outer storage ownership.
    */
-  [[maybe_unused]] void DestroyProjectileTypeInfoBody(ProjectileTypeInfo* const typeInfo) noexcept
+  [[maybe_unused]] void DestroyProjectileTypeInfoBody(
+    ProjectileTypeInfo* const typeInfo
+  ) noexcept
   {
     gpg::ClearTypeLists(typeInfo);
   }
@@ -83,7 +89,9 @@ namespace moho
   /**
    * Address: 0x0069F820 (FUN_0069F820, Moho::ProjectileTypeInfo::AddBaseEntity)
    */
-  void ProjectileTypeInfo::AddBase_Entity(gpg::RType* const typeInfo)
+  void ProjectileTypeInfo::AddBase_Entity(
+    gpg::RType* const typeInfo
+  )
   {
     static gpg::RType* sEntityType = nullptr;
     if (!sEntityType) {
@@ -118,7 +126,9 @@ namespace
   ProjectileTypeInfoBootstrap gProjectileTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_ProjectileTypeInfo_71e28d, moho::register_ProjectileTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_ProjectileTypeInfo_71e28d,
+  moho::register_ProjectileTypeInfo
+)

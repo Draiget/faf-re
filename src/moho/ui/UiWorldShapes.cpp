@@ -42,11 +42,11 @@ namespace
    */
   struct RenderWorldPass
   {
-    bool mViewPending = false;               // `_worldview != nullptr`
-    bool mInRenderWorld = false;             // `is_in_render_world`
+    bool mViewPending = false;   // `_worldview != nullptr`
+    bool mInRenderWorld = false; // `is_in_render_world`
     moho::CD3DPrimBatcher* mBatcher = nullptr;
     const moho::GeomCamera3* mCamera = nullptr;
-    bool mGpu = false;                       // collect records for WorldShapeGpuRenderer
+    bool mGpu = false; // collect records for WorldShapeGpuRenderer
     std::vector<moho::WorldShapeRecord> mRecords;
   };
 
@@ -54,7 +54,10 @@ namespace
   float sRenderWorldFrameSeconds = 0.0f; // `delta_frame`
 
   /** The patch's `ToVector` (include/utility.h): `{t[1], t[2], t[3]}`, zero for a non-table. */
-  [[nodiscard]] moho::Vector3f ReadLuaVector(lua_State* const L, const int index)
+  [[nodiscard]] moho::Vector3f ReadLuaVector(
+    lua_State* const L,
+    const int index
+  )
   {
     moho::Vector3f result{0.0f, 0.0f, 0.0f};
     if (!lua_istable(L, index)) {
@@ -72,7 +75,10 @@ namespace
   }
 
   /** The head every draw function shares: false means `return 0`. */
-  [[nodiscard]] bool EnterShapeCall(lua_State* const L, const char* const outsideMessage)
+  [[nodiscard]] bool EnterShapeCall(
+    lua_State* const L,
+    const char* const outsideMessage
+  )
   {
     if (sPass.mBatcher == nullptr || !sPass.mViewPending) {
       return false;
@@ -99,7 +105,10 @@ namespace
   LastParsedColor sLastParsedColor;
 
   /** `Moho::TryConvertToColor` (0x004B2B90) on `text`, or the engine's "Unknown color" error. */
-  [[nodiscard]] std::uint32_t ParseColorArgument(lua_State* const L, const char* const text)
+  [[nodiscard]] std::uint32_t ParseColorArgument(
+    lua_State* const L,
+    const char* const text
+  )
   {
     if (sLastParsedColor.mValid && sLastParsedColor.mText == text) {
       return sLastParsedColor.mColor;
@@ -119,18 +128,27 @@ namespace
    * dotted with `point` (`camera[169..172]`, i.e. `GeomCamera3::viewport` at
    * +0x284, row 2 at +0x2A4) - world units per pixel at that point.
    */
-  [[nodiscard]] float LodMetric(const moho::Vector3f& point)
+  [[nodiscard]] float LodMetric(
+    const moho::Vector3f& point
+  )
   {
     return sPass.mCamera->viewport.ProjectViewportWidthRow2(point);
   }
 
   /** At least two LOD units: the patch's `std::max(thickness / lod, 2.f)`. */
-  [[nodiscard]] float ThicknessInLodUnits(const float thickness, const float lod)
+  [[nodiscard]] float ThicknessInLodUnits(
+    const float thickness,
+    const float lod
+  )
   {
     return std::max(thickness / lod, kMinimumThicknessLodUnits);
   }
 
-  void StorePoint(moho::WorldShapeRecord& record, const std::size_t index, const moho::Vector3f& point)
+  void StorePoint(
+    moho::WorldShapeRecord& record,
+    const std::size_t index,
+    const moho::Vector3f& point
+  )
   {
     record.mPoints[index][0] = point.x;
     record.mPoints[index][1] = point.y;
@@ -138,7 +156,9 @@ namespace
   }
 
   /** Draws through the batcher now, as the patch does, or keeps the record for the GPU path. */
-  void SubmitShape(const moho::WorldShapeRecord& record)
+  void SubmitShape(
+    const moho::WorldShapeRecord& record
+  )
   {
     if (sPass.mGpu) {
       sPass.mRecords.push_back(record);
@@ -148,7 +168,9 @@ namespace
   }
 
   /** The patch's `Vector3f::normalized` (include/Maths.h): unchanged when the length is not positive. */
-  [[nodiscard]] moho::Vector3f NormalizedOrSame(const moho::Vector3f& v)
+  [[nodiscard]] moho::Vector3f NormalizedOrSame(
+    const moho::Vector3f& v
+  )
   {
     const float length = std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
     if (length > 0.0f) {
@@ -158,7 +180,9 @@ namespace
   }
 } // namespace
 
-void moho::UI_SetRenderWorldFrameSeconds(const float frameSeconds) noexcept
+void moho::UI_SetRenderWorldFrameSeconds(
+  const float frameSeconds
+) noexcept
 {
   sRenderWorldFrameSeconds = frameSeconds;
 }
@@ -174,7 +198,9 @@ void moho::UI_SetRenderWorldFrameSeconds(const float frameSeconds) noexcept
  * solid white texture), calls `OnRenderWorld(self, frameSeconds)` with the
  * UI_Draw* functions enabled, warns with the message if it fails, and flushes.
  */
-void moho::CUIWorldView::RenderWorldShapes(CD3DPrimBatcher* const batcher)
+void moho::CUIWorldView::RenderWorldShapes(
+  CD3DPrimBatcher* const batcher
+)
 {
   sPass.mViewPending = true;
   sPass.mBatcher = batcher;
@@ -242,7 +268,9 @@ void moho::CUIWorldView::RenderWorldShapes(CD3DPrimBatcher* const batcher)
  * field: corner `pos`, sides `size` along +Z and +X, border `thickness` world
  * units but at least two LOD units at `pos`.
  */
-int moho::cfunc_UI_DrawRect(lua_State* const L)
+int moho::cfunc_UI_DrawRect(
+  lua_State* const L
+)
 {
   if (!EnterShapeCall(L, "Attempt to call DrawRect outside of OnRenderWorld")) {
     return 0;
@@ -292,7 +320,9 @@ moho::CScrLuaInitForm* moho::func_UI_DrawRect_LuaFuncDef()
  * `thickness` world units either side of `radius` but at least two LOD units
  * at `pos`.
  */
-int moho::cfunc_UI_DrawCircle(lua_State* const L)
+int moho::cfunc_UI_DrawCircle(
+  lua_State* const L
+)
 {
   if (!EnterShapeCall(L, "Attempt to call DrawCircle outside of OnRenderWorld")) {
     return 0;
@@ -344,7 +374,9 @@ moho::CScrLuaInitForm* moho::func_UI_DrawCircle_LuaFuncDef()
  * offset either way along the horizontal normal of the segment by half the
  * thickness; the thickness is at least two LOD units at the farther end.
  */
-int moho::cfunc_UI_DrawLine(lua_State* const L)
+int moho::cfunc_UI_DrawLine(
+  lua_State* const L
+)
 {
   if (!EnterShapeCall(L, "Attempt to call DrawLine outside of OnRenderWorld")) {
     return 0;

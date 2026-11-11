@@ -76,7 +76,11 @@ namespace
     return gExeDir;
   }
 
-  void AppendToFile(const char* const path, const char* const text, const std::size_t length)
+  void AppendToFile(
+    const char* const path,
+    const char* const text,
+    const std::size_t length
+  )
   {
     const int fd = ::open(path, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0644);
     if (fd < 0) {
@@ -93,7 +97,10 @@ namespace
     (void)::close(fd);
   }
 
-  void WriteStack(std::FILE* const sink, const int skipFrames)
+  void WriteStack(
+    std::FILE* const sink,
+    const int skipFrames
+  )
   {
     void* frames[kMaxFrames]{};
     const int count = ::backtrace(frames, kMaxFrames);
@@ -104,7 +111,9 @@ namespace
     }
   }
 
-  const char* SignalName(const int signalNumber)
+  const char* SignalName(
+    const int signalNumber
+  )
   {
     switch (signalNumber) {
     case SIGSEGV:
@@ -122,7 +131,11 @@ namespace
     }
   }
 
-  void OnFatalSignal(const int signalNumber, siginfo_t* const info, void*)
+  void OnFatalSignal(
+    const int signalNumber,
+    siginfo_t* const info,
+    void*
+  )
   {
     char reason[256]{};
     std::snprintf(
@@ -139,11 +152,18 @@ namespace
 
   /// Until InstallCrtDiagnosticHooks runs (static initialisation, early startup): the signal
   /// and the raw stack on stderr, async-signal-safe, then the default action.
-  void OnEarlyFatalSignal(const int signalNumber, siginfo_t* const info, void*)
+  void OnEarlyFatalSignal(
+    const int signalNumber,
+    siginfo_t* const info,
+    void*
+  )
   {
     char line[128];
     const int length = std::snprintf(
-      line, sizeof(line), "fatal signal %d at address %p before the diagnostic hooks; stack:\n", signalNumber,
+      line,
+      sizeof(line),
+      "fatal signal %d at address %p before the diagnostic hooks; stack:\n",
+      signalNumber,
       info != nullptr ? info->si_addr : nullptr
     );
     (void)::write(2, line, static_cast<std::size_t>(length));
@@ -180,7 +200,9 @@ namespace
 
 namespace gpg::diag
 {
-  void InstallCrtDiagnosticHooks(const CrtDiagOptions& options)
+  void InstallCrtDiagnosticHooks(
+    const CrtDiagOptions& options
+  )
   {
     (void)options; // CRT heap validation is MSVC's.
 
@@ -210,7 +232,10 @@ namespace gpg::diag
     return gDiagLogPath;
   }
 
-  void DiagLine(const char* const format, ...)
+  void DiagLine(
+    const char* const format,
+    ...
+  )
   {
     char line[2048]{};
     const std::time_t now = std::time(nullptr);
@@ -220,7 +245,8 @@ namespace gpg::diag
 
     va_list arguments;
     va_start(arguments, format);
-    const int body = std::vsnprintf(line + length, sizeof(line) - static_cast<std::size_t>(length) - 1, format, arguments);
+    const int body =
+      std::vsnprintf(line + length, sizeof(line) - static_cast<std::size_t>(length) - 1, format, arguments);
     va_end(arguments);
     if (body > 0) {
       length = std::min<int>(length + body, static_cast<int>(sizeof(line)) - 2);
@@ -229,7 +255,9 @@ namespace gpg::diag
     AppendToFile(DiagLogPath(), line, static_cast<std::size_t>(length));
   }
 
-  void DiagLogStack(const char* const tag)
+  void DiagLogStack(
+    const char* const tag
+  )
   {
     DiagLine("stack (%s):", tag != nullptr ? tag : "");
     void* frames[kMaxFrames]{};
@@ -241,7 +269,11 @@ namespace gpg::diag
     }
   }
 
-  void DiagDescribeAddress(const void* const address, char* const out, const std::size_t outBytes)
+  void DiagDescribeAddress(
+    const void* const address,
+    char* const out,
+    const std::size_t outBytes
+  )
   {
     if (out == nullptr || outBytes == 0) {
       return;
@@ -257,8 +289,15 @@ namespace gpg::diag
     if (info.dli_sname != nullptr) {
       const auto symbolOffset =
         reinterpret_cast<std::uintptr_t>(address) - reinterpret_cast<std::uintptr_t>(info.dli_saddr);
-      std::snprintf(out, outBytes, "%s+0x%zx [%s+0x%zx]", module, static_cast<std::size_t>(offset), info.dli_sname,
-                    static_cast<std::size_t>(symbolOffset));
+      std::snprintf(
+        out,
+        outBytes,
+        "%s+0x%zx [%s+0x%zx]",
+        module,
+        static_cast<std::size_t>(offset),
+        info.dli_sname,
+        static_cast<std::size_t>(symbolOffset)
+      );
     } else {
       std::snprintf(out, outBytes, "%s+0x%zx", module, static_cast<std::size_t>(offset));
     }
@@ -269,7 +308,11 @@ namespace gpg::diag
     return true;
   }
 
-  void AddCrashSection(const char* const name, const CrashSectionWriter writer, const int priority)
+  void AddCrashSection(
+    const char* const name,
+    const CrashSectionWriter writer,
+    const int priority
+  )
   {
     if (name == nullptr || writer == nullptr || gSectionCount >= static_cast<int>(gSections.size())) {
       return;
@@ -316,7 +359,9 @@ namespace gpg::diag
     return gDumpPath;
   }
 
-  bool WriteCrashReport(const CrashReportContext& context)
+  bool WriteCrashReport(
+    const CrashReportContext& context
+  )
   {
     bool expected = false;
     if (!gWritingReport.compare_exchange_strong(expected, true)) {
@@ -366,7 +411,9 @@ namespace gpg::diag
     return true;
   }
 
-  void WriteEnvironmentReport(std::FILE* const sink)
+  void WriteEnvironmentReport(
+    std::FILE* const sink
+  )
   {
     std::fprintf(sink, "Commit    : %s\n", BuildIdentity());
     char exe[kPathBytes]{};
@@ -410,7 +457,9 @@ namespace gpg::diag
     }
   }
 
-  void WriteModuleList(std::FILE* const sink)
+  void WriteModuleList(
+    std::FILE* const sink
+  )
   {
     std::FILE* const maps = std::fopen("/proc/self/maps", "r");
     if (maps == nullptr) {
@@ -428,44 +477,58 @@ namespace gpg::diag
     std::fclose(maps);
   }
 
-  void HandleFatalPath(const CrashReportContext& context)
+  void HandleFatalPath(
+    const CrashReportContext& context
+  )
   {
     if (WriteCrashReport(context)) {
       ShowCrashReportDialog(CrashReportPath());
     }
   }
 
-  bool WriteCrashMinidump(_EXCEPTION_POINTERS* const exceptionInfo)
+  bool WriteCrashMinidump(
+    _EXCEPTION_POINTERS* const exceptionInfo
+  )
   {
     (void)exceptionInfo;
     return false;
   }
 
-  void NoteSimLuaError(const char* const message)
+  void NoteSimLuaError(
+    const char* const message
+  )
   {
     (void)message; // The minidump-on-Lua-error aid is Windows only.
   }
 
   void CopyCrashReportToClipboard() {}
 
-  void ShowCrashReportDialog(const char* const reportPath)
+  void ShowCrashReportDialog(
+    const char* const reportPath
+  )
   {
     std::fprintf(stderr, "FAF crashed; report: %s\n", reportPath != nullptr ? reportPath : "(none)");
   }
 
-  bool ParseWatchSpec(const char* const spec)
+  bool ParseWatchSpec(
+    const char* const spec
+  )
   {
     DiagLine("memory watch \"%s\" ignored: not available on this platform", spec != nullptr ? spec : "");
     return false;
   }
 
-  bool ParseProbeSpec(const char* const spec)
+  bool ParseProbeSpec(
+    const char* const spec
+  )
   {
     DiagLine("code probe \"%s\" ignored: not available on this platform", spec != nullptr ? spec : "");
     return false;
   }
 
-  bool ParseFadepProbeRequest(const char* const text)
+  bool ParseFadepProbeRequest(
+    const char* const text
+  )
   {
     (void)text;
     return false;
@@ -473,7 +536,10 @@ namespace gpg::diag
 
   void InstallProbeWatchHandler() {}
 
-  void WriteProbeWatchSection(std::FILE* const sink, const CrashSectionInfo& info)
+  void WriteProbeWatchSection(
+    std::FILE* const sink,
+    const CrashSectionInfo& info
+  )
   {
     (void)info;
     std::fprintf(sink, "(memory watches and code probes are not available on this platform)\n");

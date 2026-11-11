@@ -13,7 +13,7 @@ namespace gpg
   class RRef;
   class RType;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -23,7 +23,6 @@ namespace moho
   class CUnitFireAtTask : public CCommandTask
   {
   public:
-
     /**
      * Address: 0x0060C0EA-0x0060C10C, inlined into
      * `CUnitFireAtTaskTypeInfo::NewRef` (0x0060C0B0) and its `CtrRef` sibling:
@@ -54,11 +53,8 @@ namespace moho
      * Allocates one fire-at task object and forwards constructor arguments into
      * in-place task construction.
      */
-    [[nodiscard]] static CUnitFireAtTask* Create(
-      IAiCommandDispatchImpl* dispatchTask,
-      CAiTarget* target,
-      std::int32_t isNuclear
-    );
+    [[nodiscard]] static CUnitFireAtTask*
+    Create(IAiCommandDispatchImpl* dispatchTask, CAiTarget* target, std::int32_t isNuclear);
 
     /**
      * Address: 0x0060B260 (FUN_0060B260, ??0CUnitFireAtTask@Moho@@QAE@@Z)
@@ -130,10 +126,7 @@ namespace moho
   static_assert(offsetof(CUnitFireAtTask, mDispatch) == 0x30, "CUnitFireAtTask::mDispatch offset must be 0x30");
   static_assert(offsetof(CUnitFireAtTask, mTarget) == 0x34, "CUnitFireAtTask::mTarget offset must be 0x34");
   static_assert(offsetof(CUnitFireAtTask, mWeapon) == 0x54, "CUnitFireAtTask::mWeapon offset must be 0x54");
-  static_assert(
-    offsetof(CUnitFireAtTask, mIsNuclear) == 0x58,
-    "CUnitFireAtTask::mIsNuclear offset must be 0x58"
-  );
+  static_assert(offsetof(CUnitFireAtTask, mIsNuclear) == 0x58, "CUnitFireAtTask::mIsNuclear offset must be 0x58");
   static_assert(sizeof(CUnitFireAtTask) == 0x5C, "CUnitFireAtTask size must be 0x5C");
 
   /**
@@ -171,8 +164,7 @@ namespace moho
    *    calls `CUnitFireAtTask::MemberSerialize` at 0x0060D510)
    */
   class CUnitFireAtTaskSerializer final : public gpg::SerSaveLoadHelper<CUnitFireAtTask>
-  {
-  };
+  {};
 
   /**
    * Address: 0x00BD06B0 (FUN_00BD06B0, register_CUnitFireAtTaskSerializer)

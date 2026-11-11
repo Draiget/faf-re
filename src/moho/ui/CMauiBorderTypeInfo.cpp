@@ -22,7 +22,10 @@ namespace
 
   struct CMauiBorderTypeInfoBootstrap
   {
-    CMauiBorderTypeInfoBootstrap() { moho::register_CMauiBorderTypeInfoStartup(); }
+    CMauiBorderTypeInfoBootstrap()
+    {
+      moho::register_CMauiBorderTypeInfoStartup();
+    }
   };
   CMauiBorderTypeInfoBootstrap gCMauiBorderTypeInfoBootstrap;
 
@@ -37,7 +40,9 @@ namespace
    * `RType::IsDerivedFrom` cannot walk from it to CScriptObject and every
    * reflected reference built from a CMauiBorder fails its upcast.
    */
-  void AddCMauiControlBase(gpg::RType& typeInfo)
+  void AddCMauiControlBase(
+    gpg::RType& typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CMauiControl>(&typeInfo);
   }
@@ -98,4 +103,7 @@ void moho::register_CMauiBorderTypeInfoStartup()
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every
 // consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CMauiBorderTypeInfoStartup_7848c0, moho::register_CMauiBorderTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CMauiBorderTypeInfoStartup_7848c0,
+  moho::register_CMauiBorderTypeInfoStartup
+)

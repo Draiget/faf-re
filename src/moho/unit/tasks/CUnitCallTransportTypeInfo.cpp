@@ -5,7 +5,8 @@
 
 #include "gpg/core/utils/Global.h"
 #include "moho/task/CCommandTask.h"
-#include "moho/unit/tasks/CUnitCallTransport.h"
+#include "moho/unit/tasks/CUnitCallTransport.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -67,7 +68,9 @@ namespace moho
   /**
    * Address: 0x00602C20 (FUN_00602C20, AddBase_CCommandTask)
    */
-  void __stdcall CUnitCallTransportTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void __stdcall CUnitCallTransportTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBaseViaSlot<CCommandTask>(typeInfo);
   }
@@ -84,7 +87,9 @@ namespace moho
   /**
    * Address: 0x00602800 (FUN_00602800)
    */
-  gpg::RRef CUnitCallTransportTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitCallTransportTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const task = gpg::ConstructInStorage<CUnitCallTransport>(objectStorage);
     return gpg::RRef{task, gpg::LookupRType(typeid(CUnitCallTransport))};
@@ -93,7 +98,9 @@ namespace moho
   /**
    * Address: 0x006027E0 (FUN_006027E0)
    */
-  void CUnitCallTransportTypeInfo::Delete(void* const objectStorage)
+  void CUnitCallTransportTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CUnitCallTransport*>(objectStorage);
   }
@@ -101,7 +108,9 @@ namespace moho
   /**
    * Address: 0x00602870 (FUN_00602870)
    */
-  void CUnitCallTransportTypeInfo::Destruct(void* const objectStorage)
+  void CUnitCallTransportTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     auto* const task = static_cast<CUnitCallTransport*>(objectStorage);
     if (!task) {
@@ -120,8 +129,9 @@ namespace moho
   }
 } // namespace moho
 
-
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CUnitCallTransportTypeInfo_a90248, moho::register_CUnitCallTransportTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CUnitCallTransportTypeInfo_a90248,
+  moho::register_CUnitCallTransportTypeInfo
+)

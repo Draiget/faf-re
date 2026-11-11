@@ -9,7 +9,12 @@ namespace gpg
    * Clamps one candidate rectangle to valid map bounds and returns true when
    * any cell in the clamped area contains a strictly positive value.
    */
-  bool Array2D::ContainsRect(int x, int z, int w, int h) const
+  bool Array2D::ContainsRect(
+    int x,
+    int z,
+    int w,
+    int h
+  ) const
   {
     int minX = x;
     int maxX = x + w;

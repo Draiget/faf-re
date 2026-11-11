@@ -48,9 +48,8 @@ namespace gpg::gal::d3d11
    * preprocessing, read for the D3D9 pass states the D3D10 dialect
    * preprocesses away (the alpha test).
    */
-  [[nodiscard]] TranslatedEffectSource TranslateEffectSource(
-    std::string_view preprocessed, bool shaderModel41, std::string_view original
-  );
+  [[nodiscard]] TranslatedEffectSource
+  TranslateEffectSource(std::string_view preprocessed, bool shaderModel41, std::string_view original);
 
   /**
    * Engine addition: `ren_EffectFastScan`. Scan effect text with EffectScan.h (true, the default) or

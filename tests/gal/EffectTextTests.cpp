@@ -13,7 +13,10 @@
 
 namespace text = gpg::gal::effects::text;
 
-TEST(GalEffectText, LowerTrimAndSqueeze)
+TEST(
+  GalEffectText,
+  LowerTrimAndSqueeze
+)
 {
   EXPECT_EQ(text::Lower("AbC_1 XyZ"), "abc_1 xyz");
   EXPECT_EQ(text::Trim("  \t a b \r\n"), "a b");
@@ -24,7 +27,10 @@ TEST(GalEffectText, LowerTrimAndSqueeze)
   EXPECT_EQ(text::Squeeze("abc"), "abc");
 }
 
-TEST(GalEffectText, IdentifierCharactersAndLeadingWords)
+TEST(
+  GalEffectText,
+  IdentifierCharactersAndLeadingWords
+)
 {
   for (const char c : std::string_view("azAZ09_")) {
     EXPECT_TRUE(text::IsIdentifierChar(c)) << c;
@@ -40,7 +46,10 @@ TEST(GalEffectText, IdentifierCharactersAndLeadingWords)
   EXPECT_FALSE(text::StartsWithWord(" technique", "technique"));
 }
 
-TEST(GalEffectText, MatchingFindsTheCloserAndSkipsStrings)
+TEST(
+  GalEffectText,
+  MatchingFindsTheCloserAndSkipsStrings
+)
 {
   const std::string braces = "{ a { b } c } d";
   EXPECT_EQ(text::Matching(braces, 0U), 12U);
@@ -59,7 +68,10 @@ TEST(GalEffectText, MatchingFindsTheCloserAndSkipsStrings)
   EXPECT_EQ(text::Matching("( ( )", 0U), std::string_view::npos);
 }
 
-TEST(GalEffectText, SplitTopLevelKeepsBracketsAndStringsWhole)
+TEST(
+  GalEffectText,
+  SplitTopLevelKeepsBracketsAndStringsWhole
+)
 {
   const std::vector<std::string> parts = text::SplitTopLevel("a, f(b, c), {d, e}, [g, h], \"i, j\"", ',');
   ASSERT_EQ(parts.size(), 5U);
@@ -74,7 +86,10 @@ TEST(GalEffectText, SplitTopLevelKeepsBracketsAndStringsWhole)
   EXPECT_EQ(text::SplitTopLevel("a;;b", ';'), (std::vector<std::string>{"a", "", "b"}));
 }
 
-TEST(GalEffectText, ParseNumbersReadsEveryLiteralForm)
+TEST(
+  GalEffectText,
+  ParseNumbersReadsEveryLiteralForm
+)
 {
   EXPECT_EQ(text::ParseNumbers("float4 ( 1 , 0.5 , - 2 , 1 )"), (std::vector<float>{1.0f, 0.5f, -2.0f, 1.0f}));
   EXPECT_EQ(text::ParseNumbers("{ 1 , 2 }"), (std::vector<float>{1.0f, 2.0f}));
@@ -88,7 +103,10 @@ TEST(GalEffectText, ParseNumbersReadsEveryLiteralForm)
   EXPECT_TRUE(text::ParseNumbers("").empty());
 }
 
-TEST(GalEffectText, EvaluateConstantFoldsIntegerAndFloatExpressions)
+TEST(
+  GalEffectText,
+  EvaluateConstantFoldsIntegerAndFloatExpressions
+)
 {
   const struct
   {
@@ -111,7 +129,7 @@ TEST(GalEffectText, EvaluateConstantFoldsIntegerAndFloatExpressions)
     {"false", 0.0},
     {"0xFFFFFFFF", 4294967295.0},
     {"7 / 2", 3.5},
-    {"1 / 0", 0.0},  // a zero divisor folds to zero instead of failing
+    {"1 / 0", 0.0}, // a zero divisor folds to zero instead of failing
     {"5 % 0", 0.0},
   };
   for (const auto& entry : cases) {
@@ -126,15 +144,23 @@ TEST(GalEffectText, EvaluateConstantFoldsIntegerAndFloatExpressions)
   }
 }
 
-TEST(GalEffectText, ReplaceIdentifierSkipsLongerNamesAndMembers)
+TEST(
+  GalEffectText,
+  ReplaceIdentifierSkipsLongerNamesAndMembers
+)
 {
   EXPECT_EQ(text::ReplaceIdentifier("a + ab + a.a + b . a + _a + a", "a", "X"), "X + ab + X.a + b . a + _a + X");
-  EXPECT_EQ(text::ReplaceIdentifier("sampler2D s; samplerCUBE c;", "sampler2D", "faf_sampler"), "faf_sampler s; samplerCUBE c;");
+  EXPECT_EQ(
+    text::ReplaceIdentifier("sampler2D s; samplerCUBE c;", "sampler2D", "faf_sampler"), "faf_sampler s; samplerCUBE c;"
+  );
   EXPECT_EQ(text::ReplaceIdentifier("", "a", "b"), "");
   EXPECT_EQ(text::ReplaceIdentifier("nothing here", "zz", "y"), "nothing here");
 }
 
-TEST(GalEffectText, ContainsIdentifierWantsAWholeWord)
+TEST(
+  GalEffectText,
+  ContainsIdentifierWantsAWholeWord
+)
 {
   EXPECT_TRUE(text::ContainsIdentifier("row_major float4x4 m", "float4x4"));
   EXPECT_TRUE(text::ContainsIdentifier("column_major", "column_major"));
@@ -143,7 +169,10 @@ TEST(GalEffectText, ContainsIdentifierWantsAWholeWord)
   EXPECT_FALSE(text::ContainsIdentifier("", "a"));
 }
 
-TEST(GalEffectText, HasTopLevelAssignmentIgnoresComparisonsAndNestedText)
+TEST(
+  GalEffectText,
+  HasTopLevelAssignmentIgnoresComparisonsAndNestedText
+)
 {
   EXPECT_TRUE(text::HasTopLevelAssignment("float a = 1"));
   EXPECT_TRUE(text::HasTopLevelAssignment("string s = \"=\""));
@@ -157,17 +186,19 @@ TEST(GalEffectText, HasTopLevelAssignmentIgnoresComparisonsAndNestedText)
   EXPECT_FALSE(text::HasTopLevelAssignment(""));
 }
 
-TEST(GalEffectText, SplitItemsSeparatesDeclarationsBlocksAndDirectives)
+TEST(
+  GalEffectText,
+  SplitItemsSeparatesDeclarationsBlocksAndDirectives
+)
 {
-  const std::string source =
-    "float4 a : COLOR < string UIName = \"A;B\"; > = float4(1, 2, 3, 4);\n"
-    "#define X 1 \\\n"
-    "   + 2\n"
-    "struct S { float x; };\n"
-    "float f(float v) { return v; }\n"
-    "sampler2D s = sampler_state { Texture = <t>; };\n"
-    "// a comment ; with { braces\n"
-    "/* and ; another */ float k[] = { 1, 2 };\n";
+  const std::string source = "float4 a : COLOR < string UIName = \"A;B\"; > = float4(1, 2, 3, 4);\n"
+                             "#define X 1 \\\n"
+                             "   + 2\n"
+                             "struct S { float x; };\n"
+                             "float f(float v) { return v; }\n"
+                             "sampler2D s = sampler_state { Texture = <t>; };\n"
+                             "// a comment ; with { braces\n"
+                             "/* and ; another */ float k[] = { 1, 2 };\n";
   const std::vector<text::Item> items = text::SplitItems(source);
   ASSERT_EQ(items.size(), 6U);
 
@@ -198,7 +229,10 @@ TEST(GalEffectText, SplitItemsSeparatesDeclarationsBlocksAndDirectives)
   EXPECT_EQ(items[5].end, source.size() - 1U);
 }
 
-TEST(GalEffectText, SplitItemsTreatsAComparisonInAnInitializerAsText)
+TEST(
+  GalEffectText,
+  SplitItemsTreatsAComparisonInAnInitializerAsText
+)
 {
   // The '<' has a '>' in the next statement; it must not swallow the ';' between them.
   const std::vector<text::Item> items = text::SplitItems("static const bool b = 1 < 2; static const bool c = 3 > 1;");
@@ -211,7 +245,10 @@ TEST(GalEffectText, SplitItemsTreatsAComparisonInAnInitializerAsText)
   EXPECT_EQ(unmatched[1].head, "float e");
 }
 
-TEST(GalEffectText, SplitItemsRefusesUnbalancedBraces)
+TEST(
+  GalEffectText,
+  SplitItemsRefusesUnbalancedBraces
+)
 {
   EXPECT_THROW(static_cast<void>(text::SplitItems("float f() { return 1;")), std::runtime_error);
   EXPECT_THROW(static_cast<void>(text::SplitItems("}}}{{")), std::runtime_error);

@@ -41,7 +41,9 @@ namespace moho
    * Clears reflected base/field vector lanes for one `WeakUnitSetTypeInfo`
    * instance while preserving outer storage ownership.
    */
-  [[maybe_unused]] void DestroyWeakUnitSetTypeInfoBody(WeakUnitSetTypeInfo* const typeInfo) noexcept
+  [[maybe_unused]] void DestroyWeakUnitSetTypeInfoBody(
+    WeakUnitSetTypeInfo* const typeInfo
+  ) noexcept
   {
     gpg::ClearTypeLists(typeInfo);
   }
@@ -69,7 +71,9 @@ namespace moho
    * What it does:
    * Resolves `EntitySetTemplate<Unit>` RTTI and appends it as base type.
    */
-  void WeakUnitSetTypeInfo::AddBase_UnitSet(gpg::RType* const typeInfo)
+  void WeakUnitSetTypeInfo::AddBase_UnitSet(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RType* baseType = EntitySetTemplate<Unit>::sType;
     if (!baseType) {
@@ -121,7 +125,10 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_WeakUnitSetTypeInfo_72e330, moho::register_WeakUnitSetTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_WeakUnitSetTypeInfo_72e330,
+  moho::register_WeakUnitSetTypeInfo
+)
 
 namespace moho
 {

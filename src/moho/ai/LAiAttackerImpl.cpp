@@ -12,12 +12,13 @@
  * the CTask and LAiAttackerImpl instance counts come from their
  * `InstanceCounter` bases.
  */
-moho::LAiAttackerImpl::LAiAttackerImpl(CAiAttackerImpl* const owner)
+moho::LAiAttackerImpl::LAiAttackerImpl(
+  CAiAttackerImpl* const owner
+)
   : CTask(nullptr, false)
   , mReserved18(0u)
   , cImpl(owner)
-{
-}
+{}
 
 /**
  * Address: 0x005D5FD0 (FUN_005D5FD0, Moho::LAiAttackerImpl::dtr)

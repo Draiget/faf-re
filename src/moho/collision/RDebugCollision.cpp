@@ -16,7 +16,10 @@ namespace
 {
 
   template <typename TObject>
-  [[nodiscard]] gpg::RRef MakeStaticRef(TObject* object, gpg::RType* staticType)
+  [[nodiscard]] gpg::RRef MakeStaticRef(
+    TObject* object,
+    gpg::RType* staticType
+  )
   {
     gpg::RRef out{};
     out.mObj = object;
@@ -35,7 +38,9 @@ namespace
   /**
    * Address: 0x0064C7E0 (LAB_0064C7E0, RDebugCollisionTypeInfo::deleteFunc_)
    */
-  void DeleteRDebugCollisionOwned(void* object)
+  void DeleteRDebugCollisionOwned(
+    void* object
+  )
   {
     delete static_cast<moho::RDebugCollision*>(object);
   }
@@ -43,7 +48,9 @@ namespace
   /**
    * Address: 0x0064C800 (LAB_0064C800, RDebugCollisionTypeInfo::ctorRefFunc_)
    */
-  [[nodiscard]] gpg::RRef ConstructRDebugCollisionRefInPlace(void* objectStorage)
+  [[nodiscard]] gpg::RRef ConstructRDebugCollisionRefInPlace(
+    void* objectStorage
+  )
   {
     auto* const object = static_cast<moho::RDebugCollision*>(objectStorage);
     if (object) {
@@ -55,7 +62,9 @@ namespace
   /**
    * Address: 0x0064C840 (LAB_0064C840, RDebugCollisionTypeInfo::dtrFunc_)
    */
-  void DestroyRDebugCollisionInPlace(void* object)
+  void DestroyRDebugCollisionInPlace(
+    void* object
+  )
   {
     auto* const overlay = static_cast<moho::RDebugCollision*>(object);
     if (overlay) {
@@ -69,7 +78,9 @@ namespace
    * What it does:
    * Registers one debug-overlay descriptor pair for collision box rendering.
    */
-  void RegisterRDebugCollisionOverlayClass(moho::RDebugOverlayClass* const typeInfo)
+  void RegisterRDebugCollisionOverlayClass(
+    moho::RDebugOverlayClass* const typeInfo
+  )
   {
     typeInfo->RegisterOverlayClass("Display collision boxes for all units", "Collision");
   }
@@ -132,7 +143,9 @@ namespace moho
    * (0x005657F0). This used to walk a hand-kept side list of entities and
    * draw nothing.
    */
-  void RDebugCollision::Tick(Sim* const sim)
+  void RDebugCollision::Tick(
+    Sim* const sim
+  )
   {
     constexpr std::uint32_t kCollisionColour = 0xFF0000FFu;
 
@@ -183,7 +196,9 @@ namespace moho
    * What it does:
    * Registers `RDebugOverlay` as this type's reflected base at offset 0.
    */
-  void RDebugCollisionTypeInfo::AddBase_RDebugOverlay(gpg::RType* const typeInfo)
+  void RDebugCollisionTypeInfo::AddBase_RDebugOverlay(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddBaseIfPresent(typeInfo, gpg::RTypeOf<moho::RDebugOverlay>(), 0);
   }
@@ -229,7 +244,9 @@ namespace
   [[maybe_unused]] RDebugCollisionStartupBootstrap gRDebugCollisionStartupBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_RDebugCollisionTypeInfo_bd3f9a, moho::register_RDebugCollisionTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_RDebugCollisionTypeInfo_bd3f9a,
+  moho::register_RDebugCollisionTypeInfo
+)

@@ -117,4 +117,7 @@ namespace moho
 // Phase-1 pre-registration: RegisterSerializeFunctions above is a consumer
 // that calls gpg::LookupRType, so the descriptor must exist first. See
 // StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_EFireStateTypeInfo_55b990, moho::preregister_EFireStateTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_EFireStateTypeInfo_55b990,
+  moho::preregister_EFireStateTypeInfo
+)

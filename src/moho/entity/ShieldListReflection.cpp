@@ -44,7 +44,8 @@ namespace moho
    * Address: 0x0074CDC0 (FUN_0074CDC0 -- `GetLexical`; reads `_Mysize` at 0x0074CDFC with no null test.)
    * Address: 0x0074CDA0 (FUN_0074CDA0 -- `Init`.)
    * Address: 0x0074E3C0 (FUN_0074E3C0 -- `SerLoad`; each shield read by `ReadPointer<Shield>` 0x007545A0.)
-   * Address: 0x0074E440 (FUN_0074E440 -- `SerSave`; each shield written `Unowned` through `MakeRRef<Shield>` 0x00753FC0, owned by `*ownerRef`.)
+   * Address: 0x0074E440 (FUN_0074E440 -- `SerSave`; each shield written `Unowned` through `MakeRRef<Shield>`
+   * 0x00753FC0, owned by `*ownerRef`.)
    */
   gpg::RType* preregister_RListType_ShieldPtr()
   {
@@ -55,4 +56,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_RListType_ShieldPtr_095a6f, moho::preregister_RListType_ShieldPtr)
+GPG_PREREGISTER_INIT(
+  preregister_RListType_ShieldPtr_095a6f,
+  moho::preregister_RListType_ShieldPtr
+)

@@ -40,8 +40,16 @@
 #include <Shlwapi.h>
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#if FAFRE_PLATFORM_WINDOWS // the Direct3D 10 backend: Windows only (issue #255)
 #include "gpg/gal/backends/d3d10/DeviceD3D10.hpp"
+#endif
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#endif
+#if FAFRE_PLATFORM_POSIX
+#include "platform/posix/SdlMovieSink.h" // movie sound on SDL3 (issue #255)
+#endif
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/Error.hpp"
@@ -144,7 +152,10 @@ namespace
    */
   struct ResolutionLess
   {
-    [[nodiscard]] bool operator()(const moho::Resolution& lhs, const moho::Resolution& rhs) const noexcept
+    [[nodiscard]] bool operator()(
+      const moho::Resolution& lhs,
+      const moho::Resolution& rhs
+    ) const noexcept
     {
       if (lhs.width != rhs.width) {
         return lhs.width < rhs.width;
@@ -163,7 +174,9 @@ namespace
   // states are published in the adapter's own order as the scan walks it.
   using AdapterModeDedup = fa::set<moho::Resolution, ResolutionLess>;
 
-  [[nodiscard]] bool IsModeAboveWindowMinimum(const gpg::gal::HeadAdapterMode& mode)
+  [[nodiscard]] bool IsModeAboveWindowMinimum(
+    const gpg::gal::HeadAdapterMode& mode
+  )
   {
     return mode.width >= static_cast<std::uint32_t>(moho::wnd_DefaultCreateWidth) &&
       mode.height >= static_cast<std::uint32_t>(moho::wnd_DefaultCreateHeight);
@@ -205,7 +218,9 @@ namespace
     stateEntry.SetString("key", key != nullptr ? key : "");
     statesTable->SetObject(index, stateEntry);
   }
-  [[nodiscard]] fa::string BuildModeKey(const gpg::gal::HeadAdapterMode& mode)
+  [[nodiscard]] fa::string BuildModeKey(
+    const gpg::gal::HeadAdapterMode& mode
+  )
   {
     return gpg::STR_Printf("%u,%u,%u", mode.width, mode.height, mode.refreshRate);
   }
@@ -216,13 +231,17 @@ namespace
    * Formats one adapter mode label as `"<width>x<height>(<refresh>)"` for
    * startup option state text.
    */
-  [[nodiscard]] fa::string BuildModeLabel(const gpg::gal::HeadAdapterMode& mode)
+  [[nodiscard]] fa::string BuildModeLabel(
+    const gpg::gal::HeadAdapterMode& mode
+  )
   {
     std::ostringstream stream;
     stream << mode.width << 'x' << mode.height << '(' << mode.refreshRate << ')';
     return fa::string(stream.str().c_str());
   }
-  [[nodiscard]] LuaPlus::LuaObject BuildOptionRoot(LuaPlus::LuaState* const state)
+  [[nodiscard]] LuaPlus::LuaObject BuildOptionRoot(
+    LuaPlus::LuaState* const state
+  )
   {
     LuaPlus::LuaObject root(state);
     root.AssignNewTable(state, 0, 0);
@@ -241,7 +260,9 @@ namespace
    * gave up when the context had no head at that index; the binary asks the
    * device and has neither the head lookup nor the guards.
    */
-  [[nodiscard]] fa::vector<gpg::gal::HeadAdapterMode> CollectAdapterModes(const int adapterIndex)
+  [[nodiscard]] fa::vector<gpg::gal::HeadAdapterMode> CollectAdapterModes(
+    const int adapterIndex
+  )
   {
     fa::vector<gpg::gal::HeadAdapterMode> adapterModes;
     gpg::gal::Device::GetInstance()->GetModesForAdapter(adapterModes, adapterIndex);
@@ -275,7 +296,10 @@ namespace
    * What it does:
    * Routes Sofdec middleware errors into gpg warning logs.
    */
-  int __cdecl GpgSofDecError(std::uint32_t /*ignored*/, const char* const message)
+  int __cdecl GpgSofDecError(
+    std::uint32_t /*ignored*/,
+    const char* const message
+  )
   {
     gpg::Warnf("SofDec error: %s", message);
     return 0;
@@ -338,7 +362,9 @@ namespace
   constexpr char kSetPreferenceHelpText[] = "SetPreference(string, obj)";
   constexpr char kShadowQualityKey[] = "shadow_quality";
   constexpr char kWindowedModeKey[] = "windowed";
-  void RefreshFidelitySupportLanes(const gpg::gal::DeviceContext* const context)
+  void RefreshFidelitySupportLanes(
+    const gpg::gal::DeviceContext* const context
+  )
   {
     if (context == nullptr) {
       return;
@@ -347,7 +373,9 @@ namespace
     moho::graphics_FidelitySupported = context->mPixelShaderProfile > 5 ? 2 : 1;
     moho::shadow_FidelitySupported = context->mPixelShaderProfile > 5 ? 3 : 2;
   }
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingLuaState(lua_State* const luaContext) noexcept
+  [[nodiscard]] LuaPlus::LuaState* ResolveBindingLuaState(
+    lua_State* const luaContext
+  ) noexcept
   {
     return luaContext ? luaContext->stateUserData : nullptr;
   }
@@ -367,7 +395,6 @@ namespace
    */
   fa::auto_ptr<moho::CMovieManager> sMovieManager;
 } // namespace
-
 
 std::int32_t moho::wnd_MinCmdLineWidth = 1024;
 std::int32_t moho::wnd_MinCmdLineHeight = 720;
@@ -397,7 +424,9 @@ bool moho::sDeviceLock = false;
  * Lua array table of copied argument strings when found, otherwise returns
  * boolean false.
  */
-int moho::cfunc_GetCommandLineArgL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetCommandLineArgL(
+  LuaPlus::LuaState* const state
+)
 {
   if (state == nullptr || state->m_state == nullptr) {
     return 0;
@@ -462,7 +491,9 @@ int moho::cfunc_GetCommandLineArgL(LuaPlus::LuaState* const state)
  * Lua C callback thunk that unwraps `lua_State*` and forwards to
  * `cfunc_GetCommandLineArgL`.
  */
-int moho::cfunc_GetCommandLineArg(lua_State* const luaContext)
+int moho::cfunc_GetCommandLineArg(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetCommandLineArgL(ResolveBindingLuaState(luaContext));
 }
@@ -492,7 +523,9 @@ moho::CScrLuaInitForm* moho::func_GetCommandLineArg_LuaFuncDef()
  * What it does:
  * Resolves one command-line option and pushes whether it is present.
  */
-int moho::cfunc_HasCommandLineArgL(LuaPlus::LuaState* const state)
+int moho::cfunc_HasCommandLineArgL(
+  LuaPlus::LuaState* const state
+)
 {
   if (state == nullptr || state->m_state == nullptr) {
     return 0;
@@ -517,7 +550,9 @@ int moho::cfunc_HasCommandLineArgL(LuaPlus::LuaState* const state)
  * Lua C callback thunk that unwraps `lua_State*` and forwards to
  * `cfunc_HasCommandLineArgL`.
  */
-int moho::cfunc_HasCommandLineArg(lua_State* const luaContext)
+int moho::cfunc_HasCommandLineArg(
+  lua_State* const luaContext
+)
 {
   return cfunc_HasCommandLineArgL(ResolveBindingLuaState(luaContext));
 }
@@ -572,7 +607,9 @@ moho::CScrLuaInitForm* moho::register_HasCommandLineArg_LuaFuncDef()
  * Loads one texture by filename and optional border and returns
  * `(width, height)` on success, otherwise `nil`.
  */
-int moho::cfunc_GetTextureDimensionsL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetTextureDimensionsL(
+  LuaPlus::LuaState* const state
+)
 {
   if (state == nullptr || state->m_state == nullptr) {
     return 0;
@@ -624,7 +661,9 @@ int moho::cfunc_GetTextureDimensionsL(LuaPlus::LuaState* const state)
  * Lua C callback thunk that unwraps `lua_State*` and forwards to
  * `cfunc_GetTextureDimensionsL`.
  */
-int moho::cfunc_GetTextureDimensions(lua_State* const luaContext)
+int moho::cfunc_GetTextureDimensions(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetTextureDimensionsL(ResolveBindingLuaState(luaContext));
 }
@@ -656,7 +695,9 @@ moho::CScrLuaInitForm* moho::func_GetTextureDimensions_LuaFuncDef()
  * Lua C callback thunk that unwraps `lua_State*` and forwards to
  * `cfunc_SetMovieVolumeL`.
  */
-int moho::cfunc_SetMovieVolume(lua_State* const luaContext)
+int moho::cfunc_SetMovieVolume(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetMovieVolumeL(ResolveBindingLuaState(luaContext));
 }
@@ -687,7 +728,9 @@ moho::CScrLuaInitForm* moho::func_SetMovieVolume_LuaFuncDef()
  * Reads one volume argument, validates numeric type, and hands it to
  * `MOV_SetVolume`, which the binary carries inline.
  */
-int moho::cfunc_SetMovieVolumeL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetMovieVolumeL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kSetMovieVolumeHelpText);
@@ -708,7 +751,9 @@ int moho::cfunc_SetMovieVolumeL(LuaPlus::LuaState* const state)
  * Lua C callback thunk that unwraps `lua_State*` and forwards to
  * `cfunc_GetMovieVolumeL`.
  */
-int moho::cfunc_GetMovieVolume(lua_State* const luaContext)
+int moho::cfunc_GetMovieVolume(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetMovieVolumeL(ResolveBindingLuaState(luaContext));
 }
@@ -739,7 +784,9 @@ moho::CScrLuaInitForm* moho::func_GetMovieVolume_LuaFuncDef()
  * Validates zero-argument call shape and pushes `MOV_GetVolume()`, which the
  * binary carries inline.
  */
-int moho::cfunc_GetMovieVolumeL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetMovieVolumeL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 0, kGetMovieVolumeHelpText);
@@ -756,7 +803,9 @@ int moho::cfunc_GetMovieVolumeL(LuaPlus::LuaState* const state)
  * Lua C callback thunk that unwraps `lua_State*` and forwards to
  * `cfunc_GetAntiAliasingOptionsL`.
  */
-int moho::cfunc_GetAntiAliasingOptions(lua_State* const luaContext)
+int moho::cfunc_GetAntiAliasingOptions(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetAntiAliasingOptionsL(ResolveBindingLuaState(luaContext));
 }
@@ -788,7 +837,9 @@ moho::CScrLuaInitForm* moho::func_GetAntiAliasingOptions_LuaFuncDef()
  * Builds and returns a Lua array-like table of anti-aliasing option keys from
  * active head sample modes (`0` disabled plus packed mode entries).
  */
-int moho::cfunc_GetAntiAliasingOptionsL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetAntiAliasingOptionsL(
+  LuaPlus::LuaState* const state
+)
 {
   if (state == nullptr || state->m_state == nullptr) {
     return 0;
@@ -829,7 +880,9 @@ int moho::cfunc_GetAntiAliasingOptionsL(LuaPlus::LuaState* const state)
  * Lua C callback thunk that unwraps `lua_State*` and forwards to
  * `cfunc_GetOptionsL`.
  */
-int moho::cfunc_GetOptions(lua_State* const luaContext)
+int moho::cfunc_GetOptions(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetOptionsL(ResolveBindingLuaState(luaContext));
 }
@@ -844,12 +897,7 @@ int moho::cfunc_GetOptions(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_GetOptions_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    "GetOptions",
-    &moho::cfunc_GetOptions,
-    nullptr,
-    "<global>",
-    "obj GetOptions()"
+    moho::SCR_UserLuaInitSet(), "GetOptions", &moho::cfunc_GetOptions, nullptr, "<global>", "obj GetOptions()"
   );
   return &binder;
 }
@@ -860,7 +908,9 @@ moho::CScrLuaInitForm* moho::func_GetOptions_LuaFuncDef()
  * What it does:
  * Reads one options key string and pushes the current preference value.
  */
-int moho::cfunc_GetOptionsL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetOptionsL(
+  LuaPlus::LuaState* const state
+)
 {
   if (state == nullptr || state->m_state == nullptr) {
     return 0;
@@ -898,7 +948,9 @@ int moho::cfunc_GetOptionsL(LuaPlus::LuaState* const state)
  * Lua C callback thunk that unwraps `lua_State*` and forwards to
  * `cfunc_GetPreferenceL`.
  */
-int moho::cfunc_GetPreference(lua_State* const luaContext)
+int moho::cfunc_GetPreference(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetPreferenceL(ResolveBindingLuaState(luaContext));
 }
@@ -913,12 +965,7 @@ int moho::cfunc_GetPreference(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_GetPreference_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    "GetPreference",
-    &moho::cfunc_GetPreference,
-    nullptr,
-    "<global>",
-    kGetPreferenceHelpText
+    moho::SCR_UserLuaInitSet(), "GetPreference", &moho::cfunc_GetPreference, nullptr, "<global>", kGetPreferenceHelpText
   );
   return &binder;
 }
@@ -930,7 +977,9 @@ moho::CScrLuaInitForm* moho::func_GetPreference_LuaFuncDef()
  * Resolves one preference key and returns its Lua object value, with optional
  * default object fallback from arg #2.
  */
-int moho::cfunc_GetPreferenceL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetPreferenceL(
+  LuaPlus::LuaState* const state
+)
 {
   if (state == nullptr || state->m_state == nullptr) {
     return 0;
@@ -983,7 +1032,9 @@ int moho::cfunc_GetPreferenceL(LuaPlus::LuaState* const state)
  * Lua C callback thunk that unwraps `lua_State*` and forwards to
  * `cfunc_SetPreferenceL`.
  */
-int moho::cfunc_SetPreference(lua_State* const luaContext)
+int moho::cfunc_SetPreference(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetPreferenceL(ResolveBindingLuaState(luaContext));
 }
@@ -998,12 +1049,7 @@ int moho::cfunc_SetPreference(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SetPreference_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    "SetPreference",
-    &moho::cfunc_SetPreference,
-    nullptr,
-    "<global>",
-    kSetPreferenceHelpText
+    moho::SCR_UserLuaInitSet(), "SetPreference", &moho::cfunc_SetPreference, nullptr, "<global>", kSetPreferenceHelpText
   );
   return &binder;
 }
@@ -1014,7 +1060,9 @@ moho::CScrLuaInitForm* moho::func_SetPreference_LuaFuncDef()
  * What it does:
  * Reads `(key, value)` from Lua and stores the preference object under `key`.
  */
-int moho::cfunc_SetPreferenceL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetPreferenceL(
+  LuaPlus::LuaState* const state
+)
 {
   if (state == nullptr || state->m_state == nullptr) {
     return 0;
@@ -1057,7 +1105,9 @@ int moho::cfunc_SetPreferenceL(LuaPlus::LuaState* const state)
  * What it does:
  * Validates zero-argument call shape and persists current user preferences.
  */
-int moho::cfunc_SavePreferences(lua_State* const luaContext)
+int moho::cfunc_SavePreferences(
+  lua_State* const luaContext
+)
 {
   LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
   moho::SCR_ExpectExactArgs(state, 0, kSavePreferencesHelpText);
@@ -1105,7 +1155,9 @@ moho::CScrLuaInitForm* moho::register_SavePreferences_LuaFuncDef()
  * Lua C callback thunk that unwraps `lua_State*` and forwards to
  * `cfunc_DebugFacilitiesEnabledL`.
  */
-int moho::cfunc_DebugFacilitiesEnabled(lua_State* const luaContext)
+int moho::cfunc_DebugFacilitiesEnabled(
+  lua_State* const luaContext
+)
 {
   return cfunc_DebugFacilitiesEnabledL(ResolveBindingLuaState(luaContext));
 }
@@ -1149,7 +1201,9 @@ moho::CScrLuaInitForm* moho::j_func_DebugFacilitiesEnabled_LuaFuncDef()
  * Validates zero-argument call shape and returns whether debug facilities
  * are enabled.
  */
-int moho::cfunc_DebugFacilitiesEnabledL(LuaPlus::LuaState* const state)
+int moho::cfunc_DebugFacilitiesEnabledL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 0, kDebugFacilitiesEnabledHelpText);
@@ -1206,6 +1260,11 @@ void moho::CMovieManager::CreateDirectSound()
     return;
   }
 
+#if !FAFRE_PLATFORM_WINDOWS
+  // The Linux client (issue #255) has no DirectSound: the movie player's sound goes to an SDL3
+  // audio stream (platform/posix/SdlMovieSink.cpp), and the device it is handed only says so.
+  mDirectSound = platform::posix::MovieSoundDevice();
+#else
   if (FAILED(::DirectSoundCreate(nullptr, &mDirectSound, nullptr))) {
     gpg::Logf("Failed to create DirectSound.");
     return;
@@ -1237,6 +1296,7 @@ void moho::CMovieManager::CreateDirectSound()
     mDirectSound->Release();
     mDirectSound = nullptr;
   }
+#endif
 }
 
 /**
@@ -1267,6 +1327,7 @@ moho::CMovieManager::~CMovieManager()
 void moho::CMovieManager::ReleaseDirectSound()
 {
   ::ADXPC_SetupSoundDirectSound8(nullptr);
+#if FAFRE_PLATFORM_WINDOWS
   if (mPrimaryBuffer != nullptr) {
     mPrimaryBuffer->Release();
     mPrimaryBuffer = nullptr;
@@ -1275,6 +1336,9 @@ void moho::CMovieManager::ReleaseDirectSound()
     mDirectSound->Release();
     mDirectSound = nullptr;
   }
+#else
+  mDirectSound = nullptr; // the movie sound token (platform/posix/SdlMovieSink.h) owns nothing
+#endif
 }
 
 /**
@@ -1285,7 +1349,9 @@ void moho::CMovieManager::ReleaseDirectSound()
  * hundredths of a decibel: `DSBVOLUME_MIN` (-100 dB) for 0 up to 0 for full
  * volume, truncated to a whole unit.
  */
-void moho::CMovieManager::SetVolume(float volume)
+void moho::CMovieManager::SetVolume(
+  float volume
+)
 {
   volume = std::min(1.0f, volume);
   mVolume = static_cast<float>(static_cast<std::int32_t>(DSBVOLUME_MIN - volume * DSBVOLUME_MIN));
@@ -1349,7 +1415,9 @@ void moho::SetupPrimaryAdapterSettings()
  * Publishes secondary-adapter option states. When command-line adapter
  * override is active, publishes only the override lane.
  */
-void moho::SetupSecondaryAdapterSettings(const bool adapterNotCommandLineOverridden)
+void moho::SetupSecondaryAdapterSettings(
+  const bool adapterNotCommandLineOverridden
+)
 {
   LuaPlus::LuaState* const state = ResolveStartupLuaState();
   if (state == nullptr) {
@@ -1514,7 +1582,7 @@ namespace moho
   {
     CON_Printf("Exe timestamp : %s", "Mon Jun 22 14:06:14 2009");
   }
-}
+} // namespace moho
 
 /**
  * Address: 0x00874C20 (FUN_00874C20, func_SetupBasicMovieManager)
@@ -1546,7 +1614,9 @@ void moho::DestroyMovieManagerSingleton()
  * Clamps a script volume to [0, 2] and hands it to the movie manager, if
  * there is one. `cfunc_SetMovieVolumeL` (0x00875020) carries this inline.
  */
-void moho::MOV_SetVolume(float volume)
+void moho::MOV_SetVolume(
+  float volume
+)
 {
   volume = std::max(std::min(kMovieVolumeScriptMax, volume), 0.0f);
   if (CMovieManager* const manager = sMovieManager.get(); manager != nullptr) {
@@ -1579,7 +1649,9 @@ namespace
    * map-height lanes the range and vision renderers build their rings from,
    * and initializes the active viewport's range and vision renderers.
    */
-  void InitRenderersForCreatedSim(moho::Sim& sim)
+  void InitRenderersForCreatedSim(
+    moho::Sim& sim
+  )
   {
     // Scan the terrain heightfield for its extreme 16-bit samples.
     moho::CHeightField* const heightField = sim.mMapData->mHeightField.get();
@@ -1612,7 +1684,8 @@ namespace
     }
   }
 
-  [[maybe_unused]] const bool gSimCreatedRenderHookSet = (moho::sSimCreatedRenderHook = &InitRenderersForCreatedSim, true);
+  [[maybe_unused]] const bool gSimCreatedRenderHookSet =
+    (moho::sSimCreatedRenderHook = &InitRenderersForCreatedSim, true);
 
   /** MOV_GetDuration's `sMovieManager.get() != nullptr` (StartupHelpers.cpp). */
   bool MovieManagerPresent()
@@ -1661,7 +1734,9 @@ namespace
  * `NetName`, and sets `profile.current`; when the profile name is missing,
  * imports `/lua/user/prefs.lua` and invokes `CreateProfile(profileName)`.
  */
-void moho::USER_SetCurrentProfile(const fa::string& profileName)
+void moho::USER_SetCurrentProfile(
+  const fa::string& profileName
+)
 {
   try {
     IUserPrefs* const preferences = USER_GetPreferences();
@@ -1728,9 +1803,8 @@ void moho::USER_EnsureDocumentDirectories()
 
   std::wstring documentPath(documentsPath);
 
-  const std::wstring myGamesName = gpg::STR_Utf8ToWide(
-    moho::Loc(moho::USER_GetLuaState(), "<LOC Engine0020>My Games").c_str()
-  );
+  const std::wstring myGamesName =
+    gpg::STR_Utf8ToWide(moho::Loc(moho::USER_GetLuaState(), "<LOC Engine0020>My Games").c_str());
   documentPath.append(L"\\");
   documentPath.append(myGamesName);
   if (::CreateDirectoryW(documentPath.c_str(), nullptr) == FALSE && ::GetLastError() != ERROR_ALREADY_EXISTS) {
@@ -1836,27 +1910,26 @@ void moho::USER_GetSpecialFiles(
 )
 {
   switch (specialFileType) {
-    case ESpecialFileType::SaveGame:
-      outDirectory = USER_GetSaveGameDir().to_std();
-      outExtension = USER_GetSaveGameExt().to_std();
-      break;
-    case ESpecialFileType::Replay:
-      outDirectory = USER_GetReplayDir().to_std();
-      outExtension = USER_GetReplayExt().to_std();
-      break;
-    case ESpecialFileType::CampaignSave:
-      outDirectory = USER_GetSaveGameDir().to_std();
-      outExtension = USER_GetCampaignSaveExt().to_std();
-      break;
-    case ESpecialFileType::Screenshot:
-    default:
-      {
-        ESpecialFileType reflectedType = specialFileType;
-        gpg::RRef enumRef{};
-        enumRef = gpg::MakeRRef<moho::ESpecialFileType>(&reflectedType);
-        const fa::string lexical = enumRef.GetLexical();
-        throw std::runtime_error(gpg::STR_Printf("Invalid special file type %s", lexical.c_str()).to_std());
-      }
+  case ESpecialFileType::SaveGame:
+    outDirectory = USER_GetSaveGameDir().to_std();
+    outExtension = USER_GetSaveGameExt().to_std();
+    break;
+  case ESpecialFileType::Replay:
+    outDirectory = USER_GetReplayDir().to_std();
+    outExtension = USER_GetReplayExt().to_std();
+    break;
+  case ESpecialFileType::CampaignSave:
+    outDirectory = USER_GetSaveGameDir().to_std();
+    outExtension = USER_GetCampaignSaveExt().to_std();
+    break;
+  case ESpecialFileType::Screenshot:
+  default: {
+    ESpecialFileType reflectedType = specialFileType;
+    gpg::RRef enumRef{};
+    enumRef = gpg::MakeRRef<moho::ESpecialFileType>(&reflectedType);
+    const fa::string lexical = enumRef.GetLexical();
+    throw std::runtime_error(gpg::STR_Printf("Invalid special file type %s", lexical.c_str()).to_std());
+  }
   }
 
   const std::wstring wideDirectory = gpg::STR_Utf8ToWide(outDirectory.c_str());
@@ -1915,7 +1988,9 @@ void moho::USER_GetSpecialFiles(
  * Reads one options value from `/lua/user/prefs.lua:GetOption` and returns it
  * as an integer lane.
  */
-std::int32_t moho::OPTIONS_GetInt(const gpg::StrArg key)
+std::int32_t moho::OPTIONS_GetInt(
+  const gpg::StrArg key
+)
 {
   // 0x008C68C1-0x008C6939: the option is resolved through the Lua helper, not
   // read straight off the preference root - `GetOption` looks the key up
@@ -1945,7 +2020,9 @@ std::int32_t moho::OPTIONS_GetInt(const gpg::StrArg key)
  * Invokes `/lua/user/prefs.lua:GetOption(key)` and returns the resulting Lua
  * value as one floating-point lane.
  */
-float moho::OPTIONS_GetFloat(const gpg::StrArg key)
+float moho::OPTIONS_GetFloat(
+  const gpg::StrArg key
+)
 {
   try {
     LuaPlus::LuaState* const state = USER_GetLuaState();
@@ -1969,7 +2046,9 @@ float moho::OPTIONS_GetFloat(const gpg::StrArg key)
  * Reads one options value from `/lua/user/prefs.lua:GetOption` and returns it
  * as an owned `fa::string`.
  */
-fa::string moho::OPTIONS_GetString(const gpg::StrArg key)
+fa::string moho::OPTIONS_GetString(
+  const gpg::StrArg key
+)
 {
   // 0x008C6AD9-0x008C6B72: same `/lua/user/prefs.lua:GetOption` bridge as
   // OPTIONS_GetInt above; the binary takes `LuaObject::GetString()` and builds
@@ -2005,7 +2084,9 @@ fa::string moho::OPTIONS_GetString(const gpg::StrArg key)
  * Invokes `/lua/user/prefs.lua:GetOption(key)` and returns the value as one
  * boolean lane; on Lua bridge failure logs a warning and returns `false`.
  */
-bool moho::OPTIONS_GetBool(const gpg::StrArg key)
+bool moho::OPTIONS_GetBool(
+  const gpg::StrArg key
+)
 {
   try {
     LuaPlus::LuaState* const state = USER_GetLuaState();
@@ -2090,7 +2171,9 @@ void moho::OPTIONS_SetCustomData(
  * - `ProfilesExist()`
  * - `CreateProfile(profileName)` when profiles are missing.
  */
-void moho::OPTIONS_CreateInitialProfileIfNeeded(const gpg::StrArg profileName)
+void moho::OPTIONS_CreateInitialProfileIfNeeded(
+  const gpg::StrArg profileName
+)
 {
   try {
     LuaPlus::LuaState* const state = USER_GetLuaState();
@@ -2149,7 +2232,10 @@ fa::string moho::OPTIONS_GetCurrentProfileName()
  * Imports `/lua/SinglePlayerLaunch.lua` and invokes
  * `StartCommandLineSession(mapName, isPerfTest)`.
  */
-bool moho::StartCommandLineSession(const gpg::StrArg mapName, const bool isPerfTest)
+bool moho::StartCommandLineSession(
+  const gpg::StrArg mapName,
+  const bool isPerfTest
+)
 {
   const char* const effectiveMapName = mapName != nullptr ? mapName : "";
 

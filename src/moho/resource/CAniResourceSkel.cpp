@@ -25,7 +25,10 @@ namespace moho
    * `mName`. The binary empty-initializes the SSO string and assigns the full
    * source name (`assign(name, 0, npos)`).
    */
-  CAniResourceSkel::CAniResourceSkel(const fa::string& name, const boost::shared_ptr<const SScmFile>& file)
+  CAniResourceSkel::CAniResourceSkel(
+    const fa::string& name,
+    const boost::shared_ptr<const SScmFile>& file
+  )
     : CAniSkel(file)
   {
     mName.assign(name, 0, fa::string::npos);
@@ -42,7 +45,12 @@ namespace moho
 
 namespace moho
 {
-  void CAniResourceSkel::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CAniResourceSkel::MemberConstruct(
+    gpg::ReadArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     fa::string path;
     archive.ReadString(&path);
@@ -57,7 +65,10 @@ namespace moho
    * Address: 0x00538770 (FUN_00538770)
    */
   void CAniResourceSkel::MemberSaveConstructArgs(
-    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+    gpg::WriteArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerSaveConstructArgsResult& result
   )
   {
     fa::string mountedPath;

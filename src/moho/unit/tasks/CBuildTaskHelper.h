@@ -11,7 +11,7 @@ namespace gpg
 {
   class ReadArchive;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -27,11 +27,8 @@ namespace moho
    * Applies blueprint build-restriction gating for one target area using the
    * owning sim-resource deposit map.
    */
-  [[nodiscard]] bool CheckBuildRestriction(
-    const RUnitBlueprint* blueprint,
-    gpg::Rect2i* buildArea,
-    CBuildTaskHelper* buildTaskHelper
-  );
+  [[nodiscard]] bool
+  CheckBuildRestriction(const RUnitBlueprint* blueprint, gpg::Rect2i* buildArea, CBuildTaskHelper* buildTaskHelper);
 
   /**
    * Shared build/assist progress helper used by multiple unit command tasks.
@@ -122,31 +119,27 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
-    Unit* mUnit;                 // 0x00
-    Sim* mSim;                   // 0x04
-    WeakPtr<Unit> mFocus;        // 0x08
-    bool mBeingBuilt;            // 0x10
-    std::uint8_t mPad11_13[3];   // 0x11
-    float mUnknown14;            // 0x14
-    float mUnknown18;            // 0x18
-    float mDelta;                // 0x1C
-    fa::string mActionName;   // 0x20
-    float mFractionComplete;     // 0x3C
-    bool mIsSilo;                // 0x40
-    std::uint8_t mPad41_43[3];   // 0x41
+    Unit* mUnit;               // 0x00
+    Sim* mSim;                 // 0x04
+    WeakPtr<Unit> mFocus;      // 0x08
+    bool mBeingBuilt;          // 0x10
+    std::uint8_t mPad11_13[3]; // 0x11
+    float mUnknown14;          // 0x14
+    float mUnknown18;          // 0x18
+    float mDelta;              // 0x1C
+    fa::string mActionName;    // 0x20
+    float mFractionComplete;   // 0x3C
+    bool mIsSilo;              // 0x40
+    std::uint8_t mPad41_43[3]; // 0x41
   };
 
   static_assert(sizeof(CBuildTaskHelper) == 0x44, "CBuildTaskHelper size must be 0x44");
   static_assert(offsetof(CBuildTaskHelper, mUnit) == 0x00, "CBuildTaskHelper::mUnit offset must be 0x00");
   static_assert(offsetof(CBuildTaskHelper, mSim) == 0x04, "CBuildTaskHelper::mSim offset must be 0x04");
   static_assert(offsetof(CBuildTaskHelper, mFocus) == 0x08, "CBuildTaskHelper::mFocus offset must be 0x08");
-  static_assert(
-    offsetof(CBuildTaskHelper, mBeingBuilt) == 0x10, "CBuildTaskHelper::mBeingBuilt offset must be 0x10"
-  );
+  static_assert(offsetof(CBuildTaskHelper, mBeingBuilt) == 0x10, "CBuildTaskHelper::mBeingBuilt offset must be 0x10");
   static_assert(offsetof(CBuildTaskHelper, mDelta) == 0x1C, "CBuildTaskHelper::mDelta offset must be 0x1C");
-  static_assert(
-    offsetof(CBuildTaskHelper, mActionName) == 0x20, "CBuildTaskHelper::mActionName offset must be 0x20"
-  );
+  static_assert(offsetof(CBuildTaskHelper, mActionName) == 0x20, "CBuildTaskHelper::mActionName offset must be 0x20");
   static_assert(
     offsetof(CBuildTaskHelper, mFractionComplete) == 0x3C,
     "CBuildTaskHelper::mFractionComplete offset must be 0x3C"

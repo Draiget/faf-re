@@ -6,11 +6,21 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <map>
 #include <vector>
 
 #include <Windows.h>
 
+#include "editor/graph/EdTextureGraph.h"
+#include "editor/view/EdLiveUnits.h"
+#include "editor/tools/EdViewAids.h"
+#include "editor/view/EdParticlePreview.h"
+#include "editor/tools/EdTerrainTypes.h"
+#include "editor/doc/EdLayerPreset.h"
+#include "editor/doc/EdUnitPreset.h"
+#include "editor/doc/EdMarkerPreset.h"
 #include "editor/EdTools.h"
+#include "editor/doc/EdAdaptiveTables.h"
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdUnits.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
@@ -55,18 +65,65 @@ namespace faf::editor
     EdMapScene& operator=(const EdMapScene&) = delete;
 
     /** Each frame, after the play's frame logic: attaches, follows the window's size, or leaves. */
-    void Update(float frameSeconds, bool playIdle);
+    void Update(float frameSeconds, bool playIdle, bool editorViewInPlay = false);
+    /** The editor's view is in front of a running play (the session's views and interface wait). */
+    [[nodiscard]] bool OverPlay() const noexcept
+    {
+      return mOverPlay;
+    }
+    /** In front of a play: the play's own map (the session's); null otherwise. */
+    [[nodiscard]] moho::CWldMap* SessionMap() const noexcept
+    {
+      return mOverPlay ? mSessionMap : nullptr;
+    }
+    /** In front of a play: its units now, and the ones selected (test runs select some). */
+    [[nodiscard]] const std::vector<LiveUnit>& LiveNow() const noexcept
+    {
+      return mLiveNow;
+    }
+    void SelectLive(
+      std::vector<std::uint32_t> ids
+    )
+    {
+      mLiveSelection = std::move(ids);
+    }
+    /** Test runs: a raise of `seconds` at world x,z, as a stroke would make it (undo kept); false if nothing changed.
+     */
+    bool TestRaise(float x, float z, float seconds);
+    /**
+     * Test runs: stratum 4 painted full in a square of 24 mask texels around world x,z, as the mask brush uploads it,
+     * then the editor's and (in front of a play) the play's mask read back at its middle, logged.
+     */
+    void TestLiveMask(float x, float z);
 
     /** Leaves the viewport (the document is about to drop its map). */
     void Detach();
 
     /** The tool settings the left mouse button acts with (the Tools panel's). */
-    void SetTools(EdTools* tools) noexcept { mTools = tools; }
+    void SetTools(
+      EdTools* tools
+    ) noexcept
+    {
+      mTools = tools;
+    }
 
     /** Replaces the map's heights from a height image, resampled to the map's size, as one undo step. */
     bool ImportHeights(const std::filesystem::path& file, float scale, std::string& message);
     /** Writes the map's heights as a height image, `width` samples wide (0: the map's own size). */
     bool ExportHeights(const std::filesystem::path& file, int width, float scale, std::string& message);
+    /** The point the orbit camera looks at (on the ground): where the particle editor's preview emits. */
+    void ViewTarget(
+      float& x,
+      float& y,
+      float& z
+    ) const noexcept
+    {
+      x = mTargetX;
+      y = mTargetY;
+      z = mTargetZ;
+    }
+    /** The map's heights in game units for the material editor's map nodes (null without a map). */
+    [[nodiscard]] std::shared_ptr<TerrainSource> TerrainHeights();
 
     /** The open map's ten texture slots (lower, strata 1-8, upper) as the terrain has them. */
     [[nodiscard]] std::vector<EdTools::LayerSlot> LayerSlots() const;
@@ -82,14 +139,62 @@ namespace faf::editor
     /** Sets the map's terrain shader, as one undo step. */
     void ChangeTerrainShader(const std::string& shader);
 
+    /**
+     * Shows in-memory DDS files in a slot's albedo and normal map (the material editor's Live Update) without changing
+     * what the map names or saves; an empty one leaves that texture as it is. RestoreLayerSlot puts the slot's own
+     * files back. A slot without a size gets `emptySize`.
+     */
+    void PreviewLayerSlot(
+      int slot,
+      const std::vector<std::uint8_t>& albedo,
+      const std::vector<std::uint8_t>& normals,
+      float emptySize
+    );
+    void RestoreLayerSlot(int slot);
+    /** Stratum `layer`'s (0-7) mask from a grey image over the whole map, as one undo step. */
+    bool SetMaskLayer(int layer, const TexImage& image, std::string& message);
+
     /** Changes one slot as the Tools panel asked, as one undo step. */
     void ChangeLayerSlot(int slot, const EdTools::LayerSlot& value);
+    /**
+     * Layers from a settings file, with the terrain shader when `shader` isn't empty: what differs is changed as one
+     * undo step. Returns how many slots (and the shader) changed.
+     */
+    int ApplyLayerSettings(const std::string& shader, const std::vector<std::pair<int, LayerSettings>>& layers);
+    /** The ten layers as the files hold them. */
+    [[nodiscard]] std::vector<LayerSettings> LayerSettingsNow() const;
 
     /** The selected markers' entries, for the panel. */
     [[nodiscard]] std::vector<SaveEntry> SelectedMarkers() const;
+    /** The selected markers' names (empty when none). */
+    [[nodiscard]] const std::vector<std::string>& SelectedMarkerNames() const noexcept
+    {
+      return mMarkerSelection;
+    }
+    /** Adds a `.fafmapmarkers` file's markers as one undo step and selects them; false with `error`. */
+    bool ImportMarkerFile(const std::string& text, MarkerImport& result, std::string& error);
+    /** The units an export writes: the selected ones, or every unit of `army` when none is selected. */
+    [[nodiscard]] std::vector<SaveUnit> UnitsToExport(const std::string& army) const;
+    /**
+     * Adds a `.scunits` file's units to `army` (its INITIAL group) under new UNIT_n names, on the ground, as one undo
+     * step, and selects them; `moved` when they came from off this map. False with `error`.
+     */
+    bool ImportUnitFile(
+      const std::string& text,
+      const std::string& army,
+      std::vector<std::string>& names,
+      bool& moved,
+      std::string& error
+    );
     /** Changes a property of a marker ("name" renames it), as one undo step. */
     void EditMarker(const std::string& marker, const std::string& key, const std::string& value);
-    /** The move gizmo's parts: an arrow per axis and the free square in its middle. */
+    /** An air path node grid `count` a side over the playable area (or the map), as one undo step; `replace` removes
+     * the air nodes there were. */
+    void FillAirGrid(int count, bool replace);
+    /**
+     * The move gizmo's parts: an arrow per axis; the corner between two arms for a move in their plane (Free: X and Z,
+     * over the ground, also the square in the middle; XY and ZY: upright planes, so up and down too).
+     */
     enum class GizmoPart
     {
       None,
@@ -97,10 +202,33 @@ namespace faf::editor
       Y,
       Z,
       Free,
+      XY,
+      ZY,
     };
+    /** What the Select tool picks: one kind of thing at a time, the kind last clicked. */
+    enum class PickKind
+    {
+      None,
+      Prop,
+      Marker,
+      Unit,
+      Decal,
+    };
+    /** The Select tool's panel: what is selected and what is under the cursor, in words. */
+    [[nodiscard]] std::string SelectionText() const;
+    /** The selection's active (first) item for the Properties panel, and an edit of it as one undo step. */
+    [[nodiscard]] SelectionProperties SelectionPropertiesNow() const;
+    void ApplyPropertyEdit(const PropertyEdit& edit);
+    [[nodiscard]] std::string HoverText() const;
     /** The Decals tool's path: its points, and how many decals it would place (the cursor as its next point). */
-    [[nodiscard]] int DecalPathPointCount() const noexcept { return static_cast<int>(mDecalPath.size()); }
-    [[nodiscard]] int DecalPathDecalCount() const noexcept { return mDecalPathPreview; }
+    [[nodiscard]] int DecalPathPointCount() const noexcept
+    {
+      return static_cast<int>(mDecalPath.size());
+    }
+    [[nodiscard]] int DecalPathDecalCount() const noexcept
+    {
+      return mDecalPathPreview;
+    }
     /** Lays the path's decals with their symmetric copies as one undo step, and starts a new path. */
     void PlaceDecalPath();
     void RemoveLastDecalPathPoint()
@@ -109,26 +237,69 @@ namespace faf::editor
         mDecalPath.pop_back();
       }
     }
-    void ClearDecalPath() { mDecalPath.clear(); }
+    void ClearDecalPath()
+    {
+      mDecalPath.clear();
+    }
     /** A prop blueprint's reclaim, scale and mesh, for the Props panel ("" when the rules don't have it). */
     [[nodiscard]] std::string PropDetails(const std::string& blueprint) const;
     /** How many units the Units tool has selected, for its panel. */
-    [[nodiscard]] int UnitSelectionCount() const noexcept { return static_cast<int>(mUnitSelection.size()); }
+    [[nodiscard]] int UnitSelectionCount() const noexcept
+    {
+      return static_cast<int>(mUnitSelection.size());
+    }
+    [[nodiscard]] const std::vector<std::pair<std::string, std::string>>& UnitSelection() const noexcept
+    {
+      return mUnitSelection;
+    }
+    /** The panels' Select: these units (army, name) selected. */
+    void SelectUnits(
+      std::vector<std::pair<std::string, std::string>> units
+    )
+    {
+      mUnitSelection = std::move(units);
+    }
+    /** Moves `names` of `army` into the group `path` (made when missing); one undo step. False when nothing changed. */
+    bool MoveUnitsToGroup(
+      const std::string& army,
+      const std::vector<std::string>& names,
+      const std::vector<std::string>& path
+    );
+    /** Whether the armies' units are drawn (test runs wait for it). */
+    [[nodiscard]] bool UnitsReady() const noexcept
+    {
+      return !mUnitRefs.empty();
+    }
+    /** The map shows, but its props and units wait for the game's blueprints (built after startup). */
+    [[nodiscard]] bool ModelsPending() const noexcept
+    {
+      return mMap != nullptr && !mPropsDone;
+    }
     /** How many decals the Decals tool has selected, for its panel. */
-    [[nodiscard]] int DecalSelectionCount() const noexcept { return static_cast<int>(mDecalSelection.size()); }
+    [[nodiscard]] int DecalSelectionCount() const noexcept
+    {
+      return static_cast<int>(mDecalSelection.size());
+    }
     /** Selects markers by name (`add` toggles them in the selection instead), for the Markers panel. */
     void SelectMarkers(const std::vector<std::string>& names, bool add);
     /** Moves the camera over a marker, at most `distance` away. */
     void FrameMarker(const std::string& name, float distance = 140.0f);
+    /** The view to the point (x, z) of the map, from no farther than `distance`. */
+    void FramePoint(float x, float z, float distance = 80.0f);
+    /** Test runs (`/selectunit <army>,<unit>`): that unit selected and the view on it. */
+    void SelectUnit(const std::string& army, const std::string& name);
     /** Sets the scenario's teams (the panel's slot order, the FFA repair), as one undo step. */
     void ChangeTeams(const std::vector<ScenarioTeam>& teams);
     /** Sets the scenario's extra armies (names split on spaces), as one undo step. */
     void ChangeExtraArmies(const std::string& armies);
     /**
      * Places markers of the Markers tool's type at (x, z) and its symmetric copies, as one undo step. With `connect`,
-     * a path node placed while a node of its type is selected is linked to it (each copy to its copy), so clicks lay a path.
+     * a path node placed while a node of its type is selected is linked to it (each copy to its copy), so clicks lay a
+     * path.
      */
     void PlaceMarkers(float x, float z, bool connect = false);
+    /** An effect decoration (an Effect marker) playing `effect` at the view's centre, selected, as one undo step. */
+    void PlaceEffect(const std::string& effect);
     /**
      * Links each selected path node to `target`, or unlinks it when they are linked, with the symmetric copies of the
      * pair, as one undo step; `target` becomes the selection, so the next click continues from it.
@@ -157,7 +328,10 @@ namespace faf::editor
     bool Undo();
     bool Redo();
 
-    [[nodiscard]] bool Attached() const noexcept { return mMap != nullptr; }
+    [[nodiscard]] bool Attached() const noexcept
+    {
+      return mMap != nullptr;
+    }
 
     /** The game viewport window's messages while attached; true when the scene used one. */
     bool OnWindowMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
@@ -169,12 +343,25 @@ namespace faf::editor
     /** The ground (terrain or water) under a point of the viewport, in its pixels; false off the map. */
     bool GroundAt(float x, float y, float& outX, float& outZ) const;
     void MoveWithKeys(float frameSeconds);
-    /** The map's props as mesh instances, from the kept rules' blueprints once they are ready. */
+    /**
+     * The game's rules the view draws props, units and deposits with: the kept ones between plays; in front of a play,
+     * the ones lent to it (the same object, kept again when it ends; WPE.51). Null while neither is ready.
+     */
+    [[nodiscard]] moho::RRuleGameRules* Rules() const;
+    /** The map's props as mesh instances, from the rules' blueprints once they are ready. */
     void CreateProps();
     void DeleteProps();
 
     /** One mesh per prop entry, at the entry's index (null when its blueprint or mesh is missing). */
     std::vector<moho::MeshInstance*> mProps;
+    /**
+     * The deposit props the game puts at each resource marker with `resource` on (ScenarioUtilities.lua
+     * CreateResources: massDeposit01_prop.bp, hydrocarbonDeposit01_prop.bp), by marker name; kept at the markers each
+     * frame.
+     */
+    std::map<std::string, moho::MeshInstance*> mDeposits;
+    void UpdateDeposits();
+    void DeleteDeposits();
     bool mPropsDone = false;
     /** The armies' units from `_save.lua` (every group's), drawn as the game places them, and which unit each is. */
     struct UnitRef
@@ -243,6 +430,8 @@ namespace faf::editor
     std::vector<Wm3::Vec3f> mDragStart;
     float mScatterDue = 0.0f;
     std::uint32_t mScatterSeed = 12345U;
+    /** A stroke's props painted from the paint list, by blueprint (for the log). */
+    std::map<std::string, int> mPaintCounts;
     void BeginObjectStroke();
     void EndObjectStroke();
 
@@ -271,6 +460,59 @@ namespace faf::editor
     void UploadMasks(const std::vector<SampleRect>& rects, unsigned layers);
     void ApplyRules();
     bool mPaintingMask = false;
+    /** A terrain type stroke: the grid before it, and the overlay's runs (rebuilt when the grid changes). */
+    bool mPaintingTypes = false;
+    /** The slope view's runs (rebuilt when the heights change), and the ruler (Alt+drag): its ends, on while held. */
+    std::vector<TerrainTypeRun> mSlopeRuns;
+    std::uint64_t mSlopeHeights = 0;
+    int mSlopeFrames = 0;
+    bool mRuling = false;
+    /** Box select (Shift + right drag): its corners on the screen while it is drawn. */
+    bool mBoxing = false;
+    /**
+     * The clipboard (Ctrl+C, Ctrl+V at the cursor, Ctrl+D a copy beside): the copied selection of one kind, and the
+     * middle of its places, from which a paste offsets each.
+     */
+    struct Clipboard
+    {
+      enum class Kind
+      {
+        None,
+        Markers,
+        Props,
+        Units,
+        Decals,
+      };
+      Kind kind = Kind::None;
+      std::vector<SaveEntry> markers;
+      std::vector<std::pair<moho::CWldPropEntry, PropRecord>> props;
+      std::vector<std::pair<std::string, SaveUnit>> units;
+      std::vector<DecalState> decals;
+      float centre[2] = {0.0f, 0.0f};
+    };
+    Clipboard mClipboard;
+    /** Copies the active tool's selection; returns how many. */
+    std::size_t CopySelection();
+    /**
+     * Shift held as a move starts (user ask 2026-11-11): the selection is copied in place and the copy selected, so the
+     * move carries the copy and the original stays (the paste is its own undo step); the clipboard is kept as it was.
+     * True when it copied.
+     */
+    bool CloneSelectionForDrag(bool shift);
+    /** Puts the clipboard down with its middle at (x, z), as one undo step, and selects what it put. */
+    void PasteAt(float x, float z);
+    POINT mBoxFrom{};
+    POINT mBoxTo{};
+    [[nodiscard]] bool BoxSelectable() const;
+    void FinishBoxSelect(bool add);
+    bool mRulerShown = false;
+    float mRulerFrom[2] = {0.0f, 0.0f};
+    float mRulerTo[2] = {0.0f, 0.0f};
+    std::vector<std::uint8_t> mTypesBefore;
+    std::vector<TerrainTypeRun> mTypeRuns;
+    int mTypeRunsRevision = -1;
+    void PaintTypes();
+    void EndTypeStroke();
     /** Ends a whole-mask change: the undo step, every layer uploaded, the coverage and a check made kept up to date. */
     void WholeMaskChanged(const SampleRect& whole);
     std::vector<std::string> mShaders;
@@ -298,6 +540,128 @@ namespace faf::editor
     int mBorderEdges = 0;
     /** The Markers tool: selected markers by name, a drag of them, and its start positions. */
     std::vector<std::string> mMarkerSelection;
+    /** One thing the Select tool can pick: its kind and its index (a prop's, a marker's, a unit ref's, a decal's
+     * mIndex). */
+    struct PickHit
+    {
+      PickKind kind = PickKind::None;
+      int index = -1;
+    };
+    /** The marker, unit or prop nearest the cursor on screen, each within its own reach; the decal under it when none
+     * is. */
+    [[nodiscard]] PickHit PickAnything(POINT at) const;
+    /** The border's edges within reach of a ground point: 1 left, 2 top, 4 right, 8 bottom (a corner, two). */
+    [[nodiscard]] int BorderEdgesAt(float groundX, float groundZ) const;
+    /** The kind the Select tool works on: the last one clicked while it has a selection, else the first that has one.
+     */
+    [[nodiscard]] PickKind SelectedKind() const;
+    void ClearAllSelections();
+    /** Starts moving the selection of a kind: along the gizmo's part, or over the ground from (groundX, groundZ). */
+    void BeginSelectionDrag(HWND window, PickKind kind, GizmoPart part, POINT at, float groundX, float groundZ);
+    /**
+     * A marker where the view shows it: on the ground under its x and z (the file's height can be stale after the
+     * terrain changed, and the game places resources and armies on the ground), except a Camera Info, whose height
+     * counts.
+     */
+    bool ShownMarkerPosition(const SaveEntry& marker, float& x, float& y, float& z) const;
+    /** Where a pick sits and how big its ring is, for the hover ring. */
+    [[nodiscard]] bool PickPlace(const PickHit& hit, float& x, float& z, float& radius) const;
+    PickKind mSelectKind = PickKind::None;
+    /** The stroke under way was started with the right button: the brush's opposite (Raise/Lower, Paint/Erase). */
+    bool mPaintInverted = false;
+    float mStrokeStartHeight = 0.0f;
+    /** The scenario's water bodies filled over the heights and put on the map, as the game's session does
+     * (EdWaterBodyView.cpp). */
+    void RefreshWaterBodies();
+    void DrawWaterBodyGuides(moho::CD3DPrimBatcher& batcher, const moho::CHeightField& field);
+    /** The chosen body's handle under the cursor: an outline point's index, -1 the seed, -2 none. */
+    [[nodiscard]] int WaterBodyHandleAt(POINT at) const;
+    /** A press with the Water tool: a seed or an outline point placed, or a drag of one started; true when it took it.
+     */
+    bool WaterBodyPress(HWND window, POINT at);
+    void WaterBodyDrag(POINT at);
+    void WaterBodyRelease();
+    std::string mWaterBodiesScenario;
+    bool mWaterBodiesStale = true;
+    int mWaterBodyHandle = -2;
+    /** The adaptive tables as last read, for the ties drawn from resources to their armies. */
+    std::string mAdaptiveText;
+    AdaptiveTables mAdaptive;
+    bool mPropsCulled = false;
+    bool mUnitsCulled = false;
+    /** Some units were hidden by the Adaptive Map window's lobby preview last frame (shown again when it ends). */
+    bool mPreviewCulled = false;
+    /** In front of a play: the session's map (given back to the renderer), and whether its interface was drawn. */
+    /** The marker under the cursor (its helper drawn in the hover colour); empty for none. */
+    std::string mHoverMarker;
+    /** The prop under the cursor (-1 none), seen while drawing; outlined next frame outside the draw (WPE.54). */
+    int mHoverPropWanted = -1;
+    /**
+     * One prop's outline (WPE.57): its mesh again as the outline shell (EditorOutline*, in the outline's colour) and as
+     * the prop redrawn over the shell's middle (EditorPropOver*). Kept for the prop it was made for while that prop's
+     * blueprint stays, hidden when not wanted (the cursor often comes back), recoloured between hover and selected.
+     */
+    struct PropOutline
+    {
+      int prop = -1;
+      std::string blueprint;
+      moho::MeshInstance* shell = nullptr;
+      moho::MeshInstance* over = nullptr;
+    };
+    /** The outlined props: the selected ones (user ask 2026-11-11, in place of a ring) and the one under the cursor. */
+    std::vector<PropOutline> mOutlines;
+    /** Selected props beyond this many keep a ring instead (a forest box-selected would add thousands of meshes). */
+    static constexpr std::size_t kMaxOutlinedProps = 256;
+    void UpdatePropHighlight();
+    void DeletePropHighlight();
+    bool MakePropOutline(int prop, PropOutline& out);
+
+  public:
+    /** Test runs (`/hovermarker <name>`): the cursor kept on that marker's place on the screen. */
+    void TestHoverMarker(
+      std::string name
+    )
+    {
+      mTestHover = std::move(name);
+    }
+    /** Test runs (`/hoverprop <index>`): the cursor kept on that prop, the camera close over it. */
+    void TestHoverProp(
+      const int index,
+      const bool select = false,
+      const int selectNearest = 0
+    )
+    {
+      mTestHoverProp = index;
+      mTestSelectHoverProp = select;
+      mTestSelectNearest = selectNearest;
+    }
+    bool mTestSelectHoverProp = false;
+    /** `/selectprops <n>` with `/hoverprop`: that prop and the nearest others selected (n in all), the cursor away. */
+    int mTestSelectNearest = 0;
+    /** Test runs (`/propswapundo`): the props' newest edit undone, and the hovered prop's blueprint logged. */
+    void TestUndoPropSwap();
+    int mTestHoverProp = -1;
+    bool mTestHoverPropFramed = false;
+
+  private:
+    std::string mTestHover;
+    bool mOverPlay = false;
+    bool mLiveMaskSizeWarned = false;
+    std::uint32_t mWaterErodeSeed = 0;
+    /** The camera left by the last Detach, and the map it was on (kept for that map's next Attach). */
+    bool mCameraKept = false;
+    std::string mCameraKeptFor;
+    moho::CWldMap* mSessionMap = nullptr;
+    bool mUiWas = true;
+    /** In front of a play: its units now, the ones selected (entity ids), and a drag of them (ground from / to). */
+    std::vector<LiveUnit> mLiveNow;
+    std::vector<std::uint32_t> mLiveSelection;
+    bool mDragLive = false;
+    float mLiveFromX = 0.0f;
+    float mLiveFromZ = 0.0f;
+    float mLiveToX = 0.0f;
+    float mLiveToZ = 0.0f;
+    std::size_t mPreviewCulledCount = 0;
     bool mDragMarkers = false;
     bool mMarkersMoved = false;
     float mMarkerDragFromX = 0.0f;
@@ -308,13 +672,17 @@ namespace faf::editor
     [[nodiscard]] int PickMarker(float x, float z) const;
     /**
      * The move gizmo over the selection (markers with the Markers tool, props with the Select tool): arrows along X,
-     * Y (up) and Z, and a square in the middle for a free move over the ground. Dragging an arrow moves along it by
-     * the cursor's move projected on the arrow on screen.
+     * Y (up) and Z; between each two arms a corner joined to both (as CryEngine's and Blender's), for a move in their
+     * plane; a square in the middle for a free move over the ground. Dragging an arrow moves along it by the cursor's
+     * move projected on the arrow on screen; a corner, by the cursor's move split along its two arms on screen.
      */
     /** The selection's middle, where the gizmo stands; false when nothing it moves is selected. */
     [[nodiscard]] bool GizmoOrigin(Wm3::Vec3f& origin) const;
     /** The arms' length in world units: about the same on screen at any zoom. */
-    [[nodiscard]] float GizmoLength() const noexcept { return mDistance * 0.07f; }
+    [[nodiscard]] float GizmoLength() const noexcept
+    {
+      return mDistance * 0.07f;
+    }
     [[nodiscard]] GizmoPart PickGizmo(POINT at) const;
     void DrawGizmo(moho::CD3DPrimBatcher& batcher);
     /** Starts a gizmo drag of `part` from the cursor at `at`. */
@@ -322,7 +690,10 @@ namespace faf::editor
     /** The drag's move so far, as a displacement in the world. */
     [[nodiscard]] Wm3::Vec3f GizmoDisplacement(POINT at) const;
     /** Where an object that started at `start` goes for `move`: snapped, on or above the ground. */
-    [[nodiscard]] Wm3::Vec3f GizmoPlace(const Wm3::Vec3f& start, const Wm3::Vec3f& move, bool resource) const;
+    [[nodiscard]] Wm3::Vec3f
+    GizmoPlace(const Wm3::Vec3f& start, const Wm3::Vec3f& move, bool resource, bool unit = false) const;
+    /** Where a unit rests at (x, z): the ground, or the sea's surface over it (the game's saves keep ships there). */
+    [[nodiscard]] float UnitRestHeight(float x, float z) const;
     GizmoPart mGizmoDrag = GizmoPart::None;
     POINT mGizmoFrom{};
     Wm3::Vec3f mGizmoStart{};
@@ -343,8 +714,8 @@ namespace faf::editor
     std::vector<std::pair<float, float>> mDecalPath;
     int mDecalPathPreview = 0;
     /** The path's copy `c` under the symmetry, or empty when a point of it is off the map. */
-    [[nodiscard]] std::vector<std::pair<float, float>> DecalPathCopy(const std::vector<std::pair<float, float>>& path, int c,
-                                                                    int& copies) const;
+    [[nodiscard]] std::vector<std::pair<float, float>>
+    DecalPathCopy(const std::vector<std::pair<float, float>>& path, int c, int& copies) const;
     /** The topmost decal at (x, z) (the last drawn), by its map index, or -1. */
     [[nodiscard]] int PickDecal(float x, float z) const;
     /** Places the Decals tool's texture centred at (x, z), with its symmetric copies, as one undo step. */
@@ -354,6 +725,32 @@ namespace faf::editor
     void DrawDecalOutlines(moho::CD3DPrimBatcher& batcher, const moho::CHeightField& field);
     bool UndoDecals(bool redo);
     bool UndoWater(bool redo);
+    bool UndoLighting(bool redo);
+    bool UndoSkybox(bool redo);
+    bool UndoWaves(bool redo);
+    bool UndoTerrainTypes(bool redo);
+
+  public:
+    /** The ruler between two points (test runs, `/ruler`). */
+    void SetRuler(float x0, float z0, float x1, float z1);
+    /** Ctrl+C, Ctrl+V or Ctrl+D (`key` 'C', 'V' or 'D'), as the keyboard gives them and test runs (`/uiclicks ^D`). */
+    void CtrlKey(char key);
+    /** A Units-tool group ask on `army`'s tree: select a group's units, or change the tree as one undo step. */
+    /** An army's settings in `_save.lua`, as one undo step. */
+    void ChangeArmySettings(const std::string& army, const ArmySettings& settings);
+    void ChangeUnitGroups(
+      const std::string& army,
+      EdTools::GroupAsk ask,
+      const std::vector<std::string>& path,
+      const std::string& name
+    );
+    /**
+     * Moves `names` of `army` into its WRECKAGE group (wrecks from the start) or, `wreck` false, into its INITIAL group
+     * (units from the start), each made when the army has none; one undo step.
+     */
+    void SetUnitsWreck(const std::string& army, const std::vector<std::string>& names, bool wreck);
+
+  private:
     /** Whether the Markers panel hides this marker's type. */
     [[nodiscard]] bool MarkerHidden(const SaveEntry& marker) const;
     void DeleteSelectedMarkers();
@@ -370,8 +767,10 @@ namespace faf::editor
     EdDocument::SaveSnapshot mBorderBefore;
     /** A size drag on one slot keeps adding to its undo step until something else happens. */
     bool mLayerDragJoin = false;
+    int mLayerBatch = 0;
     /** Sets a texture slot's paths and sizes on the terrain (its textures load), the Info panel's facts too. */
-    void SetLayerSlot(int slot, const std::string& albedo, const std::string& normals, float albedoSize, float normalsSize);
+    void
+    SetLayerSlot(int slot, const std::string& albedo, const std::string& normals, float albedoSize, float normalsSize);
     bool UndoMasks(bool redo);
     /** Stamp mode: the click's stamp is down. */
     bool mStamped = false;
@@ -396,6 +795,14 @@ namespace faf::editor
     std::unique_ptr<moho::SimpleRenderWorldView> mWorldView;
 
     // The orbit camera: the point it looks at, its heading and pitch (radians) and its distance from it.
+    /** The Effect markers' effects, playing where they stand (by marker name; remade when the effect changes). */
+    struct EffectDecoration
+    {
+      std::string effect; // the marker's paths, ';' between (an effect of several emitters)
+      std::vector<std::unique_ptr<EdParticlePreview>> previews;
+    };
+    std::map<std::string, EffectDecoration> mEffects;
+    void UpdateEffects();
     float mTargetX = 0.0f;
     float mTargetY = 0.0f;
     float mTargetZ = 0.0f;

@@ -46,7 +46,6 @@ namespace moho
 
   static_assert(sizeof(EUnitCommandTypeTypeInfo) == 0x78, "EUnitCommandTypeTypeInfo size must be 0x78");
 
-
   /**
    * Address: 0x00BC9C20 (FUN_00BC9C20, sub_BC9C20)
    *
@@ -61,4 +60,3 @@ namespace moho
    */
   void register_EUnitCommandTypeTypeInfo();
 } // namespace moho
-

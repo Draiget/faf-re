@@ -97,9 +97,7 @@ namespace moho
      * found from `reporter`'s acknowledgement (`selfReport`: the sender's own),
      * and whether the game has stopped.
      */
-    virtual void NoteOrdersDiffer(
-      const fa::string& sender, const fa::string& reporter, bool selfReport, bool stopped
-    );
+    virtual void NoteOrdersDiffer(const fa::string& sender, const fa::string& reporter, bool selfReport, bool stopped);
 
     /**
      * Engine addition (issue #275): a launcher asked (`/rejoinoffer`), and this client could
@@ -162,9 +160,7 @@ namespace moho
      * Engine addition: shows the notice in the chat as a local system line
      * and in the console.
      */
-    void NoteOrdersDiffer(
-      const fa::string& sender, const fa::string& reporter, bool selfReport, bool stopped
-    ) override;
+    void NoteOrdersDiffer(const fa::string& sender, const fa::string& reporter, bool selfReport, bool stopped) override;
 
     void NoteRejoinOffer(const fa::string& localSource, const fa::string& seats) override;
   };

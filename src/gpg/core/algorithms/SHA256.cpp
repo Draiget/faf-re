@@ -17,10 +17,12 @@ namespace
     0x748f82eeu, 0x78a5636fu, 0x84c87814u, 0x8cc70208u, 0x90befffau, 0xa4506cebu, 0xbef9a3f7u, 0xc67178f2u,
   };
 
-  [[nodiscard]] std::uint32_t LoadBigEndian(const std::uint8_t* const bytes) noexcept
+  [[nodiscard]] std::uint32_t LoadBigEndian(
+    const std::uint8_t* const bytes
+  ) noexcept
   {
     return (std::uint32_t{bytes[0]} << 24) | (std::uint32_t{bytes[1]} << 16) | (std::uint32_t{bytes[2]} << 8) |
-           std::uint32_t{bytes[3]};
+      std::uint32_t{bytes[3]};
   }
 } // namespace
 
@@ -30,7 +32,9 @@ namespace gpg
     : mState{0x6a09e667u, 0xbb67ae85u, 0x3c6ef372u, 0xa54ff53au, 0x510e527fu, 0x9b05688cu, 0x1f83d9abu, 0x5be0cd19u}
   {}
 
-  void SHA256::Compress(const std::uint8_t* const block) noexcept
+  void SHA256::Compress(
+    const std::uint8_t* const block
+  ) noexcept
   {
     std::array<std::uint32_t, 64> schedule{};
     for (std::size_t i = 0; i < 16; ++i) {
@@ -73,7 +77,10 @@ namespace gpg
     mState[7] += h;
   }
 
-  void SHA256::Update(const void* const data, std::size_t size) noexcept
+  void SHA256::Update(
+    const void* const data,
+    std::size_t size
+  ) noexcept
   {
     const auto* bytes = static_cast<const std::uint8_t*>(data);
     mTotalBytes += size;

@@ -47,8 +47,14 @@ namespace gpg::gal
     [[nodiscard]] ID3D11ShaderResourceView* GetShaderResourceView() const;
     /** The texture; throws when it is not 2D. */
     [[nodiscard]] ID3D11Texture2D* GetTexture2D() const;
-    [[nodiscard]] ID3D11Resource* GetResource() const noexcept { return mResource.Get(); }
-    [[nodiscard]] DXGI_FORMAT GetFormat() const noexcept { return mDesc.Format; }
+    [[nodiscard]] ID3D11Resource* GetResource() const noexcept
+    {
+      return mResource.Get();
+    }
+    [[nodiscard]] DXGI_FORMAT GetFormat() const noexcept
+    {
+      return mDesc.Format;
+    }
 
     /**
      * The GPU copy changed behind the CPU one (a copy into this texture):

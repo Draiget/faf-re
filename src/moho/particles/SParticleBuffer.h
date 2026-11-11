@@ -30,7 +30,7 @@ namespace moho
     SParticleBuffer();
 
     fa::vector<SWorldParticle> mParticles; // +0x00
-    fa::vector<SWorldTrail> mTrails;  // +0x10
+    fa::vector<SWorldTrail> mTrails;       // +0x10
     fa::vector<SWorldBeam> mBeams;         // +0x20
   };
 

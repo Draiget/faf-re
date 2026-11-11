@@ -2,8 +2,8 @@
 
 namespace gpg::gal
 {
-namespace
-{
+  namespace
+  {
 
     constexpr DXGI_FORMAT kAdapterProbeFormats[8] = {
       static_cast<DXGI_FORMAT>(10),
@@ -38,8 +38,7 @@ namespace
       }
       return entry;
     }
-}
-
+  } // namespace
 
   /**
    * Address: 0x008F7AC0 (FUN_008F7AC0)
@@ -50,7 +49,9 @@ namespace
    * Initializes one adapter wrapper from one DXGI adapter pointer and captures
    * the adapter descriptor payload.
    */
-  AdapterD3D10::AdapterD3D10(IDXGIAdapter* const dxgiAdapter)
+  AdapterD3D10::AdapterD3D10(
+    IDXGIAdapter* const dxgiAdapter
+  )
     : dxgiAdapter_(dxgiAdapter)
     , description_()
     , modes_()
@@ -67,7 +68,9 @@ namespace
    * Copy-constructs one adapter wrapper by cloning descriptor payload and
    * deep-copying cached mode vectors from `other`.
    */
-  AdapterD3D10::AdapterD3D10(const AdapterD3D10& other)
+  AdapterD3D10::AdapterD3D10(
+    const AdapterD3D10& other
+  )
     : dxgiAdapter_(other.dxgiAdapter_)
     , description_(other.description_)
     , modes_(other.modes_)
@@ -80,7 +83,9 @@ namespace
    * Copy-assigns adapter pointer/descriptor lanes and deep-copies the cached
    * mode-vector lane from `other`.
    */
-  AdapterD3D10& AdapterD3D10::operator=(const AdapterD3D10& other)
+  AdapterD3D10& AdapterD3D10::operator=(
+    const AdapterD3D10& other
+  )
   {
     dxgiAdapter_ = other.dxgiAdapter_;
     description_ = other.description_;
@@ -156,5 +161,4 @@ namespace
     // containers, so `modes_ = {}` is the whole teardown (0x008F76C0).
     modes_ = fa::vector<AdapterModeD3D10>{};
   }
-}
-
+} // namespace gpg::gal

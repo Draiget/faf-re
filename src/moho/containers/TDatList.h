@@ -146,13 +146,16 @@ namespace moho
      * Address: 0x00773B30 (FUN_00773B30, formerly
      *   UnlinkAndSelfLinkForwardNode773B30 in LegacyContainerFillLanes.cpp,
      *   a thin wrapper around the address directly above)
-     * Address: 0x005A7690 (FUN_005A7690 -- `ListUnlinkSelf` -- neighbours adopt each other, then self-link, handing this node back for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `UnlinkAndResetGenericNode` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x005A7A90 (FUN_005A7A90 -- a second emission of that unlink for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `UnlinkAndResetGenericNodeAlias` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x00632DF0 (FUN_00632DF0 -- the `moho::TDatListItem<IAniManipulator, void>`
-     *   emission, with a twenty-strong ICF family (0x00406C50, 0x00407690,
-     *   0x00409930, 0x0040A860, 0x0040A990, 0x0040AC20, 0x00431E90 ...) that is
-     *   what identifies it as one template body rather than twenty hand-written
-     *   unlinks; zero callers, unreachable; formerly
+     * Address: 0x005A7690 (FUN_005A7690 -- `ListUnlinkSelf` -- neighbours adopt each other, then self-link, handing
+     * this node back for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node
+     * the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `UnlinkAndResetGenericNode`
+     * in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.) Address: 0x005A7A90 (FUN_005A7A90 -- a second
+     * emission of that unlink for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev,
+     * next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly
+     * `UnlinkAndResetGenericNodeAlias` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.) Address: 0x00632DF0
+     * (FUN_00632DF0 -- the `moho::TDatListItem<IAniManipulator, void>` emission, with a twenty-strong ICF family
+     * (0x00406C50, 0x00407690, 0x00409930, 0x0040A860, 0x0040A990, 0x0040AC20, 0x00431E90 ...) that is what identifies
+     * it as one template body rather than twenty hand-written unlinks; zero callers, unreachable; formerly
      *   `UnlinkNodeAndRestoreSelfLinks` over an `IntrusiveNode` in
      *   moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-22.)
      * Address: 0x007C0CA0 (FUN_007C0CA0 -- the `TDatListItem<SPeer, void>`
@@ -258,16 +261,38 @@ namespace moho
      *
      * What it does:
      * Unlinks this node from its current ring and resets it to singleton state.
-     * Address: 0x009064B0 (FUN_009064B0 -- the pipe-chunk ring's unlink in gpg/core/streams: unlink the node from its ring, self-link it, hand back the successor; callers 0x00906510 (unreached); formerly `UnlinkIntrusiveNodeAndReturnNext` and its two `[[maybe_unused]]` wrappers in gpg/core/utils/Logging.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x00936200 (FUN_00936200 -- the log-target ring's unlink in gpg/core/utils: unlink the node from its ring, self-link it, hand back the successor; callers 0x00936770; formerly `UnlinkIntrusiveNodeAndReturnNext` and its two `[[maybe_unused]]` wrappers in gpg/core/utils/Logging.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x005A7340 (FUN_005A7340 -- an iterator over that ring, stored through a caller slot for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursor` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x005A7370 (FUN_005A7370 -- that iterator read back out of its slot for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `LoadNodeCursor` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x005A75C0 (FUN_005A75C0 -- `mNext` stored through the caller's cursor slot for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeNextCursor` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x005A7A10 (FUN_005A7A10 -- a second emission of that `mNext` store for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeNextCursorAlias` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x005A7A20 (FUN_005A7A20 -- a second emission of the iterator store for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursorAlias` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x005A7AB0 (FUN_005A7AB0 -- a third emission of the iterator store for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursorAlias2` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x005A7AC0 (FUN_005A7AC0 -- `operator++` -- step the cursor to `mNext` for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `AdvanceNodeCursor` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x005A7AF0 (FUN_005A7AF0 -- a fourth emission of the iterator store for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursorAlias3` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x009064B0 (FUN_009064B0 -- the pipe-chunk ring's unlink in gpg/core/streams: unlink the node from its
+     * ring, self-link it, hand back the successor; callers 0x00906510 (unreached); formerly
+     * `UnlinkIntrusiveNodeAndReturnNext` and its two `[[maybe_unused]]` wrappers in gpg/core/utils/Logging.cpp (RULE
+     * ONE), removed 2026-09-11.) Address: 0x00936200 (FUN_00936200 -- the log-target ring's unlink in gpg/core/utils:
+     * unlink the node from its ring, self-link it, hand back the successor; callers 0x00936770; formerly
+     * `UnlinkIntrusiveNodeAndReturnNext` and its two `[[maybe_unused]]` wrappers in gpg/core/utils/Logging.cpp (RULE
+     * ONE), removed 2026-09-11.) Address: 0x005A7340 (FUN_005A7340 -- an iterator over that ring, stored through a
+     * caller slot for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the
+     * `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursor` in
+     * moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.) Address: 0x005A7370 (FUN_005A7370 -- that iterator read
+     * back out of its slot for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}`
+     * node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `LoadNodeCursor` in
+     * moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.) Address: 0x005A75C0 (FUN_005A75C0 -- `mNext` stored
+     * through the caller's cursor slot for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08
+     * `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly
+     * `StoreNodeNextCursor` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.) Address: 0x005A7A10
+     * (FUN_005A7A10 -- a second emission of that `mNext` store for `moho::TDatListItem<void, void>` (the navigator's
+     * listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers,
+     * unreachable; formerly `StoreNodeNextCursorAlias` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x005A7A20 (FUN_005A7A20 -- a second emission of the iterator store for `moho::TDatListItem<void, void>`
+     * (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through);
+     * zero callers, unreachable; formerly `StoreNodeCursorAlias` in moho/ai/IAiNavigator.cpp (RULE ONE), removed
+     * 2026-09-11.) Address: 0x005A7AB0 (FUN_005A7AB0 -- a third emission of the iterator store for
+     * `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the
+     * `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursorAlias2` in
+     * moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.) Address: 0x005A7AC0 (FUN_005A7AC0 -- `operator++` --
+     * step the cursor to `mNext` for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev,
+     * next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly
+     * `AdvanceNodeCursor` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.) Address: 0x005A7AF0
+     * (FUN_005A7AF0 -- a fourth emission of the iterator store for `moho::TDatListItem<void, void>` (the navigator's
+     * listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers,
+     * unreachable; formerly `StoreNodeCursorAlias3` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x004027D0 (FUN_004027D0)
      * Address: 0x009063A0 (FUN_009063A0)
      * Address: 0x00906410 (FUN_00906410)
@@ -316,7 +341,9 @@ namespace moho
      * What it does:
      * Unlinks this node from its current ring and inserts it directly after `that`.
      */
-    item_t* ListLinkAfter(item_t* that) noexcept
+    item_t* ListLinkAfter(
+      item_t* that
+    ) noexcept
     {
       ListUnlink();
 
@@ -335,7 +362,9 @@ namespace moho
      *
      * What it does:
      * Unlinks this node from its current ring and inserts it directly before `that`.
-     * Address: 0x00761CE0 (FUN_00761CE0 -- `ListLinkBefore` -- unlink, then splice ahead of the anchor for `moho::TDatListItem<moho::HSound, void>` (`HSound::mSimLoopLink`, the sound manager's active-loop ring); callers 0x008AB2B0; formerly `AppendSoundToList` in moho/audio/CUserSoundManager.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x00761CE0 (FUN_00761CE0 -- `ListLinkBefore` -- unlink, then splice ahead of the anchor for
+     * `moho::TDatListItem<moho::HSound, void>` (`HSound::mSimLoopLink`, the sound manager's active-loop ring); callers
+     * 0x008AB2B0; formerly `AppendSoundToList` in moho/audio/CUserSoundManager.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x0063C030 (FUN_0063C030 -- the
      *   `moho::TDatListItem<IAniManipulator, void>` emission, reached as
      *   `IAniManipulator::mActorOrderLink`, the actor's precedence-ordered
@@ -352,7 +381,9 @@ namespace moho
      *   `+0 = anchor->+0`, `+4 = anchor`, `anchor->+0 = this`, then the old
      *   `+0`'s `+4 = this`: a splice ahead of the anchor.)
      */
-    item_t* ListLinkBefore(item_t* that) noexcept
+    item_t* ListLinkBefore(
+      item_t* that
+    ) noexcept
     {
       ListUnlink();
 
@@ -375,7 +406,9 @@ namespace moho
      * What it does:
      * Swaps one node's intrusive link lanes (`mPrev`, `mNext`) with another node.
      */
-    item_t* SwapLinks(item_t* that) noexcept
+    item_t* SwapLinks(
+      item_t* that
+    ) noexcept
     {
       item_t* const prev = mPrev;
       mPrev = that->mPrev;
@@ -411,7 +444,9 @@ namespace moho
      * What it does:
      * Returns the `mNext` node lane from one intrusive list node.
      */
-    static item_t* NextNode(item_t* node) noexcept
+    static item_t* NextNode(
+      item_t* node
+    ) noexcept
     {
       return node->mNext;
     }
@@ -424,7 +459,9 @@ namespace moho
      * What it does:
      * Returns the same node pointer unchanged.
      */
-    static item_t* IdentityNode(item_t* node) noexcept
+    static item_t* IdentityNode(
+      item_t* node
+    ) noexcept
     {
       return node;
     }
@@ -435,7 +472,9 @@ namespace moho
      * What it does:
      * Advances one node-pointer cursor to `cursor->mNext`.
      */
-    static item_t** AdvanceCursor(item_t** cursor) noexcept
+    static item_t** AdvanceCursor(
+      item_t** cursor
+    ) noexcept
     {
       *cursor = (*cursor)->mNext;
       return cursor;
@@ -473,7 +512,9 @@ namespace moho
     /**
      * Move this node to be the first after head (MRU push).
      */
-    void ListMoveToFront(item_t* head) noexcept
+    void ListMoveToFront(
+      item_t* head
+    ) noexcept
     {
       ListLinkAfter(head);
     }
@@ -481,13 +522,17 @@ namespace moho
     /**
      * Move this node to be right before head (LRU push).
      */
-    void ListMoveToBack(item_t* head) noexcept
+    void ListMoveToBack(
+      item_t* head
+    ) noexcept
     {
       ListLinkBefore(head);
     }
 
     template <class Owner, item_t Owner::* Member>
-    static Owner* owner_from_member_node(item_t* node) noexcept
+    static Owner* owner_from_member_node(
+      item_t* node
+    ) noexcept
     {
       const auto* const memberPtr = &(reinterpret_cast<Owner const volatile*>(0)->*Member);
       const auto memberOffset = static_cast<std::ptrdiff_t>(reinterpret_cast<std::uintptr_t>(memberPtr));
@@ -495,7 +540,9 @@ namespace moho
     }
 
     template <class Owner, item_t Owner::* Member>
-    static const Owner* owner_from_member_node(const item_t* node) noexcept
+    static const Owner* owner_from_member_node(
+      const item_t* node
+    ) noexcept
     {
       return owner_from_member_node<Owner, Member>(const_cast<item_t*>(node));
     }
@@ -538,11 +585,15 @@ namespace moho
         return **this;
       }
 
-      bool operator==(const member_owner_iterator& r) const noexcept
+      bool operator==(
+        const member_owner_iterator& r
+      ) const noexcept
       {
         return pos == r.pos;
       }
-      bool operator!=(const member_owner_iterator& r) const noexcept
+      bool operator!=(
+        const member_owner_iterator& r
+      ) const noexcept
       {
         return pos != r.pos;
       }
@@ -642,11 +693,15 @@ namespace moho
       {
         return pos;
       }
-      bool operator==(const Iterator& r) const noexcept
+      bool operator==(
+        const Iterator& r
+      ) const noexcept
       {
         return pos == r.pos;
       }
-      bool operator!=(const Iterator& r) const noexcept
+      bool operator!=(
+        const Iterator& r
+      ) const noexcept
       {
         return pos != r.pos;
       }
@@ -660,7 +715,9 @@ namespace moho
        * What it does:
        * Initializes one iterator cursor from a raw node pointer.
        */
-      explicit Iterator(pointer p)
+      explicit Iterator(
+        pointer p
+      )
         : pos{p}
       {}
     };
@@ -722,7 +779,9 @@ namespace moho
     /**
      * Erase at iterator (unlink node); return iterator to next.
      */
-    iterator erase(iterator it) noexcept
+    iterator erase(
+      iterator it
+    ) noexcept
     {
       item_t* const next = it.pos->mNext;
       it.pos->ListUnlink();
@@ -732,11 +791,15 @@ namespace moho
     /**
      * Push NODE front/back (node must be unlinked).
      */
-    void push_front(item_t* node) noexcept
+    void push_front(
+      item_t* node
+    ) noexcept
     {
       node->ListLinkAfter(this);
     }
-    void push_back(item_t* node) noexcept
+    void push_back(
+      item_t* node
+    ) noexcept
     {
       node->ListLinkBefore(this);
     }
@@ -766,7 +829,9 @@ namespace moho
      * Move all nodes from this list head into pending and reset this head.
      * The destination head is unlinked/reset first.
      */
-    void move_nodes_to(TDatList& pending) noexcept
+    void move_nodes_to(
+      TDatList& pending
+    ) noexcept
     {
       pending.ListResetLinks();
       if (this->ListIsSingleton()) {
@@ -812,11 +877,15 @@ namespace moho
         return **this;
       }
 
-      bool operator==(const owner_iterator& r) const noexcept
+      bool operator==(
+        const owner_iterator& r
+      ) const noexcept
       {
         return pos == r.pos;
       }
-      bool operator!=(const owner_iterator& r) const noexcept
+      bool operator!=(
+        const owner_iterator& r
+      ) const noexcept
       {
         return pos != r.pos;
       }
@@ -886,11 +955,15 @@ namespace moho
         return **this;
       }
 
-      bool operator==(const owner_safe_iterator& r) const noexcept
+      bool operator==(
+        const owner_safe_iterator& r
+      ) const noexcept
       {
         return pos == r.pos;
       }
-      bool operator!=(const owner_safe_iterator& r) const noexcept
+      bool operator!=(
+        const owner_safe_iterator& r
+      ) const noexcept
       {
         return pos != r.pos;
       }
@@ -937,7 +1010,9 @@ namespace moho
      * Converts one intrusive-member pointer back to the owning object pointer.
      * The listed codegen lanes match offset-`0x04` member ownership recovery.
      */
-    static Owner* owner_from_member(MemberNode* node) noexcept
+    static Owner* owner_from_member(
+      MemberNode* node
+    ) noexcept
     {
       static_assert(std::is_base_of_v<item_t, MemberNode>, "MemberNode must derive from TDatList item_t");
       if (!node) {
@@ -950,7 +1025,9 @@ namespace moho
     }
 
     template <class Owner, class MemberNode, MemberNode Owner::* Member>
-    static const Owner* owner_from_member(const MemberNode* node) noexcept
+    static const Owner* owner_from_member(
+      const MemberNode* node
+    ) noexcept
     {
       static_assert(std::is_base_of_v<item_t, MemberNode>, "MemberNode must derive from TDatList item_t");
       if (!node) {

@@ -35,9 +35,7 @@ namespace
       Finish();
     }
   };
-  static_assert(
-    sizeof(SPerArmyReconInfoTypeInfo) == 0x64, "SPerArmyReconInfoTypeInfo size must be 0x64"
-  );
+  static_assert(sizeof(SPerArmyReconInfoTypeInfo) == 0x64, "SPerArmyReconInfoTypeInfo size must be 0x64");
 
   [[nodiscard]] gpg::RType* ResolveSPerArmyReconInfoType()
   {
@@ -67,7 +65,9 @@ namespace
      * What it does:
      * Formats vector lexical text and appends the runtime per-army recon count.
      */
-    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override
+    [[nodiscard]] fa::string GetLexical(
+      const gpg::RRef& ref
+    ) const override
     {
       const fa::string base = gpg::RType::GetLexical(ref);
       return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
@@ -96,7 +96,10 @@ namespace
       serLoadFunc_ = &gpg::LoadVectorSPerArmyReconInfo;
     }
 
-    gpg::RRef SubscriptIndex(void* const obj, const int ind) const override
+    gpg::RRef SubscriptIndex(
+      void* const obj,
+      const int ind
+    ) const override
     {
       auto* const storage = static_cast<fa::vector<moho::SPerArmyReconInfo>*>(obj);
 
@@ -111,13 +114,18 @@ namespace
       return out;
     }
 
-    size_t GetCount(void* const obj) const override
+    size_t GetCount(
+      void* const obj
+    ) const override
     {
       const auto* const storage = static_cast<const fa::vector<moho::SPerArmyReconInfo>*>(obj);
       return storage ? storage->size() : 0u;
     }
 
-    void SetCount(void* const obj, const int count) const override
+    void SetCount(
+      void* const obj,
+      const int count
+    ) const override
     {
       auto* const storage = static_cast<fa::vector<moho::SPerArmyReconInfo>*>(obj);
       GPG_ASSERT(storage != nullptr);
@@ -130,9 +138,7 @@ namespace
       storage->resize(static_cast<std::size_t>(count), zeroFill);
     }
   };
-  static_assert(
-    sizeof(SPerArmyReconInfoVectorType) == 0x68, "SPerArmyReconInfoVectorType size must be 0x68"
-  );
+  static_assert(sizeof(SPerArmyReconInfoVectorType) == 0x68, "SPerArmyReconInfoVectorType size must be 0x68");
 
   using moho::ReconBlipTypeInfo;
 
@@ -226,7 +232,9 @@ namespace moho
   /**
    * Address: 0x005C9010 (FUN_005C9010)
    */
-  void ReconBlipTypeInfo::AddBase_Entity(gpg::RType* const typeInfo)
+  void ReconBlipTypeInfo::AddBase_Entity(
+    gpg::RType* const typeInfo
+  )
   {
     static gpg::RType* cachedEntityType = nullptr;
     if (!cachedEntityType) {
@@ -301,8 +309,20 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_ReconBlipTypeInfo_3acb48, moho::register_ReconBlipTypeInfo)
-GPG_PREREGISTER_INIT(register_SPerArmyReconInfoTypeInfo_3acb48, moho::register_SPerArmyReconInfoTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_ReconBlipTypeInfo_3acb48,
+  moho::register_ReconBlipTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_SPerArmyReconInfoTypeInfo_3acb48,
+  moho::register_SPerArmyReconInfoTypeInfo
+)
 
-GPG_PREREGISTER_INIT(preregister_SPerArmyReconInfoTypeInfo_3acb48, moho::preregister_SPerArmyReconInfoTypeInfo)
-GPG_PREREGISTER_INIT(preregister_RVectorType_SPerArmyReconInfo_3acb48, moho::preregister_RVectorType_SPerArmyReconInfo)
+GPG_PREREGISTER_INIT(
+  preregister_SPerArmyReconInfoTypeInfo_3acb48,
+  moho::preregister_SPerArmyReconInfoTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  preregister_RVectorType_SPerArmyReconInfo_3acb48,
+  moho::preregister_RVectorType_SPerArmyReconInfo
+)

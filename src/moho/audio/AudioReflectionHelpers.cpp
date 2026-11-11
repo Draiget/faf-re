@@ -46,7 +46,10 @@ namespace moho::audio_reflection
     return gpg::CachedLookup(CachedCScriptEventType(), typeid(moho::CScriptEvent));
   }
 
-  void AddBase(gpg::RType* const ownerType, gpg::RType* const baseType)
+  void AddBase(
+    gpg::RType* const ownerType,
+    gpg::RType* const baseType
+  )
   {
     if (!ownerType || !baseType) {
       return;
@@ -56,7 +59,9 @@ namespace moho::audio_reflection
   }
 
   void RegisterSerializeCallbacks(
-    gpg::RType* const typeInfo, const gpg::RType::load_func_t loadCallback, const gpg::RType::save_func_t saveCallback
+    gpg::RType* const typeInfo,
+    const gpg::RType::load_func_t loadCallback,
+    const gpg::RType::save_func_t saveCallback
   )
   {
     GPG_ASSERT(typeInfo != nullptr);
@@ -67,4 +72,3 @@ namespace moho::audio_reflection
   }
 
 } // namespace moho::audio_reflection
-

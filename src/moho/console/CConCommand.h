@@ -30,7 +30,8 @@ namespace moho
    * out-of-bounds read yielded; each such site carries its own note.
    */
   [[nodiscard]] inline const fa::string* ConCommandArg(
-    const fa::vector<fa::string>& args, const std::size_t index
+    const fa::vector<fa::string>& args,
+    const std::size_t index
   ) noexcept
   {
     return index < args.size() ? &args[index] : nullptr;
@@ -166,7 +167,8 @@ namespace moho
   void UnregisterConCommand(CConCommand& command);
 
   /**
-   * Address: 0x0041BFF0 (FUN_0041BFF0, ?CON_ParseCommand@Moho@@YAXVStrArg@gpg@@AAV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@AAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@5@@Z)
+   * Address: 0x0041BFF0 (FUN_0041BFF0,
+   * ?CON_ParseCommand@Moho@@YAXVStrArg@gpg@@AAV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@AAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@5@@Z)
    *
    * const char* commandText, vector<string>& tokens, string& remainder
    *
@@ -177,7 +179,8 @@ namespace moho
   void CON_ParseCommand(const char* commandText, fa::vector<fa::string>& tokens, fa::string& remainder);
 
   /**
-   * Address: 0x0041C4D0 (FUN_0041C4D0, ?CON_UnparseCommand@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@3@@Z)
+   * Address: 0x0041C4D0 (FUN_0041C4D0,
+   * ?CON_UnparseCommand@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@3@@Z)
    *
    * vector<string> const&
    *
@@ -188,7 +191,8 @@ namespace moho
   [[nodiscard]] fa::string CON_UnparseCommand(const fa::vector<fa::string>& tokens);
 
   /**
-   * Address: 0x0041C600 (FUN_0041C600, ?CON_GetCommandList@Moho@@YAXAAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@_N@Z)
+   * Address: 0x0041C600 (FUN_0041C600,
+   * ?CON_GetCommandList@Moho@@YAXAAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@_N@Z)
    *
    * string&, bool includeDescriptions
    *
@@ -198,7 +202,8 @@ namespace moho
   void CON_GetCommandList(fa::string& outText, bool includeDescriptions);
 
   /**
-   * Address: 0x0041C770 (FUN_0041C770, ?CON_GetFindTextMatches@Moho@@YA?BV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@PBD@Z)
+   * Address: 0x0041C770 (FUN_0041C770,
+   * ?CON_GetFindTextMatches@Moho@@YA?BV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@PBD@Z)
    *
    * const char* prefix
    *
@@ -218,7 +223,7 @@ namespace moho
   void CON_Printf(const char* format, ...);
 
   /**
-     * Address: 0x0041CC90 (FUN_0041CC90)
+   * Address: 0x0041CC90 (FUN_0041CC90)
    *
    * What it does:
    * Tokenizes and executes a single console command text line through the global registry.
@@ -226,7 +231,7 @@ namespace moho
   void ExecuteConsoleCommandText(const char* commandText);
 
   /**
-    * Alias of FUN_0041CC90 (non-canonical helper lane).
+   * Alias of FUN_0041CC90 (non-canonical helper lane).
    *
    * What it does:
    * Public console-execution entry point; forwards to command tokenizer/dispatcher.
@@ -258,7 +263,8 @@ namespace moho
   void CON_ExecuteLastCommand();
 
   /**
-   * Address: 0x0041D3C0 (FUN_0041D3C0, ?CON_GetExecuteStack@Moho@@YAABV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@XZ)
+   * Address: 0x0041D3C0 (FUN_0041D3C0,
+   * ?CON_GetExecuteStack@Moho@@YAABV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@XZ)
    *
    * What it does:
    * Returns the process-global saved execute command stack.
@@ -456,22 +462,6 @@ namespace moho
    * Throws `std::exception` with fixed debug text.
    */
   void CON_Debug_Throw(const fa::vector<fa::string>& args);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   /**
    * Address: 0x00500AF0 (FUN_00500AF0, Moho::CON_p4_Edit)
@@ -1003,7 +993,11 @@ namespace moho
   class TConVar final : public CConCommand
   {
   public:
-    TConVar(const char* name, const char* description, T* value) noexcept
+    TConVar(
+      const char* name,
+      const char* description,
+      T* value
+    ) noexcept
       : CConCommand(name, description)
       , mValue(value)
     {}
@@ -1021,7 +1015,9 @@ namespace moho
    * specializations below.
    */
   template <typename T>
-  inline void TConVar<T>::Handle(const fa::vector<fa::string>& args)
+  inline void TConVar<T>::Handle(
+    const fa::vector<fa::string>& args
+  )
   {
     (void)args;
   }
@@ -1068,7 +1064,7 @@ namespace moho
 
   /**
    * Address: 0x007FDE00 (FUN_007FDE00, Moho::TConVar_uint::Process)
-    * Alias of FUN_103C8880 (non-canonical helper lane).
+   * Alias of FUN_103C8880 (non-canonical helper lane).
    *
    * What it does:
    * Handles uint32 console-convar commands.

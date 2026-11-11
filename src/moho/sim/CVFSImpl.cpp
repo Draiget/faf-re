@@ -32,7 +32,8 @@ namespace moho
 
   TConVar<bool> gTConVar_res_CacheFileLookups(
     "res_CacheFileLookups",
-    "Remember where the mounted file system found each file until the mounts or files change (same results, less work).",
+    "Remember where the mounted file system found each file until the mounts or files change (same results, less "
+    "work).",
     &res_CacheFileLookups
   );
 
@@ -85,7 +86,9 @@ namespace
       : CDiskWatchListener("*")
     {}
 
-    void OnDiskWatchEvent(const moho::SDiskWatchEvent& /*event*/) override
+    void OnDiskWatchEvent(
+      const moho::SDiskWatchEvent& /*event*/
+    ) override
     {
       Invalidate();
     }
@@ -173,7 +176,9 @@ void moho::DISK_InvalidateFileLookups()
 
 namespace
 {
-  [[nodiscard]] const char* SafePathArg(const gpg::StrArg sourcePath)
+  [[nodiscard]] const char* SafePathArg(
+    const gpg::StrArg sourcePath
+  )
   {
     return sourcePath != nullptr ? sourcePath : "";
   }
@@ -186,10 +191,14 @@ namespace
    * or mod could read or probe any file. A path with no `..` segment is left
    * exactly as it was.
    */
-  [[nodiscard]] bool ConfineMountedPath(fa::string& path)
+  [[nodiscard]] bool ConfineMountedPath(
+    fa::string& path
+  )
   {
     const std::string_view text = path.view();
-    const auto isSeparator = [](const char c) { return c == '/' || c == '\\'; };
+    const auto isSeparator = [](const char c) {
+      return c == '/' || c == '\\';
+    };
 
     std::vector<std::string_view> segments;
     bool climbs = false;
@@ -231,12 +240,16 @@ namespace
     return true;
   }
 
-  [[nodiscard]] bool ContainsWildcardCharacters(const fa::string& pathPattern)
+  [[nodiscard]] bool ContainsWildcardCharacters(
+    const fa::string& pathPattern
+  )
   {
     return pathPattern.find('*') != fa::string::npos || pathPattern.find('?') != fa::string::npos;
   }
 
-  [[nodiscard]] fa::string ParentDirectoryFromPattern(const fa::string& canonicalPattern)
+  [[nodiscard]] fa::string ParentDirectoryFromPattern(
+    const fa::string& canonicalPattern
+  )
   {
     const std::string_view patternView = canonicalPattern.view();
     const std::size_t splitIndex = patternView.find_last_of("\\/");
@@ -255,10 +268,12 @@ namespace
     bool mIsDirectory = false;
   };
   static_assert(
-    offsetof(SearchPathCandidate, mResolvedPath) == 0x00, "SearchPathCandidate::mResolvedPath offset must be 0x00"
+    offsetof(SearchPathCandidate, mResolvedPath) == 0x00,
+    "SearchPathCandidate::mResolvedPath offset must be 0x00"
   );
   static_assert(
-    offsetof(SearchPathCandidate, mIsDirectory) == 0x1C, "SearchPathCandidate::mIsDirectory offset must be 0x1C"
+    offsetof(SearchPathCandidate, mIsDirectory) == 0x1C,
+    "SearchPathCandidate::mIsDirectory offset must be 0x1C"
   );
   static_assert(sizeof(SearchPathCandidate) == 0x20, "SearchPathCandidate size must be 0x20");
 
@@ -269,7 +284,9 @@ namespace
    * Destroys one search-candidate string lane and resets it to empty SSO
    * state.
    */
-  [[maybe_unused]] void DestroySearchPathCandidate(SearchPathCandidate& candidate)
+  [[maybe_unused]] void DestroySearchPathCandidate(
+    SearchPathCandidate& candidate
+  )
   {
     candidate.mResolvedPath.tidy(true, 0U);
   }
@@ -286,7 +303,9 @@ namespace
    * `FindFirstFileA` triad -- matches the same CRT calls already used by
    * `lua::io_dir` (LuaObject.cpp, 0x00915F60).
    */
-  [[nodiscard]] std::vector<SearchPathCandidate> CollectSearchPathCandidates(const fa::string& canonicalPattern)
+  [[nodiscard]] std::vector<SearchPathCandidate> CollectSearchPathCandidates(
+    const fa::string& canonicalPattern
+  )
   {
     std::vector<SearchPathCandidate> candidates{};
     if (canonicalPattern.empty()) {
@@ -357,7 +376,8 @@ namespace
   }
 
   [[nodiscard]] fa::string CanonicalizeJoinedMountPath(
-    const std::filesystem::path& launchDir, const fa::string& sourcePath
+    const std::filesystem::path& launchDir,
+    const fa::string& sourcePath
   )
   {
     if (sourcePath.empty()) {
@@ -375,7 +395,9 @@ namespace
     return canonicalPath;
   }
 
-  void SortAndUniquePaths(fa::vector<fa::string>& paths)
+  void SortAndUniquePaths(
+    fa::vector<fa::string>& paths
+  )
   {
     std::sort(paths.begin(), paths.end(), [](const fa::string& lhs, const fa::string& rhs) {
       return lhs.view() < rhs.view();
@@ -388,15 +410,18 @@ namespace
   }
 
   /**
-    * Alias of FUN_0046AE90 (non-canonical helper lane).
-    * Alias of FUN_0046B4B0 (non-canonical helper lane).
-    * Alias of FUN_0046BA60 (non-canonical helper lane).
+   * Alias of FUN_0046AE90 (non-canonical helper lane).
+   * Alias of FUN_0046B4B0 (non-canonical helper lane).
+   * Alias of FUN_0046BA60 (non-canonical helper lane).
    *
    * What it does:
    * Compares search-path candidate string lanes using reverse path-component
    * order (leaf-first), then applies directory-flag tiebreak ordering.
    */
-  [[nodiscard]] bool SearchPathCandidateLess(const SearchPathCandidate& lhs, const SearchPathCandidate& rhs)
+  [[nodiscard]] bool SearchPathCandidateLess(
+    const SearchPathCandidate& lhs,
+    const SearchPathCandidate& rhs
+  )
   {
     if (moho::PATH_ReverseComponentLess(lhs.mResolvedPath, rhs.mResolvedPath)) {
       return true;
@@ -422,7 +447,9 @@ namespace
   );
 
   /** The archive's lowered names with forward slashes, one per entry, or null when the cache is off. */
-  [[nodiscard]] const std::vector<std::string>* LoweredZipNames(const moho::CZipFile& zipFile)
+  [[nodiscard]] const std::vector<std::string>* LoweredZipNames(
+    const moho::CZipFile& zipFile
+  )
   {
     static const bool startupOff = moho::CFG_GetArgOption("/nozipnamecache", 0u, nullptr);
     if (!res_ZipNameCache || startupOff) {
@@ -548,8 +575,7 @@ namespace
         continue;
       }
 
-      const std::size_t childLength =
-        static_cast<std::size_t>(firstSlash - entryPath.c_str());
+      const std::size_t childLength = static_cast<std::size_t>(firstSlash - entryPath.c_str());
       fa::string childPath = entryPath.substr(0u, childLength);
 
       fa::string mountedPath = mountedRoot;
@@ -672,14 +698,18 @@ namespace
     });
   }
 
-  void RetainMountedZipHandle(moho::SFileWaitHandle* const handle)
+  void RetainMountedZipHandle(
+    moho::SFileWaitHandle* const handle
+  )
   {
     if (handle != nullptr) {
       (void)::InterlockedExchangeAdd(&handle->mLock, 1);
     }
   }
 
-  void ReleaseMountedZipHandle(moho::SFileWaitHandle* const handle)
+  void ReleaseMountedZipHandle(
+    moho::SFileWaitHandle* const handle
+  )
   {
     if (handle == nullptr) {
       return;
@@ -701,7 +731,8 @@ namespace
    * destination storage is non-null.
    */
   [[maybe_unused]] moho::SVFSMountPoint* ConstructMountPointCopyIfPresent(
-    const moho::SVFSMountPoint& source, moho::SVFSMountPoint* destination
+    const moho::SVFSMountPoint& source,
+    moho::SVFSMountPoint* destination
   )
   {
     if (destination == nullptr) {
@@ -758,8 +789,7 @@ namespace moho
     : mDir()
     , mMountpoint("/", 1u)
     , mZipHandle(nullptr)
-  {
-  }
+  {}
 
   /**
    * Address: 0x004577D0 (FUN_004577D0, Moho::SVFSMountPoint::SVFSMountPoint)
@@ -770,14 +800,18 @@ namespace moho
    * Initializes one mount-point lane from explicit directory/mountpoint text
    * tokens and clears mounted-zip ownership.
    */
-  SVFSMountPoint::SVFSMountPoint(const gpg::StrArg dir, const gpg::StrArg mountpoint)
+  SVFSMountPoint::SVFSMountPoint(
+    const gpg::StrArg dir,
+    const gpg::StrArg mountpoint
+  )
     : mDir(dir != nullptr ? dir : "", dir != nullptr ? std::strlen(dir) : 0u)
     , mMountpoint(mountpoint != nullptr ? mountpoint : "", mountpoint != nullptr ? std::strlen(mountpoint) : 0u)
     , mZipHandle(nullptr)
-  {
-  }
+  {}
 
-  SVFSMountPoint::SVFSMountPoint(const SVFSMountPoint& other)
+  SVFSMountPoint::SVFSMountPoint(
+    const SVFSMountPoint& other
+  )
     : mDir()
     , mMountpoint()
     , mZipHandle(other.mZipHandle)
@@ -787,7 +821,9 @@ namespace moho
     RetainMountedZipHandle(mZipHandle);
   }
 
-  SVFSMountPoint::SVFSMountPoint(SVFSMountPoint&& other) noexcept
+  SVFSMountPoint::SVFSMountPoint(
+    SVFSMountPoint&& other
+  ) noexcept
     : mDir(std::move(other.mDir))
     , mMountpoint(std::move(other.mMountpoint))
     , mZipHandle(other.mZipHandle)
@@ -802,7 +838,9 @@ namespace moho
    * Copies mountpoint directory/root strings and transfers zip-handle
    * ownership with retain/release semantics.
    */
-  SVFSMountPoint& SVFSMountPoint::operator=(const SVFSMountPoint& other)
+  SVFSMountPoint& SVFSMountPoint::operator=(
+    const SVFSMountPoint& other
+  )
   {
     SFileWaitHandle* const nextHandle = other.mZipHandle;
     RetainMountedZipHandle(nextHandle);
@@ -814,7 +852,9 @@ namespace moho
     return *this;
   }
 
-  SVFSMountPoint& SVFSMountPoint::operator=(SVFSMountPoint&& other) noexcept
+  SVFSMountPoint& SVFSMountPoint::operator=(
+    SVFSMountPoint&& other
+  ) noexcept
   {
     if (this == &other) {
       return *this;
@@ -840,12 +880,16 @@ namespace moho
   /**
    * Address: 0x00466250 (FUN_00466250, ??0CVFSImpl@Moho@@QAE@@Z)
    *
-   * std::vector<Moho::SVFSMountPoint> const &,boost::filesystem::basic_path<std::string,boost::filesystem::path_traits> const &
+   * std::vector<Moho::SVFSMountPoint> const &,boost::filesystem::basic_path<std::string,boost::filesystem::path_traits>
+   * const &
    *
    * What it does:
    * Initializes mountpoint storage and expands the configured mount lanes.
    */
-  CVFSImpl::CVFSImpl(const fa::vector<SVFSMountPoint>& mountpoints, const std::filesystem::path& launchDir)
+  CVFSImpl::CVFSImpl(
+    const fa::vector<SVFSMountPoint>& mountpoints,
+    const std::filesystem::path& launchDir
+  )
     : mMountpoints()
   {
     for (const SVFSMountPoint& mountpoint : mountpoints) {
@@ -870,7 +914,10 @@ namespace moho
    * Resolves one configured mount source path (including wildcard expansion)
    * and forwards concrete candidates to `AddSearchPath`.
    */
-  void CVFSImpl::AddMountPoint(const SVFSMountPoint& mountPoint, const std::filesystem::path& launchDir)
+  void CVFSImpl::AddMountPoint(
+    const SVFSMountPoint& mountPoint,
+    const std::filesystem::path& launchDir
+  )
   {
     const fa::string canonicalPattern = CanonicalizeJoinedMountPath(launchDir, mountPoint.mDir);
     if (canonicalPattern.empty()) {
@@ -884,7 +931,10 @@ namespace moho
     }
   }
 
-  void CVFSImpl::MountDirectoryLate(const std::filesystem::path& directory, const gpg::StrArg mountpoint)
+  void CVFSImpl::MountDirectoryLate(
+    const std::filesystem::path& directory,
+    const gpg::StrArg mountpoint
+  )
   {
     const SVFSMountPoint point(directory.string().c_str(), mountpoint);
     AddSearchPath(point, fa::string(directory.string().c_str()), true);
@@ -898,7 +948,9 @@ namespace moho
    * mounted directly and files are mounted through `DISK_MountZipFile`.
    */
   void CVFSImpl::AddSearchPath(
-    const SVFSMountPoint& mountPoint, const fa::string& resolvedPath, const bool isDirectory
+    const SVFSMountPoint& mountPoint,
+    const fa::string& resolvedPath,
+    const bool isDirectory
   )
   {
     fa::string canonicalPath{};
@@ -944,7 +996,11 @@ namespace moho
    * Resolves a mounted path to on-disk/zip-backed path and stores the first
    * matching real path into `outPath`.
    */
-  fa::string* CVFSImpl::FindFile(fa::string* const outPath, const gpg::StrArg sourcePath, SDiskFileInfo* const outInfo)
+  fa::string* CVFSImpl::FindFile(
+    fa::string* const outPath,
+    const gpg::StrArg sourcePath,
+    SDiskFileInfo* const outInfo
+  )
   {
     if (outPath == nullptr) {
       return nullptr;
@@ -971,8 +1027,7 @@ namespace moho
       triedLooseDirectory = triedLooseDirectory || mountpoint.mZipHandle == nullptr;
 
       const std::size_t mountpointSize = mountpoint.mMountpoint.size();
-      const std::size_t suffixStart =
-        mountpointSize == 0 ? 0u : std::min(loweredPath.size(), mountpointSize - 1u);
+      const std::size_t suffixStart = mountpointSize == 0 ? 0u : std::min(loweredPath.size(), mountpointSize - 1u);
       fa::string diskPath = mountpoint.mDir + (loweredPath.c_str() + suffixStart);
       for (std::size_t index = mountpoint.mDir.size(); index < diskPath.size(); ++index) {
         if (diskPath[index] == '/') {
@@ -981,8 +1036,10 @@ namespace moho
       }
 
       FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
-      if (waitHandleSet != nullptr &&
-          waitHandleSet->GetFileInfo(diskPath.c_str(), outInfo, mountpoint.mZipHandle != nullptr)) {
+      if (
+        waitHandleSet != nullptr &&
+        waitHandleSet->GetFileInfo(diskPath.c_str(), outInfo, mountpoint.mZipHandle != nullptr)
+      ) {
         outPath->assign_owned(diskPath.view());
         if (useLookupCache) {
           MountedFileLookups().Store(this, loweredPath, *outPath, lookupGeneration);
@@ -1006,7 +1063,10 @@ namespace moho
    * What it does:
    * Maps one on-disk path under mounted directories back to VFS mountpoint form.
    */
-  fa::string* CVFSImpl::ToMountedPath(fa::string* const outPath, const gpg::StrArg sourcePath)
+  fa::string* CVFSImpl::ToMountedPath(
+    fa::string* const outPath,
+    const gpg::StrArg sourcePath
+  )
   {
     if (outPath == nullptr) {
       return nullptr;
@@ -1045,7 +1105,10 @@ namespace moho
    * What it does:
    * Resolves metadata for one mounted path via wait-handle set lookup.
    */
-  bool CVFSImpl::GetFileInfo(const gpg::StrArg sourcePath, SDiskFileInfo* const outInfo)
+  bool CVFSImpl::GetFileInfo(
+    const gpg::StrArg sourcePath,
+    SDiskFileInfo* const outInfo
+  )
   {
     fa::string loweredPath = gpg::STR_ToLower(SafePathArg(sourcePath));
     if (!ConfineMountedPath(loweredPath)) {
@@ -1057,13 +1120,14 @@ namespace moho
       }
 
       const std::size_t mountpointSize = mountpoint.mMountpoint.size();
-      const std::size_t suffixStart =
-        mountpointSize == 0 ? 0u : std::min(loweredPath.size(), mountpointSize - 1u);
+      const std::size_t suffixStart = mountpointSize == 0 ? 0u : std::min(loweredPath.size(), mountpointSize - 1u);
       const fa::string diskPath = mountpoint.mDir + (loweredPath.c_str() + suffixStart);
 
       FWaitHandleSet* const waitHandleSet = FILE_GetWaitHandleSet();
-      if (waitHandleSet != nullptr &&
-          waitHandleSet->GetFileInfo(diskPath.c_str(), outInfo, mountpoint.mZipHandle != nullptr)) {
+      if (
+        waitHandleSet != nullptr &&
+        waitHandleSet->GetFileInfo(diskPath.c_str(), outInfo, mountpoint.mZipHandle != nullptr)
+      ) {
         return true;
       }
     }
@@ -1104,8 +1168,7 @@ namespace moho
     }
 
     for (const SVFSMountPoint& mountpoint : mMountpoints) {
-      const bool prefixContainsMount =
-        gpg::STR_StartsWith(normalizedPrefix.c_str(), mountpoint.mMountpoint.c_str());
+      const bool prefixContainsMount = gpg::STR_StartsWith(normalizedPrefix.c_str(), mountpoint.mMountpoint.c_str());
       const bool mountContainsPrefix =
         allowPrefixWildcard && gpg::STR_StartsWith(mountpoint.mMountpoint.c_str(), normalizedPrefix.c_str());
       if (!prefixContainsMount && !mountContainsPrefix) {
@@ -1135,13 +1198,7 @@ namespace moho
         const char* const diskSuffix = normalizedPrefix.c_str() + (sharedPrefixLen - 1u);
         (void)diskDirectory.append(diskSuffix, std::strlen(diskSuffix));
       }
-      EnumerateDirectoryFiles(
-        diskDirectory,
-        mountedDirectory,
-        wildcardPattern.c_str(),
-        allowPrefixWildcard,
-        *outPaths
-      );
+      EnumerateDirectoryFiles(diskDirectory, mountedDirectory, wildcardPattern.c_str(), allowPrefixWildcard, *outPaths);
     }
 
     SortAndUniquePaths(*outPaths);
@@ -1166,7 +1223,10 @@ namespace moho
    * Enumerates child directory paths under one mounted prefix from zip and
    * directory search roots, then sorts and de-duplicates output.
    */
-  void CVFSImpl::EnumerateChildren(const gpg::StrArg mountPrefix, fa::vector<fa::string>* const outPaths)
+  void CVFSImpl::EnumerateChildren(
+    const gpg::StrArg mountPrefix,
+    fa::vector<fa::string>* const outPaths
+  )
   {
     if (outPaths == nullptr) {
       return;

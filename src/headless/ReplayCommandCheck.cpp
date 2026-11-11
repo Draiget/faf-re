@@ -16,12 +16,16 @@ namespace faf::headless
   {
     constexpr std::uint64_t kLoggedDifferences = 3; // per opcode
 
-    [[nodiscard]] std::vector<char> MessageBytes(const moho::CMessage& message)
+    [[nodiscard]] std::vector<char> MessageBytes(
+      const moho::CMessage& message
+    )
     {
       return std::vector<char>(message.mBuff.start_, message.mBuff.start_ + message.mBuff.Size());
     }
 
-    [[nodiscard]] std::string Hex(const std::vector<char>& bytes)
+    [[nodiscard]] std::string Hex(
+      const std::vector<char>& bytes
+    )
     {
       std::string text;
       char part[4];
@@ -39,7 +43,12 @@ namespace faf::headless
      * string, 2 nil, 3 boolean, 4 table of key/value pairs up to 5) in a form that does not
      * depend on the order a table's pairs were written in. False when `bytes` does not hold one.
      */
-    [[nodiscard]] bool CanonicalLua(const std::vector<char>& bytes, std::size_t& at, std::string& out, const int depth)
+    [[nodiscard]] bool CanonicalLua(
+      const std::vector<char>& bytes,
+      std::size_t& at,
+      std::string& out,
+      const int depth
+    )
     {
       if (at >= bytes.size() || depth > 64) {
         return false;
@@ -101,7 +110,10 @@ namespace faf::headless
      * Whether two command messages differ only in the order a Lua table's pairs were written:
      * the same bytes up to a table, tables with the same pairs, the same bytes after it.
      */
-    [[nodiscard]] bool SameButLuaKeyOrder(const std::vector<char>& a, const std::vector<char>& b)
+    [[nodiscard]] bool SameButLuaKeyOrder(
+      const std::vector<char>& a,
+      const std::vector<char>& b
+    )
     {
       if (a.size() != b.size()) {
         return false;
@@ -119,8 +131,10 @@ namespace faf::headless
         std::size_t endB = start;
         std::string canonicalA;
         std::string canonicalB;
-        if (CanonicalLua(a, endA, canonicalA, 0) && CanonicalLua(b, endB, canonicalB, 0) && endA == endB
-            && endA > first && canonicalA == canonicalB) {
+        if (
+          CanonicalLua(a, endA, canonicalA, 0) && CanonicalLua(b, endB, canonicalB, 0) && endA == endB &&
+          endA > first && canonicalA == canonicalB
+        ) {
           return SameButLuaKeyOrder(
             std::vector<char>(a.begin() + static_cast<std::ptrdiff_t>(endA), a.end()),
             std::vector<char>(b.begin() + static_cast<std::ptrdiff_t>(endB), b.end())
@@ -131,9 +145,16 @@ namespace faf::headless
     }
   } // namespace
 
-  CReplayCommandCheck::CReplayCommandCheck(moho::RRuleGameRules& rules)
+  CReplayCommandCheck::CReplayCommandCheck(
+    moho::RRuleGameRules& rules
+  )
     : mLuaState(new LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE))
-    , mCapture([this](moho::CMessage& message) { mCaptured.push_back(MessageBytes(message)); }, nullptr)
+    , mCapture(
+        [this](moho::CMessage& message) {
+          mCaptured.push_back(MessageBytes(message));
+        },
+        nullptr
+      )
     , mMarshaller(std::make_unique<moho::CMarshaller>(&mCapture))
     , mDecoder(std::make_unique<moho::CDecoder>(mMarshaller.get(), mNoRecording, &rules, mLuaState.get()))
   {}
@@ -153,12 +174,17 @@ namespace faf::headless
     moho::CDecoder::SetMessageObserver(nullptr, nullptr);
   }
 
-  void CReplayCommandCheck::Observe(const moho::CMessage& message, void* const context)
+  void CReplayCommandCheck::Observe(
+    const moho::CMessage& message,
+    void* const context
+  )
   {
     static_cast<CReplayCommandCheck*>(context)->OnMessage(message);
   }
 
-  void CReplayCommandCheck::OnMessage(const moho::CMessage& message)
+  void CReplayCommandCheck::OnMessage(
+    const moho::CMessage& message
+  )
   {
     if (mInside) {
       return; // this check's own decoder
@@ -167,8 +193,17 @@ namespace faf::headless
     struct SInside
     {
       bool& inside;
-      explicit SInside(bool& flag) : inside(flag) { inside = true; }
-      ~SInside() { inside = false; }
+      explicit SInside(
+        bool& flag
+      )
+        : inside(flag)
+      {
+        inside = true;
+      }
+      ~SInside()
+      {
+        inside = false;
+      }
     };
     mCaptured.clear();
     {
@@ -189,8 +224,11 @@ namespace faf::headless
     } else {
       if (mDiffering[opcode]++ < kLoggedDifferences) {
         std::printf(
-          "command check: opcode %u differs: replay %s, round trip %s%s\n", static_cast<unsigned>(opcode),
-          Hex(original).c_str(), Hex(mCaptured.front()).c_str(), mCaptured.size() > 1u ? " (and more)" : ""
+          "command check: opcode %u differs: replay %s, round trip %s%s\n",
+          static_cast<unsigned>(opcode),
+          Hex(original).c_str(),
+          Hex(mCaptured.front()).c_str(),
+          mCaptured.size() > 1u ? " (and more)" : ""
         );
       }
     }
@@ -217,11 +255,14 @@ namespace faf::headless
     }
     char text[256];
     std::snprintf(
-      text, sizeof(text),
+      text,
+      sizeof(text),
       "command check: %llu messages, %llu identical after decode and marshal, %llu the same but for the order of "
       "a Lua table's pairs, %llu differing, %llu not marshalled again (dropped by the decoder, as the sim drops them)",
-      static_cast<unsigned long long>(mMessages), static_cast<unsigned long long>(mIdentical),
-      static_cast<unsigned long long>(keyOrderOnly), static_cast<unsigned long long>(Failures()),
+      static_cast<unsigned long long>(mMessages),
+      static_cast<unsigned long long>(mIdentical),
+      static_cast<unsigned long long>(keyOrderOnly),
+      static_cast<unsigned long long>(Failures()),
       static_cast<unsigned long long>(missing)
     );
     std::string summary = text;
@@ -232,10 +273,14 @@ namespace faf::headless
       }
       char part[128];
       std::snprintf(
-        part, sizeof(part), " %zu:%llu%s", op, static_cast<unsigned long long>(mSeen[op]),
+        part,
+        sizeof(part),
+        " %zu:%llu%s",
+        op,
+        static_cast<unsigned long long>(mSeen[op]),
         mDiffering[op] != 0u || mMissing[op] != 0u || mKeyOrderOnly[op] != 0u
-          ? (std::string("(") + std::to_string(mKeyOrderOnly[op]) + " key order, " + std::to_string(mDiffering[op])
-             + " differ, " + std::to_string(mMissing[op]) + " dropped)")
+          ? (std::string("(") + std::to_string(mKeyOrderOnly[op]) + " key order, " + std::to_string(mDiffering[op]) +
+             " differ, " + std::to_string(mMissing[op]) + " dropped)")
               .c_str()
           : ""
       );

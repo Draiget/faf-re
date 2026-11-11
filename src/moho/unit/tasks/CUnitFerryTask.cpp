@@ -41,7 +41,9 @@ namespace
   constexpr const char* kFerryBeaconCategoryName = "FERRYBEACON";
   constexpr const char* kOnFerryPointSetScriptName = "OnFerryPointSet";
 
-  void MarkOwnerFerryTaskAssigned(moho::Unit* const ownerUnit)
+  void MarkOwnerFerryTaskAssigned(
+    moho::Unit* const ownerUnit
+  )
   {
     if (ownerUnit == nullptr) {
       return;
@@ -50,7 +52,9 @@ namespace
     ownerUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskFerryTaskAssigned;
   }
 
-  void RunOwnerFerryPointSetScript(moho::Unit* const ownerUnit)
+  void RunOwnerFerryPointSetScript(
+    moho::Unit* const ownerUnit
+  )
   {
     if (ownerUnit == nullptr) {
       return;
@@ -62,12 +66,17 @@ namespace
   // 0x0060E0A5-0x0060E0DE: IsInCategory("FACTORY"), `[unit+0x554]` AiBuilder
   // non-null, then vtable +0x30 IsMobile -- the flag is set only when it
   // returns false (`je 0x60E0E4` keeps the 1).
-  [[nodiscard]] bool IsStationaryFactoryWithBuilder(const moho::Unit* const unit)
+  [[nodiscard]] bool IsStationaryFactoryWithBuilder(
+    const moho::Unit* const unit
+  )
   {
-    return unit != nullptr && unit->IsInCategory(kFactoryCategoryName) && unit->AiBuilder != nullptr && !unit->IsMobile();
+    return unit != nullptr && unit->IsInCategory(kFactoryCategoryName) && unit->AiBuilder != nullptr &&
+      !unit->IsMobile();
   }
 
-  void ResolveGuardedFactoryOwner(moho::WeakPtr<moho::Unit>& ferryUnitRef)
+  void ResolveGuardedFactoryOwner(
+    moho::WeakPtr<moho::Unit>& ferryUnitRef
+  )
   {
     while (true) {
       moho::Unit* const ferryUnit = ferryUnitRef.GetObjectPtr();
@@ -98,9 +107,7 @@ namespace
     ScopedRouteCommandVector() = default;
     ScopedRouteCommandVector(const ScopedRouteCommandVector&) = delete;
     ScopedRouteCommandVector& operator=(const ScopedRouteCommandVector&) = delete;
-
   };
-
 
   /**
    * Fills `outUnits` with the owner army's units matching a named entity
@@ -115,11 +122,10 @@ namespace
     moho::EntitySetTemplate<moho::Unit>& outUnits
   )
   {
-    const moho::EntityCategorySet* const category =
-      ownerUnit.SimulationRef->mRules->GetEntityCategory(categoryName);
+    const moho::EntityCategorySet* const category = ownerUnit.SimulationRef->mRules->GetEntityCategory(categoryName);
     (void)ownerUnit.ArmyRef->GetUnits(&outUnits, const_cast<moho::EntityCategorySet*>(category));
   }
-}
+} // namespace
 
 namespace moho
 {
@@ -154,7 +160,10 @@ namespace moho
    * transport loaded-state into task-state, and binds head-command beacon
    * ownership when present.
    */
-  CUnitFerryTask::CUnitFerryTask(IAiCommandDispatchImpl* const dispatch, const Wm3::Vector3f& ferryPosition)
+  CUnitFerryTask::CUnitFerryTask(
+    IAiCommandDispatchImpl* const dispatch,
+    const Wm3::Vector3f& ferryPosition
+  )
     : CCommandTask(static_cast<CCommandTask*>(dispatch))
     , mDispatch(dispatch)
     , mCommandIndex(0)
@@ -219,7 +228,10 @@ namespace moho
    * target unit, resolves ferry/beacon ownership, then publishes the ferry
    * script hook and completes immediately.
    */
-  CUnitFerryTask::CUnitFerryTask(CCommandTask* const parentTask, Unit* const targetUnit)
+  CUnitFerryTask::CUnitFerryTask(
+    CCommandTask* const parentTask,
+    Unit* const targetUnit
+  )
     : CCommandTask(parentTask)
     , mDispatch(static_cast<IAiCommandDispatchImpl*>(parentTask))
     , mCommandIndex(0)
@@ -343,7 +355,9 @@ namespace moho
    *   unit's own IsUnitState(+0x3C) with 2 = UNITSTATE_Moving
    *   (0x0060E724-0x0060E75D).
    */
-  void CUnitFerryTask::FilterTransportableUnits(EntitySetTemplate<Unit>& outUnits)
+  void CUnitFerryTask::FilterTransportableUnits(
+    EntitySetTemplate<Unit>& outUnits
+  )
   {
     Unit* const ownerUnit = mUnit;
 
@@ -386,8 +400,10 @@ namespace moho
         continue;
       }
 
-      if (!ownerUnit->AiTransport->TransportHasSpaceFor(candidate->GetBlueprint())
-          || candidate->GetFocusEntity() == nullptr) {
+      if (
+        !ownerUnit->AiTransport->TransportHasSpaceFor(candidate->GetBlueprint()) ||
+        candidate->GetFocusEntity() == nullptr
+      ) {
         continue;
       }
 
@@ -416,8 +432,10 @@ namespace moho
           if (Unit* const routeUnit = mRouteUnit.GetObjectPtr(); routeUnit != nullptr) {
             // While the route transport still has room for this candidate and
             // is not underway, leave the candidate for that transport.
-            if (routeUnit->AiTransport->TransportHasSpaceFor(candidate->GetBlueprint())
-                && !routeUnit->IsUnitState(UNITSTATE_Moving)) {
+            if (
+              routeUnit->AiTransport->TransportHasSpaceFor(candidate->GetBlueprint()) &&
+              !routeUnit->IsUnitState(UNITSTATE_Moving)
+            ) {
               continue;
             }
           }
@@ -470,8 +488,7 @@ namespace moho
         // blueprints (RUnitBlueprint derives from REntityBlueprint), so the
         // checked cast resolves to a static upcast for all reachable inputs —
         // same treatment as IAiCommandDispatchImpl::DispatchQueuedCommand.
-        const auto* const buildBlueprint =
-          static_cast<const RUnitBlueprint*>(headCommand->mConstDat.blueprint);
+        const auto* const buildBlueprint = static_cast<const RUnitBlueprint*>(headCommand->mConstDat.blueprint);
 
         if (mUnit->AiTransport->TransportHasSpaceFor(buildBlueprint)) {
           return true;
@@ -488,8 +505,10 @@ namespace moho
         continue;
       }
 
-      if (candidate->IsDead() || candidate->DestroyQueued() || candidate->IsBeingBuilt()
-          || candidate->IsUnitState(UNITSTATE_Attached)) {
+      if (
+        candidate->IsDead() || candidate->DestroyQueued() || candidate->IsBeingBuilt() ||
+        candidate->IsUnitState(UNITSTATE_Attached)
+      ) {
         continue;
       }
 
@@ -584,7 +603,9 @@ namespace moho
    *   (FUN_0060DAE0) compared against decoded beacon (0x0060ECB1-0x0060ECCD);
    *   on match, assign from that transport's queue (0x0060ECFC-0x0060ED0A).
    */
-  void CUnitFerryTask::GetUnitCommands(fa::vector<WeakPtr<CUnitCommand>>& outCommands)
+  void CUnitFerryTask::GetUnitCommands(
+    fa::vector<WeakPtr<CUnitCommand>>& outCommands
+  )
   {
     outCommands = mUnit->CommandQueue->mCommandVec;
 
@@ -676,16 +697,16 @@ namespace moho
     const std::int32_t index = mCommandIndex;
 
     if (index < commandCount - 1) {
-      CUnitCommand* const pickupCommand =
-        routeCommands.commands[static_cast<std::size_t>(index)].GetObjectPtr();
-      CUnitCommand* const dropoffCommand =
-        routeCommands.commands[static_cast<std::size_t>(index) + 1u].GetObjectPtr();
+      CUnitCommand* const pickupCommand = routeCommands.commands[static_cast<std::size_t>(index)].GetObjectPtr();
+      CUnitCommand* const dropoffCommand = routeCommands.commands[static_cast<std::size_t>(index) + 1u].GetObjectPtr();
 
       if (pickupCommand != nullptr && dropoffCommand != nullptr) {
         // With a ferry unit bound the dropoff leg is a plain move; a
         // beacon-only route encodes it as a ferry command.
-        if ((mFerryUnit.HasValue() && dropoffCommand->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_Move)
-            || (!mFerryUnit.HasValue() && dropoffCommand->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_Ferry)) {
+        if (
+          (mFerryUnit.HasValue() && dropoffCommand->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_Move) ||
+          (!mFerryUnit.HasValue() && dropoffCommand->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_Ferry)
+        ) {
           const Wm3::Vec3f pickupPos = pickupCommand->mTarget.GetTargetPosGun(false);
           const SNavGoal goal(mUnit->GetFootprint().ToCellPos(pickupPos));
           NewMoveTask(goal, mDispatch, 0, pickupCommand, 0);
@@ -739,8 +760,7 @@ namespace moho
     }
     mCommandIndex = index;
 
-    CUnitCommand* const routeCommand =
-      routeCommands.commands[static_cast<std::size_t>(index)].GetObjectPtr();
+    CUnitCommand* const routeCommand = routeCommands.commands[static_cast<std::size_t>(index)].GetObjectPtr();
     if (routeCommand == nullptr) {
       mCommandIndex = 0;
     } else {
@@ -795,8 +815,7 @@ namespace moho
       }
       mCommandIndex = index;
 
-      CUnitCommand* const routeCommand =
-        routeCommands.commands[static_cast<std::size_t>(index)].GetObjectPtr();
+      CUnitCommand* const routeCommand = routeCommands.commands[static_cast<std::size_t>(index)].GetObjectPtr();
       if (routeCommand != nullptr) {
         const Wm3::Vec3f targetPos = routeCommand->mTarget.GetTargetPosGun(false);
         const SNavGoal goal(mUnit->GetFootprint().ToCellPos(targetPos));
@@ -847,8 +866,7 @@ namespace moho
     // 0x0060F2B7 `comiss` + `jbe`: an unordered compare also takes the branch, so
     // a NaN route anchor (a beacon at a NaN target) counts as arrived and the
     // grounded transport stays put; `<=` would send it flying.
-    if (mUnit->mVarDat.mLayerMask == LAYER_Land
-        && !(distance > mUnit->GetBlueprint()->Air.StartTurnDistance)) {
+    if (mUnit->mVarDat.mLayerMask == LAYER_Land && !(distance > mUnit->GetBlueprint()->Air.StartTurnDistance)) {
       mTaskState = TASKSTATE_Preparing;
       return;
     }
@@ -930,8 +948,7 @@ namespace moho
     }
 
     if (mBeacon.HasValue()) {
-      if (CUnitCommand* const currentCommand = mUnit->CommandQueue->GetCurrentCommand();
-          currentCommand != nullptr) {
+      if (CUnitCommand* const currentCommand = mUnit->CommandQueue->GetCurrentCommand(); currentCommand != nullptr) {
         Unit* const beaconUnit = mBeacon.GetObjectPtr();
         CAiTarget& commandTarget = currentCommand->mTarget;
 
@@ -960,48 +977,48 @@ namespace moho
     }
 
     switch (mTaskState) {
-      case TASKSTATE_Preparing: {
-        mUnit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_ForceSpeedThrough);
+    case TASKSTATE_Preparing: {
+      mUnit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_ForceSpeedThrough);
 
-        if (HasNextUnitToLoad()) {
-          return 1;
-        }
-
-        if (mUnit->mVarDat.mLayerMask == LAYER_Air) {
-          SNavGoal goal(mUnit->GetFootprint().ToCellPos(mPos));
-          goal.mLayer = LAYER_Land;
-          NewMoveTask(goal, mDispatch, 0, nullptr, 1);
-        }
-
-        return 10;
-      }
-
-      case TASKSTATE_Waiting: {
-        mUnit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_ForceSpeedThrough);
-        MoveToNextRoutePoint();
+      if (HasNextUnitToLoad()) {
         return 1;
       }
 
-      case TASKSTATE_Starting: {
-        mUnit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_ForceSpeedThrough);
-        IssueUnloadAtRoutePoint();
-        return 1;
+      if (mUnit->mVarDat.mLayerMask == LAYER_Air) {
+        SNavGoal goal(mUnit->GetFootprint().ToCellPos(mPos));
+        goal.mLayer = LAYER_Land;
+        NewMoveTask(goal, mDispatch, 0, nullptr, 1);
       }
 
-      case TASKSTATE_Processing: {
-        mUnit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_ForceSpeedThrough);
-        MoveToPreviousRoutePoint();
-        return 1;
-      }
+      return 10;
+    }
 
-      case TASKSTATE_Complete: {
-        mUnit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_ForceSpeedThrough);
-        ResumeFerryRoute();
-        return 1;
-      }
+    case TASKSTATE_Waiting: {
+      mUnit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_ForceSpeedThrough);
+      MoveToNextRoutePoint();
+      return 1;
+    }
 
-      default:
-        return 1;
+    case TASKSTATE_Starting: {
+      mUnit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_ForceSpeedThrough);
+      IssueUnloadAtRoutePoint();
+      return 1;
+    }
+
+    case TASKSTATE_Processing: {
+      mUnit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_ForceSpeedThrough);
+      MoveToPreviousRoutePoint();
+      return 1;
+    }
+
+    case TASKSTATE_Complete: {
+      mUnit->mUnitVarDat.mUnitStates &= ~(1ull << UNITSTATE_ForceSpeedThrough);
+      ResumeFerryRoute();
+      return 1;
+    }
+
+    default:
+      return 1;
     }
   }
 
@@ -1013,7 +1030,9 @@ namespace moho
    * mDispatch, mCommandIndex, mFollowsExistingRoute, mPos, then mRouteUnit/
    * mFerryUnit/mBeacon in that order.
    */
-  void CUnitFerryTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CUnitFerryTask::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     const gpg::RRef owner{};
 
@@ -1041,7 +1060,9 @@ namespace moho
    * mFollowsExistingRoute, mPos, then mRouteUnit/mFerryUnit/mBeacon, in the
    * same field order as the load side.
    */
-  void CUnitFerryTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CUnitFerryTask::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     const gpg::RRef owner{};
 
@@ -1168,9 +1189,7 @@ namespace
     offsetof(CUnitFerryTaskSerializerHelper, mSaveCallback) == 0x10,
     "CUnitFerryTaskSerializerHelper::mSaveCallback offset must be 0x10"
   );
-  static_assert(
-    sizeof(CUnitFerryTaskSerializerHelper) == 0x14, "CUnitFerryTaskSerializerHelper size must be 0x14"
-  );
+  static_assert(sizeof(CUnitFerryTaskSerializerHelper) == 0x14, "CUnitFerryTaskSerializerHelper size must be 0x14");
 
   CUnitFerryTaskSerializerHelper gCUnitFerryTaskSerializer;
 
@@ -1198,7 +1217,10 @@ namespace gpg
    * Builds one typed reflection reference for `moho::CUnitFerryTask*`,
    * preserving dynamic-derived ownership and base-offset adjustment.
    */
-  gpg::RRef* RRef_CUnitFerryTask(gpg::RRef* const outRef, moho::CUnitFerryTask* const value)
+  gpg::RRef* RRef_CUnitFerryTask(
+    gpg::RRef* const outRef,
+    moho::CUnitFerryTask* const value
+  )
   {
     return gpg::WriteDerivedRef(outRef, value);
   }
@@ -1210,7 +1232,10 @@ namespace gpg
    * Wrapper lane that materializes one temporary `RRef_CUnitFerryTask` and
    * copies object/type fields into the destination reference record.
    */
-  gpg::RRef* AssignCUnitFerryTaskRef(gpg::RRef* const outRef, moho::CUnitFerryTask* const value)
+  gpg::RRef* AssignCUnitFerryTaskRef(
+    gpg::RRef* const outRef,
+    moho::CUnitFerryTask* const value
+  )
   {
     if (!outRef) {
       return nullptr;

@@ -29,7 +29,10 @@ namespace faf::remote::wire
     /** Entry record: varuint id, varuint byte length, the bytes. */
     void WriteEntry(std::uint32_t id, BitWriter& writer) const;
 
-    [[nodiscard]] std::uint32_t Size() const noexcept { return static_cast<std::uint32_t>(mNames.size()); }
+    [[nodiscard]] std::uint32_t Size() const noexcept
+    {
+      return static_cast<std::uint32_t>(mNames.size());
+    }
 
   private:
     std::map<std::string, std::uint32_t, std::less<>> mIds;
@@ -46,7 +49,10 @@ namespace faf::remote::wire
     [[nodiscard]] bool ReadEntry(BitReader& reader);
 
     [[nodiscard]] const std::string* Find(std::uint32_t id) const noexcept;
-    [[nodiscard]] std::uint32_t Size() const noexcept { return static_cast<std::uint32_t>(mNames.size()); }
+    [[nodiscard]] std::uint32_t Size() const noexcept
+    {
+      return static_cast<std::uint32_t>(mNames.size());
+    }
 
   private:
     std::vector<std::string> mNames;

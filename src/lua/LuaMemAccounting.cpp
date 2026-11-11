@@ -28,7 +28,9 @@ namespace
     {"WrapFile", 0x08u},       // LuaObject.cpp (io library file handle)
   };
 
-  [[maybe_unused]] [[nodiscard]] lu_mem LookupX86PayloadSize(const gpg::RType* const type) noexcept
+  [[maybe_unused]] [[nodiscard]] lu_mem LookupX86PayloadSize(
+    const gpg::RType* const type
+  ) noexcept
   {
     if (type->IsPointer() != nullptr) {
       return 4u;
@@ -43,14 +45,22 @@ namespace
 
     // Unknown value type: account this build's size and say so once, so a
     // FAF_LUAGC_LOG comparison that drifts points at the missing entry.
-    static std::mutex reportedLock;
-    static std::set<std::string> reported;
+    // Never destroyed: a Lua state that outlives this set (one destroyed at
+    // exit, after the set, since the set is made on first use mid-game)
+    // still frees its userdata through here.
+    struct ReportedTypes
     {
-      const std::lock_guard<std::mutex> lock(reportedLock);
-      if (reported.insert(name != nullptr ? name : "<unnamed>").second) {
+      std::mutex lock;
+      std::set<std::string> names;
+    };
+    static ReportedTypes* const reported = new ReportedTypes();
+    {
+      const std::lock_guard<std::mutex> lock(reported->lock);
+      if (reported->names.insert(name != nullptr ? name : "<unnamed>").second) {
         gpg::Warnf(
           "[LUAGC] userdata payload %s has no x86 size entry; accounting its %d-byte native size",
-          name != nullptr ? name : "<unnamed>", type->size_
+          name != nullptr ? name : "<unnamed>",
+          type->size_
         );
       }
     }
@@ -58,7 +68,9 @@ namespace
   }
 } // namespace
 
-lu_mem LuaX86PayloadSize(const gpg::RType* const type) noexcept
+lu_mem LuaX86PayloadSize(
+  const gpg::RType* const type
+) noexcept
 {
   if (type == nullptr) {
     return 0u;
@@ -70,7 +82,9 @@ lu_mem LuaX86PayloadSize(const gpg::RType* const type) noexcept
 #endif
 }
 
-LuaBlockSize sizeudata(const gpg::RType* const type) noexcept
+LuaBlockSize sizeudata(
+  const gpg::RType* const type
+) noexcept
 {
   const lu_mem payload = (type != nullptr) ? static_cast<lu_mem>(type->size_) : 0u;
   return {static_cast<lu_mem>(sizeof(Udata)) + payload, kLuaX86Size<Udata> + LuaX86PayloadSize(type)};

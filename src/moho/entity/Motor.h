@@ -59,7 +59,10 @@ namespace moho
      * What it does:
      * No-op load callback: the base motor has no serialized fields of its own.
      */
-    void MemberDeserialize(gpg::ReadArchive*) noexcept {}
+    void MemberDeserialize(
+      gpg::ReadArchive*
+    ) noexcept
+    {}
 
     /**
      * Address: 0x00694950 (FUN_00694950, Moho::MotorSerializer::Serialize)
@@ -67,7 +70,10 @@ namespace moho
      * What it does:
      * No-op save callback: the base motor has no serialized fields of its own.
      */
-    void MemberSerialize(gpg::WriteArchive*) const noexcept {}
+    void MemberSerialize(
+      gpg::WriteArchive*
+    ) const noexcept
+    {}
   };
 
 #if defined(_M_IX86)

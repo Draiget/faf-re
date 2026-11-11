@@ -138,9 +138,7 @@ namespace moho
      * variable can sample it. The binary increments `use_count_` (control
      * block +0x04), i.e. a strong reference, not a weak one.
      */
-    boost::shared_ptr<CD3DRenderTarget>& GetShadowMap(
-      boost::shared_ptr<CD3DRenderTarget>& outShadowMap
-    ) const;
+    boost::shared_ptr<CD3DRenderTarget>& GetShadowMap(boost::shared_ptr<CD3DRenderTarget>& outShadowMap) const;
 
     /**
      * Address: 0x007FEE70 (FUN_007FEE70)
@@ -157,38 +155,38 @@ namespace moho
   public:
     // +0x04 is the hole MSVC leaves after the vfptr of an 8-aligned class
     // (see the class comment): the constructor never writes it.
-    std::int32_t mShadowFidelity;                         // +0x08
-    bool mShadowBlurEnabled;                              // +0x0C
-    std::uint8_t mPadding0D_0F[0x03];                     // +0x0D
-    std::int32_t mShadowSize;                             // +0x10
+    std::int32_t mShadowFidelity;     // +0x08
+    bool mShadowBlurEnabled;          // +0x0C
+    std::uint8_t mPadding0D_0F[0x03]; // +0x0D
+    std::int32_t mShadowSize;         // +0x10
 
     // Set to 1 by the light/camera setup (0x007FE940) immediately after
     // GeomCamera3::Init succeeds, and cleared at its entry. The render pass
     // (0x007FEEA0) branches on it: set means draw the shadow map, clear means
     // only clear the targets for this frame.
-    bool mShadowCameraValid;                              // +0x14
-    std::uint8_t mPadding15_17[0x03];                     // +0x15
+    bool mShadowCameraValid;          // +0x14
+    std::uint8_t mPadding15_17[0x03]; // +0x15
 
-    GeomCamera3 mCamera;                                  // +0x18
+    GeomCamera3 mCamera; // +0x18
 
     // Drawn into by the render pass and sampled by the mesh/terrain shaders
     // through GetShadowMap.
-    boost::shared_ptr<CD3DRenderTarget> mShadowMap;       // +0x2E0
+    boost::shared_ptr<CD3DRenderTarget> mShadowMap; // +0x2E0
 
     // Blur ping-pong targets; only allocated when mShadowBlurEnabled.
-    boost::shared_ptr<CD3DRenderTarget> mBlurTargetA;     // +0x2E8
-    boost::shared_ptr<CD3DRenderTarget> mBlurTargetB;     // +0x2F0
+    boost::shared_ptr<CD3DRenderTarget> mBlurTargetA; // +0x2E8
+    boost::shared_ptr<CD3DRenderTarget> mBlurTargetB; // +0x2F0
 
-    boost::shared_ptr<CD3DDepthStencil> mDepthStencil;    // +0x2F8
+    boost::shared_ptr<CD3DDepthStencil> mDepthStencil; // +0x2F8
 
     // Unit quad the blur passes draw; built once by Init.
-    boost::shared_ptr<ID3DVertexSheet> mQuadVertexSheet;  // +0x300
+    boost::shared_ptr<ID3DVertexSheet> mQuadVertexSheet; // +0x300
 
     // Two further reference-counted slots. The constructor null-clears them and
     // the reset helper releases them exactly like the five above, so they are
     // handles of the same shape - but no function in this binary reads or
     // writes either one, so their pointee type cannot be named yet.
-    boost::shared_ptr<void> mUnreferencedResources[2];    // +0x308, +0x310
+    boost::shared_ptr<void> mUnreferencedResources[2]; // +0x308, +0x310
   };
 
   static_assert(offsetof(Shadow, mShadowFidelity) == 0x08, "Shadow::mShadowFidelity offset must be 0x08");

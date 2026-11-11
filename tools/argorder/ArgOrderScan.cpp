@@ -22,13 +22,38 @@
 #include <vector>
 
 extern "C" {
-enum CXCursorKind { CXCursor_FunctionDecl = 8, CXCursor_CXXMethod = 21, CXCursor_Constructor = 24,
-                    CXCursor_Destructor = 25, CXCursor_ConversionFunction = 26, CXCursor_FunctionTemplate = 30,
-                    CXCursor_CallExpr = 103 };
-enum CXChildVisitResult { CXChildVisit_Break, CXChildVisit_Continue, CXChildVisit_Recurse };
-struct CXCursor { CXCursorKind kind; int xdata; const void* data[3]; };
-struct CXString { const void* data; unsigned private_flags; };
-struct CXSourceLocation { const void* ptr_data[2]; unsigned int_data; };
+enum CXCursorKind
+{
+  CXCursor_FunctionDecl = 8,
+  CXCursor_CXXMethod = 21,
+  CXCursor_Constructor = 24,
+  CXCursor_Destructor = 25,
+  CXCursor_ConversionFunction = 26,
+  CXCursor_FunctionTemplate = 30,
+  CXCursor_CallExpr = 103
+};
+enum CXChildVisitResult
+{
+  CXChildVisit_Break,
+  CXChildVisit_Continue,
+  CXChildVisit_Recurse
+};
+struct CXCursor
+{
+  CXCursorKind kind;
+  int xdata;
+  const void* data[3];
+};
+struct CXString
+{
+  const void* data;
+  unsigned private_flags;
+};
+struct CXSourceLocation
+{
+  const void* ptr_data[2];
+  unsigned int_data;
+};
 using CXIndex = void*;
 using CXTranslationUnit = struct CXTranslationUnitImpl*;
 using CXFile = void*;
@@ -37,8 +62,15 @@ using CXCursorVisitor = CXChildVisitResult (*)(CXCursor cursor, CXCursor parent,
 
 CXIndex clang_createIndex(int excludeDeclarationsFromPCH, int displayDiagnostics);
 void clang_disposeIndex(CXIndex index);
-CXTranslationUnit clang_parseTranslationUnit(CXIndex index, const char* source, const char* const* args, int numArgs,
-                                             void* unsavedFiles, unsigned numUnsaved, unsigned options);
+CXTranslationUnit clang_parseTranslationUnit(
+  CXIndex index,
+  const char* source,
+  const char* const* args,
+  int numArgs,
+  void* unsavedFiles,
+  unsigned numUnsaved,
+  unsigned options
+);
 void clang_disposeTranslationUnit(CXTranslationUnit unit);
 CXCursor clang_getTranslationUnitCursor(CXTranslationUnit unit);
 unsigned clang_visitChildren(CXCursor parent, CXCursorVisitor visitor, CXClientData data);
@@ -50,7 +82,13 @@ unsigned clang_CXXMethod_isStatic(CXCursor cursor);
 int clang_Cursor_getNumArguments(CXCursor cursor);
 CXCursor clang_Cursor_getArgument(CXCursor cursor, unsigned index);
 CXSourceLocation clang_getCursorLocation(CXCursor cursor);
-void clang_getSpellingLocation(CXSourceLocation location, CXFile* file, unsigned* line, unsigned* column, unsigned* offset);
+void clang_getSpellingLocation(
+  CXSourceLocation location,
+  CXFile* file,
+  unsigned* line,
+  unsigned* column,
+  unsigned* offset
+);
 CXString clang_getFileName(CXFile file);
 CXString clang_getCursorSpelling(CXCursor cursor);
 CXString clang_getCursorDisplayName(CXCursor cursor);
@@ -62,7 +100,9 @@ unsigned clang_getNumDiagnostics(CXTranslationUnit unit);
 
 namespace
 {
-  std::string Take(const CXString text)
+  std::string Take(
+    const CXString text
+  )
   {
     const char* const raw = clang_getCString(text);
     std::string out = raw != nullptr ? raw : "";
@@ -71,7 +111,9 @@ namespace
   }
 
   /// `Class::name` of a function declaration.
-  std::string QualifiedName(const CXCursor declaration)
+  std::string QualifiedName(
+    const CXCursor declaration
+  )
   {
     std::string name = Take(clang_getCursorSpelling(declaration));
     const CXCursor parent = clang_getCursorSemanticParent(declaration);
@@ -86,15 +128,20 @@ namespace
 
   /// Functions without side effects that are not const members (accessors on non-const
   /// objects pick the non-const overload; math is pure).
-  bool IsPureName(const std::string& qualified, const std::string& plain)
+  bool IsPureName(
+    const std::string& qualified,
+    const std::string& plain
+  )
   {
     static const std::set<std::string> kPure = {
-      "begin", "end", "cbegin", "cend", "rbegin", "rend", "size", "empty", "data", "c_str", "length", "capacity",
-      "front", "back", "at", "operator[]", "operator*", "operator->", "get", "move", "forward", "addressof",
-      "sqrt", "sqrtf", "fabs", "fabsf", "abs", "min", "max", "clamp", "floor", "ceil", "floorf", "ceilf",
-      "sin", "cos", "sinf", "cosf", "atan2", "atan2f", "operator+", "operator-", "operator/", "operator==",
-      "operator!=", "operator<", "operator>", "operator<=", "operator>=", "operator!", "operator&", "operator|",
-      "strlen", "strcmp", "wcslen", "view", "to_std", "Get", "IsNil", "operator bool",
+      "begin",      "end",        "cbegin",    "cend",          "rbegin",     "rend",      "size",      "empty",
+      "data",       "c_str",      "length",    "capacity",      "front",      "back",      "at",        "operator[]",
+      "operator*",  "operator->", "get",       "move",          "forward",    "addressof", "sqrt",      "sqrtf",
+      "fabs",       "fabsf",      "abs",       "min",           "max",        "clamp",     "floor",     "ceil",
+      "floorf",     "ceilf",      "sin",       "cos",           "sinf",       "cosf",      "atan2",     "atan2f",
+      "operator+",  "operator-",  "operator/", "operator==",    "operator!=", "operator<", "operator>", "operator<=",
+      "operator>=", "operator!",  "operator&", "operator|",     "strlen",     "strcmp",    "wcslen",    "view",
+      "to_std",     "Get",        "IsNil",     "operator bool",
     };
     if (kPure.count(plain) != 0) {
       return true;
@@ -108,7 +155,11 @@ namespace
     std::vector<std::string> sideEffectCallees;
   };
 
-  CXChildVisitResult VisitArgument(const CXCursor cursor, CXCursor, const CXClientData data)
+  CXChildVisitResult VisitArgument(
+    const CXCursor cursor,
+    CXCursor,
+    const CXClientData data
+  )
   {
     auto& scan = *static_cast<ArgumentScan*>(data);
     if (clang_getCursorKind(cursor) == CXCursor_CallExpr) {
@@ -131,7 +182,11 @@ namespace
 
   std::set<std::string> gReported;
 
-  CXChildVisitResult VisitAll(const CXCursor cursor, CXCursor, CXClientData)
+  CXChildVisitResult VisitAll(
+    const CXCursor cursor,
+    CXCursor,
+    CXClientData
+  )
   {
     if (clang_getCursorKind(cursor) == CXCursor_CallExpr) {
       const int count = clang_Cursor_getNumArguments(cursor);
@@ -177,7 +232,10 @@ namespace
   }
 } // namespace
 
-int main(int argc, char** argv)
+int main(
+  int argc,
+  char** argv
+)
 {
   if (argc < 3 || std::strcmp(argv[2], "--") != 0) {
     std::fprintf(stderr, "usage: %s <source> -- <compiler arguments...>\n", argv[0]);

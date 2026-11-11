@@ -63,8 +63,8 @@ namespace lua
      */
     ~lua_Error() override;
 
-    lua_State* L;   // originating lua state
-    int code;       // numeric lua error code (e.g. LUA_ERRMEM, LUA_ERRRUN)
+    lua_State* L; // originating lua state
+    int code;     // numeric lua error code (e.g. LUA_ERRMEM, LUA_ERRRUN)
   };
 
   // 0x30 in the shipped binary, and now here: fa::runtime_error is the
@@ -104,7 +104,7 @@ public:
    * What it does:
    * Destroys one `lua_MemError` object and releases exception storage through
    * the usual C++ virtual-destruction path.
-  */
+   */
   ~lua_MemError() override;
 };
 

@@ -24,7 +24,9 @@ namespace
   // Mirrors the binary's small per-thread dynamic type cache used by RRef helpers.
   thread_local std::array<CachedDerivedTypeEntry, 3> gDerivedTypeCache{};
 
-  [[nodiscard]] gpg::RType* LookupCachedDerivedType(const std::type_info& dynamicTypeInfo)
+  [[nodiscard]] gpg::RType* LookupCachedDerivedType(
+    const std::type_info& dynamicTypeInfo
+  )
   {
     for (std::size_t index = 0; index < gDerivedTypeCache.size(); ++index) {
       const CachedDerivedTypeEntry& entry = gDerivedTypeCache[index];
@@ -68,7 +70,8 @@ namespace moho
 
   /**
    * Address: 0x00624E90 (FUN_00624E90, sub_624E90)
-   * Address: 0x00BFA550 (FUN_00BFA550, atexit destructor of the CUnitLoadUnitsTypeInfo object; registered by 0x00BD1C90)
+   * Address: 0x00BFA550 (FUN_00BFA550, atexit destructor of the CUnitLoadUnitsTypeInfo object; registered by
+   * 0x00BD1C90)
    *
    * What it does:
    * Constructs the static descriptor in place on first call and returns it,
@@ -114,7 +117,9 @@ namespace moho
   /**
    * Address: 0x00627F50 (FUN_00627F50, Moho::CUnitLoadUnitsTypeInfo::AddBase_CCommandTask)
    */
-  void __stdcall CUnitLoadUnitsTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void __stdcall CUnitLoadUnitsTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CCommandTask>(typeInfo);
   }
@@ -133,7 +138,9 @@ namespace moho
   /**
    * Address: 0x00627CC0 (FUN_00627CC0, Moho::CUnitLoadUnitsTypeInfo::CtrRef)
    */
-  gpg::RRef CUnitLoadUnitsTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitLoadUnitsTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const task = gpg::ConstructInStorage<CUnitLoadUnits>(objectStorage);
 
@@ -145,7 +152,9 @@ namespace moho
   /**
    * Address: 0x00627CA0 (FUN_00627CA0, Moho::CUnitLoadUnitsTypeInfo::Delete)
    */
-  void CUnitLoadUnitsTypeInfo::Delete(void* const objectStorage)
+  void CUnitLoadUnitsTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CUnitLoadUnits*>(objectStorage);
   }
@@ -153,7 +162,9 @@ namespace moho
   /**
    * Address: 0x00627D30 (FUN_00627D30, Moho::CUnitLoadUnitsTypeInfo::Destruct)
    */
-  void CUnitLoadUnitsTypeInfo::Destruct(void* const objectStorage)
+  void CUnitLoadUnitsTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     static_cast<CUnitLoadUnits*>(objectStorage)->~CUnitLoadUnits();
   }
@@ -164,7 +175,10 @@ namespace gpg
   /**
    * Address: 0x00628C00 (FUN_00628C00, gpg::RRef_CUnitLoadUnits)
    */
-  gpg::RRef* RRef_CUnitLoadUnits(gpg::RRef* const outRef, moho::CUnitLoadUnits* const value)
+  gpg::RRef* RRef_CUnitLoadUnits(
+    gpg::RRef* const outRef,
+    moho::CUnitLoadUnits* const value
+  )
   {
     if (!outRef) {
       return nullptr;
@@ -200,7 +214,10 @@ namespace gpg
    * Wrapper lane that materializes one temporary `RRef_CUnitLoadUnits` and
    * copies object/type fields into the destination reference record.
    */
-  [[maybe_unused]] gpg::RRef* AssignCUnitLoadUnitsRef(gpg::RRef* const outRef, moho::CUnitLoadUnits* const value)
+  [[maybe_unused]] gpg::RRef* AssignCUnitLoadUnitsRef(
+    gpg::RRef* const outRef,
+    moho::CUnitLoadUnits* const value
+  )
   {
     if (!outRef) {
       return nullptr;
@@ -216,4 +233,7 @@ namespace gpg
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every
 // consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_CUnitLoadUnitsTypeInfo_624e90, moho::preregister_CUnitLoadUnitsTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_CUnitLoadUnitsTypeInfo_624e90,
+  moho::preregister_CUnitLoadUnitsTypeInfo
+)

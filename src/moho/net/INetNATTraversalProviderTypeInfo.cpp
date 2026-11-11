@@ -81,4 +81,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_INetNATTraversalProviderTypeInfo_7971d9, moho::register_INetNATTraversalProviderTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_INetNATTraversalProviderTypeInfo_7971d9,
+  moho::register_INetNATTraversalProviderTypeInfo
+)

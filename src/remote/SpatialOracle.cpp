@@ -29,7 +29,9 @@ namespace faf::remote
     // precision or rounding control, `GridPos` 0x00506E20) from dropping a candidate.
     constexpr std::int32_t kCellMargin = 1;
 
-    [[nodiscard]] bool IsReconGrid(const std::int32_t viz) noexcept
+    [[nodiscard]] bool IsReconGrid(
+      const std::int32_t viz
+    ) noexcept
     {
       return static_cast<moho::EUserEntityVisibilityMode>(viz) == moho::EUserEntityVisibilityMode::ReconGrid;
     }
@@ -49,7 +51,9 @@ namespace faf::remote
      * army and for a prop (`Prop::Sync` 0x006FA2A0); a published channel other than ReconGrid
      * is sent without a grid test (`CanViewSee`).
      */
-    [[nodiscard]] EGridUse ClassifyGridUse(moho::Entity& entity)
+    [[nodiscard]] EGridUse ClassifyGridUse(
+      moho::Entity& entity
+    )
     {
       const bool publishesAnyMode = entity.ArmyRef == nullptr || entity.IsProp() != nullptr;
 
@@ -76,7 +80,10 @@ namespace faf::remote
 
     /** Orders cell entries by layer, then z, then x, so one cell's entries are adjacent. */
     template <class TEntry>
-    [[nodiscard]] bool CellLess(const TEntry& lhs, const TEntry& rhs) noexcept
+    [[nodiscard]] bool CellLess(
+      const TEntry& lhs,
+      const TEntry& rhs
+    ) noexcept
     {
       if (lhs.mUnderwater != rhs.mUnderwater) {
         return rhs.mUnderwater;
@@ -88,7 +95,10 @@ namespace faf::remote
     }
 
     template <class TEntry>
-    [[nodiscard]] bool SameCell(const TEntry& lhs, const TEntry& rhs) noexcept
+    [[nodiscard]] bool SameCell(
+      const TEntry& lhs,
+      const TEntry& rhs
+    ) noexcept
     {
       return lhs.mUnderwater == rhs.mUnderwater && lhs.mZ == rhs.mZ && lhs.mX == rhs.mX;
     }
@@ -98,7 +108,10 @@ namespace faf::remote
      * that layer or an ally's (`ViewCanSeeCell`, `UserArmy::CanSeeCell` 0x008B17F0).
      */
     [[nodiscard]] bool CellNearVisible(
-      const moho::Sim& sim, const moho::CArmyImpl& view, const std::int32_t x, const std::int32_t z,
+      const moho::Sim& sim,
+      const moho::CArmyImpl& view,
+      const std::int32_t x,
+      const std::int32_t z,
       const bool underwater
     )
     {
@@ -112,9 +125,9 @@ namespace faf::remote
           if (cellX < kMin || cellX > kMax) {
             continue;
           }
-          if (ViewCanSeeCell(
-                sim, view, static_cast<std::int32_t>(cellX), static_cast<std::int32_t>(cellZ), underwater
-              )) {
+          if (
+            ViewCanSeeCell(sim, view, static_cast<std::int32_t>(cellX), static_cast<std::int32_t>(cellZ), underwater)
+          ) {
             return true;
           }
         }
@@ -123,7 +136,11 @@ namespace faf::remote
     }
   } // namespace
 
-  void CollectViewEntitiesBruteForce(const moho::Sim& sim, const std::int32_t viewArmy, std::vector<std::uint32_t>& outIds)
+  void CollectViewEntitiesBruteForce(
+    const moho::Sim& sim,
+    const std::int32_t viewArmy,
+    std::vector<std::uint32_t>& outIds
+  )
   {
     outIds.clear();
     if (sim.mEntityDB == nullptr) {
@@ -138,7 +155,9 @@ namespace faf::remote
     std::sort(outIds.begin(), outIds.end());
   }
 
-  void SpatialOracle::Build(const moho::Sim& sim)
+  void SpatialOracle::Build(
+    const moho::Sim& sim
+  )
   {
     const std::size_t armyCount = sim.mArmiesList.size();
     mUnitsByArmy.assign(armyCount, {});
@@ -200,27 +219,27 @@ namespace faf::remote
       }
 
       switch (ClassifyGridUse(*entity)) {
-        case EGridUse::Free:
-          mGridFree.push_back(entity);
-          break;
+      case EGridUse::Free:
+        mGridFree.push_back(entity);
+        break;
 
-        case EGridUse::Cells: {
-          const bool underwater = entity->mVarDat.UsesUnderwaterReconGrid();
-          for (SCellIndex& index : mCellIndices) {
-            Wm3::Vec3f cellPos = entity->mVarDat.mCurTransform.pos_;
-            const moho::GridPos cell(&cellPos, static_cast<int>(index.mGridSize));
-            SCellEntity entry;
-            entry.mX = cell.x;
-            entry.mZ = cell.z;
-            entry.mUnderwater = underwater;
-            entry.mEntity = entity;
-            index.mEntries.push_back(entry);
-          }
-          break;
+      case EGridUse::Cells: {
+        const bool underwater = entity->mVarDat.UsesUnderwaterReconGrid();
+        for (SCellIndex& index : mCellIndices) {
+          Wm3::Vec3f cellPos = entity->mVarDat.mCurTransform.pos_;
+          const moho::GridPos cell(&cellPos, static_cast<int>(index.mGridSize));
+          SCellEntity entry;
+          entry.mX = cell.x;
+          entry.mZ = cell.z;
+          entry.mUnderwater = underwater;
+          entry.mEntity = entity;
+          index.mEntries.push_back(entry);
         }
+        break;
+      }
 
-        case EGridUse::Never:
-          break;
+      case EGridUse::Never:
+        break;
       }
     }
 
@@ -229,7 +248,9 @@ namespace faf::remote
     }
   }
 
-  const SpatialOracle::SCellIndex* SpatialOracle::FindCellIndex(const std::uint32_t gridSize) const noexcept
+  const SpatialOracle::SCellIndex* SpatialOracle::FindCellIndex(
+    const std::uint32_t gridSize
+  ) const noexcept
   {
     for (const SCellIndex& index : mCellIndices) {
       if (index.mGridSize == gridSize) {
@@ -240,7 +261,9 @@ namespace faf::remote
   }
 
   void SpatialOracle::CollectViewEntities(
-    const moho::Sim& sim, const std::int32_t viewArmy, std::vector<std::uint32_t>& outIds
+    const moho::Sim& sim,
+    const std::int32_t viewArmy,
+    std::vector<std::uint32_t>& outIds
   ) const
   {
     // `ViewCanSeePoint`: a view with no army or no vision grid sees every point, so the grid

@@ -59,7 +59,9 @@ namespace moho
   /**
    * Address: 0x00490570 (FUN_00490570, Moho::SWorldParticle::MemberDeserialize)
    */
-  void SWorldParticle::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SWorldParticle::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -94,7 +96,9 @@ namespace moho
   /**
    * Address: 0x004907D0 (FUN_004907D0, Moho::SWorldParticle::MemberSerialize)
    */
-  void SWorldParticle::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SWorldParticle::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;

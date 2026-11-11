@@ -32,17 +32,23 @@ namespace faf::remote::wire
     constexpr int kVisualFlagBits = 5;
     constexpr std::uint32_t kCreationRequired = kEntityFields | kFieldKind;
 
-    [[nodiscard]] std::uint32_t Bits(const float value) noexcept
+    [[nodiscard]] std::uint32_t Bits(
+      const float value
+    ) noexcept
     {
       return std::bit_cast<std::uint32_t>(value);
     }
 
-    [[nodiscard]] std::uint32_t ZigZag(const std::int32_t value) noexcept
+    [[nodiscard]] std::uint32_t ZigZag(
+      const std::int32_t value
+    ) noexcept
     {
       return (static_cast<std::uint32_t>(value) << 1) ^ static_cast<std::uint32_t>(value >> 31);
     }
 
-    [[nodiscard]] std::int32_t UnZigZag(const std::uint32_t value) noexcept
+    [[nodiscard]] std::int32_t UnZigZag(
+      const std::uint32_t value
+    ) noexcept
     {
       return static_cast<std::int32_t>(value >> 1) ^ -static_cast<std::int32_t>(value & 1u);
     }
@@ -60,13 +66,20 @@ namespace faf::remote::wire
     constexpr std::uint32_t kQuaternionComponentMask = (1u << kQuaternionComponentBits) - 1u;
     constexpr int kMaxGolombZeros = 26; // more than any step a field this wide can take
 
-    [[nodiscard]] int ExpGolombBits(const std::uint32_t value, const int order) noexcept
+    [[nodiscard]] int ExpGolombBits(
+      const std::uint32_t value,
+      const int order
+    ) noexcept
     {
       const std::uint64_t shifted = std::uint64_t{value} + (std::uint64_t{1} << order);
       return 2 * static_cast<int>(std::bit_width(shifted)) - 1 - order;
     }
 
-    void WriteExpGolomb(BitWriter& writer, const std::uint32_t value, const int order)
+    void WriteExpGolomb(
+      BitWriter& writer,
+      const std::uint32_t value,
+      const int order
+    )
     {
       const std::uint64_t shifted = std::uint64_t{value} + (std::uint64_t{1} << order);
       const int width = static_cast<int>(std::bit_width(shifted));
@@ -79,7 +92,11 @@ namespace faf::remote::wire
       }
     }
 
-    [[nodiscard]] std::uint32_t ReadExpGolomb(BitReader& reader, const int order, const int maxZeros = kMaxGolombZeros) noexcept
+    [[nodiscard]] std::uint32_t ReadExpGolomb(
+      BitReader& reader,
+      const int order,
+      const int maxZeros = kMaxGolombZeros
+    ) noexcept
     {
       int zeros = 0;
       while (reader.ReadBits(1) == 0u) {
@@ -94,51 +111,76 @@ namespace faf::remote::wire
     }
 
     /** A position's step from `before`, per axis, zigzagged. */
-    [[nodiscard]] std::array<std::uint32_t, 3> PositionSteps(const SEntityRecord& record, const SEntityRecord& before) noexcept
+    [[nodiscard]] std::array<std::uint32_t, 3> PositionSteps(
+      const SEntityRecord& record,
+      const SEntityRecord& before
+    ) noexcept
     {
       std::array<std::uint32_t, 3> steps{};
       for (std::size_t axis = 0; axis < 3; ++axis) {
-        steps[axis] = ZigZag(static_cast<std::int32_t>(static_cast<std::int64_t>(record.position[axis]) - before.position[axis]));
+        steps[axis] =
+          ZigZag(static_cast<std::int32_t>(static_cast<std::int64_t>(record.position[axis]) - before.position[axis]));
       }
       return steps;
     }
 
     /** Whether a changed position may go as its step: both ends in the quantiser's range. */
-    [[nodiscard]] bool PositionMayStep(const SEntityRecord& record, const SEntityRecord* const before) noexcept
+    [[nodiscard]] bool PositionMayStep(
+      const SEntityRecord& record,
+      const SEntityRecord* const before
+    ) noexcept
     {
       return before != nullptr && !before->farPosition && !record.farPosition;
     }
 
-    [[nodiscard]] int PositionStepBits(const std::array<std::uint32_t, 3>& steps) noexcept
+    [[nodiscard]] int PositionStepBits(
+      const std::array<std::uint32_t, 3>& steps
+    ) noexcept
     {
-      return ExpGolombBits(steps[0], kStepOrderXZ) + ExpGolombBits(steps[1], kStepOrderY) + ExpGolombBits(steps[2], kStepOrderXZ);
+      return ExpGolombBits(steps[0], kStepOrderXZ) + ExpGolombBits(steps[1], kStepOrderY) +
+        ExpGolombBits(steps[2], kStepOrderXZ);
     }
 
-    [[nodiscard]] int PositionWholeBits(const SFrameCodec& codec) noexcept
+    [[nodiscard]] int PositionWholeBits(
+      const SFrameCodec& codec
+    ) noexcept
     {
       return codec.position.x.bits + codec.position.y.bits + codec.position.z.bits;
     }
 
     /** Whether a changed yaw may go as its turn: yaw-only at both ends. */
-    [[nodiscard]] bool YawMayStep(const SEntityRecord& record, const SEntityRecord* const before) noexcept
+    [[nodiscard]] bool YawMayStep(
+      const SEntityRecord& record,
+      const SEntityRecord* const before
+    ) noexcept
     {
       return before != nullptr && before->yawOnly && record.yawOnly;
     }
 
-    [[nodiscard]] std::uint32_t YawStep(const SEntityRecord& record, const SEntityRecord& before) noexcept
+    [[nodiscard]] std::uint32_t YawStep(
+      const SEntityRecord& record,
+      const SEntityRecord& before
+    ) noexcept
     {
       return ZigZag(static_cast<std::int16_t>(static_cast<std::uint16_t>(record.orientation - before.orientation)));
     }
 
     /** Whether a changed full orientation is sent with its stepped bit: full at both ends. */
-    [[nodiscard]] bool FullMayStep(const SEntityRecord& record, const SEntityRecord* const before) noexcept
+    [[nodiscard]] bool FullMayStep(
+      const SEntityRecord& record,
+      const SEntityRecord* const before
+    ) noexcept
     {
       return before != nullptr && !before->yawOnly && !record.yawOnly;
     }
 
     /** A full orientation's packed components' steps from `before`'s, zigzagged; false when the largest component
      * differs (the components then aren't the same three). */
-    [[nodiscard]] bool FullSteps(const std::uint32_t orientation, const std::uint32_t before, std::array<std::uint32_t, 3>& steps) noexcept
+    [[nodiscard]] bool FullSteps(
+      const std::uint32_t orientation,
+      const std::uint32_t before,
+      std::array<std::uint32_t, 3>& steps
+    ) noexcept
     {
       if ((orientation & 3u) != (before & 3u)) {
         return false;
@@ -153,38 +195,50 @@ namespace faf::remote::wire
     }
 
     /** The bits of `steps`, or 32 or more when they aren't shorter than the whole orientation. */
-    [[nodiscard]] int FullStepBits(const std::array<std::uint32_t, 3>& steps) noexcept
+    [[nodiscard]] int FullStepBits(
+      const std::array<std::uint32_t, 3>& steps
+    ) noexcept
     {
-      return ExpGolombBits(steps[0], kStepOrderQuaternion) + ExpGolombBits(steps[1], kStepOrderQuaternion) + ExpGolombBits(steps[2], kStepOrderQuaternion);
+      return ExpGolombBits(steps[0], kStepOrderQuaternion) + ExpGolombBits(steps[1], kStepOrderQuaternion) +
+        ExpGolombBits(steps[2], kStepOrderQuaternion);
     }
 
     /** `beat` is the frame's: a dead-reckoned anchor cannot lie in its future. */
-    [[nodiscard]] bool FitsCodec(const SEntityRecord& record, const SFrameCodec& codec, const std::uint32_t beat) noexcept
+    [[nodiscard]] bool FitsCodec(
+      const SEntityRecord& record,
+      const SFrameCodec& codec,
+      const std::uint32_t beat
+    ) noexcept
     {
       const bool turnFits = codec.orientationReckoning && record.yawOnly
-                              ? record.orientationBeat <= beat
-                              : (record.orientationBeat == 0u && record.yawRate == 0);
-      if (!turnFits || (codec.orientationReckoning && !codec.deadReckoning)
-          || (codec.groundFollowing && !codec.deadReckoning)
-          || (record.followsGround && (!codec.groundFollowing || record.farPosition))) {
+        ? record.orientationBeat <= beat
+        : (record.orientationBeat == 0u && record.yawRate == 0);
+      if (
+        !turnFits || (codec.orientationReckoning && !codec.deadReckoning) ||
+        (codec.groundFollowing && !codec.deadReckoning) ||
+        (record.followsGround && (!codec.groundFollowing || record.farPosition))
+      ) {
         return false;
       }
       if (record.farPosition) {
-        return record.position == QuantizedPosition{} && record.velocity == std::array<std::int32_t, 3>{}
-            && record.verticalAcceleration == 0 && record.anchorBeat == 0u
-            && (!record.yawOnly || record.orientation <= 0xFFFFu);
+        return record.position == QuantizedPosition{} && record.velocity == std::array<std::int32_t, 3>{} &&
+          record.verticalAcceleration == 0 && record.anchorBeat == 0u &&
+          (!record.yawOnly || record.orientation <= 0xFFFFu);
       }
       const bool motionFits = codec.deadReckoning
-                                ? record.anchorBeat <= beat
-                                : (record.anchorBeat == 0u && record.velocity == std::array<std::int32_t, 3>{}
-                                   && record.verticalAcceleration == 0);
-      return motionFits && (!record.yawOnly || record.orientation <= 0xFFFFu)
-          && record.position[0] <= codec.position.x.MaxQuantized()
-          && record.position[1] <= codec.position.y.MaxQuantized()
-          && record.position[2] <= codec.position.z.MaxQuantized();
+        ? record.anchorBeat <= beat
+        : (record.anchorBeat == 0u && record.velocity == std::array<std::int32_t, 3>{} &&
+           record.verticalAcceleration == 0);
+      return motionFits && (!record.yawOnly || record.orientation <= 0xFFFFu) &&
+        record.position[0] <= codec.position.x.MaxQuantized() &&
+        record.position[1] <= codec.position.y.MaxQuantized() && record.position[2] <= codec.position.z.MaxQuantized();
     }
 
-    [[nodiscard]] bool SameFloats(const float* a, const float* b, const std::size_t count) noexcept
+    [[nodiscard]] bool SameFloats(
+      const float* a,
+      const float* b,
+      const std::size_t count
+    ) noexcept
     {
       for (std::size_t i = 0; i < count; ++i) {
         if (Bits(a[i]) != Bits(b[i])) {
@@ -194,35 +248,49 @@ namespace faf::remote::wire
       return true;
     }
 
-    void WriteInt(BitWriter& writer, const std::int32_t value)
+    void WriteInt(
+      BitWriter& writer,
+      const std::int32_t value
+    )
     {
       writer.WriteVarUint(ZigZag(value));
     }
 
-    [[nodiscard]] std::int32_t ReadInt(BitReader& reader)
+    [[nodiscard]] std::int32_t ReadInt(
+      BitReader& reader
+    )
     {
       return UnZigZag(reader.ReadVarUint());
     }
 
-    [[nodiscard]] bool SameUnitFields(const SUnitFields& a, const SUnitFields& b) noexcept
+    [[nodiscard]] bool SameUnitFields(
+      const SUnitFields& a,
+      const SUnitFields& b
+    ) noexcept
     {
-      return Bits(a.fuelRatio) == Bits(b.fuelRatio) && Bits(a.shieldRatio) == Bits(b.shieldRatio)
-          && Bits(a.workProgress) == Bits(b.workProgress) && a.unitStates == b.unitStates
-          && a.scriptBits == b.scriptBits && a.siloCounts == b.siloCounts && a.unitFlags == b.unitFlags
-          && a.stats == b.stats && a.buildStateTag == b.buildStateTag && a.fake == b.fake && a.detail == b.detail;
+      return Bits(a.fuelRatio) == Bits(b.fuelRatio) && Bits(a.shieldRatio) == Bits(b.shieldRatio) &&
+        Bits(a.workProgress) == Bits(b.workProgress) && a.unitStates == b.unitStates && a.scriptBits == b.scriptBits &&
+        a.siloCounts == b.siloCounts && a.unitFlags == b.unitFlags && a.stats == b.stats &&
+        a.buildStateTag == b.buildStateTag && a.fake == b.fake && a.detail == b.detail;
     }
 
-    [[nodiscard]] bool SameDetailScalars(const SUnitDetail& a, const SUnitDetail& b) noexcept
+    [[nodiscard]] bool SameDetailScalars(
+      const SUnitDetail& a,
+      const SUnitDetail& b
+    ) noexcept
     {
-      return a.creator == b.creator && a.creationTick == b.creationTick && a.stunTicks == b.stunTicks
-          && a.jobType == b.jobType && a.fireState == b.fireState && a.siloMaxStorage == b.siloMaxStorage
-          && a.selectionInheritor == b.selectionInheritor && a.customName == b.customName
-          && a.focusUnit == b.focusUnit && a.guardedUnit == b.guardedUnit && a.targetBlip == b.targetBlip
-          && a.didRefresh == b.didRefresh && a.reconFlags == b.reconFlags;
+      return a.creator == b.creator && a.creationTick == b.creationTick && a.stunTicks == b.stunTicks &&
+        a.jobType == b.jobType && a.fireState == b.fireState && a.siloMaxStorage == b.siloMaxStorage &&
+        a.selectionInheritor == b.selectionInheritor && a.customName == b.customName && a.focusUnit == b.focusUnit &&
+        a.guardedUnit == b.guardedUnit && a.targetBlip == b.targetBlip && a.didRefresh == b.didRefresh &&
+        a.reconFlags == b.reconFlags;
     }
 
     /** The appearance fields in which two blocks differ. */
-    [[nodiscard]] std::uint32_t AppearanceChanges(const SAppearance& b, const SAppearance& a) noexcept
+    [[nodiscard]] std::uint32_t AppearanceChanges(
+      const SAppearance& b,
+      const SAppearance& a
+    ) noexcept
     {
       std::uint32_t fields = 0;
       if (b.mesh != a.mesh) {
@@ -260,8 +328,12 @@ namespace faf::remote::wire
      * start is the old end (`Entity::SetAnimScroll` shifts it) is sent as one bit and the end.
      */
     void WriteFields(
-      BitWriter& writer, const SEntityRecord& record, const std::uint32_t fields, const SFrameCodec& codec,
-      const std::uint32_t beat, const SEntityRecord* const before
+      BitWriter& writer,
+      const SEntityRecord& record,
+      const std::uint32_t fields,
+      const SFrameCodec& codec,
+      const std::uint32_t beat,
+      const SEntityRecord* const before
     )
     {
       if ((fields & kFieldKind) != 0u) {
@@ -471,8 +543,8 @@ namespace faf::remote::wire
         writer.WriteFloatExact(look.impact);
       }
       if ((fields & kFieldScroll) != 0u) {
-        const bool shifted = before != nullptr && Bits(look.scroll[0]) == Bits(before->appearance.scroll[2])
-                          && Bits(look.scroll[1]) == Bits(before->appearance.scroll[3]);
+        const bool shifted = before != nullptr && Bits(look.scroll[0]) == Bits(before->appearance.scroll[2]) &&
+          Bits(look.scroll[1]) == Bits(before->appearance.scroll[3]);
         writer.WriteBool(shifted);
         for (std::size_t i = shifted ? 2u : 0u; i < look.scroll.size(); ++i) {
           writer.WriteFloatExact(look.scroll[i]);
@@ -498,8 +570,12 @@ namespace faf::remote::wire
      * holds the baseline's record, which a stepped position or yaw goes from (none for a creation).
      */
     [[nodiscard]] bool ReadFields(
-      BitReader& reader, SEntityRecord& record, const std::uint32_t fields, const SFrameCodec& codec,
-      const std::uint32_t beat, const bool change
+      BitReader& reader,
+      SEntityRecord& record,
+      const std::uint32_t fields,
+      const SFrameCodec& codec,
+      const std::uint32_t beat,
+      const bool change
     )
     {
       const bool positionFromBaseline = change && !record.farPosition;
@@ -529,10 +605,13 @@ namespace faf::remote::wire
       } else if ((fields & kFieldPosition) != 0u) {
         record.farValue = {};
         if (positionFromBaseline && reader.ReadBool()) {
-          const std::uint32_t limits[3] = {codec.position.x.MaxQuantized(), codec.position.y.MaxQuantized(), codec.position.z.MaxQuantized()};
+          const std::uint32_t limits[3] = {
+            codec.position.x.MaxQuantized(), codec.position.y.MaxQuantized(), codec.position.z.MaxQuantized()
+          };
           const int orders[3] = {kStepOrderXZ, kStepOrderY, kStepOrderXZ};
           for (std::size_t axis = 0; axis < 3; ++axis) {
-            const std::int64_t value = static_cast<std::int64_t>(baselinePosition[axis]) + UnZigZag(ReadExpGolomb(reader, orders[axis]));
+            const std::int64_t value =
+              static_cast<std::int64_t>(baselinePosition[axis]) + UnZigZag(ReadExpGolomb(reader, orders[axis]));
             if (!reader.Ok() || value < 0 || value > limits[axis]) {
               reader.Fail();
               return false;
@@ -566,14 +645,16 @@ namespace faf::remote::wire
             reader.Fail();
             return false;
           }
-          record.orientation = static_cast<std::uint16_t>(baselineOrientation + static_cast<std::uint32_t>(UnZigZag(turn)));
+          record.orientation =
+            static_cast<std::uint16_t>(baselineOrientation + static_cast<std::uint32_t>(UnZigZag(turn)));
         } else if (fullFromBaseline && !record.yawOnly && reader.ReadBool()) {
           // Entities 13: the baseline's largest component, its three others each stepped.
           std::uint32_t packed = baselineOrientation & 3u;
           for (int i = 0; i < 3; ++i) {
             const int shift = 2 + i * kQuaternionComponentBits;
             const std::uint32_t step = ReadExpGolomb(reader, kStepOrderQuaternion);
-            const std::int64_t value = static_cast<std::int64_t>((baselineOrientation >> shift) & kQuaternionComponentMask) + UnZigZag(step);
+            const std::int64_t value =
+              static_cast<std::int64_t>((baselineOrientation >> shift) & kQuaternionComponentMask) + UnZigZag(step);
             if (!reader.Ok() || step > 2u * kQuaternionComponentMask || value < 0 || value > kQuaternionComponentMask) {
               reader.Fail();
               return false;
@@ -642,7 +723,9 @@ namespace faf::remote::wire
       }
       if ((fields & kFieldUnitStats) != 0u) {
         const std::uint32_t count = reader.ReadVarUint();
-        if (!reader.Ok() || count > SUnitFields::kMaxStats || static_cast<std::uint64_t>(count) * 11u > reader.BitsLeft()) {
+        if (
+          !reader.Ok() || count > SUnitFields::kMaxStats || static_cast<std::uint64_t>(count) * 11u > reader.BitsLeft()
+        ) {
           reader.Fail();
           return false;
         }
@@ -699,7 +782,10 @@ namespace faf::remote::wire
         if ((fields & kFieldUnitQueues) != 0u) {
           for (std::vector<std::int32_t>* const queue : {&detail.commands, &detail.buildQueue}) {
             const std::uint32_t count = reader.ReadVarUint();
-            if (!reader.Ok() || count > SUnitDetail::kMaxQueue || static_cast<std::uint64_t>(count) * 8u > reader.BitsLeft()) {
+            if (
+              !reader.Ok() || count > SUnitDetail::kMaxQueue ||
+              static_cast<std::uint64_t>(count) * 8u > reader.BitsLeft()
+            ) {
               reader.Fail();
               return false;
             }
@@ -711,7 +797,10 @@ namespace faf::remote::wire
         }
         if ((fields & kFieldUnitWeapons) != 0u) {
           const std::uint32_t count = reader.ReadVarUint();
-          if (!reader.Ok() || count > SUnitDetail::kMaxWeapons || static_cast<std::uint64_t>(count) * 120u > reader.BitsLeft()) {
+          if (
+            !reader.Ok() || count > SUnitDetail::kMaxWeapons ||
+            static_cast<std::uint64_t>(count) * 120u > reader.BitsLeft()
+          ) {
             reader.Fail();
             return false;
           }
@@ -758,8 +847,10 @@ namespace faf::remote::wire
       if ((fields & kFieldAttachment) != 0u) {
         look.attachParent = reader.ReadBits(32);
         const std::uint32_t count = reader.ReadVarUint();
-        if (!reader.Ok() || count > SAppearance::kMaxAttachments
-            || static_cast<std::uint64_t>(count) * 32u > reader.BitsLeft()) {
+        if (
+          !reader.Ok() || count > SAppearance::kMaxAttachments ||
+          static_cast<std::uint64_t>(count) * 32u > reader.BitsLeft()
+        ) {
           reader.Fail();
           return false;
         }
@@ -804,7 +895,10 @@ namespace faf::remote::wire
     class CIdCursor
     {
     public:
-      [[nodiscard]] bool Next(BitReader& reader, std::uint32_t& id) noexcept
+      [[nodiscard]] bool Next(
+        BitReader& reader,
+        std::uint32_t& id
+      ) noexcept
       {
         const std::uint64_t gap = reader.ReadVarUint();
         const std::uint64_t next = mFirst ? gap : static_cast<std::uint64_t>(mPrevious) + 1u + gap;
@@ -823,7 +917,12 @@ namespace faf::remote::wire
       std::uint32_t mPrevious = 0;
     };
 
-    void WriteGap(BitWriter& writer, bool& first, std::uint32_t& previous, const std::uint32_t id)
+    void WriteGap(
+      BitWriter& writer,
+      bool& first,
+      std::uint32_t& previous,
+      const std::uint32_t id
+    )
     {
       writer.WriteVarUint(first ? id : id - previous - 1u);
       first = false;
@@ -833,7 +932,9 @@ namespace faf::remote::wire
     constexpr int kMaxGapZeros = 32; // an order-0 code of any 32-bit gap
   } // namespace
 
-  std::uint32_t CChangeHeaders::Find(const std::uint32_t fields) const noexcept
+  std::uint32_t CChangeHeaders::Find(
+    const std::uint32_t fields
+  ) const noexcept
   {
     std::uint32_t place = 0;
     while (place < mRecentCount && mRecentMasks[place] != fields) {
@@ -842,7 +943,10 @@ namespace faf::remote::wire
     return place < mRecentCount ? place : kRecent;
   }
 
-  void CChangeHeaders::Use(const std::uint32_t place, const std::uint32_t fields) noexcept
+  void CChangeHeaders::Use(
+    const std::uint32_t place,
+    const std::uint32_t fields
+  ) noexcept
   {
     // Moved (or, when new, put) to the front; a new mask drops the oldest once all 15 are taken.
     std::uint32_t from = place;
@@ -855,7 +959,11 @@ namespace faf::remote::wire
     mRecentMasks[0] = fields;
   }
 
-  void CChangeHeaders::Write(BitWriter& writer, const std::uint32_t id, const std::uint32_t fields)
+  void CChangeHeaders::Write(
+    BitWriter& writer,
+    const std::uint32_t id,
+    const std::uint32_t fields
+  )
   {
     if (mFirst) {
       writer.WriteVarUint(id);
@@ -872,7 +980,11 @@ namespace faf::remote::wire
     Use(place, fields);
   }
 
-  bool CChangeHeaders::Read(BitReader& reader, std::uint32_t& id, std::uint32_t& fields) noexcept
+  bool CChangeHeaders::Read(
+    BitReader& reader,
+    std::uint32_t& id,
+    std::uint32_t& fields
+  ) noexcept
   {
     const std::uint64_t gap = mFirst ? reader.ReadVarUint() : ReadExpGolomb(reader, 0, kMaxGapZeros);
     const std::uint64_t next = mFirst ? gap : static_cast<std::uint64_t>(mPrevious) + 1u + gap;
@@ -896,7 +1008,10 @@ namespace faf::remote::wire
     return true;
   }
 
-  int CChangeHeaders::Bits(const std::uint32_t id, const std::uint32_t fields) noexcept
+  int CChangeHeaders::Bits(
+    const std::uint32_t id,
+    const std::uint32_t fields
+  ) noexcept
   {
     const auto varintBits = [](std::uint32_t value) {
       int bits = 8;
@@ -918,11 +1033,17 @@ namespace faf::remote::wire
   namespace
   {
     /** A section count the remaining bits could carry and the codec allows. */
-    [[nodiscard]] bool ReadCount(BitReader& reader, const SFrameCodec& codec, std::uint32_t& count) noexcept
+    [[nodiscard]] bool ReadCount(
+      BitReader& reader,
+      const SFrameCodec& codec,
+      std::uint32_t& count
+    ) noexcept
     {
       count = reader.ReadVarUint();
-      if (!reader.Ok() || count > codec.maxEntities
-          || static_cast<std::uint64_t>(count) * kMinBitsPerItem > reader.BitsLeft()) {
+      if (
+        !reader.Ok() || count > codec.maxEntities ||
+        static_cast<std::uint64_t>(count) * kMinBitsPerItem > reader.BitsLeft()
+      ) {
         reader.Fail();
         return false;
       }
@@ -930,7 +1051,10 @@ namespace faf::remote::wire
     }
   } // namespace
 
-  void WriteCategoryBits(BitWriter& writer, const SCategoryBits& bits)
+  void WriteCategoryBits(
+    BitWriter& writer,
+    const SCategoryBits& bits
+  )
   {
     writer.WriteVarUint(bits.firstWord);
     writer.WriteVarUint(static_cast<std::uint32_t>(bits.words.size()));
@@ -939,11 +1063,16 @@ namespace faf::remote::wire
     }
   }
 
-  bool ReadCategoryBits(BitReader& reader, SCategoryBits& bits)
+  bool ReadCategoryBits(
+    BitReader& reader,
+    SCategoryBits& bits
+  )
   {
     bits.firstWord = reader.ReadVarUint();
     const std::uint32_t count = reader.ReadVarUint();
-    if (!reader.Ok() || count > SCategoryBits::kMaxWords || static_cast<std::uint64_t>(count) * 32u > reader.BitsLeft()) {
+    if (
+      !reader.Ok() || count > SCategoryBits::kMaxWords || static_cast<std::uint64_t>(count) * 32u > reader.BitsLeft()
+    ) {
       reader.Fail();
       return false;
     }
@@ -954,51 +1083,66 @@ namespace faf::remote::wire
     return reader.Ok();
   }
 
-  bool SUnitWeapon::operator==(const SUnitWeapon& other) const noexcept
+  bool SUnitWeapon::operator==(
+    const SUnitWeapon& other
+  ) const noexcept
   {
-    return targets == other.targets && secondary == other.secondary && layer == other.layer
-        && Bits(minRadius) == Bits(other.minRadius) && Bits(maxRadius) == Bits(other.maxRadius)
-        && Bits(effectiveRadius) == Bits(other.effectiveRadius) && minRangeVisual == other.minRangeVisual
-        && maxRangeVisual == other.maxRangeVisual;
+    return targets == other.targets && secondary == other.secondary && layer == other.layer &&
+      Bits(minRadius) == Bits(other.minRadius) && Bits(maxRadius) == Bits(other.maxRadius) &&
+      Bits(effectiveRadius) == Bits(other.effectiveRadius) && minRangeVisual == other.minRangeVisual &&
+      maxRangeVisual == other.maxRangeVisual;
   }
 
-  bool SUnitAttributes::operator==(const SUnitAttributes& other) const noexcept
+  bool SUnitAttributes::operator==(
+    const SUnitAttributes& other
+  ) const noexcept
   {
-    return blueprint == other.blueprint && reserved04 == other.reserved04 && restriction == other.restriction
-        && SameFloats(scalars.data(), other.scalars.data(), scalars.size()) && commandCaps == other.commandCaps
-        && toggleCaps == other.toggleCaps && flags == other.flags && reserved6C == other.reserved6C;
+    return blueprint == other.blueprint && reserved04 == other.reserved04 && restriction == other.restriction &&
+      SameFloats(scalars.data(), other.scalars.data(), scalars.size()) && commandCaps == other.commandCaps &&
+      toggleCaps == other.toggleCaps && flags == other.flags && reserved6C == other.reserved6C;
   }
 
-  bool SUnitDetail::operator==(const SUnitDetail& other) const noexcept
+  bool SUnitDetail::operator==(
+    const SUnitDetail& other
+  ) const noexcept
   {
-    return SameDetailScalars(*this, other) && SameFloats(economy.data(), other.economy.data(), economy.size())
-        && commands == other.commands && buildQueue == other.buildQueue
-        && weapons == other.weapons && attributes == other.attributes;
+    return SameDetailScalars(*this, other) && SameFloats(economy.data(), other.economy.data(), economy.size()) &&
+      commands == other.commands && buildQueue == other.buildQueue && weapons == other.weapons &&
+      attributes == other.attributes;
   }
 
-  bool SAppearance::operator==(const SAppearance& other) const noexcept
+  bool SAppearance::operator==(
+    const SAppearance& other
+  ) const noexcept
   {
     return AppearanceChanges(*this, other) == 0u;
   }
 
-  bool SEntityRecord::operator==(const SEntityRecord& other) const noexcept
+  bool SEntityRecord::operator==(
+    const SEntityRecord& other
+  ) const noexcept
   {
-    return id == other.id && tickCreated == other.tickCreated && blueprint == other.blueprint && army == other.army && position == other.position
-        && farPosition == other.farPosition && SameFloats(farValue.data(), other.farValue.data(), farValue.size())
-        && velocity == other.velocity && verticalAcceleration == other.verticalAcceleration
-        && anchorBeat == other.anchorBeat && followsGround == other.followsGround
-        && orientation == other.orientation && yawOnly == other.yawOnly && yawRate == other.yawRate
-        && orientationBeat == other.orientationBeat && Bits(health) == Bits(other.health)
-        && Bits(maxHealth) == Bits(other.maxHealth) && Bits(fractionComplete) == Bits(other.fractionComplete)
-        && flags == other.flags && isUnit == other.isUnit && (!isUnit || SameUnitFields(unit, other.unit))
-        && appearance == other.appearance;
+    return id == other.id && tickCreated == other.tickCreated && blueprint == other.blueprint && army == other.army &&
+      position == other.position && farPosition == other.farPosition &&
+      SameFloats(farValue.data(), other.farValue.data(), farValue.size()) && velocity == other.velocity &&
+      verticalAcceleration == other.verticalAcceleration && anchorBeat == other.anchorBeat &&
+      followsGround == other.followsGround && orientation == other.orientation && yawOnly == other.yawOnly &&
+      yawRate == other.yawRate && orientationBeat == other.orientationBeat && Bits(health) == Bits(other.health) &&
+      Bits(maxHealth) == Bits(other.maxHealth) && Bits(fractionComplete) == Bits(other.fractionComplete) &&
+      flags == other.flags && isUnit == other.isUnit && (!isUnit || SameUnitFields(unit, other.unit)) &&
+      appearance == other.appearance;
   }
 
-  std::uint64_t HashBlipUpdate(const SEntityRecord& record, const SUnitDetail& detail) noexcept
+  std::uint64_t HashBlipUpdate(
+    const SEntityRecord& record,
+    const SUnitDetail& detail
+  ) noexcept
   {
     // Four lanes in turn, so each value's multiplies wait on the value four before, not the one
     // before: a server hashes every blip update of every view group each beat (plan #118).
-    std::uint64_t lanes[4] = {0x9E3779B97F4A7C15ull, 0xC2B2AE3D27D4EB4Full, 0x165667B19E3779F9ull, 0x27D4EB2F165667C5ull};
+    std::uint64_t lanes[4] = {
+      0x9E3779B97F4A7C15ull, 0xC2B2AE3D27D4EB4Full, 0x165667B19E3779F9ull, 0x27D4EB2F165667C5ull
+    };
     const auto add = [&lanes](const std::uint64_t value) {
       const std::uint64_t next = std::rotl(lanes[0] ^ (value * 0xC2B2AE3D27D4EB4Full), 31) * 0x9E3779B185EBCA87ull;
       lanes[0] = lanes[1];
@@ -1114,7 +1258,9 @@ namespace faf::remote::wire
     return hash != 0u ? hash : 1u;
   }
 
-  std::uint64_t HashRecord(const SEntityRecord& record) noexcept
+  std::uint64_t HashRecord(
+    const SEntityRecord& record
+  ) noexcept
   {
     // A record that isn't a unit keeps an empty unit block, as `operator==` ignores it.
     static const SUnitDetail kNoDetail{};
@@ -1138,24 +1284,32 @@ namespace faf::remote::wire
     return hash ^ (hash >> 29u);
   }
 
-  std::uint32_t CreationFields(const SEntityRecord& record) noexcept
+  std::uint32_t CreationFields(
+    const SEntityRecord& record
+  ) noexcept
   {
-    return kEntityFields | kFieldKind | (record.isUnit ? kUnitFields : 0u)
-         | AppearanceChanges(SAppearance{}, record.appearance);
+    return kEntityFields | kFieldKind | (record.isUnit ? kUnitFields : 0u) |
+      AppearanceChanges(SAppearance{}, record.appearance);
   }
 
-  std::uint32_t ChangedFields(const SEntityRecord& before, const SEntityRecord& after) noexcept
+  std::uint32_t ChangedFields(
+    const SEntityRecord& before,
+    const SEntityRecord& after
+  ) noexcept
   {
     std::uint32_t fields = AppearanceChanges(before.appearance, after.appearance);
-    if (before.position != after.position || before.velocity != after.velocity
-        || before.verticalAcceleration != after.verticalAcceleration || before.anchorBeat != after.anchorBeat
-        || before.followsGround != after.followsGround
-        || before.farPosition != after.farPosition
-        || !SameFloats(before.farValue.data(), after.farValue.data(), before.farValue.size())) {
+    if (
+      before.position != after.position || before.velocity != after.velocity ||
+      before.verticalAcceleration != after.verticalAcceleration || before.anchorBeat != after.anchorBeat ||
+      before.followsGround != after.followsGround || before.farPosition != after.farPosition ||
+      !SameFloats(before.farValue.data(), after.farValue.data(), before.farValue.size())
+    ) {
       fields |= kFieldPosition;
     }
-    if (before.orientation != after.orientation || before.yawOnly != after.yawOnly || before.yawRate != after.yawRate
-        || before.orientationBeat != after.orientationBeat) {
+    if (
+      before.orientation != after.orientation || before.yawOnly != after.yawOnly || before.yawRate != after.yawRate ||
+      before.orientationBeat != after.orientationBeat
+    ) {
       fields |= kFieldOrientation;
     }
     if (Bits(before.health) != Bits(after.health)) {
@@ -1240,7 +1394,10 @@ namespace faf::remote::wire
   namespace
   {
     /** `numerator / denominator` rounded half up; the denominator is positive. */
-    [[nodiscard]] std::int64_t DivideRounded(const std::int64_t numerator, const std::int64_t denominator) noexcept
+    [[nodiscard]] std::int64_t DivideRounded(
+      const std::int64_t numerator,
+      const std::int64_t denominator
+    ) noexcept
     {
       const std::int64_t shifted = 2 * numerator + denominator;
       const std::int64_t twice = 2 * denominator;
@@ -1248,7 +1405,11 @@ namespace faf::remote::wire
     }
 
     /** Twice the motion's offset, in sub-steps, `t` beats from its anchor. */
-    [[nodiscard]] std::int64_t TwiceOffset(const std::int64_t velocity, const std::int64_t acceleration, const std::int64_t t) noexcept
+    [[nodiscard]] std::int64_t TwiceOffset(
+      const std::int64_t velocity,
+      const std::int64_t acceleration,
+      const std::int64_t t
+    ) noexcept
     {
       return 2 * velocity * t + acceleration * t * t;
     }
@@ -1266,14 +1427,17 @@ namespace faf::remote::wire
      * step of the motion wins; a straight fit before a bent one at the same window.
      */
     [[nodiscard]] SAxisMotion FitAxis(
-      const std::int64_t* const past, const std::size_t count, const std::uint32_t maxWindow, const std::int64_t unit,
+      const std::int64_t* const past,
+      const std::size_t count,
+      const std::uint32_t maxWindow,
+      const std::int64_t unit,
       const bool bend
     ) noexcept
     {
       const auto fits = [&](const SAxisMotion& motion, const std::uint32_t window) {
         for (std::uint32_t k = 1; k < window; ++k) {
-          const std::int64_t twiceError =
-            2 * (past[0] - past[k]) * unit - TwiceOffset(motion.velocity, -motion.acceleration, static_cast<std::int64_t>(k));
+          const std::int64_t twiceError = 2 * (past[0] - past[k]) * unit -
+            TwiceOffset(motion.velocity, -motion.acceleration, static_cast<std::int64_t>(k));
           if (twiceError > 2 * unit || -twiceError > 2 * unit) {
             return false;
           }
@@ -1310,7 +1474,10 @@ namespace faf::remote::wire
   namespace
   {
     /** The quantised terrain height under a quantised x and z (`codec.ground` set). */
-    [[nodiscard]] std::uint32_t GroundStep(const QuantizedPosition& at, const SFrameCodec& codec) noexcept
+    [[nodiscard]] std::uint32_t GroundStep(
+      const QuantizedPosition& at,
+      const SFrameCodec& codec
+    ) noexcept
     {
       return codec.position.y.Encode(
         codec.ground->HeightAt(codec.position.x.Decode(at[0]), codec.position.z.Decode(at[2]))
@@ -1318,7 +1485,11 @@ namespace faf::remote::wire
     }
   } // namespace
 
-  QuantizedPosition PredictPosition(const SEntityRecord& record, const std::uint32_t beat, const SFrameCodec& codec) noexcept
+  QuantizedPosition PredictPosition(
+    const SEntityRecord& record,
+    const std::uint32_t beat,
+    const SFrameCodec& codec
+  ) noexcept
   {
     const std::int64_t elapsed = static_cast<std::int64_t>(beat) - static_cast<std::int64_t>(record.anchorBeat);
     const std::int64_t unit = std::int64_t{1} << codec.velocityFractionBits;
@@ -1328,8 +1499,8 @@ namespace faf::remote::wire
     QuantizedPosition predicted{};
     for (int axis = 0; axis < 3; ++axis) {
       const std::int64_t acceleration = axis == 1 ? record.verticalAcceleration : 0;
-      const std::int64_t value = static_cast<std::int64_t>(record.position[axis])
-                               + DivideRounded(TwiceOffset(record.velocity[axis], acceleration, elapsed), 2 * unit);
+      const std::int64_t value = static_cast<std::int64_t>(record.position[axis]) +
+        DivideRounded(TwiceOffset(record.velocity[axis], acceleration, elapsed), 2 * unit);
       predicted[axis] = value < 0 ? 0u : (value > limits[axis] ? limits[axis] : static_cast<std::uint32_t>(value));
     }
     if (record.followsGround && codec.ground != nullptr) {
@@ -1339,8 +1510,11 @@ namespace faf::remote::wire
   }
 
   bool ApplyDeadReckoning(
-    SEntityRecord& sent, const std::span<const QuantizedPosition> history, const std::uint32_t beat,
-    const SReckoningScheme& scheme, const SFrameCodec& codec
+    SEntityRecord& sent,
+    const std::span<const QuantizedPosition> history,
+    const std::uint32_t beat,
+    const SReckoningScheme& scheme,
+    const SFrameCodec& codec
   ) noexcept
   {
     if (history.empty()) {
@@ -1391,7 +1565,11 @@ namespace faf::remote::wire
     return true;
   }
 
-  std::uint32_t PredictYaw(const SEntityRecord& record, const std::uint32_t beat, const SFrameCodec& codec) noexcept
+  std::uint32_t PredictYaw(
+    const SEntityRecord& record,
+    const std::uint32_t beat,
+    const SFrameCodec& codec
+  ) noexcept
   {
     if (!codec.orientationReckoning || !record.yawOnly) {
       return record.orientation;
@@ -1403,8 +1581,12 @@ namespace faf::remote::wire
   }
 
   bool ApplyOrientationReckoning(
-    SEntityRecord& sent, const SEntityRecord& actual, const std::span<const std::uint32_t> yawHistory,
-    const std::uint32_t beat, const SReckoningScheme& scheme, const SFrameCodec& codec
+    SEntityRecord& sent,
+    const SEntityRecord& actual,
+    const std::span<const std::uint32_t> yawHistory,
+    const std::uint32_t beat,
+    const SReckoningScheme& scheme,
+    const SFrameCodec& codec
   ) noexcept
   {
     // The shortest way round between two yaws, in yaw units.
@@ -1421,11 +1603,12 @@ namespace faf::remote::wire
       const std::array<float, 4> a = UnpackQuaternion(actual.orientation);
       const std::array<float, 4> b = UnpackQuaternion(sent.orientation);
       const double dot = std::fabs(
-        static_cast<double>(a[0]) * b[0] + static_cast<double>(a[1]) * b[1] + static_cast<double>(a[2]) * b[2]
-        + static_cast<double>(a[3]) * b[3]
+        static_cast<double>(a[0]) * b[0] + static_cast<double>(a[1]) * b[1] + static_cast<double>(a[2]) * b[2] +
+        static_cast<double>(a[3]) * b[3]
       );
       constexpr double kHalfTurnPerUnit = 3.141592653589793 / 65536.0;
-      within = sent.orientation == actual.orientation || dot >= std::cos(kHalfTurnPerUnit * static_cast<double>(tolerance));
+      within =
+        sent.orientation == actual.orientation || dot >= std::cos(kHalfTurnPerUnit * static_cast<double>(tolerance));
     }
     if (within) {
       return false;
@@ -1460,7 +1643,10 @@ namespace faf::remote::wire
     return true;
   }
 
-  SFrameDelta ComputeFrameDelta(const SViewFrame* const baseline, const SViewFrame& frame)
+  SFrameDelta ComputeFrameDelta(
+    const SViewFrame* const baseline,
+    const SViewFrame& frame
+  )
   {
     SFrameDelta delta;
     static const std::vector<SEntityRecord> kEmpty;
@@ -1490,10 +1676,16 @@ namespace faf::remote::wire
   {
     /** The frame's header and its removed, created and changed records. */
     void WriteFrameChanges(
-      const std::uint32_t frameId, const std::uint32_t baselineId, const std::uint32_t beat, const std::int32_t simRate,
-      const std::uint32_t serverMs, const std::span<const std::uint32_t> removed,
-      const std::span<const SEntityRecord* const> created, const std::span<const SFrameChange> changed,
-      const SFrameCodec& codec, BitWriter& writer
+      const std::uint32_t frameId,
+      const std::uint32_t baselineId,
+      const std::uint32_t beat,
+      const std::int32_t simRate,
+      const std::uint32_t serverMs,
+      const std::span<const std::uint32_t> removed,
+      const std::span<const SEntityRecord* const> created,
+      const std::span<const SFrameChange> changed,
+      const SFrameCodec& codec,
+      BitWriter& writer
     )
     {
       writer.WriteBits(kLaneVersions[static_cast<std::size_t>(ELane::Entities)], 16);
@@ -1529,10 +1721,17 @@ namespace faf::remote::wire
     }
   } // namespace
 
-  bool EncodeFrame(const SViewFrame& frame, const SViewFrame* const baseline, const SFrameCodec& codec, BitWriter& writer)
+  bool EncodeFrame(
+    const SViewFrame& frame,
+    const SViewFrame* const baseline,
+    const SFrameCodec& codec,
+    BitWriter& writer
+  )
   {
-    if (!frame.IsWellFormed() || (baseline != nullptr && !baseline->IsWellFormed())
-        || frame.entities.size() > codec.maxEntities) {
+    if (
+      !frame.IsWellFormed() || (baseline != nullptr && !baseline->IsWellFormed()) ||
+      frame.entities.size() > codec.maxEntities
+    ) {
       return false;
     }
     for (const SEntityRecord& record : frame.entities) {
@@ -1569,13 +1768,25 @@ namespace faf::remote::wire
       }
     }
     WriteFrameChanges(
-      frame.frameId, baseline != nullptr ? baseline->frameId : kNoBaseline, frame.beat, frame.simRate, frame.serverMs, removed,
-      created, changed, codec, writer
+      frame.frameId,
+      baseline != nullptr ? baseline->frameId : kNoBaseline,
+      frame.beat,
+      frame.simRate,
+      frame.serverMs,
+      removed,
+      created,
+      changed,
+      codec,
+      writer
     );
     return true;
   }
 
-  bool EncodeFrameChanges(const SFrameChanges& changes, const SFrameCodec& codec, BitWriter& writer)
+  bool EncodeFrameChanges(
+    const SFrameChanges& changes,
+    const SFrameCodec& codec,
+    BitWriter& writer
+  )
   {
     if (changes.entityCount > codec.maxEntities) {
       return false;
@@ -1591,13 +1802,25 @@ namespace faf::remote::wire
       }
     }
     WriteFrameChanges(
-      changes.frameId, changes.baselineId, changes.beat, changes.simRate, changes.serverMs, changes.removed, changes.created,
-      changes.changed, codec, writer
+      changes.frameId,
+      changes.baselineId,
+      changes.beat,
+      changes.simRate,
+      changes.serverMs,
+      changes.removed,
+      changes.created,
+      changes.changed,
+      codec,
+      writer
     );
     return true;
   }
 
-  int PositionFieldBits(const SEntityRecord& record, const SEntityRecord* const before, const SFrameCodec& codec) noexcept
+  int PositionFieldBits(
+    const SEntityRecord& record,
+    const SEntityRecord* const before,
+    const SFrameCodec& codec
+  ) noexcept
   {
     if (record.farPosition) {
       return 1 + 96;
@@ -1608,7 +1831,10 @@ namespace faf::remote::wire
     return 2 + std::min(PositionStepBits(PositionSteps(record, *before)), PositionWholeBits(codec));
   }
 
-  int OrientationFieldBits(const SEntityRecord& record, const SEntityRecord* const before) noexcept
+  int OrientationFieldBits(
+    const SEntityRecord& record,
+    const SEntityRecord* const before
+  ) noexcept
   {
     if (!record.yawOnly) {
       if (!FullMayStep(record, before)) {
@@ -1623,7 +1849,9 @@ namespace faf::remote::wire
     return 2 + std::min(ExpGolombBits(YawStep(record, *before), kStepOrderYaw), kYawBits);
   }
 
-  std::uint32_t PeekFrameBaseline(const std::span<const std::uint8_t> bytes) noexcept
+  std::uint32_t PeekFrameBaseline(
+    const std::span<const std::uint8_t> bytes
+  ) noexcept
   {
     BitReader reader(bytes);
     (void)reader.ReadBits(16);
@@ -1632,7 +1860,12 @@ namespace faf::remote::wire
     return reader.Ok() ? baseline : kNoBaseline;
   }
 
-  bool DecodeFrame(BitReader& reader, const SViewFrame* const baseline, const SFrameCodec& codec, SViewFrame& out)
+  bool DecodeFrame(
+    BitReader& reader,
+    const SViewFrame* const baseline,
+    const SFrameCodec& codec,
+    SViewFrame& out
+  )
   {
     const std::uint32_t laneVersion = reader.ReadBits(16);
     const std::uint32_t frameId = reader.ReadBits(32);
@@ -1643,8 +1876,10 @@ namespace faf::remote::wire
     if (!reader.Ok() || laneVersion != kLaneVersions[static_cast<std::size_t>(ELane::Entities)]) {
       return false;
     }
-    if ((baselineId == kNoBaseline) != (baseline == nullptr)
-        || (baseline != nullptr && (baseline->frameId != baselineId || !baseline->IsWellFormed()))) {
+    if (
+      (baselineId == kNoBaseline) != (baseline == nullptr) ||
+      (baseline != nullptr && (baseline->frameId != baselineId || !baseline->IsWellFormed()))
+    ) {
       return false;
     }
 

@@ -10,7 +10,7 @@ namespace gpg
   class ReadArchive;
   class WriteArchive;
   class RType;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -32,28 +32,28 @@ namespace moho
    */
   struct UnitAttributes
   {
-    const RUnitBlueprint* blueprint;    // +0x00
-    std::uint32_t unknown_0004;         // +0x04
+    const RUnitBlueprint* blueprint;       // +0x00
+    std::uint32_t unknown_0004;            // +0x04
     EntityCategorySet restrictionCategory; // +0x08
-    float spawnElevationOffset;         // +0x30 (also written by Unit:SetElevation)
-    float moveSpeedMult;                // +0x34 (also written by Unit:SetSpeedMult)
-    float accelerationMult;             // +0x38
-    float turnMult;                     // +0x3C
-    float breakOffTriggerMult;          // +0x40
-    float breakOffDistanceMult;         // +0x44
-    float consumptionPerSecondEnergy; // +0x48
-    float consumptionPerSecondMass;   // +0x4C
-    float productionPerSecondEnergy;  // +0x50
-    float productionPerSecondMass;    // +0x54
-    float buildRate;                  // +0x58
-    float regenRate;                  // +0x5C
-    std::uint32_t commandCapsMask; // +0x60 (RULEUCC_* bits, e.g. Pause=0x20000)
-    std::uint32_t toggleCapsMask;  // +0x64 (RULEUTC_* bits, e.g. GenericToggle=0x40)
-    bool mReclaimable;             // +0x68
-    bool mCapturable;              // +0x69
-    std::uint8_t unknown_006A;     // +0x6A
-    std::uint8_t unknown_006B;     // +0x6B
-    std::uint32_t unknown_006C;    // +0x6C
+    float spawnElevationOffset;            // +0x30 (also written by Unit:SetElevation)
+    float moveSpeedMult;                   // +0x34 (also written by Unit:SetSpeedMult)
+    float accelerationMult;                // +0x38
+    float turnMult;                        // +0x3C
+    float breakOffTriggerMult;             // +0x40
+    float breakOffDistanceMult;            // +0x44
+    float consumptionPerSecondEnergy;      // +0x48
+    float consumptionPerSecondMass;        // +0x4C
+    float productionPerSecondEnergy;       // +0x50
+    float productionPerSecondMass;         // +0x54
+    float buildRate;                       // +0x58
+    float regenRate;                       // +0x5C
+    std::uint32_t commandCapsMask;         // +0x60 (RULEUCC_* bits, e.g. Pause=0x20000)
+    std::uint32_t toggleCapsMask;          // +0x64 (RULEUTC_* bits, e.g. GenericToggle=0x40)
+    bool mReclaimable;                     // +0x68
+    bool mCapturable;                      // +0x69
+    std::uint8_t unknown_006A;             // +0x6A
+    std::uint8_t unknown_006B;             // +0x6B
+    std::uint32_t unknown_006C;            // +0x6C
 
     static gpg::RType* sType;
     UnitAttributes() = default;
@@ -102,13 +102,18 @@ namespace moho
     "UnitAttributes::restrictionCategory offset must be 0x08"
   );
   static_assert(
-    offsetof(UnitAttributes, spawnElevationOffset) == 0x30, "UnitAttributes::spawnElevationOffset offset must be 0x30"
+    offsetof(UnitAttributes, spawnElevationOffset) == 0x30,
+    "UnitAttributes::spawnElevationOffset offset must be 0x30"
   );
   static_assert(offsetof(UnitAttributes, moveSpeedMult) == 0x34, "UnitAttributes::moveSpeedMult offset must be 0x34");
-  static_assert(offsetof(UnitAttributes, accelerationMult) == 0x38, "UnitAttributes::accelerationMult offset must be 0x38");
+  static_assert(
+    offsetof(UnitAttributes, accelerationMult) == 0x38,
+    "UnitAttributes::accelerationMult offset must be 0x38"
+  );
   static_assert(offsetof(UnitAttributes, turnMult) == 0x3C, "UnitAttributes::turnMult offset must be 0x3C");
   static_assert(
-    offsetof(UnitAttributes, breakOffTriggerMult) == 0x40, "UnitAttributes::breakOffTriggerMult offset must be 0x40"
+    offsetof(UnitAttributes, breakOffTriggerMult) == 0x40,
+    "UnitAttributes::breakOffTriggerMult offset must be 0x40"
   );
   static_assert(
     offsetof(UnitAttributes, breakOffDistanceMult) == 0x44,
@@ -133,7 +138,8 @@ namespace moho
   static_assert(offsetof(UnitAttributes, buildRate) == 0x58, "UnitAttributes::buildRate offset must be 0x58");
   static_assert(offsetof(UnitAttributes, regenRate) == 0x5C, "UnitAttributes::regenRate offset must be 0x5C");
   static_assert(
-    offsetof(UnitAttributes, commandCapsMask) == 0x60, "UnitAttributes::commandCapsMask offset must be 0x60"
+    offsetof(UnitAttributes, commandCapsMask) == 0x60,
+    "UnitAttributes::commandCapsMask offset must be 0x60"
   );
   static_assert(offsetof(UnitAttributes, toggleCapsMask) == 0x64, "UnitAttributes::toggleCapsMask offset must be 0x64");
   static_assert(offsetof(UnitAttributes, mReclaimable) == 0x68, "UnitAttributes::mReclaimable offset must be 0x68");

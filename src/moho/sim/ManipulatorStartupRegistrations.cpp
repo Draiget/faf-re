@@ -128,13 +128,17 @@ namespace
   using VectorBoolStorage = moho::SBitStorage32;
 
   template <class TObject>
-  [[nodiscard]] TObject* PointerFromArchiveInt(const std::intptr_t objectPtr)
+  [[nodiscard]] TObject* PointerFromArchiveInt(
+    const std::intptr_t objectPtr
+  )
   {
     return reinterpret_cast<TObject*>(objectPtr);
   }
 
   template <class TObject>
-  [[nodiscard]] const TObject* ConstPointerFromArchiveInt(const std::intptr_t objectPtr)
+  [[nodiscard]] const TObject* ConstPointerFromArchiveInt(
+    const std::intptr_t objectPtr
+  )
   {
     return reinterpret_cast<const TObject*>(objectPtr);
   }
@@ -207,7 +211,9 @@ namespace
    * What it does:
    * Formats inherited lexical text and appends current vector<bool> size.
    */
-  fa::string RVectorTypeBool::GetLexical(const gpg::RRef& ref) const
+  fa::string RVectorTypeBool::GetLexical(
+    const gpg::RRef& ref
+  ) const
   {
     const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
@@ -236,8 +242,8 @@ namespace
    */
   struct VectorBoolBitCursor
   {
-    std::uint32_t* wordPtr;   // +0x00
-    std::uint32_t bitOffset;  // +0x04 (0..31)
+    std::uint32_t* wordPtr;  // +0x00
+    std::uint32_t bitOffset; // +0x04 (0..31)
   };
 
   /**
@@ -259,7 +265,10 @@ namespace
    * Returns the new capacity word count on success, or the prior element
    * count if no reallocation was necessary.
    */
-  std::uint32_t VectorBoolReserveWordCapacity(VectorBoolStorage& storage, const std::uint32_t wordCount)
+  std::uint32_t VectorBoolReserveWordCapacity(
+    VectorBoolStorage& storage,
+    const std::uint32_t wordCount
+  )
   {
     // Length-check: matches the legacy `sub_444270` overflow throw at 0x6421EE.
     if (wordCount > 0x3FFFFFFFu) {
@@ -272,9 +281,8 @@ namespace
     std::uint32_t* const oldWordsEnd = storage.mWordsEnd;
     std::uint32_t* const oldCapacityEnd = storage.mWordsCapacityEnd;
 
-    const std::uint32_t currentCapacity = (oldWords != nullptr && oldCapacityEnd != nullptr)
-      ? static_cast<std::uint32_t>(oldCapacityEnd - oldWords)
-      : 0u;
+    const std::uint32_t currentCapacity =
+      (oldWords != nullptr && oldCapacityEnd != nullptr) ? static_cast<std::uint32_t>(oldCapacityEnd - oldWords) : 0u;
     if (currentCapacity >= wordCount) {
       return currentCapacity;
     }
@@ -360,9 +368,8 @@ namespace
     // reallocation using the same dword-stride math as the binary:
     //   new_word_ptr = iterBaseWord + (newBase - oldBase)
     //   new_bit = iterBitOffset
-    const std::intptr_t wordDelta = (oldWordsBase != nullptr)
-      ? (storage.mWords - oldWordsBase)
-      : (storage.mWords - iterBaseWord);
+    const std::intptr_t wordDelta =
+      (oldWordsBase != nullptr) ? (storage.mWords - oldWordsBase) : (storage.mWords - iterBaseWord);
     std::uint32_t* const translatedWord = iterBaseWord + wordDelta;
 
     VectorBoolBitCursor cursor{translatedWord, iterBitOffset};
@@ -387,7 +394,12 @@ namespace
    * insert via the canonical per-bit `VectorBoolInsertOneBit` lane to match
    * the original binary loop shape.
    */
-  void RVectorTypeBool::SerLoad(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const)
+  void RVectorTypeBool::SerLoad(
+    gpg::ReadArchive* const archive,
+    const std::intptr_t objectPtr,
+    const int,
+    gpg::RRef* const
+  )
   {
     auto* const storage = PointerFromArchiveInt<VectorBoolStorage>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -416,9 +428,7 @@ namespace
       // matching `v5 = v12 + 4*(v11>>5); v6 = v11 & 0x1F;` in FUN_00641F70.
       std::uint32_t* const baseWord = loaded.mWords;
       const std::uint32_t liveBitCount = loaded.mBitCount;
-      std::uint32_t* const cursorWord = (baseWord != nullptr)
-        ? (baseWord + (liveBitCount >> 5u))
-        : nullptr;
+      std::uint32_t* const cursorWord = (baseWord != nullptr) ? (baseWord + (liveBitCount >> 5u)) : nullptr;
       const std::uint32_t cursorBit = liveBitCount & 31u;
 
       (void)VectorBoolInsertOneBit(loaded, value, cursorWord, cursorBit);
@@ -441,7 +451,12 @@ namespace
    * Writes packed boolean bit-count/value lanes to archive payload in index
    * order from one `SBitStorage32` source.
    */
-  void RVectorTypeBool::SerSave(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const)
+  void RVectorTypeBool::SerSave(
+    gpg::WriteArchive* const archive,
+    const std::intptr_t objectPtr,
+    const int,
+    gpg::RRef* const
+  )
   {
     const auto* const storage = ConstPointerFromArchiveInt<VectorBoolStorage>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -464,7 +479,10 @@ namespace
    * Builds one reflected proxy reference to the indexed legacy
    * `vector<bool>::reference` bit lane.
    */
-  gpg::RRef RVectorTypeBool::SubscriptIndex(void* const obj, const int ind) const
+  gpg::RRef RVectorTypeBool::SubscriptIndex(
+    void* const obj,
+    const int ind
+  ) const
   {
     auto* const storage = static_cast<VectorBoolStorage*>(obj);
     GPG_ASSERT(storage != nullptr);
@@ -474,18 +492,24 @@ namespace
     (void)fa::detail::AdvanceCursorBits(&gRecoveredRVectorTypeBoolSubscriptCursorScratch, ind);
 
     gpg::RRef out{};
-    auto* const reference = reinterpret_cast<std::vector<bool>::reference*>(&gRecoveredRVectorTypeBoolSubscriptCursorScratch);
+    auto* const reference =
+      reinterpret_cast<std::vector<bool>::reference*>(&gRecoveredRVectorTypeBoolSubscriptCursorScratch);
     out = gpg::MakeRRef<std::vector<bool>::reference>(reference);
     return out;
   }
 
-  size_t RVectorTypeBool::GetCount(void* const obj) const
+  size_t RVectorTypeBool::GetCount(
+    void* const obj
+  ) const
   {
     const auto* const storage = static_cast<const VectorBoolStorage*>(obj);
     return storage ? static_cast<size_t>(storage->mBitCount) : 0u;
   }
 
-  void RVectorTypeBool::SetCount(void* const obj, const int count) const
+  void RVectorTypeBool::SetCount(
+    void* const obj,
+    const int count
+  ) const
   {
     auto* const storage = static_cast<VectorBoolStorage*>(obj);
     GPG_ASSERT(storage != nullptr);
@@ -513,7 +537,11 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant1()
   {
     static CScrLuaClassBinder binder(
-      moho::SCR_SimLuaInitSet(), "moho.ScriptTask_Methods", &CScrLuaMetatableFactory<CUnitScriptTask>::Instance(), "CUnitScriptTask", ""
+      moho::SCR_SimLuaInitSet(),
+      "moho.ScriptTask_Methods",
+      &CScrLuaMetatableFactory<CUnitScriptTask>::Instance(),
+      "CUnitScriptTask",
+      ""
     );
     return &binder;
   }
@@ -531,7 +559,11 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant2()
   {
     static CScrLuaClassBinder binder(
-      moho::SCR_SimLuaInitSet(), "moho.AimManipulator", &CScrLuaMetatableFactory<CAimManipulator>::Instance(), "CAimManipulator", ""
+      moho::SCR_SimLuaInitSet(),
+      "moho.AimManipulator",
+      &CScrLuaMetatableFactory<CAimManipulator>::Instance(),
+      "CAimManipulator",
+      ""
     );
     return &binder;
   }
@@ -594,7 +626,11 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant4()
   {
     static CScrLuaClassBinder binder(
-      moho::SCR_SimLuaInitSet(), "moho.BoneEntityManipulator", &CScrLuaMetatableFactory<CBoneEntityManipulator>::Instance(), "CBoneEntityManipulator", ""
+      moho::SCR_SimLuaInitSet(),
+      "moho.BoneEntityManipulator",
+      &CScrLuaMetatableFactory<CBoneEntityManipulator>::Instance(),
+      "CBoneEntityManipulator",
+      ""
     );
     return &binder;
   }
@@ -645,7 +681,11 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant6()
   {
     static CScrLuaClassBinder binder(
-      moho::SCR_SimLuaInitSet(), "moho.BuilderArmManipulator", &CScrLuaMetatableFactory<CBuilderArmManipulator>::Instance(), "CBuilderArmManipulator", ""
+      moho::SCR_SimLuaInitSet(),
+      "moho.BuilderArmManipulator",
+      &CScrLuaMetatableFactory<CBuilderArmManipulator>::Instance(),
+      "CBuilderArmManipulator",
+      ""
     );
     return &binder;
   }
@@ -696,7 +736,11 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant7()
   {
     static CScrLuaClassBinder binder(
-      moho::SCR_SimLuaInitSet(), "moho.CollisionManipulator", &CScrLuaMetatableFactory<CCollisionManipulator>::Instance(), "CCollisionManipulator", ""
+      moho::SCR_SimLuaInitSet(),
+      "moho.CollisionManipulator",
+      &CScrLuaMetatableFactory<CCollisionManipulator>::Instance(),
+      "CCollisionManipulator",
+      ""
     );
     return &binder;
   }
@@ -747,7 +791,11 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant8()
   {
     static CScrLuaClassBinder binder(
-      moho::SCR_SimLuaInitSet(), "moho.FootPlantManipulator", &CScrLuaMetatableFactory<CFootPlantManipulator>::Instance(), "CFootPlantManipulator", ""
+      moho::SCR_SimLuaInitSet(),
+      "moho.FootPlantManipulator",
+      &CScrLuaMetatableFactory<CFootPlantManipulator>::Instance(),
+      "CFootPlantManipulator",
+      ""
     );
     return &binder;
   }
@@ -794,7 +842,11 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant9()
   {
     static CScrLuaClassBinder binder(
-      moho::SCR_SimLuaInitSet(), "moho.manipulator_methods", &CScrLuaMetatableFactory<IAniManipulator>::Instance(), "IAniManipulator", ""
+      moho::SCR_SimLuaInitSet(),
+      "moho.manipulator_methods",
+      &CScrLuaMetatableFactory<IAniManipulator>::Instance(),
+      "IAniManipulator",
+      ""
     );
     return &binder;
   }
@@ -808,7 +860,9 @@ namespace moho
    */
   CScrLuaInitForm* register_sim_SimInits_mForms_off_F59B34_mFactory()
   {
-    return RegisterRecoveredSimInitLinkerLane<&gRecoveredSimLuaInitFormPrev_off_F59B34_mFactory, &gRecoveredSimLuaInitFormAnchor_off_F59B34_mFactory>();
+    return RegisterRecoveredSimInitLinkerLane<
+      &gRecoveredSimLuaInitFormPrev_off_F59B34_mFactory,
+      &gRecoveredSimLuaInitFormAnchor_off_F59B34_mFactory>();
   }
 
   /**
@@ -838,8 +892,11 @@ namespace moho
   CScrLuaInitForm* register_moho_AnimationManipulator_ClassBinder()
   {
     static CScrLuaClassBinder binder(
-      moho::SCR_SimLuaInitSet(), "moho.AnimationManipulator", &CScrLuaMetatableFactory<CAnimationManipulator>::Instance(),
-      "CAnimationManipulator", ""
+      moho::SCR_SimLuaInitSet(),
+      "moho.AnimationManipulator",
+      &CScrLuaMetatableFactory<CAnimationManipulator>::Instance(),
+      "CAnimationManipulator",
+      ""
     );
     return &binder;
   }
@@ -901,7 +958,11 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant11()
   {
     static CScrLuaClassBinder binder(
-      moho::SCR_SimLuaInitSet(), "moho.RotateManipulator", &CScrLuaMetatableFactory<CRotateManipulator>::Instance(), "CRotateManipulator", ""
+      moho::SCR_SimLuaInitSet(),
+      "moho.RotateManipulator",
+      &CScrLuaMetatableFactory<CRotateManipulator>::Instance(),
+      "CRotateManipulator",
+      ""
     );
     return &binder;
   }
@@ -951,7 +1012,11 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant13()
   {
     static CScrLuaClassBinder binder(
-      moho::SCR_SimLuaInitSet(), "moho.SlaveManipulator", &CScrLuaMetatableFactory<CSlaveManipulator>::Instance(), "CSlaveManipulator", ""
+      moho::SCR_SimLuaInitSet(),
+      "moho.SlaveManipulator",
+      &CScrLuaMetatableFactory<CSlaveManipulator>::Instance(),
+      "CSlaveManipulator",
+      ""
     );
     return &binder;
   }
@@ -1001,7 +1066,11 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant15()
   {
     static CScrLuaClassBinder binder(
-      moho::SCR_SimLuaInitSet(), "moho.SlideManipulator", &CScrLuaMetatableFactory<CSlideManipulator>::Instance(), "CSlideManipulator", ""
+      moho::SCR_SimLuaInitSet(),
+      "moho.SlideManipulator",
+      &CScrLuaMetatableFactory<CSlideManipulator>::Instance(),
+      "CSlideManipulator",
+      ""
     );
     return &binder;
   }
@@ -1054,7 +1123,11 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant17()
   {
     static CScrLuaClassBinder binder(
-      moho::SCR_SimLuaInitSet(), "moho.StorageManipulator", &CScrLuaMetatableFactory<CStorageManipulator>::Instance(), "CStorageManipulator", ""
+      moho::SCR_SimLuaInitSet(),
+      "moho.StorageManipulator",
+      &CScrLuaMetatableFactory<CStorageManipulator>::Instance(),
+      "CStorageManipulator",
+      ""
     );
     return &binder;
   }
@@ -1104,7 +1177,11 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_offVariant19()
   {
     static CScrLuaClassBinder binder(
-      moho::SCR_SimLuaInitSet(), "moho.ThrustManipulator", &CScrLuaMetatableFactory<CThrustManipulator>::Instance(), "CThrustManipulator", ""
+      moho::SCR_SimLuaInitSet(),
+      "moho.ThrustManipulator",
+      &CScrLuaMetatableFactory<CThrustManipulator>::Instance(),
+      "CThrustManipulator",
+      ""
     );
     return &binder;
   }
@@ -1195,4 +1272,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_RVectorType_bool_324744, preregister_RVectorType_bool)
+GPG_PREREGISTER_INIT(
+  preregister_RVectorType_bool_324744,
+  preregister_RVectorType_bool
+)

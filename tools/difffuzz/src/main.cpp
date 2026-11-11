@@ -31,8 +31,15 @@ namespace difffuzz
     // call stub per spec entry and runs the spec rows, one child process per
     // row (--spec-row selects a single row).
     int RunSpecMain(
-      const char* specPath, const unsigned long long iters, const unsigned long long seed, const char* filter,
-      const char* dump, const char* values, const long rowIndex, const unsigned rowTimeoutSeconds, RetailImage& image
+      const char* specPath,
+      const unsigned long long iters,
+      const unsigned long long seed,
+      const char* filter,
+      const char* dump,
+      const char* values,
+      const long rowIndex,
+      const unsigned rowTimeoutSeconds,
+      RetailImage& image
     );
   } // namespace specrun
 } // namespace difffuzz
@@ -87,7 +94,9 @@ namespace
   constexpr std::size_t kHeapGuard = 16;
   constexpr unsigned char kHeapGuardByte = 0xAB;
   unsigned gRetailHeapOverruns = 0;
-  void* __cdecl RetailHeapMalloc(const std::size_t size)
+  void* __cdecl RetailHeapMalloc(
+    const std::size_t size
+  )
   {
     unsigned char* const block = static_cast<unsigned char*>(_aligned_malloc(kHeapHeader + size + kHeapGuard, 16));
     if (block == nullptr) {
@@ -98,7 +107,9 @@ namespace
     std::memset(block + kHeapHeader + size, kHeapGuardByte, kHeapGuard);
     return block + kHeapHeader;
   }
-  void __cdecl RetailHeapFree(void* const p)
+  void __cdecl RetailHeapFree(
+    void* const p
+  )
   {
     if (p == nullptr) {
       return;
@@ -109,14 +120,20 @@ namespace
     for (std::size_t i = 0; i < kHeapGuard; ++i) {
       if (block[kHeapHeader + size + i] != kHeapGuardByte) {
         if (gRetailHeapOverruns++ < 8) {
-          std::printf("[HEAP] retail wrote past a %u-byte block at +%u\n", static_cast<unsigned>(size), static_cast<unsigned>(size + i));
+          std::printf(
+            "[HEAP] retail wrote past a %u-byte block at +%u\n",
+            static_cast<unsigned>(size),
+            static_cast<unsigned>(size + i)
+          );
         }
         break;
       }
     }
     _aligned_free(block);
   }
-  std::size_t __cdecl RetailHeapMsize(void* const p)
+  std::size_t __cdecl RetailHeapMsize(
+    void* const p
+  )
   {
     if (p == nullptr) {
       return 0;
@@ -173,7 +190,7 @@ namespace
   [[nodiscard]] unsigned short ReadControlWord() noexcept
   {
     unsigned short cw;
-    __asm fnstcw cw
+    __asm { fnstcw cw }
     return cw;
   }
 
@@ -182,7 +199,7 @@ namespace
   [[nodiscard]] int X87Depth() noexcept
   {
     unsigned short sw;
-    __asm fnstsw sw
+    __asm { fnstsw sw }
     const int top = (sw >> 11) & 7;
     return top == 0 ? 0 : 8 - top;
   }
@@ -197,7 +214,9 @@ namespace
   volatile unsigned long long gWatchIteration = 0;
   u32 gWatchInput[difffuzz::kMaxWords];
 
-  DWORD WINAPI WatchdogMain(void*)
+  DWORD WINAPI WatchdogMain(
+    void*
+  )
   {
     LONG seen = gWatchCalls;
     int still = 0;
@@ -210,7 +229,9 @@ namespace
       if (still < kHangSeconds || tg == nullptr) {
         continue;
       }
-      std::printf("[HANG] %-22s iter %llu: one call ran for %d s\n      input   ", tg->name, gWatchIteration, kHangSeconds);
+      std::printf(
+        "[HANG] %-22s iter %llu: one call ran for %d s\n      input   ", tg->name, gWatchIteration, kHangSeconds
+      );
       for (int i = 0; i < tg->inWords; ++i) {
         std::printf(" %08X", gWatchInput[i]);
       }
@@ -221,7 +242,11 @@ namespace
   }
 
   // SEH has to live in a function without C++ unwinding objects.
-  DWORD CallGuarded(void (*fn)(const u32*, u32*), const u32* in, u32* out) noexcept
+  DWORD CallGuarded(
+    void (*fn)(const u32*, u32*),
+    const u32* in,
+    u32* out
+  ) noexcept
   {
     __try {
       fn(in, out);
@@ -231,7 +256,9 @@ namespace
     return 0;
   }
 
-  DWORD CallGuardedInit(const u32 va) noexcept
+  DWORD CallGuardedInit(
+    const u32 va
+  ) noexcept
   {
     __try {
       retail::RunStaticInit(va);
@@ -241,7 +268,12 @@ namespace
     return 0;
   }
 
-  void PrintWords(const char* label, const u32* w, const int n, const char* layout)
+  void PrintWords(
+    const char* label,
+    const u32* w,
+    const int n,
+    const char* layout
+  )
   {
     std::printf("      %-7s [%s]\n        ", label, layout);
     for (int i = 0; i < n; ++i) {
@@ -252,12 +284,18 @@ namespace
     std::printf("\n");
   }
 
-  [[nodiscard]] bool IsNan(const u32 w) noexcept
+  [[nodiscard]] bool IsNan(
+    const u32 w
+  ) noexcept
   {
     return (w & 0x7F800000u) == 0x7F800000u && (w & 0x007FFFFFu) != 0;
   }
 
-  [[nodiscard]] bool OnlyNanPayloadDiffers(const u32* a, const u32* b, const int n) noexcept
+  [[nodiscard]] bool OnlyNanPayloadDiffers(
+    const u32* a,
+    const u32* b,
+    const int n
+  ) noexcept
   {
     for (int i = 0; i < n; ++i) {
       if (a[i] != b[i] && !(IsNan(a[i]) && IsNan(b[i]))) {
@@ -270,7 +308,10 @@ namespace
   /// Any input word outside the range where x87 _PC_24 and SSE single
   /// arithmetic can only agree: denormal, inf, NaN, or a magnitude whose
   /// square/product leaves the float exponent range.
-  [[nodiscard]] bool InputsExtreme(const u32* in, const int n) noexcept
+  [[nodiscard]] bool InputsExtreme(
+    const u32* in,
+    const int n
+  ) noexcept
   {
     for (int i = 0; i < n; ++i) {
       const u32 e = (in[i] >> 23) & 0xFFu;
@@ -294,13 +335,13 @@ namespace
     const char* filter = nullptr;
     std::string image;
     bool list = false;
-    const char* dump = nullptr; // retail's outputs in faf_math_dump's format
+    const char* dump = nullptr;   // retail's outputs in faf_math_dump's format
     const char* values = nullptr; // retail's values for sampled inputs (dump_format.h)
-    const char* lines = nullptr; // retail's values for every input from `from` on
+    const char* lines = nullptr;  // retail's values for every input from `from` on
     unsigned long long from = 0;
     const char* spec = nullptr; // tools/retail-recorder's RRS1 file: call every function in it (spec_run.cpp)
     unsigned long long specIters = 100000ull;
-    long specRow = -1; // >= 0: run exactly this selected row (a child of the parent spec run)
+    long specRow = -1;         // >= 0: run exactly this selected row (a child of the parent spec run)
     unsigned rowTimeout = 300; // per-row child timeout, seconds
   };
 
@@ -346,7 +387,10 @@ namespace
     );
   }
 
-  [[nodiscard]] bool Matches(const char* name, const char* filter)
+  [[nodiscard]] bool Matches(
+    const char* name,
+    const char* filter
+  )
   {
     if (filter == nullptr) {
       return true;
@@ -368,12 +412,17 @@ namespace
   }
 } // namespace
 
-int main(int argc, char** argv)
+int main(
+  int argc,
+  char** argv
+)
 {
   Options opt;
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
-    auto next = [&]() -> const char* { return i + 1 < argc ? argv[++i] : ""; };
+    auto next = [&]() -> const char* {
+      return i + 1 < argc ? argv[++i] : "";
+    };
     if (a == "--iters") {
       opt.iters = std::strtoull(next(), nullptr, 0);
     } else if (a == "--seed") {
@@ -489,14 +538,18 @@ int main(int argc, char** argv)
       fninit
       fldcw defaultCw
     }
-    if (CallGuardedInit(init) != 0) {
+    if (CallGuardedInit(init) != 0)
+    {
       std::fprintf(stderr, "difffuzz: retail static init 0x%08X faulted\n", init);
       return 3;
     }
   }
   std::printf(
-    "difffuzz: mapped %s at 0x%08X (0x%X bytes, %u imports trapped)\n", opt.image.c_str(), image.Base(),
-    image.SizeOfImage(), image.ImportCount()
+    "difffuzz: mapped %s at 0x%08X (0x%X bytes, %u imports trapped)\n",
+    opt.image.c_str(),
+    image.Base(),
+    image.SizeOfImage(),
+    image.ImportCount()
   );
 
   // The spec lane, child mode (--spec-row): this process has the image
@@ -536,8 +589,11 @@ int main(int argc, char** argv)
 
   SetFpEnv();
   std::printf(
-    "difffuzz: x87 CW=0x%04X MXCSR=0x%04X seed=0x%llX iters=%llu (%s build)\n", ReadControlWord(), _mm_getcsr(),
-    opt.seed, opt.iters,
+    "difffuzz: x87 CW=0x%04X MXCSR=0x%04X seed=0x%llX iters=%llu (%s build)\n",
+    ReadControlWord(),
+    _mm_getcsr(),
+    opt.seed,
+    opt.iters,
 #ifdef NDEBUG
     "release"
 #else
@@ -615,16 +671,17 @@ int main(int argc, char** argv)
       }
 
       if (exR != 0 || exO != 0) {
-        std::printf(
-          "[CRASH] %-22s iter %llu: retail exception 0x%08lX, ours 0x%08lX\n", tg.name, done, exR, exO
-        );
+        std::printf("[CRASH] %-22s iter %llu: retail exception 0x%08lX, ours 0x%08lX\n", tg.name, done, exR, exO);
         PrintWords("input", in, tg.inWords, tg.inLayout);
         crashed = true;
         break;
       }
 
       bool same = std::memcmp(outR, outO, sizeof(u32) * tg.outWords) == 0 && depthR == depthO && cwR == cwO;
-      if (!same && !opt.strictNan && !tg.rawOutputs && depthR == depthO && cwR == cwO && OnlyNanPayloadDiffers(outR, outO, tg.outWords)) {
+      if (
+        !same && !opt.strictNan && !tg.rawOutputs && depthR == depthO && cwR == cwO &&
+        OnlyNanPayloadDiffers(outR, outO, tg.outWords)
+      ) {
         // Both sides produced a NaN in every differing word; only which
         // operand's payload propagated differs (x87 picks the larger
         // significand, SSE the first source operand). Tallied, not failed.
@@ -639,7 +696,12 @@ int main(int argc, char** argv)
       if (!same) {
         ++mismatches;
         std::printf(
-          "[MISMATCH %d] %s (retail 0x%08X vs %s) iter %llu  inputs: %s\n", mismatches, tg.name, tg.va, tg.source, done,
+          "[MISMATCH %d] %s (retail 0x%08X vs %s) iter %llu  inputs: %s\n",
+          mismatches,
+          tg.name,
+          tg.va,
+          tg.source,
+          done,
           InputsExtreme(in, tg.inWords) ? "EXTREME (denormal/inf/NaN or |x| outside 2^-63..2^63)" : "ordinary"
         );
         PrintWords("input", in, tg.inWords, tg.inLayout);
@@ -672,7 +734,10 @@ int main(int argc, char** argv)
 
     if (gRetailHeapOverruns != overrunsBefore) {
       std::printf(
-        "[HEAP] %-22s 0x%08X  retail wrote past %u heap block(s)\n", tg.name, tg.va, gRetailHeapOverruns - overrunsBefore
+        "[HEAP] %-22s 0x%08X  retail wrote past %u heap block(s)\n",
+        tg.name,
+        tg.va,
+        gRetailHeapOverruns - overrunsBefore
       );
       crashed = true;
     }
@@ -702,13 +767,17 @@ int main(int argc, char** argv)
   if (dumpFile != nullptr) {
     std::fclose(dumpFile);
     std::printf(
-      "difffuzz: retail outputs %s %s\n", dumpComplete ? "written to" : "INCOMPLETE (a target stopped early) in", opt.dump
+      "difffuzz: retail outputs %s %s\n",
+      dumpComplete ? "written to" : "INCOMPLETE (a target stopped early) in",
+      opt.dump
     );
   }
   if (valuesFile != nullptr) {
     std::fclose(valuesFile);
     std::printf(
-      "difffuzz: retail values %s %s\n", dumpComplete ? "written to" : "INCOMPLETE (a target stopped early) in", opt.values
+      "difffuzz: retail values %s %s\n",
+      dumpComplete ? "written to" : "INCOMPLETE (a target stopped early) in",
+      opt.values
     );
   }
   if (linesFile != nullptr) {

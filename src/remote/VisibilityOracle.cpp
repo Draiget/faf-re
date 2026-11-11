@@ -21,7 +21,10 @@ namespace faf::remote
 {
   namespace
   {
-    [[nodiscard]] const moho::CArmyImpl* ArmyAt(const moho::Sim& sim, const std::int32_t armyIndex) noexcept
+    [[nodiscard]] const moho::CArmyImpl* ArmyAt(
+      const moho::Sim& sim,
+      const std::int32_t armyIndex
+    ) noexcept
     {
       const fa::vector<moho::CArmyImpl*>& armies = sim.mArmiesList;
       if (armyIndex < 0 || static_cast<std::uint32_t>(armyIndex) >= armies.size()) {
@@ -35,7 +38,9 @@ namespace faf::remote
      * for the view's relation to the entity's army, and whether that channel publishes.
      */
     [[nodiscard]] SViewVisibility ResolveEntityChannel(
-      const moho::Sim& sim, const std::int32_t viewArmy, const SEntityFacts& facts
+      const moho::Sim& sim,
+      const std::int32_t viewArmy,
+      const SEntityFacts& facts
     )
     {
       SViewVisibility result;
@@ -55,16 +60,16 @@ namespace faf::remote
         // 0x00678AB5..0x00678AF2: by the alliance of the entity's army with the view's army
         // (null when the index is outside the army list, as the binary passes it).
         switch (facts.army->GetAllianceWith(ArmyAt(sim, viewArmy))) {
-          case moho::ALLIANCE_Neutral:
-            viz = facts.vizToNeutrals;
-            break;
-          case moho::ALLIANCE_Ally:
-            viz = facts.vizToAllies;
-            break;
-          case moho::ALLIANCE_Enemy:
-          default:
-            viz = facts.vizToEnemies;
-            break;
+        case moho::ALLIANCE_Neutral:
+          viz = facts.vizToNeutrals;
+          break;
+        case moho::ALLIANCE_Ally:
+          viz = facts.vizToAllies;
+          break;
+        case moho::ALLIANCE_Enemy:
+        default:
+          viz = facts.vizToEnemies;
+          break;
         }
       }
 
@@ -74,7 +79,9 @@ namespace faf::remote
     }
 
     /** Units and blips: a `UserUnit` on the client, which never tests the grid. */
-    [[nodiscard]] bool IsClientUnit(const SEntityFacts& facts) noexcept
+    [[nodiscard]] bool IsClientUnit(
+      const SEntityFacts& facts
+    ) noexcept
     {
       return facts.kind == SEntityFacts::EKind::Unit || facts.kind == SEntityFacts::EKind::Blip;
     }
@@ -84,7 +91,10 @@ namespace faf::remote
     constexpr std::uint32_t kUnitReconFlags = 28u;  // `Unit::SyncInterface`: every unit update
 
     /** The recon flags the client's `UserUnit` holds: the unit's fixed word, or the blip's record. */
-    [[nodiscard]] std::uint32_t ClientReconFlags(const std::int32_t viewArmy, moho::Entity& entity)
+    [[nodiscard]] std::uint32_t ClientReconFlags(
+      const std::int32_t viewArmy,
+      moho::Entity& entity
+    )
     {
       const moho::ReconBlip* const blip = entity.IsReconBlip();
       if (blip == nullptr) {
@@ -101,7 +111,9 @@ namespace faf::remote
      * entity's own, `ReconBlip::CreateInterface` / `Unit::CreateInterface`): motion types Land
      * through AmphibiousFloating.
      */
-    [[nodiscard]] bool IsClientMobile(const moho::Entity& entity)
+    [[nodiscard]] bool IsClientMobile(
+      const moho::Entity& entity
+    )
     {
       const auto* const blueprint = reinterpret_cast<const moho::RUnitBlueprint*>(entity.BluePrint);
       if (blueprint == nullptr) {
@@ -118,13 +130,15 @@ namespace faf::remote
    * grid counts as seeing.
    */
   [[nodiscard]] bool ViewCanSeeCell(
-    const moho::Sim& sim, const moho::CArmyImpl& view, const std::int32_t x, const std::int32_t z,
+    const moho::Sim& sim,
+    const moho::CArmyImpl& view,
+    const std::int32_t x,
+    const std::int32_t z,
     const bool underwater
   )
   {
     const moho::SSTIArmyConstantData& own = view.mConstDat;
-    const moho::CIntelGrid* const ownGrid =
-      underwater ? own.mWaterReconGrid.get() : own.mVisionReconGrid.get();
+    const moho::CIntelGrid* const ownGrid = underwater ? own.mWaterReconGrid.get() : own.mVisionReconGrid.get();
     if (ownGrid != nullptr && ownGrid->IsVisible(x, z)) {
       return true;
     }
@@ -145,7 +159,9 @@ namespace faf::remote
     return false;
   }
 
-  SEntityFacts ReadEntityFacts(moho::Entity& entity)
+  SEntityFacts ReadEntityFacts(
+    moho::Entity& entity
+  )
   {
     SEntityFacts facts;
     facts.army = entity.ArmyRef;
@@ -175,12 +191,20 @@ namespace faf::remote
     return facts;
   }
 
-  SViewVisibility ResolveViewVisibility(const moho::Sim& sim, const std::int32_t viewArmy, moho::Entity& entity)
+  SViewVisibility ResolveViewVisibility(
+    const moho::Sim& sim,
+    const std::int32_t viewArmy,
+    moho::Entity& entity
+  )
   {
     return ResolveViewVisibility(sim, viewArmy, ReadEntityFacts(entity));
   }
 
-  SViewVisibility ResolveViewVisibility(const moho::Sim& sim, const std::int32_t viewArmy, const SEntityFacts& facts)
+  SViewVisibility ResolveViewVisibility(
+    const moho::Sim& sim,
+    const std::int32_t viewArmy,
+    const SEntityFacts& facts
+  )
   {
     SViewVisibility result = ResolveEntityChannel(sim, viewArmy, facts);
 
@@ -212,7 +236,12 @@ namespace faf::remote
     return result;
   }
 
-  bool ViewCanSeePoint(const moho::Sim& sim, const std::int32_t viewArmy, const Wm3::Vec3f& pos, const bool underwater)
+  bool ViewCanSeePoint(
+    const moho::Sim& sim,
+    const std::int32_t viewArmy,
+    const Wm3::Vec3f& pos,
+    const bool underwater
+  )
   {
     // `UserEntity::UpdateVisibility` (0x008B9580): no focus army, nothing is fogged.
     const moho::CArmyImpl* const view = ArmyAt(sim, viewArmy);
@@ -231,12 +260,20 @@ namespace faf::remote
     return ViewCanSeeCell(sim, *view, cell.x, cell.z, underwater);
   }
 
-  bool CanViewSee(const moho::Sim& sim, const std::int32_t viewArmy, moho::Entity& entity)
+  bool CanViewSee(
+    const moho::Sim& sim,
+    const std::int32_t viewArmy,
+    moho::Entity& entity
+  )
   {
     return CanViewSee(sim, viewArmy, ReadEntityFacts(entity));
   }
 
-  bool CanViewSee(const moho::Sim& sim, const std::int32_t viewArmy, const SEntityFacts& facts)
+  bool CanViewSee(
+    const moho::Sim& sim,
+    const std::int32_t viewArmy,
+    const SEntityFacts& facts
+  )
   {
     const SViewVisibility visibility = ResolveViewVisibility(sim, viewArmy, facts);
     if (!visibility.published) {
@@ -248,7 +285,11 @@ namespace faf::remote
     return ViewCanSeePoint(sim, viewArmy, facts.pos, facts.underwater);
   }
 
-  std::uint32_t ViewsThatSee(const moho::Sim& sim, const std::size_t viewCount, const SEntityFacts& facts)
+  std::uint32_t ViewsThatSee(
+    const moho::Sim& sim,
+    const std::size_t viewCount,
+    const SEntityFacts& facts
+  )
   {
     const std::uint32_t all = viewCount >= 32u ? ~std::uint32_t{0} : (std::uint32_t{1} << viewCount) - 1u;
     // Units and blips are sent whenever published (`CanViewSee`): to the own army, or by recon record.
@@ -266,7 +307,8 @@ namespace faf::remote
     }
     // One channel for every view and no grid to test: the answer is the same for all of them.
     if (ViewsFollowFactsAlone(facts)) {
-      const bool published = facts.army == nullptr || facts.kind == SEntityFacts::EKind::Prop || facts.vizToNeutrals != moho::VIZMODE_Never;
+      const bool published =
+        facts.army == nullptr || facts.kind == SEntityFacts::EKind::Prop || facts.vizToNeutrals != moho::VIZMODE_Never;
       return published ? all : 0u;
     }
     std::uint32_t views = 0;
@@ -278,17 +320,24 @@ namespace faf::remote
     return views;
   }
 
-  bool ViewsFollowFactsAlone(const SEntityFacts& facts) noexcept
+  bool ViewsFollowFactsAlone(
+    const SEntityFacts& facts
+  ) noexcept
   {
     if (IsClientUnit(facts) || facts.destroyed) {
       return true;
     }
     const std::int32_t viz = facts.vizToNeutrals;
-    return (facts.army == nullptr || (facts.vizToFocusPlayer == viz && facts.vizToAllies == viz && facts.vizToEnemies == viz))
-        && static_cast<moho::EUserEntityVisibilityMode>(viz) != moho::EUserEntityVisibilityMode::ReconGrid;
+    return (facts.army == nullptr ||
+            (facts.vizToFocusPlayer == viz && facts.vizToAllies == viz && facts.vizToEnemies == viz)) &&
+      static_cast<moho::EUserEntityVisibilityMode>(viz) != moho::EUserEntityVisibilityMode::ReconGrid;
   }
 
-  bool ViewShowsMesh(const moho::Sim& sim, const std::int32_t viewArmy, moho::Entity& entity)
+  bool ViewShowsMesh(
+    const moho::Sim& sim,
+    const std::int32_t viewArmy,
+    moho::Entity& entity
+  )
   {
     const SEntityFacts facts = ReadEntityFacts(entity);
     const SViewVisibility visibility = ResolveViewVisibility(sim, viewArmy, facts);
@@ -298,35 +347,35 @@ namespace faf::remote
 
     const bool clientUnit = IsClientUnit(facts);
     switch (visibility.mode) {
-      case moho::EUserEntityVisibilityMode::Hidden:
-        return false;
+    case moho::EUserEntityVisibilityMode::Hidden:
+      return false;
 
-      case moho::EUserEntityVisibilityMode::MapPlayableRect: {
-        // `UserUnit::UpdateVisibility` 0x008C0A24: shown. `UserEntity::UpdateVisibility`: the
-        // cell of the truncated position inside the playable rect, `[min, max)`.
-        if (clientUnit) {
-          return true;
-        }
-        const gpg::Rect2i& rect = sim.mMapData->mPlayableRect;
-        const auto cellX = static_cast<std::int32_t>(entity.mVarDat.mCurTransform.pos_.x);
-        const auto cellZ = static_cast<std::int32_t>(entity.mVarDat.mCurTransform.pos_.z);
-        return cellX >= rect.x0 && cellX < rect.x1 && cellZ >= rect.z0 && cellZ < rect.z1;
-      }
-
-      case moho::EUserEntityVisibilityMode::ReconGrid: {
-        if (!clientUnit) {
-          return ViewCanSeePoint(
-            sim, viewArmy, entity.mVarDat.mCurTransform.pos_, entity.mVarDat.UsesUnderwaterReconGrid()
-          );
-        }
-        // 0x008C09CF..0x008C0A0A: a mobile unit shows on "seen now", a structure on "seen ever".
-        const std::uint32_t flags = ClientReconFlags(viewArmy, entity);
-        return IsClientMobile(entity) ? (flags & kReconSeenNow) != 0u : (flags & kReconSeenEver) != 0u;
-      }
-
-      default:
-        // Both client functions leave the mesh as it was for any other mode.
+    case moho::EUserEntityVisibilityMode::MapPlayableRect: {
+      // `UserUnit::UpdateVisibility` 0x008C0A24: shown. `UserEntity::UpdateVisibility`: the
+      // cell of the truncated position inside the playable rect, `[min, max)`.
+      if (clientUnit) {
         return true;
+      }
+      const gpg::Rect2i& rect = sim.mMapData->mPlayableRect;
+      const auto cellX = static_cast<std::int32_t>(entity.mVarDat.mCurTransform.pos_.x);
+      const auto cellZ = static_cast<std::int32_t>(entity.mVarDat.mCurTransform.pos_.z);
+      return cellX >= rect.x0 && cellX < rect.x1 && cellZ >= rect.z0 && cellZ < rect.z1;
+    }
+
+    case moho::EUserEntityVisibilityMode::ReconGrid: {
+      if (!clientUnit) {
+        return ViewCanSeePoint(
+          sim, viewArmy, entity.mVarDat.mCurTransform.pos_, entity.mVarDat.UsesUnderwaterReconGrid()
+        );
+      }
+      // 0x008C09CF..0x008C0A0A: a mobile unit shows on "seen now", a structure on "seen ever".
+      const std::uint32_t flags = ClientReconFlags(viewArmy, entity);
+      return IsClientMobile(entity) ? (flags & kReconSeenNow) != 0u : (flags & kReconSeenEver) != 0u;
+    }
+
+    default:
+      // Both client functions leave the mesh as it was for any other mode.
+      return true;
     }
   }
 } // namespace faf::remote

@@ -23,36 +23,50 @@ namespace
   using faf_container_tests::Values;
 
   template <class List>
-  [[nodiscard]] std::vector<int> ReverseValues(const List& list)
+  [[nodiscard]] std::vector<int> ReverseValues(
+    const List& list
+  )
   {
     return Values(list.rbegin(), list.rend());
   }
 
   template <class List>
-  [[nodiscard]] typename List::iterator At(List& list, const std::size_t index)
+  [[nodiscard]] typename List::iterator At(
+    List& list,
+    const std::size_t index
+  )
   {
     auto it = list.begin();
     std::advance(it, static_cast<std::ptrdiff_t>(index));
     return it;
   }
 
-  [[nodiscard]] std::size_t Pick(std::mt19937& rng, const std::size_t maxInclusive)
+  [[nodiscard]] std::size_t Pick(
+    std::mt19937& rng,
+    const std::size_t maxInclusive
+  )
   {
     return std::uniform_int_distribution<std::size_t>(0, maxInclusive)(rng);
   }
 
-  [[nodiscard]] std::vector<int> ToVector(const std::list<int>& list)
+  [[nodiscard]] std::vector<int> ToVector(
+    const std::list<int>& list
+  )
   {
     return std::vector<int>(list.begin(), list.end());
   }
 
-  [[nodiscard]] std::vector<int> ToReverseVector(const std::list<int>& list)
+  [[nodiscard]] std::vector<int> ToReverseVector(
+    const std::list<int>& list
+  )
   {
     return std::vector<int>(list.rbegin(), list.rend());
   }
 
   template <class E>
-  [[nodiscard]] E Make(const int v)
+  [[nodiscard]] E Make(
+    const int v
+  )
   {
     if constexpr (std::is_same_v<E, int>) {
       return v;
@@ -62,7 +76,10 @@ namespace
   }
 
   template <class E>
-  void RunListRandomOps(const unsigned seed, const int steps)
+  void RunListRandomOps(
+    const unsigned seed,
+    const int steps
+  )
   {
     using List = fa::list<E>;
     std::mt19937 rng(seed);
@@ -150,7 +167,9 @@ namespace
         }
         const std::size_t first = 1 + Pick(rng, refA.size() - 2);
         const std::size_t last = first + 1 + Pick(rng, refA.size() - first - 1);
-        const std::size_t where = (rng() & 1u) != 0u || last == refA.size() ? Pick(rng, first - 1) : last + 1 + Pick(rng, refA.size() - last - 1);
+        const std::size_t where = (rng() & 1u) != 0u || last == refA.size()
+          ? Pick(rng, first - 1)
+          : last + 1 + Pick(rng, refA.size() - last - 1);
         if (where == last) {
           break;
         }
@@ -215,7 +234,10 @@ namespace
   }
 } // namespace
 
-TEST(FaList, EmptyList)
+TEST(
+  FaList,
+  EmptyList
+)
 {
   const fa::list<int> list;
   EXPECT_TRUE(list.empty());
@@ -224,7 +246,10 @@ TEST(FaList, EmptyList)
   EXPECT_EQ(list.rbegin(), list.rend());
 }
 
-TEST(FaList, IteratorsStayValidAcrossInsertAndErase)
+TEST(
+  FaList,
+  IteratorsStayValidAcrossInsertAndErase
+)
 {
   fa::list<int> list;
   list.push_back(1);
@@ -247,7 +272,10 @@ TEST(FaList, IteratorsStayValidAcrossInsertAndErase)
   EXPECT_EQ(*prev, 1);
 }
 
-TEST(FaList, EraseOfTheEndDoesNothing)
+TEST(
+  FaList,
+  EraseOfTheEndDoesNothing
+)
 {
   fa::list<int> list;
   list.push_back(1);
@@ -255,7 +283,10 @@ TEST(FaList, EraseOfTheEndDoesNothing)
   EXPECT_EQ(list.size(), 1u);
 }
 
-TEST(FaList, EraseOfEverythingClears)
+TEST(
+  FaList,
+  EraseOfEverythingClears
+)
 {
   fa::list<int> list;
   for (int i = 0; i < 10; ++i) {
@@ -267,7 +298,10 @@ TEST(FaList, EraseOfEverythingClears)
   EXPECT_EQ(Values(list), std::vector<int>{5});
 }
 
-TEST(FaList, SpliceFromAnotherListMovesNodesAndCounts)
+TEST(
+  FaList,
+  SpliceFromAnotherListMovesNodesAndCounts
+)
 {
   fa::list<int> a;
   fa::list<int> b;
@@ -299,7 +333,10 @@ TEST(FaList, SpliceFromAnotherListMovesNodesAndCounts)
 // `_Where == _Last`) leave the list as it is. The guard in fa::list::splice tests
 // `whereNode == firstNode` instead. Minimal input: {1, 2, 3}, splice(it(3), self, it(1), it(3))
 // leaves begin..end = {3} with size() 3.
-TEST(FaList, DISABLED_SpliceBeforeTheRangeEndIsANoOp)
+TEST(
+  FaList,
+  DISABLED_SpliceBeforeTheRangeEndIsANoOp
+)
 {
   fa::list<int> list;
   list.push_back(1);
@@ -312,7 +349,10 @@ TEST(FaList, DISABLED_SpliceBeforeTheRangeEndIsANoOp)
   EXPECT_EQ(list.size(), 3u);
 }
 
-TEST(FaList, SpliceBeforeTheRangeStartIsANoOp)
+TEST(
+  FaList,
+  SpliceBeforeTheRangeStartIsANoOp
+)
 {
   fa::list<int> list;
   list.push_back(1);
@@ -325,7 +365,10 @@ TEST(FaList, SpliceBeforeTheRangeStartIsANoOp)
   EXPECT_EQ(Values(list), (std::vector<int>{1, 2, 3}));
 }
 
-TEST(FaList, CopyMoveSwapAndSelfAssignment)
+TEST(
+  FaList,
+  CopyMoveSwapAndSelfAssignment
+)
 {
   fa::list<int> a;
   for (int i = 0; i < 6; ++i) {
@@ -352,12 +395,15 @@ TEST(FaList, CopyMoveSwapAndSelfAssignment)
   EXPECT_EQ(Values(moved), std::vector<int>{42});
 }
 
-TEST(FaList, DestroysEveryElement)
+TEST(
+  FaList,
+  DestroysEveryElement
+)
 {
   Tracked::ResetCounters();
   {
     fa::list<Tracked> list;
-    const long heads = Tracked::live;  // the head node holds a value too
+    const long heads = Tracked::live; // the head node holds a value too
     for (int i = 0; i < 30; ++i) {
       list.push_back(Tracked(i));
     }
@@ -375,14 +421,20 @@ TEST(FaList, DestroysEveryElement)
   EXPECT_EQ(Tracked::badAccesses, 0);
 }
 
-TEST(FaList, RandomOpsMatchStdList)
+TEST(
+  FaList,
+  RandomOpsMatchStdList
+)
 {
   for (unsigned seed = 1; seed <= 3; ++seed) {
     RunListRandomOps<int>(seed, 2500);
   }
 }
 
-TEST(FaList, RandomOpsMatchStdListTrackedElement)
+TEST(
+  FaList,
+  RandomOpsMatchStdListTrackedElement
+)
 {
   Tracked::ResetCounters();
   for (unsigned seed = 11; seed <= 12; ++seed) {
@@ -392,7 +444,10 @@ TEST(FaList, RandomOpsMatchStdListTrackedElement)
   EXPECT_EQ(Tracked::badAccesses, 0);
 }
 
-TEST(FaList, LinkedListLayout)
+TEST(
+  FaList,
+  LinkedListLayout
+)
 {
   EXPECT_EQ(sizeof(fa::linked_list<int>), 2 * sizeof(void*));
 }
@@ -402,7 +457,9 @@ TEST(FaList, LinkedListLayout)
 namespace
 {
   template <class Queue>
-  void RunQueueRandomOps(const unsigned seed)
+  void RunQueueRandomOps(
+    const unsigned seed
+  )
   {
     std::mt19937 rng(seed);
     Queue q;
@@ -414,7 +471,7 @@ namespace
         if ((rng() & 1u) != 0u) {
           q.push(value);
         } else {
-          q.push(value + 0);  // the rvalue overload
+          q.push(value + 0); // the rvalue overload
         }
         ref.push(value);
       } else {
@@ -434,17 +491,26 @@ namespace
   }
 } // namespace
 
-TEST(FaQueue, RandomOpsOverListMatchStdQueue)
+TEST(
+  FaQueue,
+  RandomOpsOverListMatchStdQueue
+)
 {
   RunQueueRandomOps<fa::queue<int>>(5);
 }
 
-TEST(FaQueue, RandomOpsOverDequeMatchStdQueue)
+TEST(
+  FaQueue,
+  RandomOpsOverDequeMatchStdQueue
+)
 {
   RunQueueRandomOps<fa::queue<int, fa::deque<int>>>(6);
 }
 
-TEST(FaQueue, CopyMoveAndSwap)
+TEST(
+  FaQueue,
+  CopyMoveAndSwap
+)
 {
   fa::queue<int> a;
   for (int i = 0; i < 5; ++i) {

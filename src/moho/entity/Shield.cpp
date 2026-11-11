@@ -44,7 +44,9 @@ namespace
   constexpr std::uint32_t kShieldFamilyMaskSourceBits = 0x400u;
   constexpr std::uint32_t kInvalidArmySourceIndex = 0xFFu;
 
-  [[nodiscard]] std::uint32_t BuildShieldFamilySourceBits(const std::uint32_t armySourceIndex) noexcept
+  [[nodiscard]] std::uint32_t BuildShieldFamilySourceBits(
+    const std::uint32_t armySourceIndex
+  ) noexcept
   {
     // 0x007764B2..0x007764B7: `(index | 0x400) << 20`, no masking.
     return (armySourceIndex | kShieldFamilyMaskSourceBits) << moho::kEntityIdSourceShift;
@@ -56,12 +58,16 @@ namespace
    * What it does:
    * Adds `Entity` as a reflected base of `Shield`.
    */
-  void AddEntityBaseToShieldTypeInfo(gpg::RType* const typeInfo)
+  void AddEntityBaseToShieldTypeInfo(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::Entity>(typeInfo);
   }
 
-  void UnlinkShieldFromSimList(moho::Shield* const shield)
+  void UnlinkShieldFromSimList(
+    moho::Shield* const shield
+  )
   {
     if (!shield || !shield->SimulationRef) {
       return;
@@ -99,7 +105,9 @@ namespace moho
    * Serializer construction lane: initializes Shield with default collision
    * bucket flags under one simulation owner.
    */
-  Shield::Shield(Sim* const sim)
+  Shield::Shield(
+    Sim* const sim
+  )
     : Entity(sim, kShieldCollisionBucketFlags)
   {}
 
@@ -111,7 +119,11 @@ namespace moho
    * provided source index, binds Lua object state, and links into
    * `Sim::mShields`.
    */
-  Shield::Shield(Sim* const sim, const LuaPlus::LuaObject& luaObject, const std::uint32_t armySourceIndex)
+  Shield::Shield(
+    Sim* const sim,
+    const LuaPlus::LuaObject& luaObject,
+    const std::uint32_t armySourceIndex
+  )
     : Entity(
         luaObject,
         sim,
@@ -124,7 +136,12 @@ namespace moho
   /**
    * Address: 0x00776860 (FUN_00776860)
    */
-  void Shield::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void Shield::MemberConstruct(
+    gpg::ReadArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     Sim* sim = nullptr;
     const gpg::RRef owner{};
@@ -132,12 +149,16 @@ namespace moho
     result.SetUnowned(gpg::MakeRRef(new Shield(sim)), 0u);
   }
 
-  void Shield::MemberDeserialize(gpg::ReadArchive* const archive)
+  void Shield::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     archive->Read(gpg::RTypeOf<moho::Entity>(), static_cast<Entity*>(this), gpg::RRef{});
   }
 
-  void Shield::MemberSerialize(gpg::WriteArchive* const archive) const
+  void Shield::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     archive->Write(gpg::RTypeOf<moho::Entity>(), static_cast<const Entity*>(this), gpg::RRef{});
   }
@@ -219,7 +240,9 @@ namespace moho
    * What it does:
    * Unwraps raw Lua callback context and forwards to `cfunc__c_CreateShieldL`.
    */
-  int cfunc__c_CreateShield(lua_State* const luaContext)
+  int cfunc__c_CreateShield(
+    lua_State* const luaContext
+  )
   {
     return cfunc__c_CreateShieldL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -233,12 +256,7 @@ namespace moho
   CScrLuaInitForm* func__c_CreateShield_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      moho::SCR_SimLuaInitSet(),
-      kCreateShieldName,
-      &cfunc__c_CreateShield,
-      nullptr,
-      "<global>",
-      kCreateShieldHelpText
+      moho::SCR_SimLuaInitSet(), kCreateShieldName, &cfunc__c_CreateShield, nullptr, "<global>", kCreateShieldHelpText
     );
     return &binder;
   }
@@ -250,7 +268,9 @@ namespace moho
    * Validates `(luaobj, spec)`, derives shield source index from optional
    * `spec.Owner`, creates one `Shield`, and pushes its Lua object.
    */
-  int cfunc__c_CreateShieldL(LuaPlus::LuaState* const state)
+  int cfunc__c_CreateShieldL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (state == nullptr || state->m_state == nullptr) {
       return 0;
@@ -348,7 +368,10 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_ShieldTypeInfo_0bcbf6, moho::preregister_ShieldTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_ShieldTypeInfo_0bcbf6,
+  moho::preregister_ShieldTypeInfo
+)
 
 namespace
 {
@@ -374,7 +397,11 @@ namespace
   moho::CScrLuaInitForm* register_moho_shield_methods()
   {
     static moho::CScrLuaClassBinder binder(
-      moho::SCR_SimLuaInitSet(), "moho.shield_methods", &moho::CScrLuaMetatableFactory<moho::Shield>::Instance(), "Shield", ""
+      moho::SCR_SimLuaInitSet(),
+      "moho.shield_methods",
+      &moho::CScrLuaMetatableFactory<moho::Shield>::Instance(),
+      "Shield",
+      ""
     );
     return &binder;
   }

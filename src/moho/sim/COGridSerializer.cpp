@@ -24,7 +24,9 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<COGrid>::Deserialize` 0x00722CC0.
    */
-  void COGrid::MemberDeserialize(gpg::ReadArchive* const archive)
+  void COGrid::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     gpg::RRef selfRef{};
     selfRef = gpg::MakeRRef<moho::COGrid>(this);
@@ -34,7 +36,9 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<COGrid>::Serialize` 0x00722D00.
    */
-  void COGrid::MemberSerialize(gpg::WriteArchive* const archive)
+  void COGrid::MemberSerialize(
+    gpg::WriteArchive* const archive
+  )
   {
     gpg::RRef selfRef{};
     selfRef = gpg::MakeRRef<moho::COGrid>(this);

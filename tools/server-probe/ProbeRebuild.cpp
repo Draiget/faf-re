@@ -47,7 +47,10 @@ namespace faf::probe
       CProbeApp()
         : moho::IWinApp("SupCom", "SupremeCommander")
       {}
-      bool Init() override { return AppInitCommonServices(); }
+      bool Init() override
+      {
+        return AppInitCommonServices();
+      }
       void Main() override {}
       void Destroy() override {}
     };
@@ -68,7 +71,9 @@ namespace faf::probe
   CProbeRebuild::CProbeRebuild() = default;
   CProbeRebuild::~CProbeRebuild() = default;
 
-  bool CProbeRebuild::Start(std::string& error)
+  bool CProbeRebuild::Start(
+    std::string& error
+  )
   {
     if (mState) {
       return true;
@@ -86,7 +91,11 @@ namespace faf::probe
     return true;
   }
 
-  bool CProbeRebuild::OnLaunchInfo(const std::span<const std::uint8_t> configuration, const int uid, std::string& error)
+  bool CProbeRebuild::OnLaunchInfo(
+    const std::span<const std::uint8_t> configuration,
+    const int uid,
+    std::string& error
+  )
   {
     if (!mState || mState->rules) {
       return true; // not asked to rebuild from it, or the rules are loaded already (a reconnect sends it again)
@@ -116,7 +125,11 @@ namespace faf::probe
     return LoadRules(config, uid, error);
   }
 
-  bool CProbeRebuild::Load(const std::string& matchPath, const int uid, std::string& error)
+  bool CProbeRebuild::Load(
+    const std::string& matchPath,
+    const int uid,
+    std::string& error
+  )
   {
     if (!Start(error)) {
       return false;
@@ -139,7 +152,11 @@ namespace faf::probe
     return LoadRules(config, uid, error);
   }
 
-  bool CProbeRebuild::LoadRules(LuaPlus::LuaObject& config, const int uid, std::string& error)
+  bool CProbeRebuild::LoadRules(
+    LuaPlus::LuaObject& config,
+    const int uid,
+    std::string& error
+  )
   {
     LuaPlus::LuaState* const state = faf::headless::ReplayLuaState();
     // As the player this probe is: `BuildLaunchInfo` wants the local player in the match.
@@ -167,7 +184,9 @@ namespace faf::probe
     return true;
   }
 
-  bool CProbeRebuild::Content(remote::SContentReport& out) const
+  bool CProbeRebuild::Content(
+    remote::SContentReport& out
+  ) const
   {
     if (!mState || !mState->rules) {
       return false;
@@ -176,7 +195,11 @@ namespace faf::probe
     return true;
   }
 
-  void CProbeRebuild::OnGameInfo(const float mapSizeX, const float mapSizeZ, const std::int32_t army)
+  void CProbeRebuild::OnGameInfo(
+    const float mapSizeX,
+    const float mapSizeZ,
+    const std::int32_t army
+  )
   {
     if (!mState || !mState->rules || mState->client) {
       return;
@@ -187,14 +210,18 @@ namespace faf::probe
     info.army = army;
     mState->client = std::make_unique<remote::client::CServerViewClient>(*mState->rules, info);
     // The heights as this client loaded the map: the server's terrain edits go on a copy, as in the game client.
-    if (mState->map && mState->map->mTerrainRes != nullptr && mState->map->mTerrainRes->mMap != nullptr
-        && mState->map->mTerrainRes->mMap->mHeightField) {
+    if (
+      mState->map && mState->map->mTerrainRes != nullptr && mState->map->mTerrainRes->mMap != nullptr &&
+      mState->map->mTerrainRes->mMap->mHeightField
+    ) {
       mState->client->SeedTerrain(*mState->map->mTerrainRes->mMap->mHeightField);
       mState->seeded = true;
     }
   }
 
-  void CProbeRebuild::OnTables(const std::span<const std::uint8_t> message)
+  void CProbeRebuild::OnTables(
+    const std::span<const std::uint8_t> message
+  )
   {
     if (!mState || !mState->client) {
       return;
@@ -206,8 +233,12 @@ namespace faf::probe
   }
 
   void CProbeRebuild::OnView(
-    const std::span<const std::uint8_t> own, const std::span<const std::uint8_t> team, const std::span<const std::uint8_t> armies,
-    const std::span<const std::uint8_t> grids, const std::span<const std::uint8_t> poses, const bool hasPoses
+    const std::span<const std::uint8_t> own,
+    const std::span<const std::uint8_t> team,
+    const std::span<const std::uint8_t> armies,
+    const std::span<const std::uint8_t> grids,
+    const std::span<const std::uint8_t> poses,
+    const bool hasPoses
   )
   {
     if (!mState || !mState->client) {
@@ -230,7 +261,9 @@ namespace faf::probe
     return mState && mState->rules;
   }
 
-  void CProbeRebuild::Report(const int uid) const
+  void CProbeRebuild::Report(
+    const int uid
+  ) const
   {
     if (!mState || !mState->client) {
       std::printf("probe %d: rebuild: never started (no rules or no game info)\n", uid);
@@ -241,13 +274,20 @@ namespace faf::probe
     const remote::client::SRebuildStats& s = client.RebuildStats();
     std::string slots;
     for (const remote::wire::SGridSlot& slot : client.Grids()) {
-      slots += " army " + std::to_string(slot.army) + (slot.kind == 0 ? " vision " : " water ") + std::to_string(slot.bits.width) + "x" +
-               std::to_string(slot.bits.height);
+      slots += " army " + std::to_string(slot.army) + (slot.kind == 0 ? " vision " : " water ") +
+        std::to_string(slot.bits.width) + "x" + std::to_string(slot.bits.height);
     }
     std::printf(
-      "probe %d: rebuild: army lanes %llu (%llu failed), %zu armies held; grid lanes %llu (%llu failed), %zu grids held:%s\n", uid,
-      static_cast<unsigned long long>(v.armyLanes), static_cast<unsigned long long>(v.armyFailures), client.Armies().size(),
-      static_cast<unsigned long long>(v.gridLanes), static_cast<unsigned long long>(v.gridFailures), client.Grids().size(), slots.c_str()
+      "probe %d: rebuild: army lanes %llu (%llu failed), %zu armies held; grid lanes %llu (%llu failed), %zu grids "
+      "held:%s\n",
+      uid,
+      static_cast<unsigned long long>(v.armyLanes),
+      static_cast<unsigned long long>(v.armyFailures),
+      client.Armies().size(),
+      static_cast<unsigned long long>(v.gridLanes),
+      static_cast<unsigned long long>(v.gridFailures),
+      client.Grids().size(),
+      slots.c_str()
     );
     std::uint64_t records = 0;
     std::uint64_t units = 0;
@@ -260,34 +300,59 @@ namespace faf::probe
       }
     }
     std::printf(
-      "probe %d: rebuild: last frame %llu records: %llu units, %llu orphaned; %llu own blips left out\n", uid,
-      static_cast<unsigned long long>(records), static_cast<unsigned long long>(units), static_cast<unsigned long long>(orphaned),
+      "probe %d: rebuild: last frame %llu records: %llu units, %llu orphaned; %llu own blips left out\n",
+      uid,
+      static_cast<unsigned long long>(records),
+      static_cast<unsigned long long>(units),
+      static_cast<unsigned long long>(orphaned),
       static_cast<unsigned long long>(client.BlipsLeftOut())
     );
     std::printf(
-      "probe %d: rebuild: %llu frames, %llu applied, %llu failed; %llu blueprints known; created %llu, updates %llu, erased %llu, "
+      "probe %d: rebuild: %llu frames, %llu applied, %llu failed; %llu blueprints known; created %llu, updates %llu, "
+      "erased %llu, "
       "deleted %llu; no blueprint %llu, unknown table ids %llu, unit updates %llu\n",
-      uid, static_cast<unsigned long long>(v.views), static_cast<unsigned long long>(v.applied), static_cast<unsigned long long>(v.frameFailures),
-      static_cast<unsigned long long>(v.blueprintsKnown), static_cast<unsigned long long>(s.created), static_cast<unsigned long long>(s.entityUpdates),
-      static_cast<unsigned long long>(s.erased), static_cast<unsigned long long>(s.deleted), static_cast<unsigned long long>(s.noBlueprint),
-      static_cast<unsigned long long>(s.unknownTableIds), static_cast<unsigned long long>(s.unitUpdates)
+      uid,
+      static_cast<unsigned long long>(v.views),
+      static_cast<unsigned long long>(v.applied),
+      static_cast<unsigned long long>(v.frameFailures),
+      static_cast<unsigned long long>(v.blueprintsKnown),
+      static_cast<unsigned long long>(s.created),
+      static_cast<unsigned long long>(s.entityUpdates),
+      static_cast<unsigned long long>(s.erased),
+      static_cast<unsigned long long>(s.deleted),
+      static_cast<unsigned long long>(s.noBlueprint),
+      static_cast<unsigned long long>(s.unknownTableIds),
+      static_cast<unsigned long long>(s.unitUpdates)
     );
     const remote::wire::CSessionTableReaders& tables = client.Tables();
     std::printf(
-      "probe %d: rebuild: session tables %llu records (%llu bad, %llu resets): %u sounds, %u names, %zu deposits, %llu terrain edits "
+      "probe %d: rebuild: session tables %llu records (%llu bad, %llu resets): %u sounds, %u names, %zu deposits, %llu "
+      "terrain edits "
       "(%s); unit stat items applied %llu\n",
-      uid, static_cast<unsigned long long>(v.tableRecords), static_cast<unsigned long long>(v.tableFailures + mState->tablesBad),
-      static_cast<unsigned long long>(v.tableResets), tables.Sounds().Size(), tables.Names().Size(), tables.Deposits().size(),
-      static_cast<unsigned long long>(s.terrainEdits), mState->seeded ? "applied to the map's heights" : "counted, no heights",
+      uid,
+      static_cast<unsigned long long>(v.tableRecords),
+      static_cast<unsigned long long>(v.tableFailures + mState->tablesBad),
+      static_cast<unsigned long long>(v.tableResets),
+      tables.Sounds().Size(),
+      tables.Names().Size(),
+      tables.Deposits().size(),
+      static_cast<unsigned long long>(s.terrainEdits),
+      mState->seeded ? "applied to the map's heights" : "counted, no heights",
       static_cast<unsigned long long>(s.statsApplied)
     );
     std::printf(
-      "probe %d: rebuild: poses: %llu lanes (%llu bad, %llu KB), %llu poses made, %llu unit-beats with bones, %llu bones applied, "
+      "probe %d: rebuild: poses: %llu lanes (%llu bad, %llu KB), %llu poses made, %llu unit-beats with bones, %llu "
+      "bones applied, "
       "%llu bad, %llu without a mesh\n",
-      uid, static_cast<unsigned long long>(v.poseLanes), static_cast<unsigned long long>(v.poseFailures),
-      static_cast<unsigned long long>(v.poseBytes / 1024u), static_cast<unsigned long long>(s.posesMade),
-      static_cast<unsigned long long>(s.poseBeats), static_cast<unsigned long long>(s.poseBonesApplied),
-      static_cast<unsigned long long>(s.poseBonesBad), static_cast<unsigned long long>(s.posesWithoutMesh)
+      uid,
+      static_cast<unsigned long long>(v.poseLanes),
+      static_cast<unsigned long long>(v.poseFailures),
+      static_cast<unsigned long long>(v.poseBytes / 1024u),
+      static_cast<unsigned long long>(s.posesMade),
+      static_cast<unsigned long long>(s.poseBeats),
+      static_cast<unsigned long long>(s.poseBonesApplied),
+      static_cast<unsigned long long>(s.poseBonesBad),
+      static_cast<unsigned long long>(s.posesWithoutMesh)
     );
   }
 } // namespace faf::probe

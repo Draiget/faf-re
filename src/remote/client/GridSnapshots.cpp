@@ -13,7 +13,7 @@ namespace faf::remote::client
     // A link that falls behind the sim (the GUI at high game speed takes several beats a frame) still
     // finds its beat; a link that stops taking does not grow this without end.
     constexpr std::size_t kMaxQueuedBeats = 256;
-  }
+  } // namespace
 
   CGridSnapshots::~CGridSnapshots()
   {
@@ -35,21 +35,28 @@ namespace faf::remote::client
     }
   }
 
-  void CGridSnapshots::OnEntityWillSync(moho::Entity& entity)
+  void CGridSnapshots::OnEntityWillSync(
+    moho::Entity& entity
+  )
   {
     if (mNext != nullptr) {
       mNext->OnEntityWillSync(entity);
     }
   }
 
-  void CGridSnapshots::OnEntitySynced(moho::Entity& entity)
+  void CGridSnapshots::OnEntitySynced(
+    moho::Entity& entity
+  )
   {
     if (mNext != nullptr) {
       mNext->OnEntitySynced(entity);
     }
   }
 
-  void CGridSnapshots::OnSyncWalkDone(moho::Sim& sim, const moho::SSyncData& packet)
+  void CGridSnapshots::OnSyncWalkDone(
+    moho::Sim& sim,
+    const moho::SSyncData& packet
+  )
   {
     if (mNext != nullptr) {
       mNext->OnSyncWalkDone(sim, packet);
@@ -59,11 +66,15 @@ namespace faf::remote::client
     if (view >= 0) {
       for (std::size_t index = 0; index < sim.mArmiesList.size(); ++index) {
         const moho::CArmyImpl* const army = sim.mArmiesList[index];
-        if (army == nullptr
-            || (static_cast<std::int32_t>(index) != view && !army->mVarDat.mAllies.Contains(static_cast<unsigned int>(view)))) {
+        if (
+          army == nullptr ||
+          (static_cast<std::int32_t>(index) != view && !army->mVarDat.mAllies.Contains(static_cast<unsigned int>(view)))
+        ) {
           continue;
         }
-        const moho::CIntelGrid* const kinds[2] = {army->mConstDat.mVisionReconGrid.get(), army->mConstDat.mWaterReconGrid.get()};
+        const moho::CIntelGrid* const kinds[2] = {
+          army->mConstDat.mVisionReconGrid.get(), army->mConstDat.mWaterReconGrid.get()
+        };
         for (std::uint8_t kind = 0; kind < 2u; ++kind) {
           const moho::CIntelGrid* const grid = kinds[kind];
           if (grid == nullptr || grids.size() >= wire::kMaxGridSlots) {
@@ -89,7 +100,10 @@ namespace faf::remote::client
     }
   }
 
-  bool CGridSnapshots::Take(const std::uint32_t beat, std::vector<wire::SGridSlot>& out)
+  bool CGridSnapshots::Take(
+    const std::uint32_t beat,
+    std::vector<wire::SGridSlot>& out
+  )
   {
     const std::lock_guard<std::mutex> guard(mLock);
     while (!mBeats.empty() && mBeats.front().first < beat) {

@@ -28,7 +28,7 @@ namespace moho
   struct SPartialConnection : TDatListItem<SPartialConnection, void>
   {
     CNetTCPConnector* mConnector;
-    SOCKET mSocket;
+    platform::net::Socket mSocket;
     u_long mAddr;
     u_short mPort;
     std::uint16_t mPad0x16;
@@ -39,7 +39,12 @@ namespace moho
     /**
      * Address: 0x00484660 (FUN_00484660, Moho::SPartialConnection::SPartialConnection)
      */
-    SPartialConnection(CNetTCPConnector* connector, const SOCKET socket, const u_long address, const u_short port)
+    SPartialConnection(
+      CNetTCPConnector* connector,
+      const platform::net::Socket socket,
+      const u_long address,
+      const u_short port
+    )
       : TDatListItem<SPartialConnection, void>()
       , mConnector(connector)
       , mSocket(socket)
@@ -56,9 +61,9 @@ namespace moho
      */
     ~SPartialConnection()
     {
-      if (mSocket != INVALID_SOCKET) {
-        ::closesocket(mSocket);
-        mSocket = INVALID_SOCKET;
+      if (mSocket != platform::net::kInvalidSocket) {
+        platform::net::CloseSocket(mSocket);
+        mSocket = platform::net::kInvalidSocket;
       }
     }
 
@@ -72,7 +77,7 @@ namespace moho
     {
       char buffer[kNetTcpIoChunkSize];
 
-      int received = ::recv(mSocket, buffer, static_cast<int>(sizeof(buffer)), 0);
+      int received = platform::net::Recv(mSocket, buffer, static_cast<int>(sizeof(buffer)));
       while (received >= 0) {
         if (received == 0) {
           gpg::Logf("SPartialConnection<%s:%d>::Pull(): at end of stream.", NET_GetHostName(mAddr).c_str(), mPort);
@@ -96,7 +101,7 @@ namespace moho
           stream.Read(reinterpret_cast<char*>(&port), sizeof(port));
 
           mConnector->ReadFromStream(mSocket, mAddr, port, mStream);
-          mSocket = INVALID_SOCKET;
+          mSocket = platform::net::kInvalidSocket;
           delete this;
           return;
         }
@@ -109,10 +114,10 @@ namespace moho
           return;
         }
 
-        received = ::recv(mSocket, buffer, static_cast<int>(sizeof(buffer)), 0);
+        received = platform::net::Recv(mSocket, buffer, static_cast<int>(sizeof(buffer)));
       }
 
-      if (::WSAGetLastError() == WSAEWOULDBLOCK) {
+      if (platform::net::LastError() == platform::net::error::kWouldBlock) {
         return;
       }
 
@@ -156,8 +161,8 @@ CNetTCPConnector::~CNetTCPConnector()
     GPG_NONVIRTUAL_DESTROY(delete mConnections.front());
   }
 
-  if (mSocket != INVALID_SOCKET) {
-    ::closesocket(mSocket);
+  if (mSocket != platform::net::kInvalidSocket) {
+    platform::net::CloseSocket(mSocket);
   }
 }
 
@@ -195,8 +200,7 @@ ENetProtocolType CNetTCPConnector::GetProtocol()
 u_short CNetTCPConnector::GetLocalPort()
 {
   sockaddr_in name{};
-  int nameLen = static_cast<int>(sizeof(name));
-  ::getsockname(mSocket, reinterpret_cast<sockaddr*>(&name), &nameLen);
+  platform::net::GetLocalAddress(mSocket, &name);
   return ::ntohs(name.sin_port);
 }
 
@@ -207,10 +211,13 @@ u_short CNetTCPConnector::GetLocalPort()
  * What it does:
  * Creates an outbound non-blocking TCP connection object.
  */
-INetConnection* CNetTCPConnector::Connect(const u_long address, const u_short port)
+INetConnection* CNetTCPConnector::Connect(
+  const u_long address,
+  const u_short port
+)
 {
-  const SOCKET socket = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-  if (socket == INVALID_SOCKET) {
+  const platform::net::Socket socket = platform::net::OpenSocket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if (socket == platform::net::kInvalidSocket) {
     gpg::Logf(
       "CNetTCPConnector::Connect(%s:%d): socket() failed: %s",
       NET_GetHostName(address).c_str(),
@@ -220,15 +227,14 @@ INetConnection* CNetTCPConnector::Connect(const u_long address, const u_short po
     return nullptr;
   }
 
-  u_long arg = 1;
-  if (::ioctlsocket(socket, FIONBIO, &arg) == SOCKET_ERROR) {
+  if (platform::net::SetNonBlocking(socket) == platform::net::kSocketError) {
     gpg::Logf(
       "CNetTCPConnector::Connect(%s:%d): ioctlsocket(FIONBIO) failed: %s",
       NET_GetHostName(address).c_str(),
       port,
       NET_GetWinsockErrorString()
     );
-    ::closesocket(socket);
+    platform::net::CloseSocket(socket);
     return nullptr;
   }
 
@@ -236,15 +242,17 @@ INetConnection* CNetTCPConnector::Connect(const u_long address, const u_short po
   name.sin_family = AF_INET;
   name.sin_port = ::htons(port);
   name.sin_addr.s_addr = ::htonl(address);
-  if (::connect(socket, reinterpret_cast<const sockaddr*>(&name), static_cast<int>(sizeof(name))) == SOCKET_ERROR &&
-      ::WSAGetLastError() != WSAEWOULDBLOCK) {
+  if (
+    platform::net::Connect(socket, name) == platform::net::kSocketError &&
+    platform::net::LastError() != platform::net::error::kWouldBlock
+  ) {
     gpg::Logf(
       "CNetTCPConnector::Connect(%s:%d): connect() failed: %s",
       NET_GetHostName(address).c_str(),
       port,
       NET_GetWinsockErrorString()
     );
-    ::closesocket(socket);
+    platform::net::CloseSocket(socket);
     return nullptr;
   }
 
@@ -265,7 +273,10 @@ INetConnection* CNetTCPConnector::Connect(const u_long address, const u_short po
  * What it does:
  * Finds next pending remote endpoint awaiting accept.
  */
-bool CNetTCPConnector::FindNextAddress(u_long& outAddress, u_short& outPort)
+bool CNetTCPConnector::FindNextAddress(
+  u_long& outAddress,
+  u_short& outPort
+)
 {
   for (CNetTCPConnection* const connection : mConnections) {
     if (connection->mState == kNetStatePending) {
@@ -284,7 +295,10 @@ bool CNetTCPConnector::FindNextAddress(u_long& outAddress, u_short& outPort)
  * What it does:
  * Accepts endpoint into active connection list or creates placeholder.
  */
-INetConnection* CNetTCPConnector::Accept(const u_long address, const u_short port)
+INetConnection* CNetTCPConnector::Accept(
+  const u_long address,
+  const u_short port
+)
 {
   gpg::Logf("CNetTCPConnector::Accept(%s:%d)", NET_GetHostName(address).c_str(), port);
 
@@ -295,7 +309,7 @@ INetConnection* CNetTCPConnector::Accept(const u_long address, const u_short por
     }
   }
 
-  return new (std::nothrow) CNetTCPConnection(this, INVALID_SOCKET, address, port, kNetStateAnswering);
+  return new (std::nothrow) CNetTCPConnection(this, platform::net::kInvalidSocket, address, port, kNetStateAnswering);
 }
 
 /**
@@ -305,7 +319,10 @@ INetConnection* CNetTCPConnector::Accept(const u_long address, const u_short por
  * What it does:
  * Rejects endpoint pending connection.
  */
-void CNetTCPConnector::Reject(const u_long address, const u_short port)
+void CNetTCPConnector::Reject(
+  const u_long address,
+  const u_short port
+)
 {
   gpg::Logf("CNetTCPConnector::Reject(%s:%d)", NET_GetHostName(address).c_str(), port);
 
@@ -329,10 +346,9 @@ void CNetTCPConnector::Reject(const u_long address, const u_short port)
 void CNetTCPConnector::Pull()
 {
   sockaddr_in address{};
-  int addressLen = static_cast<int>(sizeof(address));
-  const SOCKET accepted = ::accept(mSocket, reinterpret_cast<sockaddr*>(&address), &addressLen);
-  if (accepted == INVALID_SOCKET) {
-    if (::WSAGetLastError() != WSAEWOULDBLOCK) {
+  const platform::net::Socket accepted = platform::net::Accept(mSocket, &address);
+  if (accepted == platform::net::kInvalidSocket) {
+    if (platform::net::LastError() != platform::net::error::kWouldBlock) {
       gpg::Logf("CNetTCPConnector::Pull: accept() failed: %s", NET_GetWinsockErrorString());
     }
   } else {
@@ -384,12 +400,16 @@ void CNetTCPConnector::Push()
  * What it does:
  * Redirects socket network events to supplied event handle.
  */
-void CNetTCPConnector::SelectEvent(const HANDLE ev)
+void CNetTCPConnector::SelectEvent(
+  const HANDLE ev
+)
 {
-  ::WSAEventSelect(mSocket, ev, FD_ACCEPT);
+  platform::net::SelectSocketEvents(mSocket, ev, platform::net::kEventAccept);
 
   for (CNetTCPConnection* const connection : mConnections) {
-    ::WSAEventSelect(connection->mSocket, ev, FD_READ | FD_CONNECT | FD_CLOSE);
+    platform::net::SelectSocketEvents(
+      connection->mSocket, ev, platform::net::kEventRead | platform::net::kEventConnect | platform::net::kEventClose
+    );
   }
 }
 
@@ -411,7 +431,9 @@ HANDLE CNetTCPConnector::GetSelectedEventHandle() const noexcept
  * What it does:
  * Returns empty stamp snapshot for legacy TCP path.
  */
-SSendStampWindow CNetTCPConnector::SnapshotSendStamps(const int32_t /*since*/)
+SSendStampWindow CNetTCPConnector::SnapshotSendStamps(
+  const int32_t /*since*/
+)
 {
   return SSendStampWindow{0, 0};
 }
@@ -422,7 +444,9 @@ SSendStampWindow CNetTCPConnector::SnapshotSendStamps(const int32_t /*since*/)
  * What it does:
  * Initializes TCP connector around already-open listening socket.
  */
-CNetTCPConnector::CNetTCPConnector(const SOCKET socket) noexcept
+CNetTCPConnector::CNetTCPConnector(
+  const platform::net::Socket socket
+) noexcept
   : INetConnector()
   , WeakObject() // 0x00484AB2: the weak-reference head is zeroed first
   , mSocket(socket)
@@ -442,7 +466,10 @@ CNetTCPConnector::CNetTCPConnector(const SOCKET socket) noexcept
  * partial had buffered.
  */
 void CNetTCPConnector::ReadFromStream(
-  const SOCKET socket, const u_long address, const u_short port, gpg::PipeStream& stream
+  const platform::net::Socket socket,
+  const u_long address,
+  const u_short port,
+  gpg::PipeStream& stream
 )
 {
   CNetTCPConnection* connection = nullptr;

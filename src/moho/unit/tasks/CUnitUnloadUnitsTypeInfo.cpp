@@ -5,7 +5,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/unit/tasks/CUnitUnloadUnits.h"
+#include "moho/unit/tasks/CUnitUnloadUnits.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -17,7 +18,9 @@ namespace
    * What it does:
    * Deletes one heap-owned `CUnitUnloadUnits` instance.
    */
-  void DeleteCUnitUnloadUnitsOwned(void* const objectStorage)
+  void DeleteCUnitUnloadUnitsOwned(
+    void* const objectStorage
+  )
   {
     delete static_cast<moho::CUnitUnloadUnits*>(objectStorage);
   }
@@ -28,7 +31,9 @@ namespace
    * What it does:
    * Executes one in-place `CUnitUnloadUnits` destructor lane.
    */
-  void DestroyCUnitUnloadUnitsInPlace(void* const objectStorage)
+  void DestroyCUnitUnloadUnitsInPlace(
+    void* const objectStorage
+  )
   {
     gpg::DestructInStorage<moho::CUnitUnloadUnits>(objectStorage);
   }
@@ -36,13 +41,15 @@ namespace
 
 namespace moho
 {
-    /**
+  /**
    * Address: 0x00628010 (FUN_00628010, Moho::CUnitUnloadUnitsTypeInfo::AddBase_CCommandTask)
    *
    * What it does:
    * Registers `CCommandTask` as this type's reflected base at offset 0.
    */
-  void CUnitUnloadUnitsTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void CUnitUnloadUnitsTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     static gpg::RType* sType = nullptr;
     if (!sType) {
@@ -51,9 +58,9 @@ namespace moho
     gpg::AddBaseIfPresent(typeInfo, sType, 0);
   }
 
-/**
+  /**
    * Address: 0x00626120 (FUN_00626120, preregister_CUnitUnloadUnitsTypeInfo)
- * Address: 0x00BFA5E0 (FUN_00BFA5E0, atexit destructor of the CUnitUnloadUnitsTypeInfo object)
+   * Address: 0x00BFA5E0 (FUN_00BFA5E0, atexit destructor of the CUnitUnloadUnitsTypeInfo object)
    *
    * What it does:
    * Constructs/preregisters the startup `CUnitUnloadUnitsTypeInfo`
@@ -107,7 +114,9 @@ namespace moho
    * Constructs one `CUnitUnloadUnits` in caller-provided storage and returns a
    * typed reflection ref.
    */
-  gpg::RRef CUnitUnloadUnitsTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitUnloadUnitsTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     CUnitUnloadUnits* task = nullptr;
     if (objectStorage != nullptr) {
@@ -122,4 +131,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_CUnitUnloadUnitsTypeInfo_b5308d, moho::preregister_CUnitUnloadUnitsTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_CUnitUnloadUnitsTypeInfo_b5308d,
+  moho::preregister_CUnitUnloadUnitsTypeInfo
+)

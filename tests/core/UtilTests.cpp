@@ -15,7 +15,10 @@
 
 namespace
 {
-  bool Parse(const char* const text, int* const out)
+  bool Parse(
+    const char* const text,
+    int* const out
+  )
   {
     return gpg::ParseNum(text, text + std::char_traits<char>::length(text), out);
   }
@@ -24,7 +27,10 @@ namespace
   // ParseNum
   // ---------------------------------------------------------------------------------------------
 
-  TEST(GpgParseNum, DecimalHexAndOctal)
+  TEST(
+    GpgParseNum,
+    DecimalHexAndOctal
+  )
   {
     int value = 0;
     EXPECT_TRUE(Parse("12345", &value));
@@ -43,7 +49,10 @@ namespace
     EXPECT_EQ(value, 7);
   }
 
-  TEST(GpgParseNum, StopsAtTheEndPointer)
+  TEST(
+    GpgParseNum,
+    StopsAtTheEndPointer
+  )
   {
     const char* const text = "123456";
     int value = 0;
@@ -55,21 +64,27 @@ namespace
     EXPECT_EQ(value, 123456);
   }
 
-  TEST(GpgParseNum, RejectsBadDigitsAndLeavesTheOutputAlone)
+  TEST(
+    GpgParseNum,
+    RejectsBadDigitsAndLeavesTheOutputAlone
+  )
   {
     int value = 99;
     EXPECT_FALSE(Parse("", &value));
     EXPECT_FALSE(Parse("-", &value));
-    EXPECT_FALSE(Parse("08", &value));   // 8 is not octal
-    EXPECT_FALSE(Parse("12a", &value));  // 'a' is 10, not below 10
+    EXPECT_FALSE(Parse("08", &value));  // 8 is not octal
+    EXPECT_FALSE(Parse("12a", &value)); // 'a' is 10, not below 10
     EXPECT_FALSE(Parse("0xg", &value));
-    EXPECT_FALSE(Parse("0xB", &value));  // capitals other than A fail the letter check
+    EXPECT_FALSE(Parse("0xB", &value)); // capitals other than A fail the letter check
     EXPECT_FALSE(Parse(" 1", &value));
     EXPECT_FALSE(Parse("1 ", &value));
     EXPECT_EQ(value, 99);
   }
 
-  TEST(GpgParseNum, CapitalAIsTheRetailQuirk)
+  TEST(
+    GpgParseNum,
+    CapitalAIsTheRetailQuirk
+  )
   {
     // 0x008D8FF1: `sub bl, 41h; jne` lets 'A' through, then `sub eax, 57h` makes it -22, below any base.
     int value = 0;
@@ -84,9 +99,17 @@ namespace
   // ---------------------------------------------------------------------------------------------
 
   std::string gCaptured;
-  void Capture(const char* const message) { gCaptured = message != nullptr ? message : ""; }
+  void Capture(
+    const char* const message
+  )
+  {
+    gCaptured = message != nullptr ? message : "";
+  }
 
-  TEST(GpgDieHandler, SetReturnsThePreviousHandlerAndAssertionsReachIt)
+  TEST(
+    GpgDieHandler,
+    SetReturnsThePreviousHandlerAndAssertionsReachIt
+  )
   {
     const gpg::die_handler_t previous = gpg::SetDieHandler(&Capture);
     EXPECT_NE(previous, nullptr); // the suite's own handler (CoreTestSupport.cpp)
@@ -104,7 +127,10 @@ namespace
   // LocalCache
   // ---------------------------------------------------------------------------------------------
 
-  TEST(GpgLocalCache, ExecutableIdentityIsStableAndReadTheExe)
+  TEST(
+    GpgLocalCache,
+    ExecutableIdentityIsStableAndReadTheExe
+  )
   {
     const std::uint64_t identity = gpg::ExecutableIdentity();
     EXPECT_EQ(gpg::ExecutableIdentity(), identity);
@@ -112,7 +138,10 @@ namespace
     EXPECT_NE(identity, 0xCBF29CE484222325ULL);
   }
 
-  TEST(GpgLocalCache, DirectoryComesFromTheEnvironmentAndExists)
+  TEST(
+    GpgLocalCache,
+    DirectoryComesFromTheEnvironmentAndExists
+  )
   {
     // The directory is fixed on first use, so this is the process's first call (nothing in this suite or in
     // the engine's static initialisers asks for it before).
@@ -143,7 +172,10 @@ namespace
     return frequency.QuadPart;
   }
 
-  TEST(GpgTimer, GetCycleNeverGoesBack)
+  TEST(
+    GpgTimer,
+    GetCycleNeverGoesBack
+  )
   {
     LONGLONG previous = gpg::time::GetCycle();
     for (int index = 0; index < 10000; ++index) {
@@ -153,7 +185,10 @@ namespace
     }
   }
 
-  TEST(GpgTimer, ConversionsUseThePerformanceFrequency)
+  TEST(
+    GpgTimer,
+    ConversionsUseThePerformanceFrequency
+  )
   {
     const LONGLONG frequency = Frequency();
     ASSERT_GT(frequency, 0);
@@ -166,21 +201,29 @@ namespace
     // The float conversions round through a float; allow one part in a million.
     const double tolerance = static_cast<double>(frequency) * 1e-6 + 1.0;
     EXPECT_NEAR(static_cast<double>(gpg::time::SecondsToCycles(1.0f)), static_cast<double>(frequency), tolerance);
-    EXPECT_NEAR(static_cast<double>(gpg::time::MillisecondsToCycles(1000.0f)), static_cast<double>(frequency), tolerance);
+    EXPECT_NEAR(
+      static_cast<double>(gpg::time::MillisecondsToCycles(1000.0f)), static_cast<double>(frequency), tolerance
+    );
     EXPECT_NEAR(gpg::time::CyclesToSeconds(frequency), 1.0f, 1e-5f);
     EXPECT_NEAR(gpg::time::CyclesToMilliseconds(frequency), 1000.0f, 1e-2f);
   }
 
-  TEST(GpgTimer, MicrosecondsRoundTrip)
+  TEST(
+    GpgTimer,
+    MicrosecondsRoundTrip
+  )
   {
     for (const LONGLONG micro : {LONGLONG{1}, LONGLONG{999}, LONGLONG{123456}, LONGLONG{86400000000}}) {
       const LONGLONG back = gpg::time::CyclesToMicroseconds(gpg::time::MicrosecondsToCycles(micro));
-      EXPECT_LE(back, micro);       // both directions truncate
+      EXPECT_LE(back, micro); // both directions truncate
       EXPECT_GE(back, micro - 1) << micro;
     }
   }
 
-  TEST(GpgTimer, ElapsedTimeFollowsTheClock)
+  TEST(
+    GpgTimer,
+    ElapsedTimeFollowsTheClock
+  )
   {
     gpg::time::Timer timer;
     ::Sleep(30);
@@ -201,7 +244,10 @@ namespace
     EXPECT_LT(timer.ElapsedMilliseconds(), beforeReset);
   }
 
-  TEST(GpgTimer, SystemTimerIsOneObject)
+  TEST(
+    GpgTimer,
+    SystemTimerIsOneObject
+  )
   {
     const gpg::time::Timer& first = gpg::time::GetSystemTimer();
     EXPECT_EQ(&gpg::time::GetSystemTimer(), &first);

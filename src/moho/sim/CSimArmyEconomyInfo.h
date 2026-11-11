@@ -86,8 +86,8 @@ namespace moho
   class CSimArmyEconomyInfo
   {
   public:
-    Sim* mSim;                             // +0x00 (CEconomy::mSim)
-    std::int32_t mIndex;                   // +0x04 (CEconomy::mIndex)
+    Sim* mSim;           // +0x00 (CEconomy::mSim)
+    std::int32_t mIndex; // +0x04 (CEconomy::mIndex)
     /// Resources banked this tick. `Unit::HandleResourceManagement` adds each
     /// producing unit's per-tick output here and to `mPendingResources`.
     SEconPair mResources;                  // +0x08 (CEconomy::mResources)
@@ -104,21 +104,26 @@ namespace moho
   static_assert(sizeof(SEconStoragePair) == 0x10, "SEconStoragePair size must be 0x10");
   static_assert(offsetof(SEconTotals, mMaxStorage) == 0x28, "SEconTotals::mMaxStorage offset must be 0x28");
   static_assert(sizeof(SEconTotals) == 0x38, "SEconTotals size must be 0x38");
-  static_assert(offsetof(CSimArmyEconomyInfo, mResources) == 0x08, "CSimArmyEconomyInfo::mResources offset must be 0x08");
+  static_assert(
+    offsetof(CSimArmyEconomyInfo, mResources) == 0x08,
+    "CSimArmyEconomyInfo::mResources offset must be 0x08"
+  );
   static_assert(
     offsetof(CSimArmyEconomyInfo, mPendingResources) == 0x10,
     "CSimArmyEconomyInfo::mPendingResources offset must be 0x10"
   );
   static_assert(offsetof(CSimArmyEconomyInfo, economy) == 0x18, "CSimArmyEconomyInfo::economy offset must be 0x18");
   static_assert(
-    offsetof(CSimArmyEconomyInfo, storageDelta) == 0x50, "CSimArmyEconomyInfo::storageDelta offset must be 0x50"
+    offsetof(CSimArmyEconomyInfo, storageDelta) == 0x50,
+    "CSimArmyEconomyInfo::storageDelta offset must be 0x50"
   );
   static_assert(
     offsetof(CSimArmyEconomyInfo, isResourceSharingEnabled) == 0x54,
     "CSimArmyEconomyInfo::isResourceSharingEnabled offset must be 0x54"
   );
   static_assert(
-    offsetof(CSimArmyEconomyInfo, registrationNode) == 0x58, "CSimArmyEconomyInfo::registrationNode offset must be 0x58"
+    offsetof(CSimArmyEconomyInfo, registrationNode) == 0x58,
+    "CSimArmyEconomyInfo::registrationNode offset must be 0x58"
   );
   static_assert(sizeof(CSimArmyEconomyInfo) == 0x60, "CSimArmyEconomyInfo size must be 0x60");
 } // namespace moho

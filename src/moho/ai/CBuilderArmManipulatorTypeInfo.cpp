@@ -63,7 +63,9 @@ namespace
    * adjusting the object pointer by the reflected base-subobject offset
    * returned by `gpg::RType::IsDerivedFrom`.
    */
-  [[nodiscard]] gpg::RRef MakeBuilderArmManipulatorRef(moho::CBuilderArmManipulator* const object)
+  [[nodiscard]] gpg::RRef MakeBuilderArmManipulatorRef(
+    moho::CBuilderArmManipulator* const object
+  )
   {
     gpg::RType* const staticType = CachedCBuilderArmManipulatorType();
 
@@ -82,11 +84,9 @@ namespace
     }
 
     int baseOffset = 0;
-    if (runtimeType != nullptr && staticType != nullptr
-        && runtimeType->IsDerivedFrom(staticType, &baseOffset)) {
-      out.mObj = reinterpret_cast<void*>(
-        reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset)
-      );
+    if (runtimeType != nullptr && staticType != nullptr && runtimeType->IsDerivedFrom(staticType, &baseOffset)) {
+      out.mObj =
+        reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(object) - static_cast<std::uintptr_t>(baseOffset));
       out.mType = runtimeType;
       return out;
     }
@@ -162,7 +162,9 @@ namespace moho
    * Assigns all lifecycle callback slots (`NewRef`, `CtrRef`, `Delete`,
    * `Destruct`) on one type descriptor.
    */
-  void CBuilderArmManipulatorTypeInfo::AssignAllLifecycleCallbacks(CBuilderArmManipulatorTypeInfo& typeInfo)
+  void CBuilderArmManipulatorTypeInfo::AssignAllLifecycleCallbacks(
+    CBuilderArmManipulatorTypeInfo& typeInfo
+  )
   {
     AssignCtorCallbacks(typeInfo);
     AssignDtorCallbacks(typeInfo);
@@ -175,7 +177,9 @@ namespace moho
    * Assigns constructor-lane callback slots (`NewRef`, `CtrRef`) on one type
    * descriptor.
    */
-  void CBuilderArmManipulatorTypeInfo::AssignCtorCallbacks(CBuilderArmManipulatorTypeInfo& typeInfo)
+  void CBuilderArmManipulatorTypeInfo::AssignCtorCallbacks(
+    CBuilderArmManipulatorTypeInfo& typeInfo
+  )
   {
     typeInfo.newRefFunc_ = &CBuilderArmManipulatorTypeInfo::NewRef;
     typeInfo.ctorRefFunc_ = &CBuilderArmManipulatorTypeInfo::CtrRef;
@@ -188,7 +192,9 @@ namespace moho
    * Assigns destructor-lane callback slots (`Delete`, `Destruct`) on one
    * type descriptor.
    */
-  void CBuilderArmManipulatorTypeInfo::AssignDtorCallbacks(CBuilderArmManipulatorTypeInfo& typeInfo)
+  void CBuilderArmManipulatorTypeInfo::AssignDtorCallbacks(
+    CBuilderArmManipulatorTypeInfo& typeInfo
+  )
   {
     typeInfo.deleteFunc_ = &CBuilderArmManipulatorTypeInfo::Delete;
     typeInfo.dtrFunc_ = &CBuilderArmManipulatorTypeInfo::Destruct;
@@ -214,19 +220,25 @@ namespace moho
    * Placement-constructs one `CBuilderArmManipulator` in caller storage and
    * returns a typed reflection reference.
    */
-  gpg::RRef CBuilderArmManipulatorTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CBuilderArmManipulatorTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const manipulator = gpg::ConstructInStorage<CBuilderArmManipulator>(objectStorage);
 
     return MakeBuilderArmManipulatorRef(manipulator);
   }
 
-  void CBuilderArmManipulatorTypeInfo::Delete(void* const objectStorage)
+  void CBuilderArmManipulatorTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CBuilderArmManipulator*>(objectStorage);
   }
 
-  void CBuilderArmManipulatorTypeInfo::Destruct(void* const objectStorage)
+  void CBuilderArmManipulatorTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     auto* const manipulator = static_cast<CBuilderArmManipulator*>(objectStorage);
     if (!manipulator) {
@@ -236,7 +248,9 @@ namespace moho
     manipulator->~CBuilderArmManipulator();
   }
 
-  void CBuilderArmManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const typeInfo)
+  void CBuilderArmManipulatorTypeInfo::AddBase_IAniManipulator(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RType* const baseType = CachedIAniManipulatorType();
     gpg::AddReflectedBaseType(typeInfo, baseType);
@@ -254,9 +268,14 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CBuilderArmManipulatorTypeInfo_9cf0c1, moho::register_CBuilderArmManipulatorTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CBuilderArmManipulatorTypeInfo_9cf0c1,
+  moho::register_CBuilderArmManipulatorTypeInfo
+)
 
-GPG_PREREGISTER_INIT(AcquireTypeInfo_9cf0c1, AcquireTypeInfo)
+GPG_PREREGISTER_INIT(
+  AcquireTypeInfo_9cf0c1,
+  AcquireTypeInfo
+)

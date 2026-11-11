@@ -24,7 +24,9 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RRef MakeIEffectRef(moho::IEffect* effect)
+  [[nodiscard]] gpg::RRef MakeIEffectRef(
+    moho::IEffect* effect
+  )
   {
     gpg::RRef out{};
     out.mObj = nullptr;
@@ -41,8 +43,8 @@ namespace
     }
 
     std::int32_t baseOffset = 0;
-    const bool isDerived =
-      dynamicType != nullptr && moho::IEffect::StaticGetClass() != nullptr && dynamicType->IsDerivedFrom(moho::IEffect::StaticGetClass(), &baseOffset);
+    const bool isDerived = dynamicType != nullptr && moho::IEffect::StaticGetClass() != nullptr &&
+      dynamicType->IsDerivedFrom(moho::IEffect::StaticGetClass(), &baseOffset);
 
     out.mObj = isDerived
       ? reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(effect) - static_cast<std::uintptr_t>(baseOffset))
@@ -51,7 +53,10 @@ namespace
     return out;
   }
 
-  [[nodiscard]] moho::IEffect* ReadPointerIEffect(gpg::ReadArchive* const archive, const gpg::RRef& ownerRef)
+  [[nodiscard]] moho::IEffect* ReadPointerIEffect(
+    gpg::ReadArchive* const archive,
+    const gpg::RRef& ownerRef
+  )
   {
     const gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
     if (!tracked.object) {
@@ -67,10 +72,12 @@ namespace
       return static_cast<moho::IEffect*>(upcast.mObj);
     }
 
-    const char* const expected = moho::IEffect::StaticGetClass() ? moho::IEffect::StaticGetClass()->GetName() : "IEffect";
+    const char* const expected =
+      moho::IEffect::StaticGetClass() ? moho::IEffect::StaticGetClass()->GetName() : "IEffect";
     const char* const actual = source.GetTypeName();
     const fa::string msg = gpg::STR_Printf(
-      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
+      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+      "instead",
       expected ? expected : "IEffect",
       actual ? actual : "null"
     );
@@ -97,7 +104,10 @@ namespace moho
    * Rebinds one `WeakPtr<IEffect>` node to a new owner link and updates the
    * intrusive owner chain in-place without allocating.
    */
-  WeakPtr<IEffect>* RelinkWeakPtrIEffect(WeakPtr<IEffect>* const weak, IEffect* const effect) noexcept
+  WeakPtr<IEffect>* RelinkWeakPtrIEffect(
+    WeakPtr<IEffect>* const weak,
+    IEffect* const effect
+  ) noexcept
   {
     if (weak == nullptr) {
       return nullptr;
@@ -110,7 +120,12 @@ namespace moho
   /**
    * Address: 0x006751B0 (FUN_006751B0, Moho::WeakPtr_IEffect::Deserialize)
    */
-  void WeakPtr_IEffect::Deserialize(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void WeakPtr_IEffect::Deserialize(
+    gpg::ReadArchive* const archive,
+    const std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const weak = reinterpret_cast<WeakPtr<IEffect>*>(objectPtr);
     if (!archive || !weak) {
@@ -124,7 +139,12 @@ namespace moho
   /**
    * Address: 0x006751E0 (FUN_006751E0, Moho::WeakPtr_IEffect::Serialize)
    */
-  void WeakPtr_IEffect::Serialize(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void WeakPtr_IEffect::Serialize(
+    gpg::WriteArchive* const archive,
+    const std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const weak = reinterpret_cast<WeakPtr<IEffect>*>(objectPtr);
     if (!archive || !weak) {
@@ -152,7 +172,9 @@ namespace moho
   /**
    * Address: 0x00674970 (FUN_00674970, Moho::RWeakPtrType_IEffect::GetLexical)
    */
-  fa::string RWeakPtrType<IEffect>::GetLexical(const gpg::RRef& ref) const
+  fa::string RWeakPtrType<IEffect>::GetLexical(
+    const gpg::RRef& ref
+  ) const
   {
     auto* const weak = static_cast<const WeakPtr<IEffect>*>(ref.mObj);
     if (!weak || !weak->HasValue()) {
@@ -198,7 +220,10 @@ namespace moho
   /**
    * Address: 0x00674B50 (FUN_00674B50, Moho::RWeakPtrType_IEffect::SubscriptIndex)
    */
-  gpg::RRef RWeakPtrType<IEffect>::SubscriptIndex(void* const obj, const int ind) const
+  gpg::RRef RWeakPtrType<IEffect>::SubscriptIndex(
+    void* const obj,
+    const int ind
+  ) const
   {
     GPG_ASSERT(ind == 0);
 
@@ -209,7 +234,9 @@ namespace moho
   /**
    * Address: 0x00674B20 (FUN_00674B20, Moho::RWeakPtrType_IEffect::GetCount)
    */
-  size_t RWeakPtrType<IEffect>::GetCount(void* const obj) const
+  size_t RWeakPtrType<IEffect>::GetCount(
+    void* const obj
+  ) const
   {
     auto* const weak = static_cast<WeakPtr<IEffect>*>(obj);
     return (weak && weak->HasValue()) ? 1u : 0u;
@@ -236,4 +263,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_WeakPtr_IEffect_Type_00_ad6e8d, moho::register_WeakPtr_IEffect_Type_00)
+GPG_PREREGISTER_INIT(
+  register_WeakPtr_IEffect_Type_00_ad6e8d,
+  moho::register_WeakPtr_IEffect_Type_00
+)

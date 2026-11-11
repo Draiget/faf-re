@@ -19,7 +19,11 @@ namespace
   using faf::editor::ScaleHeights;
   using faf::editor::WriteHeightImage;
 
-  HeightImage Random(const int width, const int height, const unsigned seed)
+  HeightImage Random(
+    const int width,
+    const int height,
+    const unsigned seed
+  )
   {
     HeightImage image;
     image.width = width;
@@ -33,7 +37,9 @@ namespace
     return image;
   }
 
-  std::filesystem::path TempFile(const char* const name)
+  std::filesystem::path TempFile(
+    const char* const name
+  )
   {
     const std::filesystem::path folder = std::filesystem::temp_directory_path() / "faf_editor_height_tests";
     std::filesystem::create_directories(folder);
@@ -43,7 +49,10 @@ namespace
   class EveryFormat : public ::testing::TestWithParam<const char*>
   {};
 
-  TEST_P(EveryFormat, ReadsBackWhatItWrote)
+  TEST_P(
+    EveryFormat,
+    ReadsBackWhatItWrote
+  )
   {
     const HeightImage written = Random(65, 65, 3u);
     const std::filesystem::path file = TempFile(GetParam());
@@ -58,7 +67,10 @@ namespace
 
   INSTANTIATE_TEST_SUITE_P(HeightFile, EveryFormat, ::testing::Values("heights.raw", "heights.r16", "heights.png"));
 
-  TEST(HeightFile, RawOfTheMapsSizeNeedNotBeSquare)
+  TEST(
+    HeightFile,
+    RawOfTheMapsSizeNeedNotBeSquare
+  )
   {
     const HeightImage written = Random(129, 65, 4u);
     const std::filesystem::path file = TempFile("wide.raw");
@@ -70,7 +82,10 @@ namespace
     EXPECT_EQ(read.words, written.words);
   }
 
-  TEST(HeightFile, ResampleKeepsCornersAndScaleMultiplies)
+  TEST(
+    HeightFile,
+    ResampleKeepsCornersAndScaleMultiplies
+  )
   {
     HeightImage image = Random(33, 33, 5u);
     const HeightImage bigger = ResampleHeights(image, 65, 65);

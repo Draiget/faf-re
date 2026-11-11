@@ -20,9 +20,13 @@ namespace faf_lua_tests
   protected:
     LuaPlus::LuaState state{LuaPlus::LuaState::LIB_BASE};
 
-    [[nodiscard]] lua_State* L() const { return state.GetCState(); }
+    [[nodiscard]] lua_State* L() const
+    {
+      return state.GetCState();
+    }
 
-    /** Compiles and runs `source`, returning its first result (nil when it returns nothing). A load or run error fails the test. */
+    /** Compiles and runs `source`, returning its first result (nil when it returns nothing). A load or run error fails
+     * the test. */
     LuaPlus::LuaObject Run(const std::string& source);
 
     /** Runs `source` and returns its first result, which must be a string. */
@@ -34,7 +38,8 @@ namespace faf_lua_tests
     /** Runs `source` and returns its first result, which must be a boolean. */
     bool Bool(const std::string& source);
 
-    /** The message `source` fails with, from loading or from running it. Empty, and a test failure, when it succeeds. */
+    /** The message `source` fails with, from loading or from running it. Empty, and a test failure, when it succeeds.
+     */
     std::string ErrorOf(const std::string& source);
 
     /** Only compiles `source`: 0 when it loads, else the status, with the message in `message`. */
@@ -46,13 +51,18 @@ namespace faf_lua_tests
    * luaG_errormsg passes every message through it (LuaObjectVm.inl), so a raised string arrives
    * with "\nstack traceback:..." appended.
    */
-  [[nodiscard]] inline std::string FirstLine(const std::string& text)
+  [[nodiscard]] inline std::string FirstLine(
+    const std::string& text
+  )
   {
     return text.substr(0, text.find('\n'));
   }
 
   /** True when `text` contains `part`. */
-  [[nodiscard]] inline bool Contains(const std::string& text, const std::string& part)
+  [[nodiscard]] inline bool Contains(
+    const std::string& text,
+    const std::string& part
+  )
   {
     return text.find(part) != std::string::npos;
   }

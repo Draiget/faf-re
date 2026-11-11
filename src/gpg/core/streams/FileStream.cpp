@@ -11,27 +11,27 @@ using namespace gpg;
 
 namespace
 {
-    constexpr DWORD kCreationDispositionByAttribute[8] = {
-        CREATE_ALWAYS,
-        CREATE_NEW,
-        OPEN_ALWAYS,
-        OPEN_EXISTING,
-        TRUNCATE_EXISTING,
-        0,
-        0,
-        0,
-    };
+  constexpr DWORD kCreationDispositionByAttribute[8] = {
+    CREATE_ALWAYS,
+    CREATE_NEW,
+    OPEN_ALWAYS,
+    OPEN_EXISTING,
+    TRUNCATE_EXISTING,
+    0,
+    0,
+    0,
+  };
 
-    constexpr DWORD kSeekMoveMethod[3] = {
-        FILE_BEGIN,
-        FILE_CURRENT,
-        FILE_END,
-    };
+  constexpr DWORD kSeekMoveMethod[3] = {
+    FILE_BEGIN,
+    FILE_CURRENT,
+    FILE_END,
+  };
 
-    constexpr const char* kReadModeError = "Attempt to read from a file that isn't open for input.";
-    constexpr const char* kWriteModeError = "Attempt to write to a file that isn't open for output.";
+  constexpr const char* kReadModeError = "Attempt to read from a file that isn't open for input.";
+  constexpr const char* kWriteModeError = "Attempt to write to a file that isn't open for output.";
 
-}
+} // namespace
 
 /**
  * Address: 0x00955890 (FUN_00955890)
@@ -39,10 +39,12 @@ namespace
  * What it does:
  * Builds a runtime_error payload from a Win32/system error code and stores that code in `mMsg`.
  */
-FileStream::IOError::IOError(const DWORD messageId)
-    : std::runtime_error(BuildMessage(messageId)), mMsg(messageId)
-{
-}
+FileStream::IOError::IOError(
+  const DWORD messageId
+)
+  : std::runtime_error(BuildMessage(messageId))
+  , mMsg(messageId)
+{}
 
 /**
  * Address: 0x00955A50 (FUN_00955A50)
@@ -50,10 +52,12 @@ FileStream::IOError::IOError(const DWORD messageId)
  * What it does:
  * Copy-constructs IOError by copying runtime_error payload and error id lane.
  */
-FileStream::IOError::IOError(const IOError& other)
-    : std::runtime_error(other), mMsg(other.mMsg)
-{
-}
+FileStream::IOError::IOError(
+  const IOError& other
+)
+  : std::runtime_error(other)
+  , mMsg(other.mMsg)
+{}
 
 /**
  * Address: 0x00955900 (FUN_00955900)
@@ -72,28 +76,24 @@ FileStream::IOError::~IOError() noexcept = default;
  * Resolves one Win32 system-message id to UTF-8 text via `FormatMessageW`.
  * Falls back to `"Unknown error 0x%08x"` when lookup fails.
  */
-std::string FileStream::IOError::BuildMessage(const DWORD messageId)
+std::string FileStream::IOError::BuildMessage(
+  const DWORD messageId
+)
 {
-    LPWSTR systemText = nullptr;
-    const DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER;
-    const int length = static_cast<int>(
-        ::FormatMessageW(
-            flags,
-            nullptr,
-            messageId,
-            0x400u,
-            reinterpret_cast<LPWSTR>(&systemText),
-            0,
-            nullptr));
+  LPWSTR systemText = nullptr;
+  const DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER;
+  const int length = static_cast<int>(
+    ::FormatMessageW(flags, nullptr, messageId, 0x400u, reinterpret_cast<LPWSTR>(&systemText), 0, nullptr)
+  );
 
-    if (length <= 0 || systemText == nullptr) {
-        const fa::string unknownText = gpg::STR_Printf("Unknown error 0x%08x", messageId);
-        return std::string(unknownText.c_str());
-    }
+  if (length <= 0 || systemText == nullptr) {
+    const fa::string unknownText = gpg::STR_Printf("Unknown error 0x%08x", messageId);
+    return std::string(unknownText.c_str());
+  }
 
-    const fa::string utf8Message = gpg::STR_WideToUtf8(systemText);
-    ::LocalFree(systemText);
-    return std::string(utf8Message.c_str());
+  const fa::string utf8Message = gpg::STR_WideToUtf8(systemText);
+  ::LocalFree(systemText);
+  return std::string(utf8Message.c_str());
 }
 
 /**
@@ -105,7 +105,7 @@ std::string FileStream::IOError::BuildMessage(const DWORD messageId)
  */
 FileStream::~FileStream()
 {
-    CloseNoThrow(mAccessKind);
+  CloseNoThrow(mAccessKind);
 }
 
 /**
@@ -114,13 +114,18 @@ FileStream::~FileStream()
  * What it does:
  * Constructs FileStream with a freshly allocated internal `MemBuffer<char>` and opens the file.
  */
-FileStream::FileStream(const char* const filename, const Mode accessKind, const unsigned int attributes, const int buffSize)
-    : Stream(),
-      mHandle(nullptr),
-      mAccessKind(ModeNone),
-      mBuff(AllocMemBuffer(static_cast<unsigned int>(buffSize)))
+FileStream::FileStream(
+  const char* const filename,
+  const Mode accessKind,
+  const unsigned int attributes,
+  const int buffSize
+)
+  : Stream()
+  , mHandle(nullptr)
+  , mAccessKind(ModeNone)
+  , mBuff(AllocMemBuffer(static_cast<unsigned int>(buffSize)))
 {
-    DoOpen(filename, accessKind, attributes);
+  DoOpen(filename, accessKind, attributes);
 }
 
 /**
@@ -129,13 +134,18 @@ FileStream::FileStream(const char* const filename, const Mode accessKind, const 
  * What it does:
  * Constructs FileStream from a caller-provided `MemBuffer<char>` view and opens the file.
  */
-FileStream::FileStream(const char* const filename, const Mode accessKind, const unsigned int attributes, const MemBuffer<char>& buffer)
-    : Stream(),
-      mHandle(nullptr),
-      mAccessKind(ModeNone),
-      mBuff(buffer)
+FileStream::FileStream(
+  const char* const filename,
+  const Mode accessKind,
+  const unsigned int attributes,
+  const MemBuffer<char>& buffer
+)
+  : Stream()
+  , mHandle(nullptr)
+  , mAccessKind(ModeNone)
+  , mBuff(buffer)
 {
-    DoOpen(filename, accessKind, attributes);
+  DoOpen(filename, accessKind, attributes);
 }
 
 /**
@@ -144,29 +154,26 @@ FileStream::FileStream(const char* const filename, const Mode accessKind, const 
  * What it does:
  * Converts UTF-8 path to wide string, opens file handle with attribute-driven Win32 flags, and stores access mode.
  */
-void FileStream::DoOpen(const char* const file, const Mode accessKind, const unsigned int attributes)
+void FileStream::DoOpen(
+  const char* const file,
+  const Mode accessKind,
+  const unsigned int attributes
+)
 {
-    const std::wstring widePath = STR_Utf8ToWide(file);
-    const auto modeValue = static_cast<unsigned int>(accessKind);
-    const DWORD desiredAccess = ((modeValue * 4U) | (modeValue & 2U)) << 29;
-    const DWORD shareMode = (attributes >> 3U) & 3U;
-    const DWORD creation = kCreationDispositionByAttribute[attributes & 7U];
-    const DWORD flagsAndAttributes = FILE_ATTRIBUTE_NORMAL | ((attributes & 0x20U) << 21U);
+  const std::wstring widePath = STR_Utf8ToWide(file);
+  const auto modeValue = static_cast<unsigned int>(accessKind);
+  const DWORD desiredAccess = ((modeValue * 4U) | (modeValue & 2U)) << 29;
+  const DWORD shareMode = (attributes >> 3U) & 3U;
+  const DWORD creation = kCreationDispositionByAttribute[attributes & 7U];
+  const DWORD flagsAndAttributes = FILE_ATTRIBUTE_NORMAL | ((attributes & 0x20U) << 21U);
 
-    mHandle = CreateFileW(
-        widePath.c_str(),
-        desiredAccess,
-        shareMode,
-        nullptr,
-        creation,
-        flagsAndAttributes,
-        nullptr);
+  mHandle = CreateFileW(widePath.c_str(), desiredAccess, shareMode, nullptr, creation, flagsAndAttributes, nullptr);
 
-    if (mHandle == INVALID_HANDLE_VALUE) {
-        throw IOError(GetLastError());
-    }
+  if (mHandle == INVALID_HANDLE_VALUE) {
+    throw IOError(GetLastError());
+  }
 
-    mAccessKind = accessKind;
+  mAccessKind = accessKind;
 }
 
 /**
@@ -175,27 +182,29 @@ void FileStream::DoOpen(const char* const file, const Mode accessKind, const uns
  * What it does:
  * Returns current logical stream position adjusted by unread/read-buffer and pending-write windows.
  */
-std::uint64_t FileStream::VirtTell(const Mode mode)
+std::uint64_t FileStream::VirtTell(
+  const Mode mode
+)
 {
-    if ((mode & mAccessKind) == 0) {
-        throw std::invalid_argument("Invalid mode for Tell()");
-    }
+  if ((mode & mAccessKind) == 0) {
+    throw std::invalid_argument("Invalid mode for Tell()");
+  }
 
-    LARGE_INTEGER distance{};
-    LARGE_INTEGER filePointer{};
-    if (!SetFilePointerEx(mHandle, distance, &filePointer, FILE_CURRENT)) {
-        throw IOError(GetLastError());
-    }
+  LARGE_INTEGER distance{};
+  LARGE_INTEGER filePointer{};
+  if (!SetFilePointerEx(mHandle, distance, &filePointer, FILE_CURRENT)) {
+    throw IOError(GetLastError());
+  }
 
-    LONGLONG logicalPosition = filePointer.QuadPart;
-    if (mReadEnd != mReadHead) {
-        logicalPosition -= static_cast<LONGLONG>(mReadEnd - mReadHead);
-    }
-    if (mWriteHead != mWriteStart) {
-        logicalPosition += static_cast<LONGLONG>(mWriteHead - mWriteStart);
-    }
+  LONGLONG logicalPosition = filePointer.QuadPart;
+  if (mReadEnd != mReadHead) {
+    logicalPosition -= static_cast<LONGLONG>(mReadEnd - mReadHead);
+  }
+  if (mWriteHead != mWriteStart) {
+    logicalPosition += static_cast<LONGLONG>(mWriteHead - mWriteStart);
+  }
 
-    return static_cast<std::uint64_t>(logicalPosition);
+  return static_cast<std::uint64_t>(logicalPosition);
 }
 
 /**
@@ -204,40 +213,44 @@ std::uint64_t FileStream::VirtTell(const Mode mode)
  * What it does:
  * Flushes pending write bytes, seeks by origin/mode with read-window compensation, and clears local windows.
  */
-std::uint64_t FileStream::VirtSeek(const Mode mode, const SeekOrigin orig, const std::int64_t pos)
+std::uint64_t FileStream::VirtSeek(
+  const Mode mode,
+  const SeekOrigin orig,
+  const std::int64_t pos
+)
 {
-    if ((mode & mAccessKind) == 0) {
-        throw std::invalid_argument("Invalid mode for Seek()");
-    }
+  if ((mode & mAccessKind) == 0) {
+    throw std::invalid_argument("Invalid mode for Seek()");
+  }
 
-    if (orig > OriginEnd) {
-        throw std::invalid_argument("Invalid origin for Seek()");
-    }
+  if (orig > OriginEnd) {
+    throw std::invalid_argument("Invalid origin for Seek()");
+  }
 
-    if (mWriteHead != mWriteStart) {
-        DoWrite(mWriteStart, static_cast<size_t>(mWriteHead - mWriteStart));
-    }
+  if (mWriteHead != mWriteStart) {
+    DoWrite(mWriteStart, static_cast<size_t>(mWriteHead - mWriteStart));
+  }
 
-    LARGE_INTEGER distance{};
-    distance.QuadPart = static_cast<LONGLONG>(pos);
-    if (mReadHead != mReadEnd && orig == OriginCurr) {
-        distance.QuadPart -= static_cast<LONGLONG>(mReadEnd - mReadHead);
-    }
+  LARGE_INTEGER distance{};
+  distance.QuadPart = static_cast<LONGLONG>(pos);
+  if (mReadHead != mReadEnd && orig == OriginCurr) {
+    distance.QuadPart -= static_cast<LONGLONG>(mReadEnd - mReadHead);
+  }
 
-    LARGE_INTEGER filePointer{};
-    const auto originIndex = static_cast<unsigned int>(orig);
-    if (!SetFilePointerEx(mHandle, distance, &filePointer, kSeekMoveMethod[originIndex])) {
-        throw IOError(GetLastError());
-    }
+  LARGE_INTEGER filePointer{};
+  const auto originIndex = static_cast<unsigned int>(orig);
+  if (!SetFilePointerEx(mHandle, distance, &filePointer, kSeekMoveMethod[originIndex])) {
+    throw IOError(GetLastError());
+  }
 
-    mReadStart = nullptr;
-    mReadHead = nullptr;
-    mReadEnd = nullptr;
-    mWriteStart = nullptr;
-    mWriteHead = nullptr;
-    mWriteEnd = nullptr;
+  mReadStart = nullptr;
+  mReadHead = nullptr;
+  mReadEnd = nullptr;
+  mWriteStart = nullptr;
+  mWriteHead = nullptr;
+  mWriteEnd = nullptr;
 
-    return static_cast<std::uint64_t>(filePointer.QuadPart);
+  return static_cast<std::uint64_t>(filePointer.QuadPart);
 }
 
 /**
@@ -246,71 +259,73 @@ std::uint64_t FileStream::VirtSeek(const Mode mode, const SeekOrigin orig, const
  * What it does:
  * Reads up to `len` bytes using inline read window first, then refill/direct OS reads through DoRead.
  */
-size_t FileStream::VirtRead(char* buf, size_t len)
+size_t FileStream::VirtRead(
+  char* buf,
+  size_t len
+)
 {
-    if ((mAccessKind & ModeReceive) == 0) {
-        throw std::runtime_error(kReadModeError);
+  if ((mAccessKind & ModeReceive) == 0) {
+    throw std::runtime_error(kReadModeError);
+  }
+
+  size_t remaining = len;
+  size_t copied = 0;
+  size_t available = static_cast<size_t>(mReadEnd - mReadHead);
+
+  if (available >= remaining) {
+    // Raw byte-stream IO through the file read/write buffer.
+    std::copy_n(mReadHead, remaining, buf);
+    mReadHead += remaining;
+    return remaining;
+  }
+
+  while (true) {
+    if (available != 0) {
+      // Raw byte-stream IO through the file read/write buffer.
+      std::copy_n(mReadHead, available, buf);
+      mReadHead += available;
+      copied += available;
+      buf += available;
+      remaining -= available;
     }
 
-    size_t remaining = len;
-    size_t copied = 0;
-    size_t available = static_cast<size_t>(mReadEnd - mReadHead);
+    const size_t capacity = mBuff.Size();
+    if (remaining < capacity) {
+      const size_t fetched = DoRead(mBuff.begin(), capacity);
+      if (fetched == 0) {
+        return copied;
+      }
 
-    if (available >= remaining) {
+      char* const begin = mBuff.begin();
+      mReadHead = begin;
+      mReadStart = begin;
+      mReadEnd = begin + fetched;
+      available = static_cast<size_t>(mReadEnd - mReadHead);
+      if (available >= remaining) {
         // Raw byte-stream IO through the file read/write buffer.
         std::copy_n(mReadHead, remaining, buf);
         mReadHead += remaining;
-        return remaining;
+        return copied + remaining;
+      }
+      continue;
     }
 
-    while (true)
-    {
-        if (available != 0) {
-            // Raw byte-stream IO through the file read/write buffer.
-            std::copy_n(mReadHead, available, buf);
-            mReadHead += available;
-            copied += available;
-            buf += available;
-            remaining -= available;
-        }
-
-        const size_t capacity = mBuff.Size();
-        if (remaining < capacity) {
-            const size_t fetched = DoRead(mBuff.begin(), capacity);
-            if (fetched == 0) {
-                return copied;
-            }
-
-            char* const begin = mBuff.begin();
-            mReadHead = begin;
-            mReadStart = begin;
-            mReadEnd = begin + fetched;
-            available = static_cast<size_t>(mReadEnd - mReadHead);
-            if (available >= remaining) {
-                // Raw byte-stream IO through the file read/write buffer.
-                std::copy_n(mReadHead, remaining, buf);
-                mReadHead += remaining;
-                return copied + remaining;
-            }
-            continue;
-        }
-
-        const size_t directRead = DoRead(buf, remaining);
-        if (directRead == 0) {
-            return copied;
-        }
-
-        copied += directRead;
-        buf += directRead;
-        remaining -= directRead;
-        available = static_cast<size_t>(mReadEnd - mReadHead);
-        if (available >= remaining) {
-            // Raw byte-stream IO through the file read/write buffer.
-            std::copy_n(mReadHead, remaining, buf);
-            mReadHead += remaining;
-            return copied + remaining;
-        }
+    const size_t directRead = DoRead(buf, remaining);
+    if (directRead == 0) {
+      return copied;
     }
+
+    copied += directRead;
+    buf += directRead;
+    remaining -= directRead;
+    available = static_cast<size_t>(mReadEnd - mReadHead);
+    if (available >= remaining) {
+      // Raw byte-stream IO through the file read/write buffer.
+      std::copy_n(mReadHead, remaining, buf);
+      mReadHead += remaining;
+      return copied + remaining;
+    }
+  }
 }
 
 /**
@@ -321,20 +336,20 @@ size_t FileStream::VirtRead(char* buf, size_t len)
  */
 bool FileStream::VirtAtEnd()
 {
-    if ((mAccessKind & ModeReceive) == 0) {
-        throw std::runtime_error(kReadModeError);
-    }
+  if ((mAccessKind & ModeReceive) == 0) {
+    throw std::runtime_error(kReadModeError);
+  }
 
-    if (mReadHead != mReadEnd) {
-        return false;
-    }
+  if (mReadHead != mReadEnd) {
+    return false;
+  }
 
-    const size_t fetched = DoRead(mBuff.begin(), mBuff.Size());
-    char* const begin = mBuff.begin();
-    mReadHead = begin;
-    mReadStart = begin;
-    mReadEnd = begin + fetched;
-    return fetched == 0;
+  const size_t fetched = DoRead(mBuff.begin(), mBuff.Size());
+  char* const begin = mBuff.begin();
+  mReadHead = begin;
+  mReadStart = begin;
+  mReadEnd = begin + fetched;
+  return fetched == 0;
 }
 
 /**
@@ -343,36 +358,39 @@ bool FileStream::VirtAtEnd()
  * What it does:
  * Writes bytes through inline write window and flushes/direct-writes when needed.
  */
-void FileStream::VirtWrite(const char* data, size_t size)
+void FileStream::VirtWrite(
+  const char* data,
+  size_t size
+)
 {
-    if ((mAccessKind & ModeSend) == 0) {
-        throw std::runtime_error(kWriteModeError);
+  if ((mAccessKind & ModeSend) == 0) {
+    throw std::runtime_error(kWriteModeError);
+  }
+
+  char* writeHead = mWriteHead;
+  size_t available = static_cast<size_t>(mWriteEnd - writeHead);
+  if (size > available) {
+    const size_t capacity = mBuff.Size();
+    if (available != 0 && (size - available) < capacity) {
+      // Raw byte-stream IO through the file read/write buffer.
+      std::copy_n(data, available, writeHead);
+      mWriteHead += available;
+      data += available;
+      size -= available;
     }
 
-    char* writeHead = mWriteHead;
-    size_t available = static_cast<size_t>(mWriteEnd - writeHead);
-    if (size > available) {
-        const size_t capacity = mBuff.Size();
-        if (available != 0 && (size - available) < capacity) {
-            // Raw byte-stream IO through the file read/write buffer.
-            std::copy_n(data, available, writeHead);
-            mWriteHead += available;
-            data += available;
-            size -= available;
-        }
-
-        DoWrite(mWriteStart, static_cast<size_t>(mWriteHead - mWriteStart));
-        if (size >= capacity) {
-            DoWrite(data, size);
-            return;
-        }
-
-        writeHead = mWriteHead;
+    DoWrite(mWriteStart, static_cast<size_t>(mWriteHead - mWriteStart));
+    if (size >= capacity) {
+      DoWrite(data, size);
+      return;
     }
 
-    // Raw byte-stream IO through the file read/write buffer.
-    std::copy_n(data, size, writeHead);
-    mWriteHead += size;
+    writeHead = mWriteHead;
+  }
+
+  // Raw byte-stream IO through the file read/write buffer.
+  std::copy_n(data, size, writeHead);
+  mWriteHead += size;
 }
 
 /**
@@ -383,13 +401,13 @@ void FileStream::VirtWrite(const char* data, size_t size)
  */
 void FileStream::VirtFlush()
 {
-    if ((mAccessKind & ModeSend) == 0) {
-        throw std::runtime_error(kWriteModeError);
-    }
+  if ((mAccessKind & ModeSend) == 0) {
+    throw std::runtime_error(kWriteModeError);
+  }
 
-    if (mWriteHead != mWriteStart) {
-        DoWrite(mWriteStart, static_cast<size_t>(mWriteHead - mWriteStart));
-    }
+  if (mWriteHead != mWriteStart) {
+    DoWrite(mWriteStart, static_cast<size_t>(mWriteHead - mWriteStart));
+  }
 }
 
 /**
@@ -398,31 +416,33 @@ void FileStream::VirtFlush()
  * What it does:
  * Closes requested read/write lanes, releases the OS handle, and resets owned memory buffer state.
  */
-void FileStream::VirtClose(const Mode mode)
+void FileStream::VirtClose(
+  const Mode mode
+)
 {
-    if ((mAccessKind & mode & ModeSend) != 0) {
-        if (mWriteHead != mWriteStart) {
-            DoWrite(mWriteStart, static_cast<size_t>(mWriteHead - mWriteStart));
-        }
-
-        mAccessKind = static_cast<Mode>(mAccessKind & ~ModeSend);
-        mWriteStart = nullptr;
-        mWriteHead = nullptr;
-        mWriteEnd = nullptr;
+  if ((mAccessKind & mode & ModeSend) != 0) {
+    if (mWriteHead != mWriteStart) {
+      DoWrite(mWriteStart, static_cast<size_t>(mWriteHead - mWriteStart));
     }
 
-    if ((mode & mAccessKind & ModeReceive) != 0) {
-        mAccessKind = static_cast<Mode>(mAccessKind & ~ModeReceive);
-        mReadStart = nullptr;
-        mReadHead = nullptr;
-        mReadEnd = nullptr;
-    }
+    mAccessKind = static_cast<Mode>(mAccessKind & ~ModeSend);
+    mWriteStart = nullptr;
+    mWriteHead = nullptr;
+    mWriteEnd = nullptr;
+  }
 
-    if (mHandle != INVALID_HANDLE_VALUE) {
-        CloseHandle(mHandle);
-        mHandle = INVALID_HANDLE_VALUE;
-        mBuff.Reset();
-    }
+  if ((mode & mAccessKind & ModeReceive) != 0) {
+    mAccessKind = static_cast<Mode>(mAccessKind & ~ModeReceive);
+    mReadStart = nullptr;
+    mReadHead = nullptr;
+    mReadEnd = nullptr;
+  }
+
+  if (mHandle != INVALID_HANDLE_VALUE) {
+    CloseHandle(mHandle);
+    mHandle = INVALID_HANDLE_VALUE;
+    mBuff.Reset();
+  }
 }
 
 /**
@@ -431,41 +451,43 @@ void FileStream::VirtClose(const Mode mode)
  * What it does:
  * Flushes pending read-window offset compensation and writes bytes to the file handle.
  */
-void FileStream::DoWrite(const void* const buffer, const size_t bytes)
+void FileStream::DoWrite(
+  const void* const buffer,
+  const size_t bytes
+)
 {
-    if (mReadHead != mReadEnd) {
-        LARGE_INTEGER distance{};
-        distance.QuadPart = static_cast<LONGLONG>(mReadHead - mReadEnd);
-        if (!SetFilePointerEx(mHandle, distance, nullptr, FILE_CURRENT)) {
-            throw IOError(GetLastError());
-        }
+  if (mReadHead != mReadEnd) {
+    LARGE_INTEGER distance{};
+    distance.QuadPart = static_cast<LONGLONG>(mReadHead - mReadEnd);
+    if (!SetFilePointerEx(mHandle, distance, nullptr, FILE_CURRENT)) {
+      throw IOError(GetLastError());
+    }
+  }
+
+  mReadStart = nullptr;
+  mReadHead = nullptr;
+  mReadEnd = nullptr;
+
+  const auto expectedBytes = static_cast<DWORD>(bytes);
+  if (expectedBytes != 0) {
+    DWORD written = 0;
+    if (!WriteFile(mHandle, buffer, expectedBytes, &written, nullptr)) {
+      int* const runtimeErrno = _errno();
+      const DWORD errorCode = runtimeErrno ? static_cast<DWORD>(*runtimeErrno) : GetLastError();
+      throw IOError(errorCode);
     }
 
-    mReadStart = nullptr;
-    mReadHead = nullptr;
-    mReadEnd = nullptr;
-
-    const auto expectedBytes = static_cast<DWORD>(bytes);
-    if (expectedBytes != 0) {
-        DWORD written = 0;
-        if (!WriteFile(mHandle, buffer, expectedBytes, &written, nullptr)) {
-            int* const runtimeErrno = _errno();
-            const DWORD errorCode = runtimeErrno ? static_cast<DWORD>(*runtimeErrno) : GetLastError();
-            throw IOError(errorCode);
-        }
-
-        if (written != expectedBytes) {
-            HandleAssertFailure(
-                "written == bytes",
-                288,
-                "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\streams\\FileStream.cpp");
-        }
+    if (written != expectedBytes) {
+      HandleAssertFailure(
+        "written == bytes", 288, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\streams\\FileStream.cpp"
+      );
     }
+  }
 
-    char* const begin = mBuff.begin();
-    mWriteStart = begin;
-    mWriteHead = begin;
-    mWriteEnd = mBuff.end();
+  char* const begin = mBuff.begin();
+  mWriteStart = begin;
+  mWriteHead = begin;
+  mWriteEnd = mBuff.end();
 }
 
 /**
@@ -474,20 +496,23 @@ void FileStream::DoWrite(const void* const buffer, const size_t bytes)
  * What it does:
  * Flushes pending write window if needed, then reads bytes from file handle into caller buffer.
  */
-size_t FileStream::DoRead(void* const buffer, const size_t bytes)
+size_t FileStream::DoRead(
+  void* const buffer,
+  const size_t bytes
+)
 {
-    if (mWriteHead != mWriteStart) {
-        DoWrite(mWriteStart, static_cast<size_t>(mWriteHead - mWriteStart));
-    }
+  if (mWriteHead != mWriteStart) {
+    DoWrite(mWriteStart, static_cast<size_t>(mWriteHead - mWriteStart));
+  }
 
-    mWriteStart = nullptr;
-    mWriteHead = nullptr;
-    mWriteEnd = nullptr;
+  mWriteStart = nullptr;
+  mWriteHead = nullptr;
+  mWriteEnd = nullptr;
 
-    DWORD read = 0;
-    if (!ReadFile(mHandle, buffer, static_cast<DWORD>(bytes), &read, nullptr)) {
-        throw IOError(GetLastError());
-    }
+  DWORD read = 0;
+  if (!ReadFile(mHandle, buffer, static_cast<DWORD>(bytes), &read, nullptr)) {
+    throw IOError(GetLastError());
+  }
 
-    return read;
+  return read;
 }

@@ -73,18 +73,24 @@ namespace moho
 
   static_assert(sizeof(CSimConVarBase) == 0x10, "CSimConVarBase size must be 0x10");
   static_assert(offsetof(CSimConVarBase, mName) == 0x04, "CSimConVarBase::mName offset must be 0x04");
-  static_assert(offsetof(CSimConVarBase, mAllowWithoutCheats) == 0x08, "CSimConVarBase::mAllowWithoutCheats offset must be 0x08");
+  static_assert(
+    offsetof(CSimConVarBase, mAllowWithoutCheats) == 0x08,
+    "CSimConVarBase::mAllowWithoutCheats offset must be 0x08"
+  );
   static_assert(offsetof(CSimConVarBase, mIndex) == 0x0C, "CSimConVarBase::mIndex offset must be 0x0C");
 
   template <typename T>
   class TSimConVar : public CSimConVarBase
   {
   public:
-    TSimConVar(bool allowWithoutCheats, const char* name, const T& defaultValue)
+    TSimConVar(
+      bool allowWithoutCheats,
+      const char* name,
+      const T& defaultValue
+    )
       : CSimConVarBase(allowWithoutCheats, name)
       , mDefaultValue(defaultValue)
-    {
-    }
+    {}
 
     /**
      * Address: 0x0057DF30 (FUN_0057DF30) for the `TSimConVar<int>` instantiation -
@@ -167,16 +173,20 @@ namespace moho
   CSimConVarInstanceBase* TSimConVar<fa::string>::CreateInstance();
 
   static_assert(
-    offsetof(TSimConVar<bool>, mDefaultValue) == 0x10, "TSimConVar<bool>::mDefaultValue offset must be 0x10"
+    offsetof(TSimConVar<bool>, mDefaultValue) == 0x10,
+    "TSimConVar<bool>::mDefaultValue offset must be 0x10"
   );
   static_assert(offsetof(TSimConVar<int>, mDefaultValue) == 0x10, "TSimConVar<int>::mDefaultValue offset must be 0x10");
   static_assert(
-    offsetof(TSimConVar<float>, mDefaultValue) == 0x10, "TSimConVar<float>::mDefaultValue offset must be 0x10"
+    offsetof(TSimConVar<float>, mDefaultValue) == 0x10,
+    "TSimConVar<float>::mDefaultValue offset must be 0x10"
   );
   static_assert(
-    offsetof(TSimConVar<std::uint8_t>, mDefaultValue) == 0x10, "TSimConVar<uint8_t>::mDefaultValue offset must be 0x10"
+    offsetof(TSimConVar<std::uint8_t>, mDefaultValue) == 0x10,
+    "TSimConVar<uint8_t>::mDefaultValue offset must be 0x10"
   );
   static_assert(
-    offsetof(TSimConVar<fa::string>, mDefaultValue) == 0x10, "TSimConVar<string>::mDefaultValue offset must be 0x10"
+    offsetof(TSimConVar<fa::string>, mDefaultValue) == 0x10,
+    "TSimConVar<string>::mDefaultValue offset must be 0x10"
   );
 } // namespace moho

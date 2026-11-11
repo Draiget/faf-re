@@ -35,6 +35,10 @@ namespace moho
 
   /// As a peer: whether `signature` answers this challenge from the holder of `key`, for that seat, to this peer.
   [[nodiscard]] bool REJOIN_CheckProof(
-    const SRejoinPublicKey& key, const SRejoinNonce& nonce, int source, int peerIndex, const SRejoinSignature& signature
+    const SRejoinPublicKey& key,
+    const SRejoinNonce& nonce,
+    int source,
+    int peerIndex,
+    const SRejoinSignature& signature
   );
 } // namespace moho

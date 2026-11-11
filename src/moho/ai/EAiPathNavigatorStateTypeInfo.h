@@ -36,7 +36,6 @@ namespace moho
     void Init() override;
   };
 
-
   /**
    * Address: 0x00BCCFC0 (FUN_00BCCFC0, register_EAiPathNavigatorStateTypeInfo)
    *

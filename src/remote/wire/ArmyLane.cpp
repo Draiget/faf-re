@@ -8,20 +8,28 @@ namespace faf::remote::wire
 {
   namespace
   {
-    void WriteU64(BitWriter& writer, const std::uint64_t value)
+    void WriteU64(
+      BitWriter& writer,
+      const std::uint64_t value
+    )
     {
       writer.WriteBits(static_cast<std::uint32_t>(value), 32);
       writer.WriteBits(static_cast<std::uint32_t>(value >> 32u), 32);
     }
 
-    [[nodiscard]] std::uint64_t ReadU64(BitReader& reader) noexcept
+    [[nodiscard]] std::uint64_t ReadU64(
+      BitReader& reader
+    ) noexcept
     {
       const std::uint64_t low = reader.ReadBits(32);
       const std::uint64_t high = reader.ReadBits(32);
       return low | (high << 32u);
     }
 
-    [[nodiscard]] bool WriteSet(BitWriter& writer, const std::vector<std::uint32_t>& members)
+    [[nodiscard]] bool WriteSet(
+      BitWriter& writer,
+      const std::vector<std::uint32_t>& members
+    )
     {
       if (members.size() > SArmyRecord::kMaxSetMembers) {
         return false;
@@ -33,7 +41,10 @@ namespace faf::remote::wire
       return true;
     }
 
-    [[nodiscard]] bool ReadSet(BitReader& reader, std::vector<std::uint32_t>& members)
+    [[nodiscard]] bool ReadSet(
+      BitReader& reader,
+      std::vector<std::uint32_t>& members
+    )
     {
       const std::uint32_t count = reader.ReadVarUint();
       if (!reader.Ok() || count > SArmyRecord::kMaxSetMembers || count > reader.BitsLeft()) {
@@ -47,7 +58,10 @@ namespace faf::remote::wire
       return reader.Ok();
     }
 
-    [[nodiscard]] bool WriteRecord(BitWriter& writer, const SArmyRecord& record)
+    [[nodiscard]] bool WriteRecord(
+      BitWriter& writer,
+      const SArmyRecord& record
+    )
     {
       for (const float value : record.economy) {
         writer.WriteFloatExact(value);
@@ -55,15 +69,19 @@ namespace faf::remote::wire
       WriteU64(writer, record.maxStorage[0]);
       WriteU64(writer, record.maxStorage[1]);
       writer.WriteBits(record.resourceSharing, 8);
-      if (!WriteSet(writer, record.neutrals) || !WriteSet(writer, record.allies) || !WriteSet(writer, record.enemies)
-          || !WriteSet(writer, record.validCommandSources)) {
+      if (
+        !WriteSet(writer, record.neutrals) || !WriteSet(writer, record.allies) || !WriteSet(writer, record.enemies) ||
+        !WriteSet(writer, record.validCommandSources)
+      ) {
         return false;
       }
       writer.WriteBits(record.isAlly, 8);
       writer.WriteBits(record.playerColor, 32);
       writer.WriteBits(record.armyColor, 32);
-      if (record.armyType.size() > SArmyRecord::kMaxTypeLength
-          || record.categoryFilter.words.size() > SCategoryBits::kMaxWords) {
+      if (
+        record.armyType.size() > SArmyRecord::kMaxTypeLength ||
+        record.categoryFilter.words.size() > SCategoryBits::kMaxWords
+      ) {
         return false;
       }
       writer.WriteVarUint(static_cast<std::uint32_t>(record.armyType.size()));
@@ -86,7 +104,10 @@ namespace faf::remote::wire
       return true;
     }
 
-    [[nodiscard]] bool ReadRecord(BitReader& reader, SArmyRecord& record)
+    [[nodiscard]] bool ReadRecord(
+      BitReader& reader,
+      SArmyRecord& record
+    )
     {
       for (float& value : record.economy) {
         value = reader.ReadFloatExact();
@@ -94,8 +115,10 @@ namespace faf::remote::wire
       record.maxStorage[0] = ReadU64(reader);
       record.maxStorage[1] = ReadU64(reader);
       record.resourceSharing = static_cast<std::uint8_t>(reader.ReadBits(8));
-      if (!ReadSet(reader, record.neutrals) || !ReadSet(reader, record.allies) || !ReadSet(reader, record.enemies)
-          || !ReadSet(reader, record.validCommandSources)) {
+      if (
+        !ReadSet(reader, record.neutrals) || !ReadSet(reader, record.allies) || !ReadSet(reader, record.enemies) ||
+        !ReadSet(reader, record.validCommandSources)
+      ) {
         return false;
       }
       record.isAlly = static_cast<std::uint8_t>(reader.ReadBits(8));
@@ -129,7 +152,11 @@ namespace faf::remote::wire
     }
   } // namespace
 
-  bool EncodeArmyLane(const std::vector<SArmyRecord>& records, const std::vector<SArmyRecord>* baseline, BitWriter& writer)
+  bool EncodeArmyLane(
+    const std::vector<SArmyRecord>& records,
+    const std::vector<SArmyRecord>* baseline,
+    BitWriter& writer
+  )
   {
     if (records.size() > kMaxArmyRecords) {
       return false;
@@ -145,7 +172,11 @@ namespace faf::remote::wire
     return true;
   }
 
-  bool DecodeArmyLane(BitReader& reader, const std::vector<SArmyRecord>* baseline, std::vector<SArmyRecord>& out)
+  bool DecodeArmyLane(
+    BitReader& reader,
+    const std::vector<SArmyRecord>* baseline,
+    std::vector<SArmyRecord>& out
+  )
   {
     const std::uint32_t count = reader.ReadVarUint();
     if (!reader.Ok() || count > kMaxArmyRecords) {
@@ -172,7 +203,11 @@ namespace faf::remote::wire
     return true;
   }
 
-  bool EncodeGridLane(const std::vector<SGridSlot>& grids, const std::vector<SGridSlot>& held, BitWriter& writer)
+  bool EncodeGridLane(
+    const std::vector<SGridSlot>& grids,
+    const std::vector<SGridSlot>& held,
+    BitWriter& writer
+  )
   {
     if (grids.size() > kMaxGridSlots) {
       return false;
@@ -189,20 +224,30 @@ namespace faf::remote::wire
     return true;
   }
 
-  void WriteGridSlotHeader(const SGridSlot& slot, BitWriter& writer)
+  void WriteGridSlotHeader(
+    const SGridSlot& slot,
+    BitWriter& writer
+  )
   {
     writer.WriteBits(slot.army, 8);
     writer.WriteBits(slot.kind, 1);
     writer.WriteVarUint(slot.gridSize);
   }
 
-  bool EncodeGridSlot(const SGridSlot& slot, const SGridBits* const baseline, BitWriter& writer)
+  bool EncodeGridSlot(
+    const SGridSlot& slot,
+    const SGridBits* const baseline,
+    BitWriter& writer
+  )
   {
     WriteGridSlotHeader(slot, writer);
     return EncodeGridDelta(slot.bits, baseline, writer);
   }
 
-  bool DecodeGridLane(BitReader& reader, std::vector<SGridSlot>& held)
+  bool DecodeGridLane(
+    BitReader& reader,
+    std::vector<SGridSlot>& held
+  )
   {
     const std::uint32_t count = reader.ReadVarUint();
     if (!reader.Ok() || count > kMaxGridSlots) {
@@ -217,7 +262,9 @@ namespace faf::remote::wire
       const auto found = std::find_if(held.begin(), held.end(), [&slot](const SGridSlot& other) {
         return other.army == slot.army && other.kind == slot.kind;
       });
-      if (!reader.Ok() || !DecodeGridDelta(reader, found != held.end() ? &found->bits : nullptr, kMaxGridCells, slot.bits)) {
+      if (
+        !reader.Ok() || !DecodeGridDelta(reader, found != held.end() ? &found->bits : nullptr, kMaxGridCells, slot.bits)
+      ) {
         return false;
       }
     }

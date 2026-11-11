@@ -12,7 +12,7 @@ namespace gpg
 {
   class BinaryReader;
   class BinaryWriter;
-}
+} // namespace gpg
 
 namespace LuaPlus
 {
@@ -37,7 +37,13 @@ namespace moho
    * (a single virtual-destructor vtable slot) so `fa::vector<WaveParameters>`
    * tears its elements down through the class's own vtable rather than a
    * statically-bound call -- see `WavePattern::~WavePattern` below.
-   * Address: 0x0088B2A0 (FUN_0088B2A0 -- the compiler-generated copy assignment (`operator= = default` below), emitted out of line for `fa::vector<WaveParameters>` (136-byte polymorphic element, `WavePattern::mWaves` at +0x3C): `mTexturePath`/`mRampPath` through `basic_string::assign(rhs, 0, npos)` (0x004056B0), then +0x3C..+0x84 member-wise, vptr untouched; `this` in ESI, `rhs` in EDI; callers 0x0088AD60 (`std::copy`, stride 0x88), 0x0088AE30 (`std::fill`), 0x0088AE60 (`std::copy_backward`) and the untokenized adapter sites 0x0088B070, 0x0088B1C0, 0x0088B20C, 0x0088B48C; formerly `CopyWaveParametersPayloadRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+   * Address: 0x0088B2A0 (FUN_0088B2A0 -- the compiler-generated copy assignment (`operator= = default` below), emitted
+   * out of line for `fa::vector<WaveParameters>` (136-byte polymorphic element, `WavePattern::mWaves` at +0x3C):
+   * `mTexturePath`/`mRampPath` through `basic_string::assign(rhs, 0, npos)` (0x004056B0), then +0x3C..+0x84
+   * member-wise, vptr untouched; `this` in ESI, `rhs` in EDI; callers 0x0088AD60 (`std::copy`, stride 0x88), 0x0088AE30
+   * (`std::fill`), 0x0088AE60 (`std::copy_backward`) and the untokenized adapter sites 0x0088B070, 0x0088B1C0,
+   * 0x0088B20C, 0x0088B48C; formerly `CopyWaveParametersPayloadRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE),
+   * removed 2026-09-30.)
    */
   class WaveParameters
   {
@@ -117,22 +123,22 @@ namespace moho
      */
     void PopulateFromLua(LuaPlus::LuaObject& source);
 
-    fa::string mTexturePath;                    // +0x04 ("texture")
+    fa::string mTexturePath;                     // +0x04 ("texture")
     fa::string mRampPath;                        // +0x20 ("ramp")
-    Wm3::Vec3f mPosition{0.0f, 0.0f, 0.0f};          // +0x3C ("position", 1-based array)
-    float mPeriod = 0.0f;                            // +0x48
-    float mPeriodVariance = 0.0f;                    // +0x4C
-    float mSpeed = 0.0f;                              // +0x50
-    float mSpeedVariance = 0.0f;                      // +0x54
-    float mLifetime = 0.0f;                           // +0x58
-    float mLifetimeVariance = 0.0f;                   // +0x5C
-    Wm3::Vector2f mScale{0.0f, 0.0f};                 // +0x60 ("scale[1]"/"scale[2]")
-    float mScaleVariance = 0.0f;                      // +0x68
-    Wm3::Vec3f mVelocityDelta{0.0f, 0.0f, 0.0f};      // +0x6C ("velocityDelta", 1-based array)
-    float mFrameCount = 1.0f;                         // +0x78 (default 1.0 when nil)
-    float mFrameRate = 1.0f;                          // +0x7C (default 1.0 when nil)
-    float mFrameRateVariance = 0.0f;                  // +0x80 (default 0.0 when nil)
-    float mStripCount = 1.0f;                         // +0x84 (default 1.0 when nil)
+    Wm3::Vec3f mPosition{0.0f, 0.0f, 0.0f};      // +0x3C ("position", 1-based array)
+    float mPeriod = 0.0f;                        // +0x48
+    float mPeriodVariance = 0.0f;                // +0x4C
+    float mSpeed = 0.0f;                         // +0x50
+    float mSpeedVariance = 0.0f;                 // +0x54
+    float mLifetime = 0.0f;                      // +0x58
+    float mLifetimeVariance = 0.0f;              // +0x5C
+    Wm3::Vector2f mScale{0.0f, 0.0f};            // +0x60 ("scale[1]"/"scale[2]")
+    float mScaleVariance = 0.0f;                 // +0x68
+    Wm3::Vec3f mVelocityDelta{0.0f, 0.0f, 0.0f}; // +0x6C ("velocityDelta", 1-based array)
+    float mFrameCount = 1.0f;                    // +0x78 (default 1.0 when nil)
+    float mFrameRate = 1.0f;                     // +0x7C (default 1.0 when nil)
+    float mFrameRateVariance = 0.0f;             // +0x80 (default 0.0 when nil)
+    float mStripCount = 1.0f;                    // +0x84 (default 1.0 when nil)
   };
 
   static_assert(sizeof(WaveParameters) == 0x88, "WaveParameters size must be 0x88");
@@ -212,9 +218,9 @@ namespace moho
      */
     void LoadParametersFromLua(LuaPlus::LuaObject& source);
 
-    fa::string mName;                       // +0x04 ("name")
-    fa::string mPreview;                     // +0x20 ("preview")
-    fa::vector<WaveParameters> mWaves;       // +0x3C ("parameters")
+    fa::string mName;                  // +0x04 ("name")
+    fa::string mPreview;               // +0x20 ("preview")
+    fa::vector<WaveParameters> mWaves; // +0x3C ("parameters")
   };
 
   static_assert(sizeof(WavePattern) == 0x4C, "WavePattern size must be 0x4C");
@@ -271,7 +277,9 @@ namespace moho
      */
     void Save(gpg::BinaryWriter& writer) const;
 
-    void Save(gpg::BinaryWriter* writer) const
+    void Save(
+      gpg::BinaryWriter* writer
+    ) const
     {
       if (writer != nullptr) {
         Save(*writer);
@@ -320,33 +328,33 @@ namespace moho
     void RebuildSpatialBounds();
 
   private:
-    [[maybe_unused]] std::uint32_t mReserved04;             // +0x04
-    SpatialDBEntry<WaveGenerator> mSpatialEntry; // +0x08
-    Wm3::AxisAlignedBox3f mBounds;         // +0x10
-    Wm3::Vec3f mBoundsCenter;              // +0x28
-    VAxes3 mBoundsAxes;                    // +0x34
-    Wm3::Vec3f mBoundsHalfExtents;         // +0x58
-    [[maybe_unused]] std::uint32_t mReserved64;             // +0x64
-    double mCurrentTime;                   // +0x68
-    double mUpdateInterval;                // +0x70
-    fa::string mPrimaryTexturePath;     // +0x78
-    CParticleTexture* mPrimaryTexture;     // +0x94
-    fa::string mRampTexturePath;        // +0x98
-    CParticleTexture* mRampTexture;        // +0xB4
-    Wm3::Vec3f mPosition;                  // +0xB8
-    float mAngle;                          // +0xC4
-    Wm3::Vec3f mDirection;                 // +0xC8
-    float mMinLifetime;                    // +0xD4
-    float mMaxLifetime;                    // +0xD8
-    float mMinUpdateInterval;              // +0xDC
-    float mMaxUpdateInterval;              // +0xE0
-    float mBeginSize;                      // +0xE4
-    float mEndSize;                        // +0xE8
-    float mRampValueScale;                 // +0xEC
-    float mMinFramerate;                   // +0xF0
-    float mMaxFramerate;                   // +0xF4
-    float mTextureSelectionRange;          // +0xF8
-    [[maybe_unused]] std::uint8_t mTailPaddingFC[0x04];     // +0xFC
+    [[maybe_unused]] std::uint32_t mReserved04;         // +0x04
+    SpatialDBEntry<WaveGenerator> mSpatialEntry;        // +0x08
+    Wm3::AxisAlignedBox3f mBounds;                      // +0x10
+    Wm3::Vec3f mBoundsCenter;                           // +0x28
+    VAxes3 mBoundsAxes;                                 // +0x34
+    Wm3::Vec3f mBoundsHalfExtents;                      // +0x58
+    [[maybe_unused]] std::uint32_t mReserved64;         // +0x64
+    double mCurrentTime;                                // +0x68
+    double mUpdateInterval;                             // +0x70
+    fa::string mPrimaryTexturePath;                     // +0x78
+    CParticleTexture* mPrimaryTexture;                  // +0x94
+    fa::string mRampTexturePath;                        // +0x98
+    CParticleTexture* mRampTexture;                     // +0xB4
+    Wm3::Vec3f mPosition;                               // +0xB8
+    float mAngle;                                       // +0xC4
+    Wm3::Vec3f mDirection;                              // +0xC8
+    float mMinLifetime;                                 // +0xD4
+    float mMaxLifetime;                                 // +0xD8
+    float mMinUpdateInterval;                           // +0xDC
+    float mMaxUpdateInterval;                           // +0xE0
+    float mBeginSize;                                   // +0xE4
+    float mEndSize;                                     // +0xE8
+    float mRampValueScale;                              // +0xEC
+    float mMinFramerate;                                // +0xF0
+    float mMaxFramerate;                                // +0xF4
+    float mTextureSelectionRange;                       // +0xF8
+    [[maybe_unused]] std::uint8_t mTailPaddingFC[0x04]; // +0xFC
   };
 
   class WaveSystem
@@ -444,11 +452,11 @@ namespace moho
     // be an 8-byte handle plus an opaque mRuntimeBlock10[0x8C] tail -- the
     // same split the mesh renderer carried, because one flat type had to
     // serve as both the database and the per-object entry.
-    SpatialDB<WaveGenerator> mSpatialMeshInstance;        // +0x08
-    std::uint32_t mReserved98;                            // +0x98
+    SpatialDB<WaveGenerator> mSpatialMeshInstance; // +0x08
+    std::uint32_t mReserved98;                     // +0x98
     // 12-byte gpg-style vector (no proxy lane); matches the binary triplet
     // initialized in WaveSystem ctor at 0x00888CB0 (mVec._Myfirst/_Mylast/_Myend).
-    gpg::core::FastVector<WaveGenerator*> mWaveGenerators; // +0x9C
+    gpg::core::FastVector<WaveGenerator*> mWaveGenerators;  // +0x9C
     gpg::fastvector_n<WaveGenerator*, 100> mGeneratorCache; // +0xA8
   };
 
@@ -456,14 +464,8 @@ namespace moho
     offsetof(WaveSystem, mSpatialMeshInstance) == 0x08,
     "WaveSystem::mSpatialMeshInstance offset must be 0x08"
   );
-  static_assert(
-    offsetof(WaveSystem, mWaveGenerators) == 0x9C,
-    "WaveSystem::mWaveGenerators offset must be 0x9C"
-  );
-  static_assert(
-    offsetof(WaveSystem, mGeneratorCache) == 0xA8,
-    "WaveSystem::mGeneratorCache offset must be 0xA8"
-  );
+  static_assert(offsetof(WaveSystem, mWaveGenerators) == 0x9C, "WaveSystem::mWaveGenerators offset must be 0x9C");
+  static_assert(offsetof(WaveSystem, mGeneratorCache) == 0xA8, "WaveSystem::mGeneratorCache offset must be 0xA8");
   static_assert(sizeof(WaveSystem) == 0x248, "WaveSystem size must be 0x248");
 
   struct WaveGeneratorLayoutVerifier

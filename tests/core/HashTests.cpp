@@ -20,7 +20,9 @@ namespace
 {
   using faf_core_tests::ToHex;
 
-  std::string Md5Hex(const std::string& input)
+  std::string Md5Hex(
+    const std::string& input
+  )
   {
     gpg::MD5Context context{};
     context.Reset();
@@ -29,7 +31,10 @@ namespace
   }
 
   /** The same input fed in pieces of `piece` bytes. */
-  std::string Md5HexInPieces(const std::string& input, const std::size_t piece)
+  std::string Md5HexInPieces(
+    const std::string& input,
+    const std::size_t piece
+  )
   {
     gpg::MD5Context context{};
     context.Reset();
@@ -39,7 +44,10 @@ namespace
     return std::string(context.Digest().ToString().view());
   }
 
-  std::string Sha256Hex(const std::string& input, const std::size_t piece = 0)
+  std::string Sha256Hex(
+    const std::string& input,
+    const std::size_t piece = 0
+  )
   {
     gpg::SHA256 hasher;
     if (piece == 0) {
@@ -54,7 +62,9 @@ namespace
   }
 
   /** The bytes `(i * 7 + 3) & 0xFF`, as in the Python that produced the boundary digests below. */
-  std::string BoundaryInput(const std::size_t size)
+  std::string BoundaryInput(
+    const std::size_t size
+  )
   {
     std::string bytes(size, '\0');
     for (std::size_t index = 0; index < size; ++index) {
@@ -95,11 +105,19 @@ namespace
   class GpgMd5 : public ::testing::Test
   {
   protected:
-    void SetUp() override { mSaved = gpg::md5_UnrolledBlocks; }
-    void TearDown() override { gpg::md5_UnrolledBlocks = mSaved; }
+    void SetUp() override
+    {
+      mSaved = gpg::md5_UnrolledBlocks;
+    }
+    void TearDown() override
+    {
+      gpg::md5_UnrolledBlocks = mSaved;
+    }
 
     template <class Body>
-    static void ForBothBlockForms(const Body& body)
+    static void ForBothBlockForms(
+      const Body& body
+    )
     {
       for (const bool unrolled : {true, false}) {
         gpg::md5_UnrolledBlocks = unrolled;
@@ -112,7 +130,10 @@ namespace
     bool mSaved = true;
   };
 
-  TEST_F(GpgMd5, Rfc1321TestSuite)
+  TEST_F(
+    GpgMd5,
+    Rfc1321TestSuite
+  )
   {
     ForBothBlockForms([] {
       EXPECT_EQ(Md5Hex(""), "d41d8cd98f00b204e9800998ecf8427e");
@@ -130,7 +151,10 @@ namespace
     });
   }
 
-  TEST_F(GpgMd5, OneMillionA)
+  TEST_F(
+    GpgMd5,
+    OneMillionA
+  )
   {
     ForBothBlockForms([] {
       const std::string input(1000000u, 'a');
@@ -139,7 +163,10 @@ namespace
     });
   }
 
-  TEST_F(GpgMd5, BlockBoundariesInPieces)
+  TEST_F(
+    GpgMd5,
+    BlockBoundariesInPieces
+  )
   {
     ForBothBlockForms([] {
       for (const BoundaryVector& vector : kBoundaryVectors) {
@@ -152,7 +179,10 @@ namespace
     });
   }
 
-  TEST_F(GpgMd5, DigestLeavesTheContextRunning)
+  TEST_F(
+    GpgMd5,
+    DigestLeavesTheContextRunning
+  )
   {
     ForBothBlockForms([] {
       gpg::MD5Context context{};
@@ -169,7 +199,10 @@ namespace
     });
   }
 
-  TEST(GpgMd5Digest, ToStringIsTheBytesInMemoryOrder)
+  TEST(
+    GpgMd5Digest,
+    ToStringIsTheBytesInMemoryOrder
+  )
   {
     // The RFC's digest of "" read back as the four little-endian words the context holds.
     gpg::MD5Digest digest{{0xd98c1dd4u, 0x04b2008fu, 0x980980e9u, 0x7e42f8ecu}};
@@ -177,7 +210,10 @@ namespace
     EXPECT_EQ(digest.ToString().size(), 32u);
   }
 
-  TEST(GpgMd5Digest, InequalityComparesAllFourWords)
+  TEST(
+    GpgMd5Digest,
+    InequalityComparesAllFourWords
+  )
   {
     gpg::MD5Digest a{{1u, 2u, 3u, 4u}};
     gpg::MD5Digest same{{1u, 2u, 3u, 4u}};
@@ -188,7 +224,10 @@ namespace
     EXPECT_TRUE(a != &first);
   }
 
-  TEST(GpgMd5Digest, StdStringUpdateIncludesTheTerminator)
+  TEST(
+    GpgMd5Digest,
+    StdStringUpdateIncludesTheTerminator
+  )
   {
     gpg::MD5Context context{};
     context.Reset();
@@ -202,7 +241,10 @@ namespace
   // SHA-256
   // ---------------------------------------------------------------------------------------------
 
-  TEST(GpgSha256, Fips180Examples)
+  TEST(
+    GpgSha256,
+    Fips180Examples
+  )
   {
     EXPECT_EQ(Sha256Hex("abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     EXPECT_EQ(
@@ -212,14 +254,20 @@ namespace
     EXPECT_EQ(Sha256Hex(""), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
   }
 
-  TEST(GpgSha256, OneMillionA)
+  TEST(
+    GpgSha256,
+    OneMillionA
+  )
   {
     const std::string input(1000000u, 'a');
     EXPECT_EQ(Sha256Hex(input), "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0");
     EXPECT_EQ(Sha256Hex(input, 1000u), "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0");
   }
 
-  TEST(GpgSha256, BlockBoundariesInPieces)
+  TEST(
+    GpgSha256,
+    BlockBoundariesInPieces
+  )
   {
     for (const BoundaryVector& vector : kBoundaryVectors) {
       const std::string input = BoundaryInput(vector.size);
@@ -230,7 +278,10 @@ namespace
     }
   }
 
-  TEST(GpgSha256, SnapshotLeavesTheHasherRunning)
+  TEST(
+    GpgSha256,
+    SnapshotLeavesTheHasherRunning
+  )
   {
     gpg::SHA256 hasher;
     hasher.Update("ab", 2u);
@@ -247,23 +298,32 @@ namespace
   // HashDword / HashBytes / Hash
   // ---------------------------------------------------------------------------------------------
 
-  TEST(GpgHash, HashDwordMatchesTheRetailMix)
+  TEST(
+    GpgHash,
+    HashDwordMatchesTheRetailMix
+  )
   {
     EXPECT_EQ(gpg::HashDword(0x12345678u, 0u), 0x1957b023u);
     EXPECT_EQ(gpg::HashDword(0u, 0x12345678u), 0x1957b023u); // xor first: the two arguments commute
     EXPECT_EQ(gpg::HashDword(0x00000001u, 0xdeadbeefu), 0x1951bc3du);
   }
 
-  TEST(GpgHash, HashBytesMatchesTheRetailLoop)
+  TEST(
+    GpgHash,
+    HashBytesMatchesTheRetailLoop
+  )
   {
-    EXPECT_EQ(gpg::HashBytes("", 0u, 7u), 7u); // nothing mixed in: the salt comes back
-    EXPECT_EQ(gpg::HashBytes("abc", 3u, 0u), 0x5baa1efbu); // tail bytes only
+    EXPECT_EQ(gpg::HashBytes("", 0u, 7u), 7u);              // nothing mixed in: the salt comes back
+    EXPECT_EQ(gpg::HashBytes("abc", 3u, 0u), 0x5baa1efbu);  // tail bytes only
     EXPECT_EQ(gpg::HashBytes("abcd", 4u, 0u), 0xb16cde57u); // one little-endian dword
     EXPECT_EQ(gpg::HashBytes("Forged Alliance", 15u, 0x9e3779b9u), 0x12d671e1u); // three dwords and a tail
     EXPECT_EQ(gpg::HashBytes("abcd", 4u, 0u), gpg::HashDword(0x64636261u, 0u));
   }
 
-  TEST(GpgHash, StringHashIsHashBytesWithoutTheTerminator)
+  TEST(
+    GpgHash,
+    StringHashIsHashBytesWithoutTheTerminator
+  )
   {
     EXPECT_EQ(gpg::Hash(std::string("Forged Alliance"), 0x9e3779b9u), 0x12d671e1u);
     EXPECT_EQ(gpg::Hash(std::string(), 99u), 99u);

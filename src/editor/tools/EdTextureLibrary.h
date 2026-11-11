@@ -33,7 +33,10 @@ namespace faf::editor
 
     /** Lists the textures (once; again after Refresh). */
     const std::vector<LayerTexture>& Textures();
-    void Refresh() { mListed = false; }
+    void Refresh()
+    {
+      mListed = false;
+    }
 
     /**
      * The thumbnail of a texture for ImGui::Image, or 0 while it waits its turn; asks for it either way. Opaque by

@@ -16,6 +16,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <csignal>
 #include <cstdarg>
 #include <cstdio>
@@ -42,8 +43,11 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/diagnostics/BuildInfo.h"
 #include "gpg/core/utils/Logging.h"
+#include "gpg/core/algorithms/MD5.h"
 #include "headless/ReplayLuaState.h"
 #include "headless/SessionLoad.h"
+#include "headless/StateDigest.h"
+#include "moho/sim/SimDebugCommandRegistrations.h"
 #include "gpg/core/utils/Global.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaTableIterator.h"
@@ -75,14 +79,17 @@
 #include "platform/X87Precision.h"
 #include "remote/net/UdpSocket.h"
 #include "remote/ContentTables.h"
+#include "server/ArmyBoard.h"
 #include "server/ControlListener.h"
 #include "server/LiveReplaySender.h"
 #include "server/ObserverListener.h"
 #include "server/ReplayLog.h"
 #include "server/LobbySignaller.h"
+#include "server/Nftables.h"
 #include "server/ServerNet.h"
 #include "server/ServerViews.h"
 #include "remote/SpeedLimit.h"
+#include "remote/SyncRouting.h"
 #include "server/LinkSpeed.h"
 #include "server/SpeedWatch.h"
 
@@ -100,12 +107,21 @@ namespace
   constexpr const char* kServerName = "server";
 
   constexpr const char* kUsage =
-    "usage: server --match <file.lua> --out <dir> /init <init.lua> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
-    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view observe|disconnect] [--lobby-seconds <n>] [--lobby-away-seconds <n>] [--stats-every <beats>] [--congestion-control]\n";
+    "usage: server --match <file.lua> --out <dir> /init <init.lua> | --data <dir> [--cpus <list>] [--speed <n>] "
+    "[--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
+    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] "
+    "[--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view "
+    "observe|disconnect] [--lobby-seconds <n> [--start-when-ready <seconds>]] [--lobby-away-seconds <n>] "
+    "[--stats-every <beats>] [--pose-budget-kbps <n>] [--congestion-control] [--nftables-out <file> [--nftables-only] "
+    "[--unlisted-pps <n>] [--unlisted-total-pps <n>]] [--unvalidated-policy] "
+    "[--control <ip:port> --control-key <file>] [--rest <ip:port> --rest-token-file <file> [--rest-cors-origin "
+    "<origin>]] "
+    "[--checksum-period <beats>] [--digests <file>] [--state-digests <file>]\n";
 
   constexpr double kDefaultStatusMinutes = 10.0;
-  // Plan WP13.7: how long a defeated player keeps their view with `DefeatedPlayerView = "disconnect"`: the defeat banner
-  // and the commander's explosion (`AIBrain.OnDefeat`, `lua/aibrain.lua`, waits 10 s before it hands the army over).
+  // Plan WP13.7: how long a defeated player keeps their view with `DefeatedPlayerView = "disconnect"`: the defeat
+  // banner and the commander's explosion (`AIBrain.OnDefeat`, `lua/aibrain.lua`, waits 10 s before it hands the army
+  // over).
   constexpr double kDefeatedLeaveSeconds = 10.0;
   // `net_Lag` is 500 ms in a lockstep game, time for every player's beats to arrive. Here it's only the
   // sim's head start on the next beat, and a player's command waits for all of it.
@@ -117,17 +133,31 @@ namespace
 
   using Clock = std::chrono::steady_clock;
 
+  /** Plan WP16.1: a beat the sim wrote no checksum digest for (`--digests` skips it, as headless does). */
+  [[nodiscard]] bool IsZeroDigest(
+    const gpg::MD5Digest& digest
+  ) noexcept
+  {
+    return (digest.vals[0] | digest.vals[1] | digest.vals[2] | digest.vals[3]) == 0u;
+  }
+
   volatile std::sig_atomic_t gStopSignal = 0;
   volatile std::sig_atomic_t gPauseRequests = 0;
-  volatile std::sig_atomic_t gForceStartRequests = 0; // plan WPR.49: SIGUSR2, the operator starts the match from the lobby
-  faf::server::CControlListener* gControl = nullptr;    // plan WP17.2: the console's lines also go to the control service
+  volatile std::sig_atomic_t gForceStartRequests =
+    0; // plan WPR.49: SIGUSR2, the operator starts the match from the lobby
+  faf::server::CControlListener* gControl = nullptr; // plan WP17.2: the console's lines also go to the control service
 
-  [[nodiscard]] double SecondsSince(const Clock::time_point start)
+  [[nodiscard]] double SecondsSince(
+    const Clock::time_point start
+  )
   {
     return std::chrono::duration<double>(Clock::now() - start).count();
   }
 
-  [[nodiscard]] bool ReadOption(const char* const name, std::string& value)
+  [[nodiscard]] bool ReadOption(
+    const char* const name,
+    std::string& value
+  )
   {
     fa::vector<fa::string> args;
     if (!moho::CFG_GetArgOption(name, 1, &args) || args.empty()) {
@@ -138,7 +168,10 @@ namespace
   }
 
   /** A line for whoever runs the server, also in the log so the two can be read together. */
-  void Say(const char* const format, ...)
+  void Say(
+    const char* const format,
+    ...
+  )
   {
     char text[1024];
     va_list args;
@@ -165,7 +198,9 @@ namespace
     );
   }
 
-  [[nodiscard]] std::string ClockText(const double seconds)
+  [[nodiscard]] std::string ClockText(
+    const double seconds
+  )
   {
     const int whole = static_cast<int>(seconds);
     char text[32];
@@ -174,7 +209,9 @@ namespace
   }
 
   /** A beat is a tenth of a second of game time. */
-  [[nodiscard]] std::string GameClockText(const int beat)
+  [[nodiscard]] std::string GameClockText(
+    const int beat
+  )
   {
     return ClockText(beat / 10.0);
   }
@@ -188,7 +225,9 @@ namespace
     return residentPages * ::sysconf(_SC_PAGESIZE) / (1024 * 1024);
   }
 
-  void CrashSignal(const int signalNumber)
+  void CrashSignal(
+    const int signalNumber
+  )
   {
     char text[64];
     const int length = std::snprintf(text, sizeof(text), "server: crash, signal %d\n", signalNumber);
@@ -196,17 +235,23 @@ namespace
     std::_Exit(kExitCrash);
   }
 
-  void PauseSignal(const int)
+  void PauseSignal(
+    const int
+  )
   {
     gPauseRequests = gPauseRequests + 1;
   }
 
-  void ForceStartSignal(const int)
+  void ForceStartSignal(
+    const int
+  )
   {
     gForceStartRequests = gForceStartRequests + 1;
   }
 
-  void StopSignal(const int signalNumber)
+  void StopSignal(
+    const int signalNumber
+  )
   {
     gStopSignal = signalNumber;
   }
@@ -219,14 +264,22 @@ namespace
       : gpg::LogTarget(true)
     {}
 
-    void OnMessage(const gpg::LogSeverity level, const fa::string&, const fa::vector<fa::string>&, int) override
+    void OnMessage(
+      const gpg::LogSeverity level,
+      const fa::string&,
+      const fa::vector<fa::string>&,
+      int
+    ) override
     {
       if (level == gpg::LogSeverity::Warn) {
         mWarnings.fetch_add(1, std::memory_order_relaxed);
       }
     }
 
-    [[nodiscard]] unsigned long Count() const { return mWarnings.load(std::memory_order_relaxed); }
+    [[nodiscard]] unsigned long Count() const
+    {
+      return mWarnings.load(std::memory_order_relaxed);
+    }
 
   private:
     std::atomic<unsigned long> mWarnings{0};
@@ -239,7 +292,10 @@ namespace
       : moho::IWinApp("SupCom", "SupremeCommander")
     {}
 
-    bool Init() override { return AppInitCommonServices(); }
+    bool Init() override
+    {
+      return AppInitCommonServices();
+    }
     void Main() override {}
     void Destroy() override {}
   };
@@ -252,10 +308,17 @@ namespace
     int team = 0;
     bool human = false;
     std::string result;
+    std::int32_t uid = 0; // a human's OwnerID; 0 for an AI
   };
 
   /** The match file: Lua that sets `MatchConfig`, the table `CLobby.LaunchGame` takes, `MatchSeed` and `MatchName`. */
-  [[nodiscard]] bool LoadMatch(LuaPlus::LuaState* const state, const std::string& path, LuaPlus::LuaObject& config, std::int32_t& seed, std::string& error)
+  [[nodiscard]] bool LoadMatch(
+    LuaPlus::LuaState* const state,
+    const std::string& path,
+    LuaPlus::LuaObject& config,
+    std::int32_t& seed,
+    std::string& error
+  )
   {
     std::ifstream file(path, std::ios::binary);
     if (!file) {
@@ -291,7 +354,9 @@ namespace
   }
 
   /** `MatchTokens`, by `OwnerID`: outside `MatchConfig`, as what's in there goes in the replay and to every player. */
-  [[nodiscard]] std::map<std::int32_t, std::string> ReadTokens(LuaPlus::LuaState* const state)
+  [[nodiscard]] std::map<std::int32_t, std::string> ReadTokens(
+    LuaPlus::LuaState* const state
+  )
   {
     std::map<std::int32_t, std::string> tokens;
     LuaPlus::LuaObject table = state->GetGlobal("MatchTokens");
@@ -312,7 +377,11 @@ namespace
    * Plan WPR.45: `MatchAddresses`, by `OwnerID`, each an IPv4 address or a list of them, outside `MatchConfig` as the
    * tokens are. The addresses FAF knows its players by. False with `error` for one that doesn't parse.
    */
-  [[nodiscard]] bool ReadAddresses(LuaPlus::LuaState* const state, std::vector<std::uint32_t>& addresses, std::string& error)
+  [[nodiscard]] bool ReadAddresses(
+    LuaPlus::LuaState* const state,
+    std::vector<std::uint32_t>& addresses,
+    std::string& error
+  )
   {
     LuaPlus::LuaObject table = state->GetGlobal("MatchAddresses");
     if (!table.IsTable()) {
@@ -321,7 +390,8 @@ namespace
     const auto add = [&](const LuaPlus::LuaObject& value) {
       faf::remote::net::SEndpoint endpoint;
       if (!value.IsString() || !faf::remote::net::ParseEndpoint(std::string(value.GetString()) + ":1", endpoint)) {
-        error = std::string("MatchAddresses holds ") + (value.IsString() ? value.GetString() : "a value that isn't a string") + ", not an IPv4 address";
+        error = std::string("MatchAddresses holds ") +
+          (value.IsString() ? value.GetString() : "a value that isn't a string") + ", not an IPv4 address";
         return false;
       }
       addresses.push_back(endpoint.ip);
@@ -343,7 +413,9 @@ namespace
   }
 
   /** Plan WPR.42: the sim mods a match names. FAF's lobby puts only sim mods in `GameMods` (`Mods.GetGameMods`). */
-  [[nodiscard]] int CountSimMods(const LuaPlus::LuaObject& config)
+  [[nodiscard]] int CountSimMods(
+    const LuaPlus::LuaObject& config
+  )
   {
     LuaPlus::LuaObject mods = config["GameMods"];
     int count = 0;
@@ -355,7 +427,9 @@ namespace
     return count;
   }
 
-  [[nodiscard]] std::vector<SMatchPlayer> ReadPlayers(const LuaPlus::LuaObject& config)
+  [[nodiscard]] std::vector<SMatchPlayer> ReadPlayers(
+    const LuaPlus::LuaObject& config
+  )
   {
     std::vector<SMatchPlayer> players;
     LuaPlus::LuaObject options = config["PlayerOptions"];
@@ -374,15 +448,22 @@ namespace
       player.team = team.IsNumber() ? static_cast<int>(team.GetNumber()) : 0;
       const LuaPlus::LuaObject human = value["Human"];
       player.human = human.IsBoolean() && human.GetBoolean();
+      if (const LuaPlus::LuaObject owner = value["OwnerID"]; player.human && owner.IsString()) {
+        player.uid = static_cast<std::int32_t>(std::atoi(owner.GetString()));
+      }
       players.push_back(player);
       it.Next();
     }
-    std::sort(players.begin(), players.end(), [](const SMatchPlayer& lhs, const SMatchPlayer& rhs) { return lhs.slot < rhs.slot; });
+    std::sort(players.begin(), players.end(), [](const SMatchPlayer& lhs, const SMatchPlayer& rhs) {
+      return lhs.slot < rhs.slot;
+    });
     return players;
   }
 
   /** Plan WP2.14: what a launch check compares, from a game configuration. */
-  [[nodiscard]] faf::server::SLaunchFacts ReadLaunchFacts(const LuaPlus::LuaObject& config)
+  [[nodiscard]] faf::server::SLaunchFacts ReadLaunchFacts(
+    const LuaPlus::LuaObject& config
+  )
   {
     faf::server::SLaunchFacts facts;
     LuaPlus::LuaObject options = config["GameOptions"];
@@ -403,7 +484,8 @@ namespace
         }
         const LuaPlus::LuaObject owner = player["OwnerID"];
         facts.humans.push_back(
-          owner.IsString() ? std::atoi(owner.GetString()) : (owner.IsNumber() ? static_cast<std::int32_t>(owner.GetNumber()) : -1)
+          owner.IsString() ? std::atoi(owner.GetString())
+                           : (owner.IsNumber() ? static_cast<std::int32_t>(owner.GetNumber()) : -1)
         );
       }
     }
@@ -413,7 +495,10 @@ namespace
 
   /** A launch request's configuration, decoded as `CLobby` decodes script data; false when it isn't a table. */
   [[nodiscard]] bool DecodeLaunchConfig(
-    LuaPlus::LuaState* const state, const std::span<const std::uint8_t> bytes, LuaPlus::LuaObject& codec, LuaPlus::LuaObject& out
+    LuaPlus::LuaState* const state,
+    const std::span<const std::uint8_t> bytes,
+    LuaPlus::LuaObject& codec,
+    LuaPlus::LuaObject& out
   )
   {
     try {
@@ -432,7 +517,9 @@ namespace
    * Plan WPR.55: the `LaunchInfo` message, the match's configuration in the lobby's Lua byte form. Empty when it can't
    * be written or is too large for one message's 16-bit size.
    */
-  [[nodiscard]] std::vector<std::uint8_t> MakeLaunchInfo(LuaPlus::LuaObject& config)
+  [[nodiscard]] std::vector<std::uint8_t> MakeLaunchInfo(
+    LuaPlus::LuaObject& config
+  )
   {
     moho::CMessage message(moho::ELobbyMsg::LOBMSG_DirectScriptData);
     bool written = false;
@@ -453,8 +540,11 @@ namespace
     return out;
   }
 
-  /** One Lua value in the lobby's byte form (`LuaObject::ToByteStream`, as script data carries it); empty on failure. */
-  [[nodiscard]] std::vector<std::uint8_t> LuaValueBytes(LuaPlus::LuaObject value)
+  /** One Lua value in the lobby's byte form (`LuaObject::ToByteStream`, as script data carries it); empty on failure.
+   */
+  [[nodiscard]] std::vector<std::uint8_t> LuaValueBytes(
+    LuaPlus::LuaObject value
+  )
   {
     moho::CMessage message(moho::ELobbyMsg::LOBMSG_DirectScriptData);
     bool written = false;
@@ -476,7 +566,10 @@ namespace
    * `MatchPinnedOptions`, a list of `GameOptions` keys, outside `MatchConfig` as the tokens are; without one, every
    * option `MatchConfig.GameOptions` sets (the game is launched with those whatever the host's lobby shows).
    */
-  [[nodiscard]] faf::server::SPinnedOptions ReadPinnedOptions(LuaPlus::LuaState* const state, const LuaPlus::LuaObject& config)
+  [[nodiscard]] faf::server::SPinnedOptions ReadPinnedOptions(
+    LuaPlus::LuaState* const state,
+    const LuaPlus::LuaObject& config
+  )
   {
     faf::server::SPinnedOptions pinned;
     LuaPlus::LuaObject options = config["GameOptions"];
@@ -511,14 +604,19 @@ namespace
   }
 
   /** Plan WP2.6: the match file's `MatchContentCheck` ("off", "warn", "refuse"); "warn" without one. */
-  [[nodiscard]] bool ReadContentCheck(LuaPlus::LuaState* const state, faf::remote::EContentCheck& mode, std::string& error)
+  [[nodiscard]] bool ReadContentCheck(
+    LuaPlus::LuaState* const state,
+    faf::remote::EContentCheck& mode,
+    std::string& error
+  )
   {
     const LuaPlus::LuaObject text = state->GetGlobal("MatchContentCheck");
     mode = faf::remote::EContentCheck::Warn;
     if (text.IsNil()) {
       return true;
     }
-    const std::optional<faf::remote::EContentCheck> read = text.IsString() ? faf::remote::ReadContentCheck(text.GetString()) : std::nullopt;
+    const std::optional<faf::remote::EContentCheck> read =
+      text.IsString() ? faf::remote::ReadContentCheck(text.GetString()) : std::nullopt;
     if (!read) {
       error = "MatchContentCheck is \"off\", \"warn\" or \"refuse\"";
       return false;
@@ -527,8 +625,13 @@ namespace
     return true;
   }
 
-  /** Plan WP17.8: the match file's `MatchUiMods`, the UI mods a player may run (`{}`: none); nothing when it isn't set. */
-  [[nodiscard]] bool ReadUiMods(LuaPlus::LuaState* const state, std::optional<std::vector<std::string>>& allowed, std::string& error)
+  /** Plan WP17.8: the match file's `MatchUiMods`, the UI mods a player may run (`{}`: none); nothing when it isn't set.
+   */
+  [[nodiscard]] bool ReadUiMods(
+    LuaPlus::LuaState* const state,
+    std::optional<std::vector<std::string>>& allowed,
+    std::string& error
+  )
   {
     LuaPlus::LuaObject table = state->GetGlobal("MatchUiMods");
     if (table.IsNil()) {
@@ -543,7 +646,8 @@ namespace
       const LuaPlus::LuaObject value = it.GetValue();
       const std::size_t size = value.IsString() ? std::strlen(value.GetString()) : 0u;
       if (size == 0u || size > faf::remote::kMaxModText) {
-        error = "MatchUiMods holds mod uids: strings of 1 to " + std::to_string(faf::remote::kMaxModText) + " characters";
+        error =
+          "MatchUiMods holds mod uids: strings of 1 to " + std::to_string(faf::remote::kMaxModText) + " characters";
         return false;
       }
       allowed->emplace_back(value.GetString());
@@ -554,17 +658,23 @@ namespace
   /** Plan WP15.1: a tournament's rules, the match file's `MatchRules` table; each unset unless the match sets it. */
   struct SMatchRules
   {
-    std::optional<double> reconnectSeconds;  // the reconnect window (`--reconnect-seconds`)
-    std::optional<double> awayPauseSeconds;  // each player's pause while away (`--away-pause-seconds`)
-    std::optional<double> lobbyAwaySeconds;  // the logical host's succession (`--lobby-away-seconds`)
+    std::optional<double> reconnectSeconds;     // the reconnect window (`--reconnect-seconds`)
+    std::optional<double> awayPauseSeconds;     // each player's pause while away (`--away-pause-seconds`)
+    std::optional<double> lobbyAwaySeconds;     // the logical host's succession (`--lobby-away-seconds`)
     std::optional<double> observerDelaySeconds; // plan WP13.1: how far behind the game observers watch
-    bool fixedSpeed = false;                 // nobody changes the game speed
-    bool noCheats = false;                   // `CheatsEnabled` is "false", whatever a host or organiser sets
-    std::string defeatedPlayerView;          // plan WP13.4: "observe" (as the original game) or "disconnect" (`--defeated-view`)
-    std::optional<int> gameVersion;          // plan WP15.1: the FAF game version the match is for (`/lua/version.lua`)
+    std::optional<double>
+      startWhenReadySeconds;        // plan WP17.12: once every player is ready, start after this (`--start-when-ready`)
+    bool fixedSpeed = false;        // nobody changes the game speed
+    bool noCheats = false;          // `CheatsEnabled` is "false", whatever a host or organiser sets
+    std::string defeatedPlayerView; // plan WP13.4: "observe" (as the original game) or "disconnect" (`--defeated-view`)
+    std::optional<int> gameVersion; // plan WP15.1: the FAF game version the match is for (`/lua/version.lua`)
   };
 
-  [[nodiscard]] bool ReadMatchRules(LuaPlus::LuaState* const state, SMatchRules& matchRules, std::string& error)
+  [[nodiscard]] bool ReadMatchRules(
+    LuaPlus::LuaState* const state,
+    SMatchRules& matchRules,
+    std::string& error
+  )
   {
     const LuaPlus::LuaObject table = state->GetGlobal("MatchRules");
     if (table.IsNil()) {
@@ -598,14 +708,18 @@ namespace
       out = value.GetBoolean();
       return true;
     };
-    if (!(seconds("ReconnectSeconds", matchRules.reconnectSeconds) && seconds("AwayPauseSeconds", matchRules.awayPauseSeconds) &&
-          seconds("LobbyAwaySeconds", matchRules.lobbyAwaySeconds) && seconds("ObserverDelaySeconds", matchRules.observerDelaySeconds) &&
+    if (!(seconds("ReconnectSeconds", matchRules.reconnectSeconds) &&
+          seconds("AwayPauseSeconds", matchRules.awayPauseSeconds) &&
+          seconds("LobbyAwaySeconds", matchRules.lobbyAwaySeconds) &&
+          seconds("ObserverDelaySeconds", matchRules.observerDelaySeconds) &&
+          seconds("StartWhenReadySeconds", matchRules.startWhenReadySeconds) &&
           flag("FixedSpeed", matchRules.fixedSpeed) && flag("NoCheats", matchRules.noCheats))) {
       return false;
     }
     if (const LuaPlus::LuaObject version = table["GameVersion"]; !version.IsNil()) {
       // A number, or the text FAF's `GetVersion()` returns ("3839").
-      const double number = version.IsNumber() ? version.GetNumber() : (version.IsString() ? std::atof(version.GetString()) : 0.0);
+      const double number =
+        version.IsNumber() ? version.GetNumber() : (version.IsString() ? std::atof(version.GetString()) : 0.0);
       if (number < 1.0 || number > 1000000.0 || number != static_cast<double>(static_cast<int>(number))) {
         error = "MatchRules.GameVersion is FAF's game version, a whole number such as 3839";
         return false;
@@ -625,7 +739,10 @@ namespace
 
   /** Plan WP13.1: the match file's `MatchObservers`, the tokens observers may watch with (a list, or uid = token). */
   [[nodiscard]] bool ReadMatchObservers(
-    LuaPlus::LuaState* const state, std::vector<std::string>& tokens, std::string& error, const char* const name = "MatchObservers"
+    LuaPlus::LuaState* const state,
+    std::vector<std::string>& tokens,
+    std::string& error,
+    const char* const name = "MatchObservers"
   )
   {
     LuaPlus::LuaObject table = state->GetGlobal(name);
@@ -649,14 +766,19 @@ namespace
   }
 
   /** Plan WP17.1: the match file's `MatchLobbyControl` ("organiser", "player"); "organiser" without one. */
-  [[nodiscard]] bool ReadLobbyControl(LuaPlus::LuaState* const state, faf::server::ELobbyControl& control, std::string& error)
+  [[nodiscard]] bool ReadLobbyControl(
+    LuaPlus::LuaState* const state,
+    faf::server::ELobbyControl& control,
+    std::string& error
+  )
   {
     const LuaPlus::LuaObject text = state->GetGlobal("MatchLobbyControl");
     control = faf::server::ELobbyControl::Organiser;
     if (text.IsNil()) {
       return true;
     }
-    const std::optional<faf::server::ELobbyControl> read = text.IsString() ? faf::server::ReadLobbyControl(text.GetString()) : std::nullopt;
+    const std::optional<faf::server::ELobbyControl> read =
+      text.IsString() ? faf::server::ReadLobbyControl(text.GetString()) : std::nullopt;
     if (!read) {
       error = "MatchLobbyControl is \"organiser\" or \"player\"";
       return false;
@@ -666,7 +788,9 @@ namespace
   }
 
   /** Plan WP17.1: a game option's value as the console shows it. */
-  [[nodiscard]] std::string OptionText(const LuaPlus::LuaObject& value)
+  [[nodiscard]] std::string OptionText(
+    const LuaPlus::LuaObject& value
+  )
   {
     if (value.IsString()) {
       return value.GetString();
@@ -683,7 +807,10 @@ namespace
   }
 
   /** Plan WP17.1: the same option value: strings, numbers and booleans by value; a table is always taken as new. */
-  [[nodiscard]] bool SameOption(const LuaPlus::LuaObject& a, const LuaPlus::LuaObject& b)
+  [[nodiscard]] bool SameOption(
+    const LuaPlus::LuaObject& a,
+    const LuaPlus::LuaObject& b
+  )
   {
     if (a.IsString() && b.IsString()) {
       return std::strcmp(a.GetString(), b.GetString()) == 0;
@@ -709,7 +836,11 @@ namespace
    * lobby: `ScenarioFile` (the map), `GameSpeed` (the client manager's speed) and `TeamLock` (team views). Returns each
    * option changed, with its value before, so it can be put back.
    */
-  [[nodiscard]] std::vector<STakenOption> TakeHostOptions(LuaPlus::LuaObject& config, LuaPlus::LuaObject& requested, const bool noCheats)
+  [[nodiscard]] std::vector<STakenOption> TakeHostOptions(
+    LuaPlus::LuaObject& config,
+    LuaPlus::LuaObject& requested,
+    const bool noCheats
+  )
   {
     std::vector<STakenOption> taken;
     LuaPlus::LuaObject options = config["GameOptions"];
@@ -724,7 +855,9 @@ namespace
         continue;
       }
       const std::string name = key.GetString();
-      if (name == "ScenarioFile" || name == "GameSpeed" || name == "TeamLock" || (noCheats && name == "CheatsEnabled")) {
+      if (
+        name == "ScenarioFile" || name == "GameSpeed" || name == "TeamLock" || (noCheats && name == "CheatsEnabled")
+      ) {
         continue;
       }
       const LuaPlus::LuaObject before = options[name.c_str()];
@@ -738,7 +871,9 @@ namespace
   }
 
   /** Plan WP17.2: a request's "Key=Value,Key=Value"; pairs without a key are skipped. */
-  [[nodiscard]] std::vector<std::pair<std::string, std::string>> OptionPairs(const std::string& text)
+  [[nodiscard]] std::vector<std::pair<std::string, std::string>> OptionPairs(
+    const std::string& text
+  )
   {
     std::vector<std::pair<std::string, std::string>> pairs;
     for (std::size_t start = 0; start < text.size();) {
@@ -752,8 +887,12 @@ namespace
     return pairs;
   }
 
-  /** Plan WP17.2: the match's `PlayerOptions` entry of the human with this uid as `OwnerID`; nothing when there is none. */
-  [[nodiscard]] std::optional<LuaPlus::LuaObject> MatchPlayerOf(const LuaPlus::LuaObject& config, const std::int64_t uid)
+  /** Plan WP17.2: the match's `PlayerOptions` entry of the human with this uid as `OwnerID`; nothing when there is
+   * none. */
+  [[nodiscard]] std::optional<LuaPlus::LuaObject> MatchPlayerOf(
+    const LuaPlus::LuaObject& config,
+    const std::int64_t uid
+  )
   {
     LuaPlus::LuaObject players = config["PlayerOptions"];
     if (players.IsTable()) {
@@ -764,7 +903,9 @@ namespace
         }
         const LuaPlus::LuaObject human = player["Human"];
         const LuaPlus::LuaObject owner = player["OwnerID"];
-        const std::int64_t id = owner.IsString() ? std::atoll(owner.GetString()) : (owner.IsNumber() ? static_cast<std::int64_t>(owner.GetNumber()) : -1);
+        const std::int64_t id = owner.IsString()
+          ? std::atoll(owner.GetString())
+          : (owner.IsNumber() ? static_cast<std::int64_t>(owner.GetNumber()) : -1);
         if (human.IsBoolean() && human.GetBoolean() && id == uid) {
           return player;
         }
@@ -773,7 +914,10 @@ namespace
     return std::nullopt;
   }
 
-  void PutBackOptions(LuaPlus::LuaObject& config, const std::vector<STakenOption>& taken)
+  void PutBackOptions(
+    LuaPlus::LuaObject& config,
+    const std::vector<STakenOption>& taken
+  )
   {
     LuaPlus::LuaObject options = config["GameOptions"];
     for (const STakenOption& option : taken) {
@@ -785,12 +929,19 @@ namespace
     }
   }
 
-  /** Plan WP17.1: why a rebuilt launch's seats aren't the ones the server's seats were made for; empty when they are. */
+  /** Plan WP17.1: why a rebuilt launch's seats aren't the ones the server's seats were made for; empty when they are.
+   */
   [[nodiscard]] std::string SeatsDiffer(
-    const moho::SLaunchBuild& before, const moho::CLaunchRoster& beforeRoster, const moho::SLaunchBuild& after, const moho::CLaunchRoster& afterRoster
+    const moho::SLaunchBuild& before,
+    const moho::CLaunchRoster& beforeRoster,
+    const moho::SLaunchBuild& after,
+    const moho::CLaunchRoster& afterRoster
   )
   {
-    if (after.clientCount != before.clientCount || after.localClientIndex != before.localClientIndex || after.localSourceId != before.localSourceId) {
+    if (
+      after.clientCount != before.clientCount || after.localClientIndex != before.localClientIndex ||
+      after.localSourceId != before.localSourceId
+    ) {
       return "the clients or the server's own source differ";
     }
     const std::vector<moho::SLaunchClient>& a = beforeRoster.Remotes();
@@ -807,7 +958,10 @@ namespace
   }
 
   /** What to call the game: the match file's `MatchName`, or the map's name without its `<LOC id>`. */
-  [[nodiscard]] std::string ReadMatchTitle(const LuaPlus::LuaObject& config, LuaPlus::LuaState* const state)
+  [[nodiscard]] std::string ReadMatchTitle(
+    const LuaPlus::LuaObject& config,
+    LuaPlus::LuaState* const state
+  )
   {
     const LuaPlus::LuaObject matchName = state->GetGlobal("MatchName");
     if (matchName.IsString()) {
@@ -836,7 +990,9 @@ namespace
     return text;
   }
 
-  [[nodiscard]] std::string JsonText(const std::string& text)
+  [[nodiscard]] std::string JsonText(
+    const std::string& text
+  )
   {
     std::string escaped;
     for (const char c : text) {
@@ -861,24 +1017,115 @@ namespace
     std::string stoppedBy;
     std::string error;
     std::vector<SMatchPlayer> players;
+    std::string stats; // plan WP15.2: the sim's `Sync.StatsToSend` (score.lua's ArmyScore) as JSON, empty before it
   };
 
-  void WriteResult(const std::string& path, const SMatchEnd& end)
+  /**
+   * Plan WP15.2: a Lua value as JSON, as FAF's UserSync.lua encodes `Sync.StatsToSend` for `JsonStats` (dkson): a
+   * table whose keys are 1..n is an array, any other an object with its keys as strings; a number that isn't finite,
+   * a function or anything else is null. At most 32 tables deep.
+   */
+  void LuaToJson(
+    const LuaPlus::LuaObject& value,
+    std::string& out,
+    const int depth = 0
+  )
+  {
+    if (value.IsBoolean()) {
+      out += value.GetBoolean() ? "true" : "false";
+    } else if (value.IsNumber()) {
+      const double number = value.GetNumber();
+      if (!std::isfinite(number)) {
+        out += "null";
+      } else if (number == std::floor(number) && std::fabs(number) < 1e15) {
+        out += std::to_string(static_cast<long long>(number));
+      } else {
+        char text[32];
+        std::snprintf(
+          text, sizeof(text), "%.14g", number
+        ); // Lua's own number format (LUA_NUMBER_FMT), as the UI's JSON has it
+        out += text;
+      }
+    } else if (value.IsString()) {
+      out += faf::server::JsonString(value.GetString());
+    } else if (value.IsTable() && depth < 32) {
+      LuaPlus::LuaObject table = value;
+      std::size_t count = 0;
+      bool sequence = true;
+      {
+        LuaPlus::LuaTableIterator scan(&table, 1);
+        while (!scan.m_isDone) {
+          ++count;
+          const LuaPlus::LuaObject key = scan.GetKey();
+          sequence =
+            sequence && key.IsNumber() && key.GetNumber() >= 1.0 && key.GetNumber() == std::floor(key.GetNumber());
+          scan.Next();
+        }
+      }
+      for (std::size_t index = 1; sequence && index <= count; ++index) {
+        sequence = !table[static_cast<int>(index)].IsNil();
+      }
+      if (sequence) {
+        out += '[';
+        for (std::size_t index = 1; index <= count; ++index) {
+          out += index == 1 ? "" : ",";
+          LuaToJson(table[static_cast<int>(index)], out, depth + 1);
+        }
+        out += ']';
+        return;
+      }
+      LuaPlus::LuaTableIterator it(&table, 1);
+      out += '{';
+      bool first = true;
+      while (!it.m_isDone) {
+        const LuaPlus::LuaObject key = it.GetKey();
+        std::string name;
+        if (key.IsString()) {
+          name = key.GetString();
+        } else if (key.IsNumber()) {
+          LuaToJson(key, name, depth + 1);
+        } else {
+          it.Next();
+          continue;
+        }
+        out += first ? "" : ",";
+        first = false;
+        out += faf::server::JsonString(name);
+        out += ':';
+        LuaToJson(it.GetValue(), out, depth + 1);
+        it.Next();
+      }
+      out += '}';
+    } else {
+      out += "null";
+    }
+  }
+
+  void WriteResult(
+    const std::string& path,
+    const SMatchEnd& end
+  )
   {
     std::ofstream file(path, std::ios::trunc);
-    file << "{\"name\": \"" << JsonText(end.title) << "\", \"map\": \"" << JsonText(end.map) << "\", \"ended\": " << (end.ended ? "true" : "false")
-         << ", \"beats\": " << end.beats << ", \"lastBeat\": " << end.lastBeat << ", \"seconds\": " << static_cast<int>(end.seconds)
-         << ", \"stoppedBy\": \"" << JsonText(end.stoppedBy) << "\", \"error\": \"" << JsonText(end.error) << "\", \"players\": [";
+    file << "{\"name\": \"" << JsonText(end.title) << "\", \"map\": \"" << JsonText(end.map)
+         << "\", \"ended\": " << (end.ended ? "true" : "false") << ", \"beats\": " << end.beats
+         << ", \"lastBeat\": " << end.lastBeat << ", \"seconds\": " << static_cast<int>(end.seconds)
+         << ", \"stoppedBy\": \"" << JsonText(end.stoppedBy) << "\", \"error\": \"" << JsonText(end.error)
+         << "\", \"players\": [";
     for (std::size_t index = 0; index < end.players.size(); ++index) {
       const SMatchPlayer& player = end.players[index];
-      file << (index == 0 ? "" : ", ") << "{\"army\": " << index + 1 << ", \"name\": \"" << JsonText(player.name) << "\", \"team\": " << player.team
-           << ", \"human\": " << (player.human ? "true" : "false") << ", \"result\": \"" << JsonText(player.result) << "\"}";
+      file << (index == 0 ? "" : ", ") << "{\"army\": " << index + 1 << ", \"name\": \"" << JsonText(player.name)
+           << "\", \"team\": " << player.team << ", \"human\": " << (player.human ? "true" : "false")
+           << ", \"result\": \"" << JsonText(player.result) << "\"}";
     }
-    file << "]}\n";
+    file << "], \"stats\": " << (end.stats.empty() ? std::string("null") : end.stats) << "}\n";
   }
 
   /** `Sync.GameResult` (`SimSyncUtils.SyncGameResult`): a list of `{ army index, "victory 10" }`. */
-  void ReadGameResults(LuaPlus::LuaObject& results, std::vector<SMatchPlayer>& players)
+  void ReadGameResults(
+    LuaPlus::LuaObject& results,
+    std::vector<SMatchPlayer>& players
+  )
   {
     LuaPlus::LuaTableIterator it(&results, 1);
     while (!it.m_isDone) {
@@ -897,7 +1144,10 @@ namespace
     }
   }
 
-  [[nodiscard]] int Run(CLogWarningCounter& warnings, SMatchEnd& end)
+  [[nodiscard]] int Run(
+    CLogWarningCounter& warnings,
+    SMatchEnd& end
+  )
   {
     std::string matchPath;
     std::string outDir;
@@ -908,8 +1158,10 @@ namespace
     const int speedOption = speedGiven ? std::atoi(text.c_str()) : 0;
     const int stopBeat = ReadOption("--stop-beat", text) ? std::atoi(text.c_str()) : 0;
     const double timeLimit = 60.0 * (ReadOption("--timeout", text) ? std::atof(text.c_str()) : 240.0);
-    const double statusSeconds = 60.0 * (ReadOption("--status-minutes", text) ? std::atof(text.c_str()) : kDefaultStatusMinutes);
-    const float warnBeatMs = ReadOption("--warn-beat-ms", text) ? static_cast<float>(std::atof(text.c_str())) : kDefaultWarnBeatMs;
+    const double statusSeconds =
+      60.0 * (ReadOption("--status-minutes", text) ? std::atof(text.c_str()) : kDefaultStatusMinutes);
+    const float warnBeatMs =
+      ReadOption("--warn-beat-ms", text) ? static_cast<float>(std::atof(text.c_str())) : kDefaultWarnBeatMs;
     const std::string resultPath = outDir + "/result.json";
     const int viewThreads = ReadOption("--view-threads", text) ? std::atoi(text.c_str()) : 1;
     const bool perPlayerViews = moho::CFG_GetArgOption("--per-player-views", 0, nullptr);
@@ -928,7 +1180,8 @@ namespace
     if (reconnectGiven) {
       netConfig.reconnectSeconds = std::atof(text.c_str());
     }
-    netConfig.congestionControl = moho::CFG_GetArgOption("--congestion-control", 0, nullptr); // plan WP10.7, off by default
+    netConfig.congestionControl =
+      moho::CFG_GetArgOption("--congestion-control", 0, nullptr); // plan WP10.7, off by default
     const bool awayPauseGiven = ReadOption("--away-pause-seconds", text);
     double awayPauseSeconds = awayPauseGiven ? std::atof(text.c_str()) : 0.0;
     std::string defeatedView; // plan WP13.4
@@ -936,6 +1189,44 @@ namespace
     // Plan WP2.2: a lobby before the game, the server signalling it. Until launch interception (WP2.14) it stays
     // open this long and then the game starts as the match file says.
     const double lobbySeconds = ReadOption("--lobby-seconds", text) ? std::atof(text.c_str()) : 0.0;
+    // Plan WP16.1 (I2): per-beat digests beside the replay, in headless's formats, so the game's replay played back
+    // elsewhere (Windows x64, x86) compares beat by beat (tools/server-i2): `--digests` the sim's own checksum digest
+    // of every checksummed beat, `--state-digests` what the sim published each beat. The checksums the server records
+    // in its replay are ignored on playback (source 255), hence the side files. `--checksum-period` is
+    // `sim_ChecksumPeriod` (it changes only the checksum, never the sim); 1 digests every beat.
+    std::string digestPath;
+    std::string stateDigestPath;
+    (void)ReadOption("--digests", digestPath);
+    (void)ReadOption("--state-digests", stateDigestPath);
+    // Plan WP13.3: the same checksums live, as `checksum` control events, for a shadow verifier (tools/server-shadow)
+    // that re-simulates the game as a referee and compares them as they come.
+    const bool checksumEvents = moho::CFG_GetArgOption("--checksum-events", 0, nullptr);
+    if (ReadOption("--checksum-period", text)) {
+      const int period = std::atoi(text.c_str());
+      if (period <= 0) {
+        end.error = "--checksum-period takes a number of beats above 0, not " + text;
+        Say("Can't host: %s", end.error.c_str());
+        return kExitBadInput;
+      }
+      moho::gSimConVar_sim_ChecksumPeriod.mDefaultValue = period;
+    }
+    const auto openDigests = [&end](const std::string& path) -> std::unique_ptr<std::FILE, int (*)(std::FILE*)> {
+      std::unique_ptr<std::FILE, int (*)(std::FILE*)> file(nullptr, &std::fclose);
+      if (!path.empty()) {
+        file.reset(std::fopen(path.c_str(), "w"));
+        if (!file) {
+          end.error = "can't write " + path;
+        }
+      }
+      return file;
+    };
+    const auto digestFile = openDigests(digestPath);
+    const auto stateDigestFile = openDigests(stateDigestPath);
+    if (!end.error.empty()) {
+      Say("Can't host: %s", end.error.c_str());
+      return kExitBadInput;
+    }
+    std::uint64_t digestsWritten = 0;
 
     LuaPlus::LuaState* const state = faf::headless::ReplayLuaState();
     LuaPlus::LuaObject config;
@@ -956,6 +1247,16 @@ namespace
     if (!awayPauseGiven && matchRules.awayPauseSeconds) {
       awayPauseSeconds = *matchRules.awayPauseSeconds;
     }
+    // Plan WP17.12: start the lobby's game once every player is ready, after this many seconds (0: off). The flag wins.
+    double startWhenReadySeconds = matchRules.startWhenReadySeconds.value_or(0.0);
+    if (ReadOption("--start-when-ready", text)) {
+      startWhenReadySeconds = std::atof(text.c_str());
+      if (startWhenReadySeconds < 0.0 || startWhenReadySeconds > 3600.0) {
+        end.error = "--start-when-ready takes seconds, 0 to 3600, not " + text;
+        Say("Can't host: %s", end.error.c_str());
+        return kExitBadInput;
+      }
+    }
     if (!defeatedViewGiven) {
       defeatedView = matchRules.defeatedPlayerView.empty() ? "observe" : matchRules.defeatedPlayerView;
     } else if (defeatedView != "observe" && defeatedView != "disconnect") {
@@ -972,12 +1273,20 @@ namespace
     }
     {
       std::string said;
-      const auto add = [&said](const std::string& part) { said += (said.empty() ? "" : ", ") + part; };
+      const auto add = [&said](const std::string& part) {
+        said += (said.empty() ? "" : ", ") + part;
+      };
       if (matchRules.reconnectSeconds) {
-        add("reconnect " + std::to_string(static_cast<int>(*matchRules.reconnectSeconds)) + " s" + (reconnectGiven ? " (the flag wins)" : ""));
+        add(
+          "reconnect " + std::to_string(static_cast<int>(*matchRules.reconnectSeconds)) + " s" +
+          (reconnectGiven ? " (the flag wins)" : "")
+        );
       }
       if (matchRules.awayPauseSeconds) {
-        add("away pause " + std::to_string(static_cast<int>(*matchRules.awayPauseSeconds)) + " s" + (awayPauseGiven ? " (the flag wins)" : ""));
+        add(
+          "away pause " + std::to_string(static_cast<int>(*matchRules.awayPauseSeconds)) + " s" +
+          (awayPauseGiven ? " (the flag wins)" : "")
+        );
       }
       if (matchRules.lobbyAwaySeconds) {
         add("host succession after " + std::to_string(static_cast<int>(*matchRules.lobbyAwaySeconds)) + " s");
@@ -1003,13 +1312,61 @@ namespace
       Say("Can't host: %s", end.error.c_str());
       return kExitBadInput;
     }
+    // Plan WPR.45: the kernel's half of the allowlist, for the deployment to load before the port opens (Nftables.h).
+    if (std::string nftablesPath; ReadOption("--nftables-out", nftablesPath)) {
+      if (!listening) {
+        end.error = "--nftables-out needs --listen, whose port the ruleset guards";
+        Say("Can't host: %s", end.error.c_str());
+        return kExitBadInput;
+      }
+      faf::server::SNftablesConfig nft;
+      nft.port = netConfig.listen.port;
+      nft.listed = allowedAddresses;
+      nft.unlistedPerSourcePps =
+        ReadOption("--unlisted-pps", text) ? static_cast<std::uint32_t>(std::max(0, std::atoi(text.c_str()))) : 100u;
+      nft.unlistedTotalPps = ReadOption("--unlisted-total-pps", text)
+        ? static_cast<std::uint32_t>(std::max(0, std::atoi(text.c_str())))
+        : 2000u;
+      std::ofstream file(nftablesPath, std::ios::binary | std::ios::trunc);
+      file << faf::server::MakeNftablesRuleset(nft);
+      if (!file.good()) {
+        end.error = "the nftables ruleset couldn't be written to " + nftablesPath;
+        Say("Can't host: %s", end.error.c_str());
+        return kExitBadInput;
+      }
+      file.close();
+      if (nft.unlistedPerSourcePps == 0) {
+        Say(
+          "nftables ruleset for UDP port %u written to %s: %d listed addresses pass, every other address is dropped",
+          nft.port,
+          nftablesPath.c_str(),
+          static_cast<int>(nft.listed.size())
+        );
+      } else {
+        Say(
+          "nftables ruleset for UDP port %u written to %s: %d listed addresses pass; others %u datagrams a second "
+          "each, %u together, into the challenge",
+          nft.port,
+          nftablesPath.c_str(),
+          static_cast<int>(nft.listed.size()),
+          nft.unlistedPerSourcePps,
+          nft.unlistedTotalPps
+        );
+      }
+      if (moho::CFG_GetArgOption("--nftables-only", 0, nullptr)) {
+        return 0;
+      }
+    }
     faf::remote::EContentCheck contentCheck = faf::remote::EContentCheck::Warn;
     if (!ReadContentCheck(state, contentCheck, end.error) || !ReadUiMods(state, netConfig.uiModsAllowed, end.error)) {
       Say("Can't host: %s", end.error.c_str());
       return kExitBadInput;
     }
     if (netConfig.uiModsAllowed) {
-      Say("UI mods: %d allowed (MatchUiMods), judged under MatchContentCheck", static_cast<int>(netConfig.uiModsAllowed->size()));
+      Say(
+        "UI mods: %d allowed (MatchUiMods), judged under MatchContentCheck",
+        static_cast<int>(netConfig.uiModsAllowed->size())
+      );
     }
     if (ReadOption("--lobby-away-seconds", text)) {
       netConfig.lobbyAwaySeconds = std::atof(text.c_str());
@@ -1037,7 +1394,7 @@ namespace
     // Plan WP15.4 (#200): each player's pause budget stays with the server, by command source; the sim gets unlimited.
     std::map<std::uint32_t, int> pauseBudgets;
     const auto pauseBook = std::make_shared<faf::server::CPauseBook>(); // what the players are shown (step 5)
-    std::map<std::uint32_t, int> pauseGranted; // what each source was given, for the book
+    std::map<std::uint32_t, int> pauseGranted;                          // what each source was given, for the book
     const auto takePauseBudgets = [&pauseBudgets, &pauseBook, &pauseGranted](moho::SLaunchBuild& launch) {
       pauseBudgets.clear();
       pauseGranted.clear();
@@ -1069,8 +1426,14 @@ namespace
     const bool teamsLocked = teamLock.IsString() && std::strcmp(teamLock.GetString(), "locked") == 0;
     const bool teamViews = !perPlayerViews && (teamsLocked || moho::CFG_GetArgOption("--team-views", 0, nullptr));
 
-    Say("Hosting game \"%s\" on %s, %d players, speed %+d%s", end.title.c_str(), end.map.c_str(), static_cast<int>(end.players.size()), launchSpeed.speed,
-        launchSpeed.adjustable ? " (adjustable)" : "");
+    Say(
+      "Hosting game \"%s\" on %s, %d players, speed %+d%s",
+      end.title.c_str(),
+      end.map.c_str(),
+      static_cast<int>(end.players.size()),
+      launchSpeed.speed,
+      launchSpeed.adjustable ? " (adjustable)" : ""
+    );
     for (const SMatchPlayer& player : end.players) {
       Say("  %s, team %d%s", player.name.c_str(), player.team, player.human ? "" : ", AI");
     }
@@ -1082,9 +1445,12 @@ namespace
     sessionInfo->mSourceId = build.localSourceId;
     sessionInfo->mMapName = build.mapName;
     sessionInfo->mLaunchInfo = boost::static_pointer_cast<moho::LaunchInfoBase>(build.launchInfo);
-    sessionInfo->mClientManager =
-      moho::CLIENT_CreateClientManager(static_cast<std::size_t>(build.clientCount), nullptr, launchSpeed.speed, launchSpeed.adjustable);
-    sessionInfo->mClientManager->CreateLocalClient(kServerName, build.localClientIndex, kServerUid, sessionInfo->mSourceId);
+    sessionInfo->mClientManager = moho::CLIENT_CreateClientManager(
+      static_cast<std::size_t>(build.clientCount), nullptr, launchSpeed.speed, launchSpeed.adjustable
+    );
+    sessionInfo->mClientManager->CreateLocalClient(
+      kServerName, build.localClientIndex, kServerUid, sessionInfo->mSourceId
+    );
     // Not listening, nobody can sit in these: they count as loaded and stay silent, and the game goes on regardless.
     std::unique_ptr<faf::server::CServerNet> net;
     if (listening) {
@@ -1094,7 +1460,10 @@ namespace
     std::unique_ptr<faf::server::CControlListener> control;
     struct SControlUnhook
     {
-      ~SControlUnhook() { gControl = nullptr; } // before `control` goes: no `Say` reaches it after
+      ~SControlUnhook()
+      {
+        gControl = nullptr;
+      } // before `control` goes: no `Say` reaches it after
     } controlUnhook;
     if (ReadOption("--control", text)) {
       faf::remote::net::SEndpoint controlAt;
@@ -1127,22 +1496,73 @@ namespace
       gControl = control.get();
       Say("Control API on %s", controlAt.Text().c_str());
     }
+    // Plan WP17.11: the same API over HTTP/JSON for a dashboard, guarded by an admin token from a file (not the command
+    // line, which every user of the machine can read).
+    if (ReadOption("--rest", text)) {
+      faf::remote::net::SEndpoint restAt;
+      std::string tokenPath;
+      std::string restError;
+      std::string token;
+      if (!faf::remote::net::ParseEndpoint(text, restAt)) {
+        restError = "--rest takes <ip:port>, not " + text;
+      } else if (!ReadOption("--rest-token-file", tokenPath)) {
+        restError = "--rest needs --rest-token-file <file>: the admin token, at least 16 characters";
+      } else {
+        std::ifstream tokenFile(tokenPath);
+        std::stringstream tokenText;
+        tokenText << tokenFile.rdbuf();
+        token = tokenText.str();
+        while (!token.empty() &&
+               (token.back() == '\n' || token.back() == '\r' || token.back() == ' ' || token.back() == '\t')) {
+          token.pop_back();
+        }
+        if (!tokenFile) {
+          restError = "--rest-token-file " + tokenPath + " can't be read";
+        }
+      }
+      std::string corsOrigin;
+      (void)ReadOption("--rest-cors-origin", corsOrigin);
+      if (restError.empty()) {
+        if (!control) {
+          control = std::make_unique<faf::server::CControlListener>();
+        }
+        if (!control->OpenRest(restAt, std::move(token), corsOrigin, restError)) {
+          control.reset();
+        }
+      }
+      if (!control || !restError.empty()) {
+        end.error = restError;
+        Say("Can't host: %s", end.error.c_str());
+        return kExitBadInput;
+      }
+      gControl = control.get();
+      Say(
+        "REST API on http://%s/api/v1 (admin token required%s%s)",
+        restAt.Text().c_str(),
+        corsOrigin.empty() ? "" : "; browsers from ",
+        corsOrigin.c_str()
+      );
+    }
     const auto controlSeats = [&net]() {
       std::string seats = "\"seats\":[";
       if (net) {
         bool first = true;
         for (const faf::server::CServerNet::SSeatState& seat : net->Seats()) {
-          const auto flag = [](const bool on) { return on ? "true" : "false"; };
-          seats += std::string(first ? "" : ",") + "{\"uid\":" + std::to_string(seat.uid) + ",\"name\":" + faf::server::JsonString(seat.name) +
-                   ",\"joined\":" + flag(seat.joined) + ",\"loaded\":" + flag(seat.loaded) + ",\"lost\":" + flag(seat.lost) +
-                   ",\"gone\":" + flag(seat.gone) + ",\"away\":" + flag(seat.away) + ",\"ping_ms\":" + std::to_string(seat.pingMs) +
-                   ",\"ready\":" + faf::server::JsonString(seat.ready) + ",\"slot\":" + std::to_string(seat.lobbySlot) +
-                   ",\"speed_limit\":" + (seat.speedLimit ? std::to_string(*seat.speedLimit) : std::string("null")) +
-                   ",\"camera_updates\":" + std::to_string(seat.cameraUpdates) +
-                   ",\"backlog_kb\":" + std::to_string(seat.backlogBytes / 1024u) + ",\"behind_beats\":" + std::to_string(seat.behindBeats) +
-                   ",\"load\":" + faf::server::JsonString(seat.load) +
-                   ",\"content\":" + faf::server::JsonString(seat.content) +
-                   ",\"mods\":" + faf::server::JsonString(seat.mods) + ",\"ui_mods\":[";
+          const auto flag = [](const bool on) {
+            return on ? "true" : "false";
+          };
+          seats += std::string(first ? "" : ",") + "{\"uid\":" + std::to_string(seat.uid) +
+            ",\"name\":" + faf::server::JsonString(seat.name) + ",\"joined\":" + flag(seat.joined) +
+            ",\"loaded\":" + flag(seat.loaded) + ",\"lost\":" + flag(seat.lost) + ",\"gone\":" + flag(seat.gone) +
+            ",\"away\":" + flag(seat.away) + ",\"ping_ms\":" + std::to_string(seat.pingMs) +
+            ",\"ready\":" + faf::server::JsonString(seat.ready) + ",\"slot\":" + std::to_string(seat.lobbySlot) +
+            ",\"speed_limit\":" + (seat.speedLimit ? std::to_string(*seat.speedLimit) : std::string("null")) +
+            ",\"camera_updates\":" + std::to_string(seat.cameraUpdates) +
+            ",\"backlog_kb\":" + std::to_string(seat.backlogBytes / 1024u) +
+            ",\"behind_beats\":" + std::to_string(seat.behindBeats) +
+            ",\"load\":" + faf::server::JsonString(seat.load) +
+            ",\"content\":" + faf::server::JsonString(seat.content) +
+            ",\"mods\":" + faf::server::JsonString(seat.mods) + ",\"ui_mods\":[";
           for (std::size_t i = 0; i < seat.uiMods.size(); ++i) {
             seats += (i == 0 ? "" : ",") + faf::server::JsonString(seat.uiMods[i]);
           }
@@ -1162,7 +1582,11 @@ namespace
           control->Refuse(request.id, request.op + " needs an IPv4 address, a.b.c.d");
         } else {
           net->RequestAddress(address.ip, request.op == "allow");
-          Say("The control service %s %s", request.op == "allow" ? "allows" : "takes off the allowlist", request.address.c_str());
+          Say(
+            "The control service %s %s",
+            request.op == "allow" ? "allows" : "takes off the allowlist",
+            request.address.c_str()
+          );
           control->Reply(request.id, {});
         }
         return true;
@@ -1175,7 +1599,8 @@ namespace
       } else if (request.uid <= 0 || request.uid > INT32_MAX) {
         control->Refuse(request.id, "eject needs a participant's uid");
       } else if (!net->RequestEject(
-                   static_cast<std::int32_t>(request.uid), "ejected by the organiser" + (request.reason.empty() ? std::string() : ": " + request.reason)
+                   static_cast<std::int32_t>(request.uid),
+                   "ejected by the organiser" + (request.reason.empty() ? std::string() : ": " + request.reason)
                  )) {
         control->Refuse(request.id, "no participant with uid " + std::to_string(request.uid));
       } else {
@@ -1205,11 +1630,17 @@ namespace
     std::map<std::int32_t, std::uint32_t> pauseSources;              // and each uid's source
     for (const moho::SLaunchClient& client : roster.Remotes()) {
       faf::remote::CServerClient& seat = faf::remote::CServerClient::Create(
-        *static_cast<moho::CClientManagerImpl*>(sessionInfo->mClientManager), client.name.c_str(), client.clientIndex, client.uid, client.commandSource
+        *static_cast<moho::CClientManagerImpl*>(sessionInfo->mClientManager),
+        client.name.c_str(),
+        client.clientIndex,
+        client.uid,
+        client.commandSource
       );
       pauseSeats[client.commandSource] = &seat;
       pauseSources[client.uid] = client.commandSource;
-      if (const auto budget = pauseBudgets.find(client.commandSource); budget != pauseBudgets.end() && budget->second == 0) {
+      if (
+        const auto budget = pauseBudgets.find(client.commandSource); budget != pauseBudgets.end() && budget->second == 0
+      ) {
         seat.SetPauseAllowed(false);
       }
       if (!net) {
@@ -1229,8 +1660,11 @@ namespace
         net->AllowAddress(ip);
       }
       if (!allowedAddresses.empty()) {
-        Say("%d addresses from MatchAddresses get a full handshake budget; others share a small one, and a valid token lists them",
-            static_cast<int>(allowedAddresses.size()));
+        Say(
+          "%d addresses from MatchAddresses get a full handshake budget; others share a small one, and a valid token "
+          "lists them",
+          static_cast<int>(allowedAddresses.size())
+        );
       }
       faf::server::SPinnedOptions lobbyPins; // plan WP17.2: the organised lobby's pins, which set_options adds to
       if (lobbySeconds <= 0.0) {
@@ -1244,7 +1678,9 @@ namespace
         for (const auto& [key, bytes] : pinned) {
           keys += (keys.empty() ? "" : ", ") + key;
         }
-        Say("Lobby: %d game options pinned%s%s", static_cast<int>(pinned.size()), keys.empty() ? "" : ": ", keys.c_str());
+        Say(
+          "Lobby: %d game options pinned%s%s", static_cast<int>(pinned.size()), keys.empty() ? "" : ": ", keys.c_str()
+        );
         lobbyPins = pinned;
         net->PinLobbyOptions(std::move(pinned));
       }
@@ -1254,7 +1690,12 @@ namespace
         Say("Can't host: %s", end.error.c_str());
         return kExitBadInput;
       }
-      Say("Listening on %s, %d seats, %.0f s to join", net->Local().Text().c_str(), static_cast<int>(roster.Remotes().size()), netConfig.joinSeconds);
+      Say(
+        "Listening on %s, %d seats, %.0f s to join",
+        net->Local().Text().c_str(),
+        static_cast<int>(roster.Remotes().size()),
+        netConfig.joinSeconds
+      );
       if (lobbySeconds > 0.0) {
         // Plan WP2.2, WP2.12: the server signals each participant's game as FAF's lobby server does over GPGNet; the
         // match's first participant hosts the lobby in its own FAF lobby; their lobbies talk through the relay.
@@ -1262,14 +1703,16 @@ namespace
         const LuaPlus::LuaObject scenarioFile = gameOptions["ScenarioFile"];
         faf::server::CLobbySignaller signaller(
           scenarioFile.IsString() ? scenarioFile.GetString() : "",
-          netConfig.lobbyControl == faf::server::ELobbyControl::Organiser ? faf::remote::net::kLobbySignalOrganised : std::uint8_t{0}
+          netConfig.lobbyControl == faf::server::ELobbyControl::Organiser ? faf::remote::net::kLobbySignalOrganised
+                                                                          : std::uint8_t{0}
         );
         for (const moho::SLaunchClient& client : roster.Remotes()) {
           signaller.AddParticipant(client.uid, client.name.c_str());
         }
         Say("Lobby open for %.0f s, hosted by uid %d", lobbySeconds, static_cast<int>(signaller.Host()));
         net->SetLobbyHost(signaller.Host()); // plan WP17.1: whose ejects go through in a player-hosted lobby
-        const Clock::time_point lobbyEnd = Clock::now() + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(lobbySeconds));
+        const Clock::time_point lobbyEnd =
+          Clock::now() + std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(lobbySeconds));
         std::vector<faf::server::CLobbySignaller::SOutgoing> out;
         std::size_t lastIn = 0;
         std::uint64_t toServer = 0;
@@ -1277,6 +1720,12 @@ namespace
         bool launched = false;
         std::int32_t lastHost = signaller.Host();
         const int forceStartsBefore = gForceStartRequests;
+        // Plan WP17.12: each participant's last ready state, and when the countdown that starts the game ends.
+        std::map<std::int32_t, bool> readyOf;
+        std::optional<Clock::time_point> countdownEnd;
+        if (startWhenReadySeconds > 0.0) {
+          Say("Lobby: the game starts %.0f s after every player is ready", startWhenReadySeconds);
+        }
         // Plan WP2.14: what the host's launch is checked against. The match file's configuration stays the one the
         // game starts with (plan WPR.55: the clients' launch comes from the server, never from the lobby's message).
         const faf::server::SLaunchFacts matchFacts = ReadLaunchFacts(config);
@@ -1286,13 +1735,14 @@ namespace
           message.text = std::move(text);
           net->QueueLobbyFromServer(to, faf::remote::net::EncodeLobbySignal(message));
         };
-        // Plan WP17.1, WP17.2: the launch built again once config's GameOptions changed (the host's or the organiser's),
-        // on the seats the server made, so the server's sim starts from what the players' LaunchInfo says. Empty, or why
-        // not (then `taken` is put back).
+        // Plan WP17.1, WP17.2: the launch built again once config's GameOptions changed (the host's or the
+        // organiser's), on the seats the server made, so the server's sim starts from what the players' LaunchInfo
+        // says. Empty, or why not (then `taken` is put back).
         const auto relaunch = [&](const std::vector<STakenOption>& taken) -> std::string {
           moho::CLaunchRoster rebuiltRoster(kServerUid, kServerName, {});
           moho::SLaunchBuild rebuilt = moho::BuildLaunchInfo(config, rebuiltRoster, seed, true, state);
-          std::string why = rebuilt.failure != nullptr ? std::string("they don't launch: ") + rebuilt.failure : SeatsDiffer(build, roster, rebuilt, rebuiltRoster);
+          std::string why = rebuilt.failure != nullptr ? std::string("they don't launch: ") + rebuilt.failure
+                                                       : SeatsDiffer(build, roster, rebuilt, rebuiltRoster);
           if (!why.empty()) {
             PutBackOptions(config, taken);
             return why;
@@ -1340,7 +1790,8 @@ namespace
                   std::string changed;
                   LuaPlus::LuaObject options = config["GameOptions"];
                   for (const STakenOption& option : taken) {
-                    changed += (changed.empty() ? "" : ", ") + option.key + "=" + OptionText(options[option.key.c_str()]);
+                    changed +=
+                      (changed.empty() ? "" : ", ") + option.key + "=" + OptionText(options[option.key.c_str()]);
                   }
                   Say("Lobby: the host's game options: %s", changed.c_str());
                 }
@@ -1348,7 +1799,12 @@ namespace
             }
             if (!refusal.empty()) {
               Say("Lobby: launch refused: %s", refusal.c_str());
-              signal(message.from, faf::remote::net::ELobbySignal::LaunchRefused, refusal);
+              // Everyone in the lobby: FAF's joiners leave the lobby window on the host's own `Launch` message, which
+              // reaches them before the server has checked anything (lobby.lua's `Launch` handler), and all of them
+              // should see why the game didn't start.
+              for (const std::int32_t uid : signaller.InLobbyUids()) {
+                signal(uid, faf::remote::net::ELobbySignal::LaunchRefused, refusal);
+              }
               continue;
             }
             Say("Lobby: the host launched; starting the match");
@@ -1358,8 +1814,8 @@ namespace
             }
             launched = true;
           }
-          // Plan WPR.49: the operator's force start (SIGUSR2): the match file's launch, as always, with no lobby message;
-          // each client starts from the server's LaunchInfo whatever its lobby is doing.
+          // Plan WPR.49: the operator's force start (SIGUSR2): the match file's launch, as always, with no lobby
+          // message; each client starts from the server's LaunchInfo whatever its lobby is doing.
           if (!launched && gForceStartRequests != forceStartsBefore) {
             Say("Lobby: the operator forces the start; the match starts as the match file says");
             controlEvent("launched", "\"by\":\"operator\"");
@@ -1387,7 +1843,12 @@ namespace
           }
           out.clear();
           if (const std::int32_t host = signaller.Host(); host != lastHost && host != 0) {
-            Say("Lobby: uid %d hosts now, in place of uid %d (succession %u)", static_cast<int>(host), static_cast<int>(lastHost), signaller.Successions());
+            Say(
+              "Lobby: uid %d hosts now, in place of uid %d (succession %u)",
+              static_cast<int>(host),
+              static_cast<int>(lastHost),
+              signaller.Successions()
+            );
             lastHost = host;
             net->SetLobbyHost(host);
             controlEvent("host", "\"uid\":" + std::to_string(host));
@@ -1408,21 +1869,38 @@ namespace
             control->Poll(requests, ControlNowUs());
             for (const faf::server::SControlRequest& request : requests) {
               if (request.op == "status") {
-                control->Reply(request.id, "\"phase\":\"lobby\",\"host\":" + std::to_string(signaller.Host()) + "," + controlSeats());
+                std::string countdown =
+                  ",\"start_when_ready_seconds\":" + std::to_string(static_cast<int>(startWhenReadySeconds));
+                if (countdownEnd) {
+                  const double left =
+                    std::max(0.0, std::chrono::duration<double>(*countdownEnd - Clock::now()).count());
+                  char text[32];
+                  std::snprintf(text, sizeof(text), "%.1f", left);
+                  countdown += ",\"countdown_seconds\":" + std::string(text);
+                }
+                control->Reply(
+                  request.id,
+                  "\"phase\":\"lobby\",\"host\":" + std::to_string(signaller.Host()) + countdown + "," + controlSeats()
+                );
               } else if (request.op == "set_options") {
-                // Plan WP17.2: an organised lobby's options from the organiser: the launch, the pins, and the players' screens.
+                // Plan WP17.2: an organised lobby's options from the organiser: the launch, the pins, and the players'
+                // screens.
                 const std::vector<std::pair<std::string, std::string>> pairs = OptionPairs(request.options);
                 const auto fixed = std::find_if(pairs.begin(), pairs.end(), [&matchRules](const auto& pair) {
                   return pair.first == "ScenarioFile" || pair.first == "GameSpeed" || pair.first == "TeamLock" ||
-                         (matchRules.noCheats && pair.first == "CheatsEnabled");
+                    (matchRules.noCheats && pair.first == "CheatsEnabled");
                 });
                 if (netConfig.lobbyControl == faf::server::ELobbyControl::Player) {
                   control->Refuse(request.id, "a player-hosted lobby's options are its host's");
                 } else if (pairs.empty()) {
                   control->Refuse(request.id, "set_options needs options: Key=Value,Key=Value");
                 } else if (fixed != pairs.end()) {
-                  control->Refuse(request.id, fixed->first == "CheatsEnabled" ? std::string("the match's rules keep cheats off (MatchRules.NoCheats)")
-                                                                               : fixed->first + " is set before the lobby opens; the match file has it");
+                  control->Refuse(
+                    request.id,
+                    fixed->first == "CheatsEnabled"
+                      ? std::string("the match's rules keep cheats off (MatchRules.NoCheats)")
+                      : fixed->first + " is set before the lobby opens; the match file has it"
+                  );
                 } else {
                   LuaPlus::LuaObject options = config["GameOptions"];
                   std::vector<STakenOption> taken;
@@ -1440,8 +1918,8 @@ namespace
                       table.SetString(key.c_str(), value.c_str());
                     }
                     net->RequestPins(lobbyPins);
-                    // The other participants' lobby screens, in the host's name (lobby.lua takes GameOptions from the host
-                    // alone). The host isn't sent one: a frame in its own uid would look like a new peer to it.
+                    // The other participants' lobby screens, in the host's name (lobby.lua takes GameOptions from the
+                    // host alone). The host isn't sent one: a frame in its own uid would look like a new peer to it.
                     LuaPlus::LuaObject data;
                     data.AssignNewTable(state, 0, 2u);
                     data.SetString("Type", "GameOptions");
@@ -1464,7 +1942,9 @@ namespace
                       }
                     }
                     Say("The control service sets the game options: %s", request.options.c_str());
-                    control->Reply(request.id, "\"options\":" + std::to_string(pairs.size()) + ",\"told\":" + std::to_string(told));
+                    control->Reply(
+                      request.id, "\"options\":" + std::to_string(pairs.size()) + ",\"told\":" + std::to_string(told)
+                    );
                     controlEvent("options", "\"options\":" + faf::server::JsonString(request.options));
                   }
                 }
@@ -1547,10 +2027,21 @@ namespace
                         }
                       }
                     }
-                    Say("The control service sets uid %d's %s (lobby slot %d)", static_cast<int>(request.uid), request.options.c_str(), slot);
-                    control->Reply(request.id, "\"options\":" + std::to_string(values.size()) + ",\"slot\":" + std::to_string(slot) + ",\"told\":" + std::to_string(told));
+                    Say(
+                      "The control service sets uid %d's %s (lobby slot %d)",
+                      static_cast<int>(request.uid),
+                      request.options.c_str(),
+                      slot
+                    );
+                    control->Reply(
+                      request.id,
+                      "\"options\":" + std::to_string(values.size()) + ",\"slot\":" + std::to_string(slot) +
+                        ",\"told\":" + std::to_string(told)
+                    );
                     controlEvent(
-                      "player", "\"uid\":" + std::to_string(request.uid) + ",\"options\":" + faf::server::JsonString(request.options) + ",\"slot\":" + std::to_string(slot)
+                      "player",
+                      "\"uid\":" + std::to_string(request.uid) +
+                        ",\"options\":" + faf::server::JsonString(request.options) + ",\"slot\":" + std::to_string(slot)
                     );
                   }
                 }
@@ -1559,30 +2050,69 @@ namespace
                 gForceStartRequests = gForceStartRequests + 1;
                 control->Reply(request.id, {});
               } else if (!controlCommon(request)) {
-                control->Refuse(request.id, request.op == "pause" || request.op == "resume" || request.op == "end" || request.op == "substitute" ||
-                                                  request.op == "extend_timeouts"
-                                              ? "the game hasn't started"
-                                              : "unknown op " + request.op);
+                control->Refuse(
+                  request.id,
+                  request.op == "pause" || request.op == "resume" || request.op == "end" ||
+                      request.op == "substitute" || request.op == "extend_timeouts" || request.op == "armies"
+                    ? "the game hasn't started"
+                    : "unknown op " + request.op
+                );
               }
             }
             controlNews();
           }
-          if (control) {
-            // Plan WP17.2: who readied up or stood down in the lobby.
-            for (const auto& [uid, ready] : net->TakeReadyChanges()) {
-              controlEvent("ready", "\"uid\":" + std::to_string(uid) + ",\"ready\":" + (ready ? "true" : "false"));
+          // Plan WP17.2: who readied up or stood down in the lobby (kept for WP17.12's countdown).
+          for (const auto& [uid, ready] : net->TakeReadyChanges()) {
+            readyOf[uid] = ready;
+            controlEvent("ready", "\"uid\":" + std::to_string(uid) + ",\"ready\":" + (ready ? "true" : "false"));
+          }
+          // Plan WP17.12: every player of the match in the lobby and ready starts the countdown; anyone leaving or
+          // standing down before it ends stops it; at its end the match starts as the operator's force start does.
+          if (startWhenReadySeconds > 0.0 && !launched) {
+            const std::vector<std::int32_t> inLobby = signaller.InLobbyUids();
+            std::string waitingFor;
+            for (const moho::SLaunchClient& client : roster.Remotes()) {
+              if (client.uid == signaller.Host()) {
+                continue; // as in FAF's lobby, the host has no Ready: it is the one who launches once the others are
+              }
+              const bool in = std::find(inLobby.begin(), inLobby.end(), client.uid) != inLobby.end();
+              const auto ready = readyOf.find(client.uid);
+              if (!in || ready == readyOf.end() || !ready->second) {
+                waitingFor = std::string(client.name.c_str()) + (in ? " isn't ready" : " isn't in the lobby");
+                break;
+              }
+            }
+            const bool everyoneReady = waitingFor.empty() && roster.Remotes().size() > 1u;
+            if (everyoneReady && !countdownEnd) {
+              countdownEnd = Clock::now() +
+                std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(startWhenReadySeconds));
+              Say("Lobby: every player is ready; the game starts in %.0f s", startWhenReadySeconds);
+              controlEvent("countdown", "\"seconds\":" + std::to_string(static_cast<int>(startWhenReadySeconds)));
+            } else if (!everyoneReady && countdownEnd) {
+              countdownEnd.reset();
+              Say("Lobby: the countdown stops: %s", waitingFor.c_str());
+              controlEvent("countdown_cancelled", "\"reason\":" + faf::server::JsonString(waitingFor));
+            }
+            if (countdownEnd && Clock::now() >= *countdownEnd) {
+              Say("Lobby: the countdown ended; the match starts as the match file says");
+              controlEvent("launched", "\"by\":\"ready\"");
+              launched = true;
             }
           }
           std::this_thread::sleep_for(std::chrono::milliseconds(20));
         }
         net->CloseLobby();
-        Say("Lobby closed: %d of %d participants in, %llu messages to the server", static_cast<int>(lastIn), static_cast<int>(roster.Remotes().size()),
-            static_cast<unsigned long long>(toServer));
+        Say(
+          "Lobby closed: %d of %d participants in, %llu messages to the server",
+          static_cast<int>(lastIn),
+          static_cast<int>(roster.Remotes().size()),
+          static_cast<unsigned long long>(toServer)
+        );
       }
     } else if (!roster.Remotes().empty()) {
       Say("%d seats stay empty: this server isn't listening (--listen)", static_cast<int>(roster.Remotes().size()));
     }
-    std::unique_ptr<faf::server::CObserverListener> observers; // plan WP13.1, with the replay below
+    std::unique_ptr<faf::server::CObserverListener> observers;  // plan WP13.1, with the replay below
     std::unique_ptr<faf::server::CLiveReplaySender> liveReplay; // plan WP15.3, likewise
     const auto sayNetNews = [&net, &observers, &liveReplay] {
       if (net) {
@@ -1613,21 +2143,40 @@ namespace
     // `WLD_DoLoading`: the game version (and with it the engine patches) is fixed before the replay
     // names it and before the driver creates the sim.
     moho::FAF_BeginSession(false);
-    // Plan WP15.1: a match for one FAF release is played on that release's game data, or not at all. The players' data is
-    // the content check's (WP2.6).
+    // Plan WP15.1: a match for one FAF release is played on that release's game data, or not at all. The players' data
+    // is the content check's (WP2.6).
     if (matchRules.gameVersion && *matchRules.gameVersion != moho::FAF_GetSessionGameVersion()) {
-      end.error = "the match is for FAF game version " + std::to_string(*matchRules.gameVersion) + ", and this server's game data is version " +
-                  std::to_string(moho::FAF_GetSessionGameVersion());
+      end.error = "the match is for FAF game version " + std::to_string(*matchRules.gameVersion) +
+        ", and this server's game data is version " + std::to_string(moho::FAF_GetSessionGameVersion());
       Say("Can't host: %s", end.error.c_str());
       WriteResult(resultPath, end);
       return kExitBadInput;
+    }
+    // Plan WPR.32: each player's Lua `Sync` is routed by a table validated per FAF version (remote/SyncRouting.h); on
+    // another version a new key would reach observers only, and the players' UI would miss it without a sign.
+    if (const int dataVersion = moho::FAF_GetSessionGameVersion(); !faf::remote::SyncPolicyValidatedFor(dataVersion)) {
+      if (!moho::CFG_GetArgOption("--unvalidated-policy", 0, nullptr)) {
+        end.error = "the game data is FAF game version " + std::to_string(dataVersion) +
+          ", and the Sync routing policy is validated on " + faf::remote::SyncPolicyGameVersionsText() +
+          " only (plan WPR.5); --unvalidated-policy hosts anyway";
+        Say("Can't host: %s", end.error.c_str());
+        WriteResult(resultPath, end);
+        return kExitBadInput;
+      }
+      Say(
+        "Hosting on FAF game version %d, which the Sync routing policy is not validated on (%s): keys new since then "
+        "reach observers only",
+        dataVersion,
+        faf::remote::SyncPolicyGameVersionsText().c_str()
+      );
     }
 
     std::unique_ptr<LuaPlus::LuaState> sessionState(gameData.mState);
     std::unique_ptr<moho::RRuleGameRules> rules(gameData.mGameRules);
     std::unique_ptr<moho::CWldMap> wldMap(gameData.mWldMap);
     gameData = moho::SWldGameData{};
-    moho::STIMap* const launchMap = faf::headless::CompleteSessionLaunchInfo(*sessionInfo, *rules, *wldMap, *sessionState);
+    moho::STIMap* const launchMap =
+      faf::headless::CompleteSessionLaunchInfo(*sessionInfo, *rules, *wldMap, *sessionState);
     const Wm3::AxisAlignedBox3f mapBounds = launchMap->GetBounds3D();
     const float mapSizeX = mapBounds.Max.x - mapBounds.Min.x;
     const float mapSizeZ = mapBounds.Max.z - mapBounds.Min.z;
@@ -1635,10 +2184,10 @@ namespace
     // Each player's view, before the driver: the sync walk's observer sees the sim from its first beat.
     const faf::remote::wire::SContentTables contentTables = faf::remote::BuildContentTables(*rules);
     std::unique_ptr<faf::server::CServerViews> views;
-    std::map<std::size_t, std::int32_t> armyUids;                  // each player's army
-    std::set<std::size_t> defeatedArmies;                          // plan WP13.7: defeats seen
-    std::set<std::size_t> focusFreed;                              // plan WP11.1: defeated players free to focus
-    std::vector<std::pair<double, std::int32_t>> defeatedLeaving;  // and when each such player goes
+    std::map<std::size_t, std::int32_t> armyUids;                 // each player's army
+    std::set<std::size_t> defeatedArmies;                         // plan WP13.7: defeats seen
+    std::set<std::size_t> focusFreed;                             // plan WP11.1: defeated players free to focus
+    std::vector<std::pair<double, std::int32_t>> defeatedLeaving; // and when each such player goes
     if (net) {
       // Plan WP2.6, WP1.4: what each player's report is compared with: the server's own rules, before any player has
       // the launch to load them from.
@@ -1648,8 +2197,12 @@ namespace
       content.mods = faf::remote::HashModUids(faf::remote::ReadModUids(std::string(gameMods.c_str(), gameMods.size())));
       net->SetContentCheck(contentCheck, content);
       static constexpr const char* kModes[] = {"not compared", "warned of", "refused"};
-      Say("Content: blueprints %016llx, mods %016llx; a player whose content differs is %s", static_cast<unsigned long long>(content.blueprints),
-          static_cast<unsigned long long>(content.mods), kModes[static_cast<int>(contentCheck)]);
+      Say(
+        "Content: blueprints %016llx, mods %016llx; a player whose content differs is %s",
+        static_cast<unsigned long long>(content.blueprints),
+        static_cast<unsigned long long>(content.mods),
+        kModes[static_cast<int>(contentCheck)]
+      );
     }
     if (net && !roster.Remotes().empty()) {
       // Plan WPR.55: every client's launch comes from here; a game too large for one message is refused at start.
@@ -1676,7 +2229,16 @@ namespace
         net->SetFocusRule(client.uid, playerArmy); // plan WP11.1: their SetFocusArmy keeps them on it
       }
       armyUids = viewPlayers;
-      views = std::make_unique<faf::server::CServerViews>(contentTables, *rules, mapSizeX, mapSizeZ, *net, std::move(viewPlayers), static_cast<unsigned int>(std::max(viewThreads, 1)), teamViews);
+      views = std::make_unique<faf::server::CServerViews>(
+        contentTables,
+        *rules,
+        mapSizeX,
+        mapSizeZ,
+        *net,
+        std::move(viewPlayers),
+        static_cast<unsigned int>(std::max(viewThreads, 1)),
+        teamViews
+      );
       if (teamViews && !disconnectDefeated) {
         views->EnableObserverViews(); // plan WP13.6
       }
@@ -1684,9 +2246,37 @@ namespace
         views->SetStatsEveryBeats(static_cast<std::uint32_t>(std::max(1, std::atoi(statsEvery.c_str()))));
       }
       views->SetPauseBook(pauseBook);
+      // Plan WP8.2: each view's pose lane within a budget, the units nearest its player's cameras first.
+      if (std::string poseBudget; ReadOption("--pose-budget-kbps", poseBudget)) {
+        const int kbps = std::max(0, std::atoi(poseBudget.c_str()));
+        views->SetPoseBudget(static_cast<std::size_t>(kbps) * 1024u / 10u); // a beat is a tenth of a second at speed 0
+        Say(
+          "Poses: within %d KB/s a view (%zu bytes a beat), nearest the player's cameras first",
+          kbps,
+          views->PoseBudget()
+        );
+      }
+      {
+        std::map<std::int32_t, std::size_t> uidArmies;
+        for (const auto& [army, uid] : armyUids) {
+          uidArmies[uid] = army;
+        }
+        faf::server::CServerViews* const cameraViews = views.get();
+        net->SetCameraSink([cameraViews,
+                            uidArmies](const std::int32_t uid, const std::vector<faf::remote::SCameraReport>& cameras) {
+          if (const auto found = uidArmies.find(uid); found != uidArmies.end()) {
+            cameraViews->SetCameras(found->second, cameras);
+          }
+        });
+      }
       views->Install();
-      Say("Views: %s", teamViews ? (teamsLocked ? "one per team, and each player's own units" : "one per team (--team-views), with teams unlocked")
-                       : perPlayerViews ? "one per player (--per-player-views)" : "one per player, as teams aren't locked (TeamLock)");
+      Say(
+        "Views: %s",
+        teamViews          ? (teamsLocked ? "one per team, and each player's own units"
+                                          : "one per team (--team-views), with teams unlocked")
+          : perPlayerViews ? "one per player (--per-player-views)"
+                           : "one per player, as teams aren't locked (TeamLock)"
+      );
     }
     sessionInfo->mLaunchInfo->mCommandSources.mOriginalSource = -1;
 
@@ -1697,8 +2287,8 @@ namespace
       Say("Can't host: %s", end.error.c_str());
       return kExitBadInput;
     }
-    // Plan WP13.1, WP15.3: with observers or a live replay, the replay goes through a tee into a log they're both served
-    // from, header included, each byte `ObserverDelaySeconds` late.
+    // Plan WP13.1, WP15.3: with observers or a live replay, the replay goes through a tee into a log they're both
+    // served from, header included, each byte `ObserverDelaySeconds` late.
     std::string observeText;
     std::string liveText;
     const bool observeGiven = ReadOption("--observe", observeText);
@@ -1714,10 +2304,17 @@ namespace
         Say("Can't host: %s", end.error.c_str());
         return kExitBadInput;
       } else {
-        liveReplay = std::make_unique<faf::server::CLiveReplaySender>(replayLog, &ControlNowUs, matchRules.observerDelaySeconds.value_or(0.0), *to);
+        liveReplay = std::make_unique<faf::server::CLiveReplaySender>(
+          replayLog, &ControlNowUs, matchRules.observerDelaySeconds.value_or(0.0), *to
+        );
         liveReplay->Start();
-        Say("Live replay to %s:%d%s, %.0f s behind the game", to->host.c_str(), static_cast<int>(to->port), to->path.c_str(),
-            matchRules.observerDelaySeconds.value_or(0.0));
+        Say(
+          "Live replay to %s:%d%s, %.0f s behind the game",
+          to->host.c_str(),
+          static_cast<int>(to->port),
+          to->path.c_str(),
+          matchRules.observerDelaySeconds.value_or(0.0)
+        );
       }
     }
     if (observeGiven) {
@@ -1727,10 +2324,15 @@ namespace
       std::vector<std::string> referees; // plan WP13.2
       if (!faf::remote::net::ParseEndpoint(text, observeAt)) {
         end.error = "--observe takes <ip:port>, not " + text;
-      } else if (!ReadMatchObservers(state, tokens, end.error) || !ReadMatchObservers(state, referees, end.error, "MatchReferees")) {
+      } else if (
+        !ReadMatchObservers(state, tokens, end.error) ||
+        !ReadMatchObservers(state, referees, end.error, "MatchReferees")
+      ) {
         // `end.error` says why
       } else {
-        observers = std::make_unique<faf::server::CObserverListener>(replayLog, &ControlNowUs, matchRules.observerDelaySeconds.value_or(0.0));
+        observers = std::make_unique<faf::server::CObserverListener>(
+          replayLog, &ControlNowUs, matchRules.observerDelaySeconds.value_or(0.0)
+        );
         if (control) {
           observers->HoldUnknownTokens(); // plan WP17.9: the organiser approves on the web
         }
@@ -1741,8 +2343,13 @@ namespace
           observers->AllowReferee(token);
         }
         if (observers->Start(observeAt, end.error)) {
-          Say("Observers on %s: %d tokens, %.0f s behind the game; %d referees, no delay", observeAt.Text().c_str(), static_cast<int>(tokens.size()),
-              matchRules.observerDelaySeconds.value_or(0.0), static_cast<int>(referees.size()));
+          Say(
+            "Observers on %s: %d tokens, %.0f s behind the game; %d referees, no delay",
+            observeAt.Text().c_str(),
+            static_cast<int>(tokens.size()),
+            matchRules.observerDelaySeconds.value_or(0.0),
+            static_cast<int>(referees.size())
+          );
         }
       }
       if (!end.error.empty()) {
@@ -1760,9 +2367,14 @@ namespace
     moho::SIM_SetIssueWhilePaused(true);
     moho::IClientManager* const clientManager = sessionInfo->mClientManager;
     sessionInfo->mClientManager = nullptr;
-    std::unique_ptr<moho::ISTIDriver> driver(moho::SIM_CreateDriver(
-      static_cast<moho::CClientManagerImpl*>(clientManager), replay.release(), sessionInfo->mLaunchInfo, sessionInfo->mSourceId
-    ));
+    std::unique_ptr<moho::ISTIDriver> driver(
+      moho::SIM_CreateDriver(
+        static_cast<moho::CClientManagerImpl*>(clientManager),
+        replay.release(),
+        sessionInfo->mLaunchInfo,
+        sessionInfo->mSourceId
+      )
+    );
     auto* const simDriver = static_cast<moho::CSimDriver*>(driver.get());
     // Ahead of the driver going away, on every way out: the network's thread touches its seats.
     struct SStopNet
@@ -1795,6 +2407,14 @@ namespace
     // Beats go on while the game is paused, and no game time with them.
     int pausedBeats = 0;
     std::int32_t pausedBy = -1;
+    faf::server::CArmyBoard armyBoard; // plan WP17.15: each army's state for `armies`
+    const auto boardPlayers = [&end]() {
+      std::vector<faf::server::CArmyBoard::SPlayer> players;
+      for (const SMatchPlayer& player : end.players) {
+        players.push_back({player.name, player.team, player.human, player.uid, player.result});
+      }
+      return players;
+    };
     // The operator's (SIGUSR1, control API) pause or resume asked of the driver, until the game is so: a beat or more.
     std::optional<bool> operatorPauseWanted;
     int pauseRequestsDone = 0;
@@ -1811,8 +2431,8 @@ namespace
     bool awayPauseSeen = false;
     double awayCharged = 0.0;
 
-    // Plan WP10.7: the speed the game runs at: the one requested, held to the slowest playing seat's sim-speed limit, as
-    // lockstep's `CClientManagerImpl::GetSimRate` holds it to the slowest client's.
+    // Plan WP10.7: the speed the game runs at: the one requested, held to the slowest playing seat's sim-speed limit,
+    // as lockstep's `CClientManagerImpl::GetSimRate` holds it to the slowest client's.
     std::int32_t speedHolder = 0;
     faf::server::CLinkSpeedGovernor linkSpeeds; // plan WP10.7 step 2: links that fall behind hold the game too
     int pacedNow = 0;
@@ -1851,11 +2471,19 @@ namespace
         std::vector<faf::server::SLinkSample> samples;
         samples.reserve(seatStates.size());
         for (const faf::server::CServerNet::SSeatState& seat : seatStates) {
-          samples.push_back(faf::server::SLinkSample{seat.uid, seat.behindSeconds, seat.gone});
+          // Plan WP3.8: a lost seat (its channel timed out, the reconnect window running) holds nothing, as a gone one.
+          samples.push_back(
+            faf::server::SLinkSample{seat.uid, seat.behindSeconds, seat.gone || seat.lost, seat.silentSeconds}
+          );
         }
         for (const faf::server::SLinkNews& change : linkSpeeds.Update(elapsed, pacedNow, asked, samples)) {
           if (change.limit) {
-            Say("%s's link is %.1f s behind: it holds the game at %+d at most", nameOf(change.uid).c_str(), change.behindSeconds, *change.limit);
+            Say(
+              "%s's link is %.1f s behind: it holds the game at %+d at most",
+              nameOf(change.uid).c_str(),
+              change.behindSeconds,
+              *change.limit
+            );
           } else {
             Say("%s's link keeps up again: it no longer holds the game", nameOf(change.uid).c_str());
           }
@@ -1871,7 +2499,13 @@ namespace
       if (holder != speedHolder) {
         speedHolder = holder;
         if (holder != 0) {
-          Say("Game speed held at %+d by %s's %s (requested %+d)", requested, nameOf(holder).c_str(), byLink ? "link" : "game", asked);
+          Say(
+            "Game speed held at %+d by %s's %s (requested %+d)",
+            requested,
+            nameOf(holder).c_str(),
+            byLink ? "link" : "game",
+            asked
+          );
         } else {
           Say("Game speed no longer held by a player (requested %+d)", asked);
         }
@@ -1883,12 +2517,15 @@ namespace
       int speed = requested;
       std::pair<double, int>& oldest = beatHistory[beatSamples % beatHistory.size()];
       if (beatSamples >= beatHistory.size() && elapsed > oldest.first) {
-        speed = std::min(requested, faf::server::SpeedOfBeatRate((end.beats - oldest.second) / (elapsed - oldest.first)));
+        speed =
+          std::min(requested, faf::server::SpeedOfBeatRate((end.beats - oldest.second) / (elapsed - oldest.first)));
       }
       oldest = {elapsed, end.beats};
       ++beatSamples;
 
-      const faf::server::SSpeedNews news = speedWatch.Update(faf::server::SSpeedSample{elapsed, asked, speed, beatMs}); // what was asked; a hold is said above
+      const faf::server::SSpeedNews news = speedWatch.Update(
+        faf::server::SSpeedSample{elapsed, asked, speed, beatMs}
+      ); // what was asked; a hold is said above
       if (news.requestChanged) {
         Say("Game speed requested: %+d (was %+d)", requested, news.requestedBefore);
       }
@@ -1896,7 +2533,11 @@ namespace
         Say("Sim speed %+d (was %+d, requested %+d), a beat takes %.0f ms", speed, news.speedBefore, asked, beatMs);
       }
       if (news.slowStarted) {
-        Say("WARNING: the sim is close to speed -1: a beat takes %.0f ms, -1 starts at %.0f ms", beatMs, faf::server::kSpeedZeroBeatMs);
+        Say(
+          "WARNING: the sim is close to speed -1: a beat takes %.0f ms, -1 starts at %.0f ms",
+          beatMs,
+          faf::server::kSpeedZeroBeatMs
+        );
       }
       if (news.slowEnded) {
         Say("The sim is clear of speed -1 again: a beat takes %.0f ms", beatMs);
@@ -1916,14 +2557,28 @@ namespace
             }
           }
           if (worst != nullptr && worst->behindBeats > 10u) {
-            behind = ", " + worst->name + " " + std::to_string(worst->behindBeats) + " beats behind (" + std::to_string(worst->backlogBytes / 1024u) + " KB)";
+            behind = ", " + worst->name + " " + std::to_string(worst->behindBeats) + " beats behind (" +
+              std::to_string(worst->backlogBytes / 1024u) + " KB)";
           }
         }
-        Say("Status: game time %s, real time %s, speed %+d (requested %+d%s), %.1f beats/s, a beat takes %.0f ms, memory %ld MB, %.0f KB/s to players%s, %lu warnings in the log",
-            GameClockText(end.lastBeat - pausedBeats).c_str(), ClockText(elapsed).c_str(), speed, asked,
-            requested < asked ? (", held at " + std::string(requested >= 0 ? "+" : "") + std::to_string(requested) + " by a player (see the hold line)").c_str() : "",
-            beatsPerSecond, beatMs, ResidentMegabytes(),
-            static_cast<double>(netBytes - statusNetBytes) / 1024.0 / (elapsed - lastStatus), behind.c_str(), warnings.Count());
+        Say(
+          "Status: game time %s, real time %s, speed %+d (requested %+d%s), %.1f beats/s, a beat takes %.0f ms, memory "
+          "%ld MB, %.0f KB/s to players%s, %lu warnings in the log",
+          GameClockText(end.lastBeat - pausedBeats).c_str(),
+          ClockText(elapsed).c_str(),
+          speed,
+          asked,
+          requested < asked ? (", held at " + std::string(requested >= 0 ? "+" : "") + std::to_string(requested) +
+                               " by a player (see the hold line)")
+                                .c_str()
+                            : "",
+          beatsPerSecond,
+          beatMs,
+          ResidentMegabytes(),
+          static_cast<double>(netBytes - statusNetBytes) / 1024.0 / (elapsed - lastStatus),
+          behind.c_str(),
+          warnings.Count()
+        );
         statusNetBytes = netBytes;
         lastStatus = elapsed;
         statusBeats = end.beats;
@@ -1954,9 +2609,13 @@ namespace
           const bool pending = gPauseRequests != pauseRequestsDone;
           if (request.op == "status") {
             control->Reply(
-              request.id, "\"phase\":\"game\",\"started\":" + std::string(started ? "true" : "false") + ",\"beat\":" + std::to_string(end.lastBeat) +
-                            ",\"paused\":" + std::string(pausedBy != -1 ? "true" : "false") + "," + controlSeats()
+              request.id,
+              "\"phase\":\"game\",\"started\":" + std::string(started ? "true" : "false") +
+                ",\"beat\":" + std::to_string(end.lastBeat) +
+                ",\"paused\":" + std::string(pausedBy != -1 ? "true" : "false") + "," + controlSeats()
             );
+          } else if (request.op == "armies") {
+            control->Reply(request.id, armyBoard.Json(end.lastBeat, boardPlayers()));
           } else if (request.op == "pause" || request.op == "resume") {
             const bool pause = request.op == "pause";
             if (!started) {
@@ -1967,6 +2626,39 @@ namespace
               control->Refuse(request.id, pause ? "the game is paused already" : "the game isn't paused");
             } else {
               gPauseRequests = gPauseRequests + 1;
+              control->Reply(request.id, {});
+            }
+          } else if (request.op == "verifier") {
+            // Plan WP13.3: a shadow verifier's verdict (tools/server-shadow): `name`, `count` the beat, `results` ok,
+            // mismatch or stopped, `reason` the detail. A mismatch is the admin's alert: a console line and an event.
+            const std::string& verdict = request.results;
+            if (verdict != "ok" && verdict != "mismatch" && verdict != "stopped") {
+              control->Refuse(
+                request.id, "verifier takes results ok, mismatch or stopped, a beat as count, a name and a reason"
+              );
+            } else {
+              const std::string who = request.name.empty() ? std::string("a verifier") : request.name.substr(0, 64);
+              const std::string why = request.reason.substr(0, 300);
+              if (verdict == "mismatch") {
+                Say(
+                  "VERIFIER %s: MISMATCH at beat %lld: %s",
+                  who.c_str(),
+                  static_cast<long long>(request.count),
+                  why.c_str()
+                );
+              } else if (verdict == "stopped") {
+                Say(
+                  "Verifier %s stopped at beat %lld: %s",
+                  who.c_str(),
+                  static_cast<long long>(request.count),
+                  why.c_str()
+                );
+              }
+              controlEvent(
+                "verifier",
+                "\"name\":" + faf::server::JsonString(who) + ",\"verdict\":\"" + verdict +
+                  "\",\"beat\":" + std::to_string(request.count) + ",\"reason\":" + faf::server::JsonString(why)
+              );
               control->Reply(request.id, {});
             }
           } else if (request.op == "force_start") {
@@ -1983,21 +2675,33 @@ namespace
               } else {
                 observers->RefuseToken(request.token);
               }
-              Say("The control service %s observer token %s", request.op == "approve_observer" ? "approves" : "refuses", request.token.c_str());
+              Say(
+                "The control service %s observer token %s",
+                request.op == "approve_observer" ? "approves" : "refuses",
+                request.token.c_str()
+              );
               control->Reply(request.id, {});
             }
           } else if (request.op == "substitute") {
             // Plan WP15.4 (#200): another person takes a player's seat (army, sources, pauses) from now on.
             if (!net) {
               control->Refuse(request.id, "this server has no players (--listen)");
-            } else if (request.token.empty() || request.token.size() > 1024u || request.name.empty() || request.name.size() > 256u) {
+            } else if (
+              request.token.empty() || request.token.size() > 1024u || request.name.empty() ||
+              request.name.size() > 256u
+            ) {
               control->Refuse(request.id, "substitute needs a token (1 to 1024 characters) and a name (1 to 256)");
-            } else if (request.uid <= 0 || request.uid > INT32_MAX ||
-                       !net->RequestSubstitute(static_cast<std::int32_t>(request.uid), request.token, request.name)) {
+            } else if (
+              request.uid <= 0 || request.uid > INT32_MAX ||
+              !net->RequestSubstitute(static_cast<std::int32_t>(request.uid), request.token, request.name)
+            ) {
               control->Refuse(request.id, "no player in the game with uid " + std::to_string(request.uid));
             } else {
               control->Reply(request.id, {});
-              controlEvent("substitute", "\"uid\":" + std::to_string(request.uid) + ",\"name\":" + faf::server::JsonString(request.name));
+              controlEvent(
+                "substitute",
+                "\"uid\":" + std::to_string(request.uid) + ",\"name\":" + faf::server::JsonString(request.name)
+              );
             }
           } else if (request.op == "extend_timeouts") {
             // Plan WP15.4 (#200): more pauses for one player.
@@ -2016,13 +2720,19 @@ namespace
               if (const auto seat = pauseSeats.find(budget->first); seat != pauseSeats.end()) {
                 seat->second->SetPauseAllowed(true);
               }
-              Say("The control service gives uid %lld %lld more pause%s: %d left", static_cast<long long>(request.uid),
-                  static_cast<long long>(request.count), request.count == 1 ? "" : "s", budget->second);
+              Say(
+                "The control service gives uid %lld %lld more pause%s: %d left",
+                static_cast<long long>(request.uid),
+                static_cast<long long>(request.count),
+                request.count == 1 ? "" : "s",
+                budget->second
+              );
               control->Reply(request.id, "\"left\":" + std::to_string(budget->second));
             }
           } else if (request.op == "end") {
-            // Plan WP15.4 (#200): the organiser ends the game now, with each army's result if given ("1=victory,2=defeat",
-            // army numbers from 1 as the sim's `GameResult` has them). With results it counts as ended; without, as stopped.
+            // Plan WP15.4 (#200): the organiser ends the game now, with each army's result if given
+            // ("1=victory,2=defeat", army numbers from 1 as the sim's `GameResult` has them). With results it counts as
+            // ended; without, as stopped.
             std::vector<std::pair<std::size_t, std::string>> results;
             std::string bad;
             for (std::size_t start = 0; start < request.results.size() && bad.empty();) {
@@ -2031,8 +2741,10 @@ namespace
               const std::size_t equals = pair.find('=');
               const int army = equals == std::string::npos ? 0 : std::atoi(pair.substr(0, equals).c_str());
               const std::string outcome = equals == std::string::npos ? std::string() : pair.substr(equals + 1);
-              if (army < 1 || static_cast<std::size_t>(army) > end.players.size() ||
-                  (outcome != "victory" && outcome != "defeat" && outcome != "draw")) {
+              if (
+                army < 1 || static_cast<std::size_t>(army) > end.players.size() ||
+                (outcome != "victory" && outcome != "defeat" && outcome != "draw")
+              ) {
                 bad = pair;
               } else {
                 results.emplace_back(static_cast<std::size_t>(army - 1), outcome);
@@ -2040,7 +2752,11 @@ namespace
               start = comma + 1;
             }
             if (!bad.empty()) {
-              control->Refuse(request.id, "end takes results as army=victory|defeat|draw, armies 1 to " + std::to_string(end.players.size()) + ", not " + bad);
+              control->Refuse(
+                request.id,
+                "end takes results as army=victory|defeat|draw, armies 1 to " + std::to_string(end.players.size()) +
+                  ", not " + bad
+              );
             } else {
               for (const auto& [index, outcome] : results) {
                 end.players[index].result = outcome + " 0";
@@ -2053,7 +2769,12 @@ namespace
               control->Reply(request.id, "\"results\":" + std::to_string(results.size()));
             }
           } else if (!controlCommon(request)) {
-            control->Refuse(request.id, request.op == "set_options" || request.op == "set_player" || request.op == "force_start" ? "the game has started" : "unknown op " + request.op);
+            control->Refuse(
+              request.id,
+              request.op == "set_options" || request.op == "set_player" || request.op == "force_start"
+                ? "the game has started"
+                : "unknown op " + request.op
+            );
           }
         }
         controlNews();
@@ -2073,9 +2794,10 @@ namespace
       if (control && net) {
         // Plan WP17.2, WP17.8: a seat's content or mod verdict as it is made: who differs, for the web.
         for (const faf::server::CServerNet::SSeatState& seat : net->TakeJudged()) {
-          std::string fields = "\"uid\":" + std::to_string(seat.uid) + ",\"name\":" + faf::server::JsonString(seat.name) +
-                               ",\"content\":" + faf::server::JsonString(seat.content) + ",\"mods\":" + faf::server::JsonString(seat.mods) +
-                               ",\"ui_mods\":[";
+          std::string fields = "\"uid\":" + std::to_string(seat.uid) +
+            ",\"name\":" + faf::server::JsonString(seat.name) +
+            ",\"content\":" + faf::server::JsonString(seat.content) +
+            ",\"mods\":" + faf::server::JsonString(seat.mods) + ",\"ui_mods\":[";
           for (std::size_t i = 0; i < seat.uiMods.size(); ++i) {
             fields += (i == 0 ? "" : ",") + faf::server::JsonString(seat.uiMods[i]);
           }
@@ -2084,7 +2806,10 @@ namespace
       }
       if (control && observers && control->Connected()) {
         for (const faf::server::CObserverListener::SRequest& asked : observers->TakeRequests()) {
-          controlEvent("observer_request", "\"token\":" + faf::server::JsonString(asked.token) + ",\"from\":" + faf::server::JsonString(asked.from));
+          controlEvent(
+            "observer_request",
+            "\"token\":" + faf::server::JsonString(asked.token) + ",\"from\":" + faf::server::JsonString(asked.from)
+          );
         }
       }
       if (net && net->NobodyCame()) {
@@ -2094,7 +2819,8 @@ namespace
       }
       if (const int requests = gPauseRequests; started && requests != pauseRequestsDone) {
         pauseRequestsDone = requests;
-        const bool pause = !operatorPauseWanted.value_or(pausedBy != -1); // against what the game will be, not what it was
+        const bool pause =
+          !operatorPauseWanted.value_or(pausedBy != -1); // against what the game will be, not what it was
         Say("The operator asks to %s the game", pause ? "pause" : "resume");
         operatorPauseWanted = pause;
         if (pause) {
@@ -2104,7 +2830,8 @@ namespace
         }
       }
       if (net && started) {
-        // Plan WP3.5, WP14.2. The reconnect window runs on meanwhile. A pause someone else ends or takes over isn't renewed.
+        // Plan WP3.5, WP14.2. The reconnect window runs on meanwhile. A pause someone else ends or takes over isn't
+        // renewed.
         for (const faf::server::CServerNet::SPresence& change : net->TakePresence()) {
           if (change.gone) {
             controlLeft(change.uid);
@@ -2150,7 +2877,11 @@ namespace
         } else if (waitingFor.empty() && awayPausing) {
           awayPausing = false;
           awayPending = false;
-          Say("%s", away.empty() ? "Resuming the game: nobody is away" : "Resuming the game: the time to wait for whoever is away has run out");
+          Say(
+            "%s",
+            away.empty() ? "Resuming the game: nobody is away"
+                         : "Resuming the game: the time to wait for whoever is away has run out"
+          );
           driver->Resume();
         }
       }
@@ -2159,7 +2890,11 @@ namespace
         watchSpeed(elapsed);
         if (!stalled && elapsed - lastBeatAt >= kStallSeconds) {
           stalled = true;
-          Say("WARNING: no beat for %.0f s, at game time %s", kStallSeconds, GameClockText(end.lastBeat - pausedBeats).c_str());
+          Say(
+            "WARNING: no beat for %.0f s, at game time %s",
+            kStallSeconds,
+            GameClockText(end.lastBeat - pausedBeats).c_str()
+          );
         }
       }
 
@@ -2175,7 +2910,10 @@ namespace
         // `WLD_DoPostInitializing` / `WLD_DoWaiting`: the first beat is out and this client is ready;
         // once every client is, the issue thread may run.
         if (started && !ready) {
-          if (moho::CClientManagerImpl* const manager = driver->GetClientManager(); manager != nullptr && manager->IsEveryoneReady()) {
+          if (
+            moho::CClientManagerImpl* const manager = driver->GetClientManager();
+            manager != nullptr && manager->IsEveryoneReady()
+          ) {
             driver->DecrementOutstandingRequestsAndSignal();
             ready = true;
           }
@@ -2193,6 +2931,33 @@ namespace
         ++end.beats;
         end.lastBeat = packet->mCurBeat;
         lastBeatAt = SecondsSince(playStart);
+        armyBoard.ReadPacket(*packet);
+        // Plan WP16.1: as headless writes them (ReplayRunner), line for line.
+        if ((digestFile || checksumEvents) && packet->mCurBeat >= 0) {
+          if (const moho::Sim* const sim = simDriver->GetSimForReplayCheck(); sim != nullptr) {
+            const gpg::MD5Digest& digest = sim->mSimHashes[static_cast<std::uint32_t>(packet->mCurBeat) & 0x7Fu];
+            if (!IsZeroDigest(digest)) {
+              if (digestFile) {
+                std::fprintf(digestFile.get(), "%d %s\n", packet->mCurBeat, digest.ToString().c_str());
+                ++digestsWritten;
+              }
+              if (checksumEvents) {
+                controlEvent(
+                  "checksum",
+                  "\"beat\":" + std::to_string(packet->mCurBeat) + ",\"md5\":\"" + digest.ToString().c_str() + "\""
+                );
+              }
+            }
+          }
+        }
+        if (stateDigestFile) {
+          std::fprintf(
+            stateDigestFile.get(),
+            "%d %016llx\n",
+            packet->mCurBeat,
+            static_cast<unsigned long long>(faf::headless::DigestPublishedState(*packet))
+          );
+        }
         if (net) {
           net->NoteBeat(end.lastBeat);
         }
@@ -2202,11 +2967,16 @@ namespace
           if (packet->mPausedBy == -1) {
             Say("Game resumed, at game time %s", GameClockText(end.lastBeat - pausedBeats).c_str());
           } else if (static_cast<std::size_t>(packet->mPausedBy) < sources.size()) {
-            Say("Game paused by %s, at game time %s", sources[static_cast<std::size_t>(packet->mPausedBy)].mName.c_str(), GameClockText(end.lastBeat - pausedBeats).c_str());
+            Say(
+              "Game paused by %s, at game time %s",
+              sources[static_cast<std::size_t>(packet->mPausedBy)].mName.c_str(),
+              GameClockText(end.lastBeat - pausedBeats).c_str()
+            );
           } else {
             Say("Game paused, at game time %s", GameClockText(end.lastBeat - pausedBeats).c_str());
           }
-          // Plan WP15.4: the pause a player's budget pays for, as the sim would have spent it (only from running to paused).
+          // Plan WP15.4: the pause a player's budget pays for, as the sim would have spent it (only from running to
+          // paused).
           if (pausedBy == -1 && packet->mPausedBy != -1) {
             const auto source = static_cast<std::uint32_t>(packet->mPausedBy);
             if (const auto budget = pauseBudgets.find(source); budget != pauseBudgets.end() && budget->second > 0) {
@@ -2216,7 +2986,12 @@ namespace
                   seat->second->SetPauseAllowed(false);
                 }
               }
-              Say("%s has %d pause%s left", source < sources.size() ? sources[static_cast<std::size_t>(source)].mName.c_str() : "a player", budget->second, budget->second == 1 ? "" : "s");
+              Say(
+                "%s has %d pause%s left",
+                source < sources.size() ? sources[static_cast<std::size_t>(source)].mName.c_str() : "a player",
+                budget->second,
+                budget->second == 1 ? "" : "s"
+              );
             }
           }
           pausedBy = packet->mPausedBy;
@@ -2225,7 +3000,8 @@ namespace
           }
         }
         if (moho::CClientManagerImpl* const manager = driver->GetClientManager(); manager != nullptr) {
-          nextBeatAt = std::max(nextBeatAt, lastBeatAt - kMaxCatchUpSeconds) + faf::server::SecondsPerBeat(pacedSpeed(manager->GetSimRateRequested()));
+          nextBeatAt = std::max(nextBeatAt, lastBeatAt - kMaxCatchUpSeconds) +
+            faf::server::SecondsPerBeat(pacedSpeed(manager->GetSimRateRequested()));
         }
         if (stalled) {
           stalled = false;
@@ -2242,10 +3018,38 @@ namespace
         }
 
         LuaPlus::LuaObject sync;
-        if (faf::headless::ReadSyncNaming(*packet, state, {"GameResult", "GameEnded"}, sync)) {
+        if (
+          faf::headless::ReadSyncNaming(
+            *packet, state, {"GameResult", "GameEnded", "StatsToSend", "Score", "UserUnitEnhancements"}, sync
+          )
+        ) {
+          armyBoard.ReadSync(sync);
+          // Plan WP15.2: the server reports the game's army stats itself, as each player's UI would (UserSync.lua
+          // encodes `Sync.StatsToSend` for `GpgNetSend('JsonStats', ...)`): into result.json and as a control event.
+          if (LuaPlus::LuaObject stats = sync["StatsToSend"]; stats.IsTable()) {
+            end.stats.clear();
+            LuaToJson(stats, end.stats);
+            Say("Army stats: %zu bytes of JSON", end.stats.size());
+            controlEvent("stats", "\"stats\":" + end.stats);
+          }
           LuaPlus::LuaObject results = sync["GameResult"];
           if (results.IsTable()) {
+            const std::vector<SMatchPlayer> before = end.players;
             ReadGameResults(results, end.players);
+            // Plan WP15.2: each army's result as data, once it has one or it changes.
+            for (std::size_t army = 0; army < end.players.size(); ++army) {
+              if (
+                army < before.size() && before[army].result != end.players[army].result &&
+                !end.players[army].result.empty()
+              ) {
+                controlEvent(
+                  "result",
+                  "\"army\":" + std::to_string(army + 1) +
+                    ",\"name\":" + faf::server::JsonString(end.players[army].name) +
+                    ",\"result\":" + faf::server::JsonString(end.players[army].result)
+                );
+              }
+            }
             // Plan WP11.1: with `DefeatedPlayerView = "observe"`, a defeated player may focus on any army (the original
             // client's `SetFocusArmy(-1)` on defeat); they see only what their view (WP13.6) was sent.
             for (std::size_t army = 0; net && !disconnectDefeated && army < end.players.size(); ++army) {
@@ -2287,6 +3091,10 @@ namespace
       if (views->Failures() != 0u) {
         Say("WARNING: %llu view lanes didn't encode", static_cast<unsigned long long>(views->Failures()));
       }
+      net->SetCameraSink({}); // plan WP8.2: no camera reaches the views from here on
+      if (views->PoseBudget() != 0u) {
+        Say("Poses: %zu units owed a pose across the views at the end", views->OwedPoses());
+      }
       views->Uninstall();
       Say("%s", net->Intake().Report().c_str());
       Say("%s", views->LaneReport().c_str());
@@ -2300,6 +3108,15 @@ namespace
       driver->GetSyncData(rawPacket);
       delete rawPacket;
     }
+    if (digestFile || stateDigestFile) {
+      Say(
+        "Digests: %llu checksum digests (period %d), state digests for %d beats, up to beat %d",
+        static_cast<unsigned long long>(digestsWritten),
+        static_cast<int>(moho::gSimConVar_sim_ChecksumPeriod.mDefaultValue),
+        stateDigestFile ? end.beats : 0,
+        end.lastBeat
+      );
+    }
     sessionState.reset();
     rules.reset();
     wldMap.reset();
@@ -2307,10 +3124,12 @@ namespace
     if (observers || liveReplay) {
       // Observers and the live replay are behind the game: they get its last moments before the server goes, for the
       // delay and a little more.
-      const auto waitEnd = Clock::now() + std::chrono::duration_cast<Clock::duration>(
-                                            std::chrono::duration<double>(matchRules.observerDelaySeconds.value_or(0.0) + 10.0)
-                                          );
-      while (((observers && !observers->AllSent()) || (liveReplay && !liveReplay->Done())) && Clock::now() < waitEnd && gStopSignal == 0) {
+      const auto waitEnd = Clock::now() +
+        std::chrono::duration_cast<Clock::duration>(
+                             std::chrono::duration<double>(matchRules.observerDelaySeconds.value_or(0.0) + 10.0)
+        );
+      while (((observers && !observers->AllSent()) || (liveReplay && !liveReplay->Done())) && Clock::now() < waitEnd &&
+             gStopSignal == 0) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         sayNetNews();
       }
@@ -2325,15 +3144,30 @@ namespace
 
     WriteResult(resultPath, end);
     controlEvent(
-      "game_ended", "\"ended\":" + std::string(end.ended ? "true" : "false") + ",\"beats\":" + std::to_string(end.beats) +
-                      ",\"stopped_by\":" + faf::server::JsonString(end.stoppedBy) + ",\"error\":" + faf::server::JsonString(end.error)
+      "game_ended",
+      "\"ended\":" + std::string(end.ended ? "true" : "false") + ",\"beats\":" + std::to_string(end.beats) +
+        ",\"stopped_by\":" + faf::server::JsonString(end.stoppedBy) + ",\"error\":" + faf::server::JsonString(end.error)
     );
     if (end.ended) {
-      Say("Game ended: game time %s, real time %s", GameClockText(end.lastBeat - pausedBeats).c_str(), ClockText(end.seconds).c_str());
+      Say(
+        "Game ended: game time %s, real time %s",
+        GameClockText(end.lastBeat - pausedBeats).c_str(),
+        ClockText(end.seconds).c_str()
+      );
     } else if (!end.error.empty()) {
-      Say("ERROR: the game didn't finish: %s, at game time %s, real time %s", end.error.c_str(), GameClockText(end.lastBeat - pausedBeats).c_str(), ClockText(end.seconds).c_str());
+      Say(
+        "ERROR: the game didn't finish: %s, at game time %s, real time %s",
+        end.error.c_str(),
+        GameClockText(end.lastBeat - pausedBeats).c_str(),
+        ClockText(end.seconds).c_str()
+      );
     } else {
-      Say("Game stopped (%s): game time %s, real time %s", end.stoppedBy.c_str(), GameClockText(end.lastBeat - pausedBeats).c_str(), ClockText(end.seconds).c_str());
+      Say(
+        "Game stopped (%s): game time %s, real time %s",
+        end.stoppedBy.c_str(),
+        GameClockText(end.lastBeat - pausedBeats).c_str(),
+        ClockText(end.seconds).c_str()
+      );
     }
     Say("Replay %s, result %s, %lu warnings in the log", replayPath.c_str(), resultPath.c_str(), warnings.Count());
     if (!end.error.empty()) {
@@ -2346,7 +3180,14 @@ namespace
   }
 } // namespace
 
-int main(int, char**)
+// The command line as the engine reads it (src/platform/posix/Win32Shim.cpp sets them before main).
+extern int __argc;
+extern char** __argv;
+
+int main(
+  int,
+  char**
+)
 {
   for (const int signalNumber : {SIGSEGV, SIGBUS, SIGFPE, SIGILL, SIGABRT}) {
     (void)std::signal(signalNumber, &CrashSignal);
@@ -2368,6 +3209,50 @@ int main(int, char**)
   if (!ReadOption("--match", matchPath) || !ReadOption("--out", outDir)) {
     std::printf("%s", kUsage);
     return kExitBadInput;
+  }
+  // Plan WP0.7: `--data <dir>`, the game data a deployment ships in one folder (fa/, faf/, vault/, as the server's
+  // images and runs lay it out): without `/init`, its `faf/bin/init_replay.lua` is the init file. The engine reads
+  // the command line from `__argv` on every lookup (`CFG_GetArgOption`), so the option joins it before anything reads
+  // it.
+  if (std::string dataDir; ReadOption("--data", dataDir) && !moho::CFG_GetArgOption("/init", 1, nullptr)) {
+    const std::filesystem::path init = std::filesystem::path(dataDir) / "faf" / "bin" / "init_replay.lua";
+    std::error_code initError;
+    if (!std::filesystem::is_regular_file(init, initError)) {
+      std::printf("--data %s: no %s\n", dataDir.c_str(), init.string().c_str());
+      return kExitBadInput;
+    }
+    static std::vector<std::string> sDataArgs{"/init", init.string()};
+    static std::vector<char*> sArgv;
+    for (int i = 0; i < __argc; ++i) {
+      sArgv.push_back(__argv[i]);
+    }
+    for (std::string& arg : sDataArgs) {
+      sArgv.push_back(arg.data());
+    }
+    sArgv.push_back(nullptr);
+    __argv = sArgv.data();
+    __argc = static_cast<int>(sArgv.size()) - 1;
+  }
+  // Plan WP17.13: a server started on chosen CPUs (server-host pins each lobby's process before it starts, or
+  // `--cpus`) keeps them. Without the lock FAF's init script moves the process onto its own CPU range through
+  // `SetProcessAffinityMask` (2-23 on fw0); headless locks the same way (`--cpus`).
+  {
+    std::string cpuList;
+    if (ReadOption("--cpus", cpuList) && !moho::AssignProcessCpus(cpuList.c_str())) {
+      std::printf("--cpus %s: not CPUs this process may run on\n", cpuList.c_str());
+      return kExitBadInput;
+    }
+    moho::LockAssignedProcessCpus();
+    if (moho::ProcessCpusAreLocked()) {
+      DWORD_PTR processMask = 0;
+      DWORD_PTR systemMask = 0;
+      (void)::GetProcessAffinityMask(::GetCurrentProcess(), &processMask, &systemMask);
+      std::printf(
+        "CPUs: mask %llx of %llx, kept (scripts can't change it)\n",
+        static_cast<unsigned long long>(processMask),
+        static_cast<unsigned long long>(systemMask)
+      );
+    }
   }
   std::error_code directoryError;
   std::filesystem::create_directories(outDir, directoryError);

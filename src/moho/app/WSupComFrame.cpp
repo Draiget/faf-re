@@ -2,6 +2,9 @@
 
 namespace
 {
+#if FAFRE_PLATFORM_WINDOWS
+  // The Win32 messages MSWWindowProc handles; on Linux the window system reports the frame's
+  // size, activation and closing (issue #256).
   constexpr unsigned int kSupComFrameMessageSize = WM_SIZE;
   constexpr unsigned int kSupComFrameMessageActivateApp = WM_ACTIVATEAPP;
   constexpr unsigned int kSupComFrameMessageSysCommand = WM_SYSCOMMAND;
@@ -10,6 +13,7 @@ namespace
   constexpr unsigned int kSupComFrameSysCommandToggleLogDialog = 0x1u;
   constexpr unsigned int kSupComFrameSysCommandLuaDebugger = 0x2u;
   constexpr unsigned int kSupComFrameSysCommandKeyMenu = SC_KEYMENU;
+#endif
 
   constexpr const char* kSupComFrameXPreferenceKey = "Windows.Main.x";
   constexpr const char* kSupComFrameYPreferenceKey = "Windows.Main.y";
@@ -19,6 +23,9 @@ namespace
   constexpr const char* kSupComFrameToggleLogDialogCommand = "WIN_ToggleLogDialog";
   constexpr const char* kSupComFrameLuaDebuggerCommand = "SC_LuaDebugger";
   constexpr const char* kSupComFrameCursorLockPreferenceKey = "lock_fullscreen_cursor_to_window";
+
+#if FAFRE_PLATFORM_WINDOWS
+  // The two helpers below serve MSWWindowProc only.
 
   /**
    * Address: 0x008CDBE0 (FUN_008CDBE0)
@@ -115,8 +122,8 @@ namespace
 
     ::ClipCursor(clipRectPtr);
   }
-}
-
+#endif // FAFRE_PLATFORM_WINDOWS
+} // namespace
 
 /**
  * Address: 0x008CD8C0 (FUN_008CD8C0)
@@ -146,9 +153,16 @@ WSupComFrame::WSupComFrame(
 // Table 0x00DFE4EC = {&wxFrame::sm_eventTable (0x00D56F70), rows 0x00F5BB4C};
 // GetEventTable (0x008CE090) comes with it. The deleting destructor
 // (0x008CE060) is the compiler's.
-BEGIN_EVENT_TABLE(WSupComFrame, wxFrame)
-  EVT_CLOSE(WSupComFrame::OnCloseWindow)
-  EVT_MOVE(WSupComFrame::OnMove)
+BEGIN_EVENT_TABLE(
+  WSupComFrame,
+  wxFrame
+)
+EVT_CLOSE(
+  WSupComFrame::OnCloseWindow
+)
+EVT_MOVE(
+  WSupComFrame::OnMove
+)
 END_EVENT_TABLE()
 
 /**
@@ -172,6 +186,7 @@ void WSupComFrame::OnCloseWindow(
   (void)moho::ShowEscapeDialog(true);
 }
 
+#if FAFRE_PLATFORM_WINDOWS
 /**
  * Address: 0x008CDCD0 (FUN_008CDCD0, WSupComFrame::MSWDefWindowProc)
  *
@@ -207,6 +222,7 @@ long WSupComFrame::MSWDefWindowProc(
 
   return dispatchBase();
 }
+#endif // FAFRE_PLATFORM_WINDOWS
 
 /**
  * Address: 0x008CDAD0 (FUN_008CDAD0, WSupComFrame::OnMove)
@@ -236,6 +252,7 @@ void WSupComFrame::OnMove(
   preferences->SetInteger(fa::string(kSupComFrameYPreferenceKey), GetPosition().y);
 }
 
+#if FAFRE_PLATFORM_WINDOWS
 /**
  * Address: 0x008CDD40 (FUN_008CDD40, WSupComFrame::MSWWindowProc)
  * Mangled: ?MSWWindowProc@WSupComFrame@@UAEJIIJ@Z
@@ -345,3 +362,4 @@ long WSupComFrame::MSWWindowProc(
 
   return 0;
 }
+#endif // FAFRE_PLATFORM_WINDOWS: MSWWindowProc

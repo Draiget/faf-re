@@ -14,76 +14,91 @@ typedef unsigned int Instruction;
 typedef __int64 type_ptrdiff_t;
 typedef int(__cdecl* CFunction)(lua_State* L);
 typedef void(__cdecl* Hook)(lua_State* L, lua_Debug* ar);
-typedef void* (__cdecl* ReallocFunction)(void* ptr, int oldsize, int size, void* data, const char* allocName, unsigned int flags);
+typedef void*(__cdecl* ReallocFunction)(
+  void* ptr,
+  int oldsize,
+  int size,
+  void* data,
+  const char* allocName,
+  unsigned int flags
+);
 typedef void(__cdecl* FreeFunction)(void* ptr, int oldsize, void* data);
 
 struct type_lua_longjmp;
 
 struct GCheader
 {
-	GCObject* next;      // Intrusive GC list link.
-	lu_byte tt;          // Type tag.
-	lu_byte marked;      // GC mark/color flags.
+  GCObject* next; // Intrusive GC list link.
+  lu_byte tt;     // Type tag.
+  lu_byte marked; // GC mark/color flags.
 };
 
 struct __declspec(align(4)) TString
 {
-	GCObject* next;
-	lu_byte tt;
-	lu_byte marked;
-	lu_byte commonHeaderPad[2]; // +0x06 CommonHeader tail padding in this fork.
+  GCObject* next;
+  lu_byte tt;
+  lu_byte marked;
+  lu_byte commonHeaderPad[2]; // +0x06 CommonHeader tail padding in this fork.
 
-	/**
-	 * Reserved-word index, one-based, or 0 for an ordinary string.
-	 *
-	 * A SINGLE BYTE, and it must stay one. `newlstr` (0x00924860) clears it
-	 * with `mov byte ptr [esi+8], 0` and `luaX_init` (0x009180D0) sets it with
-	 * `*((_BYTE *)v2 + 8) = i` - neither ever touches +0x09..+0x0B, so those
-	 * three bytes hold whatever the allocator left. Widening this field to an
-	 * int32 reads that garbage: it made ordinary identifiers come back with a
-	 * non-zero `reserved`, so the lexer returned `reserved + FIRST_RESERVED-1`
-	 * instead of TK_NAME and every `local <name>` after one could fail.
-	 */
-	lu_byte reserved;
-	lu_byte reservedPad[3];     // +0x09 never written by the binary.
+  /**
+   * Reserved-word index, one-based, or 0 for an ordinary string.
+   *
+   * A SINGLE BYTE, and it must stay one. `newlstr` (0x00924860) clears it
+   * with `mov byte ptr [esi+8], 0` and `luaX_init` (0x009180D0) sets it with
+   * `*((_BYTE *)v2 + 8) = i` - neither ever touches +0x09..+0x0B, so those
+   * three bytes hold whatever the allocator left. Widening this field to an
+   * int32 reads that garbage: it made ordinary identifiers come back with a
+   * non-zero `reserved`, so the lexer returned `reserved + FIRST_RESERVED-1`
+   * instead of TK_NAME and every `local <name>` after one could fail.
+   */
+  lu_byte reserved;
+  lu_byte reservedPad[3]; // +0x09 never written by the binary.
 
-	lu_hash hash;        // Cached hash for string table lookup.
-	size_t len;          // String length in bytes.
-	char str[1];         // Flexible array tail.
+  lu_hash hash; // Cached hash for string table lookup.
+  size_t len;   // String length in bytes.
+  char str[1];  // Flexible array tail.
 
-	/**
-	 * What it does:
-	 * Reads the characters and interns them in the owning thread's state,
-	 * handed back owned. Inlined into `SerConstructHelper<TString>::Construct`
-	 * 0x00921280.
-	 */
-	static void MemberConstruct(
-		gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-	);
+  /**
+   * What it does:
+   * Reads the characters and interns them in the owning thread's state,
+   * handed back owned. Inlined into `SerConstructHelper<TString>::Construct`
+   * 0x00921280.
+   */
+  static void
+  MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
-	/**
-	 * Address: 0x00921500 (FUN_00921500)
-	 *
-	 * What it does:
-	 * Saves the characters, owned.
-	 */
-	void MemberSaveConstructArgs(
-		gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
-	);
+  /**
+   * Address: 0x00921500 (FUN_00921500)
+   *
+   * What it does:
+   * Saves the characters, owned.
+   */
+  void MemberSaveConstructArgs(
+    gpg::WriteArchive& archive,
+    int version,
+    const gpg::RRef& ownerRef,
+    gpg::SerSaveConstructArgsResult& result
+  );
 
-	/**
-	 * What it does:
-	 * Nothing: the construct hook built the string from its characters.
-	 * `SerSaveLoadHelper<TString>::Deserialize` 0x0091E4D0 is a bare `ret`.
-	 */
-	void MemberDeserialize(gpg::ReadArchive*) {}
+  /**
+   * What it does:
+   * Nothing: the construct hook built the string from its characters.
+   * `SerSaveLoadHelper<TString>::Deserialize` 0x0091E4D0 is a bare `ret`.
+   */
+  void MemberDeserialize(
+    gpg::ReadArchive*
+  )
+  {}
 
-	/**
-	 * What it does:
-	 * Nothing: the characters went out with the construct arguments.
-	 * `SerSaveLoadHelper<TString>::Serialize` 0x0091E4E0 is a bare `ret`.
-	 */
-	void MemberSerialize(gpg::WriteArchive*) const {}
+  /**
+   * What it does:
+   * Nothing: the characters went out with the construct arguments.
+   * `SerSaveLoadHelper<TString>::Serialize` 0x0091E4E0 is a bare `ret`.
+   */
+  void MemberSerialize(
+    gpg::WriteArchive*
+  ) const
+  {}
 };
 static_assert(offsetof(TString, tt) == 0x04, "TString::tt must be at +0x04");
 static_assert(offsetof(TString, marked) == 0x05, "TString::marked must be at +0x05");
@@ -96,70 +111,114 @@ static_assert(offsetof(TString, str) == 0x14, "TString::str must be at +0x14");
 struct Node
 {
 #if INTPTR_MAX == INT32_MAX
-	LuaPlus::TObject i_key; // Hash key.
-	LuaPlus::TObject i_val; // Hash value.
-	Node* next;             // Collision chain link.
+  LuaPlus::TObject i_key; // Hash key.
+  LuaPlus::TObject i_val; // Hash value.
+  Node* next;             // Collision chain link.
 
-	[[nodiscard]] Node* Next() const noexcept { return next; }
-	void SetNext(Node* const node) noexcept { next = node; }
+  [[nodiscard]] Node* Next() const noexcept
+  {
+    return next;
+  }
+  void SetNext(
+    Node* const node
+  ) noexcept
+  {
+    next = node;
+  }
 
-	[[nodiscard]] int KeyTag() const noexcept { return i_key.tt; }
-	[[nodiscard]] bool KeyIs(const int tag) const noexcept { return i_key.tt == tag; }
-	void SetKeyTag(const int tag) noexcept { i_key.tt = tag; }
-	[[nodiscard]] const LuaPlus::Value& KeyValue() const noexcept { return i_key.value; }
-	[[nodiscard]] LuaPlus::TObject Key() const noexcept { return i_key; }
-	void SetKey(const LuaPlus::TObject& key) noexcept { i_key = key; }
+  [[nodiscard]] int KeyTag() const noexcept
+  {
+    return i_key.tt;
+  }
+  [[nodiscard]] bool KeyIs(
+    const int tag
+  ) const noexcept
+  {
+    return i_key.tt == tag;
+  }
+  void SetKeyTag(
+    const int tag
+  ) noexcept
+  {
+    i_key.tt = tag;
+  }
+  [[nodiscard]] const LuaPlus::Value& KeyValue() const noexcept
+  {
+    return i_key.value;
+  }
+  [[nodiscard]] LuaPlus::TObject Key() const noexcept
+  {
+    return i_key;
+  }
+  void SetKey(
+    const LuaPlus::TObject& key
+  ) noexcept
+  {
+    i_key = key;
+  }
 #else
-	// Engine change on x64: the key's type tag and the chain link share one word, as a key's type needs
-	// 4 bits and the link is a distance within the table's node array (at most 2^24 nodes, setnodevector),
-	// so a node takes 16 bytes rather than 20. Lookups return the address of `i_val`, so the value stays
-	// a whole TObject. nblocks still counts the x86 20 (LuaMemAccounting.h).
-	LuaPlus::TObject i_val; // Hash value.
-	LuaPlus::Value keyValue; // Hash key's value.
-	std::uint32_t keyTagAndLink; // Low 4 bits: key type, kDeadKeyTag for LUA_TNONE. The rest: signed distance, 0: the end of the chain.
+  // Engine change on x64: the key's type tag and the chain link share one word, as a key's type needs
+  // 4 bits and the link is a distance within the table's node array (at most 2^24 nodes, setnodevector),
+  // so a node takes 16 bytes rather than 20. Lookups return the address of `i_val`, so the value stays
+  // a whole TObject. nblocks still counts the x86 20 (LuaMemAccounting.h).
+  LuaPlus::TObject i_val;      // Hash value.
+  LuaPlus::Value keyValue;     // Hash key's value.
+  std::uint32_t keyTagAndLink; // Low 4 bits: key type, kDeadKeyTag for LUA_TNONE. The rest: signed distance, 0: the end
+                               // of the chain.
 
-	static constexpr std::uint32_t kKeyTagMask = 0xFu;
-	static constexpr std::uint32_t kDeadKeyTag = 0xFu;
-	static constexpr int kLinkShift = 4;
+  static constexpr std::uint32_t kKeyTagMask = 0xFu;
+  static constexpr std::uint32_t kDeadKeyTag = 0xFu;
+  static constexpr int kLinkShift = 4;
 
-	[[nodiscard]] Node* Next() const noexcept
-	{
-		const std::int32_t distance = static_cast<std::int32_t>(keyTagAndLink) >> kLinkShift;
-		return distance != 0 ? const_cast<Node*>(this) + distance : nullptr;
-	}
-	void SetNext(const Node* const node) noexcept
-	{
-		const std::int32_t distance = node != nullptr ? static_cast<std::int32_t>(node - this) : 0;
-		keyTagAndLink = (keyTagAndLink & kKeyTagMask) | (static_cast<std::uint32_t>(distance) << kLinkShift);
-	}
+  [[nodiscard]] Node* Next() const noexcept
+  {
+    const std::int32_t distance = static_cast<std::int32_t>(keyTagAndLink) >> kLinkShift;
+    return distance != 0 ? const_cast<Node*>(this) + distance : nullptr;
+  }
+  void SetNext(
+    const Node* const node
+  ) noexcept
+  {
+    const std::int32_t distance = node != nullptr ? static_cast<std::int32_t>(node - this) : 0;
+    keyTagAndLink = (keyTagAndLink & kKeyTagMask) | (static_cast<std::uint32_t>(distance) << kLinkShift);
+  }
 
-	[[nodiscard]] int KeyTag() const noexcept
-	{
-		const std::uint32_t tag = keyTagAndLink & kKeyTagMask;
-		return tag == kDeadKeyTag ? LUA_TNONE : static_cast<int>(tag);
-	}
-	/// `tag` is a live type, never LUA_TNONE.
-	[[nodiscard]] bool KeyIs(const int tag) const noexcept
-	{
-		return (keyTagAndLink & kKeyTagMask) == static_cast<std::uint32_t>(tag);
-	}
-	void SetKeyTag(const int tag) noexcept
-	{
-		keyTagAndLink = (keyTagAndLink & ~kKeyTagMask) | (static_cast<std::uint32_t>(tag) & kKeyTagMask);
-	}
-	[[nodiscard]] const LuaPlus::Value& KeyValue() const noexcept { return keyValue; }
-	[[nodiscard]] LuaPlus::TObject Key() const noexcept
-	{
-		LuaPlus::TObject key;
-		key.tt = KeyTag();
-		key.value = keyValue;
-		return key;
-	}
-	void SetKey(const LuaPlus::TObject& key) noexcept
-	{
-		SetKeyTag(key.tt);
-		keyValue = key.value;
-	}
+  [[nodiscard]] int KeyTag() const noexcept
+  {
+    const std::uint32_t tag = keyTagAndLink & kKeyTagMask;
+    return tag == kDeadKeyTag ? LUA_TNONE : static_cast<int>(tag);
+  }
+  /// `tag` is a live type, never LUA_TNONE.
+  [[nodiscard]] bool KeyIs(
+    const int tag
+  ) const noexcept
+  {
+    return (keyTagAndLink & kKeyTagMask) == static_cast<std::uint32_t>(tag);
+  }
+  void SetKeyTag(
+    const int tag
+  ) noexcept
+  {
+    keyTagAndLink = (keyTagAndLink & ~kKeyTagMask) | (static_cast<std::uint32_t>(tag) & kKeyTagMask);
+  }
+  [[nodiscard]] const LuaPlus::Value& KeyValue() const noexcept
+  {
+    return keyValue;
+  }
+  [[nodiscard]] LuaPlus::TObject Key() const noexcept
+  {
+    LuaPlus::TObject key;
+    key.tt = KeyTag();
+    key.value = keyValue;
+    return key;
+  }
+  void SetKey(
+    const LuaPlus::TObject& key
+  ) noexcept
+  {
+    SetKeyTag(key.tt);
+    keyValue = key.value;
+  }
 #endif
 };
 
@@ -181,63 +240,65 @@ using NodeTakes16BytesOnX64 = char[sizeof(Node) == 0x10 ? 1 : -1];
 
 struct Table
 {
-	GCObject* next;          // +0x00
-	lu_byte tt;              // +0x04
-	lu_byte marked;          // +0x05
-	lu_byte reservedAfterHeader[2]; // +0x06 CommonHeader tail padding in this fork.
-	int8_t flags;            // +0x08 Cached "missing TM" bitset.
-	lu_byte lsizenode;       // +0x09 log2(node array size).
-	// +0x0A..0x0B implicit padding before the pointer lanes.
-	LuaPlus::ObjectPointer<Table> metatable; // +0x0C
-	LuaPlus::ObjectPointer<LuaPlus::TObject> array; // +0x10 Dense integer-key part.
-	LuaPlus::ObjectPointer<Node> node; // +0x14 Hash node array.
-	LuaPlus::ObjectPointer<Node> firstfree; // +0x18 First free hash node.
-	LuaPlus::ObjectPointer<GCObject> gclist; // +0x1C GC gray list link.
-	int sizearray;           // +0x20 Dense array slot count.
+  GCObject* next;                 // +0x00
+  lu_byte tt;                     // +0x04
+  lu_byte marked;                 // +0x05
+  lu_byte reservedAfterHeader[2]; // +0x06 CommonHeader tail padding in this fork.
+  int8_t flags;                   // +0x08 Cached "missing TM" bitset.
+  lu_byte lsizenode;              // +0x09 log2(node array size).
+  // +0x0A..0x0B implicit padding before the pointer lanes.
+  LuaPlus::ObjectPointer<Table> metatable;        // +0x0C
+  LuaPlus::ObjectPointer<LuaPlus::TObject> array; // +0x10 Dense integer-key part.
+  LuaPlus::ObjectPointer<Node> node;              // +0x14 Hash node array.
+  LuaPlus::ObjectPointer<Node> firstfree;         // +0x18 First free hash node.
+  LuaPlus::ObjectPointer<GCObject> gclist;        // +0x1C GC gray list link.
+  int sizearray;                                  // +0x20 Dense array slot count.
 
-	/**
-	 * Address: 0x00920530 (FUN_00920530, Table::MemberSerialize)
-	 *
-	 * What it does:
-	 * Serializes one table metatable pointer lane, dense array payload lanes,
-	 * and non-empty hash key/value lanes using the archive owner context.
-	 */
-	void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
+  /**
+   * Address: 0x00920530 (FUN_00920530, Table::MemberSerialize)
+   *
+   * What it does:
+   * Serializes one table metatable pointer lane, dense array payload lanes,
+   * and non-empty hash key/value lanes using the archive owner context.
+   */
+  void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
 
-	/**
-	 * Address: 0x00922950 (FUN_00922950, Table::MemberDeserialize)
-	 *
-	 * What it does:
-	 * Deserializes one Lua table metatable pointer lane, dense array payload
-	 * lanes, and hashed key/value lanes under owner GC traversal lock.
-	 */
-	void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
+  /**
+   * Address: 0x00922950 (FUN_00922950, Table::MemberDeserialize)
+   *
+   * What it does:
+   * Deserializes one Lua table metatable pointer lane, dense array payload
+   * lanes, and hashed key/value lanes under owner GC traversal lock.
+   */
+  void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
 
-	/**
-	 * What it does:
-	 * Reads whether the table was saved by name. A named table is looked up
-	 * in the loading state's `__serialize_object_for_name` and handed back
-	 * as it is; anything else is a fresh table of the saved array and hash
-	 * sizes, owned. Inlined into `SerConstructHelper<Table>::Construct`
-	 * 0x00922190.
-	 */
-	static void MemberConstruct(
-		gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-	);
+  /**
+   * What it does:
+   * Reads whether the table was saved by name. A named table is looked up
+   * in the loading state's `__serialize_object_for_name` and handed back
+   * as it is; anything else is a fresh table of the saved array and hash
+   * sizes, owned. Inlined into `SerConstructHelper<Table>::Construct`
+   * 0x00922190.
+   */
+  static void
+  MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
-	/**
-	 * Address: 0x00921590 (FUN_00921590)
-	 *
-	 * What it does:
-	 * Saves the table's name when the owning state's
-	 * `__serialize_name_for_object` has one for it, otherwise its array and
-	 * hash sizes.
-	 */
-	void MemberSaveConstructArgs(
-		gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
-	);
+  /**
+   * Address: 0x00921590 (FUN_00921590)
+   *
+   * What it does:
+   * Saves the table's name when the owning state's
+   * `__serialize_name_for_object` has one for it, otherwise its array and
+   * hash sizes.
+   */
+  void MemberSaveConstructArgs(
+    gpg::WriteArchive& archive,
+    int version,
+    const gpg::RRef& ownerRef,
+    gpg::SerSaveConstructArgsResult& result
+  );
 
-	static gpg::RType* sType;
+  static gpg::RType* sType;
 };
 
 // Layout confirmed from the binary, not inferred: luaH_new (FUN_00927320)
@@ -258,53 +319,55 @@ static_assert(sizeof(Table) == 0x24, "Table size must be 0x24 (luaH_new allocate
 
 struct Udata
 {
-	GCObject* next;
-	lu_byte tt;
-	lu_byte marked;
-	Table* metatable;
-	/// Reused by this fork to carry the object's `gpg::RType*` rather than a
-	/// byte count - see LuaObject::GetUserData (0x00907BC0), which reads it
-	/// from +0x0C and takes the payload from +0x10.
-	size_t len;
+  GCObject* next;
+  lu_byte tt;
+  lu_byte marked;
+  Table* metatable;
+  /// Reused by this fork to carry the object's `gpg::RType*` rather than a
+  /// byte count - see LuaObject::GetUserData (0x00907BC0), which reads it
+  /// from +0x0C and takes the payload from +0x10.
+  size_t len;
 
-	/**
-	 * Address: 0x009207E0 (FUN_009207E0, Udata::MemberSerialize)
-	 *
-	 * What it does:
-	 * Serializes userdata metatable pointer lane and typed payload bytes using
-	 * one owning Lua thread reference as archive owner context.
-	 */
-	void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
+  /**
+   * Address: 0x009207E0 (FUN_009207E0, Udata::MemberSerialize)
+   *
+   * What it does:
+   * Serializes userdata metatable pointer lane and typed payload bytes using
+   * one owning Lua thread reference as archive owner context.
+   */
+  void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
 
-	/**
-	 * Address: 0x00923170 (FUN_00923170, Udata::MemberDeserialize)
-	 *
-	 * What it does:
-	 * Deserializes userdata metatable pointer lane and payload bytes under one
-	 * owning Lua thread traversal lock context.
-	 */
-	void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
+  /**
+   * Address: 0x00923170 (FUN_00923170, Udata::MemberDeserialize)
+   *
+   * What it does:
+   * Deserializes userdata metatable pointer lane and payload bytes under one
+   * owning Lua thread traversal lock context.
+   */
+  void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
 
-	/**
-	 * What it does:
-	 * Reads the payload type and builds a default-constructed userdata of it
-	 * in the owning thread's state (`luaS_newudata`), owned. Inlined into
-	 * `SerConstructHelper<Udata>::Construct` 0x00920D30.
-	 */
-	static void MemberConstruct(
-		gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-	);
+  /**
+   * What it does:
+   * Reads the payload type and builds a default-constructed userdata of it
+   * in the owning thread's state (`luaS_newudata`), owned. Inlined into
+   * `SerConstructHelper<Udata>::Construct` 0x00920D30.
+   */
+  static void
+  MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
-	/**
-	 * What it does:
-	 * Saves the payload type, owned. Inlined into
-	 * `SerSaveConstructHelper<Udata>::SaveConstructArgs` 0x0091E530.
-	 */
-	void MemberSaveConstructArgs(
-		gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
-	);
+  /**
+   * What it does:
+   * Saves the payload type, owned. Inlined into
+   * `SerSaveConstructHelper<Udata>::SaveConstructArgs` 0x0091E530.
+   */
+  void MemberSaveConstructArgs(
+    gpg::WriteArchive& archive,
+    int version,
+    const gpg::RRef& ownerRef,
+    gpg::SerSaveConstructArgsResult& result
+  );
 
-	static gpg::RType* sType;
+  static gpg::RType* sType;
 };
 static_assert(offsetof(Udata, metatable) == 0x08, "Udata::metatable offset must be 0x08");
 static_assert(offsetof(Udata, len) == 0x0C, "Udata::len offset must be 0x0C");
@@ -312,24 +375,24 @@ static_assert(sizeof(Udata) == 0x10, "Udata size must be 0x10");
 
 struct CClosure
 {
-	GCObject* next;
-	lu_byte tt;
-	lu_byte marked;
-	int8_t reservedHeader[2];
-	lu_byte nupvalues;
-	lu_byte isC;
-	GCObject* gclist;
-	CFunction f;
-	lu_byte reservedTail[36]; // Build-specific expansion before upvalue tail.
-	LuaPlus::TObject upvalue_m1[1];
-	LuaPlus::TObject upvalue[1];
+  GCObject* next;
+  lu_byte tt;
+  lu_byte marked;
+  int8_t reservedHeader[2];
+  lu_byte nupvalues;
+  lu_byte isC;
+  GCObject* gclist;
+  CFunction f;
+  lu_byte reservedTail[36]; // Build-specific expansion before upvalue tail.
+  LuaPlus::TObject upvalue_m1[1];
+  LuaPlus::TObject upvalue[1];
 };
 
 struct LocVar
 {
-	TString* varname;
-	int startpc;
-	int endpc;
+  TString* varname;
+  int startpc;
+  int endpc;
 };
 
 // Proto's `int64_t reserved8` forces a natural 8-byte alignment, so any
@@ -337,75 +400,77 @@ struct LocVar
 // specifier — the natural alignment is correct and matches the binary layout.
 struct Proto
 {
-	GCObject* next;
-	lu_byte tt;
-	lu_byte marked;
-	LuaPlus::TObject* k; // Constant table.
-	Instruction* code;   // Bytecode stream.
-	Proto** p;           // Nested function prototypes.
-	int* lineinfo;       // PC -> source line map.
-	LocVar* locvars;     // Local debug names/ranges.
-	TString** upvalues;  // Upvalue names.
-	TString* source;     // Defining chunk name.
-	int sizeupvalues;
-	int sizek;
-	int sizecode;
-	int sizelineinfo;
-	int sizep;
-	int sizelocvars;
-	int lineDefined;
-	GCObject* gclist;
-	lu_byte nups;
-	lu_byte numparams;
-	lu_byte is_vararg;
-	lu_byte maxstacksize;
-	int32_t reserved0;
-	int32_t reserved1;
-	int32_t reserved2;
-	int32_t reserved3;
-	int32_t reserved4;
-	int32_t reserved5;
-	int32_t reserved6;
-	int32_t reserved7;
-	int64_t reserved8;
+  GCObject* next;
+  lu_byte tt;
+  lu_byte marked;
+  LuaPlus::TObject* k; // Constant table.
+  Instruction* code;   // Bytecode stream.
+  Proto** p;           // Nested function prototypes.
+  int* lineinfo;       // PC -> source line map.
+  LocVar* locvars;     // Local debug names/ranges.
+  TString** upvalues;  // Upvalue names.
+  TString* source;     // Defining chunk name.
+  int sizeupvalues;
+  int sizek;
+  int sizecode;
+  int sizelineinfo;
+  int sizep;
+  int sizelocvars;
+  int lineDefined;
+  GCObject* gclist;
+  lu_byte nups;
+  lu_byte numparams;
+  lu_byte is_vararg;
+  lu_byte maxstacksize;
+  int32_t reserved0;
+  int32_t reserved1;
+  int32_t reserved2;
+  int32_t reserved3;
+  int32_t reserved4;
+  int32_t reserved5;
+  int32_t reserved6;
+  int32_t reserved7;
+  int64_t reserved8;
 
-	/**
-	 * Address: 0x00920E40 (FUN_00920E40, Proto::MemberSerialize)
-	 *
-	 * What it does:
-	 * Serializes proto scalar metadata, constants/code/nested-proto lanes, and
-	 * debug name/source pointer lanes under the owning thread archive context.
-	 */
-	void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
+  /**
+   * Address: 0x00920E40 (FUN_00920E40, Proto::MemberSerialize)
+   *
+   * What it does:
+   * Serializes proto scalar metadata, constants/code/nested-proto lanes, and
+   * debug name/source pointer lanes under the owning thread archive context.
+   */
+  void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
 
-	/**
-	 * Address: 0x00922B20 (FUN_00922B20, Proto::MemberDeserialize)
-	 *
-	 * What it does:
-	 * Deserializes proto scalar metadata, constants/code/nested-proto lanes,
-	 * and debug name/source pointer lanes, then validates bytecode consistency.
-	 */
-	void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
+  /**
+   * Address: 0x00922B20 (FUN_00922B20, Proto::MemberDeserialize)
+   *
+   * What it does:
+   * Deserializes proto scalar metadata, constants/code/nested-proto lanes,
+   * and debug name/source pointer lanes, then validates bytecode consistency.
+   */
+  void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
 
-	/**
-	 * What it does:
-	 * Builds an empty prototype in the owning thread's state, owned. Inlined
-	 * into `SerConstructHelper<Proto>::Construct` 0x00920C20.
-	 */
-	static void MemberConstruct(
-		gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-	);
+  /**
+   * What it does:
+   * Builds an empty prototype in the owning thread's state, owned. Inlined
+   * into `SerConstructHelper<Proto>::Construct` 0x00920C20.
+   */
+  static void
+  MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
-	/**
-	 * What it does:
-	 * Saves nothing; the prototype is owned. Inlined into
-	 * `SerSaveConstructHelper<Proto>::SaveConstructArgs` 0x0091E520.
-	 */
-	void MemberSaveConstructArgs(
-		gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
-	);
+  /**
+   * What it does:
+   * Saves nothing; the prototype is owned. Inlined into
+   * `SerSaveConstructHelper<Proto>::SaveConstructArgs` 0x0091E520.
+   */
+  void MemberSaveConstructArgs(
+    gpg::WriteArchive& archive,
+    int version,
+    const gpg::RRef& ownerRef,
+    gpg::SerSaveConstructArgsResult& result
+  );
 
-	static gpg::RType* sType;
+  static gpg::RType* sType;
 };
 
 // Proto's head is pinned by two functions in the binary that walk it field by
@@ -462,43 +527,45 @@ static_assert(offsetof(Proto, maxstacksize) == 0x47, "Proto::maxstacksize offset
 
 struct UpVal
 {
-	GCObject* next;
-	lu_byte tt;
-	lu_byte marked;
-	LuaPlus::TObject* v; // Points to stack slot when open.
-	LuaPlus::TObject value; // Closed value storage.
+  GCObject* next;
+  lu_byte tt;
+  lu_byte marked;
+  LuaPlus::TObject* v;    // Points to stack slot when open.
+  LuaPlus::TObject value; // Closed value storage.
 
-	/**
-	 * What it does:
-	 * Builds a closed upvalue in the owning thread's state, owned. Inlined
-	 * into `SerConstructHelper<UpVal>::Construct` 0x00920B10.
-	 */
-	static void MemberConstruct(
-		gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-	);
+  /**
+   * What it does:
+   * Builds a closed upvalue in the owning thread's state, owned. Inlined
+   * into `SerConstructHelper<UpVal>::Construct` 0x00920B10.
+   */
+  static void
+  MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
-	/**
-	 * What it does:
-	 * Saves nothing; the upvalue is owned. Inlined into
-	 * `SerSaveConstructHelper<UpVal>::SaveConstructArgs` 0x0091E510.
-	 */
-	void MemberSaveConstructArgs(
-		gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
-	);
+  /**
+   * What it does:
+   * Saves nothing; the upvalue is owned. Inlined into
+   * `SerSaveConstructHelper<UpVal>::SaveConstructArgs` 0x0091E510.
+   */
+  void MemberSaveConstructArgs(
+    gpg::WriteArchive& archive,
+    int version,
+    const gpg::RRef& ownerRef,
+    gpg::SerSaveConstructArgsResult& result
+  );
 
-	/**
-	 * What it does:
-	 * Loads the value `v` points at. Inlined into
-	 * `SerSaveLoadHelper<UpVal>::Deserialize` 0x00920B60.
-	 */
-	void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
+  /**
+   * What it does:
+   * Loads the value `v` points at. Inlined into
+   * `SerSaveLoadHelper<UpVal>::Deserialize` 0x00920B60.
+   */
+  void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
 
-	/**
-	 * What it does:
-	 * Saves the value `v` points at. Inlined into
-	 * `SerSaveLoadHelper<UpVal>::Serialize` 0x00920BA0.
-	 */
-	void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef) const;
+  /**
+   * What it does:
+   * Saves the value `v` points at. Inlined into
+   * `SerSaveLoadHelper<UpVal>::Serialize` 0x00920BA0.
+   */
+  void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef) const;
 };
 
 // luaF_newupval (FUN_00914F40) allocates "push 14h" and stores
@@ -513,99 +580,101 @@ static_assert(sizeof(UpVal) == 0x14, "UpVal size must be 0x14 (luaF_newupval all
 // every `cl.l.p` read was landing on the wrong field.
 struct LClosure
 {
-	GCObject* next;                  // +0x00
-	lu_byte tt;                      // +0x04
-	lu_byte marked;                  // +0x05
-	lu_byte reservedAfterHeader[2];  // +0x06 CommonHeader tail padding.
-	lu_byte nupvalues;               // +0x08
-	lu_byte isC;                     // +0x09
-	lu_byte reservedAfterCounts[2];  // +0x0A
-	GCObject* gclist;                // +0x0C
-	LuaPlus::TObject g;              // +0x10 Closure environment/global table.
-	Proto* p;                        // +0x18
-	UpVal* upvals[1];                // +0x1C Flexible tail, one pointer each.
+  GCObject* next;                 // +0x00
+  lu_byte tt;                     // +0x04
+  lu_byte marked;                 // +0x05
+  lu_byte reservedAfterHeader[2]; // +0x06 CommonHeader tail padding.
+  lu_byte nupvalues;              // +0x08
+  lu_byte isC;                    // +0x09
+  lu_byte reservedAfterCounts[2]; // +0x0A
+  GCObject* gclist;               // +0x0C
+  LuaPlus::TObject g;             // +0x10 Closure environment/global table.
+  Proto* p;                       // +0x18
+  UpVal* upvals[1];               // +0x1C Flexible tail, one pointer each.
 
-	/**
-	 * Address: 0x00920DA0 (FUN_00920DA0, LClosure::MemberSerialize)
-	 *
-	 * What it does:
-	 * Serializes one closure's proto pointer, global-object lane, and upvalue
-	 * pointer array lanes under the owning thread archive context.
-	 */
-	void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
+  /**
+   * Address: 0x00920DA0 (FUN_00920DA0, LClosure::MemberSerialize)
+   *
+   * What it does:
+   * Serializes one closure's proto pointer, global-object lane, and upvalue
+   * pointer array lanes under the owning thread archive context.
+   */
+  void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
 
-	/**
-	 * Address: 0x00922AB0 (FUN_00922AB0, LClosure::MemberDeserialize)
-	 *
-	 * What it does:
-	 * Deserializes prototype/global-object/upvalue pointer lanes for one
-	 * Lua closure object.
-	 */
-	void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
+  /**
+   * Address: 0x00922AB0 (FUN_00922AB0, LClosure::MemberDeserialize)
+   *
+   * What it does:
+   * Deserializes prototype/global-object/upvalue pointer lanes for one
+   * Lua closure object.
+   */
+  void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
 
-	/**
-	 * What it does:
-	 * Reads the upvalue count and builds a closure with that many slots over
-	 * the owning thread's globals, owned. Inlined into
-	 * `SerConstructHelper<LClosure>::Construct` 0x00920A80.
-	 */
-	static void MemberConstruct(
-		gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-	);
+  /**
+   * What it does:
+   * Reads the upvalue count and builds a closure with that many slots over
+   * the owning thread's globals, owned. Inlined into
+   * `SerConstructHelper<LClosure>::Construct` 0x00920A80.
+   */
+  static void
+  MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
-	/**
-	 * What it does:
-	 * Saves the upvalue count, owned. Inlined into
-	 * `SerSaveConstructHelper<LClosure>::SaveConstructArgs` 0x0091F490.
-	 */
-	void MemberSaveConstructArgs(
-		gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
-	);
+  /**
+   * What it does:
+   * Saves the upvalue count, owned. Inlined into
+   * `SerSaveConstructHelper<LClosure>::SaveConstructArgs` 0x0091F490.
+   */
+  void MemberSaveConstructArgs(
+    gpg::WriteArchive& archive,
+    int version,
+    const gpg::RRef& ownerRef,
+    gpg::SerSaveConstructArgsResult& result
+  );
 
-	static gpg::RType* sType;
+  static gpg::RType* sType;
 };
 
 union Closure
 {
-	CClosure c;
-	LClosure l;
+  CClosure c;
+  LClosure l;
 };
 
 struct CallInfo
 {
-	LuaPlus::StkId base;    // Base stack slot for this frame.
-	LuaPlus::StkId top;     // Stack limit for this frame.
-	int state;              // CI_* state flags.
-	const Instruction* savedpc;
-	const Instruction** pc; // Live interpreter PC pointer.
-	int32_t reserved0;
-	int32_t reserved1;
-	int32_t reserved2;
-	int tailcalls;          // Number of collapsed tail calls.
-	int32_t reserved3;
+  LuaPlus::StkId base; // Base stack slot for this frame.
+  LuaPlus::StkId top;  // Stack limit for this frame.
+  int state;           // CI_* state flags.
+  const Instruction* savedpc;
+  const Instruction** pc; // Live interpreter PC pointer.
+  int32_t reserved0;
+  int32_t reserved1;
+  int32_t reserved2;
+  int tailcalls; // Number of collapsed tail calls.
+  int32_t reserved3;
 };
 
 struct Mbuffer
 {
-	char* buffer;
-	size_t buffsize;
+  char* buffer;
+  size_t buffsize;
 };
 
 struct stringtable
 {
-	GCObject** hash;
-	ls_nstr nuse;
-	int size;
+  GCObject** hash;
+  ls_nstr nuse;
+  int size;
 };
 
 struct GCState
 {
-	GCObject* tmark;
-	GCObject* wk;
-	GCObject* wv;
-	GCObject* wkv;
-	global_State* g;
-	lua_State* L;
+  GCObject* tmark;
+  GCObject* wk;
+  GCObject* wv;
+  GCObject* wkv;
+  global_State* g;
+  lua_State* L;
 };
 
 // Every offset below is pinned by a concrete instruction in the shipped
@@ -615,121 +684,123 @@ struct GCState
 // and made `_registry`/`_defaultmeta` alias each other's halves.
 struct global_State
 {
-	stringtable strt;            // +0x00 Interned string table.
-	GCObject* rootgc;            // +0x0C Main GC root list.
-	GCObject* rootgc1;           // +0x10 Secondary GC root list lane (debug traversal).
-	GCObject* rootudata;         // +0x14 Userdata root list.
-	GCObject* tmudata;           // +0x18 Userdata queued for finalization.
-	Mbuffer buff;                // +0x1C Scratch concat buffer.
-	lu_mem GCthreshold;          // +0x24 Next GC trigger threshold.
-	int32_t gcTraversalLockDepth; // +0x28 GC traversal lock counter used by debug helpers.
-	lu_mem nblocks;              // +0x2C Bytes currently allocated.
-	LuaPlus::TObject _registry;  // +0x30 Registry table.
-	LuaPlus::TObject _defaultmeta; // +0x38 Default table/userdata metatable.
-	lua_State* mainthread;       // +0x40 Main thread.
-	lua_State* lstate;           // +0x44 Currently active thread.
-	Node dummynode[1];           // +0x48 Shared empty-table node.
-	TString* tmname[18];         // +0x5C Interned tag-method names.
-	TString* typenames[12];      // +0xA4 Interned type-name strings, indexed by tag.
-	LuaPlus::TObject _defaultmetatypes[12]; // +0xD4 Default metatable per type tag.
-	void (*fatalErrorFunc)(void);   // +0x134 Fatal VM error sink.
-	void* memData;                  // +0x138 Allocator user context.
-	ReallocFunction reallocFunc;    // +0x13C Custom realloc callback.
-	FreeFunction freeFunc;          // +0x140 Custom free callback.
-	int minimumstrings;             // +0x144 String table floor.
-	moho::Sim* globalUserData;      // +0x148 Engine-owned Lua global userdata.
-	void(__cdecl* userGCFunction)(GCState*); // +0x14C Engine GC callback hook.
-	lu_byte allocationTrackingEnabled; // +0x150 Debug allocation-tracking gate.
-	lu_byte hookmask;               // +0x151 Hook event mask (CALL/RET/LINE/COUNT).
-	lu_byte allowhook;              // +0x152 Hook enable gate.
-	lu_byte reservedAfterAllowHook; // +0x153 Padding to the hook-count block.
-	int32_t basehookcount;          // +0x154 Hook countdown reset value.
-	int32_t hookcount;              // +0x158 Current hook countdown.
-	Hook hook;                      // +0x15C Active debug hook callback.
+  stringtable strt;                        // +0x00 Interned string table.
+  GCObject* rootgc;                        // +0x0C Main GC root list.
+  GCObject* rootgc1;                       // +0x10 Secondary GC root list lane (debug traversal).
+  GCObject* rootudata;                     // +0x14 Userdata root list.
+  GCObject* tmudata;                       // +0x18 Userdata queued for finalization.
+  Mbuffer buff;                            // +0x1C Scratch concat buffer.
+  lu_mem GCthreshold;                      // +0x24 Next GC trigger threshold.
+  int32_t gcTraversalLockDepth;            // +0x28 GC traversal lock counter used by debug helpers.
+  lu_mem nblocks;                          // +0x2C Bytes currently allocated.
+  LuaPlus::TObject _registry;              // +0x30 Registry table.
+  LuaPlus::TObject _defaultmeta;           // +0x38 Default table/userdata metatable.
+  lua_State* mainthread;                   // +0x40 Main thread.
+  lua_State* lstate;                       // +0x44 Currently active thread.
+  Node dummynode[1];                       // +0x48 Shared empty-table node.
+  TString* tmname[18];                     // +0x5C Interned tag-method names.
+  TString* typenames[12];                  // +0xA4 Interned type-name strings, indexed by tag.
+  LuaPlus::TObject _defaultmetatypes[12];  // +0xD4 Default metatable per type tag.
+  void (*fatalErrorFunc)(void);            // +0x134 Fatal VM error sink.
+  void* memData;                           // +0x138 Allocator user context.
+  ReallocFunction reallocFunc;             // +0x13C Custom realloc callback.
+  FreeFunction freeFunc;                   // +0x140 Custom free callback.
+  int minimumstrings;                      // +0x144 String table floor.
+  moho::Sim* globalUserData;               // +0x148 Engine-owned Lua global userdata.
+  void(__cdecl* userGCFunction)(GCState*); // +0x14C Engine GC callback hook.
+  lu_byte allocationTrackingEnabled;       // +0x150 Debug allocation-tracking gate.
+  lu_byte hookmask;                        // +0x151 Hook event mask (CALL/RET/LINE/COUNT).
+  lu_byte allowhook;                       // +0x152 Hook enable gate.
+  lu_byte reservedAfterAllowHook;          // +0x153 Padding to the hook-count block.
+  int32_t basehookcount;                   // +0x154 Hook countdown reset value.
+  int32_t hookcount;                       // +0x158 Current hook countdown.
+  Hook hook;                               // +0x15C Active debug hook callback.
 };
 
 struct __declspec(align(8)) lua_State
 {
-	GCObject* next;
-	lu_byte tt;
-	lu_byte marked;
-	LuaPlus::TObject* top;        // First free stack slot.
-	LuaPlus::StkId base;          // Base of current function frame.
-	global_State* l_G;            // Shared global VM state.
-	CallInfo* ci;                 // Current call frame.
-	LuaPlus::StkId stack_last;    // Last valid stack slot.
-	LuaPlus::StkId stack;         // Stack base.
-	int stacksize;                // Allocated stack slots.
-	CallInfo* end_ci;             // End of callinfo array.
-	CallInfo* base_ci;            // Callinfo array start.
-	unsigned __int16 size_ci;     // Number of CallInfo entries.
-	unsigned __int16 nCcalls;     // Nested C-call depth.
-	LuaPlus::TObject _gt;         // Thread global table reference.
-	GCObject* openupval;          // Open upvalue list head.
-	GCObject* gclist;             // Thread GC list link.
-	unsigned int allocFlags;      // Allocator behavior flags.
-	LuaPlus::LuaState* stateUserData; // C++ LuaState wrapper back-pointer.
+  GCObject* next;
+  lu_byte tt;
+  lu_byte marked;
+  LuaPlus::TObject* top;            // First free stack slot.
+  LuaPlus::StkId base;              // Base of current function frame.
+  global_State* l_G;                // Shared global VM state.
+  CallInfo* ci;                     // Current call frame.
+  LuaPlus::StkId stack_last;        // Last valid stack slot.
+  LuaPlus::StkId stack;             // Stack base.
+  int stacksize;                    // Allocated stack slots.
+  CallInfo* end_ci;                 // End of callinfo array.
+  CallInfo* base_ci;                // Callinfo array start.
+  unsigned __int16 size_ci;         // Number of CallInfo entries.
+  unsigned __int16 nCcalls;         // Nested C-call depth.
+  LuaPlus::TObject _gt;             // Thread global table reference.
+  GCObject* openupval;              // Open upvalue list head.
+  GCObject* gclist;                 // Thread GC list link.
+  unsigned int allocFlags;          // Allocator behavior flags.
+  LuaPlus::LuaState* stateUserData; // C++ LuaState wrapper back-pointer.
 
-	/**
-	 * Address: 0x00921050 (FUN_00921050, lua_State::MemberSerialize)
-	 *
-	 * What it does:
-	 * Serializes raw VM stack/callframe/global/upvalue lanes for one
-	 * `lua_State` runtime object.
-	 */
-	void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
+  /**
+   * Address: 0x00921050 (FUN_00921050, lua_State::MemberSerialize)
+   *
+   * What it does:
+   * Serializes raw VM stack/callframe/global/upvalue lanes for one
+   * `lua_State` runtime object.
+   */
+  void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
 
-	/**
-	 * Address: 0x00922DD0 (FUN_00922DD0, lua_State::MemberDeserialize)
-	 *
-	 * What it does:
-	 * Restores one Lua thread stack/callframe/global/upvalue lane set from a
-	 * serialized archive payload.
-	 */
-	void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
+  /**
+   * Address: 0x00922DD0 (FUN_00922DD0, lua_State::MemberDeserialize)
+   *
+   * What it does:
+   * Restores one Lua thread stack/callframe/global/upvalue lane set from a
+   * serialized archive payload.
+   */
+  void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
 
-	/**
-	 * What it does:
-	 * Reads whether the saved thread was the main one: that is the loading
-	 * state itself, handed back unowned; any other becomes a new thread of
-	 * it, owned. Inlined into `SerConstructHelper<lua_State>::Construct`
-	 * 0x00920C70.
-	 */
-	static void MemberConstruct(
-		gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-	);
+  /**
+   * What it does:
+   * Reads whether the saved thread was the main one: that is the loading
+   * state itself, handed back unowned; any other becomes a new thread of
+   * it, owned. Inlined into `SerConstructHelper<lua_State>::Construct`
+   * 0x00920C70.
+   */
+  static void
+  MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
-	/**
-	 * Address: 0x00921630 (FUN_00921630)
-	 *
-	 * What it does:
-	 * Checks the thread belongs to the owning state and saves whether it is
-	 * the main one; refuses a thread inside a C call.
-	 */
-	void MemberSaveConstructArgs(
-		gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
-	);
+  /**
+   * Address: 0x00921630 (FUN_00921630)
+   *
+   * What it does:
+   * Checks the thread belongs to the owning state and saves whether it is
+   * the main one; refuses a thread inside a C call.
+   */
+  void MemberSaveConstructArgs(
+    gpg::WriteArchive& archive,
+    int version,
+    const gpg::RRef& ownerRef,
+    gpg::SerSaveConstructArgsResult& result
+  );
 
-	// The object ends at +0x48: lua_open (FUN_009246D0) allocates it with
-	// "push 48h" -> luaM_realloc, and f_luaopen stores
-	// sizeof(lua_State) + sizeof(global_State) into nblocks as 0x1A8, which
-	// leaves exactly 0x1A8 - 0x160 = 0x48 for this struct. It used to carry
-	// 0x20 bytes of unproven trailing slots (errorJmp/errfunc/allocName and
-	// filler), so any write through them landed past the real allocation.
+  // The object ends at +0x48: lua_open (FUN_009246D0) allocates it with
+  // "push 48h" -> luaM_realloc, and f_luaopen stores
+  // sizeof(lua_State) + sizeof(global_State) into nblocks as 0x1A8, which
+  // leaves exactly 0x1A8 - 0x160 = 0x48 for this struct. It used to carry
+  // 0x20 bytes of unproven trailing slots (errorJmp/errfunc/allocName and
+  // filler), so any write through them landed past the real allocation.
 
-	static gpg::RType* sType;
+  static gpg::RType* sType;
 };
 
 union GCObject
 {
-	GCheader gch;
-	TString ts;
-	Udata u;
-	Closure cl;
-	Table h;
-	Proto p;
-	UpVal uv;
-	lua_State th;
+  GCheader gch;
+  TString ts;
+  Udata u;
+  Closure cl;
+  Table h;
+  Proto p;
+  UpVal uv;
+  lua_State th;
 };
 
 #if INTPTR_MAX == INT32_MAX
@@ -782,8 +853,8 @@ static_assert(offsetof(global_State, tmudata) == 0x18, "global_State::tmudata mu
 static_assert(offsetof(global_State, buff) == 0x1C, "global_State::buff must be at +0x1C (x86)");
 static_assert(offsetof(global_State, GCthreshold) == 0x24, "global_State::GCthreshold must be at +0x24 (x86)");
 static_assert(
-	offsetof(global_State, gcTraversalLockDepth) == 0x28,
-	"global_State::gcTraversalLockDepth must be at +0x28 (x86)"
+  offsetof(global_State, gcTraversalLockDepth) == 0x28,
+  "global_State::gcTraversalLockDepth must be at +0x28 (x86)"
 );
 static_assert(offsetof(global_State, nblocks) == 0x2C, "global_State::nblocks must be at +0x2C (x86)");
 static_assert(offsetof(global_State, _registry) == 0x30, "global_State::_registry must be at +0x30 (x86)");
@@ -794,8 +865,8 @@ static_assert(offsetof(global_State, dummynode) == 0x48, "global_State::dummynod
 static_assert(offsetof(global_State, tmname) == 0x5C, "global_State::tmname must be at +0x5C (x86)");
 static_assert(offsetof(global_State, typenames) == 0xA4, "global_State::typenames must be at +0xA4 (x86)");
 static_assert(
-	offsetof(global_State, _defaultmetatypes) == 0xD4,
-	"global_State::_defaultmetatypes must be at +0xD4 (x86)"
+  offsetof(global_State, _defaultmetatypes) == 0xD4,
+  "global_State::_defaultmetatypes must be at +0xD4 (x86)"
 );
 static_assert(offsetof(global_State, fatalErrorFunc) == 0x134, "global_State::fatalErrorFunc must be at +0x134 (x86)");
 static_assert(offsetof(global_State, memData) == 0x138, "global_State::memData must be at +0x138 (x86)");
@@ -805,8 +876,8 @@ static_assert(offsetof(global_State, minimumstrings) == 0x144, "global_State::mi
 static_assert(offsetof(global_State, globalUserData) == 0x148, "global_State::globalUserData must be at +0x148 (x86)");
 static_assert(offsetof(global_State, userGCFunction) == 0x14C, "global_State::userGCFunction must be at +0x14C (x86)");
 static_assert(
-	offsetof(global_State, allocationTrackingEnabled) == 0x150,
-	"global_State::allocationTrackingEnabled must be at +0x150 (x86)"
+  offsetof(global_State, allocationTrackingEnabled) == 0x150,
+  "global_State::allocationTrackingEnabled must be at +0x150 (x86)"
 );
 static_assert(offsetof(global_State, hookmask) == 0x151, "global_State::hookmask must be at +0x151 (x86)");
 static_assert(offsetof(global_State, allowhook) == 0x152, "global_State::allowhook must be at +0x152 (x86)");

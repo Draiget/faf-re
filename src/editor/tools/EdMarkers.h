@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -30,6 +31,15 @@ namespace faf::editor
   /** The palette entry of a `type` string, or null. */
   const MarkerType* FindMarkerType(const std::string& type);
 
+  /**
+   * What FAF's game code does with markers of `type` (its Lua as of 2026-11: lua/AI, lua/sim), one or two sentences;
+   * empty for a type it doesn't know.
+   */
+  const char* MarkerTypeUse(const std::string& type);
+  /** Whether the game reads a marker field (`hint` no, `adjacentTo` yes) and what for; empty for one it doesn't know.
+   */
+  const char* MarkerFieldUse(const std::string& key);
+
   /** The next free name for a type among `markers` (`Mass 07`, or `ARMY_9` for a start position). */
   std::string NextMarkerName(const std::vector<SaveEntry>& markers, const MarkerType& type);
 
@@ -40,6 +50,32 @@ namespace faf::editor
   bool MarkerPosition(const SaveEntry& marker, float& x, float& y, float& z);
   /** A marker's colour as ARGB (from `color`, else grey). */
   std::uint32_t MarkerColor(const SaveEntry& marker);
+
+  /**
+   * One marker property's value as `_save.lua` writes it, by kind (user ask 2026-11-11: typed fields, not raw Lua):
+   * `STRING( 'x' )`, `FLOAT( 1.5 )`, `BOOLEAN( true )`, `VECTOR3( 1, 2, 3 )`; anything else stays raw text.
+   */
+  struct MarkerValue
+  {
+    enum class Kind
+    {
+      Raw,
+      String,
+      Float,
+      Bool,
+      Vector3,
+    };
+    Kind kind = Kind::Raw;
+    std::string text; // String: the string; Raw: the whole text
+    float number[3] = {0.0f, 0.0f, 0.0f};
+    bool flag = false;
+  };
+  MarkerValue ParseMarkerValue(const std::string& text);
+  std::string WriteMarkerValue(const MarkerValue& value);
+  /** A colour string as the game's markers keep them (`'ff800080'`: alpha, red, green, blue in hex); false when not
+   * one. */
+  bool MarkerColourText(const std::string& text, float rgba[4]);
+  std::string MarkerColourOf(const float rgba[4]);
   /** A marker's `type` string. */
   std::string MarkerTypeOf(const SaveEntry& marker);
   /** A path node's neighbours (`adjacentTo`, names split on spaces). */
@@ -54,6 +90,21 @@ namespace faf::editor
    * (land and water) aren't linked. Returns whether anything changed.
    */
   bool SetMarkerLink(std::vector<SaveEntry>& markers, const std::string& a, const std::string& b, bool linked);
+
+  /**
+   * An N x N grid of air path nodes over the rectangle (x0, z0)-(x1, z1), each a cell's middle and linked to its 8
+   * neighbours, as FAForeverMapEditor's air presets lay them (16 x 16 over the map, a sixteenth apart, half a step in).
+   * Named after `existing` (AirPN<nn> not yet taken); heights from `height`. Returned in rows, the links set.
+   */
+  std::vector<SaveEntry> AirNodeGrid(
+    const std::vector<SaveEntry>& existing,
+    int count,
+    float x0,
+    float z0,
+    float x1,
+    float z1,
+    const std::function<float(float, float)>& height
+  );
   /** Drops every link naming `name` (the marker is being deleted); returns how many markers changed. */
   int RemoveLinksTo(std::vector<SaveEntry>& markers, const std::string& name);
   /** The marker tree's groups, in the order the panel lists them. */

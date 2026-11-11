@@ -19,7 +19,7 @@ namespace moho
   {
   public:
     /**
-       * Address: 0x006A4E60 (FUN_006A4E60)
+     * Address: 0x006A4E60 (FUN_006A4E60)
      *
      * What it does:
      * Constructs and preregisters RTTI metadata for `SInfoCache`.

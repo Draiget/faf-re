@@ -34,7 +34,7 @@ namespace faf
         const char* end = start + (m_blockSize * m_nextCapacity);
 
         if (p >= start && p < end) {
-            return true;
+          return true;
         }
       }
       return false;

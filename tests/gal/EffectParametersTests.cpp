@@ -28,14 +28,18 @@ namespace
   class GalParameterStore : public ::testing::Test
   {
   protected:
-    void Load(const std::string& source)
+    void Load(
+      const std::string& source
+    )
     {
       mDescription = ParseEffect(source);
       mLayout = ComputeConstantLayout(mDescription);
       mStore.Initialize(mDescription, mLayout);
     }
 
-    [[nodiscard]] std::uint32_t Index(const std::string& name) const
+    [[nodiscard]] std::uint32_t Index(
+      const std::string& name
+    ) const
     {
       for (std::uint32_t index = 0U; index < mDescription.parameters.size(); ++index) {
         if (mDescription.parameters[index].name == name) {
@@ -46,15 +50,32 @@ namespace
       return 0xFFFFFFFFU;
     }
 
-    [[nodiscard]] std::uint32_t Offset(const std::string& name) const
+    [[nodiscard]] std::uint32_t Offset(
+      const std::string& name
+    ) const
     {
       const ConstantSlot* const slot = mLayout.Find(Index(name));
       return (slot != nullptr) ? slot->offset : 0xFFFFFFFFU;
     }
 
-    [[nodiscard]] float F(const std::size_t offset) const { return FloatAt(mStore.Constants(), offset); }
-    [[nodiscard]] std::uint32_t W(const std::size_t offset) const { return WordAt(mStore.Constants(), offset); }
-    [[nodiscard]] std::int32_t I(const std::size_t offset) const { return IntAt(mStore.Constants(), offset); }
+    [[nodiscard]] float F(
+      const std::size_t offset
+    ) const
+    {
+      return FloatAt(mStore.Constants(), offset);
+    }
+    [[nodiscard]] std::uint32_t W(
+      const std::size_t offset
+    ) const
+    {
+      return WordAt(mStore.Constants(), offset);
+    }
+    [[nodiscard]] std::int32_t I(
+      const std::size_t offset
+    ) const
+    {
+      return IntAt(mStore.Constants(), offset);
+    }
 
     EffectDescription mDescription;
     ConstantLayout mLayout;
@@ -78,7 +99,10 @@ float z;
 )fx";
 } // namespace
 
-TEST_F(GalParameterStore, DefaultsAreWrittenInTheParametersTypes)
+TEST_F(
+  GalParameterStore,
+  DefaultsAreWrittenInTheParametersTypes
+)
 {
   Load(kDefaults);
   EXPECT_EQ(mStore.Version(), 1U);
@@ -123,7 +147,10 @@ TEST_F(GalParameterStore, DefaultsAreWrittenInTheParametersTypes)
   EXPECT_FLOAT_EQ(F(Offset("z")), 0.0f) << "no initializer: zero";
 }
 
-TEST_F(GalParameterStore, ScalarsConvertToTheParametersType)
+TEST_F(
+  GalParameterStore,
+  ScalarsConvertToTheParametersType
+)
 {
   Load("float f; int i; uint u; bool b; float3 v; int2 iv; float4x4 m;");
   const std::uint64_t start = mStore.Version();
@@ -155,7 +182,10 @@ TEST_F(GalParameterStore, ScalarsConvertToTheParametersType)
   EXPECT_EQ(mStore.Version(), start + 8U);
 }
 
-TEST_F(GalParameterStore, VectorsWriteTheirComponentsOnly)
+TEST_F(
+  GalParameterStore,
+  VectorsWriteTheirComponentsOnly
+)
 {
   Load("float2 two; float tail; float s; float4 four; float4 list[2]; float2 pairs[3];");
   const float vector[4] = {1.0f, 2.0f, 3.0f, 4.0f};
@@ -182,7 +212,10 @@ TEST_F(GalParameterStore, VectorsWriteTheirComponentsOnly)
   EXPECT_FLOAT_EQ(F(Offset("pairs") + 36U), 10.0f);
 }
 
-TEST_F(GalParameterStore, FloatArraysFollowSetFloatArray)
+TEST_F(
+  GalParameterStore,
+  FloatArraysFollowSetFloatArray
+)
 {
   Load("float w[3]; float2 pairs[2]; float4 quads[2]; float3 v; float after;");
   const float values[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
@@ -213,9 +246,14 @@ TEST_F(GalParameterStore, FloatArraysFollowSetFloatArray)
   EXPECT_EQ(mStore.Version(), version) << "null data is ignored";
 }
 
-TEST_F(GalParameterStore, MatricesAreStoredRowOrColumnMajor)
+TEST_F(
+  GalParameterStore,
+  MatricesAreStoredRowOrColumnMajor
+)
 {
-  Load("float4x4 rows; column_major float4x4 columns; float3x4 short3; float4x4 bones[2]; float4 asVectors[4]; float tail;");
+  Load(
+    "float4x4 rows; column_major float4x4 columns; float3x4 short3; float4x4 bones[2]; float4 asVectors[4]; float tail;"
+  );
   float matrix[16];
   for (int index = 0; index < 16; ++index) {
     matrix[index] = static_cast<float>(index + 1);
@@ -255,7 +293,10 @@ TEST_F(GalParameterStore, MatricesAreStoredRowOrColumnMajor)
   EXPECT_FLOAT_EQ(F(Offset("asVectors")), 1.0f);
 }
 
-TEST_F(GalParameterStore, PackedValuesAreRawComponents)
+TEST_F(
+  GalParameterStore,
+  PackedValuesAreRawComponents
+)
 {
   Load("int i; int2 pair; column_major float2x2 cm; float2x2 rm; struct S { float2 uv; int k; }; S s; S list[2];");
   const std::int32_t five = 5;
@@ -290,7 +331,10 @@ TEST_F(GalParameterStore, PackedValuesAreRawComponents)
   EXPECT_EQ(W(Offset("list") + 24U), 11U);
 }
 
-TEST_F(GalParameterStore, TexturesAndOutOfRangeParameters)
+TEST_F(
+  GalParameterStore,
+  TexturesAndOutOfRangeParameters
+)
 {
   Load("texture t; float f; string s = \"x\";");
   const std::uint32_t texture = Index("t");
@@ -323,7 +367,10 @@ TEST_F(GalParameterStore, TexturesAndOutOfRangeParameters)
   EXPECT_FLOAT_EQ(F(Offset("f")), 0.0f);
 }
 
-TEST_F(GalParameterStore, AnEffectWithoutNumbersHasAnEmptyImage)
+TEST_F(
+  GalParameterStore,
+  AnEffectWithoutNumbersHasAnEmptyImage
+)
 {
   const EffectDescription description = ParseEffect("texture t; string s = \"x\";");
   const ConstantLayout layout = ComputeConstantLayout(description);

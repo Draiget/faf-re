@@ -85,7 +85,12 @@ namespace moho
    * the network. On failure the record stays in the outbox and is retried with the next record
    * and at the next start, at most three attempts in all.
    */
-  void TELEMETRY_Send(const char* eventName, int severityNumber, const char* severityText, const CTelemetryAttributes& attributes);
+  void TELEMETRY_Send(
+    const char* eventName,
+    int severityNumber,
+    const char* severityText,
+    const CTelemetryAttributes& attributes
+  );
 
   /**
    * Waits up to `timeoutMs` until every queued record had its attempt, so the game-end record is

@@ -19,7 +19,10 @@
 
 namespace
 {
-  void WriteAdvance(gpg::Stream& stream, const std::int32_t beats)
+  void WriteAdvance(
+    gpg::Stream& stream,
+    const std::int32_t beats
+  )
   {
     moho::CMessage message(moho::ECmdStreamOp::CMDST_Advance);
     {
@@ -29,25 +32,35 @@ namespace
     stream.Write(message.mBuff.data(), message.mBuff.size());
   }
 
-  void WriteOther(gpg::Stream& stream)
+  void WriteOther(
+    gpg::Stream& stream
+  )
   {
     const moho::CMessage message(moho::ECmdStreamOp::CMDST_SetCommandSource, 1u);
     stream.Write(message.mBuff.data(), message.mBuff.size());
   }
 
-  [[nodiscard]] std::uint64_t Position(gpg::Stream& stream)
+  [[nodiscard]] std::uint64_t Position(
+    gpg::Stream& stream
+  )
   {
     return stream.VirtTell(gpg::Stream::ModeReceive);
   }
 
-  TEST(Existing_ReplayScan, EmptyStream)
+  TEST(
+    Existing_ReplayScan,
+    EmptyStream
+  )
   {
     gpg::MemBufferStream stream(256);
     EXPECT_EQ(moho::VCR_ScanReplayBeats(stream), 0);
     EXPECT_EQ(Position(stream), 0u);
   }
 
-  TEST(Existing_ReplayScan, OnlyAdvanceMessagesCount)
+  TEST(
+    Existing_ReplayScan,
+    OnlyAdvanceMessagesCount
+  )
   {
     gpg::MemBufferStream stream(1024);
     WriteOther(stream);
@@ -64,7 +77,10 @@ namespace
     EXPECT_TRUE(first.GetType().raw() == static_cast<std::uint8_t>(moho::ECmdStreamOp::CMDST_SetCommandSource));
   }
 
-  TEST(Existing_ReplayScan, ComesBackToWhereItBegan)
+  TEST(
+    Existing_ReplayScan,
+    ComesBackToWhereItBegan
+  )
   {
     gpg::MemBufferStream stream(1024);
     const std::string header = "the replay's header";
@@ -77,7 +93,10 @@ namespace
     EXPECT_EQ(Position(stream), header.size());
   }
 
-  TEST(Existing_ReplayScan, TruncatedLastMessage)
+  TEST(
+    Existing_ReplayScan,
+    TruncatedLastMessage
+  )
   {
     gpg::MemBufferStream stream(256);
     WriteAdvance(stream, 50);
@@ -87,7 +106,10 @@ namespace
     EXPECT_EQ(Position(stream), 0u);
   }
 
-  TEST(Existing_ReplayScan, NegativeBeatsCountAsNone)
+  TEST(
+    Existing_ReplayScan,
+    NegativeBeatsCountAsNone
+  )
   {
     gpg::MemBufferStream stream(256);
     WriteAdvance(stream, 20);

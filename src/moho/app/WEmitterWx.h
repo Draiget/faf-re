@@ -61,30 +61,30 @@ namespace moho
      * (0x00661470) and by FUN_00661A90 (0x00661B37); "no selection" is
      * expressed as `mSelectedKey == mCurve.mKeys.end()`.
      */
-    Wm3::Vector3f* mSelectedKey;                  // +0x130
+    Wm3::Vector3f* mSelectedKey; // +0x130
 
     // Alignment padding: SEfxCurve's fastvector_n puts it on an 8-byte
     // boundary in the binary, which gpg::fastvector_n does not model yet.
     std::uint8_t mReserved134To137[0x4];
 
-    SEfxCurve mCurve;                             // +0x138
+    SEfxCurve mCurve; // +0x138
 
     /**
      * Time-axis pixels per unit, recomputed by the paint handler
      * (FUN_006621F0) as `clientWidth / (mViewTimeMax - mViewTimeMin)`.
      */
-    float mViewTimeScale;                         // +0x170
+    float mViewTimeScale; // +0x170
 
     /**
      * Value-axis pixels per unit, recomputed by the paint handler as
      * `clientHeight / (mViewValueMax - mViewValueMin)`; the mouse handlers
      * divide pixel and wheel deltas by it.
      */
-    float mViewValueScale;                        // +0x174
+    float mViewValueScale; // +0x174
 
     /** Client size cached by the paint handler (FUN_006621F0). */
-    std::int32_t mClientWidth;                    // +0x178
-    std::int32_t mClientHeight;                   // +0x17C
+    std::int32_t mClientWidth;  // +0x178
+    std::int32_t mClientHeight; // +0x17C
 
     /**
      * Visible view rectangle over the curve, stored interleaved as
@@ -93,33 +93,33 @@ namespace moho
      * `[0x184] = argC`, `[0x18C] = arg10`; and by the span arithmetic in
      * FUN_006621F0 (`[0x188]-[0x180]` paired with `[0x18C]-[0x184]`).
      */
-    float mViewTimeMin;                           // +0x180
-    float mViewValueMin;                          // +0x184
-    float mViewTimeMax;                           // +0x188
-    float mViewValueMax;                          // +0x18C
+    float mViewTimeMin;  // +0x180
+    float mViewValueMin; // +0x184
+    float mViewTimeMax;  // +0x188
+    float mViewValueMax; // +0x18C
 
     /** Set while the widget holds the mouse capture for a drag. */
-    bool mMouseCaptured;                          // +0x190
+    bool mMouseCaptured; // +0x190
 
     /** Set by an edit, cleared once the change has been posted or pushed. */
-    bool mCurveDirty;                             // +0x191
+    bool mCurveDirty; // +0x191
     std::uint8_t mReserved192To193[0x2];
 
     /** Caption painted at the widget's top-left corner (SetName). */
-    wxString mCaption;                            // +0x194
+    wxString mCaption; // +0x194
 
     /** Key this curve is written out under in a blueprint (WriteCurveScript). */
-    wxString mScriptName;                         // +0x198
+    wxString mScriptName; // +0x198
 
     /** Panel that owns this editor; refreshed after a curve assignment. */
-    WCurveEditorPanel* mOwnerPanel;               // +0x19C
+    WCurveEditorPanel* mOwnerPanel; // +0x19C
 
     /** Cursor position at the last button press or motion. */
-    std::int32_t mLastMouseX;                     // +0x1A0
-    std::int32_t mLastMouseY;                     // +0x1A4
+    std::int32_t mLastMouseX; // +0x1A0
+    std::int32_t mLastMouseY; // +0x1A4
 
     /** Which button is driving the current drag: 1 = left, 2 = middle. */
-    std::int32_t mActiveDragButton;               // +0x1A8
+    std::int32_t mActiveDragButton; // +0x1A8
 
     // Tail padding to the 8-byte class alignment (see mReserved134To137):
     // operator new(0x1B0) at 0x006626FF.
@@ -342,7 +342,7 @@ namespace moho
   class WCurveEditorPanel : public wxPanel
   {
   public:
-    WCurveEditor* mCurveEditor;    // +0x134
+    WCurveEditor* mCurveEditor; // +0x134
 
     /**
      * The five numeric fields the panel keeps in sync with the editor. Their
@@ -356,7 +356,7 @@ namespace moho
     wxTextCtrl* mViewValueMaxText; // +0x148, id 626
 
     /** Set once the panel's fields are bound; commits are ignored until then. */
-    bool mFieldsLive;              // +0x14C
+    bool mFieldsLive; // +0x14C
 
     /**
      * Address: 0x00662680 (FUN_00662680, Moho::WCurveEditorPanel::WCurveEditorPanel)
@@ -397,13 +397,22 @@ namespace moho
 
     DECLARE_EVENT_TABLE()
   };
-  static_assert(offsetof(WCurveEditorPanel, mCurveEditor) == 0x134, "WCurveEditorPanel::mCurveEditor offset must be 0x134");
-  static_assert(offsetof(WCurveEditorPanel, mKeyTimeText) == 0x138, "WCurveEditorPanel::mKeyTimeText offset must be 0x138");
+  static_assert(
+    offsetof(WCurveEditorPanel, mCurveEditor) == 0x134,
+    "WCurveEditorPanel::mCurveEditor offset must be 0x134"
+  );
+  static_assert(
+    offsetof(WCurveEditorPanel, mKeyTimeText) == 0x138,
+    "WCurveEditorPanel::mKeyTimeText offset must be 0x138"
+  );
   static_assert(
     offsetof(WCurveEditorPanel, mViewValueMaxText) == 0x148,
     "WCurveEditorPanel::mViewValueMaxText offset must be 0x148"
   );
-  static_assert(offsetof(WCurveEditorPanel, mFieldsLive) == 0x14C, "WCurveEditorPanel::mFieldsLive offset must be 0x14C");
+  static_assert(
+    offsetof(WCurveEditorPanel, mFieldsLive) == 0x14C,
+    "WCurveEditorPanel::mFieldsLive offset must be 0x14C"
+  );
   static_assert(sizeof(WCurveEditorPanel) == 0x150, "WCurveEditorPanel size must be 0x150");
 
   /**
@@ -550,53 +559,53 @@ namespace moho
     void ApplyMenuFlagParam(wxMenu* menu, std::int32_t commandId, std::int32_t parameter);
 
   public:
-    Sim* mSim;                                  // +0x17C
-    Wm3::Vector3f mSpawnPosition;               // +0x180
-    wxTextCtrl* mLifetimeControl;               // +0x18C, id 556
-    wxTextCtrl* mRepeatTimeControl;             // +0x190, id 557
+    Sim* mSim;                      // +0x17C
+    Wm3::Vector3f mSpawnPosition;   // +0x180
+    wxTextCtrl* mLifetimeControl;   // +0x18C, id 556
+    wxTextCtrl* mRepeatTimeControl; // +0x190, id 557
 
     // Neither constructed nor read by any function in the binary.
-    std::uint32_t mUnreferenced194[3];          // +0x194
+    std::uint32_t mUnreferenced194[3]; // +0x194
 
-    wxTextCtrl* mTextureFrameCountControl;      // +0x1A0, id 559
-    wxTextCtrl* mTextureStripCountControl;      // +0x1A4, id 560
-    wxTextCtrl* mSortOrderControl;              // +0x1A8, id 563
-    wxTextCtrl* mLodCutoffControl;              // +0x1AC, id 565
-    wxCheckBox* mPlayingCheckBox;               // +0x1B0, id 561
-    wxSlider* mTimeSlider;                      // +0x1B4, id 562
-    wxComboBox* mBlendModeChoice;               // +0x1B8, id 558
-    wxComboBox* mFidelityChoice;                // +0x1BC, id 558 as well
-    wxStaticText* mTextureNameControl;          // +0x1C0
-    wxStaticText* mRampNameControl;             // +0x1C4
-    wxString mTexturePath;                      // +0x1C8
-    wxString mRampTexturePath;                  // +0x1CC
+    wxTextCtrl* mTextureFrameCountControl; // +0x1A0, id 559
+    wxTextCtrl* mTextureStripCountControl; // +0x1A4, id 560
+    wxTextCtrl* mSortOrderControl;         // +0x1A8, id 563
+    wxTextCtrl* mLodCutoffControl;         // +0x1AC, id 565
+    wxCheckBox* mPlayingCheckBox;          // +0x1B0, id 561
+    wxSlider* mTimeSlider;                 // +0x1B4, id 562
+    wxComboBox* mBlendModeChoice;          // +0x1B8, id 558
+    wxComboBox* mFidelityChoice;           // +0x1BC, id 558 as well
+    wxStaticText* mTextureNameControl;     // +0x1C0
+    wxStaticText* mRampNameControl;        // +0x1C4
+    wxString mTexturePath;                 // +0x1C8
+    wxString mRampTexturePath;             // +0x1CC
 
     // Where the blueprint and texture file dialogs open, and where they were
     // last closed.
-    wxString mBlueprintDirectory;               // +0x1D0
-    wxString mTextureDirectory;                 // +0x1D4
+    wxString mBlueprintDirectory; // +0x1D0
+    wxString mTextureDirectory;   // +0x1D4
 
     // The repeat time last pushed into the effect and the curve editors' time
     // axes; -1 after the effect is recreated, so the next refresh pushes it again.
-    double mCachedRepeatTime;                   // +0x1D8
+    double mCachedRepeatTime; // +0x1D8
 
     // Raised by LoadFromEffect so the control writes do not refresh the effect.
-    bool mRefreshGuard;                         // +0x1E0
+    bool mRefreshGuard; // +0x1E0
 
     fa::vector<WCurveEditorPanel*> mCurvePanels; // +0x1E4, one per EEmitterCurve
-    WeakPtr<IEffect> mPreviewEffect;            // +0x1F4
-    WeakPtr<Unit> mAttachedUnit;                // +0x1FC
-    fa::string mBoneName;                    // +0x204
-    fa::string mBlueprintName;               // +0x220, VFS name of the loaded blueprint
-    wxMenuBar* mMenuBar;                        // +0x23C
-    wxMenu* mFileMenu;                          // +0x240
-    wxMenu* mOptionsMenu;                       // +0x244
-    wxMenu* mLodMenu;                           // +0x248
+    WeakPtr<IEffect> mPreviewEffect;             // +0x1F4
+    WeakPtr<Unit> mAttachedUnit;                 // +0x1FC
+    fa::string mBoneName;                        // +0x204
+    fa::string mBlueprintName;                   // +0x220, VFS name of the loaded blueprint
+    wxMenuBar* mMenuBar;                         // +0x23C
+    wxMenu* mFileMenu;                           // +0x240
+    wxMenu* mOptionsMenu;                        // +0x244
+    wxMenu* mLodMenu;                            // +0x248
 
     // The blueprint file last opened or saved: full path (also the title) and
     // bare file name.
-    wxString mBlueprintPath;                    // +0x24C
-    wxString mBlueprintFileName;                // +0x250
+    wxString mBlueprintPath;     // +0x24C
+    wxString mBlueprintFileName; // +0x250
 
     DECLARE_EVENT_TABLE()
   };
@@ -621,6 +630,9 @@ namespace moho
   static_assert(offsetof(WEmitterWx, mMenuBar) == 0x23C, "WEmitterWx::mMenuBar offset must be 0x23C");
   static_assert(offsetof(WEmitterWx, mLodMenu) == 0x248, "WEmitterWx::mLodMenu offset must be 0x248");
   static_assert(offsetof(WEmitterWx, mBlueprintPath) == 0x24C, "WEmitterWx::mBlueprintPath offset must be 0x24C");
-  static_assert(offsetof(WEmitterWx, mBlueprintFileName) == 0x250, "WEmitterWx::mBlueprintFileName offset must be 0x250");
+  static_assert(
+    offsetof(WEmitterWx, mBlueprintFileName) == 0x250,
+    "WEmitterWx::mBlueprintFileName offset must be 0x250"
+  );
   static_assert(sizeof(WEmitterWx) == 0x258, "WEmitterWx size must be 0x258");
 } // namespace moho

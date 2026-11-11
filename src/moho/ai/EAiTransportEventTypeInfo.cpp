@@ -131,7 +131,9 @@ void moho::register_EAiTransportEventTypeInfo()
   (void)AcquireEAiTransportEventTypeInfo();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_EAiTransportEventTypeInfo_b34ccd, moho::register_EAiTransportEventTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_EAiTransportEventTypeInfo_b34ccd,
+  moho::register_EAiTransportEventTypeInfo
+)

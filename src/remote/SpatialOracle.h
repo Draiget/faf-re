@@ -28,7 +28,7 @@ namespace moho
 {
   class Entity;
   class Sim;
-}
+} // namespace moho
 
 namespace faf::remote
 {
@@ -72,7 +72,7 @@ namespace faf::remote
 
     [[nodiscard]] const SCellIndex* FindCellIndex(std::uint32_t gridSize) const noexcept;
 
-    std::vector<std::vector<moho::Entity*>> mUnitsByArmy;       // units, by their army's index
+    std::vector<std::vector<moho::Entity*>> mUnitsByArmy;        // units, by their army's index
     std::vector<std::vector<moho::Entity*>> mFlushedBlipsByArmy; // blips whose record for that army needs a flush
     std::vector<moho::Entity*> mGridFree; // some view admits it without a grid test: tested for every view
     std::vector<SCellIndex> mCellIndices; // one per distinct vision-grid size among the armies

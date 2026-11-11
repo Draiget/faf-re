@@ -310,7 +310,10 @@ namespace moho
     /// first/last/end at +4/+8/+0xC of the object.
     fa::vector<boost::shared_ptr<PrefetchData>> mPrefetchData; // +0x38
   };
-  static_assert(offsetof(CLuaWldUIProvider, mPrefetchData) == 0x38, "CLuaWldUIProvider::mPrefetchData offset must be 0x38");
+  static_assert(
+    offsetof(CLuaWldUIProvider, mPrefetchData) == 0x38,
+    "CLuaWldUIProvider::mPrefetchData offset must be 0x38"
+  );
   static_assert(sizeof(CLuaWldUIProvider) == 0x48, "CLuaWldUIProvider size must be 0x48");
 
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(EUIState) == 0x4, "moho::EUIState size must be 0x4");
@@ -507,10 +510,22 @@ namespace moho
     float mMaxVisible = 0.0f;
   };
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SMauiScrollValues) == 0x10, "moho::SMauiScrollValues size must be 0x10");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SMauiScrollValues, mMinRange) == 0x0, "SMauiScrollValues::mMinRange offset must be 0x0");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SMauiScrollValues, mMaxRange) == 0x4, "SMauiScrollValues::mMaxRange offset must be 0x4");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SMauiScrollValues, mMinVisible) == 0x8, "SMauiScrollValues::mMinVisible offset must be 0x8");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SMauiScrollValues, mMaxVisible) == 0xC, "SMauiScrollValues::mMaxVisible offset must be 0xC");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SMauiScrollValues, mMinRange) == 0x0,
+    "SMauiScrollValues::mMinRange offset must be 0x0"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SMauiScrollValues, mMaxRange) == 0x4,
+    "SMauiScrollValues::mMaxRange offset must be 0x4"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SMauiScrollValues, mMinVisible) == 0x8,
+    "SMauiScrollValues::mMinVisible offset must be 0x8"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SMauiScrollValues, mMaxVisible) == 0xC,
+    "SMauiScrollValues::mMaxVisible offset must be 0xC"
+  );
 
   struct SMauiMousePos
   {
@@ -530,13 +545,28 @@ namespace moho
     EMauiEventModifier mModifiers = MEM_None; // +0x1C
     CScriptObject* mSource = nullptr;         // +0x20
   };
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SMauiEventData, mEventType) == 0x0, "SMauiEventData::mEventType offset must be 0x0");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SMauiEventData, mEventType) == 0x0,
+    "SMauiEventData::mEventType offset must be 0x0"
+  );
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SMauiEventData, mMousePos) == 0x4, "SMauiEventData::mMousePos offset must be 0x4");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SMauiEventData, mWheelRotation) == 0xC, "SMauiEventData::mWheelRotation offset must be 0xC");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SMauiEventData, mWheelData) == 0x10, "SMauiEventData::mWheelData offset must be 0x10");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SMauiEventData, mWheelRotation) == 0xC,
+    "SMauiEventData::mWheelRotation offset must be 0xC"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SMauiEventData, mWheelData) == 0x10,
+    "SMauiEventData::mWheelData offset must be 0x10"
+  );
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SMauiEventData, mKeyCode) == 0x14, "SMauiEventData::mKeyCode offset must be 0x14");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SMauiEventData, mRawKeyCode) == 0x18, "SMauiEventData::mRawKeyCode offset must be 0x18");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SMauiEventData, mModifiers) == 0x1C, "SMauiEventData::mModifiers offset must be 0x1C");
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SMauiEventData, mRawKeyCode) == 0x18,
+    "SMauiEventData::mRawKeyCode offset must be 0x18"
+  );
+  FAF_RUNTIME_LAYOUT_ASSERT(
+    offsetof(SMauiEventData, mModifiers) == 0x1C,
+    "SMauiEventData::mModifiers offset must be 0x1C"
+  );
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(SMauiEventData, mSource) == 0x20, "SMauiEventData::mSource offset must be 0x20");
 
   /**
@@ -877,12 +907,12 @@ namespace moho
      */
     void UpdateDragPreview();
 
-    CWldSession* mSession = nullptr;                       // +0x00
+    CWldSession* mSession = nullptr; // +0x00
     // The binary stores the *mesh* blueprint here, not the unit one:
     // FUN_00852C10 fills it from `mRules->GetMeshBlueprint(...)` at
     // 0x00852C75 and then divides `[+0x64,+0x68)` by 204 (0x00852CD4,
     // sizeof(RMeshBlueprintLOD)) to test whether the LOD chain is empty.
-    RMeshBlueprint* mActiveBuildMesh = nullptr;             // +0x04
+    RMeshBlueprint* mActiveBuildMesh = nullptr;          // +0x04
     fa::vector<boost::shared_ptr<MeshInstance>> mMeshes; // +0x08
     fa::vector<RUnitBlueprint*> mBlueprints;             // +0x18
     // The binary's "preview positions" lane is an ordinary MSVC8 std::map
@@ -890,47 +920,53 @@ namespace moho
     // pair<const CmdId, shared_ptr<MeshInstance>> at 0x0C, _Color at 0x18 and
     // _Isnil at 0x19 - exactly fa::map's node shape.
     fa::map<CmdId, boost::shared_ptr<MeshInstance>> mPreviewPositions; // +0x28
-    boost::shared_ptr<MeshMaterial> mUnitPlaceMaterial;     // +0x34
-    CWldTerrainDecal* mDecal = nullptr;                     // +0x3C
+    boost::shared_ptr<MeshMaterial> mUnitPlaceMaterial;                // +0x34
+    CWldTerrainDecal* mDecal = nullptr;                                // +0x3C
     // Command *mode*, not caps: FUN_00852C10 copies `CommandModeData::mMode`
     // (its +0x00 lane) here at 0x00852C9C and gates the whole preview on it
     // being COMMOD_Build (2) or COMMOD_BuildAnchored (3) at 0x00852CAB.
-    ECommandMode mActiveCommandMode = COMMOD_None;          // +0x40
-    Wm3::Vector3f mStart{};                                 // +0x44
-    Wm3::Vector3f mEnd{};                                   // +0x50
-    bool mPreviewInvalid = false;                           // +0x5C
+    ECommandMode mActiveCommandMode = COMMOD_None; // +0x40
+    Wm3::Vector3f mStart{};                        // +0x44
+    Wm3::Vector3f mEnd{};                          // +0x50
+    bool mPreviewInvalid = false;                  // +0x5C
     /// Whether the ghosts at queued build orders are hidden: `DrawCommandGraph`
     /// (0x00853E10..0x00853E2F) latches it to "a command graph exists" and,
     /// whenever that flips, copies it into every `mPreviewPositions` mesh's
     /// hidden flag, so the ghosts give way while the full graph is drawn.
-    bool mQueuedGhostsHidden = false;                       // +0x5D
+    bool mQueuedGhostsHidden = false; // +0x5D
     /// Engine addition, in the tail padding (`ren_BuildGhostsPerBeat`): the beat and order count the
     /// queued ghosts were last rebuilt for.
-    std::uint16_t mQueuedGhostStamp = 0xFFFFU;              // +0x5E
+    std::uint16_t mQueuedGhostStamp = 0xFFFFU; // +0x5E
   };
   static_assert(offsetof(CBuildDragPreview, mSession) == 0x00, "CBuildDragPreview::mSession offset must be 0x00");
   static_assert(
-    offsetof(CBuildDragPreview, mActiveBuildMesh) == 0x04, "CBuildDragPreview::mActiveBuildMesh offset must be 0x04"
+    offsetof(CBuildDragPreview, mActiveBuildMesh) == 0x04,
+    "CBuildDragPreview::mActiveBuildMesh offset must be 0x04"
   );
   static_assert(offsetof(CBuildDragPreview, mMeshes) == 0x08, "CBuildDragPreview::mMeshes offset must be 0x08");
   static_assert(offsetof(CBuildDragPreview, mBlueprints) == 0x18, "CBuildDragPreview::mBlueprints offset must be 0x18");
   static_assert(
-    offsetof(CBuildDragPreview, mPreviewPositions) == 0x28, "CBuildDragPreview::mPreviewPositions offset must be 0x28"
+    offsetof(CBuildDragPreview, mPreviewPositions) == 0x28,
+    "CBuildDragPreview::mPreviewPositions offset must be 0x28"
   );
   static_assert(
-    offsetof(CBuildDragPreview, mUnitPlaceMaterial) == 0x34, "CBuildDragPreview::mUnitPlaceMaterial offset must be 0x34"
+    offsetof(CBuildDragPreview, mUnitPlaceMaterial) == 0x34,
+    "CBuildDragPreview::mUnitPlaceMaterial offset must be 0x34"
   );
   static_assert(offsetof(CBuildDragPreview, mDecal) == 0x3C, "CBuildDragPreview::mDecal offset must be 0x3C");
   static_assert(
-    offsetof(CBuildDragPreview, mActiveCommandMode) == 0x40, "CBuildDragPreview::mActiveCommandMode offset must be 0x40"
+    offsetof(CBuildDragPreview, mActiveCommandMode) == 0x40,
+    "CBuildDragPreview::mActiveCommandMode offset must be 0x40"
   );
   static_assert(offsetof(CBuildDragPreview, mStart) == 0x44, "CBuildDragPreview::mStart offset must be 0x44");
   static_assert(offsetof(CBuildDragPreview, mEnd) == 0x50, "CBuildDragPreview::mEnd offset must be 0x50");
   static_assert(
-    offsetof(CBuildDragPreview, mPreviewInvalid) == 0x5C, "CBuildDragPreview::mPreviewInvalid offset must be 0x5C"
+    offsetof(CBuildDragPreview, mPreviewInvalid) == 0x5C,
+    "CBuildDragPreview::mPreviewInvalid offset must be 0x5C"
   );
   static_assert(
-    offsetof(CBuildDragPreview, mQueuedGhostsHidden) == 0x5D, "CBuildDragPreview::mQueuedGhostsHidden offset must be 0x5D"
+    offsetof(CBuildDragPreview, mQueuedGhostsHidden) == 0x5D,
+    "CBuildDragPreview::mQueuedGhostsHidden offset must be 0x5D"
   );
   static_assert(sizeof(CBuildDragPreview) == 0x60, "CBuildDragPreview size must be 0x60");
 
@@ -1034,22 +1070,25 @@ namespace moho
   public:
     // +0x00 vptr and +0x04 `WeakObject::weakLinkHead_` both belong to the
     // `IMauiDragger` base; this class's own storage starts at +0x08.
-    CWldSession* mWldSession = nullptr;                     // +0x08
-    CBuildDragPreview* mWldView = nullptr;   // +0x0C
-    CameraImpl* mCam = nullptr;                             // +0x10
-    Wm3::Vector3f mStart{};                                 // +0x14
-    Wm3::Vector3f mEnd{};                                   // +0x20
+    CWldSession* mWldSession = nullptr;    // +0x08
+    CBuildDragPreview* mWldView = nullptr; // +0x0C
+    CameraImpl* mCam = nullptr;            // +0x10
+    Wm3::Vector3f mStart{};                // +0x14
+    Wm3::Vector3f mEnd{};                  // +0x20
   };
 
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(UIBuildDragger, mWldSession) == 0x8, "moho::UIBuildDragger::mWldSession offset must be 0x8"
+    offsetof(UIBuildDragger, mWldSession) == 0x8,
+    "moho::UIBuildDragger::mWldSession offset must be 0x8"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(UIBuildDragger, mWldView) == 0xC, "moho::UIBuildDragger::mWldView offset must be 0xC"
+    offsetof(UIBuildDragger, mWldView) == 0xC,
+    "moho::UIBuildDragger::mWldView offset must be 0xC"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(UIBuildDragger, mCam) == 0x10, "moho::UIBuildDragger::mCam offset must be 0x10");
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(UIBuildDragger, mStart) == 0x14, "moho::UIBuildDragger::mStart offset must be 0x14"
+    offsetof(UIBuildDragger, mStart) == 0x14,
+    "moho::UIBuildDragger::mStart offset must be 0x14"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(UIBuildDragger, mEnd) == 0x20, "moho::UIBuildDragger::mEnd offset must be 0x20");
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(UIBuildDragger) == 0x2C, "moho::UIBuildDragger size must be 0x2C");
@@ -1179,9 +1218,9 @@ namespace moho
   public:
     // +0x00 vptr and +0x04 WeakObject::weakLinkHead_ both belong to the
     // IMauiDragger base; this class's own storage starts at +0x08.
-    CWldSession* mSession = nullptr;  // +0x08
-    CameraImpl* mCam = nullptr;       // +0x0C
-    CmdId mCommandId{};                // +0x10
+    CWldSession* mSession = nullptr; // +0x08
+    CameraImpl* mCam = nullptr;      // +0x0C
+    CmdId mCommandId{};              // +0x10
     /// The strong reference this drag holds on the session's command graph.
     /// The constructor (0x00823FE0) builds it in place: `GetCommandGraph`'s
     /// hidden return buffer is `lea ecx,[esi+14h]`.
@@ -1262,7 +1301,9 @@ namespace moho
   class CMauiWxEventMapper : public wxEvtHandler
   {
   public:
-    explicit CMauiWxEventMapper(CMauiFrame* const frame)
+    explicit CMauiWxEventMapper(
+      CMauiFrame* const frame
+    )
       : mWindow(nullptr)
       , mFrame(frame)
     {}
@@ -1314,8 +1355,8 @@ namespace moho
      */
     void OnChar(wxKeyEvent& event);
 
-    wxWindow* mWindow;   // +0x28: the input window this mapper was pushed onto
-    CMauiFrame* mFrame;  // +0x2C
+    wxWindow* mWindow;  // +0x28: the input window this mapper was pushed onto
+    CMauiFrame* mFrame; // +0x2C
 
     DECLARE_EVENT_TABLE()
   };
@@ -1693,17 +1734,17 @@ namespace moho
     // runs ~CScriptObject, which is plain reverse-declaration destruction.
 
     /// The texture the cursor shows now.
-    boost::shared_ptr<RD3DTextureResource> mTexture;        // +0x34
+    boost::shared_ptr<RD3DTextureResource> mTexture; // +0x34
     /// The texture `ResetToDefault` goes back to.
     boost::shared_ptr<RD3DTextureResource> mDefaultTexture; // +0x3C
     /// The texture, hotspot or visibility changed since `MAUI_UpdateCursor`
     /// last pushed them to the device; it clears this when it does.
-    bool mNeedsUpdate;                                      // +0x44
-    bool mIsShowing;                                        // +0x45
-    std::int32_t mHotspotX;                                 // +0x48
-    std::int32_t mHotspotY;                                 // +0x4C
-    std::int32_t mDefaultHotspotX;                          // +0x50
-    std::int32_t mDefaultHotspotY;                          // +0x54
+    bool mNeedsUpdate;             // +0x44
+    bool mIsShowing;               // +0x45
+    std::int32_t mHotspotX;        // +0x48
+    std::int32_t mHotspotY;        // +0x4C
+    std::int32_t mDefaultHotspotX; // +0x50
+    std::int32_t mDefaultHotspotY; // +0x54
   };
 
   static_assert(sizeof(CMauiCursor) == 0x58, "moho::CMauiCursor size must be 0x58");
@@ -1907,7 +1948,6 @@ namespace moho
      */
     virtual void Dump();
 
-
     /**
      * Address: 0x00786F60 (FUN_00786F60, Moho::CMauiControl::ClearChildren)
      *
@@ -1915,7 +1955,7 @@ namespace moho
      * Unlinks each direct child from the intrusive child list and dispatches
      * virtual destroy on each child control.
      */
-     void ClearChildren();
+    void ClearChildren();
 
     /**
      * Address: 0x00786FA0 (FUN_00786FA0, Moho::CMauiControl::Render)
@@ -1925,8 +1965,7 @@ namespace moho
      * visible rendered-child lane when invalidated or depth-changed, then sorts
      * the lane by depth.
      */
-     void Render();
-
+    void Render();
 
     /**
      * Address: 0x0078A700 (FUN_0078A700, Moho::CMauiControl::OnHide)
@@ -1937,7 +1976,6 @@ namespace moho
      */
     [[nodiscard]] bool OnHide(const bool& hidden);
 
-
     /**
      * Address: 0x0078AA00 (FUN_0078AA00, Moho::CMauiControl::GetIsScrollable)
      *
@@ -1946,7 +1984,6 @@ namespace moho
      * bool result when callback is present.
      */
     [[nodiscard]] bool GetIsScrollable(const char* axisLexical);
-
 
     /**
      * Address: 0x00787370 (FUN_00787370, Moho::CMauiControl::PostEvent)
@@ -2021,7 +2058,6 @@ namespace moho
      * invalidates affected controls.
      */
     void SetParent(CMauiControl* newParent);
-
 
     /**
      * Address: 0x00786EA0 (FUN_00786EA0, Moho::CMauiControl::DepthFirstSuccessor)
@@ -2131,7 +2167,6 @@ namespace moho
      */
     [[nodiscard]] bool NeedsFrameUpdate();
 
-
     /**
      * Address: 0x00787990 (FUN_00787990, Moho::CMauiControl::ApplyFunction)
      *
@@ -2139,7 +2174,6 @@ namespace moho
      * Calls one Lua function with this control and each direct child control.
      */
     void ApplyFunction(const LuaPlus::LuaObject& functionObject);
-
 
     /**
      * Address: 0x0077F6F0 (FUN_0077F6F0, Moho::CMauiControl::GetDebugName)
@@ -2157,7 +2191,6 @@ namespace moho
      */
     void SetDebugName(fa::string debugName);
 
-
     /**
      * Address: 0x007872E0 (FUN_007872E0, Moho::CMauiControl::GetTopmostControl)
      *
@@ -2174,30 +2207,30 @@ namespace moho
     // state follows it, +0x3C through +0x11B. The constructor (0x007867B0)
     // builds these in this order and the destructor (0x00786D00) tears them
     // down in reverse, the list node last.
-    CMauiControl* mParent;                         // +0x3C
-    TDatList<CMauiControl, void> mChildrenList;    // +0x40
+    CMauiControl* mParent;                      // +0x3C
+    TDatList<CMauiControl, void> mChildrenList; // +0x40
     // Layout lazy vars, published to Lua as Left/Right/Top/Bottom/Width/Height/Depth.
-    CScriptLazyVar_float mLeftLV;                  // +0x48
-    CScriptLazyVar_float mRightLV;                 // +0x5C
-    CScriptLazyVar_float mTopLV;                   // +0x70
-    CScriptLazyVar_float mBottomLV;                // +0x84
-    CScriptLazyVar_float mWidthLV;                 // +0x98
-    CScriptLazyVar_float mHeightLV;                // +0xAC
-    CScriptLazyVar_float mDepthLV;                 // +0xC0
+    CScriptLazyVar_float mLeftLV;   // +0x48
+    CScriptLazyVar_float mRightLV;  // +0x5C
+    CScriptLazyVar_float mTopLV;    // +0x70
+    CScriptLazyVar_float mBottomLV; // +0x84
+    CScriptLazyVar_float mWidthLV;  // +0x98
+    CScriptLazyVar_float mHeightLV; // +0xAC
+    CScriptLazyVar_float mDepthLV;  // +0xC0
     /// `mDepthLV`'s value, cached for depth sorting.
-    float mDepth;                                  // +0xD4
+    float mDepth; // +0xD4
     /// Children in draw order, rebuilt when the control is invalidated.
     fa::vector<CMauiControl*> mRenderedChildren; // +0xD8
-    bool mInvalidated;                             // +0xE8
-    bool mDisableHitTest;                          // +0xE9
-    bool mIsHidden;                                // +0xEA
-    bool mNeedsFrameUpdate;                        // +0xEB
-    bool mInvisible;                               // +0xEC
-    float mAlpha;                                  // +0xF0
-    std::uint32_t mVertexAlpha;                    // +0xF4
-    std::int32_t mRenderPass;                      // +0xF8
-    CMauiControl* mRootFrame;                      // +0xFC
-    fa::string mDebugName;                      // +0x100
+    bool mInvalidated;                           // +0xE8
+    bool mDisableHitTest;                        // +0xE9
+    bool mIsHidden;                              // +0xEA
+    bool mNeedsFrameUpdate;                      // +0xEB
+    bool mInvisible;                             // +0xEC
+    float mAlpha;                                // +0xF0
+    std::uint32_t mVertexAlpha;                  // +0xF4
+    std::int32_t mRenderPass;                    // +0xF8
+    CMauiControl* mRootFrame;                    // +0xFC
+    fa::string mDebugName;                       // +0x100
   };
 
   static_assert(sizeof(CMauiControl) == 0x11C, "moho::CMauiControl size must be 0x11C");
@@ -2212,11 +2245,17 @@ namespace moho
   static_assert(offsetof(CMauiControl, mHeightLV) == 0xAC, "CMauiControl::mHeightLV offset must be 0xAC");
   static_assert(offsetof(CMauiControl, mDepthLV) == 0xC0, "CMauiControl::mDepthLV offset must be 0xC0");
   static_assert(offsetof(CMauiControl, mDepth) == 0xD4, "CMauiControl::mDepth offset must be 0xD4");
-  static_assert(offsetof(CMauiControl, mRenderedChildren) == 0xD8, "CMauiControl::mRenderedChildren offset must be 0xD8");
+  static_assert(
+    offsetof(CMauiControl, mRenderedChildren) == 0xD8,
+    "CMauiControl::mRenderedChildren offset must be 0xD8"
+  );
   static_assert(offsetof(CMauiControl, mInvalidated) == 0xE8, "CMauiControl::mInvalidated offset must be 0xE8");
   static_assert(offsetof(CMauiControl, mDisableHitTest) == 0xE9, "CMauiControl::mDisableHitTest offset must be 0xE9");
   static_assert(offsetof(CMauiControl, mIsHidden) == 0xEA, "CMauiControl::mIsHidden offset must be 0xEA");
-  static_assert(offsetof(CMauiControl, mNeedsFrameUpdate) == 0xEB, "CMauiControl::mNeedsFrameUpdate offset must be 0xEB");
+  static_assert(
+    offsetof(CMauiControl, mNeedsFrameUpdate) == 0xEB,
+    "CMauiControl::mNeedsFrameUpdate offset must be 0xEB"
+  );
   static_assert(offsetof(CMauiControl, mInvisible) == 0xEC, "CMauiControl::mInvisible offset must be 0xEC");
   static_assert(offsetof(CMauiControl, mAlpha) == 0xF0, "CMauiControl::mAlpha offset must be 0xF0");
   static_assert(offsetof(CMauiControl, mVertexAlpha) == 0xF4, "CMauiControl::mVertexAlpha offset must be 0xF4");
@@ -2554,7 +2593,7 @@ namespace moho
     std::uint32_t mHighlightBackgroundColor = 0; // +0x138
     bool mDropShadow = false;                    // +0x13C
     bool mIsEnabled = false;                     // +0x13D
-    fa::string mText{};                       // +0x140
+    fa::string mText{};                          // +0x140
     std::int32_t mCaretPosition = 0;             // +0x15C
     bool mCaretVisible = false;                  // +0x160
     std::uint32_t mCaretColor = 0;               // +0x164
@@ -2590,7 +2629,8 @@ namespace moho
      * LuaPlus::LuaObject* luaObject, CMauiControl* parent
      *
      * IDA signature:
-     * Moho::CMauiFrame *__stdcall Moho::CMauiFrame::CMauiFrame(Moho::CMauiFrame *this, LuaPlus::LuaObject *luaObject, Moho::CMauiControl *parent);
+     * Moho::CMauiFrame *__stdcall Moho::CMauiFrame::CMauiFrame(Moho::CMauiFrame *this, LuaPlus::LuaObject *luaObject,
+     * Moho::CMauiControl *parent);
      *
      * What it does:
      * Constructs one frame root lane, initializes weak-self/deleted-control
@@ -2755,7 +2795,10 @@ namespace moho
 
   static_assert(sizeof(CMauiFrame) == 0x134, "CMauiFrame size must be 0x134");
   static_assert(offsetof(CMauiFrame, mSelfWeak) == 0x11c, "CMauiFrame::mSelfWeak offset must be 0x11c");
-  static_assert(offsetof(CMauiFrame, mDeletedControlList) == 0x124, "CMauiFrame::mDeletedControlList offset must be 0x124");
+  static_assert(
+    offsetof(CMauiFrame, mDeletedControlList) == 0x124,
+    "CMauiFrame::mDeletedControlList offset must be 0x124"
+  );
   static_assert(offsetof(CMauiFrame, mTargetHead) == 0x130, "CMauiFrame::mTargetHead offset must be 0x130");
 
   class CMauiBitmap : public CMauiControl
@@ -2946,35 +2989,38 @@ namespace moho
     // `CMauiBitmap::~CMauiBitmap` via `CMauiFrame::PurgeDeleted`.
     // ---------------------------------------------------------------------
     fa::vector<boost::shared_ptr<CD3DBatchTexture>> mTextureBatches; // +0x11C
-    CScriptLazyVar_float mBitmapWidthLV{};                              // +0x12C
-    CScriptLazyVar_float mBitmapHeightLV{};                             // +0x140
-    float mU0 = 0.0f;                                                   // +0x154
-    float mV0 = 0.0f;                                                   // +0x158
-    float mU1 = 0.0f;                                                   // +0x15C
-    float mV1 = 0.0f;                                                   // +0x160
+    CScriptLazyVar_float mBitmapWidthLV{};                           // +0x12C
+    CScriptLazyVar_float mBitmapHeightLV{};                          // +0x140
+    float mU0 = 0.0f;                                                // +0x154
+    float mV0 = 0.0f;                                                // +0x158
+    float mU1 = 0.0f;                                                // +0x15C
+    float mV1 = 0.0f;                                                // +0x160
     /// Per-pixel hit mask, owned: the destructor deletes it before anything
     /// else (0x0077FC1A..0x0077FC36) and `HitTest` reads it as a bit grid.
-    gpg::BitArray2D* mHitMask = nullptr;                                // +0x164
-    bool mUseAlphaHitTest = false;                                      // +0x168
-    bool mIsTiled = false;                                              // +0x169
-    float mFrameDurationSeconds = 0.0f;                                 // +0x16C
-    bool mIsPlaying = false;                                            // +0x170
-    bool mDoLoop = false;                                               // +0x171
-    std::int32_t mCurrentFrame = 0;                                     // +0x174
-    float mCurrentFrameTimeSeconds = 0.0f;                              // +0x178
+    gpg::BitArray2D* mHitMask = nullptr;   // +0x164
+    bool mUseAlphaHitTest = false;         // +0x168
+    bool mIsTiled = false;                 // +0x169
+    float mFrameDurationSeconds = 0.0f;    // +0x16C
+    bool mIsPlaying = false;               // +0x170
+    bool mDoLoop = false;                  // +0x171
+    std::int32_t mCurrentFrame = 0;        // +0x174
+    float mCurrentFrameTimeSeconds = 0.0f; // +0x178
     /// The frame pattern. An ordinary `fa::vector`: `SetFramePattern`
     /// (0x007802D0) takes the object at `this+0x17C` and clears through
     /// `[obj+8]`, and like `mTextureBatches` at +0x11C its allocator word is
     /// never written - the constructor and destructor only touch
     /// first/last/end at +0x180..+0x188.
-    fa::vector<std::int32_t> mFrames;                                // +0x17C
+    fa::vector<std::int32_t> mFrames; // +0x17C
   };
 
   static_assert(sizeof(CMauiBitmap) == 0x18C, "CMauiBitmap size must be 0x18C");
   static_assert(offsetof(CMauiBitmap, mTextureBatches) == 0x11C, "CMauiBitmap::mTextureBatches offset must be 0x11C");
   static_assert(offsetof(CMauiBitmap, mBitmapWidthLV) == 0x12C, "CMauiBitmap::mBitmapWidthLV offset must be 0x12C");
   static_assert(offsetof(CMauiBitmap, mHitMask) == 0x164, "CMauiBitmap::mHitMask offset must be 0x164");
-  static_assert(offsetof(CMauiBitmap, mFrameDurationSeconds) == 0x16C, "CMauiBitmap::mFrameDurationSeconds offset must be 0x16C");
+  static_assert(
+    offsetof(CMauiBitmap, mFrameDurationSeconds) == 0x16C,
+    "CMauiBitmap::mFrameDurationSeconds offset must be 0x16C"
+  );
   static_assert(offsetof(CMauiBitmap, mCurrentFrame) == 0x174, "CMauiBitmap::mCurrentFrame offset must be 0x174");
   static_assert(offsetof(CMauiBitmap, mFrames) == 0x17C, "CMauiBitmap::mFrames offset must be 0x17C");
 
@@ -3043,7 +3089,7 @@ namespace moho
    */
   struct SHistogramColumn
   {
-    std::uint32_t mColor = 0;     // +0x00
+    std::uint32_t mColor = 0;  // +0x00
     fa::vector<float> mValues; // +0x04
   };
   static_assert(sizeof(SHistogramColumn) == 0x14, "SHistogramColumn size must be 0x14");
@@ -3121,8 +3167,8 @@ namespace moho
     // 0x11C and every access through the old `CMauiHistogram` overlay -- which described
     // exactly this run -- wrote past the end of the heap block.
     // ---------------------------------------------------------------------
-    std::int32_t mXIncrement = 0;           // +0x11C
-    std::int32_t mYIncrement = 0;           // +0x120
+    std::int32_t mXIncrement = 0; // +0x11C
+    std::int32_t mYIncrement = 0; // +0x120
     /// The data series. An `fa::vector`: the constructor (0x007977A0) and
     /// the destructor (0x00797840) touch only first/last/end at +0x128..+0x130,
     /// and the word at +0x124 they skip is its allocator slot.
@@ -3207,7 +3253,7 @@ namespace moho
      * What it does:
      * Scrolls to the bottommost list row by setting top-scroll to current
      * item count.
-    */
+     */
     void ScrollToBottom();
 
     /**
@@ -3342,7 +3388,7 @@ namespace moho
     std::uint32_t mSelectedBackgroundColor = 0;  // +0x12C
     std::uint32_t mHighlightForegroundColor = 0; // +0x130
     std::uint32_t mHighlightBackgroundColor = 0; // +0x134
-    fa::vector<fa::string> mItems;         // +0x138
+    fa::vector<fa::string> mItems;               // +0x138
     std::int32_t mCurSelection = -1;             // +0x148
     std::int32_t mHoverItem = -1;                // +0x14C
     bool mShowSelection = false;                 // +0x150
@@ -3351,10 +3397,16 @@ namespace moho
   };
 
   static_assert(sizeof(CMauiItemList) == 0x158, "CMauiItemList size must be 0x158");
-  static_assert(offsetof(CMauiItemList, mScrollPosition) == 0x154, "CMauiItemList::mScrollPosition offset must be 0x154");
+  static_assert(
+    offsetof(CMauiItemList, mScrollPosition) == 0x154,
+    "CMauiItemList::mScrollPosition offset must be 0x154"
+  );
   static_assert(offsetof(CMauiItemList, mFont) == 0x11c, "CMauiItemList::mFont offset must be 0x11c");
   static_assert(offsetof(CMauiItemList, mItems) == 0x138, "CMauiItemList::mItems offset must be 0x138");
-  static_assert(offsetof(CMauiItemList, mScrollPosition) == 0x154, "CMauiItemList::mScrollPosition offset must be 0x154");
+  static_assert(
+    offsetof(CMauiItemList, mScrollPosition) == 0x154,
+    "CMauiItemList::mScrollPosition offset must be 0x154"
+  );
 
   class CMauiMesh : public CMauiControl
   {
@@ -3467,12 +3519,12 @@ namespace moho
     boost::shared_ptr<ID3DTextureSheet> mThumbnailSheet; // +0x11C
     /// Set by `SetMesh`, `SetOrientation` and a sheet resize; `Frame` renders
     /// and clears it.
-    bool mThumbnailDirty = false;                        // +0x124
-    RMeshBlueprint* mMeshBlueprint = nullptr;            // +0x128
-    Wm3::Quaternionf mOrientation{};                     // +0x12C
+    bool mThumbnailDirty = false;             // +0x124
+    RMeshBlueprint* mMeshBlueprint = nullptr; // +0x128
+    Wm3::Quaternionf mOrientation{};          // +0x12C
     /// `REN_RequestThumbnail`'s color argument; the constructor sets
     /// 0xFFFFFFFF and nothing writes it afterwards.
-    std::uint32_t mThumbnailColor = 0;                   // +0x13C
+    std::uint32_t mThumbnailColor = 0; // +0x13C
   };
 
   static_assert(sizeof(CMauiMesh) == 0x140, "CMauiMesh size must be 0x140");
@@ -3551,7 +3603,7 @@ namespace moho
     void OnMinimized(bool minimized) override;
 
     /**
-       * Address: 0x0079F8F0 (FUN_0079F8F0)
+     * Address: 0x0079F8F0 (FUN_0079F8F0)
      *
      * What it does:
      * Updates movie looping state used by playback runtime.
@@ -3559,7 +3611,7 @@ namespace moho
     void Loop(bool shouldLoop);
 
     /**
-       * Address: 0x0079FA40 (FUN_0079FA40)
+     * Address: 0x0079FA40 (FUN_0079FA40)
      *
      * What it does:
      * Starts movie playback when an internal movie resource is attached.
@@ -3567,7 +3619,7 @@ namespace moho
     void Play();
 
     /**
-       * Address: 0x0079FBA0 (FUN_0079FBA0)
+     * Address: 0x0079FBA0 (FUN_0079FBA0)
      *
      * What it does:
      * Stops movie playback when an internal movie resource is attached.
@@ -3575,7 +3627,7 @@ namespace moho
     void Stop();
 
     /**
-       * Address: 0x0079FCF0 (FUN_0079FCF0)
+     * Address: 0x0079FCF0 (FUN_0079FCF0)
      *
      * What it does:
      * Returns whether an internal movie resource is attached and loaded.
@@ -3583,7 +3635,7 @@ namespace moho
     [[nodiscard]] bool IsLoaded() const;
 
     /**
-       * Address: 0x0079FE50 (FUN_0079FE50)
+     * Address: 0x0079FE50 (FUN_0079FE50)
      *
      * What it does:
      * Returns frame count from the attached movie resource.
@@ -3591,7 +3643,7 @@ namespace moho
     [[nodiscard]] std::int32_t GetNumFrames() const;
 
     /**
-       * Address: 0x0079FFA0 (FUN_0079FFA0)
+     * Address: 0x0079FFA0 (FUN_0079FFA0)
      *
      * What it does:
      * Returns playback frame rate from the attached movie resource.
@@ -3635,7 +3687,7 @@ namespace moho
     bool mDoLoop = false;                  // +0x121
     bool mIsStopped = false;               // +0x122
     bool mIsMinimized = false;             // +0x123
-    fa::string mSubtitleCache{};        // +0x124
+    fa::string mSubtitleCache{};           // +0x124
     CScriptLazyVar_float mMovieWidthLV{};  // +0x140
     CScriptLazyVar_float mMovieHeightLV{}; // +0x154
   };
@@ -3763,14 +3815,14 @@ namespace moho
     // past the end of the block.
     // ---------------------------------------------------------------------
     /// The control this scrollbar scrolls (`SetScrollable`).
-    WeakPtr<CMauiControl> mScrollable;                     // +0x124
-    boost::shared_ptr<CD3DBatchTexture> mThumbTop{};       // +0x12C
-    boost::shared_ptr<CD3DBatchTexture> mThumbBottom{};    // +0x134
-    boost::shared_ptr<CD3DBatchTexture> mThumbMiddle{};    // +0x13C
-    boost::shared_ptr<CD3DBatchTexture> mBackground{};     // +0x144
-    float mDragStart = 0.0f;                               // +0x14C
-    float mTopAtDragStart = 0.0f;                          // +0x150
-    EMauiScrollAxis mAxis{};                               // +0x154
+    WeakPtr<CMauiControl> mScrollable;                  // +0x124
+    boost::shared_ptr<CD3DBatchTexture> mThumbTop{};    // +0x12C
+    boost::shared_ptr<CD3DBatchTexture> mThumbBottom{}; // +0x134
+    boost::shared_ptr<CD3DBatchTexture> mThumbMiddle{}; // +0x13C
+    boost::shared_ptr<CD3DBatchTexture> mBackground{};  // +0x144
+    float mDragStart = 0.0f;                            // +0x14C
+    float mTopAtDragStart = 0.0f;                       // +0x150
+    EMauiScrollAxis mAxis{};                            // +0x154
   };
 
   // The `IMauiDragger` sub-object has to begin at +0x11C; that holds only
@@ -3782,7 +3834,10 @@ namespace moho
   // 0x007A0503 replaces it with the scrollbar's own thunk vtable - so the
   // sub-object runs 0x11C..0x124, and the control's own state follows it up
   // to the 0x158 the binary allocates.
-  static_assert(offsetof(CMauiScrollbar, mScrollable) == 0x124, "moho::CMauiScrollbar must place IMauiDragger at 0x11C");
+  static_assert(
+    offsetof(CMauiScrollbar, mScrollable) == 0x124,
+    "moho::CMauiScrollbar must place IMauiDragger at 0x11C"
+  );
   static_assert(sizeof(CMauiScrollbar) == 0x158, "moho::CMauiScrollbar size must be 0x158");
   static_assert(offsetof(CMauiScrollbar, mThumbTop) == 0x12c, "CMauiScrollbar::mThumbTop offset must be 0x12c");
   static_assert(offsetof(CMauiScrollbar, mAxis) == 0x154, "CMauiScrollbar::mAxis offset must be 0x154");
@@ -3881,7 +3936,7 @@ namespace moho
     // exactly this run -- wrote past the end of the heap block.
     // ---------------------------------------------------------------------
     CD3DFont* mFont = nullptr;                     // +0x11C
-    fa::string mText{};                         // +0x120
+    fa::string mText{};                            // +0x120
     std::uint32_t mColor = 0;                      // +0x13C
     bool mDropShadow = false;                      // +0x140
     bool mClipToWidth = false;                     // +0x141
@@ -4113,10 +4168,8 @@ namespace moho
   static_assert(sizeof(CUIMapPreview) == 0x124, "moho::CUIMapPreview size must be 0x124");
   static_assert(offsetof(CUIMapPreview, mTexture) == 0x11c, "CUIMapPreview::mTexture offset must be 0x11c");
 
-
   static_assert(sizeof(fa::vector<CMauiControl*>) == 0x10, "fa::vector must be 0x10");
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(fa::string) == 0x1C, "fa::string size must be 0x1C");
-
 
   /**
    * Address: 0x0085ABD0 (FUN_0085ABD0, Moho::DrawUnitSkirt)
@@ -4445,54 +4498,54 @@ namespace moho
     /// with `reset` (0x0086E7A6: store the new pointer, then delete the old
     /// one through its scalar deleting destructor), and member destruction
     /// deletes it last (0x0086EB71).
-    boost::scoped_ptr<CameraImpl> mCamera;          // +0x120
+    boost::scoped_ptr<CameraImpl> mCamera; // +0x120
     // The viewport rect `DoRender` last pushed to the camera: left/top and then
     // the Width/Height lazy vars, which 0x0086EF40 passes straight through as
     // an extent. -1 until the first draw (0x0086E50F..0x0086E527).
-    float mCachedViewLeft = -1.0f;                  // +0x124
-    float mCachedViewTop = -1.0f;                   // +0x128
-    float mCachedViewWidth = -1.0f;                 // +0x12C
-    float mCachedViewHeight = -1.0f;                // +0x130
-    bool mOrthographic = false;                     // +0x134
-    bool mIsMiniMap;                                // +0x135
-    bool mEnableResourceRendering = true;           // +0x136
-    std::int32_t mInputLocks = 0;                   // +0x138
-    std::int32_t mWorldViewDepth;                   // +0x13C
-    std::int32_t mState = 0;                        // +0x140
+    float mCachedViewLeft = -1.0f;        // +0x124
+    float mCachedViewTop = -1.0f;         // +0x128
+    float mCachedViewWidth = -1.0f;       // +0x12C
+    float mCachedViewHeight = -1.0f;      // +0x130
+    bool mOrthographic = false;           // +0x134
+    bool mIsMiniMap;                      // +0x135
+    bool mEnableResourceRendering = true; // +0x136
+    std::int32_t mInputLocks = 0;         // +0x138
+    std::int32_t mWorldViewDepth;         // +0x13C
+    std::int32_t mState = 0;              // +0x140
     /// Event type of the last right-button action this view processed, stored
     /// at 0x00870F2C and tested `== MET_ButtonDClick` at 0x008710B8 so the
     /// release path can tell a double-click order from a single-click one.
     EMauiEventType mLastRightButtonEvent = MET_Unknown; // +0x144
-    CommandModeData mLeftMouseCommand;              // +0x148
-    CommandModeData mCommandData;                   // +0x1A8
-    CWldSession* mWldSession;                       // +0x208
+    CommandModeData mLeftMouseCommand;                  // +0x148
+    CommandModeData mCommandData;                       // +0x1A8
+    CWldSession* mWldSession;                           // +0x208
     /// This view's hold on the session's command graph while Shift shows it:
     /// `RenderCommandGraph` takes it (0x0086ED3F) and lets go when Shift comes
     /// up (0x0086ED9E). The session keeps only a weak reference, so this is
     /// what keeps the graph, and the ghost meshes hanging off it, alive.
-    boost::shared_ptr<UICommandGraph> mComGraph;    // +0x20C
-    CBuildDragPreview mBuildDrag;                   // +0x214
-    bool mConvertToPatrolCursor = false;            // +0x274
+    boost::shared_ptr<UICommandGraph> mComGraph; // +0x20C
+    CBuildDragPreview mBuildDrag;                // +0x214
+    bool mConvertToPatrolCursor = false;         // +0x274
     /// Set on MET_MouseEnter and cleared on MET_MouseExit by `HandleEvent`
     /// (0x008704E4 / 0x00870500): the cursor is inside this view.
-    bool mCursorInside = false;                     // +0x275
+    bool mCursorInside = false; // +0x275
     /// Space-drag camera rotation in progress. Raised on the first rotating
     /// motion frame (0x00870A55) and dropped when the drag ends or the pointer
     /// leaves (0x0087051F / 0x00870A8F). `Render` reads it at 0x0086EE0B to
     /// suppress the resource-splat pass.
-    bool mCameraRotationActive = false;             // +0x276
+    bool mCameraRotationActive = false; // +0x276
     /// Cursor position the last rotation frame sampled, so the next frame can
     /// hand `CameraSpin` a delta. Read at 0x008709DE / 0x008709F1 and rewritten
     /// at 0x00870A5F / 0x00870A68.
-    Wm3::Vector2f mLastCursorScreenPos;             // +0x278
-    fa::string mCameraTrack;                     // +0x280
+    Wm3::Vector2f mLastCursorScreenPos; // +0x278
+    fa::string mCameraTrack;            // +0x280
     /// The selection dragger this view has posted and draws each frame
     /// (`ISelectionDragger::Render`, from `DoRender`). A weak link, so it
     /// clears itself when the dragger deletes itself on release.
-    WeakPtr<ISelectionDragger> mSelectionDragger;   // +0x29C
-    bool mHighlightEnabled = true;                  // +0x2A4
-    bool mIconsVisible = true;                      // +0x2A5
-    bool mGlobalCameraCommands = false;             // +0x2A6
+    WeakPtr<ISelectionDragger> mSelectionDragger; // +0x29C
+    bool mHighlightEnabled = true;                // +0x2A4
+    bool mIconsVisible = true;                    // +0x2A5
+    bool mGlobalCameraCommands = false;           // +0x2A6
   };
 
   static_assert(offsetof(CUIWorldView, mCamera) == 0x120, "CUIWorldView::mCamera offset must be 0x120");
@@ -4507,30 +4560,42 @@ namespace moho
   static_assert(offsetof(CUIWorldView, mWorldViewDepth) == 0x13C, "CUIWorldView::mWorldViewDepth offset must be 0x13C");
   static_assert(offsetof(CUIWorldView, mState) == 0x140, "CUIWorldView::mState offset must be 0x140");
   static_assert(
-    offsetof(CUIWorldView, mLastRightButtonEvent) == 0x144, "CUIWorldView::mLastRightButtonEvent offset must be 0x144"
+    offsetof(CUIWorldView, mLastRightButtonEvent) == 0x144,
+    "CUIWorldView::mLastRightButtonEvent offset must be 0x144"
   );
-  static_assert(offsetof(CUIWorldView, mLeftMouseCommand) == 0x148, "CUIWorldView::mLeftMouseCommand offset must be 0x148");
+  static_assert(
+    offsetof(CUIWorldView, mLeftMouseCommand) == 0x148,
+    "CUIWorldView::mLeftMouseCommand offset must be 0x148"
+  );
   static_assert(offsetof(CUIWorldView, mCommandData) == 0x1A8, "CUIWorldView::mCommandData offset must be 0x1A8");
   static_assert(offsetof(CUIWorldView, mWldSession) == 0x208, "CUIWorldView::mWldSession offset must be 0x208");
   static_assert(offsetof(CUIWorldView, mComGraph) == 0x20C, "CUIWorldView::mComGraph offset must be 0x20C");
   static_assert(offsetof(CUIWorldView, mBuildDrag) == 0x214, "CUIWorldView::mBuildDrag offset must be 0x214");
   static_assert(
-    offsetof(CUIWorldView, mConvertToPatrolCursor) == 0x274, "CUIWorldView::mConvertToPatrolCursor offset must be 0x274"
+    offsetof(CUIWorldView, mConvertToPatrolCursor) == 0x274,
+    "CUIWorldView::mConvertToPatrolCursor offset must be 0x274"
   );
   static_assert(offsetof(CUIWorldView, mCursorInside) == 0x275, "CUIWorldView::mCursorInside offset must be 0x275");
   static_assert(
-    offsetof(CUIWorldView, mCameraRotationActive) == 0x276, "CUIWorldView::mCameraRotationActive offset must be 0x276"
+    offsetof(CUIWorldView, mCameraRotationActive) == 0x276,
+    "CUIWorldView::mCameraRotationActive offset must be 0x276"
   );
   static_assert(
-    offsetof(CUIWorldView, mLastCursorScreenPos) == 0x278, "CUIWorldView::mLastCursorScreenPos offset must be 0x278"
+    offsetof(CUIWorldView, mLastCursorScreenPos) == 0x278,
+    "CUIWorldView::mLastCursorScreenPos offset must be 0x278"
   );
   static_assert(offsetof(CUIWorldView, mCameraTrack) == 0x280, "CUIWorldView::mCameraTrack offset must be 0x280");
   static_assert(
-    offsetof(CUIWorldView, mSelectionDragger) == 0x29C, "CUIWorldView::mSelectionDragger offset must be 0x29C"
+    offsetof(CUIWorldView, mSelectionDragger) == 0x29C,
+    "CUIWorldView::mSelectionDragger offset must be 0x29C"
   );
-  static_assert(offsetof(CUIWorldView, mHighlightEnabled) == 0x2A4, "CUIWorldView::mHighlightEnabled offset must be 0x2A4");
   static_assert(
-    offsetof(CUIWorldView, mGlobalCameraCommands) == 0x2A6, "CUIWorldView::mGlobalCameraCommands offset must be 0x2A6"
+    offsetof(CUIWorldView, mHighlightEnabled) == 0x2A4,
+    "CUIWorldView::mHighlightEnabled offset must be 0x2A4"
+  );
+  static_assert(
+    offsetof(CUIWorldView, mGlobalCameraCommands) == 0x2A6,
+    "CUIWorldView::mGlobalCameraCommands offset must be 0x2A6"
   );
   static_assert(sizeof(boost::scoped_ptr<CameraImpl>) == 0x4, "CUIWorldView::mCamera must be one pointer");
   static_assert(sizeof(CUIWorldView) == 0x2A8, "CUIWorldView size must be 0x2A8");
@@ -4557,14 +4622,9 @@ namespace moho
    */
   [[nodiscard]] bool MAUI_KeyIsDown(EMauiKeyCode keyCode);
 
-
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(boost::weak_ptr<CMauiFrame>) == 0x8, "boost::weak_ptr<CMauiFrame> size must be 0x8");
 
-
-
-
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(fa::vector<fa::string>) == 0x10, "fa::vector<fa::string> size must be 0x10");
-
 
   /**
    * Address: 0x0083CD30 (FUN_0083CD30, Moho::MAUI_StartMainScript)
@@ -5759,7 +5819,7 @@ namespace moho
    * What it does:
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_CMauiBitmapSetFrameRateL`.
-  */
+   */
   int cfunc_CMauiBitmapSetFrameRate(lua_State* luaContext);
 
   /**
@@ -6833,7 +6893,7 @@ namespace moho
    *
    * What it does:
    * Publishes the `CMauiEdit:AcquireFocus()` Lua binder.
-  */
+   */
   CScrLuaInitForm* func_CMauiEditAcquireFocus_LuaFuncDef();
 
   /**
@@ -6859,7 +6919,7 @@ namespace moho
    *
    * What it does:
    * Publishes the `CMauiEdit:AbandonFocus()` Lua binder.
-  */
+   */
   CScrLuaInitForm* func_CMauiEditAbandonFocus_LuaFuncDef();
 
   /**
@@ -6884,7 +6944,7 @@ namespace moho
    *
    * What it does:
    * Publishes the `CMauiEdit:SetDropShadow(...)` Lua binder.
-  */
+   */
   CScrLuaInitForm* func_CMauiEditSetDropShadow_LuaFuncDef();
 
   /**
@@ -6910,7 +6970,7 @@ namespace moho
    *
    * What it does:
    * Publishes the `CMauiEdit:GetStringAdvance(...)` Lua binder.
-  */
+   */
   CScrLuaInitForm* func_CMauiEditGetStringAdvance_LuaFuncDef();
 
   /**
@@ -7731,7 +7791,7 @@ namespace moho
   CScrLuaInitForm* func_CMauiMeshSetOrientation_LuaFuncDef();
 
   /**
-    * Alias of FUN_0079E930 (non-canonical helper lane).
+   * Alias of FUN_0079E930 (non-canonical helper lane).
    *
    * What it does:
    * Reads one `CMauiMesh` plus quaternion arg and stores mesh orientation.
@@ -7781,7 +7841,7 @@ namespace moho
   CScrLuaInitForm* func_CMauiMovieLoop_LuaFuncDef();
 
   /**
-    * Alias of FUN_0079F8F0 (non-canonical helper lane).
+   * Alias of FUN_0079F8F0 (non-canonical helper lane).
    *
    * What it does:
    * Reads one `CMauiMovie` plus bool and updates loop state.
@@ -7805,7 +7865,7 @@ namespace moho
   CScrLuaInitForm* func_CMauiMoviePlay_LuaFuncDef();
 
   /**
-    * Alias of FUN_0079FA40 (non-canonical helper lane).
+   * Alias of FUN_0079FA40 (non-canonical helper lane).
    *
    * What it does:
    * Reads one `CMauiMovie` and starts playback.
@@ -7829,7 +7889,7 @@ namespace moho
   CScrLuaInitForm* func_CMauiMovieStop_LuaFuncDef();
 
   /**
-    * Alias of FUN_0079FBA0 (non-canonical helper lane).
+   * Alias of FUN_0079FBA0 (non-canonical helper lane).
    *
    * What it does:
    * Reads one `CMauiMovie` and stops playback.
@@ -7854,7 +7914,7 @@ namespace moho
   CScrLuaInitForm* func_CMauiMovieIsLoaded_LuaFuncDef();
 
   /**
-    * Alias of FUN_0079FCF0 (non-canonical helper lane).
+   * Alias of FUN_0079FCF0 (non-canonical helper lane).
    *
    * What it does:
    * Reads one `CMauiMovie` and returns its load state.
@@ -7879,7 +7939,7 @@ namespace moho
   CScrLuaInitForm* func_CMauiMovieGetNumFrames_LuaFuncDef();
 
   /**
-    * Alias of FUN_0079FE50 (non-canonical helper lane).
+   * Alias of FUN_0079FE50 (non-canonical helper lane).
    *
    * What it does:
    * Reads one `CMauiMovie` and returns frame count.
@@ -7904,7 +7964,7 @@ namespace moho
   CScrLuaInitForm* func_CMauiMovieGetFrameRate_LuaFuncDef();
 
   /**
-    * Alias of FUN_0079FFA0 (non-canonical helper lane).
+   * Alias of FUN_0079FFA0 (non-canonical helper lane).
    *
    * What it does:
    * Reads one `CMauiMovie` and returns frame rate.
@@ -9598,9 +9658,9 @@ namespace moho
     FactoryQueueDisplayItem() noexcept;
     FactoryQueueDisplayItem& operator=(const FactoryQueueDisplayItem& other);
 
-    fa::string blueprintId;      // +0x00
-    std::int32_t count;             // +0x1C
-    fa::vector<CmdId> commands;  // +0x20
+    fa::string blueprintId;     // +0x00
+    std::int32_t count;         // +0x1C
+    fa::vector<CmdId> commands; // +0x20
   };
   static_assert(offsetof(FactoryQueueDisplayItem, count) == 0x1C, "FactoryQueueDisplayItem::count offset must be 0x1C");
   static_assert(
@@ -9838,11 +9898,8 @@ namespace moho
    * Constructs one Lua event table from one raw Maui event payload and emits
    * type/mouse/key/modifier/control lanes for script callbacks.
    */
-  [[nodiscard]] LuaPlus::LuaObject* CreateLuaEventObject(
-    SMauiEventData* eventData,
-    LuaPlus::LuaObject* outEvent,
-    LuaPlus::LuaState* state
-  );
+  [[nodiscard]] LuaPlus::LuaObject*
+  CreateLuaEventObject(SMauiEventData* eventData, LuaPlus::LuaObject* outEvent, LuaPlus::LuaState* state);
 
   /**
    * True while a MAUI event is being dispatched on this thread.
@@ -9869,5 +9926,6 @@ namespace moho
    */
   void PushBackMeshInstanceSharedPtrVector(
     fa::vector<boost::shared_ptr<MeshInstance>>& destination,
-    const boost::shared_ptr<MeshInstance>& value);
+    const boost::shared_ptr<MeshInstance>& value
+  );
 } // namespace moho

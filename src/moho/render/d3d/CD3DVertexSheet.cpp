@@ -27,7 +27,8 @@ namespace moho
    * CD3DVertexFormat *,CD3DDevice *,int,std::uint32_t,CD3DVertexStream **
    *
    * IDA signature:
-   * Moho::CD3DVertexSheet *__userpurge CD3DVertexSheet@<eax>(CD3DVertexFormat *a1@<ebx>, CD3DVertexSheet *this, CD3DDevice *a3, int a4, int a5, CD3DVertexStream **a6);
+   * Moho::CD3DVertexSheet *__userpurge CD3DVertexSheet@<eax>(CD3DVertexFormat *a1@<ebx>, CD3DVertexSheet *this,
+   * CD3DDevice *a3, int a4, int a5, CD3DVertexStream **a6);
    *
    * What it does:
    * Initializes list links and typed stream ownership storage, then wires one
@@ -189,7 +190,9 @@ namespace moho
    * Closes current owned stream buffers, applies one frequency token to every
    * owned stream context, then recreates owned stream buffers.
    */
-  bool CD3DVertexSheet::Func6(const int streamFrequencyToken)
+  bool CD3DVertexSheet::Func6(
+    const int streamFrequencyToken
+  )
   {
     if (streamFrequencyToken == mStreamFrequencyToken) {
       return true;
@@ -251,12 +254,15 @@ namespace moho
    * std::uint32_t
    *
    * IDA signature:
-   * Moho::CD3DVertexStream *__thiscall Moho::CD3DVertexSheet::GetVertStream(Moho::CD3DVertexSheet *this, unsigned int a2);
+   * Moho::CD3DVertexStream *__thiscall Moho::CD3DVertexSheet::GetVertStream(Moho::CD3DVertexSheet *this, unsigned int
+   * a2);
    *
    * What it does:
    * Returns one retained stream by index when in range.
    */
-  ID3DVertexStream* CD3DVertexSheet::GetVertStream(const std::uint32_t streamIndex)
+  ID3DVertexStream* CD3DVertexSheet::GetVertStream(
+    const std::uint32_t streamIndex
+  )
   {
     if (streamIndex >= static_cast<std::uint32_t>(mStreams.size())) {
       return nullptr;
@@ -336,12 +342,17 @@ namespace moho
     }
   }
 
-  bool CD3DVertexSheet::IsStreamOwned(const std::uint32_t streamIndex) const
+  bool CD3DVertexSheet::IsStreamOwned(
+    const std::uint32_t streamIndex
+  ) const
   {
     return mOwnedStreamMask.TestBit(streamIndex);
   }
 
-  void CD3DVertexSheet::SetStreamOwned(const std::uint32_t streamIndex, const bool owned)
+  void CD3DVertexSheet::SetStreamOwned(
+    const std::uint32_t streamIndex,
+    const bool owned
+  )
   {
     mOwnedStreamMask.SetBit(streamIndex, owned);
   }

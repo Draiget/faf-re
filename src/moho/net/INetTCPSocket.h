@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gpg/core/streams/Stream.h"
+#include "platform/Net.h"
 #include "platform/Platform.h"
 
 namespace moho

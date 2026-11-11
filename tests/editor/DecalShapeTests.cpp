@@ -11,7 +11,10 @@ namespace
 {
   using faf::editor::DecalFootprint;
 
-  TEST(DecalShape, CentredDecalHasItsMiddleThere)
+  TEST(
+    DecalShape,
+    CentredDecalHasItsMiddleThere
+  )
   {
     for (const float yaw : {0.0f, 0.7f, 1.5707963f, 3.0f, -2.2f}) {
       const DecalFootprint decal = faf::editor::DecalAround(100.0f, 200.0f, 12.0f, 4.0f, yaw);
@@ -23,7 +26,10 @@ namespace
     }
   }
 
-  TEST(DecalShape, CornersAsTheGameComputesThem)
+  TEST(
+    DecalShape,
+    CornersAsTheGameComputesThem
+  )
   {
     // Unturned: the corner, then along x by sizeX, then along z by sizeZ.
     const DecalFootprint flat{10.0f, 20.0f, 8.0f, 2.0f, 0.0f};
@@ -44,7 +50,10 @@ namespace
     EXPECT_NEAR(z[3], 20.0f, 1e-4f);
   }
 
-  TEST(DecalShape, InsideIsTheCornersInverse)
+  TEST(
+    DecalShape,
+    InsideIsTheCornersInverse
+  )
   {
     const DecalFootprint decal = faf::editor::DecalAround(50.0f, 50.0f, 20.0f, 6.0f, 0.6f);
     float x[4], z[4];
@@ -60,7 +69,10 @@ namespace
     }
   }
 
-  TEST(DecalShape, PathPassesThroughItsPoints)
+  TEST(
+    DecalShape,
+    PathPassesThroughItsPoints
+  )
   {
     const std::vector<std::pair<float, float>> points = {{0.0f, 0.0f}, {50.0f, 20.0f}, {100.0f, 0.0f}, {120.0f, 60.0f}};
     for (std::size_t i = 0; i < points.size(); ++i) {
@@ -70,7 +82,10 @@ namespace
     }
   }
 
-  TEST(DecalShape, DecalsAlongAStraightPath)
+  TEST(
+    DecalShape,
+    DecalsAlongAStraightPath
+  )
   {
     // A 100-unit line along x, decals 20 long without overlap: five, centred at 10, 30, ..., 90, turned along x.
     const std::vector<std::pair<float, float>> line = {{0.0f, 5.0f}, {100.0f, 5.0f}};
@@ -91,7 +106,10 @@ namespace
     EXPECT_TRUE(faf::editor::DecalsAlongPath({{0.0f, 0.0f}}, 20.0f, 6.0f, 0.0f).empty());
   }
 
-  TEST(DecalShape, DecalsTurnWithTheCurve)
+  TEST(
+    DecalShape,
+    DecalsTurnWithTheCurve
+  )
   {
     // Up along z, then right along x: the first decals point along +z, the last along +x.
     const std::vector<std::pair<float, float>> corner = {{0.0f, 0.0f}, {0.0f, 100.0f}, {100.0f, 100.0f}};
@@ -101,7 +119,10 @@ namespace
     EXPECT_NEAR(decals.back().yaw, 0.0f, 0.15f);
   }
 
-  TEST(DecalShape, TypeFromTheTexturesName)
+  TEST(
+    DecalShape,
+    TypeFromTheTexturesName
+  )
   {
     EXPECT_EQ(faf::editor::DecalTypeForTexture("/env/Evergreen/decals/eg_rock01_albedo.dds"), 1);
     EXPECT_EQ(faf::editor::DecalTypeForTexture("/env/Evergreen/decals/eg_rock01_NORMALS.dds"), 2);

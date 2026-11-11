@@ -29,7 +29,10 @@ namespace moho
    * Otherwise the length rounds up to a step of 1/16 of its octave. Every bit of length is shadow
    * resolution lost, so both limits stay small.
    */
-  [[nodiscard]] inline float FitShadowStableExtent(const float needed, const float held) noexcept
+  [[nodiscard]] inline float FitShadowStableExtent(
+    const float needed,
+    const float held
+  ) noexcept
   {
     if (held >= needed && held <= needed * 1.12f) {
       return held;
@@ -44,7 +47,10 @@ namespace moho
    * snapped down moves by under one texel, so the length carries one texel of margin.
    */
   [[nodiscard]] inline float FitShadowStableAxis(
-    const float rawMin, const float rawMax, const int shadowSize, float& held
+    const float rawMin,
+    const float rawMax,
+    const int shadowSize,
+    float& held
   ) noexcept
   {
     const float usable = static_cast<float>(shadowSize - 2);

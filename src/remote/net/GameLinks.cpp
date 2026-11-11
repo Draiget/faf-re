@@ -17,11 +17,16 @@ namespace faf::remote::net
     constexpr int kMaxDatagramsPerPump = 4096;
   } // namespace
 
-  CServerLinks::CServerLinks(const ChannelConfig& channel)
+  CServerLinks::CServerLinks(
+    const ChannelConfig& channel
+  )
     : mChannelConfig(channel)
   {}
 
-  bool CServerLinks::Open(const SEndpoint& local, std::string& error)
+  bool CServerLinks::Open(
+    const SEndpoint& local,
+    std::string& error
+  )
   {
     if (!mCookies.Init() || !FillRandom(&mAddressSalt, sizeof(mAddressSalt))) {
       error = "the system gave no random secret for the handshake";
@@ -30,25 +35,35 @@ namespace faf::remote::net
     return mSocket.Open(local, error);
   }
 
-  void CServerLinks::AllowAddress(const std::uint32_t ip)
+  void CServerLinks::AllowAddress(
+    const std::uint32_t ip
+  )
   {
     mAllowlistOn = true;
     mAllowed.insert(ip);
   }
 
-  void CServerLinks::DisallowAddress(const std::uint32_t ip)
+  void CServerLinks::DisallowAddress(
+    const std::uint32_t ip
+  )
   {
     mAllowlistOn = true;
     mAllowed.erase(ip);
   }
 
-  bool CServerLinks::TakeAddressBudget(const std::uint32_t ip, const std::uint64_t nowUs) noexcept
+  bool CServerLinks::TakeAddressBudget(
+    const std::uint32_t ip,
+    const std::uint64_t nowUs
+  ) noexcept
   {
     // Salted, so a flood can't pick addresses that share a player's bucket.
     const std::uint64_t mixed = (static_cast<std::uint64_t>(ip) ^ mAddressSalt) * 0x9E3779B97F4A7C15ull;
     SAddressBucket& bucket = mAddressBuckets[static_cast<std::size_t>(mixed >> 52) % kAddressBuckets];
     if (nowUs > bucket.lastUs) {
-      bucket.tokens = std::min(kHandshakeBurstPerAddress, bucket.tokens + static_cast<double>(nowUs - bucket.lastUs) * 1e-6 * kHandshakesPerAddressPerSecond);
+      bucket.tokens = std::min(
+        kHandshakeBurstPerAddress,
+        bucket.tokens + static_cast<double>(nowUs - bucket.lastUs) * 1e-6 * kHandshakesPerAddressPerSecond
+      );
       bucket.lastUs = nowUs;
     }
     if (bucket.tokens < 1.0) {
@@ -59,10 +74,15 @@ namespace faf::remote::net
     return true;
   }
 
-  bool CServerLinks::TakeUnlistedBudget(const std::uint64_t nowUs) noexcept
+  bool CServerLinks::TakeUnlistedBudget(
+    const std::uint64_t nowUs
+  ) noexcept
   {
     if (nowUs > mUnlistedBudgetUs) {
-      mUnlistedBudget = std::min(kUnlistedHandshakesPerSecond, mUnlistedBudget + static_cast<double>(nowUs - mUnlistedBudgetUs) * 1e-6 * kUnlistedHandshakesPerSecond);
+      mUnlistedBudget = std::min(
+        kUnlistedHandshakesPerSecond,
+        mUnlistedBudget + static_cast<double>(nowUs - mUnlistedBudgetUs) * 1e-6 * kUnlistedHandshakesPerSecond
+      );
       mUnlistedBudgetUs = nowUs;
     }
     if (mUnlistedBudget < 1.0) {
@@ -73,12 +93,17 @@ namespace faf::remote::net
     return true;
   }
 
-  void CServerLinks::AddPlayer(const std::int32_t uid, const Token& token)
+  void CServerLinks::AddPlayer(
+    const std::int32_t uid,
+    const Token& token
+  )
   {
     mPlayers[uid].token = token;
   }
 
-  void CServerLinks::RemovePlayer(const std::int32_t uid)
+  void CServerLinks::RemovePlayer(
+    const std::int32_t uid
+  )
   {
     const auto found = mPlayers.find(uid);
     if (found == mPlayers.end()) {
@@ -90,10 +115,15 @@ namespace faf::remote::net
     mPlayers.erase(found);
   }
 
-  bool CServerLinks::TakeHandshakeBudget(const std::uint64_t nowUs) noexcept
+  bool CServerLinks::TakeHandshakeBudget(
+    const std::uint64_t nowUs
+  ) noexcept
   {
     if (nowUs > mHandshakeBudgetUs) {
-      mHandshakeBudget = std::min(kHandshakesPerSecond, mHandshakeBudget + static_cast<double>(nowUs - mHandshakeBudgetUs) * 1e-6 * kHandshakesPerSecond);
+      mHandshakeBudget = std::min(
+        kHandshakesPerSecond,
+        mHandshakeBudget + static_cast<double>(nowUs - mHandshakeBudgetUs) * 1e-6 * kHandshakesPerSecond
+      );
       mHandshakeBudgetUs = nowUs;
     }
     if (mHandshakeBudget < 1.0) {
@@ -104,7 +134,13 @@ namespace faf::remote::net
     return true;
   }
 
-  void CServerLinks::HandleConnect(const std::uint8_t* const data, const std::size_t size, const SEndpoint& from, const std::uint64_t nowUs, IEvents& events)
+  void CServerLinks::HandleConnect(
+    const std::uint8_t* const data,
+    const std::size_t size,
+    const SEndpoint& from,
+    const std::uint64_t nowUs,
+    IEvents& events
+  )
   {
     SConnectRequest request;
     if (!ReadConnect(data, size, request)) {
@@ -131,7 +167,9 @@ namespace faf::remote::net
       return;
     }
     // An old Connect sent again by someone else must not knock out the live channel.
-    if (std::find(player.usedPublics.begin(), player.usedPublics.end(), request.clientPublic) != player.usedPublics.end()) {
+    if (
+      std::find(player.usedPublics.begin(), player.usedPublics.end(), request.clientPublic) != player.usedPublics.end()
+    ) {
       ++mStats.refused;
       return;
     }
@@ -174,7 +212,13 @@ namespace faf::remote::net
     events.OnJoined(request.uid, from, returning);
   }
 
-  void CServerLinks::HandleDatagram(const std::uint8_t* const data, const std::size_t size, const SEndpoint& from, const std::uint64_t nowUs, IEvents& events)
+  void CServerLinks::HandleDatagram(
+    const std::uint8_t* const data,
+    const std::size_t size,
+    const SEndpoint& from,
+    const std::uint64_t nowUs,
+    IEvents& events
+  )
   {
     if (size == 0u) {
       ++mStats.strangersDropped;
@@ -216,7 +260,10 @@ namespace faf::remote::net
     }
   }
 
-  void CServerLinks::Pump(const std::uint64_t nowUs, IEvents& events)
+  void CServerLinks::Pump(
+    const std::uint64_t nowUs,
+    IEvents& events
+  )
   {
     std::array<std::uint8_t, kReceiveBuffer> buffer{};
     SEndpoint from;
@@ -252,13 +299,20 @@ namespace faf::remote::net
     }
   }
 
-  bool CServerLinks::SendReliable(const std::int32_t uid, const void* const data, const std::size_t size)
+  bool CServerLinks::SendReliable(
+    const std::int32_t uid,
+    const void* const data,
+    const std::size_t size
+  )
   {
     const auto found = mPlayers.find(uid);
     return found != mPlayers.end() && found->second.channel && found->second.channel->SendReliable(data, size);
   }
 
-  void CServerLinks::SendUnreliableToAll(const void* const data, const std::size_t size)
+  void CServerLinks::SendUnreliableToAll(
+    const void* const data,
+    const std::size_t size
+  )
   {
     for (auto& [uid, player] : mPlayers) {
       if (player.channel && !player.lost) {
@@ -267,25 +321,37 @@ namespace faf::remote::net
     }
   }
 
-  const ChannelStats* CServerLinks::StatsOf(const std::int32_t uid) const
+  const ChannelStats* CServerLinks::StatsOf(
+    const std::int32_t uid
+  ) const
   {
     const auto found = mPlayers.find(uid);
     return found != mPlayers.end() && found->second.channel ? &found->second.channel->Stats() : nullptr;
   }
 
-  std::uint64_t CServerLinks::ReliableUnacked(const std::int32_t uid) const
+  std::uint64_t CServerLinks::ReliableUnacked(
+    const std::int32_t uid
+  ) const
   {
     const auto found = mPlayers.find(uid);
     return found != mPlayers.end() && found->second.channel ? found->second.channel->ReliableUnacked() : 0u;
   }
 
-  std::uint64_t CServerLinks::SilentUs(const std::int32_t uid, const std::uint64_t nowUs) const
+  std::uint64_t CServerLinks::SilentUs(
+    const std::int32_t uid,
+    const std::uint64_t nowUs
+  ) const
   {
     const auto found = mPlayers.find(uid);
     return found != mPlayers.end() && found->second.channel ? found->second.channel->SinceLastReceivedUs(nowUs) : 0u;
   }
 
-  CClientLink::CClientLink(const std::int32_t uid, const Token& token, const SEndpoint& server, const ChannelConfig& channel)
+  CClientLink::CClientLink(
+    const std::int32_t uid,
+    const Token& token,
+    const SEndpoint& server,
+    const ChannelConfig& channel
+  )
     : mUid(uid)
     , mToken(token)
     , mServer(server)
@@ -293,7 +359,9 @@ namespace faf::remote::net
     , mHandshake(std::make_unique<CClientHandshake>(uid, token))
   {}
 
-  bool CClientLink::Open(std::string& error)
+  bool CClientLink::Open(
+    std::string& error
+  )
   {
     return mSocket.Open(SEndpoint{}, error);
   }
@@ -308,7 +376,9 @@ namespace faf::remote::net
     mNextSendUs = 0;
   }
 
-  void CClientLink::Pump(const std::uint64_t nowUs)
+  void CClientLink::Pump(
+    const std::uint64_t nowUs
+  )
   {
     std::array<std::uint8_t, kReceiveBuffer> buffer{};
     SEndpoint from;
@@ -371,23 +441,33 @@ namespace faf::remote::net
       for (const std::vector<std::uint8_t>& datagram : mOut) {
         (void)mSocket.SendTo(datagram.data(), datagram.size(), mServer);
       }
-      if (mState == EState::Connected && (mChannel->State() == ChannelState::TimedOut || mChannel->State() == ChannelState::Failed)) {
+      if (
+        mState == EState::Connected &&
+        (mChannel->State() == ChannelState::TimedOut || mChannel->State() == ChannelState::Failed)
+      ) {
         mState = EState::Lost;
       }
     }
   }
 
-  bool CClientLink::SendReliable(const void* const data, const std::size_t size)
+  bool CClientLink::SendReliable(
+    const void* const data,
+    const std::size_t size
+  )
   {
     return mChannel && mChannel->SendReliable(data, size);
   }
 
-  bool CClientLink::TakeUnreliable(std::vector<std::uint8_t>& out)
+  bool CClientLink::TakeUnreliable(
+    std::vector<std::uint8_t>& out
+  )
   {
     return mChannel && mChannel->TakeUnreliable(out);
   }
 
-  bool CClientLink::TakeReliable(std::vector<std::uint8_t>& out)
+  bool CClientLink::TakeReliable(
+    std::vector<std::uint8_t>& out
+  )
   {
     return mChannel && mChannel->TakeReliable(out);
   }

@@ -86,7 +86,11 @@ namespace
    * Deserializes one `Motor` object lane through archive owner context and
    * returns the archive instance.
    */
-  [[maybe_unused]] gpg::ReadArchive* ReadMotorArchiveAdapter(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
+  [[maybe_unused]] gpg::ReadArchive* ReadMotorArchiveAdapter(
+    gpg::ReadArchive* const archive,
+    void* const object,
+    gpg::RRef* const ownerRef
+  )
   {
     archive->Read(CachedMotorType(), object, *ownerRef);
     return archive;
@@ -115,7 +119,11 @@ namespace
    * What it does:
    * Deserializes one `Motor` object lane through archive owner context.
    */
-  [[maybe_unused]] void ReadMotorArchiveObjectLane1(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
+  [[maybe_unused]] void ReadMotorArchiveObjectLane1(
+    gpg::ReadArchive* const archive,
+    void* const object,
+    gpg::RRef* const ownerRef
+  )
   {
     archive->Read(CachedMotorType(), object, *ownerRef);
   }
@@ -138,7 +146,9 @@ namespace
   /**
    * Address: 0x00696E70 (FUN_00696E70, Lua factory lookup thunk)
    */
-  [[nodiscard]] LuaPlus::LuaObject GetMotorSinkAwayLuaFactoryObject(LuaPlus::LuaState* const state)
+  [[nodiscard]] LuaPlus::LuaObject GetMotorSinkAwayLuaFactoryObject(
+    LuaPlus::LuaState* const state
+  )
   {
     return moho::CScrLuaMetatableFactory<moho::MotorSinkAway>::Instance().Get(state);
   }
@@ -191,7 +201,9 @@ namespace moho
   /**
    * Address: 0x00696FD0 (FUN_00696FD0, Moho::CScrLuaMetatableFactory<Moho::MotorSinkAway>::Create)
    */
-  LuaPlus::LuaObject CScrLuaMetatableFactory<MotorSinkAway>::Create(LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject CScrLuaMetatableFactory<MotorSinkAway>::Create(
+    LuaPlus::LuaState* const state
+  )
   {
     return SCR_CreateSimpleMetatable(state);
   }
@@ -203,26 +215,30 @@ namespace moho
     : Motor()
     , CScriptObject()
     , mSinkDeltaY(0.0f)
-  {
-  }
+  {}
 
   /**
    * Address: 0x006963F0 (FUN_006963F0, Lua ctor lane)
    */
-  MotorSinkAway::MotorSinkAway(LuaPlus::LuaState* const state, const float sinkDeltaY)
+  MotorSinkAway::MotorSinkAway(
+    LuaPlus::LuaState* const state,
+    const float sinkDeltaY
+  )
     : Motor()
-    , CScriptObject(GetMotorSinkAwayLuaFactoryObject(state), LuaPlus::LuaObject{}, LuaPlus::LuaObject{}, LuaPlus::LuaObject{})
+    , CScriptObject(
+        GetMotorSinkAwayLuaFactoryObject(state),
+        LuaPlus::LuaObject{},
+        LuaPlus::LuaObject{},
+        LuaPlus::LuaObject{}
+      )
     , mSinkDeltaY(sinkDeltaY)
-  {
-  }
+  {}
 
   /**
    * Address: 0x00696580 (FUN_00696580, deleting-thunk chain)
    * Address: 0x006965A0 (FUN_006965A0, non-deleting body)
    */
-  MotorSinkAway::~MotorSinkAway()
-  {
-  }
+  MotorSinkAway::~MotorSinkAway() {}
 
   /**
    * Address: 0x006963B0 (FUN_006963B0, Moho::MotorSinkAway::GetClass)
@@ -248,7 +264,9 @@ namespace moho
    * along Y each tick, preserving orientation and X/Z, then submits it as the
    * pending transform (used for destroyed units settling under the surface).
    */
-  void MotorSinkAway::Update(Entity* const entity)
+  void MotorSinkAway::Update(
+    Entity* const entity
+  )
   {
     VTransform tran = entity->GetTransformWm3();
     tran.pos_.y = (mSinkDeltaY * 0.1f) + tran.pos_.y;
@@ -271,7 +289,9 @@ namespace moho
    * Clears reflected base/field vector lanes for one `MotorSinkAwayTypeInfo`
    * instance while preserving outer storage ownership.
    */
-  void DestroyMotorSinkAwayTypeInfoBody(MotorSinkAwayTypeInfo* const typeInfo) noexcept
+  void DestroyMotorSinkAwayTypeInfoBody(
+    MotorSinkAwayTypeInfo* const typeInfo
+  ) noexcept
   {
     gpg::ClearTypeLists(typeInfo);
   }
@@ -295,7 +315,9 @@ namespace moho
   /**
    * Address: 0x00696E90 (FUN_00696E90, Moho::MotorSinkAwayTypeInfo::AddBase_CScriptObject)
    */
-  void MotorSinkAwayTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
+  void MotorSinkAwayTypeInfo::AddBase_CScriptObject(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RType* const baseType = CachedCScriptObjectType();
     gpg::AddReflectedBaseType(typeInfo, baseType, gpg::RType::BaseSubobjectOffset<MotorSinkAway, CScriptObject>());
@@ -305,7 +327,9 @@ namespace moho
    * Address: 0x00696EF0 (FUN_00696EF0, Moho::MotorSinkAwayTypeInfo::AddBase_Motor)
    * Address: 0x00696740 (FUN_00696740, add-base thunk lane)
    */
-  void MotorSinkAwayTypeInfo::AddBase_Motor(gpg::RType* const typeInfo)
+  void MotorSinkAwayTypeInfo::AddBase_Motor(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RType* const baseType = CachedMotorType();
     gpg::AddReflectedBaseType(typeInfo, baseType);
@@ -326,7 +350,9 @@ namespace moho
   /**
    * Address: 0x00697200 (FUN_00697200, Moho::MotorSinkAway::MemberDeserialize)
    */
-  void MotorSinkAway::MemberDeserialize(gpg::ReadArchive* const archive)
+  void MotorSinkAway::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -341,7 +367,9 @@ namespace moho
   /**
    * Address: 0x00697290 (FUN_00697290, Moho::MotorSinkAway::MemberSerialize)
    */
-  void MotorSinkAway::MemberSerialize(gpg::WriteArchive* const archive) const
+  void MotorSinkAway::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;
@@ -406,7 +434,10 @@ namespace gpg
    * resolves the most-derived RType, asserts derivation, and stores
    * `{value - baseOffset, dynamicType}`.
    */
-  gpg::RRef* RRef_MotorSinkAway(gpg::RRef* const out, moho::MotorSinkAway* const value)
+  gpg::RRef* RRef_MotorSinkAway(
+    gpg::RRef* const out,
+    moho::MotorSinkAway* const value
+  )
   {
     return gpg::WriteDerivedRef(out, value, &CachedMotorSinkAwayType);
   }
@@ -429,14 +460,22 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_MotorSinkAwayTypeInfo_905beb, moho::register_MotorSinkAwayTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_MotorSinkAwayTypeInfo_905beb,
+  moho::register_MotorSinkAwayTypeInfo
+)
 
 namespace moho
 {
   /**
    * Address: 0x006967F0 (FUN_006967F0)
    */
-  void MotorSinkAway::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void MotorSinkAway::MemberConstruct(
+    gpg::ReadArchive&,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     result.SetUnowned(gpg::MakeRRef(new MotorSinkAway()), 0u);
   }

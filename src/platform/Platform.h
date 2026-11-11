@@ -70,8 +70,7 @@
 
 #define MOHO_EBO_PADDING_FIELD(N)                                                                                      \
   static_assert((N) >= 0, "padding units must be non-negative");                                                       \
-  [[maybe_unused]] std::uint8_t MOHO_EBO__CAT(eboPadding_, __COUNTER__)[(N) * 4]                                       \
-  {}
+  [[maybe_unused]] std::uint8_t MOHO_EBO__CAT(eboPadding_, __COUNTER__)[(N) * 4] {}
 
 #else
 /* No actual storage, but keep a member for debug/inspection:
@@ -79,8 +78,7 @@
    - MSVC/others: zero-size via [[no_unique_address]] empty std::array. */
 #if defined(__clang__) || defined(__GNUC__)
 #define MOHO_EBO_PADDING_FIELD(N)                                                                                      \
-  [[maybe_unused]] std::uint8_t MOHO_EBO__CAT(eboPadding_, __COUNTER__)[0]                                             \
-  {}
+  [[maybe_unused]] std::uint8_t MOHO_EBO__CAT(eboPadding_, __COUNTER__)[0] {}
 #else
 #define MOHO_EBO_PADDING_FIELD(N)                                                                                      \
   [[maybe_unused]] [[no_unique_address]]                                                                               \
@@ -117,8 +115,9 @@
  * Checked with -fdump-record-layouts against /d1reportSingleClassLayout for
  * x86 and x64, and by the Win32 layout static_asserts.
  */
-#if defined(__clang__)
+#if defined(__clang__) && defined(_MSC_VER)
 #define MOHO_CLANG_EMPTY_BASE_LAYOUT __declspec(empty_bases)
 #else
+// The Itanium ABI (Linux, macOS) has no such attribute and lays empty bases out without it.
 #define MOHO_CLANG_EMPTY_BASE_LAYOUT
 #endif

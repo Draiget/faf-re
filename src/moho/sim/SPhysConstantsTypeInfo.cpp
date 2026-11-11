@@ -56,7 +56,9 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::RRef MakeSPhysConstantsRef(moho::SPhysConstants* const object)
+  [[nodiscard]] gpg::RRef MakeSPhysConstantsRef(
+    moho::SPhysConstants* const object
+  )
   {
     gpg::RRef ref{};
     ref.mObj = object;
@@ -71,7 +73,10 @@ namespace
    * Deserializes one `Vector3f` object lane using one local null-owner
    * reference.
    */
-  [[maybe_unused]] void ReadVector3fArchiveObjectWithNullOwnerVariantA(gpg::ReadArchive* const archive, void* const object)
+  [[maybe_unused]] void ReadVector3fArchiveObjectWithNullOwnerVariantA(
+    gpg::ReadArchive* const archive,
+    void* const object
+  )
   {
     gpg::RRef ownerRef{};
     archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), object, ownerRef);
@@ -84,7 +89,10 @@ namespace
    * Serializes one `Vector3f` object lane using one local null-owner
    * reference.
    */
-  [[maybe_unused]] void WriteVector3fArchiveObjectWithNullOwnerVariantA(gpg::WriteArchive* const archive, void** const objectSlot)
+  [[maybe_unused]] void WriteVector3fArchiveObjectWithNullOwnerVariantA(
+    gpg::WriteArchive* const archive,
+    void** const objectSlot
+  )
   {
     const gpg::RRef ownerRef{};
     archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), objectSlot, ownerRef);
@@ -97,7 +105,10 @@ namespace
    * Secondary deserialization lane for one `Vector3f` object using one local
    * null-owner reference.
    */
-  [[maybe_unused]] void ReadVector3fArchiveObjectWithNullOwnerVariantB(gpg::ReadArchive* const archive, void* const object)
+  [[maybe_unused]] void ReadVector3fArchiveObjectWithNullOwnerVariantB(
+    gpg::ReadArchive* const archive,
+    void* const object
+  )
   {
     gpg::RRef ownerRef{};
     archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), object, ownerRef);
@@ -110,7 +121,10 @@ namespace
    * Secondary serialization lane for one `Vector3f` object using one local
    * null-owner reference.
    */
-  [[maybe_unused]] void WriteVector3fArchiveObjectWithNullOwnerVariantB(gpg::WriteArchive* const archive, void** const objectSlot)
+  [[maybe_unused]] void WriteVector3fArchiveObjectWithNullOwnerVariantB(
+    gpg::WriteArchive* const archive,
+    void** const objectSlot
+  )
   {
     const gpg::RRef ownerRef{};
     archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), objectSlot, ownerRef);
@@ -123,7 +137,10 @@ namespace
    * Stdcall bridge that deserializes one `Vector3f` object lane using one
    * local null-owner reference.
    */
-  [[maybe_unused]] void ReadVector3fArchiveObjectWithNullOwnerStdCall(void* const object, gpg::ReadArchive* const archive)
+  [[maybe_unused]] void ReadVector3fArchiveObjectWithNullOwnerStdCall(
+    void* const object,
+    gpg::ReadArchive* const archive
+  )
   {
     gpg::RRef ownerRef{};
     archive->Read(gpg::RTypeOf<Wm3::Vector3f>(), object, ownerRef);
@@ -136,7 +153,10 @@ namespace
    * Stdcall bridge that serializes one `Vector3f` object lane using one local
    * null-owner reference.
    */
-  [[maybe_unused]] void WriteVector3fArchiveObjectWithNullOwnerStdCall(void** const objectSlot, gpg::WriteArchive* const archive)
+  [[maybe_unused]] void WriteVector3fArchiveObjectWithNullOwnerStdCall(
+    void** const objectSlot,
+    gpg::WriteArchive* const archive
+  )
   {
     const gpg::RRef ownerRef{};
     archive->Write(gpg::RTypeOf<Wm3::Vector3f>(), objectSlot, ownerRef);
@@ -153,8 +173,7 @@ namespace moho
    */
   SPhysConstants::SPhysConstants() noexcept
     : mGravity(0.0f, -4.9f, 0.0f)
-  {
-  }
+  {}
 
   /**
    * Address: 0x00699AB0 (FUN_00699AB0, Moho::SPhysConstantsTypeInfo::SPhysConstantsTypeInfo)
@@ -172,7 +191,9 @@ namespace moho
    * Clears reflected base/field vector lanes for one `SPhysConstantsTypeInfo`
    * instance while preserving outer storage ownership.
    */
-  [[maybe_unused]] void DestroySPhysConstantsTypeInfoBody(SPhysConstantsTypeInfo* const typeInfo) noexcept
+  [[maybe_unused]] void DestroySPhysConstantsTypeInfoBody(
+    SPhysConstantsTypeInfo* const typeInfo
+  ) noexcept
   {
     gpg::ClearTypeLists(typeInfo);
   }
@@ -222,7 +243,9 @@ namespace moho
   /**
    * Address: 0x00699FC0 (FUN_00699FC0, Moho::SPhysConstantsTypeInfo::CtrRef)
    */
-  gpg::RRef SPhysConstantsTypeInfo::CtrRef(void* const objectPtr)
+  gpg::RRef SPhysConstantsTypeInfo::CtrRef(
+    void* const objectPtr
+  )
   {
     auto* const object = static_cast<SPhysConstants*>(objectPtr);
     if (object) {
@@ -235,7 +258,9 @@ namespace moho
   /**
    * Address: 0x00699FB0 (FUN_00699FB0, Moho::SPhysConstantsTypeInfo::Delete)
    */
-  void SPhysConstantsTypeInfo::Delete(void* const objectPtr)
+  void SPhysConstantsTypeInfo::Delete(
+    void* const objectPtr
+  )
   {
     ::operator delete(objectPtr);
   }
@@ -243,7 +268,9 @@ namespace moho
   /**
    * Address: 0x0069A010 (FUN_0069A010, Moho::SPhysConstantsTypeInfo::Destruct)
    */
-  void SPhysConstantsTypeInfo::Destruct(void*)
+  void SPhysConstantsTypeInfo::Destruct(
+    void*
+  )
   {}
 
   /**
@@ -270,4 +297,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_SPhysConstantsTypeInfo_4a719c, moho::register_SPhysConstantsTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_SPhysConstantsTypeInfo_4a719c,
+  moho::register_SPhysConstantsTypeInfo
+)

@@ -29,10 +29,14 @@ namespace gpg::gal
         return nullptr;
       }
       const DeviceContext* const context = device->GetDeviceContext();
-      return (context != nullptr && context->mDeviceType == DeviceApi::Vulkan) ? static_cast<DeviceVulkan*>(device) : nullptr;
+      return (context != nullptr && context->mDeviceType == DeviceApi::Vulkan) ? static_cast<DeviceVulkan*>(device)
+                                                                               : nullptr;
     }
 
-    [[nodiscard]] DeviceVulkan& RequireDevice(const char* const file, const int line)
+    [[nodiscard]] DeviceVulkan& RequireDevice(
+      const char* const file,
+      const int line
+    )
     {
       DeviceVulkan* const device = ActiveDevice();
       if (device == nullptr) {
@@ -41,12 +45,18 @@ namespace gpg::gal
       return *device;
     }
 
-    [[nodiscard]] bool HasFlag(const std::uint32_t flags, const MohoD3DLockFlags flag) noexcept
+    [[nodiscard]] bool HasFlag(
+      const std::uint32_t flags,
+      const MohoD3DLockFlags flag
+    ) noexcept
     {
       return (flags & static_cast<std::uint32_t>(flag)) != 0U;
     }
 
-    void RetireImage(vulkan::TrackedImage& image, VkImageView view)
+    void RetireImage(
+      vulkan::TrackedImage& image,
+      VkImageView view
+    )
     {
       if (DeviceVulkan* const device = ActiveDevice()) {
         device->Retire(image, view);
@@ -92,7 +102,11 @@ namespace gpg::gal
     return &mContext;
   }
 
-  TextureLockRect TextureVulkan::Lock(const int level, const RECT& rect, const int flags)
+  TextureLockRect TextureVulkan::Lock(
+    const int level,
+    const RECT& rect,
+    const int flags
+  )
   {
     if (mImage.image == VK_NULL_HANDLE || IsVolume()) {
       ThrowError("TextureVulkan.cpp", __LINE__, "attempt to map invalid texture");
@@ -104,8 +118,9 @@ namespace gpg::gal
       ThrowError("TextureVulkan.cpp", __LINE__, "texture map/unmap mismatch");
     }
     const auto levelIndex = static_cast<std::uint32_t>(level);
-    const dxgi::LevelLayout layout =
-      dxgi::ComputeLevelLayout(mDxgiFormat, std::max(1U, mImage.width >> levelIndex), std::max(1U, mImage.height >> levelIndex));
+    const dxgi::LevelLayout layout = dxgi::ComputeLevelLayout(
+      mDxgiFormat, std::max(1U, mImage.width >> levelIndex), std::max(1U, mImage.height >> levelIndex)
+    );
     std::vector<std::uint8_t>& bytes = mLevels[levelIndex];
     if (bytes.size() != layout.ByteSize()) {
       if (mContentsFromEngine || HasFlag(static_cast<std::uint32_t>(flags), MohoD3DLockFlags::Discard)) {
@@ -118,9 +133,11 @@ namespace gpg::gal
     if (rect.left != rect.right) {
       const std::uint32_t elementBytes = dxgi::FormatElementBytes(mDxgiFormat);
       if (dxgi::IsBlockCompressed(mDxgiFormat)) {
-        offset = static_cast<std::size_t>(rect.top / 4) * layout.rowPitch + static_cast<std::size_t>(rect.left / 4) * elementBytes;
+        offset = static_cast<std::size_t>(rect.top / 4) * layout.rowPitch +
+          static_cast<std::size_t>(rect.left / 4) * elementBytes;
       } else {
-        offset = static_cast<std::size_t>(rect.top) * layout.rowPitch + static_cast<std::size_t>(rect.left) * elementBytes;
+        offset =
+          static_cast<std::size_t>(rect.top) * layout.rowPitch + static_cast<std::size_t>(rect.left) * elementBytes;
       }
     }
     mLocked = true;
@@ -134,12 +151,16 @@ namespace gpg::gal
     return lock;
   }
 
-  int TextureVulkan::Unlock(const TextureLockRect lock)
+  int TextureVulkan::Unlock(
+    const TextureLockRect lock
+  )
   {
     return Unlock(lock.level);
   }
 
-  int TextureVulkan::Unlock(const int level)
+  int TextureVulkan::Unlock(
+    const int level
+  )
   {
     if (!mLocked || level != mLockedLevel) {
       ThrowError("TextureVulkan.cpp", __LINE__, "texture lock/unlock mismatch");
@@ -158,7 +179,9 @@ namespace gpg::gal
     return 0;
   }
 
-  void TextureVulkan::SaveToBuffer(gpg::MemBuffer<char>* const outBuffer)
+  void TextureVulkan::SaveToBuffer(
+    gpg::MemBuffer<char>* const outBuffer
+  )
   {
     imaging::ImageCodec* const codec = imaging::ImageCodec::Instance();
     if (codec == nullptr || mImage.image == VK_NULL_HANDLE) {
@@ -186,7 +209,11 @@ namespace gpg::gal
   // ---------------------------------------------------------------------------
   // Targets
 
-  RenderTargetVulkan::RenderTargetVulkan(std::vector<Buffer> buffers, const DXGI_FORMAT dxgiFormat, const int swapChainIndex)
+  RenderTargetVulkan::RenderTargetVulkan(
+    std::vector<Buffer> buffers,
+    const DXGI_FORMAT dxgiFormat,
+    const int swapChainIndex
+  )
     : mBuffers(std::move(buffers))
     , mDxgiFormat(dxgiFormat)
     , mSwapChainIndex(swapChainIndex)
@@ -218,14 +245,18 @@ namespace gpg::gal
   {
     if (mSwapChainIndex >= 0 && mBuffers.size() > 1U) {
       DeviceVulkan* const device = ActiveDevice();
-      const std::uint32_t index = (device != nullptr) ? device->AcquiredImage(static_cast<std::uint32_t>(mSwapChainIndex)) : 0U;
+      const std::uint32_t index =
+        (device != nullptr) ? device->AcquiredImage(static_cast<std::uint32_t>(mSwapChainIndex)) : 0U;
       return mBuffers[std::min<std::size_t>(index, mBuffers.size() - 1U)];
     }
     return mBuffers.front();
   }
 
   DepthStencilTargetVulkan::DepthStencilTargetVulkan(
-    const DepthStencilTargetContext& context, vulkan::TrackedImage image, const VkImageView view, const VkImageView sampledView
+    const DepthStencilTargetContext& context,
+    vulkan::TrackedImage image,
+    const VkImageView view,
+    const VkImageView sampledView
   )
     : mContext(context)
     , mImage(image)
@@ -249,7 +280,9 @@ namespace gpg::gal
     return &mContext;
   }
 
-  CubeRenderTargetVulkan::CubeRenderTargetVulkan(const CubeRenderTargetContext& context)
+  CubeRenderTargetVulkan::CubeRenderTargetVulkan(
+    const CubeRenderTargetContext& context
+  )
     : mContext(context)
   {}
 
@@ -264,7 +297,10 @@ namespace gpg::gal
   // Buffers
 
   BufferStorageVulkan::BufferStorageVulkan(
-    const std::uint32_t byteWidth, const bool dynamic, const VkBufferUsageFlags usage, const char* const kind
+    const std::uint32_t byteWidth,
+    const bool dynamic,
+    const VkBufferUsageFlags usage,
+    const char* const kind
   )
     : mByteWidth(std::max(byteWidth, 4U))
     , mKind(kind)
@@ -276,9 +312,9 @@ namespace gpg::gal
     }
     // Transfer both ways: uploads write it, and Device::CopyVertexBufferRegion
     // copies between static buffers on the GPU.
-    mBuffer = RequireDevice(mKind, __LINE__).CreateDeviceBuffer(
-      mByteWidth, usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
-    );
+    mBuffer =
+      RequireDevice(mKind, __LINE__)
+        .CreateDeviceBuffer(mByteWidth, usage | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
   }
 
   BufferStorageVulkan::~BufferStorageVulkan()
@@ -290,7 +326,11 @@ namespace gpg::gal
     }
   }
 
-  std::uint8_t* BufferStorageVulkan::Lock(const std::uint32_t offset, const std::uint32_t size, const MohoD3DLockFlags flags)
+  std::uint8_t* BufferStorageVulkan::Lock(
+    const std::uint32_t offset,
+    const std::uint32_t size,
+    const MohoD3DLockFlags flags
+  )
   {
     if (mLocked) {
       ThrowError(mKind, __LINE__, "buffer lock/unlock mismatch");
@@ -302,6 +342,10 @@ namespace gpg::gal
     mLockSize = (size == 0U || offset + size > mByteWidth) ? (mByteWidth - offset) : size;
     mLockFlags = static_cast<std::uint32_t>(flags);
     mLocked = true;
+    if (!HasFlag(mLockFlags, MohoD3DLockFlags::ReadOnly)) {
+      const std::uint32_t end = mLockOffset + mLockSize;
+      mWrittenEnd = HasFlag(mLockFlags, MohoD3DLockFlags::Discard) ? end : std::max(mWrittenEnd, end);
+    }
     if (mShadow.Released()) {
       if (HasFlag(mLockFlags, MohoD3DLockFlags::ReadOnly)) {
         gpg::Warnf("gal: %s read lock after its CPU copy was released reads zeros", mKind);
@@ -335,7 +379,10 @@ namespace gpg::gal
       device.UploadBuffer(mBuffer, mLockOffset, mShadow.data() + mLockOffset, mLockSize);
       return;
     }
-    if (HasFlag(mLockFlags, MohoD3DLockFlags::NoOverwrite) && mChunkCpu != nullptr && mChunkSerial == device.RecordingSerial()) {
+    if (
+      HasFlag(mLockFlags, MohoD3DLockFlags::NoOverwrite) && mChunkCpu != nullptr &&
+      mChunkSerial == device.RecordingSerial()
+    ) {
       std::memcpy(mChunkCpu + mLockOffset, mShadow.data() + mLockOffset, mLockSize);
       return;
     }
@@ -345,7 +392,8 @@ namespace gpg::gal
     if (mLockedRangeOnly && gLockedRangeOnly) {
       std::memcpy(chunk.cpu + mLockOffset, mShadow.data() + mLockOffset, mLockSize);
     } else {
-      std::memcpy(chunk.cpu, mShadow.data(), mByteWidth);
+      // Engine change (ren_CopyWrittenOnly): a marked buffer's draws read only what was written since its last discard.
+      std::memcpy(chunk.cpu, mShadow.data(), WrittenCopyBytes());
     }
     mChunkBuffer = chunk.buffer;
     mChunkOffset = chunk.offset;
@@ -353,7 +401,16 @@ namespace gpg::gal
     mChunkSerial = device.RecordingSerial();
   }
 
-  void BufferStorageVulkan::PrepareForDraw(DeviceVulkan& device, VkBuffer& outBuffer, VkDeviceSize& outOffset)
+  std::uint32_t BufferStorageVulkan::WrittenCopyBytes() const noexcept
+  {
+    return (mCopyWrittenOnly && gCopyWrittenOnly && mWrittenEnd < mByteWidth) ? mWrittenEnd : mByteWidth;
+  }
+
+  void BufferStorageVulkan::PrepareForDraw(
+    DeviceVulkan& device,
+    VkBuffer& outBuffer,
+    VkDeviceSize& outOffset
+  )
   {
     if (!mDynamic) {
       outBuffer = mBuffer.buffer;
@@ -362,7 +419,7 @@ namespace gpg::gal
     }
     if (mChunkCpu == nullptr || mChunkSerial != device.RecordingSerial()) {
       const vulkan::UploadAllocation chunk = device.AllocateUpload(mByteWidth, 256U);
-      std::memcpy(chunk.cpu, mShadow.data(), mByteWidth);
+      std::memcpy(chunk.cpu, mShadow.data(), WrittenCopyBytes()); // ren_CopyWrittenOnly
       mChunkBuffer = chunk.buffer;
       mChunkOffset = chunk.offset;
       mChunkCpu = chunk.cpu;
@@ -372,9 +429,16 @@ namespace gpg::gal
     outOffset = mChunkOffset;
   }
 
-  VertexBufferVulkan::VertexBufferVulkan(const VertexBufferContext& context)
+  VertexBufferVulkan::VertexBufferVulkan(
+    const VertexBufferContext& context
+  )
     : mContext(context)
-    , mStorage(context.vertexCount_ * context.stride_, context.usage_ == 2U, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, "VertexBufferVulkan.cpp")
+    , mStorage(
+        context.vertexCount_ * context.stride_,
+        context.usage_ == 2U,
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        "VertexBufferVulkan.cpp"
+      )
   {}
 
   VertexBufferVulkan::~VertexBufferVulkan() = default;
@@ -384,7 +448,11 @@ namespace gpg::gal
     return &mContext;
   }
 
-  void* VertexBufferVulkan::Lock(const unsigned int offset, const unsigned int size, const MohoD3DLockFlags lockFlags)
+  void* VertexBufferVulkan::Lock(
+    const unsigned int offset,
+    const unsigned int size,
+    const MohoD3DLockFlags lockFlags
+  )
   {
     return mStorage.Lock(offset, size, lockFlags);
   }
@@ -394,10 +462,15 @@ namespace gpg::gal
     mStorage.Unlock();
   }
 
-  IndexBufferVulkan::IndexBufferVulkan(const IndexBufferContext& context)
+  IndexBufferVulkan::IndexBufferVulkan(
+    const IndexBufferContext& context
+  )
     : mContext(context)
     , mStorage(
-        context.size_ * ((context.format_ == 1U) ? 2U : 4U), context.type_ == 2U, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, "IndexBufferVulkan.cpp"
+        context.size_ * ((context.format_ == 1U) ? 2U : 4U),
+        context.type_ == 2U,
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+        "IndexBufferVulkan.cpp"
       )
   {}
 
@@ -408,7 +481,11 @@ namespace gpg::gal
     return &mContext;
   }
 
-  std::int16_t* IndexBufferVulkan::Lock(const unsigned int offset, const unsigned int size, const MohoD3DLockFlags lockFlags)
+  std::int16_t* IndexBufferVulkan::Lock(
+    const unsigned int offset,
+    const unsigned int size,
+    const MohoD3DLockFlags lockFlags
+  )
   {
     return reinterpret_cast<std::int16_t*>(mStorage.Lock(offset, size, lockFlags));
   }
@@ -423,7 +500,9 @@ namespace gpg::gal
     return (mContext.format_ == 1U) ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32;
   }
 
-  VertexFormatVulkan::VertexFormatVulkan(const std::uint32_t formatCode)
+  VertexFormatVulkan::VertexFormatVulkan(
+    const std::uint32_t formatCode
+  )
   {
     formatCode_ = formatCode;
     for (const D3D11_INPUT_ELEMENT_DESC& element : d3d11::VertexLayoutElements(formatCode)) {

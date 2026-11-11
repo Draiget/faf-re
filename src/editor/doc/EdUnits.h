@@ -5,7 +5,8 @@
 
 namespace faf::editor
 {
-  /** A unit of an army's `_save.lua` group: `['UNIT_328'] = { type = 'ueb2101', orders, platoon, Position, Orientation }`. */
+  /** A unit of an army's `_save.lua` group: `['UNIT_328'] = { type = 'ueb2101', orders, platoon, Position, Orientation
+   * }`. */
   struct SaveUnit
   {
     std::string name;
@@ -67,4 +68,19 @@ namespace faf::editor
 
   /** Adds a unit at the end of the army's INITIAL group (made when the army has none), as the game's units start. */
   void AddUnit(UnitGroup& root, SaveUnit unit);
+
+  // The group tree (a path is the groups' names from under the army's root down; empty: the root).
+
+  /** The group at `path`, or null. */
+  UnitGroup* GroupAt(UnitGroup& root, const std::vector<std::string>& path);
+  /** Adds an empty group `name` at the end of the group at `path`; false when that group has a member of the name. */
+  bool AddGroup(UnitGroup& root, const std::vector<std::string>& path, const std::string& name);
+  /** Renames the group at `path`; false for the root or a name its parent already has. */
+  bool RenameGroup(UnitGroup& root, const std::vector<std::string>& path, const std::string& name);
+  /** Removes the group at `path`; its groups and units go to its parent, in its place. False for the root. */
+  bool RemoveGroup(UnitGroup& root, const std::vector<std::string>& path);
+  /** Moves the named units, wherever they are, to the end of the group at `path`; returns how many moved. */
+  int MoveUnitsTo(UnitGroup& root, const std::vector<std::string>& names, const std::vector<std::string>& path);
+  /** The names of the units in a group and its groups. */
+  std::vector<std::string> UnitNamesIn(const UnitGroup& group);
 } // namespace faf::editor

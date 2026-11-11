@@ -42,7 +42,8 @@ namespace moho
      * `shadow`, when it drew this frame's sun shadow, keeps contact shadows to the points it lights:
      * it already shades the rest, and a second darkening turned the ground under trees near-black.
      */
-    void Render(const GeomCamera3& camera, int x, int y, int width, int height, float shadowReach, const Shadow* shadow);
+    void
+    Render(const GeomCamera3& camera, int x, int y, int width, int height, float shadowReach, const Shadow* shadow);
 
   private:
     /** Re-bakes terrain shadows when the map's heightfield or the sun changed; false when there are none. */

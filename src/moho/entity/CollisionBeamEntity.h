@@ -17,7 +17,7 @@ namespace gpg
   class ReadArchive;
   class WriteArchive;
   class SerConstructResult;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -188,9 +188,8 @@ namespace moho
      * Reads construct payload (`Sim*`), allocates one `CollisionBeamEntity`,
      * and publishes it as an unowned construct result.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x006762F0 (FUN_006762F0, Moho::CollisionBeamEntity::MemberDeserialize)
@@ -229,13 +228,16 @@ namespace moho
     WeakPtr<UnitWeapon> mLauncher;                      // +0x28C
     std::uint8_t mEnabled;                              // +0x294
     std::uint8_t mCollisionListenerBound;               // +0x295
-    std::uint8_t mPad296_297[0x02];                    // +0x296
+    std::uint8_t mPad296_297[0x02];                     // +0x296
     std::int32_t mCollisionCheckTickCounter;            // +0x298
-    std::uint8_t mPad29C_29F[0x04];                    // +0x29C
+    std::uint8_t mPad29C_29F[0x04];                     // +0x29C
   };
 
   static_assert(sizeof(CollisionBeamEntity) == 0x2A0, "CollisionBeamEntity size must be 0x2A0");
-  static_assert(offsetof(CollisionBeamEntity, mListener) == 0x270, "CollisionBeamEntity::mListener offset must be 0x270");
+  static_assert(
+    offsetof(CollisionBeamEntity, mListener) == 0x270,
+    "CollisionBeamEntity::mListener offset must be 0x270"
+  );
   static_assert(
     offsetof(CollisionBeamEntity, mSerializedBeamState) == 0x278,
     "CollisionBeamEntity::mSerializedBeamState offset must be 0x278"
@@ -249,7 +251,10 @@ namespace moho
     "CollisionBeamEntity::mLastBeamLength offset must be 0x280"
   );
   static_assert(offsetof(CollisionBeamEntity, mEffect) == 0x284, "CollisionBeamEntity::mEffect offset must be 0x284");
-  static_assert(offsetof(CollisionBeamEntity, mLauncher) == 0x28C, "CollisionBeamEntity::mLauncher offset must be 0x28C");
+  static_assert(
+    offsetof(CollisionBeamEntity, mLauncher) == 0x28C,
+    "CollisionBeamEntity::mLauncher offset must be 0x28C"
+  );
   static_assert(offsetof(CollisionBeamEntity, mEnabled) == 0x294, "CollisionBeamEntity::mEnabled offset must be 0x294");
   static_assert(
     offsetof(CollisionBeamEntity, mCollisionListenerBound) == 0x295,

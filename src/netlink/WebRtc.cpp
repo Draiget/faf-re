@@ -12,7 +12,9 @@
 
 namespace faf::netlink
 {
-  bool IsWebRtcSignal(const std::string& json)
+  bool IsWebRtcSignal(
+    const std::string& json
+  )
   {
     const std::optional<JsonValue> v = ParseJson(json);
     return v && v->IsObject() && v->Find("webrtc") != nullptr;
@@ -30,14 +32,18 @@ namespace faf::netlink
     std::vector<std::string> outbox;
     bool closed = false;
 
-    void Log(const std::string& text) const
+    void Log(
+      const std::string& text
+    ) const
     {
       if (onLog) {
         onLog("webrtc: " + text);
       }
     }
 
-    void Queue(JsonValue body)
+    void Queue(
+      JsonValue body
+    )
     {
       JsonValue m = JsonValue::Object();
       m.Set("srcId", options.localId);
@@ -48,8 +54,11 @@ namespace faf::netlink
     }
   };
 
-  WebRtcChannel::WebRtcChannel(WebRtcOptions options, std::function<void(const std::uint8_t*, std::size_t)> onData,
-                               std::function<void(const std::string&)> onLog)
+  WebRtcChannel::WebRtcChannel(
+    WebRtcOptions options,
+    std::function<void(const std::uint8_t*, std::size_t)> onData,
+    std::function<void(const std::string&)> onLog
+  )
     : mImpl(std::make_unique<Impl>())
   {
     mImpl->options = std::move(options);
@@ -145,7 +154,9 @@ namespace faf::netlink
     }
   }
 
-  void WebRtcChannel::OnSignal(const std::string& json)
+  void WebRtcChannel::OnSignal(
+    const std::string& json
+  )
   {
     Impl& in = *mImpl;
     std::shared_ptr<rtc::PeerConnection> pc;
@@ -177,7 +188,10 @@ namespace faf::netlink
     return out;
   }
 
-  bool WebRtcChannel::Send(const void* data, const std::size_t size)
+  bool WebRtcChannel::Send(
+    const void* data,
+    const std::size_t size
+  )
   {
     if (!mOpen.load()) {
       return false;
@@ -220,7 +234,6 @@ namespace faf::netlink
         pc->resetCallbacks();
         pc->close();
       }
-    } catch (const std::exception&) {
-    }
+    } catch (const std::exception&) {}
   }
 } // namespace faf::netlink

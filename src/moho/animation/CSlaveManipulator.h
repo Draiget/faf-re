@@ -80,8 +80,8 @@ namespace moho
     static gpg::RType* sType;
 
     std::int32_t mSourceBoneIndex = -1;  // +0x80
-    Wm3::Quaternionf mCurrentRotation{};  // +0x84
-    float mMaxRate = -1.0f;               // +0x94
+    Wm3::Quaternionf mCurrentRotation{}; // +0x84
+    float mMaxRate = -1.0f;              // +0x94
   };
 
   static_assert(
@@ -242,7 +242,8 @@ namespace moho
 
   protected:
     /**
-     * Address: 0x00646610 (FUN_00646610, ?Create@?$CScrLuaMetatableFactory@VCSlaveManipulator@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
+     * Address: 0x00646610 (FUN_00646610,
+     * ?Create@?$CScrLuaMetatableFactory@VCSlaveManipulator@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
      *
      * What it does:
      * Builds the metatable object used for `CSlaveManipulator` Lua userdata.

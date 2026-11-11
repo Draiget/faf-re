@@ -56,7 +56,9 @@ namespace faf::netlink
     std::uint16_t portHost = 0;
   };
 
-  inline EngineAddress EngineAddressFor(const std::int64_t remoteId)
+  inline EngineAddress EngineAddressFor(
+    const std::int64_t remoteId
+  )
   {
     const auto id = static_cast<std::uint32_t>(remoteId);
     EngineAddress a;
@@ -65,11 +67,13 @@ namespace faf::netlink
     return a;
   }
 
-  inline std::string EngineAddressText(const std::int64_t remoteId)
+  inline std::string EngineAddressText(
+    const std::int64_t remoteId
+  )
   {
     const EngineAddress a = EngineAddressFor(remoteId);
     return std::to_string(a.addrHost >> 24) + "." + std::to_string((a.addrHost >> 16) & 0xFF) + "." +
-           std::to_string((a.addrHost >> 8) & 0xFF) + "." + std::to_string(a.addrHost & 0xFF) + ":" +
-           std::to_string(a.portHost);
+      std::to_string((a.addrHost >> 8) & 0xFF) + "." + std::to_string(a.addrHost & 0xFF) + ":" +
+      std::to_string(a.portHost);
   }
 } // namespace faf::netlink

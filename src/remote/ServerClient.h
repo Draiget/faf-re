@@ -26,7 +26,8 @@ namespace moho
 
 namespace faf::remote
 {
-  /** Whether a player may send this op. The beats, the checksums and who's playing are the server's, and cheats aren't allowed. */
+  /** Whether a player may send this op. The beats, the checksums and who's playing are the server's, and cheats aren't
+   * allowed. */
   [[nodiscard]] bool SeatMaySend(moho::ECmdStreamOp op) noexcept;
 
   class CServerClient final : public moho::CClientBase
@@ -39,13 +40,24 @@ namespace faf::remote
 
     /** Installs a seat in slot `index`, with `sourceId` as its only command source. The manager owns it. */
     static CServerClient& Create(
-      moho::CClientManagerImpl& manager, const char* name, std::int32_t index, std::int32_t ownerId, std::uint32_t sourceId
+      moho::CClientManagerImpl& manager,
+      const char* name,
+      std::int32_t index,
+      std::int32_t ownerId,
+      std::uint32_t sourceId
     );
 
-    float GetStatusMetricA() override { return 0.0f; }
-    float GetStatusMetricB() override { return 0.0f; }
+    float GetStatusMetricA() override
+    {
+      return 0.0f;
+    }
+    float GetStatusMetricB() override
+    {
+      return 0.0f;
+    }
 
-    /** What the server's side sends to every client: a beat is queued here too, an ack noted, the rest isn't for a seat. */
+    /** What the server's side sends to every client: a beat is queued here too, an ack noted, the rest isn't for a
+     * seat. */
     void Process(moho::CMessage& message) override;
 
     void Debug() override;
@@ -65,12 +77,20 @@ namespace faf::remote
     void SetBeatHook(BeatHook hook);
 
     /**
-     * Plan WP15.4 (#200): whether its player may still pause. The server keeps each seat's pause budget (the sim's own is
-     * unlimited, so replays need nothing new) and closes this at 0; `ReceiveCommand` then refuses `CMDST_RequestPause`.
+     * Plan WP15.4 (#200): whether its player may still pause. The server keeps each seat's pause budget (the sim's own
+     * is unlimited, so replays need nothing new) and closes this at 0; `ReceiveCommand` then refuses
+     * `CMDST_RequestPause`.
      */
-    void SetPauseAllowed(const bool allowed) noexcept { mPauseAllowed.store(allowed, std::memory_order_relaxed); }
+    void SetPauseAllowed(
+      const bool allowed
+    ) noexcept
+    {
+      mPauseAllowed.store(allowed, std::memory_order_relaxed);
+    }
 
-    [[nodiscard]] std::uint64_t Refused(moho::ECmdStreamOp op) const noexcept
+    [[nodiscard]] std::uint64_t Refused(
+      moho::ECmdStreamOp op
+    ) const noexcept
     {
       const auto index = static_cast<std::size_t>(op);
       return index < mRefused.size() ? mRefused[index] : 0u;
@@ -78,7 +98,11 @@ namespace faf::remote
 
   private:
     CServerClient(
-      moho::CClientManagerImpl& manager, const char* name, std::int32_t index, std::int32_t ownerId, moho::BVIntSet& sources,
+      moho::CClientManagerImpl& manager,
+      const char* name,
+      std::int32_t index,
+      std::int32_t ownerId,
+      moho::BVIntSet& sources,
       std::uint32_t sourceId
     );
 

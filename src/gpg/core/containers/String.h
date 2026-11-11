@@ -30,7 +30,7 @@ namespace gpg
    * Counts UTF-8 codepoints in `str` by walking codepoint boundaries via
    * `STR_NextUtf8Char` until the terminating NUL.
    */
-  int STR_Utf8Len(char const*);                                         // 0x00938070
+  int STR_Utf8Len(char const*); // 0x00938070
   /**
    * Address: 0x00938040 (FUN_00938040, gpg::STR_NextUtf8Char)
    *
@@ -53,7 +53,7 @@ namespace gpg
    * What it does:
    * Returns one UTF-8 codepoint-range substring; throws `std::out_of_range`
    * when `pos` starts past the end of the source string.
-  */
+   */
   fa::string STR_Utf8SubString(StrArg str, int pos, int len);
   /**
    * Address: 0x00937F90 (FUN_00937F90, gpg::STR_EncodeUtf8Char)
@@ -79,7 +79,7 @@ namespace gpg
    * Encodes one wide-character string as UTF-8 via `STR_EncodeUtf8Char`,
    * appending each codepoint until the terminating NUL.
    */
-  fa::string STR_WideToUtf8(const wchar_t*);                         // 0x00938680
+  fa::string STR_WideToUtf8(const wchar_t*); // 0x00938680
   /**
    * Address: 0x00938720 (FUN_00938720, gpg::STR_Utf8ToWide)
    *
@@ -88,7 +88,7 @@ namespace gpg
    * `STR_DecodeUtf8Char`, appending each codepoint until the terminating
    * NUL.
    */
-  std::wstring STR_Utf8ToWide(StrArg str);                              // 0x00938720
+  std::wstring STR_Utf8ToWide(StrArg str); // 0x00938720
 
   /**
    * Address: 0x00938CB0 (FUN_00938CB0, gpg::STR_GetToken)
@@ -106,7 +106,7 @@ namespace gpg
    * produced token to `dest`.
    */
   void STR_GetTokens(StrArg find, const char* str, fa::vector<fa::string>& dest);
-  int STR_GetWordStartIndex(fa::string& str, int pos);                               // 0x009384A0
+  int STR_GetWordStartIndex(fa::string& str, int pos); // 0x009384A0
   /**
    * Address: 0x00938570 (FUN_00938570, gpg::STR_GetNextWordStartIndex)
    *
@@ -180,8 +180,8 @@ namespace gpg
    * non-zero, returning the number of replacements performed.
    */
   int STR_Replace(fa::string& str, StrArg what, StrArg with, unsigned int unk);
-  int STR_ParseUInt32(StrArg str);                                                 // 0x00938150
-  int STR_Xtoi(StrArg str);                                                        // 0x009380F0
+  int STR_ParseUInt32(StrArg str); // 0x00938150
+  int STR_Xtoi(StrArg str);        // 0x009380F0
   bool STR_IsAsciiWhitespace(char ch);
   /**
    * Address: 0x00938450 (FUN_00938450, gpg::STR_MatchWildcard)
@@ -200,7 +200,7 @@ namespace gpg
   bool STR_WildcardValidPrefix(StrArg prefix, StrArg pattern);
   bool STR_WildcardValidPrefix(StrArg, StrArg, bool caseSensitive);
 
-  fa::string STR_GetWhitespaceCharacters();  // 0x00938C80
+  fa::string STR_GetWhitespaceCharacters(); // 0x00938C80
   /**
    * Address: 0x00938BF0 (FUN_00938BF0, gpg::STR_Chop)
    *
@@ -209,7 +209,7 @@ namespace gpg
    * character when `chr==0`).
    */
   fa::string STR_Chop(StrArg str, char chr);
-  fa::string STR_ToLower(StrArg str);        // 0x00938A80
+  fa::string STR_ToLower(StrArg str); // 0x00938A80
   /**
    * Address: 0x009389C0 (FUN_009389C0, gpg::STR_ToUpper)
    *

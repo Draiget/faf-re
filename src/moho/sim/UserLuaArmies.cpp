@@ -3,7 +3,8 @@
 namespace
 {
   constexpr const char* kGetArmiesTableHelpText = "armyInfo GetArmiesTable()";
-  constexpr const char* kGetArmyAvatarsHelpText = "table GetArmyAvatars() - return a table of avatar units for the army";
+  constexpr const char* kGetArmyAvatarsHelpText =
+    "table GetArmyAvatars() - return a table of avatar units for the army";
   constexpr const char* kGetArmyScoreHelpText = "int GetArmyScore(armyIndex)";
   constexpr const char* kGetEconomyTotalsHelpText = "table GetEconomyTotals()";
   constexpr const char* kGetEconomyTotalsMissingSessionWarning =
@@ -15,8 +16,7 @@ namespace
   constexpr const char* kIsNeutralUserHelpText = "IsNeutral(army1,army2)";
   constexpr const char* kIsObserverHelpText = "IsObserver()";
   constexpr const char* kSetFocusArmyUserHelpText = "SetFocusArmy(armyIndex or -1)";
-}
-
+} // namespace
 
 /**
  * Address: 0x008BE490 (FUN_008BE490, cfunc_IsAllyUser)
@@ -24,7 +24,9 @@ namespace
  * What it does:
  * Unwraps Lua callback state and forwards to `cfunc_IsAllyUserL`.
  */
-int moho::cfunc_IsAllyUser(lua_State* const luaContext)
+int moho::cfunc_IsAllyUser(
+  lua_State* const luaContext
+)
 {
   return cfunc_IsAllyUserL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -38,12 +40,7 @@ int moho::cfunc_IsAllyUser(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_IsAllyUser_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    "IsAlly",
-    &moho::cfunc_IsAllyUser,
-    nullptr,
-    "<global>",
-    kIsAllyUserHelpText
+    moho::SCR_UserLuaInitSet(), "IsAlly", &moho::cfunc_IsAllyUser, nullptr, "<global>", kIsAllyUserHelpText
   );
   return &binder;
 }
@@ -54,7 +51,9 @@ moho::CScrLuaInitForm* moho::func_IsAllyUser_LuaFuncDef()
  * What it does:
  * Resolves `(army1, army2)` and returns whether army1 treats army2 as ally.
  */
-int moho::cfunc_IsAllyUserL(LuaPlus::LuaState* const state)
+int moho::cfunc_IsAllyUserL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!WLD_GetActiveSession()) {
     return 0;
@@ -79,7 +78,9 @@ int moho::cfunc_IsAllyUserL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback state and forwards to `cfunc_IsEnemyUserL`.
  */
-int moho::cfunc_IsEnemyUser(lua_State* const luaContext)
+int moho::cfunc_IsEnemyUser(
+  lua_State* const luaContext
+)
 {
   return cfunc_IsEnemyUserL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -93,12 +94,7 @@ int moho::cfunc_IsEnemyUser(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_IsEnemyUser_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    "IsEnemy",
-    &moho::cfunc_IsEnemyUser,
-    nullptr,
-    "<global>",
-    kIsEnemyUserHelpText
+    moho::SCR_UserLuaInitSet(), "IsEnemy", &moho::cfunc_IsEnemyUser, nullptr, "<global>", kIsEnemyUserHelpText
   );
   return &binder;
 }
@@ -109,7 +105,9 @@ moho::CScrLuaInitForm* moho::func_IsEnemyUser_LuaFuncDef()
  * What it does:
  * Resolves `(army1, army2)` and returns whether army1 treats army2 as enemy.
  */
-int moho::cfunc_IsEnemyUserL(LuaPlus::LuaState* const state)
+int moho::cfunc_IsEnemyUserL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!WLD_GetActiveSession()) {
     return 0;
@@ -123,8 +121,8 @@ int moho::cfunc_IsEnemyUserL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject secondArmyObject(LuaPlus::LuaStackObject(state, 2));
   UserArmy* const secondArmy = USER_ResolveArmyFromLuaState(state, secondArmyObject);
 
-  const bool isEnemy = firstArmy != nullptr && secondArmy != nullptr &&
-    firstArmy->mVarDat.mEnemies.Contains(secondArmy->mArmyIndex);
+  const bool isEnemy =
+    firstArmy != nullptr && secondArmy != nullptr && firstArmy->mVarDat.mEnemies.Contains(secondArmy->mArmyIndex);
   lua_pushboolean(rawState, isEnemy ? 1 : 0);
   return 1;
 }
@@ -137,7 +135,10 @@ namespace
    * Returns whether `targetArmyIndex` is in one neutral-relation bitset lane.
    * Legacy behavior treats `0xFFFFFFFF` as neutral by default.
    */
-  [[nodiscard]] bool IsArmyMarkedNeutral(const std::uint32_t targetArmyIndex, const moho::BVIntSet& neutralSet) noexcept
+  [[nodiscard]] bool IsArmyMarkedNeutral(
+    const std::uint32_t targetArmyIndex,
+    const moho::BVIntSet& neutralSet
+  ) noexcept
   {
     if (targetArmyIndex == std::numeric_limits<std::uint32_t>::max()) {
       return true;
@@ -145,8 +146,7 @@ namespace
 
     return neutralSet.Contains(targetArmyIndex);
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x008BE710 (FUN_008BE710, cfunc_IsNeutral)
@@ -154,7 +154,9 @@ namespace
  * What it does:
  * Unwraps Lua callback state and forwards to `cfunc_IsNeutralL`.
  */
-int moho::cfunc_IsNeutral(lua_State* const luaContext)
+int moho::cfunc_IsNeutral(
+  lua_State* const luaContext
+)
 {
   return cfunc_IsNeutralL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -168,12 +170,7 @@ int moho::cfunc_IsNeutral(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_IsNeutral_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    "IsNeutral",
-    &moho::cfunc_IsNeutral,
-    nullptr,
-    "<global>",
-    kIsNeutralUserHelpText
+    moho::SCR_UserLuaInitSet(), "IsNeutral", &moho::cfunc_IsNeutral, nullptr, "<global>", kIsNeutralUserHelpText
   );
   return &binder;
 }
@@ -184,7 +181,9 @@ moho::CScrLuaInitForm* moho::func_IsNeutral_LuaFuncDef()
  * What it does:
  * Resolves `(army1, army2)` and returns whether army1 treats army2 as neutral.
  */
-int moho::cfunc_IsNeutralL(LuaPlus::LuaState* const state)
+int moho::cfunc_IsNeutralL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!WLD_GetActiveSession()) {
     return 0;
@@ -198,8 +197,8 @@ int moho::cfunc_IsNeutralL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject secondArmyObject(LuaPlus::LuaStackObject(state, 2));
   UserArmy* const secondArmy = USER_ResolveArmyFromLuaState(state, secondArmyObject);
 
-  const bool isNeutral = firstArmy != nullptr && secondArmy != nullptr
-    && IsArmyMarkedNeutral(secondArmy->mArmyIndex, firstArmy->mVarDat.mNeutrals);
+  const bool isNeutral = firstArmy != nullptr && secondArmy != nullptr &&
+    IsArmyMarkedNeutral(secondArmy->mArmyIndex, firstArmy->mVarDat.mNeutrals);
   lua_pushboolean(rawState, isNeutral ? 1 : 0);
   return 1;
 }
@@ -210,7 +209,9 @@ int moho::cfunc_IsNeutralL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_GetArmyAvatarsL`.
  */
-int moho::cfunc_GetArmyAvatars(lua_State* const luaContext)
+int moho::cfunc_GetArmyAvatars(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetArmyAvatarsL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -240,7 +241,9 @@ moho::CScrLuaInitForm* moho::func_GetArmyAvatars_LuaFuncDef()
  * What it does:
  * Returns one Lua array of focus-army avatar unit script objects.
  */
-int moho::cfunc_GetArmyAvatarsL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetArmyAvatarsL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -283,7 +286,9 @@ int moho::cfunc_GetArmyAvatarsL(LuaPlus::LuaState* const state)
  * What it does:
  * Builds and returns one table containing focus-army economy totals.
  */
-int moho::cfunc_GetEconomyTotalsL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetEconomyTotalsL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -321,8 +326,7 @@ int moho::cfunc_GetEconomyTotalsL(LuaPlus::LuaState* const state)
   const std::array<float, 2> requestedValues = {totals.mLastUseRequested.ENERGY, totals.mLastUseRequested.MASS};
   const std::array<float, 2> actualValues = {totals.mLastUseActual.ENERGY, totals.mLastUseActual.MASS};
   const std::array<std::uint32_t, 2> storageValues = {
-    static_cast<std::uint32_t>(totals.mMaxStorage.ENERGY),
-    static_cast<std::uint32_t>(totals.mMaxStorage.MASS)
+    static_cast<std::uint32_t>(totals.mMaxStorage.ENERGY), static_cast<std::uint32_t>(totals.mMaxStorage.MASS)
   };
 
   for (std::size_t resourceIndex = 0; resourceIndex < kResourceLexical.size(); ++resourceIndex) {
@@ -354,7 +358,9 @@ int moho::cfunc_GetEconomyTotalsL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_GetEconomyTotalsL`.
  */
-int moho::cfunc_GetEconomyTotals(lua_State* const luaContext)
+int moho::cfunc_GetEconomyTotals(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetEconomyTotalsL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -384,7 +390,9 @@ moho::CScrLuaInitForm* moho::func_GetEconomyTotals_LuaFuncDef()
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_GetResourceSharingL`.
  */
-int moho::cfunc_GetResourceSharing(lua_State* const luaContext)
+int moho::cfunc_GetResourceSharing(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetResourceSharingL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -414,7 +422,9 @@ moho::CScrLuaInitForm* moho::func_GetResourceSharing_LuaFuncDef()
  * What it does:
  * Pushes whether the focused user army has resource sharing enabled.
  */
-int moho::cfunc_GetResourceSharingL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetResourceSharingL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -452,7 +462,9 @@ int moho::cfunc_GetResourceSharingL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_SetFocusArmyUserL`.
  */
-int moho::cfunc_SetFocusArmyUser(lua_State* const luaContext)
+int moho::cfunc_SetFocusArmyUser(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetFocusArmyUserL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -482,7 +494,9 @@ moho::CScrLuaInitForm* moho::func_SetFocusArmyUser_LuaFuncDef()
  * What it does:
  * Validates one-based army index input and requests focus-army update.
  */
-int moho::cfunc_SetFocusArmyUserL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetFocusArmyUserL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -506,10 +520,7 @@ int moho::cfunc_SetFocusArmyUserL(LuaPlus::LuaState* const state)
     const int maxArmyIndexOneBased = static_cast<int>(session->userArmies.size());
     if (focusArmyIndex < 1 || focusArmyIndex > maxArmyIndexOneBased) {
       LuaPlus::LuaState::Error(
-        state,
-        "Invalid army index of %d; must be between 1 and %d inclusive.",
-        focusArmyIndex,
-        maxArmyIndexOneBased
+        state, "Invalid army index of %d; must be between 1 and %d inclusive.", focusArmyIndex, maxArmyIndexOneBased
       );
     }
 
@@ -526,7 +537,9 @@ int moho::cfunc_SetFocusArmyUserL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_GetFocusArmyUserL`.
  */
-int moho::cfunc_GetFocusArmyUser(lua_State* const luaContext)
+int moho::cfunc_GetFocusArmyUser(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetFocusArmyUserL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -556,7 +569,9 @@ moho::CScrLuaInitForm* moho::func_GetFocusArmyUser_LuaFuncDef()
  * What it does:
  * Pushes the focused army as a one-based Lua index (`-1` when unset).
  */
-int moho::cfunc_GetFocusArmyUserL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetFocusArmyUserL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -585,7 +600,9 @@ int moho::cfunc_GetFocusArmyUserL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_IsObserverL`.
  */
-int moho::cfunc_IsObserver(lua_State* const luaContext)
+int moho::cfunc_IsObserver(
+  lua_State* const luaContext
+)
 {
   return cfunc_IsObserverL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -599,12 +616,7 @@ int moho::cfunc_IsObserver(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_IsObserver_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    "IsObserver",
-    &moho::cfunc_IsObserver,
-    nullptr,
-    "<global>",
-    kIsObserverHelpText
+    moho::SCR_UserLuaInitSet(), "IsObserver", &moho::cfunc_IsObserver, nullptr, "<global>", kIsObserverHelpText
   );
   return &binder;
 }
@@ -615,7 +627,9 @@ moho::CScrLuaInitForm* moho::func_IsObserver_LuaFuncDef()
  * What it does:
  * Pushes whether the active focus army has no owning `UserArmy` entry.
  */
-int moho::cfunc_IsObserverL(LuaPlus::LuaState* const state)
+int moho::cfunc_IsObserverL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -645,7 +659,9 @@ int moho::cfunc_IsObserverL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_GetArmiesTableL`.
  */
-int moho::cfunc_GetArmiesTable(lua_State* const luaContext)
+int moho::cfunc_GetArmiesTable(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetArmiesTableL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -696,7 +712,9 @@ static fa::vector<moho::UserArmy*>* SnapshotUserArmyVector(
  * Builds and returns one Lua table describing session armies and command
  * source authorization lanes.
  */
-int moho::cfunc_GetArmiesTableL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetArmiesTableL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -762,8 +780,9 @@ int moho::cfunc_GetArmiesTableL(LuaPlus::LuaState* const state)
         if ((wordBits & (1u << bit)) == 0u) {
           continue;
         }
-        const std::uint32_t sourceId =
-          static_cast<std::uint32_t>((static_cast<std::int32_t>(validSources.mFirstWordIndex) + static_cast<std::int32_t>(wordIndex)) * 32u + bit);
+        const std::uint32_t sourceId = static_cast<std::uint32_t>(
+          (static_cast<std::int32_t>(validSources.mFirstWordIndex) + static_cast<std::int32_t>(wordIndex)) * 32u + bit
+        );
         authorizedCommandSources.SetInteger(luaSourceIndex++, static_cast<std::int32_t>(sourceId + 1u));
       }
     }
@@ -783,7 +802,9 @@ int moho::cfunc_GetArmiesTableL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_GetArmyScoreL`.
  */
-int moho::cfunc_GetArmyScore(lua_State* const luaContext)
+int moho::cfunc_GetArmyScore(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetArmyScoreL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -797,12 +818,7 @@ int moho::cfunc_GetArmyScore(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_GetArmyScore_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    "GetArmyScore",
-    &moho::cfunc_GetArmyScore,
-    nullptr,
-    "<global>",
-    kGetArmyScoreHelpText
+    moho::SCR_UserLuaInitSet(), "GetArmyScore", &moho::cfunc_GetArmyScore, nullptr, "<global>", kGetArmyScoreHelpText
   );
   return &binder;
 }
@@ -814,7 +830,9 @@ moho::CScrLuaInitForm* moho::func_GetArmyScore_LuaFuncDef()
  * Validates one argument and active-session precondition for the
  * `GetArmyScore` global Lua callback lane.
  */
-int moho::cfunc_GetArmyScoreL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetArmyScoreL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;

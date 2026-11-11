@@ -20,7 +20,9 @@ SEconValue Unit::GetConsumptionRequest() const
  * What it does:
  * Stores one economy-rate pair in the shared runtime production lane.
  */
-void Unit::UpdateResourceProduction(const SEconValue& resourceProduction)
+void Unit::UpdateResourceProduction(
+  const SEconValue& resourceProduction
+)
 {
   mUnitVarDat.mMaintainenceCost.ENERGY = resourceProduction.energy;
   mUnitVarDat.mMaintainenceCost.MASS = resourceProduction.mass;
@@ -49,7 +51,9 @@ Unit* Unit::ResetEconValues()
  * Rebuilds unit upkeep request lanes for active/inactive economy
  * consumption and dispatches matching Lua script callbacks.
  */
-void Unit::SetConsumptionActive(const bool isActive)
+void Unit::SetConsumptionActive(
+  const bool isActive
+)
 {
   const bool oldConsumptionIsActive = ConsumptionActive;
   ConsumptionActive = isActive;
@@ -115,7 +119,9 @@ void Unit::SetConsumptionActive(const bool isActive)
  * Writes one production-active flag lane and dispatches matching
  * `OnProductionActive` / `OnProductionInActive` script callbacks.
  */
-void Unit::SetProductionActive(const bool isActive)
+void Unit::SetProductionActive(
+  const bool isActive
+)
 {
   ProductionActive = isActive;
   (void)RunScript(isActive ? kUnitOnProductionActiveScript : kUnitOnProductionInactiveScript);
@@ -153,11 +159,9 @@ void Unit::RenderAIDebugInfo()
     IncrementAIDebugStateStat(armyStats, unitStatePrefix + "_Idle");
   }
 
-  for (
-    std::int32_t stateValue = static_cast<std::int32_t>(UNITSTATE_Immobile);
-    stateValue <= static_cast<std::int32_t>(UNITSTATE_SiloBuildingAmmo);
-    ++stateValue
-  ) {
+  for (std::int32_t stateValue = static_cast<std::int32_t>(UNITSTATE_Immobile);
+       stateValue <= static_cast<std::int32_t>(UNITSTATE_SiloBuildingAmmo);
+       ++stateValue) {
     const EUnitState state = static_cast<EUnitState>(stateValue);
     if (!IsUnitState(state)) {
       continue;
@@ -181,7 +185,9 @@ namespace
    * inlines the same null-tag test and `id_` load at each one.
    */
   template <class TObject>
-  [[nodiscard]] moho::EntId WeakRefEntityId(const moho::WeakPtr<TObject>& weak) noexcept
+  [[nodiscard]] moho::EntId WeakRefEntityId(
+    const moho::WeakPtr<TObject>& weak
+  ) noexcept
   {
     const TObject* const target = weak.GetObjectPtr();
     return target != nullptr ? target->id_ : kNoCreatorEntityId;
@@ -201,9 +207,7 @@ namespace
   {
     return attributeRadius < 0.0f ? blueprint->*blueprintRadius : attributeRadius;
   }
-}
-
-
+} // namespace
 
 /**
  * Address: 0x006ABCC0 (FUN_006ABCC0, ?Sync@Unit@Moho@@UAEXPAUSSyncData@2@@Z)
@@ -229,7 +233,9 @@ namespace
  * Both shared animation poses are refreshed on every sync, dirty or not,
  * because they change every frame the unit animates.
  */
-void Unit::Sync(SSyncData* const syncData)
+void Unit::Sync(
+  SSyncData* const syncData
+)
 {
   RefreshSyncBlock();
   Entity::Sync(syncData);
@@ -250,7 +256,8 @@ namespace moho
 } // namespace moho
 
 void Unit::RefreshSyncBlock(
-  boost::shared_ptr<CAniPose>* const releasedPose, boost::shared_ptr<CAniPose>* const releasedPriorPose
+  boost::shared_ptr<CAniPose>* const releasedPose,
+  boost::shared_ptr<CAniPose>* const releasedPriorPose
 )
 {
   if (NeedSyncGameData) {
@@ -263,8 +270,7 @@ void Unit::RefreshSyncBlock(
 
     varDat.mTacticalSiloBuildCount = AiSiloBuild != nullptr ? AiSiloBuild->SiloGetBuildCount(SILOTYPE_Tactical) : 0;
     varDat.mNukeSiloBuildCount = AiSiloBuild != nullptr ? AiSiloBuild->SiloGetBuildCount(SILOTYPE_Nuke) : 0;
-    varDat.mTacticalSiloStorageCount =
-      AiSiloBuild != nullptr ? AiSiloBuild->SiloGetStorageCount(SILOTYPE_Tactical) : 0;
+    varDat.mTacticalSiloStorageCount = AiSiloBuild != nullptr ? AiSiloBuild->SiloGetStorageCount(SILOTYPE_Tactical) : 0;
     varDat.mNukeSiloStorageCount = AiSiloBuild != nullptr ? AiSiloBuild->SiloGetStorageCount(SILOTYPE_Nuke) : 0;
     varDat.mTacticalSiloMaxStorageCount =
       AiSiloBuild != nullptr ? AiSiloBuild->SiloGetMaxStorageCount(SILOTYPE_Tactical) : 0;

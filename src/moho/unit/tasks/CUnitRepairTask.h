@@ -13,14 +13,13 @@ namespace gpg
 {
   class ReadArchive;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
   class IAiCommandDispatchImpl;
   class CUnitCommand;
   class Unit;
-
 
   /**
    * Address: 0x005F8C80 (FUN_005F8C80, ??0CUnitRepairTask@Moho@@QAE@@Z)
@@ -163,9 +162,11 @@ namespace moho
   static_assert(offsetof(CUnitRepairTask, mInPosition) == 0x98, "CUnitRepairTask::mInPosition offset must be 0x98");
   static_assert(offsetof(CUnitRepairTask, mIsSilo) == 0x99, "CUnitRepairTask::mIsSilo offset must be 0x99");
   static_assert(
-    offsetof(CUnitRepairTask, mGuardAssistMode) == 0x9A, "CUnitRepairTask::mGuardAssistMode offset must be 0x9A"
+    offsetof(CUnitRepairTask, mGuardAssistMode) == 0x9A,
+    "CUnitRepairTask::mGuardAssistMode offset must be 0x9A"
   );
   static_assert(
-    offsetof(CUnitRepairTask, mInheritingWork) == 0x9B, "CUnitRepairTask::mInheritingWork offset must be 0x9B"
+    offsetof(CUnitRepairTask, mInheritingWork) == 0x9B,
+    "CUnitRepairTask::mInheritingWork offset must be 0x9B"
   );
 } // namespace moho

@@ -44,6 +44,27 @@ namespace faf::editor
   /** A new decal on the map with these fields (a fresh index); returns it. */
   moho::CWldTerrainDecal* AddDecal(moho::IDecalManager& manager, const DecalState& state);
 
+  /** A decal's saved fields as one key (its index left out): the same decal in another map's manager has the same key.
+   */
+  [[nodiscard]] std::string DecalKey(const DecalState& state);
+
+  /** What `MirrorDecals` did. */
+  struct DecalMirror
+  {
+    int removed = 0;
+    int added = 0;
+    /** Decals the edit took away that the other manager didn't have. */
+    int missing = 0;
+  };
+
+  /**
+   * An edit's change (the decals `before` and `after` it) made in another manager too, matched by content (DecalKey):
+   * the decals that went are destroyed there and those that came are added. The editor's view in front of a play
+   * sends its decal edits into the play's map this way (WPE.49); its indices needn't match the editor's.
+   */
+  DecalMirror
+  MirrorDecals(moho::IDecalManager& live, const std::vector<DecalState>& before, const std::vector<DecalState>& after);
+
   /** The decal with this index, or null. */
   moho::CWldTerrainDecal* FindDecal(moho::IDecalManager& manager, int index);
 

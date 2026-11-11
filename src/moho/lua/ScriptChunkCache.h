@@ -50,6 +50,7 @@ namespace moho
    */
   void SCR_BeginUiScriptChunkCache();
 
-  /** Writes what the main thread's batch compiled, once it has compiled nothing for a few seconds, or at once with `now`. */
+  /** Writes what the main thread's batch compiled, once it has compiled nothing for a few seconds, or at once with
+   * `now`. */
   void SCR_FlushUiScriptChunkCache(bool now);
 } // namespace moho

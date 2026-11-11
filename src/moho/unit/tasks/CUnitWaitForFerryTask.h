@@ -13,7 +13,7 @@ namespace gpg
   class RRef;
   class RType;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -26,7 +26,6 @@ namespace moho
   class CUnitWaitForFerryTask : public CCommandTask
   {
   public:
-
     /**
      * Address: 0x0061037A-0x0061039B, inlined into
      * `CUnitWaitForFerryTaskTypeInfo::NewRef` (0x00610340) and its `CtrRef`
@@ -92,11 +91,8 @@ namespace moho
      * Allocates one wait-for-ferry task object and forwards constructor
      * arguments into in-place construction.
      */
-    [[nodiscard]] static CUnitWaitForFerryTask* Create(
-      IAiCommandDispatchImpl* dispatch,
-      const SNavGoal& moveGoal,
-      Unit* ferryUnit
-    );
+    [[nodiscard]] static CUnitWaitForFerryTask*
+    Create(IAiCommandDispatchImpl* dispatch, const SNavGoal& moveGoal, Unit* ferryUnit);
 
     /**
      * Address: 0x00610D30 (FUN_00610D30, Moho::CUnitWaitForFerryTaskSerializer::Serialize body)
@@ -138,13 +134,16 @@ namespace moho
 
   static_assert(sizeof(CUnitWaitForFerryTask) == 0x60, "CUnitWaitForFerryTask size must be 0x60");
   static_assert(
-    offsetof(CUnitWaitForFerryTask, mDispatch) == 0x30, "CUnitWaitForFerryTask::mDispatch offset must be 0x30"
+    offsetof(CUnitWaitForFerryTask, mDispatch) == 0x30,
+    "CUnitWaitForFerryTask::mDispatch offset must be 0x30"
   );
   static_assert(
-    offsetof(CUnitWaitForFerryTask, mFerryUnit) == 0x34, "CUnitWaitForFerryTask::mFerryUnit offset must be 0x34"
+    offsetof(CUnitWaitForFerryTask, mFerryUnit) == 0x34,
+    "CUnitWaitForFerryTask::mFerryUnit offset must be 0x34"
   );
   static_assert(
-    offsetof(CUnitWaitForFerryTask, mMoveGoal) == 0x3C, "CUnitWaitForFerryTask::mMoveGoal offset must be 0x3C"
+    offsetof(CUnitWaitForFerryTask, mMoveGoal) == 0x3C,
+    "CUnitWaitForFerryTask::mMoveGoal offset must be 0x3C"
   );
 } // namespace moho
 

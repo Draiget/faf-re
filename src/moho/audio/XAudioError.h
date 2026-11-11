@@ -25,4 +25,3 @@ namespace moho
 
   static_assert(sizeof(XAudioError) == sizeof(std::runtime_error), "XAudioError size must match std::runtime_error");
 } // namespace moho
-

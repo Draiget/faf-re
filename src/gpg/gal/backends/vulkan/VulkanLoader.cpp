@@ -15,11 +15,17 @@ namespace gpg::gal::vulkan
     if (module != nullptr) {
       return true;
     }
+#if FAFRE_PLATFORM_WINDOWS
     module = ::LoadLibraryA("vulkan-1.dll");
+#else
+    // The Linux client (issue #255): the Vulkan loader's soname; LoadLibraryA is dlopen there.
+    module = ::LoadLibraryA("libvulkan.so.1");
+#endif
     if (module == nullptr) {
       return false;
     }
-    vkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(::GetProcAddress(module, "vkGetInstanceProcAddr"));
+    vkGetInstanceProcAddr =
+      reinterpret_cast<PFN_vkGetInstanceProcAddr>(::GetProcAddress(module, "vkGetInstanceProcAddr"));
     if (vkGetInstanceProcAddr == nullptr) {
       Unload();
       return false;
@@ -30,11 +36,13 @@ namespace gpg::gal::vulkan
     return vkCreateInstance != nullptr && vkEnumerateInstanceExtensionProperties != nullptr;
   }
 
-  bool Functions::LoadInstance(const VkInstance instance)
+  bool Functions::LoadInstance(
+    const VkInstance instance
+  )
   {
     bool complete = true;
-#define FAF_VK_LOAD_INSTANCE(name)                                                     \
-  name = reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(instance, #name));         \
+#define FAF_VK_LOAD_INSTANCE(name)                                                                                     \
+  name = reinterpret_cast<PFN_##name>(vkGetInstanceProcAddr(instance, #name));                                         \
   complete = complete && (name != nullptr);
     FAF_VK_INSTANCE_FUNCTIONS(FAF_VK_LOAD_INSTANCE)
 #undef FAF_VK_LOAD_INSTANCE
@@ -44,22 +52,26 @@ namespace gpg::gal::vulkan
     return complete;
   }
 
-  bool Functions::LoadDevice(const VkDevice device)
+  bool Functions::LoadDevice(
+    const VkDevice device
+  )
   {
     bool complete = true;
-#define FAF_VK_LOAD_DEVICE(name)                                                       \
-  name = reinterpret_cast<PFN_##name>(vkGetDeviceProcAddr(device, #name));             \
+#define FAF_VK_LOAD_DEVICE(name)                                                                                       \
+  name = reinterpret_cast<PFN_##name>(vkGetDeviceProcAddr(device, #name));                                             \
   complete = complete && (name != nullptr);
     FAF_VK_DEVICE_FUNCTIONS(FAF_VK_LOAD_DEVICE)
 #undef FAF_VK_LOAD_DEVICE
     return complete;
   }
 
-  bool Functions::LoadRay(const VkDevice device)
+  bool Functions::LoadRay(
+    const VkDevice device
+  )
   {
     bool complete = true;
-#define FAF_VK_LOAD_RAY(name)                                                          \
-  name = reinterpret_cast<PFN_##name>(vkGetDeviceProcAddr(device, #name));             \
+#define FAF_VK_LOAD_RAY(name)                                                                                          \
+  name = reinterpret_cast<PFN_##name>(vkGetDeviceProcAddr(device, #name));                                             \
   complete = complete && (name != nullptr);
     FAF_VK_RAY_FUNCTIONS(FAF_VK_LOAD_RAY)
 #undef FAF_VK_LOAD_RAY

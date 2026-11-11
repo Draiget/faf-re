@@ -20,6 +20,9 @@ namespace moho
     SWldScenarioLoadControl* mHandle; // +0x00
   };
 
-  static_assert(offsetof(CBackgroundTaskControl, mHandle) == 0x00, "CBackgroundTaskControl::mHandle offset must be 0x00");
+  static_assert(
+    offsetof(CBackgroundTaskControl, mHandle) == 0x00,
+    "CBackgroundTaskControl::mHandle offset must be 0x00"
+  );
   static_assert(sizeof(CBackgroundTaskControl) == 0x04, "CBackgroundTaskControl size must be 0x04");
 } // namespace moho

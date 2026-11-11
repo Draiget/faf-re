@@ -13,7 +13,9 @@ namespace
    * Metamethod for vector tables (`__index`):
    * validates `x`/`y`/`z` key and forwards to `lua_rawgeti`.
    */
-  int cfunc_LuaVectorIndex(lua_State* const state)
+  int cfunc_LuaVectorIndex(
+    lua_State* const state
+  )
   {
     if (lua_type(state, 1) != LUA_TTABLE) {
       luaL_argerror(state, 1, kVectorExpectedError);
@@ -41,7 +43,9 @@ namespace
    * Metamethod for vector tables (`__newindex`):
    * validates `x`/`y`/`z` key and forwards to `lua_rawseti`.
    */
-  int cfunc_LuaVectorNewIndex(lua_State* const state)
+  int cfunc_LuaVectorNewIndex(
+    lua_State* const state
+  )
   {
     if (lua_type(state, 1) != LUA_TTABLE) {
       luaL_argerror(state, 1, kVectorExpectedError);
@@ -83,7 +87,9 @@ moho::CLuaVectorMetatableFactory& moho::CLuaVectorMetatableFactory::Instance()
  * Address: 0x100C1180 (FUN_100C1180, sub_100C1180, MohoEngine.dll)
  * Address: 0x004CFA40 (FUN_004CFA40, sub_4CFA40, ForgedAlliance.exe mirror)
  */
-LuaPlus::LuaObject moho::CLuaVectorMetatableFactory::Create(LuaPlus::LuaState* const state)
+LuaPlus::LuaObject moho::CLuaVectorMetatableFactory::Create(
+  LuaPlus::LuaState* const state
+)
 {
   LuaPlus::LuaObject metatable;
   metatable.AssignNewTable(state, 0, 0);

@@ -2,7 +2,7 @@
 
 Replays to play back before opening a pull request that can change what the sim does, and how to read the result. The pull request template asks for the replay IDs you played and what each one did; using the replays below means every PR is checked against the same games and results can be compared across PRs.
 
-Every replay here is from the [retail parity set](RETAIL_REPLAY_PARITY.md): it plays back on master with every recorded checksum matching, so a mismatch on your branch comes from your change. All of them were recorded on FAF game version 3835.
+Every replay here plays back on master with every recorded checksum matching, so a mismatch on your branch comes from your change. The sets are FAF game version 3840's, the version FAF plays now, picked from [Replay parity](../.github/workflows/replay-parity.yml) run 42771586614 (every one played to game over, on a map the CI caches hold). Game version 3835's sets are kept below: [tests/replay_sets](../tests/replay_sets/README.md) holds the original game's call hashes recorded on its core replays, and the replay check still plays those for it.
 
 ## Which replays
 
@@ -15,6 +15,34 @@ Every replay here is from the [retail parity set](RETAIL_REPLAY_PARITY.md): it p
 
 | Replay | Map | Players | Length | M28AI |
 |---|---|---|---|---|
+| 28016454 | Rotun | 2 | 13 min | |
+| 28063699 | The Dark Heart | 2 | 14 min | |
+| 28070914 | Astro Crater Battles 4x4 Rich XL | 8 | 20 min | |
+| 28059028 | Adaptive Hilly Plateau | 4 | 21 min | |
+| 28058778 | Dual Gap Adaptive | 12 | 25 min | |
+| 28038031 | Astro Crater Battles | 6 | 28 min | |
+| 28013263 | Astro Crater Battles 4x4 Rich Huge | 2, with the built-in AI | 32 min | |
+| 28041625 | Serenity Reef 5v5 | 3 + M28AI | 35 min | v328 |
+
+### Extended set (in addition to the core set)
+
+| Replay | Map | Players | Length | M28AI |
+|---|---|---|---|---|
+| 28035761 | Astro Crater Battles 4x4 Rich Huge | 8 | 28 min | |
+| 28004977 | Seton's Clutch | 8 | 29 min | |
+| 28012666 | Seton's Clutch | 6 | 31 min | |
+| 28094872 | Dual Gap Adaptive | 12 | 35 min | |
+| 28011154 | Dual Gap Adaptive | 12 | 35 min | |
+| 28005584 | SCMP_021 | 2, with the built-in AI | 47 min | |
+| 28052742 | SCMP_026 | 2 | 48 min | |
+| 28072694 | Azalea Gardens | 2 | 48 min | |
+| 28010105 | SCMP_022 | 2 + M28AI | 44 min | v327 |
+| 28072023 | Seton's Clutch | 4, with the built-in AI | 70 min | |
+
+### Game version 3835's core set (tests/replay_sets)
+
+| Replay | Map | Players | Length | M28AI |
+|---|---|---|---|---|
 | 26902315 | The Dark Heart | 3 | 13 min | |
 | 26930624 | Open Palms | 2 | 14 min | |
 | 26943656 | Mechanoclastic Rush | 6 + M28AI | 15 min | v294 |
@@ -24,7 +52,7 @@ Every replay here is from the [retail parity set](RETAIL_REPLAY_PARITY.md): it p
 | 26989770 | High Noon | 1 vs AI | 33 min | |
 | 26897073 | Dual Gap | 12 | 34 min | |
 
-### Extended set (in addition to the core set)
+### Game version 3835's extended set
 
 | Replay | Map | Players | Length | M28AI |
 |---|---|---|---|---|
@@ -51,7 +79,7 @@ Every replay here is from the [retail parity set](RETAIL_REPLAY_PARITY.md): it p
    python scripts/perf/convert_replay.py 26902315.fafreplay 26902315.scfareplay
    ```
 
-3. **Game data.** The installed game data must be game version 3835 (`lua/version.lua` in `gamedata/lua.nx2`); the engine refuses a replay recorded on another version. Custom maps must be in your vault's `maps` folder, and an M28AI replay needs exactly the M28AI version in the table in `mods/M28AI`: any other version desyncs within minutes and looks like an engine bug.
+3. **Game data.** The installed game data must be the game version the replay was recorded on (`lua/version.lua` in `gamedata/lua.nx2`): 3840 for the sets above, 3835 for the 3835 sets; the engine refuses a replay recorded on another version. Custom maps must be in your vault's `maps` folder, and an M28AI replay needs exactly the M28AI version in the table in `mods/M28AI`: any other version desyncs within minutes and looks like an engine bug.
 4. **Run** it from the build's own folder:
 
    ```

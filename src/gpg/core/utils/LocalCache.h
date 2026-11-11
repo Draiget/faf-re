@@ -12,6 +12,7 @@ namespace gpg
    */
   [[nodiscard]] const std::string& LocalCacheDirectory();
 
-  /** Engine addition: this executable's size and last write time, hashed, so a rebuild gets cache entries of its own. */
+  /** Engine addition: this executable's size and last write time, hashed, so a rebuild gets cache entries of its own.
+   */
   [[nodiscard]] std::uint64_t ExecutableIdentity();
 } // namespace gpg

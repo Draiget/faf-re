@@ -40,7 +40,11 @@ size_t CWaitHandle::capacity() const noexcept
  *
  * Insert `count` copies of `*value` at iterator `pos`.
  */
-HANDLE* CWaitHandle::AppendHandle(HANDLE* pos, const unsigned count, const HANDLE* value)
+HANDLE* CWaitHandle::AppendHandle(
+  HANDLE* pos,
+  const unsigned count,
+  const HANDLE* value
+)
 {
   if (count == 0) {
     return end;
@@ -158,8 +162,10 @@ CWaitHandleSet::CWaitHandleSet()
   const HANDLE h = CreateEventW(nullptr, FALSE, FALSE, nullptr);
 
   // Fast in-place append if capacity is available, else grow via AppendHandle
-  if (handleSet.begin &&
-      static_cast<unsigned>(handleSet.end - handleSet.begin) < static_cast<unsigned>(handleSet.cap - handleSet.begin)) {
+  if (
+    handleSet.begin &&
+    static_cast<unsigned>(handleSet.end - handleSet.begin) < static_cast<unsigned>(handleSet.cap - handleSet.begin)
+  ) {
     *handleSet.end = h;
     ++handleSet.end;
   } else {
@@ -191,7 +197,9 @@ CWaitHandleSet::~CWaitHandleSet()
 /**
  * Address: 0x004143C0 (FUN_004143C0)
  */
-void CWaitHandleSet::AddHandle(const HANDLE handle)
+void CWaitHandleSet::AddHandle(
+  const HANDLE handle
+)
 {
   boost::mutex::scoped_lock l(lock);
 
@@ -210,8 +218,10 @@ void CWaitHandleSet::AddHandle(const HANDLE handle)
   }
 
   // Fast path: capacity available -> append in place
-  if (handleSet.begin &&
-      static_cast<unsigned>(handleSet.end - handleSet.begin) < static_cast<unsigned>(handleSet.cap - handleSet.begin)) {
+  if (
+    handleSet.begin &&
+    static_cast<unsigned>(handleSet.end - handleSet.begin) < static_cast<unsigned>(handleSet.cap - handleSet.begin)
+  ) {
     *handleSet.end = handle;
     ++handleSet.end;
   } else {
@@ -230,7 +240,9 @@ void CWaitHandleSet::AddHandle(const HANDLE handle)
 /**
  * Address: 0x004144D0 (FUN_004144D0)
  */
-void CWaitHandleSet::RemoveHandle(const HANDLE handle)
+void CWaitHandleSet::RemoveHandle(
+  const HANDLE handle
+)
 {
   boost::mutex::scoped_lock guard(lock);
 
@@ -275,7 +287,9 @@ void CWaitHandleSet::RemoveHandle(const HANDLE handle)
 /**
  * Address: 0x004145E0 (FUN_004145E0)
  */
-void CWaitHandleSet::MsgWaitEx(const DWORD timeoutMs)
+void CWaitHandleSet::MsgWaitEx(
+  const DWORD timeoutMs
+)
 {
   boost::mutex::scoped_lock guard(lock);
 
@@ -311,11 +325,13 @@ void CWaitHandleSet::MsgWaitEx(const DWORD timeoutMs)
 }
 
 /**
-  * Alias of FUN_004145E0 (non-canonical helper lane).
+ * Alias of FUN_004145E0 (non-canonical helper lane).
  *
  * Compatibility wrapper retained while callsites migrate to MsgWaitEx naming.
  */
-void CWaitHandleSet::Wait(const DWORD timeoutMs)
+void CWaitHandleSet::Wait(
+  const DWORD timeoutMs
+)
 {
   MsgWaitEx(timeoutMs);
 }

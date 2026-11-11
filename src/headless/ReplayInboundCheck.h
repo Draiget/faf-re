@@ -58,21 +58,29 @@ namespace faf::headless
 
     [[nodiscard]] std::string Summary() const;
     /** Commands whose round trip through view ids differs from the plain one (should stay 0). */
-    [[nodiscard]] std::uint64_t Failures() const noexcept { return mDiffering; }
+    [[nodiscard]] std::uint64_t Failures() const noexcept
+    {
+      return mDiffering;
+    }
 
   private:
     /** Sim ids into the view ids of the current source's army, as its client would have sent them. */
     class CClientSide final : public remote::CCommandIdRewriter
     {
     public:
-      CClientSide(moho::ICommandSink& next, CReplayInboundCheck& owner) noexcept
+      CClientSide(
+        moho::ICommandSink& next,
+        CReplayInboundCheck& owner
+      ) noexcept
         : CCommandIdRewriter(next)
         , mOwner(owner)
       {}
 
       void SetCommandSource(moho::CommandSourceId sourceId) override;
       void LuaSimCallback(
-        const char* name, const LuaPlus::LuaObject& args, const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities
+        const char* name,
+        const LuaPlus::LuaObject& args,
+        const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities
       ) override;
 
     protected:
@@ -105,21 +113,21 @@ namespace faf::headless
     std::vector<std::vector<char>> mCaptured; // what a marshaller sent for one message
     faf::remote::client::CRemoteClientManager mCapture;
     std::unique_ptr<moho::CMarshaller> mMarshaller;
-    remote::CViewIdMap mNoMap{-1};            // the translator's map before a source is known
-    remote::CInboundIdTranslator mTranslator; // the server's intake
-    CClientSide mClient;                      // the client's side
+    remote::CViewIdMap mNoMap{-1};                 // the translator's map before a source is known
+    remote::CInboundIdTranslator mTranslator;      // the server's intake
+    CClientSide mClient;                           // the client's side
     std::unique_ptr<moho::CDecoder> mPlainDecoder; // decode and marshal, ids untouched
     std::unique_ptr<moho::CDecoder> mIdDecoder;    // decode, to view ids, back, marshal
     bool mInside = false;
-    std::int32_t mArmy = -1;                  // the current source's army
-    std::uint32_t mLastRefused = 0;           // the last entity id the client side looked up
+    std::int32_t mArmy = -1;        // the current source's army
+    std::uint32_t mLastRefused = 0; // the last entity id the client side looked up
     std::uint64_t mMessages = 0;
-    std::uint64_t mBeforeViews = 0;           // before the first beat's views (no maps yet)
+    std::uint64_t mBeforeViews = 0; // before the first beat's views (no maps yet)
     std::uint64_t mIdentical = 0;
     std::uint64_t mDiffering = 0;
-    std::uint64_t mNotShown = 0;              // named a renumbered id the view never got
+    std::uint64_t mNotShown = 0; // named a renumbered id the view never got
     std::vector<std::string> mNotShownExamples;
-    std::map<std::string, std::uint64_t> mCallbacks;                         // calls by name
+    std::map<std::string, std::uint64_t> mCallbacks;                        // calls by name
     std::map<std::pair<std::string, std::string>, SPayloadIds> mPayloadIds; // (callback, key path)
   };
 } // namespace faf::headless

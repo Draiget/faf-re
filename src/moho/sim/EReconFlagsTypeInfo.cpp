@@ -20,7 +20,13 @@ namespace
     return sInstance;
   }
 
-  struct Bootstrap { Bootstrap() { moho::register_EReconFlagsTypeInfoStartup(); } };
+  struct Bootstrap
+  {
+    Bootstrap()
+    {
+      moho::register_EReconFlagsTypeInfoStartup();
+    }
+  };
   Bootstrap gBootstrap;
 } // namespace
 
@@ -34,7 +40,10 @@ EReconFlagsTypeInfo::EReconFlagsTypeInfo()
 EReconFlagsTypeInfo::~EReconFlagsTypeInfo() = default;
 
 /** Address: 0x00564510 (FUN_00564510) */
-const char* EReconFlagsTypeInfo::GetName() const { return "EReconFlags"; }
+const char* EReconFlagsTypeInfo::GetName() const
+{
+  return "EReconFlags";
+}
 
 /**
  * Address: 0x005644F0 (FUN_005644F0, Init)
@@ -55,7 +64,9 @@ void EReconFlagsTypeInfo::Init()
  * None, Radar, Sonar, Omni, LOSNow, LOSEver, KnownFake, MaybeDead, plus
  * combinations Exposed (28), AnyPing (7), RadarSonar (3), AnySense (15).
  */
-void EReconFlagsTypeInfo::AddEnums(gpg::REnumType* const enumType)
+void EReconFlagsTypeInfo::AddEnums(
+  gpg::REnumType* const enumType
+)
 {
   enumType->mPrefix = "RECON_";
   enumType->AddEnum(enumType->StripPrefix("RECON_None"), RECON_None);
@@ -80,7 +91,9 @@ void moho::register_EReconFlagsTypeInfoStartup()
   (void)Acquire();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_EReconFlagsTypeInfoStartup_dc2936, moho::register_EReconFlagsTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_EReconFlagsTypeInfoStartup_dc2936,
+  moho::register_EReconFlagsTypeInfoStartup
+)

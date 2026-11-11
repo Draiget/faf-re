@@ -21,8 +21,13 @@ namespace moho
   // of four and cap is the existing sheet's real quad capacity (250 or 2500).
   // Must remain on the same render thread as the original DrawTriangleList.
   inline void DrawSplatChunksPassMajor(
-    CD3DDevice* device, CD3DVertexSheet* sheet, CD3DIndexSheet* indices,
-    const CWldSplat::SplatVertex* source, std::size_t count, std::size_t quadCap)
+    CD3DDevice* device,
+    CD3DVertexSheet* sheet,
+    CD3DIndexSheet* indices,
+    const CWldSplat::SplatVertex* source,
+    std::size_t count,
+    std::size_t quadCap
+  )
   {
     if (count == 0) {
       return;
@@ -58,8 +63,14 @@ namespace moho
             std::copy_n(source + offset, n, static_cast<CWldSplat::SplatVertex*>(output));
             stream->Unlock();
           }
-          gpg::gal::DrawIndexedContext context(gpg::gal::DrawContext::TOPOLOGY_TRIANGLELIST,
-            0U, static_cast<std::uint32_t>(n), static_cast<std::uint32_t>((n / 4) * 6), 0U, 0);
+          gpg::gal::DrawIndexedContext context(
+            gpg::gal::DrawContext::TOPOLOGY_TRIANGLELIST,
+            0U,
+            static_cast<std::uint32_t>(n),
+            static_cast<std::uint32_t>((n / 4) * 6),
+            0U,
+            0
+          );
           galDevice->DrawIndexedPrimitive(&context);
           offset += n;
         }

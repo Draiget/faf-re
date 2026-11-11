@@ -68,9 +68,16 @@ namespace moho
   {
   public:
     constexpr EntIdValue() noexcept = default;
-    constexpr explicit EntIdValue(std::int32_t value) noexcept : mValue(value) {}
+    constexpr explicit EntIdValue(
+      std::int32_t value
+    ) noexcept
+      : mValue(value)
+    {}
 
-    [[nodiscard]] constexpr std::int32_t Value() const noexcept { return mValue; }
+    [[nodiscard]] constexpr std::int32_t Value() const noexcept
+    {
+      return mValue;
+    }
 
   private:
     std::int32_t mValue = 0; // +0x00

@@ -144,7 +144,9 @@ namespace
     return outName;
   }
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
+  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(
+    lua_State* const luaContext
+  ) noexcept
   {
     return luaContext ? luaContext->stateUserData : nullptr;
   }
@@ -254,7 +256,9 @@ namespace
     return projectile;
   }
 
-  [[nodiscard]] float ReadProjectileRandomUpSpeed(const moho::Projectile& projectile) noexcept
+  [[nodiscard]] float ReadProjectileRandomUpSpeed(
+    const moho::Projectile& projectile
+  ) noexcept
   {
     const auto* const blueprint = static_cast<const moho::RProjectileBlueprint*>(projectile.BluePrint);
     if (blueprint == nullptr) {
@@ -283,7 +287,9 @@ namespace
     return static_cast<moho::RProjectileBlueprint*>(upcast.mObj);
   }
 
-  [[nodiscard]] gpg::RRef MakeProjectileBlueprintRef(moho::RProjectileBlueprint* blueprint)
+  [[nodiscard]] gpg::RRef MakeProjectileBlueprintRef(
+    moho::RProjectileBlueprint* blueprint
+  )
   {
     gpg::RRef ref{};
     ref.mObj = blueprint;
@@ -291,12 +297,12 @@ namespace
     return ref;
   }
 
-
   class RManyToOneBroadcasterProjectileImpactTypeInfo final : public gpg::RType
   {
   public:
     /**
-     * Address: 0x0069FBC0 (FUN_0069FBC0, Moho::RManyBroadcasterRType_EProjectileImpactEvent::RManyBroadcasterRType_EProjectileImpactEvent)
+     * Address: 0x0069FBC0 (FUN_0069FBC0,
+     * Moho::RManyBroadcasterRType_EProjectileImpactEvent::RManyBroadcasterRType_EProjectileImpactEvent)
      *
      * What it does:
      * Preregisters `ManyToOneBroadcaster<EProjectileImpactEvent>` reflection
@@ -340,15 +346,18 @@ namespace
      */
     void Init() override
     {
-      static_assert(sizeof(moho::ManyToOneBroadcaster_EProjectileImpactEvent) == 0x08, "moho::ManyToOneBroadcaster_EProjectileImpactEvent is 0x08 bytes on x86");
+      static_assert(
+        sizeof(moho::ManyToOneBroadcaster_EProjectileImpactEvent) == 0x08,
+        "moho::ManyToOneBroadcaster_EProjectileImpactEvent is 0x08 bytes on x86"
+      );
       size_ = sizeof(moho::ManyToOneBroadcaster_EProjectileImpactEvent);
       version_ = 1;
       serLoadFunc_ = reinterpret_cast<gpg::RType::load_func_t>(
         reinterpret_cast<void (*)()>(&gpg::LoadAndBroadcastManyToOneListenerEProjectileImpactEvent)
       );
-      serSaveFunc_ = reinterpret_cast<gpg::RType::save_func_t>(
-        reinterpret_cast<void (*)()>(&gpg::SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1)
-      );
+      serSaveFunc_ = reinterpret_cast<gpg::RType::save_func_t>(reinterpret_cast<void (*)()>(
+        &gpg::SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1
+      ));
     }
   };
 
@@ -356,7 +365,8 @@ namespace
   {
   public:
     /**
-     * Address: 0x0069FC20 (FUN_0069FC20, Moho::RManyListenerRType_EProjectileImpactEvent::RManyListenerRType_EProjectileImpactEvent)
+     * Address: 0x0069FC20 (FUN_0069FC20,
+     * Moho::RManyListenerRType_EProjectileImpactEvent::RManyListenerRType_EProjectileImpactEvent)
      *
      * What it does:
      * Preregisters `ManyToOneListener<EProjectileImpactEvent>` reflection
@@ -400,7 +410,10 @@ namespace
      */
     void Init() override
     {
-      static_assert(sizeof(moho::ManyToOneListener_EProjectileImpactEvent) == 0x08, "moho::ManyToOneListener_EProjectileImpactEvent is 0x08 bytes on x86");
+      static_assert(
+        sizeof(moho::ManyToOneListener_EProjectileImpactEvent) == 0x08,
+        "moho::ManyToOneListener_EProjectileImpactEvent is 0x08 bytes on x86"
+      );
       size_ = sizeof(moho::ManyToOneListener_EProjectileImpactEvent);
     }
   };
@@ -422,7 +435,6 @@ namespace
    * `gpg::RType` reflection storage lanes.
    */
   RManyToOneListenerProjectileImpactTypeInfo::~RManyToOneListenerProjectileImpactTypeInfo() = default;
-
 
   // Address: 0x010B55E4 -- process-global `PrimitiveSerHelper<
   // EProjectileImpactEvent,int>` singleton (constructed by FUN_00BD6350,
@@ -473,7 +485,8 @@ namespace
   }
 
   /**
-   * Address: 0x00BFD7C0 (FUN_00BFD7C0, atexit destructor of the ManyToOneBroadcaster<EProjectileImpactEvent> type-info object)
+   * Address: 0x00BFD7C0 (FUN_00BFD7C0, atexit destructor of the ManyToOneBroadcaster<EProjectileImpactEvent> type-info
+   * object)
    */
   [[nodiscard]] gpg::RType* ConstructManyToOneBroadcasterProjectileImpactTypeInfo()
   {
@@ -483,7 +496,8 @@ namespace
   }
 
   /**
-   * Address: 0x00BFD760 (FUN_00BFD760, atexit destructor of the ManyToOneListener<EProjectileImpactEvent> type-info object)
+   * Address: 0x00BFD760 (FUN_00BFD760, atexit destructor of the ManyToOneListener<EProjectileImpactEvent> type-info
+   * object)
    */
   [[nodiscard]] gpg::RType* ConstructManyToOneListenerProjectileImpactTypeInfo()
   {
@@ -524,7 +538,9 @@ namespace moho
   /**
    * Address: 0x0067FFE0 (FUN_0067FFE0, Moho::CScrLuaMetatableFactory<Moho::Projectile>::Create)
    */
-  LuaPlus::LuaObject CScrLuaMetatableFactory<Projectile>::Create(LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject CScrLuaMetatableFactory<Projectile>::Create(
+    LuaPlus::LuaState* const state
+  )
   {
     return SCR_CreateSimpleMetatable(state);
   }
@@ -541,8 +557,10 @@ namespace moho
    * Returns cached `Projectile` metatable object from Lua object-factory
    * storage.
    */
-  LuaPlus::LuaObject*
-  func_GetProjectileFactory(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject* func_GetProjectileFactory(
+    LuaPlus::LuaObject* const object,
+    LuaPlus::LuaState* const state
+  )
   {
     return SCR_WriteMetatable<Projectile>(object, state);
   }
@@ -613,7 +631,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_ProjectileGetLauncherL`.
    */
-  int cfunc_ProjectileGetLauncher(lua_State* const luaContext)
+  int cfunc_ProjectileGetLauncher(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileGetLauncherL(ResolveBindingState(luaContext));
   }
@@ -625,7 +645,9 @@ namespace moho
    * Reads one projectile from Lua and pushes its launcher entity Lua object when
    * available; otherwise pushes `nil`.
    */
-  int cfunc_ProjectileGetLauncherL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileGetLauncherL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -674,7 +696,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileGetTrackingTargetL`.
    */
-  int cfunc_ProjectileGetTrackingTarget(lua_State* const luaContext)
+  int cfunc_ProjectileGetTrackingTarget(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileGetTrackingTargetL(ResolveBindingState(luaContext));
   }
@@ -687,7 +711,9 @@ namespace moho
    * object when tracking is enabled and target data resolves; otherwise pushes
    * `nil`.
    */
-  int cfunc_ProjectileGetTrackingTargetL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileGetTrackingTargetL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -740,7 +766,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileGetCurrentTargetPositionL`.
    */
-  int cfunc_ProjectileGetCurrentTargetPosition(lua_State* const luaContext)
+  int cfunc_ProjectileGetCurrentTargetPosition(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileGetCurrentTargetPositionL(ResolveBindingState(luaContext));
   }
@@ -752,7 +780,9 @@ namespace moho
    * Reads one projectile, resolves one current target-position vector, and
    * pushes that vector in Lua table form.
    */
-  int cfunc_ProjectileGetCurrentTargetPositionL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileGetCurrentTargetPositionL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -799,7 +829,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_ProjectileSetNewTargetL`.
    */
-  int cfunc_ProjectileSetNewTarget(lua_State* const luaContext)
+  int cfunc_ProjectileSetNewTarget(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileSetNewTargetL(ResolveBindingState(luaContext));
   }
@@ -811,7 +843,9 @@ namespace moho
    * Reads `(projectile, entity)` from Lua and rewrites projectile target data
    * to one entity-tracking target payload.
    */
-  int cfunc_ProjectileSetNewTargetL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileSetNewTargetL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -858,7 +892,9 @@ namespace moho
    * Reads `(projectile, location)` from Lua and rewrites projectile target data
    * to one ground target at the supplied world-space location.
    */
-  int cfunc_ProjectileSetNewTargetGroundL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileSetNewTargetGroundL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -890,7 +926,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileSetNewTargetGroundL`.
    */
-  int cfunc_ProjectileSetNewTargetGround(lua_State* const luaContext)
+  int cfunc_ProjectileSetNewTargetGround(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileSetNewTargetGroundL(ResolveBindingState(luaContext));
   }
@@ -921,7 +959,9 @@ namespace moho
    * What it does:
    * FAF extension: pushes `mAttributes.mMaxZigZag` (`[proj+36Ch]`).
    */
-  int cfunc_ProjectileGetMaxZigZag(lua_State* const luaContext)
+  int cfunc_ProjectileGetMaxZigZag(
+    lua_State* const luaContext
+  )
   {
     LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
     const LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
@@ -954,7 +994,9 @@ namespace moho
    * What it does:
    * FAF extension: pushes `mAttributes.mZigZagFrequency` (`[proj+370h]`).
    */
-  int cfunc_ProjectileGetZigZagFrequency(lua_State* const luaContext)
+  int cfunc_ProjectileGetZigZagFrequency(
+    lua_State* const luaContext
+  )
   {
     LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
     const LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
@@ -990,7 +1032,9 @@ namespace moho
    * the position comes from `GetTargetPosGun(false)`, as for
    * `GetCurrentTargetPosition`.
    */
-  int cfunc_ProjectileGetCurrentTargetPositionXYZ(lua_State* const luaContext)
+  int cfunc_ProjectileGetCurrentTargetPositionXYZ(
+    lua_State* const luaContext
+  )
   {
     LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
     const LuaPlus::LuaObject projectileObject(LuaPlus::LuaStackObject(state, 1));
@@ -1033,7 +1077,9 @@ namespace moho
    * at that point (`CAiTarget::operator=`, 0x005D5670), the same payload
    * `SetNewTargetGround` builds from a vector table.
    */
-  int cfunc_ProjectileSetNewTargetGroundXYZ(lua_State* const luaContext)
+  int cfunc_ProjectileSetNewTargetGroundXYZ(
+    lua_State* const luaContext
+  )
   {
     LuaPlus::LuaState* const state = ResolveBindingState(luaContext);
     const int argumentCount = lua_gettop(luaContext);
@@ -1082,7 +1128,9 @@ namespace moho
    * Reads `(projectile, seconds)` from Lua, stores the computed lifetime-end
    * tick (`mCurTick + seconds*10`), and returns the projectile Lua object.
    */
-  int cfunc_ProjectileSetLifetimeL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileSetLifetimeL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1110,7 +1158,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_ProjectileSetLifetimeL`.
    */
-  int cfunc_ProjectileSetLifetime(lua_State* const luaContext)
+  int cfunc_ProjectileSetLifetime(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileSetLifetimeL(ResolveBindingState(luaContext));
   }
@@ -1142,7 +1192,9 @@ namespace moho
    * Reads optional `(amount, radius)` number lanes from Lua and assigns each
    * non-nil lane to projectile damage storage.
    */
-  int cfunc_ProjectileSetDamageL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileSetDamageL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1151,14 +1203,7 @@ namespace moho
     lua_State* const rawState = state->m_state;
     const int argumentCount = lua_gettop(rawState);
     if (argumentCount < 2 || argumentCount > 3) {
-      LuaPlus::LuaState::Error(
-        state,
-        kLuaExpectedBetweenArgsWarning,
-        kSetDamageHelpText,
-        2,
-        3,
-        argumentCount
-      );
+      LuaPlus::LuaState::Error(state, kLuaExpectedBetweenArgsWarning, kSetDamageHelpText, 2, 3, argumentCount);
     }
 
     lua_settop(rawState, 3);
@@ -1192,7 +1237,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_ProjectileSetDamageL`.
    */
-  int cfunc_ProjectileSetDamage(lua_State* const luaContext)
+  int cfunc_ProjectileSetDamage(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileSetDamageL(ResolveBindingState(luaContext));
   }
@@ -1224,7 +1271,9 @@ namespace moho
    * Reads `(projectile, speed)` from Lua, writes projectile max-speed lane,
    * and returns the projectile Lua object.
    */
-  int cfunc_ProjectileSetMaxSpeedL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileSetMaxSpeedL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1252,7 +1301,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_ProjectileSetMaxSpeedL`.
    */
-  int cfunc_ProjectileSetMaxSpeed(lua_State* const luaContext)
+  int cfunc_ProjectileSetMaxSpeed(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileSetMaxSpeedL(ResolveBindingState(luaContext));
   }
@@ -1284,7 +1335,9 @@ namespace moho
    * Reads `(projectile, acceleration)` from Lua, writes projectile
    * acceleration lane, and returns the projectile Lua object.
    */
-  int cfunc_ProjectileSetAccelerationL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileSetAccelerationL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1313,7 +1366,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileSetAccelerationL`.
    */
-  int cfunc_ProjectileSetAcceleration(lua_State* const luaContext)
+  int cfunc_ProjectileSetAcceleration(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileSetAccelerationL(ResolveBindingState(luaContext));
   }
@@ -1346,7 +1401,9 @@ namespace moho
    * projectile ballistic-acceleration storage. Accepted forms are:
    * `(projectile)`, `(projectile, y)`, and `(projectile, x, y, z)`.
    */
-  int cfunc_ProjectileSetBallisticAccelerationL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileSetBallisticAccelerationL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1367,32 +1424,32 @@ namespace moho
     Wm3::Vector3f& ballisticAcceleration = projectile->mBallisticAcceleration;
 
     switch (argumentCount) {
-      case 1: {
-        Sim* const sim = lua_getglobaluserdata(rawState);
-        ballisticAcceleration = sim->mPhysConstants->mGravity;
-        break;
-      }
+    case 1: {
+      Sim* const sim = lua_getglobaluserdata(rawState);
+      ballisticAcceleration = sim->mPhysConstants->mGravity;
+      break;
+    }
 
-      case 2: {
-        LuaPlus::LuaStackObject yArg(state, 2);
-        ballisticAcceleration.x = 0.0f;
-        ballisticAcceleration.y = static_cast<float>(yArg.GetNumber());
-        ballisticAcceleration.z = 0.0f;
-        break;
-      }
+    case 2: {
+      LuaPlus::LuaStackObject yArg(state, 2);
+      ballisticAcceleration.x = 0.0f;
+      ballisticAcceleration.y = static_cast<float>(yArg.GetNumber());
+      ballisticAcceleration.z = 0.0f;
+      break;
+    }
 
-      case 4: {
-        LuaPlus::LuaStackObject xArg(state, 2);
-        LuaPlus::LuaStackObject yArg(state, 3);
-        LuaPlus::LuaStackObject zArg(state, 4);
-        ballisticAcceleration.x = static_cast<float>(xArg.GetNumber());
-        ballisticAcceleration.y = static_cast<float>(yArg.GetNumber());
-        ballisticAcceleration.z = static_cast<float>(zArg.GetNumber());
-        break;
-      }
+    case 4: {
+      LuaPlus::LuaStackObject xArg(state, 2);
+      LuaPlus::LuaStackObject yArg(state, 3);
+      LuaPlus::LuaStackObject zArg(state, 4);
+      ballisticAcceleration.x = static_cast<float>(xArg.GetNumber());
+      ballisticAcceleration.y = static_cast<float>(yArg.GetNumber());
+      ballisticAcceleration.z = static_cast<float>(zArg.GetNumber());
+      break;
+    }
 
-      default:
-        break;
+    default:
+      break;
     }
 
     projectile->mLuaObj.PushStack(state);
@@ -1406,7 +1463,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileSetBallisticAccelerationL`.
    */
-  int cfunc_ProjectileSetBallisticAcceleration(lua_State* const luaContext)
+  int cfunc_ProjectileSetBallisticAcceleration(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileSetBallisticAccelerationL(ResolveBindingState(luaContext));
   }
@@ -1438,7 +1497,9 @@ namespace moho
    * Reads `(projectile, flag)` from Lua and writes projectile destroy-on-water
    * behavior lane.
    */
-  int cfunc_ProjectileSetDestroyOnWaterL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileSetDestroyOnWaterL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1461,7 +1522,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileSetDestroyOnWaterL`.
    */
-  int cfunc_ProjectileSetDestroyOnWater(lua_State* const luaContext)
+  int cfunc_ProjectileSetDestroyOnWater(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileSetDestroyOnWaterL(ResolveBindingState(luaContext));
   }
@@ -1493,7 +1556,9 @@ namespace moho
    * Reads `(projectile, radiansPerSecond)` from Lua, writes projectile
    * turn-rate lane, and returns the projectile Lua object.
    */
-  int cfunc_ProjectileSetTurnRateL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileSetTurnRateL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1522,7 +1587,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileSetTurnRateL`.
    */
-  int cfunc_ProjectileSetTurnRate(lua_State* const luaContext)
+  int cfunc_ProjectileSetTurnRate(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileSetTurnRateL(ResolveBindingState(luaContext));
   }
@@ -1554,7 +1621,9 @@ namespace moho
    * Reads one projectile argument, computes velocity magnitude, and pushes one
    * numeric result to Lua.
    */
-  int cfunc_ProjectileGetCurrentSpeedL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileGetCurrentSpeedL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1583,7 +1652,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileGetCurrentSpeedL`.
    */
-  int cfunc_ProjectileGetCurrentSpeed(lua_State* const luaContext)
+  int cfunc_ProjectileGetCurrentSpeed(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileGetCurrentSpeedL(ResolveBindingState(luaContext));
   }
@@ -1616,7 +1687,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_ProjectileGetVelocityL`.
    */
-  int cfunc_ProjectileGetVelocity(lua_State* const luaContext)
+  int cfunc_ProjectileGetVelocity(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileGetVelocityL(ResolveBindingState(luaContext));
   }
@@ -1628,7 +1701,9 @@ namespace moho
    * Reads one projectile argument and pushes velocity components `(x, y, z)` as
    * three Lua numbers.
    */
-  int cfunc_ProjectileGetVelocityL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileGetVelocityL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1677,7 +1752,9 @@ namespace moho
    * Reads `(projectile, speed)` or `(projectile, vx, vy, vz)` from Lua,
    * updates projectile velocity, and returns the projectile Lua object.
    */
-  int cfunc_ProjectileSetVelocityL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileSetVelocityL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1735,7 +1812,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_ProjectileSetVelocityL`.
    */
-  int cfunc_ProjectileSetVelocity(lua_State* const luaContext)
+  int cfunc_ProjectileSetVelocity(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileSetVelocityL(ResolveBindingState(luaContext));
   }
@@ -1769,7 +1848,9 @@ namespace moho
    * Lua, writes projectile `mScaleVelocity`, and returns the projectile Lua
    * object (or `nil` when projectile resolution fails).
    */
-  int cfunc_ProjectileSetScaleVelocityL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileSetScaleVelocityL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1816,7 +1897,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileSetScaleVelocityL`.
    */
-  int cfunc_ProjectileSetScaleVelocity(lua_State* const luaContext)
+  int cfunc_ProjectileSetScaleVelocity(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileSetScaleVelocityL(ResolveBindingState(luaContext));
   }
@@ -1849,7 +1932,9 @@ namespace moho
    * Reads `(projectile, x, y, z)` from Lua and writes local angular velocity
    * lanes before returning the projectile Lua object.
    */
-  int cfunc_ProjectileSetLocalAngularVelocityL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileSetLocalAngularVelocityL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1892,7 +1977,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileSetLocalAngularVelocityL`.
    */
-  int cfunc_ProjectileSetLocalAngularVelocity(lua_State* const luaContext)
+  int cfunc_ProjectileSetLocalAngularVelocity(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileSetLocalAngularVelocityL(ResolveBindingState(luaContext));
   }
@@ -1924,7 +2011,9 @@ namespace moho
    * Reads `(projectile, enabled)` from Lua, updates both collision booleans,
    * and returns the projectile Lua object.
    */
-  int cfunc_ProjectileSetCollisionL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileSetCollisionL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -1949,7 +2038,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_ProjectileSetCollisionL`.
    */
-  int cfunc_ProjectileSetCollision(lua_State* const luaContext)
+  int cfunc_ProjectileSetCollision(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileSetCollisionL(ResolveBindingState(luaContext));
   }
@@ -1981,7 +2072,9 @@ namespace moho
    * Reads `(projectile, enabled)` from Lua, updates surface-collision lane, and
    * returns the projectile Lua object.
    */
-  int cfunc_ProjectileSetCollideSurfaceL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileSetCollideSurfaceL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -2004,7 +2097,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileSetCollideSurfaceL`.
    */
-  int cfunc_ProjectileSetCollideSurface(lua_State* const luaContext)
+  int cfunc_ProjectileSetCollideSurface(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileSetCollideSurfaceL(ResolveBindingState(luaContext));
   }
@@ -2036,7 +2131,9 @@ namespace moho
    * Reads `(projectile, enabled)` from Lua, updates entity-collision lane, and
    * returns the projectile Lua object.
    */
-  int cfunc_ProjectileSetCollideEntityL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileSetCollideEntityL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -2059,7 +2156,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileSetCollideEntityL`.
    */
-  int cfunc_ProjectileSetCollideEntity(lua_State* const luaContext)
+  int cfunc_ProjectileSetCollideEntity(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileSetCollideEntityL(ResolveBindingState(luaContext));
   }
@@ -2091,7 +2190,9 @@ namespace moho
    * Reads `(projectile, enabled)` from Lua, updates stay-underwater flag, and
    * returns the projectile Lua object.
    */
-  int cfunc_ProjectileStayUnderwaterL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileStayUnderwaterL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -2114,7 +2215,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileStayUnderwaterL`.
    */
-  int cfunc_ProjectileStayUnderwater(lua_State* const luaContext)
+  int cfunc_ProjectileStayUnderwater(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileStayUnderwaterL(ResolveBindingState(luaContext));
   }
@@ -2146,7 +2249,9 @@ namespace moho
    * Reads `(projectile, enabled)` from Lua, updates target-tracking flag, and
    * returns the projectile Lua object.
    */
-  int cfunc_ProjectileTrackTargetL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileTrackTargetL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -2168,7 +2273,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_ProjectileTrackTargetL`.
    */
-  int cfunc_ProjectileTrackTarget(lua_State* const luaContext)
+  int cfunc_ProjectileTrackTarget(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileTrackTargetL(ResolveBindingState(luaContext));
   }
@@ -2199,7 +2306,9 @@ namespace moho
    * What it does:
    * Reads `(projectile, enabled)` from Lua and updates stay-upright flag.
    */
-  int cfunc_ProjectileSetStayUprightL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileSetStayUprightL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -2221,7 +2330,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileSetStayUprightL`.
    */
-  int cfunc_ProjectileSetStayUpright(lua_State* const luaContext)
+  int cfunc_ProjectileSetStayUpright(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileSetStayUprightL(ResolveBindingState(luaContext));
   }
@@ -2252,7 +2363,9 @@ namespace moho
    * What it does:
    * Reads `(projectile, enabled)` from Lua and updates velocity-align flag.
    */
-  int cfunc_ProjectileSetVelocityAlignL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileSetVelocityAlignL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -2274,7 +2387,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileSetVelocityAlignL`.
    */
-  int cfunc_ProjectileSetVelocityAlign(lua_State* const luaContext)
+  int cfunc_ProjectileSetVelocityAlign(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileSetVelocityAlignL(ResolveBindingState(luaContext));
   }
@@ -2306,7 +2421,9 @@ namespace moho
    * Reads `(projectile, blueprintId)`, creates one child projectile from the
    * source projectile launch profile, and returns the created Lua projectile.
    */
-  int cfunc_ProjectileCreateChildProjectileL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileCreateChildProjectileL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -2362,7 +2479,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileCreateChildProjectileL`.
    */
-  int cfunc_ProjectileCreateChildProjectile(lua_State* const luaContext)
+  int cfunc_ProjectileCreateChildProjectile(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileCreateChildProjectileL(ResolveBindingState(luaContext));
   }
@@ -2394,7 +2513,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileSetVelocityRandomUpVectorL`.
    */
-  int cfunc_ProjectileSetVelocityRandomUpVector(lua_State* const luaContext)
+  int cfunc_ProjectileSetVelocityRandomUpVector(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileSetVelocityRandomUpVectorL(ResolveBindingState(luaContext));
   }
@@ -2406,7 +2527,9 @@ namespace moho
    * Reads one projectile arg and replaces projectile velocity with a random
    * upward-direction vector scaled to projectile blueprint max speed.
    */
-  int cfunc_ProjectileSetVelocityRandomUpVectorL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileSetVelocityRandomUpVectorL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -2468,7 +2591,9 @@ namespace moho
    * Reads `(projectile, value)` from Lua and updates projectile zig-zag
    * amplitude lane.
    */
-  int cfunc_ProjectileChangeMaxZigZagL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileChangeMaxZigZagL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -2495,7 +2620,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileChangeMaxZigZagL`.
    */
-  int cfunc_ProjectileChangeMaxZigZag(lua_State* const luaContext)
+  int cfunc_ProjectileChangeMaxZigZag(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileChangeMaxZigZagL(ResolveBindingState(luaContext));
   }
@@ -2527,7 +2654,9 @@ namespace moho
    * Reads `(projectile, value)` from Lua and updates projectile zig-zag
    * frequency lane.
    */
-  int cfunc_ProjectileChangeZigZagFrequencyL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileChangeZigZagFrequencyL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -2554,7 +2683,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileChangeZigZagFrequencyL`.
    */
-  int cfunc_ProjectileChangeZigZagFrequency(lua_State* const luaContext)
+  int cfunc_ProjectileChangeZigZagFrequency(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileChangeZigZagFrequencyL(ResolveBindingState(luaContext));
   }
@@ -2586,7 +2717,9 @@ namespace moho
    * Reads `(projectile, value)` from Lua and updates projectile detonate-above
    * height lane.
    */
-  int cfunc_ProjectileChangeDetonateAboveHeightL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileChangeDetonateAboveHeightL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -2613,7 +2746,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileChangeDetonateAboveHeightL`.
    */
-  int cfunc_ProjectileChangeDetonateAboveHeight(lua_State* const luaContext)
+  int cfunc_ProjectileChangeDetonateAboveHeight(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileChangeDetonateAboveHeightL(ResolveBindingState(luaContext));
   }
@@ -2645,7 +2780,9 @@ namespace moho
    * Reads `(projectile, value)` from Lua and updates projectile detonate-below
    * height lane.
    */
-  int cfunc_ProjectileChangeDetonateBelowHeightL(LuaPlus::LuaState* const state)
+  int cfunc_ProjectileChangeDetonateBelowHeightL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -2672,7 +2809,9 @@ namespace moho
    * Unwraps Lua callback context and forwards to
    * `cfunc_ProjectileChangeDetonateBelowHeightL`.
    */
-  int cfunc_ProjectileChangeDetonateBelowHeight(lua_State* const luaContext)
+  int cfunc_ProjectileChangeDetonateBelowHeight(
+    lua_State* const luaContext
+  )
   {
     return cfunc_ProjectileChangeDetonateBelowHeightL(ResolveBindingState(luaContext));
   }
@@ -2741,8 +2880,7 @@ namespace moho
     , mZigZagFrequency(-1.0f)
     , mDetonateAboveHeight(-1.0f)
     , mDetonateBelowHeight(-1.0f)
-  {
-  }
+  {}
 
   /**
    * Address: 0x0069A4D0 (FUN_0069A4D0, Moho::CProjectileAttributes::CProjectileAttributes)
@@ -2751,7 +2889,9 @@ namespace moho
    * Initializes one projectile-attributes payload from a blueprint pointer
    * while keeping zig-zag/detonation override lanes unset.
    */
-  CProjectileAttributes::CProjectileAttributes(RProjectileBlueprint* const blueprint) noexcept
+  CProjectileAttributes::CProjectileAttributes(
+    RProjectileBlueprint* const blueprint
+  ) noexcept
     : CProjectileAttributes()
   {
     mBlueprint = blueprint;
@@ -2777,7 +2917,9 @@ namespace moho
    * `CProjectileAttributesTypeInfo` instance while preserving outer storage
    * ownership.
    */
-  [[maybe_unused]] void DestroyCProjectileAttributesTypeInfoBody(CProjectileAttributesTypeInfo* const typeInfo) noexcept
+  [[maybe_unused]] void DestroyCProjectileAttributesTypeInfoBody(
+    CProjectileAttributesTypeInfo* const typeInfo
+  ) noexcept
   {
     gpg::ClearTypeLists(typeInfo);
   }
@@ -2841,13 +2983,24 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_EProjectileImpactEventTypeInfo_6d193a, moho::register_EProjectileImpactEventTypeInfo)
-GPG_PREREGISTER_INIT(register_CProjectileAttributesTypeInfo_6d193a, moho::register_CProjectileAttributesTypeInfo)
-GPG_PREREGISTER_INIT(register_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo_6d193a, moho::register_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo)
-GPG_PREREGISTER_INIT(register_ManyToOneListener_EProjectileImpactEvent_TypeInfo_6d193a, moho::register_ManyToOneListener_EProjectileImpactEvent_TypeInfo)
+GPG_PREREGISTER_INIT(
+  register_EProjectileImpactEventTypeInfo_6d193a,
+  moho::register_EProjectileImpactEventTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_CProjectileAttributesTypeInfo_6d193a,
+  moho::register_CProjectileAttributesTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo_6d193a,
+  moho::register_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_ManyToOneListener_EProjectileImpactEvent_TypeInfo_6d193a,
+  moho::register_ManyToOneListener_EProjectileImpactEvent_TypeInfo
+)
 
 namespace
 {
@@ -2914,7 +3067,8 @@ namespace gpg
 {
   /**
    * Address: 0x0069EF30 (FUN_0069EF30)
-   * Mangled: ?LoadAndBroadcastManyToOneListenerEProjectileImpactEvent@gpg@@YAXPAVReadArchive@1@PAV?$ManyToOneBroadcaster@W4EProjectileImpactEvent@Moho@@@Moho@@HPAVRRef@1@@Z
+   * Mangled:
+   * ?LoadAndBroadcastManyToOneListenerEProjectileImpactEvent@gpg@@YAXPAVReadArchive@1@PAV?$ManyToOneBroadcaster@W4EProjectileImpactEvent@Moho@@@Moho@@HPAVRRef@1@@Z
    *
    * IDA signature:
    * void __cdecl sub_69EF30(gpg::ReadArchive *a1,
@@ -2947,7 +3101,11 @@ namespace moho
   /**
    * Address: 0x0069F470 (FUN_0069F470)
    */
-  void CProjectileAttributes::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
+  void CProjectileAttributes::MemberDeserialize(
+    gpg::ReadArchive* const archive,
+    const int,
+    const gpg::RRef& ownerRef
+  )
   {
     mBlueprint = ReadProjectileBlueprintPointer(archive, ownerRef);
     archive->ReadFloat(&mMaxZigZag);
@@ -2959,7 +3117,11 @@ namespace moho
   /**
    * Address: 0x0069F4D0 (FUN_0069F4D0)
    */
-  void CProjectileAttributes::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef) const
+  void CProjectileAttributes::MemberSerialize(
+    gpg::WriteArchive* const archive,
+    const int,
+    const gpg::RRef& ownerRef
+  ) const
   {
     gpg::RRef blueprintRef = MakeProjectileBlueprintRef(mBlueprint);
     gpg::WriteRawPointer(archive, blueprintRef, gpg::TrackedPointerState::Unowned, ownerRef);

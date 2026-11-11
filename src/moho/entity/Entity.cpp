@@ -13,14 +13,16 @@ namespace moho
     "Remember which blueprint script modules exist instead of asking the file system for every new entity.",
     &sim_CacheScriptModuleLookups
   );
-}
+} // namespace moho
 
 namespace
 {
   constexpr std::uint32_t kEntityAttributeRangeMask = 0x7FFFFFFFu;
   constexpr std::uint32_t kEntityAttributeEnabledMask = 0x80000000u;
 
-  [[nodiscard]] constexpr std::uint32_t EncodeIntelRangeLane(const std::uint32_t range) noexcept
+  [[nodiscard]] constexpr std::uint32_t EncodeIntelRangeLane(
+    const std::uint32_t range
+  ) noexcept
   {
     return (range != 0u) ? (range | kEntityAttributeEnabledMask) : 0u;
   }
@@ -61,7 +63,10 @@ namespace
    * What it does:
    * Pushes one byte-backed boolean lane to Lua stack storage.
    */
-  [[maybe_unused]] void PushLuaBooleanByte(lua_State* const rawState, const std::uint8_t value) noexcept
+  [[maybe_unused]] void PushLuaBooleanByte(
+    lua_State* const rawState,
+    const std::uint8_t value
+  ) noexcept
   {
     lua_pushboolean(rawState, value != 0u ? 1 : 0);
   }
@@ -73,7 +78,10 @@ namespace
    * Pushes one unsigned 32-bit lane to Lua number stack storage while
    * preserving unsigned conversion semantics for values above `INT32_MAX`.
    */
-  [[maybe_unused]] void PushLuaUnsignedInt(lua_State* const rawState, const std::uint32_t value) noexcept
+  [[maybe_unused]] void PushLuaUnsignedInt(
+    lua_State* const rawState,
+    const std::uint32_t value
+  ) noexcept
   {
     const std::int32_t signedBits = static_cast<std::int32_t>(value);
     float lane = static_cast<float>(signedBits);
@@ -121,7 +129,9 @@ namespace
     Prop
   };
 
-  [[nodiscard]] BlueprintKind GuessBlueprintKind(const moho::REntityBlueprint* blueprint)
+  [[nodiscard]] BlueprintKind GuessBlueprintKind(
+    const moho::REntityBlueprint* blueprint
+  )
   {
     if (!blueprint) {
       return BlueprintKind::Unknown;
@@ -209,7 +219,9 @@ namespace
     const char* className;
   };
 
-  [[nodiscard]] ScriptFallbackSpec GetScriptFallbackSpec(const BlueprintKind kind)
+  [[nodiscard]] ScriptFallbackSpec GetScriptFallbackSpec(
+    const BlueprintKind kind
+  )
   {
     switch (kind) {
     case BlueprintKind::Unit:
@@ -237,7 +249,9 @@ namespace
    * the start, which can never match a short id like "uel0001" (zero
    * underscores) and silently produced an always-empty result.
    */
-  [[nodiscard]] std::string BuildBlueprintScriptModuleFromId(const moho::REntityBlueprint* blueprint)
+  [[nodiscard]] std::string BuildBlueprintScriptModuleFromId(
+    const moho::REntityBlueprint* blueprint
+  )
   {
     if (!blueprint) {
       return {};
@@ -268,7 +282,9 @@ namespace
    * What it does:
    * Returns cached `Entity` metatable object from Lua object-factory storage.
    */
-  [[nodiscard]] LuaPlus::LuaObject GetEntityFactory(LuaPlus::LuaState* const state)
+  [[nodiscard]] LuaPlus::LuaObject GetEntityFactory(
+    LuaPlus::LuaState* const state
+  )
   {
     return moho::CScrLuaMetatableFactory<moho::Entity>::Instance().Get(state);
   }
@@ -289,12 +305,18 @@ namespace
       : CDiskWatchListener("*.lua")
     {}
 
-    void OnDiskWatchEvent(const moho::SDiskWatchEvent& /*event*/) override
+    void OnDiskWatchEvent(
+      const moho::SDiskWatchEvent& /*event*/
+    ) override
     {
       mChanges.fetch_add(1u, std::memory_order_relaxed);
     }
 
-    [[nodiscard]] bool Exists(const moho::Sim* const sim, moho::CVirtualFileSystem& vfs, const char* const path)
+    [[nodiscard]] bool Exists(
+      const moho::Sim* const sim,
+      moho::CVirtualFileSystem& vfs,
+      const char* const path
+    )
     {
       const std::uint64_t changes = mChanges.load(std::memory_order_relaxed);
       if (sim != mSim || changes != mSeenChanges) {
@@ -330,8 +352,10 @@ namespace
    * Resolves blueprint script factory tables by trying blueprint-specific module/class
    * first, then falling back to type-default `unit/projectile/prop` script modules.
    */
-  [[nodiscard]] LuaPlus::LuaObject
-  ResolveBlueprintScriptFactory(moho::Sim* sim, const moho::REntityBlueprint* blueprint)
+  [[nodiscard]] LuaPlus::LuaObject ResolveBlueprintScriptFactory(
+    moho::Sim* sim,
+    const moho::REntityBlueprint* blueprint
+  )
   {
     if (!sim || !sim->mLuaState) {
       return {};
@@ -391,11 +415,11 @@ namespace
     // `RunScript`. dbgrun counted 3000 first-chance throws inside `Sim::Setup`.
     // Retail, with this check, emits none of it.
     const moho::FWaitHandleSet* const waitHandleSet = moho::FILE_GetWaitHandleSet();
-    const bool moduleFileExists = requestedModule != nullptr && *requestedModule != '\0'
-      && waitHandleSet != nullptr && waitHandleSet->mHandle != nullptr
-      && (moho::sim_CacheScriptModuleLookups
-            ? ScriptModuleExistence().Exists(sim, *waitHandleSet->mHandle, requestedModule)
-            : waitHandleSet->mHandle->GetFileInfo(requestedModule, nullptr));
+    const bool moduleFileExists = requestedModule != nullptr && *requestedModule != '\0' && waitHandleSet != nullptr &&
+      waitHandleSet->mHandle != nullptr &&
+      (moho::sim_CacheScriptModuleLookups
+         ? ScriptModuleExistence().Exists(sim, *waitHandleSet->mHandle, requestedModule)
+         : waitHandleSet->mHandle->GetFileInfo(requestedModule, nullptr));
 
     // Both modules load through SCR_Import (0x004D3250, called at 0x006776DE
     // and 0x0067783E): its `catch (const std::runtime_error&)` turns a script
@@ -431,8 +455,8 @@ namespace
 
     // 0x006777FD: the fallback module gets the same VFS existence check before
     // it is imported.
-    const bool fallbackFileExists = waitHandleSet != nullptr && waitHandleSet->mHandle != nullptr
-      && waitHandleSet->mHandle->GetFileInfo(fallback.module, nullptr);
+    const bool fallbackFileExists = waitHandleSet != nullptr && waitHandleSet->mHandle != nullptr &&
+      waitHandleSet->mHandle->GetFileInfo(fallback.module, nullptr);
     if (!fallbackFileExists) {
       gpg::Logf("Can't find module '%s'.  No scripts for you -- one year.", fallback.module);
       return defaultFactory;
@@ -457,7 +481,10 @@ namespace
     return defaultFactory;
   }
 
-  [[nodiscard]] moho::CArmyImpl* ResolveEntityArmyFromEntityId(moho::Sim* sim, const moho::EntId entityId) noexcept
+  [[nodiscard]] moho::CArmyImpl* ResolveEntityArmyFromEntityId(
+    moho::Sim* sim,
+    const moho::EntId entityId
+  ) noexcept
   {
     if (!sim) {
       return nullptr;
@@ -475,7 +502,9 @@ namespace
     return sim->mArmiesList[sourceIndex];
   }
 
-  [[nodiscard]] moho::EntityOccupationManager* ResolveEntityCollisionGrid(moho::Sim* sim) noexcept
+  [[nodiscard]] moho::EntityOccupationManager* ResolveEntityCollisionGrid(
+    moho::Sim* sim
+  ) noexcept
   {
     if (!sim || !sim->mOGrid) {
       return nullptr;
@@ -487,7 +516,10 @@ namespace
     return &sim->mOGrid->mEntityOccupationManager;
   }
 
-  [[nodiscard]] Wm3::Vector3f RotateVectorByQuaternion(const Wm3::Quatf& quaternion, const Wm3::Vector3f& v) noexcept
+  [[nodiscard]] Wm3::Vector3f RotateVectorByQuaternion(
+    const Wm3::Quatf& quaternion,
+    const Wm3::Vector3f& v
+  ) noexcept
   {
     Wm3::Vector3f out{};
     // Ground truth (FUN_00679CE0.c) rotates via
@@ -500,7 +532,9 @@ namespace
     return out;
   }
 
-  [[nodiscard]] std::uint8_t LayerToOccupancyBit(const moho::ELayer layer) noexcept
+  [[nodiscard]] std::uint8_t LayerToOccupancyBit(
+    const moho::ELayer layer
+  ) noexcept
   {
     switch (layer) {
     case moho::LAYER_Land:
@@ -520,12 +554,17 @@ namespace
     }
   }
 
-  [[nodiscard]] bool HasOccupancyBit(const moho::EOccupancyCaps caps, const std::uint8_t bit) noexcept
+  [[nodiscard]] bool HasOccupancyBit(
+    const moho::EOccupancyCaps caps,
+    const std::uint8_t bit
+  ) noexcept
   {
     return (static_cast<std::uint8_t>(caps) & bit) != 0u;
   }
 
-  void RefreshCollisionBoundsSnapshot(moho::Entity& entity)
+  void RefreshCollisionBoundsSnapshot(
+    moho::Entity& entity
+  )
   {
     entity.UpdateAABox();
   }
@@ -537,7 +576,10 @@ namespace
    * Replaces collision primitive pointer, relinks span as needed, and keeps
    * cached collision bounds in sync.
    */
-  void InstallCollisionPrimitiveAndRefresh(moho::Entity& entity, moho::CColPrimitiveBase* replacement)
+  void InstallCollisionPrimitiveAndRefresh(
+    moho::Entity& entity,
+    moho::CColPrimitiveBase* replacement
+  )
   {
     moho::CColPrimitiveBase* const old = entity.CollisionExtents;
     entity.CollisionExtents = replacement;
@@ -553,7 +595,9 @@ namespace
     RefreshCollisionBoundsSnapshot(entity);
   }
 
-  [[nodiscard]] Wm3::Box3f BuildBlueprintCollisionBox(const moho::REntityBlueprint& blueprint)
+  [[nodiscard]] Wm3::Box3f BuildBlueprintCollisionBox(
+    const moho::REntityBlueprint& blueprint
+  )
   {
     Wm3::Box3f localBox{};
     localBox.Center[0] = blueprint.mCollisionOffsetX;
@@ -576,7 +620,9 @@ namespace
     return localBox;
   }
 
-  [[nodiscard]] std::uint32_t ReadBlueprintCategoryBitIndex(const moho::REntityBlueprint* blueprint) noexcept
+  [[nodiscard]] std::uint32_t ReadBlueprintCategoryBitIndex(
+    const moho::REntityBlueprint* blueprint
+  ) noexcept
   {
     return blueprint ? blueprint->mCategoryBitIndex : 0u;
   }
@@ -588,7 +634,10 @@ namespace
    * Applies attach-link/local transform from `src` into `dst`, including
    * intrusive weak-chain rewire when attach owner changes.
    */
-  void ApplyAttachInfo(moho::SEntAttachInfo& dst, const moho::SEntAttachInfo& src)
+  void ApplyAttachInfo(
+    moho::SEntAttachInfo& dst,
+    const moho::SEntAttachInfo& src
+  )
   {
     moho::WeakPtr<moho::Entity>& dstWeak = dst.TargetWeakLink();
     const moho::WeakPtr<moho::Entity>& srcWeak = src.TargetWeakLink();
@@ -675,7 +724,7 @@ namespace
     out.pos_.z = rotatedNegChildPos.z + parentComposedTransform.pos_.z;
     return out;
   }
-}
+} // namespace
 
 namespace moho
 {
@@ -687,7 +736,9 @@ namespace moho
    * Returns the masked range magnitude for intel-bearing lanes and zero for
    * the non-range field lanes.
    */
-  std::uint32_t EntityAttributes::GetRange(const EEntityAttribute attribute) const noexcept
+  std::uint32_t EntityAttributes::GetRange(
+    const EEntityAttribute attribute
+  ) const noexcept
   {
     switch (attribute) {
     case ENTATTR_Vision:
@@ -723,7 +774,9 @@ namespace moho
    * Returns the high-bit enable flag for range-bearing intel lanes and false
    * for field/jammer/spoof lanes.
    */
-  bool EntityAttributes::IsEnabled(const EEntityAttribute attribute) const noexcept
+  bool EntityAttributes::IsEnabled(
+    const EEntityAttribute attribute
+  ) const noexcept
   {
     switch (attribute) {
     case ENTATTR_Vision:
@@ -759,7 +812,10 @@ namespace moho
    * Writes one high-bit enable flag into the selected range-bearing intel lane
    * while preserving its lower 31-bit radius payload.
    */
-  void EntityAttributes::SetEnabled(const EEntityAttribute attribute, const bool enabled) noexcept
+  void EntityAttributes::SetEnabled(
+    const EEntityAttribute attribute,
+    const bool enabled
+  ) noexcept
   {
     const std::uint32_t enabledBit = enabled ? kEntityAttributeEnabledMask : 0u;
 
@@ -810,7 +866,10 @@ namespace moho
    * Writes one new intel radius magnitude into the matching payload lane while
    * preserving the lane's sign bit. The non-radius field lanes are left alone.
    */
-  void EntityAttributes::SetIntelRadius(const EEntityAttribute attribute, const int radius) noexcept
+  void EntityAttributes::SetIntelRadius(
+    const EEntityAttribute attribute,
+    const int radius
+  ) noexcept
   {
     const std::uint32_t newRadius = static_cast<std::uint32_t>(radius);
 
@@ -854,7 +913,9 @@ namespace moho
    * What it does:
    * Loads all eight intel payload lanes from archive storage in field order.
    */
-  void EntityAttributes::MemberDeserialize(gpg::ReadArchive* const archive)
+  void EntityAttributes::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     archive->ReadUInt(&vision);
     archive->ReadUInt(&waterVision);
@@ -872,7 +933,9 @@ namespace moho
    * What it does:
    * Stores all eight intel payload lanes to archive storage in field order.
    */
-  void EntityAttributes::MemberSerialize(gpg::WriteArchive* const archive) const
+  void EntityAttributes::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     archive->WriteUInt(vision);
     archive->WriteUInt(waterVision);
@@ -891,7 +954,9 @@ namespace moho
    * Seeds intel lanes from unit-blueprint intel radii, setting the enable
    * sign bit for non-zero ranges.
    */
-  void EntityAttributes::Initialize(const RUnitBlueprint* const blueprint)
+  void EntityAttributes::Initialize(
+    const RUnitBlueprint* const blueprint
+  )
   {
     vision = EncodeIntelRangeLane(blueprint->Intel.VisionRadius);
     waterVision = EncodeIntelRangeLane(blueprint->Intel.WaterVisionRadius);
@@ -902,7 +967,6 @@ namespace moho
     sonarStealth = EncodeIntelRangeLane(blueprint->Intel.SonarStealthFieldRadius);
     cloak = EncodeIntelRangeLane(blueprint->Intel.CloakFieldRadius);
   }
-
 
   // Engine addition (sim_EntityPool, sim_EntityPools): see EntityPool and EntityMemoryManager. With sim_EntityPools
   // on, a size that has a slab pool comes from a 64 KB slab; everything else goes through EntityPool. A block is
@@ -919,8 +983,8 @@ namespace moho
   }
 
   void* Entity::operator new(
-      std::size_t size,
-      std::nothrow_t
+    std::size_t size,
+    std::nothrow_t
   ) noexcept
   {
     try {
@@ -956,11 +1020,10 @@ namespace moho
     }
     return sEntityType;
   }
-namespace
-{
+  namespace
+  {
 
-}
-
+  }
 
   /**
    * Address: 0x00681220 (FUN_00681220, sub_681220)
@@ -974,7 +1037,9 @@ namespace
    * pointer's OWNED/UNOWNED state. Without this the base of every entity could
    * be written to a save but never read back.
    */
-  void Entity::MemberDeserialize(gpg::ReadArchive* const archive)
+  void Entity::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (archive == nullptr) {
@@ -1078,7 +1143,9 @@ namespace
    *      texture scroller (OWNED), physics body (OWNED), realtime-stats bool,
    *      unique name string, shooter set, motor (OWNED), collision AABB.
    */
-  void Entity::MemberSerialize(gpg::WriteArchive* const archive) const
+  void Entity::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     const gpg::RRef owner{};
 
@@ -1159,8 +1226,8 @@ namespace
       archive->Write(gpg::LookupRType(typeid(LuaPlus::LuaObject)), &mLuaPositionCache, owner);
     }
   }
-namespace
-{
+  namespace
+  {
     /**
      * Address: 0x0067E410 (FUN_0067E410)
      * Address: 0x00BFC900 (FUN_00BFC900, atexit destructor of the static `RPointerType<Entity>` descriptor)
@@ -1180,8 +1247,7 @@ namespace
       gpg::PreRegisterRType(typeid(moho::Entity*), &sDescriptor);
       return &sDescriptor;
     }
-}
-
+  } // namespace
 
   /**
    * Address: 0x0067CFA0 (FUN_0067CFA0, Moho::Entity::GetPointerType)
@@ -1239,7 +1305,12 @@ namespace
    * Reads construct payload (`Sim*`) and allocates one `Entity` with
    * default entity collision-bucket flags (`0x800`).
    */
-  void Entity::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void Entity::MemberConstruct(
+    gpg::ReadArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     Sim* sim = nullptr;
     const gpg::RRef owner{};
@@ -1326,7 +1397,10 @@ namespace
    * Initializes Entity storage for serializer-owned construction paths and
    * links the entity node into `Sim::mCoordEntities`.
    */
-  Entity::Entity(Sim* sim, const std::uint32_t collisionBucketFlags)
+  Entity::Entity(
+    Sim* sim,
+    const std::uint32_t collisionBucketFlags
+  )
     : CollisionShape<Entity>(ResolveEntityCollisionGrid(sim), collisionBucketFlags)
     , CTask(nullptr, false)
   {
@@ -1398,7 +1472,11 @@ namespace
    * of game time. The missing link is whatever pushes the entity onto a
    * `CTaskThread` later, not this constructor.
    */
-  Entity::Entity(Sim* sim, const EntId entityId, const std::uint32_t collisionBucketFlags)
+  Entity::Entity(
+    Sim* sim,
+    const EntId entityId,
+    const std::uint32_t collisionBucketFlags
+  )
     : CollisionShape<Entity>(ResolveEntityCollisionGrid(sim), collisionBucketFlags)
     , CTask(nullptr, false)
   {
@@ -1452,7 +1530,12 @@ namespace
    * Initializes Entity base state blocks, binds script object from blueprint module,
    * seeds collision/grid metadata, and dispatches `StandardInit`.
    */
-  Entity::Entity(REntityBlueprint* blueprint, Sim* sim, const EntId entityId, const std::uint32_t collisionBucketFlags)
+  Entity::Entity(
+    REntityBlueprint* blueprint,
+    Sim* sim,
+    const EntId entityId,
+    const std::uint32_t collisionBucketFlags
+  )
     : CollisionShape<Entity>(ResolveEntityCollisionGrid(sim), collisionBucketFlags)
     , CTask(nullptr, false)
   {
@@ -1512,13 +1595,18 @@ namespace
    * LuaPlus::LuaObject const &,Moho::Sim *,Moho::EntId
    *
    * IDA signature:
-   * LuaPlus::LuaObject *__userpurge Moho::Entity::Entity@<eax>(Moho::Sim *a1@<edi>, LuaPlus::LuaObject *result, LuaPlus::LuaObject *a2, unsigned int a4);
+   * LuaPlus::LuaObject *__userpurge Moho::Entity::Entity@<eax>(Moho::Sim *a1@<edi>, LuaPlus::LuaObject *result,
+   * LuaPlus::LuaObject *a2, unsigned int a4);
    *
    * What it does:
    * Initializes Entity base state for Lua-side spawned entities, applies the
    * default collision bucket mask `0x800`, then binds the provided Lua object.
    */
-  Entity::Entity(const LuaPlus::LuaObject& luaObject, Sim* sim, const EntId entityId)
+  Entity::Entity(
+    const LuaPlus::LuaObject& luaObject,
+    Sim* sim,
+    const EntId entityId
+  )
     : CollisionShape<Entity>(ResolveEntityCollisionGrid(sim), 0x800u)
     , CTask(nullptr, false)
   {
@@ -1573,7 +1661,10 @@ namespace
    * Applies runtime identity ownership (sim/army/id), initializes interface/visibility
    * defaults, registers entity in sim db/lists, and initializes collision shape.
    */
-  void Entity::StandardInit(Sim* sim, const EntId entityId)
+  void Entity::StandardInit(
+    Sim* sim,
+    const EntId entityId
+  )
   {
     SimulationRef = sim;
     ArmyRef = ResolveEntityArmyFromEntityId(sim, entityId);
@@ -1630,7 +1721,8 @@ namespace
       if (!BluePrint->mBlueprintLabel.empty()) {
         mUniqueName += gpg::STR_Printf("(%s)", BluePrint->mBlueprintLabel.c_str());
       }
-      mUniqueName += gpg::STR_Printf("-%d", static_cast<int>(static_cast<std::uint16_t>(static_cast<std::uint32_t>(entityId))));
+      mUniqueName +=
+        gpg::STR_Printf("-%d", static_cast<int>(static_cast<std::uint16_t>(static_cast<std::uint32_t>(entityId))));
     } else {
       mUniqueName.assign("", 0);
     }
@@ -1643,7 +1735,10 @@ namespace
    * Chooses initial simulation layer from footprint occupancy, category hints,
    * map water elevation and terrain elevation at spawn coordinates.
    */
-  ELayer Entity::GetStartingLayer(const Wm3::Vec3f& worldPos, const ELayer desiredLayer) const
+  ELayer Entity::GetStartingLayer(
+    const Wm3::Vec3f& worldPos,
+    const ELayer desiredLayer
+  ) const
   {
     const SFootprint& footprint = GetFootprint();
 
@@ -1680,8 +1775,9 @@ namespace
       return LAYER_Land;
     }
 
-    if (HasOccupancyBit(footprint.mOccupancyCaps, static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB)) &&
-        !isExperimental) {
+    if (
+      HasOccupancyBit(footprint.mOccupancyCaps, static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB)) && !isExperimental
+    ) {
       return LAYER_Sub;
     }
 
@@ -1791,7 +1887,9 @@ namespace
    * Resolves one bone index through the current mesh skeleton and returns the
    * bone-name pointer, or null when the mesh/skeleton lane is unavailable.
    */
-  const char* Entity::GetBoneName(const std::uint32_t boneIndex) const
+  const char* Entity::GetBoneName(
+    const std::uint32_t boneIndex
+  ) const
   {
     auto* const scmResource = mVarDat.mScmResource.get();
     if (scmResource == nullptr) {
@@ -1826,7 +1924,10 @@ namespace
    * Tests this entity's current transform position against simulation map
    * bounds with caller-selected whole-map border semantics.
    */
-  bool Entity::IsInBounds(const bool wholeMap, const float border) const
+  bool Entity::IsInBounds(
+    const bool wholeMap,
+    const float border
+  ) const
   {
     return SimulationRef->mMapData->IsWithin(mVarDat.mCurTransform.pos_, border, wholeMap);
   }
@@ -1849,7 +1950,9 @@ namespace
    * Resolves one bone-name token through the current SCM skeleton, returning
    * `-1` when the mesh/skeleton lane is missing.
    */
-  int Entity::ResolveBoneIndex(const char* const boneName) const
+  int Entity::ResolveBoneIndex(
+    const char* const boneName
+  ) const
   {
     auto* const scmResource = mVarDat.mScmResource.get();
     if (scmResource == nullptr) {
@@ -1879,7 +1982,9 @@ namespace
    * What it does:
    * Updates visibility + interface sync state and clears dirty-sync marker.
    */
-  void Entity::Sync(SSyncData* syncData)
+  void Entity::Sync(
+    SSyncData* syncData
+  )
   {
     UpdateVisibility();
 
@@ -1920,8 +2025,11 @@ namespace
    * (FUN_0055AA60). The `allowExplicitPlaceholder` parameter is part of
    * the ABI signature but the shipped binary never branches on it.
    */
-  void
-  Entity::SetMesh(const RResId& meshResId, RMeshBlueprint* const explicitPlaceholder, const bool allowExplicitPlaceholder)
+  void Entity::SetMesh(
+    const RResId& meshResId,
+    RMeshBlueprint* const explicitPlaceholder,
+    const bool allowExplicitPlaceholder
+  )
   {
     static_cast<void>(allowExplicitPlaceholder);
 
@@ -1931,8 +2039,7 @@ namespace
       return;
     }
 
-    RMeshBlueprint* const meshBlueprint =
-      SimulationRef->mRules->GetMeshBlueprint(meshResId);
+    RMeshBlueprint* const meshBlueprint = SimulationRef->mRules->GetMeshBlueprint(meshResId);
     if (meshBlueprint == nullptr) {
       return;
     }
@@ -1952,10 +2059,7 @@ namespace
         return;
       }
 
-      gpg::Warnf(
-        "Failed to load ExplicitPlaceholder %s",
-        explicitPlaceholder->mBlueprintId.raw_data_unsafe()
-      );
+      gpg::Warnf("Failed to load ExplicitPlaceholder %s", explicitPlaceholder->mBlueprintId.raw_data_unsafe());
       return;
     }
 
@@ -1971,7 +2075,9 @@ namespace
    * binding inlines this whole body (e.g. 0x006911F7..0x0069123D in
    * `AddManualScroller`), after reading its arguments.
    */
-  void Entity::ChangeScroller(const SScroller& definition)
+  void Entity::ChangeScroller(
+    const SScroller& definition
+  )
   {
     if (mScroller == nullptr) {
       // The binary stores the new scroller before deleting the old pointer
@@ -1989,7 +2095,9 @@ namespace
    * What it does:
    * Seeds both texture-scroll lanes from one incoming UV coordinate pair.
    */
-  void Entity::UpdateScrollPos(const Wm3::Vec2f& scrollPosition)
+  void Entity::UpdateScrollPos(
+    const Wm3::Vec2f& scrollPosition
+  )
   {
     mVarDat.mScrollBeatStart = scrollPosition;
     mVarDat.mScrollBeatEnd = scrollPosition;
@@ -2002,7 +2110,9 @@ namespace
    * Copies current scroll lane to previous and advances current lane by one
    * delta vector.
    */
-  void Entity::UpdateScroll(const Wm3::Vec2f& scrollDelta)
+  void Entity::UpdateScroll(
+    const Wm3::Vec2f& scrollDelta
+  )
   {
     const Wm3::Vec2f beatEnd = mVarDat.mScrollBeatEnd;
     mVarDat.mScrollBeatStart = beatEnd;
@@ -2028,7 +2138,10 @@ namespace
    * Shifts the current texture-scroll lane into the previous lane and stores
    * one new animation scroll lane pair.
    */
-  void Entity::SetAnimScroll(const float scrollX, const float scrollY)
+  void Entity::SetAnimScroll(
+    const float scrollX,
+    const float scrollY
+  )
   {
     mVarDat.mScrollBeatStart = mVarDat.mScrollBeatEnd;
     mVarDat.mScrollBeatEnd.x = scrollX;
@@ -2041,7 +2154,10 @@ namespace
    * What it does:
    * Stores ambient detail and rumble sound parameter lanes.
    */
-  void Entity::SetAmbientSound(CSndParams* const detailSound, CSndParams* const rumbleSound)
+  void Entity::SetAmbientSound(
+    CSndParams* const detailSound,
+    CSndParams* const rumbleSound
+  )
   {
     mVarDat.mAmbientSound = detailSound;
     mVarDat.mRumbleSound = rumbleSound;
@@ -2138,7 +2254,9 @@ namespace
    *  - any other negative index (the `-2` weapon callers pass, or `-1`
    *    without a blueprint) (0x00679DCC..0x00679E13): the current transform.
    */
-  VTransform Entity::GetBoneWorldTransform(const int boneIndex) const
+  VTransform Entity::GetBoneWorldTransform(
+    const int boneIndex
+  ) const
   {
     const VTransform& curTransform = mVarDat.mCurTransform;
     if (boneIndex >= 0) {
@@ -2188,7 +2306,9 @@ namespace
    *  - otherwise, including a missing mesh, skeleton or bone
    *    (0x00679F33..0x00679F69): the identity transform.
    */
-  VTransform Entity::GetBoneLocalTransform(const int boneIndex) const
+  VTransform Entity::GetBoneLocalTransform(
+    const int boneIndex
+  ) const
   {
     if (boneIndex >= 0) {
       if (RScmResource* const scmResource = mVarDat.mScmResource.get(); scmResource != nullptr) {
@@ -2233,7 +2353,8 @@ namespace
 
     const VTransform parentBoneTransform = parentEntity->GetBoneWorldTransform(mAttachInfo.mParentBoneIndex);
     const VTransform parentComposedTransform = VTransform::Compose(mAttachInfo.mRelativeTransform, parentBoneTransform);
-    VTransform attachedTransform = SolveAttachedWorldTransformFromChildLocal(childLocalTransform, parentComposedTransform);
+    VTransform attachedTransform =
+      SolveAttachedWorldTransformFromChildLocal(childLocalTransform, parentComposedTransform);
     NormalizeQuatInPlace(&attachedTransform.orient_);
     return attachedTransform;
   }
@@ -2245,7 +2366,9 @@ namespace
    * Inserts one shooter entry into this entity's shooter ownership set when
    * the shooter pointer is non-null.
    */
-  void Entity::AddShooter(Entity* const shooter)
+  void Entity::AddShooter(
+    Entity* const shooter
+  )
   {
     if (shooter == nullptr) {
       return;
@@ -2271,7 +2394,9 @@ namespace
    * then reached `mDesiredShooterCap` early and `CAiAttackerImpl::TrackToTarget`
    * (0x005D8253 `cmp shooters, cap; jge skip`) rejected them.
    */
-  void Entity::RemoveShooter(Entity* const shooter)
+  void Entity::RemoveShooter(
+    Entity* const shooter
+  )
   {
     if (shooter == nullptr) {
       return;
@@ -2339,7 +2464,9 @@ namespace
    * Returns cached physics body, lazily constructing it from blueprint-derived
    * mass/inertia/collision-offset lanes and current entity transform when absent.
    */
-  SPhysBody* Entity::GetPhysBody(const bool unusedFlag)
+  SPhysBody* Entity::GetPhysBody(
+    const bool unusedFlag
+  )
   {
     (void)unusedFlag;
 
@@ -2385,7 +2512,10 @@ namespace
    * Applies one world-space impulse at one world-space application point into
    * this entity's cached physics-body lane when present.
    */
-  void Entity::AddWorldImpulse(const Wm3::Vec3f& impulse, const Wm3::Vec3f& worldPoint)
+  void Entity::AddWorldImpulse(
+    const Wm3::Vec3f& impulse,
+    const Wm3::Vec3f& worldPoint
+  )
   {
     SPhysBody* const body = mPhysBody;
     if (body == nullptr) {
@@ -2403,7 +2533,10 @@ namespace
    * Forwards one local impulse + local-point payload into the cached physics
    * body lane when present.
    */
-  void Entity::AddLocalImpulse(const Wm3::Vec3f& localImpulse, const Wm3::Vec3f& localPoint)
+  void Entity::AddLocalImpulse(
+    const Wm3::Vec3f& localImpulse,
+    const Wm3::Vec3f& localPoint
+  )
   {
     SPhysBody* const body = mPhysBody;
     if (body == nullptr) {
@@ -2419,7 +2552,9 @@ namespace
    * What it does:
    * Writes pending transform, advances twice, then updates entity intel manager.
    */
-  void Entity::Warp(const VTransform& transform)
+  void Entity::Warp(
+    const VTransform& transform
+  )
   {
     SetPendingTransform(transform, 1.0f);
     AdvanceCoords();
@@ -2443,7 +2578,10 @@ namespace
    * Stores pending transform/scalar and links the coord-node into Sim list
    * when it is currently detached.
    */
-  void Entity::SetPendingTransform(const VTransform& transform, const float pendingVelocityScale)
+  void Entity::SetPendingTransform(
+    const VTransform& transform,
+    const float pendingVelocityScale
+  )
   {
     mPendingTransform = transform;
     mPendingVelocityScale = pendingVelocityScale;
@@ -2479,7 +2617,9 @@ namespace
    * Replaces entity motor from auto_ptr handoff storage, then wakes the task
    * thread so the new motor actually gets ticked.
    */
-  void Entity::SetMotor(fa::auto_ptr<Motor>& motor)
+  void Entity::SetMotor(
+    fa::auto_ptr<Motor>& motor
+  )
   {
     Motor* const newMotor = motor.release();
     Motor* oldMotor = mMotor;
@@ -2523,7 +2663,9 @@ namespace
    * Packs the entity identity snapshot into the sync payload's create queue
    * and marks the interface lane created.
    */
-  void Entity::CreateInterface(SSyncData* const syncData)
+  void Entity::CreateInterface(
+    SSyncData* const syncData
+  )
   {
     SCreateEntityParams createParams{};
     createParams.mEntityId = id_;
@@ -2546,7 +2688,9 @@ namespace
    * cited on Vector.h's `push_back` -- then clears the interface-created
    * flag (`mInterfaceCreated`, +0x1EC).
    */
-  void Entity::DestroyInterface(SSyncData* const syncData)
+  void Entity::DestroyInterface(
+    SSyncData* const syncData
+  )
   {
     syncData->mDeleteIds.push_back(id_);
     mInterfaceCreated = 0u;
@@ -2574,7 +2718,9 @@ namespace
    * The IDA return of the stored `SSTIEntityVariableData*` is discarded at every
    * call site, so the override keeps its `void` signature.
    */
-  void Entity::SyncInterface(SSyncData* const syncData)
+  void Entity::SyncInterface(
+    SSyncData* const syncData
+  )
   {
     constexpr std::uint32_t kInvalidEntityId = ToRaw(EEntityIdSentinel::Invalid);
 
@@ -2586,8 +2732,7 @@ namespace
     );
     for (std::size_t i = 0; i < mAttachedEntities.size(); ++i) {
       Entity* const child = mAttachedEntities[i];
-      mVarDat.mAuxValueVector[i].mAttachedEntityId =
-        std::bit_cast<std::int32_t>(child ? child->id_ : kInvalidEntityId);
+      mVarDat.mAuxValueVector[i].mAttachedEntityId = std::bit_cast<std::int32_t>(child ? child->id_ : kInvalidEntityId);
     }
     // The whole block goes to the client verbatim. It is a plain member now, so
     // this is an ordinary argument rather than the `(char*)this + 0x78` cast the
@@ -2609,7 +2754,9 @@ namespace
    * `fa::vector<Entity*>::_Insert_n` (0x0067DB40) directly at 0x0067961C for
    * the capacity-full arm, so no out-of-line `push_back` exists for this element.
    */
-  bool Entity::AttachTo(const SEntAttachInfo& attachInfo)
+  bool Entity::AttachTo(
+    const SEntAttachInfo& attachInfo
+  )
   {
     if (mAttachInfo.HasAttachTarget()) {
       return false;
@@ -2669,7 +2816,10 @@ namespace
    * Removes this entity from parent attached-list and applies detached defaults
    * to the local attach-info block.
    */
-  bool Entity::DetachFrom(Entity* parent, bool)
+  bool Entity::DetachFrom(
+    Entity* parent,
+    bool
+  )
   {
     if (!parent) {
       return false;
@@ -2695,7 +2845,9 @@ namespace
   /**
    * Address: 0x006797E0 (FUN_006797E0)
    */
-  void Entity::AttachedEntityDestroyed(Entity* const attached)
+  void Entity::AttachedEntityDestroyed(
+    Entity* const attached
+  )
   {
     // 0x006797E0: `lea eax, [esp+4]; push eax` -- the entity rides along as the
     // script's argument (RunScript_Ent, 0x0067F180).
@@ -2705,7 +2857,9 @@ namespace
   /**
    * Address: 0x00679800 (FUN_00679800)
    */
-  void Entity::AttachedEntityKilled(Entity* const attached)
+  void Entity::AttachedEntityKilled(
+    Entity* const attached
+  )
   {
     // 0x00679800: `lea eax, [esp+4]; push eax` -- the entity rides along as the
     // script's argument (RunScript_Ent, 0x0067F180).
@@ -2715,7 +2869,9 @@ namespace
   /**
    * Address: 0x00679820 (FUN_00679820)
    */
-  void Entity::ParentEntityDestroyed(Entity* const parent)
+  void Entity::ParentEntityDestroyed(
+    Entity* const parent
+  )
   {
     // 0x00679820: `lea eax, [esp+4]; push eax` -- the entity rides along as the
     // script's argument (RunScript_Ent, 0x0067F180).
@@ -2725,7 +2881,9 @@ namespace
   /**
    * Address: 0x00679840 (FUN_00679840)
    */
-  void Entity::ParentEntityKilled(Entity* const parent)
+  void Entity::ParentEntityKilled(
+    Entity* const parent
+  )
   {
     // 0x00679840: `lea eax, [esp+4]; push eax` -- the entity rides along as the
     // script's argument (RunScript_Ent, 0x0067F180).
@@ -2735,7 +2893,9 @@ namespace
   /**
    * Address: 0x005BDC20 (FUN_005BDC20)
    */
-  float Entity::Materialize(float)
+  float Entity::Materialize(
+    float
+  )
   {
     return 0.0f;
   }
@@ -2758,7 +2918,9 @@ namespace
    * Accumulates completion fraction by `delta`, enforces binary clamp rules
    * and health-derived floor, then returns the applied fraction delta.
    */
-  float Entity::UpdateFractionComplete(const float delta)
+  float Entity::UpdateFractionComplete(
+    const float delta
+  )
   {
     if (delta == 0.0f) {
       return 0.0f;
@@ -2803,7 +2965,9 @@ namespace
    * when the bucket changes, then re-queues this entity at the front of the Sim
    * coord-dirty list.
    */
-  void Entity::SetHealth(const float newHealth)
+  void Entity::SetHealth(
+    const float newHealth
+  )
   {
     // The binary divides by MaxHealth unconditionally -- there is no MaxHealth<=0
     // guard in the original; callers guarantee a positive MaxHealth for a live
@@ -2818,7 +2982,8 @@ namespace
       "Entity[0x%08x]->SetHealth(%.1f [0x%08x])\n",
       static_cast<std::uint32_t>(id_),
       newHealth,
-      std::bit_cast<std::uint32_t>(newHealth));
+      std::bit_cast<std::uint32_t>(newHealth)
+    );
 
     if (nextBucket != prevBucket) {
       RunScriptNum2("OnHealthChanged", nextBucket, prevBucket);
@@ -2839,12 +3004,12 @@ namespace
    * the "NoDamage" sim cheat blocks a negative delta or the entity is dead and
    * the delta would heal it. The (unused) first parameter is the instigator.
    */
-  void Entity::AdjustHealth(Entity*, const float delta)
+  void Entity::AdjustHealth(
+    Entity*,
+    const float delta
+  )
   {
-    SimulationRef->Logf(
-      "Entity[0x%08x]->AdjustHealth(%.5f)\n",
-      static_cast<std::uint32_t>(id_),
-      delta);
+    SimulationRef->Logf("Entity[0x%08x]->AdjustHealth(%.5f)\n", static_cast<std::uint32_t>(id_), delta);
 
     // Only an exact-zero delta short-circuits (0x00679893, `ucomiss`/`jnp`); a
     // NaN delta passes. It does not reach SetHealth as NaN, though: the max
@@ -2882,7 +3047,11 @@ namespace
    * What it does:
    * Dispatches attached/parent killed notifications and marks entity dead/dirty.
    */
-  void Entity::Kill(Entity*, gpg::StrArg, float)
+  void Entity::Kill(
+    Entity*,
+    gpg::StrArg,
+    float
+  )
   {
     Entity* const parent = mAttachInfo.GetAttachTargetEntity();
     if (parent) {
@@ -3005,7 +3174,10 @@ namespace
    * Tests one world sphere against this entity's active collision primitive.
    * On hit, stamps this entity as the collision source lane in `outResult`.
    */
-  bool Entity::Intersects(const Wm3::Sphere3f& sphere, CollisionResult* const outResult)
+  bool Entity::Intersects(
+    const Wm3::Sphere3f& sphere,
+    CollisionResult* const outResult
+  )
   {
     CColPrimitiveBase* const collision = CollisionExtents;
     if (collision == nullptr || !collision->CollideSphere(&sphere, outResult)) {
@@ -3023,7 +3195,10 @@ namespace
    * Tests one world-space box against this entity's active collision primitive.
    * On hit, stamps this entity as the collision source lane in `outResult`.
    */
-  bool Entity::Intersects(const Wm3::Box3f& box, CollisionResult* const outResult)
+  bool Entity::Intersects(
+    const Wm3::Box3f& box,
+    CollisionResult* const outResult
+  )
   {
     CColPrimitiveBase* const collision = CollisionExtents;
     if (collision == nullptr || !collision->CollideBox(&box, outResult)) {
@@ -3035,7 +3210,8 @@ namespace
   }
 
   /**
-   * Address: 0x0067A9F0 (FUN_0067A9F0, ?Intersects@Entity@Moho@@QAE_NABV?$Vector3@M@Wm3@@0PAUCollisionSegmentResult@2@@Z)
+   * Address: 0x0067A9F0 (FUN_0067A9F0,
+   * ?Intersects@Entity@Moho@@QAE_NABV?$Vector3@M@Wm3@@0PAUCollisionSegmentResult@2@@Z)
    *
    * What it does:
    * Tests one world line segment against this entity's active collision
@@ -3058,7 +3234,8 @@ namespace
   }
 
   /**
-   * Address: 0x0067AA50 (FUN_0067AA50, ?GetTerrainCollisionGeom@Entity@Moho@@QBEXAAV?$fastvector@V?$Sphere3@M@Wm3@@@gpg@@@Z)
+   * Address: 0x0067AA50 (FUN_0067AA50,
+   * ?GetTerrainCollisionGeom@Entity@Moho@@QBEXAAV?$fastvector@V?$Sphere3@M@Wm3@@@gpg@@@Z)
    *
    * What it does:
    * Emits one terrain-collision proxy sphere list from the active collision
@@ -3070,7 +3247,9 @@ namespace
    * never get here. Its only caller, `CUnitMotion::HandleGroundCollision`, is
    * unreachable in FAF's build (patched out of `CalcMoveAir` at 0x006C018B).
    */
-  void Entity::GetTerrainCollisionGeom(gpg::fastvector<Wm3::Sphere3f>& outSpheres) const
+  void Entity::GetTerrainCollisionGeom(
+    gpg::fastvector<Wm3::Sphere3f>& outSpheres
+  ) const
   {
     Wm3::Vec3f center{};
     CollisionExtents->GetCenter(&center);
@@ -3111,23 +3290,28 @@ namespace
   }
 
   /**
-    * Alias of FUN_0067AC40 (non-canonical helper lane).
+   * Alias of FUN_0067AC40 (non-canonical helper lane).
    *
    * What it does:
    * Builds a box collision primitive from supplied local box and installs it.
    */
-  void Entity::SetCollisionBoxShape(const Wm3::Box3f& localBox)
+  void Entity::SetCollisionBoxShape(
+    const Wm3::Box3f& localBox
+  )
   {
     InstallCollisionPrimitiveAndRefresh(*this, new CColPrimitive<Wm3::Box3f>(localBox));
   }
 
   /**
-    * Alias of FUN_0067AD30 (non-canonical helper lane).
+   * Alias of FUN_0067AD30 (non-canonical helper lane).
    *
    * What it does:
    * Builds a sphere collision primitive from local center/radius and installs it.
    */
-  void Entity::SetCollisionSphereShape(const Wm3::Vec3f& localCenter, const float radius)
+  void Entity::SetCollisionSphereShape(
+    const Wm3::Vec3f& localCenter,
+    const float radius
+  )
   {
     InstallCollisionPrimitiveAndRefresh(*this, new CColPrimitive<Wm3::Sphere3f>(localCenter, radius));
   }
@@ -3288,7 +3472,9 @@ namespace
    * What it does:
    * Updates current layer and issues `OnLayerChange(new, old)` callback.
    */
-  void Entity::SetCurrentLayer(const ELayer newLayer)
+  void Entity::SetCurrentLayer(
+    const ELayer newLayer
+  )
   {
     const ELayer oldLayer = mVarDat.mLayerMask;
     mVarDat.mLayerMask = newLayer;
@@ -3309,7 +3495,9 @@ namespace
    * What it does:
    * Resolves category text through Sim rules and tests the blueprint category bit.
    */
-  bool Entity::IsInCategory(const char* categoryName) const noexcept
+  bool Entity::IsInCategory(
+    const char* categoryName
+  ) const noexcept
   {
     if (!categoryName || !BluePrint || !SimulationRef || !SimulationRef->mRules) {
       return false;
@@ -3338,7 +3526,9 @@ namespace
    * updates the underlay texture pointer, and relinks this entity in the
    * coord-entities update list.
    */
-  void Entity::SetStrategicUnderlay(const RResId& underlayId)
+  void Entity::SetStrategicUnderlay(
+    const RResId& underlayId
+  )
   {
     if (underlayId.name.empty()) {
       mVarDat.mUnderlayTexture.reset();
@@ -3359,8 +3549,8 @@ namespace
 
     // Engine addition (plan WPL.4): the texture is the client's
     // (CD3DBatchTexture.h sBatchTextureFromFile); without a client there is none.
-    mVarDat.mUnderlayTexture =
-      sBatchTextureFromFile != nullptr ? sBatchTextureFromFile(underlayPath.c_str(), 0u) : boost::shared_ptr<CD3DBatchTexture>{};
+    mVarDat.mUnderlayTexture = sBatchTextureFromFile != nullptr ? sBatchTextureFromFile(underlayPath.c_str(), 0u)
+                                                                : boost::shared_ptr<CD3DBatchTexture>{};
 #if FAF_SERVER_MODE
     // Engine addition, server mode: the path, for the frames (remote/UnderlayPaths.h).
     faf::remote::SetUnderlayPath(static_cast<std::uint32_t>(id_), underlayPath);
@@ -3370,14 +3560,17 @@ namespace
   }
 
   /**
-   * Address: 0x005BDC70 (FUN_005BDC70, ?SetStrategicUnderlay@Entity@Moho@@QAEXV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@@Z)
-   * Mangled: ?SetStrategicUnderlay@Entity@Moho@@QAEXV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@@Z
+   * Address: 0x005BDC70 (FUN_005BDC70,
+   * ?SetStrategicUnderlay@Entity@Moho@@QAEXV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@@Z) Mangled:
+   * ?SetStrategicUnderlay@Entity@Moho@@QAEXV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@@Z
    *
    * What it does:
    * Updates strategic-underlay texture pointer/control lanes from one by-value
    * shared handle when the incoming raw texture pointer differs.
    */
-  void Entity::SetStrategicUnderlay(boost::shared_ptr<CD3DBatchTexture> underlayTexture)
+  void Entity::SetStrategicUnderlay(
+    boost::shared_ptr<CD3DBatchTexture> underlayTexture
+  )
   {
     if (mVarDat.mUnderlayTexture.get() == underlayTexture.get()) {
       return;
@@ -3387,8 +3580,9 @@ namespace
   }
 
   /**
-   * Address: 0x005BDD20 (FUN_005BDD20, ?GetStrategicUnderlay@Entity@Moho@@QBE?AV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@XZ)
-   * Mangled: ?GetStrategicUnderlay@Entity@Moho@@QBE?AV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@XZ
+   * Address: 0x005BDD20 (FUN_005BDD20,
+   * ?GetStrategicUnderlay@Entity@Moho@@QBE?AV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@XZ) Mangled:
+   * ?GetStrategicUnderlay@Entity@Moho@@QBE?AV?$shared_ptr@VCD3DBatchTexture@Moho@@@boost@@XZ
    *
    * What it does:
    * Returns one retained shared strategic-underlay texture handle.
@@ -3429,7 +3623,9 @@ namespace
    * Maps one requested tick to the rolling 25-entry position-history ring and
    * returns the selected sample as a `VTransform` view.
    */
-  VTransform const& Entity::GetPositionHistory(const int tick) const
+  VTransform const& Entity::GetPositionHistory(
+    const int tick
+  ) const
   {
     const PositionHistory* const positionHistory = mPositionHistory;
     const std::int32_t delta = positionHistory->cursor - tick;
@@ -3460,9 +3656,11 @@ namespace
       mPositionHistory->samples[mPositionHistory->cursor] = mVarDat.mCurTransform;
     }
 
-    if (CollisionExtents &&
-        (mVarDat.mLastTransform.pos_ != mVarDat.mCurTransform.pos_ ||
-         mVarDat.mLastTransform.orient_ != mVarDat.mCurTransform.orient_)) {
+    if (
+      CollisionExtents &&
+      (mVarDat.mLastTransform.pos_ != mVarDat.mCurTransform.pos_ ||
+       mVarDat.mLastTransform.orient_ != mVarDat.mCurTransform.orient_)
+    ) {
       UpdateCollision();
     }
 
@@ -3481,7 +3679,9 @@ namespace
     }
   }
 
-  void Entity::AdvanceCoordsOwn(CollisionShapeBase::DeferredRelink& relink)
+  void Entity::AdvanceCoordsOwn(
+    CollisionShapeBase::DeferredRelink& relink
+  )
   {
     mVarDat.mLastTransform = mVarDat.mCurTransform;
     mVarDat.mCurTransform = mPendingTransform;
@@ -3494,16 +3694,20 @@ namespace
     }
 
     relink = CollisionShapeBase::DeferredRelink{};
-    if (CollisionExtents &&
-        (mVarDat.mLastTransform.pos_ != mVarDat.mCurTransform.pos_ ||
-         mVarDat.mLastTransform.orient_ != mVarDat.mCurTransform.orient_)) {
+    if (
+      CollisionExtents &&
+      (mVarDat.mLastTransform.pos_ != mVarDat.mCurTransform.pos_ ||
+       mVarDat.mLastTransform.orient_ != mVarDat.mCurTransform.orient_)
+    ) {
       CollisionShapeBase::SetDeferredRelinkSlot(&relink);
       UpdateCollision();
       CollisionShapeBase::SetDeferredRelinkSlot(nullptr);
     }
   }
 
-  void Entity::AdvanceCoordsShared(const CollisionShapeBase::DeferredRelink& relink)
+  void Entity::AdvanceCoordsShared(
+    const CollisionShapeBase::DeferredRelink& relink
+  )
   {
     CollisionShapeBase::ApplyDeferredRelink(relink);
 
@@ -3571,23 +3775,23 @@ namespace
       }
 
       switch (ArmyRef->GetAllianceWith(focusArmyImpl)) {
-        case ALLIANCE_Neutral:
-          mVarDat.mVisibilityMode = static_cast<EUserEntityVisibilityMode>(mVizToNeutrals);
-          mVarDat.mVisibilityHidden = static_cast<std::uint8_t>(mVizToNeutrals != VIZMODE_Never);
-          return;
-        case ALLIANCE_Ally:
-          mVarDat.mVisibilityMode = static_cast<EUserEntityVisibilityMode>(mVizToAllies);
-          mVarDat.mVisibilityHidden = static_cast<std::uint8_t>(mVizToAllies != VIZMODE_Never);
-          return;
-        case ALLIANCE_Enemy:
-          viz = mVizToEnemies;
-          break;
-        default:
-          gpg::HandleAssertFailure(
-            "Reached the supposably unreachable.", 354,
-            "c:\\work\\rts\\main\\code\\src\\sim\\Entity.cpp");
-          viz = mVizToEnemies;
-          break;
+      case ALLIANCE_Neutral:
+        mVarDat.mVisibilityMode = static_cast<EUserEntityVisibilityMode>(mVizToNeutrals);
+        mVarDat.mVisibilityHidden = static_cast<std::uint8_t>(mVizToNeutrals != VIZMODE_Never);
+        return;
+      case ALLIANCE_Ally:
+        mVarDat.mVisibilityMode = static_cast<EUserEntityVisibilityMode>(mVizToAllies);
+        mVarDat.mVisibilityHidden = static_cast<std::uint8_t>(mVizToAllies != VIZMODE_Never);
+        return;
+      case ALLIANCE_Enemy:
+        viz = mVizToEnemies;
+        break;
+      default:
+        gpg::HandleAssertFailure(
+          "Reached the supposably unreachable.", 354, "c:\\work\\rts\\main\\code\\src\\sim\\Entity.cpp"
+        );
+        viz = mVizToEnemies;
+        break;
       }
     }
 
@@ -3602,7 +3806,9 @@ namespace
    * Updates focus-player visibility mode, refreshes derived visibility state,
    * and queues this entity in Sim coord-visibility refresh list when needed.
    */
-  void Entity::SetVizToFocusPlayer(const EVisibilityMode mode)
+  void Entity::SetVizToFocusPlayer(
+    const EVisibilityMode mode
+  )
   {
     mVizToFocusPlayer = static_cast<std::int32_t>(mode);
     UpdateVisibility();
@@ -3618,7 +3824,9 @@ namespace
    * Updates enemy visibility mode, refreshes derived visibility state,
    * and queues this entity in Sim coord-visibility refresh list when needed.
    */
-  void Entity::SetVizToEnemies(const EVisibilityMode mode)
+  void Entity::SetVizToEnemies(
+    const EVisibilityMode mode
+  )
   {
     mVizToEnemies = static_cast<std::int32_t>(mode);
     UpdateVisibility();
@@ -3634,7 +3842,9 @@ namespace
    * Updates allied visibility mode, refreshes derived visibility state,
    * and queues this entity in Sim coord-visibility refresh list when needed.
    */
-  void Entity::SetVizToAllies(const EVisibilityMode mode)
+  void Entity::SetVizToAllies(
+    const EVisibilityMode mode
+  )
   {
     mVizToAllies = static_cast<std::int32_t>(mode);
     UpdateVisibility();
@@ -3650,7 +3860,9 @@ namespace
    * Updates neutral visibility mode, refreshes derived visibility state,
    * and queues this entity in Sim coord-visibility refresh list when needed.
    */
-  void Entity::SetVizToNeutrals(const EVisibilityMode mode)
+  void Entity::SetVizToNeutrals(
+    const EVisibilityMode mode
+  )
   {
     mVizToNeutrals = static_cast<std::int32_t>(mode);
     UpdateVisibility();
@@ -3658,7 +3870,6 @@ namespace
       ListLinkBefore(&SimulationRef->mCoordEntities);
     }
   }
-
 
   /**
    * Address: 0x00692580 (FUN_00692580, Moho::ENTSCR_ResolveBoneIndex)
@@ -3776,7 +3987,10 @@ namespace
    *             = (cH*sP, cP*sH, -sH*sP)
    * which is an independent confirmation of the lane order above.
    */
-  Wm3::Quaternionf COORDS_Orient(const float heading, const float pitch) noexcept
+  Wm3::Quaternionf COORDS_Orient(
+    const float heading,
+    const float pitch
+  ) noexcept
   {
     const float halfHeading = heading * 0.5f;
     const float halfPitch = pitch * 0.5f;
@@ -3801,7 +4015,9 @@ namespace
    * Builds an orientation quaternion whose forward axis follows `direction`,
    * with fixed fallback quaternions for zero-length and vertical vectors.
    */
-  Wm3::Quaternionf COORDS_Orient(const Wm3::Vector3f& direction) noexcept
+  Wm3::Quaternionf COORDS_Orient(
+    const Wm3::Vector3f& direction
+  ) noexcept
   {
     Wm3::Vector3f forward = direction;
     if (Wm3::Vector3f::Normalize(&forward) == 0.0f) {
@@ -3846,7 +4062,10 @@ namespace
    * Converts heading/pitch radians into one forward vector using the engine's
    * original trigonometric sign convention.
    */
-  Wm3::Vector3f COORDS_ForwardVector(const float heading, const float pitch) noexcept
+  Wm3::Vector3f COORDS_ForwardVector(
+    const float heading,
+    const float pitch
+  ) noexcept
   {
     const float cosPitch = fa::cos(pitch);
 
@@ -3864,7 +4083,9 @@ namespace
    * Computes the negative fast-asin pitch approximation used by the engine's
    * aim and sound lanes from a 3D velocity vector.
    */
-  [[nodiscard]] float COORDS_Pitch(const Wm3::Vector3f& velocity) noexcept
+  [[nodiscard]] float COORDS_Pitch(
+    const Wm3::Vector3f& velocity
+  ) noexcept
   {
     const float length = std::sqrt((velocity.x * velocity.x) + (velocity.y * velocity.y) + (velocity.z * velocity.z));
     const float normalizedY = velocity.y / length;
@@ -3881,10 +4102,11 @@ namespace
    * Computes pitch from quaternion orientation lanes using the binary's
    * clamped fast-asin polynomial path.
    */
-  [[nodiscard]] float COORDS_Pitch(const Wm3::Quaternionf& orientation) noexcept
+  [[nodiscard]] float COORDS_Pitch(
+    const Wm3::Quaternionf& orientation
+  ) noexcept
   {
-    float clamped =
-      ((orientation.w * orientation.z) - (orientation.y * orientation.x)) * -2.0f;
+    float clamped = ((orientation.w * orientation.z) - (orientation.y * orientation.x)) * -2.0f;
     if (clamped > 1.0f) {
       clamped = 1.0f;
     }
@@ -3913,7 +4135,10 @@ namespace
    * both operands). Same pattern as `cfunc_EntityPushOverL`, which shares
    * this helper.
    */
-  void COORDS_Tilt(Wm3::Quaternionf* const orientation, Wm3::Vector3f surfaceNormal) noexcept
+  void COORDS_Tilt(
+    Wm3::Quaternionf* const orientation,
+    Wm3::Vector3f surfaceNormal
+  ) noexcept
   {
     if (orientation == nullptr) {
       return;
@@ -3956,7 +4181,9 @@ namespace
    * Maps canonical layer text names to enum lanes and returns `LAYER_None`
    * when no supported name matches.
    */
-  ELayer COORDS_StringToLayer(const char* const layerName) noexcept
+  ELayer COORDS_StringToLayer(
+    const char* const layerName
+  ) noexcept
   {
     if (_stricmp(layerName, "Land") == 0) {
       return LAYER_Land;
@@ -3983,7 +4210,10 @@ namespace
    * Converts one footprint-origin cell position and footprint dimensions into
    * one half-open cell rectangle.
    */
-  gpg::Rect2i COORDS_ToRect(const SOCellPos& cellPos, const SFootprint& footprint) noexcept
+  gpg::Rect2i COORDS_ToRect(
+    const SOCellPos& cellPos,
+    const SFootprint& footprint
+  ) noexcept
   {
     gpg::Rect2i result{};
     result.x0 = static_cast<int>(cellPos.x);
@@ -4007,7 +4237,12 @@ namespace
    * (0x0050AFC6/0x0050AFE6), then narrowed to `int16` (the binary's `WORD`
    * cast).
    */
-  gpg::Rect2i* COORDS_ToGridRect(gpg::Rect2i* const result, const SCoordsVec2& centerXZ, const int sizeX, const int sizeZ)
+  gpg::Rect2i* COORDS_ToGridRect(
+    gpg::Rect2i* const result,
+    const SCoordsVec2& centerXZ,
+    const int sizeX,
+    const int sizeZ
+  )
   {
     const std::int16_t halfSizeX =
       static_cast<std::int16_t>(fa::RoundToInt(centerXZ.x - (static_cast<float>(sizeX) * 0.5f)));
@@ -4031,11 +4266,13 @@ namespace
    * Footprint-typed overload of `COORDS_ToGridRect`: delegates to the raw
    * integer-dimensions overload using the footprint's `mSizeX`/`mSizeZ`.
    */
-  gpg::Rect2i* COORDS_ToGridRect(gpg::Rect2i* const result, const SCoordsVec2& centerXZ, const SFootprint& footprint)
+  gpg::Rect2i* COORDS_ToGridRect(
+    gpg::Rect2i* const result,
+    const SCoordsVec2& centerXZ,
+    const SFootprint& footprint
+  )
   {
-    return COORDS_ToGridRect(
-      result, centerXZ, static_cast<int>(footprint.mSizeX), static_cast<int>(footprint.mSizeZ)
-    );
+    return COORDS_ToGridRect(result, centerXZ, static_cast<int>(footprint.mSizeX), static_cast<int>(footprint.mSizeZ));
   }
 
   /**
@@ -4045,7 +4282,12 @@ namespace
    * Samples terrain elevation and optionally clamps it to water elevation when
    * the requested layer is not seabed-capable.
    */
-  float COORDS_Elevation(const STIMap* const map, const float x, const float z, const ELayer layer) noexcept
+  float COORDS_Elevation(
+    const STIMap* const map,
+    const float x,
+    const float z,
+    const ELayer layer
+  ) noexcept
   {
     const float terrainElevation = map->mHeightField->GetElevation(x, z);
     if ((static_cast<std::uint8_t>(layer) & static_cast<std::uint8_t>(LAYER_Seabed)) != 0u) {
@@ -4064,8 +4306,13 @@ namespace
    * Converts one footprint-origin cell position into world center position and
    * samples terrain/water elevation by requested layer.
    */
-  Wm3::Vector3f
-  COORDS_ToWorldPos(const STIMap* const map, const SOCellPos& cellPos, const ELayer layer, const int sizeX, const int sizeZ) noexcept
+  Wm3::Vector3f COORDS_ToWorldPos(
+    const STIMap* const map,
+    const SOCellPos& cellPos,
+    const ELayer layer,
+    const int sizeX,
+    const int sizeZ
+  ) noexcept
   {
     Wm3::Vector3f outPos{};
     const float worldX = static_cast<float>(cellPos.x) + (static_cast<float>(sizeX) * 0.5f);
@@ -4087,13 +4334,18 @@ namespace
   }
 
   /**
-   * Address: 0x0050B1A0 (FUN_0050B1A0, ?COORDS_ToWorldPos@Moho@@YA?AV?$Vector3@M@Wm3@@PBVSTIMap@1@ABUSOCellPos@1@ABUSFootprint@1@@Z)
+   * Address: 0x0050B1A0 (FUN_0050B1A0,
+   * ?COORDS_ToWorldPos@Moho@@YA?AV?$Vector3@M@Wm3@@PBVSTIMap@1@ABUSOCellPos@1@ABUSFootprint@1@@Z)
    *
    * What it does:
    * Convenience overload that converts one cell position using a footprint's
    * layer and dimensions.
    */
-  Wm3::Vector3f COORDS_ToWorldPos(const STIMap* const map, const SOCellPos& cellPos, const SFootprint& footprint) noexcept
+  Wm3::Vector3f COORDS_ToWorldPos(
+    const STIMap* const map,
+    const SOCellPos& cellPos,
+    const SFootprint& footprint
+  ) noexcept
   {
     return COORDS_ToWorldPos(
       map,
@@ -4105,13 +4357,18 @@ namespace
   }
 
   /**
-   * Address: 0x0050B1D0 (FUN_0050B1D0, ?COORDS_ToWorldPos@Moho@@YA?AV?$Vector3@M@Wm3@@PBVSTIMap@1@ABUSCoordsVec2@1@ABUSFootprint@1@@Z)
+   * Address: 0x0050B1D0 (FUN_0050B1D0,
+   * ?COORDS_ToWorldPos@Moho@@YA?AV?$Vector3@M@Wm3@@PBVSTIMap@1@ABUSCoordsVec2@1@ABUSFootprint@1@@Z)
    *
    * What it does:
    * Builds one world-space vector from raw XZ coordinates and samples
    * elevation using footprint occupancy and water rules.
    */
-  Wm3::Vector3f COORDS_ToWorldPos(const STIMap* const map, const SCoordsVec2& worldPos, const SFootprint& footprint) noexcept
+  Wm3::Vector3f COORDS_ToWorldPos(
+    const STIMap* const map,
+    const SCoordsVec2& worldPos,
+    const SFootprint& footprint
+  ) noexcept
   {
     Wm3::Vector3f outPos{};
     outPos.x = worldPos.x;
@@ -4134,28 +4391,33 @@ namespace
   }
 
   /**
-   * Address: 0x0050B260 (FUN_0050B260, ?COORDS_GridSnap@Moho@@YA?AV?$Vector3@M@Wm3@@PBVSTIMap@1@ABUSCoordsVec2@1@ABUSFootprint@1@W4ELayer@1@@Z)
+   * Address: 0x0050B260 (FUN_0050B260,
+   * ?COORDS_GridSnap@Moho@@YA?AV?$Vector3@M@Wm3@@PBVSTIMap@1@ABUSCoordsVec2@1@ABUSFootprint@1@W4ELayer@1@@Z)
    *
    * What it does:
    * Snaps one world XZ center to footprint-origin cell coordinates and returns
    * the corresponding world-aligned snapped position.
    */
-  Wm3::Vector3f
-  COORDS_GridSnap(const STIMap* const map, const SCoordsVec2& worldPos, const SFootprint& footprint, ELayer layer) noexcept
+  Wm3::Vector3f COORDS_GridSnap(
+    const STIMap* const map,
+    const SCoordsVec2& worldPos,
+    const SFootprint& footprint,
+    ELayer layer
+  ) noexcept
   {
     if (layer == LAYER_None) {
       layer = static_cast<ELayer>(static_cast<std::uint8_t>(footprint.mOccupancyCaps));
     }
 
     SOCellPos cellPos{};
-    cellPos.x = static_cast<std::int16_t>(static_cast<int>(std::lrintf(worldPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f))));
-    cellPos.z = static_cast<std::int16_t>(static_cast<int>(std::lrintf(worldPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f))));
+    cellPos.x = static_cast<std::int16_t>(
+      static_cast<int>(std::lrintf(worldPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f)))
+    );
+    cellPos.z = static_cast<std::int16_t>(
+      static_cast<int>(std::lrintf(worldPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)))
+    );
     return COORDS_ToWorldPos(
-      map,
-      cellPos,
-      layer,
-      static_cast<int>(footprint.mSizeX),
-      static_cast<int>(footprint.mSizeZ)
+      map, cellPos, layer, static_cast<int>(footprint.mSizeX), static_cast<int>(footprint.mSizeZ)
     );
   }
 
@@ -4166,7 +4428,9 @@ namespace
    * Maps canonical single-layer enum values to their text names and returns an
    * empty string for mixed-bit layer masks.
    */
-  const char* Entity::LayerToString(const ELayer layer) noexcept
+  const char* Entity::LayerToString(
+    const ELayer layer
+  ) noexcept
   {
     switch (layer) {
     case LAYER_None:
@@ -4187,12 +4451,14 @@ namespace
       return "";
     }
   }
-}
-
+} // namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(PreregisterEntityPointerType_26ac7a, moho::PreregisterEntityPointerType)
+GPG_PREREGISTER_INIT(
+  PreregisterEntityPointerType_26ac7a,
+  moho::PreregisterEntityPointerType
+)
 
 namespace
 {
@@ -4287,11 +4553,10 @@ namespace moho
    */
   struct EntitySerializer : gpg::SerSaveLoadHelper<Entity>
   {};
-}
+} // namespace moho
 
 namespace
 {
   // Address: 0x010B43E4 -- process-global `EntitySerializer` singleton.
   moho::EntitySerializer gEntitySerializer;
-}
-
+} // namespace

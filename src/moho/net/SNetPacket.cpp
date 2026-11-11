@@ -77,7 +77,10 @@ fa::string SNetPacket::ToString() const
  * What it does:
  * Logs packet age, size, resend count, type and sequence/payload header fields.
  */
-void SNetPacket::LogPacket(const char* dirType, const int64_t receiveOrSentTime) const
+void SNetPacket::LogPacket(
+  const char* dirType,
+  const int64_t receiveOrSentTime
+) const
 {
   gpg::Logf("      %s %7dusec ago:", dirType, static_cast<int64_t>(receiveOrSentTime - mSentTime));
   gpg::Logf("        length=%d bytes", mSize);

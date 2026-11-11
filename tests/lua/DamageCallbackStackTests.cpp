@@ -17,9 +17,18 @@ namespace
   {
   public:
     CallbackObject() = default;
-    gpg::RType* GetClass() const override { return moho::CScriptObject::StaticGetClass(); }
-    gpg::RRef GetDerivedObjectRef() override { return {this, GetClass()}; }
-    fa::string GetErrorDescription() override { return "damage callback test"; }
+    gpg::RType* GetClass() const override
+    {
+      return moho::CScriptObject::StaticGetClass();
+    }
+    gpg::RRef GetDerivedObjectRef() override
+    {
+      return {this, GetClass()};
+    }
+    fa::string GetErrorDescription() override
+    {
+      return "damage callback test";
+    }
   };
 
   class DamageCallbackStack : public ::testing::Test
@@ -29,22 +38,26 @@ namespace
     CallbackObject object;
     moho::WeakPtr<moho::Entity> source;
 
-    void Run(const char* code)
+    void Run(
+      const char* code
+    )
     {
       lua_State* const L = state.GetCState();
       const int top = lua_gettop(L);
       ASSERT_EQ(luaL_loadbuffer(L, code, std::strlen(code), "=damage-stack-test"), 0)
         << (lua_tostring(L, -1) ? lua_tostring(L, -1) : "load error");
-      ASSERT_EQ(LuaCallProtected(L, 0, 0), 0)
-        << (lua_tostring(L, -1) ? lua_tostring(L, -1) : "call error");
+      ASSERT_EQ(LuaCallProtected(L, 0, 0), 0) << (lua_tostring(L, -1) ? lua_tostring(L, -1) : "call error");
       ASSERT_EQ(lua_gettop(L), top);
     }
 
     void SetUp() override
     {
-      Run("callbacks = { damageCalls = 0, absorptionCalls = 0, "
-          "OnDamage = function(self) self.damageCalls = self.damageCalls + 1; error('damage failed') end, "
-          "OnGetDamageAbsorption = function(self) self.absorptionCalls = self.absorptionCalls + 1; error('absorption failed') end }");
+      Run(
+        "callbacks = { damageCalls = 0, absorptionCalls = 0, "
+        "OnDamage = function(self) self.damageCalls = self.damageCalls + 1; error('damage failed') end, "
+        "OnGetDamageAbsorption = function(self) self.absorptionCalls = self.absorptionCalls + 1; error('absorption "
+        "failed') end }"
+      );
       object.mLuaObj = state.GetGlobal("callbacks");
     }
 
@@ -57,7 +70,10 @@ namespace
     }
   };
 
-  TEST_F(DamageCallbackStack, DamageErrorsRestoreExistingCallerStack)
+  TEST_F(
+    DamageCallbackStack,
+    DamageErrorsRestoreExistingCallerStack
+  )
   {
     lua_pushnumber(state.GetCState(), 314.0f);
     LuaPlus::LuaObject payload = state.GetGlobal("callbacks");
@@ -68,7 +84,10 @@ namespace
     Run("assert(callbacks.damageCalls == 64)");
   }
 
-  TEST_F(DamageCallbackStack, AbsorptionErrorsRestoreExistingCallerStack)
+  TEST_F(
+    DamageCallbackStack,
+    AbsorptionErrorsRestoreExistingCallerStack
+  )
   {
     lua_pushnumber(state.GetCState(), 314.0f);
     for (int i = 0; i < 64; ++i) {
@@ -78,25 +97,32 @@ namespace
     Run("assert(callbacks.absorptionCalls == 64)");
   }
 
-  TEST_F(DamageCallbackStack, SuccessfulCallsAfterCaughtErrorsKeepArgumentsAndResults)
+  TEST_F(
+    DamageCallbackStack,
+    SuccessfulCallsAfterCaughtErrorsKeepArgumentsAndResults
+  )
   {
     LuaPlus::LuaObject payload = state.GetGlobal("callbacks");
     lua_pushnumber(state.GetCState(), 314.0f);
     object.RunScriptEntityOnDamage(source, 7.0f, payload, "Normal");
     EXPECT_FLOAT_EQ(object.RunScriptOnGetDamageAbsorption(source, 7.0f, "Normal"), 0.0f);
     CheckSentinel();
-    Run("callbacks.OnDamage = function(self, source, amount, payload, kind) "
-        "assert(self == callbacks and source == nil and amount == 7 and payload == callbacks and kind == 'Normal'); "
-        "self.called = true end; "
-        "callbacks.OnGetDamageAbsorption = function(self, source, amount, kind) "
-        "assert(self == callbacks and source == nil and amount == 7 and kind == 'Normal'); return 2.5 end");
+    Run(
+      "callbacks.OnDamage = function(self, source, amount, payload, kind) "
+      "assert(self == callbacks and source == nil and amount == 7 and payload == callbacks and kind == 'Normal'); "
+      "self.called = true end; "
+      "callbacks.OnGetDamageAbsorption = function(self, source, amount, kind) "
+      "assert(self == callbacks and source == nil and amount == 7 and kind == 'Normal'); return 2.5 end"
+    );
     object.RunScriptEntityOnDamage(source, 7.0f, payload, "Normal");
     EXPECT_FLOAT_EQ(object.RunScriptOnGetDamageAbsorption(source, 7.0f, "Normal"), 2.5f);
     CheckSentinel();
     Run("assert(callbacks.called)");
   }
 
-  int NativeBatch(lua_State* L)
+  int NativeBatch(
+    lua_State* L
+  )
   {
     auto* const object = static_cast<CallbackObject*>(lua_touserdata(L, lua_upvalueindex(1)));
     moho::WeakPtr<moho::Entity> source;
@@ -109,7 +135,10 @@ namespace
     return 1;
   }
 
-  TEST_F(DamageCallbackStack, RealNativeFrameReturnsOriginalArgumentAfterCaughtErrors)
+  TEST_F(
+    DamageCallbackStack,
+    RealNativeFrameReturnsOriginalArgumentAfterCaughtErrors
+  )
   {
     lua_State* const L = state.GetCState();
     lua_pushlightuserdata(L, &object);
@@ -118,7 +147,10 @@ namespace
     Run("assert(nativeBatch(314) == 314); assert(callbacks.damageCalls == 32 and callbacks.absorptionCalls == 32)");
   }
 
-  TEST_F(DamageCallbackStack, WrappedCoroutineRestoresItsOwnNativeFrame)
+  TEST_F(
+    DamageCallbackStack,
+    WrappedCoroutineRestoresItsOwnNativeFrame
+  )
   {
     lua_State* const root = state.GetCState();
     lua_pushlightuserdata(root, &object);
@@ -137,7 +169,10 @@ namespace
     Run("assert(callbacks.damageCalls == 32 and callbacks.absorptionCalls == 32)");
   }
 
-  TEST_F(DamageCallbackStack, MissingCallbacksLeaveCallerStackAlone)
+  TEST_F(
+    DamageCallbackStack,
+    MissingCallbacksLeaveCallerStackAlone
+  )
   {
     Run("callbacks.OnDamage = nil; callbacks.OnGetDamageAbsorption = nil");
     lua_pushnumber(state.GetCState(), 314.0f);
@@ -147,7 +182,10 @@ namespace
     CheckSentinel();
   }
 
-  TEST_F(DamageCallbackStack, PartialArgumentSetupDoesNotPolluteCallerStack)
+  TEST_F(
+    DamageCallbackStack,
+    PartialArgumentSetupDoesNotPolluteCallerStack
+  )
   {
     lua_pushnumber(state.GetCState(), 314.0f);
     const LuaPlus::LuaObject unboundPayload;
@@ -156,7 +194,10 @@ namespace
     Run("assert(callbacks.damageCalls == 0)");
   }
 
-  TEST_F(DamageCallbackStack, AbsorptionResultConversionAndStackAreUnchanged)
+  TEST_F(
+    DamageCallbackStack,
+    AbsorptionResultConversionAndStackAreUnchanged
+  )
   {
     lua_pushnumber(state.GetCState(), 314.0f);
     Run("callbacks.OnGetDamageAbsorption = function() return nil end");
@@ -170,11 +211,16 @@ namespace
     CheckSentinel();
   }
 
-  TEST_F(DamageCallbackStack, NestedLuaFramesRestoreTheNativeCallerStack)
+  TEST_F(
+    DamageCallbackStack,
+    NestedLuaFramesRestoreTheNativeCallerStack
+  )
   {
-    Run("local function recurse(n) if n == 0 then error('nested failure') end; "
-        "return recurse(n - 1) + 1 end; "
-        "callbacks.OnDamage = function(self) self.damageCalls = self.damageCalls + 1; recurse(128) end");
+    Run(
+      "local function recurse(n) if n == 0 then error('nested failure') end; "
+      "return recurse(n - 1) + 1 end; "
+      "callbacks.OnDamage = function(self) self.damageCalls = self.damageCalls + 1; recurse(128) end"
+    );
     lua_pushnumber(state.GetCState(), 314.0f);
     LuaPlus::LuaObject payload = state.GetGlobal("callbacks");
     object.RunScriptEntityOnDamage(source, 7.0f, payload, "Normal");
@@ -184,13 +230,18 @@ namespace
 
   int standardExceptionCalls = 0;
 
-  int ThrowStandardException(lua_State*)
+  int ThrowStandardException(
+    lua_State*
+  )
   {
     ++standardExceptionCalls;
     throw std::runtime_error("native callback failed");
   }
 
-  TEST_F(DamageCallbackStack, StandardCppExceptionsUseTheVmUnwindAndRestoreTop)
+  TEST_F(
+    DamageCallbackStack,
+    StandardCppExceptionsUseTheVmUnwindAndRestoreTop
+  )
   {
     lua_State* const L = state.GetCState();
     standardExceptionCalls = 0;
@@ -204,4 +255,4 @@ namespace
     CheckSentinel();
     EXPECT_EQ(standardExceptionCalls, 2);
   }
-}
+} // namespace

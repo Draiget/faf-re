@@ -13,17 +13,24 @@
 
 namespace gpg::gal::d3d11::scan
 {
-  [[nodiscard]] constexpr bool IsWord(const char c) noexcept
+  [[nodiscard]] constexpr bool IsWord(
+    const char c
+  ) noexcept
   {
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
   }
 
-  [[nodiscard]] constexpr bool IsSpace(const char c) noexcept
+  [[nodiscard]] constexpr bool IsSpace(
+    const char c
+  ) noexcept
   {
     return c == ' ' || (c >= '\t' && c <= '\r');
   }
 
-  [[nodiscard]] inline std::size_t SkipSpace(const std::string_view text, std::size_t at) noexcept
+  [[nodiscard]] inline std::size_t SkipSpace(
+    const std::string_view text,
+    std::size_t at
+  ) noexcept
   {
     while (at < text.size() && IsSpace(text[at])) {
       ++at;
@@ -31,7 +38,10 @@ namespace gpg::gal::d3d11::scan
     return at;
   }
 
-  [[nodiscard]] inline std::size_t SkipWord(const std::string_view text, std::size_t at) noexcept
+  [[nodiscard]] inline std::size_t SkipWord(
+    const std::string_view text,
+    std::size_t at
+  ) noexcept
   {
     while (at < text.size() && IsWord(text[at])) {
       ++at;
@@ -42,7 +52,11 @@ namespace gpg::gal::d3d11::scan
   /** `\b(keyword)\s+(\w+)`, where `tail` may go on from the name's end. Returns the match's end, or npos. */
   template <typename Tail>
   [[nodiscard]] std::size_t MatchKeywordName(
-    const std::string_view text, const std::size_t at, const std::string_view keyword, std::string_view& name, Tail&& tail
+    const std::string_view text,
+    const std::size_t at,
+    const std::string_view keyword,
+    std::string_view& name,
+    Tail&& tail
   )
   {
     const std::size_t afterKeyword = at + keyword.size();
@@ -60,7 +74,12 @@ namespace gpg::gal::d3d11::scan
 
   /** Calls `visit(position)` for each `\bkeyword` from `from` on and goes on where it says, or stops at npos. */
   template <typename Visit>
-  void ForEachKeyword(const std::string_view text, const std::string_view keyword, const std::size_t from, Visit&& visit)
+  void ForEachKeyword(
+    const std::string_view text,
+    const std::string_view keyword,
+    const std::size_t from,
+    Visit&& visit
+  )
   {
     std::size_t at = text.find(keyword, from);
     while (at != std::string_view::npos) {
@@ -77,11 +96,16 @@ namespace gpg::gal::d3d11::scan
 
   /** `\bstruct\s+(\w+)`: `visit(name)`. */
   template <typename Visit>
-  void ForEachStructName(const std::string_view text, Visit&& visit)
+  void ForEachStructName(
+    const std::string_view text,
+    Visit&& visit
+  )
   {
     ForEachKeyword(text, "struct", 0U, [&](const std::size_t at) {
       std::string_view name;
-      const std::size_t end = MatchKeywordName(text, at, "struct", name, [](const std::size_t nameEnd) { return nameEnd; });
+      const std::size_t end = MatchKeywordName(text, at, "struct", name, [](const std::size_t nameEnd) {
+        return nameEnd;
+      });
       if (end == std::string_view::npos) {
         return at + 1U;
       }
@@ -92,7 +116,10 @@ namespace gpg::gal::d3d11::scan
 
   /** `\bstruct\s+(\w+)\s*\{`: `visit(name, position of the brace)`. */
   template <typename Visit>
-  void ForEachStructHead(const std::string_view text, Visit&& visit)
+  void ForEachStructHead(
+    const std::string_view text,
+    Visit&& visit
+  )
   {
     ForEachKeyword(text, "struct", 0U, [&](const std::size_t at) {
       std::string_view name;
@@ -109,21 +136,29 @@ namespace gpg::gal::d3d11::scan
   }
 
   /** `technique1[01]` at `at`. */
-  [[nodiscard]] inline bool IsTechniqueKeyword(const std::string_view text, const std::size_t at) noexcept
+  [[nodiscard]] inline bool IsTechniqueKeyword(
+    const std::string_view text,
+    const std::size_t at
+  ) noexcept
   {
     return at + 11U <= text.size() && (text[at + 10U] == '0' || text[at + 10U] == '1');
   }
 
   /** `\btechnique1[01]\s+(\w+)`: `visit(name)`. */
   template <typename Visit>
-  void ForEachTechniqueName(const std::string_view text, Visit&& visit)
+  void ForEachTechniqueName(
+    const std::string_view text,
+    Visit&& visit
+  )
   {
     ForEachKeyword(text, "technique1", 0U, [&](const std::size_t at) {
       if (!IsTechniqueKeyword(text, at)) {
         return at + 1U;
       }
       std::string_view name;
-      const std::size_t end = MatchKeywordName(text, at, "technique10", name, [](const std::size_t nameEnd) { return nameEnd; });
+      const std::size_t end = MatchKeywordName(text, at, "technique10", name, [](const std::size_t nameEnd) {
+        return nameEnd;
+      });
       if (end == std::string_view::npos) {
         return at + 1U;
       }
@@ -133,7 +168,10 @@ namespace gpg::gal::d3d11::scan
   }
 
   /** `(\btechnique1[01]\s+)faf_NAME\b` replaced by `$1NAME`, everywhere. */
-  [[nodiscard]] inline std::string RestoreRenamedTechnique(const std::string_view text, const std::string_view name)
+  [[nodiscard]] inline std::string RestoreRenamedTechnique(
+    const std::string_view text,
+    const std::string_view name
+  )
   {
     const std::string renamed = "faf_" + std::string(name);
     std::string result;
@@ -163,7 +201,11 @@ namespace gpg::gal::d3d11::scan
 
   /** `\btechnique1[01]\s+(\w+)\s*(<(?:[^>"]|"[^"]*")*>)?\s*\{` from `from`, which counts as a word boundary. */
   [[nodiscard]] inline bool FindTechniqueHead(
-    const std::string_view text, const std::size_t from, std::size_t& start, std::size_t& open, std::string_view& name
+    const std::string_view text,
+    const std::size_t from,
+    std::size_t& start,
+    std::size_t& open,
+    std::string_view& name
   )
   {
     bool found = false;
@@ -205,14 +247,19 @@ namespace gpg::gal::d3d11::scan
 
   /** `\b(BlendState|DepthStencilState|RasterizerState)\s+(\w+)\s*\{`: `visit(kind, name, position of the brace)`. */
   template <typename Visit>
-  void ForEachStateDeclaration(const std::string_view text, Visit&& visit)
+  void ForEachStateDeclaration(
+    const std::string_view text,
+    Visit&& visit
+  )
   {
     // Every kind ends in "State", which is rarer in effect text than any of their first letters.
     std::size_t searchFrom = 0U;
     std::size_t state = text.find("State");
     while (state != std::string_view::npos) {
       std::string_view kind;
-      for (const std::string_view candidate : {std::string_view("BlendState"), std::string_view("DepthStencilState"), std::string_view("RasterizerState")}) {
+      for (const std::string_view candidate : {
+             std::string_view("BlendState"), std::string_view("DepthStencilState"), std::string_view("RasterizerState")
+           }) {
         const std::size_t prefix = candidate.size() - 5U;
         if (state >= prefix && text.compare(state - prefix, candidate.size(), candidate) == 0) {
           kind = candidate;
@@ -244,7 +291,10 @@ namespace gpg::gal::d3d11::scan
    * `visit(return type, name, parameters, semantic, has semantic)`.
    */
   template <typename Visit>
-  void ForEachFunctionHead(const std::string_view text, Visit&& visit)
+  void ForEachFunctionHead(
+    const std::string_view text,
+    Visit&& visit
+  )
   {
     std::size_t at = 0U;
     while (at < text.size()) {
@@ -288,15 +338,21 @@ namespace gpg::gal::d3d11::scan
         continue;
       }
       visit(
-        text.substr(at, typeEnd - at), text.substr(nameBegin, nameEnd - nameBegin),
-        text.substr(paren + 1U, close - paren - 1U), semantic, hasSemantic
+        text.substr(at, typeEnd - at),
+        text.substr(nameBegin, nameEnd - nameBegin),
+        text.substr(paren + 1U, close - paren - 1U),
+        semantic,
+        hasSemantic
       );
       at = cursor + 1U;
     }
   }
 
   /** Whether `\b\w+\s+FUNCTION\s*\([^;{]*\)\s*(:\s*\w+\s*)?\{` is in `text`. */
-  [[nodiscard]] inline bool HasFunctionDefinition(const std::string_view text, const std::string_view function)
+  [[nodiscard]] inline bool HasFunctionDefinition(
+    const std::string_view text,
+    const std::string_view function
+  )
   {
     for (std::size_t at = text.find(function); at != std::string_view::npos; at = text.find(function, at + 1U)) {
       if (at == 0U || !IsSpace(text[at - 1U])) {

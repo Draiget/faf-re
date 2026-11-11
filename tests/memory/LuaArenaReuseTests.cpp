@@ -18,8 +18,14 @@ namespace
   class HostNewFailure
   {
   public:
-    HostNewFailure() { failHostNew = true; }
-    ~HostNewFailure() { failHostNew = false; }
+    HostNewFailure()
+    {
+      failHostNew = true;
+    }
+    ~HostNewFailure()
+    {
+      failHostNew = false;
+    }
     HostNewFailure(const HostNewFailure&) = delete;
     HostNewFailure& operator=(const HostNewFailure&) = delete;
   };
@@ -40,7 +46,10 @@ namespace
     }
   };
 
-  TEST_F(LuaArenaReuse, FullCapacity)
+  TEST_F(
+    LuaArenaReuse,
+    FullCapacity
+  )
   {
     std::vector<void*> blocks(gReserveBytes / 16);
     void* const entireArena = lua::ArenaAllocate(gReserveBytes);
@@ -57,7 +66,10 @@ namespace
       const HostNewFailure failure;
       for (std::size_t index = 0; index < blocks.size(); ++index) {
         blocks[index] = lua::ArenaAllocate(16);
-        if (!blocks[index]) { allocatedAll = false; break; }
+        if (!blocks[index]) {
+          allocatedAll = false;
+          break;
+        }
         std::memset(blocks[index], static_cast<int>(index % 251), 16);
       }
       exhaustedSmall = lua::ArenaAllocate(16) == nullptr;
@@ -68,7 +80,9 @@ namespace
           lua::ArenaFree(blocks[index]);
         }
       }
-    } catch (...) { threw = true; }
+    } catch (...) {
+      threw = true;
+    }
     ASSERT_FALSE(threw);
     EXPECT_TRUE(allocatedAll);
     EXPECT_TRUE(exhaustedSmall);
@@ -76,7 +90,10 @@ namespace
     EXPECT_TRUE(payloadIntact);
   }
 
-  TEST_F(LuaArenaReuse, MixedSizes)
+  TEST_F(
+    LuaArenaReuse,
+    MixedSizes
+  )
   {
     void* const entireArena = lua::ArenaAllocate(gReserveBytes);
     ASSERT_TRUE(entireArena != nullptr);
@@ -100,7 +117,10 @@ namespace
     ASSERT_TRUE(lua::ArenaAllocate(16384) != nullptr);
   }
 
-  TEST_F(LuaArenaReuse, OversizedRejected)
+  TEST_F(
+    LuaArenaReuse,
+    OversizedRejected
+  )
   {
     // SIZE_MAX used to round to a zero-span block that overlapped the next allocation.
     EXPECT_EQ(lua::ArenaAllocate(std::numeric_limits<std::size_t>::max()), nullptr);
@@ -114,7 +134,10 @@ namespace
     EXPECT_EQ(lua::ArenaAllocate(16384), live);
   }
 
-  TEST_F(LuaArenaReuse, ConcurrentReuse)
+  TEST_F(
+    LuaArenaReuse,
+    ConcurrentReuse
+  )
   {
     std::vector<void*> large;
     for (unsigned index = 0; index < 64; ++index) {
@@ -155,7 +178,7 @@ namespace
       }
     }
   }
-}
+} // namespace
 
 // clang's ThreadSanitizer runtime defines operator new itself, so the replacement (and with it the
 // FullCapacity host-new check) is left out there; GCC's TSan and the other builds keep it.
@@ -166,7 +189,9 @@ namespace
 #endif
 
 #ifndef FAF_LUA_ARENA_RUNTIME_OWNS_NEW
-void* operator new(std::size_t bytes)
+void* operator new(
+  std::size_t bytes
+)
 {
   if (failHostNew) {
     throw std::bad_alloc();
@@ -177,23 +202,71 @@ void* operator new(std::size_t bytes)
   throw std::bad_alloc();
 }
 
-void operator delete(void* block) noexcept { std::free(block); }
-void operator delete(void* block, std::size_t) noexcept { std::free(block); }
-
+void operator delete(
+  void* block
+) noexcept
+{
+  std::free(block);
+}
+void operator delete(
+  void* block,
+  std::size_t
+) noexcept
+{
+  std::free(block);
+}
 
 // Keep the replacement allocation family paired, including GoogleTest's
 // nothrow temporary-buffer path (for example std::stable_sort).
-void* operator new[](std::size_t bytes) { return ::operator new(bytes); }
-void* operator new(std::size_t bytes, const std::nothrow_t&) noexcept
+void* operator new[](
+  std::size_t bytes
+)
 {
-  try { return ::operator new(bytes); } catch (...) { return nullptr; }
+  return ::operator new(bytes);
 }
-void* operator new[](std::size_t bytes, const std::nothrow_t&) noexcept
+void* operator new(
+  std::size_t bytes,
+  const std::nothrow_t&
+) noexcept
+{
+  try {
+    return ::operator new(bytes);
+  } catch (...) {
+    return nullptr;
+  }
+}
+void* operator new[](
+  std::size_t bytes,
+  const std::nothrow_t&
+) noexcept
 {
   return ::operator new(bytes, std::nothrow);
 }
-void operator delete[](void* block) noexcept { std::free(block); }
-void operator delete[](void* block, std::size_t) noexcept { std::free(block); }
-void operator delete(void* block, const std::nothrow_t&) noexcept { std::free(block); }
-void operator delete[](void* block, const std::nothrow_t&) noexcept { std::free(block); }
+void operator delete[](
+  void* block
+) noexcept
+{
+  std::free(block);
+}
+void operator delete[](
+  void* block,
+  std::size_t
+) noexcept
+{
+  std::free(block);
+}
+void operator delete(
+  void* block,
+  const std::nothrow_t&
+) noexcept
+{
+  std::free(block);
+}
+void operator delete[](
+  void* block,
+  const std::nothrow_t&
+) noexcept
+{
+  std::free(block);
+}
 #endif

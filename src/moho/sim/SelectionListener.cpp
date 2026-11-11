@@ -21,7 +21,9 @@ namespace
    * `IUnit` base sub-object), matching the `ResolveIUnitBridge` helper
    * in CWldSession.cpp.
    */
-  [[nodiscard]] moho::IUnit* ResolveUserUnitBridge(moho::UserUnit* const userUnit) noexcept
+  [[nodiscard]] moho::IUnit* ResolveUserUnitBridge(
+    moho::UserUnit* const userUnit
+  ) noexcept
   {
     return userUnit ? static_cast<moho::IUnit*>(userUnit) : nullptr;
   }
@@ -59,7 +61,9 @@ namespace moho
    * Re-links this listener node into the provided session-listener lane
    * (the lane anchor is the session selection broadcaster sentinel).
    */
-  void SelectionListener::AttachToSessionListenerLane(CWldSession* const session)
+  void SelectionListener::AttachToSessionListenerLane(
+    CWldSession* const session
+  )
   {
     session->mSelectionBroadcaster.AddListener(this);
   }
@@ -71,7 +75,9 @@ namespace moho
    * Detaches this selection-listener node from its current lane and leaves it
    * self-linked.
    */
-  void SelectionListener::DetachFromSessionListenerLane(CWldSession* const)
+  void SelectionListener::DetachFromSessionListenerLane(
+    CWldSession* const
+  )
   {
     ListUnlink();
   }
@@ -92,7 +98,9 @@ namespace moho
    * routed through `gpg::Warnf` matching the original `"Error running
    * '/lua/ui/game/gamemain.lua:OnSelectionChanged': %s"` template.
    */
-  void SelectionListener::OnEvent(const SSelectionEvent event)
+  void SelectionListener::OnEvent(
+    const SSelectionEvent event
+  )
   {
     CWldSession* const activeSession = WLD_GetSession();
     if (activeSession == nullptr) {
@@ -129,10 +137,7 @@ namespace moho
     LuaPlus::LuaFunction onSelectionChangedFn(onSelectionChangedObj);
     try {
       onSelectionChangedFn.Call_Object4(
-        previousSelectionTable,
-        currentSelectionTable,
-        addedSelectionTable,
-        removedSelectionTable
+        previousSelectionTable, currentSelectionTable, addedSelectionTable, removedSelectionTable
       );
     } catch (const std::exception& exception) {
       gpg::Warnf(

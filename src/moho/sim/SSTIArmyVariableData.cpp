@@ -97,7 +97,9 @@ namespace moho
    * Clones army-variable runtime payload lanes, including Set/category bitsets
    * and legacy vector/string state, from one source object.
    */
-  SSTIArmyVariableData::SSTIArmyVariableData(const SSTIArmyVariableData& other)
+  SSTIArmyVariableData::SSTIArmyVariableData(
+    const SSTIArmyVariableData& other
+  )
     : mEconomyTotals(other.mEconomyTotals)
     , mIsResourceSharingEnabled(other.mIsResourceSharingEnabled)
     , mNeutrals(other.mNeutrals)
@@ -141,7 +143,9 @@ namespace moho
   /**
    * Address: 0x007011C0 (FUN_007011C0)
    */
-  void SArmyVectorWithMeta::CopyWordPayloadFrom(const SArmyVectorWithMeta& source)
+  void SArmyVectorWithMeta::CopyWordPayloadFrom(
+    const SArmyVectorWithMeta& source
+  )
   {
     if (this == &source) {
       return;
@@ -155,16 +159,19 @@ namespace moho
    * Member-wise copy constructor. `mWords`' own copy constructor is what the
    * engine emitted at 0x00560A90; the body says nothing.
    */
-  SArmyVectorWithMeta::SArmyVectorWithMeta(const SArmyVectorWithMeta& other)
+  SArmyVectorWithMeta::SArmyVectorWithMeta(
+    const SArmyVectorWithMeta& other
+  )
     : mWords(other.mWords)
     , mMetaWord(other.mMetaWord)
-  {
-  }
+  {}
 
   /**
    * Address: 0x00551270 (FUN_00551270, Moho::SSTIArmyVariableData::MemberDeserialize)
    */
-  void SSTIArmyVariableData::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SSTIArmyVariableData::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -214,7 +221,9 @@ namespace moho
   /**
    * Address: 0x00551500 (FUN_00551500, Moho::SSTIArmyVariableData::MemberSerialize)
    */
-  void SSTIArmyVariableData::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SSTIArmyVariableData::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;
@@ -307,7 +316,8 @@ namespace moho
    * `CWldSession::DoBeat` to fold each army update into its `UserArmy`.
    */
   SSTIArmyVariableData* AssignArmyVariableData(
-    const SSTIArmyVariableData& source, SSTIArmyVariableData* const destination
+    const SSTIArmyVariableData& source,
+    SSTIArmyVariableData* const destination
   )
   {
     if (destination == nullptr) {
@@ -323,10 +333,12 @@ namespace
 {
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_SSTIArmyVariableDataTypeInfo_275369, moho::register_SSTIArmyVariableDataTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_SSTIArmyVariableDataTypeInfo_275369,
+  moho::register_SSTIArmyVariableDataTypeInfo
+)
 
 namespace moho
 {

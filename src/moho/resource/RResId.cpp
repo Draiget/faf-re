@@ -47,7 +47,10 @@ namespace moho
   /**
    * Address: 0x004A9350 (FUN_004A9350, Moho::RES_CompletePath)
    */
-  fa::string RES_CompletePath(const gpg::StrArg resourceName, const gpg::StrArg sourceName)
+  fa::string RES_CompletePath(
+    const gpg::StrArg resourceName,
+    const gpg::StrArg sourceName
+  )
   {
     const fa::string sourceDir = FILE_DirPrefix(sourceName);
     const fa::string absolutePath = FILE_MakeAbsolute(resourceName, sourceDir.c_str());
@@ -81,7 +84,9 @@ namespace moho
   /**
    * Address: 0x004A9450 (FUN_004A9450, Moho::RResIdType::GetLexical)
    */
-  fa::string RResIdType::GetLexical(const gpg::RRef& ref) const
+  fa::string RResIdType::GetLexical(
+    const gpg::RRef& ref
+  ) const
   {
     const auto* const resourceId = static_cast<const RResId*>(ref.mObj);
     if (resourceId == nullptr) {
@@ -93,7 +98,10 @@ namespace moho
   /**
    * Address: 0x004A9430 (FUN_004A9430, Moho::RResIdType::SetLexical)
    */
-  bool RResIdType::SetLexical(const gpg::RRef& ref, const char* const lexical) const
+  bool RResIdType::SetLexical(
+    const gpg::RRef& ref,
+    const char* const lexical
+  ) const
   {
     auto* const resourceId = static_cast<RResId*>(ref.mObj);
     if (resourceId == nullptr) {

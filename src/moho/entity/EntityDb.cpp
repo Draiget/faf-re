@@ -35,10 +35,10 @@ namespace moho
 {
   struct CEntityDbBoundedPropQueueNode
   {
-    std::int32_t mPriority;                 // +0x00 (SPropPriorityInfo::mPriority)
-    std::int32_t mBoundedTick;              // +0x04 (SPropPriorityInfo::mBoundedTick)
-    moho::WeakPtr<Prop> mOwnerLink;         // +0x08 (ownerLinkSlot +0x08, nextInOwner +0x0C)
-    std::int32_t mHandleId;                 // +0x10
+    std::int32_t mPriority;         // +0x00 (SPropPriorityInfo::mPriority)
+    std::int32_t mBoundedTick;      // +0x04 (SPropPriorityInfo::mBoundedTick)
+    moho::WeakPtr<Prop> mOwnerLink; // +0x08 (ownerLinkSlot +0x08, nextInOwner +0x0C)
+    std::int32_t mHandleId;         // +0x10
 
     CEntityDbBoundedPropQueueNode() noexcept = default;
 
@@ -117,7 +117,8 @@ namespace moho
      * Binary min-heap comparator: lexicographic on `(mPriority, mBoundedTick)`.
      */
     [[nodiscard]] static bool IsLowerPriority(
-      const CEntityDbBoundedPropQueueNode& lhs, const CEntityDbBoundedPropQueueNode& rhs
+      const CEntityDbBoundedPropQueueNode& lhs,
+      const CEntityDbBoundedPropQueueNode& rhs
     ) noexcept
     {
       if (lhs.mPriority != rhs.mPriority) {
@@ -126,13 +127,23 @@ namespace moho
       return lhs.mBoundedTick < rhs.mBoundedTick;
     }
   };
+  static_assert(sizeof(CEntityDbBoundedPropQueueNode) == 0x14, "CEntityDbBoundedPropQueueNode size must be 0x14");
   static_assert(
-    sizeof(CEntityDbBoundedPropQueueNode) == 0x14, "CEntityDbBoundedPropQueueNode size must be 0x14"
+    offsetof(CEntityDbBoundedPropQueueNode, mPriority) == 0x00,
+    "CEntityDbBoundedPropQueueNode::mPriority offset must be 0x00"
   );
-  static_assert(offsetof(CEntityDbBoundedPropQueueNode, mPriority) == 0x00, "CEntityDbBoundedPropQueueNode::mPriority offset must be 0x00");
-  static_assert(offsetof(CEntityDbBoundedPropQueueNode, mBoundedTick) == 0x04, "CEntityDbBoundedPropQueueNode::mBoundedTick offset must be 0x04");
-  static_assert(offsetof(CEntityDbBoundedPropQueueNode, mOwnerLink) == 0x08, "CEntityDbBoundedPropQueueNode::mOwnerLink offset must be 0x08");
-  static_assert(offsetof(CEntityDbBoundedPropQueueNode, mHandleId) == 0x10, "CEntityDbBoundedPropQueueNode::mHandleId offset must be 0x10");
+  static_assert(
+    offsetof(CEntityDbBoundedPropQueueNode, mBoundedTick) == 0x04,
+    "CEntityDbBoundedPropQueueNode::mBoundedTick offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CEntityDbBoundedPropQueueNode, mOwnerLink) == 0x08,
+    "CEntityDbBoundedPropQueueNode::mOwnerLink offset must be 0x08"
+  );
+  static_assert(
+    offsetof(CEntityDbBoundedPropQueueNode, mHandleId) == 0x10,
+    "CEntityDbBoundedPropQueueNode::mHandleId offset must be 0x10"
+  );
 } // namespace moho
 
 namespace
@@ -197,7 +208,10 @@ namespace
   moho::StatItem* sEngineStat_EntityCount_Shield = nullptr;
   moho::StatItem* sEngineStat_EntityCount_Unknown = nullptr;
 
-  [[nodiscard]] moho::StatItem* EnsureEntityCountStatSlot(moho::StatItem*& slot, const char* const statPath)
+  [[nodiscard]] moho::StatItem* EnsureEntityCountStatSlot(
+    moho::StatItem*& slot,
+    const char* const statPath
+  )
   {
     if (slot) {
       return slot;
@@ -215,7 +229,11 @@ namespace
     return slot;
   }
 
-  void AddEntityCountStat(moho::StatItem*& slot, const char* const statPath, const std::uint32_t delta) noexcept
+  void AddEntityCountStat(
+    moho::StatItem*& slot,
+    const char* const statPath,
+    const std::uint32_t delta
+  ) noexcept
   {
     moho::StatItem* const statItem = EnsureEntityCountStatSlot(slot, statPath);
     if (!statItem) {
@@ -235,7 +253,10 @@ namespace
    * What it does:
    * Updates engine entity-count stat lanes for one packed entity id family.
    */
-  void UpdateEntityCountStats(const std::uint32_t entityId, const std::uint32_t delta)
+  void UpdateEntityCountStats(
+    const std::uint32_t entityId,
+    const std::uint32_t delta
+  )
   {
     AddEntityCountStat(sEngineStat_EntityCount, "EntityCount", delta);
 
@@ -278,7 +299,9 @@ namespace
     return {};
   }
 
-  [[nodiscard]] moho::Entity* ReadOwnedEntityPointer(gpg::ReadArchive* const archive)
+  [[nodiscard]] moho::Entity* ReadOwnedEntityPointer(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return nullptr;
@@ -290,7 +313,9 @@ namespace
     return entity;
   }
 
-  [[nodiscard]] moho::EntitySetBase* ReadEntitySetPointer(gpg::ReadArchive* const archive)
+  [[nodiscard]] moho::EntitySetBase* ReadEntitySetPointer(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return nullptr;
@@ -302,8 +327,10 @@ namespace
     return entitySet;
   }
 
-  [[nodiscard]] moho::CEntityDbAllUnitsNode*
-  TreeLowerBound(moho::CEntityDbAllUnitsNode* const head, const std::uint32_t lowerBoundKey) noexcept
+  [[nodiscard]] moho::CEntityDbAllUnitsNode* TreeLowerBound(
+    moho::CEntityDbAllUnitsNode* const head,
+    const std::uint32_t lowerBoundKey
+  ) noexcept
   {
     return fa::lower_bound_node<moho::CEntityDbAllUnitsNode, &moho::CEntityDbAllUnitsNode::isNil>(
       head, lowerBoundKey, [](const auto& node, const std::uint32_t key) {
@@ -422,7 +449,8 @@ namespace
       return nullptr;
     }
 
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsHighFamilyBoundaryKey) : nullptr;
+    *outNode =
+      (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsHighFamilyBoundaryKey) : nullptr;
     return outNode;
   }
 
@@ -442,7 +470,8 @@ namespace
       return nullptr;
     }
 
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsMidFamilyBoundaryKey) : nullptr;
+    *outNode =
+      (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsMidFamilyBoundaryKey) : nullptr;
     return outNode;
   }
 
@@ -462,7 +491,8 @@ namespace
       return nullptr;
     }
 
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsShieldFamilyBoundaryKey) : nullptr;
+    *outNode =
+      (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsShieldFamilyBoundaryKey) : nullptr;
     return outNode;
   }
 
@@ -483,7 +513,8 @@ namespace
       return nullptr;
     }
 
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsOtherFamilyBoundaryKey) : nullptr;
+    *outNode =
+      (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsOtherFamilyBoundaryKey) : nullptr;
     return outNode;
   }
 
@@ -503,7 +534,8 @@ namespace
       return nullptr;
     }
 
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsLateFamilyBoundaryKey) : nullptr;
+    *outNode =
+      (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsLateFamilyBoundaryKey) : nullptr;
     return outNode;
   }
 
@@ -695,12 +727,14 @@ namespace
       return nullptr;
     }
 
-    *outNode = (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsHighFamilyBoundaryKey) : nullptr;
+    *outNode =
+      (entityDb != nullptr) ? TreeLowerBound(entityDb->AllUnitsHead(), kAllUnitsHighFamilyBoundaryKey) : nullptr;
     return outNode;
   }
 
-  [[nodiscard]] moho::CEntityDbAllUnitsNode*
-  NextNodeInAllUnitsTree(moho::CEntityDbAllUnitsNode* node) noexcept
+  [[nodiscard]] moho::CEntityDbAllUnitsNode* NextNodeInAllUnitsTree(
+    moho::CEntityDbAllUnitsNode* node
+  ) noexcept
   {
     if (node == nullptr || node->isNil != 0u) {
       return node;
@@ -712,7 +746,8 @@ namespace
     }
 
     if (childOrParent->isNil != 0u) {
-      for (moho::CEntityDbAllUnitsNode* next = node->parent; next != nullptr && next->isNil == 0u; next = next->parent) {
+      for (moho::CEntityDbAllUnitsNode* next = node->parent; next != nullptr && next->isNil == 0u;
+           next = next->parent) {
         if (node != next->right) {
           return next;
         }
@@ -796,7 +831,9 @@ namespace
     return outIterator;
   }
 
-  void PurgeRegisteredEntitySets(moho::EntityDB& entityDb)
+  void PurgeRegisteredEntitySets(
+    moho::EntityDB& entityDb
+  )
   {
     auto& registry = entityDb.mRegisteredEntitySets;
     for (auto* node = registry.mNext; node != &registry; node = node->mNext) {
@@ -891,7 +928,9 @@ namespace
    * Clears reflected base/field vector lanes for one `EntityDB` type-info
    * object while preserving outer ownership of the instance storage.
    */
-  void DestroyEntityDbTypeInfoBody(EntityDbTypeInfo* const typeInfo) noexcept
+  void DestroyEntityDbTypeInfoBody(
+    EntityDbTypeInfo* const typeInfo
+  ) noexcept
   {
     gpg::ClearTypeLists(typeInfo);
   }
@@ -927,7 +966,9 @@ namespace
    * Constructs one `EntityDB` in caller-provided storage and wraps it in an
    * `EntityDB` reflection reference.
    */
-  gpg::RRef EntityDbTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef EntityDbTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     moho::EntityDB* entityDb = nullptr;
     if (objectStorage != nullptr) {
@@ -945,7 +986,9 @@ namespace
    * What it does:
    * `~EntityDB` (0x006843B0) then `operator delete`, skipped for null.
    */
-  void EntityDbTypeInfo::Delete(void* const objectStorage)
+  void EntityDbTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<moho::EntityDB*>(objectStorage);
   }
@@ -956,7 +999,9 @@ namespace
    * What it does:
    * Runs `~EntityDB` (0x006843B0) on caller-owned storage.
    */
-  void EntityDbTypeInfo::Destruct(void* const objectStorage)
+  void EntityDbTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     static_cast<moho::EntityDB*>(objectStorage)->~EntityDB();
   }
@@ -991,7 +1036,9 @@ namespace
      * What it does:
      * Formats inherited lexical text and appends current map element count.
      */
-    [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override
+    [[nodiscard]] fa::string GetLexical(
+      const gpg::RRef& ref
+    ) const override
     {
       const fa::string base = gpg::RType::GetLexical(ref);
       const auto* const map = static_cast<const fa::map<std::uint32_t, moho::IdPool>*>(ref.mObj);
@@ -1057,7 +1104,9 @@ namespace
    * Clears reflected base/field vector lanes for one `map<uint, IdPool>`
    * type-info object while preserving outer storage ownership.
    */
-  void DestroyEntityDbIdPoolMapTypeInfoBody(EntityDbIdPoolMapTypeInfo* const typeInfo) noexcept
+  void DestroyEntityDbIdPoolMapTypeInfoBody(
+    EntityDbIdPoolMapTypeInfo* const typeInfo
+  ) noexcept
   {
     gpg::ClearTypeLists(typeInfo);
   }
@@ -1081,8 +1130,7 @@ namespace
     gpg::RRef* const ownerRef
   )
   {
-    auto* const map =
-      reinterpret_cast<fa::map<std::uint32_t, moho::IdPool>*>(objectPtr);
+    auto* const map = reinterpret_cast<fa::map<std::uint32_t, moho::IdPool>*>(objectPtr);
     if (archive == nullptr || map == nullptr) {
       return;
     }
@@ -1119,8 +1167,7 @@ namespace
     gpg::RRef* const ownerRef
   )
   {
-    const auto* const map =
-      reinterpret_cast<const fa::map<std::uint32_t, moho::IdPool>*>(objectPtr);
+    const auto* const map = reinterpret_cast<const fa::map<std::uint32_t, moho::IdPool>*>(objectPtr);
     if (archive == nullptr || map == nullptr) {
       return;
     }
@@ -1216,7 +1263,10 @@ namespace moho
    * Runs the `EntityDB` destructor and conditionally releases object storage
    * when scalar-delete flag bit 0 is set.
    */
-  EntityDB* DestroyEntityDbAndMaybeDelete(EntityDB* const entityDb, const std::uint8_t deleteFlags)
+  EntityDB* DestroyEntityDbAndMaybeDelete(
+    EntityDB* const entityDb,
+    const std::uint8_t deleteFlags
+  )
   {
     entityDb->~EntityDB();
     if ((deleteFlags & 1u) != 0u) {
@@ -1261,7 +1311,9 @@ namespace moho
    * Initializes one all-armies unit iterator from one concrete army source by
    * setting `[source, source + 1)` bounds over the all-units tree.
    */
-  CUnitIterAllArmies::CUnitIterAllArmies(CArmyImpl* const army)
+  CUnitIterAllArmies::CUnitIterAllArmies(
+    CArmyImpl* const army
+  )
     : mItr(nullptr)
     , mEnd(nullptr)
     , mCur(nullptr)
@@ -1292,7 +1344,9 @@ namespace moho
    * capturing the leftmost all-units tree node, iterator end sentinel, and
    * current decoded unit payload.
    */
-  CUnitIterAllArmies::CUnitIterAllArmies(Sim* const sim)
+  CUnitIterAllArmies::CUnitIterAllArmies(
+    Sim* const sim
+  )
     : mItr(nullptr)
     , mEnd(nullptr)
     , mCur(nullptr)
@@ -1346,7 +1400,9 @@ namespace moho
    * What it does:
    * Returns the first all-units tree node with key >= (`sourceIndex << 20`).
    */
-  CEntityDbAllUnitsNode* EntityDB::AllUnitsEnd(const std::uint32_t sourceIndex) const
+  CEntityDbAllUnitsNode* EntityDB::AllUnitsEnd(
+    const std::uint32_t sourceIndex
+  ) const
   {
     return TreeLowerBound(AllUnitsHead(), sourceIndex << kEntityIdSourceShift);
   }
@@ -1370,15 +1426,19 @@ namespace moho
    * What it does:
    * Returns the in-order successor for one all-units tree node.
    */
-  CEntityDbAllUnitsNode* EntityDB::NextAllUnitsNode(CEntityDbAllUnitsNode* node) noexcept
+  CEntityDbAllUnitsNode* EntityDB::NextAllUnitsNode(
+    CEntityDbAllUnitsNode* node
+  ) noexcept
   {
     return NextNodeInAllUnitsTree(node);
   }
 
   /**
-    * Alias of FUN_005C87A0 (non-canonical helper lane).
+   * Alias of FUN_005C87A0 (non-canonical helper lane).
    */
-  Unit* EntityDB::UnitFromAllUnitsNode(const CEntityDbAllUnitsNode* const node) noexcept
+  Unit* EntityDB::UnitFromAllUnitsNode(
+    const CEntityDbAllUnitsNode* const node
+  ) noexcept
   {
     if (node == nullptr || node->unitListNode == nullptr) {
       return nullptr;
@@ -1420,7 +1480,9 @@ namespace moho
    * collapses "no such key" onto the head node (`end()`), which this returns
    * as `nullptr`.
    */
-  Entity* EntityDB::FindEntityById(const std::uint32_t entityId) const noexcept
+  Entity* EntityDB::FindEntityById(
+    const std::uint32_t entityId
+  ) const noexcept
   {
     CEntityDbAllUnitsNode* const node = FindExactEntityNodeOrHead(AllUnitsHead(), entityId);
     if (node == nullptr || node == AllUnitsHead()) {
@@ -1435,7 +1497,9 @@ namespace moho
    * What it does:
    * Reserves a new entity id in the requested packed-id family/source key.
    */
-  std::uint32_t EntityDB::DoReserveId(const std::uint32_t requestedFamilySourceBits)
+  std::uint32_t EntityDB::DoReserveId(
+    const std::uint32_t requestedFamilySourceBits
+  )
   {
     IdPool& pool = mIdPoolTree[requestedFamilySourceBits];
 
@@ -1462,7 +1526,9 @@ namespace moho
    * from `mAllUnits`, and queues the serial for reuse in its family/source
    * pool.
    */
-  BVIntSetAddResult EntityDB::ReleaseId(const std::uint32_t releasedId)
+  BVIntSetAddResult EntityDB::ReleaseId(
+    const std::uint32_t releasedId
+  )
   {
     UpdateEntityCountStats(releasedId, static_cast<std::uint32_t>(-1));
 
@@ -1496,7 +1562,10 @@ namespace moho
    * unreachable from here) -- collapsed onto this method, the real
    * source-level invocation `SiftUp`/`SiftDown` already call by name.
    */
-  void CEntityDbBoundedPropQueue::Swap(const std::int32_t lhs, const std::int32_t rhs) noexcept
+  void CEntityDbBoundedPropQueue::Swap(
+    const std::int32_t lhs,
+    const std::int32_t rhs
+  ) noexcept
   {
     if (lhs == rhs) {
       return;
@@ -1529,7 +1598,9 @@ namespace moho
    * unreachable from here) -- collapsed onto this method, the real
    * source-level invocation `Insert` already calls by name.
    */
-  std::int32_t CEntityDbBoundedPropQueue::AcquireHandle(const std::int32_t payload) noexcept
+  std::int32_t CEntityDbBoundedPropQueue::AcquireHandle(
+    const std::int32_t payload
+  ) noexcept
   {
     if (lastHandle == -1) {
       const std::int32_t index = static_cast<std::int32_t>(handleSlots.size());
@@ -1559,7 +1630,9 @@ namespace moho
    * `moho/sim/SimRecoveryRuntime.cpp`, unreachable from here) -- collapsed
    * onto this method, reached by name from `Insert`.
    */
-  std::int32_t CEntityDbBoundedPropQueue::SiftUp(std::int32_t index) noexcept
+  std::int32_t CEntityDbBoundedPropQueue::SiftUp(
+    std::int32_t index
+  ) noexcept
   {
     CEntityDbBoundedPropQueueNode* const nodes = heap.begin();
     while (index != 0) {
@@ -1590,7 +1663,10 @@ namespace moho
    * anywhere in `src/ **`; removed rather than left as a citation
    * duplicate.
    */
-  void CEntityDbBoundedPropQueue::SiftDown(std::int32_t index, const std::int32_t count) noexcept
+  void CEntityDbBoundedPropQueue::SiftDown(
+    std::int32_t index,
+    const std::int32_t count
+  ) noexcept
   {
     CEntityDbBoundedPropQueueNode* const nodes = heap.begin();
     for (;;) {
@@ -1641,7 +1717,9 @@ namespace moho
    * this at 0x00684CCF.
    */
   std::int32_t CEntityDbBoundedPropQueue::Insert(
-    const std::int32_t priority, const std::int32_t boundedTick, Prop* const prop
+    const std::int32_t priority,
+    const std::int32_t boundedTick,
+    Prop* const prop
   ) noexcept
   {
     const std::int32_t index = static_cast<std::int32_t>(heap.size());
@@ -1675,7 +1753,9 @@ namespace moho
    * `RemoveBoundedProp` (explicit removal by handle), and `Prop::~Prop`
    * (auto-unregister on prop destruction).
    */
-  void CEntityDbBoundedPropQueue::PopAt(const std::int32_t index) noexcept
+  void CEntityDbBoundedPropQueue::PopAt(
+    const std::int32_t index
+  ) noexcept
   {
     const std::int32_t lastIndex = static_cast<std::int32_t>(heap.size()) - 1;
     if (index != lastIndex) {
@@ -1700,7 +1780,9 @@ namespace moho
    * priority/boundedTick fields (0x00684CBF/0x00684CC5), so this preserves
    * that precondition: `prop` must be non-null.
    */
-  std::int32_t EntityDB::AddBoundedProp(Prop* const prop)
+  std::int32_t EntityDB::AddBoundedProp(
+    Prop* const prop
+  )
   {
     while (!mBoundedProps.heap.empty() && mBoundedProps.heap.size() >= kBoundedPropQueueMaxSize) {
       Prop* const evictedProp = mBoundedProps.heap.begin()[0].mOwnerLink.GetObjectPtr();
@@ -1713,8 +1795,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00684CE0 (FUN_00684CE0, ?RemoveBoundedProp@EntityDB@Moho@@QAEXW4Handle@?$PriorityQueue@USPropPriorityInfo@Moho@@V?$WeakPtr@VProp@Moho@@@2@@gpg@@@Z)
-   * Mangled: ?RemoveBoundedProp@EntityDB@Moho@@QAEXW4Handle@?$PriorityQueue@USPropPriorityInfo@Moho@@V?$WeakPtr@VProp@Moho@@@2@@gpg@@@Z
+   * Address: 0x00684CE0 (FUN_00684CE0,
+   * ?RemoveBoundedProp@EntityDB@Moho@@QAEXW4Handle@?$PriorityQueue@USPropPriorityInfo@Moho@@V?$WeakPtr@VProp@Moho@@@2@@gpg@@@Z)
+   * Mangled:
+   * ?RemoveBoundedProp@EntityDB@Moho@@QAEXW4Handle@?$PriorityQueue@USPropPriorityInfo@Moho@@V?$WeakPtr@VProp@Moho@@@2@@gpg@@@Z
    *
    * What it does:
    * Resolves one bounded-prop queue handle to its current heap index
@@ -1722,18 +1806,24 @@ namespace moho
    * `EntityDB + 0x40`, i.e. `mBoundedProps + 0x14` -- the flattened offset
    * of `handleSlots`'s own `first_` field), then removes that queue node.
    */
-  void EntityDB::RemoveBoundedProp(const std::int32_t handle)
+  void EntityDB::RemoveBoundedProp(
+    const std::int32_t handle
+  )
   {
     const std::int32_t heapIndex = mBoundedProps.handleSlots.begin()[handle];
     mBoundedProps.PopAt(heapIndex);
   }
 
-  void EntityDB::RegisterEntitySet(EntitySetTemplate<Unit>& set) noexcept
+  void EntityDB::RegisterEntitySet(
+    EntitySetTemplate<Unit>& set
+  ) noexcept
   {
     set.ListLinkBefore(&mRegisteredEntitySets);
   }
 
-  void EntityDB::RegisterEntitySet(EntitySetBase& set) noexcept
+  void EntityDB::RegisterEntitySet(
+    EntitySetBase& set
+  ) noexcept
   {
     set.ListLinkBefore(&mRegisteredEntitySets);
   }
@@ -1741,7 +1831,9 @@ namespace moho
   /**
    * Address: 0x00684AA0 (FUN_00684AA0, Moho::EntityDB::SerEntities read lane)
    */
-  void EntityDB::SerEntities(gpg::ReadArchive* const archive)
+  void EntityDB::SerEntities(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -1769,7 +1861,9 @@ namespace moho
   /**
    * Address: 0x006849C0 (FUN_006849C0, Moho::EntityDB::SerEntities write lane)
    */
-  void EntityDB::SerEntities(gpg::WriteArchive* const archive)
+  void EntityDB::SerEntities(
+    gpg::WriteArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -1794,7 +1888,9 @@ namespace moho
   /**
    * Address: 0x00684B40 (FUN_00684B40, Moho::EntityDB::SerSets read lane)
    */
-  void EntityDB::SerSets(gpg::ReadArchive* const archive)
+  void EntityDB::SerSets(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -1813,7 +1909,9 @@ namespace moho
   /**
    * Address: 0x00684BC0 (FUN_00684BC0, Moho::EntityDB::SerSets write lane)
    */
-  void EntityDB::SerSets(gpg::WriteArchive* const archive)
+  void EntityDB::SerSets(
+    gpg::WriteArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -1829,7 +1927,9 @@ namespace moho
   /**
    * Address: 0x00689760 (FUN_00689760, Moho::EntityDB::MemberDeserialize)
    */
-  void EntityDB::MemberDeserialize(gpg::ReadArchive* const archive)
+  void EntityDB::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -1862,7 +1962,9 @@ namespace moho
   /**
    * Address: 0x006897F0 (FUN_006897F0, Moho::EntityDB::MemberSerialize)
    */
-  void EntityDB::MemberSerialize(gpg::WriteArchive* const archive)
+  void EntityDB::MemberSerialize(
+    gpg::WriteArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -1960,7 +2062,8 @@ namespace moho
    * Address: 0x00685E90 (FUN_00685E90 -- `GetLexical`.)
    * Address: 0x00685E70 (FUN_00685E70 -- `Init`.)
    * Address: 0x00686B90 (FUN_00686B90 -- `SerLoad`; each entity read by `ReadPointer<Entity>` 0x00680FB0.)
-   * Address: 0x00686C10 (FUN_00686C10 -- `SerSave`; each entity written `Unowned` through `MakeRRef<Entity>` 0x006805E0.)
+   * Address: 0x00686C10 (FUN_00686C10 -- `SerSave`; each entity written `Unowned` through `MakeRRef<Entity>`
+   * 0x006805E0.)
    */
   gpg::RType* preregister_EntityDbEntityListTypeInfo()
   {
@@ -1998,9 +2101,18 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_EntityDbTypeInfo_53cb23, moho::preregister_EntityDbTypeInfo)
-GPG_PREREGISTER_INIT(preregister_EntityDbIdPoolMapTypeInfo_53cb23, moho::preregister_EntityDbIdPoolMapTypeInfo)
-GPG_PREREGISTER_INIT(preregister_EntityDbEntityListTypeInfo_53cb23, moho::preregister_EntityDbEntityListTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_EntityDbTypeInfo_53cb23,
+  moho::preregister_EntityDbTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  preregister_EntityDbIdPoolMapTypeInfo_53cb23,
+  moho::preregister_EntityDbIdPoolMapTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  preregister_EntityDbEntityListTypeInfo_53cb23,
+  moho::preregister_EntityDbEntityListTypeInfo
+)
 
 namespace moho
 {

@@ -117,13 +117,13 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
-    SCoordsVec2 mFallbackPos;        // +0x00
-    Wm3::Quatf mOri;                 // +0x08
-    Wm3::Vec3f mPos;                 // +0x18
-    std::uint32_t mReserved24;       // +0x24
-    EntitySetTemplate<Unit> mUnits;   // +0x28
-    std::uint8_t mHasSpace;          // +0x50
-    std::uint8_t mUnknown51[0x07];   // +0x51
+    SCoordsVec2 mFallbackPos;       // +0x00
+    Wm3::Quatf mOri;                // +0x08
+    Wm3::Vec3f mPos;                // +0x18
+    std::uint32_t mReserved24;      // +0x24
+    EntitySetTemplate<Unit> mUnits; // +0x28
+    std::uint8_t mHasSpace;         // +0x50
+    std::uint8_t mUnknown51[0x07];  // +0x51
   };
   static_assert(sizeof(STransportPickUpInfo) == 0x58, "STransportPickUpInfo size must be 0x58");
   static_assert(
@@ -164,9 +164,8 @@ namespace moho
      * Allocates one `CAiTransportImpl` instance and publishes it via
      * `SerConstructResult::SetUnowned`.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x005EEE30 (FUN_005EEE30, Moho::CAiTransportImpl::MemberDeserialize)
@@ -545,10 +544,8 @@ namespace moho
      * Rebuilds one destination attach-point vector from source lanes using the
      * same zero-init + resize + copy sequence as the VC8 helper constructor.
      */
-    static fa::vector<SAttachPoint>* CopyAttachPointVector(
-      const fa::vector<SAttachPoint>& source,
-      fa::vector<SAttachPoint>& destination
-    );
+    static fa::vector<SAttachPoint>*
+    CopyAttachPointVector(const fa::vector<SAttachPoint>& source, fa::vector<SAttachPoint>& destination);
 
     /**
      * Address: 0x005E4D40 (FUN_005E4D40)
@@ -563,35 +560,40 @@ namespace moho
     /**
      * Address: 0x005E4FA0 (FUN_005E4FA0)
      */
-    void ReserveBone(unsigned int bestAttachBoneIndex, Unit* unit, unsigned int transportBoneIndex, fa::vector<int> boneIndices);
+    void ReserveBone(
+      unsigned int bestAttachBoneIndex,
+      Unit* unit,
+      unsigned int transportBoneIndex,
+      fa::vector<int> boneIndices
+    );
 
   public:
     static gpg::RType* sType;
 
-    Unit* mUnit; // +0x0C
-    WeakPtr<Unit> mTeleportBeacon; // +0x10
-    std::uint8_t mStagingPlatform; // +0x18
-    std::uint8_t mTeleportation; // +0x19
-    std::uint8_t mUnknown1A[0x02]; // +0x1A
-    std::int32_t mAttachpoints; // +0x1C
-    std::int32_t mNextGeneric; // +0x20
-    std::int32_t mLaunchAttachIndex; // +0x24
-    std::int32_t mGenericOverflow; // +0x28
-    std::uint8_t mUnknown2C[0x04]; // +0x2C
-    EntitySetTemplate<Unit> mUnitSet30; // +0x30
-    EntitySetTemplate<Unit> mStoredUnits; // +0x58
-    EntitySetTemplate<Unit> mUnitSet80; // +0x80
+    Unit* mUnit;                                         // +0x0C
+    WeakPtr<Unit> mTeleportBeacon;                       // +0x10
+    std::uint8_t mStagingPlatform;                       // +0x18
+    std::uint8_t mTeleportation;                         // +0x19
+    std::uint8_t mUnknown1A[0x02];                       // +0x1A
+    std::int32_t mAttachpoints;                          // +0x1C
+    std::int32_t mNextGeneric;                           // +0x20
+    std::int32_t mLaunchAttachIndex;                     // +0x24
+    std::int32_t mGenericOverflow;                       // +0x28
+    std::uint8_t mUnknown2C[0x04];                       // +0x2C
+    EntitySetTemplate<Unit> mUnitSet30;                  // +0x30
+    EntitySetTemplate<Unit> mStoredUnits;                // +0x58
+    EntitySetTemplate<Unit> mUnitSet80;                  // +0x80
     fa::vector<SAiReservedTransportBone> mReservedBones; // +0xA8
-    STransportPickUpInfo mPickupInfo; // +0xB8
-    IFormationInstance* mWaitingFormation; // +0x110
-    Wm3::Vec3f mPickupFacing; // +0x114
-    fa::vector<SAttachPoint> mGenericAttachPoints; // +0x120
-    fa::vector<SAttachPoint> mClass1AttachPoints; // +0x130
-    fa::vector<SAttachPoint> mClass2AttachPoints; // +0x140
-    fa::vector<SAttachPoint> mClass3AttachPoints; // +0x150
-    fa::vector<SAttachPoint> mClass4AttachPoints; // +0x160
-    fa::vector<SAttachPoint> mClassSAttachPoints; // +0x170
-    fa::vector<SAttachPoint> mLaunchAttachPoints; // +0x180
+    STransportPickUpInfo mPickupInfo;                    // +0xB8
+    IFormationInstance* mWaitingFormation;               // +0x110
+    Wm3::Vec3f mPickupFacing;                            // +0x114
+    fa::vector<SAttachPoint> mGenericAttachPoints;       // +0x120
+    fa::vector<SAttachPoint> mClass1AttachPoints;        // +0x130
+    fa::vector<SAttachPoint> mClass2AttachPoints;        // +0x140
+    fa::vector<SAttachPoint> mClass3AttachPoints;        // +0x150
+    fa::vector<SAttachPoint> mClass4AttachPoints;        // +0x160
+    fa::vector<SAttachPoint> mClassSAttachPoints;        // +0x170
+    fa::vector<SAttachPoint> mLaunchAttachPoints;        // +0x180
   };
 
   static_assert(sizeof(CAiTransportImpl) == 0x190, "CAiTransportImpl size must be 0x190");
@@ -604,8 +606,14 @@ namespace moho
     offsetof(CAiTransportImpl, mStagingPlatform) == 0x18,
     "CAiTransportImpl::mStagingPlatform offset must be 0x18"
   );
-  static_assert(offsetof(CAiTransportImpl, mTeleportation) == 0x19, "CAiTransportImpl::mTeleportation offset must be 0x19");
-  static_assert(offsetof(CAiTransportImpl, mAttachpoints) == 0x1C, "CAiTransportImpl::mAttachpoints offset must be 0x1C");
+  static_assert(
+    offsetof(CAiTransportImpl, mTeleportation) == 0x19,
+    "CAiTransportImpl::mTeleportation offset must be 0x19"
+  );
+  static_assert(
+    offsetof(CAiTransportImpl, mAttachpoints) == 0x1C,
+    "CAiTransportImpl::mAttachpoints offset must be 0x1C"
+  );
   static_assert(offsetof(CAiTransportImpl, mNextGeneric) == 0x20, "CAiTransportImpl::mNextGeneric offset must be 0x20");
   static_assert(
     offsetof(CAiTransportImpl, mLaunchAttachIndex) == 0x24,
@@ -616,11 +624,11 @@ namespace moho
     "CAiTransportImpl::mGenericOverflow offset must be 0x28"
   );
   static_assert(offsetof(CAiTransportImpl, mStoredUnits) == 0x58, "CAiTransportImpl::mStoredUnits offset must be 0x58");
-  static_assert(offsetof(CAiTransportImpl, mReservedBones) == 0xA8, "CAiTransportImpl::mReservedBones offset must be 0xA8");
   static_assert(
-    offsetof(CAiTransportImpl, mPickupInfo) == 0xB8,
-    "CAiTransportImpl::mPickupInfo offset must be 0xB8"
+    offsetof(CAiTransportImpl, mReservedBones) == 0xA8,
+    "CAiTransportImpl::mReservedBones offset must be 0xA8"
   );
+  static_assert(offsetof(CAiTransportImpl, mPickupInfo) == 0xB8, "CAiTransportImpl::mPickupInfo offset must be 0xB8");
   static_assert(
     offsetof(CAiTransportImpl, mWaitingFormation) == 0x110,
     "CAiTransportImpl::mWaitingFormation offset must be 0x110"

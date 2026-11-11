@@ -67,6 +67,36 @@ Texture2D<float4> ShadowMap : register(t4);
 [[vk::binding(0, 2)]]
 #endif
 RaytracingAccelerationStructure RayScene : register(t0, space1);
+// Alpha-tested pieces (trees): as ModernHlsl.cpp's faf_ray_solid.
+#ifdef __spirv__
+[[vk::binding(1, 2)]]
+#endif
+ByteAddressBuffer RayAttributes : register(t1, space1);
+#ifdef __spirv__
+[[vk::binding(2, 2)]]
+#endif
+StructuredBuffer<uint4> RayRecords : register(t2, space1);
+#ifdef __spirv__
+[[vk::binding(3, 2)]]
+#endif
+Texture2D RayTextures[64] : register(t0, space2);
+#ifdef __spirv__
+[[vk::binding(4, 2)]]
+#endif
+SamplerState RaySampler : register(s0, space1);
+bool TracedSolid(uint instance, uint primitive, float2 bary)
+{
+    const uint4 record = RayRecords[instance];
+    if (record.w == 0) {
+        return true;
+    }
+    const uint3 corner = RayAttributes.Load3(record.x + primitive * 12);
+    const float2 uv0 = asfloat(RayAttributes.Load2(record.y + corner.x * 8));
+    const float2 uv1 = asfloat(RayAttributes.Load2(record.y + corner.y * 8));
+    const float2 uv2 = asfloat(RayAttributes.Load2(record.y + corner.z * 8));
+    const float2 uv = uv0 + bary.x * (uv1 - uv0) + bary.y * (uv2 - uv0);
+    return RayTextures[NonUniformResourceIndex(record.z)].SampleLevel(RaySampler, uv, 1).a >= 0.5;
+}
 
 // Ambient light that reaches `center` by rays: RayParams.y rays spread over the hemisphere around `normal`
 // (cosine-weighted, turned per point by `spin`), each up to Radius long; a hit takes more of the light the
@@ -83,15 +113,35 @@ float TracedHit(float3 origin, float3 direction, float tMin, uint mask)
     ray.Direction = direction;
     ray.TMin = tMin;
     ray.TMax = Radius;
-    RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES | RAY_FLAG_FORCE_OPAQUE> query;
+    RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> query;
     query.TraceRayInline(RayScene, RAY_FLAG_NONE, mask, ray);
-    query.Proceed();
+    while (query.Proceed()) {
+        if (query.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE &&
+            TracedSolid(query.CandidateInstanceIndex(), query.CandidatePrimitiveIndex(), query.CandidateTriangleBarycentrics())) {
+            query.CommitNonOpaqueTriangleHit();
+        }
+    }
     return (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT) ? query.CommittedRayT() : -1.0;
+}
+
+// How far under the traced ground `p` lies, 0 when it doesn't (ModernHlsl.cpp's faf_ray_under_ground): the
+// drawn ground is coarser than the traced height field with camera distance, by more than any fixed lift.
+float TracedUnderGround(float3 p)
+{
+    RayDesc ray;
+    ray.Origin = p;
+    ray.Direction = float3(0, 1, 0);
+    ray.TMin = 0;
+    ray.TMax = 200;
+    RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES | RAY_FLAG_FORCE_OPAQUE> query;
+    query.TraceRayInline(RayScene, RAY_FLAG_NONE, 1, ray);
+    query.Proceed();
+    return (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT) ? query.CommittedRayT() : 0.0;
 }
 
 // `center` is rebuilt from the depth buffer, whose error grows with camera distance; the rays leave from
 // above the surface by more than that error (RayParams.z per unit of distance), or they would start under
-// the ground and hit it from below.
+// the ground and hit it from below. A point under the traced ground moves up onto it first.
 float TracedOcclusion(float3 center, float3 normal, float spin, float distance)
 {
     const float3 helper = (abs(normal.y) < 0.9) ? float3(0, 1, 0) : float3(1, 0, 0);
@@ -99,7 +149,7 @@ float TracedOcclusion(float3 center, float3 normal, float spin, float distance)
     const float3 bitangent = cross(normal, tangent);
     const int count = clamp((int)RayParams.y, 1, 16);
     const float lift = 0.05 + RayParams.z * distance;
-    const float3 origin = center + normal * lift;
+    const float3 origin = center + float3(0, TracedUnderGround(center), 0) + normal * lift;
     float blocked = 0.0;
     const float under = RayParams.w;
     for (int i = 0; i < count; ++i) {
@@ -161,7 +211,9 @@ float SunVisibility(float3 world)
     uint width;
     uint height;
     ShadowMap.GetDimensions(width, height);
-    return saturate(ShadowMap.Load(int3(int2(uv * float2(width, height)), 0)).g);
+    // uv may be exactly 1 (the test above and the cascade boxes are inclusive): the last texel, not the one past it.
+    const int2 texel = min(int2(uv * float2(width, height)), int2(width, height) - 1);
+    return saturate(ShadowMap.Load(int3(texel, 0)).g);
 }
 
 float3 WorldPosition(int2 pixel, float depth)

@@ -15,7 +15,7 @@ namespace gpg
   class RType;
   class ReadArchive;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace LuaPlus
 {
@@ -378,4 +378,3 @@ namespace moho
   static_assert(offsetof(IAiNavigator, mListeners) == 0x04, "IAiNavigator::mListeners offset must be 0x04");
   static_assert(offsetof(IAiNavigator, mPad0C) == 0x0C, "IAiNavigator::mPad0C offset must be 0x0C");
 } // namespace moho
-

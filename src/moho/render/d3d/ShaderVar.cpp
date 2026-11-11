@@ -6,7 +6,10 @@
 #include "gpg/gal/Error.hpp"
 #include "gpg/gal/Effect.hpp"
 #include "gpg/gal/EffectVariable.hpp"
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
+#endif
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/ID3DRenderTarget.h"
 #include "moho/render/ID3DTextureSheet.h"
@@ -77,7 +80,9 @@ namespace moho
 
 namespace
 {
-  [[nodiscard]] moho::CD3DEffect* ResolveOwnerEffect(const moho::ShaderVar& shaderVar) noexcept
+  [[nodiscard]] moho::CD3DEffect* ResolveOwnerEffect(
+    const moho::ShaderVar& shaderVar
+  ) noexcept
   {
     return reinterpret_cast<moho::CD3DEffect*>(shaderVar.mEffectLink.mLinkLane);
   }
@@ -89,7 +94,10 @@ namespace
    * Rebinds one shader-var attached-link lane to a new owner effect, updating
    * intrusive list linkage on both detach and attach paths.
    */
-  moho::ShaderVar& RelinkShaderVarEffect(moho::ShaderVar& shaderVar, moho::CD3DEffect* const effect) noexcept
+  moho::ShaderVar& RelinkShaderVarEffect(
+    moho::ShaderVar& shaderVar,
+    moho::CD3DEffect* const effect
+  ) noexcept
   {
     moho::CD3DEffect* const currentOwner = ResolveOwnerEffect(shaderVar);
     if (currentOwner != effect) {
@@ -149,7 +157,9 @@ namespace moho
    * effect/effect-variable link state.
    */
   ShaderVar* RegisterShaderVar(
-    const char* const variableName, ShaderVar* const shaderVar, const char* const effectFileName
+    const char* const variableName,
+    ShaderVar* const shaderVar,
+    const char* const effectFileName
   )
   {
     if (shaderVar == nullptr) {
@@ -269,7 +279,9 @@ namespace moho
    * Resolves this shader-var if needed and pushes one optional texture handle
    * into the bound effect-variable lane.
    */
-  ShaderVar* ShaderVar::GetTexture(const boost::shared_ptr<ID3DTextureSheet>& textureSheet)
+  ShaderVar* ShaderVar::GetTexture(
+    const boost::shared_ptr<ID3DTextureSheet>& textureSheet
+  )
   {
     if (Exists()) {
       ID3DTextureSheet::TextureHandle textureHandle{};
@@ -299,7 +311,9 @@ namespace moho
    * 0x004912C6 zeroes the same temporary and calls the same slot, so both paths
    * bind, they only differ in what.
    */
-  ShaderVar* ShaderVar::SetRenderTargetTexture(const boost::shared_ptr<ID3DRenderTarget>& renderTarget)
+  ShaderVar* ShaderVar::SetRenderTargetTexture(
+    const boost::shared_ptr<ID3DRenderTarget>& renderTarget
+  )
   {
     if (Exists()) {
       ID3DRenderTarget::SurfaceHandle surfaceHandle{};
@@ -319,7 +333,9 @@ namespace moho
    * Guards on `Exists()` and forwards one float value to the bound
    * effect variable.
    */
-  ShaderVar* ShaderVar::SetFloat(const float value)
+  ShaderVar* ShaderVar::SetFloat(
+    const float value
+  )
   {
     if (Exists()) {
       mEffectVariable->SetFloat(value);
@@ -334,7 +350,9 @@ namespace moho
    * Guards on `Exists()` and forwards one 4x4 matrix pointer to the bound
    * effect variable.
    */
-  ShaderVar* ShaderVar::SetMatrix4x4(const gpg::gal::Matrix* const matrix)
+  ShaderVar* ShaderVar::SetMatrix4x4(
+    const gpg::gal::Matrix* const matrix
+  )
   {
     if (Exists()) {
       mEffectVariable->SetMatrix4x4(matrix);
@@ -480,7 +498,10 @@ namespace moho
   {
     struct FrameGlowCopyAddShaderVarBootstrap
     {
-      FrameGlowCopyAddShaderVarBootstrap() { moho::register_ShaderVarFrameGlowCopyAdd(); }
+      FrameGlowCopyAddShaderVarBootstrap()
+      {
+        moho::register_ShaderVarFrameGlowCopyAdd();
+      }
     };
 
     [[maybe_unused]] FrameGlowCopyAddShaderVarBootstrap gFrameGlowCopyAddShaderVarBootstrap;

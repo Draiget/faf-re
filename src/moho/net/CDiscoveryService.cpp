@@ -69,7 +69,9 @@ namespace
    * Removes every currently tracked discovery-game entry by issuing one
    * `RemoveGame(index)` callback from back to front and compacting list bounds.
    */
-  void RemoveTrackedDiscoveryGames(moho::CDiscoveryService* const discoveryService)
+  void RemoveTrackedDiscoveryGames(
+    moho::CDiscoveryService* const discoveryService
+  )
   {
     if (discoveryService == nullptr || discoveryService->mGames.empty()) {
       return;
@@ -93,7 +95,9 @@ namespace
    * Pulls datagram updates, expires stale discovery replies from the tracked
    * game list, emits timeout logs/callback removal, and arms the next wakeup.
    */
-  void ExpireStaleDiscoveryReplies(moho::CDiscoveryService* const discoveryService)
+  void ExpireStaleDiscoveryReplies(
+    moho::CDiscoveryService* const discoveryService
+  )
   {
     if (discoveryService == nullptr) {
       return;
@@ -140,7 +144,9 @@ namespace
    * Broadcasts periodic discovery-request datagrams and updates wakeup timing
    * for the next scheduled broadcast tick.
    */
-  void BroadcastDiscoveryRequestTick(moho::CDiscoveryService* const discoveryService)
+  void BroadcastDiscoveryRequestTick(
+    moho::CDiscoveryService* const discoveryService
+  )
   {
     if (discoveryService == nullptr || discoveryService->mDatagramSocket == nullptr) {
       return;
@@ -158,12 +164,16 @@ namespace
     moho::WIN_SetWakeupTimer((discoveryService->mNextDiscoveryBroadcastTimeSeconds - nowSeconds) * 1000.0f);
   }
 
-  [[nodiscard]] moho::CTask* PullTaskSubobject(moho::CDiscoveryService* const discoveryService) noexcept
+  [[nodiscard]] moho::CTask* PullTaskSubobject(
+    moho::CDiscoveryService* const discoveryService
+  ) noexcept
   {
     return reinterpret_cast<moho::CTask*>(discoveryService->mPullTaskStorage);
   }
 
-  [[nodiscard]] moho::CTask* PushTaskSubobject(moho::CDiscoveryService* const discoveryService) noexcept
+  [[nodiscard]] moho::CTask* PushTaskSubobject(
+    moho::CDiscoveryService* const discoveryService
+  ) noexcept
   {
     return reinterpret_cast<moho::CTask*>(discoveryService->mPushTaskStorage);
   }
@@ -217,7 +227,9 @@ namespace
  * Initializes Lua/script base lanes, pull/push task subobjects, discovery
  * storage pointers, timer state, and datagram-socket wait-handle wiring.
  */
-moho::CDiscoveryService::CDiscoveryService(const LuaPlus::LuaObject& clazz)
+moho::CDiscoveryService::CDiscoveryService(
+  const LuaPlus::LuaObject& clazz
+)
   : CScriptObject(clazz, LuaPlus::LuaObject{}, LuaPlus::LuaObject{}, LuaPlus::LuaObject{})
 {
   ::new (static_cast<void*>(mPullTaskStorage)) CDiscoveryServicePullTask();
@@ -365,7 +377,9 @@ gpg::RRef moho::CDiscoveryService::GetDerivedObjectRef()
  * so the faithful recovery is the one-line call below, not a duplicate of
  * the growth arithmetic.
  */
-void moho::CDiscoveryService::AddDiscoveredGame(const DiscoveredGameRecord& newRecord)
+void moho::CDiscoveryService::AddDiscoveredGame(
+  const DiscoveredGameRecord& newRecord
+)
 {
   mGames.push_back(newRecord);
 }
@@ -455,15 +469,17 @@ void moho::CDiscoveryService::OnDatagram(
   mLuaObj.SCR_FromByteStream(configObject, mLuaObj.m_state, &reader);
   if (!configObject.IsTable()) {
     // Anyone can send a reply; the fields below are set on a table.
-    gpg::Logf("LOBBY: Ignoring discovery reply without a game config from %s:%d", NET_GetHostName(address).c_str(),
-      static_cast<unsigned>(port));
+    gpg::Logf(
+      "LOBBY: Ignoring discovery reply without a game config from %s:%d",
+      NET_GetHostName(address).c_str(),
+      static_cast<unsigned>(port)
+    );
     return;
   }
 
   configObject.SetString("Hostname", NET_GetHostName(address).c_str());
   configObject.SetString(
-    "Address",
-    gpg::STR_Printf("%s:%i", NET_GetDottedOctetFromUInt32(address).c_str(), hostPort).c_str()
+    "Address", gpg::STR_Printf("%s:%i", NET_GetDottedOctetFromUInt32(address).c_str(), hostPort).c_str()
   );
 
   gpg::RRef protocolRef{};
@@ -518,7 +534,9 @@ int moho::CDiscoveryService::GetGameCount() const noexcept
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CDiscoveryServiceGetGameCountL`.
  */
-int moho::cfunc_CDiscoveryServiceGetGameCount(lua_State* const luaContext)
+int moho::cfunc_CDiscoveryServiceGetGameCount(
+  lua_State* const luaContext
+)
 {
   return cfunc_CDiscoveryServiceGetGameCountL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -530,7 +548,9 @@ int moho::cfunc_CDiscoveryServiceGetGameCount(lua_State* const luaContext)
  * Validates one Lua `self` arg, resolves `CDiscoveryService`, and returns
  * current discovered-game count.
  */
-int moho::cfunc_CDiscoveryServiceGetGameCountL(LuaPlus::LuaState* const state)
+int moho::cfunc_CDiscoveryServiceGetGameCountL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kCDiscoveryServiceGetGameCountHelp);
 
@@ -568,7 +588,9 @@ moho::CScrLuaInitForm* moho::func_CDiscoveryServiceGetGameCount_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_CDiscoveryServiceResetL`.
  */
-int moho::cfunc_CDiscoveryServiceReset(lua_State* const luaContext)
+int moho::cfunc_CDiscoveryServiceReset(
+  lua_State* const luaContext
+)
 {
   return cfunc_CDiscoveryServiceResetL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -580,7 +602,9 @@ int moho::cfunc_CDiscoveryServiceReset(lua_State* const luaContext)
  * Validates one Lua `self` arg, resolves `CDiscoveryService`, and removes all
  * tracked discovery-game entries through callback lane.
  */
-int moho::cfunc_CDiscoveryServiceResetL(LuaPlus::LuaState* const state)
+int moho::cfunc_CDiscoveryServiceResetL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kCDiscoveryServiceResetHelp);
 
@@ -616,7 +640,9 @@ moho::CScrLuaInitForm* moho::func_CDiscoveryServiceReset_LuaFuncDef()
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CDiscoveryServiceDestroyL`.
  */
-int moho::cfunc_CDiscoveryServiceDestroy(lua_State* const luaContext)
+int moho::cfunc_CDiscoveryServiceDestroy(
+  lua_State* const luaContext
+)
 {
   return cfunc_CDiscoveryServiceDestroyL(luaContext ? luaContext->stateUserData : nullptr);
 }
@@ -628,7 +654,9 @@ int moho::cfunc_CDiscoveryServiceDestroy(lua_State* const luaContext)
  * Validates one Lua `self` arg, resolves optional `CDiscoveryService`, and
  * destroys it when present.
  */
-int moho::cfunc_CDiscoveryServiceDestroyL(LuaPlus::LuaState* const state)
+int moho::cfunc_CDiscoveryServiceDestroyL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kCDiscoveryServiceDestroyHelp);
 
@@ -707,7 +735,11 @@ namespace
   moho::CScrLuaInitForm* register_moho_discovery_service_methods()
   {
     static moho::CScrLuaClassBinder binder(
-      moho::SCR_UserLuaInitSet(), "moho.discovery_service_methods", &moho::CScrLuaMetatableFactory<moho::CDiscoveryService>::Instance(), "CDiscoveryService", ""
+      moho::SCR_UserLuaInitSet(),
+      "moho.discovery_service_methods",
+      &moho::CScrLuaMetatableFactory<moho::CDiscoveryService>::Instance(),
+      "CDiscoveryService",
+      ""
     );
     return &binder;
   }

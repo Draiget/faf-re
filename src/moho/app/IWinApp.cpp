@@ -30,7 +30,7 @@ namespace
   {
     return moho::DISK_GetLaunchDir();
   }
-}
+} // namespace
 
 /**
  * Address: 0x008CD360 (FUN_008CD360)
@@ -41,7 +41,10 @@ namespace
  * What it does:
  * Initializes app identity strings used by startup/logging flows.
  */
-IWinApp::IWinApp(const gpg::StrArg shortNameArg, const gpg::StrArg longNameArg)
+IWinApp::IWinApp(
+  const gpg::StrArg shortNameArg,
+  const gpg::StrArg longNameArg
+)
 {
   const char* const shortNameText = shortNameArg ? shortNameArg : "";
   const char* const longNameText = longNameArg ? longNameArg : "";
@@ -70,7 +73,10 @@ IWinApp::~IWinApp()
  * Runs one deleting-destructor thunk for `IWinApp`, forwarding through
  * non-deleting teardown and optional storage release.
  */
-[[nodiscard]] IWinApp* DestroyIWinAppDeleting(IWinApp* const app, const unsigned char deleteFlag)
+[[nodiscard]] IWinApp* DestroyIWinAppDeleting(
+  IWinApp* const app,
+  const unsigned char deleteFlag
+)
 {
   app->~IWinApp();
   if ((deleteFlag & 1u) != 0u) {
@@ -89,7 +95,10 @@ IWinApp::~IWinApp()
  * Default command-line help text provider.
  * FA retail default is a false/nullsub return.
  */
-bool IWinApp::AppGetHelpText(fa::string& outHelpText, const bool shortMode)
+bool IWinApp::AppGetHelpText(
+  fa::string& outHelpText,
+  const bool shortMode
+)
 {
   (void)shortMode;
   outHelpText.assign_owned("");

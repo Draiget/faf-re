@@ -14,7 +14,7 @@ namespace gpg::gal
    * to `-1`/`0`/`+1` instead of negative/zero/positive. The binary uses an
    * inlined 4-byte word comparison loop followed by per-byte fallback for
    * tail bytes; this implementation matches that observable behavior.
-  */
+   */
   [[nodiscard]] int STR_Compare(const char* lhs, const char* rhs, std::size_t length) noexcept;
 
   /**
@@ -24,7 +24,5 @@ namespace gpg::gal
    * Scans a contiguous `fa::string` range and returns the first entry that
    * exactly matches `*search`; returns `end` when not found.
    */
-  [[nodiscard]] fa::string* STR_FindInRange(
-    fa::string* start, fa::string* end, const char* const* search
-  ) noexcept;
+  [[nodiscard]] fa::string* STR_FindInRange(fa::string* start, fa::string* end, const char* const* search) noexcept;
 } // namespace gpg::gal

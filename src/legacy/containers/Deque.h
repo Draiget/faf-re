@@ -11,586 +11,757 @@
 
 namespace fa
 {
+  /**
+   * MSVC8-compatible deque (x86) with strict 0x14-bytes layout:
+   *   +0x00: void*   _Myproxy
+   *   +0x04: T**     _Map
+   *   +0x08: size_t  _Mapsize      (number of map slots)
+   *   +0x0C: size_t  _Myoff        (offset of begin in elements, modulo capacity)
+   *   +0x10: size_t  _Mysize       (current size in elements)
+   *
+   * Nodes are fixed-size blocks; the map is a circular array of pointers to nodes.
+   * Iterators are synthesized from (_Myoff, _Mysize).
+   */
+  template <class T, class Alloc = std::allocator<T>>
+  class deque
+  {
+    static_assert(sizeof(void*) == 4, "This layout targets 32-bit x86.");
+    static_assert(sizeof(std::size_t) == 4, "This layout targets 32-bit x86.");
+
+  public:
+    using value_type = T;
+    using allocator_type = Alloc;
+    using size_type = std::size_t;
+    using difference_type = std::ptrdiff_t;
+    using reference = T&;
+    using const_reference = const T&;
+
     /**
-     * MSVC8-compatible deque (x86) with strict 0x14-bytes layout:
-     *   +0x00: void*   _Myproxy
-     *   +0x04: T**     _Map
-     *   +0x08: size_t  _Mapsize      (number of map slots)
-     *   +0x0C: size_t  _Myoff        (offset of begin in elements, modulo capacity)
-     *   +0x10: size_t  _Mysize       (current size in elements)
-     *
-     * Nodes are fixed-size blocks; the map is a circular array of pointers to nodes.
-     * Iterators are synthesized from (_Myoff, _Mysize).
+     * Elements-per-node follows the classic Dinkumware/MSVC8 `_DEQUESIZ`
+     * stepped policy, confirmed against two real emissions with
+     * different element sizes: `FUN_0067B870` (`std::deque<Entity*>`,
+     * sizeof(T)==4, block index math uses `>> 2`/`& 3` i.e. block size
+     * 4) and `FUN_007BB920`/`FUN_007BB400` (`std::deque<SNetCommand>`,
+     * sizeof(T)==0x30, block index is the raw node index with no
+     * intra-node math at all, i.e. block size 1). This is NOT a
+     * flat "512-byte chunk" division -- that formula gives block size
+     * 128 for a 4-byte element and 10 for a 0x30-byte element, neither
+     * of which matches the binary.
      */
-    template<class T, class Alloc = std::allocator<T>>
-    class deque
+    static constexpr size_type kBlockSize = sizeof(T) <= 1 ? 16
+      : sizeof(T) <= 2                                     ? 8
+      : sizeof(T) <= 4                                     ? 4
+      : sizeof(T) <= 8                                     ? 2
+                                                           : 1;
+
+    /**
+     * Growth-map fallback slot count used by `grow_map()` when doubling
+     * from an empty or near-empty map (`max(mapsize / 2, kMinGrowSlots)`).
+     * Not a pre-allocation size -- the default-constructed deque holds
+     * no map at all (see the ctor below).
+     */
+    static constexpr size_type kMinGrowSlots = 8;
+
+    /**
+     * Map-slot ceiling before `grow_map()` throws `length_error`.
+     * Dinkumware derives this from the allocator's `max_size()` in
+     * elements (`SIZE_MAX / sizeof(T)`) further divided down to whole
+     * nodes. Confirmed against two real emissions with different
+     * element sizes: `FUN_007BB920` (`deque<SNetCommand>`, sizeof(T)==
+     * 0x30, kBlockSize==1) computes 0x05555555, and `FUN_00741030`
+     * (`deque<SSyncData*>` / 4-byte T, kBlockSize==4) computes
+     * 0x0FFFFFFF -- both match `(SIZE_MAX / sizeof(T)) / kBlockSize`
+     * exactly, so the ceiling is data-dependent and must not be
+     * hardcoded to either emission's constant.
+     */
+    static constexpr size_type kMaxSlots = (static_cast<size_type>(-1) / sizeof(T)) / kBlockSize;
+
+    /** Random-access iterator synthesized from container + logical offset. */
+    struct iterator
     {
-        static_assert(sizeof(void*) == 4, "This layout targets 32-bit x86.");
-        static_assert(sizeof(std::size_t) == 4, "This layout targets 32-bit x86.");
+      deque* cont{};
+      size_type off{}; // offset from begin(), in elements
 
-    public:
-        using value_type = T;
-        using allocator_type = Alloc;
-        using size_type = std::size_t;
-        using difference_type = std::ptrdiff_t;
-        using reference = T&;
-        using const_reference = const T&;
+      iterator() = default;
+      iterator(
+        deque* c,
+        size_type o
+      )
+        : cont(c)
+        , off(o)
+      {}
 
-        /**
-         * Elements-per-node follows the classic Dinkumware/MSVC8 `_DEQUESIZ`
-         * stepped policy, confirmed against two real emissions with
-         * different element sizes: `FUN_0067B870` (`std::deque<Entity*>`,
-         * sizeof(T)==4, block index math uses `>> 2`/`& 3` i.e. block size
-         * 4) and `FUN_007BB920`/`FUN_007BB400` (`std::deque<SNetCommand>`,
-         * sizeof(T)==0x30, block index is the raw node index with no
-         * intra-node math at all, i.e. block size 1). This is NOT a
-         * flat "512-byte chunk" division -- that formula gives block size
-         * 128 for a 4-byte element and 10 for a 0x30-byte element, neither
-         * of which matches the binary.
-         */
-        static constexpr size_type kBlockSize =
-          sizeof(T) <= 1 ? 16 :
-          sizeof(T) <= 2 ? 8 :
-          sizeof(T) <= 4 ? 4 :
-          sizeof(T) <= 8 ? 2 : 1;
+      reference operator*() const
+      {
+        return *cont->ptr_at(off);
+      }
+      T* operator->() const
+      {
+        return cont->ptr_at(off);
+      }
 
-        /**
-         * Growth-map fallback slot count used by `grow_map()` when doubling
-         * from an empty or near-empty map (`max(mapsize / 2, kMinGrowSlots)`).
-         * Not a pre-allocation size -- the default-constructed deque holds
-         * no map at all (see the ctor below).
-         */
-        static constexpr size_type kMinGrowSlots = 8;
+      iterator& operator++()
+      {
+        ++off;
+        return *this;
+      }
+      iterator operator++(
+        int
+      )
+      {
+        iterator t = *this;
+        ++(*this);
+        return t;
+      }
+      iterator& operator--()
+      {
+        --off;
+        return *this;
+      }
+      iterator operator--(
+        int
+      )
+      {
+        iterator t = *this;
+        --(*this);
+        return t;
+      }
 
-        /**
-         * Map-slot ceiling before `grow_map()` throws `length_error`.
-         * Dinkumware derives this from the allocator's `max_size()` in
-         * elements (`SIZE_MAX / sizeof(T)`) further divided down to whole
-         * nodes. Confirmed against two real emissions with different
-         * element sizes: `FUN_007BB920` (`deque<SNetCommand>`, sizeof(T)==
-         * 0x30, kBlockSize==1) computes 0x05555555, and `FUN_00741030`
-         * (`deque<SSyncData*>` / 4-byte T, kBlockSize==4) computes
-         * 0x0FFFFFFF -- both match `(SIZE_MAX / sizeof(T)) / kBlockSize`
-         * exactly, so the ceiling is data-dependent and must not be
-         * hardcoded to either emission's constant.
-         */
-        static constexpr size_type kMaxSlots =
-          (static_cast<size_type>(-1) / sizeof(T)) / kBlockSize;
+      iterator& operator+=(
+        difference_type n
+      )
+      {
+        off = static_cast<size_type>(off + n);
+        return *this;
+      }
+      iterator& operator-=(
+        difference_type n
+      )
+      {
+        off = static_cast<size_type>(off - n);
+        return *this;
+      }
 
-        /** Random-access iterator synthesized from container + logical offset. */
-        struct iterator
-        {
-            deque* cont{};
-            size_type off{}; // offset from begin(), in elements
+      friend iterator operator+(
+        iterator it,
+        difference_type n
+      )
+      {
+        it += n;
+        return it;
+      }
+      friend iterator operator+(
+        difference_type n,
+        iterator it
+      )
+      {
+        it += n;
+        return it;
+      }
+      friend iterator operator-(
+        iterator it,
+        difference_type n
+      )
+      {
+        it -= n;
+        return it;
+      }
+      friend difference_type operator-(
+        const iterator& a,
+        const iterator& b
+      )
+      {
+        assert(a.cont == b.cont);
+        return static_cast<difference_type>(a.off) - static_cast<difference_type>(b.off);
+      }
 
-            iterator() = default;
-            iterator(deque* c, size_type o) : cont(c), off(o) {}
-
-            reference operator*() const { return *cont->ptr_at(off); }
-            T* operator->() const { return  cont->ptr_at(off); }
-
-            iterator& operator++() { ++off; return *this; }
-            iterator  operator++(int) { iterator t = *this; ++(*this); return t; }
-            iterator& operator--() { --off; return *this; }
-            iterator  operator--(int) { iterator t = *this; --(*this); return t; }
-
-            iterator& operator+=(difference_type n) { off = static_cast<size_type>(off + n); return *this; }
-            iterator& operator-=(difference_type n) { off = static_cast<size_type>(off - n); return *this; }
-
-            friend iterator operator+(iterator it, difference_type n) { it += n; return it; }
-            friend iterator operator+(difference_type n, iterator it) { it += n; return it; }
-            friend iterator operator-(iterator it, difference_type n) { it -= n; return it; }
-            friend difference_type operator-(const iterator& a, const iterator& b)
-            {
-                assert(a.cont == b.cont);
-                return static_cast<difference_type>(a.off) - static_cast<difference_type>(b.off);
-            }
-
-            friend bool operator==(const iterator& a, const iterator& b) { return a.cont == b.cont && a.off == b.off; }
-            friend bool operator!=(const iterator& a, const iterator& b) { return !(a == b); }
-            friend bool operator<(const iterator& a, const iterator& b) { assert(a.cont == b.cont); return a.off < b.off; }
-            friend bool operator<=(const iterator& a, const iterator& b) { assert(a.cont == b.cont); return a.off <= b.off; }
-            friend bool operator>(const iterator& a, const iterator& b) { assert(a.cont == b.cont); return a.off > b.off; }
-            friend bool operator>=(const iterator& a, const iterator& b) { assert(a.cont == b.cont); return a.off >= b.off; }
-        };
-
-        /**
-         * Address: 0x0073B570 (FUN_0073B570, `Moho::CSimDriver::CSimDriver`)
-         *
-         * What it does:
-         * Confirms the real default-construction state for a deque member:
-         * the ctor writes `_Map = 0; _Mapsize = 0; _Myoff = 0; _Mysize = 0;`
-         * directly (`this->mSyncdat._Map = 0` etc. in the decompiler export)
-         * with no call into any node/map-allocating helper. The map is
-         * built lazily by `grow_map()` on first insert, matching
-         * Dinkumware's own lazy-empty `deque` state -- there is no eager
-         * `kInitMapSlots`-sized pre-allocation.
-         */
-        deque()
-            : _Map(nullptr), _Mapsize(0), _Myoff(0), _Mysize(0)
-        {
-        }
-
-        /**
-         * Address: 0x008B5210 (FUN_008B5210 -- `~deque` for
-         * `fa::deque<Moho::UserCommandIssueLocalEvent>` (0x50-byte element,
-         * block size 1): `pop_back` until empty (each event's implicit
-         * destructor 0x008B4800), then every node from the top of the map
-         * down, then the map; `UserCommandIssueHelper::~UserCommandIssueHelper`
-         * 0x008B3F80 runs it on `mLocalQueue`.)
-         * Address: 0x0074DF10 (FUN_0074DF10 -- `~deque` for `fa::deque<void*>`,
-         * `Sim::mDeletionQueue` (+0xA48): the same `pop_back` drain (a no-op
-         * element destructor, so only `_Mysize`/`_Myoff` move), the nodes from
-         * the top down, then the map. Reached from `Sim::~Sim` 0x007458E0.)
-         * Address: 0x0074C940 (FUN_0074C940 -- a one-instruction `jmp` thunk to
-         * 0x0074DF10, reached from `Sim::Sim`'s unwind path 0x007434D0 and from
-         * `Sim::~Sim`.)
-         * Address: 0x00740860 (FUN_00740860 -- `~deque` for `fa::deque<Moho::SSyncData*>` (`SSyncDataQueue::mSyncdat`), a one-instruction `jmp` to its teardown body 0x007411A0 (cited on `clear()`), the same shape as 0x0074C940; reached only from unwind funclets: 0x00BAC240 (0x0073FA70), 0x00BAC260 (0x0073BA10), 0x00BAC280 (`SSyncDataQueue::~SSyncDataQueue` 0x0073B940) and 0x00BBB9A7 (`CSimDriver::~CSimDriver` 0x0073BA50); formerly `ForwardOwnerCleanupThunkRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
-         * Address: 0x004ADA70 (FUN_004ADA70 -- `~deque` for `fa::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2): `pop_back`
-         *   until empty, releasing each `weak_ptr`, then the nodes from the top of
-         *   the map down and the map. `~ResourceManager` 0x004A9C00; formerly
-         *   `CleanupPrefetchWeakPairRingQueue_004ADA70` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
-         * Address: 0x004AC9E0 (FUN_004AC9E0 -- a one-instruction `jmp` to 0x004ADA70,
-         *   reached from `~ResourceManager` and the constructor's unwind path;
-         *   formerly `CleanupPrefetchWeakPairRingQueueThunk`.)
-         */
-        ~deque()
-        {
-            clear();
-        }
-
-        deque(const deque&) = delete;
-        deque& operator=(const deque&) = delete;
-
-        // ---- Capacity / state ----
-        size_type size()     const noexcept { return _Mysize; }
-        bool      empty()    const noexcept { return _Mysize == 0; }
-        size_type capacity() const noexcept { return _Mapsize * kBlockSize; }
-
-        // ---- Element access ----
-        reference       operator[](size_type n) { return *ptr_at(n); }
-        const_reference operator[](size_type n) const { return *ptr_at(n); }
-
-        reference at(size_type n)
-        {
-            if (n >= _Mysize) throw std::out_of_range("deque::at");
-            return (*this)[n];
-        }
-        const_reference at(size_type n) const
-        {
-            if (n >= _Mysize) throw std::out_of_range("deque::at");
-            return (*this)[n];
-        }
-
-        reference       front() { assert(!empty()); return *ptr_at(0); }
-        const_reference front() const { assert(!empty()); return *ptr_at(0); }
-
-        reference       back() { assert(!empty()); return *ptr_at(_Mysize - 1); }
-        const_reference back()  const { assert(!empty()); return *ptr_at(_Mysize - 1); }
-
-        // ---- Iterators ----
-        iterator begin() { return iterator{ this, 0 }; }
-        iterator end() { return iterator{ this, _Mysize }; }
-
-        // ---- Modifiers (minimal set) ----
-        /**
-         * Address: 0x007411A0 (FUN_007411A0, bookkeeping half of
-         * `deque<SSyncData*>::~deque` reached via `SSyncDataQueue::
-         * ~SSyncDataQueue` / `Moho::CSimDriver` teardown)
-         *
-         * What it does:
-         * The binary's size-drain loop destroys nothing itself (element
-         * destruction for a pointer-typed deque is a no-op) -- it just
-         * decrements `_Mysize` to 0 and resets `_Myoff` to 0 once it gets
-         * there, exactly mirroring `pop_back()`/`pop_front()`'s "empty
-         * resets offset" convention. Element dtors still run here for
-         * non-trivial T so this stays real `clear()` semantics; only the
-         * offset reset was missing before this citation.
-         * Address: 0x008B7B50 (FUN_008B7B50 -- `_Tidy` for
-         * `fa::deque<Moho::UserManagerHelperEntry>` (`UserCommandQueue::
-         * issueQueue`, 0x10-byte element, block size 1): the drain, each node
-         * from the top of the map down, then the map. Reached from
-         * `issueQueue.clear()` in `ResetUserUnitManagerState` 0x008B6E60, from
-         * `~UserCommandQueue` 0x008B6BE0 and through the `~deque` thunks
-         * 0x008B7640 / 0x008B7740. Formerly `ClearUserManagerIssueQueue` in
-         * moho/unit/core/UserUnit.cpp, removed 2026-09-30.)
-         * Address: 0x008B7640 (FUN_008B7640 -- a one-instruction `jmp` to
-         * 0x008B7B50, that instantiation's `~deque`; zero callers.)
-         * Address: 0x008B7740 (FUN_008B7740 -- a second such `jmp`; zero callers.)
-         */
-        void clear()
-        {
-            // VC8's `clear` is `_Tidy`: `pop_back` until empty (last element
-            // first), then every node from the top of the map down, then the
-            // map itself. The recovery used to stop after the drain and keep
-            // the storage; the binary frees it (0x008B7B50 below).
-            while (_Mysize != 0)
-            {
-                ptr_at(_Mysize - 1)->~T();
-                if (--_Mysize == 0)
-                    _Myoff = 0;
-            }
-            release_all();
-        }
-
-        /**
-         * Address: 0x0067B870 (FUN_0067B870, fa::deque<void*>::push_back
-         * specialization for `Moho::Sim::mDeletionQueue`) — grows the node map
-         * when the write slot's map index wraps onto a full map (`_Growmap`),
-         * lazily allocates the target node if unset, then constructs the value
-         * at the computed slot and bumps `_Mysize`. Emitted via
-         * SimulationRef->mDeletionQueue.push_back(this) in Entity::Destroy
-         * (Entity.cpp:4559).
-         * Address: 0x007408F0 (FUN_007408F0, fa::deque<Moho::SSyncData*>::
-         * Address: 0x008B76D0 (FUN_008B76D0 -- `push_back` for
-         *          `fa::deque<Moho::UserManagerHelperEntry>` (block size 1):
-         *          `_Growmap` 0x008B79E0 when `_Mapsize <= _Mysize + 1`, the node
-         *          allocated through 0x008B8010, the 0x10-byte edit copied in.
-         *          Callers: the queue edits `UserUnitManagerAdd` 0x008B6DE0,
-         *          `ResetUserUnitManagerState` 0x008B6E60 and
-         *          `RecordUnitManagerCommandHelperRemoval` 0x008B6EE0. Formerly
-         *          `PushUserManagerIssue` in moho/unit/core/UserUnit.cpp,
-         *          removed 2026-09-30.)
-         *          push_back -- same body, 4-byte T / kBlockSize==4
-         *          instantiation; sole caller is `SSyncDataQueue::PushBack`'s
-         *          guard `FUN_0073F940`, see SimDriver.cpp).
-         * Address: 0x007BB440 (FUN_007BB440, fa::deque<Moho::SNetCommand>::
-         *          push_back -- 0x30-byte T / kBlockSize==1 instantiation:
-         *          the "grow if within one slot of full" guard, wraparound
-         *          slot computation, and lazy per-slot node allocation are
-         *          the same shape as the two instantiations above; the
-         *          element is copy-constructed in place via
-         *          `SNetCommand::SNetCommand(const SNetCommand&)`
-         *          (FUN_007BCE70) rather than a placement-new of a trivial
-         *          type. Reached from `PushBackQueuedCommand`
-         *          (CGpgNetInterface.cpp), itself called from
-         *          `CGpgNetInterface::EnqueueCommand`.)
-         * Address: 0x008B4E80 (FUN_008B4E80 -- `push_back` for
-         *          `fa::deque<Moho::UserCommandIssueLocalEvent>` (0x50-byte
-         *          element, block size 1, so the `% _DEQUESIZ` test folds away
-         *          and the grow test is `_Mapsize <= _Mysize + 1`); the slot is
-         *          bought through the checked one-element allocator 0x008B55D0
-         *          and the event copy-constructed into it (0x008B56F0). Reached
-         *          from the six local-edit queueing bodies 0x008B4720,
-         *          0x008B4880, 0x008B49D0, 0x008B4A40, 0x008B4AC0.)
-         * Address: 0x008B55D0 (FUN_008B55D0 -- that instantiation's one-element
-         *          node allocator: `0xFFFFFFFF / n < 0x50` throws `bad_alloc`,
-         *          else `operator new(0x50 * n)`; `allocate_node` here.)
-         * Address: 0x004ACB00 (FUN_004ACB00 -- `push_back` for `fa::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2): the
-         *          element is a `weak_ptr` built from the queued `shared_ptr`.
-         *          `ResourceManager::PrefetchResource` 0x004AAC20; formerly
-         *          `PushPrefetchWeakPairRingBack` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
-         * Address: 0x004AF360 (FUN_004AF360 -- that instantiation's node
-         *          allocator, `0xFFFFFFFF / n < 8` throws `bad_alloc`; formerly
-         *          `AllocateChecked8ByteStride_004AF360`.)
-         * Address: 0x004ADB30 (FUN_004ADB30 -- `allocate_node` for the same
-         *          deque, `n = 2` into 0x004AF360; unreferenced; formerly
-         *          `AllocateWeakPairChunkBlock_004ADB30`.)
-         */
-        void push_back(const T& v)
-        {
-            // VC8: `if ((_Myoff + _Mysize) % _DEQUESIZ == 0 &&
-            //          _Mapsize <= (_Mysize + _DEQUESIZ) / _DEQUESIZ) _Growmap(1);`
-            // (0x007408FD..0x0074090E, 0x008B4E83..0x008B4E8F).
-            if ((_Myoff + _Mysize) % kBlockSize == 0 && _Mapsize <= (_Mysize + kBlockSize) / kBlockSize)
-                grow_map();
-            ensure_node_for_write(_Mysize); // element at logical index = size()
-            T* p = ptr_at(_Mysize);
-            ::new (static_cast<void*>(p)) T(v);
-            ++_Mysize;
-        }
-
-        /**
-         * Exception safety: compute the would-be front slot without
-         * mutating `_Myoff`/`_Mysize` until construction has actually
-         * succeeded (confirmed against the real `deque<Moho::SNetCommand>`
-         * push_front emission, FUN_007BE750: it writes `_Myoff` and bumps
-         * `_Mysize` only after its copy-construct call returns). The
-         * straight-line "decrement offset, then construct" version this
-         * replaced would leave `_Myoff` pointing at an uninitialized slot
-         * if `T`'s copy constructor throws.
-         *
-         * Address: 0x004ACA20 (FUN_004ACA20 -- `push_front` for `fa::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2): a
-         *   prefetch the file changed under goes back to the front.
-         *   `ResourceManager::PrefetchThread` 0x004AB180; formerly
-         *   `PushPrefetchWeakPairRingFront` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
-         */
-        void push_front(const T& v)
-        {
-            if (_Myoff % kBlockSize == 0 && _Mapsize <= (_Mysize + kBlockSize) / kBlockSize)
-                grow_map();
-            const size_type newOff = (_Myoff == 0) ? capacity() - 1 : _Myoff - 1;
-            const size_type nodeIdx = node_index_from_global(newOff, _Mapsize);
-            if (_Map[nodeIdx] == nullptr)
-                _Map[nodeIdx] = allocate_node();
-            T* const p = _Map[nodeIdx] + in_node_index_from_global(newOff);
-            ::new (static_cast<void*>(p)) T(v);
-            _Myoff = newOff;
-            ++_Mysize;
-        }
-
-        /**
-         * Address: 0x007BC110 (FUN_007BC110, fa::deque<Moho::SNetCommand>::pop_back)
-         *
-         * What it does:
-         * Destroys the back element and decrements size, additionally
-         * resetting the begin offset back to 0 when the deque becomes
-         * empty (the binary does this so a fully-drained deque restarts
-         * writes at map slot 0 instead of wherever the last element
-         * happened to sit).
-         */
-        void pop_back()
-        {
-            assert(!empty());
-            T* p = ptr_at(_Mysize - 1);
-            p->~T();
-            --_Mysize;
-            if (_Mysize == 0)
-                _Myoff = 0;
-        }
-
-        /**
-         * Address: 0x007BB400 (FUN_007BB400, fa::deque<Moho::SNetCommand>::pop_front)
-         * Address: 0x004ACAA0 (FUN_004ACAA0 -- `pop_front` for `fa::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2), releasing the
-         *          front `weak_ptr`; `ResourceManager::PrefetchThread` 0x004AB180;
-         *          formerly `PopPrefetchWeakPairRingFront` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
-         *
-         * What it does:
-         * Destroys the front element, advances the begin offset (wrapping
-         * at `capacity()`), decrements size, and resets the begin offset
-         * back to 0 when the deque becomes empty.
-         */
-        void pop_front()
-        {
-            assert(!empty());
-            T* p = ptr_at(0);
-            p->~T();
-            ++_Myoff;
-            if (_Myoff >= capacity())
-                _Myoff = 0;
-            --_Mysize;
-            if (_Mysize == 0)
-                _Myoff = 0;
-        }
-
-        /**
-         * Address: 0x007BCF50 (FUN_007BCF50, fa::deque<Moho::SNetCommand>::swap)
-         * Address: 0x007BC5B0 (FUN_007BC5B0) - linker-emitted thunk that
-         *          tail-calls 0x007BCF50 directly (IDA marks it
-         *          `attributes: thunk`); no separate body to recover.
-         *
-         * What it does:
-         * Swaps the map/mapsize/offset/size storage lanes with another
-         * deque of the same type, leaving each object's debug proxy
-         * pointer untouched.
-         */
-        void swap(deque& other) noexcept
-        {
-            std::swap(_Map, other._Map);
-            std::swap(_Mapsize, other._Mapsize);
-            std::swap(_Myoff, other._Myoff);
-            std::swap(_Mysize, other._Mysize);
-        }
-
-        allocator_type get_allocator() const { return allocator_type(); }
-
-        /**
-         * Address: 0x007BBA90 (FUN_007BBA90, fa::deque<Moho::SNetCommand>::
-         * clear-and-release lane, 0x30-byte element / kBlockSize==1) --
-         * drains every live element in logical order (the loop inlines
-         * `SNetCommand::~SNetCommand()` field-by-field: releases `mArgs`'
-         * heap buffer when non-null, resets its three pointer lanes, frees
-         * `mName`'s heap buffer when its capacity is >=16 and resets it to
-         * empty-SSO state), resetting `_Myoff` to 0 once fully drained
-         * exactly like `clear()` above, THEN additionally frees every
-         * allocated node in `_Map` and the map array itself -- strictly
-         * more than `clear()` alone does, matching `clear()` followed by
-         * `release_all()`. Reached from six recovered `CGpgNetInterface`
-         * call sites (`FUN_007B6900`, `FUN_007B7680`, `FUN_007B7710`,
-         * `FUN_007BB3C0`, `FUN_007BB4D0`, all in CGpgNetInterface.cpp) that
-         * tear the queued-command deque all the way down rather than just
-         * logically emptying it -- `ClearCommandQueue` below is the
-         * source-level call site.
-         */
-        void clear_and_release()
-        {
-            clear();
-            release_all();
-        }
-
-    private:
-        // ---- Exact layout (keep order!) ----
-#if FAF_RETAIL_LAYOUT
-        void* _Myproxy = nullptr;   // +0x00
-#endif
-        T** _Map;       // +0x04
-        size_type _Mapsize;   // +0x08
-        size_type _Myoff;     // +0x0C
-        size_type _Mysize;    // +0x10
-
-        // ---- Helpers ----
-        static size_type node_index_from_global(size_type global, size_type mapsize) noexcept
-        {
-            const size_type node = (global / kBlockSize) % mapsize;
-            return node;
-        }
-
-        static size_type in_node_index_from_global(size_type global) noexcept
-        {
-            return global % kBlockSize;
-        }
-
-        // Returns a pointer to element for logical index n (0.._Mysize), assumes node exists for read.
-        T* ptr_at(size_type logical_index) const
-        {
-            const size_type global = _Myoff + logical_index;
-            const size_type node_idx = node_index_from_global(global, _Mapsize);
-            const size_type within = in_node_index_from_global(global);
-            T* base = _Map[node_idx];
-            assert(base != nullptr && "node must exist for ptr_at()");
-            return base + within;
-        }
-
-        // Ensures node for write at logical index exists (allocates node storage if needed).
-        void ensure_node_for_write(size_type logical_index)
-        {
-            const size_type global = _Myoff + logical_index;
-            const size_type node_idx = node_index_from_global(global, _Mapsize);
-            if (_Map[node_idx] == nullptr)
-                _Map[node_idx] = allocate_node();
-        }
-
-        T* allocate_node()
-        {
-            // Raw uninitialized storage for kBlockSize elements
-            return static_cast<T*>(::operator new(sizeof(T) * kBlockSize));
-        }
-
-        void deallocate_node(T* p)
-        {
-            ::operator delete(static_cast<void*>(p));
-        }
-
-        void release_all()
-        {
-            if (_Map)
-            {
-                for (size_type i = _Mapsize; i != 0; --i)
-                {
-                    if (_Map[i - 1])
-                    {
-                        deallocate_node(_Map[i - 1]);
-                        _Map[i - 1] = nullptr;
-                    }
-                }
-                ::operator delete(static_cast<void*>(_Map));
-                _Map = nullptr;
-                _Mapsize = 0;
-            }
-            _Myoff = _Mysize = 0;
-        }
-
-        /**
-         * Address: 0x007BB920 (FUN_007BB920, fa::deque<Moho::SNetCommand>::_Growmap)
-         * Address: 0x008B79E0 (FUN_008B79E0 -- `_Growmap` for
-         *          `fa::deque<Moho::UserManagerHelperEntry>`, block size 1, its
-         *          map allocated through 0x008B80A0; reached from `push_back`
-         *          0x008B76D0. Formerly `GrowUserManagerIssueQueueMap` in
-         *          moho/unit/core/UserUnit.cpp, removed 2026-09-30.)
-         * Address: 0x008B7E00 (FUN_008B7E00 -- that instantiation's `_Xlen`,
-         *          `throw length_error("deque<T> too long")`.)
-         * Address: 0x008B50A0 (FUN_008B50A0 -- `_Growmap` for
-         *          `fa::deque<Moho::UserCommandIssueLocalEvent>`, block size
-         *          1; its map allocator is 0x008B5690.)
-         * Address: 0x008B5410 (FUN_008B5410 -- that instantiation's `_Xlen`,
-         *          `throw length_error("deque<T> too long")` once the map
-         *          reaches `kMaxSlots` (0x3333333 for the 0x50-byte element).)
-         * Address: 0x00741030 (FUN_00741030, fa::deque<Moho::SSyncData*>::
-         *          _Growmap -- confirms the same body for a 4-byte T /
-         *          kBlockSize==4 instantiation; sole caller is
-         *          `FUN_007408F0` = `push_back`, called from
-         *          `SSyncDataQueue::PushBack` guard `FUN_0073F940`)
-         * Address: 0x004AD900 (FUN_004AD900 -- `_Growmap` for `fa::deque<boost::weak_ptr<moho::PrefetchData>>` (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2), ceiling
-         *          0x0FFFFFFF; its callers are `push_back` 0x004ACB00 and
-         *          `push_front` 0x004ACA20; formerly
-         *          `GrowPrefetchWeakPairRingChunkIndex_004AD900` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
-         * Address: 0x004AE590 (FUN_004AE590 -- that instantiation's `_Xlen`,
-         *          `throw length_error("deque<T> too long")`; formerly
-         *          `ThrowDequeTooLong_004AE590`.)
-         * Address: 0x004AF4E0 (FUN_004AF4E0 -- that instantiation's map
-         *          allocator, `0xFFFFFFFF / n < 4` throws `bad_alloc`; formerly
-         *          `AllocateChecked4ByteStride_004AF4E0`.)
-         *
-         * What it does:
-         * Classic Dinkumware `_Growmap`: grows the node map by
-         * `max(mapsize / 2, kMinGrowSlots)` slots (falling back to 1 slot
-         * when that would overflow the `kMaxSlots`-slot ceiling, which
-         * itself throws `length_error` once actually reached), then
-         * reshuffles existing node pointers with three `memmove`-shaped
-         * ranges so the new, empty slots land contiguously right after the
-         * map's previous end (wrapping around slot 0) instead of
-         * recentering the whole map. The begin node index (`_Myoff /
-         * kBlockSize`) is provably unchanged by this reshuffle -- the
-         * "tail" range `[beginNode, oldMapSize)` always maps to itself --
-         * so `_Myoff` itself is left untouched, matching the binary (which
-         * never writes `view.mOffset` in this function).
-         */
-        void grow_map()
-        {
-            if (_Mapsize == kMaxSlots)
-                throw std::length_error("deque<T> too long");
-
-            size_type growth = 1;
-            const size_type half = _Mapsize >> 1;
-            if (half >= kMinGrowSlots)
-                growth = half;
-            else
-                growth = kMinGrowSlots;
-            if (_Mapsize > kMaxSlots - growth)
-                growth = 1;
-
-            const size_type oldMapSize = _Mapsize;
-            const size_type beginNode = _Myoff / kBlockSize;
-            T** const oldMap = _Map;
-
-            const size_type newMapSize = oldMapSize + growth;
-            T** const newMap = static_cast<T**>(::operator new(sizeof(T*) * newMapSize));
-            std::memset(newMap, 0, sizeof(T*) * newMapSize);
-
-            if (oldMap != nullptr && oldMapSize != 0)
-            {
-                const size_type tailCount = beginNode < oldMapSize ? oldMapSize - beginNode : 0;
-                if (tailCount != 0)
-                    std::memmove(newMap + beginNode, oldMap + beginNode, tailCount * sizeof(T*));
-
-                if (beginNode > growth)
-                {
-                    const size_type prefixCount = growth;
-                    if (prefixCount != 0)
-                        std::memmove(newMap + oldMapSize, oldMap, prefixCount * sizeof(T*));
-
-                    const size_type middleCount = beginNode - growth;
-                    if (middleCount != 0)
-                        std::memmove(newMap, oldMap + growth, middleCount * sizeof(T*));
-                }
-                else
-                {
-                    const size_type copiedCount = beginNode;
-                    if (copiedCount != 0)
-                        std::memmove(newMap + oldMapSize, oldMap, copiedCount * sizeof(T*));
-
-                    if (growth > copiedCount)
-                        std::memset(newMap + oldMapSize + copiedCount, 0, (growth - copiedCount) * sizeof(T*));
-                }
-            }
-
-            if (oldMap != nullptr)
-                ::operator delete(static_cast<void*>(oldMap));
-            _Map = newMap;
-            _Mapsize = newMapSize;
-        }
+      friend bool operator==(
+        const iterator& a,
+        const iterator& b
+      )
+      {
+        return a.cont == b.cont && a.off == b.off;
+      }
+      friend bool operator!=(
+        const iterator& a,
+        const iterator& b
+      )
+      {
+        return !(a == b);
+      }
+      friend bool operator<(
+        const iterator& a,
+        const iterator& b
+      )
+      {
+        assert(a.cont == b.cont);
+        return a.off < b.off;
+      }
+      friend bool operator<=(
+        const iterator& a,
+        const iterator& b
+      )
+      {
+        assert(a.cont == b.cont);
+        return a.off <= b.off;
+      }
+      friend bool operator>(
+        const iterator& a,
+        const iterator& b
+      )
+      {
+        assert(a.cont == b.cont);
+        return a.off > b.off;
+      }
+      friend bool operator>=(
+        const iterator& a,
+        const iterator& b
+      )
+      {
+        assert(a.cont == b.cont);
+        return a.off >= b.off;
+      }
     };
 
-    static_assert(sizeof(deque<int>) == 0x14, "fa::deque must be 20 bytes on x86.");
-    static_assert(sizeof(deque<void*>) == 0x14, "fa::deque must be 20 bytes on x86.");
+    /**
+     * Address: 0x0073B570 (FUN_0073B570, `Moho::CSimDriver::CSimDriver`)
+     *
+     * What it does:
+     * Confirms the real default-construction state for a deque member:
+     * the ctor writes `_Map = 0; _Mapsize = 0; _Myoff = 0; _Mysize = 0;`
+     * directly (`this->mSyncdat._Map = 0` etc. in the decompiler export)
+     * with no call into any node/map-allocating helper. The map is
+     * built lazily by `grow_map()` on first insert, matching
+     * Dinkumware's own lazy-empty `deque` state -- there is no eager
+     * `kInitMapSlots`-sized pre-allocation.
+     */
+    deque()
+      : _Map(nullptr)
+      , _Mapsize(0)
+      , _Myoff(0)
+      , _Mysize(0)
+    {}
+
+    /**
+     * Address: 0x008B5210 (FUN_008B5210 -- `~deque` for
+     * `fa::deque<Moho::UserCommandIssueLocalEvent>` (0x50-byte element,
+     * block size 1): `pop_back` until empty (each event's implicit
+     * destructor 0x008B4800), then every node from the top of the map
+     * down, then the map; `UserCommandIssueHelper::~UserCommandIssueHelper`
+     * 0x008B3F80 runs it on `mLocalQueue`.)
+     * Address: 0x0074DF10 (FUN_0074DF10 -- `~deque` for `fa::deque<void*>`,
+     * `Sim::mDeletionQueue` (+0xA48): the same `pop_back` drain (a no-op
+     * element destructor, so only `_Mysize`/`_Myoff` move), the nodes from
+     * the top down, then the map. Reached from `Sim::~Sim` 0x007458E0.)
+     * Address: 0x0074C940 (FUN_0074C940 -- a one-instruction `jmp` thunk to
+     * 0x0074DF10, reached from `Sim::Sim`'s unwind path 0x007434D0 and from
+     * `Sim::~Sim`.)
+     * Address: 0x00740860 (FUN_00740860 -- `~deque` for `fa::deque<Moho::SSyncData*>` (`SSyncDataQueue::mSyncdat`), a
+     * one-instruction `jmp` to its teardown body 0x007411A0 (cited on `clear()`), the same shape as 0x0074C940; reached
+     * only from unwind funclets: 0x00BAC240 (0x0073FA70), 0x00BAC260 (0x0073BA10), 0x00BAC280
+     * (`SSyncDataQueue::~SSyncDataQueue` 0x0073B940) and 0x00BBB9A7 (`CSimDriver::~CSimDriver` 0x0073BA50); formerly
+     * `ForwardOwnerCleanupThunkRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.) Address:
+     * 0x004ADA70 (FUN_004ADA70 -- `~deque` for `fa::deque<boost::weak_ptr<moho::PrefetchData>>`
+     * (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2): `pop_back` until empty, releasing each
+     * `weak_ptr`, then the nodes from the top of the map down and the map. `~ResourceManager` 0x004A9C00; formerly
+     *   `CleanupPrefetchWeakPairRingQueue_004ADA70` in moho/resource/ResourceManager.cpp (RULE ONE), removed
+     * 2026-09-30.) Address: 0x004AC9E0 (FUN_004AC9E0 -- a one-instruction `jmp` to 0x004ADA70, reached from
+     * `~ResourceManager` and the constructor's unwind path; formerly `CleanupPrefetchWeakPairRingQueueThunk`.)
+     */
+    ~deque()
+    {
+      clear();
+    }
+
+    deque(const deque&) = delete;
+    deque& operator=(const deque&) = delete;
+
+    // ---- Capacity / state ----
+    size_type size() const noexcept
+    {
+      return _Mysize;
+    }
+    bool empty() const noexcept
+    {
+      return _Mysize == 0;
+    }
+    size_type capacity() const noexcept
+    {
+      return _Mapsize * kBlockSize;
+    }
+
+    // ---- Element access ----
+    reference operator[](
+      size_type n
+    )
+    {
+      return *ptr_at(n);
+    }
+    const_reference operator[](
+      size_type n
+    ) const
+    {
+      return *ptr_at(n);
+    }
+
+    reference at(
+      size_type n
+    )
+    {
+      if (n >= _Mysize)
+        throw std::out_of_range("deque::at");
+      return (*this)[n];
+    }
+    const_reference at(
+      size_type n
+    ) const
+    {
+      if (n >= _Mysize)
+        throw std::out_of_range("deque::at");
+      return (*this)[n];
+    }
+
+    reference front()
+    {
+      assert(!empty());
+      return *ptr_at(0);
+    }
+    const_reference front() const
+    {
+      assert(!empty());
+      return *ptr_at(0);
+    }
+
+    reference back()
+    {
+      assert(!empty());
+      return *ptr_at(_Mysize - 1);
+    }
+    const_reference back() const
+    {
+      assert(!empty());
+      return *ptr_at(_Mysize - 1);
+    }
+
+    // ---- Iterators ----
+    iterator begin()
+    {
+      return iterator{this, 0};
+    }
+    iterator end()
+    {
+      return iterator{this, _Mysize};
+    }
+
+    // ---- Modifiers (minimal set) ----
+    /**
+     * Address: 0x007411A0 (FUN_007411A0, bookkeeping half of
+     * `deque<SSyncData*>::~deque` reached via `SSyncDataQueue::
+     * ~SSyncDataQueue` / `Moho::CSimDriver` teardown)
+     *
+     * What it does:
+     * The binary's size-drain loop destroys nothing itself (element
+     * destruction for a pointer-typed deque is a no-op) -- it just
+     * decrements `_Mysize` to 0 and resets `_Myoff` to 0 once it gets
+     * there, exactly mirroring `pop_back()`/`pop_front()`'s "empty
+     * resets offset" convention. Element dtors still run here for
+     * non-trivial T so this stays real `clear()` semantics; only the
+     * offset reset was missing before this citation.
+     * Address: 0x008B7B50 (FUN_008B7B50 -- `_Tidy` for
+     * `fa::deque<Moho::UserManagerHelperEntry>` (`UserCommandQueue::
+     * issueQueue`, 0x10-byte element, block size 1): the drain, each node
+     * from the top of the map down, then the map. Reached from
+     * `issueQueue.clear()` in `ResetUserUnitManagerState` 0x008B6E60, from
+     * `~UserCommandQueue` 0x008B6BE0 and through the `~deque` thunks
+     * 0x008B7640 / 0x008B7740. Formerly `ClearUserManagerIssueQueue` in
+     * moho/unit/core/UserUnit.cpp, removed 2026-09-30.)
+     * Address: 0x008B7640 (FUN_008B7640 -- a one-instruction `jmp` to
+     * 0x008B7B50, that instantiation's `~deque`; zero callers.)
+     * Address: 0x008B7740 (FUN_008B7740 -- a second such `jmp`; zero callers.)
+     */
+    void clear()
+    {
+      // VC8's `clear` is `_Tidy`: `pop_back` until empty (last element
+      // first), then every node from the top of the map down, then the
+      // map itself. The recovery used to stop after the drain and keep
+      // the storage; the binary frees it (0x008B7B50 below).
+      while (_Mysize != 0) {
+        ptr_at(_Mysize - 1)->~T();
+        if (--_Mysize == 0)
+          _Myoff = 0;
+      }
+      release_all();
+    }
+
+    /**
+     * Address: 0x0067B870 (FUN_0067B870, fa::deque<void*>::push_back
+     * specialization for `Moho::Sim::mDeletionQueue`) — grows the node map
+     * when the write slot's map index wraps onto a full map (`_Growmap`),
+     * lazily allocates the target node if unset, then constructs the value
+     * at the computed slot and bumps `_Mysize`. Emitted via
+     * SimulationRef->mDeletionQueue.push_back(this) in Entity::Destroy
+     * (Entity.cpp:4559).
+     * Address: 0x007408F0 (FUN_007408F0, fa::deque<Moho::SSyncData*>::
+     * Address: 0x008B76D0 (FUN_008B76D0 -- `push_back` for
+     *          `fa::deque<Moho::UserManagerHelperEntry>` (block size 1):
+     *          `_Growmap` 0x008B79E0 when `_Mapsize <= _Mysize + 1`, the node
+     *          allocated through 0x008B8010, the 0x10-byte edit copied in.
+     *          Callers: the queue edits `UserUnitManagerAdd` 0x008B6DE0,
+     *          `ResetUserUnitManagerState` 0x008B6E60 and
+     *          `RecordUnitManagerCommandHelperRemoval` 0x008B6EE0. Formerly
+     *          `PushUserManagerIssue` in moho/unit/core/UserUnit.cpp,
+     *          removed 2026-09-30.)
+     *          push_back -- same body, 4-byte T / kBlockSize==4
+     *          instantiation; sole caller is `SSyncDataQueue::PushBack`'s
+     *          guard `FUN_0073F940`, see SimDriver.cpp).
+     * Address: 0x007BB440 (FUN_007BB440, fa::deque<Moho::SNetCommand>::
+     *          push_back -- 0x30-byte T / kBlockSize==1 instantiation:
+     *          the "grow if within one slot of full" guard, wraparound
+     *          slot computation, and lazy per-slot node allocation are
+     *          the same shape as the two instantiations above; the
+     *          element is copy-constructed in place via
+     *          `SNetCommand::SNetCommand(const SNetCommand&)`
+     *          (FUN_007BCE70) rather than a placement-new of a trivial
+     *          type. Reached from `PushBackQueuedCommand`
+     *          (CGpgNetInterface.cpp), itself called from
+     *          `CGpgNetInterface::EnqueueCommand`.)
+     * Address: 0x008B4E80 (FUN_008B4E80 -- `push_back` for
+     *          `fa::deque<Moho::UserCommandIssueLocalEvent>` (0x50-byte
+     *          element, block size 1, so the `% _DEQUESIZ` test folds away
+     *          and the grow test is `_Mapsize <= _Mysize + 1`); the slot is
+     *          bought through the checked one-element allocator 0x008B55D0
+     *          and the event copy-constructed into it (0x008B56F0). Reached
+     *          from the six local-edit queueing bodies 0x008B4720,
+     *          0x008B4880, 0x008B49D0, 0x008B4A40, 0x008B4AC0.)
+     * Address: 0x008B55D0 (FUN_008B55D0 -- that instantiation's one-element
+     *          node allocator: `0xFFFFFFFF / n < 0x50` throws `bad_alloc`,
+     *          else `operator new(0x50 * n)`; `allocate_node` here.)
+     * Address: 0x004ACB00 (FUN_004ACB00 -- `push_back` for `fa::deque<boost::weak_ptr<moho::PrefetchData>>`
+     * (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2): the element is a `weak_ptr` built from the
+     * queued `shared_ptr`. `ResourceManager::PrefetchResource` 0x004AAC20; formerly `PushPrefetchWeakPairRingBack` in
+     * moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.) Address: 0x004AF360 (FUN_004AF360 -- that
+     * instantiation's node allocator, `0xFFFFFFFF / n < 8` throws `bad_alloc`; formerly
+     *          `AllocateChecked8ByteStride_004AF360`.)
+     * Address: 0x004ADB30 (FUN_004ADB30 -- `allocate_node` for the same
+     *          deque, `n = 2` into 0x004AF360; unreferenced; formerly
+     *          `AllocateWeakPairChunkBlock_004ADB30`.)
+     */
+    void push_back(
+      const T& v
+    )
+    {
+      // VC8: `if ((_Myoff + _Mysize) % _DEQUESIZ == 0 &&
+      //          _Mapsize <= (_Mysize + _DEQUESIZ) / _DEQUESIZ) _Growmap(1);`
+      // (0x007408FD..0x0074090E, 0x008B4E83..0x008B4E8F).
+      if ((_Myoff + _Mysize) % kBlockSize == 0 && _Mapsize <= (_Mysize + kBlockSize) / kBlockSize)
+        grow_map();
+      ensure_node_for_write(_Mysize); // element at logical index = size()
+      T* p = ptr_at(_Mysize);
+      ::new (static_cast<void*>(p)) T(v);
+      ++_Mysize;
+    }
+
+    /**
+     * Exception safety: compute the would-be front slot without
+     * mutating `_Myoff`/`_Mysize` until construction has actually
+     * succeeded (confirmed against the real `deque<Moho::SNetCommand>`
+     * push_front emission, FUN_007BE750: it writes `_Myoff` and bumps
+     * `_Mysize` only after its copy-construct call returns). The
+     * straight-line "decrement offset, then construct" version this
+     * replaced would leave `_Myoff` pointing at an uninitialized slot
+     * if `T`'s copy constructor throws.
+     *
+     * Address: 0x004ACA20 (FUN_004ACA20 -- `push_front` for `fa::deque<boost::weak_ptr<moho::PrefetchData>>`
+     * (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2): a prefetch the file changed under goes back to
+     * the front. `ResourceManager::PrefetchThread` 0x004AB180; formerly `PushPrefetchWeakPairRingFront` in
+     * moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
+     */
+    void push_front(
+      const T& v
+    )
+    {
+      if (_Myoff % kBlockSize == 0 && _Mapsize <= (_Mysize + kBlockSize) / kBlockSize)
+        grow_map();
+      const size_type newOff = (_Myoff == 0) ? capacity() - 1 : _Myoff - 1;
+      const size_type nodeIdx = node_index_from_global(newOff, _Mapsize);
+      if (_Map[nodeIdx] == nullptr)
+        _Map[nodeIdx] = allocate_node();
+      T* const p = _Map[nodeIdx] + in_node_index_from_global(newOff);
+      ::new (static_cast<void*>(p)) T(v);
+      _Myoff = newOff;
+      ++_Mysize;
+    }
+
+    /**
+     * Address: 0x007BC110 (FUN_007BC110, fa::deque<Moho::SNetCommand>::pop_back)
+     *
+     * What it does:
+     * Destroys the back element and decrements size, additionally
+     * resetting the begin offset back to 0 when the deque becomes
+     * empty (the binary does this so a fully-drained deque restarts
+     * writes at map slot 0 instead of wherever the last element
+     * happened to sit).
+     */
+    void pop_back()
+    {
+      assert(!empty());
+      T* p = ptr_at(_Mysize - 1);
+      p->~T();
+      --_Mysize;
+      if (_Mysize == 0)
+        _Myoff = 0;
+    }
+
+    /**
+     * Address: 0x007BB400 (FUN_007BB400, fa::deque<Moho::SNetCommand>::pop_front)
+     * Address: 0x004ACAA0 (FUN_004ACAA0 -- `pop_front` for `fa::deque<boost::weak_ptr<moho::PrefetchData>>`
+     * (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2), releasing the front `weak_ptr`;
+     * `ResourceManager::PrefetchThread` 0x004AB180; formerly `PopPrefetchWeakPairRingFront` in
+     * moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.)
+     *
+     * What it does:
+     * Destroys the front element, advances the begin offset (wrapping
+     * at `capacity()`), decrements size, and resets the begin offset
+     * back to 0 when the deque becomes empty.
+     */
+    void pop_front()
+    {
+      assert(!empty());
+      T* p = ptr_at(0);
+      p->~T();
+      ++_Myoff;
+      if (_Myoff >= capacity())
+        _Myoff = 0;
+      --_Mysize;
+      if (_Mysize == 0)
+        _Myoff = 0;
+    }
+
+    /**
+     * Address: 0x007BCF50 (FUN_007BCF50, fa::deque<Moho::SNetCommand>::swap)
+     * Address: 0x007BC5B0 (FUN_007BC5B0) - linker-emitted thunk that
+     *          tail-calls 0x007BCF50 directly (IDA marks it
+     *          `attributes: thunk`); no separate body to recover.
+     *
+     * What it does:
+     * Swaps the map/mapsize/offset/size storage lanes with another
+     * deque of the same type, leaving each object's debug proxy
+     * pointer untouched.
+     */
+    void swap(
+      deque& other
+    ) noexcept
+    {
+      std::swap(_Map, other._Map);
+      std::swap(_Mapsize, other._Mapsize);
+      std::swap(_Myoff, other._Myoff);
+      std::swap(_Mysize, other._Mysize);
+    }
+
+    allocator_type get_allocator() const
+    {
+      return allocator_type();
+    }
+
+    /**
+     * Address: 0x007BBA90 (FUN_007BBA90, fa::deque<Moho::SNetCommand>::
+     * clear-and-release lane, 0x30-byte element / kBlockSize==1) --
+     * drains every live element in logical order (the loop inlines
+     * `SNetCommand::~SNetCommand()` field-by-field: releases `mArgs`'
+     * heap buffer when non-null, resets its three pointer lanes, frees
+     * `mName`'s heap buffer when its capacity is >=16 and resets it to
+     * empty-SSO state), resetting `_Myoff` to 0 once fully drained
+     * exactly like `clear()` above, THEN additionally frees every
+     * allocated node in `_Map` and the map array itself -- strictly
+     * more than `clear()` alone does, matching `clear()` followed by
+     * `release_all()`. Reached from six recovered `CGpgNetInterface`
+     * call sites (`FUN_007B6900`, `FUN_007B7680`, `FUN_007B7710`,
+     * `FUN_007BB3C0`, `FUN_007BB4D0`, all in CGpgNetInterface.cpp) that
+     * tear the queued-command deque all the way down rather than just
+     * logically emptying it -- `ClearCommandQueue` below is the
+     * source-level call site.
+     */
+    void clear_and_release()
+    {
+      clear();
+      release_all();
+    }
+
+  private:
+    // ---- Exact layout (keep order!) ----
+#if FAF_RETAIL_LAYOUT
+    void* _Myproxy = nullptr; // +0x00
+#endif
+    T** _Map;           // +0x04
+    size_type _Mapsize; // +0x08
+    size_type _Myoff;   // +0x0C
+    size_type _Mysize;  // +0x10
+
+    // ---- Helpers ----
+    static size_type node_index_from_global(
+      size_type global,
+      size_type mapsize
+    ) noexcept
+    {
+      const size_type node = (global / kBlockSize) % mapsize;
+      return node;
+    }
+
+    static size_type in_node_index_from_global(
+      size_type global
+    ) noexcept
+    {
+      return global % kBlockSize;
+    }
+
+    // Returns a pointer to element for logical index n (0.._Mysize), assumes node exists for read.
+    T* ptr_at(
+      size_type logical_index
+    ) const
+    {
+      const size_type global = _Myoff + logical_index;
+      const size_type node_idx = node_index_from_global(global, _Mapsize);
+      const size_type within = in_node_index_from_global(global);
+      T* base = _Map[node_idx];
+      assert(base != nullptr && "node must exist for ptr_at()");
+      return base + within;
+    }
+
+    // Ensures node for write at logical index exists (allocates node storage if needed).
+    void ensure_node_for_write(
+      size_type logical_index
+    )
+    {
+      const size_type global = _Myoff + logical_index;
+      const size_type node_idx = node_index_from_global(global, _Mapsize);
+      if (_Map[node_idx] == nullptr)
+        _Map[node_idx] = allocate_node();
+    }
+
+    T* allocate_node()
+    {
+      // Raw uninitialized storage for kBlockSize elements
+      return static_cast<T*>(::operator new(sizeof(T) * kBlockSize));
+    }
+
+    void deallocate_node(
+      T* p
+    )
+    {
+      ::operator delete(static_cast<void*>(p));
+    }
+
+    void release_all()
+    {
+      if (_Map) {
+        for (size_type i = _Mapsize; i != 0; --i) {
+          if (_Map[i - 1]) {
+            deallocate_node(_Map[i - 1]);
+            _Map[i - 1] = nullptr;
+          }
+        }
+        ::operator delete(static_cast<void*>(_Map));
+        _Map = nullptr;
+        _Mapsize = 0;
+      }
+      _Myoff = _Mysize = 0;
+    }
+
+    /**
+     * Address: 0x007BB920 (FUN_007BB920, fa::deque<Moho::SNetCommand>::_Growmap)
+     * Address: 0x008B79E0 (FUN_008B79E0 -- `_Growmap` for
+     *          `fa::deque<Moho::UserManagerHelperEntry>`, block size 1, its
+     *          map allocated through 0x008B80A0; reached from `push_back`
+     *          0x008B76D0. Formerly `GrowUserManagerIssueQueueMap` in
+     *          moho/unit/core/UserUnit.cpp, removed 2026-09-30.)
+     * Address: 0x008B7E00 (FUN_008B7E00 -- that instantiation's `_Xlen`,
+     *          `throw length_error("deque<T> too long")`.)
+     * Address: 0x008B50A0 (FUN_008B50A0 -- `_Growmap` for
+     *          `fa::deque<Moho::UserCommandIssueLocalEvent>`, block size
+     *          1; its map allocator is 0x008B5690.)
+     * Address: 0x008B5410 (FUN_008B5410 -- that instantiation's `_Xlen`,
+     *          `throw length_error("deque<T> too long")` once the map
+     *          reaches `kMaxSlots` (0x3333333 for the 0x50-byte element).)
+     * Address: 0x00741030 (FUN_00741030, fa::deque<Moho::SSyncData*>::
+     *          _Growmap -- confirms the same body for a 4-byte T /
+     *          kBlockSize==4 instantiation; sole caller is
+     *          `FUN_007408F0` = `push_back`, called from
+     *          `SSyncDataQueue::PushBack` guard `FUN_0073F940`)
+     * Address: 0x004AD900 (FUN_004AD900 -- `_Growmap` for `fa::deque<boost::weak_ptr<moho::PrefetchData>>`
+     * (`ResourceManager::mPrefetchQueue`, 8-byte element, block size 2), ceiling 0x0FFFFFFF; its callers are
+     * `push_back` 0x004ACB00 and `push_front` 0x004ACA20; formerly `GrowPrefetchWeakPairRingChunkIndex_004AD900` in
+     * moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-30.) Address: 0x004AE590 (FUN_004AE590 -- that
+     * instantiation's `_Xlen`, `throw length_error("deque<T> too long")`; formerly `ThrowDequeTooLong_004AE590`.)
+     * Address: 0x004AF4E0 (FUN_004AF4E0 -- that instantiation's map
+     *          allocator, `0xFFFFFFFF / n < 4` throws `bad_alloc`; formerly
+     *          `AllocateChecked4ByteStride_004AF4E0`.)
+     *
+     * What it does:
+     * Classic Dinkumware `_Growmap`: grows the node map by
+     * `max(mapsize / 2, kMinGrowSlots)` slots (falling back to 1 slot
+     * when that would overflow the `kMaxSlots`-slot ceiling, which
+     * itself throws `length_error` once actually reached), then
+     * reshuffles existing node pointers with three `memmove`-shaped
+     * ranges so the new, empty slots land contiguously right after the
+     * map's previous end (wrapping around slot 0) instead of
+     * recentering the whole map. The begin node index (`_Myoff /
+     * kBlockSize`) is provably unchanged by this reshuffle -- the
+     * "tail" range `[beginNode, oldMapSize)` always maps to itself --
+     * so `_Myoff` itself is left untouched, matching the binary (which
+     * never writes `view.mOffset` in this function).
+     */
+    void grow_map()
+    {
+      if (_Mapsize == kMaxSlots)
+        throw std::length_error("deque<T> too long");
+
+      size_type growth = 1;
+      const size_type half = _Mapsize >> 1;
+      if (half >= kMinGrowSlots)
+        growth = half;
+      else
+        growth = kMinGrowSlots;
+      if (_Mapsize > kMaxSlots - growth)
+        growth = 1;
+
+      const size_type oldMapSize = _Mapsize;
+      const size_type beginNode = _Myoff / kBlockSize;
+      T** const oldMap = _Map;
+
+      const size_type newMapSize = oldMapSize + growth;
+      T** const newMap = static_cast<T**>(::operator new(sizeof(T*) * newMapSize));
+      std::memset(newMap, 0, sizeof(T*) * newMapSize);
+
+      if (oldMap != nullptr && oldMapSize != 0) {
+        const size_type tailCount = beginNode < oldMapSize ? oldMapSize - beginNode : 0;
+        if (tailCount != 0)
+          std::memmove(newMap + beginNode, oldMap + beginNode, tailCount * sizeof(T*));
+
+        if (beginNode > growth) {
+          const size_type prefixCount = growth;
+          if (prefixCount != 0)
+            std::memmove(newMap + oldMapSize, oldMap, prefixCount * sizeof(T*));
+
+          const size_type middleCount = beginNode - growth;
+          if (middleCount != 0)
+            std::memmove(newMap, oldMap + growth, middleCount * sizeof(T*));
+        } else {
+          const size_type copiedCount = beginNode;
+          if (copiedCount != 0)
+            std::memmove(newMap + oldMapSize, oldMap, copiedCount * sizeof(T*));
+
+          if (growth > copiedCount)
+            std::memset(newMap + oldMapSize + copiedCount, 0, (growth - copiedCount) * sizeof(T*));
+        }
+      }
+
+      if (oldMap != nullptr)
+        ::operator delete(static_cast<void*>(oldMap));
+      _Map = newMap;
+      _Mapsize = newMapSize;
+    }
+  };
+
+  static_assert(sizeof(deque<int>) == 0x14, "fa::deque must be 20 bytes on x86.");
+  static_assert(sizeof(deque<void*>) == 0x14, "fa::deque must be 20 bytes on x86.");
 } // namespace fa

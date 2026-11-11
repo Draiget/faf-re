@@ -102,7 +102,12 @@ namespace moho
 
 namespace moho
 {
-  void RBeamBlueprint::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void RBeamBlueprint::MemberConstruct(
+    gpg::ReadArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     RRuleGameRules* rules = nullptr;
     const gpg::RRef owner{};
@@ -118,7 +123,10 @@ namespace moho
    * Address: 0x00510260 (FUN_00510260)
    */
   void RBeamBlueprint::MemberSaveConstructArgs(
-    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+    gpg::WriteArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerSaveConstructArgsResult& result
   )
   {
     archive.WritePointer(mOwnerRules, gpg::TrackedPointerState::Unowned, gpg::RRef{});

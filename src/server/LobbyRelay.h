@@ -56,11 +56,12 @@ namespace faf::server
     UnknownSender, // not a participant of the match
     UnknownTarget, // the uid it is for isn't one, or is the sender
     TooLarge,
-    TooFast,       // past the sender's rate
-    Malformed,     // no uid, or no message after it
-    EjectIgnored,  // plan WPR.49: an eject of a participant of the match (organised, or not from the host)
+    TooFast,        // past the sender's rate
+    Malformed,      // no uid, or no message after it
+    EjectIgnored,   // plan WPR.49: an eject of a participant of the match (organised, or not from the host)
     EjectForwarded, // plan WP17.1: a player-hosted lobby's host ejects a participant: `out` goes to `to`, who is out
-    Locked,        // plan WP17.6: an organiser-run lobby's player asked to move, change colour or sides, or set more than Ready
+    Locked, // plan WP17.6: an organiser-run lobby's player asked to move, change colour or sides, or set more than
+            // Ready
     Count
   };
 
@@ -73,24 +74,52 @@ namespace faf::server
     void RemoveParticipant(std::int32_t uid);
     [[nodiscard]] bool IsParticipant(std::int32_t uid) const;
     /** At launch: every frame from now on is `Closed`. */
-    void Close() noexcept { mOpen = false; }
-    [[nodiscard]] bool Open() const noexcept { return mOpen; }
+    void Close() noexcept
+    {
+      mOpen = false;
+    }
+    [[nodiscard]] bool Open() const noexcept
+    {
+      return mOpen;
+    }
     /** Plan WPR.49: the game options the match pins, which no participant's message changes. */
-    void PinOptions(SPinnedOptions pinned) { mPinned = std::move(pinned); }
+    void PinOptions(
+      SPinnedOptions pinned
+    )
+    {
+      mPinned = std::move(pinned);
+    }
     /** Plan WP17.1: organised (the default) or player-hosted. */
-    void SetControl(const ELobbyControl control) noexcept { mControl = control; }
-    [[nodiscard]] ELobbyControl Control() const noexcept { return mControl; }
+    void SetControl(
+      const ELobbyControl control
+    ) noexcept
+    {
+      mControl = control;
+    }
+    [[nodiscard]] ELobbyControl Control() const noexcept
+    {
+      return mControl;
+    }
     /** The current logical host (0: none), whose ejects go through in a player-hosted lobby. */
-    void SetHost(const std::int32_t uid) noexcept { mHost = uid; }
+    void SetHost(
+      const std::int32_t uid
+    ) noexcept
+    {
+      mHost = uid;
+    }
 
     /**
      * A `Lobby` frame's body from `from` (varint uid it is for, then the message) at `nowUs`. With `Forward`, `to`
-     * is the participant and `out` the whole frame for them (`ESeatMessage::Lobby`, varint `from`, the message, with the
-     * match's pinned options written back into script data); with `ToServer`, `message` is the lobby message for the
-     * server. Counted by verdict either way.
+     * is the participant and `out` the whole frame for them (`ESeatMessage::Lobby`, varint `from`, the message, with
+     * the match's pinned options written back into script data); with `ToServer`, `message` is the lobby message for
+     * the server. Counted by verdict either way.
      */
     [[nodiscard]] ELobbyRelayVerdict Take(
-      std::int32_t from, std::span<const std::uint8_t> body, std::uint64_t nowUs, std::int32_t& to, std::vector<std::uint8_t>& out,
+      std::int32_t from,
+      std::span<const std::uint8_t> body,
+      std::uint64_t nowUs,
+      std::int32_t& to,
+      std::vector<std::uint8_t>& out,
       std::span<const std::uint8_t>& message
     );
 
@@ -100,25 +129,43 @@ namespace faf::server
      * host, for what only a host may send: FAF lobby.lua takes `GameOptions` from the host alone). */
     [[nodiscard]] static std::vector<std::uint8_t> FrameFrom(std::int32_t from, std::span<const std::uint8_t> message);
 
-    [[nodiscard]] std::uint64_t Count(ELobbyRelayVerdict verdict) const noexcept { return mCounts[static_cast<std::size_t>(verdict)]; }
+    [[nodiscard]] std::uint64_t Count(
+      ELobbyRelayVerdict verdict
+    ) const noexcept
+    {
+      return mCounts[static_cast<std::size_t>(verdict)];
+    }
     /** Forwarded messages whose pinned options were written back. */
-    [[nodiscard]] std::uint64_t OptionsPinned() const noexcept { return mOptionsPinned; }
+    [[nodiscard]] std::uint64_t OptionsPinned() const noexcept
+    {
+      return mOptionsPinned;
+    }
     /** Plan WP17.6: a player's own options that went on with only `Ready` left. */
-    [[nodiscard]] std::uint64_t PlayerOptionsLimited() const noexcept { return mPlayerOptionsLimited; }
+    [[nodiscard]] std::uint64_t PlayerOptionsLimited() const noexcept
+    {
+      return mPlayerOptionsLimited;
+    }
     /** Plan WP17.2: a participant's ready state as their own `PlayerOptions` last set it; nothing before they did. */
-    [[nodiscard]] std::optional<bool> ReadyOf(const std::int32_t uid) const
+    [[nodiscard]] std::optional<bool> ReadyOf(
+      const std::int32_t uid
+    ) const
     {
       const auto found = mReady.find(uid);
       return found == mReady.end() ? std::nullopt : std::optional<bool>(found->second);
     }
     /** Plan WP17.2: a participant's lobby slot as the host's lobby last said it (`SLobbyFacts::seats`); 0 before. */
-    [[nodiscard]] int LobbySlotOf(const std::int32_t uid) const
+    [[nodiscard]] int LobbySlotOf(
+      const std::int32_t uid
+    ) const
     {
       const auto found = mLobbySlots.find(uid);
       return found == mLobbySlots.end() ? 0 : found->second;
     }
     /** The ready states that changed since the last call, in order. */
-    [[nodiscard]] std::vector<std::pair<std::int32_t, bool>> TakeReadyChanges() { return std::exchange(mReadyChanges, {}); }
+    [[nodiscard]] std::vector<std::pair<std::int32_t, bool>> TakeReadyChanges()
+    {
+      return std::exchange(mReadyChanges, {});
+    }
 
   private:
     struct SBucket

@@ -63,7 +63,10 @@ namespace moho
      * Empty rect, not yet linked. Inlined into every `Entity` constructor
      * (0x006779E0, 0x00678160, ...), which is where the grid comes from.
      */
-    CollisionShapeBase(EntityOccupationManager* const grid, const std::uint32_t bucketFlags) noexcept
+    CollisionShapeBase(
+      EntityOccupationManager* const grid,
+      const std::uint32_t bucketFlags
+    ) noexcept
       : CollisionDBRect{0u, 0u, 0u, 0u}
       , mSpatialGrid(grid)
       , mMarked(0u)
@@ -130,7 +133,9 @@ namespace moho
 
     static void SetDeferredRelinkSlot(DeferredRelink* slot) noexcept;
 
-    static void ApplyDeferredRelink(const DeferredRelink& relink)
+    static void ApplyDeferredRelink(
+      const DeferredRelink& relink
+    )
     {
       if (relink.shape != nullptr) {
         relink.shape->RelinkTo(relink.rect);
@@ -147,9 +152,15 @@ namespace moho
     void RelinkTo(const CollisionDBRect& rect);
   };
   static_assert(sizeof(CollisionShapeBase) == 0x14, "CollisionShapeBase size must be 0x14");
-  static_assert(offsetof(CollisionShapeBase, mSpatialGrid) == 0x08, "CollisionShapeBase::mSpatialGrid offset must be 0x08");
+  static_assert(
+    offsetof(CollisionShapeBase, mSpatialGrid) == 0x08,
+    "CollisionShapeBase::mSpatialGrid offset must be 0x08"
+  );
   static_assert(offsetof(CollisionShapeBase, mMarked) == 0x0C, "CollisionShapeBase::mMarked offset must be 0x0C");
-  static_assert(offsetof(CollisionShapeBase, mBucketFlags) == 0x10, "CollisionShapeBase::mBucketFlags offset must be 0x10");
+  static_assert(
+    offsetof(CollisionShapeBase, mBucketFlags) == 0x10,
+    "CollisionShapeBase::mBucketFlags offset must be 0x10"
+  );
 
   /**
    * RTTI: `Moho::CollisionShape<Moho::Entity>`, a base of `Entity` at +0x4C
@@ -168,7 +179,9 @@ namespace moho
       return static_cast<T*>(this);
     }
 
-    [[nodiscard]] static T* OwnerOf(CollisionShapeBase* const shape) noexcept
+    [[nodiscard]] static T* OwnerOf(
+      CollisionShapeBase* const shape
+    ) noexcept
     {
       return shape ? static_cast<T*>(static_cast<CollisionShape*>(shape)) : nullptr;
     }

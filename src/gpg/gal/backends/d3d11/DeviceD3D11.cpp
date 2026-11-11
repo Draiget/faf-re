@@ -63,12 +63,14 @@ namespace gpg::gal
       if (mModule == nullptr) {
         ThrowError("DeviceD3D11.cpp", __LINE__, "unable to explicitly link to d3dx11_43.dll");
       }
-      createTextureFromMemory =
-        reinterpret_cast<decltype(&::D3DX11CreateTextureFromMemory)>(::GetProcAddress(mModule, "D3DX11CreateTextureFromMemory"));
+      createTextureFromMemory = reinterpret_cast<decltype(&::D3DX11CreateTextureFromMemory)>(
+        ::GetProcAddress(mModule, "D3DX11CreateTextureFromMemory")
+      );
       saveTextureToFile =
         reinterpret_cast<decltype(&::D3DX11SaveTextureToFileA)>(::GetProcAddress(mModule, "D3DX11SaveTextureToFileA"));
-      saveTextureToMemory =
-        reinterpret_cast<decltype(&::D3DX11SaveTextureToMemory)>(::GetProcAddress(mModule, "D3DX11SaveTextureToMemory"));
+      saveTextureToMemory = reinterpret_cast<decltype(&::D3DX11SaveTextureToMemory)>(
+        ::GetProcAddress(mModule, "D3DX11SaveTextureToMemory")
+      );
       if (createTextureFromMemory == nullptr || saveTextureToFile == nullptr || saveTextureToMemory == nullptr) {
         ThrowError("DeviceD3D11.cpp", __LINE__, "d3dx11_43.dll lacks the texture exports");
       }
@@ -166,7 +168,11 @@ namespace gpg::gal
 
     // gal image file format -> D3DX11_IMAGE_FILE_FORMAT (D3D10's 0x00D430A0).
     constexpr D3DX11_IMAGE_FILE_FORMAT kImageFileFormats[5] = {
-      D3DX11_IFF_BMP, D3DX11_IFF_JPG, D3DX11_IFF_PNG, D3DX11_IFF_PNG, D3DX11_IFF_DDS,
+      D3DX11_IFF_BMP,
+      D3DX11_IFF_JPG,
+      D3DX11_IFF_PNG,
+      D3DX11_IFF_PNG,
+      D3DX11_IFF_DDS,
     };
 
     struct RttVertex
@@ -181,12 +187,16 @@ namespace gpg::gal
       {1.0f, 1.0f, 0.0f, 1.0f, 0.0f},
     };
 
-    [[nodiscard]] D3DX11_IMAGE_FILE_FORMAT ImageFileFormat(const int galFormat) noexcept
+    [[nodiscard]] D3DX11_IMAGE_FILE_FORMAT ImageFileFormat(
+      const int galFormat
+    ) noexcept
     {
       return (galFormat >= 0 && galFormat < 5) ? kImageFileFormats[galFormat] : D3DX11_IFF_BMP;
     }
 
-    [[nodiscard]] const char* FeatureLevelName(const D3D_FEATURE_LEVEL level) noexcept
+    [[nodiscard]] const char* FeatureLevelName(
+      const D3D_FEATURE_LEVEL level
+    ) noexcept
     {
       switch (level) {
       case D3D_FEATURE_LEVEL_11_1:
@@ -203,7 +213,9 @@ namespace gpg::gal
     }
 
     /** Case-insensitive search of the process command line for `option`. */
-    [[nodiscard]] bool CommandLineHas(const char* const option)
+    [[nodiscard]] bool CommandLineHas(
+      const char* const option
+    )
     {
       std::string commandLine = ::GetCommandLineA();
       std::string needle = option;
@@ -221,7 +233,10 @@ namespace gpg::gal
     class Fnv1a64
     {
     public:
-      void Add(const void* const data, const std::size_t bytes) noexcept
+      void Add(
+        const void* const data,
+        const std::size_t bytes
+      ) noexcept
       {
         const auto* const begin = static_cast<const unsigned char*>(data);
         for (std::size_t index = 0U; index < bytes; ++index) {
@@ -229,7 +244,9 @@ namespace gpg::gal
           mHash *= 0x100000001B3ULL;
         }
       }
-      void AddString(const char* const text) noexcept
+      void AddString(
+        const char* const text
+      ) noexcept
       {
         if (text != nullptr) {
           Add(text, std::strlen(text) + 1U);
@@ -237,7 +254,10 @@ namespace gpg::gal
           Add("", 1U);
         }
       }
-      [[nodiscard]] std::uint64_t Value() const noexcept { return mHash; }
+      [[nodiscard]] std::uint64_t Value() const noexcept
+      {
+        return mHash;
+      }
 
     private:
       std::uint64_t mHash = 0xCBF29CE484222325ULL;
@@ -252,11 +272,16 @@ namespace gpg::gal
 
     constexpr char kEffectCacheMagic[8] = {'F', 'A', 'F', 'F', 'X', '1', '1', '1'};
 
-    [[nodiscard]] std::vector<char> ReadEffectCache(const std::string& path, const std::uint64_t key, bool& stale)
+    [[nodiscard]] std::vector<char> ReadEffectCache(
+      const std::string& path,
+      const std::uint64_t key,
+      bool& stale
+    )
     {
       std::vector<char> blob;
       stale = false;
-      HANDLE const file = ::CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0U, nullptr);
+      HANDLE const file =
+        ::CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0U, nullptr);
       if (file == INVALID_HANDLE_VALUE) {
         const DWORD error = ::GetLastError();
         if (error != ERROR_FILE_NOT_FOUND && error != ERROR_PATH_NOT_FOUND) {
@@ -266,9 +291,11 @@ namespace gpg::gal
       }
       EffectCacheHeader header{};
       DWORD read = 0U;
-      if (::ReadFile(file, &header, sizeof(header), &read, nullptr) && read == sizeof(header) &&
-          std::memcmp(header.magic, kEffectCacheMagic, sizeof(kEffectCacheMagic)) == 0 && header.key == key &&
-          header.blobBytes != 0U && header.blobBytes < (64ULL << 20U)) {
+      if (
+        ::ReadFile(file, &header, sizeof(header), &read, nullptr) && read == sizeof(header) &&
+        std::memcmp(header.magic, kEffectCacheMagic, sizeof(kEffectCacheMagic)) == 0 && header.key == key &&
+        header.blobBytes != 0U && header.blobBytes < (64ULL << 20U)
+      ) {
         blob.resize(static_cast<std::size_t>(header.blobBytes));
         if (!::ReadFile(file, blob.data(), static_cast<DWORD>(blob.size()), &read, nullptr) || read != blob.size()) {
           blob.clear();
@@ -280,7 +307,12 @@ namespace gpg::gal
       return blob;
     }
 
-    void WriteEffectCache(const std::string& path, const std::uint64_t key, const void* const blob, const std::size_t bytes)
+    void WriteEffectCache(
+      const std::string& path,
+      const std::uint64_t key,
+      const void* const blob,
+      const std::size_t bytes
+    )
     {
       const std::string temporary = path + ".tmp";
       HANDLE const file = ::CreateFileA(temporary.c_str(), GENERIC_WRITE, 0U, nullptr, CREATE_ALWAYS, 0U, nullptr);
@@ -301,7 +333,9 @@ namespace gpg::gal
     }
 
     /** The first lines of a compiler message, short enough for a dialog. */
-    [[nodiscard]] std::string TrimCompilerMessage(ID3DBlob* const errors)
+    [[nodiscard]] std::string TrimCompilerMessage(
+      ID3DBlob* const errors
+    )
     {
       if (errors == nullptr) {
         return "unknown error";
@@ -380,26 +414,53 @@ namespace gpg::gal
     }
 
     const D3D_FEATURE_LEVEL levels[] = {
-      D3D_FEATURE_LEVEL_11_1, D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0,
+      D3D_FEATURE_LEVEL_11_1,
+      D3D_FEATURE_LEVEL_11_0,
+      D3D_FEATURE_LEVEL_10_1,
+      D3D_FEATURE_LEVEL_10_0,
     };
     // An adapter is given, so the driver type must be UNKNOWN.
     HRESULT result = ::D3D11CreateDevice(
-      adapter.adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, flags, levels, static_cast<UINT>(std::size(levels)),
-      D3D11_SDK_VERSION, &mDevice, &mFeatureLevel, &mImmediate
+      adapter.adapter.Get(),
+      D3D_DRIVER_TYPE_UNKNOWN,
+      nullptr,
+      flags,
+      levels,
+      static_cast<UINT>(std::size(levels)),
+      D3D11_SDK_VERSION,
+      &mDevice,
+      &mFeatureLevel,
+      &mImmediate
     );
     if (result == E_INVALIDARG) {
       // A pre-11.1 runtime rejects the 11_1 entry.
       result = ::D3D11CreateDevice(
-        adapter.adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, flags, levels + 1, static_cast<UINT>(std::size(levels) - 1U),
-        D3D11_SDK_VERSION, &mDevice, &mFeatureLevel, &mImmediate
+        adapter.adapter.Get(),
+        D3D_DRIVER_TYPE_UNKNOWN,
+        nullptr,
+        flags,
+        levels + 1,
+        static_cast<UINT>(std::size(levels) - 1U),
+        D3D11_SDK_VERSION,
+        &mDevice,
+        &mFeatureLevel,
+        &mImmediate
       );
     }
     if (FAILED(result) && debugLayer) {
       gpg::Warnf("D3D11: the debug layer is not installed; creating the device without it");
       flags &= ~static_cast<UINT>(D3D11_CREATE_DEVICE_DEBUG);
       result = ::D3D11CreateDevice(
-        adapter.adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, flags, levels + 1, static_cast<UINT>(std::size(levels) - 1U),
-        D3D11_SDK_VERSION, &mDevice, &mFeatureLevel, &mImmediate
+        adapter.adapter.Get(),
+        D3D_DRIVER_TYPE_UNKNOWN,
+        nullptr,
+        flags,
+        levels + 1,
+        static_cast<UINT>(std::size(levels) - 1U),
+        D3D11_SDK_VERSION,
+        &mDevice,
+        &mFeatureLevel,
+        &mImmediate
       );
     }
     CheckHresult("DeviceD3D11.cpp", __LINE__, result);
@@ -427,7 +488,9 @@ namespace gpg::gal
     );
   }
 
-  void DeviceD3D11::CreateSwapChains(const DeviceContext& context)
+  void DeviceD3D11::CreateSwapChains(
+    const DeviceContext& context
+  )
   {
     mSwapChains.clear();
     const bool allowFlip = !CommandLineHas("/d3d11blt");
@@ -489,7 +552,8 @@ namespace gpg::gal
       key.AddString(macro->Definition);
     }
 
-    const std::string cacheFile = (cachePath != nullptr && cachePath[0] != '\0') ? std::string(cachePath) + ".d3d11fx" : std::string();
+    const std::string cacheFile =
+      (cachePath != nullptr && cachePath[0] != '\0') ? std::string(cachePath) + ".d3d11fx" : std::string();
     if (!cacheFile.empty()) {
       bool stale = false;
       const std::vector<char> cached = ReadEffectCache(cacheFile, key.Value(), stale);
@@ -498,11 +562,16 @@ namespace gpg::gal
       }
       if (!cached.empty()) {
         ComPtr<ID3DX11Effect> effect;
-        const HRESULT result = ::D3DX11CreateEffectFromMemory(cached.data(), cached.size(), 0U, mDevice.Get(), &effect, sourceName);
+        const HRESULT result =
+          ::D3DX11CreateEffectFromMemory(cached.data(), cached.size(), 0U, mDevice.Get(), &effect, sourceName);
         if (SUCCEEDED(result)) {
           return effect;
         }
-        gpg::Logf("D3D11: cached %s did not load (HRESULT 0x%08lX); recompiling", cacheFile.c_str(), static_cast<unsigned long>(result));
+        gpg::Logf(
+          "D3D11: cached %s did not load (HRESULT 0x%08lX); recompiling",
+          cacheFile.c_str(),
+          static_cast<unsigned long>(result)
+        );
       }
     }
 
@@ -518,11 +587,14 @@ namespace gpg::gal
       ComPtr<ID3DBlob> preprocessed;
       ComPtr<ID3DBlob> errors;
       if (FAILED(::D3DPreprocess(source, sourceBytes, sourceName, defines, nullptr, &preprocessed, &errors))) {
-        const std::string message = std::string("unable to preprocess effect: ") + sourceName + " reason: " + TrimCompilerMessage(errors.Get());
+        const std::string message =
+          std::string("unable to preprocess effect: ") + sourceName + " reason: " + TrimCompilerMessage(errors.Get());
         ThrowError("DeviceD3D11.cpp", __LINE__, message.c_str());
       }
       d3d11::TranslatedEffectSource result = d3d11::TranslateEffectSource(
-        std::string_view(static_cast<const char*>(preprocessed->GetBufferPointer()), preprocessed->GetBufferSize() - 1U),
+        std::string_view(
+          static_cast<const char*>(preprocessed->GetBufferPointer()), preprocessed->GetBufferSize() - 1U
+        ),
         mFeatureLevel >= D3D_FEATURE_LEVEL_10_1,
         std::string_view(source, sourceBytes)
       );
@@ -538,7 +610,17 @@ namespace gpg::gal
     ComPtr<ID3DBlob> compiled;
     ComPtr<ID3DBlob> errors;
     const HRESULT compileResult = ::D3DCompile(
-      compileSource, compileBytes, sourceName, compileDefines, nullptr, nullptr, kEffectProfile, flags, 0U, &compiled, &errors
+      compileSource,
+      compileBytes,
+      sourceName,
+      compileDefines,
+      nullptr,
+      nullptr,
+      kEffectProfile,
+      flags,
+      0U,
+      &compiled,
+      &errors
     );
     if (FAILED(compileResult)) {
       if (!translated.empty() && !cacheFile.empty()) {
@@ -549,19 +631,23 @@ namespace gpg::gal
           std::fclose(file);
         }
       }
-      const std::string message = std::string("unable to create effect: ") + ((sourceName != nullptr) ? sourceName : "(built-in)") +
-        " reason: " + TrimCompilerMessage(errors.Get());
+      const std::string message = std::string("unable to create effect: ") +
+        ((sourceName != nullptr) ? sourceName : "(built-in)") + " reason: " + TrimCompilerMessage(errors.Get());
       ThrowError("DeviceD3D11.cpp", __LINE__, message.c_str());
     }
 
     ComPtr<ID3DX11Effect> effect;
-    const HRESULT createResult =
-      ::D3DX11CreateEffectFromMemory(compiled->GetBufferPointer(), compiled->GetBufferSize(), 0U, mDevice.Get(), &effect, sourceName);
+    const HRESULT createResult = ::D3DX11CreateEffectFromMemory(
+      compiled->GetBufferPointer(), compiled->GetBufferSize(), 0U, mDevice.Get(), &effect, sourceName
+    );
     if (FAILED(createResult)) {
       char message[512]{};
       std::snprintf(
-        message, sizeof(message), "unable to load effect %s into Effects 11: HRESULT 0x%08lX",
-        (sourceName != nullptr) ? sourceName : "(built-in)", static_cast<unsigned long>(createResult)
+        message,
+        sizeof(message),
+        "unable to load effect %s into Effects 11: HRESULT 0x%08lX",
+        (sourceName != nullptr) ? sourceName : "(built-in)",
+        static_cast<unsigned long>(createResult)
       );
       ThrowError("DeviceD3D11.cpp", __LINE__, message);
     }
@@ -577,7 +663,8 @@ namespace gpg::gal
 
   void DeviceD3D11::CreateHelperEffects()
   {
-    mSignatureEffect = CompileEffect(kSignatureEffectSource, sizeof(kSignatureEffectSource) - 1U, nullptr, nullptr, nullptr);
+    mSignatureEffect =
+      CompileEffect(kSignatureEffectSource, sizeof(kSignatureEffectSource) - 1U, nullptr, nullptr, nullptr);
     mRttEffect = CompileEffect(kRttEffectSource, sizeof(kRttEffectSource) - 1U, nullptr, nullptr, nullptr);
     mRttTechnique = mRttEffect->GetTechniqueByName("RTT");
     if (mRttTechnique == nullptr || !mRttTechnique->IsValid()) {
@@ -601,12 +688,17 @@ namespace gpg::gal
     D3DX11_PASS_DESC passDesc{};
     CheckHresult("DeviceD3D11.cpp", __LINE__, mRttTechnique->GetPassByIndex(0U)->GetDesc(&passDesc));
     CheckHresult(
-      "DeviceD3D11.cpp", __LINE__,
-      mDevice->CreateInputLayout(elements, 2U, passDesc.pIAInputSignature, passDesc.IAInputSignatureSize, &mRttInputLayout)
+      "DeviceD3D11.cpp",
+      __LINE__,
+      mDevice->CreateInputLayout(
+        elements, 2U, passDesc.pIAInputSignature, passDesc.IAInputSignatureSize, &mRttInputLayout
+      )
     );
   }
 
-  void DeviceD3D11::CheckAvailableFormats(DeviceContext* const context)
+  void DeviceD3D11::CheckAvailableFormats(
+    DeviceContext* const context
+  )
   {
     const DeviceApi api = context->mDeviceType;
     mDeviceContext = *context;
@@ -634,8 +726,10 @@ namespace gpg::gal
       for (std::int32_t format = 1; format < 8; ++format) {
         UINT support = 0U;
         const DXGI_FORMAT dxgiFormat = d3d11::RenderTargetFormatToDxgi(static_cast<std::uint32_t>(format));
-        if (dxgiFormat != DXGI_FORMAT_UNKNOWN && SUCCEEDED(mDevice->CheckFormatSupport(dxgiFormat, &support)) &&
-            (support & D3D11_FORMAT_SUPPORT_RENDER_TARGET) != 0U) {
+        if (
+          dxgiFormat != DXGI_FORMAT_UNKNOWN && SUCCEEDED(mDevice->CheckFormatSupport(dxgiFormat, &support)) &&
+          (support & D3D11_FORMAT_SUPPORT_RENDER_TARGET) != 0U
+        ) {
           head.validFormats1.push_back(format);
         }
       }
@@ -644,8 +738,10 @@ namespace gpg::gal
       for (std::int32_t format = 1; format < 20; ++format) {
         UINT support = 0U;
         const DXGI_FORMAT dxgiFormat = d3d11::TextureFormatToDxgi(static_cast<std::uint32_t>(format));
-        if (dxgiFormat != DXGI_FORMAT_UNKNOWN && SUCCEEDED(mDevice->CheckFormatSupport(dxgiFormat, &support)) &&
-            (support & D3D11_FORMAT_SUPPORT_TEXTURE2D) != 0U) {
+        if (
+          dxgiFormat != DXGI_FORMAT_UNKNOWN && SUCCEEDED(mDevice->CheckFormatSupport(dxgiFormat, &support)) &&
+          (support & D3D11_FORMAT_SUPPORT_TEXTURE2D) != 0U
+        ) {
           head.validFormats2.push_back(format);
         }
       }
@@ -667,17 +763,27 @@ namespace gpg::gal
       CheckHresult("DeviceD3D11.cpp", __LINE__, mSwapChains[headIndex]->GetBuffer(backBuffer.GetAddressOf()));
 
       ComPtr<ID3D11RenderTargetView> renderTargetView;
-      CheckHresult("DeviceD3D11.cpp", __LINE__, mDevice->CreateRenderTargetView(backBuffer.Get(), nullptr, &renderTargetView));
+      CheckHresult(
+        "DeviceD3D11.cpp", __LINE__, mDevice->CreateRenderTargetView(backBuffer.Get(), nullptr, &renderTargetView)
+      );
 
       ComPtr<ID3D11ShaderResourceView> shaderResourceView;
-      CheckHresult("DeviceD3D11.cpp", __LINE__, mDevice->CreateShaderResourceView(backBuffer.Get(), nullptr, &shaderResourceView));
+      CheckHresult(
+        "DeviceD3D11.cpp", __LINE__, mDevice->CreateShaderResourceView(backBuffer.Get(), nullptr, &shaderResourceView)
+      );
 
       D3D11_TEXTURE2D_DESC desc{};
       backBuffer->GetDesc(&desc);
 
       OutputContext& output = mHeadOutputContexts[headIndex];
       output.surface.reset(new RenderTargetD3D11(backBuffer.Get(), renderTargetView.Get(), shaderResourceView.Get()));
-      gpg::Logf("D3D11: head %u back buffer target %p (%ux%u)", static_cast<unsigned>(headIndex), output.surface.get(), desc.Width, desc.Height);
+      gpg::Logf(
+        "D3D11: head %u back buffer target %p (%ux%u)",
+        static_cast<unsigned>(headIndex),
+        output.surface.get(),
+        desc.Width,
+        desc.Height
+      );
       const DepthStencilTargetContext depthContext(desc.Width, desc.Height, 3U, false);
       output.depthStencil = CreateDepthStencilTarget(&depthContext);
     }
@@ -704,7 +810,9 @@ namespace gpg::gal
     }
   }
 
-  void DeviceD3D11::Setup(DeviceContext* const context)
+  void DeviceD3D11::Setup(
+    DeviceContext* const context
+  )
   {
     mCurThreadId = static_cast<int>(::GetCurrentThreadId());
     mLog.clear();
@@ -721,7 +829,8 @@ namespace gpg::gal
       ThrowError("DeviceD3D11.cpp", __LINE__, "unable to enumerate adapters");
     }
     const auto adapterCount = static_cast<std::int32_t>(mFactory.Adapters().size());
-    mAdapterIndex = (context->mAdapter >= 0 && context->mAdapter < adapterCount) ? static_cast<std::uint32_t>(context->mAdapter) : 0U;
+    mAdapterIndex =
+      (context->mAdapter >= 0 && context->mAdapter < adapterCount) ? static_cast<std::uint32_t>(context->mAdapter) : 0U;
 
     CreateDevice();
     mD3DX11 = std::make_unique<D3DX11Library>();
@@ -766,7 +875,10 @@ namespace gpg::gal
 
   void DeviceD3D11::Func1() const {}
 
-  void DeviceD3D11::GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, const int adapterIndex)
+  void DeviceD3D11::GetModesForAdapter(
+    fa::vector<HeadAdapterMode>& outModes,
+    const int adapterIndex
+  )
   {
     outModes.clear();
     const auto& adapters = mFactory.Adapters();
@@ -780,7 +892,9 @@ namespace gpg::gal
     }
   }
 
-  OutputContext* DeviceD3D11::GetHeadOutputContext(const unsigned int headIndex)
+  OutputContext* DeviceD3D11::GetHeadOutputContext(
+    const unsigned int headIndex
+  )
   {
     if (headIndex >= mHeadOutputContexts.size()) {
       ThrowError("DeviceD3D11.cpp", __LINE__, "invalid head index specified");
@@ -788,7 +902,9 @@ namespace gpg::gal
     return &mHeadOutputContexts[headIndex];
   }
 
-  const OutputContext* DeviceD3D11::GetHeadOutputContext(const unsigned int headIndex) const
+  const OutputContext* DeviceD3D11::GetHeadOutputContext(
+    const unsigned int headIndex
+  ) const
   {
     if (headIndex >= mHeadOutputContexts.size()) {
       ThrowError("DeviceD3D11.cpp", __LINE__, "invalid head index specified");
@@ -801,7 +917,9 @@ namespace gpg::gal
     return mPipelineState;
   }
 
-  boost::shared_ptr<Effect> DeviceD3D11::CreateEffect(const EffectContext& context)
+  boost::shared_ptr<Effect> DeviceD3D11::CreateEffect(
+    const EffectContext& context
+  )
   {
     if (context.mSourceType != 2U) {
       ThrowError("DeviceD3D11.cpp", __LINE__, "invalid source defined for effect");
@@ -826,7 +944,9 @@ namespace gpg::gal
     return boost::shared_ptr<Effect>(new EffectD3D11(context, effect.Get()));
   }
 
-  boost::shared_ptr<Texture> DeviceD3D11::CreateTexture(const TextureContext* const context)
+  boost::shared_ptr<Texture> DeviceD3D11::CreateTexture(
+    const TextureContext* const context
+  )
   {
     ComPtr<ID3D11Resource> resource;
     bool contentsFromEngine = false;
@@ -871,11 +991,15 @@ namespace gpg::gal
       const char* const data = context->dataBuffer_.mBegin;
       const SIZE_T bytes = context->DataSizeBytes();
 
-      const HRESULT result = mD3DX11->createTextureFromMemory(mDevice.Get(), data, bytes, nullptr, nullptr, &resource, nullptr);
+      const HRESULT result =
+        mD3DX11->createTextureFromMemory(mDevice.Get(), data, bytes, nullptr, nullptr, &resource, nullptr);
       if (FAILED(result)) {
         char message[640]{};
         std::snprintf(
-          message, sizeof(message), "unable to load texture %s: HRESULT 0x%08lX", context->location_.c_str(),
+          message,
+          sizeof(message),
+          "unable to load texture %s: HRESULT 0x%08lX",
+          context->location_.c_str(),
           static_cast<unsigned long>(result)
         );
         ThrowError("DeviceD3D11.cpp", __LINE__, message);
@@ -905,8 +1029,14 @@ namespace gpg::gal
             for (UINT slice = 0U; slice < desc.ArraySize; ++slice) {
               for (UINT level = 0U; level < desc.MipLevels; ++level) {
                 mImmediate->CopySubresourceRegion(
-                  smaller.Get(), D3D11CalcSubresource(level, slice, desc.MipLevels), 0U, 0U, 0U, whole.Get(),
-                  D3D11CalcSubresource(level + skip, slice, wholeLevels), nullptr
+                  smaller.Get(),
+                  D3D11CalcSubresource(level, slice, desc.MipLevels),
+                  0U,
+                  0U,
+                  0U,
+                  whole.Get(),
+                  D3D11CalcSubresource(level + skip, slice, wholeLevels),
+                  nullptr
                 );
               }
             }
@@ -942,7 +1072,9 @@ namespace gpg::gal
     );
   }
 
-  boost::shared_ptr<RenderTarget> DeviceD3D11::CreateRenderTarget(const RenderTargetContext* const context)
+  boost::shared_ptr<RenderTarget> DeviceD3D11::CreateRenderTarget(
+    const RenderTargetContext* const context
+  )
   {
     D3D11_TEXTURE2D_DESC desc{};
     desc.Width = std::max(context->width_, 1U);
@@ -960,9 +1092,13 @@ namespace gpg::gal
     ComPtr<ID3D11Texture2D> texture;
     CheckHresult("DeviceD3D11.cpp", __LINE__, mDevice->CreateTexture2D(&desc, nullptr, &texture));
     ComPtr<ID3D11RenderTargetView> renderTargetView;
-    CheckHresult("DeviceD3D11.cpp", __LINE__, mDevice->CreateRenderTargetView(texture.Get(), nullptr, &renderTargetView));
+    CheckHresult(
+      "DeviceD3D11.cpp", __LINE__, mDevice->CreateRenderTargetView(texture.Get(), nullptr, &renderTargetView)
+    );
     ComPtr<ID3D11ShaderResourceView> shaderResourceView;
-    CheckHresult("DeviceD3D11.cpp", __LINE__, mDevice->CreateShaderResourceView(texture.Get(), nullptr, &shaderResourceView));
+    CheckHresult(
+      "DeviceD3D11.cpp", __LINE__, mDevice->CreateShaderResourceView(texture.Get(), nullptr, &shaderResourceView)
+    );
 
     // As DeviceD3D10::CreateRenderTarget (0x008FB1D0): a viewport covering
     // the new target.
@@ -977,12 +1113,16 @@ namespace gpg::gal
     );
   }
 
-  boost::shared_ptr<CubeRenderTarget> DeviceD3D11::CreateCubeRenderTarget(const CubeRenderTargetContext* const context)
+  boost::shared_ptr<CubeRenderTarget> DeviceD3D11::CreateCubeRenderTarget(
+    const CubeRenderTargetContext* const context
+  )
   {
     return boost::shared_ptr<CubeRenderTarget>(new CubeRenderTargetD3D11(*context));
   }
 
-  boost::shared_ptr<DepthStencilTarget> DeviceD3D11::CreateDepthStencilTarget(const DepthStencilTargetContext* const context)
+  boost::shared_ptr<DepthStencilTarget> DeviceD3D11::CreateDepthStencilTarget(
+    const DepthStencilTargetContext* const context
+  )
   {
     const bool sampled = context->field0x10_;
     const d3d11::DepthFormats formats = d3d11::DepthStencilFormatToDxgi(context->format_, sampled);
@@ -1012,7 +1152,9 @@ namespace gpg::gal
       viewDesc.Format = formats.shaderView;
       viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
       viewDesc.Texture2D.MipLevels = 1U;
-      CheckHresult("DeviceD3D11.cpp", __LINE__, mDevice->CreateShaderResourceView(texture.Get(), &viewDesc, &shaderView));
+      CheckHresult(
+        "DeviceD3D11.cpp", __LINE__, mDevice->CreateShaderResourceView(texture.Get(), &viewDesc, &shaderView)
+      );
     }
 
     return boost::shared_ptr<DepthStencilTarget>(
@@ -1023,7 +1165,9 @@ namespace gpg::gal
   namespace
   {
     /** HLSL type of one input element: float/uint/int and its component count. */
-    [[nodiscard]] std::string ElementType(const DXGI_FORMAT format)
+    [[nodiscard]] std::string ElementType(
+      const DXGI_FORMAT format
+    )
     {
       unsigned components = 4U;
       const char* base = "float";
@@ -1055,7 +1199,9 @@ namespace gpg::gal
     }
   } // namespace
 
-  ComPtr<ID3D10Blob> DeviceD3D11::BuildInputSignature(const std::uint32_t formatCode)
+  ComPtr<ID3D10Blob> DeviceD3D11::BuildInputSignature(
+    const std::uint32_t formatCode
+  )
   {
     // A vertex shader that declares exactly the layout's elements, so its
     // input signature always matches the layout.
@@ -1072,9 +1218,15 @@ namespace gpg::gal
                                                                           : "vs_4_0";
     ComPtr<ID3DBlob> code;
     ComPtr<ID3DBlob> errors;
-    if (FAILED(::D3DCompile(source.data(), source.size(), "FafInputSignature", nullptr, nullptr, "main", profile, 0U, 0U, &code, &errors))) {
-      const std::string message = "unable to build an input signature for vertex format " + std::to_string(formatCode) + ": " +
-        TrimCompilerMessage(errors.Get());
+    if (
+      FAILED(
+        ::D3DCompile(
+          source.data(), source.size(), "FafInputSignature", nullptr, nullptr, "main", profile, 0U, 0U, &code, &errors
+        )
+      )
+    ) {
+      const std::string message = "unable to build an input signature for vertex format " + std::to_string(formatCode) +
+        ": " + TrimCompilerMessage(errors.Get());
       ThrowError("DeviceD3D11.cpp", __LINE__, message.c_str());
     }
     return code;
@@ -1094,14 +1246,20 @@ namespace gpg::gal
 
       // The D3D10 backend's way: the signature effect's technique for the
       // format (its techniques follow D3D10's numbering, so only up to 16).
-      ID3DX11EffectTechnique* const technique = (format <= 16U) ? mSignatureEffect->GetTechniqueByIndex(format) : nullptr;
+      ID3DX11EffectTechnique* const technique =
+        (format <= 16U) ? mSignatureEffect->GetTechniqueByIndex(format) : nullptr;
       if (technique != nullptr && technique->IsValid()) {
         D3DX11_PASS_DESC passDesc{};
-        if (SUCCEEDED(technique->GetPassByIndex(0U)->GetDesc(&passDesc)) &&
-            SUCCEEDED(mDevice->CreateInputLayout(
-              elements.data(), static_cast<UINT>(elements.size()), passDesc.pIAInputSignature, passDesc.IAInputSignatureSize,
-              &mInputLayouts[format]
-            ))) {
+        if (
+          SUCCEEDED(technique->GetPassByIndex(0U)->GetDesc(&passDesc)) &&
+          SUCCEEDED(mDevice->CreateInputLayout(
+            elements.data(),
+            static_cast<UINT>(elements.size()),
+            passDesc.pIAInputSignature,
+            passDesc.IAInputSignatureSize,
+            &mInputLayouts[format]
+          ))
+        ) {
           continue;
         }
       }
@@ -1110,9 +1268,13 @@ namespace gpg::gal
       // inputs than vs_4_0 takes); fall back to a signature built from the layout.
       const ComPtr<ID3D10Blob> signature = BuildInputSignature(format);
       CheckHresult(
-        "DeviceD3D11.cpp", __LINE__,
+        "DeviceD3D11.cpp",
+        __LINE__,
         mDevice->CreateInputLayout(
-          elements.data(), static_cast<UINT>(elements.size()), signature->GetBufferPointer(), signature->GetBufferSize(),
+          elements.data(),
+          static_cast<UINT>(elements.size()),
+          signature->GetBufferPointer(),
+          signature->GetBufferSize(),
           &mInputLayouts[format]
         )
       );
@@ -1123,7 +1285,9 @@ namespace gpg::gal
     }
   }
 
-  boost::shared_ptr<VertexFormat> DeviceD3D11::CreateVertexFormat(const std::uint32_t formatCode)
+  boost::shared_ptr<VertexFormat> DeviceD3D11::CreateVertexFormat(
+    const std::uint32_t formatCode
+  )
   {
     if (formatCode >= d3d11::kVertexFormatCount || mInputLayouts[formatCode] == nullptr) {
       ThrowError("DeviceD3D11.cpp", __LINE__, "invalid vertex format specified");
@@ -1131,17 +1295,24 @@ namespace gpg::gal
     return boost::shared_ptr<VertexFormat>(new VertexFormatD3D11(formatCode, mInputLayouts[formatCode].Get()));
   }
 
-  boost::shared_ptr<VertexBuffer> DeviceD3D11::CreateVertexBuffer(const VertexBufferContext* const context)
+  boost::shared_ptr<VertexBuffer> DeviceD3D11::CreateVertexBuffer(
+    const VertexBufferContext* const context
+  )
   {
     return boost::shared_ptr<VertexBuffer>(new VertexBufferD3D11(*context, mDevice.Get(), mImmediate.Get()));
   }
 
-  boost::shared_ptr<IndexBuffer> DeviceD3D11::CreateIndexBuffer(const IndexBufferContext* const context)
+  boost::shared_ptr<IndexBuffer> DeviceD3D11::CreateIndexBuffer(
+    const IndexBufferContext* const context
+  )
   {
     return boost::shared_ptr<IndexBuffer>(new IndexBufferD3D11(*context, mDevice.Get(), mImmediate.Get()));
   }
 
-  void DeviceD3D11::GetRenderTargetData(const boost::shared_ptr<RenderTarget>& source, const boost::shared_ptr<Texture>& destination)
+  void DeviceD3D11::GetRenderTargetData(
+    const boost::shared_ptr<RenderTarget>& source,
+    const boost::shared_ptr<Texture>& destination
+  )
   {
     if (source == nullptr) {
       ThrowError("DeviceD3D11.cpp", __LINE__, "Missing source texture");
@@ -1176,8 +1347,17 @@ namespace gpg::gal
     const RenderTargetContext* const sourceContext = sourceTarget->GetContext();
     const RenderTargetContext* const destinationContext = destinationTarget->GetContext();
     if (mTracing) {
-      Trace("StretchRect %p %ux%u fmt %u -> %p %ux%u fmt %u", sourceTarget, sourceContext->width_, sourceContext->height_,
-            sourceContext->format_, destinationTarget, destinationContext->width_, destinationContext->height_, destinationContext->format_);
+      Trace(
+        "StretchRect %p %ux%u fmt %u -> %p %ux%u fmt %u",
+        sourceTarget,
+        sourceContext->width_,
+        sourceContext->height_,
+        sourceContext->format_,
+        destinationTarget,
+        destinationContext->width_,
+        destinationContext->height_,
+        destinationContext->format_
+      );
     }
 
     D3D11_TEXTURE2D_DESC sourceDesc{};
@@ -1190,16 +1370,17 @@ namespace gpg::gal
     // split-screen view relies on this: it passes the view's rect and no
     // destination rect, and the particle shaders sample the copy with
     // view-relative coordinates.
-    const RECT fromRect =
-      (sourceRect != nullptr) ? *sourceRect
-                              : RECT{0, 0, static_cast<LONG>(sourceContext->width_), static_cast<LONG>(sourceContext->height_)};
-    const RECT toRect =
-      (destinationRect != nullptr)
-        ? *destinationRect
-        : RECT{0, 0, static_cast<LONG>(destinationContext->width_), static_cast<LONG>(destinationContext->height_)};
+    const RECT fromRect = (sourceRect != nullptr)
+      ? *sourceRect
+      : RECT{0, 0, static_cast<LONG>(sourceContext->width_), static_cast<LONG>(sourceContext->height_)};
+    const RECT toRect = (destinationRect != nullptr)
+      ? *destinationRect
+      : RECT{0, 0, static_cast<LONG>(destinationContext->width_), static_cast<LONG>(destinationContext->height_)};
 
-    if (fromRect.right - fromRect.left == toRect.right - toRect.left &&
-        fromRect.bottom - fromRect.top == toRect.bottom - toRect.top && sourceDesc.Format == destinationDesc.Format) {
+    if (
+      fromRect.right - fromRect.left == toRect.right - toRect.left &&
+      fromRect.bottom - fromRect.top == toRect.bottom - toRect.top && sourceDesc.Format == destinationDesc.Format
+    ) {
       // Same size: a direct copy.
       D3D11_BOX box{};
       box.left = static_cast<UINT>(fromRect.left);
@@ -1262,7 +1443,9 @@ namespace gpg::gal
       {1.0f, 1.0f, 0.0f, u1, v0},
     };
     D3D11_MAPPED_SUBRESOURCE mapped{};
-    CheckHresult("DeviceD3D11.cpp", __LINE__, mImmediate->Map(mRttQuadVertexBuffer.Get(), 0U, D3D11_MAP_WRITE_DISCARD, 0U, &mapped));
+    CheckHresult(
+      "DeviceD3D11.cpp", __LINE__, mImmediate->Map(mRttQuadVertexBuffer.Get(), 0U, D3D11_MAP_WRITE_DISCARD, 0U, &mapped)
+    );
     std::memcpy(mapped.pData, vertices, sizeof(vertices));
     mImmediate->Unmap(mRttQuadVertexBuffer.Get(), 0U);
 
@@ -1285,7 +1468,8 @@ namespace gpg::gal
 
     D3DX11_TECHNIQUE_DESC techniqueDesc{};
     mRttTechnique->GetDesc(&techniqueDesc);
-    ID3DX11EffectShaderResourceVariable* const sourceVariable = mRttEffect->GetVariableByName("g_txSource")->AsShaderResource();
+    ID3DX11EffectShaderResourceVariable* const sourceVariable =
+      mRttEffect->GetVariableByName("g_txSource")->AsShaderResource();
     for (UINT pass = 0U; pass < techniqueDesc.Passes; ++pass) {
       sourceVariable->SetResource(source);
       mRttTechnique->GetPassByIndex(pass)->Apply(0U, mImmediate.Get());
@@ -1320,8 +1504,10 @@ namespace gpg::gal
     const TextureContext* const sourceContext = sourceTexture->GetContext();
     const TextureContext* const destinationContext = destinationTexture->GetContext();
 
-    if (sourceContext->width_ == destinationContext->width_ && sourceContext->height_ == destinationContext->height_ &&
-        sourceTexture->GetFormat() == destinationTexture->GetFormat()) {
+    if (
+      sourceContext->width_ == destinationContext->width_ && sourceContext->height_ == destinationContext->height_ &&
+      sourceTexture->GetFormat() == destinationTexture->GetFormat()
+    ) {
       UINT destinationX = 0U;
       UINT destinationY = 0U;
       if (destinationRect != nullptr) {
@@ -1340,7 +1526,14 @@ namespace gpg::gal
         boxPointer = &box;
       }
       mImmediate->CopySubresourceRegion(
-        destinationTexture->GetTexture2D(), 0U, destinationX, destinationY, 0U, sourceTexture->GetTexture2D(), 0U, boxPointer
+        destinationTexture->GetTexture2D(),
+        0U,
+        destinationX,
+        destinationY,
+        0U,
+        sourceTexture->GetTexture2D(),
+        0U,
+        boxPointer
       );
       destinationTexture->DiscardCpuCopy();
       return;
@@ -1354,9 +1547,17 @@ namespace gpg::gal
         sourceTexture->GetTexture2D()->GetDesc(&sourceDesc);
         destinationTexture->GetTexture2D()->GetDesc(&destinationDesc);
         gpg::Logf(
-          "D3D11: UpdateSurface fallback %ux%u fmt %d mips %u -> %ux%u fmt %d mips %u (gal %u -> %u)", sourceDesc.Width,
-          sourceDesc.Height, static_cast<int>(sourceDesc.Format), sourceDesc.MipLevels, destinationDesc.Width, destinationDesc.Height,
-          static_cast<int>(destinationDesc.Format), destinationDesc.MipLevels, sourceContext->format_, destinationContext->format_
+          "D3D11: UpdateSurface fallback %ux%u fmt %d mips %u -> %ux%u fmt %d mips %u (gal %u -> %u)",
+          sourceDesc.Width,
+          sourceDesc.Height,
+          static_cast<int>(sourceDesc.Format),
+          sourceDesc.MipLevels,
+          destinationDesc.Width,
+          destinationDesc.Height,
+          static_cast<int>(destinationDesc.Format),
+          destinationDesc.MipLevels,
+          sourceContext->format_,
+          destinationContext->format_
         );
       }
     }
@@ -1364,7 +1565,8 @@ namespace gpg::gal
     // level of BC3, and copy that into the destination.
     ComPtr<ID3D10Blob> encoded;
     CheckHresult(
-      "DeviceD3D11.cpp", __LINE__,
+      "DeviceD3D11.cpp",
+      __LINE__,
       mD3DX11->saveTextureToMemory(mImmediate.Get(), sourceTexture->GetResource(), D3DX11_IFF_DDS, &encoded, 0U)
     );
     // D3D10 reloads as one level of BC3, which only fits a BC3 destination.
@@ -1384,7 +1586,8 @@ namespace gpg::gal
     loadInfo.MiscFlags = 0U;
     ComPtr<ID3D11Resource> recreated;
     CheckHresult(
-      "DeviceD3D11.cpp", __LINE__,
+      "DeviceD3D11.cpp",
+      __LINE__,
       mD3DX11->createTextureFromMemory(
         mDevice.Get(), encoded->GetBufferPointer(), encoded->GetBufferSize(), &loadInfo, nullptr, &recreated, nullptr
       )
@@ -1393,19 +1596,25 @@ namespace gpg::gal
     destinationTexture->DiscardCpuCopy();
   }
 
-  void DeviceD3D11::SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath)
+  void DeviceD3D11::SaveCubeRenderTarget(
+    const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
+    const fa::string& filePath
+  )
   {
     static_cast<void>(cubeTarget);
     static_cast<void>(filePath);
   }
 
   void DeviceD3D11::SaveRenderTarget(
-    const boost::shared_ptr<RenderTarget>& renderTarget, const fa::string& filePath, const int fileFormat
+    const boost::shared_ptr<RenderTarget>& renderTarget,
+    const fa::string& filePath,
+    const int fileFormat
   )
   {
     auto* const target = static_cast<RenderTargetD3D11*>(renderTarget.get());
     CheckHresult(
-      "DeviceD3D11.cpp", __LINE__,
+      "DeviceD3D11.cpp",
+      __LINE__,
       mD3DX11->saveTextureToFile(mImmediate.Get(), target->GetTexture(), ImageFileFormat(fileFormat), filePath.c_str())
     );
   }
@@ -1419,7 +1628,9 @@ namespace gpg::gal
   {
     auto* const sourceTexture = static_cast<TextureD3D11*>(texture.get());
     if (outBuffer == nullptr) {
-      const HRESULT saved = mD3DX11->saveTextureToFile(mImmediate.Get(), sourceTexture->GetResource(), ImageFileFormat(fileFormat), filePath.c_str());
+      const HRESULT saved = mD3DX11->saveTextureToFile(
+        mImmediate.Get(), sourceTexture->GetResource(), ImageFileFormat(fileFormat), filePath.c_str()
+      );
       if (FAILED(saved) && fileFormat == 0) {
         // D3DX11 answers E_FAIL for a frame as a BMP, which is what dump_Frame asks for.
         DumpTexture(sourceTexture->GetTexture2D(), filePath.c_str());
@@ -1430,7 +1641,9 @@ namespace gpg::gal
     }
 
     ComPtr<ID3D10Blob> encoded;
-    CheckHresult("DeviceD3D11.cpp", __LINE__, EncodeTexture(sourceTexture->GetResource(), ImageFileFormat(fileFormat), &encoded));
+    CheckHresult(
+      "DeviceD3D11.cpp", __LINE__, EncodeTexture(sourceTexture->GetResource(), ImageFileFormat(fileFormat), &encoded)
+    );
     const std::size_t bytes = encoded->GetBufferSize();
     if (outBuffer->Size() != bytes) {
       *outBuffer = gpg::AllocMemBuffer(bytes);
@@ -1438,7 +1651,11 @@ namespace gpg::gal
     std::copy_n(static_cast<const char*>(encoded->GetBufferPointer()), bytes, outBuffer->GetPtr(0U, 0U));
   }
 
-  HRESULT DeviceD3D11::EncodeTexture(ID3D11Resource* const resource, const int d3dxFormat, ID3D10Blob** const outBlob)
+  HRESULT DeviceD3D11::EncodeTexture(
+    ID3D11Resource* const resource,
+    const int d3dxFormat,
+    ID3D10Blob** const outBlob
+  )
   {
     return mD3DX11->saveTextureToMemory(
       mImmediate.Get(), resource, static_cast<D3DX11_IMAGE_FILE_FORMAT>(d3dxFormat), outBlob, 0U
@@ -1469,8 +1686,20 @@ namespace gpg::gal
     const std::lock_guard<std::mutex> decodeLock(mDecodeMutex);
     if (mDecodeDevice == nullptr) {
       CheckHresult(
-        "DeviceD3D11.cpp", __LINE__,
-        ::D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_WARP, nullptr, 0U, nullptr, 0U, D3D11_SDK_VERSION, &mDecodeDevice, nullptr, &mDecodeContext)
+        "DeviceD3D11.cpp",
+        __LINE__,
+        ::D3D11CreateDevice(
+          nullptr,
+          D3D_DRIVER_TYPE_WARP,
+          nullptr,
+          0U,
+          nullptr,
+          0U,
+          D3D11_SDK_VERSION,
+          &mDecodeDevice,
+          nullptr,
+          &mDecodeContext
+        )
       );
     }
     D3DX11_IMAGE_LOAD_INFO loadInfo;
@@ -1486,8 +1715,11 @@ namespace gpg::gal
 
     ComPtr<ID3D11Resource> decoded;
     CheckHresult(
-      "DeviceD3D11.cpp", __LINE__,
-      mD3DX11->createTextureFromMemory(mDecodeDevice.Get(), sourceData, sourceBytes, &loadInfo, nullptr, &decoded, nullptr)
+      "DeviceD3D11.cpp",
+      __LINE__,
+      mD3DX11->createTextureFromMemory(
+        mDecodeDevice.Get(), sourceData, sourceBytes, &loadInfo, nullptr, &decoded, nullptr
+      )
     );
     ComPtr<ID3D11Texture2D> staging;
     CheckHresult("DeviceD3D11.cpp", __LINE__, decoded.As(&staging));
@@ -1512,21 +1744,28 @@ namespace gpg::gal
     char* const destinationBytes = outTextureData->GetPtr(0U, 0U);
     const auto* const sourceRows = static_cast<const char*>(mapped.pData);
     for (std::uint32_t row = 0U; row < rowCount; ++row) {
-      std::memcpy(destinationBytes + static_cast<std::size_t>(row) * rowBytes,
-                  sourceRows + static_cast<std::size_t>(row) * mapped.RowPitch,
-                  rowBytes);
+      std::memcpy(
+        destinationBytes + static_cast<std::size_t>(row) * rowBytes,
+        sourceRows + static_cast<std::size_t>(row) * mapped.RowPitch,
+        rowBytes
+      );
     }
     mDecodeContext->Unmap(staging.Get(), 0U);
   }
 
-  boost::weak_ptr<void>* DeviceD3D11::Func7(boost::weak_ptr<void>* const outWeakHandle, boost::shared_ptr<void> temporarySharedHandle)
+  boost::weak_ptr<void>* DeviceD3D11::Func7(
+    boost::weak_ptr<void>* const outWeakHandle,
+    boost::shared_ptr<void> temporarySharedHandle
+  )
   {
     static_cast<void>(temporarySharedHandle);
     outWeakHandle->reset();
     return outWeakHandle;
   }
 
-  void DeviceD3D11::Reset(DeviceContext* const context)
+  void DeviceD3D11::Reset(
+    DeviceContext* const context
+  )
   {
     if (mDevice == nullptr) {
       return;
@@ -1559,8 +1798,13 @@ namespace gpg::gal
       }
       const HRESULT result = mSwapChains[headIndex]->Resize(width, height);
       if (FAILED(result)) {
-        gpg::Warnf("D3D11: resizing head %u to %ux%u failed (HRESULT 0x%08lX)", static_cast<unsigned>(headIndex), width, height,
-                   static_cast<unsigned long>(result));
+        gpg::Warnf(
+          "D3D11: resizing head %u to %ux%u failed (HRESULT 0x%08lX)",
+          static_cast<unsigned>(headIndex),
+          width,
+          height,
+          static_cast<unsigned long>(result)
+        );
       }
     }
     mPipelineState->SetDeviceState();
@@ -1589,7 +1833,8 @@ namespace gpg::gal
       renderTargetView = static_cast<RenderTargetD3D11*>(outputContext_.surface.get())->GetRenderTargetView();
     }
     if (outputContext_.depthStencil != nullptr) {
-      depthStencilView = static_cast<DepthStencilTargetD3D11*>(outputContext_.depthStencil.get())->GetDepthStencilView();
+      depthStencilView =
+        static_cast<DepthStencilTargetD3D11*>(outputContext_.depthStencil.get())->GetDepthStencilView();
     }
     mImmediate->OMSetRenderTargets(1U, &renderTargetView, depthStencilView);
   }
@@ -1618,12 +1863,16 @@ namespace gpg::gal
     mLastDumpTick = now;
 
     char path[MAX_PATH]{};
-    std::snprintf(path, sizeof(path), "%s/d3d11_%06lu.bmp", directory, static_cast<unsigned long>((now - mFirstDumpTick) / 1000U));
+    std::snprintf(
+      path, sizeof(path), "%s/d3d11_%06lu.bmp", directory, static_cast<unsigned long>((now - mFirstDumpTick) / 1000U)
+    );
     auto* const target = static_cast<RenderTargetD3D11*>(mHeadOutputContexts.front().surface.get());
     DumpTexture(target->GetTexture(), path);
   }
 
-  void DeviceD3D11::DumpBoundTarget(const char* const label)
+  void DeviceD3D11::DumpBoundTarget(
+    const char* const label
+  )
   {
     static const char* const directory = std::getenv("FAF_GAL_DUMP_DIR");
     if (directory == nullptr || directory[0] == 0 || outputContext_.surface == nullptr) {
@@ -1634,7 +1883,10 @@ namespace gpg::gal
     DumpTexture(static_cast<RenderTargetD3D11*>(outputContext_.surface.get())->GetTexture(), path);
   }
 
-  void DeviceD3D11::DumpTexture(ID3D11Texture2D* const texture, const char* const path)
+  void DeviceD3D11::DumpTexture(
+    ID3D11Texture2D* const texture,
+    const char* const path
+  )
   {
     D3D11_TEXTURE2D_DESC desc{};
     texture->GetDesc(&desc);
@@ -1709,7 +1961,10 @@ namespace gpg::gal
     mInfoQueue->ClearStoredMessages();
   }
 
-  void DeviceD3D11::Trace(const char* const format, ...)
+  void DeviceD3D11::Trace(
+    const char* const format,
+    ...
+  )
   {
     char line[512];
     va_list arguments;
@@ -1734,7 +1989,8 @@ namespace gpg::gal
         const char* const value = std::getenv("FAF_GAL_TRACE_FRAMES");
         return (value != nullptr) ? std::strtol(value, nullptr, 10) : 1L;
       }();
-      mTracing = start >= 0L && static_cast<long>(mFrameIndex) >= start && static_cast<long>(mFrameIndex) < start + frames;
+      mTracing =
+        start >= 0L && static_cast<long>(mFrameIndex) >= start && static_cast<long>(mFrameIndex) < start + frames;
     }
     DumpBackBufferIfDue();
     LogDebugLayerMessages();
@@ -1754,7 +2010,8 @@ namespace gpg::gal
           // exit-time destructors that would touch the dead device.
           const HRESULT reason = mDevice->GetDeviceRemovedReason();
           gpg::Warnf(
-            "D3D11: device removed (reason 0x%08lX); exiting. Run with /d3d11debug for the cause, or without /d3d11 for Direct3D 9.",
+            "D3D11: device removed (reason 0x%08lX); exiting. Run with /d3d11debug for the cause, or without /d3d11 "
+            "for Direct3D 9.",
             static_cast<unsigned long>(reason)
           );
           LogDebugLayerMessages();
@@ -1772,7 +2029,9 @@ namespace gpg::gal
     }
   }
 
-  void DeviceD3D11::SetCursor(const CursorContext* const context)
+  void DeviceD3D11::SetCursor(
+    const CursorContext* const context
+  )
   {
     static_cast<void>(mCursor.SetCursor(*context));
   }
@@ -1782,15 +2041,27 @@ namespace gpg::gal
     static_cast<void>(mCursor.InitCursor());
   }
 
-  int DeviceD3D11::ShowCursor(const bool show)
+  int DeviceD3D11::ShowCursor(
+    const bool show
+  )
   {
     return mCursor.ShowCursor(show);
   }
 
-  void DeviceD3D11::SetViewport(const D3DVIEWPORT9* const viewport)
+  void DeviceD3D11::SetViewport(
+    const D3DVIEWPORT9* const viewport
+  )
   {
     if (mTracing) {
-      Trace("SetViewport %lu,%lu %lux%lu z %f..%f", viewport->X, viewport->Y, viewport->Width, viewport->Height, viewport->MinZ, viewport->MaxZ);
+      Trace(
+        "SetViewport %lu,%lu %lux%lu z %f..%f",
+        viewport->X,
+        viewport->Y,
+        viewport->Width,
+        viewport->Height,
+        viewport->MinZ,
+        viewport->MaxZ
+      );
     }
     // D3D9 puts pixel centres on integer coordinates, D3D10 and later on
     // halves. The engine's 2D paths are written for D3D9: the UI projection
@@ -1809,7 +2080,9 @@ namespace gpg::gal
     mImmediate->RSSetViewports(1U, &native);
   }
 
-  void DeviceD3D11::GetViewport(D3DVIEWPORT9* const outViewport)
+  void DeviceD3D11::GetViewport(
+    D3DVIEWPORT9* const outViewport
+  )
   {
     UINT count = 1U;
     D3D11_VIEWPORT native{};
@@ -1822,15 +2095,25 @@ namespace gpg::gal
     outViewport->MaxZ = native.MaxDepth;
   }
 
-  void DeviceD3D11::ClearTarget(const OutputContext* const context)
+  void DeviceD3D11::ClearTarget(
+    const OutputContext* const context
+  )
   {
     if (mTracing) {
-      const RenderTargetContext* const surface = (context != nullptr && context->surface != nullptr) ? context->surface->GetContext() : nullptr;
+      const RenderTargetContext* const surface =
+        (context != nullptr && context->surface != nullptr) ? context->surface->GetContext() : nullptr;
       const DepthStencilTargetContext* const depth =
         (context != nullptr && context->depthStencil != nullptr) ? context->depthStencil->GetContext() : nullptr;
-      Trace("ClearTarget rt=%p %ux%u fmt %u, ds=%p %ux%u", (context != nullptr) ? context->surface.get() : nullptr,
-            surface ? surface->width_ : 0U, surface ? surface->height_ : 0U, surface ? surface->format_ : 0U,
-            (context != nullptr) ? context->depthStencil.get() : nullptr, depth ? depth->width_ : 0U, depth ? depth->height_ : 0U);
+      Trace(
+        "ClearTarget rt=%p %ux%u fmt %u, ds=%p %ux%u",
+        (context != nullptr) ? context->surface.get() : nullptr,
+        surface ? surface->width_ : 0U,
+        surface ? surface->height_ : 0U,
+        surface ? surface->format_ : 0U,
+        (context != nullptr) ? context->depthStencil.get() : nullptr,
+        depth ? depth->width_ : 0U,
+        depth ? depth->height_ : 0U
+      );
     }
     const RenderTarget* const previousSurface = outputContext_.surface.get();
     Device::ClearTarget(context);
@@ -1867,7 +2150,15 @@ namespace gpg::gal
   )
   {
     if (mTracing) {
-      Trace("Clear color=%d depth=%d stencil=%d 0x%08X z=%f s=%d", clearColor, clearDepth, clearStencil, packedColor, depth, stencil);
+      Trace(
+        "Clear color=%d depth=%d stencil=%d 0x%08X z=%f s=%d",
+        clearColor,
+        clearDepth,
+        clearStencil,
+        packedColor,
+        depth,
+        stencil
+      );
     }
     constexpr float kScale = 1.0f / 255.0f;
     const float rgba[4] = {
@@ -1881,7 +2172,9 @@ namespace gpg::gal
     // clears its own corner of the screen); D3D11's clears ignore it. A
     // viewport smaller than the bound targets is cleared with a draw.
     if (!ViewportCoversTargets()) {
-      ClearViewportWithDraw(clearColor && outputContext_.surface != nullptr, clearDepth, clearStencil, rgba, depth, stencil);
+      ClearViewportWithDraw(
+        clearColor && outputContext_.surface != nullptr, clearDepth, clearStencil, rgba, depth, stencil
+      );
       return;
     }
 
@@ -1928,32 +2221,46 @@ namespace gpg::gal
       height = context->height_;
     }
     return viewport.TopLeftX <= kD3D9PixelCentreOffset && viewport.TopLeftY <= kD3D9PixelCentreOffset &&
-      viewport.Width >= static_cast<float>(width) &&
-      viewport.Height >= static_cast<float>(height);
+      viewport.Width >= static_cast<float>(width) && viewport.Height >= static_cast<float>(height);
   }
 
   void DeviceD3D11::CreateClearResources()
   {
-    static constexpr char kSource[] =
-      "cbuffer FafClear : register(b0) { float4 faf_color; float4 faf_depth; };\n"
-      "float4 VSMain(uint id : SV_VertexID) : SV_Position\n"
-      "{\n"
-      "    float2 p = float2((id << 1) & 2, id & 2);\n"
-      "    return float4(p * float2(2, -2) + float2(-1, 1), faf_depth.x, 1);\n"
-      "}\n"
-      "float4 PSMain() : SV_Target { return faf_color; }\n";
+    static constexpr char kSource[] = "cbuffer FafClear : register(b0) { float4 faf_color; float4 faf_depth; };\n"
+                                      "float4 VSMain(uint id : SV_VertexID) : SV_Position\n"
+                                      "{\n"
+                                      "    float2 p = float2((id << 1) & 2, id & 2);\n"
+                                      "    return float4(p * float2(2, -2) + float2(-1, 1), faf_depth.x, 1);\n"
+                                      "}\n"
+                                      "float4 PSMain() : SV_Target { return faf_color; }\n";
 
     ComPtr<ID3DBlob> code;
     ComPtr<ID3DBlob> errors;
-    CheckHresult("DeviceD3D11.cpp", __LINE__,
-                 ::D3DCompile(kSource, sizeof(kSource) - 1U, "FafClear", nullptr, nullptr, "VSMain", "vs_4_0", 0U, 0U, &code, &errors));
-    CheckHresult("DeviceD3D11.cpp", __LINE__,
-                 mDevice->CreateVertexShader(code->GetBufferPointer(), code->GetBufferSize(), nullptr, &mClearVertexShader));
+    CheckHresult(
+      "DeviceD3D11.cpp",
+      __LINE__,
+      ::D3DCompile(
+        kSource, sizeof(kSource) - 1U, "FafClear", nullptr, nullptr, "VSMain", "vs_4_0", 0U, 0U, &code, &errors
+      )
+    );
+    CheckHresult(
+      "DeviceD3D11.cpp",
+      __LINE__,
+      mDevice->CreateVertexShader(code->GetBufferPointer(), code->GetBufferSize(), nullptr, &mClearVertexShader)
+    );
     code.Reset();
-    CheckHresult("DeviceD3D11.cpp", __LINE__,
-                 ::D3DCompile(kSource, sizeof(kSource) - 1U, "FafClear", nullptr, nullptr, "PSMain", "ps_4_0", 0U, 0U, &code, &errors));
-    CheckHresult("DeviceD3D11.cpp", __LINE__,
-                 mDevice->CreatePixelShader(code->GetBufferPointer(), code->GetBufferSize(), nullptr, &mClearPixelShader));
+    CheckHresult(
+      "DeviceD3D11.cpp",
+      __LINE__,
+      ::D3DCompile(
+        kSource, sizeof(kSource) - 1U, "FafClear", nullptr, nullptr, "PSMain", "ps_4_0", 0U, 0U, &code, &errors
+      )
+    );
+    CheckHresult(
+      "DeviceD3D11.cpp",
+      __LINE__,
+      mDevice->CreatePixelShader(code->GetBufferPointer(), code->GetBufferSize(), nullptr, &mClearPixelShader)
+    );
 
     D3D11_BUFFER_DESC bufferDesc{};
     bufferDesc.ByteWidth = 32U;
@@ -1993,12 +2300,19 @@ namespace gpg::gal
       depthStencil.FrontFace.StencilFailOp = D3D11_STENCIL_OP_REPLACE;
       depthStencil.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_REPLACE;
       depthStencil.BackFace = depthStencil.FrontFace;
-      CheckHresult("DeviceD3D11.cpp", __LINE__, mDevice->CreateDepthStencilState(&depthStencil, &mClearDepthStencil[variant]));
+      CheckHresult(
+        "DeviceD3D11.cpp", __LINE__, mDevice->CreateDepthStencilState(&depthStencil, &mClearDepthStencil[variant])
+      );
     }
   }
 
   void DeviceD3D11::ClearViewportWithDraw(
-    const bool clearColor, const bool clearDepth, const bool clearStencil, const float* const rgba, const float depth, const int stencil
+    const bool clearColor,
+    const bool clearDepth,
+    const bool clearStencil,
+    const float* const rgba,
+    const float depth,
+    const int stencil
   )
   {
     const bool hasDepth = outputContext_.depthStencil != nullptr;
@@ -2076,7 +2390,9 @@ namespace gpg::gal
     mPipelineState->ClearTextures();
   }
 
-  void DeviceD3D11::SetVertexDeclaration(const boost::shared_ptr<VertexFormat> vertexFormat)
+  void DeviceD3D11::SetVertexDeclaration(
+    const boost::shared_ptr<VertexFormat> vertexFormat
+  )
   {
     auto* const format = static_cast<VertexFormatD3D11*>(vertexFormat.get());
     mImmediate->IASetInputLayout(format->GetInputLayout());
@@ -2085,7 +2401,10 @@ namespace gpg::gal
     RecordStateChange();
   }
 
-  void DeviceD3D11::SetPassVertexShader(const void* const bytecode, const SIZE_T length)
+  void DeviceD3D11::SetPassVertexShader(
+    const void* const bytecode,
+    const SIZE_T length
+  )
   {
     if (bytecode != mPassVertexShader || length != mPassVertexShaderLength) {
       mPassVertexShader = bytecode;
@@ -2115,7 +2434,9 @@ namespace gpg::gal
     std::memcpy(key.checksum, static_cast<const std::uint8_t*>(mPassVertexShader) + 4U, sizeof(key.checksum));
     auto found = mShaderInputLayouts.find(key);
     if (found == mShaderInputLayouts.end()) {
-      found = mShaderInputLayouts.emplace(key, CreateShaderInputLayout(mBoundFormat, mPassVertexShader, mPassVertexShaderLength)).first;
+      found = mShaderInputLayouts
+                .emplace(key, CreateShaderInputLayout(mBoundFormat, mPassVertexShader, mPassVertexShaderLength))
+                .first;
     }
     if (found->second != nullptr) {
       mImmediate->IASetInputLayout(found->second.Get());
@@ -2123,7 +2444,9 @@ namespace gpg::gal
   }
 
   ComPtr<ID3D11InputLayout> DeviceD3D11::CreateShaderInputLayout(
-    const std::uint32_t format, const void* const bytecode, const SIZE_T length
+    const std::uint32_t format,
+    const void* const bytecode,
+    const SIZE_T length
   )
   {
     constexpr UINT kUnboundSlot = D3D11_IA_VERTEX_INPUT_RESOURCE_SLOT_COUNT - 1U;
@@ -2145,8 +2468,10 @@ namespace gpg::gal
       if (parameter.SystemValueType != D3D_NAME_UNDEFINED) {
         continue;
       }
-      const bool provided = std::any_of(formatElements.begin(), formatElements.end(), [&](const D3D11_INPUT_ELEMENT_DESC& element) {
-        return element.SemanticIndex == parameter.SemanticIndex && ::_stricmp(element.SemanticName, parameter.SemanticName) == 0;
+      const bool provided =
+        std::any_of(formatElements.begin(), formatElements.end(), [&](const D3D11_INPUT_ELEMENT_DESC& element) {
+        return element.SemanticIndex == parameter.SemanticIndex &&
+          ::_stricmp(element.SemanticName, parameter.SemanticName) == 0;
       });
       if (provided) {
         continue;
@@ -2155,8 +2480,8 @@ namespace gpg::gal
       D3D11_INPUT_ELEMENT_DESC missing{};
       missing.SemanticIndex = parameter.SemanticIndex;
       missing.Format = (parameter.ComponentType == D3D_REGISTER_COMPONENT_UINT32) ? DXGI_FORMAT_R32G32B32A32_UINT
-        : (parameter.ComponentType == D3D_REGISTER_COMPONENT_SINT32)                ? DXGI_FORMAT_R32G32B32A32_SINT
-                                                                                    : DXGI_FORMAT_R32G32B32A32_FLOAT;
+        : (parameter.ComponentType == D3D_REGISTER_COMPONENT_SINT32)              ? DXGI_FORMAT_R32G32B32A32_SINT
+                                                                                  : DXGI_FORMAT_R32G32B32A32_FLOAT;
       missing.InputSlot = kUnboundSlot;
       missing.AlignedByteOffset = 0U;
       missing.InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
@@ -2167,7 +2492,9 @@ namespace gpg::gal
     }
 
     ComPtr<ID3D11InputLayout> layout;
-    if (FAILED(mDevice->CreateInputLayout(elements.data(), static_cast<UINT>(elements.size()), bytecode, length, &layout))) {
+    if (
+      FAILED(mDevice->CreateInputLayout(elements.data(), static_cast<UINT>(elements.size()), bytecode, length, &layout))
+    ) {
       gpg::Warnf("D3D11: no input layout for vertex format %u with this vertex shader; using the format's own", format);
       return nullptr;
     }
@@ -2203,31 +2530,54 @@ namespace gpg::gal
     mStreamFrequencies[streamSlot] = (context->type_ == kGeometryStreamType) ? static_cast<std::int32_t>(count) : 1;
   }
 
-  void DeviceD3D11::SetBufferIndices(const boost::shared_ptr<IndexBuffer> indexBuffer)
+  void DeviceD3D11::SetBufferIndices(
+    const boost::shared_ptr<IndexBuffer> indexBuffer
+  )
   {
     auto* const buffer = static_cast<IndexBufferD3D11*>(indexBuffer.get());
     mImmediate->IASetIndexBuffer(buffer->GetBuffer(), buffer->GetIndexFormat(), 0U);
     RecordStateChange();
   }
 
-  void DeviceD3D11::SetFogState(const bool, const Matrix* const, const float, const float, const int) {}
+  void DeviceD3D11::SetFogState(
+    const bool,
+    const Matrix* const,
+    const float,
+    const float,
+    const int
+  )
+  {}
 
-  void DeviceD3D11::SetWireframeState(const bool enabled)
+  void DeviceD3D11::SetWireframeState(
+    const bool enabled
+  )
   {
     mPipelineState->SetWireframe(enabled);
   }
 
-  void DeviceD3D11::SetColorWriteState(const bool writeColor, const bool writeAlpha)
+  void DeviceD3D11::SetColorWriteState(
+    const bool writeColor,
+    const bool writeAlpha
+  )
   {
     mPipelineState->SetColorWriteMask(writeColor, writeAlpha);
   }
 
-  void DeviceD3D11::DrawIndexedPrimitive(const DrawIndexedContext* const context)
+  void DeviceD3D11::DrawIndexedPrimitive(
+    const DrawIndexedContext* const context
+  )
   {
     PrepareInputLayout();
     if (mTracing) {
-      Trace("DrawIndexed topo %d idx %u start %u base %d inst %d fmt %u", static_cast<int>(context->topology_), context->indexCount_,
-            context->startIndex_, context->baseVertexIndex_, mStreamFrequencies[0], mBoundFormat);
+      Trace(
+        "DrawIndexed topo %d idx %u start %u base %d inst %d fmt %u",
+        static_cast<int>(context->topology_),
+        context->indexCount_,
+        context->startIndex_,
+        context->baseVertexIndex_,
+        mStreamFrequencies[0],
+        mBoundFormat
+      );
     }
     const auto token = static_cast<std::uint32_t>(context->topology_);
     if (token == 0U || token >= std::size(kTopologyByToken)) {
@@ -2239,19 +2589,29 @@ namespace gpg::gal
     // BaseVertexIndex, which is what the engine means.
     const auto instanceCount = static_cast<UINT>(mStreamFrequencies[0]);
     if (instanceCount > 1U) {
-      mImmediate->DrawIndexedInstanced(context->indexCount_, instanceCount, context->startIndex_, context->baseVertexIndex_, 0U);
+      mImmediate->DrawIndexedInstanced(
+        context->indexCount_, instanceCount, context->startIndex_, context->baseVertexIndex_, 0U
+      );
     } else {
       mImmediate->DrawIndexed(context->indexCount_, context->startIndex_, context->baseVertexIndex_);
     }
     RecordDraw(context->GetPrimitiveCount(), context->vertexCount_);
   }
 
-  void DeviceD3D11::DrawPrimitive(const DrawContext* const context)
+  void DeviceD3D11::DrawPrimitive(
+    const DrawContext* const context
+  )
   {
     PrepareInputLayout();
     if (mTracing) {
-      Trace("Draw topo %d count %u start %u inst %d fmt %u", static_cast<int>(context->topology_), context->vertexCount_,
-            context->startVertex_, mStreamFrequencies[0], mBoundFormat);
+      Trace(
+        "Draw topo %d count %u start %u inst %d fmt %u",
+        static_cast<int>(context->topology_),
+        context->vertexCount_,
+        context->startVertex_,
+        mStreamFrequencies[0],
+        mBoundFormat
+      );
     }
     const auto token = static_cast<std::uint32_t>(context->topology_);
     if (token == 0U || token >= std::size(kTopologyByToken)) {
@@ -2278,15 +2638,17 @@ namespace gpg::gal
     mPipelineState->EndTechnique();
   }
 
-  bool DeviceD3D11::SupportsVertexTextureFormat(const std::uint32_t textureFormat)
+  bool DeviceD3D11::SupportsVertexTextureFormat(
+    const std::uint32_t textureFormat
+  )
   {
     const DXGI_FORMAT format = d3d11::TextureFormatToDxgi(textureFormat);
     if (mDevice == nullptr || format == DXGI_FORMAT_UNKNOWN) {
       return false;
     }
     UINT support = 0U;
-    return SUCCEEDED(mDevice->CheckFormatSupport(format, &support)) && (support & D3D11_FORMAT_SUPPORT_TEXTURE2D) != 0U &&
-      (support & D3D11_FORMAT_SUPPORT_SHADER_SAMPLE) != 0U;
+    return SUCCEEDED(mDevice->CheckFormatSupport(format, &support)) &&
+      (support & D3D11_FORMAT_SUPPORT_TEXTURE2D) != 0U && (support & D3D11_FORMAT_SUPPORT_SHADER_SAMPLE) != 0U;
   }
 
   // ---------------------------------------------------------------------------
@@ -2313,28 +2675,40 @@ namespace gpg::gal
   {
     // The GPU font cook (ren_GpuFontCook): GPU and CPU atlases compared per font, and a device reset during
     // a cook, on NVIDIA only; other vendors keep the CPU cook until it has run there (issue #309).
-    const bool nvidia = mAdapterIndex < mFactory.Adapters().size() && mFactory.Adapters()[mAdapterIndex].desc.VendorId == kPciVendorNvidia;
+    const bool nvidia = mAdapterIndex < mFactory.Adapters().size() &&
+      mFactory.Adapters()[mAdapterIndex].desc.VendorId == kPciVendorNvidia;
     return nvidia ? kGpuPathMsdfCook : 0U;
   }
 
-  boost::shared_ptr<GpuBuffer> DeviceD3D11::CreateGpuBuffer(const GpuBufferDesc& desc)
+  boost::shared_ptr<GpuBuffer> DeviceD3D11::CreateGpuBuffer(
+    const GpuBufferDesc& desc
+  )
   {
     return mGpuDriven != nullptr ? mGpuDriven->CreateBuffer(desc) : boost::shared_ptr<GpuBuffer>();
   }
 
-  void DeviceD3D11::UpdateGpuBuffer(GpuBuffer& buffer, const std::uint32_t firstElement, const std::uint32_t count, const void* const data)
+  void DeviceD3D11::UpdateGpuBuffer(
+    GpuBuffer& buffer,
+    const std::uint32_t firstElement,
+    const std::uint32_t count,
+    const void* const data
+  )
   {
     if (mGpuDriven != nullptr) {
       mGpuDriven->UpdateBuffer(buffer, firstElement, count, data);
     }
   }
 
-  boost::shared_ptr<GpuProgram> DeviceD3D11::CreateGpuProgram(const GpuProgramDesc& desc)
+  boost::shared_ptr<GpuProgram> DeviceD3D11::CreateGpuProgram(
+    const GpuProgramDesc& desc
+  )
   {
     return mGpuDriven != nullptr ? mGpuDriven->CreateProgram(desc) : boost::shared_ptr<GpuProgram>();
   }
 
-  void DeviceD3D11::DrawGpuProgram(const GpuDrawCall& call)
+  void DeviceD3D11::DrawGpuProgram(
+    const GpuDrawCall& call
+  )
   {
     if (mGpuDriven != nullptr) {
       mGpuDriven->Draw(call);
@@ -2343,21 +2717,27 @@ namespace gpg::gal
     }
   }
 
-  void DeviceD3D11::DispatchGpuProgram(const GpuDispatch& dispatch)
+  void DeviceD3D11::DispatchGpuProgram(
+    const GpuDispatch& dispatch
+  )
   {
     if (mGpuDriven != nullptr) {
       mGpuDriven->Dispatch(dispatch);
     }
   }
 
-  void DeviceD3D11::BeginProfileRegion(const std::uint32_t region)
+  void DeviceD3D11::BeginProfileRegion(
+    const std::uint32_t region
+  )
   {
     if (mGpuDriven != nullptr) {
       mGpuDriven->BeginProfileRegion(region);
     }
   }
 
-  void DeviceD3D11::EndProfileRegion(const std::uint32_t region)
+  void DeviceD3D11::EndProfileRegion(
+    const std::uint32_t region
+  )
   {
     if (mGpuDriven != nullptr) {
       mGpuDriven->EndProfileRegion(region);
@@ -2388,12 +2768,19 @@ namespace gpg::gal
     return true;
   }
 
-  bool DeviceD3D11::ReadGpuBuffer(GpuBuffer& buffer, const std::uint32_t firstElement, const std::uint32_t count, void* const out)
+  bool DeviceD3D11::ReadGpuBuffer(
+    GpuBuffer& buffer,
+    const std::uint32_t firstElement,
+    const std::uint32_t count,
+    void* const out
+  )
   {
     return mGpuDriven != nullptr && mGpuDriven->ReadBuffer(buffer, firstElement, count, out);
   }
 
-  bool DeviceD3D11::GetRuntimeInfo(DeviceRuntimeInfo& out)
+  bool DeviceD3D11::GetRuntimeInfo(
+    DeviceRuntimeInfo& out
+  )
   {
     if (mDevice == nullptr) {
       return false;
@@ -2413,9 +2800,16 @@ namespace gpg::gal
       (void)chain->Get()->GetDesc(&desc);
       char text[128] = {};
       std::snprintf(
-        text, sizeof(text), "%s%ux%u %s %u buffers%s%s", chains.empty() ? "" : "; ", desc.BufferDesc.Width,
-        desc.BufferDesc.Height, dxgi::SwapModelName(chain->Model()), chain->BufferCount(),
-        chain->AllowsTearing() ? ", tearing" : "", desc.Windowed ? ", windowed" : ", full screen"
+        text,
+        sizeof(text),
+        "%s%ux%u %s %u buffers%s%s",
+        chains.empty() ? "" : "; ",
+        desc.BufferDesc.Width,
+        desc.BufferDesc.Height,
+        dxgi::SwapModelName(chain->Model()),
+        chain->BufferCount(),
+        chain->AllowsTearing() ? ", tearing" : "",
+        desc.Windowed ? ", windowed" : ", full screen"
       );
       chains += text;
     }

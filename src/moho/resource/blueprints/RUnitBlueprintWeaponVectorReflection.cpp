@@ -27,7 +27,8 @@ namespace
    */
   void PushBackRUnitBlueprintWeaponVector(
     WeaponVector& destination,
-    const moho::RUnitBlueprintWeapon& value)
+    const moho::RUnitBlueprintWeapon& value
+  )
   {
     destination.push_back(value);
   }
@@ -55,7 +56,10 @@ namespace
    * Ensures one `vector<RUnitBlueprintWeapon>` has capacity for `count`
    * elements before deserialization fills it.
    */
-  void EnsureWeaponVectorCapacity(WeaponVector& storage, const std::size_t count)
+  void EnsureWeaponVectorCapacity(
+    WeaponVector& storage,
+    const std::size_t count
+  )
   {
     if (count <= storage.capacity()) {
       return;
@@ -233,8 +237,7 @@ namespace
   {
     const std::size_t currentCount = storage.size();
     if (currentCount < requestedCount) {
-      InsertDefaultRUnitBlueprintWeapons(
-        storage, storage.end(), requestedCount - currentCount);
+      InsertDefaultRUnitBlueprintWeapons(storage, storage.end(), requestedCount - currentCount);
       return requestedCount;
     }
 
@@ -242,8 +245,7 @@ namespace
       if (!storage.empty()) {
         moho::RUnitBlueprintWeapon* const eraseBegin = storage.begin() + requestedCount;
         moho::RUnitBlueprintWeapon* outIterator = nullptr;
-        (void)DestroyUnitBlueprintWeaponTailAndReturnIterator(
-          storage, &outIterator, eraseBegin, storage.end());
+        (void)DestroyUnitBlueprintWeaponTailAndReturnIterator(storage, &outIterator, eraseBegin, storage.end());
       }
     }
 
@@ -267,8 +269,8 @@ gpg::RVectorType_RUnitBlueprintWeapon::~RVectorType_RUnitBlueprintWeapon() = def
  */
 const char* gpg::RVectorType_RUnitBlueprintWeapon::GetName() const
 {
-    static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::RUnitBlueprintWeapon>()->GetName());
-    return sName.c_str();
+  static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::RUnitBlueprintWeapon>()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -278,7 +280,9 @@ const char* gpg::RVectorType_RUnitBlueprintWeapon::GetName() const
  * Returns base lexical text plus reflected vector size for one
  * `fa::vector<moho::RUnitBlueprintWeapon>` instance.
  */
-fa::string gpg::RVectorType_RUnitBlueprintWeapon::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_RUnitBlueprintWeapon::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
@@ -391,7 +395,10 @@ void gpg::RVectorType_RUnitBlueprintWeapon::SerSave(
 /**
  * Address: 0x00523650 (FUN_00523650, gpg::RVectorType_RUnitBlueprintWeapon::SubscriptIndex)
  */
-gpg::RRef gpg::RVectorType_RUnitBlueprintWeapon::SubscriptIndex(void* const obj, const int ind) const
+gpg::RRef gpg::RVectorType_RUnitBlueprintWeapon::SubscriptIndex(
+  void* const obj,
+  const int ind
+) const
 {
   gpg::RRef out{};
   out.mType = gpg::RTypeOf<moho::RUnitBlueprintWeapon>();
@@ -409,7 +416,9 @@ gpg::RRef gpg::RVectorType_RUnitBlueprintWeapon::SubscriptIndex(void* const obj,
 /**
  * Address: 0x005235F0 (FUN_005235F0, gpg::RVectorType_RUnitBlueprintWeapon::GetCount)
  */
-size_t gpg::RVectorType_RUnitBlueprintWeapon::GetCount(void* const obj) const
+size_t gpg::RVectorType_RUnitBlueprintWeapon::GetCount(
+  void* const obj
+) const
 {
   const auto* const storage = static_cast<const WeaponVector*>(obj);
   return storage ? storage->size() : 0u;
@@ -418,7 +427,10 @@ size_t gpg::RVectorType_RUnitBlueprintWeapon::GetCount(void* const obj) const
 /**
  * Address: 0x00523620 (FUN_00523620, gpg::RVectorType_RUnitBlueprintWeapon::SetCount)
  */
-void gpg::RVectorType_RUnitBlueprintWeapon::SetCount(void* const obj, const int count) const
+void gpg::RVectorType_RUnitBlueprintWeapon::SetCount(
+  void* const obj,
+  const int count
+) const
 {
   if (!obj || count < 0) {
     return;
@@ -450,5 +462,11 @@ void moho::register_VectorRUnitBlueprintWeaponType()
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_VectorRUnitBlueprintWeaponType_8f3a7d, moho::preregister_VectorRUnitBlueprintWeaponType)
-GPG_PREREGISTER_INIT(register_VectorRUnitBlueprintWeaponType_8f3a7d, moho::register_VectorRUnitBlueprintWeaponType)
+GPG_PREREGISTER_INIT(
+  preregister_VectorRUnitBlueprintWeaponType_8f3a7d,
+  moho::preregister_VectorRUnitBlueprintWeaponType
+)
+GPG_PREREGISTER_INIT(
+  register_VectorRUnitBlueprintWeaponType_8f3a7d,
+  moho::register_VectorRUnitBlueprintWeaponType
+)

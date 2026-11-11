@@ -27,7 +27,7 @@ namespace moho
     fa::vector<std::uint32_t> mWords; // +0x00
     // A dword in the binary; the path preview stores a footprint pointer in
     // it, so it is pointer-sized (the same unsigned int on x86).
-    std::uintptr_t mMetaWord;            // +0x10
+    std::uintptr_t mMetaWord; // +0x10
 
     SArmyVectorWithMeta() = default;
 
@@ -71,9 +71,15 @@ namespace moho
    * Network/sync variable payload for per-army runtime state.
    * Field coverage follows FA + Moho serializer/copy evidence; unresolved sub-ranges
    * remain explicit offset-scoped runtime blocks.
-   * Address: 0x00563590 (FUN_00563590 -- `SSTIArmyVariableData`'s copy constructor, guarded on a null destination, as emitted for its vector's `_Ucopy`; zero callers, unreachable; formerly `CopyConstructSSTIArmyVariableDataIfPresentPrimary` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x00563790 (FUN_00563790 -- `SSTIArmyVariableData`'s copy constructor (second copy); zero callers, unreachable; formerly `CopyConstructSSTIArmyVariableDataIfPresentSecondary` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x008B17D0 (FUN_008B17D0 -- `SSTIArmyVariableData::operator=` into an owner-embedded slot; zero callers, unreachable; formerly `AssignSSTIArmyVariableDataIntoEmbeddedOwnerSlot` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00563590 (FUN_00563590 -- `SSTIArmyVariableData`'s copy constructor, guarded on a null destination, as
+   * emitted for its vector's `_Ucopy`; zero callers, unreachable; formerly
+   * `CopyConstructSSTIArmyVariableDataIfPresentPrimary` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x00563790 (FUN_00563790 -- `SSTIArmyVariableData`'s copy constructor (second copy); zero
+   * callers, unreachable; formerly `CopyConstructSSTIArmyVariableDataIfPresentSecondary` in
+   * moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.) Address: 0x008B17D0 (FUN_008B17D0 --
+   * `SSTIArmyVariableData::operator=` into an owner-embedded slot; zero callers, unreachable; formerly
+   * `AssignSSTIArmyVariableDataIntoEmbeddedOwnerSlot` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed
+   * 2026-09-10.)
    */
   struct SSTIArmyVariableData
   {
@@ -90,15 +96,15 @@ namespace moho
     BVIntSet mValidCommandSources;  // 0x0A8
     std::uint32_t mPlayerColorBgra; // 0x0C8
     std::uint32_t mArmyColorBgra;   // 0x0CC
-    fa::string mArmyType;        // 0x0D0
+    fa::string mArmyType;           // 0x0D0
     std::int32_t mFaction;          // 0x0EC
     std::uint8_t mUseWholeMap;      // 0x0F0
     std::uint8_t mPad_00F1_00F4[0x03]{};
     SArmyVectorWithMeta mWordVectorWithMeta; // 0x0F4
-    std::uint8_t mShowScore;                        // 0x108
+    std::uint8_t mShowScore;                 // 0x108
     std::uint8_t mRuntimePad_0109_0110[0x07]{};
     EntityCategorySet mCategoryFilterSet; // 0x110
-    std::uint8_t mIsOutOfGame;                // 0x138
+    std::uint8_t mIsOutOfGame;            // 0x138
     std::uint8_t mPad_0139_013C[0x03]{};
     Wm3::Vector2f mArmyStart;    // 0x13C
     std::int32_t mNoRushTimer;   // 0x144
@@ -152,56 +158,69 @@ namespace moho
   };
 
   static_assert(
-    offsetof(SSTIArmyVariableData, mEconomyTotals) == 0x000, "SSTIArmyVariableData::mEconomyTotals offset must be 0x000"
+    offsetof(SSTIArmyVariableData, mEconomyTotals) == 0x000,
+    "SSTIArmyVariableData::mEconomyTotals offset must be 0x000"
   );
   static_assert(
-    offsetof(SSTIArmyVariableData, mNeutrals) == 0x040, "SSTIArmyVariableData::mNeutrals offset must be 0x040"
+    offsetof(SSTIArmyVariableData, mNeutrals) == 0x040,
+    "SSTIArmyVariableData::mNeutrals offset must be 0x040"
   );
   static_assert(offsetof(SSTIArmyVariableData, mAllies) == 0x060, "SSTIArmyVariableData::mAllies offset must be 0x060");
   static_assert(
-    offsetof(SSTIArmyVariableData, mEnemies) == 0x080, "SSTIArmyVariableData::mEnemies offset must be 0x080"
+    offsetof(SSTIArmyVariableData, mEnemies) == 0x080,
+    "SSTIArmyVariableData::mEnemies offset must be 0x080"
   );
   static_assert(
     offsetof(SSTIArmyVariableData, mValidCommandSources) == 0x0A8,
     "SSTIArmyVariableData::mValidCommandSources offset must be 0x0A8"
   );
   static_assert(
-    offsetof(SSTIArmyVariableData, mArmyType) == 0x0D0, "SSTIArmyVariableData::mArmyType offset must be 0x0D0"
+    offsetof(SSTIArmyVariableData, mArmyType) == 0x0D0,
+    "SSTIArmyVariableData::mArmyType offset must be 0x0D0"
   );
   static_assert(
-    offsetof(SSTIArmyVariableData, mUseWholeMap) == 0x0F0, "SSTIArmyVariableData::mUseWholeMap offset must be 0x0F0"
+    offsetof(SSTIArmyVariableData, mUseWholeMap) == 0x0F0,
+    "SSTIArmyVariableData::mUseWholeMap offset must be 0x0F0"
   );
   static_assert(
     offsetof(SSTIArmyVariableData, mWordVectorWithMeta) == 0x0F4,
     "SSTIArmyVariableData::mWordVectorWithMeta offset must be 0x0F4"
   );
   static_assert(
-    offsetof(SSTIArmyVariableData, mShowScore) == 0x108, "SSTIArmyVariableData::mShowScore offset must be 0x108"
+    offsetof(SSTIArmyVariableData, mShowScore) == 0x108,
+    "SSTIArmyVariableData::mShowScore offset must be 0x108"
   );
   static_assert(
     offsetof(SSTIArmyVariableData, mCategoryFilterSet) == 0x110,
     "SSTIArmyVariableData::mCategoryFilterSet offset must be 0x110"
   );
   static_assert(
-    offsetof(SSTIArmyVariableData, mIsOutOfGame) == 0x138, "SSTIArmyVariableData::mIsOutOfGame offset must be 0x138"
+    offsetof(SSTIArmyVariableData, mIsOutOfGame) == 0x138,
+    "SSTIArmyVariableData::mIsOutOfGame offset must be 0x138"
   );
   static_assert(
-    offsetof(SSTIArmyVariableData, mArmyStart) == 0x13C, "SSTIArmyVariableData::mArmyStart offset must be 0x13C"
+    offsetof(SSTIArmyVariableData, mArmyStart) == 0x13C,
+    "SSTIArmyVariableData::mArmyStart offset must be 0x13C"
   );
   static_assert(
-    offsetof(SSTIArmyVariableData, mNoRushTimer) == 0x144, "SSTIArmyVariableData::mNoRushTimer offset must be 0x144"
+    offsetof(SSTIArmyVariableData, mNoRushTimer) == 0x144,
+    "SSTIArmyVariableData::mNoRushTimer offset must be 0x144"
   );
   static_assert(
-    offsetof(SSTIArmyVariableData, mNoRushRadius) == 0x148, "SSTIArmyVariableData::mNoRushRadius offset must be 0x148"
+    offsetof(SSTIArmyVariableData, mNoRushRadius) == 0x148,
+    "SSTIArmyVariableData::mNoRushRadius offset must be 0x148"
   );
   static_assert(
-    offsetof(SSTIArmyVariableData, mNoRushOffset) == 0x14C, "SSTIArmyVariableData::mNoRushOffset offset must be 0x14C"
+    offsetof(SSTIArmyVariableData, mNoRushOffset) == 0x14C,
+    "SSTIArmyVariableData::mNoRushOffset offset must be 0x14C"
   );
   static_assert(
-    offsetof(SSTIArmyVariableData, mHandicapValue) == 0x154, "SSTIArmyVariableData::mHandicapValue offset must be 0x154"
+    offsetof(SSTIArmyVariableData, mHandicapValue) == 0x154,
+    "SSTIArmyVariableData::mHandicapValue offset must be 0x154"
   );
   static_assert(
-    offsetof(SSTIArmyVariableData, mHandicapExtra) == 0x158, "SSTIArmyVariableData::mHandicapExtra offset must be 0x158"
+    offsetof(SSTIArmyVariableData, mHandicapExtra) == 0x158,
+    "SSTIArmyVariableData::mHandicapExtra offset must be 0x158"
   );
   static_assert(sizeof(SSTIArmyVariableData) == 0x160, "SSTIArmyVariableData size must be 0x160");
 

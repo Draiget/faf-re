@@ -34,7 +34,10 @@ namespace
    * What it does:
    * Constructs one `shared_ptr<ShoreCell>` from one raw shoreline-cell pointer lane.
    */
-  [[maybe_unused]] ShoreCellRef* ConstructSharedShoreCellFromRaw(ShoreCellRef* const outShoreCell, moho::ShoreCell* const shoreCell)
+  [[maybe_unused]] ShoreCellRef* ConstructSharedShoreCellFromRaw(
+    ShoreCellRef* const outShoreCell,
+    moho::ShoreCell* const shoreCell
+  )
   {
     return ::new (outShoreCell) ShoreCellRef(shoreCell);
   }
@@ -72,8 +75,10 @@ namespace
   moho::StatItem* sEngineStatShorelineVerticesFinal = nullptr;
   moho::StatItem* sEngineStatShorelineTrianglesFinal = nullptr;
 
-
-  void EnsureNamedStat(moho::StatItem*& slot, const char* const name)
+  void EnsureNamedStat(
+    moho::StatItem*& slot,
+    const char* const name
+  )
   {
     if (slot != nullptr) {
       return;
@@ -122,7 +127,10 @@ namespace
     out[5] = c.z;
   }
 
-  void StoreStatCounter(moho::StatItem* const slot, const std::int32_t value)
+  void StoreStatCounter(
+    moho::StatItem* const slot,
+    const std::int32_t value
+  )
   {
     if (slot == nullptr) {
       return;
@@ -154,13 +162,13 @@ namespace
   )
   {
     const float t = (waterElevation - first.y) / (second.y - first.y);
-    return {
-      first.x + ((second.x - first.x) * t),
-      first.z + ((second.z - first.z) * t)
-    };
+    return {first.x + ((second.x - first.x) * t), first.z + ((second.z - first.z) * t)};
   }
 
-  void UpdateShoreCellCentroid(moho::ShoreCell& cell, const std::int32_t pointCount)
+  void UpdateShoreCellCentroid(
+    moho::ShoreCell& cell,
+    const std::int32_t pointCount
+  )
   {
     float sumX = 0.0f;
     float sumZ = 0.0f;
@@ -174,7 +182,9 @@ namespace
     cell.mCenterZ = sumZ * invCount;
   }
 
-  void ResetShoreCell(moho::ShoreCell& cell)
+  void ResetShoreCell(
+    moho::ShoreCell& cell
+  )
   {
     cell.mType = 0;
     cell.mPad06 = 0;
@@ -587,7 +597,10 @@ namespace
    * Appends one shoreline-cell shared pointer at vector tail, using the
    * in-place lane when capacity is available and growing storage otherwise.
    */
-  void AppendShoreCellRef(fa::vector<ShoreCellRef>& shorelineCells, const ShoreCellRef& cell)
+  void AppendShoreCellRef(
+    fa::vector<ShoreCellRef>& shorelineCells,
+    const ShoreCellRef& cell
+  )
   {
     shorelineCells.push_back(cell);
   }
@@ -625,12 +638,7 @@ namespace
     ResetShoreCell(*cell);
     if (maskType >= 0 && maskType < static_cast<std::int32_t>(kShoreCellMaskBuilders.size())) {
       kShoreCellMaskBuilders[static_cast<std::size_t>(maskType)](
-        *cell,
-        waterElevation,
-        corner00,
-        corner10,
-        corner01,
-        corner11
+        *cell, waterElevation, corner00, corner10, corner01, corner11
       );
     }
 
@@ -651,7 +659,8 @@ namespace moho
   {
     TConVar<bool> gTConVar_ren_ShorelineMemo(
       "ren_ShorelineMemo",
-      "Direct3D 12 / Vulkan: the shoreline stays in GPU memory and is rewritten only when the view changes (1, the default), "
+      "Direct3D 12 / Vulkan: the shoreline stays in GPU memory and is rewritten only when the view changes (1, the "
+      "default), "
       "or each frame (0). GPU memory is chosen when a shoreline is generated.",
       &ren_ShorelineMemo
     );
@@ -675,7 +684,9 @@ namespace moho
     };
     ShorelineRuns sShorelineRuns;
 
-    [[nodiscard]] float ShoreCellLevel(const ShoreCell& cell) noexcept
+    [[nodiscard]] float ShoreCellLevel(
+      const ShoreCell& cell
+    ) noexcept
     {
       return (cell.mBounds.Min.y + cell.mBounds.Max.y) * 0.5f;
     }
@@ -760,7 +771,9 @@ namespace moho
    * Rebuilds shoreline cells from terrain-water heightfield masks, recreates
    * shoreline vertex-sheet ownership, and updates shoreline-cell stats.
    */
-  void Shoreline::Generate(IWldTerrainRes* const terrainResource)
+  void Shoreline::Generate(
+    IWldTerrainRes* const terrainResource
+  )
   {
     Destroy();
 
@@ -781,7 +794,8 @@ namespace moho
     // Engine change (ren_ShorelineMemo): upload memory is recycled, so a dynamic sheet is copied again each
     // frame though a still camera sees the same shoreline. In GPU memory it uploads only when rewritten.
     const gpg::gal::DeviceApi deviceApi = gpg::gal::Device::GetInstance()->GetDeviceContext()->mDeviceType;
-    sShorelineGpuSheet = ren_ShorelineMemo && (deviceApi == gpg::gal::DeviceApi::Direct3D12 || deviceApi == gpg::gal::DeviceApi::Vulkan);
+    sShorelineGpuSheet =
+      ren_ShorelineMemo && (deviceApi == gpg::gal::DeviceApi::Direct3D12 || deviceApi == gpg::gal::DeviceApi::Vulkan);
     CD3DVertexSheet* const vertexSheet = resources->NewVertexSheet(
       sShorelineGpuSheet ? 0U : kShorelineVertexSheetUsageToken, kShorelineVertexSheetVertexCount, vertexFormat
     );
@@ -850,7 +864,9 @@ namespace moho
    * Refreshes shoreline mesh geometry for the current camera view; see the
    * header declaration for the full behavioral summary.
    */
-  void Shoreline::Update(const GeomCamera3& camera)
+  void Shoreline::Update(
+    const GeomCamera3& camera
+  )
   {
     EnsureNamedStat(sEngineStatShorelineVertices, "Shoreline_Vertices");
     StoreStatCounter(sEngineStatShorelineVertices, 0);
@@ -861,8 +877,16 @@ namespace moho
     // Engine change (ren_ShorelineMemo): the cells only change in Generate, so the same view gives the same
     // vertices. Collecting the visible cells alone was over 2 % of a near-zoom frame.
     const bool keepVertices = ren_ShorelineMemo && sShorelineGpuSheet && sShorelineView.owner == this &&
-      std::memcmp(static_cast<const void*>(&sShorelineView.transform), static_cast<const void*>(&camera.tranform), sizeof(VTransform)) == 0 &&
-      std::memcmp(static_cast<const void*>(&sShorelineView.projection), static_cast<const void*>(&camera.projection), sizeof(gpg::gal::Matrix)) == 0;
+      std::memcmp(
+        static_cast<const void*>(&sShorelineView.transform),
+        static_cast<const void*>(&camera.tranform),
+        sizeof(VTransform)
+      ) == 0 &&
+      std::memcmp(
+        static_cast<const void*>(&sShorelineView.projection),
+        static_cast<const void*>(&camera.projection),
+        sizeof(gpg::gal::Matrix)
+      ) == 0;
     if (keepVertices) {
       StoreStatCounter(sEngineStatShorelineVertices, mShorelineTris * 3);
       StoreStatCounter(sEngineStatShorelineTriangles, mShorelineTris);
@@ -895,9 +919,11 @@ namespace moho
     // Engine addition (water bodies): the shader puts every vertex at one level, so cells are
     // written grouped by their water's level and drawn one group at a time.
     if (sShorelineRuns.generation != 0u) {
-      std::stable_sort(visibleCells.begin(), visibleCells.end(), [](const ShoreCell* const a, const ShoreCell* const b) {
+      std::stable_sort(
+        visibleCells.begin(), visibleCells.end(), [](const ShoreCell* const a, const ShoreCell* const b) {
         return ShoreCellLevel(*a) < ShoreCellLevel(*b);
-      });
+      }
+      );
     }
 
     // A GPU sheet's draw reads only what this writes, so only that is uploaded.
@@ -911,8 +937,7 @@ namespace moho
     }
 
     auto* const vertexStream = mVertexSheet->GetVertStream(0U);
-    auto* writeCursor =
-      static_cast<ShorelineMeshRecord*>(vertexStream->Lock(0, lockVertices, false, true));
+    auto* writeCursor = static_cast<ShorelineMeshRecord*>(vertexStream->Lock(0, lockVertices, false, true));
 
     std::int32_t vertexCount = 0;
     for (ShoreCell* const cell : visibleCells) {
@@ -981,7 +1006,9 @@ namespace moho
    * Runs the non-deleting destructor and conditionally frees `this` when the
    * low delete-flag bit is set.
    */
-  Shoreline* Shoreline::DeleteWithFlag(const std::uint8_t deleteFlags)
+  Shoreline* Shoreline::DeleteWithFlag(
+    const std::uint8_t deleteFlags
+  )
   {
     this->~Shoreline();
     if ((deleteFlags & 0x1u) != 0u) {

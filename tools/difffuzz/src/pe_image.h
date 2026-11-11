@@ -18,9 +18,18 @@ namespace difffuzz
   public:
     bool Load(const std::string& path, std::string& error);
 
-    [[nodiscard]] std::uint32_t Base() const noexcept { return mBase; }
-    [[nodiscard]] std::uint32_t SizeOfImage() const noexcept { return mSizeOfImage; }
-    [[nodiscard]] unsigned ImportCount() const noexcept { return mImportCount; }
+    [[nodiscard]] std::uint32_t Base() const noexcept
+    {
+      return mBase;
+    }
+    [[nodiscard]] std::uint32_t SizeOfImage() const noexcept
+    {
+      return mSizeOfImage;
+    }
+    [[nodiscard]] unsigned ImportCount() const noexcept
+    {
+      return mImportCount;
+    }
 
     /// True when `va` lies inside a mapped executable section.
     [[nodiscard]] bool IsExecutable(std::uint32_t va) const noexcept;

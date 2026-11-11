@@ -11,7 +11,7 @@ namespace gpg
   class RType;
   class ReadArchive;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -91,7 +91,7 @@ namespace moho
     std::uint32_t transportBoneIndex; // +0x00
     std::uint32_t attachBoneIndex;    // +0x04
     WeakPtr<Unit> reservedUnit;       // +0x08
-    fa::vector<int> reservedBones; // +0x10
+    fa::vector<int> reservedBones;    // +0x10
   };
 
   static_assert(sizeof(SAiReservedTransportBone) == 0x20, "SAiReservedTransportBone size must be 0x20");
@@ -99,9 +99,18 @@ namespace moho
     offsetof(SAiReservedTransportBone, transportBoneIndex) == 0x00,
     "SAiReservedTransportBone::transportBoneIndex offset must be 0x00"
   );
-  static_assert(offsetof(SAiReservedTransportBone, attachBoneIndex) == 0x04, "SAiReservedTransportBone::attachBoneIndex offset must be 0x04");
-  static_assert(offsetof(SAiReservedTransportBone, reservedUnit) == 0x08, "SAiReservedTransportBone::reservedUnit offset must be 0x08");
-  static_assert(offsetof(SAiReservedTransportBone, reservedBones) == 0x10, "SAiReservedTransportBone::reservedBones offset must be 0x10");
+  static_assert(
+    offsetof(SAiReservedTransportBone, attachBoneIndex) == 0x04,
+    "SAiReservedTransportBone::attachBoneIndex offset must be 0x04"
+  );
+  static_assert(
+    offsetof(SAiReservedTransportBone, reservedUnit) == 0x08,
+    "SAiReservedTransportBone::reservedUnit offset must be 0x08"
+  );
+  static_assert(
+    offsetof(SAiReservedTransportBone, reservedBones) == 0x10,
+    "SAiReservedTransportBone::reservedBones offset must be 0x10"
+  );
 
   /**
    * Address: 0x005E8230 (FUN_005E8230, Moho::SAiReservedTransportBone::~SAiReservedTransportBone)

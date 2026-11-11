@@ -19,7 +19,8 @@ namespace moho
   struct Vector4f;
   struct SphereBoundsProbe;
 
-  template <class T> struct SpatialShardData;
+  template <class T>
+  struct SpatialShardData;
 
   /**
    * One object's record in a spatial map -- the value a map node carries at
@@ -51,8 +52,14 @@ namespace moho
   };
 
   static_assert(sizeof(SpatialEntry<UserEntity>) == 0x28, "SpatialEntry<T> size must be 0x28");
-  static_assert(offsetof(SpatialEntry<UserEntity>, mEntityType) == 0x18, "SpatialEntry<T>::mEntityType offset must be 0x18");
-  static_assert(offsetof(SpatialEntry<UserEntity>, mShardData) == 0x1C, "SpatialEntry<T>::mShardData offset must be 0x1C");
+  static_assert(
+    offsetof(SpatialEntry<UserEntity>, mEntityType) == 0x18,
+    "SpatialEntry<T>::mEntityType offset must be 0x18"
+  );
+  static_assert(
+    offsetof(SpatialEntry<UserEntity>, mShardData) == 0x1C,
+    "SpatialEntry<T>::mShardData offset must be 0x1C"
+  );
   static_assert(offsetof(SpatialEntry<UserEntity>, mFadeOut) == 0x20, "SpatialEntry<T>::mFadeOut offset must be 0x20");
   static_assert(offsetof(SpatialEntry<UserEntity>, mOwner) == 0x24, "SpatialEntry<T>::mOwner offset must be 0x24");
 
@@ -72,7 +79,10 @@ namespace moho
   template <class T>
   struct SpatialEntryLess
   {
-    [[nodiscard]] bool operator()(const SpatialEntry<T>& lhs, const SpatialEntry<T>& rhs) const noexcept
+    [[nodiscard]] bool operator()(
+      const SpatialEntry<T>& lhs,
+      const SpatialEntry<T>& rhs
+    ) const noexcept
     {
       if (lhs.mFadeOut > 0.0f) {
         return rhs.mFadeOut > 0.0f && lhs.mFadeOut > rhs.mFadeOut;
@@ -94,16 +104,16 @@ namespace moho
   template <class T>
   struct SpatialShard
   {
-    SpatialShard<T>* mParent;                   // +0x00
-    gpg::Rect2i mAreaRect;                      // +0x04
-    std::int32_t mLevel;                        // +0x14
-    std::int32_t mUnitCount;                    // +0x18
-    std::int32_t mProjectileCount;              // +0x1C
-    std::int32_t mPropCount;                    // +0x20
-    std::int32_t mEntityCount;                  // +0x24
-    Wm3::AxisAlignedBox3f mBounds;              // +0x28
-    fa::vector<SpatialShard<T>*> mShards;    // +0x40, the 4x4 children while mLevel > 0
-    fa::vector<SpatialShardData<T>*> mData;  // +0x50, the 4x4 leaf lanes once mLevel <= 0
+    SpatialShard<T>* mParent;               // +0x00
+    gpg::Rect2i mAreaRect;                  // +0x04
+    std::int32_t mLevel;                    // +0x14
+    std::int32_t mUnitCount;                // +0x18
+    std::int32_t mProjectileCount;          // +0x1C
+    std::int32_t mPropCount;                // +0x20
+    std::int32_t mEntityCount;              // +0x24
+    Wm3::AxisAlignedBox3f mBounds;          // +0x28
+    fa::vector<SpatialShard<T>*> mShards;   // +0x40, the 4x4 children while mLevel > 0
+    fa::vector<SpatialShardData<T>*> mData; // +0x50, the 4x4 leaf lanes once mLevel <= 0
 
     /**
      * Address: 0x005011A0 (FUN_005011A0, Moho::SpatialShard<T>::SpatialShard)
@@ -164,7 +174,7 @@ namespace moho
   {
     using iterator = typename SpatialMap<T>::iterator;
 
-    SpatialShard<T>* mShard;       // +0x00
+    SpatialShard<T>* mShard; // +0x00
 
     /**
      * +0x04..+0x13. Four dwords the constructor at 0x00500F60 stores zero into
@@ -279,11 +289,7 @@ namespace moho
      * What it does:
      * Collects selected leaf-map entities intersecting one AABB query.
      */
-    void CollectInBoxFromData(
-      const Wm3::AxisAlignedBox3f& bounds,
-      EEntityType type,
-      gpg::fastvector<T*>& destination
-    );
+    void CollectInBoxFromData(const Wm3::AxisAlignedBox3f& bounds, EEntityType type, gpg::fastvector<T*>& destination);
 
     /**
      * Address: 0x00503DB0 (FUN_00503DB0, Moho::SpatialShardData<T>::CollectInVolume)
@@ -291,12 +297,8 @@ namespace moho
      * What it does:
      * Recursively collects selected entities that intersect one convex volume.
      */
-    static void CollectInVolume(
-      SpatialShard<T>* shard,
-      EEntityType type,
-      CGeomSolid3* volume,
-      gpg::fastvector<T*>& destination
-    );
+    static void
+    CollectInVolume(SpatialShard<T>* shard, EEntityType type, CGeomSolid3* volume, gpg::fastvector<T*>& destination);
 
     /**
      * Address: 0x00503490 (FUN_00503490, Moho::SpatialShardData<T>::CollectInVolumeFromData)
@@ -334,11 +336,8 @@ namespace moho
      * map appending owners whose box either intersects the sphere or is
      * fully contained by it.
      */
-    [[nodiscard]] bool CollectInSphereFromData(
-      EEntityType type,
-      const SphereBoundsProbe& probe,
-      gpg::fastvector<T*>& destination
-    );
+    [[nodiscard]] bool
+    CollectInSphereFromData(EEntityType type, const SphereBoundsProbe& probe, gpg::fastvector<T*>& destination);
 
     /**
      * Address: 0x00502340 (FUN_00502340, Moho::SpatialShardData<T>::RemoveNode)
@@ -383,12 +382,30 @@ namespace moho
   };
 
   static_assert(sizeof(SpatialShardData<UserEntity>) == 0x60, "SpatialShardData<T> size must be 0x60");
-  static_assert(offsetof(SpatialShardData<UserEntity>, mTimeSinceRecalc) == 0x14, "SpatialShardData<T>::mTimeSinceRecalc offset must be 0x14");
-  static_assert(offsetof(SpatialShardData<UserEntity>, mBounds) == 0x18, "SpatialShardData<T>::mBounds offset must be 0x18");
-  static_assert(offsetof(SpatialShardData<UserEntity>, mMapUnits) == 0x30, "SpatialShardData<T>::mMapUnits offset must be 0x30");
-  static_assert(offsetof(SpatialShardData<UserEntity>, mMapProjectiles) == 0x3C, "SpatialShardData<T>::mMapProjectiles offset must be 0x3C");
-  static_assert(offsetof(SpatialShardData<UserEntity>, mMapProps) == 0x48, "SpatialShardData<T>::mMapProps offset must be 0x48");
-  static_assert(offsetof(SpatialShardData<UserEntity>, mMapEntities) == 0x54, "SpatialShardData<T>::mMapEntities offset must be 0x54");
+  static_assert(
+    offsetof(SpatialShardData<UserEntity>, mTimeSinceRecalc) == 0x14,
+    "SpatialShardData<T>::mTimeSinceRecalc offset must be 0x14"
+  );
+  static_assert(
+    offsetof(SpatialShardData<UserEntity>, mBounds) == 0x18,
+    "SpatialShardData<T>::mBounds offset must be 0x18"
+  );
+  static_assert(
+    offsetof(SpatialShardData<UserEntity>, mMapUnits) == 0x30,
+    "SpatialShardData<T>::mMapUnits offset must be 0x30"
+  );
+  static_assert(
+    offsetof(SpatialShardData<UserEntity>, mMapProjectiles) == 0x3C,
+    "SpatialShardData<T>::mMapProjectiles offset must be 0x3C"
+  );
+  static_assert(
+    offsetof(SpatialShardData<UserEntity>, mMapProps) == 0x48,
+    "SpatialShardData<T>::mMapProps offset must be 0x48"
+  );
+  static_assert(
+    offsetof(SpatialShardData<UserEntity>, mMapEntities) == 0x54,
+    "SpatialShardData<T>::mMapEntities offset must be 0x54"
+  );
 
   /**
    * The spatial database: a recursive 4x4 shard partition over the playable
@@ -410,14 +427,14 @@ namespace moho
   template <class T>
   struct SpatialDB
   {
-    fa::vector<SpatialShard<T>*> mShards;  // +0x00, the 4x4 top-level shards
-    SpatialShardData<T> mShardData;           // +0x10, entries outside the shard grid
-    std::int32_t mMapWidth;                   // +0x70
-    std::int32_t mMapHeight;                  // +0x74
-    std::int32_t mShardWidth;                 // +0x78
-    std::int32_t mShardHeight;                // +0x7C
-    std::int32_t mShardLevel;                 // +0x80
-    SpatialMap<T> mMapTree;                   // +0x84, registered entries not yet bounded
+    fa::vector<SpatialShard<T>*> mShards; // +0x00, the 4x4 top-level shards
+    SpatialShardData<T> mShardData;       // +0x10, entries outside the shard grid
+    std::int32_t mMapWidth;               // +0x70
+    std::int32_t mMapHeight;              // +0x74
+    std::int32_t mShardWidth;             // +0x78
+    std::int32_t mShardHeight;            // +0x7C
+    std::int32_t mShardLevel;             // +0x80
+    SpatialMap<T> mMapTree;               // +0x84, registered entries not yet bounded
 
     /**
      * Address: 0x00501D80 (FUN_00501D80) -- member construction (the root lane

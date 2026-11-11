@@ -77,9 +77,8 @@ namespace moho
     [[nodiscard]] virtual const fa::string* GetSubtitleText() = 0;
 
     /// Slot 14.
-    virtual boost::shared_ptr<ID3DTextureSheet>* GetTextureSheetHandle(
-      boost::shared_ptr<ID3DTextureSheet>* outHandle
-    ) = 0;
+    virtual boost::shared_ptr<ID3DTextureSheet>*
+    GetTextureSheetHandle(boost::shared_ptr<ID3DTextureSheet>* outHandle) = 0;
   };
 
   static_assert(sizeof(IMovie) == 0x04, "IMovie size must be 0x04");
@@ -322,25 +321,23 @@ namespace moho
      * result straight to `CD3DPrimBatcher::SetTexture(shared_ptr<...>)`, which
      * the binary calls at 0x00438870 by pushing the pair as two words.
      */
-    boost::shared_ptr<ID3DTextureSheet>* GetTextureSheetHandle(
-      boost::shared_ptr<ID3DTextureSheet>* outHandle
-    ) override;
+    boost::shared_ptr<ID3DTextureSheet>* GetTextureSheetHandle(boost::shared_ptr<ID3DTextureSheet>* outHandle) override;
 
   public:
     // +0x04 vptr and the +0x08 node come from the Listener base above.
-    std::uint8_t mPlaybackEnabled = 0;   // +0x10
-    std::uint8_t mReserved11_13[0x3]{};  // +0x11
-    TextureSheetHandle mTextureSheet{};  // +0x14
-    gpg::MemBuffer<char> mSubtitleBuffer{}; // +0x1C
-    boost::SharedPtrRaw<void> mWorkbuffer{}; // +0x2C (Sofdec work buffer shared owner)
-    std::int32_t mWidth = 0;             // +0x34
-    std::int32_t mHeight = 0;            // +0x38
-    std::int32_t mFrameCount = 0;        // +0x3C
-    float mFrameRate = 0.0f;             // +0x40
-    fa::string mMovieName{};          // +0x44
-    fa::string mSubtitleText{};       // +0x60
-    std::uint8_t mFrameAdvanceBlocked = 0; // +0x7C
-    std::uint8_t mReserved7D_7F[0x03]{}; // +0x7D
+    std::uint8_t mPlaybackEnabled = 0;        // +0x10
+    std::uint8_t mReserved11_13[0x3]{};       // +0x11
+    TextureSheetHandle mTextureSheet{};       // +0x14
+    gpg::MemBuffer<char> mSubtitleBuffer{};   // +0x1C
+    boost::SharedPtrRaw<void> mWorkbuffer{};  // +0x2C (Sofdec work buffer shared owner)
+    std::int32_t mWidth = 0;                  // +0x34
+    std::int32_t mHeight = 0;                 // +0x38
+    std::int32_t mFrameCount = 0;             // +0x3C
+    float mFrameRate = 0.0f;                  // +0x40
+    fa::string mMovieName{};                  // +0x44
+    fa::string mSubtitleText{};               // +0x60
+    std::uint8_t mFrameAdvanceBlocked = 0;    // +0x7C
+    std::uint8_t mReserved7D_7F[0x03]{};      // +0x7D
     MwsfdPlaybackStateSubobj* mPly = nullptr; // +0x80
   };
 

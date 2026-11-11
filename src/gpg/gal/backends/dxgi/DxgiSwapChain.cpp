@@ -6,7 +6,9 @@ namespace gpg::gal::dxgi
 {
   using Microsoft::WRL::ComPtr;
 
-  const char* SwapModelName(const SwapModel model) noexcept
+  const char* SwapModelName(
+    const SwapModel model
+  ) noexcept
   {
     switch (model) {
     case SwapModel::FlipDiscard:
@@ -24,7 +26,11 @@ namespace gpg::gal::dxgi
     Release();
   }
 
-  HRESULT SwapChain::Create(const Factory& factory, IUnknown* const device, const SwapChainDesc& desc)
+  HRESULT SwapChain::Create(
+    const Factory& factory,
+    IUnknown* const device,
+    const SwapChainDesc& desc
+  )
   {
     Release();
     mDesc = desc;
@@ -115,7 +121,9 @@ namespace gpg::gal::dxgi
     return S_OK;
   }
 
-  HRESULT SwapChain::Present(const bool vsync)
+  HRESULT SwapChain::Present(
+    const bool vsync
+  )
   {
     if (mSwapChain == nullptr) {
       return E_POINTER;
@@ -132,7 +140,10 @@ namespace gpg::gal::dxgi
     return mSwapChain->Present(vsync ? 1U : 0U, flags);
   }
 
-  HRESULT SwapChain::Resize(const std::uint32_t width, const std::uint32_t height)
+  HRESULT SwapChain::Resize(
+    const std::uint32_t width,
+    const std::uint32_t height
+  )
   {
     if (mSwapChain == nullptr) {
       return E_POINTER;

@@ -23,7 +23,9 @@ namespace faf::remote
   inline constexpr int kMaxFocusArmy = 63;
 
   /** `ESeatMessage::FocusArmy` either way: the kind, then varint (army + 1), so -1 (no army) is 0. */
-  [[nodiscard]] inline std::vector<std::uint8_t> EncodeFocusArmy(const int army)
+  [[nodiscard]] inline std::vector<std::uint8_t> EncodeFocusArmy(
+    const int army
+  )
   {
     std::vector<std::uint8_t> message;
     net::ByteWriter writer(message);
@@ -32,7 +34,9 @@ namespace faf::remote
     return message;
   }
 
-  [[nodiscard]] inline std::optional<int> DecodeFocusArmy(const std::span<const std::uint8_t> message)
+  [[nodiscard]] inline std::optional<int> DecodeFocusArmy(
+    const std::span<const std::uint8_t> message
+  )
   {
     if (message.empty() || message[0] != static_cast<std::uint8_t>(net::ESeatMessage::FocusArmy)) {
       return std::nullopt;
@@ -54,11 +58,13 @@ namespace faf::remote
     [[nodiscard]] bool operator==(const SCameraReport&) const = default;
   };
 
-  inline constexpr std::size_t kMaxCameras = 4;  // the game draws one or two (split screen)
-  inline constexpr int kCameraPeriodMs = 250;    // at most four updates a second
+  inline constexpr std::size_t kMaxCameras = 4; // the game draws one or two (split screen)
+  inline constexpr int kCameraPeriodMs = 250;   // at most four updates a second
 
   /** `ESeatMessage::Cameras`: the kind, varint count (at most kMaxCameras), then per camera 17 little-endian floats. */
-  [[nodiscard]] inline std::vector<std::uint8_t> EncodeCameras(const std::span<const SCameraReport> cameras)
+  [[nodiscard]] inline std::vector<std::uint8_t> EncodeCameras(
+    const std::span<const SCameraReport> cameras
+  )
   {
     std::vector<std::uint8_t> message;
     net::ByteWriter writer(message);
@@ -74,7 +80,10 @@ namespace faf::remote
     return message;
   }
 
-  [[nodiscard]] inline bool DecodeCameras(const std::span<const std::uint8_t> message, std::vector<SCameraReport>& out)
+  [[nodiscard]] inline bool DecodeCameras(
+    const std::span<const std::uint8_t> message,
+    std::vector<SCameraReport>& out
+  )
   {
     out.clear();
     if (message.empty() || message[0] != static_cast<std::uint8_t>(net::ESeatMessage::Cameras)) {

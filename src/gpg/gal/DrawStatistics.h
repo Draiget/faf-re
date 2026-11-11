@@ -43,7 +43,10 @@ namespace gpg::gal
   }
 
   /** Called by a backend after each successful draw submission. */
-  inline void RecordDraw(const std::uint32_t primitiveCount, const std::uint32_t vertexCount) noexcept
+  inline void RecordDraw(
+    const std::uint32_t primitiveCount,
+    const std::uint32_t vertexCount
+  ) noexcept
   {
     DrawStatistics& pending = PendingDrawStatistics();
     ++pending.drawCalls;
@@ -52,13 +55,17 @@ namespace gpg::gal
   }
 
   /** Called by a backend for every upload from the CPU (see `DrawStatistics::uploadBytes`). */
-  inline void RecordUpload(const std::uint64_t bytes) noexcept
+  inline void RecordUpload(
+    const std::uint64_t bytes
+  ) noexcept
   {
     PendingDrawStatistics().uploadBytes += bytes;
   }
 
   /** Called by a backend for every pipeline state change (see `DrawStatistics::stateChanges`). */
-  inline void RecordStateChange(const std::uint32_t count = 1U) noexcept
+  inline void RecordStateChange(
+    const std::uint32_t count = 1U
+  ) noexcept
   {
     PendingDrawStatistics().stateChanges += count;
   }

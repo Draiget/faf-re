@@ -38,7 +38,9 @@ namespace
    * What it does:
    * Clears one `SSiloBuildInfo` lane (`weapon/ammo/maxStorage`) to all zeros.
    */
-  void ZeroSiloBuildInfoWords(SSiloBuildInfo* const info) noexcept
+  void ZeroSiloBuildInfoWords(
+    SSiloBuildInfo* const info
+  ) noexcept
   {
     if (!info) {
       return;
@@ -65,7 +67,6 @@ namespace
     return SEconValue::sType;
   }
 
-
   template <typename TObject>
   void WritePointerWithType(
     gpg::WriteArchive* const archive,
@@ -79,18 +80,26 @@ namespace
     gpg::WriteRawPointer(archive, objectRef, state, owner);
   }
 
-  [[nodiscard]] std::size_t ToSiloIndex(const ESiloType type) noexcept
+  [[nodiscard]] std::size_t ToSiloIndex(
+    const ESiloType type
+  ) noexcept
   {
     return static_cast<std::size_t>(static_cast<std::int32_t>(type));
   }
 
-  void ReplaceEconomyRequestPointer(CEconRequest*& request, CEconRequest* const replacement)
+  void ReplaceEconomyRequestPointer(
+    CEconRequest*& request,
+    CEconRequest* const replacement
+  )
   {
     DestroyEconomyRequestPointer(request);
     request = replacement;
   }
 
-  [[nodiscard]] CEconRequest* CreateEconomyRequest(const SEconValue& requested, CSimArmyEconomyInfo* const economy)
+  [[nodiscard]] CEconRequest* CreateEconomyRequest(
+    const SEconValue& requested,
+    CSimArmyEconomyInfo* const economy
+  )
   {
     auto* const request = new CEconRequest{};
     request->mRequested = requested;
@@ -103,7 +112,11 @@ namespace
     return request;
   }
 
-  [[nodiscard]] float CallUnitNumericScript(Unit* const unit, const char* const scriptName, const float fallbackValue)
+  [[nodiscard]] float CallUnitNumericScript(
+    Unit* const unit,
+    const char* const scriptName,
+    const float fallbackValue
+  )
   {
     if (!unit || !scriptName || !*scriptName) {
       return fallbackValue;
@@ -127,7 +140,11 @@ namespace
    * raised "attempt to call method (a nil value)", aborting the silo
    * progress chain every missile build.
    */
-  void DispatchWeaponCallback(Unit* const unit, const char* const callbackName, UnitWeapon* const weapon)
+  void DispatchWeaponCallback(
+    Unit* const unit,
+    const char* const callbackName,
+    UnitWeapon* const weapon
+  )
   {
     if (!unit || !weapon || !callbackName || !*callbackName) {
       return;
@@ -143,7 +160,9 @@ gpg::RType* CAiSiloBuildImpl::sType = nullptr;
 /**
  * Address: 0x005D04A0 (FUN_005D04A0, Moho::SSiloBuildInfo::MemberDeserialize)
  */
-void SSiloBuildInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+void SSiloBuildInfo::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -158,7 +177,9 @@ void SSiloBuildInfo::MemberDeserialize(gpg::ReadArchive* const archive)
 /**
  * Address: 0x005D04F0 (FUN_005D04F0, Moho::SSiloBuildInfo::MemberSerialize)
  */
-void SSiloBuildInfo::MemberSerialize(gpg::WriteArchive* const archive) const
+void SSiloBuildInfo::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (!archive) {
     return;
@@ -191,7 +212,9 @@ CAiSiloBuildImpl::CAiSiloBuildImpl()
 /**
  * Address: 0x005CED30 (FUN_005CED30, ??0CAiSiloBuildImpl@Moho@@QAE@PAVUnit@1@@Z)
  */
-CAiSiloBuildImpl::CAiSiloBuildImpl(Unit* const unit)
+CAiSiloBuildImpl::CAiSiloBuildImpl(
+  Unit* const unit
+)
   : CAiSiloBuildImpl()
 {
   mUnit = unit;
@@ -215,7 +238,12 @@ CAiSiloBuildImpl::~CAiSiloBuildImpl()
 /**
  * Address: 0x005CF850 (FUN_005CF850, Moho::CAiSiloBuildImpl::MemberConstruct)
  */
-void CAiSiloBuildImpl::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+void CAiSiloBuildImpl::MemberConstruct(
+  gpg::ReadArchive&,
+  const int,
+  const gpg::RRef&,
+  gpg::SerConstructResult& result
+)
 {
   result.SetUnowned(gpg::MakeRRef(new CAiSiloBuildImpl()), 0u);
 }
@@ -223,7 +251,9 @@ void CAiSiloBuildImpl::MemberConstruct(gpg::ReadArchive&, const int, const gpg::
 /**
  * Address: 0x005D1080 (FUN_005D1080, Moho::CAiSiloBuildImpl::MemberDeserialize)
  */
-void CAiSiloBuildImpl::MemberDeserialize(gpg::ReadArchive* const archive)
+void CAiSiloBuildImpl::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -266,7 +296,9 @@ void CAiSiloBuildImpl::MemberDeserialize(gpg::ReadArchive* const archive)
 /**
  * Address: 0x005D1230 (FUN_005D1230, Moho::CAiSiloBuildImpl::MemberSerialize)
  */
-void CAiSiloBuildImpl::MemberSerialize(gpg::WriteArchive* const archive) const
+void CAiSiloBuildImpl::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (!archive) {
     return;
@@ -355,7 +387,9 @@ void CAiSiloBuildImpl::SiloUpdateProjectileBlueprint()
 /**
  * Address: 0x005CEF00 (FUN_005CEF00, ?SiloIsBusy@CAiSiloBuildImpl@Moho@@UBE_NW4ESiloType@2@@Z)
  */
-bool CAiSiloBuildImpl::SiloIsBusy(const ESiloType type) const
+bool CAiSiloBuildImpl::SiloIsBusy(
+  const ESiloType type
+) const
 {
   return !mSiloTypes.empty() && mSiloTypes.front() == type;
 }
@@ -363,7 +397,9 @@ bool CAiSiloBuildImpl::SiloIsBusy(const ESiloType type) const
 /**
  * Address: 0x005CEF20 (FUN_005CEF20, ?SiloIsFull@CAiSiloBuildImpl@Moho@@UBE_NW4ESiloType@2@@Z)
  */
-bool CAiSiloBuildImpl::SiloIsFull(const ESiloType type) const
+bool CAiSiloBuildImpl::SiloIsFull(
+  const ESiloType type
+) const
 {
   const SSiloBuildInfo& slot = mSiloInfo[ToSiloIndex(type)];
   return (slot.mAmmo + SiloGetBuildCount(type)) >= slot.mMaxStorageCount;
@@ -372,7 +408,9 @@ bool CAiSiloBuildImpl::SiloIsFull(const ESiloType type) const
 /**
  * Address: 0x005CEF50 (FUN_005CEF50, ?SiloGetBuildCount@CAiSiloBuildImpl@Moho@@UBEHW4ESiloType@2@@Z)
  */
-std::int32_t CAiSiloBuildImpl::SiloGetBuildCount(const ESiloType type) const
+std::int32_t CAiSiloBuildImpl::SiloGetBuildCount(
+  const ESiloType type
+) const
 {
   std::int32_t count = 0;
   for (const ESiloType queued : mSiloTypes) {
@@ -386,7 +424,9 @@ std::int32_t CAiSiloBuildImpl::SiloGetBuildCount(const ESiloType type) const
 /**
  * Address: 0x005CEF80 (FUN_005CEF80, ?SiloGetStorageCount@CAiSiloBuildImpl@Moho@@UBEHW4ESiloType@2@@Z)
  */
-std::int32_t CAiSiloBuildImpl::SiloGetStorageCount(const ESiloType type) const
+std::int32_t CAiSiloBuildImpl::SiloGetStorageCount(
+  const ESiloType type
+) const
 {
   return mSiloInfo[ToSiloIndex(type)].mAmmo;
 }
@@ -394,7 +434,9 @@ std::int32_t CAiSiloBuildImpl::SiloGetStorageCount(const ESiloType type) const
 /**
  * Address: 0x005CEF90 (FUN_005CEF90, ?SiloGetMaxStorageCount@CAiSiloBuildImpl@Moho@@UBEHW4ESiloType@2@@Z)
  */
-std::int32_t CAiSiloBuildImpl::SiloGetMaxStorageCount(const ESiloType type) const
+std::int32_t CAiSiloBuildImpl::SiloGetMaxStorageCount(
+  const ESiloType type
+) const
 {
   return mSiloInfo[ToSiloIndex(type)].mMaxStorageCount;
 }
@@ -402,7 +444,10 @@ std::int32_t CAiSiloBuildImpl::SiloGetMaxStorageCount(const ESiloType type) cons
 /**
  * Address: 0x005CEFA0 (FUN_005CEFA0, ?SiloAdjustStorageCount@CAiSiloBuildImpl@Moho@@UAEXW4ESiloType@2@H@Z)
  */
-void CAiSiloBuildImpl::SiloAdjustStorageCount(const ESiloType type, const std::int32_t delta)
+void CAiSiloBuildImpl::SiloAdjustStorageCount(
+  const ESiloType type,
+  const std::int32_t delta
+)
 {
   mSiloInfo[ToSiloIndex(type)].mAmmo += delta;
   if (mUnit) {
@@ -413,7 +458,9 @@ void CAiSiloBuildImpl::SiloAdjustStorageCount(const ESiloType type, const std::i
 /**
  * Address: 0x005CEFC0 (FUN_005CEFC0, ?SiloAddBuild@CAiSiloBuildImpl@Moho@@UAE_NW4ESiloType@2@@Z)
  */
-bool CAiSiloBuildImpl::SiloAddBuild(const ESiloType type)
+bool CAiSiloBuildImpl::SiloAddBuild(
+  const ESiloType type
+)
 {
   const UnitWeapon* const weapon = mSiloInfo[ToSiloIndex(type)].mWeapon;
   if (!weapon || weapon->mEnabled == 0u || SiloIsFull(type)) {
@@ -435,7 +482,9 @@ bool CAiSiloBuildImpl::SiloAddBuild(const ESiloType type)
  * Banks an assisting builder's resources and converts them into fractional
  * build segments, capped at the segments still remaining.
  */
-void CAiSiloBuildImpl::SiloAssistWithResource(const SEconValue& value)
+void CAiSiloBuildImpl::SiloAssistWithResource(
+  const SEconValue& value
+)
 {
   // FAF hot-patch: 0x005CF030 jumps to 0x01291617 in .exxt, which replaces the
   // whole body. The 2007 loop only advanced in whole segments, once both banked
@@ -535,8 +584,7 @@ void CAiSiloBuildImpl::SiloTick()
     }
     return;
 
-  case SBS_Prepare:
-  {
+  case SBS_Prepare: {
     if (mSiloTypes.empty()) {
       mState = SBS_Idle;
       return;
@@ -544,16 +592,14 @@ void CAiSiloBuildImpl::SiloTick()
 
     const ESiloType queuedType = mSiloTypes.front();
     UnitWeapon* const queuedWeapon = mSiloInfo[ToSiloIndex(queuedType)].mWeapon;
-    RProjectileBlueprint* const projectileBlueprint =
-      queuedWeapon ? queuedWeapon->mProjectileBlueprint : nullptr;
+    RProjectileBlueprint* const projectileBlueprint = queuedWeapon ? queuedWeapon->mProjectileBlueprint : nullptr;
     if (!queuedWeapon || !projectileBlueprint) {
       mSiloTypes.pop_front();
       mState = SBS_Idle;
       return;
     }
 
-    const float buildRate =
-      std::max(kSiloMinimumBuildRate, CallUnitNumericScript(mUnit, "GetEconomyBuildRate", 0.0f));
+    const float buildRate = std::max(kSiloMinimumBuildRate, CallUnitNumericScript(mUnit, "GetEconomyBuildRate", 0.0f));
     const float energyAdj = CallUnitNumericScript(mUnit, "GetEnergyBuildAdjMod", 0.0f);
     const float massAdj = CallUnitNumericScript(mUnit, "GetMassBuildAdjMod", 0.0f);
 
@@ -575,8 +621,7 @@ void CAiSiloBuildImpl::SiloTick()
     return;
   }
 
-  case SBS_Active:
-  {
+  case SBS_Active: {
     // FAF hot-patch: 0x005CF430 calls 0x0129155F in .exxt (then jumps to the
     // epilogue at 0x005CF4CA), replacing this arm. The 2007 arm only took the
     // grant once it covered a whole segment and then advanced one segment.
@@ -601,8 +646,7 @@ void CAiSiloBuildImpl::SiloTick()
     return;
   }
 
-  case SBS_Finish:
-  {
+  case SBS_Finish: {
     mUnit->mUnitVarDat.mMaintainenceCost.ENERGY = 0.0f;
     mUnit->mUnitVarDat.mMaintainenceCost.MASS = 0.0f;
     mUnit->mUnitVarDat.mUnitStates &= ~kSiloBuildingStateMask;

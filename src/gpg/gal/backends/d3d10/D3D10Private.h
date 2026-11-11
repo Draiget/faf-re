@@ -10,6 +10,7 @@
 #include "EffectD3D10.hpp"
 #include "EffectTechniqueD3D10.hpp"
 #include "EffectVariableD3D10.hpp"
+#include "D3D10MatrixRows.h"
 #include "Float16HardwareVertexFormatterD3D10.hpp"
 #include "HardwareVertexFormatterD3D10.hpp"
 #include "IndexBufferD3D10.hpp"
@@ -54,16 +55,14 @@
 
 namespace gpg::gal
 {
-namespace
-{
+  namespace
+  {
 
     struct DXGIFormatPair final
     {
       int dxgi = 0;
       int gal = 0;
     };
-
-
 
     constexpr DXGIFormatPair kTextureDxgiGalPairs[89] = {
       {0, 20},  {1, 20},  {2, 18},  {3, 20},  {4, 20},  {5, 20},  {6, 20},  {7, 20},  {8, 20},  {9, 20},
@@ -314,7 +313,9 @@ namespace
       nullptr,
     };
 
-    fa::string MakeShortString(const char* const text)
+    fa::string MakeShortString(
+      const char* const text
+    )
     {
       if (text == nullptr) {
         return fa::string();
@@ -324,44 +325,29 @@ namespace
       return fa::string(text, length);
     }
 
-    [[noreturn]] void ThrowGalError(const char* const file, const int line, const char* const message)
+    [[noreturn]] void ThrowGalError(
+      const char* const file,
+      const int line,
+      const char* const message
+    )
     {
       throw Error(MakeShortString(file), line, MakeShortString(message));
     }
 
-    [[maybe_unused]] [[noreturn]] void ThrowGalErrorFromHresult(const char* const file, const int line, const HRESULT code)
+    [[maybe_unused]] [[noreturn]] void ThrowGalErrorFromHresult(
+      const char* const file,
+      const int line,
+      const HRESULT code
+    )
     {
       throw Error(MakeShortString(file), line, MakeShortString(::gpg::D3DErrorToString(static_cast<long>(code))));
     }
 
-    [[maybe_unused]] fa::string MakeD3DErrorString(const HRESULT code)
-    {
-      return MakeShortString(::gpg::D3DErrorToString(static_cast<long>(code)));
-    }
-
-    /**
-     * Address: 0x0094D490 (FUN_0094D490)
-     *
-     * What it does:
-     * Copies rows `(0,1,2)`, `(4,5,6)`, `(8,9,10)`, `(12,13,14)` from one
-     * source 4x4 matrix into four contiguous 3-float destination rows.
-     */
-    [[maybe_unused]] const Matrix* CopyMatrix4x3Rows(
-      float* const outRow0,
-      float* const outRow1,
-      float* const outRow2,
-      float* const outRow3,
-      const Matrix& matrix
+    [[maybe_unused]] fa::string MakeD3DErrorString(
+      const HRESULT code
     )
     {
-      float* const outRows[4] = {outRow0, outRow1, outRow2, outRow3};
-      for (int row = 0; row < 4; ++row) {
-        outRows[row][0] = matrix.r[row].x;
-        outRows[row][1] = matrix.r[row].y;
-        outRows[row][2] = matrix.r[row].z;
-      }
-
-      return &matrix;
+      return MakeShortString(::gpg::D3DErrorToString(static_cast<long>(code)));
     }
 
     /**
@@ -371,7 +357,9 @@ namespace
      * Releases retained output COM lanes for every cached adapter-mode entry,
      * then releases the retained DXGI adapter lane.
      */
-    [[maybe_unused]] void ReleaseAdapterOutputAndDeviceRefs(AdapterD3D10* const adapter) noexcept
+    [[maybe_unused]] void ReleaseAdapterOutputAndDeviceRefs(
+      AdapterD3D10* const adapter
+    ) noexcept
     {
       for (AdapterModeD3D10& mode : adapter->modes_) {
         SafeRelease(mode.output_);
@@ -386,7 +374,9 @@ namespace
      * Converts GAL texture format token to its backing DXGI format token by scanning
      * the recovered 89-entry mapping table.
      */
-    [[maybe_unused]] int MapGalTextureFormatToDxgi(const int galFormat)
+    [[maybe_unused]] int MapGalTextureFormatToDxgi(
+      const int galFormat
+    )
     {
       for (const DXGIFormatPair& pair : kTextureDxgiGalPairs) {
         if (pair.gal == galFormat) {
@@ -403,7 +393,9 @@ namespace
      * What it does:
      * Returns byte size per texel/block for recovered GAL texture format IDs.
      */
-    [[maybe_unused]] unsigned int GetTextureFormatBlockBytes(const unsigned int format)
+    [[maybe_unused]] unsigned int GetTextureFormatBlockBytes(
+      const unsigned int format
+    )
     {
       switch (format) {
       case 2:
@@ -469,7 +461,9 @@ namespace
      * Validates one vertex-format token and returns the matching static
      * element-layout table pointer.
      */
-    [[maybe_unused]] const D3D10_INPUT_ELEMENT_DESC* GetVertexLayoutElementsOrThrow(const std::uint32_t format)
+    [[maybe_unused]] const D3D10_INPUT_ELEMENT_DESC* GetVertexLayoutElementsOrThrow(
+      const std::uint32_t format
+    )
     {
       if (format >= 24U) {
         ThrowGalError("VertexFormatD3D10.cpp", 426, "invalid vertex format specified");
@@ -484,7 +478,9 @@ namespace
      * What it does:
      * Validates one vertex-format token and returns the static element count.
      */
-    [[maybe_unused]] std::uint32_t GetVertexLayoutElementCountOrThrow(const std::uint32_t format)
+    [[maybe_unused]] std::uint32_t GetVertexLayoutElementCountOrThrow(
+      const std::uint32_t format
+    )
     {
       if (format >= 24U) {
         ThrowGalError("VertexFormatD3D10.cpp", 432, "invalid vertex format specified");
@@ -509,15 +505,13 @@ namespace
       blendDesc.RenderTargetWriteMask[0] = D3D10_COLOR_WRITE_ENABLE_ALL;
       return blendDesc;
     }
-}
+  } // namespace
 
-
-    // FAF addition, not in the shipped binary. GPG's D3D10 SetColorWriteState
-    // and SetWireframeState (0x008FE6F0, 0x008FE6E0) are empty, so the engine's
-    // colour-write masks (13 call sites) and wireframe toggle did nothing under
-    // /D3D10. These hold what the engine last asked for; one device exists at a
-    // time, and the binary-sized PipelineStateD3D10 has no room for them.
-    extern UINT8 sColorWriteMask;
-    extern bool sWireframe;
-}
-
+  // FAF addition, not in the shipped binary. GPG's D3D10 SetColorWriteState
+  // and SetWireframeState (0x008FE6F0, 0x008FE6E0) are empty, so the engine's
+  // colour-write masks (13 call sites) and wireframe toggle did nothing under
+  // /D3D10. These hold what the engine last asked for; one device exists at a
+  // time, and the binary-sized PipelineStateD3D10 has no room for them.
+  extern UINT8 sColorWriteMask;
+  extern bool sWireframe;
+} // namespace gpg::gal

@@ -21,7 +21,7 @@ namespace gpg::gal::vulkan
     VkDeviceSize size = 0;
     std::uint8_t* mapped = nullptr; // host-visible memory only
     std::int32_t block = -1;
-    bool linear = false;            // buffers and images live in separate blocks (bufferImageGranularity)
+    bool linear = false; // buffers and images live in separate blocks (bufferImageGranularity)
   };
 
   /** Device memory in large blocks per memory type, first fit, with coalescing frees. */
@@ -32,7 +32,8 @@ namespace gpg::gal::vulkan
     void Release() noexcept;
 
     /** Throws a gal Error when no memory type fits or the device is out of memory. */
-    [[nodiscard]] Allocation Allocate(const VkMemoryRequirements& requirements, VkMemoryPropertyFlags required, bool linear);
+    [[nodiscard]] Allocation
+    Allocate(const VkMemoryRequirements& requirements, VkMemoryPropertyFlags required, bool linear);
     void Free(const Allocation& allocation) noexcept;
     /** Bytes in device memory blocks (memory diagnostics). */
     [[nodiscard]] std::uint64_t BlockBytes() const noexcept;

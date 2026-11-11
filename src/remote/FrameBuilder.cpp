@@ -33,7 +33,10 @@ namespace faf::remote
   namespace
   {
     /** A sound's session-table id: its names, as `Sound{...}` / `RPCSound{...}` were given them. */
-    [[nodiscard]] std::uint32_t SoundId(const moho::CSndParams* const params, wire::CSessionTableWriters* const session)
+    [[nodiscard]] std::uint32_t SoundId(
+      const moho::CSndParams* const params,
+      wire::CSessionTableWriters* const session
+    )
     {
       if (params == nullptr || session == nullptr) {
         return wire::COrdinalTable::kNone;
@@ -59,8 +62,10 @@ namespace faf::remote
       const char* const rpcLoop = params->mRpcLoopVariable != nullptr ? params->mRpcLoopVariable->mName.c_str() : "";
       if (const auto found = sounds.ids.find(params); found != sounds.ids.end()) {
         const SCached& cached = found->second;
-        if (cached.bank == params->mBank.c_str() && cached.cue == params->mCue.c_str() && cached.lodCutoff == lodCutoff
-            && cached.rpcLoop == rpcLoop) {
+        if (
+          cached.bank == params->mBank.c_str() && cached.cue == params->mCue.c_str() && cached.lodCutoff == lodCutoff &&
+          cached.rpcLoop == rpcLoop
+        ) {
           return cached.id;
         }
       }
@@ -75,8 +80,12 @@ namespace faf::remote
     }
 
     void ApplyAppearance(
-      wire::SAppearance& look, const std::uint32_t entityId, const moho::SSTIEntityVariableData& data,
-      const wire::SContentTables& tables, wire::CSessionTableWriters* const session, const CUnderlayPathReader& underlays,
+      wire::SAppearance& look,
+      const std::uint32_t entityId,
+      const moho::SSTIEntityVariableData& data,
+      const wire::SContentTables& tables,
+      wire::CSessionTableWriters* const session,
+      const CUnderlayPathReader& underlays,
       std::uint64_t& unknownUnderlays
     )
     {
@@ -94,8 +103,16 @@ namespace faf::remote
       look.impact = data.mCurImpactValue;
       look.scroll = {data.mScrollBeatStart.x, data.mScrollBeatStart.y, data.mScrollBeatEnd.x, data.mScrollBeatEnd.y};
       const moho::SSTIIntelAttributes& intel = data.mIntelAttributes;
-      look.intel = {intel.vision, intel.waterVision, intel.radar, intel.sonar,
-                    intel.omni, intel.radarStealth, intel.sonarStealth, intel.cloak};
+      look.intel = {
+        intel.vision,
+        intel.waterVision,
+        intel.radar,
+        intel.sonar,
+        intel.omni,
+        intel.radarStealth,
+        intel.sonarStealth,
+        intel.cloak
+      };
       look.ambientSound = SoundId(data.mAmbientSound, session);
       look.rumbleSound = SoundId(data.mRumbleSound, session);
       // The underlay by the path `Entity::SetStrategicUnderlay` recorded: a server without a
@@ -116,7 +133,10 @@ namespace faf::remote
      * objects are shared by every view on every worker, so their reference counts stay untouched,
      * except for an underlay, which hardly any entity has.
      */
-    void CopyEntityBlockReadByBuilder(moho::SSTIEntityVariableData& to, const moho::SSTIEntityVariableData& from)
+    void CopyEntityBlockReadByBuilder(
+      moho::SSTIEntityVariableData& to,
+      const moho::SSTIEntityVariableData& from
+    )
     {
       to.mMeshBlueprint = from.mMeshBlueprint;
       to.mScale = from.mScale;
@@ -142,21 +162,27 @@ namespace faf::remote
     }
 
     void ApplyVariableData(
-      wire::SEntityRecord& record, const moho::SSTIEntityVariableData& data, const wire::SFrameCodec& codec,
-      const wire::SContentTables& tables, wire::CSessionTableWriters* const session, const CUnderlayPathReader& underlays,
+      wire::SEntityRecord& record,
+      const moho::SSTIEntityVariableData& data,
+      const wire::SFrameCodec& codec,
+      const wire::SContentTables& tables,
+      wire::CSessionTableWriters* const session,
+      const CUnderlayPathReader& underlays,
       std::uint64_t& unknownUnderlays
     )
     {
       ApplyAppearance(record.appearance, record.id, data, tables, session, underlays, unknownUnderlays);
       const auto& pos = data.mCurTransform.pos_;
       const auto& orient = data.mCurTransform.orient_;
-      record.position = {codec.position.x.Encode(pos.x), codec.position.y.Encode(pos.y), codec.position.z.Encode(pos.z)};
+      record.position = {
+        codec.position.x.Encode(pos.x), codec.position.y.Encode(pos.y), codec.position.z.Encode(pos.z)
+      };
       // Outside the quantiser's range (or not a number): exact floats instead.
       const auto off = [](const wire::SAxisQuantizer& axis, const std::uint32_t q, const float value) {
         return !(std::fabs(axis.Decode(q) - value) <= axis.step);
       };
-      record.farPosition = off(codec.position.x, record.position[0], pos.x) || off(codec.position.y, record.position[1], pos.y)
-                        || off(codec.position.z, record.position[2], pos.z);
+      record.farPosition = off(codec.position.x, record.position[0], pos.x) ||
+        off(codec.position.y, record.position[1], pos.y) || off(codec.position.z, record.position[2], pos.z);
       if (record.farPosition) {
         record.farValue = {pos.x, pos.y, pos.z};
         record.position = {};
@@ -174,12 +200,17 @@ namespace faf::remote
       record.flags = static_cast<std::uint16_t>(PackEntityFlags(data) | (record.flags & kEntityFlagOrphaned));
     }
 
-    [[nodiscard]] std::uint16_t SiloCount(const std::int32_t count) noexcept
+    [[nodiscard]] std::uint16_t SiloCount(
+      const std::int32_t count
+    ) noexcept
     {
       return static_cast<std::uint16_t>(count < 0 ? 0 : (count > 0xFFFF ? 0xFFFF : count));
     }
 
-    void ReadCategories(wire::SCategoryBits& bits, const moho::EntityCategorySet& set)
+    void ReadCategories(
+      wire::SCategoryBits& bits,
+      const moho::EntityCategorySet& set
+    )
     {
       bits.firstWord = set.mBits.mFirstWordIndex;
       bits.words.assign(set.mBits.mWords.begin(), set.mBits.mWords.end());
@@ -188,14 +219,20 @@ namespace faf::remote
       }
     }
 
-    [[nodiscard]] std::uint32_t NameId(const fa::string& name, wire::CSessionTableWriters* const session)
+    [[nodiscard]] std::uint32_t NameId(
+      const fa::string& name,
+      wire::CSessionTableWriters* const session
+    )
     {
       return session != nullptr ? session->Name(name.c_str()) : wire::COrdinalTable::kNone;
     }
 
     void ApplyUnitDetail(
-      wire::SUnitDetail& detail, const moho::SSTIUnitVariableData& data, const std::int32_t reconFlags,
-      const wire::SContentTables& tables, wire::CSessionTableWriters* const session
+      wire::SUnitDetail& detail,
+      const moho::SSTIUnitVariableData& data,
+      const std::int32_t reconFlags,
+      const wire::SContentTables& tables,
+      wire::CSessionTableWriters* const session
     )
     {
       detail.creator = static_cast<std::uint32_t>(data.mCreator);
@@ -211,8 +248,14 @@ namespace faf::remote
       detail.targetBlip = static_cast<std::uint32_t>(data.mTargetBlip);
       detail.didRefresh = data.mDidRefresh ? 1u : 0u;
       detail.reconFlags = reconFlags;
-      detail.economy = {data.mProduced.ENERGY,       data.mProduced.MASS,       data.mResourcesSpent.ENERGY,
-                        data.mResourcesSpent.MASS,   data.mMaintainenceCost.ENERGY, data.mMaintainenceCost.MASS};
+      detail.economy = {
+        data.mProduced.ENERGY,
+        data.mProduced.MASS,
+        data.mResourcesSpent.ENERGY,
+        data.mResourcesSpent.MASS,
+        data.mMaintainenceCost.ENERGY,
+        data.mMaintainenceCost.MASS
+      };
       detail.commands.assign(data.mCommands.begin(), data.mCommands.end());
       detail.buildQueue.assign(data.mBuildQueue.begin(), data.mBuildQueue.end());
       if (detail.commands.size() > wire::SUnitDetail::kMaxQueue) {
@@ -239,23 +282,40 @@ namespace faf::remote
       }
       const moho::UnitAttributes& source = data.mAttributes;
       wire::SUnitAttributes& attributes = detail.attributes;
-      attributes.blueprint = source.blueprint != nullptr ? tables.blueprints.Ordinal(source.blueprint->mBlueprintId.c_str())
-                                                         : wire::COrdinalTable::kNone;
+      attributes.blueprint = source.blueprint != nullptr
+        ? tables.blueprints.Ordinal(source.blueprint->mBlueprintId.c_str())
+        : wire::COrdinalTable::kNone;
       attributes.reserved04 = source.unknown_0004;
       ReadCategories(attributes.restriction, source.restrictionCategory);
-      attributes.scalars = {source.spawnElevationOffset, source.moveSpeedMult, source.accelerationMult, source.turnMult,
-                            source.breakOffTriggerMult, source.breakOffDistanceMult, source.consumptionPerSecondEnergy,
-                            source.consumptionPerSecondMass, source.productionPerSecondEnergy,
-                            source.productionPerSecondMass, source.buildRate, source.regenRate};
+      attributes.scalars = {
+        source.spawnElevationOffset,
+        source.moveSpeedMult,
+        source.accelerationMult,
+        source.turnMult,
+        source.breakOffTriggerMult,
+        source.breakOffDistanceMult,
+        source.consumptionPerSecondEnergy,
+        source.consumptionPerSecondMass,
+        source.productionPerSecondEnergy,
+        source.productionPerSecondMass,
+        source.buildRate,
+        source.regenRate
+      };
       attributes.commandCaps = source.commandCapsMask;
       attributes.toggleCaps = source.toggleCapsMask;
-      attributes.flags = {static_cast<std::uint8_t>(source.mReclaimable ? 1u : 0u),
-                          static_cast<std::uint8_t>(source.mCapturable ? 1u : 0u), source.unknown_006A,
-                          source.unknown_006B};
+      attributes.flags = {
+        static_cast<std::uint8_t>(source.mReclaimable ? 1u : 0u),
+        static_cast<std::uint8_t>(source.mCapturable ? 1u : 0u),
+        source.unknown_006A,
+        source.unknown_006B
+      };
       attributes.reserved6C = source.unknown_006C;
     }
 
-    void ApplyUnitData(wire::SUnitFields& unit, const moho::SSTIUnitVariableData& data)
+    void ApplyUnitData(
+      wire::SUnitFields& unit,
+      const moho::SSTIUnitVariableData& data
+    )
     {
       unit.fuelRatio = data.mFuelRatio;
       unit.shieldRatio = data.mShieldRatio;
@@ -263,19 +323,24 @@ namespace faf::remote
       unit.unitStates = data.mUnitStates;
       unit.scriptBits = data.mScriptbits;
       unit.siloCounts = {
-        SiloCount(data.mTacticalSiloBuildCount), SiloCount(data.mNukeSiloBuildCount),
-        SiloCount(data.mTacticalSiloStorageCount), SiloCount(data.mNukeSiloStorageCount)
+        SiloCount(data.mTacticalSiloBuildCount),
+        SiloCount(data.mNukeSiloBuildCount),
+        SiloCount(data.mTacticalSiloStorageCount),
+        SiloCount(data.mNukeSiloStorageCount)
       };
       unit.unitFlags = static_cast<std::uint8_t>(
-        (data.mIsPaused ? 1u : 0u) | (data.mAutoMode ? 2u : 0u) | (data.mAutoSurfaceMode ? 4u : 0u)
-        | (data.mIsBusy ? 8u : 0u) | (data.mRepeatQueue ? 16u : 0u) | (data.mIsValidTarget ? 32u : 0u)
-        | (data.mOverchargePaused ? 64u : 0u)
+        (data.mIsPaused ? 1u : 0u) | (data.mAutoMode ? 2u : 0u) | (data.mAutoSurfaceMode ? 4u : 0u) |
+        (data.mIsBusy ? 8u : 0u) | (data.mRepeatQueue ? 16u : 0u) | (data.mIsValidTarget ? 32u : 0u) |
+        (data.mOverchargePaused ? 64u : 0u)
       );
     }
 
     /** 0x005BF168..0x005BF1C4: the entity block from the view's recon record. */
     void WriteReconBlock(
-      moho::SSTIEntityVariableData& block, const moho::SPerArmyReconInfo& recon, const std::uint32_t vision, const bool hasVision
+      moho::SSTIEntityVariableData& block,
+      const moho::SPerArmyReconInfo& recon,
+      const std::uint32_t vision,
+      const bool hasVision
     )
     {
       if (hasVision) {
@@ -288,8 +353,12 @@ namespace faf::remote
       block.mIsDead = recon.mMaybeDead;
     }
 
-    /** What `ApplyVariableData` and `ApplyUnitData` write, from a record they wrote (`wire::HashBlipUpdate` covers the same). */
-    void CopyBlipRecord(wire::SEntityRecord& record, const wire::SEntityRecord& from)
+    /** What `ApplyVariableData` and `ApplyUnitData` write, from a record they wrote (`wire::HashBlipUpdate` covers the
+     * same). */
+    void CopyBlipRecord(
+      wire::SEntityRecord& record,
+      const wire::SEntityRecord& from
+    )
     {
       record.appearance = from.appearance;
       record.position = from.position;
@@ -319,7 +388,9 @@ namespace faf::remote
     }
   } // namespace
 
-  std::uint16_t PackEntityFlags(const moho::SSTIEntityVariableData& data) noexcept
+  std::uint16_t PackEntityFlags(
+    const moho::SSTIEntityVariableData& data
+  ) noexcept
   {
     std::uint32_t flags = 0;
     flags |= data.mIsBeingBuilt != 0u ? 1u : 0u;
@@ -329,7 +400,10 @@ namespace faf::remote
     return static_cast<std::uint16_t>(flags);
   }
 
-  void UnpackEntityFlags(const std::uint16_t flags, moho::SSTIEntityVariableData& data) noexcept
+  void UnpackEntityFlags(
+    const std::uint16_t flags,
+    moho::SSTIEntityVariableData& data
+  ) noexcept
   {
     data.mIsBeingBuilt = (flags & 1u) != 0u ? 1u : 0u;
     data.mIsDead = (flags & 2u) != 0u ? 1u : 0u;
@@ -337,16 +411,21 @@ namespace faf::remote
     data.mLayerMask = static_cast<moho::ELayer>((flags >> 5) & 0x7Fu);
   }
 
-  std::uint8_t PackVisualFlags(const moho::SSTIEntityVariableData& data) noexcept
+  std::uint8_t PackVisualFlags(
+    const moho::SSTIEntityVariableData& data
+  ) noexcept
   {
     return static_cast<std::uint8_t>(
-      (data.mVisibilityHidden != 0u ? 1u : 0u) | (data.mUsingAltFootprint != 0u ? 2u : 0u)
-      | (data.mUsingAltFootprintSecondary != 0u ? 4u : 0u) | (data.mDestroyedByKill != 0u ? 8u : 0u)
-      | (data.mRequestRefreshUI != 0u ? 16u : 0u)
+      (data.mVisibilityHidden != 0u ? 1u : 0u) | (data.mUsingAltFootprint != 0u ? 2u : 0u) |
+      (data.mUsingAltFootprintSecondary != 0u ? 4u : 0u) | (data.mDestroyedByKill != 0u ? 8u : 0u) |
+      (data.mRequestRefreshUI != 0u ? 16u : 0u)
     );
   }
 
-  void UnpackAppearance(const wire::SAppearance& look, moho::SSTIEntityVariableData& data)
+  void UnpackAppearance(
+    const wire::SAppearance& look,
+    moho::SSTIEntityVariableData& data
+  )
   {
     data.mScale = Wm3::Vec3f(look.scale[0], look.scale[1], look.scale[2]);
     data.mAttachmentParentRef = look.attachParent;
@@ -375,7 +454,10 @@ namespace faf::remote
     intel.cloak = look.intel[7];
   }
 
-  void UnpackUnitFields(const wire::SUnitFields& unit, moho::SSTIUnitVariableData& data) noexcept
+  void UnpackUnitFields(
+    const wire::SUnitFields& unit,
+    moho::SSTIUnitVariableData& data
+  ) noexcept
   {
     data.mFuelRatio = unit.fuelRatio;
     data.mShieldRatio = unit.shieldRatio;
@@ -396,7 +478,9 @@ namespace faf::remote
   }
 
   CViewFrameBuilder::CViewFrameBuilder(
-    const wire::SContentTables& tables, const wire::SFrameCodec& codec, const std::uint32_t orphanBeats
+    const wire::SContentTables& tables,
+    const wire::SFrameCodec& codec,
+    const std::uint32_t orphanBeats
   )
     : mTables(tables)
     , mCodec(codec)
@@ -404,7 +488,9 @@ namespace faf::remote
   {}
 
   void ReadUnitStats(
-    moho::Stats<moho::StatItem>& stats, wire::CSessionTableWriters& session, std::vector<wire::SUnitStat>& out
+    moho::Stats<moho::StatItem>& stats,
+    wire::CSessionTableWriters& session,
+    std::vector<wire::SUnitStat>& out
   )
   {
     out.clear();
@@ -424,10 +510,14 @@ namespace faf::remote
         out.push_back(stat);
       }
     });
-    std::sort(out.begin(), out.end(), [](const wire::SUnitStat& a, const wire::SUnitStat& b) { return a.name < b.name; });
+    std::sort(out.begin(), out.end(), [](const wire::SUnitStat& a, const wire::SUnitStat& b) {
+      return a.name < b.name;
+    });
   }
 
-  void CViewFrameBuilder::DropStats(const std::uint32_t id)
+  void CViewFrameBuilder::DropStats(
+    const std::uint32_t id
+  )
   {
     if (const auto found = mUnitStats.find(id); found != mUnitStats.end()) {
       if (mSharedStats != nullptr) {
@@ -449,20 +539,27 @@ namespace faf::remote
     mDroppedStats.clear();
   }
 
-  CSharedEntityRecords::CSharedEntityRecords(const wire::SContentTables& tables, const wire::SFrameCodec& codec)
+  CSharedEntityRecords::CSharedEntityRecords(
+    const wire::SContentTables& tables,
+    const wire::SFrameCodec& codec
+  )
     : mTables(tables)
     , mCodec(codec)
   {}
 
   CSharedEntityRecords::~CSharedEntityRecords() = default;
 
-  bool CSharedEntityRecords::Shareable(const moho::Entity& entity) noexcept
+  bool CSharedEntityRecords::Shareable(
+    const moho::Entity& entity
+  ) noexcept
   {
     const moho::SSTIEntityVariableData& data = entity.mVarDat;
     return data.mAmbientSound == nullptr && data.mRumbleSound == nullptr && !data.mUnderlayTexture;
   }
 
-  void CSharedEntityRecords::BeginBeat(const std::size_t changedCount)
+  void CSharedEntityRecords::BeginBeat(
+    const std::size_t changedCount
+  )
   {
     mFree.insert(mFree.end(), mReplaced.begin(), mReplaced.end());
     mReplaced.clear();
@@ -477,7 +574,10 @@ namespace faf::remote
     mUpdateCount = changedCount;
   }
 
-  void CSharedEntityRecords::Build(const std::vector<SChangedEntity>& changed, const bool parallel)
+  void CSharedEntityRecords::Build(
+    const std::vector<SChangedEntity>& changed,
+    const bool parallel
+  )
   {
     // Which records go where is decided here; filling them touches only each entity's own.
     for (std::size_t i = 0; i < changed.size(); ++i) {
@@ -507,8 +607,9 @@ namespace faf::remote
       if (entry->entity != &entity || entry->tickCreated != tickCreated) {
         entry->entity = &entity;
         entry->tickCreated = tickCreated;
-        entry->blueprint = entity.BluePrint != nullptr ? mTables.blueprints.Ordinal(entity.BluePrint->mBlueprintId.c_str())
-                                                       : wire::COrdinalTable::kNone;
+        entry->blueprint = entity.BluePrint != nullptr
+          ? mTables.blueprints.Ordinal(entity.BluePrint->mBlueprintId.c_str())
+          : wire::COrdinalTable::kNone;
       }
       for (std::size_t mode = 0; mode < SSharedUpdate::kModes; ++mode) {
         if ((modes & (1u << mode)) == 0u) {
@@ -560,7 +661,9 @@ namespace faf::remote
     }
   }
 
-  void CSharedEntityRecords::ReserveBlipRecords(const std::size_t count)
+  void CSharedEntityRecords::ReserveBlipRecords(
+    const std::size_t count
+  )
   {
     if (count > mBlipRecords.size()) {
       mBlipRecords.grow_to(count);
@@ -568,8 +671,14 @@ namespace faf::remote
   }
 
   void CSharedEntityRecords::FillBlipRecord(
-    SBlipRecord& out, moho::SSTIEntityVariableData& block, moho::ReconBlip& blip, const bool requestRefreshUI, const std::size_t army,
-    const moho::EUserEntityVisibilityMode mode, const std::uint32_t vision, const bool hasVision
+    SBlipRecord& out,
+    moho::SSTIEntityVariableData& block,
+    moho::ReconBlip& blip,
+    const bool requestRefreshUI,
+    const std::size_t army,
+    const moho::EUserEntityVisibilityMode mode,
+    const std::uint32_t vision,
+    const bool hasVision
   ) const
   {
     moho::Entity& entity = blip;
@@ -597,7 +706,9 @@ namespace faf::remote
     mBefore.clear();
   }
 
-  void CViewFrameBuilder::SaveBefore(const std::uint32_t slot)
+  void CViewFrameBuilder::SaveBefore(
+    const std::uint32_t slot
+  )
   {
     if (slot < mWatched.size() && mWatched[slot] != 0u && mBeforeRecords[slot] == nullptr) {
       const wire::SEntityRecord* record = mWorldSlots[slot];
@@ -609,7 +720,9 @@ namespace faf::remote
     }
   }
 
-  wire::SEntityRecord& CViewFrameBuilder::LocalRecord(const std::uint32_t slot)
+  wire::SEntityRecord& CViewFrameBuilder::LocalRecord(
+    const std::uint32_t slot
+  )
   {
     if (mLocalSlots[slot] != kNoLocal) {
       return mLocalRecords[mLocalSlots[slot]];
@@ -631,7 +744,9 @@ namespace faf::remote
     return record;
   }
 
-  void CViewFrameBuilder::ReleaseLocal(const std::uint32_t slot)
+  void CViewFrameBuilder::ReleaseLocal(
+    const std::uint32_t slot
+  )
   {
     const std::uint32_t index = mLocalSlots[slot];
     if (index != kNoLocal) {
@@ -641,7 +756,10 @@ namespace faf::remote
     }
   }
 
-  std::uint32_t CViewFrameBuilder::NewSlot(const std::uint32_t id, const std::vector<SWorldEntry>::const_iterator found)
+  std::uint32_t CViewFrameBuilder::NewSlot(
+    const std::uint32_t id,
+    const std::vector<SWorldEntry>::const_iterator found
+  )
   {
     std::uint32_t slot;
     if (!mFreeSlots.empty()) {
@@ -659,7 +777,9 @@ namespace faf::remote
     return slot;
   }
 
-  wire::SEntityRecord* CViewFrameBuilder::FindRecord(const std::uint32_t id)
+  wire::SEntityRecord* CViewFrameBuilder::FindRecord(
+    const std::uint32_t id
+  )
   {
     const auto found = LowerBound(id);
     if (found == mWorldIndex.end() || found->id != id) {
@@ -669,7 +789,9 @@ namespace faf::remote
     return &LocalRecord(found->slot);
   }
 
-  wire::SEntityRecord& CViewFrameBuilder::PutRecord(const wire::SEntityRecord& record)
+  wire::SEntityRecord& CViewFrameBuilder::PutRecord(
+    const wire::SEntityRecord& record
+  )
   {
     if (mTrackChanges) {
       mTouchedIds.push_back(record.id);
@@ -687,7 +809,10 @@ namespace faf::remote
     return local;
   }
 
-  void CViewFrameBuilder::ApplySharedUpdate(const SDirectUpdate& update, std::size_t& cursor)
+  void CViewFrameBuilder::ApplySharedUpdate(
+    const SDirectUpdate& update,
+    std::size_t& cursor
+  )
   {
     const auto id = static_cast<std::uint32_t>(update.target->entity->id_);
     const wire::SEntityRecord* const record = update.target->shared->records[SSharedUpdate::ModeIndex(update.Mode())];
@@ -720,7 +845,9 @@ namespace faf::remote
     }
   }
 
-  void CViewFrameBuilder::EraseRecord(const std::uint32_t id)
+  void CViewFrameBuilder::EraseRecord(
+    const std::uint32_t id
+  )
   {
     const auto found = LowerBound(id);
     if (found == mWorldIndex.end() || found->id != id) {
@@ -737,7 +864,9 @@ namespace faf::remote
   }
 
   void WriteEntityBlockForView(
-    moho::SSTIEntityVariableData& data, moho::Entity& entity, const moho::EUserEntityVisibilityMode mode,
+    moho::SSTIEntityVariableData& data,
+    moho::Entity& entity,
+    const moho::EUserEntityVisibilityMode mode,
     const bool requestRefreshUI
   )
   {
@@ -751,7 +880,8 @@ namespace faf::remote
     );
     for (std::size_t i = 0; i < entity.mAttachedEntities.size(); ++i) {
       moho::Entity* const child = entity.mAttachedEntities[i];
-      data.mAuxValueVector[i].mAttachedEntityId = std::bit_cast<std::int32_t>(child != nullptr ? child->id_ : kInvalidEntityId);
+      data.mAuxValueVector[i].mAttachedEntityId =
+        std::bit_cast<std::int32_t>(child != nullptr ? child->id_ : kInvalidEntityId);
     }
 
     // What `UpdateVisibility` would have left for this focus: published, and its mode.
@@ -762,7 +892,9 @@ namespace faf::remote
   }
 
   void CSessionEditCollector::Collect(
-    moho::CSimResources* const resources, const moho::CHeightField* const field, const std::span<const gpg::Rect2i> rects,
+    moho::CSimResources* const resources,
+    const moho::CHeightField* const field,
+    const std::span<const gpg::Rect2i> rects,
     wire::CSessionTableWriters& session
   )
   {
@@ -773,8 +905,11 @@ namespace faf::remote
       for (std::size_t i = session.DepositCount(); i < resources->deposits_.size(); ++i) {
         const moho::ResourceDeposit& source = resources->deposits_[i];
         const wire::SDeposit deposit{
-          static_cast<std::uint8_t>(source.depositType), source.footprintRect.x0, source.footprintRect.z0,
-          source.footprintRect.x1, source.footprintRect.z1
+          static_cast<std::uint8_t>(source.depositType),
+          source.footprintRect.x0,
+          source.footprintRect.z0,
+          source.footprintRect.x1,
+          source.footprintRect.z1
         };
         if (!session.Deposit(deposit)) {
           ++mDepositOverflows;
@@ -786,7 +921,11 @@ namespace faf::remote
     if (field != nullptr && !mSentTerrain) {
       // The heights as the client starts with them (SyncRebuilder.cpp: the first beat's).
       mSentTerrain.reset(new moho::CHeightField(field->width - 1, field->height - 1));
-      std::copy_n(field->data, static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height), mSentTerrain->data);
+      std::copy_n(
+        field->data,
+        static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height),
+        mSentTerrain->data
+      );
     }
     for (const gpg::Rect2i& rect : rects) {
       wire::STerrainEdit edit{};
@@ -794,19 +933,25 @@ namespace faf::remote
       edit.cells = {0, 0, -1, -1};
       if (field != nullptr) {
         const wire::SCellRect clipped{
-          std::max(rect.x0, 0), std::max(rect.z0, 0), std::min(rect.x1, field->width - 1),
+          std::max(rect.x0, 0),
+          std::max(rect.z0, 0),
+          std::min(rect.x1, field->width - 1),
           std::min(rect.z1, field->height - 1)
         };
         if (clipped.x0 <= clipped.x1 && clipped.z0 <= clipped.z1) {
           edit.cells = clipped;
           edit.heights.reserve(
-            static_cast<std::size_t>(clipped.x1 - clipped.x0 + 1) * static_cast<std::size_t>(clipped.z1 - clipped.z0 + 1)
+            static_cast<std::size_t>(clipped.x1 - clipped.x0 + 1) *
+            static_cast<std::size_t>(clipped.z1 - clipped.z0 + 1)
           );
           for (std::int32_t z = clipped.z0; z <= clipped.z1; ++z) {
             const std::uint16_t* const row = field->data + static_cast<std::ptrdiff_t>(z) * field->width;
             edit.heights.insert(edit.heights.end(), row + clipped.x0, row + clipped.x1 + 1);
-            std::copy(row + clipped.x0, row + clipped.x1 + 1,
-                      mSentTerrain->data + static_cast<std::ptrdiff_t>(z) * mSentTerrain->width + clipped.x0);
+            std::copy(
+              row + clipped.x0,
+              row + clipped.x1 + 1,
+              mSentTerrain->data + static_cast<std::ptrdiff_t>(z) * mSentTerrain->width + clipped.x0
+            );
           }
         }
       }
@@ -816,7 +961,11 @@ namespace faf::remote
     }
   }
 
-  void CSharedUnitStats::ReadTree(Tree& tree, STree& state, wire::CSessionTableWriters& session)
+  void CSharedUnitStats::ReadTree(
+    Tree& tree,
+    STree& state,
+    wire::CSessionTableWriters& session
+  )
   {
     thread_local std::vector<moho::StatItem*> items;
     thread_local std::vector<wire::SUnitStat> stats;
@@ -854,11 +1003,15 @@ namespace faf::remote
       }
       stats.push_back(stat);
     }
-    std::sort(stats.begin(), stats.end(), [](const wire::SUnitStat& a, const wire::SUnitStat& b) { return a.name < b.name; });
+    std::sort(stats.begin(), stats.end(), [](const wire::SUnitStat& a, const wire::SUnitStat& b) {
+      return a.name < b.name;
+    });
     state.changed = state.value.Assign(stats);
   }
 
-  void CSharedUnitStats::Attach(SUnit& unit)
+  void CSharedUnitStats::Attach(
+    SUnit& unit
+  )
   {
     moho::Unit* const asUnit = unit.entity->IsUnit();
     if (asUnit == nullptr || !asUnit->mConstDat.mStatsRoot) {
@@ -869,7 +1022,9 @@ namespace faf::remote
     mByTree[unit.tree] = unit.state.get();
   }
 
-  void CSharedUnitStats::Forget(SUnit& unit)
+  void CSharedUnitStats::Forget(
+    SUnit& unit
+  )
   {
     if (unit.tree != nullptr) {
       if (const auto found = mByTree.find(unit.tree); found != mByTree.end() && found->second == unit.state.get()) {
@@ -879,7 +1034,9 @@ namespace faf::remote
   }
 
   void CSharedUnitStats::Refresh(
-    const std::span<const std::uint32_t> ids, const std::span<moho::Entity* const> entities, wire::CSessionTableWriters& session,
+    const std::span<const std::uint32_t> ids,
+    const std::span<moho::Entity* const> entities,
+    wire::CSessionTableWriters& session,
     const bool parallel
   )
   {
@@ -922,7 +1079,9 @@ namespace faf::remote
       STree& state = *unit.state;
       state.changed = false;
       // A tree's share: its address, mixed, spreads the trees evenly over the beats.
-      const auto phase = static_cast<std::uint32_t>((static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(unit.tree)) * 0x9E3779B97F4A7C15ull) >> 40u);
+      const auto phase = static_cast<std::uint32_t>(
+        (static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(unit.tree)) * 0x9E3779B97F4A7C15ull) >> 40u
+      );
       if (state.fresh || mReadEvery <= 1u || (phase + beat) % mReadEvery == 0u) {
         state.fresh = false;
         mWork.push_back(&state);
@@ -949,14 +1108,19 @@ namespace faf::remote
     }
   }
 
-  void CViewFrameBuilder::Apply(const moho::SSyncData& packet, const std::span<const SDirectUpdate> direct)
+  void CViewFrameBuilder::Apply(
+    const moho::SSyncData& packet,
+    const std::span<const SDirectUpdate> direct
+  )
   {
     mUnderlays.Refresh();
 
     if (mSession != nullptr && mCollectEdits) {
       mEdits.Collect(
-        packet.mSimResources.px, packet.mTerrainUpdate.px,
-        std::span<const gpg::Rect2i>(packet.mPlayableRectUpdates.data(), packet.mPlayableRectUpdates.size()), *mSession
+        packet.mSimResources.px,
+        packet.mTerrainUpdate.px,
+        std::span<const gpg::Rect2i>(packet.mPlayableRectUpdates.data(), packet.mPlayableRectUpdates.size()),
+        *mSession
       );
     }
 
@@ -1005,7 +1169,9 @@ namespace faf::remote
       }
     }
     for (const moho::SEntityVariableUpdateEntry& update : packet.mEntityUpdates) {
-      if (wire::SEntityRecord* const record = FindRecord(static_cast<std::uint32_t>(update.mEntityId)); record != nullptr) {
+      if (
+        wire::SEntityRecord* const record = FindRecord(static_cast<std::uint32_t>(update.mEntityId)); record != nullptr
+      ) {
         ApplyVariableData(*record, update.mVariableData, mCodec, mTables, mSession, mUnderlays, mUnknownUnderlays);
         if (mTrackChanges) {
           mTouchedIds.push_back(record->id);
@@ -1095,7 +1261,9 @@ namespace faf::remote
     }
   }
 
-  wire::SViewFrame CViewFrameBuilder::StartFrame(const std::uint32_t beat)
+  wire::SViewFrame CViewFrameBuilder::StartFrame(
+    const std::uint32_t beat
+  )
   {
     wire::SViewFrame frame{};
     frame.frameId = mNextFrameId++;
@@ -1146,12 +1314,18 @@ namespace faf::remote
     return frame;
   }
 
-  float CHeightFieldGround::HeightAt(const float x, const float z) const noexcept
+  float CHeightFieldGround::HeightAt(
+    const float x,
+    const float z
+  ) const noexcept
   {
     return mField != nullptr ? mField->GetElevation(x, z) : 0.0f;
   }
 
-  void CDeadReckoner::Apply(wire::SViewFrame& frame, const wire::SFrameCodec& codec)
+  void CDeadReckoner::Apply(
+    wire::SViewFrame& frame,
+    const wire::SFrameCodec& codec
+  )
   {
     // Both are in id order: records the frame no longer has (or has far away) are dropped.
     auto sent = mSent.begin();
@@ -1206,14 +1380,20 @@ namespace faf::remote
       entry.lastBeat = frame.beat;
       const wire::QuantizedPosition predicted = wire::PredictPosition(entry.anchor, frame.beat, codec);
       const std::uint32_t anchoredAt = entry.anchor.anchorBeat;
-      if (wire::ApplyDeadReckoning(
-            entry.anchor, std::span<const wire::QuantizedPosition>(entry.history.data(), entry.historyCount),
-            frame.beat, mScheme, codec
-          )) {
+      if (
+        wire::ApplyDeadReckoning(
+          entry.anchor,
+          std::span<const wire::QuantizedPosition>(entry.history.data(), entry.historyCount),
+          frame.beat,
+          mScheme,
+          codec
+        )
+      ) {
         ++mReanchors;
         mGroundAnchors += entry.anchor.followsGround ? 1u : 0u;
         const auto off = [&](const int axis) {
-          const std::int64_t error = static_cast<std::int64_t>(actual[axis]) - static_cast<std::int64_t>(predicted[axis]);
+          const std::int64_t error =
+            static_cast<std::int64_t>(actual[axis]) - static_cast<std::int64_t>(predicted[axis]);
           return error > mScheme.tolerance || -error > mScheme.tolerance;
         };
         const bool horizontal = off(0) || off(2);
@@ -1240,10 +1420,16 @@ namespace faf::remote
           }
           entry.yawHistory[entry.yawCount++] = record.orientation;
         }
-        if (wire::ApplyOrientationReckoning(
-              entry.anchor, record, std::span<const std::uint32_t>(entry.yawHistory.data(), entry.yawCount),
-              frame.beat, mScheme, codec
-            )) {
+        if (
+          wire::ApplyOrientationReckoning(
+            entry.anchor,
+            record,
+            std::span<const std::uint32_t>(entry.yawHistory.data(), entry.yawCount),
+            frame.beat,
+            mScheme,
+            codec
+          )
+        ) {
           ++mOrientationReanchors;
         }
         record.orientation = entry.anchor.orientation;

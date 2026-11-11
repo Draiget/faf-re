@@ -20,7 +20,9 @@ namespace
     return sInstance;
   }
 
-  [[nodiscard]] gpg::RRef MakeBeamBlueprintRef(moho::RBeamBlueprint* object)
+  [[nodiscard]] gpg::RRef MakeBeamBlueprintRef(
+    moho::RBeamBlueprint* object
+  )
   {
     gpg::RRef out{};
     out.mObj = object;
@@ -33,7 +35,9 @@ namespace
     return MakeBeamBlueprintRef(new moho::RBeamBlueprint());
   }
 
-  [[nodiscard]] gpg::RRef ConstructBeamBlueprintRef(void* objectMemory)
+  [[nodiscard]] gpg::RRef ConstructBeamBlueprintRef(
+    void* objectMemory
+  )
   {
     if (!objectMemory) {
       return MakeBeamBlueprintRef(nullptr);
@@ -43,12 +47,16 @@ namespace
     return MakeBeamBlueprintRef(object);
   }
 
-  void DeleteBeamBlueprintObject(void* objectMemory)
+  void DeleteBeamBlueprintObject(
+    void* objectMemory
+  )
   {
     delete static_cast<moho::RBeamBlueprint*>(objectMemory);
   }
 
-  void DestroyBeamBlueprintObject(void* objectMemory)
+  void DestroyBeamBlueprintObject(
+    void* objectMemory
+  )
   {
     if (!objectMemory) {
       return;
@@ -64,7 +72,9 @@ namespace
    * Binds the callback lanes used by `RBeamBlueprintTypeInfo` for object
    * allocation, placement construction, deletion, and destruction.
    */
-  [[nodiscard]] TypeInfo* BindBeamBlueprintTypeInfoHookLanes(TypeInfo* const typeInfo)
+  [[nodiscard]] TypeInfo* BindBeamBlueprintTypeInfoHookLanes(
+    TypeInfo* const typeInfo
+  )
   {
     typeInfo->newRefFunc_ = &NewBeamBlueprintRef;
     typeInfo->ctorRefFunc_ = &ConstructBeamBlueprintRef;
@@ -109,18 +119,20 @@ namespace moho
   }
 
   /**
- * Address: 0x00510F90 (FUN_00510F90, Moho::RBeamBlueprintTypeInfo::AddBase_REffectBlueprint)
- *
- * What it does:
- * Registers `REffectBlueprint` as this type's reflected base at offset 0 - single
- * inheritance, so the sub-object starts where the object does.
- */
-void RBeamBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* const typeInfo)
-{
-  gpg::AddReflectedBase<moho::REffectBlueprint>(typeInfo);
-}
+   * Address: 0x00510F90 (FUN_00510F90, Moho::RBeamBlueprintTypeInfo::AddBase_REffectBlueprint)
+   *
+   * What it does:
+   * Registers `REffectBlueprint` as this type's reflected base at offset 0 - single
+   * inheritance, so the sub-object starts where the object does.
+   */
+  void RBeamBlueprintTypeInfo::AddBase_REffectBlueprint(
+    gpg::RType* const typeInfo
+  )
+  {
+    gpg::AddReflectedBase<moho::REffectBlueprint>(typeInfo);
+  }
 
-/**
+  /**
    * Address: 0x0050FA90 (FUN_0050FA90, Moho::RBeamBlueprintTypeInfo::Init)
    */
   void RBeamBlueprintTypeInfo::Init()
@@ -136,22 +148,28 @@ void RBeamBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* const typeInfo
   /**
    * Address: 0x0050FB90 (FUN_0050FB90, Moho::RBeamBlueprintTypeInfo::AddFields)
    */
-  void RBeamBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
+  void RBeamBlueprintTypeInfo::AddFields(
+    gpg::RType* const typeInfo
+  )
   {
     typeInfo->AddField<float>("Length", offsetof(RBeamBlueprint, Length), 3, "Total length of beam");
     typeInfo->AddField<float>("Lifetime", offsetof(RBeamBlueprint, Lifetime), 3, "Lifetime of the emitter");
     typeInfo->AddField<float>("Thickness", offsetof(RBeamBlueprint, Thickness), 3, "Thickness of the beam");
     typeInfo->AddField<float>("LODCutoff", offsetof(RBeamBlueprint, LODCutoff), 3, "cutoff distance");
     typeInfo->AddField<fa::string>("TextureName", offsetof(RBeamBlueprint, TextureName), 3, "Filename of texture");
-    gpg::RField* const startColorField = typeInfo->AddField<moho::Vector4f>("StartColor", offsetof(RBeamBlueprint, StartColor));
+    gpg::RField* const startColorField =
+      typeInfo->AddField<moho::Vector4f>("StartColor", offsetof(RBeamBlueprint, StartColor));
     startColorField->mFlags = 3;
     startColorField->mDesc = "RGBA start color of beam";
-    gpg::RField* const endColorField = typeInfo->AddField<moho::Vector4f>("EndColor", offsetof(RBeamBlueprint, EndColor));
+    gpg::RField* const endColorField =
+      typeInfo->AddField<moho::Vector4f>("EndColor", offsetof(RBeamBlueprint, EndColor));
     endColorField->mFlags = 3;
     endColorField->mDesc = "RGBA end color of beam";
     typeInfo->AddField<float>("UShift", offsetof(RBeamBlueprint, UShift), 3, "U Texture shift of beam texture");
     typeInfo->AddField<float>("VShift", offsetof(RBeamBlueprint, VShift), 3, "V Texture shift of beam texture");
-    typeInfo->AddField<float>("RepeatRate", offsetof(RBeamBlueprint, RepeatRate), 3, "How often the texture repeats per ogrid");
+    typeInfo->AddField<float>(
+      "RepeatRate", offsetof(RBeamBlueprint, RepeatRate), 3, "How often the texture repeats per ogrid"
+    );
     typeInfo->AddField<std::int32_t>("Blendmode", offsetof(RBeamBlueprint, BlendMode), 3, "blendmode of this beam");
   }
 
@@ -166,4 +184,7 @@ void RBeamBlueprintTypeInfo::AddBase_REffectBlueprint(gpg::RType* const typeInfo
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_RBeamBlueprintTypeInfo_860a8a, moho::register_RBeamBlueprintTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_RBeamBlueprintTypeInfo_860a8a,
+  moho::register_RBeamBlueprintTypeInfo
+)

@@ -1,0 +1,34 @@
+kind: server
+name: server-8v8-ai
+description: >
+  Plan WP16.4: an 8v8 on Strait of Aquilla (a vault map with 16 start spots, FAF's strait_of_aquilla.v0004): two
+  remote players on team 2 with six AIs, against eight AIs. Every view decodes, every frame check matches, and the
+  replay plays back. The map must be in the data's vault.
+map: /maps/strait_of_aquilla.v0004/Strait_of_Aquilla_scenario.lua
+seats:
+  - uid: 1001
+    team: 2
+    args: ["--order-at", "30"]
+  - uid: 1002
+    team: 2
+ais:
+  - team: 2
+  - team: 2
+  - team: 2
+  - team: 2
+  - team: 2
+  - team: 2
+  - team: 3
+  - team: 3
+  - team: 3
+  - team: 3
+  - team: 3
+  - team: 3
+  - team: 3
+  - team: 3
+server:
+  stopBeat: 1800
+timeout: 15m
+expect:
+  clean: true
+  playback: true

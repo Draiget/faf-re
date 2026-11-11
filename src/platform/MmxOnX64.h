@@ -19,14 +19,18 @@
 
 namespace mmx_on_x64
 {
-  [[nodiscard]] inline __m64 FromU64(const std::uint64_t value) noexcept
+  [[nodiscard]] inline __m64 FromU64(
+    const std::uint64_t value
+  ) noexcept
   {
     __m64 result;
     result.m64_u64 = value;
     return result;
   }
 
-  [[nodiscard]] inline std::uint8_t SaturateToU8(const std::int16_t value) noexcept
+  [[nodiscard]] inline std::uint8_t SaturateToU8(
+    const std::int16_t value
+  ) noexcept
   {
     return value < 0 ? 0 : (value > 255 ? 255 : static_cast<std::uint8_t>(value));
   }
@@ -40,17 +44,25 @@ inline __m64 _mm_setzero_si64() noexcept
   return mmx_on_x64::FromU64(0);
 }
 
-inline int _mm_cvtsi64_si32(const __m64 a) noexcept
+inline int _mm_cvtsi64_si32(
+  const __m64 a
+) noexcept
 {
   return a.m64_i32[0];
 }
 
-inline __m64 _m_por(const __m64 a, const __m64 b) noexcept
+inline __m64 _m_por(
+  const __m64 a,
+  const __m64 b
+) noexcept
 {
   return mmx_on_x64::FromU64(a.m64_u64 | b.m64_u64);
 }
 
-inline __m64 _m_paddw(const __m64 a, const __m64 b) noexcept
+inline __m64 _m_paddw(
+  const __m64 a,
+  const __m64 b
+) noexcept
 {
   __m64 r;
   for (int i = 0; i < 4; ++i) {
@@ -59,12 +71,18 @@ inline __m64 _m_paddw(const __m64 a, const __m64 b) noexcept
   return r;
 }
 
-inline __m64 _mm_add_pi16(const __m64 a, const __m64 b) noexcept
+inline __m64 _mm_add_pi16(
+  const __m64 a,
+  const __m64 b
+) noexcept
 {
   return _m_paddw(a, b);
 }
 
-inline __m64 _m_paddusw(const __m64 a, const __m64 b) noexcept
+inline __m64 _m_paddusw(
+  const __m64 a,
+  const __m64 b
+) noexcept
 {
   __m64 r;
   for (int i = 0; i < 4; ++i) {
@@ -74,7 +92,10 @@ inline __m64 _m_paddusw(const __m64 a, const __m64 b) noexcept
   return r;
 }
 
-inline __m64 _m_pmullw(const __m64 a, const __m64 b) noexcept
+inline __m64 _m_pmullw(
+  const __m64 a,
+  const __m64 b
+) noexcept
 {
   __m64 r;
   for (int i = 0; i < 4; ++i) {
@@ -84,7 +105,10 @@ inline __m64 _m_pmullw(const __m64 a, const __m64 b) noexcept
   return r;
 }
 
-inline __m64 _m_pavgw(const __m64 a, const __m64 b) noexcept
+inline __m64 _m_pavgw(
+  const __m64 a,
+  const __m64 b
+) noexcept
 {
   __m64 r;
   for (int i = 0; i < 4; ++i) {
@@ -93,7 +117,10 @@ inline __m64 _m_pavgw(const __m64 a, const __m64 b) noexcept
   return r;
 }
 
-inline __m64 _m_pavgb(const __m64 a, const __m64 b) noexcept
+inline __m64 _m_pavgb(
+  const __m64 a,
+  const __m64 b
+) noexcept
 {
   __m64 r;
   for (int i = 0; i < 8; ++i) {
@@ -102,7 +129,10 @@ inline __m64 _m_pavgb(const __m64 a, const __m64 b) noexcept
   return r;
 }
 
-inline __m64 _m_punpcklbw(const __m64 a, const __m64 b) noexcept
+inline __m64 _m_punpcklbw(
+  const __m64 a,
+  const __m64 b
+) noexcept
 {
   __m64 r;
   for (int i = 0; i < 4; ++i) {
@@ -112,7 +142,10 @@ inline __m64 _m_punpcklbw(const __m64 a, const __m64 b) noexcept
   return r;
 }
 
-inline __m64 _m_punpckhbw(const __m64 a, const __m64 b) noexcept
+inline __m64 _m_punpckhbw(
+  const __m64 a,
+  const __m64 b
+) noexcept
 {
   __m64 r;
   for (int i = 0; i < 4; ++i) {
@@ -122,7 +155,10 @@ inline __m64 _m_punpckhbw(const __m64 a, const __m64 b) noexcept
   return r;
 }
 
-inline __m64 _m_packuswb(const __m64 a, const __m64 b) noexcept
+inline __m64 _m_packuswb(
+  const __m64 a,
+  const __m64 b
+) noexcept
 {
   __m64 r;
   for (int i = 0; i < 4; ++i) {
@@ -132,22 +168,34 @@ inline __m64 _m_packuswb(const __m64 a, const __m64 b) noexcept
   return r;
 }
 
-inline __m64 _mm_packs_pu16(const __m64 a, const __m64 b) noexcept
+inline __m64 _mm_packs_pu16(
+  const __m64 a,
+  const __m64 b
+) noexcept
 {
   return _m_packuswb(a, b);
 }
 
-inline __m64 _m_psllqi(const __m64 a, const int count) noexcept
+inline __m64 _m_psllqi(
+  const __m64 a,
+  const int count
+) noexcept
 {
   return mmx_on_x64::FromU64(static_cast<unsigned>(count) > 63u ? 0u : a.m64_u64 << count);
 }
 
-inline __m64 _m_psrlqi(const __m64 a, const int count) noexcept
+inline __m64 _m_psrlqi(
+  const __m64 a,
+  const int count
+) noexcept
 {
   return mmx_on_x64::FromU64(static_cast<unsigned>(count) > 63u ? 0u : a.m64_u64 >> count);
 }
 
-inline __m64 _m_psrlwi(const __m64 a, const int count) noexcept
+inline __m64 _m_psrlwi(
+  const __m64 a,
+  const int count
+) noexcept
 {
   __m64 r;
   for (int i = 0; i < 4; ++i) {
@@ -156,7 +204,10 @@ inline __m64 _m_psrlwi(const __m64 a, const int count) noexcept
   return r;
 }
 
-inline __m64 _m_psrawi(const __m64 a, const int count) noexcept
+inline __m64 _m_psrawi(
+  const __m64 a,
+  const int count
+) noexcept
 {
   const int shift = static_cast<unsigned>(count) > 15u ? 15 : count;
   __m64 r;
@@ -166,7 +217,10 @@ inline __m64 _m_psrawi(const __m64 a, const int count) noexcept
   return r;
 }
 
-inline __m64 _mm_srai_pi16(const __m64 a, const int count) noexcept
+inline __m64 _mm_srai_pi16(
+  const __m64 a,
+  const int count
+) noexcept
 {
   return _m_psrawi(a, count);
 }

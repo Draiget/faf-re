@@ -49,7 +49,9 @@ namespace moho
    * Whether one FA-Binary-Patches simulation fix applies to the current session. Constant for the
    * whole session, so every client and every replay run of one game takes the same branch.
    */
-  [[nodiscard]] inline bool FAF_IsSimFixActive(const EFafSimFix fix) noexcept
+  [[nodiscard]] inline bool FAF_IsSimFixActive(
+    const EFafSimFix fix
+  ) noexcept
   {
     return (gFafSessionSimFixes & (1u << static_cast<std::uint32_t>(fix))) != 0u;
   }

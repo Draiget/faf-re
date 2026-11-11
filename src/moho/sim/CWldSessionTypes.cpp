@@ -38,7 +38,7 @@ namespace
     }
     return buffer;
   }
-}
+} // namespace
 
 namespace moho
 {
@@ -74,15 +74,16 @@ namespace moho
    * What it does:
    * Copy-constructs cursor info and relinks weak hovered-unit ownership to this instance.
    */
-  MouseInfo::MouseInfo(const MouseInfo& other)
+  MouseInfo::MouseInfo(
+    const MouseInfo& other
+  )
     : mHitValid(other.mHitValid)
     , pad_01{0u, 0u, 0u}
     , mMouseWorldPos(other.mMouseWorldPos)
     , mUnitHover(other.mUnitHover)
     , mIsDragger(other.mIsDragger)
     , mMouseScreenPos(other.mMouseScreenPos)
-  {
-  }
+  {}
 
   /**
    * Address: 0x00893140 (FUN_00893140, ??1UICursorInfo@Moho@@QAE@@Z)
@@ -121,7 +122,9 @@ namespace moho
    * What it does:
    * Assigns cursor info and updates hovered-unit weak-owner chain links.
    */
-  MouseInfo& MouseInfo::operator=(const MouseInfo& other)
+  MouseInfo& MouseInfo::operator=(
+    const MouseInfo& other
+  )
   {
     mHitValid = other.mHitValid;
     mMouseWorldPos = other.mMouseWorldPos;
@@ -136,7 +139,9 @@ namespace moho
     return mUnitHover.GetObjectPtr();
   }
 
-  void MouseInfo::SetHoveredEntity(UserEntity* const entity) noexcept
+  void MouseInfo::SetHoveredEntity(
+    UserEntity* const entity
+  ) noexcept
   {
     mUnitHover.ResetFromObject(entity);
   }
@@ -147,7 +152,9 @@ namespace moho
    * What it does:
    * Copy-constructs command mode state, including both cursor snapshots.
    */
-  CommandModeData::CommandModeData(const CommandModeData& other)
+  CommandModeData::CommandModeData(
+    const CommandModeData& other
+  )
     : mMode(other.mMode)
     , mCommandCaps(other.mCommandCaps)
     , mBlueprint(other.mBlueprint)
@@ -181,7 +188,10 @@ namespace moho
    * mode(cursorInfo, eventData.mModifiers);` declarations in
    * moho/ui/UiRuntimeTypes.cpp are the recovery of both.
    */
-  CommandModeData::CommandModeData(const MouseInfo& mouseInfo, const int modifiers)
+  CommandModeData::CommandModeData(
+    const MouseInfo& mouseInfo,
+    const int modifiers
+  )
     : mMode(COMMOD_None)
     , mCommandCaps(RULEUCC_None)
     , mBlueprint(nullptr)
@@ -214,7 +224,9 @@ namespace moho
    * Assigns command mode state from another value and copies both cursor-info
    * lanes via `MouseInfo::operator=`.
    */
-  CommandModeData& CommandModeData::operator=(const CommandModeData& other)
+  CommandModeData& CommandModeData::operator=(
+    const CommandModeData& other
+  )
   {
     mMode = other.mMode;
     mCommandCaps = other.mCommandCaps;
@@ -226,7 +238,7 @@ namespace moho
     mReserved5C = other.mReserved5C;
     return *this;
   }
-}
+} // namespace moho
 
 namespace gpg
 {
@@ -264,7 +276,7 @@ namespace gpg
      */
     [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
   };
-}
+} // namespace gpg
 
 namespace
 {
@@ -399,8 +411,7 @@ namespace
       archive->WriteString(&value);
     }
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x00899120 (FUN_00899120, gpg::RMultiMapType_EntId_string::Init)
@@ -439,7 +450,9 @@ const char* gpg::RMultiMapType_EntId_string::GetName() const
  * What it does:
  * Formats inherited lexical text and appends current multimap element count.
  */
-fa::string gpg::RMultiMapType_EntId_string::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RMultiMapType_EntId_string::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   const fa::string base = gpg::RType::GetLexical(ref);
   // The reflected object is the `EntIdStringMultiMap` this type describes; a
@@ -467,7 +480,7 @@ namespace moho
 {
   // 0x00F57A8E holds 0x01 in bin/2025.7.1/ForgedAlliance.exe's .data, so the
   // resource splats are on unless a console command turns them off.
-  bool UI_RenResources = true;              // 0x00F57A8E
+  bool UI_RenResources = true; // 0x00F57A8E
 
   /**
    * Address: 0x00824480 (FUN_00824480, sub_824480)
@@ -475,7 +488,9 @@ namespace moho
    * What it does:
    * See the declaration in UserTarget.h.
    */
-  UserTarget::UserTarget(UserEntity* const entity) noexcept
+  UserTarget::UserTarget(
+    UserEntity* const entity
+  ) noexcept
     : targetType(UserTargetType::Entity)
     , targetEntity(entity)
   {}
@@ -486,13 +501,15 @@ namespace moho
    * What it does:
    * Copy-constructs one build-template entry (position, heading, blueprint id).
    */
-  SBuildTemplateInfo::SBuildTemplateInfo(const SBuildTemplateInfo& other)
+  SBuildTemplateInfo::SBuildTemplateInfo(
+    const SBuildTemplateInfo& other
+  )
     : mPos(other.mPos)
     , mBuildOrder(other.mBuildOrder)
     , mBlueprintId(other.mBlueprintId)
   {}
-namespace
-{
+  namespace
+  {
     // gWldFrameAction: moho/sim/WldSessionState.cpp (WldSessionState.h).
 
     /**
@@ -506,7 +523,9 @@ namespace
      * teardown pass uses (see `DoTeardownCallbacks`, FUN_008698B0, which takes
      * `*v4 + 4`).
      */
-    [[maybe_unused]] void DispatchSessionListenerAttach(WldTeardownCallbackVector* const callbacks)
+    [[maybe_unused]] void DispatchSessionListenerAttach(
+      WldTeardownCallbackVector* const callbacks
+    )
     {
       const std::size_t callbackCount = callbacks->size();
       for (std::size_t i = 0; i < callbackCount; ++i) {
@@ -531,7 +550,9 @@ namespace
      * What it does:
      * Returns one first-dword lane from one build-template helper payload.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadBuildTemplateHelperLane0(const void* const value) noexcept
+    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadBuildTemplateHelperLane0(
+      const void* const value
+    ) noexcept
     {
       if (value == nullptr) {
         return 0u;
@@ -545,7 +566,9 @@ namespace
      * What it does:
      * Returns one second-dword lane from one build-template helper payload.
      */
-    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadBuildTemplateHelperLane4(const void* const value) noexcept
+    [[maybe_unused]] [[nodiscard]] std::uint32_t ReadBuildTemplateHelperLane4(
+      const void* const value
+    ) noexcept
     {
       if (value == nullptr) {
         return 0u;
@@ -556,7 +579,9 @@ namespace
     constexpr std::uint32_t kBuildPreviewValidColor = 0xD800D800u;
     constexpr std::uint32_t kBuildPreviewInvalidColor = 0xD8D80000u;
 
-    [[nodiscard]] SCoordsVec2 BuildPreviewCoordsFromWorldPosition(const Wm3::Vector3f& worldPosition) noexcept
+    [[nodiscard]] SCoordsVec2 BuildPreviewCoordsFromWorldPosition(
+      const Wm3::Vector3f& worldPosition
+    ) noexcept
     {
       return SCoordsVec2{worldPosition.x, worldPosition.z};
     }
@@ -587,7 +612,8 @@ namespace
      * Wm3::Vector3f const &, Moho::RUnitBlueprint const *, Moho::VTransform &, Moho::CWldSession &, std::uint32_t &
      *
      * IDA signature:
-     * int __userpurge sub_854930@<eax>(float *a1@<eax>, Moho::RUnitBlueprint *a2@<edx>, float *a3@<edi>, int esi0@<esi>, int *a5);
+     * int __userpurge sub_854930@<eax>(float *a1@<eax>, Moho::RUnitBlueprint *a2@<edx>, float *a3@<edi>, int
+     * esi0@<esi>, int *a5);
      *
      * What it does:
      * Evaluates build placement for one template-entry preview position, writes
@@ -646,8 +672,7 @@ namespace
       return &previewTransform;
     }
 
-}
-
+  } // namespace
 
   /**
    * Bridge for the recovered `cfunc_IssueDockCommandL` worker: resolves the world
@@ -657,7 +682,9 @@ namespace
    * the helper itself, so this is a pointer conversion, not an offset. Forwards
    * to `ResolveCommandIssueTargetPosition` (FUN_0081CFD0).
    */
-  Wm3::Vector3f ResolveLastQueuedCommandAnchorPosition(const QueuedUserCommandRecord* const record)
+  Wm3::Vector3f ResolveLastQueuedCommandAnchorPosition(
+    const QueuedUserCommandRecord* const record
+  )
   {
     Wm3::Vector3f out{};
     (void)ResolveCommandIssueTargetPosition(&out, *reinterpret_cast<const UserCommandIssueHelper*>(record));
@@ -673,11 +700,7 @@ namespace
   {
     std::uint32_t previewColor = 0u;
     return ApplyBuildTemplatePlacementPreviewStatus(
-      worldPosition,
-      buildBlueprint,
-      previewTransform,
-      session,
-      previewColor
+      worldPosition, buildBlueprint, previewTransform, session, previewColor
     );
   }
 
@@ -690,11 +713,7 @@ namespace
   {
     std::uint32_t previewColor = 0u;
     (void)ApplyCommandModeBuildPlacementPreviewStatus(
-      commandMode,
-      worldPosition,
-      session,
-      previewTransform,
-      previewColor
+      commandMode, worldPosition, session, previewTransform, previewColor
     );
     return previewColor;
   }
@@ -706,7 +725,10 @@ namespace
    * matching the binary's inline `mEntityMap` in-order scan (entity ids are
    * unique keys, so the collection order equals the binary's iteration order).
    */
-  void GetSessionUserUnits(CWldSession* const session, fa::vector<UserUnit*>& outUnits)
+  void GetSessionUserUnits(
+    CWldSession* const session,
+    fa::vector<UserUnit*>& outUnits
+  )
   {
     CollectSessionUserUnits(session, outUnits);
   }
@@ -721,12 +743,14 @@ namespace
    */
   SSessionSaveData::~SSessionSaveData() = default;
 
-}
-
+} // namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_RMultiMapType_EntId_string_933d97, preregister_RMultiMapType_EntId_string)
+GPG_PREREGISTER_INIT(
+  preregister_RMultiMapType_EntId_string_933d97,
+  preregister_RMultiMapType_EntId_string
+)
 namespace moho
 {
   /**
@@ -734,7 +758,11 @@ namespace moho
    * Loads the save-node map. Inlined into
    * `gpg::SerSaveLoadHelper<SSessionSaveData>::Deserialize` 0x00897470.
    */
-  void SSessionSaveData::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
+  void SSessionSaveData::MemberDeserialize(
+    gpg::ReadArchive* const archive,
+    const int,
+    const gpg::RRef& ownerRef
+  )
   {
     archive->Read(gpg::RTypeOf<moho::SSessionSaveNodeMap>(), &mNodeMap, ownerRef);
   }
@@ -744,7 +772,11 @@ namespace moho
    * Saves the save-node map. Inlined into
    * `gpg::SerSaveLoadHelper<SSessionSaveData>::Serialize` 0x008974B0.
    */
-  void SSessionSaveData::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef) const
+  void SSessionSaveData::MemberSerialize(
+    gpg::WriteArchive* const archive,
+    const int,
+    const gpg::RRef& ownerRef
+  ) const
   {
     archive->Write(gpg::RTypeOf<moho::SSessionSaveNodeMap>(), &mNodeMap, ownerRef);
   }
@@ -760,11 +792,10 @@ namespace moho
    */
   struct SSessionSaveDataSerializer : gpg::SerSaveLoadHelper<SSessionSaveData>
   {};
-}
+} // namespace moho
 
 namespace
 {
   // Address: 0x010C51C8 -- process-global `SSessionSaveDataSerializer` singleton.
   moho::SSessionSaveDataSerializer gSSessionSaveDataSerializer;
-}
-
+} // namespace

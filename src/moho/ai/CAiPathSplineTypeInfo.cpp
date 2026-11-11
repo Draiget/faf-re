@@ -60,7 +60,9 @@ namespace
    * `delete` lowering chains through `~CAiPathSpline()` to release the inline
    * fastvector lanes before `operator delete`.
    */
-  void DeleteAiPathSplineOwned(void* object)
+  void DeleteAiPathSplineOwned(
+    void* object
+  )
   {
     delete static_cast<CAiPathSpline*>(object);
   }
@@ -73,7 +75,9 @@ namespace
    * wraps it in a typed `gpg::RRef` lane. Installed as `ctorRefFunc_` by the
    * lifecycle-callbacks helper.
    */
-  [[nodiscard]] gpg::RRef ConstructAiPathSplineRefInPlace(void* objectStorage)
+  [[nodiscard]] gpg::RRef ConstructAiPathSplineRefInPlace(
+    void* objectStorage
+  )
   {
     auto* const spline = gpg::ConstructInStorage<CAiPathSpline>(objectStorage);
     return gpg::MakeTypedRef(spline, gpg::RTypeOf<CAiPathSpline>());
@@ -88,7 +92,9 @@ namespace
    * helper. The compiler-generated destructor body releases inline fastvector
    * lanes (matching the binary's manual cleanup of the embedded vectors).
    */
-  void DestroyAiPathSplineInPlace(void* object)
+  void DestroyAiPathSplineInPlace(
+    void* object
+  )
   {
     auto* const spline = static_cast<CAiPathSpline*>(object);
     if (spline) {
@@ -104,8 +110,9 @@ namespace
    * `deleteFunc_`, `ctorRefFunc_`, `dtrFunc_`) on one reflected type
    * descriptor and returns the same descriptor pointer.
    */
-  [[nodiscard]] CAiPathSplineTypeInfo*
-  ConfigureCAiPathSplineTypeInfoLifecycleCallbacks(CAiPathSplineTypeInfo* const typeInfo)
+  [[nodiscard]] CAiPathSplineTypeInfo* ConfigureCAiPathSplineTypeInfoLifecycleCallbacks(
+    CAiPathSplineTypeInfo* const typeInfo
+  )
   {
     if (typeInfo == nullptr) {
       return nullptr;
@@ -171,6 +178,12 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CAiPathSplineTypeInfo_62956f, moho::register_CAiPathSplineTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CAiPathSplineTypeInfo_62956f,
+  moho::register_CAiPathSplineTypeInfo
+)
 
-GPG_PREREGISTER_INIT(preregister_CAiPathSplineTypeInfo_62956f, preregister_CAiPathSplineTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_CAiPathSplineTypeInfo_62956f,
+  preregister_CAiPathSplineTypeInfo
+)

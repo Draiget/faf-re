@@ -97,4 +97,3 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitLoadUnits(gpg::RRef* outRef, moho::CUnitLoadUnits* value);
 } // namespace gpg
-

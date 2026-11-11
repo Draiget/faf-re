@@ -15,8 +15,13 @@ namespace faf::server
     // A `CLobby` message: its type, then its whole size in 16 bits (moho/net/CMessage.h), then the payload.
     constexpr std::size_t kMessageHeaderBytes = 3u;
 
-    /** A LEB128 uid at the start of `body`: its value and length, or false for none, one past 31 bits, or a long form. */
-    [[nodiscard]] bool ReadUid(const std::span<const std::uint8_t> body, std::uint32_t& uid, std::size_t& length) noexcept
+    /** A LEB128 uid at the start of `body`: its value and length, or false for none, one past 31 bits, or a long form.
+     */
+    [[nodiscard]] bool ReadUid(
+      const std::span<const std::uint8_t> body,
+      std::uint32_t& uid,
+      std::size_t& length
+    ) noexcept
     {
       std::uint64_t value = 0;
       for (std::size_t i = 0; i < body.size() && i < 5u; ++i) {
@@ -35,29 +40,41 @@ namespace faf::server
     }
   } // namespace
 
-  CLobbyRelay::CLobbyRelay(const SLobbyRelayLimits& limits)
+  CLobbyRelay::CLobbyRelay(
+    const SLobbyRelayLimits& limits
+  )
     : mLimits(limits)
   {}
 
-  void CLobbyRelay::AddParticipant(const std::int32_t uid)
+  void CLobbyRelay::AddParticipant(
+    const std::int32_t uid
+  )
   {
     // A new sender starts with a full bucket: joining sends a burst (`Join`, then the peers' hellos).
     mSenders.try_emplace(uid, SBucket{mLimits.burstBytes, mLimits.burstMessages, 0u});
   }
 
-  void CLobbyRelay::RemoveParticipant(const std::int32_t uid)
+  void CLobbyRelay::RemoveParticipant(
+    const std::int32_t uid
+  )
   {
     mSenders.erase(uid);
   }
 
-  bool CLobbyRelay::IsParticipant(const std::int32_t uid) const
+  bool CLobbyRelay::IsParticipant(
+    const std::int32_t uid
+  ) const
   {
     return mSenders.contains(uid);
   }
 
   ELobbyRelayVerdict CLobbyRelay::Take(
-    const std::int32_t from, const std::span<const std::uint8_t> body, const std::uint64_t nowUs, std::int32_t& to,
-    std::vector<std::uint8_t>& out, std::span<const std::uint8_t>& message
+    const std::int32_t from,
+    const std::span<const std::uint8_t> body,
+    const std::uint64_t nowUs,
+    std::int32_t& to,
+    std::vector<std::uint8_t>& out,
+    std::span<const std::uint8_t>& message
   )
   {
     const auto verdict = [this](const ELobbyRelayVerdict result) {
@@ -110,7 +127,10 @@ namespace faf::server
     // Plan WPR.49: what the relay reads of a `CLobby` message (type, 16-bit whole size, payload): its type.
     const std::uint8_t type = message[0];
     bool eject = false;
-    if (type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_Rejected) || type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_DeletePeer)) {
+    if (
+      type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_Rejected) ||
+      type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_DeletePeer)
+    ) {
       // Plan WP17.1: only a player-hosted lobby's current host ejects.
       if (mControl != ELobbyControl::Player || mHost == 0 || from != mHost) {
         return verdict(ELobbyRelayVerdict::EjectIgnored);
@@ -118,8 +138,8 @@ namespace faf::server
       eject = true;
     }
     std::span<const std::uint8_t> forwarded = message;
-    const bool script = type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_BroadcastScriptData)
-                        || type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_DirectScriptData);
+    const bool script = type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_BroadcastScriptData) ||
+      type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_DirectScriptData);
     if (mControl == ELobbyControl::Organiser && from != mHost && script && message.size() > kMessageHeaderBytes) {
       // Plan WP17.6: what the organiser set stays; a player chats, readies up and leaves.
       mPayload.assign(message.begin() + kMessageHeaderBytes, message.end());
@@ -129,21 +149,28 @@ namespace faf::server
       }
       if (limited == EPlayerScript::Rewritten) {
         const std::size_t size = kMessageHeaderBytes + mPayload.size();
-        mPayload.insert(mPayload.begin(), {type, static_cast<std::uint8_t>(size), static_cast<std::uint8_t>(size >> 8u)});
+        mPayload.insert(
+          mPayload.begin(), {type, static_cast<std::uint8_t>(size), static_cast<std::uint8_t>(size >> 8u)}
+        );
         forwarded = mPayload;
         ++mPlayerOptionsLimited;
       }
     }
-    if (mControl == ELobbyControl::Organiser && !mPinned.empty() && forwarded.data() == message.data() && message.size() > kMessageHeaderBytes
-        && (type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_BroadcastScriptData)
-            || type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_DirectScriptData))) {
+    if (
+      mControl == ELobbyControl::Organiser && !mPinned.empty() && forwarded.data() == message.data() &&
+      message.size() > kMessageHeaderBytes &&
+      (type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_BroadcastScriptData) ||
+       type == static_cast<std::uint8_t>(moho::ELobbyMsg::LOBMSG_DirectScriptData))
+    ) {
       mPayload.assign(message.begin() + kMessageHeaderBytes, message.end());
       if (PinGameOptions(mPayload, mPinned)) {
         const std::size_t size = kMessageHeaderBytes + mPayload.size();
         if (size > 0xFFFFu || size > mLimits.maxMessageBytes) {
           return verdict(ELobbyRelayVerdict::TooLarge);
         }
-        mPayload.insert(mPayload.begin(), {type, static_cast<std::uint8_t>(size), static_cast<std::uint8_t>(size >> 8u)});
+        mPayload.insert(
+          mPayload.begin(), {type, static_cast<std::uint8_t>(size), static_cast<std::uint8_t>(size >> 8u)}
+        );
         forwarded = mPayload;
         ++mOptionsPinned;
       }
@@ -163,7 +190,9 @@ namespace faf::server
         // false when the options change), so its message counts for the slot's owner.
         std::int32_t owner = from;
         if (from == mHost && facts.slot) {
-          const auto seated = std::find_if(mLobbySlots.begin(), mLobbySlots.end(), [&facts](const auto& entry) { return entry.second == *facts.slot; });
+          const auto seated = std::find_if(mLobbySlots.begin(), mLobbySlots.end(), [&facts](const auto& entry) {
+            return entry.second == *facts.slot;
+          });
           owner = seated == mLobbySlots.end() ? 0 : seated->first;
         }
         if (owner != 0) {
@@ -184,7 +213,9 @@ namespace faf::server
     return verdict(eject ? ELobbyRelayVerdict::EjectForwarded : ELobbyRelayVerdict::Forward);
   }
 
-  std::optional<ELobbyControl> ReadLobbyControl(const std::string_view text) noexcept
+  std::optional<ELobbyControl> ReadLobbyControl(
+    const std::string_view text
+  ) noexcept
   {
     if (text == "organiser") {
       return ELobbyControl::Organiser;
@@ -195,12 +226,17 @@ namespace faf::server
     return std::nullopt;
   }
 
-  std::vector<std::uint8_t> CLobbyRelay::FrameFromServer(const std::span<const std::uint8_t> message)
+  std::vector<std::uint8_t> CLobbyRelay::FrameFromServer(
+    const std::span<const std::uint8_t> message
+  )
   {
     return FrameFrom(0, message);
   }
 
-  std::vector<std::uint8_t> CLobbyRelay::FrameFrom(const std::int32_t from, const std::span<const std::uint8_t> message)
+  std::vector<std::uint8_t> CLobbyRelay::FrameFrom(
+    const std::int32_t from,
+    const std::span<const std::uint8_t> message
+  )
   {
     std::vector<std::uint8_t> out;
     remote::net::ByteWriter writer(out);

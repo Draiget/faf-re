@@ -6,6 +6,10 @@
 #include <cstdint>
 #include <cstdio>
 #include <fstream>
+#if !FAFRE_PLATFORM_WINDOWS
+#include <filesystem>
+#include <system_error>
+#endif
 
 #include <Windows.h>
 #include <psapi.h>
@@ -20,13 +24,19 @@
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/GpuPathSettings.h"
 
+#if FAFRE_PLATFORM_WINDOWS
 #pragma comment(lib, "psapi.lib")
+#endif
 
 namespace moho
 {
   namespace
   {
-    void AppendLine(std::string& text, const char* const format, ...)
+    void AppendLine(
+      std::string& text,
+      const char* const format,
+      ...
+    )
     {
       char line[512] = {};
       va_list args;
@@ -37,12 +47,16 @@ namespace moho
       text += '\n';
     }
 
-    [[nodiscard]] double Megabytes(const std::uint64_t bytes) noexcept
+    [[nodiscard]] double Megabytes(
+      const std::uint64_t bytes
+    ) noexcept
     {
       return static_cast<double>(bytes) / (1024.0 * 1024.0);
     }
 
-    [[nodiscard]] std::string GpuDrivenFeatureNames(const std::uint32_t features)
+    [[nodiscard]] std::string GpuDrivenFeatureNames(
+      const std::uint32_t features
+    )
     {
       std::string names;
       const auto add = [&](const std::uint32_t bit, const char* const name) {
@@ -60,10 +74,25 @@ namespace moho
     }
 
     /** Files and bytes directly in `directory`. */
-    void MeasureDirectory(const std::string& directory, std::uint32_t& files, std::uint64_t& bytes)
+    void MeasureDirectory(
+      const std::string& directory,
+      std::uint32_t& files,
+      std::uint64_t& bytes
+    )
     {
       files = 0U;
       bytes = 0U;
+#if !FAFRE_PLATFORM_WINDOWS
+      // The Linux client (issue #255).
+      std::error_code error;
+      for (const auto& entry : std::filesystem::directory_iterator(directory, error)) {
+        std::error_code entryError;
+        if (entry.is_regular_file(entryError)) {
+          ++files;
+          bytes += static_cast<std::uint64_t>(entry.file_size(entryError));
+        }
+      }
+#else
       WIN32_FIND_DATAA entry{};
       const HANDLE search = ::FindFirstFileA((directory + "\\*").c_str(), &entry);
       if (search == INVALID_HANDLE_VALUE) {
@@ -76,10 +105,13 @@ namespace moho
         }
       } while (::FindNextFileA(search, &entry) != FALSE);
       ::FindClose(search);
+#endif
     }
 
     /** Prints `text` to the console and the log, one line at a time. */
-    void PrintRuntimeInfo(const std::string& text)
+    void PrintRuntimeInfo(
+      const std::string& text
+    )
     {
       std::size_t begin = 0U;
       while (begin < text.size()) {
@@ -94,12 +126,16 @@ namespace moho
       }
     }
 
-    void RenInfo(const fa::vector<fa::string>&)
+    void RenInfo(
+      const fa::vector<fa::string>&
+    )
     {
       PrintRuntimeInfo(REN_FormatRuntimeInfo());
     }
 
-    void RenInfoDump(const fa::vector<fa::string>& args)
+    void RenInfoDump(
+      const fa::vector<fa::string>& args
+    )
     {
       if (args.size() < 2U) {
         CON_Printf("syntax: ren_InfoDump <file>");
@@ -120,7 +156,8 @@ namespace moho
       "Print the render backend, GPU, video memory, swap chain, last-frame statistics and memory use.",
       &RenInfo
     );
-    CConFunc gCConFunc_ren_InfoDump("ren_InfoDump", "Write the ren_Info block to a file: ren_InfoDump <file>.", &RenInfoDump);
+    CConFunc
+      gCConFunc_ren_InfoDump("ren_InfoDump", "Write the ren_Info block to a file: ren_InfoDump <file>.", &RenInfoDump);
   } // namespace
 
   std::string REN_FormatRuntimeInfo()
@@ -135,17 +172,27 @@ namespace moho
     } else {
       AppendLine(text, "  backend: %s, feature level %s", info.api.c_str(), info.featureLevel.c_str());
       AppendLine(
-        text, "  adapter: %s (vendor 0x%04X, device 0x%04X), driver %s", info.adapter.c_str(), info.vendorId, info.deviceId,
+        text,
+        "  adapter: %s (vendor 0x%04X, device 0x%04X), driver %s",
+        info.adapter.c_str(),
+        info.vendorId,
+        info.deviceId,
         info.driverVersion.empty() ? "unknown" : info.driverVersion.c_str()
       );
       AppendLine(
-        text, "  video memory: %.0f MB dedicated, %.0f MB shared", Megabytes(info.dedicatedVideoMemory),
+        text,
+        "  video memory: %.0f MB dedicated, %.0f MB shared",
+        Megabytes(info.dedicatedVideoMemory),
         Megabytes(info.sharedSystemMemory)
       );
       if (info.localBudget != 0U || info.nonLocalBudget != 0U) {
         AppendLine(
-          text, "  budget: local %.0f / %.0f MB used, non-local %.0f / %.0f MB used", Megabytes(info.localUsage),
-          Megabytes(info.localBudget), Megabytes(info.nonLocalUsage), Megabytes(info.nonLocalBudget)
+          text,
+          "  budget: local %.0f / %.0f MB used, non-local %.0f / %.0f MB used",
+          Megabytes(info.localUsage),
+          Megabytes(info.localBudget),
+          Megabytes(info.nonLocalUsage),
+          Megabytes(info.nonLocalBudget)
         );
       }
       if (info.availableTextureMemory != 0U) {
@@ -160,15 +207,21 @@ namespace moho
     const gpg::gal::RenderProfiler::Summary& summary = gpg::gal::RenderProfiler::Get().GetSummary();
     if (summary.frames != 0U) {
       AppendLine(
-        text, "  last frame: %.2f ms, %u draws, %u state changes, %.1f KB uploaded", summary.lastFrameWallMilliseconds,
-        summary.lastFrame.drawCalls, summary.lastFrame.stateChanges,
+        text,
+        "  last frame: %.2f ms, %u draws, %u state changes, %.1f KB uploaded",
+        summary.lastFrameWallMilliseconds,
+        summary.lastFrame.drawCalls,
+        summary.lastFrame.stateChanges,
         static_cast<double>(summary.lastFrame.uploadBytes) / 1024.0
       );
     }
     if (summary.intervalFrames != 0U) {
       AppendLine(
-        text, "  render profile (last %u frames): CPU %.2f ms, GPU %.2f ms per frame", summary.intervalFrames,
-        summary.intervalCpuMilliseconds, summary.intervalGpuMilliseconds
+        text,
+        "  render profile (last %u frames): CPU %.2f ms, GPU %.2f ms per frame",
+        summary.intervalFrames,
+        summary.intervalCpuMilliseconds,
+        summary.intervalGpuMilliseconds
       );
     } else {
       AppendLine(text, "  render profile: off (set FAF_GPU_PROFILE=<frames> for render CPU and GPU times)");
@@ -176,17 +229,27 @@ namespace moho
 
     PROCESS_MEMORY_COUNTERS_EX process{};
     process.cb = sizeof(process);
-    if (::GetProcessMemoryInfo(::GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&process), sizeof(process))) {
+    if (
+      ::GetProcessMemoryInfo(
+        ::GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&process), sizeof(process)
+      )
+    ) {
       AppendLine(
-        text, "  process: %.0f MB private, %.0f MB working set (peak %.0f MB)", Megabytes(process.PrivateUsage),
-        Megabytes(process.WorkingSetSize), Megabytes(process.PeakWorkingSetSize)
+        text,
+        "  process: %.0f MB private, %.0f MB working set (peak %.0f MB)",
+        Megabytes(process.PrivateUsage),
+        Megabytes(process.WorkingSetSize),
+        Megabytes(process.PeakWorkingSetSize)
       );
     }
     gpg::HeapStats heap{};
     gpg::GetHeapInfo(&heap);
     AppendLine(
-      text, "  engine heap: %.0f MB in use, %.0f MB committed, %.0f MB reserved", Megabytes(heap.inUse),
-      Megabytes(heap.committed), Megabytes(heap.reserved)
+      text,
+      "  engine heap: %.0f MB in use, %.0f MB committed, %.0f MB reserved",
+      Megabytes(heap.inUse),
+      Megabytes(heap.committed),
+      Megabytes(heap.reserved)
     );
 
     const fa::string cacheDirectory = USER_GetAppCacheDir();

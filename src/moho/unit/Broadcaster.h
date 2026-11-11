@@ -55,7 +55,9 @@ namespace moho
      * Moves `listener` to the back of this broadcaster's ring, unlinking it
      * from any ring it is on first.
      */
-    void AddListener(listener_type* const listener) noexcept
+    void AddListener(
+      listener_type* const listener
+    ) noexcept
     {
       mListeners.push_back(listener);
     }
@@ -117,7 +119,9 @@ namespace moho
      * a self-linked node; the binary emits both sequences, which is what pins
      * the source to this pair of calls rather than one splice.
      */
-    void BroadcastEvent(TEvent event)
+    void BroadcastEvent(
+      TEvent event
+    )
     {
       gpg::DList<listener_type> pending;
       mListeners.move_nodes_to(pending);

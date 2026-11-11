@@ -18,7 +18,8 @@
 // Code that must be checked everywhere (wire formats, file headers) cannot rely
 // on static_assert in this configuration; the retail-layout build still checks
 // it, and its layout carries no pointers or containers, so it is the same on all.
-#if defined(__cplusplus) && (defined(_M_X64) || defined(__x86_64__) || (defined(FAF_RETAIL_LAYOUT) && FAF_RETAIL_LAYOUT == 0))
+#if defined(__cplusplus) &&                                                                                            \
+  (defined(_M_X64) || defined(__x86_64__) || (defined(FAF_RETAIL_LAYOUT) && FAF_RETAIL_LAYOUT == 0))
 #define _ALLOW_KEYWORD_MACROS
 #define static_assert(...) static_assert(true, "x86 layout assert, not checked in this build")
 #endif

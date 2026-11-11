@@ -51,7 +51,10 @@ namespace
    * columns 1 and 2 as `(y + z) + x` (e.g. 0x00645AF5..0x00645B12 versus
    * 0x00645B0E..0x00645B31), so both groupings are kept.
    */
-  [[nodiscard]] moho::VAxes3 MultiplyAxesByTranspose(const moho::VAxes3& lhs, const moho::VAxes3& rhs) noexcept
+  [[nodiscard]] moho::VAxes3 MultiplyAxesByTranspose(
+    const moho::VAxes3& lhs,
+    const moho::VAxes3& rhs
+  ) noexcept
   {
     const auto firstColumn = [](const Wm3::Vector3f& row, const Wm3::Vector3f& column) noexcept {
       return ((row.x * column.x) + (row.y * column.y)) + (row.z * column.z);
@@ -73,7 +76,9 @@ namespace
    * What it does:
    * Upcasts one reflected reference lane to `moho::CSlaveManipulator*`.
    */
-  [[maybe_unused]] [[nodiscard]] void* TryUpcastCSlaveManipulatorRefObject(gpg::RRef* const sourceRef)
+  [[maybe_unused]] [[nodiscard]] void* TryUpcastCSlaveManipulatorRefObject(
+    gpg::RRef* const sourceRef
+  )
   {
     if (!sourceRef) {
       return nullptr;
@@ -150,7 +155,9 @@ namespace
    * Returns the cached metatable object used for `CSlaveManipulator` Lua
    * userdata.
    */
-  [[nodiscard]] LuaPlus::LuaObject func_CreateCSlaveManipulatorObject(LuaPlus::LuaState* const state)
+  [[nodiscard]] LuaPlus::LuaObject func_CreateCSlaveManipulatorObject(
+    LuaPlus::LuaState* const state
+  )
   {
     return moho::CScrLuaMetatableFactory<moho::CSlaveManipulator>::Instance().Get(state);
   }
@@ -163,7 +170,7 @@ namespace moho
 } // namespace moho
 
 /**
-  * Alias of FUN_10015880 (non-canonical helper lane).
+ * Alias of FUN_10015880 (non-canonical helper lane).
  *
  * What it does:
  * Stores one metatable-factory index used by `CScrLuaObjectFactory::Get`.
@@ -179,12 +186,15 @@ moho::CScrLuaMetatableFactory<moho::CSlaveManipulator>::Instance()
 }
 
 /**
- * Address: 0x00646610 (FUN_00646610, ?Create@?$CScrLuaMetatableFactory@VCSlaveManipulator@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
+ * Address: 0x00646610 (FUN_00646610,
+ * ?Create@?$CScrLuaMetatableFactory@VCSlaveManipulator@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
  *
  * What it does:
  * Creates the default metatable used by `CSlaveManipulator` Lua userdata.
  */
-LuaPlus::LuaObject moho::CScrLuaMetatableFactory<moho::CSlaveManipulator>::Create(LuaPlus::LuaState* const state)
+LuaPlus::LuaObject moho::CScrLuaMetatableFactory<moho::CSlaveManipulator>::Create(
+  LuaPlus::LuaState* const state
+)
 {
   return SCR_CreateSimpleMetatable(state);
 }
@@ -239,7 +249,9 @@ moho::CSlaveManipulator::CSlaveManipulator(
  * Loads `IAniManipulator` base state, then source-bone index, current
  * rotation quaternion, and max-rate fields.
  */
-void moho::CSlaveManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
+void moho::CSlaveManipulator::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -259,7 +271,9 @@ void moho::CSlaveManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
  * Saves `IAniManipulator` base state, then source-bone index, current
  * rotation quaternion, and max-rate fields.
  */
-void moho::CSlaveManipulator::MemberSerialize(gpg::WriteArchive* const archive) const
+void moho::CSlaveManipulator::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (!archive) {
     return;
@@ -317,19 +331,17 @@ bool moho::CSlaveManipulator::ManipulatorUpdate()
   if (mMaxRate >= 0.0f) {
     Wm3::Quaternionf steppedRotation{};
     (void)moho::BlendOrientationDeltaByMaxAngle(
-      targetRotation,
-      mCurrentRotation,
-      mMaxRate,
-      &reachedTarget,
-      &steppedRotation
+      targetRotation, mCurrentRotation, mMaxRate, &reachedTarget, &steppedRotation
     );
     mCurrentRotation = steppedRotation;
   } else {
     mCurrentRotation = targetRotation;
   }
 
-  if (CAniPoseBone* const destinationBone = moho::ResolvePoseBone(mOwnerActor->mPose.get(), watchedBinding->mBoneIndex);
-      destinationBone != nullptr) {
+  if (
+    CAniPoseBone* const destinationBone = moho::ResolvePoseBone(mOwnerActor->mPose.get(), watchedBinding->mBoneIndex);
+    destinationBone != nullptr
+  ) {
     destinationBone->Rotate(mCurrentRotation);
   }
   EventSetSignaled(reachedTarget);
@@ -342,7 +354,9 @@ bool moho::CSlaveManipulator::ManipulatorUpdate()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_CreateSlaverL`.
  */
-int moho::cfunc_CreateSlaver(lua_State* const luaContext)
+int moho::cfunc_CreateSlaver(
+  lua_State* const luaContext
+)
 {
   return cfunc_CreateSlaverL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -354,7 +368,9 @@ int moho::cfunc_CreateSlaver(lua_State* const luaContext)
  * Reads `(unit, dest_bone, src_bone)`, constructs one slave manipulator, and
  * returns it to Lua.
  */
-int moho::cfunc_CreateSlaverL(LuaPlus::LuaState* const state)
+int moho::cfunc_CreateSlaverL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 3, kCreateSlaverHelpText);
 
@@ -405,7 +421,9 @@ moho::CScrLuaInitForm* moho::func_CreateSlaver_LuaFuncDef()
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CSlaveManipulatorSetMaxRateL`.
  */
-int moho::cfunc_CSlaveManipulatorSetMaxRate(lua_State* const luaContext)
+int moho::cfunc_CSlaveManipulatorSetMaxRate(
+  lua_State* const luaContext
+)
 {
   return cfunc_CSlaveManipulatorSetMaxRateL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -437,7 +455,9 @@ moho::CScrLuaInitForm* moho::func_CSlaveManipulatorSetMaxRate_LuaFuncDef()
  * Resolves one `CSlaveManipulator`, converts degrees/second to radians, and
  * updates the manipulator max-rate lane.
  */
-int moho::cfunc_CSlaveManipulatorSetMaxRateL(LuaPlus::LuaState* const state)
+int moho::cfunc_CSlaveManipulatorSetMaxRateL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kSetMaxRateHelpText);
@@ -483,7 +503,9 @@ gpg::RRef moho::CSlaveManipulatorTypeInfo::NewRef()
  * Constructs one detached `CSlaveManipulator` in caller-owned storage and
  * returns its typed reflection reference.
  */
-gpg::RRef moho::CSlaveManipulatorTypeInfo::CtrRef(void* const objectStorage)
+gpg::RRef moho::CSlaveManipulatorTypeInfo::CtrRef(
+  void* const objectStorage
+)
 {
   CSlaveManipulator* object = nullptr;
   if (objectStorage) {
@@ -501,7 +523,9 @@ gpg::RRef moho::CSlaveManipulatorTypeInfo::CtrRef(void* const objectStorage)
  * What it does:
  * Deletes one heap-owned `CSlaveManipulator`.
  */
-void moho::CSlaveManipulatorTypeInfo::Delete(void* const objectStorage)
+void moho::CSlaveManipulatorTypeInfo::Delete(
+  void* const objectStorage
+)
 {
   delete static_cast<CSlaveManipulator*>(objectStorage);
 }
@@ -512,7 +536,9 @@ void moho::CSlaveManipulatorTypeInfo::Delete(void* const objectStorage)
  * What it does:
  * Runs non-deleting in-place destructor logic for `CSlaveManipulator`.
  */
-void moho::CSlaveManipulatorTypeInfo::Destruct(void* const objectStorage)
+void moho::CSlaveManipulatorTypeInfo::Destruct(
+  void* const objectStorage
+)
 {
   if (!objectStorage) {
     return;
@@ -527,7 +553,9 @@ void moho::CSlaveManipulatorTypeInfo::Destruct(void* const objectStorage)
  * What it does:
  * Registers `IAniManipulator` as reflected base at offset `0`.
  */
-void moho::CSlaveManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const typeInfo)
+void moho::CSlaveManipulatorTypeInfo::AddBase_IAniManipulator(
+  gpg::RType* const typeInfo
+)
 {
   if (!typeInfo) {
     return;
@@ -551,8 +579,9 @@ void moho::CSlaveManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const 
  * What it does:
  * Installs allocation and placement-construction callback lanes.
  */
-moho::CSlaveManipulatorTypeInfo*
-moho::CSlaveManipulatorTypeInfo::ConfigureCtorCallbacks(CSlaveManipulatorTypeInfo* const typeInfo)
+moho::CSlaveManipulatorTypeInfo* moho::CSlaveManipulatorTypeInfo::ConfigureCtorCallbacks(
+  CSlaveManipulatorTypeInfo* const typeInfo
+)
 {
   typeInfo->newRefFunc_ = &CSlaveManipulatorTypeInfo::NewRef;
   typeInfo->ctorRefFunc_ = &CSlaveManipulatorTypeInfo::CtrRef;
@@ -565,8 +594,9 @@ moho::CSlaveManipulatorTypeInfo::ConfigureCtorCallbacks(CSlaveManipulatorTypeInf
  * What it does:
  * Installs deletion and in-place destruction callback lanes.
  */
-moho::CSlaveManipulatorTypeInfo*
-moho::CSlaveManipulatorTypeInfo::ConfigureDtorCallbacks(CSlaveManipulatorTypeInfo* const typeInfo)
+moho::CSlaveManipulatorTypeInfo* moho::CSlaveManipulatorTypeInfo::ConfigureDtorCallbacks(
+  CSlaveManipulatorTypeInfo* const typeInfo
+)
 {
   typeInfo->deleteFunc_ = &CSlaveManipulatorTypeInfo::Delete;
   typeInfo->dtrFunc_ = &CSlaveManipulatorTypeInfo::Destruct;
@@ -579,8 +609,9 @@ moho::CSlaveManipulatorTypeInfo::ConfigureDtorCallbacks(CSlaveManipulatorTypeInf
  * What it does:
  * Installs all reflection lifecycle callbacks on one type-info instance.
  */
-moho::CSlaveManipulatorTypeInfo*
-moho::CSlaveManipulatorTypeInfo::ConfigureLifecycleCallbacks(CSlaveManipulatorTypeInfo* const typeInfo)
+moho::CSlaveManipulatorTypeInfo* moho::CSlaveManipulatorTypeInfo::ConfigureLifecycleCallbacks(
+  CSlaveManipulatorTypeInfo* const typeInfo
+)
 {
   ConfigureCtorCallbacks(typeInfo);
   ConfigureDtorCallbacks(typeInfo);
@@ -623,18 +654,26 @@ namespace gpg
    * Builds one typed reflection reference for `moho::CSlaveManipulator*`,
    * preserving dynamic-derived ownership and base-offset adjustment.
    */
-  gpg::RRef* RRef_CSlaveManipulator(gpg::RRef* const outRef, moho::CSlaveManipulator* const value)
+  gpg::RRef* RRef_CSlaveManipulator(
+    gpg::RRef* const outRef,
+    moho::CSlaveManipulator* const value
+  )
   {
     return gpg::WriteDerivedRef(outRef, value);
   }
 } // namespace gpg
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CSlaveManipulatorTypeInfoStartup_28b2e3, register_CSlaveManipulatorTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CSlaveManipulatorTypeInfoStartup_28b2e3,
+  register_CSlaveManipulatorTypeInfoStartup
+)
 
-GPG_PREREGISTER_INIT(preregister_CSlaveManipulatorTypeInfo_28b2e3, preregister_CSlaveManipulatorTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_CSlaveManipulatorTypeInfo_28b2e3,
+  preregister_CSlaveManipulatorTypeInfo
+)
 
 namespace
 {

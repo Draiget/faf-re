@@ -4,14 +4,19 @@ namespace faf_lua_tests
 {
   namespace
   {
-    std::string TopMessage(lua_State* const L)
+    std::string TopMessage(
+      lua_State* const L
+    )
     {
       const char* const text = lua_tostring(L, -1);
       return text != nullptr ? std::string(text, lua_strlen(L, -1)) : std::string("(non-string error value)");
     }
   } // namespace
 
-  int LuaFixture::Load(const std::string& source, std::string* const message)
+  int LuaFixture::Load(
+    const std::string& source,
+    std::string* const message
+  )
   {
     lua_State* const lua = L();
     const int top = lua_gettop(lua);
@@ -23,7 +28,9 @@ namespace faf_lua_tests
     return status;
   }
 
-  LuaPlus::LuaObject LuaFixture::Run(const std::string& source)
+  LuaPlus::LuaObject LuaFixture::Run(
+    const std::string& source
+  )
   {
     lua_State* const lua = L();
     const int top = lua_gettop(lua);
@@ -42,7 +49,9 @@ namespace faf_lua_tests
     return result;
   }
 
-  std::string LuaFixture::Str(const std::string& source)
+  std::string LuaFixture::Str(
+    const std::string& source
+  )
   {
     const LuaPlus::LuaObject result = Run(source);
     if (!result.IsString()) {
@@ -53,7 +62,9 @@ namespace faf_lua_tests
     return std::string(text->str, text->len);
   }
 
-  double LuaFixture::Num(const std::string& source)
+  double LuaFixture::Num(
+    const std::string& source
+  )
   {
     const LuaPlus::LuaObject result = Run(source);
     if (!result.IsNumber()) {
@@ -63,7 +74,9 @@ namespace faf_lua_tests
     return result.GetNumber();
   }
 
-  bool LuaFixture::Bool(const std::string& source)
+  bool LuaFixture::Bool(
+    const std::string& source
+  )
   {
     const LuaPlus::LuaObject result = Run(source);
     if (!result.IsBoolean()) {
@@ -73,7 +86,9 @@ namespace faf_lua_tests
     return result.GetBoolean();
   }
 
-  std::string LuaFixture::ErrorOf(const std::string& source)
+  std::string LuaFixture::ErrorOf(
+    const std::string& source
+  )
   {
     lua_State* const lua = L();
     const int top = lua_gettop(lua);

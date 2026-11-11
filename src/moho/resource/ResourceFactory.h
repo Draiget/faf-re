@@ -46,7 +46,10 @@ namespace moho
      * prefetch thread already produced `prefetchData`.
      */
     virtual boost::shared_ptr<void> LoadFrom(
-      gpg::StrArg path, const gpg::RType* type, boost::shared_ptr<void> prefetchData, const gpg::RType* prefetchType
+      gpg::StrArg path,
+      const gpg::RType* type,
+      boost::shared_ptr<void> prefetchData,
+      const gpg::RType* prefetchType
     ) = 0;
 
     /** What `Load` produces; the manager's registration key (factory +0x04). */
@@ -115,7 +118,10 @@ namespace moho
      * Address: 0x005397F0 (FUN_005397F0, Moho::ResourceFactory_RScmResource::Load)
      * Address: 0x0053AE00 (FUN_0053AE00, Moho::ResourceFactory_RScaResource::Load)
      */
-    boost::shared_ptr<void> Load(const gpg::StrArg path, const gpg::RType*) override
+    boost::shared_ptr<void> Load(
+      const gpg::StrArg path,
+      const gpg::RType*
+    ) override
     {
       return LoadImpl(path);
     }
@@ -125,7 +131,10 @@ namespace moho
      * Address: 0x005398A0 (FUN_005398A0, Moho::ResourceFactory_RScmResource::Preload)
      * Address: 0x0053AEB0 (FUN_0053AEB0, Moho::ResourceFactory_RScaResource::Preload)
      */
-    boost::shared_ptr<void> Preload(const gpg::StrArg path, const gpg::RType*) override
+    boost::shared_ptr<void> Preload(
+      const gpg::StrArg path,
+      const gpg::RType*
+    ) override
     {
       return PreloadImpl(path);
     }
@@ -136,7 +145,10 @@ namespace moho
      * Address: 0x0053AF60 (FUN_0053AF60, Moho::ResourceFactory_RScaResource::LoadFrom)
      */
     boost::shared_ptr<void> LoadFrom(
-      const gpg::StrArg path, const gpg::RType*, const boost::shared_ptr<void> prefetchData, const gpg::RType*
+      const gpg::StrArg path,
+      const gpg::RType*,
+      const boost::shared_ptr<void> prefetchData,
+      const gpg::RType*
     ) override
     {
       return LoadFromImpl(path, boost::static_pointer_cast<T>(prefetchData));
@@ -150,7 +162,9 @@ namespace moho
      * Address: 0x00539730 (FUN_00539730, Moho::ResourceFactory_RScmResource::PreloadImpl)
      * Address: 0x0053AD40 (FUN_0053AD40, Moho::ResourceFactory_RScaResource::PreloadImpl)
      */
-    virtual boost::shared_ptr<T> PreloadImpl(const gpg::StrArg path)
+    virtual boost::shared_ptr<T> PreloadImpl(
+      const gpg::StrArg path
+    )
     {
       return LoadImpl(path);
     }
@@ -160,7 +174,10 @@ namespace moho
      * Address: 0x00539760 (FUN_00539760, Moho::ResourceFactory_RScmResource::LoadFromImpl)
      * Address: 0x0053AD70 (FUN_0053AD70, Moho::ResourceFactory_RScaResource::LoadFromImpl)
      */
-    virtual boost::shared_ptr<T> LoadFromImpl(gpg::StrArg, const boost::shared_ptr<T> prefetchData)
+    virtual boost::shared_ptr<T> LoadFromImpl(
+      gpg::StrArg,
+      const boost::shared_ptr<T> prefetchData
+    )
     {
       return prefetchData;
     }
@@ -192,7 +209,10 @@ namespace moho
     /**
      * Address: 0x00443530 (FUN_00443530, Moho::ResourceFactoryPreload_RD3DTextureResource::Load)
      */
-    boost::shared_ptr<void> Load(const gpg::StrArg path, const gpg::RType*) override
+    boost::shared_ptr<void> Load(
+      const gpg::StrArg path,
+      const gpg::RType*
+    ) override
     {
       return LoadImpl(path);
     }
@@ -200,7 +220,10 @@ namespace moho
     /**
      * Address: 0x004435E0 (FUN_004435E0, Moho::ResourceFactoryPreload_RD3DTextureResource::Preload)
      */
-    boost::shared_ptr<void> Preload(const gpg::StrArg path, const gpg::RType*) override
+    boost::shared_ptr<void> Preload(
+      const gpg::StrArg path,
+      const gpg::RType*
+    ) override
     {
       return PreloadImpl(path);
     }
@@ -209,7 +232,10 @@ namespace moho
      * Address: 0x00443690 (FUN_00443690, Moho::ResourceFactoryPreload_RD3DTextureResource::LoadFrom)
      */
     boost::shared_ptr<void> LoadFrom(
-      const gpg::StrArg path, const gpg::RType*, const boost::shared_ptr<void> prefetchData, const gpg::RType*
+      const gpg::StrArg path,
+      const gpg::RType*,
+      const boost::shared_ptr<void> prefetchData,
+      const gpg::RType*
     ) override
     {
       return LoadFromImpl(path, boost::static_pointer_cast<P>(prefetchData));

@@ -17,13 +17,13 @@ namespace moho
 {
   class ID3DTextureSheet;
   class IWldTerrainRes;
-}
+} // namespace moho
 
 namespace gpg
 {
   class BinaryReader;
   class BinaryWriter;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -43,8 +43,10 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x0089D190 (FUN_0089D190, ?LookupDecalType@CWldTerrainDecal@Moho@@SA?AW4TYPE@12@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
-     * Mangled: ?LookupDecalType@CWldTerrainDecal@Moho@@SA?AW4TYPE@12@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z
+     * Address: 0x0089D190 (FUN_0089D190,
+     * ?LookupDecalType@CWldTerrainDecal@Moho@@SA?AW4TYPE@12@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
+     * Mangled:
+     * ?LookupDecalType@CWldTerrainDecal@Moho@@SA?AW4TYPE@12@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z
      *
      * What it does:
      * Resolves one decal type enum from the static decal-type descriptor table
@@ -155,11 +157,7 @@ namespace moho
      * What it does:
      * Stores orientation/position/scale lanes in one pass, then refreshes decal state.
      */
-    void SetParameters(
-      const Wm3::Vec3f& orientation,
-      const Wm3::Vec3f& position,
-      const Wm3::Vec3f& scale
-    );
+    void SetParameters(const Wm3::Vec3f& orientation, const Wm3::Vec3f& position, const Wm3::Vec3f& scale);
 
     /**
      * Address: 0x0089D3E0 (FUN_0089D3E0, ?SetNearCutoffLOD@CWldTerrainDecal@Moho@@QAEXM@Z)
@@ -187,8 +185,7 @@ namespace moho
      * `(frameSeed + phaseOffset) * mFadeDistance * 0.1 + mUnknown94`, and
      * returns one retained texture-sheet handle.
      */
-    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet>
-      GetTexture(int slot, float phaseOffset, int frameSeed) const;
+    [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetTexture(int slot, float phaseOffset, int frameSeed) const;
 
     /**
      * Address: 0x0089D9C0 (Moho::CWldTerrainDecal::ComputeCorner)
@@ -305,45 +302,45 @@ namespace moho
 
   public:
     // +0x04 is the `WeakObject` base's `weakLinkHead_`.
-    IWldTerrainRes* mTerrainRes;               // +0x08
-    SpatialDBEntry<CWldTerrainDecal> mEntry;   // +0x0C
-    std::uint32_t mVecIndex;                   // +0x14
-    std::int32_t mIndex;                       // +0x18
-    EWldTerrainDecalType mType;                // +0x1C
+    IWldTerrainRes* mTerrainRes;             // +0x08
+    SpatialDBEntry<CWldTerrainDecal> mEntry; // +0x0C
+    std::uint32_t mVecIndex;                 // +0x14
+    std::int32_t mIndex;                     // +0x18
+    EWldTerrainDecalType mType;              // +0x1C
     /// Graphics-fidelity band this decal belongs to. A full dword, not a flag:
     /// the constructor stores `1` with `mov dword ptr [edi+20h], 1` (0x0089CABB)
     /// and `CDecalManager::AddDecals` copies `SDecalInfo::mFidelity` into it
     /// with a dword move (0x00878822), whose default is likewise 1.
-    std::int32_t mFidelity;                    // +0x20
-    fa::string mNames[2];                   // +0x24
-    Wm3::Vec3f mScale;                         // +0x5C
-    Wm3::Vec3f mPosition;                      // +0x68
-    Wm3::Vec3f mOrientation;                   // +0x74
-    float mCutoffLOD;                          // +0x80
-    float mNearCutoff;                         // +0x84
-    std::int32_t mRemoveTick;                  // +0x88
-    float mCurrentAlpha;                       // +0x8C
-    float mFadeDistance;                       // +0x90
-    float mUnknown94;                          // +0x94
-    std::int32_t mDecalHandle;               // +0x98
+    std::int32_t mFidelity;    // +0x20
+    fa::string mNames[2];      // +0x24
+    Wm3::Vec3f mScale;         // +0x5C
+    Wm3::Vec3f mPosition;      // +0x68
+    Wm3::Vec3f mOrientation;   // +0x74
+    float mCutoffLOD;          // +0x80
+    float mNearCutoff;         // +0x84
+    std::int32_t mRemoveTick;  // +0x88
+    float mCurrentAlpha;       // +0x8C
+    float mFadeDistance;       // +0x90
+    float mUnknown94;          // +0x94
+    std::int32_t mDecalHandle; // +0x98
     /// Owning army, or -1 for a decal that came off the map rather than out of
     /// the sim. `CDecalManager::AddDecals` copies `SDecalInfo::mArmy` here
     /// (0x0087899B), and the constructor seeds -1 (0x0089CB5D).
-    std::int32_t mArmy;                        // +0x9C
-    std::uint8_t mUnknownA0;                   // +0xA0
-    std::uint8_t mPadA1_A3[0x03];              // +0xA1
+    std::int32_t mArmy;                         // +0x9C
+    std::uint8_t mUnknownA0;                    // +0xA0
+    std::uint8_t mPadA1_A3[0x03];               // +0xA1
     CountedPtr<CountedObject> mResourceRefs[2]; // +0xA4
-    VMatrix4 mTexMatrix;                       // +0xAC
-    VMatrix4 mTangentMatrix;                   // +0xEC
-    float mBoundsMinX;                         // +0x12C
-    float mBoundsMinZ;                         // +0x130
-    float mBoundsMaxX;                         // +0x134
-    float mBoundsMaxZ;                         // +0x138
-    std::uint8_t mFlatOptimizationEnabled;     // +0x13C
-    std::uint8_t mFlatnessCacheValid;          // +0x13D
-    std::uint8_t mCachedFlatResult;            // +0x13E
-    std::uint8_t mPad13F;                      // +0x13F
-    Quad mCachedFlatQuad;                      // +0x140
+    VMatrix4 mTexMatrix;                        // +0xAC
+    VMatrix4 mTangentMatrix;                    // +0xEC
+    float mBoundsMinX;                          // +0x12C
+    float mBoundsMinZ;                          // +0x130
+    float mBoundsMaxX;                          // +0x134
+    float mBoundsMaxZ;                          // +0x138
+    std::uint8_t mFlatOptimizationEnabled;      // +0x13C
+    std::uint8_t mFlatnessCacheValid;           // +0x13D
+    std::uint8_t mCachedFlatResult;             // +0x13E
+    std::uint8_t mPad13F;                       // +0x13F
+    Quad mCachedFlatQuad;                       // +0x140
   };
 
   static_assert(offsetof(CWldTerrainDecal, mTerrainRes) == 0x08, "CWldTerrainDecal::mTerrainRes offset must be 0x08");
@@ -360,34 +357,30 @@ namespace moho
   static_assert(offsetof(CWldTerrainDecal, mNearCutoff) == 0x84, "CWldTerrainDecal::mNearCutoff offset must be 0x84");
   static_assert(offsetof(CWldTerrainDecal, mRemoveTick) == 0x88, "CWldTerrainDecal::mRemoveTick offset must be 0x88");
   static_assert(
-    offsetof(CWldTerrainDecal, mCurrentAlpha) == 0x8C, "CWldTerrainDecal::mCurrentAlpha offset must be 0x8C"
+    offsetof(CWldTerrainDecal, mCurrentAlpha) == 0x8C,
+    "CWldTerrainDecal::mCurrentAlpha offset must be 0x8C"
   );
-  static_assert(offsetof(CWldTerrainDecal, mFadeDistance) == 0x90, "CWldTerrainDecal::mFadeDistance offset must be 0x90");
+  static_assert(
+    offsetof(CWldTerrainDecal, mFadeDistance) == 0x90,
+    "CWldTerrainDecal::mFadeDistance offset must be 0x90"
+  );
   static_assert(offsetof(CWldTerrainDecal, mUnknown94) == 0x94, "CWldTerrainDecal::mUnknown94 offset must be 0x94");
   static_assert(offsetof(CWldTerrainDecal, mDecalHandle) == 0x98, "CWldTerrainDecal::mDecalHandle offset must be 0x98");
   static_assert(offsetof(CWldTerrainDecal, mArmy) == 0x9C, "CWldTerrainDecal::mArmy offset must be 0x9C");
   static_assert(offsetof(CWldTerrainDecal, mUnknownA0) == 0xA0, "CWldTerrainDecal::mUnknownA0 offset must be 0xA0");
-  static_assert(offsetof(CWldTerrainDecal, mResourceRefs) == 0xA4, "CWldTerrainDecal::mResourceRefs offset must be 0xA4");
+  static_assert(
+    offsetof(CWldTerrainDecal, mResourceRefs) == 0xA4,
+    "CWldTerrainDecal::mResourceRefs offset must be 0xA4"
+  );
   static_assert(offsetof(CWldTerrainDecal, mTexMatrix) == 0xAC, "CWldTerrainDecal::mTexMatrix offset must be 0xAC");
   static_assert(
-    offsetof(CWldTerrainDecal, mTangentMatrix) == 0xEC, "CWldTerrainDecal::mTangentMatrix offset must be 0xEC"
+    offsetof(CWldTerrainDecal, mTangentMatrix) == 0xEC,
+    "CWldTerrainDecal::mTangentMatrix offset must be 0xEC"
   );
-  static_assert(
-    offsetof(CWldTerrainDecal, mBoundsMinX) == 0x12C,
-    "CWldTerrainDecal::mBoundsMinX offset must be 0x12C"
-  );
-  static_assert(
-    offsetof(CWldTerrainDecal, mBoundsMinZ) == 0x130,
-    "CWldTerrainDecal::mBoundsMinZ offset must be 0x130"
-  );
-  static_assert(
-    offsetof(CWldTerrainDecal, mBoundsMaxX) == 0x134,
-    "CWldTerrainDecal::mBoundsMaxX offset must be 0x134"
-  );
-  static_assert(
-    offsetof(CWldTerrainDecal, mBoundsMaxZ) == 0x138,
-    "CWldTerrainDecal::mBoundsMaxZ offset must be 0x138"
-  );
+  static_assert(offsetof(CWldTerrainDecal, mBoundsMinX) == 0x12C, "CWldTerrainDecal::mBoundsMinX offset must be 0x12C");
+  static_assert(offsetof(CWldTerrainDecal, mBoundsMinZ) == 0x130, "CWldTerrainDecal::mBoundsMinZ offset must be 0x130");
+  static_assert(offsetof(CWldTerrainDecal, mBoundsMaxX) == 0x134, "CWldTerrainDecal::mBoundsMaxX offset must be 0x134");
+  static_assert(offsetof(CWldTerrainDecal, mBoundsMaxZ) == 0x138, "CWldTerrainDecal::mBoundsMaxZ offset must be 0x138");
   static_assert(
     offsetof(CWldTerrainDecal, mFlatOptimizationEnabled) == 0x13C,
     "CWldTerrainDecal::mFlatOptimizationEnabled offset must be 0x13C"
@@ -409,4 +402,3 @@ namespace moho
   static_assert(sizeof(CountedPtr<CountedObject>) == 0x04, "CountedPtr<CountedObject> size must be 0x04");
   static_assert(sizeof(CWldTerrainDecal) == 0x170, "CWldTerrainDecal size must be 0x170");
 } // namespace moho
-

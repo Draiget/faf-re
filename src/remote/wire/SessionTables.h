@@ -81,11 +81,17 @@ namespace faf::remote::wire
     /** The name table id of `name`, as `Sound`. */
     [[nodiscard]] std::uint32_t Name(std::string_view name);
     /** Tells this session from any other (for a thread's own caches of its ids). */
-    [[nodiscard]] std::uint64_t Serial() const noexcept { return mSerial; }
+    [[nodiscard]] std::uint64_t Serial() const noexcept
+    {
+      return mSerial;
+    }
     /** Queues a deposit the sim added (false past `kMaxDeposits`, which the client would refuse). */
     bool Deposit(const SDeposit& deposit);
     /** Deposits queued or written so far: the sim's deposits from this index on are new. */
-    [[nodiscard]] std::size_t DepositCount() const noexcept { return mDepositCount; }
+    [[nodiscard]] std::size_t DepositCount() const noexcept
+    {
+      return mDepositCount;
+    }
     /** Queues a terrain edit (false when it is too large or too many are queued). */
     bool TerrainEdit(STerrainEdit edit);
 
@@ -118,10 +124,19 @@ namespace faf::remote::wire
     /** Reads one record; false (with whatever was read kept) when it is malformed. */
     [[nodiscard]] bool Read(BitReader& reader);
 
-    [[nodiscard]] const CSoundTableReader& Sounds() const noexcept { return mSounds; }
-    [[nodiscard]] const CNameTableReader& Names() const noexcept { return mNames; }
+    [[nodiscard]] const CSoundTableReader& Sounds() const noexcept
+    {
+      return mSounds;
+    }
+    [[nodiscard]] const CNameTableReader& Names() const noexcept
+    {
+      return mNames;
+    }
     /** Every deposit read so far, in the sim's order. */
-    [[nodiscard]] const std::vector<SDeposit>& Deposits() const noexcept { return mDeposits; }
+    [[nodiscard]] const std::vector<SDeposit>& Deposits() const noexcept
+    {
+      return mDeposits;
+    }
     /** The terrain edits read since the last call, in order (the client applies each once). */
     [[nodiscard]] std::vector<STerrainEdit> TakeTerrainEdits() noexcept
     {

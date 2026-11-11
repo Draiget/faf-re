@@ -45,11 +45,11 @@ namespace moho
 #endif
 
 #if MOHO_SIM_AFFINITY_CHECKS
-#define MOHO_ASSERT_NOT_SIM_WORKER(what)                                                                           \
-  do {                                                                                                             \
-    if (::moho::IsSimWorkerThread()) {                                                                             \
-      ::gpg::HandleAssertFailure("sim worker thread touched owner-thread-only state: " what, __LINE__, __FILE__); \
-    }                                                                                                              \
+#define MOHO_ASSERT_NOT_SIM_WORKER(what)                                                                               \
+  do {                                                                                                                 \
+    if (::moho::IsSimWorkerThread()) {                                                                                 \
+      ::gpg::HandleAssertFailure("sim worker thread touched owner-thread-only state: " what, __LINE__, __FILE__);      \
+    }                                                                                                                  \
   } while (false)
 #else
 #define MOHO_ASSERT_NOT_SIM_WORKER(what) ((void)0)

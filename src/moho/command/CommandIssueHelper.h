@@ -53,7 +53,7 @@ namespace moho
   {
     CmdId mCmdId;                           // +0x00: the sim beat the edit is due on
     ECommandIssueEvent mType;               // +0x04
-    WeakSet<UserUnit> mUnits;             // +0x08: SelectUnit / DeselectUnit
+    WeakSet<UserUnit> mUnits;               // +0x08: SelectUnit / DeselectUnit
     std::int32_t mCount;                    // +0x14: IncreaseCount / DecreaseCount
     UserTarget mTarget;                     // +0x18: SetTarget
     EUnitCommandType mCommandType;          // +0x30: SetCommandType
@@ -76,14 +76,30 @@ namespace moho
     UserCommandIssueLocalEvent(CmdId cmdId, ECommandIssueEvent type);
   };
 
-  static_assert(offsetof(UserCommandIssueLocalEvent, mType) == 0x04, "UserCommandIssueLocalEvent::mType offset must be 0x04");
-  static_assert(offsetof(UserCommandIssueLocalEvent, mUnits) == 0x08, "UserCommandIssueLocalEvent::mUnits offset must be 0x08");
-  static_assert(offsetof(UserCommandIssueLocalEvent, mCount) == 0x14, "UserCommandIssueLocalEvent::mCount offset must be 0x14");
-  static_assert(offsetof(UserCommandIssueLocalEvent, mTarget) == 0x18, "UserCommandIssueLocalEvent::mTarget offset must be 0x18");
   static_assert(
-    offsetof(UserCommandIssueLocalEvent, mCommandType) == 0x30, "UserCommandIssueLocalEvent::mCommandType offset must be 0x30"
+    offsetof(UserCommandIssueLocalEvent, mType) == 0x04,
+    "UserCommandIssueLocalEvent::mType offset must be 0x04"
   );
-  static_assert(offsetof(UserCommandIssueLocalEvent, mCells) == 0x38, "UserCommandIssueLocalEvent::mCells offset must be 0x38");
+  static_assert(
+    offsetof(UserCommandIssueLocalEvent, mUnits) == 0x08,
+    "UserCommandIssueLocalEvent::mUnits offset must be 0x08"
+  );
+  static_assert(
+    offsetof(UserCommandIssueLocalEvent, mCount) == 0x14,
+    "UserCommandIssueLocalEvent::mCount offset must be 0x14"
+  );
+  static_assert(
+    offsetof(UserCommandIssueLocalEvent, mTarget) == 0x18,
+    "UserCommandIssueLocalEvent::mTarget offset must be 0x18"
+  );
+  static_assert(
+    offsetof(UserCommandIssueLocalEvent, mCommandType) == 0x30,
+    "UserCommandIssueLocalEvent::mCommandType offset must be 0x30"
+  );
+  static_assert(
+    offsetof(UserCommandIssueLocalEvent, mCells) == 0x38,
+    "UserCommandIssueLocalEvent::mCells offset must be 0x38"
+  );
   static_assert(sizeof(UserCommandIssueLocalEvent) == 0x50, "UserCommandIssueLocalEvent size must be 0x50");
 
   /**
@@ -95,13 +111,13 @@ namespace moho
    */
   struct UserCommandIssueHelper : WeakObject
   {
-    SSTICommandConstantData mConstantData;    // +0x004
-    SSTICommandVariableData mVariableData;    // +0x040 (0x70 with its tail padding)
-    std::uint8_t mReservedB0;                 // +0x0B0
-    std::uint8_t mDeleteWhenDue;              // +0x0B1
-    std::uint8_t mVariableDataDirty;          // +0x0B2
-    std::uint8_t mReservedB3;                 // +0x0B3
-    std::int32_t mDueSeqNo;                   // +0x0B4
+    SSTICommandConstantData mConstantData; // +0x004
+    SSTICommandVariableData mVariableData; // +0x040 (0x70 with its tail padding)
+    std::uint8_t mReservedB0;              // +0x0B0
+    std::uint8_t mDeleteWhenDue;           // +0x0B1
+    std::uint8_t mVariableDataDirty;       // +0x0B2
+    std::uint8_t mReservedB3;              // +0x0B3
+    std::int32_t mDueSeqNo;                // +0x0B4
     /// Local edits not yet confirmed by the sim, oldest first. Block size 1
     /// (0x50-byte element), so each map slot owns one event.
     fa::deque<UserCommandIssueLocalEvent> mLocalQueue; // +0x0B8
@@ -109,7 +125,7 @@ namespace moho
     /// plus the queued select/deselect edits (`GetEntitiesUnderCursor`, 0x008B43F0,
     /// which runs the `WeakSet<UserUnit>` bodies: `Add` 0x00822270, `Remove`
     /// 0x008B2890, `SkipDead` 0x007B29C0).
-    WeakSet<UserUnit> mCursorEntitySet;               // +0x0CC
+    WeakSet<UserUnit> mCursorEntitySet; // +0x0CC
 
     /**
      * Address: 0x008B3EC0 (FUN_008B3EC0, struct_CommandIssueHelper::struct_CommandIssueHelper)
@@ -145,16 +161,37 @@ namespace moho
     ~UserCommandIssueHelper() noexcept;
   };
 
-  static_assert(offsetof(UserCommandIssueHelper, mConstantData) == 0x004, "UserCommandIssueHelper::mConstantData offset must be 0x004");
-  static_assert(offsetof(UserCommandIssueHelper, mVariableData) == 0x040, "UserCommandIssueHelper::mVariableData offset must be 0x040");
-  static_assert(offsetof(UserCommandIssueHelper, mReservedB0) == 0x0B0, "UserCommandIssueHelper::mReservedB0 offset must be 0x0B0");
-  static_assert(offsetof(UserCommandIssueHelper, mDeleteWhenDue) == 0x0B1, "UserCommandIssueHelper::mDeleteWhenDue offset must be 0x0B1");
+  static_assert(
+    offsetof(UserCommandIssueHelper, mConstantData) == 0x004,
+    "UserCommandIssueHelper::mConstantData offset must be 0x004"
+  );
+  static_assert(
+    offsetof(UserCommandIssueHelper, mVariableData) == 0x040,
+    "UserCommandIssueHelper::mVariableData offset must be 0x040"
+  );
+  static_assert(
+    offsetof(UserCommandIssueHelper, mReservedB0) == 0x0B0,
+    "UserCommandIssueHelper::mReservedB0 offset must be 0x0B0"
+  );
+  static_assert(
+    offsetof(UserCommandIssueHelper, mDeleteWhenDue) == 0x0B1,
+    "UserCommandIssueHelper::mDeleteWhenDue offset must be 0x0B1"
+  );
   static_assert(
     offsetof(UserCommandIssueHelper, mVariableDataDirty) == 0x0B2,
     "UserCommandIssueHelper::mVariableDataDirty offset must be 0x0B2"
   );
-  static_assert(offsetof(UserCommandIssueHelper, mDueSeqNo) == 0x0B4, "UserCommandIssueHelper::mDueSeqNo offset must be 0x0B4");
-  static_assert(offsetof(UserCommandIssueHelper, mLocalQueue) == 0x0B8, "UserCommandIssueHelper::mLocalQueue offset must be 0x0B8");
-  static_assert(offsetof(UserCommandIssueHelper, mCursorEntitySet) == 0x0CC, "UserCommandIssueHelper::mCursorEntitySet offset must be 0x0CC");
+  static_assert(
+    offsetof(UserCommandIssueHelper, mDueSeqNo) == 0x0B4,
+    "UserCommandIssueHelper::mDueSeqNo offset must be 0x0B4"
+  );
+  static_assert(
+    offsetof(UserCommandIssueHelper, mLocalQueue) == 0x0B8,
+    "UserCommandIssueHelper::mLocalQueue offset must be 0x0B8"
+  );
+  static_assert(
+    offsetof(UserCommandIssueHelper, mCursorEntitySet) == 0x0CC,
+    "UserCommandIssueHelper::mCursorEntitySet offset must be 0x0CC"
+  );
   static_assert(sizeof(UserCommandIssueHelper) == 0x0D8, "UserCommandIssueHelper size must be 0x0D8");
 } // namespace moho

@@ -31,7 +31,10 @@ namespace gpg::gal::effects
     boost::shared_ptr<Texture> texture;
     boost::shared_ptr<RenderTarget> renderTarget;
 
-    [[nodiscard]] bool Empty() const noexcept { return texture == nullptr && renderTarget == nullptr; }
+    [[nodiscard]] bool Empty() const noexcept
+    {
+      return texture == nullptr && renderTarget == nullptr;
+    }
   };
 
   class ParameterStore
@@ -43,12 +46,21 @@ namespace gpg::gal::effects
     void Initialize(const EffectDescription& description, const ConstantLayout& layout);
 
     /** The $Globals image (a multiple of 16 bytes; empty when the effect has no numeric parameters). */
-    [[nodiscard]] std::span<const std::uint8_t> Constants() const noexcept { return mImage; }
+    [[nodiscard]] std::span<const std::uint8_t> Constants() const noexcept
+    {
+      return mImage;
+    }
 
     /** Bumped by every write, so a backend can tell an unchanged image. */
-    [[nodiscard]] std::uint64_t Version() const noexcept { return mVersion; }
+    [[nodiscard]] std::uint64_t Version() const noexcept
+    {
+      return mVersion;
+    }
     /** Bumped by every texture binding change only. */
-    [[nodiscard]] std::uint64_t TextureVersion() const noexcept { return mTextureVersion; }
+    [[nodiscard]] std::uint64_t TextureVersion() const noexcept
+    {
+      return mTextureVersion;
+    }
 
     // Setters, by index into EffectDescription::parameters. A parameter the
     // shaders never read (no constant slot) accepts and drops the value.
@@ -84,7 +96,7 @@ namespace gpg::gal::effects
     const ConstantLayout* mLayout = nullptr;
     std::vector<std::int32_t> mSlotByParameter; // -1: no slot
     std::vector<std::uint8_t> mImage;
-    std::vector<TextureBinding> mBindings;      // by parameter index
+    std::vector<TextureBinding> mBindings; // by parameter index
     std::uint64_t mVersion = 1;
     std::uint64_t mTextureVersion = 1;
   };

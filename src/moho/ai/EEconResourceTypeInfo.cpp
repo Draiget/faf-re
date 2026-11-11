@@ -107,4 +107,7 @@ namespace moho
 // Phase-1 pre-registration: gEEconResourcePrimitiveSerializer's Init() (run
 // later, from InitNewHelpers) calls gpg::LookupRType(typeid(EEconResource)),
 // so the descriptor must exist first. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_EEconResourceTypeInfo_563980, moho::preregister_EEconResourceTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_EEconResourceTypeInfo_563980,
+  moho::preregister_EEconResourceTypeInfo
+)

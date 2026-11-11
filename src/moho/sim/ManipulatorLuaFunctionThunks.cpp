@@ -73,7 +73,6 @@ namespace moho
   int cfunc_CThrustManipulatorSetThrustingParam(lua_State* luaContext);
   int cfunc_CThrustManipulatorSetThrustingParamL(LuaPlus::LuaState* state);
 
-
   CScrLuaMetatableFactory<CBoneEntityManipulator> CScrLuaMetatableFactory<CBoneEntityManipulator>::sInstance{};
   CScrLuaMetatableFactory<CBuilderArmManipulator> CScrLuaMetatableFactory<CBuilderArmManipulator>::sInstance{};
   CScrLuaMetatableFactory<CFootPlantManipulator> CScrLuaMetatableFactory<CFootPlantManipulator>::sInstance{};
@@ -106,7 +105,9 @@ namespace moho
     return &instance;
   }
 
-  LuaPlus::LuaObject CScrLuaMetatableFactory<CBoneEntityManipulator>::Create(LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject CScrLuaMetatableFactory<CBoneEntityManipulator>::Create(
+    LuaPlus::LuaState* const state
+  )
   {
     return SCR_CreateSimpleMetatable(state);
   }
@@ -120,7 +121,9 @@ namespace moho
     return sInstance;
   }
 
-  LuaPlus::LuaObject CScrLuaMetatableFactory<CBuilderArmManipulator>::Create(LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject CScrLuaMetatableFactory<CBuilderArmManipulator>::Create(
+    LuaPlus::LuaState* const state
+  )
   {
     return SCR_CreateSimpleMetatable(state);
   }
@@ -134,7 +137,9 @@ namespace moho
     return sInstance;
   }
 
-  LuaPlus::LuaObject CScrLuaMetatableFactory<CFootPlantManipulator>::Create(LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject CScrLuaMetatableFactory<CFootPlantManipulator>::Create(
+    LuaPlus::LuaState* const state
+  )
   {
     return SCR_CreateSimpleMetatable(state);
   }
@@ -148,7 +153,9 @@ namespace moho
     return sInstance;
   }
 
-  LuaPlus::LuaObject CScrLuaMetatableFactory<Entity>::Create(LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject CScrLuaMetatableFactory<Entity>::Create(
+    LuaPlus::LuaState* const state
+  )
   {
     return SCR_CreateSimpleMetatable(state);
   }
@@ -162,7 +169,9 @@ namespace moho
     return sInstance;
   }
 
-  LuaPlus::LuaObject CScrLuaMetatableFactory<CRotateManipulator>::Create(LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject CScrLuaMetatableFactory<CRotateManipulator>::Create(
+    LuaPlus::LuaState* const state
+  )
   {
     return SCR_CreateSimpleMetatable(state);
   }
@@ -176,12 +185,16 @@ namespace moho
     return sInstance;
   }
 
-  LuaPlus::LuaObject CScrLuaMetatableFactory<CThrustManipulator>::Create(LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject CScrLuaMetatableFactory<CThrustManipulator>::Create(
+    LuaPlus::LuaState* const state
+  )
   {
     return SCR_CreateSimpleMetatable(state);
   }
 
-  LuaPlus::LuaObject CreateRotateManipulatorLuaMetatable(LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject CreateRotateManipulatorLuaMetatable(
+    LuaPlus::LuaState* const state
+  )
   {
     return CScrLuaMetatableFactory<CRotateManipulator>::Instance().Get(state);
   }
@@ -193,7 +206,10 @@ namespace moho
    * Writes the `CBuilderArmManipulator` metatable Lua object into `object` and
    * returns the same destination pointer.
    */
-  LuaPlus::LuaObject* func_CreateLuaBuilderArmObject(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject* func_CreateLuaBuilderArmObject(
+    LuaPlus::LuaObject* const object,
+    LuaPlus::LuaState* const state
+  )
   {
     *object = CScrLuaMetatableFactory<CBuilderArmManipulator>::Instance().Get(state);
     return object;
@@ -206,7 +222,10 @@ namespace moho
    * Writes the `CAimManipulator` metatable Lua object into `object` and
    * returns the same destination pointer.
    */
-  LuaPlus::LuaObject* func_CreateLuaAimManipulatorObject(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject* func_CreateLuaAimManipulatorObject(
+    LuaPlus::LuaObject* const object,
+    LuaPlus::LuaState* const state
+  )
   {
     *object = CScrLuaMetatableFactory<CAimManipulator>::Instance().Get(state);
     return object;
@@ -219,8 +238,10 @@ namespace moho
    * Writes the `CBoneEntityManipulator` metatable Lua object into `object` and
    * returns the same destination pointer.
    */
-  LuaPlus::LuaObject*
-  func_CreateLuaBoneEntityManipulatorObject(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject* func_CreateLuaBoneEntityManipulatorObject(
+    LuaPlus::LuaObject* const object,
+    LuaPlus::LuaState* const state
+  )
   {
     *object = CScrLuaMetatableFactory<CBoneEntityManipulator>::Instance().Get(state);
     return object;
@@ -233,8 +254,10 @@ namespace moho
    * Writes the `CFootPlantManipulator` metatable Lua object into `object` and
    * returns the same destination pointer.
    */
-  LuaPlus::LuaObject*
-  func_CreateLuaFootPlantManipulatorObject(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject* func_CreateLuaFootPlantManipulatorObject(
+    LuaPlus::LuaObject* const object,
+    LuaPlus::LuaState* const state
+  )
   {
     *object = CScrLuaMetatableFactory<CFootPlantManipulator>::Instance().Get(state);
     return object;
@@ -247,8 +270,10 @@ namespace moho
    * Writes the `CRotateManipulator` metatable Lua object into `object` and
    * returns the same destination pointer.
    */
-  LuaPlus::LuaObject*
-  func_CreateCRotateManipulatorObject(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject* func_CreateCRotateManipulatorObject(
+    LuaPlus::LuaObject* const object,
+    LuaPlus::LuaState* const state
+  )
   {
     *object = CScrLuaMetatableFactory<CRotateManipulator>::Instance().Get(state);
     return object;
@@ -261,7 +286,10 @@ namespace moho
    * Writes the `CThrustManipulator` metatable Lua object into `object` and
    * returns the same destination pointer.
    */
-  LuaPlus::LuaObject* func_CreateLuaCThrustManipulator(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject* func_CreateLuaCThrustManipulator(
+    LuaPlus::LuaObject* const object,
+    LuaPlus::LuaState* const state
+  )
   {
     *object = CScrLuaMetatableFactory<CThrustManipulator>::Instance().Get(state);
     return object;
@@ -326,8 +354,7 @@ namespace
   constexpr const char* kCRotateManipulatorSetSpeedHelpText = "RotateManipulator:SetSpeed(self, degrees_per_second)";
   constexpr const char* kCRotateManipulatorSetTargetSpeedHelpText =
     "RotateManipulator:SetTargetSpeed(degrees_per_second)";
-  constexpr const char* kCRotateManipulatorSetAccelHelpText =
-    "RotateManipulator:SetAccel(degrees_per_second_squared)";
+  constexpr const char* kCRotateManipulatorSetAccelHelpText = "RotateManipulator:SetAccel(degrees_per_second_squared)";
   constexpr const char* kCRotateManipulatorClearFollowBoneHelpText = "RotateManipulator:ClearFollowBone()";
   constexpr const char* kCRotateManipulatorSetFollowBoneHelpText = "RotateManipulator:SetFollowBone(bone)";
   constexpr const char* kCRotateManipulatorGetCurrentAngleHelpText = "RotateManipulator:GetCurrentAngle()";
@@ -356,8 +383,10 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] moho::CRotateManipulator*
-  GetRotateManipulatorOptional(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+  [[nodiscard]] moho::CRotateManipulator* GetRotateManipulatorOptional(
+    const LuaPlus::LuaObject& object,
+    LuaPlus::LuaState* const state
+  )
   {
     moho::CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
     if (!scriptObjectSlot) {
@@ -381,7 +410,10 @@ namespace
     return static_cast<moho::CRotateManipulator*>(upcast.mObj);
   }
 
-  [[nodiscard]] float ReadRequiredLuaNumber(LuaPlus::LuaState* const state, const int stackIndex)
+  [[nodiscard]] float ReadRequiredLuaNumber(
+    LuaPlus::LuaState* const state,
+    const int stackIndex
+  )
   {
     LuaPlus::LuaStackObject stackObject{};
     stackObject.m_state = state;
@@ -479,7 +511,9 @@ namespace moho
    * Unwraps raw Lua callback state and forwards to
    * `cfunc_CBuilderArmManipulatorSetAimingArcL`.
    */
-  int cfunc_CBuilderArmManipulatorSetAimingArc(lua_State* const luaContext)
+  int cfunc_CBuilderArmManipulatorSetAimingArc(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CBuilderArmManipulatorSetAimingArcL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -491,7 +525,9 @@ namespace moho
    * Reads six degree-domain arc parameters from Lua, converts to radians, and
    * updates builder-arm heading/pitch arc lanes.
    */
-  int cfunc_CBuilderArmManipulatorSetAimingArcL(LuaPlus::LuaState* const state)
+  int cfunc_CBuilderArmManipulatorSetAimingArcL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 7, kCBuilderArmManipulatorSetAimingArcHelpText);
 
@@ -521,7 +557,9 @@ namespace moho
    * Unwraps raw Lua callback state and forwards to
    * `cfunc_CBuilderArmManipulatorGetHeadingPitchL`.
    */
-  int cfunc_CBuilderArmManipulatorGetHeadingPitch(lua_State* const luaContext)
+  int cfunc_CBuilderArmManipulatorGetHeadingPitch(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CBuilderArmManipulatorGetHeadingPitchL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -532,7 +570,9 @@ namespace moho
    * What it does:
    * Pushes current builder-arm heading/pitch values to Lua.
    */
-  int cfunc_CBuilderArmManipulatorGetHeadingPitchL(LuaPlus::LuaState* const state)
+  int cfunc_CBuilderArmManipulatorGetHeadingPitchL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kCBuilderArmManipulatorGetHeadingPitchHelpText);
 
@@ -553,7 +593,9 @@ namespace moho
    * Unwraps raw Lua callback state and forwards to
    * `cfunc_CBuilderArmManipulatorSetHeadingPitchL`.
    */
-  int cfunc_CBuilderArmManipulatorSetHeadingPitch(lua_State* const luaContext)
+  int cfunc_CBuilderArmManipulatorSetHeadingPitch(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CBuilderArmManipulatorSetHeadingPitchL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -565,7 +607,9 @@ namespace moho
    * Reads heading/pitch scalar args from Lua and stores them on the builder-arm
    * manipulator runtime lane.
    */
-  int cfunc_CBuilderArmManipulatorSetHeadingPitchL(LuaPlus::LuaState* const state)
+  int cfunc_CBuilderArmManipulatorSetHeadingPitchL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 3, kCBuilderArmManipulatorSetHeadingPitchHelpText);
 
@@ -586,7 +630,9 @@ namespace moho
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_CRotateManipulatorClearGoalL`.
    */
-  int cfunc_CRotateManipulatorClearGoal(lua_State* const luaContext)
+  int cfunc_CRotateManipulatorClearGoal(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CRotateManipulatorClearGoalL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -598,7 +644,9 @@ namespace moho
    * Resolves one rotate manipulator from Lua, clears its goal-armed lane, and
    * raises Lua errors for invalid/mismatched game-object handles.
    */
-  int cfunc_CRotateManipulatorClearGoalL(LuaPlus::LuaState* const state)
+  int cfunc_CRotateManipulatorClearGoalL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kCRotateManipulatorClearGoalHelpText);
 
@@ -622,7 +670,9 @@ namespace moho
    * Unwraps raw Lua callback state and forwards to
    * `cfunc_CThrustManipulatorSetThrustingParamL`.
    */
-  int cfunc_CThrustManipulatorSetThrustingParam(lua_State* const luaContext)
+  int cfunc_CThrustManipulatorSetThrustingParam(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CThrustManipulatorSetThrustingParamL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -634,7 +684,9 @@ namespace moho
    * Validates and reads `SetThrustingParam(...)` numeric arguments from Lua
    * then updates cap ranges plus turn force/speed on one thrust manipulator.
    */
-  int cfunc_CThrustManipulatorSetThrustingParamL(LuaPlus::LuaState* const state)
+  int cfunc_CThrustManipulatorSetThrustingParamL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 9, kCThrustManipulatorSetThrustingParamHelpText);
 
@@ -668,7 +720,9 @@ namespace moho
    * Executes one non-deleting cleanup lane for the CBone manipulator type-info
    * descriptor by running the `gpg::RType` base teardown.
    */
-  [[maybe_unused]] void DestroyCBoneEntityManipulatorTypeInfoBody(gpg::RType* const typeInfo) noexcept
+  [[maybe_unused]] void DestroyCBoneEntityManipulatorTypeInfoBody(
+    gpg::RType* const typeInfo
+  ) noexcept
   {
     if (!typeInfo) {
       return;
@@ -684,7 +738,9 @@ namespace moho
    * Unwraps raw Lua callback state and forwards to
    * `cfunc_CBoneEntityManipulatorSetPivotL`.
    */
-  int cfunc_CBoneEntityManipulatorSetPivot(lua_State* const luaContext)
+  int cfunc_CBoneEntityManipulatorSetPivot(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CBoneEntityManipulatorSetPivotL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -701,7 +757,9 @@ namespace moho
    * `manipulator->mPivot`, trims the Lua stack down to the manipulator
    * receiver, and returns one value to Lua.
    */
-  int cfunc_CBoneEntityManipulatorSetPivotL(LuaPlus::LuaState* const state)
+  int cfunc_CBoneEntityManipulatorSetPivotL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 4, kCBoneEntityManipulatorSetPivotHelpText);
 
@@ -744,7 +802,9 @@ namespace moho
    * Unwraps the raw Lua callback context to its bound LuaPlus::LuaState and
    * forwards to `cfunc_EntityAttachBoneToEntityBoneL`.
    */
-  int cfunc_EntityAttachBoneToEntityBone(lua_State* const luaContext)
+  int cfunc_EntityAttachBoneToEntityBone(
+    lua_State* const luaContext
+  )
   {
     return cfunc_EntityAttachBoneToEntityBoneL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -763,7 +823,9 @@ namespace moho
    * `CBoneEntityManipulator` pinning the unit bone to the target entity bone.
    * Pushes the manipulator's Lua userdata onto the stack as the return value.
    */
-  int cfunc_EntityAttachBoneToEntityBoneL(LuaPlus::LuaState* const state)
+  int cfunc_EntityAttachBoneToEntityBoneL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 5, kEntityAttachBoneToEntityBoneHelpText);
 
@@ -783,9 +845,8 @@ namespace moho
     LuaPlus::LuaStackObject keepMarkArg(state, 5);
     const bool markSkipInterp = keepMarkArg.GetBoolean();
 
-    CBoneEntityManipulator* const manipulator = new CBoneEntityManipulator(
-      targetEntity, goalUnit, watchedBoneIndex, referenceBoneIndex, markSkipInterp
-    );
+    CBoneEntityManipulator* const manipulator =
+      new CBoneEntityManipulator(targetEntity, goalUnit, watchedBoneIndex, referenceBoneIndex, markSkipInterp);
     manipulator->mLuaObj.PushStack(state);
     return 1;
   }
@@ -880,7 +941,9 @@ namespace moho
    * on the weapon, constructs one new `CAimManipulator` bound to that weapon, and
    * pushes the manipulator's Lua userdata as the return value.
    */
-  int cfunc_CreateAimControllerL(LuaPlus::LuaState* const state)
+  int cfunc_CreateAimControllerL(
+    LuaPlus::LuaState* const state
+  )
   {
     lua_State* const rawState = state->m_state;
     const int argumentCount = lua_gettop(rawState);
@@ -946,7 +1009,9 @@ namespace moho
    * Unwraps the raw Lua callback context and forwards to
    * `cfunc_CreateAimControllerL`.
    */
-  int cfunc_CreateAimController(lua_State* const luaContext)
+  int cfunc_CreateAimController(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreateAimControllerL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -982,7 +1047,9 @@ namespace moho
    * one new `CBuilderArmManipulator` bound to that unit, and pushes the manipulator's
    * Lua userdata as the return value.
    */
-  int cfunc_CreateBuilderArmControllerL(LuaPlus::LuaState* const state)
+  int cfunc_CreateBuilderArmControllerL(
+    LuaPlus::LuaState* const state
+  )
   {
     lua_State* const rawState = state->m_state;
     const int argumentCount = lua_gettop(rawState);
@@ -1026,7 +1093,9 @@ namespace moho
    * Unwraps the raw Lua callback context and forwards to
    * `cfunc_CreateBuilderArmControllerL`.
    */
-  int cfunc_CreateBuilderArmController(lua_State* const luaContext)
+  int cfunc_CreateBuilderArmController(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreateBuilderArmControllerL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1095,7 +1164,9 @@ namespace moho
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_CreateFootPlantControllerL`.
    */
-  int cfunc_CreateFootPlantController(lua_State* const luaContext)
+  int cfunc_CreateFootPlantController(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CreateFootPlantControllerL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1111,7 +1182,9 @@ namespace moho
    * `CFootPlantManipulator` bound to that unit. Pushes the manipulator's Lua
    * userdata onto the stack as the return value.
    */
-  int cfunc_CreateFootPlantControllerL(LuaPlus::LuaState* const state)
+  int cfunc_CreateFootPlantControllerL(
+    LuaPlus::LuaState* const state
+  )
   {
     lua_State* const rawState = state->m_state;
     const int argumentCount = lua_gettop(rawState);

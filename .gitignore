@@ -90,3 +90,6 @@ tools/tracy/
 
 # Built tools (go build in tools/, e.g. fakegame.exe); no exe is tracked.
 *.exe
+
+# Local secrets (S3 keys and the like); never commit.
+.env/

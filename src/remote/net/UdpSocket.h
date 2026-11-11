@@ -16,8 +16,16 @@ namespace faf::remote::net
     std::uint32_t ip = 0; // host order
     std::uint16_t port = 0;
 
-    [[nodiscard]] bool operator==(const SEndpoint& other) const noexcept { return ip == other.ip && port == other.port; }
-    [[nodiscard]] std::uint64_t Key() const noexcept { return (static_cast<std::uint64_t>(ip) << 16) | port; }
+    [[nodiscard]] bool operator==(
+      const SEndpoint& other
+    ) const noexcept
+    {
+      return ip == other.ip && port == other.port;
+    }
+    [[nodiscard]] std::uint64_t Key() const noexcept
+    {
+      return (static_cast<std::uint64_t>(ip) << 16) | port;
+    }
     [[nodiscard]] std::string Text() const;
   };
 
@@ -43,7 +51,10 @@ namespace faf::remote::net
     /** Until a datagram is waiting, for at most `milliseconds`. */
     void Wait(int milliseconds) noexcept;
 
-    [[nodiscard]] SEndpoint Local() const noexcept { return mLocal; }
+    [[nodiscard]] SEndpoint Local() const noexcept
+    {
+      return mLocal;
+    }
 
   private:
     std::intptr_t mSocket = -1;

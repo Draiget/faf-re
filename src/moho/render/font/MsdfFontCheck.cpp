@@ -19,12 +19,14 @@ namespace moho
     constexpr std::size_t kMaxTimestampTableBytes = 64u;
     constexpr float kMaxQuadEm = 16.0f;
 
-    [[nodiscard]] constexpr std::uint32_t Tag(const char (&text)[5]) noexcept
+    [[nodiscard]] constexpr std::uint32_t Tag(
+      const char (&text)[5]
+    ) noexcept
     {
-      return (static_cast<std::uint32_t>(static_cast<std::uint8_t>(text[0])) << 24u)
-        | (static_cast<std::uint32_t>(static_cast<std::uint8_t>(text[1])) << 16u)
-        | (static_cast<std::uint32_t>(static_cast<std::uint8_t>(text[2])) << 8u)
-        | static_cast<std::uint32_t>(static_cast<std::uint8_t>(text[3]));
+      return (static_cast<std::uint32_t>(static_cast<std::uint8_t>(text[0])) << 24u) |
+        (static_cast<std::uint32_t>(static_cast<std::uint8_t>(text[1])) << 16u) |
+        (static_cast<std::uint32_t>(static_cast<std::uint8_t>(text[2])) << 8u) |
+        static_cast<std::uint32_t>(static_cast<std::uint8_t>(text[3]));
     }
 
     // Outlines, metrics, names, layout and hinting. Hinting tables are allowed but never run: the cook loads
@@ -32,23 +34,31 @@ namespace moho
     // because that build ignores them, and bitmap and color tables because nothing here draws them.
     constexpr std::uint32_t kAllowedTables[] = {
       Tag("cmap"), Tag("head"), Tag("hhea"), Tag("hmtx"), Tag("maxp"), Tag("name"), Tag("OS/2"), Tag("post"),
-      Tag("glyf"), Tag("loca"), Tag("CFF "),
-      Tag("cvt "), Tag("fpgm"), Tag("prep"), Tag("gasp"), Tag("hdmx"), Tag("LTSH"), Tag("VDMX"),
-      Tag("GDEF"), Tag("GPOS"), Tag("GSUB"), Tag("BASE"), Tag("JSTF"), Tag("kern"), Tag("STAT"),
-      Tag("vhea"), Tag("vmtx"), Tag("VORG"), Tag("DSIG"), Tag("PCLT"), Tag("meta"),
+      Tag("glyf"), Tag("loca"), Tag("CFF "), Tag("cvt "), Tag("fpgm"), Tag("prep"), Tag("gasp"), Tag("hdmx"),
+      Tag("LTSH"), Tag("VDMX"), Tag("GDEF"), Tag("GPOS"), Tag("GSUB"), Tag("BASE"), Tag("JSTF"), Tag("kern"),
+      Tag("STAT"), Tag("vhea"), Tag("vmtx"), Tag("VORG"), Tag("DSIG"), Tag("PCLT"), Tag("meta"),
       Tag("FFTM"), // FontForge's timestamps, which many free fonts carry; its size is limited below
     };
     constexpr std::uint32_t kRequiredTables[] = {
-      Tag("cmap"), Tag("head"), Tag("hhea"), Tag("hmtx"), Tag("maxp"), Tag("name"),
+      Tag("cmap"),
+      Tag("head"),
+      Tag("hhea"),
+      Tag("hmtx"),
+      Tag("maxp"),
+      Tag("name"),
     };
 
-    [[nodiscard]] std::uint32_t ReadU32(const std::uint8_t* const at) noexcept
+    [[nodiscard]] std::uint32_t ReadU32(
+      const std::uint8_t* const at
+    ) noexcept
     {
-      return (static_cast<std::uint32_t>(at[0]) << 24u) | (static_cast<std::uint32_t>(at[1]) << 16u)
-        | (static_cast<std::uint32_t>(at[2]) << 8u) | static_cast<std::uint32_t>(at[3]);
+      return (static_cast<std::uint32_t>(at[0]) << 24u) | (static_cast<std::uint32_t>(at[1]) << 16u) |
+        (static_cast<std::uint32_t>(at[2]) << 8u) | static_cast<std::uint32_t>(at[3]);
     }
 
-    [[nodiscard]] std::string TagText(const std::uint32_t tag)
+    [[nodiscard]] std::string TagText(
+      const std::uint32_t tag
+    )
     {
       std::string text;
       for (const int shift : {24, 16, 8, 0}) {
@@ -58,19 +68,31 @@ namespace moho
       return text;
     }
 
-    [[nodiscard]] bool Refuse(std::string& reason, std::string text)
+    [[nodiscard]] bool Refuse(
+      std::string& reason,
+      std::string text
+    )
     {
       reason = std::move(text);
       return false;
     }
 
-    [[nodiscard]] bool AllZero(const std::uint8_t* const first, const std::uint8_t* const last) noexcept
+    [[nodiscard]] bool AllZero(
+      const std::uint8_t* const first,
+      const std::uint8_t* const last
+    ) noexcept
     {
-      return std::all_of(first, last, [](const std::uint8_t value) { return value == 0u; });
+      return std::all_of(first, last, [](const std::uint8_t value) {
+        return value == 0u;
+      });
     }
   } // namespace
 
-  bool MSDF_CheckFontStructure(const void* const bytes, const std::size_t byteCount, std::string& reason)
+  bool MSDF_CheckFontStructure(
+    const void* const bytes,
+    const std::size_t byteCount,
+    std::string& reason
+  )
   {
     if (bytes == nullptr || byteCount == 0u) {
       return Refuse(reason, "the file is empty");
@@ -155,14 +177,22 @@ namespace moho
     return true;
   }
 
-  bool MSDF_IsAllowedModFontPath(const char* const path, std::string& reason)
+  bool MSDF_IsAllowedModFontPath(
+    const char* const path,
+    std::string& reason
+  )
   {
     if (path == nullptr || *path == '\0') {
       return Refuse(reason, "no path given");
     }
     std::string lower(path);
-    std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    if (lower.find("..") != std::string::npos || lower.find('\\') != std::string::npos || lower.find(':') != std::string::npos) {
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](const unsigned char c) {
+      return static_cast<char>(std::tolower(c));
+    });
+    if (
+      lower.find("..") != std::string::npos || lower.find('\\') != std::string::npos ||
+      lower.find(':') != std::string::npos
+    ) {
       return Refuse(reason, "the path has parts a font path can't have");
     }
     constexpr char kModsPrefix[] = "/mods/";
@@ -173,23 +203,36 @@ namespace moho
     const std::size_t modEnd = lower.find('/', kModsPrefixBytes);
     constexpr char kFontsFolder[] = "/fonts/";
     constexpr std::size_t kFontsFolderBytes = sizeof(kFontsFolder) - 1u;
-    if (modEnd == std::string::npos || modEnd == kModsPrefixBytes || lower.compare(modEnd, kFontsFolderBytes, kFontsFolder) != 0) {
+    if (
+      modEnd == std::string::npos || modEnd == kModsPrefixBytes ||
+      lower.compare(modEnd, kFontsFolderBytes, kFontsFolder) != 0
+    ) {
       return Refuse(reason, "the path isn't under /mods/<mod>/fonts/");
     }
     const std::size_t dot = lower.rfind('.');
     const std::size_t slash = lower.rfind('/');
-    if (dot == std::string::npos || dot < slash || dot == slash + 1u || (lower.compare(dot, std::string::npos, ".ttf") != 0 && lower.compare(dot, std::string::npos, ".otf") != 0)) {
+    if (
+      dot == std::string::npos || dot < slash || dot == slash + 1u ||
+      (lower.compare(dot, std::string::npos, ".ttf") != 0 && lower.compare(dot, std::string::npos, ".otf") != 0)
+    ) {
       return Refuse(reason, "a font file has to be a .ttf or .otf");
     }
     return true;
   }
 
-  bool MSDF_CheckCookedAtlas(const SMsdfFontAtlas& atlas, const SMsdfCookOptions& options, std::string& reason)
+  bool MSDF_CheckCookedAtlas(
+    const SMsdfFontAtlas& atlas,
+    const SMsdfCookOptions& options,
+    std::string& reason
+  )
   {
     if (atlas.mWidth != options.mAtlasWidth || atlas.mHeight <= 0 || atlas.mHeight > options.mMaxAtlasHeight) {
       return Refuse(reason, "the atlas has the wrong size");
     }
-    if (atlas.mEmPixels != static_cast<float>(options.mEmPixels) || atlas.mDistanceRange != static_cast<float>(options.mDistanceRange)) {
+    if (
+      atlas.mEmPixels != static_cast<float>(options.mEmPixels) ||
+      atlas.mDistanceRange != static_cast<float>(options.mDistanceRange)
+    ) {
       return Refuse(reason, "the atlas has the wrong scale");
     }
     std::vector<std::uint32_t> asked = options.mCodepoints;
@@ -201,14 +244,19 @@ namespace moho
       if (!std::binary_search(asked.begin(), asked.end(), glyph.mCodepoint)) {
         return Refuse(reason, "the atlas has a character nobody asked for");
       }
-      const float metrics[] = {glyph.mAdvance, glyph.mPlaneLeft, glyph.mPlaneBottom, glyph.mPlaneRight, glyph.mPlaneTop};
+      const float metrics[] = {
+        glyph.mAdvance, glyph.mPlaneLeft, glyph.mPlaneBottom, glyph.mPlaneRight, glyph.mPlaneTop
+      };
       for (const float value : metrics) {
         if (!std::isfinite(value) || std::fabs(value) > kMaxQuadEm) {
           return Refuse(reason, "a glyph's size is out of range");
         }
       }
     }
-    if (std::fabs(atlas.mAscent) > kMaxQuadEm || std::fabs(atlas.mDescent) > kMaxQuadEm || std::fabs(atlas.mLineGap) > kMaxQuadEm) {
+    if (
+      std::fabs(atlas.mAscent) > kMaxQuadEm || std::fabs(atlas.mDescent) > kMaxQuadEm ||
+      std::fabs(atlas.mLineGap) > kMaxQuadEm
+    ) {
       return Refuse(reason, "the font's line metrics are out of range");
     }
     if (atlas.mStrikes.size() != options.mStrikeSizes.size()) {

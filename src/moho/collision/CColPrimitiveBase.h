@@ -42,7 +42,8 @@ namespace moho
   static_assert(sizeof(CollisionResult) == 0x18, "CollisionResult size must be 0x18");
   static_assert(offsetof(CollisionResult, direction) == 0x08, "CollisionResult::direction offset must be 0x08");
   static_assert(
-    offsetof(CollisionResult, penetrationDepth) == 0x14, "CollisionResult::penetrationDepth offset must be 0x14"
+    offsetof(CollisionResult, penetrationDepth) == 0x14,
+    "CollisionResult::penetrationDepth offset must be 0x14"
   );
 
   /**
@@ -62,10 +63,12 @@ namespace moho
   };
   static_assert(sizeof(CollisionSegmentResult) == 0x20, "CollisionSegmentResult size must be 0x20");
   static_assert(
-    offsetof(CollisionSegmentResult, direction) == 0x04, "CollisionSegmentResult::direction offset must be 0x04"
+    offsetof(CollisionSegmentResult, direction) == 0x04,
+    "CollisionSegmentResult::direction offset must be 0x04"
   );
   static_assert(
-    offsetof(CollisionSegmentResult, position) == 0x10, "CollisionSegmentResult::position offset must be 0x10"
+    offsetof(CollisionSegmentResult, position) == 0x10,
+    "CollisionSegmentResult::position offset must be 0x10"
   );
   static_assert(
     offsetof(CollisionSegmentResult, distanceFromLineStart) == 0x1C,
@@ -256,11 +259,18 @@ namespace moho
   public:
     /**
      * What it does:
-     * Nothing: the construct arguments carry the whole shape. `gpg::SerSaveLoadHelper<CColPrimitive<Wm3::Box3f>>::Deserialize`
-     * 0x004FF880 and `Serialize` 0x004FF890 are a bare `ret`.
+     * Nothing: the construct arguments carry the whole shape.
+     * `gpg::SerSaveLoadHelper<CColPrimitive<Wm3::Box3f>>::Deserialize` 0x004FF880 and `Serialize` 0x004FF890 are a bare
+     * `ret`.
      */
-    void MemberDeserialize(gpg::ReadArchive*) {}
-    void MemberSerialize(gpg::WriteArchive*) const {}
+    void MemberDeserialize(
+      gpg::ReadArchive*
+    )
+    {}
+    void MemberSerialize(
+      gpg::WriteArchive*
+    ) const
+    {}
 
     /**
      * What it does:
@@ -268,9 +278,8 @@ namespace moho
      * for an archive load, handed back unowned. Inlined into
      * `SerConstructHelper<CColPrimitive<Wm3::Box3f>>::Construct` 0x004FF750.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x004FF620 (FUN_004FF620)
@@ -279,7 +288,10 @@ namespace moho
      * Saves the shape and the local centre through the primitive accessors.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     /**
@@ -321,7 +333,9 @@ namespace moho
      * Address: 0x004FF2D0 (FUN_004FF2D0)
      */
     [[nodiscard]] bool CollideLine(
-      const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionSegmentResult* outResult
+      const Wm3::Vec3f* lineStart,
+      const Wm3::Vec3f* lineEnd,
+      CollisionSegmentResult* outResult
     ) const override;
 
     /**
@@ -354,11 +368,18 @@ namespace moho
   public:
     /**
      * What it does:
-     * Nothing: the construct arguments carry the whole shape. `gpg::SerSaveLoadHelper<CColPrimitive<Wm3::Sphere3f>>::Deserialize`
-     * 0x004FEF40 and `Serialize` 0x004FEF50 are a bare `ret`.
+     * Nothing: the construct arguments carry the whole shape.
+     * `gpg::SerSaveLoadHelper<CColPrimitive<Wm3::Sphere3f>>::Deserialize` 0x004FEF40 and `Serialize` 0x004FEF50 are a
+     * bare `ret`.
      */
-    void MemberDeserialize(gpg::ReadArchive*) {}
-    void MemberSerialize(gpg::WriteArchive*) const {}
+    void MemberDeserialize(
+      gpg::ReadArchive*
+    )
+    {}
+    void MemberSerialize(
+      gpg::WriteArchive*
+    ) const
+    {}
 
     /**
      * What it does:
@@ -366,9 +387,8 @@ namespace moho
      * for an archive load, handed back unowned. Inlined into
      * `SerConstructHelper<CColPrimitive<Wm3::Sphere3f>>::Construct` 0x004FEE20.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x004FECF0 (FUN_004FECF0)
@@ -377,7 +397,10 @@ namespace moho
      * Saves the shape and the local centre through the primitive accessors.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     /**
@@ -419,7 +442,9 @@ namespace moho
      * Address: 0x004FE9D0 (FUN_004FE9D0)
      */
     [[nodiscard]] bool CollideLine(
-      const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionSegmentResult* outResult
+      const Wm3::Vec3f* lineStart,
+      const Wm3::Vec3f* lineEnd,
+      CollisionSegmentResult* outResult
     ) const override;
 
     /**
@@ -446,7 +471,8 @@ namespace moho
   static_assert(sizeof(CColPrimitiveBase) == 0x04, "CColPrimitiveBase size must be 0x04");
 
   static_assert(
-    offsetof(CColPrimitive<Wm3::Box3f>, mShape) == 0x04, "CColPrimitive<Wm3::Box3f>::mShape offset must be 0x04"
+    offsetof(CColPrimitive<Wm3::Box3f>, mShape) == 0x04,
+    "CColPrimitive<Wm3::Box3f>::mShape offset must be 0x04"
   );
   static_assert(
     offsetof(CColPrimitive<Wm3::Box3f>, mLocalCenter) == 0x40,
@@ -455,7 +481,8 @@ namespace moho
   static_assert(sizeof(CColPrimitive<Wm3::Box3f>) == 0x4C, "CColPrimitive<Wm3::Box3f> size must be 0x4C");
 
   static_assert(
-    offsetof(CColPrimitive<Wm3::Sphere3f>, mShape) == 0x04, "CColPrimitive<Wm3::Sphere3f>::mShape offset must be 0x04"
+    offsetof(CColPrimitive<Wm3::Sphere3f>, mShape) == 0x04,
+    "CColPrimitive<Wm3::Sphere3f>::mShape offset must be 0x04"
   );
   static_assert(
     offsetof(CColPrimitive<Wm3::Sphere3f>, mLocalCenter) == 0x14,

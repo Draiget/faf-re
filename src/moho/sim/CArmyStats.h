@@ -49,7 +49,7 @@ namespace moho
     ArmyNameIndexNode* left;   // +0x00
     ArmyNameIndexNode* parent; // +0x04
     ArmyNameIndexNode* right;  // +0x08
-    fa::string key;         // +0x0C
+    fa::string key;            // +0x0C
     CArmyStatItem* value;      // +0x28
     std::uint8_t color;        // +0x2C
     std::uint8_t isNil;        // +0x2D
@@ -205,9 +205,8 @@ namespace moho
      * its members are loaded over it afterwards.
      * Inlined into `SerConstructHelper<CArmyStats>::Construct` 0x0070E140.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * What it does:
@@ -215,7 +214,10 @@ namespace moho
      * Inlined into `SerSaveConstructHelper<CArmyStats>::SaveConstructArgs` 0x0070DF60.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     /**
@@ -260,7 +262,8 @@ namespace moho
 
     /**
      * Address: 0x0070CC40 (FUN_0070CC40, Moho::CArmyStats::ArmyXmlStatsNode)
-     * Mangled: ?ArmyXmlStatsNode@CArmyStats@Moho@@QAE?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV34@@Z
+     * Mangled:
+     * ?ArmyXmlStatsNode@CArmyStats@Moho@@QAE?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV34@@Z
      *
      * What it does:
      * Builds one indented `<Army>` XML subtree containing per-blueprint unit,
@@ -294,11 +297,7 @@ namespace moho
      * Resolves one army-stat item by path, resolves one per-blueprint float
      * lane in that item, applies `delta`, and returns the updated lane pointer.
      */
-    [[nodiscard]] float* AddBlueprintStatDelta(
-      const char* statPath,
-      const RUnitBlueprint* blueprint,
-      float delta
-    );
+    [[nodiscard]] float* AddBlueprintStatDelta(const char* statPath, const RUnitBlueprint* blueprint, float delta);
 
     /**
      * Address: 0x00593260 (FUN_00593260, func_UpdateUnitStat)
@@ -427,8 +426,6 @@ namespace moho
     // the binary's own inlined `erase_range`-then-delete-then-zero sequence
     // (cited on `~rb_tree()`/`erase_range` in RbTree.h) -- there is no
     // separate "destroy the name index" symbol anywhere in this binary.
-
-
 
   public:
     CAiBrain* mOwnerArmy;         // +0x10

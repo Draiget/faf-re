@@ -10,7 +10,7 @@ namespace gpg
 {
   class BinaryReader;
   class BinaryWriter;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -58,22 +58,35 @@ namespace moho
     float mSunReflectionAmount{};  // +0x78  "sunReflectionAmount"
     float mSunGlow{};              // +0x7C  "SunGlow"
   };
-  static_assert(offsetof(WaterShaderNumericState, mWaterLerp) == 0x0C,
-                "WaterShaderNumericState::mWaterLerp offset must be 0x0C");
-  static_assert(offsetof(WaterShaderNumericState, mNormalRepeatRate) == 0x28,
-                "WaterShaderNumericState::mNormalRepeatRate offset must be 0x28");
-  static_assert(offsetof(WaterShaderNumericState, mNormal1Movement) == 0x38,
-                "WaterShaderNumericState::mNormal1Movement offset must be 0x38");
-  static_assert(offsetof(WaterShaderNumericState, mSunShininess) == 0x58,
-                "WaterShaderNumericState::mSunShininess offset must be 0x58");
-  static_assert(offsetof(WaterShaderNumericState, mSunDirection) == 0x60,
-                "WaterShaderNumericState::mSunDirection offset must be 0x60");
-  static_assert(offsetof(WaterShaderNumericState, mSunColor) == 0x6C,
-                "WaterShaderNumericState::mSunColor offset must be 0x6C");
-  static_assert(offsetof(WaterShaderNumericState, mSunGlow) == 0x7C,
-                "WaterShaderNumericState::mSunGlow offset must be 0x7C");
-  static_assert(sizeof(WaterShaderNumericState) == 0x80,
-                "WaterShaderNumericState size must be 0x80");
+  static_assert(
+    offsetof(WaterShaderNumericState, mWaterLerp) == 0x0C,
+    "WaterShaderNumericState::mWaterLerp offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(WaterShaderNumericState, mNormalRepeatRate) == 0x28,
+    "WaterShaderNumericState::mNormalRepeatRate offset must be 0x28"
+  );
+  static_assert(
+    offsetof(WaterShaderNumericState, mNormal1Movement) == 0x38,
+    "WaterShaderNumericState::mNormal1Movement offset must be 0x38"
+  );
+  static_assert(
+    offsetof(WaterShaderNumericState, mSunShininess) == 0x58,
+    "WaterShaderNumericState::mSunShininess offset must be 0x58"
+  );
+  static_assert(
+    offsetof(WaterShaderNumericState, mSunDirection) == 0x60,
+    "WaterShaderNumericState::mSunDirection offset must be 0x60"
+  );
+  static_assert(
+    offsetof(WaterShaderNumericState, mSunColor) == 0x6C,
+    "WaterShaderNumericState::mSunColor offset must be 0x6C"
+  );
+  static_assert(
+    offsetof(WaterShaderNumericState, mSunGlow) == 0x7C,
+    "WaterShaderNumericState::mSunGlow offset must be 0x7C"
+  );
+  static_assert(sizeof(WaterShaderNumericState) == 0x80, "WaterShaderNumericState size must be 0x80");
 
   /**
    * Water shader parameters and texture handles for the high-fidelity water
@@ -156,8 +169,9 @@ namespace moho
     [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetWaterRamp() const;
 
     /**
-     * Address: 0x0089FC40 (FUN_0089FC40, ?GetCubeMap@CWaterShaderProperties@Moho@@QBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@XZ)
-     * Mangled: ?GetCubeMap@CWaterShaderProperties@Moho@@QBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@XZ
+     * Address: 0x0089FC40 (FUN_0089FC40,
+     * ?GetCubeMap@CWaterShaderProperties@Moho@@QBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@XZ) Mangled:
+     * ?GetCubeMap@CWaterShaderProperties@Moho@@QBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@XZ
      *
      * What it does:
      * Lazily resolves one water-cubemap texture from mWaterCubemap, caches
@@ -167,8 +181,9 @@ namespace moho
     [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetCubeMap() const;
 
     /**
-     * Address: 0x0089FB00 (FUN_0089FB00, ?GetNormalMap@CWaterShaderProperties@Moho@@QBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@H@Z)
-     * Mangled: ?GetNormalMap@CWaterShaderProperties@Moho@@QBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@H@Z
+     * Address: 0x0089FB00 (FUN_0089FB00,
+     * ?GetNormalMap@CWaterShaderProperties@Moho@@QBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@H@Z) Mangled:
+     * ?GetNormalMap@CWaterShaderProperties@Moho@@QBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@H@Z
      *
      * What it does:
      * Lazily resolves one indexed normal-map texture from mShaderNames[index],
@@ -206,17 +221,26 @@ namespace moho
     void copy(const CWaterShaderProperties& rhs);
   };
 
-  static_assert(offsetof(CWaterShaderProperties, mNumericState) == 0x04,
-                "CWaterShaderProperties::mNumericState offset must be 0x04");
-  static_assert(offsetof(CWaterShaderProperties, mShaderNames) == 0x84,
-                "CWaterShaderProperties::mShaderNames offset must be 0x84");
-  static_assert(offsetof(CWaterShaderProperties, mWaterCubemap) == 0xF4,
-                "CWaterShaderProperties::mWaterCubemap offset must be 0xF4");
-  static_assert(offsetof(CWaterShaderProperties, mWaterRamp) == 0x110,
-                "CWaterShaderProperties::mWaterRamp offset must be 0x110");
-  static_assert(offsetof(CWaterShaderProperties, mTextures) == 0x12C,
-                "CWaterShaderProperties::mTextures offset must be 0x12C");
-  static_assert(sizeof(CWaterShaderProperties) == 0x15C,
-                "CWaterShaderProperties size must be 0x15C");
+  static_assert(
+    offsetof(CWaterShaderProperties, mNumericState) == 0x04,
+    "CWaterShaderProperties::mNumericState offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CWaterShaderProperties, mShaderNames) == 0x84,
+    "CWaterShaderProperties::mShaderNames offset must be 0x84"
+  );
+  static_assert(
+    offsetof(CWaterShaderProperties, mWaterCubemap) == 0xF4,
+    "CWaterShaderProperties::mWaterCubemap offset must be 0xF4"
+  );
+  static_assert(
+    offsetof(CWaterShaderProperties, mWaterRamp) == 0x110,
+    "CWaterShaderProperties::mWaterRamp offset must be 0x110"
+  );
+  static_assert(
+    offsetof(CWaterShaderProperties, mTextures) == 0x12C,
+    "CWaterShaderProperties::mTextures offset must be 0x12C"
+  );
+  static_assert(sizeof(CWaterShaderProperties) == 0x15C, "CWaterShaderProperties size must be 0x15C");
 
 } // namespace moho

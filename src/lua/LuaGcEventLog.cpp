@@ -38,7 +38,9 @@ namespace
     return log;
   }
 
-  [[nodiscard]] GcEventLogEntry* FindEntry(const global_State* const globalState) noexcept
+  [[nodiscard]] GcEventLogEntry* FindEntry(
+    const global_State* const globalState
+  ) noexcept
   {
     for (GcEventLogEntry& entry : TheGcEventLog().entries) {
       if (entry.state.load(std::memory_order_acquire) == globalState) {
@@ -59,7 +61,9 @@ bool lua::GcEventLogEnabled() noexcept
   return enabled;
 }
 
-void lua::GcEventLogRegisterState(const global_State* const globalState) noexcept
+void lua::GcEventLogRegisterState(
+  const global_State* const globalState
+) noexcept
 {
   if (!GcEventLogEnabled() || globalState == nullptr) {
     return;
@@ -75,11 +79,16 @@ void lua::GcEventLogRegisterState(const global_State* const globalState) noexcep
       return;
     }
   }
-  gpg::Warnf("[LUAGC] more than %u live Lua VMs; state %u is not tracked",
-             static_cast<unsigned>(kMaxTrackedStates), static_cast<unsigned>(index));
+  gpg::Warnf(
+    "[LUAGC] more than %u live Lua VMs; state %u is not tracked",
+    static_cast<unsigned>(kMaxTrackedStates),
+    static_cast<unsigned>(index)
+  );
 }
 
-void lua::GcEventLogUnregisterState(const global_State* const globalState) noexcept
+void lua::GcEventLogUnregisterState(
+  const global_State* const globalState
+) noexcept
 {
   if (!GcEventLogEnabled() || globalState == nullptr) {
     return;
@@ -90,7 +99,9 @@ void lua::GcEventLogUnregisterState(const global_State* const globalState) noexc
   }
 }
 
-void lua::GcEventLogCountRealloc(const global_State* const globalState) noexcept
+void lua::GcEventLogCountRealloc(
+  const global_State* const globalState
+) noexcept
 {
   if (!GcEventLogEnabled()) {
     return;
@@ -101,7 +112,9 @@ void lua::GcEventLogCountRealloc(const global_State* const globalState) noexcept
 }
 
 void lua::GcEventLogCollection(
-  const global_State* const globalState, const std::size_t nblocks, const std::size_t threshold
+  const global_State* const globalState,
+  const std::size_t nblocks,
+  const std::size_t threshold
 ) noexcept
 {
   if (!GcEventLogEnabled()) {
@@ -148,7 +161,9 @@ namespace
     return now.QuadPart;
   }
 
-  [[nodiscard]] double QpcToMs(const long long ticks) noexcept
+  [[nodiscard]] double QpcToMs(
+    const long long ticks
+  ) noexcept
   {
     static const double msPerTick = [] {
       LARGE_INTEGER frequency{};
@@ -164,7 +179,10 @@ namespace
   thread_local lua::GcTimer* tCurrentGcTimer = nullptr;
 }
 
-lua::GcTimer::GcTimer(const global_State* const globalState, const std::size_t nblocks) noexcept
+lua::GcTimer::GcTimer(
+  const global_State* const globalState,
+  const std::size_t nblocks
+) noexcept
 {
   (void)globalState;
   if (GcTimingEnabled() && moho::IsSimThread()) {
@@ -185,7 +203,10 @@ long long lua::GcTimer::Now() noexcept
 }
 
 void lua::GcTimer::NoteSweep(
-  const long long classifyTicks, const long long clearTicks, const long long replayTicks, const std::size_t live,
+  const long long classifyTicks,
+  const long long clearTicks,
+  const long long replayTicks,
+  const std::size_t live,
   const std::size_t dead
 ) noexcept
 {
@@ -197,7 +218,10 @@ void lua::GcTimer::NoteSweep(
   mSweepNoted = true;
 }
 
-void lua::GcTimer::Detail(const char* const name, const long long ticks) noexcept
+void lua::GcTimer::Detail(
+  const char* const name,
+  const long long ticks
+) noexcept
 {
   for (int slot = 0; slot < 8; ++slot) {
     if (mDetailNames[slot] == nullptr || mDetailNames[slot] == name) {
@@ -208,7 +232,9 @@ void lua::GcTimer::Detail(const char* const name, const long long ticks) noexcep
   }
 }
 
-void lua::GcTimer::Lap(const EPhase phase) noexcept
+void lua::GcTimer::Lap(
+  const EPhase phase
+) noexcept
 {
   if (mLast == 0) {
     return;
@@ -231,7 +257,10 @@ lua::GcTimer::~GcTimer()
     int length = 0;
     for (int slot = 0; slot < 8 && mDetailNames[slot] != nullptr; ++slot) {
       length += std::snprintf(
-        text + length, sizeof(text) - static_cast<std::size_t>(length), " %s=%.3f", mDetailNames[slot],
+        text + length,
+        sizeof(text) - static_cast<std::size_t>(length),
+        " %s=%.3f",
+        mDetailNames[slot],
         QpcToMs(mDetailTicks[slot])
       );
     }

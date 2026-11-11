@@ -46,7 +46,13 @@ namespace moho
     void Begin(const void* viewKey);
 
     /** Appends one icon: the quad `DrawQuad` would draw around `(centerX, centerY)` with `texture`. */
-    void Add(const boost::shared_ptr<CD3DBatchTexture>& texture, float centerX, float centerY, float halfWidth, float halfHeight);
+    void Add(
+      const boost::shared_ptr<CD3DBatchTexture>& texture,
+      float centerX,
+      float centerY,
+      float halfWidth,
+      float halfHeight
+    );
 
     /**
      * Draws the icons added since `Begin` (or the last `Flush`) through

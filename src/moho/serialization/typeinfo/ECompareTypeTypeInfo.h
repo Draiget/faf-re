@@ -54,4 +54,3 @@ namespace moho
    */
   void register_ECompareTypeTypeInfoStartup();
 } // namespace moho
-

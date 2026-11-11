@@ -128,9 +128,14 @@ namespace
   [[maybe_unused]] EVisibilityModeTypeInfoBootstrap gEVisibilityModeTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_EVisibilityModeTypeInfo_700154, moho::register_EVisibilityModeTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_EVisibilityModeTypeInfo_700154,
+  moho::register_EVisibilityModeTypeInfo
+)
 
-GPG_PREREGISTER_INIT(preregister_EVisibilityModeTypeInfo_700154, moho::preregister_EVisibilityModeTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_EVisibilityModeTypeInfo_700154,
+  moho::preregister_EVisibilityModeTypeInfo
+)
