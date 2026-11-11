@@ -5,11 +5,18 @@
 #include <mutex>
 #include <utility>
 
+#include "gpg/core/containers/FastVector.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/collision/CColPrimitiveBase.h"
+#include "moho/math/MathReflection.h"
+#include "moho/path/PathTables.h"
+#include "moho/sim/COGrid.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimEditorHook.h"
+#include "moho/unit/CUnitMotion.h"
+#include "moho/unit/core/Unit.h"
 
 namespace faf::editor
 {
@@ -25,6 +32,7 @@ namespace faf::editor
 
     std::mutex gMutex;
     std::vector<Patch> gQueue;
+    bool gNoReseat = false;
 
     /** On the sim's thread, at a beat's start: the queued heights into the sim's height field. */
     void ApplyQueued(moho::Sim& sim)
@@ -50,8 +58,47 @@ namespace faf::editor
         field->SetElevationRectRaw(patch.rect, patch.samples.data(), patch.width);
         samples += patch.samples.size();
       }
-      gpg::Logf("editor: %zu height rectangles (%zu samples) into the play's sim; its height at %.0f,%.0f %.2f -> %.2f", patches.size(), samples,
-                static_cast<double>(cx), static_cast<double>(cz), static_cast<double>(before), static_cast<double>(field->GetElevation(cx, cz)));
+      // The changed area as one rectangle: its path clusters worked out again from the new heights, and the land and
+      // seabed units on it put back on the ground, as `Sim::FlattenMapRect` (0x0074B120) does after its write.
+      gpg::Rect2i area = patches.front().rect;
+      for (const Patch& patch : patches) {
+        area.x0 = std::min(area.x0, patch.rect.x0);
+        area.z0 = std::min(area.z0, patch.rect.z0);
+        area.x1 = std::max(area.x1, patch.rect.x1);
+        area.z1 = std::max(area.z1, patch.rect.z1);
+      }
+      if (sim.mPathTables != nullptr) {
+        // A footprint's slope check reaches a few cells past the cell it stands on.
+        constexpr int kPad = 4;
+        sim.mPathTables->DirtyClusters(gpg::Rect2i{std::max(0, area.x0 - kPad), std::max(0, area.z0 - kPad),
+                                                   std::min(field->width - 1, area.x1 + kPad), std::min(field->height - 1, area.z1 + kPad)});
+      }
+      int reseated = 0;
+      if (sim.mOGrid != nullptr && !gNoReseat) {
+        const Wm3::Vector3f centre{static_cast<float>(area.x0 + area.x1) * 0.5f, 0.0f, static_cast<float>(area.z0 + area.z1) * 0.5f};
+        const Wm3::Vector3f extents{static_cast<float>(area.x1 - area.x0), 100.0f, static_cast<float>(area.z1 - area.z0)};
+        const moho::VAxes3 axes{Wm3::Quaternionf(0.0f, 0.0f, 0.0f, 0.0f)};
+        const Wm3::Box3f box{centre, &axes.vX, &extents.x};
+        gpg::core::FastVectorN<moho::CollisionResult, 10> hits{};
+        sim.mOGrid->CollectEntitiesInBox(hits, moho::ENTITYTYPE_Unit, box);
+        for (const moho::CollisionResult& hit : hits) {
+          moho::Unit* const unit = hit.sourceEntity->IsUnit();
+          if (unit == nullptr || unit->IsDead() || unit->DestroyQueued() ||
+              (unit->mVarDat.mLayerMask != moho::LAYER_Land && unit->mVarDat.mLayerMask != moho::LAYER_Seabed)) {
+            continue;
+          }
+          if (unit->UnitMotion != nullptr) {
+            unit->UnitMotion->mProcessSurfaceCollision = true; // its motion puts it on the ground next tick
+          } else {
+            unit->Warp(unit->GetTransform()); // a structure: at once
+          }
+          ++reseated;
+        }
+      }
+      gpg::Logf("editor: %zu height rectangles (%zu samples) into the play's sim; its height at %.0f,%.0f %.2f -> %.2f; %d units re-seated, "
+                "path clusters in %d,%d..%d,%d redone",
+                patches.size(), samples, static_cast<double>(cx), static_cast<double>(cz), static_cast<double>(before),
+                static_cast<double>(field->GetElevation(cx, cz)), reseated, area.x0, area.z0, area.x1, area.z1);
     }
   } // namespace
 
@@ -94,6 +141,11 @@ namespace faf::editor
       }
     }
     moho::gSimBeforeBeat = &ApplyQueued;
+  }
+
+  void SetLiveHeightsNoReseat(const bool off) noexcept
+  {
+    gNoReseat = off;
   }
 
   void DropLiveHeights()

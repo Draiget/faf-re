@@ -40,6 +40,7 @@
 #include "editor/tools/EdHeightFile.h"
 #include "editor/tools/EdTextureLibrary.h"
 #include "editor/doc/EdMapFile.h"
+#include "editor/view/EdLiveTerrain.h"
 #include "editor/view/EdMapScene.h"
 #include "gpg/core/diagnostics/CrashHooks.h"
 #include "gpg/core/diagnostics/CrashReport.h"
@@ -1368,9 +1369,11 @@ namespace faf::editor
               step = 3;
             }
           }
-          // `/playheighttest` (test runs, with /playeditorview): in the editor's view, a raise 25 units beside the first
-          // commander, then the sim's own terrain height there read through its Lua (WPE.40: the play's sim takes it).
+          // `/playheighttest` (test runs, with /playeditorview): in the editor's view, a raise under the first commander,
+          // then the sim's own terrain height there and the commander's height read through its Lua (WPE.40: the play's
+          // sim takes it; WPE.47: the commander stands on the new ground).
           if (moho::CFG_GetArgOption("/playheighttest", 0, nullptr) && mScene.OverPlay()) {
+            SetLiveHeightsNoReseat(moho::CFG_GetArgOption("/playnoreseat", 0, nullptr));
             static int step = 0;
             static double stepAt = 0.0;
             static float x = 0.0f;
@@ -1380,7 +1383,7 @@ namespace faf::editor
               for (const LiveUnit& u : mScene.LiveNow()) {
                 if (u.blueprint.find("0001") != std::string::npos && step == 0) {
                   unitId = u.id;
-                  x = u.x + 25.0f;
+                  x = u.x;
                   z = u.z;
                   step = 1;
                   stepAt = now + 1.0;
@@ -1400,6 +1403,7 @@ namespace faf::editor
               std::snprintf(lua, sizeof(lua), "LOG(string.format('editor: height test: the sim reads %%.2f at %.0f,%.0f', GetTerrainHeight(%.1f, %.1f)))",
                             static_cast<double>(x), static_cast<double>(z), static_cast<double>(x), static_cast<double>(z));
               LiveUnitDo(unitId, lua);
+              LiveUnitDo(unitId, "local p = u:GetPosition() LOG('editor: height test: the commander at y ' .. p[2] .. ', ground ' .. GetTerrainHeight(p[1], p[3]))");
               step = 3;
             }
           }
