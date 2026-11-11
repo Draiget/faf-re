@@ -673,6 +673,28 @@ namespace faf::editor
         }
       }
     }
+    // The play's selected units (in front of a play): a red ring each, and where a drag puts them.
+    {
+      std::vector<EdTools::ViewRing> live;
+      for (const std::uint32_t id : mLiveSelection) {
+        for (const LiveUnit& unit : mLiveNow) {
+          if (unit.id == id) {
+            live.push_back({unit.x, unit.z, 3.0f, 0xF0FF5040u});
+            if (mDragLive) {
+              live.push_back({unit.x + mLiveToX - mLiveFromX, unit.z + mLiveToZ - mLiveFromZ, 3.0f, 0x90FFFFFFu});
+            }
+          }
+        }
+      }
+      for (const EdTools::ViewRing& ring : live) {
+        for (int s = 0; s < 24; ++s) {
+          const float a0 = 2.0f * kPi * static_cast<float>(s) / 24.0f;
+          const float a1 = 2.0f * kPi * static_cast<float>(s + 1) / 24.0f;
+          batcher->DrawLine(groundVertex(ring.x + std::cos(a0) * ring.radius, ring.z + std::sin(a0) * ring.radius, ring.colour, 1.0f),
+                            groundVertex(ring.x + std::cos(a1) * ring.radius, ring.z + std::sin(a1) * ring.radius, ring.colour, 1.0f));
+        }
+      }
+    }
     // Rings a panel asks for (a choice's markers or units under the mouse in the Adaptive Map window): two circles each.
     for (const EdTools::ViewRing& ring : mTools->ViewRings()) {
       for (const float r : {ring.radius, ring.radius * 0.8f}) {
@@ -805,10 +827,18 @@ namespace faf::editor
     // The props first: their blueprints are the kept rules', which the next play takes.
     DeleteProps();
     moho::ED_SetHook(nullptr);
-    // In front of a play: the session's world views and interface drawn again.
+    // In front of a play: the session's world views and interface drawn again, its units shown as the game has them.
     if (mOverPlay) {
       moho::gViewportOnlyView = nullptr;
       moho::ren_Ui = mUiWas;
+      SetLiveUnitsHidden(false);
+      (void)LiveUnits();
+      mLiveNow.clear();
+      mLiveSelection.clear();
+      mDragLive = false;
+      if (mTools != nullptr) {
+        mTools->SetLiveSelection({});
+      }
       gpg::Logf("editor: the game's view again");
     }
     if (moho::ren_Viewport != nullptr && mWorldView != nullptr) {
@@ -1780,6 +1810,25 @@ namespace faf::editor
       moho::ren_Ui = mUiWas;
       moho::REN_SetWldMap(mMap);
       gpg::Logf("editor: the play ended behind the editor's view");
+    }
+    // The play's own units, while its game runs behind this view: picked, selected, moved (EdLiveUnits).
+    if (mOverPlay) {
+      if (mTools != nullptr) {
+        SetLiveUnitsHidden(!mTools->ShowGameUnits());
+      }
+      mLiveNow = LiveUnits();
+      mLiveSelection.erase(std::remove_if(mLiveSelection.begin(), mLiveSelection.end(),
+                                          [&](const std::uint32_t id) {
+                                            return std::none_of(mLiveNow.begin(), mLiveNow.end(), [&](const LiveUnit& u) { return u.id == id; });
+                                          }),
+                           mLiveSelection.end());
+    } else if (!mLiveNow.empty() || !mLiveSelection.empty()) {
+      mLiveNow.clear();
+      mLiveSelection.clear();
+      mDragLive = false;
+    }
+    if (mTools != nullptr) {
+      mTools->SetLiveSelection(mLiveSelection);
     }
     UpdateDeposits();
     UpdateEffects();
@@ -5660,6 +5709,50 @@ namespace faf::editor
         ::SetFocus(window);
         return true;
       }
+      if (mTools != nullptr && mTools->SelectToolActive() && mOverPlay && mTools->ShowGameUnits()) {
+        // In front of a play: the game's own units first (the nearest within reach of the click); Ctrl adds or takes
+        // one out; a drag warps the selected ones by as much (EdLiveUnits).
+        float groundX = 0.0f;
+        float groundZ = 0.0f;
+        if (GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
+          // Entity ids start at 0 (army 0's first unit, its commander): found or not is its own flag.
+          std::uint32_t hit = 0;
+          bool found = false;
+          float best = 4.0f;
+          for (const LiveUnit& unit : mLiveNow) {
+            const float d = std::hypot(unit.x - groundX, unit.z - groundZ);
+            if (d < best) {
+              best = d;
+              hit = unit.id;
+              found = true;
+            }
+          }
+          const bool add = (wParam & MK_CONTROL) != 0;
+          if (found) {
+            const auto found = std::find(mLiveSelection.begin(), mLiveSelection.end(), hit);
+            if (add && found != mLiveSelection.end()) {
+              mLiveSelection.erase(found);
+              return true;
+            }
+            if (found == mLiveSelection.end()) {
+              if (!add) {
+                mLiveSelection.clear();
+              }
+              mLiveSelection.push_back(hit);
+            }
+            ClearAllSelections();
+            mDragLive = true;
+            mLiveFromX = mLiveToX = groundX;
+            mLiveFromZ = mLiveToZ = groundZ;
+            ::SetCapture(window);
+            ::SetFocus(window);
+            return true;
+          }
+          if (!add) {
+            mLiveSelection.clear();
+          }
+        }
+      }
       if (mTools != nullptr && mTools->SelectToolActive()) {
         // The gizmo moves what is selected; else a click picks the nearest marker, unit, prop or decal (Ctrl adds or
         // takes one out; another kind starts a new selection), and a drag moves the selection.
@@ -5813,6 +5906,23 @@ namespace faf::editor
     }
     case WM_LBUTTONUP:
       mGizmoDrag = GizmoPart::None;
+      if (mDragLive) {
+        // The game's units dragged: each warped by the drag (the sim's own Warp, on the ground there).
+        mDragLive = false;
+        ::ReleaseCapture();
+        const float dx = mLiveToX - mLiveFromX;
+        const float dz = mLiveToZ - mLiveFromZ;
+        if (std::hypot(dx, dz) > 0.5f) {
+          for (const std::uint32_t id : mLiveSelection) {
+            for (const LiveUnit& unit : mLiveNow) {
+              if (unit.id == id) {
+                LiveUnitWarp(id, unit.x + dx, unit.z + dz);
+              }
+            }
+          }
+        }
+        return true;
+      }
       if (mWaterBodyHandle != -2) {
         WaterBodyRelease();
         return true;
@@ -5985,6 +6095,10 @@ namespace faf::editor
       }
       return true;
     case WM_MOUSEMOVE: {
+      if (mDragLive) {
+        (void)GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), mLiveToX, mLiveToZ);
+        return true;
+      }
       if (mWaterBodyHandle != -2) {
         WaterBodyDrag(at);
         return true;

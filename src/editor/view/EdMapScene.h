@@ -12,6 +12,7 @@
 #include <Windows.h>
 
 #include "editor/graph/EdTextureGraph.h"
+#include "editor/view/EdLiveUnits.h"
 #include "editor/tools/EdViewAids.h"
 #include "editor/view/EdParticlePreview.h"
 #include "editor/tools/EdTerrainTypes.h"
@@ -67,6 +68,9 @@ namespace faf::editor
     void Update(float frameSeconds, bool playIdle, bool editorViewInPlay = false);
     /** The editor's view is in front of a running play (the session's views and interface wait). */
     [[nodiscard]] bool OverPlay() const noexcept { return mOverPlay; }
+    /** In front of a play: its units now, and the ones selected (test runs select some). */
+    [[nodiscard]] const std::vector<LiveUnit>& LiveNow() const noexcept { return mLiveNow; }
+    void SelectLive(std::vector<std::uint32_t> ids) { mLiveSelection = std::move(ids); }
 
     /** Leaves the viewport (the document is about to drop its map). */
     void Detach();
@@ -494,6 +498,14 @@ namespace faf::editor
     bool mOverPlay = false;
     moho::CWldMap* mSessionMap = nullptr;
     bool mUiWas = true;
+    /** In front of a play: its units now, the ones selected (entity ids), and a drag of them (ground from / to). */
+    std::vector<LiveUnit> mLiveNow;
+    std::vector<std::uint32_t> mLiveSelection;
+    bool mDragLive = false;
+    float mLiveFromX = 0.0f;
+    float mLiveFromZ = 0.0f;
+    float mLiveToX = 0.0f;
+    float mLiveToZ = 0.0f;
     std::size_t mPreviewCulledCount = 0;
     bool mDragMarkers = false;
     bool mMarkersMoved = false;

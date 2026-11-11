@@ -494,6 +494,11 @@ namespace faf::editor
       float radius = 3.0f;
       std::uint32_t colour = 0xF0FFA040u;
     };
+    /** In front of a play: the game's units selected in the editor's view (entity ids), for the Properties panel. */
+    void SetLiveSelection(std::vector<std::uint32_t> ids) { mLiveSelection = std::move(ids); }
+    [[nodiscard]] const std::vector<std::uint32_t>& LiveSelection() const noexcept { return mLiveSelection; }
+    /** The game's units drawn in the editor's view in front of a play (hidden: not drawn, not picked). */
+    [[nodiscard]] bool& ShowGameUnits() noexcept { return mShowGameUnits; }
     /** The map's props and units still loading (the view says so, else an empty map looks finished; user report). */
     void SetModelsLoading(const bool loading) noexcept { mModelsLoading = loading; }
     [[nodiscard]] bool ModelsLoading() const noexcept { return mModelsLoading; }
@@ -977,6 +982,8 @@ namespace faf::editor
     bool mUnitGroupAsked = false;
     std::vector<ViewRing> mViewRings;
     bool mModelsLoading = false;
+    std::vector<std::uint32_t> mLiveSelection;
+    bool mShowGameUnits = true;
     std::set<std::pair<std::string, std::string>> mPreviewHiddenUnits;
     std::set<std::string> mPreviewHiddenMarkers;
     void DrawUnitGroup(const UnitGroup& group, std::vector<std::string>& path);

@@ -436,6 +436,12 @@ namespace faf::editor
           ImGui::PopStyleColor();
           tip(editorView ? "The editor's view of the map, the play running on behind it: F6 for the game's view"
                          : "The game's view: F6 for the editor's view of the map (the play keeps running)");
+          if (editorView) {
+            ImGui::SameLine();
+            ImGui::Checkbox("Game units", &mTools.ShowGameUnits());
+            tip("The play's own units in the editor's view: shown (click one to select it, drag to move it, change it in "
+                "Properties) or hidden");
+          }
         }
       }
       divider();

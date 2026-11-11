@@ -69,6 +69,8 @@ set(FAF_EDITOR_SOURCES
   ui/EdTexturePicker.cpp
   ui/EdCodeEditor.cpp
   ui/EdAdaptiveWindow.cpp
+  ui/EdLiveUnitPanel.cpp
+  view/EdLiveUnits.cpp
   doc/EdAdaptiveModel.cpp
   doc/EdLuaSyntax.cpp
   ui/EdNodeCanvas.cpp

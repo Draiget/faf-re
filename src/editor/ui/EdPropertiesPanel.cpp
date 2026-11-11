@@ -69,6 +69,12 @@ namespace faf::editor
       }
       ImGui::Spacing();
     }
+    // The game's own units selected in the editor's view in front of a play.
+    if (!mTools.LiveSelection().empty()) {
+      DrawLiveUnitPanel();
+      ImGui::End();
+      return;
+    }
     const SelectionProperties& now = mTools.SelectionPropertiesNow();
     if (now.kind == SelectionProperties::Kind::None) {
       mPropertiesEditing = false;

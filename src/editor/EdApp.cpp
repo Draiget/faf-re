@@ -1225,6 +1225,85 @@ namespace faf::editor
               mShell->EditorViewInPlay() = false;
             }
           }
+          // `/playlivetest` (test runs, with /playeditorview): in the editor's view, the commander selected, its state
+          // logged as the Properties panel reads it, then an enhancement added, its health halved and a warp, and the
+          // state logged again (WPE.43).
+          if (moho::CFG_GetArgOption("/playlivetest", 0, nullptr) && mScene.OverPlay()) {
+            static int step = 0;
+            static double stepAt = 0.0;
+            static std::uint32_t unitId = 0;
+            const auto logInfo = [&](const char* const when) {
+              LiveUnitInfo info;
+              try {
+                info = ReadLiveUnit(unitId);
+              } catch (const std::exception& error) {
+                gpg::Warnf("editor: live test: reading unit %u threw: %s", unitId, error.what());
+              } catch (...) {
+                gpg::Warnf("editor: live test: reading unit %u threw", unitId);
+              }
+              std::string toggles;
+              for (const LiveUnitInfo::Toggle& t : info.toggles) {
+                toggles += " " + ToggleName(t.cap) + "=" + (t.on ? "set" : "clear");
+              }
+              std::string has;
+              for (const LiveUnitInfo::Enhancement& e : info.enhancements) {
+                has += e.has ? " " + e.name : std::string();
+              }
+              float x = 0.0f, z = 0.0f;
+              for (const LiveUnit& u : LiveUnits()) {
+                if (u.id == unitId) {
+                  x = u.x;
+                  z = u.z;
+                }
+              }
+              gpg::Logf("editor: live test %s: %s %s army %d health %.0f/%.0f at %.1f,%.1f; %zu enhancements, has:%s; toggles:%s", when,
+                        info.blueprint.c_str(), info.name.c_str(), info.army, static_cast<double>(info.health), static_cast<double>(info.maxHealth),
+                        static_cast<double>(x), static_cast<double>(z), info.enhancements.size(), has.empty() ? " none" : has.c_str(),
+                        toggles.empty() ? " none" : toggles.c_str());
+              return info;
+            };
+            if (step == 0) {
+              static bool listed = false;
+              if (!listed) {
+                listed = true;
+                gpg::Logf("editor: live test: %zu units, the first %s", mScene.LiveNow().size(),
+                          mScene.LiveNow().empty() ? "-" : mScene.LiveNow().front().blueprint.c_str());
+              }
+              bool found = false;
+              for (const LiveUnit& u : mScene.LiveNow()) {
+                // A commander (its blueprint ...0001); its entity id may well be 0 (army 0's first unit).
+                if (u.blueprint.find("0001") != std::string::npos && !found) {
+                  unitId = u.id;
+                  found = true;
+                }
+              }
+              if (found) {
+                mScene.SelectLive({unitId});
+                step = 1;
+                stepAt = now + 1.0;
+              }
+            } else if (step == 1 && now >= stepAt) {
+              gpg::Logf("editor: live test: reading unit %u", unitId);
+              const LiveUnitInfo info = logInfo("before");
+              for (const LiveUnitInfo::Enhancement& e : info.enhancements) {
+                if (!e.has && e.prerequisite.empty()) {
+                  LiveUnitDo(unitId, "u:CreateEnhancement('" + e.name + "')");
+                  break;
+                }
+              }
+              LiveUnitDo(unitId, "u:SetHealth(u, u:GetMaxHealth() * 0.5)");
+              for (const LiveUnit& u : LiveUnits()) {
+                if (u.id == unitId) {
+                  LiveUnitWarp(unitId, u.x + 20.0f, u.z);
+                }
+              }
+              step = 2;
+              stepAt = now + 2.0;
+            } else if (step == 2 && now >= stepAt) {
+              (void)logInfo("after");
+              step = 3;
+            }
+          }
         } else if (playIdle) {
           // Armed again only once the play is over (a play's other phases aren't its end).
           playingSince = -1.0;
