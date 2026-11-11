@@ -42,8 +42,11 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/diagnostics/BuildInfo.h"
 #include "gpg/core/utils/Logging.h"
+#include "gpg/core/algorithms/MD5.h"
 #include "headless/ReplayLuaState.h"
 #include "headless/SessionLoad.h"
+#include "headless/StateDigest.h"
+#include "moho/sim/SimDebugCommandRegistrations.h"
 #include "gpg/core/utils/Global.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaTableIterator.h"
@@ -103,7 +106,8 @@ namespace
 
   constexpr const char* kUsage =
     "usage: server --match <file.lua> --out <dir> /init <init.lua> | --data <dir> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
-    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view observe|disconnect] [--lobby-seconds <n>] [--lobby-away-seconds <n>] [--stats-every <beats>] [--congestion-control] [--nftables-out <file> [--nftables-only] [--unlisted-pps <n>] [--unlisted-total-pps <n>]] [--unvalidated-policy]\n";
+    "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view observe|disconnect] [--lobby-seconds <n>] [--lobby-away-seconds <n>] [--stats-every <beats>] [--congestion-control] [--nftables-out <file> [--nftables-only] [--unlisted-pps <n>] [--unlisted-total-pps <n>]] [--unvalidated-policy] "
+    "[--checksum-period <beats>] [--digests <file>] [--state-digests <file>]\n";
 
   constexpr double kDefaultStatusMinutes = 10.0;
   // Plan WP13.7: how long a defeated player keeps their view with `DefeatedPlayerView = "disconnect"`: the defeat banner
@@ -118,6 +122,12 @@ namespace
   constexpr double kMaxCatchUpSeconds = 1.0;
 
   using Clock = std::chrono::steady_clock;
+
+  /** Plan WP16.1: a beat the sim wrote no checksum digest for (`--digests` skips it, as headless does). */
+  [[nodiscard]] bool IsZeroDigest(const gpg::MD5Digest& digest) noexcept
+  {
+    return (digest.vals[0] | digest.vals[1] | digest.vals[2] | digest.vals[3]) == 0u;
+  }
 
   volatile std::sig_atomic_t gStopSignal = 0;
   volatile std::sig_atomic_t gPauseRequests = 0;
@@ -938,6 +948,41 @@ namespace
     // Plan WP2.2: a lobby before the game, the server signalling it. Until launch interception (WP2.14) it stays
     // open this long and then the game starts as the match file says.
     const double lobbySeconds = ReadOption("--lobby-seconds", text) ? std::atof(text.c_str()) : 0.0;
+    // Plan WP16.1 (I2): per-beat digests beside the replay, in headless's formats, so the game's replay played back
+    // elsewhere (Windows x64, x86) compares beat by beat (tools/server-i2): `--digests` the sim's own checksum digest
+    // of every checksummed beat, `--state-digests` what the sim published each beat. The checksums the server records
+    // in its replay are ignored on playback (source 255), hence the side files. `--checksum-period` is
+    // `sim_ChecksumPeriod` (it changes only the checksum, never the sim); 1 digests every beat.
+    std::string digestPath;
+    std::string stateDigestPath;
+    (void)ReadOption("--digests", digestPath);
+    (void)ReadOption("--state-digests", stateDigestPath);
+    if (ReadOption("--checksum-period", text)) {
+      const int period = std::atoi(text.c_str());
+      if (period <= 0) {
+        end.error = "--checksum-period takes a number of beats above 0, not " + text;
+        Say("Can't host: %s", end.error.c_str());
+        return kExitBadInput;
+      }
+      moho::gSimConVar_sim_ChecksumPeriod.mDefaultValue = period;
+    }
+    const auto openDigests = [&end](const std::string& path) -> std::unique_ptr<std::FILE, int (*)(std::FILE*)> {
+      std::unique_ptr<std::FILE, int (*)(std::FILE*)> file(nullptr, &std::fclose);
+      if (!path.empty()) {
+        file.reset(std::fopen(path.c_str(), "w"));
+        if (!file) {
+          end.error = "can't write " + path;
+        }
+      }
+      return file;
+    };
+    const auto digestFile = openDigests(digestPath);
+    const auto stateDigestFile = openDigests(stateDigestPath);
+    if (!end.error.empty()) {
+      Say("Can't host: %s", end.error.c_str());
+      return kExitBadInput;
+    }
+    std::uint64_t digestsWritten = 0;
 
     LuaPlus::LuaState* const state = faf::headless::ReplayLuaState();
     LuaPlus::LuaObject config;
@@ -2245,6 +2290,19 @@ namespace
         ++end.beats;
         end.lastBeat = packet->mCurBeat;
         lastBeatAt = SecondsSince(playStart);
+        // Plan WP16.1: as headless writes them (ReplayRunner), line for line.
+        if (digestFile && packet->mCurBeat >= 0) {
+          if (const moho::Sim* const sim = simDriver->GetSimForReplayCheck(); sim != nullptr) {
+            const gpg::MD5Digest& digest = sim->mSimHashes[static_cast<std::uint32_t>(packet->mCurBeat) & 0x7Fu];
+            if (!IsZeroDigest(digest)) {
+              std::fprintf(digestFile.get(), "%d %s\n", packet->mCurBeat, digest.ToString().c_str());
+              ++digestsWritten;
+            }
+          }
+        }
+        if (stateDigestFile) {
+          std::fprintf(stateDigestFile.get(), "%d %016llx\n", packet->mCurBeat, static_cast<unsigned long long>(faf::headless::DigestPublishedState(*packet)));
+        }
         if (net) {
           net->NoteBeat(end.lastBeat);
         }
@@ -2351,6 +2409,10 @@ namespace
       moho::SSyncData* rawPacket = nullptr;
       driver->GetSyncData(rawPacket);
       delete rawPacket;
+    }
+    if (digestFile || stateDigestFile) {
+      Say("Digests: %llu checksum digests (period %d), state digests for %d beats, up to beat %d", static_cast<unsigned long long>(digestsWritten),
+          static_cast<int>(moho::gSimConVar_sim_ChecksumPeriod.mDefaultValue), stateDigestFile ? end.beats : 0, end.lastBeat);
     }
     sessionState.reset();
     rules.reset();

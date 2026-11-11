@@ -341,6 +341,7 @@ add_executable(server
   "${PROJECT_SOURCE_DIR}/src/server/ServerViews.cpp"
   "${PROJECT_SOURCE_DIR}/src/headless/SessionLoad.cpp"
   "${PROJECT_SOURCE_DIR}/src/headless/ReplayLuaState.cpp"
+  "${PROJECT_SOURCE_DIR}/src/headless/StateDigest.cpp"
 )
 target_link_libraries(server PRIVATE faf_sim faf_netchannel faf_monocypher)
 target_compile_definitions(server PRIVATE FAF_SERVER_MODE=1)
