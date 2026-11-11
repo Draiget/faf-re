@@ -526,7 +526,7 @@ namespace moho
 
   void PlannedFactoryManager::QueuePlannedFactoryOrders(const std::string& bpId, const int count, const bool clearQueue)
   {
-    if (!IsFactoryPreOrdersEnabled() || bpId.empty() || count <= 0) {
+    if (!IsFactoryPreOrdersEnabled() || mBufferingSuppressed || bpId.empty() || count <= 0) {
       return;
     }
     gpg::Logf("[PlannedFactory] QueuePlannedFactoryOrders: %dx '%s' (clear=%d) for %zu selected proxies",
@@ -543,7 +543,7 @@ namespace moho
 
   void PlannedFactoryManager::SetSelectedPlannedFactoriesRallyPoint(const Vector3f& pos)
   {
-    if (!IsFactoryPreOrdersEnabled()) {
+    if (!IsFactoryPreOrdersEnabled() || mBufferingSuppressed) {
       return;
     }
     for (auto* const proxy : GetSelectedProxies()) {
@@ -555,7 +555,7 @@ namespace moho
 
   void PlannedFactoryManager::SetSelectedPlannedFactoriesRepeat(const bool repeat)
   {
-    if (!IsFactoryPreOrdersEnabled()) {
+    if (!IsFactoryPreOrdersEnabled() || mBufferingSuppressed) {
       return;
     }
     for (auto* const proxy : GetSelectedProxies()) {
@@ -766,7 +766,7 @@ namespace moho
     if (unit == nullptr) {
       return false;
     }
-    Wm3::Vec3f uPos = unit->GetPosition();
+    Wm3::Vec3f uPos = unit->mTransform.pos_;
     if (uPos.x == 0.0f && uPos.z == 0.0f) {
       uPos = unit->mVariableData.mCurTransform.pos_;
     }

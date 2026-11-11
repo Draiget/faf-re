@@ -4,6 +4,7 @@
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/sim/PlannedFactoryProxy.h"
 #include "moho/sim/Sim.h"
+#include "moho/unit/core/UserUnit.h"
 #include "lua/LuaObject.h"
 
 namespace moho
@@ -856,4 +857,336 @@ TEST(PlannedFactoryPreOrdersTest, DispatchPreOrdersZeroPositionHandling)
   // Position at (0, 0, 0) indicates uninitialized / un-replicated position, should return false
   EXPECT_FALSE(mgr.DispatchPreOrdersForUnit(reinterpret_cast<moho::UserUnit*>(0x1000), {0.0f, 0.0f, 0.0f}));
   EXPECT_EQ(mgr.GetCount(), 1u);
+}
+
+TEST(PlannedFactoryPreOrdersTest, ProxyEntityIdRangeClassification)
+{
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  // Null check safety
+  EXPECT_FALSE(mgr.IsPlannedProxyUnit(nullptr));
+
+  alignas(moho::UserUnit) std::byte unitStorage[sizeof(moho::UserUnit)]{};
+  auto* testUnit = reinterpret_cast<moho::UserUnit*>(unitStorage);
+
+  // Normal unit entity IDs: low 16 bits outside the 0x7000 mask
+  const std::uint32_t normalEntityIds[] = {
+    0x00100001u, // Standard unit index 1
+    0x00100042u, // Standard unit index 66
+    0x00106FFFu, // Index right below proxy range
+    0x00108000u, // Index above proxy range
+    0x00200100u, // Different army, normal index
+  };
+
+  for (const auto entId : normalEntityIds) {
+    testUnit->mParams.mEntityId = entId;
+    EXPECT_FALSE(mgr.IsPlannedProxyUnit(testUnit))
+      << "Entity ID 0x" << std::hex << entId << " was incorrectly classified as a planned proxy";
+  }
+
+  // Planned proxy entity IDs: low 16 bits have (index & 0x7000u) == 0x7000u
+  const std::uint32_t proxyEntityIds[] = {
+    0x00107000u, // First proxy index
+    0x00107001u, // Proxy ID 1
+    0x00107042u, // Proxy ID 66
+    0x00107FFFu, // Max proxy index in 0x7000 band
+    0x00307010u, // Army 3 proxy index
+  };
+
+  for (const auto entId : proxyEntityIds) {
+    testUnit->mParams.mEntityId = entId;
+    EXPECT_TRUE(mgr.IsPlannedProxyUnit(testUnit))
+      << "Entity ID 0x" << std::hex << entId << " should be classified as a planned proxy";
+  }
+
+  // Verify that IsPlannedProxyUnit also classifies via pointer equality with mProxies
+  testUnit->mParams.mEntityId = 0x00100055u; // Non-proxy entity ID
+  EXPECT_FALSE(mgr.IsPlannedProxyUnit(testUnit));
+
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(10, 0, nullptr, {50.0f, 0.0f, 50.0f});
+  ASSERT_NE(proxy, nullptr);
+  proxy->mUserUnit = testUnit;
+
+  EXPECT_TRUE(mgr.IsPlannedProxyUnit(testUnit));
+  EXPECT_EQ(mgr.FindByUserUnit(testUnit), proxy);
+
+  // Once detached or removed, pointer fallback is dropped
+  proxy->mUserUnit = nullptr;
+  EXPECT_FALSE(mgr.IsPlannedProxyUnit(testUnit));
+  EXPECT_EQ(mgr.FindByUserUnit(testUnit), nullptr);
+
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, ShiftClickOrderCoalescingAndSequencePreservation)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(1, 0, nullptr, {100.0f, 0.0f, 100.0f});
+  ASSERT_NE(proxy, nullptr);
+  mgr.SelectProxy(proxy->mProxyId, false);
+
+  // Simulate 8 Shift-clicks of 5 units of 'url0107' (Cybran Mantis)
+  for (int i = 0; i < 8; ++i) {
+    mgr.QueuePlannedFactoryOrders("url0107", 5, /*clearQueue=*/false);
+  }
+
+  // Consecutive same-blueprint clicks must coalesce into a single queue entry
+  ASSERT_EQ(proxy->mPreOrders.size(), 1u);
+  EXPECT_EQ(proxy->mPreOrders[0].blueprintId, "url0107");
+  EXPECT_EQ(proxy->mPreOrders[0].count, 40);
+
+  // Simulate 2 Shift-clicks of 5 units of 'url0103' (Cybran Medusa)
+  for (int i = 0; i < 2; ++i) {
+    mgr.QueuePlannedFactoryOrders("url0103", 5, /*clearQueue=*/false);
+  }
+
+  // Different blueprint appends a second queue entry
+  ASSERT_EQ(proxy->mPreOrders.size(), 2u);
+  EXPECT_EQ(proxy->mPreOrders[0].blueprintId, "url0107");
+  EXPECT_EQ(proxy->mPreOrders[0].count, 40);
+  EXPECT_EQ(proxy->mPreOrders[1].blueprintId, "url0103");
+  EXPECT_EQ(proxy->mPreOrders[1].count, 10);
+
+  // Non-consecutive click: 1 Shift-click of 5 units of 'url0107' again
+  // Production queue order MUST be preserved: [40x Mantis, 10x Medusa, 5x Mantis]
+  mgr.QueuePlannedFactoryOrders("url0107", 5, /*clearQueue=*/false);
+  ASSERT_EQ(proxy->mPreOrders.size(), 3u);
+  EXPECT_EQ(proxy->mPreOrders[0].blueprintId, "url0107");
+  EXPECT_EQ(proxy->mPreOrders[0].count, 40);
+  EXPECT_EQ(proxy->mPreOrders[1].blueprintId, "url0103");
+  EXPECT_EQ(proxy->mPreOrders[1].count, 10);
+  EXPECT_EQ(proxy->mPreOrders[2].blueprintId, "url0107");
+  EXPECT_EQ(proxy->mPreOrders[2].count, 5);
+
+  // Regular click without Shift: clearQueue=true wipes previous queue and starts fresh
+  mgr.QueuePlannedFactoryOrders("url0101", 1, /*clearQueue=*/true);
+  ASSERT_EQ(proxy->mPreOrders.size(), 1u);
+  EXPECT_EQ(proxy->mPreOrders[0].blueprintId, "url0101");
+  EXPECT_EQ(proxy->mPreOrders[0].count, 1);
+
+  // Edge cases: empty blueprint ID and non-positive counts are safely ignored
+  mgr.QueuePlannedFactoryOrders("", 5, false);
+  mgr.QueuePlannedFactoryOrders("url0101", 0, false);
+  mgr.QueuePlannedFactoryOrders("url0101", -3, false);
+  ASSERT_EQ(proxy->mPreOrders.size(), 1u);
+  EXPECT_EQ(proxy->mPreOrders[0].count, 1);
+
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, ScopedBufferingSuppressionPreventsRebuffering)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(10, 0, nullptr, {20.0f, 0.0f, 20.0f});
+  ASSERT_NE(proxy, nullptr);
+  mgr.SelectProxy(proxy->mProxyId, false);
+
+  // Initially unsuppressed: orders queue normally
+  EXPECT_FALSE(mgr.IsBufferingSuppressed());
+  mgr.QueuePlannedFactoryOrders("uel0201", 3, false);
+  ASSERT_EQ(proxy->mPreOrders.size(), 1u);
+  EXPECT_EQ(proxy->mPreOrders[0].count, 3);
+
+  // Enter ScopedBufferingSuppression scope (as occurs during DispatchPreOrdersForUnit)
+  {
+    moho::PlannedFactoryManager::ScopedBufferingSuppression suppression;
+    EXPECT_TRUE(mgr.IsBufferingSuppressed());
+
+    // All buffering operations during suppression MUST be silent no-ops
+    mgr.QueuePlannedFactoryOrders("uel0201", 10, false);
+    mgr.QueuePlannedFactoryOrders("uel0106", 5, false);
+    mgr.SetSelectedPlannedFactoriesRallyPoint({100.0f, 0.0f, 100.0f});
+    mgr.SetSelectedPlannedFactoriesRepeat(true);
+
+    // Proxy state must remain completely untouched
+    ASSERT_EQ(proxy->mPreOrders.size(), 1u);
+    EXPECT_EQ(proxy->mPreOrders[0].count, 3);
+    EXPECT_FALSE(proxy->mHasRallyPoint);
+    EXPECT_FALSE(proxy->mRepeatBuild);
+  }
+
+  // Outside scope: suppression automatically lifted
+  EXPECT_FALSE(mgr.IsBufferingSuppressed());
+
+  // Subsequent orders queue normally again
+  mgr.QueuePlannedFactoryOrders("uel0201", 2, false);
+  ASSERT_EQ(proxy->mPreOrders.size(), 1u);
+  EXPECT_EQ(proxy->mPreOrders[0].count, 5);
+
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, MultiProxyBroadcastSelection)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  auto* proxyA = mgr.RegisterOrUpdatePlannedFactory(1, 0, nullptr, {10.0f, 0.0f, 10.0f});
+  auto* proxyB = mgr.RegisterOrUpdatePlannedFactory(2, 0, nullptr, {20.0f, 0.0f, 20.0f});
+  auto* proxyC = mgr.RegisterOrUpdatePlannedFactory(3, 0, nullptr, {30.0f, 0.0f, 30.0f});
+  ASSERT_NE(proxyA, nullptr);
+  ASSERT_NE(proxyB, nullptr);
+  ASSERT_NE(proxyC, nullptr);
+
+  // Select A and B; leave C unselected
+  mgr.SelectProxy(proxyA->mProxyId, false);
+  mgr.SelectProxy(proxyB->mProxyId, true);
+
+  EXPECT_TRUE(proxyA->IsSelected());
+  EXPECT_TRUE(proxyB->IsSelected());
+  EXPECT_FALSE(proxyC->IsSelected());
+  EXPECT_EQ(mgr.GetSelectedProxies().size(), 2u);
+
+  // Broadcast orders, rally point, and repeat build
+  mgr.QueuePlannedFactoryOrders("xal0201", 10, false);
+  mgr.SetSelectedPlannedFactoriesRallyPoint({250.0f, 0.0f, 250.0f});
+  mgr.SetSelectedPlannedFactoriesRepeat(true);
+
+  // Verify A and B received the broadcast
+  for (const auto* p : {proxyA, proxyB}) {
+    ASSERT_EQ(p->mPreOrders.size(), 1u);
+    EXPECT_EQ(p->mPreOrders[0].blueprintId, "xal0201");
+    EXPECT_EQ(p->mPreOrders[0].count, 10);
+    EXPECT_TRUE(p->mHasRallyPoint);
+    EXPECT_FLOAT_EQ(p->mRallyPoint.x, 250.0f);
+    EXPECT_FLOAT_EQ(p->mRallyPoint.z, 250.0f);
+    EXPECT_TRUE(p->mRepeatBuild);
+  }
+
+  // Verify C was not affected
+  EXPECT_TRUE(proxyC->mPreOrders.empty());
+  EXPECT_FALSE(proxyC->mHasRallyPoint);
+  EXPECT_FALSE(proxyC->mRepeatBuild);
+
+  // Deselect B: now only A is selected
+  mgr.DeselectProxy(proxyB->mProxyId);
+  EXPECT_TRUE(proxyA->IsSelected());
+  EXPECT_FALSE(proxyB->IsSelected());
+
+  mgr.QueuePlannedFactoryOrders("xal0305", 5, false);
+  ASSERT_EQ(proxyA->mPreOrders.size(), 2u);
+  EXPECT_EQ(proxyA->mPreOrders[1].blueprintId, "xal0305");
+  EXPECT_EQ(proxyA->mPreOrders[1].count, 5);
+
+  // B should NOT have received the new order
+  ASSERT_EQ(proxyB->mPreOrders.size(), 1u);
+
+  // Clear selection: queuing when nothing is selected is a safe no-op
+  mgr.ClearSelection();
+  EXPECT_TRUE(mgr.GetSelectedProxies().empty());
+  mgr.QueuePlannedFactoryOrders("xal0101", 1, false);
+
+  EXPECT_EQ(proxyA->mPreOrders.size(), 2u);
+  EXPECT_EQ(proxyB->mPreOrders.size(), 1u);
+  EXPECT_EQ(proxyC->mPreOrders.size(), 0u);
+
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, ReplicatedCurTransformFallbackOnDispatch)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(5, 0, nullptr, {500.0f, 10.0f, 500.0f});
+  ASSERT_NE(proxy, nullptr);
+  proxy->AddPreOrder("uel0201", 5);
+
+  bool dispatched = false;
+  mgr.SetDispatchHook([&](moho::UserUnit* /*unit*/, const moho::PlannedUnitProxy& p) {
+    EXPECT_EQ(p.mProxyId, proxy->mProxyId);
+    ASSERT_EQ(p.mPreOrders.size(), 1u);
+    EXPECT_EQ(p.mPreOrders[0].blueprintId, "uel0201");
+    EXPECT_EQ(p.mPreOrders[0].count, 5);
+    dispatched = true;
+  });
+
+  // Scenario A: Unit has mTransform.pos_ == {0, 0, 0} (before first interpolation tick),
+  // but mVariableData.mCurTransform.pos_ holds the valid replicated sim position {502.0f, 10.0f, 501.5f}.
+  alignas(moho::UserUnit) std::byte unitStorageA[sizeof(moho::UserUnit)]{};
+  auto* unitA = reinterpret_cast<moho::UserUnit*>(unitStorageA);
+  unitA->mTransform.pos_ = {0.0f, 0.0f, 0.0f};
+  unitA->mVariableData.mCurTransform.pos_ = {502.0f, 10.0f, 501.5f};
+
+  EXPECT_TRUE(mgr.DispatchPreOrdersForUnit(unitA));
+  EXPECT_TRUE(dispatched);
+  EXPECT_EQ(mgr.GetCount(), 0u); // Proxy consumed
+
+  // Scenario B: Unit has both mTransform.pos_ AND mVariableData.mCurTransform.pos_ at {0, 0, 0}.
+  // Must be rejected as uninitialized.
+  auto* proxy2 = mgr.RegisterOrUpdatePlannedFactory(6, 0, nullptr, {600.0f, 10.0f, 600.0f});
+  ASSERT_NE(proxy2, nullptr);
+
+  alignas(moho::UserUnit) std::byte unitStorageB[sizeof(moho::UserUnit)]{};
+  auto* unitB = reinterpret_cast<moho::UserUnit*>(unitStorageB);
+  unitB->mTransform.pos_ = {0.0f, 0.0f, 0.0f};
+  unitB->mVariableData.mCurTransform.pos_ = {0.0f, 0.0f, 0.0f};
+
+  EXPECT_FALSE(mgr.DispatchPreOrdersForUnit(unitB));
+  EXPECT_EQ(mgr.GetCount(), 1u); // Proxy NOT consumed
+
+  mgr.ClearAll();
+}
+
+TEST(PlannedFactoryPreOrdersTest, MultiBuilderAssistanceAndRetirementLifecycle)
+{
+  moho::SetFactoryPreOrdersEnabled(true);
+  auto& mgr = moho::PlannedFactoryManager::Get();
+  mgr.ClearAll();
+
+  const moho::Vector3f factoryPos{150.0f, 0.0f, 150.0f};
+
+  // Builder 10 (ACU) starts planning the factory
+  auto* proxy = mgr.RegisterOrUpdatePlannedFactory(10, 0, nullptr, factoryPos);
+  ASSERT_NE(proxy, nullptr);
+  proxy->AddPreOrder("uel0106", 15);
+  proxy->SetRallyPoint({200.0f, 0.0f, 200.0f});
+
+  // Builder 20 (Engineer 1) assists at the same factory location
+  auto* proxyAfter20 = mgr.RegisterOrUpdatePlannedFactory(20, 1, nullptr, factoryPos);
+  EXPECT_EQ(proxy, proxyAfter20);
+  EXPECT_TRUE(proxy->HasBuilder(10, 0));
+  EXPECT_TRUE(proxy->HasBuilder(20, 1));
+
+  // Builder 30 (Engineer 2) assists at the same factory location
+  auto* proxyAfter30 = mgr.RegisterOrUpdatePlannedFactory(30, 2, nullptr, factoryPos);
+  EXPECT_EQ(proxy, proxyAfter30);
+  EXPECT_TRUE(proxy->HasBuilder(30, 2));
+  EXPECT_EQ(mgr.GetCount(), 1u);
+
+  // Case 1: Builder 20 finishes moving, begins building, or switches order:
+  // its specific command helper is retired via RemoveByBuilderAndIndex.
+  // The proxy MUST survive and retain all pre-orders because Builders 10 & 30 are still attached.
+  mgr.RemoveByBuilderAndIndex(20, 1);
+  EXPECT_EQ(mgr.GetCount(), 1u);
+  EXPECT_FALSE(proxy->HasBuilder(20, 1));
+  EXPECT_TRUE(proxy->HasBuilder(10, 0));
+  EXPECT_TRUE(proxy->HasBuilder(30, 2));
+  ASSERT_EQ(proxy->mPreOrders.size(), 1u);
+  EXPECT_EQ(proxy->mPreOrders[0].count, 15);
+  EXPECT_TRUE(proxy->mHasRallyPoint);
+
+  // Case 2: Builder 10 cancels construction or dies.
+  // The proxy MUST still survive because Builder 30 is still assisting.
+  mgr.RemoveByBuilder(10);
+  EXPECT_EQ(mgr.GetCount(), 1u);
+  EXPECT_FALSE(proxy->HasBuilder(10, 0));
+  EXPECT_TRUE(proxy->HasBuilder(30, 2));
+
+  // Case 3: Builder 30 cancels construction (all builders gone).
+  // Now the proxy is cleaned up.
+  mgr.RemoveByBuilder(30);
+  EXPECT_EQ(mgr.GetCount(), 0u);
+  EXPECT_EQ(mgr.FindByPosition(factoryPos, 1.0f), nullptr);
+
+  mgr.ClearAll();
 }
