@@ -130,7 +130,7 @@ namespace faf::editor
     mPath.clear();
     mDirty = false;
     Changed();
-    mPreview.Restart();
+    RestartPreview();
   }
 
   void EdParticleEditor::Frame(const bool showing)
@@ -146,11 +146,11 @@ namespace faf::editor
       } else {
         mPreview.SetEmitter(mEmitter);
       }
-      mPreview.Restart();
+      RestartPreview();
       mPreviewStarted = true;
     }
     // It plays far off the map, where only the particle view looks.
-    mPreview.SetPlace(EdParticleViewport::kPlaceX, EdParticleViewport::kPlaceY + mViewport.Opts().height, EdParticleViewport::kPlaceZ);
+    mPreview.SetPlace(mViewport.PlaceX(), EdParticleViewport::kPlaceY + mViewport.Opts().height, mViewport.PlaceZ());
     if (std::exchange(mFrameAsk, false)) {
       mViewport.Reset(mFlatMode ? 20.0f : 12.0f);
     }
@@ -182,7 +182,7 @@ namespace faf::editor
       mPath.clear();
       mDirty = false;
       mPreview.SetFlat(mFlat);
-      mPreview.Restart();
+      RestartPreview();
       mFrameAsk = true;
       mStatus = "Opened " + path;
       return true;
@@ -196,7 +196,7 @@ namespace faf::editor
     mCurve = kEmitRate;
     mSelectedKey = -1;
     mPreview.SetEmitter(mEmitter);
-    mPreview.Restart();
+    RestartPreview();
     mFrameAsk = true;
     mStatus = "Opened " + path;
     return true;
@@ -342,6 +342,19 @@ namespace faf::editor
     const auto checkboxWidth = [&](const char* label) { return ImGui::GetFrameHeight() + style.ItemInnerSpacing.x + ImGui::CalcTextSize(label).x; };
     const auto buttonWidth = [&](const char* label) { return ImGui::CalcTextSize(label).x + style.FramePadding.x * 2.0f; };
 
+    // Playing: pause, start again, loop (in both the Particle Editor and the Browser).
+    flow(buttonWidth("Pause"));
+    if (ImGui::Button(mPlaying ? "Pause" : "Play")) {
+      mPlaying = !mPlaying;
+    }
+    flow(buttonWidth("Restart"));
+    if (ImGui::Button("Restart")) {
+      RestartPreview();
+    }
+    flow(checkboxWidth("Loop"));
+    ImGui::Checkbox("Loop", &mLoop);
+    ImGui::SetItemTooltip("Starts the effect again each time its Lifetime ends");
+
     static const char* const kBackgrounds[] = {"Night", "Grey", "Sky", "Black"};
     const float comboWidth = ImGui::CalcTextSize("Black").x + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight() + style.ItemInnerSpacing.x;
     flow(comboWidth);
@@ -380,6 +393,13 @@ namespace faf::editor
     }
   }
 
+  void EdParticleEditor::RestartPreview()
+  {
+    mViewport.NextSpot();
+    mPreview.SetPlace(mViewport.PlaceX(), EdParticleViewport::kPlaceY + mViewport.Opts().height, mViewport.PlaceZ());
+    mPreview.Restart();
+  }
+
   std::string EdParticleEditor::GamePath() const
   {
     // Edited and saved into the map's folder: the map's copy; untouched since opened: the game's own.
@@ -409,7 +429,7 @@ namespace faf::editor
         mPath.clear();
         mDirty = false;
         Changed();
-        mPreview.Restart();
+        RestartPreview();
       }
       if (ImGui::MenuItem("Browse the game's effects...")) {
         mOpenBrowserAsk = true;
@@ -434,13 +454,6 @@ namespace faf::editor
     ImGui::Separator();
     ImGui::Text("%s%s", mName.c_str(), mDirty ? " *" : "");
     ImGui::Separator();
-    if (ImGui::Button(mPlaying ? "Pause" : "Play")) {
-      mPlaying = !mPlaying;
-    }
-    if (ImGui::Button("Restart")) {
-      mPreview.Restart();
-    }
-    ImGui::Checkbox("Loop", &mLoop);
     {
       const std::string place = GamePath();
       ImGui::BeginDisabled(place.empty());

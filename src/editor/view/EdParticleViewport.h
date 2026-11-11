@@ -16,10 +16,15 @@ namespace faf::editor
   class EdParticleViewport
   {
   public:
-    /** Where the effect plays: far outside any map (maps are at most 4096 across). */
-    static constexpr float kPlaceX = -6000.0f;
+    /**
+     * Where the effect plays: far outside any map (maps are at most 4096 across), one of eight spots 3000 apart. The
+     * particles the renderer already has can't be taken back, so a new effect (or a restart) plays at the next spot and
+     * the last one's particles live out their lives beyond this view's far plane (2000 past the effect).
+     */
     static constexpr float kPlaceY = 0.0f;
-    static constexpr float kPlaceZ = -6000.0f;
+    [[nodiscard]] float PlaceX() const noexcept { return -6000.0f - 3000.0f * static_cast<float>(mSpot); }
+    [[nodiscard]] float PlaceZ() const noexcept { return -6000.0f; }
+    void NextSpot() noexcept { mSpot = (mSpot + 1) % 8; }
 
     struct Options
     {
@@ -57,6 +62,7 @@ namespace faf::editor
     float mPitch = 0.45f;
     float mDistance = 30.0f;
     bool mShown = false;
+    int mSpot = 0;
     std::uint64_t mImage = 0;
     moho::ID3DDeviceResources::RenderTargetHandle mTarget;
     moho::ID3DDeviceResources::DepthStencilHandle mDepth;

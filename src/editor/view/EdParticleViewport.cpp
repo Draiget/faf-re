@@ -98,6 +98,8 @@ namespace faf::editor
     }
 
     // The orbit camera round the effect, built as CameraImpl::UpdateCoords builds the game's (0x007AA330).
+    const float kPlaceX = PlaceX();
+    const float kPlaceZ = PlaceZ();
     const Wm3::Vec3f target{kPlaceX, kPlaceY + mOptions.height + 1.0f, kPlaceZ};
     moho::VTransform view{};
     view.orient_ = ViewOrient(moho::COORDS_Orient(mHeading, mPitch));
@@ -105,7 +107,7 @@ namespace faf::editor
     view.pos_ = Wm3::Vec3f{target.x + eye.x * mDistance, target.y + eye.y * mDistance, target.z + eye.z * mDistance};
     const float fov = 0.9f;
     const float nearClip = -std::max(mDistance * 0.01f, 0.05f);
-    const float farClip = -(mDistance + 3000.0f);
+    const float farClip = -(mDistance + 2000.0f); // short of the next spot (3000 away)
     const moho::VMatrix4 projection =
       moho::VEC_D3DProjectionMatrixFOV(fov, fov, nearClip, farClip, static_cast<float>(mHeight) / static_cast<float>(mWidth));
     moho::GeomCamera3 camera(view, projection);

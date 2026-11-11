@@ -66,6 +66,8 @@ namespace faf::editor
     void NewFlat(const char* kind);
     void DrawBrowser();
     void Changed();
+    /** Plays the effect from its start at the view's next spot, leaving the last particles out of sight. */
+    void RestartPreview();
     bool Save(const std::filesystem::path& file);
     [[nodiscard]] std::filesystem::path Folder() const;
 
