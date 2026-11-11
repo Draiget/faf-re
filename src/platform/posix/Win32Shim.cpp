@@ -1819,6 +1819,55 @@ BOOL SetProcessAffinityMask(const HANDLE process, const DWORD_PTR processMask)
   return TRUE;
 }
 
+namespace
+{
+  /**
+   * The folder xdg-user-dirs names for `key` (XDG_DOCUMENTS_DIR, XDG_DESKTOP_DIR), read as
+   * `xdg-user-dir` reads it: `<configHome>/user-dirs.dirs` holds shell lines KEY="$HOME/<path>" or
+   * KEY="/<path>", and the last one wins. A desktop in another language names its own folder there
+   * (~/Dokumente, ~/Bureau). Empty when there is no such file or line; the environment variable of
+   * the same name comes next, as `xdg-user-dir` falls back to it.
+   */
+  [[nodiscard]] std::string XdgUserDirectory(
+    const std::string& home,
+    const std::string& configHome,
+    const char* const key
+  )
+  {
+    std::string found;
+    const std::string prefix = std::string(key) + "=";
+    std::ifstream file(configHome + "/user-dirs.dirs");
+    for (std::string line; std::getline(file, line);) {
+      const std::size_t start = line.find_first_not_of(" \t");
+      if (start == std::string::npos || line.compare(start, prefix.size(), prefix) != 0) {
+        continue;
+      }
+      std::string value = line.substr(start + prefix.size());
+      while (!value.empty() && (value.back() == '\r' || value.back() == ' ' || value.back() == '\t')) {
+        value.pop_back();
+      }
+      if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+        value = value.substr(1, value.size() - 2);
+      }
+      if (value.rfind("$HOME", 0) == 0 && (value.size() == 5 || value[5] == '/')) {
+        found = home + value.substr(5);
+      } else if (!value.empty() && value[0] == '/') {
+        found = value;
+      }
+    }
+    if (found.empty()) {
+      const char* const environment = std::getenv(key);
+      if (environment != nullptr && environment[0] == '/') {
+        found = environment;
+      }
+    }
+    while (found.size() > 1 && found.back() == '/') {
+      found.pop_back();
+    }
+    return found;
+  }
+} // namespace
+
 HRESULT SHGetFolderPathW(HWND, const int folder, HANDLE, DWORD, wchar_t* const path)
 {
   if (path == nullptr) {
@@ -1832,8 +1881,13 @@ HRESULT SHGetFolderPathW(HWND, const int folder, HANDLE, DWORD, wchar_t* const p
     const char* const value = std::getenv(variable);
     return value != nullptr && value[0] == '/' ? std::string(value) : std::string(home) + fallback;
   };
+  const auto userDirectory = [&](const char* const key, const char* const fallback) {
+    const std::string named = XdgUserDirectory(home, fromEnvironment("XDG_CONFIG_HOME", "/.config"), key);
+    return named.empty() ? std::string(home) + fallback : named;
+  };
+  const int kind = folder & ~CSIDL_FLAG_CREATE;
   std::string resolved;
-  switch (folder & ~CSIDL_FLAG_CREATE) {
+  switch (kind) {
   case CSIDL_LOCAL_APPDATA:
     resolved = fromEnvironment("XDG_DATA_HOME", "/.local/share");
     break;
@@ -1841,11 +1895,11 @@ HRESULT SHGetFolderPathW(HWND, const int folder, HANDLE, DWORD, wchar_t* const p
     resolved = fromEnvironment("XDG_CONFIG_HOME", "/.config");
     break;
   case CSIDL_PERSONAL:
-    resolved = std::string(home) + "/Documents";
+    resolved = userDirectory("XDG_DOCUMENTS_DIR", "/Documents");
     break;
   case CSIDL_DESKTOP:
   case CSIDL_DESKTOPDIRECTORY:
-    resolved = std::string(home) + "/Desktop";
+    resolved = userDirectory("XDG_DESKTOP_DIR", "/Desktop");
     break;
   default:
     return E_FAIL;
@@ -1856,10 +1910,14 @@ HRESULT SHGetFolderPathW(HWND, const int folder, HANDLE, DWORD, wchar_t* const p
   }
   // Windows' known folders always exist, and callers create only their own subfolders below them
   // (the replay and saved-game folders, one level at a time); a home folder here may have no
-  // ~/.local/share or ~/Documents (a fresh account, a container, a desktop whose documents folder
-  // has a translated name).
-  std::error_code created;
-  std::filesystem::create_directories(resolved, created);
+  // ~/.local/share or the documents folder (a fresh account, a container). The folders the engine
+  // writes below are made here; the desktop, which only Lua's SHGetFolderPath("DESKTOP") asks for,
+  // only with CSIDL_FLAG_CREATE, as Windows creates a missing folder only then.
+  const bool engineWritesBelow = kind == CSIDL_LOCAL_APPDATA || kind == CSIDL_APPDATA || kind == CSIDL_PERSONAL;
+  if (engineWritesBelow || (folder & CSIDL_FLAG_CREATE) != 0) {
+    std::error_code created;
+    std::filesystem::create_directories(resolved, created);
+  }
   std::wmemcpy(path, wide.c_str(), wide.size() + 1);
   return S_OK;
 }

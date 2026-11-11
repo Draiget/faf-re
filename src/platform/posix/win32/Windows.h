@@ -530,8 +530,11 @@ DWORD GetModuleFileNameW(HMODULE module, wchar_t* fileName, DWORD size);
 BOOL SetProcessAffinityMask(HANDLE process, DWORD_PTR processMask);
 
 // The shell folders, as the XDG directories: CSIDL_LOCAL_APPDATA is $XDG_DATA_HOME
-// (~/.local/share), CSIDL_APPDATA $XDG_CONFIG_HOME (~/.config), CSIDL_PERSONAL ~/Documents,
-// CSIDL_DESKTOPDIRECTORY ~/Desktop; other folders fail with E_FAIL.
+// (~/.local/share), CSIDL_APPDATA $XDG_CONFIG_HOME (~/.config), CSIDL_PERSONAL and
+// CSIDL_DESKTOPDIRECTORY the user's XDG_DOCUMENTS_DIR and XDG_DESKTOP_DIR (user-dirs.dirs, then the
+// environment; ~/Documents and ~/Desktop without them); other folders fail with E_FAIL. The data
+// and documents folders are created when missing, as Windows' always exist; the desktop only with
+// CSIDL_FLAG_CREATE.
 #define CSIDL_DESKTOP 0x0000
 #define CSIDL_PERSONAL 0x0005
 #define CSIDL_DESKTOPDIRECTORY 0x0010
