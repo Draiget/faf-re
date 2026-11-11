@@ -73,8 +73,8 @@ if not rawget(getfenv(1), 'UpdateRejoinScreen') then
         if UIUtil.CreateNinePatchStd then
             local background = UIUtil.CreateNinePatchStd(panel, '/scx_menu/lan-game-lobby/dialog/background/')
             -- The corners are 80 px: inset 40 across and 26 up and down, so the frame's middle keeps a positive
-        -- height (8 of the panel's 60) and the frame reaches about 40 past the panel.
-        LayoutHelpers.OffsetIn(background, panel, 40, 26, 40, 26)
+            -- height (8 of the panel's 60) and the frame reaches about 40 past the panel.
+            LayoutHelpers.OffsetIn(background, panel, 40, 26, 40, 26)
             background.Depth:Set(function() return panel.Depth() - 1 end)
         end
 
