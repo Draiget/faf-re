@@ -21,6 +21,8 @@
 
 namespace faf::server
 {
+  class CRestListener; // plan WP17.11, RestListener.h
+
   /** One request: `{"id": n, "op": "...", "uid": n, "reason": "...", "address": "a.b.c.d"}`; other keys are ignored. */
   struct SControlRequest
   {
@@ -53,6 +55,11 @@ namespace faf::server
     CControlListener& operator=(const CControlListener&) = delete;
 
     [[nodiscard]] bool Open(const remote::net::SEndpoint& at, const ControlKey& key, std::string& error);
+    /**
+     * Plan WP17.11: the same API over HTTP/JSON for a dashboard (RestListener.h), with `token` as the admin token;
+     * its requests come out of `Poll` with negative ids, and `Reply`, `Refuse` and `Event` reach it too.
+     */
+    [[nodiscard]] bool OpenRest(const remote::net::SEndpoint& at, std::string token, std::string corsOrigin, std::string& error);
     /** Accepts, reads and writes what it can without waiting; the requests that came, in order. */
     void Poll(std::vector<SControlRequest>& requests, std::uint64_t nowUs);
     /**
@@ -88,5 +95,6 @@ namespace faf::server
     std::uint64_t mNextSerial = 1;
     std::vector<std::pair<std::int64_t, std::uint64_t>> mWaiting; // requests handed out, not answered: id, connection serial
     std::vector<std::string> mNews;
+    std::unique_ptr<CRestListener> mRest; // plan WP17.11, with OpenRest
   };
 } // namespace faf::server

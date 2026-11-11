@@ -1,4 +1,5 @@
 #include "server/ControlListener.h"
+#include "server/RestListener.h"
 
 #include <algorithm>
 #include <arpa/inet.h>
@@ -303,7 +304,7 @@ namespace faf::server
 
   bool CControlListener::Connected() const noexcept
   {
-    return std::any_of(mConnections.begin(), mConnections.end(), [](const std::unique_ptr<SConnection>& connection) {
+    return (mRest && mRest->Connected()) || std::any_of(mConnections.begin(), mConnections.end(), [](const std::unique_ptr<SConnection>& connection) {
       return connection->socket >= 0 && connection->channel && connection->channel->Ready();
     });
   }
@@ -378,14 +379,34 @@ namespace faf::server
     }
   }
 
+  bool CControlListener::OpenRest(const remote::net::SEndpoint& at, std::string token, std::string corsOrigin, std::string& error)
+  {
+    auto rest = std::make_unique<CRestListener>();
+    if (!rest->Open(at, std::move(token), std::move(corsOrigin), error)) {
+      return false;
+    }
+    mRest = std::move(rest);
+    return true;
+  }
+
   void CControlListener::Reply(const std::int64_t id, const std::string_view fields)
   {
-    Answer(id, "{\"id\":" + std::to_string(id) + ",\"ok\":true" + (fields.empty() ? std::string() : "," + std::string(fields)) + "}");
+    const std::string json = "{\"id\":" + std::to_string(id) + ",\"ok\":true" + (fields.empty() ? std::string() : "," + std::string(fields)) + "}";
+    if (id < 0 && mRest) {
+      mRest->Answer(id, true, json); // plan WP17.11: a REST request's
+      return;
+    }
+    Answer(id, json);
   }
 
   void CControlListener::Refuse(const std::int64_t id, const std::string_view error)
   {
-    Answer(id, "{\"id\":" + std::to_string(id) + ",\"ok\":false,\"error\":" + JsonString(error) + "}");
+    const std::string json = "{\"id\":" + std::to_string(id) + ",\"ok\":false,\"error\":" + JsonString(error) + "}";
+    if (id < 0 && mRest) {
+      mRest->Answer(id, false, json);
+      return;
+    }
+    Answer(id, json);
   }
 
   void CControlListener::Event(const std::string_view name, const std::string_view fields)
@@ -394,10 +415,19 @@ namespace faf::server
     for (const std::unique_ptr<SConnection>& connection : mConnections) {
       Send(*connection, json);
     }
+    if (mRest) {
+      mRest->Event(name, json);
+    }
   }
 
   void CControlListener::Poll(std::vector<SControlRequest>& requests, const std::uint64_t nowUs)
   {
+    if (mRest) {
+      mRest->Poll(requests, nowUs); // plan WP17.11
+      for (std::string& line : mRest->TakeNews()) {
+        mNews.push_back(std::move(line));
+      }
+    }
     if (mListenSocket < 0) {
       return;
     }

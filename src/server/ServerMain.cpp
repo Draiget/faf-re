@@ -108,6 +108,7 @@ namespace
   constexpr const char* kUsage =
     "usage: server --match <file.lua> --out <dir> /init <init.lua> | --data <dir> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
     "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view observe|disconnect] [--lobby-seconds <n>] [--lobby-away-seconds <n>] [--stats-every <beats>] [--pose-budget-kbps <n>] [--congestion-control] [--nftables-out <file> [--nftables-only] [--unlisted-pps <n>] [--unlisted-total-pps <n>]] [--unvalidated-policy] "
+    "[--control <ip:port> --control-key <file>] [--rest <ip:port> --rest-token-file <file> [--rest-cors-origin <origin>]] "
     "[--checksum-period <beats>] [--digests <file>] [--state-digests <file>]\n";
 
   constexpr double kDefaultStatusMinutes = 10.0;
@@ -1280,6 +1281,48 @@ namespace
       }
       gControl = control.get();
       Say("Control API on %s", controlAt.Text().c_str());
+    }
+    // Plan WP17.11: the same API over HTTP/JSON for a dashboard, guarded by an admin token from a file (not the command
+    // line, which every user of the machine can read).
+    if (ReadOption("--rest", text)) {
+      faf::remote::net::SEndpoint restAt;
+      std::string tokenPath;
+      std::string restError;
+      std::string token;
+      if (!faf::remote::net::ParseEndpoint(text, restAt)) {
+        restError = "--rest takes <ip:port>, not " + text;
+      } else if (!ReadOption("--rest-token-file", tokenPath)) {
+        restError = "--rest needs --rest-token-file <file>: the admin token, at least 16 characters";
+      } else {
+        std::ifstream tokenFile(tokenPath);
+        std::stringstream tokenText;
+        tokenText << tokenFile.rdbuf();
+        token = tokenText.str();
+        while (!token.empty() && (token.back() == '\n' || token.back() == '\r' || token.back() == ' ' || token.back() == '\t')) {
+          token.pop_back();
+        }
+        if (!tokenFile) {
+          restError = "--rest-token-file " + tokenPath + " can't be read";
+        }
+      }
+      std::string corsOrigin;
+      (void)ReadOption("--rest-cors-origin", corsOrigin);
+      if (restError.empty()) {
+        if (!control) {
+          control = std::make_unique<faf::server::CControlListener>();
+        }
+        if (!control->OpenRest(restAt, std::move(token), corsOrigin, restError)) {
+          control.reset();
+        }
+      }
+      if (!control || !restError.empty()) {
+        end.error = restError;
+        Say("Can't host: %s", end.error.c_str());
+        return kExitBadInput;
+      }
+      gControl = control.get();
+      Say("REST API on http://%s/api/v1 (admin token required%s%s)", restAt.Text().c_str(), corsOrigin.empty() ? "" : "; browsers from ",
+          corsOrigin.c_str());
     }
     const auto controlSeats = [&net]() {
       std::string seats = "\"seats\":[";
