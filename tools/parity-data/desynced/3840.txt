@@ -1,2 +1,14 @@
 # Replays of game version 3840 that desynced in a parity run, fixed or not, for the nightly set.
-# None yet: 3840's first parity run comes after the Parity prewarm fills its caches.
+# From the first nightly on 3840, run 42891807223: matchmaker games on sandstorm.v0003 that desynced because the
+# nightly named the map in Game.prefs (issue #377, fixed by 0008df1b2).
+27996994
+28002820
+28011306
+28011563
+28018701
+28025532
+28029746
+28033143
+28033592
+28035360
+28035387
