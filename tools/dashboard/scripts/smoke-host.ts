@@ -1,6 +1,7 @@
 // The dashboard's host client against a running server-host (plan WP17.13):
 // node scripts/smoke-host.ts <host url> <token file> [map id]
-// The machine, the maps, a cost hint, a wrong token, then a lobby: started on "auto" CPUs, its own status through the
+// The machine, the maps, a cost hint, a wrong token, then a lobby with an observer and a referee: started on "auto"
+// CPUs, each watcher's watch line back, its own status through the
 // host's proxy once it answers, stopped, and forgotten. Exit 0 when every check passed.
 
 import { readFileSync } from "node:fs";
@@ -50,10 +51,33 @@ let lobby: Lobby = await host.createLobby({
   lobby_minutes: 5,
   cpus: "auto",
   cores: 1,
+  observers: [{ name: "Caster" }, { name: "Ref", referee: true }],
+  observer_delay_seconds: 30,
 });
 const join = lobby.seats?.find((seat) => seat.kind === "human")?.join ?? "";
 check("create", typeof lobby.id === "string" && (lobby.cpus ?? []).length > 0, `${lobby.id} ${lobby.state} on CPU ${(lobby.cpus ?? []).join(",")}, join "${join}"`);
 check("join command", join.includes("/connectserver"), join);
+
+/** The observer and the referee came back with their names, roles and a watch line each: `/replay gpgnet://host:port/<32 hex>`. */
+function checkObservers(name: string, listed: Lobby): void {
+  const watchLine = /^\/replay gpgnet:\/\/[^\s/:]+:(\d+)\/[0-9a-f]{32}$/;
+  const list = listed.observers ?? [];
+  const caster = list.find((observer) => observer.name === "Caster");
+  const referee = list.find((observer) => observer.name === "Ref");
+  const ports = new Set(list.map((observer) => watchLine.exec(observer.watch ?? "")?.[1]));
+  const ok =
+    list.length === 2 &&
+    caster !== undefined &&
+    caster.referee !== true &&
+    referee?.referee === true &&
+    list.every((observer) => watchLine.test(observer.watch ?? "")) &&
+    typeof listed.observe_port === "number" &&
+    ports.size === 1 &&
+    ports.has(String(listed.observe_port)) &&
+    listed.observer_delay_seconds === 30;
+  check(name, ok, `observe_port ${listed.observe_port}, delay ${listed.observer_delay_seconds}, ${JSON.stringify(list)}`);
+}
+checkObservers("observers on create", lobby);
 
 const deadline = Date.now() + 30000;
 let phase = "";
@@ -73,6 +97,7 @@ for (let tries = 0; tries < 12; tries++) {
   await new Promise((resolve) => setTimeout(resolve, 250));
 }
 check("listed", lobby.state === "lobby", `state ${lobby.state}`);
+checkObservers("observers listed", lobby);
 
 lobby = await host.stopLobby(lobby.id);
 check("stop", lobby.state === "stopped", `state ${lobby.state}`);

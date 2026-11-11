@@ -66,16 +66,16 @@ export async function copyText(text: string): Promise<boolean> {
   }
 }
 
-/** A button that copies `text` and says so. */
-export function copyButton(text: string, label: string): HTMLButtonElement {
-  const button = h("button", { type: "button", class: "btn small copy", "aria-label": label }, icon("copy", "icon tiny"), h("span", {}, "Copy"));
+/** A button that copies `text` and says so; `caption` is its visible word. */
+export function copyButton(text: string, label: string, caption = "Copy"): HTMLButtonElement {
+  const button = h("button", { type: "button", class: "btn small copy", "aria-label": label }, icon("copy", "icon tiny"), h("span", {}, caption));
   button.addEventListener("click", () => {
     void copyText(text).then((ok) => {
       const span = button.querySelector("span:last-child");
       if (span !== null) span.textContent = ok ? "Copied" : "Copy failed";
       button.classList.toggle("copied", ok);
       window.setTimeout(() => {
-        if (span !== null) span.textContent = "Copy";
+        if (span !== null) span.textContent = caption;
         button.classList.remove("copied");
       }, 1600);
       if (!ok) toast("bad", "Couldn't copy", "Select the text and copy it by hand.");

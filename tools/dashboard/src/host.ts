@@ -56,6 +56,11 @@ const cpuSummary = byId<HTMLElement>("cpu-summary");
 const hintBox = byId<HTMLElement>("hint-box");
 const cpuWarnings = byId<HTMLElement>("cpu-warnings");
 const lobbySubmit = byId<HTMLButtonElement>("lobby-submit");
+const observerRows = byId<HTMLElement>("observer-rows");
+const observerAdd = byId<HTMLButtonElement>("observer-add");
+const observerCount = byId<HTMLElement>("observer-count");
+const observerDelayField = byId<HTMLElement>("observer-delay-field");
+const observerDelay = byId<HTMLInputElement>("observer-delay");
 
 // ---------------------------------------------------------------- state
 
@@ -85,6 +90,15 @@ interface SeatDraft {
   team: number;
 }
 let seats: SeatDraft[] = [];
+
+interface ObserverDraft {
+  name: string;
+  referee: boolean;
+}
+let observers: ObserverDraft[] = [];
+const MAX_OBSERVERS = 32;
+const MAX_OBSERVER_NAME = 40;
+const GAME_EXE = "main_x64.exe /init init_faf.lua";
 
 // ---------------------------------------------------------------- helpers
 
@@ -374,6 +388,54 @@ function joinBlock(lobby: Lobby): HTMLElement {
   );
 }
 
+/** Each observer's watch line (a live replay of the lobby's game), with copy buttons for it and the whole command. */
+function watchBlock(lobby: Lobby): HTMLElement {
+  const list = lobby.observers ?? [];
+  const delay = isNumber(lobby.observer_delay_seconds) ? lobby.observer_delay_seconds : 0;
+  return h(
+    "div",
+    { class: "join watch" },
+    h("p", { class: "join-help" }, "Open the game with these switches to watch:"),
+    h(
+      "p",
+      { class: "join-help small" },
+      "Start command: ",
+      h("code", { class: "inline-code" }, `${GAME_EXE} <watch line>`),
+      delay > 0 ? `. Observers see the game ${delay} s late; referees see it live.` : ".",
+    ),
+    h(
+      "ul",
+      { class: "join-list" },
+      ...list.map((observer, index) => {
+        const who = observer.name || `Observer ${index + 1}`;
+        const watch = typeof observer.watch === "string" && observer.watch !== "" ? observer.watch : null;
+        return h(
+          "li",
+          { class: "join-row" },
+          h(
+            "div",
+            { class: "join-who" },
+            h("strong", {}, who),
+            " ",
+            observer.referee === true
+              ? h("span", { class: "chip tiny tone-accent referee-chip" }, "Referee · no delay")
+              : delay > 0
+                ? h("span", { class: "dim" }, ` · ${delay} s behind`)
+                : null,
+          ),
+          h(
+            "div",
+            { class: "join-cmd" },
+            h("code", { class: "cmd" }, watch ?? "not given out yet"),
+            watch === null ? null : copyButton(watch, `Copy the watch switches for ${who}`),
+            watch === null ? null : copyButton(`${GAME_EXE} ${watch}`, `Copy the whole start command for ${who}`, "Command"),
+          ),
+        );
+      }),
+    ),
+  );
+}
+
 function seatSummary(lobby: Lobby): string {
   const list = lobby.seats ?? [];
   const humans = list.filter((seat) => seat.kind === "human").length;
@@ -395,6 +457,10 @@ function createCard(first: Lobby): LobbyCard {
   const joinBody = h("div", { class: "join-body" });
   const join = h("details", { class: "join-details" }, joinSummary, joinBody);
   let joinSignature = "";
+  const watchSummary = h("summary", {}, "Watch lines");
+  const watchBody = h("div", { class: "join-body" });
+  const watch = h("details", { class: "join-details" }, watchSummary, watchBody);
+  let watchSignature = "";
   let current = first;
 
   stop.addEventListener("click", () => void stopLobby(current, stop));
@@ -408,6 +474,7 @@ function createCard(first: Lobby): LobbyCard {
     facts,
     exit,
     join,
+    watch,
     h("div", { class: "lobby-actions" }, open, stop, forget),
   );
   title.id = `lobby-title-${id}`;
@@ -437,7 +504,16 @@ function createCard(first: Lobby): LobbyCard {
       ],
       ["Control", lobby.control === "organiser" ? "organiser" : lobby.control === "player" ? "player hosts" : "–"],
     ];
-    if (isNumber(lobby.port)) factItems.push(["Port", String(lobby.port)]);
+    const watchers = lobby.observers ?? [];
+    if (watchers.length > 0) {
+      const referees = watchers.filter((observer) => observer.referee === true).length;
+      const delay = isNumber(lobby.observer_delay_seconds) ? lobby.observer_delay_seconds : 0;
+      const parts = [plural(watchers.length, "observer")];
+      if (referees > 0) parts.push(`${referees} ${referees === 1 ? "referee" : "referees"}`);
+      if (delay > 0 && referees < watchers.length) parts.push(`${delay} s delay`);
+      factItems.push(["Observers", parts.join(" · ")]);
+    }
+    if (isNumber(lobby.port)) factItems.push(["Port", isNumber(lobby.observe_port) ? `${lobby.port} · watch ${lobby.observe_port}` : String(lobby.port)]);
     if (lobby.created) {
       const created = new Date(lobby.created);
       if (!Number.isNaN(created.getTime())) factItems.push(["Created", created.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })]);
@@ -458,6 +534,14 @@ function createCard(first: Lobby): LobbyCard {
     if (signature !== joinSignature) {
       joinSignature = signature;
       joinBody.replaceChildren(joinBlock(lobby));
+    }
+
+    watch.hidden = watchers.length === 0 || !running;
+    watchSummary.textContent = `Watch lines (${watchers.length})`;
+    const watchNow = JSON.stringify([lobby.observer_delay_seconds, watchers.map((observer) => [observer.name, observer.referee, observer.watch])]);
+    if (watchNow !== watchSignature) {
+      watchSignature = watchNow;
+      watchBody.replaceChildren(watchBlock(lobby));
     }
   }
 
@@ -499,7 +583,7 @@ function renderCreated(): void {
     if (createdId === null) createdBox.hidden = true;
     return;
   }
-  const signature = JSON.stringify([lobby.state, lobby.name, (lobby.seats ?? []).map((seat) => seat.join)]);
+  const signature = JSON.stringify([lobby.state, lobby.name, (lobby.seats ?? []).map((seat) => seat.join), (lobby.observers ?? []).map((observer) => observer.watch)]);
   if (createdBox.dataset.signature === signature) return;
   createdBox.dataset.signature = signature;
   const dismiss = h("button", { type: "button", class: "btn ghost small" }, "Dismiss");
@@ -517,6 +601,7 @@ function renderCreated(): void {
       stateChip(lobby.state),
     ),
     joinBlock(lobby),
+    (lobby.observers ?? []).length === 0 ? "" : watchBlock(lobby),
     h("div", { class: "lobby-actions" }, h("a", { class: "btn primary small", href: `#/lobby/${encodeURIComponent(lobby.id)}` }, "Open the lobby"), dismiss),
   );
   createdBox.hidden = false;
@@ -798,6 +883,54 @@ seatAdd.addEventListener("click", () => {
   byId<HTMLSelectElement>(`seat-${seats.length}-kind`).focus();
 });
 
+// ---------------------------------------------------------------- new lobby: observers
+
+function renderObservers(): void {
+  observerRows.replaceChildren(
+    ...observers.map((observer, index) => {
+      const n = index + 1;
+      const name = h("input", { id: `observer-${n}-name`, maxlength: MAX_OBSERVER_NAME, placeholder: `Observer ${n}`, spellcheck: "false", autocomplete: "off" });
+      name.value = observer.name;
+      name.addEventListener("input", () => (observer.name = name.value));
+      const referee = h("input", { id: `observer-${n}-referee`, type: "checkbox" });
+      referee.checked = observer.referee;
+      referee.addEventListener("change", () => {
+        observer.referee = referee.checked;
+        renderObserverDelay();
+      });
+      const remove = h("button", { type: "button", class: "btn ghost small", "aria-label": `Remove observer ${n}`, title: "Remove this observer" }, icon("trash", "icon tiny"));
+      remove.addEventListener("click", () => {
+        observers.splice(index, 1);
+        renderObservers();
+        const next = document.getElementById(`observer-${Math.min(n, observers.length)}-name`) ?? observerAdd;
+        next.focus();
+      });
+      return h(
+        "div",
+        { class: "observer-row", role: "group", "aria-label": `Observer ${n}` },
+        h("div", { class: "field grow" }, h("label", { for: `observer-${n}-name` }, `Observer ${n}`), name),
+        h("label", { class: "check", for: `observer-${n}-referee` }, referee, h("span", {}, "Referee, no delay")),
+        remove,
+      );
+    }),
+  );
+  observerCount.textContent = observers.length === 0 ? "none" : `${observers.length} of ${MAX_OBSERVERS}`;
+  observerAdd.disabled = observers.length >= MAX_OBSERVERS;
+  renderObserverDelay();
+}
+
+/** The delay matters only to observers who aren't referees. */
+function renderObserverDelay(): void {
+  observerDelayField.hidden = !observers.some((observer) => !observer.referee);
+}
+
+observerAdd.addEventListener("click", () => {
+  if (observers.length >= MAX_OBSERVERS) return;
+  observers.push({ name: "", referee: false });
+  renderObservers();
+  byId<HTMLInputElement>(`observer-${observers.length}-name`).focus();
+});
+
 // ---------------------------------------------------------------- new lobby: CPUs and the hint
 
 function requestHint(): void {
@@ -921,6 +1054,7 @@ function openForm(): void {
   if (lobbyName.value.trim() === "") lobbyName.value = `${info?.name ?? "Host"} lobby ${lobbies.length + 1}`;
   if (picked.size > 0) cpuAuto.checked = false;
   renderSeats();
+  renderObservers();
   renderCpuMode();
   void loadMaps();
   requestHint();
@@ -987,6 +1121,22 @@ async function submit(): Promise<void> {
     cpus: cpuAuto.checked ? "auto" : pickedList(),
   };
   if (cpuAuto.checked) request.cores = Math.max(1, Math.round(Number(cpuCores.value) || 1));
+  if (observers.length > 0) {
+    if (observers.length > MAX_OBSERVERS) return fail(`At most ${MAX_OBSERVERS} observers.`, observerAdd);
+    for (const [index, observer] of observers.entries()) {
+      if (observer.name.trim().length > MAX_OBSERVER_NAME) {
+        return fail(`Observer ${index + 1}'s name is longer than ${MAX_OBSERVER_NAME} characters.`, document.getElementById(`observer-${index + 1}-name`));
+      }
+    }
+    let delay = 0;
+    if (observers.some((observer) => !observer.referee)) {
+      delay = Number(observerDelay.value || "0");
+      if (!Number.isFinite(delay) || delay < 0 || delay > 3600) return fail("The observers' delay is 0 to 3600 seconds.", observerDelay);
+    }
+    // An empty name is the host's to fill ("Observer N").
+    request.observers = observers.map((observer) => (observer.referee ? { name: observer.name.trim(), referee: true } : { name: observer.name.trim() }));
+    request.observer_delay_seconds = delay;
+  }
 
   lobbySubmit.disabled = true;
   lobbySubmit.classList.add("busy");
@@ -999,6 +1149,8 @@ async function submit(): Promise<void> {
     picked.clear();
     coresTouched = false;
     lobbyName.value = "";
+    observers = [];
+    observerDelay.value = "0";
     closeForm();
     renderLobbies();
     renderHeatmap();
@@ -1064,6 +1216,8 @@ export function stopHost(): void {
   maps = null;
   mapId = "";
   seats = [];
+  observers = [];
+  observerDelay.value = "0";
   hint = null;
   hintKey = "";
   createdId = null;

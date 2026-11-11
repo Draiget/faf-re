@@ -970,3 +970,84 @@ a.btn {
 .back-link {
   color: var(--accent);
 }
+
+/* ------------------------------------------------------------ observers */
+
+.section-help {
+  margin: 0;
+}
+
+.observer-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.observer-rows:empty {
+  display: none;
+}
+
+.observer-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--info);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.observer-row:has(input[type="checkbox"]:checked) {
+  border-left-color: var(--accent);
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.35rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.check input {
+  width: 1.05rem;
+  height: 1.05rem;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+#observer-delay-field {
+  max-width: 12rem;
+}
+
+.referee-chip {
+  vertical-align: 0.05em;
+}
+
+.watch .join-help .inline-code {
+  padding: 0.05rem 0.35rem;
+}
+
+@media (max-width: 36rem) {
+  .observer-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .observer-row .field {
+    grid-column: 1 / -1;
+  }
+}
+
+/* A watch row has two buttons: both go under the line, side by side. */
+.watch .join-cmd {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.watch .cmd {
+  flex: 1 1 100%;
+}

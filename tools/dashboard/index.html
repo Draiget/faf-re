@@ -85,6 +85,17 @@
               </div>
 
               <div class="form-section">
+                <div class="section-head"><h3>Observers</h3><span class="dim" id="observer-count"></span></div>
+                <p class="dim small section-help">Each observer gets a watch line of their own, which the game opens as a live replay of this lobby's game. Referees watch live; the others see it with the delay below.</p>
+                <div id="observer-rows" class="observer-rows"></div>
+                <button id="observer-add" class="btn small add-seat" type="button">Add an observer</button>
+                <div id="observer-delay-field" class="field cores-field" hidden>
+                  <label for="observer-delay">Delay for observers (s)</label>
+                  <input id="observer-delay" type="number" min="0" max="3600" value="0" inputmode="numeric" />
+                </div>
+              </div>
+
+              <div class="form-section">
                 <div class="section-head"><h3>Game options</h3></div>
                 <div id="option-grid" class="option-grid"></div>
               </div>

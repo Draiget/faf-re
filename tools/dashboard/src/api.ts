@@ -137,6 +137,15 @@ export interface LobbySeat {
   join?: string | null;
 }
 
+/** Someone who watches a lobby's game as a live replay (plan WP13.1). */
+export interface LobbyObserver {
+  name?: string | null;
+  /** A referee watches with no delay. */
+  referee?: boolean | null;
+  /** The switches the game opens the live replay with: `/replay gpgnet://<host>:<port>/<token>`. */
+  watch?: string | null;
+}
+
 export interface Lobby {
   id: string;
   name?: string | null;
@@ -155,7 +164,18 @@ export interface Lobby {
   beat?: number | null;
   /** How the process exited, for a failed lobby. */
   exit?: string | null;
+  observers?: LobbyObserver[] | null;
+  /** How far behind the game non-referee observers watch. */
+  observer_delay_seconds?: number | null;
+  /** The second port observers watch from; only with observers. */
+  observe_port?: number | null;
   [key: string]: unknown;
+}
+
+export interface NewObserver {
+  /** Up to 40 characters; empty gives "Observer N". */
+  name: string;
+  referee?: boolean;
 }
 
 export interface NewSeat {
@@ -179,6 +199,10 @@ export interface NewLobby {
   lobby_minutes: number;
   cpus: number[] | "auto";
   cores?: number;
+  /** At most 32. */
+  observers?: NewObserver[];
+  /** 0..3600; referees watch without it. */
+  observer_delay_seconds?: number;
 }
 
 export interface Answer {
