@@ -20,6 +20,14 @@ namespace moho
   class CD3DDevice;
   class ID3DTextureSheet;
 
+  /**
+   * Engine addition, set by the map editor before the device loads its effects: FAF's `mesh.fx` gets the editor's
+   * outline techniques appended (`EditorOutline`, `EditorOutlineAlpha`: the model's front faces pushed out along their
+   * normals by a share of their distance to the camera, in the instance's colour, over everything; `EditorPropOver`:
+   * the prop drawn again over the shell's middle, so a rim stays). Off in the game.
+   */
+  extern bool ren_EditorMeshOutline;
+
   class CD3DEffect
   {
   public:

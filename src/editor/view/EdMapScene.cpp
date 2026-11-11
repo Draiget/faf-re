@@ -48,10 +48,11 @@ namespace moho
 {
   extern bool ren_Ui; // the game's interface drawn (console `ren_Ui`; RuntimeTuningGlobals.cpp)
 }
+#include "gpg/core/utils/BoostWrappers.h"
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/d3d/CD3DDeviceResources.h"
 #include "moho/render/d3d/RD3DTextureResource.h"
-#include "gpg/core/utils/BoostWrappers.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 
@@ -5636,8 +5637,10 @@ namespace faf::editor
                          : mHoverPropWanted;
     if (wanted < 0) {
       // Hidden, not deleted: the cursor often leaves a prop and comes back to it; a mesh is remade only for another prop.
-      if (mHighlight != nullptr) {
-        mHighlight->isHidden = 1;
+      for (moho::MeshInstance* const instance : {mHighlight, mHighlightOver}) {
+        if (instance != nullptr) {
+          instance->isHidden = 1;
+        }
       }
       return;
     }
@@ -5656,30 +5659,69 @@ namespace faf::editor
       if (mesh == nullptr) {
         return;
       }
-      // The prop's own mesh again, a little larger, with the game's build-placement technique (UnitPlace in mesh.fx:
-      // its vertices pushed out along their normals, lit, in the instance's colour at a fifth opacity): a lit shell over
-      // the prop, its rim showing round the edge. Every renderer has it, as the game's build ghost draws with it.
-      static const boost::shared_ptr<moho::MeshMaterial> kHighlight =
-        moho::MeshMaterial::Create(fa::string("UnitPlace"), fa::string(), fa::string(), fa::string(), fa::string(), fa::string(), nullptr);
-      const float scale = blueprint->Display.UniformScale * 1.04f;
-      mHighlight = renderer->CreateMeshInstance(0, static_cast<std::int32_t>(0xFFFFB040u), mesh, Wm3::Vec3f{scale, scale, scale}, false, kHighlight);
+      // The outline (WPE.57), two more instances of the prop's mesh with the editor's techniques appended to mesh.fx
+      // (ren_EditorMeshOutline): EditorOutline, its front faces pushed out a few pixels' worth at any zoom in the
+      // instance's colour, drawn after the water over everything; then EditorPropOver, the prop again with its own
+      // textures over the shell's middle, so only the rim stays (both over what stands in front, as a highlight). A
+      // prop drawn alpha-tested (its shader "...Alpha": most props, the trees' leaf cards among them) gets the hull cut
+      // out by its albedo's alpha, so the outline follows the leaves, not the cards.
+      const moho::RMeshBlueprintLOD* const lod =
+        mesh->mLods.begin() != mesh->mLods.end() ? mesh->mLods.begin() : nullptr;
+      if (lod == nullptr) {
+        return;
+      }
+      const bool alphaTested = std::string(lod->mShaderName.c_str()).find("Alpha") != std::string::npos;
+      const boost::shared_ptr<moho::MeshMaterial> hull = moho::MeshMaterial::Create(
+        fa::string(alphaTested ? "EditorOutlineAlpha" : "EditorOutline"),
+        lod->mAlbedoName,
+        fa::string(),
+        fa::string(),
+        fa::string(),
+        fa::string(),
+        nullptr
+      );
+      const boost::shared_ptr<moho::MeshMaterial> over = moho::MeshMaterial::Create(
+        fa::string("EditorPropOver"),
+        lod->mAlbedoName,
+        lod->mNormalsName,
+        lod->mSpecularName,
+        lod->mLookupName,
+        lod->mSecondaryName,
+        nullptr
+      );
+      const float scale = blueprint->Display.UniformScale;
+      mHighlight = renderer->CreateMeshInstance(
+        0, static_cast<std::int32_t>(0xFFFFB040u), mesh, Wm3::Vec3f{scale, scale, scale}, false, hull
+      );
+      mHighlightOver = renderer->CreateMeshInstance(0, -1, mesh, Wm3::Vec3f{scale, scale, scale}, false, over);
       mHighlightProp = wanted;
       if (mHighlight == nullptr) {
         return;
       }
-      mHighlight->isHidden = 0;
-      gpg::Logf("editor: prop %d highlighted (%s)", wanted, entry.mBlueprintPath.c_str());
+      gpg::Logf(
+        "editor: prop %d outlined (%s, shader %s%s)",
+        wanted,
+        entry.mBlueprintPath.c_str(),
+        lod->mShaderName.c_str(),
+        alphaTested ? ", cut out by its albedo" : ""
+      );
     }
-    mHighlight->isHidden = 0;
-    mHighlight->SetStance(entry.mTransform, entry.mTransform);
+    for (moho::MeshInstance* const instance : {mHighlight, mHighlightOver}) {
+      if (instance != nullptr) {
+        instance->isHidden = 0;
+        instance->SetStance(entry.mTransform, entry.mTransform);
+      }
+    }
   }
 
   void EdMapScene::DeletePropHighlight()
   {
-    if (mHighlight != nullptr && moho::MeshRenderer::GetInstance() != nullptr) {
+    if (moho::MeshRenderer::GetInstance() != nullptr) {
       delete mHighlight;
+      delete mHighlightOver;
     }
     mHighlight = nullptr;
+    mHighlightOver = nullptr;
     mHighlightProp = -1;
   }
 

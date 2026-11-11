@@ -24,53 +24,54 @@
 #include <string>
 #include <vector>
 
-#include "editor/EdLog.h"
-#include "editor/doc/EdWaterPreset.h"
-#include "editor/EdMemTrace.h"
-#include "editor/EdPlay.h"
-#include "editor/ui/EdHelp.h"
-#include "editor/EdShell.h"
-#include "editor/ui/EdFonts.h"
-#include "moho/render/AmbientOcclusionRenderer.h"
-#include <cstring>
 #include "editor/doc/EdDocument.h"
-#include "moho/render/RCamManager.h"
-#include "moho/render/camera/CameraImpl.h"
-#include "moho/sim/CWldMap.h"
-#include "moho/sim/STIMap.h"
-#include "moho/terrain/splat/CWldSplat.h"
+#include "editor/doc/EdMapFile.h"
 #include "editor/doc/EdRoundTrip.h"
 #include "editor/doc/EdUnitWrecks.h"
-#include "editor/ui/EdImGuiRenderer.h"
+#include "editor/doc/EdWaterPreset.h"
+#include "editor/EdLog.h"
+#include "editor/EdMemTrace.h"
+#include "editor/EdPlay.h"
+#include "editor/EdShell.h"
 #include "editor/tools/EdHeightFile.h"
 #include "editor/tools/EdTextureLibrary.h"
-#include "editor/doc/EdMapFile.h"
+#include "editor/ui/EdFonts.h"
+#include "editor/ui/EdHelp.h"
+#include "editor/ui/EdImGuiRenderer.h"
 #include "editor/view/EdLiveTerrain.h"
 #include "editor/view/EdMapScene.h"
 #include "gpg/core/diagnostics/CrashHooks.h"
 #include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "gpg/gal/backends/common/ImageCodec.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/Error.hpp"
-#include "gpg/gal/backends/common/ImageCodec.h"
 #include "imgui.h"
-#include "imgui_internal.h"
 #include "imgui_impl_win32.h"
+#include "imgui_internal.h"
 #include "moho/app/CScApp.h"
 #include "moho/app/WinApp.h"
 #include "moho/app/WxRuntimeTypes.h"
-#include "moho/misc/SessionStartup.h"
 #include "moho/misc/CVirtualFileSystem.h"
-#include "moho/misc/StartupHelpers.h"
-#include "moho/render/WRenViewport.h"
-#include "moho/render/d3d/CD3DDevice.h"
-#include "moho/render/d3d/CD3DRenderTarget.h"
-#include "moho/misc/ID3DDeviceResources.h"
-#include "moho/sim/RRuleGameRules.h"
 #include "moho/misc/FileWaitHandleSet.h"
+#include "moho/misc/ID3DDeviceResources.h"
+#include "moho/misc/SessionStartup.h"
+#include "moho/misc/StartupHelpers.h"
+#include "moho/render/AmbientOcclusionRenderer.h"
+#include "moho/render/camera/CameraImpl.h"
+#include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/d3d/CD3DEffectTechnique.h"
+#include "moho/render/d3d/CD3DRenderTarget.h"
+#include "moho/render/RCamManager.h"
+#include "moho/render/WRenViewport.h"
 #include "moho/sim/CVFSImpl.h"
+#include "moho/sim/CWldMap.h"
+#include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/STIMap.h"
+#include "moho/terrain/splat/CWldSplat.h"
 #include "moho/ui/IUIManager.h"
+#include <cstring>
 
 // imgui_impl_win32.h leaves this declaration to the application.
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -806,6 +807,8 @@ namespace faf::editor
       } else {
         moho::gAppRenderers = {DeviceApi::Direct3D12, DeviceApi::Vulkan};
       }
+      // The hovered prop's outline techniques in mesh.fx (before the device loads its effects; WPE.57).
+      moho::ren_EditorMeshOutline = true;
       // One maximized, movable, resizable window, whatever the game's display options say.
       moho::gAppWindowed = true;
       // The panels' window and its head (head 1); the game keeps head 0 for its viewport.

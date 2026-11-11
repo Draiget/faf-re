@@ -518,6 +518,8 @@ namespace faf::editor
     int mHoverPropWanted = -1;
     int mHighlightProp = -1;
     moho::MeshInstance* mHighlight = nullptr;
+    /** The prop drawn again over the outline's middle (EditorPropOver). */
+    moho::MeshInstance* mHighlightOver = nullptr;
     void UpdatePropHighlight();
     void DeletePropHighlight();
 

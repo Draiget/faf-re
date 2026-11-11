@@ -1,7 +1,9 @@
 ﻿#include "moho/render/d3d/CD3DEffectTechnique.h"
 #include <algorithm>
-#include <cstring>
+#include <cstdint>
+#include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <exception>
 #include <mutex>
 #include <new>
@@ -108,6 +110,269 @@ technique TMsdfText
         PixelShader = compile ps_2_0 MsdfTextPS();
     }
 }
+)fx";
+
+  } // namespace
+
+  bool ren_EditorMeshOutline = false;
+
+  namespace
+  {
+    /**
+     * Engine addition (ren_EditorMeshOutline, the map editor's hovered prop): appended to FAF's `mesh.fx`, using its
+     * vertex inputs, `ComputeWorldMatrix`, `CompatSwizzle`, `albedoSampler`, matrices and NormalMappedAlpha's shaders.
+     * `EditorOutline`: the model's front faces pushed out along their normals by a share of their distance to the
+     * camera, so the rim is about the same width on the screen at any zoom, in the instance's colour, drawn after the
+     * water and before the effects with no depth test. An inverted hull (back faces) drew nothing on FAF's rocks, open
+     * domes sunk into the ground with no back faces seen from above, and its rim was under the terrain anyway.
+     * `EditorPropOver`, NormalMappedAlpha's passes after the effects with no depth test, then draws the prop again
+     * over the shell's middle, so only the rim stays. `EditorOutlineAlpha` cuts out by the albedo's alpha as the
+     * alpha-tested props do (trees' leaf cards), with the pass states NormalMappedAlpha uses.
+     */
+    constexpr const char kEditorOutlineSource[] = R"fx(
+
+static const float EditorOutlineWidth = 0.002;
+
+VERTEXNORMAL_VERTEX EditorOutlineVS(
+    float3 position : POSITION0,
+    float3 normal : NORMAL0,
+    float3 UnusedTangent : TANGENT,
+    float3 UnusedBinormal : BINORMAL,
+    float4 texcoord0 : TEXCOORD0,
+    int boneIndex[4] : BLENDINDICES,
+    float3 row0 : TEXCOORD1,
+    float3 row1 : TEXCOORD2,
+    float3 row2 : TEXCOORD3,
+    float3 row3 : TEXCOORD4,
+    anim_t anim : TEXCOORD5,
+    float4 material : TEXCOORD6,
+    float4 color : COLOR0
+)
+{
+    VERTEXNORMAL_VERTEX vertex = (VERTEXNORMAL_VERTEX)0;
+    CompatSwizzle(color);
+    int bone = anim.y + boneIndex[0];
+    float4x4 worldMatrix = ComputeWorldMatrix( bone, row0, row1, row2, row3);
+    float4 world = mul( float4(position,1), worldMatrix);
+    float3 worldNormal = normalize( mul( normal, (float3x3)worldMatrix));
+    float distance = abs( mul( world, viewMatrix).z);
+    world.xyz += worldNormal * distance * EditorOutlineWidth;
+    vertex.position = mul( world, mul( viewMatrix, projMatrix));
+    vertex.texcoord0 = texcoord0;
+    vertex.color = color;
+    vertex.normal = worldNormal;
+    vertex.material = material;
+    return vertex;
+}
+
+float4 EditorOutlinePS( VERTEXNORMAL_VERTEX vertex) : COLOR0
+{
+    return float4( vertex.color.rgb, 1);
+}
+
+float4 EditorOutlineAlphaPS( VERTEXNORMAL_VERTEX vertex) : COLOR0
+{
+    return float4( vertex.color.rgb, tex2D( albedoSampler, vertex.texcoord0.xy).a);
+}
+
+// The shell: the prop's front faces pushed out, drawn after the water and before the effects over everything (no
+// depth test or write), so the rim shows even where the prop is sunk into the ground; EditorPropOver then draws the prop
+// again over its middle.
+technique EditorOutline_HighFidelity
+<
+    int fidelity = FIDELITY_HIGH;
+    string abstractTechnique = "EditorOutline";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+        VertexShader = compile vs_1_1 EditorOutlineVS();
+        PixelShader = compile ps_2_0 EditorOutlinePS();
+    }
+}
+
+technique EditorOutlineAlpha_HighFidelity
+<
+    int fidelity = FIDELITY_HIGH;
+    string abstractTechnique = "EditorOutlineAlpha";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 EditorOutlineVS();
+        PixelShader = compile ps_2_0 EditorOutlineAlphaPS();
+    }
+}
+
+technique EditorOutline_MedFidelity
+<
+    int fidelity = FIDELITY_MEDIUM;
+    string abstractTechnique = "EditorOutline";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+        VertexShader = compile vs_1_1 EditorOutlineVS();
+        PixelShader = compile ps_2_0 EditorOutlinePS();
+    }
+}
+
+technique EditorOutlineAlpha_MedFidelity
+<
+    int fidelity = FIDELITY_MEDIUM;
+    string abstractTechnique = "EditorOutlineAlpha";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 EditorOutlineVS();
+        PixelShader = compile ps_2_0 EditorOutlineAlphaPS();
+    }
+}
+
+technique EditorOutline_LowFidelity
+<
+    int fidelity = FIDELITY_LOW;
+    string abstractTechnique = "EditorOutline";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+        VertexShader = compile vs_1_1 EditorOutlineVS();
+        PixelShader = compile ps_2_0 EditorOutlinePS();
+    }
+}
+
+technique EditorOutlineAlpha_LowFidelity
+<
+    int fidelity = FIDELITY_LOW;
+    string abstractTechnique = "EditorOutlineAlpha";
+    int renderStage = STAGE_POSTWATER + STAGE_PREEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 EditorOutlineVS();
+        PixelShader = compile ps_2_0 EditorOutlineAlphaPS();
+    }
+}
+
+// The prop again over the shell's middle: NormalMappedAlpha's passes (most props' shader), drawn after the effects,
+// without a depth test (drawn again, the prop's own depth didn't match closely enough to pass), so it shows over what
+// stands in front of it, as an editor's highlight does.
+technique EditorPropOver_HighFidelity
+<
+    int fidelity = FIDELITY_HIGH;
+    string abstractTechnique = "EditorPropOver";
+    int renderStage = STAGE_POSTWATER + STAGE_POSTEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 NormalMappedVS();
+        PixelShader = compile ps_2_a NormalMappedPS(false,false,true,  true, d3d_Greater, 0x80 );
+    }
+}
+
+technique EditorPropOver_MedFidelity
+<
+    int fidelity = FIDELITY_MEDIUM;
+    string abstractTechnique = "EditorPropOver";
+    int renderStage = STAGE_POSTWATER + STAGE_POSTEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 NormalMappedVS();
+        PixelShader = compile ps_2_a NormalMappedPS(false,false,false,  true, d3d_Greater, 0x80 );
+    }
+}
+
+technique EditorPropOver_LowFidelity
+<
+    int fidelity = FIDELITY_LOW;
+    string abstractTechnique = "EditorPropOver";
+    int renderStage = STAGE_POSTWATER + STAGE_POSTEFFECT;
+    int parameter = PARAM_FRACTIONCOMPLETE;
+>
+{
+    pass P0
+    {
+        AlphaState( AlphaBlend_Disable_Write_RGB )
+        RasterizerState( Rasterizer_Cull_CW )
+        DepthState( Depth_Disable )
+#ifndef DIRECT3D10
+        AlphaTestEnable = true;
+        AlphaRef = 0x80;
+        AlphaFunc = Greater;
+#endif
+        VertexShader = compile vs_1_1 VertexNormalVS();
+        PixelShader = compile ps_2_0 VertexNormalPS_LowFidelity( true, d3d_Greater, 0x80 );
+    }
+}
+
 )fx";
 
     [[nodiscard]] gpg::MemBuffer<char> AppendSource(const gpg::MemBuffer<char>& source, const char* const tail, const std::size_t tailBytes)
@@ -627,8 +892,25 @@ technique TMsdfText
       // does `msdfText`, the source with the MSDF technique appended, and
       // `terrainTess`, terrain.fx with the tessellated techniques appended.
       gpg::MemBuffer<const char> terrainTess{};
-      const auto createEffect = [&](const bool boneTexture, const bool msdfText = false, const bool withTerrainTess = false) {
-        const char* const variant = boneTexture ? ".bonetex." : (msdfText ? ".msdf." : (withTerrainTess ? ".tess." : "."));
+      const auto createEffect = [&](
+                                  const bool boneTexture,
+                                  const bool msdfText = false,
+                                  const bool withTerrainTess = false,
+                                  const bool editorOutline = false
+                                ) {
+        // The outline's appended text is the editor's own, not a file whose date the cache checks: its hash names its
+        // cache.
+        char outlineVariant[32];
+        if (editorOutline) {
+          std::uint32_t hash = 2166136261u;
+          for (const char c : std::string_view(kEditorOutlineSource, sizeof(kEditorOutlineSource) - 1u)) {
+            hash = (hash ^ static_cast<unsigned char>(c)) * 16777619u;
+          }
+          (void)std::snprintf(outlineVariant, sizeof(outlineVariant), ".edoutline%08x.", hash);
+        }
+        const char* const variant = boneTexture
+          ? ".bonetex."
+          : (msdfText ? ".msdf." : (withTerrainTess ? ".tess." : (editorOutline ? outlineVariant : ".")));
         const fa::string cachePath = cacheDirectory + "/" + mName + variant + engineVersion;
         SDiskFileInfo cacheInfo{};
         bool useCachePayload = false;
@@ -641,9 +923,12 @@ technique TMsdfText
           effectMacros.push_back(gpg::gal::EffectMacro("FAF_BONE_TEXTURE", "1"));
         }
         const gpg::gal::EffectContext context(
-          useCachePayload, mFile.c_str(), cachePath.c_str(),
-          msdfText          ? AppendSource(mergedBuffer, kMsdfTechniqueSource, sizeof(kMsdfTechniqueSource) - 1u)
+          useCachePayload,
+          mFile.c_str(),
+          cachePath.c_str(),
+          msdfText            ? AppendSource(mergedBuffer, kMsdfTechniqueSource, sizeof(kMsdfTechniqueSource) - 1u)
             : withTerrainTess ? AppendSource(mergedBuffer, terrainTess.GetPtr(0U, 0U), terrainTess.Size())
+            : editorOutline   ? AppendSource(mergedBuffer, kEditorOutlineSource, sizeof(kEditorOutlineSource) - 1u)
                               : mergedBuffer,
           effectMacros
         );
@@ -701,6 +986,34 @@ technique TMsdfText
             gpg::Warnf("%s: %s; building it without terrain tessellation", effectFilePath, exception.what());
             mEffect.reset();
           }
+        }
+      }
+      // Engine addition (ren_EditorMeshOutline, the map editor only): mesh.fx with the outline techniques on its end.
+      // Every one is compiled here so a mistake shows at once and the meshes fall back to the plain effect.
+      if (!mEffect && ren_EditorMeshOutline && std::strcmp(mName.c_str(), "mesh") == 0) {
+        try {
+          createEffect(false, false, false, true);
+          auto* const program = dynamic_cast<gpg::gal::ProgramEffect*>(mEffect.get());
+          for (const char* const name :
+               {"EditorOutline_HighFidelity",
+                "EditorOutline_MedFidelity",
+                "EditorOutline_LowFidelity",
+                "EditorOutlineAlpha_HighFidelity",
+                "EditorOutlineAlpha_MedFidelity",
+                "EditorOutlineAlpha_LowFidelity",
+                "EditorPropOver_HighFidelity",
+                "EditorPropOver_MedFidelity",
+                "EditorPropOver_LowFidelity"}) {
+            if (program == nullptr || !program->TechniqueCompiles(name)) {
+              throw std::runtime_error(
+                std::string("technique ") + name + " did not compile (see the shader messages above)"
+              );
+            }
+          }
+          gpg::Logf("mesh: the editor's outline techniques loaded");
+        } catch (const std::exception& exception) {
+          gpg::Warnf("%s: %s; building it without the editor's outline", effectFilePath, exception.what());
+          mEffect.reset();
         }
       }
       if (!mEffect) {
