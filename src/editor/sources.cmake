@@ -67,6 +67,8 @@ set(FAF_EDITOR_SOURCES
   ui/EdParticleBrowser.cpp
   ui/EdParticleGraph.cpp
   ui/EdTexturePicker.cpp
+  ui/EdCodeEditor.cpp
+  doc/EdLuaSyntax.cpp
   ui/EdNodeCanvas.cpp
   ui/EdMaterialEditor.cpp
   tools/EdPathing.cpp

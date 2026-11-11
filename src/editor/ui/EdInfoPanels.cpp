@@ -11,6 +11,7 @@
 #include <map>
 
 #include "editor/EdPlay.h"
+#include "editor/ui/EdCodeEditor.h"
 #include "editor/ui/EdHelp.h"
 #include "moho/terrain/CWldTerrainRes.h"
 #include "moho/sim/SFootprint.h"
@@ -963,11 +964,17 @@ namespace faf::editor
       const float line = ImGui::GetTextLineHeight();
       if (ImGui::Selectable("##issue", false, ImGuiSelectableFlags_SpanAvailWidth, ImVec2(0.0f, line * 2.0f + 2.0f))) {
         if (!issue.file.empty()) {
-          // A script's error: its text in the Script panel, at the line.
+          // A script's error: its file in the Script Editor, at the line.
+          const auto endsWith = [&](const char* const tail) {
+            const std::string end = tail;
+            return issue.file.size() >= end.size() && issue.file.compare(issue.file.size() - end.size(), end.size(), end) == 0;
+          };
+          mScriptFile = endsWith("_options.lua") ? 1 : endsWith("_tables.lua") ? 2 : 0;
           mShowScript = true;
           mFocusScript = true;
           mScriptErrorLine = issue.line;
           mScriptMessage = issue.file + " line " + std::to_string(issue.line) + ": " + issue.text;
+          LuaCodeScrollTo(issue.line);
         } else if (issue.marker == "Props" || issue.marker.rfind("Prop ", 0) == 0) {
           // A prop's finding: the view to its place (props have no names to select by).
           mTools.AskPointFrame(issue.x, issue.z);
@@ -991,30 +998,20 @@ namespace faf::editor
     ImGui::EndChild();
     ImGui::End();
   }
-  namespace
-  {
-    /** ImGui's text callback growing a std::string as the text grows. */
-    int GrowString(ImGuiInputTextCallbackData* const data)
-    {
-      if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
-        auto* const text = static_cast<std::string*>(data->UserData);
-        text->resize(static_cast<std::size_t>(data->BufTextLen));
-        data->Buf = text->data();
-      }
-      return 0;
-    }
-  } // namespace
 
   void EdShell::DrawScriptPanel()
   {
-    if (const ImGuiWindow* const map = ImGui::FindWindowByName(kMapWindow); map != nullptr && map->DockId != 0) {
-      ImGui::SetNextWindowDockID(map->DockId, ImGuiCond_FirstUseEver);
-    }
-    if (mFocusScript) {
-      mFocusScript = false;
+    // A window of its own, large, over the view (user ask 2026-11-11: the script in a separate window with Lua
+    // highlighting); a new window id, so the old docked "Script" panel's place isn't taken back from the layout file.
+    const ImGuiViewport* const viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x * 0.62f, viewport->WorkSize.y * 0.8f), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_FirstUseEver, ImVec2(0.5f, 0.5f));
+    const bool focusAsked = std::exchange(mFocusScript, false);
+    if (focusAsked) {
       ImGui::SetNextWindowFocus();
+      ImGui::SetNextWindowCollapsed(false);
     }
-    if (!ImGui::Begin("Script", &mShowScript)) {
+    if (!ImGui::Begin("Script Editor###ScriptEditor", &mShowScript, ImGuiWindowFlags_NoCollapse)) {
       ImGui::End();
       return;
     }
@@ -1023,22 +1020,42 @@ namespace faf::editor
       ImGui::End();
       return;
     }
-    // Which file: the script, the lobby options (any map may have them), an adaptive map's tables.
+    // Which file, as tabs: the script, the lobby options (any map may have them), an adaptive map's tables.
     {
       const bool tables = mDocument.Adaptive();
       if (mScriptFile == 2 && !tables) {
         mScriptFile = 0;
       }
-      ImGui::RadioButton("_script.lua", &mScriptFile, 0);
-      ImGui::SameLine();
-      ImGui::RadioButton("_options.lua", &mScriptFile, 1);
-      ImGui::SetItemTooltip("The lobby's options for this map. The Adaptive tool writes the options its tables need; the "
-                            "others (wreckage, reclaim...) are edited here.");
-      if (tables) {
-        ImGui::SameLine();
-        ImGui::RadioButton("_tables.lua", &mScriptFile, 2);
-        ImGui::SetItemTooltip("The adaptive tables, which the Adaptive tool writes; the tables it doesn't know (the mapper's own) "
-                              "are edited here.");
+      struct Tab
+      {
+        const char* name;
+        const char* help;
+      };
+      static constexpr Tab kTabs[] = {
+        {"_script.lua", "The map's script: what runs when a game starts (the lobby options' groups, the playable area, effects...)."},
+        {"_options.lua", "The lobby's options for this map. The Adaptive tool writes the options its tables need; the others "
+                         "(wreckage, reclaim...) are edited here."},
+        {"_tables.lua", "The adaptive tables, which the Adaptive tool writes; the tables it doesn't know (the mapper's own) are edited here."},
+      };
+      if (ImGui::BeginTabBar("##files")) {
+        for (int t = 0; t < (tables ? 3 : 2); ++t) {
+          ImGuiTabItemFlags flags = focusAsked && t == mScriptFile ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+          // The tab being edited and not applied shows the unsaved dot.
+          if (t == mScriptFile && mScriptFor == mDocument.Path() + "#" + std::to_string(t)) {
+            const std::string& now = t == 0 ? mDocument.Script() : t == 1 ? mDocument.OptionsText() : mDocument.TablesText();
+            if (mScriptBuffer != now) {
+              flags |= ImGuiTabItemFlags_UnsavedDocument;
+            }
+          }
+          if (ImGui::BeginTabItem(kTabs[t].name, nullptr, flags)) {
+            if (!focusAsked) {
+              mScriptFile = t;
+            }
+            ImGui::EndTabItem();
+          }
+          ImGui::SetItemTooltip("%s", kTabs[t].help);
+        }
+        ImGui::EndTabBar();
       }
     }
     const MapFacts& facts = mDocument.Facts();
@@ -1083,6 +1100,9 @@ namespace faf::editor
       const CheckIssue issue = mDocument.CheckLuaText(mScriptBuffer, fileName);
       mScriptMessage = issue.text.empty() ? std::string("compiles") : "line " + std::to_string(issue.line) + ": " + issue.text;
       mScriptErrorLine = issue.text.empty() ? 0 : std::max(issue.line, 1);
+      if (mScriptErrorLine > 0) {
+        LuaCodeScrollTo(mScriptErrorLine);
+      }
       // The tables must also read as the Adaptive tool reads them.
       if (issue.text.empty() && mScriptFile == 2) {
         AdaptiveTables tables;
@@ -1094,25 +1114,15 @@ namespace faf::editor
       gpg::Logf("editor: %s check: %s", fileName.c_str(), mScriptMessage.c_str());
     }
     if (!mScriptMessage.empty()) {
-      ImGui::PushTextWrapPos(0.0f);
+      ImGui::SameLine();
       ImGui::TextColored(mScriptErrorLine > 0 ? ImVec4(0.95f, 0.45f, 0.40f, 1.0f) : ImVec4(0.55f, 0.80f, 0.55f, 1.0f), "%s", mScriptMessage.c_str());
-      ImGui::PopTextWrapPos();
-    }
-    if (mScriptErrorLine > 0) {
-      // The line in question, under the buttons.
-      std::size_t start = 0;
-      for (int line = 1; line < mScriptErrorLine && start != std::string::npos; ++line) {
-        start = mScriptBuffer.find('\n', start);
-        start = start == std::string::npos ? start : start + 1;
+      if (mScriptErrorLine > 0 && ImGui::IsItemClicked()) {
+        LuaCodeScrollTo(mScriptErrorLine);
       }
-      if (start != std::string::npos) {
-        const std::size_t end = mScriptBuffer.find('\n', start);
-        ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "%d: %s", mScriptErrorLine,
-                           mScriptBuffer.substr(start, end == std::string::npos ? std::string::npos : end - start).c_str());
-      }
+      ImGui::SetItemTooltip("%s", mScriptErrorLine > 0 ? "Click to go to the line (marked red)" : "");
     }
-    ImGui::InputTextMultiline("##script", mScriptBuffer.data(), mScriptBuffer.capacity() + 1, ImVec2(-1.0f, -1.0f),
-                              ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize, &GrowString, &mScriptBuffer);
+    // The code, coloured as Lua, line numbers beside it; the error line marked.
+    (void)LuaCodeInput("##script", mScriptBuffer, mScriptErrorLine, std::max(ImGui::GetContentRegionAvail().y, 120.0f));
     ImGui::End();
   }
   void EdShell::DrawLightingPanel()
