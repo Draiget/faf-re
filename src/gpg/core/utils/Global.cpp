@@ -552,8 +552,16 @@ namespace
         constinit thread_local ThreadLists tLists{};
 
         /// `/smallpool 0` on the command line (read here, before anything else runs) or FAF_SMALLPOOL=0.
+        /// An AddressSanitizer build (FAF_ASAN) never pools: ASan can't see inside the pool's blocks.
         [[nodiscard]] bool TurnedOff() noexcept
         {
+#if defined(__SANITIZE_ADDRESS__)
+            return true;
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+            return true;
+#endif
+#endif
             char value[4] = {};
             const DWORD written = ::GetEnvironmentVariableA("FAF_SMALLPOOL", value, static_cast<DWORD>(sizeof(value)));
             if (written == 1u && value[0] == '0') {
@@ -2319,6 +2327,40 @@ void __cdecl operator delete[](void* const ptr, std::size_t) noexcept
 void* __cdecl operator new[](const std::size_t size)
 {
     return ::operator new(size);
+}
+
+/**
+ * The nothrow forms (fa::string grows through `new (std::nothrow)`, legacy/containers/String.cpp).
+ * The library's own nothrow `new` already calls the scalar form above, but a sanitizer's doesn't:
+ * AddressSanitizer allocated those blocks itself and then saw this file's `delete` free them
+ * (alloc-dealloc-mismatch). Replacing them keeps every form on the same lanes everywhere.
+ */
+void* __cdecl operator new(const std::size_t size, const std::nothrow_t&) noexcept
+{
+    try {
+        return ::operator new(size);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+void* __cdecl operator new[](const std::size_t size, const std::nothrow_t&) noexcept
+{
+    try {
+        return ::operator new[](size);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+void __cdecl operator delete(void* const ptr, const std::nothrow_t&) noexcept
+{
+    ::operator delete(ptr);
+}
+
+void __cdecl operator delete[](void* const ptr, const std::nothrow_t&) noexcept
+{
+    ::operator delete(ptr);
 }
 
 /**
