@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 
 #include "boost/shared_ptr.h"
@@ -72,9 +73,45 @@ namespace moho
     /**
      * Address: 0x00538DB0 (FUN_00538DB0,
      * ?GetSkeleton@RScmResource@Moho@@QAE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)
+     *
+     * Returns one shared handle that aliases this resource's own control block,
+     * so the skeleton stays alive for as long as the handle does. Callers that
+     * only read bones inside their own frame do not need that and can use
+     * `PeekSkeleton` instead.
      */
     [[nodiscard]] boost::shared_ptr<const CAniSkel> GetSkeleton();
 
+    /**
+     * Engine addition: the owned skeleton without a shared handle.
+     *
+     * The skeleton is built on first use and owned outright by this resource
+     * (`~RScmResource` deletes it), so a caller only has to keep this resource
+     * alive. Every caller already holds an owning `shared_ptr<RScmResource>` for
+     * the length of its frame, which is what `Prop` relies on when it takes the
+     * raw pointer and drops the handle.
+     *
+     * Unlike the old `if (mSkeleton == nullptr)` in `GetSkeleton`, the build is
+     * guarded against concurrent first use: without that, two threads would both
+     * allocate, one pointer would be overwritten and leaked, and a reader could
+     * see a non-null pointer to a skeleton that is still being parsed.
+     */
+    [[nodiscard]] const CAniSkel* PeekSkeleton();
+
+  private:
+    /**
+     * Engine addition: the object `kSkeletonBuildInProgress` points at. It exists
+     * only to give the in-progress marker a unique address; nothing reads it.
+     */
+    static const char sSkeletonBuildInProgressSentinel;
+
+    /**
+     * Engine addition: the value `PeekSkeleton` exchanges into `mSkeleton` while it
+     * parses, so a second thread can tell "not built" from "being built". Never
+     * dereferenced, and never returned to a caller.
+     */
+    static CAniSkel* const kSkeletonBuildInProgress;
+
+  public:
     /**
      * Engine addition (plan WPR.35): whether models keep their vertices and indices after they
      * load. A program that draws nothing turns this off before it loads anything: the sim reads
@@ -82,6 +119,12 @@ namespace moho
      */
     static void SetKeepGeometry(bool keep) noexcept;
     [[nodiscard]] static bool KeepGeometry() noexcept;
+    /**
+     * Engine addition: whether bone lookups take `PeekSkeleton` (on, the default) or
+     * the shared handle `GetSkeleton` returns (off, the original path). Both give the
+     * same bones, so the switch only chooses how the pointer is obtained.
+     */
+    [[nodiscard]] static bool PeekSkeletonEnabled() noexcept;
     /**
      * Engine addition: builds the skeleton (its bone bounds need the vertices), then keeps only the
      * file's start, with the header, the bone names and the bones. Called while no one else holds
@@ -92,7 +135,10 @@ namespace moho
   public:
     fa::string mName;                   // +0x08
     boost::shared_ptr<const SScmFile> mFile; // +0x24
-    CAniSkel* mSkeleton;                   // +0x2C
+    // Engine addition: atomic so the lazy build in `PeekSkeleton` can claim it.
+    // `std::atomic<T*>` has the same size and alignment as `T*` on every target
+    // this builds for, so the +0x2C offset and the 0x4C size above are unchanged.
+    std::atomic<CAniSkel*> mSkeleton;      // +0x2C
     Wm3::AxisAlignedBox3f mBounds;         // +0x30
     float mSize;                           // +0x48
   };

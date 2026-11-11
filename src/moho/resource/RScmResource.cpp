@@ -7,8 +7,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <new>
+#include <thread>
 #include <typeinfo>
 
+#include "moho/console/CConCommand.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -99,6 +101,10 @@ namespace moho
   {
     bool gKeepGeometry = true;
 
+    /// Engine addition: the switch behind PeekSkeletonEnabled. On, bone lookups
+    /// take the raw pointer; off, they take the shared handle GetSkeleton returns.
+    bool gPeekSkeleton = true;
+
     void DeleteTrimmedScmFile(const SScmFile* const file) noexcept
     {
       delete[] reinterpret_cast<const char*>(file);
@@ -115,6 +121,22 @@ namespace moho
     return gKeepGeometry;
   }
 
+  bool RScmResource::PeekSkeletonEnabled() noexcept
+  {
+    return gPeekSkeleton;
+  }
+
+  /**
+   * Engine addition: /con sim_PeekSkeleton=0 brings back the original path, which
+   * builds a shared handle per lookup. Both paths read the same skeleton, so the
+   * switch changes only how the pointer is obtained, never what the sim computes.
+   */
+  TConVar<bool> gTConVar_sim_PeekSkeleton(
+    "sim_PeekSkeleton",
+    "Bone lookups take the skeleton pointer without building a shared handle (same bones).",
+    &gPeekSkeleton
+  );
+
   void RScmResource::DropGeometry()
   {
     const SScmFile& file = *mFile;
@@ -125,7 +147,7 @@ namespace moho
     }
     (void)GetSkeleton();
     const char* const base = reinterpret_cast<const char*>(&file);
-    for (const SAniSkelBone& bone : mSkeleton->mBones) {
+    for (const SAniSkelBone& bone : mSkeleton.load(std::memory_order_acquire)->mBones) {
       if (bone.mBoneName != nullptr && bone.mBoneName + std::strlen(bone.mBoneName) >= base + keptBytes) {
         return; // bone names after the bones
       }
@@ -137,7 +159,7 @@ namespace moho
     trimmed->mVertexCount = 0u;
     trimmed->mIndexCount = 0u;
     const boost::shared_ptr<const SScmFile> trimmedFile(trimmed, &DeleteTrimmedScmFile);
-    mSkeleton->RebindFile(trimmedFile);
+    mSkeleton.load(std::memory_order_acquire)->RebindFile(trimmedFile);
     mFile = trimmedFile;
   }
 
@@ -149,30 +171,70 @@ namespace moho
    */
   RScmResource::~RScmResource()
   {
-    delete mSkeleton;
-    mSkeleton = nullptr;
+    delete mSkeleton.exchange(nullptr, std::memory_order_acq_rel);
+  }
+
+  /**
+   * Engine addition: the marker `PeekSkeleton` exchanges into `mSkeleton` to
+   * say "a build is in progress". It is never dereferenced -- it only has to be
+   * a value no real skeleton can have. A dedicated one-byte static gives it
+   * that value without adding a member to the resource.
+   */
+  const char RScmResource::sSkeletonBuildInProgressSentinel = 0;
+
+  CAniSkel* const RScmResource::kSkeletonBuildInProgress =
+    reinterpret_cast<CAniSkel*>(const_cast<char*>(&sSkeletonBuildInProgressSentinel));
+
+  const CAniSkel* RScmResource::PeekSkeleton()
+  {
+    // One build site for both entry points, so `GetSkeleton` and `PeekSkeleton`
+    // cannot drift. `mSkeleton` doubles as the state: null means "not built",
+    // `kSkeletonBuildInProgress` means "a thread is parsing it now", and any
+    // other value is the finished skeleton.
+    //
+    // The exchange claims the build for exactly one thread. A thread that loses
+    // spins until the winner publishes, so the parse never runs twice and no
+    // reader ever sees a pointer to a half-built object. After the first call
+    // this is one acquire load and a compare.
+    for (;;) {
+      CAniSkel* const current = mSkeleton.load(std::memory_order_acquire);
+      if (current != nullptr && current != kSkeletonBuildInProgress) {
+        return current;
+      }
+
+      if (current == kSkeletonBuildInProgress) {
+        // Another thread is parsing. Let it finish rather than starting again.
+        std::this_thread::yield();
+        continue;
+      }
+
+      CAniSkel* expected = nullptr;
+      if (mSkeleton.compare_exchange_weak(
+            expected, kSkeletonBuildInProgress, std::memory_order_acq_rel, std::memory_order_acquire
+          )) {
+        // This thread owns the build. Publish only once the skeleton is fully
+        // parsed, so a reader that sees the pointer sees a finished object.
+        CAniSkel* const built = new CAniResourceSkel(mName, mFile);
+        mSkeleton.store(built, std::memory_order_release);
+        return built;
+      }
+
+      // Lost the exchange: `expected` now holds the winner's value, and the next
+      // pass either returns it or waits for it.
+    }
   }
 
   /**
    * Address: 0x00538DB0 (FUN_00538DB0, ?GetSkeleton@RScmResource@Moho@@QAE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)
    *
    * What it does:
-   * Lazily constructs the owned skeleton on first request by parsing this
-   * resource's SCM file into a `CAniResourceSkel` (allocated with
-   * `operator new(0x48)`), then returns one shared handle that aliases this
-   * resource's own shared-control block so the skeleton stays alive for as long
-   * as the returned handle does.
+   * Returns one shared handle that aliases this resource's own shared-control
+   * block so the skeleton stays alive for as long as the returned handle does.
+   * The build itself belongs to `PeekSkeleton`.
    */
   boost::shared_ptr<const CAniSkel> RScmResource::GetSkeleton()
   {
-    if (mSkeleton == nullptr) {
-      // The binary allocates a 0x48-byte CAniResourceSkel and constructs it
-      // from this resource's name + SCM file, storing it through the CAniSkel*
-      // base pointer lane.
-      CAniSkel* const previousSkeleton = mSkeleton;
-      mSkeleton = new CAniResourceSkel(mName, mFile);
-      delete previousSkeleton;
-    }
+    const CAniSkel* const skeleton = PeekSkeleton();
 
     struct KeepOwnerAlive
     {
@@ -181,7 +243,7 @@ namespace moho
     };
 
     KeepOwnerAlive keepOwner{shared_from_this()};
-    return boost::shared_ptr<const CAniSkel>(mSkeleton, keepOwner);
+    return boost::shared_ptr<const CAniSkel>(skeleton, keepOwner);
   }
 
   /**
