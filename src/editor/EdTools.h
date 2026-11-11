@@ -82,6 +82,11 @@ namespace faf::editor
     void SetPropPictures(std::function<std::uint64_t(const std::string&)> source) { mPropPictures = std::move(source); }
     [[nodiscard]] std::uint64_t PropPicture(const std::string& blueprint) const { return mPropPictures ? mPropPictures(blueprint) : 0U; }
     [[nodiscard]] bool HasPropBlueprints() const noexcept { return !mPropBlueprints.empty(); }
+    /** The prop blueprints the game has (the Props tool's palette; the Properties panel's prop browser). */
+    [[nodiscard]] const std::vector<std::string>& PropBlueprints() const noexcept
+    {
+      return mPropBlueprints;
+    }
     /** The map's prop reclaim for the panel (the app counts it now and then while the Props tool shows). */
     void SetPropReclaim(std::string summary, std::vector<std::string> rows)
     {

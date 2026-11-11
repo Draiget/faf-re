@@ -525,7 +525,17 @@ namespace faf::editor
     /** Test runs (`/hovermarker <name>`): the cursor kept on that marker's place on the screen. */
     void TestHoverMarker(std::string name) { mTestHover = std::move(name); }
     /** Test runs (`/hoverprop <index>`): the cursor kept on that prop, the camera close over it. */
-    void TestHoverProp(const int index) { mTestHoverProp = index; }
+    void TestHoverProp(
+      const int index,
+      const bool select = false
+    )
+    {
+      mTestHoverProp = index;
+      mTestSelectHoverProp = select;
+    }
+    bool mTestSelectHoverProp = false;
+    /** Test runs (`/propswapundo`): the props' newest edit undone, and the hovered prop's blueprint logged. */
+    void TestUndoPropSwap();
     int mTestHoverProp = -1;
     bool mTestHoverPropFramed = false;
 

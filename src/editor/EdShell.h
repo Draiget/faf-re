@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdio>
 #include <map>
 #include <string>
 #include <utility>
@@ -189,6 +190,24 @@ namespace faf::editor
     bool mShowAdaptiveWindow = false;
     bool mEditorViewInPlay = false;
     float mUiScale = 1.0f;
+    /** The Properties panel's prop browser: open, its search, and a test run's click on its first tile. */
+    bool mPropBrowserOpen = false;
+    char mPropBrowserFilter[64]{};
+    bool mTestPropSwap = false;
+    void DrawPropBrowser(const std::string& current, int selected);
+
+  public:
+    /** Test runs (`/propswap <part>`): the prop browser opened on that search, its first tile clicked once. */
+    void TestPropSwap(
+      const std::string& filter
+    )
+    {
+      mPropBrowserOpen = true;
+      mTestPropSwap = true;
+      (void)std::snprintf(mPropBrowserFilter, sizeof(mPropBrowserFilter), "%s", filter.c_str());
+    }
+
+  private:
     /** The toolbar's UI scale buttons; returns their width when `measure` (nothing drawn). */
     float DrawUiScaleButtons(bool measure);
     bool mFocusAdaptiveWindow = false;

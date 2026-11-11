@@ -649,6 +649,13 @@ namespace faf::editor
       if (!mTestHoverPropFramed) {
         mTestHoverPropFramed = true;
         mTools->SetTool(0);
+        if (mTestSelectHoverProp) {
+          // `/propswap` too: that prop selected, alone (the Properties panel shows it).
+          mMarkerSelection.clear();
+          mUnitSelection.clear();
+          mDecalSelection.clear();
+          mSelection = {mTestHoverProp};
+        }
         mTargetX = at.x;
         mTargetZ = at.z;
         mDistance = 40.0f;
@@ -3829,6 +3836,37 @@ namespace faf::editor
       break;
     }
     case SelectionProperties::Kind::Prop: {
+      if (edit.what == PropertyEdit::What::Blueprint && !edit.value.empty() && mMap->mProps != nullptr) {
+        // Every selected prop becomes the chosen one where it stands (user ask 2026-11-11, WPE.55), as one undo step.
+        BeginObjectStroke();
+        int changed = 0;
+        for (const int index : mSelection) {
+          if (index < 0 || static_cast<std::size_t>(index) >= mMap->mProps->mEntries.size()) {
+            continue;
+          }
+          moho::CWldPropEntry& entry = mMap->mProps->mEntries[static_cast<std::size_t>(index)];
+          if (edit.value == entry.mBlueprintPath.c_str()) {
+            continue;
+          }
+          entry.mBlueprintPath.assign(edit.value.c_str());
+          const PropRecord record = PropRecordFor(entry.mBlueprintPath.c_str(), entry.mTransform);
+          entry.mTransform = record.loaded;
+          mDocument.SetPropRecord(static_cast<std::size_t>(index), record);
+          if (static_cast<std::size_t>(index) < mProps.size()) {
+            delete mProps[static_cast<std::size_t>(index)];
+            mProps[static_cast<std::size_t>(index)] = MakePropInstance(entry);
+          }
+          ++changed;
+        }
+        if (changed > 0) {
+          DeletePropHighlight(); // it was the old model's
+          mObjectsChanged = true;
+          mDocument.SetModified(true);
+        }
+        EndObjectStroke();
+        gpg::Logf("editor: %d props now %s", changed, edit.value.c_str());
+        break;
+      }
       if (edit.what != PropertyEdit::What::Position && edit.what != PropertyEdit::What::Heading) {
         break;
       }
@@ -5574,6 +5612,18 @@ namespace faf::editor
       ReloadUnits();
       gpg::Logf("editor: %d units deleted, %zu now", deleted, mUnitRefs.size());
     }
+  }
+
+  void EdMapScene::TestUndoPropSwap()
+  {
+    const bool undone = UndoProps(false);
+    const std::string path = mMap != nullptr && mMap->mProps != nullptr && mTestHoverProp >= 0 &&
+        static_cast<std::size_t>(mTestHoverProp) < mMap->mProps->mEntries.size()
+      ? mMap->mProps->mEntries[static_cast<std::size_t>(mTestHoverProp)].mBlueprintPath.c_str()
+      : "";
+    gpg::Logf(
+      "editor: /propswapundo: %s; prop %d is %s", undone ? "undone" : "nothing to undo", mTestHoverProp, path.c_str()
+    );
   }
 
   void EdMapScene::UpdatePropHighlight()

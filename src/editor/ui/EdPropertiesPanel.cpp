@@ -12,11 +12,12 @@
 #include <cstring>
 #include <string>
 
-#include "editor/EdShell.h"
-#include "editor/doc/EdDocument.h"
 #include "editor/doc/EdAdaptiveTables.h"
+#include "editor/doc/EdDocument.h"
 #include "editor/doc/EdSaveFile.h"
+#include "editor/EdShell.h"
 #include "editor/ui/EdHelp.h"
+#include "gpg/core/utils/Logging.h"
 #include "imgui.h"
 
 namespace faf::editor
@@ -513,6 +514,15 @@ namespace faf::editor
         if (!now.details.empty()) {
           ImGui::TextDisabled("%s", now.details.c_str());
         }
+        // Another prop in its place: the game's props as pictures (user ask 2026-11-11, WPE.55).
+        if (
+          ImGui::Button(mPropBrowserOpen ? "Close the prop browser" : "Change to another prop...", ImVec2(-1.0f, 0.0f))
+        ) {
+          mPropBrowserOpen = !mPropBrowserOpen;
+        }
+        if (mPropBrowserOpen) {
+          DrawPropBrowser(now.type, now.count);
+        }
       }
       break;
     case SelectionProperties::Kind::Decal:
@@ -526,5 +536,115 @@ namespace faf::editor
     HelpNote("Drag a value or type one (Enter); each change is one undo step. With several selected, the first is edited.");
     mPropertiesEditing = active;
     ImGui::End();
+  }
+
+  void EdShell::DrawPropBrowser(
+    const std::string& current,
+    const int selected
+  )
+  {
+    const std::vector<std::string>& blueprints = mTools.PropBlueprints();
+    if (blueprints.empty()) {
+      ImGui::TextDisabled("The props come once the game's rules are built after startup.");
+      return;
+    }
+    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::InputTextWithHint(
+      "##propbrowserfilter", "search (rock, pine, wreck...)", mPropBrowserFilter, sizeof(mPropBrowserFilter)
+    );
+    std::string filter = mPropBrowserFilter;
+    for (char& c : filter) {
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    // "/env/evergreen/props/rocks/fieldstone02_prop.bp" is "fieldstone02", in "evergreen / rocks".
+    const auto shortName = [](const std::string& path) {
+      std::size_t start = path.find_last_of('/');
+      std::string name = path.substr(start == std::string::npos ? 0 : start + 1);
+      if (name.size() > 8 && name.compare(name.size() - 8, 8, "_prop.bp") == 0) {
+        name.resize(name.size() - 8);
+      }
+      return name;
+    };
+    std::string chosen;
+    const float tile = ImGui::GetFrameHeight() * 3.2f;
+    const float labelHeight = ImGui::GetTextLineHeight() + 2.0f;
+    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+    if (
+      ImGui::BeginChild("##propbrowser", ImVec2(0.0f, (tile + labelHeight + spacing) * 3.5f), ImGuiChildFlags_Borders)
+    ) {
+      const int columns =
+        std::max(1, static_cast<int>((ImGui::GetContentRegionAvail().x + spacing) / (tile + spacing)));
+      int shown = 0;
+      ImDrawList* const draw = ImGui::GetWindowDrawList();
+      for (const std::string& blueprint : blueprints) {
+        if (!filter.empty() && blueprint.find(filter) == std::string::npos) {
+          continue;
+        }
+        if (shown % columns != 0) {
+          ImGui::SameLine(0.0f, spacing);
+        }
+        ++shown;
+        ImGui::PushID(blueprint.c_str());
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        if (ImGui::InvisibleButton("##tile", ImVec2(tile, tile + labelHeight))) {
+          chosen = blueprint;
+        }
+        const bool hovered = ImGui::IsItemHovered();
+        ImGui::PopID();
+        // Only tiles in view ask for their picture (there are thousands of props).
+        if (!ImGui::IsItemVisible()) {
+          continue;
+        }
+        const bool isCurrent = blueprint == current;
+        draw->AddRectFilled(at, ImVec2(at.x + tile, at.y + tile), IM_COL32(24, 27, 32, 255), 4.0f);
+        if (const std::uint64_t image = mTools.PropPicture(blueprint); image != 0U) {
+          draw->AddImage(
+            static_cast<ImTextureID>(image),
+            ImVec2(at.x + 2.0f, at.y + 2.0f),
+            ImVec2(at.x + tile - 2.0f, at.y + tile - 2.0f)
+          );
+        }
+        const ImU32 border = isCurrent ? IM_COL32(227, 148, 66, 255)
+          : hovered                    ? IM_COL32(200, 200, 200, 255)
+                                       : IM_COL32(58, 65, 75, 255);
+        draw->AddRect(at, ImVec2(at.x + tile, at.y + tile), border, 4.0f, 0, isCurrent ? 2.0f : 1.0f);
+        std::string name = shortName(blueprint);
+        while (name.size() > 3 && ImGui::CalcTextSize(name.c_str()).x > tile) {
+          name.resize(name.size() - 1);
+        }
+        draw->AddText(
+          ImVec2(at.x, at.y + tile + 1.0f),
+          ImGui::GetColorU32(isCurrent ? ImGuiCol_Text : ImGuiCol_TextDisabled),
+          name.c_str()
+        );
+        if (hovered) {
+          ImGui::SetTooltip(
+            "%s\nclick: %s",
+            blueprint.c_str(),
+            selected > 1 ? "every selected prop becomes this one" : "the prop becomes this one"
+          );
+        }
+      }
+      if (shown == 0) {
+        ImGui::TextDisabled("No prop matches \"%s\".", mPropBrowserFilter);
+      }
+      // `/propswap` (test runs): the first tile the filter shows, as a click on it.
+      if (mTestPropSwap && shown > 0) {
+        mTestPropSwap = false;
+        for (const std::string& blueprint : blueprints) {
+          if (chosen.empty() && (filter.empty() || blueprint.find(filter) != std::string::npos)) {
+            chosen = blueprint;
+          }
+        }
+        gpg::Logf("editor: /propswap: the browser's first tile for \"%s\" is %s", mPropBrowserFilter, chosen.c_str());
+      }
+    }
+    ImGui::EndChild();
+    if (!chosen.empty() && chosen != current) {
+      PropertyEdit change;
+      change.what = PropertyEdit::What::Blueprint;
+      change.value = chosen;
+      mTools.AskPropertyEdit(change);
+    }
   }
 } // namespace faf::editor

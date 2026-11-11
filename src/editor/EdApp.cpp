@@ -568,6 +568,7 @@ namespace faf::editor
       /** The style at the screen's DPI, before the user's UI scale; the scale in use on it. */
       ImGuiStyle mBaseStyle;
       float mUiScaleApplied = 1.0f;
+      double mPropSwapUndoAt = 0.0;
 
       /**
        * Before a frame: the scale read from layout.ini at the first frame into the toolbar's, `/uiscale <x>` (test runs)
@@ -2295,6 +2296,22 @@ namespace faf::editor
         }
         if (PropertyEdit edit; tools.TakePropertyEdit(edit)) {
           mScene.ApplyPropertyEdit(edit);
+          // `/propswapundo` (test runs, with /propswap): the swap undone a second on, the prop's blueprint logged.
+          static double undoAt = 0.0;
+          if (
+            edit.what == PropertyEdit::What::Blueprint && moho::CFG_GetArgOption("/propswapundo", 0, nullptr) &&
+            undoAt == 0.0
+          ) {
+            undoAt = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count() + 1.0;
+          }
+          mPropSwapUndoAt = undoAt;
+        }
+        if (
+          mPropSwapUndoAt > 0.0 &&
+          std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count() >= mPropSwapUndoAt
+        ) {
+          mPropSwapUndoAt = -1.0;
+          mScene.TestUndoPropSwap();
         }
         // The Water panel: its change on the map at once, one undo step when the drag ends.
         tools.SetWater(mDocument.WaterNow());
@@ -2502,7 +2519,11 @@ namespace faf::editor
           }
         }
         // `/hoverprop <index or part of a blueprint path>` (test runs): the Select tool's cursor kept on that prop (WPE.54).
-        if (fa::vector<fa::string> prop; moho::CFG_GetArgOption("/hoverprop", 1, &prop) && !prop.empty()) {
+        static bool hoverPropArmed = false;
+        if (
+          fa::vector<fa::string> prop;
+          !hoverPropArmed && moho::CFG_GetArgOption("/hoverprop", 1, &prop) && !prop.empty()
+        ) {
           const std::string wanted = prop[0].c_str();
           int index = std::isdigit(static_cast<unsigned char>(wanted.front())) != 0 ? std::atoi(wanted.c_str()) : -1;
           if (const moho::CWldMap* const map = mDocument.Map(); index < 0 && map != nullptr && map->mProps != nullptr) {
@@ -2512,7 +2533,15 @@ namespace faf::editor
               }
             }
           }
-          mScene.TestHoverProp(index);
+          // `/propswap <part of a blueprint path>` too: that prop selected, the Properties panel's prop browser opened
+          // on that filter and its first tile clicked (WPE.55).
+          fa::vector<fa::string> swap;
+          const bool swapping = moho::CFG_GetArgOption("/propswap", 1, &swap) && !swap.empty();
+          hoverPropArmed = index >= 0; // once, when the map's props are there to find it in
+          mScene.TestHoverProp(index, swapping);
+          if (swapping) {
+            mShell->TestPropSwap(swap[0].c_str());
+          }
         }
         if (fa::vector<fa::string> hover; !mFrameMarkerArg.empty() && moho::CFG_GetArgOption("/hovermarker", 1, &hover) && !hover.empty()) {
           // `/hovermarker <name>` (test runs, with /framemarker): the cursor kept on that marker ("Mass+08" for "Mass 08").

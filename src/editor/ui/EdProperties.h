@@ -49,6 +49,8 @@ namespace faf::editor
       Size,
       Name,
       Field,
+      /** Props: every selected prop takes the blueprint in `value` (its path), as one undo step. */
+      Blueprint,
     };
     What what = What::None;
     float values[3] = {0.0f, 0.0f, 0.0f};
