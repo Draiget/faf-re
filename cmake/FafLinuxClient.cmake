@@ -258,6 +258,16 @@ target_include_directories(faf_client_objs PRIVATE
 # WinMain's place), the client objects and the simulation. Not built by default until it links;
 # `--target faf_client` lists what is still unresolved.
 add_executable(faf_client EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/src/platform/posix/ClientMainPosix.cpp")
+# The replay player, as the Windows game has it (src/CMakeLists.txt): the replay viewer starts this
+# program again with `/replaykeyframes` to prepare keyframes ahead, with no window
+# (moho/sim/ReplayTimeline.cpp). headless/sources.cmake without headless's own entry point.
+include("${PROJECT_SOURCE_DIR}/src/headless/sources.cmake")
+foreach(_src IN LISTS FAF_HEADLESS_SOURCES)
+  if(NOT _src STREQUAL "headless/HeadlessEntry.cpp")
+    target_sources(faf_client PRIVATE "${PROJECT_SOURCE_DIR}/src/${_src}")
+  endif()
+endforeach()
+target_sources(faf_client PRIVATE "${PROJECT_SOURCE_DIR}/src/headless/GameEntry.cpp")
 target_include_directories(faf_client PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/wx")
 # The simulation's objects first: their static initializers run in link order, and the client's
 # register factories for the sim's reflected types (SBatchTextureDataFactory.cpp looks up

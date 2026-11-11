@@ -10,12 +10,24 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Error.hpp"
+#include "headless/HeadlessMain.h"
 #include "moho/app/CScApp.h"
 #include "moho/app/WinApp.h"
+#include "moho/misc/StartupHelpers.h"
 #include "platform/Window.h"
+
+// Set by headless/GameEntry.cpp, as in the Windows game (moho/app/WinMain.cpp defines it there).
+int (*gGameReplayPlayerMain)(int argc, char** argv) = nullptr;
 
 int main()
 {
+  // The replay viewer's hidden process (moho/sim/ReplayTimeline.cpp): this same program with
+  // `/replaykeyframes` plays the replay with no window or device, as WinMain hands it over. It reads
+  // its arguments from the command line itself, so it needs none here.
+  if (gGameReplayPlayerMain != nullptr && moho::CFG_GetArgOption("/replaykeyframes", 0, nullptr)) {
+    return gGameReplayPlayerMain(0, nullptr);
+  }
+
   gpg::SetThreadName(0xFFFFFFFFu, "Main");
 
   // The window system (platform/Window.h, SDL3) before anything makes a window.
