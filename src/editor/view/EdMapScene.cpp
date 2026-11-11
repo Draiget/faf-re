@@ -852,7 +852,15 @@ namespace faf::editor
     mMap = &map;
     mWidth = 0;
     mHeight = 0;
-    FrameWholeMap();
+    // The same map again (the editor's view back in front of a play, or the play over): the camera where it was left
+    // (user ask 2026-11-11); another map starts framed whole.
+    if (mCameraKept && mCameraKeptFor == mDocument.Path()) {
+      ApplyCamera();
+      gpg::Logf("editor: the editor's camera as it was left: at %.1f,%.1f, %.1f away", static_cast<double>(mTargetX),
+                static_cast<double>(mTargetZ), static_cast<double>(mDistance));
+    } else {
+      FrameWholeMap();
+    }
     mWorldView = std::make_unique<moho::SimpleRenderWorldView>(const_cast<moho::GeomCamera3*>(&mCamera->CameraGetView()));
     moho::ren_Viewport->AddWorldView(mWorldView.get(), 0, 0);
     if (mRingHook == nullptr) {
@@ -872,6 +880,9 @@ namespace faf::editor
     if (mMap == nullptr) {
       return;
     }
+    // The camera (mTargetX/Z, mHeading, mPitch, mDistance) stays for this map's next Attach.
+    mCameraKept = true;
+    mCameraKeptFor = mDocument.Path();
     // A stroke in progress ends here, so undo has it whole.
     EndStroke();
     EndMaskStroke();
@@ -926,6 +937,7 @@ namespace faf::editor
     }
     HeightBrush brush = mTools->CurrentHeightBrush();
     brush.flattenTo = mFlattenTo;
+    brush.seed = ++mWaterErodeSeed; // Water erode: new droplets every step
     // A right-button stroke does the opposite: Raise lowers, Lower raises.
     if (mPaintInverted) {
       brush.mode = brush.mode == HeightBrushMode::Raise ? HeightBrushMode::Lower

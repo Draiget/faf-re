@@ -520,6 +520,10 @@ namespace faf::editor
     std::string mTestHover;
     bool mOverPlay = false;
     bool mLiveMaskSizeWarned = false;
+    std::uint32_t mWaterErodeSeed = 0;
+    /** The camera left by the last Detach, and the map it was on (kept for that map's next Attach). */
+    bool mCameraKept = false;
+    std::string mCameraKeptFor;
     moho::CWldMap* mSessionMap = nullptr;
     bool mUiWas = true;
     /** In front of a play: its units now, the ones selected (entity ids), and a drag of them (ground from / to). */

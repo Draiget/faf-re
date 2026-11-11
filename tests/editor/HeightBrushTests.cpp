@@ -263,6 +263,103 @@ namespace
     EXPECT_LT(field.At(16, 16) - field.At(15, 16), 96);
   }
 
+  /** A field leaning down towards +x (`drop` words a sample) with a little noise, so rain has somewhere to run. */
+  Field Ramp(const int size, const int drop)
+  {
+    Field field(size, size, 0);
+    for (int z = 0; z < size; ++z) {
+      for (int x = 0; x < size; ++x) {
+        const int bump = static_cast<int>((static_cast<unsigned>(x * 73856093) ^ static_cast<unsigned>(z * 19349663)) % 40u);
+        field.words[static_cast<std::size_t>(z) * static_cast<std::size_t>(size) + static_cast<std::size_t>(x)] =
+          static_cast<std::uint16_t>(20000 - drop * x + bump);
+      }
+    }
+    return field;
+  }
+
+  long long TotalOf(const Field& field)
+  {
+    long long sum = 0;
+    for (const std::uint16_t w : field.words) {
+      sum += w;
+    }
+    return sum;
+  }
+
+  HeightBrush Rain()
+  {
+    HeightBrush brush;
+    brush.mode = HeightBrushMode::WaterErode;
+    brush.strength = 1.0f;
+    brush.falloff = 0.3f;
+    brush.radius = 14.0f;
+    return brush;
+  }
+
+  TEST(HeightBrush, WaterErodeCarvesARampWithoutMakingGround)
+  {
+    Field field = Ramp(49, 60);
+    const Field before = field;
+    HeightBrush brush = Rain();
+    for (int step = 0; step < 120; ++step) {
+      brush.seed = static_cast<std::uint32_t>(step + 1);
+      (void)ApplyHeightBrush(field.words.data(), 49, 49, 24.0f, 24.0f, brush, 1.0f / 60.0f);
+    }
+    int lowered = 0;
+    int raised = 0;
+    for (std::size_t i = 0; i < field.words.size(); ++i) {
+      lowered += field.words[i] < before.words[i] ? 1 : 0;
+      raised += field.words[i] > before.words[i] ? 1 : 0;
+    }
+    EXPECT_GT(lowered, 50); // channels cut...
+    EXPECT_GT(raised, 20);  // ...and their ground left lower down
+    // Moved, not made: the total stays within rounding (each sample rounds at random, evenly).
+    EXPECT_NEAR(static_cast<double>(TotalOf(field)), static_cast<double>(TotalOf(before)), 600.0);
+    // Nothing outside the brush's square changed.
+    EXPECT_EQ(field.At(2, 2), before.At(2, 2));
+    EXPECT_EQ(field.At(46, 46), before.At(46, 46));
+  }
+
+  TEST(HeightBrush, WaterErodeLeavesFlatGroundAndRepeatsWithItsSeed)
+  {
+    Field flat(33, 33, 5000);
+    HeightBrush brush = Rain();
+    brush.radius = 10.0f;
+    for (int step = 0; step < 30; ++step) {
+      brush.seed = static_cast<std::uint32_t>(step + 1);
+      (void)ApplyHeightBrush(flat.words.data(), 33, 33, 16.0f, 16.0f, brush, 1.0f / 60.0f);
+    }
+    EXPECT_EQ(flat.words, Field(33, 33, 5000).words);
+
+    Field a = Ramp(49, 60);
+    Field b = Ramp(49, 60);
+    brush = Rain();
+    brush.seed = 7;
+    (void)ApplyHeightBrush(a.words.data(), 49, 49, 24.0f, 24.0f, brush, 0.1f);
+    (void)ApplyHeightBrush(b.words.data(), 49, 49, 24.0f, 24.0f, brush, 0.1f);
+    EXPECT_EQ(a.words, b.words);
+  }
+
+  TEST(HeightBrush, WaterErodeKeepsAMirroredMapMirrored)
+  {
+    // Left-right mirrored hills, rained on near the mirror line and well off it.
+    Field field(49, 49, 0);
+    for (int z = 0; z < 49; ++z) {
+      for (int x = 0; x < 49; ++x) {
+        const int mx = std::min(x, 48 - x);
+        field.words[static_cast<std::size_t>(z) * 49 + static_cast<std::size_t>(x)] = static_cast<std::uint16_t>(8000 + 70 * mx + 30 * z);
+      }
+    }
+    HeightBrush brush = Rain();
+    brush.symmetry = Symmetry::LeftRight;
+    brush.radius = 9.0f;
+    for (int step = 0; step < 60; ++step) {
+      brush.seed = static_cast<std::uint32_t>(step + 1);
+      (void)ApplyHeightBrush(field.words.data(), 49, 49, step % 2 == 0 ? 10.0f : 22.0f, 24.0f, brush, 1.0f / 60.0f);
+    }
+    EXPECT_TRUE(CopiesEqual(field, Symmetry::LeftRight));
+  }
+
   TEST(HeightBrush, ErodeLeavesGroundGentlerThanTheTalusAlone)
   {
     Field field(33, 33, 0);
