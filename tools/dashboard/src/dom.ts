@@ -21,6 +21,12 @@ export function append(node: Node, children: Child[]): void {
   }
 }
 
+/** Replaces a node's children; false/null children are skipped. */
+export function fill(node: Element, ...children: Child[]): void {
+  node.replaceChildren();
+  append(node, children);
+}
+
 export function byId<T extends HTMLElement>(id: string): T {
   const found = document.getElementById(id);
   if (found === null) {
@@ -61,6 +67,13 @@ const ICONS: Record<string, string> = {
   auto: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>',
   trash: '<path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><path d="M12 7.5v.5"/>',
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h9"/>',
+  cpu: '<rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9.5" y="9.5" width="5" height="5"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/>',
+  plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
+  chevron: '<path d="M15 18l-6-6 6-6"/>',
+  map: '<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14"/><path d="M15 6v14"/>',
+  server: '<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>',
+  warn: '<path d="M12 3l10 18H2z"/><path d="M12 10v5"/><path d="M12 18v.01"/>',
 };
 
 export function icon(name: string, className = "icon"): HTMLSpanElement {

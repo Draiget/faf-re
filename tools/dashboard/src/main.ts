@@ -1,11 +1,14 @@
-// The dashboard's page (plan WP17.4): connect to a server's REST API with its admin token, watch the lobby or game
-// (seats, countdown, the armies of a running game), run the control ops, and follow the event stream.
+// The dashboard's page (plan WP17.4, WP17.13): connect to a machine's server-host or to one server with the admin
+// token. A host shows its CPUs, its lobbies and the form that starts one (host.ts); a lobby, or a single server, shows
+// the lobby or game (seats, countdown, the armies of a running game), the control ops and the event stream.
 
 import "./style.css";
-import { ApiError, ServerApi, type Answer, type Seat, type ServerEvent, type Status } from "./api.ts";
+import { ApiError, HostApi, ServerApi, type Answer, type HostInfo, type Lobby, type Seat, type ServerEvent, type Status } from "./api.ts";
 import { renderArmies } from "./armies.ts";
 import { byId, clock, h, icon, initials, isNumber, type Child } from "./dom.ts";
 import { CATEGORIES, eventItem, kindOf, type Category, type EventContext } from "./events.ts";
+import { lobbyById, lobbyHue, startHost, stateChip, stopHost } from "./host.ts";
+import { confirmAction, toast } from "./ui.ts";
 
 const STORE_URL = "faf-dashboard.url";
 const STORE_TOKEN = "faf-dashboard.token";
@@ -80,15 +83,21 @@ const eventFilters = byId<HTMLElement>("event-filters");
 const eventSearch = byId<HTMLInputElement>("event-search");
 const eventsClear = byId<HTMLButtonElement>("events-clear");
 
-const toasts = byId<HTMLElement>("toasts");
-const confirmDialog = byId<HTMLDialogElement>("confirm");
-const confirmTitle = byId<HTMLElement>("confirm-title");
-const confirmText = byId<HTMLElement>("confirm-text");
-const confirmOk = byId<HTMLButtonElement>("confirm-ok");
+const hostView = byId<HTMLElement>("host-view");
+const serverView = byId<HTMLElement>("server-view");
+const lobbyBar = byId<HTMLElement>("lobby-bar");
+const lobbyBarName = byId<HTMLElement>("lobby-bar-name");
+const lobbyBarMeta = byId<HTMLElement>("lobby-bar-meta");
+const lobbyBarState = byId<HTMLElement>("lobby-bar-state");
 
 // ---------------------------------------------------------------- state
 
 let api: ServerApi | null = null;
+/** "host": a server-host with lobbies; "single": one server; null before connecting. */
+let mode: "host" | "single" | null = null;
+let hostApi: HostApi | null = null;
+/** The lobby the server view shows, in host mode. */
+let lobbyId: string | null = null;
 let refresh: number | undefined;
 let stream: AbortController | null = null;
 let lastStatus: Status | null = null;
@@ -130,31 +139,6 @@ themeButton.addEventListener("click", () => {
   applyTheme(next);
   writeStore(local, STORE_THEME, next);
 });
-
-// ---------------------------------------------------------------- toasts
-
-type Tone = "ok" | "bad" | "info" | "warn";
-
-function toast(tone: Tone, title: string, detail = ""): void {
-  const close = h("button", { class: "toast-close", type: "button", "aria-label": "Dismiss" }, icon("x"));
-  const node = h(
-    "div",
-    { class: `toast tone-${tone}` },
-    h("span", { class: "toast-icon" }, icon(tone === "ok" ? "check" : tone === "bad" ? "ban" : tone === "warn" ? "timer" : "info")),
-    h("div", { class: "toast-body" }, h("strong", {}, title), detail === "" ? null : h("span", { class: "toast-detail" }, detail)),
-    close,
-  );
-  const remove = (): void => {
-    node.classList.add("leaving");
-    window.setTimeout(() => node.remove(), 200);
-  };
-  close.addEventListener("click", remove);
-  toasts.append(node);
-  while (toasts.children.length > 5) {
-    toasts.firstElementChild?.remove();
-  }
-  window.setTimeout(remove, tone === "bad" ? 9000 : 5000);
-}
 
 // ---------------------------------------------------------------- connection state
 
@@ -498,11 +482,23 @@ async function poll(): Promise<void> {
     const status = await current.status(AbortSignal.timeout(CONNECT_TIME_MS));
     if (api !== current) return;
     showStatus(status);
-    setConnection("ok", "Connected", `connected to ${current.base}`);
+    if (mode === "single") setConnection("ok", "Connected", `connected to ${current.base}`);
     if (status.phase === "game") void pollArmies(current);
   } catch (error) {
     if (api !== current) return;
     document.body.classList.add("stale");
+    if (mode === "host") {
+      // The host knows why: a lobby still starting, stopped, or failed with its exit.
+      const lobby = lobbyId === null ? undefined : lobbyById(lobbyId);
+      if (lobby?.state === "failed") {
+        renderIdle(`The lobby's server failed${lobby.exit ? `: ${lobby.exit}` : ""}`);
+      } else if (lobby?.state === "stopped") {
+        renderIdle("The lobby was stopped");
+      } else if (lastStatus === null) {
+        renderIdle(lobby?.state === "starting" ? "The lobby's server is starting…" : "The lobby's server isn't answering");
+      }
+      return;
+    }
     if (error instanceof ApiError && error.status === 401) {
       setConnection("bad", "Token refused", "the admin token was refused");
     } else {
@@ -642,7 +638,7 @@ function follow(current: ServerApi): void {
 
 // ---------------------------------------------------------------- connect
 
-urlInput.value = readStore(session, STORE_URL) || "http://127.0.0.1:27181";
+urlInput.value = readStore(session, STORE_URL) || "http://127.0.0.1:27180";
 tokenInput.value = readStore(session, STORE_TOKEN);
 
 function setConnecting(on: boolean, label: string): void {
@@ -675,7 +671,112 @@ function resetView(): void {
   controls.disabled = true;
   controlsMeta.textContent = "connect first";
   document.body.classList.remove("stale");
+  eventsList.replaceChildren();
+  categoryCounts.clear();
+  renderFilterCounts();
+  applyFilters();
   setStream(null);
+  renderIdle("Not connected");
+}
+
+/** Shows `candidate` (one server, or a lobby through its host) in the server view; `status` is its first answer. */
+function startServerView(candidate: ServerApi, status: Status | null): void {
+  stopServerView();
+  api = candidate;
+  controls.disabled = false;
+  if (status !== null) {
+    showStatus(status);
+  } else {
+    renderIdle("Connecting to the lobby…");
+  }
+  refresh = window.setInterval(() => void poll(), POLL_MS);
+  follow(candidate);
+  if (status === null) void poll();
+  else if (status.phase === "game") void pollArmies(candidate);
+}
+
+/** What the server view ran stops: one server's seats and events don't mix with another's. */
+function stopServerView(): void {
+  window.clearInterval(refresh);
+  refresh = undefined;
+  stream?.abort();
+  stream = null;
+  api = null;
+  resetView();
+}
+
+function showView(view: "host" | "server"): void {
+  hostView.hidden = view !== "host";
+  serverView.hidden = view !== "server";
+  lobbyBar.hidden = !(view === "server" && mode === "host");
+}
+
+/** Host mode: `#/lobby/<id>` shows that lobby in the server view, anything else the host overview. */
+function route(): void {
+  if (mode !== "host" || hostApi === null) return;
+  const match = /^#\/lobby\/(.+)$/.exec(location.hash);
+  const id = match?.[1] === undefined ? null : decodeURIComponent(match[1]);
+  if (id === null) {
+    if (lobbyId !== null) {
+      stopServerView();
+      lobbyId = null;
+    }
+    showView("host");
+    document.title = "FAF Server Dashboard";
+    return;
+  }
+  if (id !== lobbyId) {
+    lobbyId = id;
+    startServerView(hostApi.lobbyApi(id), null);
+    window.scrollTo({ top: 0 });
+  }
+  showView("server");
+  renderLobbyBar();
+}
+
+window.addEventListener("hashchange", route);
+
+function renderLobbyBar(): void {
+  if (lobbyId === null) return;
+  const lobby: Lobby | undefined = lobbyById(lobbyId);
+  lobbyBarName.textContent = lobby?.name || lobbyId;
+  lobbyBar.style.setProperty("--lobby", `hsl(${lobbyHue(lobbyId)} 75% 52%)`);
+  if (lobby === undefined) {
+    lobbyBarMeta.textContent = " · not on the host's list";
+    lobbyBarState.replaceChildren();
+  } else {
+    const cpus = (lobby.cpus ?? []).filter(isNumber);
+    const map = lobby.map;
+    lobbyBarMeta.textContent = ` · ${map?.name ?? map?.id ?? "map ?"}${cpus.length > 0 ? ` · CPU ${cpus.join(", ")}` : ""}`;
+    lobbyBarState.replaceChildren(stateChip(lobby.state));
+  }
+  document.title = `${lobby?.name || lobbyId} · FAF Server Dashboard`;
+}
+
+function hostHealth(error: string | null, unauthorized: boolean): void {
+  if (hostApi === null) return;
+  if (error === null) {
+    setConnection("ok", "Connected", `connected to the host at ${hostApi.base}`);
+  } else {
+    setConnection("bad", unauthorized ? "Token refused" : "No answer", error);
+  }
+}
+
+function stopEverything(): void {
+  stopServerView();
+  stopHost();
+  mode = null;
+  hostApi = null;
+  lobbyId = null;
+  showView("server");
+}
+
+function connected(base: string, kind: string): void {
+  setConnection("ok", "Connected", `connected to ${base}`);
+  brandSub.textContent = `${kind} · ${base.replace(/^https?:\/\//, "")}`;
+  connectSummary.textContent = `Connected to ${kind} at ${base}`;
+  connectToggle.hidden = false;
+  setFormOpen(false);
 }
 
 async function connect(): Promise<void> {
@@ -685,8 +786,8 @@ async function connect(): Promise<void> {
   const url = urlInput.value.trim();
   const token = tokenInput.value.trim();
   if (!/^https?:\/\/.+/.test(url)) {
-    setConnection("bad", "Not connected", "the REST address starts with http:// or https://");
-    setConnectError("The REST address starts with http:// or https://.");
+    setConnection("bad", "Not connected", "the address starts with http:// or https://");
+    setConnectError("The address starts with http:// or https://.");
     urlInput.focus();
     return;
   }
@@ -696,35 +797,40 @@ async function connect(): Promise<void> {
     tokenInput.focus();
     return;
   }
-  // What ran before stops: the old server's seats and events don't mix with the new one's.
-  window.clearInterval(refresh);
-  stream?.abort();
-  stream = null;
-  api = null;
-  resetView();
+  stopEverything();
   renderIdle("Connecting…");
   writeStore(session, STORE_URL, url);
   writeStore(session, STORE_TOKEN, token);
   setConnectError("");
   setConnecting(true, "Connecting…");
   setConnection("busy", "Connecting…", `connecting to ${url}`);
-  const candidate = new ServerApi(url, token);
   try {
-    const status = await candidate.status(AbortSignal.timeout(CONNECT_TIME_MS));
-    api = candidate;
-    controls.disabled = false;
-    showStatus(status);
-    setConnection("ok", "Connected", `connected to ${candidate.base}`);
-    brandSub.textContent = candidate.base.replace(/^https?:\/\//, "");
-    connectSummary.textContent = `Connected to ${candidate.base}`;
-    connectToggle.hidden = false;
-    setFormOpen(false);
-    refresh = window.setInterval(() => void poll(), POLL_MS);
-    follow(candidate);
-    if (status.phase === "game") void pollArmies(candidate);
+    // A server-host answers /api/v1/host; a single server answers 404 there and is shown as before.
+    const host = new HostApi(url, token);
+    let info: HostInfo | null = null;
+    try {
+      info = await host.host(AbortSignal.timeout(CONNECT_TIME_MS));
+    } catch (error) {
+      if (!(error instanceof ApiError && error.status === 404)) throw error;
+    }
+    if (info !== null) {
+      mode = "host";
+      hostApi = host;
+      startHost(host, info, { onHealth: hostHealth, onLobbies: renderLobbyBar });
+      connected(host.base, `host ${info.name ?? ""}`.trim());
+      route();
+    } else {
+      const candidate = new ServerApi(url, token);
+      const status = await candidate.status(AbortSignal.timeout(CONNECT_TIME_MS));
+      mode = "single";
+      showView("server");
+      startServerView(candidate, status);
+      connected(candidate.base, "the server");
+    }
     setConnecting(false, "Reconnect");
   } catch (error) {
-    let why = `No answer from ${url}: check the address and port, and that the server runs with --rest.`;
+    stopEverything();
+    let why = `No answer from ${url}: check the address and port, and that server-host (or a server with --rest) runs there.`;
     let short = "No answer";
     if (error instanceof ApiError && error.status === 401) {
       why = "The admin token was refused.";
@@ -738,7 +844,7 @@ async function connect(): Promise<void> {
     setConnection("bad", short, why);
     setConnectError(why);
     renderIdle("Not connected");
-    connectSummary.textContent = "Enter the REST address and admin token";
+    connectSummary.textContent = "Enter the address and admin token";
     setFormOpen(true);
     setConnecting(false, "Connect");
   }
@@ -789,17 +895,6 @@ async function run(op: string, fields: Record<string, unknown>, button: HTMLButt
     button.classList.remove("busy");
   }
   void poll();
-}
-
-function confirmAction(title: string, text: string, okLabel: string): Promise<boolean> {
-  confirmTitle.textContent = title;
-  confirmText.textContent = text;
-  confirmOk.textContent = okLabel;
-  confirmDialog.returnValue = "";
-  return new Promise((resolve) => {
-    confirmDialog.addEventListener("close", () => resolve(confirmDialog.returnValue === "ok"), { once: true });
-    confirmDialog.showModal();
-  });
 }
 
 /** The uid in the player controls, or null (with a toast) when there is none. */

@@ -53,7 +53,137 @@
         <p id="connect-error" class="form-error" role="alert" hidden></p>
       </section>
 
-      <div class="columns">
+      <div id="host-view" class="host-columns" hidden>
+        <div class="host-main">
+          <section id="lobby-created" class="card created" aria-live="polite" hidden></section>
+
+          <section id="new-lobby" class="card new-lobby" aria-labelledby="new-lobby-title" hidden>
+            <div class="card-head">
+              <h2 id="new-lobby-title">New lobby</h2>
+              <button id="lobby-cancel" class="btn ghost small" type="button">Cancel</button>
+            </div>
+            <form id="lobby-form" class="lobby-form" novalidate>
+              <div class="form-section">
+                <div class="field">
+                  <label for="lobby-name">Lobby name</label>
+                  <input id="lobby-name" autocomplete="off" spellcheck="false" />
+                </div>
+              </div>
+
+              <div class="form-section">
+                <div class="section-head"><h3 id="map-title">Map</h3><span class="dim" id="map-count"></span></div>
+                <label class="sr-only" for="map-search">Search maps</label>
+                <input id="map-search" type="search" placeholder="Search maps by name or id" spellcheck="false" />
+                <div id="map-list" class="map-list" role="radiogroup" aria-labelledby="map-title"></div>
+                <div id="map-selected" class="map-selected" aria-live="polite"></div>
+              </div>
+
+              <div class="form-section">
+                <div class="section-head"><h3>Seats</h3><span class="dim" id="seat-count"></span></div>
+                <div id="seat-rows" class="seat-rows"></div>
+                <button id="seat-add" class="btn small add-seat" type="button">Add a seat</button>
+              </div>
+
+              <div class="form-section">
+                <div class="section-head"><h3>Game options</h3></div>
+                <div id="option-grid" class="option-grid"></div>
+              </div>
+
+              <div class="form-section">
+                <div class="section-head"><h3 id="control-title">Lobby control</h3></div>
+                <div class="choice-cards" role="radiogroup" aria-labelledby="control-title">
+                  <label class="choice">
+                    <input type="radio" name="lobby-control" value="player" checked />
+                    <span class="choice-body"><strong>A player hosts</strong><span>The first human hosts the lobby in their game and presses Launch.</span></span>
+                  </label>
+                  <label class="choice">
+                    <input type="radio" name="lobby-control" value="organiser" />
+                    <span class="choice-body"><strong>Organiser starts it</strong><span>Nobody hosts: start it from here, or it starts once every player is ready.</span></span>
+                  </label>
+                </div>
+                <div class="field-pair even">
+                  <div class="field">
+                    <label for="lobby-swr">Start when all are ready, after (s) <span class="dim">0 = off</span></label>
+                    <input id="lobby-swr" type="number" min="0" value="10" inputmode="numeric" />
+                  </div>
+                  <div class="field">
+                    <label for="lobby-minutes">Lobby stays open for (min)</label>
+                    <input id="lobby-minutes" type="number" min="1" value="60" inputmode="numeric" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-section">
+                <div class="section-head"><h3>CPUs</h3></div>
+                <label class="switch">
+                  <input id="cpu-auto" type="checkbox" role="switch" checked />
+                  <span class="switch-track" aria-hidden="true"></span>
+                  <span>Auto: the host picks the least loaded CPUs</span>
+                </label>
+                <div id="cpu-cores-field" class="field cores-field">
+                  <label for="cpu-cores">Cores</label>
+                  <input id="cpu-cores" type="number" min="1" value="1" inputmode="numeric" />
+                </div>
+                <p id="cpu-summary" class="cpu-summary" hidden></p>
+                <div id="hint-box" class="hint-box"></div>
+                <ul id="cpu-warnings" class="warnings" aria-live="polite"></ul>
+              </div>
+
+              <div class="form-actions">
+                <button id="lobby-submit" class="btn primary" type="submit">Start the lobby</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="card" aria-labelledby="lobbies-title">
+            <div class="card-head">
+              <h2 id="lobbies-title">Lobbies</h2>
+              <div class="head-tools">
+                <span class="dim" id="lobbies-meta"></span>
+                <button id="lobby-new" class="btn primary small" type="button">New lobby</button>
+              </div>
+            </div>
+            <div id="lobbies" class="lobby-grid"></div>
+            <div id="lobbies-empty" class="empty big-empty">
+              <p class="empty-title">No lobbies running</p>
+              <p class="dim">The host starts with none. Each lobby is its own server, pinned to the CPUs you pick.</p>
+              <button id="lobbies-empty-new" class="btn primary" type="button">New lobby</button>
+            </div>
+          </section>
+        </div>
+
+        <aside class="host-side" aria-label="Machine">
+          <section class="card machine" aria-labelledby="host-name">
+            <p class="eyebrow">Host</p>
+            <h2 id="host-name" class="hero-title">Host</h2>
+            <p id="host-model" class="dim host-model"></p>
+            <dl id="host-tiles" class="tiles host-tiles"></dl>
+          </section>
+          <section class="card" aria-labelledby="heat-title">
+            <div class="card-head">
+              <h2 id="heat-title">CPU load</h2>
+              <div class="heat-legend" aria-hidden="true"><span>0%</span><span class="legend-bar"></span><span>100%</span></div>
+            </div>
+            <p class="dim small heat-selection" id="heat-selection"></p>
+            <div id="heatmap" class="heatmap"></div>
+            <div class="btn-row heat-actions">
+              <button id="heat-clear" class="btn small" type="button" hidden>Clear</button>
+              <button id="heat-new" class="btn primary small" type="button" hidden>New lobby</button>
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      <nav id="lobby-bar" class="card lobby-bar" aria-label="Lobby" hidden>
+        <a href="#/" class="btn ghost small back-link"><span aria-hidden="true">‹</span> Host overview</a>
+        <div class="lobby-bar-text">
+          <strong id="lobby-bar-name"></strong>
+          <span id="lobby-bar-meta" class="dim"></span>
+        </div>
+        <span id="lobby-bar-state"></span>
+      </nav>
+
+      <div id="server-view" class="columns">
         <div class="col-main">
           <section id="hero" class="card hero" aria-labelledby="hero-title" data-phase="none">
             <div class="hero-top">

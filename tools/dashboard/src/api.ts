@@ -78,6 +78,109 @@ export interface Armies {
   [key: string]: unknown;
 }
 
+// ---------------------------------------------------------------- server-host (one per machine, many lobbies)
+
+export interface HostCpu {
+  id: number;
+  /** Hyperthread siblings share a core id. */
+  core?: number | null;
+  socket?: number | null;
+  /** Busy % over the last second, 0..100. */
+  load?: number | null;
+  /** Busy % over the last 10 s, 0..100. */
+  load10?: number | null;
+  /** Ids of the lobbies pinned to this CPU. */
+  lobbies?: string[] | null;
+}
+
+export interface HostInfo {
+  name?: string;
+  cpu_model?: string;
+  memory_mb?: { total?: number | null; available?: number | null } | null;
+  cpus: HostCpu[];
+  lobbies?: number;
+  /** AI personalities a seat may take. */
+  ai?: string[];
+  [key: string]: unknown;
+}
+
+export interface MapInfo {
+  id: string;
+  name?: string;
+  file?: string;
+  size?: number[] | null;
+  km?: number | null;
+  players?: number | null;
+  description?: string | null;
+  /** "fa" (the game's own maps) or "vault". */
+  source?: string | null;
+}
+
+export interface Hint {
+  players?: number;
+  km?: number;
+  mean_cores?: number | null;
+  worst_cores?: number | null;
+  suggested_cores?: number | null;
+  basis?: string | null;
+}
+
+export interface LobbySeat {
+  seat: number;
+  kind: "human" | "ai" | string;
+  name?: string | null;
+  uid?: number | null;
+  ai?: string | null;
+  faction?: number | null;
+  team?: number | null;
+  /** Humans: the switches their game starts with to join. */
+  join?: string | null;
+}
+
+export interface Lobby {
+  id: string;
+  name?: string | null;
+  /** starting, lobby, game, ended, failed, stopped. */
+  state: string;
+  map?: { id?: string; name?: string | null; km?: number | null; players?: number | null } | null;
+  cpus?: number[] | null;
+  port?: number | null;
+  pid?: number | null;
+  created?: string | null;
+  control?: string | null;
+  start_when_ready?: number | null;
+  seats?: LobbySeat[] | null;
+  hint?: Hint | null;
+  phase?: string | null;
+  beat?: number | null;
+  /** How the process exited, for a failed lobby. */
+  exit?: string | null;
+  [key: string]: unknown;
+}
+
+export interface NewSeat {
+  kind: "human" | "ai";
+  name?: string;
+  uid?: number;
+  ai?: string;
+  /** 1 UEF, 2 Aeon, 3 Cybran, 4 Seraphim, 5 random. */
+  faction: number;
+  /** 1 = no team, 2.. = team 1.. (FAF's numbering). */
+  team: number;
+}
+
+export interface NewLobby {
+  name: string;
+  map: string;
+  options: Record<string, string>;
+  seats: NewSeat[];
+  control: "player" | "organiser";
+  start_when_ready: number;
+  lobby_minutes: number;
+  cpus: number[] | "auto";
+  cores?: number;
+}
+
 export interface Answer {
   ok: boolean;
   error?: string;
@@ -209,5 +312,82 @@ export class ServerApi {
         end = buffered.indexOf("\n\n");
       }
     }
+  }
+}
+
+/**
+ * A machine's `server-host` (plan WP17.13): the machine, its maps, the cost hint, and its lobbies, each lobby its own
+ * server reached through the host (`lobbyApi`). Errors throw `ApiError` with the HTTP status and the host's reason.
+ */
+export class HostApi {
+  readonly base: string;
+  private readonly token: string;
+
+  constructor(base: string, token: string) {
+    this.base = base.replace(/\/+$/, "");
+    this.token = token;
+  }
+
+  private async request(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<Answer> {
+    const headers: Record<string, string> = { Authorization: `Bearer ${this.token}` };
+    if (body !== undefined) {
+      headers["Content-Type"] = "application/json";
+    }
+    const response = await fetch(`${this.base}${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal,
+    });
+    const answer = await readAnswer(response);
+    if (!response.ok || !answer.ok) {
+      throw new ApiError(answer.error ?? `${method} ${path}: HTTP ${response.status}`, response.status);
+    }
+    return answer;
+  }
+
+  /** `GET /api/v1/host`. A plain server (no host) answers 404. */
+  async host(signal?: AbortSignal): Promise<HostInfo> {
+    const answer = await this.request("GET", "/api/v1/host", undefined, signal);
+    const host = (answer.host ?? {}) as HostInfo;
+    return { ...host, cpus: Array.isArray(host.cpus) ? host.cpus : [] };
+  }
+
+  /** `GET /api/v1/maps`, sorted by name. */
+  async maps(signal?: AbortSignal): Promise<MapInfo[]> {
+    const answer = await this.request("GET", "/api/v1/maps", undefined, signal);
+    return Array.isArray(answer.maps) ? (answer.maps as MapInfo[]) : [];
+  }
+
+  /** `GET /api/v1/hint`: how many cores a game of that many players on a map that big needs. */
+  async hint(players: number, km: number, signal?: AbortSignal): Promise<Hint> {
+    const query = `players=${encodeURIComponent(String(players))}&km=${encodeURIComponent(String(km))}`;
+    return (await this.request("GET", `/api/v1/hint?${query}`, undefined, signal)) as Hint;
+  }
+
+  /** `GET /api/v1/lobbies`. */
+  async lobbies(signal?: AbortSignal): Promise<Lobby[]> {
+    const answer = await this.request("GET", "/api/v1/lobbies", undefined, signal);
+    return Array.isArray(answer.lobbies) ? (answer.lobbies as Lobby[]) : [];
+  }
+
+  /** `POST /api/v1/lobbies`: starts a lobby's server. */
+  async createLobby(lobby: NewLobby): Promise<Lobby> {
+    return (await this.request("POST", "/api/v1/lobbies", lobby)).lobby as Lobby;
+  }
+
+  /** `DELETE /api/v1/lobbies/<id>`: stops its server; it stays listed as stopped. */
+  async stopLobby(id: string): Promise<Lobby> {
+    return (await this.request("DELETE", `/api/v1/lobbies/${encodeURIComponent(id)}`)).lobby as Lobby;
+  }
+
+  /** `DELETE /api/v1/lobbies/<id>?forget=1`: takes a stopped or failed lobby off the list. */
+  async forgetLobby(id: string): Promise<void> {
+    await this.request("DELETE", `/api/v1/lobbies/${encodeURIComponent(id)}?forget=1`);
+  }
+
+  /** The lobby's own server API, proxied by the host with the host's token. */
+  lobbyApi(id: string): ServerApi {
+    return new ServerApi(`${this.base}/api/v1/lobbies/${encodeURIComponent(id)}`, this.token);
   }
 }

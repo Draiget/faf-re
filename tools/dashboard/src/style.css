@@ -177,6 +177,15 @@ select {
   outline-offset: 2px;
 }
 
+/* `hidden` always hides, also on elements whose class sets a display. */
+[hidden] {
+  display: none !important;
+}
+
+.small {
+  font-size: 0.82rem;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
