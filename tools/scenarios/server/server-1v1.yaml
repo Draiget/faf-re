@@ -1,0 +1,20 @@
+kind: server
+name: server-1v1
+description: >
+  Plan WP16.4: a 1v1 on Seton's Clutch between two remote players (faf_server_probe), one of them ordering a unit;
+  three minutes of game time. Every view decodes, every frame check matches, and the server's replay plays back with
+  every recorded checksum. Run with tools/cmd/server-scenario on Linux.
+map: /maps/scmp_009/scmp_009_scenario.lua
+seats:
+  - uid: 1001
+    team: 2
+    args: ["--order-at", "30"]
+  - uid: 1002
+    team: 3
+server:
+  stopBeat: 1800
+timeout: 10m
+expect:
+  clean: true
+  playback: true
+  present: ["Seat 1001 joined", "Seat 1002 joined", "Game started"]

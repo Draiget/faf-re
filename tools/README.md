@@ -12,7 +12,8 @@ Development tools for the engine. The main one is **mpemu**, a Go multiplayer te
 | `cmd/fafclient` | Emulates the mainline FAF client's side of the ICE adapter contract and the lobby server's pairing, so any adapter (FAF's `faf-ice-adapter.jar`, ours) runs unchanged; see [docs/LAUNCHER_ADAPTER_CONTRACT.md](../docs/LAUNCHER_ADAPTER_CONTRACT.md) |
 | `cmd/desync-diff` | Compares players' desync dumps from one game and prints the first value that differs (`compare`), rebuilds a missing side from the replay (`rebuild`), and is the desync server's dump receiver (`serve`). See [cmd/desync-diff/README.md](cmd/desync-diff/README.md) |
 | `cmd/turnsrv` | `turnsrv` on its own (prints its URLs and one set of credentials), for testing ICE agents such as `faf_juice_gather` |
-| `scenarios/` | YAML scenarios for mpemu |
+| `cmd/server-scenario` | Runs a dedicated-server scenario (`scenarios/server/*.yaml`, `kind: server`) on Linux: the server with remote seats played by `faf_server_probe` and the rest by AIs, seats killed and started again, then each seat's decode and frame-check counts and a headless playback of the server's replay. Build with `GOOS=linux go build ./cmd/server-scenario`; usage in its doc comment |
+| `scenarios/` | YAML scenarios for mpemu; `scenarios/server/` holds those for `cmd/server-scenario` |
 | `fontfuzz/` | `faf_fontfuzz`: fuzzes what a mod's font goes through, the structure check, the cook and the atlas that comes back. Build it with `-DFAF_FONTFUZZ_SANITIZE=ON` in its own build folder |
 | `difffuzz/` | Differential fuzzing of pure leaf functions, retail against recovered, and `faf_math_dump`, the same functions compared across Windows and Linux; see [difffuzz/README.md](difffuzz/README.md) |
 | `sfd-inspect/` | Independent SFD diagnostics and parser tests; see [sfd-inspect/README.md](sfd-inspect/README.md) |
