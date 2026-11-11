@@ -1,4 +1,5 @@
 #include "moho/sim/SimPrivate2.h"
+#include "moho/sim/SimEditorHook.h"
 
 namespace
 {
@@ -1132,7 +1133,8 @@ namespace
   }
 }
 
-
+// Engine addition (moho/sim/SimEditorHook.h): the map editor's per-beat hook, never set in the game.
+void (*moho::gSimBeforeBeat)(Sim& sim) = nullptr;
 
 /**
  * Address: 0x00749F40 (FUN_00749F40)
@@ -1154,6 +1156,11 @@ namespace
 void Sim::AdvanceBeat(const int amt)
 {
   (void)amt; // Binary implementation does not consume this parameter at 0x00749F40.
+
+  // Engine addition: the map editor's edits into its solo play, between beats (null in the game).
+  if (gSimBeforeBeat != nullptr) {
+    gSimBeforeBeat(*this);
+  }
 
   Logf("********** beat %u **********\n", mCurBeat);
   {

@@ -71,6 +71,8 @@ namespace faf::editor
     /** In front of a play: its units now, and the ones selected (test runs select some). */
     [[nodiscard]] const std::vector<LiveUnit>& LiveNow() const noexcept { return mLiveNow; }
     void SelectLive(std::vector<std::uint32_t> ids) { mLiveSelection = std::move(ids); }
+    /** Test runs: a raise of `seconds` at world x,z, as a stroke would make it (undo kept); false if nothing changed. */
+    bool TestRaise(float x, float z, float seconds);
 
     /** Leaves the viewport (the document is about to drop its map). */
     void Detach();

@@ -432,6 +432,7 @@ namespace faf::editor
           ImGui::PushStyleColor(ImGuiCol_Button, editorView ? ImVec4(0.75f, 0.50f, 0.15f, 1.0f) : ImGui::GetStyleColorVec4(ImGuiCol_Button));
           if (ImGui::Button(editorView ? "Editor view  F6" : "Game view  F6", ImVec2(0.0f, buttonHeight))) {
             mEditorViewInPlay = !mEditorViewInPlay;
+            gpg::Logf("editor: the toolbar: the %s view", mEditorViewInPlay ? "editor's" : "game's");
           }
           ImGui::PopStyleColor();
           tip(editorView ? "The editor's view of the map, the play running on behind it: F6 for the game's view"

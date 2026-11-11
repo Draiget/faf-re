@@ -71,6 +71,7 @@ set(FAF_EDITOR_SOURCES
   ui/EdAdaptiveWindow.cpp
   ui/EdLiveUnitPanel.cpp
   view/EdLiveUnits.cpp
+  view/EdLiveTerrain.cpp
   doc/EdAdaptiveModel.cpp
   doc/EdLuaSyntax.cpp
   doc/EdViewState.cpp

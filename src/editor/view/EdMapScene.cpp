@@ -42,6 +42,7 @@
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/render/SimpleRenderWorldView.h"
 #include "moho/render/WRenViewport.h"
+#include "editor/view/EdLiveTerrain.h"
 
 namespace moho
 {
@@ -1809,6 +1810,33 @@ namespace faf::editor
     return terrain;
   }
 
+  bool EdMapScene::TestRaise(const float x, const float z, const float seconds)
+  {
+    moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr) {
+      return false;
+    }
+    HeightBrush brush;
+    brush.mode = HeightBrushMode::Raise;
+    brush.strength = 1.0f;
+    mDocument.Heights().BeginStroke();
+    for (const SampleRect& rect : HeightBrushRects(field->width, field->height, x, z, brush)) {
+      mDocument.Heights().BeforeWrite(field->data, rect);
+    }
+    std::vector<SampleRect> rects;
+    for (float left = seconds; left > 0.0f; left -= 0.1f) {
+      const std::vector<SampleRect> step = ApplyHeightBrush(field->data, field->width, field->height, x, z, brush, std::min(left, 0.1f));
+      rects.insert(rects.end(), step.begin(), step.end());
+    }
+    mDocument.Heights().EndStroke(field->data);
+    if (rects.empty()) {
+      return false;
+    }
+    mDocument.SetModified(true);
+    RefreshHeights(rects);
+    return true;
+  }
+
   void EdMapScene::RefreshHeights(const std::vector<SampleRect>& rects)
   {
     mWeightStale = true; // the overlays lie on the ground
@@ -1827,15 +1855,30 @@ namespace faf::editor
                                     std::min(field->height - 1, rect.z1 + 1)});
     }
     mMap->mTerrainRes->NotifyMapChanges(changed.data(), changed.size());
+    // In front of a play: the same heights into it (its rendered terrain now, its sim at its next beat; WPE.40).
+    if (mOverPlay && mSessionMap != nullptr) {
+      std::vector<HeightRect> live;
+      live.reserve(rects.size());
+      for (const SampleRect& rect : rects) {
+        live.push_back({rect.x0, rect.z0, rect.x1, rect.z1});
+      }
+      LiveHeights(*mSessionMap, *field, live);
+    }
   }
 
   void EdMapScene::Update(const float frameSeconds, const bool playIdle, const bool editorViewInPlay)
   {
+    if (playIdle) {
+      DropLiveHeights(); // a play's height queue doesn't outlive it
+    }
     // The editor's map shows between plays, and in front of a running play when its view is asked for (user ask
     // 2026-11-11: switch between the editor's view and the game's while it plays).
     moho::CWldMap* const wanted =
       (playIdle || editorViewInPlay) && mDocument.GetState() == EdDocument::State::Open ? mDocument.Map() : nullptr;
     if (mMap != nullptr && mMap != wanted) {
+      if (mOverPlay && !playIdle) {
+        gpg::Logf("editor: leaving the play's front: %s", !editorViewInPlay ? "the game's view asked for" : "the document isn't open");
+      }
       Detach();
     }
     // A play's session clears the renderer's map when it ends (0x00893BE6); attach once it has. In front of a play the

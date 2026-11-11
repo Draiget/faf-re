@@ -539,7 +539,11 @@ namespace faf::editor
       ViewState mViewStateSaved;
 
       /** F6 while a play runs: the editor's view in front of it, or the game's again. */
-      void ToggleEditorView() { mShell->EditorViewInPlay() = !mShell->EditorViewInPlay(); }
+      void ToggleEditorView()
+      {
+        mShell->EditorViewInPlay() = !mShell->EditorViewInPlay();
+        gpg::Logf("editor: F6: the %s view", mShell->EditorViewInPlay() ? "editor's" : "game's");
+      }
       [[nodiscard]] bool EditorViewOverPlay() const { return mScene.OverPlay(); }
 
     private:
@@ -1361,6 +1365,41 @@ namespace faf::editor
               stepAt = now + 2.0;
             } else if (step == 2 && now >= stepAt) {
               (void)logInfo("after");
+              step = 3;
+            }
+          }
+          // `/playheighttest` (test runs, with /playeditorview): in the editor's view, a raise 25 units beside the first
+          // commander, then the sim's own terrain height there read through its Lua (WPE.40: the play's sim takes it).
+          if (moho::CFG_GetArgOption("/playheighttest", 0, nullptr) && mScene.OverPlay()) {
+            static int step = 0;
+            static double stepAt = 0.0;
+            static float x = 0.0f;
+            static float z = 0.0f;
+            static std::uint32_t unitId = 0;
+            if (step == 0) {
+              for (const LiveUnit& u : mScene.LiveNow()) {
+                if (u.blueprint.find("0001") != std::string::npos && step == 0) {
+                  unitId = u.id;
+                  x = u.x + 25.0f;
+                  z = u.z;
+                  step = 1;
+                  stepAt = now + 1.0;
+                }
+              }
+            } else if (step == 1 && now >= stepAt) {
+              const moho::CHeightField* const edited = mDocument.Map() != nullptr ? mDocument.Map()->mTerrainRes->GetHeightField() : nullptr;
+              const float before = edited != nullptr ? edited->GetElevation(x, z) : 0.0f;
+              const bool raised = mScene.TestRaise(x, z, 1.0f);
+              gpg::Logf("editor: height test: raise at %.0f,%.0f %s; the editor's height %.2f -> %.2f", static_cast<double>(x),
+                        static_cast<double>(z), raised ? "made" : "changed nothing", static_cast<double>(before),
+                        static_cast<double>(edited != nullptr ? edited->GetElevation(x, z) : 0.0f));
+              step = 2;
+              stepAt = now + 2.0;
+            } else if (step == 2 && now >= stepAt) {
+              char lua[160];
+              std::snprintf(lua, sizeof(lua), "LOG(string.format('editor: height test: the sim reads %%.2f at %.0f,%.0f', GetTerrainHeight(%.1f, %.1f)))",
+                            static_cast<double>(x), static_cast<double>(z), static_cast<double>(x), static_cast<double>(z));
+              LiveUnitDo(unitId, lua);
               step = 3;
             }
           }
