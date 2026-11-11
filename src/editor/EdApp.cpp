@@ -91,6 +91,28 @@ namespace faf::editor
       return error ? std::filesystem::path{} : folder;
     }
 
+    // The panels' scale the user chose (the toolbar's - / % / +), kept in layout.ini as [FafEditor][Ui] Scale=<x>: read
+    // there at the first frame (-1 until then), the one in use written back.
+    float gUiScaleRead = -1.0f;
+    float gUiScaleNow = 1.0f;
+
+    void* UiSettingsOpen(ImGuiContext*, ImGuiSettingsHandler*, const char* const name)
+    {
+      return std::strcmp(name, "Ui") == 0 ? &gUiScaleRead : nullptr;
+    }
+
+    void UiSettingsLine(ImGuiContext*, ImGuiSettingsHandler*, void*, const char* const line)
+    {
+      if (float scale = 0.0f; std::sscanf(line, "Scale=%f", &scale) == 1 && scale >= 0.5f && scale <= 3.0f) {
+        gUiScaleRead = scale;
+      }
+    }
+
+    void UiSettingsWrite(ImGuiContext*, ImGuiSettingsHandler* const handler, ImGuiTextBuffer* const out)
+    {
+      out->appendf("[%s][Ui]\nScale=%.3f\n\n", handler->TypeName, static_cast<double>(gUiScaleNow));
+    }
+
     // The window procedures the editor put in front of the game's, and what they replaced.
     WNDPROC gViewportProc = nullptr;
     WNDPROC gFrameProc = nullptr;
@@ -540,6 +562,43 @@ namespace faf::editor
       std::string mViewStateFor;
       double mViewStateCheckAt = 0.0;
       ViewState mViewStateSaved;
+      /** The style at the screen's DPI, before the user's UI scale; the scale in use on it. */
+      ImGuiStyle mBaseStyle;
+      float mUiScaleApplied = 1.0f;
+
+      /**
+       * Before a frame: the scale read from layout.ini at the first frame into the toolbar's, `/uiscale <x>` (test runs)
+       * once, then any change applied (sizes from the DPI style, fonts by FontScaleMain) and marked for saving.
+       */
+      void ApplyUiScale()
+      {
+        float& scale = mShell->UiScale();
+        if (gUiScaleRead > 0.0f) {
+          scale = gUiScaleRead;
+          gUiScaleRead = -1.0f;
+          gpg::Logf("editor: UI scale %.2f from layout.ini", static_cast<double>(scale));
+        }
+        // The test option once layout.ini has been read (ImGui reads it at the first frame), so it wins over the file's.
+        static bool argDone = false;
+        if (!argDone && ImGui::GetCurrentContext()->SettingsLoaded) {
+          argDone = true;
+          if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/uiscale", 1, &value) && !value.empty()) {
+            scale = static_cast<float>(std::atof(value[0].c_str()));
+          }
+        }
+        scale = std::clamp(scale, 0.5f, 3.0f);
+        if (scale == mUiScaleApplied) {
+          return;
+        }
+        ImGuiStyle& style = ImGui::GetStyle();
+        style = mBaseStyle;
+        style.ScaleAllSizes(scale);
+        style.FontScaleMain = scale;
+        mUiScaleApplied = scale;
+        gUiScaleNow = scale;
+        ImGui::MarkIniSettingsDirty();
+        gpg::Logf("editor: UI scale %.2f", static_cast<double>(scale));
+      }
 
       /** F6 while a play runs: the editor's view in front of it, or the game's again. */
       void ToggleEditorView()
@@ -875,6 +934,15 @@ namespace faf::editor
     {
       IMGUI_CHECKVERSION();
       ImGui::CreateContext();
+      {
+        ImGuiSettingsHandler handler;
+        handler.TypeName = "FafEditor";
+        handler.TypeHash = ImHashStr("FafEditor");
+        handler.ReadOpenFn = &UiSettingsOpen;
+        handler.ReadLineFn = &UiSettingsLine;
+        handler.WriteAllFn = &UiSettingsWrite;
+        ImGui::AddSettingsHandler(&handler);
+      }
       ImGuiIO& io = ImGui::GetIO();
       io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable;
       const std::filesystem::path settings = EditorSettingsFolder();
@@ -903,6 +971,7 @@ namespace faf::editor
       style.ScaleAllSizes(dpiScale);
       style.FontScaleDpi = dpiScale;
       io.ConfigDpiScaleFonts = true;
+      mBaseStyle = style; // the user's UI scale is applied over this (ApplyUiScale)
 
       std::error_code error;
       const std::filesystem::path segoe = "C:\\Windows\\Fonts\\segoeui.ttf";
@@ -1469,6 +1538,7 @@ namespace faf::editor
       mShell->Tools().SetModelsLoading(mScene.ModelsPending());
 
       if (mImGuiReady) {
+        ApplyUiScale();
         ImGui_ImplWin32_NewFrame();
         FeedUiClicks();
         ImGui::NewFrame();

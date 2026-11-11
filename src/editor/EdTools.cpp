@@ -1,4 +1,5 @@
 #include "editor/EdTools.h"
+#include "editor/ui/EdUiScale.h"
 #include "editor/tools/EdShaderSlots.h"
 #include "editor/ui/EdHelp.h"
 
@@ -709,7 +710,7 @@ namespace faf::editor
     }
     ImGui::Text("Layer %s", mBrowseSlot == 0 ? "Lower" : (mBrowseSlot == 9 ? "Upper" : std::to_string(mBrowseSlot).c_str()));
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(260.0f);
+    ImGui::SetNextItemWidth(Em(260.0f));
     ImGui::InputTextWithHint("##filter", "search name or biome", mBrowseFilter, sizeof(mBrowseFilter));
     ImGui::SameLine();
     if (mBrowseSlot >= 1 && mBrowseSlot <= 8 && ImGui::Button("Empty")) {
@@ -851,7 +852,7 @@ namespace faf::editor
     for (std::size_t i = 0; i < mRules.size(); ++i) {
       MaskRule& rule = mRules[i];
       ImGui::PushID(static_cast<int>(i));
-      ImGui::SetNextItemWidth(70.0f);
+      ImGui::SetNextItemWidth(Em(70.0f));
       int layer = rule.layer + 1;
       if (ImGui::InputInt("##layer", &layer)) {
         rule.layer = std::clamp(layer - 1, 0, 7);
@@ -997,7 +998,7 @@ namespace faf::editor
     for (int i = 0; i < 6; ++i) {
       ImGui::PushID(i);
       ImGui::TextDisabled("%s", kTextureNames[i]);
-      ImGui::SameLine(90.0f);
+      ImGui::SameLine(Em(90.0f));
       ImGui::SetNextItemWidth(-1.0f);
       char path[260];
       (void)std::snprintf(path, sizeof(path), "%s", mWater.textures[i].c_str());

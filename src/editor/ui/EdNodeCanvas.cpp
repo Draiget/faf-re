@@ -1,4 +1,5 @@
 #include "editor/ui/EdNodeCanvas.h"
+#include "editor/ui/EdUiScale.h"
 
 #include "imgui.h"
 
@@ -548,7 +549,7 @@ namespace faf::editor
 
   void EdNodeCanvas::DrawPalettePopup(NodeGraph& graph)
   {
-    ImGui::SetNextWindowSizeConstraints(ImVec2(220.0f, 0.0f), ImVec2(320.0f, 420.0f));
+    ImGui::SetNextWindowSizeConstraints(ImVec2(Em(220.0f), Em(0.0f)), ImVec2(Em(320.0f), Em(420.0f)));
     if (!ImGui::BeginPopup("##palette")) {
       return;
     }

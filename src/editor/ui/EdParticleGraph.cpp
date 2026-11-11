@@ -3,6 +3,7 @@
 // canvas, with Details for the selected node and a palette; every emitter plays in the particle view.
 
 #include "editor/ui/EdParticleEditor.h"
+#include "editor/ui/EdUiScale.h"
 
 #include "editor/doc/EdMapFile.h"
 #include "imgui.h"
@@ -478,7 +479,7 @@ namespace faf::editor
   bool EdParticleEditor::DrawCurveKeys(std::vector<EmitterKey>& keys, float& range, const EmitterCurveInfo* info)
   {
     bool changed = false;
-    ImGui::SetNextItemWidth(120.0f);
+    ImGui::SetNextItemWidth(Em(120.0f));
     changed |= ImGui::DragFloat("Time range", &range, 0.1f, 0.1f, 1000.0f, "%.2f");
     ImGui::SetItemTooltip("The curve's time axis in ticks (10 a second)");
     const float span = range > 0.0f ? range : 1.0f;
@@ -543,13 +544,13 @@ namespace faf::editor
     }
     if (mKeySelected >= 0 && static_cast<std::size_t>(mKeySelected) < keys.size()) {
       EmitterKey& key = keys[static_cast<std::size_t>(mKeySelected)];
-      ImGui::SetNextItemWidth(90.0f);
+      ImGui::SetNextItemWidth(Em(90.0f));
       changed |= ImGui::DragFloat("Time", &key.x, 0.05f, 0.0f, span, "%.3f");
       ImGui::SameLine();
-      ImGui::SetNextItemWidth(90.0f);
+      ImGui::SetNextItemWidth(Em(90.0f));
       changed |= ImGui::DragFloat("Value", &key.y, 0.01f, 0.0f, 0.0f, "%.3f");
       ImGui::SameLine();
-      ImGui::SetNextItemWidth(90.0f);
+      ImGui::SetNextItemWidth(Em(90.0f));
       changed |= ImGui::DragFloat("Spread", &key.z, 0.01f, 0.0f, 0.0f, "%.3f");
     } else {
       ImGui::TextDisabled("%zu key(s). Click a key to edit its numbers.", keys.size());

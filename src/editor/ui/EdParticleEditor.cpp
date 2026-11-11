@@ -1,4 +1,5 @@
 #include "editor/ui/EdParticleEditor.h"
+#include "editor/ui/EdUiScale.h"
 
 #include "editor/doc/EdMapFile.h"
 #include "editor/ui/EdImGuiRenderer.h"
@@ -556,7 +557,7 @@ namespace faf::editor
       }
       bool edited = false;
       ImGui::PushID(field.key);
-      ImGui::SetNextItemWidth(260.0f);
+      ImGui::SetNextItemWidth(Em(260.0f));
       switch (field.kind) {
       case FlatValue::Kind::Number:
         edited = ImGui::DragFloat(field.key, &value.number, 0.01f, 0.0f, 0.0f, "%.4g");
@@ -639,7 +640,7 @@ namespace faf::editor
         }
       }
     }
-    ImGui::SetNextWindowSize(ImVec2(520.0f, 480.0f), ImGuiCond_Appearing);
+    ImGui::SetNextWindowSize(ImVec2(Em(520.0f), Em(480.0f)), ImGuiCond_Appearing);
     if (!ImGui::BeginPopup("Open a game effect")) {
       return;
     }

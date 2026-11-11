@@ -1,4 +1,5 @@
 #include "editor/ui/EdMapBrowser.h"
+#include "editor/ui/EdUiScale.h"
 #include "editor/EdPath.h"
 
 #include <algorithm>
@@ -541,9 +542,9 @@ namespace faf::editor
     const std::string uploaded = std::string("Uploaded: ") + (mFromText[0] ? mFromText : "any") + " to " + (mToText[0] ? mToText : "any");
     if (ImGui::BeginCombo("##uploaded", uploaded.c_str())) {
       ImGui::TextDisabled("Updated after and before (YYYY-MM-DD)");
-      ImGui::SetNextItemWidth(130.0f);
+      ImGui::SetNextItemWidth(Em(130.0f));
       changed |= ImGui::InputTextWithHint("from", "2020-01-01", mFromText, sizeof(mFromText), ImGuiInputTextFlags_EnterReturnsTrue);
-      ImGui::SetNextItemWidth(130.0f);
+      ImGui::SetNextItemWidth(Em(130.0f));
       changed |= ImGui::InputTextWithHint("to", "2026-12-31", mToText, sizeof(mToText), ImGuiInputTextFlags_EnterReturnsTrue);
       if (ImGui::SmallButton("Any date")) {
         mFromText[0] = '\0';
@@ -593,7 +594,7 @@ namespace faf::editor
     ImGui::AlignTextToFramePadding();
     ImGui::TextDisabled("Sort by");
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(150.0f);
+    ImGui::SetNextItemWidth(Em(150.0f));
     if (ImGui::BeginCombo("##sortby", SortLabel(mFilters.sortProperty))) {
       for (const VaultSortKey& key : kVaultSortKeys) {
         if (ImGui::Selectable(key.label, mFilters.sortProperty == key.property)) {
@@ -604,7 +605,7 @@ namespace faf::editor
       ImGui::EndCombo();
     }
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(120.0f);
+    ImGui::SetNextItemWidth(Em(120.0f));
     int order = mFilters.descending ? 1 : 0;
     static const char* const kOrders[] = {"ascending", "descending"};
     if (ImGui::Combo("##order", &order, kOrders, 2)) {
@@ -617,7 +618,7 @@ namespace faf::editor
       mSaveQueryName[0] = '\0';
     }
     if (ImGui::BeginPopup("##savequery")) {
-      ImGui::SetNextItemWidth(220.0f);
+      ImGui::SetNextItemWidth(Em(220.0f));
       const bool enter = ImGui::InputTextWithHint("##qname", "Name for this query", mSaveQueryName, sizeof(mSaveQueryName), ImGuiInputTextFlags_EnterReturnsTrue);
       ImGui::SameLine();
       if ((ImGui::Button("Save") || enter) && mSaveQueryName[0] != '\0') {
@@ -642,7 +643,7 @@ namespace faf::editor
       }
       for (std::size_t i = 0; i < mSavedQueries.size(); ++i) {
         ImGui::PushID(static_cast<int>(i));
-        if (ImGui::Selectable(mSavedQueries[i].first.c_str(), false, ImGuiSelectableFlags_None, ImVec2(220.0f, 0.0f))) {
+        if (ImGui::Selectable(mSavedQueries[i].first.c_str(), false, ImGuiSelectableFlags_None, ImVec2(Em(220.0f), 0.0f))) {
           VaultQuery query;
           if (VaultQueryFromText(mSavedQueries[i].second, query)) {
             mFilters = query;

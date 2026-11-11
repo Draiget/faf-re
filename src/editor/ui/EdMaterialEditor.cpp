@@ -1,4 +1,5 @@
 #include "editor/ui/EdMaterialEditor.h"
+#include "editor/ui/EdUiScale.h"
 
 #include "editor/doc/EdMapFile.h"
 #include "editor/graph/EdTextureBake.h"
@@ -685,7 +686,7 @@ namespace faf::editor
         }
       }
       ImGui::SetItemTooltip("Reads the open map's heights again for the Map Height and Map Slope nodes");
-      ImGui::SetNextItemWidth(90.0f);
+      ImGui::SetNextItemWidth(Em(90.0f));
       static const int kSizes[] = {128, 256, 512, 1024};
       if (ImGui::BeginCombo("##size", (std::to_string(mPreviewSize) + " px").c_str())) {
         for (const int size : kSizes) {
@@ -701,7 +702,7 @@ namespace faf::editor
       ImGui::Separator();
       const bool haveMap = !mSlotNames.empty();
       ImGui::BeginDisabled(!haveMap);
-      ImGui::SetNextItemWidth(190.0f);
+      ImGui::SetNextItemWidth(Em(190.0f));
       const std::string current = haveMap && mTargetSlot < static_cast<int>(mSlotNames.size()) ? mSlotNames[static_cast<std::size_t>(mTargetSlot)]
                                                                                                : std::string("(no map open)");
       if (ImGui::BeginCombo("##slot", current.c_str())) {
@@ -730,7 +731,7 @@ namespace faf::editor
                                              "(one undo step); a linked Mask paints the stratum's mask"
                                            : "Apply writes into the map's own folder: open a map from your vault (the game's own maps can't be "
                                              "changed; File > Save as new map folder makes one)");
-      ImGui::SetNextItemWidth(80.0f);
+      ImGui::SetNextItemWidth(Em(80.0f));
       if (ImGui::BeginCombo("##bake", (std::to_string(mBakeSize) + " px").c_str())) {
         for (const int size : {512, 1024, 2048}) {
           if (ImGui::Selectable((std::to_string(size) + " px").c_str(), size == mBakeSize)) {
@@ -750,7 +751,7 @@ namespace faf::editor
   void EdMaterialEditor::DrawPreview(Doc& doc, const float width)
   {
     static const char* const kModes[] = {"Sphere", "Plane 2x2", "Albedo", "Normal", "Mask"};
-    ImGui::SetNextItemWidth(110.0f);
+    ImGui::SetNextItemWidth(Em(110.0f));
     if (ImGui::Combo("##mode", &mPreviewMode, kModes, IM_ARRAYSIZE(kModes))) {
       mPreviewStale = true;
     }
@@ -956,7 +957,7 @@ namespace faf::editor
       ImGui::OpenPopup("Open graph");
       mOpenOpen = false;
     }
-    ImGui::SetNextWindowSizeConstraints(ImVec2(360.0f, 120.0f), ImVec2(600.0f, 500.0f));
+    ImGui::SetNextWindowSizeConstraints(ImVec2(Em(360.0f), Em(120.0f)), ImVec2(Em(600.0f), Em(500.0f)));
     if (!ImGui::BeginPopup("Open graph")) {
       return;
     }

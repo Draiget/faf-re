@@ -1,4 +1,5 @@
 #include "editor/EdShell.h"
+#include "editor/ui/EdUiScale.h"
 #include "editor/ui/EdIcons.h"
 #include "editor/tools/EdMarkers.h"
 
@@ -188,7 +189,11 @@ namespace faf::editor
       mLayoutBuilt = true;
       mResetLayout = false;
     }
+    // The panels' tab titles with room around them (ImGui lays out a dock node's tab bar with the frame padding,
+    // 4 x 3 px by default, which crowds the titles).
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(Em(9.0f), Em(5.0f)));
     ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
+    ImGui::PopStyleVar();
     // A layout saved before the Properties panel existed: the panel goes under the Tools panel, once.
     if (!mPropertiesPlaced) {
       if (const ImGuiWindow* const tools = ImGui::FindWindowByName(kToolsWindow); tools != nullptr) {
@@ -350,7 +355,7 @@ namespace faf::editor
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 6.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 4.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10.0f, ImGui::GetStyle().FramePadding.y));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(Em(10.0f), ImGui::GetStyle().FramePadding.y));
     if (ImGui::Begin("##Toolbar", nullptr, kFlags)) {
       const bool playing = mPlay.Active();
       const bool open = mDocument.GetState() == EdDocument::State::Open;
@@ -374,7 +379,7 @@ namespace faf::editor
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(base.x * 0.85f, base.y * 0.85f, base.z * 0.85f, 1.0f));
         ImGui::BeginDisabled(!playing && !mPlay.CanPlay());
         const ImVec2 at = ImGui::GetCursorScreenPos();
-        const ImVec2 size(118.0f, buttonHeight);
+        const ImVec2 size(Em(118.0f), buttonHeight);
         if (ImGui::Button("##playstop", size)) {
           if (playing) {
             mPlay.Stop();
@@ -386,22 +391,22 @@ namespace faf::editor
         const ImU32 white = ImGui::GetColorU32(ImGuiCol_Text);
         const float cy = at.y + size.y * 0.5f;
         const float r = size.y * 0.24f;
+        const float left = Em(12.0f);
         if (playing) {
-          draw->AddRectFilled(ImVec2(at.x + 12.0f, cy - r), ImVec2(at.x + 12.0f + 2.0f * r, cy + r), white, 1.5f);
+          draw->AddRectFilled(ImVec2(at.x + left, cy - r), ImVec2(at.x + left + 2.0f * r, cy + r), white, 1.5f);
         } else {
-          draw->AddTriangleFilled(ImVec2(at.x + 12.0f, cy - r * 1.1f), ImVec2(at.x + 12.0f, cy + r * 1.1f),
-                                  ImVec2(at.x + 12.0f + 2.0f * r, cy), white);
+          draw->AddTriangleFilled(ImVec2(at.x + left, cy - r * 1.1f), ImVec2(at.x + left, cy + r * 1.1f), ImVec2(at.x + left + 2.0f * r, cy), white);
         }
         const char* const word = playing ? "Stop" : "Play";
         const float textY = at.y + (size.y - ImGui::GetTextLineHeight()) * 0.5f;
-        draw->AddText(ImVec2(at.x + 20.0f + 2.0f * r, textY), white, word);
+        draw->AddText(ImVec2(at.x + Em(20.0f) + 2.0f * r, textY), white, word);
         // The key, on a darker cap so it reads on the green and the red.
         const ImVec2 keySize = ImGui::CalcTextSize("F5");
-        const ImVec2 capMin(at.x + size.x - keySize.x - 14.0f, at.y + 4.0f);
-        const ImVec2 capMax(at.x + size.x - 6.0f, at.y + size.y - 4.0f);
+        const ImVec2 capMin(at.x + size.x - keySize.x - Em(14.0f), at.y + Em(4.0f));
+        const ImVec2 capMax(at.x + size.x - Em(6.0f), at.y + size.y - Em(4.0f));
         draw->AddRectFilled(capMin, capMax, IM_COL32(0, 0, 0, 90), 3.0f);
         draw->AddRect(capMin, capMax, IM_COL32(255, 255, 255, 70), 3.0f);
-        draw->AddText(ImVec2(capMin.x + 4.0f, textY), IM_COL32(255, 255, 255, 230), "F5");
+        draw->AddText(ImVec2(capMin.x + Em(4.0f), textY), IM_COL32(255, 255, 255, 230), "F5");
         ImGui::EndDisabled();
         tip(playing ? "Stop the session and go back to editing (F5)" : "Play the map picked in the Map panel (F5)");
         // The setup, one click away.
@@ -607,15 +612,17 @@ namespace faf::editor
         }
       }
 
-      // The open map, at the right: its name, its folder, and a dot while it has unsaved edits.
+      // At the right: the open map (its name, its folder, "edited" while it has unsaved edits), then the UI scale.
+      const float scaleWidth = DrawUiScaleButtons(true);
       if (open) {
         const MapFacts& facts = mDocument.Facts();
         const std::string name = facts.name.empty() ? MapDisplayName(facts.scenarioPath) : facts.name;
         const std::string folder = MapDisplayName(facts.scenarioPath);
         const char* const edited = mDocument.Modified() ? "  edited" : "";
-        const float width = ImGui::CalcTextSize(name.c_str()).x + ImGui::CalcTextSize(folder.c_str()).x +
-                            ImGui::CalcTextSize(edited).x + 24.0f;
-        ImGui::SameLine(std::max(ImGui::GetCursorPosX() + 16.0f, ImGui::GetWindowWidth() - width - 8.0f));
+        const ImGuiStyle& style = ImGui::GetStyle();
+        const float width = ImGui::CalcTextSize(name.c_str()).x + style.ItemSpacing.x + ImGui::CalcTextSize(folder.c_str()).x +
+                            (mDocument.Modified() ? 4.0f + ImGui::CalcTextSize(edited).x : 0.0f) + Em(16.0f) + scaleWidth;
+        ImGui::SameLine(std::max(ImGui::GetCursorPosX() + Em(16.0f), ImGui::GetWindowWidth() - width - style.WindowPadding.x));
         ImGui::AlignTextToFramePadding();
         ImGui::TextUnformatted(name.c_str());
         ImGui::SameLine();
@@ -624,10 +631,57 @@ namespace faf::editor
           ImGui::SameLine(0.0f, 4.0f);
           ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "%s", edited);
         }
+        ImGui::SameLine(0.0f, Em(16.0f));
+      } else {
+        ImGui::SameLine(std::max(ImGui::GetCursorPosX() + Em(16.0f), ImGui::GetWindowWidth() - scaleWidth - ImGui::GetStyle().WindowPadding.x));
       }
+      (void)DrawUiScaleButtons(false);
     }
     ImGui::End();
     ImGui::PopStyleVar(4);
+  }
+
+  float EdShell::DrawUiScaleButtons(const bool measure)
+  {
+    // The steps a click moves between; the middle button shows the scale and puts it back to 100%.
+    static constexpr float kSteps[] = {0.75f, 0.85f, 1.0f, 1.1f, 1.25f, 1.4f, 1.6f, 1.8f, 2.0f};
+    // One joined row, as the view's toggle groups: - | 100% | +, the ends square buttons.
+    char percent[16];
+    (void)std::snprintf(percent, sizeof(percent), "%d%%", static_cast<int>(std::lround(mUiScale * 100.0f)));
+    const float side = ImGui::GetFrameHeight();
+    const float middle = EdTextSegmentWidth("100%");
+    if (measure) {
+      return side * 2.0f + middle + 2.0f;
+    }
+    float smaller = kSteps[0];
+    float larger = kSteps[std::size(kSteps) - 1];
+    for (const float step : kSteps) {
+      smaller = step < mUiScale - 0.01f ? step : smaller;
+    }
+    for (auto it = std::rbegin(kSteps); it != std::rend(kSteps); ++it) {
+      larger = *it > mUiScale + 0.01f ? *it : larger;
+    }
+    if (EdTextSegment("##uiscaledown", "-", EdSegment::First, mUiScale > kSteps[0] + 0.01f, side)) {
+      mUiScale = smaller;
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort)) {
+      ImGui::SetTooltip("Smaller panels and text");
+    }
+    ImGui::SameLine(0.0f, 1.0f);
+    if (EdTextSegment("##uiscale", percent, EdSegment::Middle, true, middle)) {
+      mUiScale = 1.0f;
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+      ImGui::SetTooltip("The panels' scale (kept over restarts); click for 100%%");
+    }
+    ImGui::SameLine(0.0f, 1.0f);
+    if (EdTextSegment("##uiscaleup", "+", EdSegment::Last, mUiScale < kSteps[std::size(kSteps) - 1] - 0.01f, side)) {
+      mUiScale = larger;
+    }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled | ImGuiHoveredFlags_DelayShort)) {
+      ImGui::SetTooltip("Larger panels and text");
+    }
+    return 0.0f;
   }
 
   void EdShell::DrawToolsPanel()
@@ -1065,10 +1119,10 @@ namespace faf::editor
     }
     ImGui::TextUnformatted("The new folder goes into your vault's maps folder:");
     ImGui::TextDisabled("%s", (mDocument.VaultFolder() / "maps").string().c_str());
-    ImGui::SetNextItemWidth(420.0f);
+    ImGui::SetNextItemWidth(Em(420.0f));
     const bool enter = ImGui::InputText("Folder", mSaveAsName, sizeof(mSaveAsName), ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::TextDisabled("FAF names map folders name.vNNNN; the files take the name without the version.");
-    if (ImGui::Button("Save", ImVec2(120.0f, 0.0f)) || enter) {
+    if (ImGui::Button("Save", ImVec2(Em(120.0f), 0.0f)) || enter) {
       std::string message;
       if (mDocument.SaveAsNewFolder(mSaveAsName, message)) {
         gpg::Logf("editor: %s", message.c_str());
@@ -1078,7 +1132,7 @@ namespace faf::editor
       }
     }
     ImGui::SameLine();
-    if (ImGui::Button("Cancel", ImVec2(120.0f, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+    if (ImGui::Button("Cancel", ImVec2(Em(120.0f), 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
       ImGui::CloseCurrentPopup();
     }
     ImGui::EndPopup();
@@ -1131,7 +1185,7 @@ namespace faf::editor
     ImGui::TextDisabled("In %s", (mDocument.VaultFolder() / "maps").string().c_str());
     ImGui::Separator();
     ImGui::TextUnformatted("Type");
-    ImGui::SameLine(110.0f);
+    ImGui::SameLine(Em(110.0f));
     if (ImGui::RadioButton("Skirmish", !mNewMap.campaign)) {
       mNewMap.campaign = false;
     }
@@ -1140,7 +1194,7 @@ namespace faf::editor
       mNewMap.campaign = true;
     }
     ImGui::TextUnformatted("Size");
-    ImGui::SameLine(110.0f);
+    ImGui::SameLine(Em(110.0f));
     for (int i = 0; i < kNewMapSizeCount; ++i) {
       if (i > 0) {
         ImGui::SameLine();
@@ -1161,7 +1215,7 @@ namespace faf::editor
     }
     ImGui::TextDisabled("Start positions ARMY_1 to ARMY_%d in a ring; ARMY_17 and NEUTRAL_CIVILIAN as extra armies.", mNewMap.players);
     ImGui::Separator();
-    if (ImGui::Button("Create", ImVec2(120.0f, 0.0f))) {
+    if (ImGui::Button("Create", ImVec2(Em(120.0f), 0.0f))) {
       mNewMap.title = mNewMapTitle;
       mNewMap.folder = mNewMapFolder;
       std::string message;
@@ -1173,7 +1227,7 @@ namespace faf::editor
       }
     }
     ImGui::SameLine();
-    if (ImGui::Button("Cancel", ImVec2(120.0f, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+    if (ImGui::Button("Cancel", ImVec2(Em(120.0f), 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
       ImGui::CloseCurrentPopup();
     }
     ImGui::EndPopup();
@@ -1209,21 +1263,21 @@ namespace faf::editor
       ImGui::TextColored(ImVec4(0.55f, 0.80f, 0.55f, 1.0f), "The folder's name, version and scenario paths are as the vault wants them.");
     }
     ImGui::TextDisabled("%zu files go in:", mPackagePlan.files.size());
-    if (ImGui::BeginChild("##packagefiles", ImVec2(520.0f, ImGui::GetTextLineHeightWithSpacing() * 7.0f), ImGuiChildFlags_Borders)) {
+    if (ImGui::BeginChild("##packagefiles", ImVec2(Em(520.0f), ImGui::GetTextLineHeightWithSpacing() * 7.0f), ImGuiChildFlags_Borders)) {
       for (const std::string& file : mPackagePlan.files) {
         ImGui::TextUnformatted(file.c_str());
       }
     }
     ImGui::EndChild();
     ImGui::BeginDisabled(!mPackagePlan.errors.empty());
-    if (ImGui::Button("Package", ImVec2(120.0f, 0.0f))) {
+    if (ImGui::Button("Package", ImVec2(Em(120.0f), 0.0f))) {
       std::filesystem::path written;
       const bool ok = mDocument.WritePackage(mPackagePlan, written, mPackageMessage);
       (ok ? gpg::Logf : gpg::Warnf)("editor: %s", mPackageMessage.c_str());
     }
     ImGui::EndDisabled();
     ImGui::SameLine();
-    if (ImGui::Button("Close", ImVec2(120.0f, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+    if (ImGui::Button("Close", ImVec2(Em(120.0f), 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
       ImGui::CloseCurrentPopup();
     }
     if (!mPackageMessage.empty()) {

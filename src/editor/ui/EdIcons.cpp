@@ -1,5 +1,6 @@
 #include "editor/ui/EdIcons.h"
 
+#include <algorithm>
 #include <cmath>
 #include <initializer_list>
 
@@ -203,5 +204,39 @@ namespace faf::editor
   bool IconToggle(const char* const id, const EdIcon icon, const bool on, const EdSegment segment)
   {
     return EdToolButton(id, icon, nullptr, true, on, segment);
+  }
+
+  float EdTextSegmentWidth(const char* const text, const float minWidth)
+  {
+    return std::max(minWidth, ImGui::CalcTextSize(text).x + ImGui::GetStyle().FramePadding.x * 2.0f);
+  }
+
+  bool EdTextSegment(const char* const id, const char* const text, const EdSegment segment, const bool enabled, const float minWidth)
+  {
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float side = ImGui::GetFrameHeight();
+    const float width = EdTextSegmentWidth(text, minWidth);
+    const ImVec2 at = ImGui::GetCursorScreenPos();
+    ImGui::BeginDisabled(!enabled);
+    const bool clicked = ImGui::InvisibleButton(id, ImVec2(width, side));
+    ImGui::EndDisabled();
+    const bool hovered = enabled && ImGui::IsItemHovered();
+    const bool held = enabled && ImGui::IsItemActive();
+    ImDrawFlags corners = ImDrawFlags_RoundCornersAll;
+    if (segment == EdSegment::First) {
+      corners = ImDrawFlags_RoundCornersLeft;
+    } else if (segment == EdSegment::Middle) {
+      corners = ImDrawFlags_RoundCornersNone;
+    } else if (segment == EdSegment::Last) {
+      corners = ImDrawFlags_RoundCornersRight;
+    }
+    ImDrawList* const draw = ImGui::GetWindowDrawList();
+    const ImVec2 end(at.x + width, at.y + side);
+    draw->AddRectFilled(at, end, ImGui::GetColorU32(held ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button),
+                        style.FrameRounding, corners);
+    const ImVec2 textSize = ImGui::CalcTextSize(text);
+    draw->AddText(ImVec2(at.x + (width - textSize.x) * 0.5f, at.y + (side - textSize.y) * 0.5f),
+                  ImGui::GetColorU32(enabled ? ImGuiCol_Text : ImGuiCol_TextDisabled), text);
+    return clicked && enabled;
   }
 } // namespace faf::editor

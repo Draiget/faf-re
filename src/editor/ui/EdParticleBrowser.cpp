@@ -2,6 +2,7 @@
 // editor (it shares its preview and opens effects in it).
 
 #include "editor/ui/EdParticleEditor.h"
+#include "editor/ui/EdUiScale.h"
 
 #include "editor/doc/EdMapFile.h"
 #include "imgui.h"
@@ -139,13 +140,13 @@ namespace faf::editor
 
       // The grid: filters, then a tile per effect.
       ImGui::TableSetColumnIndex(1);
-      ImGui::SetNextItemWidth(130.0f);
+      ImGui::SetNextItemWidth(Em(130.0f));
       (void)ImGui::Combo("##faction", &mBrowseFaction, kEffectFactions, static_cast<int>(std::size(kEffectFactions)));
       ImGui::SameLine();
-      ImGui::SetNextItemWidth(130.0f);
+      ImGui::SetNextItemWidth(Em(130.0f));
       (void)ImGui::Combo("##kind", &mBrowseKind, kEffectKinds, static_cast<int>(std::size(kEffectKinds)));
       ImGui::SameLine();
-      ImGui::SetNextItemWidth(110.0f);
+      ImGui::SetNextItemWidth(Em(110.0f));
       (void)ImGui::Combo("##type", &mBrowseType, kTypes, 4);
       ImGui::SetItemTooltip("Types are read from the files as their tiles show");
       ImGui::SameLine();

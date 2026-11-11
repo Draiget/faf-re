@@ -49,4 +49,9 @@ namespace faf::editor
 
   /** A square toggle with `icon` only. */
   bool IconToggle(const char* id, EdIcon icon, bool on, EdSegment segment = EdSegment::Alone);
+
+  /** A plain button with centred `text` that joins a row as the icon ones do (at least `minWidth` wide). */
+  bool EdTextSegment(const char* id, const char* text, EdSegment segment, bool enabled = true, float minWidth = 0.0f);
+  /** The width `EdTextSegment` takes for `text`. */
+  [[nodiscard]] float EdTextSegmentWidth(const char* text, float minWidth = 0.0f);
 } // namespace faf::editor

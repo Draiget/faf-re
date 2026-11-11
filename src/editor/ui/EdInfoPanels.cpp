@@ -1,6 +1,7 @@
 // The Info panel (what the open map is) and the Markers panel (its markers as a tree), EdShell's right-hand panels.
 
 #include "editor/EdShell.h"
+#include "editor/ui/EdUiScale.h"
 #include "editor/doc/EdAdaptiveTables.h"
 
 #include <algorithm>
@@ -255,10 +256,10 @@ namespace faf::editor
     ImGui::Spacing();
     ImGui::SeparatorText("Terrain");
     ImGui::TextDisabled("Shader");
-    ImGui::SameLine(110.0f);
+    ImGui::SameLine(Em(110.0f));
     ImGui::TextUnformatted(facts.terrainShader.c_str());
     ImGui::TextDisabled("Height field");
-    ImGui::SameLine(110.0f);
+    ImGui::SameLine(Em(110.0f));
     ImGui::Text("%d x %d samples", facts.fieldWidth, facts.fieldHeight);
     ImGui::Spacing();
     {

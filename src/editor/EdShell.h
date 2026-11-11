@@ -47,6 +47,8 @@ namespace faf::editor
     bool& ShowScript() noexcept { return mShowScript; }
     /** While a play runs: the editor's view in front of it (true) or the game's (F6, the toolbar's switch). */
     bool& EditorViewInPlay() noexcept { return mEditorViewInPlay; }
+    /** The panels' scale (1 at the screen's DPI): the toolbar's - / % / + at its right; kept in layout.ini. */
+    float& UiScale() noexcept { return mUiScale; }
     /** The Adaptive Map window (View > Adaptive Map). */
     bool& ShowAdaptiveWindow() noexcept { return mShowAdaptiveWindow; }
     /** Test runs (`/adaptivepreview <key>=<choice index>,...[;<players>]`): the window's preview on with those picks. */
@@ -186,6 +188,9 @@ namespace faf::editor
                             const std::vector<std::string>& selectedUnits, const UnitGroup& army);
     bool mShowAdaptiveWindow = false;
     bool mEditorViewInPlay = false;
+    float mUiScale = 1.0f;
+    /** The toolbar's UI scale buttons; returns their width when `measure` (nothing drawn). */
+    float DrawUiScaleButtons(bool measure);
     bool mFocusAdaptiveWindow = false;
     /** The option the window shows (its key; "#players" for the players' resources). */
     std::string mAdaptivePick;

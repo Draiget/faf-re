@@ -1,4 +1,5 @@
 #include "editor/ui/EdTexturePicker.h"
+#include "editor/ui/EdUiScale.h"
 
 #include "editor/tools/EdTextureLibrary.h"
 #include "imgui.h"
@@ -96,10 +97,10 @@ namespace faf::editor
       if (ImGui::IsWindowAppearing()) {
         ImGui::SetKeyboardFocusHere();
       }
-      ImGui::SetNextItemWidth(260.0f);
+      ImGui::SetNextItemWidth(Em(260.0f));
       ImGui::InputTextWithHint("##search", "Search names", mSearch, sizeof(mSearch));
       ImGui::SameLine();
-      ImGui::SetNextItemWidth(260.0f);
+      ImGui::SetNextItemWidth(Em(260.0f));
       if (ImGui::BeginCombo("##folder", mFolder == 0 ? "All folders" : mFolders[static_cast<std::size_t>(mFolder - 1)].c_str(),
                             ImGuiComboFlags_HeightLarge)) {
         if (ImGui::Selectable("All folders", mFolder == 0)) {
@@ -113,7 +114,7 @@ namespace faf::editor
         ImGui::EndCombo();
       }
       ImGui::SameLine();
-      ImGui::SetNextItemWidth(140.0f);
+      ImGui::SetNextItemWidth(Em(140.0f));
       ImGui::SliderFloat("##tile", &mTile, 64.0f, 192.0f, "tiles %.0f px");
       ImGui::SameLine();
       if (ImGui::Button("None")) {
