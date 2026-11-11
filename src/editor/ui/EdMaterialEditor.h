@@ -33,6 +33,43 @@ namespace faf::editor
 
     /** The open map's folder when graphs may go beside it (a vault map), else empty: the editor's own folder. */
     void SetMapFolder(const std::filesystem::path& folder);
+    /**
+     * The open map's ten texture slots as the target list shows them (lower, strata 1-8, upper); empty without a map,
+     * which turns Live Update and Apply off.
+     */
+    void SetSlotNames(std::vector<std::string> names);
+
+    /** The live result for the map's terrain: in-memory DDS files for a slot (Live Update). */
+    struct LiveImage
+    {
+      int slot = -1;
+      std::vector<std::uint8_t> albedo;
+      std::vector<std::uint8_t> normals;
+    };
+    [[nodiscard]] bool TakeLive(LiveImage& out);
+    /** A slot the live result left: its own files go back. */
+    [[nodiscard]] bool TakeRestore(int& slot);
+
+    /** Apply: the graph baked at the bake size, for the app to write into the map's folder and set into the slot. */
+    struct Bake
+    {
+      int slot = -1;
+      std::string name;
+      std::vector<std::uint8_t> albedo;  // BC3
+      std::vector<std::uint8_t> normals; // BC1, empty for the upper slot or an unlinked Normal
+      TexImagePtr mask;                  // the Mask output over the whole map, null when unlinked
+    };
+    [[nodiscard]] bool TakeApply(Bake& out);
+    /** Test runs (`/materiallive <slot>`, `/materialapply <slot>`): Live Update into the slot on, or Apply into it. */
+    void TestLive(const int slot)
+    {
+      mTargetSlot = slot;
+      mLive = true;
+    }
+    void TestApply(const int slot) { mApplyAsk = slot; }
+    /** What the app made of an Apply (shown in the toolbar). */
+    void SetStatus(std::string status) { mStatus = std::move(status); }
+
     /** Gives the map nodes the open map's heights (asked when a graph needs them and on Refresh). */
     void SetTerrainSource(std::function<std::shared_ptr<TerrainSource>()> source) { mTerrainSource = std::move(source); }
 
@@ -114,6 +151,24 @@ namespace faf::editor
     bool mOpenSaveAs = false;
     std::string mStatus;
     bool mFocused = false;
+
+    // Live Update and Apply.
+    void UpdateLive(Doc& doc);
+    void StopLive();
+    void ApplyBake(Doc& doc);
+    std::vector<std::string> mSlotNames;
+    int mTargetSlot = 1;
+    bool mLive = false;
+    int mLiveSlot = -1;
+    bool mLiveStale = true;
+    double mLiveSentAt = 0.0;
+    int mBakeSize = 1024;
+    LiveImage mLiveOut;
+    bool mLiveReady = false;
+    std::vector<int> mRestore;
+    Bake mBakeOut;
+    bool mBakeReady = false;
+    int mApplyAsk = -1;
   };
 
   /** A lit preview of a stratum's albedo and normal maps: `mode` 0 a sphere, 1 a 2 x 2 plane; BGRA rows. */

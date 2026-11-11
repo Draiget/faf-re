@@ -92,6 +92,16 @@ namespace faf::editor
     /** Sets the map's terrain shader, as one undo step. */
     void ChangeTerrainShader(const std::string& shader);
 
+    /**
+     * Shows in-memory DDS files in a slot's albedo and normal map (the material editor's Live Update) without changing
+     * what the map names or saves; an empty one leaves that texture as it is. RestoreLayerSlot puts the slot's own
+     * files back. A slot without a size gets `emptySize`.
+     */
+    void PreviewLayerSlot(int slot, const std::vector<std::uint8_t>& albedo, const std::vector<std::uint8_t>& normals, float emptySize);
+    void RestoreLayerSlot(int slot);
+    /** Stratum `layer`'s (0-7) mask from a grey image over the whole map, as one undo step. */
+    bool SetMaskLayer(int layer, const TexImage& image, std::string& message);
+
     /** Changes one slot as the Tools panel asked, as one undo step. */
     void ChangeLayerSlot(int slot, const EdTools::LayerSlot& value);
     /**

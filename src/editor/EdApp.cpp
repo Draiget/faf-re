@@ -37,6 +37,8 @@
 #include "editor/doc/EdUnitWrecks.h"
 #include "editor/ui/EdImGuiRenderer.h"
 #include "editor/tools/EdHeightFile.h"
+#include "editor/tools/EdTextureLibrary.h"
+#include "editor/doc/EdMapFile.h"
 #include "editor/view/EdMapScene.h"
 #include "gpg/core/diagnostics/CrashHooks.h"
 #include "gpg/core/diagnostics/CrashReport.h"
@@ -640,6 +642,9 @@ namespace faf::editor
       // `/roundtripframes <n>` (test runs): /roundtrip and /saveas wait this many frames of the drawn map (180).
       int mRoundTripAfter = 180;
       void SaveDocument();
+      /** The material editor's Live Update and Apply, with the open map's slots. */
+      void DriveMaterialEditor();
+      void ApplyMaterial(const EdMaterialEditor::Bake& bake);
       std::string mIniPath;
       bool mImGuiReady = false;
     };
@@ -1226,6 +1231,13 @@ namespace faf::editor
             ImGui::SetWindowFocus(panel[0].c_str());
             gpg::Logf("editor: /focuspanel %s", panel[0].c_str());
           }
+          // `/materiallive <slot>` and `/materialapply <slot>` (test runs): the material editor's result into a slot.
+          if (fa::vector<fa::string> slot; mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/materiallive", 1, &slot) && !slot.empty()) {
+            mShell->MaterialEditor().TestLive(std::atoi(slot[0].c_str()));
+          }
+          if (fa::vector<fa::string> slot; mFocusPanelFrames == 80 && moho::CFG_GetArgOption("/materialapply", 1, &slot) && !slot.empty()) {
+            mShell->MaterialEditor().TestApply(std::atoi(slot[0].c_str()));
+          }
         }
         switch (mShell->TakeCommand()) {
         case EdShell::Command::Save:
@@ -1451,6 +1463,89 @@ namespace faf::editor
       gpg::Warnf("editor: /open %s: no such map", args[0].c_str());
     }
 
+    void EditorApp::DriveMaterialEditor()
+    {
+      EdMaterialEditor& material = mShell->MaterialEditor();
+      if (!mScene.Attached()) {
+        material.SetSlotNames({});
+        return;
+      }
+      static const char* const kSlotLabels[10] = {"Lower", "Stratum 1", "Stratum 2", "Stratum 3", "Stratum 4",
+                                                  "Stratum 5", "Stratum 6", "Stratum 7", "Stratum 8", "Upper"};
+      std::vector<std::string> names;
+      const std::vector<EdTools::LayerSlot> slots = mScene.LayerSlots();
+      for (std::size_t s = 0; s < slots.size() && s < 10; ++s) {
+        names.push_back(std::string(kSlotLabels[s]) + "  " + LayerTextureName(slots[s].albedo));
+      }
+      material.SetSlotNames(std::move(names));
+      for (int slot = -1; material.TakeRestore(slot);) {
+        mScene.RestoreLayerSlot(slot);
+      }
+      if (EdMaterialEditor::LiveImage live; material.TakeLive(live)) {
+        mScene.PreviewLayerSlot(live.slot, live.albedo, live.normals, 10.0f);
+      }
+      if (EdMaterialEditor::Bake bake; material.TakeApply(bake)) {
+        ApplyMaterial(bake);
+      }
+    }
+
+    void EditorApp::ApplyMaterial(const EdMaterialEditor::Bake& bake)
+    {
+      EdMaterialEditor& material = mShell->MaterialEditor();
+      const std::filesystem::path scmap = mDocument.MapDiskFile();
+      if (scmap.empty() || bake.slot < 0 || bake.slot > 9) {
+        material.SetStatus("Apply: no map folder to write into.");
+        return;
+      }
+      // <map>/env/layers/<graph>_albedo.dds (and _normals.dds), named in the game's files under the map's folder.
+      std::string base;
+      for (const char c : bake.name) {
+        base += (std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_' || c == '-') ? static_cast<char>(std::tolower(static_cast<unsigned char>(c))) : '_';
+      }
+      const std::filesystem::path folder = scmap.parent_path() / "env" / "layers";
+      std::error_code ec;
+      std::filesystem::create_directories(folder, ec);
+      const auto write = [&](const std::string& file, const std::vector<std::uint8_t>& bytes) {
+        std::ofstream out(folder / file, std::ios::binary | std::ios::trunc);
+        out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+        return static_cast<bool>(out);
+      };
+      const std::string gameFolder = "/maps/" + mDocument.FolderName() + "/env/layers/";
+      EdTools::LayerSlot value = mScene.LayerSlots()[static_cast<std::size_t>(bake.slot)];
+      if (!write(base + "_albedo.dds", bake.albedo)) {
+        material.SetStatus("Apply: can't write " + (folder / (base + "_albedo.dds")).string());
+        return;
+      }
+      value.albedo = gameFolder + base + "_albedo.dds";
+      if (!bake.normals.empty()) {
+        if (!write(base + "_normals.dds", bake.normals)) {
+          material.SetStatus("Apply: can't write " + (folder / (base + "_normals.dds")).string());
+          return;
+        }
+        value.normals = gameFolder + base + "_normals.dds";
+      }
+      if (value.albedoSize <= 1.0f) {
+        value.albedoSize = 10.0f;
+        value.normalsSize = 10.0f;
+      }
+      mScene.RestoreLayerSlot(bake.slot);
+      mScene.ChangeLayerSlot(bake.slot, value);
+      // The game's files must see the new file for the terrain (and Play) to load it.
+      std::string read;
+      const bool seen = ReadGameFile(value.albedo, read) && read.size() == bake.albedo.size();
+      gpg::Logf("editor: material %s applied to slot %d: %s (%zu bytes)%s", bake.name.c_str(), bake.slot, value.albedo.c_str(), bake.albedo.size(),
+                seen ? "" : "; the game's files don't see it yet");
+      if (!seen) {
+        mScene.PreviewLayerSlot(bake.slot, bake.albedo, bake.normals, 10.0f);
+      }
+      std::string status = "Applied to the slot: " + value.albedo;
+      if (bake.mask != nullptr && bake.slot >= 1 && bake.slot <= 8) {
+        std::string message;
+        status += mScene.SetMaskLayer(bake.slot - 1, *bake.mask, message) ? "; the stratum's mask painted" : "; " + message;
+      }
+      material.SetStatus(status);
+    }
+
     void EditorApp::SaveDocument()
     {
       std::string message;
@@ -1566,6 +1661,7 @@ namespace faf::editor
           mScene.ChangeLayerSlot(slot, value);
         }
         tools.SetLayerSlots(mScene.LayerSlots());
+        DriveMaterialEditor();
         tools.SetMapSizeUnits(static_cast<float>(std::max(mDocument.Facts().sizeX, mDocument.Facts().sizeZ)));
         {
           std::vector<std::string> names;
@@ -2000,6 +2096,7 @@ namespace faf::editor
         }
       } else {
         tools.SetLayerSlots({});
+        DriveMaterialEditor();
       }
       if (mMaskLayerArg >= 0) {
         // `/layerweight` (test runs): the paint layer's weight shown.

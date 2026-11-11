@@ -389,6 +389,15 @@ set_target_properties(faf_editor_brush_tests PROPERTIES FOLDER "Tests/Editor")
 add_test(NAME editor_height_brush COMMAND faf_editor_brush_tests)
 set_tests_properties(editor_height_brush PROPERTIES LABELS "Editor")
 
+# The material editor's DDS files, read back by the engine's own decoder (so it links the engine).
+add_executable(faf_editor_bake_tests EXCLUDE_FROM_ALL editor/TextureBakeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/graph/EdTextureBake.cpp
+  ${CMAKE_SOURCE_DIR}/src/editor/graph/EdTextureGraph.cpp ${CMAKE_SOURCE_DIR}/src/editor/graph/EdNodeGraph.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdJson.cpp)
+target_include_directories(faf_editor_bake_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_editor_bake_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_editor_bake_tests PROPERTIES FOLDER "Tests/Editor")
+add_test(NAME editor_texture_bake COMMAND faf_editor_bake_tests)
+set_tests_properties(editor_texture_bake PROPERTIES LABELS "Editor")
+
 add_executable(faf_slab_tests EXCLUDE_FROM_ALL entity/FixedSlabPoolTests.cpp)
 target_link_libraries(faf_slab_tests PRIVATE faf_engine gtest_main)
 set_target_properties(faf_slab_tests PROPERTIES FOLDER "Tests/Sim")

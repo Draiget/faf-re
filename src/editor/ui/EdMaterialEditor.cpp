@@ -1,6 +1,7 @@
 #include "editor/ui/EdMaterialEditor.h"
 
 #include "editor/doc/EdMapFile.h"
+#include "editor/graph/EdTextureBake.h"
 #include "editor/ui/EdImGuiRenderer.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
 #include "imgui.h"
@@ -12,6 +13,7 @@
 #include <cstring>
 #include <fstream>
 #include <sstream>
+#include <utility>
 
 namespace faf::editor
 {
@@ -162,6 +164,124 @@ namespace faf::editor
   void EdMaterialEditor::SetMapFolder(const std::filesystem::path& folder)
   {
     mMapFolder = folder;
+  }
+
+  void EdMaterialEditor::SetSlotNames(std::vector<std::string> names)
+  {
+    if (names.empty() && !mSlotNames.empty()) {
+      // The map closed: nothing to show the result on, and nothing to put back.
+      mLive = false;
+      mLiveSlot = -1;
+      mRestore.clear();
+      mLiveReady = false;
+    }
+    mSlotNames = std::move(names);
+  }
+
+  bool EdMaterialEditor::TakeLive(LiveImage& out)
+  {
+    if (!mLiveReady) {
+      return false;
+    }
+    out = std::move(mLiveOut);
+    mLiveOut = {};
+    mLiveReady = false;
+    return true;
+  }
+
+  bool EdMaterialEditor::TakeRestore(int& slot)
+  {
+    if (mRestore.empty()) {
+      return false;
+    }
+    slot = mRestore.front();
+    mRestore.erase(mRestore.begin());
+    return true;
+  }
+
+  bool EdMaterialEditor::TakeApply(Bake& out)
+  {
+    if (!mBakeReady) {
+      return false;
+    }
+    out = std::move(mBakeOut);
+    mBakeOut = {};
+    mBakeReady = false;
+    return true;
+  }
+
+  void EdMaterialEditor::StopLive()
+  {
+    if (mLiveSlot >= 0) {
+      mRestore.push_back(mLiveSlot);
+    }
+    mLiveSlot = -1;
+    mLiveReady = false;
+  }
+
+  void EdMaterialEditor::UpdateLive(Doc& doc)
+  {
+    if (!mLive || mSlotNames.empty()) {
+      return;
+    }
+    if (mLiveSlot != mTargetSlot) {
+      StopLive();
+      mLiveSlot = mTargetSlot;
+      mLiveStale = true;
+    }
+    // At most ten updates a second while a slider is dragged; the last change always goes out.
+    const double now = ImGui::GetTime();
+    if (!mLiveStale || now - mLiveSentAt < 0.1) {
+      return;
+    }
+    const TexImagePtr albedo = doc.eval->Result("Albedo");
+    const TexImagePtr normals = doc.eval->Result("Normal");
+    LiveImage live;
+    live.slot = mLiveSlot;
+    std::string error;
+    if (albedo != nullptr && !EncodeDds(*albedo, DdsKind::Bgra, live.albedo, error)) {
+      mStatus = "Live: " + error;
+    }
+    if (normals != nullptr && mLiveSlot < 9 && !EncodeDds(*normals, DdsKind::Bgra, live.normals, error)) {
+      mStatus = "Live: " + error;
+    }
+    mLiveOut = std::move(live);
+    mLiveReady = true;
+    mLiveStale = false;
+    mLiveSentAt = now;
+  }
+
+  void EdMaterialEditor::ApplyBake(Doc& doc)
+  {
+    // The graph again at the bake size, apart from the preview's (its cache stays).
+    TextureGraphEvaluator bake(*doc.graph);
+    bake.SetSize(mBakeSize);
+    bake.SetTextureLoader(LoadTexture);
+    bake.SetTerrain(mTerrain);
+    Bake out;
+    out.slot = mTargetSlot;
+    out.name = doc.name;
+    std::string error;
+    const TexImagePtr albedo = bake.Result("Albedo");
+    if (albedo == nullptr) {
+      mStatus = "Apply: link something to the output's Albedo first.";
+      return;
+    }
+    if (!EncodeDds(*albedo, DdsKind::Bc3, out.albedo, error)) {
+      mStatus = "Apply: " + error;
+      return;
+    }
+    if (const TexImagePtr normals = bake.Result("Normal"); normals != nullptr && mTargetSlot < 9 && !EncodeDds(*normals, DdsKind::Bc1, out.normals, error)) {
+      mStatus = "Apply: " + error;
+      return;
+    }
+    if (mTargetSlot >= 1 && mTargetSlot <= 8) {
+      out.mask = bake.Result("Mask");
+    }
+    mBakeOut = std::move(out);
+    mBakeReady = true;
+    StopLive();
+    mLive = false;
   }
 
   std::filesystem::path EdMaterialEditor::Folder() const
@@ -340,6 +460,7 @@ namespace faf::editor
         doc.lastMillis += doc.eval->Millis(node.id);
       }
       mPreviewStale = true;
+      mLiveStale = true;
       UpdateThumbnails(doc);
     }
   }
@@ -389,6 +510,10 @@ namespace faf::editor
     if (!ImGui::Begin("Material Editor", &open, ImGuiWindowFlags_MenuBar)) {
       ImGui::End();
       return;
+    }
+    if (!open) {
+      StopLive(); // closed: the terrain shows the map's own textures again
+      mLive = false;
     }
     mFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
     if (mDocs.empty()) {
@@ -488,6 +613,11 @@ namespace faf::editor
       ImGui::EndTable();
     }
     Snapshot(*doc);
+    if (mApplyAsk >= 0 && !mSlotNames.empty()) {
+      mTargetSlot = std::exchange(mApplyAsk, -1);
+      ApplyBake(*doc);
+    }
+    UpdateLive(*doc);
     DrawOpenPopup();
     DrawSaveAsPopup();
     ImGui::End();
@@ -550,6 +680,50 @@ namespace faf::editor
         ImGui::EndCombo();
       }
       ImGui::SetItemTooltip("The graph's working size: larger is finer and slower");
+
+      // The slot the result goes into, live and on Apply.
+      ImGui::Separator();
+      const bool haveMap = !mSlotNames.empty();
+      ImGui::BeginDisabled(!haveMap);
+      ImGui::SetNextItemWidth(190.0f);
+      const std::string current = haveMap && mTargetSlot < static_cast<int>(mSlotNames.size()) ? mSlotNames[static_cast<std::size_t>(mTargetSlot)]
+                                                                                               : std::string("(no map open)");
+      if (ImGui::BeginCombo("##slot", current.c_str())) {
+        for (std::size_t s = 0; s < mSlotNames.size(); ++s) {
+          if (ImGui::Selectable(mSlotNames[s].c_str(), static_cast<int>(s) == mTargetSlot)) {
+            mTargetSlot = static_cast<int>(s);
+            mLiveStale = true;
+          }
+        }
+        ImGui::EndCombo();
+      }
+      ImGui::SetItemTooltip("The map's texture slot the graph's result goes into");
+      if (ImGui::Checkbox("Live Update", &mLive) && !mLive) {
+        StopLive();
+      }
+      mLiveStale = mLiveStale || ImGui::IsItemDeactivatedAfterEdit();
+      ImGui::SetItemTooltip("Shows the result on the map's terrain in that slot as you edit (not saved: Apply writes it into the map)");
+      ImGui::EndDisabled();
+      const bool canApply = haveMap && !mMapFolder.empty() && doc != nullptr;
+      ImGui::BeginDisabled(!canApply);
+      if (ImGui::Button("Apply") && doc != nullptr) {
+        ApplyBake(*doc);
+      }
+      ImGui::EndDisabled();
+      ImGui::SetItemTooltip("%s", canApply ? "Bakes the graph at the bake size into DDS files in the map's env/layers folder and sets the slot to them "
+                                             "(one undo step); a linked Mask paints the stratum's mask"
+                                           : "Apply writes into the map's own folder: open a map from your vault (the game's own maps can't be "
+                                             "changed; File > Save as new map folder makes one)");
+      ImGui::SetNextItemWidth(80.0f);
+      if (ImGui::BeginCombo("##bake", (std::to_string(mBakeSize) + " px").c_str())) {
+        for (const int size : {512, 1024, 2048}) {
+          if (ImGui::Selectable((std::to_string(size) + " px").c_str(), size == mBakeSize)) {
+            mBakeSize = size;
+          }
+        }
+        ImGui::EndCombo();
+      }
+      ImGui::SetItemTooltip("The size Apply bakes at");
       if (!mStatus.empty()) {
         ImGui::TextDisabled("%s", mStatus.c_str());
       }

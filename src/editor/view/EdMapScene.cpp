@@ -40,6 +40,8 @@
 #include "moho/render/WRenViewport.h"
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/d3d/RD3DTextureResource.h"
+#include "gpg/core/utils/BoostWrappers.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 
@@ -966,6 +968,50 @@ namespace faf::editor
     mDocument.SetModified(true);
   }
 
+  void EdMapScene::PreviewLayerSlot(const int slot, const std::vector<std::uint8_t>& albedo, const std::vector<std::uint8_t>& normals,
+                                    const float emptySize)
+  {
+    if (mMap == nullptr || slot < 0 || slot > 9) {
+      return;
+    }
+    moho::StratumMaterial& strata = mMap->mTerrainRes->GetStratumMaterial();
+    const auto show = [&](moho::CStratumMaterial& material, const std::vector<std::uint8_t>& bytes) {
+      if (bytes.empty()) {
+        return;
+      }
+      // A texture made from the bytes (copied), as the engine's own in-memory sheets are (CD3DDeviceResources 0x00441810);
+      // the path stays the map's, so saving writes what the map names.
+      boost::shared_ptr<moho::RD3DTextureResource> sheet(
+        new moho::RD3DTextureResource("editor:material", const_cast<std::uint8_t*>(bytes.data()), bytes.size()));
+      material.mTextureSheet.release();
+      material.mTextureSheet = {};
+      material.mTextureSheet.assign_retain(boost::SharedPtrRawFromSharedBorrow(sheet));
+      if (material.mPath.empty() && material.mSize <= 1.0f) {
+        material.mSize = emptySize;
+      }
+    };
+    show(SlotMaterial(strata, slot, false), albedo);
+    if (slot < 9) {
+      show(SlotMaterial(strata, slot, true), normals);
+    }
+    strata.SetSizeTo(mMap->mTerrainRes);
+  }
+
+  void EdMapScene::RestoreLayerSlot(const int slot)
+  {
+    if (mMap == nullptr || slot < 0 || slot > 9) {
+      return;
+    }
+    moho::StratumMaterial& strata = mMap->mTerrainRes->GetStratumMaterial();
+    for (const bool normals : {false, true}) {
+      moho::CStratumMaterial& material = SlotMaterial(strata, slot, normals);
+      material.mTextureSheet.release();
+      material.mTextureSheet = {};
+    }
+    // Loads the files the slot names again (StratumMaterial::SetSizeTo).
+    strata.SetSizeTo(mMap->mTerrainRes);
+  }
+
   void EdMapScene::ChangeLayerSlot(const int slot, const EdTools::LayerSlot& value)
   {
     const std::vector<EdTools::LayerSlot> slots = LayerSlots();
@@ -1313,6 +1359,32 @@ namespace faf::editor
     }
     WholeMaskChanged(whole);
     message = "Imported the mask of layer " + std::to_string(layer + 1) + " from " + file.string();
+    return true;
+  }
+
+  bool EdMapScene::SetMaskLayer(const int layer, const TexImage& image, std::string& message)
+  {
+    LoadMasks();
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    if (masks.texels.empty() || mPaintingMask || layer < 0 || layer > 7 || image.size <= 0) {
+      message = "No map's masks to change.";
+      return false;
+    }
+    const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
+    mDocument.MaskUndo().BeginStroke();
+    mDocument.MaskUndo().BeforeWrite(masks.texels.data(), whole);
+    for (int y = 0; y < masks.height; ++y) {
+      for (int x = 0; x < masks.width; ++x) {
+        // The image covers the whole map: its rows run along z as the mask's do.
+        float c[4];
+        image.Sample((static_cast<float>(x) + 0.5f) / static_cast<float>(masks.width), (static_cast<float>(y) + 0.5f) / static_cast<float>(masks.height), c);
+        const float grey = image.channels == 1 ? c[0] : c[0] * 0.2126f + c[1] * 0.7152f + c[2] * 0.0722f;
+        std::uint64_t& texel = masks.texels[static_cast<std::size_t>(y) * masks.width + x];
+        texel = WithMaskByte(texel, layer, static_cast<std::uint8_t>(std::lround(std::clamp(grey, 0.0f, 1.0f) * 255.0f)));
+      }
+    }
+    WholeMaskChanged(whole);
+    message = "Set the mask of stratum " + std::to_string(layer + 1) + " from the material graph";
     return true;
   }
 

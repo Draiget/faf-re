@@ -57,6 +57,7 @@ set(FAF_EDITOR_SOURCES
   tools/EdShaderSlots.cpp
   graph/EdNodeGraph.cpp
   graph/EdTextureGraph.cpp
+  graph/EdTextureBake.cpp
   ui/EdNodeCanvas.cpp
   ui/EdMaterialEditor.cpp
   tools/EdPathing.cpp
