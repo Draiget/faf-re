@@ -71,29 +71,63 @@ namespace faf::editor
     bool ranked = false;
   };
 
-  /** What a vault search asks for: a name, an order, and filters (0 / false: any). */
-  struct VaultQuery
-  {
-    enum class Sort
-    {
-      MostPlayed,
-      Newest,
-      BestRated,
-      Name,
-    };
-    std::string text;
-    Sort sort = Sort::MostPlayed;
-    int minPlayers = 0;
-    int maxPlayers = 0;
-    /** The map's width in height-field pixels (512 is 10 km), 0 any. */
-    int width = 0;
-    bool rankedOnly = false;
+  /** The map sizes the FAF client filters by (MapVaultController): height-field pixels, 1 km to 80 km. */
+  inline constexpr int kVaultSizes[7] = {64, 128, 256, 512, 1024, 2048, 4096};
+  inline constexpr const char* kVaultSizeNames[7] = {"1 km", "2 km", "5 km", "10 km", "20 km", "40 km", "80 km"};
 
-    bool operator==(const VaultQuery& other) const = default;
+  /** What a search can be ordered by: the FAF client's sortable map properties (SearchablePropertyMappings). */
+  struct VaultSortKey
+  {
+    const char* property;
+    const char* label;
+  };
+  inline constexpr VaultSortKey kVaultSortKeys[] = {
+    {"gamesPlayed", "Times played"},
+    {"displayName", "Name"},
+    {"author.login", "Author"},
+    {"latestVersion.createTime", "Uploaded"},
+    {"latestVersion.updateTime", "Updated"},
+    {"latestVersion.maxPlayers", "Max players"},
+    {"latestVersion.width", "Width"},
+    {"latestVersion.height", "Height"},
+    {"latestVersion.folderName", "Folder name"},
+    {"latestVersion.ranked", "Ranked"},
+    {"latestVersion.description", "Description"},
+    {"latestVersion.id", "Version id"},
   };
 
+  /**
+   * What a vault search asks for: the FAF client's map filters (MapVaultController::initSearchController) and its
+   * order. Empty, 0 or false: any.
+   */
+  struct VaultQuery
+  {
+    std::string text;   // the name (anywhere in it)
+    std::string author; // the author's login (anywhere in it)
+    /** Uploaded (the latest version's update time, as the client's filter): after `from`, before `to`, YYYY-MM-DD. */
+    std::string uploadedFrom;
+    std::string uploadedTo;
+    /** Widths and heights by bit: bit k is kVaultSizes[k]. */
+    unsigned widths = 0;
+    unsigned heights = 0;
+    /** Max players from and to (the client's range is 0 to 16: 0 below, 16 above mean any). */
+    int minPlayers = 0;
+    int maxPlayers = 0;
+    /** The average review score from and to (0 to 5). */
+    float minScore = 0.0f;
+    float maxScore = 5.0f;
+    bool rankedOnly = false;
+    std::string sortProperty = "gamesPlayed";
+    bool descending = true;
+    bool operator==(const VaultQuery& other) const = default;
+  };
+  /** The query's filter, as the FAF client writes it (RSQL; "Display search query"). */
+  std::string VaultQueryFilter(const VaultQuery& query);
   /** The map API's link for a vault search, 30 maps a page. */
   std::string VaultSearchUrl(const VaultQuery& query, int page);
+  /** A query as one line of text and back (the saved queries, "Favorites"); unknown keys are skipped. */
+  std::string VaultQueryText(const VaultQuery& query);
+  bool VaultQueryFromText(const std::string& text, VaultQuery& out);
 
   /** A map API answer (`data` maps, `included` versions and players) as maps; false with `error`. */
   bool ParseVaultSearch(const std::string& json, std::vector<VaultMap>& maps, int& pages, std::string& error);

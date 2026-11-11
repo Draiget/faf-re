@@ -39,23 +39,37 @@ namespace
     EXPECT_NE(url.find("page%5Bnumber%5D=2"), std::string::npos);
     EXPECT_NE(url.find("&sort=-gamesPlayed"), std::string::npos);
     EXPECT_EQ(faf::editor::VaultSearchUrl(faf::editor::VaultQuery{}, 1).find("displayName"), std::string::npos);
-    // Filters and orders: 8 to 12 players, 20 km, ranked; newest first, best rated, by name.
+    // The FAF client's filters, in its order, each as its QBuilder writes it.
     faf::editor::VaultQuery filtered;
-    filtered.minPlayers = 8;
-    filtered.maxPlayers = 12;
-    filtered.width = 1024;
+    filtered.text = "Dual";
+    filtered.author = "Gator";
+    filtered.uploadedFrom = "2024-01-01";
+    filtered.uploadedTo = "2025-06-30";
+    filtered.uploadedTo = "2025-06-30";
+    filtered.widths = (1U << 3) | (1U << 4); // 10 and 20 km
+    filtered.heights = 1U << 4;
+    filtered.minPlayers = 4;
+    filtered.maxPlayers = 8;
+    filtered.minScore = 3.5f;
+    filtered.maxScore = 4.5f;
     filtered.rankedOnly = true;
-    filtered.sort = faf::editor::VaultQuery::Sort::Newest;
-    const std::string f = faf::editor::VaultSearchUrl(filtered, 1);
-    EXPECT_NE(f.find("latestVersion.hidden%3D%3Dfalse%3BlatestVersion.maxPlayers%3Dge%3D8%3BlatestVersion.maxPlayers%3Dle%3D12%3B"
-                     "latestVersion.width%3D%3D1024%3BlatestVersion.ranked%3D%3Dtrue"),
-              std::string::npos)
-      << f;
-    EXPECT_NE(f.find("&sort=-updateTime"), std::string::npos);
-    filtered.sort = faf::editor::VaultQuery::Sort::BestRated;
-    EXPECT_NE(faf::editor::VaultSearchUrl(filtered, 1).find("&sort=-reviewsSummary.lowerBound"), std::string::npos);
-    filtered.sort = faf::editor::VaultQuery::Sort::Name;
-    EXPECT_NE(faf::editor::VaultSearchUrl(filtered, 1).find("&sort=displayName&"), std::string::npos);
+    filtered.sortProperty = "latestVersion.createTime";
+    filtered.descending = false;
+    EXPECT_EQ(faf::editor::VaultQueryFilter(filtered),
+              "displayName==\"*Dual*\";author.login==\"*Gator*\";latestVersion.updateTime=gt=\"2024-01-01T00:00:00Z\";"
+              "latestVersion.updateTime=lt=\"2025-06-30T00:00:00Z\";latestVersion.width=in=(\"512\",\"1024\");"
+              "latestVersion.height=in=(\"1024\");latestVersion.maxPlayers=ge=4;latestVersion.maxPlayers=le=8;"
+              "reviewsSummary.averageScore=ge=3.5;reviewsSummary.averageScore=le=4.5;latestVersion.ranked==\"true\";latestVersion.hidden==false");
+    EXPECT_NE(faf::editor::VaultSearchUrl(filtered, 1).find("&sort=latestVersion.createTime&"), std::string::npos);
+    // The range ends that mean "any" and a bad date add nothing.
+    faf::editor::VaultQuery any;
+    any.maxPlayers = 16;
+    any.uploadedFrom = "2024-1-1";
+    EXPECT_EQ(faf::editor::VaultQueryFilter(any), "latestVersion.hidden==false");
+    // Saved as text (Favorites) and read back the same.
+    faf::editor::VaultQuery read;
+    ASSERT_TRUE(faf::editor::VaultQueryFromText(faf::editor::VaultQueryText(filtered), read));
+    EXPECT_EQ(read, filtered);
   }
 
   TEST(FafApi, SearchAnswerToMaps)

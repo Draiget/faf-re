@@ -338,41 +338,168 @@ namespace faf::editor
     return true;
   }
 
-  std::string VaultSearchUrl(const VaultQuery& query, const int page)
+  namespace
   {
-    // RSQL as the FAF client writes it: the name with wildcards, hidden versions left out, then the filters.
-    std::string name;
-    for (const char c : query.text) {
-      if (c != '"' && c != '\\') {
-        name += c;
+    /** Text for a quoted RSQL value: quotes and backslashes left out. */
+    std::string Unquoted(const std::string& text)
+    {
+      std::string out;
+      for (const char c : text) {
+        if (c != '"' && c != '\\') {
+          out += c;
+        }
       }
+      return out;
     }
-    std::string filter;
-    if (!name.empty()) {
-      filter = "displayName==\"*" + name + "*\";";
+
+    /** "YYYY-MM-DD", checked. */
+    bool IsDate(const std::string& text)
+    {
+      if (text.size() != 10 || text[4] != '-' || text[7] != '-') {
+        return false;
+      }
+      for (const std::size_t i : {0U, 1U, 2U, 3U, 5U, 6U, 8U, 9U}) {
+        if (text[i] < '0' || text[i] > '9') {
+          return false;
+        }
+      }
+      return true;
     }
-    filter += "latestVersion.hidden==false";
+
+    std::string Sizes(const unsigned bits)
+    {
+      std::string out;
+      for (int k = 0; k < 7; ++k) {
+        if ((bits & (1U << k)) != 0) {
+          out += (out.empty() ? "\"" : ",\"") + std::to_string(kVaultSizes[k]) + "\"";
+        }
+      }
+      return out;
+    }
+
+    std::string Number(const float value)
+    {
+      char text[32];
+      (void)std::snprintf(text, sizeof(text), "%g", static_cast<double>(value));
+      return text;
+    }
+  } // namespace
+
+  std::string VaultQueryFilter(const VaultQuery& query)
+  {
+    // The FAF client's filters in its order, each condition as its QBuilder writes it, then the hidden versions left out.
+    std::vector<std::string> conditions;
+    if (const std::string name = Unquoted(query.text); !name.empty()) {
+      conditions.push_back("displayName==\"*" + name + "*\"");
+    }
+    if (const std::string author = Unquoted(query.author); !author.empty()) {
+      conditions.push_back("author.login==\"*" + author + "*\"");
+    }
+    if (IsDate(query.uploadedFrom)) {
+      conditions.push_back("latestVersion.updateTime=gt=\"" + query.uploadedFrom + "T00:00:00Z\"");
+    }
+    if (IsDate(query.uploadedTo)) {
+      conditions.push_back("latestVersion.updateTime=lt=\"" + query.uploadedTo + "T00:00:00Z\"");
+    }
+    if (query.widths != 0) {
+      conditions.push_back("latestVersion.width=in=(" + Sizes(query.widths) + ")");
+    }
+    if (query.heights != 0) {
+      conditions.push_back("latestVersion.height=in=(" + Sizes(query.heights) + ")");
+    }
     if (query.minPlayers > 0) {
-      filter += ";latestVersion.maxPlayers=ge=" + std::to_string(query.minPlayers);
+      conditions.push_back("latestVersion.maxPlayers=ge=" + std::to_string(query.minPlayers));
     }
-    if (query.maxPlayers > 0) {
-      filter += ";latestVersion.maxPlayers=le=" + std::to_string(query.maxPlayers);
+    if (query.maxPlayers > 0 && query.maxPlayers < 16) {
+      conditions.push_back("latestVersion.maxPlayers=le=" + std::to_string(query.maxPlayers));
     }
-    if (query.width > 0) {
-      filter += ";latestVersion.width==" + std::to_string(query.width);
+    if (query.minScore > 0.0f) {
+      conditions.push_back("reviewsSummary.averageScore=ge=" + Number(query.minScore));
+    }
+    if (query.maxScore < 5.0f) {
+      conditions.push_back("reviewsSummary.averageScore=le=" + Number(query.maxScore));
     }
     if (query.rankedOnly) {
-      filter += ";latestVersion.ranked==true";
+      conditions.push_back("latestVersion.ranked==\"true\"");
     }
-    const char* sort = "-gamesPlayed";
-    switch (query.sort) {
-    case VaultQuery::Sort::Newest: sort = "-updateTime"; break;
-    case VaultQuery::Sort::BestRated: sort = "-reviewsSummary.lowerBound"; break;
-    case VaultQuery::Sort::Name: sort = "displayName"; break;
-    default: break;
+    conditions.push_back("latestVersion.hidden==false");
+    std::string filter;
+    for (const std::string& condition : conditions) {
+      filter += (filter.empty() ? "" : ";") + condition;
     }
-    return std::string(kFafApiUrl) + "/data/map?filter=" + UrlEncode(filter) + "&include=latestVersion,author&sort=" + sort +
+    return filter;
+  }
+
+  std::string VaultSearchUrl(const VaultQuery& query, const int page)
+  {
+    const std::string sort = (query.descending ? "-" : "") + (query.sortProperty.empty() ? std::string("gamesPlayed") : query.sortProperty);
+    return std::string(kFafApiUrl) + "/data/map?filter=" + UrlEncode(VaultQueryFilter(query)) + "&include=latestVersion,author&sort=" + sort +
            "&page%5Bsize%5D=30&page%5Bnumber%5D=" + std::to_string(std::max(page, 1)) + "&page%5Btotals%5D";
+  }
+
+  std::string VaultQueryText(const VaultQuery& q)
+  {
+    // key=value separated by tabs (no field holds a tab: the panel's fields are single lines).
+    const auto clean = [](std::string text) {
+      for (char& c : text) {
+        c = (c == '\t' || c == '\n' || c == '\r') ? ' ' : c;
+      }
+      return text;
+    };
+    return "name=" + clean(q.text) + "\tauthor=" + clean(q.author) + "\tfrom=" + clean(q.uploadedFrom) + "\tto=" + clean(q.uploadedTo) +
+           "\twidths=" + std::to_string(q.widths) + "\theights=" + std::to_string(q.heights) + "\tplayersFrom=" + std::to_string(q.minPlayers) +
+           "\tplayersTo=" + std::to_string(q.maxPlayers) + "\tscoreFrom=" + Number(q.minScore) + "\tscoreTo=" + Number(q.maxScore) +
+           "\tranked=" + (q.rankedOnly ? "1" : "0") + "\tsort=" + clean(q.sortProperty) + "\tdescending=" + (q.descending ? "1" : "0");
+  }
+
+  bool VaultQueryFromText(const std::string& text, VaultQuery& out)
+  {
+    VaultQuery q;
+    bool any = false;
+    std::size_t at = 0;
+    while (at <= text.size()) {
+      const std::size_t tab = text.find('\t', at);
+      const std::string field = text.substr(at, tab == std::string::npos ? std::string::npos : tab - at);
+      at = tab == std::string::npos ? text.size() + 1 : tab + 1;
+      const std::size_t eq = field.find('=');
+      if (eq == std::string::npos) {
+        continue;
+      }
+      const std::string key = field.substr(0, eq);
+      const std::string value = field.substr(eq + 1);
+      any = true;
+      if (key == "name") {
+        q.text = value;
+      } else if (key == "author") {
+        q.author = value;
+      } else if (key == "from") {
+        q.uploadedFrom = value;
+      } else if (key == "to") {
+        q.uploadedTo = value;
+      } else if (key == "widths") {
+        q.widths = static_cast<unsigned>(std::strtoul(value.c_str(), nullptr, 10)) & 0x7FU;
+      } else if (key == "heights") {
+        q.heights = static_cast<unsigned>(std::strtoul(value.c_str(), nullptr, 10)) & 0x7FU;
+      } else if (key == "playersFrom") {
+        q.minPlayers = std::clamp(std::atoi(value.c_str()), 0, 16);
+      } else if (key == "playersTo") {
+        q.maxPlayers = std::clamp(std::atoi(value.c_str()), 0, 16);
+      } else if (key == "scoreFrom") {
+        q.minScore = std::clamp(static_cast<float>(std::atof(value.c_str())), 0.0f, 5.0f);
+      } else if (key == "scoreTo") {
+        q.maxScore = std::clamp(static_cast<float>(std::atof(value.c_str())), 0.0f, 5.0f);
+      } else if (key == "ranked") {
+        q.rankedOnly = value == "1";
+      } else if (key == "sort") {
+        q.sortProperty = value;
+      } else if (key == "descending") {
+        q.descending = value == "1";
+      }
+    }
+    if (any) {
+      out = q;
+    }
+    return any;
   }
 
   bool ParseVaultSearch(const std::string& json, std::vector<VaultMap>& maps, int& pages, std::string& error)

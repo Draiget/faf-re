@@ -108,11 +108,24 @@ namespace faf::editor
     char mSearchText[128]{};
     std::string mSearchedText;
     int mSearchPage = 1;
-    /** The filters' choices (indices into their lists), and the query they make with the searched text. */
-    int mSortChoice = 0;
-    int mPlayersChoice = 0;
-    int mSizeChoice = 0;
-    bool mRankedOnly = false;
+    /**
+     * The FAF client's map filters and order (its map vault's search bar): author, uploaded from/to, widths, heights,
+     * max players from/to, review score from/to, only ranked, sort by and order; the name is the search box. With the
+     * searched text, the query a search sends.
+     */
+    VaultQuery mFilters;
+    char mAuthorText[64]{};
+    char mFromText[16]{};
+    char mToText[16]{};
+    bool mShowQuery = false;
+    /** The saved queries ("Favorites"): name and query text, kept in the editor's folder (vault_queries.txt). */
+    std::vector<std::pair<std::string, std::string>> mSavedQueries;
+    bool mSavedQueriesRead = false;
+    char mSaveQueryName[64]{};
+    void ReadSavedQueries();
+    void WriteSavedQueries() const;
+    /** The filters' row (DrawVaultSearch); true when a filter changed. */
+    bool DrawVaultFilters();
     [[nodiscard]] VaultQuery Query() const;
     int mSearchPages = 0;
     std::vector<VaultMap> mFound;

@@ -33,12 +33,38 @@ namespace faf::editor
   namespace
   {
     constexpr int kPicture = 96;
-    const char* const kSortNames[] = {"Most played", "Newest", "Best rated", "Name (A-Z)"};
-    const char* const kPlayersNames[] = {"Any players", "2 players", "4 players", "6 players", "8 players", "10-12 players", "13+ players"};
+    // The old test switch's choices (`/vaultquery sort,players,size,ranked`), as the new filters.
+    const char* const kOldSorts[] = {"gamesPlayed", "latestVersion.updateTime", "latestVersion.createTime", "displayName"};
     const int kPlayersMin[] = {0, 2, 4, 6, 8, 10, 13};
     const int kPlayersMax[] = {0, 2, 4, 6, 8, 12, 0};
-    const char* const kSizeNames[] = {"Any size", "5 km", "10 km", "20 km", "40 km", "80 km"};
-    const int kSizeWidths[] = {0, 256, 512, 1024, 2048, 4096};
+
+    const char* SortLabel(const std::string& property)
+    {
+      for (const VaultSortKey& key : kVaultSortKeys) {
+        if (property == key.property) {
+          return key.label;
+        }
+      }
+      return "Times played";
+    }
+
+    /** The sizes chosen, "10 km, 20 km", or `none`. */
+    std::string SizesText(const unsigned bits, const char* none)
+    {
+      std::string out;
+      for (int k = 0; k < 7; ++k) {
+        if ((bits & (1U << k)) != 0) {
+          out += (out.empty() ? "" : ", ") + std::string(kVaultSizeNames[k]);
+        }
+      }
+      return out.empty() ? std::string(none) : out;
+    }
+
+    std::filesystem::path SavedQueriesFile()
+    {
+      const char* const local = std::getenv("LOCALAPPDATA");
+      return local != nullptr ? std::filesystem::path(local) / "FAForever" / "Editor" / "vault_queries.txt" : std::filesystem::path("vault_queries.txt");
+    }
     const char* const kWhereNames[] = {"Everywhere", "The game's folder", "FAF's ProgramData folder", "Your vault", "Other folders"};
 
     std::string Lower(std::string text)
@@ -442,27 +468,219 @@ namespace faf::editor
 
   VaultQuery EdMapBrowser::Query() const
   {
-    VaultQuery query;
+    VaultQuery query = mFilters;
     query.text = mSearchedText;
-    query.sort = static_cast<VaultQuery::Sort>(std::clamp(mSortChoice, 0, 3));
-    query.minPlayers = kPlayersMin[std::clamp(mPlayersChoice, 0, 6)];
-    query.maxPlayers = kPlayersMax[std::clamp(mPlayersChoice, 0, 6)];
-    query.width = kSizeWidths[std::clamp(mSizeChoice, 0, 5)];
-    query.rankedOnly = mRankedOnly;
+    query.author = mAuthorText;
+    query.uploadedFrom = mFromText;
+    query.uploadedTo = mToText;
     return query;
   }
 
   void EdMapBrowser::SetFilters(const int sort, const int players, const int size, const bool ranked)
   {
-    mSortChoice = std::clamp(sort, 0, 3);
-    mPlayersChoice = std::clamp(players, 0, 6);
-    mSizeChoice = std::clamp(size, 0, 5);
-    mRankedOnly = ranked;
+    mFilters.sortProperty = kOldSorts[std::clamp(sort, 0, 3)];
+    mFilters.descending = std::clamp(sort, 0, 3) != 3;
+    mFilters.minPlayers = kPlayersMin[std::clamp(players, 0, 6)];
+    mFilters.maxPlayers = kPlayersMax[std::clamp(players, 0, 6)];
+    // Old sizes: any, 5, 10, 20, 40, 80 km (bits 2 to 6).
+    mFilters.widths = size <= 0 ? 0U : (1U << std::clamp(size + 1, 2, 6));
+    mFilters.rankedOnly = ranked;
+  }
+
+  void EdMapBrowser::ReadSavedQueries()
+  {
+    mSavedQueriesRead = true;
+    mSavedQueries.clear();
+    std::ifstream in(SavedQueriesFile());
+    std::string line;
+    while (std::getline(in, line)) {
+      // name, a tab, then the query's text.
+      const std::size_t tab = line.find('\t');
+      if (tab != std::string::npos && tab > 0) {
+        mSavedQueries.emplace_back(line.substr(0, tab), line.substr(tab + 1));
+      }
+    }
+  }
+
+  void EdMapBrowser::WriteSavedQueries() const
+  {
+    std::error_code ec;
+    std::filesystem::create_directories(SavedQueriesFile().parent_path(), ec);
+    std::ofstream out(SavedQueriesFile(), std::ios::trunc);
+    for (const auto& [name, text] : mSavedQueries) {
+      out << name << '\t' << text << '\n';
+    }
+  }
+
+  bool EdMapBrowser::DrawVaultFilters()
+  {
+    // The FAF client's map vault filters (MapVaultController): three rows as its search bar has them.
+    if (!mSavedQueriesRead) {
+      ReadSavedQueries();
+    }
+    bool changed = false;
+    const float field = std::max(ImGui::GetContentRegionAvail().x / 4.0f - ImGui::GetStyle().ItemSpacing.x, 120.0f);
+    const auto sizes = [&](const char* id, const char* label, unsigned& bits) {
+      ImGui::SetNextItemWidth(field);
+      if (ImGui::BeginCombo(id, (std::string(label) + ": " + SizesText(bits, "any")).c_str())) {
+        for (int k = 0; k < 7; ++k) {
+          bool on = (bits & (1U << k)) != 0;
+          if (ImGui::Checkbox(kVaultSizeNames[k], &on)) {
+            bits = on ? (bits | (1U << k)) : (bits & ~(1U << k));
+            changed = true;
+          }
+        }
+        ImGui::EndCombo();
+      }
+    };
+    // Row 1: author, uploaded from/to, width (the name is the search box above).
+    ImGui::SetNextItemWidth(field);
+    changed |= ImGui::InputTextWithHint("##author", "Author", mAuthorText, sizeof(mAuthorText), ImGuiInputTextFlags_EnterReturnsTrue);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(field);
+    const std::string uploaded = std::string("Uploaded: ") + (mFromText[0] ? mFromText : "any") + " to " + (mToText[0] ? mToText : "any");
+    if (ImGui::BeginCombo("##uploaded", uploaded.c_str())) {
+      ImGui::TextDisabled("Updated after and before (YYYY-MM-DD)");
+      ImGui::SetNextItemWidth(130.0f);
+      changed |= ImGui::InputTextWithHint("from", "2020-01-01", mFromText, sizeof(mFromText), ImGuiInputTextFlags_EnterReturnsTrue);
+      ImGui::SetNextItemWidth(130.0f);
+      changed |= ImGui::InputTextWithHint("to", "2026-12-31", mToText, sizeof(mToText), ImGuiInputTextFlags_EnterReturnsTrue);
+      if (ImGui::SmallButton("Any date")) {
+        mFromText[0] = '\0';
+        mToText[0] = '\0';
+        changed = true;
+      }
+      ImGui::EndCombo();
+    }
+    ImGui::SameLine();
+    sizes("##width", "Width", mFilters.widths);
+    // Row 2: height, max players, review score, only ranked.
+    sizes("##height", "Height", mFilters.heights);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(field);
+    const std::string players = "Max. players: " + (mFilters.minPlayers > 0 ? std::to_string(mFilters.minPlayers) : std::string("")) + " to " +
+                                (mFilters.maxPlayers > 0 && mFilters.maxPlayers < 16 ? std::to_string(mFilters.maxPlayers) : std::string(""));
+    if (ImGui::BeginCombo("##players", players.c_str())) {
+      changed |= ImGui::SliderInt("from##p", &mFilters.minPlayers, 0, 16, mFilters.minPlayers == 0 ? "any" : "%d");
+      int to = mFilters.maxPlayers == 0 ? 16 : mFilters.maxPlayers;
+      if (ImGui::SliderInt("to##p", &to, 0, 16, to >= 16 ? "any" : "%d")) {
+        mFilters.maxPlayers = to >= 16 ? 0 : to;
+        changed = true;
+      }
+      ImGui::EndCombo();
+    }
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(field);
+    char score[64];
+    (void)std::snprintf(score, sizeof(score), "Average reviews score: %s to %s", mFilters.minScore > 0.0f ? std::to_string(mFilters.minScore).substr(0, 3).c_str() : "",
+                        mFilters.maxScore < 5.0f ? std::to_string(mFilters.maxScore).substr(0, 3).c_str() : "");
+    if (ImGui::BeginCombo("##score", score)) {
+      changed |= ImGui::SliderFloat("from##s", &mFilters.minScore, 0.0f, 5.0f, mFilters.minScore <= 0.0f ? "any" : "%.1f");
+      changed |= ImGui::SliderFloat("to##s", &mFilters.maxScore, 0.0f, 5.0f, mFilters.maxScore >= 5.0f ? "any" : "%.1f");
+      ImGui::EndCombo();
+    }
+    ImGui::SameLine();
+    changed |= ImGui::Checkbox("Only ranked", &mFilters.rankedOnly);
+    // Row 3: reset, sort by and order, save query, favorites, display search query.
+    if (RoundButton("Reset")) {
+      const VaultQuery fresh;
+      mFilters = fresh;
+      mAuthorText[0] = mFromText[0] = mToText[0] = '\0';
+      mSearchText[0] = '\0';
+      changed = true;
+    }
+    ImGui::SameLine();
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("Sort by");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(150.0f);
+    if (ImGui::BeginCombo("##sortby", SortLabel(mFilters.sortProperty))) {
+      for (const VaultSortKey& key : kVaultSortKeys) {
+        if (ImGui::Selectable(key.label, mFilters.sortProperty == key.property)) {
+          mFilters.sortProperty = key.property;
+          changed = true;
+        }
+      }
+      ImGui::EndCombo();
+    }
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(120.0f);
+    int order = mFilters.descending ? 1 : 0;
+    static const char* const kOrders[] = {"ascending", "descending"};
+    if (ImGui::Combo("##order", &order, kOrders, 2)) {
+      mFilters.descending = order == 1;
+      changed = true;
+    }
+    ImGui::SameLine();
+    if (RoundButton("Save query")) {
+      ImGui::OpenPopup("##savequery");
+      mSaveQueryName[0] = '\0';
+    }
+    if (ImGui::BeginPopup("##savequery")) {
+      ImGui::SetNextItemWidth(220.0f);
+      const bool enter = ImGui::InputTextWithHint("##qname", "Name for this query", mSaveQueryName, sizeof(mSaveQueryName), ImGuiInputTextFlags_EnterReturnsTrue);
+      ImGui::SameLine();
+      if ((ImGui::Button("Save") || enter) && mSaveQueryName[0] != '\0') {
+        VaultQuery query = Query();
+        query.text = mSearchText;
+        std::string name = mSaveQueryName;
+        std::replace(name.begin(), name.end(), '\t', ' ');
+        mSavedQueries.erase(std::remove_if(mSavedQueries.begin(), mSavedQueries.end(), [&](const auto& q) { return q.first == name; }), mSavedQueries.end());
+        mSavedQueries.emplace_back(name, VaultQueryText(query));
+        WriteSavedQueries();
+        ImGui::CloseCurrentPopup();
+      }
+      ImGui::EndPopup();
+    }
+    ImGui::SameLine();
+    if (RoundButton("Favorites")) {
+      ImGui::OpenPopup("##favorites");
+    }
+    if (ImGui::BeginPopup("##favorites")) {
+      if (mSavedQueries.empty()) {
+        ImGui::TextDisabled("No saved queries yet: Save query keeps the filters under a name.");
+      }
+      for (std::size_t i = 0; i < mSavedQueries.size(); ++i) {
+        ImGui::PushID(static_cast<int>(i));
+        if (ImGui::Selectable(mSavedQueries[i].first.c_str(), false, ImGuiSelectableFlags_None, ImVec2(220.0f, 0.0f))) {
+          VaultQuery query;
+          if (VaultQueryFromText(mSavedQueries[i].second, query)) {
+            mFilters = query;
+            (void)std::snprintf(mSearchText, sizeof(mSearchText), "%s", query.text.c_str());
+            (void)std::snprintf(mAuthorText, sizeof(mAuthorText), "%s", query.author.c_str());
+            (void)std::snprintf(mFromText, sizeof(mFromText), "%s", query.uploadedFrom.c_str());
+            (void)std::snprintf(mToText, sizeof(mToText), "%s", query.uploadedTo.c_str());
+            changed = true;
+          }
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("x")) {
+          mSavedQueries.erase(mSavedQueries.begin() + static_cast<std::ptrdiff_t>(i));
+          WriteSavedQueries();
+          ImGui::PopID();
+          break;
+        }
+        ImGui::PopID();
+      }
+      ImGui::EndPopup();
+    }
+    ImGui::SameLine();
+    ImGui::Checkbox("Display search query", &mShowQuery);
+    if (mShowQuery) {
+      VaultQuery query = Query();
+      query.text = mSearchText;
+      std::string text = VaultQueryFilter(query) + "  (sort " + (query.descending ? "-" : "") + query.sortProperty + ")";
+      ImGui::SetNextItemWidth(-1.0f);
+      ImGui::InputText("##query", text.data(), text.size() + 1, ImGuiInputTextFlags_ReadOnly);
+    }
+    return changed;
   }
 
   void EdMapBrowser::AskSearch(const std::string& text)
   {
     mAskedSearch = text.empty() ? std::string(" ") : text;
+    (void)std::snprintf(mSearchText, sizeof(mSearchText), "%s", mAskedSearch == " " ? "" : mAskedSearch.c_str());
+    ShowVault();
   }
 
   std::uint64_t EdMapBrowser::VaultPicture(const std::string& url)
@@ -523,9 +741,8 @@ namespace faf::editor
     if (int pages = 0; mFaf.TakeResults(mFound, pages)) {
       mSearchPages = pages;
       mSearchedOnce = true;
-      gpg::Logf("editor: vault search \"%s\" (%s, %s, %s%s) page %d of %d: %zu maps%s%s", mSearchedText.c_str(), kSortNames[mSortChoice],
-                kPlayersNames[mPlayersChoice], kSizeNames[mSizeChoice], mRankedOnly ? ", ranked only" : "", mSearchPage, pages, mFound.size(),
-                mFaf.Message().empty() ? "" : "; ", mFaf.Message().c_str());
+      gpg::Logf("editor: vault search %s (sort %s%s) page %d of %d: %zu maps%s%s", VaultQueryFilter(Query()).c_str(), mFilters.descending ? "-" : "",
+                mFilters.sortProperty.c_str(), mSearchPage, pages, mFound.size(), mFaf.Message().empty() ? "" : "; ", mFaf.Message().c_str());
       for (std::size_t i = 0; i < mFound.size() && i < 5; ++i) {
         gpg::Logf("editor:   %s (%s), %d players, %d x %d, v%s, %d games%s", mFound[i].name.c_str(), mFound[i].folder.c_str(),
                   mFound[i].players, mFound[i].width, mFound[i].height, mFound[i].version.c_str(), mFound[i].gamesPlayed,
@@ -785,6 +1002,10 @@ namespace faf::editor
         }
         EndCard();
       }
+      // The search's filters, to set up before signing in (the search itself needs the sign-in).
+      ImGui::Spacing();
+      ImGui::SeparatorText("Search filters (searching needs the sign-in)");
+      (void)DrawVaultFilters();
       DrawVaultByName();
       return;
     }
@@ -926,44 +1147,9 @@ namespace faf::editor
     ImGui::EndDisabled();
     ImGui::PopStyleVar(2);
 
-    // Order and filters: a change searches again from the first page.
+    // The filters and order (the FAF client's): a change searches again from the first page.
     {
-      bool changed = false;
-      const auto combo = [&](const char* const id, int& choice, const char* const* names, const int count) {
-        float widest = 0.0f;
-        for (int i = 0; i < count; ++i) {
-          widest = std::max(widest, ImGui::CalcTextSize(names[i]).x);
-        }
-        ImGui::SetNextItemWidth(widest + ImGui::GetFrameHeight() * 1.8f);
-        if (ImGui::BeginCombo(id, names[choice])) {
-          for (int i = 0; i < count; ++i) {
-            if (ImGui::Selectable(names[i], i == choice) && i != choice) {
-              choice = i;
-              changed = true;
-            }
-          }
-          ImGui::EndCombo();
-        }
-        ImGui::SameLine();
-      };
-      ImGui::AlignTextToFramePadding();
-      ImGui::TextDisabled("Sort");
-      ImGui::SameLine();
-      combo("##sort", mSortChoice, kSortNames, 4);
-      ImGui::TextDisabled("Show");
-      ImGui::SameLine();
-      combo("##players", mPlayersChoice, kPlayersNames, 7);
-      combo("##size", mSizeChoice, kSizeNames, 6);
-      changed = ImGui::Checkbox("Ranked only", &mRankedOnly) || changed;
-      if (mPlayersChoice != 0 || mSizeChoice != 0 || mRankedOnly) {
-        ImGui::SameLine();
-        if (RoundButton("Clear filters")) {
-          mPlayersChoice = 0;
-          mSizeChoice = 0;
-          mRankedOnly = false;
-          changed = true;
-        }
-      }
+      const bool changed = DrawVaultFilters();
       if (changed && !mFaf.Searching()) {
         mSearchedText = mSearchText;
         mSearchPage = 1;
@@ -981,7 +1167,7 @@ namespace faf::editor
     } else if (mSearchedOnce) {
       const float lineRight = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
       ImGui::AlignTextToFramePadding();
-      ImGui::TextDisabled("%s", mFound.empty() ? "No maps match" : (std::string(kSortNames[mSortChoice]) + " first").c_str());
+      ImGui::TextDisabled("%s", mFound.empty() ? "No maps match" : (std::string("By ") + SortLabel(mFilters.sortProperty) + (mFilters.descending ? ", most first" : ", least first")).c_str());
       if (mSearchPages > 1) {
         char page[32];
         (void)std::snprintf(page, sizeof(page), "Page %d of %d", mSearchPage, mSearchPages);
