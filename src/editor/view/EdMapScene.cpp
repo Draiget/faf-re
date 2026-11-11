@@ -903,6 +903,7 @@ namespace faf::editor
     }
     mOverPlay = false;
     mSessionMap = nullptr;
+    mDocument.SetLiveMap(nullptr);
     mWorldView.reset();
     // ~CameraImpl takes the camera out of the camera manager (as RenderPreviewImage relies on).
     delete mCamera;
@@ -1076,6 +1077,13 @@ namespace faf::editor
     set(SlotMaterial(strata, slot, true), normals, normalsSize);
     // Loads what has no texture yet and scales every layer to the map (StratumMaterial::SetSizeTo).
     strata.SetSizeTo(mMap->mTerrainRes);
+    // In front of a play: its terrain's layer the same (WPE.41).
+    if (mOverPlay && mSessionMap != nullptr && mSessionMap->mTerrainRes != nullptr) {
+      moho::StratumMaterial& live = mSessionMap->mTerrainRes->GetStratumMaterial();
+      set(SlotMaterial(live, slot, false), albedo, albedoSize);
+      set(SlotMaterial(live, slot, true), normals, normalsSize);
+      live.SetSizeTo(mSessionMap->mTerrainRes);
+    }
     mDocument.SetLayerFact(slot, albedo);
     mDocument.SetModified(true);
   }
@@ -1331,6 +1339,19 @@ namespace faf::editor
       return;
     }
     mMaskPlane.resize(masks.texels.size());
+    // In front of a play whose masks are the same size (the play was loaded from this map's files): the same rows into
+    // its terrain (WPE.41).
+    moho::IWldTerrainRes* live = nullptr;
+    if (mOverPlay && mSessionMap != nullptr && mSessionMap->mTerrainRes != nullptr) {
+      const moho::StratumMaterial& strata = mSessionMap->mTerrainRes->GetStratumMaterial();
+      if (strata.mStratumMaskWidth == static_cast<std::uint32_t>(masks.width) && strata.mStratumMaskHeight == static_cast<std::uint32_t>(masks.height)) {
+        live = mSessionMap->mTerrainRes;
+      } else if (!mLiveMaskSizeWarned) {
+        mLiveMaskSizeWarned = true;
+        gpg::Warnf("editor: the play's masks are %ux%u, the map's %dx%d: mask edits stay in the editor", strata.mStratumMaskWidth,
+                   strata.mStratumMaskHeight, masks.width, masks.height);
+      }
+    }
     for (int layer = 0; layer < 8; ++layer) {
       if ((layers & (1u << layer)) == 0) {
         continue;
@@ -1343,6 +1364,9 @@ namespace faf::editor
           }
         }
         mMap->mTerrainRes->UpdateStratumMask(layer, mMaskPlane.data(), rect.x0, rect.z0, rect.x1 + 1, rect.z1 + 1);
+        if (live != nullptr) {
+          live->UpdateStratumMask(layer, mMaskPlane.data(), rect.x0, rect.z0, rect.x1 + 1, rect.z1 + 1);
+        }
       }
     }
   }
@@ -1837,6 +1861,48 @@ namespace faf::editor
     return true;
   }
 
+  void EdMapScene::TestLiveMask(const float x, const float z)
+  {
+    moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr) {
+      return;
+    }
+    EdDocument::MaskGrid& masks = mDocument.Masks();
+    if (masks.texels.empty()) {
+      LoadMasks();
+    }
+    if (masks.texels.empty()) {
+      gpg::Warnf("editor: mask test: the map has no masks");
+      return;
+    }
+    const float perSample = static_cast<float>(masks.width) / static_cast<float>(field->width - 1);
+    const int cx = std::clamp(static_cast<int>(x * perSample), 12, masks.width - 13);
+    const int cz = std::clamp(static_cast<int>(z * perSample), 12, masks.height - 13);
+    const SampleRect rect{cx - 12, cz - 12, cx + 12, cz + 12};
+    constexpr int kLayer = 3; // stratum 4
+    const auto read = [&](moho::IWldTerrainRes& terrain) {
+      const moho::StratumMaterial& strata = terrain.GetStratumMaterial();
+      std::vector<std::uint8_t> plane(static_cast<std::size_t>(strata.mStratumMaskWidth) * strata.mStratumMaskHeight);
+      if (plane.empty() || strata.mStratumMaskWidth != static_cast<std::uint32_t>(masks.width)) {
+        return -1;
+      }
+      terrain.GetStratumMask(kLayer, plane.data());
+      return static_cast<int>(plane[static_cast<std::size_t>(cz) * static_cast<std::size_t>(masks.width) + static_cast<std::size_t>(cx)]);
+    };
+    const bool live = mOverPlay && mSessionMap != nullptr && mSessionMap->mTerrainRes != nullptr;
+    const int playBefore = live ? read(*mSessionMap->mTerrainRes) : -2;
+    for (int tz = rect.z0; tz <= rect.z1; ++tz) {
+      for (int tx = rect.x0; tx <= rect.x1; ++tx) {
+        std::uint64_t& texel = masks.texels[static_cast<std::size_t>(tz) * static_cast<std::size_t>(masks.width) + static_cast<std::size_t>(tx)];
+        texel = WithMaskByte(texel, kLayer, 255);
+      }
+    }
+    mDocument.SetModified(true);
+    UploadMasks({rect}, 1u << kLayer);
+    gpg::Logf("editor: mask test: stratum 4 at texel %d,%d: the editor's %d, the play's %d -> %d", cx, cz, read(*mMap->mTerrainRes), playBefore,
+              live ? read(*mSessionMap->mTerrainRes) : -2);
+  }
+
   void EdMapScene::RefreshHeights(const std::vector<SampleRect>& rects)
   {
     mWeightStale = true; // the overlays lie on the ground
@@ -1888,6 +1954,8 @@ namespace faf::editor
       Attach(*wanted);
       if (mMap != nullptr && !playIdle) {
         mSessionMap = sessionMap;
+        mDocument.SetLiveMap(sessionMap);
+        mLiveMaskSizeWarned = false;
         mOverPlay = true;
         mUiWas = moho::ren_Ui;
         moho::ren_Ui = false;
@@ -1902,6 +1970,7 @@ namespace faf::editor
     if (mOverPlay && playIdle) {
       mOverPlay = false;
       mSessionMap = nullptr;
+      mDocument.SetLiveMap(nullptr);
       moho::gViewportOnlyView = nullptr;
       moho::ren_Ui = mUiWas;
       moho::REN_SetWldMap(mMap);

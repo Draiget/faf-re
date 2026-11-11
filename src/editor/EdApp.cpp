@@ -34,6 +34,8 @@
 #include "moho/render/AmbientOcclusionRenderer.h"
 #include <cstring>
 #include "editor/doc/EdDocument.h"
+#include "moho/sim/CWldMap.h"
+#include "moho/sim/STIMap.h"
 #include "editor/doc/EdRoundTrip.h"
 #include "editor/doc/EdUnitWrecks.h"
 #include "editor/ui/EdImGuiRenderer.h"
@@ -1366,6 +1368,54 @@ namespace faf::editor
               stepAt = now + 2.0;
             } else if (step == 2 && now >= stepAt) {
               (void)logInfo("after");
+              step = 3;
+            }
+          }
+          // `/playlooktest` (test runs, with /playeditorview): in the editor's view, the sun's colour made red, the water
+          // raised 6 and stratum 4 painted beside the first commander; each read back from the play's map, and the water
+          // from its sim (WPE.41).
+          if (moho::CFG_GetArgOption("/playlooktest", 0, nullptr) && mScene.OverPlay() && mScene.SessionMap() != nullptr) {
+            static int step = 0;
+            static double stepAt = 0.0;
+            static std::uint32_t unitId = 0;
+            static float x = 0.0f;
+            static float z = 0.0f;
+            moho::IWldTerrainRes* const play = mScene.SessionMap()->mTerrainRes;
+            if (step == 0) {
+              for (const LiveUnit& u : mScene.LiveNow()) {
+                if (u.blueprint.find("0001") != std::string::npos && step == 0) {
+                  unitId = u.id;
+                  x = u.x + 30.0f;
+                  z = u.z;
+                  step = 1;
+                  stepAt = now + 1.0;
+                }
+              }
+            } else if (step == 1 && now >= stepAt && play != nullptr) {
+              const Wm3::Vector3f sunBefore = play->GetSunColor();
+              LightingState lighting = mDocument.LightingNow();
+              lighting.sunColor[0] = 2.0f;
+              lighting.sunColor[1] = 0.4f;
+              lighting.sunColor[2] = 0.3f;
+              mDocument.ApplyLighting(lighting);
+              const Wm3::Vector3f sun = play->GetSunColor();
+              gpg::Logf("editor: look test: the play's sun colour %.2f,%.2f,%.2f -> %.2f,%.2f,%.2f", static_cast<double>(sunBefore.x),
+                        static_cast<double>(sunBefore.y), static_cast<double>(sunBefore.z), static_cast<double>(sun.x), static_cast<double>(sun.y),
+                        static_cast<double>(sun.z));
+              const float levelBefore = play->mMap != nullptr ? play->mMap->mWaterElevation : 0.0f;
+              WaterState water = mDocument.WaterNow();
+              water.elevation += 6.0f;
+              water.deep += 6.0f;
+              water.abyss += 6.0f;
+              mDocument.ApplyWater(water);
+              gpg::Logf("editor: look test: the play's drawn water level %.2f -> %.2f", static_cast<double>(levelBefore),
+                        static_cast<double>(play->mMap != nullptr ? play->mMap->mWaterElevation : 0.0f));
+              mScene.TestLiveMask(x, z);
+              step = 2;
+              stepAt = now + 2.0;
+            } else if (step == 2 && now >= stepAt) {
+              // A point of open water on Seton's Clutch: the surface there is the water's level.
+              LiveUnitDo(unitId, "LOG('editor: look test: the sim surface at 150,150 ' .. GetSurfaceHeight(150, 150) .. ', ground ' .. GetTerrainHeight(150, 150))");
               step = 3;
             }
           }

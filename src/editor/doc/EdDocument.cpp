@@ -1,6 +1,7 @@
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdRecentMaps.h"
 #include "editor/doc/EdAdaptiveTables.h"
+#include "editor/view/EdLiveTerrain.h"
 
 #include <algorithm>
 #include <atomic>
@@ -1138,7 +1139,16 @@ namespace faf::editor
     if (mMap == nullptr || mMap->mTerrainRes == nullptr) {
       return;
     }
-    moho::IWldTerrainRes& terrain = *mMap->mTerrainRes;
+    LightingInto(*mMap->mTerrainRes, lighting);
+    // In front of a play: its map takes the same (WPE.41).
+    if (mLiveMap != nullptr && mLiveMap->mTerrainRes != nullptr) {
+      LightingInto(*mLiveMap->mTerrainRes, lighting);
+    }
+    mModified = true;
+  }
+
+  void EdDocument::LightingInto(moho::IWldTerrainRes& terrain, const LightingState& lighting)
+  {
     const auto vec = [](const float (&v)[3]) { return Wm3::Vector3f(v[0], v[1], v[2]); };
     terrain.SetLightingMultiplier(lighting.multiplier);
     terrain.SetSunDirection(vec(lighting.sunDirection));
@@ -1159,7 +1169,6 @@ namespace faf::editor
     fog.mMaxClamp = lighting.fogStart;
     fog.mCurveExponent = lighting.fogEnd;
     terrain.SetFogInfo(fog);
-    mModified = true;
   }
 
   void EdDocument::LightingEdited(LightingState before)
@@ -1200,8 +1209,25 @@ namespace faf::editor
     if (mMap == nullptr || mMap->mTerrainRes == nullptr || mMap->mTerrainRes->mMap == nullptr) {
       return;
     }
-    moho::IWldTerrainRes* const terrain = mMap->mTerrainRes;
-    const WaterState now = WaterNow();
+    WaterInto(*mMap->mTerrainRes, water, true);
+    // In front of a play: its map's water the same, and its sim's levels at its next beat (WPE.41).
+    if (mLiveMap != nullptr && mLiveMap->mTerrainRes != nullptr && mLiveMap->mTerrainRes->mMap != nullptr) {
+      WaterInto(*mLiveMap->mTerrainRes, water, false);
+      LiveWaterLevels(water.enabled, water.elevation, water.deep, water.abyss);
+    }
+    mFacts.water = water.enabled;
+    mFacts.waterElevation = water.elevation;
+    mFacts.waterDeep = water.deep;
+    mFacts.waterAbyss = water.abyss;
+    mModified = true;
+  }
+
+  void EdDocument::WaterInto(moho::IWldTerrainRes& terrainRes, const WaterState& water, const bool warnTextures)
+  {
+    moho::IWldTerrainRes* const terrain = &terrainRes;
+    const moho::STIMap& map = *terrain->mMap;
+    const bool levelsChanged = (map.mWaterEnabled != 0u) != water.enabled || map.mWaterElevation != water.elevation ||
+                               map.mWaterElevationDeep != water.deep || map.mWaterElevationAbyss != water.abyss;
     terrain->WaterEnabled(water.enabled);
     terrain->SetWaterElevation(water.elevation);
     terrain->SetWaterElevationDeep(water.deep);
@@ -1217,7 +1243,7 @@ namespace faf::editor
         if (water.textures[i] != paths[i]->c_str()) {
           paths[i]->assign(water.textures[i].c_str());
           texturesChanged = true;
-          if (std::string probe; !water.textures[i].empty() && !ReadGameFile(water.textures[i], probe)) {
+          if (std::string probe; warnTextures && !water.textures[i].empty() && !ReadGameFile(water.textures[i], probe)) {
             gpg::Warnf("editor: water texture %s isn't in the game's files; the game draws a stand-in", water.textures[i].c_str());
           }
         }
@@ -1227,14 +1253,9 @@ namespace faf::editor
       }
     }
     // The water map (depth below the sea, for the shore and the water's colour) follows the levels.
-    if (now.enabled != water.enabled || now.elevation != water.elevation || now.deep != water.deep || now.abyss != water.abyss) {
+    if (levelsChanged) {
       terrain->UpdateWaterMap();
     }
-    mFacts.water = water.enabled;
-    mFacts.waterElevation = water.elevation;
-    mFacts.waterDeep = water.deep;
-    mFacts.waterAbyss = water.abyss;
-    mModified = true;
   }
 
   void EdDocument::WaterEdited(WaterState before)

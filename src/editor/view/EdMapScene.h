@@ -68,11 +68,18 @@ namespace faf::editor
     void Update(float frameSeconds, bool playIdle, bool editorViewInPlay = false);
     /** The editor's view is in front of a running play (the session's views and interface wait). */
     [[nodiscard]] bool OverPlay() const noexcept { return mOverPlay; }
+    /** In front of a play: the play's own map (the session's); null otherwise. */
+    [[nodiscard]] moho::CWldMap* SessionMap() const noexcept { return mOverPlay ? mSessionMap : nullptr; }
     /** In front of a play: its units now, and the ones selected (test runs select some). */
     [[nodiscard]] const std::vector<LiveUnit>& LiveNow() const noexcept { return mLiveNow; }
     void SelectLive(std::vector<std::uint32_t> ids) { mLiveSelection = std::move(ids); }
     /** Test runs: a raise of `seconds` at world x,z, as a stroke would make it (undo kept); false if nothing changed. */
     bool TestRaise(float x, float z, float seconds);
+    /**
+     * Test runs: stratum 4 painted full in a square of 24 mask texels around world x,z, as the mask brush uploads it, then
+     * the editor's and (in front of a play) the play's mask read back at its middle, logged.
+     */
+    void TestLiveMask(float x, float z);
 
     /** Leaves the viewport (the document is about to drop its map). */
     void Detach();
@@ -507,6 +514,7 @@ namespace faf::editor
   private:
     std::string mTestHover;
     bool mOverPlay = false;
+    bool mLiveMaskSizeWarned = false;
     moho::CWldMap* mSessionMap = nullptr;
     bool mUiWas = true;
     /** In front of a play: its units now, the ones selected (entity ids), and a drag of them (ground from / to). */

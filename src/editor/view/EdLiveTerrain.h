@@ -28,6 +28,11 @@ namespace faf::editor
   void LiveHeights(moho::CWldMap& sessionMap, const moho::CHeightField& edited, const std::vector<HeightRect>& rects);
   /** No play: what is still queued is dropped and the sim hook taken away (a next play starts from its own files). */
   void DropLiveHeights();
+  /**
+   * Water levels changed in the editor's view in front of a play: the sim's copy of them set at the start of its next
+   * beat (WPE.41; the play's drawn water is set by the caller). What floats and what is under water follows them.
+   */
+  void LiveWaterLevels(bool enabled, float elevation, float deep, float abyss);
   /** Test runs (`/playnoreseat`): the play's units left where they were on changed ground, to compare against. */
   void SetLiveHeightsNoReseat(bool off) noexcept;
 } // namespace faf::editor

@@ -34,8 +34,54 @@ namespace faf::editor
     std::vector<Patch> gQueue;
     bool gNoReseat = false;
 
-    /** On the sim's thread, at a beat's start: the queued heights into the sim's height field. */
+    /** Water levels for the sim, waiting for its next beat. */
+    struct WaterLevels
+    {
+      bool pending = false;
+      bool enabled = false;
+      float elevation = 0.0f;
+      float deep = 0.0f;
+      float abyss = 0.0f;
+    };
+    WaterLevels gWater;
+
+    /** On the sim's thread: the queued water levels into the sim's map. */
+    void ApplyWater(moho::Sim& sim)
+    {
+      WaterLevels water;
+      {
+        const std::lock_guard<std::mutex> lock(gMutex);
+        if (!gWater.pending) {
+          return;
+        }
+        water = gWater;
+        gWater.pending = false;
+      }
+      if (sim.mMapData == nullptr) {
+        return;
+      }
+      moho::STIMap& map = *sim.mMapData;
+      const float before = map.mWaterElevation;
+      map.mWaterEnabled = static_cast<std::uint8_t>(water.enabled ? 1 : 0);
+      map.mWaterElevation = water.elevation;
+      map.mWaterElevationDeep = water.deep;
+      map.mWaterElevationAbyss = water.abyss;
+      gpg::Logf("editor: water into the play's sim: %s, level %.2f -> %.2f (deep %.2f, abyss %.2f)", water.enabled ? "on" : "off",
+                static_cast<double>(before), static_cast<double>(water.elevation), static_cast<double>(water.deep),
+                static_cast<double>(water.abyss));
+    }
+
+    void ApplyHeights(moho::Sim& sim);
+
+    /** The beat hook: whatever the editor queued for the play. */
     void ApplyQueued(moho::Sim& sim)
+    {
+      ApplyWater(sim);
+      ApplyHeights(sim);
+    }
+
+    /** On the sim's thread, at a beat's start: the queued heights into the sim's height field. */
+    void ApplyHeights(moho::Sim& sim)
     {
       std::vector<Patch> patches;
       {
@@ -143,6 +189,19 @@ namespace faf::editor
     moho::gSimBeforeBeat = &ApplyQueued;
   }
 
+  void LiveWaterLevels(const bool enabled, const float elevation, const float deep, const float abyss)
+  {
+    {
+      const std::lock_guard<std::mutex> lock(gMutex);
+      gWater.pending = true;
+      gWater.enabled = enabled;
+      gWater.elevation = elevation;
+      gWater.deep = deep;
+      gWater.abyss = abyss;
+    }
+    moho::gSimBeforeBeat = &ApplyQueued;
+  }
+
   void SetLiveHeightsNoReseat(const bool off) noexcept
   {
     gNoReseat = off;
@@ -156,5 +215,6 @@ namespace faf::editor
     moho::gSimBeforeBeat = nullptr;
     const std::lock_guard<std::mutex> lock(gMutex);
     gQueue.clear();
+    gWater.pending = false;
   }
 } // namespace faf::editor

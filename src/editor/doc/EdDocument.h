@@ -32,6 +32,7 @@ namespace LuaPlus
 namespace moho
 {
   class CWldMap;
+  class IWldTerrainRes;
 } // namespace moho
 
 namespace faf::editor
@@ -259,6 +260,11 @@ namespace faf::editor
     [[nodiscard]] WaterState WaterNow() const;
     /** Puts a water state on the map at once (no undo step: a drag applies it many times, then WaterEdited records it). */
     void ApplyWater(const WaterState& water);
+    /**
+     * While the editor's view is in front of a play: that play's map (the session's), which lighting and water edits
+     * go into as well (WPE.41); null otherwise.
+     */
+    void SetLiveMap(moho::CWldMap* map) noexcept { mLiveMap = map; }
     /** A water edit ended: its before and the water now become the newest undo step. */
     void WaterEdited(WaterState before);
     [[nodiscard]] std::vector<std::pair<WaterState, WaterState>>& WaterUndo() noexcept { return mWaterUndo; }
@@ -419,6 +425,10 @@ namespace faf::editor
     std::string mCreatedScenario;
 
     State mState = State::Empty;
+    moho::CWldMap* mLiveMap = nullptr;
+    /** The lighting / water written into one map's terrain (the document's, or a play's). */
+    static void LightingInto(moho::IWldTerrainRes& terrain, const LightingState& lighting);
+    static void WaterInto(moho::IWldTerrainRes& terrain, const WaterState& water, bool warnTextures);
     std::string mPath;
     MapFacts mFacts;
     std::string mError;
