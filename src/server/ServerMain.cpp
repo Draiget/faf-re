@@ -107,7 +107,7 @@ namespace
   constexpr const char* kServerName = "server";
 
   constexpr const char* kUsage =
-    "usage: server --match <file.lua> --out <dir> /init <init.lua> | --data <dir> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
+    "usage: server --match <file.lua> --out <dir> /init <init.lua> | --data <dir> [--cpus <list>] [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
     "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view observe|disconnect] [--lobby-seconds <n> [--start-when-ready <seconds>]] [--lobby-away-seconds <n>] [--stats-every <beats>] [--pose-budget-kbps <n>] [--congestion-control] [--nftables-out <file> [--nftables-only] [--unlisted-pps <n>] [--unlisted-total-pps <n>]] [--unvalidated-policy] "
     "[--control <ip:port> --control-key <file>] [--rest <ip:port> --rest-token-file <file> [--rest-cors-origin <origin>]] "
     "[--checksum-period <beats>] [--digests <file>] [--state-digests <file>]\n";
@@ -2739,6 +2739,24 @@ int main(int, char**)
     sArgv.push_back(nullptr);
     __argv = sArgv.data();
     __argc = static_cast<int>(sArgv.size()) - 1;
+  }
+  // Plan WP17.13: a server started on chosen CPUs (server-host pins each lobby's process before it starts, or
+  // `--cpus`) keeps them. Without the lock FAF's init script moves the process onto its own CPU range through
+  // `SetProcessAffinityMask` (2-23 on fw0); headless locks the same way (`--cpus`).
+  {
+    std::string cpuList;
+    if (ReadOption("--cpus", cpuList) && !moho::AssignProcessCpus(cpuList.c_str())) {
+      std::printf("--cpus %s: not CPUs this process may run on\n", cpuList.c_str());
+      return kExitBadInput;
+    }
+    moho::LockAssignedProcessCpus();
+    if (moho::ProcessCpusAreLocked()) {
+      DWORD_PTR processMask = 0;
+      DWORD_PTR systemMask = 0;
+      (void)::GetProcessAffinityMask(::GetCurrentProcess(), &processMask, &systemMask);
+      std::printf("CPUs: mask %llx of %llx, kept (scripts can't change it)\n", static_cast<unsigned long long>(processMask),
+        static_cast<unsigned long long>(systemMask));
+    }
   }
   std::error_code directoryError;
   std::filesystem::create_directories(outDir, directoryError);
