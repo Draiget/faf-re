@@ -43,11 +43,18 @@ namespace
 
     // Unknown value type: account this build's size and say so once, so a
     // FAF_LUAGC_LOG comparison that drifts points at the missing entry.
-    static std::mutex reportedLock;
-    static std::set<std::string> reported;
+    // Never destroyed: a Lua state that outlives this set (one destroyed at
+    // exit, after the set, since the set is made on first use mid-game)
+    // still frees its userdata through here.
+    struct ReportedTypes
     {
-      const std::lock_guard<std::mutex> lock(reportedLock);
-      if (reported.insert(name != nullptr ? name : "<unnamed>").second) {
+      std::mutex lock;
+      std::set<std::string> names;
+    };
+    static ReportedTypes* const reported = new ReportedTypes();
+    {
+      const std::lock_guard<std::mutex> lock(reported->lock);
+      if (reported->names.insert(name != nullptr ? name : "<unnamed>").second) {
         gpg::Warnf(
           "[LUAGC] userdata payload %s has no x86 size entry; accounting its %d-byte native size",
           name != nullptr ? name : "<unnamed>", type->size_
