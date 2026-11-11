@@ -16,6 +16,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <csignal>
 #include <cstdarg>
 #include <cstdio>
@@ -873,7 +874,82 @@ namespace
     std::string stoppedBy;
     std::string error;
     std::vector<SMatchPlayer> players;
+    std::string stats; // plan WP15.2: the sim's `Sync.StatsToSend` (score.lua's ArmyScore) as JSON, empty before it
   };
+
+  /**
+   * Plan WP15.2: a Lua value as JSON, as FAF's UserSync.lua encodes `Sync.StatsToSend` for `JsonStats` (dkson): a
+   * table whose keys are 1..n is an array, any other an object with its keys as strings; a number that isn't finite,
+   * a function or anything else is null. At most 32 tables deep.
+   */
+  void LuaToJson(const LuaPlus::LuaObject& value, std::string& out, const int depth = 0)
+  {
+    if (value.IsBoolean()) {
+      out += value.GetBoolean() ? "true" : "false";
+    } else if (value.IsNumber()) {
+      const double number = value.GetNumber();
+      if (!std::isfinite(number)) {
+        out += "null";
+      } else if (number == std::floor(number) && std::fabs(number) < 1e15) {
+        out += std::to_string(static_cast<long long>(number));
+      } else {
+        char text[32];
+        std::snprintf(text, sizeof(text), "%.14g", number); // Lua's own number format (LUA_NUMBER_FMT), as the UI's JSON has it
+        out += text;
+      }
+    } else if (value.IsString()) {
+      out += faf::server::JsonString(value.GetString());
+    } else if (value.IsTable() && depth < 32) {
+      LuaPlus::LuaObject table = value;
+      std::size_t count = 0;
+      bool sequence = true;
+      {
+        LuaPlus::LuaTableIterator scan(&table, 1);
+        while (!scan.m_isDone) {
+          ++count;
+          const LuaPlus::LuaObject key = scan.GetKey();
+          sequence = sequence && key.IsNumber() && key.GetNumber() >= 1.0 && key.GetNumber() == std::floor(key.GetNumber());
+          scan.Next();
+        }
+      }
+      for (std::size_t index = 1; sequence && index <= count; ++index) {
+        sequence = !table[static_cast<int>(index)].IsNil();
+      }
+      if (sequence) {
+        out += '[';
+        for (std::size_t index = 1; index <= count; ++index) {
+          out += index == 1 ? "" : ",";
+          LuaToJson(table[static_cast<int>(index)], out, depth + 1);
+        }
+        out += ']';
+        return;
+      }
+      LuaPlus::LuaTableIterator it(&table, 1);
+      out += '{';
+      bool first = true;
+      while (!it.m_isDone) {
+        const LuaPlus::LuaObject key = it.GetKey();
+        std::string name;
+        if (key.IsString()) {
+          name = key.GetString();
+        } else if (key.IsNumber()) {
+          LuaToJson(key, name, depth + 1);
+        } else {
+          it.Next();
+          continue;
+        }
+        out += first ? "" : ",";
+        first = false;
+        out += faf::server::JsonString(name);
+        out += ':';
+        LuaToJson(it.GetValue(), out, depth + 1);
+        it.Next();
+      }
+      out += '}';
+    } else {
+      out += "null";
+    }
+  }
 
   void WriteResult(const std::string& path, const SMatchEnd& end)
   {
@@ -886,7 +962,7 @@ namespace
       file << (index == 0 ? "" : ", ") << "{\"army\": " << index + 1 << ", \"name\": \"" << JsonText(player.name) << "\", \"team\": " << player.team
            << ", \"human\": " << (player.human ? "true" : "false") << ", \"result\": \"" << JsonText(player.result) << "\"}";
     }
-    file << "]}\n";
+    file << "], \"stats\": " << (end.stats.empty() ? std::string("null") : end.stats) << "}\n";
   }
 
   /** `Sync.GameResult` (`SimSyncUtils.SyncGameResult`): a list of `{ army index, "victory 10" }`. */
@@ -2370,10 +2446,28 @@ namespace
         }
 
         LuaPlus::LuaObject sync;
-        if (faf::headless::ReadSyncNaming(*packet, state, {"GameResult", "GameEnded"}, sync)) {
+        if (faf::headless::ReadSyncNaming(*packet, state, {"GameResult", "GameEnded", "StatsToSend"}, sync)) {
+          // Plan WP15.2: the server reports the game's army stats itself, as each player's UI would (UserSync.lua
+          // encodes `Sync.StatsToSend` for `GpgNetSend('JsonStats', ...)`): into result.json and as a control event.
+          if (LuaPlus::LuaObject stats = sync["StatsToSend"]; stats.IsTable()) {
+            end.stats.clear();
+            LuaToJson(stats, end.stats);
+            Say("Army stats: %zu bytes of JSON", end.stats.size());
+            controlEvent("stats", "\"stats\":" + end.stats);
+          }
           LuaPlus::LuaObject results = sync["GameResult"];
           if (results.IsTable()) {
+            const std::vector<SMatchPlayer> before = end.players;
             ReadGameResults(results, end.players);
+            // Plan WP15.2: each army's result as data, once it has one or it changes.
+            for (std::size_t army = 0; army < end.players.size(); ++army) {
+              if (army < before.size() && before[army].result != end.players[army].result && !end.players[army].result.empty()) {
+                controlEvent(
+                  "result", "\"army\":" + std::to_string(army + 1) + ",\"name\":" + faf::server::JsonString(end.players[army].name)
+                              + ",\"result\":" + faf::server::JsonString(end.players[army].result)
+                );
+              }
+            }
             // Plan WP11.1: with `DefeatedPlayerView = "observe"`, a defeated player may focus on any army (the original
             // client's `SetFocusArmy(-1)` on defeat); they see only what their view (WP13.6) was sent.
             for (std::size_t army = 0; net && !disconnectDefeated && army < end.players.size(); ++army) {
