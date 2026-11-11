@@ -197,6 +197,189 @@ namespace
     return field;
   }
 
+  TEST(HeightBrush, ErodeSlumpsAPillarWithoutMakingGround)
+  {
+    // A 2 x 2 pillar 2000 words (about 16 units) over flat ground at 1000, well inside the brush.
+    Field field(33, 33, 1000);
+    for (int z = 15; z <= 16; ++z) {
+      for (int x = 15; x <= 16; ++x) {
+        field.words[static_cast<std::size_t>(z) * 33 + static_cast<std::size_t>(x)] = 3000;
+      }
+    }
+    const auto total = [&field] {
+      long long sum = 0;
+      for (const std::uint16_t w : field.words) {
+        sum += w;
+      }
+      return sum;
+    };
+    const long long before = total();
+    HeightBrush brush;
+    brush.mode = HeightBrushMode::Erode;
+    brush.erodeTalus = 0.6f; // 76.8 words a sample
+    brush.strength = 1.0f;
+    brush.falloff = 0.0f;
+    brush.radius = 12.0f;
+    for (int step = 0; step < 600; ++step) {
+      (void)ApplyHeightBrush(field.words.data(), 33, 33, 15.5f, 15.5f, brush, 0.1f);
+    }
+    // The pillar has slumped into a mound...
+    EXPECT_LT(field.At(15, 15), 1600);
+    EXPECT_GT(field.At(15, 15), field.At(10, 15));
+    // ...whose slopes are near the talus slope (a few words over, from rounding and the last steps)...
+    int steepest = 0;
+    for (int z = 5; z <= 26; ++z) {
+      for (int x = 5; x <= 25; ++x) {
+        steepest = std::max(steepest, std::abs(static_cast<int>(field.At(x + 1, z)) - static_cast<int>(field.At(x, z))));
+      }
+    }
+    EXPECT_LT(steepest, 77 + 20);
+    // ...and the ground was moved, not made: the total is the same but for rounding.
+    EXPECT_NEAR(static_cast<double>(total()), static_cast<double>(before), static_cast<double>(before) * 0.0005);
+  }
+
+  TEST(HeightBrush, ErodeWorksAtTheEditorsFrameRate)
+  {
+    // As the editor paints: a step a frame at 60 fps, strength 0.5, for three seconds, on a ridge only a little steeper
+    // than the talus (96 words a sample against 76.8). Each frame's change there is about a word; scaled like the other
+    // brushes' blend it was a sixth of one, which rounded away to nothing (heights are whole words).
+    Field field(33, 33, 0);
+    for (int z = 0; z < 33; ++z) {
+      for (int x = 0; x < 33; ++x) {
+        field.words[static_cast<std::size_t>(z) * 33 + static_cast<std::size_t>(x)] = static_cast<std::uint16_t>(4000 - 96 * std::abs(x - 16));
+      }
+    }
+    HeightBrush brush;
+    brush.mode = HeightBrushMode::Erode;
+    brush.erodeTalus = 0.6f;
+    brush.strength = 0.5f;
+    brush.radius = 8.0f;
+    for (int frame = 0; frame < 180; ++frame) {
+      (void)ApplyHeightBrush(field.words.data(), 33, 33, 16.0f, 16.0f, brush, 1.0f / 60.0f);
+    }
+    // The crest worn down towards the talus (only the crest has any excess: it settles some 10-19 words lower), its
+    // slope eased. Scaled like the other brushes it stayed at 4000.
+    EXPECT_LT(field.At(16, 16), 3995);
+    EXPECT_LT(field.At(16, 16) - field.At(15, 16), 96);
+  }
+
+  /** A field leaning down towards +x (`drop` words a sample) with a little noise, so rain has somewhere to run. */
+  Field Ramp(const int size, const int drop)
+  {
+    Field field(size, size, 0);
+    for (int z = 0; z < size; ++z) {
+      for (int x = 0; x < size; ++x) {
+        const int bump = static_cast<int>((static_cast<unsigned>(x * 73856093) ^ static_cast<unsigned>(z * 19349663)) % 40u);
+        field.words[static_cast<std::size_t>(z) * static_cast<std::size_t>(size) + static_cast<std::size_t>(x)] =
+          static_cast<std::uint16_t>(20000 - drop * x + bump);
+      }
+    }
+    return field;
+  }
+
+  long long TotalOf(const Field& field)
+  {
+    long long sum = 0;
+    for (const std::uint16_t w : field.words) {
+      sum += w;
+    }
+    return sum;
+  }
+
+  HeightBrush Rain()
+  {
+    HeightBrush brush;
+    brush.mode = HeightBrushMode::WaterErode;
+    brush.strength = 1.0f;
+    brush.falloff = 0.3f;
+    brush.radius = 14.0f;
+    return brush;
+  }
+
+  TEST(HeightBrush, WaterErodeCarvesARampWithoutMakingGround)
+  {
+    Field field = Ramp(49, 60);
+    const Field before = field;
+    HeightBrush brush = Rain();
+    for (int step = 0; step < 120; ++step) {
+      brush.seed = static_cast<std::uint32_t>(step + 1);
+      (void)ApplyHeightBrush(field.words.data(), 49, 49, 24.0f, 24.0f, brush, 1.0f / 60.0f);
+    }
+    int lowered = 0;
+    int raised = 0;
+    for (std::size_t i = 0; i < field.words.size(); ++i) {
+      lowered += field.words[i] < before.words[i] ? 1 : 0;
+      raised += field.words[i] > before.words[i] ? 1 : 0;
+    }
+    EXPECT_GT(lowered, 50); // channels cut...
+    EXPECT_GT(raised, 20);  // ...and their ground left lower down
+    // Moved, not made: the total stays within rounding (each sample rounds at random, evenly).
+    EXPECT_NEAR(static_cast<double>(TotalOf(field)), static_cast<double>(TotalOf(before)), 600.0);
+    // Nothing outside the brush's square changed.
+    EXPECT_EQ(field.At(2, 2), before.At(2, 2));
+    EXPECT_EQ(field.At(46, 46), before.At(46, 46));
+  }
+
+  TEST(HeightBrush, WaterErodeLeavesFlatGroundAndRepeatsWithItsSeed)
+  {
+    Field flat(33, 33, 5000);
+    HeightBrush brush = Rain();
+    brush.radius = 10.0f;
+    for (int step = 0; step < 30; ++step) {
+      brush.seed = static_cast<std::uint32_t>(step + 1);
+      (void)ApplyHeightBrush(flat.words.data(), 33, 33, 16.0f, 16.0f, brush, 1.0f / 60.0f);
+    }
+    EXPECT_EQ(flat.words, Field(33, 33, 5000).words);
+
+    Field a = Ramp(49, 60);
+    Field b = Ramp(49, 60);
+    brush = Rain();
+    brush.seed = 7;
+    (void)ApplyHeightBrush(a.words.data(), 49, 49, 24.0f, 24.0f, brush, 0.1f);
+    (void)ApplyHeightBrush(b.words.data(), 49, 49, 24.0f, 24.0f, brush, 0.1f);
+    EXPECT_EQ(a.words, b.words);
+  }
+
+  TEST(HeightBrush, WaterErodeKeepsAMirroredMapMirrored)
+  {
+    // Left-right mirrored hills, rained on near the mirror line and well off it.
+    Field field(49, 49, 0);
+    for (int z = 0; z < 49; ++z) {
+      for (int x = 0; x < 49; ++x) {
+        const int mx = std::min(x, 48 - x);
+        field.words[static_cast<std::size_t>(z) * 49 + static_cast<std::size_t>(x)] = static_cast<std::uint16_t>(8000 + 70 * mx + 30 * z);
+      }
+    }
+    HeightBrush brush = Rain();
+    brush.symmetry = Symmetry::LeftRight;
+    brush.radius = 9.0f;
+    for (int step = 0; step < 60; ++step) {
+      brush.seed = static_cast<std::uint32_t>(step + 1);
+      (void)ApplyHeightBrush(field.words.data(), 49, 49, step % 2 == 0 ? 10.0f : 22.0f, 24.0f, brush, 1.0f / 60.0f);
+    }
+    EXPECT_TRUE(CopiesEqual(field, Symmetry::LeftRight));
+  }
+
+  TEST(HeightBrush, ErodeLeavesGroundGentlerThanTheTalusAlone)
+  {
+    Field field(33, 33, 0);
+    for (int z = 0; z < 33; ++z) {
+      for (int x = 0; x < 33; ++x) {
+        field.words[static_cast<std::size_t>(z) * 33 + static_cast<std::size_t>(x)] = static_cast<std::uint16_t>(1000 + 40 * x); // 0.31 a unit
+      }
+    }
+    const std::vector<std::uint16_t> before = field.words;
+    HeightBrush brush;
+    brush.mode = HeightBrushMode::Erode;
+    brush.erodeTalus = 0.6f;
+    brush.strength = 1.0f;
+    brush.radius = 10.0f;
+    for (int step = 0; step < 50; ++step) {
+      (void)ApplyHeightBrush(field.words.data(), 33, 33, 16.0f, 16.0f, brush, 0.1f);
+    }
+    EXPECT_EQ(field.words, before);
+  }
+
   TEST(HeightBrush, SetHeightTerraceAndPlaneReachTheirTargets)
   {
     HeightBrush brush;

@@ -14,6 +14,7 @@ namespace faf::editor
     constexpr float kNoiseUnitsPerSecond = 15.0f;
     // Smooth and Flatten at full strength close this share of the gap each second (capped at all of it).
     constexpr float kBlendPerSecond = 8.0f;
+    constexpr float kErodeStepsPerSecond = 60.0f;
     constexpr float kWordsPerUnit = 128.0f;
     constexpr double kTwoPi = 6.283185307179586;
     // N-way turns: copies are written this many samples past the brush's edge, since the heights a copy
@@ -257,6 +258,31 @@ namespace faf::editor
           return current;
         }
         return current + StampAt(*brush.stamp, dx, dz, brush.radius) * brush.stampHeight * strength * weight;
+      case HeightBrushMode::Erode: {
+        // Each of the 8 neighbours: the part of the difference over the talus slope at its distance, towards it. A
+        // sixteenth of each (half of a pair's excess, shared by 8 neighbours) keeps a step from overshooting.
+        // Its own rate: up to kErodeStepsPerSecond full steps a second (at most one a call). The other brushes' blend would
+        // move a sample under half a word a frame at 60 fps, which rounds back to nothing.
+        const float steps = std::min(1.0f, strength * kErodeStepsPerSecond * seconds);
+        const float talus = std::max(0.0f, brush.erodeTalus) * kWordsPerUnit;
+        float change = 0.0f;
+        for (int nz = -1; nz <= 1; ++nz) {
+          for (int nx = -1; nx <= 1; ++nx) {
+            if (nx == 0 && nz == 0) {
+              continue;
+            }
+            const float distance = nx != 0 && nz != 0 ? 1.41421356f : 1.0f;
+            const float diff = snapshot.At(sx + nx, sz + nz) - current;
+            const float over = std::abs(diff) - talus * distance;
+            if (over > 0.0f) {
+              change += diff > 0.0f ? over : -over;
+            }
+          }
+        }
+        return current + change * 0.0625f * steps * weight;
+      }
+      case HeightBrushMode::WaterErode:
+        return current; // simulated over the whole area at once (ApplyWater), not sample by sample
       }
       return current;
     }
@@ -305,6 +331,173 @@ namespace faf::editor
         }
       }
       return true;
+    }
+
+    /** A small fast generator (SplitMix64) for the droplets: the same seed, the same step. */
+    struct DropletRandom
+    {
+      std::uint64_t state;
+      std::uint64_t Next()
+      {
+        std::uint64_t z = (state += 0x9E3779B97F4A7C15ULL);
+        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+        z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+        return z ^ (z >> 31);
+      }
+      /** 0 to 1. */
+      float Unit() { return static_cast<float>(Next() >> 40) / 16777216.0f; }
+    };
+
+    constexpr float kDropletsPerSecond = 600.0f;
+    constexpr int kDropletSteps = 40;
+    constexpr float kDropletInertia = 0.05f;
+    constexpr float kDropletCapacity = 4.0f;
+    constexpr float kDropletMinCapacity = 0.01f;
+    constexpr float kDropletErodeRate = 0.3f;
+    constexpr float kDropletDepositRate = 0.3f;
+    constexpr float kDropletEvaporate = 0.02f;
+    constexpr float kDropletGravity = 4.0f;
+
+    /**
+     * Water erode (HeightBrushMode::WaterErode) around the brush's first copy (`rect`, centred on cx, cz): droplets
+     * on a float copy of the area, in game units, then each changed sample written, rounded at random but evenly, to
+     * every member of its symmetry group.
+     */
+    void ApplyWater(std::uint16_t* const heights, const int width, const int height, const SampleRect& rect, const float cx, const float cz,
+                    const Symmetry symmetry, const HeightBrush& brush, const float seconds)
+    {
+      const int areaW = rect.x1 - rect.x0 + 1;
+      const int areaH = rect.z1 - rect.z0 + 1;
+      if (areaW < 3 || areaH < 3) {
+        return;
+      }
+      std::vector<float> ground(static_cast<std::size_t>(areaW) * static_cast<std::size_t>(areaH));
+      std::vector<std::uint16_t> original(ground.size());
+      for (int z = 0; z < areaH; ++z) {
+        for (int x = 0; x < areaW; ++x) {
+          const std::uint16_t word =
+            heights[static_cast<std::size_t>(rect.z0 + z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(rect.x0 + x)];
+          original[static_cast<std::size_t>(z) * static_cast<std::size_t>(areaW) + static_cast<std::size_t>(x)] = word;
+          ground[static_cast<std::size_t>(z) * static_cast<std::size_t>(areaW) + static_cast<std::size_t>(x)] = static_cast<float>(word) / kWordsPerUnit;
+        }
+      }
+      const auto cell = [&](const int x, const int z) -> float& {
+        return ground[static_cast<std::size_t>(z) * static_cast<std::size_t>(areaW) + static_cast<std::size_t>(x)];
+      };
+      // Inside the area with a cell to the right and below (bilinear reads and writes), and under the brush.
+      const auto usable = [&](const float px, const float pz) {
+        return px >= 0.0f && pz >= 0.0f && px < static_cast<float>(areaW - 1) && pz < static_cast<float>(areaH - 1) &&
+               Weight(std::hypot(px + static_cast<float>(rect.x0) - cx, pz + static_cast<float>(rect.z0) - cz), brush) > 0.0f;
+      };
+      // The height at a point and its gradient, from its cell's four corners.
+      const auto sample = [&](const float px, const float pz, float& h, float& gx, float& gz) {
+        const int x = static_cast<int>(px);
+        const int z = static_cast<int>(pz);
+        const float fx = px - static_cast<float>(x);
+        const float fz = pz - static_cast<float>(z);
+        const float a = cell(x, z), b = cell(x + 1, z), c = cell(x, z + 1), d = cell(x + 1, z + 1);
+        gx = (b - a) * (1.0f - fz) + (d - c) * fz;
+        gz = (c - a) * (1.0f - fx) + (d - b) * fx;
+        h = (a * (1.0f - fx) + b * fx) * (1.0f - fz) + (c * (1.0f - fx) + d * fx) * fz;
+      };
+      // Ground added (or taken, when negative) at a point, shared between its cell's corners.
+      const auto add = [&](const float px, const float pz, const float amount) {
+        const int x = static_cast<int>(px);
+        const int z = static_cast<int>(pz);
+        const float fx = px - static_cast<float>(x);
+        const float fz = pz - static_cast<float>(z);
+        cell(x, z) += amount * (1.0f - fx) * (1.0f - fz);
+        cell(x + 1, z) += amount * fx * (1.0f - fz);
+        cell(x, z + 1) += amount * (1.0f - fx) * fz;
+        cell(x + 1, z + 1) += amount * fx * fz;
+      };
+
+      DropletRandom random{static_cast<std::uint64_t>(brush.seed) * 0x2545F4914F6CDD1DULL + 1};
+      const float wanted = std::clamp(brush.strength, 0.0f, 1.0f) * kDropletsPerSecond * seconds;
+      const int droplets = static_cast<int>(wanted) + (random.Unit() < wanted - std::floor(wanted) ? 1 : 0);
+      for (int d = 0; d < droplets; ++d) {
+        const float angle = random.Unit() * 6.2831853f;
+        const float reach = brush.radius * std::sqrt(random.Unit());
+        float px = cx + std::cos(angle) * reach - static_cast<float>(rect.x0);
+        float pz = cz + std::sin(angle) * reach - static_cast<float>(rect.z0);
+        if (!usable(px, pz)) {
+          continue;
+        }
+        float dirX = 0.0f, dirZ = 0.0f, speed = 1.0f, water = 1.0f, sediment = 0.0f;
+        for (int step = 0; step < kDropletSteps; ++step) {
+          float h = 0.0f, gx = 0.0f, gz = 0.0f;
+          sample(px, pz, h, gx, gz);
+          dirX = dirX * kDropletInertia - gx * (1.0f - kDropletInertia);
+          dirZ = dirZ * kDropletInertia - gz * (1.0f - kDropletInertia);
+          const float length = std::hypot(dirX, dirZ);
+          if (length < 1e-6f) {
+            break; // flat: it stays (and leaves what it carries below)
+          }
+          dirX /= length;
+          dirZ /= length;
+          const float nx = px + dirX;
+          const float nz = pz + dirZ;
+          if (!usable(nx, nz)) {
+            break;
+          }
+          float nh = 0.0f, ngx = 0.0f, ngz = 0.0f;
+          sample(nx, nz, nh, ngx, ngz);
+          const float rise = nh - h;
+          const float capacity = std::max(-rise * speed * water * kDropletCapacity, kDropletMinCapacity);
+          const float weight = Weight(std::hypot(px + static_cast<float>(rect.x0) - cx, pz + static_cast<float>(rect.z0) - cz), brush);
+          if (sediment > capacity || rise > 0.0f) {
+            // Uphill it fills the dip it leaves (no more than it carries); otherwise it leaves what it can't carry.
+            const float drop = rise > 0.0f ? std::min(rise, sediment) : (sediment - capacity) * kDropletDepositRate;
+            add(px, pz, drop);
+            sediment -= drop;
+          } else {
+            // It takes ground, no deeper than the drop to its next point, less towards the brush's edge.
+            const float take = std::min((capacity - sediment) * kDropletErodeRate, -rise) * weight;
+            add(px, pz, -take);
+            sediment += take;
+          }
+          speed = std::sqrt(std::max(0.0f, speed * speed - rise * kDropletGravity));
+          water *= 1.0f - kDropletEvaporate;
+          px = nx;
+          pz = nz;
+        }
+        add(px, pz, sediment); // what it still carries stays where it stopped
+      }
+
+      // Written back: each sample that changed, rounded at random in proportion (so small changes add up, and none is
+      // lost on average), to every member of its symmetry group, within the brush's limits.
+      const auto originalAt = [&](const int x, const int z) {
+        return static_cast<float>(
+          original[static_cast<std::size_t>(std::clamp(z, 0, areaH - 1)) * static_cast<std::size_t>(areaW) + static_cast<std::size_t>(std::clamp(x, 0, areaW - 1))]);
+      };
+      for (int z = 0; z < areaH; ++z) {
+        for (int x = 0; x < areaW; ++x) {
+          const float value = cell(x, z) * kWordsPerUnit;
+          const float lower = std::floor(value);
+          const float rounded = random.Unit() < value - lower ? lower + 1.0f : lower;
+          const std::uint16_t word = ToWord(rounded);
+          if (word == original[static_cast<std::size_t>(z) * static_cast<std::size_t>(areaW) + static_cast<std::size_t>(x)]) {
+            continue;
+          }
+          const float before = originalAt(x, z);
+          if (brush.limitHeight && (before < brush.limitLow || before > brush.limitHigh)) {
+            continue;
+          }
+          if (brush.limitSlope) {
+            const float sx = (originalAt(x + 1, z) - originalAt(x - 1, z)) * 0.5f / kWordsPerUnit;
+            const float sz = (originalAt(x, z + 1) - originalAt(x, z - 1)) * 0.5f / kWordsPerUnit;
+            if (std::hypot(sx, sz) > brush.limitMaxSlope) {
+              continue;
+            }
+          }
+          int memberX[kMaxSymmetryCopies];
+          int memberZ[kMaxSymmetryCopies];
+          const int members = Copies<int>(symmetry, brush.turns, width - 1, height - 1, rect.x0 + x, rect.z0 + z, memberX, memberZ);
+          for (int m = 0; m < members; ++m) {
+            heights[static_cast<std::size_t>(memberZ[m]) * static_cast<std::size_t>(width) + static_cast<std::size_t>(memberX[m])] = word;
+          }
+        }
+      }
     }
 
     /** N-way turns: see ApplyHeightBrush. */
@@ -464,6 +657,13 @@ namespace faf::editor
     const int centres = HeightBrushCentres(width, height, x, z, symmetry, brush.turns, centreX, centreZ);
     const std::vector<SampleRect> rects =
       RectsAround(width, height, centreX, centreZ, centres, brush.radius + (symmetry == Symmetry::NWay ? kTurnRim : 0.0f));
+    if (brush.mode == HeightBrushMode::WaterErode) {
+      // Simulated around the cursor's copy; its changes written to every symmetric copy.
+      if (!rects.empty()) {
+        ApplyWater(heights, width, height, rects.front(), centreX[0], centreZ[0], symmetry, brush, seconds);
+      }
+      return rects;
+    }
     if (symmetry == Symmetry::NWay) {
       ApplyTurned(heights, width, height, rects, centreX, centreZ, centres, brush, seconds);
       return rects;

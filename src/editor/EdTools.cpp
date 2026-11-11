@@ -254,16 +254,18 @@ namespace faf::editor
   {
     SectionHeader("BRUSH");
     if (withModes) {
-      // Three rows of three; each entry is its HeightBrushMode.
-      static const char* const kRows[3][3] = {{"Raise", "Lower", "Smooth"}, {"Flatten", "Set height", "Noise"}, {"Terrace", "Plane", "Stamp"}};
-      static constexpr int kModeOf[3][3] = {{0, 1, 2}, {3, 5, 4}, {6, 7, 8}};
-      for (int row = 0; row < 3; ++row) {
+      // Rows of up to three; each entry is its HeightBrushMode.
+      static const char* const kRows[4][3] = {
+        {"Raise", "Lower", "Smooth"}, {"Flatten", "Set height", "Noise"}, {"Terrace", "Plane", "Stamp"}, {"Erode", "Water erode", nullptr}};
+      static constexpr int kModeOf[4][3] = {{0, 1, 2}, {3, 5, 4}, {6, 7, 8}, {9, 10, -1}};
+      static constexpr int kRowSize[4] = {3, 3, 3, 2};
+      for (int row = 0; row < 4; ++row) {
         int chosen = -1;
-        for (int i = 0; i < 3; ++i) {
+        for (int i = 0; i < kRowSize[row]; ++i) {
           chosen = kModeOf[row][i] == mBrushMode ? i : chosen;
         }
         const int before = chosen;
-        Segmented(kRows[row], 3, chosen);
+        Segmented(kRows[row], kRowSize[row], chosen);
         if (chosen != before && chosen >= 0) {
           mBrushMode = kModeOf[row][chosen];
         }
@@ -303,6 +305,15 @@ namespace faf::editor
         ImGui::SetNextItemWidth(-1.0f);
         ImGui::DragFloat("##stampheight", &mStampHeight, 0.25f, -200.0f, 200.0f, "Stamp height %.1f");
         Note("Each click adds the image over the brush's square: white adds the stamp height times strength.");
+        break;
+      case HeightBrushMode::Erode:
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::SliderFloat("##talus", &mErodeTalus, 0.05f, 2.0f, "Talus slope %.2f");
+        Note("Slopes steeper than the talus slope slump towards it; gentler ground stays. Ground moves downhill, none is made.");
+        break;
+      case HeightBrushMode::WaterErode:
+        Note("Rain on the brush: droplets run downhill, carry ground away where they speed up and leave it where they slow, "
+             "carving channels and fans. Strength sets how much rain. Ground is moved, none is made.");
         break;
       default:
         break;

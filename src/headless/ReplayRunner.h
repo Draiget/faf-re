@@ -68,6 +68,8 @@ namespace faf::headless
     std::string viewBenchPath;   // when set: the server's per-beat view work, timed (CSV; ReplayViewBench.h)
     bool inboundCheck = false;   // with `viewIds`: every command through view ids and back (ReplayInboundCheck.h)
     std::string stateDigestPath; // when set: "beat digest" of what the sim published, every beat
+    std::string botObsPath;     // with `focusArmy` >= 0: that army's view and commands, as JSON lines (BotObservation.h)
+    int botObsEvery = 10;       // with `botObsPath`: one sample every this many beats
     bool fpuReport = false;     // at beat 1: every thread's x87 control word and MXCSR
     std::string boneStatsPath;  // when set: changed bones per unit and beat (CSV), per blueprint at the end
     std::string laneSizesPath;  // when set: per-beat element counts and bytes of every sync lane (CSV)
@@ -122,6 +124,7 @@ namespace faf::headless
     std::string inboundSummary;     // with `inboundCheck`
     std::uint64_t inboundFailures = 0;
     std::string boneSummary;    // with `boneStatsPath`: one summary line
+    std::string botObsSummary;  // with `botObsPath`: one summary line
     std::string keyframeSummary; // with `keyframeEvery`: one summary line
     int keyframeFailures = 0;
     std::string fpuReport;      // with `fpuReport`: one line per thread

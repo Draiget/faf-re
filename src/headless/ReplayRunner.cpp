@@ -1,4 +1,5 @@
 #include "headless/ReplayRunner.h"
+#include "headless/BotObservation.h"
 #include "headless/SessionLoad.h"
 #include "headless/ReplayLuaState.h"
 #include "headless/ReplaySyncWriters.h"
@@ -505,6 +506,32 @@ namespace faf::headless
       syncWriters.Enable();
     }
 
+    // `--bot-obs`: the focus army's view and its player's commands, from the sim's first message.
+    std::unique_ptr<CBotObservation> botObs;
+    if (!options.botObsPath.empty()) {
+      if (options.focusArmy < 0 || static_cast<std::size_t>(options.focusArmy) >= launchInfo->mArmyLaunchInfo.size()) {
+        result.error = "--bot-obs needs --focus on an army";
+        return result;
+      }
+      std::vector<std::uint32_t> sources;
+      const moho::BVIntSet& unitSources = launchInfo->mArmyLaunchInfo[static_cast<std::size_t>(options.focusArmy)].mUnitSources;
+      for (unsigned int source = unitSources.GetNext(~0u); source != unitSources.Max(); source = unitSources.GetNext(source)) {
+        sources.push_back(source);
+      }
+      if (sources.empty()) {
+        std::printf(
+          "[%s] warning: --bot-obs army %d has no command source (an AI slot): the file will hold no commands\n",
+          label, options.focusArmy
+        );
+      }
+      botObs = std::make_unique<CBotObservation>(*rules, options.focusArmy, std::move(sources), options.botObsEvery);
+      if (!botObs->Open(options.botObsPath, options.replayPath)) {
+        result.error = "cannot write " + options.botObsPath;
+        return result;
+      }
+      botObs->Install();
+    }
+
 #if FAF_SERVER_MODE
     // `--command-check`: watches the sim's decoder from its first message.
     std::unique_ptr<CReplayCommandCheck> commandCheck;
@@ -844,6 +871,9 @@ namespace faf::headless
             static_cast<unsigned long long>(DigestPublishedState(*packet))
           );
         }
+        if (botObs) {
+          botObs->OnPacket(*packet);
+        }
         // The first packet means the sim exists and has its copy of the blueprints.
         if (rules && !options.keepClientData && !releasedScriptBlueprints) {
           static_cast<moho::RRuleGameRulesImpl*>(rules.get())->ReleaseScriptBlueprints();
@@ -1024,6 +1054,10 @@ namespace faf::headless
     if (laneSizesFile != nullptr) {
       std::fclose(laneSizesFile);
     }
+    if (botObs) {
+      botObs->Finish();
+      result.botObsSummary = botObs->Summary();
+    }
     if (boneStats) {
       result.boneSummary = boneStats->Finish();
     }
@@ -1110,6 +1144,8 @@ namespace faf::headless
     // The driver, sim and session objects are left to the process exit: the caller ends the
     // process once the verdict is out, as nothing after it is observed.
     (void)driver.release();
+    // Its decoder may still be called on the sim's thread, which the driver left running.
+    (void)botObs.release();
     (void)sessionState.release();
     (void)rules.release();
     (void)wldMap.release();

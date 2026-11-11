@@ -847,6 +847,7 @@ namespace faf::editor
       brush.turns = mNWay;
       brush.setTo = mSetHeight * 128.0f;
       brush.terraceStep = mTerraceStep * 128.0f;
+      brush.erodeTalus = mErodeTalus;
       brush.planeSet = mPlaneSet;
       brush.planeX = mPlaneX;
       brush.planeZ = mPlaneZ;
@@ -906,6 +907,8 @@ namespace faf::editor
       mTool = 1;
       mBrushMode = mode;
     }
+    /** Test runs (`/erodetalus`): the Erode brush's talus slope. */
+    void SetErodeTalus(const float talus) noexcept { mErodeTalus = talus; }
     void RequestRepair() noexcept { mRepairRequested = true; }
 
     /** The height field's Import and Export buttons, taken by the app each frame (it asks for the file). */
@@ -989,6 +992,7 @@ namespace faf::editor
     float mLimitSlopeDegrees = 30.0f;
     float mSetHeight = 20.0f;
     float mTerraceStep = 5.0f;
+    float mErodeTalus = 0.6f;
     float mPlanePointX[3]{};
     float mPlanePointH[3]{};
     float mPlanePointZ[3]{};

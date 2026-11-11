@@ -79,6 +79,7 @@
 #include "platform/X87Precision.h"
 #include "remote/net/UdpSocket.h"
 #include "remote/ContentTables.h"
+#include "server/ArmyBoard.h"
 #include "server/ControlListener.h"
 #include "server/LiveReplaySender.h"
 #include "server/ObserverListener.h"
@@ -106,7 +107,7 @@ namespace
   constexpr const char* kServerName = "server";
 
   constexpr const char* kUsage =
-    "usage: server --match <file.lua> --out <dir> /init <init.lua> | --data <dir> [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
+    "usage: server --match <file.lua> --out <dir> /init <init.lua> | --data <dir> [--cpus <list>] [--speed <n>] [--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
     "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] [--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view observe|disconnect] [--lobby-seconds <n> [--start-when-ready <seconds>]] [--lobby-away-seconds <n>] [--stats-every <beats>] [--pose-budget-kbps <n>] [--congestion-control] [--nftables-out <file> [--nftables-only] [--unlisted-pps <n>] [--unlisted-total-pps <n>]] [--unvalidated-policy] "
     "[--control <ip:port> --control-key <file>] [--rest <ip:port> --rest-token-file <file> [--rest-cors-origin <origin>]] "
     "[--checksum-period <beats>] [--digests <file>] [--state-digests <file>]\n";
@@ -266,6 +267,7 @@ namespace
     int team = 0;
     bool human = false;
     std::string result;
+    std::int32_t uid = 0; // a human's OwnerID; 0 for an AI
   };
 
   /** The match file: Lua that sets `MatchConfig`, the table `CLobby.LaunchGame` takes, `MatchSeed` and `MatchName`. */
@@ -388,6 +390,9 @@ namespace
       player.team = team.IsNumber() ? static_cast<int>(team.GetNumber()) : 0;
       const LuaPlus::LuaObject human = value["Human"];
       player.human = human.IsBoolean() && human.GetBoolean();
+      if (const LuaPlus::LuaObject owner = value["OwnerID"]; player.human && owner.IsString()) {
+        player.uid = static_cast<std::int32_t>(std::atoi(owner.GetString()));
+      }
       players.push_back(player);
       it.Next();
     }
@@ -1786,7 +1791,7 @@ namespace
                 control->Reply(request.id, {});
               } else if (!controlCommon(request)) {
                 control->Refuse(request.id, request.op == "pause" || request.op == "resume" || request.op == "end" || request.op == "substitute" ||
-                                                  request.op == "extend_timeouts"
+                                                  request.op == "extend_timeouts" || request.op == "armies"
                                               ? "the game hasn't started"
                                               : "unknown op " + request.op);
               }
@@ -2083,6 +2088,14 @@ namespace
     // Beats go on while the game is paused, and no game time with them.
     int pausedBeats = 0;
     std::int32_t pausedBy = -1;
+    faf::server::CArmyBoard armyBoard; // plan WP17.15: each army's state for `armies`
+    const auto boardPlayers = [&end]() {
+      std::vector<faf::server::CArmyBoard::SPlayer> players;
+      for (const SMatchPlayer& player : end.players) {
+        players.push_back({player.name, player.team, player.human, player.uid, player.result});
+      }
+      return players;
+    };
     // The operator's (SIGUSR1, control API) pause or resume asked of the driver, until the game is so: a beat or more.
     std::optional<bool> operatorPauseWanted;
     int pauseRequestsDone = 0;
@@ -2246,6 +2259,8 @@ namespace
               request.id, "\"phase\":\"game\",\"started\":" + std::string(started ? "true" : "false") + ",\"beat\":" + std::to_string(end.lastBeat) +
                             ",\"paused\":" + std::string(pausedBy != -1 ? "true" : "false") + "," + controlSeats()
             );
+          } else if (request.op == "armies") {
+            control->Reply(request.id, armyBoard.Json(end.lastBeat, boardPlayers()));
           } else if (request.op == "pause" || request.op == "resume") {
             const bool pause = request.op == "pause";
             if (!started) {
@@ -2482,6 +2497,7 @@ namespace
         ++end.beats;
         end.lastBeat = packet->mCurBeat;
         lastBeatAt = SecondsSince(playStart);
+        armyBoard.ReadPacket(*packet);
         // Plan WP16.1: as headless writes them (ReplayRunner), line for line.
         if (digestFile && packet->mCurBeat >= 0) {
           if (const moho::Sim* const sim = simDriver->GetSimForReplayCheck(); sim != nullptr) {
@@ -2544,7 +2560,8 @@ namespace
         }
 
         LuaPlus::LuaObject sync;
-        if (faf::headless::ReadSyncNaming(*packet, state, {"GameResult", "GameEnded", "StatsToSend"}, sync)) {
+        if (faf::headless::ReadSyncNaming(*packet, state, {"GameResult", "GameEnded", "StatsToSend", "Score", "UserUnitEnhancements"}, sync)) {
+          armyBoard.ReadSync(sync);
           // Plan WP15.2: the server reports the game's army stats itself, as each player's UI would (UserSync.lua
           // encodes `Sync.StatsToSend` for `GpgNetSend('JsonStats', ...)`): into result.json and as a control event.
           if (LuaPlus::LuaObject stats = sync["StatsToSend"]; stats.IsTable()) {
@@ -2722,6 +2739,24 @@ int main(int, char**)
     sArgv.push_back(nullptr);
     __argv = sArgv.data();
     __argc = static_cast<int>(sArgv.size()) - 1;
+  }
+  // Plan WP17.13: a server started on chosen CPUs (server-host pins each lobby's process before it starts, or
+  // `--cpus`) keeps them. Without the lock FAF's init script moves the process onto its own CPU range through
+  // `SetProcessAffinityMask` (2-23 on fw0); headless locks the same way (`--cpus`).
+  {
+    std::string cpuList;
+    if (ReadOption("--cpus", cpuList) && !moho::AssignProcessCpus(cpuList.c_str())) {
+      std::printf("--cpus %s: not CPUs this process may run on\n", cpuList.c_str());
+      return kExitBadInput;
+    }
+    moho::LockAssignedProcessCpus();
+    if (moho::ProcessCpusAreLocked()) {
+      DWORD_PTR processMask = 0;
+      DWORD_PTR systemMask = 0;
+      (void)::GetProcessAffinityMask(::GetCurrentProcess(), &processMask, &systemMask);
+      std::printf("CPUs: mask %llx of %llx, kept (scripts can't change it)\n", static_cast<unsigned long long>(processMask),
+        static_cast<unsigned long long>(systemMask));
+    }
   }
   std::error_code directoryError;
   std::filesystem::create_directories(outDir, directoryError);

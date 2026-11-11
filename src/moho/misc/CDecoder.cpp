@@ -138,7 +138,6 @@ namespace moho
    */
   CDecoder::~CDecoder() = default;
 
-#if FAF_SERVER_MODE
   namespace
   {
     CDecoder::MessageObserver sMessageObserver = nullptr;
@@ -150,7 +149,6 @@ namespace moho
     sMessageObserverContext = context;
     sMessageObserver = observer;
   }
-#endif
 
   /**
    * Address: 0x006E40F0 (FUN_006E40F0)
@@ -168,11 +166,9 @@ namespace moho
     if (mStream.get() != nullptr) {
       mStream->Write(message->mBuff.start_, message->mBuff.Size());
     }
-#if FAF_SERVER_MODE
     if (sMessageObserver != nullptr) {
       sMessageObserver(*message, sMessageObserverContext);
     }
-#endif
 
     DecodeMessage(*message);
   }

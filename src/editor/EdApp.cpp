@@ -34,6 +34,8 @@
 #include "moho/render/AmbientOcclusionRenderer.h"
 #include <cstring>
 #include "editor/doc/EdDocument.h"
+#include "moho/render/RCamManager.h"
+#include "moho/render/camera/CameraImpl.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 #include "moho/terrain/splat/CWldSplat.h"
@@ -1346,20 +1348,36 @@ namespace faf::editor
         static double playingSince = -1.0;
         static bool onDone = false;
         static bool offDone = false;
+        static bool againDone = false;
         const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
         if (moho::WLD_GetFrameAction() == moho::EWldFrameAction::Playing) {
           if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/playeditorview", 1, &value) && !value.empty()) {
             playingSince = playingSince < 0.0 ? now : playingSince;
             double on = 0.0;
             double off = 0.0;
-            (void)std::sscanf(value[0].c_str(), "%lf,%lf", &on, &off);
+            double again = 0.0;
+            (void)std::sscanf(value[0].c_str(), "%lf,%lf,%lf", &on, &off, &again);
+            // The game's camera at each switch (it should be where it was left when the game's view comes back).
+            const auto logGameCamera = [](const char* const when) {
+              if (moho::CameraImpl* const camera = moho::CAM_GetManager()->GetCamera("WorldCamera"); camera != nullptr) {
+                const Wm3::Vector3f at = camera->GetTargetPosition();
+                gpg::Logf("editor: the game's camera %s: at %.1f,%.1f, zoom %.1f", when, static_cast<double>(at.x), static_cast<double>(at.z),
+                          static_cast<double>(camera->CameraGetTargetZoom()));
+              }
+            };
             if (!onDone && now - playingSince >= on) {
               onDone = true;
+              logGameCamera("before the editor's view");
               mShell->EditorViewInPlay() = true;
             }
             if (!offDone && off > 0.0 && now - playingSince >= off) {
               offDone = true;
               mShell->EditorViewInPlay() = false;
+            }
+            if (offDone && !againDone && again > 0.0 && now - playingSince >= again) {
+              againDone = true;
+              logGameCamera("back in the game's view");
+              mShell->EditorViewInPlay() = true;
             }
           }
           // `/playlivetest` (test runs, with /playeditorview): in the editor's view, the commander selected, its state
@@ -1594,6 +1612,7 @@ namespace faf::editor
           playingSince = -1.0;
           onDone = false;
           offDone = false;
+          againDone = false;
         }
       }
       mScene.Update(frameSeconds, playIdle, mShell->EditorViewInPlay() && moho::WLD_GetFrameAction() == moho::EWldFrameAction::Playing);
@@ -2643,6 +2662,10 @@ namespace faf::editor
       if (mBrushModeArg >= 0) {
         tools.SetBrushMode(mBrushModeArg);
         mBrushModeArg = -1;
+        // `/erodetalus <slope>` (test runs, with /brush 9): the Erode brush's talus slope.
+        if (fa::vector<fa::string> talus; moho::CFG_GetArgOption("/erodetalus", 1, &talus) && !talus.empty()) {
+          tools.SetErodeTalus(static_cast<float>(std::atof(talus[0].c_str())));
+        }
       }
       if (!mStampArg.empty()) {
         HeightImage image;
@@ -3648,10 +3671,12 @@ namespace faf::editor
         ImGui::DestroyContext();
         mImGuiReady = false;
       }
+      // The opened map's textures go while the device is up; and before the shell, whose Tools panel the scene points at
+      // (closing detaches the scene, which clears the panel's selections; user report: a crash on exit there).
+      mDocument.Close();
+      mScene.SetTools(nullptr);
       delete mShell;
       mShell = nullptr;
-      // The opened map's textures go while the device is up.
-      mDocument.Close();
       if (const HWND viewport = HandleOf(moho::ren_Viewport); viewport != nullptr && gViewportProc != nullptr) {
         (void)::SetWindowLongPtrW(viewport, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(gViewportProc));
       }

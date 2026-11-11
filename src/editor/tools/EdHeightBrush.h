@@ -21,6 +21,18 @@ namespace faf::editor
     Plane,
     /** Adds a height image over the brush's circle, once per click. */
     Stamp,
+    /**
+     * Thermal erosion: where the ground between two neighbours is steeper than the talus slope, height moves from the
+     * higher to the lower until it isn't; gentler ground stays. Each pair's exchange is equal and opposite, so ground
+     * is moved downhill, not made.
+     */
+    Erode,
+    /**
+     * Hydraulic erosion: water droplets dropped in the brush run downhill, carry ground away where they speed up and
+     * leave it where they slow, carving channels and fans. What a droplet still carries when it stops is left there, so
+     * ground is moved, not made.
+     */
+    WaterErode,
   };
 
   /** A height image for stamps: `width` x `height` words, read between samples over the brush's square. */
@@ -75,6 +87,10 @@ namespace faf::editor
     /** Stamp: the image (null: none) and the height its brightest value adds, in height words, times strength. */
     const HeightStamp* stamp = nullptr;
     float stampHeight = 2560.0f;
+    /** Erode: the steepest slope (rise over run, game units) the ground keeps. */
+    float erodeTalus = 0.6f;
+    /** Water erode: where this step's droplets start and how it rounds (the caller changes it every step). */
+    std::uint32_t seed = 1;
     /** Limits: only samples between these heights (height words), and only where the slope (rise over run) is at most this. */
     bool limitHeight = false;
     float limitLow = 0.0f;
