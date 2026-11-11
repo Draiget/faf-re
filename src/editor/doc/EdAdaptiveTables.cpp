@@ -15,6 +15,9 @@ namespace faf::editor
       std::string atom;
       bool isTable = false;
       std::vector<Value> items;
+      /** Where it is in the text: from its first character to past its last. */
+      std::size_t start = 0;
+      std::size_t end = 0;
     };
 
     /** Reads `_tables.lua`'s simple Lua: comments, numbers, quoted strings, nested tables, commas and semicolons. */
@@ -49,6 +52,7 @@ namespace faf::editor
         }
         const char c = mText[mAt];
         Value value;
+        value.start = mAt;
         if (c == '{') {
           value.isTable = true;
           ++mAt;
@@ -56,6 +60,7 @@ namespace faf::editor
             SkipSpace();
             if (mAt < mText.size() && mText[mAt] == '}') {
               ++mAt;
+              value.end = mAt;
               return value;
             }
             std::optional<Value> item = ReadValue(error);
@@ -77,6 +82,7 @@ namespace faf::editor
           }
           value.atom = mText.substr(mAt, end + 1 - mAt);
           mAt = end + 1;
+          value.end = mAt;
           return value;
         }
         const std::size_t start = mAt;
@@ -89,6 +95,7 @@ namespace faf::editor
           return std::nullopt;
         }
         value.atom = mText.substr(start, mAt - start);
+        value.end = mAt;
         return value;
       }
 
@@ -193,6 +200,67 @@ namespace faf::editor
         text += (i > 0 ? "," : "") + ListText(groups[i], hydro);
       }
       return text + "}";
+    }
+
+    /**
+     * A table of rows (an army's mexes, an option's groups) written into its text as it is (user ask 2026-11-11: the
+     * FAF Map Editor generated these files; replace only what changed): a row whose entries are the same keeps its text,
+     * a changed one is written, and what lies between the rows (commas, line breaks, the template's alignment, comments)
+     * stays; a new row takes the separator before the last one, a dropped row goes with the separator before it.
+     * `fresh` is the whole table written anew, for a value that isn't a table of tables.
+     */
+    std::string RowsWithin(const std::string& text, const Value& table, const std::vector<std::vector<std::string>>& rows, const bool hydro,
+                           const std::string& fresh, const char* const separator)
+    {
+      if (!table.isTable || table.items.empty() || rows.empty()) {
+        return fresh;
+      }
+      for (const Value& item : table.items) {
+        if (!item.isTable) {
+          return fresh;
+        }
+      }
+      const std::vector<Value>& items = table.items;
+      const auto between = [&](const std::size_t from, const std::size_t to) { return text.substr(from, to - from); };
+      // A new row's separator: a comma, and the last row's line break and indentation (not a comment by it).
+      std::string added = separator;
+      if (items.size() >= 2) {
+        const std::string last = between(items[items.size() - 2].end, items[items.size() - 1].start);
+        const std::size_t newline = last.rfind('\n');
+        added = newline == std::string::npos ? last : "," + last.substr(newline);
+      }
+      std::string out = "{" + between(table.start + 1, items[0].start);
+      for (std::size_t r = 0; r < rows.size(); ++r) {
+        if (r > 0) {
+          out += r < items.size() ? between(items[r - 1].end, items[r].start) : added;
+        }
+        if (r < items.size() && Names(items[r], hydro) == rows[r]) {
+          out += between(items[r].start, items[r].end);
+        } else if (r < items.size()) {
+          // A changed row: the entries it keeps as written (`00` stays `00`), the new ones written.
+          std::string row = "{";
+          for (std::size_t e = 0; e < rows[r].size(); ++e) {
+            std::string entry;
+            for (const Value& was : items[r].items) {
+              if (!was.isTable && AdaptiveMarkerName(was.atom, hydro) == rows[r][e]) {
+                entry = was.atom;
+                break;
+              }
+            }
+            if (entry.empty()) {
+              entry = ListText({rows[r][e]}, hydro);
+              entry = entry.substr(1, entry.size() - 2); // "{7}" is 7
+            }
+            row += (e > 0 ? "," : "") + entry;
+          }
+          out += row + "}";
+        } else {
+          out += ListText(rows[r], hydro);
+        }
+      }
+      // What followed the table's last row (a trailing comma, a comment) up to the closing brace; dropped rows don't come.
+      out += between(items.back().end, table.end - 1);
+      return out + "}";
     }
   } // namespace
 
@@ -640,9 +708,23 @@ namespace faf::editor
     }
     for (auto it = assignments.rbegin(); it != assignments.rend(); ++it) {
       for (const auto& [name, value] : wanted) {
-        if (it->name == name && !unchanged(name)) {
-          out.replace(it->valueStart, it->valueEnd - it->valueStart, value);
+        if (it->name != name || unchanged(name)) {
+          continue;
         }
+        // Tables of rows: only the rows that changed (the rest of the table's text kept).
+        std::string written = value;
+        if (name == "spwnMexArmy") {
+          written = RowsWithin(text, it->value, tables.mexArmy, false, value, ",\n    ");
+        } else if (name == "spwnHydroArmy") {
+          written = RowsWithin(text, it->value, tables.hydroArmy, true, value, ",\n    ");
+        } else {
+          for (const OptionTable& option : KnownOptionTables()) {
+            if (name == option.name) {
+              written = RowsWithin(text, it->value, groupsOf(tables, name), option.hydro, value, ",");
+            }
+          }
+        }
+        out.replace(it->valueStart, it->valueEnd - it->valueStart, written);
       }
     }
     for (const auto& [name, value] : missing) {
