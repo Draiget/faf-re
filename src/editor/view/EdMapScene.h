@@ -478,6 +478,9 @@ namespace faf::editor
     AdaptiveTables mAdaptive;
     bool mPropsCulled = false;
     bool mUnitsCulled = false;
+    /** Some units were hidden by the Adaptive Map window's lobby preview last frame (shown again when it ends). */
+    bool mPreviewCulled = false;
+    std::size_t mPreviewCulledCount = 0;
     bool mDragMarkers = false;
     bool mMarkersMoved = false;
     float mMarkerDragFromX = 0.0f;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <string>
 #include <utility>
 
@@ -46,6 +47,23 @@ namespace faf::editor
     bool& ShowScript() noexcept { return mShowScript; }
     /** The Adaptive Map window (View > Adaptive Map). */
     bool& ShowAdaptiveWindow() noexcept { return mShowAdaptiveWindow; }
+    /** Test runs (`/adaptivepreview <key>=<choice index>,...[;<players>]`): the window's preview on with those picks. */
+    void TestAdaptivePreview(const std::string& spec)
+    {
+      mShowAdaptiveWindow = true;
+      mAdaptivePreview = true;
+      const std::size_t semicolon = spec.find(';');
+      const std::string picks = spec.substr(0, semicolon);
+      mAdaptivePreviewPlayers = semicolon == std::string::npos ? 0 : std::atoi(spec.c_str() + semicolon + 1);
+      for (std::size_t at = 0; at < picks.size();) {
+        const std::size_t comma = std::min(picks.find(',', at), picks.size());
+        const std::string pair = picks.substr(at, comma - at);
+        if (const std::size_t eq = pair.find('='); eq != std::string::npos) {
+          mAdaptivePreviewPicks[pair.substr(0, eq)] = std::atoi(pair.c_str() + eq + 1);
+        }
+        at = comma + 1;
+      }
+    }
     /** Shows it with an option picked (test runs: `/adaptivewindow <key>`). */
     void OpenAdaptiveWindow(const std::string& key)
     {
@@ -165,6 +183,14 @@ namespace faf::editor
     bool mFocusAdaptiveWindow = false;
     /** The option the window shows (its key; "#players" for the players' resources). */
     std::string mAdaptivePick;
+    /** The window's preview of a game: on, each option's picked choice (index into its values), and the players in it (0: all). */
+    bool mAdaptivePreview = false;
+    std::map<std::string, int> mAdaptivePreviewPicks;
+    int mAdaptivePreviewPlayers = 0;
+    /** What the preview's hidden things were worked out for (cleared when the preview ends). */
+    std::string mAdaptivePreviewDone;
+    /** Works out what the preview hides and gives it to the view (ui/EdAdaptiveWindow.cpp). */
+    void UpdateAdaptivePreview(const std::vector<AdaptiveOption>& options, const std::vector<LobbyOptionInfo>& lobby, const AdaptiveTables& tables);
     /** View > Script on one of the map's Lua files (0 script, 1 lobby options, 2 adaptive tables). */
     void ShowLuaFile(int file)
     {

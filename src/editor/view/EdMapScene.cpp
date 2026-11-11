@@ -665,6 +665,17 @@ namespace faf::editor
         }
       }
     }
+    // Rings a panel asks for (a choice's markers or units under the mouse in the Adaptive Map window): two circles each.
+    for (const EdTools::ViewRing& ring : mTools->ViewRings()) {
+      for (const float r : {ring.radius, ring.radius * 0.8f}) {
+        for (int s = 0; s < 24; ++s) {
+          const float a0 = 2.0f * kPi * static_cast<float>(s) / 24.0f;
+          const float a1 = 2.0f * kPi * static_cast<float>(s + 1) / 24.0f;
+          batcher->DrawLine(groundVertex(ring.x + std::cos(a0) * r, ring.z + std::sin(a0) * r, ring.colour, 1.0f),
+                            groundVertex(ring.x + std::cos(a1) * r, ring.z + std::sin(a1) * r, ring.colour, 1.0f));
+        }
+      }
+    }
     DrawGizmo(*batcher);
     if (!mTools->TerrainToolActive() && !mTools->TextureToolActive() && !mTools->PropsToolActive()) {
       batcher->Flush();
@@ -1840,14 +1851,24 @@ namespace faf::editor
         }
         mPropsCulled = hideProps;
       }
+      // Units: all hidden by the Show menu, or the ones a previewed lobby setting doesn't create (the Adaptive Map window).
       const bool hideUnits = !mTools->ShowUnits();
-      if (hideUnits || mUnitsCulled) {
-        for (moho::MeshInstance* const instance : mUnits) {
-          if (instance != nullptr) {
-            instance->Cull(hideUnits);
+      const auto& previewHidden = mTools->PreviewHiddenUnits();
+      if (hideUnits || mUnitsCulled || !previewHidden.empty() || mPreviewCulled) {
+        std::size_t previewed = 0;
+        for (std::size_t i = 0; i < mUnits.size() && i < mUnitRefs.size(); ++i) {
+          if (mUnits[i] != nullptr) {
+            const bool byPreview = !previewHidden.empty() && previewHidden.count({mUnitRefs[i].army, mUnitRefs[i].name}) != 0;
+            previewed += byPreview ? 1 : 0;
+            mUnits[i]->Cull(hideUnits || byPreview);
           }
         }
+        if (previewed != mPreviewCulledCount) {
+          gpg::Logf("editor: the lobby preview hides %zu of the %zu units drawn", previewed, mUnits.size());
+          mPreviewCulledCount = previewed;
+        }
         mUnitsCulled = hideUnits;
+        mPreviewCulled = !previewHidden.empty();
       }
     }
     if (mTools != nullptr && mTools->TextureToolActive()) {
@@ -3154,6 +3175,9 @@ namespace faf::editor
       }
     }
     for (std::size_t i = 0; i < mUnitRefs.size() && (mTools == nullptr || mTools->ShowUnits()); ++i) {
+      if (mTools != nullptr && !mTools->PreviewHiddenUnits().empty() && mTools->PreviewHiddenUnits().count({mUnitRefs[i].army, mUnitRefs[i].name}) != 0) {
+        continue; // hidden by the lobby preview
+      }
       consider(PickKind::Unit, static_cast<int>(i), mUnitRefs[i].position, 2.5f, 16.0f);
     }
     if (mMap->mProps != nullptr && (mTools == nullptr || mTools->ShowProps())) {
@@ -3603,7 +3627,12 @@ namespace faf::editor
 
   bool EdMapScene::MarkerHidden(const SaveEntry& marker) const
   {
-    return mTools != nullptr && !mTools->HiddenMarkerTypes().empty() && mTools->HiddenMarkerTypes().count(MarkerTypeOf(marker)) != 0;
+    if (mTools == nullptr) {
+      return false;
+    }
+    // By type (the Markers panel), or by name (a resource a previewed lobby setting doesn't spawn).
+    return (!mTools->HiddenMarkerTypes().empty() && mTools->HiddenMarkerTypes().count(MarkerTypeOf(marker)) != 0) ||
+           (!mTools->PreviewHiddenMarkers().empty() && mTools->PreviewHiddenMarkers().count(marker.name) != 0);
   }
 
   void EdMapScene::SelectMarkers(const std::vector<std::string>& names, const bool add)

@@ -1297,6 +1297,10 @@ namespace faf::editor
             // `/adaptivewindow <option key>` (test runs): the Adaptive Map window on that option.
             mShell->OpenAdaptiveWindow(key[0].c_str());
           }
+          if (fa::vector<fa::string> spec; mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/adaptivepreview", 1, &spec) && !spec.empty()) {
+            // `/adaptivepreview <key>=<choice>,...[;<players>]` (test runs): the window's preview of a game on.
+            mShell->TestAdaptivePreview(spec[0].c_str());
+          }
           if (mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/texturepicker", 0, nullptr)) {
             // `/texturepicker` (test runs): the particle editor's next texture input opens its browser.
             mShell->ParticleEditor().TestTexturePicker();

@@ -149,6 +149,14 @@ namespace faf::editor
 
   void EdShell::Draw()
   {
+    // The rings panels ask the view for are this frame's only; the lobby preview's hidden things only while it is on.
+    mTools.ClearViewRings();
+    if (!mShowAdaptiveWindow || !mAdaptivePreview) {
+      if (!mTools.PreviewHiddenUnits().empty() || !mTools.PreviewHiddenMarkers().empty()) {
+        mTools.SetPreviewHidden({}, {});
+      }
+      mAdaptivePreviewDone.clear();
+    }
     HandleKeys();
     UpdateTestRun();
     mBrowser.Update();

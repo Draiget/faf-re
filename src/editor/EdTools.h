@@ -486,6 +486,28 @@ namespace faf::editor
     /** The toolbar's Show menu: prop and unit models drawn or hidden (hidden ones are not picked either). */
     [[nodiscard]] bool& ShowProps() noexcept { return mShowProps; }
     [[nodiscard]] bool& ShowUnits() noexcept { return mShowUnits; }
+    /** Rings a panel asks the view to draw this frame (a choice's markers or units under the mouse); the panels refill them each frame. */
+    struct ViewRing
+    {
+      float x = 0.0f;
+      float z = 0.0f;
+      float radius = 3.0f;
+      std::uint32_t colour = 0xF0FFA040u;
+    };
+    void ClearViewRings() noexcept { mViewRings.clear(); }
+    void AddViewRing(const ViewRing& ring) { mViewRings.push_back(ring); }
+    [[nodiscard]] const std::vector<ViewRing>& ViewRings() const noexcept { return mViewRings; }
+    /**
+     * The Adaptive Map window's preview of a game: the units (army, name) and markers a lobby setting doesn't create,
+     * hidden in the view (not drawn, not picked) while it is on; empty when off.
+     */
+    void SetPreviewHidden(std::set<std::pair<std::string, std::string>> units, std::set<std::string> markers)
+    {
+      mPreviewHiddenUnits = std::move(units);
+      mPreviewHiddenMarkers = std::move(markers);
+    }
+    [[nodiscard]] const std::set<std::pair<std::string, std::string>>& PreviewHiddenUnits() const noexcept { return mPreviewHiddenUnits; }
+    [[nodiscard]] const std::set<std::string>& PreviewHiddenMarkers() const noexcept { return mPreviewHiddenMarkers; }
     /** The Markers panel: the types it hides (not drawn, not picked), and what it asks the view for. */
     [[nodiscard]] const std::set<std::string>& HiddenMarkerTypes() const noexcept { return mHiddenMarkerTypes; }
     [[nodiscard]] std::set<std::string>& HiddenMarkerTypes() noexcept { return mHiddenMarkerTypes; }
@@ -950,6 +972,9 @@ namespace faf::editor
     std::vector<std::pair<std::string, std::string>> mUnitSelectionNow;
     UnitGroupAsk mUnitGroupAsk;
     bool mUnitGroupAsked = false;
+    std::vector<ViewRing> mViewRings;
+    std::set<std::pair<std::string, std::string>> mPreviewHiddenUnits;
+    std::set<std::string> mPreviewHiddenMarkers;
     void DrawUnitGroup(const UnitGroup& group, std::vector<std::string>& path);
     int mTerrainTypeCode = 81;
     bool mShowTerrainTypes = true;

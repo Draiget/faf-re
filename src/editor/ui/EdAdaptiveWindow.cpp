@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <functional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -13,12 +14,14 @@
 #include "editor/doc/EdAdaptiveModel.h"
 #include "editor/doc/EdAdaptiveTables.h"
 #include "editor/doc/EdDocument.h"
+#include "editor/doc/EdUnitFate.h"
 #include "editor/doc/EdUnitWrecks.h"
 #include "editor/doc/EdUnits.h"
 #include "editor/tools/EdMarkers.h"
 #include "editor/ui/EdFonts.h"
 #include "editor/ui/EdHelp.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 
 namespace faf::editor
 {
@@ -117,6 +120,116 @@ namespace faf::editor
     }
   } // namespace
 
+  void EdShell::UpdateAdaptivePreview(const std::vector<AdaptiveOption>& options, const std::vector<LobbyOptionInfo>& lobby, const AdaptiveTables& tables)
+  {
+    // What a game with these lobby choices doesn't create: worked out again only when something it reads changed.
+    std::string key = std::to_string(std::hash<std::string>{}(mDocument.Script())) + "/" + std::to_string(std::hash<std::string>{}(mDocument.OptionsText())) +
+                      "/" + std::to_string(std::hash<std::string>{}(mDocument.TablesText())) + "/" +
+                      std::to_string(mDocument.SaveData().Armies().size()) + "/" + std::to_string(mAdaptivePreviewPlayers);
+    for (const SaveEntry& army : mDocument.SaveData().Armies()) {
+      key += "/" + std::to_string(std::hash<std::string>{}(army.Get("Units")));
+    }
+    for (const auto& [option, pick] : mAdaptivePreviewPicks) {
+      key += "/" + option + "=" + std::to_string(pick);
+    }
+    if (key == mAdaptivePreviewDone) {
+      return;
+    }
+    mAdaptivePreviewDone = key;
+    const auto pickOf = [&](const std::string& optionKey) {
+      // The picked choice, else the lobby's default (index into its values); -1 when the lobby doesn't offer it.
+      for (std::size_t i = 0; i < lobby.size(); ++i) {
+        if (lobby[i].key == optionKey) {
+          const auto picked = mAdaptivePreviewPicks.find(optionKey);
+          const int count = static_cast<int>(lobby[i].values.size());
+          const int pick = picked != mAdaptivePreviewPicks.end() ? picked->second : lobby[i].defaultIndex - 1;
+          return std::clamp(pick, 0, std::max(count - 1, 0));
+        }
+      }
+      return -1;
+    };
+    std::set<std::string> markers;
+    // Option tables: value key k spawns groups 1 .. k-1; an option the lobby lacks reads 1 (none).
+    for (const AdaptiveOption& option : options) {
+      if (option.kind != AdaptiveOption::Kind::Mexes && option.kind != AdaptiveOption::Kind::Hydros) {
+        continue;
+      }
+      const int pick = pickOf(option.key);
+      int spawned = 0; // groups 1 .. spawned
+      if (pick >= 0) {
+        spawned = std::max(TableGroupOfChoice(lobby[static_cast<std::size_t>(option.lobby)].values[static_cast<std::size_t>(pick)]) + 1, 0);
+      }
+      for (const auto& [name, groups] : tables.options) {
+        if (name != option.table) {
+          continue;
+        }
+        for (std::size_t g = static_cast<std::size_t>(spawned); g < groups.size(); ++g) {
+          markers.insert(groups[g].begin(), groups[g].end());
+        }
+      }
+    }
+    // Players: the resources of the armies past the game's.
+    if (mAdaptivePreviewPlayers > 0) {
+      for (const auto* const lists : {&tables.mexArmy, &tables.hydroArmy}) {
+        for (std::size_t a = static_cast<std::size_t>(mAdaptivePreviewPlayers); a < lists->size(); ++a) {
+          markers.insert((*lists)[a].begin(), (*lists)[a].end());
+        }
+      }
+    }
+    // Unit groups the script creates: hidden where the picks don't make them (a "maybe" stays shown).
+    std::set<std::pair<std::string, std::string>> units;
+    std::vector<std::string> names;
+    for (const ScriptGroupCreation& creation : ScriptGroupCreations(mDocument.Script())) {
+      if (!creation.prefix && std::find(names.begin(), names.end(), creation.name) == names.end()) {
+        names.push_back(creation.name);
+      }
+    }
+    for (const AdaptiveOption& option : options) {
+      if (option.kind == AdaptiveOption::Kind::UnitLevels) {
+        for (int k = option.loop.from; k < option.loop.from + 32; ++k) {
+          names.push_back(option.loop.prefix + std::to_string(k));
+        }
+      }
+    }
+    for (const SaveEntry& army : mDocument.SaveData().Armies()) {
+      UnitGroup root;
+      std::string error;
+      if (!ParseUnitGroup(army.Get("Units"), root, error)) {
+        continue;
+      }
+      for (const std::string& name : names) {
+        std::vector<std::string> path;
+        const UnitGroup* const group = FindGroup(root, name, path);
+        if (group == nullptr) {
+          continue;
+        }
+        const GroupLobbyRule rule = LobbyRuleOfGroup(mDocument.Script(), lobby, name);
+        if (!rule.scriptNames) {
+          continue;
+        }
+        bool made = true;
+        for (const GroupLobbyRule::Case& c : rule.cases) {
+          bool match = true;
+          for (std::size_t k = 0; k < rule.keys.size(); ++k) {
+            match = match && c.picks[k] == pickOf(rule.keys[k]);
+          }
+          if (match) {
+            made = c.made != GroupLobbyRule::Made::No;
+            break;
+          }
+        }
+        if (!made) {
+          std::vector<const SaveUnit*> list;
+          CollectUnits(*group, list);
+          for (const SaveUnit* const unit : list) {
+            units.emplace(army.name, unit->name);
+          }
+        }
+      }
+    }
+    mTools.SetPreviewHidden(std::move(units), std::move(markers));
+  }
+
   void EdShell::DrawAdaptiveWindow()
   {
     const ImGuiViewport* const viewport = ImGui::GetMainViewport();
@@ -204,9 +317,32 @@ namespace faf::editor
       file("_script.lua", adaptiveScript, "The adaptive script, which reads the tables.",
            "The script doesn't read the tables: copy an adaptive map's _script.lua into this map's folder.", 0);
       file("_options.lua", !optionsText.empty(), "The lobby's options.", "No lobby options yet: the first option written makes the file.", 1);
-      ImGui::NewLine();
+      // The preview of a game: the view shows only what these lobby choices and players start with.
+      ImGui::Checkbox("Preview a game", &mAdaptivePreview);
+      ImGui::SetItemTooltip("The view shows what a game with the choices picked on the left starts with: the resources and units a choice "
+                            "doesn't make are hidden (not drawn, not picked) while this is on");
+      if (mAdaptivePreview) {
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::GetFontSize() * 9.0f);
+        const int most = std::max(tables.maxPlayers, 1);
+        int players = mAdaptivePreviewPlayers == 0 ? most : mAdaptivePreviewPlayers;
+        if (ImGui::SliderInt("##players", &players, 1, most, players == most ? "all %d players" : "%d players")) {
+          mAdaptivePreviewPlayers = players == most ? 0 : players;
+        }
+        ImGui::SetItemTooltip("Players in the game: ARMY_1 up to this one (the resources of the armies past it don't spawn)");
+        ImGui::SameLine();
+        ImGui::TextColored(kDim, "hidden: %zu resources, %zu units", mTools.PreviewHiddenMarkers().size(), mTools.PreviewHiddenUnits().size());
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Lobby defaults")) {
+          mAdaptivePreviewPicks.clear();
+          mAdaptivePreviewPlayers = 0;
+        }
+      }
     }
     ImGui::Separator();
+    if (mAdaptivePreview) {
+      UpdateAdaptivePreview(options, lobby, tables);
+    }
 
     // Two columns: the options, and the picked one.
     if (!ImGui::BeginTable("##adaptive", 2, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, ImGui::GetContentRegionAvail())) {
@@ -227,7 +363,7 @@ namespace faf::editor
         const bool picked = mAdaptivePick == option.key;
         const float rowHeight = ImGui::GetTextLineHeightWithSpacing() * 2.0f + 4.0f;
         const ImVec2 at = ImGui::GetCursorScreenPos();
-        if (ImGui::Selectable("##pick", picked, 0, ImVec2(0.0f, rowHeight))) {
+        if (ImGui::Selectable("##pick", picked, ImGuiSelectableFlags_AllowOverlap, ImVec2(0.0f, rowHeight))) {
           mAdaptivePick = option.key;
         }
         ImGui::SetCursorScreenPos(ImVec2(at.x + 4.0f, at.y + 2.0f));
@@ -243,6 +379,22 @@ namespace faf::editor
         ImGui::SetCursorScreenPos(ImVec2(at.x + 4.0f, at.y + 2.0f + ImGui::GetTextLineHeightWithSpacing()));
         if (option.lobby < 0) {
           ImGui::TextColored(kWarn, "not in the lobby");
+        } else if (mAdaptivePreview) {
+          // The preview's choice for it (the lobby's default until picked).
+          const LobbyOptionInfo& info = lobby[static_cast<std::size_t>(option.lobby)];
+          const auto picked = mAdaptivePreviewPicks.find(option.key);
+          int pick = std::clamp(picked != mAdaptivePreviewPicks.end() ? picked->second : info.defaultIndex - 1, 0,
+                                std::max(static_cast<int>(info.values.size()) - 1, 0));
+          ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8.0f);
+          if (!info.values.empty() && ImGui::BeginCombo("##preview", info.values[static_cast<std::size_t>(pick)].text.c_str())) {
+            for (std::size_t v = 0; v < info.values.size(); ++v) {
+              if (ImGui::Selectable(info.values[v].text.c_str(), static_cast<int>(v) == pick)) {
+                mAdaptivePreviewPicks[option.key] = static_cast<int>(v);
+              }
+            }
+            ImGui::EndCombo();
+          }
+          ImGui::SetItemTooltip("The preview's choice for it");
         } else {
           const LobbyOptionInfo& info = lobby[static_cast<std::size_t>(option.lobby)];
           const int d = info.defaultIndex;
@@ -653,6 +805,21 @@ namespace faf::editor
             ImGui::TextDisabled("no groups");
           } else {
             ImGui::TextWrapped("%s", what.c_str());
+          }
+        }
+        // The row under the mouse: its markers or units ringed in the view.
+        if (ImGui::TableGetHoveredRow() == ImGui::TableGetRowIndex()) {
+          if (table) {
+            for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+              float x = 0.0f, y = 0.0f, z = 0.0f;
+              if (std::find(names.begin(), names.end(), marker.name) != names.end() && MarkerPosition(marker, x, y, z)) {
+                mTools.AddViewRing({x, z, 3.0f, hydro ? 0xF05AAAE6u : 0xF06EBE5Au});
+              }
+            }
+          } else if (levels) {
+            for (const SaveUnit* const unit : levelUnits) {
+              mTools.AddViewRing({unit->position[0], unit->position[2], 2.5f, 0xF0DC9650u});
+            }
           }
         }
         ImGui::TableSetColumnIndex(3);
