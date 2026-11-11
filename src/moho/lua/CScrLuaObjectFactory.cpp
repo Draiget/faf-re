@@ -821,26 +821,30 @@ namespace moho
     const char* const modulePath
   )
   {
-    if (!state || !modulePath || !*modulePath) {
-      return {};
-    }
-
-    lua_State* const lstate = state->GetCState();
+    // A failed import answers a nil object bound to `state`, as SCR_Import
+    // (0x004D3250) does through 0x00908970. An unbound object would pass the
+    // callers' `IsNil()` guards, and the `GetByName` after them then throws
+    // "m_state" (issue #379: a broken /lua/formations.lua ended the game on
+    // the first formation drag).
+    lua_State* const lstate = (state != nullptr) ? state->GetCState() : nullptr;
     if (!lstate) {
       return {};
+    }
+    if (!modulePath || !*modulePath) {
+      return LuaPlus::LuaObject(state);
     }
 
     const int savedTop = lua_gettop(lstate);
     lua_getglobal(lstate, "import");
     if (!lua_isfunction(lstate, -1)) {
       lua_settop(lstate, savedTop);
-      return {};
+      return LuaPlus::LuaObject(state);
     }
 
     lua_pushstring(lstate, modulePath);
     if (LuaCallProtected(lstate, 1, 1) != 0) {
       lua_settop(lstate, savedTop);
-      return {};
+      return LuaPlus::LuaObject(state);
     }
 
     LuaPlus::LuaObject moduleObject{LuaPlus::LuaStackObject(state, -1)};
@@ -863,8 +867,13 @@ namespace moho
     const char* const fieldName
   )
   {
-    if (!state || !fieldName || !*fieldName || !tableObj.IsTable()) {
+    // Same nil-not-unbound answer as SCR_ImportLuaModule, so `IsNil()`
+    // guards on the result hold.
+    if (!state) {
       return {};
+    }
+    if (!fieldName || !*fieldName || !tableObj.IsTable()) {
+      return LuaPlus::LuaObject(state);
     }
 
     return tableObj.GetByName(fieldName);
