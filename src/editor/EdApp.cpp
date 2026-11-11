@@ -2643,6 +2643,10 @@ namespace faf::editor
       if (mBrushModeArg >= 0) {
         tools.SetBrushMode(mBrushModeArg);
         mBrushModeArg = -1;
+        // `/erodetalus <slope>` (test runs, with /brush 9): the Erode brush's talus slope.
+        if (fa::vector<fa::string> talus; moho::CFG_GetArgOption("/erodetalus", 1, &talus) && !talus.empty()) {
+          tools.SetErodeTalus(static_cast<float>(std::atof(talus[0].c_str())));
+        }
       }
       if (!mStampArg.empty()) {
         HeightImage image;

@@ -14,6 +14,7 @@ namespace faf::editor
     constexpr float kNoiseUnitsPerSecond = 15.0f;
     // Smooth and Flatten at full strength close this share of the gap each second (capped at all of it).
     constexpr float kBlendPerSecond = 8.0f;
+    constexpr float kErodeStepsPerSecond = 60.0f;
     constexpr float kWordsPerUnit = 128.0f;
     constexpr double kTwoPi = 6.283185307179586;
     // N-way turns: copies are written this many samples past the brush's edge, since the heights a copy
@@ -257,6 +258,29 @@ namespace faf::editor
           return current;
         }
         return current + StampAt(*brush.stamp, dx, dz, brush.radius) * brush.stampHeight * strength * weight;
+      case HeightBrushMode::Erode: {
+        // Each of the 8 neighbours: the part of the difference over the talus slope at its distance, towards it. A
+        // sixteenth of each (half of a pair's excess, shared by 8 neighbours) keeps a step from overshooting.
+        // Its own rate: up to kErodeStepsPerSecond full steps a second (at most one a call). The other brushes' blend would
+        // move a sample under half a word a frame at 60 fps, which rounds back to nothing.
+        const float steps = std::min(1.0f, strength * kErodeStepsPerSecond * seconds);
+        const float talus = std::max(0.0f, brush.erodeTalus) * kWordsPerUnit;
+        float change = 0.0f;
+        for (int nz = -1; nz <= 1; ++nz) {
+          for (int nx = -1; nx <= 1; ++nx) {
+            if (nx == 0 && nz == 0) {
+              continue;
+            }
+            const float distance = nx != 0 && nz != 0 ? 1.41421356f : 1.0f;
+            const float diff = snapshot.At(sx + nx, sz + nz) - current;
+            const float over = std::abs(diff) - talus * distance;
+            if (over > 0.0f) {
+              change += diff > 0.0f ? over : -over;
+            }
+          }
+        }
+        return current + change * 0.0625f * steps * weight;
+      }
       }
       return current;
     }

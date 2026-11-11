@@ -970,6 +970,7 @@ namespace faf::editor
         mDocument.Heights().EndStroke(field->data);
         if (mDocument.Heights().UndoCount() > before) {
           mDocument.EditEnded(EdDocument::EditKind::Heights);
+          gpg::Logf("editor: height stroke changed %zu samples", mDocument.Heights().NewestChangedSamples());
         }
         // A check that was made is kept up to date as the map changes.
         if (mCheckDone) {
