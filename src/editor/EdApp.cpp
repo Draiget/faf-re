@@ -1262,6 +1262,9 @@ namespace faf::editor
           mShell->ParticleEditor().SetMapFolder(inVault ? scmap.parent_path() : std::filesystem::path(), inVault ? mDocument.FolderName() : std::string());
           // The particle editor's effect plays in its own view (EdParticleViewport) while its windows show.
           mShell->ParticleEditor().Frame(mShell->ShowParticleEditor() || mShell->ShowParticleBrowser());
+          if (std::string effect; mShell->ParticleEditor().TakePlaceAsk(effect) && mScene.Attached()) {
+            mScene.PlaceEffect(effect);
+          }
         }
         mShell->Draw();
         // `/focuspanel <window>` (test runs): that panel in front, a while after the map opened (opening fronts Info).
@@ -1273,6 +1276,10 @@ namespace faf::editor
           // `/materiallive <slot>` and `/materialapply <slot>` (test runs): the material editor's result into a slot.
           if (fa::vector<fa::string> slot; mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/materiallive", 1, &slot) && !slot.empty()) {
             mShell->MaterialEditor().TestLive(std::atoi(slot[0].c_str()));
+          }
+          if (fa::vector<fa::string> effect; mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/placeeffect", 1, &effect) && !effect.empty()) {
+            // `/placeeffect <game path>` (test runs): an effect decoration at the view's centre.
+            mScene.PlaceEffect(effect[0].c_str());
           }
           if (fa::vector<fa::string> distance; mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/particleframe", 1, &distance) && !distance.empty()) {
             // `/particleframe <distance>` (test runs): the view this close to its centre, where the particle preview emits.

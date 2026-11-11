@@ -127,6 +127,11 @@ namespace faf::editor
         if (ImGui::Button("Edit in the Particle Editor", ImVec2(-1.0f, 0.0f))) {
           mOpenEditorAsk = true;
         }
+        if (ImGui::Button("Place on the map", ImVec2(-1.0f, 0.0f))) {
+          mPlaceAsk = mBrowserPick;
+        }
+        ImGui::SetItemTooltip("An effect decoration at the middle of the map's view (an Effect marker: move it with the Markers tool; "
+                              "the map's script plays it in the game)");
         ImGui::SetItemTooltip("Opens it in the Particle Editor to change; Save there writes a copy into the map's folder");
       } else {
         ImGui::TextWrapped("Click an effect to play it here (and at the middle of the map's view). The wheel over the preview zooms.");

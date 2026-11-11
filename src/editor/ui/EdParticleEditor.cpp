@@ -177,6 +177,7 @@ namespace faf::editor
       }
       mFlat = std::move(flat);
       mFlatMode = true;
+      mGamePath = path;
       mName = BaseName(path);
       mPath.clear();
       mDirty = false;
@@ -187,6 +188,7 @@ namespace faf::editor
       return true;
     }
     mFlatMode = false;
+    mGamePath = path;
     mEmitter = std::move(read);
     mName = BaseName(path);
     mPath.clear(); // the game's own: Save asks for a name in the map's folder
@@ -359,6 +361,15 @@ namespace faf::editor
     }
   }
 
+  std::string EdParticleEditor::GamePath() const
+  {
+    // Edited and saved into the map's folder: the map's copy; untouched since opened: the game's own.
+    if (!mPath.empty() && !mMapFolderName.empty() && mPath.parent_path() == Folder()) {
+      return "/maps/" + mMapFolderName + "/effects/emitters/" + mPath.filename().string();
+    }
+    return mDirty ? std::string() : mGamePath;
+  }
+
   void EdParticleEditor::DrawToolbar()
   {
     if (!ImGui::BeginMenuBar()) {
@@ -373,6 +384,7 @@ namespace faf::editor
       }
       if (ImGui::MenuItem("New emitter")) {
         mFlatMode = false;
+        mGamePath.clear();
         mEmitter = NewEmitter();
         mName = "new_emitter";
         mPath.clear();
@@ -410,6 +422,16 @@ namespace faf::editor
       mPreview.Restart();
     }
     ImGui::Checkbox("Loop", &mLoop);
+    {
+      const std::string place = GamePath();
+      ImGui::BeginDisabled(place.empty());
+      if (ImGui::Button("Place on the map")) {
+        mPlaceAsk = place;
+      }
+      ImGui::EndDisabled();
+      ImGui::SetItemTooltip("%s", place.empty() ? "Save the effect into the map's folder first (or open a game effect): the map plays it by its path"
+                                                : "An effect decoration at the middle of the map's view: an Effect marker the map's script plays the effect at");
+    }
     ImGui::SetItemTooltip("Starts the emitter again each time its Lifetime ends");
     ImGui::TextDisabled("age %.0f ticks, %llu particles", static_cast<double>(mPreview.Age()), static_cast<unsigned long long>(mPreview.Emitted()));
     ImGui::SetItemTooltip("The preview emits at the centre of the map's view (10 ticks a second)");

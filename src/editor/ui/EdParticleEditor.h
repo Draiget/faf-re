@@ -30,6 +30,17 @@ namespace faf::editor
     /** The browser asked to show the Particle Editor (Edit in the Particle Editor, File > Browse in it the other way). */
     [[nodiscard]] bool TakeOpenEditorAsk() noexcept { return std::exchange(mOpenEditorAsk, false); }
     [[nodiscard]] bool TakeOpenBrowserAsk() noexcept { return std::exchange(mOpenBrowserAsk, false); }
+    /** "Place on the map": the effect's game path for a decoration at the view's centre; taken once. */
+    [[nodiscard]] bool TakePlaceAsk(std::string& path)
+    {
+      if (mPlaceAsk.empty()) {
+        return false;
+      }
+      path = std::exchange(mPlaceAsk, std::string());
+      return true;
+    }
+    /** The open effect's path in the game's files: a game effect's own, or the map's copy once saved there; else empty. */
+    [[nodiscard]] std::string GamePath() const;
 
     /** Where a vault map keeps its effects (`<map>`), empty without one: the editor's own folder then. */
     void SetMapFolder(const std::filesystem::path& folder, const std::string& mapFolderName);
@@ -114,6 +125,9 @@ namespace faf::editor
     std::string mBrowserPick;
     bool mOpenEditorAsk = false;
     bool mOpenBrowserAsk = false;
+    std::string mPlaceAsk;
+    /** The game effect last opened (its own path), empty for a new one. */
+    std::string mGamePath;
     EdTextureLibrary mLibrary;
   };
 } // namespace faf::editor

@@ -690,6 +690,69 @@ namespace faf::editor
     }
     return out + "\nfunction OnPopulate()\n" + line + "end\n";
   }
+  namespace
+  {
+    // The function the editor keeps in a map's script for its effect decorations, between these two lines.
+    constexpr const char* kEffectsBegin = "-- Map editor: effect decorations (markers of type 'Effect'). Written by the editor; edit the markers, not this.\n";
+    constexpr const char* kEffectsEnd = "-- Map editor: end of effect decorations\n";
+    constexpr const char* kEffectsBody =
+      "function MapEditorEffects()\n"
+      "    local Entity = import('/lua/sim/Entity.lua').Entity\n"
+      "    local count = 0\n"
+      "    for _, marker in pairs(Scenario.MasterChain._MASTERCHAIN_.Markers) do\n"
+      "        if marker.type == 'Effect' and marker.effect and marker.effect ~= '' then\n"
+      "            local position = marker.position\n"
+      "            local entity = Entity({})\n"
+      "            Warp(entity, Vector(position[1], position[2] + (marker.height or 0), position[3]))\n"
+      "            local emitter = CreateEmitterAtEntity(entity, -1, marker.effect)\n"
+      "            if emitter and marker.scale and marker.scale ~= 1 then\n"
+      "                emitter:ScaleEmitter(marker.scale)\n"
+      "            end\n"
+      "            count = count + 1\n"
+      "        end\n"
+      "    end\n"
+      "    LOG('map editor: ' .. count .. ' effect decorations')\n"
+      "end\n";
+    constexpr const char* kEffectsCall = "    MapEditorEffects() -- the map editor's effect decorations\n";
+  } // namespace
+
+  std::string WithScriptEffects(const std::string& script, const bool on)
+  {
+    std::string out = script;
+    // Off first (also before turning on, so the text is the editor's current one).
+    if (const std::size_t begin = out.find(kEffectsBegin); begin != std::string::npos) {
+      const std::size_t end = out.find(kEffectsEnd, begin);
+      if (end != std::string::npos) {
+        std::size_t stop = end + std::string(kEffectsEnd).size();
+        out.erase(begin, stop - begin);
+        // The blank line written before it.
+        if (begin >= 1 && out[begin - 1] == '\n' && (begin < 2 || out[begin - 2] == '\n')) {
+          out.erase(begin - 1, 1);
+        }
+      }
+    }
+    if (const std::size_t call = out.find(kEffectsCall); call != std::string::npos) {
+      out.erase(call, std::string(kEffectsCall).size());
+    }
+    if (!on) {
+      return out;
+    }
+    // The call after InitializeArmies in OnPopulate (units exist; the effects don't depend on them), or its first line.
+    std::smatch match;
+    if (std::regex_search(out, match, std::regex(R"(ScenarioUtils\.InitializeArmies\(\)[ \t]*\r?\n)"))) {
+      out.insert(static_cast<std::size_t>(match.position(0) + match.length(0)), kEffectsCall);
+    } else if (std::regex_search(out, match, std::regex(R"(function\s+OnPopulate\s*\([^)]*\)[ \t]*\r?\n)"))) {
+      out.insert(static_cast<std::size_t>(match.position(0) + match.length(0)), kEffectsCall);
+    } else {
+      out += std::string("\nfunction OnPopulate()\n") + kEffectsCall + "end\n";
+    }
+    if (!out.empty() && out.back() != '\n') {
+      out += '\n';
+    }
+    out += std::string("\n") + kEffectsBegin + kEffectsBody + kEffectsEnd;
+    return out;
+  }
+
   std::string WithScenarioReclaim(const std::string& scenario, const double mass, const double energy)
   {
     std::smatch match;

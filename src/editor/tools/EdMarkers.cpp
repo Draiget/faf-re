@@ -62,6 +62,9 @@ namespace faf::editor
       {"Camera Info", "Other", "Camera Info ", "ff808000", "M_Camera_prop.bp",
        {{"zoom", Float(30.0)}, {"canSetCamera", "BOOLEAN( true )"}, {"canSyncCamera", "BOOLEAN( true )"}}},
       {"Island", "Other", "Island ", "ff808080", "M_Blank_prop.bp", Hint()},
+      // The map editor's effect decorations: the map's script puts the effect here when the game starts (WithScriptEffects).
+      {"Effect", "Other", "Effect ", "ffff8000", "M_Blank_prop.bp",
+       {{"effect", StringValue("/effects/emitters/destruction_damaged_smoke_01_emit.bp")}, {"scale", Float(1.0)}, {"height", Float(0.0)}}},
     };
     return types;
   }
@@ -98,6 +101,9 @@ namespace faf::editor
                                               "map has none)."},
       {"Transport Marker", "An AI transport drop-off spot, used only on a map without any Land Path Node."},
       {"Naval Link", "No game code reads it (only the in-game debug marker list shows it)."},
+      {"Effect", "The map editor's effect decoration: the map's script (MapEditorEffects, called from OnPopulate) plays the effect "
+                 "'effect' here, 'height' above the ground and 'scale' times its size, on an entity of its own, for the whole game. "
+                 "An effect of the map's own folder plays only in games started from FAF's lobby."},
       {"Land Path Node", "Older AI code builds its pathing graph from the path nodes and their 'adjacentTo' links (threat-avoiding "
                          "routes, path checks, transport drops); most AI movement now uses the navigation mesh. The lobby shows "
                          "\"AI markers: yes\" when nodes are linked."},

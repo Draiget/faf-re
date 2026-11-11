@@ -206,7 +206,17 @@ namespace faf::editor
         mAge = 0.0f;
         mCarry = 0.0f;
       }
-      for (const EmittedParticle& p : EmitTick(mEmitter, mAge, mCarry, random)) {
+      for (EmittedParticle p : EmitTick(mEmitter, mAge, mCarry, random)) {
+        if (mScale != 1.0f) {
+          // EFFECT_SCALE, as CEfxEmitter::Tick multiplies its curves (the velocity and gravity aside: close enough here).
+          for (int i = 0; i < 3; ++i) {
+            p.pos[i] *= mScale;
+            p.dir[i] *= mScale;
+            p.accel[i] *= mScale;
+          }
+          p.beginSize *= mScale;
+          p.endSize *= mScale;
+        }
         moho::SWorldParticle particle;
         particle.mDragEnabled = mEmitter.flags[kParticleResistance];
         particle.mResistance = p.resistance;

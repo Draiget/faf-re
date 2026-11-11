@@ -184,4 +184,11 @@ namespace faf::editor
    * `ScenarioUtils.InitializeArmies()`, or its area name replaced), or removed when `area` is empty.
    */
   std::string WithScriptPlayableArea(const std::string& script, const std::string& area);
+
+  /**
+   * The script with the map editor's effect decorations on (`on`: the MapEditorEffects function, which plays each
+   * `Effect` marker's effect on an entity of its own, and its call in OnPopulate after
+   * `ScenarioUtils.InitializeArmies()`) or off (both removed). The same text for a script that already has it as asked.
+   */
+  std::string WithScriptEffects(const std::string& script, bool on);
 } // namespace faf::editor

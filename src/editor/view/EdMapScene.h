@@ -13,6 +13,7 @@
 
 #include "editor/graph/EdTextureGraph.h"
 #include "editor/tools/EdViewAids.h"
+#include "editor/view/EdParticlePreview.h"
 #include "editor/tools/EdTerrainTypes.h"
 #include "editor/doc/EdLayerPreset.h"
 #include "editor/doc/EdUnitPreset.h"
@@ -207,6 +208,8 @@ namespace faf::editor
      * a path node placed while a node of its type is selected is linked to it (each copy to its copy), so clicks lay a path.
      */
     void PlaceMarkers(float x, float z, bool connect = false);
+    /** An effect decoration (an Effect marker) playing `effect` at the view's centre, selected, as one undo step. */
+    void PlaceEffect(const std::string& effect);
     /**
      * Links each selected path node to `target`, or unlinks it when they are linked, with the symmetric copies of the
      * pair, as one undo step; `target` becomes the selection, so the next click continues from it.
@@ -598,6 +601,14 @@ namespace faf::editor
     std::unique_ptr<moho::SimpleRenderWorldView> mWorldView;
 
     // The orbit camera: the point it looks at, its heading and pitch (radians) and its distance from it.
+    /** The Effect markers' effects, playing where they stand (by marker name; remade when the effect changes). */
+    struct EffectDecoration
+    {
+      std::string effect;
+      std::unique_ptr<EdParticlePreview> preview;
+    };
+    std::map<std::string, EffectDecoration> mEffects;
+    void UpdateEffects();
     float mTargetX = 0.0f;
     float mTargetY = 0.0f;
     float mTargetZ = 0.0f;

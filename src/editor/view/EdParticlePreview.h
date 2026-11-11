@@ -40,6 +40,8 @@ namespace faf::editor
     void SetPlaying(bool playing) noexcept { mPlaying = playing; }
     /** Starts over at the emitter's tick 0 at the next frame. */
     void Restart() noexcept { mRestart = true; }
+    /** The emitter's scale (ScaleEmitter): positions, directions, accelerations and sizes times it. */
+    void SetScale(const float scale) noexcept { mScale = scale; }
     /** Starts over each time the emitter's Lifetime ends. */
     void SetLoop(bool loop) noexcept { mLoop = loop; }
 
@@ -60,6 +62,7 @@ namespace faf::editor
     FlatBlueprint mFlat;
     bool mUseFlat = false;
     float mTrailLength = 0.0f;
+    float mScale = 1.0f;
     std::string mTexturePath;
     std::string mRampPath;
     moho::CParticleTexture* mTexture = nullptr;

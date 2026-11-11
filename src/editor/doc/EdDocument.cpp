@@ -626,6 +626,19 @@ namespace faf::editor
     mModified = true;
   }
 
+  void EdDocument::SyncEffectScript()
+  {
+    // The effect decorations' script block follows the Effect markers (on with any, off without).
+    if (!mSave.Loaded() || mFacts.scriptPath.empty()) {
+      return;
+    }
+    bool effects = false;
+    for (const SaveEntry& marker : mSave.Markers()) {
+      effects = effects || ValueString(marker.Get("type")) == "Effect";
+    }
+    mScript = WithScriptEffects(mScript, effects);
+  }
+
   bool EdDocument::WriteLuaFiles(const std::filesystem::path& folder, std::string& error)
   {
     const auto write = [&](const std::string& gamePath, const std::string& text) {
@@ -638,6 +651,7 @@ namespace faf::editor
       }
       return true;
     };
+    SyncEffectScript();
     if (mSave.Loaded() && mSave.Changed()) {
       if (!write(mFacts.savePath, mSave.Text())) {
         return false;
@@ -1502,6 +1516,7 @@ namespace faf::editor
       message = "No map is open.";
       return false;
     }
+    SyncEffectScript();
     if (mMap->mTerrainRes == nullptr || !mMap->mTerrainRes->GetBool()) {
       message = "The map isn't ready yet (its terrain is still being prepared); save again in a moment.";
       return false;

@@ -359,4 +359,22 @@ Scenario = {
     ASSERT_TRUE(again.Parse(save.Text(), error)) << error;
     EXPECT_TRUE(faf::editor::ReadArmySettings(again.Armies()[0]) == settings);
   }
+  TEST(SaveFile, TheEffectDecorationsBlockGoesInAndOut)
+  {
+    const std::string script = "local ScenarioUtils = import('/lua/sim/ScenarioUtilities.lua')\n\nfunction OnPopulate()\n"
+                               "    ScenarioUtils.InitializeArmies()\nend\n\nfunction OnStart(self)\nend\n";
+    const std::string on = faf::editor::WithScriptEffects(script, true);
+    // The call right after InitializeArmies, the function at the end.
+    EXPECT_NE(on.find("    ScenarioUtils.InitializeArmies()\n    MapEditorEffects()"), std::string::npos);
+    EXPECT_NE(on.find("function MapEditorEffects()"), std::string::npos);
+    EXPECT_NE(on.find("CreateEmitterAtEntity(entity, -1, marker.effect)"), std::string::npos);
+    // On again: the same text (one block, one call).
+    EXPECT_EQ(faf::editor::WithScriptEffects(on, true), on);
+    // Off: the script as it was.
+    EXPECT_EQ(faf::editor::WithScriptEffects(on, false), script);
+    EXPECT_EQ(faf::editor::WithScriptEffects(script, false), script);
+    // No OnPopulate: one is added.
+    const std::string bare = faf::editor::WithScriptEffects("function OnStart(self)\nend\n", true);
+    EXPECT_NE(bare.find("function OnPopulate()\n    MapEditorEffects()"), std::string::npos);
+  }
 } // namespace

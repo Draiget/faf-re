@@ -445,6 +445,8 @@ namespace faf::editor
     std::vector<std::pair<SaveSnapshot, SaveSnapshot>> mSaveRedo;
     /** Writes `_save.lua` and `_script.lua` beside the map file when they changed (Save). */
     bool WriteLuaFiles(const std::filesystem::path& folder, std::string& error);
+    /** The script's effect decorations block on when the save has Effect markers, off when it has none (both saves). */
+    void SyncEffectScript();
     std::vector<std::pair<PropSnapshot, PropSnapshot>> mPropUndo;
     std::vector<std::pair<PropSnapshot, PropSnapshot>> mPropRedo;
     std::vector<LayerEdit> mLayerUndo;

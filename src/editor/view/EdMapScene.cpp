@@ -13,6 +13,7 @@
 #include "editor/EdTools.h"
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdMapFile.h"
+#include "moho/app/CScApp.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/math/QuaternionMath.h"
 #include "editor/doc/EdUnits.h"
@@ -1733,6 +1734,7 @@ namespace faf::editor
       return;
     }
     UpdateDeposits();
+    UpdateEffects();
     if (moho::CD3DDevice* const device = moho::D3D_GetDevice(); device != nullptr) {
       const int width = device->GetHeadWidth(0);
       const int height = device->GetHeadHeight(0);
@@ -3952,6 +3954,76 @@ namespace faf::editor
     } else {
       mMarkerSelection = std::move(selectedBefore);
     }
+  }
+
+  void EdMapScene::UpdateEffects()
+  {
+    // Each Effect marker plays its effect where it stands (its height above the ground, its scale), as the map's script
+    // will in the game (WithScriptEffects).
+    std::set<std::string> seen;
+    for (const SaveEntry& marker : mDocument.SaveData().Markers()) {
+      if (MarkerTypeOf(marker) != "Effect") {
+        continue;
+      }
+      float x = 0.0f;
+      float y = 0.0f;
+      float z = 0.0f;
+      if (!ShownMarkerPosition(marker, x, y, z)) {
+        continue;
+      }
+      seen.insert(marker.name);
+      const std::string effect = ValueString(marker.Get("effect"));
+      EffectDecoration& decoration = mEffects[marker.name];
+      if (!decoration.preview || decoration.effect != effect) {
+        decoration.effect = effect;
+        decoration.preview = std::make_unique<EdParticlePreview>();
+        std::string text;
+        EmitterBlueprint emitter;
+        FlatBlueprint flat;
+        std::string error;
+        if (effect.empty() || !ReadGameFile(effect, text)) {
+          decoration.preview.reset();
+          continue;
+        }
+        if (ParseEmitter(text, emitter, error)) {
+          decoration.preview->SetEmitter(emitter);
+        } else if (ParseFlatBlueprint(text, flat, error)) {
+          decoration.preview->SetFlat(flat);
+        } else {
+          decoration.preview.reset();
+          continue;
+        }
+        decoration.preview->Restart();
+        moho::gAppIdleClock = true; // the renderer's clock between sessions, so the particles age
+      }
+      const std::vector<double> height = ValueNumbers(marker.Get("height"));
+      const std::vector<double> scale = ValueNumbers(marker.Get("scale"));
+      decoration.preview->SetPlace(x, y + (height.empty() ? 0.0f : static_cast<float>(height[0])), z);
+      decoration.preview->SetScale(scale.empty() || scale[0] <= 0.0 ? 1.0f : static_cast<float>(scale[0]));
+      decoration.preview->Frame();
+    }
+    for (auto it = mEffects.begin(); it != mEffects.end();) {
+      it = seen.count(it->first) == 0 ? mEffects.erase(it) : std::next(it);
+    }
+  }
+
+  void EdMapScene::PlaceEffect(const std::string& effect)
+  {
+    const MarkerType* type = FindMarkerType("Effect");
+    if (mMap == nullptr || type == nullptr || effect.empty()) {
+      return;
+    }
+    EdDocument::SaveSnapshot before = mDocument.SaveDataNow();
+    std::vector<SaveEntry>& markers = mDocument.SaveData().Markers();
+    const float x = SnapToGrid(mTargetX);
+    const float z = SnapToGrid(mTargetZ);
+    const float y = mMap->mTerrainRes->GetHeightAt(static_cast<std::int32_t>(x), static_cast<std::int32_t>(z));
+    SaveEntry marker = NewMarker(*type, NextMarkerName(markers, *type), x, y, z);
+    marker.Set("effect", StringValue(effect));
+    mMarkerSelection = {marker.name};
+    gpg::Logf("editor: effect decoration %s placed at %.1f, %.1f: %s", marker.name.c_str(), static_cast<double>(x), static_cast<double>(z), effect.c_str());
+    markers.push_back(std::move(marker));
+    mDocument.SaveDataEdited(std::move(before));
   }
 
   void EdMapScene::FillAirGrid(const int count, const bool replace)
