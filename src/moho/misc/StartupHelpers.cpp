@@ -4207,21 +4207,44 @@ bool moho::DISK_SetupDataAndSearchPaths(fa::string dataPathScriptName, const std
     return false;
   }
 
-  std::filesystem::path scriptPath(dataPathScriptName.c_str());
-  if (scriptPath.empty()) {
+  const std::filesystem::path requestedScriptPath(dataPathScriptName.c_str());
+  if (requestedScriptPath.empty()) {
     return false;
   }
-  if (!scriptPath.is_absolute()) {
-    scriptPath = absoluteLaunchDirectory / scriptPath;
-  }
-  const std::filesystem::path absoluteScriptPath = MakeAbsolutePath(scriptPath);
+  std::filesystem::path absoluteScriptPath = MakeAbsolutePath(
+    requestedScriptPath.is_absolute() ? requestedScriptPath : absoluteLaunchDirectory / requestedScriptPath);
   if (absoluteScriptPath.empty()) {
     return false;
   }
 
   std::error_code ec;
   if (!std::filesystem::exists(absoluteScriptPath, ec) || ec) {
-    return false;
+    // Engine addition (issue #379): the x64 exe runs from bin_x64, next to FAF's
+    // bin folder, but the FAF client writes every featured mod's init file
+    // (init_nomads.lua, init_coop.lua, ...) into bin only. A relative `/init`
+    // name missing next to the exe is looked up in that sibling bin folder, where
+    // retail - which runs from bin - would have found it. InitFileDir then names
+    // bin, so the script's `..\fa_path.lua` and `..\gamedata` resolve as in retail.
+    std::filesystem::path fallbackScriptPath;
+    if (!requestedScriptPath.is_absolute()) {
+      fallbackScriptPath = MakeAbsolutePath(absoluteLaunchDirectory.parent_path() / "bin" / requestedScriptPath);
+    }
+    std::error_code fallbackEc;
+    if (fallbackScriptPath.empty() || !std::filesystem::exists(fallbackScriptPath, fallbackEc) || fallbackEc) {
+      gpg::Warnf(
+        "DISK_SetupDataAndSearchPaths: init script \"%s\" not found at \"%s\"%s%s%s",
+        dataPathScriptName.c_str(),
+        absoluteScriptPath.string().c_str(),
+        fallbackScriptPath.empty() ? "" : " or \"",
+        fallbackScriptPath.empty() ? "" : fallbackScriptPath.string().c_str(),
+        fallbackScriptPath.empty() ? "" : "\"");
+      return false;
+    }
+    gpg::Logf(
+      "init script \"%s\" is not next to the exe; using \"%s\"",
+      dataPathScriptName.c_str(),
+      fallbackScriptPath.string().c_str());
+    absoluteScriptPath = fallbackScriptPath;
   }
 
   std::vector<std::wstring> allowedProtocols;
