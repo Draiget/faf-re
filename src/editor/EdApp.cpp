@@ -113,6 +113,7 @@ namespace faf::editor
       kMenuFullHelp = 1112,
       kMenuArmies = 1113,
       kMenuProperties = 1114,
+      kMenuMaterialEditor = 1115,
       kMenuPanelsWhilePlaying = 1104,
       kMenuResetLayout = 1105,
       kMenuImGuiDemo = 1106,
@@ -842,6 +843,7 @@ namespace faf::editor
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuLighting, L"&Lighting");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuArmies, L"&Armies");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuProperties, L"P&roperties");
+      ::AppendMenuW(mViewMenu, MF_STRING, kMenuMaterialEditor, L"Mat&erial Editor");
       ::AppendMenuW(mViewMenu, MF_SEPARATOR, 0, nullptr);
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuFullHelp, L"&Full help text");
       ::AppendMenuW(mViewMenu, MF_STRING, kMenuLog, L"&Log");
@@ -889,6 +891,7 @@ namespace faf::editor
       check(kMenuLighting, mShell->ShowLighting());
       check(kMenuArmies, mShell->ShowArmies());
       check(kMenuProperties, mShell->ShowProperties());
+      check(kMenuMaterialEditor, mShell->ShowMaterialEditor());
       check(kMenuFullHelp, FullHelpText());
       check(kMenuLog, mShell->ShowLog());
       check(kMenuPanelsWhilePlaying, mShell->PanelsWhilePlaying());
@@ -995,6 +998,9 @@ namespace faf::editor
         break;
       case kMenuLighting:
         mShell->ShowLighting() = !mShell->ShowLighting();
+        break;
+      case kMenuMaterialEditor:
+        mShell->ShowMaterialEditor() = !mShell->ShowMaterialEditor();
         break;
       case kMenuScript:
         mShell->ShowScript() = !mShell->ShowScript();
@@ -1189,6 +1195,30 @@ namespace faf::editor
             mShell->Browser().OpenFromDisk(file);
           }
         }
+        // `/materialeditor` (test runs): the material editor open from the start.
+        if (static bool asked = false; !asked) {
+          asked = true;
+          if (moho::CFG_GetArgOption("/materialeditor", 0, nullptr)) {
+            mShell->ShowMaterialEditor() = true;
+          }
+          if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/materialopen", 1, &file) && !file.empty()) {
+            mShell->ShowMaterialEditor() = true;
+            (void)mShell->MaterialEditor().OpenFile(std::filesystem::path(file[0].c_str()));
+          }
+          if (fa::vector<fa::string> type; moho::CFG_GetArgOption("/materialselect", 1, &type) && !type.empty()) {
+            mShell->ShowMaterialEditor() = true;
+            mShell->MaterialEditor().SelectFirst(type[0].c_str());
+          }
+          mShell->MaterialEditor().SetTerrainSource([this] { return mScene.TerrainHeights(); });
+        }
+        {
+          // A vault map's own folder keeps its graphs; the game's own maps (in its install folder) don't get any.
+          const std::filesystem::path scmap = mDocument.MapDiskFile();
+          const std::string vault = mDocument.VaultFolder().lexically_normal().string();
+          const std::string folder = scmap.parent_path().lexically_normal().string();
+          const bool inVault = !scmap.empty() && !vault.empty() && folder.size() > vault.size() && _strnicmp(folder.c_str(), vault.c_str(), vault.size()) == 0;
+          mShell->MaterialEditor().SetMapFolder(inVault ? scmap.parent_path() : std::filesystem::path());
+        }
         mShell->Draw();
         // `/focuspanel <window>` (test runs): that panel in front, a while after the map opened (opening fronts Info).
         if (mFocusPanelFrames < 90 && mDocument.GetState() == EdDocument::State::Open) {
@@ -1210,8 +1240,9 @@ namespace faf::editor
         case EdShell::Command::None:
           break;
         }
-        // Undo and redo from the panels too (the viewport's keys go to the scene directly).
-        if (!ImGui::GetIO().WantTextInput) {
+        // Undo and redo from the panels too (the viewport's keys go to the scene directly); the material editor
+        // keeps its own.
+        if (!ImGui::GetIO().WantTextInput && !mShell->MaterialEditor().Focused()) {
           if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S)) {
             SaveDocument();
           } else if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_N)) {
@@ -2887,7 +2918,11 @@ namespace faf::editor
       std::vector<RECT> holes;
       if (mImGuiReady && !modal) {
         for (const ImGuiWindow* const window : ImGui::GetCurrentContext()->Windows) {
-          const bool floating = std::strncmp(window->Name, EdMapBrowser::kWindowName, std::strlen(EdMapBrowser::kWindowName)) == 0;
+          // A window not docked into the layout (the Maps window, the Material Editor, any panel pulled out) floats over
+          // the view and takes the mouse there; the dock space's own host window (behind everything) doesn't.
+          const bool undocked = (window->Flags & ImGuiWindowFlags_NoBringToFrontOnFocus) == 0 &&
+                                (window->DockNode == nullptr || ImGui::DockNodeGetRootNode(window->DockNode)->IsFloatingNode());
+          const bool floating = undocked || std::strncmp(window->Name, EdMapBrowser::kWindowName, std::strlen(EdMapBrowser::kWindowName)) == 0;
           if (!window->WasActive || window->Hidden ||
               ((window->Flags & (ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_Popup | ImGuiWindowFlags_ChildMenu)) == 0 && !floating) ||
               (window->Flags & ImGuiWindowFlags_ChildWindow) != 0) {

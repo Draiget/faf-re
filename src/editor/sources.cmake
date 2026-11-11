@@ -55,6 +55,10 @@ set(FAF_EDITOR_SOURCES
   tools/EdDecals.cpp
   tools/EdChecks.cpp
   tools/EdShaderSlots.cpp
+  graph/EdNodeGraph.cpp
+  graph/EdTextureGraph.cpp
+  ui/EdNodeCanvas.cpp
+  ui/EdMaterialEditor.cpp
   tools/EdPathing.cpp
   tools/EdTextureLibrary.cpp
   tools/EdSymmetryCheck.cpp

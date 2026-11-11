@@ -221,6 +221,9 @@ namespace faf::editor
       if (mShowLighting) {
         DrawLightingPanel();
       }
+      if (mShowMaterialEditor) {
+        mMaterialEditor.Draw(mShowMaterialEditor);
+      }
       if (mTools.TakeOpenArmies()) {
         mShowArmies = true;
         mFocusArmies = true;

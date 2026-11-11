@@ -11,6 +11,7 @@
 
 #include <Windows.h>
 
+#include "editor/graph/EdTextureGraph.h"
 #include "editor/tools/EdViewAids.h"
 #include "editor/tools/EdTerrainTypes.h"
 #include "editor/doc/EdLayerPreset.h"
@@ -74,6 +75,8 @@ namespace faf::editor
     bool ImportHeights(const std::filesystem::path& file, float scale, std::string& message);
     /** Writes the map's heights as a height image, `width` samples wide (0: the map's own size). */
     bool ExportHeights(const std::filesystem::path& file, int width, float scale, std::string& message);
+    /** The map's heights in game units for the material editor's map nodes (null without a map). */
+    [[nodiscard]] std::shared_ptr<TerrainSource> TerrainHeights() const;
 
     /** The open map's ten texture slots (lower, strata 1-8, upper) as the terrain has them. */
     [[nodiscard]] std::vector<EdTools::LayerSlot> LayerSlots() const;

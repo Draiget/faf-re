@@ -1603,6 +1603,23 @@ namespace faf::editor
     return true;
   }
 
+  std::shared_ptr<TerrainSource> EdMapScene::TerrainHeights() const
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    if (field == nullptr || field->width < 2 || field->height < 2) {
+      return nullptr;
+    }
+    auto terrain = std::make_shared<TerrainSource>();
+    terrain->width = field->width;
+    terrain->height = field->height;
+    terrain->units = 1.0f; // a sample per game unit
+    terrain->heights.resize(static_cast<std::size_t>(field->width) * static_cast<std::size_t>(field->height));
+    for (std::size_t i = 0; i < terrain->heights.size(); ++i) {
+      terrain->heights[i] = static_cast<float>(field->data[i]) / 128.0f;
+    }
+    return terrain;
+  }
+
   void EdMapScene::RefreshHeights(const std::vector<SampleRect>& rects)
   {
     mWeightStale = true; // the overlays lie on the ground
