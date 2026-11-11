@@ -866,39 +866,15 @@ namespace faf::editor
           value.text = buffer;
           changed = true;
         }
-        // The terrain textures the game data has, with thumbnails.
-        if (ImGui::Button("Pick a texture...")) {
-          ImGui::OpenPopup("##pick");
-        }
-        ImGui::SetNextWindowSizeConstraints(ImVec2(300.0f, 200.0f), ImVec2(420.0f, 460.0f));
-        if (ImGui::BeginPopup("##pick")) {
-          static char filter[64] = {};
-          ImGui::SetNextItemWidth(-1.0f);
-          ImGui::InputTextWithHint("##filter", "Search", filter, sizeof(filter));
-          int shown = 0;
+        // The terrain textures the game data has: the picked one's picture, a click opens the browser of them all
+        // (pictures in a grid, by biome folder). The path above still takes any file typed in.
+        if (mLayerPaths.size() != mLibrary.Textures().size()) {
+          mLayerPaths.clear();
           for (const LayerTexture& texture : mLibrary.Textures()) {
-            if (filter[0] != '\0' && texture.path.find(filter) == std::string::npos) {
-              continue;
-            }
-            if (++shown > 200) {
-              break;
-            }
-            const std::uint64_t thumb = mLibrary.Thumbnail(texture.path);
-            if (thumb != 0) {
-              ImGui::Image(static_cast<ImTextureID>(thumb), ImVec2(32.0f, 32.0f));
-            } else {
-              ImGui::Dummy(ImVec2(32.0f, 32.0f));
-            }
-            ImGui::SameLine();
-            if (ImGui::Selectable((texture.biome + " / " + texture.name).c_str(), texture.path == value.text, 0, ImVec2(0.0f, 32.0f))) {
-              value.text = texture.path;
-              changed = true;
-              ImGui::CloseCurrentPopup();
-            }
+            mLayerPaths.push_back(texture.path);
           }
-          mLibrary.Pump(6);
-          ImGui::EndPopup();
         }
+        changed = mTexturePicker.Field("##pick", value.text, mLayerPaths, mLibrary, false) || changed;
         break;
       }
       }

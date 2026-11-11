@@ -3,6 +3,7 @@
 #include "editor/doc/EdMapFile.h"
 #include "editor/ui/EdImGuiRenderer.h"
 #include "editor/view/EdParticleViewport.h"
+#include "gpg/core/utils/Logging.h"
 #include "imgui.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
@@ -65,8 +66,83 @@ namespace faf::editor
     }
   }
 
+  void EdParticleEditor::OpenOther(std::function<void()> open)
+  {
+    SyncGraph(); // the graph's edits counted
+    if (!mDirty) {
+      open();
+      return;
+    }
+    mPendingOpen = std::move(open);
+    mAskUnsaved = true;
+  }
+
+  void EdParticleEditor::DrawUnsavedModal()
+  {
+    if (std::exchange(mAskUnsaved, false)) {
+      ImGui::OpenPopup("Unsaved changes");
+      gpg::Logf("editor: particle editor: unsaved changes in %s, asked before opening another", (mFlatMode ? mName : mEffectName).c_str());
+    }
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (!ImGui::BeginPopupModal("Unsaved changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      return;
+    }
+    const std::string name = mFlatMode ? mName : mEffectName;
+    ImGui::Text("%s has changes that are not saved.", name.c_str());
+    ImGui::TextDisabled("Opening another effect replaces it in the Particle Editor.");
+    ImGui::Spacing();
+    const auto proceed = [&] {
+      if (mPendingOpen) {
+        std::exchange(mPendingOpen, nullptr)();
+      }
+      ImGui::CloseCurrentPopup();
+    };
+    if (ImGui::Button("Save")) {
+      const bool saved = mFlatMode ? Save(mPath.empty() ? Folder() / (mName + ".bp") : mPath) : SaveGraph(mEffectName);
+      if (saved) {
+        proceed();
+      }
+    }
+    ImGui::SetItemTooltip("Saves it into %s, then opens the other", Folder().string().c_str());
+    ImGui::SameLine();
+    if (ImGui::Button("Don't save")) {
+      mDirty = false;
+      proceed();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+      mPendingOpen = nullptr;
+      ImGui::CloseCurrentPopup();
+    }
+    if (!mStatus.empty() && mStatus.rfind("Can't", 0) == 0) {
+      ImGui::TextColored(ImVec4(0.95f, 0.45f, 0.35f, 1.0f), "%s", mStatus.c_str());
+    }
+    ImGui::EndPopup();
+  }
+
+  void EdParticleEditor::ClearGraph()
+  {
+    if (mGraph) {
+      mGraph->Clear();
+      mGraphUndo = {mGraph->Save()};
+      mGraphUndoAt = 0;
+      mGraphSnap = mGraph->Changes();
+      mGraphClean = mGraph->Changes();
+      mGraphBuilt = mGraph->Changes();
+    }
+    mFxEmitters.clear();
+    for (const auto& fx : mFx) {
+      fx->SetPlaying(false);
+    }
+    mEffectName = "new_effect";
+    mEffectPaths.clear();
+    mKeyDrag = -1;
+    mKeySelected = -1;
+  }
+
   void EdParticleEditor::NewFlat(const char* kind)
   {
+    ClearGraph();
     // A start as the game's own files have them.
     mFlat = {};
     mFlat.kind = kind;
@@ -168,6 +244,7 @@ namespace faf::editor
         mStatus = path + ": " + error;
         return false;
       }
+      ClearGraph();
       mFlat = std::move(flat);
       mFlatMode = true;
       mGamePath = path;
@@ -267,6 +344,7 @@ namespace faf::editor
       ImGui::EndDisabled();
       ImGui::EndPopup();
     }
+    DrawUnsavedModal();
     ImGui::End();
   }
 
@@ -390,14 +468,16 @@ namespace faf::editor
     }
     if (ImGui::BeginMenu("File")) {
       if (ImGui::MenuItem("New beam")) {
-        NewFlat("BeamBlueprint");
+        OpenOther([this] { NewFlat("BeamBlueprint"); });
       }
       if (ImGui::MenuItem("New trail")) {
-        NewFlat("TrailEmitterBlueprint");
+        OpenOther([this] { NewFlat("TrailEmitterBlueprint"); });
       }
       if (ImGui::MenuItem("New effect")) {
-        mGamePath.clear();
-        SetGraph("new_effect", {{"new_emitter", NewEmitter()}}, "");
+        OpenOther([this] {
+          mGamePath.clear();
+          SetGraph("new_effect", {{"new_emitter", NewEmitter()}}, "");
+        });
       }
       if (ImGui::MenuItem("Browse the game's effects...")) {
         mOpenBrowserAsk = true;
@@ -489,15 +569,10 @@ namespace faf::editor
         break;
       case FlatValue::Kind::Text:
         if (field.texture) {
-          if (ImGui::BeginCombo(field.key, value.text.empty() ? "(none)" : BaseName(value.text).c_str(), ImGuiComboFlags_HeightLarge)) {
-            for (const std::string& texture : mParticleTextures) {
-              if (ImGui::Selectable(texture.c_str(), Lower(texture) == Lower(value.text))) {
-                value.text = texture;
-                edited = true;
-              }
-            }
-            ImGui::EndCombo();
-          }
+          ImGui::TextDisabled("%s", field.key);
+          ImGui::PushItemWidth(260.0f);
+          edited = mTexturePicker.Field(field.key, value.text, mParticleTextures, mLibrary, true);
+          ImGui::PopItemWidth();
         } else {
           char buffer[160];
           (void)std::snprintf(buffer, sizeof(buffer), "%s", value.text.c_str());
@@ -582,7 +657,7 @@ namespace faf::editor
           break;
         }
         if (ImGui::Selectable(path.c_str())) {
-          (void)OpenGameEmitter(path);
+          OpenOther([this, path] { (void)OpenGameEmitter(path); });
           ImGui::CloseCurrentPopup();
         }
       }

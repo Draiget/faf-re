@@ -125,14 +125,14 @@ namespace faf::editor
         }
         ImGui::Spacing();
         if (ImGui::Button("Edit in the Particle Editor", ImVec2(-1.0f, 0.0f))) {
-          mOpenEditorAsk = true;
+          mOpenEditorAsk = true; // the editor opens and this browser closes (EdShell)
         }
+        ImGui::SetItemTooltip("Opens it in the Particle Editor to change (this browser closes); Save there writes a copy into the map's folder");
         if (ImGui::Button("Place on the map", ImVec2(-1.0f, 0.0f))) {
           mPlaceAsk = mBrowserPick;
         }
         ImGui::SetItemTooltip("An effect decoration at the middle of the map's view (an Effect marker: move it with the Markers tool; "
                               "the map's script plays it in the game)");
-        ImGui::SetItemTooltip("Opens it in the Particle Editor to change; Save there writes a copy into the map's folder");
       } else {
         ImGui::TextWrapped("Click an effect to play it here (and at the middle of the map's view). The wheel over the preview zooms.");
       }
@@ -214,8 +214,15 @@ namespace faf::editor
                 ImGui::SetTooltip("%s\n%s, %s, %s\nClick to play it in the preview", info.path.c_str(), kEffectFactions[info.faction], kEffectKinds[info.kind],
                                   info.read ? kTypes[std::clamp(info.type, 0, 3)] + 0 : "...");
               }
-              if (picked && OpenGameEmitter(info.path)) {
-                mBrowserPick = info.path;
+              if (picked && info.path == mBrowserPick) {
+                RestartPreview(); // the one open again: played from its start, its edits kept
+              } else if (picked) {
+                // Another effect in place of the open one: asks first when that one has unsaved edits.
+                OpenOther([this, path = info.path] {
+                  if (OpenGameEmitter(path)) {
+                    mBrowserPick = path;
+                  }
+                });
               }
               ImGui::PopID();
             }
@@ -226,6 +233,7 @@ namespace faf::editor
       ImGui::EndChild();
       ImGui::EndTable();
     }
+    DrawUnsavedModal();
     ImGui::End();
   }
 } // namespace faf::editor

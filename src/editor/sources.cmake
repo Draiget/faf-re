@@ -15,6 +15,7 @@ set(FAF_EDITOR_SOURCES
   doc/EdSaveFile.cpp
   doc/EdUnits.cpp
   doc/EdUnitFate.cpp
+  doc/EdGroupOptions.cpp
   doc/EdUnitWrecks.cpp
   doc/EdPackage.cpp
   doc/EdWaterPreset.cpp
@@ -65,6 +66,7 @@ set(FAF_EDITOR_SOURCES
   ui/EdParticleEditor.cpp
   ui/EdParticleBrowser.cpp
   ui/EdParticleGraph.cpp
+  ui/EdTexturePicker.cpp
   ui/EdNodeCanvas.cpp
   ui/EdMaterialEditor.cpp
   tools/EdPathing.cpp

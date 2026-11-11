@@ -3,11 +3,13 @@
 #include "editor/doc/EdEmitter.h"
 #include "editor/graph/EdEffectGraph.h"
 #include "editor/ui/EdNodeCanvas.h"
+#include "editor/ui/EdTexturePicker.h"
 #include "editor/tools/EdTextureLibrary.h"
 #include "editor/view/EdParticlePreview.h"
 #include "editor/view/EdParticleViewport.h"
 
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <utility>
 #include <string>
@@ -56,6 +58,15 @@ namespace faf::editor
     void TestNew(const std::string& kind) { NewFlat(kind == "beam" ? "BeamBlueprint" : "TrailEmitterBlueprint"); }
     /** Test runs (`/particleopen <game path>`): opens a game emitter. */
     bool OpenGameEmitter(const std::string& path);
+    /** Test runs (`/particleswitch <game path>`): the open effect marked edited, then that one opened through the question. */
+    void TestOpenEdited(const std::string& path)
+    {
+      SyncGraph();
+      mDirty = true;
+      OpenOther([this, path] { (void)OpenGameEmitter(path); });
+    }
+    /** Test runs (`/texturepicker`): the next texture input drawn opens its browser. */
+    void TestTexturePicker() noexcept { mTexturePicker.AskOpen(); }
     /** Opens one of FAF's effect templates (its emitters played together) as a graph. */
     bool OpenTemplate(const EffectTemplate& effect);
     /** Test runs (`/particletemplate <name>`): opens that template. */
@@ -68,6 +79,17 @@ namespace faf::editor
     void NewFlat(const char* kind);
     void DrawBrowser();
     void Changed();
+    /**
+     * Opens something else in place of the open effect (another effect, a new one): at once while it has no unsaved
+     * edits, else after the "Unsaved changes" question (Save, Don't save, Cancel).
+     */
+    void OpenOther(std::function<void()> open);
+    /** The question, in whichever window (editor or browser) draws first; both call it. */
+    void DrawUnsavedModal();
+    std::function<void()> mPendingOpen;
+    bool mAskUnsaved = false;
+    /** The graph emptied and its previews stopped, before a beam or trail opens instead (no old nodes left behind). */
+    void ClearGraph();
     /** Plays the effect from its start at the view's next spot, leaving the last particles out of sight. */
     void RestartPreview();
     bool Save(const std::filesystem::path& file);
@@ -94,6 +116,8 @@ namespace faf::editor
     bool mOpenBrowser = false;
     char mBrowserFilter[96] = {};
     std::vector<std::string> mParticleTextures;
+    /** The texture inputs' browser (a grid of the particle textures' pictures). */
+    EdTexturePicker mTexturePicker;
     char mSaveName[96] = {};
     bool mOpenSave = false;
     /** The Preview pane: the middle of the 3D view, where the effect plays, magnified. */

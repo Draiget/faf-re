@@ -3,6 +3,7 @@
 #include "editor/graph/EdTextureGraph.h"
 #include "editor/tools/EdTextureLibrary.h"
 #include "editor/ui/EdNodeCanvas.h"
+#include "editor/ui/EdTexturePicker.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -138,6 +139,9 @@ namespace faf::editor
     std::function<std::shared_ptr<TerrainSource>()> mTerrainSource;
     std::shared_ptr<TerrainSource> mTerrain;
     EdTextureLibrary mLibrary;
+    /** The texture inputs' browser, and the layer textures' paths it shows. */
+    EdTexturePicker mTexturePicker;
+    std::vector<std::string> mLayerPaths;
 
     // The preview: what it shows, its turn, and its image.
     int mPreviewMode = 0; // sphere, plane (2 x 2), albedo, normal, mask

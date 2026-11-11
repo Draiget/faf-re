@@ -231,7 +231,9 @@ namespace faf::editor
         mParticleEditor.DrawBrowserWindow(mShowParticleBrowser);
       }
       if (mParticleEditor.TakeOpenEditorAsk()) {
+        // The browser's "Edit": the editor takes over, the browser closes.
         mShowParticleEditor = true;
+        mShowParticleBrowser = false;
       }
       if (mParticleEditor.TakeOpenBrowserAsk()) {
         mShowParticleBrowser = true;

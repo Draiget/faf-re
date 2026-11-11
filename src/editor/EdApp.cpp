@@ -1282,6 +1282,15 @@ namespace faf::editor
           if (fa::vector<fa::string> slot; mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/materiallive", 1, &slot) && !slot.empty()) {
             mShell->MaterialEditor().TestLive(std::atoi(slot[0].c_str()));
           }
+          if (fa::vector<fa::string> file; mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/particleswitch", 1, &file) && !file.empty()) {
+            // `/particleswitch <game path>` (test runs): the open effect taken as edited, then another opened (it asks first).
+            mShell->ShowParticleEditor() = true;
+            mShell->ParticleEditor().TestOpenEdited(file[0].c_str());
+          }
+          if (mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/texturepicker", 0, nullptr)) {
+            // `/texturepicker` (test runs): the particle editor's next texture input opens its browser.
+            mShell->ParticleEditor().TestTexturePicker();
+          }
           if (fa::vector<fa::string> effect; mFocusPanelFrames == 60 && moho::CFG_GetArgOption("/placeeffect", 1, &effect) && !effect.empty()) {
             // `/placeeffect <game path>` (test runs): an effect decoration at the view's centre.
             mScene.PlaceEffect(effect[0].c_str());

@@ -9,6 +9,7 @@
 
 #include "editor/EdShell.h"
 #include "editor/doc/EdDocument.h"
+#include "editor/doc/EdGroupOptions.h"
 #include "editor/doc/EdUnitFate.h"
 #include "editor/doc/EdUnitWrecks.h"
 #include "editor/doc/EdUnits.h"
@@ -51,12 +52,46 @@ namespace faf::editor
       civilian = civilian && std::find(team.armies.begin(), team.armies.end(), unit.owner) == team.armies.end();
     }
     const UnitFate fate = FateOfUnit(path, civilian, mDocument.Script());
+    // A group the script creates: which lobby option decides it, and what each of its values does (user report: Dual
+    // Gap's wrecks are a lobby option the panel didn't name). Read again only when the script, options or group change.
+    const bool byScript = fate.kind == UnitFate::Kind::ScriptUnit || fate.kind == UnitFate::Kind::ScriptWreck || fate.kind == UnitFate::Kind::ScriptEither;
+    static std::string cachedScript;
+    static std::string cachedOptions;
+    static std::string cachedGroup;
+    static std::vector<std::string> lobbyLines;
+    static bool lobbyNever = false;
+    if (byScript && (cachedGroup != fate.group || cachedScript != mDocument.Script() || cachedOptions != mDocument.OptionsText())) {
+      cachedGroup = fate.group;
+      cachedScript = mDocument.Script();
+      cachedOptions = mDocument.OptionsText();
+      const std::vector<LobbyOptionInfo> options = ParseLobbyOptions(cachedOptions);
+      const GroupLobbyRule rule = LobbyRuleOfGroup(cachedScript, options, fate.group);
+      lobbyLines = DescribeLobbyRule(rule, options);
+      lobbyNever = rule.scriptNames && rule.Never();
+    }
+    const ImVec4 warn(0.95f, 0.75f, 0.30f, 1.0f);
     row("In a game");
     ImGui::PushTextWrapPos(0.0f);
     const bool wreck = fate.kind == UnitFate::Kind::Wreck || fate.kind == UnitFate::Kind::ScriptWreck;
-    ImGui::TextColored(fate.kind == UnitFate::Kind::Never ? ImVec4(0.95f, 0.75f, 0.30f, 1.0f) : ImGui::GetStyleColorVec4(ImGuiCol_Text), "%s",
+    ImGui::TextColored(fate.kind == UnitFate::Kind::Never || (byScript && lobbyNever) ? warn : ImGui::GetStyleColorVec4(ImGuiCol_Text), "%s",
                        fate.text.c_str());
     ImGui::PopTextWrapPos();
+    if (byScript && !lobbyLines.empty()) {
+      row("Lobby");
+      ImGui::BeginGroup();
+      ImGui::PushTextWrapPos(0.0f);
+      for (const std::string& line : lobbyLines) {
+        if (lobbyNever) {
+          ImGui::TextColored(warn, "%s", line.c_str());
+        } else {
+          ImGui::TextUnformatted(line.c_str());
+        }
+      }
+      ImGui::PopTextWrapPos();
+      ImGui::EndGroup();
+      ImGui::SetItemTooltip("Read from the map's script (the if / for around its CreateArmyGroup) and its _options.lua: the values the "
+                            "lobby offers for each option the script reads there.");
+    }
 
     // The wreck's value, as Unit.lua's CreateWreckageProp makes it (under water: its ground below the map's water).
     const bool underwater = UnderWater(mDocument, unit.position[0], unit.position[2]);

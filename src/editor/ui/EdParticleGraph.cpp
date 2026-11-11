@@ -126,7 +126,10 @@ namespace faf::editor
         return node.type->name == kTextureNode ? mLibrary.Thumbnail(node.params[0].text, true) : 0;
       });
     }
+    // The old effect's nodes go (BuildEffectGraph clears the graph), and with them what was picked on them.
     BuildEffectGraph(*mGraph, effectName, emitters);
+    mKeyDrag = -1;
+    mKeySelected = -1;
     mEffectName = effectName;
     mEffectPaths = gamePaths;
     mGraphClean = mGraph->Changes();
@@ -446,20 +449,8 @@ namespace faf::editor
       }
       case ParamKind::Text:
         if (type.name == kTextureNode) {
-          // The game's particle textures, with the picked one's picture.
-          if (const std::uint64_t image = mLibrary.Thumbnail(value.text, true); image != 0) {
-            ImGui::Image(ImTextureRef(static_cast<ImTextureID>(image)), ImVec2(96.0f, 96.0f));
-          }
-          ImGui::SetNextItemWidth(-1.0f);
-          if (ImGui::BeginCombo("##texture", FileBase(value.text).c_str(), ImGuiComboFlags_HeightLarge)) {
-            for (const std::string& texture : mParticleTextures) {
-              if (ImGui::Selectable(texture.c_str(), LowerName(texture) == LowerName(value.text))) {
-                value.text = texture;
-                changed = true;
-              }
-            }
-            ImGui::EndCombo();
-          }
+          // The game's particle textures: the picked one's picture, a click opens the browser of them all.
+          changed = mTexturePicker.Field("##texture", value.text, mParticleTextures, mLibrary, true);
         } else {
           char buffer[160];
           (void)std::snprintf(buffer, sizeof(buffer), "%s", value.text.c_str());
