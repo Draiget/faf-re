@@ -11,6 +11,7 @@
 #include "editor/doc/EdWaterBodies.h"
 #include "editor/tools/EdDecals.h"
 #include "editor/tools/EdMarkers.h"
+#include "editor/doc/EdViewState.h"
 #include "editor/tools/EdTextureLibrary.h"
 
 #include <algorithm>
@@ -494,6 +495,47 @@ namespace faf::editor
       float radius = 3.0f;
       std::uint32_t colour = 0xF0FFA040u;
     };
+    /** The view switches and tool, as kept per map across restarts (doc/EdViewState). */
+    [[nodiscard]] ViewState GetViewState() const
+    {
+      ViewState s;
+      s.tool = mTool;
+      s.grid = mShowGrid;
+      s.snap = mSnap;
+      s.gridStep = mGridStep;
+      s.keepOnGround = mKeepOnGround;
+      s.slope = mShowSlope;
+      s.kmGrid = mShowKmGrid;
+      s.terrainTypes = mShowTerrainTypes;
+      s.pathing = mShowPathing;
+      s.pathingLayer = mPathingLayer;
+      s.layerWeight = mShowWeight;
+      s.differences = mShowDifferences;
+      s.props = mShowProps;
+      s.units = mShowUnits;
+      s.gameUnits = mShowGameUnits;
+      s.hiddenMarkerTypes = mHiddenMarkerTypes;
+      return s;
+    }
+    void SetViewState(const ViewState& s)
+    {
+      mTool = s.tool;
+      mShowGrid = s.grid;
+      mSnap = s.snap;
+      mGridStep = s.gridStep;
+      mKeepOnGround = s.keepOnGround;
+      mShowSlope = s.slope;
+      mShowKmGrid = s.kmGrid;
+      mShowTerrainTypes = s.terrainTypes;
+      mShowPathing = s.pathing;
+      mPathingLayer = s.pathingLayer;
+      mShowWeight = s.layerWeight;
+      mShowDifferences = s.differences;
+      mShowProps = s.props;
+      mShowUnits = s.units;
+      mShowGameUnits = s.gameUnits;
+      mHiddenMarkerTypes = s.hiddenMarkerTypes;
+    }
     /** In front of a play: the game's units selected in the editor's view (entity ids), for the Properties panel. */
     void SetLiveSelection(std::vector<std::uint32_t> ids) { mLiveSelection = std::move(ids); }
     [[nodiscard]] const std::vector<std::uint32_t>& LiveSelection() const noexcept { return mLiveSelection; }

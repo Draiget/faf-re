@@ -4,6 +4,7 @@
 #include "editor/doc/EdAdaptiveTables.h"
 #include <iterator>
 #include <fstream>
+#include <sstream>
 #include <regex>
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 
@@ -478,6 +479,65 @@ namespace faf::editor
         return mScene.OnWindowMessage(window, message, wParam, lParam);
       }
       [[nodiscard]] bool SessionActive() const { return mPlay.Active(); }
+      /**
+       * The view switches and tool per map (doc/EdViewState): read when a map opens (a map not seen before keeps the
+       * switches as they are), written within a second of a change. Command-line test runs (`/open`, `/play`) don't
+       * write them, so they never change what the user's maps keep, unless `/viewsave` asks; a `/tool` given keeps its
+       * tool over the file's.
+       */
+      void KeepViewState()
+      {
+        if (mDocument.GetState() != EdDocument::State::Open) {
+          return;
+        }
+        EdTools& tools = mShell->Tools();
+        const std::filesystem::path folder = EditorSettingsFolder();
+        if (folder.empty()) {
+          return;
+        }
+        const std::filesystem::path file = folder / "views" / ViewStateFileName(mDocument.Path());
+        const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+        if (mViewStateFor != mDocument.Path()) {
+          mViewStateFor = mDocument.Path();
+          mViewStateCheckAt = now + 1.0;
+          if (std::ifstream in(file, std::ios::binary); in) {
+            std::stringstream text;
+            text << in.rdbuf();
+            ViewState state = ReadViewState(text.str(), tools.GetViewState());
+            if (moho::CFG_GetArgOption("/tool", 1, nullptr)) {
+              state.tool = tools.GetViewState().tool;
+            }
+            tools.SetViewState(state);
+            gpg::Logf("editor: the map's view switches and tool from %s", file.string().c_str());
+          }
+          mViewStateSaved = tools.GetViewState();
+          return;
+        }
+        if (now < mViewStateCheckAt) {
+          return;
+        }
+        mViewStateCheckAt = now + 1.0;
+        const ViewState state = tools.GetViewState();
+        if (state == mViewStateSaved) {
+          return;
+        }
+        mViewStateSaved = state;
+        static const bool testRun = (moho::CFG_GetArgOption("/open", 1, nullptr) || moho::CFG_GetArgOption("/play", 1, nullptr)) &&
+                                    !moho::CFG_GetArgOption("/viewsave", 0, nullptr);
+        if (testRun) {
+          return;
+        }
+        std::error_code error;
+        std::filesystem::create_directories(file.parent_path(), error);
+        if (std::ofstream out(file, std::ios::binary | std::ios::trunc); out) {
+          out << WriteViewState(state);
+          gpg::Logf("editor: the map's view switches and tool kept in %s", file.string().c_str());
+        }
+      }
+      std::string mViewStateFor;
+      double mViewStateCheckAt = 0.0;
+      ViewState mViewStateSaved;
+
       /** F6 while a play runs: the editor's view in front of it, or the game's again. */
       void ToggleEditorView() { mShell->EditorViewInPlay() = !mShell->EditorViewInPlay(); }
       [[nodiscard]] bool EditorViewOverPlay() const { return mScene.OverPlay(); }
@@ -1312,6 +1372,7 @@ namespace faf::editor
         }
       }
       mScene.Update(frameSeconds, playIdle, mShell->EditorViewInPlay() && moho::WLD_GetFrameAction() == moho::EWldFrameAction::Playing);
+      KeepViewState();
       mShell->Tools().SetModelsLoading(mScene.ModelsPending());
 
       if (mImGuiReady) {

@@ -73,6 +73,7 @@ set(FAF_EDITOR_SOURCES
   view/EdLiveUnits.cpp
   doc/EdAdaptiveModel.cpp
   doc/EdLuaSyntax.cpp
+  doc/EdViewState.cpp
   ui/EdNodeCanvas.cpp
   ui/EdMaterialEditor.cpp
   tools/EdPathing.cpp
