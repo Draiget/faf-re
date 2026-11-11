@@ -1,0 +1,7 @@
+file = extended_full.fmap
+layer = 0
+sampler = flat height 10.0, slope 0, material 0, surface 0, no holes, density map constant 1.0
+grid = 64x48 cells, cellSize 1.0, origin 0,0
+record = u32 variant, f32 x, z, y, scale, yawDeg, tint (little endian)
+count = 60
+sha256 = 37ff6aa107f2b4682dbb6c17cd97cec1f094dde4cb42506045edf8dfef288a73

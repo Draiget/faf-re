@@ -18,6 +18,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
+#include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/core/streams/Stream.h"
 #include "lua/LuaObject.h"
 #include "gpg/core/utils/Logging.h"
@@ -25,6 +26,10 @@
 #include "legacy/containers/Tree.h"
 #include "legacy/containers/Vector.h"
 #include "moho/misc/FileWaitHandleSet.h"
+#include "moho/sim/mapformat/ClassicExport.h"
+#include "moho/sim/mapformat/ExtendedMap.h"
+#include "moho/sim/mapformat/MapFormat.h"
+#include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/math/Vector4f.h"
 #include "moho/math/MathReflection.h"
@@ -383,6 +388,35 @@ namespace
     if (loadControl.mHandle != nullptr) {
       loadControl.mHandle->UpdateLoadingProgress();
     }
+  }
+
+  // The container 3 / 4 map of the running session (null for Classic maps) and the format of the last map loaded for a
+  // session. Plain statics: a session loads one map at a time, on the loading thread, before the sim starts.
+  std::shared_ptr<moho::mapformat::ExtendedMap> g_sessionExtendedMap;
+  moho::mapformat::SMapFormatInfo g_sessionMapFormat;
+
+  void FreeMapBytes(const char* bytes)
+  {
+    delete[] bytes;
+  }
+
+  /// True when `<map folder>/terrain/terrain.lua` exists (the FA-MeshTerrain manifest, map format "Legacy25D").
+  bool HasMeshTerrainManifest(const std::string& mapPath)
+  {
+    const std::size_t slash = mapPath.find_last_of("/\\");
+    if (slash == std::string::npos) {
+      return false;
+    }
+    const std::string manifest = mapPath.substr(0, slash) + "/terrain/terrain.lua";
+    moho::FILE_EnsureWaitHandleSet();
+    moho::FWaitHandleSet* const waitHandleSet = moho::FILE_GetWaitHandleSet();
+    if (waitHandleSet == nullptr || waitHandleSet->mHandle == nullptr) {
+      return false;
+    }
+    fa::string resolved;
+    resolved.tidy(false, 0U);
+    (void)waitHandleSet->mHandle->FindFile(&resolved, manifest.c_str(), nullptr);
+    return !resolved.empty();
   }
 } // namespace
 
@@ -937,6 +971,11 @@ namespace moho
     std::uint32_t fileVersion = 0;
     reader.ReadExact(fileMagic);
     reader.ReadExact(fileVersion);
+    // Chunked formats (container 3 Extended, 4 Full3D; docs/mapformat/): same magic, another container version. They are
+    // decoded as a whole and bridged to the Classic loaders below. Container 2 takes the path it always took.
+    if (fileMagic == kWorldMapFileMagic && (fileVersion == 3U || fileVersion == 4U)) {
+      return MapLoadChunked(*stream, state, previewOnly, loadControl);
+    }
     if (fileMagic != kWorldMapFileMagic || fileVersion != kWorldMapFileVersion) {
       return false;
     }
@@ -947,6 +986,105 @@ namespace moho
       return false;
     }
 
+    if (previewOnly) {
+      return true;
+    }
+    g_sessionExtendedMap.reset();
+    g_sessionMapFormat = mapformat::SMapFormatInfo{};
+    g_sessionMapFormat.id = mapformat::EMapFormat::Classic;
+    g_sessionMapFormat.container = fileVersion;
+    // Legacy25D: a Classic map whose folder carries the mesh-terrain manifest (FA-MeshTerrain: terrain/terrain.lua).
+    if (HasMeshTerrainManifest(mapName != nullptr ? mapName : "")) {
+      g_sessionMapFormat.id = mapformat::EMapFormat::Legacy25D;
+    }
+
+    TickLoadingProgress(loadControl);
+    IWldTerrainRes* const newTerrainRes = WLD_CreateTerrainRes();
+    IWldTerrainRes* const previousTerrainRes = mTerrainRes;
+    mTerrainRes = newTerrainRes;
+    delete previousTerrainRes;
+    if (mTerrainRes == nullptr || !mTerrainRes->Load(reader, state, loadControl)) {
+      return false;
+    }
+
+    TickLoadingProgress(loadControl);
+    CWldProps* const newProps = WLD_CreateProps();
+    CWldProps* const previousProps = mProps;
+    mProps = newProps;
+    DestroyWldProps(previousProps);
+    if (mProps == nullptr || !mProps->Load(reader, loadControl)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Map format work (docs/mapformat/), not in the original binary.
+   *
+   * Loads a container 3 (Extended) or 4 (Full3D) map: reads the whole file, decodes and cross-checks it
+   * (`mapformat::LoadExtendedMap`), exports the Classic subset in memory (`mapformat::ExportClassic`) and runs the
+   * unchanged preview / terrain / prop loaders over those bytes. The decoded map stays available through
+   * `WLD_GetExtendedMap` for the stages that use the newer chunks. A map the reader refuses is logged with the reason
+   * and fails the load like any unreadable map.
+   */
+  bool CWldMap::MapLoadChunked(
+    gpg::Stream& stream, LuaPlus::LuaState* const state, const bool previewOnly, CBackgroundTaskControl& loadControl
+  )
+  {
+    const std::uint64_t fileSize = stream.VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginEnd, 0);
+    (void)stream.VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, 0);
+    if (fileSize < 128U || fileSize > 0x7FFFFFFFULL) {
+      gpg::Warnf("MapFormat: the map file has an unusable size (%u bytes)", static_cast<unsigned>(fileSize));
+      return false;
+    }
+    std::vector<std::uint8_t> fileBytes(static_cast<std::size_t>(fileSize));
+    if (stream.Read(reinterpret_cast<char*>(fileBytes.data()), fileBytes.size()) != fileBytes.size()) {
+      gpg::Warnf("MapFormat: could not read the whole map file");
+      return false;
+    }
+    TickLoadingProgress(loadControl);
+
+    auto extended = std::make_shared<mapformat::ExtendedMap>();
+    std::string problem;
+    if (!mapformat::LoadExtendedMap(std::move(fileBytes), mapformat::LoadOptions(), *extended, problem)) {
+      gpg::Warnf("MapFormat: cannot load this map: %s", problem.c_str());
+      return false;
+    }
+    gpg::Logf("%s", mapformat::DescribeFormat(extended->info).c_str());
+    for (const std::string& warning : extended->warnings) {
+      gpg::Warnf("MapFormat: %s", warning.c_str());
+    }
+    TickLoadingProgress(loadControl);
+
+    mapformat::ClassicExportResult exported;
+    if (!mapformat::ExportClassic(*extended, mapformat::ClassicExportOptions(), exported, problem)) {
+      gpg::Warnf("MapFormat: cannot build the engine map: %s", problem.c_str());
+      return false;
+    }
+    for (const std::string& note : exported.notes) {
+      gpg::Logf("MapFormat: engine map: %s", note.c_str());
+    }
+    TickLoadingProgress(loadControl);
+
+    char* const bridgeBytes = new char[exported.bytes.size()];
+    std::memcpy(bridgeBytes, exported.bytes.data(), exported.bytes.size());
+    const gpg::MemBuffer<const char> bridgeBuffer(
+      boost::shared_ptr<const char>(bridgeBytes, &FreeMapBytes), exported.bytes.size()
+    );
+    gpg::MemBufferStream bridgeStream(bridgeBuffer, static_cast<unsigned int>(exported.bytes.size()));
+    gpg::BinaryReader reader(&bridgeStream);
+
+    std::uint32_t bridgeMagic = 0;
+    std::uint32_t bridgeVersion = 0;
+    reader.ReadExact(bridgeMagic);
+    reader.ReadExact(bridgeVersion);
+
+    auto* const newPreviewChunk = new (std::nothrow) RWldMapPreviewChunk();
+    ReplaceOwnedPreviewChunk(&mMapPreviewChunk, newPreviewChunk);
+    if (mMapPreviewChunk == nullptr || !mMapPreviewChunk->Load(reader, loadControl)) {
+      return false;
+    }
     if (previewOnly) {
       return true;
     }
@@ -969,7 +1107,19 @@ namespace moho
       return false;
     }
 
+    g_sessionMapFormat = extended->info;
+    g_sessionExtendedMap = std::move(extended);
     return true;
+  }
+
+  const mapformat::SMapFormatInfo& WLD_GetMapFormatInfo()
+  {
+    return g_sessionMapFormat;
+  }
+
+  const mapformat::ExtendedMap* WLD_GetExtendedMap()
+  {
+    return g_sessionExtendedMap.get();
   }
 
 

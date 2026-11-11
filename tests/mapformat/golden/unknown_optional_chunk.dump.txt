@@ -1,0 +1,68 @@
+file.container = 3
+file.revision = 1
+file.flags = 0x00000000
+file.required = 0x0000000000000001
+file.optional = 0x0000000000000000
+file.mapGuid = f6b9450dba8c868a1a08ffefcbb4c738
+file.simHash = 912371335f45e09d0fab00dc4041e16eefc68cd0f2c92d7353c06aaddb67525c
+chunk GPLY inst=0 ver=1 flags=0x0003 raw=3102
+GPLY.legacyTerrainIds = 1
+GPLY.surfaces.count = 1
+GPLY.surfaces[0].id = 0
+GPLY.surfaces[0].name = "Default"
+GPLY.surfaces[0].flags = 0
+GPLY.surfaces[0].speedMul = 256
+GPLY.surfaces[0].effectsKey = ""
+GPLY.idWidth = 1
+GPLY.ids = plane[64x48] sha256:e80232b4d18d0bb7e794be263ba937626f383f9917d4b8a737ba893a8f752293
+GPLY.masks.count = 0
+chunk GRID inst=0 ver=1 flags=0x0003 raw=29
+GRID.cellsX = 64
+GRID.cellsZ = 48
+GRID.cellSize = f32:3f800000
+GRID.originX = f32:00000000
+GRID.originZ = f32:00000000
+GRID.minElevation = f32:42bb8400
+GRID.maxElevation = f32:436ce400
+GRID.reserved = 0
+chunk HGHT inst=0 ver=1 flags=0x000b raw=6378
+HGHT.minHeight = f32:00000000
+HGHT.stepLog2 = -7
+HGHT.predictor = 1
+HGHT.tileSize = 0
+HGHT.samples = plane[65x49] sha256:09dfe5c2db376d5c3fc685914eb415d96956435960f9961636569ff60c57a442
+chunk META inst=0 ver=1 flags=0x0000 raw=189
+META.name = "Golden Min"
+META.locs.count = 1
+META.locs[0].lang = "de"
+META.locs[0].name = "Golden Min (de)"
+META.locs[0].description = "Eine Testkarte \u00fcber H\u00fcgel"
+META.author = "faf-re golden generator"
+META.version = "1.0"
+META.license = "CC0-1.0"
+META.website = "https://example.invalid/maps"
+META.tags.count = 1
+META.tags[0] = "golden"
+META.mapType = 0
+META.minPlayers = 2
+META.maxPlayers = 4
+META.reqs.count = 0
+META.createdUtc = 1730678400
+META.modifiedUtc = 1730764800
+META.toolName = "make_golden.py"
+META.toolVersion = "1"
+chunk PLAY inst=0 ver=1 flags=0x0003 raw=21
+PLAY.x0 = 2
+PLAY.z0 = 2
+PLAY.x1 = 62
+PLAY.z1 = 46
+PLAY.borderMode = 1
+PLAY.polygon.count = 0
+chunk WBOD inst=0 ver=1 flags=0x0003 raw=17
+WBOD.bodies.count = 1
+WBOD.bodies[0].id = 0
+WBOD.bodies[0].name = "Sea"
+WBOD.bodies[0].kind = 0
+WBOD.bodies[0].level = f32:42be0000
+WBOD.bodies[0].extentKind = 0
+chunk ZZZO inst=0 skipped

@@ -708,6 +708,18 @@ set(FAF_ENGINE_SOURCES
   moho/sim/CWldMap.cpp
   moho/sim/WldTerrainResHeadless.cpp
   moho/terrain/CWldTerrainRes.cpp
+  moho/sim/mapformat/Hash.cpp
+  moho/sim/mapformat/Inflate.cpp
+  moho/sim/mapformat/MapFormat.cpp
+  moho/sim/mapformat/MapContainer.cpp
+  moho/sim/mapformat/SimChunks.cpp
+  moho/sim/mapformat/RenderChunks.cpp
+  moho/sim/mapformat/World3DChunks.cpp
+  moho/sim/mapformat/MapDump.cpp
+  moho/sim/mapformat/Scatter.cpp
+  moho/sim/mapformat/ExtendedMap.cpp
+  moho/sim/mapformat/ClassicExport.cpp
+  moho/sim/MapFormatLua.cpp
   moho/collision/RDebugCollision.cpp
   moho/collision/RDebugCollisionTypeInfo.cpp
   moho/client/Localization.cpp

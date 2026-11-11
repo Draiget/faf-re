@@ -881,6 +881,8 @@ namespace
       (void)::moho::func_GetUnitsInRect_LuaFuncDef();
       (void)::moho::func_GetReclaimablesInRect_LuaFuncDef();
       (void)::moho::func_GetMapSize_LuaFuncDef();
+      (void)::moho::func_GetMapFormat_Sim_LuaFuncDef();
+      (void)::moho::func_GetMapFormat_User_LuaFuncDef();
       (void)::moho::func_GetTerrainHeight_LuaFuncDef();
       (void)::moho::func_GetSurfaceHeight_LuaFuncDef();
       (void)::moho::func_GetTerrainTypeOffset_LuaFuncDef();

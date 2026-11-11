@@ -410,6 +410,39 @@ set_target_properties(faf_slab_tests PROPERTIES FOLDER "Tests/Sim")
 add_test(NAME slab_tests COMMAND faf_slab_tests)
 set_tests_properties(slab_tests PROPERTIES LABELS "Sim")
 
+# Map formats (docs/mapformat/): the container reader, chunk decoders and the Classic bridge are standard C++ only, so
+# each test is built from the sources it exercises and not from the engine. The golden maps are read relative to
+# tests/mapformat/, which is the working directory.
+function(faf_mapformat_test name)
+  set(_target faf_mapformat_${name}_tests)
+  set(_sources)
+  foreach(_file ${ARGN})
+    list(APPEND _sources ${CMAKE_SOURCE_DIR}/src/moho/sim/mapformat/${_file})
+  endforeach()
+  add_executable(${_target} EXCLUDE_FROM_ALL mapformat/${name}Tests.cpp ${_sources})
+  target_include_directories(${_target} PRIVATE ${CMAKE_SOURCE_DIR}/src)
+  target_link_libraries(${_target} PRIVATE gtest_main)
+  set_target_properties(${_target} PROPERTIES FOLDER "Tests/MapFormat")
+  if(MSVC)
+    target_compile_options(${_target} PRIVATE /EHsc)
+  endif()
+  add_test(NAME mapformat_${name} COMMAND ${_target} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/mapformat)
+  set_tests_properties(mapformat_${name} PROPERTIES LABELS "MapFormat")
+endfunction()
+
+faf_mapformat_test(Smoke Hash.cpp)
+faf_mapformat_test(Inflate Inflate.cpp)
+faf_mapformat_test(Container Hash.cpp Inflate.cpp MapFormat.cpp MapContainer.cpp MapDump.cpp World3DChunks.cpp)
+faf_mapformat_test(SimChunks Hash.cpp SimChunks.cpp)
+faf_mapformat_test(RenderChunks Hash.cpp RenderChunks.cpp)
+faf_mapformat_test(World3DChunks Hash.cpp World3DChunks.cpp)
+faf_mapformat_test(World3DSim Hash.cpp SimChunks.cpp)
+faf_mapformat_test(Scatter Hash.cpp Scatter.cpp)
+faf_mapformat_test(Golden Hash.cpp Inflate.cpp MapFormat.cpp MapContainer.cpp MapDump.cpp SimChunks.cpp RenderChunks.cpp
+  World3DChunks.cpp Scatter.cpp)
+faf_mapformat_test(ClassicExport Hash.cpp Inflate.cpp MapFormat.cpp MapContainer.cpp SimChunks.cpp RenderChunks.cpp
+  ExtendedMap.cpp ClassicExport.cpp)
+
 # Every GoogleTest executable above and in the subdirectories. Keep this last: it sees only the
 # targets defined before it, so a test added below it is never built by faf_tests and ctest
 # reports it as Not Run.

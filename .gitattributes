@@ -10,3 +10,6 @@ tools/pgo/*.sh text eol=lf
 # Stored call hashes (tests/replay_sets): binary, and the list keeps its LF.
 tests/replay_sets/*.sets binary
 tests/replay_sets/*.tsv text eol=lf
+# Map format goldens are byte-exact binary and text
+tests/mapformat/golden/* -text
+*.fmap binary
