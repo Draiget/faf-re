@@ -173,7 +173,7 @@ namespace
   [[nodiscard]] unsigned short ReadControlWord() noexcept
   {
     unsigned short cw;
-    __asm fnstcw cw
+    __asm { fnstcw cw }
     return cw;
   }
 
@@ -182,7 +182,7 @@ namespace
   [[nodiscard]] int X87Depth() noexcept
   {
     unsigned short sw;
-    __asm fnstsw sw
+    __asm { fnstsw sw }
     const int top = (sw >> 11) & 7;
     return top == 0 ? 0 : 8 - top;
   }

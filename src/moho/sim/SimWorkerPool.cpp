@@ -108,7 +108,7 @@ namespace moho
     SFpuControlState state{};
 #if defined(_M_IX86)
     std::uint16_t controlWord = 0;
-    __asm fnstcw controlWord
+    __asm { fnstcw controlWord }
     state.mX87ControlWord = controlWord;
 #endif
     state.mMxcsr = _mm_getcsr() & kMxcsrControlMask;
@@ -119,7 +119,7 @@ namespace moho
   {
 #if defined(_M_IX86)
     std::uint16_t controlWord = static_cast<std::uint16_t>(mX87ControlWord);
-    __asm fldcw controlWord
+    __asm { fldcw controlWord }
 #endif
     _mm_setcsr((_mm_getcsr() & ~kMxcsrControlMask) | (mMxcsr & kMxcsrControlMask));
   }
