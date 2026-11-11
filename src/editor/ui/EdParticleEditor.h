@@ -32,6 +32,8 @@ namespace faf::editor
 
     /** Test runs (`/particlecollapse`): the window folded to its title bar, the preview still running. */
     void TestCollapse() noexcept { mCollapse = true; }
+    /** Test runs (`/particlenew beam|trail`): a new beam or trail. */
+    void TestNew(const std::string& kind) { NewFlat(kind == "beam" ? "BeamBlueprint" : "TrailEmitterBlueprint"); }
     /** Test runs (`/particleopen <game path>`): opens a game emitter. */
     bool OpenGameEmitter(const std::string& path);
 
@@ -40,12 +42,18 @@ namespace faf::editor
     void DrawModules();
     void DrawCurve();
     void DrawDetails();
+    /** A beam's or trail's keys (they have no curves). */
+    void DrawFlat();
+    void NewFlat(const char* kind);
     void DrawBrowser();
     void Changed();
     bool Save(const std::filesystem::path& file);
     [[nodiscard]] std::filesystem::path Folder() const;
 
     EmitterBlueprint mEmitter = NewEmitter();
+    /** A beam or trail is open instead of an emitter. */
+    bool mFlatMode = false;
+    FlatBlueprint mFlat;
     std::string mName = "new_emitter";
     std::filesystem::path mPath;
     bool mDirty = false;

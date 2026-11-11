@@ -29,6 +29,12 @@ namespace faf::editor
 
     /** The emitter to show (its curves and settings from now on; textures loaded when their paths change). */
     void SetEmitter(const EmitterBlueprint& emitter);
+    /**
+     * A beam or trail to show instead (EmitterBlueprint again with SetEmitter): a beam from the point rising at an angle
+     * for its Lifetime, then again; a trail behind a point circling the place (15 units out, 4 s a turn), a segment a
+     * tick as CEfxTrailEmitter::Tick builds them.
+     */
+    void SetFlat(const FlatBlueprint& blueprint);
     /** Where it emits (game units). */
     void SetPlace(float x, float y, float z);
     void SetPlaying(bool playing) noexcept { mPlaying = playing; }
@@ -47,7 +53,13 @@ namespace faf::editor
   private:
     void Retexture();
 
+    void FrameBeam(int now);
+    void FrameTrail(int now);
+
     EmitterBlueprint mEmitter;
+    FlatBlueprint mFlat;
+    bool mUseFlat = false;
+    float mTrailLength = 0.0f;
     std::string mTexturePath;
     std::string mRampPath;
     moho::CParticleTexture* mTexture = nullptr;

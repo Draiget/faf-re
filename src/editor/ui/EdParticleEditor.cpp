@@ -73,7 +73,62 @@ namespace faf::editor
   void EdParticleEditor::Changed()
   {
     mDirty = true;
-    mPreview.SetEmitter(mEmitter);
+    if (mFlatMode) {
+      mPreview.SetFlat(mFlat);
+    } else {
+      mPreview.SetEmitter(mEmitter);
+    }
+  }
+
+  void EdParticleEditor::NewFlat(const char* kind)
+  {
+    // A start as the game's own files have them.
+    mFlat = {};
+    mFlat.kind = kind;
+    FlatValue value;
+    const bool beam = std::string(kind) == "BeamBlueprint";
+    mName = beam ? "new_beam" : "new_trail";
+    value.kind = FlatValue::Kind::Text;
+    value.text = mName;
+    mFlat.Set("BlueprintId", value);
+    const auto number = [&](const char* key, const float n) {
+      FlatValue v;
+      v.number = n;
+      mFlat.Set(key, v);
+    };
+    const auto text = [&](const char* key, const char* s) {
+      FlatValue v;
+      v.kind = FlatValue::Kind::Text;
+      v.text = s;
+      mFlat.Set(key, v);
+    };
+    if (beam) {
+      number("Lifetime", 10.0f);
+      text("TextureName", "/textures/particles/beam_white_01.dds");
+      number("Length", 30.0f);
+      number("Thickness", 1.0f);
+      FlatValue color;
+      color.kind = FlatValue::Kind::Color;
+      color.color = {1.0f, 0.6f, 0.2f, 1.0f};
+      mFlat.Set("StartColor", color);
+      color.color = {1.0f, 0.2f, 0.1f, 1.0f};
+      mFlat.Set("EndColor", color);
+    } else {
+      number("Lifetime", -1.0f);
+      number("TrailLength", 10.0f);
+      number("Size", 1.0f);
+      number("SortOrder", 0.0f);
+      number("BlendMode", 3.0f);
+      number("TextureRepeatRate", 0.05f);
+      number("LODCutoff", 160.0f);
+      text("RepeatTexture", "/textures/particles/air_contrail_01.dds");
+      text("RampTexture", "/textures/particles/ramp_white_01.dds");
+    }
+    mFlatMode = true;
+    mPath.clear();
+    mDirty = false;
+    Changed();
+    mPreview.Restart();
   }
 
   void EdParticleEditor::Frame(const bool showing)
@@ -84,7 +139,11 @@ namespace faf::editor
     if (!mPreviewStarted) {
       // The renderer's clock runs between sessions from now on, so the preview's particles age and expire.
       moho::gAppIdleClock = true;
-      mPreview.SetEmitter(mEmitter);
+      if (mFlatMode) {
+        mPreview.SetFlat(mFlat);
+      } else {
+        mPreview.SetEmitter(mEmitter);
+      }
       mPreview.Restart();
       mPreviewStarted = true;
     }
@@ -103,9 +162,23 @@ namespace faf::editor
     EmitterBlueprint read;
     std::string error;
     if (!ParseEmitter(text, read, error)) {
-      mStatus = path + ": " + error;
-      return false;
+      FlatBlueprint flat;
+      std::string flatError;
+      if (!ParseFlatBlueprint(text, flat, flatError)) {
+        mStatus = path + ": " + error;
+        return false;
+      }
+      mFlat = std::move(flat);
+      mFlatMode = true;
+      mName = BaseName(path);
+      mPath.clear();
+      mDirty = false;
+      mPreview.SetFlat(mFlat);
+      mPreview.Restart();
+      mStatus = "Opened " + path;
+      return true;
     }
+    mFlatMode = false;
     mEmitter = std::move(read);
     mName = BaseName(path);
     mPath.clear(); // the game's own: Save asks for a name in the map's folder
@@ -127,7 +200,7 @@ namespace faf::editor
       mStatus = "Can't write " + file.string();
       return false;
     }
-    const std::string text = WriteEmitter(mEmitter);
+    const std::string text = mFlatMode ? WriteFlatBlueprint(mFlat) : WriteEmitter(mEmitter);
     std::string crlf;
     for (const char c : text) {
       crlf += c == '\n' ? std::string("\r\n") : std::string(1, c);
@@ -154,7 +227,12 @@ namespace faf::editor
       return;
     }
     DrawToolbar();
-    if (ImGui::BeginTable("##layout", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, ImGui::GetContentRegionAvail())) {
+    if (mFlatMode) {
+      if (ImGui::BeginChild("##flat", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders)) {
+        DrawFlat();
+      }
+      ImGui::EndChild();
+    } else if (ImGui::BeginTable("##layout", 3, ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV, ImGui::GetContentRegionAvail())) {
       ImGui::TableSetupColumn("modules", ImGuiTableColumnFlags_WidthFixed, 230.0f);
       ImGui::TableSetupColumn("curve", ImGuiTableColumnFlags_WidthStretch);
       ImGui::TableSetupColumn("details", ImGuiTableColumnFlags_WidthFixed, 320.0f);
@@ -204,7 +282,14 @@ namespace faf::editor
       return;
     }
     if (ImGui::BeginMenu("File")) {
+      if (ImGui::MenuItem("New beam")) {
+        NewFlat("BeamBlueprint");
+      }
+      if (ImGui::MenuItem("New trail")) {
+        NewFlat("TrailEmitterBlueprint");
+      }
       if (ImGui::MenuItem("New emitter")) {
+        mFlatMode = false;
         mEmitter = NewEmitter();
         mName = "new_emitter";
         mPath.clear();
@@ -212,7 +297,7 @@ namespace faf::editor
         Changed();
         mPreview.Restart();
       }
-      if (ImGui::MenuItem("Open a game emitter...")) {
+      if (ImGui::MenuItem("Open a game effect (emitter, beam, trail)...")) {
         mOpenBrowser = true;
       }
       if (ImGui::MenuItem("Save", nullptr, false, true)) {
@@ -527,10 +612,103 @@ namespace faf::editor
     }
   }
 
+  void EdParticleEditor::DrawFlat()
+  {
+    const bool beam = mFlat.kind == "BeamBlueprint";
+    ImGui::SeparatorText(beam ? "Beam" : "Trail");
+    ImGui::TextWrapped("%s", beam ? "A beam is a textured strip between two points: weapons' beams, tractor and shield beams. The preview draws it from "
+                                    "the view's centre, rising, for its Lifetime and again."
+                                  : "A trail is a ribbon left behind a moving point: missiles' and aircraft's trails. The preview moves its emitter "
+                                    "round the view's centre, a turn every 4 seconds.");
+    ImGui::Spacing();
+    bool changed = false;
+    for (const FlatField& field : FlatFields(mFlat.kind)) {
+      const FlatValue* present = mFlat.Find(field.key);
+      FlatValue value;
+      value.kind = field.kind;
+      value.number = field.initial;
+      value.flag = field.initial != 0.0f;
+      value.color = field.initialColor;
+      if (present != nullptr) {
+        value = *present;
+      }
+      bool edited = false;
+      ImGui::PushID(field.key);
+      ImGui::SetNextItemWidth(260.0f);
+      switch (field.kind) {
+      case FlatValue::Kind::Number:
+        edited = ImGui::DragFloat(field.key, &value.number, 0.01f, 0.0f, 0.0f, "%.4g");
+        break;
+      case FlatValue::Kind::Bool:
+        edited = ImGui::Checkbox(field.key, &value.flag);
+        break;
+      case FlatValue::Kind::Color:
+        edited = ImGui::ColorEdit4(field.key, value.color.data(), ImGuiColorEditFlags_Float | ImGuiColorEditFlags_AlphaBar);
+        break;
+      case FlatValue::Kind::Text:
+        if (field.texture) {
+          if (ImGui::BeginCombo(field.key, value.text.empty() ? "(none)" : BaseName(value.text).c_str(), ImGuiComboFlags_HeightLarge)) {
+            for (const std::string& texture : mParticleTextures) {
+              if (ImGui::Selectable(texture.c_str(), Lower(texture) == Lower(value.text))) {
+                value.text = texture;
+                edited = true;
+              }
+            }
+            ImGui::EndCombo();
+          }
+        } else {
+          char buffer[160];
+          (void)std::snprintf(buffer, sizeof(buffer), "%s", value.text.c_str());
+          if (ImGui::InputText(field.key, buffer, sizeof(buffer), ImGuiInputTextFlags_EnterReturnsTrue)) {
+            value.text = buffer;
+            edited = true;
+          }
+        }
+        break;
+      case FlatValue::Kind::Raw:
+        break;
+      }
+      ImGui::SetItemTooltip("%s", field.help);
+      if (present == nullptr) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("(not in the file: the engine's default)");
+      }
+      ImGui::PopID();
+      if (edited) {
+        value.kind = field.kind;
+        mFlat.Set(field.key, value);
+        changed = true;
+      }
+    }
+    // Keys the editor doesn't know, as the file has them.
+    for (const auto& [key, value] : mFlat.fields) {
+      bool known = false;
+      for (const FlatField& field : FlatFields(mFlat.kind)) {
+        known = known || key == field.key;
+      }
+      if (!known) {
+        ImGui::TextDisabled("%s = %s (kept as written)", key.c_str(), value.kind == FlatValue::Kind::Number ? std::to_string(value.number).c_str() : value.text.c_str());
+      }
+    }
+    if (mParticleTextures.empty()) {
+      if (moho::CVirtualFileSystem* vfs = moho::DISK_GetVFS(); vfs != nullptr) {
+        fa::vector<fa::string> found;
+        vfs->EnumerateFiles("/textures/particles", "*.dds", true, &found);
+        for (const fa::string& file : found) {
+          mParticleTextures.push_back(file.c_str());
+        }
+        std::sort(mParticleTextures.begin(), mParticleTextures.end());
+      }
+    }
+    if (changed) {
+      Changed();
+    }
+  }
+
   void EdParticleEditor::DrawBrowser()
   {
     if (mOpenBrowser) {
-      ImGui::OpenPopup("Open a game emitter");
+      ImGui::OpenPopup("Open a game effect");
       mOpenBrowser = false;
       if (!mListed) {
         mListed = true;
@@ -545,11 +723,11 @@ namespace faf::editor
       }
     }
     ImGui::SetNextWindowSize(ImVec2(520.0f, 480.0f), ImGuiCond_Appearing);
-    if (!ImGui::BeginPopup("Open a game emitter")) {
+    if (!ImGui::BeginPopup("Open a game effect")) {
       return;
     }
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::InputTextWithHint("##filter", "Search the game's effects (e.g. muzzle, smoke, explosion)", mBrowserFilter, sizeof(mBrowserFilter));
+    ImGui::InputTextWithHint("##filter", "Search the game's effects (e.g. muzzle, smoke, beam, trail)", mBrowserFilter, sizeof(mBrowserFilter));
     const std::string filter = Lower(mBrowserFilter);
     if (ImGui::BeginChild("##list", ImVec2(0.0f, 0.0f))) {
       int shown = 0;

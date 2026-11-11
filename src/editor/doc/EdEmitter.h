@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <utility>
@@ -157,4 +158,54 @@ namespace faf::editor
   bool ParseEmitter(const std::string& text, EmitterBlueprint& out, std::string& error);
   /** The file's text, as retail's editor writes it. */
   std::string WriteEmitter(const EmitterBlueprint& emitter);
+
+  // ---- Beams and trails: short flat tables, written by hand in the game's data ----
+
+  /** One value of a beam's or trail's blueprint. */
+  struct FlatValue
+  {
+    enum class Kind : std::uint8_t
+    {
+      Number,
+      Bool,
+      Text,
+      Color, // {x=r, y=g, z=b, w=a}
+      Raw,   // anything else, kept as the file had it
+    } kind = Kind::Number;
+    float number = 0.0f;
+    bool flag = false;
+    std::string text;
+    std::array<float, 4> color{};
+  };
+
+  /** A BeamBlueprint or TrailEmitterBlueprint: its keys in the file's order (only those it has: a missing key keeps the engine's default). */
+  struct FlatBlueprint
+  {
+    std::string kind; // "BeamBlueprint" or "TrailEmitterBlueprint"
+    std::vector<std::pair<std::string, FlatValue>> fields;
+
+    [[nodiscard]] const FlatValue* Find(const std::string& key) const;
+    /** Sets the key's value, adding it at the end when the file didn't have it. */
+    void Set(const std::string& key, const FlatValue& value);
+    [[nodiscard]] float Number(const std::string& key, float fallback) const;
+    [[nodiscard]] std::string Text(const std::string& key) const;
+    [[nodiscard]] std::array<float, 4> Color(const std::string& key, const std::array<float, 4>& fallback) const;
+  };
+
+  /** What the editor shows for one key: its kind, the engine's default (RBeamBlueprint / RTrailBlueprint), and help. */
+  struct FlatField
+  {
+    const char* key;
+    FlatValue::Kind kind;
+    float initial;
+    std::array<float, 4> initialColor;
+    const char* help;
+    bool texture;
+  };
+  const std::vector<FlatField>& FlatFields(const std::string& kind);
+
+  /** Reads a beam or trail file; false with `error` for anything else. */
+  bool ParseFlatBlueprint(const std::string& text, FlatBlueprint& out, std::string& error);
+  /** The file's text: `Kind {`, a key a line (four spaces, as the game's own), `}`. */
+  std::string WriteFlatBlueprint(const FlatBlueprint& blueprint);
 } // namespace faf::editor

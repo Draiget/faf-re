@@ -1212,6 +1212,10 @@ namespace faf::editor
           if (moho::CFG_GetArgOption("/materialeditor", 0, nullptr)) {
             mShell->ShowMaterialEditor() = true;
           }
+          if (fa::vector<fa::string> kind; moho::CFG_GetArgOption("/particlenew", 1, &kind) && !kind.empty()) {
+            mShell->ShowParticleEditor() = true;
+            mShell->ParticleEditor().TestNew(kind[0].c_str());
+          }
           if (fa::vector<fa::string> file; moho::CFG_GetArgOption("/particleopen", 1, &file) && !file.empty()) {
             // `/particleopen <game path>` (test runs): the particle editor open on a game emitter.
             mShell->ShowParticleEditor() = true;

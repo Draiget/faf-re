@@ -85,7 +85,9 @@ namespace faf::editor
     public:
       explicit Reader(const std::string& text) : mText(text) {}
 
-      bool Parse(Value& out, std::string& error)
+      bool Parse(Value& out, std::string& error) { return Parse(out, error, {"EmitterBlueprint"}, nullptr); }
+
+      bool Parse(Value& out, std::string& error, const std::vector<std::string>& names, std::string* found)
       {
         Skip();
         // `EmitterBlueprint { ... }` or `EmitterBlueprint({ ... })`.
@@ -94,8 +96,11 @@ namespace faf::editor
           ++mAt;
         }
         const std::string name = mText.substr(nameStart, mAt - nameStart);
-        if (name != "EmitterBlueprint") {
-          return Fail("not an EmitterBlueprint file", error);
+        if (std::find(names.begin(), names.end(), name) == names.end()) {
+          return Fail("not a" + std::string(names.size() == 1 ? "n " + names.front() : " beam or trail") + " file", error);
+        }
+        if (found != nullptr) {
+          *found = name;
         }
         Skip();
         const bool paren = Eat('(');
@@ -137,7 +142,10 @@ namespace faf::editor
           while (mAt < mText.size() && std::isspace(static_cast<unsigned char>(mText[mAt])) != 0) {
             ++mAt;
           }
-          if (mText.compare(mAt, 4, "--[[") == 0) {
+          if (mAt < mText.size() && mText[mAt] == '#') {
+            const std::size_t close = mText.find('\n', mAt);
+            mAt = close == std::string::npos ? mText.size() : close + 1;
+          } else if (mText.compare(mAt, 4, "--[[") == 0) {
             const std::size_t close = mText.find("]]", mAt + 4);
             mAt = close == std::string::npos ? mText.size() : close + 2;
           } else if (mText.compare(mAt, 2, "--") == 0) {
@@ -329,6 +337,173 @@ namespace faf::editor
       }
     }
   } // namespace
+
+  namespace
+  {
+    const std::vector<FlatField> kBeamFields = {
+      {"BlueprintId", FlatValue::Kind::Text, 0.0f, {}, "FAF's blueprint loader replaces it with the file's path", false},
+      {"Lifetime", FlatValue::Kind::Number, 1.0f, {}, "Ticks the beam shows (10 a second)", false},
+      {"TextureName", FlatValue::Kind::Text, 0.0f, {}, "The beam's texture, along its length", true},
+      {"Length", FlatValue::Kind::Number, 10.0f, {}, "Its length in game units", false},
+      {"Thickness", FlatValue::Kind::Number, 1.0f, {}, "Its width in game units", false},
+      {"StartColor", FlatValue::Kind::Color, 0.0f, {1.0f, 1.0f, 1.0f, 0.0f}, "The colour at its start (alpha: as the blend mode reads it)", false},
+      {"EndColor", FlatValue::Kind::Color, 0.0f, {1.0f, 1.0f, 1.0f, 0.0f}, "The colour at its end", false},
+      {"UShift", FlatValue::Kind::Number, 0.0f, {}, "Texture scroll across, a tick", false},
+      {"VShift", FlatValue::Kind::Number, 0.0f, {}, "Texture scroll along, a tick", false},
+      {"RepeatRate", FlatValue::Kind::Number, 0.0f, {}, "Texture repeats a game unit of length (0: once over the whole beam)", false},
+      {"Blendmode", FlatValue::Kind::Number, 3.0f, {}, "0 alpha, 1 modulate inverse, 2 modulate 2x inverse, 3 add, 4 premultiplied alpha", false},
+      {"LODCutoff", FlatValue::Kind::Number, 200.0f, {}, "The camera distance beyond which it isn't drawn", false},
+    };
+    const std::vector<FlatField> kTrailFields = {
+      {"BlueprintId", FlatValue::Kind::Text, 0.0f, {}, "FAF's blueprint loader replaces it with the file's path", false},
+      {"Lifetime", FlatValue::Kind::Number, 0.0f, {}, "Ticks the trail emitter lives; -1: as long as what carries it", false},
+      {"TrailLength", FlatValue::Kind::Number, 0.0f, {}, "Ticks each segment of the trail lasts: how long the trail is behind its emitter", false},
+      {"Size", FlatValue::Kind::Number, 0.0f, {}, "The ribbon's width in game units", false},
+      {"SortOrder", FlatValue::Kind::Number, 0.0f, {}, "Drawing order among effects", false},
+      {"BlendMode", FlatValue::Kind::Number, 0.0f, {}, "0 alpha, 1 modulate inverse, 2 modulate 2x inverse, 3 add, 4 premultiplied alpha", false},
+      {"TextureRepeatRate", FlatValue::Kind::Number, 0.0f, {}, "Texture repeats a game unit of the trail's length", false},
+      {"LODCutoff", FlatValue::Kind::Number, 100.0f, {}, "The camera distance beyond which it isn't drawn", false},
+      {"EmitIfVisible", FlatValue::Kind::Bool, 1.0f, {}, "Emits only while a player can see it", false},
+      {"CatchupEmit", FlatValue::Kind::Bool, 1.0f, {}, "Catches up with the ticks a hidden emitter missed", false},
+      {"RepeatTexture", FlatValue::Kind::Text, 0.0f, {}, "The ribbon's texture, repeated along it", true},
+      {"RampTexture", FlatValue::Kind::Text, 0.0f, {}, "Colours the ribbon over its age", true},
+    };
+
+    std::string Number(const float value)
+    {
+      char text[48];
+      (void)std::snprintf(text, sizeof(text), "%.6g", static_cast<double>(value));
+      return text;
+    }
+  } // namespace
+
+  const FlatValue* FlatBlueprint::Find(const std::string& key) const
+  {
+    for (const auto& [name, value] : fields) {
+      if (name == key) {
+        return &value;
+      }
+    }
+    return nullptr;
+  }
+
+  void FlatBlueprint::Set(const std::string& key, const FlatValue& value)
+  {
+    for (auto& [name, existing] : fields) {
+      if (name == key) {
+        existing = value;
+        return;
+      }
+    }
+    fields.emplace_back(key, value);
+  }
+
+  float FlatBlueprint::Number(const std::string& key, const float fallback) const
+  {
+    const FlatValue* value = Find(key);
+    if (value == nullptr) {
+      return fallback;
+    }
+    return value->kind == FlatValue::Kind::Bool ? (value->flag ? 1.0f : 0.0f) : value->number;
+  }
+
+  std::string FlatBlueprint::Text(const std::string& key) const
+  {
+    const FlatValue* value = Find(key);
+    return value != nullptr ? value->text : std::string();
+  }
+
+  std::array<float, 4> FlatBlueprint::Color(const std::string& key, const std::array<float, 4>& fallback) const
+  {
+    const FlatValue* value = Find(key);
+    return value != nullptr && value->kind == FlatValue::Kind::Color ? value->color : fallback;
+  }
+
+  const std::vector<FlatField>& FlatFields(const std::string& kind)
+  {
+    return kind == "BeamBlueprint" ? kBeamFields : kTrailFields;
+  }
+
+  bool ParseFlatBlueprint(const std::string& text, FlatBlueprint& out, std::string& error)
+  {
+    Value root;
+    Reader reader(text);
+    std::string kind;
+    if (!reader.Parse(root, error, {"BeamBlueprint", "TrailEmitterBlueprint"}, &kind)) {
+      return false;
+    }
+    FlatBlueprint made;
+    made.kind = kind;
+    for (const Field& field : root.fields) {
+      if (field.key.empty()) {
+        continue;
+      }
+      const Value& value = field.value.front();
+      FlatValue flat;
+      switch (value.kind) {
+      case Value::Kind::Number:
+        flat.kind = FlatValue::Kind::Number;
+        flat.number = static_cast<float>(value.number);
+        break;
+      case Value::Kind::Bool:
+        flat.kind = FlatValue::Kind::Bool;
+        flat.flag = value.flag;
+        break;
+      case Value::Kind::String:
+        flat.kind = FlatValue::Kind::Text;
+        flat.text = value.text;
+        break;
+      case Value::Kind::Table:
+        if (const Value* x = value.Find("x"); x != nullptr && value.fields.size() <= 4) {
+          flat.kind = FlatValue::Kind::Color;
+          const char* const axes[4] = {"x", "y", "z", "w"};
+          for (int i = 0; i < 4; ++i) {
+            const Value* lane = value.Find(axes[i]);
+            flat.color[static_cast<std::size_t>(i)] = lane != nullptr ? NumberOf(*lane) : 0.0f;
+          }
+          break;
+        }
+        flat.kind = FlatValue::Kind::Raw;
+        flat.text = text.substr(value.begin, value.end - value.begin);
+        break;
+      default:
+        flat.kind = FlatValue::Kind::Raw;
+        flat.text = text.substr(value.begin, value.end - value.begin);
+        break;
+      }
+      made.fields.emplace_back(field.key, std::move(flat));
+    }
+    out = std::move(made);
+    return true;
+  }
+
+  std::string WriteFlatBlueprint(const FlatBlueprint& blueprint)
+  {
+    std::string out = blueprint.kind + " {\n";
+    for (const auto& [key, value] : blueprint.fields) {
+      out += "    " + key + " = ";
+      switch (value.kind) {
+      case FlatValue::Kind::Number:
+        out += Number(value.number);
+        break;
+      case FlatValue::Kind::Bool:
+        out += value.flag ? "true" : "false";
+        break;
+      case FlatValue::Kind::Text:
+        out += value.text.find(']') == std::string::npos ? "[[" + value.text + "]]" : "'" + value.text + "'";
+        break;
+      case FlatValue::Kind::Color:
+        out += "{x=" + Number(value.color[0]) + ",y=" + Number(value.color[1]) + ",z=" + Number(value.color[2]) + ",w=" + Number(value.color[3]) + "}";
+        break;
+      case FlatValue::Kind::Raw:
+        out += value.text;
+        break;
+      }
+      out += ",\n";
+    }
+    out += "}\n";
+    return out;
+  }
 
   const EmitterCurveInfo& CurveInfo(const int curve)
   {

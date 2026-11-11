@@ -187,4 +187,71 @@ EmitterBlueprint {
     e.lifetime = -1.0f;
     EXPECT_FALSE(EmitterFinished(e, 1e6f));
   }
+  bool SameFlat(const FlatBlueprint& a, const FlatBlueprint& b)
+  {
+    if (a.kind != b.kind || a.fields.size() != b.fields.size()) {
+      return false;
+    }
+    for (std::size_t i = 0; i < a.fields.size(); ++i) {
+      const FlatValue& x = a.fields[i].second;
+      const FlatValue& y = b.fields[i].second;
+      const auto near = [](const float p, const float q) { return std::fabs(p - q) <= 1e-5f * std::max(1.0f, std::fabs(p)); };
+      if (a.fields[i].first != b.fields[i].first || x.kind != y.kind || x.flag != y.flag || x.text != y.text || !near(x.number, y.number)) {
+        return false;
+      }
+      for (int c = 0; c < 4; ++c) {
+        if (!near(x.color[static_cast<std::size_t>(c)], y.color[static_cast<std::size_t>(c)])) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  TEST(Emitter, BeamsWithCommentsAndColoursReadAndWriteBack)
+  {
+    const std::string text = "BeamBlueprint {\n    Lifetime = 3.0,\n    TextureName = '/textures/particles/beam_white_03.dds',\n"
+                             "    Thickness = 0.0175,\n    StartColor = {x=0,y=0.5,z=1,w=0}, # R,G,B,A\n}\n";
+    FlatBlueprint beam;
+    std::string error;
+    ASSERT_TRUE(ParseFlatBlueprint(text, beam, error)) << error;
+    EXPECT_EQ(beam.kind, "BeamBlueprint");
+    ASSERT_EQ(beam.fields.size(), 4U);
+    EXPECT_FLOAT_EQ(beam.Number("Thickness", 1.0f), 0.0175f);
+    EXPECT_FLOAT_EQ(beam.Number("Length", 10.0f), 10.0f); // missing: the engine's default
+    EXPECT_FLOAT_EQ(beam.Color("StartColor", {}).at(1), 0.5f);
+    EXPECT_EQ(beam.Text("TextureName"), "/textures/particles/beam_white_03.dds");
+    FlatBlueprint again;
+    ASSERT_TRUE(ParseFlatBlueprint(WriteFlatBlueprint(beam), again, error)) << error;
+    EXPECT_TRUE(SameFlat(beam, again));
+    EXPECT_FALSE(ParseFlatBlueprint("EmitterBlueprint { }", again, error));
+  }
+
+  TEST(Emitter, TheGamesBeamsAndTrailsReadAndWriteBack)
+  {
+    const std::string folder = faf::editor::test::EnvText("FAF_RETAIL_EMITTERS");
+    if (folder.empty()) {
+      GTEST_SKIP() << "FAF_RETAIL_EMITTERS is not set";
+    }
+    int beams = 0;
+    int trails = 0;
+    for (const auto& entry : std::filesystem::directory_iterator(folder)) {
+      std::ifstream in(entry.path(), std::ios::binary);
+      const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+      const bool beam = text.rfind("BeamBlueprint", 0) == 0;
+      if (!beam && text.rfind("TrailEmitterBlueprint", 0) != 0) {
+        continue;
+      }
+      (beam ? beams : trails) += 1;
+      FlatBlueprint read;
+      std::string error;
+      ASSERT_TRUE(ParseFlatBlueprint(text, read, error)) << entry.path().filename().string() << ": " << error;
+      FlatBlueprint again;
+      ASSERT_TRUE(ParseFlatBlueprint(WriteFlatBlueprint(read), again, error)) << entry.path().filename().string() << ": " << error;
+      EXPECT_TRUE(SameFlat(read, again)) << entry.path().filename().string();
+    }
+    std::printf("beams %d, trails %d\n", beams, trails);
+    EXPECT_GT(beams, 50);
+    EXPECT_GT(trails, 100);
+  }
 } // namespace
