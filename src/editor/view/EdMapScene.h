@@ -267,7 +267,12 @@ namespace faf::editor
     /** The ground (terrain or water) under a point of the viewport, in its pixels; false off the map. */
     bool GroundAt(float x, float y, float& outX, float& outZ) const;
     void MoveWithKeys(float frameSeconds);
-    /** The map's props as mesh instances, from the kept rules' blueprints once they are ready. */
+    /**
+     * The game's rules the view draws props, units and deposits with: the kept ones between plays; in front of a play,
+     * the ones lent to it (the same object, kept again when it ends; WPE.51). Null while neither is ready.
+     */
+    [[nodiscard]] moho::RRuleGameRules* Rules() const;
+    /** The map's props as mesh instances, from the rules' blueprints once they are ready. */
     void CreateProps();
     void DeleteProps();
 

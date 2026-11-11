@@ -221,15 +221,10 @@ namespace faf::editor
         if (loadingSince < 0.0) {
           loadingSince = now;
         }
+        // In front of a play the view draws them with the play's own rules (WPE.51), so this is the same short wait.
         char text[200];
-        if (playing) {
-          // The editor's view in front of a play: the blueprints are the play's until it ends.
-          (void)std::snprintf(text, sizeof(text), "While the map plays, its props and placed units aren't drawn here (the play has the game's "
-                                                  "blueprints); the game's own units are. They come back when the play stops.");
-        } else {
-          (void)std::snprintf(text, sizeof(text), "Loading models: trees, rocks, wrecks and units appear when the game's blueprints are ready (%.0f s)",
-                              now - loadingSince);
-        }
+        (void)std::snprintf(text, sizeof(text), "Loading models: trees, rocks, wrecks and units appear when the game's blueprints are ready (%.0f s)",
+                            now - loadingSince);
         ImDrawList* const dl = ImGui::GetForegroundDrawList();
         const ImVec2 size = ImGui::CalcTextSize(text);
         const float pad = 8.0f;

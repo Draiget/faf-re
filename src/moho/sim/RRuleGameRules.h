@@ -933,6 +933,13 @@ namespace moho
    */
   [[nodiscard]] RRuleGameRules* RULE_PeekKept();
 
+  /**
+   * Engine addition: the rules lent to the running session that will be kept after it (`RULE_TakeOrCreate` with
+   * keeping on), or null. The same object becomes the kept rules when the session ends, so blueprint pointers read
+   * from it on the main thread stay good across the session's end (the editor's view in front of its play).
+   */
+  [[nodiscard]] RRuleGameRules* RULE_PeekLent();
+
   /** Deletes the kept rules, if any (the editor, before the engine shuts down). */
   void RULE_DeleteKept();
 

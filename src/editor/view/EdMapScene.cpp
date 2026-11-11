@@ -2149,10 +2149,18 @@ namespace faf::editor
     moho::CAM_GetManager()->Frame(0.0f, frameSeconds);
   }
 
+  moho::RRuleGameRules* EdMapScene::Rules() const
+  {
+    if (moho::RRuleGameRules* const kept = moho::RULE_PeekKept(); kept != nullptr) {
+      return kept;
+    }
+    return mOverPlay ? moho::RULE_PeekLent() : nullptr;
+  }
+
   void EdMapScene::CreateProps()
   {
     // The rules every play uses, kept between plays and built at startup; until they are ready, next frame.
-    moho::RRuleGameRules* const rules = moho::RULE_PeekKept();
+    moho::RRuleGameRules* const rules = Rules();
     moho::MeshRenderer* const renderer = moho::MeshRenderer::GetInstance();
     if (rules == nullptr || renderer == nullptr || mMap == nullptr) {
       return;
@@ -2173,7 +2181,7 @@ namespace faf::editor
 
   void EdMapScene::CreateUnits()
   {
-    moho::RRuleGameRules* const rules = moho::RULE_PeekKept();
+    moho::RRuleGameRules* const rules = Rules();
     moho::MeshRenderer* const renderer = moho::MeshRenderer::GetInstance();
     if (rules == nullptr || renderer == nullptr) {
       return;
@@ -2242,7 +2250,7 @@ namespace faf::editor
 
   moho::MeshInstance* EdMapScene::MakePropInstance(const moho::CWldPropEntry& entry) const
   {
-    moho::RRuleGameRules* const rules = moho::RULE_PeekKept();
+    moho::RRuleGameRules* const rules = Rules();
     moho::MeshRenderer* const renderer = moho::MeshRenderer::GetInstance();
     if (rules == nullptr || renderer == nullptr) {
       return nullptr;
@@ -4518,7 +4526,7 @@ namespace faf::editor
 
   void EdMapScene::UpdateDeposits()
   {
-    moho::RRuleGameRules* const rules = moho::RULE_PeekKept();
+    moho::RRuleGameRules* const rules = Rules();
     moho::MeshRenderer* const renderer = moho::MeshRenderer::GetInstance();
     if (rules == nullptr || renderer == nullptr || mMap == nullptr) {
       return;
@@ -5228,7 +5236,7 @@ namespace faf::editor
     }
     mDetailsFor = path;
     mDetails.clear();
-    moho::RRuleGameRules* const rules = moho::RULE_PeekKept();
+    moho::RRuleGameRules* const rules = Rules();
     if (rules == nullptr || path.empty()) {
       return mDetails;
     }

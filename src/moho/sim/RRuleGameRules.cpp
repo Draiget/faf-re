@@ -1317,6 +1317,14 @@ namespace moho
     return state.preparing ? nullptr : state.kept;
   }
 
+  RRuleGameRules* RULE_PeekLent()
+  {
+    KeptRules& state = Kept();
+    const std::lock_guard<std::mutex> guard(state.lock);
+    // Held const while lent; the same object is the kept (non-const) rules after the session. Readers only read it.
+    return state.enabled ? const_cast<RRuleGameRules*>(state.lent) : nullptr;
+  }
+
   void RULE_DeleteKept()
   {
     KeptRules& state = Kept();
