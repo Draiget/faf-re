@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "gpg/core/containers/String.h"
+#include "legacy/algorithms/Sort.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/containers/BVIntSet.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
@@ -260,9 +261,12 @@ namespace moho
     }
 
     if (!playerOptions.empty()) {
-      std::sort(
-        playerOptions.begin(),
-        playerOptions.end(),
+      // The retail MSVC8 sort (legacy/algorithms/Sort.h), not the host library's: slots that tie (a
+      // non-integral or non-numeric PlayerOptions key gives slot -1) keep the same order on every
+      // platform, and the players and command sources are built in this order.
+      fa::sort(
+        playerOptions.data(),
+        playerOptions.data() + playerOptions.size(),
         [](const LaunchPlayerOptionEntry& lhs, const LaunchPlayerOptionEntry& rhs) {
         return lhs.mSlotIndex < rhs.mSlotIndex;
       }
