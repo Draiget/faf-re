@@ -17,10 +17,12 @@ Prints what the file holds: samples, own units, contacts, commands per minute by
 Pairing views with decisions: a command's "b" is the beat it ran in, and a line holds the commands up to its
 own beat, so its view already shows them running. The view a command was decided on is an earlier line's.
 
-Row layouts (format version 2):
+Row layouts (format version 3):
   own:      [id, bp, x, y, z, health, maxHealth, fraction, busy, workProgress]
   contacts: [id, bp|null, icon|null, generic, x, y, z, reconFlags, health|null, maxHealth|null, army|null]
             generic is the generic icon's class: structure, land, naval, air or other.
+            reconFlags also carries 0x100 when the UI draws the unit map-wide (visibility mode
+            MapPlayableRect, e.g. civilians revealed at the start): type and owner then show without intel.
 """
 
 import argparse
@@ -33,6 +35,7 @@ import sys
 RECON_LOS_NOW = 0x08
 RECON_LOS_EVER = 0x10
 RECON_KNOWN_FAKE = 0x20
+SHOWN_MAP_WIDE = 0x100  # not a recon flag: the writer's mark for visibility mode MapPlayableRect
 BLIP_KIND = 3
 
 # Contact row columns.
@@ -61,8 +64,8 @@ def read(path):
                 samples.append(record)
     if header is None:
         raise SystemExit(f"{path}: no header line")
-    if header.get("version") != 2:
-        raise SystemExit(f"{path}: format version {header.get('version')}, this reader reads 2")
+    if header.get("version") != 3:
+        raise SystemExit(f"{path}: format version {header.get('version')}, this reader reads 3")
     return header, samples, end
 
 
@@ -109,6 +112,8 @@ def check(header, samples, end, mobile):
                 if flags & RECON_KNOWN_FAKE:
                     problems.append(f"beat {beat}: contact {row[C_ID]} is a known fake (flags {flags:#x})")
                 continue
+            if flags & SHOWN_MAP_WIDE:
+                continue  # the UI draws it map-wide, type and owner included
             if mobile is not None and bp.lower() in mobile:
                 needed = RECON_LOS_NOW if mobile[bp.lower()] else RECON_LOS_EVER
                 if not flags & needed:

@@ -26,6 +26,7 @@ namespace faf::headless
   namespace
   {
     constexpr std::uint32_t kBlipKind = 3u; // top 4 bits of a recon blip's id (remote/client/ViewMerge.h)
+    constexpr std::uint32_t kShownMapWide = 0x100u; // added to a contact's recon flags: visibility mode MapPlayableRect
 
     [[nodiscard]] constexpr std::uint32_t IdKind(const std::uint32_t id) noexcept { return id >> 28u; }
     [[nodiscard]] constexpr std::uint32_t IdArmy(const std::uint32_t id) noexcept { return (id >> 20u) & 0xFFu; }
@@ -371,7 +372,7 @@ namespace faf::headless
       mFile = nullptr;
       return false;
     }
-    std::string header = "{\"format\":\"faf-bot-obs\",\"version\":2,\"replay\":";
+    std::string header = "{\"format\":\"faf-bot-obs\",\"version\":3,\"replay\":";
     AppendEscaped(header, replayPath.c_str());
     header += ",\"army\":" + std::to_string(mArmy) + ",\"sources\":[";
     for (std::size_t i = 0; i < mSources.size(); ++i) {
@@ -678,7 +679,13 @@ namespace faf::headless
         line += ',';
         AppendFloat(line, value);
       }
-      line += ',' + std::to_string(entity->recon) + ',';
+      // The recon flags, plus kShownMapWide when the entity's visibility mode is MapPlayableRect: the UI then draws
+      // its mesh whatever the intel (`UserUnit::UpdateVisibility`), as for civilians revealed at the start.
+      std::uint32_t flags = entity->recon;
+      if (entity->visibilityMode == static_cast<std::int32_t>(moho::EUserEntityVisibilityMode::MapPlayableRect)) {
+        flags |= kShownMapWide;
+      }
+      line += ',' + std::to_string(flags) + ',';
       // Health only while in sight now: a structure remembered from an earlier sighting
       // (RECON_LOSEver alone) keeps its type and owner, not its live health.
       if (known && InSightNow(*entity)) {

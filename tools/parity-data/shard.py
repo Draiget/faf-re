@@ -193,7 +193,8 @@ class Shard:
         minutes_left = max(1, int((self.deadline - time.time()) / 60) + 1)
         cmd = [self.args.headless, "--replay", prepared["scfa"], "/init", prepared["init"], "/nobugreport",
                "/nosound", "/log", game["log"], "--label", "r%d" % replay_id, "--timeout", str(minutes_left),
-               "/simworkers", str(self.args.simworkers), *shlex.split(self.args.engine_args)]
+               "/simworkers", str(self.args.simworkers),
+               *shlex.split(self.args.engine_args.replace("{id}", str(replay_id)))]
         if self.args.oracle_check:
             cmd += ["--focus", "-1", "--oracle-check"]
         with open(game["out"], "wb") as out:
@@ -400,7 +401,8 @@ def main():
     parser.add_argument("--slots", type=int, default=os.cpu_count() or 1)
     parser.add_argument("--simworkers", type=int, default=1)
     parser.add_argument("--engine-args", default="",
-                        help="more engine switches for every replay, e.g. \"/con sim_ParallelPose=0\" (docs/SWITCHES.md)")
+                        help="more engine switches for every replay, e.g. \"/con sim_ParallelPose=0\" (docs/SWITCHES.md); "
+                             "{id} becomes the replay's id, e.g. \"--focus 0 --bot-obs /out/{id}_0.jsonl\"")
     parser.add_argument("--game-version", type=int, default=3840)
     parser.add_argument("--oracle-check", action="store_true",
                         help="play unfocused with headless --oracle-check; a difference is the verdict oracle")
