@@ -328,35 +328,54 @@ namespace faf::editor
       }
       ImGui::SetTooltip("Drag to turn round the effect, the wheel to come closer");
     }
+    // The options as one row that wraps: each control as wide as its text, on the same line while it fits, else on the
+    // next (user report: the height slider's text was cut).
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float rightEdge = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
+    bool first = true;
+    const auto flow = [&](const float width) {
+      if (!first && ImGui::GetItemRectMax().x + style.ItemSpacing.x + width <= rightEdge) {
+        ImGui::SameLine();
+      }
+      first = false;
+    };
+    const auto checkboxWidth = [&](const char* label) { return ImGui::GetFrameHeight() + style.ItemInnerSpacing.x + ImGui::CalcTextSize(label).x; };
+    const auto buttonWidth = [&](const char* label) { return ImGui::CalcTextSize(label).x + style.FramePadding.x * 2.0f; };
+
     static const char* const kBackgrounds[] = {"Night", "Grey", "Sky", "Black"};
-    ImGui::SetNextItemWidth(80.0f);
+    const float comboWidth = ImGui::CalcTextSize("Black").x + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight() + style.ItemInnerSpacing.x;
+    flow(comboWidth);
+    ImGui::SetNextItemWidth(comboWidth);
     (void)ImGui::Combo("##bg", &options.background, kBackgrounds, 4);
     ImGui::SetItemTooltip("The view's background");
-    ImGui::SameLine();
+    flow(checkboxWidth("Ground"));
     ImGui::Checkbox("Ground", &options.ground);
-    ImGui::SameLine();
+    flow(checkboxWidth("Grid"));
     ImGui::Checkbox("Grid", &options.grid);
     ImGui::SetItemTooltip("A line every game unit, stronger every five; the emitter's spot in orange");
-    ImGui::SameLine();
+    flow(checkboxWidth("Turn"));
     ImGui::Checkbox("Turn", &options.turn);
     ImGui::SetItemTooltip("The camera turns slowly round the effect");
-    ImGui::SetNextItemWidth(120.0f);
+    // As wide as its longest text, and a little for the grab.
+    const float sliderWidth = ImGui::CalcTextSize("above ground 30.0").x + style.FramePadding.x * 2.0f + ImGui::GetFrameHeight();
+    flow(sliderWidth);
+    ImGui::SetNextItemWidth(sliderWidth);
     ImGui::SliderFloat("##height", &options.height, 0.0f, 30.0f, "above ground %.1f");
     ImGui::SetItemTooltip("The emitter this high above the ground (most effects play on a unit, some way up)");
-    ImGui::SameLine();
-    if (ImGui::SmallButton("Front")) {
+    flow(buttonWidth("Front"));
+    if (ImGui::Button("Front")) {
       mViewport.Look(3.14159265f, 0.15f);
     }
-    ImGui::SameLine();
-    if (ImGui::SmallButton("Side")) {
+    flow(buttonWidth("Side"));
+    if (ImGui::Button("Side")) {
       mViewport.Look(1.5707963f, 0.15f);
     }
-    ImGui::SameLine();
-    if (ImGui::SmallButton("Top")) {
+    flow(buttonWidth("Top"));
+    if (ImGui::Button("Top")) {
       mViewport.Look(3.14159265f, 1.55f);
     }
-    ImGui::SameLine();
-    if (ImGui::SmallButton("Reset")) {
+    flow(buttonWidth("Reset"));
+    if (ImGui::Button("Reset")) {
       mViewport.Reset(mFlatMode ? 20.0f : 12.0f);
     }
   }
