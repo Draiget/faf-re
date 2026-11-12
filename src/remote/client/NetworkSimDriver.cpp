@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <cstring>
 #include <optional>
 #include <utility>
@@ -145,7 +146,7 @@ namespace faf::remote::client
       "%zu deposits, %llu terrain edits, %llu unknown ids; clock: server rate %+d, %.1f beats/s on its clock, %.1f "
       "arriving, "
       "backlog %lld, skew %.2f; roster: %llu (%llu bad), %zu clients; chat: %llu sent, %llu received, %llu bad; "
-      "KB by lane: entities %.0f, armies %.0f, grids %.0f, Lua %.0f, poses %.0f",
+      "KB by lane: entities %.0f, armies %.0f, grids %.0f, Lua %.0f, poses %.0f, effects %.0f",
       when,
       static_cast<unsigned long long>(mViewsTaken),
       static_cast<unsigned long long>(views.applied),
@@ -182,7 +183,46 @@ namespace faf::remote::client
       static_cast<double>(mLaneBytes[1]) / 1024.0,
       static_cast<double>(mLaneBytes[2]) / 1024.0,
       static_cast<double>(mLaneBytes[3]) / 1024.0,
-      static_cast<double>(mLaneBytes[4]) / 1024.0
+      static_cast<double>(mLaneBytes[4]) / 1024.0,
+      static_cast<double>(mLaneBytes[5]) / 1024.0
+    );
+    if (mViews) {
+      LogEffects(when, mViews->Effects().Total());
+    }
+  }
+
+  void CNetworkSimDriver::LogEffects(
+    const char* const when,
+    const SEffectApplyCounts& counts
+  ) const
+  {
+    // Plan WP9.3: the effects lane as this client applied it (`when`: a beat, or "so far" / "end" for every lane).
+    const CEffectLaneApplier& effects = mViews->Effects();
+    gpg::Logf(
+      "server driver effects %s: %llu ops in %llu lanes (most %llu in one), %llu applied: %llu created (%llu replacing "
+      "one held), %llu setters, %llu lights, %llu destroyed by script; dropped %llu with their entity, %llu at a whole "
+      "view, %llu aged out; skipped %llu (entity not held %llu, unknown effect %llu, name not sent %llu, blueprint "
+      "not held %llu); %llu lanes didn't decode; %zu held now",
+      when,
+      static_cast<unsigned long long>(counts.ops),
+      static_cast<unsigned long long>(counts.lanes),
+      static_cast<unsigned long long>(effects.MostOps()),
+      static_cast<unsigned long long>(counts.applied),
+      static_cast<unsigned long long>(counts.created),
+      static_cast<unsigned long long>(counts.replaced),
+      static_cast<unsigned long long>(counts.setters),
+      static_cast<unsigned long long>(counts.lights),
+      static_cast<unsigned long long>(counts.destroyedByScript),
+      static_cast<unsigned long long>(counts.droppedWithEntity),
+      static_cast<unsigned long long>(counts.droppedWhole),
+      static_cast<unsigned long long>(counts.agedOut),
+      static_cast<unsigned long long>(counts.Skipped()),
+      static_cast<unsigned long long>(counts.skipped[static_cast<std::size_t>(EEffectSkip::EntityNotHeld)]),
+      static_cast<unsigned long long>(counts.skipped[static_cast<std::size_t>(EEffectSkip::UnknownEffect)]),
+      static_cast<unsigned long long>(counts.skipped[static_cast<std::size_t>(EEffectSkip::UnknownName)]),
+      static_cast<unsigned long long>(counts.skipped[static_cast<std::size_t>(EEffectSkip::UnknownBlueprint)]),
+      static_cast<unsigned long long>(counts.badLanes),
+      effects.Live()
     );
   }
 
@@ -417,10 +457,12 @@ namespace faf::remote::client
     laneBytes[static_cast<std::size_t>(EServerLane::Grids)] = view.grids.size();
     laneBytes[static_cast<std::size_t>(EServerLane::Lua)] = lua.size();
     laneBytes[static_cast<std::size_t>(EServerLane::Poses)] = view.hasPoses ? view.poses.size() : 0u;
+    laneBytes[static_cast<std::size_t>(EServerLane::Effects)] = view.effects.size();
     if (mViewsTaken == 1u) {
       CServerLaneMeter::Get().Reset(); // a new game
     }
     CServerLaneMeter::Get().Record(laneBytes);
+    static_assert(std::tuple_size_v<decltype(mLaneBytes)> == kServerLaneCount, "a total per lane");
     for (std::size_t lane = 0; lane < kServerLaneCount; ++lane) {
       mLaneBytes[lane] += laneBytes[lane];
     }
@@ -441,6 +483,22 @@ namespace faf::remote::client
     if (!mViews->Apply(view, *packet)) {
       ++mViewsBad;
       return;
+    }
+    // Plan WP9.3: the beat's effects lane, applied with the view: its counts for the panel, and for the log the first
+    // beats with ops and the first that skipped any.
+    {
+      const CEffectLaneApplier& effects = mViews->Effects();
+      const SEffectApplyCounts& beat = effects.LastLane();
+      CServerLaneMeter::Get().RecordEffects(effects.Live(), effects.Total().applied, effects.Total().Skipped());
+      const bool first = beat.ops != 0u && mEffectLanesLogged < 3u;
+      const bool skipped = beat.Skipped() != 0u && mEffectSkipsLogged < 10u;
+      if (first || skipped) {
+        mEffectLanesLogged += first ? 1u : 0u;
+        mEffectSkipsLogged += skipped ? 1u : 0u;
+        char when[32];
+        std::snprintf(when, sizeof(when), "beat %u", view.beat);
+        LogEffects(when, beat);
+      }
     }
     // Plan WP10.7: what applying a view costs this machine is its share of a beat, as a lockstep client's sim beat is;
     // the speed step it allows goes to the server whenever it changes (lockstep's `CLIMSG_IntParam`).

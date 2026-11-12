@@ -182,14 +182,18 @@ namespace faf::server
         line,
         sizeof(line),
         "\neffects routing, army index %zu: %llu ops (%llu KB), %llu lights; %llu creates held at their beat, %llu "
-        "effects sent whole later, %llu dropped with their entity",
+        "effects sent whole later, %llu dropped with their entity; entities as the client's ids %llu, held under none "
+        "%llu; %zu effects its client holds at the end",
         army,
         static_cast<unsigned long long>(route.OpsSent()),
         static_cast<unsigned long long>(receiver.bytes / 1024u),
         static_cast<unsigned long long>(route.Lights()),
         static_cast<unsigned long long>(route.Held()),
         static_cast<unsigned long long>(route.Released()),
-        static_cast<unsigned long long>(route.Withdrawn())
+        static_cast<unsigned long long>(route.Withdrawn()),
+        static_cast<unsigned long long>(route.Translated()),
+        static_cast<unsigned long long>(route.Untranslated()),
+        mEffectRoutes->HeldBy(army)
       );
       report += line;
     }
@@ -277,11 +281,20 @@ namespace faf::server
       if (const auto receiver = mEffectReceivers.find(army); mEffects && receiver != mEffectReceivers.end()) {
         std::vector<std::uint8_t>& lane = receiver->second.lane;
         if (mEffectRoutes) {
-          // Plan WP9.2: the effects whose place this client holds (its frame and its team's, as just encoded).
+          // Plan WP9.2: the effects whose place this client holds (its frame and its team's, as just encoded); plan
+          // WP9.3: their entities by the ids this client holds them under (its view's id map, read on its own job).
+          const remote::CViewIdMap& ids = IdMap(static_cast<std::int32_t>(army));
           receiver->second.route.Write(
             mEffectBeat, *mEffectRoutes, army, lanes.fresh, [this, army](const std::int32_t entity, const bool orLeft) {
             return ViewHoldsEntityNow(army, static_cast<std::uint32_t>(entity), orLeft);
-          }, lane
+          }, lane, [&ids](const std::int32_t entity, std::int32_t& clientId) {
+            std::uint32_t viewId = 0;
+            if (!ids.EntityToHeldView(static_cast<std::uint32_t>(entity), viewId)) {
+              return false;
+            }
+            clientId = static_cast<std::int32_t>(viewId);
+            return true;
+          }
           );
         } else {
           if (lanes.fresh) {
@@ -348,9 +361,9 @@ namespace faf::server
             }
           }
           return views;
-        }, [this, &sim](const std::int32_t entity) {
-          // Another army's unit: those who draw its blip (a unit is published to its own army only).
-          return remote::ViewsShowingUnitBlips(sim, mPlayerViews, static_cast<std::uint32_t>(entity));
+        }, [this, &sim](const std::int32_t entity, CEffectRoutes::SBlips& blips) {
+          // Another army's unit: those who draw its blip (a unit is published to its own army only), and which blip.
+          return remote::ViewsShowingUnitBlips(sim, mPlayerViews, static_cast<std::uint32_t>(entity), &blips);
         });
       }
     }

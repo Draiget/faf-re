@@ -157,11 +157,12 @@ namespace faf::server
         if (entity < 0) {
           return 0u;
         }
-        const auto [it, inserted] = mShownCache.try_emplace(entity, 0u);
+        const auto [it, inserted] = mShownCache.try_emplace(entity);
         if (inserted) {
-          it->second = shownBy(entity) & views;
+          it->second.blips.fill(-1);
+          it->second.views = shownBy(entity, it->second.blips) & views;
         }
-        return it->second;
+        return it->second.views;
       };
       for (auto& [id, live] : mLive) {
         if (live.ended || live.positioned) {
@@ -173,13 +174,38 @@ namespace faf::server
     }
   }
 
+  std::int32_t CEffectRoutes::BlipShownTo(
+    const std::int32_t entity,
+    const std::size_t view
+  ) const noexcept
+  {
+    const auto found = mShownCache.find(entity);
+    if (found == mShownCache.end() || view >= found->second.blips.size()) {
+      return -1;
+    }
+    return ((found->second.views >> view) & 1u) != 0u ? found->second.blips[view] : -1;
+  }
+
+  std::size_t CEffectRoutes::HeldBy(
+    const std::size_t view
+  ) const noexcept
+  {
+    const std::uint32_t bit = view < 32u ? std::uint32_t{1} << view : 0u;
+    std::size_t held = 0;
+    for (const auto& [id, live] : mLive) {
+      held += !live.ended && (live.sent.load(std::memory_order_relaxed) & bit) != 0u ? 1u : 0u;
+    }
+    return held;
+  }
+
   void CEffectViewRoute::Write(
     const SEffectBeat& beat,
     CEffectRoutes& routes,
     const std::size_t view,
     const bool fresh,
     const Holds& holds,
-    std::vector<std::uint8_t>& lane
+    std::vector<std::uint8_t>& lane,
+    const ClientId& clientId
   )
   {
     const std::uint32_t bit = view < 32u ? std::uint32_t{1} << view : 0u;
@@ -193,16 +219,37 @@ namespace faf::server
     mNames.Begin();
     mOps.clear();
     std::uint32_t count = 0;
-    const auto take = [this](
+    // Plan WP9.3: an entity as this view's client holds it: a record of its frames (or one this beat's frame removed)
+    // by the record's id, another army's unit by the id of the blip its client draws, otherwise none.
+    const EffectEntityToClient toClient = [&](const std::int32_t entity) -> std::int32_t {
+      std::int32_t client = -1;
+      if (holds(entity, true) && clientId(entity, client)) {
+        ++mTranslated;
+        return client;
+      }
+      if (const std::int32_t blip = routes.BlipShownTo(entity, view); blip >= 0 && clientId(blip, client)) {
+        ++mTranslated;
+        return client;
+      }
+      ++mUntranslated;
+      return -1;
+    };
+    const auto take = [this, &clientId, &toClient](
                         const std::uint8_t* const bytes,
                         const std::size_t size,
                         const SEffectBeatName* const names,
-                        const std::size_t nameCount
+                        const std::size_t nameCount,
+                        const bool namesEntities
                       ) {
-      mOps.insert(mOps.end(), bytes, bytes + size);
+      if (!clientId || !namesEntities || !AppendWithClientEntities({bytes, size}, toClient, mOps)) {
+        mOps.insert(mOps.end(), bytes, bytes + size);
+      }
       for (std::size_t i = 0; i < nameCount; ++i) {
         mNames.Need(names[i]);
       }
+    };
+    const auto namesEntities = [](const SEffectBeatOp& op) {
+      return op.entity >= 0 || op.entity2 >= 0;
     };
     // Its client holds the entities (as records of its frames, or another army's unit as a blip it draws).
     const auto placeable =
@@ -216,7 +263,7 @@ namespace faf::server
       const std::uint8_t* const bytes = beat.ops.data() + op.offset;
       if (op.op == EEffectOp::CreateLightParticle) {
         if ((op.views & bit) != 0u) {
-          take(bytes, op.size, op.names.data(), op.nameCount);
+          take(bytes, op.size, op.names.data(), op.nameCount, false);
           ++count;
           ++mLights;
         }
@@ -234,7 +281,7 @@ namespace faf::server
           : live->placed                   ? op.entity >= 0 && ((live->shown & bit) != 0u || holds(op.entity, true))
                                            : placeable(*live, op.entity, op.entity2);
         if (here) {
-          take(bytes, op.size, op.names.data(), op.nameCount);
+          take(bytes, op.size, op.names.data(), op.nameCount, namesEntities(op));
           ++count;
           live->sent.fetch_or(bit, std::memory_order_relaxed);
           live->everSent.fetch_or(bit, std::memory_order_relaxed);
@@ -249,7 +296,7 @@ namespace faf::server
           IsAttach(op.op) || op.op == EEffectOp::DestroyByScript || live->positioned || live->placed || !live->kept ||
           placeable(*live, live->entity, live->entity2)
         ) {
-          take(bytes, op.size, nullptr, 0u);
+          take(bytes, op.size, nullptr, 0u, namesEntities(op));
           ++count;
         }
       }
@@ -265,7 +312,7 @@ namespace faf::server
         const bool held = (live.sent.load(std::memory_order_relaxed) & bit) != 0u;
         const bool here = live.positioned ? (live.seen & bit) != 0u : placeable(live, live.entity, live.entity2);
         if (here && !held && live.kept) {
-          take(live.bytes.data(), live.bytes.size(), live.names.data(), live.nameCount);
+          take(live.bytes.data(), live.bytes.size(), live.names.data(), live.nameCount, true);
           count += static_cast<std::uint32_t>(live.parts.size());
           live.sent.fetch_or(bit, std::memory_order_relaxed);
           live.everSent.fetch_or(bit, std::memory_order_relaxed);

@@ -238,7 +238,8 @@ namespace faf::probe
     const std::span<const std::uint8_t> armies,
     const std::span<const std::uint8_t> grids,
     const std::span<const std::uint8_t> poses,
-    const bool hasPoses
+    const bool hasPoses,
+    const std::span<const std::uint8_t> effects
   )
   {
     if (!mState || !mState->client) {
@@ -251,6 +252,7 @@ namespace faf::probe
     view.grids = grids;
     view.poses = poses;
     view.hasPoses = hasPoses;
+    view.effects = effects; // plan WP9.3: applied as the game client applies them, with its rules' blueprints
     // A fresh packet each beat: a client with no sim has nothing else to start from.
     moho::SSyncData packet{};
     (void)mState->client->Apply(view, packet);
@@ -272,6 +274,34 @@ namespace faf::probe
     const remote::client::CServerViewClient& client = *mState->client;
     const remote::client::SServerViewStats& v = client.Stats();
     const remote::client::SRebuildStats& s = client.RebuildStats();
+    {
+      // Plan WP9.3: the effects lane as the game client's view client applied it.
+      using remote::client::EEffectSkip;
+      const remote::client::SEffectApplyCounts& e = client.Effects().Total();
+      std::printf(
+        "probe %d: rebuild: effects: %llu ops, %llu applied (%llu created, %llu replacing one held, %llu setters, %llu "
+        "lights, %llu destroyed by script), dropped %llu with their entity, %llu at a whole view, %llu aged out; "
+        "skipped: entity not held %llu, unknown effect %llu, name not sent %llu, blueprint not held %llu; %llu lanes "
+        "didn't decode; %zu held at the end\n",
+        uid,
+        static_cast<unsigned long long>(e.ops),
+        static_cast<unsigned long long>(e.applied),
+        static_cast<unsigned long long>(e.created),
+        static_cast<unsigned long long>(e.replaced),
+        static_cast<unsigned long long>(e.setters),
+        static_cast<unsigned long long>(e.lights),
+        static_cast<unsigned long long>(e.destroyedByScript),
+        static_cast<unsigned long long>(e.droppedWithEntity),
+        static_cast<unsigned long long>(e.droppedWhole),
+        static_cast<unsigned long long>(e.agedOut),
+        static_cast<unsigned long long>(e.skipped[static_cast<std::size_t>(EEffectSkip::EntityNotHeld)]),
+        static_cast<unsigned long long>(e.skipped[static_cast<std::size_t>(EEffectSkip::UnknownEffect)]),
+        static_cast<unsigned long long>(e.skipped[static_cast<std::size_t>(EEffectSkip::UnknownName)]),
+        static_cast<unsigned long long>(e.skipped[static_cast<std::size_t>(EEffectSkip::UnknownBlueprint)]),
+        static_cast<unsigned long long>(e.badLanes),
+        client.Effects().Live()
+      );
+    }
     std::string slots;
     for (const remote::wire::SGridSlot& slot : client.Grids()) {
       slots += " army " + std::to_string(slot.army) + (slot.kind == 0 ? " vision " : " water ") +

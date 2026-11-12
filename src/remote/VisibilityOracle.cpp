@@ -346,7 +346,8 @@ namespace faf::remote
   std::uint32_t ViewsShowingUnitBlips(
     const moho::Sim& sim,
     const std::uint32_t views,
-    const std::uint32_t unitId
+    const std::uint32_t unitId,
+    std::array<std::int32_t, 32>* const blipIds
   )
   {
     moho::Entity* const entity = sim.mEntityDB != nullptr ? sim.mEntityDB->FindEntityById(unitId) : nullptr;
@@ -367,6 +368,9 @@ namespace faf::remote
           ViewShowsMesh(sim, static_cast<std::int32_t>(army), *blip, facts)
         ) {
           shown |= bit;
+          if (blipIds != nullptr) {
+            (*blipIds)[army] = static_cast<std::int32_t>(blip->id_);
+          }
         }
       }
     }

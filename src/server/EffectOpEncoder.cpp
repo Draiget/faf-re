@@ -1,5 +1,6 @@
 #include "server/EffectOpEncoder.h"
 
+#include <algorithm>
 #include <cstring>
 
 namespace faf::server
@@ -373,5 +374,201 @@ namespace faf::server
       }
     }
     Finish(beat.ops, beat.opCount, lane);
+  }
+
+  namespace
+  {
+    /** Copies ops field by field (`AppendWithClientEntities`); `Ok` false once a field runs past the end. */
+    class COpCopier
+    {
+    public:
+      COpCopier(
+        const std::span<const std::uint8_t> in,
+        std::vector<std::uint8_t>& out,
+        const EffectEntityToClient& toClient
+      ) noexcept
+        : mIn(in)
+        , mOut(out)
+        , mToClient(toClient)
+      {}
+
+      [[nodiscard]] bool AtEnd() const noexcept
+      {
+        return mAt >= mIn.size();
+      }
+      [[nodiscard]] bool Ok() const noexcept
+      {
+        return mOk;
+      }
+
+      std::uint8_t Byte() noexcept
+      {
+        if (mAt >= mIn.size()) {
+          mOk = false;
+          return 0u;
+        }
+        mOut.push_back(mIn[mAt]);
+        return mIn[mAt++];
+      }
+
+      /** A varint, copied. */
+      std::uint32_t Varint() noexcept
+      {
+        const std::uint32_t value = Read();
+        if (mOk) {
+          CEffectOpEncoder::AppendVarint(mOut, value);
+        }
+        return value;
+      }
+
+      /** An entity field: the value + 1 as a varint, translated. */
+      void Entity()
+      {
+        const auto entity = static_cast<std::int32_t>(Read() - 1u);
+        if (mOk) {
+          const std::int32_t client = entity < 0 ? entity : mToClient(entity);
+          CEffectOpEncoder::AppendVarint(mOut, static_cast<std::uint32_t>(client) + 1u);
+        }
+      }
+
+      void Floats(
+        const std::uint32_t count
+      ) noexcept
+      {
+        if (static_cast<std::size_t>(count) * 4u > mIn.size() - std::min(mAt, mIn.size())) {
+          mOk = false;
+          return;
+        }
+        mOut.insert(
+          mOut.end(),
+          mIn.begin() + static_cast<std::ptrdiff_t>(mAt),
+          mIn.begin() + static_cast<std::ptrdiff_t>(mAt + count * 4u)
+        );
+        mAt += static_cast<std::size_t>(count) * 4u;
+      }
+
+    private:
+      std::uint32_t Read() noexcept
+      {
+        std::uint32_t value = 0;
+        for (int shift = 0; shift < 35; shift += 7) {
+          if (mAt >= mIn.size()) {
+            mOk = false;
+            return 0u;
+          }
+          const std::uint8_t byte = mIn[mAt++];
+          value |= static_cast<std::uint32_t>(byte & 0x7Fu) << shift;
+          if ((byte & 0x80u) == 0u) {
+            return value;
+          }
+        }
+        mOk = false;
+        return 0u;
+      }
+
+      std::span<const std::uint8_t> mIn;
+      std::vector<std::uint8_t>& mOut;
+      const EffectEntityToClient& mToClient;
+      std::size_t mAt = 0;
+      bool mOk = true;
+    };
+  } // namespace
+
+  bool AppendWithClientEntities(
+    const std::span<const std::uint8_t> ops,
+    const EffectEntityToClient& toClient,
+    std::vector<std::uint8_t>& out
+  )
+  {
+    const std::size_t start = out.size();
+    COpCopier copy(ops, out, toClient);
+    while (copy.Ok() && !copy.AtEnd()) {
+      const std::uint8_t kind = copy.Byte();
+      if (kind >= static_cast<std::uint8_t>(EEffectOp::Count)) {
+        break;
+      }
+      const auto op = static_cast<EEffectOp>(kind);
+      if (op != EEffectOp::CreateLightParticle) {
+        (void)copy.Varint(); // the effect's id
+      }
+      // The layouts of `CEffectOpEncoder::EndBeat` (and remote/wire/EffectLane.h).
+      switch (op) {
+      case EEffectOp::CreateEmitter:
+        (void)copy.Varint(); // blueprint
+        (void)copy.Varint(); // army
+        copy.Floats(3u);
+        break;
+      case EEffectOp::CreateAttachedEmitter:
+      case EEffectOp::CreateEmitterAtBone:
+      case EEffectOp::CreateTrail:
+        copy.Entity();
+        (void)copy.Varint(); // bone
+        (void)copy.Varint(); // blueprint
+        (void)copy.Varint(); // army
+        break;
+      case EEffectOp::CreateEmitterAtEntity:
+      case EEffectOp::CreateEmitterOnEntity:
+        copy.Entity();
+        (void)copy.Varint(); // blueprint
+        (void)copy.Varint(); // army
+        break;
+      case EEffectOp::CreateBeam:
+        if (copy.Varint() == 0u) {
+          // From create parameters: entity, bone, army, texture, blend mode, floats.
+          copy.Entity();
+          (void)copy.Varint();
+          (void)copy.Varint();
+          (void)copy.Varint();
+          (void)copy.Varint();
+          copy.Floats(copy.Varint());
+        } else {
+          (void)copy.Varint(); // army
+        }
+        break;
+      case EEffectOp::CreateBeamEntityToEntity:
+      case EEffectOp::AttachBeamEntityToEntity:
+        copy.Entity();
+        (void)copy.Varint(); // bone
+        copy.Entity();
+        (void)copy.Varint(); // bone
+        (void)copy.Varint(); // blueprint
+        (void)copy.Varint(); // army
+        break;
+      case EEffectOp::CreateLightParticle:
+        (void)copy.Varint(); // army
+        (void)copy.Varint(); // texture
+        (void)copy.Varint(); // ramp
+        copy.Floats(5u);
+        break;
+      case EEffectOp::SetFloat:
+        (void)copy.Varint();
+        copy.Floats(1u);
+        break;
+      case EEffectOp::SetVector:
+      case EEffectOp::SetN:
+      case EEffectOp::SetCurve:
+        (void)copy.Varint();
+        copy.Floats(copy.Varint());
+        break;
+      case EEffectOp::SetEntity:
+        copy.Entity();
+        break;
+      case EEffectOp::SetBone:
+        copy.Entity();
+        (void)copy.Varint(); // bone
+        break;
+      case EEffectOp::DestroyByScript:
+        break;
+      case EEffectOp::Destroy:
+      case EEffectOp::Count:
+        out.resize(start); // never encoded
+        return false;
+      }
+    }
+    if (!copy.Ok() || !copy.AtEnd()) {
+      out.resize(start);
+      return false;
+    }
+    return true;
   }
 } // namespace faf::server

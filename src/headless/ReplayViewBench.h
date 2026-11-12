@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "remote/ViewLanes.h"
+#include "remote/client/EffectLaneApplier.h"
 #include "remote/wire/EffectLane.h"
 #include "server/EffectOpEncoder.h"
 #include "server/EffectOpRouter.h"
@@ -137,6 +138,51 @@ namespace faf::headless
     std::unique_ptr<CReplaySyncSpy> mSyncSpy;
     // `EnableEffects`: the beat's ops (written on the sim thread before the views) and each view's two lanes.
     static constexpr std::size_t kEffectKinds = static_cast<std::size_t>(moho::EEffectOp::Count);
+    /**
+     * Plan WP9.3: a view's client as the bench models it: the entities its frames hold, by the ids it holds them
+     * under (the view's id map turns one back into the sim's, whose record the view's held frame answers for).
+     */
+    class CEffectClient final : public remote::client::IEffectLaneTarget
+    {
+    public:
+      CEffectClient(
+        const CReplayViewBench& bench,
+        const std::size_t army
+      ) noexcept
+        : mBench(bench)
+        , mArmy(army)
+      {}
+      [[nodiscard]] bool HoldsEntity(std::int32_t entity, bool orRemoved) const override;
+      [[nodiscard]] bool Create(
+        std::uint32_t,
+        const remote::wire::SEffectLaneOp&,
+        const std::string*,
+        const std::string*
+      ) override
+      {
+        return true; // blueprints aren't checked here (faf_server_probe --rebuild checks them with its rules)
+      }
+      void Change(
+        std::uint32_t,
+        const remote::wire::SEffectLaneOp&
+      ) override
+      {}
+      void Destroy(
+        std::uint32_t
+      ) override
+      {}
+      void Light(
+        const remote::wire::SEffectLaneOp&,
+        const std::string*,
+        const std::string*
+      ) override
+      {}
+
+    private:
+      const CReplayViewBench& mBench;
+      std::size_t mArmy;
+    };
+
     struct SEffectView
     {
       server::CEffectViewRoute route;
@@ -144,14 +190,27 @@ namespace faf::headless
       remote::wire::CEffectLaneReader reader;
       std::vector<remote::wire::SEffectLaneOp> ops;
       std::vector<std::uint8_t> lane;
-      std::unordered_map<std::uint32_t, std::int32_t> held; // the effects its client holds: id -> entity
+      // Plan WP9.3: the client's applier on the routed lane, and each beat its effects against those the routes
+      // count as its client's (`CEffectRoutes::HeldBy`).
+      std::unique_ptr<CEffectClient> client;
+      std::unique_ptr<remote::client::CEffectLaneApplier> applier;
+      std::uint64_t beatsDiffering = 0; // beats whose two counts differ
+      std::uint64_t mostDifference = 0; // the largest difference
+      std::int64_t lastDifference = 0;  // the client's count less the routes', at the last beat
+      std::uint64_t clientOnly = 0;     // at the first beat that differed: effects only the client holds
+      std::uint64_t routesOnly = 0;     // and only the routes count
+      std::uint32_t firstDiffering = 0; // that beat
+      std::uint64_t routesHeldSum = 0;  // the routes' count, summed over the beats (for a mean)
+      // Summed over the beats that differ: effects only the client holds (0: ended or unknown to the routes; 1-4: not
+      // sent there, by where its entity is: follows nothing, a record, a blip, neither but the client follows a blip
+      // record it holds), only the routes count (5-8), and (9) neither and the client follows no blip.
+      std::array<std::uint64_t, 10> why{};
       std::uint64_t routedBytes = 0;
       std::uint64_t allBytes = 0;
       std::uint64_t allOps = 0;
       std::uint32_t routedMax = 0;
       std::uint32_t allMax = 0;
-      std::uint64_t unknown = 0; // ops on an effect its client doesn't hold
-      std::uint64_t failed = 0;  // routed lanes that didn't read back
+      std::uint64_t failed = 0; // routed lanes that didn't read back
       std::uint64_t beats = 0;
       std::array<std::uint64_t, kEffectKinds> kinds{}; // routed ops it read back, by `EEffectOp`
       // Beams between two entities at their create: neither end held, the first only, the second only, both.

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 
@@ -138,7 +139,13 @@ namespace faf::remote
   /**
    * Plan WP9.2: of `views` (bit n: army n's view), those whose client draws the unit with this sim id through one of
    * its recon blips (`ViewShowsMesh` on the blip): how another army's client, allies' included, sees a unit, since the
-   * sim publishes a unit to its own army only. 0 for an id that isn't a unit.
+   * sim publishes a unit to its own army only. 0 for an id that isn't a unit. Plan WP9.3: with `blipIds`, the sim id of
+   * the blip each of those views draws goes into its slot (by army index; other slots are left as they are).
    */
-  [[nodiscard]] std::uint32_t ViewsShowingUnitBlips(const moho::Sim& sim, std::uint32_t views, std::uint32_t unitId);
+  [[nodiscard]] std::uint32_t ViewsShowingUnitBlips(
+    const moho::Sim& sim,
+    std::uint32_t views,
+    std::uint32_t unitId,
+    std::array<std::int32_t, 32>* blipIds = nullptr
+  );
 } // namespace faf::remote

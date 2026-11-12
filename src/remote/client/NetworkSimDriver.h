@@ -146,6 +146,7 @@ namespace faf::remote::client
     /** The beat a command just sent will be applied at, as best this side knows: the newest shown plus one. */
     [[nodiscard]] moho::CmdId IssueBeat() const noexcept;
     void LogSummary(const char* when) const;
+    void LogEffects(const char* when, const SEffectApplyCounts& counts) const;
     /** Plan WP11.4: chat for a roster client goes through the server; for this player's own client, straight to its UI.
      */
     void SendChat(int clientIndex, const gpg::MemBuffer<const char>& data);
@@ -161,7 +162,9 @@ namespace faf::remote::client
     std::atomic<int> mFocusGranted{kNoFocusGranted}; // plan WP11.1: the army the server granted; none: GameInfo's
     std::chrono::steady_clock::time_point mCamerasSentAt{};
     std::uint64_t mCamerasSent = 0;
-    std::array<std::uint64_t, 5> mLaneBytes{};        // plan WP10.10: bytes taken by lane (EServerLane order)
+    std::array<std::uint64_t, 6> mLaneBytes{}; // plan WP10.10: bytes taken by lane (EServerLane order)
+    std::uint64_t mEffectLanesLogged = 0;      // plan WP9.3: beats whose effects counts went to the log
+    std::uint64_t mEffectSkipsLogged = 0;
     std::unique_ptr<LuaPlus::LuaState> mEmptySyncLua; // makes the `Sync` table's bytes for a view with no Lua lane
     std::vector<std::uint8_t> mEmptySync;
     // Every army's constants (index, names, civilian), as the sim's first packet gives them (`Sim::Sync`

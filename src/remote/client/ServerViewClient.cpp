@@ -1,5 +1,6 @@
 #include "remote/client/ServerViewClient.h"
 
+#include <algorithm>
 #include <cstring>
 #include <utility>
 
@@ -120,6 +121,39 @@ namespace faf::remote::client
     mTables = std::make_unique<wire::CSessionTableReaders>();
     mRebuilder->SetSessionTables(mTables.get());
     mMerger.SetArmy(info.army);
+    // Plan WP9.3: the effects lane, applied against this client's frames and rules.
+    mEffectTarget = std::make_unique<SEffectTarget>([this](const std::int32_t id, const bool orRemoved) {
+      return HoldsEntity(id, orRemoved);
+    }, [&rules](const moho::EEffectOp op, const std::string& name) {
+      return HasEffectBlueprint(rules, op, name);
+    });
+    mEffects = std::make_unique<CEffectLaneApplier>(*mEffectTarget);
+    mEffects->SetHorizon(kCountedEffectBeats);
+  }
+
+  bool CServerViewClient::HoldsEntity(
+    const std::int32_t id,
+    const bool orRemoved
+  ) const
+  {
+    if (id < 0) {
+      return false;
+    }
+    const auto key = static_cast<std::uint32_t>(id);
+    if (const wire::SViewFrame* const shown = mRebuilder->Baseline(); shown != nullptr) {
+      const auto found = std::lower_bound(
+        shown->entities.begin(),
+        shown->entities.end(),
+        key,
+        [](const wire::SEntityRecord& record, const std::uint32_t at) {
+        return record.id < at;
+      }
+      );
+      if (found != shown->entities.end() && found->id == key) {
+        return true;
+      }
+    }
+    return orRemoved && std::binary_search(mPreviousIds.begin(), mPreviousIds.end(), key);
   }
 
   bool CServerViewClient::ApplyTables(
@@ -182,6 +216,14 @@ namespace faf::remote::client
       }
     }
     mRebuilder->SetPoseLane(view.hasPoses ? &mPoses : nullptr);
+    // Plan WP9.3: an emitter placed at an entity may name one this view removes; the ids shown before it answer that.
+    mPreviousIds.clear();
+    if (const wire::SViewFrame* const shown = mRebuilder->Baseline(); shown != nullptr && !view.effects.empty()) {
+      mPreviousIds.reserve(shown->entities.size());
+      for (const wire::SEntityRecord& record : shown->entities) {
+        mPreviousIds.push_back(record.id);
+      }
+    }
     wire::SViewFrame merged;
     const bool applied = mMerger.Decode(view.own, view.team, mCodec, merged) &&
       mRebuilder->ApplyFrame(std::move(merged), view.own.size() + view.team.size(), packet);
@@ -191,6 +233,12 @@ namespace faf::remote::client
       return false;
     }
     ++mStats.applied;
+    // The effects lane, after the frames whose entities it names. A view whose own frame came against nothing is
+    // whole: the server takes this client to hold no effect then.
+    const bool whole = wire::PeekFrameBaseline(view.own) == wire::kNoBaseline;
+    if (!mEffects->Apply(view.effects, whole)) {
+      ++mStats.effectFailures;
+    }
     return true;
   }
 } // namespace faf::remote::client

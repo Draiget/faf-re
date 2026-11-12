@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <span>
 #include <string>
 #include <unordered_map>
@@ -198,6 +199,21 @@ namespace faf::server
   };
 
   /**
+   * Plan WP9.3: ops name entities by the sim's ids, but a view's client holds some of them under ids of the view's own
+   * (remote/ViewIdMap.h: other armies' projectiles and every recon blip), and another army's unit only as its blip.
+   * Copies encoded ops (one, or several in a row: a beat's ops, a kept effect's create and setters) to the end of
+   * `out`, each entity field (creates, `SetEntity`, `SetBone`) replaced by `toClient(entity)`: the id the view's client
+   * holds that entity under, or -1 when it holds none. Other fields are copied byte for byte. False, with `out` as it
+   * was, when the bytes don't parse as ops.
+   */
+  using EffectEntityToClient = std::function<std::int32_t(std::int32_t entity)>;
+  [[nodiscard]] bool AppendWithClientEntities(
+    std::span<const std::uint8_t> ops,
+    const EffectEntityToClient& toClient,
+    std::vector<std::uint8_t>& out
+  );
+
+  /**
    * Plan WP9.1 step 3: what one view's client was sent of the name tables. A name's text goes in the view's lane the
    * first time one of its ops refers to it; a view that joins late, or comes back holding nothing (`Reset`), gets the
    * names again as its ops need them. One per view, used by one thread at a time.
@@ -237,7 +253,7 @@ namespace faf::server
     }
 
   private:
-    std::vector<bool> mSent[2]; // per table, by entry
+    std::vector<bool> mSent[2];        // per table, by entry
     std::vector<SEffectBeatName> mNew; // this lane's names new to the client, in first-use order
     std::uint64_t mNamesSent = 0;
   };

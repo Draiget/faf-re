@@ -47,6 +47,7 @@
 #include "remote/ViewLanes.h"
 #include "remote/net/GameLinks.h"
 #include "moho/effects/rendering/EffectOps.h"
+#include "remote/client/EffectLaneApplier.h"
 #include "remote/wire/EffectLane.h"
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/LuaSyncLane.h"
@@ -642,12 +643,60 @@ namespace
     std::uint64_t effectMaxLane = 0;
     std::uint64_t effectFailed = 0;
     std::uint64_t lanesSkipped = 0; // past the effects lane: a newer server's
-    // Plan WP9.2: the effects this client holds (created, not destroyed by script; cleared by a whole view), and ops
-    // that came for one it doesn't hold (routing must make that 0), and creates of one it held already (sent whole
-    // again after its entity left the view and came back).
-    std::unordered_set<std::uint32_t> effectIds;
-    std::uint64_t effectUnknown = 0;
-    std::uint64_t effectRecreated = 0;
+    // Plan WP9.3: the lanes applied as the game client applies them (remote/client/EffectLaneApplier.h), against the
+    // entities this probe's frames hold: ops on an effect it doesn't hold and creates on an entity it doesn't hold
+    // (routing and the server's id translation must make both 0), creates of one held already (sent whole again after
+    // its entity left the view and came back). The probe has no rules here, so it takes every blueprint as known.
+    struct SEffectTarget final : faf::remote::client::IEffectLaneTarget
+    {
+      SEffectTarget(
+        const std::vector<std::uint32_t>& heldNow,
+        const std::vector<std::uint32_t>& heldBefore
+      ) noexcept
+        : now(&heldNow)
+        , before(&heldBefore)
+      {}
+      const std::vector<std::uint32_t>* now;    // the ids of the frames held, own and team, ascending
+      const std::vector<std::uint32_t>* before; // those before the view just applied
+      [[nodiscard]] bool HoldsEntity(
+        const std::int32_t entity,
+        const bool orRemoved
+      ) const override
+      {
+        const auto id = static_cast<std::uint32_t>(entity);
+        return entity >= 0 &&
+          (std::binary_search(now->begin(), now->end(), id) ||
+           (orRemoved && std::binary_search(before->begin(), before->end(), id)));
+      }
+      [[nodiscard]] bool Create(
+        std::uint32_t,
+        const faf::remote::wire::SEffectLaneOp&,
+        const std::string*,
+        const std::string*
+      ) override
+      {
+        return true;
+      }
+      void Change(
+        std::uint32_t,
+        const faf::remote::wire::SEffectLaneOp&
+      ) override
+      {}
+      void Destroy(
+        std::uint32_t
+      ) override
+      {}
+      void Light(
+        const faf::remote::wire::SEffectLaneOp&,
+        const std::string*,
+        const std::string*
+      ) override
+      {}
+    };
+    std::vector<std::uint32_t> heldIds;
+    std::vector<std::uint32_t> previousIds;
+    SEffectTarget effectTarget{heldIds, previousIds};
+    faf::remote::client::CEffectLaneApplier effectApplier{effectTarget};
     double beatMs = 0.0;
     double lateBase = 0.0; // the seconds at which beat 0 would have come
     bool haveLateBase = false;
@@ -778,27 +827,11 @@ namespace
     if (ok) {
       out.effectBytes += effectLane.size();
       out.effectMaxLane = std::max<std::uint64_t>(out.effectMaxLane, effectLane.size());
-      if (
-        faf::remote::wire::PeekFrameBaseline(std::span<const std::uint8_t>(frame, frameSize)) ==
-        faf::remote::wire::kNoBaseline
-      ) {
-        out.effectIds.clear(); // a whole view: the server takes this client to hold no effect
-      }
       if (out.effects.Read(effectLane, out.effectOps)) {
         out.effectLanes += out.effectOps.empty() ? 0u : 1u;
         out.effectOpCount += out.effectOps.size();
         for (const faf::remote::wire::SEffectLaneOp& op : out.effectOps) {
           ++out.effectOpsByKind[static_cast<std::size_t>(op.op)];
-          if (op.op == moho::EEffectOp::CreateLightParticle) {
-            continue;
-          }
-          if (op.op < moho::EEffectOp::CreateLightParticle) {
-            out.effectRecreated += out.effectIds.insert(op.id).second ? 0u : 1u;
-          } else if (!out.effectIds.contains(op.id)) {
-            ++out.effectUnknown;
-          } else if (op.op == moho::EEffectOp::DestroyByScript) {
-            out.effectIds.erase(op.id);
-          }
         }
       } else {
         if (out.effectFailed < 3u) {
@@ -838,7 +871,8 @@ namespace
           lanes[0],
           lanes[1],
           poses,
-          hasPoses
+          hasPoses,
+          effectLane
         );
       }
       faf::remote::wire::SViewFrame decoded;
@@ -897,6 +931,19 @@ namespace
       out.frame = std::move(decoded);
       out.teamFrame = std::move(teamDecoded);
       out.haveFrame = ok;
+      // Plan WP9.3: the effects lane, after the frames whose entities it names. A view whose own frame came against
+      // nothing is whole: the server takes this client to hold no effect then.
+      out.previousIds.swap(out.heldIds);
+      out.heldIds.clear();
+      for (const faf::remote::wire::SViewFrame* const held : {&out.frame, &out.teamFrame}) {
+        for (const faf::remote::wire::SEntityRecord& record : held->entities) {
+          out.heldIds.push_back(record.id);
+        }
+      }
+      std::sort(out.heldIds.begin(), out.heldIds.end());
+      const bool whole = faf::remote::wire::PeekFrameBaseline(std::span<const std::uint8_t>(frame, frameSize)) ==
+        faf::remote::wire::kNoBaseline;
+      (void)out.effectApplier.Apply(effectLane, whole);
     }
     if (
       !ok && why != nullptr && out.failed < 3u &&
@@ -2151,6 +2198,8 @@ int main(
   {
     // Plan WP9.1 step 3: what the effects lanes carried. A beat is a tenth of a second of game time.
     const double perView = views.views != 0u ? 1.0 / static_cast<double>(views.views) : 0.0;
+    using faf::remote::client::EEffectSkip;
+    const faf::remote::client::SEffectApplyCounts& applied = views.effectApplier.Total();
     std::string kinds;
     for (std::size_t kind = 0; kind < static_cast<std::size_t>(moho::EEffectOp::Count); ++kind) {
       if (views.effectOpsByKind[kind] != 0u) {
@@ -2161,7 +2210,11 @@ int main(
     std::printf(
       "probe %d: effects: %llu ops in %llu of %llu views (%.1f a view), %llu bytes (%.1f a view, the most %llu), %.2f "
       "KB/s, %.2f KB/s at 10 beats a second, %llu names taken, %llu references to names not held, %llu lanes didn't "
-      "decode, %llu later lanes skipped, %llu ops on unknown effects, %llu effects created again; %s\n",
+      "decode, %llu later lanes skipped, %llu ops on unknown effects, %llu effects created again; %s\n"
+      "probe %d: effects applied: %llu created, %llu setters, %llu lights, %llu destroyed by script, %llu dropped with "
+      "their entity, %llu at a whole view, %llu aged out; skipped: %llu creates or attaches on an entity not held, "
+      "%llu ops on an "
+      "unknown effect, %llu names not sent; %zu held at the end\n",
       options.uid,
       static_cast<unsigned long long>(views.effectOpCount),
       static_cast<unsigned long long>(views.effectLanes),
@@ -2176,9 +2229,21 @@ int main(
       static_cast<unsigned long long>(views.effects.UnknownNames()),
       static_cast<unsigned long long>(views.effectFailed),
       static_cast<unsigned long long>(views.lanesSkipped),
-      static_cast<unsigned long long>(views.effectUnknown),
-      static_cast<unsigned long long>(views.effectRecreated),
-      kinds.empty() ? "no ops" : kinds.c_str()
+      static_cast<unsigned long long>(applied.skipped[static_cast<std::size_t>(EEffectSkip::UnknownEffect)]),
+      static_cast<unsigned long long>(applied.replaced),
+      kinds.empty() ? "no ops" : kinds.c_str(),
+      options.uid,
+      static_cast<unsigned long long>(applied.created),
+      static_cast<unsigned long long>(applied.setters),
+      static_cast<unsigned long long>(applied.lights),
+      static_cast<unsigned long long>(applied.destroyedByScript),
+      static_cast<unsigned long long>(applied.droppedWithEntity),
+      static_cast<unsigned long long>(applied.droppedWhole),
+      static_cast<unsigned long long>(applied.agedOut),
+      static_cast<unsigned long long>(applied.skipped[static_cast<std::size_t>(EEffectSkip::EntityNotHeld)]),
+      static_cast<unsigned long long>(applied.skipped[static_cast<std::size_t>(EEffectSkip::UnknownEffect)]),
+      static_cast<unsigned long long>(applied.skipped[static_cast<std::size_t>(EEffectSkip::UnknownName)]),
+      views.effectApplier.Live()
     );
   }
   std::printf(

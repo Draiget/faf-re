@@ -351,6 +351,17 @@ namespace moho
         );
         b.Text(text);
       }
+      // Plan WP9.3: what the client made of the effects lane.
+      b.NewLine();
+      std::snprintf(
+        text,
+        sizeof(text),
+        "  effects: %llu held, %llu ops applied, %llu skipped",
+        static_cast<unsigned long long>(lanes.effectsHeld),
+        static_cast<unsigned long long>(lanes.effectsApplied),
+        static_cast<unsigned long long>(lanes.effectsSkipped)
+      );
+      b.Text(text, kDim);
       b.NewLine();
       return true;
     }

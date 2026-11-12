@@ -1,10 +1,13 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <span>
+#include <string>
 #include <vector>
 
+#include "remote/client/EffectLaneApplier.h"
 #include "remote/client/SyncRebuilder.h"
 #include "remote/client/ViewMerge.h"
 #include "remote/wire/ArmyLane.h"
@@ -71,6 +74,12 @@ namespace faf::remote::client
   /** Reads a whole `SessionTables` message (its kind byte first). */
   [[nodiscard]] bool ReadTablesMessage(std::span<const std::uint8_t> message, STablesMessage& out);
 
+  /**
+   * Plan WP9.3: a client that doesn't run effects yet only keeps and counts them (`CEffectLaneApplier::SetHorizon`),
+   * and can't tell when one's lifetime ends, so one no op has named for this many beats is forgotten.
+   */
+  inline constexpr std::uint32_t kCountedEffectBeats = 600;
+
   struct SServerViewStats
   {
     std::uint64_t views = 0;
@@ -87,6 +96,7 @@ namespace faf::remote::client
     std::uint64_t poseLanes = 0;
     std::uint64_t poseFailures = 0; // pose lanes that didn't decode
     std::uint64_t poseBytes = 0;
+    std::uint64_t effectFailures = 0; // effects lanes that didn't decode
   };
 
   class CServerViewClient
@@ -147,8 +157,24 @@ namespace faf::remote::client
     {
       return mMerger.BlipsLeftOut();
     }
+    /**
+     * Plan WP9.3: each view's effects lane, applied after its frames: entities checked against the frame shown (or
+     * the one before, for an emitter placed at an entity the view removed), blueprints against the client's rules.
+     * Until effects run outside the sim (WP9.3's hosting), nothing is drawn: the effects are kept and counted.
+     */
+    [[nodiscard]] const CEffectLaneApplier& Effects() const noexcept
+    {
+      return *mEffects;
+    }
 
   private:
+    /** Whether the frame shown holds an entity with this id; `orRemoved`: or the one before it did. */
+    [[nodiscard]] bool HoldsEntity(std::int32_t id, bool orRemoved) const;
+
+    using SEffectTarget = CEffectCountTarget<
+      std::function<bool(std::int32_t, bool)>,
+      std::function<bool(moho::EEffectOp, const std::string&)>>;
+
     SServerGameInfo mInfo;
     wire::SFrameCodec mCodec{};
     std::unique_ptr<wire::CSessionTableReaders> mTables;
@@ -159,5 +185,8 @@ namespace faf::remote::client
     std::vector<wire::SGridSlot> mGrids;
     std::vector<wire::SUnitPose> mPoses; // this view's pose lane, while it's applied
     SServerViewStats mStats;
+    std::vector<std::uint32_t> mPreviousIds; // the ids of the frame shown before the view being applied
+    std::unique_ptr<SEffectTarget> mEffectTarget;
+    std::unique_ptr<CEffectLaneApplier> mEffects;
   };
 } // namespace faf::remote::client

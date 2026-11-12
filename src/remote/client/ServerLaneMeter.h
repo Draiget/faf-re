@@ -21,6 +21,7 @@ namespace faf::remote::client
     Grids,
     Lua,
     Poses,
+    Effects, // plan WP9.3
     Count,
   };
 
@@ -41,6 +42,8 @@ namespace faf::remote::client
       return "Lua";
     case EServerLane::Poses:
       return "poses";
+    case EServerLane::Effects:
+      return "effects";
     case EServerLane::Count:
       break;
     }
@@ -54,6 +57,10 @@ namespace faf::remote::client
     std::array<std::uint64_t, kServerLaneCount> total{}; // bytes since the game started
     std::array<double, kServerLaneCount> perSecond{};    // bytes a second over the last whole seconds (up to 5)
     double seconds = 0.0;                                // how many seconds `perSecond` covers
+    // Plan WP9.3: what the client did with the effects lane (`RecordEffects`).
+    std::uint64_t effectsHeld = 0;    // effects it holds now
+    std::uint64_t effectsApplied = 0; // ops applied since the game started
+    std::uint64_t effectsSkipped = 0; // and ops skipped
   };
 
   class CServerLaneMeter
@@ -79,6 +86,22 @@ namespace faf::remote::client
       mBuckets = {};
       mFirstSecond = 0;
       mLastSecond = -1;
+      mEffectsHeld = 0;
+      mEffectsApplied = 0;
+      mEffectsSkipped = 0;
+    }
+
+    /** Plan WP9.3: the effects the client holds after a view, and its effect ops applied and skipped so far. */
+    void RecordEffects(
+      const std::uint64_t held,
+      const std::uint64_t applied,
+      const std::uint64_t skipped
+    )
+    {
+      const std::lock_guard lock(mMutex);
+      mEffectsHeld = held;
+      mEffectsApplied = applied;
+      mEffectsSkipped = skipped;
     }
 
     /** One view's bytes by lane, as taken at `now`. */
@@ -111,6 +134,9 @@ namespace faf::remote::client
       out.active = mActive;
       out.views = mViews;
       out.total = mTotal;
+      out.effectsHeld = mEffectsHeld;
+      out.effectsApplied = mEffectsApplied;
+      out.effectsSkipped = mEffectsSkipped;
       if (!mActive) {
         return out;
       }
@@ -159,5 +185,8 @@ namespace faf::remote::client
     std::array<std::array<std::uint64_t, kServerLaneCount>, kWindowSeconds + 1> mBuckets{};
     std::int64_t mFirstSecond = 0;
     std::int64_t mLastSecond = -1;
+    std::uint64_t mEffectsHeld = 0;
+    std::uint64_t mEffectsApplied = 0;
+    std::uint64_t mEffectsSkipped = 0;
   };
 } // namespace faf::remote::client

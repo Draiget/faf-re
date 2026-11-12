@@ -58,6 +58,11 @@ namespace
     std::uint32_t sight[2]{};       // views seeing a point, by `position[0]`: bit 0 for x 0, bit 1 for x 1
     std::uint32_t watching = 0u;
     std::map<std::int32_t, std::uint32_t> blips; // another army's unit: the views that draw its blip
+    std::map<std::int32_t, std::int32_t> blipOf; // and that blip's sim id (plan WP9.3)
+    // Plan WP9.3: with `translate`, each view's lane names entities by its client's ids (`clientIds`: sim id -> the
+    // view's id; an id not in it maps to itself).
+    bool translate = false;
+    std::map<std::int32_t, std::int32_t> clientIds[2];
     bool fresh[2]{};
     Bytes lanes[2];
 
@@ -67,9 +72,17 @@ namespace
       SEffectBeat beat = encoder.EndBeat();
       routes.TakeBeat(beat, 0b11u, watching, [this](const std::array<float, 3>& at) {
         return sight[at[0] > 0.5f ? 1 : 0];
-      }, [this](const std::int32_t entity) {
+      }, [this](const std::int32_t entity, CEffectRoutes::SBlips& blipIds) {
         const auto found = blips.find(entity);
-        return found != blips.end() ? found->second : 0u;
+        if (found == blips.end()) {
+          return 0u;
+        }
+        for (std::size_t view = 0; view < 2u; ++view) {
+          if (((found->second >> view) & 1u) != 0u) {
+            blipIds[view] = blipOf.contains(entity) ? blipOf.at(entity) : -1;
+          }
+        }
+        return found->second;
       });
       std::array<std::vector<SOp>, 2> out;
       for (std::size_t view = 0; view < 2u; ++view) {
@@ -81,7 +94,13 @@ namespace
           [this, view](const std::int32_t entity, const bool orLeft) {
           return holds[view].contains(entity) || (orLeft && left[view].contains(entity));
         },
-          lanes[view]
+          lanes[view],
+          translate ? CEffectViewRoute::ClientId([this, view](const std::int32_t entity, std::int32_t& clientId) {
+          const auto found = clientIds[view].find(entity);
+          clientId = found != clientIds[view].end() ? found->second : entity;
+          return true;
+        })
+                    : CEffectViewRoute::ClientId{}
         );
         left[view].clear();
         std::vector<SEffectLaneOp> ops;
@@ -526,4 +545,194 @@ TEST(
   EXPECT_GT(game.routes.Dropped(), 10u);
   EXPECT_EQ(game.reader[0].UnknownNames(), 0u);
   EXPECT_EQ(game.reader[1].UnknownNames(), 0u);
+}
+
+TEST(
+  EffectRoutes,
+  EntitiesGoAsTheIdsEachViewsClientHoldsThemUnder
+)
+{
+  // Plan WP9.3: view 0 holds its unit 100 (kept id) and another army's projectile 5000 (the view's id 7); view 1 draws
+  // unit 300 through its blip 301, which it holds as id 9.
+  SGame game;
+  game.translate = true;
+  game.holds[0] = {100, 5000};
+  game.clientIds[0] = {{5000, 7}};
+  game.blips[300] = 0b10u;
+  game.blipOf[300] = 301;
+  game.clientIds[1] = {{301, 9}};
+  game.encoder.Record(
+    EEffectOp::CreateAttachedEmitter, {.effect = Effect(1), .entity = 100, .bone = 2, .army = 0, .blueprint = "/a.bp"}
+  );
+  game.encoder.Record(
+    EEffectOp::CreateEmitterOnEntity, {.effect = Effect(2), .entity = 5000, .army = 1, .blueprint = "/b.bp"}
+  );
+  game.encoder.Record(
+    EEffectOp::CreateEmitterOnEntity, {.effect = Effect(3), .entity = 300, .army = 1, .blueprint = "/b.bp"}
+  );
+  game.encoder.Record(EEffectOp::SetBone, {.effect = Effect(1), .entity = 5000, .bone = 3});
+  auto beat = game.Beat();
+  ASSERT_EQ(
+    Kinds(beat[0]),
+    (std::vector{EEffectOp::CreateAttachedEmitter, EEffectOp::CreateEmitterOnEntity, EEffectOp::SetBone})
+  );
+  EXPECT_EQ(beat[0][0].entity, 100);
+  EXPECT_EQ(beat[0][1].entity, 7);
+  EXPECT_EQ(beat[0][2].entity, 7);
+  ASSERT_EQ(Kinds(beat[1]), (std::vector{EEffectOp::CreateEmitterOnEntity}));
+  EXPECT_EQ(beat[1][0].id, 2u);
+  EXPECT_EQ(beat[1][0].entity, 9);
+  EXPECT_EQ(game.route[0].Translated(), 3u);
+  EXPECT_EQ(game.route[1].Translated(), 1u);
+  EXPECT_EQ(game.route[0].Untranslated(), 0u);
+
+  // The blip leaves view 1 and comes back: the effect goes whole again, still by the blip's id.
+  game.blips[300] = 0u;
+  (void)game.Beat();
+  game.blips[300] = 0b10u;
+  beat = game.Beat();
+  ASSERT_EQ(Kinds(beat[1]), (std::vector{EEffectOp::CreateEmitterOnEntity}));
+  EXPECT_EQ(beat[1][0].entity, 9);
+  EXPECT_EQ(game.route[1].Released(), 1u);
+}
+
+TEST(
+  EffectRoutes,
+  AnEntityAViewHoldsUnderNoIdGoesAsNone
+)
+{
+  // View 0 holds unit 100, but its id map never gave it an id (the callback says no): sent as -1, and counted.
+  CEffectOpEncoder encoder;
+  CEffectRoutes routes;
+  CEffectViewRoute route;
+  encoder.Record(
+    EEffectOp::CreateEmitterOnEntity, {.effect = Effect(1), .entity = 100, .army = 0, .blueprint = "/a.bp"}
+  );
+  SEffectBeat beat = encoder.EndBeat();
+  routes.TakeBeat(beat, 0b1u, 0u, [](const std::array<float, 3>&) {
+    return 0u;
+  });
+  Bytes lane;
+  route.Write(beat, routes, 0u, false, [](const std::int32_t entity, bool) {
+    return entity == 100;
+  }, lane, [](std::int32_t, std::int32_t&) {
+    return false;
+  });
+  CEffectLaneReader reader;
+  std::vector<SEffectLaneOp> ops;
+  ASSERT_TRUE(reader.Read(lane, ops));
+  ASSERT_EQ(ops.size(), 1u);
+  EXPECT_EQ(ops[0].entity, -1);
+  EXPECT_EQ(route.Untranslated(), 1u);
+}
+
+TEST(
+  EffectRoutes,
+  OpsAreCopiedWithTheirEntitiesTranslatedAndEverythingElseByteForByte
+)
+{
+  // Every op kind through `AppendWithClientEntities`, entities + 1000: they read back as the same ops with only the
+  // entities changed. A cut op isn't copied.
+  CEffectOpEncoder encoder;
+  const float five[5] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+  encoder.Record(
+    EEffectOp::CreateEmitter, {.effect = Effect(1), .army = 2, .blueprint = "/e.bp", .values = kXyz, .valueCount = 3}
+  );
+  encoder.Record(
+    EEffectOp::CreateAttachedEmitter, {.effect = Effect(2), .entity = 10, .bone = 1, .army = 0, .blueprint = "/e.bp"}
+  );
+  encoder.Record(
+    EEffectOp::CreateEmitterAtBone, {.effect = Effect(3), .entity = 11, .bone = 4, .army = 0, .blueprint = "/e.bp"}
+  );
+  encoder.Record(
+    EEffectOp::CreateEmitterAtEntity, {.effect = Effect(4), .entity = 12, .army = 0, .blueprint = "/e.bp"}
+  );
+  encoder.Record(
+    EEffectOp::CreateEmitterOnEntity, {.effect = Effect(5), .entity = 13, .army = 0, .blueprint = "/e.bp"}
+  );
+  encoder.Record(
+    EEffectOp::CreateTrail, {.effect = Effect(6), .entity = 14, .bone = 0, .army = 0, .blueprint = "/t.bp"}
+  );
+  encoder.Record(EEffectOp::CreateBeam, {.effect = Effect(7), .army = 1, .blueprint = "/b.bp"});
+  encoder.Record(
+    EEffectOp::CreateBeam,
+    {.effect = Effect(8),
+     .entity = 15,
+     .bone = 2,
+     .army = 1,
+     .texture = "/x.dds",
+     .param = 3,
+     .values = five,
+     .valueCount = 5}
+  );
+  encoder.Record(
+    EEffectOp::CreateBeamEntityToEntity,
+    {.effect = Effect(9), .entity = 16, .bone = 1, .entity2 = 17, .bone2 = 2, .army = 1, .blueprint = "/b.bp"}
+  );
+  encoder.Record(
+    EEffectOp::AttachBeamEntityToEntity,
+    {.effect = Effect(10), .entity = 18, .bone = 1, .entity2 = 19, .bone2 = -1, .army = 1, .blueprint = "/b.bp"}
+  );
+  encoder.Record(
+    EEffectOp::CreateLightParticle,
+    {.army = 1, .texture = "/l.dds", .texture2 = "/r.dds", .values = five, .valueCount = 5}
+  );
+  encoder.Record(EEffectOp::SetFloat, {.effect = Effect(2), .param = 18, .values = &kTwo, .valueCount = 1});
+  encoder.Record(EEffectOp::SetN, {.effect = Effect(2), .param = 0, .values = kXyz, .valueCount = 3});
+  encoder.Record(EEffectOp::SetEntity, {.effect = Effect(7), .entity = 20});
+  encoder.Record(EEffectOp::SetBone, {.effect = Effect(7), .entity = 21, .bone = 5});
+  encoder.Record(EEffectOp::DestroyByScript, {.effect = Effect(3)});
+  const SEffectBeat beat = encoder.EndBeat();
+
+  Bytes out{0xAAu};
+  ASSERT_TRUE(faf::server::AppendWithClientEntities(beat.ops, [](const std::int32_t entity) {
+    return entity + 1000;
+  }, out));
+  EXPECT_EQ(out.front(), 0xAAu); // appended after what was there
+
+  const auto readOps = [&beat](const std::span<const std::uint8_t> ops) {
+    faf::server::CEffectLaneNames names;
+    Bytes lane;
+    names.Begin();
+    for (const faf::server::SEffectBeatName& name : beat.names) {
+      names.Need(name);
+    }
+    names.Finish(ops, beat.opCount, lane);
+    CEffectLaneReader reader;
+    std::vector<SEffectLaneOp> read;
+    EXPECT_TRUE(reader.Read(lane, read));
+    return read;
+  };
+  const std::vector<SEffectLaneOp> before = readOps(beat.ops);
+  const std::vector<SEffectLaneOp> after = readOps(std::span<const std::uint8_t>(out).subspan(1));
+  ASSERT_EQ(before.size(), 16u);
+  ASSERT_EQ(after.size(), before.size());
+  for (std::size_t i = 0; i < before.size(); ++i) {
+    SCOPED_TRACE(i);
+    EXPECT_EQ(after[i].op, before[i].op);
+    EXPECT_EQ(after[i].id, before[i].id);
+    EXPECT_EQ(after[i].entity, before[i].entity < 0 ? -1 : before[i].entity + 1000);
+    EXPECT_EQ(after[i].entity2, before[i].entity2 < 0 ? -1 : before[i].entity2 + 1000);
+    EXPECT_EQ(after[i].bone, before[i].bone);
+    EXPECT_EQ(after[i].bone2, before[i].bone2);
+    EXPECT_EQ(after[i].army, before[i].army);
+    EXPECT_EQ(after[i].param, before[i].param);
+    EXPECT_EQ(after[i].blueprint, before[i].blueprint);
+    EXPECT_EQ(after[i].texture, before[i].texture);
+    EXPECT_EQ(after[i].texture2, before[i].texture2);
+    EXPECT_EQ(after[i].values, before[i].values);
+  }
+  EXPECT_EQ(after[1].entity, 1010);
+  EXPECT_EQ(after[8].entity2, 1017);
+  EXPECT_EQ(after[14].entity, 1021);
+
+  Bytes cut;
+  EXPECT_FALSE(
+    faf::server::AppendWithClientEntities(
+      std::span<const std::uint8_t>(beat.ops).first(beat.ops.size() - 1u), [](const std::int32_t entity) {
+    return entity;
+  }, cut
+    )
+  );
+  EXPECT_TRUE(cut.empty());
 }

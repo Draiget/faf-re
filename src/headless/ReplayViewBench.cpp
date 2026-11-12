@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <iterator>
 
 #include "headless/ReplaySyncSpy.h"
@@ -141,45 +142,100 @@ namespace faf::headless
         ++view.beamEnds[(first ? 1u : 0u) + (second ? 2u : 0u)];
       }
     }
-    view.route.Write(mEffectBeat, *mEffectRoutes, army, lanes.fresh, holds, view.lane);
+    // Plan WP9.3: entities as this view's client holds them (its id map), as the server sends them.
+    const remote::CViewIdMap& ids = IdMap(static_cast<std::int32_t>(army));
+    view.route.Write(
+      mEffectBeat,
+      *mEffectRoutes,
+      army,
+      lanes.fresh,
+      holds,
+      view.lane,
+      [&ids](const std::int32_t entity, std::int32_t& clientId) {
+      std::uint32_t viewId = 0;
+      if (!ids.EntityToHeldView(static_cast<std::uint32_t>(entity), viewId)) {
+        return false;
+      }
+      clientId = static_cast<std::int32_t>(viewId);
+      return true;
+    }
+    );
     view.routedBytes += view.lane.size();
     view.routedMax = std::max(view.routedMax, static_cast<std::uint32_t>(view.lane.size()));
     if (!view.reader.Read(view.lane, view.ops)) {
       ++view.failed;
-      return;
     }
-    // As a client: it keeps the effects it is sent and drops one whose entity it no longer holds.
     for (const remote::wire::SEffectLaneOp& op : view.ops) {
       ++view.kinds[static_cast<std::size_t>(op.op) % view.kinds.size()];
-      if (op.op == moho::EEffectOp::CreateLightParticle) {
-        continue;
-      }
-      if (op.op < moho::EEffectOp::CreateLightParticle) {
-        // An emitter placed at an entity or a bone doesn't follow it, so it stays when the entity goes.
-        const bool placed =
-          op.op == moho::EEffectOp::CreateEmitterAtBone || op.op == moho::EEffectOp::CreateEmitterAtEntity;
-        view.held[op.id] = placed ? -1 : op.entity;
-        continue;
-      }
-      const auto found = view.held.find(op.id);
-      if (found == view.held.end()) {
-        ++view.unknown;
-      } else if (op.op == moho::EEffectOp::SetEntity || op.op == moho::EEffectOp::SetBone) {
-        found->second = op.entity;
-      } else if (op.op == moho::EEffectOp::DestroyByScript) {
-        view.held.erase(found);
-      }
     }
+    // As its client: the game client's applier on the lane, against what the view's frames hold, by the client's ids.
+    if (!view.applier) {
+      view.client = std::make_unique<CEffectClient>(*this, army);
+      view.applier = std::make_unique<remote::client::CEffectLaneApplier>(*view.client);
+    }
+    remote::client::CEffectLaneApplier& applier = *view.applier;
+    (void)applier.Apply(view.lane, lanes.fresh);
     for (const std::uint32_t id : mEffectBeat.ended) {
-      view.held.erase(id); // its client derives the end
+      applier.Ended(id); // its client derives the end (the effect's lifetime, its entity's death)
     }
-    for (auto it = view.held.begin(); it != view.held.end();) {
-      // Held as a record, or another army's unit drawn through its blip.
-      const server::CEffectRoutes::SLive* const live = mEffectRoutes->Find(it->first);
-      const bool shown = live != nullptr && (live->shown & (std::uint32_t{1} << army)) != 0u;
-      const bool lost = it->second >= 0 && !shown && !holds(it->second, false);
-      it = lost ? view.held.erase(it) : std::next(it);
+    // The effects it holds against those the routes take it to hold.
+    const std::size_t routesHeld = mEffectRoutes->HeldBy(army);
+    view.routesHeldSum += routesHeld;
+    const auto difference = static_cast<std::int64_t>(applier.Live()) - static_cast<std::int64_t>(routesHeld);
+    view.lastDifference = difference;
+    if (difference != 0) {
+      view.mostDifference =
+        std::max<std::uint64_t>(view.mostDifference, static_cast<std::uint64_t>(std::abs(difference)));
+      if (view.beatsDiffering++ == 0u) {
+        view.firstDiffering = ViewBeat();
+        applier.ForEachHeld([&](const std::uint32_t id) {
+          const server::CEffectRoutes::SLive* const live = mEffectRoutes->Find(id);
+          view.clientOnly += live == nullptr || live->ended || (live->sent.load() & bit) == 0u ? 1u : 0u;
+        });
+        view.routesOnly = routesHeld - (applier.Live() - view.clientOnly);
+      }
+      // Why, on each beat that differs: the effects only one side holds, by what holds their entity.
+      const auto where = [&](const server::CEffectRoutes::SLive& live) -> std::size_t {
+        if (live.positioned || live.placed) {
+          return 0u; // follows nothing
+        }
+        if (live.entity >= 0 && holds(live.entity, false)) {
+          return 1u; // a record of the view's frames
+        }
+        if ((live.shown & bit) != 0u) {
+          return 2u; // drawn through a blip
+        }
+        return 3u;
+      };
+      applier.ForEachHeld([&](const std::uint32_t id) {
+        const server::CEffectRoutes::SLive* const live = mEffectRoutes->Find(id);
+        if (live == nullptr || live->ended) {
+          ++view.why[0];
+        } else if ((live->sent.load() & bit) == 0u) {
+          // Elsewhere: is what the client follows a blip (entity family 3) it still holds as a record?
+          const std::int32_t following = applier.Following(id);
+          const bool blip = following >= 0 && (static_cast<std::uint32_t>(following) >> 28u) == 3u;
+          const std::size_t at = where(*live);
+          ++view.why[at == 3u && !blip ? 9u : 1u + at];
+        }
+      });
+      mEffectRoutes->ForEachLiveId([&](const std::uint32_t id, const server::CEffectRoutes::SLive& live) {
+        if (!live.ended && (live.sent.load() & bit) != 0u && !applier.Holds(id)) {
+          ++view.why[5 + where(live)];
+        }
+      });
     }
+  }
+
+  bool CReplayViewBench::CEffectClient::HoldsEntity(
+    const std::int32_t entity,
+    const bool orRemoved
+  ) const
+  {
+    std::uint32_t simId = 0;
+    return entity >= 0 &&
+      mBench.IdMap(static_cast<std::int32_t>(mArmy)).EntityToSim(static_cast<std::uint32_t>(entity), simId) &&
+      mBench.ViewHoldsEntityNow(mArmy, simId, orRemoved);
   }
 
   void CReplayViewBench::OnViewFrames(
@@ -212,8 +268,8 @@ namespace faf::headless
           }
         }
         return seeing;
-      }, [&sim, views](const std::int32_t entity) {
-        return remote::ViewsShowingUnitBlips(sim, views, static_cast<std::uint32_t>(entity));
+      }, [&sim, views](const std::int32_t entity, server::CEffectRoutes::SBlips& blips) {
+        return remote::ViewsShowingUnitBlips(sim, views, static_cast<std::uint32_t>(entity), &blips);
       });
     }
     if (mSessionTables.HasPending()) {
@@ -328,7 +384,7 @@ namespace faf::headless
       perSecond.push_back(static_cast<double>(bytes) * 10.0);
     }
     std::string summary;
-    char text[320];
+    char text[768];
     std::snprintf(
       text,
       sizeof(text),
@@ -437,6 +493,12 @@ namespace faf::headless
           static_cast<unsigned long long>(view.route.Lights())
         );
         summary += text;
+        using remote::client::EEffectSkip;
+        const remote::client::SEffectApplyCounts noCounts{};
+        const remote::client::SEffectApplyCounts& applied = view.applier ? view.applier->Total() : noCounts;
+        const auto skipped = [&applied](const EEffectSkip why) {
+          return static_cast<unsigned long long>(applied.skipped[static_cast<std::size_t>(why)]);
+        };
         std::snprintf(
           text,
           sizeof(text),
@@ -445,8 +507,75 @@ namespace faf::headless
           static_cast<unsigned long long>(view.route.Held()),
           static_cast<unsigned long long>(view.route.Released()),
           static_cast<unsigned long long>(view.route.Withdrawn()),
-          static_cast<unsigned long long>(view.unknown),
+          skipped(EEffectSkip::UnknownEffect),
           static_cast<unsigned long long>(view.failed)
+        );
+        summary += text;
+        // Plan WP9.3: the client's applier on the routed lane, and its effects against the routes' count.
+        std::snprintf(
+          text,
+          sizeof(text),
+          "\n  effects client %zu: entities as the client's ids %llu, held under none %llu; applied %llu (created "
+          "%llu, "
+          "replacing %llu, setters %llu, lights %llu, destroyed by script %llu), ended %llu, dropped with their entity "
+          "%llu, at a whole view %llu; skipped: entity not held %llu, unknown effect %llu, name not sent %llu",
+          army,
+          static_cast<unsigned long long>(view.route.Translated()),
+          static_cast<unsigned long long>(view.route.Untranslated()),
+          static_cast<unsigned long long>(applied.applied),
+          static_cast<unsigned long long>(applied.created),
+          static_cast<unsigned long long>(applied.replaced),
+          static_cast<unsigned long long>(applied.setters),
+          static_cast<unsigned long long>(applied.lights),
+          static_cast<unsigned long long>(applied.destroyedByScript),
+          static_cast<unsigned long long>(applied.ended),
+          static_cast<unsigned long long>(applied.droppedWithEntity),
+          static_cast<unsigned long long>(applied.droppedWhole),
+          skipped(EEffectSkip::EntityNotHeld),
+          skipped(EEffectSkip::UnknownEffect),
+          skipped(EEffectSkip::UnknownName)
+        );
+        summary += text;
+        std::snprintf(
+          text,
+          sizeof(text),
+          "\n  effects held %zu: client %zu, routes %zu at the end (mean %.1f a beat); %llu of %llu beats differ (the "
+          "most by %llu; first at beat %u: %llu only the client holds, %llu only the routes count), last difference "
+          "%lld",
+          army,
+          view.applier ? view.applier->Live() : std::size_t{0},
+          mEffectRoutes->HeldBy(army),
+          static_cast<double>(view.routesHeldSum) / static_cast<double>(view.beats),
+          static_cast<unsigned long long>(view.beatsDiffering),
+          static_cast<unsigned long long>(view.beats),
+          static_cast<unsigned long long>(view.mostDifference),
+          view.firstDiffering,
+          static_cast<unsigned long long>(view.clientOnly),
+          static_cast<unsigned long long>(view.routesOnly),
+          static_cast<long long>(view.lastDifference)
+        );
+        summary += text;
+        const auto why = [&view](const std::size_t i) {
+          return static_cast<unsigned long long>(view.why[i]);
+        };
+        std::snprintf(
+          text,
+          sizeof(text),
+          "\n  effects differ %zu, summed over those beats: only the client: ended %llu, not sent there and on nothing "
+          "%llu, on a record %llu, on a blip %llu, on a blip record it holds but doesn't draw %llu; only the routes: "
+          "on "
+          "nothing %llu, on a record %llu, on a blip %llu, elsewhere %llu; only the client, on no blip %llu",
+          army,
+          why(0),
+          why(1),
+          why(2),
+          why(3),
+          why(4),
+          why(5),
+          why(6),
+          why(7),
+          why(8),
+          why(9)
         );
         summary += text;
       }

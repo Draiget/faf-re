@@ -51,9 +51,10 @@
 // view message removes (a projectile's impact): the client places it from that entity's last state, and keeps it when
 // the entity goes, as it doesn't follow it.
 //
-// Open (for the client step): ops name entities by the sim's ids. A view's frames hold another army's unit as its
-// recon blip, and other armies' projectiles and blips under ids of the view's own (remote/ViewIdMap.h), so such an
-// effect goes to the views that draw that unit or projectile, but its entity id is not yet one the client holds.
+// Plan WP9.3: entities go as the view's client holds them. A view's frames hold another army's unit as its recon blip,
+// and other armies' projectiles and every blip under ids of the view's own (remote/ViewIdMap.h); the server writes
+// each entity of each op it sends a view by that id (a unit drawn through a blip by the blip's), and -1 for one the
+// view holds under none (server/EffectOpRouter.h). The client applies the lane with remote/client/EffectLaneApplier.h.
 
 namespace faf::remote::wire
 {
