@@ -44,6 +44,14 @@ namespace faf::remote::client
 {
   class CSyncRebuilder;
 
+  /**
+   * A beam from create parameters as the effects lane sends it (wire/EffectLane.h, `CreateBeam` without a blueprint),
+   * into `out` (its attachment left out: the caller attaches the client's own target). False when the op has fewer
+   * than its 9 first floats.
+   */
+  [[nodiscard]] bool
+  BeamParamsFromOp(const wire::SEffectLaneOp& op, const std::string* texture, moho::SCreateBeamParams& out);
+
   /** What the game's session lends the effects a client hosts. Either may be empty (no camera: nothing is drawn). */
   struct SEffectHostWorld
   {
@@ -77,6 +85,18 @@ namespace faf::remote::client
     void Update(const SState& state);
     /** The client no longer holds it: the effects that follow it end (`Dying`). Its last state stays. */
     void MarkGone() noexcept;
+    /**
+     * Plan WP9.5: a collision beam's length (`CollisionBeamEntity::mLastBeamLength`), which the client learns from the
+     * length its beam is given (`CollisionBeamEntity::CheckCollision` sets both, and the beam's goes in the effects
+     * lane). From then on its bones are a collision beam's: bone 1 at the beam's end. Only an entity with no mesh that
+     * is no unit takes it (a collision beam has neither); a `const` setter, as `ResetHistory`, since effects hold
+     * their targets as `const`.
+     */
+    void LearnBeamLength(float length) const noexcept;
+    [[nodiscard]] bool HasBeamLength() const noexcept
+    {
+      return mHasBeamLength;
+    }
 
     [[nodiscard]] bool Dying() const override
     {
@@ -105,6 +125,8 @@ namespace faf::remote::client
     bool mGone = false;
     mutable std::array<moho::VTransform, kHistorySamples> mHistory{};
     mutable int mCursor = 0;
+    mutable bool mHasBeamLength = false; // `LearnBeamLength`
+    mutable float mBeamLength = 0.0f;
   };
 
   /** What `CClientEffects` did, over the whole session. */
@@ -122,6 +144,7 @@ namespace faf::remote::client
     std::uint64_t lights = 0;
     std::uint64_t mostAlive = 0;
     std::uint64_t mostTargets = 0;
+    std::uint64_t untickedBeats = 0; // beats the sim didn't tick, held as it held them (plan WP9.5)
   };
 
   class CClientEffects final : public moho::IEffectHost, public IEffectLaneTarget
@@ -175,12 +198,25 @@ namespace faf::remote::client
     {
       return *mManager;
     }
+    /**
+     * The server's id of a hosted effect while it is hosted: an effect that ends by itself until its purge, one an op
+     * destroys until its `DestroyEffect` returns (so an effect tick observer can still ask).
+     */
+    [[nodiscard]] bool ServerId(const moho::IEffect* effect, std::uint32_t& id) const;
+    /** Whether an effect with the server's id `id` is hosted now. */
+    [[nodiscard]] bool Hosts(
+      const std::uint32_t id
+    ) const noexcept
+    {
+      return mEffects.find(id) != mEffects.end();
+    }
 
     // moho::IEffectHost
     [[nodiscard]] moho::SParticleBuffer* ParticleBuffer() override;
     [[nodiscard]] std::uint32_t CurTick() const override
     {
-      return mBeat;
+      // The sim's tick counts the beats it ticked: the beat less those the server said it didn't (plan WP9.5).
+      return mBeat - mUntickedBeats;
     }
     [[nodiscard]] const fa::vector<moho::GeomCamera3>& Cameras() const override
     {
@@ -205,6 +241,12 @@ namespace faf::remote::client
     void Change(std::uint32_t id, const wire::SEffectLaneOp& op) override;
     void Destroy(std::uint32_t id) override;
     void Light(const wire::SEffectLaneOp& op, const std::string* texture, const std::string* ramp) override;
+    void Unticked() override
+    {
+      mUnticked = true;
+      ++mUntickedBeats;
+      ++mCounts.untickedBeats;
+    }
 
   private:
     using TargetPtr = std::shared_ptr<CClientFollowTarget>;
@@ -228,6 +270,8 @@ namespace faf::remote::client
     boost::shared_ptr<moho::SParticleBuffer> mParticles;
     fa::vector<moho::GeomCamera3> mCameras;
     std::uint32_t mBeat = 0;
+    bool mUnticked = false;           // this beat's lane said the sim didn't tick (`Unticked`)
+    std::uint32_t mUntickedBeats = 0; // such beats, over the session
     int mFocusArmy = -1;
     const std::vector<wire::SGridSlot>* mGrids = nullptr;
     moho::STIMap* mMap = nullptr;

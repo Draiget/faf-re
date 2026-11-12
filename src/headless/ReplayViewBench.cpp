@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <iterator>
 
+#include "headless/ReplayEffectDump.h"
 #include "headless/ReplaySyncSpy.h"
 #include "moho/sim/Sim.h"
 #include "remote/VisibilityOracle.h"
@@ -67,6 +68,8 @@ namespace faf::headless
     const bool check
   )
     : remote::CViewLanes(tables, mapSizeX, mapSizeZ)
+    , mMapSizeX(mapSizeX)
+    , mMapSizeZ(mapSizeZ)
   {
     EnableIdMaps();      // the server's frames carry each view's own ids
     SkipCivilianViews(); // and no client receives a civilian army's view
@@ -101,6 +104,9 @@ namespace faf::headless
       moho::gEffectOpHook = nullptr;
       mEffectRecorder->Detach();
     }
+    if (mEffectDump) {
+      (void)mEffectDump->Finish(); // stops observing; the files are written once
+    }
   }
 
   void CReplayViewBench::EnableEffects()
@@ -109,6 +115,19 @@ namespace faf::headless
     mEffectRoutes = std::make_unique<server::CEffectRoutes>();
     mEffectRecorder->Attach();
     moho::gEffectOpHook = &server::CEffectOpRecorder::Hook;
+  }
+
+  void CReplayViewBench::EnableEffectDump(
+    const std::string& prefix,
+    const std::int32_t army
+  )
+  {
+    if (!mEffectRecorder) {
+      return;
+    }
+    mEffectDump = std::make_unique<CReplayEffectDump>(prefix, army, *mEffectRecorder);
+    mEffectDump->SetMapSize(mMapSizeX, mMapSizeZ);
+    moho::gEffectOpHook = &CReplayEffectDump::Hook; // the recorder's, and the dump's own notes
   }
 
   void CReplayViewBench::OnLanesEncoded(
@@ -167,6 +186,27 @@ namespace faf::headless
     }
     for (const remote::wire::SEffectLaneOp& op : view.ops) {
       ++view.kinds[static_cast<std::size_t>(op.op) % view.kinds.size()];
+    }
+    if (mEffectDump && static_cast<std::int32_t>(army) == mEffectDump->Army()) {
+      // Plan WP9.5: this army's client, hosting the routed lane's effects over its own view.
+      const auto bytes = [](const remote::wire::BitWriter& lane) {
+        return std::span<const std::uint8_t>(lane.Bytes().data(), lane.Bytes().size());
+      };
+      static const remote::wire::BitWriter noLane;
+      mEffectDump->QueueView(
+        ViewBeat(),
+        bytes(lanes.frame),
+        bytes(lanes.team != nullptr ? *lanes.team : noLane),
+        bytes(lanes.grids),
+        bytes(lanes.poses != nullptr ? *lanes.poses : noLane),
+        lanes.poses != nullptr,
+        std::span<const std::uint8_t>(view.lane.data(), view.lane.size()),
+        view.ops,
+        view.reader
+      );
+      if (!PipelineOn()) {
+        mEffectDump->HostQueued(true); // on the sim thread, before its next tick
+      }
     }
     // As its client: the game client's applier on the lane, against what the view's frames hold, by the client's ids.
     if (!view.applier) {
@@ -243,9 +283,17 @@ namespace faf::headless
   )
   {
     const auto sendStart = std::chrono::steady_clock::now();
+    if (mEffectDump) {
+      if (PipelineOn()) {
+        // The last beat's views are done (`OnBeatStarting`): its client applies the dump army's view now.
+        (void)FinishViews();
+        mEffectDump->HostQueued(false);
+      }
+      mEffectDump->OnSimSynced(sim);
+    }
     if (mEffectRoutes) {
       // As a server's `CServerViews::OnViewFrames`: the beat's ops, the live effects and each army's sight of a point.
-      mEffectBeat = mEffectRecorder->EndBeat();
+      mEffectBeat = mEffectRecorder->EndBeat(sim.mAdvancedThisTick); // as the server's (plan WP9.5)
       for (const server::SEffectBeatOp& op : mEffectBeat.list) {
         ++mEffectKinds[static_cast<std::size_t>(op.op) % mEffectKinds.size()];
       }
@@ -463,6 +511,10 @@ namespace faf::headless
     if (mSyncSpy != nullptr) {
       summary += "\n  ";
       summary += mSyncSpy->Summary();
+    }
+    if (mEffectDump) {
+      summary += "\n  ";
+      summary += mEffectDump->Finish();
     }
     if (mEffectRoutes) {
       // Plan WP9.2: each view's effects lane, KB/s at 10 beats a second, with every op against routed.

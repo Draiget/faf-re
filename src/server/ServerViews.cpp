@@ -337,7 +337,8 @@ namespace faf::server
     // Plan WP9.1 step 3: the beat's effect ops, for its views' effects lanes. Ops the sim makes from here on (the next
     // beat's, while these views are built) go into the next beat's.
     if (mEffects) {
-      mEffectBeat = mEffects->EndBeat();
+      // Plan WP9.5: a beat the sim didn't tick (paused) goes as the unticked lane, so clients hold their effects too.
+      mEffectBeat = mEffects->EndBeat(sim.mAdvancedThisTick);
       ++mEffectBeats;
       mEffectBeatsWithOps += mEffectBeat.opCount != 0u ? 1u : 0u;
       mEffectOpsTaken += mEffectBeat.opCount;

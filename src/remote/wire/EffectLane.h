@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -30,6 +31,10 @@
 //   CreateEmitterAtEntity, CreateEmitterOnEntity      entity, blueprint, army
 //   CreateBeam                                        blueprint, then with one: army; without (a beam from create
 //                                                     parameters): entity, bone, army, texture, blend mode, floats
+//                                                     (start 3, end 3, lifetime, width, texture scale; from plan
+//                                                     WP9.5 on also the colour 4, U shift, V shift, repeat rate: 16.
+//                                                     A client reads the first 9 and takes defaults for the rest when
+//                                                     the count is 9; one that knows only 9 leaves the rest unread)
 //   CreateBeamEntityToEntity, AttachBeamEntityToEntity entity, bone, entity2, bone2, blueprint, army
 //   CreateLightParticle                               army, texture, ramp texture, 5 floats (position, size, lifetime)
 //   SetFloat                                          parameter, 1 float
@@ -45,11 +50,13 @@
 // Plan WP9.2: a view gets only the effects its client can place (server/EffectOpRouter.h): those on entities its
 // frames hold, at points its army sees, and lights its army sees or detects. A client drops an effect when it drops the
 // effect's entity, or when an attach names an entity it doesn't hold; when it holds the entity again the effect comes
-// again whole, with the same id: its create, then its latest setters. A create for an id the client holds replaces
-// that effect. A whole view (after a lost connection) is followed by every effect the client can place. An emitter
-// placed once at an entity or a bone (`CreateEmitterAtEntity`, `CreateEmitterAtBone`) may name an entity the same
-// view message removes (a projectile's impact): the client places it from that entity's last state, and keeps it when
-// the entity goes, as it doesn't follow it.
+// again whole, with the same id: its create, then its latest setters. A `DestroyByScript` goes to every client that
+// was ever sent the effect (plan WP9.5): one that still holds it after the server stopped counting it as held (the
+// entity's record kept, its blip no longer drawn) ends it with the sim's; one that dropped it skips the op. A create
+// for an id the client holds replaces that effect. A whole view (after a lost connection) is followed by every effect
+// the client can place. An emitter placed once at an entity or a bone (`CreateEmitterAtEntity`, `CreateEmitterAtBone`)
+// may name an entity the same view message removes (a projectile's impact): the client places it from that entity's
+// last state, and keeps it when the entity goes, as it doesn't follow it.
 //
 // Plan WP9.3: entities go as the view's client holds them. A view's frames hold another army's unit as its recon blip,
 // and other armies' projectiles and every blip under ids of the view's own (remote/ViewIdMap.h); the server writes
@@ -58,6 +65,21 @@
 
 namespace faf::remote::wire
 {
+  /**
+   * Plan WP9.5: the lane of a beat in which the sim didn't tick its effects (the game paused, or over), when the beat
+   * has no op: no new name and no op, which no other beat writes (a beat without ops sends an empty lane). A client
+   * that knows it holds its effects for that beat (no tick, as the paused sim); an older one reads a lane with no op.
+   * A beat the sim didn't tick that has ops (rare: a reconnect's re-sends) goes as usual.
+   */
+  inline constexpr std::array<std::uint8_t, 2> kEffectLaneUnticked{0u, 0u};
+
+  [[nodiscard]] inline bool IsUntickedEffectLane(
+    const std::span<const std::uint8_t> lane
+  ) noexcept
+  {
+    return lane.size() == kEffectLaneUnticked.size() && lane[0] == 0u && lane[1] == 0u;
+  }
+
   /** One op as the lane has it. Names are references: 0 none, else entry + 1 (`CEffectLaneReader::Name`). */
   struct SEffectLaneOp
   {

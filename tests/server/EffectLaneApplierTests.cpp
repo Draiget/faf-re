@@ -94,6 +94,10 @@ namespace
     {
       calls.push_back({"light", 0u, op, "", texture != nullptr ? *texture : "", ramp != nullptr ? *ramp : ""});
     }
+    void Unticked() override
+    {
+      calls.push_back({"unticked"});
+    }
 
     [[nodiscard]] std::vector<std::string> Whats() const
     {
@@ -111,9 +115,11 @@ namespace
     CEffectOpEncoder encoder;
     CEffectLaneNames names;
 
-    Bytes Lane()
+    Bytes Lane(
+      const bool ticked = true
+    )
     {
-      const SEffectBeat beat = encoder.EndBeat();
+      const SEffectBeat beat = encoder.EndBeat(ticked);
       Bytes lane;
       names.Write(beat, lane);
       return lane;
@@ -459,4 +465,42 @@ TEST(
   ASSERT_TRUE(countedApplier.Apply({}, false));
   EXPECT_EQ(countedApplier.Live(), 0u);
   EXPECT_EQ(countedApplier.Total().agedOut, 1u);
+}
+
+TEST(
+  EffectLaneApplier,
+  ABeatTheSimDidntTickIsTheUntickedLaneAndTheTargetHoldsItsEffects
+)
+{
+  // Plan WP9.5: a paused beat has no op; its lane is two zero bytes (no new name, no op), which the target is told,
+  // and which an older reader reads as a lane with no op. A ticked beat with no op stays an empty lane.
+  SServer server;
+  CRecordingTarget target;
+  CEffectLaneApplier applier(target);
+  const Bytes ticked = server.Lane(true);
+  EXPECT_TRUE(ticked.empty());
+  ASSERT_TRUE(applier.Apply(ticked, false));
+  EXPECT_TRUE(target.calls.empty());
+
+  const Bytes paused = server.Lane(false);
+  EXPECT_EQ(paused, (Bytes{0x00, 0x00}));
+  EXPECT_TRUE(faf::remote::wire::IsUntickedEffectLane(paused));
+  ASSERT_TRUE(applier.Apply(paused, false));
+  EXPECT_EQ(target.Whats(), (std::vector<std::string>{"unticked"}));
+  EXPECT_EQ(applier.Total().unticked, 1u);
+  faf::remote::wire::CEffectLaneReader older;
+  std::vector<SEffectLaneOp> ops;
+  EXPECT_TRUE(older.Read(paused, ops)) << "an older client reads it as a lane with no op";
+  EXPECT_TRUE(ops.empty());
+
+  // A paused beat with ops (a reconnect's re-sends, say) goes as any lane: the client ticks.
+  target.calls.clear();
+  target.holds = {5};
+  server.encoder.Record(
+    EEffectOp::CreateEmitterOnEntity, {.effect = Effect(1), .entity = 5, .army = 0, .blueprint = "/a.bp"}
+  );
+  const Bytes withOps = server.Lane(false);
+  EXPECT_FALSE(faf::remote::wire::IsUntickedEffectLane(withOps));
+  ASSERT_TRUE(applier.Apply(withOps, false));
+  EXPECT_EQ(target.Whats(), (std::vector<std::string>{"create"}));
 }

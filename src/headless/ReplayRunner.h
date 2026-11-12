@@ -65,6 +65,8 @@ namespace faf::headless
     int statsEvery = 0;          // `--stats-every <beats>` with `viewTables` (0: the server's default)
     bool viewPoses = false;      // `--view-poses`: each view's pose lane as a server sends it (plan WP8.1)
     bool viewEffects = false;    // `--view-effects`: each view's effects lane, routed and with every op (plan WP9.2)
+    std::string effectDumpPath;  // `--effect-dump <prefix>`: the focus army's effects, lockstep against its client's
+    bool effectDumpCentred = false; // `--effect-dump-centred`: effect curves' random spread held at its centre
     bool viewTeams = false;      // with `viewPipelineThreads`: one view per team and each player's own units
     std::string viewDumpPath;    // with `viewBenchPath`: what each client holds, every 2000 beats, to compare two runs
     bool parallelViews =

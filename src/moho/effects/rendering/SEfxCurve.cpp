@@ -1,4 +1,5 @@
 #include "moho/effects/rendering/SEfxCurve.h"
+#include "moho/effects/rendering/EffectTickObserver.h"
 
 #include <cstddef>
 #include <limits>
@@ -395,7 +396,9 @@ namespace moho
     }
 
     const auto RandomizedValue = [](const float center, const float spread) {
-      const double randomUnit = moho::MathGlobalRandomUnitSafe();
+      // Plan WPR.10: headless's `--effect-dump-centred` holds the spread at its centre (EffectTickObserver.h); false
+      // in the game, which draws as before.
+      const double randomUnit = gEffectCurveSpreadCentred ? 0.5 : moho::MathGlobalRandomUnitSafe();
       return static_cast<float>((randomUnit - 0.5) * spread + center);
     };
 

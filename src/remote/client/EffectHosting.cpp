@@ -1,6 +1,7 @@
 #include "remote/client/EffectHosting.h"
 
 #include <algorithm>
+#include <utility>
 
 #include "gpg/core/containers/String.h"
 #include "moho/animation/CAniPose.h"
@@ -11,6 +12,7 @@
 #include "moho/entity/Entity.h"
 #include "moho/math/GridPos.h"
 #include "moho/particles/SParticleBuffer.h"
+#include "moho/render/EBeamParam.h"
 #include "moho/resource/RResId.h"
 #include "moho/resource/blueprints/RBeamBlueprint.h"
 #include "moho/resource/blueprints/REmitterBlueprint.h"
@@ -49,6 +51,37 @@ namespace faf::remote::client
     }
   } // namespace
 
+  bool BeamParamsFromOp(
+    const wire::SEffectLaneOp& op,
+    const std::string* const texture,
+    moho::SCreateBeamParams& out
+  )
+  {
+    // Start, end, lifetime, width, texture scale; from a server of plan WP9.5 on, the colour (the beam's start and end
+    // colour), U shift, V shift and repeat rate; from an older one, without those, the parameters' defaults.
+    const float* const v = Values(op, 0, 9);
+    if (v == nullptr) {
+      return false;
+    }
+    out.mAttachEntity = nullptr; // the caller attaches the client's target
+    out.mAttachBoneIndex = op.bone;
+    out.mAttachArmyIndex = op.army;
+    out.mStart = Wm3::Vector3<float>(v[0], v[1], v[2]);
+    out.mEnd = Wm3::Vector3<float>(v[3], v[4], v[5]);
+    out.mLifetime = v[6];
+    out.mWidth = v[7];
+    out.mTextureScale = v[8];
+    if (const float* const spawn = Values(op, 9, 7); spawn != nullptr) {
+      out.mSpawnTransform.mOrientation = {spawn[0], spawn[1], spawn[2], spawn[3]};
+      out.mSpawnTransform.mPosition = Wm3::Vector3<float>(spawn[4], spawn[5], spawn[6]);
+    }
+    if (texture != nullptr) {
+      out.mTexture.assign_owned(texture->c_str());
+    }
+    out.mBlendMode = op.param;
+    return true;
+  }
+
   void CClientFollowTarget::Update(
     const SState& state
   )
@@ -67,6 +100,17 @@ namespace faf::remote::client
   {
     mGone = true;
     mState.pose.reset(); // the rebuilder's: not this target's to keep
+  }
+
+  void CClientFollowTarget::LearnBeamLength(
+    const float length
+  ) const noexcept
+  {
+    if (mState.isUnit || mState.mesh) {
+      return; // not a collision beam (it has no mesh and is no unit)
+    }
+    mHasBeamLength = true;
+    mBeamLength = length;
   }
 
   const moho::VTransform& CClientFollowTarget::History(
@@ -108,6 +152,16 @@ namespace faf::remote::client
       }
       return local;
     }
+    if (mHasBeamLength) {
+      // `CollisionBeamEntity::GetBoneLocalTransform` (0x006731A0): identity, bone 1 at the beam's length along +Z.
+      moho::VTransform local{};
+      local.orient_.w = 1.0f;
+      local.orient_.x = 0.0f;
+      local.orient_.y = 0.0f;
+      local.orient_.z = 0.0f;
+      local.pos_ = Wm3::Vec3f(0.0f, 0.0f, bone == 1 ? mBeamLength : 0.0f);
+      return local;
+    }
     // `Entity::GetBoneLocalTransform` (0x00679E20), shared with the sim.
     return moho::ENTITY_BoneLocalTransform(mState.mesh.get(), mState.scale, mState.blueprint, bone);
   }
@@ -133,6 +187,24 @@ namespace faf::remote::client
         anchor.pos_.y = mState.blueprint->mSizeY * 0.5f;
       }
       return moho::VTransform::Compose(mState.pending, anchor);
+    }
+    if (mHasBeamLength) {
+      // `CollisionBeamEntity::GetBoneWorldTransform` (0x006730B0): the current transform; any bone but 0 moved by the
+      // length along the transform's local +Z, term for term as the sim computes it.
+      moho::VTransform result = mState.current;
+      if (bone != 0) {
+        const float w = result.orient_.w;
+        const float x = result.orient_.x;
+        const float y = result.orient_.y;
+        const float z = result.orient_.z;
+        const float rotatedX = (w * y) + (z * x);
+        const float rotatedY = (z * y) - (w * x);
+        const float rotatedZ = 1.0f - ((y * y + x * x) * 2.0f);
+        result.pos_.x += (rotatedX * 2.0f) * mBeamLength;
+        result.pos_.y += (rotatedY * 2.0f) * mBeamLength;
+        result.pos_.z += rotatedZ * mBeamLength;
+      }
+      return result;
     }
     // `Entity::GetBoneWorldTransform` (0x00679CE0): the local bone (or the collision anchor) on the current transform.
     if (bone >= 0 || (bone == -1 && mState.blueprint != nullptr)) {
@@ -339,7 +411,11 @@ namespace faf::remote::client
     moho::SSyncData* const packet
   )
   {
-    mManager->Tick();
+    // A beat the sim didn't tick (paused, the game over; plan WP9.5): the effects wait, as in the sim, whose purge
+    // still runs (`Sim::Sync`'s beat, outside the tick).
+    if (!std::exchange(mUnticked, false)) {
+      mManager->Tick();
+    }
     mManager->PurgeDestroyedEffects();
     mCounts.mostAlive = std::max<std::uint64_t>(mCounts.mostAlive, mEffects.size());
     if (!mParticles) {
@@ -441,24 +517,10 @@ namespace faf::remote::client
         }
         break;
       }
-      // From create parameters (wire/EffectLane.h): start, end, lifetime, width, texture scale; the texture; the blend
-      // mode in `param`. The colour and UV lanes don't travel: the parameters' defaults.
-      const float* const v = Values(op, 0, 9);
+      moho::SCreateBeamParams params;
       TargetPtr target = op.entity >= 0 ? Target(op.entity, false) : nullptr;
-      known = v != nullptr && (op.entity < 0 || target != nullptr);
+      known = BeamParamsFromOp(op, texture, params) && (op.entity < 0 || target != nullptr);
       if (known) {
-        moho::SCreateBeamParams params;
-        params.mAttachBoneIndex = op.bone;
-        params.mAttachArmyIndex = op.army;
-        params.mStart = Wm3::Vector3<float>(v[0], v[1], v[2]);
-        params.mEnd = Wm3::Vector3<float>(v[3], v[4], v[5]);
-        params.mLifetime = v[6];
-        params.mWidth = v[7];
-        params.mTextureScale = v[8];
-        if (texture != nullptr) {
-          params.mTexture.assign_owned(texture->c_str());
-        }
-        params.mBlendMode = op.param;
         effect = mManager->HostBeamWithParams(params, std::move(target), op.bone);
       }
       break;
@@ -512,6 +574,16 @@ namespace faf::remote::client
     case EEffectOp::SetFloat:
       if (fits(1u)) {
         effect->SetFloatParam(op.param, op.values[0]);
+        if (op.param == moho::BEAM_LENGTH && dynamic_cast<moho::CEfxBeam*>(effect) != nullptr) {
+          // Plan WP9.5: a collision beam's length reaches its beam this way; the entity the beam follows takes it too,
+          // so an emitter on its bone 1 (the end splash) sits where the beam ends.
+          if (
+            const auto* const target = dynamic_cast<const CClientFollowTarget*>(mManager->Follows(*effect, false));
+            target != nullptr
+          ) {
+            target->LearnBeamLength(op.values[0]);
+          }
+        }
       }
       return;
     case EEffectOp::SetVector:
@@ -570,9 +642,22 @@ namespace faf::remote::client
       return;
     }
     moho::IEffect* const effect = found->second;
+    mManager->DestroyEffect(effect); // deleted at the purge, after this beat's tick; `ServerId` answers in the call
     mIds.erase(effect);
     mEffects.erase(found);
-    mManager->DestroyEffect(effect); // deleted at the purge, after this beat's tick
+  }
+
+  bool CClientEffects::ServerId(
+    const moho::IEffect* const effect,
+    std::uint32_t& id
+  ) const
+  {
+    const auto found = mIds.find(effect);
+    if (found == mIds.end()) {
+      return false;
+    }
+    id = found->second;
+    return true;
   }
 
   void CClientEffects::Light(

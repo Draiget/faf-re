@@ -262,7 +262,12 @@ namespace
       "  --stats-every <beats>     with --view-tables: each unit's stats read every <beats> beats (default 4)\n"
       "  --view-poses              with --view-bench: each view's pose lane (the units' bones) as a server sends it\n"
       "  --view-effects            with --view-bench: each view's effects lane routed and with every op, compared\n"
-      "  --view-dump <file>        with --view-bench: what each player's client holds every 2000 beats, to compare two "
+      "  --effect-dump <prefix>    with --view-effects --view-poses --keep-client-data --focus <army>: each effect of\n"
+      "                            that army, lockstep against its server-mode client hosting its view's lane\n"
+      "                            (<prefix>.lockstep.csv, .client.csv, .join.txt)\n"
+      "  --effect-dump-centred     with --effect-dump: the effect curves' random spread held at its centre in both\n"
+      "                            runtimes, so each emitter's counts compare one for one\n"
+      "  --view-dump <file>       with --view-bench: what each player's client holds every 2000 beats, to compare two "
       "runs\n"
       "  --parallel-views          with --view-frames or --view-bench: the views are built on the sim's workers\n"
       "  --cpus <list>             run on these CPUs only, for example 8-15 or 0,2,4,6; a CPU set from taskset or a\n"
@@ -444,6 +449,8 @@ int HEADLESS_Main(
   options.viewTables = moho::CFG_GetArgOption("--view-tables", 0, nullptr);
   options.viewPoses = moho::CFG_GetArgOption("--view-poses", 0, nullptr);
   options.viewEffects = moho::CFG_GetArgOption("--view-effects", 0, nullptr);
+  (void)ReadOption("--effect-dump", options.effectDumpPath); // plan WP9.5
+  options.effectDumpCentred = moho::CFG_GetArgOption("--effect-dump-centred", 0, nullptr);
   if (std::string statsEvery; ReadOption("--stats-every", statsEvery)) {
     options.statsEvery = std::atoi(statsEvery.c_str());
   }

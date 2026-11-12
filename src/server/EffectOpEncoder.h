@@ -54,6 +54,9 @@ namespace faf::server
     std::vector<SEffectBeatName> names; // every name the ops refer to, once, in first-use order
     std::vector<SEffectBeatOp> list;    // plan WP9.2: each op of `ops`, in order
     std::vector<std::uint32_t> ended;   // plan WP9.2: effects destroyed this beat (any destroy, derived ones too)
+    // Plan WP9.5: the sim ticked its effects this beat. A beat it didn't (paused, the game over) goes to each view as
+    // the unticked lane (remote/wire/EffectLane.h) when it has no op, so a client holds its effects as the sim does.
+    bool ticked = true;
   };
 
   /**
@@ -87,8 +90,8 @@ namespace faf::server
 
     void Record(moho::EEffectOp op, const moho::SEffectOpArgs& args);
 
-    /** Encodes the ops recorded since the last call. */
-    [[nodiscard]] SEffectBeat EndBeat();
+    /** Encodes the ops recorded since the last call; `ticked`: whether the sim ticked its effects in that beat. */
+    [[nodiscard]] SEffectBeat EndBeat(bool ticked = true);
 
     [[nodiscard]] std::uint64_t EncodedOps(
       moho::EEffectOp op
@@ -131,6 +134,19 @@ namespace faf::server
     [[nodiscard]] std::size_t LiveEffects() const noexcept
     {
       return mEffects.size();
+    }
+    /** Plan WPR.10: the id a live effect was given at its create; false for one never seen created, or destroyed. */
+    [[nodiscard]] bool IdOf(
+      const moho::IEffect* const effect,
+      std::uint32_t& id
+    ) const noexcept
+    {
+      const auto found = mEffects.find(effect);
+      if (found == mEffects.end()) {
+        return false;
+      }
+      id = found->second.id;
+      return true;
     }
 
     static void AppendVarint(std::vector<std::uint8_t>& out, std::uint32_t value);
@@ -243,8 +259,16 @@ namespace faf::server
       mNew.clear();
     }
     void Need(const SEffectBeatName& name);
-    /** The lane (cleared first): empty without an op, else the names `Need` found new, then `ops`. */
-    void Finish(std::span<const std::uint8_t> ops, std::uint32_t opCount, std::vector<std::uint8_t>& lane);
+    /**
+     * The lane (cleared first): empty without an op (the unticked lane when `ticked` is false), else the names `Need`
+     * found new, then `ops`.
+     */
+    void Finish(
+      std::span<const std::uint8_t> ops,
+      std::uint32_t opCount,
+      std::vector<std::uint8_t>& lane,
+      bool ticked = true
+    );
 
     /** Name texts this view was sent, over its whole life. */
     [[nodiscard]] std::uint64_t NamesSent() const noexcept

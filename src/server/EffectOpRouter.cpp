@@ -288,7 +288,13 @@ namespace faf::server
         } else {
           ++mHeld;
         }
-      } else if ((live->sent.load(std::memory_order_relaxed) & bit) != 0u) {
+      } else if (
+        (live->sent.load(std::memory_order_relaxed) & bit) != 0u ||
+        (op.op == EEffectOp::DestroyByScript && (live->everSent.load(std::memory_order_relaxed) & bit) != 0u)
+      ) {
+        // Plan WP9.5: the script's destroy also goes to a client the effect was withdrawn from: one that still holds
+        // the entity's record (a blip it no longer draws, say) keeps the effect and drops it only with the entity, so
+        // without this it went on emitting after the sim's ended (one that dropped it skips an op on an unknown id).
         // Its client holds the effect. An attach or the script's destroy goes as it is (one to an entity the client
         // lacks makes it drop the effect); another setter only while the effect stays where the client can place it,
         // since one whose entity left this beat is dropped below.
@@ -324,7 +330,7 @@ namespace faf::server
       });
     }
 
-    mNames.Finish(mOps, count, lane);
+    mNames.Finish(mOps, count, lane, beat.ticked);
     mOpsSent += count;
   }
 } // namespace faf::server

@@ -1,4 +1,5 @@
 #include "server/EffectOpEncoder.h"
+#include "remote/wire/EffectLane.h"
 
 #include <algorithm>
 #include <cstring>
@@ -180,9 +181,12 @@ namespace faf::server
     }
   }
 
-  SEffectBeat CEffectOpEncoder::EndBeat()
+  SEffectBeat CEffectOpEncoder::EndBeat(
+    const bool ticked
+  )
   {
     SEffectBeat beat;
+    beat.ticked = ticked;
     ++mBeatSerial;
     std::vector<std::uint8_t>& out = beat.ops;
     for (const SPending& pending : mPending) {
@@ -334,11 +338,16 @@ namespace faf::server
   void CEffectLaneNames::Finish(
     const std::span<const std::uint8_t> ops,
     const std::uint32_t opCount,
-    std::vector<std::uint8_t>& lane
+    std::vector<std::uint8_t>& lane,
+    const bool ticked
   )
   {
     lane.clear();
     if (opCount == 0u) {
+      if (!ticked) {
+        // Plan WP9.5: no name and no op, which no beat with ops writes: the sim didn't tick its effects.
+        lane.assign(remote::wire::kEffectLaneUnticked.begin(), remote::wire::kEffectLaneUnticked.end());
+      }
       return;
     }
     // Per table: the count of names new to this view, then each one's entry, length and text.
@@ -373,7 +382,7 @@ namespace faf::server
         Need(name);
       }
     }
-    Finish(beat.ops, beat.opCount, lane);
+    Finish(beat.ops, beat.opCount, lane, beat.ticked);
   }
 
   namespace

@@ -39,7 +39,15 @@ namespace faf::server
         beam->mEnd.z,
         beam->mLifetime,
         beam->mWidth,
-        beam->mTextureScale
+        beam->mTextureScale,
+        // Plan WP9.5: the colour (the beam's start and end colour, 0x00654A70) and the UV shifts and repeat rate.
+        beam->mSpawnTransform.mOrientation[0],
+        beam->mSpawnTransform.mOrientation[1],
+        beam->mSpawnTransform.mOrientation[2],
+        beam->mSpawnTransform.mOrientation[3],
+        beam->mSpawnTransform.mPosition.x,
+        beam->mSpawnTransform.mPosition.y,
+        beam->mSpawnTransform.mPosition.z
       };
       args.entity = moho::EffectOpEntity(beam->mAttachEntity);
       args.bone = beam->mAttachBoneIndex;
@@ -90,9 +98,20 @@ namespace faf::server
     }
   }
 
-  SEffectBeat CEffectOpRecorder::EndBeat()
+  SEffectBeat CEffectOpRecorder::EndBeat(
+    const bool ticked
+  )
   {
     const std::lock_guard<std::mutex> lock(sLock);
-    return mEncoder.EndBeat();
+    return mEncoder.EndBeat(ticked);
+  }
+
+  bool CEffectOpRecorder::IdOf(
+    const moho::IEffect* const effect,
+    std::uint32_t& id
+  ) const
+  {
+    const std::lock_guard<std::mutex> lock(sLock);
+    return mEncoder.IdOf(effect, id);
   }
 } // namespace faf::server

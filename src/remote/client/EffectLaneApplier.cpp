@@ -53,6 +53,7 @@ namespace faf::remote::client
     ended += other.ended;
     agedOut += other.agedOut;
     badLanes += other.badLanes;
+    unticked += other.unticked;
     for (std::size_t i = 0; i < skipped.size(); ++i) {
       skipped[i] += other.skipped[i];
     }
@@ -206,6 +207,10 @@ namespace faf::remote::client
         mLast.agedOut += old ? 1u : 0u;
         return old;
       });
+    }
+    if (wire::IsUntickedEffectLane(lane)) {
+      ++mLast.unticked;
+      mTarget.Unticked();
     }
     const bool ok = mReader.Read(lane, mOps);
     mLast.badLanes += ok ? 0u : 1u;

@@ -12,6 +12,7 @@
 #include "moho/effects/rendering/CEfxEmitter.h"
 #include "moho/effects/rendering/CEffectManagerImpl.h"
 #include "moho/effects/rendering/EffectHost.h"
+#include "moho/effects/rendering/EffectTickObserver.h"
 #include "moho/effects/rendering/IEffectManager.h"
 #include "moho/entity/Entity.h"
 #include "moho/render/ETrailParam.h"
@@ -268,6 +269,7 @@ namespace moho
   {
     const float lifetime = mParams.start_[TRAIL_LIFETIME];
     if (!(lifetime < 0.0f || (static_cast<float>(mTrailLength) + mTotalTicks) < lifetime)) {
+      EFFECT_Ending(*this, EEffectEnd::Lifetime); // plan WPR.10: null in the game
       mManager->DestroyEffect(this);
       return true;
     }
@@ -281,6 +283,7 @@ namespace moho
       return false;
     }
 
+    EFFECT_Ending(*this, EEffectEnd::EntityGone);
     mManager->DestroyEffect(this);
     return true;
   }
@@ -528,7 +531,23 @@ namespace moho
       }
       return;
     }
-    if (ProcessLifetime() || !CalculateVisible()) {
+    CEffectTickScope observed(*this); // plan WPR.10 (EffectTickObserver.h): the tick's segments, with an observer
+    if (observed.Observing()) {
+      // Where `CanSeeCam` tests it: the attachment at tick 0 on the start lane.
+      VMatrix4 placed{};
+      (void)CEfxEmitter::InterpolatePosition(this, &placed, 0, 0.0f);
+      const float* const p = mParams.start_;
+      observed.SetPosition(
+        (placed.r[0].x * p[0]) + (placed.r[1].x * p[1]) + (placed.r[2].x * p[2]) + placed.r[3].x,
+        (placed.r[0].y * p[0]) + (placed.r[1].y * p[1]) + (placed.r[2].y * p[2]) + placed.r[3].y,
+        (placed.r[0].z * p[0]) + (placed.r[1].z * p[1]) + (placed.r[2].z * p[2]) + placed.r[3].z
+      );
+    }
+    if (ProcessLifetime()) {
+      return;
+    }
+    if (!CalculateVisible()) {
+      observed.SetHidden();
       return;
     }
 

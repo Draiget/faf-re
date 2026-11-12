@@ -37,6 +37,7 @@ namespace faf::server
 
 namespace faf::headless
 {
+  class CReplayEffectDump;
   class CReplaySyncSpy;
 
   class CReplayViewBench final : public remote::CViewLanes
@@ -91,6 +92,12 @@ namespace faf::headless
      * hold.
      */
     void EnableEffects();
+    /**
+     * Plan WP9.5, WPR.10, `--effect-dump <prefix>` (after `EnableEffects`, with poses, serial views, and the sim
+     * focused on `army`): each effect of that army's lockstep sim against the same effect hosted by that army's view's
+     * client (ReplayEffectDump.h). The comparison goes into `Summary`.
+     */
+    void EnableEffectDump(const std::string& prefix, std::int32_t army);
     [[nodiscard]] std::string Summary() const;
     /** Lanes that did not encode, and what the check found (should stay 0). */
     [[nodiscard]] std::uint64_t Failures() const noexcept;
@@ -217,6 +224,9 @@ namespace faf::headless
       std::array<std::uint64_t, 4> beamEnds{};
     };
     std::unique_ptr<server::CEffectOpRecorder> mEffectRecorder;
+    std::unique_ptr<CReplayEffectDump> mEffectDump; // `EnableEffectDump`
+    float mMapSizeX = 0.0f;
+    float mMapSizeZ = 0.0f;
     std::unique_ptr<server::CEffectRoutes> mEffectRoutes;
     server::SEffectBeat mEffectBeat;
     std::vector<SEffectView> mEffectViews;                  // by army

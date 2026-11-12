@@ -1,5 +1,6 @@
 #include "moho/effects/rendering/CEffectManagerImpl.h"
 #include "moho/effects/rendering/EffectOps.h"
+#include "moho/effects/rendering/EffectTickObserver.h"
 
 #include <algorithm>
 #include <memory>
@@ -556,8 +557,14 @@ namespace moho
     }
 
     // Plan WP9.1: after the chunk check, so a destroy on a worker records once, at its commit (which calls this
-    // again on the sim thread), in list order.
-    EFFECT_Op(EEffectOp::Destroy, {.effect = effect});
+    // again on the sim thread), in list order. Only the sim's: a hosted manager's (CHostedEffectManager) are a
+    // client's.
+    if (mSim != nullptr) {
+      EFFECT_Op(EEffectOp::Destroy, {.effect = effect});
+    }
+    if (gEffectTickObserver != nullptr) {
+      gEffectTickObserver->OnEffectDestroyed(*effect); // plan WPR.10: null in the game
+    }
 
     effect->ListLinkBefore(&mDestroyedEffects);
   }
@@ -772,17 +779,20 @@ namespace moho
       return;
     }
 
-    // Plan WP9.1: a light without a ramp texture makes nothing, so it records nothing.
+    // Plan WP9.1: a light without a ramp texture makes nothing, so it records nothing; nor does a hosted manager's (a
+    // client's light, made from the op).
     const float lightValues[5] = {position.x, position.y, position.z, size, lifetime};
-    EFFECT_Op(
-      EEffectOp::CreateLightParticle,
-      {.army = armyIndex,
-       .texture = texturePrimary.c_str(),
-       .texture2 = textureSecondary.c_str(),
-       .values = lightValues,
-       .valueCount = 5,
-       .armies = tEffectOpLightArmies}
-    );
+    if (mSim != nullptr) {
+      EFFECT_Op(
+        EEffectOp::CreateLightParticle,
+        {.army = armyIndex,
+         .texture = texturePrimary.c_str(),
+         .texture2 = textureSecondary.c_str(),
+         .values = lightValues,
+         .valueCount = 5,
+         .armies = tEffectOpLightArmies}
+      );
+    }
 
     const fa::string rampPath = BuildParticleTexturePath(textureSecondary, nullptr);
 

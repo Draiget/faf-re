@@ -76,6 +76,7 @@ namespace faf::remote::client
     std::uint64_t ended = 0;             // `Ended`: the client derived the end
     std::uint64_t agedOut = 0;           // `SetHorizon`
     std::uint64_t badLanes = 0;          // lanes that didn't decode
+    std::uint64_t unticked = 0;          // plan WP9.5: lanes saying the sim didn't tick its effects
     std::array<std::uint64_t, kEffectSkipCount> skipped{};
 
     [[nodiscard]] std::uint64_t Skipped() const noexcept;
@@ -113,6 +114,8 @@ namespace faf::remote::client
     virtual void Destroy(std::uint32_t id) = 0;
     /** A one-shot light. */
     virtual void Light(const wire::SEffectLaneOp& op, const std::string* texture, const std::string* ramp) = 0;
+    /** Plan WP9.5: the sim didn't tick its effects this beat (`wire::IsUntickedEffectLane`): nor should the target. */
+    virtual void Unticked() {}
   };
 
   class CEffectLaneApplier

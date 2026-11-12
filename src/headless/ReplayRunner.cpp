@@ -72,8 +72,11 @@
 // --wire-stats, --loopback and --command-check (docs/SWITCHES.md, "headless").
 #include "headless/ReplayCommandCheck.h"
 #include "headless/ReplayChangeSetCheck.h"
+#include "headless/ReplayEffectDump.h"
 #include "headless/ReplayOracleCheck.h"
 #include "headless/ReplayInboundCheck.h"
+#include "moho/effects/rendering/CEffectManagerImpl.h"
+#include "moho/effects/rendering/EffectTickObserver.h"
 #include "headless/ReplayViewBench.h"
 #include "headless/ReplayViewFrameStats.h"
 #include "headless/ReplayViewPacketCheck.h"
@@ -676,6 +679,21 @@ namespace faf::headless
           return result;
         }
         viewBench->EnableEffects();
+        if (!options.effectDumpPath.empty()) {
+          // Plan WP9.5: the effects must draw (`--keep-client-data`), the views are built one after another (the
+          // client hosts on the sim thread; with `--view-pipeline`, for `--view-teams`, a beat late), and the sim is
+          // focused on the army whose client is compared.
+          if (moho::EFFECT_LifetimeOnly() || options.parallelViews || options.focusArmy < 0 || !options.viewPoses) {
+            result.error = "--effect-dump needs --keep-client-data, --view-poses and --focus <army>, and not "
+                           "--parallel-views";
+            return result;
+          }
+          viewBench->EnableEffectDump(options.effectDumpPath, options.focusArmy);
+          moho::gEffectCurveSpreadCentred = options.effectDumpCentred; // both runtimes alike (EffectTickObserver.h)
+        }
+      } else if (!options.effectDumpPath.empty()) {
+        result.error = "--effect-dump needs --view-effects";
+        return result;
       }
       if (options.viewTables) {
         viewBench->EnableBenchTables();
@@ -782,6 +800,12 @@ namespace faf::headless
       )
     );
     auto* const simDriver = static_cast<moho::CSimDriver*>(driver.get());
+#if FAF_SERVER_MODE
+    if (viewBench && !options.effectDumpPath.empty()) {
+      // Plan WP9.5: the lockstep sim draws for the camera its client gets (cameras decide nothing in the comparison).
+      simDriver->SetGeomCams(CReplayEffectDump::EverywhereCamera());
+    }
+#endif
 #if FAF_HEADLESS_NET
     // Ahead of the driver going away, on every way out: the network's thread touches its seats.
     struct SStopSeatNet

@@ -35,8 +35,11 @@ namespace faf::server
 
     static void Hook(moho::EEffectOp op, const moho::SEffectOpArgs& args);
 
-    /** The ops recorded since the last call, encoded. */
-    [[nodiscard]] SEffectBeat EndBeat();
+    /** The ops recorded since the last call, encoded; `ticked`: whether the sim ticked its effects in that beat. */
+    [[nodiscard]] SEffectBeat EndBeat(bool ticked = true);
+
+    /** Plan WPR.10: the id the encoder gave a live effect (`CEffectOpEncoder::IdOf`), under the recorder's lock. */
+    [[nodiscard]] bool IdOf(const moho::IEffect* effect, std::uint32_t& id) const;
 
     /** The encoder's counts. Only once no op can arrive any more (detached), or under the caller's own ordering. */
     [[nodiscard]] const CEffectOpEncoder& Encoder() const noexcept

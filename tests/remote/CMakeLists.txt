@@ -29,7 +29,9 @@ endif()
 
 if(FAF_SERVER_MODE)
   # Plan WP9.3: the effect classes hosted outside a sim, and the client's follow targets.
-  add_executable(faf_remote_tests EXCLUDE_FROM_ALL WireTests.cpp EffectHostingTests.cpp)
+  # Plan WP9.5: a beam's create parameters from the server's recorder, through the lane, into the client's beam.
+  add_executable(faf_remote_tests EXCLUDE_FROM_ALL WireTests.cpp EffectHostingTests.cpp
+    ${CMAKE_SOURCE_DIR}/src/server/EffectOpEncoder.cpp ${CMAKE_SOURCE_DIR}/src/server/EffectOpRecorder.cpp)
   target_link_libraries(faf_remote_tests PRIVATE faf_engine gtest_main)
   target_compile_definitions(faf_remote_tests PRIVATE FAF_SERVER_MODE=1)
   set_target_properties(faf_remote_tests PROPERTIES FOLDER "Tests/Existing")

@@ -67,9 +67,11 @@ namespace
     Bytes lanes[2];
 
     /** Ends the beat; returns each view's ops as its client reads them. */
-    std::array<std::vector<SOp>, 2> Beat()
+    std::array<std::vector<SOp>, 2> Beat(
+      const bool ticked = true
+    )
     {
-      SEffectBeat beat = encoder.EndBeat();
+      SEffectBeat beat = encoder.EndBeat(ticked);
       routes.TakeBeat(beat, 0b11u, watching, [this](const std::array<float, 3>& at) {
         return sight[at[0] > 0.5f ? 1 : 0];
       }, [this](const std::int32_t entity, CEffectRoutes::SBlips& blipIds) {
@@ -225,6 +227,32 @@ TEST(
   game.holds[0] = {100};
   beat = game.Beat();
   EXPECT_EQ(Kinds(beat[0]), (std::vector{EEffectOp::CreateEmitterOnEntity, EEffectOp::SetFloat}));
+}
+
+TEST(
+  EffectRoutes,
+  AScriptDestroyAlsoGoesToAViewTheEffectWasWithdrawnFrom
+)
+{
+  // Plan WP9.5: the server withdraws an effect when a view stops drawing its entity, but the client may still hold the
+  // entity's record (a remembered blip) and with it the effect; the script's destroy must reach it, or the client's
+  // effect runs on until the entity goes. A view that never got the effect gets nothing.
+  SGame game;
+  game.holds[0] = {100};
+  game.encoder.Record(
+    EEffectOp::CreateAttachedEmitter, {.effect = Effect(1), .entity = 100, .bone = 3, .army = 0, .blueprint = "/a.bp"}
+  );
+  (void)game.Beat();
+  game.holds[0].clear(); // withdrawn from view 0
+  (void)game.Beat();
+  EXPECT_EQ(game.route[0].Withdrawn(), 1u);
+  game.encoder.Record(EEffectOp::SetFloat, {.effect = Effect(1), .param = 18, .values = &kTwo, .valueCount = 1});
+  game.encoder.Record(EEffectOp::DestroyByScript, {.effect = Effect(1)});
+  game.encoder.Record(EEffectOp::Destroy, {.effect = Effect(1)});
+  const auto beat = game.Beat();
+  EXPECT_EQ(Kinds(beat[0]), (std::vector{EEffectOp::DestroyByScript})) << "the destroy, not the setter";
+  EXPECT_EQ(beat[0][0].id, 0u);
+  EXPECT_TRUE(beat[1].empty());
 }
 
 TEST(
@@ -437,6 +465,7 @@ TEST(
   std::uintptr_t made = 0;
   std::unordered_map<std::uint32_t, std::int32_t> held[2]; // each client's effects: id -> entity (-1: none)
   std::uint64_t unknown[2]{};
+  std::uint64_t unknownDestroys[2]{}; // a script's destroy of an effect withdrawn from the view (plan WP9.5)
   std::uint64_t got[2]{};
   for (int beatIndex = 0; beatIndex < 3000; ++beatIndex) {
     for (std::size_t view = 0; view < 2u; ++view) {
@@ -519,7 +548,7 @@ TEST(
         }
         const auto found = held[view].find(op.id);
         if (found == held[view].end()) {
-          ++unknown[view];
+          ++(op.op == EEffectOp::DestroyByScript ? unknownDestroys[view] : unknown[view]);
           continue;
         }
         if (op.op == EEffectOp::SetEntity || op.op == EEffectOp::SetBone) {
@@ -538,6 +567,7 @@ TEST(
   }
   EXPECT_EQ(unknown[0], 0u);
   EXPECT_EQ(unknown[1], 0u);
+  EXPECT_GT(unknownDestroys[0] + unknownDestroys[1], 0u) << "script destroys reach views the effect was withdrawn from";
   EXPECT_GT(got[0], 1000u);
   EXPECT_GT(got[1], 1000u);
   EXPECT_GT(game.route[0].Released(), 10u);
@@ -735,4 +765,23 @@ TEST(
     )
   );
   EXPECT_TRUE(cut.empty());
+}
+
+TEST(
+  EffectRoutes,
+  ABeatTheSimDidntTickGoesToEveryViewAsTheUntickedLane
+)
+{
+  // Plan WP9.5: routed lanes tell each client the sim held its effects, as the every-op lane does.
+  SGame game;
+  game.holds[0] = {100};
+  game.encoder.Record(
+    EEffectOp::CreateEmitterOnEntity, {.effect = Effect(1), .entity = 100, .army = 0, .blueprint = "/a.bp"}
+  );
+  (void)game.Beat();
+  (void)game.Beat(false);
+  EXPECT_EQ(game.lanes[0], (Bytes{0x00, 0x00}));
+  EXPECT_EQ(game.lanes[1], (Bytes{0x00, 0x00}));
+  (void)game.Beat(true);
+  EXPECT_TRUE(game.lanes[0].empty());
 }

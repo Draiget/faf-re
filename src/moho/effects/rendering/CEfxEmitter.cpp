@@ -15,6 +15,7 @@
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/effects/rendering/CEffectManagerImpl.h"
 #include "moho/effects/rendering/EffectHost.h"
+#include "moho/effects/rendering/EffectTickObserver.h"
 #include "moho/effects/rendering/IEffectManager.h"
 #include "moho/entity/Entity.h"
 #include "moho/math/QuaternionMath.h"
@@ -625,6 +626,7 @@ namespace moho
       params[EFFECT_LIFETIME] >= 0.0f &&
       (static_cast<float>(static_cast<int>(mLife)) + params[EFFECT_TICKCOUNT]) >= params[EFFECT_LIFETIME]
     ) {
+      EFFECT_Ending(*this, EEffectEnd::Lifetime); // plan WPR.10: null in the game
       effectManager->DestroyEffect(this);
       return true;
     }
@@ -632,6 +634,7 @@ namespace moho
     if (mNewAttachment != 0u) {
       const CEffectFollow attached(*this, mEntityInfo, false);
       if (!attached || attached.Dying()) {
+        EFFECT_Ending(*this, EEffectEnd::EntityGone);
         effectManager->DestroyEffect(this);
         return true;
       }
@@ -648,6 +651,7 @@ namespace moho
         return false;
       }
 
+      EFFECT_Ending(*this, EEffectEnd::NotVisible);
       effectManager->DestroyEffect(this);
       return true;
     }
@@ -1097,6 +1101,21 @@ namespace moho
       }
       return;
     }
+    // Plan WPR.10 (EffectTickObserver.h): with an observer, the tick's particles and the emitter's place are reported.
+    CEffectTickScope observed(*this);
+    if (observed.Observing()) {
+      VMatrix4 placed{};
+      (void)InterpolatePosition(this, &placed, 0, 0.0f);
+      const float* const p = mParams.start_;
+      observed.SetPosition(
+        (placed.r[0].x * p[EFFECT_POSITION_X]) + (placed.r[1].x * p[EFFECT_POSITION_Y]) +
+          (placed.r[2].x * p[EFFECT_POSITION_Z]) + placed.r[3].x,
+        (placed.r[0].y * p[EFFECT_POSITION_X]) + (placed.r[1].y * p[EFFECT_POSITION_Y]) +
+          (placed.r[2].y * p[EFFECT_POSITION_Z]) + placed.r[3].y,
+        (placed.r[0].z * p[EFFECT_POSITION_X]) + (placed.r[1].z * p[EFFECT_POSITION_Y]) +
+          (placed.r[2].z * p[EFFECT_POSITION_Z]) + placed.r[3].z
+      );
+    }
     const float* const start = mParams.start_;
     if (
       (start[EFFECT_EMITIFVISIBLE] > 0.0f || start[EFFECT_CREATEIFVISIBLE] > 0.0f) &&
@@ -1118,7 +1137,11 @@ namespace moho
       mPos.z = worldZ;
     }
 
-    if (ProcessLifetime() || !IsVisible()) {
+    if (ProcessLifetime()) {
+      return;
+    }
+    if (!IsVisible()) {
+      observed.SetHidden();
       return;
     }
 

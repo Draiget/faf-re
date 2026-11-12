@@ -4,6 +4,8 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -13,12 +15,18 @@
 #include "moho/effects/rendering/CEfxBeam.h"
 #include "moho/effects/rendering/CHostedEffectManager.h"
 #include "moho/effects/rendering/EffectHost.h"
+#include "moho/effects/rendering/EffectOps.h"
+#include "moho/effects/rendering/EffectTickObserver.h"
 #include "moho/effects/rendering/SEfxCurve.h"
 #include "moho/particles/SParticleBuffer.h"
+#include "moho/render/EBeamParam.h"
 #include "moho/render/EEmitterCurve.h"
 #include "moho/render/EEmitterParam.h"
 #include "moho/resource/blueprints/RBeamBlueprint.h"
 #include "remote/client/EffectHosting.h"
+#include "remote/wire/EffectLane.h"
+#include "server/EffectOpEncoder.h"
+#include "server/EffectOpRecorder.h"
 
 namespace
 {
@@ -338,4 +346,283 @@ TEST(
   const VTransform local = target.BoneLocal(3);
   EXPECT_FLOAT_EQ(local.pos_.x, 0.0f);
   EXPECT_FLOAT_EQ(local.orient_.w, 1.0f);
+}
+
+namespace
+{
+  /** Plan WPR.10: what the tick observer is told, effect by effect. */
+  class CRecordingObserver final : public moho::IEffectTickObserver
+  {
+  public:
+    void OnEffectTicked(
+      const moho::IEffect& effect,
+      const moho::SEffectTick& tick
+    ) override
+    {
+      ticks.push_back({&effect, tick});
+    }
+    void OnEffectEnding(
+      const moho::IEffect& effect,
+      const moho::EEffectEnd why
+    ) override
+    {
+      endings.push_back({&effect, why});
+    }
+    void OnEffectDestroyed(
+      const moho::IEffect& effect
+    ) override
+    {
+      destroyed.push_back(&effect);
+    }
+
+    std::vector<std::pair<const moho::IEffect*, moho::SEffectTick>> ticks;
+    std::vector<std::pair<const moho::IEffect*, moho::EEffectEnd>> endings;
+    std::vector<const moho::IEffect*> destroyed;
+  };
+
+  /** Sets the observer for one test, and always takes it away again. */
+  struct SObserving
+  {
+    explicit SObserving(
+      moho::IEffectTickObserver& observer
+    )
+    {
+      moho::gEffectTickObserver = &observer;
+    }
+    ~SObserving()
+    {
+      moho::gEffectTickObserver = nullptr;
+    }
+  };
+
+  std::uint32_t sOpsSeen = 0;
+  void CountOps(
+    moho::EEffectOp,
+    const moho::SEffectOpArgs&
+  )
+  {
+    ++sOpsSeen;
+  }
+} // namespace
+
+TEST(
+  EffectHosting,
+  TheTickObserverIsToldEachTicksParticlesThePlaceAndTheEnd
+)
+{
+  CFakeHost host;
+  moho::CHostedEffectManager manager(host);
+  auto target = std::make_shared<CFakeTarget>(3.0f, 4.0f, 5.0f);
+  moho::IEffect* const effect = manager.HostEmitterOnEntity(target, nullptr, 0);
+  ASSERT_NE(effect, nullptr);
+  MakeEmit(*effect, 3.0f);
+
+  CRecordingObserver observer;
+  {
+    const SObserving observing(observer);
+    manager.Tick();
+    ASSERT_EQ(observer.ticks.size(), 1u);
+    EXPECT_EQ(observer.ticks[0].first, effect);
+    EXPECT_EQ(observer.ticks[0].second.particles, 3u) << "what this tick put in the host's buffer";
+    EXPECT_EQ(observer.ticks[0].second.trails, 0u);
+    EXPECT_FALSE(observer.ticks[0].second.hidden);
+    ASSERT_TRUE(observer.ticks[0].second.positioned);
+    EXPECT_FLOAT_EQ(observer.ticks[0].second.position[0], 3.0f);
+    EXPECT_FLOAT_EQ(observer.ticks[0].second.position[2], 5.0f);
+    ASSERT_TRUE(host.buffer);
+    EXPECT_EQ(host.buffer->mParticles.size(), 3u);
+
+    target->dying = true;
+    manager.Tick();
+    ASSERT_EQ(observer.endings.size(), 1u);
+    EXPECT_EQ(observer.endings[0].second, moho::EEffectEnd::EntityGone);
+    ASSERT_EQ(observer.destroyed.size(), 1u) << "DestroyEffect tells it, once";
+    EXPECT_EQ(observer.destroyed[0], effect);
+    ASSERT_EQ(observer.ticks.size(), 2u);
+    EXPECT_EQ(observer.ticks[1].second.particles, 0u);
+    manager.PurgeDestroyedEffects();
+  }
+
+  // Without an observer the same tick reports nothing and emits the same.
+  auto again = std::make_shared<CFakeTarget>(0.0f, 0.0f, 0.0f);
+  moho::IEffect* const quiet = manager.HostEmitterOnEntity(again, nullptr, 0);
+  ASSERT_NE(quiet, nullptr);
+  MakeEmit(*quiet, 2.0f);
+  host.buffer.reset();
+  manager.Tick();
+  EXPECT_EQ(observer.ticks.size(), 2u);
+  ASSERT_TRUE(host.buffer);
+  EXPECT_EQ(host.buffer->mParticles.size(), 2u);
+}
+
+TEST(
+  EffectHosting,
+  AnEmitterNoCameraSeesIsReportedHidden
+)
+{
+  CFakeHost host; // no camera
+  moho::CHostedEffectManager manager(host);
+  moho::IEffect* const effect = manager.HostEmitterAt(Wm3::Vector3<float>(1.0f, 2.0f, 3.0f), nullptr, 0);
+  ASSERT_NE(effect, nullptr);
+  MakeEmit(*effect, 1.0f);
+  effect->SetFloatParam(moho::EFFECT_EMITIFVISIBLE, 1.0f);
+  CRecordingObserver observer;
+  const SObserving observing(observer);
+  manager.Tick();
+  ASSERT_EQ(observer.ticks.size(), 1u);
+  EXPECT_TRUE(observer.ticks[0].second.hidden);
+  EXPECT_EQ(observer.ticks[0].second.particles, 0u);
+}
+
+TEST(
+  EffectHosting,
+  AHostedManagersDestroysAreNotTheSimsOps
+)
+{
+  // The sim's op hook records the sim's effect ops for the server; a client's hosted manager destroys its own effects
+  // (lifetime, entity, the lane's drops), which must not reach it (a headless run hosts both in one process).
+  CFakeHost host;
+  moho::CHostedEffectManager manager(host);
+  moho::IEffect* const effect = manager.HostEmitterAt(Wm3::Vector3<float>(0.0f, 0.0f, 0.0f), nullptr, 0);
+  ASSERT_NE(effect, nullptr);
+  sOpsSeen = 0;
+  moho::gEffectOpHook = &CountOps;
+  manager.DestroyEffect(effect);
+  moho::gEffectOpHook = nullptr;
+  manager.PurgeDestroyedEffects();
+  EXPECT_EQ(sOpsSeen, 0u);
+}
+
+TEST(
+  EffectHosting,
+  ACollisionBeamsLengthPutsItsBoneOneAtTheBeamsEnd
+)
+{
+  using faf::remote::client::CClientFollowTarget;
+  auto beamEntity = std::make_shared<CClientFollowTarget>();
+  CClientFollowTarget::SState state; // no mesh, no unit: what a collision beam entity is on the client
+  state.current.pos_ = Wm3::Vec3f(10.0f, 2.0f, 10.0f);
+  state.pending = state.current;
+  beamEntity->Update(state);
+  EXPECT_NEAR(beamEntity->BoneLocal(1).pos_.z, 0.0f, 1e-6f) << "no length yet: an entity's bone";
+
+  // `CollisionBeamEntity::CheckCollision` gives the beam effect its length; the client learns it from that op.
+  beamEntity->LearnBeamLength(25.0f);
+  ASSERT_TRUE(beamEntity->HasBeamLength());
+  const VTransform local = beamEntity->BoneLocal(1);
+  EXPECT_FLOAT_EQ(local.pos_.z, 25.0f);
+  EXPECT_FLOAT_EQ(local.orient_.w, 1.0f);
+  EXPECT_FLOAT_EQ(beamEntity->BoneLocal(0).pos_.z, 0.0f);
+  EXPECT_FLOAT_EQ(beamEntity->BoneLocal(2).pos_.z, 0.0f) << "only bone 1 is moved locally (0x006731A0)";
+  // `GetBoneWorldTransform` (0x006730B0): any bone but 0 along the transform's +Z; identity orientation here.
+  EXPECT_FLOAT_EQ(beamEntity->BoneWorld(1).pos_.z, 35.0f);
+  EXPECT_FLOAT_EQ(beamEntity->BoneWorld(0).pos_.z, 10.0f);
+
+  // The end splash: an emitter on bone 1 emits at the beam's end.
+  CFakeHost host;
+  moho::CHostedEffectManager manager(host);
+  moho::IEffect* const splash = manager.HostAttachedEmitter(beamEntity, 1, nullptr, 0);
+  ASSERT_NE(splash, nullptr);
+  MakeEmit(*splash, 1.0f);
+  manager.Tick();
+  ASSERT_TRUE(host.buffer);
+  ASSERT_EQ(host.buffer->mParticles.size(), 1u);
+  EXPECT_NEAR(host.buffer->mParticles[0].mPos.x, 10.0f, 1e-4f);
+  EXPECT_NEAR(host.buffer->mParticles[0].mPos.z, 35.0f, 1e-4f);
+
+  // A unit, or an entity with a mesh, is no collision beam: a length on a beam that follows it changes nothing.
+  CClientFollowTarget unit;
+  CClientFollowTarget::SState unitState;
+  unitState.isUnit = true;
+  unit.Update(unitState);
+  unit.LearnBeamLength(9.0f);
+  EXPECT_FALSE(unit.HasBeamLength());
+}
+
+TEST(
+  EffectHosting,
+  ABeamFromCreateParametersTakesItsColourAndUvFromTheLane
+)
+{
+  using faf::remote::wire::SEffectLaneOp;
+  SEffectLaneOp op;
+  op.op = moho::EEffectOp::CreateBeam;
+  op.bone = -1;
+  op.army = 2;
+  op.param = 4;
+  op.values = {1, 2, 3, 4, 5, 6, 7, 0.5f, 2, 0.25f, 0.5f, 0.75f, 1.5f, 0.1f, 0.2f, 3.0f};
+  const std::string texture = "/textures/particles/beam_white_01.dds";
+  moho::SCreateBeamParams params;
+  ASSERT_TRUE(faf::remote::client::BeamParamsFromOp(op, &texture, params));
+  EXPECT_FLOAT_EQ(params.mEnd.z, 6.0f);
+  EXPECT_FLOAT_EQ(params.mWidth, 0.5f);
+  EXPECT_FLOAT_EQ(params.mSpawnTransform.mOrientation[0], 0.25f);
+  EXPECT_FLOAT_EQ(params.mSpawnTransform.mOrientation[3], 1.5f);
+  EXPECT_FLOAT_EQ(params.mSpawnTransform.mPosition.z, 3.0f);
+  EXPECT_EQ(params.mBlendMode, 4);
+  EXPECT_STREQ(params.mTexture.c_str(), texture.c_str());
+
+  // The beam takes them as the sim's does (0x00654A70): the colour at start and end, the UV lanes.
+  CFakeHost host;
+  moho::CHostedEffectManager manager(host);
+  moho::IEffect* const beam = manager.HostBeamWithParams(params, nullptr, -1);
+  ASSERT_NE(beam, nullptr);
+  const auto& impl = static_cast<const moho::CEffectImpl&>(*beam);
+  EXPECT_FLOAT_EQ(impl.mParams.start_[moho::BEAM_STARTCOLOR_R], 0.25f);
+  EXPECT_FLOAT_EQ(impl.mParams.start_[moho::BEAM_ENDCOLOR_A], 1.5f);
+  EXPECT_FLOAT_EQ(impl.mParams.start_[moho::BEAM_USHIFT], 0.1f);
+  EXPECT_FLOAT_EQ(impl.mParams.start_[moho::BEAM_REPEATRATE], 3.0f);
+
+  // An older server's 9 floats: the parameters' defaults (white, no shift).
+  op.values.resize(9);
+  moho::SCreateBeamParams older;
+  ASSERT_TRUE(faf::remote::client::BeamParamsFromOp(op, nullptr, older));
+  EXPECT_FLOAT_EQ(older.mSpawnTransform.mOrientation[0], 1.0f);
+  EXPECT_FLOAT_EQ(older.mSpawnTransform.mOrientation[3], 0.0f);
+  EXPECT_FLOAT_EQ(older.mSpawnTransform.mPosition.x, 0.0f);
+  op.values.resize(8);
+  EXPECT_FALSE(faf::remote::client::BeamParamsFromOp(op, nullptr, older));
+}
+
+TEST(
+  EffectHosting,
+  ABeamsColourAndUvGoFromTheSimsCreateThroughTheLaneToTheClientsBeam
+)
+{
+  // `UnitWeapon::DoInstaHit` gives its beam a colour: the recorder flattens it with the rest, the lane carries it, and
+  // the client builds the same create parameters.
+  moho::SCreateBeamParams sim;
+  sim.mStart = Wm3::Vector3<float>(1.0f, 2.0f, 3.0f);
+  sim.mEnd = Wm3::Vector3<float>(4.0f, 5.0f, 6.0f);
+  sim.mLifetime = 2.0f;
+  sim.mWidth = 0.3f;
+  sim.mTexture = "/textures/particles/beam_white_01.dds";
+  sim.mSpawnTransform.mOrientation = {0.9f, 0.1f, 0.2f, 0.7f};
+  sim.mSpawnTransform.mPosition = Wm3::Vector3<float>(0.5f, 0.25f, 4.0f);
+  sim.mBlendMode = 2;
+  moho::SEffectOpArgs args{.effect = reinterpret_cast<const moho::IEffect*>(0x1000), .beam = &sim};
+  std::vector<float> floats;
+  faf::server::FlattenEffectOpArgs(args, floats);
+  ASSERT_EQ(args.valueCount, 16u) << "start, end, lifetime, width, texture scale, colour, U and V shift, repeat rate";
+
+  faf::server::CEffectOpEncoder encoder;
+  encoder.Record(moho::EEffectOp::CreateBeam, args);
+  faf::server::CEffectLaneNames names;
+  std::vector<std::uint8_t> lane;
+  names.Write(encoder.EndBeat(), lane);
+  faf::remote::wire::CEffectLaneReader reader;
+  std::vector<faf::remote::wire::SEffectLaneOp> ops;
+  ASSERT_TRUE(reader.Read(lane, ops));
+  ASSERT_EQ(ops.size(), 1u);
+  ASSERT_EQ(ops[0].values.size(), 16u);
+
+  moho::SCreateBeamParams client;
+  ASSERT_TRUE(faf::remote::client::BeamParamsFromOp(ops[0], reader.Name(true, ops[0].texture), client));
+  EXPECT_EQ(client.mSpawnTransform.mOrientation, sim.mSpawnTransform.mOrientation);
+  EXPECT_FLOAT_EQ(client.mSpawnTransform.mPosition.x, 0.5f);
+  EXPECT_FLOAT_EQ(client.mSpawnTransform.mPosition.y, 0.25f);
+  EXPECT_FLOAT_EQ(client.mSpawnTransform.mPosition.z, 4.0f);
+  EXPECT_FLOAT_EQ(client.mWidth, 0.3f);
+  EXPECT_EQ(client.mBlendMode, 2);
+  EXPECT_STREQ(client.mTexture.c_str(), sim.mTexture.c_str());
 }

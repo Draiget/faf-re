@@ -10,6 +10,7 @@
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/effects/rendering/CEffectImpl.h"
 #include "moho/effects/rendering/EffectHost.h"
+#include "moho/effects/rendering/EffectTickObserver.h"
 #include "moho/effects/rendering/IEffectManager.h"
 #include "moho/entity/Entity.h"
 #include "moho/math/QuaternionMath.h"
@@ -558,6 +559,7 @@ namespace moho
       // The sim's entities, or a hosted beam's targets (EffectHost.h), read the same way.
       const CEffectFollow sourceEntity(*this, mEntityInfo, false);
       if (IsAttachmentInvalid(sourceEntity)) {
+        EFFECT_Ending(*this, EEffectEnd::EntityGone); // plan WPR.10: null in the game
         mManager->DestroyEffect(this);
         return false;
       }
@@ -675,6 +677,7 @@ namespace moho
    */
   void CEfxBeam::OnTick()
   {
+    const CEffectTickScope observed(*this); // plan WPR.10 (EffectTickObserver.h): the tick's beam, with an observer
     // Established (non-newly-attached) beams age one tick; when their lifetime
     // reaches zero after the decrement, the beam is destroyed instead of ticked.
     if (!mNewAttachment) {
@@ -682,6 +685,7 @@ namespace moho
       if (lifetime > 0.0f) {
         SetFloatParam(BEAM_LIFETIME, lifetime - 1.0f);
         if (GetFloatParam(BEAM_LIFETIME) <= 0.0f) {
+          EFFECT_Ending(*this, EEffectEnd::Lifetime);
           mManager->DestroyEffect(this);
           return;
         }
