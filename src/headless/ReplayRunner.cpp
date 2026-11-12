@@ -65,6 +65,7 @@
 #include "server/ServerViews.h"
 #endif
 #include "headless/ReplayFpuReport.h"
+#include "headless/ReplayEffectOps.h"
 #include "headless/ReplayKeyframes.h"
 #if FAF_SERVER_MODE
 // The wire format and the remote client (src/remote), built only with FAF_SERVER_MODE:
@@ -833,6 +834,11 @@ namespace faf::headless
         return result;
       }
     }
+    CReplayEffectOps effectOps; // plan WP9.1
+    if (!options.effectOpsPath.empty() && !effectOps.Open(options.effectOpsPath)) {
+      result.error = "cannot write " + options.effectOpsPath;
+      return result;
+    }
 #if FAF_SERVER_MODE
     std::unique_ptr<CReplayWireStats> wireStats;
     if (!options.wireStatsPath.empty()) {
@@ -933,6 +939,7 @@ namespace faf::headless
           simDriver->SetPendingFocusArmyRaw(options.focusSwitchArmy);
         }
         result.desyncReports += static_cast<int>(packet->mDesyncs.size());
+        effectOps.OnBeat(packet->mCurBeat);
 
         if (digestFile != nullptr) {
           const moho::Sim* const sim = simDriver->GetSimForReplayCheck();
@@ -1151,6 +1158,7 @@ namespace faf::headless
       );
       std::fflush(stdout);
     }
+    effectOps.Finish(label);
     if (digestFile != nullptr) {
       std::fclose(digestFile);
     }

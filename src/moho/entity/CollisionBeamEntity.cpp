@@ -1,4 +1,5 @@
 #include "moho/entity/CollisionBeamEntity.h"
+#include "moho/effects/rendering/EffectOps.h"
 
 #include <cstdint>
 #include <string>
@@ -386,6 +387,7 @@ namespace moho
 
     if (IEffect* const beamEffect = mEffect.GetObjectPtr(); beamEffect != nullptr) {
       constexpr std::int32_t kBeamLengthParam = 6;
+      moho::EFFECT_Op(moho::EEffectOp::SetFloat, beamEffect); // plan WP9.1
       beamEffect->SetFloatParam(kBeamLengthParam, beam.mBeamLength);
     }
 

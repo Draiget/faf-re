@@ -1,4 +1,5 @@
 #include "moho/effects/rendering/CEffectManagerImpl.h"
+#include "moho/effects/rendering/EffectOps.h"
 
 #include <algorithm>
 #include <memory>
@@ -287,6 +288,7 @@ namespace moho
     const int armyIndex
   )
   {
+    EFFECT_Op(EEffectOp::CreateEmitter, nullptr); // plan WP9.1
     Sim* const sim = GetSim();
     REmitterBlueprint* const blueprint = LookupEmitterBlueprint(sim, blueprintName);
     if (blueprintName != nullptr && blueprint == nullptr) {
@@ -321,6 +323,7 @@ namespace moho
     const int armyIndex
   )
   {
+    EFFECT_Op(EEffectOp::CreateAttachedEmitter, nullptr); // plan WP9.1
     Sim* const sim = GetSim();
     REmitterBlueprint* const blueprint = LookupEmitterBlueprint(sim, blueprintName);
     if (blueprintName != nullptr && blueprint == nullptr) {
@@ -354,6 +357,7 @@ namespace moho
     const int armyIndex
   )
   {
+    EFFECT_Op(EEffectOp::CreateEmitterAtBone, nullptr); // plan WP9.1
     Sim* const sim = GetSim();
     REmitterBlueprint* const blueprint = LookupEmitterBlueprint(sim, blueprintName);
     if (blueprintName != nullptr && blueprint == nullptr) {
@@ -386,6 +390,7 @@ namespace moho
     const int armyIndex
   )
   {
+    EFFECT_Op(EEffectOp::CreateEmitterAtEntity, nullptr); // plan WP9.1
     Sim* const sim = GetSim();
     REmitterBlueprint* const blueprint = LookupEmitterBlueprint(sim, blueprintName);
     if (blueprintName != nullptr && blueprint == nullptr) {
@@ -418,6 +423,7 @@ namespace moho
     const int armyIndex
   )
   {
+    EFFECT_Op(EEffectOp::CreateEmitterOnEntity, nullptr); // plan WP9.1
     Sim* const sim = GetSim();
     REmitterBlueprint* const blueprint = LookupEmitterBlueprint(sim, blueprintName);
     if (blueprintName != nullptr && blueprint == nullptr) {
@@ -451,6 +457,7 @@ namespace moho
     const int armyIndex
   )
   {
+    EFFECT_Op(EEffectOp::CreateTrail, nullptr); // plan WP9.1
     Sim* const sim = GetSim();
     RTrailBlueprint* const blueprint = LookupTrailBlueprint(sim, blueprintName);
     if (blueprintName != nullptr && blueprint == nullptr) {
@@ -486,6 +493,7 @@ namespace moho
     if (effect == nullptr) {
       return;
     }
+    EFFECT_Op(EEffectOp::Destroy, effect); // plan WP9.1
 
     // sim_ParallelEffects: inside a chunk the relink waits for the chunk's commit.
     if (SEffectTickChunk* const chunk = tEffectTickChunk; chunk != nullptr) {
@@ -494,6 +502,38 @@ namespace moho
     }
 
     effect->ListLinkBefore(&mDestroyedEffects);
+  }
+
+  // Plan WP9.1 (EffectOps.h): null in the game.
+  EffectOpHook gEffectOpHook = nullptr;
+
+  const char* EffectOpName(
+    const EEffectOp op
+  ) noexcept
+  {
+    static constexpr const char* kNames[] = {
+      "CreateEmitter",
+      "CreateAttachedEmitter",
+      "CreateEmitterAtBone",
+      "CreateEmitterAtEntity",
+      "CreateEmitterOnEntity",
+      "CreateTrail",
+      "CreateBeam",
+      "CreateBeamEntityToEntity",
+      "AttachBeamEntityToEntity",
+      "CreateLightParticle",
+      "Destroy",
+      "SetFloat",
+      "SetVector",
+      "SetN",
+      "SetCurve",
+      "SetEntity",
+      "SetBone",
+      "DestroyByScript"
+    };
+    static_assert(sizeof(kNames) / sizeof(kNames[0]) == static_cast<std::size_t>(EEffectOp::Count));
+    const auto index = static_cast<std::size_t>(op);
+    return index < static_cast<std::size_t>(EEffectOp::Count) ? kNames[index] : "?";
   }
 
   namespace
@@ -655,6 +695,7 @@ namespace moho
     const int armyIndex
   )
   {
+    EFFECT_Op(EEffectOp::CreateLightParticle, nullptr); // plan WP9.1
     const fa::string primaryPath = BuildParticleTexturePath(texturePrimary, "/textures/particles/beam_white_01.dds");
 
     if (textureSecondary.empty()) {
@@ -702,6 +743,7 @@ namespace moho
     const int armyIndex
   )
   {
+    EFFECT_Op(EEffectOp::CreateBeam, nullptr); // plan WP9.1
     CEfxBeam* const effect = new (std::nothrow) CEfxBeam(this, beamBlueprint, armyIndex);
     if (effect == nullptr) {
       return nullptr;
@@ -724,6 +766,7 @@ namespace moho
     const SCreateBeamParams& params
   )
   {
+    EFFECT_Op(EEffectOp::CreateBeam, nullptr); // plan WP9.1
     // The create-params ctor applies every beam render parameter (endpoints,
     // colour, length, thickness, UV shift, repeat rate, LOD cutoff, texture, and
     // blend mode) and runs Reset(); constructing through the default ctor here
@@ -757,6 +800,7 @@ namespace moho
     const int armyIndex
   )
   {
+    EFFECT_Op(EEffectOp::CreateBeamEntityToEntity, nullptr); // plan WP9.1
     CEfxBeam* const effect = new (std::nothrow) CEfxBeam(this, beamBlueprint, armyIndex);
     if (effect == nullptr) {
       return nullptr;
@@ -793,6 +837,7 @@ namespace moho
     const int armyIndex
   )
   {
+    EFFECT_Op(EEffectOp::AttachBeamEntityToEntity, nullptr); // plan WP9.1
     CEfxBeam* const effect = new (std::nothrow) CEfxBeam(this, beamBlueprint, armyIndex);
     if (effect == nullptr) {
       return nullptr;

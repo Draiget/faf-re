@@ -1,4 +1,5 @@
 #include "moho/console/CConAlias.h"
+#include "moho/effects/rendering/EffectOps.h"
 #include "moho/console/CConCommand.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/effects/rendering/CEffectManagerImpl.h"
@@ -359,6 +360,7 @@ namespace
 
     LuaPlus::LuaStackObject valueArg(state, 3);
     const float value = valueArg.GetNumber();
+    moho::EFFECT_Op(moho::EEffectOp::SetFloat, effect); // plan WP9.1
     effect->SetFloatParam(paramIndex, value);
     effect->mLuaObj.PushStack(state);
     return 1;
@@ -685,8 +687,10 @@ namespace moho
     LuaPlus::LuaStackObject boneArg(state, 2);
     const int boneIndex = ENTSCR_ResolveBoneIndex(entity, boneArg, true);
     if (boneIndex == -1) {
+      moho::EFFECT_Op(moho::EEffectOp::SetEntity, effect); // plan WP9.1
       effect->SetEntity(entity);
     } else {
+      moho::EFFECT_Op(moho::EEffectOp::SetBone, effect); // plan WP9.1
       effect->SetBone(entity, boneIndex);
     }
 
@@ -983,8 +987,10 @@ namespace moho
     (void)lua_tonumber(rawState, 4);
 
     if (targetBoneIndex == -1) {
+      moho::EFFECT_Op(moho::EEffectOp::SetEntity, effect); // plan WP9.1
       effect->SetEntity(targetEntity);
     } else {
+      moho::EFFECT_Op(moho::EEffectOp::SetBone, effect); // plan WP9.1
       effect->SetBone(targetEntity, targetBoneIndex);
     }
     return 0;
@@ -1930,6 +1936,7 @@ namespace moho
     }
 
     const float scale = lua_tonumber(state->m_state, 2);
+    moho::EFFECT_Op(moho::EEffectOp::SetFloat, effect); // plan WP9.1
     effect->SetFloatParam(18, scale);
     effect->mLuaObj.PushStack(state);
     return 1;
@@ -1991,6 +1998,7 @@ namespace moho
     curve.mBoundsMin.x = 0.0f;
     curve.mBoundsMax.x = newCurveLength;
     RecomputeEmitterCurveYBounds(curve);
+    moho::EFFECT_Op(moho::EEffectOp::SetCurve, effect); // plan WP9.1
     effect->SetCurveParam(curveParamIndex, &curve);
     effect->mLuaObj.PushStack(state);
     return 1;
@@ -2048,6 +2056,7 @@ namespace moho
     SEfxCurve curve{};
     const Wm3::Vector3f key{0.0f, height, size};
     moho::InsertEmitterCurveKey(curve, key);
+    moho::EFFECT_Op(moho::EEffectOp::SetCurve, effect); // plan WP9.1
     effect->SetCurveParam(curveParamIndex, &curve);
     effect->mLuaObj.PushStack(state);
     return 1;
@@ -2111,6 +2120,7 @@ namespace moho
     z += effect->GetFloatParam(2);
 
     const float values[3] = {x, y, z};
+    moho::EFFECT_Op(moho::EEffectOp::SetN, effect); // plan WP9.1
     effect->SetNParam(0, values, 3);
     effect->mLuaObj.PushStack(state);
     return 1;
@@ -2147,6 +2157,7 @@ namespace moho
     if (effect) {
       Sim* const sim = ResolveGlobalSim(state->m_state);
       if (sim != nullptr && sim->mEffectManager != nullptr) {
+        moho::EFFECT_Op(moho::EEffectOp::DestroyByScript, effect); // plan WP9.1
         sim->mEffectManager->DestroyEffect(effect);
       }
     }

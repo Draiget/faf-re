@@ -23,6 +23,7 @@ namespace faf::headless
     int rejoinSource = -1;         // when set: play as this source of a live game (CRejoinFeed.h)
     int rejoinBeat = 0;            // with `rejoinSource`: the beat the driver takes over
     std::string digestPath;        // when set: one "beat digest" line per checksummed beat
+    std::string effectOpsPath;     // plan WP9.1: when set, the sim's effect operations per beat (ReplayEffectOps.h)
     std::string syncKeysPath;      // when set: every top-level Lua `Sync` key seen, with beat counts
     std::string wireStatsPath;     // when set: the entities lane of the wire format, per beat (CSV)
     std::string syncWritersPath;   // when set: every Sync write's Lua call site (ReplaySyncWriters.h)

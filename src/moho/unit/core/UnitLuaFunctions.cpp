@@ -1,4 +1,5 @@
 #include "moho/unit/core/UnitLuaPrivate.h"
+#include "moho/effects/rendering/EffectOps.h"
 
 namespace
 {
@@ -408,12 +409,15 @@ int moho::cfunc_UnitScaleGetBuiltEmitterL(
   const Wm3::Vector3f scaleKey(static_cast<float>(footprint.mSizeX), static_cast<float>(footprint.mSizeZ), 0.0f);
 
   const SEfxCurve param10Curve = BuildSingleEmitterScaleCurve(scaleKey);
+  moho::EFFECT_Op(moho::EEffectOp::SetCurve, effect); // plan WP9.1
   effect->SetCurveParam(10, &param10Curve);
 
   const SEfxCurve param4Curve = BuildSingleEmitterScaleCurve(scaleKey);
+  moho::EFFECT_Op(moho::EEffectOp::SetCurve, effect); // plan WP9.1
   effect->SetCurveParam(4, &param4Curve);
 
   const SEfxCurve param3Curve = BuildSingleEmitterScaleCurve(scaleKey);
+  moho::EFFECT_Op(moho::EEffectOp::SetCurve, effect); // plan WP9.1
   effect->SetCurveParam(3, &param3Curve);
 
   return 0;

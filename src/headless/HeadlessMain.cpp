@@ -349,6 +349,7 @@ int HEADLESS_Main(
   (void)ReadIntOption("--rejoin-port", options.rejoinPort, bad);
   (void)ReadIntOption("--rejoin-beat", options.rejoinBeat, bad);
   (void)ReadOption("--digests", options.digestPath);
+  (void)ReadOption("--effect-ops", options.effectOpsPath); // plan WP9.1
   (void)ReadOption("--sync-keys", options.syncKeysPath);
   (void)ReadOption("--sync-dump", options.syncDumpPath);
   (void)ReadOption("--lua-routing-dump", options.luaRoutingDump);
