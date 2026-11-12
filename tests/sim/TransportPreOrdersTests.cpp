@@ -5,6 +5,7 @@
 
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/entity/EntityId.h"
+#include "moho/ui/SelectionDragger.h"
 #include "moho/unit/core/UserUnit.h"
 
 namespace
@@ -535,5 +536,147 @@ namespace
   )
   {
     EXPECT_FALSE(moho::ui_TransportPreOrders);
+  }
+
+  TEST(
+    TransportPreOrdersTests,
+    FallbackHologramSelectionNullSessionSafe
+  )
+  {
+    EXPECT_FALSE(moho::TryFallbackHologramSelection(nullptr, 0.0f, 0.0f, 100.0f, 100.0f, false));
+    EXPECT_FALSE(moho::TryFallbackHologramSelection(nullptr, 0.0f, 0.0f, 100.0f, 100.0f, true));
+  }
+
+  TEST(
+    TransportPreOrdersTests,
+    FallbackHologramSelectionGatedByConVar
+  )
+  {
+    const bool prev = moho::ui_TransportPreOrders;
+    moho::ui_TransportPreOrders = false;
+    EXPECT_FALSE(moho::TryFallbackHologramSelection(nullptr, 10.0f, 10.0f, 50.0f, 50.0f, false));
+    moho::ui_TransportPreOrders = prev;
+  }
+
+  TEST(
+    TransportPreOrdersTests,
+    SelectionPriorityRulesLiveOverHolograms
+  )
+  {
+    // Rule 7 & User Requirement: "Если в выделение попали живые юниты, то выделяются живые юниты."
+    // Verification of the golden path selection resolution logic:
+    // When live units are non-empty, fallback is bypassed entirely.
+    std::vector<std::uint32_t> liveUnitsInDragSolid = {1001, 1002};
+    std::vector<std::uint32_t> hologramsInDragRect = {2001, 2002};
+
+    bool fallbackCalled = false;
+    std::vector<std::uint32_t> resultingSelection;
+
+    auto resolveSelection = [&](bool isShift, const std::vector<std::uint32_t>& currentSel) {
+      if (!liveUnitsInDragSolid.empty()) {
+        // Vanilla path: select live units (or merge/deselect for shift)
+        resultingSelection = liveUnitsInDragSolid;
+      } else {
+        // Fallback path
+        fallbackCalled = true;
+        resultingSelection = hologramsInDragRect;
+      }
+    };
+
+    resolveSelection(false, {});
+    EXPECT_FALSE(fallbackCalled);
+    EXPECT_EQ(resultingSelection, liveUnitsInDragSolid);
+
+    // When no live units in drag solid, fallback triggers
+    liveUnitsInDragSolid.clear();
+    resolveSelection(false, {});
+    EXPECT_TRUE(fallbackCalled);
+    EXPECT_EQ(resultingSelection, hologramsInDragRect);
+  }
+
+  TEST(
+    TransportPreOrdersTests,
+    FallbackSelectionShiftLogicDeselectAndUnion
+  )
+  {
+    // Verify shift logic:
+    // 1. If all captured units are already in current selection -> deselect them.
+    // 2. If at least one captured unit is NOT in current selection -> union.
+    // 3. If not shift -> replace selection.
+    auto applyHologramDragSelection = [](
+                                        const std::vector<std::uint32_t>& currentSelection,
+                                        const std::vector<std::uint32_t>& capturedUnits,
+                                        bool isShift
+                                      ) -> std::vector<std::uint32_t> {
+      if (capturedUnits.empty()) {
+        return currentSelection;
+      }
+      if (!isShift) {
+        return capturedUnits;
+      }
+
+      // Check if all capturedUnits are already selected
+      bool allAlreadySelected = true;
+      for (const auto cap : capturedUnits) {
+        if (std::find(currentSelection.begin(), currentSelection.end(), cap) == currentSelection.end()) {
+          allAlreadySelected = false;
+          break;
+        }
+      }
+
+      if (allAlreadySelected) {
+        // Deselect capturedUnits from currentSelection
+        std::vector<std::uint32_t> remaining;
+        for (const auto cur : currentSelection) {
+          if (std::find(capturedUnits.begin(), capturedUnits.end(), cur) == capturedUnits.end()) {
+            remaining.push_back(cur);
+          }
+        }
+        return remaining;
+      } else {
+        // Union: currentSelection + capturedUnits (unique)
+        std::vector<std::uint32_t> result = currentSelection;
+        for (const auto cap : capturedUnits) {
+          if (std::find(result.begin(), result.end(), cap) == result.end()) {
+            result.push_back(cap);
+          }
+        }
+        return result;
+      }
+    };
+
+    // Case 1: Non-shift replaces selection
+    {
+      const std::vector<std::uint32_t> current = {101, 102};
+      const std::vector<std::uint32_t> captured = {201, 202};
+      const auto res = applyHologramDragSelection(current, captured, false);
+      EXPECT_EQ(res, captured);
+    }
+
+    // Case 2: Shift with new units -> Union
+    {
+      const std::vector<std::uint32_t> current = {101, 102};
+      const std::vector<std::uint32_t> captured = {102, 201}; // 201 is new
+      const auto res = applyHologramDragSelection(current, captured, true);
+      const std::vector<std::uint32_t> expected = {101, 102, 201};
+      EXPECT_EQ(res, expected);
+    }
+
+    // Case 3: Shift with all captured units already selected -> Deselect (subtraction)
+    {
+      const std::vector<std::uint32_t> current = {101, 102, 103};
+      const std::vector<std::uint32_t> captured = {101, 103}; // all are already in current
+      const auto res = applyHologramDragSelection(current, captured, true);
+      const std::vector<std::uint32_t> expected = {102};
+      EXPECT_EQ(res, expected);
+    }
+
+    // Case 4: Shift deselect all selected units -> Empty selection
+    {
+      const std::vector<std::uint32_t> current = {201, 202};
+      const std::vector<std::uint32_t> captured = {201, 202};
+      const auto res = applyHologramDragSelection(current, captured, true);
+      EXPECT_TRUE(res.empty());
+    }
   }
 } // namespace

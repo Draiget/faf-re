@@ -27,6 +27,12 @@ namespace moho
   extern WeakSet<UserEntity> sSelectionBrackets;
 
   /**
+   * Attempts to fallback-select transport unload cargo holograms via Lua
+   * when rubber-band drag volume contains no live units.
+   */
+  bool TryFallbackHologramSelection(CWldSession* session, float x0, float y0, float x1, float y1, bool isShift);
+
+  /**
    * Interface layer between `IMauiDragger` and the concrete selection
    * draggers: a dragger the world view is allowed to draw.
    *
