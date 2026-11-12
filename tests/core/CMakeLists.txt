@@ -14,6 +14,7 @@ add_executable(faf_core_tests EXCLUDE_FROM_ALL
   UtilTests.cpp
   StatItemTests.cpp
   ProbeWatchTests.cpp
+  DiskWatchTests.cpp
 )
 target_link_libraries(faf_core_tests PRIVATE faf_engine gtest_main)
 set_target_properties(faf_core_tests PROPERTIES FOLDER "Tests/Core")
