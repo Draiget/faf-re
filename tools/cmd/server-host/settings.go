@@ -60,9 +60,9 @@ type rawSettings struct {
 }
 
 type rawOption struct {
-	Key     string `json:"key"`
-	Label   string `json:"label"`
-	Help    string `json:"help"`
+	Key     string            `json:"key"`
+	Label   string            `json:"label"`
+	Help    string            `json:"help"`
 	Default any               `json:"default"`
 	Values  []json.RawMessage `json:"values"` // records {key, text, help}, or plain strings or numbers
 }

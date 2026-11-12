@@ -52,30 +52,31 @@ type LobbyMap struct {
 
 // Lobby is one lobby: its own server process.
 type Lobby struct {
-	ID             string            `json:"id"`
-	Name           string            `json:"name"`
-	State          string            `json:"state"` // starting, lobby, game, ended, failed, stopped
-	Map            LobbyMap          `json:"map"`
-	Options        map[string]any    `json:"options"`
-	CPUs           []int             `json:"cpus"`
-	CPUsAllowed    string            `json:"cpus_allowed,omitempty"`
-	Port           int               `json:"port"`
-	PID            int               `json:"pid"`
-	Created        string            `json:"created"`
-	Control        string            `json:"control"`
-	StartWhenReady float64           `json:"start_when_ready"`
-	Seats          []Seat            `json:"seats"`
-	Observers      []Observer        `json:"observers"`
-	ObserverDelay  float64           `json:"observer_delay_seconds"`
-	ObservePort    int               `json:"observe_port,omitempty"`
-	Hint           Hint              `json:"hint"`
-	Nodes          []int             `json:"nodes"`    // plan WP17.17: the NUMA nodes its CPUs are on
-	Warnings       []Warning         `json:"warnings"` // the placement's, when it was made
-	Usage          procUsage         `json:"usage"`    // plan WP17.16: its server process, sampled every 2 s
-	Phase          string            `json:"phase"`
-	Beat           int               `json:"beat"`
-	Exit           string            `json:"exit"`
-	Dir            string            `json:"dir"`
+	ID             string         `json:"id"`
+	Name           string         `json:"name"`
+	State          string         `json:"state"` // starting, lobby, game, ended, failed, stopped
+	Map            LobbyMap       `json:"map"`
+	Options        map[string]any `json:"options"`
+	CPUs           []int          `json:"cpus"`
+	CPUsAllowed    string         `json:"cpus_allowed,omitempty"`
+	Port           int            `json:"port"`
+	PID            int            `json:"pid"`
+	Created        string         `json:"created"`
+	Control        string         `json:"control"`
+	StartWhenReady float64        `json:"start_when_ready"`
+	Seats          []Seat         `json:"seats"`
+	Observers      []Observer     `json:"observers"`
+	ObserverDelay  float64        `json:"observer_delay_seconds"`
+	ObservePort    int            `json:"observe_port,omitempty"`
+	Hint           Hint           `json:"hint"`
+	Nodes          []int          `json:"nodes"`          // plan WP17.17: the NUMA nodes its CPUs are on
+	Warnings       []Warning      `json:"warnings"`       // the placement's, when it was made
+	Usage          procUsage      `json:"usage"`          // plan WP17.16: its server process, sampled every 2 s
+	Slot           string         `json:"slot,omitempty"` // plan WP17.18: the open slot it was claimed from
+	Phase          string         `json:"phase"`
+	Beat           int            `json:"beat"`
+	Exit           string         `json:"exit"`
+	Dir            string         `json:"dir"`
 
 	restPort   int
 	lastTicks  uint64
@@ -88,18 +89,18 @@ type Lobby struct {
 
 // CreateRequest is POST /api/v1/lobbies's body.
 type CreateRequest struct {
-	Name           string            `json:"name"`
-	Map            string            `json:"map"`
-	Options        map[string]any    `json:"options"`
-	Seats          []Seat            `json:"seats"`
-	Observers      []Observer        `json:"observers"`
-	ObserverDelay  float64           `json:"observer_delay_seconds"`
-	Control        string            `json:"control"`
-	StartWhenReady float64           `json:"start_when_ready"`
-	LobbyMinutes   float64           `json:"lobby_minutes"`
-	CPUs           json.RawMessage   `json:"cpus"` // [ids] or "auto"
-	Cores          int               `json:"cores"`
-	Force          bool              `json:"force"` // start even when the placement says it doesn't fit
+	Name           string          `json:"name"`
+	Map            string          `json:"map"`
+	Options        map[string]any  `json:"options"`
+	Seats          []Seat          `json:"seats"`
+	Observers      []Observer      `json:"observers"`
+	ObserverDelay  float64         `json:"observer_delay_seconds"`
+	Control        string          `json:"control"`
+	StartWhenReady float64         `json:"start_when_ready"`
+	LobbyMinutes   float64         `json:"lobby_minutes"`
+	CPUs           json.RawMessage `json:"cpus"` // [ids] or "auto"
+	Cores          int             `json:"cores"`
+	Force          bool            `json:"force"` // start even when the placement says it doesn't fit
 }
 
 // config is how the host starts each lobby's server.
@@ -127,11 +128,14 @@ type manager struct {
 	procDir string
 	// Plan WP17.20: FAF's settings and defaults; nil without them (tests).
 	settings *settingsSource
+	// Plan WP17.18: open slots, by id.
+	slots    map[string]*Slot
+	nextSlot int
 }
 
 func newManager(cfg config, maps func() []Map, cpus func() []CPU) *manager {
 	m := &manager{cfg: cfg, lobbies: map[string]*Lobby{}, next: 1, maps: maps, cpus: cpus, client: &http.Client{Timeout: 3 * time.Second},
-		procDir: "/proc", links: func() []Link { return nil }}
+		procDir: "/proc", links: func() []Link { return nil }, slots: map[string]*Slot{}, nextSlot: 1}
 	// Without NUMA information (tests, a machine without /sys): one node holding every CPU.
 	m.nodes = func() []Node {
 		ids := []int{}
@@ -241,19 +245,8 @@ func (m *manager) validate(req *CreateRequest) (Map, error) {
 	if req.LobbyMinutes < 1 || req.LobbyMinutes > 24*60 {
 		return mp, errors.New("lobby_minutes is 1..1440")
 	}
-	for k, v := range req.Options {
-		if !reOptionKey.MatchString(k) || fixedOptions[k] {
-			return mp, fmt.Errorf("game option %q can't be set", k)
-		}
-		switch value := v.(type) {
-		case string:
-			if len(value) > 64 || strings.ContainsAny(value, "\n\r") {
-				return mp, fmt.Errorf("game option %s: value too long or not one line", k)
-			}
-		case float64, bool:
-		default:
-			return mp, fmt.Errorf("game option %s: a string, number or true/false", k)
-		}
+	if err := validateOptions(req.Options); err != nil {
+		return mp, err
 	}
 	humans := 0
 	uids := map[int]bool{}
@@ -299,7 +292,7 @@ func (m *manager) validate(req *CreateRequest) (Map, error) {
 				s.AI = "adaptive"
 			}
 			ok := false
-			for _, k := range aiKeys {
+			for _, k := range m.aiKeys() {
 				ok = ok || k == s.AI
 			}
 			if !ok {
@@ -334,6 +327,21 @@ func (m *manager) validate(req *CreateRequest) (Map, error) {
 		o.Watch = ""
 	}
 	return mp, nil
+}
+
+// aiKeys is the AIs a seat may be: the settings catalog's (FAF's aitypes.lua, as the server describes it) when the
+// host has one, else the built-in list.
+func (m *manager) aiKeys() []string {
+	if m.settings != nil {
+		if s, err := m.settings.get(nil); err == nil && len(s.AI) > 0 {
+			keys := make([]string, len(s.AI))
+			for i, a := range s.AI {
+				keys[i] = a.Key
+			}
+			return keys
+		}
+	}
+	return aiKeys
 }
 
 // matchFile is the server's --match file for the lobby.
@@ -422,6 +430,21 @@ func (m *manager) cpusWithLobbies() []CPU {
 			}
 		}
 	}
+	// Plan WP17.18: an open slot holds its CPUs under its own id until its lobby runs on them.
+	slotIDs := make([]string, 0, len(m.slots))
+	for id, s := range m.slots {
+		if holding(s) {
+			slotIDs = append(slotIDs, id)
+		}
+	}
+	sort.Strings(slotIDs)
+	for _, id := range slotIDs {
+		for _, c := range m.slots[id].CPUs {
+			if i, ok := idx[c]; ok {
+				cpus[i].Lobbies = append(cpus[i].Lobbies, id)
+			}
+		}
+	}
 	return cpus
 }
 
@@ -435,8 +458,22 @@ func cpuArg(cpus []int) string {
 
 // machine is the placement engine's view: CPUs with the lobbies on them, NUMA nodes, links, the running lobbies'
 // upload estimates and the memory available.
-func (m *manager) machine() *machine {
+func (m *manager) machine() *machine { return m.machineExcept("") }
+
+// machineExcept is machine() without one holder on the CPUs: the slot a lobby is being claimed from.
+func (m *manager) machineExcept(holder string) *machine {
 	cpus := m.cpusWithLobbies()
+	if holder != "" {
+		for i := range cpus {
+			kept := cpus[i].Lobbies[:0]
+			for _, id := range cpus[i].Lobbies {
+				if id != holder {
+					kept = append(kept, id)
+				}
+			}
+			cpus[i].Lobbies = kept
+		}
+	}
 	mc := &machine{cpus: cpus, nodes: m.nodes(), links: m.links()}
 	m.mu.Lock()
 	for _, l := range m.lobbies {
@@ -475,7 +512,11 @@ func freeLocalTCPPort() (int, error) {
 }
 
 // create starts a lobby: its folder, match file, token, and the server pinned to its CPUs.
-func (m *manager) create(req CreateRequest) (*Lobby, int, error) {
+func (m *manager) create(req CreateRequest) (*Lobby, int, error) { return m.createIn(req, "") }
+
+// createIn is create for a lobby claimed from slot (plan WP17.18; "" for none): the slot's hold on its CPUs doesn't
+// count against the lobby that takes them over.
+func (m *manager) createIn(req CreateRequest, slot string) (*Lobby, int, error) {
 	mp, err := m.validate(&req)
 	if err != nil {
 		return nil, http.StatusBadRequest, err
@@ -483,13 +524,10 @@ func (m *manager) create(req CreateRequest) (*Lobby, int, error) {
 	hint := hintFor(len(req.Seats), mp.KM)
 	// Plan WP17.17: the placement engine picks or checks the CPUs, inside one NUMA node where it can.
 	preq := PlanRequest{Players: len(req.Seats), KM: mp.KM, Cores: req.Cores}
-	raw := strings.TrimSpace(string(req.CPUs))
-	if raw != "" && raw != `"auto"` && raw != "null" {
-		if err := json.Unmarshal(req.CPUs, &preq.CPUs); err != nil || len(preq.CPUs) == 0 {
-			return nil, http.StatusBadRequest, errors.New(`cpus is a list of CPU ids or "auto"`)
-		}
+	if preq.CPUs, err = parseCPUs(req.CPUs); err != nil {
+		return nil, http.StatusBadRequest, err
 	}
-	plan := place(m.machine(), preq)
+	plan := place(m.machineExcept(slot), preq)
 	if !plan.Fits && !req.Force {
 		var why []string
 		for _, w := range plan.Warnings {
@@ -516,9 +554,15 @@ func (m *manager) create(req CreateRequest) (*Lobby, int, error) {
 			}
 		}
 	}
+	// Plan WP17.18: open slots count too, as making them does, except the one this lobby is claimed from.
+	for id, s := range m.slots {
+		if holding(s) && id != slot {
+			live++
+		}
+	}
 	if live >= m.cfg.maxLobbies {
 		m.mu.Unlock()
-		return nil, http.StatusConflict, fmt.Errorf("this host runs at most %d lobbies", m.cfg.maxLobbies)
+		return nil, http.StatusConflict, fmt.Errorf("this host runs at most %d lobbies and open slots", m.cfg.maxLobbies)
 	}
 	// A game port, and with observers a second one they watch from.
 	wanted := 1
@@ -566,7 +610,7 @@ func (m *manager) create(req CreateRequest) (*Lobby, int, error) {
 	l := &Lobby{ID: id, Name: req.Name, State: "starting", Map: LobbyMap{mp.ID, mp.Name, mp.KM, mp.Players}, Options: opts,
 		CPUs: cpuList, Port: port, Created: now.Format(time.RFC3339), Control: req.Control, StartWhenReady: req.StartWhenReady,
 		Seats: req.Seats, Observers: req.Observers, ObserverDelay: req.ObserverDelay, ObservePort: observePort,
-		Hint: hint, Nodes: plan.Nodes, Warnings: plan.Warnings, restPort: restPort, restToken: randomHex(24), done: make(chan struct{})}
+		Hint: hint, Nodes: plan.Nodes, Warnings: plan.Warnings, Slot: slot, restPort: restPort, restToken: randomHex(24), done: make(chan struct{})}
 	if l.Observers == nil {
 		l.Observers = []Observer{}
 	}
@@ -643,6 +687,7 @@ func (m *manager) create(req CreateRequest) (*Lobby, int, error) {
 		} else {
 			l.Exit = "exit 0"
 		}
+		m.lobbyEnded(l)
 		close(l.done)
 	}()
 	go m.watch(l)

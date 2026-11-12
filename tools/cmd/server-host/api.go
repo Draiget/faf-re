@@ -54,11 +54,16 @@ func (a *api) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
+	p := r.URL.Path
+	// Plan WP17.18: a player's claim of an open slot; its claim code is the credential, not the admin token.
+	if rest, ok := strings.CutPrefix(p, "/api/v1/claim/"); ok {
+		a.claim(w, r, rest)
+		return
+	}
 	if !a.authorized(r) {
 		fail(w, http.StatusUnauthorized, errors.New("missing or wrong admin token"))
 		return
 	}
-	p := r.URL.Path
 	switch {
 	case p == "/api/v1/host" && r.Method == http.MethodGet:
 		total, avail := memoryMB(a.procDir)
@@ -93,30 +98,39 @@ func (a *api) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "plan": place(a.m.machine(), req)})
 	case p == "/api/v1/settings" && r.Method == http.MethodGet:
-		// Plan WP17.20: the lobby options, AIs and, with ?map=<id>, that map's own options, with their defaults.
-		var mp *Map
-		if id := r.URL.Query().Get("map"); id != "" {
-			for _, x := range a.maps() {
-				if x.ID == strings.ToLower(id) {
-					found := x
-					mp = &found
-				}
-			}
-			if mp == nil {
-				fail(w, http.StatusNotFound, fmt.Errorf("no map %q", id))
-				return
-			}
-		}
-		if a.settings == nil {
-			fail(w, http.StatusNotFound, errors.New("this host doesn't describe settings"))
+		a.serveSettings(w, r)
+	case p == "/api/v1/slots" && r.Method == http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "slots": a.m.listSlots()})
+	case p == "/api/v1/slots" && r.Method == http.MethodPost:
+		var req SlotRequest
+		dec := json.NewDecoder(io.LimitReader(r.Body, 64<<10))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&req); err != nil {
+			fail(w, http.StatusBadRequest, fmt.Errorf("body: %w", err))
 			return
 		}
-		s, err := a.settings.get(mp)
+		slots, code, err := a.m.createSlots(req)
 		if err != nil {
-			fail(w, http.StatusBadGateway, err)
+			log.Printf("slots not made (%d): %v", code, err)
+			fail(w, code, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": s})
+		for _, s := range slots {
+			log.Printf("slot %s: %s, up to %d players, on CPUs %v", s.ID, s.Name, s.MaxPlayers, s.CPUs)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "slots": slots})
+	case strings.HasPrefix(p, "/api/v1/slots/") && r.Method == http.MethodDelete:
+		id := strings.TrimPrefix(p, "/api/v1/slots/")
+		if err := a.m.deleteSlot(id); err != nil {
+			code := http.StatusInternalServerError
+			if errors.Is(err, errNoSlot) {
+				code = http.StatusNotFound
+			}
+			fail(w, code, err)
+			return
+		}
+		log.Printf("slot %s freed", id)
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	case p == "/api/v1/lobbies" && r.Method == http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "lobbies": a.m.list()})
 	case p == "/api/v1/lobbies" && r.Method == http.MethodPost:
@@ -145,6 +159,72 @@ func (a *api) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.proxy(w, r, id, "/"+sub)
 	default:
 		fail(w, http.StatusNotFound, fmt.Errorf("no %s %s", r.Method, p))
+	}
+}
+
+// serveSettings answers the lobby options, AIs and, with ?map=<id>, that map's own options, with their defaults (plan
+// WP17.20).
+func (a *api) serveSettings(w http.ResponseWriter, r *http.Request) {
+	var mp *Map
+	if id := r.URL.Query().Get("map"); id != "" {
+		for _, x := range a.maps() {
+			if x.ID == strings.ToLower(id) {
+				found := x
+				mp = &found
+			}
+		}
+		if mp == nil {
+			// 400, not 404: under /claim/<code>/ a 404 means the code is unknown.
+			fail(w, http.StatusBadRequest, fmt.Errorf("no map %q", id))
+			return
+		}
+	}
+	if a.settings == nil {
+		fail(w, http.StatusNotFound, errors.New("this host doesn't describe settings"))
+		return
+	}
+	s, err := a.settings.get(mp)
+	if err != nil {
+		fail(w, http.StatusBadGateway, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": s})
+}
+
+// claim serves /api/v1/claim/<code>[/maps|/settings] (plan WP17.18): GET shows the slot and, once claimed, the lobby
+// with its join lines; POST claims it; /maps and /settings are what the player picks from.
+func (a *api) claim(w http.ResponseWriter, r *http.Request, rest string) {
+	code, sub, _ := strings.Cut(rest, "/")
+	if _, ok := a.m.claimView(code); !ok {
+		fail(w, http.StatusNotFound, errors.New("no slot has this claim code"))
+		return
+	}
+	switch {
+	case sub == "" && r.Method == http.MethodGet:
+		v, _ := a.m.claimView(code)
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "claim": v})
+	case sub == "" && r.Method == http.MethodPost:
+		var req ClaimRequest
+		dec := json.NewDecoder(io.LimitReader(r.Body, 64<<10))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&req); err != nil {
+			fail(w, http.StatusBadRequest, fmt.Errorf("body: %w", err))
+			return
+		}
+		v, status, err := a.m.claim(code, req)
+		if err != nil {
+			log.Printf("claim not made (%d): %v", status, err)
+			fail(w, status, err)
+			return
+		}
+		log.Printf("slot %s claimed by %s: lobby %s on %s", v.Slot.ID, req.Player, v.Lobby.ID, v.Lobby.Map.Name)
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "claim": v})
+	case sub == "maps" && r.Method == http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "maps": a.maps()})
+	case sub == "settings" && r.Method == http.MethodGet:
+		a.serveSettings(w, r)
+	default:
+		fail(w, http.StatusNotFound, fmt.Errorf("no %s %s", r.Method, r.URL.Path))
 	}
 }
 
