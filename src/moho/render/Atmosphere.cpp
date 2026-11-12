@@ -1,5 +1,6 @@
 #include "moho/render/Atmosphere.h"
 
+#include "moho/render/BoundDepthSupport.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -96,15 +97,6 @@ namespace moho
     /** The fog's light is the scene's: this much of the sun's and the ambient light reaches the camera from it. */
     constexpr float kLightScale = 0.55f;
 
-    [[nodiscard]] bool BackendReadsBoundDepth(
-      gpg::gal::Device& device
-    )
-    {
-      const gpg::gal::DeviceContext* const context = device.GetDeviceContext();
-      return context != nullptr &&
-        (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 ||
-         context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
-    }
   } // namespace
 
   // Defined in moho/app/WxRuntimeTypes.cpp (0x007FA170).

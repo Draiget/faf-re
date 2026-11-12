@@ -1,5 +1,6 @@
 #include "moho/render/DynamicLights.h"
 
+#include "moho/render/BoundDepthSupport.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -79,15 +80,6 @@ namespace moho
     // A light lasts no longer than this many ticks, whatever its source's life (smoke that glows for seconds).
     constexpr float kMaxLifetime = 12.0f;
 
-    [[nodiscard]] bool BackendReadsBoundDepth(
-      gpg::gal::Device& device
-    )
-    {
-      const gpg::gal::DeviceContext* const context = device.GetDeviceContext();
-      return context != nullptr &&
-        (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 ||
-         context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
-    }
   } // namespace
 
   const DynamicLights::RampColor* DynamicLights::ColorOfRamp(

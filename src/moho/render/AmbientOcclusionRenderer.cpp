@@ -1,5 +1,6 @@
 #include "moho/render/AmbientOcclusionRenderer.h"
 
+#include "moho/render/BoundDepthSupport.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -133,15 +134,6 @@ namespace moho
     /** Terrain-shadow cells across the larger side of the map at most. */
     constexpr std::int32_t kTerrainShadowCells = 1024;
 
-    [[nodiscard]] bool BackendReadsBoundDepth(
-      gpg::gal::Device& device
-    )
-    {
-      const gpg::gal::DeviceContext* const context = device.GetDeviceContext();
-      return context != nullptr &&
-        (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 ||
-         context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
-    }
   } // namespace
 
   AmbientOcclusionRenderer& AmbientOcclusionRenderer::Get()

@@ -1,5 +1,6 @@
 #include "moho/render/BounceLight.h"
 
+#include "moho/render/BoundDepthSupport.h"
 #include <algorithm>
 #include <cstdint>
 
@@ -64,15 +65,6 @@ namespace moho
     };
     static_assert(sizeof(BounceConstants) == 208, "BounceConstants matches the shader's cbuffer");
 
-    [[nodiscard]] bool BackendReadsBoundDepth(
-      gpg::gal::Device& device
-    )
-    {
-      const gpg::gal::DeviceContext* const context = device.GetDeviceContext();
-      return context != nullptr &&
-        (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 ||
-         context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
-    }
   } // namespace
 
   BounceLight& BounceLight::Get()
