@@ -1,4 +1,7 @@
 #include "editor/EdShell.h"
+#include "editor/ui/EdCommands.h"
+#include "editor/ui/EdPalette.h"
+#include "editor/ui/EdTitleBar.h"
 #include "editor/ui/EdUiScale.h"
 #include "editor/ui/EdIcons.h"
 #include "editor/tools/EdMarkers.h"
@@ -55,6 +58,13 @@ namespace faf::editor
 
   void EdShell::HandleKeys()
   {
+    // Ctrl+K or Ctrl+Shift+P: the command palette (the view's own keys reach EdApp.cpp, which opens it too).
+    if (
+      ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_K) ||
+      ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_P)
+    ) {
+      OpenCommandPalette();
+    }
     // F5 plays the picked map or stops the running one, wherever the focus is (EdApp.cpp keeps it from the game).
     if (ImGui::IsKeyPressed(ImGuiKey_F5, false)) {
       if (mPlay.Active()) {
@@ -180,9 +190,39 @@ namespace faf::editor
     const ImGuiViewport* const viewport = ImGui::GetMainViewport();
     const float statusHeight = ImGui::GetFrameHeight();
     const float toolbarHeight = ImGui::GetFrameHeight() + 12.0f;
-    DrawToolbar(toolbarHeight);
-    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + toolbarHeight));
-    ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, viewport->WorkSize.y - statusHeight - toolbarHeight));
+    // The title row first (the editor draws its own: map name, menus, search, the window's buttons), always, also
+    // while a play runs, so the window can be moved and closed.
+    float titleHeight = 0.0f;
+    if (mCommands != nullptr && mMenus != nullptr) {
+      EdTitleInfo info;
+      if (mDocument.GetState() == EdDocument::State::Open) {
+        // The map's own title (as the game's list has it), else its folder.
+        info.document = mDocument.FolderName();
+        const std::vector<std::string>& maps = mPlay.Maps();
+        for (std::size_t i = 0; i < maps.size() && i < mPlay.Titles().size(); ++i) {
+          if (_stricmp(maps[i].c_str(), mDocument.Path().c_str()) == 0) {
+            info.document = mPlay.Titles()[i];
+            break;
+          }
+        }
+        info.modified = mDocument.Modified();
+      } else if (mDocument.GetState() == EdDocument::State::Loading) {
+        info.document = "Opening a map...";
+      } else {
+        info.document = "FAF Map Editor";
+      }
+      if (playing) {
+        info.state = mPlay.StateText();
+      }
+      titleHeight = DrawTitleBar(*mCommands, *mMenus, info, [] {
+        OpenCommandPalette();
+      });
+      DrawCommandPalette(*mCommands);
+    }
+    DrawToolbar(toolbarHeight, titleHeight);
+    const float top = titleHeight + toolbarHeight;
+    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + top));
+    ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, viewport->WorkSize.y - statusHeight - top));
     ImGui::SetNextWindowViewport(viewport->ID);
     constexpr ImGuiWindowFlags kHostFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
       ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus |
@@ -361,11 +401,12 @@ namespace faf::editor
   }
 
   void EdShell::DrawToolbar(
-    const float height
+    const float height,
+    const float top
   )
   {
     const ImGuiViewport* const viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(viewport->WorkPos);
+    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + top));
     ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, height));
     ImGui::SetNextWindowViewport(viewport->ID);
     constexpr ImGuiWindowFlags kFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |

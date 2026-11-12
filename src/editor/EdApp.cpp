@@ -10,10 +10,12 @@
 
 #include <Windows.h>
 #include <windowsx.h>
+#include <dwmapi.h>
 #include <ShlObj.h>
 #include <commdlg.h>
 
 #include <algorithm>
+#include <cfloat>
 #include <optional>
 #include <cstdio>
 #include <array>
@@ -35,8 +37,11 @@
 #include "editor/EdShell.h"
 #include "editor/tools/EdHeightFile.h"
 #include "editor/tools/EdTextureLibrary.h"
+#include "editor/ui/EdCommands.h"
 #include "editor/ui/EdFonts.h"
 #include "editor/ui/EdHelp.h"
+#include "editor/ui/EdPalette.h"
+#include "editor/ui/EdWindowChrome.h"
 #include "editor/ui/EdImGuiRenderer.h"
 #include "editor/view/EdLiveTerrain.h"
 #include "editor/view/EdMapScene.h"
@@ -332,7 +337,10 @@ namespace faf::editor
     bool OnViewportMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
     void ToggleEditorViewInPlay();
     [[nodiscard]] bool EditorViewOverPlay();
-    void OnMenuOpening(HMENU menu);
+    /** The title row's menu that Alt and this letter opens, or -1. */
+    [[nodiscard]] int MenuIndexForKey(char key);
+    /** What a point of the frame (screen coordinates) is, by the title row's layout (own caption only). */
+    [[nodiscard]] EdHit FrameHit(HWND frame, LPARAM screenPoint);
     [[nodiscard]] bool SessionActive();
 
     /**
@@ -382,6 +390,14 @@ namespace faf::editor
       const LPARAM lParam
     )
     {
+      // Over the title row's empty parts, its caption buttons and the top resize band, this window steps aside
+      // (HTTRANSPARENT) and the frame answers (EditorFrameProc): it covers the frame's whole client area from 0,0.
+      if (message == WM_NCHITTEST && WindowChrome().own) {
+        const HWND frame = ::GetParent(window);
+        if (frame != nullptr && FrameHit(frame, lParam) != EdHit::Client) {
+          return HTTRANSPARENT;
+        }
+      }
       // Over the composited 3D view: the mouse is the view's (in its own client coordinates), and a click gives it
       // the keyboard. ImGui still sees the moves, so a panel under the cursor before stops being hovered.
       if (gComposite && gViewWindow != nullptr) {
@@ -482,6 +498,154 @@ namespace faf::editor
      * (an "are you sure" dialog from the main menu's scripts, which the editor never starts), so the loop is
      * ended here and the app's Destroy takes the windows down.
      */
+    /** The resize band along a caption-less edge, and what a maximised window hides off-screen on each side. */
+    [[nodiscard]] int FrameBorder(
+      const HWND window
+    )
+    {
+      const UINT dpi = ::GetDpiForWindow(window);
+      return ::GetSystemMetricsForDpi(SM_CYFRAME, dpi) + ::GetSystemMetricsForDpi(SM_CXPADDEDBORDER, dpi);
+    }
+
+    [[nodiscard]] LRESULT HitCode(
+      const EdHit hit
+    )
+    {
+      switch (hit) {
+      case EdHit::Caption:
+        return HTCAPTION;
+      case EdHit::Minimize:
+        return HTMINBUTTON;
+      case EdHit::Maximize:
+        return HTMAXBUTTON;
+      case EdHit::Close:
+        return HTCLOSE;
+      case EdHit::Top:
+        return HTTOP;
+      case EdHit::TopLeft:
+        return HTTOPLEFT;
+      case EdHit::TopRight:
+        return HTTOPRIGHT;
+      case EdHit::Client:
+        break;
+      }
+      return HTCLIENT;
+    }
+
+    [[nodiscard]] EdHit CaptionButtonOf(
+      const WPARAM code
+    )
+    {
+      return code == HTMINBUTTON ? EdHit::Minimize
+        : code == HTMAXBUTTON    ? EdHit::Maximize
+        : code == HTCLOSE        ? EdHit::Close
+                                 : EdHit::Client;
+    }
+
+    /** What a point of the frame (screen coordinates) is, by the title row's layout. */
+    [[nodiscard]] EdHit FrameHit(
+      const HWND frame,
+      const LPARAM screenPoint
+    )
+    {
+      POINT at{GET_X_LPARAM(screenPoint), GET_Y_LPARAM(screenPoint)};
+      (void)::ScreenToClient(frame, &at);
+      RECT client{};
+      (void)::GetClientRect(frame, &client);
+      return TitleHit(
+        WindowChrome(),
+        static_cast<float>(at.x),
+        static_cast<float>(at.y),
+        static_cast<float>(client.right),
+        static_cast<float>(FrameBorder(frame))
+      );
+    }
+
+    /**
+     * The editor's own title row (design §3, as Discord and VS Code): Windows draws no caption. The client area takes
+     * the caption's place (WM_NCCALCSIZE; a maximised window keeps its hidden border out of sight); the row's empty
+     * parts drag the window and its buttons are Windows' own (WM_NCHITTEST: HTCAPTION, HTMINBUTTON, HTMAXBUTTON so
+     * Windows 11 shows its snap layouts, HTCLOSE); the window keeps WS_OVERLAPPEDWINDOW, so Aero Snap, Win+arrows,
+     * the shadow and rounded corners stay. True when the message was handled, with `result`.
+     */
+    bool HandleOwnCaption(
+      const HWND window,
+      const UINT message,
+      const WPARAM wParam,
+      const LPARAM lParam,
+      LRESULT& result
+    )
+    {
+      EdWindowChrome& chrome = WindowChrome();
+      switch (message) {
+      case WM_NCCALCSIZE:
+        if (wParam == TRUE) {
+          NCCALCSIZE_PARAMS* const params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lParam);
+          const LONG top = params->rgrc[0].top;
+          (void)::CallWindowProcW(gFrameProc, window, message, wParam, lParam);
+          params->rgrc[0].top = top + (::IsZoomed(window) ? FrameBorder(window) : 0);
+          result = 0;
+          return true;
+        }
+        return false;
+      case WM_NCHITTEST: {
+        const LRESULT base = ::CallWindowProcW(gFrameProc, window, message, wParam, lParam);
+        result = base == HTCLIENT ? HitCode(FrameHit(window, lParam)) : base;
+        return true;
+      }
+      case WM_NCMOUSEMOVE: {
+        chrome.hot = CaptionButtonOf(wParam);
+        TRACKMOUSEEVENT track{sizeof(TRACKMOUSEEVENT), TME_LEAVE | TME_NONCLIENT, window, 0};
+        (void)::TrackMouseEvent(&track);
+        // The mouse left the panels: nothing of them stays hovered.
+        if (ImGui::GetCurrentContext() != nullptr) {
+          ImGui::GetIO().AddMousePosEvent(-FLT_MAX, -FLT_MAX);
+        }
+        return false;
+      }
+      case WM_NCMOUSELEAVE:
+        chrome.hot = EdHit::Client;
+        chrome.pressed = EdHit::Client;
+        return false;
+      case WM_NCLBUTTONDOWN:
+      case WM_NCLBUTTONDBLCLK:
+        // The caption buttons are drawn by the panels; Windows mustn't draw its classic ones over them.
+        if (CaptionButtonOf(wParam) != EdHit::Client) {
+          chrome.pressed = CaptionButtonOf(wParam);
+          result = 0;
+          return true;
+        }
+        return false;
+      case WM_NCLBUTTONUP:
+        if (CaptionButtonOf(wParam) != EdHit::Client) {
+          const EdHit button = CaptionButtonOf(wParam);
+          if (button == chrome.pressed) {
+            if (button == EdHit::Minimize) {
+              (void)::ShowWindow(window, SW_MINIMIZE);
+            } else if (button == EdHit::Maximize) {
+              (void)::ShowWindow(window, ::IsZoomed(window) ? SW_RESTORE : SW_MAXIMIZE);
+            } else {
+              (void)::PostMessageW(window, WM_CLOSE, 0, 0);
+            }
+          }
+          chrome.pressed = EdHit::Client;
+          result = 0;
+          return true;
+        }
+        return false;
+      case WM_NCACTIVATE:
+        chrome.active = wParam != FALSE;
+        // lParam -1: Windows doesn't repaint a caption that isn't there.
+        result = ::CallWindowProcW(gFrameProc, window, message, wParam, -1);
+        return true;
+      case WM_SIZE:
+        chrome.maximised = wParam == SIZE_MAXIMIZED;
+        return false;
+      default:
+        return false;
+      }
+    }
+
     LRESULT CALLBACK EditorFrameProc(
       const HWND window,
       const UINT message,
@@ -489,6 +653,22 @@ namespace faf::editor
       const LPARAM lParam
     )
     {
+      if (WindowChrome().own) {
+        LRESULT result = 0;
+        if (HandleOwnCaption(window, message, wParam, lParam, result)) {
+          return result;
+        }
+      }
+      // Alt alone or F10 opens the title row's first menu; Alt and a letter the menu with that letter (the menus are
+      // the panels' now). During play the game has Alt (its own bindings), so only a click does.
+      if (message == WM_SYSCOMMAND && (wParam & 0xFFF0U) == SC_KEYMENU && !SessionActive()) {
+        const int menu = lParam == 0 ? 0 : MenuIndexForKey(static_cast<char>(lParam));
+        if (menu >= 0) {
+          WindowChrome().openMenu = menu;
+          (void)::SetFocus(gPanelWindow);
+          return 0;
+        }
+      }
       if (message == WM_CLOSE) {
         gWindowClosing = true;
         if (gShellApp != nullptr) {
@@ -496,15 +676,12 @@ namespace faf::editor
         }
         return 0;
       }
+      // The old menu ids still run their commands (test runs post them: shot_input.ps1 -MenuCommand).
       if (message == WM_COMMAND && HIWORD(wParam) == 0 && LOWORD(wParam) >= kMenuExit) {
         OnMenuCommand(LOWORD(wParam));
         return 0;
       }
-      if (message == WM_INITMENUPOPUP) {
-        OnMenuOpening(reinterpret_cast<HMENU>(wParam));
-        return 0;
-      }
-      // Alt alone opens the menu bar; during play the game has Alt (its own bindings), so only a click does.
+      // During play the game has Alt (its own bindings).
       if (message == WM_SYSCOMMAND && (wParam & 0xFFF0U) == SC_KEYMENU && lParam == 0 && SessionActive()) {
         return 0;
       }
@@ -560,8 +737,21 @@ namespace faf::editor
         return mGame.AppDoSuppressWindowsKeys();
       }
 
+      /** An old menu id (WM_COMMAND from test runs) runs its command. */
       void HandleMenuCommand(UINT command);
-      void UpdateMenu();
+      /** The title row's menu whose Alt letter is `key`, or -1. */
+      [[nodiscard]] int MenuForKey(
+        const char key
+      ) const
+      {
+        const char wanted = static_cast<char>(std::toupper(static_cast<unsigned char>(key)));
+        for (std::size_t i = 0; i < mMenus.size(); ++i) {
+          if (MenuAccessKey(mMenus[i].label) == wanted) {
+            return static_cast<int>(i);
+          }
+        }
+        return -1;
+      }
       bool HandleViewportMessage(
         HWND window,
         UINT message,
@@ -579,6 +769,15 @@ namespace faf::editor
         }
         if (message == WM_KEYDOWN && wParam == 'O' && (::GetKeyState(VK_CONTROL) & 0x8000) != 0) {
           mShell->Browser().Show();
+          return true;
+        }
+        // The command palette, also with the mouse over the view (its keys come here, not to the panels).
+        if (
+          message == WM_KEYDOWN && (::GetKeyState(VK_CONTROL) & 0x8000) != 0 &&
+          (wParam == 'K' || (wParam == 'P' && (::GetKeyState(VK_SHIFT) & 0x8000) != 0))
+        ) {
+          OpenCommandPalette();
+          (void)::SetFocus(gPanelWindow);
           return true;
         }
         return mScene.OnWindowMessage(window, message, wParam, lParam);
@@ -723,20 +922,19 @@ namespace faf::editor
 
     private:
       void SetUpImGui();
-      void BuildMenu(HWND frame);
+      /** Every command of the editor and the title row's menus (design §3: one registry behind menus, keys and
+       * palette). */
+      void RegisterCommands();
+      /** The own title row: Windows draws no caption (`/nativecaption` keeps Windows'), the frame's border dark. */
+      void SetUpWindowChrome(HWND frame);
       void UpdateTitle();
       void RenderPanels();
       void FitGameView();
       void ReadOpenCommandLine();
       void DriveOpens();
 
-      HMENU mMenuBar = nullptr;
-      HMENU mViewMenu = nullptr;
-      HMENU mEditMenu = nullptr;
-      HMENU mFileMenu = nullptr;
-      HMENU mPlayMenu = nullptr;
-      HMENU mMapMenu = nullptr;
-      HMENU mRecentMenu = nullptr;
+      EdCommands mCommands;
+      std::vector<EdMenu> mMenus;
       /** The scenario path of each item File > Open Recent shows, by its place. */
       std::vector<std::string> mRecentShown;
       std::wstring mBaseTitle;
@@ -887,6 +1085,42 @@ namespace faf::editor
       std::vector<UiClick> mUiClicks;
       int mUiClickFrame = 0;
       void FeedUiClicks();
+      /**
+       * Test runs: `/command <id>[,<id>...]` runs those commands once the map is open (each logs what it did, or why
+       * it can't run), `/palette <text>` opens the command palette with the text typed, at frame 300.
+       */
+      void FeedTestCommands()
+      {
+        static int frame = 0;
+        if (++frame != 300) {
+          return;
+        }
+        if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/command", 1, &value) && !value.empty()) {
+          std::string list = value[0].c_str();
+          std::size_t start = 0;
+          while (start <= list.size()) {
+            const std::size_t comma = list.find(',', start);
+            const std::string id = list.substr(start, comma == std::string::npos ? std::string::npos : comma - start);
+            if (!id.empty()) {
+              const std::string why = mCommands.WhyNot(id);
+              if (why.empty()) {
+                gpg::Logf("editor: /command %s", id.c_str());
+                (void)mCommands.Run(id);
+              } else {
+                gpg::Logf("editor: /command %s can't run now: %s", id.c_str(), why.c_str());
+              }
+            }
+            if (comma == std::string::npos) {
+              break;
+            }
+            start = comma + 1;
+          }
+        }
+        if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/palette", 1, &value) && !value.empty()) {
+          OpenCommandPalette(value[0].c_str());
+          gpg::Logf("editor: /palette %s", value[0].c_str());
+        }
+      }
       // `/proptool <mode>,<blueprint>` and `/tool <index>` (test runs).
       std::string mPropToolArg;
       int mToolArg = -1;
@@ -1062,7 +1296,9 @@ namespace faf::editor
           ImGui::GetCurrentContext() != nullptr ? ImGui::GetIO().DeltaTime : 0.016f
         );
       };
-      BuildMenu(frame);
+      RegisterCommands();
+      mShell->SetCommands(&mCommands, &mMenus);
+      SetUpWindowChrome(frame);
       // The game view's ambient occlusion makes its GPU programs on first use, which the editor's own view never
       // is: made now, so the first Play's first frame doesn't wait for them (WPE.15).
       const auto warmStart = std::chrono::steady_clock::now();
@@ -1134,147 +1370,287 @@ namespace faf::editor
       ImGui_ImplWin32_Init(gPanelWindow);
     }
 
-    void EditorApp::BuildMenu(
+    void EditorApp::RegisterCommands()
+    {
+      EdCommands& c = mCommands;
+      const auto mapOpen = [this]() -> std::string {
+        return mDocument.GetState() == EdDocument::State::Open ? std::string() : std::string("no map is open");
+      };
+      const auto notBusy = [this]() -> std::string {
+        if (mPlay.Active()) {
+          return "a play is running (F5 stops it)";
+        }
+        if (mDocument.GetState() == EdDocument::State::Loading) {
+          return "a map is opening";
+        }
+        return {};
+      };
+      const auto add = [&c](
+                         const char* id,
+                         const char* title,
+                         const char* category,
+                         const char* keys,
+                         std::function<void()> run,
+                         std::function<std::string()> why = {},
+                         std::function<bool()> checked = {},
+                         const char* description = ""
+                       ) {
+        c.Add(EdCommand{id, title, category, keys, description, std::move(run), std::move(why), std::move(checked)});
+      };
+      // A panel shown or hidden: View's entries, ticked while shown.
+      const auto panel = [this, &add](const char* id, const char* title, bool& (EdShell::*flag)() noexcept) {
+        add(id, title, "View", "", [this, flag] {
+          bool& on = (mShell->*flag)();
+          on = !on;
+        }, {}, [this, flag] {
+          return (mShell->*flag)();
+        });
+      };
+
+      // File
+      add("file.new", "New map...", "File", "Ctrl+N", [this] {
+        mShell->OpenNewMap();
+      }, notBusy);
+      add("file.open", "Open map...", "File", "Ctrl+O", [this] {
+        mShell->Browser().Show();
+      }, {}, {}, "This computer and the FAF vault");
+      add("file.save", "Save", "File", "Ctrl+S", [this] {
+        SaveDocument();
+      }, mapOpen);
+      add("file.saveas", "Save as new map folder...", "File", "", [this] {
+        mShell->OpenSaveAs();
+      }, mapOpen);
+      add("file.package", "Package for the FAF vault...", "File", "", [this] {
+        mShell->OpenPackage();
+      }, mapOpen);
+      add("file.recent.clear", "Clear recently opened", "File", "", [this] {
+        mDocument.ClearRecentMaps();
+      }, [this]() -> std::string {
+        return mDocument.RecentMaps().empty() ? "the list is empty" : "";
+      });
+      add("file.recent.none", "(no maps opened yet)", "File", "", [] {}, [] {
+        return std::string("no maps opened yet");
+      });
+      for (int i = 0; i < 10; ++i) {
+        EdCommand recent{
+          "file.recent." + std::to_string(i),
+          "Open recent map " + std::to_string(i + 1),
+          "File",
+          "",
+          "",
+          [this, i] {
+          if (static_cast<std::size_t>(i) >= mRecentShown.size()) {
+            return;
+          }
+          const std::string scenario = mRecentShown[static_cast<std::size_t>(i)];
+          const std::vector<std::string>& maps = mPlay.Maps();
+          for (std::size_t m = 0; m < maps.size(); ++m) {
+            if (maps[m] == scenario) {
+              mPlay.Select(static_cast<int>(m));
+              (void)mDocument.Open(scenario);
+              gpg::Logf("editor: File > Open Recent: %s", scenario.c_str());
+            }
+          }
+        },
+          notBusy,
+          [this, i] {
+          return static_cast<std::size_t>(i) < mRecentShown.size() && mDocument.GetState() == EdDocument::State::Open &&
+            _stricmp(mDocument.Path().c_str(), mRecentShown[static_cast<std::size_t>(i)].c_str()) == 0;
+        },
+        };
+        recent.palette = false;
+        c.Add(std::move(recent));
+      }
+      add("file.exit", "Exit", "File", "Alt+F4", [this] {
+        mShell->RequestExit();
+      });
+
+      // Edit
+      add("edit.undo", "Undo", "Edit", "Ctrl+Z", [this] {
+        (void)mScene.Undo();
+      });
+      add("edit.redo", "Redo", "Edit", "Ctrl+Y, Ctrl+Shift+Z", [this] {
+        (void)mScene.Redo();
+      });
+      add("edit.delete", "Delete selection", "Edit", "Delete", [this] {
+        mScene.DeleteSelected();
+      }, mapOpen);
+
+      // View
+      panel("view.tools", "Tools", &EdShell::ShowTools);
+      panel("view.map", "Map", &EdShell::ShowMap);
+      panel("view.info", "Info", &EdShell::ShowInfo);
+      panel("view.markers", "Markers", &EdShell::ShowMarkers);
+      panel("view.check", "Check", &EdShell::ShowCheck);
+      panel("view.script", "Script", &EdShell::ShowScript);
+      panel("view.lighting", "Lighting", &EdShell::ShowLighting);
+      panel("view.armies", "Armies", &EdShell::ShowArmies);
+      panel("view.properties", "Properties", &EdShell::ShowProperties);
+      panel("view.material", "Material Editor", &EdShell::ShowMaterialEditor);
+      panel("view.particle", "Particle Editor", &EdShell::ShowParticleEditor);
+      panel("view.particlebrowser", "Particle Browser", &EdShell::ShowParticleBrowser);
+      panel("view.adaptive", "Adaptive Map", &EdShell::ShowAdaptiveWindow);
+      panel("view.log", "Log", &EdShell::ShowLog);
+      panel("view.panelsplaying", "Panels while playing", &EdShell::PanelsWhilePlaying);
+      panel("view.imguidemo", "ImGui demo", &EdShell::ShowDemo);
+      add("view.fullhelp", "Full help text", "View", "", [] {
+        FullHelpText() = !FullHelpText();
+      }, {}, [] {
+        return FullHelpText();
+      });
+      add("view.resetlayout", "Reset layout", "View", "", [this] {
+        mShell->ResetLayout();
+      });
+      add("view.palette", "Command palette", "View", "Ctrl+K, Ctrl+Shift+P", [] {
+        OpenCommandPalette();
+      }, {}, {}, "Find any command by a few of its letters");
+
+      // Play
+      add("play.toggle", "Play", "Play", "F5", [this] {
+        if (mPlay.Active()) {
+          mPlay.Stop();
+        } else if (mPlay.CanPlay()) {
+          mPlay.Play();
+        }
+      }, [this]() -> std::string {
+        if (mPlay.Active() || mPlay.CanPlay()) {
+          return {};
+        }
+        return mPlay.Maps().empty() ? "the game lists no maps to play" : "a session is still loading";
+      });
+      for (std::size_t i = 0; i < mPlay.Maps().size(); ++i) {
+        EdCommand map{
+          "play.map." + std::to_string(i),
+          mPlay.Titles()[i] + "  (" + MapDisplayName(mPlay.Maps()[i]) + ")",
+          "Play",
+          "",
+          "",
+          [this, i] {
+          mPlay.Select(static_cast<int>(i));
+        },
+          [this]() -> std::string {
+          return mPlay.Active() ? "a play is running" : "";
+        },
+          [this, i] {
+          return mPlay.Selected() == static_cast<int>(i);
+        },
+        };
+        map.palette = false;
+        c.Add(std::move(map));
+      }
+
+      // The title row's menus.
+      const auto cmd = [](const char* id) {
+        EdMenuItem item;
+        item.command = id;
+        return item;
+      };
+      const auto sep = [] {
+        EdMenuItem item;
+        item.separator = true;
+        return item;
+      };
+      EdMenuItem recent;
+      recent.label = "Open &Recent";
+      recent.provider = [this] {
+        // The recent maps the game still lists, with their titles; filled each time the menu opens.
+        mRecentShown.clear();
+        std::vector<EdMenuItem> items;
+        for (const std::string& scenario : mDocument.RecentMaps()) {
+          const std::vector<std::string>& maps = mPlay.Maps();
+          for (std::size_t i = 0; i < maps.size() && mRecentShown.size() < 10; ++i) {
+            if (_stricmp(maps[i].c_str(), scenario.c_str()) != 0) {
+              continue;
+            }
+            EdMenuItem item;
+            item.command = "file.recent." + std::to_string(mRecentShown.size());
+            item.label = std::to_string(mRecentShown.size() + 1) + "  " + mPlay.Titles()[i] + "  (" +
+              MapDisplayName(maps[i]) + ")";
+            items.push_back(std::move(item));
+            mRecentShown.push_back(maps[i]);
+            break;
+          }
+        }
+        if (items.empty()) {
+          EdMenuItem none;
+          none.command = "file.recent.none";
+          items.push_back(std::move(none));
+        } else {
+          EdMenuItem line;
+          line.separator = true;
+          items.push_back(std::move(line));
+          EdMenuItem clear;
+          clear.command = "file.recent.clear";
+          items.push_back(std::move(clear));
+        }
+        return items;
+      };
+      EdMenuItem playMaps;
+      playMaps.label = "&Map";
+      playMaps.provider = [this] {
+        std::vector<EdMenuItem> items;
+        for (std::size_t i = 0; i < mPlay.Maps().size(); ++i) {
+          EdMenuItem item;
+          item.command = "play.map." + std::to_string(i);
+          items.push_back(std::move(item));
+        }
+        return items;
+      };
+      mMenus = {
+        EdMenu{
+          "&File",
+          {cmd("file.new"),
+           cmd("file.open"),
+           recent,
+           sep(),
+           cmd("file.save"),
+           cmd("file.saveas"),
+           cmd("file.package"),
+           sep(),
+           cmd("file.exit")}
+        },
+        EdMenu{"&Edit", {cmd("edit.undo"), cmd("edit.redo"), sep(), cmd("edit.delete")}},
+        EdMenu{"&View", {cmd("view.tools"),         cmd("view.map"),
+                         cmd("view.info"),          cmd("view.markers"),
+                         cmd("view.check"),         cmd("view.script"),
+                         cmd("view.lighting"),      cmd("view.armies"),
+                         cmd("view.properties"),    cmd("view.material"),
+                         cmd("view.particle"),      cmd("view.particlebrowser"),
+                         cmd("view.adaptive"),      sep(),
+                         cmd("view.palette"),       sep(),
+                         cmd("view.fullhelp"),      cmd("view.log"),
+                         cmd("view.panelsplaying"), sep(),
+                         cmd("view.resetlayout"),   cmd("view.imguidemo")}},
+        EdMenu{"&Play", {cmd("play.toggle"), playMaps}},
+      };
+      const auto clashes = c.Clashes();
+      for (const auto& [a, b] : clashes) {
+        gpg::Warnf("editor: commands %s and %s share a key", a.c_str(), b.c_str());
+      }
+      gpg::Logf("editor: %zu commands, %zu menus", c.All().size(), mMenus.size());
+    }
+
+    void EditorApp::SetUpWindowChrome(
       const HWND frame
     )
     {
-      HMENU file = ::CreatePopupMenu();
-      ::AppendMenuW(file, MF_STRING, kMenuNew, L"&New map...\tCtrl+N");
-      ::AppendMenuW(file, MF_STRING, kMenuOpen, L"&Open map...\tCtrl+O");
-      // Open Recent, as VS Code has it: the maps opened last, newest first; filled each time File opens.
-      mRecentMenu = ::CreatePopupMenu();
-      ::AppendMenuW(file, MF_POPUP, reinterpret_cast<UINT_PTR>(mRecentMenu), L"Open &Recent");
-      ::AppendMenuW(file, MF_SEPARATOR, 0, nullptr);
-      ::AppendMenuW(file, MF_STRING, kMenuSave, L"&Save\tCtrl+S");
-      ::AppendMenuW(file, MF_STRING, kMenuSaveAs, L"Save as new map &folder...");
-      ::AppendMenuW(file, MF_STRING, kMenuPackage, L"&Package for the FAF vault...");
-      mFileMenu = file;
-      ::AppendMenuW(file, MF_SEPARATOR, 0, nullptr);
-      ::AppendMenuW(file, MF_STRING, kMenuExit, L"E&xit");
-
-      mViewMenu = ::CreatePopupMenu();
-      ::AppendMenuW(mViewMenu, MF_STRING, kMenuTools, L"&Tools");
-      ::AppendMenuW(mViewMenu, MF_STRING, kMenuMap, L"&Map");
-      ::AppendMenuW(mViewMenu, MF_STRING, kMenuInfo, L"&Info");
-      ::AppendMenuW(mViewMenu, MF_STRING, kMenuMarkers, L"Mar&kers");
-      ::AppendMenuW(mViewMenu, MF_STRING, kMenuCheck, L"&Check");
-      ::AppendMenuW(mViewMenu, MF_STRING, kMenuScript, L"&Script");
-      ::AppendMenuW(mViewMenu, MF_STRING, kMenuLighting, L"&Lighting");
-      ::AppendMenuW(mViewMenu, MF_STRING, kMenuArmies, L"&Armies");
-      ::AppendMenuW(mViewMenu, MF_STRING, kMenuProperties, L"P&roperties");
-      ::AppendMenuW(mViewMenu, MF_STRING, kMenuMaterialEditor, L"Mat&erial Editor");
-      ::AppendMenuW(mViewMenu, MF_STRING, kMenuParticleEditor, L"Partic&le Editor");
-      ::AppendMenuW(mViewMenu, MF_STRING, kMenuParticleBrowser, L"Particle &Browser");
-      ::AppendMenuW(mViewMenu, MF_STRING, kMenuAdaptiveWindow, L"&Adaptive Map");
-      ::AppendMenuW(mViewMenu, MF_SEPARATOR, 0, nullptr);
-      ::AppendMenuW(mViewMenu, MF_STRING, kMenuFullHelp, L"&Full help text");
-      ::AppendMenuW(mViewMenu, MF_STRING, kMenuLog, L"&Log");
-      ::AppendMenuW(mViewMenu, MF_STRING, kMenuPanelsWhilePlaying, L"&Panels while playing");
-      ::AppendMenuW(mViewMenu, MF_SEPARATOR, 0, nullptr);
-      ::AppendMenuW(mViewMenu, MF_STRING, kMenuResetLayout, L"&Reset layout");
-      ::AppendMenuW(mViewMenu, MF_STRING, kMenuImGuiDemo, L"ImGui &demo");
-
-      mMapMenu = ::CreatePopupMenu();
-      const std::vector<std::string>& maps = mPlay.Maps();
-      for (std::size_t i = 0; i < maps.size(); ++i) {
-        const std::wstring label = Widen(mPlay.Titles()[i]) + L"  (" + Widen(MapDisplayName(maps[i])) + L")";
-        ::AppendMenuW(
-          mMapMenu, MF_STRING | ((i % 32U == 0U && i != 0U) ? MF_MENUBARBREAK : 0U), kMenuFirstMap + i, label.c_str()
-        );
-      }
-      mPlayMenu = ::CreatePopupMenu();
-      ::AppendMenuW(mPlayMenu, MF_STRING, kMenuPlayStop, L"&Play\tF5");
-      ::AppendMenuW(mPlayMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(mMapMenu), L"&Map");
-
-      mMenuBar = ::CreateMenu();
-      ::AppendMenuW(mMenuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(file), L"&File");
-      mEditMenu = ::CreatePopupMenu();
-      ::AppendMenuW(mEditMenu, MF_STRING, kMenuUndo, L"&Undo\tCtrl+Z");
-      ::AppendMenuW(mEditMenu, MF_STRING, kMenuRedo, L"&Redo\tCtrl+Y");
-      ::AppendMenuW(mEditMenu, MF_SEPARATOR, 0, nullptr);
-      ::AppendMenuW(mEditMenu, MF_STRING, kMenuDelete, L"&Delete selection\tDel");
-      ::AppendMenuW(mMenuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(mEditMenu), L"&Edit");
-      ::AppendMenuW(mMenuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(mViewMenu), L"&View");
-      ::AppendMenuW(mMenuBar, MF_POPUP, reinterpret_cast<UINT_PTR>(mPlayMenu), L"&Play");
-      ::SetMenu(frame, mMenuBar);
-      // The client area loses the menu's height; the game's frame resizes its viewport and the device to it
-      // (WSupComFrame's size handler), so the game's interface lays out below the menu.
+      EdWindowChrome& chrome = WindowChrome();
+      chrome.own = !moho::CFG_GetArgOption("/nativecaption", 0, nullptr);
+      // The frame's border and (with Windows' caption) its caption dark, as the panels are.
+      const BOOL dark = TRUE;
+      (void)::DwmSetWindowAttribute(frame, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &dark, sizeof(dark));
+      chrome.maximised = ::IsZoomed(frame) != FALSE;
+      const LONG_PTR style = ::GetWindowLongPtrW(frame, GWL_STYLE);
+      gpg::Logf(
+        "editor: title row %s (window style 0x%08llx%s)",
+        chrome.own ? "drawn by the editor" : "Windows'",
+        static_cast<unsigned long long>(style),
+        (style & WS_THICKFRAME) != 0 ? ", resizable" : ", fixed size"
+      );
+      // The frame's client area changes (WM_NCCALCSIZE): the game's frame resizes its viewport and device to it.
       ::SetWindowPos(
         frame, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED
       );
-      ::DrawMenuBar(frame);
-    }
-
-    void EditorApp::UpdateMenu()
-    {
-      const auto check = [&](const UINT id, const bool on) {
-        ::CheckMenuItem(mViewMenu, id, MF_BYCOMMAND | (on ? MF_CHECKED : MF_UNCHECKED));
-      };
-      check(kMenuTools, mShell->ShowTools());
-      check(kMenuMap, mShell->ShowMap());
-      check(kMenuInfo, mShell->ShowInfo());
-      check(kMenuMarkers, mShell->ShowMarkers());
-      check(kMenuCheck, mShell->ShowCheck());
-      check(kMenuScript, mShell->ShowScript());
-      check(kMenuLighting, mShell->ShowLighting());
-      check(kMenuArmies, mShell->ShowArmies());
-      check(kMenuProperties, mShell->ShowProperties());
-      check(kMenuMaterialEditor, mShell->ShowMaterialEditor());
-      check(kMenuParticleEditor, mShell->ShowParticleEditor());
-      check(kMenuParticleBrowser, mShell->ShowParticleBrowser());
-      check(kMenuAdaptiveWindow, mShell->ShowAdaptiveWindow());
-      check(kMenuFullHelp, FullHelpText());
-      check(kMenuLog, mShell->ShowLog());
-      check(kMenuPanelsWhilePlaying, mShell->PanelsWhilePlaying());
-      check(kMenuImGuiDemo, mShell->ShowDemo());
-
-      const bool active = mPlay.Active();
-      // Open Recent: the recent maps the game still lists, with their titles.
-      while (::GetMenuItemCount(mRecentMenu) > 0) {
-        (void)::DeleteMenu(mRecentMenu, 0, MF_BYPOSITION);
-      }
-      mRecentShown.clear();
-      const bool busy = active || mDocument.GetState() == EdDocument::State::Loading;
-      for (const std::string& recent : mDocument.RecentMaps()) {
-        const std::vector<std::string>& maps = mPlay.Maps();
-        for (std::size_t i = 0; i < maps.size(); ++i) {
-          if (_stricmp(maps[i].c_str(), recent.c_str()) != 0) {
-            continue;
-          }
-          const UINT id = kMenuFirstRecent + static_cast<UINT>(mRecentShown.size());
-          const bool current =
-            mDocument.GetState() == EdDocument::State::Open && _stricmp(mDocument.Path().c_str(), recent.c_str()) == 0;
-          std::wstring label = Widen(mPlay.Titles()[i]) + L"  (" + Widen(MapDisplayName(maps[i])) + L")";
-          if (mRecentShown.size() < 9) {
-            label = L"&" + std::to_wstring(mRecentShown.size() + 1) + L"  " + label;
-          }
-          ::AppendMenuW(
-            mRecentMenu, MF_STRING | (busy ? MF_GRAYED : 0U) | (current ? MF_CHECKED : 0U), id, label.c_str()
-          );
-          mRecentShown.push_back(maps[i]);
-          break;
-        }
-      }
-      if (mRecentShown.empty()) {
-        ::AppendMenuW(mRecentMenu, MF_STRING | MF_GRAYED, 0, L"(no maps opened yet)");
-      } else {
-        ::AppendMenuW(mRecentMenu, MF_SEPARATOR, 0, nullptr);
-        ::AppendMenuW(mRecentMenu, MF_STRING, kMenuClearRecent, L"&Clear recently opened");
-      }
-      ::ModifyMenuW(
-        mPlayMenu,
-        kMenuPlayStop,
-        MF_BYCOMMAND | MF_STRING | ((active || mPlay.CanPlay()) ? MF_ENABLED : MF_GRAYED),
-        kMenuPlayStop,
-        active ? L"&Stop\tF5" : L"&Play\tF5"
-      );
-      const int count = static_cast<int>(mPlay.Maps().size());
-      for (int i = 0; i < count; ++i) {
-        ::CheckMenuItem(
-          mMapMenu, kMenuFirstMap + i, MF_BYCOMMAND | (i == mPlay.Selected() ? MF_CHECKED : MF_UNCHECKED)
-        );
-        ::EnableMenuItem(mMapMenu, kMenuFirstMap + i, MF_BYCOMMAND | (active ? MF_GRAYED : MF_ENABLED));
-      }
     }
 
     void EditorApp::FeedUiClicks()
@@ -1322,123 +1698,63 @@ namespace faf::editor
       const UINT command
     )
     {
-      switch (command) {
-      case kMenuExit:
-        mShell->RequestExit();
-        return;
-      case kMenuTools:
-        mShell->ShowTools() = !mShell->ShowTools();
-        return;
-      case kMenuMap:
-        mShell->ShowMap() = !mShell->ShowMap();
-        return;
-      case kMenuFullHelp:
-        FullHelpText() = !FullHelpText();
-        break;
-      case kMenuArmies:
-        mShell->ShowArmies() = !mShell->ShowArmies();
-        break;
-      case kMenuProperties:
-        mShell->ShowProperties() = !mShell->ShowProperties();
-        break;
-      case kMenuLighting:
-        mShell->ShowLighting() = !mShell->ShowLighting();
-        break;
-      case kMenuMaterialEditor:
-        mShell->ShowMaterialEditor() = !mShell->ShowMaterialEditor();
-        break;
-      case kMenuParticleEditor:
-        mShell->ShowParticleEditor() = !mShell->ShowParticleEditor();
-        break;
-      case kMenuParticleBrowser:
-        mShell->ShowParticleBrowser() = !mShell->ShowParticleBrowser();
-        break;
-      case kMenuAdaptiveWindow:
-        mShell->ShowAdaptiveWindow() = !mShell->ShowAdaptiveWindow();
-        break;
-      case kMenuScript:
-        mShell->ShowScript() = !mShell->ShowScript();
-        break;
-      case kMenuCheck:
-        mShell->ShowCheck() = !mShell->ShowCheck();
-        break;
-      case kMenuMarkers:
-        mShell->ShowMarkers() = !mShell->ShowMarkers();
-        break;
-      case kMenuInfo:
-        mShell->ShowInfo() = !mShell->ShowInfo();
-        break;
-      case kMenuSave:
-        SaveDocument();
-        break;
-      case kMenuNew:
-        mShell->OpenNewMap();
-        break;
-      case kMenuOpen:
-        mShell->Browser().Show();
-        break;
-      case kMenuClearRecent:
-        mDocument.ClearRecentMaps();
-        break;
-      case kMenuSaveAs:
-        mShell->OpenSaveAs();
-        break;
-      case kMenuPackage:
-        mShell->OpenPackage();
-        break;
-      case kMenuUndo:
-        (void)mScene.Undo();
-        break;
-      case kMenuRedo:
-        (void)mScene.Redo();
-        break;
-      case kMenuDelete:
-        mScene.DeleteSelected();
-        break;
-      case kMenuLog:
-        mShell->ShowLog() = !mShell->ShowLog();
-        return;
-      case kMenuPanelsWhilePlaying:
-        mShell->PanelsWhilePlaying() = !mShell->PanelsWhilePlaying();
-        return;
-      case kMenuResetLayout:
-        mShell->ResetLayout();
-        return;
-      case kMenuImGuiDemo:
-        mShell->ShowDemo() = !mShell->ShowDemo();
-        return;
-      case kMenuPlayStop:
-        if (mPlay.Active()) {
-          mPlay.Stop();
-        } else if (mPlay.CanPlay()) {
-          mPlay.Play();
+      // The old menu ids (test runs post them) and the commands they ran.
+      static const std::pair<UINT, const char*> kIds[] = {
+        {kMenuExit, "file.exit"},
+        {kMenuTools, "view.tools"},
+        {kMenuMap, "view.map"},
+        {kMenuLog, "view.log"},
+        {kMenuInfo, "view.info"},
+        {kMenuMarkers, "view.markers"},
+        {kMenuCheck, "view.check"},
+        {kMenuScript, "view.script"},
+        {kMenuLighting, "view.lighting"},
+        {kMenuFullHelp, "view.fullhelp"},
+        {kMenuArmies, "view.armies"},
+        {kMenuProperties, "view.properties"},
+        {kMenuMaterialEditor, "view.material"},
+        {kMenuParticleEditor, "view.particle"},
+        {kMenuParticleBrowser, "view.particlebrowser"},
+        {kMenuAdaptiveWindow, "view.adaptive"},
+        {kMenuPanelsWhilePlaying, "view.panelsplaying"},
+        {kMenuResetLayout, "view.resetlayout"},
+        {kMenuImGuiDemo, "view.imguidemo"},
+        {kMenuPlayStop, "play.toggle"},
+        {kMenuSave, "file.save"},
+        {kMenuSaveAs, "file.saveas"},
+        {kMenuNew, "file.new"},
+        {kMenuPackage, "file.package"},
+        {kMenuOpen, "file.open"},
+        {kMenuClearRecent, "file.recent.clear"},
+        {kMenuUndo, "edit.undo"},
+        {kMenuRedo, "edit.redo"},
+        {kMenuDelete, "edit.delete"},
+      };
+      std::string id;
+      for (const auto& [menuId, commandId] : kIds) {
+        if (menuId == command) {
+          id = commandId;
         }
-        return;
-      default:
-        if (
-          command >= kMenuFirstRecent && command < kMenuFirstRecent + mRecentShown.size() && !mPlay.Active() &&
-          mDocument.GetState() != EdDocument::State::Loading
-        ) {
-          const std::string scenario = mRecentShown[command - kMenuFirstRecent];
-          const std::vector<std::string>& maps = mPlay.Maps();
-          for (std::size_t i = 0; i < maps.size(); ++i) {
-            if (maps[i] == scenario) {
-              mPlay.Select(static_cast<int>(i));
-              (void)mDocument.Open(scenario);
-              gpg::Logf("editor: File > Open Recent: %s", scenario.c_str());
-            }
-          }
-          return;
-        }
-        if (command >= kMenuFirstMap && command < kMenuFirstMap + mPlay.Maps().size() && !mPlay.Active()) {
-          mPlay.Select(static_cast<int>(command - kMenuFirstMap));
-        }
+      }
+      if (id.empty() && command >= kMenuFirstRecent && command < kMenuFirstRecent + 10) {
+        id = "file.recent." + std::to_string(command - kMenuFirstRecent);
+      } else if (id.empty() && command >= kMenuFirstMap && command < kMenuFirstMap + mPlay.Maps().size()) {
+        id = "play.map." + std::to_string(command - kMenuFirstMap);
+      }
+      if (id.empty()) {
         return;
       }
+      const std::string why = mCommands.WhyNot(id);
+      if (!why.empty()) {
+        gpg::Logf("editor: %s can't run now: %s", id.c_str(), why.c_str());
+        return;
+      }
+      (void)mCommands.Run(id);
     }
 
     void EditorApp::UpdateTitle()
     {
+      mCommands.SetTitle("play.toggle", mPlay.Active() ? "Stop" : "Play");
       std::wstring title = mBaseTitle;
       if (mPlay.Active() && !mPlay.Maps().empty()) {
         const std::size_t at = static_cast<std::size_t>(mPlay.Selected());
@@ -1482,14 +1798,11 @@ namespace faf::editor
       }
     }
 
-    void OnMenuOpening(
-      const HMENU menu
+    int MenuIndexForKey(
+      const char key
     )
     {
-      (void)menu;
-      if (gEditorApp != nullptr) {
-        gEditorApp->UpdateMenu();
-      }
+      return gEditorApp != nullptr ? gEditorApp->MenuForKey(key) : -1;
     }
 
     bool SessionActive()
@@ -1955,6 +2268,7 @@ namespace faf::editor
         ImGui_ImplWin32_NewFrame();
         FeedUiClicks();
         ImGui::NewFrame();
+        FeedTestCommands();
         // `/browser`, `/vaultmap <name>` (test runs), with or without a map open.
         if (mBrowserArg) {
           mBrowserArg = false;

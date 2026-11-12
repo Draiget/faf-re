@@ -17,17 +17,21 @@
 #include "editor/ui/EdParticleEditor.h"
 #include "imgui.h"
 
+#include <vector>
+
 namespace faf::editor
 {
+  class EdCommands;
+  struct EdMenu;
   class EdDocument;
   class EdLog;
   class EdPlay;
 
   /**
-   * The editor's panels over the game's frame: the docked panels (tools, map, log) around an empty middle where
-   * the game's picture shows through, and the status bar. The window's own menu bar (EdApp.cpp) holds File,
-   * View and Play, outside the game's picture, so the game's interface keeps its whole area. While a session
-   * runs the panels and the status bar step aside unless "Panels while playing" is on.
+   * The editor's panels over the game's frame: the title row (the editor draws its own, with the menus; ui/EdTitleBar),
+   * the toolbar, the docked panels (tools, map, log) around an empty middle where the game's picture shows through,
+   * and the status bar. While a session runs the panels and the status bar step aside unless "Panels while playing" is
+   * on; the title row stays.
    */
   class EdShell
   {
@@ -260,12 +264,27 @@ namespace faf::editor
       return mGameView;
     }
 
-  private:
-    void BuildDefaultLayout(unsigned int dockspaceId);
-    /** The toolbar over the panels: Play/Stop (F5) first, then New, Open, Save, Save as, Undo, Redo, and the open map.
+    /**
+     * The command registry and the title row's menus (EdApp owns both): the title row draws the menus and the command
+     * palette runs the commands. Without them the shell draws no title row.
      */
+    void SetCommands(
+      EdCommands* commands,
+      const std::vector<EdMenu>* menus
+    ) noexcept
+    {
+      mCommands = commands;
+      mMenus = menus;
+    }
+
+  private:
+    EdCommands* mCommands = nullptr;
+    const std::vector<EdMenu>* mMenus = nullptr;
+    void BuildDefaultLayout(unsigned int dockspaceId);
+    /** The toolbar under the title row: Play/Stop (F5) first, then New, Open, Save, Save as, Undo, Redo, and the open
+     * map. `top` is where it starts (the title row's height). */
     EdMapBrowser mBrowser;
-    void DrawToolbar(float height);
+    void DrawToolbar(float height, float top);
     Command mCommand = Command::None;
     void HandleKeys();
     void DrawToolsPanel();
