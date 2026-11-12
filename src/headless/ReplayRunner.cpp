@@ -760,6 +760,15 @@ namespace faf::headless
     moho::SIM_SetSessionPacing(
       rejoinRehearsal || liveRejoin ? moho::ESimSessionPacing::Network : moho::ESimSessionPacing::Replay
     );
+    // A replay file holds every beat, so playback never waits for a player. While the sim is paused or the game is
+    // over, the driver's issue thread only issues a beat that some client has queued input for
+    // (`CSimDriver` issue loop, `mSimBusy`); a replay has no live client, so a player's pause that the recording never
+    // resumes (28088230 at beat 4864, 27993035 at 14215) stalled headless for good. Issuing anyway plays the
+    // recorded beats as the game ran them: paused beats advance without a tick. A live game's stream (gpgnet://)
+    // and the rejoin modes keep the network rule.
+    if (!rejoinRehearsal && !liveRejoin && options.replayPath.rfind("gpgnet://", 0) != 0) {
+      moho::SIM_SetIssueWhilePaused(true);
+    }
     std::unique_ptr<moho::ISTIDriver> driver(
       moho::SIM_CreateDriver(
         static_cast<moho::CClientManagerImpl*>(clientManager), nullptr, sessionInfo->mLaunchInfo, sessionInfo->mSourceId
