@@ -244,6 +244,10 @@ namespace faf::editor
     {
       return mHomeVaultItems;
     }
+    bool& ShowHistory() noexcept
+    {
+      return mShowHistory;
+    }
     /** The scene's selection, said in the status bar as a count ("3 markers"). */
     void SetStatusSelection(
       std::string text
@@ -340,6 +344,9 @@ namespace faf::editor
     void DrawHomeRecent();
     void DrawHomeVault(bool loggedIn);
     void DrawHomeSearch(bool loggedIn);
+    /** View > History (ui/EdHistoryPanel.cpp): the edits, a click goes back or forward to one. */
+    void DrawHistoryPanel();
+    bool mShowHistory = false;
     bool mShowHome = false;
     bool mHomeFocusSearch = false;
     bool mHomeFront = false;

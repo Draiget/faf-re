@@ -396,6 +396,9 @@ namespace faf::editor
       if (mShowProperties) {
         DrawPropertiesPanel();
       }
+      if (mShowHistory) {
+        DrawHistoryPanel();
+      }
       if (mShowLog) {
         if (ImGui::Begin(Panel(kLogWindow), &mShowLog)) {
           mLog.Draw();
@@ -475,6 +478,7 @@ namespace faf::editor
       {"Particle Editor", &EdShell::mShowParticleEditor},
       {"Particle Browser", &EdShell::mShowParticleBrowser},
       {kLogWindow, &EdShell::mShowLog},
+      {"History", &EdShell::mShowHistory},
     };
     return kFlags;
   }

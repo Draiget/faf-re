@@ -2581,6 +2581,7 @@ namespace faf::editor
       panel("view.particlebrowser", "Particle Browser", &EdShell::ShowParticleBrowser);
       panel("view.adaptive", "Adaptive Map", &EdShell::ShowAdaptiveWindow);
       panel("view.log", "Log", &EdShell::ShowLog);
+      panel("view.history", "History", &EdShell::ShowHistory);
       panel("view.panelsplaying", "Panels while playing", &EdShell::PanelsWhilePlaying);
       panel("view.imguidemo", "ImGui demo", &EdShell::ShowDemo);
       add("view.fullhelp", "Full help text", "View", "", [] {
@@ -2802,6 +2803,7 @@ namespace faf::editor
            sep(),
            cmd("view.fullhelp"),
            cmd("view.log"),
+           cmd("view.history"),
            cmd("view.panelsplaying"),
            sep(),
            workspaces,

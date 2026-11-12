@@ -416,6 +416,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/SettingsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdSettings.cpp
   editor/HomeModelTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdHomeModel.cpp
   editor/AutosaveTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdAutosave.cpp
+  editor/HistoryTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdHistory.cpp
   editor/WaterBodiesEditTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdWaterBodies.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLuaText.cpp
   ${CMAKE_SOURCE_DIR}/src/moho/sim/WaterBodies.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightBrush.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetryCheck.cpp

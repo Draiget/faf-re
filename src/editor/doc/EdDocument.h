@@ -631,6 +631,15 @@ namespace faf::editor
       }
       return "edit";
     }
+    /** The steps in Undo's order (oldest first) and Redo's (the next Redo last), for the History panel. */
+    [[nodiscard]] const std::vector<EditKind>& UndoOrder() const noexcept
+    {
+      return mUndoOrder;
+    }
+    [[nodiscard]] const std::vector<EditKind>& RedoOrder() const noexcept
+    {
+      return mRedoOrder;
+    }
     /** The step Undo (Redo) would take back, or null when there is none. */
     [[nodiscard]] const char* UndoStepName() const noexcept
     {
