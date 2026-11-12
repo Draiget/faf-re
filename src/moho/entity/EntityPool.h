@@ -2,7 +2,7 @@
 #include <cstddef>
 #include <mutex>
 
-#include "faf/memory/MemoryPool.h"
+#include "moho/core/MemoryPool.h"
 
 namespace moho
 {
@@ -29,7 +29,7 @@ namespace moho
   private:
     [[nodiscard]] static bool Active() noexcept;
 
-    faf::MultiMemoryPool mPool;
+    MultiMemoryPool mPool;
     std::mutex mLock;
   };
 } // namespace moho

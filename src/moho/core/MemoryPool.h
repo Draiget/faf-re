@@ -2,8 +2,9 @@
 #include <memory>
 #include <vector>
 
-namespace faf
+namespace moho
 {
+  /// Engine addition: a fixed-size block allocator with a free list, growing by whole chunks (used by EntityPool).
   class MemoryPool
   {
   public:
@@ -140,4 +141,4 @@ namespace faf
     std::vector<MemoryPool> m_pools;
   };
 
-} // namespace faf
+} // namespace moho

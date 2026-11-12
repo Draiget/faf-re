@@ -1,10 +1,9 @@
-
 #include "MemoryPool.h"
 #include <stdexcept>
 
-namespace faf
+namespace moho
 {
-  faf::MemoryPool::MemoryPool(
+  MemoryPool::MemoryPool(
     std::size_t blockSize,
     std::size_t nextCapacity
   )
@@ -108,4 +107,4 @@ namespace faf
   {
     m_pools.reserve(intialCapacity);
   }
-} // namespace faf
+} // namespace moho

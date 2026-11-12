@@ -1137,5 +1137,5 @@ set(FAF_ENGINE_SOURCES
   moho/movie/sfd/FfmpegSfdDecoder.cpp
   moho/movie/sfd/DirectSoundMovieSink.cpp
   moho/movie/sfd/SfdMetadata.cpp
-  faf/memory/MemoryPool.cpp
+  moho/core/MemoryPool.cpp
 )
