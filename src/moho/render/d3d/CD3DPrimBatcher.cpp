@@ -132,24 +132,6 @@ namespace
     return rotated;
   }
 
-  /**
-   * Address: 0x007FC1C0 (FUN_007FC1C0)
-   *
-   * What it does:
-   * Disposes one `sp_counted_impl_p<CD3DPrimBatcher>` payload by running
-   * non-deleting `CD3DPrimBatcher` teardown and releasing owned storage.
-   */
-  [[maybe_unused]] void DisposeCountedPrimBatcherStorage(
-    boost::SpCountedImplStorage<moho::CD3DPrimBatcher>* const countedStorage
-  )
-  {
-    moho::CD3DPrimBatcher* const ownedBatcher = countedStorage->px;
-    if (ownedBatcher != nullptr) {
-      ownedBatcher->~CD3DPrimBatcher();
-      ::operator delete(static_cast<void*>(ownedBatcher));
-    }
-  }
-
   [[nodiscard]] moho::CD3DPrimBatcher::Vertex BuildTransformedVertex(
     const moho::CD3DPrimBatcher& runtime,
     const moho::CD3DPrimBatcher::Vertex& source

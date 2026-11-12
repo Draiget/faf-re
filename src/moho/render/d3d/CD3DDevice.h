@@ -12,11 +12,6 @@
 struct tagRECT;
 using RECT = tagRECT;
 
-namespace boost::detail
-{
-  class sp_counted_base;
-} // namespace boost::detail
-
 namespace gpg::gal
 {
   class Device;

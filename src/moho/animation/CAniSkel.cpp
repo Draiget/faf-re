@@ -3,8 +3,6 @@
 #include <cstring>
 #include <new>
 
-#include <boost/detail/sp_counted_impl.hpp>
-
 #include "CAniDefaultSkel.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"

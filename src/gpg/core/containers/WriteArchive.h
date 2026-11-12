@@ -49,17 +49,16 @@ namespace gpg
      * and the insert guard (0x009512CC) gives `0x0AAAAAA9` =
      * `0xFFFFFFFF / 0x18 - 1`, so with an 0x08 key the record is 0x10.
      *
-     * The trailing `{px, pn}` pair is the shared owner the write path
-     * parks on an entry; it is modelled raw here, as `TrackedPointerInfo`
-     * models the read side's, so no refcount moves with a copy. That gap
-     * is the same one on both sides and wants one fix, not two.
+     * The trailing two words are plain data: the map's teardown
+     * (0x009503E0) runs no destructor on the record, so they are not a
+     * `boost::shared_ptr`, and no writer in this tree sets them.
      */
     struct TrackedPointerRecord
     {
       int index = -1;                                                // +0x00
       TrackedPointerState ownership = TrackedPointerState::Reserved; // +0x04
       void* sharedObject = nullptr;                                  // +0x08
-      boost::detail::sp_counted_base* sharedControl = nullptr;       // +0x0C
+      void* sharedControl = nullptr;                                 // +0x0C
     };
     static_assert(sizeof(TrackedPointerRecord) == 0x10, "TrackedPointerRecord size must be 0x10");
 

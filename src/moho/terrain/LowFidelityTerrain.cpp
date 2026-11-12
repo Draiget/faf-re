@@ -8,8 +8,6 @@
 #include <cstring>
 #include <limits>
 
-#include <boost/detail/sp_counted_base.hpp>
-
 #include "Wm3Vector3.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/Stats.h"

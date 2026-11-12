@@ -17,16 +17,6 @@
 #include "Wm3Vector3.h"
 #include <memory>
 
-namespace boost
-{
-  struct SharedCountPair;
-}
-
-namespace boost::detail
-{
-  class sp_counted_base;
-}
-
 namespace moho
 {
   class AudioEngine;

@@ -1405,6 +1405,9 @@ void moho::WRenViewport::D3DWindowOnDeviceInit(
   moho::snd_index = 0;
 
   if (createBatchers) {
+    // Address: 0x007FC170 (FUN_007FC170) and 0x007FC1C0 (FUN_007FC1C0) -- the `dispose` of these two shared_ptrs'
+    // `sp_counted_impl_p<CD3DTextureBatcher>` and `<CD3DPrimBatcher>` (delete the batcher); formerly unused
+    // hand-written copies in CD3DTextureBatcher.cpp and CD3DPrimBatcher.cpp.
     mTexBatcher.reset(new moho::CD3DTextureBatcher());
     mPrimBatcher.reset(new moho::CD3DPrimBatcher(mTexBatcher.get()));
 

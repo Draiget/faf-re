@@ -2,7 +2,6 @@
 
 #include <cmath>
 #include <new>
-#include <boost/detail/sp_counted_base.hpp>
 
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
