@@ -149,6 +149,11 @@ namespace faf::remote::client
     {
       return mRebuilder->Stats();
     }
+    /** Plan WP10.9: what the client holds, as the session was last given it (for a made-up beat). */
+    [[nodiscard]] const CSyncRebuilder& Rebuilder() const noexcept
+    {
+      return *mRebuilder;
+    }
     /** The last merged frame shown. */
     [[nodiscard]] const wire::SViewFrame* Shown() const noexcept
     {

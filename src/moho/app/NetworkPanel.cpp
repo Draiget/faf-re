@@ -362,6 +362,36 @@ namespace moho
         static_cast<unsigned long long>(lanes.effectsSkipped)
       );
       b.Text(text, kDim);
+      // Plan WP10.9, WPR.14: the view buffer: how far behind the views the display runs, and what late views cost.
+      const faf::remote::client::SServerInterpSnapshot& interp = lanes.interp;
+      b.NewLine();
+      if (interp.on) {
+        std::snprintf(
+          text,
+          sizeof(text),
+          "  view buffer: %d beats%s, %.1f now; views late 95%% %.0f ms",
+          static_cast<int>(interp.target),
+          interp.adaptive ? " (adaptive)" : " (fixed)",
+          interp.depth,
+          interp.lateness95Ms
+        );
+      } else {
+        std::snprintf(text, sizeof(text), "  view buffer: off; views late 95%% %.0f ms", interp.lateness95Ms);
+      }
+      b.Text(text, kDim);
+      b.NewLine();
+      std::snprintf(
+        text,
+        sizeof(text),
+        "  late views %llu, underruns %llu: %llu made up, %llu stalled (%.1f s), %llu caught up",
+        static_cast<unsigned long long>(interp.lateViews),
+        static_cast<unsigned long long>(interp.underruns),
+        static_cast<unsigned long long>(interp.synthesized),
+        static_cast<unsigned long long>(interp.stalls),
+        interp.stallSeconds,
+        static_cast<unsigned long long>(interp.catchUps)
+      );
+      b.Text(text, kDim);
       b.NewLine();
       return true;
     }
@@ -707,6 +737,17 @@ namespace moho
       );
       lines.emplace_back(text);
     }
+    // Plan WP10.9: the view buffer's depth and what late views cost so far.
+    std::snprintf(
+      text,
+      sizeof(text),
+      "buffer %d, late %llu, made up %llu, stalled %llu",
+      static_cast<int>(lanes.interp.target),
+      static_cast<unsigned long long>(lanes.interp.lateViews),
+      static_cast<unsigned long long>(lanes.interp.synthesized),
+      static_cast<unsigned long long>(lanes.interp.stalls)
+    );
+    lines.emplace_back(text);
     const float rowStep = font->mHeight + font->mExternalLeading;
     float widest = 0.0f;
     for (const std::string& line : lines) {

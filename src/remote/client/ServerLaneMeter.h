@@ -50,6 +50,22 @@ namespace faf::remote::client
     return "?";
   }
 
+  /** Plan WP10.9, WPR.14: the view buffer (InterpBuffer.h) as the network driver last left it. */
+  struct SServerInterpSnapshot
+  {
+    bool on = false;         // `net_ClientInterp`
+    bool adaptive = false;   // `net_ClientInterpAdaptive`
+    std::int32_t target = 0; // beats the display keeps behind the newest view
+    double depth = 0.0;      // and how many it is behind now
+    double lateness95Ms = 0.0;
+    std::uint64_t lateViews = 0;
+    std::uint64_t underruns = 0;
+    std::uint64_t synthesized = 0;
+    std::uint64_t stalls = 0;
+    double stallSeconds = 0.0;
+    std::uint64_t catchUps = 0;
+  };
+
   struct SServerLaneSnapshot
   {
     bool active = false; // a server-mode game has taken a view
@@ -61,6 +77,7 @@ namespace faf::remote::client
     std::uint64_t effectsHeld = 0;    // effects it holds now
     std::uint64_t effectsApplied = 0; // ops applied since the game started
     std::uint64_t effectsSkipped = 0; // and ops skipped
+    SServerInterpSnapshot interp;     // plan WP10.9
   };
 
   class CServerLaneMeter
@@ -89,6 +106,16 @@ namespace faf::remote::client
       mEffectsHeld = 0;
       mEffectsApplied = 0;
       mEffectsSkipped = 0;
+      mInterp = {};
+    }
+
+    /** Plan WP10.9: the view buffer's state, after each view and each beat the session takes. */
+    void RecordInterp(
+      const SServerInterpSnapshot& interp
+    )
+    {
+      const std::lock_guard lock(mMutex);
+      mInterp = interp;
     }
 
     /** Plan WP9.3: the effects the client holds after a view, and its effect ops applied and skipped so far. */
@@ -137,6 +164,7 @@ namespace faf::remote::client
       out.effectsHeld = mEffectsHeld;
       out.effectsApplied = mEffectsApplied;
       out.effectsSkipped = mEffectsSkipped;
+      out.interp = mInterp;
       if (!mActive) {
         return out;
       }
@@ -188,5 +216,6 @@ namespace faf::remote::client
     std::uint64_t mEffectsHeld = 0;
     std::uint64_t mEffectsApplied = 0;
     std::uint64_t mEffectsSkipped = 0;
+    SServerInterpSnapshot mInterp;
   };
 } // namespace faf::remote::client

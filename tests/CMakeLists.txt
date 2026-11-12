@@ -103,6 +103,17 @@ set_target_properties(faf_effect_op_encoder_tests PROPERTIES FOLDER "Tests/Headl
 add_test(NAME effect_op_encoder COMMAND faf_effect_op_encoder_tests)
 set_tests_properties(effect_op_encoder PROPERTIES LABELS "Headless")
 
+# Engine addition (dedicated-server plan WP10.9, WPR.14): the server-mode client's interpolation buffer, its beat
+# synthesis and the display model they run under, on scripted view arrivals; no engine needed.
+add_executable(faf_interp_buffer_tests EXCLUDE_FROM_ALL remote/InterpBufferTests.cpp
+  ${CMAKE_SOURCE_DIR}/src/remote/client/InterpBuffer.cpp ${CMAKE_SOURCE_DIR}/src/remote/client/BeatSynthesis.cpp
+  ${CMAKE_SOURCE_DIR}/src/remote/client/DisplayModel.cpp ${CMAKE_SOURCE_DIR}/src/remote/client/BeatClock.cpp)
+target_include_directories(faf_interp_buffer_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_interp_buffer_tests PRIVATE gtest_main)
+set_target_properties(faf_interp_buffer_tests PROPERTIES FOLDER "Tests/Headless")
+add_test(NAME interp_buffer COMMAND faf_interp_buffer_tests)
+set_tests_properties(interp_buffer PROPERTIES LABELS "Headless")
+
 # Engine addition: where UserDecal:SetOrientation puts a decal's corner so it stays centred.
 add_executable(faf_scripted_decal_tests EXCLUDE_FROM_ALL scripted_decal/PlacementTests.cpp)
 target_include_directories(faf_scripted_decal_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)

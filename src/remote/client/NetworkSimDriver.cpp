@@ -14,6 +14,8 @@
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
+#include "moho/console/CConCommand.h"
+#include "moho/render/camera/VTransform.h"
 #include "moho/lua/SCR_String.h"
 #include "moho/misc/LaunchInfoBase.h"
 #include "moho/resource/CSimResources.h"
@@ -42,6 +44,110 @@ namespace faf::remote::client
   {
     constexpr std::uint32_t kSummaryEveryViews = 600; // one minute of game time
 
+    // Plan WP10.9, WPR.14: the view buffer's switches (docs/SWITCHES.md, server mode), read live. They change only
+    // when this client shows what the server sent, never what it sends or what any sim computes.
+    std::int32_t net_ClientInterp = 1;
+    std::int32_t net_ClientInterpAdaptive = 1;
+    std::int32_t net_ClientInterpTicks = 1;
+    std::int32_t net_ClientInterpMaxTicks = 10;
+    std::int32_t net_ClientExtrapolateBeats = 2;
+
+    moho::TConVar<std::int32_t> gTConVar_net_ClientInterp(
+      "net_ClientInterp",
+      "Server-mode games: 1 (default) keeps the display a few beats behind the server's views and makes up a beat "
+      "that comes late; 0 shows each view as it comes.",
+      &net_ClientInterp
+    );
+    moho::TConVar<std::int32_t> gTConVar_net_ClientInterpAdaptive(
+      "net_ClientInterpAdaptive",
+      "Server-mode games: 1 (default) sizes the view buffer from how late the views come; 0 keeps it at "
+      "net_ClientInterpTicks.",
+      &net_ClientInterpAdaptive
+    );
+    moho::TConVar<std::int32_t> gTConVar_net_ClientInterpTicks(
+      "net_ClientInterpTicks",
+      "Server-mode games: the fewest beats the view buffer keeps (default 1).",
+      &net_ClientInterpTicks
+    );
+    moho::TConVar<std::int32_t> gTConVar_net_ClientInterpMaxTicks(
+      "net_ClientInterpMaxTicks",
+      "Server-mode games: the most beats the adaptive view buffer keeps (default 10).",
+      &net_ClientInterpMaxTicks
+    );
+    moho::TConVar<std::int32_t> gTConVar_net_ClientExtrapolateBeats(
+      "net_ClientExtrapolateBeats",
+      "Server-mode games: beats past the last view the display may make up while the next is late, carrying moving "
+      "entities on (default 2; 0 waits instead).",
+      &net_ClientExtrapolateBeats
+    );
+
+    [[nodiscard]] double NowSeconds() noexcept
+    {
+      return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+    }
+
+    [[nodiscard]] SSynthTransform ToSynth(
+      const moho::VTransform& transform
+    ) noexcept
+    {
+      SSynthTransform out;
+      out.px = transform.pos_.x;
+      out.py = transform.pos_.y;
+      out.pz = transform.pos_.z;
+      out.qw = transform.orient_.w;
+      out.qx = transform.orient_.x;
+      out.qy = transform.orient_.y;
+      out.qz = transform.orient_.z;
+      return out;
+    }
+
+    void FromSynth(
+      const SSynthTransform& transform,
+      moho::VTransform& out
+    ) noexcept
+    {
+      out.pos_.x = transform.px;
+      out.pos_.y = transform.py;
+      out.pos_.z = transform.pz;
+      out.orient_.w = transform.qw;
+      out.orient_.x = transform.qx;
+      out.orient_.y = transform.qy;
+      out.orient_.z = transform.qz;
+    }
+
+    /** The client's real data of a live entity, as the session was last given it. */
+    [[nodiscard]] CBeatSynthesizer::Lookup HeldLookup(
+      const CSyncRebuilder& rebuilder
+    )
+    {
+      return [&rebuilder](const std::uint32_t id, SSynthTransform& last, SSynthTransform& cur) {
+        CSyncRebuilder::SHeldView held;
+        if (!rebuilder.FindHeld(id, false, held) || held.data == nullptr) {
+          return false;
+        }
+        last = ToSynth(held.data->mLastTransform);
+        cur = ToSynth(held.data->mCurTransform);
+        return true;
+      };
+    }
+
+    /** A packet's entity updates as transforms, in its order. */
+    [[nodiscard]] std::vector<SSynthUpdate> UpdatesOf(
+      const moho::SSyncData& packet
+    )
+    {
+      std::vector<SSynthUpdate> out;
+      out.reserve(packet.mEntityUpdates.size());
+      for (const moho::SEntityVariableUpdateEntry& entry : packet.mEntityUpdates) {
+        SSynthUpdate update;
+        update.id = static_cast<std::uint32_t>(entry.mEntityId);
+        update.last = ToSynth(entry.mVariableData.mLastTransform);
+        update.cur = ToSynth(entry.mVariableData.mCurTransform);
+        out.push_back(update);
+      }
+      return out;
+    }
+
     /** The bytes `LuaObject::ToByteStream` writes for an empty table: a beat whose Lua lane carries nothing. */
     [[nodiscard]] std::vector<std::uint8_t> EmptyTableBytes(
       LuaPlus::LuaState& state
@@ -63,6 +169,29 @@ namespace faf::remote::client
     }
   } // namespace
 
+  /**
+   * Plan WP10.9: what a made-up beat repeats of the last real packet, as the session sets them from every packet:
+   * the focus, fog and pause flags, and the height field and deposits it keeps a reference to. (The views carry no
+   * `mSyncExtraUnitData`: every packet here has it empty, and a made-up one too.)
+   */
+  struct CNetworkSimDriver::SCarried
+  {
+    std::int32_t focusArmy = -1;
+    bool fogOfWar = false;
+    std::int32_t pausedBy = -1;
+    boost::SharedPtrRaw<moho::CHeightField> terrain;
+    boost::SharedPtrRaw<moho::CSimResources> resources;
+
+    SCarried() = default;
+    SCarried(const SCarried&) = delete;
+    SCarried& operator=(const SCarried&) = delete;
+    ~SCarried()
+    {
+      terrain.release();
+      resources.release();
+    }
+  };
+
   CNetworkSimDriver::CNetworkSimDriver(
     moho::RRuleGameRules& rules,
     const moho::LaunchInfoBase& launch,
@@ -81,7 +210,9 @@ namespace faf::remote::client
       )
     , mMarshaller(&mClientManager)
     , mEmptySyncLua(new LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE))
+    , mCarried(std::make_unique<SCarried>())
   {
+    ConfigureBuffer();
     mEmptySync = EmptyTableBytes(*mEmptySyncLua);
     mResources.reset(new moho::CSimResources());
     mSeedHeights = heights;
@@ -187,9 +318,211 @@ namespace faf::remote::client
       static_cast<double>(mLaneBytes[4]) / 1024.0,
       static_cast<double>(mLaneBytes[5]) / 1024.0
     );
+    // Plan WP10.9, WPR.14: the view buffer: its depth, the views' lateness, and what late views cost the display.
+    const SInterpStats& buffer = mInterp.Stats();
+    const SSynthStats& made = mSynth.Stats();
+    gpg::Logf(
+      "server driver %s: view buffer %s, target %d beats (floor %d, most %d; raised %llu, lowered %llu), views late "
+      "95%% %.0f ms, median %.0f ms; %llu late views, %llu underruns: %llu made up, %llu stalled (%.2f s, longest "
+      "%.2f s), %llu caught up, %llu outages; made-up beats moved %llu entities, %llu eased back (%llu added), made-up "
+      "positions %.3f off on average, %.3f at most (%llu compared)",
+      when,
+      !mInterp.Config().enabled ? "off" : (mInterp.Config().adaptive ? "adaptive" : "fixed"),
+      static_cast<int>(mInterp.TargetDepth()),
+      static_cast<int>(mInterp.Config().floorBeats),
+      static_cast<int>(buffer.mostTarget),
+      static_cast<unsigned long long>(buffer.raised),
+      static_cast<unsigned long long>(buffer.lowered),
+      buffer.lateness95Ms,
+      buffer.latenessMedianMs,
+      static_cast<unsigned long long>(buffer.lateViews),
+      static_cast<unsigned long long>(buffer.underruns),
+      static_cast<unsigned long long>(buffer.synthesized),
+      static_cast<unsigned long long>(buffer.stalls),
+      buffer.stallSeconds,
+      buffer.longestStall,
+      static_cast<unsigned long long>(buffer.catchUps),
+      static_cast<unsigned long long>(buffer.outages),
+      static_cast<unsigned long long>(made.moved),
+      static_cast<unsigned long long>(made.eased),
+      static_cast<unsigned long long>(made.easedAdded),
+      made.compared != 0u ? made.errorSum / static_cast<double>(made.compared) : 0.0,
+      made.errorMost,
+      static_cast<unsigned long long>(made.compared)
+    );
     if (mViews) {
       LogEffects(when, mViews->Effects().Total());
     }
+  }
+
+  void CNetworkSimDriver::ConfigureBuffer()
+  {
+    SInterpConfig config;
+    config.enabled = net_ClientInterp != 0;
+    config.adaptive = net_ClientInterpAdaptive != 0;
+    config.floorBeats = net_ClientInterpTicks;
+    config.maxBeats = net_ClientInterpMaxTicks;
+    config.synthBeats = net_ClientExtrapolateBeats;
+    if (mBufferConfigured && config == mBufferSwitches) {
+      return;
+    }
+    mBufferConfigured = true;
+    mBufferSwitches = config;
+    mInterp.Configure(config);
+    const SInterpConfig& used = mInterp.Config();
+    gpg::Logf(
+      "server driver: view buffer %s, %d to %d beats, up to %d made up",
+      !used.enabled ? "off" : (used.adaptive ? "adaptive" : "fixed"),
+      static_cast<int>(used.floorBeats),
+      static_cast<int>(used.adaptive ? used.maxBeats : used.floorBeats),
+      static_cast<int>(used.enabled ? used.synthBeats : 0)
+    );
+  }
+
+  void CNetworkSimDriver::RecordBuffer(
+    const double now
+  ) const
+  {
+    const SInterpStats& stats = mInterp.Stats();
+    SServerInterpSnapshot snapshot;
+    snapshot.on = mInterp.Config().enabled;
+    snapshot.adaptive = mInterp.Config().adaptive;
+    snapshot.target = mInterp.TargetDepth();
+    snapshot.depth = mInterp.Depth(now);
+    snapshot.lateness95Ms = stats.lateness95Ms;
+    snapshot.lateViews = stats.lateViews;
+    snapshot.underruns = stats.underruns;
+    snapshot.synthesized = stats.synthesized;
+    snapshot.stalls = stats.stalls;
+    snapshot.stallSeconds = stats.stallSeconds;
+    snapshot.catchUps = stats.catchUps;
+    CServerLaneMeter::Get().RecordInterp(snapshot);
+  }
+
+  void CNetworkSimDriver::StampView(
+    const SViewMessage& view,
+    moho::SSyncData& packet
+  )
+  {
+    const double now = NowSeconds();
+    ConfigureBuffer();
+    mInterp.SetBeatSeconds(1.0 / mClock.ExpectedBeatsPerSecond());
+    const wire::SViewFrame* const shown = mViews->Shown();
+    // The server's clock when it built the beat; without a frame, where the beat would be at speed 0.
+    const double serverSeconds =
+      shown != nullptr ? static_cast<double>(shown->serverMs) / 1000.0 : static_cast<double>(view.beat) * 0.1;
+    const SBeatStamp stamp = mInterp.OnView(static_cast<std::int32_t>(view.beat), serverSeconds, now);
+    mFirstViewAt = mFirstViewAt < 0.0 ? now : mFirstViewAt;
+    packet.mCurTick = stamp.tick;
+    packet.mAdvanced = stamp.advanced;
+
+    const CSyncRebuilder& rebuilder = mViews->Rebuilder();
+    const CBeatSynthesizer::Lookup lookup = HeldLookup(rebuilder);
+    mSynth.CompareWithReal(static_cast<std::int32_t>(view.beat), lookup);
+    if (stamp.kind == EBeatKind::CatchUp) {
+      mSynth.OnCatchUp(UpdatesOf(packet));
+    } else if (mSynth.Shown() != 0u) {
+      // The first beat with display time after made-up ones: each entity starts from where the screen showed it.
+      std::vector<SSynthUpdate> updates = UpdatesOf(packet);
+      std::vector<SSynthUpdate> added;
+      mSynth.OnAdvance(updates, lookup, added);
+      for (std::size_t i = 0; i < updates.size(); ++i) {
+        FromSynth(updates[i].last, packet.mEntityUpdates[i].mVariableData.mLastTransform);
+      }
+      for (const SSynthUpdate& update : added) {
+        CSyncRebuilder::SHeldView held;
+        if (!rebuilder.FindHeld(update.id, false, held) || held.data == nullptr) {
+          continue;
+        }
+        moho::SEntityVariableUpdateEntry& entry = packet.mEntityUpdates.emplace_back();
+        entry.mEntityId = static_cast<moho::EntId>(update.id);
+        entry.mVariableData = *held.data;
+        FromSynth(update.last, entry.mVariableData.mLastTransform);
+        FromSynth(update.cur, entry.mVariableData.mCurTransform);
+      }
+    }
+
+    // What a made-up beat repeats of this one.
+    mCarried->focusArmy = packet.mFocusArmy;
+    mCarried->fogOfWar = packet.mFogOfWar;
+    mCarried->pausedBy = packet.mPausedBy;
+    mCarried->terrain.reset_from(packet.mTerrainUpdate);
+    mCarried->resources.reset_from(packet.mSimResources);
+    mStamps.push_back(stamp);
+
+    if (const std::int32_t target = mInterp.TargetDepth(); target != mTargetLogged && mTargetChangesLogged < 20u) {
+      ++mTargetChangesLogged;
+      gpg::Logf(
+        "server driver: view buffer target %d beats at beat %u (views late 95%% %.0f ms, median %.0f ms)",
+        static_cast<int>(target),
+        view.beat,
+        mInterp.Stats().lateness95Ms,
+        mInterp.Stats().latenessMedianMs
+      );
+      mTargetLogged = target;
+    }
+    RecordBuffer(now);
+  }
+
+  void CNetworkSimDriver::QueueSynthesized(
+    const SBeatStamp& stamp
+  )
+  {
+    auto packet = std::make_unique<moho::SSyncData>();
+    packet->mCurBeat = stamp.beat;
+    packet->mCurTick = stamp.tick;
+    packet->mAdvanced = true;
+    packet->mFocusArmy = mCarried->focusArmy;
+    packet->mFogOfWar = mCarried->fogOfWar;
+    packet->mPausedBy = mCarried->pausedBy;
+    packet->mTerrainUpdate.reset_from(mCarried->terrain);
+    if (mCarried->resources.px != nullptr) {
+      packet->mSimResources.reset_from(mCarried->resources);
+    } else {
+      packet->mSimResources.reset_from_owner(mResources);
+    }
+
+    // Every moving entity carried on by its last beat's motion, from where the screen shows it; units whose pose moved
+    // hold it. Nothing else changes: no creation, death, army, effect or Lua `Sync` is made up.
+    const CSyncRebuilder& rebuilder = mViews->Rebuilder();
+    const CBeatSynthesizer::Lookup lookup = HeldLookup(rebuilder);
+    const CBeatSynthesizer::ForEach forEach = [&rebuilder](const auto& visit) {
+      rebuilder.ForEachLive([&visit](const std::uint32_t id, const moho::SSTIEntityVariableData& data) {
+        visit(id, ToSynth(data.mLastTransform), ToSynth(data.mCurTransform));
+      });
+    };
+    std::vector<SSynthUpdate> updates;
+    mSynth.Synthesize(stamp.tick, stamp.ahead, forEach, lookup, updates);
+    packet->mEntityUpdates.reserve(updates.size());
+    for (const SSynthUpdate& update : updates) {
+      CSyncRebuilder::SHeldView held;
+      if (!rebuilder.FindHeld(update.id, false, held) || held.data == nullptr) {
+        continue;
+      }
+      moho::SEntityVariableUpdateEntry& entry = packet->mEntityUpdates.emplace_back();
+      entry.mEntityId = static_cast<moho::EntId>(update.id);
+      entry.mVariableData = *held.data;
+      FromSynth(update.last, entry.mVariableData.mLastTransform);
+      FromSynth(update.cur, entry.mVariableData.mCurTransform);
+    }
+    rebuilder.HeldPoseUpdates(packet->mUnitUpdates);
+
+    auto* const stream = new gpg::MemBufferStream(static_cast<unsigned int>(mEmptySync.size() + 16u));
+    stream->Write(reinterpret_cast<const char*>(mEmptySync.data()), mEmptySync.size());
+    packet->mStream = stream;
+    if (mInterp.Stats().synthesized <= 5u) {
+      gpg::Logf(
+        "server driver: beat made up at display tick %d, %d past view %d: %zu entities moved, %zu poses held",
+        static_cast<int>(stamp.tick),
+        static_cast<int>(stamp.ahead),
+        static_cast<int>(stamp.beat),
+        packet->mEntityUpdates.size(),
+        packet->mUnitUpdates.size()
+      );
+    }
+    mPackets.push_back(std::move(packet));
+    mStamps.push_back(stamp);
+    (void)::SetEvent(mAvailable);
   }
 
   void CNetworkSimDriver::LogEffects(
@@ -591,6 +924,7 @@ namespace faf::remote::client
     auto* const stream = new gpg::MemBufferStream(static_cast<unsigned int>(sync.size() + 16u));
     stream->Write(reinterpret_cast<const char*>(sync.data()), sync.size());
     packet->mStream = stream;
+    StampView(view, *packet); // plan WP10.9: its display tick, with its stamp queued beside it
     mLastBeat = packet->mCurBeat;
     mPackets.push_back(std::move(packet));
     (void)::SetEvent(mAvailable);
@@ -652,7 +986,25 @@ namespace faf::remote::client
 
   bool CNetworkSimDriver::HasSyncData()
   {
-    return !mPackets.empty();
+    // Plan WP10.9: the session asks when its clock reached its next tick (`CWldSession::SessionFrame`).
+    if (!mPackets.empty()) {
+      // The game's start: the first beat waits until the buffer holds its depth (a second at the most).
+      constexpr double kMostStartHold = 1.0;
+      return mRealTaken != 0u || !mInterp.HoldStart() || NowSeconds() - mFirstViewAt >= kMostStartHold;
+    }
+    if (mRealTaken == 0u || mShutDown || !mViews) {
+      return false;
+    }
+    // None has come for that tick: the buffer may let one be made up, or the picture waits.
+    ConfigureBuffer();
+    const double now = NowSeconds();
+    const std::optional<SBeatStamp> stamp = mInterp.OnUnderrun(now);
+    if (!stamp) {
+      RecordBuffer(now);
+      return false;
+    }
+    QueueSynthesized(*stamp);
+    return true;
   }
 
   void CNetworkSimDriver::GetSyncData(
@@ -664,6 +1016,14 @@ namespace faf::remote::client
     if (!mPackets.empty()) {
       outSyncData = mPackets.front().release();
       mPackets.pop_front();
+      if (!mStamps.empty()) {
+        const SBeatStamp stamp = mStamps.front();
+        mStamps.pop_front();
+        const double now = NowSeconds();
+        mInterp.OnTaken(stamp, now);
+        mRealTaken += stamp.kind != EBeatKind::Synthesized ? 1u : 0u;
+        RecordBuffer(now);
+      }
       mClock.OnShown(static_cast<std::uint32_t>(outSyncData->mCurBeat));
     }
     if (mPackets.empty()) {
@@ -678,8 +1038,9 @@ namespace faf::remote::client
 
   double CNetworkSimDriver::GetSimSpeed()
   {
-    // #178: `WLD_GetSimRate`'s skew, so the display follows the server's beats (CBeatClock).
-    return mClock.HasFrames() ? mClock.Skew() : 0.0;
+    // #178, plan WP10.9: `WLD_GetSimRate`'s skew, so the display keeps the view buffer's depth behind the server's
+    // beats.
+    return mInterp.HasViews() ? mInterp.Skew(NowSeconds()) : 0.0;
   }
 
   void CNetworkSimDriver::SetArmyIndex(

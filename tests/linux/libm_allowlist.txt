@@ -35,3 +35,5 @@ cos faf::remote::wire::ApplyOrientationReckoning(faf::remote::wire::SEntityRecor
 acos faf::remote::client::CSyncRebuilder::ApplyFrame(faf::remote::wire::SViewFrame, unsigned long, moho::SSyncData&, std::__1::chrono::time_point<std::__1::chrono::steady_clock, std::__1::chrono::duration<long long, std::__1::ratio<1l, 1000000000l> > >)
 # The client's beat clock: the beat rate the server's sim rate implies, for pacing and skew stats.
 pow faf::remote::client::CBeatClock::ExpectedBeatsPerSecond() const
+# The client's display model (DisplayModel.h): `WLD_GetSimRate`'s skew factor, for tests and the probe's report.
+pow faf::remote::client::RunDisplayModel(std::__1::span<faf::remote::client::SViewArrival const, 18446744073709551615ul>, faf::remote::client::EDisplayPolicy, faf::remote::client::SInterpConfig const&, double)

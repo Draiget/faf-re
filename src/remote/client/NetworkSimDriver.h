@@ -18,6 +18,8 @@
 #include "moho/sim/ISTIDriver.h"
 #include "remote/SpeedLimit.h"
 #include "remote/client/BeatClock.h"
+#include "remote/client/BeatSynthesis.h"
+#include "remote/client/InterpBuffer.h"
 #include "remote/client/RemoteClientManager.h"
 #include "remote/client/ServerViewClient.h"
 
@@ -30,6 +32,11 @@
 // What the server doesn't send yet stays empty in the packets (research map: session tables, poses, the lanes nobody
 // sends). The beat a command is issued at (`IssueCommand`'s return) is the newest beat shown plus one: the server's
 // answer (`CommandAnswer`, the beat it went in) comes later and is counted (plan WP3.7).
+//
+// Plan WP10.9, WPR.14: the packets go to the session through a view buffer (InterpBuffer.h): the display is kept a
+// few beats behind the newest view (`GetSimSpeed` steers the session's clock), and when the session's clock reaches a
+// tick no view has come for, `HasSyncData` may make one up (BeatSynthesis.h: moving entities carried on, poses and
+// everything else held); the real beat then comes as a catch-up beat with no display time of its own.
 
 namespace moho
 {
@@ -146,6 +153,17 @@ namespace faf::remote::client
     void SendCommandFrame(moho::CMessage& message);
     /** The beat a command just sent will be applied at, as best this side knows: the newest shown plus one. */
     [[nodiscard]] moho::CmdId IssueBeat() const noexcept;
+    /** Plan WP10.9: the view buffer's switches (`net_ClientInterp*`, `net_ClientExtrapolateBeats`), read live. */
+    void ConfigureBuffer();
+    /**
+     * Plan WP10.9: a view's packet as the buffer stamps it: a catch-up beat gets no display time, and the first beat
+     * with display time after made-up ones starts each entity from where the screen showed it.
+     */
+    void StampView(const SViewMessage& view, moho::SSyncData& packet);
+    /** Plan WP10.9: a made-up beat at `stamp`'s display tick, from what the client holds (BeatSynthesis.h). */
+    void QueueSynthesized(const SBeatStamp& stamp);
+    /** Plan WP10.9: the view buffer's state to the network panel. */
+    void RecordBuffer(double now) const;
     void LogSummary(const char* when) const;
     void LogEffects(const char* when, const SEffectApplyCounts& counts) const;
     /** Plan WP11.4: chat for a roster client goes through the server; for this player's own client, straight to its UI.
@@ -185,6 +203,19 @@ namespace faf::remote::client
     std::uint64_t mChatReceived = 0;
     std::uint64_t mChatBad = 0;
     std::deque<std::unique_ptr<moho::SSyncData>> mPackets;
+    // Plan WP10.9, WPR.14: the view buffer (InterpBuffer.h): each packet's stamp (in `mPackets`' order), what made-up
+    // beats show (BeatSynthesis.h), and the fields of the last real packet a made-up one repeats.
+    CInterpBuffer mInterp;
+    CBeatSynthesizer mSynth;
+    std::deque<SBeatStamp> mStamps;
+    struct SCarried;
+    std::unique_ptr<SCarried> mCarried;
+    std::uint64_t mRealTaken = 0;    // real beats the session took
+    double mFirstViewAt = -1.0;      // when the first view's packet was ready (the start's hold is bounded)
+    std::int32_t mTargetLogged = -1; // the buffer's target as last logged
+    std::uint64_t mTargetChangesLogged = 0;
+    SInterpConfig mBufferSwitches; // the switches as last read
+    bool mBufferConfigured = false;
     // Views waiting for their beat's Lua lane (`LuaSync`, sent once the server's `Sync` for the beat is routed).
     struct SPendingView
     {
@@ -197,9 +228,8 @@ namespace faf::remote::client
     std::map<std::uint32_t, std::vector<std::uint8_t>> mEarlyLua; // a `LuaSync` before its view (the pipeline)
     std::uint64_t mLuaMissing = 0;
     HANDLE mAvailable = nullptr;
-    // Plan WP11.5 (#178): the server's beats as they arrive and as the session shows them; `GetSimSpeed` is its skew,
-    // so the display keeps `kTargetBacklog` beats in hand against arrival jitter, neither ahead of the views nor
-    // behind.
+    // Plan WP11.5 (#178): the server's beats as they arrive and as the session shows them, for the log's rates; the
+    // display's pace (`GetSimSpeed`) is the view buffer's since plan WP10.9.
     static constexpr std::int64_t kTargetBacklog = 1;
     CBeatClock mClock{kTargetBacklog};
     std::int32_t mLastBeat = -1;

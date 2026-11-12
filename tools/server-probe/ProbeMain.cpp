@@ -11,6 +11,7 @@
 // 3 bad arguments.
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -27,6 +28,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -47,6 +49,8 @@
 #include "remote/ViewLanes.h"
 #include "remote/net/GameLinks.h"
 #include "moho/effects/rendering/EffectOps.h"
+#include "remote/client/BeatSynthesis.h"
+#include "remote/client/DisplayModel.h"
 #include "remote/client/EffectLaneApplier.h"
 #include "remote/wire/EffectLane.h"
 #include "remote/wire/EntityFrame.h"
@@ -252,6 +256,9 @@ namespace
 
     double beatMs = 0.0;   // the game's beat, to tell how late views come; 0: no telling
     bool noDecode = false; // the channel's limit alone, as decoding takes a while
+    // Plan WP10.9, WPR.14: each view's arrival to this file, and at the end the game client's display played over them
+    // (remote/client/DisplayModel.h) with the view buffer off, as before it, and on.
+    std::string displayModel;
     bool luaKeys =
       false; // plan WP14.1: each `Sync` key of the Lua lane the first time it comes (again after a partition)
     // Plan WP11 step 1: rebuild each beat's game data from the views alone, with this match file's rules.
@@ -466,6 +473,8 @@ namespace
         out.floodAt = Argument(value);
       } else if (name == "--beat-ms") {
         out.beatMs = Argument(value);
+      } else if (name == "--display-model") {
+        out.displayModel = value;
       } else if (name == "--loss") {
         out.path.lossPercent = Argument(value);
       } else if (name == "--latency-ms") {
@@ -634,6 +643,18 @@ namespace
     std::uint32_t source = 0;
     bool noDecode = false;
     faf::probe::CProbeRebuild* rebuild = nullptr; // `--rebuild`
+    // Plan WP10.9 (`--display-model`): each decoded view's beat, the server's stamp and when it came; and each moving
+    // entity's last positions, to tell how far off a made-up beat would have shown it.
+    bool recordArrivals = false;
+    std::vector<faf::remote::client::SViewArrival> arrivals;
+    struct STrack
+    {
+      std::uint32_t beat = 0;                   // of the newest position
+      std::array<std::array<float, 3>, 3> at{}; // newest first
+      std::uint32_t count = 0;                  // positions held, up to 3
+    };
+    std::unordered_map<std::uint32_t, STrack> tracks;
+    std::array<std::vector<float>, 2> synthError; // a made-up beat 1 and 2 beats past the last real one: distance off
     int uid = 0;
     std::uint64_t launchInfos = 0;
     std::uint64_t tableMessages = 0; // `SessionTables`
@@ -722,6 +743,55 @@ namespace
     double firstAt = -1.0;
     double lastAt = 0.0;
   };
+
+  /**
+   * Plan WP10.9 (`--display-model`): each entity of a decoded frame against where a made-up beat would have shown it
+   * (remote/client/BeatSynthesis.h: carried on by the last real beat's motion), had this beat been made up from the one
+   * before (1 beat past it) or from the one before that (2 beats past). Moving entities only, as a made-up beat moves
+   * no other.
+   */
+  void TrackForSynthesis(
+    SViews& out,
+    const faf::remote::wire::SViewFrame& frame,
+    const std::uint32_t beat
+  )
+  {
+    namespace wire = faf::remote::wire;
+    using faf::remote::client::SSynthTransform;
+    const auto at = [](const std::array<float, 3>& p) {
+      SSynthTransform t;
+      t.px = p[0];
+      t.py = p[1];
+      t.pz = p[2];
+      return t;
+    };
+    for (const wire::SEntityRecord& record : frame.entities) {
+      std::array<float, 3> now = record.farValue;
+      if (!record.farPosition) {
+        const wire::QuantizedPosition q =
+          out.codec.deadReckoning ? wire::PredictPosition(record, beat, out.codec) : record.position;
+        now = {out.codec.position.x.Decode(q[0]), out.codec.position.y.Decode(q[1]), out.codec.position.z.Decode(q[2])};
+      }
+      SViews::STrack& track = out.tracks[record.id];
+      if (track.count != 0u && track.beat + 1u != beat) {
+        track.count = 0; // a gap (a view it wasn't in): start again
+      }
+      for (int ahead = 1; ahead <= 2; ++ahead) {
+        const auto newer = static_cast<std::size_t>(ahead - 1);
+        if (track.count < static_cast<std::uint32_t>(ahead + 1) || track.at[newer] == track.at[newer + 1u]) {
+          continue;
+        }
+        const SSynthTransform madeUp =
+          faf::remote::client::ExtrapolateTransform(at(track.at[newer + 1u]), at(track.at[newer]), ahead);
+        out.synthError[newer].push_back(faf::remote::client::PositionError(madeUp, at(now)));
+      }
+      track.at[2] = track.at[1];
+      track.at[1] = track.at[0];
+      track.at[0] = now;
+      track.count = std::min<std::uint32_t>(track.count + 1u, 3u);
+      track.beat = beat;
+    }
+  }
 
   void TakeView(
     SViews& out,
@@ -929,6 +999,16 @@ namespace
           static_cast<unsigned long long>(frameSize),
           static_cast<unsigned long long>(teamSize)
         );
+      }
+      if (ok && out.recordArrivals) {
+        // Plan WP10.9: when the view came, and how far a made-up beat would have been off for each moving entity.
+        out.arrivals.push_back(
+          faf::remote::client::SViewArrival{
+            static_cast<std::int32_t>(beat), static_cast<double>(decoded.serverMs) / 1000.0, elapsed
+          }
+        );
+        TrackForSynthesis(out, decoded, static_cast<std::uint32_t>(beat));
+        TrackForSynthesis(out, teamDecoded, static_cast<std::uint32_t>(beat));
       }
       out.frameBytes += frameSize + teamSize;
       out.lastEntities = entities + teamEntities;
@@ -1257,7 +1337,8 @@ int main(
       "--lobby-player-options-at <s>] [--lobby-request <Type> --lobby-request-at <s>] [--lobby-assign-slot <n> "
       "--lobby-assign-at <s>] [--lobby-eject-at <s>] [--lobby-established-at <s>]] [--speed-limit <step> "
       "--speed-limit-at <s>] [--focus-army <army> --focus-army-at <s>] [--cameras-every <s> [--camera-at "
-      "<x,z,half-width>]] [--content-report rules|wrong] [--ui-mods <uid,...>|none] [--beat-ms <ms>] [--loss "
+      "<x,z,half-width>]] [--content-report rules|wrong] [--ui-mods <uid,...>|none] [--beat-ms <ms>] "
+      "[--display-model <arrivals file>] [--loss "
       "<percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--lua-keys] "
       "[--bandwidth-kbps <kbit/s> [--buffer-ms <ms>]] [--rebuild <match.lua> /init <init.lua> [--host-effects]]\n"
     );
@@ -1310,6 +1391,7 @@ int main(
   SViews views;
   views.beatMs = options.beatMs;
   views.noDecode = options.noDecode;
+  views.recordArrivals = !options.displayModel.empty();
   views.rebuild = options.rebuild.empty() ? nullptr : &rebuild;
   views.uid = options.uid;
   // Left to the process's end to close.
@@ -2314,6 +2396,59 @@ int main(
       at(0.99),
       views.lateMs.back()
     );
+  }
+  if (!options.displayModel.empty() && !views.arrivals.empty()) {
+    // Plan WP10.9, WPR.14: the game client's display played over the arrivals measured here, before the view buffer
+    // and with it; and how far off a made-up beat would have shown the moving entities.
+    if (FILE* const file = std::fopen(options.displayModel.c_str(), "w"); file != nullptr) {
+      std::fprintf(file, "# beat server_seconds local_seconds\n");
+      for (const faf::remote::client::SViewArrival& arrival : views.arrivals) {
+        std::fprintf(file, "%d %.4f %.4f\n", arrival.beat, arrival.serverSeconds, arrival.localSeconds);
+      }
+      std::fclose(file);
+    }
+    using faf::remote::client::EDisplayPolicy;
+    using faf::remote::client::SInterpConfig;
+    const auto show = [&](const char* label, const EDisplayPolicy policy, const SInterpConfig& config) {
+      const faf::remote::client::SDisplayRun run = faf::remote::client::RunDisplayModel(views.arrivals, policy, config);
+      std::printf("probe %d: %s\n", options.uid, faf::remote::client::DescribeDisplayRun(label, run).c_str());
+    };
+    SInterpConfig off;
+    off.enabled = false;
+    SInterpConfig fixedOne;
+    fixedOne.adaptive = false;
+    fixedOne.synthBeats = 0;
+    SInterpConfig adaptiveOnly;
+    adaptiveOnly.synthBeats = 0;
+    show("display, buffer off", EDisplayPolicy::Buffered, off);
+    show("display, as before the buffer", EDisplayPolicy::Master, SInterpConfig{});
+    show("display, fixed 1 beat, none made up", EDisplayPolicy::Buffered, fixedOne);
+    show("display, adaptive, none made up", EDisplayPolicy::Buffered, adaptiveOnly);
+    show("display, adaptive (default)", EDisplayPolicy::Buffered, SInterpConfig{});
+    for (std::size_t ahead = 0; ahead < views.synthError.size(); ++ahead) {
+      std::vector<float>& errors = views.synthError[ahead];
+      if (errors.empty()) {
+        continue;
+      }
+      std::sort(errors.begin(), errors.end());
+      const auto at = [&errors](const double share) {
+        return errors[std::min(
+          errors.size() - 1u, static_cast<std::size_t>(static_cast<double>(errors.size()) * share)
+        )];
+      };
+      std::printf(
+        "probe %d: synthesis %zu beat%s past the last view: moving entities off by median %.3f, 95%% %.3f, 99%% %.3f, "
+        "worst %.3f world units (%zu entity-beats)\n",
+        options.uid,
+        ahead + 1u,
+        ahead == 0u ? "" : "s",
+        at(0.5),
+        at(0.95),
+        at(0.99),
+        errors.back(),
+        errors.size()
+      );
+    }
   }
   if (options.path.Any()) {
     std::printf(

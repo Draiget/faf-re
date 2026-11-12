@@ -44,6 +44,9 @@ set(FAF_REMOTE_SOURCES
 
 set(FAF_REMOTE_CLIENT_SOURCES
   remote/client/BeatClock.cpp
+  remote/client/BeatSynthesis.cpp
+  remote/client/DisplayModel.cpp
+  remote/client/InterpBuffer.cpp
   remote/client/EffectBlueprint.cpp
   remote/client/EffectHosting.cpp
   remote/client/EffectLaneApplier.cpp

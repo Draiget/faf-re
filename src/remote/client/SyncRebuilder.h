@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <span>
 #include <unordered_map>
@@ -247,6 +248,16 @@ namespace faf::remote::client
      * was then. False for any other. The view stays valid until the next frame is applied.
      */
     [[nodiscard]] bool FindHeld(std::uint32_t id, bool orRemoved, SHeldView& out) const;
+    /**
+     * Plan WP10.9: every entity live in the frame shown (as `FindHeld` finds them), with its data as last given to the
+     * session, for a made-up beat (BeatSynthesis.h).
+     */
+    void ForEachLive(const std::function<void(std::uint32_t, const moho::SSTIEntityVariableData&)>& visit) const;
+    /**
+     * Plan WP10.9, with `SetNoSim`: a made-up beat's unit updates: every live unit whose last beat moved its pose, its
+     * data as last given with the pose held (prior = current), so the session doesn't play that beat's motion again.
+     */
+    void HeldPoseUpdates(fa::vector<moho::SUnitVariableUpdateEntry>& out) const;
     /** Plan WP9.3: keep each frame's removed entities until the next frame (for `FindHeld`'s `orRemoved`). */
     void KeepRemoved(
       const bool keep

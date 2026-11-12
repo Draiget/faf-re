@@ -1115,4 +1115,37 @@ namespace faf::remote::client
     }
     return false;
   }
+
+  void CSyncRebuilder::ForEachLive(
+    const std::function<void(std::uint32_t, const moho::SSTIEntityVariableData&)>& visit
+  ) const
+  {
+    for (const auto& [id, held] : mHeld) {
+      if (held.live && ShownRecord(id) != nullptr) {
+        visit(id, held.data);
+      }
+    }
+  }
+
+  void CSyncRebuilder::HeldPoseUpdates(
+    fa::vector<moho::SUnitVariableUpdateEntry>& out
+  ) const
+  {
+    for (const auto& [id, held] : mHeld) {
+      if (!held.live || !held.poseMoving || !held.unit || !held.pose) {
+        continue;
+      }
+      const wire::SEntityRecord* const record = ShownRecord(id);
+      if (record == nullptr || !record->isUnit) {
+        continue;
+      }
+      // As the next beat without bones gives it (`UpdatePoses`): the current pose as both, so nothing moves.
+      moho::SUnitVariableUpdateEntry& entry = out.emplace_back();
+      entry.mEntityId = static_cast<moho::EntId>(id);
+      entry.mVariableData = *held.unit;
+      entry.mVariableData.mPriorSharedPose = held.pose;
+      entry.mVariableData.mSharedPose = held.pose;
+      entry.mReconFlags = record->unit.detail->reconFlags;
+    }
+  }
 } // namespace faf::remote::client
