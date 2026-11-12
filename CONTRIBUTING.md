@@ -51,6 +51,10 @@ git clang-format origin/master
 
 `git clang-format` comes with LLVM (Windows: `C:\Program Files\LLVM\bin`), or with `pip install clang-format==22.1.8`, which is the version the check uses.
 
+### Platform guards
+
+Platform code tests the macros in [src/platform/PlatformDefines.h](src/platform/PlatformDefines.h), never the compilers' own (`_WIN32`, `__linux__`, `__APPLE__`): `#if FAFRE_PLATFORM_WINDOWS` and `#if FAFRE_PLATFORM_POSIX`. Code that every POSIX system shares (the SDL window layer, `src/platform/posix/`, sockets, threads) tests `FAFRE_PLATFORM_POSIX`, so the macOS port gets it too. `FAFRE_PLATFORM_LINUX` and `FAFRE_PLATFORM_MACOS` are only for something one system has, named in a comment on the same line: `#if FAFRE_PLATFORM_LINUX // MSG_NOSIGNAL; macOS sets SO_NOSIGPIPE`. The `platform-macros` check fails a pull request that adds a line breaking this; run it before pushing with `python .github/scripts/platform_macros.py --diff origin/master HEAD`.
+
 ## Writing tests
 
 Use **GoogleTest (GTest)** for all unit and integration tests. Do not roll custom or ad-hoc test harnesses (such as custom `Check` loops, hand-rolled `gFailures` counters, or manual `main()` runners).
