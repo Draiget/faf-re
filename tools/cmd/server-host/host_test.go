@@ -91,16 +91,6 @@ func TestHint(t *testing.T) {
 	}
 }
 
-func TestPickCPUs(t *testing.T) {
-	cpus := []CPU{{ID: 0, Load10: 5}, {ID: 1, Load10: 90}, {ID: 2, Load10: 1, Lobbies: []string{"l1"}}, {ID: 3, Load10: 30}}
-	if got := pickCPUs(cpus, 2); len(got) != 2 || got[0] != 0 || got[1] != 3 {
-		t.Fatalf("got %v, want [0 3]: free CPUs first, least loaded", got)
-	}
-	if got := pickCPUs(cpus, 9); len(got) != 4 {
-		t.Fatalf("got %v", got)
-	}
-}
-
 func testManager(t *testing.T) *manager {
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, "maps", "SCMP_009"), 0o755); err != nil {

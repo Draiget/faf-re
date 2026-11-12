@@ -98,6 +98,20 @@ func main() {
 	smp := newSampler("/proc", "/sys/devices/system/cpu")
 	stop := make(chan struct{})
 	go smp.run(stop)
+	// Plan WP17.16: network links, sampled every second like the CPUs.
+	links := &linkSampler{dir: "/sys/class/net"}
+	go func() {
+		t := time.NewTicker(time.Second)
+		defer t.Stop()
+		for {
+			links.sample()
+			select {
+			case <-stop:
+				return
+			case <-t.C:
+			}
+		}
+	}()
 
 	// The map list is read once and again at most every minute.
 	var mapsMu sync.Mutex
@@ -115,6 +129,14 @@ func main() {
 
 	m := newManager(config{serverBin: *serverBin, engineArgs: strings.Fields(*engineArgs), runsDir: *runs, publicHost: *publicHost,
 		listenIP: *gameIP, portFirst: pf, portLast: pl, maxLobbies: *maxLobbies}, listMaps, smp.cpus)
+	m.links = links.get
+	m.nodes = func() []Node {
+		ids := []int{}
+		for _, c := range smp.cpus() {
+			ids = append(ids, c.ID)
+		}
+		return readNodes("/sys/devices/system/node", ids)
+	}
 	a := &api{token: token, corsOrigin: *cors, m: m, maps: listMaps, procDir: "/proc", hostName: hostName()}
 	srv := &http.Server{Addr: *listen, Handler: a, ReadHeaderTimeout: 5 * time.Second, MaxHeaderBytes: 16 << 10}
 

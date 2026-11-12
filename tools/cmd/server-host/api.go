@@ -65,6 +65,7 @@ func (a *api) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"name": a.hostName, "cpu_model": cpuModel(a.procDir),
 			"memory_mb": map[string]int{"total": total, "available": avail},
 			"cpus":      a.m.cpusWithLobbies(), "lobbies": a.liveLobbies(), "ai": aiKeys,
+			"nodes": a.m.nodes(), "links": a.m.links(), // plan WP17.16
 		}})
 	case p == "/api/v1/maps" && r.Method == http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "maps": a.maps()})
@@ -80,6 +81,16 @@ func (a *api) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"worst_cores": h.WorstCores, "suggested_cores": h.SuggestedCores, "basis": h.Basis,
 			"min_connection_kbps": h.MinConnectionKBps, "server_upload_kbps": h.ServerUploadKBps, "max_players": h.MaxPlayers,
 			"connection_basis": h.ConnectionBasis})
+	case p == "/api/v1/plan" && r.Method == http.MethodPost:
+		// Plan WP17.17: where a game of this size would go, and why it may not fit; nothing is started.
+		var req PlanRequest
+		dec := json.NewDecoder(io.LimitReader(r.Body, 16<<10))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&req); err != nil || req.Players < 1 || req.Players > kMaxPlayers || req.KM < 1 {
+			fail(w, http.StatusBadRequest, errors.New("plan takes players 1..16, km, and cores or cpus"))
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "plan": place(a.m.machine(), req)})
 	case p == "/api/v1/lobbies" && r.Method == http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "lobbies": a.m.list()})
 	case p == "/api/v1/lobbies" && r.Method == http.MethodPost:

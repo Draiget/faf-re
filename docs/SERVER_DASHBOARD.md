@@ -75,7 +75,11 @@ The host page shows:
 
 ### Choosing CPUs
 
-Pick cells on the heatmap, or leave **Auto** on with a number of cores: the host then takes the CPUs no lobby uses, least loaded first. The form shows what a game of that size costs, from measurements: a game on fw0 (Xeon Gold 6144, one sim thread, normal speed) used on average 0.07 cores with 1-2 players, 0.25 with 3-5, 0.22 with 6-8 and 0.38 with 9 or more; its worst 30 s 0.14, 0.58, 0.40 and 0.67. Bigger maps are scaled up by an estimate (×1.15 at 20 km, ×1.3 at 40 km, ×1.5 at 81 km) that hasn't been measured. One core holds about four games at once; the form warns when you pick fewer cores than suggested, or CPUs already busy.
+Pick cells on the heatmap, or leave **Auto** on with a number of cores. Either way the host's planner (`POST /api/v1/plan`, the same as a lobby's creation uses) estimates the game and says where it goes:
+
+- **Estimate**, from measurements on fw0 (Xeon Gold 6144, one sim thread, normal speed): cores on average 0.07 with 1-2 players, 0.25 with 3-5, 0.22 with 6-8 and 0.38 with 9 or more, worst 30 s 0.14, 0.58, 0.40 and 0.67 (bigger maps scaled by an unmeasured ×1.15 at 20 km, ×1.3 at 40 km, ×1.5 at 81 km); memory from the measured peaks (190 MB at 4 players to 406 MB at 12) plus a quarter, 16 players estimated; the server's upload 205 KB/s for a 1v1, 2.3 MB/s for 8 players, 2.6 MB/s for 16.
+- **Placement** (Auto): one NUMA node, the one with enough free physical cores (no lobby on any of their hyperthreads), then the most free memory, then the least load; one CPU per physical core, least loaded first; hyperthread siblings only when the node runs short. The lobby's memory is preferred on that node (`set_mempolicy`, inherited by its server): in a container this needs `CAP_SYS_NICE` (`docker run --cap-add SYS_NICE`), else the lobby starts with a `memory_policy` warning.
+- **Warnings**: CPUs on two NUMA nodes (`spans_nodes`), fewer cores than the game's worst 30 s needs (`too_few_cores`) or far more than it needs (`too_many_cores`), a CPU another lobby runs on (`shared_cpu`) or busy outside the lobbies (`busy_cpu`), both hyperthreads of one core (`both_siblings`), a sibling busy with another lobby (`sibling_busy`), a node short of whole cores (`node_short`), less free memory on the node than the game takes (`node_memory`), and the lobbies' upload over 80% of the links (`network`). An `error` (too little memory, no free CPU, links overrun, an unknown CPU) refuses the lobby unless the request says `"force": true`.
 
 ### Who starts the game
 
@@ -136,10 +140,11 @@ The host (`server-host`):
 
 | Request | Does |
 |---|---|
-| `GET /api/v1/host` | the machine: `name`, `cpu_model`, `memory_mb`, `cpus` (each `id`, `core`, `socket`, `load` over 1 s and `load10` over 10 s in %, the `lobbies` on it), the number of running `lobbies`, the `ai` personalities |
+| `GET /api/v1/host` | the machine: `name`, `cpu_model`, `memory_mb`, `cpus` (each `id`, `core`, `socket`, `load` over 1 s and `load10` over 10 s in %, the `lobbies` on it), the number of running `lobbies`, the `ai` personalities; `nodes` (each NUMA node's `id`, `cpus`, `memory_mb` total and free) and `links` (each physical network link's `name`, `speed_mbps`, `in_kbps`, `out_kbps`); each CPU also has its `node` |
 | `GET /api/v1/maps` | the maps: `id`, `name`, `file`, `size`, `km`, `players` (start spots), `description`, `source` |
 | `GET /api/v1/hint?players=<n>&km=<km>` | a game's cost: `mean_cores`, `worst_cores`, `suggested_cores`, `basis` |
-| `GET /api/v1/lobbies` | every lobby: `id`, `name`, `state`, `map`, `cpus`, `port`, `seats` (with each human's `join` line), `observers` (each `name`, `referee`, `watch` line), `observer_delay_seconds`, `observe_port`, `hint`, `phase`, `beat`, `exit` |
+| `POST /api/v1/plan` | `{"players": 8, "km": 20, "cores": 2}` or `{..., "cpus": [3, 11]}`: the planner's answer without starting anything: `estimate` (cores mean, worst, suggested; `memory_mb`; `upload_kbps`; `basis`), `cores`, `cpus`, `nodes`, `fits` and `warnings` (each `code`, `severity`, `text`) |
+| `GET /api/v1/lobbies` | every lobby: `id`, `name`, `state`, `map`, `cpus`, `port`, `seats` (with each human's `join` line), `observers` (each `name`, `referee`, `watch` line), `observer_delay_seconds`, `observe_port`, `hint`, `nodes`, `warnings` (the placement's), `usage` (its server's `cpu_cores` and `rss_mb`, every 2 s), `phase`, `beat`, `exit` |
 | `POST /api/v1/lobbies` | a new lobby: `{"map": "scmp_009", "seats": [{"kind": "human", "name": "Ann", "faction": 1, "team": 2}, {"kind": "ai", "ai": "adaptive", "faction": 2, "team": 3}], "options": {"Victory": "demoralization"}, "control": "player", "start_when_ready": 10, "lobby_minutes": 60, "observers": [{"name": "Caster"}, {"name": "Ref", "referee": true}], "observer_delay_seconds": 120, "cpus": "auto", "cores": 1}`; `cpus` may instead list CPU ids. Faction 1-4 (UEF, Aeon, Cybran, Seraphim) or 5 (random, chosen by the host); team 1 is no team, 2-9 teams 1-8 |
 | `DELETE /api/v1/lobbies/<id>` | stops the lobby's server (SIGTERM, a kill after 10 s); `?forget=1` then removes it from the list |
 | `/api/v1/lobbies/<id>/api/v1/...` | that lobby's own API, below, with the host's token |

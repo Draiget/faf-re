@@ -69,16 +69,21 @@ type Lobby struct {
 	ObserverDelay  float64           `json:"observer_delay_seconds"`
 	ObservePort    int               `json:"observe_port,omitempty"`
 	Hint           Hint              `json:"hint"`
+	Nodes          []int             `json:"nodes"`    // plan WP17.17: the NUMA nodes its CPUs are on
+	Warnings       []Warning         `json:"warnings"` // the placement's, when it was made
+	Usage          procUsage         `json:"usage"`    // plan WP17.16: its server process, sampled every 2 s
 	Phase          string            `json:"phase"`
 	Beat           int               `json:"beat"`
 	Exit           string            `json:"exit"`
 	Dir            string            `json:"dir"`
 
-	restPort  int
-	restToken string
-	proc      *os.Process
-	stopAsked bool
-	done      chan struct{}
+	restPort   int
+	lastTicks  uint64
+	lastSample time.Time
+	restToken  string
+	proc       *os.Process
+	stopAsked  bool
+	done       chan struct{}
 }
 
 // CreateRequest is POST /api/v1/lobbies's body.
@@ -94,6 +99,7 @@ type CreateRequest struct {
 	LobbyMinutes   float64           `json:"lobby_minutes"`
 	CPUs           json.RawMessage   `json:"cpus"` // [ids] or "auto"
 	Cores          int               `json:"cores"`
+	Force          bool              `json:"force"` // start even when the placement says it doesn't fit
 }
 
 // config is how the host starts each lobby's server.
@@ -116,10 +122,23 @@ type manager struct {
 	maps    func() []Map
 	cpus    func() []CPU
 	client  *http.Client
+	nodes   func() []Node
+	links   func() []Link
+	procDir string
 }
 
 func newManager(cfg config, maps func() []Map, cpus func() []CPU) *manager {
-	return &manager{cfg: cfg, lobbies: map[string]*Lobby{}, next: 1, maps: maps, cpus: cpus, client: &http.Client{Timeout: 3 * time.Second}}
+	m := &manager{cfg: cfg, lobbies: map[string]*Lobby{}, next: 1, maps: maps, cpus: cpus, client: &http.Client{Timeout: 3 * time.Second},
+		procDir: "/proc", links: func() []Link { return nil }}
+	// Without NUMA information (tests, a machine without /sys): one node holding every CPU.
+	m.nodes = func() []Node {
+		ids := []int{}
+		for _, c := range cpus() {
+			ids = append(ids, c.ID)
+		}
+		return []Node{{ID: 0, CPUs: ids}}
+	}
+	return m
 }
 
 var (
@@ -348,29 +367,6 @@ func matchFile(l *Lobby, scenario string) string {
 	return b.String()
 }
 
-// pickCPUs chooses n CPUs for a lobby: those no running lobby holds first, then the least loaded.
-func pickCPUs(cpus []CPU, n int) []int {
-	c := append([]CPU(nil), cpus...)
-	sort.SliceStable(c, func(i, j int) bool {
-		if len(c[i].Lobbies) != len(c[j].Lobbies) {
-			return len(c[i].Lobbies) < len(c[j].Lobbies)
-		}
-		if c[i].Load10 != c[j].Load10 {
-			return c[i].Load10 < c[j].Load10
-		}
-		return c[i].ID < c[j].ID
-	})
-	if n > len(c) {
-		n = len(c)
-	}
-	out := make([]int, 0, n)
-	for _, x := range c[:n] {
-		out = append(out, x.ID)
-	}
-	sort.Ints(out)
-	return out
-}
-
 // cpusWithLobbies is the sampler's CPUs with each running lobby marked on its CPUs.
 func (m *manager) cpusWithLobbies() []CPU {
 	cpus := m.cpus()
@@ -379,6 +375,13 @@ func (m *manager) cpusWithLobbies() []CPU {
 	idx := map[int]int{}
 	for i, c := range cpus {
 		idx[c.ID] = i
+	}
+	for _, n := range m.nodes() {
+		for _, c := range n.CPUs {
+			if i, ok := idx[c]; ok {
+				cpus[i].Node = n.ID
+			}
+		}
 	}
 	ids := make([]string, 0, len(m.lobbies))
 	for id := range m.lobbies {
@@ -405,6 +408,22 @@ func cpuArg(cpus []int) string {
 		parts[i] = strconv.Itoa(c)
 	}
 	return strings.Join(parts, ",")
+}
+
+// machine is the placement engine's view: CPUs with the lobbies on them, NUMA nodes, links, the running lobbies'
+// upload estimates and the memory available.
+func (m *manager) machine() *machine {
+	cpus := m.cpusWithLobbies()
+	mc := &machine{cpus: cpus, nodes: m.nodes(), links: m.links()}
+	m.mu.Lock()
+	for _, l := range m.lobbies {
+		if running(l.State) {
+			mc.lobbiesUpload += l.Hint.ServerUploadKBps
+		}
+	}
+	m.mu.Unlock()
+	_, mc.memAvailMB = memoryMB(m.procDir)
+	return mc
 }
 
 func running(state string) bool { return state == "starting" || state == "lobby" || state == "game" }
@@ -439,34 +458,28 @@ func (m *manager) create(req CreateRequest) (*Lobby, int, error) {
 		return nil, http.StatusBadRequest, err
 	}
 	hint := hintFor(len(req.Seats), mp.KM)
-	cpuList := []int{}
+	// Plan WP17.17: the placement engine picks or checks the CPUs, inside one NUMA node where it can.
+	preq := PlanRequest{Players: len(req.Seats), KM: mp.KM, Cores: req.Cores}
 	raw := strings.TrimSpace(string(req.CPUs))
-	allCPUs := m.cpusWithLobbies()
-	if raw == "" || raw == `"auto"` || raw == "null" {
-		n := req.Cores
-		if n <= 0 {
-			n = hint.SuggestedCores
+	if raw != "" && raw != `"auto"` && raw != "null" {
+		if err := json.Unmarshal(req.CPUs, &preq.CPUs); err != nil || len(preq.CPUs) == 0 {
+			return nil, http.StatusBadRequest, errors.New(`cpus is a list of CPU ids or "auto"`)
 		}
-		cpuList = pickCPUs(allCPUs, n)
-	} else if err := json.Unmarshal(req.CPUs, &cpuList); err != nil {
-		return nil, http.StatusBadRequest, errors.New(`cpus is a list of CPU ids or "auto"`)
-	} else {
-		known := map[int]bool{}
-		for _, c := range allCPUs {
-			known[c.ID] = true
-		}
-		seen := map[int]bool{}
-		for _, c := range cpuList {
-			if !known[c] || seen[c] {
-				return nil, http.StatusBadRequest, fmt.Errorf("CPU %d isn't one of this machine's, or is listed twice", c)
-			}
-			seen[c] = true
-		}
-		sort.Ints(cpuList)
 	}
-	if len(cpuList) == 0 {
+	plan := place(m.machine(), preq)
+	if !plan.Fits && !req.Force {
+		var why []string
+		for _, w := range plan.Warnings {
+			if w.Severity == "error" {
+				why = append(why, w.Text)
+			}
+		}
+		return nil, http.StatusConflict, fmt.Errorf("doesn't fit (force to start anyway): %s", strings.Join(why, "; "))
+	}
+	if len(plan.CPUs) == 0 {
 		return nil, http.StatusBadRequest, errors.New("no CPUs to run the lobby on")
 	}
+	cpuList := plan.CPUs
 
 	m.mu.Lock()
 	live := 0
@@ -521,7 +534,7 @@ func (m *manager) create(req CreateRequest) (*Lobby, int, error) {
 	l := &Lobby{ID: id, Name: req.Name, State: "starting", Map: LobbyMap{mp.ID, mp.Name, mp.KM, mp.Players}, Options: opts,
 		CPUs: cpuList, Port: port, Created: now.Format(time.RFC3339), Control: req.Control, StartWhenReady: req.StartWhenReady,
 		Seats: req.Seats, Observers: req.Observers, ObserverDelay: req.ObserverDelay, ObservePort: observePort,
-		Hint: hint, restPort: restPort, restToken: randomHex(24), done: make(chan struct{})}
+		Hint: hint, Nodes: plan.Nodes, Warnings: plan.Warnings, restPort: restPort, restToken: randomHex(24), done: make(chan struct{})}
 	if l.Observers == nil {
 		l.Observers = []Observer{}
 	}
@@ -566,7 +579,11 @@ func (m *manager) create(req CreateRequest) (*Lobby, int, error) {
 	cmd := exec.Command(m.cfg.serverBin, args...)
 	cmd.Dir = l.Dir
 	cmd.Stdout, cmd.Stderr = logf, logf
-	if err := startPinned(cmd, cpuList); err != nil {
+	memNote, err := startPinned(cmd, cpuList, l.Nodes)
+	if memNote != "" {
+		l.Warnings = append(l.Warnings, Warning{Code: "memory_policy", Severity: "warn", Text: memNote})
+	}
+	if err != nil {
 		logf.Close()
 		return nil, http.StatusInternalServerError, fmt.Errorf("starting the server: %w", err)
 	}
@@ -611,7 +628,17 @@ func (m *manager) watch(l *Lobby) {
 		case <-time.After(wait):
 		}
 		phase, beat, ok := m.childStatus(l)
+		ticks, rssKB, pok := procTicks(m.procDir, l.PID)
+		now := time.Now()
 		m.mu.Lock()
+		if pok {
+			if !l.lastSample.IsZero() && ticks >= l.lastTicks {
+				// Clock ticks are 1/100 s on Linux (USER_HZ).
+				l.Usage.CPUCores = round1(float64(ticks-l.lastTicks)/100/now.Sub(l.lastSample).Seconds()*10) / 10
+			}
+			l.Usage.RSSMB = rssKB / 1024
+			l.lastTicks, l.lastSample = ticks, now
+		}
 		if ok && running(l.State) {
 			l.Phase, l.Beat = phase, beat
 			if phase == "lobby" || phase == "game" {

@@ -61,6 +61,7 @@ type CPU struct {
 	ID      int      `json:"id"`
 	Core    int      `json:"core"`
 	Socket  int      `json:"socket"`
+	Node    int      `json:"node"` // plan WP17.16: its NUMA node
 	Load    float64  `json:"load"`
 	Load10  float64  `json:"load10"`
 	Lobbies []string `json:"lobbies"`
