@@ -32,5 +32,6 @@ steps:
 expect:
   allLaunched: true
   noCrash: true
+  cleanExitOk: true # the tour quits the game when it is done (/tourexit)
   logsContain:
     - { uids: all, pattern: 'TOUR: done' }

@@ -374,6 +374,9 @@ func (r *runner) check(e Expect) []string {
 			}
 			how := "crashed or was closed"
 			if toInt(data["code"]) == 0 {
+				if e.CleanExitOK {
+					continue // the scenario expects its games to end themselves
+				}
 				how = "exited cleanly (closed?)"
 			}
 			fails = append(fails, fmt.Sprintf("player %d %s %s on its own (code %v)", rec.UID, rec.Text, how, data["code"]))

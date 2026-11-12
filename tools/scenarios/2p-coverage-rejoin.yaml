@@ -40,6 +40,7 @@ expect:
   allLaunched: true
   noDesync: true
   noCrash: true
+  cleanExitOk: true # each game quits itself 330 s after its session starts (/tourquitafter)
   logsContain:
     - { uids: [1], pattern: 'REJOIN: client \d+:\S+ served' }
     - { uids: [1], pattern: 'REJOIN: client \d+:\S+ is asked to prove its seat' }

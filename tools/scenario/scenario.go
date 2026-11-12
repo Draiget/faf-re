@@ -173,6 +173,9 @@ type Expect struct {
 	NoDesync bool `yaml:"noDesync"`
 	// NoCrash: no game or adapter exited unless mpemu killed it.
 	NoCrash bool `yaml:"noCrash"`
+	// CleanExitOK: with NoCrash, a game that ends itself with exit code 0 passes (the coverage tour quits its game to
+	// write the counters); any other code still fails.
+	CleanExitOK bool `yaml:"cleanExitOk"`
 	// Present / Absent: journal records that must / must not exist.
 	Present []Match `yaml:"present"`
 	Absent  []Match `yaml:"absent"`
