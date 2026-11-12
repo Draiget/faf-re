@@ -1,0 +1,6 @@
+# Files left out of folders.py's second total ("without excluded files"); summary.txt and the first total keep them.
+# Each one is reachable, so it stays in the engine, but none of the measured runs (ctest, replays, the unit zoo, the
+# client tours) reaches it. One path relative to the source root, a tab, then the reason.
+src/gpg/gal/backends/d3d10/DeviceD3D10.cpp	the D3D10 renderer: chosen only by /d3d10; the client tours run D3D9, D3D11, D3D12 and Vulkan
+src/moho/app/WEmitterWx.cpp	the wx emitter editor window: opened only by the EFX_CreateEmitterWindow console command
+src/moho/unit/tasks/CUnitMeleeAttackTargetTask.cpp	the melee attack task: made only for units with Unit::mIsMelee (CUnitAttackTargetTask.cpp); the unit zoo, which spawns every blueprint, runs none of it
