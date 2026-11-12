@@ -189,9 +189,11 @@ namespace moho
    */
   boost::shared_ptr<const CAniSkel> RScmResource::GetSkeleton()
   {
+    CAniSkel* skeleton = nullptr;
     for (;;) {
       CAniSkel* const current = mSkeleton.load(std::memory_order_acquire);
       if (current != nullptr && current != kSkeletonBuildInProgress) {
+        skeleton = current;
         break;
       }
 
@@ -215,8 +217,8 @@ namespace moho
         // The binary allocates a 0x48-byte CAniResourceSkel and constructs it
         // from this resource's name + SCM file, storing it through the CAniSkel*
         // base pointer lane.
-        CAniSkel* const built = new CAniResourceSkel(mName, mFile);
-        mSkeleton.store(built, std::memory_order_release);
+        skeleton = new CAniResourceSkel(mName, mFile);
+        mSkeleton.store(skeleton, std::memory_order_release);
       } catch (...) {
         // Parsing can fail (the bone tables are resized). Put the slot back to
         // "not built" before letting the exception out, so the next caller tries
@@ -237,7 +239,7 @@ namespace moho
     };
 
     KeepOwnerAlive keepOwner{shared_from_this()};
-    return boost::shared_ptr<const CAniSkel>(mSkeleton.load(std::memory_order_acquire), keepOwner);
+    return boost::shared_ptr<const CAniSkel>(skeleton, keepOwner);
   }
 
   /**
