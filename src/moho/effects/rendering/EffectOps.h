@@ -68,7 +68,18 @@ namespace moho
     std::uint32_t valueCount = 0;
     const SEfxCurve* curve = nullptr;
     const SCreateBeamParams* beam = nullptr;
+    /** `CreateLightParticle`: the armies (bit n: army n) whose intel shows it (`tEffectOpLightArmies`); all ones for a
+     * plain light. */
+    std::uint32_t armies = ~0u;
   };
+
+  /**
+   * Plan WP9.2: `CreateLightParticleIntel` makes its light only where the focus army's intel detects the point. A sim
+   * with no focus army (the server's) makes it always; while a hook is set, the binding puts here the armies whose
+   * intel detects it, as each army's client would decide, for the light's op (`SEffectOpArgs::armies`), and sets it
+   * back to all ones after. Only the sim thread's Lua writes it.
+   */
+  inline thread_local std::uint32_t tEffectOpLightArmies = ~0u;
 
   /** `entity`'s id for `SEffectOpArgs`, -1 without one (a template so this header needs no `Entity`). */
   template <class TEntity>

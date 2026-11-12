@@ -1714,6 +1714,18 @@ namespace moho
 
       CAiReconDBImpl* const reconDb = focusArmy->GetReconDB();
       emitParticle = reconDb->ReconCanDetect(bonePosition, RECON_LOSNow) != RECON_None;
+    } else if (gEffectOpHook != nullptr) {
+      // Plan WP9.2: no focus army (a server), so the light is made; its op carries the armies whose client would have
+      // made it, each deciding as above for itself. Reads only.
+      std::uint32_t armies = 0u;
+      for (std::size_t index = 0; index < sim->mArmiesList.size() && index < 32u; ++index) {
+        CArmyImpl* const army = sim->mArmiesList[index];
+        CAiReconDBImpl* const reconDb = army != nullptr ? army->GetReconDB() : nullptr;
+        if (reconDb != nullptr && reconDb->ReconCanDetect(bonePosition, RECON_LOSNow) != RECON_None) {
+          armies |= std::uint32_t{1} << index;
+        }
+      }
+      tEffectOpLightArmies = armies;
     }
 
     if (emitParticle) {
@@ -1721,6 +1733,7 @@ namespace moho
         bonePosition, texturePrimary, textureSecondary, size, lifetime, armyIndex
       );
     }
+    tEffectOpLightArmies = ~0u;
     return 0;
   }
 

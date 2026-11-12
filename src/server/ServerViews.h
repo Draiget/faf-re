@@ -13,6 +13,7 @@
 
 #include "remote/ViewLanes.h"
 #include "server/EffectOpEncoder.h"
+#include "server/EffectOpRouter.h"
 
 namespace moho
 {
@@ -102,10 +103,11 @@ namespace faf::server
     /**
      * Plan WP9.1 step 3, before `Install`: the sim's effect operations (moho/effects/rendering/EffectOps.h) are
      * recorded from now on (this sets `gEffectOpHook`), and each beat's go in every player's view as its effects lane
-     * (remote/wire/EffectLane.h), after the pose lane. Every view gets every op for now; each view's client gets a
-     * name's text the first time its ops need it, again after it comes back holding nothing.
+     * (remote/wire/EffectLane.h), after the pose lane. Each view's client gets a name's text the first time its ops
+     * need it, again after it comes back holding nothing. Plan WP9.2: with `route` each view gets only the effects its
+     * client can place (server/EffectOpRouter.h); without, every view gets every op (`--effect-ops-all`).
      */
-    void EnableEffectOps();
+    void EnableEffectOps(bool route = true);
     /** Call with the sim stopped. */
     void Uninstall();
     /** What the effects lanes carried, for the console; empty without `EnableEffectOps`. After `Uninstall`. */
@@ -170,10 +172,14 @@ namespace faf::server
     // beat's views start, and only read by them; each player's names and lane are its own job's.
     struct SEffectReceiver
     {
-      CEffectLaneNames names;
+      CEffectLaneNames names; // every op to every view
+      CEffectViewRoute route; // plan WP9.2: routed
       std::vector<std::uint8_t> lane;
+      std::uint64_t bytes = 0; // its lanes, summed
     };
     std::unique_ptr<CEffectOpRecorder> mEffects;
+    std::unique_ptr<CEffectRoutes> mEffectRoutes; // plan WP9.2: null when every view gets every op
+    std::uint32_t mPlayerViews = 0u;              // every player's army, a bit each (under 32)
     SEffectBeat mEffectBeat;
     std::map<std::size_t, SEffectReceiver> mEffectReceivers; // by army, one per player, made before `Install`
     std::atomic<std::uint64_t> mEffectBytes{0};              // summed over the views

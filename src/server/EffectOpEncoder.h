@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <span>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -27,12 +28,31 @@ namespace faf::server
     const std::string* text = nullptr;
   };
 
+  /** Plan WP9.2: one op of a beat, where its bytes are and what routing it to the views needs. */
+  struct SEffectBeatOp
+  {
+    std::uint32_t offset = 0; // in `SEffectBeat::ops`
+    std::uint32_t size = 0;
+    moho::EEffectOp op = moho::EEffectOp::Count;
+    std::uint8_t nameCount = 0;
+    std::uint32_t id = 0;                   // the effect's (not for `CreateLightParticle`)
+    std::int32_t entity = -1;               // the entities it names: creates, `SetEntity`, `SetBone`
+    std::int32_t entity2 = -1;              // a beam's other end
+    std::int32_t param = -1;                // a setter's parameter
+    std::array<SEffectBeatName, 2> names{}; // the names it refers to (`nameCount` of them)
+    std::array<float, 3> position{};        // `CreateEmitter`, `CreateLightParticle`: where it is
+    std::uint32_t armies = ~0u; // `CreateLightParticle`: the armies whose intel shows it (all for a plain light)
+    std::uint32_t views = 0;    // `CreateLightParticle`: the views it goes to, set by the server before the views
+  };
+
   /** One beat's encoded ops, the same for every view (`CEffectLaneNames` makes each view's lane of it). */
   struct SEffectBeat
   {
     std::vector<std::uint8_t> ops; // the ops, names as references only
     std::uint32_t opCount = 0;
     std::vector<SEffectBeatName> names; // every name the ops refer to, once, in first-use order
+    std::vector<SEffectBeatOp> list;    // plan WP9.2: each op of `ops`, in order
+    std::vector<std::uint32_t> ended;   // plan WP9.2: effects destroyed this beat (any destroy, derived ones too)
   };
 
   /**
@@ -138,6 +158,7 @@ namespace faf::server
       std::uint32_t texture2 = 0;
       std::uint32_t floatOffset = 0;
       std::uint32_t floatCount = 0;
+      std::uint32_t armies = ~0u;
     };
 
     struct SEffectEntry
@@ -154,7 +175,7 @@ namespace faf::server
       return index < kOps ? index : kOps - 1u;
     }
     [[nodiscard]] static std::uint32_t Resolve(SNameTable& table, const char* name);
-    void EncodeName(SEffectBeat& beat, SNameTable& table, EEffectNameTable which, std::uint32_t ref);
+    void EncodeName(SEffectBeat& beat, SEffectBeatOp& op, SNameTable& table, EEffectNameTable which, std::uint32_t ref);
     static void EncodeInt(std::vector<std::uint8_t>& out, std::int32_t value);
     void EncodeFloats(std::vector<std::uint8_t>& out, const SPending& pending, std::uint32_t fixedCount) const;
 
@@ -165,6 +186,7 @@ namespace faf::server
     std::uint64_t mBeatSerial = 0; // counts `EndBeat`s, from 1
 
     std::vector<SPending> mPending;
+    std::vector<std::uint32_t> mEnded; // this beat's destroyed effects
     std::vector<float> mFloats;
     std::unordered_map<std::uint64_t, std::size_t> mLastSetFloat; // (id, param) -> mPending index, this beat
 
@@ -196,6 +218,18 @@ namespace faf::server
      */
     void Write(const SEffectBeat& beat, std::vector<std::uint8_t>& lane);
 
+    /**
+     * Plan WP9.2, a lane of some of the beat's ops (a routed view's): `Begin`, then `Need` for each name the chosen ops
+     * refer to, then `Finish` with those ops' bytes. `Need` marks the name sent at once, so a name is listed once.
+     */
+    void Begin() noexcept
+    {
+      mNew.clear();
+    }
+    void Need(const SEffectBeatName& name);
+    /** The lane (cleared first): empty without an op, else the names `Need` found new, then `ops`. */
+    void Finish(std::span<const std::uint8_t> ops, std::uint32_t opCount, std::vector<std::uint8_t>& lane);
+
     /** Name texts this view was sent, over its whole life. */
     [[nodiscard]] std::uint64_t NamesSent() const noexcept
     {
@@ -204,6 +238,7 @@ namespace faf::server
 
   private:
     std::vector<bool> mSent[2]; // per table, by entry
+    std::vector<SEffectBeatName> mNew; // this lane's names new to the client, in first-use order
     std::uint64_t mNamesSent = 0;
   };
 } // namespace faf::server

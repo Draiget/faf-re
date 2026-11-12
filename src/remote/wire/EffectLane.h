@@ -41,6 +41,19 @@
 // Effect ids count up from 0 and are never reused. A client that never saw an effect's create (it joined, or came
 // back, after it) drops the ops on it. `Destroy` never goes: a client derives it (the effect's lifetime, the entity's
 // death). Entities are the server's ids, as the view's frames name them.
+//
+// Plan WP9.2: a view gets only the effects its client can place (server/EffectOpRouter.h): those on entities its
+// frames hold, at points its army sees, and lights its army sees or detects. A client drops an effect when it drops the
+// effect's entity, or when an attach names an entity it doesn't hold; when it holds the entity again the effect comes
+// again whole, with the same id: its create, then its latest setters. A create for an id the client holds replaces
+// that effect. A whole view (after a lost connection) is followed by every effect the client can place. An emitter
+// placed once at an entity or a bone (`CreateEmitterAtEntity`, `CreateEmitterAtBone`) may name an entity the same
+// view message removes (a projectile's impact): the client places it from that entity's last state, and keeps it when
+// the entity goes, as it doesn't follow it.
+//
+// Open (for the client step): ops name entities by the sim's ids. A view's frames hold another army's unit as its
+// recon blip, and other armies' projectiles and blips under ids of the view's own (remote/ViewIdMap.h), so such an
+// effect goes to the views that draw that unit or projectile, but its entity id is not yet one the client holds.
 
 namespace faf::remote::wire
 {

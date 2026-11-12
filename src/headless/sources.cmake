@@ -34,6 +34,7 @@ set(FAF_HEADLESS_SOURCES
   # The server's effect-op encoder (plan WP9.1), which --effect-record measures.
   server/EffectOpEncoder.cpp
   server/EffectOpRecorder.cpp
+  server/EffectOpRouter.cpp
 )
 
 set(FAF_HEADLESS_SERVER_SOURCES

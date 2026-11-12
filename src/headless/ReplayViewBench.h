@@ -1,13 +1,23 @@
 #pragma once
 
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "remote/ViewLanes.h"
+#include "remote/wire/EffectLane.h"
+#include "server/EffectOpEncoder.h"
+#include "server/EffectOpRouter.h"
+
+namespace faf::server
+{
+  class CEffectOpRecorder;
+}
 
 // Engine addition, server mode (plan WP16.5, WPR.35): headless's `--view-bench <file>`. Run
 // unfocused, every beat it does the work a dedicated server does for its players and nothing a
@@ -73,6 +83,13 @@ namespace faf::headless
     {
       mLuaResyncs.push_back({beat, view, 0});
     }
+    /**
+     * Plan WP9.2, `--view-effects`, before the first beat: the sim's effect ops are recorded (this sets
+     * `gEffectOpHook`) and each view's effects lane is written both ways, routed (server/EffectOpRouter.h) and with
+     * every op, and counted; each routed lane is read back as its client would, counting ops on effects it doesn't
+     * hold.
+     */
+    void EnableEffects();
     [[nodiscard]] std::string Summary() const;
     /** Lanes that did not encode, and what the check found (should stay 0). */
     [[nodiscard]] std::uint64_t Failures() const noexcept;
@@ -82,6 +99,7 @@ namespace faf::headless
     void OnViewsFinished() override;
     void OnLuaRouterMade(remote::CSyncRouter& router) override;
     void OnLuaRouterBeat(moho::Sim& sim, remote::CSyncRouter& router) override;
+    void OnLanesEncoded(std::size_t army, const SLanes& lanes) override;
 
   private:
     /** One beat's measurements. */
@@ -117,5 +135,32 @@ namespace faf::headless
     std::vector<SLuaTestStep> mLuaResyncs;
     bool mLuaSpyOn = false;
     std::unique_ptr<CReplaySyncSpy> mSyncSpy;
+    // `EnableEffects`: the beat's ops (written on the sim thread before the views) and each view's two lanes.
+    static constexpr std::size_t kEffectKinds = static_cast<std::size_t>(moho::EEffectOp::Count);
+    struct SEffectView
+    {
+      server::CEffectViewRoute route;
+      server::CEffectLaneNames all;
+      remote::wire::CEffectLaneReader reader;
+      std::vector<remote::wire::SEffectLaneOp> ops;
+      std::vector<std::uint8_t> lane;
+      std::unordered_map<std::uint32_t, std::int32_t> held; // the effects its client holds: id -> entity
+      std::uint64_t routedBytes = 0;
+      std::uint64_t allBytes = 0;
+      std::uint64_t allOps = 0;
+      std::uint32_t routedMax = 0;
+      std::uint32_t allMax = 0;
+      std::uint64_t unknown = 0; // ops on an effect its client doesn't hold
+      std::uint64_t failed = 0;  // routed lanes that didn't read back
+      std::uint64_t beats = 0;
+      std::array<std::uint64_t, kEffectKinds> kinds{}; // routed ops it read back, by `EEffectOp`
+      // Beams between two entities at their create: neither end held, the first only, the second only, both.
+      std::array<std::uint64_t, 4> beamEnds{};
+    };
+    std::unique_ptr<server::CEffectOpRecorder> mEffectRecorder;
+    std::unique_ptr<server::CEffectRoutes> mEffectRoutes;
+    server::SEffectBeat mEffectBeat;
+    std::vector<SEffectView> mEffectViews;                  // by army
+    std::array<std::uint64_t, kEffectKinds> mEffectKinds{}; // every op, by `EEffectOp`, once
   };
 } // namespace faf::headless

@@ -116,7 +116,8 @@ namespace
     "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] "
     "[--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view "
     "observe|disconnect] [--lobby-seconds <n> [--start-when-ready <seconds>]] [--lobby-away-seconds <n>] "
-    "[--stats-every <beats>] [--pose-budget-kbps <n>] [--no-effect-ops] [--congestion-control] [--nftables-out <file> "
+    "[--stats-every <beats>] [--pose-budget-kbps <n>] [--no-effect-ops | --effect-ops-all] [--congestion-control] "
+    "[--nftables-out <file> "
     "[--nftables-only] "
     "[--unlisted-pps <n>] [--unlisted-total-pps <n>]] [--unvalidated-policy] "
     "[--control <ip:port> --control-key <file>] [--rest <ip:port> --rest-token-file <file> [--rest-cors-origin "
@@ -2389,9 +2390,15 @@ namespace
           }
         });
       }
-      // Plan WP9.1 step 3: the sim's effect operations go in every player's view as its effects lane.
+      // Plan WP9.1 step 3: the sim's effect operations go in every player's view as its effects lane; plan WP9.2: each
+      // view gets those its client can place, or with `--effect-ops-all` every op (to compare).
       if (!moho::CFG_GetArgOption("--no-effect-ops", 0, nullptr)) {
-        views->EnableEffectOps();
+        const bool all = moho::CFG_GetArgOption("--effect-ops-all", 0, nullptr);
+        views->EnableEffectOps(!all);
+        Say(
+          "Effects lane: %s",
+          all ? "every op to every player (--effect-ops-all)" : "routed to the players who can place them"
+        );
       }
       views->Install();
       Say(

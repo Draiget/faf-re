@@ -4,6 +4,7 @@
 
 #include "moho/entity/EVisibilityModeTypeInfo.h"
 #include "moho/entity/Entity.h"
+#include "moho/entity/EntityDb.h"
 #include "moho/math/GridPos.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/STIMap.h"
@@ -339,7 +340,46 @@ namespace faf::remote
     moho::Entity& entity
   )
   {
-    const SEntityFacts facts = ReadEntityFacts(entity);
+    return ViewShowsMesh(sim, viewArmy, entity, ReadEntityFacts(entity));
+  }
+
+  std::uint32_t ViewsShowingUnitBlips(
+    const moho::Sim& sim,
+    const std::uint32_t views,
+    const std::uint32_t unitId
+  )
+  {
+    moho::Entity* const entity = sim.mEntityDB != nullptr ? sim.mEntityDB->FindEntityById(unitId) : nullptr;
+    moho::Unit* const unit = entity != nullptr ? entity->IsUnit() : nullptr;
+    if (unit == nullptr) {
+      return 0u;
+    }
+    std::uint32_t shown = 0u;
+    for (moho::ReconBlip* const blip : unit->mReconBlips) {
+      if (blip == nullptr) {
+        continue;
+      }
+      const SEntityFacts facts = ReadEntityFacts(*blip); // once for every view
+      for (std::uint32_t army = 0; army < 32u; ++army) {
+        const std::uint32_t bit = std::uint32_t{1} << army;
+        if (
+          (views & bit) != 0u && (shown & bit) == 0u &&
+          ViewShowsMesh(sim, static_cast<std::int32_t>(army), *blip, facts)
+        ) {
+          shown |= bit;
+        }
+      }
+    }
+    return shown;
+  }
+
+  bool ViewShowsMesh(
+    const moho::Sim& sim,
+    const std::int32_t viewArmy,
+    moho::Entity& entity,
+    const SEntityFacts& facts
+  )
+  {
     const SViewVisibility visibility = ResolveViewVisibility(sim, viewArmy, facts);
     if (!visibility.published) {
       return false;

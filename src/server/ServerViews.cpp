@@ -14,6 +14,7 @@
 #include "remote/net/Datagram.h"
 #include "remote/net/GameLinks.h"
 #include "remote/SyncRouting.h"
+#include "remote/VisibilityOracle.h"
 #include "remote/wire/BitStream.h"
 #include "remote/wire/LuaSyncLane.h"
 #include "server/EffectOpRecorder.h"
@@ -78,6 +79,7 @@ namespace faf::server
       mNet.Intake().SetArmy(uid, static_cast<std::int32_t>(army));
     }
     SetViewArmies(mViewMask);
+    mPlayerViews = mViewMask;
     EnableHeldFrames(false);
     SetParallel(true);
     EnablePipeline(threads);
@@ -104,10 +106,15 @@ namespace faf::server
     mInstalled = true;
   }
 
-  void CServerViews::EnableEffectOps()
+  void CServerViews::EnableEffectOps(
+    const bool route
+  )
   {
     if (mEffects) {
       return;
+    }
+    if (route) {
+      mEffectRoutes = std::make_unique<CEffectRoutes>();
     }
     for (const auto& [army, uid] : mPlayers) {
       mEffectReceivers.try_emplace(army);
@@ -140,7 +147,7 @@ namespace faf::server
     const CEffectOpEncoder& encoder = mEffects->Encoder();
     std::uint64_t namesSent = 0;
     for (const auto& [army, receiver] : mEffectReceivers) {
-      namesSent += receiver.names.NamesSent();
+      namesSent += receiver.names.NamesSent() + receiver.route.Names().NamesSent();
     }
     char line[512];
     std::snprintf(
@@ -164,7 +171,40 @@ namespace faf::server
       encoder.BlueprintNames(),
       encoder.TextureNames()
     );
-    return line;
+    std::string report = line;
+    if (!mEffectRoutes) {
+      return report + "\neffects routing: off (--effect-ops-all), every player gets every op";
+    }
+    // Plan WP9.2: what each player's view was sent of them.
+    for (const auto& [army, receiver] : mEffectReceivers) {
+      const CEffectViewRoute& route = receiver.route;
+      std::snprintf(
+        line,
+        sizeof(line),
+        "\neffects routing, army index %zu: %llu ops (%llu KB), %llu lights; %llu creates held at their beat, %llu "
+        "effects sent whole later, %llu dropped with their entity",
+        army,
+        static_cast<unsigned long long>(route.OpsSent()),
+        static_cast<unsigned long long>(receiver.bytes / 1024u),
+        static_cast<unsigned long long>(route.Lights()),
+        static_cast<unsigned long long>(route.Held()),
+        static_cast<unsigned long long>(route.Released()),
+        static_cast<unsigned long long>(route.Withdrawn())
+      );
+      report += line;
+    }
+    std::snprintf(
+      line,
+      sizeof(line),
+      "\neffects routing: %llu effects ended without reaching a player (summed over the players), %zu live at the "
+      "end (%zu kept, %.1f KB), %llu creates past the cap not kept",
+      static_cast<unsigned long long>(mEffectRoutes->Dropped()),
+      mEffectRoutes->Live(),
+      mEffectRoutes->Kept(),
+      static_cast<double>(mEffectRoutes->KeptBytes()) / 1024.0,
+      static_cast<unsigned long long>(mEffectRoutes->NotKept())
+    );
+    return report + line;
   }
 
   void CServerViews::OnBeatStarting()
@@ -235,11 +275,21 @@ namespace faf::server
       // Plan WP9.1 step 3: the seventh, the beat's effect ops (remote/wire/EffectLane.h). It needs the pose lane before
       // it, which the server always sends; a client that doesn't know it skips it.
       if (const auto receiver = mEffectReceivers.find(army); mEffects && receiver != mEffectReceivers.end()) {
-        if (lanes.fresh) {
-          receiver->second.names.Reset(); // its client holds nothing: the names its ops need go again
-        }
         std::vector<std::uint8_t>& lane = receiver->second.lane;
-        receiver->second.names.Write(mEffectBeat, lane);
+        if (mEffectRoutes) {
+          // Plan WP9.2: the effects whose place this client holds (its frame and its team's, as just encoded).
+          receiver->second.route.Write(
+            mEffectBeat, *mEffectRoutes, army, lanes.fresh, [this, army](const std::int32_t entity, const bool orLeft) {
+            return ViewHoldsEntityNow(army, static_cast<std::uint32_t>(entity), orLeft);
+          }, lane
+          );
+        } else {
+          if (lanes.fresh) {
+            receiver->second.names.Reset(); // its client holds nothing: the names its ops need go again
+          }
+          receiver->second.names.Write(mEffectBeat, lane);
+        }
+        receiver->second.bytes += lane.size();
         writer.Varint(lane.size());
         writer.Bytes(lane.data(), lane.size());
         mEffectBytes.fetch_add(lane.size(), std::memory_order_relaxed);
@@ -280,6 +330,29 @@ namespace faf::server
       mEffectOpsTaken += mEffectBeat.opCount;
       mEffectOpBytes += mEffectBeat.ops.size();
       mEffectMaxBeatBytes = std::max(mEffectMaxBeatBytes, static_cast<std::uint32_t>(mEffectBeat.ops.size()));
+      if (mEffectRoutes) {
+        // Plan WP9.2: the live effects and the beat's lights, with the sight of each player's army as the sim has it
+        // now (the frames' own test for a point, `ViewCanSeePoint`). A player watching everything sees every point.
+        std::uint32_t watching = 0u;
+        for (const auto& [army, uid] : mPlayers) {
+          if (army < 32u && WatchesEverything(army)) {
+            watching |= std::uint32_t{1} << army;
+          }
+        }
+        mEffectRoutes->TakeBeat(mEffectBeat, mPlayerViews, watching, [this, &sim](const std::array<float, 3>& at) {
+          std::uint32_t views = 0u;
+          const Wm3::Vec3f point(at[0], at[1], at[2]);
+          for (const auto& [army, uid] : mPlayers) {
+            if (army < 32u && remote::ViewCanSeePoint(sim, static_cast<std::int32_t>(army), point, false)) {
+              views |= std::uint32_t{1} << army;
+            }
+          }
+          return views;
+        }, [this, &sim](const std::int32_t entity) {
+          // Another army's unit: those who draw its blip (a unit is published to its own army only).
+          return remote::ViewsShowingUnitBlips(sim, mPlayerViews, static_cast<std::uint32_t>(entity));
+        });
+      }
     }
     // The builders are done with the beat (they interned what the frames name); its views go out after this.
     if (mSessionTables.HasPending()) {

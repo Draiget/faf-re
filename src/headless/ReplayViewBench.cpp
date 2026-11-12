@@ -1,9 +1,13 @@
 #include "headless/ReplayViewBench.h"
 
 #include <algorithm>
+#include <array>
+#include <iterator>
 
 #include "headless/ReplaySyncSpy.h"
 #include "moho/sim/Sim.h"
+#include "remote/VisibilityOracle.h"
+#include "server/EffectOpRecorder.h"
 
 // Engine addition, server mode: see ReplayViewBench.h.
 
@@ -92,6 +96,90 @@ namespace faf::headless
     (void)FinishViews();
     UninstallRouting();
     moho::Sim::SetSyncObserver(nullptr);
+    if (mEffectRecorder) {
+      moho::gEffectOpHook = nullptr;
+      mEffectRecorder->Detach();
+    }
+  }
+
+  void CReplayViewBench::EnableEffects()
+  {
+    mEffectRecorder = std::make_unique<server::CEffectOpRecorder>();
+    mEffectRoutes = std::make_unique<server::CEffectRoutes>();
+    mEffectRecorder->Attach();
+    moho::gEffectOpHook = &server::CEffectOpRecorder::Hook;
+  }
+
+  void CReplayViewBench::OnLanesEncoded(
+    const std::size_t army,
+    const SLanes& lanes
+  )
+  {
+    // On the view's own job (a worker or a pipeline thread): its two lanes, and its routed one read back.
+    if (!mEffectRoutes || army >= mEffectViews.size() || army >= 32u) {
+      return;
+    }
+    SEffectView& view = mEffectViews[army];
+    ++view.beats;
+    view.all.Write(mEffectBeat, view.lane);
+    view.allBytes += view.lane.size();
+    view.allOps += mEffectBeat.opCount;
+    view.allMax = std::max(view.allMax, static_cast<std::uint32_t>(view.lane.size()));
+    const auto holds = [this, army](const std::int32_t entity, const bool orLeft) {
+      return ViewHoldsEntityNow(army, static_cast<std::uint32_t>(entity), orLeft);
+    };
+    // Beams between two entities made this beat: which ends this view's client holds, as a record or through a blip
+    // (the far end of a build beam is a script-made entity with no army).
+    const std::uint32_t bit = std::uint32_t{1} << army;
+    for (const server::SEffectBeatOp& op : mEffectBeat.list) {
+      if (op.op == moho::EEffectOp::AttachBeamEntityToEntity || op.op == moho::EEffectOp::CreateBeamEntityToEntity) {
+        const server::CEffectRoutes::SLive* const live = mEffectRoutes->Find(op.id);
+        const bool first =
+          op.entity >= 0 && ((live != nullptr && (live->shown & bit) != 0u) || holds(op.entity, false));
+        const bool second =
+          op.entity2 >= 0 && ((live != nullptr && (live->shown2 & bit) != 0u) || holds(op.entity2, false));
+        ++view.beamEnds[(first ? 1u : 0u) + (second ? 2u : 0u)];
+      }
+    }
+    view.route.Write(mEffectBeat, *mEffectRoutes, army, lanes.fresh, holds, view.lane);
+    view.routedBytes += view.lane.size();
+    view.routedMax = std::max(view.routedMax, static_cast<std::uint32_t>(view.lane.size()));
+    if (!view.reader.Read(view.lane, view.ops)) {
+      ++view.failed;
+      return;
+    }
+    // As a client: it keeps the effects it is sent and drops one whose entity it no longer holds.
+    for (const remote::wire::SEffectLaneOp& op : view.ops) {
+      ++view.kinds[static_cast<std::size_t>(op.op) % view.kinds.size()];
+      if (op.op == moho::EEffectOp::CreateLightParticle) {
+        continue;
+      }
+      if (op.op < moho::EEffectOp::CreateLightParticle) {
+        // An emitter placed at an entity or a bone doesn't follow it, so it stays when the entity goes.
+        const bool placed =
+          op.op == moho::EEffectOp::CreateEmitterAtBone || op.op == moho::EEffectOp::CreateEmitterAtEntity;
+        view.held[op.id] = placed ? -1 : op.entity;
+        continue;
+      }
+      const auto found = view.held.find(op.id);
+      if (found == view.held.end()) {
+        ++view.unknown;
+      } else if (op.op == moho::EEffectOp::SetEntity || op.op == moho::EEffectOp::SetBone) {
+        found->second = op.entity;
+      } else if (op.op == moho::EEffectOp::DestroyByScript) {
+        view.held.erase(found);
+      }
+    }
+    for (const std::uint32_t id : mEffectBeat.ended) {
+      view.held.erase(id); // its client derives the end
+    }
+    for (auto it = view.held.begin(); it != view.held.end();) {
+      // Held as a record, or another army's unit drawn through its blip.
+      const server::CEffectRoutes::SLive* const live = mEffectRoutes->Find(it->first);
+      const bool shown = live != nullptr && (live->shown & (std::uint32_t{1} << army)) != 0u;
+      const bool lost = it->second >= 0 && !shown && !holds(it->second, false);
+      it = lost ? view.held.erase(it) : std::next(it);
+    }
   }
 
   void CReplayViewBench::OnViewFrames(
@@ -99,6 +187,35 @@ namespace faf::headless
   )
   {
     const auto sendStart = std::chrono::steady_clock::now();
+    if (mEffectRoutes) {
+      // As a server's `CServerViews::OnViewFrames`: the beat's ops, the live effects and each army's sight of a point.
+      mEffectBeat = mEffectRecorder->EndBeat();
+      for (const server::SEffectBeatOp& op : mEffectBeat.list) {
+        ++mEffectKinds[static_cast<std::size_t>(op.op) % mEffectKinds.size()];
+      }
+      const auto armyCount = static_cast<std::size_t>(ArmyCount());
+      if (mEffectViews.size() < armyCount) {
+        mEffectViews = std::vector<SEffectView>(armyCount);
+      }
+      std::uint32_t views = 0u;
+      for (std::size_t army = 0; army < armyCount && army < 32u; ++army) {
+        views |= HasView(static_cast<std::int32_t>(army)) ? std::uint32_t{1} << army : 0u;
+      }
+      mEffectRoutes->TakeBeat(mEffectBeat, views, 0u, [&sim, views](const std::array<float, 3>& at) {
+        std::uint32_t seeing = 0u;
+        const Wm3::Vec3f point(at[0], at[1], at[2]);
+        for (std::size_t army = 0; army < 32u; ++army) {
+          if (
+            ((views >> army) & 1u) != 0u && remote::ViewCanSeePoint(sim, static_cast<std::int32_t>(army), point, false)
+          ) {
+            seeing |= std::uint32_t{1} << army;
+          }
+        }
+        return seeing;
+      }, [&sim, views](const std::int32_t entity) {
+        return remote::ViewsShowingUnitBlips(sim, views, static_cast<std::uint32_t>(entity));
+      });
+    }
     if (mSessionTables.HasPending()) {
       // As a server's `CServerViews::OnViewFrames`: the beat's record, before the views.
       remote::wire::BitWriter record;
@@ -211,7 +328,7 @@ namespace faf::headless
       perSecond.push_back(static_cast<double>(bytes) * 10.0);
     }
     std::string summary;
-    char text[200];
+    char text[320];
     std::snprintf(
       text,
       sizeof(text),
@@ -290,6 +407,106 @@ namespace faf::headless
     if (mSyncSpy != nullptr) {
       summary += "\n  ";
       summary += mSyncSpy->Summary();
+    }
+    if (mEffectRoutes) {
+      // Plan WP9.2: each view's effects lane, KB/s at 10 beats a second, with every op against routed.
+      std::uint64_t allBytes = 0;
+      std::uint64_t routedBytes = 0;
+      std::uint64_t viewBeats = 0;
+      for (std::size_t army = 0; army < mEffectViews.size(); ++army) {
+        const SEffectView& view = mEffectViews[army];
+        if (view.beats == 0u) {
+          continue;
+        }
+        allBytes += view.allBytes;
+        routedBytes += view.routedBytes;
+        viewBeats += view.beats;
+        const double perSecond = 10.0 / 1024.0 / static_cast<double>(view.beats);
+        std::snprintf(
+          text,
+          sizeof(text),
+          "\n  effects view %zu: all %.2f KB/s (%llu ops, most %u B), routed %.2f KB/s (%llu ops, most %u B), %llu "
+          "lights, ",
+          army,
+          static_cast<double>(view.allBytes) * perSecond,
+          static_cast<unsigned long long>(view.allOps),
+          view.allMax,
+          static_cast<double>(view.routedBytes) * perSecond,
+          static_cast<unsigned long long>(view.route.OpsSent()),
+          view.routedMax,
+          static_cast<unsigned long long>(view.route.Lights())
+        );
+        summary += text;
+        std::snprintf(
+          text,
+          sizeof(text),
+          "%llu held, %llu sent whole later, %llu dropped with their entity, %llu ops on unknown effects, %llu lanes "
+          "didn't read",
+          static_cast<unsigned long long>(view.route.Held()),
+          static_cast<unsigned long long>(view.route.Released()),
+          static_cast<unsigned long long>(view.route.Withdrawn()),
+          static_cast<unsigned long long>(view.unknown),
+          static_cast<unsigned long long>(view.failed)
+        );
+        summary += text;
+      }
+      std::snprintf(
+        text,
+        sizeof(text),
+        "\n  effects: a view's lane %.2f KB/s with every op, %.2f routed (%.1f %%); %llu effects ended without "
+        "reaching "
+        "a view (summed over views), %zu live at the end, %.1f KB kept",
+        viewBeats != 0u ? static_cast<double>(allBytes) * 10.0 / 1024.0 / static_cast<double>(viewBeats) : 0.0,
+        viewBeats != 0u ? static_cast<double>(routedBytes) * 10.0 / 1024.0 / static_cast<double>(viewBeats) : 0.0,
+        allBytes != 0u ? 100.0 * static_cast<double>(routedBytes) / static_cast<double>(allBytes) : 0.0,
+        static_cast<unsigned long long>(mEffectRoutes->Dropped()),
+        mEffectRoutes->Live(),
+        static_cast<double>(mEffectRoutes->KeptBytes()) / 1024.0
+      );
+      summary += text;
+      // Per op kind: the ops the views got routed (summed over them) against every op times the views.
+      std::size_t views = 0;
+      std::array<std::uint64_t, kEffectKinds> routedKinds{};
+      for (const SEffectView& view : mEffectViews) {
+        views += view.beats != 0u ? 1u : 0u;
+        for (std::size_t kind = 0; kind < kEffectKinds; ++kind) {
+          routedKinds[kind] += view.kinds[kind];
+        }
+      }
+      std::array<std::uint64_t, 4> beamEnds{};
+      for (const SEffectView& view : mEffectViews) {
+        for (std::size_t i = 0; i < beamEnds.size(); ++i) {
+          beamEnds[i] += view.beamEnds[i];
+        }
+      }
+      std::snprintf(
+        text,
+        sizeof(text),
+        "\n  effects: beams between two entities at their create, summed over the views: both ends held %llu, only the "
+        "first %llu, only the second %llu, neither %llu",
+        static_cast<unsigned long long>(beamEnds[3]),
+        static_cast<unsigned long long>(beamEnds[1]),
+        static_cast<unsigned long long>(beamEnds[2]),
+        static_cast<unsigned long long>(beamEnds[0])
+      );
+      summary += text;
+      summary += "\n  effects by kind, routed / every op (summed over the views):";
+      for (std::size_t kind = 0; kind < kEffectKinds; ++kind) {
+        if (mEffectKinds[kind] == 0u) {
+          continue;
+        }
+        const std::uint64_t all = mEffectKinds[kind] * views;
+        std::snprintf(
+          text,
+          sizeof(text),
+          " %s %llu / %llu (%.1f %%);",
+          moho::EffectOpName(static_cast<moho::EEffectOp>(kind)),
+          static_cast<unsigned long long>(routedKinds[kind]),
+          static_cast<unsigned long long>(all),
+          all != 0u ? 100.0 * static_cast<double>(routedKinds[kind]) / static_cast<double>(all) : 0.0
+        );
+        summary += text;
+      }
     }
     return summary;
   }

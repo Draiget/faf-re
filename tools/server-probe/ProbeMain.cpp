@@ -27,6 +27,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <unordered_set>
 #include <vector>
 
 #include "ProbeRebuild.h"
@@ -641,6 +642,12 @@ namespace
     std::uint64_t effectMaxLane = 0;
     std::uint64_t effectFailed = 0;
     std::uint64_t lanesSkipped = 0; // past the effects lane: a newer server's
+    // Plan WP9.2: the effects this client holds (created, not destroyed by script; cleared by a whole view), and ops
+    // that came for one it doesn't hold (routing must make that 0), and creates of one it held already (sent whole
+    // again after its entity left the view and came back).
+    std::unordered_set<std::uint32_t> effectIds;
+    std::uint64_t effectUnknown = 0;
+    std::uint64_t effectRecreated = 0;
     double beatMs = 0.0;
     double lateBase = 0.0; // the seconds at which beat 0 would have come
     bool haveLateBase = false;
@@ -771,11 +778,27 @@ namespace
     if (ok) {
       out.effectBytes += effectLane.size();
       out.effectMaxLane = std::max<std::uint64_t>(out.effectMaxLane, effectLane.size());
+      if (
+        faf::remote::wire::PeekFrameBaseline(std::span<const std::uint8_t>(frame, frameSize)) ==
+        faf::remote::wire::kNoBaseline
+      ) {
+        out.effectIds.clear(); // a whole view: the server takes this client to hold no effect
+      }
       if (out.effects.Read(effectLane, out.effectOps)) {
         out.effectLanes += out.effectOps.empty() ? 0u : 1u;
         out.effectOpCount += out.effectOps.size();
         for (const faf::remote::wire::SEffectLaneOp& op : out.effectOps) {
           ++out.effectOpsByKind[static_cast<std::size_t>(op.op)];
+          if (op.op == moho::EEffectOp::CreateLightParticle) {
+            continue;
+          }
+          if (op.op < moho::EEffectOp::CreateLightParticle) {
+            out.effectRecreated += out.effectIds.insert(op.id).second ? 0u : 1u;
+          } else if (!out.effectIds.contains(op.id)) {
+            ++out.effectUnknown;
+          } else if (op.op == moho::EEffectOp::DestroyByScript) {
+            out.effectIds.erase(op.id);
+          }
         }
       } else {
         if (out.effectFailed < 3u) {
@@ -2138,7 +2161,7 @@ int main(
     std::printf(
       "probe %d: effects: %llu ops in %llu of %llu views (%.1f a view), %llu bytes (%.1f a view, the most %llu), %.2f "
       "KB/s, %.2f KB/s at 10 beats a second, %llu names taken, %llu references to names not held, %llu lanes didn't "
-      "decode, %llu later lanes skipped; %s\n",
+      "decode, %llu later lanes skipped, %llu ops on unknown effects, %llu effects created again; %s\n",
       options.uid,
       static_cast<unsigned long long>(views.effectOpCount),
       static_cast<unsigned long long>(views.effectLanes),
@@ -2153,6 +2176,8 @@ int main(
       static_cast<unsigned long long>(views.effects.UnknownNames()),
       static_cast<unsigned long long>(views.effectFailed),
       static_cast<unsigned long long>(views.lanesSkipped),
+      static_cast<unsigned long long>(views.effectUnknown),
+      static_cast<unsigned long long>(views.effectRecreated),
       kinds.empty() ? "no ops" : kinds.c_str()
     );
   }

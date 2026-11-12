@@ -670,6 +670,13 @@ namespace faf::headless
       if (options.viewPoses) {
         viewBench->EnablePoses();
       }
+      if (options.viewEffects) {
+        if (!options.effectOpsPath.empty() || !options.effectRecordPath.empty()) {
+          result.error = "--view-effects records the effect ops itself: not with --effect-ops or --effect-record";
+          return result;
+        }
+        viewBench->EnableEffects();
+      }
       if (options.viewTables) {
         viewBench->EnableBenchTables();
         if (options.statsEvery > 0) {

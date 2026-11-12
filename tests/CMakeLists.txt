@@ -93,8 +93,9 @@ set_tests_properties(effect_scan PROPERTIES LABELS "Existing")
 
 # Engine addition (dedicated-server plan WP9.1): the server's encoder of the sim's effect operations, its per-view
 # effects lane and the lane's reader.
-add_executable(faf_effect_op_encoder_tests EXCLUDE_FROM_ALL server/EffectOpEncoderTests.cpp
-  ${CMAKE_SOURCE_DIR}/src/server/EffectOpEncoder.cpp ${CMAKE_SOURCE_DIR}/src/remote/wire/EffectLane.cpp)
+add_executable(faf_effect_op_encoder_tests EXCLUDE_FROM_ALL server/EffectOpEncoderTests.cpp server/EffectOpRouterTests.cpp
+  ${CMAKE_SOURCE_DIR}/src/server/EffectOpEncoder.cpp ${CMAKE_SOURCE_DIR}/src/server/EffectOpRouter.cpp
+  ${CMAKE_SOURCE_DIR}/src/remote/wire/EffectLane.cpp)
 target_include_directories(faf_effect_op_encoder_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(faf_effect_op_encoder_tests PRIVATE gtest_main)
 set_target_properties(faf_effect_op_encoder_tests PROPERTIES FOLDER "Tests/Headless")

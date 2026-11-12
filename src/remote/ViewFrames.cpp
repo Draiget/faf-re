@@ -312,6 +312,7 @@ namespace faf::remote
     }
     held.candidates.clear();
     held.removed.clear();
+    held.removedSim.clear();
     held.created.clear();
     held.changed.clear();
     held.before.clear();
@@ -346,6 +347,7 @@ namespace faf::remote
       if (held.sent[erased.slot] != 0u) {
         const std::uint32_t own = held.ownSlot[erased.slot];
         held.removed.push_back(own != kNoOwn ? held.own[own].id : erased.id);
+        held.removedSim.push_back(erased.id);
         dropOwn(erased.slot);
         held.sent[erased.slot] = 0u;
         --held.count;
@@ -450,6 +452,7 @@ namespace faf::remote
       if (held.keep[slot] == 0u) {
         if (wasSent) {
           held.removed.push_back(own != kNoOwn ? held.own[own].id : world.id);
+          held.removedSim.push_back(world.id);
           dropOwn(slot);
           held.sent[slot] = 0u;
           --held.count;
@@ -513,6 +516,7 @@ namespace faf::remote
       builder.UnwatchRecord(slot);
     }
     std::sort(held.removed.begin(), held.removed.end());
+    std::sort(held.removedSim.begin(), held.removedSim.end());
     for (const std::uint32_t id : held.removed) {
       held.recentlyGone.emplace_back(held.beat, id);
     }
@@ -681,7 +685,8 @@ namespace faf::remote
 
   bool CViewFrames::SlotHoldsEntity(
     const std::size_t slot,
-    const std::uint32_t id
+    const std::uint32_t id,
+    const EHeld since
   ) const
   {
     if (slot >= mHeld.size()) {
@@ -691,6 +696,14 @@ namespace faf::remote
     std::uint32_t found = 0;
     if (mBuilders[slot]->FindSlot(id, found) && found < held.sent.size() && held.sent[found] != 0u) {
       return true;
+    }
+    switch (since) {
+    case EHeld::Now:
+      return false;
+    case EHeld::ThisBeat:
+      return std::binary_search(held.removedSim.begin(), held.removedSim.end(), id); // sorted by `FinishFrame`
+    case EHeld::Lately:
+      break;
     }
     return std::any_of(held.recentlyGone.begin(), held.recentlyGone.end(), [id](const auto& gone) {
       return gone.second == id;
@@ -790,8 +803,19 @@ namespace faf::remote
     const std::uint32_t id
   ) const
   {
-    return SlotHoldsEntity(army, id) ||
-      (TeamSlotOf(army) != army && !CutFromTeam(army) && SlotHoldsEntity(TeamSlotOf(army), id));
+    return SlotHoldsEntity(army, id, EHeld::Lately) ||
+      (TeamSlotOf(army) != army && !CutFromTeam(army) && SlotHoldsEntity(TeamSlotOf(army), id, EHeld::Lately));
+  }
+
+  bool CViewFrames::ViewHoldsEntityNow(
+    const std::size_t army,
+    const std::uint32_t id,
+    const bool orLeftThisBeat
+  ) const
+  {
+    const EHeld since = orLeftThisBeat ? EHeld::ThisBeat : EHeld::Now;
+    return SlotHoldsEntity(army, id, since) ||
+      (TeamSlotOf(army) != army && !CutFromTeam(army) && SlotHoldsEntity(TeamSlotOf(army), id, since));
   }
 
   CViewIdMap::OwnCommandTest CViewFrames::OwnCommands(

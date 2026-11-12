@@ -237,6 +237,12 @@ namespace faf::remote
      * id, or held one within `CViewIdMap::kInboundGraceBeats` (its order may be on its way).
      */
     [[nodiscard]] bool ViewHoldsEntity(std::size_t army, std::uint32_t id) const;
+    /**
+     * Plan WP9.2: whether `army`'s client holds a record with this (sim) id after its last frame, without the grace;
+     * `orLeftThisBeat`: or held it until that frame removed it. Between a beat's views, or from `army`'s own
+     * `OnViewReady` (its frame and its team's are done by then).
+     */
+    [[nodiscard]] bool ViewHoldsEntityNow(std::size_t army, std::uint32_t id, bool orLeftThisBeat = false) const;
     /** `simId` as `view`'s client knows it, for an id written outside its frames (plan WP6.10). */
     [[nodiscard]] std::uint32_t ViewEntityId(std::size_t view, std::uint32_t simId);
     /** Differences the check found (should stay 0). */
@@ -325,6 +331,7 @@ namespace faf::remote
       std::uint32_t beat = 0;
       std::vector<std::uint32_t> candidates;
       std::vector<std::uint32_t> removed;
+      std::vector<std::uint32_t> removedSim; // the same records by sim id (plan WP9.2), sorted once the beat is done
       std::deque<std::pair<std::uint32_t, std::uint32_t>> recentlyGone; // beat, id; oldest first
       std::vector<const wire::SEntityRecord*> created;
       std::vector<wire::SFrameChange> changed;
@@ -350,8 +357,15 @@ namespace faf::remote
     void FinishFrame(std::size_t army);
     /** Writes `--view-dump`'s sample. */
     void DumpViews();
-    /** Whether a slot's client holds a record now, or held one lately. */
-    [[nodiscard]] bool SlotHoldsEntity(std::size_t slot, std::uint32_t id) const;
+    /** How far back `SlotHoldsEntity` looks: now, or also a record its last frame removed, or one removed lately. */
+    enum class EHeld : std::uint8_t
+    {
+      Now,
+      ThisBeat,
+      Lately
+    };
+    /** Whether a slot's client holds a record now, or held one as `since` says. */
+    [[nodiscard]] bool SlotHoldsEntity(std::size_t slot, std::uint32_t id, EHeld since) const;
     /** A view's own-command test: the commands of its army, or with teams its whole team's. */
     [[nodiscard]] CViewIdMap::OwnCommandTest OwnCommands(std::size_t slot) const;
     /** Compares the held frame with the whole frame built from the same world. */

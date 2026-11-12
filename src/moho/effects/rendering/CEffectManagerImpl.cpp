@@ -771,7 +771,8 @@ namespace moho
        .texture = texturePrimary.c_str(),
        .texture2 = textureSecondary.c_str(),
        .values = lightValues,
-       .valueCount = 5}
+       .valueCount = 5,
+       .armies = tEffectOpLightArmies}
     );
 
     const fa::string rampPath = BuildParticleTexturePath(textureSecondary, nullptr);

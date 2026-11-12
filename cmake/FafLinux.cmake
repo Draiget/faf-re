@@ -355,6 +355,7 @@ add_executable(server
   "${PROJECT_SOURCE_DIR}/src/server/ServerNet.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/ServerViews.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/EffectOpEncoder.cpp"
+  "${PROJECT_SOURCE_DIR}/src/server/EffectOpRouter.cpp"
   "${PROJECT_SOURCE_DIR}/src/server/EffectOpRecorder.cpp"
   "${PROJECT_SOURCE_DIR}/src/headless/SessionLoad.cpp"
   "${PROJECT_SOURCE_DIR}/src/headless/ReplayLuaState.cpp"
@@ -493,7 +494,8 @@ _faf_linux_portable_test(faf_shadow_fit_tests shadow_stable_fit tests/render/Sha
 _faf_linux_portable_test(faf_scripted_decal_tests scripted_decal_placement tests/scripted_decal/PlacementTests.cpp)
 _faf_linux_portable_test(faf_effect_scan_tests effect_scan tests/effect_scan/EffectScanTests.cpp)
 _faf_linux_portable_test(faf_effect_op_encoder_tests effect_op_encoder
-  tests/server/EffectOpEncoderTests.cpp src/server/EffectOpEncoder.cpp src/remote/wire/EffectLane.cpp)
+  tests/server/EffectOpEncoderTests.cpp tests/server/EffectOpRouterTests.cpp src/server/EffectOpEncoder.cpp
+  src/server/EffectOpRouter.cpp src/remote/wire/EffectLane.cpp)
 _faf_linux_portable_test(faf_texture_quality_tests texture_quality tests/image_codec/TextureQualityTests.cpp)
 _faf_linux_portable_test(faf_profiler_tests profiler_facade tests/profiling/ProfilerFacadeTests.cpp)
 _faf_linux_portable_test(faf_sfd_parser_tests sfd_header_parser

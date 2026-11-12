@@ -131,4 +131,14 @@ namespace faf::remote
    * (plan WP4.4) compares with a client's display.
    */
   [[nodiscard]] bool ViewShowsMesh(const moho::Sim& sim, std::int32_t viewArmy, moho::Entity& entity);
+  /** `ViewShowsMesh` with `entity`'s facts read this beat. */
+  [[nodiscard]] bool
+  ViewShowsMesh(const moho::Sim& sim, std::int32_t viewArmy, moho::Entity& entity, const SEntityFacts& facts);
+
+  /**
+   * Plan WP9.2: of `views` (bit n: army n's view), those whose client draws the unit with this sim id through one of
+   * its recon blips (`ViewShowsMesh` on the blip): how another army's client, allies' included, sees a unit, since the
+   * sim publishes a unit to its own army only. 0 for an id that isn't a unit.
+   */
+  [[nodiscard]] std::uint32_t ViewsShowingUnitBlips(const moho::Sim& sim, std::uint32_t views, std::uint32_t unitId);
 } // namespace faf::remote
