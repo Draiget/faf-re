@@ -13,7 +13,7 @@
 #include <cstring>
 #include <cwchar>
 #include <new>
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
 #include <pthread.h>
 #endif
 
@@ -331,7 +331,7 @@ namespace
 
   [[nodiscard]] bool ImageIsLargeAddressAware() noexcept
   {
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
     // Engine addition (dedicated-server plan WPL.5): a 64-bit ELF process has the whole
     // address space.
     return true;
@@ -1393,7 +1393,7 @@ namespace
     }
   }
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
   /**
    * Engine addition (dedicated-server plan WPL.5): an ELF image has no TLS callback
    * directory. A pthread key whose destructor runs `TlsCallback_1`'s thread-detach path
@@ -1776,7 +1776,7 @@ namespace
 
     if (request.head != nullptr) {
       gThreadHeapCache = ResetThreadHeapCache(reinterpret_cast<ThreadHeapCache*>(request.head));
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
       RegisterThreadHeapCacheExit(gThreadHeapCache);
 #endif
       if (hasLock != 0) {
@@ -1819,7 +1819,7 @@ namespace
  * Registering the real callback fixes both: the reason code is whatever Windows
  * passes, and every thread exit runs it.
  */
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #if defined(_M_IX86)
 #pragma comment(linker, "/INCLUDE:__tls_used")
 #pragma comment(linker, "/INCLUDE:_gAllocatorTlsCallbackEntry")
@@ -2345,7 +2345,7 @@ void* __cdecl operator new(
       return block;
     }
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     if (_callnewh(size) == 0) {
       throw std::bad_alloc{};
     }
@@ -2576,6 +2576,6 @@ void gpg::SetThreadName(
   FAF_PROFILE_SET_THREAD_NAME(name);
 }
 
-#if defined(_WIN32) && !defined(_M_X64) && !defined(__x86_64__)
+#if FAFRE_PLATFORM_WINDOWS && !defined(_M_X64) && !defined(__x86_64__)
 #include "../../../../tests/memory/AllocatorBoundsNative.inl"
 #endif

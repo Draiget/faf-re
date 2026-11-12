@@ -1,5 +1,7 @@
 #pragma once
 
+#include "platform/PlatformDefines.h"
+
 #include <cstddef>
 #include <cstdint>
 
@@ -30,7 +32,7 @@ namespace moho
 
   namespace slab_region
   {
-#if defined(_WIN64)
+#if FAFRE_PLATFORM_WINDOWS && defined(_M_X64)
     constexpr std::size_t kReserveBytes = std::size_t{2} << 30; // 2 GB virtual address space
 #else
     constexpr std::size_t kReserveBytes = 128u * 1024u * 1024u; // 128 MB virtual address space

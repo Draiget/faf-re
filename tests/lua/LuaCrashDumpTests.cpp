@@ -3,7 +3,7 @@
 // inside a VM's stack is placed in its slot. In the game this only runs from the crash handler, so a test is the only
 // way it runs before a crash needs it. Windows only for now (its Linux build hasn't been checked).
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 
 #include "LuaTestSupport.h"
 

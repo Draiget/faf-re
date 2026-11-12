@@ -9,7 +9,7 @@
 #include <string_view>
 #include <vector>
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include <windows.h>
 
 #include <zstd.h>
@@ -19,7 +19,7 @@
 
 namespace gpg
 {
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
   // Linux (the dedicated server and headless): an executable there carries no resources, so nothing
   // is embedded and the loose files are used, as the header says for an exe without the resource.
   std::wstring EmbeddedDxcDirectory()

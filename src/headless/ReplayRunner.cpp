@@ -10,7 +10,7 @@
 #endif
 
 #include <Windows.h>
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include <Psapi.h>
 #endif
 
@@ -97,7 +97,7 @@ namespace faf::headless
     /** This process's private bytes (Linux: resident), in MB. */
     [[nodiscard]] double ProcessMegabytes()
     {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
       PROCESS_MEMORY_COUNTERS_EX counters{};
       counters.cb = sizeof(counters);
       if (

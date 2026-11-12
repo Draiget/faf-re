@@ -8,7 +8,9 @@
 #define FA_FASTCALL
 #endif
 
-#if defined(_WIN32)
+#include "PlatformDefines.h"
+
+#if FAFRE_PLATFORM_WINDOWS
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif

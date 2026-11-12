@@ -49,9 +49,9 @@ namespace
 
   const char* PlatformName()
   {
-#if defined(_WIN32) && defined(_M_X64)
+#if FAFRE_PLATFORM_WINDOWS && defined(_M_X64)
     return "windows-x64";
-#elif defined(_WIN32)
+#elif FAFRE_PLATFORM_WINDOWS
     return "windows-x86";
 #elif defined(__x86_64__)
     return "linux-x64";

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "platform/PlatformDefines.h"
+
 #include <cstdint>
 #include <string>
 
@@ -41,7 +43,7 @@ namespace moho
   };
 
 #if defined(_MSC_VER) && _ITERATOR_DEBUG_LEVEL == 0
-#if defined(_WIN64)
+#if FAFRE_PLATFORM_WINDOWS && defined(_M_X64)
   static_assert(sizeof(XFileError) == 0x140, "XFileError size must be 0x140");
 #else
   static_assert(sizeof(XFileError) == 0xA8, "XFileError size must be 0xA8");

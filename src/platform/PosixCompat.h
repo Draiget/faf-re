@@ -1,11 +1,13 @@
 #pragma once
 
+#include "PlatformDefines.h"
+
 // Engine addition (dedicated-server plan WPL.5): the Windows names the shared simulation
 // code uses from <Windows.h> and the MSVC CRT, for builds without them (Linux). The Linux
 // build force-includes this header (cmake/FafLinux.cmake); Windows builds never see it.
 // Each name means what it means on Windows.
 
-#if !defined(_WIN32) && defined(__cplusplus)
+#if !FAFRE_PLATFORM_WINDOWS && defined(__cplusplus)
 
 #include <cstddef>
 #include <cstdint>

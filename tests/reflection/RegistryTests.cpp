@@ -25,7 +25,7 @@
 #include "moho/entity/Prop.h"
 #include "moho/unit/core/Unit.h"
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include "moho/ui/UiStateTypes.h"
 #endif
 
@@ -796,7 +796,7 @@ namespace
     EXPECT_FALSE(gpg::RTypeOf<ReflFlags>()->SetLexical(gpg::RRef{nullptr, gpg::RTypeOf<ReflFlags>()}, "Beta"));
   }
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   TEST(
     ReflectionEnum,
     CurrentUiStateRefNamesTheEngineEnum

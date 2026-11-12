@@ -4,7 +4,7 @@
 // registers, as in the game. Probes (an int3 written into code) are not run here: one on a function of this test
 // program stopped the process, which wasn't looked into yet.
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 
 #include "gpg/core/diagnostics/CrashReport.h"
 #include "gpg/core/diagnostics/ProbeWatch.h"

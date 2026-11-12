@@ -1,5 +1,7 @@
 #pragma once
 
+#include "PlatformDefines.h"
+
 // Engine addition (dedicated-server plan WPL.5, WPL.6): the operand type of the MSVC
 // interlocked intrinsics (_InterlockedExchangeAdd, _InterlockedIncrement, ...). They work
 // on Windows' 32-bit `long`. clang provides the same intrinsics on Linux (-fms-extensions)
@@ -12,7 +14,7 @@
 
 namespace platform
 {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   using InterlockedLong = long;
 #else
   using InterlockedLong = int;

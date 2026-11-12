@@ -1,7 +1,7 @@
 #include "CHostManager.h"
 
 #include <cstring>
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
 #include <winsock2.h> // platform/posix/win32: the BSD socket and resolver calls
 #endif
 

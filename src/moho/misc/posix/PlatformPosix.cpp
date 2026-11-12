@@ -5,7 +5,7 @@
 // Call stacks come from backtrace(3) and are symbolised with dladdr(3); a message box is a
 // line on stderr; the error-report attachments are kept as on Windows but nothing sends them.
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
 
 #include "moho/app/WinApp.h"
 

@@ -1,6 +1,6 @@
 #include "headless/ReplayFpuReport.h"
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include <Windows.h>
 #include <TlHelp32.h>
 #else
@@ -28,7 +28,7 @@
 // control word and MXCSR the kernel saved in the signal frame (the handler's own registers
 // are reset, the interrupted thread's are in ucontext's fpregs).
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
 namespace faf::headless
 {
   namespace

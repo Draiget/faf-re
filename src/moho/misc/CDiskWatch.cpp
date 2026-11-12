@@ -33,7 +33,7 @@ namespace
   std::mutex gDiskWatchInitMutex;
   CDiskWatch* gDiskWatch = nullptr;
   constexpr std::size_t kDefaultReadBufferSize = 0x1000u;
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   constexpr DWORD kDirectoryNotifyFilter =
     FILE_NOTIFY_CHANGE_FILE_NAME | FILE_NOTIFY_CHANGE_DIR_NAME | FILE_NOTIFY_CHANGE_LAST_WRITE;
 #endif
@@ -124,7 +124,7 @@ namespace
     return FileWildMatch(path + 1, currentPattern);
   }
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   [[nodiscard]]
   OVERLAPPED* AsOverlapped(
     CDiskDirWatch& watch
@@ -225,7 +225,7 @@ namespace
     const SDiskWatchEvent& event
   )
   {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     if (event.mActionCode != FILE_ACTION_MODIFIED) {
       return false;
     }
@@ -328,7 +328,7 @@ CDiskDirWatch::CDiskDirWatch(
   mReadBuffer.resize(kDefaultReadBufferSize, 0u);
 
   const char* const watchPath = mDirectoryPath.c_str();
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   const HANDLE watchHandle = ::CreateFileA(
     watchPath,
     FILE_READ_DATA,
@@ -360,7 +360,7 @@ CDiskDirWatch::CDiskDirWatch(
  */
 CDiskDirWatch::~CDiskDirWatch()
 {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   const HANDLE watchHandle = static_cast<HANDLE>(mDirectoryHandle);
   if (watchHandle != INVALID_HANDLE_VALUE) {
     (void)::CancelIo(watchHandle);
@@ -382,7 +382,7 @@ CDiskDirWatch::~CDiskDirWatch()
  */
 void CDiskDirWatch::DoRead()
 {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   const HANDLE watchHandle = static_cast<HANDLE>(mDirectoryHandle);
   if (watchHandle == INVALID_HANDLE_VALUE || mReadBuffer.empty()) {
     return;
@@ -420,7 +420,7 @@ void CDiskDirWatch::DoRead()
  */
 void CDiskDirWatch::Update()
 {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   HANDLE watchHandle = static_cast<HANDLE>(mDirectoryHandle);
   while (watchHandle != INVALID_HANDLE_VALUE) {
     DWORD transferredBytes = 0;
@@ -748,7 +748,7 @@ bool CDiskWatch::EnablePrivilege(
   const bool enable
 ) const
 {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   HANDLE tokenHandle = nullptr;
   const HANDLE currentProcess = ::GetCurrentProcess();
   if (!::OpenProcessToken(currentProcess, TOKEN_ADJUST_PRIVILEGES, &tokenHandle)) {

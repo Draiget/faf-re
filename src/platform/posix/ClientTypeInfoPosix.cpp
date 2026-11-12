@@ -10,7 +10,7 @@
 // (name, ==, hash). No object of these classes exists in the Linux programs, so nothing
 // dynamic_casts through them.
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
 
 // FAF_CLIENT_TYPEINFO(mangled name): typeinfo `_ZTI<name>` and its name string `_ZTS<name>`.
 #define FAF_CLIENT_TYPEINFO(NAME)                                                                                      \

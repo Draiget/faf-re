@@ -1,9 +1,11 @@
 #pragma once
 
+#include "../PlatformDefines.h"
+
 // Engine addition (dedicated-server plan WPL.9): the Linux threads' floating-point
 // environment, pinned to the Windows x64 build's (platform/posix/FpEnvPosix.cpp).
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
 
 #include <cstdint>
 

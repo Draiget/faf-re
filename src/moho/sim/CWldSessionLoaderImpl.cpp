@@ -70,7 +70,7 @@ namespace moho
 
     bool IsInterlockedLoadingEnabled()
     {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
       const char* const cmdLine = GetCommandLineA();
       return cmdLine && std::strstr(cmdLine, "/interlocked") != nullptr;
 #else

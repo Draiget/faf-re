@@ -1,12 +1,14 @@
 #pragma once
 
+#include "platform/PlatformDefines.h"
+
 // Thin BSD-socket wrapper for faf-netbridge (Winsock on Windows, POSIX
 // elsewhere). Engine addition, not recovered code.
 
 #include <cstdint>
 #include <string>
 
-#ifdef _WIN32
+#if FAFRE_PLATFORM_WINDOWS
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -28,7 +30,7 @@
 
 namespace faf::netbridge
 {
-#ifdef _WIN32
+#if FAFRE_PLATFORM_WINDOWS
   using SocketHandle = SOCKET;
   constexpr SocketHandle kInvalidSocket = INVALID_SOCKET;
 #else
@@ -38,7 +40,7 @@ namespace faf::netbridge
 
   inline bool SocketsInit()
   {
-#ifdef _WIN32
+#if FAFRE_PLATFORM_WINDOWS
     WSADATA data;
     return WSAStartup(MAKEWORD(2, 2), &data) == 0;
 #else
@@ -53,7 +55,7 @@ namespace faf::netbridge
     if (s == kInvalidSocket) {
       return;
     }
-#ifdef _WIN32
+#if FAFRE_PLATFORM_WINDOWS
     closesocket(s);
 #else
     close(s);
@@ -63,7 +65,7 @@ namespace faf::netbridge
 
   inline int LastSocketError()
   {
-#ifdef _WIN32
+#if FAFRE_PLATFORM_WINDOWS
     return WSAGetLastError();
 #else
     return errno;
@@ -74,7 +76,7 @@ namespace faf::netbridge
     const int err
   )
   {
-#ifdef _WIN32
+#if FAFRE_PLATFORM_WINDOWS
     return err == WSAEWOULDBLOCK;
 #else
     return err == EWOULDBLOCK || err == EAGAIN;
@@ -87,7 +89,7 @@ namespace faf::netbridge
     const int err
   )
   {
-#ifdef _WIN32
+#if FAFRE_PLATFORM_WINDOWS
     return err == WSAECONNRESET || err == WSAEWOULDBLOCK || err == WSAEMSGSIZE;
 #else
     return err == ECONNREFUSED || err == EWOULDBLOCK || err == EAGAIN;
@@ -98,7 +100,7 @@ namespace faf::netbridge
     const SocketHandle s
   )
   {
-#ifdef _WIN32
+#if FAFRE_PLATFORM_WINDOWS
     u_long on = 1;
     ioctlsocket(s, FIONBIO, &on);
 #else
@@ -140,7 +142,7 @@ namespace faf::netbridge
     if (s == kInvalidSocket) {
       return s;
     }
-#ifndef _WIN32
+#if !FAFRE_PLATFORM_WINDOWS
     int reuse = 1;
     setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
 #endif
@@ -167,7 +169,7 @@ namespace faf::netbridge
       CloseSocket(s);
       return kInvalidSocket;
     }
-#ifdef _WIN32
+#if FAFRE_PLATFORM_WINDOWS
     // Don't let an ICMP port unreachable turn into WSAECONNRESET on recvfrom.
     BOOL off = FALSE;
     DWORD bytes = 0;

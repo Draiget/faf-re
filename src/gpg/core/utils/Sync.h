@@ -1,4 +1,6 @@
 #pragma once
+
+#include "platform/PlatformDefines.h"
 #include <cstdint>
 #include <chrono>
 #include <limits>
@@ -24,9 +26,9 @@ namespace gpg::core
     constexpr uint8_t kKindMask = 0x01;
   } // namespace detail
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
   // Some platforms (older macOS) miss pthread_mutex_timedlock; emulate if needed.
-#if defined(__APPLE__) || defined(__MACH__)
+#if FAFRE_PLATFORM_MACOS // older macOS has no pthread_mutex_timedlock
 #define GPG_NO_PTHREAD_MUTEX_TIMEDLOCK 1
 #else
 #define GPG_NO_PTHREAD_MUTEX_TIMEDLOCK 0
@@ -105,7 +107,7 @@ namespace gpg::core
       lockMode_ = b;
     }
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     /**
      * Initialize owned CRITICAL_SECTION.
      */
@@ -193,7 +195,7 @@ namespace gpg::core
      */
     void destroy() noexcept
     {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
       if (!native_ || !owned()) {
         native_ = nullptr;
         set_owned(false);
@@ -235,7 +237,7 @@ namespace gpg::core
      */
     void lock() const noexcept
     {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
       if (!native_)
         return;
       if (kind() == LockKind::kCriticalSection) {
@@ -255,7 +257,7 @@ namespace gpg::core
      */
     [[nodiscard]] bool try_lock() const noexcept
     {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
       if (!native_)
         return false;
       if (kind() == LockKind::kCriticalSection) {
@@ -278,7 +280,7 @@ namespace gpg::core
       const std::chrono::duration<Rep, Period>& d
     ) noexcept
     {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
       if (!native_)
         return false;
 
@@ -329,7 +331,7 @@ namespace gpg::core
      */
     void unlock() const noexcept
     {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
       if (!native_)
         return;
       if (kind() == LockKind::kCriticalSection) {
@@ -347,7 +349,7 @@ namespace gpg::core
 #pragma pack(pop)
 
   static_assert(sizeof(Mutex) == 8, "Mutex must be 8 bytes on x86");
-#if defined(_WIN64)
+#if FAFRE_PLATFORM_WINDOWS && defined(_M_X64)
   static_assert(sizeof(void*) == 8, "Audit layout for x64 sites.");
 #endif
 
@@ -356,7 +358,7 @@ namespace gpg::core
    */
   struct SharedLock
   {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     SRWLOCK lock_ = SRWLOCK_INIT;
 
     void lock_shared() noexcept

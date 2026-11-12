@@ -1,10 +1,12 @@
 #pragma once
 
+#include "../../PlatformDefines.h"
+
 // Engine addition (dedicated-server plan WPL.5): the MSVC CRT <direct.h> calls the shared
 // code uses, for the Linux build. There are no drives: every drive's working directory is
 // the process's, and the current drive is reported as none (0).
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #error "platform/posix/win32/direct.h is for builds without the Windows SDK"
 #endif
 

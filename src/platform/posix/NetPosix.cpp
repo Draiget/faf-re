@@ -425,7 +425,7 @@ namespace platform::net
     }
 
     constexpr int kSendFlags =
-#if FAFRE_PLATFORM_LINUX
+#if FAFRE_PLATFORM_LINUX // MSG_NOSIGNAL; macOS has no such send flag
       MSG_NOSIGNAL;
 #else
       0; // macOS: SO_NOSIGPIPE, set by OpenSocket and Accept
@@ -435,7 +435,7 @@ namespace platform::net
       [[maybe_unused]] const Socket socket
     ) noexcept
     {
-#if FAFRE_PLATFORM_MACOS
+#if FAFRE_PLATFORM_MACOS // SO_NOSIGPIPE, the socket option only macOS has
       const int on = 1;
       (void)::setsockopt(socket, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(on));
 #endif

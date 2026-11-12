@@ -17,7 +17,7 @@ namespace moho
   } // namespace
 } // namespace moho
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN

@@ -1,9 +1,10 @@
+#include "platform/PlatformDefines.h"
 #include "remote/net/UdpSocket.h"
 
 #include <charconv>
 #include <cstring>
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -28,7 +29,7 @@ namespace faf::remote::net
   {
     constexpr int kBufferBytes = 1024 * 1024;
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     using SocketHandle = SOCKET;
     [[nodiscard]] int LastError() noexcept
     {
@@ -181,7 +182,7 @@ namespace faf::remote::net
     (void)setsockopt(handle, SOL_SOCKET, SO_SNDBUF, reinterpret_cast<const char*>(&kBufferBytes), sizeof(kBufferBytes));
 
     sockaddr_in bound{};
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     int boundSize = sizeof(bound);
 #else
     socklen_t boundSize = sizeof(bound);
@@ -212,7 +213,7 @@ namespace faf::remote::net
       return false;
     }
     const sockaddr_in address = ToAddress(to);
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     const int sent = sendto(
       static_cast<SocketHandle>(mSocket),
       static_cast<const char*>(data),
@@ -240,7 +241,7 @@ namespace faf::remote::net
     }
     for (;;) {
       sockaddr_in address{};
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
       int addressSize = sizeof(address);
       const int received = recvfrom(
         static_cast<SocketHandle>(mSocket),
@@ -274,7 +275,7 @@ namespace faf::remote::net
     if (mSocket == -1) {
       return;
     }
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     WSAPOLLFD entry{};
     entry.fd = static_cast<SocketHandle>(mSocket);
     entry.events = POLLRDNORM;

@@ -7,7 +7,7 @@
 #include <mutex>
 #include <unordered_map>
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include <Windows.h>
 #include <DbgHelp.h>
 
@@ -99,7 +99,7 @@ namespace faf::headless
       const void* const function
     )
     {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
       if (!gpg::diag::DiagSymbolsReady()) {
         return {};
       }

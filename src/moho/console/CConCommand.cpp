@@ -1337,7 +1337,7 @@ void moho::CON_Debug_Throw(
 )
 {
   (void)args;
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   throw std::exception("Hope you really wanted to do this...");
 #else
   // Engine addition (dedicated-server plan WPL.5): std::exception has no message

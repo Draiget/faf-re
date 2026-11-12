@@ -147,7 +147,7 @@ namespace
     // the engine's static initialisers asks for it before).
     const faf_core_tests::TempDir folder;
     const std::filesystem::path wanted = folder.Path() / "cache";
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     ASSERT_EQ(_putenv_s("FAF_SHADER_CACHE_DIR", wanted.string().c_str()), 0);
     const std::string& directory = gpg::LocalCacheDirectory();
     (void)_putenv_s("FAF_SHADER_CACHE_DIR", "");

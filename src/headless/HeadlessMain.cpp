@@ -7,7 +7,7 @@
 // out every window, device, audio and UI step.
 
 #include <Windows.h>
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include <objbase.h>
 #else
 #include <csignal>
@@ -72,7 +72,7 @@ namespace
 #endif
     // The sim and loader threads are still running; nothing after the verdict is observed,
     // so the process ends here instead of tearing them down.
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     ::TerminateProcess(::GetCurrentProcess(), static_cast<UINT>(exitCode));
 #endif
     std::_Exit(exitCode);
@@ -89,7 +89,7 @@ namespace
     EndProcess(kExitCrash);
   }
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   LONG WINAPI ReplayCrashFilter(
     EXCEPTION_POINTERS* const info
   )
@@ -319,7 +319,7 @@ int HEADLESS_Main(
 {
   (void)argc;
   (void)argv;
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   ::SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
   ::SetUnhandledExceptionFilter(&ReplayCrashFilter);
 #else
@@ -552,7 +552,7 @@ int HEADLESS_Main(
     }
     moho::DISK_SetAccessTrace(diskTrace);
   }
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
   std::string pathSpellingPath;
   if (ReadOption("--path-spelling", pathSpellingPath)) {
     std::FILE* const pathSpelling = std::fopen(pathSpellingPath.c_str(), "w");
@@ -579,7 +579,7 @@ int HEADLESS_Main(
 
   // `WIN_AppExecute` builds wx's application object here; headless links only the
   // simulation and has no wx.
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   (void)::CoInitialize(nullptr);
 #endif
   moho::PLAT_Init();

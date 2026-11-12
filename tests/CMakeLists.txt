@@ -170,6 +170,8 @@ set_tests_properties(replay_scan PROPERTIES LABELS "Existing")
 # without FAF_REPLAY_DATA. Games take minutes, hence the timeout.
 add_executable(faf_replay_playback_tests EXCLUDE_FROM_ALL replay/ReplayPlaybackTests.cpp)
 target_link_libraries(faf_replay_playback_tests PRIVATE gtest_main)
+# No engine library, so no force-included platform/PlatformDefines.h: the test includes it from src.
+target_include_directories(faf_replay_playback_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
 target_compile_definitions(faf_replay_playback_tests PRIVATE FAF_HEADLESS_EXE="$<TARGET_FILE:headless>"
   FAF_REPLAY_ZOO_DIR="${CMAKE_CURRENT_SOURCE_DIR}/replay/zoo")
 if(FAF_SERVER_MODE)

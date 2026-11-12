@@ -1,10 +1,12 @@
 #pragma once
 
+#include "../../PlatformDefines.h"
+
 // Engine addition (dedicated-server plan WPL.5): the MSVC CRT <io.h> directory search the
 // shared code uses (the VFS's mount-point and directory walks, Lua's io.dir), for the Linux
 // build. Implemented in platform/posix/Win32Shim.cpp.
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #error "platform/posix/win32/io.h is for builds without the Windows SDK"
 #endif
 

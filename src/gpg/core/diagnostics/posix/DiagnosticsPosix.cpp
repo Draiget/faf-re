@@ -9,7 +9,7 @@
 // on stderr. Minidumps are the system's core dumps; memory watches and code probes are not
 // available.
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
 
 #include "gpg/core/diagnostics/BuildInfo.h"
 #include "gpg/core/diagnostics/CrashHooks.h"

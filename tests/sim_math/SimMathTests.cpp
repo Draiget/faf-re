@@ -34,7 +34,7 @@
 #include <string>
 #include <vector>
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -42,7 +42,7 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
-#elif defined(__linux__)
+#elif FAFRE_PLATFORM_POSIX
 #include <unistd.h>
 #endif
 
@@ -610,9 +610,9 @@ namespace
 
   const char* PlatformName()
   {
-#if defined(_WIN32) && defined(_M_X64)
+#if FAFRE_PLATFORM_WINDOWS && defined(_M_X64)
     return "windows-x64";
-#elif defined(_WIN32)
+#elif FAFRE_PLATFORM_WINDOWS
     return "windows-x86";
 #elif defined(__x86_64__)
     return "linux-x64";
@@ -821,13 +821,13 @@ namespace
   std::filesystem::path GetExecutableDir()
   {
     std::error_code ec;
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     char buffer[MAX_PATH];
     const DWORD len = GetModuleFileNameA(nullptr, buffer, static_cast<DWORD>(sizeof(buffer)));
     if (len > 0 && len < sizeof(buffer)) {
       return std::filesystem::path(buffer).parent_path();
     }
-#elif defined(__linux__)
+#elif FAFRE_PLATFORM_LINUX // /proc/self/exe
     char buffer[1024];
     const ssize_t len = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
     if (len > 0) {

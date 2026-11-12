@@ -11,6 +11,7 @@
 // A FAF_COVERAGE build's headless writes its own counters (LLVM_PROFILE_FILE), so these games count in
 // tools/coverage/report.sh.
 
+#include "platform/PlatformDefines.h"
 #include <gtest/gtest.h>
 
 #include <cstdio>
@@ -24,7 +25,7 @@
 #include <utility>
 #include <vector>
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #define FAF_POPEN _popen
 #define FAF_PCLOSE _pclose
 #else
@@ -94,7 +95,7 @@ namespace
   )
   {
     SRun run;
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     // cmd /c drops the outer quotes of a line that starts with one.
     const std::string line = "\"" + commandLine + " 2>&1\"";
 #else
@@ -124,7 +125,7 @@ namespace
       }
     }
     const int status = FAF_PCLOSE(pipe);
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     run.exitCode = status;
 #else
     run.exitCode = WIFEXITED(status) ? WEXITSTATUS(status) : -1;

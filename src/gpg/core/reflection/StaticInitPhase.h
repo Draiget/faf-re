@@ -1,5 +1,7 @@
 #pragma once
 
+#include "platform/PlatformDefines.h"
+
 /**
  * Two-phase static initialization for the reflection registry.
  *
@@ -41,7 +43,7 @@
  *     GPG_PREREGISTER_INIT(SFootprintTypeInfo, register_SFootprintTypeInfo)
  */
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #define GPG_PREREGISTER_INIT(TAG, FN)                                                                                  \
   static void __cdecl gGpgPreRegisterThunk_##TAG()                                                                     \
   {                                                                                                                    \

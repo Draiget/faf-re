@@ -1,4 +1,5 @@
 #include "lua/LuaArena.h"
+#include "platform/PlatformDefines.h"
 
 #if INTPTR_MAX != INT32_MAX
 
@@ -9,7 +10,7 @@
 #include <mutex>
 #include <vector>
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -134,7 +135,7 @@ namespace
     const std::size_t bytes
   ) noexcept
   {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     return reinterpret_cast<std::uintptr_t>(
       ::VirtualAlloc(reinterpret_cast<void*>(address), bytes, MEM_RESERVE, PAGE_NOACCESS)
     );
@@ -183,7 +184,7 @@ namespace
       (endBytes - gCommittedBytes + kCommitChunkBytes - 1u) / kCommitChunkBytes * kCommitChunkBytes;
     const std::size_t commit = (want > gReserveBytes - gCommittedBytes) ? gReserveBytes - gCommittedBytes : want;
     void* const start = reinterpret_cast<void*>(gBase + gCommittedBytes);
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     if (::VirtualAlloc(start, commit, MEM_COMMIT, PAGE_READWRITE) == nullptr) {
       return false;
     }

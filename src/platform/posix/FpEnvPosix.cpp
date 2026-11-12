@@ -12,7 +12,7 @@
 // other thread at its start, through `-Wl,--wrap=pthread_create` (cmake/FafLinux.cmake):
 // boost.thread, std::thread and the sim worker pool all start threads there.
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
 
 #include "platform/posix/FpEnvPosix.h"
 

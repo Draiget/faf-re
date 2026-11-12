@@ -1,3 +1,4 @@
+#include "platform/PlatformDefines.h"
 #include "remote/net/Handshake.h"
 
 #include <algorithm>
@@ -5,7 +6,7 @@
 
 #include "monocypher.h"
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -143,7 +144,7 @@ namespace faf::remote::net
     const std::size_t size
   ) noexcept
   {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     return BCryptGenRandom(
              nullptr, static_cast<PUCHAR>(out), static_cast<ULONG>(size), BCRYPT_USE_SYSTEM_PREFERRED_RNG
            ) == 0;

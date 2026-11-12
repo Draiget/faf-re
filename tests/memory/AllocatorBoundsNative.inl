@@ -1,6 +1,8 @@
 // Included at the END of Global.cpp in every Windows x86 build. Only faf_allocator_bounds_tests calls it.
 // No copied allocator bodies, OS stubs, live-state reset, or fake addresses.
-#if !defined(_WIN32) || defined(_M_X64) || defined(__x86_64__)
+#include "platform/PlatformDefines.h"
+
+#if !FAFRE_PLATFORM_WINDOWS || defined(_M_X64) || defined(__x86_64__)
 #error Allocator boundary acceptance requires native Windows x86
 #endif
 #include <cstdio>

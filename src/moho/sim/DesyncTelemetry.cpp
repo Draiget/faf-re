@@ -16,7 +16,7 @@
 #include <thread>
 #include <vector>
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include <windows.h>
 #include <winhttp.h>
 #else
@@ -39,7 +39,7 @@ namespace moho
 {
   namespace
   {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     constexpr const char kDefaultScheme[] = "https://";
 #else
     constexpr const char kDefaultScheme[] = "http://"; // no TLS library in the Linux build
@@ -170,7 +170,7 @@ namespace moho
       int mTimeoutMs = kTimeoutMs;
     };
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     /// WinHTTP, loaded at the first post: the import table stays as it is, so the headless exe's
     /// allowed-DLL check (cmake/HeadlessImports.cmake) still holds.
     struct SWinHttp
@@ -424,7 +424,7 @@ namespace moho
       if (pid == 0u || pid == self) {
         return false;
       }
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
       const HANDLE process = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
       if (process == nullptr) {
         return false;
@@ -449,7 +449,7 @@ namespace moho
       const std::string arch = gpg::diag::BuildArch();
       resource.Add("host.arch", std::string(arch == "x86" ? "x86" : "amd64"));
       resource.Add("faf.arch", arch);
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
       resource.Add("os.type", std::string("windows"));
 #else
       resource.Add("os.type", std::string("linux"));
@@ -521,7 +521,7 @@ namespace moho
 
       void Run()
       {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
         const unsigned long pid = ::GetCurrentProcessId();
 #else
         const unsigned long pid = static_cast<unsigned long>(::getpid());

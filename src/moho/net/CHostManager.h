@@ -1,4 +1,6 @@
 #pragma once
+
+#include "platform/PlatformDefines.h"
 #include <cstddef>
 #include <cstdint>
 #include <map>
@@ -49,7 +51,7 @@ namespace moho
     static void DestroyHeapNode(Host* host) noexcept;
   };
 
-#if defined(_WIN32) && (defined(_M_IX86) || defined(__i386__))
+#if FAFRE_PLATFORM_WINDOWS && (defined(_M_IX86) || defined(__i386__))
   static_assert(sizeof(Host) == 0x28, "Host size must be 0x28");
 #endif
 

@@ -525,6 +525,8 @@ add_test(NAME reflection COMMAND faf_reflection_tests)
 # Recorded games played back by headless (tests/replay/ReplayPlaybackTests.cpp); skipped without FAF_REPLAY_DATA.
 add_executable(faf_replay_playback_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/replay/ReplayPlaybackTests.cpp")
 target_link_libraries(faf_replay_playback_tests PRIVATE faf_codegen gtest_main)
+# faf_codegen brings no include path: the test includes platform/PlatformDefines.h from src.
+target_include_directories(faf_replay_playback_tests PRIVATE "${PROJECT_SOURCE_DIR}/src")
 target_compile_definitions(faf_replay_playback_tests PRIVATE FAF_HEADLESS_EXE="$<TARGET_FILE:headless>" FAF_HEADLESS_SERVER_MODE=1
   FAF_REPLAY_ZOO_DIR="${PROJECT_SOURCE_DIR}/tests/replay/zoo")
 add_dependencies(faf_replay_playback_tests headless)

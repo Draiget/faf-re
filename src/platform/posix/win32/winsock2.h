@@ -1,10 +1,12 @@
 #pragma once
 
+#include "../../PlatformDefines.h"
+
 // Engine addition (dedicated-server plan WPL.5): the BSD socket headers and the few <winsock2.h>
 // type names that the shared code still spells, for builds without the Windows SDK. Socket calls
 // go through platform::net (src/platform/Net.h, issue #259), not through Winsock names here.
 
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #error "platform/posix/win32/winsock2.h is for builds without the Windows SDK"
 #endif
 

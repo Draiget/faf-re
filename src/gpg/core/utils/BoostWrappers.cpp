@@ -15,7 +15,7 @@
 
 #include "moho/terrain/TerrainFactory.h"
 // Engine addition (dedicated-server plan WPL.5): the Direct3D backends' types exist on Windows only.
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
 #include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
 #include "gpg/gal/backends/d3d10/EffectD3D10.hpp"
@@ -556,12 +556,12 @@ namespace boost
   }
 
   // Engine addition (dedicated-server plan WPL.5): the Direct3D backends' types exist on Windows only.
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 
 #endif // _WIN32
 
   // Engine addition (dedicated-server plan WPL.5): the Direct3D backends' types exist on Windows only.
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
   namespace
   {
     template <class TObject>
@@ -596,7 +596,7 @@ namespace boost
   }
 
   // Engine addition (dedicated-server plan WPL.5): the Direct3D backends' types exist on Windows only.
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
 
 #endif // _WIN32
 

@@ -1097,7 +1097,7 @@ namespace
       ("faf_rejoin_" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + "_" +
        std::to_string(sCount.fetch_add(1)) + ".bin");
     std::FILE* file = nullptr;
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     if (fopen_s(&file, path.string().c_str(), "w+bD") != 0) {
       file = nullptr;
     }

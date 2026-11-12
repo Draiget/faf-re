@@ -1,3 +1,4 @@
+#include "platform/PlatformDefines.h"
 #include "netbridge/Bridge.h"
 #include "netlink/EngineLinks.h"
 #include "netlink/WebRtc.h"
@@ -24,7 +25,7 @@ namespace faf::netbridge
       const std::time_t t = std::chrono::system_clock::to_time_t(now);
       const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() % 1000;
       std::tm tm{};
-#ifdef _WIN32
+#if FAFRE_PLATFORM_WINDOWS
       localtime_s(&tm, &t);
 #else
       localtime_r(&t, &tm);
@@ -868,7 +869,7 @@ namespace faf::netbridge
     for (;;) {
       sockaddr_in from{};
       socklen_t len = sizeof(from);
-#ifdef _WIN32
+#if FAFRE_PLATFORM_WINDOWS
       u_long avail = 0;
       if (ioctlsocket(peer.udp, FIONREAD, &avail) != 0 || avail == 0) {
         return;
@@ -884,7 +885,7 @@ namespace faf::netbridge
         peer.counters.OnSent(reinterpret_cast<const unsigned char*>(buf), static_cast<std::size_t>(n));
       }
       peer.link->Send(buf, static_cast<std::size_t>(n));
-#ifndef _WIN32
+#if !FAFRE_PLATFORM_WINDOWS
       return; // one per select round without FIONREAD
 #endif
     }

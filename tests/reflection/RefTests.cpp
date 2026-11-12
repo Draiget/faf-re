@@ -646,7 +646,7 @@ namespace
     ExpectEnumAdapter("PackRRef_EFireState", &gpg::PackRRef_EFireState, "EFireState");
     ExpectEnumAdapter("AssignESpecialFileTypeRefAdapter", &gpg::AssignESpecialFileTypeRefAdapter, "ESpecialFileType");
     ExpectEnumAdapter("AssignEGenericIconTypeRef", &gpg::AssignEGenericIconTypeRef, "EGenericIconType");
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     ExpectEnumAdapter("AssignEMauiScrollAxisRef", &gpg::AssignEMauiScrollAxisRef, "EMauiScrollAxis");
     ExpectEnumAdapter("AssignEMauiEventTypeRef", &gpg::AssignEMauiEventTypeRef, "EMauiEventType");
 #endif

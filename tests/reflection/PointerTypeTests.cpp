@@ -170,7 +170,7 @@ namespace
     const gpg::RType* const type
   )
   {
-#if defined(__linux__)
+#if FAFRE_PLATFORM_POSIX
     return type != nullptr && gpg::REF_FindTypeNamed(type->GetName()) != type;
 #else
     (void)type;
@@ -178,7 +178,7 @@ namespace
 #endif
   }
 
-#if defined(__linux__)
+#if FAFRE_PLATFORM_POSIX
   TEST(
     ReflectionPointerTypes,
     DISABLED_EveryPointerTypeIsFinished

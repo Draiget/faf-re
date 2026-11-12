@@ -365,7 +365,7 @@ namespace moho
       {
         const std::time_t now = std::time(nullptr);
         std::tm local{};
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
         (void)localtime_s(&local, &now);
 #else
         (void)localtime_r(&now, &local);

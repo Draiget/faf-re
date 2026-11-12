@@ -1,5 +1,7 @@
 #pragma once
 
+#include "platform/PlatformDefines.h"
+
 // Engine addition (dedicated-server plan WPL.17): Lua's number text as the Windows C runtime
 // writes and reads it, on every platform.
 //
@@ -30,7 +32,7 @@ namespace lua
     const double value
   )
   {
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
     std::uint64_t bits = 0;
     std::memcpy(&bits, &value, sizeof(bits));
     if (bits == 0xFFF8000000000000ull) {
@@ -66,7 +68,7 @@ namespace lua
     char** const end
   )
   {
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
     const char* cursor = text;
     while (*cursor == ' ' || (*cursor >= '\t' && *cursor <= '\r')) {
       ++cursor;

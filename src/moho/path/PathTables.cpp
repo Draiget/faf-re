@@ -36,7 +36,7 @@
 #include "moho/sim/SRuleFootprintsBlueprint.h"
 #include "moho/sim/STIMap.h"
 
-#ifdef _WIN32
+#if FAFRE_PLATFORM_WINDOWS
 #include <windows.h>
 #endif
 #include "gpg/core/reflection/StaticInitPhase.h"
@@ -1491,7 +1491,7 @@ namespace
 
   [[nodiscard]] bool IsGenPathEnabled()
   {
-#ifdef _WIN32
+#if FAFRE_PLATFORM_WINDOWS
     const char* const commandLine = ::GetCommandLineA();
     return commandLine && std::strstr(commandLine, "/genpath");
 #else

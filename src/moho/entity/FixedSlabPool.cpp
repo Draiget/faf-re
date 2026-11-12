@@ -34,7 +34,7 @@ namespace moho
       PVOID*
     ) noexcept
     {
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
       void* const base = ::VirtualAlloc(nullptr, kReserveBytes, MEM_RESERVE, PAGE_NOACCESS);
       gBase = reinterpret_cast<std::uintptr_t>(base);
 #else

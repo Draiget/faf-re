@@ -415,7 +415,7 @@ namespace
     if (!statItem) {
       return;
     }
-#if defined(_WIN32)
+#if FAFRE_PLATFORM_WINDOWS
     statItem->AddPrimaryBits(delta);
 #else
     statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
