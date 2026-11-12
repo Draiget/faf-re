@@ -220,6 +220,8 @@ ExternalProject_Add(faf_ffmpeg_build
   CONFIGURE_COMMAND "${_faf_ffmpeg}/configure" --prefix=<INSTALL_DIR>
     "--cc=${CMAKE_C_COMPILER}" "--ar=${CMAKE_AR}" "--ranlib=${CMAKE_RANLIB}" "--nm=${CMAKE_NM}"
     --enable-pic --disable-autodetect --pkg-config=false
+    # hypot bound to the version glibc 2.34 has (see the header).
+    "--extra-cflags=-include ${PROJECT_SOURCE_DIR}/cmake/deps/ffmpeg-linux-glibc.h"
     --disable-x86asm --disable-everything --disable-programs --disable-doc --disable-network
     --enable-static --disable-shared
     --enable-avcodec --enable-avformat --enable-avutil --enable-swscale --enable-swresample

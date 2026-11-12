@@ -1,0 +1,183 @@
+#!/bin/sh
+# Starts the rebuilt engine's Linux download (ForgedAlliance next to this script) with the game data of
+# a Forged Alliance install and of FAF's client, so nothing has to be copied by hand (issue #394; from
+# Julian Cooper's faf-re fork, tools/linux-build/package/faf-launch). A FAF client that starts the
+# engine itself passes its own /init and does not need this.
+#
+#   ./faf-launch [--fa DIR] [--faf-data DIR] [--vault DIR] [--show] [--] [game switches...]
+#
+# What the game needs, and where this looks for it (the first that is given or found wins):
+#
+#   Forged Alliance install (Steam or GOG copy; its gamedata/, fonts/, sounds/...)
+#     --fa DIR, $FAF_FA_PATH, fa_path in FAF's fa_path.lua, Steam's library folders
+#   FAF's data folder (bin/init_faf.lua and gamedata/*.nx2, which FAF's client downloads)
+#     --faf-data DIR, $FAF_DATA_DIR, the client's data folder in ~/.faforever/client.prefs,
+#     ~/.faforever (the FAF client's default on Linux)
+#   Maps and mods vault (optional)
+#     --vault DIR, $FAF_VAULT_PATH, custom_vault_path in FAF's fa_path.lua
+#
+# It puts FAF's init file next to a fa_path.lua naming those folders, in
+# ${XDG_DATA_HOME:-~/.local/share}/faf-re/init/ (FAF's own fa_path.lua is left alone: its client
+# rewrites it for every game), and starts `ForgedAlliance /init .../bin/init_faf.lua` with the
+# remaining arguments, e.g. `./faf-launch /windowed 1920 1080` or `./faf-launch /replay my.scfareplay`.
+# init_faf.lua reads fa_path.lua one folder up, mounts ../gamedata/*.nx2 and the install's gamedata
+# and fonts; with /init given the engine needs no SupComDataPath.lua.
+# --show prints what it found and exits.
+set -eu
+
+self=$(readlink -f -- "$0" 2>/dev/null || printf '%s' "$0")
+here=$(CDPATH='' cd -- "$(dirname -- "$self")" && pwd -P)
+program="$here/ForgedAlliance"
+me=$(basename -- "$0")
+
+die() {
+  printf '%s: %s\n' "$me" "$1" >&2
+  shift
+  for line in "$@"; do
+    printf '  %s\n' "$line" >&2
+  done
+  exit 1
+}
+
+usage() {
+  sed -n '2,/^set -eu/{/^set -eu/d;s/^# \{0,1\}//;p}' "$0"
+}
+
+fa="${FAF_FA_PATH:-}"
+faf_data="${FAF_DATA_DIR:-}"
+vault="${FAF_VAULT_PATH:-}"
+show=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --fa) [ $# -ge 2 ] || die "--fa needs a folder"; fa="$2"; shift 2 ;;
+    --fa=*) fa="${1#--fa=}"; shift ;;
+    --faf-data) [ $# -ge 2 ] || die "--faf-data needs a folder"; faf_data="$2"; shift 2 ;;
+    --faf-data=*) faf_data="${1#--faf-data=}"; shift ;;
+    --vault) [ $# -ge 2 ] || die "--vault needs a folder"; vault="$2"; shift 2 ;;
+    --vault=*) vault="${1#--vault=}"; shift ;;
+    --show) show=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    --) shift; break ;;
+    *) break ;;
+  esac
+done
+
+[ -x "$program" ] || die "the game is missing: $program" "Unpack the whole download and start faf-launch from it."
+
+# A value from a Lua `name = "value"` line (FAF's fa_path.lua).
+lua_value() {
+  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*\"\\(.*\\)\"[[:space:]]*\$/\\1/p" "$2" 2>/dev/null | head -n 1
+}
+
+# A string from FAF's client.prefs (JSON), by key; good enough for the paths it holds.
+json_value() {
+  sed -n "s/.*\"$1\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" "$2" 2>/dev/null | head -n 1
+}
+
+# FAF's client can write paths relative to the home folder (its "relative game paths" setting,
+# for Wine); take them back.
+resolve_home() {
+  case "$1" in
+    "") ;;
+    "~"/*) printf '%s\n' "$HOME/${1#\~/}" ;;
+    *) if [ ! -d "$1" ] && [ -d "$HOME$1" ]; then printf '%s\n' "$HOME$1"; else printf '%s\n' "$1"; fi ;;
+  esac
+}
+
+# --- FAF's data folder ---------------------------------------------------------------------
+prefs="$HOME/.faforever/client.prefs"
+if [ -z "$faf_data" ] && [ -f "$prefs" ]; then
+  faf_data=$(resolve_home "$(json_value baseDataDirectory "$prefs")")
+fi
+if [ -z "$faf_data" ] || [ ! -d "$faf_data" ]; then
+  faf_data="${faf_data:-$HOME/.faforever}"
+fi
+[ -d "$faf_data" ] || die "FAF's data folder was not found: $faf_data" \
+  "The game needs FAF's init file and game data, which FAF's client downloads into its data" \
+  "folder (~/.faforever on Linux) when it first starts a game or replay. Install FAF's client" \
+  "(https://faforever.com) and start a game or replay once, or pass the folder that holds" \
+  "bin/init_faf.lua and gamedata/ with --faf-data DIR (or FAF_DATA_DIR)."
+[ -f "$faf_data/bin/init_faf.lua" ] || die "FAF's init file is missing: $faf_data/bin/init_faf.lua" \
+  "FAF's client puts it there when it starts a game or replay; do that once," \
+  "or name the folder that has it with --faf-data DIR."
+nx2=$(find "$faf_data/gamedata" -maxdepth 1 -name '*.nx2' 2>/dev/null | head -n 1)
+[ -n "$nx2" ] || die "FAF's game data is missing: no *.nx2 files in $faf_data/gamedata" \
+  "FAF's client downloads them when it starts a game or replay; do that once," \
+  "or name the folder that has them with --faf-data DIR."
+faf_path_lua="$faf_data/fa_path.lua"
+
+# --- The Forged Alliance install ------------------------------------------------------------
+fa_ok() { [ -n "$1" ] && [ -d "$1/gamedata" ]; }
+if [ -z "$fa" ] && [ -f "$faf_path_lua" ]; then
+  candidate=$(resolve_home "$(lua_value fa_path "$faf_path_lua")")
+  fa_ok "$candidate" && fa="$candidate"
+fi
+if [ -z "$fa" ] && [ -f "$prefs" ]; then
+  candidate=$(resolve_home "$(json_value installationPath "$prefs")")
+  fa_ok "$candidate" && fa="$candidate"
+fi
+if [ -z "$fa" ]; then
+  for steam in "$HOME/.steam/steam" "$HOME/.local/share/Steam" "$HOME/.var/app/com.valvesoftware.Steam/.local/share/Steam"; do
+    [ -d "$steam" ] || continue
+    libraries="$steam"
+    if [ -f "$steam/steamapps/libraryfolders.vdf" ]; then
+      libraries="$libraries
+$(sed -n 's/^[[:space:]]*"path"[[:space:]]*"\(.*\)"[[:space:]]*$/\1/p' "$steam/steamapps/libraryfolders.vdf")"
+    fi
+    while IFS= read -r library; do
+      candidate="$library/steamapps/common/Supreme Commander Forged Alliance"
+      if fa_ok "$candidate"; then
+        fa="$candidate"
+        break
+      fi
+    done <<EOF
+$libraries
+EOF
+    [ -n "$fa" ] && break
+  done
+fi
+[ -n "$fa" ] || die "the Forged Alliance install was not found." \
+  "Pass its folder (the one with gamedata/, fonts/ and sounds/) with --fa DIR (or FAF_FA_PATH)," \
+  "e.g. ~/.local/share/Steam/steamapps/common/Supreme Commander Forged Alliance."
+fa_ok "$fa" || die "not a Forged Alliance install (no gamedata/ folder): $fa"
+fa=$(CDPATH='' cd -- "$fa" && pwd -P)
+
+# --- The vault (optional) -------------------------------------------------------------------
+if [ -z "$vault" ] && [ -f "$faf_path_lua" ]; then
+  candidate=$(resolve_home "$(lua_value custom_vault_path "$faf_path_lua")")
+  [ -n "$candidate" ] && [ -d "$candidate" ] && vault="$candidate"
+fi
+if [ -n "$vault" ]; then
+  [ -d "$vault" ] || die "the vault folder does not exist: $vault"
+  vault=$(CDPATH='' cd -- "$vault" && pwd -P)
+fi
+
+if [ "$show" = 1 ]; then
+  printf 'game:            %s\n' "$program"
+  printf 'Forged Alliance: %s\n' "$fa"
+  printf 'FAF data:        %s\n' "$faf_data"
+  printf 'vault:           %s\n' "${vault:-(none: the game uses ~/Documents/My Games/...)}"
+  exit 0
+fi
+
+# --- The init folder: FAF's init file, our fa_path.lua, FAF's game data ----------------------
+init="${XDG_DATA_HOME:-$HOME/.local/share}/faf-re/init"
+mkdir -p "$init/bin" || die "cannot create $init"
+cp -f "$faf_data/bin/init_faf.lua" "$init/bin/init_faf.lua"
+lua_string() { printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
+{
+  echo "-- Written by faf-launch for each start; FAF's own is $faf_path_lua"
+  echo "fa_path = $(lua_string "$fa")"
+  [ -n "$vault" ] && echo "custom_vault_path = $(lua_string "$vault")"
+  # The rest of FAF's (GameType, GameVersion, ...), which init_faf.lua may read.
+  if [ -f "$faf_path_lua" ]; then
+    grep -vE '^[[:space:]]*(fa_path|custom_vault_path)[[:space:]]*=' "$faf_path_lua" | tr -d '\r' || true
+  fi
+} > "$init/fa_path.lua.new"
+mv -f "$init/fa_path.lua.new" "$init/fa_path.lua"
+if [ -e "$init/gamedata" ] && [ ! -L "$init/gamedata" ]; then
+  die "$init/gamedata is not the link faf-launch makes; move it away"
+fi
+ln -sfn "$faf_data/gamedata" "$init/gamedata"
+
+exec "$program" /init "$init/bin/init_faf.lua" "$@"
