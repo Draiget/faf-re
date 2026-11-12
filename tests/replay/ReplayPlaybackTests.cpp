@@ -445,6 +445,41 @@ TEST(
   std::filesystem::remove_all(out, ignored);
 }
 
+// --bot-obs (src/headless/BotObservation.cpp): army 0's view and its player's commands, one JSON object per line every
+// --bot-obs-every beats. It can't share a run with --focus-switch, so it gets its own. Observing must not change the
+// recorded checksums, and the file gets samples.
+TEST(
+  ReplayPlayback,
+  BotObservationWritesSamplesAndKeepsTheChecksums
+)
+{
+  const std::vector<SReplay> replays = Replays();
+  if (replays.empty()) {
+    GTEST_SKIP() << "set FAF_REPLAY_DATA to a folder with replays/ and faf/bin/ (see the file's header)";
+  }
+  const SReplay& replay = replays.front();
+  SCOPED_TRACE("replay " + replay.id);
+  const std::filesystem::path out = LogFolder() / ("botobs_" + replay.id + ".jsonl");
+  std::error_code ignored;
+  std::filesystem::remove(out, ignored);
+  const SRun run =
+    PlayReplay(replay, "ctest_botobs_" + replay.id, " --focus 0 --bot-obs " + Quoted(out) + " --bot-obs-every 50");
+  ExpectMatchedToTheEnd(run);
+
+  std::ifstream samples(out);
+  int lines = 0;
+  for (std::string line; std::getline(samples, line);) {
+    if (line.empty()) {
+      continue;
+    }
+    ++lines;
+    EXPECT_EQ(line.front(), '{') << "line " << lines << " is no JSON object: " << line.substr(0, 80);
+  }
+  EXPECT_GT(lines, 10) << "too few samples in " << out.string();
+  samples.close();
+  std::filesystem::remove(out, ignored);
+}
+
 #if defined(FAF_HEADLESS_SERVER_MODE)
 namespace
 {
