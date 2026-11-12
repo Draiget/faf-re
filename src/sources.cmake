@@ -17,7 +17,6 @@ set(FAF_ENGINE_SOURCES
   gpg/core/containers/ArchiveSerialization.cpp
   moho/misc/CrtRuntimeExportedHelpers.cpp
   moho/misc/RuntimeTuningGlobals.cpp
-  moho/misc/DName.cpp
   moho/misc/StringUtils.cpp
   moho/misc/ID3DDeviceResources.cpp
   gpg/core/reflection/voidTypeInfo.cpp
