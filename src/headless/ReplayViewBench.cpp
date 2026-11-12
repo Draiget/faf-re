@@ -6,6 +6,7 @@
 #include <iterator>
 
 #include "headless/ReplayEffectDump.h"
+#include "headless/ReplayPoseDump.h"
 #include "headless/ReplaySyncSpy.h"
 #include "moho/sim/Sim.h"
 #include "remote/VisibilityOracle.h"
@@ -107,6 +108,17 @@ namespace faf::headless
     if (mEffectDump) {
       (void)mEffectDump->Finish(); // stops observing; the files are written once
     }
+    if (mPoseDump) {
+      (void)mPoseDump->Finish();
+    }
+  }
+
+  void CReplayViewBench::EnablePoseDump(
+    const std::string& prefix,
+    const std::int32_t army
+  )
+  {
+    mPoseDump = std::make_unique<CReplayPoseDump>(prefix, army, mMapSizeX, mMapSizeZ);
   }
 
   void CReplayViewBench::EnableEffects()
@@ -135,6 +147,23 @@ namespace faf::headless
     const SLanes& lanes
   )
   {
+    if (lanes.poses != nullptr && army < mPoseLaneBytes.size()) {
+      mPoseLaneBytes[army].push_back(static_cast<std::uint32_t>(lanes.poses->Bytes().size()));
+    }
+    if (mPoseDump && mRules != nullptr && static_cast<std::int32_t>(army) == mPoseDump->Army()) {
+      // Plan WP8.4: this army's client, applied on the runner's thread with lockstep's packet of the same beat.
+      static const remote::wire::BitWriter noLane;
+      const remote::wire::BitWriter& team = lanes.team != nullptr ? *lanes.team : noLane;
+      const remote::wire::BitWriter& poses = lanes.poses != nullptr ? *lanes.poses : noLane;
+      mPoseDump->QueueView(
+        *mRules,
+        ViewBeat(),
+        std::span<const std::uint8_t>(lanes.frame.Bytes().data(), lanes.frame.Bytes().size()),
+        std::span<const std::uint8_t>(team.Bytes().data(), team.Bytes().size()),
+        std::span<const std::uint8_t>(poses.Bytes().data(), poses.Bytes().size()),
+        lanes.poses != nullptr
+      );
+    }
     // On the view's own job (a worker or a pipeline thread): its two lanes, and its routed one read back.
     if (!mEffectRoutes || army >= mEffectViews.size() || army >= 32u) {
       return;
@@ -283,6 +312,10 @@ namespace faf::headless
   )
   {
     const auto sendStart = std::chrono::steady_clock::now();
+    mRules = sim.mRules;
+    if (PosesOn() && mPoseLaneBytes.size() < static_cast<std::size_t>(ArmyCount())) {
+      mPoseLaneBytes.resize(static_cast<std::size_t>(ArmyCount())); // before any view's job runs
+    }
     if (mEffectDump) {
       if (PipelineOn()) {
         // The last beat's views are done (`OnBeatStarting`): its client applies the dump army's view now.
@@ -455,6 +488,22 @@ namespace faf::headless
       summary += "; poses: " + std::to_string(Poses().PosedUnits()) + " units with a pose at the end, " +
         std::to_string(Poses().TotalChangedBones() / beats) + " bones changed a beat (all units), " +
         std::to_string(Poses().TotalHookedUnits() / beats) + " units a beat read from the animation hook's marks";
+      if (PoseBudget() != 0u) {
+        summary += ", budget " + std::to_string(PoseBudget()) + " bytes a beat, " + std::to_string(OwedPoses()) +
+          " poses owed at the end";
+      }
+      // Plan WP8.4: each view's pose lane, KB/s at 10 beats a second (KB = 1024 bytes).
+      for (std::size_t army = 0; army < mPoseLaneBytes.size(); ++army) {
+        if (mPoseLaneBytes[army].empty()) {
+          continue;
+        }
+        std::vector<double> lane;
+        lane.reserve(mPoseLaneBytes[army].size());
+        for (const std::uint32_t bytes : mPoseLaneBytes[army]) {
+          lane.push_back(static_cast<double>(bytes) * 10.0 / 1024.0);
+        }
+        summary += "\n  pose lane view " + std::to_string(army) + ": " + Distribution(lane, "KB/s");
+      }
     }
     if (SessionTables() != nullptr) {
       summary += "; session tables " + std::to_string(mTableRecords) + " records, " +
@@ -515,6 +564,10 @@ namespace faf::headless
     if (mEffectDump) {
       summary += "\n  ";
       summary += mEffectDump->Finish();
+    }
+    if (mPoseDump) {
+      summary += "\n  ";
+      summary += mPoseDump->Finish();
     }
     if (mEffectRoutes) {
       // Plan WP9.2: each view's effects lane, KB/s at 10 beats a second, with every op against routed.

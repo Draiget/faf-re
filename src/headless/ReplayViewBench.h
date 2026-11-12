@@ -20,6 +20,11 @@ namespace faf::server
   class CEffectOpRecorder;
 }
 
+namespace moho
+{
+  class RRuleGameRules;
+}
+
 // Engine addition, server mode (plan WP16.5, WPR.35): headless's `--view-bench <file>`. Run
 // unfocused, every beat it does the work a dedicated server does for its players and nothing a
 // check adds: every army's view but a civilian army's (no client receives one) is built with its
@@ -38,6 +43,7 @@ namespace faf::server
 namespace faf::headless
 {
   class CReplayEffectDump;
+  class CReplayPoseDump;
   class CReplaySyncSpy;
 
   class CReplayViewBench final : public remote::CViewLanes
@@ -98,6 +104,17 @@ namespace faf::headless
      * client (ReplayEffectDump.h). The comparison goes into `Summary`.
      */
     void EnableEffectDump(const std::string& prefix, std::int32_t army);
+    /**
+     * Plan WP8.4, `--pose-dump <prefix>` (with poses, serial views, and the sim focused on `army`): what that army's
+     * lockstep client draws of its units' bodies against its server-mode client applying its view's pose lane
+     * (ReplayPoseDump.h). The runner hands the dump lockstep's packets (`PoseDump`); the comparison goes into
+     * `Summary`.
+     */
+    void EnablePoseDump(const std::string& prefix, std::int32_t army);
+    [[nodiscard]] CReplayPoseDump* PoseDump() const noexcept
+    {
+      return mPoseDump.get();
+    }
     [[nodiscard]] std::string Summary() const;
     /** Lanes that did not encode, and what the check found (should stay 0). */
     [[nodiscard]] std::uint64_t Failures() const noexcept;
@@ -225,6 +242,11 @@ namespace faf::headless
     };
     std::unique_ptr<server::CEffectOpRecorder> mEffectRecorder;
     std::unique_ptr<CReplayEffectDump> mEffectDump; // `EnableEffectDump`
+    std::unique_ptr<CReplayPoseDump> mPoseDump;     // `EnablePoseDump`
+    moho::RRuleGameRules* mRules = nullptr;         // the sim's, from the first beat (the pose dump's client)
+    // Plan WP8.4, with poses: each view's pose lane bytes, one entry per beat, by army (each written by its view's
+    // own job only).
+    std::vector<std::vector<std::uint32_t>> mPoseLaneBytes;
     float mMapSizeX = 0.0f;
     float mMapSizeZ = 0.0f;
     std::unique_ptr<server::CEffectRoutes> mEffectRoutes;

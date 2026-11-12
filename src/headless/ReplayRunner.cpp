@@ -73,6 +73,7 @@
 #include "headless/ReplayCommandCheck.h"
 #include "headless/ReplayChangeSetCheck.h"
 #include "headless/ReplayEffectDump.h"
+#include "headless/ReplayPoseDump.h"
 #include "headless/ReplayOracleCheck.h"
 #include "headless/ReplayInboundCheck.h"
 #include "moho/effects/rendering/CEffectManagerImpl.h"
@@ -695,6 +696,23 @@ namespace faf::headless
         result.error = "--effect-dump needs --view-effects";
         return result;
       }
+      if (options.poseBudgetKbps > 0) {
+        // Plan WP8.2/WP8.4: each view's pose lane within the budget, as the server's --pose-budget-kbps.
+        viewBench->SetPoseBudget(static_cast<std::size_t>(options.poseBudgetKbps) * 1024u / 10u);
+      }
+      if (!options.poseDumpPath.empty()) {
+        // Plan WP8.4: lockstep's poses need the sim to keep the client's pose handles (`--keep-client-data`); the
+        // client's view is taken from the view's job with its beat, so the views are built one after another.
+        if (
+          !options.keepClientData || options.parallelViews || options.viewPipelineThreads > 0 ||
+          options.focusArmy < 0 || !options.viewPoses
+        ) {
+          result.error = "--pose-dump needs --keep-client-data, --view-poses and --focus <army>, and not "
+                         "--parallel-views or --view-pipeline";
+          return result;
+        }
+        viewBench->EnablePoseDump(options.poseDumpPath, options.focusArmy);
+      }
       if (options.viewTables) {
         viewBench->EnableBenchTables();
         if (options.statsEvery > 0) {
@@ -1042,6 +1060,9 @@ namespace faf::headless
 #if FAF_SERVER_MODE
         if (wireStats) {
           wireStats->OnPacket(*packet);
+        }
+        if (viewBench && viewBench->PoseDump() != nullptr) {
+          viewBench->PoseDump()->OnLockstepPacket(*packet); // plan WP8.4: lockstep's side, on this thread
         }
 #endif
         if (options.fpuReport && result.fpuReport.empty() && packet->mCurBeat >= 1) {

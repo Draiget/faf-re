@@ -25,6 +25,7 @@ set(FAF_HEADLESS_SOURCES
   headless/StateDigest.cpp
   headless/ReplayViewBench.cpp
   headless/ReplayEffectDump.cpp
+  headless/ReplayPoseDump.cpp
   headless/ReplayViewFrameStats.cpp
   headless/HeadlessEntry.cpp
   headless/HeadlessMain.cpp
@@ -48,6 +49,7 @@ set(FAF_HEADLESS_SERVER_SOURCES
   headless/ReplaySyncSpy.cpp
   headless/ReplayViewBench.cpp
   headless/ReplayEffectDump.cpp
+  headless/ReplayPoseDump.cpp
   headless/ReplayViewFrameStats.cpp
   headless/ReplayWireStats.cpp
 )

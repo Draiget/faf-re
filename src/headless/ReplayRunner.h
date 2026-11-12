@@ -35,7 +35,8 @@ namespace faf::headless
     bool seats = false;            // the commands through the game server's seats (ReplaySeats.h)
     std::string seatsListen; // with `seats`, Linux: the whole server's load: views and players over UDP at this address
     bool targetAudit = false; // with `seatsListen`: how many recorded targets a server's view wouldn't have held
-    int poseBudgetKbps = 0;   // with `seatsListen`: the server's --pose-budget-kbps (plan WP8.2); 0 none
+    int poseBudgetKbps =
+      0; // with `seatsListen` or `viewBenchPath`: the server's --pose-budget-kbps (plan WP8.2); 0 none
     bool poseCheck =
       false; // with `seatsListen`: every view's pose lane applied to a copy of its client's poses and compared
     bool oracleCheck = false;           // the visibility oracle against the sim's own publication (ReplayOracleCheck.h)
@@ -67,6 +68,7 @@ namespace faf::headless
     bool viewEffects = false;    // `--view-effects`: each view's effects lane, routed and with every op (plan WP9.2)
     std::string effectDumpPath;  // `--effect-dump <prefix>`: the focus army's effects, lockstep against its client's
     bool effectDumpCentred = false; // `--effect-dump-centred`: effect curves' random spread held at its centre
+    std::string poseDumpPath;       // `--pose-dump <prefix>`: the focus army's units drawn, lockstep against its client
     bool viewTeams = false;      // with `viewPipelineThreads`: one view per team and each player's own units
     std::string viewDumpPath;    // with `viewBenchPath`: what each client holds, every 2000 beats, to compare two runs
     bool parallelViews =

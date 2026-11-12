@@ -222,8 +222,8 @@ namespace
       "  --seats-listen <ip:port>  with --seats, Linux: and each seat's view over UDP to whoever joins as it, uid\n"
       "                            the source's index, token seat-<uid> (--view-pipeline: its threads)\n"
       "  --target-audit            with --seats-listen: how many recorded targets a server's view wouldn't have held\n"
-      "  --pose-budget-kbps <n>    with --seats-listen: each view's pose lane within n KB/s, as the server's (plan "
-      "WP8.2)\n"
+      "  --pose-budget-kbps <n>    with --seats-listen or --view-bench: each view's pose lane within n KB/s, as the\n"
+      "                            server's (plan WP8.2)\n"
       "  --pose-check              with --seats-listen: each view's pose lane applied to a copy of its client's "
       "poses,\n"
       "                            every unit it isn't owed compared with the server's (plan WP8.2)\n"
@@ -265,6 +265,11 @@ namespace
       "  --effect-dump <prefix>    with --view-effects --view-poses --keep-client-data --focus <army>: each effect of\n"
       "                            that army, lockstep against its server-mode client hosting its view's lane\n"
       "                            (<prefix>.lockstep.csv, .client.csv, .join.txt)\n"
+      "  --pose-dump <prefix>      with --view-poses --keep-client-data --focus <army> (serial views): every unit "
+      "that\n"
+      "                            army sees, drawn by lockstep and by its server-mode client applying its view's "
+      "pose\n"
+      "                            lane, bone by bone (<prefix>.beats.csv, .worst.csv, .summary.txt)\n"
       "  --effect-dump-centred     with --effect-dump: the effect curves' random spread held at its centre in both\n"
       "                            runtimes, so each emitter's counts compare one for one\n"
       "  --view-dump <file>       with --view-bench: what each player's client holds every 2000 beats, to compare two "
@@ -451,6 +456,7 @@ int HEADLESS_Main(
   options.viewEffects = moho::CFG_GetArgOption("--view-effects", 0, nullptr);
   (void)ReadOption("--effect-dump", options.effectDumpPath); // plan WP9.5
   options.effectDumpCentred = moho::CFG_GetArgOption("--effect-dump-centred", 0, nullptr);
+  (void)ReadOption("--pose-dump", options.poseDumpPath); // plan WP8.4
   if (std::string statsEvery; ReadOption("--stats-every", statsEvery)) {
     options.statsEvery = std::atoi(statsEvery.c_str());
   }
