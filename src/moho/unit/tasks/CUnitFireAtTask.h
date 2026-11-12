@@ -191,12 +191,4 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitFireAtTask(gpg::RRef* outRef, moho::CUnitFireAtTask* value);
 
-  /**
-   * Address: 0x0060C800 (FUN_0060C800)
-   *
-   * What it does:
-   * Wrapper lane that materializes one temporary `RRef_CUnitFireAtTask` and
-   * copies object/type fields into the destination reference record.
-   */
-  gpg::RRef* AssignCUnitFireAtTaskRef(gpg::RRef* outRef, moho::CUnitFireAtTask* value);
 } // namespace gpg

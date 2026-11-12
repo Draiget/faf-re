@@ -1950,33 +1950,6 @@ EReconFlags CAiReconDBImpl::ReconCanDetect(
 }
 
 /**
- * Address: 0x005C19C0 (FUN_005C19C0)
- *
- * What it does:
- * Register-shape adapter that computes underwater state from map water lanes
- * and forwards one rect probe to `CAiReconDBImpl::GetReconFlagsForRect`.
- */
-[[maybe_unused]] EReconFlags ReconCanDetectRectWithWaterAdapter(
-  const CAiReconDBImpl* const reconDb,
-  const EReconFlags oldFlags,
-  const moho::Rect2<int>& rect,
-  const float y
-)
-{
-  if (reconDb == nullptr) {
-    return oldFlags;
-  }
-
-  // Engine addition (water bodies): the level at the rectangle's centre.
-  const float waterElevation = reconDb->mMapData
-    ? reconDb->mMapData->GetWaterElevationAt(
-        static_cast<float>(rect.x0 + rect.x1) * 0.5f, static_cast<float>(rect.z0 + rect.z1) * 0.5f
-      )
-    : -10000.0f;
-  return reconDb->GetReconFlagsForRect(rect, oldFlags, waterElevation > y);
-}
-
-/**
  * Address: 0x005C18F0 (FUN_005C18F0, Moho::CAiReconDBImpl::ReconCanDetect)
  *
  * Entity *, Wm3::Vector3<float> const &, EReconFlags
@@ -2039,37 +2012,6 @@ bool CAiReconDBImpl::BeamIsVisible(
     beam.mCurStart.pos_.z + beam.mEnd.z,
   };
   return ReconCanDetect(beamEndProbe, RECON_LOSNow) != RECON_None;
-}
-
-/**
- * Address: 0x005C1810 (FUN_005C1810, Moho::CAiReconDBImpl::IntelConfirmDead)
- *
- * ReconBlip *
- *
- * IDA signature:
- * bool __usercall Moho::CAiReconDBImpl::IntelConfirmDead@<al>(
- *   Moho::ReconBlip *blip@<eax>, Moho::CAiReconDBImpl *this@<ecx>);
- *
- * What it does:
- * Confirms dead-state visibility when the blip is allied or currently
- * detectable via LOS at its probe position.
- */
-bool CAiReconDBImpl::IntelConfirmDead(
-  ReconBlip* const blip
-)
-{
-  if (!blip) {
-    return false;
-  }
-
-  // 0x005C1815..0x005C1826: the VIEWER's index tested against the BLIP army's
-  // ally set (0x005BD630 on `blip->ArmyRef + 8`), the ReconTick direction.
-  if (BlipArmyTreatsViewerAsAlly(this, blip)) {
-    return true;
-  }
-
-  // 0x005C1837: the LOS probe sits at the pending position (`blip+0x160`).
-  return ReconCanDetect(blip, BlipProbePosition(blip), RECON_LOSNow) != RECON_None;
 }
 
 /**

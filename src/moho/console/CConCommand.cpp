@@ -1013,18 +1013,6 @@ void moho::CON_Printf(
 }
 
 /**
- * Address: 0x0041D3C0 (FUN_0041D3C0,
- * ?CON_GetExecuteStack@Moho@@YAABV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@XZ)
- *
- * What it does:
- * Returns the global saved execute stack.
- */
-const fa::vector<fa::string>& moho::CON_GetExecuteStack()
-{
-  return gSavedConsoleCommands;
-}
-
-/**
  * Address: 0x0041D3D0 (FUN_0041D3D0, ?CON_FindCommand@Moho@@YAPAVCConCommand@1@PBD@Z)
  *
  * What it does:

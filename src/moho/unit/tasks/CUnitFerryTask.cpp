@@ -1225,26 +1225,4 @@ namespace gpg
     return gpg::WriteDerivedRef(outRef, value);
   }
 
-  /**
-   * Address: 0x006105B0 (FUN_006105B0)
-   *
-   * What it does:
-   * Wrapper lane that materializes one temporary `RRef_CUnitFerryTask` and
-   * copies object/type fields into the destination reference record.
-   */
-  gpg::RRef* AssignCUnitFerryTaskRef(
-    gpg::RRef* const outRef,
-    moho::CUnitFerryTask* const value
-  )
-  {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    gpg::RRef temporaryRef{};
-    (void)RRef_CUnitFerryTask(&temporaryRef, value);
-    outRef->mObj = temporaryRef.mObj;
-    outRef->mType = temporaryRef.mType;
-    return outRef;
-  }
 } // namespace gpg

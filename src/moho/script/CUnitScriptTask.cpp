@@ -223,20 +223,6 @@ moho::CScrLuaMetatableFactory<moho::CUnitScriptTask>& moho::CScrLuaMetatableFact
 }
 
 /**
- * Address: 0x006240F0 (FUN_006240F0)
- *
- * What it does:
- * Rebinds the startup metatable-factory index lane for
- * `CScrLuaMetatableFactory<CUnitScriptTask>` and returns that singleton.
- */
-moho::CScrLuaMetatableFactory<moho::CUnitScriptTask>* moho::startup_CScrLuaMetatableFactory_CUnitScriptTask_Index()
-{
-  auto& instance = CScrLuaMetatableFactory<CUnitScriptTask>::Instance();
-  instance.SetFactoryObjectIndexForRecovery(CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-  return &instance;
-}
-
-/**
  * Address: 0x00623B50 (FUN_00623B50,
  * ?Create@?$CScrLuaMetatableFactory@VCUnitScriptTask@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
  *
@@ -824,23 +810,6 @@ void CUnitScriptTask::OnEvent(
 
 namespace gpg
 {
-  /**
-   * Address: 0x006240C0 (FUN_006240C0, reflection pair-pack thunk alias)
-   *
-   * What it does:
-   * Builds one `CUnitScriptTask` reflection reference then writes the pair into
-   * caller-provided `RRef` storage.
-   */
-  gpg::RRef* PackCUnitScriptTaskRefPair(
-    moho::CUnitScriptTask* const value,
-    gpg::RRef* const outPair
-  )
-  {
-    gpg::RRef typedRef{};
-    (void)gpg::RRef_CUnitScriptTask(&typedRef, value);
-    *outPair = typedRef;
-    return outPair;
-  }
 
   /**
    * Address: 0x006242A0 (FUN_006242A0, gpg::RRef_CUnitScriptTask)

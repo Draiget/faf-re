@@ -505,25 +505,6 @@ void Unit::SetGuardedUnit(
 }
 
 /**
- * Address: 0x006AA720 (FUN_006AA720, ?RemoveGuardedByUnit@Unit@Moho@@AAEXPAV12@@Z)
- * Mangled: ?RemoveGuardedByUnit@Unit@Moho@@AAEXPAV12@@Z
- *
- * What it does:
- * Inserts one guarding owner into this unit's guarded-by list when non-null,
- * then clears this unit's guard-formation lane.
- */
-void Unit::RemoveGuardedByUnit(
-  Unit* const guardedByUnit
-)
-{
-  if (guardedByUnit != nullptr) {
-    (void)GuardedByList.Add(guardedByUnit); // 0x0057DDD0
-  }
-
-  ClearGuardFormation(this);
-}
-
-/**
  * Address: 0x00585B10 (FUN_00585B10, Moho::Unit::GetFocusEntity)
  */
 Entity* Unit::GetFocusEntity() const
@@ -575,19 +556,6 @@ Unit* Unit::GetTransportedBy() const
 Unit* Unit::GetFerryUnit() const
 {
   return AssignedTransportRef.GetObjectPtr();
-}
-
-/**
- * Address: 0x0060DAD0 (FUN_0060DAD0, Moho::Unit::SetAssignedTransport)
- *
- * What it does:
- * Rebinds this unit's assigned-transport weak-reference lane.
- */
-void Unit::SetAssignedTransport(
-  Unit* const assignedTransport
-)
-{
-  AssignedTransportRef.Set(assignedTransport);
 }
 
 /**

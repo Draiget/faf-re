@@ -1013,17 +1013,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0089E2B0 (FUN_0089E2B0, Moho::CWldSplat::GetSplatVertices)
-   *
-   * What it does:
-   * Returns the first vertex lane for the splat quad.
-   */
-  CWldSplat::SplatVertex* CWldSplat::GetSplatVertices() noexcept
-  {
-    return mSplatVertices;
-  }
-
-  /**
    * Address: 0x00878190 (FUN_00878190, Moho::CDecalManager::NewSplat)
    *
    * What it does:

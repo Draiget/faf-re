@@ -156,59 +156,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00778AD0 (FUN_00778AD0)
-   *
-   * What it does:
-   * Tests whether one army-index visibility bit is set in
-   * `mArmyVisibilityFlags`.
-   */
-  bool CDecalHandle::IsArmyVisibleForIndex(
-    const std::uint8_t armyIndex
-  ) const noexcept
-  {
-    const std::uint32_t mask = (1u << (static_cast<std::uint32_t>(armyIndex) & 31u));
-    return (mArmyVisibilityFlags & mask) != 0u;
-  }
-
-  /**
-   * Address: 0x00778AF0 (FUN_00778AF0)
-   *
-   * What it does:
-   * Sets one army-index visibility bit in `mArmyVisibilityFlags` and returns
-   * this handle.
-   */
-  CDecalHandle* CDecalHandle::SetArmyVisibleForIndex(
-    const std::uint8_t armyIndex
-  ) noexcept
-  {
-    const std::uint32_t mask = (1u << (static_cast<std::uint32_t>(armyIndex) & 31u));
-    mArmyVisibilityFlags |= mask;
-    return this;
-  }
-
-  /**
-   * Address: 0x00778B00 (FUN_00778B00)
-   *
-   * What it does:
-   * Returns the handle creation tick lane.
-   */
-  std::uint32_t CDecalHandle::GetCreatedAtTickValue() const noexcept
-  {
-    return mCreatedAtTick;
-  }
-
-  /**
-   * Address: 0x00778B10 (FUN_00778B10)
-   *
-   * What it does:
-   * Returns true when the focus-visibility flag lane is non-zero.
-   */
-  bool CDecalHandle::IsVisibleInFocusFlagSet() const noexcept
-  {
-    return mVisibleInFocus != 0u;
-  }
-
-  /**
    * Address: 0x0077F1E0 (FUN_0077F1E0, Moho::CDecalHandle::MemberDeserialize)
    *
    * What it does:

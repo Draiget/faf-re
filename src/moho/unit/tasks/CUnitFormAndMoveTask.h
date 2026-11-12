@@ -144,14 +144,6 @@ namespace moho
     "CUnitFormAndMoveTask::mFormationArrivalSatisfied offset must be 0x64"
   );
 
-  /**
-   * Address: 0x0061A3E0 (FUN_0061A3E0)
-   *
-   * What it does:
-   * Thin alias lane that forwards one `(task, archive)` pair into
-   * `CUnitFormAndMoveTask::MemberSerialize`.
-   */
-  void CUnitFormAndMoveTaskMemberSerializeAlias(const CUnitFormAndMoveTask* task, gpg::WriteArchive* archive);
 } // namespace moho
 
 namespace gpg
@@ -166,13 +158,4 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitFormAndMoveTask(gpg::RRef* outRef, moho::CUnitFormAndMoveTask* value);
 
-  /**
-   * Address: 0x0061A380 (FUN_0061A380)
-   *
-   * What it does:
-   * Wrapper lane that materializes one temporary
-   * `RRef_CUnitFormAndMoveTask` and copies object/type fields into the
-   * destination reference record.
-   */
-  gpg::RRef* AssignCUnitFormAndMoveTaskRef(gpg::RRef* outRef, moho::CUnitFormAndMoveTask* value);
 } // namespace gpg

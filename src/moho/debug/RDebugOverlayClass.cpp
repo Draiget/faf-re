@@ -158,13 +158,6 @@ namespace moho
     mOverlayClassLink.ListLinkBefore(&GetDbgOverlays());
   }
 
-  void RDebugOverlayClass::RegisterOverlayClassToken(
-    const char* const overlayToken
-  )
-  {
-    RegisterOverlayClass(GetName(), overlayToken);
-  }
-
   /**
    * Address: 0x00651760 (FUN_00651760, GetDbgOverlays)
    * Address: 0x00651F20 (FUN_00651F20, the static's constructor out of line:

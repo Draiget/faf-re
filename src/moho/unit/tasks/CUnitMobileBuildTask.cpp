@@ -217,20 +217,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00605CD0 (FUN_00605CD0)
-   *
-   * What it does:
-   * Stores one blueprint pointer lane and returns this task.
-   */
-  CUnitMobileBuildTask* CUnitMobileBuildTask::SetBlueprint(
-    const RUnitBlueprint* const blueprint
-  ) noexcept
-  {
-    mBlueprint = blueprint;
-    return this;
-  }
-
-  /**
    * Address: 0x005F6C70 (FUN_005F6C70, sub_5F6C70)
    *
    * Sphere-queries units near the build site (radius = larger footprint extent

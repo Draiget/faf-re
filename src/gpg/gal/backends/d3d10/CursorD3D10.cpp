@@ -107,31 +107,6 @@ namespace gpg::gal
   {}
 
   /**
-   * Address: 0x008F80B0 (FUN_008F80B0)
-   *
-   * void *
-   *
-   * What it does:
-   * Rebinds one cursor instance to `CursorD3D10` vtable ownership, clears the
-   * icon lane, and preserves the existing retained cursor-handle lane.
-   */
-  CursorD3D10* InitializeCursorD3D10WithRetainedCursorLane(
-    CursorD3D10* const cursor,
-    void* const reserved
-  ) noexcept
-  {
-    if (cursor == nullptr) {
-      return nullptr;
-    }
-
-    const HCURSOR retainedCursor = cursor->previousCursor_;
-    ::new (static_cast<void*>(cursor)) CursorD3D10();
-    cursor->previousCursor_ = retainedCursor;
-    static_cast<void>(reserved);
-    return cursor;
-  }
-
-  /**
    * Address: 0x008F8360 (FUN_008F8360)
    *
    * What it does:

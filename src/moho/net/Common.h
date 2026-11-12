@@ -316,14 +316,6 @@ namespace moho
   bool NET_Init();
 
   /**
-   * Address: 0x0047F540 (FUN_0047F540, NETMAIL_SendError)
-   *
-   * What it does:
-   * Legacy no-op mail/error reporting hook.
-   */
-  void NETMAIL_SendError(const char* title, const char* message);
-
-  /**
    * Address: 0x0047F990 (FUN_0047F990)
    */
   CHostManager* NET_GetHostManager();
@@ -393,20 +385,6 @@ namespace moho
    * throws `std::domain_error`.
    */
   fa::string NET_GetProtocolName(ENetProtocolType protocol);
-
-  /**
-   * Address: 0x0047EBF0 (FUN_0047EBF0, NET_MakeConnector)
-   *
-   * What it does:
-   * Creates protocol-specific connector implementation for `port`, using NAT
-   * traversal provider only on UDP.
-   * Unknown/`kNone` protocol values produce a `CNetNullConnector`.
-   */
-  INetConnector* NET_MakeConnector(
-    u_short port,
-    ENetProtocolType protocol,
-    const boost::weak_ptr<INetNATTraversalProvider>& natTraversalProvider
-  );
 
   /**
    * Address: 0x0048BBE0 (FUN_0048BBE0)

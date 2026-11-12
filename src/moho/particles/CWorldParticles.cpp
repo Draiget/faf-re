@@ -886,18 +886,6 @@ namespace moho
 
   CWorldParticles sWorldParticles{};
 
-  /**
-   * Address: 0x00495440 (FUN_00495440, sub_495440)
-   *
-   * What it does:
-   * Returns the global world-particles singleton used by engine render/update
-   * paths.
-   */
-  CWorldParticles* GetGlobalWorldParticles() noexcept
-  {
-    return &sWorldParticles;
-  }
-
   ID3DIndexSheet* GetSharedTrailQuadIndexSheet() noexcept
   {
     return sSharedTrailQuadIndexSheet.get();
@@ -1489,15 +1477,4 @@ namespace moho
     sWorldParticles.mInstantiated = false;
   }
 
-  /**
-   * Address: 0x00492E70 (FUN_00492E70)
-   *
-   * What it does:
-   * Returns the global world-particles singleton after restoring the base
-   * interface lane used by legacy exit paths.
-   */
-  [[nodiscard]] CWorldParticles* GetLegacyWorldParticlesSingleton() noexcept
-  {
-    return &sWorldParticles;
-  }
 } // namespace moho

@@ -160,8 +160,6 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive, int version);
 
-    [[nodiscard]] std::uint32_t GetVisibilityGridMask() const noexcept;
-    void SetVisibilityGridMask(std::uint32_t gridMask) noexcept;
     [[nodiscard]] bool UsesUnderwaterReconGrid() const noexcept;
 
     boost::shared_ptr<RScmResource> mScmResource; // 0x00

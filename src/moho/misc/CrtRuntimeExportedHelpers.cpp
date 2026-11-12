@@ -32,20 +32,6 @@
 }
 
 /**
- * Address: 0x00A8FB50 (FUN_00A8FB50, EngineToLowerWideWithCurrentLocale)
- *
- * What it does:
- * Lowercases one wide character under the current CRT locale lane. Called per
- * character by the typed wxString lowercase loop in `WxRuntimeTypes.cpp`.
- */
-int EngineToLowerWideWithCurrentLocale(
-  const wchar_t character
-)
-{
-  return static_cast<int>(_towlower_l(static_cast<wint_t>(character), nullptr));
-}
-
-/**
  * Address: 0x00A8FC4B (FUN_00A8FC4B, `_wtoi` wrapper lane)
  *
  * What it does:
@@ -56,43 +42,4 @@ extern "C" int __cdecl EngineWtoiFromWide(
 )
 {
   return static_cast<int>(::wcstol(text, nullptr, 10));
-}
-
-/**
- * Address: 0x00A8FC71 (FUN_00A8FC71, `_wtoi` thunk lane)
- *
- * What it does:
- * Tail-forwards one `_wtoi` thunk lane into `EngineWtoiFromWide`.
- */
-extern "C" int __cdecl EngineWtoiFromWideThunk(
-  const wchar_t* const text
-)
-{
-  return EngineWtoiFromWide(text);
-}
-
-/**
- * Address: 0x00A8xxxx (func_wstrFindLast)
- *
- * IDA signature:
- * _WORD *__cdecl func_wstrFindLast(_WORD *a1, __int16 a2);
- *
- * What it does:
- * `wcsrchr`: walks to the terminator, then scans back for `needle` and returns
- * that position, or null when absent. Searching for the terminator itself
- * finds it, because the backward scan starts there.
- */
-extern "C" wchar_t* __cdecl EngineWideStringFindLast(
-  wchar_t* const text,
-  const wchar_t needle
-)
-{
-  wchar_t* cursor = text;
-  while (*cursor++ != L'\0') {}
-
-  do {
-    --cursor;
-  } while (cursor != text && *cursor != needle);
-
-  return (*cursor == needle) ? cursor : nullptr;
 }

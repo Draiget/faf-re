@@ -3028,20 +3028,6 @@ void moho::WRenViewport::ReleaseWaterBodyReflections()
 }
 
 /**
- * Address: 0x007F7ED0 (FUN_007F7ED0, ?SetViewportToFullScreen@WRenViewport@Moho@@AAEXXZ)
- *
- * What it does:
- * Applies a full-head viewport rectangle (`(0,0)` to `mFullScreen`) to the
- * active D3D device viewport state.
- */
-void moho::WRenViewport::SetViewportToFullScreen()
-{
-  moho::CD3DDevice* const device = moho::D3D_GetDevice();
-  Wm3::Vector2i screenOrigin{0, 0};
-  device->SetViewport(&screenOrigin, &mFullScreen, 0.0f, 1.0f);
-}
-
-/**
  * Address: 0x007F7EA0 (FUN_007F7EA0, ?SetViewportToLocalScreen@WRenViewport@Moho@@AAEXXZ)
  *
  * What it does:

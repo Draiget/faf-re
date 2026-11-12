@@ -560,19 +560,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00896570 (FUN_00896570, ?SetCursorInfo@CWldSession@Moho@@QAEXABUUICursorInfo@2@@Z)
-   *
-   * What it does:
-   * Copies one cursor-info payload into the session cursor-info lane.
-   */
-  void CWldSession::SetCursorInfo(
-    const MouseInfo& cursorInfo
-  )
-  {
-    CursorInfo() = cursorInfo;
-  }
-
-  /**
    * Address: 0x00895FF0 (FUN_00895FF0, ?GetSelection@CWldSession@Moho@@QBEABV?$WeakSet@VUserEntity@Moho@@@2@XZ)
    *
    * What it does:
@@ -669,24 +656,6 @@ namespace moho
       return sTestHoveredEntity.GetObjectPtr();
     }
     return GetCursorInfo().HoveredEntity();
-  }
-
-  /**
-   * Address: 0x008965C0 (FUN_008965C0, ?BecomeObserver@CWldSession@Moho@@QAEXXZ)
-   *
-   * What it does:
-   * Validates observer focus request (`-1`) and applies it to the active sim
-   * driver when allowed.
-   */
-  void CWldSession::BecomeObserver()
-  {
-    if (!ValidateFocusArmyRequest(-1)) {
-      return;
-    }
-
-    if (ISTIDriver* const activeDriver = sSimDriver.get()) {
-      activeDriver->SetArmyIndex(-1);
-    }
   }
 
   /**
@@ -914,17 +883,6 @@ namespace moho
     }
 
     return true;
-  }
-
-  /**
-   * Address: 0x00894120 (FUN_00894120, ?GetTerrainRes@CWldSession@Moho@@QBEPAVIWldTerrainRes@2@XZ)
-   *
-   * What it does:
-   * Returns the world-map terrain resource lane owned by this world session.
-   */
-  IWldTerrainRes* CWldSession::GetTerrainRes() const
-  {
-    return mWldMap->mTerrainRes;
   }
 
   /**
@@ -1278,50 +1236,6 @@ namespace moho
       mCommandGraph = graph;
     }
     return graph;
-  }
-
-  /**
-   * Address: 0x00895DC0 (FUN_00895DC0, ?HandleFogEdge@CWldSession@Moho@@AAEXABV?$Rect2@H@gpg@@HH@Z)
-   *
-   * What it does:
-   * Clears edge-fog rows when focus army is invalid and marks every edge lane
-   * outside the visible rectangle as blocked (`0xFF`).
-   */
-  void CWldSession::HandleFogEdge(
-    const gpg::Rect2i& visibleRect,
-    const int width,
-    const int height
-  )
-  {
-    if (FocusArmy < 0 || userArmies[static_cast<std::size_t>(FocusArmy)] == nullptr) {
-      char* row = mEdgeFog.GetPtr(0u, 0u);
-      for (int y = 0; y < height; ++y) {
-        std::memset(row, 0, static_cast<std::size_t>(width));
-        row += width;
-      }
-    }
-
-    if (visibleRect.x0 > 0 || visibleRect.z0 > 0 || visibleRect.x1 < width || visibleRect.z1 < height) {
-      char* row = mEdgeFog.GetPtr(0u, 0u);
-      for (int y = 0; y < height; ++y, row += width) {
-        if (y < visibleRect.z0 || y >= visibleRect.z1) {
-          std::memset(row, 0xFF, static_cast<std::size_t>(width));
-          continue;
-        }
-
-        if (visibleRect.x0 <= 0) {
-          *row = static_cast<char>(0xFF);
-        } else {
-          std::memset(row, 0xFF, static_cast<std::size_t>(visibleRect.x0));
-        }
-
-        if (visibleRect.x1 >= (width - 1)) {
-          row[width - 1] = static_cast<char>(0xFF);
-        } else {
-          std::memset(row + visibleRect.x1, 0xFF, static_cast<std::size_t>(width - visibleRect.x1));
-        }
-      }
-    }
   }
 
   /**
@@ -2439,17 +2353,6 @@ namespace moho
     }
 
     return 0.0f;
-  }
-
-  /**
-   * Address: 0x00895FD0 (FUN_00895FD0, ?GetGameTime@CWldSession@Moho@@QBEMXZ)
-   *
-   * What it does:
-   * Returns current game time in seconds.
-   */
-  float CWldSession::GetGameTime() const
-  {
-    return (static_cast<float>(mGameTick) + mTimeSinceLastTick) * 0.1f;
   }
 
   /**

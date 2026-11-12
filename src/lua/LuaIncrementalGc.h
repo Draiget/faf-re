@@ -163,7 +163,6 @@ void faf_lua51_gc_link_upval(lua_State* L, UpVal* upvalue);
 void faf_lua51_gc_barrier_f(lua_State* L, GCObject* object, GCObject* value);
 void faf_lua51_gc_barrier_back(lua_State* L, Table* table);
 void faf_lua51_gc_barrier_value(lua_State* L, GCObject* object, const LuaPlus::TObject* value);
-bool faf_lua51_gc_is_active(global_State* g);
 void faf_lua51_gc_mark_object(global_State* g, GCObject* object);
 void faf_lua51_gc_revive_string(lua_State* L, GCObject* object);
 bool faf_lua51_gc_sweep_string_active(lua_State* L);

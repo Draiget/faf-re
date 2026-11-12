@@ -81,17 +81,6 @@ namespace moho
   void ED_SetHook(IEdRenderHook* hook);
 
   /**
-   * Address: 0x007B6440 (FUN_007B6440)
-   *
-   * IDA signature:
-   * int sub_7B6440()
-   *
-   * What it does:
-   * Returns the installed editor render hook.
-   */
-  [[nodiscard]] IEdRenderHook* ED_GetHook();
-
-  /**
    * Address: 0x007B6450 (FUN_007B6450)
    *
    * IDA signature:

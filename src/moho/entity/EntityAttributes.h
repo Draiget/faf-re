@@ -135,8 +135,6 @@ namespace moho
      * jammer/spoof lanes always report disabled.
      */
 
-    [[nodiscard]] bool IsEnabled(EEntityAttribute attribute) const noexcept;
-
     /**
      * Address: 0x00689DC0 (FUN_00689DC0, Moho::EntityAttributes::SetEnabled)
      *

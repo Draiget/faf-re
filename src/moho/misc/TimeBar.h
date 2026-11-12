@@ -111,17 +111,6 @@ namespace moho
   static_assert(sizeof(CTimeBarSection) == 0x14, "CTimeBarSection size must be 0x14");
 
   /**
-   * Address: 0x004E6F30 (FUN_004E6F30)
-   * Mangled: ?TIME_TimeBarEvent@Moho@@YAXPBD@Z
-   *
-   * char const *
-   *
-   * What it does:
-   * Emits an instantaneous named marker event into the global time-bar history.
-   */
-  void TIME_TimeBarEvent(const char* name);
-
-  /**
    * Address: 0x004E6FD0 (FUN_004E6FD0)
    *
    * int

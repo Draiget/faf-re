@@ -63,27 +63,7 @@
 
 using namespace LuaPlus;
 
-extern "C" void __cdecl _free_crt(void* ptr);
 extern "C" int luaG_checkcode(const Proto* f);
-
-/**
- * Legacy CRT `_free_crt` compat thunk. NOT a recovered binary function - this
- * is build-side glue, so it carries no `Address:` block. (It previously
- * claimed 0x004F2730, which is really
- * `?WIN_CopyToClipboard@Moho@@YA_NVStrArgW@gpg@@@Z`, recovered in
- * moho/app/WinApp.cpp.)
- *
- * What it does:
- * Forwards to `std::free`. Provides the legacy `_free_crt` symbol expected by
- * recovered code that allocates via the legacy CRT free path. Defined here
- * because `legacy_stdio_definitions.lib` does not export this thunk on UCRT.
- */
-extern "C" void __cdecl _free_crt(
-  void* const ptr
-)
-{
-  std::free(ptr);
-}
 
 /**
  * Legacy CRT `_iob[]` global array shim.
@@ -100,20 +80,6 @@ extern "C" void __cdecl _free_crt(
 // Linked statically (/MT), the CRT's own _file.obj defines `_iob`.
 extern "C" __declspec(selectany) std::FILE _iob[20]{};
 #endif
-
-/**
- * Legacy CRT errno-mapping thunk.
- *
- * Maps a Win32 error code to a POSIX `errno` value. The old MSVCRT exported
- * `_dosmaperr` (single underscore C, `__dosmaperr` with the linker's extra
- * underscore decoration); UCRT still provides the mapping through internal
- * helpers but not under this exact symbol when /MDd is combined with legacy
- * obj files. No-op here since callers only use it to propagate errors.
- */
-extern "C" void __cdecl _dosmaperr(
-  unsigned long
-)
-{}
 
 /**
  * Address: 0x00A89E54 (legacy CRT compat thunk)
@@ -659,19 +625,6 @@ void* lua_getglobaluserdata(
   return state->l_G->globalUserData;
 }
 #define lua_getglobaluserdata lua_getglobaluserdata_typed
-
-/**
- * Address: 0x009240A0 (FUN_009240A0, lua_getstateuserdata)
- *
- * What it does:
- * Returns LuaPlus state wrapper pointer stored in `lua_State::stateUserData`.
- */
-void* lua_getstateuserdata(
-  lua_State* const state
-)
-{
-  return state->stateUserData;
-}
 
 /**
  * Address: 0x0090C530 (FUN_0090C530, lua_newthread)

@@ -272,39 +272,6 @@ namespace moho
     vY.z = (vZ.x * vX.y) - (vZ.y * vX.x);
   }
 
-  /**
-   * Address: 0x004EC850 (FUN_004EC850, ?IsNormal@VAxes3@Moho@@QBE_NXZ)
-   * Mangled: ?IsNormal@VAxes3@Moho@@QBE_NXZ
-   *
-   * What it does:
-   * Checks that all three basis lanes are unit-length and verifies `vX`
-   * matches the reconstructed `vZ x vY` lane within epsilon.
-   */
-  bool VAxes3::IsNormal() const
-  {
-    constexpr float kUnitLengthEpsilon = 0.001f;
-    const auto squaredLength = [](const Wm3::Vector3f& axis) {
-      return (axis.x * axis.x) + (axis.y * axis.y) + (axis.z * axis.z);
-    };
-
-    if (std::fabs(squaredLength(vX) - 1.0f) > kUnitLengthEpsilon) {
-      return false;
-    }
-    if (std::fabs(squaredLength(vY) - 1.0f) > kUnitLengthEpsilon) {
-      return false;
-    }
-    if (std::fabs(squaredLength(vZ) - 1.0f) > kUnitLengthEpsilon) {
-      return false;
-    }
-
-    const Wm3::Vector3f reconstructedVX{
-      (vZ.z * vY.y) - (vZ.y * vY.z),
-      (vZ.x * vY.z) - (vY.x * vZ.z),
-      (vY.x * vZ.y) - (vZ.x * vY.y),
-    };
-    return PointsAreSimilarWithinEpsilon(vX, reconstructedVX);
-  }
-
   fa::string ToString(const Wm3::Vector3f& value);
 
   /**
@@ -348,21 +315,6 @@ namespace moho
     }
 
     return sIdentity;
-  }
-
-  /**
-   * Address: 0x004E9FA0 (FUN_004E9FA0)
-   *
-   * What it does:
-   * Stores one 32-bit lane into caller output storage.
-   */
-  [[maybe_unused]] std::uint32_t* WriteDwordLane9FA0(
-    std::uint32_t* const outLane,
-    const std::uint32_t value
-  ) noexcept
-  {
-    *outLane = value;
-    return outLane;
   }
 
   /**
@@ -764,53 +716,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0050B650 (FUN_0050B650, ?COORDS_LookAt@Moho@@YAXABV?$Vector3@M@Wm3@@PAVVAxes3@1@@Z)
-   *
-   * What it does:
-   * Builds look-at axes using world-up `(0,1,0)` and the supplied forward
-   * direction.
-   */
-  void COORDS_LookAt(
-    const Wm3::Vector3f& forward,
-    VAxes3* const axes
-  )
-  {
-    const Wm3::Vector3f worldUp{0.0f, 1.0f, 0.0f};
-    VEC_LookAt(worldUp, forward, axes);
-  }
-
-  /**
-   * Address: 0x0050B680 (FUN_0050B680, ?COORDS_LookAtXZ@Moho@@YAXABV?$Vector3@M@Wm3@@PAVVAxes3@1@@Z)
-   *
-   * What it does:
-   * Builds an XZ-plane-aligned basis from one direction vector without
-   * normalizing the projected axes.
-   */
-  VAxes3* COORDS_LookAtXZ(
-    VAxes3* const outAxes,
-    const Wm3::Vector3f& direction
-  )
-  {
-    const float lengthSq = (direction.x * direction.x) + (direction.y * direction.y) + (direction.z * direction.z);
-    if (lengthSq <= 0.0f) {
-      return outAxes;
-    }
-
-    outAxes->vX.x = direction.z;
-    outAxes->vX.y = 0.0f;
-    outAxes->vX.z = -direction.x;
-
-    outAxes->vY.x = 0.0f;
-    outAxes->vY.y = 1.0f;
-    outAxes->vY.z = 0.0f;
-
-    outAxes->vZ.x = direction.x;
-    outAxes->vZ.y = 0.0f;
-    outAxes->vZ.z = direction.z;
-    return outAxes;
-  }
-
-  /**
    * Address: 0x004F00E0 (FUN_004F00E0, Moho::VMatrix4TypeInfo::VMatrix4TypeInfo)
    */
   VMatrix4TypeInfo::VMatrix4TypeInfo()
@@ -883,83 +788,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x004ED8B0 (FUN_004ED8B0)
-   *
-   * What it does:
-   * Initializes one 3-float vector lane from three scalar source lanes.
-   */
-  [[maybe_unused]] Wm3::Vector3f* InitializeVector3fFromScalarLanes(
-    Wm3::Vector3f* const outVector,
-    const float* const xLane,
-    const float* const yLane,
-    const float* const zLane
-  ) noexcept
-  {
-    outVector->x = *xLane;
-    outVector->y = *yLane;
-    outVector->z = *zLane;
-    return outVector;
-  }
-
-  /**
-   * Address: 0x004ED930 (FUN_004ED930)
-   *
-   * What it does:
-   * Returns one float-lane pointer offset by `index`.
-   */
-  [[maybe_unused]] float* OffsetFloatLanePointer(
-    float* const baseLane,
-    const std::int32_t index
-  ) noexcept
-  {
-    return baseLane + index;
-  }
-
-  /**
-   * Address: 0x004EE300 (FUN_004EE300)
-   *
-   * What it does:
-   * Builds one 4x4 matrix from four row lanes in register-order mapping
-   * (`row0=edi`, `row1=esi`, `row2=edx`, `row3=ecx`).
-   */
-  [[maybe_unused]] VMatrix4* BuildVMatrix4FromRegisterRowLanesA(
-    const Vector4f* const laneEdxRow2,
-    const Vector4f* const laneEcxRow3,
-    const Vector4f* const laneEdiRow0,
-    const Vector4f* const laneEsiRow1,
-    VMatrix4* const outMatrix
-  ) noexcept
-  {
-    outMatrix->r[0] = *laneEdiRow0;
-    outMatrix->r[1] = *laneEsiRow1;
-    outMatrix->r[2] = *laneEdxRow2;
-    outMatrix->r[3] = *laneEcxRow3;
-    return outMatrix;
-  }
-
-  /**
-   * Address: 0x004EE4D0 (FUN_004EE4D0)
-   *
-   * What it does:
-   * Duplicate lane for building one 4x4 matrix from four row lanes in the
-   * same register-order mapping as `FUN_004EE300`.
-   */
-  [[maybe_unused]] VMatrix4* BuildVMatrix4FromRegisterRowLanesB(
-    const Vector4f* const laneEdxRow2,
-    const Vector4f* const laneEcxRow3,
-    const Vector4f* const laneEdiRow0,
-    const Vector4f* const laneEsiRow1,
-    VMatrix4* const outMatrix
-  ) noexcept
-  {
-    outMatrix->r[0] = *laneEdiRow0;
-    outMatrix->r[1] = *laneEsiRow1;
-    outMatrix->r[2] = *laneEdxRow2;
-    outMatrix->r[3] = *laneEcxRow3;
-    return outMatrix;
-  }
-
-  /**
    * Address: 0x004EE980 (FUN_004EE980, Moho::VMatrix4::Set)
    *
    * What it does:
@@ -1025,61 +853,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00658EE0 (FUN_00658EE0)
-   *
-   * What it does:
-   * Copies the canonical identity matrix lane into `out` and returns it.
-   */
-  [[maybe_unused]] VMatrix4* CopyVMatrix4IdentityLane(
-    VMatrix4* const out
-  )
-  {
-    if (out == nullptr) {
-      return nullptr;
-    }
-
-    static const VMatrix4 kIdentity = VMatrix4::Identity();
-    *out = kIdentity;
-    return out;
-  }
-
-  /**
-   * Address: 0x004EE6B0 (FUN_004EE6B0)
-   *
-   * What it does:
-   * Lazily snapshots `VMatrix4::NaN` into one process-global matrix lane and
-   * returns that cached lane.
-   */
-  [[maybe_unused]] VMatrix4* AccessVMatrix4NaNCache()
-  {
-    static bool sInitialized = false;
-    static VMatrix4 sNaNCache{};
-
-    if (!sInitialized) {
-      sInitialized = true;
-      sNaNCache = VMatrix4::NaN;
-    }
-
-    return &sNaNCache;
-  }
-
-  /**
-   * Address: 0x004EE6E0 (FUN_004EE6E0, ?VEC_Mul@Moho@@YA?AUVMatrix4@1@ABU21@0@Z)
-   *
-   * What it does:
-   * Returns one matrix product using the binary's `rhs * lhs` call order.
-   */
-  VMatrix4 VEC_Mul(
-    const VMatrix4& lhs,
-    const VMatrix4& rhs
-  )
-  {
-    VMatrix4 result{};
-    (void)gpg::gal::Math::mul(&result, &rhs, &lhs);
-    return result;
-  }
-
-  /**
    * Address: 0x004EE710 (FUN_004EE710, ?VEC_Mul4x3@Moho@@YAXAAUVMatrix4@1@ABU21@1@Z)
    *
    * What it does:
@@ -1120,110 +893,6 @@ namespace moho
     out.r[3].x = ((rhs.r[3].z * lhs20) + (rhs.r[3].y * lhs10) + (rhs.r[3].x * lhs00)) + lhs30;
     out.r[3].y = ((rhs.r[3].z * lhs21) + (rhs.r[3].y * lhs11) + (rhs.r[3].x * lhs01)) + lhs31;
     out.r[3].z = ((rhs.r[3].z * lhs22) + (rhs.r[3].y * lhs12) + (rhs.r[3].x * lhs02)) + lhs32;
-  }
-
-  /**
-   * Address: 0x004EEC10 (FUN_004EEC10, ?LoadInverse@VMatrix4@Moho@@QAEXXZ)
-   *
-   * What it does:
-   * Replaces this matrix with its full inverse.
-   */
-  void VMatrix4::LoadInverse()
-  {
-    VMatrix4 inverse{};
-    (void)gpg::gal::Math::invert(&inverse, this);
-    *this = inverse;
-  }
-
-  /**
-   * Address: 0x004EEC40 (FUN_004EEC40, ?LoadInverse4x3@VMatrix4@Moho@@QAEXXZ)
-   *
-   * What it does:
-   * Replaces this matrix with the inverse lane used by 4x3 call sites.
-   */
-  void VMatrix4::LoadInverse4x3()
-  {
-    VMatrix4 inverse{};
-    (void)gpg::gal::Math::invert(&inverse, this);
-    *this = inverse;
-  }
-
-  /**
-   * Address: 0x004EEC70 (FUN_004EEC70, ?LoadInverseRigid@VMatrix4@Moho@@QAEXXZ)
-   *
-   * What it does:
-   * Replaces this matrix with the inverse lane used by rigid-transform paths.
-   */
-  void VMatrix4::LoadInverseRigid()
-  {
-    VMatrix4 inverse{};
-    (void)gpg::gal::Math::invert(&inverse, this);
-    *this = inverse;
-  }
-
-  /**
-   * Address: 0x004EECA0 (FUN_004EECA0, ?LoadTranslate@VMatrix4@Moho@@QAEXMMM@Z)
-   *
-   * What it does:
-   * Overwrites this matrix with one translation matrix.
-   */
-  void VMatrix4::LoadTranslate(
-    const float x,
-    const float y,
-    const float z
-  )
-  {
-    (void)gpg::gal::Math::translation(this, x, y, z);
-  }
-
-  /**
-   * Address: 0x004EECD0 (FUN_004EECD0, ?LoadScale@VMatrix4@Moho@@QAEXMMM@Z)
-   *
-   * What it does:
-   * Overwrites this matrix with one non-uniform scale matrix.
-   */
-  void VMatrix4::LoadScale(
-    const float x,
-    const float y,
-    const float z
-  )
-  {
-    (void)gpg::gal::Math::scaling(this, x, y, z);
-  }
-
-  /**
-   * Address: 0x004EED60 (FUN_004EED60, ?LoadRotate@VMatrix4@Moho@@QAEXABV?$Vector3@M@Wm3@@M@Z)
-   *
-   * What it does:
-   * Overwrites this matrix with one axis-angle rotation matrix.
-   */
-  void VMatrix4::LoadRotate(
-    const Wm3::Vector3f& axis,
-    const float angleRadians
-  )
-  {
-    // Preserve the binary's by-value axis staging before calling the D3DX lane.
-    const Wm3::Vector3f axisCopy{axis.x, axis.y, axis.z};
-    (void)gpg::gal::Math::rotationAxis(this, &axisCopy, angleRadians);
-  }
-
-  /**
-   * Address: 0x004EEDA0 (FUN_004EEDA0, ?LoadRotate@VMatrix4@Moho@@QAEXABV?$Quaternion@M@Wm3@@@Z)
-   *
-   * What it does:
-   * Overwrites this matrix with one quaternion rotation matrix.
-   */
-  void VMatrix4::LoadRotate(
-    const Wm3::Quaternionf& rotation
-  )
-  {
-    // Wm3 lane is `w,x,y,z`; D3DX lane expects contiguous `x,y,z,w`.
-    Wm3::Quaternionf d3dRotation{};
-    d3dRotation.w = rotation.x;
-    d3dRotation.x = rotation.y;
-    d3dRotation.y = rotation.z;
-    d3dRotation.z = rotation.w;
-    (void)gpg::gal::Math::rotationQuaternion(this, &d3dRotation);
   }
 
   /**

@@ -309,34 +309,6 @@ namespace moho
     [[nodiscard]] std::int32_t UpdateUnitStat(const char* statPath, const std::int32_t* delta);
 
     /**
-     * Address: 0x00593220 (FUN_00593220, func_SetUnitStat)
-     *
-     * What it does:
-     * Resolves one stat item by path, coerces it to integer type, and
-     * atomically replaces the integer counter lane with `*value`.
-     */
-    [[nodiscard]] std::int32_t SetUnitStat(const char* statPath, const std::int32_t* value);
-
-    /**
-     * Address: 0x005931E0 (FUN_005931E0, Moho::CArmyStats::SetIntStatAtomic)
-     *
-     * What it does:
-     * Resolves one stat item by path, coerces it to integer storage, and
-     * atomically replaces the counter lane with `*value`, returning the
-     * previous value on success.
-     */
-    [[nodiscard]] std::int32_t SetIntStatAtomic(const char* statPath, const std::int32_t* value);
-
-    /**
-     * Address: 0x005932C0 (FUN_005932C0, sub_5932C0)
-     *
-     * What it does:
-     * Sets one integer stat counter to `*candidate` only when the candidate is
-     * greater than the current value, using an atomic compare-exchange loop.
-     */
-    [[nodiscard]] std::int32_t SetUnitStatGreaterOf(const char* statPath, const std::int32_t* candidate);
-
-    /**
      * Address: 0x00593310 (FUN_00593310, sub_593310)
      *
      * What it does:

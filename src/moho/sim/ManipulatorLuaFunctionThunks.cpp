@@ -89,22 +89,6 @@ namespace moho
     return sInstance;
   }
 
-  /**
-   * Address: 0x00635490 (FUN_00635490)
-   *
-   * What it does:
-   * Rebinds the startup metatable-factory index lane for
-   * `CScrLuaMetatableFactory<CBoneEntityManipulator>` and returns that
-   * singleton.
-   */
-  [[maybe_unused]] CScrLuaMetatableFactory<CBoneEntityManipulator>*
-  startup_CScrLuaMetatableFactory_CBoneEntityManipulator_Index()
-  {
-    auto& instance = CScrLuaMetatableFactory<CBoneEntityManipulator>::Instance();
-    instance.SetFactoryObjectIndexForRecovery(CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-    return &instance;
-  }
-
   LuaPlus::LuaObject CScrLuaMetatableFactory<CBoneEntityManipulator>::Create(
     LuaPlus::LuaState* const state
   )
@@ -260,22 +244,6 @@ namespace moho
   )
   {
     *object = CScrLuaMetatableFactory<CFootPlantManipulator>::Instance().Get(state);
-    return object;
-  }
-
-  /**
-   * Address: 0x00645540 (FUN_00645540, func_CreateCRotateManipulatorObject)
-   *
-   * What it does:
-   * Writes the `CRotateManipulator` metatable Lua object into `object` and
-   * returns the same destination pointer.
-   */
-  LuaPlus::LuaObject* func_CreateCRotateManipulatorObject(
-    LuaPlus::LuaObject* const object,
-    LuaPlus::LuaState* const state
-  )
-  {
-    *object = CScrLuaMetatableFactory<CRotateManipulator>::Instance().Get(state);
     return object;
   }
 
@@ -711,24 +679,6 @@ namespace moho
     manipulator->mTurnForceMult = turnForceMult;
     manipulator->mTurnSpeed = turnSpeed;
     return 0;
-  }
-
-  /**
-   * Address: 0x00634B70 (FUN_00634B70, CBoneEntityManipulatorTypeInfo non-deleting cleanup body)
-   *
-   * What it does:
-   * Executes one non-deleting cleanup lane for the CBone manipulator type-info
-   * descriptor by running the `gpg::RType` base teardown.
-   */
-  [[maybe_unused]] void DestroyCBoneEntityManipulatorTypeInfoBody(
-    gpg::RType* const typeInfo
-  ) noexcept
-  {
-    if (!typeInfo) {
-      return;
-    }
-
-    typeInfo->~RType();
   }
 
   /**

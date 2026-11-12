@@ -514,44 +514,6 @@ void moho::RBroadcasterRType_NavPath::Init()
 moho::RBroadcasterRType_NavPath::~RBroadcasterRType_NavPath() = default;
 
 /**
- * Address: 0x00763850 (FUN_00763850)
- *
- * What it does:
- * Serializes one reflected `vector<HPathCell>` payload by writing count and
- * then each path-cell element lane.
- */
-[[maybe_unused]] void SerializePathCellVectorArchive(
-  gpg::WriteArchive* const archive,
-  const std::intptr_t objectPtr,
-  const int,
-  gpg::RRef* const ownerRef
-)
-{
-  if (archive == nullptr) {
-    return;
-  }
-
-  const auto* const vectorObject = reinterpret_cast<const PathCellVector*>(objectPtr);
-
-  const unsigned int count = vectorObject != nullptr ? static_cast<unsigned int>(vectorObject->size()) : 0u;
-  archive->WriteUInt(count);
-  if (count == 0u || vectorObject == nullptr) {
-    return;
-  }
-
-  gpg::RType* const pathCellType = gpg::RTypeOf<HPathCell>();
-  GPG_ASSERT(pathCellType != nullptr);
-  if (!pathCellType) {
-    return;
-  }
-
-  const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-  for (unsigned int i = 0; i < count; ++i) {
-    archive->Write(pathCellType, const_cast<moho::HPathCell*>(&(*vectorObject)[static_cast<std::size_t>(i)]), owner);
-  }
-}
-
-/**
  * Address: 0x00763F50 (FUN_00763F50, preregister_RBroadcasterRType_NavPath)
  *
  * What it does:

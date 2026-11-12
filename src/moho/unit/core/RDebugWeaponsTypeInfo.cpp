@@ -27,21 +27,6 @@ namespace moho
   RDebugWeaponsTypeInfo::~RDebugWeaponsTypeInfo() = default;
 
   /**
-   * Address: 0x00652DE0 (FUN_00652DE0)
-   *
-   * What it does:
-   * Deleting-destructor thunk lane that forwards into
-   * `RDebugOverlayClass` non-deleting destructor body.
-   */
-  [[maybe_unused]] RDebugOverlayClass* DestroyRDebugWeaponsTypeInfoThunk(
-    RDebugOverlayClass* const object
-  )
-  {
-    object->~RDebugOverlayClass();
-    return object;
-  }
-
-  /**
    * Address: 0x00652DB0 (FUN_00652DB0, Moho::RDebugWeaponsTypeInfo::GetName)
    */
   const char* RDebugWeaponsTypeInfo::GetName() const

@@ -5,7 +5,6 @@
 namespace moho::resource_reflection
 {
   [[nodiscard]] gpg::RType* ResolveCAniSkelType();
-  [[nodiscard]] gpg::RType* ResolveCAniResourceSkelType();
   [[nodiscard]] gpg::RType* ResolveCParticleTextureType();
   [[nodiscard]] gpg::RType* ResolveCSimResourcesType();
   [[nodiscard]] gpg::RType* ResolveISimResourcesType();
@@ -24,20 +23,7 @@ namespace moho::resource_reflection
    * Returns cached `ID3DTextureSheet` reflected type, resolving it lazily.
    */
   [[nodiscard]] gpg::RType* ResolveID3DTextureSheetType();
-  /**
-   * Address: 0x004441E0 (FUN_004441E0)
-   *
-   * What it does:
-   * Returns cached `MemBuffer<const char>` reflected type, resolving it lazily.
-   */
-  [[nodiscard]] gpg::RType* ResolveMemBufferConstType();
 
   void AddBase(gpg::RType* ownerType, gpg::RType* baseType);
-
-  void RegisterSerializeCallbacks(
-    gpg::RType* typeInfo,
-    gpg::RType::load_func_t loadCallback,
-    gpg::RType::save_func_t saveCallback
-  );
 
 } // namespace moho::resource_reflection

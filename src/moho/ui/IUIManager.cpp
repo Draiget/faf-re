@@ -191,17 +191,6 @@ moho::IUIManager* moho::UI_GetManager()
 }
 
 /**
- * Address: 0x0084C960 (FUN_0084C960)
- *
- * What it does:
- * Secondary lane returning the global UI-manager singleton pointer.
- */
-[[maybe_unused]] moho::CUIManager* moho::GetUiManagerGlobalLaneB() noexcept
-{
-  return g_UIManager;
-}
-
-/**
  * Address: 0x00833C20 (FUN_00833C20, Moho::UICommandModeData::UICommandModeData)
  * Mangled: ??0UICommandModeData@Moho@@QAE@XZ
  *
@@ -257,17 +246,6 @@ bool moho::UI_StartSplashScreens()
   return StartUIMainEntry(UIS_splash, "StartSplashScreen", [](const LuaPlus::LuaFunction<void>& entryPointFn) {
     entryPointFn();
   });
-}
-
-/**
- * Address: 0x0083CE10 (FUN_0083CE10)
- *
- * What it does:
- * Forces UI state to lobby-mode.
- */
-[[maybe_unused]] void moho::ForceUiStateLobbyMode()
-{
-  sUIState = UIS_lobby;
 }
 
 /**

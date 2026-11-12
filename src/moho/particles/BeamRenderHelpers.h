@@ -55,16 +55,6 @@ namespace moho
     void Initialize(int quadCount);
 
     /**
-     * Address: 0x0043C3D0 (FUN_0043C3D0, sub_43C3D0)
-     *
-     * What it does:
-     * Locks the sheet's first vertex stream for exclusive write access over the
-     * full vertex capacity, seats the write cursor on the mapped pointer and
-     * resets the running quad count.
-     */
-    void BeginMap();
-
-    /**
      * Address: 0x0043C400 (FUN_0043C400, sub_43C400)
      *
      * What it does:
@@ -80,46 +70,6 @@ namespace moho
      * deleting-destructor thunk and nulls it, leaving the context reusable.
      */
     void Teardown();
-
-    /**
-     * Address: 0x0043C430 (FUN_0043C430, sub_43C430)
-     *
-     * What it does:
-     * Appends one axis-aligned quad built from a 6-float min/max box and a
-     * translation, in the winding the binary emits:
-     *   v0 = (box[0]+dx, box[4]+dy, box[2]+dz)
-     *   v1 = (box[3]+dx, box[4]+dy, box[2]+dz)
-     *   v2 = (box[3]+dx, box[1]+dy, box[5]+dz)
-     *   v3 = (box[0]+dx, box[1]+dy, box[5]+dz)
-     */
-    float* WriteTranslatedQuad(const float* boxCorners, float dx, float dy, float dz);
-
-    /**
-     * Address: 0x0043C510 (FUN_0043C510, sub_43C510)
-     *
-     * What it does:
-     * Appends one already-packed quad: twelve floats copied straight through.
-     */
-    const float* WritePackedQuad(const float* packedQuad);
-
-    /**
-     * Address: 0x0043C580 (FUN_0043C580, sub_43C580)
-     *
-     * What it does:
-     * Ends any map session, then submits one indexed triangle-list draw
-     * covering the quads appended since `BeginMap`, through the shared
-     * forward-filled index sheet.
-     */
-    bool FlushQuadDraw();
-
-    /**
-     * Address: 0x0043C610 (FUN_0043C610, sub_43C610)
-     *
-     * What it does:
-     * The same flush with caller-supplied view bounds; the running count is not
-     * consulted.
-     */
-    bool FlushQuadDraw(int quadCount);
 
     /**
      * Address: 0x0043C760 (FUN_0043C760, sub_43C760)

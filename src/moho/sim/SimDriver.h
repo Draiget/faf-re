@@ -592,15 +592,6 @@ namespace moho
      */
     ~CSimDriver() override;
 
-    /**
-     * Address: 0x0073B910 (FUN_0073B910, Moho::CSimDriver::dtr)
-     *
-     * What it does:
-     * Executes full destructor body and conditionally frees object storage
-     * when `deleteFlag & 1` is set.
-     */
-    CSimDriver* DestroyWithDeleteFlag(std::uint8_t deleteFlag);
-
     // Slot order matches ISTIDriver; addresses here are CSimDriver override entrypoints.
     /**
      * Address: 0x0073BBF0 (FUN_0073BBF0)
@@ -869,14 +860,6 @@ namespace moho
 
     // Shared tail lifted from FUN_0073B1B0/FUN_0073BBF0 and command wrappers.
     void MarkFirstConnectionActivityLocked();
-    /**
-     * Address: 0x0073C640 (FUN_0073C640, sub_73C640)
-     *
-     * What it does:
-     * Stamps `mLastSyncCycleTime`, signals the connection event, and writes
-     * the current command-cookie lane to one output pointer.
-     */
-    std::int32_t* SignalConnectionAndWriteCommandCookie(std::int32_t* outCommandCookie);
     /**
      * Address: 0x0073C4C0 (FUN_0073C4C0)
      *

@@ -223,16 +223,6 @@ namespace fa
     [[nodiscard]] bool isValid() const noexcept;
 
     /**
-     * Address: 0x00AB14EC (?isUDC@DName@@QBEHXZ)
-     * Mangled: ?isUDC@DName@@QBEHXZ
-     *
-     * What it does:
-     * Returns true when the name chain is non-empty/valid and the UDC marker bit
-     * (`0x20`) is set in the status word.
-     */
-    [[nodiscard]] bool isUDC() const noexcept;
-
-    /**
      * Address: 0x00AB14D7 (?isEmpty@DName@@QBEHXZ)
      * Mangled: ?isEmpty@DName@@QBEHXZ
      *
@@ -379,15 +369,6 @@ namespace fa
   private:
     friend class DNamePointerNode;
     friend class DNameNode;
-
-    /**
-     * Address: 0x00AB19B2 (FUN_00AB19B2)
-     *
-     * What it does:
-     * Rebinds this name to one nested-name pointer lane when writable, or
-     * transitions to protected status on null nested input.
-     */
-    DName& assignNestedPointer(DName* nestedName) noexcept;
 
     /**
      * Address: 0x00AB1A1A (FUN_00AB1A1A, DName::doPchar)

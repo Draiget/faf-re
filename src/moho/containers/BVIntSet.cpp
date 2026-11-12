@@ -144,20 +144,6 @@ BVIntSetIndex moho::MakeBVIntSetIndex(
 }
 
 /**
- * Address: 0x00401060 (FUN_00401060)
- *
- * What it does:
- * Compares BVIntSet index pairs by value lane only.
- */
-bool moho::BVIntSetIndexValueNotEqual(
-  const BVIntSetIndex& lhs,
-  const BVIntSetIndex& rhs
-) noexcept
-{
-  return lhs.mValue != rhs.mValue;
-}
-
-/**
  * Address: 0x00401E10 (FUN_00401E10)
  *
  * What it does:
@@ -425,39 +411,6 @@ unsigned int BVIntSet::GetNext(
 }
 
 /**
- * Address: 0x00401830 (FUN_00401830)
- *
- * What it does:
- * Finds the previous set bit before `val` by walking backward across wordIndex storage.
- */
-unsigned int BVIntSet::GetPrev(
-  const unsigned int val
-) const
-{
-  unsigned int result = val - 1u;
-  const unsigned int startWord = mFirstWordIndex;
-  const unsigned int* const words = mWords.start_;
-
-  unsigned int bitIndex = result & kWordBitMask;
-  unsigned int wordIndex = (result >> kWordShift) - startWord;
-  unsigned int bits = (0xFFFFFFFEu << bitIndex) & words[wordIndex];
-  if (bits == 0u) {
-    do {
-      bits = words[--wordIndex];
-    } while (bits == 0u);
-
-    result = 32u * (startWord + wordIndex) + 31u;
-    bitIndex = 31u;
-  }
-
-  for (; ((1u << bitIndex) & bits) == 0u; --result) {
-    --bitIndex;
-  }
-
-  return result;
-}
-
-/**
  * Address: 0x004018A0 (FUN_004018A0)
  * Address: 0x100015B0
  *
@@ -547,25 +500,6 @@ void BVIntSet::EnsureBounds(
     }
     mFirstWordIndex = requiredStart;
   }
-}
-
-/**
- * Address: 0x00401A60 (FUN_00401A60)
- *
- * What it does:
- * Unions all bits from `from` into this set.
- */
-void BVIntSet::AddAllFrom(
-  const BVIntSet* from
-)
-{
-  if (from == nullptr) {
-    return;
-  }
-
-  const unsigned int lower = from->GetNext(std::numeric_limits<unsigned int>::max());
-  const unsigned int upper = from->Max();
-  AddFrom(from, lower, upper);
 }
 
 /**
@@ -727,31 +661,6 @@ BVIntSet* BVIntSet::Union(
     dstWord |= rhsWord;
   }
   );
-}
-
-/**
- * Address: 0x00401E30 (FUN_00401E30)
- *
- * What it does:
- * Builds the symmetric difference of `*this` and `rhs` into `out`.
- */
-BVIntSet* BVIntSet::ExclusiveOr(
-  BVIntSet* const out,
-  const BVIntSet* const rhs
-) const
-{
-  const BVIntSetWordRange lhsRange = WordRange();
-  const BVIntSetWordRange rhsRange = rhs->WordRange();
-  const unsigned int outStartWord = std::min(lhsRange.mStartWord, rhsRange.mStartWord);
-  const unsigned int outWordCount = std::max(lhsRange.mEndWord, rhsRange.mEndWord) - outStartWord;
-
-  CopyAndApplyOverlap(
-    *this, *rhs, out, outStartWord, outWordCount, [](unsigned int& dstWord, const unsigned int rhsWord) {
-    dstWord ^= rhsWord;
-  }
-  );
-  out->Finalize();
-  return out;
 }
 
 /**

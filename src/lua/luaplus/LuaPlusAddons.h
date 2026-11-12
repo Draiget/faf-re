@@ -33,7 +33,6 @@ LUA_API void lua_setusergcfunction(lua_State *L, void (*userGCFunction)(void*));
 LUA_API void* lua_getglobaluserdata(lua_State *L);
 LUA_API void lua_setglobaluserdata(lua_State *L, void* globalUserData);
 
-LUA_API void* lua_getstateuserdata(lua_State *L);
 LUA_API void lua_setstateuserdata(lua_State *L, void* stateUserData);
 
 LUA_API void lua_setfatalerrorfunction(lua_State *L, void (*fatalErrorFunc)(void));

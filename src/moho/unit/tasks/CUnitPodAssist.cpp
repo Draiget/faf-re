@@ -621,20 +621,6 @@ namespace
 
 namespace gpg
 {
-  /**
-   * Address: 0x0061E7C0 (FUN_0061E7C0, gpg::RRef_CUnitPodAssist)
-   *
-   * What it does:
-   * Builds one typed reflection reference for `moho::CUnitPodAssist*`,
-   * preserving dynamic-derived ownership and base-offset adjustment.
-   */
-  gpg::RRef* RRef_CUnitPodAssist(
-    gpg::RRef* const outRef,
-    moho::CUnitPodAssist* const value
-  )
-  {
-    return gpg::WriteDerivedRef(outRef, value);
-  }
 } // namespace gpg
 
 namespace moho

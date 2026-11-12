@@ -57,21 +57,6 @@ namespace moho
   void DXT_DecodeColorBlock(std::uint64_t colorBlock, DXTFormat format, std::uint32_t* outArgb16);
 
   /**
-   * Address: 0x00404F80 (FUN_00404F80, Moho::DXT_DecodeBlocksToRGBA)
-   *
-   * unsigned __int64,unsigned __int64,Moho::DXTFormat,uint *
-   *
-   * What it does:
-   * Decodes one DXT block pair (alpha+color) into 16 ARGB pixels.
-   */
-  void DXT_DecodeBlocksToRGBA(
-    std::uint64_t alphaBlock,
-    std::uint64_t colorBlock,
-    DXTFormat format,
-    std::uint32_t* outArgb16
-  );
-
-  /**
    * Address: 0x00404FE0 (FUN_00404FE0, Moho::DXT_GetTexelAlpha)
    *
    * unsigned int,uchar const *,unsigned int,unsigned int

@@ -104,15 +104,6 @@ namespace moho
     bool IsReady() const;
 
     /**
-     * Address: 0x0053B920 (FUN_0053B920)
-     *
-     * What it does:
-     * Returns the raw sim-rate lane tracked by this client.
-     */
-    [[nodiscard]]
-    int32_t GetSimRateRaw() const;
-
-    /**
      * Address: 0x0053C960 (FUN_0053C960)
      * Slot: 1
      */

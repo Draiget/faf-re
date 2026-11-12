@@ -44,12 +44,4 @@ namespace gpg
   gpg::WriteArchive*
   WriteUnownedPointerSTIMap(moho::STIMap* value, gpg::WriteArchive* archive, const gpg::RRef& ownerRef);
 
-  /**
-   * Address: 0x005099A0 (FUN_005099A0, STIMap RRef upcast helper)
-   *
-   * What it does:
-   * Upcasts one generic `RRef` lane to `STIMap` and returns the typed object
-   * pointer (or `nullptr` on mismatch).
-   */
-  [[nodiscard]] void* UpcastPointerToSTIMap(const gpg::RRef& source);
 } // namespace gpg

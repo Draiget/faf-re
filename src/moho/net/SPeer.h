@@ -83,12 +83,4 @@ namespace moho
 
   static_assert(sizeof(SPeer) == 0x50, "SPeer size must be 0x50");
 
-  /**
-   * Address: 0x007C1320 (FUN_007C1320)
-   *
-   * What it does:
-   * Executes one scalar-delete lane for `SPeer` by running destructor logic
-   * and freeing the same object storage.
-   */
-  SPeer* DestroyAndDeletePeer(SPeer* peer);
 } // namespace moho

@@ -784,24 +784,6 @@ namespace gpg
     return gpg::WriteDerivedRef(outRef, value);
   }
 
-  /**
-   * Address: 0x00603000 (FUN_00603000)
-   *
-   * What it does:
-   * Materializes one `RRef_CUnitCallTeleport` result into a stack local and
-   * copies that pair into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* StoreRRefCUnitCallTeleportAdapter(
-    moho::CUnitCallTeleport* const value,
-    gpg::RRef* const outRef
-  )
-  {
-    gpg::RRef temp{};
-    (void)RRef_CUnitCallTeleport(&temp, value);
-    outRef->mObj = temp.mObj;
-    outRef->mType = temp.mType;
-    return outRef;
-  }
 } // namespace gpg
 
 namespace moho

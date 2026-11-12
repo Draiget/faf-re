@@ -719,25 +719,6 @@ namespace moho
   }
 } // namespace moho
 
-/**
- * Address: 0x0060C290 (FUN_0060C290, func_RRRefREntityBlueprint)
- *
- * What it does:
- * Builds one temporary `RRef_REntityBlueprint` and copies `(mObj,mType)` into
- * caller-owned output storage.
- */
-gpg::RRef* gpg::PackRRef_REntityBlueprint(
-  gpg::RRef* const outRef,
-  moho::REntityBlueprint* const value
-)
-{
-  gpg::RRef temp{};
-  temp = gpg::MakeRRef<moho::REntityBlueprint>(value);
-  outRef->mObj = temp.mObj;
-  outRef->mType = temp.mType;
-  return outRef;
-}
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
 GPG_PREREGISTER_INIT(

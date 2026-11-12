@@ -18,12 +18,4 @@ namespace gpg
    */
   gpg::RRef* RRef_CParticleTexture(gpg::RRef* outRef, moho::CParticleTexture* value);
 
-  /**
-   * Address: 0x0048FFD0 (FUN_0048FFD0, sub_48FFD0)
-   *
-   * What it does:
-   * Wrapper that forwards to `RRef_CParticleTexture` and returns the output
-   * lane pointer.
-   */
-  gpg::RRef* AssignCParticleTextureRef(gpg::RRef* outRef, moho::CParticleTexture* value);
 } // namespace gpg

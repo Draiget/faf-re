@@ -114,16 +114,6 @@ namespace moho
   [[nodiscard]] Wm3::Quaternionf COORDS_Orient(const Wm3::Vector3f& direction) noexcept;
 
   /**
-   * Address: 0x0050B620 (FUN_0050B620, ?COORDS_ForwardVector@Moho@@YA?AV?$Vector3@M@Wm3@@MM@Z)
-   *
-   * What it does:
-   * Converts heading/pitch radians into one unit forward vector using the
-   * engine's original sign convention (`+x = sin(heading)`, `+z = cos(heading)`,
-   * `+y` inverted for positive pitch).
-   */
-  [[nodiscard]] Wm3::Vector3f COORDS_ForwardVector(float heading, float pitch) noexcept;
-
-  /**
    * Address: 0x0050B710 (FUN_0050B710, ?COORDS_Pitch@Moho@@YAMABV?$Vector3@M@Wm3@@@Z)
    *
    * What it does:
@@ -161,15 +151,6 @@ namespace moho
   [[nodiscard]] ELayer COORDS_StringToLayer(const char* layerName) noexcept;
 
   /**
-   * Address: 0x0050AF80 (FUN_0050AF80, ?COORDS_ToRect@Moho@@YA?AV?$Rect2@H@gpg@@ABUSOCellPos@1@ABUSFootprint@1@@Z)
-   *
-   * What it does:
-   * Converts one footprint-origin cell position plus footprint dimensions into
-   * one half-open grid rectangle (`x0/z0` inclusive, `x1/z1` exclusive).
-   */
-  [[nodiscard]] gpg::Rect2i COORDS_ToRect(const SOCellPos& cellPos, const SFootprint& footprint) noexcept;
-
-  /**
    * Address: 0x0050AFA0 (FUN_0050AFA0, Moho::COORDS_ToGridRect)
    *
    * What it does:
@@ -179,15 +160,6 @@ namespace moho
    * match the binary's `WORD` cast.
    */
   gpg::Rect2i* COORDS_ToGridRect(gpg::Rect2i* result, const SCoordsVec2& centerXZ, int sizeX, int sizeZ);
-
-  /**
-   * Address: 0x0050B090 (FUN_0050B090, ?COORDS_Elevation@Moho@@YAMPBVSTIMap@1@MME@Z)
-   *
-   * What it does:
-   * Samples terrain elevation and optionally clamps it to water elevation when
-   * the requested layer is not seabed-capable.
-   */
-  [[nodiscard]] float COORDS_Elevation(const STIMap* map, float x, float z, ELayer layer) noexcept;
 
   /**
    * Address: 0x0050B010 (FUN_0050B010, Moho::COORDS_ToGridRect)
@@ -949,46 +921,12 @@ namespace moho
     void ChangeScroller(const SScroller& definition);
 
     /**
-     * Address: 0x0067A900 (FUN_0067A900, ?UpdateScrollPos@Entity@Moho@@QAEXQAM@Z)
-     *
-     * What it does:
-     * Seeds both texture-scroll lanes from one incoming UV coordinate pair.
-     */
-    void UpdateScrollPos(const Wm3::Vec2f& scrollPosition);
-
-    /**
-     * Address: 0x0067A930 (FUN_0067A930, ?UpdateScroll@Entity@Moho@@QAEXQAM@Z)
-     *
-     * What it does:
-     * Copies current scroll lane to previous and advances current lane by one
-     * delta vector.
-     */
-    void UpdateScroll(const Wm3::Vec2f& scrollDelta);
-
-    /**
      * Address: 0x0067A980 (FUN_0067A980, ?StopScroll@Entity@Moho@@QAEXXZ)
      *
      * What it does:
      * Collapses scroll motion by snapping current lane to previous lane.
      */
     void StopScroll();
-
-    /**
-     * Address: 0x00678D80 (FUN_00678D80, ?SetAnimScoll@Entity@Moho@@QAEXMM@Z)
-     *
-     * What it does:
-     * Shifts the current texture-scroll lane into the previous lane and stores
-     * one new animation scroll lane pair.
-     */
-    void SetAnimScroll(float scrollX, float scrollY);
-
-    /**
-     * Address: 0x0067A9A0 (FUN_0067A9A0, ?SetAmbientSound@Entity@Moho@@QAEXPAVCSndParams@2@0@Z)
-     *
-     * What it does:
-     * Stores ambient detail and rumble sound parameter lanes.
-     */
-    void SetAmbientSound(CSndParams* detailSound, CSndParams* rumbleSound);
 
     /**
      * Address: 0x005BDBD0 (FUN_005BDBD0)
@@ -2794,16 +2732,6 @@ namespace moho
    * nil lane) into one validated entity bone index.
    */
   int ENTSCR_ResolveBoneIndex(Entity* entity, LuaPlus::LuaStackObject& boneIdentifier, bool allowNilAndSpecialIndices);
-
-  /**
-   * Address: 0x006926C0 (FUN_006926C0, Moho::ENTSCR_GetBonePosition)
-   * Mangled: ?ENTSCR_GetBonePosition@Moho@@YA?AV?$Vector3@M@Wm3@@PAVEntity@1@AAVLuaStackObject@LuaPlus@@_N@Z
-   *
-   * What it does:
-   * Resolves one Lua bone identifier and returns that bone's world position.
-   */
-  [[nodiscard]] Wm3::Vector3f
-  ENTSCR_GetBonePosition(Entity* entity, LuaPlus::LuaStackObject& boneIdentifier, bool allowNilAndSpecialIndices);
 
   static_assert(sizeof(Entity) == 0x270, "Entity size must be 0x270");
 

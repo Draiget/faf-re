@@ -241,25 +241,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x006576F0 (FUN_006576F0)
-   *
-   * What it does:
-   * Initializes one counted particle-texture pointer lane to null and returns
-   * the same storage lane.
-   */
-  [[maybe_unused]] CountedPtr_CParticleTexture* ConstructCountedParticleTexturePtrNull(
-    CountedPtr_CParticleTexture* const countedTexture
-  ) noexcept
-  {
-    if (countedTexture == nullptr) {
-      return nullptr;
-    }
-
-    countedTexture->tex = nullptr;
-    return countedTexture;
-  }
-
-  /**
    * Address: 0x004954B0 (FUN_004954B0, sub_4954B0)
    *
    * What it does:

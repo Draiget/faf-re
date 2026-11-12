@@ -92,14 +92,6 @@ u_short CNetTCPConnection::GetPort()
 }
 
 /**
- * Address: 0x00483580 (FUN_00483580, Moho::CNetTCPConnection::GetSocket)
- */
-platform::net::Socket CNetTCPConnection::GetSocket() const noexcept
-{
-  return mSocket;
-}
-
-/**
  * Address: 0x00483590 (FUN_00483590, Moho::CNetTCPConnection::GetState)
  */
 ENetConnectionState CNetTCPConnection::GetState() const noexcept
@@ -472,16 +464,4 @@ void CNetTCPConnection::Push()
     }
     mSendBufferSize -= static_cast<std::uint32_t>(sent);
   }
-}
-
-/**
- * Address: 0x00484640 (FUN_00484640, Moho::CNetTCPConnection::SelectSocket)
- */
-int CNetTCPConnection::SelectSocket(
-  void* const eventHandle
-)
-{
-  return platform::net::SelectSocketEvents(
-    mSocket, eventHandle, platform::net::kEventRead | platform::net::kEventConnect | platform::net::kEventClose
-  );
 }

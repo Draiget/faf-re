@@ -812,26 +812,6 @@ namespace moho
   } // namespace
 
   /**
-   * Address: 0x0043C3D0 (FUN_0043C3D0, sub_43C3D0)
-   *
-   * IDA signature:
-   * int __usercall sub_43C3D0@<eax>(_DWORD *a1@<esi>);
-   *
-   * What it does:
-   * Locks the first vertex stream of `sheet` for exclusive
-   * write access over the full requested vertex count, stores the
-   * returned map pointer into the context write cursor, and resets
-   * the running quad count to zero.
-   */
-  void BeamDrawContext::BeginMap()
-  {
-    ID3DVertexStream* const stream = FetchPrimaryVertexStream(sheet);
-    void* const mapped = stream->Lock(0, maxVertexCount, true, true);
-    writeCursor = static_cast<float*>(mapped);
-    quadCount = 0;
-  }
-
-  /**
    * Address: 0x0043C400 (FUN_0043C400, sub_43C400)
    *
    * IDA signature:
@@ -871,86 +851,6 @@ namespace moho
     }
   }
 
-  /**
-   * Address: 0x0043C430 (FUN_0043C430, sub_43C430)
-   *
-   * IDA signature:
-   * float *__userpurge sub_43C430@<eax>(
-   *   float *a1@<eax>, int a2@<ecx>, float a3, float a4, float a5);
-   *
-   * What it does:
-   * Builds four translated vertices from one unit-box corner pair
-   * and writes them into the active write cursor in the order the
-   * binary emits:
-   *   v0 = ( boxCorners[0] + dx, boxCorners[4] + dy, boxCorners[2] + dz )
-   *   v1 = ( boxCorners[3] + dx, boxCorners[4] + dy, boxCorners[2] + dz )
-   *   v2 = ( boxCorners[3] + dx, boxCorners[1] + dy, boxCorners[5] + dz )
-   *   v3 = ( boxCorners[0] + dx, boxCorners[1] + dy, boxCorners[5] + dz )
-   * The cursor is then advanced by 48 bytes (four 3-float vertices)
-   * and the running quad count is bumped.
-   */
-  float* BeamDrawContext::WriteTranslatedQuad(
-    const float* const boxCorners,
-    const float dx,
-    const float dy,
-    const float dz
-  )
-  {
-    const float boxX0 = boxCorners[0];
-    const float boxY0 = boxCorners[1];
-    const float boxZ0 = boxCorners[2];
-    const float boxX1 = boxCorners[3];
-    const float boxY1 = boxCorners[4];
-    const float boxZ1 = boxCorners[5];
-
-    float* v0 = writeCursor;
-    v0[0] = boxX0 + dx;
-    v0[1] = boxY1 + dy;
-    v0[2] = boxZ0 + dz;
-
-    float* v1 = writeCursor + 3;
-    v1[0] = boxX1 + dx;
-    v1[1] = boxY1 + dy;
-    v1[2] = boxZ0 + dz;
-
-    float* v2 = writeCursor + 6;
-    v2[0] = boxX1 + dx;
-    v2[1] = boxY0 + dy;
-    v2[2] = boxZ1 + dz;
-
-    float* v3 = writeCursor + 9;
-    v3[0] = boxX0 + dx;
-    v3[1] = boxY0 + dy;
-    v3[2] = boxZ1 + dz;
-
-    writeCursor += 12;
-    ++quadCount;
-    return v3;
-  }
-
-  /**
-   * Address: 0x0043C510 (FUN_0043C510, sub_43C510)
-   *
-   * IDA signature:
-   * float *__usercall sub_43C510@<eax>(float *result@<eax>, int a2@<ecx>);
-   *
-   * What it does:
-   * Copies four packed 3-float vertices (12 floats, 48 bytes) from
-   * `packedQuad` into the active write cursor, advances the cursor
-   * by 48 bytes, and bumps the running quad count.
-   */
-  const float* BeamDrawContext::WritePackedQuad(
-    const float* const packedQuad
-  )
-  {
-    for (std::size_t i = 0; i < 12; ++i) {
-      writeCursor[i] = packedQuad[i];
-    }
-    writeCursor += 12;
-    ++quadCount;
-    return packedQuad;
-  }
-
   namespace
   {
     [[nodiscard]] bool FlushBeamQuadDrawImpl(
@@ -982,41 +882,6 @@ namespace moho
       return device->DrawTriangleList(&vertexView, &indexView, &primitiveType);
     }
   } // namespace
-
-  /**
-   * Address: 0x0043C580 (FUN_0043C580, sub_43C580)
-   *
-   * IDA signature:
-   * int __usercall sub_43C580@<eax>(_DWORD *a1@<eax>);
-   *
-   * What it does:
-   * Ends any pending write session on the context (unlocking the
-   * vertex stream when mapped) and submits one indexed triangle-list
-   * draw covering `quadCount` quads through the shared
-   * `sIndexSheet`.
-   */
-  bool BeamDrawContext::FlushQuadDraw()
-  {
-    return FlushBeamQuadDrawImpl(*this, quadCount);
-  }
-
-  /**
-   * Address: 0x0043C610 (FUN_0043C610, sub_43C610)
-   *
-   * IDA signature:
-   * int __usercall sub_43C610@<eax>(int a1@<edi>, _DWORD *a2@<esi>);
-   *
-   * What it does:
-   * Same as `FlushQuadDraw` but uses a caller-supplied
-   * `quadCount` for the view bounds instead of the context's own
-   * running count.
-   */
-  bool BeamDrawContext::FlushQuadDraw(
-    const int quadCountOverride
-  )
-  {
-    return FlushBeamQuadDrawImpl(*this, quadCountOverride);
-  }
 
   /**
    * Address: 0x0043C760 (FUN_0043C760, sub_43C760)

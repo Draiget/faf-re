@@ -65,33 +65,4 @@ namespace moho
    */
   CD3DIndexSheet* func_GetSharedIndexSheet();
 
-  /**
-   * Address: 0x0043C900 (FUN_0043C900, sub_43C900)
-   *
-   * What it does:
-   * Deletes the shared index-sheet singleton through its deleting
-   * dtor thunk (when present) and clears the slot.
-   */
-  void func_ClearSharedIndexSheet();
-
-  /**
-   * Address: 0x0043CA50 (FUN_0043CA50, sub_43CA50)
-   *
-   * What it does:
-   * Moves one vertex-stream pointer from caller storage into the
-   * `sVertexStream` singleton slot, destroying any prior holder
-   * (if different from the new one) via its deleting dtor. Returns
-   * the address of the updated slot.
-   */
-  fa::auto_ptr<CD3DVertexStream>* func_MoveIntoSharedVertexStream(CD3DVertexStream** inOutStream);
-
-  /**
-   * Address: 0x0043CAF0 (FUN_0043CAF0, sub_43CAF0)
-   *
-   * What it does:
-   * Replaces the `sVertexStream` singleton with the caller-supplied
-   * pointer, destroying the prior holder (if different) via its
-   * deleting dtor thunk.
-   */
-  void func_SetSharedVertexStream(CD3DVertexStream* stream);
 } // namespace moho

@@ -705,11 +705,6 @@ namespace moho
     return AddWatchBone(boneIndex);
   }
 
-  Unit* CCollisionManipulator::GetOwnerUnit() const noexcept
-  {
-    return mOwnerUnit;
-  }
-
   /**
    * Address: 0x00637C90 (FUN_00637C90)
    *
@@ -817,21 +812,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00638BF0 (FUN_00638BF0)
-   *
-   * What it does:
-   * Rebinds the startup metatable-factory index lane for
-   * `CScrLuaMetatableFactory<CCollisionManipulator>` and returns that
-   * singleton.
-   */
-  CScrLuaMetatableFactory<CCollisionManipulator>* startup_CScrLuaMetatableFactory_CCollisionManipulator_Index()
-  {
-    auto& instance = CScrLuaMetatableFactory<CCollisionManipulator>::Instance();
-    instance.SetFactoryObjectIndexForRecovery(CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-    return &instance;
-  }
-
-  /**
    * What it does:
    * Stores one factory-table slot index used by CScrLuaObjectFactory::Get.
    */
@@ -849,23 +829,6 @@ namespace moho
   )
   {
     return SCR_CreateSimpleMetatable(state);
-  }
-
-  /**
-   * Address: 0x006379A0 (FUN_006379A0, scalar deleting destructor thunk)
-   */
-  /**
-   * Address: 0x00637A00 (FUN_00637A00, CCollisionManipulatorTypeInfo non-deleting cleanup body)
-   *
-   * What it does:
-   * Executes one non-deleting destruction lane for
-   * `CCollisionManipulatorTypeInfo`.
-   */
-  [[maybe_unused]] void DestroyCCollisionManipulatorTypeInfoBody(
-    CCollisionManipulatorTypeInfo* const typeInfo
-  ) noexcept
-  {
-    typeInfo->~CCollisionManipulatorTypeInfo();
   }
 
   CCollisionManipulatorTypeInfo::~CCollisionManipulatorTypeInfo() = default;
@@ -959,28 +922,6 @@ namespace gpg
     return outRef;
   }
 
-  /**
-   * Address: 0x00638BC0 (FUN_00638BC0)
-   *
-   * What it does:
-   * Wrapper lane that materializes one temporary `RRef_CCollisionManipulator`
-   * and copies object/type fields into the destination reference record.
-   */
-  [[maybe_unused]] gpg::RRef* AssignCCollisionManipulatorRef(
-    gpg::RRef* const outRef,
-    moho::CCollisionManipulator* const value
-  )
-  {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    gpg::RRef tmp{};
-    (void)RRef_CCollisionManipulator(&tmp, value);
-    outRef->mObj = tmp.mObj;
-    outRef->mType = tmp.mType;
-    return outRef;
-  }
 } // namespace gpg
 
 namespace

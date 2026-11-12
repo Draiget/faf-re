@@ -44,21 +44,6 @@ namespace moho
 {
   gpg::RType* SSessionSaveData::sType = nullptr;
 
-  /**
-   * Address: 0x0089AEC0 (FUN_0089AEC0, boost::shared_ptr_SSessionSaveData::shared_ptr_SSessionSaveData)
-   *
-   * What it does:
-   * Constructs one `shared_ptr<SSessionSaveData>` from one raw save-data
-   * pointer lane.
-   */
-  boost::shared_ptr<SSessionSaveData>* ConstructSharedSessionSaveDataFromRaw(
-    boost::shared_ptr<SSessionSaveData>* const outSaveData,
-    SSessionSaveData* const saveData
-  )
-  {
-    return ::new (outSaveData) boost::shared_ptr<SSessionSaveData>(saveData);
-  }
-
   MouseInfo::MouseInfo()
     : mHitValid(0u)
     , pad_01{0u, 0u, 0u}

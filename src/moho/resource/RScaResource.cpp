@@ -55,36 +55,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0053B2A0 (FUN_0053B2A0, boost::shared_ptr_RScaResource::shared_ptr_RScaResource)
-   *
-   * What it does:
-   * Constructs one `shared_ptr<RScaResource>` from one raw resource pointer lane.
-   */
-  boost::shared_ptr<RScaResource>* ConstructSharedRScaResourceFromRaw(
-    boost::shared_ptr<RScaResource>* const outResource,
-    RScaResource* const resource
-  )
-  {
-    return ::new (outResource) boost::shared_ptr<RScaResource>(resource);
-  }
-
-  /**
-   * Address: 0x0053B3B0 (FUN_0053B3B0)
-   *
-   * What it does:
-   * Constructs one `boost::detail::sp_counted_impl_p<RScaResource>` control
-   * block in caller-provided storage with both initial reference counters set to
-   * `1` and payload pointer bound to `resource`.
-   */
-  boost::detail::sp_counted_impl_p<RScaResource>* ConstructRScaSharedCountedImpl(
-    boost::detail::sp_counted_impl_p<RScaResource>* const outControlBlock,
-    RScaResource* const resource
-  )
-  {
-    return ::new (outControlBlock) boost::detail::sp_counted_impl_p<RScaResource>(resource);
-  }
-
-  /**
    * Address: 0x0053A4D0 (FUN_0053A4D0)
    *
    * IDA signature:

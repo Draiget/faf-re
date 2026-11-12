@@ -108,32 +108,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0050DF10 (FUN_0050DF10, Moho::RBlueprint::InitBlueprint)
-   *
-   * What it does:
-   * Builds reflected fields from one Lua blueprint table, runs polymorphic
-   * post-init, then merges resolved fields back into the same table.
-   */
-  void RBlueprint::InitBlueprint(
-    LuaPlus::LuaObject& luaBlueprint
-  )
-  {
-    gpg::RRef destination{};
-    destination = gpg::MakeRRef<moho::RBlueprint>(this);
-
-    LuaPlus::LuaObject valueObject(luaBlueprint);
-    (void)SCR_LuaBuildObject(valueObject, destination, true);
-
-    // 0x0050DF4D: slot 3 on this object's own vtable. An ordinary virtual
-    // call now that the base is declared rather than hand-modelled.
-    OnInitBlueprint();
-
-    gpg::RRef source{};
-    source = gpg::MakeRRef<moho::RBlueprint>(this);
-    SCR_RObjectToLuaMerge(source, luaBlueprint);
-  }
-
-  /**
    * Address: 0x0050DBA0 (FUN_0050DBA0)
    * Mangled: ?OnInitBlueprint@RBlueprint@Moho@@MAEXXZ
    *

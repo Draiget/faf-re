@@ -1257,25 +1257,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00687AD0 (FUN_00687AD0)
-   *
-   * What it does:
-   * Runs the `EntityDB` destructor and conditionally releases object storage
-   * when scalar-delete flag bit 0 is set.
-   */
-  EntityDB* DestroyEntityDbAndMaybeDelete(
-    EntityDB* const entityDb,
-    const std::uint8_t deleteFlags
-  )
-  {
-    entityDb->~EntityDB();
-    if ((deleteFlags & 1u) != 0u) {
-      ::operator delete(entityDb);
-    }
-    return entityDb;
-  }
-
-  /**
    * Address: 0x00684560 (FUN_00684560)
    * Mangled: ?Purge@EntityDB@Moho@@QAEXXZ
    *
@@ -1460,15 +1441,6 @@ namespace moho
   CEntityDbAllUnitsNode* EntityDB::AllUnitsHead() const noexcept
   {
     return reinterpret_cast<CEntityDbAllUnitsNode*>(const_cast<void*>(mAllUnits.header_ptr()));
-  }
-
-  CEntityDbAllUnitsNode* EntityDB::EraseAllUnitsRange(
-    CEntityDbAllUnitsNode* const first,
-    CEntityDbAllUnitsNode* const last
-  )
-  {
-    CEntityDbAllUnitsNode* outPosition = nullptr;
-    return EraseAllUnitsTreeRange(this, &outPosition, first, last);
   }
 
   /**

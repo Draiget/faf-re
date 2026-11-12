@@ -30,22 +30,6 @@ namespace moho
   fa::string Join(const fa::vector<fa::string>& items, const char* sep);
 
   /**
-   * Check exact, case-sensitive membership in comma-separated list.
-   * Returns true if 'name' equals any trimmed token in 'ignoreList'.
-   */
-  bool IsNameIgnored(const fa::string& ignoreList, const char* name);
-
-  /**
-   * Address: 0x0050E010 (FUN_0050E010,
-   * ?BP_ShortId@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV23@@Z)
-   *
-   * What it does:
-   * Returns the substring between the slash and dot lookup lanes used by
-   * binary BP id canonicalization.
-   */
-  fa::string BP_ShortId(const fa::string& idText);
-
-  /**
    * Address: 0x0048E0C0 (FUN_0048E0C0, Moho::URI_Split)
    *
    * gpg::StrArg,std::basic_string<char,std::char_traits<char>,std::allocator<char>> &,...

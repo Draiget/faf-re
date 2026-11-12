@@ -136,14 +136,6 @@ namespace moho
      */
     [[nodiscard]] const fa::string& GetName() const;
 
-    /**
-     * Address: 0x004ABE10 (FUN_004ABE10, Moho::PrefetchHandleBase::GetResourceRType)
-     *
-     * What it does:
-     * Returns the prefetch payload reflected resource type lane.
-     */
-    [[nodiscard]] gpg::RType* GetResourceRType() const;
-
   public:
     boost::shared_ptr<PrefetchData> mPtr; // +0x00
   };

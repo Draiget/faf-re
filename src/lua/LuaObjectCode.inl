@@ -867,33 +867,6 @@ TObject* luaH_setnum(
 }
 
 /**
- * Address: 0x00927EF0 (FUN_00927EF0, sub_927EF0)
- *
- * What it does:
- * Compares two stack lanes for table-sort partitioning, using custom
- * comparator at stack index 2 when present and falling back to
- * `lua_lessthan` when comparator is absent.
- */
-[[nodiscard]] int LuaSortLessThanWithOptionalComparator(
-  const int leftStackIndex,
-  const int rightStackIndex,
-  lua_State* const state
-)
-{
-  if (lua_type(state, 2) == LUA_TNONE) {
-    return lua_lessthan(state, rightStackIndex, leftStackIndex);
-  }
-
-  lua_pushvalue(state, 2);
-  lua_pushvalue(state, rightStackIndex - 1);
-  lua_pushvalue(state, leftStackIndex - 2);
-  lua_call(state, 2, 1);
-  const int lessThan = lua_toboolean(state, -1);
-  lua_settop(state, -2);
-  return lessThan;
-}
-
-/**
  * Address: 0x00910A70 (FUN_00910A70, discharge2anyreg)
  *
  * What it does:

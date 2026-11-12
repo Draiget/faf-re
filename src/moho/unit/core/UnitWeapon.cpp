@@ -4308,14 +4308,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x006D3550 (FUN_006D3550)
-   */
-  float UnitWeapon::GetFiringRandomness() const
-  {
-    return mFiringRandomness;
-  }
-
-  /**
    * Address: 0x006D3560 (FUN_006D3560)
    */
   UnitWeapon* UnitWeapon::SetFireTargetLayerCaps(

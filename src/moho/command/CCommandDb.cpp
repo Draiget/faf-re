@@ -250,22 +250,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x006E2E10 (FUN_006E2E10)
-   *
-   * What it does:
-   * Runs one `CCommandDB` destructor lane and then releases the object storage
-   * with scalar `operator delete`, returning the same pointer.
-   */
-  [[maybe_unused]] CCommandDB* ReleaseCommandDbInstance(
-    CCommandDB* const db
-  )
-  {
-    db->~CCommandDB();
-    ::operator delete(db);
-    return db;
-  }
-
-  /**
    * Address: 0x006E13A0 (FUN_006E13A0, Moho::CCommandDB::MemberSerialize)
    *
    * What it does:
@@ -369,50 +353,6 @@ namespace moho
     }
   }
 
-  /**
-   * Address: 0x006E3300 (FUN_006E3300)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one command-db save lane to
-   * `CCommandDB::MemberSerialize`.
-   */
-  [[maybe_unused]] void SerializeCommandDbMemberLanePrimary(
-    gpg::WriteArchive* const archive,
-    CCommandDB* const commandDb
-  )
-  {
-    commandDb->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x006E3CF0 (FUN_006E3CF0)
-   *
-   * What it does:
-   * Register-shape adapter that forwards one command-db load lane to
-   * `CCommandDB::MemberDeserialize`.
-   */
-  [[maybe_unused]] void DeserializeCommandDbMemberLane(
-    CCommandDB* const commandDb,
-    gpg::ReadArchive* const archive
-  )
-  {
-    commandDb->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x006E3D00 (FUN_006E3D00)
-   *
-   * What it does:
-   * Secondary register-shape adapter that forwards one command-db save lane to
-   * `CCommandDB::MemberSerialize`.
-   */
-  [[maybe_unused]] void SerializeCommandDbMemberLaneSecondary(
-    gpg::WriteArchive* const archive,
-    CCommandDB* const commandDb
-  )
-  {
-    commandDb->MemberSerialize(archive);
-  }
 } // namespace moho
 
 namespace moho

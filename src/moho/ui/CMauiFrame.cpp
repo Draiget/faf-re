@@ -431,20 +431,6 @@ float moho::CMauiFrame::GetTopmostDepth()
 }
 
 /**
- * Address: 0x007966F0 (FUN_007966F0, ?DumpGraph@CMauiFrame@Moho@@QAEXXZ)
- *
- * What it does:
- * Walks this frame subtree depth-first and invokes `Dump()` on each control.
- */
-void moho::CMauiFrame::DumpGraph()
-{
-  for (CMauiControl* controlCursor = this; controlCursor != nullptr;
-       controlCursor = controlCursor->DepthFirstSuccessor(this)) {
-    controlCursor->Dump();
-  }
-}
-
-/**
  * Address: 0x00796720 (FUN_00796720, Moho::CMauiFrame::Dump)
  *
  * What it does:

@@ -427,33 +427,6 @@ namespace moho
     }
   }
 
-  /**
-   * Address: 0x005FD570 (FUN_005FD570)
-   *
-   * What it does:
-   * Preserves one serializer-save thunk lane for `CUnitSacrificeTask`.
-   */
-  [[maybe_unused]] void CUnitSacrificeTaskMemberSerializeAdapterLaneA(
-    const CUnitSacrificeTask* const task,
-    gpg::WriteArchive* const archive
-  )
-  {
-    task->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x005FDCA0 (FUN_005FDCA0)
-   *
-   * What it does:
-   * Alternate serializer-save thunk lane for `CUnitSacrificeTask`.
-   */
-  [[maybe_unused]] void CUnitSacrificeTaskMemberSerializeAdapterLaneB(
-    const CUnitSacrificeTask* const task,
-    gpg::WriteArchive* const archive
-  )
-  {
-    task->MemberSerialize(archive);
-  }
 } // namespace moho
 
 namespace

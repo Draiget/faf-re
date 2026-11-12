@@ -94,12 +94,4 @@ namespace moho
 namespace gpg
 {
 
-  /**
-   * Address: 0x0060C290 (FUN_0060C290, func_RRRefREntityBlueprint)
-   *
-   * What it does:
-   * Builds one temporary `RRef_REntityBlueprint` and copies `(mObj,mType)`
-   * into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_REntityBlueprint(gpg::RRef* outRef, moho::REntityBlueprint* value);
 } // namespace gpg

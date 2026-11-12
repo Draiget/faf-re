@@ -109,22 +109,6 @@ namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x00635A40 (FUN_00635A40, scalar deleting thunk)
-   */
-  /**
-   * Address: 0x00635AA0 (FUN_00635AA0, CBuilderArmManipulatorTypeInfo non-deleting cleanup body)
-   *
-   * What it does:
-   * Executes one non-deleting destruction lane for
-   * `CBuilderArmManipulatorTypeInfo`.
-   */
-  [[maybe_unused]] void DestroyCBuilderArmManipulatorTypeInfoBody(
-    CBuilderArmManipulatorTypeInfo* const typeInfo
-  ) noexcept
-  {
-    typeInfo->~CBuilderArmManipulatorTypeInfo();
-  }
 
   CBuilderArmManipulatorTypeInfo::~CBuilderArmManipulatorTypeInfo() = default;
 

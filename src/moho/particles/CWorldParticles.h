@@ -410,24 +410,6 @@ namespace moho
   void DestroyWorldParticlesSingleton();
 
   /**
-   * Address: 0x00492E70 (FUN_00492E70)
-   *
-   * What it does:
-   * Returns the global world-particles singleton after restoring the base
-   * interface lane used by legacy exit paths.
-   */
-  [[nodiscard]] CWorldParticles* GetLegacyWorldParticlesSingleton() noexcept;
-
-  /**
-   * Address: 0x00495440 (FUN_00495440, sub_495440)
-   *
-   * What it does:
-   * Returns the global world-particles singleton used by engine render/update
-   * paths.
-   */
-  [[nodiscard]] CWorldParticles* GetGlobalWorldParticles() noexcept;
-
-  /**
    * What it does:
    * Returns the shared trail-quad index sheet used by trail bucket draw
    * helpers.

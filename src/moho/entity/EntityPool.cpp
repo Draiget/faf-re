@@ -63,17 +63,6 @@ namespace moho
     return ::operator new(size);
   }
 
-  void* EntityPool::TryAllocate(
-    std::size_t size
-  ) noexcept
-  {
-    try {
-      return Allocate(size);
-    } catch (...) {
-      return nullptr;
-    }
-  }
-
   void EntityPool::Dellocate(
     void* ptr,
     std::size_t size

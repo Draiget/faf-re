@@ -111,23 +111,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x004CCB40 (FUN_004CCB40)
-   *
-   * What it does:
-   * Writes two consecutive Vector3f lanes from the shared zero-vector payload
-   * and returns the destination pair base pointer.
-   */
-  [[maybe_unused]] Wm3::Vector3f* InitializeZeroVector3fPair(
-    Wm3::Vector3f* const destinationPair
-  ) noexcept
-  {
-    static const Wm3::Vector3f kZeroVector{0.0f, 0.0f, 0.0f};
-    destinationPair[0] = kZeroVector;
-    destinationPair[1] = kZeroVector;
-    return destinationPair;
-  }
-
-  /**
    * Address: 0x005382E0 (FUN_005382E0, Moho::VEC_LargestAxis)
    *
    * What it does:

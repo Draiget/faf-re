@@ -294,12 +294,6 @@ CScrLuaMetatableFactory<UserUnit>& CScrLuaMetatableFactory<UserUnit>::Instance()
 namespace moho
 {
 
-  CScrLuaMetatableFactory<UserUnit>* startup_CScrLuaMetatableFactory_UserUnit_Index()
-  {
-    auto& instance = CScrLuaMetatableFactory<UserUnit>::Instance();
-    instance.SetFactoryObjectIndexForRecovery(CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-    return &instance;
-  }
 } // namespace moho
 
 /**

@@ -292,22 +292,6 @@ namespace moho
     void RunScriptInt(const char* scriptName, int intValue);
 
     /**
-     * Address: 0x005D0540 (FUN_005D0540, Moho::CScriptObject::RunScript_Obj_Num)
-     *
-     * What it does:
-     * Invokes one script callback with `(self)` and returns numeric result.
-     */
-    [[nodiscard]] float RunScriptObjNum(const char* scriptName);
-
-    /**
-     * Address: 0x005D06B0 (FUN_005D06B0, Moho::CScriptObject::RunScript_Weap)
-     *
-     * What it does:
-     * Invokes one script callback with `(self, weapon)` when present.
-     */
-    void RunScriptWeapon(const char* scriptName, UnitWeapon* weapon);
-
-    /**
      * Address: 0x005EC1C0 (FUN_005EC1C0, Moho::CScriptObject::RunScript_Obj)
      *
      * What it does:
@@ -665,16 +649,6 @@ namespace moho
      * @param name
      */
     void RunScriptObj(LuaPlus::LuaObject& out, const char* name);
-
-    /**
-     * Address: 0x00675CF0
-     */
-    void LuaInvoke3_DiscardReturn(
-      LuaPlus::LuaObject& func,
-      LuaPlus::LuaObject& selfObj,
-      const char* stringArg,
-      LuaPlus::LuaObject& payloadObj
-    );
 
   public:
     LuaPlus::LuaObject cObject; // +0x0C (size 0x14)

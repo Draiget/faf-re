@@ -150,17 +150,6 @@ bool CClientBase::IsReady() const
 }
 
 /**
- * Address: 0x0053B920 (FUN_0053B920)
- *
- * What it does:
- * Returns the raw sim-rate lane tracked by this client.
- */
-int32_t CClientBase::GetSimRateRaw() const
-{
-  return mSimRate;
-}
-
-/**
  * Address: 0x0053BE50 (FUN_0053BE50, Moho::CClientBase::~CClientBase)
  * Address: 0x0053BE30 (FUN_0053BE30, dtor thunk)
  *

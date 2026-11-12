@@ -48,28 +48,6 @@ namespace moho
   [[nodiscard]] BVIntSetIndex MakeBVIntSetIndex(BVIntSet* owner, unsigned int value) noexcept;
 
   /**
-   * Address: 0x00401060 (FUN_00401060)
-   * Address: 0x006D3080 (FUN_006D3080 -- the `==` half of the same pair,
-   *   `mov ecx,[eax+4] / cmp ecx,[edx+4] / sete al`, reading `mValue` off both
-   *   operands exactly as this does with `setne`. Zero callers, unreachable --
-   *   every comparison site inlined it and the COMDAT survived; formerly
-   *   `BVIntSetIndexValueEqual` over a hand-written view in
-   *   moho/containers/BVIntSet.cpp (RULE ONE), removed 2026-09-22.)
-   *
-   * What it does:
-   * Compares two BVIntSet index values by the value lane. The owner lane takes
-   * no part: two indices into different sets compare equal when their values
-   * match, which is what makes `it != end` terminate a walk whose `end` was
-   * built by `EndIndex()` on the same set.
-   *
-   * The same walk carried by a 0x0C record, with this pair at `+0x04` behind a
-   * universe lane at `+0x00`, is `BVSet<T,U>::const_iterator` (BVSet.h); its
-   * out-of-line `++`, `!=` and `*` (0x00534940, 0x006E7A40, 0x00534970,
-   * 0x00534960) are cited there.
-   */
-  [[nodiscard]] bool BVIntSetIndexValueNotEqual(const BVIntSetIndex& lhs, const BVIntSetIndex& rhs) noexcept;
-
-  /**
    * Half-open range of absolute word indices, as returned by
    * `BVIntSet::WordRange()`.
    */
@@ -248,14 +226,6 @@ namespace moho
     }
 
     /**
-     * Address: 0x00401830 (FUN_00401830)
-     *
-     * What it does:
-     * Finds the previous present value strictly below `val`.
-     */
-    [[nodiscard]] unsigned int GetPrev(unsigned int val) const;
-
-    /**
      * Address: 0x004018A0 (FUN_004018A0)
      * Address: 0x100015B0
      *
@@ -270,13 +240,6 @@ namespace moho
      * Ensure storage covers [lower, upper) values; expand left/right as needed.
      */
     void EnsureBounds(unsigned int lower, unsigned int upper);
-
-    /**
-     * Address: 0x00401A60 (FUN_00401A60)
-     *
-     * Union with all values from 'from'.
-     */
-    void AddAllFrom(const BVIntSet* from);
 
     /**
      * Address: 0x00401A90 (FUN_00401A90)
@@ -310,14 +273,6 @@ namespace moho
      * Computes the union of `*this` and `rhs` into `out`.
      */
     [[nodiscard]] BVIntSet* Union(BVIntSet* out, const BVIntSet* rhs) const;
-
-    /**
-     * Address: 0x00401E30 (FUN_00401E30)
-     *
-     * What it does:
-     * Computes the symmetric difference of `*this` and `rhs` into `out`.
-     */
-    [[nodiscard]] BVIntSet* ExclusiveOr(BVIntSet* out, const BVIntSet* rhs) const;
 
     /**
      * Address: 0x00401F60 (FUN_00401F60)

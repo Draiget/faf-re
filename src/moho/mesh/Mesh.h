@@ -61,43 +61,6 @@ namespace moho
   };
 
   /**
-   * Address: 0x007E5150 (FUN_007E5150, boost::shared_ptr_MeshMaterial::shared_ptr_MeshMaterial)
-   *
-   * What it does:
-   * Constructs one `shared_ptr<MeshMaterial>` from one raw material pointer
-   * lane.
-   */
-  boost::shared_ptr<MeshMaterial>*
-  ConstructSharedMeshMaterialFromRaw(boost::shared_ptr<MeshMaterial>* outMaterial, MeshMaterial* material);
-
-  /**
-   * Address: 0x007E5420 (FUN_007E5420, boost::shared_ptr_Mesh::shared_ptr_Mesh)
-   *
-   * What it does:
-   * Constructs one `shared_ptr<Mesh>` from one raw mesh pointer lane.
-   */
-  boost::shared_ptr<Mesh>* ConstructSharedMeshFromRaw(boost::shared_ptr<Mesh>* outMesh, Mesh* mesh);
-
-  /**
-   * Address: 0x007E6280 (FUN_007E6280, boost::shared_ptr_MeshBatch::shared_ptr_MeshBatch)
-   *
-   * What it does:
-   * Constructs one `shared_ptr<MeshBatch>` from one raw batch pointer lane.
-   */
-  boost::shared_ptr<MeshBatch>*
-  ConstructSharedMeshBatchFromRaw(boost::shared_ptr<MeshBatch>* outBatch, MeshBatch* batch);
-
-  /**
-   * Address: 0x007E6CE0 (FUN_007E6CE0)
-   *
-   * What it does:
-   * Refreshes interpolation state and copies `MeshInstance::curPose` into
-   * `outPose`, retaining the shared control lane.
-   */
-  boost::shared_ptr<CAniPose>*
-  CaptureMeshInstanceCurrentPose(boost::shared_ptr<CAniPose>* outPose, MeshInstance* meshInstance);
-
-  /**
    * Address: 0x007E6D20 (FUN_007E6D20, sub_7E6D20)
    *
    * What it does:
@@ -551,31 +514,6 @@ namespace moho
     void Cull(bool hidden);
 
     /**
-     * Address: 0x007DE6D0 (FUN_007DE6D0, ?Reflect@MeshInstance@Moho@@QAEX_N@Z)
-     *
-     * What it does:
-     * Clears one per-instance reflection-visibility flag.
-     */
-    void Reflect(bool reflected);
-
-    /**
-     * Address: 0x007DE880 (FUN_007DE880, ?SetParameter@MeshInstance@Moho@@QAEXW4PARAM@MeshMaterial@2@M@Z)
-     *
-     * What it does:
-     * Writes one shader parameter lane selected by `MeshMaterial::PARAM`.
-     */
-    void SetParameter(MeshMaterial::PARAM parameter, float value);
-
-    /**
-     * Address: 0x007DE850 (FUN_007DE850, ?SetInterpolantScale@MeshInstance@Moho@@QAEXM@Z)
-     *
-     * What it does:
-     * Stores one per-instance interpolation scale and invalidates cached
-     * interpolant lane for refresh.
-     */
-    void SetInterpolantScale(float interpolantScale);
-
-    /**
      * Address: 0x007DE8C0 (FUN_007DE8C0, ?SetScale@MeshInstance@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z)
      *
      * What it does:
@@ -590,14 +528,6 @@ namespace moho
      * Stores one packed per-instance color value.
      */
     void SetColor(std::uint32_t color);
-
-    /**
-     * Address: 0x007DE900 (FUN_007DE900, ?SetScroll@MeshInstance@Moho@@QAEXABV?$Vector2@M@Wm3@@0@Z)
-     *
-     * What it does:
-     * Stores two texture-scroll vector lanes for this mesh instance.
-     */
-    void SetScroll(const Wm3::Vec2f& scroll1, const Wm3::Vec2f& scroll2);
 
     /**
      * Address: 0x007DF140 (FUN_007DF140, ?ResetBatches@MeshInstance@Moho@@QAEXXZ)
@@ -695,14 +625,6 @@ namespace moho
      * Refreshes interpolation state and returns current interpolated position.
      */
     [[nodiscard]] Wm3::Vec3f GetInterpolatedPos() const;
-
-    /**
-     * Address: 0x007DE730 (FUN_007DE730, ?GetDebugBoneCount@MeshInstance@Moho@@QBEHXZ)
-     *
-     * What it does:
-     * Returns debug skeleton bone count for static-pose meshes.
-     */
-    [[nodiscard]] std::int32_t GetDebugBoneCount() const;
 
     /**
      * Address: 0x007DE7A0 (FUN_007DE7A0,
@@ -942,21 +864,6 @@ namespace moho
   {
     MeshShaderPaletteBuffer mPalette; // +0x48
   };
-
-  /**
-   * Address: 0x007E96A0 (FUN_007E96A0, sub_7E96A0)
-   *
-   * IDA signature:
-   * float* __usercall sub_7E96A0@<eax>(float* dest@<eax>, float* first@<ecx>,
-   *                                    float* last@<esi>);
-   *
-   * What it does:
-   * Uninitialized-move relocation for palette entries: copies each 16-byte
-   * `SkinPaletteEntry` in `[first, last)` into `dest`, four floats at a time, and
-   * returns the one-past-end destination pointer. Used by the palette grow path
-   * when the backing storage is reallocated.
-   */
-  SkinPaletteEntry* RelocatePaletteEntries(SkinPaletteEntry* dest, SkinPaletteEntry* first, SkinPaletteEntry* last);
 
   /**
    * Address: 0x007E9050 (FUN_007E9050, register_MeshShaderVar)
@@ -1303,20 +1210,6 @@ namespace moho
       CD3DPrimBatcher* debugBatcher,
       CDebugCanvas* debugCanvas,
       const GeomCamera3& camera,
-      bool showBoneNames
-    );
-
-    /**
-     * Address: 0x007E2290 (FUN_007E2290, Moho::MeshRenderer::RenderSkeleton)
-     *
-     * What it does:
-     * Draws one mesh instance's skeleton debug pose, optional bone names, and
-     * wireframe bounds.
-     */
-    void RenderSkeleton(
-      CD3DPrimBatcher* debugBatcher,
-      CDebugCanvas* debugCanvas,
-      MeshInstance* meshInstance,
       bool showBoneNames
     );
 

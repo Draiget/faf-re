@@ -171,14 +171,6 @@ namespace moho
     void SetFacing(const Wm3::Vector3f& facing);
 
     /**
-     * Address: 0x006C35B0 (FUN_006C35B0, ?SetSplineData@CUnitMotion@Moho@@QAEXPBVCPathPoint@2@0@Z)
-     *
-     * What it does:
-     * Stores current and look-ahead spline path waypoint pointers.
-     */
-    void SetSplineData(const CPathPoint* nextWaypoint, const CPathPoint* followingWaypoint);
-
-    /**
      * Address: 0x006B85E0 (FUN_006B85E0, ?SetTarget@CUnitMotion@Moho@@QAEXABV?$Vector3@M@Wm3@@0W4ELayer@2@@Z)
      *
      * What it does:
@@ -555,29 +547,6 @@ namespace moho
      * raised-platform candidate for `FindIntersectingRaisedPlatform`.
      */
     void ProcessSurfaceCollisionFromLastMove();
-
-    /**
-     * Address: 0x006BC460 (FUN_006BC460, ?HandleGroundCollision@CUnitMotion@Moho@@AAE_NXZ)
-     * Mangled: ?HandleGroundCollision@CUnitMotion@Moho@@AAE_NXZ
-     *
-     * What it does:
-     * Early-outs when the unit is well above its own footprint size.
-     * Otherwise pulls the unit's terrain-collision spheres, transforms each
-     * into world space using the physics body's collision transform, and for
-     * each sphere checks whether it has penetrated the terrain (accounting
-     * for the blueprint's ground-collision clearance) and/or sunk below the
-     * map's water floor. Ground-penetration points are collected and, if any
-     * were found, fed to `SPhysBody::ApplyGroundCollisionResponse`. Returns
-     * true if the unit is touching ground, or (for units that can't fly in
-     * water) at/below water.
-     *
-     * Unreachable in every FAF build: its only call, in `CalcMoveAir`'s tail,
-     * was hot-patched to a jump at 0x006C018B and no other reference to
-     * 0x006BC460 exists in the image. Kept as the recovered GPG body, and
-     * deliberately not called -- it dereferences `CollisionExtents`
-     * unguarded, which FAF's scripts clear on flying drones.
-     */
-    [[nodiscard]] bool HandleGroundCollision();
 
     /**
      * Address: 0x006C3220 (FUN_006C3220, ?HandleDivingAndSurfacing@CUnitMotion@Moho@@AAE_NXZ)

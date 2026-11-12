@@ -412,14 +412,6 @@ namespace moho
     virtual void SetUIInterface(IClientMgrUIInterface*);
 
     /**
-     * Address: 0x0053BD30 (FUN_0053BD30)
-     *
-     * What it does:
-     * Returns the bound client-manager UI interface lane.
-     */
-    [[nodiscard]] IClientMgrUIInterface* GetUIInterface() const;
-
-    /**
      * Address: 0x0053E4B0
      * Slot: 11
      */

@@ -148,7 +148,6 @@ LUA_API int             lua_isuserdata (lua_State *L, int idx);
 LUA_API int             lua_type (lua_State *L, int idx);
 LUA_API const char     *lua_typename (lua_State *L, int tp);
 
-LUA_API int            lua_equal (lua_State *L, int idx1, int idx2);
 LUA_API int            lua_rawequal (lua_State *L, int idx1, int idx2);
 LUA_API int            lua_lessthan (lua_State *L, int idx1, int idx2);
 
@@ -228,7 +227,6 @@ LUA_API void  lua_setgcthreshold (lua_State *L, int newthreshold);
 ** miscellaneous functions
 */
 
-LUA_API const char *lua_version (void);
 
 LUA_API int   lua_error (lua_State *L);
 
@@ -267,16 +265,6 @@ LUA_API void  lua_concat (lua_State *L, int n);
 #define lua_isnoneornil(L, n)	(lua_type(L,n) <= 0)
 
 #define lua_pushliteral(L, s)	\
-	lua_pushlstring(L, "" s, (sizeof(s)/sizeof(char))-1)
-
-
-
-/*
-** compatibility macros and functions
-*/
-
-
-LUA_API int lua_pushupvalues (lua_State *L);
 
 #define lua_getregistry(L)	lua_pushvalue(L, LUA_REGISTRYINDEX)
 #define lua_setglobal(L,s)	\

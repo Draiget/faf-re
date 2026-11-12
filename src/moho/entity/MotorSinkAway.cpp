@@ -185,20 +185,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x006971D0 (FUN_006971D0)
-   *
-   * What it does:
-   * Rebinds the startup metatable-factory index lane for
-   * `CScrLuaMetatableFactory<MotorSinkAway>` and returns that singleton.
-   */
-  CScrLuaMetatableFactory<MotorSinkAway>* startup_CScrLuaMetatableFactory_MotorSinkAway_Index()
-  {
-    auto& instance = CScrLuaMetatableFactory<MotorSinkAway>::Instance();
-    instance.SetFactoryObjectIndexForRecovery(CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-    return &instance;
-  }
-
-  /**
    * Address: 0x00696FD0 (FUN_00696FD0, Moho::CScrLuaMetatableFactory<Moho::MotorSinkAway>::Create)
    */
   LuaPlus::LuaObject CScrLuaMetatableFactory<MotorSinkAway>::Create(

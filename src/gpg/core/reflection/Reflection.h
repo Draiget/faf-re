@@ -1718,18 +1718,6 @@ namespace gpg
   RRef* PackRRef_PathQueue(RRef* out, moho::PathQueue* value);
 
   /**
-   * Address: 0x00916E60 (FUN_00916E60, gpg::RRef_WrapFile)
-   *
-   * What it does:
-   * Builds a reflected reference for a `WrapFile` payload (internal
-   * LuaObject.cpp userdata type) using the cached RTTI lookup and 3-slot
-   * TLS derived-type normalization helper. Object argument is passed as
-   * `void*` because `WrapFile` is an anonymous-namespace struct in
-   * `LuaObject.cpp`; callers inside that TU use the named typed overload.
-   */
-  RRef* RRef_WrapFile(RRef* out, void* object);
-
-  /**
    * Address: 0x00697000 (FUN_00697000, gpg::RRef_MotorSinkAway)
    *
    * What it does:

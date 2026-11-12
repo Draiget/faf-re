@@ -289,24 +289,6 @@ namespace moho
 {
   gpg::RType* SDecalInfo::sType = nullptr;
 
-  /**
-   * Address: 0x007786B0 (FUN_007786B0)
-   *
-   * What it does:
-   * Constructs one `SDecalInfo` object in preallocated storage and returns the
-   * constructed object lane.
-   */
-  [[maybe_unused]] SDecalInfo* ConstructSDecalInfoInPlace(
-    SDecalInfo* const storage
-  )
-  {
-    if (storage == nullptr) {
-      return nullptr;
-    }
-
-    return ::new (storage) SDecalInfo();
-  }
-
   [[nodiscard]] SDecalInfo* CopyConstructSDecalInfoIfPresent(
     SDecalInfo* const destination,
     const SDecalInfo* const source
@@ -317,36 +299,6 @@ namespace moho
     }
 
     return ::new (destination) SDecalInfo(*source);
-  }
-
-  /**
-   * Address: 0x0077D360 (FUN_0077D360)
-   *
-   * What it does:
-   * Primary adapter lane for nullable `SDecalInfo` copy-construction into
-   * caller-provided storage.
-   */
-  [[maybe_unused]] [[nodiscard]] SDecalInfo* CopyConstructSDecalInfoIfPresentPrimary(
-    SDecalInfo* const destination,
-    const SDecalInfo* const source
-  )
-  {
-    return CopyConstructSDecalInfoIfPresent(destination, source);
-  }
-
-  /**
-   * Address: 0x0077DCC0 (FUN_0077DCC0)
-   *
-   * What it does:
-   * Secondary adapter lane for nullable `SDecalInfo` copy-construction into
-   * caller-provided storage.
-   */
-  [[maybe_unused]] [[nodiscard]] SDecalInfo* CopyConstructSDecalInfoIfPresentSecondary(
-    SDecalInfo* const destination,
-    const SDecalInfo* const source
-  )
-  {
-    return CopyConstructSDecalInfoIfPresent(destination, source);
   }
 
   /**

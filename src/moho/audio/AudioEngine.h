@@ -75,20 +75,6 @@ namespace moho
     "XACT runtime renderer offset mismatch"
   );
 
-  /**
-   * Address: 0x004DE650 (FUN_004DE650, ??0WeakPtr_AudioEngine@Moho@@QAE@@Z)
-   * Mangled: ??0WeakPtr_AudioEngine@Moho@@QAE@@Z
-   *
-   * What it does:
-   * Rebinds one audio-engine weak/shared pair from a source shared pair by
-   * copying the pointee lane, retaining the incoming control lane, and
-   * weak-releasing any previously bound control lane.
-   */
-  boost::SharedCountPair* AssignWeakAudioEnginePairFromShared(
-    boost::SharedCountPair* outWeakPair,
-    const boost::SharedCountPair* sourceSharedPair
-  ) noexcept;
-
   class IXACTSoundBank
   {
   public:
@@ -600,17 +586,6 @@ namespace moho
     void SetPaused(gpg::StrArg category, bool paused);
 
     /**
-     * Address: 0x004D9EC0 (FUN_004D9EC0, ?GetPaused@AudioEngine@Moho@@QAE_NVStrArg@gpg@@@Z)
-     *
-     * gpg::StrArg category
-     *
-     * What it does:
-     * Returns whether one category name is currently tracked in the paused
-     * category map.
-     */
-    [[nodiscard]] bool GetPaused(gpg::StrArg category);
-
-    /**
      * Address: 0x004D9F50 (FUN_004D9F50, ?StopAllSounds@AudioEngine@Moho@@QAEXVStrArg@gpg@@@Z)
      *
      * gpg::StrArg category
@@ -774,15 +749,6 @@ namespace moho
    * global pointer.
    */
   void SND_Shutdown();
-
-  /**
-   * Address: 0x004D8F10 (FUN_004D8F10, ?SND_Enabled@Moho@@YA_NXZ)
-   *
-   * What it does:
-   * Returns true when sound configuration has at least one loaded engine and
-   * no global no-sound override is active.
-   */
-  bool SND_Enabled();
 
   /**
    * Address: 0x004D8F40 (FUN_004D8F40, ?SND_Frame@Moho@@YAXXZ)

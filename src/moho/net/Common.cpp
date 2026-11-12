@@ -824,46 +824,6 @@ bool moho::NET_Init()
 }
 
 /**
- * Address: 0x0047F540 (FUN_0047F540, NETMAIL_SendError)
- *
- * What it does:
- * Legacy no-op reporting hook kept for binary/API parity.
- */
-void moho::NETMAIL_SendError(
-  const char* const title,
-  const char* const message
-)
-{
-  (void)title;
-  (void)message;
-}
-
-/**
- * Address: 0x0047EBF0 (FUN_0047EBF0, NET_MakeConnector)
- *
- * What it does:
- * Dispatches protocol-specific connector creation for `port`.
- * `kTcp`/`kUdp` forward into protocol-specific factory paths and all other
- * values return a null-object connector instance.
- */
-INetConnector* moho::NET_MakeConnector(
-  const u_short port,
-  const ENetProtocolType protocol,
-  const boost::weak_ptr<INetNATTraversalProvider>& natTraversalProvider
-)
-{
-  switch (protocol) {
-  case ENetProtocolType::kTcp:
-    return NET_MakeTCPConnector(port);
-  case ENetProtocolType::kUdp:
-    return NET_MakeUDPConnector(port, natTraversalProvider);
-  case ENetProtocolType::kNone:
-  default:
-    return new (std::nothrow) CNetNullConnector();
-  }
-}
-
-/**
  * Address: 0x0048BBE0 (FUN_0048BBE0)
  *
  * What it does:

@@ -153,14 +153,6 @@ namespace moho
    */
   CScrLuaInitForm* func_CRotateManipulatorClearGoal_LuaFuncDef();
   CScrLuaInitForm* func_CreateRotator_LuaFuncDef();
-  /**
-   * Address: 0x00645540 (FUN_00645540, func_CreateCRotateManipulatorObject)
-   *
-   * What it does:
-   * Builds the cached `CRotateManipulator` Lua metatable object into the
-   * caller-provided destination.
-   */
-  LuaPlus::LuaObject* func_CreateCRotateManipulatorObject(LuaPlus::LuaObject* object, LuaPlus::LuaState* state);
 
   /**
    * Address: 0x006442A0 (FUN_006442A0, func_CRotateManipulatorSetSpinDown_LuaFuncDef)

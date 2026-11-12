@@ -49,14 +49,6 @@ namespace moho
     int Execute() override;
 
     /**
-     * Address: 0x006D3AE0 (FUN_006D3AE0)
-     *
-     * What it does:
-     * Returns current fire-clock lane.
-     */
-    [[nodiscard]] std::int32_t GetFireClock() const;
-
-    /**
      * Address: 0x006DF270 (FUN_006DF270, MemberDeserialize)
      *
      * What it does:

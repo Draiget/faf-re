@@ -211,14 +211,6 @@ namespace moho
   CFireWeaponTask::~CFireWeaponTask() {}
 
   /**
-   * Address: 0x006D3AE0 (FUN_006D3AE0)
-   */
-  std::int32_t CFireWeaponTask::GetFireClock() const
-  {
-    return mFireClock;
-  }
-
-  /**
    * Address: 0x006D3DC0 (FUN_006D3DC0, ?Execute@CFireWeaponTask@Moho@@UAEHXZ)
    *
    * What it does:

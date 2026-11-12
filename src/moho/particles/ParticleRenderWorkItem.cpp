@@ -88,18 +88,4 @@ namespace moho
     return false;
   }
 
-  /**
-   * Address: 0x00494730 (FUN_00494730)
-   *
-   * What it does:
-   * Appends one trail payload to the trailing trail-vector in a trail bucket
-   * entry.
-   */
-  void AppendTrailToBucketEntry(
-    const SWorldTrail& trail,
-    STrailBucketEntry& bucketEntry
-  )
-  {
-    bucketEntry.mTrails.push_back(trail);
-  }
 } // namespace moho

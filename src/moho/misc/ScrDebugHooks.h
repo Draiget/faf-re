@@ -159,15 +159,6 @@ namespace moho
   void SCR_LoadBreakpoints();
 
   /**
-   * Address: 0x004B59B0 (FUN_004B59B0, Moho::SCR_SaveBreakpoints)
-   *
-   * What it does:
-   * Serializes the in-memory breakpoint list and stores it to user
-   * preferences.
-   */
-  void SCR_SaveBreakpoints();
-
-  /**
    * Address: 0x004B5C70 (FUN_004B5C70, Moho::DebugLuaHook)
    *
    * lua_State *,lua_Debug *

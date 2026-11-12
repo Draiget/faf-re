@@ -749,17 +749,6 @@ namespace moho
   );
 
   /**
-   * Address: 0x00BD9350 (FUN_00BD9350, j_func_IsCommandDone_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_IsCommandDone_LuaFuncDef` to `func_IsCommandDone_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_IsCommandDone_LuaFuncDef()
-  {
-    return ForwardCommandLuaRegistrationThunk<&func_IsCommandDone_LuaFuncDef>();
-  }
-
-  /**
    * Address: 0x00BD9360 (FUN_00BD9360, register_IssueClearCommands_LuaFuncDef)
    *
    * What it does:
@@ -779,17 +768,6 @@ namespace moho
   CScrLuaInitForm* register_IssueStop_LuaFuncDef()
   {
     return ForwardCommandLuaRegistrationThunk<&func_IssueStop_LuaFuncDef>();
-  }
-
-  /**
-   * Address: 0x00BD9380 (FUN_00BD9380, j_func_IssuePause_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_IssuePause_LuaFuncDef` to `func_IssuePause_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_IssuePause_LuaFuncDef()
-  {
-    return ForwardCommandLuaRegistrationThunk<&func_IssuePause_LuaFuncDef>();
   }
 
   /**
@@ -837,28 +815,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD93D0 (FUN_00BD93D0, j_func_IssueMove_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_IssueMove_LuaFuncDef` to `func_IssueMove_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_IssueMove_LuaFuncDef()
-  {
-    return ForwardCommandLuaRegistrationThunk<&func_IssueMove_LuaFuncDef>();
-  }
-
-  /**
-   * Address: 0x00BD93E0 (FUN_00BD93E0, j_func_IssueMoveOffFactory_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_IssueMoveOffFactory_LuaFuncDef` to `func_IssueMoveOffFactory_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_IssueMoveOffFactory_LuaFuncDef()
-  {
-    return ForwardCommandLuaRegistrationThunk<&func_IssueMoveOffFactory_LuaFuncDef>();
-  }
-
-  /**
    * Address: 0x00BD93F0 (FUN_00BD93F0, register_IssueFormMove_LuaFuncDef)
    *
    * What it does:
@@ -870,28 +826,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD9400 (FUN_00BD9400, j_func_IssueGuard_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_IssueGuard_LuaFuncDef` to `func_IssueGuard_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_IssueGuard_LuaFuncDef()
-  {
-    return ForwardCommandLuaRegistrationThunk<&func_IssueGuard_LuaFuncDef>();
-  }
-
-  /**
-   * Address: 0x00BD9410 (FUN_00BD9410, j_func_IssueFactoryAssist_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_IssueFactoryAssist_LuaFuncDef` to `func_IssueFactoryAssist_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_IssueFactoryAssist_LuaFuncDef()
-  {
-    return ForwardCommandLuaRegistrationThunk<&func_IssueFactoryAssist_LuaFuncDef>();
-  }
-
-  /**
    * Address: 0x00BD9420 (FUN_00BD9420, register_IssueAttack_LuaFuncDef)
    *
    * What it does:
@@ -900,17 +834,6 @@ namespace moho
   CScrLuaInitForm* register_IssueAttack_LuaFuncDef()
   {
     return ForwardCommandLuaRegistrationThunk<&func_IssueAttack_LuaFuncDef>();
-  }
-
-  /**
-   * Address: 0x00BD9430 (FUN_00BD9430, j_func_CoordinateAttacks_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_CoordinateAttacks_LuaFuncDef` to `func_CoordinateAttacks_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_CoordinateAttacks_LuaFuncDef()
-  {
-    return ForwardCommandLuaRegistrationThunk<&func_CoordinateAttacks_LuaFuncDef>();
   }
 
   /**
@@ -969,17 +892,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD9490 (FUN_00BD9490, j_func_IssueTeleport_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_IssueTeleport_LuaFuncDef` to `func_IssueTeleport_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_IssueTeleport_LuaFuncDef()
-  {
-    return ForwardCommandLuaRegistrationThunk<&func_IssueTeleport_LuaFuncDef>();
-  }
-
-  /**
    * Address: 0x00BD94A0 (FUN_00BD94A0, register_IssuePatrol_LuaFuncDef)
    *
    * What it does:
@@ -1002,17 +914,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD94C0 (FUN_00BD94C0, j_func_IssueAggressiveMove_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_IssueAggressiveMove_LuaFuncDef` to `func_IssueAggressiveMove_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_IssueAggressiveMove_LuaFuncDef()
-  {
-    return ForwardCommandLuaRegistrationThunk<&func_IssueAggressiveMove_LuaFuncDef>();
-  }
-
-  /**
    * Address: 0x00BD94D0 (FUN_00BD94D0, register_IssueFormAggressiveMove_LuaFuncDef)
    *
    * What it does:
@@ -1032,17 +933,6 @@ namespace moho
   CScrLuaInitForm* register_IssueFerry_LuaFuncDef()
   {
     return ForwardCommandLuaRegistrationThunk<&func_IssueFerry_LuaFuncDef>();
-  }
-
-  /**
-   * Address: 0x00BD94F0 (FUN_00BD94F0, j_func_IssueBuildMobile_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_IssueBuildMobile_LuaFuncDef` to `func_IssueBuildMobile_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_IssueBuildMobile_LuaFuncDef()
-  {
-    return ForwardCommandLuaRegistrationThunk<&func_IssueBuildMobile_LuaFuncDef>();
   }
 
   /**
@@ -1101,17 +991,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD9550 (FUN_00BD9550, j_func_IssueCapture_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_IssueCapture_LuaFuncDef` to `func_IssueCapture_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_IssueCapture_LuaFuncDef()
-  {
-    return ForwardCommandLuaRegistrationThunk<&func_IssueCapture_LuaFuncDef>();
-  }
-
-  /**
    * Address: 0x00BD9560 (FUN_00BD9560, register_IssueKillSelf_LuaFuncDef)
    *
    * What it does:
@@ -1134,17 +1013,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD9580 (FUN_00BD9580, j_func_IssueTransportLoad_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_IssueTransportLoad_LuaFuncDef` to `func_IssueTransportLoad_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_IssueTransportLoad_LuaFuncDef()
-  {
-    return ForwardCommandLuaRegistrationThunk<&func_IssueTransportLoad_LuaFuncDef>();
-  }
-
-  /**
    * Address: 0x00BD9590 (FUN_00BD9590, register_IssueTransportUnload_LuaFuncDef)
    *
    * What it does:
@@ -1164,17 +1032,6 @@ namespace moho
   CScrLuaInitForm* register_IssueTeleportToBeacon_LuaFuncDef()
   {
     return ForwardCommandLuaRegistrationThunk<&func_IssueTeleportToBeacon_LuaFuncDef>();
-  }
-
-  /**
-   * Address: 0x00BD95B0 (FUN_00BD95B0, j_func_IssueTransportUnloadSpecific_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_IssueTransportUnloadSpecific_LuaFuncDef` to `func_IssueTransportUnloadSpecific_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_IssueTransportUnloadSpecific_LuaFuncDef()
-  {
-    return ForwardCommandLuaRegistrationThunk<&func_IssueTransportUnloadSpecific_LuaFuncDef>();
   }
 
   /**

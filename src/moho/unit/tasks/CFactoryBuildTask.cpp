@@ -471,33 +471,6 @@ namespace moho
     }
   }
 
-  /**
-   * Address: 0x005FD490 (FUN_005FD490)
-   *
-   * What it does:
-   * Preserves one serializer-save thunk lane for `CFactoryBuildTask`.
-   */
-  [[maybe_unused]] void CFactoryBuildTaskMemberSerializeAdapterLaneA(
-    const CFactoryBuildTask* const task,
-    gpg::WriteArchive* const archive
-  )
-  {
-    task->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x005FDC80 (FUN_005FDC80)
-   *
-   * What it does:
-   * Alternate serializer-save thunk lane for `CFactoryBuildTask`.
-   */
-  [[maybe_unused]] void CFactoryBuildTaskMemberSerializeAdapterLaneB(
-    const CFactoryBuildTask* const task,
-    gpg::WriteArchive* const archive
-  )
-  {
-    task->MemberSerialize(archive);
-  }
 } // namespace moho
 
 namespace

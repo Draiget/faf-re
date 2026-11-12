@@ -90,16 +90,6 @@ namespace moho
     ~RBlueprint() override;
 
     /**
-     * Address: 0x0050DF10 (FUN_0050DF10, Moho::RBlueprint::InitBlueprint)
-     *
-     * What it does:
-     * Applies one Lua blueprint table into this reflected object, runs the
-     * polymorphic `OnInitBlueprint()` lane, then merges resolved fields back
-     * into the Lua table.
-     */
-    void InitBlueprint(LuaPlus::LuaObject& luaBlueprint);
-
-    /**
      * Address: 0x0050DBA0 (FUN_0050DBA0)
      * Mangled: ?OnInitBlueprint@RBlueprint@Moho@@MAEXXZ
      *

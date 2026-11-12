@@ -704,26 +704,6 @@ int luaL_argerror(
 }
 
 /**
- * Address: 0x0090E9A0 (FUN_0090E9A0, luaL_typerror)
- *
- * IDA signature:
- * int __cdecl luaL_typerror(lua_State *L, int narg, const char *tname);
- *
- * What it does:
- * Raises "expected X, got Y" for an argument of the wrong type.
- */
-int luaL_typerror(
-  lua_State* const state,
-  const int narg,
-  const char* const tname
-)
-{
-  const char* const actual = lua_typename(state, lua_type(state, narg));
-  const char* const message = lua_pushfstring(state, "%s expected, got %s", tname, actual);
-  return luaL_argerror(state, narg, message);
-}
-
-/**
  * Address: 0x0090E420 (FUN_0090E420, luaL_ref)
  *
  * IDA signature:

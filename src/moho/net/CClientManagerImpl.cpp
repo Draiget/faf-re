@@ -997,14 +997,6 @@ void CClientManagerImpl::SetUIInterface(
 }
 
 /**
- * Address: 0x0053BD30 (FUN_0053BD30)
- */
-IClientMgrUIInterface* CClientManagerImpl::GetUIInterface() const
-{
-  return mInterface;
-}
-
-/**
  * Address: 0x0053E4B0 (FUN_0053E4B0)
  */
 void CClientManagerImpl::Cleanup()

@@ -36,11 +36,6 @@ namespace moho::audio_reflection
     return gpg::CachedLookup(CachedISoundManagerType(), typeid(moho::ISoundManager));
   }
 
-  gpg::RType* ResolveCSimSoundManagerType()
-  {
-    return gpg::CachedLookup(CachedCSimSoundManagerType(), typeid(moho::CSimSoundManager));
-  }
-
   gpg::RType* ResolveCScriptEventType()
   {
     return gpg::CachedLookup(CachedCScriptEventType(), typeid(moho::CScriptEvent));
@@ -56,19 +51,6 @@ namespace moho::audio_reflection
     }
 
     gpg::AddReflectedBaseType(ownerType, baseType);
-  }
-
-  void RegisterSerializeCallbacks(
-    gpg::RType* const typeInfo,
-    const gpg::RType::load_func_t loadCallback,
-    const gpg::RType::save_func_t saveCallback
-  )
-  {
-    GPG_ASSERT(typeInfo != nullptr);
-    GPG_ASSERT(typeInfo->serLoadFunc_ == nullptr);
-    typeInfo->serLoadFunc_ = loadCallback;
-    GPG_ASSERT(typeInfo->serSaveFunc_ == nullptr);
-    typeInfo->serSaveFunc_ = saveCallback;
   }
 
 } // namespace moho::audio_reflection

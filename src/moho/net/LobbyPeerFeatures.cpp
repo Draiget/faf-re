@@ -432,14 +432,6 @@ bool CLobbyPeerFeatures::Receive(
   return false;
 }
 
-bool CLobbyPeerFeatures::PeerRunsOurEngine(
-  const std::int32_t uid
-) const
-{
-  const auto found = mPeers.find(uid);
-  return found != mPeers.end() && found->second.announced;
-}
-
 std::string CLobbyPeerFeatures::StyleOf(
   const std::int32_t uid
 ) const

@@ -28,21 +28,6 @@ namespace moho
   RDebugNavSteeringTypeInfo::~RDebugNavSteeringTypeInfo() = default;
 
   /**
-   * Address: 0x00650A80 (FUN_00650A80)
-   *
-   * What it does:
-   * Deleting-destructor thunk lane that forwards into
-   * `RDebugOverlayClass` non-deleting destructor body.
-   */
-  [[maybe_unused]] RDebugOverlayClass* DestroyRDebugNavSteeringTypeInfoThunk(
-    RDebugOverlayClass* const object
-  )
-  {
-    object->~RDebugOverlayClass();
-    return object;
-  }
-
-  /**
    * Address: 0x00650A50 (FUN_00650A50, Moho::RDebugNavSteeringTypeInfo::GetName)
    */
   const char* RDebugNavSteeringTypeInfo::GetName() const

@@ -64,21 +64,6 @@ namespace moho
      */
     void Init();
 
-    /**
-     * Address: 0x008144C0 (FUN_008144C0, Moho::Silhouette::dtr)
-     * Mangled: ??_GSilhouette@Moho@@UAEPAXI@Z
-     * Slot: 0 (vftable slot 0 -- scalar deleting destructor thunk)
-     *
-     * IDA signature:
-     * void* __thiscall Moho::Silhouette::dtr(Silhouette* this, char deleteFlags);
-     *
-     * What it does:
-     * Runs the virtual destructor and conditionally frees backing memory with
-     * `operator delete` when the low flag bit is set. Standard MSVC8 scalar
-     * deleting destructor thunk at vftable slot 0.
-     */
-    void* ScalarDeletingDestructor(std::uint8_t deleteFlags);
-
   public:
     // The quad itself. `Init` assigns through boost::shared_ptr's operator=,
     // which IDA names `boost::shared_ptr_ID3DVertexSheet::operator=` - that

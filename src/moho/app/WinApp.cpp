@@ -2157,28 +2157,6 @@ void moho::WIN_AppRequestExit()
 }
 
 /**
- * Address: 0x004F2410 (FUN_004F2410, ?WIN_GetCurrentApp@Moho@@YAPAVIWinApp@1@XZ)
- *
- * What it does:
- * Returns the process-global active app owner pointer.
- */
-moho::IWinApp* moho::WIN_GetCurrentApp()
-{
-  return sSupComApp;
-}
-
-/**
- * Address: 0x004F25B0 (FUN_004F25B0, ?WIN_GetMainWindow@Moho@@YAPAVwxWindow@@XZ)
- *
- * What it does:
- * Returns the process-global main-window owner pointer.
- */
-wxWindow* moho::WIN_GetMainWindow()
-{
-  return sMainWindow;
-}
-
-/**
  * Address: 0x004F25C0 (FUN_004F25C0, ?WIN_SetMainWindow@Moho@@YAXPAVwxWindow@@@Z)
  *
  * What it does:
@@ -2468,41 +2446,6 @@ bool moho::PLAT_SetRegistryValue(
 }
 
 /**
- * Address: 0x004A2F60 (FUN_004A2F60)
- *
- * What it does:
- * Writes one 32-bit DWORD registry value.
- */
-bool moho::PLAT_SetRegistryValueDword(
-  const char* const keyPath,
-  const std::uint32_t value
-)
-{
-  return PLAT_SetRegistryValue(keyPath, reinterpret_cast<const std::uint8_t*>(&value), sizeof(value), REG_DWORD);
-}
-
-/**
- * Address: 0x004A2F80 (FUN_004A2F80)
- *
- * What it does:
- * Writes one zero-terminated string registry value; null input writes an
- * empty string payload.
- */
-bool moho::PLAT_SetRegistryValueString(
-  const char* const value,
-  const char* const keyPath
-)
-{
-  const char* const safeValue = (value != nullptr) ? value : "";
-  return PLAT_SetRegistryValue(
-    keyPath,
-    reinterpret_cast<const std::uint8_t*>(safeValue),
-    static_cast<std::uint32_t>(std::strlen(safeValue) + 1U),
-    REG_SZ
-  );
-}
-
-/**
  * Address: 0x004A2D40 (FUN_004A2D40)
  *
  * What it does:
@@ -2598,126 +2541,6 @@ fa::string moho::WIN_GetClipboardText()
   (void)::CloseClipboard();
   return clipboardText;
 #endif
-}
-
-/**
- * Address: 0x004F1190 (FUN_004F1190)
- * Mangled: ?WIN_ShowCrashDialog@Moho@@YAXPBD0PAU_EXCEPTION_POINTERS@@H@Z
- *
- * What it does:
- * Builds crash-details text (program, args, callstack, recent log lines) and
- * displays the crash dialog UI/fallback prompt.
- */
-void moho::WIN_ShowCrashDialog(
-  std::int32_t skipCallstackFrames,
-  _EXCEPTION_POINTERS* const exceptionInfo,
-  const gpg::StrArg caption,
-  const gpg::StrArg summaryText
-)
-{
-  std::ostringstream details;
-  details << (summaryText != nullptr ? summaryText : "") << "\n\n";
-
-  WCHAR programFileName[512]{};
-  if (
-    ::GetModuleFileNameW(
-      nullptr, programFileName, static_cast<DWORD>(sizeof(programFileName) / sizeof(programFileName[0]))
-    ) != 0
-  ) {
-    const fa::string programPath = gpg::STR_WideToUtf8(programFileName);
-    details << "Program : " << programPath.c_str() << "\n";
-  } else {
-    details << "Program : <unknown>\n";
-  }
-
-  const fa::string args = CFG_GetArgs();
-  details << "Cmd line arguments : " << args.c_str() << "\n\n";
-  details << "Callstack:\n";
-
-  void* contextRecord = nullptr;
-#if FAFRE_PLATFORM_WINDOWS
-  if (exceptionInfo != nullptr) {
-    contextRecord = exceptionInfo->ContextRecord;
-  } else {
-    skipCallstackFrames += 2;
-  }
-#else
-  // Exception records are Windows'; elsewhere the call stack is this thread's own.
-  (void)exceptionInfo;
-  skipCallstackFrames += 2;
-#endif
-
-  std::uintptr_t stackFrames[64]{};
-  const std::uint32_t frameCount = PLAT_GetCallStack(contextRecord, 64, stackFrames);
-  const std::uint32_t firstFrame =
-    skipCallstackFrames > 0 ? static_cast<std::uint32_t>(skipCallstackFrames) : static_cast<std::uint32_t>(0);
-  // The dialog is modal and everything it shows is gone the moment it closes,
-  // so mirror the summary and the callstack into the log as well. On an
-  // unattended run - and on a run where the dialog resource fails to load, as
-  // it does in this build - the log is the only surviving record of the crash.
-  gpg::Logf("CRASH: %s", summaryText != nullptr ? static_cast<const char*>(summaryText) : "<no summary>");
-  if (frameCount <= firstFrame) {
-    details << "    unavailable.\n";
-    gpg::Logf("CRASH callstack: unavailable.");
-  } else {
-    const fa::string callstackText =
-      PLAT_FormatCallstack(static_cast<std::int32_t>(firstFrame), static_cast<std::int32_t>(frameCount), stackFrames);
-    details << callstackText.c_str();
-    gpg::Logf("CRASH callstack:\n%s", callstackText.c_str());
-  }
-
-  details << "\n";
-  details << "Last 100 lines of log...\n\n";
-  const fa::string recentLogLines = LOG_GetRecentLines(100u);
-  details << recentLogLines.c_str();
-
-  const std::string bodyText = details.str();
-#if !FAFRE_PLATFORM_WINDOWS
-  // The crash dialog is a Windows dialog resource: the same text in a message box.
-  WIN_OkBox(caption != nullptr ? caption : "Crash", bodyText.c_str());
-#else
-  CrashDialogInitData dialogInit{
-    caption != nullptr ? caption : "Crash",
-    bodyText.c_str(),
-  };
-
-  HMODULE module = nullptr;
-  (void)::GetModuleHandleExW(
-    GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-    reinterpret_cast<LPCWSTR>(&CrashDialogProc),
-    &module
-  );
-
-  if (
-    module == nullptr ||
-    ::DialogBoxParamW(
-      module, MAKEINTRESOURCEW(kCrashDialogTemplateId), nullptr, &CrashDialogProc, reinterpret_cast<LPARAM>(&dialogInit)
-    ) == -1
-  ) {
-    const fa::string dialogError = WIN_GetLastError();
-    gpg::Logf("DialogBoxParam failed: %s", dialogError.c_str());
-    WIN_OkBox(dialogInit.caption, dialogInit.body);
-  }
-#endif
-}
-
-/**
- * Address: 0x004F2900 (FUN_004F2900, ?WIN_YesNoBox@Moho@@YA_NVStrArg@gpg@@0@Z)
- *
- * What it does:
- * Displays a UTF-8 yes/no message box and reports whether the user selected
- * `Yes`.
- */
-bool moho::WIN_YesNoBox(
-  const gpg::StrArg caption,
-  const gpg::StrArg text
-)
-{
-  const HWND ownerWindow =
-    sMainWindow != nullptr ? reinterpret_cast<HWND>(static_cast<std::uintptr_t>(sMainWindow->GetHandle())) : nullptr;
-  const std::wstring wideCaption = gpg::STR_Utf8ToWide(caption);
-  const std::wstring wideText = gpg::STR_Utf8ToWide(text);
-  return ::MessageBoxW(ownerWindow, wideText.c_str(), wideCaption.c_str(), 0x40004u) == IDYES;
 }
 
 namespace
@@ -2819,27 +2642,6 @@ void moho::WINX_Exit()
       managedFrames[index].UnlinkFromOwnerChain();
     }
   }
-}
-
-/**
- * Address: 0x004F3B60 (FUN_004F3B60, ?WINX_Printf@Moho@@YA?AVwxString@@PBDZZ)
- *
- * What it does:
- * Formats one UTF-8 vararg string through `gpg::STR_Va`, converts it to wide
- * text, and stores the result in caller-provided `wxString`.
- */
-wxString moho::WINX_Printf(
-  const char* const format,
-  ...
-)
-{
-  va_list args;
-  va_start(args, format);
-  const char* formatCursor = format;
-  const fa::string formatted = gpg::STR_Va(formatCursor, args);
-  va_end(args);
-
-  return wxString(gpg::STR_Utf8ToWide(formatted.c_str()).c_str());
 }
 
 /**

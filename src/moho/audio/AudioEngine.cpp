@@ -129,20 +129,6 @@ namespace moho
 }
 
 /**
- * Address: 0x004DDD80 (FUN_004DDD80, boost::shared_ptr_AudioEngine::shared_ptr_AudioEngine)
- *
- * What it does:
- * Constructs one `shared_ptr<AudioEngine>` from one raw audio-engine pointer lane.
- */
-boost::shared_ptr<moho::AudioEngine>* ConstructSharedAudioEngineFromRaw(
-  boost::shared_ptr<moho::AudioEngine>* const outEngine,
-  moho::AudioEngine* const engine
-)
-{
-  return ::new (outEngine) boost::shared_ptr<moho::AudioEngine>(engine);
-}
-
-/**
  * Address: 0x004DE470 (FUN_004DE470)
  *
  * What it does:
@@ -220,36 +206,6 @@ namespace
   }
 
   DestroyAudioEngineImplOwnedSlotCore(countedBlock->mOwnedSlot);
-}
-
-/**
- * Address: 0x004DE7C0 (FUN_004DE7C0)
- *
- * What it does:
- * Destroys one heap-owned `AudioEngineImpl*` slot and its pointee.
- */
-void DestroyAudioEngineImplOwnedSlot(
-  moho::AudioEngineImpl** const ownedSlot
-) noexcept
-{
-  DestroyAudioEngineImplOwnedSlotCore(ownedSlot);
-}
-
-/**
- * Address: 0x004DE650 (FUN_004DE650, ??0WeakPtr_AudioEngine@Moho@@QAE@@Z)
- * Mangled: ??0WeakPtr_AudioEngine@Moho@@QAE@@Z
- *
- * What it does:
- * Rebinds one audio-engine weak/shared pair from a source shared pair by
- * copying the pointee lane, retaining the incoming control lane, and
- * weak-releasing any previously bound control lane.
- */
-boost::SharedCountPair* moho::AssignWeakAudioEnginePairFromShared(
-  boost::SharedCountPair* const outWeakPair,
-  const boost::SharedCountPair* const sourceSharedPair
-) noexcept
-{
-  return boost::AssignWeakPairFromShared(outWeakPair, sourceSharedPair);
 }
 
 namespace
@@ -2208,24 +2164,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x004D8F10 (FUN_004D8F10, ?SND_Enabled@Moho@@YA_NXZ)
-   *
-   * What it does:
-   * Reports whether at least one audio engine is loaded and no-sound mode is
-   * disabled.
-   */
-  bool SND_Enabled()
-  {
-    const SoundConfiguration* const configuration = GetSoundConfigurationSingletonA();
-    if (configuration == nullptr) {
-      return false;
-    }
-
-    const AudioEngineRef* const begin = configuration->mEngines.mStart;
-    return begin != nullptr && configuration->mEngines.mFinish != begin && configuration->mNoSound == 0u;
-  }
-
-  /**
    * Address: 0x004D8F40 (FUN_004D8F40, ?SND_Frame@Moho@@YAXXZ)
    *
    * What it does:
@@ -2920,25 +2858,6 @@ namespace moho
     } else {
       mImpl->mPausedCategoryNames.erase(category);
     }
-  }
-
-  /**
-   * Address: 0x004D9EC0 (FUN_004D9EC0, ?GetPaused@AudioEngine@Moho@@QAE_NVStrArg@gpg@@@Z)
-   *
-   * gpg::StrArg category
-   *
-   * What it does:
-   * Returns true when one category name exists in the paused-category map.
-   */
-  bool AudioEngine::GetPaused(
-    const gpg::StrArg category
-  )
-  {
-    if (mImpl == nullptr || mImpl->mInstance == nullptr || !IsCategoryArgValid(category)) {
-      return false;
-    }
-
-    return mImpl->mPausedCategoryNames.count(category) != 0;
   }
 
   /**

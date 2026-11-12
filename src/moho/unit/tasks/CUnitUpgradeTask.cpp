@@ -344,33 +344,6 @@ namespace moho
     return TaskTick();
   }
 
-  /**
-   * Address: 0x005FD1B0 (FUN_005FD1B0)
-   *
-   * What it does:
-   * Preserves one serializer-save thunk lane for `CUnitUpgradeTask`.
-   */
-  [[maybe_unused]] void CUnitUpgradeTaskMemberSerializeAdapterLaneA(
-    const CUnitUpgradeTask* const task,
-    gpg::WriteArchive* const archive
-  )
-  {
-    task->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x005FDB60 (FUN_005FDB60)
-   *
-   * What it does:
-   * Alternate serializer-save thunk lane for `CUnitUpgradeTask`.
-   */
-  [[maybe_unused]] void CUnitUpgradeTaskMemberSerializeAdapterLaneB(
-    const CUnitUpgradeTask* const task,
-    gpg::WriteArchive* const archive
-  )
-  {
-    task->MemberSerialize(archive);
-  }
 } // namespace moho
 
 namespace moho

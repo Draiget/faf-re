@@ -646,28 +646,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x008904A0 (FUN_008904A0, ?GetTerrainDim@RWldMapPreviewChunk@Moho@@QBE?AV?$Vector2@M@Wm3@@XZ)
-   *
-   * What it does:
-   * Returns stored preview terrain dimensions.
-   */
-  Wm3::Vector2f RWldMapPreviewChunk::GetTerrainDim() const
-  {
-    return mPreviewSize;
-  }
-
-  /**
-   * Address: 0x008904B0 (FUN_008904B0, ?GetDescription@RWldMapPreviewChunk@Moho@@QBEPBDXZ)
-   *
-   * What it does:
-   * Returns preview description text buffer pointer.
-   */
-  const char* RWldMapPreviewChunk::GetDescription() const
-  {
-    return mPreviewName.c_str();
-  }
-
-  /**
    * Address: 0x008904C0 (FUN_008904C0,
    * ?Load@RWldMapPreviewChunk@Moho@@QAE_NAAVBinaryReader@gpg@@AAVCBackgroundTaskControl@2@@Z)
    *
@@ -1011,21 +989,4 @@ namespace moho
     return true;
   }
 
-  /**
-   * Address: 0x00891250 (FUN_00891250,
-   * ?MapSetPreview@CWldMap@Moho@@QAEXV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$Vector2@M@Wm3@@PBD@Z)
-   *
-   * What it does:
-   * Replaces the owned preview chunk with one built from the provided
-   * texture/size/name lane and destroys any previous chunk.
-   */
-  void CWldMap::MapSetPreview(
-    boost::shared_ptr<ID3DTextureSheet> textureSheet,
-    const Wm3::Vector2f& previewSize,
-    const char* const previewName
-  )
-  {
-    auto* const newChunk = new (std::nothrow) RWldMapPreviewChunk(textureSheet, previewSize, previewName);
-    ReplaceOwnedPreviewChunk(&mMapPreviewChunk, newChunk);
-  }
 } // namespace moho

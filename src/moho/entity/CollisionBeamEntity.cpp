@@ -206,31 +206,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00672C30 (FUN_00672C30, Moho::CollisionBeamEntity::SetEfxBeam)
-   */
-  void CollisionBeamEntity::SetEfxBeam(
-    IEffect* const beamEmitter,
-    const bool checkCollision
-  )
-  {
-    (void)RelinkWeakPtrIEffect(&mEffect, beamEmitter);
-
-    if (mLauncher.GetObjectPtr() != nullptr && checkCollision) {
-      CheckCollision();
-    }
-  }
-
-  /**
-   * Address: 0x00672C60 (FUN_00672C60, Moho::CollisionBeamEntity::SetCollisionCheckInterval)
-   */
-  void CollisionBeamEntity::SetCollisionCheckInterval(
-    const std::int32_t intervalTicks
-  )
-  {
-    mCollisionCheckInterval = intervalTicks;
-  }
-
-  /**
    * Address: 0x00672C00 (FUN_00672C00, Moho::CollisionBeamEntity::GetDerivedObjectRef)
    */
   gpg::RRef CollisionBeamEntity::GetDerivedObjectRef()
@@ -244,29 +219,6 @@ namespace moho
   CollisionBeamEntity* CollisionBeamEntity::IsCollisionBeam()
   {
     return this;
-  }
-
-  /**
-   * Address: 0x00672C70 (FUN_00672C70, Moho::CollisionBeamEntity::GetLauncher)
-   * Mangled: ?GetLauncher@CollisionBeamEntity@Moho@@QBEPAVEntity@2@XZ
-   *
-   * What it does:
-   * Resolves launcher weak-link ownership and returns launcher unit as its
-   * `Entity` base pointer when available.
-   */
-  Entity* CollisionBeamEntity::GetLauncher() const
-  {
-    UnitWeapon* const launcherWeapon = mLauncher.GetObjectPtr();
-    if (launcherWeapon == nullptr) {
-      return nullptr;
-    }
-
-    Unit* const launcherUnit = launcherWeapon->mUnit;
-    if (launcherUnit == nullptr) {
-      return nullptr;
-    }
-
-    return static_cast<Entity*>(launcherUnit);
   }
 
   /**
@@ -368,17 +320,6 @@ namespace moho
 
     attacker->TransmitBeamImpactEvent(launcherWeapon, this);
     mCollisionListenerBound = 1u;
-  }
-
-  /**
-   * Address: 0x006732C0 (FUN_006732C0, ?IsEnabled@CollisionBeamEntity@Moho@@QBE_NXZ)
-   *
-   * What it does:
-   * Returns whether collision-check processing is currently enabled.
-   */
-  bool CollisionBeamEntity::IsEnabled() const
-  {
-    return mEnabled != 0u;
   }
 
   /**

@@ -781,28 +781,6 @@ moho::SFileWaitHandle* moho::DISK_MountZipFile(
 }
 
 /**
- * Address: 0x00459B30 (FUN_00459B30, ?DISK_GetFileInfo@Moho@@YA_NVStrArg@gpg@@PAUSDiskFileInfo@1@@Z)
- *
- * gpg::StrArg,Moho::SDiskFileInfo *,bool
- *
- * What it does:
- * Forwards metadata lookup to the process wait-handle runtime.
- */
-bool moho::DISK_GetFileInfo(
-  const gpg::StrArg sourcePath,
-  SDiskFileInfo* const outInfo,
-  const bool realOnly
-)
-{
-  FILE_EnsureWaitHandleSet();
-  if (sPFWaitHandleSet == nullptr) {
-    return false;
-  }
-
-  return sPFWaitHandleSet->GetFileInfo(sourcePath, outInfo, realOnly);
-}
-
-/**
  * Address: 0x00459CD0 (FUN_00459CD0, ?DISK_ReadFile@Moho@@YA?AU?$MemBuffer@D@gpg@@VStrArg@3@@Z)
  *
  * gpg::StrArg

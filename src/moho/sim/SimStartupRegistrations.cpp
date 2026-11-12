@@ -215,33 +215,6 @@ namespace moho
   TSimConVar<float> gSimConVar_AirLookAheadMult(false, "AirLookAheadMult", 1.0f);
 
   /**
-   * Address: 0x00BD4BE0 (FUN_00BD4BE0, register_sim_SimInits_mForms_prependStartupLane21)
-   *
-   * What it does:
-   * Saves the current `sim` Lua-init form chain head and replaces it with the
-   * recovered startup lane anchor for `startupLane21`.
-   */
-  CScrLuaInitForm* register_sim_SimInits_mForms_prependStartupLane21()
-  {
-    CScrLuaInitFormSet* const simSet = moho::SCR_FindLuaInitFormSet("Sim");
-    if (simSet == nullptr) {
-      gSimLuaInitFormPrevStartupLane21 = nullptr;
-      return nullptr;
-    }
-
-    CScrLuaInitForm* const result = simSet->mForms;
-    gSimLuaInitFormPrevStartupLane21 = result;
-    // Prepend suppressed: the binary's anchor is a statically initialised
-    // form object in .data with no constructor, so it patches the list by
-    // hand. Our equivalent is a real C++ object whose constructor already
-    // calls AddInit, and re-doing it here published the address of a
-    // CScrLuaInitForm* variable as the list head - a null vtable pointer
-    // that crashed RunLuaInitFormSetIfPresent. See CPrefetchSet.cpp.
-    // simSet->mForms = reinterpret_cast<CScrLuaInitForm*>(&gSimLuaInitFormAnchorStartupLane21);
-    return result;
-  }
-
-  /**
    * Address: 0x00BD4C00 (FUN_00BD4C00, sub_BD4C00) -- record at 0x00F59F34
    *
    * What it does:
@@ -471,17 +444,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD9A50 (FUN_00BD9A50, j_func_CreatePropHPR_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_CreatePropHPR_LuaFuncDef` to `func_CreatePropHPR_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_CreatePropHPR_LuaFuncDef()
-  {
-    return ForwardSimStartupLuaThunk<&func_CreatePropHPR_LuaFuncDef>();
-  }
-
-  /**
    * Address: 0x00BD9A60 (FUN_00BD9A60, register_CreateProp_LuaFuncDef)
    *
    * What it does:
@@ -490,17 +452,6 @@ namespace moho
   CScrLuaInitForm* register_CreateProp_LuaFuncDef()
   {
     return ForwardSimStartupLuaThunk<&func_CreateProp_LuaFuncDef>();
-  }
-
-  /**
-   * Address: 0x00BD9CF0 (FUN_00BD9CF0, j_func_ShouldCreateInitialArmyUnits_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_ShouldCreateInitialArmyUnits_LuaFuncDef` to `func_ShouldCreateInitialArmyUnits_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_ShouldCreateInitialArmyUnits_LuaFuncDef()
-  {
-    return ForwardSimStartupLuaThunk<&func_ShouldCreateInitialArmyUnits_LuaFuncDef>();
   }
 
   /**

@@ -603,24 +603,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x007FE1A0 (FUN_007FE1A0)
-   *
-   * What it does:
-   * Runs one deleting-destructor thunk for `Shadow`, forwarding through
-   * `Shadow::~Shadow` and optional storage release.
-   */
-  [[nodiscard]] Shadow* DestroyShadowDeleting(
-    Shadow* const shadow,
-    const unsigned char deleteFlag
-  )
-  {
-    shadow->~Shadow();
-    if ((deleteFlag & 1u) != 0u) {
-      ::operator delete(static_cast<void*>(shadow));
-    }
-    return shadow;
-  }
-  /**
    * Address: 0x007FE940 (FUN_007FE940, sub_7FE940)
    *
    * What it does:

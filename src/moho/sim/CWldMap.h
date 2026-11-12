@@ -193,22 +193,6 @@ namespace moho
     [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetTextureSheet();
 
     /**
-     * Address: 0x008904A0 (FUN_008904A0, ?GetTerrainDim@RWldMapPreviewChunk@Moho@@QBE?AV?$Vector2@M@Wm3@@XZ)
-     *
-     * What it does:
-     * Returns stored preview terrain dimensions.
-     */
-    [[nodiscard]] Wm3::Vector2f GetTerrainDim() const;
-
-    /**
-     * Address: 0x008904B0 (FUN_008904B0, ?GetDescription@RWldMapPreviewChunk@Moho@@QBEPBDXZ)
-     *
-     * What it does:
-     * Returns preview description text buffer pointer.
-     */
-    [[nodiscard]] const char* GetDescription() const;
-
-    /**
      * Address: 0x008904C0 (FUN_008904C0,
      * ?Load@RWldMapPreviewChunk@Moho@@QAE_NAAVBinaryReader@gpg@@AAVCBackgroundTaskControl@2@@Z)
      *
@@ -622,36 +606,6 @@ namespace moho
      */
     [[nodiscard]]
     bool MapLoad(gpg::StrArg mapName, LuaPlus::LuaState* state, bool previewOnly, CBackgroundTaskControl& loadControl);
-
-    /**
-     * Address: 0x00891030 (FUN_00891030, ?MapSave@CWldMap@Moho@@QAE_NVStrArg@gpg@@@Z)
-     *
-     * IDA signature:
-     * bool __thiscall Moho::CWldMap::MapSave(Moho::CWldMap *this, gpg::StrArg mapName);
-     *
-     * What it does:
-     * Resolves `mapName` to a writable on-disk path through the virtual file
-     * system (mounted directory prefix + `\` + base name), opens it for
-     * writing, emits the `Map\x1A` / version-2 file header, then saves the
-     * preview chunk, the terrain resource and the prop set through the same
-     * `gpg::BinaryWriter`. Returns false when any owned map resource is missing
-     * or the destination stream cannot be opened.
-     */
-    [[nodiscard]] bool MapSave(gpg::StrArg mapName);
-
-    /**
-     * Address: 0x00891250 (FUN_00891250,
-     * ?MapSetPreview@CWldMap@Moho@@QAEXV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@ABV?$Vector2@M@Wm3@@PBD@Z)
-     *
-     * What it does:
-     * Replaces the owned preview chunk with one built from the provided
-     * texture/size/name lane and destroys any previous chunk.
-     */
-    void MapSetPreview(
-      boost::shared_ptr<ID3DTextureSheet> textureSheet,
-      const Wm3::Vector2f& previewSize,
-      const char* previewName
-    );
 
   private:
     /**

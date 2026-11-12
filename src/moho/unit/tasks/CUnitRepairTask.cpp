@@ -259,34 +259,6 @@ namespace moho
     // model, so the compiler does not emit it): unlink and reset to singleton.
   }
 
-  /**
-   * Address: 0x005FD410 (FUN_005FD410)
-   *
-   * What it does:
-   * Preserves one serializer-save thunk lane for `CUnitRepairTask`.
-   */
-  [[maybe_unused]] void CUnitRepairTaskMemberSerializeAdapterLaneA(
-    const CUnitRepairTask* const task,
-    gpg::WriteArchive* const archive
-  )
-  {
-    task->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x005FDC60 (FUN_005FDC60)
-   *
-   * What it does:
-   * Alternate serializer-save thunk lane for `CUnitRepairTask`.
-   */
-  [[maybe_unused]] void CUnitRepairTaskMemberSerializeAdapterLaneB(
-    const CUnitRepairTask* const task,
-    gpg::WriteArchive* const archive
-  )
-  {
-    task->MemberSerialize(archive);
-  }
-
   namespace
   {
     constexpr int kRepairTaskAssertLine = 1388;

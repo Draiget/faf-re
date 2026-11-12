@@ -175,20 +175,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0054E310 (FUN_0054E310)
-   *
-   * What it does:
-   * Executes one non-deleting `gpg::RType` base-teardown lane for
-   * `CAniPoseBoneTypeInfo`.
-   */
-  [[maybe_unused]] void cleanup_CAniPoseBoneTypeInfoRTypeBase(
-    CAniPoseBoneTypeInfo* const typeInfo
-  ) noexcept
-  {
-    gpg::ClearTypeLists(typeInfo);
-  }
-
-  /**
    * Address: 0x00BC99A0 (FUN_00BC99A0, register_CAniPoseBoneTypeInfo)
    */
   void register_CAniPoseBoneTypeInfo()

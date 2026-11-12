@@ -324,30 +324,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x007ED9A0 (FUN_007ED9A0, Moho::sBlueprintExtractors::~sBlueprintExtractors)
-   *
-   * What it does:
-   * Destroys the global blueprint range-extractor registry and releases
-   * all registered extractor instances.
-   */
-  void ShutdownBlueprintExtractors()
-  {
-    if (!gBlueprintExtractorsInitialized) {
-      return;
-    }
-
-    BlueprintExtractorRegistry& registry = GetBlueprintExtractorRegistry();
-    // The shipped destructor walks the tree, runs each extractor's scalar
-    // deleting destructor through the pointer at node+0x28, and only then
-    // erases the whole range.
-    for (const auto& entry : registry) {
-      delete entry.second;
-    }
-    registry.clear();
-    gBlueprintExtractorsInitialized = false;
-  }
-
-  /**
    * Address: 0x007EDA40 (FUN_007EDA40)
    *
    * fa::string const &

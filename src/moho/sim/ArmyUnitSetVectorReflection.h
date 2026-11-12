@@ -80,8 +80,6 @@ namespace gpg
     "RVectorType<EntitySetTemplate<Unit>> size must be 0x68"
   );
 
-  gpg::RRef* RRef_UnitSetBase(gpg::RRef* outRef, moho::EntitySetTemplate<moho::Unit>* value);
-
   /**
    * Address: 0x00705320 (FUN_00705320, gpg::MakeUnitSetDerivedRef)
    *

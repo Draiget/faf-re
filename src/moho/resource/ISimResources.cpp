@@ -81,44 +81,4 @@ namespace moho::detail
     }
   }
 
-  /**
-   * Address: 0x00753800 (FUN_00753800, sub_753800)
-   *
-   * What it does:
-   * Initializes one raw shared handle from `resources` and a fresh control block.
-   */
-  boost::SharedPtrRaw<ISimResources>& InitSharedISimResources(
-    boost::SharedPtrRaw<ISimResources>& outHandle,
-    CSimResources* resources
-  )
-  {
-    outHandle.px = resources;
-    outHandle.pi = CreateSimResourcesSharedControl(resources);
-    NoopSimResourcesSharedHook(resources, outHandle.pi);
-    return outHandle;
-  }
-
-  /**
-   * Address: 0x00750EA0 (FUN_00750EA0, func_CreateWeakPtrISimResources)
-   *
-   * What it does:
-   * Rebinds an existing raw shared handle to `resources` and releases the
-   * previous strong control-block reference.
-   */
-  void AssignSharedISimResources(
-    boost::SharedPtrRaw<ISimResources>& outHandle,
-    CSimResources* resources
-  )
-  {
-    boost::detail::sp_counted_base* const newControl = CreateSimResourcesSharedControl(resources);
-    NoopSimResourcesSharedHook(resources, newControl);
-
-    outHandle.px = resources;
-    boost::detail::sp_counted_base* const oldControl = outHandle.pi;
-    outHandle.pi = newControl;
-
-    if (oldControl != nullptr) {
-      oldControl->release();
-    }
-  }
 } // namespace moho::detail

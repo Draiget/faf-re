@@ -378,11 +378,4 @@ namespace moho
     bool isFocusArmy
   );
 
-  /**
-   * Address: 0x005A2C20 (FUN_005A2C20, Moho::AI_Tick)
-   *
-   * What it does:
-   * Advances one AI brain tick for an army across its three task-thread stages.
-   */
-  void AI_Tick(CArmyImpl* army);
 } // namespace moho

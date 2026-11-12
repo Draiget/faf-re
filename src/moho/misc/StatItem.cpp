@@ -944,25 +944,6 @@ namespace moho
     return gCTimeStampStringBuffer;
   }
 
-  /**
-   * Address: 0x004E9D30 (FUN_004E9D30, ?GetDeltaSeconds@CTimeStamp@Moho@@QBENABV12@@Z)
-   * Mangled: ?GetDeltaSeconds@CTimeStamp@Moho@@QBENABV12@@Z
-   *
-   * What it does:
-   * Returns the signed second delta between this timestamp and another one
-   * using fine-time seconds + millisecond lanes.
-   */
-  double CTimeStamp::GetDeltaSeconds(
-    const CTimeStamp& other
-  ) const noexcept
-  {
-    constexpr double kMillisToSeconds = 0.001;
-    const double otherFineSeconds =
-      static_cast<double>(other.ftime) + (static_cast<double>(other.millis) * kMillisToSeconds);
-    const double thisFineSeconds = static_cast<double>(ftime) + (static_cast<double>(millis) * kMillisToSeconds);
-    return otherFineSeconds - thisFineSeconds;
-  }
-
   void StatSampleBuffer::Reset() noexcept
   {
     if (begin) {
@@ -1779,30 +1760,6 @@ namespace moho
       kEndLoggingStatsLuaHelpText
     );
     return &binder;
-  }
-
-  /**
-   * Address: 0x00BC3540 (FUN_00BC3540, register_BeginLoggingStats_LuaFuncDef)
-   *
-   * What it does:
-   * Startup thunk that forwards registration to
-   * `func_BeginLoggingStats_LuaFuncDef`.
-   */
-  void register_BeginLoggingStats_LuaFuncDef()
-  {
-    (void)func_BeginLoggingStats_LuaFuncDef();
-  }
-
-  /**
-   * Address: 0x00BC3550 (FUN_00BC3550, register_EndLoggingStats_LuaFuncDef)
-   *
-   * What it does:
-   * Startup thunk that forwards registration to
-   * `func_EndLoggingStats_LuaFuncDef`.
-   */
-  CScrLuaInitForm* register_EndLoggingStats_LuaFuncDef()
-  {
-    return func_EndLoggingStats_LuaFuncDef();
   }
 
   /**

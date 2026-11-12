@@ -443,22 +443,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x005076B0 (FUN_005076B0, ?DelayedSubtractCircle@CIntelGrid@Moho@@QAEXABV?$Vector3@M@Wm3@@I@Z)
-   */
-  void CIntelGrid::DelayedSubtractCircle(
-    const Wm3::Vec3f& position,
-    const std::uint32_t radius
-  )
-  {
-    SDelayedSubVizInfo update{};
-    update.mLastPos = position;
-    update.mRadius = static_cast<float>(radius);
-    update.mTicksTilUpdate = 30;
-    // `fa::vector<SDelayedSubVizInfo>::push_back` (0x005079C0, cited on Vector.h).
-    mUpdateList.push_back(update);
-  }
-
-  /**
    * Address: 0x005077B0 (FUN_005077B0, ?Tick@CIntelGrid@Moho@@QAEXH@Z)
    */
   void CIntelGrid::Tick(

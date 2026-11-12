@@ -68,13 +68,6 @@ namespace gpg::gal
     return mRegionCount++;
   }
 
-  const char* RenderProfiler::RegionName(
-    const std::uint32_t region
-  ) const noexcept
-  {
-    return region < mRegionCount ? mRegions[region].name : "";
-  }
-
   void RenderProfiler::BeginRegion(
     const std::uint32_t region
   ) noexcept

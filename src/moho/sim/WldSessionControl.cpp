@@ -1125,60 +1125,7 @@ namespace moho
     }
   } // namespace
 
-  /**
-   * Address: 0x0088BD20 (FUN_0088BD20, ?WLD_SetUIProvider@Moho@@YAXPAVIWldUIProvider@1@@Z)
-   *
-   * What it does:
-   * Replaces the process-global world-UI provider ownership lane, deleting the
-   * previous provider when it differs from the new one.
-   */
-  void WLD_SetUIProvider(
-    IWldUIProvider* const provider
-  )
-  {
-    if (sWldUIProvider != provider && sWldUIProvider != nullptr) {
-      delete sWldUIProvider;
-    }
-
-    sWldUIProvider = provider;
-  }
-
   // WLD_GetFrameAction, WLD_SetFrameAction: moho/sim/WldSessionState.cpp.
-
-  /**
-   * Address: 0x0088BE80 (FUN_0088BE80, ?WLD_IsSessionActive@Moho@@YA_NXZ)
-   *
-   * What it does:
-   * Returns whether world-frame dispatch is currently active.
-   */
-  bool WLD_IsSessionActive()
-  {
-    return gWldFrameAction != EWldFrameAction::Inactive;
-  }
-
-  /**
-   * Address: 0x0088BE90 (FUN_0088BE90, world-frame playing-state probe)
-   *
-   * What it does:
-   * Returns whether world-frame dispatch is currently in the `Playing` state.
-   */
-  bool WLD_IsSessionPlaying()
-  {
-    return gWldFrameAction == EWldFrameAction::Playing;
-  }
-
-  /**
-   * Address: 0x0088BEA0 (FUN_0088BEA0, ?WLD_RequestEndSession@Moho@@YAXXZ)
-   *
-   * What it does:
-   * Requests world-session exit when frame dispatch is currently active.
-   */
-  void WLD_RequestEndSession()
-  {
-    if (gWldFrameAction != EWldFrameAction::Inactive) {
-      gWldFrameAction = EWldFrameAction::Exit;
-    }
-  }
 
   /**
    * Address: 0x0088E6D0 (FUN_0088E6D0)
@@ -1217,25 +1164,6 @@ namespace moho
 
     if (gWldFrameAction != EWldFrameAction::Inactive) {
       gWldFrameAction = EWldFrameAction::Exit;
-    }
-  }
-
-  /**
-   * Address: 0x0088BEC0 (FUN_0088BEC0, ?WLD_RequestRestartSession@Moho@@YAXXZ)
-   *
-   * What it does:
-   * Requests world-session recreation when frame dispatch is active and the
-   * active session carries restart launch info.
-   */
-  void WLD_RequestRestartSession()
-  {
-    if (gWldFrameAction == EWldFrameAction::Inactive) {
-      return;
-    }
-
-    CWldSession* const activeSession = WLD_GetActiveSession();
-    if (activeSession != nullptr && activeSession->mLaunchInfo) {
-      gWldFrameAction = EWldFrameAction::CreateSession;
     }
   }
 
@@ -1339,19 +1267,6 @@ namespace moho
   {
     WldTeardownCallbackVector* const callbacks = WLD_GetOnTeardownCallbacks();
     return static_cast<std::int32_t>(DispatchSessionListenerAttachAndReturnLastResult(callbacks));
-  }
-
-  /**
-   * Address: 0x008699B0 (FUN_008699B0)
-   *
-   * What it does:
-   * Resolves the process-global teardown-callback vector and runs the normal
-   * teardown callback dispatch entry point.
-   */
-  [[nodiscard]] std::intptr_t WLD_RunTeardownCallbacksFromGlobalList()
-  {
-    WldTeardownCallbackVector* const callbacks = WLD_GetOnTeardownCallbacks();
-    return DoTeardownCallbacks(callbacks);
   }
 
   /**
@@ -1476,23 +1391,6 @@ namespace moho
     session->~CWldSession();
     ::operator delete(session);
     return session;
-  }
-
-  /**
-   * Address: 0x008972A0 (FUN_008972A0, ?WLD_DestroySession@Moho@@YAXXZ)
-   *
-   * What it does:
-   * Destroys the active world-session object when present and clears the
-   * process-global active-session pointer.
-   */
-  void WLD_DestroySession()
-  {
-    CWldSession* const activeSession = gActiveWldSession;
-    if (activeSession != nullptr) {
-      (void)DeleteWldSessionAndReturn(activeSession);
-    }
-
-    gActiveWldSession = nullptr;
   }
 
   // WLD_GetSession: moho/sim/WldSessionState.cpp.
@@ -1652,35 +1550,6 @@ namespace moho
     if (requestedSimRate > -10) {
       clientManager->SetSimRate(requestedSimRate - 1);
     }
-  }
-
-  /**
-   * Address: 0x0088D2F0 (FUN_0088D2F0, ?WLD_SetGameSpeed@Moho@@YAXH@Z)
-   *
-   * What it does:
-   * Sets one requested sim-rate lane after clamping the provided game-speed
-   * value to the legacy `[-10, 10]` bounds.
-   */
-  void WLD_SetGameSpeed(
-    int gameSpeed
-  )
-  {
-    ISTIDriver* const simDriver = sSimDriver.get();
-    if (simDriver == nullptr) {
-      return;
-    }
-
-    CClientManagerImpl* const clientManager = simDriver->GetClientManager();
-    int clampedGameSpeed = gameSpeed;
-    if (gameSpeed >= 10) {
-      clampedGameSpeed = 10;
-    }
-
-    if (clampedGameSpeed < -10) {
-      clampedGameSpeed = -10;
-    }
-
-    clientManager->SetSimRate(clampedGameSpeed);
   }
 
   // WLD_GetDriver and WLD_GetActiveSession: moho/sim/WldSessionState.cpp; the

@@ -125,15 +125,6 @@ namespace moho
   void InitializeBlueprintExtractors();
 
   /**
-   * Address: 0x007ED9A0 (FUN_007ED9A0, Moho::sBlueprintExtractors::~sBlueprintExtractors)
-   *
-   * What it does:
-   * Destroys the global blueprint range-extractor registry and releases
-   * all registered extractor instances.
-   */
-  void ShutdownBlueprintExtractors();
-
-  /**
    * Address: 0x007EDA40 (FUN_007EDA40)
    *
    * std::string const &

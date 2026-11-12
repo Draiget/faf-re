@@ -22,17 +22,6 @@ void moho::THREAD_InitInvoke()
 }
 
 /**
- * Address: 0x00413AB0 (FUN_00413AB0)
- *
- * What it does:
- * Returns true when called from the captured main thread.
- */
-bool moho::THREAD_IsMainThread()
-{
-  return GetCurrentThreadId() == dwThreadId;
-}
-
-/**
  * Address: 0x00413AD0 (FUN_00413AD0)
  *
  * What it does:
@@ -84,55 +73,6 @@ void moho::THREAD_InvokeAsync(
 
   (void)::QueueUserAPC(&pfnAPC, hThread, reinterpret_cast<ULONG_PTR>(pair));
   ::CloseHandle(hThread);
-}
-
-/**
- * Address: 0x00413C50 (FUN_00413C50)
- *
- * boost::function<void(),std::allocator<void>>,uint32_t
- *
- * What it does:
- * Queues one callback as APC and blocks until completion is signaled.
- */
-void moho::THREAD_InvokeWait(
-  boost::function<void(), std::allocator<void>> fn,
-  const uint32_t threadId
-)
-{
-  const DWORD tid = ResolveTid(threadId);
-  const HANDLE hThread = ::OpenThread(kThreadAccessFa, FALSE, tid);
-  if (!hThread) {
-    return;
-  }
-
-  WaitCtx ctx;
-  ctx.begin(2);
-
-  auto pair = static_cast<void**>(::operator new(2 * sizeof(void*), std::nothrow));
-  if (!pair) {
-    ::CloseHandle(hThread);
-    ctx.end();
-    return;
-  }
-
-  void* raw = ::operator new((std::max)(std::size_t{32}, sizeof(InvokePayload)), std::nothrow);
-  if (!raw) {
-    ::operator delete(pair);
-    ::CloseHandle(hThread);
-    ctx.end();
-    return;
-  }
-
-  auto* box = ::new (raw) InvokePayload{fn};
-  pair[0] = box;
-  pair[1] = &ctx;
-
-  (void)::QueueUserAPC(&pfnAPC, hThread, reinterpret_cast<ULONG_PTR>(pair));
-
-  // Block current thread until APC signals completion
-  ctx.block();
-  ::CloseHandle(hThread);
-  ctx.end();
 }
 
 /**

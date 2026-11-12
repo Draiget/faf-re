@@ -124,32 +124,4 @@ namespace gpg::gal
 
   } // namespace
 
-  /**
-   * Address: 0x009456C0 (FUN_009456C0)
-   *
-   * What it does:
-   * Writes one 4x4 identity matrix (`float[16]`) into caller storage.
-   */
-  float* InitializeIdentityMatrix4x4Lane(
-    float* const matrix4x4
-  ) noexcept
-  {
-    matrix4x4[14] = 0.0f;
-    matrix4x4[13] = 0.0f;
-    matrix4x4[12] = 0.0f;
-    matrix4x4[11] = 0.0f;
-    matrix4x4[9] = 0.0f;
-    matrix4x4[8] = 0.0f;
-    matrix4x4[7] = 0.0f;
-    matrix4x4[6] = 0.0f;
-    matrix4x4[4] = 0.0f;
-    matrix4x4[3] = 0.0f;
-    matrix4x4[2] = 0.0f;
-    matrix4x4[1] = 0.0f;
-    matrix4x4[15] = 1.0f;
-    matrix4x4[10] = 1.0f;
-    matrix4x4[5] = 1.0f;
-    matrix4x4[0] = 1.0f;
-    return matrix4x4;
-  }
 } // namespace gpg::gal

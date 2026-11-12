@@ -272,23 +272,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x007AACD0 (FUN_007AACD0,
-   * ?CAM_CreateCamera@Moho@@YAPAVRCamCamera@1@VStrArg@gpg@@ABVSTIMap@1@PAVLuaState@LuaPlus@@@Z)
-   *
-   * What it does:
-   * Routes camera creation to the process-global camera manager.
-   */
-  CameraImpl* CAM_CreateCamera(
-    const gpg::StrArg name,
-    const STIMap& map,
-    LuaPlus::LuaState* const luaState
-  )
-  {
-    RCamManager* const manager = CAM_GetManager();
-    return manager->CreateCamera(name, map, luaState);
-  }
-
-  /**
    * Address: 0x007AAD00 (FUN_007AAD00, ?CAM_GetCamera@Moho@@YAPAVRCamCamera@1@VStrArg@gpg@@@Z)
    *
    * What it does:
@@ -300,35 +283,6 @@ namespace moho
   {
     RCamManager* const manager = CAM_GetManager();
     return manager->GetCamera(name);
-  }
-
-  /**
-   * Address: 0x007AAEC0 (FUN_007AAEC0, ?CAM_ResetAllCameras@Moho@@YAXXZ)
-   *
-   * What it does:
-   * Resets every registered camera through the manager camera list.
-   */
-  void CAM_ResetAllCameras()
-  {
-    RCamManager* const manager = CAM_GetManager();
-    for (CameraImpl* const camera : manager->mCams) {
-      camera->CameraReset();
-    }
-  }
-
-  /**
-   * Address: 0x007AAF00 (FUN_007AAF00, ?CAM_Frame@Moho@@YAXMM@Z)
-   *
-   * What it does:
-   * Executes one frame tick on the process-global camera manager.
-   */
-  void CAM_Frame(
-    const float simDeltaSeconds,
-    const float frameSeconds
-  )
-  {
-    RCamManager* const manager = CAM_GetManager();
-    manager->Frame(simDeltaSeconds, frameSeconds);
   }
 
   /**

@@ -328,19 +328,6 @@ namespace moho
     static Unit* UnitFromAllUnitsNode(const CEntityDbAllUnitsNode* node) noexcept;
 
     /**
-     * Address: 0x00686EF0 (FUN_00686EF0, sub_686EF0)
-     *
-     * What it does:
-     * Erases `[first, last)` from the `mAllUnits` RB-tree. Takes the O(1)
-     * whole-tree fast path (recursive subtree destroy + sentinel reset) when
-     * erasing the full range (`first == begin() && last == end()`);
-     * otherwise advances to each node's successor before erasing it, so the
-     * walk stays valid across the erase. Returns the node that followed the
-     * erased range. MSVC8 `std::_Tree<EntId, Entity*>::erase(iterator, iterator)`.
-     */
-    CEntityDbAllUnitsNode* EraseAllUnitsRange(CEntityDbAllUnitsNode* first, CEntityDbAllUnitsNode* last);
-
-    /**
      * The `mAllUnits` header sentinel, typed as the node view the
      * family-boundary iterators walk. Never null: the map allocates its
      * head in its constructor (`FUN_00684230` line 1).

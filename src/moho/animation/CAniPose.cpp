@@ -294,27 +294,6 @@ namespace moho
   gpg::RType* CAniPose::sType = nullptr;
 
   /**
-   * Address: 0x0063E180 (FUN_0063E180, boost::detail::shared_count_CAniPose::shared_count_CAniPose)
-   *
-   * What it does:
-   * Engine-instantiated `boost::detail::shared_count(CAniPose*)` converting
-   * constructor: allocates one 0x10-byte `sp_counted_impl_p<CAniPose>`
-   * control block, sets use/weak count to 1, publishes its vftable, and
-   * stores the raw pose pointer. Source-level wire-up: `UserEntity`'s pose
-   * setup (`moho/entity/UserEntity.cpp:808-812`) explicitly calls
-   * `CreateCAniPoseSharedPtr(pose, out)` (FUN_0063CA40, already recovered
-   * and wired), whose `out.reset(pose)` body pulls in this exact templated
-   * `shared_count<CAniPose>` ctor emission.
-   */
-  boost::detail::shared_count* ConstructSharedCountCAniPoseFromRaw(
-    boost::detail::shared_count* const outCount,
-    CAniPose* const pose
-  )
-  {
-    return boost::ConstructSharedCountFromRaw(outCount, pose);
-  }
-
-  /**
    * Address: 0x0054C9C0 (FUN_0054C9C0, Moho::CAniPoseBone::CAniPoseBone)
    *
    * What it does:
@@ -1127,71 +1106,6 @@ namespace moho
         candidate.mCompositeDirty = 1u;
       }
     }
-  }
-
-  /**
-   * Address: 0x0054BD30 (FUN_0054BD30)
-   *
-   * What it does:
-   * Rotates one local-space position delta by the bone local orientation,
-   * accumulates it into local position, and marks the bone dirty.
-   */
-  [[maybe_unused]] void ApplyBoneLocalPositionDelta(
-    CAniPoseBone* const bone,
-    const Wm3::Vector3f& localDelta
-  )
-  {
-    Wm3::Vector3f rotatedDelta{};
-    const Wm3::Vector3f* const deltaInPoseSpace =
-      MultQuadVec(&rotatedDelta, &localDelta, &bone->mLocalTransform.orient_);
-
-    bone->mLocalTransform.pos_.x += deltaInPoseSpace->x;
-    bone->mLocalTransform.pos_.y += deltaInPoseSpace->y;
-    bone->mLocalTransform.pos_.z += deltaInPoseSpace->z;
-
-    // Mirrors FUN_0054BD30's tail call into FUN_0054B990 without requiring
-    // private-member access from this translation-unit local helper.
-    const int idx = bone->mIdx;
-    CAniPose* const pose = bone->mPose;
-    CAniPoseBone* const bonesBegin = pose->mBones.begin();
-    CAniPoseBone* const bonesEnd = pose->mBones.end();
-    if (bonesBegin == nullptr || bonesEnd == nullptr || bonesEnd < bonesBegin || idx < 0) {
-      return;
-    }
-
-    const int boneCount = static_cast<int>(bonesEnd - bonesBegin);
-    if (idx >= boneCount) {
-      return;
-    }
-
-    CAniPoseBone& baseBone = bonesBegin[idx];
-    if (baseBone.mCompositeDirty != 0u) {
-      return;
-    }
-
-    baseBone.mCompositeDirty = 1u;
-    for (int boneIndex = idx + 1; boneIndex < boneCount; ++boneIndex) {
-      CAniPoseBone& candidate = bonesBegin[boneIndex];
-      if (candidate.mParent != nullptr && candidate.mParent->mCompositeDirty != 0u) {
-        candidate.mCompositeDirty = 1u;
-      }
-    }
-  }
-
-  /**
-   * Address: 0x0054BD80 (FUN_0054BD80)
-   *
-   * What it does:
-   * Composes one pose-bone local transform with an incoming transform and then
-   * marks that bone dirty through its owning pose/index lanes.
-   */
-  void CAniPose::ApplyBoneLocalTransform(
-    CAniPoseBone* const bone,
-    const VTransform& transform
-  )
-  {
-    bone->mLocalTransform = VTransform::Compose(transform, bone->mLocalTransform);
-    bone->mPose->MarkBoneDirty(bone->mIdx);
   }
 
   /**

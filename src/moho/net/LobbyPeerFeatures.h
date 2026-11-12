@@ -46,9 +46,6 @@ namespace moho
      */
     [[nodiscard]] bool Receive(const SPeer& peer, std::int32_t localUid, CMessage& message);
 
-    /// False for a player who has not announced: a retail client never does.
-    [[nodiscard]] bool PeerRunsOurEngine(std::int32_t uid) const;
-
     /// "rrggbb" for a proven style, empty for none. The local player's comes from their key.
     [[nodiscard]] std::string StyleOf(std::int32_t uid) const;
 

@@ -636,59 +636,6 @@ int moho::cfunc_CMauiCursorShowL(
 }
 
 /**
- * Address: 0x0086F090 (FUN_0086F090)
- *
- * What it does:
- * Publishes world-camera/minimap cursor telemetry into engine stats: cursor
- * position text, terrain elevation, occupancy-cell text, camera LOD metric,
- * and focus distance.
- */
-void moho::UIWorldViewUpdateCursorEngineStats(
-  CUIWorldView* const worldView,
-  const Wm3::Vec3f& cursorWorldPosition
-)
-{
-  moho::CameraImpl* const camera = worldView->mCamera.get();
-
-  if (_stricmp(camera->CameraGetName(), "WorldCamera") == 0) {
-    const fa::string positionText =
-      gpg::STR_Printf("x=%.2f,y=%.2f,z=%.2f", cursorWorldPosition.x, cursorWorldPosition.y, cursorWorldPosition.z);
-    EnsureEngineStringStat(gCameraCursorPositionStat, "Camera_Cursor_Position")->SetValue(positionText);
-
-    StoreEngineFloatStat(
-      gCameraCursorElevationStat,
-      "Camera_Cursor_Elevation",
-      SampleCursorTerrainElevation(*worldView, cursorWorldPosition)
-    );
-
-    const auto cellX = static_cast<std::int16_t>(static_cast<int>(cursorWorldPosition.x - 0.5f));
-    const auto cellZ = static_cast<std::int16_t>(static_cast<int>(cursorWorldPosition.z - 0.5f));
-    const fa::string cellText = gpg::STR_Printf("x=%i,z=%i", cellX, cellZ);
-    EnsureEngineStringStat(gCameraCursorOCellStat, "Camera_Cursor_OCell")->SetValue(cellText);
-
-    StoreCursorLodAndFocusStats(
-      *camera,
-      cursorWorldPosition,
-      gCameraCursorLodMetricStat,
-      "Camera_Cursor_LODMetric",
-      gCameraFocusDistanceStat,
-      "Camera_FocusDistance"
-    );
-  }
-
-  if (_stricmp(camera->CameraGetName(), "MiniMap") == 0) {
-    StoreCursorLodAndFocusStats(
-      *camera,
-      cursorWorldPosition,
-      gMinimapCursorLodMetricStat,
-      "Minimap_Cursor_LODMetric",
-      gMinimapFocusDistanceStat,
-      "Minimap_FocusDistance"
-    );
-  }
-}
-
-/**
  * Address: 0x0078CEF0 (FUN_0078CEF0, sub_78CEF0)
  *
  * What it does:

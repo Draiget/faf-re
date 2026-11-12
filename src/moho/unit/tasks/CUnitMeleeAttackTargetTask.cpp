@@ -1362,23 +1362,6 @@ namespace moho
 
 namespace gpg
 {
-  /**
-   * Address: 0x00617B00 (FUN_00617B00, reflection pair-pack thunk alias)
-   *
-   * What it does:
-   * Builds one `CUnitMeleeAttackTargetTask` reflection reference then writes
-   * the pair into caller-provided `RRef` storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackCUnitMeleeAttackTargetTaskRefPair(
-    moho::CUnitMeleeAttackTargetTask* const value,
-    gpg::RRef* const outPair
-  )
-  {
-    gpg::RRef typedRef{};
-    (void)gpg::RRef_CUnitMeleeAttackTargetTask(&typedRef, value);
-    *outPair = typedRef;
-    return outPair;
-  }
 
   /**
    * Address: 0x00617B50 (FUN_00617B50, gpg::RRef_CUnitMeleeAttackTargetTask)

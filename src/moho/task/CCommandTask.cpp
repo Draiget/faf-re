@@ -163,90 +163,6 @@ namespace
 gpg::RType* CCommandTask::sType = nullptr;
 
 /**
- * Address: 0x0060C490 (FUN_0060C490)
- *
- * What it does:
- * Reads one `CCommandTask` object through archive RTTI dispatch using a
- * null owner reference lane.
- */
-void ReadCCommandTaskArchiveAdapterVariantA(
-  gpg::ReadArchive* const archive,
-  void* const object
-)
-{
-  gpg::RType* taskType = CCommandTask::sType;
-  const gpg::RRef owner{};
-  if (!taskType) {
-    taskType = gpg::LookupRType(typeid(CCommandTask));
-    CCommandTask::sType = taskType;
-  }
-  archive->Read(taskType, object, owner);
-}
-
-/**
- * Address: 0x0060C4D0 (FUN_0060C4D0)
- *
- * What it does:
- * Writes one `CCommandTask` object through archive RTTI dispatch using a
- * null owner reference lane.
- */
-void WriteCCommandTaskArchiveAdapterVariantA(
-  gpg::WriteArchive* const archive,
-  const void* const object
-)
-{
-  gpg::RType* taskType = CCommandTask::sType;
-  const gpg::RRef owner{};
-  if (!taskType) {
-    taskType = gpg::LookupRType(typeid(CCommandTask));
-    CCommandTask::sType = taskType;
-  }
-  archive->Write(taskType, object, owner);
-}
-
-/**
- * Address: 0x0060C910 (FUN_0060C910)
- *
- * What it does:
- * Performs the second `CCommandTask` archive-read adapter thunk variant with
- * identical RTTI resolution and null-owner dispatch semantics.
- */
-void ReadCCommandTaskArchiveAdapterVariantB(
-  gpg::ReadArchive* const archive,
-  void* const object
-)
-{
-  gpg::RType* taskType = CCommandTask::sType;
-  const gpg::RRef owner{};
-  if (!taskType) {
-    taskType = gpg::LookupRType(typeid(CCommandTask));
-    CCommandTask::sType = taskType;
-  }
-  archive->Read(taskType, object, owner);
-}
-
-/**
- * Address: 0x0060C950 (FUN_0060C950)
- *
- * What it does:
- * Performs the second `CCommandTask` archive-write adapter thunk variant with
- * identical RTTI resolution and null-owner dispatch semantics.
- */
-void WriteCCommandTaskArchiveAdapterVariantB(
-  gpg::WriteArchive* const archive,
-  const void* const object
-)
-{
-  gpg::RType* taskType = CCommandTask::sType;
-  const gpg::RRef owner{};
-  if (!taskType) {
-    taskType = gpg::LookupRType(typeid(CCommandTask));
-    CCommandTask::sType = taskType;
-  }
-  archive->Write(taskType, object, owner);
-}
-
-/**
  * Address: 0x00608E90 (FUN_00608E90, non-deleting body)
  *
  * IDA signature:
@@ -256,20 +172,6 @@ void WriteCCommandTaskArchiveAdapterVariantB(
  * Base teardown only: `InstanceCounter<CCommandTask>`'s -1, then `CTask`.
  */
 CCommandTask::~CCommandTask() {}
-
-/**
- * Address: 0x0060A590 (FUN_0060A590)
- *
- * What it does:
- * Tail-forwards one wrapper destructor thunk lane into the canonical
- * non-deleting `CCommandTask` destructor body.
- */
-void DestroyCCommandTaskThunkVariantA(
-  CCommandTask* const task
-)
-{
-  task->~CCommandTask();
-}
 
 int CCommandTask::Execute()
 {
@@ -367,66 +269,6 @@ Unit* CCommandTask::GetUnit() const noexcept
 {
   return mUnit;
 }
-
-/**
- * Address: 0x0060C270 (FUN_0060C270, serializer load thunk alias)
- *
- * What it does:
- * Tail-forwards one CCommandTask serializer-load thunk alias into the shared
- * CCommandTask deserialize callback body.
- */
-void DeserializeCCommandTaskThunkVariantA(
-  gpg::ReadArchive* const /*archive*/,
-  const std::intptr_t /*objectPtr*/,
-  const int /*version*/,
-  gpg::RRef* const /*ownerRef*/
-)
-{}
-
-/**
- * Address: 0x0060C830 (FUN_0060C830, serializer load thunk alias)
- *
- * What it does:
- * Tail-forwards a second CCommandTask serializer-load thunk alias into the
- * shared CCommandTask deserialize callback body.
- */
-void DeserializeCCommandTaskThunkVariantB(
-  gpg::ReadArchive* const /*archive*/,
-  const std::intptr_t /*objectPtr*/,
-  const int /*version*/,
-  gpg::RRef* const /*ownerRef*/
-)
-{}
-
-/**
- * Address: 0x0060C280 (FUN_0060C280, serializer save thunk alias)
- *
- * What it does:
- * Tail-forwards one CCommandTask serializer-save thunk alias into the shared
- * CCommandTask serialize callback body.
- */
-void SerializeCCommandTaskThunkVariantA(
-  gpg::WriteArchive* const /*archive*/,
-  const std::intptr_t /*objectPtr*/,
-  const int /*version*/,
-  gpg::RRef* const /*ownerRef*/
-)
-{}
-
-/**
- * Address: 0x0060C840 (FUN_0060C840, serializer save thunk alias)
- *
- * What it does:
- * Tail-forwards a second CCommandTask serializer-save thunk alias into the
- * shared CCommandTask serialize callback body.
- */
-void SerializeCCommandTaskThunkVariantB(
-  gpg::WriteArchive* const /*archive*/,
-  const std::intptr_t /*objectPtr*/,
-  const int /*version*/,
-  gpg::RRef* const /*ownerRef*/
-)
-{}
 
 /**
  * Address: 0x00608D30 (FUN_00608D30, scalar deleting destructor thunk)

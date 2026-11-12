@@ -510,46 +510,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00514D40 (FUN_00514D40, Moho::SEfxCurveSerializer::Deserialize)
-   */
-  void SEfxCurve::DeserializeFromArchive(
-    gpg::ReadArchive* const archive,
-    const std::intptr_t objectPtr,
-    const int /*version*/,
-    gpg::RRef* const /*ownerRef*/
-  )
-  {
-    auto* const curve = reinterpret_cast<SEfxCurve*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(curve != nullptr);
-    if (!archive || !curve) {
-      return;
-    }
-
-    curve->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x00514D50 (FUN_00514D50, Moho::SEfxCurveSerializer::Serialize)
-   */
-  void SEfxCurve::SerializeToArchive(
-    gpg::WriteArchive* const archive,
-    const std::intptr_t objectPtr,
-    const int /*version*/,
-    gpg::RRef* const /*ownerRef*/
-  )
-  {
-    const auto* const curve = reinterpret_cast<const SEfxCurve*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(curve != nullptr);
-    if (!archive || !curve) {
-      return;
-    }
-
-    curve->MemberSerialize(archive);
-  }
-
-  /**
    * Address: 0x00516D20 (FUN_00516D20, Moho::SEfxCurve::MemberDeserialize)
    *
    * IDA signature:

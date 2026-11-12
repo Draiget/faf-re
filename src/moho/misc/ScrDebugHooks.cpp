@@ -755,20 +755,6 @@ void moho::SCR_LoadBreakpoints()
 }
 
 /**
- * Address: 0x004B59B0 (FUN_004B59B0, Moho::SCR_SaveBreakpoints)
- *
- * What it does:
- * Serializes the in-memory breakpoint list and stores it to user
- * preferences.
- */
-void moho::SCR_SaveBreakpoints()
-{
-  ScrDebugState& runtime = GetScrDebugState();
-  std::lock_guard<std::recursive_mutex> lock(runtime.breakpointMutex);
-  SaveBreakpointsUnlocked(runtime);
-}
-
-/**
  * Address: 0x004B5C70 (FUN_004B5C70, Moho::DebugLuaHook)
  *
  * lua_State *,lua_Debug *

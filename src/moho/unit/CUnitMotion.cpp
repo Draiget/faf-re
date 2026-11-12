@@ -1184,22 +1184,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x006C35B0 (FUN_006C35B0, ?SetSplineData@CUnitMotion@Moho@@QAEXPBVCPathPoint@2@0@Z)
-   * Mangled: ?SetSplineData@CUnitMotion@Moho@@QAEXPBVCPathPoint@2@0@Z
-   *
-   * What it does:
-   * Stores current and look-ahead spline waypoint lanes for movement steering.
-   */
-  void CUnitMotion::SetSplineData(
-    const CPathPoint* const nextWaypoint,
-    const CPathPoint* const followingWaypoint
-  )
-  {
-    mNextWaypoint = const_cast<CPathPoint*>(nextWaypoint);
-    mFollowingWaypoint = const_cast<CPathPoint*>(followingWaypoint);
-  }
-
-  /**
    * Address: 0x006B88F0 (FUN_006B88F0)
    * Mangled: ?SetTarget@CUnitMotion@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z
    *
@@ -2472,108 +2456,6 @@ namespace moho
       // dispatch when the list is consumed.
       candidates.push_back(WeakPtr<Entity>(hit.sourceEntity));
     }
-  }
-
-  /**
-   * Address: 0x006BC460 (FUN_006BC460, Moho::CUnitMotion::HandleGroundCollision)
-   * Mangled: ?HandleGroundCollision@CUnitMotion@Moho@@AAE_NXZ
-   *
-   * What it does: see header.
-   *
-   * Nothing calls this in the shipped engine; FAF patched its one call site
-   * out of `CalcMoveAir` (0x006C018B). See the note at the end of that
-   * function before wiring it back in.
-   */
-  bool CUnitMotion::HandleGroundCollision()
-  {
-    constexpr float kGroundCheckElevationScale = 2.0f;
-
-    Unit* const unit = mUnit;
-    const RUnitBlueprint* const blueprint = unit->GetBlueprint();
-
-    const float groundCheckLimit = std::max(blueprint->mSizeX, blueprint->mSizeZ) * kGroundCheckElevationScale;
-    if (mCurElevation > groundCheckLimit) {
-      return false;
-    }
-
-    STIMap* const mapData = unit->SimulationRef->mMapData;
-    SPhysBody* const physBody = unit->GetPhysBody();
-
-    gpg::fastvector_n<Wm3::Sphere3f, 8> collisionSpheres;
-    unit->GetTerrainCollisionGeom(collisionSpheres);
-
-    VTransform bodyTransform{};
-    BuildTransformFromSPhysBody(&bodyTransform, physBody);
-
-    VMatrix4 worldMatrix{};
-    worldMatrix.Set(bodyTransform.orient_, bodyTransform.pos_);
-
-    bool anyGroundHit = false;
-    bool anyBelowWater = false;
-    gpg::fastvector_n<GroundPenetrationSample, 8> hitRecords;
-
-    for (const Wm3::Sphere3f& sphere : collisionSpheres) {
-      const Vector4f localPoint{sphere.Center.x, sphere.Center.y, sphere.Center.z, 1.0f};
-      const Vector4f worldPoint = localPoint * worldMatrix;
-
-      const float terrainElevation = mapData->GetHeightField()->GetElevation(worldPoint.x, worldPoint.z);
-      const float groundThreshold = sphere.Radius + terrainElevation;
-
-      if ((groundThreshold - blueprint->Physics.GroundCollisionOffset) >= worldPoint.y) {
-        hitRecords.push_back(GroundPenetrationSample{worldPoint.x, worldPoint.y, worldPoint.z, terrainElevation});
-        anyGroundHit = true;
-      }
-
-      if (!blueprint->Air.FlyInWater) {
-        // Engine addition (water bodies): the level under each sphere.
-        anyBelowWater |= (mapData->GetWaterElevationAt(worldPoint.x, worldPoint.z) >= worldPoint.y);
-      }
-    }
-
-    if (anyGroundHit) {
-      static DiagnosticBudget sLeverCount;
-      if (sLeverCount.Take(12)) {
-        const Wm3::Sphere3f& s0 = *collisionSpheres.begin();
-        const GroundPenetrationSample& h0 = *hitRecords.begin();
-        gpg::Warnf(
-          "[GEOMLEVER] unit=%p spheres=%d hits=%d sphere0=(%.2f,%.2f,%.2f r=%.2f) "
-          "world0=(%.2f,%.2f,%.2f) bodyPos=(%.2f,%.2f,%.2f) rel0=(%.2f,%.2f,%.2f) unitPos=(%.2f,%.2f,%.2f) "
-          "bpSize=(%.3f,%.3f,%.3f) bpDensity=%.4f bodyMass=%.3f bpElev=%.2f bpGndOff=%.3f",
-          static_cast<void*>(unit),
-          static_cast<int>(collisionSpheres.end() - collisionSpheres.begin()),
-          static_cast<int>(hitRecords.end() - hitRecords.begin()),
-          s0.Center.x,
-          s0.Center.y,
-          s0.Center.z,
-          s0.Radius,
-          h0.x,
-          h0.y,
-          h0.z,
-          physBody->mPos.x,
-          physBody->mPos.y,
-          physBody->mPos.z,
-          h0.x - physBody->mPos.x,
-          h0.y - physBody->mPos.y,
-          h0.z - physBody->mPos.z,
-          unit->GetPosition().x,
-          unit->GetPosition().y,
-          unit->GetPosition().z,
-          blueprint->mSizeX,
-          blueprint->mSizeY,
-          blueprint->mSizeZ,
-          blueprint->mAverageDensity,
-          physBody->mMass,
-          blueprint->Physics.Elevation,
-          blueprint->Physics.GroundCollisionOffset
-        );
-      }
-    }
-
-    if (anyGroundHit) {
-      physBody->ApplyGroundCollisionResponse(hitRecords);
-    }
-
-    return anyGroundHit || anyBelowWater;
   }
 
   /**

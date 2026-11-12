@@ -67,25 +67,6 @@ IWinApp::~IWinApp()
 }
 
 /**
- * Address: 0x008CD480 (FUN_008CD480)
- *
- * What it does:
- * Runs one deleting-destructor thunk for `IWinApp`, forwarding through
- * non-deleting teardown and optional storage release.
- */
-[[nodiscard]] IWinApp* DestroyIWinAppDeleting(
-  IWinApp* const app,
-  const unsigned char deleteFlag
-)
-{
-  app->~IWinApp();
-  if ((deleteFlag & 1u) != 0u) {
-    ::operator delete(static_cast<void*>(app));
-  }
-  return app;
-}
-
-/**
  * Address: 0x008CD460 (FUN_008CD460)
  * Mangled: ?AppGetHelpText@IWinApp@Moho@@UAE_NAAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@_N@Z
  *

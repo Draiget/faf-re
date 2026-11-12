@@ -207,28 +207,6 @@ namespace gpg
     return outRef;
   }
 
-  /**
-   * Address: 0x006282B0 (FUN_006282B0)
-   *
-   * What it does:
-   * Wrapper lane that materializes one temporary `RRef_CUnitLoadUnits` and
-   * copies object/type fields into the destination reference record.
-   */
-  [[maybe_unused]] gpg::RRef* AssignCUnitLoadUnitsRef(
-    gpg::RRef* const outRef,
-    moho::CUnitLoadUnits* const value
-  )
-  {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    gpg::RRef tmp{};
-    (void)RRef_CUnitLoadUnits(&tmp, value);
-    outRef->mObj = tmp.mObj;
-    outRef->mType = tmp.mType;
-    return outRef;
-  }
 } // namespace gpg
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

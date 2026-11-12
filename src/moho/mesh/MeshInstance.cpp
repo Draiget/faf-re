@@ -10,26 +10,6 @@ namespace moho
 
   [[nodiscard]] float REN_GetSimDeltaSeconds();
 
-  /**
-   * Address: 0x007E6CE0 (FUN_007E6CE0)
-   *
-   * What it does:
-   * Refreshes interpolation state and copies `MeshInstance::curPose` into one
-   * shared-pose out lane while retaining the copied control block.
-   */
-  boost::shared_ptr<CAniPose>* CaptureMeshInstanceCurrentPose(
-    boost::shared_ptr<CAniPose>* const outPose,
-    MeshInstance* const meshInstance
-  )
-  {
-    if (outPose == nullptr || meshInstance == nullptr) {
-      return outPose;
-    }
-
-    meshInstance->UpdateInterpolatedFields();
-    *outPose = meshInstance->curPose;
-    return outPose;
-  }
 } // namespace moho
 
 namespace
@@ -359,67 +339,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x007DE6D0 (FUN_007DE6D0, ?Reflect@MeshInstance@Moho@@QAEX_N@Z)
-   *
-   * What it does:
-   * Clears one per-instance reflection-visibility flag.
-   */
-  void MeshInstance::Reflect(
-    [[maybe_unused]] const bool reflected
-  )
-  {
-    isReflected = 0u;
-  }
-
-  /**
-   * Address: 0x007DE880 (FUN_007DE880, ?SetParameter@MeshInstance@Moho@@QAEXW4PARAM@MeshMaterial@2@M@Z)
-   *
-   * What it does:
-   * Writes one shader parameter lane selected by `MeshMaterial::PARAM`.
-   */
-  void MeshInstance::SetParameter(
-    const MeshMaterial::PARAM parameter,
-    const float value
-  )
-  {
-    switch (parameter) {
-    case MeshMaterial::PARAM_GENERIC:
-      parameters = value;
-      break;
-    case MeshMaterial::PARAM_FRACTION_COMPLETE:
-      fractionCompleteParameter = value;
-      break;
-    case MeshMaterial::PARAM_FRACTION_HEALTH:
-      fractionHealthParameter = value;
-      break;
-    case MeshMaterial::PARAM_LIFETIME:
-      lifetimeParameter = value;
-      break;
-    case MeshMaterial::PARAM_AUXILIARY:
-      auxiliaryParameter = value;
-      break;
-    default:
-      break;
-    }
-  }
-
-  /**
-   * Address: 0x007DE850 (FUN_007DE850, ?SetInterpolantScale@MeshInstance@Moho@@QAEXM@Z)
-   *
-   * What it does:
-   * Stores one per-instance interpolation scale and invalidates cached
-   * interpolant lane for refresh.
-   */
-  void MeshInstance::SetInterpolantScale(
-    const float interpolantScale
-  )
-  {
-    uniformScale = interpolantScale;
-    frameCounter = sFrameCounter;
-    currInterpolant = -1.0f;
-  }
-
-  /**
    * Address: 0x007DE8C0 (FUN_007DE8C0, ?SetScale@MeshInstance@Moho@@QAEXABV?$Vector3@M@Wm3@@@Z)
    *
    * What it does:
@@ -443,21 +362,6 @@ namespace moho
   )
   {
     color = static_cast<std::int32_t>(colorArg);
-  }
-
-  /**
-   * Address: 0x007DE900 (FUN_007DE900, ?SetScroll@MeshInstance@Moho@@QAEXABV?$Vector2@M@Wm3@@0@Z)
-   *
-   * What it does:
-   * Stores two texture-scroll vector lanes for this mesh instance.
-   */
-  void MeshInstance::SetScroll(
-    const Wm3::Vec2f& scroll1Arg,
-    const Wm3::Vec2f& scroll2Arg
-  )
-  {
-    scroll1 = scroll1Arg;
-    scroll2 = scroll2Arg;
   }
 
   /**
@@ -814,22 +718,6 @@ namespace moho
     MeshInstance& self = *const_cast<MeshInstance*>(this);
     self.UpdateInterpolatedFields();
     return self.interpolatedPosition;
-  }
-
-  /**
-   * Address: 0x007DE730 (FUN_007DE730, ?GetDebugBoneCount@MeshInstance@Moho@@QBEHXZ)
-   *
-   * What it does:
-   * Returns zero for dynamic meshes; static meshes report SCM bone count.
-   */
-  std::int32_t MeshInstance::GetDebugBoneCount() const
-  {
-    if (isStaticPose == 0u) {
-      return 0;
-    }
-
-    const boost::shared_ptr<RScmResource> resource = mesh->GetResource(0);
-    return static_cast<std::int32_t>(resource->mFile->mBoneTotalCount);
   }
 
   /**

@@ -1414,25 +1414,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x005A2C20 (FUN_005A2C20, Moho::AI_Tick)
-   *
-   * What it does:
-   * Runs one AI brain task tick for the army's AI, attacker, and reserved
-   * thread stages.
-   */
-  void AI_Tick(
-    CArmyImpl* army
-  )
-  {
-    (void)army->GetSim();
-
-    CAiBrain* const brain = army->GetArmyBrain();
-    brain->mAiThreadStage->UserFrame();
-    brain->mAttackerThreadStage->UserFrame();
-    brain->mReservedThreadStage->UserFrame();
-  }
-
-  /**
    * Address: 0x006FDCA0 (FUN_006FDCA0, Moho::CArmyImpl::GetReconDB)
    */
   CAiReconDBImpl* CArmyImpl::GetReconDB()

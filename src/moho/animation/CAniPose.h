@@ -476,15 +476,6 @@ namespace moho
      */
     void MarkBoneDirty(int idx);
 
-    /**
-     * Address: 0x0054BD80 (FUN_0054BD80)
-     *
-     * What it does:
-     * Composes one pose-bone local transform with an incoming transform and
-     * marks that bone dirty through its pose/index ownership lanes.
-     */
-    static void ApplyBoneLocalTransform(CAniPoseBone* bone, const VTransform& transform);
-
   public:
     boost::shared_ptr<const CAniSkel> mSkeleton; // +0x00
     float mScale;                                // +0x08

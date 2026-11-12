@@ -424,64 +424,6 @@ std::int32_t Unit::DecrementCapturers()
 }
 
 /**
- * Address: 0x00603F30 (FUN_00603F30)
- *
- * What it does:
- * Returns the current non-negative captor reference count lane.
- */
-std::int32_t Unit::GetCapturerCount() const noexcept
-{
-  return CaptorCount;
-}
-
-/**
- * Address: 0x005F24C0 (FUN_005F24C0)
- *
- * What it does:
- * Returns whether this unit belongs to the MELEE category lane.
- */
-bool Unit::IsMeleeUnit() const noexcept
-{
-  return mIsMelee;
-}
-
-/**
- * Address: 0x005F5570 (FUN_005F5570)
- *
- * What it does:
- * Returns the current retaliation fire-state lane.
- */
-std::int32_t Unit::GetFireStateValue() const noexcept
-{
-  return mUnitVarDat.mFireState;
-}
-
-/**
- * Address: 0x005F5560 (FUN_005F5560)
- *
- * What it does:
- * Stores one upgraded-unit entity id lane and returns that id.
- */
-EntId Unit::SetUpgradedToEntityId(
-  const EntId upgradedToEntityId
-) noexcept
-{
-  mUnitVarDat.mSelectionInheritorId = upgradedToEntityId;
-  return upgradedToEntityId;
-}
-
-/**
- * Address: 0x005F5590 (FUN_005F5590)
- *
- * What it does:
- * Returns the current silo-build implementation lane pointer.
- */
-CAiSiloBuildImpl* Unit::GetSiloBuildImpl() const noexcept
-{
-  return AiSiloBuild;
-}
-
-/**
  * Address: 0x006A75C0 (FUN_006A75C0, ?GetMaxFootprintSize@Unit@Moho@@QBEHXZ)
  *
  * What it does:
@@ -652,35 +594,4 @@ void Unit::UpdateTerrainType(
   LuaPlus::LuaObject previousTerrain = mapData->GetTerrainType(previousTerrainType);
   LuaPlus::LuaObject currentTerrain = mapData->GetTerrainType(CurrentTerrainType);
   RunScriptOnTerrainTypeChange(currentTerrain, previousTerrain);
-}
-
-/**
- * Address: 0x006A9A40 (FUN_006A9A40, Moho::Unit::HandleTerranEffects)
- *
- * What it does:
- * Reads terrain-type Lua data for this unit, applies periodic
- * `HealthEffectPerSecond` scaling against max health every 10 ticks, and
- * kills the unit when health reaches zero.
- */
-void Unit::HandleTerranEffects()
-{
-  LuaPlus::LuaObject terrainType = SimulationRef->mMapData->GetTerrainType(CurrentTerrainType);
-  if (!terrainType.IsTable()) {
-    return;
-  }
-
-  if ((SimulationRef->mCurTick % 10u) != 0u) {
-    return;
-  }
-
-  LuaPlus::LuaObject healthEffect = terrainType["HealthEffectPerSecond"];
-  if (healthEffect.IsNil()) {
-    return;
-  }
-
-  const float delta = healthEffect.GetNumber() * mVarDat.mMaxHealth;
-  AdjustHealth(nullptr, delta);
-  if (mVarDat.mHealth <= 0.0f) {
-    Kill(nullptr, "", 0.0f);
-  }
 }

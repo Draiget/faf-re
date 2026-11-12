@@ -201,27 +201,6 @@ namespace gpg
     return outRef;
   }
 
-  /**
-   * Address: 0x007129E0 (FUN_007129E0)
-   *
-   * What it does:
-   * Packs one `RRef_CArmyStatItem` result into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_CArmyStatItem(
-    gpg::RRef* const outRef,
-    moho::CArmyStatItem* const value
-  )
-  {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    gpg::RRef tmp{};
-    (void)RRef_CArmyStatItem(&tmp, value);
-    outRef->mObj = tmp.mObj;
-    outRef->mType = tmp.mType;
-    return outRef;
-  }
 } // namespace gpg
 
 namespace

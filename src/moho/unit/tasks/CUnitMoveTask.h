@@ -216,14 +216,6 @@ namespace moho
     std::uint8_t moveVariant
   );
 
-  /**
-   * Address: 0x0061A3C0 (FUN_0061A3C0)
-   *
-   * What it does:
-   * Thin alias lane that forwards one `(task, archive)` pair into
-   * `CUnitMoveTask::MemberSerialize`.
-   */
-  void CUnitMoveTaskMemberSerializeAlias(const CUnitMoveTask* task, gpg::WriteArchive* archive);
 } // namespace moho
 
 namespace gpg
@@ -237,12 +229,4 @@ namespace gpg
    */
   gpg::RRef* RRef_CUnitMoveTask(gpg::RRef* outRef, moho::CUnitMoveTask* value);
 
-  /**
-   * Address: 0x0061A350 (FUN_0061A350)
-   *
-   * What it does:
-   * Wrapper lane that materializes one temporary `RRef_CUnitMoveTask` and
-   * copies object/type fields into the destination reference record.
-   */
-  gpg::RRef* AssignCUnitMoveTaskRef(gpg::RRef* outRef, moho::CUnitMoveTask* value);
 } // namespace gpg

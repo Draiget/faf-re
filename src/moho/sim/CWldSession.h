@@ -320,16 +320,6 @@ namespace moho
   static_assert(sizeof(SSessionSaveData) == 0x0C, "SSessionSaveData size must be 0x0C");
   static_assert(offsetof(SSessionSaveData, mNodeMap) == 0x00, "SSessionSaveData::mNodeMap offset must be 0x00");
 
-  /**
-   * Address: 0x0089AEC0 (FUN_0089AEC0, boost::shared_ptr_SSessionSaveData::shared_ptr_SSessionSaveData)
-   *
-   * What it does:
-   * Constructs one `shared_ptr<SSessionSaveData>` from one raw save-data
-   * pointer lane.
-   */
-  boost::shared_ptr<SSessionSaveData>*
-  ConstructSharedSessionSaveDataFromRaw(boost::shared_ptr<SSessionSaveData>* outSaveData, SSessionSaveData* saveData);
-
   class CWldSession
   {
   public:
@@ -406,14 +396,6 @@ namespace moho
     [[nodiscard]] bool IsObserver() const;
 
     /**
-     * Address: 0x00896570 (FUN_00896570, ?SetCursorInfo@CWldSession@Moho@@QAEXABUUICursorInfo@2@@Z)
-     *
-     * What it does:
-     * Copies one cursor-info payload into the session cursor-info lane.
-     */
-    void SetCursorInfo(const MouseInfo& cursorInfo);
-
-    /**
      * Address: 0x00895FF0 (FUN_00895FF0, ?GetSelection@CWldSession@Moho@@QBEABV?$WeakSet@VUserEntity@Moho@@@2@XZ)
      *
      * What it does:
@@ -452,15 +434,6 @@ namespace moho
     [[nodiscard]] UserEntity* GetHoveredUserEntity() const noexcept;
 
     /**
-     * Address: 0x008965C0 (FUN_008965C0, ?BecomeObserver@CWldSession@Moho@@QAEXXZ)
-     *
-     * What it does:
-     * Validates observer focus request (`-1`) and applies it to the active sim
-     * driver when allowed.
-     */
-    void BecomeObserver();
-
-    /**
      * Address context: compatibility wrapper lane used by recovered callsites.
      *
      * What it does:
@@ -495,14 +468,6 @@ namespace moho
      */
     [[nodiscard]] SpatialDB<UserEntity>* GetEntitySpatialDbStorage();
     [[nodiscard]] const SpatialDB<UserEntity>* GetEntitySpatialDbStorage() const;
-
-    /**
-     * Address: 0x00894120 (FUN_00894120, ?GetTerrainRes@CWldSession@Moho@@QBEPAVIWldTerrainRes@2@XZ)
-     *
-     * What it does:
-     * Returns the world-map terrain resource lane owned by this world session.
-     */
-    [[nodiscard]] IWldTerrainRes* GetTerrainRes() const;
 
     /**
      * Address: 0x00894130 (FUN_00894130, ?GetSTIMap@CWldSession@Moho@@QBEPAVSTIMap@2@XZ)
@@ -637,14 +602,6 @@ namespace moho
      * pause is holding on a tick boundary.
      */
     [[nodiscard]] float GetDelayToNextBeat() const;
-
-    /**
-     * Address: 0x00895FD0 (FUN_00895FD0, ?GetGameTime@CWldSession@Moho@@QBEMXZ)
-     *
-     * What it does:
-     * Returns total game time in seconds (`(mGameTick + mTimeSinceLastTick) * 0.1`).
-     */
-    [[nodiscard]] float GetGameTime() const;
 
     /**
      * Address: 0x00896000 (FUN_00896000, ?GetSelectionUnits@CWldSession@Moho@@QBEXAAV?$WeakSet@VUserUnit@Moho@@@2@@Z)
@@ -1056,15 +1013,6 @@ namespace moho
      * calls UI selection reset with a table grouped by set name.
      */
     void ApplyPendingSaveData();
-
-    /**
-     * Address: 0x00895DC0 (FUN_00895DC0, ?HandleFogEdge@CWldSession@Moho@@AAEXABV?$Rect2@H@gpg@@HH@Z)
-     *
-     * What it does:
-     * Clears/marks edge-fog rows outside the supplied visible rectangle and
-     * refreshes the backing edge-fog buffer.
-     */
-    void HandleFogEdge(const gpg::Rect2i& visibleRect, int width, int height);
 
     /**
      * Address: 0x00896670 (FUN_00896670, ?ValidateFocusArmyRequest@CWldSession@Moho@@AAE_NH@Z)
@@ -1710,15 +1658,6 @@ namespace moho
   [[nodiscard]] EWldFrameAction WLD_GetFrameAction();
 
   /**
-   * Address: 0x0088BD20 (FUN_0088BD20, ?WLD_SetUIProvider@Moho@@YAXPAVIWldUIProvider@1@@Z)
-   *
-   * What it does:
-   * Replaces the process-global world-UI provider ownership lane, deleting the
-   * previous provider when it differs from the new one.
-   */
-  void WLD_SetUIProvider(IWldUIProvider* provider);
-
-  /**
    * Address context:
    * - process-global world-frame action lane (`sWldFrameAction`) consumed by
    *   `WLD_Frame`.
@@ -1732,14 +1671,6 @@ namespace moho
    * Dispatches world-frame state transitions and per-state frame handlers.
    */
   [[nodiscard]] bool WLD_Frame(float deltaSeconds);
-
-  /**
-   * Address: 0x0088BEA0 (FUN_0088BEA0, ?WLD_RequestEndSession@Moho@@YAXXZ)
-   *
-   * What it does:
-   * Requests world-session exit when frame dispatch is currently active.
-   */
-  void WLD_RequestEndSession();
 
   /**
    * Address: 0x0088E6D0 (FUN_0088E6D0)
@@ -1761,31 +1692,6 @@ namespace moho
    * dispatch is currently active.
    */
   void CON_WLD_RequestEndSession(const fa::vector<fa::string>& args);
-
-  /**
-   * Address: 0x0088BE80 (FUN_0088BE80, ?WLD_IsSessionActive@Moho@@YA_NXZ)
-   *
-   * What it does:
-   * Returns whether world-frame dispatch is active (`!= Inactive`).
-   */
-  [[nodiscard]] bool WLD_IsSessionActive();
-
-  /**
-   * Address: 0x0088BE90 (FUN_0088BE90, world-frame playing-state probe)
-   *
-   * What it does:
-   * Returns whether world-frame dispatch is currently in the `Playing` state.
-   */
-  [[nodiscard]] bool WLD_IsSessionPlaying();
-
-  /**
-   * Address: 0x0088BEC0 (FUN_0088BEC0, ?WLD_RequestRestartSession@Moho@@YAXXZ)
-   *
-   * What it does:
-   * Requests world-session recreation when frame dispatch is active and the
-   * active session carries restart launch info.
-   */
-  void WLD_RequestRestartSession();
 
   /**
    * Address: 0x00869810 (FUN_00869810, func_WldSessionLoader_GetOnTeardownCallbacks)
@@ -1847,15 +1753,6 @@ namespace moho
     fa::auto_ptr<CWldMap>& wldMap,
     SWldSessionInfo& sessionInfo
   );
-
-  /**
-   * Address: 0x008972A0 (FUN_008972A0, ?WLD_DestroySession@Moho@@YAXXZ)
-   *
-   * What it does:
-   * Destroys the active world-session object when present and clears the
-   * process-global active-session pointer.
-   */
-  void WLD_DestroySession();
 
   /**
    * Address: 0x008972F0 (FUN_008972F0, ?WLD_GetSession@Moho@@YAPAVCWldSession@1@XZ)
@@ -1934,15 +1831,6 @@ namespace moho
    * local session contexts.
    */
   void WLD_DecreaseSimRate();
-
-  /**
-   * Address: 0x0088D2F0 (FUN_0088D2F0, ?WLD_SetGameSpeed@Moho@@YAXH@Z)
-   *
-   * What it does:
-   * Clamps one requested game-speed lane to `[-10, 10]` and forwards it to the
-   * active client manager when a sim driver is available.
-   */
-  void WLD_SetGameSpeed(int gameSpeed);
 
   /**
    * Address: 0x0088D330 (FUN_0088D330, ?WLD_GetDriver@Moho@@YAPAVISTIDriver@1@XZ)

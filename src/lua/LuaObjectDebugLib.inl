@@ -932,27 +932,6 @@ void LuaCallAlert(
 }
 
 /**
- * Address: 0x0090E830 (FUN_0090E830, lua_dofile)
- *
- * What it does:
- * Loads one Lua chunk from `filename`, executes it when load succeeds,
- * then routes any error status through `callalert`.
- */
-extern "C" int lua_dofile(
-  lua_State* const state,
-  const char* const filename
-)
-{
-  int status = ::luaL_loadfile(state, filename);
-  if (status == 0) {
-    status = LuaCallProtected(state, 0, LUA_MULTRET);
-  }
-
-  LuaCallAlert(state, status);
-  return status;
-}
-
-/**
  * Address: 0x0090E870 (FUN_0090E870, lua_dobuffer)
  *
  * What it does:
@@ -996,17 +975,6 @@ extern "C" int lua_dostring(
 )
 {
   return lua_dobuffer(state, source, static_cast<int>(std::strlen(source)), source);
-}
-
-/**
- * Address: 0x0090D6B0 (FUN_0090D6B0, lua_version)
- *
- * What it does:
- * Returns the embedded Lua runtime version string literal.
- */
-extern "C" const char* lua_version()
-{
-  return "Lua 5.0.1";
 }
 
 /**

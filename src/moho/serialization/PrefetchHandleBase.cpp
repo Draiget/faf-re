@@ -358,14 +358,6 @@ namespace moho
     return mPtr->mRecord->mId.name;
   }
 
-  /**
-   * Address: 0x004ABE10 (FUN_004ABE10, Moho::PrefetchHandleBase::GetResourceRType)
-   */
-  gpg::RType* PrefetchHandleBase::GetResourceRType() const
-  {
-    GPG_ASSERT(mPtr.get() != nullptr && mPtr->mRecord != nullptr);
-    return const_cast<gpg::RType*>(mPtr->mRecord->mType);
-  }
 } // namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of

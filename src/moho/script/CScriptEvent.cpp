@@ -1156,41 +1156,6 @@ CAnimationManipulator* moho::SCR_FromLua_CAnimationManipulator(
 }
 
 /**
- * Address: 0x00645560 (FUN_00645560, Moho::SCR_FromLua_CRotateManipulator)
- *
- * What it does:
- * Converts one Lua `_c_object` payload to `CRotateManipulator*` and raises
- * Lua errors for missing, destroyed, or type-mismatched game objects.
- */
-CRotateManipulator* moho::SCR_FromLua_CRotateManipulator(
-  const LuaPlus::LuaObject& object,
-  LuaPlus::LuaState* const state
-)
-{
-  CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
-  if (!scriptObjectSlot) {
-    luaL_error(state ? state->GetActiveCState() : nullptr, kExpectedGameObjectError);
-    return nullptr;
-  }
-
-  CScriptObject* const scriptObject = *scriptObjectSlot;
-  if (!scriptObject) {
-    luaL_error(state ? state->GetActiveCState() : nullptr, kDestroyedGameObjectError);
-    return nullptr;
-  }
-
-  const gpg::RRef sourceRef = SCR_MakeScriptObjectRef(scriptObject);
-  const gpg::RType* const rotateType = CachedCRotateManipulatorType();
-  const gpg::RRef upcast = rotateType ? gpg::REF_UpcastPtr(sourceRef, rotateType) : gpg::RRef{};
-  if (!upcast.mObj) {
-    luaL_error(state ? state->GetActiveCState() : nullptr, kIncorrectGameObjectTypeError);
-    return nullptr;
-  }
-
-  return reinterpret_cast<CRotateManipulator*>(upcast.mObj);
-}
-
-/**
  * Address: 0x00646900 (FUN_00646900, Moho::SCR_FromLua_CSlaveManipulator)
  *
  * What it does:

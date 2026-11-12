@@ -86,48 +86,6 @@ fa::string moho::Join(
   return out;
 }
 
-bool moho::IsNameIgnored(
-  const fa::string& ignoreList,
-  const char* name
-)
-{
-  if (!name || ignoreList.empty()) {
-    return false;
-  }
-
-  fa::vector<fa::string> tokens;
-  tokens.reserve(8); // small, avoids reallocs
-  SplitByComma(ignoreList, tokens);
-
-  const size_t len = std::strlen(name);
-  for (const auto& t : tokens) {
-    if (t.size() == len && std::memcmp(t.c_str(), name, len) == 0) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
- * Address: 0x0050E010 (FUN_0050E010,
- * ?BP_ShortId@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV23@@Z)
- *
- * What it does:
- * Returns the path stem lane delimited by slash/dot markers using the same
- * index math as the original binary helper.
- */
-fa::string moho::BP_ShortId(
-  const fa::string& idText
-)
-{
-  const std::string_view text = idText.view();
-  const std::size_t slash = text.find_last_of('/');
-  const std::size_t start = (slash == std::string_view::npos) ? 0u : (slash + 1u);
-  const std::size_t dot = text.find_last_of('.');
-  const std::size_t end = (dot == std::string_view::npos || dot < start) ? text.size() : dot;
-  return idText.substr(start, end - start);
-}
-
 /**
  * Address: 0x0048E0C0 (FUN_0048E0C0, Moho::URI_Split)
  *

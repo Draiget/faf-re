@@ -133,38 +133,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0086AE00 (FUN_0086AE00)
-   *
-   * What it does:
-   * Builds one stance transform from position/orientation components and
-   * applies it to the owned mesh instance as both start and end stance.
-   */
-  void CUIWorldMesh::SetStanceFromComponents(
-    const float positionX,
-    const float positionY,
-    const float positionZ,
-    const float orientationX,
-    const float orientationY,
-    const float orientationZ,
-    const float orientationW
-  )
-  {
-    if (mMeshInstance == nullptr) {
-      return;
-    }
-
-    VTransform transform{};
-    transform.orient_.x = orientationX;
-    transform.orient_.y = orientationY;
-    transform.orient_.z = orientationZ;
-    transform.orient_.w = orientationW;
-    transform.pos_.x = positionX;
-    transform.pos_.y = positionY;
-    transform.pos_.z = positionZ;
-    mMeshInstance->SetStance(transform, transform);
-  }
-
-  /**
    * Address: 0x0086B2C0 (FUN_0086B2C0, Moho::CUIWorldMesh::SetMesh)
    *
    * What it does:

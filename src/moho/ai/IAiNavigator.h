@@ -76,8 +76,6 @@ namespace moho
      */
     void AssignCopy(const SNavPath& src);
 
-    void AppendCells(const SOCellPos* begin, const SOCellPos* end);
-
     /**
      * Address: 0x005B0B60 (FUN_005B0B60)
      * Address: 0x005B0900 (FUN_005B0900 -- forwarder into the body above)
@@ -89,7 +87,6 @@ namespace moho
     void PrependCells(const SOCellPos* begin, const SOCellPos* end);
     void AppendCell(const SOCellPos& cell);
     void EraseFrontCell() noexcept;
-    void EraseFrontCells(std::int32_t count) noexcept;
   };
 
   static_assert(sizeof(SNavPath) == 0x10, "SNavPath size must be 0x10");
@@ -346,14 +343,6 @@ namespace moho
    * `IAiNavigator` interface pointer. Returns null when allocation fails.
    */
   [[nodiscard]] IAiNavigator* AI_CreateAirNavigator(Unit* unit);
-
-  /**
-   * Address: 0x005A5850 (FUN_005A5850, ?AI_ClearPathData@Moho@@YAXXZ)
-   *
-   * What it does:
-   * Preserves the legacy global AI path-data clear hook as a deliberate no-op.
-   */
-  void AI_ClearPathData();
 
   /**
    * Address: 0x00BCC9A0 (FUN_00BCC9A0)

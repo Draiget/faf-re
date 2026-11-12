@@ -33,7 +33,6 @@ namespace gpg::gal
 
     /** The region index for `name` (a string literal), registered on first use. */
     [[nodiscard]] std::uint32_t Region(const char* name) noexcept;
-    [[nodiscard]] const char* RegionName(std::uint32_t region) const noexcept;
 
     void BeginRegion(std::uint32_t region) noexcept;
     void EndRegion(std::uint32_t region) noexcept;

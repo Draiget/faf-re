@@ -8,7 +8,6 @@ namespace gpg::gal
   // directory holding dumpnormals.on. Defined here because this is where the
   // D3DX export is already resolved.
   long DebugSaveSurfaceToFileA(const char* filePath, unsigned int fileFormat, void* sourceSurface);
-  long DebugSaveTextureToFileA(const char* filePath, unsigned int fileFormat, void* sourceTexture);
 } // namespace gpg::gal
 
 long gpg::gal::DebugSaveSurfaceToFileA(
@@ -23,16 +22,5 @@ long gpg::gal::DebugSaveSurfaceToFileA(
     static_cast<IDirect3DSurface9*>(sourceSurface),
     nullptr,
     nullptr
-  ));
-}
-
-long gpg::gal::DebugSaveTextureToFileA(
-  const char* const filePath,
-  const unsigned int fileFormat,
-  void* const sourceTexture
-)
-{
-  return static_cast<long>(::D3DXSaveTextureToFileA(
-    filePath, static_cast<D3DXIMAGE_FILEFORMAT>(fileFormat), static_cast<IDirect3DBaseTexture9*>(sourceTexture), nullptr
   ));
 }

@@ -311,20 +311,6 @@ namespace moho
     );
 
     /**
-     * Address: 0x007227B0 (FUN_007227B0, Moho::COGrid::CollectEntitiesCollidingWithEntity)
-     *
-     * What it does:
-     * Gathers the unmarked entities of `flags` in `source`'s AABB cells and
-     * appends each one whose shape collides `source`'s shape (source itself
-     * excluded). No caller anywhere in the shipped binary.
-     */
-    void CollectEntitiesCollidingWithEntity(
-      EEntityType flags,
-      Entity* source,
-      gpg::core::FastVectorN<CollisionResult, 10>& outCollisions
-    );
-
-    /**
      * Address: 0x00721BD0 (FUN_00721BD0)
      *
      * What it does:

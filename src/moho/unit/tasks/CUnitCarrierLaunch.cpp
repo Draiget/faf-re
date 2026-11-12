@@ -343,35 +343,6 @@ namespace moho
     archive->Write(gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>(), &mCarriedUnits, carriedUnitsOwnerRef);
   }
 
-  /**
-   * Address: 0x00607F80 (FUN_00607F80)
-   *
-   * What it does:
-   * Preserves one deserialize thunk lane for `CUnitCarrierLaunch` serializer
-   * callback registration.
-   */
-  [[maybe_unused]] void CUnitCarrierLaunchMemberDeserializeAdapterLaneA(
-    CUnitCarrierLaunch* const task,
-    gpg::ReadArchive* const archive
-  )
-  {
-    task->MemberDeserialize(archive);
-  }
-
-  /**
-   * Address: 0x00608070 (FUN_00608070)
-   *
-   * What it does:
-   * Alternate deserialize thunk lane for `CUnitCarrierLaunch` serializer
-   * callback registration.
-   */
-  [[maybe_unused]] void CUnitCarrierLaunchMemberDeserializeAdapterLaneB(
-    CUnitCarrierLaunch* const task,
-    gpg::ReadArchive* const archive
-  )
-  {
-    task->MemberDeserialize(archive);
-  }
 } // namespace moho
 
 namespace

@@ -337,19 +337,6 @@ namespace LuaPlus
     void AssignThread(LuaState* state);
 
     /**
-     * Address: 0x00909900 (FUN_00909900, LuaPlus::LuaObject::AssignObject)
-     *
-     * What it does:
-     * Copies one source `LuaObject` payload into this object after validating
-     * shared root-state ownership.
-     *
-     * Notes:
-     * The binary keeps the `state` argument lane for ABI compatibility but
-     * does not read it in this implementation.
-     */
-    void AssignObject(LuaState* state, const LuaObject& value);
-
-    /**
      * Address: 0x009084E0 (FUN_009084E0, LuaPlus::LuaObject::SetString)
      *
      * What it does:
@@ -789,15 +776,6 @@ namespace LuaPlus
      * Returns true only for state-bound objects tagged as nil.
      */
     [[nodiscard]] bool IsNil() const noexcept;
-
-    /**
-     * Address: 0x00907850 (FUN_00907850, LuaPlus::LuaObject::IsNone)
-     *
-     * What it does:
-     * Asserts state binding and returns whether this object carries the
-     * `LUA_TNONE` sentinel tag.
-     */
-    [[nodiscard]] bool IsNone() const;
 
     /**
      * Address: 0x009078D0 (FUN_009078D0, LuaPlus::LuaObject::IsBoolean)
@@ -1247,31 +1225,6 @@ namespace LuaPlus
     [[nodiscard]] const char* CheckString(int32_t index, size_t* lengthOut);
 
     /**
-     * Address: 0x0090C170 (FUN_0090C170, LuaPlus::LuaState::CheckAny)
-     *
-     * What it does:
-     * Raises a Lua argument error when stack slot `index` is missing.
-     */
-    void CheckAny(int32_t index);
-
-    /**
-     * Address: 0x0090BF90 (FUN_0090BF90)
-     *
-     * What it does:
-     * Raises one Lua argument error for argument lane `narg`.
-     */
-    int ArgError(int narg, char* extraMessage);
-
-    /**
-     * Address: 0x0090BFD0 (FUN_0090BFD0)
-     *
-     * What it does:
-     * Returns optional string argument `narg` or `defaultValue`, and writes
-     * string byte length when `lengthOut` is non-null.
-     */
-    [[nodiscard]] const char* OptString(int narg, char* defaultValue, size_t* lengthOut);
-
-    /**
      * Address: 0x0090BFF0 (FUN_0090BFF0)
      *
      * What it does:
@@ -1289,7 +1242,6 @@ namespace LuaPlus
 
     int32_t GetTop() const;
     bool IsRootState() const;
-    bool IsSuspended() const;
 
     /**
      * Address: 0x0090C1D0 (FUN_0090C1D0, ?Error@LuaState@LuaPlus@@QAAHPBDZZ)

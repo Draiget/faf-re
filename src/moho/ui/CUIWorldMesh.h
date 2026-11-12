@@ -60,23 +60,6 @@ namespace moho
     static int DestroyAllOf(LuaPlus::LuaState* state);
 
     /**
-     * Address: 0x0086AE00 (FUN_0086AE00)
-     *
-     * What it does:
-     * Builds one stance transform from position/orientation components and
-     * applies it to the owned mesh instance as both start and end stance.
-     */
-    void SetStanceFromComponents(
-      float positionX,
-      float positionY,
-      float positionZ,
-      float orientationX,
-      float orientationY,
-      float orientationZ,
-      float orientationW
-    );
-
-    /**
      * Address: 0x0086B2C0 (FUN_0086B2C0, Moho::CUIWorldMesh::SetMesh)
      *
      * What it does:

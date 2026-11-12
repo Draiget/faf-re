@@ -717,18 +717,6 @@ namespace moho
     archive->Write(attributesType, &mIntelAttributes, ownerRef);
   }
 
-  std::uint32_t SSTIEntityVariableData::GetVisibilityGridMask() const noexcept
-  {
-    return mLayerMask;
-  }
-
-  void SSTIEntityVariableData::SetVisibilityGridMask(
-    const std::uint32_t gridMask
-  ) noexcept
-  {
-    mLayerMask = static_cast<ELayer>(gridMask);
-  }
-
   bool SSTIEntityVariableData::UsesUnderwaterReconGrid() const noexcept
   {
     return (mLayerMask & kUserEntityUnderwaterLayerMaskBits) != 0u;

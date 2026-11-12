@@ -320,32 +320,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x004E6F30 (FUN_004E6F30)
-   * Mangled: ?TIME_TimeBarEvent@Moho@@YAXPBD@Z
-   *
-   * char const *
-   *
-   * What it does:
-   * Emits an instantaneous named marker event into the global time-bar history.
-   */
-  void TIME_TimeBarEvent(
-    const char* const name
-  )
-  {
-    TimeBarState& state = GetTimeBarState();
-    STimeBarThreadInfo* const threadInfo = GetOrCreateThreadInfo(state);
-
-    const std::int64_t nowCycles = QueryCurrentCycles();
-
-    STimeBarEventRecord eventRecord{};
-    SplitCycles(nowCycles, eventRecord.mStartCycleLo, eventRecord.mStartCycleHi);
-    SplitCycles(nowCycles, eventRecord.mEndCycleLo, eventRecord.mEndCycleHi);
-    eventRecord.mName = name;
-    eventRecord.mColorTag = threadInfo->mColorTag;
-    PushHistoryRecord(state, eventRecord);
-  }
-
-  /**
    * Address: 0x004E6FD0 (FUN_004E6FD0)
    *
    * int

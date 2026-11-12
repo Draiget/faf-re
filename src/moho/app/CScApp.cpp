@@ -1152,23 +1152,6 @@ std::int32_t CScApp::RollingFrameRates::Push(
 }
 
 /**
- * Address: 0x008D1CF0 (FUN_008D1CF0)
- *
- * What it does:
- * Thin thunk lane that forwards one rolling-frame-rate object into the
- * canonical reset routine.
- */
-[[maybe_unused]] CScApp::RollingFrameRates* CScAppRollingFrameRatesResetThunk(
-  CScApp::RollingFrameRates* const history
-) noexcept
-{
-  if (history != nullptr) {
-    history->Reset();
-  }
-  return history;
-}
-
-/**
  * Address: 0x008D4B20 (FUN_008D4B20, struct_RollingFrameRates::median)
  *
  * What it does:

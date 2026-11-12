@@ -168,25 +168,6 @@ LuaState::~LuaState()
 }
 
 /**
- * Address: 0x004C99B0 (FUN_004C99B0, LuaState scalar deleting destructor thunk)
- *
- * What it does:
- * Runs `LuaState` non-deleting destruction, then conditionally releases the
- * object storage when the scalar-delete flag bit is set.
- */
-LuaState* DestroyLuaStateWithDeleteFlag(
-  LuaState* const state,
-  const std::uint8_t deleteFlag
-)
-{
-  state->~LuaState();
-  if ((deleteFlag & 1u) != 0u) {
-    ::operator delete(state);
-  }
-  return state;
-}
-
-/**
  * Address: 0x0090A7D0 (FUN_0090A7D0, LuaPlus::LuaState::SetState)
  *
  * What it does:

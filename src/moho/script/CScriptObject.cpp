@@ -584,23 +584,6 @@ CScriptObject::~CScriptObject()
   }
 }
 
-/**
- * Address: 0x007B5D00 (FUN_007B5D00)
- *
- * What it does:
- * Tail-forwards one `CScriptObject` instance pointer into the canonical
- * destructor body.
- */
-[[maybe_unused]] CScriptObject* DestroyScriptObjectThunk(
-  CScriptObject* const object
-)
-{
-  if (object != nullptr) {
-    object->~CScriptObject();
-  }
-  return object;
-}
-
 gpg::RType* CScriptObject::StaticGetClass()
 {
   if (!sType) {
@@ -1549,60 +1532,6 @@ void CScriptObject::RunScriptInt(
   try {
     LuaPlus::LuaFunction<void> fn{script};
     fn(mLuaObj, intValue);
-  } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
-  } catch (...) {
-    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
-  }
-}
-
-/**
- * Address: 0x005D0540 (FUN_005D0540, Moho::CScriptObject::RunScript_Obj_Num)
- */
-float CScriptObject::RunScriptObjNum(
-  const char* const scriptName
-)
-{
-  const WeakPtr<CScriptObject> weakGuard(this);
-
-  LuaPlus::LuaObject script;
-  FindScript(&script, scriptName);
-  if (!script) {
-    return 0.0f;
-  }
-
-  try {
-    LuaPlus::LuaFunction<LuaPlus::LuaObject> fn{script};
-    const LuaPlus::LuaObject result = fn(mLuaObj);
-    return LuaValueToFloat(result);
-  } catch (const std::exception& ex) {
-    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
-  } catch (...) {
-    LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", "unknown exception");
-  }
-
-  return 0.0f;
-}
-
-/**
- * Address: 0x005D06B0 (FUN_005D06B0, Moho::CScriptObject::RunScript_Weap)
- */
-void CScriptObject::RunScriptWeapon(
-  const char* const scriptName,
-  UnitWeapon* const weapon
-)
-{
-  const WeakPtr<CScriptObject> weakGuard(this);
-
-  LuaPlus::LuaObject script;
-  FindScript(&script, scriptName);
-  if (!script) {
-    return;
-  }
-
-  try {
-    LuaPlus::LuaFunction<void> fn{script};
-    fn(mLuaObj, weapon);
   } catch (const std::exception& ex) {
     LogScriptWarning(weakGuard.GetObjectPtr(), scriptName ? scriptName : "<unknown>", ex.what());
   } catch (...) {
@@ -2884,33 +2813,6 @@ void CScriptObject::RunScriptObj(
   if (!returns.Empty()) {
     out = returns[0];
   }
-}
-
-/**
- * Address: 0x00675CF0
- */
-void CScriptObject::LuaInvoke3_DiscardReturn(
-  LuaPlus::LuaObject& func,
-  LuaPlus::LuaObject& selfObj,
-  const char* stringArg,
-  LuaPlus::LuaObject& payloadObj
-)
-{
-  LuaPlus::LuaState* state = func.GetActiveState();
-  if (!state) {
-    return;
-  }
-
-  lua_State* lstate = state->GetCState();
-  const int stackTop = lua_gettop(lstate);
-
-  func.PushStack(lstate);
-  selfObj.PushStack(lstate);
-  lua_pushstring(lstate, stringArg ? stringArg : "");
-  payloadObj.PushStack(lstate);
-
-  lua_call(lstate, 3, 1);
-  lua_settop(lstate, stackTop);
 }
 
 namespace moho

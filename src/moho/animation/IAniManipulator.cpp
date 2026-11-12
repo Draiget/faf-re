@@ -1303,24 +1303,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00639F50 (FUN_00639F50)
-   *
-   * What it does:
-   * Installs CFootPlantManipulator creation/destruction callback lanes into
-   * the reflected type descriptor.
-   */
-  gpg::RType* InstallFootPlantManipulatorTypeCallbacks(
-    gpg::RType* const typeInfo
-  )
-  {
-    typeInfo->newRefFunc_ = &CreateFootPlantManipulatorRefCallback;
-    typeInfo->ctorRefFunc_ = &ConstructFootPlantManipulatorRefCallback;
-    typeInfo->deleteFunc_ = &DeleteFootPlantManipulatorCallback;
-    typeInfo->dtrFunc_ = &DestructFootPlantManipulatorCallback;
-    return typeInfo;
-  }
-
-  /**
    * Address: 0x0062FC70 (FUN_0062FC70, ??1IAniManipulator@Moho@@UAE@XZ)
    */
   IAniManipulator::~IAniManipulator()

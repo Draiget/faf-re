@@ -1185,10 +1185,6 @@ extern "C" void faf_lua51_gc_barrier_value(
 	IncrBarrierValue(L, object, value);
 }
 
-extern "C" bool faf_lua51_gc_is_active(global_State* const g)
-{
-	return Active(g);
-}
 
 extern "C" void faf_lua51_gc_mark_object(global_State* const g, GCObject* const object)
 {

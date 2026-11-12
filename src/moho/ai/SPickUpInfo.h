@@ -97,12 +97,4 @@ namespace moho
 
 namespace gpg
 {
-  /**
-   * Address: 0x00628090 (FUN_00628090)
-   *
-   * What it does:
-   * Wrapper lane that materializes one temporary `RRef_SPickUpInfo` and
-   * copies object/type fields into the destination reference record.
-   */
-  gpg::RRef* AssignSPickUpInfoRef(gpg::RRef* outRef, moho::SPickUpInfo* value);
 } // namespace gpg

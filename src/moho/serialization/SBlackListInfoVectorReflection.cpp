@@ -116,28 +116,6 @@ gpg::RRef* gpg::RRef_SBlackListInfo(
   return outRef;
 }
 
-/**
- * Address: 0x006DDA30 (FUN_006DDA30)
- *
- * What it does:
- * Packs one `RRef_SBlackListInfo` lane into caller-owned output storage.
- */
-[[maybe_unused]] gpg::RRef* gpg::PackRRef_SBlackListInfo(
-  gpg::RRef* const outRef,
-  moho::SBlackListInfo* const value
-)
-{
-  if (!outRef) {
-    return nullptr;
-  }
-
-  gpg::RRef tmp{};
-  (void)gpg::RRef_SBlackListInfo(&tmp, value);
-  outRef->mObj = tmp.mObj;
-  outRef->mType = tmp.mType;
-  return outRef;
-}
-
 gpg::RVectorType<moho::SBlackListInfo>::~RVectorType() = default;
 
 /**

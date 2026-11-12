@@ -128,16 +128,6 @@ namespace moho
      */
     void OrthoNormalize();
 
-    /**
-     * Address: 0x004EC850 (FUN_004EC850, ?IsNormal@VAxes3@Moho@@QBE_NXZ)
-     * Mangled: ?IsNormal@VAxes3@Moho@@QBE_NXZ
-     *
-     * What it does:
-     * Verifies all basis lanes are unit-length and confirms `vX` matches the
-     * reconstructed `vZ x vY` lane within epsilon.
-     */
-    [[nodiscard]] bool IsNormal() const;
-
     Wm3::Vector3f vX; // +0x00
     Wm3::Vector3f vY; // +0x0C
     Wm3::Vector3f vZ; // +0x18
@@ -393,24 +383,6 @@ namespace moho
    * product collapses.
    */
   void VEC_LookAt(const Wm3::Vector3f& up, const Wm3::Vector3f& forward, VAxes3* axes);
-
-  /**
-   * Address: 0x0050B650 (FUN_0050B650, ?COORDS_LookAt@Moho@@YAXABV?$Vector3@M@Wm3@@PAVVAxes3@1@@Z)
-   *
-   * What it does:
-   * Builds look-at axes using world-up `(0,1,0)` and the supplied forward
-   * direction.
-   */
-  void COORDS_LookAt(const Wm3::Vector3f& forward, VAxes3* axes);
-
-  /**
-   * Address: 0x0050B680 (FUN_0050B680, ?COORDS_LookAtXZ@Moho@@YAXABV?$Vector3@M@Wm3@@PAVVAxes3@1@@Z)
-   *
-   * What it does:
-   * Builds an XZ-plane-aligned basis from one direction vector without
-   * normalizing the projected axes.
-   */
-  VAxes3* COORDS_LookAtXZ(VAxes3* outAxes, const Wm3::Vector3f& direction);
 
   class VMatrix4TypeInfo final : public gpg::RType
   {

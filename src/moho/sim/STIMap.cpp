@@ -2130,23 +2130,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00478010 (FUN_00478010, Moho::CHeightField::CopyHeightsRectFrom)
-   *
-   * What it does:
-   * Copies a source-field rectangle using source row stride and forwards to the
-   * raw setter path.
-   */
-  void CHeightField::CopyHeightsRectFrom(
-    const CHeightField* const sourceField,
-    const gpg::Rect2i& rect
-  )
-  {
-    const std::int32_t sourceRowStride = sourceField->width;
-    const std::uint16_t* const sourceData = sourceField->data + (rect.x0 + sourceRowStride * rect.z0);
-    SetElevationRectRaw(rect, sourceData, sourceRowStride);
-  }
-
-  /**
    * Address: 0x00478040 (FUN_00478040, Moho::CHeightField::Rescale)
    *
    * What it does:
@@ -3419,49 +3402,6 @@ namespace moho
     const std::int32_t z = static_cast<std::int32_t>(position.z);
     const std::int32_t x = static_cast<std::int32_t>(position.x);
     return x >= mPlayableRect.x0 && x < mPlayableRect.x1 && z >= mPlayableRect.z0 && z < mPlayableRect.z1;
-  }
-
-  /**
-   * Address: 0x0086DA90 (FUN_0086DA90)
-   *
-   * IDA signature:
-   * double __usercall sub_86DA90@<st0>(Moho::IWldTerrainRes *terrainRes@<eax>, float x, float z);
-   *
-   * What it does:
-   * Samples the terrain elevation at world `(x,z)` through the terrain
-   * resource's map: `[terrainRes+0x04]` is `IWldTerrainRes::mMap`, whose
-   * first word is `STIMap::mHeightField`'s pointer, handed straight to
-   * `CHeightField::GetElevation` (0x0044FB90). The binary performs no null
-   * checks on either hop.
-   */
-  double QueryTerrainResElevation(
-    const IWldTerrainRes* const terrainRes,
-    const float x,
-    const float z
-  ) noexcept
-  {
-    return static_cast<double>(terrainRes->mMap->mHeightField->GetElevation(x, z));
-  }
-
-  /**
-   * Address: 0x0050AC60 (FUN_0050AC60)
-   *
-   * What it does:
-   * Computes one top-left short-coordinate lane from center `(x,z)` and
-   * integral rectangle `{width,height}` by subtracting half-extents.
-   */
-  std::int16_t* BuildTopLeftShortCoordsFromCenter(
-    std::int16_t* const outCoordsXY,
-    const float* const centerXZ,
-    const int width,
-    const int height
-  ) noexcept
-  {
-    const int y = static_cast<int>(std::lrintf(centerXZ[1] - static_cast<float>(height) * 0.5f));
-    const int x = static_cast<int>(std::lrintf(centerXZ[0] - static_cast<float>(width) * 0.5f));
-    outCoordsXY[0] = static_cast<std::int16_t>(x);
-    outCoordsXY[1] = static_cast<std::int16_t>(y);
-    return outCoordsXY;
   }
 
   /**

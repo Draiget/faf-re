@@ -390,38 +390,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0061A1A0 (FUN_0061A1A0)
-   *
-   * What it does:
-   * Serializer-save thunk lane forwarding one `(task, archive)` pair into
-   * `CUnitMoveTask::MemberSerialize`.
-   */
-  [[maybe_unused]] void CUnitMoveTaskMemberSerializeThunk(
-    const CUnitMoveTask* const task,
-    gpg::WriteArchive* const archive
-  )
-  {
-    if (task != nullptr) {
-      task->MemberSerialize(archive);
-    }
-  }
-
-  /**
-   * Address: 0x0061A3C0 (FUN_0061A3C0)
-   *
-   * What it does:
-   * Thin alias lane that forwards one `(task, archive)` pair into
-   * `CUnitMoveTask::MemberSerialize`.
-   */
-  void CUnitMoveTaskMemberSerializeAlias(
-    const CUnitMoveTask* const task,
-    gpg::WriteArchive* const archive
-  )
-  {
-    task->MemberSerialize(archive);
-  }
-
-  /**
    * Address: 0x00618A00 (FUN_00618A00, sub_618A00)
    *
    * What it does:
@@ -852,28 +820,6 @@ namespace gpg
     return gpg::WriteDerivedRef(outRef, value);
   }
 
-  /**
-   * Address: 0x0061A350 (FUN_0061A350)
-   *
-   * What it does:
-   * Wrapper lane that materializes one temporary `RRef_CUnitMoveTask` and
-   * copies object/type fields into the destination reference record.
-   */
-  gpg::RRef* AssignCUnitMoveTaskRef(
-    gpg::RRef* const outRef,
-    moho::CUnitMoveTask* const value
-  )
-  {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    gpg::RRef temporaryRef{};
-    (void)RRef_CUnitMoveTask(&temporaryRef, value);
-    outRef->mObj = temporaryRef.mObj;
-    outRef->mType = temporaryRef.mType;
-    return outRef;
-  }
 } // namespace gpg
 
 namespace

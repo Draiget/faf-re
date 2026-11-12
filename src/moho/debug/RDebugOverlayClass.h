@@ -63,12 +63,6 @@ namespace moho
      */
     void RegisterOverlayClass(const char* overlayDescription, const char* overlayToken);
 
-    /**
-     * Recovery helper:
-     * Compatibility wrapper for older callsites that only recovered token.
-     */
-    void RegisterOverlayClassToken(const char* overlayToken);
-
   public:
     // RTTI has `gpg::DListItem<RDebugOverlayClass>` as a base at +0x68, and
     // RType is 0x64 in the binary as well (its ctor 0x008DD950 stops at the

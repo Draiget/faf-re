@@ -2968,20 +2968,6 @@ void moho::CMauiEdit::MoveCaretLeft(
 }
 
 /**
- * Address: 0x00791270 (FUN_00791270, Moho::CMauiEdit::MoveCaretRight)
- *
- * What it does:
- * Moves caret right by `amount` UTF-8 characters through `SetCaretPosition`.
- */
-void moho::CMauiEdit::MoveCaretRight(
-  const int amount
-)
-{
-  const int caretPosition = mCaretPosition;
-  SetCaretPosition(caretPosition + amount);
-}
-
-/**
  * Address: 0x00791290 (FUN_00791290, Moho::CMauiEdit::MoveSelectionLeft)
  *
  * What it does:

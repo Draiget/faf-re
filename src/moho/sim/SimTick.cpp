@@ -1014,26 +1014,6 @@ bool Sim::IsSyncLogOn() const noexcept
   return recorder != nullptr && recorder->IsRecording();
 }
 
-/**
- * Address: 0x00748600 (FUN_00748600, ?GetBeatChecksum@Sim@Moho@@QBE_NVCSeqNo@2@AAUMD5Digest@gpg@@@Z)
- *
- * What it does:
- * Copies one retained beat checksum out of the 128-entry rolling ring when
- * the requested beat is still available.
- */
-bool Sim::GetBeatChecksum(
-  gpg::MD5Digest* const outChecksum,
-  const CSeqNo beat
-) const
-{
-  const int delta = static_cast<int>(beat) - static_cast<int>(mCurBeat);
-  if (delta + 128 < 0 || delta >= 0) {
-    return false;
-  }
-
-  *outChecksum = mSimHashes[static_cast<std::uint32_t>(beat) & 0x7Fu];
-  return true;
-}
 namespace
 {
   // Engine addition, not in the binary: the recon phase of AdvanceBeat on CSimWorkerPool.

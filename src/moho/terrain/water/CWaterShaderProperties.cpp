@@ -338,25 +338,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0089F8B0 (FUN_0089F8B0)
-   *
-   * What it does:
-   * Runs one deleting-destructor thunk for `CWaterShaderProperties`, forwarding
-   * through non-deleting teardown and optional storage release.
-   */
-  [[nodiscard]] CWaterShaderProperties* DestroyWaterShaderPropertiesDeleting(
-    CWaterShaderProperties* const properties,
-    const unsigned char deleteFlag
-  )
-  {
-    properties->~CWaterShaderProperties();
-    if ((deleteFlag & 1u) != 0u) {
-      ::operator delete(static_cast<void*>(properties));
-    }
-    return properties;
-  }
-
-  /**
    * Address: 0x008A0740 (FUN_008A0740)
    * Mangled: ?releaseTextures@CWaterShaderProperties@Moho@@QAEXXZ
    *

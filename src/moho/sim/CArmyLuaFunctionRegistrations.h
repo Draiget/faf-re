@@ -64,17 +64,6 @@ namespace moho
   std::uint32_t GetArmyColor(int idx);
 
   /**
-   * Address: 0x00506A30 (FUN_00506A30,
-   * ?GetPlayerColorName@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@H@Z)
-   *
-   * int idx
-   *
-   * What it does:
-   * Returns one player-color token string from the game color table.
-   */
-  fa::string GetPlayerColorName(int idx);
-
-  /**
    * Address: 0x00506B20 (FUN_00506B20, ?GetPlayerColorCount@Moho@@YAIXZ)
    *
    * What it does:
@@ -228,28 +217,12 @@ namespace moho
   CScrLuaInitForm* func_SetArmyOutOfGame_LuaFuncDef();
 
   /**
-   * Address: 0x00BD9D00 (FUN_00BD9D00, j_func_ListArmies_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_ListArmies_LuaFuncDef` to `func_ListArmies_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_ListArmies_LuaFuncDef();
-
-  /**
    * Address: 0x00BD9D10 (FUN_00BD9D10, register_GetArmyBrain_LuaFuncDef)
    *
    * What it does:
    * Forwards `register_GetArmyBrain_LuaFuncDef` to `func_GetArmyBrain_LuaFuncDef`.
    */
   CScrLuaInitForm* register_GetArmyBrain_LuaFuncDef();
-
-  /**
-   * Address: 0x00BD9D20 (FUN_00BD9D20, j_func_SetArmyStart_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_SetArmyStart_LuaFuncDef` to `func_SetArmyStart_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_SetArmyStart_LuaFuncDef();
 
   /**
    * Address: 0x00BD9D30 (FUN_00BD9D30, register_GenerateArmyStart_LuaFuncDef)
@@ -292,22 +265,6 @@ namespace moho
   CScrLuaInitForm* register_ArmyGetHandicap_LuaFuncDef();
 
   /**
-   * Address: 0x00BD9D80 (FUN_00BD9D80, j_func_SetArmyEconomy_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_SetArmyEconomy_LuaFuncDef` to `func_SetArmyEconomy_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_SetArmyEconomy_LuaFuncDef();
-
-  /**
-   * Address: 0x00BD9D90 (FUN_00BD9D90, j_func_GetArmyUnitCostTotal_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_GetArmyUnitCostTotal_LuaFuncDef` to `func_GetArmyUnitCostTotal_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_GetArmyUnitCostTotal_LuaFuncDef();
-
-  /**
    * Address: 0x00BD9DA0 (FUN_00BD9DA0, register_GetArmyUnitCap_LuaFuncDef)
    *
    * What it does:
@@ -330,14 +287,6 @@ namespace moho
    * Forwards `register_SetIgnoreArmyUnitCap_LuaFuncDef` to `func_SetIgnoreArmyUnitCap_LuaFuncDef`.
    */
   CScrLuaInitForm* register_SetIgnoreArmyUnitCap_LuaFuncDef();
-
-  /**
-   * Address: 0x00BD9DD0 (FUN_00BD9DD0, j_func_SetIgnorePlayableRect_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_SetIgnorePlayableRect_LuaFuncDef` to `func_SetIgnorePlayableRect_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_SetIgnorePlayableRect_LuaFuncDef();
 
   /**
    * Address: 0x00BD9DE0 (FUN_00BD9DE0, register_CreateInitialArmyUnit_LuaFuncDef)
@@ -364,22 +313,6 @@ namespace moho
   CScrLuaInitForm* register_SetAllianceOneWay_LuaFuncDef();
 
   /**
-   * Address: 0x00BD9E10 (FUN_00BD9E10, j_func_SetAlliedVictory_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_SetAlliedVictory_LuaFuncDef` to `func_SetAlliedVictory_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_SetAlliedVictory_LuaFuncDef();
-
-  /**
-   * Address: 0x00BD9E20 (FUN_00BD9E20, j_func_IsAllySim_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_IsAllySim_LuaFuncDef` to `func_IsAllySim_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_IsAllySim_LuaFuncDef();
-
-  /**
    * Address: 0x00BD9E30 (FUN_00BD9E30, register_IsEnemySim_LuaFuncDef)
    *
    * What it does:
@@ -396,22 +329,6 @@ namespace moho
   CScrLuaInitForm* register_IsNeutralSim_LuaFuncDef();
 
   /**
-   * Address: 0x00BD9E50 (FUN_00BD9E50, j_func_ArmyIsCivilian_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_ArmyIsCivilian_LuaFuncDef` to `func_ArmyIsCivilian_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_ArmyIsCivilian_LuaFuncDef();
-
-  /**
-   * Address: 0x00BD9E60 (FUN_00BD9E60, j_func_SetArmyColorIndex_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_SetArmyColorIndex_LuaFuncDef` to `func_SetArmyColorIndex_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_SetArmyColorIndex_LuaFuncDef();
-
-  /**
    * Address: 0x00BD9E70 (FUN_00BD9E70, register_SetArmyFactionIndex_LuaFuncDef)
    *
    * What it does:
@@ -420,28 +337,12 @@ namespace moho
   CScrLuaInitForm* register_SetArmyFactionIndex_LuaFuncDef();
 
   /**
-   * Address: 0x00BD9E80 (FUN_00BD9E80, j_func_SetArmyAIPersonality_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_SetArmyAIPersonality_LuaFuncDef` to `func_SetArmyAIPersonality_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_SetArmyAIPersonality_LuaFuncDef();
-
-  /**
    * Address: 0x00BD9E90 (FUN_00BD9E90, register_SetArmyColor_LuaFuncDef)
    *
    * What it does:
    * Forwards `register_SetArmyColor_LuaFuncDef` to `func_SetArmyColor_LuaFuncDef`.
    */
   CScrLuaInitForm* register_SetArmyColor_LuaFuncDef();
-
-  /**
-   * Address: 0x00BD9F10 (FUN_00BD9F10, j_func_SetArmyShowScore_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_SetArmyShowScore_LuaFuncDef` to `func_SetArmyShowScore_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_SetArmyShowScore_LuaFuncDef();
 
   /**
    * Address: 0x00BD9F20 (FUN_00BD9F20, register_AddBuildRestriction_LuaFuncDef)
@@ -458,14 +359,6 @@ namespace moho
    * Forwards `register_RemoveBuildRestriction_LuaFuncDef` to `func_RemoveBuildRestriction_LuaFuncDef`.
    */
   CScrLuaInitForm* register_RemoveBuildRestriction_LuaFuncDef();
-
-  /**
-   * Address: 0x00BD9F40 (FUN_00BD9F40, j_func_OkayToMessWithArmy_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards `j_func_OkayToMessWithArmy_LuaFuncDef` to `func_OkayToMessWithArmy_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_OkayToMessWithArmy_LuaFuncDef();
 
   /**
    * Address: 0x00BD9F50 (FUN_00BD9F50, register_ArmyIsOutOfGame_LuaFuncDef)

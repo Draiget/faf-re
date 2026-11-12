@@ -2054,28 +2054,6 @@ namespace gpg
     return gpg::WriteDerivedRef(outRef, value, &CachedCAimManipulatorType);
   }
 
-  /**
-   * Address: 0x006333C0 (FUN_006333C0)
-   *
-   * What it does:
-   * Wrapper lane that materializes one temporary `RRef_CAimManipulator` and
-   * copies object/type fields into the destination reference record.
-   */
-  [[maybe_unused]] gpg::RRef* AssignCAimManipulatorRef(
-    gpg::RRef* const outRef,
-    moho::CAimManipulator* const value
-  )
-  {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    gpg::RRef tmp{};
-    (void)RRef_CAimManipulator(&tmp, value);
-    outRef->mObj = tmp.mObj;
-    outRef->mType = tmp.mType;
-    return outRef;
-  }
 } // namespace gpg
 
 namespace

@@ -680,22 +680,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x007D7050 (FUN_007D7050, ?UpdateRegion@Clutter@Moho@@AAEXPBVGeomCamera3@2@PAVRegion@12@@Z)
-   *
-   * What it does:
-   * Binds each mesh instance in the region to the supplied camera.
-   */
-  void Clutter::UpdateRegion(
-    const GeomCamera3* const camera,
-    ClutterRegion* const region
-  )
-  {
-    for (void* const entry : region->mMap) {
-      static_cast<MeshInstance*>(entry)->visibilityCamera = camera;
-    }
-  }
-
-  /**
    * Address: 0x007D64D0 (FUN_007D64D0, ?IsCluttered@Clutter@Moho@@AAE_NHH@Z)
    *
    * What it does:

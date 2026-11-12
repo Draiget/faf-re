@@ -870,14 +870,6 @@ namespace moho
   static_assert(sizeof(CD3DDevice) == 0x26C, "CD3DDevice size must be 0x26C");
 
   /**
-   * Address: 0x00430900 (FUN_00430900, ?D3D_Init@Moho@@YA_NXZ)
-   *
-   * What it does:
-   * Runs render bootstrap initialization and reports success.
-   */
-  bool D3D_Init();
-
-  /**
    * Address: 0x00430910 (FUN_00430910, ?D3D_Exit@Moho@@YAXXZ)
    *
    * What it does:

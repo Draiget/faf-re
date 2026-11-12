@@ -364,16 +364,6 @@ namespace moho
   CAnimationManipulator* SCR_FromLua_CAnimationManipulator(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state);
 
   /**
-   * Address: 0x00645560 (FUN_00645560, Moho::SCR_FromLua_CRotateManipulator)
-   *
-   * What it does:
-   * Converts one Lua `_c_object` payload to `CRotateManipulator*` and raises
-   * Lua errors for missing, destroyed, or type-mismatched game objects.
-   */
-  [[nodiscard]]
-  CRotateManipulator* SCR_FromLua_CRotateManipulator(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state);
-
-  /**
    * Address: 0x00646900 (FUN_00646900, Moho::SCR_FromLua_CSlaveManipulator)
    *
    * What it does:

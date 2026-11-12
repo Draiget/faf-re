@@ -1535,15 +1535,6 @@ namespace boost
   }
 
   /**
-   * Address: 0x007FBE60 (FUN_007FBE60, boost::detail::sp_counted_impl_p<Moho::IRenTerrain>::dispose)
-   *
-   * What it does:
-   * Releases one owned `IRenTerrain` pointee through its scalar-deleting
-   * virtual destructor lane when present.
-   */
-  void SpCountedImplPDisposeIRenTerrain(SpCountedImplStorage<moho::IRenTerrain>* countedImpl) noexcept;
-
-  /**
 
   / **
 

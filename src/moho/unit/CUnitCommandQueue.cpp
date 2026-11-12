@@ -612,45 +612,6 @@ void CUnitCommandQueue::AbortActiveTask()
 }
 
 /**
- * Address: 0x006EE3C0 (FUN_006EE3C0, ?SetCommandCount@CUnitCommandQueue@Moho@@QAEXII@Z)
- *
- * What it does:
- * Sets queued-command count data for one slot, marks command dirty state, and
- * applies zero-count head/removal transitions.
- */
-void CUnitCommandQueue::SetCommandCount(
-  const unsigned int index,
-  const unsigned int count
-)
-{
-  CUnitCommand* const command = GetCommandInQueue(index);
-  if (!command) {
-    mNeedsRefresh = true;
-    return;
-  }
-
-  command->mVarDat.mCount = static_cast<std::int32_t>(count);
-  command->mNeedsUpdate = true;
-
-  if (index == 0u) {
-    if (count == 0u) {
-      AbortActiveTask();
-    }
-    mNeedsRefresh = true;
-    return;
-  }
-
-  if (count == 0u) {
-    CUnitCommandQueue* const ownerQueue = (mUnit != nullptr) ? mUnit->CommandQueue : this;
-    if (ownerQueue != nullptr) {
-      (void)ownerQueue->RemoveCommandFromQueue(index);
-    }
-  }
-
-  mNeedsRefresh = true;
-}
-
-/**
  * Address: 0x006EE430 (FUN_006EE430)
  *
  * IDA signature:
@@ -704,15 +665,4 @@ void CUnitCommandQueue::SetCommandTarget(
   (void)targetPayload.UpdateTarget(targetEntity);
   command->SetTarget(targetPayload);
   mNeedsRefresh = true;
-}
-
-/**
- * Address: 0x006A4DD0 (FUN_006A4DD0)
- *
- * What it does:
- * Returns whether this queue has a pending refresh lane.
- */
-bool CUnitCommandQueue::IsRefreshPending() const
-{
-  return mNeedsRefresh;
 }

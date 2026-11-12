@@ -114,12 +114,4 @@ namespace moho
 
 namespace gpg
 {
-  /**
-   * Address: 0x006224D0 (FUN_006224D0, gpg::RRef_CUnitRefuel)
-   *
-   * What it does:
-   * Builds one typed reflection reference for `moho::CUnitRefuel*`,
-   * preserving dynamic-derived ownership and base-offset adjustment.
-   */
-  gpg::RRef* RRef_CUnitRefuel(gpg::RRef* outRef, moho::CUnitRefuel* value);
 } // namespace gpg

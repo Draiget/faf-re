@@ -242,21 +242,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00608050 (FUN_00608050)
-   *
-   * What it does:
-   * Preserves one jump-thunk deserialize adapter lane that tail-forwards into
-   * `CUnitCarrierLand::MemberDeserialize`.
-   */
-  [[maybe_unused]] void CUnitCarrierLandMemberDeserializeAdapterLaneB(
-    CUnitCarrierLand* const task,
-    gpg::ReadArchive* const archive
-  )
-  {
-    task->MemberDeserialize(archive);
-  }
-
-  /**
    * Address: 0x00BD0260 (FUN_00BD0260, register_CUnitCarrierLandTypeInfo)
    */
   void register_CUnitCarrierLandTypeInfo()

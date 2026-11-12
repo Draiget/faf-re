@@ -1,50 +1,6 @@
 // Part of Unit.cpp, included there: consumption, production and weak references.
 
 /**
- * Address: 0x006AAE20 (FUN_006AAE20, Moho::Unit::GetConsumptionRequest)
- *
- * What it does:
- * Returns the requested per-tick consumption pair from `mConsumptionData`.
- */
-SEconValue Unit::GetConsumptionRequest() const
-{
-  SEconValue request{};
-  request.energy = mConsumptionData->mRequested.energy;
-  request.mass = mConsumptionData->mRequested.mass;
-  return request;
-}
-
-/**
- * Address: 0x006AAE40 (FUN_006AAE40, Moho::Unit::UpdateResourceProduction)
- *
- * What it does:
- * Stores one economy-rate pair in the shared runtime production lane.
- */
-void Unit::UpdateResourceProduction(
-  const SEconValue& resourceProduction
-)
-{
-  mUnitVarDat.mMaintainenceCost.ENERGY = resourceProduction.energy;
-  mUnitVarDat.mMaintainenceCost.MASS = resourceProduction.mass;
-}
-
-/**
- * Address: 0x006ABC70 (FUN_006ABC70, ?ResetEconValues@Unit@Moho@@QAEXXZ)
- *
- * What it does:
- * Clears the unit's produced and resources-spent economy totals.
- */
-Unit* Unit::ResetEconValues()
-{
-  SSTIUnitVariableData& varDat = VarDat();
-  varDat.mResourcesSpent.ENERGY = 0.0f;
-  varDat.mResourcesSpent.MASS = 0.0f;
-  varDat.mProduced.ENERGY = 0.0f;
-  varDat.mProduced.MASS = 0.0f;
-  return this;
-}
-
-/**
  * Address: 0x006AA900 (FUN_006AA900, ?SetConsumptionActive@Unit@Moho@@QAEX_N@Z)
  *
  * What it does:
@@ -127,54 +83,6 @@ void Unit::SetProductionActive(
   (void)RunScript(isActive ? kUnitOnProductionActiveScript : kUnitOnProductionInactiveScript);
 }
 
-/**
- * Address: 0x006A9370 (FUN_006A9370, ?RenderAIDebugInfo@Unit@Moho@@AAEXXZ)
- *
- * What it does:
- * Emits per-unit AI debug stat counters under `AIDebug_<UniqueName>`,
- * including platoon metadata, idle marker, and active unit-state markers.
- */
-void Unit::RenderAIDebugInfo()
-{
-  if (!mDebugAIStates || ArmyRef == nullptr) {
-    return;
-  }
-
-  ArmyRef->UpdateAIDebugPlatoonStats(this);
-
-  CArmyStats* const armyStats = ArmyRef->GetArmyStats();
-  if (armyStats == nullptr) {
-    return;
-  }
-
-  const fa::string debugPrefix = fa::string("AIDebug_") + GetUniqueName();
-  const fa::string unitStatePrefix = debugPrefix + "_UnitStates";
-
-  const CUnitCommand* headCommand = nullptr;
-  if (CommandQueue != nullptr && !CommandQueue->mCommandVec.empty()) {
-    headCommand = CommandQueue->mCommandVec.begin()->GetObjectPtr();
-  }
-
-  if (headCommand == nullptr) {
-    IncrementAIDebugStateStat(armyStats, unitStatePrefix + "_Idle");
-  }
-
-  for (std::int32_t stateValue = static_cast<std::int32_t>(UNITSTATE_Immobile);
-       stateValue <= static_cast<std::int32_t>(UNITSTATE_SiloBuildingAmmo);
-       ++stateValue) {
-    const EUnitState state = static_cast<EUnitState>(stateValue);
-    if (!IsUnitState(state)) {
-      continue;
-    }
-
-    const char* const stateLexical = UnitStateToDebugLexical(state);
-    if (stateLexical == nullptr || stateLexical[0] == '\0') {
-      continue;
-    }
-
-    IncrementAIDebugStateStat(armyStats, unitStatePrefix + "_" + stateLexical);
-  }
-}
 namespace
 {
   /**

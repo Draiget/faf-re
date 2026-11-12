@@ -58,16 +58,6 @@ namespace moho
   );
 
   /**
-   * Address: 0x004D2380 (FUN_004D2380, ?SCR_ExpectArgs@Moho@@YAXPAVLuaState@LuaPlus@@HHPBD@Z)
-   *
-   * What it does:
-   * Validates Lua argument count in `[minArgs, maxArgs]` (or `>= minArgs`
-   * when `maxArgs == -1`) and raises LuaState::Error with `helpText` on
-   * mismatch.
-   */
-  void SCR_ExpectArgs(LuaPlus::LuaState* state, int maxArgs, int minArgs, const char* helpText);
-
-  /**
    * Engine addition: the exact-count check the binary inlines into its Lua
    * bindings. SCR_ExpectArgs isn't the same check, its message says "between".
    *
@@ -85,16 +75,6 @@ namespace moho
    * Serializes one Lua object with SCR byte-stream encoding and returns the raw encoded bytes as `fa::string`.
    */
   [[nodiscard]] fa::string SCR_ToString(const LuaPlus::LuaObject& object);
-
-  /**
-   * Address: 0x004D31D0 (FUN_004D31D0, ?SCR_ToBool@Moho@@YA_NABVLuaObject@LuaPlus@@@Z)
-   *
-   * What it does:
-   * Converts one Lua object to bool using Moho script semantics:
-   * numeric non-zero is true; case-insensitive string `"true"`, `"on"`, or
-   * `"yes"` is true; every other value is false.
-   */
-  [[nodiscard]] bool SCR_ToBool(const LuaPlus::LuaObject& object);
 
   /**
    * Address: 0x004D26D0 (FUN_004D26D0, ?SCR_Copy@Moho@@YA?AVLuaObject@LuaPlus@@ABV23@PAVLuaState@3@@Z)
@@ -142,15 +122,6 @@ namespace moho
    * reflected fields.
    */
   void SCR_RObjectToLuaMerge(const gpg::RRef& source, LuaPlus::LuaObject& destination);
-
-  /**
-   * Address: 0x004CF4A0 (FUN_004CF4A0, ?SCR_RObjectToLua@Moho@@...)
-   *
-   * What it does:
-   * Builds one Lua object initialized as `nil` and merges a reflected source
-   * reference into it.
-   */
-  [[nodiscard]] LuaPlus::LuaObject SCR_RObjectToLua(const gpg::RRef& source, LuaPlus::LuaState* state);
 
   /**
    * Address: 0x004CF510 (FUN_004CF510, ?SCR_LuaBuildObject@Moho@@YA_NVLuaObject@LuaPlus@@ABVRRef@gpg@@_N@Z)

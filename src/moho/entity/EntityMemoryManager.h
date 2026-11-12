@@ -33,8 +33,6 @@ namespace moho
 
     // Diagnostic accessors
     [[nodiscard]] std::size_t GetTotalAllocatedCount() const noexcept;
-    [[nodiscard]] std::size_t GetTotalActiveSlabs() const noexcept;
-    [[nodiscard]] std::size_t GetTotalCachedEmptySlabs() const noexcept;
 
   private:
     EntityMemoryManager();

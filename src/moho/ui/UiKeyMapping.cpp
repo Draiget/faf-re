@@ -447,31 +447,6 @@ moho::CScrLuaInitForm* moho::func_IN_ClearKeyMap_LuaFuncDef()
 }
 
 /**
- * Address: 0x00838F30 (FUN_00838F30, Moho::IN_FindKeyNameIndex)
- *
- * What it does:
- * Case-sensitive linear scan of `in_keyNames` for one key name; returns the
- * matching wxKeyCode (0..255) or -1 when no slot matches. Mirrors the binary's
- * MSVC8 `std::string::compare(0, _Mysize, needlePtr, needleSize)` per-slot
- * equality test which returns 0 on match.
- */
-int moho::IN_FindKeyNameIndex(
-  const fa::string& needle
-)
-{
-  const char* const needlePtr = needle.c_str();
-  const std::size_t needleSize = needle.size();
-
-  for (int index = 0; index < 256; ++index) {
-    const fa::string& slot = in_keyNames[index];
-    if (slot.compare(0u, slot.size(), needlePtr, needleSize) == 0) {
-      return index;
-    }
-  }
-  return -1;
-}
-
-/**
  * Address: 0x00838F80 (FUN_00838F80, Moho::IN_FindKeyNameIndexCi)
  *
  * What it does:

@@ -1137,18 +1137,6 @@ moho::CScrLuaInitForm* moho::func_SavePreferences_LuaFuncDef()
 }
 
 /**
- * Address: 0x00BE8BF0 (FUN_00BE8BF0, register_SavePreferences_LuaFuncDef)
- *
- * What it does:
- * Startup thunk that forwards registration to
- * `func_SavePreferences_LuaFuncDef`.
- */
-moho::CScrLuaInitForm* moho::register_SavePreferences_LuaFuncDef()
-{
-  return func_SavePreferences_LuaFuncDef();
-}
-
-/**
  * Address: 0x008CAEA0 (FUN_008CAEA0, cfunc_DebugFacilitiesEnabled)
  *
  * What it does:
@@ -1180,18 +1168,6 @@ moho::CScrLuaInitForm* moho::func_DebugFacilitiesEnabled_LuaFuncDef()
     kDebugFacilitiesEnabledHelpText
   );
   return &binder;
-}
-
-/**
- * Address: 0x00BE8CE0 (FUN_00BE8CE0, j_func_DebugFacilitiesEnabled_LuaFuncDef)
- *
- * What it does:
- * Startup thunk that forwards registration to
- * `func_DebugFacilitiesEnabled_LuaFuncDef`.
- */
-moho::CScrLuaInitForm* moho::j_func_DebugFacilitiesEnabled_LuaFuncDef()
-{
-  return func_DebugFacilitiesEnabled_LuaFuncDef();
 }
 
 /**
@@ -2013,31 +1989,6 @@ std::int32_t moho::OPTIONS_GetInt(
 }
 
 /**
- * Address: 0x008C69A0 (FUN_008C69A0)
- * Mangled: ?OPTIONS_GetFloat@Moho@@YAMVStrArg@gpg@@@Z
- *
- * What it does:
- * Invokes `/lua/user/prefs.lua:GetOption(key)` and returns the resulting Lua
- * value as one floating-point lane.
- */
-float moho::OPTIONS_GetFloat(
-  const gpg::StrArg key
-)
-{
-  try {
-    LuaPlus::LuaState* const state = USER_GetLuaState();
-    LuaPlus::LuaObject prefsModule = SCR_Import(state, kUserPrefsModulePath);
-    LuaPlus::LuaObject getOptionFnObject = prefsModule[kGetOptionMethodName];
-    LuaPlus::LuaFunction<LuaPlus::LuaObject> getOptionFn(getOptionFnObject);
-    LuaPlus::LuaObject optionValue = getOptionFn(key);
-    return optionValue.GetNumber();
-  } catch (const std::exception& exception) {
-    gpg::Warnf(kUserPrefsGetOptionLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
-    return 0.0f;
-  }
-}
-
-/**
  * Address: 0x008C6AB0 (FUN_008C6AB0)
  * Mangled:
  * ?OPTIONS_GetString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@VStrArg@gpg@@@Z
@@ -2159,38 +2110,6 @@ void moho::OPTIONS_SetCustomData(
     (void)callResult;
   } catch (const std::exception& exception) {
     gpg::Warnf(kOptionsSetCustomDataLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
-  }
-}
-
-/**
- * Address: 0x008C6EC0 (FUN_008C6EC0)
- * Mangled: ?OPTIONS_CreateInitialProfileIfNeeded@Moho@@YAXVStrArg@gpg@@@Z
- *
- * What it does:
- * Executes `/lua/user/prefs.lua` profile bootstrap:
- * - `ProfilesExist()`
- * - `CreateProfile(profileName)` when profiles are missing.
- */
-void moho::OPTIONS_CreateInitialProfileIfNeeded(
-  const gpg::StrArg profileName
-)
-{
-  try {
-    LuaPlus::LuaState* const state = USER_GetLuaState();
-    LuaPlus::LuaObject prefsModule = SCR_Import(state, kUserPrefsModulePath);
-    LuaPlus::LuaObject profilesExistFnObject = prefsModule[kProfilesExistMethodName];
-    LuaPlus::LuaFunction<LuaPlus::LuaObject> profilesExistFn(profilesExistFnObject);
-    LuaPlus::LuaObject profilesExistResult = profilesExistFn();
-
-    if (!profilesExistResult.GetBoolean()) {
-      prefsModule = SCR_Import(state, kUserPrefsModulePath);
-      LuaPlus::LuaObject createProfileFnObject = prefsModule[kCreateProfileMethodName];
-      LuaPlus::LuaFunction<LuaPlus::LuaObject> createProfileFn(createProfileFnObject);
-      LuaPlus::LuaObject createProfileResult = createProfileFn(profileName);
-      (void)createProfileResult;
-    }
-  } catch (const std::exception& exception) {
-    gpg::Warnf(kUserPrefsLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
   }
 }
 

@@ -1097,16 +1097,6 @@ namespace moho
   using UserUnitGetMissileInfo_LuaFuncDef = ::moho::CScrLuaBinder;
 
   /**
-   * Address: 0x008C1430 (FUN_008C1430,
-   * ?USERUNIT_CanOccupy@Moho@@YA_NAAVCWldSession@1@ABUSFootprint@1@AAUSOCellPos@1@@Z)
-   *
-   * What it does:
-   * Validates one build footprint origin against map bounds and rejects
-   * placement when it strictly overlaps a visible non-mobile unit footprint.
-   */
-  bool USERUNIT_CanOccupy(CWldSession& session, const SFootprint& footprint, SOCellPos& position);
-
-  /**
    * Address: 0x008C1880 (FUN_008C1880,
    * ?USERUNIT_CanBeBuiltAt@Moho@@YA_NAAVCWldSession@1@PBVRUnitBlueprint@1@ABUSCoordsVec2@1@_NPAUSBuildInfo@1@PBVUserCommand@1@@Z)
    *
@@ -1154,17 +1144,6 @@ namespace moho
     const RUnitBlueprint* buildBlueprint,
     const SCoordsVec2& buildPosition
   );
-
-  /**
-   * Address: 0x008C1C30 (FUN_008C1C30,
-   * ?USERUNIT_GetBounds@Moho@@YA?AV?$AxisAlignedBox3@M@Wm3@@PBVRUnitBlueprint@1@ABV?$Vector3@M@3@@Z)
-   *
-   * What it does:
-   * Builds one world-space unit bounds AABB from blueprint collision/skirt
-   * lanes and one world position sample.
-   */
-  [[nodiscard]] Wm3::AxisAlignedBox3f
-  USERUNIT_GetBounds(const RUnitBlueprint* unitBlueprint, const Wm3::Vector3f& worldPosition);
 
   /**
    * Address: 0x008377E0 (FUN_008377E0, func_GetUserUnitOpt)

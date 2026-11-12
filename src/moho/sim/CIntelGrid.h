@@ -227,14 +227,6 @@ namespace moho
     void SubtractCircle(const Wm3::Vec3f& position, std::uint32_t radius);
 
     /**
-     * Address: 0x005076B0 (FUN_005076B0, ?DelayedSubtractCircle@CIntelGrid@Moho@@QAEXABV?$Vector3@M@Wm3@@I@Z)
-     *
-     * What it does:
-     * Queues delayed subtraction update (30 ticks) for later processing.
-     */
-    void DelayedSubtractCircle(const Wm3::Vec3f& position, std::uint32_t radius);
-
-    /**
      * Address: 0x005077B0 (FUN_005077B0, ?Tick@CIntelGrid@Moho@@QAEXH@Z)
      *
      * What it does:

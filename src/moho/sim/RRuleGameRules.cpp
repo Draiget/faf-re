@@ -1103,29 +1103,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00529510 (FUN_00529510)
-   *
-   * What it does:
-   * Executes the scalar-deleting wrapper lane for `RRuleGameRulesImpl` by
-   * running the core destructor body and optionally releasing object storage.
-   */
-  RRuleGameRulesImpl* DestroyRRuleGameRulesImplWithDeleteFlag(
-    RRuleGameRulesImpl* const object,
-    const std::uint8_t deleteFlags
-  )
-  {
-    if (object == nullptr) {
-      return nullptr;
-    }
-
-    object->~RRuleGameRulesImpl();
-    if ((deleteFlags & 1u) != 0u) {
-      ::operator delete(static_cast<void*>(object));
-    }
-    return object;
-  }
-
-  /**
    * Address: 0x00529700 (FUN_00529700)
    *
    * What it does:
@@ -1839,47 +1816,6 @@ namespace moho
     context.Update(&meshCount, sizeof(meshCount));
   }
 
-  /**
-   * Address: 0x00511900 (FUN_00511900)
-   *
-   * What it does:
-   * Upcasts one reflected reference to `RRuleGameRules` using the secondary
-   * cache lane and returns the typed object pointer when compatible.
-   */
-  [[nodiscard]] RRuleGameRules* CastRRuleGameRulesFromRRefSecondary(
-    const gpg::RRef& source
-  )
-  {
-    gpg::RType* type = RRuleGameRules::sType2;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(RRuleGameRules));
-      RRuleGameRules::sType2 = type;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, type);
-    return static_cast<RRuleGameRules*>(upcast.mObj);
-  }
-
-  /**
-   * Address: 0x00537810 (FUN_00537810)
-   *
-   * What it does:
-   * Upcasts one reflected reference to `RRuleGameRules` using the primary
-   * cache lane and returns the typed object pointer when compatible.
-   */
-  [[nodiscard]] RRuleGameRules* CastRRuleGameRulesFromRRefPrimary(
-    const gpg::RRef& source
-  )
-  {
-    gpg::RType* type = RRuleGameRules::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(RRuleGameRules));
-      RRuleGameRules::sType = type;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, type);
-    return static_cast<RRuleGameRules*>(upcast.mObj);
-  }
 } // namespace moho
 
 namespace moho

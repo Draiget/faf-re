@@ -527,21 +527,6 @@ void Sim::RegisterEntitySet(
 }
 
 /**
- * Address: 0x007538C0 (FUN_007538C0, boost::shared_ptr_SParticleBuffer::shared_ptr_SParticleBuffer)
- *
- * What it does:
- * Constructs one `shared_ptr<SParticleBuffer>` from one raw particle-buffer
- * pointer lane.
- */
-boost::shared_ptr<SParticleBuffer>* ConstructSharedParticleBufferFromRaw(
-  boost::shared_ptr<SParticleBuffer>* const outBuffer,
-  SParticleBuffer* const buffer
-)
-{
-  return ::new (outBuffer) boost::shared_ptr<SParticleBuffer>(buffer);
-}
-
-/**
  * Address: 0x00751220 (FUN_00751220, boost::shared_ptr_SParticleBuffer::operator=)
  *
  * What it does:
@@ -555,23 +540,4 @@ boost::shared_ptr<SParticleBuffer>* AssignSharedParticleBufferFromRaw(
 {
   outBuffer->reset(buffer);
   return outBuffer;
-}
-
-/**
- * Address: 0x00743180 (FUN_00743180)
- *
- * What it does:
- * Copies one `shared_ptr<CHeightField>` lane and retains the control block.
- */
-boost::shared_ptr<CHeightField>* CopySharedHeightFieldPtr(
-  boost::shared_ptr<CHeightField>* const destination,
-  const boost::shared_ptr<CHeightField>* const source
-)
-{
-  if (destination == nullptr || source == nullptr) {
-    return destination;
-  }
-
-  *destination = *source;
-  return destination;
 }

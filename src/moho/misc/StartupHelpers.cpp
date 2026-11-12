@@ -1987,20 +1987,6 @@ void moho::USER_SetGameId()
 }
 
 /**
- * Address: 0x008CAE10 (FUN_008CAE10, USER_GetGameId)
- * Mangled: ?USER_GetGameId@Moho@@YAABU_GUID@@XZ
- *
- * What it does:
- * Returns the process-global 128-bit game-id lane initialized by startup
- * identity setup.
- */
-_GUID& moho::USER_GetGameId()
-{
-  APP_InitializeIdentity();
-  return *reinterpret_cast<_GUID*>(gAppIdentity.mGameIdParts);
-}
-
-/**
  * Address context:
  * - 0x008CE0A0 constructor path initializes these global identity lanes.
  *
@@ -2059,22 +2045,6 @@ void moho::APP_SetAqtimeInstrumentationMode(
   gAqtimeInstrumentationMode = mode;
 }
 
-std::uint8_t moho::APP_GetAqtimeInstrumentationMode()
-{
-  return gAqtimeInstrumentationMode;
-}
-
-/**
- * Address: 0x008C6730 (FUN_008C6730, USER_LuaFrame)
- *
- * What it does:
- * Runs one user-task stage frame through the process-global user stage lane.
- */
-void moho::USER_LuaFrame()
-{
-  sUserStage->UserFrame();
-}
-
 /**
  * Address: 0x0041B560 (FUN_0041B560)
  * Mangled:
@@ -2118,41 +2088,6 @@ bool moho::CFG_GetArgOption(
   }
 
   return false;
-}
-
-/**
- * Address: 0x00500A90 (FUN_00500A90, Moho::P4_Info)
- * Mangled: ?P4_Info@Moho@@YAXXZ
- *
- * What it does:
- * Preserves one legacy Perforce info hook as a no-op.
- */
-void moho::P4_Info() {}
-
-/**
- * Address: 0x00500AA0 (FUN_00500AA0, Moho::P4_Edit)
- * Mangled: ?P4_Edit@Moho@@YAXPBD@Z
- *
- * What it does:
- * Preserves one legacy Perforce edit hook as a no-op.
- */
-void moho::P4_Edit(
-  const char* const filePath
-)
-{
-  (void)filePath;
-}
-
-/**
- * Address: 0x00500AC0 (FUN_00500AC0, Moho::P4_DoPrompt)
- *
- * What it does:
- * Returns whether startup should prompt for Perforce actions. Passing `/p4yes`
- * on command line suppresses the prompt.
- */
-bool moho::P4_DoPrompt()
-{
-  return !CFG_GetArgOption("/p4yes", 0u, nullptr);
 }
 
 /**
@@ -2258,54 +2193,6 @@ moho::CScrLuaInitForm* moho::func_SHGetFolderPath_LuaFuncDef()
     UnsafeLuaInitSet(), "SHGetFolderPath", &moho::cfunc_SHGetFolderPath, nullptr, "<global>", kSHGetFolderPathHelpText
   );
   return &binder;
-}
-
-/**
- * Address: 0x00BC63D0 (FUN_00BC63D0, register_coreInitFormSet)
- *
- * What it does:
- * Links the core init-form set at the head of `CScrLuaInitFormSet::sSets`
- * and returns the previous head.
- */
-moho::CScrLuaInitFormSet* moho::register_coreInitFormSet()
-{
-  CScrLuaInitFormSet* const previousHead = CScrLuaInitFormSet::sSets;
-  CScrLuaInitFormSet& coreSet = moho::SCR_CoreLuaInitSet();
-  coreSet.mNextSet = previousHead;
-  CScrLuaInitFormSet::sSets = &coreSet;
-  return previousHead;
-}
-
-/**
- * Address: 0x00BC63F0 (FUN_00BC63F0, register_userInitFormSet)
- *
- * What it does:
- * Links the user init-form set at the head of `CScrLuaInitFormSet::sSets`
- * and returns the previous head.
- */
-moho::CScrLuaInitFormSet* moho::register_userInitFormSet()
-{
-  CScrLuaInitFormSet* const previousHead = CScrLuaInitFormSet::sSets;
-  CScrLuaInitFormSet& userSet = moho::SCR_UserLuaInitSet();
-  userSet.mNextSet = previousHead;
-  CScrLuaInitFormSet::sSets = &userSet;
-  return previousHead;
-}
-
-/**
- * Address: 0x00BC66E0 (FUN_00BC66E0, register_unsafeInitFormSet)
- *
- * What it does:
- * Links the unsafe init-form set at the head of `CScrLuaInitFormSet::sSets`
- * and returns the previous head.
- */
-moho::CScrLuaInitFormSet* moho::register_unsafeInitFormSet()
-{
-  CScrLuaInitFormSet* const previousHead = CScrLuaInitFormSet::sSets;
-  CScrLuaInitFormSet& unsafeSet = UnsafeLuaInitSet();
-  unsafeSet.mNextSet = previousHead;
-  CScrLuaInitFormSet::sSets = &unsafeSet;
-  return previousHead;
 }
 
 /**
@@ -3495,22 +3382,6 @@ namespace
 } // namespace
 
 /**
- * Address: 0x00457D40 (FUN_00457D40, sub_457D40)
- *
- * What it does:
- * Wraps startup path resolution with `(path, basePath)` parameter order used
- * by VFS/data-path setup callsites.
- */
-fa::string* moho::PATH_ResolveAgainstBase(
-  const fa::string& path,
-  const fa::string& basePath,
-  fa::string* const outPath
-)
-{
-  return ResolvePathAgainstBase(basePath, path, outPath);
-}
-
-/**
  * Address: 0x0046AE90 (FUN_0046AE90, sub_46AE90)
  * Address: 0x0046B4B0 (FUN_0046B4B0, sub_46B4B0)
  * Address: 0x0046BA60 (FUN_0046BA60, sub_46BA60)
@@ -4382,26 +4253,6 @@ std::filesystem::path moho::DISK_GetLaunchDir()
   // half of that was really gpg::STR_ToLower mapping ':' to 'Z' through a
   // signed range test - see the comment on that function.
   return std::filesystem::path(executablePathBuffer.data()).parent_path();
-}
-
-/**
- * Address: 0x0045A770 (FUN_0045A770)
- * Mangled: ?DISK_CreateFolder@Moho@@YA_NVStrArg@gpg@@@Z
- *
- * What it does:
- * Attempts to create one folder and stores wait-handle error text on failure.
- */
-bool moho::DISK_CreateFolder(
-  const gpg::StrArg sourcePath
-)
-{
-  const char* const folderPath = sourcePath != nullptr ? sourcePath : "";
-  if (_mkdir(folderPath) == 0) {
-    return true;
-  }
-
-  func_FWaitSetError(errno);
-  return false;
 }
 
 /**

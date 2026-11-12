@@ -1377,15 +1377,6 @@ namespace moho
   extern fa::string in_keyNames[256];
 
   /**
-   * Address: 0x00838F30 (FUN_00838F30, Moho::IN_FindKeyNameIndex)
-   *
-   * What it does:
-   * Case-sensitive linear scan of `in_keyNames` for one key name; returns the
-   * matching wxKeyCode (0..255) or -1 when no slot matches.
-   */
-  [[nodiscard]] int IN_FindKeyNameIndex(const fa::string& needle);
-
-  /**
    * Address: 0x00838F80 (FUN_00838F80, Moho::IN_FindKeyNameIndexCi)
    *
    * What it does:
@@ -2003,38 +1994,6 @@ namespace moho
     [[nodiscard]] CScriptLazyVar_float& Left();
 
     /**
-     * Address: 0x0077F6A0 (FUN_0077F6A0, Moho::CMauiControl::Right)
-     *
-     * What it does:
-     * Returns writable reference to the right-edge lazy-var lane.
-     */
-    [[nodiscard]] CScriptLazyVar_float& Right();
-
-    /**
-     * Address: 0x0077F6B0 (FUN_0077F6B0, Moho::CMauiControl::Top)
-     *
-     * What it does:
-     * Returns writable reference to the top-edge lazy-var lane.
-     */
-    [[nodiscard]] CScriptLazyVar_float& Top();
-
-    /**
-     * Address: 0x0077F6C0 (FUN_0077F6C0, Moho::CMauiControl::Bottom)
-     *
-     * What it does:
-     * Returns writable reference to the bottom-edge lazy-var lane.
-     */
-    [[nodiscard]] CScriptLazyVar_float& Bottom();
-
-    /**
-     * Address: 0x0077F6D0 (FUN_0077F6D0, Moho::CMauiControl::GetVertexAlpha)
-     *
-     * What it does:
-     * Returns packed ARGB vertex-alpha color lane.
-     */
-    [[nodiscard]] std::uint32_t GetVertexAlpha();
-
-    /**
      * Address: 0x0077F6E0 (FUN_0077F6E0, Moho::CMauiControl::SetNeedsFrameUpdate)
      *
      * What it does:
@@ -2091,22 +2050,6 @@ namespace moho
      * Returns current alpha lane used by control rendering.
      */
     [[nodiscard]] float GetAlpha();
-
-    /**
-     * Address: 0x00786450 (FUN_00786450, Moho::CMauiControl::IsInvisible)
-     *
-     * What it does:
-     * Returns whether this control is currently marked invisible.
-     */
-    [[nodiscard]] bool IsInvisible();
-
-    /**
-     * Address: 0x007863F0 (FUN_007863F0, Moho::CMauiControl::SetAlpha)
-     *
-     * What it does:
-     * Stores scalar alpha and updates packed vertex-alpha color lane.
-     */
-    void SetAlpha(float alpha);
 
     /**
      * Address: 0x0078EC10 (FUN_0078EC10, Moho::CMauiControl::AdjustARGBAlpha)
@@ -2514,14 +2457,6 @@ namespace moho
     void MoveCaretLeft(int amount);
 
     /**
-     * Address: 0x00791270 (FUN_00791270, Moho::CMauiEdit::MoveCaretRight)
-     *
-     * What it does:
-     * Moves caret right by `amount` UTF-8 characters via `SetCaretPosition`.
-     */
-    void MoveCaretRight(int amount);
-
-    /**
      * Address: 0x00791290 (FUN_00791290, Moho::CMauiEdit::MoveSelectionLeft)
      *
      * What it does:
@@ -2697,14 +2632,6 @@ namespace moho
      * Scans descendants and returns maximum control depth lane.
      */
     [[nodiscard]] float GetTopmostDepth();
-
-    /**
-     * Address: 0x007966F0 (FUN_007966F0, Moho::CMauiFrame::DumpGraph)
-     *
-     * What it does:
-     * Walks this frame subtree depth-first and calls `Dump()` for each control.
-     */
-    void DumpGraph();
 
     /**
      * Address: 0x00796550 (FUN_00796550, Moho::CMauiFrame::SetBounds)
@@ -9389,14 +9316,6 @@ namespace moho
   int cfunc_CUIWorldMeshGetInterpolatedScrollL(LuaPlus::LuaState* state);
 
   /**
-   * Address: 0x0086F090 (FUN_0086F090)
-   *
-   * What it does:
-   * Publishes world-camera/minimap cursor telemetry into engine stats.
-   */
-  void UIWorldViewUpdateCursorEngineStats(CUIWorldView* worldView, const Wm3::Vec3f& cursorWorldPosition);
-
-  /**
    * Address: 0x00872830 (FUN_00872830, cfunc_CUIWorldViewGetScreenPos)
    *
    * What it does:
@@ -9843,15 +9762,6 @@ namespace moho
    * blinky list.
    */
   void func_PushBlinkyBox(UserEntity* entity, float onTime, float offTime, float totalTime);
-
-  /**
-   * Address: 0x007FDA90 (FUN_007FDA90)
-   *
-   * What it does:
-   * `sSelectionBrackets.Add(unit)` emitted out of line; nothing in the image
-   * calls or points at it (no call edge, no rel32 or abs32 reference).
-   */
-  void func_AddSelectionBracketUserUnit(UserUnit* unit);
 
   /**
    * Address: 0x00857B60 (FUN_00857B60, cfunc_AddCommandFeedbackBlip)

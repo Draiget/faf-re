@@ -377,17 +377,6 @@ namespace moho
     [[nodiscard]] bool StopRPCEntityLoop(SoundHandleRecord* record);
 
     /**
-     * Address: 0x008ABCB0 (FUN_008ABCB0)
-     *
-     * Moho::SoundHandleRecord*, bool destroy
-     *
-     * What it does:
-     * Routes one entity-loop stop request to either stop-only or
-     * stop-and-destroy behavior.
-     */
-    void StopEntityLoop(SoundHandleRecord* record, bool destroy);
-
-    /**
      * Address: 0x008AB670 (FUN_008AB670)
      *
      * float deltaSeconds

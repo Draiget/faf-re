@@ -58,15 +58,6 @@ namespace moho
     CSndParams* mLoopOwnerContext;           // +0x50
     std::uint8_t mAffectsDucking;            // +0x54
     std::uint8_t mOpaque55[0x03];            // +0x55
-
-    /**
-     * Address: 0x004E1260 (FUN_004E1260, sub_4E1260)
-     *
-     * What it does:
-     * Checks whether the active loop cue has stopped (or lost engine context)
-     * and signals this task-event when the handle is complete.
-     */
-    [[nodiscard]] bool UpdateLoopCompletionState();
   };
 
   static_assert(sizeof(HSound) == 0x58, "HSound size must be 0x58");

@@ -1,43 +1,6 @@
 // Part of LuaObject.cpp, included there: the C API (lapi).
 
 /**
- * Address: 0x0090C900 (FUN_0090C900, lua_equal)
- *
- * What it does:
- * Resolves two Lua API stack indices, validates same-type operands, then
- * performs one Lua semantic equality test via `luaV_equalval`.
- */
-int lua_equal(
-  lua_State* const state,
-  const int leftIndex,
-  const int rightIndex
-)
-{
-  TObject* leftObject = nullptr;
-  if (leftIndex > 0) {
-    TObject* const candidate = state->base + leftIndex - 1;
-    if (candidate < state->top) {
-      leftObject = candidate;
-    }
-  } else {
-    leftObject = negindex(state, leftIndex);
-  }
-
-  TObject* rightObject = nullptr;
-  if (rightIndex > 0) {
-    TObject* const candidate = state->base + rightIndex - 1;
-    if (candidate < state->top) {
-      rightObject = candidate;
-    }
-  } else {
-    rightObject = negindex(state, rightIndex);
-  }
-
-  return leftObject != nullptr && rightObject != nullptr && leftObject->tt == rightObject->tt &&
-    luaV_equalval(state, leftObject, rightObject) != 0;
-}
-
-/**
  * Address: 0x0090C3D0 (FUN_0090C3D0, luaA_index)
  *
  * What it does:
@@ -636,35 +599,6 @@ void lua_concat(
 
     state->top += 1;
   }
-}
-
-/**
- * Address: 0x0090D8E0 (FUN_0090D8E0, lua_pushupvalues)
- *
- * What it does:
- * Pushes all upvalue lanes from the current closure (`base[-1]`) onto the
- * Lua stack, preserving the original growth guard (`nup + 20` slots).
- */
-extern "C" int lua_pushupvalues(
-  lua_State* const state
-)
-{
-  const auto* const closure = static_cast<const Closure*>(state->base[-1].value.p);
-  const int upvalueCount = static_cast<int>(closure->c.nupvalues);
-  const int requiredStackSlots = upvalueCount + 20;
-
-  if ((state->stack_last - state->top) <= requiredStackSlots) {
-    luaD_growstack(state, requiredStackSlots);
-  }
-
-  const TObject* sourceUpvalue = &closure->c.upvalue[0];
-  for (int upvalueIndex = 0; upvalueIndex < upvalueCount; ++upvalueIndex, ++sourceUpvalue) {
-    TObject* const stackTop = state->top;
-    *stackTop = *sourceUpvalue;
-    state->top = stackTop + 1;
-  }
-
-  return upvalueCount;
 }
 
 /**
@@ -1491,42 +1425,6 @@ int lua_getn(
   }
 
   return LightPointer(object->value);
-}
-
-/**
- * Address: 0x0090ADE0 (FUN_0090ADE0)
- *
- * What it does:
- * Loads one light-userdata function pointer from pseudo-index `-10002` and
- * invokes that callback with the current Lua state.
- */
-int lua_calllightuserdata(
-  lua_State* const state
-)
-{
-  using LuaRegistryStdCall = int(__stdcall*)(lua_State*);
-  auto* const callback = reinterpret_cast<LuaRegistryStdCall>(lua_tolightuserdata(state, -10002));
-  return callback(state);
-}
-
-/**
- * Address: 0x0090AE30 (FUN_0090AE30)
- *
- * What it does:
- * Copies one Lua string value (including trailing `\0`) from stack index
- * `idx` into caller-provided destination storage.
- */
-char* lua_copystring_to_buffer(
-  lua_State* const state,
-  const int idx,
-  void* const destination
-)
-{
-  char* const source = const_cast<char*>(lua_tostring(state, idx));
-  const size_t length = lua_strlen(state, idx);
-  // Raw Lua string blob copy including the trailing NUL.
-  std::copy_n(source, length + 1u, static_cast<char*>(destination));
-  return static_cast<char*>(destination);
 }
 
 /**

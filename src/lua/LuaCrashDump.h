@@ -41,9 +41,6 @@ namespace lua
    */
   void RecordLuaError(lua_State* state, const char* message);
 
-  /** Marks `state` as the VM running on the current thread (crash handler). */
-  void SetThreadActiveLuaVm(lua_State* state);
-
   /** Crash-report section writer: dumps every registered VM. */
   void WriteLuaCrashSection(std::FILE* sink, const void* faultAddress, const void* accessTarget);
 

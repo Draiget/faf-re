@@ -2010,21 +2010,6 @@ namespace moho
   // `ProjectileSerializer::Serialize` (ProjectileSerHelpers.cpp, wired via
   // that class's ctor) already calls `Projectile::MemberSerialize` directly.
 
-  /**
-   * Address: 0x006A0050 (FUN_006A0050)
-   *
-   * What it does:
-   * Thin deserialization thunk that forwards to
-   * `Projectile::MemberDeserialize`.
-   */
-  [[maybe_unused]] void ProjectileMemberDeserializeThunk(
-    Projectile* const projectile,
-    gpg::ReadArchive* const archive
-  )
-  {
-    projectile->MemberDeserialize(archive);
-  }
-
 } // namespace moho
 
 namespace moho

@@ -405,36 +405,6 @@ namespace moho
     void Save(gpg::BinaryWriter& writer) const;
 
     /**
-     * Address: 0x00888E10 (FUN_00888E10, sub_888E10)
-     *
-     * What it does:
-     * Allocates and appends one runtime wave generator from explicit parameter
-     * lanes and returns the stored generator pointer.
-     */
-    WaveGenerator* CreateWaveGenerator(
-      const fa::string& primaryTexturePath,
-      const fa::string& rampTexturePath,
-      const Wm3::Vec3f& position,
-      float angle,
-      const Wm3::Vec3f& direction,
-      const Wm3::Vector2f& lifetimeRange,
-      const Wm3::Vector2f& updateIntervalRange,
-      const Wm3::Vector2f& sizeRange,
-      float rampValueScale,
-      const Wm3::Vector2f& framerateRange,
-      float textureSelectionRange
-    );
-
-    /**
-     * Address: 0x00888F20 (FUN_00888F20, sub_888F20)
-     *
-     * What it does:
-     * Removes all cached references to `generator` from active wave-generator
-     * storage and runs one deleting-destructor lane for that generator.
-     */
-    WaveGenerator* RemoveAndDeleteGenerator(WaveGenerator* generator);
-
-    /**
      * Address: 0x00889900 (FUN_00889900, ?Update@WaveSystem@Moho@@QAEXABVGeomCamera3@2@MH@Z)
      *
      * What it does:

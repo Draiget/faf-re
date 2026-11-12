@@ -98,14 +98,6 @@ namespace moho
     void ProcessPendingRequests();
 
     /**
-     * Address: 0x007EBB60 (FUN_007EBB60)
-     *
-     * What it does:
-     * Clears and destroys all currently completed thumbnail requests.
-     */
-    void ClearCompletedRequests();
-
-    /**
      * Address: 0x007EAD80 (FUN_007EAD80)
      *
      * What it does:

@@ -60,18 +60,3 @@ gpg::RRef* gpg::RRef_CParticleTexture(
   outRef->mObj = reinterpret_cast<std::uint8_t*>(value) - static_cast<std::ptrdiff_t>(baseOffset);
   return outRef;
 }
-
-/**
- * Address: 0x0048FFD0 (FUN_0048FFD0, sub_48FFD0)
- *
- * What it does:
- * Wrapper that forwards to `RRef_CParticleTexture` and returns the output
- * lane pointer.
- */
-gpg::RRef* gpg::AssignCParticleTextureRef(
-  gpg::RRef* const outRef,
-  moho::CParticleTexture* const value
-)
-{
-  return gpg::RRef_CParticleTexture(outRef, value);
-}

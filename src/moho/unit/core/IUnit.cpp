@@ -147,24 +147,4 @@ float IUnit::CalcSpawnElevation(
 
 namespace moho
 {
-  /**
-   * Address: 0x00541F40 (FUN_00541F40)
-   *
-   * What it does:
-   * Upcasts one reflected reference to `IUnit` and returns the typed object
-   * pointer when the source is compatible.
-   */
-  [[nodiscard]] IUnit* CastIUnitFromRRef(
-    const gpg::RRef& source
-  )
-  {
-    gpg::RType* type = IUnit::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(IUnit));
-      IUnit::sType = type;
-    }
-
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, type);
-    return static_cast<IUnit*>(upcast.mObj);
-  }
 } // namespace moho

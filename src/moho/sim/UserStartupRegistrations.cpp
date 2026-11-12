@@ -50,17 +50,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BE4D20 (FUN_00BE4D20, j_func_RenderOverlayMilitary_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards startup thunk into `func_RenderOverlayMilitary_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_RenderOverlayMilitary_LuaFuncDef()
-  {
-    return ForwardSimStartupLuaThunk<&func_RenderOverlayMilitary_LuaFuncDef>();
-  }
-
-  /**
    * Address: 0x00BE4D30 (FUN_00BE4D30, register_RenderOverlayIntel_LuaFuncDef)
    *
    * What it does:
@@ -80,17 +69,6 @@ namespace moho
   CScrLuaInitForm* register_RenderOverlayEconomy_LuaFuncDef()
   {
     return ForwardSimStartupLuaThunk<&func_RenderOverlayEconomy_LuaFuncDef>();
-  }
-
-  /**
-   * Address: 0x00BE4D50 (FUN_00BE4D50, j_func_TeamColorModeUser_LuaFuncDef)
-   *
-   * What it does:
-   * Forwards startup thunk into `func_TeamColorMode_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_TeamColorModeUser_LuaFuncDef()
-  {
-    return ForwardSimStartupLuaThunk<&func_TeamColorMode_LuaFuncDef>();
   }
 
   /**

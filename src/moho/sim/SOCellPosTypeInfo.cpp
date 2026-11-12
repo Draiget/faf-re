@@ -56,49 +56,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0050AC20 (FUN_0050AC20)
-   *
-   * What it does:
-   * Writes one `(x, z)` pair into a `SOCellPos` lane.
-   */
-  [[maybe_unused]] [[nodiscard]] SOCellPos* AssignSOCellPosLanes(
-    SOCellPos* const result,
-    const std::int16_t x,
-    const std::int16_t z
-  ) noexcept
-  {
-    result->x = x;
-    result->z = z;
-    return result;
-  }
-
-  /**
-   * Address: 0x0050AC40 (FUN_0050AC40)
-   *
-   * What it does:
-   * Returns the `x` lane of one `SOCellPos`.
-   */
-  [[maybe_unused]] [[nodiscard]] std::int16_t ReadSOCellPosX(
-    const SOCellPos* const value
-  ) noexcept
-  {
-    return value->x;
-  }
-
-  /**
-   * Address: 0x0050AC50 (FUN_0050AC50)
-   *
-   * What it does:
-   * Returns the `z` lane of one `SOCellPos`.
-   */
-  [[maybe_unused]] [[nodiscard]] std::int16_t ReadSOCellPosZ(
-    const SOCellPos* const value
-  ) noexcept
-  {
-    return value->z;
-  }
-
-  /**
    * Address: 0x005A2C70 (FUN_005A2C70)
    *
    * What it does:

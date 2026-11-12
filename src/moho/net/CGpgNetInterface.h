@@ -358,15 +358,6 @@ namespace moho
     void WriteArg(const SNetCommandArg* arg);
 
     /**
-     * Address: 0x007B75D0 (FUN_007B75D0)
-     *
-     * What it does:
-     * Validates connected state under `mLock` and closes the active TCP
-     * socket lane with `ModeBoth`.
-     */
-    void EnsureConnectedAndCloseSocket();
-
-    /**
      * Address: 0x007B7710 (FUN_007B7710, func_GPGNETProcess)
      *
      * What it does:

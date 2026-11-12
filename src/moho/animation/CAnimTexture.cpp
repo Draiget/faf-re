@@ -156,11 +156,6 @@ namespace moho
     outFrame.add_ref_copy();
   }
 
-  const fa::string& CAnimTexture::GetBaseTextureName() const noexcept
-  {
-    return mBaseTextureName;
-  }
-
   /**
    * Address: 0x00422FA0 (FUN_00422FA0)
    *

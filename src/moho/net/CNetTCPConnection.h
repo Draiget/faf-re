@@ -47,14 +47,6 @@ namespace moho
     u_short GetPort() override;
 
     /**
-     * Address: 0x00483580 (FUN_00483580, Moho::CNetTCPConnection::GetSocket)
-     *
-     * What it does:
-     * Returns the owned WinSock socket handle.
-     */
-    [[nodiscard]] platform::net::Socket GetSocket() const noexcept;
-
-    /**
      * Address: 0x00483590 (FUN_00483590, Moho::CNetTCPConnection::GetState)
      *
      * What it does:
@@ -168,14 +160,6 @@ namespace moho
      * Flushes outbound stream bytes to socket and handles send-side shutdown.
      */
     void Push();
-
-    /**
-     * Address: 0x00484640 (FUN_00484640, Moho::CNetTCPConnection::SelectSocket)
-     *
-     * What it does:
-     * Binds socket events (`FD_READ|FD_CONNECT|FD_CLOSE`) to `eventHandle`.
-     */
-    int SelectSocket(void* eventHandle);
 
   public:
     CNetTCPConnector* mConnector{nullptr};                        // +0x418

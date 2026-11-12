@@ -1425,26 +1425,6 @@ void CGpgNetInterface::WriteArg(
 }
 
 /**
- * Address: 0x007B75D0 (FUN_007B75D0)
- *
- * What it does:
- * Validates GPGNet connected state under `mLock` and closes one active TCP
- * socket lane with bidirectional shutdown.
- */
-void CGpgNetInterface::EnsureConnectedAndCloseSocket()
-{
-  boost::mutex::scoped_lock lock(mLock);
-
-  if (mConnectionState != kNetStateEstablishing) {
-    throw std::runtime_error("Gpg.net not connected");
-  }
-
-  if (mTcpSocket != nullptr) {
-    mTcpSocket->VirtClose(gpg::Stream::ModeBoth);
-  }
-}
-
-/**
  * Address: 0x007B7710 (FUN_007B7710 / func_GPGNETProcess)
  *
  * What it does:

@@ -80,14 +80,6 @@ namespace moho
       const Wm3::Vector3f& buildDirection
     );
 
-    /**
-     * Address: 0x00605CD0 (FUN_00605CD0)
-     *
-     * What it does:
-     * Stores one blueprint pointer lane and returns this task.
-     */
-    CUnitMobileBuildTask* SetBlueprint(const RUnitBlueprint* blueprint) noexcept;
-
     // Address: cached RTTI lane read/written by
     // `CUnitMobileBuildTaskSerializer::Init` (0x005FBBA0); see
     // `moho/unit/tasks/CUnitMobileBuildTaskSerializer.cpp`.

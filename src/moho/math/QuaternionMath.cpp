@@ -392,21 +392,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x006D1E20 (FUN_006D1E20)
-   *
-   * What it does:
-   * Thin thunk alias that forwards one row-major 3x3 matrix conversion request
-   * to the canonical matrix-to-quaternion path.
-   */
-  [[maybe_unused]] Wm3::Quaternionf* MatrixRowsToQuatCanonicalThunk(
-    const Wm3::Vector3f* const matrixRows,
-    Wm3::Quaternionf* const out
-  ) noexcept
-  {
-    return MatrixRowsToQuatCanonical(matrixRows, out);
-  }
-
-  /**
    * Address: 0x004F0AE0 (FUN_004F0AE0, func_MatrixToQuat_0)
    *
    * What it does:

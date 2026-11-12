@@ -237,14 +237,6 @@ namespace moho
     UnitWeapon* SetFiringRandomness(float value);
 
     /**
-     * Address: 0x006D3550 (FUN_006D3550)
-     *
-     * What it does:
-     * Returns current firing-randomness lane.
-     */
-    [[nodiscard]] float GetFiringRandomness() const;
-
-    /**
      * Address: 0x006D3560 (FUN_006D3560)
      *
      * What it does:

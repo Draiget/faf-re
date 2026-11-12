@@ -692,16 +692,6 @@ namespace lua
     }
   }
 
-  void SetThreadActiveLuaVm(
-    lua_State* const
-  )
-  {
-    // The per-thread active flag is folded into RegisterLuaVm's threadIds
-    // for creation; the running-thread correlation is reported through
-    // global_State::lstate, which luaV_execute already maintains and the
-    // dump reads directly. Reserved for the Phase 4 watch/probe work.
-  }
-
   void WriteLuaCrashSection(
     std::FILE* const sink,
     const void* const faultAddress,

@@ -157,70 +157,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00707C40 (FUN_00707C40)
-   */
-  void IArmy::SetPlayerColorBgra(
-    const std::uint32_t playerColorBgra
-  )
-  {
-    mVarDat.mPlayerColorBgra = playerColorBgra;
-  }
-
-  /**
-   * Address: 0x00707C50 (FUN_00707C50)
-   */
-  void IArmy::SetArmyColorBgra(
-    const std::uint32_t armyColorBgra
-  )
-  {
-    mVarDat.mArmyColorBgra = armyColorBgra;
-  }
-
-  /**
-   * Address: 0x00707C60 (FUN_00707C60)
-   */
-  void IArmy::SetFactionIndex(
-    const std::int32_t factionIndex
-  )
-  {
-    mVarDat.mFaction = factionIndex;
-  }
-
-  /**
-   * Address: 0x00707C90 (FUN_00707C90)
-   */
-  void IArmy::SetShowScoreFlag(
-    const bool enabled
-  )
-  {
-    mVarDat.mShowScore = enabled ? 1u : 0u;
-  }
-
-  /**
    * Address: 0x00707CA0 (FUN_00707CA0)
    */
   bool IArmy::IsCivilian() const
   {
     return mConstDat.mIsCivilian != 0u;
-  }
-
-  /**
-   * Address: 0x00707CB0 (FUN_00707CB0)
-   */
-  bool IArmy::IsOutOfGame() const
-  {
-    return mVarDat.mIsOutOfGame != 0u;
-  }
-
-  /**
-   * Address: 0x00707CD0 (FUN_00707CD0)
-   */
-  float IArmy::GetHandicap() const
-  {
-    if (mVarDat.mHandicapValue != 0.0f) {
-      return mVarDat.mHandicapExtra;
-    }
-    return 0.0f;
   }
 
 } // namespace moho

@@ -579,38 +579,6 @@ fa::string moho::PLAT_FormatCallstack(
 }
 
 /**
- * Address: 0x004A25D0 (FUN_004A25D0)
- * Mangled:
- * ?PLAT_UnDecorateSymbolName@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@PBD_N@Z
- *
- * What it does:
- * Converts one decorated symbol into undecorated text under the shared
- * symbol-handler mutex, with optional underscore stripping.
- */
-fa::string moho::PLAT_UnDecorateSymbolName(
-  const char* const name,
-  const bool stripLeadingUnderscore
-)
-{
-  std::lock_guard<std::recursive_mutex> lock(GetSymHandlerMutex());
-
-  fa::string result;
-  if (name == nullptr) {
-    result.assign_owned("");
-    return result;
-  }
-
-  CHAR outputString[1024]{};
-  const DWORD flags = stripLeadingUnderscore ? 0x1000u : 0u;
-  if (::UnDecorateSymbolName(name, outputString, 0x3FFu, flags) != 0) {
-    result.assign_owned(outputString);
-  } else {
-    result.assign_owned(name);
-  }
-  return result;
-}
-
-/**
  * Address: 0x004F2A00 (FUN_004F2A00)
  * Mangled:
  * ?WIN_GetLastError@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ

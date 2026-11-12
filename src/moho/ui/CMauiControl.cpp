@@ -2078,50 +2078,6 @@ moho::CScriptLazyVar_float& moho::CMauiControl::Left()
 }
 
 /**
- * Address: 0x0077F6A0 (FUN_0077F6A0, Moho::CMauiControl::Right)
- *
- * What it does:
- * Returns writable reference to the right-edge lazy-var lane.
- */
-moho::CScriptLazyVar_float& moho::CMauiControl::Right()
-{
-  return mRightLV;
-}
-
-/**
- * Address: 0x0077F6B0 (FUN_0077F6B0, Moho::CMauiControl::Top)
- *
- * What it does:
- * Returns writable reference to the top-edge lazy-var lane.
- */
-moho::CScriptLazyVar_float& moho::CMauiControl::Top()
-{
-  return mTopLV;
-}
-
-/**
- * Address: 0x0077F6C0 (FUN_0077F6C0, Moho::CMauiControl::Bottom)
- *
- * What it does:
- * Returns writable reference to the bottom-edge lazy-var lane.
- */
-moho::CScriptLazyVar_float& moho::CMauiControl::Bottom()
-{
-  return mBottomLV;
-}
-
-/**
- * Address: 0x0077F6D0 (FUN_0077F6D0, Moho::CMauiControl::GetVertexAlpha)
- *
- * What it does:
- * Returns packed ARGB vertex-alpha color lane.
- */
-std::uint32_t moho::CMauiControl::GetVertexAlpha()
-{
-  return mVertexAlpha;
-}
-
-/**
  * Address: 0x0077F6E0 (FUN_0077F6E0, Moho::CMauiControl::SetNeedsFrameUpdate)
  *
  * What it does:
@@ -2157,20 +2113,6 @@ moho::CMauiFrame* moho::CMauiControl::GetRootFrame()
 }
 
 /**
- * Address: 0x007863F0 (FUN_007863F0, Moho::CMauiControl::SetAlpha)
- *
- * What it does:
- * Stores scalar alpha and updates packed vertex-alpha color lane.
- */
-void moho::CMauiControl::SetAlpha(
-  const float alpha
-)
-{
-  mAlpha = alpha;
-  mVertexAlpha = PackVertexAlphaFromScalar(alpha);
-}
-
-/**
  * Address: 0x0078EC10 (FUN_0078EC10, Moho::CMauiControl::AdjustARGBAlpha)
  *
  * What it does:
@@ -2195,17 +2137,6 @@ std::uint32_t moho::CMauiControl::AdjustARGBAlpha(
 float moho::CMauiControl::GetAlpha()
 {
   return mAlpha;
-}
-
-/**
- * Address: 0x00786450 (FUN_00786450, Moho::CMauiControl::IsInvisible)
- *
- * What it does:
- * Returns whether this control is currently marked invisible.
- */
-bool moho::CMauiControl::IsInvisible()
-{
-  return mInvisible;
 }
 
 /**

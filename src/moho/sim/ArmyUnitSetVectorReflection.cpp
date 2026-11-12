@@ -49,26 +49,6 @@ namespace
 } // namespace
 
 /**
- * Address: 0x00704B40 (FUN_00704B40, gpg::RRef_EntitySetTemplateUnit)
- *
- * What it does:
- * Builds one reflected reference lane for `EntitySetTemplate<Unit>`.
- */
-gpg::RRef* gpg::RRef_UnitSetBase(
-  gpg::RRef* const outRef,
-  moho::EntitySetTemplate<moho::Unit>* const value
-)
-{
-  if (outRef == nullptr) {
-    return nullptr;
-  }
-
-  outRef->mObj = value;
-  outRef->mType = ResolveEntitySetTemplateUnitType();
-  return outRef;
-}
-
-/**
  * Address: 0x00705320 (FUN_00705320, gpg::MakeUnitSetDerivedRef)
  *
  * What it does:

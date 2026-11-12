@@ -70,26 +70,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00873C60 (FUN_00873C60)
-   *
-   * What it does:
-   * Destroys one Sofdec playback handle when present and clears the slot.
-   */
-  [[maybe_unused]] void DestroySofdecPlaybackHandleAndClearSlot(
-    MwsfdPlaybackStateSubobj** const slot
-  )
-  {
-    if (slot == nullptr) {
-      return;
-    }
-
-    if (*slot != nullptr) {
-      ::mwPlyDestroy(*slot);
-    }
-    *slot = nullptr;
-  }
-
-  /**
    * Address: 0x00873BE0 (FUN_00873BE0, ??0IMovie@Moho@@QAE@XZ)
    * Address: 0x00874980 (FUN_00874980, IMovie ctor lane)
    *

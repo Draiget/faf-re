@@ -6,49 +6,6 @@ namespace moho
   float ren_MeshDissolveCutoff = 0.2f; // 0x00F57F04
 
   /**
-   * Address: 0x007E5150 (FUN_007E5150, boost::shared_ptr_MeshMaterial::shared_ptr_MeshMaterial)
-   *
-   * What it does:
-   * Constructs one `shared_ptr<MeshMaterial>` from one raw material pointer
-   * lane.
-   */
-  boost::shared_ptr<MeshMaterial>* ConstructSharedMeshMaterialFromRaw(
-    boost::shared_ptr<MeshMaterial>* const outMaterial,
-    MeshMaterial* const material
-  )
-  {
-    return ::new (outMaterial) boost::shared_ptr<MeshMaterial>(material);
-  }
-
-  /**
-   * Address: 0x007E5420 (FUN_007E5420, boost::shared_ptr_Mesh::shared_ptr_Mesh)
-   *
-   * What it does:
-   * Constructs one `shared_ptr<Mesh>` from one raw mesh pointer lane.
-   */
-  boost::shared_ptr<Mesh>* ConstructSharedMeshFromRaw(
-    boost::shared_ptr<Mesh>* const outMesh,
-    Mesh* const mesh
-  )
-  {
-    return ::new (outMesh) boost::shared_ptr<Mesh>(mesh);
-  }
-
-  /**
-   * Address: 0x007E6280 (FUN_007E6280, boost::shared_ptr_MeshBatch::shared_ptr_MeshBatch)
-   *
-   * What it does:
-   * Constructs one `shared_ptr<MeshBatch>` from one raw batch pointer lane.
-   */
-  boost::shared_ptr<MeshBatch>* ConstructSharedMeshBatchFromRaw(
-    boost::shared_ptr<MeshBatch>* const outBatch,
-    MeshBatch* const batch
-  )
-  {
-    return ::new (outBatch) boost::shared_ptr<MeshBatch>(batch);
-  }
-
-  /**
    * Address: 0x007E6D20 (FUN_007E6D20, sub_7E6D20)
    *
    * IDA signature:
@@ -91,22 +48,6 @@ namespace moho
   // types. Nothing in the tree referenced any of the three -- each was counted
   // with `grep -rc` across `src`, and all three report `xrefs_total: 0`
   // with no code, data, vtable or RTTI reference in the binary either.
-
-  /**
-   * Address: 0x007E51E0 (FUN_007E51E0, boost::shared_ptr_MeshBatch::operator=)
-   *
-   * What it does:
-   * Rebinds one `shared_ptr<MeshBatch>` from a raw batch pointer and releases
-   * the previous ownership lane.
-   */
-  boost::shared_ptr<MeshBatch>* AssignSharedMeshBatchFromRaw(
-    boost::shared_ptr<MeshBatch>* const outBatchHandle,
-    MeshBatch* const batch
-  )
-  {
-    outBatchHandle->reset(batch);
-    return outBatchHandle;
-  }
 
   // The shard/map/database types that used to be defined here now live in
   // moho/mesh/SpatialDb.h, so the owners that embed a SpatialDB<T> by value

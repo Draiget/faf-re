@@ -72,30 +72,6 @@ namespace moho
     FillScreenQuadVertexSheet(*mQuadVertexSheet, headWidth, headHeight, textureScaleU, textureScaleV);
   }
 
-  /**
-   * Address: 0x008144C0 (FUN_008144C0, Moho::Silhouette::dtr)
-   * Mangled: ??_GSilhouette@Moho@@UAEPAXI@Z
-   * Slot: 0 (vftable slot 0 -- scalar deleting destructor thunk)
-   *
-   * IDA signature:
-   * void* __thiscall Moho::Silhouette::dtr(Silhouette* this, char deleteFlags);
-   *
-   * What it does:
-   * Runs the virtual destructor (which releases the owned vertex sheet) and
-   * conditionally frees backing memory via `operator delete` when the low flag
-   * bit is set. Standard MSVC8 scalar deleting destructor thunk at vftable
-   * slot 0.
-   */
-  void* Silhouette::ScalarDeletingDestructor(
-    const std::uint8_t deleteFlags
-  )
-  {
-    this->~Silhouette();
-    if ((deleteFlags & 0x01u) != 0u) {
-      ::operator delete(this);
-    }
-    return this;
-  }
 } // namespace moho
 namespace moho
 {

@@ -116,8 +116,6 @@ namespace moho
      */
     int WatchBone(int boneIndex);
 
-    [[nodiscard]] Unit* GetOwnerUnit() const noexcept;
-
     /**
      * Address: 0x00638F00 (FUN_00638F00, gpg::SerSaveLoadHelper<Moho::CCollisionManipulator>::Deserialize thunk target)
      *
@@ -301,15 +299,6 @@ namespace moho
     sizeof(CScrLuaMetatableFactory<CCollisionManipulator>) == 0x8,
     "CScrLuaMetatableFactory<CCollisionManipulator> size must be 0x8"
   );
-  /**
-   * Address: 0x00638BF0 (FUN_00638BF0)
-   *
-   * What it does:
-   * Rebinds the startup metatable-factory index lane for
-   * `CScrLuaMetatableFactory<CCollisionManipulator>` and returns that
-   * singleton.
-   */
-  CScrLuaMetatableFactory<CCollisionManipulator>* startup_CScrLuaMetatableFactory_CCollisionManipulator_Index();
 
   static_assert(sizeof(CCollisionManipulatorSerializer) == 0x14, "CCollisionManipulatorSerializer size must be 0x14");
   static_assert(sizeof(CCollisionManipulatorTypeInfo) == 0x64, "CCollisionManipulatorTypeInfo size must be 0x64");

@@ -547,23 +547,6 @@ namespace moho
   } // namespace
 
   /**
-   * Address: 0x00493210 (FUN_00493210, sub_493210)
-   *
-   * What it does:
-   * Uploads a bounded batch of pending world particles into one particle
-   * work-item instance stream for the current frame.
-   */
-  void UploadPendingParticlesIntoWorkItem(
-    SParticleRenderWorkItem& workItem,
-    const float frameDelta,
-    fa::vector<SWorldParticle>& pendingParticles
-  )
-  {
-    ParticlePendingCursor pending{pendingParticles, ren_ParticleLinearUpload > 0};
-    UploadPendingParticleRangeIntoWorkItem(workItem, frameDelta, pending);
-  }
-
-  /**
    * Address: 0x00493720 (FUN_00493720, sub_493720)
    *
    * What it does:

@@ -68,13 +68,6 @@ const std::wstring& moho::WWinLogTextBuilder::Finalize() const noexcept
   return mText;
 }
 
-void moho::WWinLogTextBuilder::SetFieldWidth(
-  const std::size_t width
-) noexcept
-{
-  mFieldWidth = width;
-}
-
 void moho::WWinLogTextBuilder::Clear() noexcept
 {
   mText.clear();
@@ -124,19 +117,6 @@ void moho::WWinLogTextBuilder::WriteWideText(
 }
 
 /**
- * Address: 0x004F9DF0 (FUN_004F9DF0)
- *
- * What it does:
- * Emits one wide-string literal with width/padding behavior.
- */
-void moho::WWinLogTextBuilder::WriteWideLiteral(
-  const wchar_t* const text
-)
-{
-  WriteWideText(text != nullptr ? std::wstring(text) : std::wstring{});
-}
-
-/**
  * Address: 0x004FA000 (FUN_004FA000)
  *
  * What it does:
@@ -181,11 +161,6 @@ void moho::WWinLogTextBuilder::WriteSpaces(
 bool moho::CWinLogLine::IsReplayEntry() const noexcept
 {
   return isReplayEntry != 0u;
-}
-
-bool moho::CWinLogLine::IsMessageEntry() const noexcept
-{
-  return !IsReplayEntry();
 }
 
 const wchar_t* moho::CWinLogLine::SeverityPrefix() const noexcept
@@ -282,18 +257,6 @@ void moho::CWinLogTarget::ReplaceCommittedLines(
 )
 {
   mCommittedLines = nextCommittedLines;
-}
-
-void moho::CWinLogTarget::SnapshotCommittedLines(
-  fa::vector<CWinLogLine>* const outLines
-)
-{
-  if (outLines == nullptr) {
-    return;
-  }
-
-  boost::mutex::scoped_lock scopedLock(lock);
-  *outLines = mCommittedLines;
 }
 
 void moho::CWinLogTarget::ResetCommittedLinesFromReplayBuffer(

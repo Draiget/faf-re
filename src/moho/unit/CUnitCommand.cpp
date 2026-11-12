@@ -41,20 +41,6 @@
 
 using namespace moho;
 
-/**
- * Address: 0x006EC9E0 (FUN_006EC9E0)
- *
- * What it does:
- * Rebinds the startup metatable-factory index lane for
- * `CScrLuaMetatableFactory<CUnitCommand>` and returns that singleton.
- */
-[[maybe_unused]] moho::CScrLuaMetatableFactory<moho::CUnitCommand>* startup_CScrLuaMetatableFactory_CUnitCommand_Index()
-{
-  auto& instance = moho::CScrLuaMetatableFactory<moho::CUnitCommand>::Instance();
-  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-  return &instance;
-}
-
 namespace
 {
 

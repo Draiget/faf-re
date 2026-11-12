@@ -596,34 +596,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x008B8E40 (FUN_008B8E40, UserEntity interpolated scroll lane)
-   *
-   * What it does:
-   * Computes one interpolated `(u,v)` texture-scroll pair by blending the two
-   * variable-data scroll lanes using clamped impact-weighted alpha.
-   */
-  UserEntity* UserEntity::GetInterpolatedScroll(
-    float* const outScrollV,
-    float* const outScrollU,
-    const float interpolationAlpha
-  )
-  {
-    const float clampedAlpha = ClampUnitInterval(mVariableData.mCurImpactValue * interpolationAlpha);
-
-    if (outScrollU != nullptr) {
-      *outScrollU = mVariableData.mScrollBeatStart.x +
-        ((mVariableData.mScrollBeatEnd.x - mVariableData.mScrollBeatStart.x) * clampedAlpha);
-    }
-
-    if (outScrollV != nullptr) {
-      *outScrollV = mVariableData.mScrollBeatStart.y +
-        ((mVariableData.mScrollBeatEnd.y - mVariableData.mScrollBeatStart.y) * clampedAlpha);
-    }
-
-    return this;
-  }
-
-  /**
    * Address: 0x007EC2F0 (FUN_007EC2F0, ?GetInterpolatedPosition@UserEntity@Moho@@QBE?AV?$Vector3@M@Wm3@@M@Z)
    *
    * What it does:
@@ -636,27 +608,6 @@ namespace moho
   {
     const VTransform interpolated = GetInterpolatedTransform(interpolationAlpha);
     return interpolated.pos_;
-  }
-
-  /**
-   * Address: 0x008B9740 (FUN_008B9740, ?GetRenderSphere@UserEntity@Moho@@QBE?AV?$Sphere3@M@Wm3@@M@Z)
-   *
-   * What it does:
-   * Returns current render-oriented bounds from mesh interpolation state when
-   * mesh data exists, otherwise synthesizes a transform-aligned half-unit box.
-   */
-  Wm3::Box3f UserEntity::GetRenderSphere(
-    const float interpolationAlpha
-  ) const
-  {
-    if (mMeshInstance != nullptr) {
-      mMeshInstance->UpdateInterpolatedFields();
-      return mMeshInstance->box;
-    }
-
-    const VTransform interpolated = GetInterpolatedTransform(interpolationAlpha);
-    const moho::VAxes3 axes(interpolated.orient_);
-    return Wm3::Box3f(interpolated.pos_, axes.vX, axes.vY, axes.vZ, 0.5f, 0.5f, 0.5f);
   }
 
   /**
@@ -841,18 +792,6 @@ namespace moho
     }
 
     return CD3DBatchTexture::FromFile(kSelectionBracketNeutralTexture, 1u);
-  }
-
-  /**
-   * Address: 0x0085B050 (FUN_0085B050, Moho::WeakPtr_CD3DBatchTexture::WeakPtr_CD3DBatchTexture)
-   *
-   * What it does:
-   * Returns one retained shared owner lane for this entity's strategic-underlay
-   * texture payload.
-   */
-  boost::shared_ptr<CD3DBatchTexture> UserEntity::GetStrategicUnderlayTexture() const
-  {
-    return boost::static_pointer_cast<CD3DBatchTexture>(mVariableData.mUnderlayTexture);
   }
 
   /**

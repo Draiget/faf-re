@@ -281,14 +281,6 @@ namespace moho
     void WriteWideText(const std::wstring& text);
 
     /**
-     * Address: 0x004F9DF0 (FUN_004F9DF0)
-     *
-     * What it does:
-     * Emits one wide literal and clears transient field width.
-     */
-    void WriteWideLiteral(const wchar_t* text);
-
-    /**
      * Address: 0x004FA000 (FUN_004FA000)
      *
      * What it does:
@@ -312,7 +304,6 @@ namespace moho
      */
     void WriteSpaces(std::size_t count);
 
-    void SetFieldWidth(std::size_t width) noexcept;
     void Clear() noexcept;
 
   private:
@@ -337,7 +328,6 @@ namespace moho
     fa::string text;
 
     [[nodiscard]] bool IsReplayEntry() const noexcept;
-    [[nodiscard]] bool IsMessageEntry() const noexcept;
     [[nodiscard]] const wchar_t* SeverityPrefix() const noexcept;
   };
 
@@ -410,7 +400,6 @@ namespace moho
      */
     [[nodiscard]] std::size_t CommittedLineCount() const;
     [[nodiscard]] const fa::vector<CWinLogLine>& CommittedLines() const;
-    void SnapshotCommittedLines(fa::vector<CWinLogLine>* outLines);
     void ResetCommittedLinesFromReplayBuffer(const fa::vector<fa::string>& replayLines);
 
     WWinLogWindow* dialog = nullptr;

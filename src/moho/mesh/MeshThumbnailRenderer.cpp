@@ -530,14 +530,4 @@ namespace moho
     queue.size = 0;
   }
 
-  /**
-   * Address: 0x007EBB60 (FUN_007EBB60)
-   *
-   * What it does:
-   * Clears and destroys all currently completed thumbnail requests.
-   */
-  void MeshThumbnailRenderer::ClearCompletedRequests()
-  {
-    ClearQueue(mCompletedRequests);
-  }
 } // namespace moho

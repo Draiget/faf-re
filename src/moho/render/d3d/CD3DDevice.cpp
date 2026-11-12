@@ -2003,29 +2003,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x007FA100 (FUN_007FA100)
-   *
-   * What it does:
-   * Jump-only adapter lane that forwards directly into `REN_Init()`.
-   */
-  [[maybe_unused]] void REN_InitAdapterA()
-  {
-    REN_Init();
-  }
-
-  /**
-   * Address: 0x00430900 (FUN_00430900, ?D3D_Init@Moho@@YA_NXZ)
-   *
-   * What it does:
-   * Runs render-font bootstrap and reports success.
-   */
-  bool D3D_Init()
-  {
-    REN_Init();
-    return true;
-  }
-
-  /**
    * Address: 0x00430910 (FUN_00430910, ?D3D_Exit@Moho@@YAXXZ)
    *
    * What it does:

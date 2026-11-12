@@ -1133,25 +1133,6 @@ void SNavPath::AssignCopy(
   finish = CopyCellsForAssignBridge(start, src.start, src.start + count);
 }
 
-void SNavPath::AppendCells(
-  const SOCellPos* const begin,
-  const SOCellPos* const end
-)
-{
-  if (!begin || !end || end <= begin) {
-    return;
-  }
-
-  const std::size_t appendCount = static_cast<std::size_t>(CountPathCellSpan(end, begin));
-  const std::size_t currentCount = Count();
-  if (appendCount > (GetPathCellLimitAlias() - currentCount)) {
-    ThrowPathCellVectorTooLong();
-  }
-
-  EnsureCapacity(currentCount + appendCount);
-  finish = CopyCellsForwardUnchecked(finish, begin, end);
-}
-
 /**
  * Address: 0x005B0B60 (FUN_005B0B60)
  * Address: 0x005B0900 (FUN_005B0900 -- a four-instruction forwarder into the
@@ -1246,16 +1227,6 @@ void SNavPath::EraseFrontCell() noexcept
   --finish;
 }
 
-void SNavPath::EraseFrontCells(
-  std::int32_t count
-) noexcept
-{
-  while (count > 0 && CountInt() > 0) {
-    EraseFrontCell();
-    --count;
-  }
-}
-
 gpg::RType* IAiNavigator::sType = nullptr;
 
 /**
@@ -1287,14 +1258,6 @@ IAiNavigator* moho::AI_CreateAirNavigator(
   auto* const navigator = new (std::nothrow) CAiNavigatorAir(unit);
   return navigator;
 }
-
-/**
- * Address: 0x005A5850 (FUN_005A5850, ?AI_ClearPathData@Moho@@YAXXZ)
- *
- * What it does:
- * Preserves the legacy global AI path-data clear hook as a deliberate no-op.
- */
-void moho::AI_ClearPathData() {}
 
 /**
  * Address: 0x005A2CF0 (FUN_005A2CF0, the body; the `Broadcaster` base's

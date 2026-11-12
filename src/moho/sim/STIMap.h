@@ -332,17 +332,6 @@ namespace moho
     void SetElevationRectRaw(const gpg::Rect2i& rect, const std::uint16_t* source, std::int32_t sourceRowStride);
 
     /**
-     * Address: 0x00478010 (FUN_00478010, Moho::CHeightField::CopyHeightsRectFrom)
-     *
-     * Moho::CHeightField const *, gpg::Rect2<int> const &
-     *
-     * What it does:
-     * Copies one rectangle of raw heights from another field using the source
-     * row stride.
-     */
-    void CopyHeightsRectFrom(const CHeightField* source, const gpg::Rect2i& rect);
-
-    /**
      * Address: 0x00475DA0 (FUN_00475DA0)
      *
      * int x, int z, int tier

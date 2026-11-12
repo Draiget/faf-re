@@ -124,20 +124,6 @@ namespace moho
     return sInstance;
   }
 
-  /**
-   * Address: 0x0072B1D0 (FUN_0072B1D0)
-   *
-   * What it does:
-   * Assigns the metatable-factory index of
-   * `CScrLuaMetatableFactory<CPlatoon>` and returns that singleton.
-   */
-  [[maybe_unused]] CScrLuaMetatableFactory<CPlatoon>* startup_CScrLuaMetatableFactory_CPlatoon_Index()
-  {
-    auto& instance = CScrLuaMetatableFactory<CPlatoon>::Instance();
-    instance.SetFactoryObjectIndexForRecovery(CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-    return &instance;
-  }
-
   LuaPlus::LuaObject CScrLuaMetatableFactory<CPlatoon>::Create(
     LuaPlus::LuaState* const state
   )
@@ -871,36 +857,6 @@ namespace moho
   float CPlatoon::GetDamageReceived() const
   {
     return mDamageReceived;
-  }
-
-  /**
-   * Address: 0x0072B7F0 (FUN_0072B7F0, sub_72B7F0)
-   */
-  bool CPlatoon::HasLuaUnitList() const
-  {
-    return mHasLuaList;
-  }
-
-  /**
-   * Address: 0x00736D70 (FUN_00736D70, sub_736D70)
-   */
-  CPlatoon* CPlatoon::AddDamageDealt(
-    const float amount
-  )
-  {
-    mDamageDealt += amount;
-    return this;
-  }
-
-  /**
-   * Address: 0x00736D90 (FUN_00736D90, sub_736D90)
-   */
-  CPlatoon* CPlatoon::AddDamageReceived(
-    const float amount
-  )
-  {
-    mDamageReceived += amount;
-    return this;
   }
 
   /**

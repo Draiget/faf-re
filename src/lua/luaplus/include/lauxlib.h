@@ -31,7 +31,6 @@ LUALIB_API void luaL_openlib (lua_State *L, const char *libname,
                                const luaL_reg *l, int nup);
 LUALIB_API int luaL_getmetafield (lua_State *L, int obj, const char *e);
 LUALIB_API int luaL_callmeta (lua_State *L, int obj, const char *e);
-LUALIB_API int luaL_typerror (lua_State *L, int narg, const char *tname);
 LUALIB_API int luaL_argerror (lua_State *L, int numarg, const char *extramsg);
 LUALIB_API const char *luaL_checklstring (lua_State *L, int numArg, size_t *l);
 LUALIB_API const char *luaL_optlstring (lua_State *L, int numArg,
@@ -139,7 +138,6 @@ LUALIB_API void luaL_addwstring (luaL_Buffer *B, const lua_WChar *s);
 ** Compatibility macros and functions
 */
 
-LUALIB_API int   lua_dofile (lua_State *L, const char *filename);
 LUALIB_API int   lua_dostring (lua_State *L, const char *str);
 LUALIB_API int   lua_dobuffer (lua_State *L, const char *buff, size_t sz,
                                const char *n);

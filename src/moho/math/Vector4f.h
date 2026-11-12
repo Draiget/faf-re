@@ -159,9 +159,6 @@ namespace moho
       }
     }
 #endif
-
-    /** Convert a quaternion (x,y,z,w) to Euler XYZ (roll, pitch, yaw), radians. */
-    [[nodiscard]] Angle quaternion_to_euler() const;
   };
 
   static_assert(sizeof(Vector4f) == 0x10, "Vector4f size must be 0x10");

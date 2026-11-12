@@ -234,38 +234,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0061A340 (FUN_0061A340)
-   *
-   * What it does:
-   * Thin alias lane that forwards one `(task, archive)` pair into
-   * `CUnitFormAndMoveTask::MemberSerialize`.
-   */
-  [[maybe_unused]] void CUnitFormAndMoveTaskMemberSerializeAliasThunk(
-    const CUnitFormAndMoveTask* const task,
-    gpg::WriteArchive* const archive
-  )
-  {
-    if (task != nullptr) {
-      task->MemberSerialize(archive);
-    }
-  }
-
-  /**
-   * Address: 0x0061A3E0 (FUN_0061A3E0)
-   *
-   * What it does:
-   * Thin alias lane that forwards one `(task, archive)` pair into
-   * `CUnitFormAndMoveTask::MemberSerialize`.
-   */
-  void CUnitFormAndMoveTaskMemberSerializeAlias(
-    const CUnitFormAndMoveTask* const task,
-    gpg::WriteArchive* const archive
-  )
-  {
-    task->MemberSerialize(archive);
-  }
-
-  /**
    * Address: 0x00619680 (FUN_00619680, Moho::CUnitFormAndMoveTask::OnEvent)
    * Primary vtable: `Listener<EAiNavigatorEvent>` secondary slot 0
    * (`??_7CUnitFormAndMoveTask@Moho@@6B?$Listener@W4EAiNavigatorEvent@Moho@@@Moho@@@`).
@@ -450,27 +418,4 @@ namespace gpg
     return gpg::WriteDerivedRef(outRef, value);
   }
 
-  /**
-   * Address: 0x0061A380 (FUN_0061A380)
-   *
-   * What it does:
-   * Wrapper lane that materializes one temporary
-   * `RRef_CUnitFormAndMoveTask` and copies object/type fields into the
-   * destination reference record.
-   */
-  gpg::RRef* AssignCUnitFormAndMoveTaskRef(
-    gpg::RRef* const outRef,
-    moho::CUnitFormAndMoveTask* const value
-  )
-  {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    gpg::RRef temporaryRef{};
-    (void)RRef_CUnitFormAndMoveTask(&temporaryRef, value);
-    outRef->mObj = temporaryRef.mObj;
-    outRef->mType = temporaryRef.mType;
-    return outRef;
-  }
 } // namespace gpg

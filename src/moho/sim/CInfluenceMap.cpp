@@ -1569,58 +1569,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0071CD70 (FUN_0071CD70)
-   *
-   * What it does:
-   * Serializes the 14 contiguous `float` lanes of one `SThreat` record.
-   */
-  void SerializeSThreatFloatLanesRaw(
-    gpg::WriteArchive* const archive,
-    const SThreat* const threat
-  )
-  {
-    if (archive == nullptr || threat == nullptr) {
-      return;
-    }
-
-    const float* const lanes = reinterpret_cast<const float*>(threat);
-    for (std::size_t i = 0u; i < 14u; ++i) {
-      archive->WriteFloat(lanes[i]);
-    }
-  }
-
-  /**
-   * Address: 0x0071CE40 (FUN_0071CE40)
-   *
-   * What it does:
-   * Serializes one `SThreat` record in named field order.
-   */
-  void SerializeSThreatFields(
-    gpg::WriteArchive* const archive,
-    const SThreat& threat
-  )
-  {
-    if (archive == nullptr) {
-      return;
-    }
-
-    archive->WriteFloat(threat.overallInfluence);
-    archive->WriteFloat(threat.influenceStructures);
-    archive->WriteFloat(threat.influenceStructuresNotMex);
-    archive->WriteFloat(threat.navalInfluence);
-    archive->WriteFloat(threat.landInfluence);
-    archive->WriteFloat(threat.airInfluence);
-    archive->WriteFloat(threat.experimentalInfluence);
-    archive->WriteFloat(threat.commanderInfluence);
-    archive->WriteFloat(threat.artilleryInfluence);
-    archive->WriteFloat(threat.antiAirInfluence);
-    archive->WriteFloat(threat.antiSurfaceInfluence);
-    archive->WriteFloat(threat.antiSubInfluence);
-    archive->WriteFloat(threat.economyInfluence);
-    archive->WriteFloat(threat.unknownInfluence);
-  }
-
-  /**
    * Address: 0x00715030 (FUN_00715030, ??0InfluenceGrid@Moho@@QAE@@Z)
    *
    * The binary does not delegate `entries`' construction to a nested
@@ -1748,21 +1696,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0071EDC0 (FUN_0071EDC0)
-   *
-   * What it does:
-   * Assigns one `InfluenceGrid` payload into `destination` and returns the
-   * destination pointer (secondary adapter lane).
-   */
-  moho::InfluenceGrid* AssignInfluenceGridAndReturnDestinationSecondary(
-    const moho::InfluenceGrid* const source,
-    moho::InfluenceGrid* const destination
-  )
-  {
-    return AssignInfluenceGridAndReturnDestinationPrimary(source, destination);
-  }
-
-  /**
    * Address: 0x0071D4B0 (FUN_0071D4B0, func_NewArray_SThreat)
    *
    * What it does:
@@ -1796,32 +1729,6 @@ namespace moho
     }
 
     return static_cast<InfluenceGrid*>(::operator new(sizeof(InfluenceGrid) * static_cast<std::size_t>(count)));
-  }
-
-  /**
-   * Address: 0x0071B2F0 (FUN_0071B2F0)
-   *
-   * What it does:
-   * Releases one raw allocation lane with `operator delete`.
-   */
-  void DeleteSThreatArrayOrZeroSizeBlockThunk(
-    void* const allocation
-  ) noexcept
-  {
-    ::operator delete(allocation);
-  }
-
-  /**
-   * Address: 0x0071BD30 (FUN_0071BD30)
-   *
-   * What it does:
-   * Releases one raw allocation lane with `operator delete`.
-   */
-  void DeleteInfluenceGridArrayOrZeroSizeBlockThunk(
-    void* const allocation
-  ) noexcept
-  {
-    ::operator delete(allocation);
   }
 
   /**

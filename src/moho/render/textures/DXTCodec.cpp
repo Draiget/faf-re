@@ -302,33 +302,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00404F80 (FUN_00404F80, Moho::DXT_DecodeBlocksToRGBA)
-   */
-  void DXT_DecodeBlocksToRGBA(
-    const std::uint64_t alphaBlock,
-    const std::uint64_t colorBlock,
-    const DXTFormat format,
-    std::uint32_t* const outArgb16
-  )
-  {
-    if (outArgb16 == nullptr) {
-      return;
-    }
-
-    DXT_DecodeColorBlock(colorBlock, format, outArgb16);
-    if (format == DXTFormat_DXT1) {
-      return;
-    }
-
-    std::uint8_t alpha[16]{};
-    DXT_DecodeAlphaBlock(alphaBlock, format, alpha);
-    for (int i = 0; i < 16; ++i) {
-      outArgb16[i] &= 0x00FFFFFFu;
-      outArgb16[i] |= (static_cast<std::uint32_t>(alpha[i]) << 24u);
-    }
-  }
-
-  /**
    * Address: 0x00404FE0 (FUN_00404FE0, Moho::DXT_GetTexelAlpha)
    */
   std::uint8_t DXT_GetTexelAlpha(

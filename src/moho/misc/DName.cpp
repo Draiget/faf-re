@@ -817,35 +817,6 @@ namespace fa
   }
 
   /**
-   * Address: 0x00AB19B2 (FUN_00AB19B2)
-   *
-   * What it does:
-   * Rebinds this name to one nested-name pointer lane when writable, or falls
-   * back to protected status when nested input is absent.
-   */
-  DName& DName::assignNestedPointer(
-    DName* const nestedName
-  ) noexcept
-  {
-    const DNameStatus currentStatusKind = DecodeStatusKind(statusWord_);
-    if (currentStatusKind != DNameStatus::kEmpty && currentStatusKind != DNameStatus::kUnknownToken) {
-      return *this;
-    }
-
-    if (nestedName != nullptr) {
-      statusWord_ &= 0xFFFFF70Fu;
-      DNamePointerNode* const pointerNode = AllocateUndecoratorObject<DNamePointerNode>(nestedName);
-      headNode_ = pointerNode;
-      if (pointerNode == nullptr) {
-        statusWord_ = (statusWord_ & 0xFFFFFFF3u) | 0x3u;
-      }
-      return *this;
-    }
-
-    return *this = DNameStatus::kProtected;
-  }
-
-  /**
    * Address: 0x00AB1A1A (FUN_00AB1A1A, DName::doPchar)
    * Mangled: ?doPchar@DName@@AAEXPBDH@Z
    *
@@ -965,19 +936,6 @@ namespace fa
   {
     const DNameStatus statusKind = DecodeStatusKind(statusWord_);
     return statusKind == DNameStatus::kEmpty || statusKind == DNameStatus::kUnknownToken;
-  }
-
-  /**
-   * Address: 0x00AB14EC (?isUDC@DName@@QBEHXZ)
-   * Mangled: ?isUDC@DName@@QBEHXZ
-   *
-   * What it does:
-   * Returns true when the name chain is non-empty/valid and the UDC marker bit
-   * (`0x20`) is set in the status word.
-   */
-  bool DName::isUDC() const noexcept
-  {
-    return headNode_ != nullptr && isValid() && (statusWord_ & 0x20u) != 0u;
   }
 
   /**

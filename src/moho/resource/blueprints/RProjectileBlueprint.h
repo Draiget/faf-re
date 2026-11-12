@@ -219,60 +219,6 @@ namespace moho
      * using `Physics.InitialSpeedRange`.
      */
     [[nodiscard]] float GetRandomInitialSpeed(CRandomStream* randomStream) const;
-
-    /**
-     * Address: 0x0051C620 (FUN_0051C620)
-     *
-     * What it does:
-     * Samples a symmetric lifetime offset around `Physics.Lifetime` using
-     * `Physics.LifetimeRange`.
-     */
-    [[nodiscard]] float GetRandomLifetime(CRandomStream* randomStream) const;
-
-    /**
-     * Address: 0x0051C6E0 (FUN_0051C6E0)
-     *
-     * What it does:
-     * Samples a symmetric max-speed offset around `Physics.MaxSpeed` using
-     * `Physics.MaxSpeedRange`.
-     */
-    [[nodiscard]] float GetRandomMaxSpeed(CRandomStream* randomStream) const;
-
-    /**
-     * Address: 0x0051C740 (FUN_0051C740)
-     *
-     * What it does:
-     * Samples a symmetric acceleration offset around `Physics.Acceleration`
-     * using `Physics.AccelerationRange`.
-     */
-    [[nodiscard]] float GetRandomAcceleration(CRandomStream* randomStream) const;
-
-    /**
-     * Address: 0x0051C7A0 (FUN_0051C7A0)
-     *
-     * What it does:
-     * Samples a symmetric turn-rate offset around `Physics.TurnRate` using
-     * `Physics.TurnRateRange`.
-     */
-    [[nodiscard]] float GetRandomTurnRate(CRandomStream* randomStream) const;
-
-    /**
-     * Address: 0x0051C800 (FUN_0051C800)
-     *
-     * What it does:
-     * Samples a symmetric mesh-scale offset around `Display.UniformScale`
-     * using `Display.MeshScaleRange`.
-     */
-    [[nodiscard]] float GetRandomMeshScale(CRandomStream* randomStream) const;
-
-    /**
-     * Address: 0x0051C860 (FUN_0051C860)
-     *
-     * What it does:
-     * Samples a symmetric mesh-scale-velocity offset around
-     * `Display.MeshScaleVelocity` using `Display.MeshScaleVelocityRange`.
-     */
-    [[nodiscard]] float GetRandomMeshScaleVelocity(CRandomStream* randomStream) const;
   };
 
   /**

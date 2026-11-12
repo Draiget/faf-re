@@ -98,16 +98,6 @@ namespace moho
      */
     [[nodiscard]] bool GetInfo(SInfo& outInfo, bool useFineTime) const noexcept;
 
-    /**
-     * Address: 0x004E9D30 (FUN_004E9D30, ?GetDeltaSeconds@CTimeStamp@Moho@@QBENABV12@@Z)
-     * Mangled: ?GetDeltaSeconds@CTimeStamp@Moho@@QBENABV12@@Z
-     *
-     * What it does:
-     * Returns the signed second delta between this timestamp and another one
-     * using fine-time seconds + millisecond lanes.
-     */
-    [[nodiscard]] double GetDeltaSeconds(const CTimeStamp& other) const noexcept;
-
     std::int64_t time{0};    // +0x00
     std::int64_t ftime{0};   // +0x08
     std::uint16_t millis{0}; // +0x10

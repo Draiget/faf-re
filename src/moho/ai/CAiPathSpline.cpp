@@ -159,26 +159,6 @@ SteeringParams::SteeringParams(
   mRotateOnSpotThreshold = physics.RotateOnSpotThreshold;
 }
 
-/**
- * Address: 0x006990B0 (FUN_006990B0)
- *
- * What it does:
- * Register-shape adapter that placement-constructs one `SteeringParams`
- * object with dynamic limits enabled.
- */
-[[maybe_unused]] SteeringParams* ConstructSteeringParamsAdapter(
-  const Wm3::Vector3f* const sourcePosition,
-  const Wm3::Vector3f* const destinationPosition,
-  const Wm3::Vector3f* const forwardVector,
-  SteeringParams* const outParams,
-  Unit* const unit,
-  const float speedLimit
-) noexcept
-{
-  ::new (outParams) SteeringParams(unit, *sourcePosition, *destinationPosition, *forwardVector, speedLimit, false);
-  return outParams;
-}
-
 namespace moho
 {
   /**
@@ -204,59 +184,6 @@ namespace moho
     return SteeringParams(unit, source, destination, forward, 0.0f, true);
   }
 } // namespace moho
-
-/**
- * Address: 0x00698F40 (FUN_00698F40)
- *
- * What it does:
- * Normalizes one input 2D direction lane into caller-owned output storage.
- */
-[[maybe_unused]] Wm3::Vector2f* NormalizeDirection2DUnchecked(
-  Wm3::Vector2f* const outDirection,
-  const Wm3::Vector2f* const inputDirection
-) noexcept
-{
-  const float x = inputDirection->x;
-  const float y = inputDirection->y;
-  const float invLength = 1.0f / std::sqrt((x * x) + (y * y));
-  outDirection->x = x * invLength;
-  outDirection->y = y * invLength;
-  return outDirection;
-}
-
-/**
- * Address: 0x00699500 (FUN_00699500)
- *
- * What it does:
- * Applies one steering blend/clamp lane to a 3D direction vector, preserving
- * orientation while enforcing a maximum magnitude cap.
- */
-[[maybe_unused]] void BlendAndClampDirection3D(
-  const Wm3::Vector3f* const blendDirection,
-  Wm3::Vector3f* const inOutDirection,
-  const float maxMagnitude
-) noexcept
-{
-  const float lengthSq = (inOutDirection->x * inOutDirection->x) + (inOutDirection->y * inOutDirection->y) +
-    (inOutDirection->z * inOutDirection->z);
-
-  if (lengthSq <= (maxMagnitude * maxMagnitude)) {
-    return;
-  }
-
-  const float deltaLength = std::sqrt(lengthSq) - maxMagnitude;
-  inOutDirection->x = ((blendDirection->x * deltaLength) + maxMagnitude) * inOutDirection->x;
-  inOutDirection->y = ((blendDirection->y * deltaLength) + maxMagnitude) * inOutDirection->y;
-  inOutDirection->z = ((blendDirection->z * deltaLength) + maxMagnitude) * inOutDirection->z;
-
-  const float adjustedLengthSq = (inOutDirection->x * inOutDirection->x) + (inOutDirection->y * inOutDirection->y) +
-    (inOutDirection->z * inOutDirection->z);
-  const float normalizeScale = maxMagnitude / std::sqrt(adjustedLengthSq);
-
-  inOutDirection->x *= normalizeScale;
-  inOutDirection->y *= normalizeScale;
-  inOutDirection->z *= normalizeScale;
-}
 
 /**
  * Address: 0x00699760 (FUN_00699760)
@@ -1741,19 +1668,6 @@ void ECollisionTypeTypeInfo::Init()
   size_ = sizeof(ECollisionType);
   gpg::RType::Init();
   Finish();
-}
-
-/**
- * Address: 0x0062F740 (FUN_0062F740, CPathPointTypeInfo non-deleting cleanup body)
- *
- * What it does:
- * Executes one non-deleting destruction lane for `CPathPointTypeInfo`.
- */
-[[maybe_unused]] void DestroyCPathPointTypeInfoBody(
-  CPathPointTypeInfo* const typeInfo
-) noexcept
-{
-  typeInfo->~CPathPointTypeInfo();
 }
 
 CPathPointTypeInfo::~CPathPointTypeInfo() = default;

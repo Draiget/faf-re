@@ -146,22 +146,4 @@ namespace moho
     return total;
   }
 
-  std::size_t EntityMemoryManager::GetTotalActiveSlabs() const noexcept
-  {
-    std::size_t total = 0;
-    for (const auto& pool : mPools) {
-      total += pool->GetActiveSlabCount();
-    }
-    return total;
-  }
-
-  std::size_t EntityMemoryManager::GetTotalCachedEmptySlabs() const noexcept
-  {
-    std::size_t total = 0;
-    for (const auto& pool : mPools) {
-      total += pool->GetCachedEmptySlabCount();
-    }
-    return total;
-  }
-
 } // namespace moho

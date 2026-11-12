@@ -454,17 +454,6 @@ namespace moho
     void GenerateNewBlips(const fa::vector<SNewBlip>& pending);
 
     /**
-     * Address: 0x005C1810 (FUN_005C1810, Moho::CAiReconDBImpl::IntelConfirmDead)
-     *
-     * ReconBlip *
-     *
-     * What it does:
-     * Returns true when a blip should be treated as confirmed-dead for this
-     * army (ally visibility or direct LOS probe).
-     */
-    [[nodiscard]] bool IntelConfirmDead(ReconBlip* blip);
-
-    /**
      * Address: 0x005C0930 (FUN_005C0930)
      *
      * SNewBlip const &

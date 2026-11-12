@@ -223,15 +223,6 @@ namespace moho
     void AbortActiveTask();
 
     /**
-     * Address: 0x006EE3C0 (FUN_006EE3C0, ?SetCommandCount@CUnitCommandQueue@Moho@@QAEXII@Z)
-     *
-     * What it does:
-     * Sets one queued command count lane, updates command dirty flag state,
-     * and applies queue-head/queue-removal transitions when count is zero.
-     */
-    void SetCommandCount(unsigned int index, unsigned int count);
-
-    /**
      * Address: 0x006EE430 (FUN_006EE430)
      *
      * IDA signature:
@@ -251,14 +242,6 @@ namespace moho
      * queue refresh state dirty when index/target are valid.
      */
     void SetCommandTarget(unsigned int index, Entity* targetEntity);
-
-    /**
-     * Address: 0x006A4DD0 (FUN_006A4DD0)
-     *
-     * What it does:
-     * Returns whether this queue has a pending refresh lane.
-     */
-    [[nodiscard]] bool IsRefreshPending() const;
 
   private:
     /**

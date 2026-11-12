@@ -759,50 +759,6 @@ namespace
 } // namespace
 
 /**
- * Address: 0x0077F670 (FUN_0077F670)
- *
- * What it does:
- * Writes `0.0` into Lua table lane `1` for one lazy-var object lane.
- */
-[[maybe_unused]] void ResetLazyVarObjectLaneToZero(
-  LuaPlus::LuaObject* const lazyVarObject
-)
-{
-  if (lazyVarObject != nullptr) {
-    lazyVarObject->SetNumber(1, 0.0);
-  }
-}
-
-/**
- * Address: 0x00782E60 (FUN_00782E60)
- *
- * What it does:
- * Adapter lane that resolves and returns one `CScriptLazyVar_float` value.
- */
-[[maybe_unused]] float EvaluateLazyVarFloatValueAdapter(
-  const moho::CScriptLazyVar_float* const value
-) noexcept
-{
-  return moho::CScriptLazyVar_float::GetValue(value);
-}
-
-/**
- * Address: 0x00782E70 (FUN_00782E70)
- *
- * What it does:
- * Adapter lane that sets one `CScriptLazyVar_float` value and returns the
- * same lazy-var lane pointer.
- */
-[[maybe_unused]] moho::CScriptLazyVar_float* SetLazyVarFloatValueAdapter(
-  moho::CScriptLazyVar_float* const value,
-  const float next
-) noexcept
-{
-  moho::CScriptLazyVar_float::SetValue(value, next);
-  return value;
-}
-
-/**
  * Address: 0x007822C0 (FUN_007822C0, cfunc_CMauiBitMapGetNumFrames)
  *
  * What it does:
@@ -1918,20 +1874,6 @@ void moho::func_PushBlinkyBox(
   blinkyBox->mTotalTime = totalTime;
 
   blinkyBox->ListLinkBefore(&moho::sBlinkyBoxes);
-}
-
-/**
- * Address: 0x007FDA90 (FUN_007FDA90)
- *
- * What it does:
- * Adds one user-unit lane into the global selection-bracket weak-set and
- * returns the raw register lane value from WeakSet_UserEntity::Add.
- */
-void moho::func_AddSelectionBracketUserUnit(
-  UserUnit* const unit
-)
-{
-  (void)sSelectionBrackets.Add(unit);
 }
 
 fa::list<SCommandFeedbackBlip> sCommandFeedbackBlips;

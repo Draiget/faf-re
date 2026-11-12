@@ -31,15 +31,6 @@ namespace moho
   void THREAD_InitInvoke();
 
   /**
-   * Address: 0x00413AB0 (FUN_00413AB0)
-   *
-   * What it does:
-   * Returns true when called from the thread captured by
-   * `THREAD_InitInvoke()`.
-   */
-  bool THREAD_IsMainThread();
-
-  /**
    * Address: 0x00413AD0 (FUN_00413AD0)
    *
    * What it does:
@@ -56,17 +47,6 @@ namespace moho
    * Clones one callback and queues it as an APC to the resolved target thread.
    */
   void THREAD_InvokeAsync(boost::function<void(), std::allocator<void>> fn, uint32_t threadId);
-
-  /**
-   * Address: 0x00413C50 (FUN_00413C50)
-   *
-   * boost::function<void(),std::allocator<void>>,uint32_t
-   *
-   * What it does:
-   * Queues one callback as APC and blocks until the callback signals
-   * completion.
-   */
-  void THREAD_InvokeWait(boost::function<void(), std::allocator<void>> fn, uint32_t threadId);
 
   /**
    * Address: 0x004141A0 (FUN_004141A0)

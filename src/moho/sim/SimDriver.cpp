@@ -1021,23 +1021,6 @@ CSimDriver::~CSimDriver()
   mSyncDataQueue.ClearAndDelete();
 }
 
-/**
- * Address: 0x0073B910 (FUN_0073B910, Moho::CSimDriver::dtr)
- *
- * What it does:
- * Runs destructor logic and conditionally frees object storage.
- */
-CSimDriver* CSimDriver::DestroyWithDeleteFlag(
-  const std::uint8_t deleteFlag
-)
-{
-  this->~CSimDriver();
-  if ((deleteFlag & 0x1u) != 0u) {
-    ::operator delete(static_cast<void*>(this));
-  }
-  return this;
-}
-
 void CSimDriver::JoinAndDeleteThread(
   boost::thread*& thread
 )
@@ -1935,29 +1918,6 @@ double CSimDriver::GetSimSpeed()
     return 0.0;
   }
   return -static_cast<double>(gSkewClock.mLagMs) / 100.0;
-}
-
-/**
- * Address: 0x0073C640 (FUN_0073C640, sub_73C640)
- *
- * What it does:
- * Stamps `mLastSyncCycleTime`, signals the connection event, and writes the
- * current command-cookie lane to one output pointer.
- */
-std::int32_t* CSimDriver::SignalConnectionAndWriteCommandCookie(
-  std::int32_t* const outCommandCookie
-)
-{
-  mLastSyncCycleTime = mTimer.ElapsedCycles();
-  if (mConnectionEvent != nullptr) {
-    SetEvent(mConnectionEvent);
-  }
-
-  if (outCommandCookie != nullptr) {
-    *outCommandCookie = mNextIssueBeat;
-  }
-
-  return outCommandCookie;
 }
 
 /**

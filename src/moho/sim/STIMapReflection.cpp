@@ -125,17 +125,6 @@ namespace gpg
   }
 
   /**
-   * Address: 0x005099A0 (FUN_005099A0, STIMap RRef upcast helper)
-   */
-  void* UpcastPointerToSTIMap(
-    const gpg::RRef& source
-  )
-  {
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedSTIMapTypeVariant1());
-    return upcast.mObj;
-  }
-
-  /**
    * Alias of FUN_005096E0 (non-canonical helper lane).
    */
   moho::STIMap* ReadPointerSTIMap(

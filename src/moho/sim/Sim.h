@@ -159,16 +159,6 @@ namespace moho
   struct SCamShakeParams;
 
   /**
-   * Address: 0x007538C0 (FUN_007538C0, boost::shared_ptr_SParticleBuffer::shared_ptr_SParticleBuffer)
-   *
-   * What it does:
-   * Constructs one `shared_ptr<SParticleBuffer>` from one raw particle-buffer
-   * pointer lane.
-   */
-  boost::shared_ptr<SParticleBuffer>*
-  ConstructSharedParticleBufferFromRaw(boost::shared_ptr<SParticleBuffer>* outBuffer, SParticleBuffer* buffer);
-
-  /**
    * Address: 0x006F14D0 (FUN_006F14D0, Moho::UNIT_IssueFactoryCommand)
    *
    * What it does:
@@ -329,15 +319,6 @@ namespace moho
      * records desync details on mismatch, and clears the cached desync log list.
      */
     void VerifyChecksum(const gpg::MD5Digest&, CSeqNo) override;
-
-    /**
-     * Address: 0x00748600 (FUN_00748600, ?GetBeatChecksum@Sim@Moho@@QBE_NVCSeqNo@2@AAUMD5Digest@gpg@@@Z)
-     *
-     * What it does:
-     * Copies one retained beat checksum out of the 128-entry rolling ring when
-     * the requested beat is still available.
-     */
-    bool GetBeatChecksum(gpg::MD5Digest* outChecksum, CSeqNo beat) const;
 
     /**
      * Address: 0x00748960 (FUN_00748960)
@@ -6386,22 +6367,6 @@ namespace moho
    * Startup thunk that forwards registration to `func_RegisterEmitterBlueprint_LuaFuncDef`.
    */
   CScrLuaInitForm* register_RegisterEmitterBlueprint_LuaFuncDef();
-
-  /**
-   * Address: 0x00BC8EB0 (FUN_00BC8EB0, j_func_RegisterBeamBlueprint_LuaFuncDef)
-   *
-   * What it does:
-   * Startup thunk that forwards registration to `func_RegisterBeamBlueprint_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_RegisterBeamBlueprint_LuaFuncDef();
-
-  /**
-   * Address: 0x00BC8EC0 (FUN_00BC8EC0, j_func_BlueprintLoaderUpdateProgress_LuaFuncDef)
-   *
-   * What it does:
-   * Startup thunk that forwards registration to `func_BlueprintLoaderUpdateProgress_LuaFuncDef`.
-   */
-  CScrLuaInitForm* j_func_BlueprintLoaderUpdateProgress_LuaFuncDef();
 
   /**
    * Address: 0x0074B110 (FUN_0074B110, ?SIM_FromLuaState@Moho@@YAPAVSim@1@PAVLuaState@LuaPlus@@@Z)

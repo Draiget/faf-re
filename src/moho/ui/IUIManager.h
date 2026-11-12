@@ -209,22 +209,6 @@ namespace moho
   [[nodiscard]] CUIManager* GetUiManagerGlobalLaneA() noexcept;
 
   /**
-   * Address: 0x0084C960 (FUN_0084C960)
-   *
-   * What it does:
-   * Secondary lane returning the global UI-manager singleton pointer.
-   */
-  [[nodiscard]] CUIManager* GetUiManagerGlobalLaneB() noexcept;
-
-  /**
-   * Address: 0x0083CE10 (FUN_0083CE10)
-   *
-   * What it does:
-   * Forces UI state to lobby-mode.
-   */
-  void ForceUiStateLobbyMode();
-
-  /**
    * Address: 0x0083D140 (FUN_0083D140, ?UI_StartFrontEnd@Moho@@YA_NXZ)
    *
    * What it does:

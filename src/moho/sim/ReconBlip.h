@@ -308,54 +308,6 @@ namespace moho
     [[nodiscard]] Unit* GetCreator() const noexcept;
 
     /**
-     * Address: 0x005BDEA0 (FUN_005BDEA0, Moho::ReconBlip::DeleteWhenStale)
-     *
-     * What it does:
-     * Returns the stale-delete policy flag for this blip.
-     */
-    [[nodiscard]] bool DeleteWhenStale() const;
-
-    /**
-     * Address: 0x005BDEB0 (FUN_005BDEB0, Moho::ReconBlip::IsJam)
-     *
-     * What it does:
-     * Returns the per-blip jam/fake marker lane stored in unit-const data.
-     */
-    [[nodiscard]] bool IsJam() const;
-
-    /**
-     * Address: 0x005BDEC0 (FUN_005BDEC0, Moho::ReconBlip::GetReconInfo)
-     *
-     * What it does:
-     * Returns the mutable per-army recon lane selected by direct army index.
-     */
-    [[nodiscard]] SPerArmyReconInfo* GetReconInfo(std::int32_t armyIndex);
-
-    /**
-     * Address: 0x005BDED0 (FUN_005BDED0, Moho::ReconBlip::GetReconInfo)
-     *
-     * What it does:
-     * Returns the mutable per-army recon lane selected by `army` index.
-     */
-    [[nodiscard]] SPerArmyReconInfo* GetReconInfo(SimArmy* army);
-
-    /**
-     * Address: 0x005BDEE0 (FUN_005BDEE0, Moho::ReconBlip::GetReconInfo)
-     *
-     * What it does:
-     * Returns the const per-army recon lane selected by direct army index.
-     */
-    [[nodiscard]] const SPerArmyReconInfo* GetReconInfo(std::int32_t armyIndex) const;
-
-    /**
-     * Address: 0x005BDEF0 (FUN_005BDEF0, Moho::ReconBlip::GetReconInfo)
-     *
-     * What it does:
-     * Returns the const per-army recon lane selected by `army` index.
-     */
-    [[nodiscard]] const SPerArmyReconInfo* GetReconInfo(SimArmy* army) const;
-
-    /**
      * Address: 0x005BDF00 (FUN_005BDF00, Moho::ReconBlip::GetFlags)
      *
      * What it does:
@@ -370,69 +322,6 @@ namespace moho
      * Returns one army-local recon bitmask by owning army object.
      */
     [[nodiscard]] EReconFlags GetFlags(CArmyImpl* army) const;
-
-    /**
-     * Address: 0x005BDF30 (FUN_005BDF30, Moho::ReconBlip::IsKnownFake)
-     *
-     * What it does:
-     * Returns whether this blip is marked `RECON_KnownFake` for the queried
-     * army lane.
-     */
-    [[nodiscard]] bool IsKnownFake(CArmyImpl* army) const;
-
-    /**
-     * Address: 0x005BDF50 (FUN_005BDF50, Moho::ReconBlip::IsOnRadar)
-     *
-     * What it does:
-     * Returns whether this blip is currently radar-visible for the queried army
-     * lane.
-     */
-    [[nodiscard]] bool IsOnRadar(CArmyImpl* army) const;
-
-    /**
-     * Address: 0x005BDF70 (FUN_005BDF70, Moho::ReconBlip::IsOnSonar)
-     *
-     * What it does:
-     * Returns whether this blip is currently sonar-visible for the queried army
-     * lane.
-     */
-    [[nodiscard]] bool IsOnSonar(CArmyImpl* army) const;
-
-    /**
-     * Address: 0x005BDF90 (FUN_005BDF90, Moho::ReconBlip::IsOnOmni)
-     *
-     * What it does:
-     * Returns whether this blip is currently omni-visible for the queried army
-     * lane.
-     */
-    [[nodiscard]] bool IsOnOmni(CArmyImpl* army) const;
-
-    /**
-     * Address: 0x005BDFB0 (FUN_005BDFB0, Moho::ReconBlip::IsSeenEver)
-     *
-     * What it does:
-     * Returns whether this blip has ever been seen (`RECON_LOSEver`) by the
-     * queried army lane.
-     */
-    [[nodiscard]] bool IsSeenEver(CArmyImpl* army) const;
-
-    /**
-     * Address: 0x005BDFD0 (FUN_005BDFD0, Moho::ReconBlip::IsSeenNow)
-     *
-     * What it does:
-     * Returns whether this blip is currently seen (`RECON_LOSNow`) by the
-     * queried army lane.
-     */
-    [[nodiscard]] bool IsSeenNow(CArmyImpl* army) const;
-
-    /**
-     * Address: 0x005BDFF0 (FUN_005BDFF0, Moho::ReconBlip::IsMaybeDead)
-     *
-     * What it does:
-     * Returns whether this blip is marked `RECON_MaybeDead` for the queried
-     * army lane.
-     */
-    [[nodiscard]] bool IsMaybeDead(CArmyImpl* army) const;
 
     /**
      * Address: 0x005BF5F0 (FUN_005BF5F0, Moho::ReconBlip::GetTargetPoint)

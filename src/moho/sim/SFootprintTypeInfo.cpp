@@ -29,21 +29,6 @@ namespace moho
   gpg::RType* SFootprint::sType = nullptr;
 
   /**
-   * Address: 0x0050AEE0 (FUN_0050AEE0)
-   *
-   * What it does:
-   * Returns whether two footprint payload lanes are byte-identical across the
-   * full 0x10-byte `SFootprint` layout.
-   */
-  [[maybe_unused]] [[nodiscard]] bool AreSFootprintBytesEqual(
-    const SFootprint& lhs,
-    const SFootprint& rhs
-  ) noexcept
-  {
-    return std::memcmp(&lhs, &rhs, sizeof(SFootprint)) == 0;
-  }
-
-  /**
    * Address: 0x0050C410 (FUN_0050C410, Moho::SFootprintTypeInfo::SFootprintTypeInfo)
    *
    * What it does:

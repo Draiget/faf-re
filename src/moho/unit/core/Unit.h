@@ -927,15 +927,6 @@ namespace moho
     void UpdateTerrainType(const Wm3::Vector3f& position);
 
     /**
-     * Address: 0x006A9A40 (FUN_006A9A40, Moho::Unit::HandleTerranEffects)
-     *
-     * What it does:
-     * Applies periodic terrain-driven health effects (`HealthEffectPerSecond`)
-     * from terrain-type Lua data and kills the unit when health drops to zero.
-     */
-    void HandleTerranEffects();
-
-    /**
      * Address: 0x006ABC30 (FUN_006ABC30, Moho::Unit::UpdateVisibility)
      *
      * What it does:
@@ -1310,46 +1301,6 @@ namespace moho
     std::int32_t DecrementCapturers();
 
     /**
-     * Address: 0x00603F30 (FUN_00603F30)
-     *
-     * What it does:
-     * Returns the current non-negative captor reference count lane.
-     */
-    [[nodiscard]] std::int32_t GetCapturerCount() const noexcept;
-
-    /**
-     * Address: 0x005F24C0 (FUN_005F24C0)
-     *
-     * What it does:
-     * Returns whether this unit belongs to the MELEE category lane.
-     */
-    [[nodiscard]] bool IsMeleeUnit() const noexcept;
-
-    /**
-     * Address: 0x005F5570 (FUN_005F5570)
-     *
-     * What it does:
-     * Returns the current retaliation fire-state lane.
-     */
-    [[nodiscard]] std::int32_t GetFireStateValue() const noexcept;
-
-    /**
-     * Address: 0x005F5560 (FUN_005F5560)
-     *
-     * What it does:
-     * Stores one upgraded-unit entity id lane and returns that id.
-     */
-    [[nodiscard]] EntId SetUpgradedToEntityId(EntId upgradedToEntityId) noexcept;
-
-    /**
-     * Address: 0x005F5590 (FUN_005F5590)
-     *
-     * What it does:
-     * Returns the current silo-build implementation lane pointer.
-     */
-    [[nodiscard]] CAiSiloBuildImpl* GetSiloBuildImpl() const noexcept;
-
-    /**
      * Address: 0x006A7640 (FUN_006A7640, Moho::Unit::SetFocusEntity)
      * Mangled: ?SetFocusEntity@Unit@Moho@@QAEXPAVEntity@2@@Z
      *
@@ -1457,70 +1408,6 @@ namespace moho
     void SetConsumptionActive(bool isActive);
 
     /**
-     * Address: 0x006C3A10 (FUN_006C3A10)
-     *
-     * What it does:
-     * Writes one stunned-state tick lane.
-     */
-    void SetStunnedStateRaw(std::int32_t stunnedState) noexcept;
-
-    /**
-     * Address: 0x006C3A20 (FUN_006C3A20)
-     *
-     * What it does:
-     * Stores one overcharge-paused boolean lane.
-     */
-    void SetOverchargePausedFlag(bool paused) noexcept;
-
-    /**
-     * Address: 0x006C3A30 (FUN_006C3A30)
-     *
-     * What it does:
-     * Returns the overcharge-paused boolean lane.
-     */
-    [[nodiscard]] bool IsOverchargePausedFlag() const noexcept;
-
-    /**
-     * Address: 0x006C3A40 (FUN_006C3A40)
-     *
-     * What it does:
-     * Returns the consumption-active boolean lane.
-     */
-    [[nodiscard]] bool IsConsumptionActiveFlag() const noexcept;
-
-    /**
-     * Address: 0x006C3A50 (FUN_006C3A50)
-     *
-     * What it does:
-     * Returns the valid-target boolean lane.
-     */
-    [[nodiscard]] bool IsValidTargetFlag() const noexcept;
-
-    /**
-     * Address: 0x006C3A60 (FUN_006C3A60)
-     *
-     * What it does:
-     * Stores one valid-target boolean lane.
-     */
-    void SetIsValidTargetFlag(bool validTarget) noexcept;
-
-    /**
-     * Address: 0x006C3A70 (FUN_006C3A70)
-     *
-     * What it does:
-     * Returns the shield-ratio float lane.
-     */
-    [[nodiscard]] float GetShieldRatioRaw() const noexcept;
-
-    /**
-     * Address: 0x006C3A80 (FUN_006C3A80)
-     *
-     * What it does:
-     * Stores one shield-ratio float lane.
-     */
-    void SetShieldRatioRaw(float shieldRatio) noexcept;
-
-    /**
      * Address: 0x006AAA90 (FUN_006AAA90, ?SetProductionActive@Unit@Moho@@QAEX_N@Z)
      *
      * What it does:
@@ -1530,41 +1417,6 @@ namespace moho
     void SetProductionActive(bool isActive);
 
     /**
-     * Address: 0x006AAE20 (FUN_006AAE20, Moho::Unit::GetConsumptionRequest)
-     *
-     * What it does:
-     * Returns the currently requested upkeep economy pair from
-     * `mConsumptionData`.
-     */
-    [[nodiscard]] SEconValue GetConsumptionRequest() const;
-
-    /**
-     * Address: 0x006AAE40 (FUN_006AAE40, Moho::Unit::UpdateResourceProduction)
-     *
-     * What it does:
-     * Stores the current per-tick maintenance production pair in the shared
-     * economy-rate lane.
-     */
-    void UpdateResourceProduction(const SEconValue& resourceProduction);
-
-    /**
-     * Address: 0x006ABC70 (FUN_006ABC70, ?ResetEconValues@Unit@Moho@@QAEXXZ)
-     *
-     * What it does:
-     * Clears the unit's produced and resources-spent economy totals.
-     */
-    Unit* ResetEconValues();
-
-    /**
-     * Address: 0x006A9370 (FUN_006A9370, ?RenderAIDebugInfo@Unit@Moho@@AAEXXZ)
-     *
-     * What it does:
-     * Emits per-unit AI debug stat counters under `AIDebug_<UniqueName>`,
-     * including platoon metadata, idle marker, and active unit-state markers.
-     */
-    void RenderAIDebugInfo();
-
-    /**
      * Address: 0x006AC530 (FUN_006AC530, ?ShowAIDebugInfo@Unit@Moho@@QAEX_N@Z)
      *
      * What it does:
@@ -1572,15 +1424,6 @@ namespace moho
      * owning army stats.
      */
     void ShowAIDebugInfo(bool isEnabled);
-
-    /**
-     * Address: 0x006AC600 (FUN_006AC600, ?DebugShowRaisedPlatforms@Unit@Moho@@QAEXXZ)
-     *
-     * What it does:
-     * When `ShowRaisedPlatforms` sim-convar is enabled, draws one debug quad
-     * for each raised-platform blueprint polygon relative to unit position.
-     */
-    void DebugShowRaisedPlatforms();
 
     /**
      * Address: 0x0062AF70 (FUN_0062AF70, Moho::Unit::DistanceToOccupiedRect)
@@ -1753,16 +1596,6 @@ namespace moho
     void SetGuardedUnit(Unit* guarded);
 
     /**
-     * Address: 0x006AA720 (FUN_006AA720, ?RemoveGuardedByUnit@Unit@Moho@@AAEXPAV12@@Z)
-     * Mangled: ?RemoveGuardedByUnit@Unit@Moho@@AAEXPAV12@@Z
-     *
-     * What it does:
-     * Adds one guarding unit into this unit's guarded-by owner list when non-null,
-     * then clears stale guard-formation ownership.
-     */
-    void RemoveGuardedByUnit(Unit* guardedByUnit);
-
-    /**
      * Address: 0x00585B10 (FUN_00585B10, Moho::Unit::GetFocusEntity)
      *
      * What it does:
@@ -1803,15 +1636,6 @@ namespace moho
      */
     [[nodiscard]]
     Unit* GetFerryUnit() const;
-
-    /**
-     * Address: 0x0060DAD0 (FUN_0060DAD0, Moho::Unit::SetAssignedTransport)
-     *
-     * What it does:
-     * Rebinds `AssignedTransportRef` to one transport unit weak-reference
-     * owner lane.
-     */
-    void SetAssignedTransport(Unit* assignedTransport);
 
     /**
      * Address: 0x006A8890 (FUN_006A8890, Moho::Unit::GetTransportFerryBeacon)

@@ -863,30 +863,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x008AE470 (FUN_008AE470, user-sound singleton getter lane)
-   *
-   * What it does:
-   * Alias entry that returns the same process-global user-sound-manager
-   * singleton pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] CUserSoundManager* USER_GetSoundManagerSingletonRawAliasA() noexcept
-  {
-    return USER_GetSoundManagerSingletonRaw();
-  }
-
-  /**
-   * Address: 0x008AED80 (FUN_008AED80, user-sound singleton getter lane)
-   *
-   * What it does:
-   * Alias entry that returns the same process-global user-sound-manager
-   * singleton pointer.
-   */
-  [[maybe_unused]] [[nodiscard]] CUserSoundManager* USER_GetSoundManagerSingletonRawAliasB() noexcept
-  {
-    return USER_GetSoundManagerSingletonRaw();
-  }
-
-  /**
    * Address: 0x008AA470 (FUN_008AA470, Moho::SND_StopEntityLoop)
    *
    * What it does:
@@ -1316,25 +1292,6 @@ namespace moho
 
     SND_StopEntityLoop(record);
     return true;
-  }
-
-  /**
-   * Address: 0x008ABCB0 (FUN_008ABCB0, Moho::CUserSoundManager::StopEntityLoop)
-   *
-   * What it does:
-   * Routes one entity-loop stop request to destroy-or-stop behavior.
-   */
-  void CUserSoundManager::StopEntityLoop(
-    SoundHandleRecord* const record,
-    const bool destroy
-  )
-  {
-    if (destroy) {
-      SND_DestroyEntityLoop(record);
-      return;
-    }
-
-    SND_StopEntityLoop(record);
   }
 
   /**

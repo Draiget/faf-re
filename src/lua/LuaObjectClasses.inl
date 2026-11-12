@@ -199,49 +199,6 @@ const char* LuaState::CheckString(
 }
 
 /**
- * Address: 0x0090C170 (FUN_0090C170, LuaPlus::LuaState::CheckAny)
- *
- * What it does:
- * Raises a Lua argument error when stack slot `index` is missing.
- */
-void LuaState::CheckAny(
-  const int32_t index
-)
-{
-  luaL_checkany(m_state, index);
-}
-
-/**
- * Address: 0x0090BF90 (FUN_0090BF90)
- *
- * What it does:
- * Raises one Lua argument error for argument lane `narg`.
- */
-int LuaState::ArgError(
-  const int narg,
-  char* const extraMessage
-)
-{
-  return luaL_argerror(m_state, narg, extraMessage);
-}
-
-/**
- * Address: 0x0090BFD0 (FUN_0090BFD0)
- *
- * What it does:
- * Returns optional string argument `narg` or `defaultValue`, and writes string
- * byte length when `lengthOut` is non-null.
- */
-const char* LuaState::OptString(
-  const int narg,
-  char* const defaultValue,
-  size_t* const lengthOut
-)
-{
-  return luaL_optlstring(m_state, narg, defaultValue, lengthOut);
-}
-
-/**
  * Address: 0x0090BFF0 (FUN_0090BFF0)
  *
  * What it does:
@@ -276,12 +233,6 @@ int32_t LuaState::GetTop() const
 bool LuaState::IsRootState() const
 {
   return m_rootState == this;
-}
-
-bool LuaState::IsSuspended() const
-{
-  // lua_suspended() is not surfaced in this SDK build yet.
-  return false;
 }
 
 /**
@@ -755,19 +706,6 @@ bool LuaObject::IsNil() const noexcept
 }
 
 /**
- * Address: 0x00907850 (FUN_00907850, LuaPlus::LuaObject::IsNone)
- *
- * What it does:
- * Asserts state binding and returns whether this object carries Lua's
- * `LUA_TNONE` sentinel tag.
- */
-bool LuaObject::IsNone() const
-{
-  Ensure(m_state != nullptr, "m_state");
-  return m_object.tt == LUA_TNONE;
-}
-
-/**
  * Address: 0x009078D0 (FUN_009078D0, LuaPlus::LuaObject::IsBoolean)
  *
  * What it does:
@@ -788,19 +726,6 @@ bool LuaObject::IsBoolean() const
 bool LuaObject::IsNumber() const noexcept
 {
   return m_object.tt == LUA_TNUMBER;
-}
-
-/**
- * Address: 0x0077F680 (FUN_0077F680, LuaObject::j_IsNumber2 thunk)
- *
- * What it does:
- * Forwards one import-thunk lane to `LuaObject::IsNumber`.
- */
-bool LuaObjectIsNumberThunk2(
-  const LuaObject* const object
-)
-{
-  return object->IsNumber();
 }
 
 /**
@@ -1144,24 +1069,6 @@ void LuaObject::AssignNewTable(
   Ensure(table != nullptr, "luaH_new returned null");
   m_object.tt = table->tt;
   m_object.value.p = table;
-}
-
-/**
- * Address: 0x00909900 (FUN_00909900, LuaPlus::LuaObject::AssignObject)
- *
- * What it does:
- * Copies one source LuaObject tagged payload into this object after enforcing
- * shared-state ownership.
- */
-void LuaObject::AssignObject(
-  LuaState* const state,
-  const LuaObject& value
-)
-{
-  (void)state;
-  Ensure(m_state == value.m_state, "m_state == value.m_state");
-  m_object.tt = value.m_object.tt;
-  m_object.value = value.m_object.value;
 }
 
 /**
@@ -2937,158 +2844,6 @@ double LuaObject::GetNumber() const
 }
 
 /**
- * Address: 0x009079D0 (FUN_009079D0)
- *
- * What it does:
- * Validates LuaObject state/type and returns the numeric payload as one float
- * lane (`Value::n`), raising Lua's type-error lane for non-numeric values.
- */
-float LuaObjectGetNumberAsFloat(
-  const LuaObject* const object
-)
-{
-  Ensure(object != nullptr, "object");
-  Ensure(object->m_state != nullptr, "m_state");
-  if (object->m_object.tt != LUA_TNUMBER) {
-    luaG_typeerror(object->m_state->m_state->l_G->lstate, &object->m_object, "get as number");
-  }
-  return object->m_object.value.n;
-}
-
-/**
- * Address: 0x00907AF0 (FUN_00907AF0)
- *
- * What it does:
- * Validates LuaObject state/type and returns one interned Lua string buffer,
- * raising Lua's typed-operation error lane on non-string values.
- */
-const char* LuaObjectGetStringChecked(
-  const LuaObject* const object
-)
-{
-  Ensure(object != nullptr, "object");
-  Ensure(object->m_state != nullptr, "m_state");
-  if (object->m_object.tt != LUA_TSTRING) {
-    luaG_typeerror(object->m_state->m_state->l_G->lstate, &object->m_object, "string");
-  }
-
-  const auto* const text = static_cast<const TString*>(object->m_object.value.p);
-  return text->str;
-}
-
-/**
- * Address: 0x00907B50 (FUN_00907B50)
- *
- * What it does:
- * Validates LuaObject state/type for function access and returns one C closure
- * entrypoint pointer, or `nullptr` if Lua still reports a non-function lane.
- */
-CFunction LuaObjectGetCFunctionChecked(
-  const LuaObject* const object
-)
-{
-  Ensure(object != nullptr, "object");
-  Ensure(object->m_state != nullptr, "m_state");
-
-  bool isFunctionType = object->m_object.tt == LUA_TFUNCTION;
-  if (!isFunctionType) {
-    luaG_typeerror(object->m_state->m_state->l_G->lstate, &object->m_object, "get as C function");
-    isFunctionType = object->m_object.tt == LUA_TFUNCTION;
-  }
-
-  if (!isFunctionType) {
-    return nullptr;
-  }
-
-  const auto* const closure = static_cast<const CClosure*>(object->m_object.value.p);
-  return closure != nullptr ? closure->f : nullptr;
-}
-
-/**
- * Address: 0x00907C30 (FUN_00907C30)
- *
- * What it does:
- * Validates LuaObject state/type and returns the raw light-userdata pointer
- * payload (`Value::p`) from this tagged object.
- */
-void* LuaObjectGetLightUserDataChecked(
-  const LuaObject* const object
-)
-{
-  Ensure(object != nullptr, "object");
-  Ensure(object->m_state != nullptr, "m_state");
-  if (object->m_object.tt != LUA_TLIGHTUSERDATA) {
-    luaG_typeerror(object->m_state->m_state->l_G->lstate, &object->m_object, "get as light userdata");
-  }
-
-  return LightPointer(object->m_object.value);
-}
-
-/**
- * Address: 0x009166B0 (FUN_009166B0)
- *
- * What it does:
- * Fetches one boolean field from the date-table lane at stack index `-2` and
- * returns the converted truth-value while restoring the original stack top.
- */
-bool LuaDateGetBooleanField(
-  const char* const fieldName,
-  lua_State* const state
-)
-{
-  Ensure(state != nullptr, "state");
-  Ensure(fieldName != nullptr, "fieldName");
-
-  lua_pushstring(state, fieldName);
-  lua_gettable(state, -2);
-  const bool value = lua_toboolean(state, -1) != 0;
-  lua_settop(state, -2);
-  return value;
-}
-
-/**
- * Address: 0x009166E0 (FUN_009166E0)
- *
- * What it does:
- * Fetches one numeric field from the date-table lane at stack index `-2`;
- * returns `defaultValue` on non-number fields and raises when required.
- */
-int LuaDateGetNumericFieldOrDefault(
-  int defaultValue,
-  const char* const fieldName,
-  lua_State* const state
-)
-{
-  Ensure(state != nullptr, "state");
-  Ensure(fieldName != nullptr, "fieldName");
-
-  lua_pushstring(state, fieldName);
-  lua_gettable(state, -2);
-
-  if (lua_isnumber(state, -1)) {
-    defaultValue = static_cast<int>(lua_tonumber(state, -1));
-  } else if (defaultValue == -2) {
-    luaL_error(state, "field `%s' missing in date table", fieldName);
-  }
-
-  lua_settop(state, -2);
-  return defaultValue;
-}
-
-/**
- * Address: 0x0077F660 (FUN_0077F660, LuaObject::j_GetNumber2 thunk)
- *
- * What it does:
- * Forwards one import-thunk lane to `LuaObject::GetNumber`.
- */
-double LuaObjectGetNumberThunk2(
-  const LuaObject* const object
-)
-{
-  return object->GetNumber();
-}
-
-/**
  * Address: 0x00907910 (FUN_00907910, LuaPlus::LuaObject::GetInteger)
  *
  * What it does:
@@ -3277,28 +3032,6 @@ namespace
 
 namespace gpg
 {
-  /**
-   * Address: 0x00916E60 (FUN_00916E60, gpg::RRef_WrapFile)
-   *
-   * IDA signature:
-   * gpg::RRef *__cdecl gpg::RRef_WrapFile(gpg::RRef *out, char *object);
-   *
-   * What it does:
-   * Builds a reflected reference for one `WrapFile` payload (internal
-   * LuaObject.cpp userdata type) using the cached RTTI lookup and the
-   * 3-slot TLS derived-type normalization helper. `WrapFile` is a
-   * non-polymorphic struct so the runtime-type compare-equal fast path
-   * always fires and the derived-type TLS-cache lanes are dead code in
-   * this instantiation; the effective behavior is
-   * `(out->mObj = object; out->mType = CachedType<WrapFile>())`.
-   */
-  gpg::RRef* RRef_WrapFile(
-    gpg::RRef* const out,
-    void* const object
-  )
-  {
-    return RRefWrapFileImpl(out, static_cast<WrapFile*>(object));
-  }
 } // namespace gpg
 
 /**

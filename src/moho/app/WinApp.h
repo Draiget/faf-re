@@ -111,22 +111,6 @@ namespace moho
   void WIN_AppRequestExit();
 
   /**
-   * Address: 0x004F2410 (FUN_004F2410, ?WIN_GetCurrentApp@Moho@@YAPAVIWinApp@1@XZ)
-   *
-   * What it does:
-   * Returns the process-global active `IWinApp` owner pointer.
-   */
-  IWinApp* WIN_GetCurrentApp();
-
-  /**
-   * Address: 0x004F25B0 (FUN_004F25B0, ?WIN_GetMainWindow@Moho@@YAPAVwxWindow@@XZ)
-   *
-   * What it does:
-   * Returns the process-global main-window owner pointer.
-   */
-  wxWindow* WIN_GetMainWindow();
-
-  /**
    * Address: 0x004F25C0 (FUN_004F25C0, ?WIN_SetMainWindow@Moho@@YAXPAVwxWindow@@@Z)
    *
    * What it does:
@@ -240,17 +224,6 @@ namespace moho
   fa::string PLAT_FormatCallstack(std::int32_t firstFrame, std::int32_t endFrame, const std::uintptr_t* frames);
 
   /**
-   * Address: 0x004A25D0 (FUN_004A25D0)
-   * Mangled:
-   * ?PLAT_UnDecorateSymbolName@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@PBD_N@Z
-   *
-   * What it does:
-   * Converts one decorated symbol into undecorated text under the shared
-   * symbol-handler mutex, with optional underscore-stripping mode.
-   */
-  fa::string PLAT_UnDecorateSymbolName(const char* name, bool stripLeadingUnderscore);
-
-  /**
    * Address: 0x004A1F10 (FUN_004A1F10)
    *
    * What it does:
@@ -259,23 +232,6 @@ namespace moho
    */
   bool
   PLAT_SetRegistryValue(const char* keyPath, const std::uint8_t* data, std::uint32_t dataSize, std::uint32_t valueType);
-
-  /**
-   * Address: 0x004A2F60 (FUN_004A2F60)
-   *
-   * What it does:
-   * Writes one 32-bit DWORD registry value.
-   */
-  bool PLAT_SetRegistryValueDword(const char* keyPath, std::uint32_t value);
-
-  /**
-   * Address: 0x004A2F80 (FUN_004A2F80)
-   *
-   * What it does:
-   * Writes one zero-terminated string registry value; null input writes an
-   * empty string payload.
-   */
-  bool PLAT_SetRegistryValueString(const char* value, const char* keyPath);
 
   /**
    * Address: 0x004A2D40 (FUN_004A2D40)
@@ -349,15 +305,6 @@ namespace moho
   extern AppPumpStepHook sAppPumpStep;
 
   /**
-   * Address: 0x004F2900 (FUN_004F2900, ?WIN_YesNoBox@Moho@@YA_NVStrArg@gpg@@0@Z)
-   *
-   * What it does:
-   * Displays a UTF-8 yes/no message box and returns true only when the user
-   * picks `IDYES`.
-   */
-  bool WIN_YesNoBox(gpg::StrArg caption, gpg::StrArg text);
-
-  /**
    * Address: 0x004F2A00 (FUN_004F2A00)
    * Mangled:
    * ?WIN_GetLastError@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ
@@ -366,21 +313,6 @@ namespace moho
    * Converts current `GetLastError()` value into readable UTF-8 text.
    */
   fa::string WIN_GetLastError();
-
-  /**
-   * Address: 0x004F1190 (FUN_004F1190)
-   * Mangled: ?WIN_ShowCrashDialog@Moho@@YAXPBD0PAU_EXCEPTION_POINTERS@@H@Z
-   *
-   * What it does:
-   * Builds crash-details text (program, args, callstack, recent log lines) and
-   * displays the crash dialog UI/fallback prompt.
-   */
-  void WIN_ShowCrashDialog(
-    std::int32_t skipCallstackFrames,
-    _EXCEPTION_POINTERS* exceptionInfo,
-    gpg::StrArg caption,
-    gpg::StrArg summaryText
-  );
 
   /**
    * Address: 0x004F2730 (FUN_004F2730)
@@ -399,14 +331,6 @@ namespace moho
    * Destroys all managed dialog/frame windows and unlinks their registry slots.
    */
   void WINX_Exit();
-
-  /**
-   * Address: 0x004F3B60 (FUN_004F3B60, ?WINX_Printf@Moho@@YA?AVwxString@@PBDZZ)
-   *
-   * What it does:
-   * Formats one UTF-8 vararg string and returns it as a (UTF-16) wxString.
-   */
-  wxString WINX_Printf(const char* format, ...);
 
   /**
    * Address: 0x004F3CE0 (FUN_004F3CE0)

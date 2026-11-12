@@ -160,36 +160,6 @@ namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x00883350 (FUN_00883350, boost::shared_ptr_SFileStarCloser::shared_ptr_SFileStarCloser)
-   *
-   * What it does:
-   * Constructs one `shared_ptr<SFileStarCloser>` in-place from one raw closer
-   * pointer and wires the shared-from-this control lane.
-   */
-  boost::shared_ptr<SFileStarCloser>* ConstructSharedFileCloserFromRaw(
-    boost::shared_ptr<SFileStarCloser>* const outCloser,
-    SFileStarCloser* const closer
-  )
-  {
-    return ::new (outCloser) boost::shared_ptr<SFileStarCloser>(closer);
-  }
-
-  /**
-   * Address: 0x00883430 (FUN_00883430, boost::shared_ptr_SFileStarCloser::operator=)
-   *
-   * What it does:
-   * Rebinds one `shared_ptr<SFileStarCloser>` from a raw pointer and releases
-   * prior ownership.
-   */
-  boost::shared_ptr<SFileStarCloser>* AssignSharedFileCloserFromRaw(
-    boost::shared_ptr<SFileStarCloser>* const outCloser,
-    SFileStarCloser* const closer
-  )
-  {
-    outCloser->reset(closer);
-    return outCloser;
-  }
 
   /**
    * Address: 0x008823B0 (FUN_008823B0, Moho::WeakPtr_FILE::Release)

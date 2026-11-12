@@ -41,22 +41,6 @@ namespace moho
     gpg::PreRegisterRType(typeid(CAimManipulator), this);
   }
 
-  /**
-   * Address: 0x0062FF80 (FUN_0062FF80, scalar deleting thunk)
-   */
-  /**
-   * Address: 0x0062FFE0 (FUN_0062FFE0, CAimManipulatorTypeInfo non-deleting cleanup body)
-   *
-   * What it does:
-   * Executes one non-deleting destruction lane for `CAimManipulatorTypeInfo`.
-   */
-  [[maybe_unused]] void DestroyCAimManipulatorTypeInfoBody(
-    CAimManipulatorTypeInfo* const typeInfo
-  ) noexcept
-  {
-    typeInfo->~CAimManipulatorTypeInfo();
-  }
-
   CAimManipulatorTypeInfo::~CAimManipulatorTypeInfo() = default;
 
   /**

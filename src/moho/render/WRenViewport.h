@@ -455,12 +455,6 @@ namespace moho
     static void ReleaseWaterBodyReflections();
 
     /**
-     * Address: 0x007F7ED0 (FUN_007F7ED0)
-     * Mangled: ?SetViewportToFullScreen@WRenViewport@Moho@@AAEXXZ
-     */
-    void SetViewportToFullScreen();
-
-    /**
      * Address: 0x007F7EA0 (FUN_007F7EA0)
      * Mangled: ?SetViewportToLocalScreen@WRenViewport@Moho@@AAEXXZ
      */

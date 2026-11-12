@@ -83,7 +83,6 @@ static_assert(sizeof(MatchState) == 0x110, "MatchState size must be 0x110");
 [[nodiscard]] const char* luaI_classend(const char* p, MatchState* ms);
 [[nodiscard]] int match_class(int c1, int cl1);
 [[nodiscard]] int matchbracketclass(const char* p, int c, const char* ec);
-[[nodiscard]] int luaI_singlematch(int c, const char* p, const char* ep);
 [[nodiscard]] const char* matchbalance(const char* p, const char* s, MatchState* ms);
 [[nodiscard]] const char* match_capture(int l, MatchState* ms, const char* s);
 [[nodiscard]] const char* max_expand(MatchState* ms, const char* s, const char* p, const char* ep);
@@ -343,34 +342,6 @@ void push_onecapture(
   }
 
   return positive == 0;
-}
-
-/**
- * Address: 0x009252D0 (FUN_009252D0, luaI_singlematch)
- *
- * What it does:
- * Performs one pattern atom test at a single character position.
- */
-[[nodiscard]] int luaI_singlematch(
-  const int c,
-  const char* const p,
-  const char* const ep
-)
-{
-  const unsigned char patternChar = static_cast<unsigned char>(*p);
-  if (patternChar == '%') {
-    return match_class(c, p[1]);
-  }
-
-  if (patternChar == '.') {
-    return 1;
-  }
-
-  if (patternChar == '[') {
-    return matchbracketclass(p, c, ep - 1);
-  }
-
-  return patternChar == c;
 }
 
 /**

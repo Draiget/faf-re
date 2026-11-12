@@ -525,24 +525,6 @@ namespace moho
     [[nodiscard]] float GetDamageReceived() const;
 
     /**
-     * Address: 0x0072B7F0 (FUN_0072B7F0, sub_72B7F0)
-     *
-     * What it does:
-     * Returns whether `mLuaUnitList` is current.
-     */
-    [[nodiscard]] bool HasLuaUnitList() const;
-
-    /**
-     * Address: 0x00736D70 (FUN_00736D70, sub_736D70)
-     */
-    CPlatoon* AddDamageDealt(float amount);
-
-    /**
-     * Address: 0x00736D90 (FUN_00736D90, sub_736D90)
-     */
-    CPlatoon* AddDamageReceived(float amount);
-
-    /**
      * Address: 0x0072B730 (FUN_0072B730, Moho::CPlatoon::SetPlatoonFormationOverride)
      *
      * What it does:

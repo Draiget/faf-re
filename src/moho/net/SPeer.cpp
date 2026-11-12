@@ -127,19 +127,4 @@ namespace moho
     connection->Write(msg);
   }
 
-  /**
-   * Address: 0x007C1320 (FUN_007C1320)
-   *
-   * What it does:
-   * Runs `SPeer` destruction for one heap object and releases the same
-   * storage via global `operator delete`.
-   */
-  SPeer* DestroyAndDeletePeer(
-    SPeer* const peer
-  )
-  {
-    peer->~SPeer();
-    ::operator delete(peer);
-    return peer;
-  }
 } // namespace moho

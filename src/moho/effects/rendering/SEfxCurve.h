@@ -58,24 +58,6 @@ namespace moho
     static gpg::RType* StaticGetClass();
 
     /**
-     * Address: 0x00514D40 (FUN_00514D40, Moho::SEfxCurveSerializer::Deserialize)
-     *
-     * What it does:
-     * Archive callback adapter that deserializes one `SEfxCurve` object.
-     */
-    static void
-    DeserializeFromArchive(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
-     * Address: 0x00514D50 (FUN_00514D50, Moho::SEfxCurveSerializer::Serialize)
-     *
-     * What it does:
-     * Archive callback adapter that serializes one `SEfxCurve` object.
-     */
-    static void
-    SerializeToArchive(gpg::WriteArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
-
-    /**
      * Address: 0x00516D20 (FUN_00516D20, Moho::SEfxCurve::MemberDeserialize)
      *
      * What it does:

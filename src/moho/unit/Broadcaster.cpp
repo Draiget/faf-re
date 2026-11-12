@@ -443,27 +443,6 @@ namespace moho
     return &type;
   }
 
-  /**
-   * Address: 0x00BD95D0 (FUN_00BD95D0, sub_BD95D0)
-   *
-   * What it does:
-   * Runs broadcaster status-type registration.
-   */
-  void register_Broadcaster_EUnitCommandQueueStatus_RTypeStartup()
-  {
-    (void)register_Broadcaster_EUnitCommandQueueStatus_RType();
-  }
-
-  /**
-   * Address: 0x00BD95F0 (FUN_00BD95F0, sub_BD95F0)
-   *
-   * What it does:
-   * Runs listener status-type registration.
-   */
-  void register_Listener_EUnitCommandQueueStatus_RTypeStartup()
-  {
-    (void)register_Listener_EUnitCommandQueueStatus_RType();
-  }
 } // namespace moho
 
 namespace gpg

@@ -82,20 +82,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0073AA90 (FUN_0073AA90)
-   *
-   * What it does:
-   * Rebinds the startup metatable-factory index lane for
-   * `CScrLuaMetatableFactory<CDamage>` and returns that singleton.
-   */
-  CScrLuaMetatableFactory<CDamage>* startup_CScrLuaMetatableFactory_CDamage_Index()
-  {
-    auto& instance = CScrLuaMetatableFactory<CDamage>::Instance();
-    instance.SetFactoryObjectIndexForRecovery(CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-    return &instance;
-  }
-
-  /**
    * Address: 0x00739CF0 (FUN_00739CF0, Moho::CScrLuaMetatableFactory<Moho::CDamage>::Create)
    *
    * What it does:

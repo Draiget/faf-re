@@ -4245,58 +4245,6 @@ LuaObject::~LuaObject()
 }
 
 /**
- * Alias of FUN_005790D0 (non-canonical helper lane).
- *
- * What it does:
- * Forwards one import-thunk lane to `LuaObject::~LuaObject`.
- */
-void LuaObjectDtrThunk3(
-  LuaObject* const object
-)
-{
-  object->~LuaObject();
-}
-
-/**
- * Alias of FUN_005791A0 (non-canonical helper lane).
- *
- * What it does:
- * Forwards one non-deleting thunk lane to `LuaObject::~LuaObject`.
- */
-void LuaObjectDtrThunk4(
-  LuaObject* const object
-)
-{
-  object->~LuaObject();
-}
-
-/**
- * Alias of FUN_005D0A90 (non-canonical helper lane).
- *
- * What it does:
- * Forwards one non-deleting thunk lane to `LuaObject::~LuaObject`.
- */
-void LuaObjectDtrThunk6(
-  LuaObject* const object
-)
-{
-  object->~LuaObject();
-}
-
-/**
- * Alias of FUN_00624120 (non-canonical helper lane).
- *
- * What it does:
- * Forwards one non-deleting thunk lane to `LuaObject::~LuaObject`.
- */
-void LuaObjectDtrThunk7(
-  LuaObject* const object
-)
-{
-  object->~LuaObject();
-}
-
-/**
  * Address: 0x0090AC10 (FUN_0090AC10, LuaPlus::LuaState::LuaState)
  *
  * What it does:

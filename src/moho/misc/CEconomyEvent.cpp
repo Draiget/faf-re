@@ -374,17 +374,6 @@ namespace
  */
 namespace gpg
 {
-  [[maybe_unused]] gpg::RRef* AssignCEconRequestRef(
-    gpg::RRef* const out,
-    moho::CEconRequest* const value
-  )
-  {
-    gpg::RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CEconRequest>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
 } // namespace gpg
 
 namespace moho

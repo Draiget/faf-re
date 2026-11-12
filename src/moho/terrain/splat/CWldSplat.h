@@ -136,15 +136,6 @@ namespace moho
     };
     [[nodiscard]] AtlasMiss OnAtlasResult(bool placed, bool mayRestart) const noexcept;
 
-    /**
-     * Address: 0x0089E2B0 (FUN_0089E2B0, Moho::CWldSplat::GetSplatVertices)
-     *
-     * What it does:
-     * Returns the first vertex lane for the splat quad.
-     */
-    [[nodiscard]]
-    SplatVertex* GetSplatVertices() noexcept;
-
   public:
     SplatVertex mSplatVertices[4];            // +0x170
     boost::shared_ptr<CD3DBatchTexture> mTex; // +0x1E0

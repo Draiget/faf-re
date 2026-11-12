@@ -222,25 +222,3 @@ moho::CScrLuaInitForm* moho::register_RegisterEmitterBlueprint_LuaFuncDef()
 {
   return func_RegisterEmitterBlueprint_LuaFuncDef();
 }
-
-/**
- * Address: 0x00BC8EB0 (FUN_00BC8EB0, j_func_RegisterBeamBlueprint_LuaFuncDef)
- *
- * What it does:
- * Startup thunk that forwards registration to `func_RegisterBeamBlueprint_LuaFuncDef`.
- */
-moho::CScrLuaInitForm* moho::j_func_RegisterBeamBlueprint_LuaFuncDef()
-{
-  return func_RegisterBeamBlueprint_LuaFuncDef();
-}
-
-/**
- * Address: 0x00BC8EC0 (FUN_00BC8EC0, j_func_BlueprintLoaderUpdateProgress_LuaFuncDef)
- *
- * What it does:
- * Startup thunk that forwards registration to `func_BlueprintLoaderUpdateProgress_LuaFuncDef`.
- */
-moho::CScrLuaInitForm* moho::j_func_BlueprintLoaderUpdateProgress_LuaFuncDef()
-{
-  return func_BlueprintLoaderUpdateProgress_LuaFuncDef();
-}
