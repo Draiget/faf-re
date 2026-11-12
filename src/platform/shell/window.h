@@ -118,6 +118,8 @@ public:
   ShellSize GetClientSize() const;
   void ScreenToClient(int* x, int* y) const;
   ShellPoint ScreenToClient(const ShellPoint& point) const;
+  // The inverse: client pixels to the screen (the 2.4.2 window library's ClientToScreen).
+  void ClientToScreen(int* x, int* y) const;
 
   // Set by the window system (issue #256).
   void SetClientArea(int screenX, int screenY, int width, int height);
