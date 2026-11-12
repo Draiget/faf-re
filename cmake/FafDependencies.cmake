@@ -7,7 +7,7 @@
 #     missing and moved when their pin changes, always with core.autocrlf=false.
 #     Git for Windows turns autocrlf on system-wide, and converted line endings
 #     break the CR-exact patches.
-#   * Downloads (boost 1.34.1, wxWindows 2.4.2, DXC, DirectXTex, libjuice, libdatachannel and its deps): pinned by SHA256, cached in
+#   * Downloads (boost 1.34.1, SDL3, Dear ImGui, DXC, DirectXTex, libjuice, libdatachannel and its deps): pinned by SHA256, cached in
 #     dependencies/.downloads and extracted into dependencies/<name>.
 #   * Patches (dependencies/patches): applied in order onto a fresh baseline. A
 #     stamp file in each tree records the patches (and their hashes) it carries,
@@ -15,7 +15,6 @@
 #     baseline. A tree without a stamp (one made before this script) is adopted
 #     as it is when its last patch is already applied (line endings aside),
 #     patched when it is the baseline, and re-created from the baseline otherwise.
-#   * wxWindows' generated files, which its nmake build used to create.
 #
 #   * The DirectX SDK (June 2010): an installed one, else its headers and libraries
 #     extracted from Microsoft's installer (see faf_dependency_dxsdk).
@@ -176,10 +175,6 @@ set(_faf_download_boost_1_34_1
     "https://downloads.sourceforge.net/project/boost/boost/1.34.1/boost_1_34_1.tar.bz2"
     "0f866c75b025a4f1340117a106595cc0675f48ba1e5a9b5c221ec7f19e96ec4c"
     "boost_1_34_1")
-set(_faf_download_wxWindows-2.4.2
-    "https://github.com/wxWidgets/wxWidgets/releases/download/v2.4.2/wxMSW-2.4.2.zip"
-    "081cb30347ed9092a50c39311b46586f4264fb125942652db168851be96ebf33"
-    "wxWindows-2.4.2")
 # libjuice (MPL-2.0): the ICE agent behind src/netlink (issue #228). The tag's
 # source archive; cmake/deps/libjuice builds it.
 set(_faf_download_libjuice
@@ -370,32 +365,6 @@ function(faf_dependency_download name)
   _faf_download_tree(${name})
 endfunction()
 
-# --- wxWindows' generated files ---------------------------------------------------------
-# What wx's makefile.vc and FAF's former Build-Deps step produced: the per-configuration
-# setup.h copies (Unicode for mswu) and the parser sources it copies from their DOS names.
-function(_faf_wx_generated)
-  if(FAF_DEPENDENCIES_ONLY AND NOT "wxWindows-2.4.2" IN_LIST FAF_DEPENDENCIES_ONLY)
-    return()
-  endif()
-  set(_wx "${FAF_DEPENDENCIES_DIR}/wxWindows-2.4.2")
-  file(READ "${_wx}/include/wx/msw/setup.h" _setup)
-  if(NOT EXISTS "${_wx}/lib/msw/wx/setup.h")
-    file(WRITE "${_wx}/lib/msw/wx/setup.h" "${_setup}")
-  endif()
-  if(NOT EXISTS "${_wx}/lib/mswu/wx/setup.h")
-    string(REPLACE "#define wxUSE_UNICODE 0" "#define wxUSE_UNICODE 1" _unicode "${_setup}")
-    file(WRITE "${_wx}/lib/mswu/wx/setup.h" "${_unicode}")
-  endif()
-  foreach(_pair "y_tab.c=dosyacc.c" "lex_yy.c=doslex.c")
-    string(REPLACE "=" ";" _pair "${_pair}")
-    list(GET _pair 0 _to)
-    list(GET _pair 1 _from)
-    if(NOT EXISTS "${_wx}/src/common/${_to}")
-      file(COPY_FILE "${_wx}/src/common/${_from}" "${_wx}/src/common/${_to}")
-    endif()
-  endforeach()
-endfunction()
-
 # --- DirectX SDK (June 2010) -----------------------------------------------------------
 # An installed SDK is used as it is. Only when none is found, or the one found is not
 # June 2010 (D3DX_SDK_VERSION 43), are its Include and Lib folders extracted from
@@ -477,7 +446,6 @@ faf_dependency_submodule(FX11)
 faf_dependency_submodule(vulkan)
 faf_dependency_submodule(ffmpeg)
 faf_dependency_download(boost_1_34_1)
-faf_dependency_download(wxWindows-2.4.2)
 faf_dependency_download(dxc)
 faf_dependency_download(libjuice)
 faf_dependency_download(libdatachannel)
@@ -517,10 +485,7 @@ faf_dependency_patches(boost_1_34_1 download
   boost_1_34_1_faf_required.patch)
 faf_dependency_patches(libjuice download
   libjuice_1_7_4_faf_turn_release.patch)
-faf_dependency_patches(wxWindows-2.4.2 download
-  wxwindows_2_4_2_faf_required.patch wxwindows_2_4_2_faf_x64.patch wxwindows_2_4_2_faf_x64_pointers.patch)
 if(NOT FAF_FREETYPE_DIR AND NOT DEFINED ENV{FAF_FREETYPE_DIR})
   faf_dependency_patches(freetype download
     freetype_2_15_0_faf_oom.patch)
 endif()
-_faf_wx_generated()

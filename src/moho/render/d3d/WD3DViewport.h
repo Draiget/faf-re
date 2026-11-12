@@ -2,16 +2,16 @@
 
 #include <cstddef>
 
-#include "platform/WxWidgets.h"
+#include "platform/shell/Shell.h"
 
-#include <wx/event.h>
-#include <wx/window.h>
+#include "platform/shell/event.h"
+#include "platform/shell/window.h"
 
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/String.h"
 
-class wxBitmap;
-class wxDC;
+class ShellBitmap;
+class SHELL_DC;
 
 namespace moho
 {
@@ -31,7 +31,7 @@ namespace moho
    * sizeof 0x128: wxWindow is 0x124, and the one member this class adds sits
    * right after it.
    */
-  class WD3DViewport : public wxWindow
+  class WD3DViewport : public ShellWindow
   {
   public:
     /**
@@ -44,7 +44,7 @@ namespace moho
      * argument is not used - the binary pushes wxDefaultPosition (0x00F33E00)
      * whatever the caller passes.
      */
-    WD3DViewport(wxWindow* parent, gpg::StrArg title, const wxPoint& position, const wxSize& size);
+    WD3DViewport(ShellWindow* parent, gpg::StrArg title, const ShellPoint& position, const ShellSize& size);
 
     /**
      * Address: 0x0042BA90 (FUN_0042BA90)
@@ -131,11 +131,11 @@ namespace moho
      * then either lets the D3D device present, dropping the background image,
      * or paints the background itself while there is no device yet.
      */
-    void OnPaint(wxPaintEvent& event);
+    void OnPaint(ShellPaintEvent& event);
 
     /**
      * Engine addition (`ren_DirectPaint`): what OnPaint does once the device is ready, with no
-     * message and no wxPaintDC. Only for a frame the device asked for, as nothing validates the
+     * message and no PaintDC. Only for a frame the device asked for, as nothing validates the
      * update region here.
      */
     void PaintWithoutMessage();
@@ -147,7 +147,7 @@ namespace moho
      * Paints the background on WM_ERASEBKGND until the device is presenting;
      * after that, erasing underneath it would only flicker.
      */
-    void OnEraseBackground(wxEraseEvent& event);
+    void OnEraseBackground(ShellEraseEvent& event);
 
   private:
     /**
@@ -158,15 +158,15 @@ namespace moho
      * Fills the DC's extent with wxBLACK_BRUSH, then selects wxNullBrush back.
      * The body never touches `this` - the binary passes the DC in esi.
      */
-    void DrawBackgroundImage(wxDC& dc);
+    void DrawBackgroundImage(SHELL_DC& dc);
 
   public:
     // +0x124. Owned: the destructor deletes it, and OnPaint deletes and clears
     // it once the device is presenting (load, store 0, then the virtual
-    // deleting destructor - slot 1, which makes it a wxObject). The binary
+    // deleting destructor - slot 1, which makes it a Object). The binary
     // only ever stores 0 here; the type is inferred from DrawBackgroundImage's
     // name, which is what would have drawn it.
-    wxBitmap* mBackgroundImage;
+    ShellBitmap* mBackgroundImage;
 
     DECLARE_EVENT_TABLE()
   };

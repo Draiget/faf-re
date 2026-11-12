@@ -248,7 +248,6 @@ target_link_libraries(faf_client_objs PUBLIC faf_sim_settings Wm3Headers zlib123
   FAudio-static SDL3::SDL3-static faf_imgui_sdl  # FAudio names its static target FAudio-static, with no alias
   faf_freetype faf_msdfgen faf_ffmpeg faf_netlink)
 target_include_directories(faf_client_objs PRIVATE
-  "${PROJECT_SOURCE_DIR}/src/platform/shell"
   "${FAF_DEPENDENCIES_DIR}/vulkan/include"
   "${FAF_DEPENDENCIES_DIR}/DirectX-Headers/include/directx")
 
@@ -266,7 +265,6 @@ foreach(_src IN LISTS FAF_HEADLESS_SOURCES)
   endif()
 endforeach()
 target_sources(faf_client PRIVATE "${PROJECT_SOURCE_DIR}/src/headless/GameEntry.cpp")
-target_include_directories(faf_client PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/shell")
 # The simulation's objects first: their static initializers run in link order, and the client's
 # register factories for the sim's reflected types (SBatchTextureDataFactory.cpp looks up
 # SBatchTextureData, whose type info faf_sim registers). The sim's never need the client's, as

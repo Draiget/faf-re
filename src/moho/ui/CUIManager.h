@@ -50,7 +50,7 @@ namespace moho
      * Registers one input window for wx event-handler routing plus one host
      * window used for client-size driven UI frame initialization.
      */
-    int AddFrame(wxWindow* inputWindow, wxWindow* eventHostWindow) override;
+    int AddFrame(ShellWindow* inputWindow, ShellWindow* eventHostWindow) override;
 
     /**
      * Address: 0x0084CC50 (FUN_0084CC50)
@@ -153,8 +153,8 @@ namespace moho
     WeakPtr<CMauiCursor> mCursor;                                // +0x28
     LuaPlus::LuaState* mLuaState = nullptr;                      // +0x30
     std::uint32_t mUnknown34 = 0;                                // +0x34
-    gpg::fastvector_n<wxWindow*, 2> mInputWindows;               // +0x38
-    gpg::fastvector_n<wxWindow*, 2> mHostWindows;                // +0x50
+    gpg::fastvector_n<ShellWindow*, 2> mInputWindows;            // +0x38
+    gpg::fastvector_n<ShellWindow*, 2> mHostWindows;             // +0x50
     float mUIControlsAlpha = 1.0f;                               // +0x68
     float mUnknown6C = 0.0f;                                     // +0x6C
     float mGCTime = 0.0f;                                        // +0x70

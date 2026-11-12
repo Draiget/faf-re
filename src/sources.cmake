@@ -149,7 +149,7 @@ set(FAF_ENGINE_SOURCES
   gpg/core/utils/BoostWrappers.cpp
   moho/audio/CSimSoundManagerSerializer.cpp
   moho/misc/PausedThread.cpp
-  moho/app/WxAppWindows.cpp
+  moho/app/AppWindows.cpp
   moho/app/WD3DViewport.cpp
   moho/app/WWinLogWindow.cpp
   moho/app/WSupComFrame.cpp
@@ -961,7 +961,7 @@ set(FAF_ENGINE_SOURCES
   moho/ui/CUIMapPreview.cpp
   moho/ui/CLuaWldUIProvider.cpp
   moho/ui/UiKeyMapping.cpp
-  moho/ui/CMauiWxEventMapper.cpp
+  moho/ui/CMauiEventMapper.cpp
   moho/ui/CScriptLazyVar.cpp
   moho/ui/UiFactoryQueue.cpp
   moho/unit/core/IUnit.cpp
@@ -1142,7 +1142,7 @@ set(FAF_ENGINE_SOURCES
   moho/movie/sfd/SfdMetadata.cpp
   moho/core/MemoryPool.cpp
   # The application shell over SDL3 (issues #407, #412): client only (sim_sources.cmake).
-  platform/shell/WxStandIn.cpp
+  platform/shell/Shell.cpp
   platform/sdl/WindowSdl.cpp
   platform/sdl/ToolWindow.cpp
   platform/windows/WindowSdlWindows.cpp

@@ -1,4 +1,4 @@
-#include "moho/app/WxPrivate.h"
+#include "moho/app/AppPrivate.h"
 #include "moho/app/NetworkPanel.h"
 #include "platform/Window.h"
 
@@ -10,7 +10,7 @@
 
 BEGIN_EVENT_TABLE(
   moho::WD3DViewport,
-  wxWindow
+  ShellWindow
 )
 EVT_PAINT(
   moho::WD3DViewport::OnPaint
@@ -30,12 +30,12 @@ END_EVENT_TABLE()
  * background image. The binary passes wxDefaultPosition, not `position`.
  */
 moho::WD3DViewport::WD3DViewport(
-  wxWindow* const parent,
+  ShellWindow* const parent,
   const gpg::StrArg title,
-  const wxPoint& position,
-  const wxSize& size
+  const ShellPoint& position,
+  const ShellSize& size
 )
-  : wxWindow(parent, -1, wxDefaultPosition, size, 0, gpg::STR_Utf8ToWide(title).c_str())
+  : ShellWindow(parent, -1, kShellDefaultPosition, size, 0, gpg::STR_Utf8ToWide(title).c_str())
   , mBackgroundImage(nullptr)
 {
   (void)position;
@@ -113,15 +113,15 @@ moho::CD3DPrimBatcher* moho::WD3DViewport::GetPrimBatcher() const
  * SetBrush(wxBLACK_BRUSH), fill the DC's extent, SetBrush(wxNullBrush).
  */
 void moho::WD3DViewport::DrawBackgroundImage(
-  wxDC& dc
+  SHELL_DC& dc
 )
 {
   int width = 0;
   int height = 0;
-  dc.SetBrush(*wxBLACK_BRUSH);
+  dc.SetBrush(*gShellBlackBrush);
   dc.GetSize(&width, &height);
   dc.DrawRectangle(0, 0, width, height);
-  dc.SetBrush(wxNullBrush);
+  dc.SetBrush(gShellNullBrush);
 }
 
 /**
@@ -132,7 +132,7 @@ void moho::WD3DViewport::DrawBackgroundImage(
  * the device asks for it; once it presents, erasing would only flicker.
  */
 void moho::WD3DViewport::OnEraseBackground(
-  wxEraseEvent& event
+  ShellEraseEvent& event
 )
 {
   CD3DDevice* const device = D3D_GetDevice();
@@ -153,15 +153,15 @@ void moho::WD3DViewport::OnEraseBackground(
  * one, the background is painted by hand.
  */
 void moho::WD3DViewport::OnPaint(
-  wxPaintEvent& event
+  ShellPaintEvent& event
 )
 {
   (void)event;
-  wxPaintDC dc(this);
+  ShellPaintDC dc(this);
 
   CD3DDevice* const device = D3D_GetDevice();
   if (gpg::gal::Device::IsReady() && device != nullptr) {
-    wxBitmap* const image = mBackgroundImage;
+    ShellBitmap* const image = mBackgroundImage;
     mBackgroundImage = nullptr;
     delete image;
     device->Paint();
@@ -173,7 +173,7 @@ void moho::WD3DViewport::OnPaint(
 
 void moho::WD3DViewport::PaintWithoutMessage()
 {
-  wxBitmap* const image = mBackgroundImage;
+  ShellBitmap* const image = mBackgroundImage;
   mBackgroundImage = nullptr;
   delete image;
   D3D_GetDevice()->Paint();

@@ -1,6 +1,6 @@
 # Engine addition (dedicated-server plan WPR.12): headless's imports, checked after every
 # link. headless links only the simulation, which must not reach for UI, graphics or audio
-# code; a DLL outside the list below (USER32, GDI32, D3D*, DSOUND, XAudio, wx's comctl32,
+# code; a DLL outside the list below (USER32, GDI32, D3D*, DSOUND, XAudio, the window library's comctl32,
 # ...) or a COM call beyond starting COM (XACT is created through COM, which the linker
 # cannot show) fails the build and names what was imported.
 #

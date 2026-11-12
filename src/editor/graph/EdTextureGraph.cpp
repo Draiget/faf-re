@@ -209,15 +209,15 @@ namespace faf::editor
         for (int dx = -1; dx <= 1; ++dx) {
           const int ix = cx + dx;
           const int iy = cy + dy;
-          const int wx = Wrap(ix, period);
-          const int wy = Wrap(iy, period);
-          const float px = static_cast<float>(ix) + 0.5f + (HashFloat(wx, wy, seed) - 0.5f) * jitter;
-          const float py = static_cast<float>(iy) + 0.5f + (HashFloat(wx, wy, seed + 7919U) - 0.5f) * jitter;
+          const int wrapX = Wrap(ix, period);
+          const int wrapY = Wrap(iy, period);
+          const float px = static_cast<float>(ix) + 0.5f + (HashFloat(wrapX, wrapY, seed) - 0.5f) * jitter;
+          const float py = static_cast<float>(iy) + 0.5f + (HashFloat(wrapX, wrapY, seed + 7919U) - 0.5f) * jitter;
           const float d = std::hypot(px - x, py - y);
           if (d < f1) {
             f2 = f1;
             f1 = d;
-            cell = HashFloat(wx, wy, seed + 104729U);
+            cell = HashFloat(wrapX, wrapY, seed + 104729U);
           } else if (d < f2) {
             f2 = d;
           }

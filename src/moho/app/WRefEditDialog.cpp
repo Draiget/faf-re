@@ -1,7 +1,7 @@
 // Engine addition (dedicated-server plan WPL.4, WPR.11): the reflection editor
 // window (WRefEditDialog over one reflected object) and the SC_CreateEntityDialog
 // console command that opens it on the selected unit's blueprint, moved out of
-// Sim.cpp: both are user-side window code. A wx dialog with a tree list in the
+// Sim.cpp: both are user-side window code. A window-library dialog with a tree list in the
 // binary; Dear ImGui in a window of its own since issue #414.
 
 #include <array>
@@ -316,7 +316,7 @@ void moho::WRefEditDialog::Draw()
   ImGui::TableSetupColumn("Description", ImGuiTableColumnFlags_WidthStretch);
   ImGui::TableHeadersRow();
   if (mRoot != nullptr) {
-    // The root row is hidden (wxTR_HIDE_ROOT): its children are the top rows.
+    // The root row is hidden (TR_HIDE_ROOT): its children are the top rows.
     for (const std::unique_ptr<CRefTreeItemData>& child : mRoot->mChildren) {
       DrawRow(*child);
     }

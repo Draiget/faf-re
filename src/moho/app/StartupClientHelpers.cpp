@@ -56,7 +56,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/app/WinApp.h"
-#include "moho/app/WxRuntimeTypes.h"
+#include "moho/app/AppRuntimeTypes.h"
 #include "moho/client/Localization.h"
 #include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaBinder.h"

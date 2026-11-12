@@ -1265,6 +1265,20 @@ DWORD GetKerningPairsW(HDC dc, DWORD count, KERNINGPAIR* pairs);
 UINT SetTextAlign(HDC dc, UINT align);
 COLORREF SetTextColor(HDC dc, COLORREF color);
 COLORREF SetBkColor(HDC dc, COLORREF color);
+// Mouse messages (WinUser.h), with their Windows values: the network panel takes the game
+// window's mouse events in these terms (moho/app/WD3DViewport.cpp, issue #407).
+#define WM_MOUSEMOVE 0x0200
+#define WM_LBUTTONDOWN 0x0201
+#define WM_LBUTTONUP 0x0202
+#define WM_LBUTTONDBLCLK 0x0203
+#define WM_RBUTTONDOWN 0x0204
+#define WM_RBUTTONUP 0x0205
+#define WM_RBUTTONDBLCLK 0x0206
+#define WM_MBUTTONDOWN 0x0207
+#define WM_MBUTTONUP 0x0208
+#define WM_MBUTTONDBLCLK 0x0209
+#define WM_MOUSEWHEEL 0x020A
+
 int FillRect(HDC dc, const RECT* rect, HBRUSH brush);
 int DrawTextW(HDC dc, const wchar_t* text, int count, RECT* rect, UINT format);
 COLORREF GetPixel(HDC dc, int x, int y);
@@ -1272,11 +1286,13 @@ LONG GetBitmapBits(HBITMAP bitmap, LONG size, void* bits);
 BOOL GdiFlush();
 
 // Virtual-key codes (WinUser.h), with their Windows values: the client's key bindings
-// convert wx key codes to and from them (wxCharCodeWXToMSW, issue #255).
+// convert the shell's key codes to and from them (ShellKeyToVirtualKey, issue #255).
 #define VK_LBUTTON 0x01
 #define VK_RBUTTON 0x02
 #define VK_CANCEL 0x03
 #define VK_MBUTTON 0x04
+#define VK_XBUTTON1 0x05
+#define VK_XBUTTON2 0x06
 #define VK_BACK 0x08
 #define VK_TAB 0x09
 #define VK_CLEAR 0x0C

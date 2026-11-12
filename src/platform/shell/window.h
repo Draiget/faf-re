@@ -1,44 +1,44 @@
 #pragma once
 
-// Engine addition (issue #255): the part of wx 2.4.2's wxWindow (wx/window.h) the Linux
-// client's game code uses: the event handler chain and the client area. See wx/defs.h in this
-// folder. The window system (issue #256) keeps the size and screen position current.
+// Engine addition (issues #255, #407): the shell's window: the event handler chain and the client
+// area. The window system (platform/Window.h) keeps the size and screen position current. See
+// defs.h.
 
-#include <wx/event.h>
-#include <wx/gdicmn.h>
+#include "platform/shell/event.h"
+#include "platform/shell/gdicmn.h"
 
 #include <cstdint>
 #include <vector>
 
-// The native window behind a wxWindow, as the renderers and the system's own window calls take
+// The native window behind a Window, as the renderers and the system's own window calls take
 // it (platform::window::NativeHandle: the HWND on Windows, the SDL_Window* elsewhere). A top-level
 // window has its own; a child window shares its top-level window's, which it fills. An integer, as
-// wx 2.4.2's WXWidget (WXHWND) is: the engine casts it with static_cast<uintptr_t>.
-typedef std::uintptr_t WXWidget;
+// The 2.4.2 window library's native handle is: the engine casts it with static_cast<uintptr_t>.
+typedef std::uintptr_t ShellNativeHandle;
 
-class wxWindow : public wxEvtHandler
+class ShellWindow : public ShellEvtHandler
 {
 public:
-  wxWindow() = default;
-  wxWindow(
-    wxWindow* parent,
-    wxWindowID id,
-    const wxPoint& pos = wxDefaultPosition,
-    const wxSize& size = wxDefaultSize,
+  ShellWindow() = default;
+  ShellWindow(
+    ShellWindow* parent,
+    ShellWindowID id,
+    const ShellPoint& pos = kShellDefaultPosition,
+    const ShellSize& size = kShellDefaultSize,
     long style = 0,
     const wchar_t* name = L"panel"
   );
-  ~wxWindow() override;
+  ~ShellWindow() override;
 
-  wxWindow* GetParent() const
+  ShellWindow* GetParent() const
   {
     return m_parent;
   }
-  WXWidget GetHandle() const
+  ShellNativeHandle GetHandle() const
   {
     return m_handle;
   }
-  WXWidget GetHWND() const
+  ShellNativeHandle GetHWND() const
   {
     return m_handle;
   }
@@ -49,7 +49,7 @@ public:
   }
 
   virtual bool Show(bool show = true);
-  // wx 2.4.2 deletes a window at once unless it is a top-level one; nothing here defers.
+  // The 2.4.2 window library deletes a window at once unless it is a top-level one; nothing here defers.
   virtual bool Destroy();
   bool IsShown() const
   {
@@ -57,8 +57,8 @@ public:
   }
   // The window that gets the keyboard and mouse events of its top-level window.
   virtual void SetFocus();
-  static wxWindow* FindFocus();
-  const std::vector<wxWindow*>& GetChildren() const
+  static ShellWindow* FindFocus();
+  const std::vector<ShellWindow*>& GetChildren() const
   {
     return m_children;
   }
@@ -66,7 +66,7 @@ public:
   {
     return m_topLevel;
   }
-  // A child with a native window of its own (platform::window::CreateChild; Windows), as wx made
+  // A child with a native window of its own (platform::window::CreateChild; Windows), as the window library made
   // child windows. Elsewhere a child fills its parent's window and shares it.
   bool IsNativeChild() const
   {
@@ -74,7 +74,7 @@ public:
   }
   virtual void Refresh(
     bool eraseBackground = true,
-    const wxRect* rect = nullptr
+    const ShellRect* rect = nullptr
   )
   {
     (void)eraseBackground;
@@ -82,7 +82,7 @@ public:
   }
   virtual void Update() {}
   void SetSize(int width, int height);
-  // wx 2.4.2: -1 keeps a coordinate or dimension as it is (with wxSIZE_USE_EXISTING).
+  // The 2.4.2 window library: -1 keeps a coordinate or dimension as it is (with SIZE_USE_EXISTING).
   void SetSize(int x, int y, int width, int height, int sizeFlags = 0);
   void Move(
     int x,
@@ -91,51 +91,50 @@ public:
   {
     SetSize(x, y, -1, -1);
   }
-  wxSize GetSize() const
+  ShellSize GetSize() const
   {
     return GetClientSize();
   }
-  wxPoint GetPosition() const
-  {
-    return wxPoint(m_screenX, m_screenY);
-  }
+  // A top-level window's frame position (borders and caption included), as the retail window
+  // library answered; a child's client origin on the screen.
+  ShellPoint GetPosition() const;
 
-  wxEvtHandler* GetEventHandler() const
+  ShellEvtHandler* GetEventHandler() const
   {
     return m_eventHandler;
   }
   void SetEventHandler(
-    wxEvtHandler* const handler
+    ShellEvtHandler* const handler
   )
   {
     m_eventHandler = handler;
   }
 
   // src/common/wincmn.cpp 2.4.2: the new handler sees events first, then passes them on.
-  void PushEventHandler(wxEvtHandler* handler);
-  wxEvtHandler* PopEventHandler(bool deleteHandler = false);
+  void PushEventHandler(ShellEvtHandler* handler);
+  ShellEvtHandler* PopEventHandler(bool deleteHandler = false);
 
   void GetClientSize(int* width, int* height) const;
-  wxSize GetClientSize() const;
+  ShellSize GetClientSize() const;
   void ScreenToClient(int* x, int* y) const;
-  wxPoint ScreenToClient(const wxPoint& point) const;
+  ShellPoint ScreenToClient(const ShellPoint& point) const;
 
   // Set by the window system (issue #256).
   void SetClientArea(int screenX, int screenY, int width, int height);
 
 protected:
-  // A top-level window with its own native window (wxTopLevelWindow's constructor).
+  // A top-level window with its own native window (TopLevelWindow's constructor).
   void SetTopLevel(void* platformWindow);
 
 private:
-  wxWindow* m_parent = nullptr;
-  std::vector<wxWindow*> m_children;
+  ShellWindow* m_parent = nullptr;
+  std::vector<ShellWindow*> m_children;
   bool m_topLevel = false;
   bool m_nativeChild = false;
-  WXWidget m_handle = 0;
+  ShellNativeHandle m_handle = 0;
   void* m_platformWindow = nullptr;
   bool m_shown = false;
-  wxEvtHandler* m_eventHandler = this;
+  ShellEvtHandler* m_eventHandler = this;
   int m_screenX = 0;
   int m_screenY = 0;
   int m_clientWidth = 0;

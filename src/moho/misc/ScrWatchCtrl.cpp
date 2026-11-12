@@ -86,7 +86,7 @@ void moho::ScrWatchCtrl::AddWatch(
   parent.push_back(std::move(row));
 }
 
-// wxTreeCtrl::SortChildren: by the row's text, which is the watch's name.
+// TreeCtrl::SortChildren: by the row's text, which is the watch's name.
 void moho::ScrWatchCtrl::SortRows(
   std::vector<std::unique_ptr<Row>>& rows
 )

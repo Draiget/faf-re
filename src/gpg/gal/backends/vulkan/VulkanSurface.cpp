@@ -36,7 +36,7 @@ namespace gpg::gal::vulkan
 } // namespace gpg::gal::vulkan
 #else
 // The Linux client (issue #255): the window is SDL3's (an SDL_Window*, the handle the window system
-// gives the wx stand-in's windows, issue #256), and SDL3 knows whether it is X11 or Wayland: it
+// gives the application shell windows, issue #256), and SDL3 knows whether it is X11 or Wayland: it
 // names the surface extension and creates the surface.
 #include <cstring>
 

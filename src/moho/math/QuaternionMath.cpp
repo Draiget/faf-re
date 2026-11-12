@@ -630,7 +630,7 @@ namespace moho
    * `FUN_0069AA50.c`'s IDA field names to offsets (its `Wm3::Quaternionf`
    * struct calls offset 0 `x`, so `a1->x` is lane 0 = `Wm3`'s `.w`), the
    * column extraction is the textbook third column of the rotation matrix -
-   * `2(xz + wy)`, `2(yz - wx)`, `1 - 2(x^2 + y^2)` - and the final product is
+   * `2(xz + wy)`, `2(yz - xw)`, `1 - 2(x^2 + y^2)` - and the final product is
    * `delta * quat`, pre-multiplying the delta:
    *   w = dw*ow - dx*ox - dy*oy - dz*oz
    *   x = dw*ox + dx*ow + dy*oz - dz*oy
@@ -909,8 +909,8 @@ namespace moho
    * four lanes as `[ecx+0]=w, [ecx+4]=x, [ecx+8]=y, [ecx+0Ch]=z` and writes:
    *
    *   [eax+00] 1-(zz+yy)   [eax+04] xy-wz     [eax+08] xz+wy
-   *   [eax+0C] xy+wz       [eax+10] 1-(zz+xx) [eax+14] yz-wx
-   *   [eax+18] xz-wy       [eax+1C] yz+wx     [eax+20] 1-(yy+xx)
+   *   [eax+0C] xy+wz       [eax+10] 1-(zz+xx) [eax+14] yz-xw
+   *   [eax+18] xz-wy       [eax+1C] yz+xw     [eax+20] 1-(yy+xx)
    *
    * where each named product already carries the factor of two (the binary
    * pre-doubles `x`, `y` and `z` at 0x00452FEE..0x00452FFF and multiplies the
@@ -944,7 +944,7 @@ namespace moho
     const float twoY = y * 2.0f;
     const float twoZ = z * 2.0f;
 
-    const float wx = w * twoX;
+    const float xw = w * twoX;
     const float wy = w * twoY;
     const float wz = w * twoZ;
     const float xx = x * twoX;
@@ -959,9 +959,9 @@ namespace moho
     outMatrix[0].z = xz + wy;
     outMatrix[1].x = xy + wz;
     outMatrix[1].y = 1.0f - (zz + xx);
-    outMatrix[1].z = yz - wx;
+    outMatrix[1].z = yz - xw;
     outMatrix[2].x = xz - wy;
-    outMatrix[2].y = yz + wx;
+    outMatrix[2].y = yz + xw;
     outMatrix[2].z = 1.0f - (yy + xx);
     return outMatrix;
   }

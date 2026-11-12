@@ -42,7 +42,7 @@
 #include "lua/LuaAssertion.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/app/WinApp.h"
-#include "moho/app/WxRuntimeTypes.h"
+#include "moho/app/AppRuntimeTypes.h"
 #include "moho/client/Localization.h"
 #include "moho/collision/CGeomSolid3.h"
 #include "moho/command/CommandIssueHelper.h"
@@ -1231,7 +1231,7 @@ static moho::WeakPtr<IMauiDragger>* func_SetCurDragger(
  */
 static std::uint8_t func_SetMouseCapture(
   const bool shouldCapture,
-  moho::CMauiWxEventMapper* const eventMapper
+  moho::CMauiEventMapper* const eventMapper
 )
 {
   std::uint8_t result = sMouseIsCaptured;
@@ -1288,7 +1288,7 @@ static std::uint8_t func_SetMouseCapture(
  * Depth of MAUI event dispatch currently on the stack. `PurgeDeleted` skips
  * the delete while this is non-zero, so a control cannot be freed underneath
  * an event walk that still holds a pointer to it. Single-threaded: every
- * dispatch runs on the wx message loop.
+ * dispatch runs on the window-library message loop.
  */
 extern int gMauiEventDispatchDepth;
 namespace

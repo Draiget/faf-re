@@ -177,7 +177,7 @@ namespace
     // frame. `CMauiControl::PostEvent` reads a control's parent *before* running
     // the handler and dispatches to it *after*, so freeing the frame here makes
     // that dispatch a virtual call through a released object. ~CMauiFrame would
-    // also delete the wx event mapper whose method is currently on the stack.
+    // also delete the window-library event mapper whose method is currently on the stack.
     //
     // The engine already defers control deletes for exactly this reason
     // (`Destroy` queues, `PurgeDeleted` frees on the tick); frames are the one
@@ -338,8 +338,8 @@ bool moho::CUIManager::Init()
  * Address: 0x0084CB70 (FUN_0084CB70)
  */
 int moho::CUIManager::AddFrame(
-  wxWindow* const inputWindow,
-  wxWindow* const eventHostWindow
+  ShellWindow* const inputWindow,
+  ShellWindow* const eventHostWindow
 )
 {
   if (inputWindow == nullptr) {
@@ -468,7 +468,7 @@ void moho::CUIManager::ClearFrames()
   }
 
   for (std::size_t index = 0; index < mInputWindows.Size(); ++index) {
-    wxWindow* const inputWindow = mInputWindows[index];
+    ShellWindow* const inputWindow = mInputWindows[index];
     if (inputWindow == nullptr) {
       continue;
     }
@@ -785,7 +785,7 @@ void moho::CUIManager::GetControlAtCursor(
 {
   // The out-parameters are written only on a hit; the callers initialise
   // them (DebugMouseOverControl does).
-  const wxPoint mouse = wxGetMousePosition();
+  const ShellPoint mouse = ShellGetMousePosition();
   for (std::size_t head = 0; head < mInputWindows.Size(); ++head) {
     int x = mouse.x;
     int y = mouse.y;
@@ -795,7 +795,7 @@ void moho::CUIManager::GetControlAtCursor(
     int height = 0;
     mInputWindows[head]->GetClientSize(&width, &height);
 
-    if (wxRect(wxPoint(0, 0), wxSize(width, height)).Inside(x, y)) {
+    if (ShellRect(ShellPoint(0, 0), ShellSize(width, height)).Inside(x, y)) {
       *outControl = CMauiControl::GetTopmostControl(mFrames[head].get(), static_cast<float>(x), static_cast<float>(y));
       *outX = static_cast<float>(x);
       *outY = static_cast<float>(y);
@@ -810,7 +810,7 @@ void moho::CUIManager::GetControlAtCursor(
  */
 void moho::CUIManager::DumpControlsUnderMouse()
 {
-  const wxPoint mouse = wxGetMousePosition();
+  const ShellPoint mouse = ShellGetMousePosition();
   for (std::size_t head = 0; head < mInputWindows.Size(); ++head) {
     int localX = mouse.x;
     int localY = mouse.y;

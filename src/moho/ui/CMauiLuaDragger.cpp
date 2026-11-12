@@ -430,20 +430,20 @@ void func_OnCommandDragEnd(
 // Rows 0x00F5A488: EVT_MOUSE_EVENTS is the thirteen mouse rows, all bound to
 // OnMouseMove (0x007A4970), in the order that macro lists them.
 BEGIN_EVENT_TABLE(
-  moho::CMauiWxEventMapper,
-  wxEvtHandler
+  moho::CMauiEventMapper,
+  ShellEvtHandler
 )
 EVT_MOUSE_EVENTS(
-  moho::CMauiWxEventMapper::OnMouseMove
+  moho::CMauiEventMapper::OnMouseMove
 )
 EVT_KEY_UP(
-  moho::CMauiWxEventMapper::OnKeyUp
+  moho::CMauiEventMapper::OnKeyUp
 )
 EVT_KEY_DOWN(
-  moho::CMauiWxEventMapper::OnKeyDown
+  moho::CMauiEventMapper::OnKeyDown
 )
 EVT_CHAR(
-  moho::CMauiWxEventMapper::OnChar
+  moho::CMauiEventMapper::OnChar
 )
 END_EVENT_TABLE()
 

@@ -2333,7 +2333,7 @@ DWORD CSimDriver::PerformNextEvent()
     mClientManager->DoBeat();
   }
 
-  // Engine addition (dedicated-server plan WPL.4): the wx pending/idle pump is
+  // Engine addition (dedicated-server plan WPL.4): the window-library pending/idle pump is
   // the client's (WinApp.h sAppPumpEvents); without a client there is none.
   if (sAppPumpEvents != nullptr) {
     sAppPumpEvents();

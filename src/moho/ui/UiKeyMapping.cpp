@@ -134,7 +134,7 @@ namespace
     return 0;
   }
   /** Win32 `WM_KEYDOWN`/`WM_KEYUP` `lParam` bit 30: the key was already down. */
-  constexpr std::uint32_t kWxKeyEventRawFlagPreviouslyDown = 0x40000000u;
+  constexpr std::uint32_t kKeyEventRawFlagPreviouslyDown = 0x40000000u;
 } // namespace
 
 /**
@@ -245,7 +245,7 @@ int moho::cfunc_KeycodeMauiToMSWL(
 
   const int mauiKeyCode = static_cast<int>(lua_tonumber(state->m_state, 1));
   bool isSpecial = false;
-  const int mswKeyCode = wxCharCodeWXToMSW(mauiKeyCode, &isSpecial);
+  const int mswKeyCode = ShellKeyToVirtualKey(mauiKeyCode, &isSpecial);
   (void)isSpecial;
 
   lua_pushnumber(state->m_state, static_cast<float>(mswKeyCode));
@@ -304,7 +304,7 @@ int moho::cfunc_KeycodeMSWToMauiL(
   }
 
   const int mswKeyCode = static_cast<int>(lua_tonumber(state->m_state, 1));
-  const int mauiKeyCode = wxCharCodeMSWToWX(mswKeyCode);
+  const int mauiKeyCode = ShellKeyFromVirtualKey(mswKeyCode);
   lua_pushnumber(state->m_state, static_cast<float>(mauiKeyCode));
   (void)lua_gettop(state->m_state);
   return 1;
@@ -871,7 +871,7 @@ void moho::IN_SetKeyName(
  * See the class declaration in UiRuntimeTypes.h for the full evidence trail.
  */
 void moho::CUIKeyHandler::OnKeyDown(
-  wxKeyEvent& keyEvent
+  ShellKeyEvent& keyEvent
 )
 {
   if (moho::Maui_CurrentFocusControl.GetObjectPtr() != nullptr) {
@@ -895,7 +895,7 @@ void moho::CUIKeyHandler::OnKeyDown(
   }
 
   const bool keyIsTrackedForRepeat = gUiKeyRepeatMap.find(packedKeyMask) != gUiKeyRepeatMap.end();
-  if (!keyIsTrackedForRepeat && (keyEvent.m_rawFlags & kWxKeyEventRawFlagPreviouslyDown) != 0) {
+  if (!keyIsTrackedForRepeat && (keyEvent.m_rawFlags & kKeyEventRawFlagPreviouslyDown) != 0) {
     // Stray Win32 auto-repeat for a key this handler never saw go down
     // (e.g. focus changed mid-press): drop it rather than firing a binding.
     keyEvent.Skip();
@@ -911,7 +911,7 @@ void moho::CUIKeyHandler::OnKeyDown(
 
   // No user key binding claimed this chord: fall back to the two hardcoded
   // shortcuts. Neither branch marks the event skipped -- matches the binary
-  // exactly, so wx keeps propagating the key afterward.
+  // exactly, so window-library keeps propagating the key afterward.
   constexpr std::int32_t kKeyCodeEnter = 13;
   constexpr std::int32_t kKeyCodeTilde = 0x7E; // '~'
   switch (keyEvent.m_keyCode) {
@@ -933,7 +933,7 @@ void moho::CUIKeyHandler::OnKeyDown(
  * See the class declaration in UiRuntimeTypes.h for the full evidence trail.
  */
 void moho::CUIKeyHandler::OnKeyUp(
-  wxKeyEvent& keyEvent
+  ShellKeyEvent& keyEvent
 )
 {
   keyEvent.Skip();

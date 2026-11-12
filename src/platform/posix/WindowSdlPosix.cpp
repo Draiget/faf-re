@@ -359,7 +359,7 @@ namespace platform::window::sdl
     return window;
   }
 
-  // No child windows: the engine's child windows share their parent's (WxStandIn.cpp).
+  // No child windows: the engine's child windows share their parent's (Shell.cpp).
   SDL_Window* CreateChild(
     SDL_Window* const parent,
     const int x,

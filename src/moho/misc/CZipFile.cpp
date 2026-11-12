@@ -773,7 +773,7 @@ namespace moho
     if (entry.mCompressionMethod == kZipCompressionDeflated) {
       // One spare byte after the compressed data. zlib 1.2.3, which both
       // architectures link (issue #406), copes with input ending exactly on the
-      // last compressed byte; zlib 1.1.4, which x86 linked from wxWindows
+      // last compressed byte; zlib 1.1.4, which x86 linked from the 2.4.2 window library
       // before, answered Z_BUF_ERROR on entries ending on an unlucky bit
       // boundary. The byte stays: a valid raw stream stops at its own
       // end-of-stream marker and never reads it, so it costs nothing.

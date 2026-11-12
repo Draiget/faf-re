@@ -210,7 +210,7 @@ namespace moho
     const float xx = twoX * orientation.x;
     const float yy = twoY * orientation.y;
     const float zz = twoZ * orientation.z;
-    const float wx = twoW * orientation.x;
+    const float xw = twoW * orientation.x;
     const float wy = twoW * orientation.y;
     const float wz = twoW * orientation.z;
     // 0x004EC5D5..0x004EC611 doubles the later lane of each mixed product, as
@@ -226,10 +226,10 @@ namespace moho
 
     vY.x = xy - wz;
     vY.y = 1.0f - (zz + xx);
-    vY.z = yz + wx;
+    vY.z = yz + xw;
 
     vZ.x = wy + xz;
-    vZ.y = yz - wx;
+    vZ.y = yz - xw;
     vZ.z = 1.0f - (yy + xx);
   }
 
@@ -801,8 +801,8 @@ namespace moho
    * function**, which is what fixes `.w` as the scalar lane. Stores:
    *
    *   [eax+00] 1-(zz+yy)  [eax+04] wz+xy    [eax+08] xz-wy    [eax+0C] 0
-   *   [eax+10] xy-wz      [eax+14] 1-(zz+xx)[eax+18] yz+wx    [eax+1C] 0
-   *   [eax+20] wy+xz      [eax+24] yz-wx    [eax+28] 1-(yy+xx)[eax+2C] 0
+   *   [eax+10] xy-wz      [eax+14] 1-(zz+xx)[eax+18] yz+xw    [eax+1C] 0
+   *   [eax+20] wy+xz      [eax+24] yz-xw    [eax+28] 1-(yy+xx)[eax+2C] 0
    *   [eax+30..38] vec    [eax+3C] 1.0
    *
    * This is exactly the transpose of `Moho::QuatToMatrix` (0x00452FD0) - the
@@ -830,7 +830,7 @@ namespace moho
     const float xy2 = twoY * quat.x;
     const float xz2 = twoZ * quat.x;
     const float yz2 = twoZ * quat.y;
-    const float wx2 = twoW * quat.x;
+    const float xw2 = twoW * quat.x;
     const float wy2 = twoW * quat.y;
     const float wz2 = twoW * quat.z;
 
@@ -840,10 +840,10 @@ namespace moho
     r[0].w = 0.0f;
     r[1].x = xy2 - wz2;
     r[1].y = 1.0f - (zz2 + xx2);
-    r[1].z = yz2 + wx2;
+    r[1].z = yz2 + xw2;
     r[1].w = 0.0f;
     r[2].x = wy2 + xz2;
-    r[2].y = yz2 - wx2;
+    r[2].y = yz2 - xw2;
     r[2].z = 1.0f - (yy2 + xx2);
     r[2].w = 0.0f;
     r[3].x = vec.x;

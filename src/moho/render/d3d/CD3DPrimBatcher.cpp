@@ -1368,7 +1368,7 @@ namespace moho
       return;
     }
 
-    wxWindow* const inputWindow = manager.mInputWindows[headIndex];
+    ShellWindow* const inputWindow = manager.mInputWindows[headIndex];
     if (inputWindow == nullptr) {
       return;
     }

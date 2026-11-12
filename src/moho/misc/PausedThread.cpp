@@ -83,7 +83,7 @@ std::uintptr_t moho::PausedMainThread::WaitUntilResumedAndDelete()
 {
   bool processIdle = true;
   while (::WaitForSingleObject(static_cast<HANDLE>(mResumeEvent), 0) != WAIT_OBJECT_0) {
-    // Engine addition (plan WPL.4): the wx pump is the client's (WinApp.h
+    // Engine addition (plan WPL.4): the window-library pump is the client's (WinApp.h
     // sAppPumpStep).
     if (sAppPumpStep != nullptr && sAppPumpStep(processIdle)) {
       processIdle = true;

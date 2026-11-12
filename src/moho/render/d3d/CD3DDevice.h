@@ -896,7 +896,7 @@ namespace moho
 
   /**
    * Engine addition: `ren_DirectPaint`. CD3DDevice::Refresh invalidates the window and the frame draws
-   * in the WM_PAINT that follows: wx's event tables, BeginPaint, EndPaint and a window DC, 6 % of an
+   * in the WM_PAINT that follows: the window library's event tables, BeginPaint, EndPaint and a window DC, 6 % of an
    * uncapped frame and none of it used by a device that draws through a swap chain. With this on,
    * Refresh only marks the frame and the main loop draws it where the message would have come. Paint
    * messages from Windows (a window uncovered, a capture tool) still go through OnPaint.

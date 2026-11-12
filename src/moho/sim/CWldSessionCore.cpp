@@ -1708,7 +1708,7 @@ namespace moho
       IsGameOver = 1u;
       UI_NoteGameOver();
       if (CFG_GetArgOption("/exitongameover", 0u, nullptr)) {
-        wxTheApp->ExitMainLoop();
+        gShellApp->ExitMainLoop();
       }
     }
 
@@ -2016,7 +2016,7 @@ namespace moho
     if (sExitAtTick >= 0 && static_cast<int>(mGameTick) >= sExitAtTick) {
       sExitAtTick = -1;
       gpg::Logf("exitattick: quitting at game tick %d", static_cast<int>(mGameTick));
-      wxTheApp->ExitMainLoop();
+      gShellApp->ExitMainLoop();
     }
   }
 

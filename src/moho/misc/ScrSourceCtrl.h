@@ -99,7 +99,7 @@ namespace moho
     // The tabs and the selected page.
     void Draw();
 
-    // wxNotebook::GetSelection: the selected page, -1 when none.
+    // Notebook::GetSelection: the selected page, -1 when none.
     [[nodiscard]] int GetSelection() const
     {
       return mSelection;

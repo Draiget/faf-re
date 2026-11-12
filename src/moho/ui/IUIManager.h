@@ -33,7 +33,7 @@ namespace moho
      * onto the input window. Returns the new head's index, or -1 without an
      * input window.
      */
-    virtual int AddFrame(wxWindow* inputWindow, wxWindow* eventHostWindow) = 0;
+    virtual int AddFrame(ShellWindow* inputWindow, ShellWindow* eventHostWindow) = 0;
 
     /**
      * Address: 0x0084CC50 (FUN_0084CC50)

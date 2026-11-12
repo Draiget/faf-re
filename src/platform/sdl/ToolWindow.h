@@ -3,7 +3,7 @@
 // Engine addition (issue #412): the developer windows (log window, Lua debugger, emitter editor,
 // reference editor) on Dear ImGui, each in a window of its own made by SDL3 and drawn with SDL's
 // renderer (Direct3D 11 or 12 on Windows, Vulkan or OpenGL elsewhere), apart from the game's
-// device. They replace wxWindows 2.4.2's dialogs and frames.
+// device. They replace the 2.4.2 window library dialogs and frames.
 //
 // All calls are made on the main thread. The main loop calls RenderAll once a frame; their input
 // reaches them through the window system (src/platform/sdl/WindowSdl.cpp), not the game.
@@ -43,7 +43,9 @@ namespace platform::tools
     // Draws one frame now (RenderAll does it for every shown window).
     void Render();
 
-    // Screen position and size of the window; -1 keeps a value. False without a window.
+    // The frame's screen position and outer size, borders and caption included, as the retail
+    // window library placed and measured its dialogs and frames (the Windows.Log.* and
+    // Windows.Debug.* preferences hold them); -1 keeps a value. False without a window.
     void SetBounds(int x, int y, int width, int height);
     bool GetBounds(int& x, int& y, int& width, int& height) const;
 

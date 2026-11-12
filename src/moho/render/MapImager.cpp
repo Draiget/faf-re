@@ -6,7 +6,7 @@
 #include "gpg/core/containers/String.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaRuntimeTypes.h"
-#include "moho/app/WxRuntimeTypes.h"
+#include "moho/app/AppRuntimeTypes.h"
 #include "moho/render/WRenViewport.h"
 #include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaBinder.h"

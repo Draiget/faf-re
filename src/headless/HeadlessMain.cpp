@@ -579,8 +579,8 @@ int HEADLESS_Main(
   // `WinMain` / `CScApp::CScApp`.
   moho::APP_InitializeIdentity();
 
-  // `WIN_AppExecute` builds wx's application object here; headless links only the
-  // simulation and has no wx.
+  // `WIN_AppExecute` builds the window library's application object here; headless links only the
+  // simulation and has no window shell.
 #if FAFRE_PLATFORM_WINDOWS
   (void)::CoInitialize(nullptr);
 #endif

@@ -5,8 +5,8 @@
 #include "moho/sim/WldSessionState.h"
 #include "CWldSession.h"
 
-#include "platform/WxWidgets.h"
-#include <wx/app.h>
+#include "platform/shell/Shell.h"
+#include "platform/shell/app.h"
 
 #include "legacy/algorithms/Sort.h"
 #include "legacy/containers/HashMap.h"

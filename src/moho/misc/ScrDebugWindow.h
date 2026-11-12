@@ -103,7 +103,7 @@ namespace moho
       std::string line;
     };
 
-    // A folder of the source tree, listed the first time it opens (wxGenericDirCtrl).
+    // A folder of the source tree, listed the first time it opens (GenericDirCtrl).
     struct FolderNode
     {
       std::string path;

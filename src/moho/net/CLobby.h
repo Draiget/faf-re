@@ -375,7 +375,7 @@ namespace moho
    * Engine addition (issue #215): whether a lobby object exists, i.e. the lobby
    * screen is up or a game is being launched from it. Counted by CLobby's
    * constructor and destructor, outside the class, whose layout is the binary's.
-   * Read by the lobby build label (WxRuntimeTypes.cpp).
+   * Read by the lobby build label (AppWindows.cpp).
    */
   [[nodiscard]] bool LOBBY_IsActive() noexcept;
 

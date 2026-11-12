@@ -27,9 +27,9 @@
 #include "moho/ui/UiStateTypes.h"
 #include "Wm3Quaternion.h"
 
-#include "platform/WxWidgets.h"
-#include <wx/event.h>
-#include <wx/window.h>
+#include "platform/shell/Shell.h"
+#include "platform/shell/event.h"
+#include "platform/shell/window.h"
 
 struct lua_State;
 
@@ -1246,7 +1246,7 @@ namespace moho
    * CMauiWxEventMapper is pushed after it, so it only sees the keys the MAUI
    * controls skipped.
    */
-  class CUIKeyHandler : public wxEvtHandler
+  class CUIKeyHandler : public ShellEvtHandler
   {
   public:
     /**
@@ -1269,7 +1269,7 @@ namespace moho
      * `gUiKeyRepeatMap` suppresses a Win32 auto-repeat (`m_rawFlags` bit 30)
      * for a key this handler is not tracking as held.
      */
-    void OnKeyDown(wxKeyEvent& event);
+    void OnKeyDown(ShellKeyEvent& event);
 
     /**
      * Address: 0x00838E30 (FUN_00838E30, sub_838E30)
@@ -1277,7 +1277,7 @@ namespace moho
      * What it does:
      * Skips the event; the handler takes no action on key-up.
      */
-    void OnKeyUp(wxKeyEvent& event);
+    void OnKeyUp(ShellKeyEvent& event);
 
     DECLARE_EVENT_TABLE()
   };
@@ -1298,10 +1298,10 @@ namespace moho
    * 0x007A4530 (slot 6) and the deleting destructor 0x007A48B0 (slot 1),
    * both the compiler's.
    */
-  class CMauiWxEventMapper : public wxEvtHandler
+  class CMauiEventMapper : public ShellEvtHandler
   {
   public:
-    explicit CMauiWxEventMapper(
+    explicit CMauiEventMapper(
       CMauiFrame* const frame
     )
       : mWindow(nullptr)
@@ -1315,7 +1315,7 @@ namespace moho
      * Unlinks the global mouse-over control link and clears the mouse-capture
      * flag; `wxEvtHandler::~wxEvtHandler` (0x0097AAE0) follows.
      */
-    ~CMauiWxEventMapper() override;
+    ~CMauiEventMapper() override;
 
     /**
      * Address: 0x007A4970 (FUN_007A4970, func_OnMouseMove)
@@ -1328,7 +1328,7 @@ namespace moho
      * `/lua/ui/uimain.lua:OnMouseButtonPress` and tells the previous
      * keyboard-focus owner it is losing focus.
      */
-    void OnMouseMove(wxMouseEvent& event);
+    void OnMouseMove(ShellMouseEvent& event);
 
     /**
      * Address: 0x007A4FD0 (FUN_007A4FD0)
@@ -1337,7 +1337,7 @@ namespace moho
      * Delivers `MET_KeyUp` to the keyboard-focus control, or the top
      * input-capture control when nothing has focus.
      */
-    void OnKeyUp(wxKeyEvent& event);
+    void OnKeyUp(ShellKeyEvent& event);
 
     /**
      * Address: 0x007A4EF0 (FUN_007A4EF0)
@@ -1345,7 +1345,7 @@ namespace moho
      * What it does:
      * Delivers `MET_KeyDown` the same way.
      */
-    void OnKeyDown(wxKeyEvent& event);
+    void OnKeyDown(ShellKeyEvent& event);
 
     /**
      * Address: 0x007A50B0 (FUN_007A50B0)
@@ -1353,17 +1353,17 @@ namespace moho
      * What it does:
      * Delivers `MET_Char` the same way.
      */
-    void OnChar(wxKeyEvent& event);
+    void OnChar(ShellKeyEvent& event);
 
-    wxWindow* mWindow;  // +0x28: the input window this mapper was pushed onto
+    ShellWindow* mWindow; // +0x28: the input window this mapper was pushed onto
     CMauiFrame* mFrame; // +0x2C
 
     DECLARE_EVENT_TABLE()
   };
 
-  static_assert(offsetof(CMauiWxEventMapper, mWindow) == 0x28, "moho::CMauiWxEventMapper::mWindow offset must be 0x28");
-  static_assert(offsetof(CMauiWxEventMapper, mFrame) == 0x2C, "moho::CMauiWxEventMapper::mFrame offset must be 0x2C");
-  static_assert(sizeof(CMauiWxEventMapper) == 0x30, "moho::CMauiWxEventMapper size must be 0x30");
+  static_assert(offsetof(CMauiEventMapper, mWindow) == 0x28, "moho::CMauiEventMapper::mWindow offset must be 0x28");
+  static_assert(offsetof(CMauiEventMapper, mFrame) == 0x2C, "moho::CMauiEventMapper::mFrame offset must be 0x2C");
+  static_assert(sizeof(CMauiEventMapper) == 0x30, "moho::CMauiEventMapper size must be 0x30");
 
   /**
    * Address: 0x010C1B48 (data segment global, 256 * 28 bytes = 0x1C00)
@@ -2716,7 +2716,7 @@ namespace moho
     // ---------------------------------------------------------------------
     boost::weak_ptr<CMauiFrame> mSelfWeak;              // +0x11C
     TDatList<CMauiControl, void> mDeletedControlList{}; // +0x124
-    CMauiWxEventMapper* mEventHandler = nullptr;        // +0x12C
+    CMauiEventMapper* mEventHandler = nullptr;          // +0x12C
     std::int32_t mTargetHead = -1;                      // +0x130
   };
 

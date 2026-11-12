@@ -1,18 +1,17 @@
 #pragma once
 
-// Engine addition (issue #255): wx 2.4.2's point, size and rectangle (wx/gdicmn.h), for the
-// Linux client. See wx/defs.h in this folder.
+// Engine addition (issues #255, #407): the shell's point, size and rectangle. See defs.h.
 
-#include <wx/defs.h>
+#include "platform/shell/defs.h"
 
-class wxSize
+class ShellSize
 {
 public:
   int x = 0;
   int y = 0;
 
-  wxSize() = default;
-  wxSize(
+  ShellSize() = default;
+  ShellSize(
     const int width,
     const int height
   )
@@ -30,14 +29,14 @@ public:
   }
 };
 
-class wxPoint
+class ShellPoint
 {
 public:
   int x = 0;
   int y = 0;
 
-  wxPoint() = default;
-  wxPoint(
+  ShellPoint() = default;
+  ShellPoint(
     const int px,
     const int py
   )
@@ -46,7 +45,7 @@ public:
   {}
 };
 
-class wxRect
+class ShellRect
 {
 public:
   int x = 0;
@@ -54,10 +53,10 @@ public:
   int width = 0;
   int height = 0;
 
-  wxRect() = default;
-  wxRect(
-    const wxPoint& pos,
-    const wxSize& size
+  ShellRect() = default;
+  ShellRect(
+    const ShellPoint& pos,
+    const ShellSize& size
   )
     : x(pos.x)
     , y(pos.y)
@@ -65,7 +64,7 @@ public:
     , height(size.y)
   {}
 
-  // wx 2.4.2 src/common/gdicmn.cpp: the right and bottom edges are outside.
+  // The 2.4.2 window library src/common/gdicmn.cpp: the right and bottom edges are outside.
   bool Inside(
     const int cx,
     const int cy
@@ -75,11 +74,11 @@ public:
   }
 };
 
-extern const wxPoint wxDefaultPosition;
-extern const wxSize wxDefaultSize;
+extern const ShellPoint kShellDefaultPosition;
+extern const ShellSize kShellDefaultSize;
 
 /**
  * The mouse position in screen coordinates. The window system (issue #256) keeps it current;
  * until then it is (0, 0).
  */
-wxPoint wxGetMousePosition();
+ShellPoint ShellGetMousePosition();

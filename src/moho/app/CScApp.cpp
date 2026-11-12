@@ -662,8 +662,8 @@ namespace
       const fa::string message =
         gpg::STR_Printf("Invalid address:port for connecting to the gpg.net client: \"%s\".", endpoint.c_str());
       moho::WIN_OkBox("Ack!", message.c_str());
-      if (wxTheApp != nullptr) {
-        wxTheApp->ExitMainLoop();
+      if (gShellApp != nullptr) {
+        gShellApp->ExitMainLoop();
       }
       return;
     }
@@ -674,8 +674,8 @@ namespace
       const fa::string message =
         gpg::STR_Printf("Unable to connect to gpgnet endpoint \"%s\":\n%s", endpoint.c_str(), exception.what());
       moho::WIN_OkBox("Ack!", message.c_str());
-      if (wxTheApp != nullptr) {
-        wxTheApp->ExitMainLoop();
+      if (gShellApp != nullptr) {
+        gShellApp->ExitMainLoop();
       }
       return;
     }
@@ -684,8 +684,8 @@ namespace
     moho::IUIManager* const uiManager = moho::UI_GetManager();
     if (state == nullptr || uiManager == nullptr || !uiManager->SetNewLuaState(state)) {
       moho::WIN_OkBox("Ack!", "UI_GetManager()->SetNewLuaState(state) failed!");
-      if (wxTheApp != nullptr) {
-        wxTheApp->ExitMainLoop();
+      if (gShellApp != nullptr) {
+        gShellApp->ExitMainLoop();
       }
       return;
     }
@@ -702,13 +702,13 @@ namespace
     } catch (const std::exception& exception) {
       const fa::string message = gpg::STR_Printf("Unable to start gpgnet UI:\n%s", exception.what());
       moho::WIN_OkBox("Ack!", message.c_str());
-      if (wxTheApp != nullptr) {
-        wxTheApp->ExitMainLoop();
+      if (gShellApp != nullptr) {
+        gShellApp->ExitMainLoop();
       }
     } catch (...) {
       moho::WIN_OkBox("Ack!", "Unable to start gpgnet UI.");
-      if (wxTheApp != nullptr) {
-        wxTheApp->ExitMainLoop();
+      if (gShellApp != nullptr) {
+        gShellApp->ExitMainLoop();
       }
     }
   }
@@ -752,8 +752,8 @@ namespace
     case faf::remote::EServerSessionStart::Started:
       return;
     case faf::remote::EServerSessionStart::Failed:
-      if (wxTheApp != nullptr) {
-        wxTheApp->ExitMainLoop();
+      if (gShellApp != nullptr) {
+        gShellApp->ExitMainLoop();
       }
       return;
     }
@@ -972,7 +972,7 @@ namespace
    * entirely invisible - which read as the engine having drawn nothing.
    */
   void ClampPositionToMonitor(
-    wxPoint* const inOutPosition,
+    ShellPoint* const inOutPosition,
     const std::uint32_t width,
     const std::uint32_t height
   )
@@ -1069,7 +1069,7 @@ namespace
   )
   {
 #if !FAFRE_PLATFORM_WINDOWS
-    // No window system menu, and the Lua debugger is a wx window (issue #260).
+    // No window system menu, and the Lua debugger is a window-library window (issue #260).
     (void)windowHandle;
     return FALSE;
 #else
@@ -1532,8 +1532,8 @@ void CScApp::Main()
     }
   }
 
-  if (!moho::WLD_Frame(smoothedFrameSeconds) && wxTheApp != nullptr) {
-    wxTheApp->ExitMainLoop();
+  if (!moho::WLD_Frame(smoothedFrameSeconds) && gShellApp != nullptr) {
+    gShellApp->ExitMainLoop();
   }
 
   moho::CWldSession* const activeSession = moho::WLD_GetActiveSession();
@@ -1958,7 +1958,7 @@ bool CScApp::CreateDevice()
   primaryHead.mHeight = static_cast<std::uint32_t>(moho::wnd_DefaultCreateHeight);
   primaryHead.framesPerSecond = 60;
 
-  wxPoint position = wxDefaultPosition;
+  ShellPoint position = kShellDefaultPosition;
   bool windowedByCommandLine = false;
   bool secondarySetupMode = false;
 
@@ -2079,7 +2079,7 @@ bool CScApp::CreateDevice()
 bool CScApp::CreateAppFrame(
   const fa::string& title,
   const bool maximized,
-  const wxPoint& position,
+  const ShellPoint& position,
   gpg::gal::DeviceContext& context
 )
 {
@@ -2090,7 +2090,7 @@ bool CScApp::CreateAppFrame(
     moho::WIN_SetMainWindow(nullptr);
 
     // 0x008CFD00: idle until wx has nothing left to delete.
-    while (wxTheApp->ProcessIdle()) {}
+    while (gShellApp->ProcessIdle()) {}
 
     if (reason != nullptr && reason[0] != '\0') {
       gpg::Warnf("GAL Exception: %s", reason);
@@ -2102,7 +2102,7 @@ bool CScApp::CreateAppFrame(
     gpg::gal::Head& primaryHead = context.GetHead(0);
     const std::int32_t frameStyle = primaryHead.mWindowed ? kFullscreenFrameStyle : kWindowedFrameStyle;
 
-    const wxSize primarySize{
+    const ShellSize primarySize{
       static_cast<std::int32_t>(primaryHead.mWidth),
       static_cast<std::int32_t>(primaryHead.mHeight),
     };
@@ -2156,7 +2156,7 @@ bool CScApp::CreateAppFrame(
 
     if (hasSecondHead) {
       gpg::gal::Head& secondaryHead = context.GetHead(1);
-      const wxSize secondarySize{
+      const ShellSize secondarySize{
         static_cast<std::int32_t>(secondaryHead.mWidth),
         static_cast<std::int32_t>(secondaryHead.mHeight),
       };
@@ -2168,7 +2168,7 @@ bool CScApp::CreateAppFrame(
     }
 
     // A stack wxPaintEvent handed straight to the handler (0x008CFB95).
-    wxPaintEvent paintEvent;
+    ShellPaintEvent paintEvent;
     viewport->OnPaint(paintEvent);
 
     moho::CD3DDevice* const device = moho::D3D_GetDevice();

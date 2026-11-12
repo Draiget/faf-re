@@ -107,9 +107,8 @@ target_include_directories(faf_engine PUBLIC
   "${FAF_DEPENDENCIES_DIR}/boost_1_34_1"
   "${FAF_DEPENDENCIES_DIR}/zlib-1.2.3")
 target_link_libraries(faf_engine PUBLIC faf_codegen Wm3Headers)
-# The application shell (src/platform/shell: the wx-shaped classes the recovered code names) over
-# SDL3, and the developer windows' Dear ImGui (issues #407, #412).
-target_include_directories(faf_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/platform/shell")
+# The application shell (src/platform/shell) over SDL3, and the developer windows' Dear ImGui
+# (issues #407, #412).
 target_link_libraries(faf_engine PUBLIC SDL3::SDL3-static faf_imgui_sdl)
 # In-engine peer links (moho/net/NetlinkPeers.cpp, issue #233; client only).
 target_link_libraries(faf_engine PUBLIC faf_netlink)
@@ -162,8 +161,8 @@ set_property(SOURCE
     gpg/gal/backends/d3d11/DeviceD3D11.cpp
   APPEND PROPERTY INCLUDE_DIRECTORIES "${_fx11}/inc")
 
-set_property(SOURCE ${FAF_WX_EVENT_TABLE_SOURCES}
-  APPEND PROPERTY COMPILE_OPTIONS ${FAF_WX_EVENT_TABLE_OPTIONS})
+set_property(SOURCE ${FAF_SHELL_EVENT_TABLE_SOURCES}
+  APPEND PROPERTY COMPILE_OPTIONS ${FAF_SHELL_EVENT_TABLE_OPTIONS})
 
 set_property(SOURCE gpg/gal/effects/ShaderCompiler.cpp
   APPEND PROPERTY INCLUDE_DIRECTORIES "${FAF_DEPENDENCIES_DIR}/dxc/inc")
@@ -325,14 +324,14 @@ add_custom_command(TARGET faf_main POST_BUILD
 # (headless here, headless and the game server on Linux, cmake/FafLinux.cmake): the
 # objects of the translation units in sim_sources.cmake, gpg::gal::Math without D3DX
 # (gpg/gal/MatrixPortable.cpp, which faf_main links too), and what linking them takes,
-# with no wx, Direct3D, D3DX, XACT, DirectSound or FFmpeg library.
+# with no window-library, Direct3D, D3DX, XACT, DirectSound or FFmpeg library.
 #
 # The objects are faf_engine's, compiled once for faf_main and faf_sim alike: each client
 # translation unit's object is filtered out of $<TARGET_OBJECTS:faf_engine>, and the rest
 # keep faf_engine's order. A separately compiled sim library would put faf_main's objects
 # in another order, and static initialisers run in link order: the Lua init forms and
 # reflection types would register in a different order (tests/registry checks it). The
-# sim's sources include no wx or DirectX header (the Linux build compiles them without
+# sim's sources include no window-library or DirectX header (the Linux build compiles them without
 # either). With FAF_SERVER_MODE the objects include src/remote.
 include(sim_sources.cmake)
 

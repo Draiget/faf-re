@@ -39,7 +39,7 @@
 #include "gpg/core/time/Timer.h"
 #include "IWinApp.h"
 #include "legacy/containers/Vector.h"
-#include "WxRuntimeTypes.h"
+#include "AppRuntimeTypes.h"
 #include "moho/app/WEmitterEditor.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
@@ -1459,15 +1459,15 @@ namespace
 
   /**
    * Engine addition: one event of the window system (platform/Window.h), through the application
-   * shell, without waiting. wx's `wxApp::Dispatch` (GetMessage) could wait for a message the
-   * `wxApp::Pending` check had seen; the window system answers HasEvents from what it has read.
+   * shell, without waiting. The window library's `App::Dispatch` (GetMessage) could wait for a message the
+   * `App::Pending` check had seen; the window system answers HasEvents from what it has read.
    */
   bool DispatchPendingMessage()
   {
-    if (!wxTheApp->Pending()) {
+    if (!gShellApp->Pending()) {
       return false;
     }
-    wxTheApp->Dispatch();
+    gShellApp->Dispatch();
     return true;
   }
 
@@ -2114,7 +2114,7 @@ void moho::WIN_SetWakeupTimer(
  */
 void moho::WIN_AppRequestExit()
 {
-  wxTheApp->ExitMainLoop();
+  gShellApp->ExitMainLoop();
 }
 
 /**
@@ -2124,7 +2124,7 @@ void moho::WIN_AppRequestExit()
  * Updates the process-global main-window owner pointer.
  */
 void moho::WIN_SetMainWindow(
-  wxWindow* const mainWindow
+  ShellWindow* const mainWindow
 )
 {
   sMainWindow = mainWindow;
@@ -2169,7 +2169,7 @@ void moho::WIN_AppExecute(
 #endif
   // enterLoop = false: wx initialises and builds the MohoApp, and the loop
   // below pumps it (0x004F2117, wxEntry 0x00992FF0).
-  wxEntry(reinterpret_cast<WXHINSTANCE>(selfModule), nullptr, nullptr, 0, false);
+  ShellEntry(reinterpret_cast<ShellInstanceHandle>(selfModule), nullptr, nullptr, 0, false);
 
   if (!HasCorrectPlatform()) {
     WIN_OkBox(
@@ -2194,8 +2194,8 @@ void moho::WIN_AppExecute(
   }
   // 0x004F2227..0x004F2233: wxApp::m_exitOnFrameDelete (+0x44) = Yes and
   // m_keepGoing (+0x5C) = TRUE, the flag this loop runs on.
-  wxTheApp->SetExitOnFrameDelete(true);
-  wxGetApp().SetKeepGoing();
+  gShellApp->SetExitOnFrameDelete(true);
+  ShellGetApp().SetKeepGoing();
 
   platform::SetX87PrecisionControl(_PC_24); // _controlfp(0x20000, 0x30000)
 
@@ -2209,7 +2209,7 @@ void moho::WIN_AppExecute(
     }
 
     // Engine change: taking the message is the check, as a second PeekMessage per pass was 7 % of
-    // an uncapped frame. wxTheApp->Dispatch() could also block, see there.
+    // an uncapped frame. TheApp->Dispatch() could also block, see there.
     if (DispatchPendingMessage()) {
       success = true;
       continue;
@@ -2223,13 +2223,13 @@ void moho::WIN_AppExecute(
     // Engine change: with idle work done this goes on to the next frame without asking for messages
     // a second or third time; one that arrives now waits for the top of the next frame.
     if (success) {
-      success = wxTheApp->ProcessIdle();
+      success = gShellApp->ProcessIdle();
       if (success) {
         continue;
       }
     }
 
-    if (!wxGetApp().KeepGoing()) {
+    if (!ShellGetApp().KeepGoing()) {
       break;
     }
 
@@ -2252,21 +2252,21 @@ void moho::WIN_AppExecute(
   PLAT_Exit();
 
   // Drain what the teardown queued (0x004F2345..0x004F2382), then let wx go.
-  if (wxTheApp != nullptr) {
+  if (gShellApp != nullptr) {
     bool moreIdle = true;
     for (;;) {
-      if (wxTheApp->Pending()) {
-        wxTheApp->Dispatch();
+      if (gShellApp->Pending()) {
+        gShellApp->Dispatch();
         moreIdle = true;
         continue;
       }
       if (!moreIdle) {
         break;
       }
-      moreIdle = wxTheApp->ProcessIdle();
+      moreIdle = gShellApp->ProcessIdle();
     }
-    wxTheApp->OnExit();
-    wxApp::CleanUp();
+    gShellApp->OnExit();
+    ShellApp::CleanUp();
   }
 
 #if FAFRE_PLATFORM_WINDOWS
@@ -2477,8 +2477,8 @@ namespace
   // cfunc_EndLoggingStatsL (moho/misc/StatItem.cpp) did before the move.
   void AppExitMainLoop()
   {
-    if (wxTheApp != nullptr) {
-      wxTheApp->ExitMainLoop();
+    if (gShellApp != nullptr) {
+      gShellApp->ExitMainLoop();
     }
   }
 
@@ -2491,8 +2491,8 @@ namespace
   {
     bool keepIdle = true;
     for (;;) {
-      if (wxTheApp->Pending()) {
-        wxTheApp->Dispatch();
+      if (gShellApp->Pending()) {
+        gShellApp->Dispatch();
         keepIdle = true;
         continue;
       }
@@ -2501,7 +2501,7 @@ namespace
         break;
       }
 
-      keepIdle = wxTheApp->ProcessIdle();
+      keepIdle = gShellApp->ProcessIdle();
     }
   }
 
@@ -2514,16 +2514,16 @@ namespace
     bool& processIdle
   )
   {
-    if (wxTheApp != nullptr && wxTheApp->Pending()) {
-      wxTheApp->Dispatch();
+    if (gShellApp != nullptr && gShellApp->Pending()) {
+      gShellApp->Dispatch();
       return true;
     }
 
     // Engine addition (issue #412): the developer windows (the Lua debugger that holds the main
     // thread here) draw while it waits.
     platform::tools::RenderAll();
-    if (processIdle && wxTheApp != nullptr) {
-      processIdle = wxTheApp->ProcessIdle();
+    if (processIdle && gShellApp != nullptr) {
+      processIdle = gShellApp->ProcessIdle();
     }
     return false;
   }
@@ -2581,8 +2581,8 @@ void moho::WINX_InitSplash(
     }
   }
 
-  // wxSplashScreen(bitmap rescaled to the size, wxSPLASH_CENTRE_ON_SCREEN, wxSIMPLE_BORDER |
-  // wxSTAY_ON_TOP) in the binary.
+  // SplashScreen(bitmap rescaled to the size, SPLASH_CENTRE_ON_SCREEN, SIMPLE_BORDER |
+  // STAY_ON_TOP) in the binary.
   (void)platform::window::ShowSplash(filename, splashWidth, splashHeight);
 }
 
@@ -2606,7 +2606,7 @@ void moho::WINX_PrecreateLogWindow()
 }
 
 /**
- * Engine addition (issue #412): wxDialog::ShowModal's loop for the developer windows on Dear
+ * Engine addition (issue #412): Dialog::ShowModal's loop for the developer windows on Dear
  * ImGui. The window system's events go through the shell as in the main loop, and the developer
  * windows are drawn, until `done` answers true or the program is asked to end.
  */
@@ -2615,13 +2615,13 @@ void moho::WINX_RunModal(
 )
 {
   while (!done()) {
-    if (wxTheApp == nullptr) {
+    if (gShellApp == nullptr) {
       return;
     }
-    while (wxTheApp->Pending()) {
-      wxTheApp->Dispatch();
+    while (gShellApp->Pending()) {
+      gShellApp->Dispatch();
     }
-    if (!wxGetApp().KeepGoing()) {
+    if (!ShellGetApp().KeepGoing()) {
       return;
     }
     platform::tools::RenderAll();

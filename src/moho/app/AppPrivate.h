@@ -1,8 +1,8 @@
 #pragma once
 
-// Private to moho/app: helpers the pieces of the former WxRuntimeTypes.cpp share.
+// Private to moho/app: helpers the pieces of the former AppWindows.cpp share.
 
-#include "WxRuntimeTypes.h"
+#include "AppRuntimeTypes.h"
 #include "gpg/core/profiling/Profiler.h"
 
 #include <Windows.h>
@@ -98,6 +98,6 @@
     moho::EVT_LOG_ADDITION,                                                                                            \
     -1,                                                                                                                \
     -1,                                                                                                                \
-    (wxObjectEventFunction)(wxEventFunction)(moho::CLogAdditionEventFunction) & fn,                                    \
-    (wxObject*)NULL                                                                                                    \
+    (ShellObjectEventFunction)(ShellEventFunction)(moho::CLogAdditionEventFunction) & fn,                              \
+    (ShellObject*)NULL                                                                                                 \
   ),

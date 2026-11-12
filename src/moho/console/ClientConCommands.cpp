@@ -38,7 +38,7 @@
 #include "legacy/containers/Set.h"
 #include "moho/app/WEmitterEditor.h"
 #include "moho/app/WinApp.h"
-#include "moho/app/WxRuntimeTypes.h"
+#include "moho/app/AppRuntimeTypes.h"
 #include "moho/audio/CUserSoundManager.h"
 #include "moho/audio/IUserSoundManager.h"
 #include "moho/client/Localization.h"

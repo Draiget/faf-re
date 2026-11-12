@@ -2,7 +2,7 @@
 // platform services the simulation uses - symbol-handler init, crash-report
 // attachment paths, call stacks and their formatting, the last Win32 error as
 // text, and the OK message box - moved unchanged out of moho/app/WinApp.cpp,
-// which keeps the wx application shell, the crash dialog and the structured
+// which keeps the window-library application shell, the crash dialog and the structured
 // exception filter. A POSIX build implements the same functions elsewhere.
 
 #include "moho/app/WinApp.h"

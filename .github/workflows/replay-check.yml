@@ -285,7 +285,7 @@ jobs:
           path: out/headless
           retention-days: 3
 
-  # The Windows builds' downloads (boost, wxWindows, the DirectX SDK installer, ...) and the
+  # The Windows builds' downloads (boost, SDL3, Dear ImGui, the DirectX SDK installer, ...) and the
   # pinned LLVM installer, fetched by the workflow's own commit: the builds of the pull request
   # only restore them, so its code never writes a cache other runs read.
   windows-downloads:

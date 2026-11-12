@@ -41,7 +41,7 @@ namespace platform::window
     Quit,          // the system asks the program to end (Windows' WM_QUIT, a terminal's Ctrl+C)
   };
 
-  // Mouse buttons, as the engine's mouse events number them (wx 2.4.2's numbers).
+  // Mouse buttons, as the engine's mouse events number them (the 2.4.2 window library's numbers).
   enum MouseButton : int
   {
     kButtonLeft = 1,
@@ -92,10 +92,12 @@ namespace platform::window
   void Shutdown();
   [[nodiscard]] bool IsInitialized();
 
-  // A top-level window, hidden until Show. x or y -1: centred. Null when it can't be made.
+  // A top-level window, hidden until Show. x, y: the frame's (outer) screen position, as the retail
+  // window library placed frames; -1: centred. width, height: the client size. Null when it can't
+  // be made.
   [[nodiscard]] Handle CreateTopLevel(const char* utf8Title, int x, int y, int width, int height, bool resizable);
   // A window inside `parent`'s client area at x, y (relative to it), shown, with input of its own,
-  // as wx's child windows were on Windows (the game's viewport, the map editor's view of it). Null
+  // as the window library's child windows were on Windows (the game's viewport, the map editor's view of it). Null
   // where the system has none; the engine's child then shares its parent's window.
   [[nodiscard]] Handle CreateChild(Handle parent, int x, int y, int width, int height);
   void Destroy(Handle window);
@@ -111,8 +113,13 @@ namespace platform::window
   void Raise(Handle window);
   // Screen position (of the client area) and client size in pixels.
   void GetBounds(Handle window, int* x, int* y, int* width, int* height);
-  // The keyboard goes to this window (wx's SetFocus); nothing where the window system decides.
+  // The keyboard goes to this window (the window library's SetFocus); nothing where the window system decides.
   void SetKeyboardFocus(Handle window);
+
+  // A top-level window's frame (outer) position on the screen, borders and caption included, as
+  // the retail window library reported and took it (the Windows.Main.x/y preferences hold it).
+  void GetFramePosition(Handle window, int* x, int* y);
+  void SetFramePosition(Handle window, int x, int y);
   // True while one of the program's windows has the keyboard.
   [[nodiscard]] bool HasKeyboardFocus();
 

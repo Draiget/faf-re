@@ -1,4 +1,4 @@
-#include "moho/app/WxPrivate.h"
+#include "moho/app/AppPrivate.h"
 #include "legacy/thread/Mutex.h"
 
 #include "imgui.h"
@@ -35,7 +35,7 @@ namespace
   constexpr std::int32_t kLogWindowDefaultWidth = 640;
   constexpr std::int32_t kLogWindowDefaultHeight = 480;
 
-  // The colour each category's lines are written in (wxTextAttr colours in the binary); the
+  // The colour each category's lines are written in (TextAttr colours in the binary); the
   // replayed context lines use the Info colour. Info was black on the rich edit's white; the
   // window is dark now, so Info is light grey.
   [[nodiscard]] ImVec4 TextColourForCategory(

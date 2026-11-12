@@ -1,5 +1,5 @@
 // Engine addition, dedicated server (plan WP1.1, WP0.7, WP1.5): the `server` program. The sim and
-// what a game needs of the engine, with no CScApp, wx, D3D, XACT or Win32.
+// what a game needs of the engine, with no CScApp, window-library, D3D, XACT or Win32.
 //
 // This is the first slice of it: a match with no players connected, the server being the one client,
 // an observer with no army. It plays the match in `--match` to its end and leaves the replay, a result

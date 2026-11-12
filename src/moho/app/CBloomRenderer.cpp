@@ -1,4 +1,4 @@
-#include "moho/app/WxPrivate.h"
+#include "moho/app/AppPrivate.h"
 
 namespace moho
 {

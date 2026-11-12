@@ -73,8 +73,8 @@
 #include "moho/audio/CSimSoundManager.h"
 #include "moho/audio/CSndParams.h"
 #include "moho/audio/HSound.h"
-#include "platform/WxWidgets.h"
-#include <wx/app.h>
+#include "platform/shell/Shell.h"
+#include "platform/shell/app.h"
 #include "moho/command/CCommandDb.h"
 #include "moho/command/CommandIssueHelper.h"
 #include "moho/sim/BuildQueueCommandDecrement.h"

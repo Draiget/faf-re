@@ -233,17 +233,26 @@ namespace platform::tools
     if (mWindow == nullptr) {
       return;
     }
+    int top = 0;
+    int left = 0;
+    int bottom = 0;
+    int right = 0;
+    (void)SDL_GetWindowBordersSize(mWindow, &top, &left, &bottom, &right);
     if (width > 0 || height > 0) {
       int currentWidth = 0;
       int currentHeight = 0;
       (void)SDL_GetWindowSize(mWindow, &currentWidth, &currentHeight);
-      (void)SDL_SetWindowSize(mWindow, width > 0 ? width : currentWidth, height > 0 ? height : currentHeight);
+      const int clientWidth = width > 0 ? width - left - right : currentWidth;
+      const int clientHeight = height > 0 ? height - top - bottom : currentHeight;
+      (void)SDL_SetWindowSize(
+        mWindow, clientWidth > 0 ? clientWidth : currentWidth, clientHeight > 0 ? clientHeight : currentHeight
+      );
     }
     if (x != -1 || y != -1) {
       int currentX = 0;
       int currentY = 0;
       (void)SDL_GetWindowPosition(mWindow, &currentX, &currentY);
-      (void)SDL_SetWindowPosition(mWindow, x != -1 ? x : currentX, y != -1 ? y : currentY);
+      (void)SDL_SetWindowPosition(mWindow, x != -1 ? x + left : currentX, y != -1 ? y + top : currentY);
     }
   }
 
@@ -257,8 +266,17 @@ namespace platform::tools
     if (mWindow == nullptr) {
       return false;
     }
+    int top = 0;
+    int left = 0;
+    int bottom = 0;
+    int right = 0;
+    (void)SDL_GetWindowBordersSize(mWindow, &top, &left, &bottom, &right);
     (void)SDL_GetWindowPosition(mWindow, &x, &y);
     (void)SDL_GetWindowSize(mWindow, &width, &height);
+    x -= left;
+    y -= top;
+    width += left + right;
+    height += top + bottom;
     return true;
   }
 

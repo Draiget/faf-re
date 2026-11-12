@@ -9,13 +9,13 @@
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/DeviceContext.hpp"
 #include "moho/app/CScApp.h"
-#include "moho/app/WxRuntimeTypes.h"
+#include "moho/app/AppRuntimeTypes.h"
 #include "moho/console/CConCommand.h"
 #include "moho/console/CConFunc.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/WRenViewport.h"
-#include <wx/toplevel.h>
+#include "platform/shell/toplevel.h"
 
 namespace
 {
@@ -130,8 +130,8 @@ namespace moho
     // the device-lock toggle.
     if (args.size() == 2u && valueToken != nullptr && valueToken->view() != "overridden") {
       // The main window is the SupCom frame: slot 131 below is
-      // wxTopLevelWindowMSW::Maximize, not a viewport hook.
-      wxTopLevelWindow* const mainWindow = static_cast<wxTopLevelWindow*>(sMainWindow);
+      // TopLevelWindowMSW::Maximize, not a viewport hook.
+      ShellTopLevelWindow* const mainWindow = static_cast<ShellTopLevelWindow*>(sMainWindow);
 
       // 0x008D35AA-0x008D35B4: `head.mWindowed` is set from the *inverse* of
       // the "argument equals `windowed`" test, and it is reused with that
@@ -177,7 +177,9 @@ namespace moho
 
       mainWindow->SetClientSize(static_cast<int>(head.mWidth), static_cast<int>(head.mHeight));
       mainWindow->Refresh(true, nullptr);
-      ren_Viewport->SetSize(-1, -1, static_cast<int>(head.mWidth), static_cast<int>(head.mHeight), wxSIZE_USE_EXISTING);
+      ren_Viewport->SetSize(
+        -1, -1, static_cast<int>(head.mWidth), static_cast<int>(head.mHeight), SHELL_SIZE_USE_EXISTING
+      );
 
       device->Clear();
       (void)device->InitContext(&deviceContext);

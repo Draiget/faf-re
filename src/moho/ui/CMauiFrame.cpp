@@ -356,7 +356,7 @@ moho::CMauiFrame::CMauiFrame(
   mDeletedControlList.mPrev = deletedListHead;
 
   mTargetHead = 0;
-  mEventHandler = new CMauiWxEventMapper(this);
+  mEventHandler = new CMauiEventMapper(this);
 
   mNeedsFrameUpdate = true;
   mRootFrame = this;

@@ -3,7 +3,7 @@
 # Included by the top-level CMakeLists.txt, in place of the Windows project,
 # when the toolchain is cmake/toolchains/linux-clang-x64.cmake. Linux builds
 # the headless simulation only (plan D2, G6): no window, render device, audio,
-# movie, wx or Win32 code.
+# movie, window-shell or Win32 code.
 #
 #   cmake --preset linux-clang-x64-release && cmake --build --preset linux-clang-x64-release
 
@@ -314,7 +314,7 @@ target_link_options(faf-sim-link PRIVATE -Wl,--error-limit=0)
 
 # --- headless (plan WPL.7) --------------------------------------------------------------
 # The headless replay runner on Linux: headless/sources.cmake on every faf_sim object, as on
-# Windows (a plain Lua state for sync packets and launch configs, no wx entry, no
+# Windows (a plain Lua state for sync packets and launch configs, no window-shell entry, no
 # userInit.lua). Linux has one architecture, so the file is `headless`, without the
 # Windows x64 build's `_x64`.
 include("${PROJECT_SOURCE_DIR}/src/headless/sources.cmake")

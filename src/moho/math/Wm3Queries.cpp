@@ -417,28 +417,28 @@ namespace Wm3
   ) noexcept
   {
     const Vector3f diff = Sub(line.Origin, box.Center);
-    const Vector3f wxd = Cross(line.Direction, diff);
+    const Vector3f dirCrossDiff = Cross(line.Direction, diff);
 
     float awdu[3];
-    float awxddu[3];
+    float absCrossDotAxis[3];
     awdu[1] = FAbs(Dot(line.Direction, box.Axis[1]));
     awdu[2] = FAbs(Dot(line.Direction, box.Axis[2]));
-    awxddu[0] = FAbs(Dot(wxd, box.Axis[0]));
+    absCrossDotAxis[0] = FAbs(Dot(dirCrossDiff, box.Axis[0]));
     float rhs = Store(X87Float(box.Extent[1]) * awdu[2] + X87Float(box.Extent[2]) * awdu[1]);
-    if (awxddu[0] > rhs) {
+    if (absCrossDotAxis[0] > rhs) {
       return false;
     }
 
     awdu[0] = FAbs(Dot(line.Direction, box.Axis[0]));
-    awxddu[1] = FAbs(Dot(wxd, box.Axis[1]));
+    absCrossDotAxis[1] = FAbs(Dot(dirCrossDiff, box.Axis[1]));
     rhs = Store(X87Float(box.Extent[0]) * awdu[2] + X87Float(box.Extent[2]) * awdu[0]);
-    if (awxddu[1] > rhs) {
+    if (absCrossDotAxis[1] > rhs) {
       return false;
     }
 
-    awxddu[2] = FAbs(Dot(wxd, box.Axis[2]));
+    absCrossDotAxis[2] = FAbs(Dot(dirCrossDiff, box.Axis[2]));
     rhs = Store(X87Float(box.Extent[0]) * awdu[1] + X87Float(box.Extent[1]) * awdu[0]);
-    return !(awxddu[2] > rhs);
+    return !(absCrossDotAxis[2] > rhs);
   }
 
   bool PointInBox3(

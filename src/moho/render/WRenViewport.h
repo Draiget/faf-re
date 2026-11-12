@@ -20,7 +20,7 @@
 #include "moho/sim/CDebugCanvas.h"
 #include "Wm3Vector2.h"
 
-class wxMouseEvent;
+class ShellMouseEvent;
 
 namespace moho
 {
@@ -210,7 +210,7 @@ namespace moho
      * Builds the D3D window, default-constructs every renderer, and sets the
      * head count from `hasSecondHead`.
      */
-    WRenViewport(wxWindow* parent, gpg::StrArg title, const wxSize& size, bool hasSecondHead);
+    WRenViewport(ShellWindow* parent, gpg::StrArg title, const ShellSize& size, bool hasSecondHead);
 
     /**
      * Address: 0x007F6900 (FUN_007F6900)
@@ -300,7 +300,7 @@ namespace moho
      * Once the GAL device is ready, gives keyboard focus to the first head's
      * window.
      */
-    void OnMouseEnter(wxMouseEvent& event);
+    void OnMouseEnter(ShellMouseEvent& event);
 
     /**
      * Address: 0x007F6640 (FUN_007F6640)
@@ -310,7 +310,7 @@ namespace moho
      * Once the GAL device is ready and there is a second head, gives keyboard
      * focus to that head's window.
      */
-    void OnMouseLeave(wxMouseEvent& event);
+    void OnMouseLeave(ShellMouseEvent& event);
 
     /**
      * Address: 0x007F9E60 (FUN_007F9E60)
@@ -615,7 +615,7 @@ namespace moho
    * Wm3::Vector2i.
    */
   [[nodiscard]] WD3DViewport*
-  REN_CreateGameViewport(wxWindow* parent, gpg::StrArg title, const Wm3::Vector2i& size, bool hasSecondHead);
+  REN_CreateGameViewport(ShellWindow* parent, gpg::StrArg title, const Wm3::Vector2i& size, bool hasSecondHead);
 
   /**
    * Address: 0x007F6530 (FUN_007F6530)

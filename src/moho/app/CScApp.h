@@ -7,7 +7,7 @@
 #include "gpg/core/time/Timer.h"
 #include "gpg/gal/DeviceContext.hpp"
 #include "moho/app/IWinApp.h"
-#include "moho/app/WxRuntimeTypes.h"
+#include "moho/app/AppRuntimeTypes.h"
 
 namespace moho
 {
@@ -150,7 +150,7 @@ public:
    * bootstrap handoff for the startup render path.
    */
   bool
-  CreateAppFrame(const fa::string& title, bool maximized, const wxPoint& position, gpg::gal::DeviceContext& context);
+  CreateAppFrame(const fa::string& title, bool maximized, const ShellPoint& position, gpg::gal::DeviceContext& context);
 
   /**
    * Address: 0x008CE1D0 (FUN_008CE1D0, CScApp::HasFrame)

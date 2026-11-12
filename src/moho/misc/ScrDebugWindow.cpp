@@ -24,7 +24,7 @@
 
 namespace
 {
-  constexpr float kMinimumPane = 8.0f; // wxSplitterWindow::SetMinimumPaneSize(8)
+  constexpr float kMinimumPane = 8.0f; // SplitterWindow::SetMinimumPaneSize(8)
 
   [[nodiscard]] bool EndsWithLua(
     const std::string& name
@@ -453,7 +453,7 @@ void moho::ScrDebugWindow::ListFolder(
   std::sort(folder.files.begin(), folder.files.end());
 }
 
-// The source tree (wxGenericDirCtrl, id 201, filter "Script files (*.lua)|*.lua"): a double-click
+// The source tree (GenericDirCtrl, id 201, filter "Script files (*.lua)|*.lua"): a double-click
 // on a file opens it (OnSourceFileActivated).
 void moho::ScrDebugWindow::DrawSourceTree(
   FolderNode& folder
@@ -684,7 +684,7 @@ void moho::ScrDebugWindow::Draw()
     prefs->SetInteger("Windows.Debug.Sash.horizontal", static_cast<int>(mHorizontalSash));
   }
 
-  // The watch notebook (wxNB_BOTTOM in the binary): Stack, Locals, Globals.
+  // The watch notebook (NB_BOTTOM in the binary): Stack, Locals, Globals.
   if (ImGui::BeginTabBar("##watch")) {
     if (ImGui::BeginTabItem("Stack")) {
       constexpr ImGuiTableFlags kFlags = ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersV |

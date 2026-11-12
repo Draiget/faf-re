@@ -1727,7 +1727,7 @@ namespace moho
       );
       WIN_OkBox("Complete!", message.c_str());
 
-      // Engine addition (plan WPL.4): `wxTheApp->ExitMainLoop()` when there is
+      // Engine addition (plan WPL.4): `TheApp->ExitMainLoop()` when there is
       // an application object, through the client's hook (WinApp.h).
       if (sAppExitMainLoop != nullptr) {
         sAppExitMainLoop();

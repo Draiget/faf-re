@@ -24,7 +24,7 @@ The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as r
 | Replay parity | Latest nightly (04–05/11/2026): 2,127 of 2,139 vault replays played (99.4 %) match every recorded checksum, 5 more are expected desyncs that aren't this engine's, 7 were new failures of ours, fixed since, as is 27064121, which failed after them; no CI run has played those fixes yet. Largest run: 12,714 of 13,148 (96.7 %) on CI (30–31/10/2026) ([Retail replay parity](docs/RETAIL_REPLAY_PARITY.md)) |
 | Live multiplayer | Retail, rebuilt x86 and rebuilt x64 in one game: 21 min of AI-driven fighting without a desync; retail and our x64 also ran 30 min without a desync, with and without sim workers |
 | Performance | x64 plays five vault replays in 41 % less time than retail all together (23 % to 45 % per replay), measured 10/11/2026 ([Performance](docs/PERFORMANCE.md)) |
-| Recovery | Complete: every engine function the game uses is written as source (40,617 functions). The rest of the shipped exe is library code we link from source (wxWidgets, the MSVC runtime, libpng, Wild Magic, ...) or unreferenced fragments; 0 functions are outstanding |
+| Recovery | Complete: every engine function the game uses is written as source (40,617 functions). The rest of the shipped exe is library code (its window library, the MSVC runtime, libpng, Wild Magic, ...) or unreferenced fragments; 0 functions are outstanding. The window library is replaced by SDL3 and Dear ImGui on every platform (#416) |
 
 Most symbols in the retail engine were never hand-written: they are template instantiations, folded aliases, unwind glue and static-init thunks the 2007 compiler emitted from a single source line. Those are rebuilt as that one line, so the function count understates how much is covered.
 
@@ -161,7 +161,8 @@ CMake configure fetches all of them at the exact version below and applies the p
 | Library | Version | Source | FAF patch |
 |---|---|---|---|
 | Wild Magic | 3.8 (original 2006 release) | [Draiget/wild-magic-3-8](https://github.com/Draiget/wild-magic-3-8) (submodule) | `wildmagic3p8_faf_required` |
-| wxWidgets (MSW) | 2.4.2 | [wxMSW-2.4.2.zip](https://github.com/wxWidgets/wxWidgets/releases/download/v2.4.2/wxMSW-2.4.2.zip) | `wxwindows_2_4_2_faf_required`, `_x64`, `_x64_pointers` |
+| SDL | 3.4.18 (zlib) | [release archive](https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz) | none; built static by `cmake/deps/sdl3` (Windows) and `cmake/FafLinuxClient.cmake`: the client's windows, input, clipboard, message boxes, pickers and the developer windows' renderer |
+| Dear ImGui | 1.92.4, docking branch (MIT) | [v1.92.4-docking source archive](https://github.com/ocornut/imgui/archive/refs/tags/v1.92.4-docking.tar.gz) | none; the map editor's panels and the developer windows (log window, Lua debugger, emitter and reference editors) |
 | Boost | 1.34.1 | [boost_1_34_1.tar.bz2](https://downloads.sourceforge.net/project/boost/boost/1.34.1/boost_1_34_1.tar.bz2) | `boost_1_34_1_faf_required` |
 | zlib | 1.2.3 | [madler/zlib](https://github.com/madler/zlib/tree/v1.2.3) (submodule) | `zlib_1_2_3_faf_required` |
 | FFmpeg | 7.1.3 (LGPL) | [Draiget/ffmpeg-mirror](https://github.com/Draiget/ffmpeg-mirror) (submodule) | none; linked statically, for SFD movies in place of CRI Sofdec/ADX. Configuration and licence: [SFD compatibility](docs/FAF_SFD_COMPATIBILITY.md#ffmpeg-dependency-and-build) |

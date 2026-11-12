@@ -17,7 +17,7 @@ namespace
  * `gMouseOverControl`) and clears the global mouse-capture flag so
  * the next mapper instance starts with a clean tracking state.
  */
-moho::CMauiWxEventMapper::~CMauiWxEventMapper()
+moho::CMauiEventMapper::~CMauiEventMapper()
 {
   gMouseOverControl.ResetFromObject(nullptr);
   sMouseIsCaptured = 0;
@@ -39,13 +39,13 @@ namespace
     MauiEventDispatchGuard& operator=(const MauiEventDispatchGuard&) = delete;
   };
   /**
-   * Builds one `moho::SMauiEventData` payload from a wxMouseEvent, translating
+   * Builds one `moho::SMauiEventData` payload from a MouseEvent, translating
    * wheel-event coordinates from screen-space to client-space through
    * `windowRuntime->ScreenToClient`.
    */
-  [[nodiscard]] moho::SMauiEventData BuildMauiEventPayloadFromWxMouse(
-    const wxMouseEvent& mouseEvent,
-    wxWindow* const window
+  [[nodiscard]] moho::SMauiEventData BuildMauiEventPayloadFromMouse(
+    const ShellMouseEvent& mouseEvent,
+    ShellWindow* const window
   )
   {
     moho::SMauiEventData payload{};
@@ -53,7 +53,7 @@ namespace
     payload.mMousePos.x = -1.0f;
     payload.mMousePos.y = -1.0f;
 
-    if (window != nullptr && mouseEvent.GetEventType() == wxEVT_MOUSEWHEEL) {
+    if (window != nullptr && mouseEvent.GetEventType() == SHELL_EVT_MOUSEWHEEL) {
       // Wheel events report screen coordinates; convert to client space.
       int clientX = mouseEvent.m_x;
       int clientY = mouseEvent.m_y;
@@ -65,7 +65,7 @@ namespace
       payload.mMousePos.y = static_cast<float>(mouseEvent.m_y);
     }
 
-    // Map the wxMouseEvent button/modifier flags onto the typed Maui
+    // Map the MouseEvent button/modifier flags onto the typed Maui
     // modifier bitmask. Bit layout proven by FUN_007A4970 disassembly.
     std::uint32_t modifierBits = 0u;
     if (mouseEvent.m_leftDown) {
@@ -148,16 +148,16 @@ namespace
  *     and notifies the previous keyboard-focus owner via
  *     `LosingKeyboardFocus`).
  */
-void moho::CMauiWxEventMapper::OnMouseMove(
-  wxMouseEvent& mouseEvent
+void moho::CMauiEventMapper::OnMouseMove(
+  ShellMouseEvent& mouseEvent
 )
 {
   // Script reached from this event may destroy controls it is still walking;
   // see MauiEventDispatchGuard.
   const MauiEventDispatchGuard dispatchGuard;
 
-  // ---- Step 1: Build typed Maui event payload from wx mouse event ----
-  moho::SMauiEventData eventPayload = BuildMauiEventPayloadFromWxMouse(mouseEvent, mWindow);
+  // ---- Step 1: Build typed Maui event payload from window-library mouse event ----
+  moho::SMauiEventData eventPayload = BuildMauiEventPayloadFromMouse(mouseEvent, mWindow);
 
   // ---- Step 2: Resolve topmost-control under the cursor ----
   // The control under the cursor, held weakly: script reached from the
@@ -213,7 +213,7 @@ void moho::CMauiWxEventMapper::OnMouseMove(
     gMouseOverControl.ResetFromObject(hitControl.GetObjectPtr());
   }
 
-  // ---- Step 4: Dispatch the wx mouse event into typed Maui paths ----
+  // ---- Step 4: Dispatch the window-library mouse event into typed Maui paths ----
   const bool isPress = mouseEvent.ButtonDown();
   const bool isDoubleClick = mouseEvent.ButtonDClick();
 
@@ -235,7 +235,7 @@ void moho::CMauiWxEventMapper::OnMouseMove(
       return;
     }
 
-    if (mouseEvent.GetEventType() == wxEVT_MOTION) {
+    if (mouseEvent.GetEventType() == SHELL_EVT_MOTION) {
       eventPayload.mEventType = moho::MET_MouseMotion;
       eventPayload.mSource = trackedControl;
 
@@ -266,8 +266,8 @@ void moho::CMauiWxEventMapper::OnMouseMove(
       return;
     }
 
-    // No release / motion / wheel rotation: mark wx event as skipped so the
-    // framework continues propagation up the wx event chain.
+    // No release / motion / wheel rotation: mark window-library event as skipped so the
+    // framework continues propagation up the window-library event chain.
     mouseEvent.Skip();
     return;
   }
@@ -305,7 +305,7 @@ namespace
 {
 
   /**
-   * Shared body of the three `CMauiWxEventMapper` keyboard event-table sinks
+   * Shared body of the three `CMauiEventMapper` keyboard event-table sinks
    * (FUN_007A4EF0 / FUN_007A4FD0 / FUN_007A50B0). The retail bodies are
    * byte-identical apart from the `EMauiEventType` constant they stamp into
    * the payload, so the mechanics live here and each sink supplies its type.
@@ -314,11 +314,11 @@ namespace
    * stamped with the binary's `-1.0f` sentinel (`flt_E4F6E8`) and the wheel
    * lanes are zeroed. Delivery order is keyboard focus first; when no focus
    * control exists the top input-capture control receives the event instead.
-   * `wxEvent::m_skipped` is set whenever nothing consumed the event, letting
-   * wx continue its own propagation.
+   * `Event::m_skipped` is set whenever nothing consumed the event, letting
+   * window-library continue its own propagation.
    */
   void DispatchMauiKeyEventToFocusOrCapture(
-    wxKeyEvent& keyEvent,
+    ShellKeyEvent& keyEvent,
     const moho::EMauiEventType eventType
   )
   {
@@ -373,8 +373,8 @@ namespace
  * `MET_KeyUp` event to the keyboard-focus control, falling back to the top
  * input-capture control.
  */
-void moho::CMauiWxEventMapper::OnKeyUp(
-  wxKeyEvent& keyEvent
+void moho::CMauiEventMapper::OnKeyUp(
+  ShellKeyEvent& keyEvent
 )
 {
   const MauiEventDispatchGuard dispatchGuard;
@@ -389,8 +389,8 @@ void moho::CMauiWxEventMapper::OnKeyUp(
  * `MET_KeyDown` event to the keyboard-focus control, falling back to the top
  * input-capture control.
  */
-void moho::CMauiWxEventMapper::OnKeyDown(
-  wxKeyEvent& keyEvent
+void moho::CMauiEventMapper::OnKeyDown(
+  ShellKeyEvent& keyEvent
 )
 {
   const MauiEventDispatchGuard dispatchGuard;
@@ -405,8 +405,8 @@ void moho::CMauiWxEventMapper::OnKeyDown(
  * `MET_Char` event to the keyboard-focus control, falling back to the top
  * input-capture control.
  */
-void moho::CMauiWxEventMapper::OnChar(
-  wxKeyEvent& keyEvent
+void moho::CMauiEventMapper::OnChar(
+  ShellKeyEvent& keyEvent
 )
 {
   const MauiEventDispatchGuard dispatchGuard;

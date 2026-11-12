@@ -1,6 +1,6 @@
 #include "gpg/gal/PipelineDefer.h"
 #include "moho/app/NetworkPanel.h"
-#include "moho/app/WxPrivate.h"
+#include "moho/app/AppPrivate.h"
 #include "moho/render/AmbientOcclusionRenderer.h"
 #include "moho/render/Atmosphere.h"
 #include "moho/render/BounceLight.h"
@@ -70,12 +70,12 @@ END_EVENT_TABLE()
  * as it is, and the head count comes from the second-head flag.
  */
 moho::WRenViewport::WRenViewport(
-  wxWindow* const parent,
+  ShellWindow* const parent,
   const gpg::StrArg title,
-  const wxSize& size,
+  const ShellSize& size,
   const bool hasSecondHead
 )
-  : WD3DViewport(parent, title, wxDefaultPosition, size)
+  : WD3DViewport(parent, title, kShellDefaultPosition, size)
   , mHasSecondaryHead(hasSecondHead)
   , mSession(nullptr)
   , mCam(nullptr)
@@ -171,13 +171,13 @@ moho::IWldTerrainRes* moho::REN_GetTerrainRes()
  * `new WRenViewport` (0x21A8 bytes) with the size copied into a wxSize.
  */
 moho::WD3DViewport* moho::REN_CreateGameViewport(
-  wxWindow* const parent,
+  ShellWindow* const parent,
   const gpg::StrArg title,
   const Wm3::Vector2i& size,
   const bool hasSecondHead
 )
 {
-  return new WRenViewport(parent, title, wxSize(size.X(), size.Y()), hasSecondHead);
+  return new WRenViewport(parent, title, ShellSize(size.X(), size.Y()), hasSecondHead);
 }
 
 /**
@@ -214,7 +214,7 @@ moho::CD3DPrimBatcher* moho::WRenViewport::GetPrimBatcher() const
  * input follows the mouse into the viewport.
  */
 void moho::WRenViewport::OnMouseEnter(
-  wxMouseEvent& event
+  ShellMouseEvent& event
 )
 {
   (void)event;
@@ -248,7 +248,7 @@ void moho::WRenViewport::OnMouseEnter(
  * head's window as the mouse leaves the viewport.
  */
 void moho::WRenViewport::OnMouseLeave(
-  wxMouseEvent& event
+  ShellMouseEvent& event
 )
 {
   (void)event;

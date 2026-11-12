@@ -1,4 +1,4 @@
-#include "moho/app/WxPrivate.h"
+#include "moho/app/AppPrivate.h"
 
 namespace
 {
@@ -40,7 +40,7 @@ namespace
 
     frame.SetClientSize(width, height);
     if (moho::ren_Viewport != nullptr) {
-      moho::ren_Viewport->SetSize(-1, -1, width, height, wxSIZE_USE_EXISTING);
+      moho::ren_Viewport->SetSize(-1, -1, width, height, SHELL_SIZE_USE_EXISTING);
     }
 
     gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance();
@@ -152,16 +152,16 @@ namespace
  */
 WSupComFrame::WSupComFrame(
   const char* const title,
-  const wxPoint& position,
-  const wxSize& size,
+  const ShellPoint& position,
+  const ShellSize& size,
   const long style
 )
-  : wxFrame(nullptr, -1, gpg::STR_Utf8ToWide(title).c_str(), position, size, style)
+  : ShellFrame(nullptr, -1, gpg::STR_Utf8ToWide(title).c_str(), position, size, style)
 {
   mPendingMaximizeSync = 0;
   mPersistedMaximizeSync = 0;
   SetSizeHints(moho::wnd_MinDragWidth, moho::wnd_MinDragHeight);
-  SetIcon(wxIcon(wxT("IDI_WIN_FAICON"), wxBITMAP_TYPE_ICO_RESOURCE));
+  SetIcon(ShellIcon(SHELL_T("IDI_WIN_FAICON"), SHELL_BITMAP_TYPE_ICO_RESOURCE));
 }
 
 // Table 0x00DFE4EC = {&wxFrame::sm_eventTable (0x00D56F70), rows 0x00F5BB4C};
@@ -169,7 +169,7 @@ WSupComFrame::WSupComFrame(
 // (0x008CE060) is the compiler's.
 BEGIN_EVENT_TABLE(
   WSupComFrame,
-  wxFrame
+  ShellFrame
 )
 EVT_CLOSE(
   WSupComFrame::OnCloseWindow
@@ -193,13 +193,13 @@ END_EVENT_TABLE()
  * Moho escape dialog.
  */
 void WSupComFrame::OnCloseWindow(
-  wxCloseEvent& event
+  ShellCloseEvent& event
 )
 {
   (void)event;
 
   if (IsIconized()) {
-    wxTheApp->ExitMainLoop();
+    gShellApp->ExitMainLoop();
     return;
   }
 
@@ -214,7 +214,7 @@ void WSupComFrame::OnCloseWindow(
  * is disabled and the frame is not iconized.
  */
 void WSupComFrame::OnMove(
-  wxMoveEvent& event
+  ShellMoveEvent& event
 )
 {
   (void)event;
@@ -242,7 +242,7 @@ void WSupComFrame::OnMove(
  * a drag, WindowSdl.cpp); the frame follows it while the device is windowed.
  */
 void WSupComFrame::OnSize(
-  wxSizeEvent& event
+  ShellSizeEvent& event
 )
 {
   (void)event;
@@ -253,7 +253,7 @@ void WSupComFrame::OnSize(
   int headWidth = 0;
   int headHeight = 0;
   DeviceHeadSize(headWidth, headHeight);
-  const wxSize clientSize = GetClientSize();
+  const ShellSize clientSize = GetClientSize();
   const bool maximized = IsMaximized();
   const bool sizeChanged = clientSize.x != headWidth || clientSize.y != headHeight;
   if (!sizeChanged && (maximized ? 1 : 0) == mPersistedMaximizeSync) {
@@ -267,7 +267,7 @@ void WSupComFrame::OnSize(
   moho::IUserPrefs* const preferences = moho::USER_GetPreferences();
   if (preferences != nullptr) {
     if (!maximized) {
-      const wxSize savedSize = GetClientSize();
+      const ShellSize savedSize = GetClientSize();
       preferences->SetInteger(fa::string(kSupComFrameWidthPreferenceKey), savedSize.x);
       preferences->SetInteger(fa::string(kSupComFrameHeightPreferenceKey), savedSize.y);
     }
@@ -281,7 +281,7 @@ void WSupComFrame::OnSize(
  * WM_ACTIVATEAPP in WSupComFrame::MSWWindowProc (0x008CDD40).
  */
 void WSupComFrame::OnActivate(
-  wxActivateEvent& event
+  ShellActivateEvent& event
 )
 {
   const bool isActive = event.GetActive();

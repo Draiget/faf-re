@@ -20,13 +20,13 @@
 #include "moho/misc/WeakPtr.h"
 
 /**
- * The retail binary linked wxWidgets 2.4.2; the engine classes below derive from the application
- * shell's wx-shaped classes (src/platform/shell, SDL3 underneath, issue #407), as their RTTI
- * records name wx's (`??_R2...` base-class arrays in dumps/rtti_dump_all.hpp).
+ * The retail binary linked the 2.4.2 window library; the engine classes below derive from the application
+ * shell's window-library-shaped classes (src/platform/shell, SDL3 underneath, issue #407), as their RTTI
+ * records name the window library's (`??_R2...` base-class arrays in dumps/rtti_dump_all.hpp).
  */
-#include "platform/WxWidgets.h"
+#include "platform/shell/Shell.h"
 #include "platform/sdl/ToolWindow.h"
-#include <wx/wx.h>
+#include "platform/shell/Shell.h"
 
 /**
  * The game's main frame (RTTI `.?AVWSupComFrame@@`: WSupComFrame > wxFrame,
@@ -40,7 +40,7 @@
  * the `mov eax, offset sm_eventTable` the macro generates. The deleting
  * destructor at 0x008CE060 is the compiler's.
  */
-class WSupComFrame : public wxFrame
+class WSupComFrame : public ShellFrame
 {
 public:
   /**
@@ -52,7 +52,7 @@ public:
    * wxFrameNameStr)` at 0x008CD92E), clears the three flag bytes, applies the
    * wnd_MinDrag* size hints and puts the IDI_WIN_FAICON icon on it.
    */
-  WSupComFrame(const char* title, const wxPoint& position, const wxSize& size, long style);
+  WSupComFrame(const char* title, const ShellPoint& position, const ShellSize& size, long style);
 
   /**
    * Address: 0x008CE050 (FUN_008CE050)
@@ -73,7 +73,7 @@ public:
    * If the frame is iconized, exits the wx main loop; otherwise requests the
    * Moho escape dialog.
    */
-  void OnCloseWindow(wxCloseEvent& event);
+  void OnCloseWindow(ShellCloseEvent& event);
 
   /**
    * Address: 0x008CDAD0 (FUN_008CDAD0, WSupComFrame::OnMove)
@@ -82,7 +82,7 @@ public:
    * Persists current top-level frame position lanes into user preferences
    * while the main frame is windowed and not device-locked.
    */
-  void OnMove(wxMoveEvent& event);
+  void OnMove(ShellMoveEvent& event);
 
   /**
    * The retail frame's window procedure (WSupComFrame::MSWWindowProc, 0x008CDD40, and
@@ -90,13 +90,13 @@ public:
    * viewport and the device and is saved to the preferences, as WM_SIZE (maximized, restored)
    * and WM_EXITSIZEMOVE after SC_SIZE were.
    */
-  void OnSize(wxSizeEvent& event);
+  void OnSize(ShellSizeEvent& event);
 
   /**
    * WM_ACTIVATEAPP in WSupComFrame::MSWWindowProc (0x008CDD40): records the active flag and
    * clips the cursor to the window (lock_fullscreen_cursor_to_window) or frees it.
    */
-  void OnActivate(wxActivateEvent& event);
+  void OnActivate(ShellActivateEvent& event);
 
   /**
    * WM_SYSCOMMAND in WSupComFrame::MSWWindowProc (0x008CDD40): the system-menu items
@@ -470,7 +470,7 @@ namespace moho
   public:
     WInputBox(const char* dialogTitle, const char* defaultValue, const char* labelText);
 
-    // wxDialog::ShowModal: true for OK, with the text in `result`.
+    // Dialog::ShowModal: true for OK, with the text in `result`.
     [[nodiscard]] bool RunModal(fa::string* result);
 
   protected:
@@ -524,7 +524,7 @@ namespace moho
    * WIN_AppExecute then pumps the loop itself, so the keep-going flag that
    * wxApp::MainLoop would own is driven through the two members below.
    */
-  class MohoApp : public wxApp
+  class MohoApp : public ShellApp
   {
   public:
     /**
@@ -572,10 +572,10 @@ namespace moho
 
   // The main frame (0x010A63B8): WIN_OkBox parents its message box on it,
   // and CScApp::CreateAppFrame sets it to the WSupComFrame.
-  extern wxWindow* sMainWindow;
+  extern ShellWindow* sMainWindow;
 } // namespace moho
 
-// wxGetApp(), from the IMPLEMENT_APP_NO_MAIN(moho::MohoApp) in WinApp.cpp.
+// GetApp(), from the IMPLEMENT_APP_NO_MAIN(moho::MohoApp) in WinApp.cpp.
 DECLARE_APP(
   moho::MohoApp
 )

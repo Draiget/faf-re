@@ -98,7 +98,7 @@ namespace platform::window::sdl
 {
   void OnInit()
   {
-    // wx's full-screen frame stayed up when another program took the keyboard.
+    // The window library's full-screen frame stayed up when another program took the keyboard.
     (void)SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
   }
 
@@ -206,7 +206,7 @@ namespace platform::window::sdl
     return HwndOf(window);
   }
 
-  // A Win32 child window, as wx 2.4.2 made the engine's child windows (the viewport), handed to SDL
+  // A Win32 child window, as the 2.4.2 window library made the engine's child windows (the viewport), handed to SDL
   // to report its input (SDL_PROP_WINDOW_CREATE_WIN32_HWND_POINTER). No background brush, so
   // nothing is painted under the renderer, and no class cursor, so WM_SETCURSOR decides.
   SDL_Window* CreateChild(
@@ -335,7 +335,7 @@ namespace platform::window::sdl
     SDL_Window* const window
   )
   {
-    // wxWindow::SetFocus (wx 2.4.2 src/msw/window.cpp) is ::SetFocus on the window's HWND.
+    // Window::SetFocus (the 2.4.2 window library src/msw/window.cpp) is ::SetFocus on the window's HWND.
     if (HWND const hwnd = HwndOf(window); hwnd != nullptr) {
       (void)::SetFocus(hwnd);
     }

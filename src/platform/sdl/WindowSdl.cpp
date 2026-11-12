@@ -623,8 +623,50 @@ namespace platform::window
     (void)SDL_StartTextInput(window);
     gWindows.push_back(window);
     sdl::OnWindowCreated(window);
+    if (x >= 0 && y >= 0) {
+      SetFramePosition(window, x, y);
+    }
     sdl::OnWindowRectChanged(window);
     return window;
+  }
+
+  void GetFramePosition(
+    const Handle window,
+    int* const x,
+    int* const y
+  )
+  {
+    int clientX = 0;
+    int clientY = 0;
+    int top = 0;
+    int left = 0;
+    if (window != nullptr) {
+      (void)SDL_GetWindowPosition(AsWindow(window), &clientX, &clientY);
+      (void)SDL_GetWindowBordersSize(AsWindow(window), &top, &left, nullptr, nullptr);
+    }
+    if (x != nullptr) {
+      *x = clientX - left;
+    }
+    if (y != nullptr) {
+      *y = clientY - top;
+    }
+  }
+
+  void SetFramePosition(
+    const Handle window,
+    const int x,
+    const int y
+  )
+  {
+    if (window == nullptr) {
+      return;
+    }
+    int top = 0;
+    int left = 0;
+    (void)SDL_GetWindowBordersSize(AsWindow(window), &top, &left, nullptr, nullptr);
+    (void)SDL_SetWindowPosition(AsWindow(window), x + left, y + top);
+    (void)SDL_SyncWindow(AsWindow(window));
+    sdl::OnWindowRectChanged(AsWindow(window));
   }
 
   Handle CreateChild(
@@ -973,7 +1015,7 @@ namespace platform::window
       }
     } else {
       // The main thread opens it when it next reads events; this thread waits, as the binary's
-      // modal wxDirDialog held the thread that asked.
+      // modal DirDialog held the thread that asked.
       if (!SDL_RunOnMainThread(&StartFolderPick, &pick, false)) {
         return false;
       }

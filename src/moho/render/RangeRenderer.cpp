@@ -23,7 +23,7 @@
 #include "gpg/gal/Head.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
-#include "moho/app/WxRuntimeTypes.h"
+#include "moho/app/AppRuntimeTypes.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/entity/REntityBlueprint.h"

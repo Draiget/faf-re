@@ -52,7 +52,7 @@
 #include "imgui_internal.h"
 #include "moho/app/CScApp.h"
 #include "moho/app/WinApp.h"
-#include "moho/app/WxRuntimeTypes.h"
+#include "moho/app/AppRuntimeTypes.h"
 #include "moho/audio/AudioEngine.h"
 #include "moho/misc/CVirtualFileSystem.h"
 #include "moho/misc/FileWaitHandleSet.h"
@@ -491,8 +491,8 @@ namespace faf::editor
     {
       if (message == WM_CLOSE) {
         gWindowClosing = true;
-        if (wxTheApp != nullptr) {
-          wxTheApp->ExitMainLoop();
+        if (gShellApp != nullptr) {
+          gShellApp->ExitMainLoop();
         }
         return 0;
       }
@@ -528,7 +528,7 @@ namespace faf::editor
     }
 
     [[nodiscard]] HWND HandleOf(
-      const wxWindow* const window
+      const ShellWindow* const window
     )
     {
       return window != nullptr ? reinterpret_cast<HWND>(static_cast<std::uintptr_t>(window->GetHandle())) : nullptr;
@@ -2186,12 +2186,12 @@ namespace faf::editor
 
       // Lua asked the app to quit (ExitApplication from a game menu) while the window stays open: that ends the
       // session, not the editor.
-      if (!wxGetApp().KeepGoing() && !gWindowClosing && !mShell->ExitRequested() && !mPlay.QuitRequested()) {
-        wxGetApp().SetKeepGoing();
+      if (!ShellGetApp().KeepGoing() && !gWindowClosing && !mShell->ExitRequested() && !mPlay.QuitRequested()) {
+        ShellGetApp().SetKeepGoing();
         mPlay.Stop();
       }
-      if ((mShell->ExitRequested() || mPlay.QuitRequested()) && wxGetApp().KeepGoing()) {
-        wxTheApp->ExitMainLoop();
+      if ((mShell->ExitRequested() || mPlay.QuitRequested()) && ShellGetApp().KeepGoing()) {
+        gShellApp->ExitMainLoop();
       }
     }
 

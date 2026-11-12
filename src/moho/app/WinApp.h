@@ -10,8 +10,8 @@
 #include "moho/task/CTaskThread.h"
 
 struct _EXCEPTION_POINTERS;
-class wxWindow;
-class wxString;
+class ShellWindow;
+class ShellString;
 
 namespace moho
 {
@@ -118,7 +118,7 @@ namespace moho
    * What it does:
    * Updates the process-global main-window owner pointer.
    */
-  void WIN_SetMainWindow(wxWindow* mainWindow);
+  void WIN_SetMainWindow(ShellWindow* mainWindow);
 
   /**
    * Address: 0x004A2150 (FUN_004A2150)
@@ -266,7 +266,7 @@ namespace moho
 
   /**
    * Engine addition (dedicated-server plan WPL.4): ends the client's main loop
-   * (`wxTheApp->ExitMainLoop()` when there is an application object), for
+   * (`TheApp->ExitMainLoop()` when there is an application object), for
    * simulation-side callers such as the core Lua set's EndLoggingStats.
    * WinApp.cpp sets it during static initialisation; defined in
    * moho/misc/WinPlatform.cpp. Without a client it is null and nothing exits.
@@ -277,7 +277,7 @@ namespace moho
   /**
    * Engine addition (dedicated-server plan WPL.4): dispatches the client's
    * pending window events, then runs idle processing until it asks for no
-   * more (wxTheApp's Pending/Dispatch/ProcessIdle), for
+   * more (TheApp's Pending/Dispatch/ProcessIdle), for
    * CSimDriver::PerformNextEvent. WinApp.cpp sets it during static
    * initialisation; defined in moho/misc/WinPlatform.cpp. Without a client it
    * is null and there is nothing to pump.

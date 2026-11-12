@@ -320,7 +320,7 @@ bool moho::MAUI_KeyIsDown(
   }
 
   bool isSpecial = false;
-  const int virtualKey = wxCharCodeWXToMSW(static_cast<int>(keyCode), &isSpecial);
+  const int virtualKey = ShellKeyToVirtualKey(static_cast<int>(keyCode), &isSpecial);
   (void)isSpecial;
   // Engine change: the same answer with the costly check last. GetForegroundWindow enters the kernel,
   // the world view asks for Shift each frame, and the key is rarely down.
@@ -893,7 +893,7 @@ void moho::UI_SetInvertMidMouseScrub(
  * Depth of MAUI event dispatch currently on the stack. `PurgeDeleted` skips
  * the delete while this is non-zero, so a control cannot be freed underneath
  * an event walk that still holds a pointer to it. Single-threaded: every
- * dispatch runs on the wx message loop.
+ * dispatch runs on the window-library message loop.
  */
 int gMauiEventDispatchDepth = 0;
 
@@ -1268,22 +1268,22 @@ namespace moho
    */
   void SuspendInputWindowEventHandlersAndFlushQueue()
   {
-    fa::vector<fa::vector<wxEvtHandler*>> suspended;
+    fa::vector<fa::vector<ShellEvtHandler*>> suspended;
     suspended.resize(g_UIManager->mInputWindows.size());
 
     std::size_t index = 0;
-    for (wxWindow* const inputWindow : g_UIManager->mInputWindows) {
+    for (ShellWindow* const inputWindow : g_UIManager->mInputWindows) {
       suspended[index].push_back(inputWindow->PopEventHandler(false));
       suspended[index].push_back(inputWindow->PopEventHandler(false));
       ++index;
     }
 
-    while (wxTheApp->Pending()) {
-      wxTheApp->Dispatch();
+    while (gShellApp->Pending()) {
+      gShellApp->Dispatch();
     }
 
     index = 0;
-    for (wxWindow* const inputWindow : g_UIManager->mInputWindows) {
+    for (ShellWindow* const inputWindow : g_UIManager->mInputWindows) {
       inputWindow->PushEventHandler(suspended[index][1]);
       inputWindow->PushEventHandler(suspended[index][0]);
       ++index;
@@ -1949,7 +1949,7 @@ void moho::UI_DumpCurrentInputCapture() {}
 // Rows 0x00F5B150.
 BEGIN_EVENT_TABLE(
   moho::CUIKeyHandler,
-  wxEvtHandler
+  ShellEvtHandler
 )
 EVT_KEY_UP(
   moho::CUIKeyHandler::OnKeyUp

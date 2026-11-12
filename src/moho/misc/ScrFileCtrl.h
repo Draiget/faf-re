@@ -105,7 +105,7 @@ namespace moho
      */
     void LoadBreakpoints();
 
-    // The selected row and showing it (SetItemState(.., wxLIST_STATE_SELECTED), EnsureVisible).
+    // The selected row and showing it (SetItemState(.., LIST_STATE_SELECTED), EnsureVisible).
     void SelectLine(int index);
 
   public:

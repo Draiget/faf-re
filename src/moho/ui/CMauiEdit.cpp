@@ -3174,7 +3174,7 @@ void moho::CMauiEdit::HandleKeyEvent(
     }
 
     [[maybe_unused]] bool isSpecial = false;
-    const int translatedKeyCode = wxCharCodeWXToMSW(keyCode, &isSpecial);
+    const int translatedKeyCode = ShellKeyToVirtualKey(keyCode, &isSpecial);
     NonTextKeyPressed(translatedKeyCode, eventData);
   };
 

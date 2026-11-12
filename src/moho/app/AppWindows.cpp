@@ -1,11 +1,11 @@
-#include "moho/app/WxPrivate.h"
+#include "moho/app/AppPrivate.h"
 
 #include "imgui.h"
 
 // The managed-window registries (managedWindows 0x010A9B94, managedFrames 0x010A9BD8) held the
 // developer windows for WINX_Exit; those are Dear ImGui windows now (issue #412), which WINX_Exit
 // closes itself.
-wxWindow* moho::sMainWindow = nullptr;
+ShellWindow* moho::sMainWindow = nullptr;
 moho::WRenViewport* moho::ren_Viewport = nullptr;
 
 // MohoApp's constructor (0x004F1F10) and destructor are the compiler's; the

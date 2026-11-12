@@ -178,7 +178,7 @@ namespace moho
         };
         NormalizeQuatInPlace(&composed);
 
-        // The palette hands the shader xyzw; the engine stores wxyz.
+        // The palette hands the shader xyzw; the engine stores w, x, y, z.
         rotPalette[slot] = SkinPaletteEntry{composed.x, composed.y, composed.z, composed.w};
       }
     }

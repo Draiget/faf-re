@@ -169,7 +169,7 @@ int moho::cfunc_ExitApplication(
   LuaPlus::LuaState* const state = LuaPlus::LuaState::CastState(luaContext);
   moho::SCR_ExpectExactArgs(state, 0, kExitApplicationHelpText);
 
-  wxTheApp->ExitMainLoop();
+  gShellApp->ExitMainLoop();
   return 0;
 }
 

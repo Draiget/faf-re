@@ -1,7 +1,7 @@
-// Engine addition (issue #255): the code behind the wx stand-in headers (wx/defs.h in this
-// folder) for the Linux client: wx 2.4.2's event table search and handler chain
-// (src/common/event.cpp, src/common/wincmn.cpp), its mouse button tests, and its key code
-// conversions (src/msw/window.cpp). The window system that feeds them is issue #256.
+// Engine addition (issues #255, #407, #415): the code behind the application shell's headers
+// (Shell.h): the event table search and the handler chain, the mouse button tests and the key code
+// conversions of the window library the retail binary linked, and the delivery of the window
+// system's events (platform/Window.h) as the shell's events.
 
 #include <Windows.h>
 
@@ -14,32 +14,32 @@
 
 #include "platform/Window.h"
 
-#include <wx/app.h>
-#include <wx/dc.h>
-#include <wx/event.h>
-#include <wx/frame.h>
-#include <wx/string.h>
-#include <wx/window.h>
+#include "platform/shell/app.h"
+#include "platform/shell/dc.h"
+#include "platform/shell/event.h"
+#include "platform/shell/frame.h"
+#include "platform/shell/string.h"
+#include "platform/shell/window.h"
 
-static wxBrush sBlackBrush;
-wxBrush* wxBLACK_BRUSH = &sBlackBrush;
-wxBrush wxNullBrush;
+static ShellBrush sBlackBrush;
+ShellBrush* gShellBlackBrush = &sBlackBrush;
+ShellBrush gShellNullBrush;
 
 // --- Event tables --------------------------------------------------------------------------
 
-const wxEventTableEntry wxEvtHandler::sm_eventTableEntries[] = {
-  DECLARE_EVENT_TABLE_ENTRY(wxEVT_NULL, 0, 0, nullptr, nullptr)
+const ShellEventTableEntry ShellEvtHandler::sm_eventTableEntries[] = {
+  DECLARE_EVENT_TABLE_ENTRY(SHELL_EVT_NULL, 0, 0, nullptr, nullptr)
 };
-const wxEventTable wxEvtHandler::sm_eventTable = {nullptr, &wxEvtHandler::sm_eventTableEntries[0]};
+const ShellEventTable ShellEvtHandler::sm_eventTable = {nullptr, &ShellEvtHandler::sm_eventTableEntries[0]};
 
-const wxEventTable* wxEvtHandler::GetEventTable() const
+const ShellEventTable* ShellEvtHandler::GetEventTable() const
 {
-  return &wxEvtHandler::sm_eventTable;
+  return &ShellEvtHandler::sm_eventTable;
 }
 
-wxEvtHandler::~wxEvtHandler()
+ShellEvtHandler::~ShellEvtHandler()
 {
-  // wx 2.4.2 unlinks a handler from its neighbours when it is destroyed.
+  // The 2.4.2 window library unlinks a handler from its neighbours when it is destroyed.
   if (m_previousHandler != nullptr) {
     m_previousHandler->m_nextHandler = m_nextHandler;
   }
@@ -48,14 +48,14 @@ wxEvtHandler::~wxEvtHandler()
   }
 }
 
-bool wxEvtHandler::SearchEventTable(
-  const wxEventTable& table,
-  wxEvent& event
+bool ShellEvtHandler::SearchEventTable(
+  const ShellEventTable& table,
+  ShellEvent& event
 )
 {
-  const wxEventType eventType = event.GetEventType();
+  const ShellEventType eventType = event.GetEventType();
   const int eventId = event.GetId();
-  for (const wxEventTableEntry* entry = table.entries; entry->m_fn != nullptr; ++entry) {
+  for (const ShellEventTableEntry* entry = table.entries; entry->m_fn != nullptr; ++entry) {
     if (entry->m_eventType != eventType) {
       continue;
     }
@@ -66,19 +66,19 @@ bool wxEvtHandler::SearchEventTable(
     ) {
       event.Skip(false);
       event.m_callbackUserData = entry->m_callbackUserData;
-      (this->*reinterpret_cast<wxEventFunction>(entry->m_fn))(event);
+      (this->*reinterpret_cast<ShellEventFunction>(entry->m_fn))(event);
       return !event.GetSkipped();
     }
   }
   return false;
 }
 
-bool wxEvtHandler::ProcessEvent(
-  wxEvent& event
+bool ShellEvtHandler::ProcessEvent(
+  ShellEvent& event
 )
 {
   if (GetEvtHandlerEnabled()) {
-    for (const wxEventTable* table = GetEventTable(); table != nullptr; table = table->baseTable) {
+    for (const ShellEventTable* table = GetEventTable(); table != nullptr; table = table->baseTable) {
       if (SearchEventTable(*table, event)) {
         return true;
       }
@@ -92,7 +92,7 @@ bool wxEvtHandler::ProcessEvent(
 
 // --- Mouse buttons (1 left, 2 middle, 3 right, -1 any) ----------------------------------------
 
-bool wxMouseEvent::ButtonDClick(
+bool ShellMouseEvent::ButtonDClick(
   const int but
 ) const
 {
@@ -110,7 +110,7 @@ bool wxMouseEvent::ButtonDClick(
   }
 }
 
-bool wxMouseEvent::ButtonDown(
+bool ShellMouseEvent::ButtonDown(
   const int but
 ) const
 {
@@ -128,7 +128,7 @@ bool wxMouseEvent::ButtonDown(
   }
 }
 
-bool wxMouseEvent::ButtonUp(
+bool ShellMouseEvent::ButtonUp(
   const int but
 ) const
 {
@@ -146,7 +146,7 @@ bool wxMouseEvent::ButtonUp(
   }
 }
 
-bool wxMouseEvent::Button(
+bool ShellMouseEvent::Button(
   const int but
 ) const
 {
@@ -164,7 +164,7 @@ bool wxMouseEvent::Button(
   }
 }
 
-bool wxMouseEvent::ButtonIsDown(
+bool ShellMouseEvent::ButtonIsDown(
   const int but
 ) const
 {
@@ -182,7 +182,7 @@ bool wxMouseEvent::ButtonIsDown(
   }
 }
 
-int wxMouseEvent::GetButton() const
+int ShellMouseEvent::GetButton() const
 {
   for (int i = 1; i <= 3; ++i) {
     if (Button(i)) {
@@ -194,22 +194,22 @@ int wxMouseEvent::GetButton() const
 
 // --- Windows ---------------------------------------------------------------------------------
 
-const wxPoint wxDefaultPosition(-1, -1);
-const wxSize wxDefaultSize(-1, -1);
+const ShellPoint kShellDefaultPosition(-1, -1);
+const ShellSize kShellDefaultSize(-1, -1);
 
 namespace
 {
-  // The window that gets its top-level window's keyboard and mouse events (wxWindow::SetFocus).
-  wxWindow* sFocusWindow = nullptr;
-  // The wxWindow of each window system window (top-level windows and native children), for
+  // The window that gets its top-level window's keyboard and mouse events (Window::SetFocus).
+  ShellWindow* sFocusWindow = nullptr;
+  // The Window of each window system window (top-level windows and native children), for
   // delivering its events.
-  std::unordered_map<void*, wxWindow*> sNativeWindows;
+  std::unordered_map<void*, ShellWindow*> sNativeWindows;
   // Whether one of the program's windows has the keyboard, and the frame told it got it.
   bool sAppActive = false;
-  wxWindow* sActivatedFrame = nullptr;
+  ShellWindow* sActivatedFrame = nullptr;
 
   [[nodiscard]] std::string Utf8(
-    const wxString& text
+    const ShellString& text
   )
   {
     std::string utf8;
@@ -235,11 +235,11 @@ namespace
   }
 } // namespace
 
-wxWindow::wxWindow(
-  wxWindow* const parent,
-  const wxWindowID id,
-  const wxPoint& pos,
-  const wxSize& size,
+ShellWindow::ShellWindow(
+  ShellWindow* const parent,
+  const ShellWindowID id,
+  const ShellPoint& pos,
+  const ShellSize& size,
   const long style,
   const wchar_t* const name
 )
@@ -264,11 +264,11 @@ wxWindow::wxWindow(
         : nullptr;
       child != nullptr
     ) {
-      // A native window of its own inside the parent's (Windows), as wx 2.4.2 made it.
+      // A native window of its own inside the parent's (Windows), as the 2.4.2 window library made it.
       m_nativeChild = true;
       m_shown = true;
       m_platformWindow = child;
-      m_handle = reinterpret_cast<WXWidget>(platform::window::NativeHandle(child));
+      m_handle = reinterpret_cast<ShellNativeHandle>(platform::window::NativeHandle(child));
       sNativeWindows[child] = this;
       platform::window::GetBounds(child, &m_screenX, &m_screenY, &m_clientWidth, &m_clientHeight);
       return;
@@ -283,22 +283,22 @@ wxWindow::wxWindow(
   }
 }
 
-void wxWindow::SetTopLevel(
+void ShellWindow::SetTopLevel(
   void* const platformWindow
 )
 {
   m_topLevel = true;
   m_platformWindow = platformWindow;
-  m_handle = reinterpret_cast<WXWidget>(platform::window::NativeHandle(platformWindow));
+  m_handle = reinterpret_cast<ShellNativeHandle>(platform::window::NativeHandle(platformWindow));
 }
 
-bool wxWindow::Destroy()
+bool ShellWindow::Destroy()
 {
   delete this;
   return true;
 }
 
-bool wxWindow::Show(
+bool ShellWindow::Show(
   const bool show
 )
 {
@@ -310,7 +310,18 @@ bool wxWindow::Show(
   return changed;
 }
 
-void wxWindow::SetFocus()
+ShellPoint ShellWindow::GetPosition() const
+{
+  if (m_topLevel && m_platformWindow != nullptr) {
+    int x = 0;
+    int y = 0;
+    platform::window::GetFramePosition(m_platformWindow, &x, &y);
+    return ShellPoint(x, y);
+  }
+  return ShellPoint(m_screenX, m_screenY);
+}
+
+void ShellWindow::SetFocus()
 {
   sFocusWindow = this;
   if ((m_topLevel || m_nativeChild) && m_platformWindow != nullptr) {
@@ -318,12 +329,12 @@ void wxWindow::SetFocus()
   }
 }
 
-wxWindow* wxWindow::FindFocus()
+ShellWindow* ShellWindow::FindFocus()
 {
   return sFocusWindow;
 }
 
-void wxWindow::SetSize(
+void ShellWindow::SetSize(
   const int width,
   const int height
 )
@@ -331,7 +342,7 @@ void wxWindow::SetSize(
   SetSize(-1, -1, width, height);
 }
 
-void wxWindow::SetSize(
+void ShellWindow::SetSize(
   const int x,
   const int y,
   const int width,
@@ -341,21 +352,28 @@ void wxWindow::SetSize(
 {
   (void)sizeFlags;
   if (m_nativeChild && m_platformWindow != nullptr) {
-    // x, y in the parent's client area, as wx 2.4.2 placed child windows.
+    // x, y in the parent's client area, as the 2.4.2 window library placed child windows.
     platform::window::SetBounds(m_platformWindow, x, y, width, height);
     platform::window::GetBounds(m_platformWindow, &m_screenX, &m_screenY, &m_clientWidth, &m_clientHeight);
     return;
   }
   if (m_topLevel && m_platformWindow != nullptr) {
-    // The window system decides; its answer is what the window has.
-    platform::window::SetBounds(m_platformWindow, x, y, width, height);
+    // x, y place the frame (the retail window library's top-level position); width, height are
+    // the client size. The window system decides; its answer is what the window has.
+    if (x != -1 || y != -1) {
+      int frameX = 0;
+      int frameY = 0;
+      platform::window::GetFramePosition(m_platformWindow, &frameX, &frameY);
+      platform::window::SetFramePosition(m_platformWindow, x != -1 ? x : frameX, y != -1 ? y : frameY);
+    }
+    platform::window::SetBounds(m_platformWindow, -1, -1, width, height);
     int screenX = 0;
     int screenY = 0;
     int clientWidth = 0;
     int clientHeight = 0;
     platform::window::GetBounds(m_platformWindow, &screenX, &screenY, &clientWidth, &clientHeight);
     SetClientArea(screenX, screenY, clientWidth, clientHeight);
-    for (wxWindow* const child : m_children) {
+    for (ShellWindow* const child : m_children) {
       if (!child->IsNativeChild()) {
         child->SetClientArea(screenX, screenY, clientWidth, clientHeight);
       }
@@ -376,7 +394,7 @@ void wxWindow::SetSize(
   }
 }
 
-wxWindow::~wxWindow()
+ShellWindow::~ShellWindow()
 {
   if (sFocusWindow == this) {
     sFocusWindow = nullptr;
@@ -385,19 +403,19 @@ wxWindow::~wxWindow()
     sActivatedFrame = nullptr;
   }
   if (m_parent != nullptr) {
-    std::vector<wxWindow*>& siblings = m_parent->m_children;
+    std::vector<ShellWindow*>& siblings = m_parent->m_children;
     siblings.erase(std::remove(siblings.begin(), siblings.end(), this), siblings.end());
   }
-  for (wxWindow* const child : m_children) {
+  for (ShellWindow* const child : m_children) {
     child->m_parent = nullptr; // the engine deletes its own windows
   }
   if ((m_topLevel || m_nativeChild) && m_platformWindow != nullptr) {
     sNativeWindows.erase(m_platformWindow);
     platform::window::Destroy(m_platformWindow);
   }
-  // wx 2.4.2 deletes the handlers still pushed onto a window it destroys.
+  // The 2.4.2 window library deletes the handlers still pushed onto a window it destroys.
   while (m_eventHandler != nullptr && m_eventHandler != this) {
-    wxEvtHandler* const handler = m_eventHandler;
+    ShellEvtHandler* const handler = m_eventHandler;
     m_eventHandler = handler->GetNextHandler();
     handler->SetNextHandler(nullptr);
     handler->SetPreviousHandler(nullptr);
@@ -405,11 +423,11 @@ wxWindow::~wxWindow()
   }
 }
 
-void wxWindow::PushEventHandler(
-  wxEvtHandler* const handler
+void ShellWindow::PushEventHandler(
+  ShellEvtHandler* const handler
 )
 {
-  wxEvtHandler* const handlerOld = GetEventHandler();
+  ShellEvtHandler* const handlerOld = GetEventHandler();
   handler->SetNextHandler(handlerOld);
   if (handlerOld != nullptr) {
     handlerOld->SetPreviousHandler(handler);
@@ -417,15 +435,15 @@ void wxWindow::PushEventHandler(
   SetEventHandler(handler);
 }
 
-wxEvtHandler* wxWindow::PopEventHandler(
+ShellEvtHandler* ShellWindow::PopEventHandler(
   const bool deleteHandler
 )
 {
-  wxEvtHandler* const handlerA = GetEventHandler();
+  ShellEvtHandler* const handlerA = GetEventHandler();
   if (handlerA == nullptr || handlerA == this) {
     return nullptr;
   }
-  wxEvtHandler* const handlerB = handlerA->GetNextHandler();
+  ShellEvtHandler* const handlerB = handlerA->GetNextHandler();
   handlerA->SetNextHandler(nullptr);
   if (handlerB != nullptr) {
     handlerB->SetPreviousHandler(nullptr);
@@ -438,7 +456,7 @@ wxEvtHandler* wxWindow::PopEventHandler(
   return handlerA;
 }
 
-void wxWindow::GetClientSize(
+void ShellWindow::GetClientSize(
   int* const width,
   int* const height
 ) const
@@ -451,12 +469,12 @@ void wxWindow::GetClientSize(
   }
 }
 
-wxSize wxWindow::GetClientSize() const
+ShellSize ShellWindow::GetClientSize() const
 {
-  return wxSize(m_clientWidth, m_clientHeight);
+  return ShellSize(m_clientWidth, m_clientHeight);
 }
 
-void wxWindow::ScreenToClient(
+void ShellWindow::ScreenToClient(
   int* const x,
   int* const y
 ) const
@@ -469,14 +487,14 @@ void wxWindow::ScreenToClient(
   }
 }
 
-wxPoint wxWindow::ScreenToClient(
-  const wxPoint& point
+ShellPoint ShellWindow::ScreenToClient(
+  const ShellPoint& point
 ) const
 {
-  return wxPoint(point.x - m_screenX, point.y - m_screenY);
+  return ShellPoint(point.x - m_screenX, point.y - m_screenY);
 }
 
-void wxWindow::SetClientArea(
+void ShellWindow::SetClientArea(
   const int screenX,
   const int screenY,
   const int width,
@@ -491,39 +509,40 @@ void wxWindow::SetClientArea(
 
 // --- The application -------------------------------------------------------------------------
 
-wxApp* wxTheApp = nullptr;
+ShellApp* gShellApp = nullptr;
 
-wxApp::wxApp()
+ShellApp::ShellApp()
 {
-  wxTheApp = this;
+  gShellApp = this;
 }
 
-wxApp::~wxApp()
+ShellApp::~ShellApp()
 {
-  if (wxTheApp == this) {
-    wxTheApp = nullptr;
+  if (gShellApp == this) {
+    gShellApp = nullptr;
   }
 }
 
 // --- Top-level windows ----------------------------------------------------------------------
 
-wxTopLevelWindow::wxTopLevelWindow(
-  wxWindow* const parent,
-  const wxWindowID id,
-  const wxString& title,
-  const wxPoint& pos,
-  const wxSize& size,
+ShellTopLevelWindow::ShellTopLevelWindow(
+  ShellWindow* const parent,
+  const ShellWindowID id,
+  const ShellString& title,
+  const ShellPoint& pos,
+  const ShellSize& size,
   const long style,
   const wchar_t* const name
 )
-  : wxWindow(nullptr, id, pos, size, style, name)
+  : ShellWindow(nullptr, id, pos, size, style, name)
   , m_title(title)
   , m_windowStyle(style)
 {
-  // wx 2.4.2 frames with a parent are still desktop windows; the parent only owns them.
+  // The 2.4.2 window library frames with a parent are still desktop windows; the parent only owns them.
   (void)parent;
-  void* const native =
-    platform::window::CreateTopLevel(Utf8(title).c_str(), pos.x, pos.y, size.x, size.y, (style & wxRESIZE_BORDER) != 0);
+  void* const native = platform::window::CreateTopLevel(
+    Utf8(title).c_str(), pos.x, pos.y, size.x, size.y, (style & SHELL_RESIZE_BORDER) != 0
+  );
   if (native == nullptr) {
     return; // no window system: the window keeps its requested area, as before
   }
@@ -537,7 +556,7 @@ wxTopLevelWindow::wxTopLevelWindow(
   SetClientArea(screenX, screenY, clientWidth, clientHeight);
 }
 
-void wxTopLevelWindow::Maximize(
+void ShellTopLevelWindow::Maximize(
   const bool maximize
 )
 {
@@ -547,7 +566,7 @@ void wxTopLevelWindow::Maximize(
   }
 }
 
-void wxTopLevelWindow::Iconize(
+void ShellTopLevelWindow::Iconize(
   const bool iconize
 )
 {
@@ -557,7 +576,7 @@ void wxTopLevelWindow::Iconize(
   }
 }
 
-bool wxTopLevelWindow::ShowFullScreen(
+bool ShellTopLevelWindow::ShowFullScreen(
   const bool show,
   const long style
 )
@@ -570,8 +589,8 @@ bool wxTopLevelWindow::ShowFullScreen(
   return true;
 }
 
-void wxTopLevelWindow::SetTitle(
-  const wxString& title
+void ShellTopLevelWindow::SetTitle(
+  const ShellString& title
 )
 {
   m_title = title;
@@ -580,14 +599,14 @@ void wxTopLevelWindow::SetTitle(
   }
 }
 
-// --- Window events: what wx 2.4.2 on Windows sent for the same messages ----------------------
+// --- Window events: what the 2.4.2 window library on Windows sent for the same messages ----------------------
 
 namespace
 {
   // The window a native window's input goes to: the focused window when it is this one or one of
   // its children sharing it (the game's viewport), else its first such child, else itself.
-  [[nodiscard]] wxWindow* InputTarget(
-    wxWindow* const top
+  [[nodiscard]] ShellWindow* InputTarget(
+    ShellWindow* const top
   )
   {
     if (
@@ -596,7 +615,7 @@ namespace
     ) {
       return sFocusWindow;
     }
-    for (wxWindow* const child : top->GetChildren()) {
+    for (ShellWindow* const child : top->GetChildren()) {
       if (!child->IsNativeChild()) {
         return child;
       }
@@ -605,32 +624,32 @@ namespace
   }
 
   void Deliver(
-    wxWindow* const window,
-    wxEvent& event
+    ShellWindow* const window,
+    ShellEvent& event
   )
   {
     event.SetEventObject(window);
-    if (wxEvtHandler* const handler = window->GetEventHandler(); handler != nullptr) {
+    if (ShellEvtHandler* const handler = window->GetEventHandler(); handler != nullptr) {
       (void)handler->ProcessEvent(event);
     }
   }
 
-  // Native children follow their parent's moves (their screen origin) and, as wxFrame::OnSize did
+  // Native children follow their parent's moves (their screen origin) and, as Frame::OnSize did
   // for a frame's only child, fill its client area when it is the only child.
   void FollowParent(
-    wxWindow* const top,
+    ShellWindow* const top,
     const bool resized
   )
   {
-    const std::vector<wxWindow*>& children = top->GetChildren();
-    for (wxWindow* const child : children) {
+    const std::vector<ShellWindow*>& children = top->GetChildren();
+    for (ShellWindow* const child : children) {
       if (!child->IsNativeChild()) {
         continue;
       }
       if (resized && children.size() == 1u) {
-        const wxSize size = top->GetClientSize();
+        const ShellSize size = top->GetClientSize();
         child->SetSize(0, 0, size.x, size.y);
-        wxSizeEvent childEvent(size.x, size.y);
+        ShellSizeEvent childEvent(size.x, size.y);
         Deliver(child, childEvent);
         continue;
       }
@@ -658,20 +677,20 @@ namespace
   }
 
   void DeliverMouse(
-    wxWindow* const top,
+    ShellWindow* const top,
     const platform::window::Event& source,
-    const wxEventType type
+    const ShellEventType type
   )
   {
-    wxWindow* const target = InputTarget(top);
-    wxMouseEvent event(type);
+    ShellWindow* const target = InputTarget(top);
+    ShellMouseEvent event(type);
     event.m_x = source.x;
     event.m_y = source.y;
     event.m_leftDown = (source.buttonsDown & platform::window::kLeftDown) != 0;
     event.m_middleDown = (source.buttonsDown & platform::window::kMiddleDown) != 0;
     event.m_rightDown = (source.buttonsDown & platform::window::kRightDown) != 0;
     FillModifiers(source.modifiers, event.m_controlDown, event.m_shiftDown, event.m_altDown, event.m_metaDown);
-    if (type == wxEVT_MOUSEWHEEL) {
+    if (type == SHELL_EVT_MOUSEWHEEL) {
       // WM_MOUSEWHEEL: 120 per notch, three lines each (the Windows default).
       event.m_wheelRotation = static_cast<int>(std::lround(source.wheel * 120.0f));
       event.m_wheelDelta = 120;
@@ -681,29 +700,29 @@ namespace
   }
 
   void DeliverKey(
-    wxWindow* const top,
-    const wxEventType type,
+    ShellWindow* const top,
+    const ShellEventType type,
     const long keyCode,
     const platform::window::Event& source,
     const bool controlOverride
   )
   {
-    wxWindow* const target = InputTarget(top);
-    wxKeyEvent event(type);
+    ShellWindow* const target = InputTarget(top);
+    ShellKeyEvent event(type);
     event.m_keyCode = keyCode;
     FillModifiers(source.modifiers, event.m_controlDown, event.m_shiftDown, event.m_altDown, event.m_metaDown);
     event.m_controlDown = event.m_controlDown || controlOverride;
     // WM_KEYDOWN's wParam and lParam: the virtual key, and bit 30 when the key was already down.
-    event.m_rawCode = static_cast<wxUint32>(source.virtualKey);
+    event.m_rawCode = static_cast<ShellUint32>(source.virtualKey);
     event.m_rawFlags = source.repeat ? (1u << 30) : 0u;
     Deliver(target, event);
   }
 
-  // wx 2.4.2 (src/msw/window.cpp) sends a char event for a key Windows gives no WM_CHAR for, with
-  // its wx code, besides the key-down; and turns WM_CHAR 1..26 (Ctrl+letter) into the code with
+  // The 2.4.2 window library (src/msw/window.cpp) sends a char event for a key Windows gives no WM_CHAR for, with
+  // its window-library code, besides the key-down; and turns WM_CHAR 1..26 (Ctrl+letter) into the code with
   // ControlDown. SDL reports typed text apart (EventType::Text); these are the keys it doesn't.
   void DeliverCharForKey(
-    wxWindow* const top,
+    ShellWindow* const top,
     const platform::window::Event& source
   )
   {
@@ -711,22 +730,22 @@ namespace
     const bool control = (source.modifiers & platform::window::kModifierControl) != 0;
     switch (virtualKey) {
     case VK_BACK:
-      DeliverKey(top, wxEVT_CHAR, WXK_BACK, source, false);
+      DeliverKey(top, SHELL_EVT_CHAR, SHELL_KEY_BACK, source, false);
       return;
     case VK_TAB:
-      DeliverKey(top, wxEVT_CHAR, WXK_TAB, source, false);
+      DeliverKey(top, SHELL_EVT_CHAR, SHELL_KEY_TAB, source, false);
       return;
     case VK_RETURN:
-      DeliverKey(top, wxEVT_CHAR, WXK_RETURN, source, false);
+      DeliverKey(top, SHELL_EVT_CHAR, SHELL_KEY_RETURN, source, false);
       return;
     case VK_ESCAPE:
-      DeliverKey(top, wxEVT_CHAR, WXK_ESCAPE, source, false);
+      DeliverKey(top, SHELL_EVT_CHAR, SHELL_KEY_ESCAPE, source, false);
       return;
     default:
       break;
     }
     if (control && virtualKey >= 'A' && virtualKey <= 'Z') {
-      DeliverKey(top, wxEVT_CHAR, virtualKey - 'A' + 1, source, true);
+      DeliverKey(top, SHELL_EVT_CHAR, virtualKey - 'A' + 1, source, true);
       return;
     }
     // Keys that type nothing: arrows, function keys, navigation, modifiers.
@@ -734,8 +753,8 @@ namespace
       (virtualKey >= 'A' && virtualKey <= 'Z') || (virtualKey >= VK_NUMPAD0 && virtualKey <= VK_DIVIDE) ||
       (virtualKey >= VK_OEM_1 && virtualKey <= VK_OEM_3) || (virtualKey >= VK_OEM_4 && virtualKey <= VK_OEM_7);
     if (!typesText) {
-      if (const int code = wxCharCodeMSWToWX(virtualKey); code != 0) {
-        DeliverKey(top, wxEVT_CHAR, code, source, false);
+      if (const int code = ShellKeyFromVirtualKey(virtualKey); code != 0) {
+        DeliverKey(top, SHELL_EVT_CHAR, code, source, false);
       }
     }
   }
@@ -746,8 +765,8 @@ namespace
   {
     using platform::window::EventType;
     if (source.type == EventType::Quit) {
-      if (wxTheApp != nullptr) {
-        wxTheApp->ExitMainLoop(); // what wxApp::DoMessage did on WM_QUIT
+      if (gShellApp != nullptr) {
+        gShellApp->ExitMainLoop(); // what App::DoMessage did on WM_QUIT
       }
       return;
     }
@@ -755,26 +774,26 @@ namespace
     if (found == sNativeWindows.end()) {
       return;
     }
-    wxWindow* const top = found->second;
+    ShellWindow* const top = found->second;
     // Window state belongs to top-level windows; a native child has input, size and paint.
-    wxTopLevelWindow* const frame = top->IsTopLevel() ? static_cast<wxTopLevelWindow*>(top) : nullptr;
+    ShellTopLevelWindow* const frame = top->IsTopLevel() ? static_cast<ShellTopLevelWindow*>(top) : nullptr;
     switch (source.type) {
     case EventType::CloseRequested: {
-      wxCloseEvent event(wxEVT_CLOSE_WINDOW);
+      ShellCloseEvent event(SHELL_EVT_CLOSE_WINDOW);
       event.SetCanVeto(true);
       Deliver(top, event);
       return;
     }
     case EventType::Moved: {
-      const wxSize size = top->GetClientSize();
+      const ShellSize size = top->GetClientSize();
       top->SetClientArea(source.x, source.y, size.x, size.y);
-      for (wxWindow* const child : top->GetChildren()) {
+      for (ShellWindow* const child : top->GetChildren()) {
         if (!child->IsNativeChild()) {
           child->SetClientArea(source.x, source.y, size.x, size.y);
         }
       }
       FollowParent(top, false);
-      wxMoveEvent event(source.x, source.y);
+      ShellMoveEvent event(source.x, source.y);
       Deliver(top, event);
       return;
     }
@@ -783,14 +802,14 @@ namespace
       int screenY = 0;
       platform::window::GetBounds(source.window, &screenX, &screenY, nullptr, nullptr);
       top->SetClientArea(screenX, screenY, source.width, source.height);
-      wxSizeEvent event(source.width, source.height);
+      ShellSizeEvent event(source.width, source.height);
       Deliver(top, event);
-      for (wxWindow* const child : top->GetChildren()) {
+      for (ShellWindow* const child : top->GetChildren()) {
         if (child->IsNativeChild()) {
           continue;
         }
         child->SetClientArea(screenX, screenY, source.width, source.height);
-        wxSizeEvent childEvent(source.width, source.height);
+        ShellSizeEvent childEvent(source.width, source.height);
         Deliver(child, childEvent);
       }
       FollowParent(top, true);
@@ -810,8 +829,8 @@ namespace
       // window system may report the state after the size, so the size event follows the state.
       frame->NoteIconized(false);
       frame->NoteMaximized(source.type == EventType::Maximized);
-      const wxSize size = top->GetClientSize();
-      wxSizeEvent event(size.x, size.y);
+      const ShellSize size = top->GetClientSize();
+      ShellSizeEvent event(size.x, size.y);
       Deliver(top, event);
       return;
     }
@@ -824,13 +843,13 @@ namespace
         return;
       }
       sAppActive = active;
-      wxWindow* receiver = active ? top : sActivatedFrame;
+      ShellWindow* receiver = active ? top : sActivatedFrame;
       while (receiver != nullptr && !receiver->IsTopLevel()) {
         receiver = receiver->GetParent();
       }
       sActivatedFrame = active ? receiver : nullptr;
       if (receiver != nullptr) {
-        wxActivateEvent event(active);
+        ShellActivateEvent event(active);
         Deliver(receiver, event);
       }
       return;
@@ -842,38 +861,38 @@ namespace
       return;
     case EventType::Exposed:
       if (top->IsNativeChild()) {
-        wxPaintEvent event;
+        ShellPaintEvent event;
         Deliver(top, event);
         return;
       }
-      for (wxWindow* const child : top->GetChildren()) {
+      for (ShellWindow* const child : top->GetChildren()) {
         if (!child->IsNativeChild()) {
-          wxPaintEvent event;
+          ShellPaintEvent event;
           Deliver(child, event);
         }
       }
       return;
     case EventType::MouseEnter:
-      DeliverMouse(top, source, wxEVT_ENTER_WINDOW);
+      DeliverMouse(top, source, SHELL_EVT_ENTER_WINDOW);
       return;
     case EventType::MouseLeave:
-      DeliverMouse(top, source, wxEVT_LEAVE_WINDOW);
+      DeliverMouse(top, source, SHELL_EVT_LEAVE_WINDOW);
       return;
     case EventType::MouseMove:
-      DeliverMouse(top, source, wxEVT_MOTION);
+      DeliverMouse(top, source, SHELL_EVT_MOTION);
       return;
     case EventType::MouseDown: {
       // Windows sends a double-click message in place of the second press.
       const bool doubleClick = source.clicks >= 2;
       switch (source.button) {
       case platform::window::kButtonLeft:
-        DeliverMouse(top, source, doubleClick ? wxEVT_LEFT_DCLICK : wxEVT_LEFT_DOWN);
+        DeliverMouse(top, source, doubleClick ? SHELL_EVT_LEFT_DCLICK : SHELL_EVT_LEFT_DOWN);
         break;
       case platform::window::kButtonMiddle:
-        DeliverMouse(top, source, doubleClick ? wxEVT_MIDDLE_DCLICK : wxEVT_MIDDLE_DOWN);
+        DeliverMouse(top, source, doubleClick ? SHELL_EVT_MIDDLE_DCLICK : SHELL_EVT_MIDDLE_DOWN);
         break;
       case platform::window::kButtonRight:
-        DeliverMouse(top, source, doubleClick ? wxEVT_RIGHT_DCLICK : wxEVT_RIGHT_DOWN);
+        DeliverMouse(top, source, doubleClick ? SHELL_EVT_RIGHT_DCLICK : SHELL_EVT_RIGHT_DOWN);
         break;
       default:
         break;
@@ -883,35 +902,35 @@ namespace
     case EventType::MouseUp:
       switch (source.button) {
       case platform::window::kButtonLeft:
-        DeliverMouse(top, source, wxEVT_LEFT_UP);
+        DeliverMouse(top, source, SHELL_EVT_LEFT_UP);
         break;
       case platform::window::kButtonMiddle:
-        DeliverMouse(top, source, wxEVT_MIDDLE_UP);
+        DeliverMouse(top, source, SHELL_EVT_MIDDLE_UP);
         break;
       case platform::window::kButtonRight:
-        DeliverMouse(top, source, wxEVT_RIGHT_UP);
+        DeliverMouse(top, source, SHELL_EVT_RIGHT_UP);
         break;
       default:
         break;
       }
       return;
     case EventType::MouseWheel:
-      DeliverMouse(top, source, wxEVT_MOUSEWHEEL);
+      DeliverMouse(top, source, SHELL_EVT_MOUSEWHEEL);
       return;
     case EventType::KeyDown: {
-      // wx 2.4.2 HandleKeyDown: the wx code of a special key, else the virtual key itself.
-      const int code = wxCharCodeMSWToWX(source.virtualKey);
-      DeliverKey(top, wxEVT_KEY_DOWN, code != 0 ? code : source.virtualKey, source, false);
+      // The 2.4.2 window library HandleKeyDown: the window-library code of a special key, else the virtual key itself.
+      const int code = ShellKeyFromVirtualKey(source.virtualKey);
+      DeliverKey(top, SHELL_EVT_KEY_DOWN, code != 0 ? code : source.virtualKey, source, false);
       DeliverCharForKey(top, source);
       return;
     }
     case EventType::KeyUp: {
-      const int code = wxCharCodeMSWToWX(source.virtualKey);
-      DeliverKey(top, wxEVT_KEY_UP, code != 0 ? code : source.virtualKey, source, false);
+      const int code = ShellKeyFromVirtualKey(source.virtualKey);
+      DeliverKey(top, SHELL_EVT_KEY_UP, code != 0 ? code : source.virtualKey, source, false);
       return;
     }
     case EventType::Text:
-      DeliverKey(top, wxEVT_CHAR, static_cast<long>(source.codepoint), source, false);
+      DeliverKey(top, SHELL_EVT_CHAR, static_cast<long>(source.codepoint), source, false);
       return;
     default:
       return;
@@ -919,12 +938,12 @@ namespace
   }
 } // namespace
 
-bool wxApp::Pending()
+bool ShellApp::Pending()
 {
   return platform::window::HasEvents();
 }
 
-void wxApp::Dispatch()
+void ShellApp::Dispatch()
 {
   platform::window::Event event;
   if (platform::window::PollEvent(event)) {
@@ -932,14 +951,14 @@ void wxApp::Dispatch()
   }
 }
 
-void wxApp::CleanUp()
+void ShellApp::CleanUp()
 {
-  delete wxTheApp; // the destructor clears wxTheApp
+  delete gShellApp; // the destructor clears TheApp
 }
 
-int wxEntry(
-  const WXHINSTANCE instance,
-  const WXHINSTANCE previousInstance,
+int ShellEntry(
+  const ShellInstanceHandle instance,
+  const ShellInstanceHandle previousInstance,
   char* const commandLine,
   const int showCommand,
   const bool enterLoop
@@ -949,12 +968,12 @@ int wxEntry(
   (void)previousInstance;
   (void)commandLine;
   (void)showCommand;
-  if (wxTheApp == nullptr) {
-    if (const wxApp::InitializerFunction create = wxApp::GetInitializerFunction(); create != nullptr) {
-      (void)create(); // the constructor sets wxTheApp
+  if (gShellApp == nullptr) {
+    if (const ShellApp::InitializerFunction create = ShellApp::GetInitializerFunction(); create != nullptr) {
+      (void)create(); // the constructor sets TheApp
     }
   }
-  if (wxTheApp == nullptr || !wxTheApp->OnInit()) {
+  if (gShellApp == nullptr || !gShellApp->OnInit()) {
     return -1;
   }
   // The engine runs its own loop (enterLoop false); nothing here runs one for it.
@@ -962,162 +981,162 @@ int wxEntry(
   return 0;
 }
 
-void wxApp::ExitMainLoop()
+void ShellApp::ExitMainLoop()
 {
   m_keepGoing = FALSE;
 }
 
-const wxString wxEmptyString;
-const wchar_t* wxFrameNameStr = L"frame";
+const ShellString kShellEmptyString;
+const wchar_t* kShellFrameName = L"frame";
 
-wxPoint wxGetMousePosition()
+ShellPoint ShellGetMousePosition()
 {
   POINT point{};
   (void)::GetCursorPos(&point);
-  return wxPoint(point.x, point.y);
+  return ShellPoint(point.x, point.y);
 }
 
-// --- Key codes (wx 2.4.2 src/msw/window.cpp) --------------------------------------------------
+// --- Key codes (the 2.4.2 window library src/msw/window.cpp) --------------------------------------------------
 
-int wxCharCodeMSWToWX(
+int ShellKeyFromVirtualKey(
   const int keySym
 )
 {
   switch (keySym) {
   case VK_CANCEL:
-    return WXK_CANCEL;
+    return SHELL_KEY_CANCEL;
   case VK_BACK:
-    return WXK_BACK;
+    return SHELL_KEY_BACK;
   case VK_TAB:
-    return WXK_TAB;
+    return SHELL_KEY_TAB;
   case VK_CLEAR:
-    return WXK_CLEAR;
+    return SHELL_KEY_CLEAR;
   case VK_RETURN:
-    return WXK_RETURN;
+    return SHELL_KEY_RETURN;
   case VK_SHIFT:
-    return WXK_SHIFT;
+    return SHELL_KEY_SHIFT;
   case VK_CONTROL:
-    return WXK_CONTROL;
+    return SHELL_KEY_CONTROL;
   case VK_MENU:
-    return WXK_MENU;
+    return SHELL_KEY_MENU;
   case VK_PAUSE:
-    return WXK_PAUSE;
+    return SHELL_KEY_PAUSE;
   case VK_CAPITAL:
-    return WXK_CAPITAL;
+    return SHELL_KEY_CAPITAL;
   case VK_SPACE:
-    return WXK_SPACE;
+    return SHELL_KEY_SPACE;
   case VK_ESCAPE:
-    return WXK_ESCAPE;
+    return SHELL_KEY_ESCAPE;
   case VK_PRIOR:
-    return WXK_PRIOR;
+    return SHELL_KEY_PRIOR;
   case VK_NEXT:
-    return WXK_NEXT;
+    return SHELL_KEY_NEXT;
   case VK_END:
-    return WXK_END;
+    return SHELL_KEY_END;
   case VK_HOME:
-    return WXK_HOME;
+    return SHELL_KEY_HOME;
   case VK_LEFT:
-    return WXK_LEFT;
+    return SHELL_KEY_LEFT;
   case VK_UP:
-    return WXK_UP;
+    return SHELL_KEY_UP;
   case VK_RIGHT:
-    return WXK_RIGHT;
+    return SHELL_KEY_RIGHT;
   case VK_DOWN:
-    return WXK_DOWN;
+    return SHELL_KEY_DOWN;
   case VK_SELECT:
-    return WXK_SELECT;
+    return SHELL_KEY_SELECT;
   case VK_PRINT:
-    return WXK_PRINT;
+    return SHELL_KEY_PRINT;
   case VK_EXECUTE:
-    return WXK_EXECUTE;
+    return SHELL_KEY_EXECUTE;
   case VK_INSERT:
-    return WXK_INSERT;
+    return SHELL_KEY_INSERT;
   case VK_DELETE:
-    return WXK_DELETE;
+    return SHELL_KEY_DELETE;
   case VK_HELP:
-    return WXK_HELP;
+    return SHELL_KEY_HELP;
   case VK_NUMPAD0:
-    return WXK_NUMPAD0;
+    return SHELL_KEY_NUMPAD0;
   case VK_NUMPAD1:
-    return WXK_NUMPAD1;
+    return SHELL_KEY_NUMPAD1;
   case VK_NUMPAD2:
-    return WXK_NUMPAD2;
+    return SHELL_KEY_NUMPAD2;
   case VK_NUMPAD3:
-    return WXK_NUMPAD3;
+    return SHELL_KEY_NUMPAD3;
   case VK_NUMPAD4:
-    return WXK_NUMPAD4;
+    return SHELL_KEY_NUMPAD4;
   case VK_NUMPAD5:
-    return WXK_NUMPAD5;
+    return SHELL_KEY_NUMPAD5;
   case VK_NUMPAD6:
-    return WXK_NUMPAD6;
+    return SHELL_KEY_NUMPAD6;
   case VK_NUMPAD7:
-    return WXK_NUMPAD7;
+    return SHELL_KEY_NUMPAD7;
   case VK_NUMPAD8:
-    return WXK_NUMPAD8;
+    return SHELL_KEY_NUMPAD8;
   case VK_NUMPAD9:
-    return WXK_NUMPAD9;
+    return SHELL_KEY_NUMPAD9;
   case VK_MULTIPLY:
-    return WXK_NUMPAD_MULTIPLY;
+    return SHELL_KEY_NUMPAD_MULTIPLY;
   case VK_ADD:
-    return WXK_NUMPAD_ADD;
+    return SHELL_KEY_NUMPAD_ADD;
   case VK_SUBTRACT:
-    return WXK_NUMPAD_SUBTRACT;
+    return SHELL_KEY_NUMPAD_SUBTRACT;
   case VK_DECIMAL:
-    return WXK_NUMPAD_DECIMAL;
+    return SHELL_KEY_NUMPAD_DECIMAL;
   case VK_DIVIDE:
-    return WXK_NUMPAD_DIVIDE;
+    return SHELL_KEY_NUMPAD_DIVIDE;
   case VK_F1:
-    return WXK_F1;
+    return SHELL_KEY_F1;
   case VK_F2:
-    return WXK_F2;
+    return SHELL_KEY_F2;
   case VK_F3:
-    return WXK_F3;
+    return SHELL_KEY_F3;
   case VK_F4:
-    return WXK_F4;
+    return SHELL_KEY_F4;
   case VK_F5:
-    return WXK_F5;
+    return SHELL_KEY_F5;
   case VK_F6:
-    return WXK_F6;
+    return SHELL_KEY_F6;
   case VK_F7:
-    return WXK_F7;
+    return SHELL_KEY_F7;
   case VK_F8:
-    return WXK_F8;
+    return SHELL_KEY_F8;
   case VK_F9:
-    return WXK_F9;
+    return SHELL_KEY_F9;
   case VK_F10:
-    return WXK_F10;
+    return SHELL_KEY_F10;
   case VK_F11:
-    return WXK_F11;
+    return SHELL_KEY_F11;
   case VK_F12:
-    return WXK_F12;
+    return SHELL_KEY_F12;
   case VK_F13:
-    return WXK_F13;
+    return SHELL_KEY_F13;
   case VK_F14:
-    return WXK_F14;
+    return SHELL_KEY_F14;
   case VK_F15:
-    return WXK_F15;
+    return SHELL_KEY_F15;
   case VK_F16:
-    return WXK_F16;
+    return SHELL_KEY_F16;
   case VK_F17:
-    return WXK_F17;
+    return SHELL_KEY_F17;
   case VK_F18:
-    return WXK_F18;
+    return SHELL_KEY_F18;
   case VK_F19:
-    return WXK_F19;
+    return SHELL_KEY_F19;
   case VK_F20:
-    return WXK_F20;
+    return SHELL_KEY_F20;
   case VK_F21:
-    return WXK_F21;
+    return SHELL_KEY_F21;
   case VK_F22:
-    return WXK_F22;
+    return SHELL_KEY_F22;
   case VK_F23:
-    return WXK_F23;
+    return SHELL_KEY_F23;
   case VK_F24:
-    return WXK_F24;
+    return SHELL_KEY_F24;
   case VK_NUMLOCK:
-    return WXK_NUMLOCK;
+    return SHELL_KEY_NUMLOCK;
   case VK_SCROLL:
-    return WXK_SCROLL;
+    return SHELL_KEY_SCROLL;
   case VK_OEM_1:
     return ';';
   case VK_OEM_PLUS:
@@ -1145,134 +1164,134 @@ int wxCharCodeMSWToWX(
   }
 }
 
-int wxCharCodeWXToMSW(
+int ShellKeyToVirtualKey(
   const int id,
   bool* const isVirtual
 )
 {
   *isVirtual = true;
   switch (id) {
-  case WXK_CANCEL:
+  case SHELL_KEY_CANCEL:
     return VK_CANCEL;
-  case WXK_CLEAR:
+  case SHELL_KEY_CLEAR:
     return VK_CLEAR;
-  case WXK_SHIFT:
+  case SHELL_KEY_SHIFT:
     return VK_SHIFT;
-  case WXK_CONTROL:
+  case SHELL_KEY_CONTROL:
     return VK_CONTROL;
-  case WXK_MENU:
+  case SHELL_KEY_MENU:
     return VK_MENU;
-  case WXK_PAUSE:
+  case SHELL_KEY_PAUSE:
     return VK_PAUSE;
-  case WXK_PRIOR:
+  case SHELL_KEY_PRIOR:
     return VK_PRIOR;
-  case WXK_NEXT:
+  case SHELL_KEY_NEXT:
     return VK_NEXT;
-  case WXK_END:
+  case SHELL_KEY_END:
     return VK_END;
-  case WXK_HOME:
+  case SHELL_KEY_HOME:
     return VK_HOME;
-  case WXK_LEFT:
+  case SHELL_KEY_LEFT:
     return VK_LEFT;
-  case WXK_UP:
+  case SHELL_KEY_UP:
     return VK_UP;
-  case WXK_RIGHT:
+  case SHELL_KEY_RIGHT:
     return VK_RIGHT;
-  case WXK_DOWN:
+  case SHELL_KEY_DOWN:
     return VK_DOWN;
-  case WXK_SELECT:
+  case SHELL_KEY_SELECT:
     return VK_SELECT;
-  case WXK_PRINT:
+  case SHELL_KEY_PRINT:
     return VK_PRINT;
-  case WXK_EXECUTE:
+  case SHELL_KEY_EXECUTE:
     return VK_EXECUTE;
-  case WXK_INSERT:
+  case SHELL_KEY_INSERT:
     return VK_INSERT;
-  case WXK_DELETE:
+  case SHELL_KEY_DELETE:
     return VK_DELETE;
-  case WXK_HELP:
+  case SHELL_KEY_HELP:
     return VK_HELP;
-  case WXK_NUMPAD0:
+  case SHELL_KEY_NUMPAD0:
     return VK_NUMPAD0;
-  case WXK_NUMPAD1:
+  case SHELL_KEY_NUMPAD1:
     return VK_NUMPAD1;
-  case WXK_NUMPAD2:
+  case SHELL_KEY_NUMPAD2:
     return VK_NUMPAD2;
-  case WXK_NUMPAD3:
+  case SHELL_KEY_NUMPAD3:
     return VK_NUMPAD3;
-  case WXK_NUMPAD4:
+  case SHELL_KEY_NUMPAD4:
     return VK_NUMPAD4;
-  case WXK_NUMPAD5:
+  case SHELL_KEY_NUMPAD5:
     return VK_NUMPAD5;
-  case WXK_NUMPAD6:
+  case SHELL_KEY_NUMPAD6:
     return VK_NUMPAD6;
-  case WXK_NUMPAD7:
+  case SHELL_KEY_NUMPAD7:
     return VK_NUMPAD7;
-  case WXK_NUMPAD8:
+  case SHELL_KEY_NUMPAD8:
     return VK_NUMPAD8;
-  case WXK_NUMPAD9:
+  case SHELL_KEY_NUMPAD9:
     return VK_NUMPAD9;
-  case WXK_NUMPAD_MULTIPLY:
+  case SHELL_KEY_NUMPAD_MULTIPLY:
     return VK_MULTIPLY;
-  case WXK_NUMPAD_ADD:
+  case SHELL_KEY_NUMPAD_ADD:
     return VK_ADD;
-  case WXK_NUMPAD_SUBTRACT:
+  case SHELL_KEY_NUMPAD_SUBTRACT:
     return VK_SUBTRACT;
-  case WXK_NUMPAD_DECIMAL:
+  case SHELL_KEY_NUMPAD_DECIMAL:
     return VK_DECIMAL;
-  case WXK_NUMPAD_DIVIDE:
+  case SHELL_KEY_NUMPAD_DIVIDE:
     return VK_DIVIDE;
-  case WXK_F1:
+  case SHELL_KEY_F1:
     return VK_F1;
-  case WXK_F2:
+  case SHELL_KEY_F2:
     return VK_F2;
-  case WXK_F3:
+  case SHELL_KEY_F3:
     return VK_F3;
-  case WXK_F4:
+  case SHELL_KEY_F4:
     return VK_F4;
-  case WXK_F5:
+  case SHELL_KEY_F5:
     return VK_F5;
-  case WXK_F6:
+  case SHELL_KEY_F6:
     return VK_F6;
-  case WXK_F7:
+  case SHELL_KEY_F7:
     return VK_F7;
-  case WXK_F8:
+  case SHELL_KEY_F8:
     return VK_F8;
-  case WXK_F9:
+  case SHELL_KEY_F9:
     return VK_F9;
-  case WXK_F10:
+  case SHELL_KEY_F10:
     return VK_F10;
-  case WXK_F11:
+  case SHELL_KEY_F11:
     return VK_F11;
-  case WXK_F12:
+  case SHELL_KEY_F12:
     return VK_F12;
-  case WXK_F13:
+  case SHELL_KEY_F13:
     return VK_F13;
-  case WXK_F14:
+  case SHELL_KEY_F14:
     return VK_F14;
-  case WXK_F15:
+  case SHELL_KEY_F15:
     return VK_F15;
-  case WXK_F16:
+  case SHELL_KEY_F16:
     return VK_F16;
-  case WXK_F17:
+  case SHELL_KEY_F17:
     return VK_F17;
-  case WXK_F18:
+  case SHELL_KEY_F18:
     return VK_F18;
-  case WXK_F19:
+  case SHELL_KEY_F19:
     return VK_F19;
-  case WXK_F20:
+  case SHELL_KEY_F20:
     return VK_F20;
-  case WXK_F21:
+  case SHELL_KEY_F21:
     return VK_F21;
-  case WXK_F22:
+  case SHELL_KEY_F22:
     return VK_F22;
-  case WXK_F23:
+  case SHELL_KEY_F23:
     return VK_F23;
-  case WXK_F24:
+  case SHELL_KEY_F24:
     return VK_F24;
-  case WXK_NUMLOCK:
+  case SHELL_KEY_NUMLOCK:
     return VK_NUMLOCK;
-  case WXK_SCROLL:
+  case SHELL_KEY_SCROLL:
     return VK_SCROLL;
   default:
     *isVirtual = false;

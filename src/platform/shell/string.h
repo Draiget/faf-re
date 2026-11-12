@@ -1,22 +1,22 @@
 #pragma once
 
-// Engine addition (issue #255): wx 2.4.2's string (wx/string.h) as the Linux client's shell uses
-// it: built from wide text, read back with c_str(). See wx/defs.h in this folder.
+// Engine addition (issues #255, #407): the shell's string: built from wide text, read back with
+// c_str(). See defs.h.
 
 #include <string>
 
-#include <wx/defs.h>
+#include "platform/shell/defs.h"
 
-class wxString : public std::wstring
+class ShellString : public std::wstring
 {
 public:
-  wxString() = default;
-  wxString(
+  ShellString() = default;
+  ShellString(
     const wchar_t* const text
   )
     : std::wstring(text != nullptr ? text : L"")
   {}
-  wxString(
+  ShellString(
     const std::wstring& text
   )
     : std::wstring(text)
@@ -36,4 +36,4 @@ public:
   }
 };
 
-extern const wxString wxEmptyString;
+extern const ShellString kShellEmptyString;

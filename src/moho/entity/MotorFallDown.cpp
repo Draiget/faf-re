@@ -112,7 +112,7 @@ namespace
   {
     return Wm3::Vec3f{
       // Column 1 - the local up axis - scalar-first:
-      // (2(xy-wz), 1-2(x*x+z*z), 2(yz+wx)). The previous spelling carried a
+      // (2(xy-wz), 1-2(x*x+z*z), 2(yz+xw)). The previous spelling carried a
       // `w*w` diagonal term, which no matrix expansion in this binary computes.
       ((orientation.y * orientation.x) - (orientation.w * orientation.z)) * 2.0f,
       1.0f - ((orientation.z * orientation.z + orientation.x * orientation.x) * 2.0f),
