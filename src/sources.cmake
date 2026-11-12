@@ -926,6 +926,7 @@ set(FAF_ENGINE_SOURCES
   moho/render/CDecalHandleTypeInfo.cpp
   moho/render/AmbientOcclusionRenderer.cpp
   moho/render/Atmosphere.cpp
+  moho/render/BounceLight.cpp
   moho/render/DynamicLights.cpp
   moho/render/TemporalAA.cpp
   moho/render/BoundaryRenderer.cpp

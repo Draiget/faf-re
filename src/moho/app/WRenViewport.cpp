@@ -3,6 +3,7 @@
 #include "moho/app/WxPrivate.h"
 #include "moho/render/AmbientOcclusionRenderer.h"
 #include "moho/render/Atmosphere.h"
+#include "moho/render/BounceLight.h"
 #include "moho/render/DynamicLights.h"
 #include "moho/render/FxaaRenderer.h"
 #include "moho/render/TemporalAA.h"
@@ -2117,6 +2118,30 @@ void moho::WRenViewport::RenderWorldView(
   if (moho::DynamicLights& lights = moho::DynamicLights::Get(); lights.IsActive()) {
     const gpg::gal::RenderProfileScope profileLights("DynamicLights");
     lights.Render(*mCam, mScreenPos.x, mScreenPos.y, mScreenSize.x, mScreenSize.y);
+  }
+  // Engine addition (ren_RayBounce): one bounce of diffuse light by ray, from the lit frame so far (copied into the
+  // refraction copy, which the water copies again later), before effects and water draw over it.
+  // Only when the terrain pass ran (it publishes this frame's ray scene through the shadow renderer) and at high
+  // fidelity (where the water copies the frame into the refraction copy again before it draws).
+  if (
+    moho::BounceLight& bounce = moho::BounceLight::Get(); moho::ren_Terrain && terrain != nullptr &&
+    moho::graphics_Fidelity >= 2 && bounce.IsActive() && mPrimaryTargetLocks[mHead]
+  ) {
+    const gpg::gal::RenderProfileScope profileBounce("BounceLight");
+    moho::CD3DDevice* const bounceDevice = moho::D3D_GetDevice();
+    boost::shared_ptr<moho::ID3DRenderTarget> headTarget{};
+    bounceDevice->GetWriterLock1(headTarget, mHead);
+    bounceDevice->SetViewRect(headTarget.get(), mPrimaryTargetLocks[mHead].get(), nullptr, nullptr);
+    moho::ID3DRenderTarget::SurfaceHandle frameCopy{};
+    (void)mPrimaryTargetLocks[mHead]->GetSurface(frameCopy);
+    bounceDevice->SetRenderTarget2(mHead, false, 0, 1.0f, 0);
+    SetViewportToLocalScreen();
+    if (frameCopy) {
+      const moho::IWldTerrainRes* const bounceMap = moho::REN_GetTerrainRes();
+      const float waterLevel =
+        (bounceMap != nullptr && bounceMap->IsWaterEnabled()) ? bounceMap->GetWaterElevation() : -1.0e9f;
+      bounce.Render(*mCam, *frameCopy, waterLevel, mScreenPos.x, mScreenPos.y, mScreenSize.x, mScreenSize.y);
+    }
   }
   {
     const gpg::gal::RenderProfileScope profileEffects("Effects");

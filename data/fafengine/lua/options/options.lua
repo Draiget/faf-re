@@ -336,6 +336,25 @@ do
                 },
             })
         end
+        if Supported('ren_RayBounce') then
+            table.insert(video.items, math.min(position + 2, table.getn(video.items) + 1), {
+                title = 'Ray-traced bounce light',
+                key = 'ray_bounce_optin',
+                type = 'toggle',
+                default = 0,
+                tip = 'With ray-traced shadows on: light bounces once off the ground, cliffs and buildings onto what '
+                    .. 'stands next to them, in their own colour.',
+                set = function(key, value, startup)
+                    ConExecute('ren_RayBounce ' .. tostring(value))
+                end,
+                custom = {
+                    states = {
+                        { text = '<LOC _On>', key = 1 },
+                        { text = '<LOC _Off>', key = 0 },
+                    },
+                },
+            })
+        end
         if Supported('ren_RayWaterReflections') then
             table.insert(video.items, math.min(position + 2, table.getn(video.items) + 1), {
                 title = 'Ray-traced water reflections',
