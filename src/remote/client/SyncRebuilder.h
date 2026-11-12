@@ -41,6 +41,7 @@ namespace moho
   template <class T>
   class Stats;
   class CD3DBatchTexture;
+  struct SEntityVariableUpdateEntry;
   struct SSyncData;
 } // namespace moho
 
@@ -256,8 +257,12 @@ namespace faf::remote::client
     /**
      * Plan WP10.9, with `SetNoSim`: a made-up beat's unit updates: every live unit whose last beat moved its pose, its
      * data as last given with the pose held (prior = current), so the session doesn't play that beat's motion again.
+     * A unit in `moved` (the made-up beat's entity updates) gets that pose's bones placed at its two transforms.
      */
-    void HeldPoseUpdates(fa::vector<moho::SUnitVariableUpdateEntry>& out) const;
+    void HeldPoseUpdates(
+      const fa::vector<moho::SEntityVariableUpdateEntry>& moved,
+      fa::vector<moho::SUnitVariableUpdateEntry>& out
+    ) const;
     /** Plan WP9.3: keep each frame's removed entities until the next frame (for `FindHeld`'s `orRemoved`). */
     void KeepRemoved(
       const bool keep

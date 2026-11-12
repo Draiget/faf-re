@@ -505,7 +505,7 @@ namespace faf::remote::client
       FromSynth(update.last, entry.mVariableData.mLastTransform);
       FromSynth(update.cur, entry.mVariableData.mCurTransform);
     }
-    rebuilder.HeldPoseUpdates(packet->mUnitUpdates);
+    rebuilder.HeldPoseUpdates(packet->mEntityUpdates, packet->mUnitUpdates);
 
     auto* const stream = new gpg::MemBufferStream(static_cast<unsigned int>(mEmptySync.size() + 16u));
     stream->Write(reinterpret_cast<const char*>(mEmptySync.data()), mEmptySync.size());

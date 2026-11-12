@@ -373,7 +373,8 @@ namespace faf::remote::client
       data.mPriorSharedPose.reset();
       return;
     }
-    if (!held.pose || held.poseSkeleton != skeleton.get()) {
+    const bool made = !held.pose || held.poseSkeleton != skeleton.get();
+    if (made) {
       float scale = 1.0f;
       if (record.blueprint < mBlueprints.size() && mBlueprints[record.blueprint] != nullptr) {
         scale = static_cast<const moho::RUnitBlueprint*>(mBlueprints[record.blueprint])->Display.UniformScale;
@@ -383,8 +384,17 @@ namespace faf::remote::client
       held.poseBones.clear();
       ++mStats.posesMade;
     }
+    // Plan WP8.4: a pose carries the unit's world transform, and the mesh draws every bone through it (the skinning
+    // palette takes the bones' composites), blending the prior pose into the current one. In lockstep every tick
+    // steps a unit's poses, so the prior one stands where the unit stood a beat ago. Here a unit that moved steps its
+    // poses too, with or without bones: otherwise one pose stands at both ends, and the body jumps a beat's way at
+    // each beat while the unit's transforms glide.
+    const bool moved = !SameTransform(held.data.mCurTransform, held.data.mLastTransform);
     boost::shared_ptr<moho::CAniPose> prior = held.pose;
-    if (bones != nullptr) {
+    if (bones == nullptr && moved) {
+      held.pose.reset(new moho::CAniPose(*held.pose)); // the same bones, a beat on
+      held.poseMoving = true;
+    } else if (bones != nullptr) {
       // A new current pose, as `CAniActor` steps: a copy of the last one with the lane's bones over it.
       boost::shared_ptr<moho::CAniPose> next(new moho::CAniPose(*held.pose));
       moho::CAniPoseBone* const first = next->mBones.begin();
@@ -439,7 +449,13 @@ namespace faf::remote::client
       held.poseMoving = false; // still: the session interpolates nothing
     }
     held.pose->SetWorldTransform(held.data.mCurTransform);
-    if (prior == held.pose) {
+    if (made) {
+      // A unit new to this client (made, or come into sight): nothing to blend from but where it stood a beat ago.
+      // The pose just made was never placed (it stands at the map's corner) and holds the bind pose; lockstep's prior
+      // pose is the unit's own a tick before. So both ends get these bones, the prior one at the last transform.
+      prior.reset(new moho::CAniPose(*held.pose));
+      prior->SetWorldTransform(held.data.mLastTransform);
+    } else if (prior == held.pose) {
       prior->SetWorldTransform(held.data.mCurTransform);
     }
     data.mPriorSharedPose = prior;
@@ -983,6 +999,7 @@ namespace faf::remote::client
         const bool fromPacket = packetIt != packetUnitUpdates.end();
         const wire::SUnitPose* bones = nullptr;
         bool poseMoving = false;
+        bool moved = false; // plan WP8.4: its poses step with its transform (`UpdatePoses`)
         if (mNoSim && record.isUnit) {
           while (mPoseLane != nullptr && poseAt < mPoseLane->size() && (*mPoseLane)[poseAt].id < record.id) {
             ++poseAt;
@@ -992,11 +1009,12 @@ namespace faf::remote::client
           }
           if (const auto found = mHeld.find(record.id); found != mHeld.end()) {
             poseMoving = found->second.poseMoving;
+            moved = !SameTransform(found->second.data.mCurTransform, found->second.data.mLastTransform);
           }
         }
         if (
           !record.isUnit || !updatable(record.id) ||
-          (!created && !unitChanged && !fromPacket && bones == nullptr && !poseMoving)
+          (!created && !unitChanged && !fromPacket && bones == nullptr && !poseMoving && !moved)
         ) {
           continue;
         }
@@ -1128,9 +1146,15 @@ namespace faf::remote::client
   }
 
   void CSyncRebuilder::HeldPoseUpdates(
+    const fa::vector<moho::SEntityVariableUpdateEntry>& moved,
     fa::vector<moho::SUnitVariableUpdateEntry>& out
   ) const
   {
+    std::unordered_map<std::uint32_t, const moho::SEntityVariableUpdateEntry*> movedById;
+    movedById.reserve(moved.size());
+    for (const moho::SEntityVariableUpdateEntry& entry : moved) {
+      movedById.emplace(static_cast<std::uint32_t>(entry.mEntityId), &entry);
+    }
     for (const auto& [id, held] : mHeld) {
       if (!held.live || !held.poseMoving || !held.unit || !held.pose) {
         continue;
@@ -1139,12 +1163,22 @@ namespace faf::remote::client
       if (record == nullptr || !record->isUnit) {
         continue;
       }
-      // As the next beat without bones gives it (`UpdatePoses`): the current pose as both, so nothing moves.
+      // As the next beat without bones gives it (`UpdatePoses`): the current pose's bones at both ends, so no bone
+      // moves. Plan WP8.4: a unit the made-up beat carries on gets them where its transforms are (the body is drawn
+      // through the poses' world transforms), on copies: the next real beat steps from the held pose as before.
       moho::SUnitVariableUpdateEntry& entry = out.emplace_back();
       entry.mEntityId = static_cast<moho::EntId>(id);
       entry.mVariableData = *held.unit;
       entry.mVariableData.mPriorSharedPose = held.pose;
       entry.mVariableData.mSharedPose = held.pose;
+      if (const auto it = movedById.find(id); it != movedById.end()) {
+        boost::shared_ptr<moho::CAniPose> prior(new moho::CAniPose(*held.pose));
+        prior->SetWorldTransform(it->second->mVariableData.mLastTransform);
+        boost::shared_ptr<moho::CAniPose> pose(new moho::CAniPose(*held.pose));
+        pose->SetWorldTransform(it->second->mVariableData.mCurTransform);
+        entry.mVariableData.mPriorSharedPose = std::move(prior);
+        entry.mVariableData.mSharedPose = std::move(pose);
+      }
       entry.mReconFlags = record->unit.detail->reconFlags;
     }
   }
