@@ -358,6 +358,48 @@ do
     end
 end
 
+-- Temporal anti-aliasing (ren_Taa), on Direct3D 12 and Vulkan: off until the player turns it on.
+do
+    local kind = type(ConTextMatches)
+    local supported = false
+    if kind == 'function' or kind == 'cfunction' then
+        local ok, matches = pcall(ConTextMatches, 'ren_Taa')
+        if ok and type(matches) == 'table' then
+            for _, name in ipairs(matches) do
+                if name == 'ren_Taa' then
+                    supported = true
+                end
+            end
+        end
+    end
+    local video = options and options.video
+    if supported and video and video.items then
+        local position = table.getn(video.items) + 1
+        for index, item in ipairs(video.items) do
+            if item.key == 'antialiasing' or item.key == 'fxaa_on' then
+                position = index + 1
+            end
+        end
+        table.insert(video.items, position, {
+            title = 'Temporal anti-aliasing',
+            key = 'taa',
+            type = 'toggle',
+            default = 0,
+            tip = 'Direct3D 12 and Vulkan: smooths edges and stops thin lines and far detail from crawling, by blending '
+                .. 'each frame with the last ones. Replaces FXAA while on.',
+            set = function(key, value, startup)
+                ConExecute('ren_Taa ' .. tostring(value))
+            end,
+            custom = {
+                states = {
+                    { text = '<LOC _On>', key = 1 },
+                    { text = '<LOC _Off>', key = 0 },
+                },
+            },
+        })
+    end
+end
+
 -- Sun shafts and height fog (ren_Atmosphere), on Direct3D 12 and Vulkan: off until the player turns it on.
 do
     local function Supported(command)

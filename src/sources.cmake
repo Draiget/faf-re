@@ -927,6 +927,7 @@ set(FAF_ENGINE_SOURCES
   moho/render/AmbientOcclusionRenderer.cpp
   moho/render/Atmosphere.cpp
   moho/render/DynamicLights.cpp
+  moho/render/TemporalAA.cpp
   moho/render/BoundaryRenderer.cpp
   moho/render/FxaaRenderer.cpp
   moho/render/PostRenderer.cpp

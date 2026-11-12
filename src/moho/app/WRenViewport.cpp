@@ -5,6 +5,7 @@
 #include "moho/render/Atmosphere.h"
 #include "moho/render/DynamicLights.h"
 #include "moho/render/FxaaRenderer.h"
+#include "moho/render/TemporalAA.h"
 #include "moho/render/PostRenderer.h"
 #include "moho/render/WideBloomRenderer.h"
 #include "moho/sim/STIMap.h"
@@ -1736,7 +1737,10 @@ void moho::WRenViewport::RenderPreviewImage(
 
   fa::vector<SWorldViewInfo> previewWorldViews{};
   previewWorldViews.push_back(worldViewEntry);
+  // Engine addition (ren_Taa): a preview is a one-off picture, not the next frame of the game's view.
+  moho::TemporalAA::Get().SetPreviewRender(true);
   Render(0, previewWorldViews);
+  moho::TemporalAA::Get().SetPreviewRender(false);
 
   moho::ren_Ui = savedUi;
   moho::ren_WorldBorder = savedWorldBorder;
@@ -1868,7 +1872,19 @@ void moho::WRenViewport::RenderWorldViewPostEffects()
     );
     device->SetViewport(&viewPos, &viewSize, viewMinZ, viewMaxZ);
   };
-  if (moho::FxaaRenderer& fxaa = moho::FxaaRenderer::Get(); fxaa.IsActive()) {
+  // Engine addition (ren_Taa): temporal anti-aliasing replaces FXAA while it runs.
+  bool temporal = false;
+  if (moho::TemporalAA& taa = moho::TemporalAA::Get(); taa.Pending()) {
+    overHeadCopy("Taa", [&](gpg::gal::RenderTarget& copy, const int, const int) {
+      Wm3::Vector2i viewPos{};
+      Wm3::Vector2i viewSize{};
+      float viewMinZ = 0.0f;
+      float viewMaxZ = 1.0f;
+      device->GetView(&viewPos, &viewSize, &viewMinZ, &viewMaxZ);
+      temporal = taa.Resolve(copy, viewPos.x, viewPos.y, viewSize.x, viewSize.y);
+    });
+  }
+  if (moho::FxaaRenderer& fxaa = moho::FxaaRenderer::Get(); !temporal && fxaa.IsActive()) {
     overHeadCopy("Fxaa", [&](gpg::gal::RenderTarget& copy, const int width, const int height) {
       fxaa.Render(copy, width, height);
     });
@@ -1924,6 +1940,15 @@ void moho::WRenViewport::RenderWorldView(
   mCam = worldView->mView->GetCameraView();
   if (mCam == nullptr) {
     return;
+  }
+  // Engine addition (ren_Taa): the world passes of the first view draw with the camera moved by this frame's
+  // sub-pixel offset; the view's overlay below draws with the unmoved one.
+  moho::GeomCamera3* const unjitteredCamera = mCam;
+  if (
+    moho::TemporalAA& taa = moho::TemporalAA::Get();
+    worldView == begin && !RenderAdditionsDisabled() && !taa.PreviewRender() && taa.IsActive()
+  ) {
+    mCam = taa.Jitter(*mCam);
   }
 
   // Ground clutter, refreshed once per frame off the primary world view.
@@ -2000,7 +2025,8 @@ void moho::WRenViewport::RenderWorldView(
     // (0x007F93DF slot 6 CameraGetTargetZoom, then 0x007F93F1).
     {
       const gpg::gal::RenderProfileScope profileShadows("Shadows");
-      mShadowRenderer.RenderFrameShadows(terrain, *mCam, worldView->mView->CameraGetTargetZoom());
+      // ren_Taa: the shadow map is fitted to the unmoved camera, so its texels don't move with the offset.
+      mShadowRenderer.RenderFrameShadows(terrain, *unjitteredCamera, worldView->mView->CameraGetTargetZoom());
     }
 
     FogOn(worldView->mView->CameraGetZoom());
@@ -2213,6 +2239,8 @@ void moho::WRenViewport::RenderWorldView(
   // orthographic flag is set, which is the minimap and whichever view the
   // player has toggled into cartographic mode.
   RenderWorldViewPostEffects();
+  mCam = unjitteredCamera;           // ren_Taa: overlays stay pixel-exact
+  moho::TemporalAA::Get().EndView(); // a frame the resolve didn't take is not left pending for another view
 
   if (moho::ren_Ui && worldView->mView != nullptr) {
     const gpg::gal::RenderProfileScope profileViewOverlay("ViewOverlay");
