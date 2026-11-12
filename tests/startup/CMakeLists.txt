@@ -6,6 +6,7 @@
 #   ctest --test-dir build/clang-x64-release -L Startup --output-on-failure
 add_executable(faf_startup_tests EXCLUDE_FROM_ALL
   StartupPathTests.cpp
+  StartupArgsTests.cpp
 )
 target_link_libraries(faf_startup_tests PRIVATE faf_engine gtest_main)
 set_target_properties(faf_startup_tests PROPERTIES FOLDER "Tests/Startup")
