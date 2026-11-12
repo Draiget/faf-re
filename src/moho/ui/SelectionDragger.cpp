@@ -17,8 +17,9 @@
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DPrimBatcher.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
-#include "moho/math/QuaternionMath.h"
 #include "moho/entity/Entity.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/CWldSession.h"
@@ -296,6 +297,51 @@ namespace moho
     return this;
   }
 
+  bool TryFallbackHologramSelection(
+    CWldSession* const session,
+    const float x0,
+    const float y0,
+    const float x1,
+    const float y1,
+    const bool isShift
+  )
+  {
+    if (!ui_TransportPreOrders || session == nullptr || session->mState == nullptr) {
+      return false;
+    }
+
+    try {
+      LuaPlus::LuaObject hologramModule =
+        SCR_Import(session->mState, "/fafengine/modules/lua/ui/game/transport_holograms.lua");
+      if (!hologramModule.IsTable()) {
+        return false;
+      }
+
+      LuaPlus::LuaObject handleWorldDragObj = hologramModule["HandleWorldDrag"];
+      if (!handleWorldDragObj.IsFunction()) {
+        return false;
+      }
+
+      LuaPlus::LuaFunction<bool> handleWorldDragFn(handleWorldDragObj);
+      LuaPlus::LuaObject nilObject(session->mState);
+
+      const float minX = std::min(x0, x1);
+      const float minY = std::min(y0, y1);
+      const float maxX = std::max(x0, x1);
+      const float maxY = std::max(y0, y1);
+
+      return handleWorldDragFn(nilObject, minX, minY, maxX, maxY, isShift);
+    } catch (const std::exception& exception) {
+      gpg::Warnf(
+        "[SelectionDragger] Fallback hologram selection failed: %s", exception.what() != nullptr ? exception.what() : ""
+      );
+      return false;
+    } catch (...) {
+      gpg::Warnf("[SelectionDragger] Fallback hologram selection failed with unknown exception");
+      return false;
+    }
+  }
+
   /**
    * Address: 0x00863870 (FUN_00863870)
    *
@@ -348,6 +394,12 @@ namespace moho
     CollectSelectionDraggerEntities(draggedSelection, *this);
 
     if ((eventData->mModifiers & MEM_Shift) != 0u) {
+      if (draggedSelection.Empty()) {
+        if (TryFallbackHologramSelection(mSess, mX0, mY0, eventData->mMousePos.x, eventData->mMousePos.y, true)) {
+          return;
+        }
+      }
+
       WeakSet<UserEntity> currentSelection(mSess->GetSelection());
 
       // 0x0086393D..0x00863950: every dragged entity was already selected --
@@ -417,6 +469,12 @@ namespace moho
         if (!bucket.Empty()) {
           resultSelection.Add(bucket.begin(), bucket.end());
           break;
+        }
+      }
+
+      if (resultSelection.Empty()) {
+        if (TryFallbackHologramSelection(mSess, mX0, mY0, eventData->mMousePos.x, eventData->mMousePos.y, false)) {
+          return;
         }
       }
 

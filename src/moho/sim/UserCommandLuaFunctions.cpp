@@ -381,6 +381,9 @@ namespace
   constexpr const char* kIssueDockCommandName = "IssueDockCommand";
   constexpr const char* kIssueUnitCommandHelpText = "IssueUnitCommand(unitList,command,[string],[clear])";
   constexpr const char* kIssueUnitCommandName = "IssueUnitCommand";
+  constexpr const char* kIsTransportPreOrdersEnabledName = "IsTransportPreOrdersEnabled";
+  constexpr const char* kIsTransportPreOrdersEnabledHelpText =
+    "IsTransportPreOrdersEnabled() -> bool - returns whether transport cargo pre-orders and drop ghosts are enabled";
   constexpr const char* kOpenURLHelpText = "OpenURL(string) - open the default browser window to the specified URL";
   constexpr const char* kOpenURLName = "OpenURL";
   constexpr const char* kSetActiveBuildTemplateHelpText = "set this as an active build template.";
@@ -747,6 +750,7 @@ namespace
 namespace moho
 {
   int cfunc_IssueUnitCommandL(LuaPlus::LuaState* state);
+  int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
 
   int cfunc_IssueBlueprintCommandL(LuaPlus::LuaState* state);
 
@@ -927,6 +931,26 @@ namespace moho
    * Publishes global Lua binder
    * `IssueBlueprintCommand(command, blueprintid, count, clear = false)`.
    */
+  /**
+   * Address: None (faf-re addition)
+   *
+   * What it does:
+   * Publishes global Lua binder
+   * `IsTransportPreOrdersEnabled() -> bool`.
+   */
+  CScrLuaInitForm* func_IsTransportPreOrdersEnabled_LuaFuncDef()
+  {
+    static CScrLuaBinder binder(
+      moho::SCR_UserLuaInitSet(),
+      kIsTransportPreOrdersEnabledName,
+      &moho::cfunc_IsTransportPreOrdersEnabled,
+      nullptr,
+      "<global>",
+      kIsTransportPreOrdersEnabledHelpText
+    );
+    return &binder;
+  }
+
   CScrLuaInitForm* func_IssueBlueprintCommand_LuaFuncDef()
   {
     static CScrLuaBinder binder(
@@ -1405,6 +1429,37 @@ namespace moho
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_DecreaseBuildCountInQueueL`.
    */
+  /**
+   * Address: None (faf-re addition)
+   *
+   * What it does:
+   * Returns whether transport cargo pre-orders and drop ghosts are enabled.
+   */
+  int cfunc_IsTransportPreOrdersEnabledL(
+    LuaPlus::LuaState* const state
+  )
+  {
+    if (state == nullptr || state->m_state == nullptr) {
+      return 0;
+    }
+    lua_pushboolean(state->m_state, ui_TransportPreOrders ? 1 : 0);
+    return 1;
+  }
+
+  /**
+   * Address: None (faf-re addition)
+   *
+   * What it does:
+   * Unwraps raw Lua callback context and forwards to
+   * `cfunc_IsTransportPreOrdersEnabledL`.
+   */
+  int cfunc_IsTransportPreOrdersEnabled(
+    lua_State* const luaContext
+  )
+  {
+    return cfunc_IsTransportPreOrdersEnabledL(moho::SCR_ResolveBindingState(luaContext));
+  }
+
   int cfunc_DecreaseBuildCountInQueue(
     lua_State* const luaContext
   )
@@ -2614,6 +2669,7 @@ namespace
       (void)::moho::func_IssueDockCommand_LuaFuncDef();
       (void)::moho::func_IssueCommand_LuaFuncDef();
       (void)::moho::func_IssueUnitCommand_LuaFuncDef();
+      (void)::moho::func_IsTransportPreOrdersEnabled_LuaFuncDef();
       (void)::moho::func_IssueBlueprintCommand_LuaFuncDef();
       (void)::moho::func_GetRolloverInfo_LuaFuncDef();
       (void)::moho::func_UISelectionByCategory_LuaFuncDef();

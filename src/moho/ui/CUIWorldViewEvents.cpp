@@ -1,4 +1,5 @@
 #include "moho/ui/UiPrivate.h"
+#include "moho/unit/core/UserUnit.h"
 #include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 
@@ -3378,6 +3379,8 @@ bool moho::CUIWorldView::HandleEvent(
         for (UserUnit* const unit : *ResolveCommandIssueCursorEntities(*hoveredCommand)) {
           ISSUE_RemoveCommandFromUnitQueue(hoveredCommand, unit);
         }
+      } else if (UserUnit::RemoveTransportPreOrderById(cursorInfo.mIsDragger)) {
+        mWldSession->DirtyCommandGraph();
       }
     } else {
       if (mCommandData.mMode != COMMOD_None && sMouseIsScrubbing == 0u) {

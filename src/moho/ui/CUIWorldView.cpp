@@ -604,7 +604,9 @@ namespace moho
     [[maybe_unused]] const float frameSeconds
   )
   {
-    if (!mIsMiniMap && MAUI_KeyIsDown(MKEY_SHIFT)) {
+    const bool shiftDown = MAUI_KeyIsDown(MKEY_SHIFT);
+    const bool hasPreOrders = UserUnit::HasAnyTransportPreOrders();
+    if (!mIsMiniMap && (shiftDown || hasPreOrders)) {
       if (!mComGraph) {
         mComGraph = mWldSession->GetCommandGraph(/*allowCreate=*/true);
       }

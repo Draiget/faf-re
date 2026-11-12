@@ -1,7 +1,18 @@
 #include "moho/unit/core/UserUnitPrivate.h"
+#include "moho/command/SSTICommandIssueData.h"
+
+#include <unordered_map>
+#include <vector>
+
+bool moho::ui_TransportPreOrders = false;
 
 namespace
 {
+  static std::unordered_map<std::uint32_t, std::vector<moho::SSTICommandIssueData>> sTransportPreOrders;
+  static std::unordered_map<std::uint32_t, Wm3::Vector3f> sSelectionBracketPositionOverrides;
+  static std::unordered_map<std::int32_t, std::uint32_t> sDispatchedPreOrderBuilders;
+  static std::unordered_map<std::uint32_t, std::int32_t> sDisembarkedWaitTicks;
+
   void WarnFocusArmyUnitDamagedCallbackError(const std::exception& exception) noexcept;
   constexpr const char* kOverlayCategoryAntiAir = "OVERLAYANTIAIR";
   constexpr const char* kOverlayCategoryDirectFire = "OVERLAYDIRECTFIRE";
@@ -850,6 +861,8 @@ UserUnit::UserUnit(
  */
 UserUnit::~UserUnit()
 {
+  ClearTransportPreOrders();
+
   UserEntity* const entityView = this;
   UserArmy* const army = this->mArmy;
   const IUnit* const iunitBridge = GetIUnitBridge(this);
@@ -893,6 +906,7 @@ UserUnit::~UserUnit()
   }
 
   mSelectionSets.clear();
+  ClearSelectionBracketPositionOverride();
 
   delete mFactoryManager;
   mFactoryManager = nullptr;
@@ -902,6 +916,330 @@ UserUnit::~UserUnit()
   if (VisionDB::Handle* const handle = GetUserUnitVisionHandle(this); handle != nullptr) {
     delete handle;
     GetUserUnitVisionHandle(this) = nullptr;
+  }
+}
+
+void UserUnit::QueueTransportPreOrders(
+  const gpg::fastvector<UserUnit*>& units,
+  const SSTICommandIssueData& order,
+  const bool clearQueue
+)
+{
+  if (!ui_TransportPreOrders || units.empty()) {
+    return;
+  }
+  SSTICommandIssueData finalOrder = order;
+  if (
+    finalOrder.nextCommandId <= 0 || (static_cast<std::uint32_t>(finalOrder.nextCommandId) & 0xFF000000u) == 0xFF000000u
+  ) {
+    static std::int32_t sNextPreOrderId = 0x7F000001;
+    finalOrder.nextCommandId = sNextPreOrderId++;
+  }
+  for (UserUnit* const unit : units) {
+    if (unit != nullptr) {
+      unit->QueueTransportPreOrder(finalOrder, clearQueue);
+    }
+  }
+}
+
+void UserUnit::QueueTransportPreOrder(
+  const SSTICommandIssueData& order,
+  bool clearQueue
+)
+{
+  if (!ui_TransportPreOrders) {
+    return;
+  }
+  auto& queue = sTransportPreOrders[this->mParams.mEntityId];
+  if (order.mCommandType == EUnitCommandType::UNITCOMMAND_Stop) {
+    queue.clear();
+    sTransportPreOrders.erase(this->mParams.mEntityId);
+    return;
+  }
+  if (clearQueue) {
+    queue.clear();
+  }
+  SSTICommandIssueData finalOrder = order;
+  if (
+    finalOrder.nextCommandId <= 0 || (static_cast<std::uint32_t>(finalOrder.nextCommandId) & 0xFF000000u) == 0xFF000000u
+  ) {
+    static std::int32_t sNextPreOrderId = 0x7F000001;
+    finalOrder.nextCommandId = sNextPreOrderId++;
+  }
+
+  if (finalOrder.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && finalOrder.mBlueprint != nullptr) {
+    CWldSession* const session = this->mSession != nullptr ? this->mSession : WLD_GetActiveSession();
+    if (session != nullptr) {
+      const SCoordsVec2 buildPos{finalOrder.mTarget.mPos.x, finalOrder.mTarget.mPos.z};
+      SOccupationResult buildInfo{};
+      const bool placeable = USERUNIT_CanBeBuiltAt(
+        *session, finalOrder.mBlueprint, buildPos, false, &buildInfo, nullptr, 0, finalOrder.nextCommandId
+      );
+      if (!placeable) {
+        gpg::Warnf(
+          "TransportPreOrders: Pre-order build rejected (cannot be built at %.1f, %.1f)",
+          finalOrder.mTarget.mPos.x,
+          finalOrder.mTarget.mPos.z
+        );
+        return;
+      }
+      finalOrder.mTarget.mPos = buildInfo.pos;
+    }
+  }
+
+  queue.push_back(finalOrder);
+}
+
+void UserUnit::ClearTransportPreOrders()
+{
+  sTransportPreOrders.erase(this->mParams.mEntityId);
+  sDisembarkedWaitTicks.erase(this->mParams.mEntityId);
+  if (sTransportPreOrders.empty()) {
+    sDispatchedPreOrderBuilders.clear();
+    sDisembarkedWaitTicks.clear();
+  }
+}
+
+bool UserUnit::RemoveTransportPreOrderById(
+  const std::int32_t commandId
+)
+{
+  bool removed = false;
+  for (auto it = sTransportPreOrders.begin(); it != sTransportPreOrders.end();) {
+    auto& orders = it->second;
+    for (auto orderIt = orders.begin(); orderIt != orders.end();) {
+      if (orderIt->nextCommandId == commandId) {
+        orderIt = orders.erase(orderIt);
+        removed = true;
+      } else {
+        ++orderIt;
+      }
+    }
+    if (orders.empty()) {
+      it = sTransportPreOrders.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  sDispatchedPreOrderBuilders.erase(commandId);
+  return removed;
+}
+
+bool UserUnit::UpdateTransportPreOrderPositionById(
+  const std::int32_t commandId,
+  const Wm3::Vector3f& newPos
+)
+{
+  bool updated = false;
+  CWldSession* const session = WLD_GetActiveSession();
+
+  for (auto& entry : sTransportPreOrders) {
+    for (SSTICommandIssueData& order : entry.second) {
+      if (order.nextCommandId == commandId) {
+        Wm3::Vector3f targetPos = newPos;
+
+        if (
+          order.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && order.mBlueprint != nullptr &&
+          session != nullptr
+        ) {
+          const SCoordsVec2 buildPos{newPos.x, newPos.z};
+          SOccupationResult buildInfo{};
+          const bool placeable = USERUNIT_CanBeBuiltAt(
+            *session, order.mBlueprint, buildPos, false, &buildInfo, nullptr, commandId, commandId
+          );
+          if (!placeable) {
+            return false;
+          }
+          targetPos = buildInfo.pos;
+        }
+
+        order.mTarget.mPos = targetPos;
+        updated = true;
+      }
+    }
+  }
+  return updated;
+}
+
+void UserUnit::SetSelectionBracketPositionOverride(
+  const Wm3::Vector3f& pos
+)
+{
+  sSelectionBracketPositionOverrides[this->mParams.mEntityId] = pos;
+}
+
+void UserUnit::ClearSelectionBracketPositionOverride()
+{
+  sSelectionBracketPositionOverrides.erase(this->mParams.mEntityId);
+}
+
+bool UserUnit::HasSelectionBracketPositionOverride() const
+{
+  if (!ui_TransportPreOrders) {
+    return false;
+  }
+  const auto it = sSelectionBracketPositionOverrides.find(this->mParams.mEntityId);
+  return it != sSelectionBracketPositionOverrides.end();
+}
+
+Wm3::Vector3f UserUnit::GetSelectionBracketPositionOverride() const
+{
+  const auto it = sSelectionBracketPositionOverrides.find(this->mParams.mEntityId);
+  if (it != sSelectionBracketPositionOverrides.end()) {
+    return it->second;
+  }
+  return Wm3::Vector3f::ZERO;
+}
+
+std::vector<SSTICommandIssueData> UserUnit::GetTransportPreOrders() const
+{
+  if (!ui_TransportPreOrders) {
+    return {};
+  }
+  const auto it = sTransportPreOrders.find(this->mParams.mEntityId);
+  if (it != sTransportPreOrders.end()) {
+    return it->second;
+  }
+  return {};
+}
+
+bool UserUnit::HasTransportPreOrders() const
+{
+  if (!ui_TransportPreOrders) {
+    return false;
+  }
+  const auto it = sTransportPreOrders.find(this->mParams.mEntityId);
+  return it != sTransportPreOrders.end() && !it->second.empty();
+}
+
+bool UserUnit::HasAnyTransportPreOrders()
+{
+  if (!ui_TransportPreOrders) {
+    return false;
+  }
+  return !sTransportPreOrders.empty();
+}
+
+const std::unordered_map<std::uint32_t, std::vector<moho::SSTICommandIssueData>>& UserUnit::GetAllTransportPreOrders()
+{
+  return sTransportPreOrders;
+}
+
+void UserUnit::DispatchDisembarkedPreOrders()
+{
+  if (!ui_TransportPreOrders || !HasTransportPreOrders()) {
+    return;
+  }
+  const auto preOrders = GetTransportPreOrders();
+  if (preOrders.empty()) {
+    ClearTransportPreOrders();
+    return;
+  }
+
+  const std::int32_t groupCommandId = preOrders[0].nextCommandId;
+  const std::uint32_t myEntId = static_cast<std::uint32_t>(this->mParams.mEntityId);
+
+  auto& waitTicks = sDisembarkedWaitTicks[myEntId];
+  constexpr std::int32_t kMaxWaitTicks = 30; // 3 seconds timeout
+  const bool timedOut = (waitTicks >= kMaxWaitTicks);
+
+  CWldSession* const session = this->mSession != nullptr ? this->mSession : WLD_GetActiveSession();
+
+  // Check if any living peers sharing this group command are still attached to the transport.
+  bool hasAttachedLivingPeers = false;
+  if (session != nullptr && groupCommandId > 0 && !timedOut) {
+    for (const auto& [peerEntId, peerOrders] : sTransportPreOrders) {
+      if (peerEntId == myEntId || peerOrders.empty() || peerOrders[0].nextCommandId != groupCommandId) {
+        continue;
+      }
+      UserEntity* const entity = session->LookupEntityId(static_cast<EntId>(peerEntId));
+      if (entity == nullptr || entity->mVariableData.mIsDead != 0) {
+        continue;
+      }
+      const bool isAttached = (entity->GetAttachmentParent() != nullptr) ||
+        (entity->mVariableData.mAttachmentParentRef != 0 &&
+         entity->mVariableData.mAttachmentParentRef != ToRaw(EEntityIdSentinel::Invalid));
+      if (isAttached) {
+        hasAttachedLivingPeers = true;
+        break;
+      }
+    }
+  }
+
+  // Defer dispatch until remaining living units of the squad detach from the transport.
+  if (hasAttachedLivingPeers) {
+    ++waitTicks;
+    return;
+  }
+
+  // All living peers in the group have detached (or timeout expired).
+  // Collect all detached units in this squad so they receive ONE synchronized group command!
+  gpg::fastvector<UserUnit*> groupUnits;
+  std::vector<std::uint32_t> unitsToClear;
+
+  if (session != nullptr && groupCommandId > 0) {
+    for (const auto& [peerEntId, peerOrders] : sTransportPreOrders) {
+      if (peerOrders.empty() || peerOrders[0].nextCommandId != groupCommandId) {
+        continue;
+      }
+      UserEntity* const entity = session->LookupEntityId(static_cast<EntId>(peerEntId));
+      UserUnit* const peerUnit =
+        (entity != nullptr) ? static_cast<UserUnit*>(entity) : (peerEntId == myEntId ? this : nullptr);
+      if (peerUnit == nullptr || peerUnit->mVariableData.mIsDead != 0) {
+        continue;
+      }
+      const bool isAttached = (peerUnit->GetAttachmentParent() != nullptr) ||
+        (peerUnit->mVariableData.mAttachmentParentRef != 0 &&
+         peerUnit->mVariableData.mAttachmentParentRef != ToRaw(EEntityIdSentinel::Invalid));
+      if (!isAttached) {
+        groupUnits.push_back(peerUnit);
+        unitsToClear.push_back(peerEntId);
+      }
+    }
+  }
+
+  if (groupUnits.empty()) {
+    groupUnits.push_back(this);
+    unitsToClear.push_back(myEntId);
+  }
+
+  for (const std::uint32_t id : unitsToClear) {
+    sTransportPreOrders.erase(id);
+    sDisembarkedWaitTicks.erase(id);
+  }
+
+  gpg::Warnf(
+    "TransportPreOrders: Dispatched %zu disembarked pre-orders for %zu units in group (cmdId %d)",
+    preOrders.size(),
+    groupUnits.size(),
+    groupCommandId
+  );
+
+  for (std::size_t i = 0; i < preOrders.size(); ++i) {
+    const bool isClear = (i == 0);
+    SSTICommandIssueData dispatchOrder = preOrders[i];
+
+    if (
+      groupUnits.size() == 1 && dispatchOrder.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile &&
+      dispatchOrder.nextCommandId > 0
+    ) {
+      auto it = sDispatchedPreOrderBuilders.find(dispatchOrder.nextCommandId);
+      if (it != sDispatchedPreOrderBuilders.end() && it->second != myEntId) {
+        dispatchOrder.mCommandType = EUnitCommandType::UNITCOMMAND_Guard;
+        dispatchOrder.mTarget.mType = EAiTargetType::AITARGET_Entity;
+        dispatchOrder.mTarget.mEnt = it->second;
+        dispatchOrder.mTarget.mEntityId = it->second;
+        dispatchOrder.mBlueprint = nullptr;
+      } else {
+        sDispatchedPreOrderBuilders[dispatchOrder.nextCommandId] = myEntId;
+      }
+    } else if (
+      dispatchOrder.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && dispatchOrder.nextCommandId > 0
+    ) {
+      sDispatchedPreOrderBuilders[dispatchOrder.nextCommandId] = myEntId;
+    }
+
+    moho::ISSUE_Command(groupUnits, dispatchOrder, isClear);
   }
 }
 
@@ -1330,6 +1668,7 @@ void UserUnit::Tick(
   const IUnit* const iunitBridge = GetIUnitBridge(this);
   UserArmy* const army = this->mArmy;
   if (iunitBridge->IsDead()) {
+    ClearTransportPreOrders();
     if (army != nullptr) {
       const RUnitBlueprint* const blueprint = iunitBridge->GetBlueprint();
       if (blueprint != nullptr && blueprint->General.QuickSelectPriority > 0) {
@@ -1351,6 +1690,10 @@ void UserUnit::Tick(
       GetUserUnitVisionHandle(this) = nullptr;
     }
     return;
+  }
+
+  if (HasTransportPreOrders() && GetAttachmentParent() == nullptr) {
+    DispatchDisembarkedPreOrders();
   }
 
   const bool isQueueEmpty = this->mUnitVarDat.mIsBusy == 0u && IsUserCommandManagerQueueEmpty(mManager);
@@ -1428,7 +1771,18 @@ void UserUnit::UpdateEntityData(
   const SSTIEntityVariableData& variableData
 )
 {
+  const std::uint32_t oldParent = mVariableData.mAttachmentParentRef;
+  const std::uint32_t newParent = variableData.mAttachmentParentRef;
   UserEntity::UpdateEntityData(variableData);
+
+  const bool wasAttached = (oldParent != 0 && oldParent != ToRaw(EEntityIdSentinel::Invalid));
+  const bool nowDetached = (newParent == 0 || newParent == ToRaw(EEntityIdSentinel::Invalid));
+  if (wasAttached && nowDetached) {
+    ClearSelectionBracketPositionOverride();
+    if (HasTransportPreOrders()) {
+      DispatchDisembarkedPreOrders();
+    }
+  }
 }
 
 /**
@@ -2211,10 +2565,19 @@ bool moho::USERUNIT_CanBeBuiltAt(
   const SCoordsVec2& buildPosition,
   const bool allowCommandOverlap,
   SOccupationResult* const buildInfo,
-  const UserCommand* const ignoredCommand
+  const UserCommand* const ignoredCommand,
+  const std::int32_t ignoredPreOrderId,
+  const std::int32_t candidateCommandId
 )
 {
   (void)allowCommandOverlap;
+
+  if (
+    session.mWldMap == nullptr || session.mWldMap->mTerrainRes == nullptr ||
+    session.mWldMap->mTerrainRes->mMap == nullptr
+  ) {
+    return true;
+  }
 
   auto* const map = session.mWldMap->mTerrainRes->mMap;
   auto* const resources = reinterpret_cast<ISimResources*>(session.mSimResources.px);
@@ -2269,43 +2632,69 @@ bool moho::USERUNIT_CanBeBuiltAt(
   }
 
   auto* const commandManager = session.mCommandManager;
-  if (commandManager == nullptr) {
-    return true;
+  if (commandManager != nullptr) {
+    for (const auto& [issueCommandId, issueHelper] : commandManager->mCommands) {
+      auto* const helper = issueHelper;
+      if (helper == nullptr || ResolveHelperCommandType(*helper) != EUnitCommandType::UNITCOMMAND_BuildMobile) {
+        continue;
+      }
+
+      if (ignoredCommand != nullptr && reinterpret_cast<const UserCommand*>(helper) == ignoredCommand) {
+        continue;
+      }
+
+      gpg::RRef buildBlueprintRef{};
+      buildBlueprintRef = gpg::MakeRRef<moho::REntityBlueprint>(helper->mConstantData.blueprint);
+      // Object reference in, object pointer out (it is handed to `GetSkirtRect`
+      // below), so the upcast target is the class descriptor - the same one
+      // `RefreshQueuedBuildGhosts` uses on this exact blueprint lane, and the
+      // one the binary's `RRef::Upcast_RUnitBlueprint` resolves through
+      // `LookupRType(typeid(RUnitBlueprint))`. Aimed at `GetPointerType()` - the
+      // descriptor for `RUnitBlueprint*` - the walk over the object's bases can
+      // never match, so `mObj` came back null for every queued order and this
+      // loop skipped all of them. That is why two queued buildings could be
+      // placed overlapping, or one inside another: the footprint test that
+      // rejects it is right here and was never reached.
+      const gpg::RRef unitBlueprintRef = gpg::REF_UpcastPtr(buildBlueprintRef, RUnitBlueprint::StaticGetClass());
+      const auto* const queuedBuildBlueprint = static_cast<const RUnitBlueprint*>(unitBlueprintRef.mObj);
+      if (queuedBuildBlueprint == nullptr) {
+        continue;
+      }
+
+      const Wm3::Vector3<float> queuedTarget = ResolveHelperTargetPosition(*helper, &session);
+      const SCoordsVec2 queuedPosition{queuedTarget.x, queuedTarget.z};
+      const gpg::Rect2f queuedSkirt = queuedBuildBlueprint->GetSkirtRect(queuedPosition);
+      if (queuedSkirt.Overlaps(candidateSkirt)) {
+        return false;
+      }
+    }
   }
 
-  for (const auto& [issueCommandId, issueHelper] : commandManager->mCommands) {
-    auto* const helper = issueHelper;
-    if (helper == nullptr || ResolveHelperCommandType(*helper) != EUnitCommandType::UNITCOMMAND_BuildMobile) {
-      continue;
-    }
+  // Check collision with queued transport pre-orders:
+  for (const auto& [entityId, orders] : sTransportPreOrders) {
+    for (const auto& order : orders) {
+      if (order.mCommandType != EUnitCommandType::UNITCOMMAND_BuildMobile || order.mBlueprint == nullptr) {
+        continue;
+      }
 
-    if (ignoredCommand != nullptr && reinterpret_cast<const UserCommand*>(helper) == ignoredCommand) {
-      continue;
-    }
+      if (ignoredPreOrderId > 0 && order.nextCommandId == ignoredPreOrderId) {
+        continue;
+      }
 
-    gpg::RRef buildBlueprintRef{};
-    buildBlueprintRef = gpg::MakeRRef<moho::REntityBlueprint>(helper->mConstantData.blueprint);
-    // Object reference in, object pointer out (it is handed to `GetSkirtRect`
-    // below), so the upcast target is the class descriptor - the same one
-    // `RefreshQueuedBuildGhosts` uses on this exact blueprint lane, and the
-    // one the binary's `RRef::Upcast_RUnitBlueprint` resolves through
-    // `LookupRType(typeid(RUnitBlueprint))`. Aimed at `GetPointerType()` - the
-    // descriptor for `RUnitBlueprint*` - the walk over the object's bases can
-    // never match, so `mObj` came back null for every queued order and this
-    // loop skipped all of them. That is why two queued buildings could be
-    // placed overlapping, or one inside another: the footprint test that
-    // rejects it is right here and was never reached.
-    const gpg::RRef unitBlueprintRef = gpg::REF_UpcastPtr(buildBlueprintRef, RUnitBlueprint::StaticGetClass());
-    const auto* const queuedBuildBlueprint = static_cast<const RUnitBlueprint*>(unitBlueprintRef.mObj);
-    if (queuedBuildBlueprint == nullptr) {
-      continue;
-    }
+      if (candidateCommandId > 0 && order.nextCommandId == candidateCommandId) {
+        continue; // Peer in the same squad contributing to the same building order
+      }
 
-    const Wm3::Vector3<float> queuedTarget = ResolveHelperTargetPosition(*helper, &session);
-    const SCoordsVec2 queuedPosition{queuedTarget.x, queuedTarget.z};
-    const gpg::Rect2f queuedSkirt = queuedBuildBlueprint->GetSkirtRect(queuedPosition);
-    if (queuedSkirt.Overlaps(candidateSkirt)) {
-      return false;
+      const RUnitBlueprint* const queuedBp = order.mBlueprint->IsUnitBlueprint();
+      if (queuedBp == nullptr) {
+        continue;
+      }
+
+      const SCoordsVec2 queuedPosition{order.mTarget.mPos.x, order.mTarget.mPos.z};
+      const gpg::Rect2f queuedSkirt = queuedBp->GetSkirtRect(queuedPosition);
+      if (queuedSkirt.Overlaps(candidateSkirt)) {
+        return false;
+      }
     }
   }
 

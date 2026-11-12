@@ -9,6 +9,7 @@
 #include "moho/command/CmdDefs.h"
 #include "moho/command/UserTarget.h"
 #include "moho/command/UserCommandQueue.h"
+#include "moho/command/SSTICommandIssueData.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/math/Vector3f.h"
@@ -23,6 +24,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 #include "boost/shared_ptr.h"
 
 struct lua_State;
@@ -35,6 +37,7 @@ namespace LuaPlus
 
 namespace moho
 {
+  extern bool ui_TransportPreOrders;
   struct SSTIEntityVariableData;
   enum class EUnitCommandType : std::int32_t;
   class UserEntity;
@@ -574,6 +577,31 @@ namespace moho
 
     [[nodiscard]] bool IsRepeatQueueEnabled() const;
 
+    /**
+     * Client-side transport cargo drop pre-orders.
+     * Backed by a static registry indexed by mParams.mEntityId so sizeof(UserUnit) remains 0x3E8.
+     */
+    static void QueueTransportPreOrders(
+      const gpg::fastvector<UserUnit*>& units,
+      const SSTICommandIssueData& order,
+      bool clearQueue
+    );
+    void QueueTransportPreOrder(const SSTICommandIssueData& order, bool clearQueue);
+    void ClearTransportPreOrders();
+    static bool RemoveTransportPreOrderById(std::int32_t commandId);
+    static bool UpdateTransportPreOrderPositionById(std::int32_t commandId, const Wm3::Vector3f& newPos);
+    [[nodiscard]] std::vector<SSTICommandIssueData> GetTransportPreOrders() const;
+    [[nodiscard]] bool HasTransportPreOrders() const;
+    [[nodiscard]] static bool HasAnyTransportPreOrders();
+    [[nodiscard]] static const std::unordered_map<std::uint32_t, std::vector<SSTICommandIssueData>>&
+    GetAllTransportPreOrders();
+    void DispatchDisembarkedPreOrders();
+
+    void SetSelectionBracketPositionOverride(const Wm3::Vector3f& pos);
+    void ClearSelectionBracketPositionOverride();
+    [[nodiscard]] bool HasSelectionBracketPositionOverride() const;
+    [[nodiscard]] Wm3::Vector3f GetSelectionBracketPositionOverride() const;
+
   public:
     // The three RTTI base records are real base classes: `UserEntity` is the
     // primary at +0x00 (0x148 bytes), `IUnit` the sub-object at +0x148
@@ -1111,7 +1139,9 @@ namespace moho
     const SCoordsVec2& buildPosition,
     bool allowCommandOverlap,
     SOccupationResult* buildInfo,
-    const UserCommand* ignoredCommand
+    const UserCommand* ignoredCommand = nullptr,
+    std::int32_t ignoredPreOrderId = 0,
+    std::int32_t candidateCommandId = 0
   );
 
   /**
@@ -2068,6 +2098,13 @@ namespace moho
    * Publishes the `UserUnit:GetCommandQueue()` Lua binder.
    */
   CScrLuaInitForm* func_UserUnitGetCommandQueue_LuaFuncDef();
+  int cfunc_UserUnitSetSelectionBracketPositionOverride(lua_State* luaContext);
+  int cfunc_UserUnitSetSelectionBracketPositionOverrideL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_UserUnitSetSelectionBracketPositionOverride_LuaFuncDef();
+
+  int cfunc_UserUnitClearSelectionBracketPositionOverride(lua_State* luaContext);
+  int cfunc_UserUnitClearSelectionBracketPositionOverrideL(LuaPlus::LuaState* state);
+  CScrLuaInitForm* func_UserUnitClearSelectionBracketPositionOverride_LuaFuncDef();
 
   /**
    * Address: 0x008C5480 (FUN_008C5480, cfunc_UserUnitGetCommandQueueL)
