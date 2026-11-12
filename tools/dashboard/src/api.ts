@@ -91,6 +91,23 @@ export interface HostCpu {
   load10?: number | null;
   /** Ids of the lobbies pinned to this CPU. */
   lobbies?: string[] | null;
+  /** Its NUMA node (plan WP17.16). */
+  node?: number | null;
+}
+
+/** A NUMA node: its CPUs and the memory next to them (plan WP17.16). */
+export interface HostNode {
+  id: number;
+  cpus: number[];
+  memory_mb?: { total?: number | null; free?: number | null } | null;
+}
+
+/** A network link with its speed and live traffic. */
+export interface HostLink {
+  name: string;
+  speed_mbps?: number | null;
+  in_kbps?: number | null;
+  out_kbps?: number | null;
 }
 
 export interface HostInfo {
@@ -98,10 +115,120 @@ export interface HostInfo {
   cpu_model?: string;
   memory_mb?: { total?: number | null; available?: number | null } | null;
   cpus: HostCpu[];
+  nodes?: HostNode[];
+  links?: HostLink[];
   lobbies?: number;
-  /** AI personalities a seat may take. */
+  /** AI personalities a seat may take (the settings catalog's `ai` replaces it). */
   ai?: string[];
   [key: string]: unknown;
+}
+
+/** A placement warning: `severity` info, warn or error (an error needs `force` to start anyway). */
+export interface PlacementWarning {
+  code: string;
+  severity: "info" | "warn" | "error" | string;
+  text: string;
+}
+
+/** A lobby's server process, sampled every 2 s. */
+export interface Usage {
+  cpu_cores?: number | null;
+  rss_mb?: number | null;
+}
+
+/** What a game of that many players on a map that big needs (plan WP17.17). */
+export interface Estimate {
+  players?: number | null;
+  km?: number | null;
+  mean_cores?: number | null;
+  worst_cores?: number | null;
+  suggested_cores?: number | null;
+  memory_mb?: number | null;
+  upload_kbps?: number | null;
+  min_connection_kbps?: number | null;
+  basis?: string | null;
+}
+
+/** `POST /api/v1/plan`'s answer: where a game would go and what's wrong with it; nothing is started. */
+export interface Plan {
+  estimate: Estimate;
+  cores: number;
+  cpus: number[];
+  nodes: number[];
+  /** No error-level warning. */
+  fits: boolean;
+  warnings: PlacementWarning[];
+}
+
+/** Players and map size, and either `cores` (0 or absent: the suggestion) or `cpus` by hand. */
+export interface PlanRequest {
+  players: number;
+  km: number;
+  cores?: number;
+  cpus?: number[];
+}
+
+/** A setting's value key: a string or a number, sent back as given. */
+export type SettingKey = string | number;
+
+export interface SettingValue {
+  key: SettingKey;
+  text?: string | null;
+  help?: string | null;
+}
+
+/** One of FAF's lobby options, or a map's own (plan WP17.20). */
+export interface SettingOption {
+  key: string;
+  label?: string | null;
+  help?: string | null;
+  default?: SettingKey | null;
+  /** rules, units, ai, other. */
+  group?: string | null;
+  values: SettingValue[];
+}
+
+export interface SettingAi {
+  key: string;
+  name?: string | null;
+  rating?: number | null;
+}
+
+export interface Settings {
+  options: SettingOption[];
+  ai: SettingAi[];
+  /** Empty for a map without its own options (adaptive maps have them). */
+  map_options: SettingOption[];
+}
+
+/** Capacity held for players who host themselves (plan WP17.18). */
+export interface Slot {
+  id: string;
+  name?: string | null;
+  /** open, claimed, lobby, game, ended. */
+  state: string;
+  max_players?: number | null;
+  cpus?: number[] | null;
+  nodes?: number[] | null;
+  warnings?: PlacementWarning[] | null;
+  /** What a player uses to host on it. */
+  claim_code?: string | null;
+  /** Once claimed: the lobby it became (a lobby like any other). */
+  lobby?: string | null;
+  host_player?: string | null;
+  [key: string]: unknown;
+}
+
+export interface NewSlots {
+  name: string;
+  max_players: number;
+  cores?: number;
+  cpus?: number[];
+  lobby_minutes: number;
+  /** How many identical slots. */
+  count: number;
+  options?: Record<string, SettingKey>;
+  force?: boolean;
 }
 
 export interface MapInfo {
@@ -174,6 +301,11 @@ export interface Lobby {
   observer_delay_seconds?: number | null;
   /** The second port observers watch from; only with observers. */
   observe_port?: number | null;
+  /** The NUMA nodes its CPUs are on. */
+  nodes?: number[] | null;
+  /** The placement's warnings when it was made. */
+  warnings?: PlacementWarning[] | null;
+  usage?: Usage | null;
   [key: string]: unknown;
 }
 
@@ -197,7 +329,8 @@ export interface NewSeat {
 export interface NewLobby {
   name: string;
   map: string;
-  options: Record<string, string>;
+  /** Game and map options together, any subset; the rest are their defaults. */
+  options: Record<string, SettingKey>;
   seats: NewSeat[];
   control: "player" | "organiser";
   start_when_ready: number;
@@ -208,6 +341,8 @@ export interface NewLobby {
   observers?: NewObserver[];
   /** 0..3600; referees watch without it. */
   observer_delay_seconds?: number;
+  /** Start despite an error-level placement warning (without it such a lobby answers 409). */
+  force?: boolean;
 }
 
 export interface Answer {
@@ -413,6 +548,47 @@ export class HostApi {
   /** `DELETE /api/v1/lobbies/<id>?forget=1`: takes a stopped or failed lobby off the list. */
   async forgetLobby(id: string): Promise<void> {
     await this.request("DELETE", `/api/v1/lobbies/${encodeURIComponent(id)}?forget=1`);
+  }
+
+  /** `POST /api/v1/plan`: where a game would go, its estimate and warnings; nothing is started. */
+  async plan(request: PlanRequest, signal?: AbortSignal): Promise<Plan> {
+    const plan = (await this.request("POST", "/api/v1/plan", request, signal)).plan as Partial<Plan> | undefined;
+    return {
+      estimate: plan?.estimate ?? {},
+      cores: plan?.cores ?? 0,
+      cpus: Array.isArray(plan?.cpus) ? plan.cpus : [],
+      nodes: Array.isArray(plan?.nodes) ? plan.nodes : [],
+      fits: plan?.fits !== false,
+      warnings: Array.isArray(plan?.warnings) ? plan.warnings : [],
+    };
+  }
+
+  /** `GET /api/v1/settings[?map=<id>]`: FAF's lobby options, the AIs, and the map's own options. */
+  async settings(mapId?: string, signal?: AbortSignal): Promise<Settings> {
+    const query = mapId === undefined || mapId === "" ? "" : `?map=${encodeURIComponent(mapId)}`;
+    const settings = (await this.request("GET", `/api/v1/settings${query}`, undefined, signal)).settings as Partial<Settings> | undefined;
+    return {
+      options: Array.isArray(settings?.options) ? settings.options : [],
+      ai: Array.isArray(settings?.ai) ? settings.ai : [],
+      map_options: Array.isArray(settings?.map_options) ? settings.map_options : [],
+    };
+  }
+
+  /** `GET /api/v1/slots`: capacity held for players who host themselves. */
+  async slots(signal?: AbortSignal): Promise<Slot[]> {
+    const answer = await this.request("GET", "/api/v1/slots", undefined, signal);
+    return Array.isArray(answer.slots) ? (answer.slots as Slot[]) : [];
+  }
+
+  /** `POST /api/v1/slots`: `count` identical slots. */
+  async createSlots(slots: NewSlots): Promise<Slot[]> {
+    const answer = await this.request("POST", "/api/v1/slots", slots);
+    return Array.isArray(answer.slots) ? (answer.slots as Slot[]) : [];
+  }
+
+  /** `DELETE /api/v1/slots/<id>`: frees an unclaimed slot, or stops a claimed one's game. */
+  async deleteSlot(id: string): Promise<void> {
+    await this.request("DELETE", `/api/v1/slots/${encodeURIComponent(id)}`);
   }
 
   /** The lobby's own server API, proxied by the host with the host's token. */

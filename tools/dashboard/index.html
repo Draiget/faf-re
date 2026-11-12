@@ -53,134 +53,200 @@
         <p id="connect-error" class="form-error" role="alert" hidden></p>
       </section>
 
-      <div id="host-view" class="host-columns" hidden>
-        <div class="host-main">
-          <section id="lobby-created" class="card created" aria-live="polite" hidden></section>
-
-          <section id="new-lobby" class="card new-lobby" aria-labelledby="new-lobby-title" hidden>
-            <div class="card-head">
-              <h2 id="new-lobby-title">New lobby</h2>
-              <button id="lobby-cancel" class="btn ghost small" type="button">Cancel</button>
+      <div id="host-view" class="plane" hidden>
+        <div class="plane-main">
+          <section class="card capacity" aria-labelledby="plane-host-name">
+            <div class="capacity-head">
+              <div>
+                <p class="eyebrow">Capacity</p>
+                <h2 id="plane-host-name" class="hero-title">Host</h2>
+                <p id="plane-host-model" class="dim host-model"></p>
+              </div>
+              <div class="legend" aria-label="Legend">
+                <span class="legend-item"><span>Load</span><span class="legend-bar" aria-hidden="true"></span></span>
+                <span class="legend-item"><span class="legend-cell held" aria-hidden="true"></span>lobby</span>
+                <span class="legend-item"><span class="legend-cell held-slot" aria-hidden="true"></span>slot</span>
+                <span class="legend-item"><span class="legend-cell planned" aria-hidden="true"></span>planned</span>
+              </div>
             </div>
-            <form id="lobby-form" class="lobby-form" novalidate>
+            <dl id="plane-tiles" class="tiles plane-tiles"></dl>
+            <div class="picked-row">
+              <p id="plane-picked" class="dim small"></p>
+              <button id="plane-picked-clear" class="btn ghost small" type="button" hidden>Clear picks</button>
+            </div>
+            <div id="plane-nodes" class="nodes"></div>
+            <div class="capacity-foot">
+              <div>
+                <h3>Network</h3>
+                <div id="plane-links" class="links"></div>
+              </div>
+              <div>
+                <h3>Allocated</h3>
+                <div id="plane-alloc"></div>
+              </div>
+            </div>
+          </section>
+
+          <section id="plane-created" class="card created" aria-live="polite" hidden></section>
+
+          <div class="uses">
+            <section class="card use-list" aria-labelledby="plane-lobbies-title">
+              <div class="card-head">
+                <h2 id="plane-lobbies-title">Tournament lobbies</h2>
+                <div class="head-tools">
+                  <span class="dim" id="plane-lobbies-meta"></span>
+                  <button class="btn small" type="button" data-configure="lobby">New lobby</button>
+                </div>
+              </div>
+              <p class="dim small use-help">Configured here: map, seats, settings, observers.</p>
+              <div id="plane-lobbies" class="use-items"></div>
+              <div id="plane-lobbies-empty" class="empty">
+                <p class="empty-title">No lobbies</p>
+                <p class="dim">The host starts with none; configure one with “New lobby”.</p>
+              </div>
+            </section>
+
+            <section class="card use-list" aria-labelledby="plane-slots-title">
+              <div class="card-head">
+                <h2 id="plane-slots-title">Open slots</h2>
+                <div class="head-tools">
+                  <span class="dim" id="plane-slots-meta"></span>
+                  <button class="btn small" type="button" data-configure="slots">New slots</button>
+                </div>
+              </div>
+              <p class="dim small use-help">Capacity held for players who host their own game: they claim a slot with its code and pick the map in their lobby.</p>
+              <div id="plane-slots" class="use-items"></div>
+              <div id="plane-slots-empty" class="empty">
+                <p class="empty-title">No open slots</p>
+                <p class="dim">Hold some with “New slots” for players to host on.</p>
+              </div>
+              <p id="plane-slots-missing" class="empty" hidden>This host doesn't offer open slots yet.</p>
+            </section>
+          </div>
+        </div>
+
+        <aside class="plane-side" aria-label="Configuration">
+          <section id="plane-config" class="card config" aria-labelledby="config-title" data-kind="lobby">
+            <div class="card-head">
+              <h2 id="config-title">Configure</h2>
+            </div>
+            <div class="segmented kind-switch" role="radiogroup" aria-label="What to create">
+              <label><input type="radio" name="cfg-kind" value="lobby" checked /><span>Tournament lobby</span></label>
+              <label><input type="radio" name="cfg-kind" value="slots" /><span>Open slots</span></label>
+            </div>
+            <form id="cfg-form" class="cfg-form" novalidate>
               <div class="form-section">
                 <div class="field">
-                  <label for="lobby-name">Lobby name</label>
-                  <input id="lobby-name" autocomplete="off" spellcheck="false" />
+                  <label for="cfg-name">Name</label>
+                  <input id="cfg-name" autocomplete="off" spellcheck="false" data-auto="1" />
+                </div>
+                <div class="slot-fields" data-for="slots" hidden>
+                  <div class="field">
+                    <label for="cfg-max-players">Players per game</label>
+                    <select id="cfg-max-players"></select>
+                  </div>
+                  <div class="field">
+                    <label for="cfg-km">Maps up to</label>
+                    <select id="cfg-km">
+                      <option value="5">5 km</option>
+                      <option value="10">10 km</option>
+                      <option value="20" selected>20 km</option>
+                      <option value="40">40 km</option>
+                      <option value="81">81 km</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="cfg-count">How many slots</label>
+                    <input id="cfg-count" type="number" min="1" max="16" value="1" inputmode="numeric" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-section" data-for="lobby">
+                <div class="section-head"><h3 id="cfg-map-title">Map</h3><span class="dim" id="cfg-map-count"></span></div>
+                <label class="sr-only" for="cfg-map-search">Search maps</label>
+                <input id="cfg-map-search" type="search" placeholder="Search maps by name or id" spellcheck="false" />
+                <div id="cfg-map-list" class="map-list" role="radiogroup" aria-labelledby="cfg-map-title"></div>
+                <div id="cfg-map-selected" class="map-selected" aria-live="polite"></div>
+              </div>
+
+              <div class="form-section" data-for="lobby">
+                <div class="section-head"><h3>Seats</h3><span class="dim" id="cfg-seat-count"></span></div>
+                <div id="cfg-seats" class="seat-rows"></div>
+                <button id="cfg-seat-add" class="btn small add-seat" type="button">Add a seat</button>
+              </div>
+
+              <div class="form-section" data-for="lobby">
+                <div class="section-head"><h3>Observers</h3><span class="dim" id="cfg-observer-count"></span></div>
+                <p class="dim small section-help">Each gets a watch line of their own, a live replay of the game. Referees watch live; the others with the delay.</p>
+                <div id="cfg-observers" class="observer-rows"></div>
+                <button id="cfg-observer-add" class="btn small add-seat" type="button">Add an observer</button>
+                <div id="cfg-observer-delay-field" class="field" hidden>
+                  <label for="cfg-observer-delay">Delay for observers (s)</label>
+                  <input id="cfg-observer-delay" type="number" min="0" max="3600" value="0" inputmode="numeric" />
                 </div>
               </div>
 
               <div class="form-section">
-                <div class="section-head"><h3 id="map-title">Map</h3><span class="dim" id="map-count"></span></div>
-                <label class="sr-only" for="map-search">Search maps</label>
-                <input id="map-search" type="search" placeholder="Search maps by name or id" spellcheck="false" />
-                <div id="map-list" class="map-list" role="radiogroup" aria-labelledby="map-title"></div>
-                <div id="map-selected" class="map-selected" aria-live="polite"></div>
-              </div>
-
-              <div class="form-section">
-                <div class="section-head"><h3>Seats</h3><span class="dim" id="seat-count"></span></div>
-                <div id="seat-rows" class="seat-rows"></div>
-                <button id="seat-add" class="btn small add-seat" type="button">Add a seat</button>
-              </div>
-
-              <div class="form-section">
-                <div class="section-head"><h3>Observers</h3><span class="dim" id="observer-count"></span></div>
-                <p class="dim small section-help">Each observer gets a watch line of their own, which the game opens as a live replay of this lobby's game. Referees watch live; the others see it with the delay below.</p>
-                <div id="observer-rows" class="observer-rows"></div>
-                <button id="observer-add" class="btn small add-seat" type="button">Add an observer</button>
-                <div id="observer-delay-field" class="field cores-field" hidden>
-                  <label for="observer-delay">Delay for observers (s)</label>
-                  <input id="observer-delay" type="number" min="0" max="3600" value="0" inputmode="numeric" />
+                <div class="section-head"><h3>Game settings</h3><span class="dim" id="cfg-settings-meta"></span></div>
+                <p class="dim small section-help" data-for="slots" hidden>Defaults for the games on these slots; the player who hosts can change them in their lobby.</p>
+                <p id="cfg-settings-note" class="settings-note" hidden>This host doesn't list its settings yet: the usual ones are shown.</p>
+                <div class="settings-tools">
+                  <label class="sr-only" for="cfg-settings-filter">Filter settings</label>
+                  <input id="cfg-settings-filter" type="search" placeholder="Filter settings" spellcheck="false" />
+                  <button id="cfg-settings-reset" class="btn ghost small" type="button" hidden>Reset all</button>
                 </div>
+                <div id="cfg-settings"></div>
               </div>
 
               <div class="form-section">
-                <div class="section-head"><h3>Game options</h3></div>
-                <div id="option-grid" class="option-grid"></div>
-              </div>
-
-              <div class="form-section">
-                <div class="section-head"><h3 id="control-title">Lobby control</h3></div>
-                <div class="choice-cards" role="radiogroup" aria-labelledby="control-title">
+                <div class="section-head"><h3 id="cfg-control-title" data-for="lobby">Lobby control</h3><h3 data-for="slots" hidden>Timing</h3></div>
+                <div class="choice-cards" role="radiogroup" aria-labelledby="cfg-control-title" data-for="lobby">
                   <label class="choice">
-                    <input type="radio" name="lobby-control" value="player" checked />
+                    <input type="radio" name="cfg-control" value="player" checked />
                     <span class="choice-body"><strong>A player hosts</strong><span>The first human hosts the lobby in their game and presses Launch.</span></span>
                   </label>
                   <label class="choice">
-                    <input type="radio" name="lobby-control" value="organiser" />
+                    <input type="radio" name="cfg-control" value="organiser" />
                     <span class="choice-body"><strong>Organiser starts it</strong><span>Nobody hosts: start it from here, or it starts once every player is ready.</span></span>
                   </label>
                 </div>
                 <div class="field-pair even">
-                  <div class="field">
-                    <label for="lobby-swr">Start when all are ready, after (s) <span class="dim">0 = off</span></label>
-                    <input id="lobby-swr" type="number" min="0" value="10" inputmode="numeric" />
+                  <div class="field" data-for="lobby">
+                    <label for="cfg-swr">Countdown once all are ready (s) <span class="dim">0 = off</span></label>
+                    <input id="cfg-swr" type="number" min="0" value="10" inputmode="numeric" />
                   </div>
                   <div class="field">
-                    <label for="lobby-minutes">Lobby stays open for (min)</label>
-                    <input id="lobby-minutes" type="number" min="1" value="60" inputmode="numeric" />
+                    <label for="cfg-minutes">Lobby stays open for (min)</label>
+                    <input id="cfg-minutes" type="number" min="1" value="60" inputmode="numeric" />
                   </div>
                 </div>
               </div>
 
               <div class="form-section">
-                <div class="section-head"><h3>CPUs</h3></div>
+                <div class="section-head"><h3>Placement</h3></div>
                 <label class="switch">
-                  <input id="cpu-auto" type="checkbox" role="switch" checked />
+                  <input id="cfg-auto" type="checkbox" role="switch" checked />
                   <span class="switch-track" aria-hidden="true"></span>
-                  <span>Auto: the host picks the least loaded CPUs</span>
+                  <span>Auto: one NUMA node, whole cores, the least loaded</span>
                 </label>
-                <div id="cpu-cores-field" class="field cores-field">
-                  <label for="cpu-cores">Cores</label>
-                  <input id="cpu-cores" type="number" min="1" value="1" inputmode="numeric" />
+                <div id="cfg-cores-field" class="field cores-field">
+                  <label for="cfg-cores">Cores</label>
+                  <input id="cfg-cores" type="number" min="1" value="1" inputmode="numeric" />
                 </div>
-                <p id="cpu-summary" class="cpu-summary" hidden></p>
-                <div id="hint-box" class="hint-box"></div>
-                <ul id="cpu-warnings" class="warnings" aria-live="polite"></ul>
+                <p id="cfg-picked" class="cpu-summary" hidden></p>
+                <div id="cfg-estimate" aria-live="polite"></div>
+                <div id="cfg-warnings" aria-live="polite"></div>
+                <div id="cfg-force-field" class="force" hidden>
+                  <label class="check" for="cfg-force"><input id="cfg-force" type="checkbox" /><span>Start anyway, despite the error</span></label>
+                </div>
               </div>
 
               <div class="form-actions">
-                <button id="lobby-submit" class="btn primary" type="submit">Start the lobby</button>
+                <p id="cfg-submit-note" class="submit-note" aria-live="polite"></p>
+                <button id="cfg-submit" class="btn primary" type="submit">Create the lobby</button>
               </div>
             </form>
-          </section>
-
-          <section class="card" aria-labelledby="lobbies-title">
-            <div class="card-head">
-              <h2 id="lobbies-title">Lobbies</h2>
-              <div class="head-tools">
-                <span class="dim" id="lobbies-meta"></span>
-                <button id="lobby-new" class="btn primary small" type="button">New lobby</button>
-              </div>
-            </div>
-            <div id="lobbies" class="lobby-grid"></div>
-            <div id="lobbies-empty" class="empty big-empty">
-              <p class="empty-title">No lobbies running</p>
-              <p class="dim">The host starts with none. Each lobby is its own server, pinned to the CPUs you pick.</p>
-              <button id="lobbies-empty-new" class="btn primary" type="button">New lobby</button>
-            </div>
-          </section>
-        </div>
-
-        <aside class="host-side" aria-label="Machine">
-          <section class="card machine" aria-labelledby="host-name">
-            <p class="eyebrow">Host</p>
-            <h2 id="host-name" class="hero-title">Host</h2>
-            <p id="host-model" class="dim host-model"></p>
-            <dl id="host-tiles" class="tiles host-tiles"></dl>
-          </section>
-          <section class="card" aria-labelledby="heat-title">
-            <div class="card-head">
-              <h2 id="heat-title">CPU load</h2>
-              <div class="heat-legend" aria-hidden="true"><span>0%</span><span class="legend-bar"></span><span>100%</span></div>
-            </div>
-            <p class="dim small heat-selection" id="heat-selection"></p>
-            <div id="heatmap" class="heatmap"></div>
-            <div class="btn-row heat-actions">
-              <button id="heat-clear" class="btn small" type="button" hidden>Clear</button>
-              <button id="heat-new" class="btn primary small" type="button" hidden>New lobby</button>
-            </div>
           </section>
         </aside>
       </div>
