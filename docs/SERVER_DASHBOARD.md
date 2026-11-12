@@ -91,7 +91,7 @@ Create lobby is a full page in six steps, with a summary beside them (the map wi
 
 ### Game settings
 
-The settings are read from the game's own files: the rules (victory, share, unit cap, fog, timeouts, prebuilt units, no-rush ...), the team options, the AI options, the AI personalities (mod AIs once mods are loaded), and for an adaptive map its own options (mexes, reclaim, and so on). Each shows its default, changed ones are marked with a way back to the default, a filter finds one by name, and only the ones changed are sent. On fw0's data: 32 options, 12 AIs, 19 maps with their own options (`adaptive_adrastea.v0004`: 11).
+The settings are read from the game's own files: the rules (victory, share, unit cap, fog, timeouts, prebuilt units, no-rush ...), the team options, the AI options, the AI personalities (mod AIs once mods are loaded), and for an adaptive map its own options (mexes, reclaim, and so on). Each shows its default, changed ones are marked with a way back to the default, a filter finds one by name, and only the ones changed are sent. On the test data: 32 options, 12 AIs, 19 maps with their own options (`adaptive_adrastea.v0004`: 11).
 
 ### Choosing CPUs
 
