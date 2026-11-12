@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "boost/shared_ptr.h"
 #include "gpg/core/containers/BitArray2D.h"
 #include "gpg/core/containers/Rect2.h"
 
@@ -307,14 +308,13 @@ namespace gpg::HaStar
 
   struct ClusterCache
   {
-    ClusterCacheImpl* mCacheTree{};
-    void* mCacheRefs{};
+    boost::shared_ptr<ClusterCacheImpl> mImpl;
 
     /**
      * Address: 0x00931FB0 (FUN_00931FB0, ??1WeakPtr_ClusterCache@Moho@@QAE@@Z)
      *
      * What it does:
-     * Releases the shared cache control block reference.
+     * Releases the shared cache reference (`mImpl`'s own destructor).
      */
     ~ClusterCache();
 
@@ -357,8 +357,7 @@ namespace gpg::HaStar
    * `ClusterMap::ClusterMap`), not a real move, so a by-value return
    * would let the temporary's `~ClusterCache()` release the reference
    * this function just created before the caller ever sees it.
-   * `outCache` must be freshly default-constructed (null `mCacheTree`/
-   * `mCacheRefs`); this function does not release any prior value.
+   * Points `outCache` at a fresh `ClusterCacheImpl`, releasing any cache it held.
    *
    * Reached from `PathTables::Impl::Impl()`
    * (`moho/path/PathTables.cpp`, `FUN_0076BA40` calls `FUN_009356E0`

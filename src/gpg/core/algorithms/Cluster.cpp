@@ -30,48 +30,6 @@
 
 namespace
 {
-  struct SharedCountControl
-  {
-    void** vtable;
-    // boost::detail::sp_counted_base's counts: Windows' 32-bit long, a 32-bit int in
-    // boost's gcc/x86 implementation on Linux (platform/Interlocked.h).
-    volatile platform::InterlockedLong useCount;
-    volatile platform::InterlockedLong weakCount;
-  };
-
-  void RetainSharedCount(
-    void* sharedCount
-  )
-  {
-    if (!sharedCount) {
-      return;
-    }
-
-    auto* const control = reinterpret_cast<SharedCountControl*>(sharedCount);
-    _InterlockedExchangeAdd(&control->useCount, 1);
-  }
-
-  [[nodiscard]] bool ReleaseSharedCount(
-    void* sharedCount
-  )
-  {
-    if (!sharedCount) {
-      return true;
-    }
-
-    auto* const control = reinterpret_cast<SharedCountControl*>(sharedCount);
-    if (_InterlockedExchangeAdd(&control->useCount, -1) == 1) {
-      // By name, not by vtable slot: the virtual destructor before these takes one slot on
-      // Windows and two on Linux.
-      auto* const base = reinterpret_cast<boost::detail::sp_counted_base*>(sharedCount);
-      base->dispose();
-      base->weak_release();
-      return true;
-    }
-
-    return false;
-  }
-
   constexpr std::uint8_t kClusterSizeLog2ByLevel[] = {0u, 3u, 5u, 7u};
   constexpr std::size_t kClusterSizeLog2Count = sizeof(kClusterSizeLog2ByLevel) / sizeof(kClusterSizeLog2ByLevel[0]);
   constexpr std::uint8_t kClusterSizeByLevel[] = {1u, 8u, 32u, 128u};
@@ -2663,54 +2621,12 @@ namespace gpg::HaStar
    * Address: 0x00931FB0 (FUN_00931FB0, ??1WeakPtr_ClusterCache@Moho@@QAE@@Z)
    *
    * Note:
-   * `ClusterCache` shares the same two-word layout as the weak/shared cache
-   * handle in the original binary: `mCacheTree` is `ClusterCacheImpl*` (the
-   * raw pointer `boost::shared_ptr<ClusterCacheImpl>` keeps for fast
-   * dereference - see `ClusterCacheImpl`'s Doxygen block for the
-   * handle/impl split's evidence trail) and `mCacheRefs` its shared control
-   * block. `ReleaseSharedCount` mirrors the control block's own
-   * `release()`; the real `ClusterCacheImpl` teardown this drives - when the
-   * last shared reference drops - is `delete mCacheTree`, which invokes
-   * `ClusterCacheImpl::~ClusterCacheImpl()` (FUN_00934F30), in turn
-   * destroying `mSubclusterData` then `mOccupationData`
-   * (FUN_00934500/FUN_00933DE0).
+   * `ClusterCache` is the two-word `boost::shared_ptr<ClusterCacheImpl>` handle. 0x00931FB0 loads the control block
+   * and releases it, never reading the pointee: the impl is deleted by the control block's `dispose()` when the last
+   * reference goes, running `ClusterCacheImpl::~ClusterCacheImpl()` (FUN_00934F30), which destroys
+   * `mSubclusterData` then `mOccupationData` (FUN_00934500/FUN_00933DE0).
    */
-  ClusterCache::~ClusterCache()
-  {
-    // 0x00931FB0 is the whole body: load the control block, and if there is
-    // none, return. It never reads `mCacheTree` -- the impl is deleted by the
-    // control block's own `dispose()` (0x00935520,
-    // DestroyClusterCacheImplPointee), which `ReleaseSharedCount` invokes
-    // through vtable slot 1 when the use count reaches zero.
-    //
-    // So a `delete mCacheTree` here is wrong twice over: on the last reference
-    // it frees the impl a second time, and on a `ClusterCache` that never went
-    // through `InitializeClusterCache` it deletes a pointer this handle never
-    // owned. The second case is what faulted on the way out of a game --
-    // `~PathTables` reached `~ClusterCacheImpl` on storage no constructor had
-    // run over, and its first member's hash map read a null list head.
-    (void)ReleaseSharedCount(mCacheRefs);
-  }
-
-  /**
-   * Address: 0x00935520 (FUN_00935520, boost::detail::sp_counted_impl_p<ClusterCacheImpl>::dispose)
-   *
-   * What it does:
-   * Bridge target for `boost::SpCountedImplPDisposeClusterCacheImpl`
-   * (`gpg/core/utils/BoostWrappers.h`/`.cpp`): `ClusterCacheImpl` is only a
-   * complete type in this translation unit, so the pointee's real
-   * destruction has to happen here. `delete` on the complete type runs
-   * `~ClusterCacheImpl()`'s ordinary reverse-declaration-order member
-   * destruction -- `mSubclusterData` then `mOccupationData` -- exactly
-   * matching the binary's explicit `sub_934500(this+44)` then
-   * `sub_933DE0(this)` pair before `operator delete`.
-   */
-  void DestroyClusterCacheImplPointee(
-    void* const p
-  )
-  {
-    delete static_cast<ClusterCacheImpl*>(p);
-  }
+  ClusterCache::~ClusterCache() = default;
 
   /**
    * Address: 0x00935580 (FUN_00935580) + 0x009356E0 (FUN_009356E0), see the
@@ -2721,14 +2637,10 @@ namespace gpg::HaStar
     ClusterCache& outCache
   )
   {
-    ClusterCacheImpl* const impl = new ClusterCacheImpl();
-
-    auto* const control =
-      static_cast<boost::SpCountedImplStorage<void>*>(::operator new(sizeof(boost::SpCountedImplStorage<void>)));
-    (void)boost::SpCountedImplPConstructClusterCacheImpl(control, impl);
-
-    outCache.mCacheTree = impl;
-    outCache.mCacheRefs = control;
+    // Address: 0x00931EB0 (FUN_00931EB0 -- `sp_counted_impl_p<ClusterCache::Impl>`'s constructor), 0x00931ED0
+    // (FUN_00931ED0 -- its `get_deleter`, null) and 0x00935520 (FUN_00935520 -- its `dispose`, `delete px`) are the
+    // control block this `shared_ptr` makes; formerly hand-built in BoostWrappers over a raw vtable probe.
+    outCache.mImpl.reset(new ClusterCacheImpl());
   }
 
   /**
@@ -2786,8 +2698,6 @@ namespace gpg::HaStar
     , mProgress(0u)
     , mArea(area)
   {
-    RetainSharedCount(mCache.mCacheRefs);
-
     if (mNumLevels >= kClusterSizeCount) {
       gpg::HandleAssertFailure(
         "numlevels <= MAX_LEVEL", 29, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\hastar\\ClusterMap.cpp"
@@ -2827,10 +2737,10 @@ namespace gpg::HaStar
     const OccupationData& occupationData
   )
   {
-    if (!mCacheTree) {
+    if (mImpl.get() == nullptr) {
       return Cluster{};
     }
-    return mCacheTree->FetchCluster(occupationData);
+    return mImpl->FetchCluster(occupationData);
   }
 
   /**
@@ -2841,10 +2751,10 @@ namespace gpg::HaStar
     const SubclusterData& subclusterData
   )
   {
-    if (!mCacheTree) {
+    if (mImpl.get() == nullptr) {
       return Cluster{};
     }
-    return mCacheTree->FetchCluster(subclusterData);
+    return mImpl->FetchCluster(subclusterData);
   }
 
   /**
