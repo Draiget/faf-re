@@ -1,8 +1,8 @@
 # Running dedicated servers with the dashboard
 
-How to run the dedicated server (`server`, Linux only) on a machine with the host agent (`server-host`) and drive it from the web dashboard (`tools/dashboard`): the host starts with no lobby; from the page you pick a map, seats, AIs and options, choose the CPUs a lobby runs on (by hand on a CPU heatmap, or the least loaded ones), start it, give players their join line, and watch the lobby and the game (each army's resources, units, commander health and upgrades).
+How to run the dedicated server (`server`, Linux only) on a machine with the host agent (`server-host`) and drive it from the web dashboard (`tools/dashboard`): the host starts with no lobby; from the page you make tournament and custom lobbies (map with its preview and start spots, seats, AIs, every setting), choose the CPUs each runs on (by hand on the machine map, or the least loaded ones), queue the ones that don't fit yet, give players their join line, let players ask for a server of their own on a pool of CPUs you set aside, and watch every lobby and game with its log and metrics.
 
-The dashboard is one page and talks to `server-host` only; every lobby, including a player's game on an open slot, opens inside it. A single `server` can also run without a host, from a match file you write yourself (section 6), but the dashboard doesn't connect to it.
+The dashboard is one page and talks to `server-host` only; every lobby, including a game a player asked for, opens inside it. A single `server` can also run without a host, from a match file you write yourself (section 6), but the dashboard doesn't connect to it.
 
 ## 1. Build
 
@@ -65,40 +65,69 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173` (exactly the `--cors-origin` origin: `http://127.0.0.1:5173` is another origin and the browser refuses it). The page opens on the control plane straight away, with a connection strip on top: the address starts as `http://<the page's own host name>:27180` (server-host's port unless `--listen` says otherwise); change it if the host runs on another machine, enter the admin token (the content of the `--token-file` file), and press Connect. The address stays in the browser, the token in the tab only; with both at hand the page connects by itself the next time it opens. If nothing answers, the page names the address it tried and says what to check (the port, that server-host runs, its `--cors-origin`).
+Open `http://localhost:5173` (exactly the `--cors-origin` origin: `http://127.0.0.1:5173` is another origin and the browser refuses it). Before it is connected the page asks for the host: the address starts as `http://<the page's own host name>:27180` (server-host's port unless `--listen` says otherwise); change it if the host runs on another machine, enter the admin token (the content of the `--token-file` file), and press Connect. The address stays in the browser, the token in the tab only; with both at hand the page connects by itself the next time it opens. If nothing answers, the page names the address it tried and says what to check (the port, that server-host runs, its `--cors-origin`). The host's name in the top bar leads back to this form.
 
 For development, `tools/dashboard/.env.local` (ignored by git) may hold `VITE_HOST_URL=http://<host>:27180` and `VITE_HOST_TOKEN=<token>`: the page starts from them when the browser has nothing stored. The token is read by `npm run dev` only and never goes into a build.
 
-Connected, the page shows:
+The page uses the whole window. A top bar shows the host, its CPU, memory and network now with the last minutes as a small line, how many alerts there are, and the connection. On the left (a strip on top on a phone) are the sections, with the running lobbies under them:
 
-- **The machine**: CPU model, memory, and a heatmap with one cell per logical CPU, grouped by NUMA node and by core (hyperthread siblings together), coloured by the load of the last 10 s; each node's memory, the network links, and a table of what is allocated with its live use. CPUs that run a lobby are outlined in that lobby's colour, an open slot's dashed.
-- **The tournament lobbies** and **the open slots**, side by side: map, state (starting, lobby, game, ended, failed, stopped), seats, CPUs, game time, placement warnings, join and watch lines, claim codes and links; Open, Stop or Free, and Forget once stopped.
-- **Configure**: a new lobby (the map with search, size and start spots; the seats, each a human with a name or an AI with its personality, faction and team; observers; every game setting; who starts it; the countdown) or new open slots, and the CPUs either runs on, with the planner's estimate and warnings.
+- **Overview**: the key numbers (CPU, memory, network, lobbies running by kind, the queue, player hosting), the machine map, the network links, what needs attention (a failed lobby, a placement forced past an error or on the pool's CPUs, low memory, a busy machine or link, a long wait in the queue, a full queue), what changed while the page was open, the running lobbies and the queue.
+- **Lobbies**: every lobby with its map, kind, state, players, CPUs and node, live use and when it started; filters for running, tournament, custom, player requests and ended; Open, Stop, and Remove once stopped.
+- **Create lobby**: the steps below.
+- **Queue**, **Player hosting**, **Logs**, **Metrics**: below.
+
+The **machine map** shows the machine by NUMA node: each node's CPUs grouped by physical core (hyperthread siblings side by side in one box), each CPU coloured by its load of the last 10 s, ringed in the colour of the lobby running on it (click it to open that lobby), and hatched when it belongs to the player-hosting pool; each node's memory. When CPUs are picked (a lobby's placement, the pool) the same map takes the clicks.
+
+### Creating a lobby
+
+Create lobby is a full page in six steps, with a summary beside them (the map with its start spots and seats, the settings changed, observers, the countdown, the placement and its warnings) and Create available from any step once nothing is missing:
+
+1. **Kind and map.** A tournament lobby is the organiser's: the map, every slot and every setting are set here, nobody hosts, and it starts from its page or by itself once every player is ready. A custom lobby is hosted by the player on spot 1 in their own game. Then the name and the map, from a gallery of the host's maps with their previews and start spots, searchable and filtered by size; maps with fewer spots than the seats asked for are marked.
+2. **Slots.** The map's preview, large, with every start spot numbered and coloured by its team, and the seat's name or AI under it; next to it one row per spot: a player (with a name, or without one as an open seat that whoever gets its join line takes; the FAF uid is optional), an AI with its personality, or empty, and the team and faction. Clicking a spot on the map picks its row. Quick buttons split the spots into two teams (odd against even), clear the teams, or fill the empty spots with AIs. Each seat is sent with its start spot (`seat`), so a seat keeps the spot it was given on the map. Player colours follow the start spot.
+3. **Settings.** Every setting, below.
+4. **Observers and start.** The countdown once every player is ready (0: off), how long the lobby stays open without a game, and the observers (each with a watch line; referees watch live, the others with the delay).
+5. **Placement.** Auto or CPUs picked on the machine map, below, with the planner's estimate and warnings as the map, seats and cores change; and what to do when it doesn't fit now: queue it (it waits in the operator queue and starts by itself when a lobby ends and it fits) or don't create it. With an error-level warning it can also be started anyway.
+6. **Review.** Every part with a way back to its step; then Create. A lobby that starts opens its page; a queued one opens the queue.
 
 ### Game settings
 
-The configuration panel lists every setting FAF's lobby has, read from the game's own files: the rules (victory, share, unit cap, fog, timeouts, prebuilt units, no-rush ...), the team options, the AI options, the AI personalities (mod AIs once mods are loaded), and for an adaptive map its own options (mexes, reclaim, and so on). Each shows its default; only the ones you change are sent. On fw0's data: 32 options, 12 AIs, 19 maps with their own options (`adaptive_adrastea.v0004`: 11).
+The settings are read from the game's own files: the rules (victory, share, unit cap, fog, timeouts, prebuilt units, no-rush ...), the team options, the AI options, the AI personalities (mod AIs once mods are loaded), and for an adaptive map its own options (mexes, reclaim, and so on). Each shows its default, changed ones are marked with a way back to the default, a filter finds one by name, and only the ones changed are sent. On fw0's data: 32 options, 12 AIs, 19 maps with their own options (`adaptive_adrastea.v0004`: 11).
 
 ### Choosing CPUs
 
-Pick cells on the heatmap, or leave **Auto** on with a number of cores. Either way the host's planner (`POST /api/v1/plan`, the same as a lobby's creation uses) estimates the game and says where it goes:
+Pick CPUs on the machine map, or leave **Auto** on, with the suggested number of cores or a fixed one. Either way the host's planner (`POST /api/v1/plan`, the same as a lobby's creation uses) estimates the game and says where it goes; the create flow asks it for the operator's side, so Auto keeps off the player-hosting pool's CPUs, and Auto's pick shows dashed on the map:
 
 - **Estimate**, from measurements on fw0 (Xeon Gold 6144, one sim thread, normal speed): cores on average 0.07 with 1-2 players, 0.25 with 3-5, 0.22 with 6-8 and 0.38 with 9 or more, worst 30 s 0.14, 0.58, 0.40 and 0.67 (bigger maps scaled by an unmeasured ×1.15 at 20 km, ×1.3 at 40 km, ×1.5 at 81 km); memory from the measured peaks (190 MB at 4 players to 406 MB at 12) plus a quarter, 16 players estimated; the server's upload 205 KB/s for a 1v1, 2.3 MB/s for 8 players, 2.6 MB/s for 16.
 - **Placement** (Auto): one NUMA node, the one with enough free physical cores (no lobby on any of their hyperthreads), then the most free memory, then the least load; one CPU per physical core, least loaded first; hyperthread siblings only when the node runs short. The lobby's memory is preferred on that node (`set_mempolicy`, inherited by its server): in a container this needs `CAP_SYS_NICE` (`docker run --cap-add SYS_NICE`), else the lobby starts with a `memory_policy` warning.
-- **Warnings**: CPUs on two NUMA nodes (`spans_nodes`), fewer cores than the game's worst 30 s needs (`too_few_cores`) or far more than it needs (`too_many_cores`), a CPU another lobby runs on (`shared_cpu`) or busy outside the lobbies (`busy_cpu`), both hyperthreads of one core (`both_siblings`), a sibling busy with another lobby (`sibling_busy`), a node short of whole cores (`node_short`), less free memory on the node than the game takes (`node_memory`), and the lobbies' upload over 80% of the links (`network`). An `error` (too little memory, no free CPU, links overrun, an unknown CPU) refuses the lobby unless the request says `"force": true`.
+- **Warnings**: CPUs on two NUMA nodes (`spans_nodes`), fewer cores than the game's worst 30 s needs (`too_few_cores`) or far more than it needs (`too_many_cores`), a CPU another lobby runs on (`shared_cpu`) or busy outside the lobbies (`busy_cpu`), a CPU of the player-hosting pool (`pool_overlap`), both hyperthreads of one core (`both_siblings`), a sibling busy with another lobby (`sibling_busy`), a node short of whole cores (`node_short`), less free memory on the node than the game takes (`node_memory`), and the lobbies' upload over 80% of the links (`network`). An `error` (too little memory, no free CPU, links overrun, an unknown CPU) refuses the lobby unless it is queued or the request says `"force": true`.
 
 ### Who starts the game
 
-- **A player hosts** (`player`): the first human seat hosts the lobby in their game and presses Launch, as in a FAF lobby; they may change game options and eject.
-- **The organiser** (`organiser`): nobody hosts. Start it from the lobby's page (Start now), or set **start when ready**: once every player but the lobby's host is ready, a countdown of that many seconds runs, and the game starts at its end. Anyone leaving or standing down stops it.
+- **Custom** (`control` `player`): the first human seat hosts the lobby in their game and presses Launch, as in a FAF lobby; they may change game options and eject.
+- **Tournament** (`control` `organiser`): nobody hosts. Start it from the lobby's page (Start the game now), or set the countdown: once every player but the lobby's host is ready, a countdown of that many seconds runs, and the game starts at its end. Anyone leaving or standing down stops it.
 
 A lobby left open longer than its lobby minutes starts as it is.
 
-### Open slots
+### Player hosting
 
-Next to the tournament lobbies, the same host can hold capacity for players who host their own game. An open slot has a name, the most players it takes, the map size it is sized for, its CPUs (Auto or picked, through the same planner and warnings as a lobby), the lobby minutes, default settings, and whether it opens again after each game. Making several at once with Auto places each with the ones before it holding their CPUs, so they get different cores. An open slot's CPUs count as taken: the heatmap shows them in the slot's colour, and the planner warns `shared_cpu` on them. Open slots count against `--max-lobbies` with the running lobbies.
+Player hosting lets players ask for a server of their own on the request page. It is off until the operator turns it on, and while it is on it has a pool: the CPUs player games may use.
 
-Each slot has a claim code, and a claim link to the dashboard's claim page (`claim.html?host=<host>&code=<code>`), which the operator hands to a player. The player needs no admin token: on the claim page they pick the map, the seats (friends and AIs, up to the slot's players), the game options and the map's own options, starting from the slot's defaults. The slot then becomes a player-hosted lobby on the slot's CPUs (`control` `player`): seat 1 is the claiming player, who changes game options (not the map) in their own game's lobby screen and presses Launch; the page shows every human seat's join line for the host to hand to their friends. When the game ends the slot opens again with a new claim code, so the old one stops working; a slot made with `"reopen": false` ends instead. Freeing a slot from the operator's page stops a game running on it.
+- **CPUs**: whole cores, picked on the machine map (a click takes or gives back a core with both of its hyperthreads) or a whole NUMA node at once. The page says how many cores go to player games and how many stay for operator lobbies; Auto doesn't pick the pool's CPUs for operator lobbies. A CPU given to the pool while an operator lobby still runs on it stays that lobby's until it ends (the answer warns `pool_overlap`).
+- **Limits**: games at once, the largest game (seats, AIs included), cores per game (from the map and players, or always a fixed number), how long a lobby waits for its game, and the longest queue. Under them the planner's hint: what a typical game (4 players on a 10 km map) and the largest one (the most players on a 20 km map) need, and how many of each fit in the pool at once.
+- **Who may ask**: anyone with the link (limited per address: a few requests a minute, one live request per player name), or only with an access code the operator hands out with the link.
+- **The request link**: `request.html?host=<host>` next to the dashboard, with a copy button. A link to a loopback address is flagged: players elsewhere can't reach it, so connect the dashboard with the host's public address before handing it out.
+- **Default settings** of player games: where a requested game starts; the player may change them.
+- **Now on the pool**: the games running on it (with their player, map, seats and CPUs), how many wait, and the free cores.
+
+Changes are kept as a draft, shown in a bar with Save and Discard, until saved (`PUT /api/v1/pool`). The on/off switch acts at once; turning it off asks first, refuses new requests, lets running games end, and with requests waiting refuses those too. The pool's settings stay across host restarts.
+
+### Requests
+
+A player opens the request link, types their name (and the access code if one is asked for), picks the map from the gallery, sets who plays where on the map's start spots (they are spot 1 and host the game; friends as players, with a name or as open seats; AIs), and the game settings, which start at the server's defaults (marked “server”). The page says how many game places are free and how many wait. "Ask for a server" sends it; the page then follows the request every few seconds: its place in the queue, starting, the lobby with every human seat's join line to copy and hand out, the game, or why it was refused. The request's key (its credential) stays in the browser, so a reload follows it again. The player can cancel while it waits or before the game. While player hosting is off, the page says the server isn't taking requests.
+
+### The queue
+
+Two queues, each first come first served: player requests wait for the pool, operator lobbies created with "Queue it" wait for the CPUs outside it. The Queue page lists both with each item's place, map, seats, what it needs (cores, memory) and what it waits for (a free game place, free cores, free memory, network room, a free port). The operator moves an item up one place or cancels it; a cancelled request shows as cancelled on the player's page. When a lobby ends, the host starts the first item of its side that fits.
 
 ### Joining
 
@@ -112,13 +141,19 @@ The token is that seat's alone; hand each player only their own line.
 
 ### Watching
 
-A lobby may list observers, each with a name and a token of their own, and a delay for them (`observer_delay_seconds`). An observer marked referee watches with no delay. Each gets a watch line, for example `/replay gpgnet://203.0.113.5:27201/9f3a…41`, which the game opens as a live replay of the lobby's game: `main_x64.exe /init init_faf.lua /replay gpgnet://203.0.113.5:27201/9f3a…41`. This is the game's own live-replay path (plan WP13.1), so it needn't be a server-mode build. The lobby then takes a second port from `--ports` for the watchers.
+A lobby may list observers, each with a name and a token of their own, and a delay for them (`observer_delay_seconds`). An observer marked referee watches with no delay. Each gets a watch line, for example `/replay gpgnet://203.0.113.5:27201/9f3a…41`, which the game opens as a live replay of the lobby's game: `main_x64.exe /init init_faf.lua /replay gpgnet://203.0.113.5:27201/9f3a…41`. This is the game's own live-replay path, so it needn't be a server-mode build. The lobby then takes a second port from `--ports` for the watchers.
 
 ### A lobby's page
 
-Open (on a lobby's card, or on a claimed slot) opens the lobby inside the same page, through the host's proxy; `#/lobby/<id>` links to it directly. A bar on top leads back to the overview, sums up the host (CPUs and load, memory, lobbies running, slots open) and switches to the other running lobbies. Below it: the lobby or game (phase, the start-when-ready countdown, the game clock), during the game each army (score, mass and energy with stored, income per second and storage, units against the unit cap, the commander's health and upgrades, the result), the seats (joined, ready, ping), the lobby's facts (map, control, CPUs, node, live use, port, its open slot) with every join and watch line and Stop, and the events with filters.
+A lobby opens from the lists, the machine map or the navigation, through the host's proxy; `#/lobby/<id>` links to it directly. A bar on top names it with its kind, state, map, CPUs and node, and has three tabs:
 
-The controls: start the game now; the lobby's game settings, as the same form the configuration panel has (the catalog's options and the map's own, each with its default; the lobby's current values, as it started and as `options` events change them; changes marked “to apply” and sent with `set_options`); pause, resume, end with results; eject, set a player's team, faction and colour, substitute, extend timeouts; allow or disallow an address. Settings change in the lobby only, and only in a lobby the organiser starts: a player-hosted lobby's settings are its host player's, so the page shows them without changing them. Game speed and team lock are fixed when the lobby starts and aren't offered. On a host without the settings catalog the settings are typed as `Key=Value,Key=Value` instead.
+- **Game**: the lobby or game (phase, the start-when-ready countdown, the game clock), during the game each army (score, mass and energy with stored, income per second and storage, units against the unit cap, the commander's health and upgrades, the result), the seats (joined, ready, ping), the lobby's facts (map, seats, who starts it, CPUs, node, live use, port, when it started and whether it was queued first, the request it came from) with every join and watch line and Stop, and the events with filters. The controls: start the game now; the lobby's game settings, as the same settings form (the lobby's current values, as it started and as `options` events change them; changes marked “to apply” and sent with `set_options`); pause, resume, end with results; eject, set a player's team, faction and colour, substitute, extend timeouts; allow or disallow an address. Settings change in the lobby only, and only in a tournament lobby: a custom lobby's settings are its host player's, so the page shows them without changing them. Game speed and team lock are fixed when the lobby starts and aren't offered. On a host without the settings catalog the settings are typed as `Key=Value,Key=Value` instead.
+- **Server log** (`#/lobby/<id>/log`): its `server.log`, the last lines and then new ones as they come, also after the lobby ended; filtered by text or to warnings and errors; it follows the newest line until scrolled up.
+- **Metrics** (`#/lobby/<id>/metrics`): its server's CPU (cores used, against the CPUs it was given) and memory over time.
+
+### Logs and metrics
+
+**Logs** lists the host's own log (lobbies starting and ending, the queue, the pool) and every lobby's log, running or ended; the one picked is shown live with the same filters. **Metrics** draws the host's history, a sample every 2 s kept for an hour, over the last 5 minutes, 15 minutes or hour: the machine's CPU, CPU by NUMA node, memory in use, free memory by node, each network link sending and receiving, and each lobby's CPU and memory. Hovering a chart reads every line at that moment. A host without the metrics endpoint gets the page's own samples since it connected.
 
 ## 5. Reaching it from another machine
 

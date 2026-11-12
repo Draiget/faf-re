@@ -1,7 +1,7 @@
-// FAF's game settings as a form (plan WP17.20), shared by the operator's configuration panel (config.ts), a running
-// lobby's settings (lobby.ts) and the player's claim page (claim.ts): options grouped into rules, teams, AI and other, the map's own options for adaptive
-// maps, each with its default shown, changed values marked and a reset; a filter over all of them. Only values that
-// differ from their defaults are kept in `chosen`.
+// FAF's game settings as a form, shared by the create flow, player hosting's defaults, a running lobby's settings
+// (controls.ts) and the public request page: options grouped into rules, units, teams, AI and other, the map's own
+// options for adaptive maps, each with its default shown, changed values marked and a reset; a filter over all of
+// them. Only values that differ from their defaults are kept in `chosen`.
 
 import type { SettingKey, SettingOption, Settings } from "../api.ts";
 import { h } from "../dom.ts";
@@ -34,12 +34,14 @@ export function sameKey(a: SettingKey | null | undefined, b: SettingKey | null |
 export interface OptionsForm {
   /** The values that differ from their defaults, by option key. */
   chosen: Map<string, SettingKey>;
-  /** Starting values someone else picked (an open slot's, by its operator), marked on their option. */
+  /** Starting values someone else picked (the pool's defaults, on the request page), marked on their option. */
   preset?: ReadonlyMap<string, SettingKey>;
-  /** What the preset is called on the option, e.g. "slot". */
+  /** What the preset is called on the option, e.g. "server". */
   presetLabel?: string;
   /** The fields' id prefix (default "set-"): two forms on one page need different ones. */
   idPrefix?: string;
+  /** Every group starts open (a full-page form); else the first and the map's. */
+  openAll?: boolean;
   /** Runs after every change by the user. */
   onChange(): void;
 }
@@ -126,7 +128,7 @@ export function renderOptions(box: HTMLElement, settings: Settings, mapTitle: st
     ...groups.map((group, index) =>
       h(
         "details",
-        { class: `set-group${group.id === "map" ? " map-group" : ""}`, "data-group": group.id, open: index === 0 || group.id === "map" },
+        { class: `set-group${group.id === "map" ? " map-group" : ""}`, "data-group": group.id, open: form.openAll === true || index === 0 || group.id === "map" },
         h("summary", {}, h("span", { class: "set-title" }, group.title), h("span", { class: "set-count dim small" })),
         h("div", { class: "set-grid" }, ...group.options.map((option) => optionField(option, form))),
       ),

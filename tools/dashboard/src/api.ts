@@ -1,7 +1,8 @@
-// The APIs the dashboard talks to: a machine's server-host (HostApi), each lobby's own server through the host's proxy
-// (ServerApi: status, the armies of a running game, control ops, the event stream; docs/SWITCHES.md `--rest`), and the
-// players' claim API (ClaimApi). The admin token goes as a bearer token. No browser-only API here, so Node runs it too
-// (scripts/smoke.ts, scripts/smoke-host.ts).
+// The APIs the pages talk to: a machine's server-host (HostApi: the machine, maps, the planner, lobbies, the player
+// hosting pool, the queue, metrics and logs), each lobby's own server through the host's proxy (ServerApi: status,
+// the armies of a running game, control ops, the event stream; docs/SWITCHES.md `--rest`), and the public request API
+// players use to ask for a server (RequestApi). The admin token goes as a bearer token; the public API has none. No
+// browser-only API here, so Node runs it too (scripts/smoke.ts, scripts/smoke-host.ts).
 
 export interface Seat {
   uid: number;
@@ -92,11 +93,11 @@ export interface HostCpu {
   load10?: number | null;
   /** Ids of the lobbies pinned to this CPU. */
   lobbies?: string[] | null;
-  /** Its NUMA node (plan WP17.16). */
+  /** Its NUMA node. */
   node?: number | null;
 }
 
-/** A NUMA node: its CPUs and the memory next to them (plan WP17.16). */
+/** A NUMA node: its CPUs and the memory next to them. */
 export interface HostNode {
   id: number;
   cpus: number[];
@@ -137,7 +138,7 @@ export interface Usage {
   rss_mb?: number | null;
 }
 
-/** What a game of that many players on a map that big needs (plan WP17.17). */
+/** What a game of that many players on a map that big needs. */
 export interface Estimate {
   players?: number | null;
   km?: number | null;
@@ -161,12 +162,17 @@ export interface Plan {
   warnings: PlacementWarning[];
 }
 
+/** Which capacity a game uses: the player-hosting pool, or the CPUs outside it (the operator's). */
+export type Side = "pool" | "operator";
+
 /** Players and map size, and either `cores` (0 or absent: the suggestion) or `cpus` by hand. */
 export interface PlanRequest {
   players: number;
   km: number;
   cores?: number;
   cpus?: number[];
+  /** The host's default is "operator". */
+  side?: Side;
 }
 
 /** A setting's value key: a string or a number, sent back as given. */
@@ -178,13 +184,13 @@ export interface SettingValue {
   help?: string | null;
 }
 
-/** One of FAF's lobby options, or a map's own (plan WP17.20). */
+/** One of FAF's lobby options, or a map's own. */
 export interface SettingOption {
   key: string;
   label?: string | null;
   help?: string | null;
   default?: SettingKey | null;
-  /** rules, units, ai, other. */
+  /** rules, units, teams, ai, other. */
   group?: string | null;
   values: SettingValue[];
 }
@@ -202,110 +208,6 @@ export interface Settings {
   map_options: SettingOption[];
 }
 
-/** Capacity held for players who host themselves (plan WP17.18). */
-export interface Slot {
-  id: string;
-  name?: string | null;
-  /** open, claimed, lobby, game, ended. */
-  state: string;
-  max_players?: number | null;
-  cpus?: number[] | null;
-  nodes?: number[] | null;
-  warnings?: PlacementWarning[] | null;
-  /** What a player uses to host on it. */
-  claim_code?: string | null;
-  /** Once claimed: the lobby it became (a lobby like any other). */
-  lobby?: string | null;
-  host_player?: string | null;
-  /** The map size it was sized for, km. */
-  km?: number | null;
-  lobby_minutes?: number | null;
-  /** The operator's default game options for the games on it. */
-  options?: Record<string, SettingKey> | null;
-  /** When its game ends it opens again with a new claim code (else it ends). */
-  reopen?: boolean | null;
-  /** Games hosted on it so far. */
-  games?: number | null;
-  created?: string | null;
-  [key: string]: unknown;
-}
-
-export interface NewSlots {
-  name: string;
-  max_players: number;
-  /** The largest map expected, for the estimate (the host's default is 20). */
-  km?: number;
-  cores?: number;
-  cpus?: number[];
-  lobby_minutes: number;
-  /** How many identical slots. */
-  count: number;
-  options?: Record<string, SettingKey>;
-  /** Open again with a new code after each game (the host's default is true). */
-  reopen?: boolean;
-  force?: boolean;
-}
-
-// ---------------------------------------------------------------- the claim API (players, no admin token)
-
-/** The slot as its claim code shows it to the player. */
-export interface ClaimSlot {
-  id: string;
-  name?: string | null;
-  /** open, claimed, lobby, game, ended. */
-  state: string;
-  max_players?: number | null;
-  /** The map size it was sized for. */
-  km?: number | null;
-  cores?: number | null;
-  lobby_minutes?: number | null;
-  /** The operator's defaults; the claim's own options go over them. */
-  options?: Record<string, SettingKey> | null;
-}
-
-/** The claimed lobby as its host player sees it, with every human seat's join line. */
-export interface ClaimLobby {
-  id: string;
-  name?: string | null;
-  /** starting, lobby, game, ended, failed, stopped. */
-  state: string;
-  phase?: string | null;
-  beat?: number | null;
-  map?: { id?: string; name?: string | null; km?: number | null; players?: number | null } | null;
-  seats?: LobbySeat[] | null;
-  options?: Record<string, SettingKey> | null;
-  port?: number | null;
-}
-
-export interface ClaimView {
-  slot: ClaimSlot;
-  /** Null until the slot is claimed. */
-  lobby: ClaimLobby | null;
-}
-
-export interface ClaimSeat {
-  kind: "human" | "ai";
-  /** Seat 1 (the host) defaults to the claim's `player`; other humans to "Player N". */
-  name?: string;
-  ai?: string;
-  /** 1 UEF, 2 Aeon, 3 Cybran, 4 Seraphim, 5 random. */
-  faction?: number;
-  /** 1 = no team, 2.. = team 1.. (FAF's numbering). */
-  team?: number;
-}
-
-/** `POST /api/v1/claim/<code>`: the player's own game. */
-export interface ClaimRequest {
-  /** The host player's name, 1..40 characters. */
-  player: string;
-  map: string;
-  /** Up to the slot's max_players; seat 1 is the host, a human. None: just the host. */
-  seats?: ClaimSeat[];
-  /** Over the slot's options; the rest are FAF's defaults. */
-  options?: Record<string, SettingKey>;
-  start_when_ready?: number;
-}
-
 export interface MapInfo {
   id: string;
   name?: string;
@@ -316,6 +218,10 @@ export interface MapInfo {
   description?: string | null;
   /** "fa" (the game's own maps) or "vault". */
   source?: string | null;
+  /** Each start spot (ARMY_n of the map's markers) as [x, z], 0..1 over the map's size, in army order. */
+  spawns?: [number, number][] | null;
+  /** Where the map's preview image is, relative to the host's address; absent when the map has none. */
+  preview?: string | null;
 }
 
 export interface Hint {
@@ -325,7 +231,6 @@ export interface Hint {
   worst_cores?: number | null;
   suggested_cores?: number | null;
   basis?: string | null;
-  /** Plan WPR.8: the published minimums for a game this size (WPR.7's measurements), KB/s. */
   min_connection_kbps?: number | null;
   server_upload_kbps?: number | null;
   max_players?: number | null;
@@ -333,6 +238,7 @@ export interface Hint {
 }
 
 export interface LobbySeat {
+  /** The seat's number, which is also its start spot (ARMY_n). */
   seat: number;
   kind: "human" | "ai" | string;
   name?: string | null;
@@ -344,7 +250,7 @@ export interface LobbySeat {
   join?: string | null;
 }
 
-/** Someone who watches a lobby's game as a live replay (plan WP13.1). */
+/** Someone who watches a lobby's game as a live replay. */
 export interface LobbyObserver {
   name?: string | null;
   /** A referee watches with no delay. */
@@ -353,18 +259,36 @@ export interface LobbyObserver {
   watch?: string | null;
 }
 
+/** tournament: the operator sets everything and nobody hosts; custom: seat 1 hosts in their own lobby screen. */
+export type LobbyKind = "tournament" | "custom";
+
+export interface LobbyMapRef {
+  id?: string;
+  name?: string | null;
+  km?: number | null;
+  players?: number | null;
+}
+
 export interface Lobby {
   id: string;
   name?: string | null;
   /** starting, lobby, game, ended, failed, stopped. */
   state: string;
-  map?: { id?: string; name?: string | null; km?: number | null; players?: number | null } | null;
+  kind?: LobbyKind | string | null;
+  /** operator, or pool (a player's request on the pool's CPUs). */
+  side?: Side | string | null;
+  /** The player request it came from (a pool game), or null. */
+  request?: string | null;
+  map?: LobbyMapRef | null;
   /** The game and map options it started with (`set_options` changes later aren't in it). */
   options?: Record<string, SettingKey> | null;
   cpus?: number[] | null;
   port?: number | null;
   pid?: number | null;
   created?: string | null;
+  /** When it went into the queue, if it waited there. */
+  queued_at?: string | null;
+  started_at?: string | null;
   control?: string | null;
   start_when_ready?: number | null;
   seats?: LobbySeat[] | null;
@@ -383,8 +307,6 @@ export interface Lobby {
   /** The placement's warnings when it was made. */
   warnings?: PlacementWarning[] | null;
   usage?: Usage | null;
-  /** The open slot it was claimed from (plan WP17.18). */
-  slot?: string | null;
   [key: string]: unknown;
 }
 
@@ -396,6 +318,11 @@ export interface NewObserver {
 
 export interface NewSeat {
   kind: "human" | "ai";
+  /**
+   * The start spot (ARMY_n), from 1. The host's lobby gives seat n start spot n, so this is the seat's number; without
+   * it the seats take spots 1, 2, 3... in the order given.
+   */
+  seat?: number;
   name?: string;
   uid?: number;
   ai?: string;
@@ -408,6 +335,8 @@ export interface NewSeat {
 export interface NewLobby {
   name: string;
   map: string;
+  /** The host's default follows `control`: organiser -> tournament, player -> custom. */
+  kind?: LobbyKind;
   /** Game and map options together, any subset; the rest are their defaults. */
   options: Record<string, SettingKey>;
   seats: NewSeat[];
@@ -422,6 +351,92 @@ export interface NewLobby {
   observer_delay_seconds?: number;
   /** Start despite an error-level placement warning (without it such a lobby answers 409). */
   force?: boolean;
+  /** When it doesn't fit now, wait in the operator queue (202 with the queue item) instead of a 409. */
+  queue?: boolean;
+}
+
+/** What waits in a queue for room: an operator lobby made with "queue if full", or a player's request. */
+export interface QueueItem {
+  id: string;
+  side: Side | string;
+  kind?: LobbyKind | string | null;
+  name?: string | null;
+  /** The requesting player (pool items); null for the operator's. */
+  player?: string | null;
+  map?: LobbyMapRef | null;
+  seats?: number | null;
+  estimate?: Estimate | null;
+  /** 1 = next on its side. */
+  position?: number | null;
+  /** games (the pool's game limit), cores, memory, network or ports; "" when it fits and starts next. */
+  waiting_for?: string | null;
+  /** The player request it is, for a pool item. */
+  request?: string | null;
+  created?: string | null;
+  [key: string]: unknown;
+}
+
+/** `POST /api/v1/lobbies`: the lobby started, or (with `queue: true`) the queue item it waits as. */
+export interface Created {
+  lobby: Lobby | null;
+  queued: QueueItem | null;
+}
+
+/** Capacity for games players ask for (requests): the CPUs, limits, defaults and access. */
+export interface Pool {
+  enabled: boolean;
+  /** Whole cores' CPUs, by NUMA node; operator lobbies' Auto doesn't pick them. */
+  cpus: number[];
+  nodes: number[];
+  /** Games at once. */
+  max_games: number;
+  /** The largest player count of one game. */
+  max_players: number;
+  /** Cores per game: 0 = from map size and players. */
+  cores: number;
+  lobby_minutes: number;
+  access: "open" | "code" | string;
+  code: string;
+  /** Default game options of player games; the player's request goes over them. */
+  options: Record<string, SettingKey>;
+  /** The longest the pool's queue gets before requests are refused. */
+  max_queue: number;
+}
+
+export interface PoolUsage {
+  games: number;
+  queued: number;
+  free_cores: number;
+  cpus_busy: number[];
+}
+
+export interface PoolView {
+  pool: Pool;
+  usage: PoolUsage;
+  /** After a change: what to know about it (`pool_overlap`: an operator lobby still runs on CPUs given to the pool). */
+  warnings: PlacementWarning[];
+}
+
+/** `PUT /api/v1/pool`: any subset; turning it off with `drop_queue` also refuses what waits. */
+export type PoolUpdate = Partial<Pool> & { drop_queue?: boolean };
+
+/** `GET /api/v1/metrics`: the host's history, a sample every 2 s; each series lines up with `t` (null: no sample). */
+export interface Metrics {
+  /** Unix seconds. */
+  t: number[];
+  /** Whole-machine busy %. */
+  cpu: (number | null)[];
+  mem_used_mb: (number | null)[];
+  net: Record<string, { in_kbps: (number | null)[]; out_kbps: (number | null)[] }>;
+  nodes: Record<string, { cpu: (number | null)[]; mem_free_mb: (number | null)[] }>;
+  lobbies: Record<string, { cpu_cores: (number | null)[]; rss_mb: (number | null)[] }>;
+}
+
+/** One line of a log: its text, with the time and level when the line says them. */
+export interface LogLine {
+  text: string;
+  time?: string | null;
+  level?: string | null;
 }
 
 export interface Answer {
@@ -455,7 +470,7 @@ async function readAnswer(response: Response): Promise<Answer> {
 }
 
 /**
- * One JSON request to `base + path`, with the token as a bearer token when there is one (the claim API has none).
+ * One JSON request to `base + path`, with the token as a bearer token when there is one (the public API has none).
  * Throws `ApiError` with the HTTP status and the answer's reason when it isn't `ok`.
  */
 async function requestJson(base: string, token: string | null, method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<Answer> {
@@ -479,6 +494,42 @@ async function requestJson(base: string, token: string | null, method: string, p
   return answer;
 }
 
+/**
+ * Reads a Server-Sent Events body until it ends or `signal` aborts: each event's `data:` lines, joined, to `onData`.
+ * Read with fetch, as the browser's EventSource can't send a token.
+ */
+async function readSse(response: Response, onData: (data: string, event: string) => void): Promise<void> {
+  if (response.body === null) return;
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffered = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) {
+      return;
+    }
+    buffered = (buffered + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
+    // An event ends at a blank line; its `data:` lines hold the payload.
+    let end = buffered.indexOf("\n\n");
+    while (end >= 0) {
+      const block = buffered.slice(0, end);
+      buffered = buffered.slice(end + 2);
+      const lines = block.split("\n");
+      const event = lines.find((line) => line.startsWith("event:"))?.slice(6).trim() ?? "message";
+      const data = lines
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).replace(/^ /, ""))
+        .join("\n");
+      if (event === "end") {
+        await reader.cancel().catch(() => undefined);
+        return;
+      }
+      if (data !== "") onData(data, event);
+      end = buffered.indexOf("\n\n");
+    }
+  }
+}
+
 function settingsFrom(raw: Partial<Settings> | undefined): Settings {
   return {
     options: Array.isArray(raw?.options) ? raw.options : [],
@@ -489,6 +540,88 @@ function settingsFrom(raw: Partial<Settings> | undefined): Settings {
 
 function settingsQuery(mapId?: string): string {
   return mapId === undefined || mapId === "" ? "" : `?map=${encodeURIComponent(mapId)}`;
+}
+
+const LEVEL = /\b(TRACE|DEBUG|INFO|WARN(?:ING)?|ERROR|FATAL|PANIC)\b/;
+const TIME = /^(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?|\d{2}:\d{2}:\d{2}(?:\.\d+)?)\s*/;
+
+/** A log line from the host: a string (time and level read from its start) or an object with text/line and fields. */
+export function logLineFrom(raw: unknown): LogLine {
+  if (raw !== null && typeof raw === "object") {
+    const item = raw as Record<string, unknown>;
+    const text = String(item.text ?? item.line ?? item.msg ?? item.message ?? "");
+    const parsed = logLineFrom(text);
+    return {
+      text: parsed.text,
+      time: typeof item.time === "string" ? item.time : typeof item.t === "number" ? new Date(item.t * 1000).toISOString() : parsed.time,
+      level: typeof item.level === "string" ? item.level.toUpperCase() : parsed.level,
+    };
+  }
+  const line = String(raw ?? "");
+  const time = TIME.exec(line);
+  const rest = time === null ? line : line.slice(time[0].length);
+  const level = LEVEL.exec(rest.slice(0, 24));
+  return { text: rest, time: time?.[1] ?? null, level: level === null ? null : level[1] === "WARNING" ? "WARN" : (level[1] ?? null) };
+}
+
+function logLinesFrom(answer: Answer): LogLine[] {
+  const raw = Array.isArray(answer.lines) ? answer.lines : Array.isArray(answer.log) ? answer.log : typeof answer.log === "string" ? answer.log.split("\n") : [];
+  return (raw as unknown[]).map(logLineFrom).filter((line) => line.text !== "");
+}
+
+function series(raw: unknown, length: number): (number | null)[] {
+  const list = Array.isArray(raw) ? raw : [];
+  return Array.from({ length }, (_, index) => {
+    const value = list[index];
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
+  });
+}
+
+/** The metrics answer, every series as long as `t` (the host's object may come bare or under `metrics`). */
+function metricsFrom(answer: Answer): Metrics {
+  const raw = (answer.metrics !== null && typeof answer.metrics === "object" ? answer.metrics : answer) as Record<string, unknown>;
+  const t = (Array.isArray(raw.t) ? raw.t : []).filter((value): value is number => typeof value === "number");
+  const n = t.length;
+  const record = (value: unknown): Record<string, Record<string, unknown>> => (value !== null && typeof value === "object" ? (value as Record<string, Record<string, unknown>>) : {});
+  const net: Metrics["net"] = {};
+  for (const [name, link] of Object.entries(record(raw.net))) net[name] = { in_kbps: series(link.in_kbps, n), out_kbps: series(link.out_kbps, n) };
+  const nodes: Metrics["nodes"] = {};
+  for (const [id, node] of Object.entries(record(raw.nodes))) nodes[id] = { cpu: series(node.cpu, n), mem_free_mb: series(node.mem_free_mb, n) };
+  const lobbies: Metrics["lobbies"] = {};
+  for (const [id, lobby] of Object.entries(record(raw.lobbies))) lobbies[id] = { cpu_cores: series(lobby.cpu_cores, n), rss_mb: series(lobby.rss_mb, n) };
+  return { t, cpu: series(raw.cpu, n), mem_used_mb: series(raw.mem_used_mb, n), net, nodes, lobbies };
+}
+
+function queueFrom(raw: unknown): QueueItem[] {
+  return Array.isArray(raw) ? (raw as QueueItem[]) : [];
+}
+
+function poolFrom(answer: Answer): PoolView {
+  const pool = (answer.pool ?? {}) as Partial<Pool>;
+  const usage = (answer.usage ?? {}) as Partial<PoolUsage>;
+  const numbers = (value: unknown): number[] => (Array.isArray(value) ? value.filter((item): item is number => typeof item === "number") : []);
+  return {
+    pool: {
+      enabled: pool.enabled === true,
+      cpus: numbers(pool.cpus),
+      nodes: numbers(pool.nodes),
+      max_games: typeof pool.max_games === "number" ? pool.max_games : 0,
+      max_players: typeof pool.max_players === "number" ? pool.max_players : 0,
+      cores: typeof pool.cores === "number" ? pool.cores : 0,
+      lobby_minutes: typeof pool.lobby_minutes === "number" ? pool.lobby_minutes : 0,
+      access: pool.access === "code" ? "code" : "open",
+      code: typeof pool.code === "string" ? pool.code : "",
+      options: pool.options !== null && typeof pool.options === "object" ? pool.options : {},
+      max_queue: typeof pool.max_queue === "number" ? pool.max_queue : 0,
+    },
+    usage: {
+      games: typeof usage.games === "number" ? usage.games : 0,
+      queued: typeof usage.queued === "number" ? usage.queued : 0,
+      free_cores: typeof usage.free_cores === "number" ? usage.free_cores : 0,
+      cpus_busy: numbers(usage.cpus_busy),
+    },
+    warnings: Array.isArray(answer.warnings) ? (answer.warnings as PlacementWarning[]) : [],
+  };
 }
 
 export class ServerApi {
@@ -554,8 +687,7 @@ export class ServerApi {
 
   /**
    * `GET /api/v1/events`, read until `signal` aborts or the server closes it: each Server-Sent Event's JSON to
-   * `onEvent`. Read with fetch, as the browser's EventSource can't send the token. `onOpen` runs once the stream is
-   * established.
+   * `onEvent`. `onOpen` runs once the stream is established.
    */
   async events(onEvent: (event: ServerEvent) => void, signal: AbortSignal, onOpen?: () => void): Promise<void> {
     const response = await fetch(`${this.base}/api/v1/events`, { headers: this.headers(false), signal });
@@ -563,41 +695,20 @@ export class ServerApi {
       throw new ApiError(`events: HTTP ${response.status}`, response.status);
     }
     onOpen?.();
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffered = "";
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) {
-        return;
+    await readSse(response, (data) => {
+      try {
+        onEvent(JSON.parse(data) as ServerEvent);
+      } catch {
+        // not JSON: ignored, as the stream's comments are
       }
-      buffered = (buffered + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
-      // An event ends at a blank line; its `data:` lines hold the JSON.
-      let end = buffered.indexOf("\n\n");
-      while (end >= 0) {
-        const block = buffered.slice(0, end);
-        buffered = buffered.slice(end + 2);
-        const data = block
-          .split("\n")
-          .filter((line) => line.startsWith("data:"))
-          .map((line) => line.slice(5).trimStart())
-          .join("\n");
-        if (data !== "") {
-          try {
-            onEvent(JSON.parse(data) as ServerEvent);
-          } catch {
-            // not JSON: ignored, as the stream's comments are
-          }
-        }
-        end = buffered.indexOf("\n\n");
-      }
-    }
+    });
   }
 }
 
 /**
- * A machine's `server-host` (plan WP17.13): the machine, its maps, the cost hint, and its lobbies, each lobby its own
- * server reached through the host (`lobbyApi`). Errors throw `ApiError` with the HTTP status and the host's reason.
+ * A machine's `server-host`: the machine, its maps, the planner, its lobbies (each its own server reached through the
+ * host, `lobbyApi`), the player-hosting pool, the queue, metrics and logs. Errors throw `ApiError` with the HTTP
+ * status and the host's reason.
  */
 export class HostApi {
   readonly base: string;
@@ -619,10 +730,19 @@ export class HostApi {
     return { ...host, cpus: Array.isArray(host.cpus) ? host.cpus : [] };
   }
 
-  /** `GET /api/v1/maps`, sorted by name. */
+  /** `GET /api/v1/maps`, with each map's start spots and preview. */
   async maps(signal?: AbortSignal): Promise<MapInfo[]> {
     const answer = await this.request("GET", "/api/v1/maps", undefined, signal);
     return Array.isArray(answer.maps) ? (answer.maps as MapInfo[]) : [];
+  }
+
+  /**
+   * The address of a map's preview image (`GET /api/v1/maps/<id>/preview.png`, PNG, no token needed: an `<img>` loads
+   * it as is), or null when the map has none.
+   */
+  previewUrl(map: MapInfo): string | null {
+    if (typeof map.preview !== "string" || map.preview === "") return null;
+    return /^https?:\/\//.test(map.preview) ? map.preview : `${this.base}${map.preview.startsWith("/") ? "" : "/"}${map.preview}`;
   }
 
   /** `GET /api/v1/hint`: how many cores a game of that many players on a map that big needs. */
@@ -637,9 +757,10 @@ export class HostApi {
     return Array.isArray(answer.lobbies) ? (answer.lobbies as Lobby[]) : [];
   }
 
-  /** `POST /api/v1/lobbies`: starts a lobby's server. */
-  async createLobby(lobby: NewLobby): Promise<Lobby> {
-    return (await this.request("POST", "/api/v1/lobbies", lobby)).lobby as Lobby;
+  /** `POST /api/v1/lobbies`: starts a lobby's server, or with `queue: true` queues it when it doesn't fit (202). */
+  async createLobby(lobby: NewLobby): Promise<Created> {
+    const answer = await this.request("POST", "/api/v1/lobbies", lobby);
+    return { lobby: (answer.lobby as Lobby | undefined) ?? null, queued: (answer.queued as QueueItem | undefined) ?? null };
   }
 
   /** `DELETE /api/v1/lobbies/<id>`: stops its server; it stays listed as stopped. */
@@ -652,7 +773,7 @@ export class HostApi {
     await this.request("DELETE", `/api/v1/lobbies/${encodeURIComponent(id)}?forget=1`);
   }
 
-  /** `POST /api/v1/plan`: where a game would go, its estimate and warnings; nothing is started. */
+  /** `POST /api/v1/plan`: where a game would go on that side, its estimate and warnings; nothing is started. */
   async plan(request: PlanRequest, signal?: AbortSignal): Promise<Plan> {
     const plan = (await this.request("POST", "/api/v1/plan", request, signal)).plan as Partial<Plan> | undefined;
     return {
@@ -670,21 +791,78 @@ export class HostApi {
     return settingsFrom((await this.request("GET", `/api/v1/settings${settingsQuery(mapId)}`, undefined, signal)).settings as Partial<Settings> | undefined);
   }
 
-  /** `GET /api/v1/slots`: capacity held for players who host themselves. */
-  async slots(signal?: AbortSignal): Promise<Slot[]> {
-    const answer = await this.request("GET", "/api/v1/slots", undefined, signal);
-    return Array.isArray(answer.slots) ? (answer.slots as Slot[]) : [];
+  /** `GET /api/v1/pool`: the player-hosting pool and its live use. */
+  async pool(signal?: AbortSignal): Promise<PoolView> {
+    return poolFrom(await this.request("GET", "/api/v1/pool", undefined, signal));
   }
 
-  /** `POST /api/v1/slots`: `count` identical slots. */
-  async createSlots(slots: NewSlots): Promise<Slot[]> {
-    const answer = await this.request("POST", "/api/v1/slots", slots);
-    return Array.isArray(answer.slots) ? (answer.slots as Slot[]) : [];
+  /** `PUT /api/v1/pool`: changes any part of it; the answer is the pool as it is now. */
+  async setPool(update: PoolUpdate): Promise<PoolView> {
+    return poolFrom(await this.request("PUT", "/api/v1/pool", update));
   }
 
-  /** `DELETE /api/v1/slots/<id>`: frees an unclaimed slot, or stops a claimed one's game. */
-  async deleteSlot(id: string): Promise<void> {
-    await this.request("DELETE", `/api/v1/slots/${encodeURIComponent(id)}`);
+  /** `GET /api/v1/queue`: both sides' queued items, each with its position on its side. */
+  async queue(signal?: AbortSignal): Promise<QueueItem[]> {
+    return queueFrom((await this.request("GET", "/api/v1/queue", undefined, signal)).queue);
+  }
+
+  /** `DELETE /api/v1/queue/<id>`: takes it out of the queue (a player's request is refused). */
+  async cancelQueued(id: string): Promise<void> {
+    await this.request("DELETE", `/api/v1/queue/${encodeURIComponent(id)}`);
+  }
+
+  /** `POST /api/v1/queue/<id>/up`: one place earlier on its side. */
+  async moveUp(id: string): Promise<void> {
+    await this.request("POST", `/api/v1/queue/${encodeURIComponent(id)}/up`);
+  }
+
+  /** `GET /api/v1/metrics?seconds=`: the host's history, a sample every 2 s, up to an hour back. */
+  async metrics(seconds: number, signal?: AbortSignal): Promise<Metrics> {
+    return metricsFrom(await this.request("GET", `/api/v1/metrics?seconds=${encodeURIComponent(String(Math.round(seconds)))}`, undefined, signal));
+  }
+
+  /** `GET /api/v1/logs/host?lines=`: the host's own log, the last lines. */
+  async hostLog(lines: number, signal?: AbortSignal): Promise<LogLine[]> {
+    return logLinesFrom(await this.request("GET", `/api/v1/logs/host?lines=${encodeURIComponent(String(lines))}`, undefined, signal));
+  }
+
+  /** `GET /api/v1/lobbies/<id>/log?lines=`: that lobby's server log, also after it ended. */
+  async lobbyLog(id: string, lines: number, signal?: AbortSignal): Promise<LogLine[]> {
+    return logLinesFrom(await this.request("GET", `/api/v1/lobbies/${encodeURIComponent(id)}/log?lines=${encodeURIComponent(String(lines))}`, undefined, signal));
+  }
+
+  /**
+   * `GET /api/v1/lobbies/<id>/log/stream`: new log lines as they come, until `signal` aborts or the host closes it.
+   * Each event's data is the line, as text or as JSON (`{"line": ...}` or `{"text": ...}`).
+   */
+  async lobbyLogStream(id: string, onLine: (line: LogLine) => void, signal: AbortSignal, onOpen?: () => void): Promise<void> {
+    await this.logStream(`/api/v1/lobbies/${encodeURIComponent(id)}/log/stream`, onLine, signal, onOpen);
+  }
+
+  /** `GET /api/v1/logs/host/stream`: the host's new log lines as they come. */
+  async hostLogStream(onLine: (line: LogLine) => void, signal: AbortSignal, onOpen?: () => void): Promise<void> {
+    await this.logStream("/api/v1/logs/host/stream", onLine, signal, onOpen);
+  }
+
+  /** A log stream: each event's data is one line (plain text; a JSON object with `line` or `text` is read too). */
+  private async logStream(path: string, onLine: (line: LogLine) => void, signal: AbortSignal, onOpen?: () => void): Promise<void> {
+    const response = await fetch(`${this.base}${path}`, { headers: { Authorization: `Bearer ${this.token}` }, signal });
+    if (!response.ok || response.body === null) throw new ApiError(`log stream: HTTP ${response.status}`, response.status);
+    onOpen?.();
+    await readSse(response, (data) => {
+      let raw: unknown = data;
+      if (/^\{"(line|text)"/.test(data)) {
+        try {
+          raw = JSON.parse(data) as unknown;
+        } catch {
+          raw = data;
+        }
+      }
+      for (const part of typeof raw === "string" ? raw.split("\n") : [raw]) {
+        const line = logLineFrom(part);
+        if (line.text !== "") onLine(line);
+      }
+    });
   }
 
   /** The lobby's own server API, proxied by the host with the host's token. */
@@ -693,49 +871,141 @@ export class HostApi {
   }
 }
 
-function claimViewFrom(raw: unknown): ClaimView {
-  const view = (raw ?? {}) as Partial<ClaimView>;
-  const slot = (view.slot ?? { id: "", state: "" }) as ClaimSlot;
-  const lobby = view.lobby ?? null;
-  return { slot, lobby: lobby === null ? null : { ...lobby, seats: Array.isArray(lobby.seats) ? lobby.seats : [] } };
+// ---------------------------------------------------------------- the public request API (players, no admin token)
+
+/** `GET /api/v1/public/pool`: what a player may ask for. */
+export interface PublicPool {
+  enabled: boolean;
+  access: "open" | "code" | string;
+  max_players: number;
+  lobby_minutes: number;
+  options: Record<string, SettingKey>;
+  queue: { length: number; games: number; max_games: number };
+}
+
+/** The lobby a request became, as its player sees it, with every human seat's join line. */
+export interface PublicLobby {
+  id: string;
+  name?: string | null;
+  /** starting, lobby, game, ended, failed, stopped. */
+  state: string;
+  phase?: string | null;
+  beat?: number | null;
+  map?: LobbyMapRef | null;
+  seats?: LobbySeat[] | null;
+  options?: Record<string, SettingKey> | null;
+  port?: number | null;
+}
+
+export interface RequestSeat {
+  kind: "human" | "ai";
+  /** Seat 1 (the host) defaults to the request's `player`; other humans to "Player N". */
+  name?: string;
+  ai?: string;
+  /** The start spot (ARMY_n), from 1; without it seats take spots in order. */
+  seat?: number;
+  /** 1 UEF, 2 Aeon, 3 Cybran, 4 Seraphim, 5 random. */
+  faction?: number;
+  /** 1 = no team, 2.. = team 1.. (FAF's numbering). */
+  team?: number;
+}
+
+export interface NewRequest {
+  /** The player's name, 1..40 characters; seat 1, who hosts. */
+  player: string;
+  map: string;
+  seats: RequestSeat[];
+  /** Over the pool's defaults. */
+  options?: Record<string, SettingKey>;
+  /** The access code, when the pool asks for one. */
+  code?: string;
+}
+
+export type RequestState = "queued" | "starting" | "lobby" | "game" | "ended" | "refused" | "cancelled";
+
+export interface GameRequest {
+  id: string;
+  /** The requester's secret for following and cancelling it; only in the answer to the POST. */
+  key?: string;
+  state: RequestState | string;
+  /** Its place in the pool's queue while queued. */
+  position?: number | null;
+  player?: string | null;
+  created?: string | null;
+  /** Why it was refused or cancelled. */
+  reason?: string | null;
+  lobby?: PublicLobby | null;
+  [key: string]: unknown;
+}
+
+function requestFrom(raw: unknown): GameRequest {
+  const request = (raw ?? {}) as Partial<GameRequest>;
+  const lobby = request.lobby ?? null;
+  return { ...request, id: String(request.id ?? ""), state: String(request.state ?? ""), lobby: lobby === null ? null : { ...lobby, seats: Array.isArray(lobby.seats) ? lobby.seats : [] } };
 }
 
 /**
- * A player's claim of an open slot (plan WP17.18): the claim code is the credential, so no Authorization header is
- * sent. Errors throw `ApiError`: 404 for an unknown code (or one that stopped working when its slot reopened after a
- * game), 409 when the slot is already claimed, 400 with the host's reason for a bad claim.
+ * A player's request for a server: no Authorization header is sent. The request's key, from the answer to the POST,
+ * follows and cancels it. Errors throw `ApiError`: 403 when player hosting is off (maps and settings too) or the access
+ * code is wrong, 429 for too many requests, 409 for a second live request of the same player or a full queue, 400
+ * with the host's reason for a bad one (more cores than the whole pool, say).
  */
-export class ClaimApi {
+export class RequestApi {
   readonly base: string;
-  readonly code: string;
 
-  constructor(base: string, code: string) {
+  constructor(base: string) {
     this.base = base.replace(/\/+$/, "");
-    this.code = code.trim();
   }
 
-  private request(method: string, sub: string, body?: unknown, signal?: AbortSignal): Promise<Answer> {
-    return requestJson(this.base, null, method, `/api/v1/claim/${encodeURIComponent(this.code)}${sub}`, body, signal);
+  private request(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<Answer> {
+    return requestJson(this.base, null, method, `/api/v1/public${path}`, body, signal);
   }
 
-  /** `GET /api/v1/claim/<code>`: the slot and, once claimed, its lobby. */
-  async view(signal?: AbortSignal): Promise<ClaimView> {
-    return claimViewFrom((await this.request("GET", "", undefined, signal)).claim);
+  /** `GET /api/v1/public/pool`. */
+  async pool(signal?: AbortSignal): Promise<PublicPool> {
+    const answer = await this.request("GET", "/pool", undefined, signal);
+    const raw = (answer.pool !== null && typeof answer.pool === "object" ? answer.pool : answer) as Partial<PublicPool>;
+    const queue = (raw.queue ?? {}) as Partial<PublicPool["queue"]>;
+    return {
+      enabled: raw.enabled === true,
+      access: raw.access === "code" ? "code" : "open",
+      max_players: typeof raw.max_players === "number" ? raw.max_players : 16,
+      lobby_minutes: typeof raw.lobby_minutes === "number" ? raw.lobby_minutes : 0,
+      options: raw.options !== null && typeof raw.options === "object" ? raw.options : {},
+      queue: { length: queue.length ?? 0, games: queue.games ?? 0, max_games: queue.max_games ?? 0 },
+    };
   }
 
-  /** `GET /api/v1/claim/<code>/maps`: the host's maps, as `/api/v1/maps` gives them. */
+  /** `GET /api/v1/public/maps`. */
   async maps(signal?: AbortSignal): Promise<MapInfo[]> {
     const answer = await this.request("GET", "/maps", undefined, signal);
     return Array.isArray(answer.maps) ? (answer.maps as MapInfo[]) : [];
   }
 
-  /** `GET /api/v1/claim/<code>/settings[?map=<id>]`: as `/api/v1/settings`. */
+  /** The address of a map's preview image on the public API (an `<img>` may load it as is). */
+  previewUrl(map: MapInfo): string | null {
+    if (typeof map.preview !== "string" || map.preview === "") return null;
+    const path = map.preview.startsWith("/api/v1/public/") ? map.preview : `/api/v1/public/maps/${encodeURIComponent(map.id)}/preview.png`;
+    return /^https?:\/\//.test(path) ? path : `${this.base}${path}`;
+  }
+
+  /** `GET /api/v1/public/settings[?map=<id>]`. */
   async settings(mapId?: string, signal?: AbortSignal): Promise<Settings> {
     return settingsFrom((await this.request("GET", `/settings${settingsQuery(mapId)}`, undefined, signal)).settings as Partial<Settings> | undefined);
   }
 
-  /** `POST /api/v1/claim/<code>`: claims the slot; the answer is the view with the new lobby. */
-  async claim(request: ClaimRequest, signal?: AbortSignal): Promise<ClaimView> {
-    return claimViewFrom((await this.request("POST", "", request, signal)).claim);
+  /** `POST /api/v1/public/requests`: the answer carries the key that follows it. */
+  async create(request: NewRequest, signal?: AbortSignal): Promise<GameRequest> {
+    return requestFrom((await this.request("POST", "/requests", request, signal)).request);
+  }
+
+  /** `GET /api/v1/public/requests/<id>?key=`. */
+  async get(id: string, key: string, signal?: AbortSignal): Promise<GameRequest> {
+    return requestFrom((await this.request("GET", `/requests/${encodeURIComponent(id)}?key=${encodeURIComponent(key)}`, undefined, signal)).request);
+  }
+
+  /** `DELETE /api/v1/public/requests/<id>?key=`: cancels it while it waits or before the game. */
+  async cancel(id: string, key: string): Promise<GameRequest> {
+    return requestFrom((await this.request("DELETE", `/requests/${encodeURIComponent(id)}?key=${encodeURIComponent(key)}`)).request);
   }
 }

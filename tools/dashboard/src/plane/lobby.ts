@@ -1,17 +1,19 @@
-// A lobby opened inside the control plane (`#/lobby/<id>`), through the host's proxy to the lobby's own server: a bar
-// with the way back, the host's summary and the other lobbies; the lobby or game (phase, countdown, game clock), the
-// armies of a running game, the seats (joined, ready, ping), the lobby's facts with its join and watch lines, the event
-// stream with filters, and the control ops (controls.ts).
+// A lobby's page (`#/lobby/<id>[/log|/metrics]`), through the host's proxy to the lobby's own server: a bar with its
+// name, kind, state, map and CPUs and three tabs. Game: the lobby or game (phase, countdown, game clock), the armies of
+// a running game, the seats (joined, ready, ping), the lobby's facts with its join and watch lines, the event stream
+// with filters, and the control ops (controls.ts). Server log: its server.log, live, filtered. Metrics: its CPU and
+// memory over time.
 
 import { ApiError, type Lobby, type Seat, type ServerApi, type ServerEvent, type Status } from "../api.ts";
 import { renderArmies } from "../armies.ts";
-import { byId, clock, fill, h, icon, initials, isNumber, num, type Child } from "../dom.ts";
+import { byId, clock, fill, h, icon, initials, isNumber, type Child } from "../dom.ts";
 import { CATEGORIES, eventItem, kindOf, type Category, type EventContext } from "../events.ts";
+import { followLobbyLog, LogView } from "../logview.ts";
 import { toast } from "../ui.ts";
-import { gb } from "./capacity.ts";
+import { LobbyCharts } from "../views/metrics.ts";
 import { bindControls, enableControls, followLobby, optionsChanged, renderSeatPicker, resetControls, showPhase, showSelection } from "./controls.ts";
-import { cpuChips, fact, forgetLobby, joinBlock, stateChip, stopLobby, usageLine, warningSummary, watchBlock } from "./lists.ts";
-import { colour, cpuLoad, displayName, lobbyById, on, plural, RUNNING, SLOT_HOLDING, slotOfLobby, store } from "./store.ts";
+import { cpuChips, fact, forgetLobby, joinBlock, kindChip, stateChip, stopLobby, timeOf, usageLine, warningSummary, watchBlock } from "./parts.ts";
+import { colour, displayName, isPoolLobby, LIVE, lobbyById, on, plural, RUNNING, store } from "./store.ts";
 
 const MAX_EVENTS = 300;
 const REQUEST_MS = 5000;
@@ -27,8 +29,15 @@ const barMeta = byId<HTMLElement>("lobby-bar-meta");
 const barState = byId<HTMLElement>("lobby-bar-state");
 const barSwatch = byId<HTMLElement>("lobby-bar-swatch");
 const bar = byId<HTMLElement>("lobby-bar");
-const hostSummary = byId<HTMLElement>("lobby-host-summary");
-const lobbySwitch = byId<HTMLElement>("lobby-switch");
+const barKind = byId<HTMLElement>("lobby-bar-kind");
+const tabButtons = [...document.querySelectorAll<HTMLAnchorElement>("[data-lobby-tab]")];
+const tabPanels = [...document.querySelectorAll<HTMLElement>("[data-lobby-panel]")];
+const logBox = byId<HTMLElement>("lobby-log");
+const metricsBox = byId<HTMLElement>("lobby-metrics");
+const logView = new LogView({ tall: true });
+const lobbyCharts = new LobbyCharts();
+logBox.append(logView.root);
+metricsBox.append(lobbyCharts.root);
 
 const hero = byId<HTMLElement>("hero");
 const heroEyebrow = byId<HTMLElement>("hero-eyebrow");
@@ -307,7 +316,7 @@ function renderHero(status: Status): void {
   const swr = status.start_when_ready_seconds;
   const tiles: HTMLElement[] = [tile("Players", `${joined.length} / ${seats.length}`)];
   if (!inGame) tiles.push(tile("Ready", `${ready} / ${seats.length}`, seats.length > 0 && ready === seats.length ? "ok" : ""));
-  tiles.push(tile("Host", status.host === undefined ? "–" : nameOf(status.host)));
+  tiles.push(tile("Host", status.host === undefined ? "–" : status.host === 0 ? "nobody (the organiser runs it)" : nameOf(status.host)));
   tiles.push(tile("Start when ready", isNumber(swr) && swr > 0 ? `${swr} s` : "off"));
   if (inGame && isNumber(status.beat)) tiles.push(tile("Beat", status.beat.toLocaleString()));
   heroTiles.replaceChildren(...tiles);
@@ -370,7 +379,7 @@ async function poll(): Promise<void> {
   }
   // A lobby the host lists as stopped or failed has no server to ask: say so without a request.
   const known = currentLobby();
-  if (known !== undefined && !RUNNING.has(known.state)) {
+  if (known !== undefined && !LIVE.has(known.state)) {
     view.classList.add("stale");
     renderIdle(known.state === "failed" ? `The lobby's server failed${known.exit ? `: ${known.exit}` : ""}` : "The lobby was stopped");
     enableControls(false, "not running");
@@ -515,7 +524,7 @@ function follow(current: ServerApi): void {
   const controller = new AbortController();
   stream = controller;
   const known = currentLobby();
-  if (known !== undefined && !RUNNING.has(known.state)) {
+  if (known !== undefined && !LIVE.has(known.state)) {
     // Stopped or failed: no stream to open. Look again later, in case the list was behind.
     setStream(null);
     window.setTimeout(() => {
@@ -543,54 +552,6 @@ function follow(current: ServerApi): void {
 
 // ---------------------------------------------------------------- the bar, the host's summary, the lobby's facts
 
-function summaryItem(label: string, value: Child): HTMLElement {
-  return h("div", { class: "summary-item" }, h("dt", {}, label), h("dd", {}, value));
-}
-
-function renderHostSummary(): void {
-  const info = store.info;
-  if (info === null) {
-    hostSummary.replaceChildren();
-    return;
-  }
-  const cpus = info.cpus;
-  const load = cpus.length === 0 ? 0 : cpus.reduce((sum, cpu) => sum + cpuLoad(cpu), 0) / cpus.length;
-  const running = store.lobbies.filter((lobby) => RUNNING.has(lobby.state)).length;
-  const open = store.slots.filter((slot) => slot.state === "open").length;
-  const held = store.slots.filter((slot) => SLOT_HOLDING.has(slot.state)).length;
-  const memory = info.memory_mb;
-  hostSummary.replaceChildren(
-    summaryItem("Host", h("a", { href: "#/" }, info.name ?? "host")),
-    summaryItem("CPUs", `${cpus.length} · ${Math.round(load)}% load`),
-    summaryItem("Memory", isNumber(memory?.available) && isNumber(memory?.total) && memory.total > 0 ? `${gb(memory.available)} free of ${gb(memory.total)}` : "–"),
-    summaryItem("Lobbies", h("a", { href: "#/" }, `${running} running`)),
-    summaryItem("Slots", h("a", { href: "#/" }, store.slotsSupported ? `${open} open · ${held - open} in use` : "–")),
-  );
-}
-
-function renderSwitch(): void {
-  const others = store.lobbies.filter((lobby) => RUNNING.has(lobby.state) || lobby.id === lobbyId);
-  if (others.length <= 1) {
-    lobbySwitch.replaceChildren();
-    return;
-  }
-  lobbySwitch.replaceChildren(
-    h("span", { class: "dim small switch-label" }, "Go to"),
-    ...others.map((lobby) => {
-      const slot = slotOfLobby(lobby.id);
-      const link = h(
-        "a",
-        { class: `switch-chip${lobby.id === lobbyId ? " current" : ""}`, href: `#/lobby/${encodeURIComponent(lobby.id)}`, title: `${displayName(lobby)}${slot === undefined ? "" : ` (slot ${displayName(slot)})`}, ${lobby.state}` },
-        h("span", { class: `swatch${slot === undefined ? "" : " slot"}`, "aria-hidden": "true" }),
-        h("span", { class: "switch-name" }, displayName(lobby)),
-      );
-      (link.firstElementChild as HTMLElement).style.setProperty("--swatch", colour(slot?.id ?? lobby.id));
-      if (lobby.id === lobbyId) link.setAttribute("aria-current", "page");
-      return link;
-    }),
-  );
-}
-
 let linesSignature = "";
 let warnSignature = "";
 
@@ -612,17 +573,18 @@ function renderInfo(lobby: Lobby | undefined): void {
   const seats = lobby.seats ?? [];
   const humans = seats.filter((seat) => seat.kind === "human").length;
   const observers = lobby.observers ?? [];
-  const slot = slotOfLobby(lobby.id);
+  const host = seats.find((seat) => seat.seat === 1 && seat.kind === "human")?.name ?? "";
   fill(
     infoFacts,
     fact("Map", h("span", {}, map?.name ?? map?.id ?? "unknown", isNumber(map?.km) ? h("span", { class: "dim" }, ` · ${map.km} km`) : null)),
     fact("Seats", `${plural(humans, "player")}${seats.length > humans ? ` + ${plural(seats.length - humans, "AI", "AIs")}` : ""}${observers.length > 0 ? ` · ${plural(observers.length, "observer")}` : ""}`),
-    fact("Control", lobby.control === "organiser" ? "organiser starts it" : lobby.control === "player" ? `a player hosts${slot?.host_player ? ` (${slot.host_player})` : ""}` : "–"),
-    fact("CPUs", cpuChips(cpus, slot?.id ?? lobby.id)),
-    fact(nodes.length > 1 ? "Nodes" : "Node", nodes.length === 0 ? "–" : nodes.join(", ")),
-    fact("Use", RUNNING.has(lobby.state) ? usageLine(cpus.length, lobby.usage) : h("span", { class: "dim" }, "–"), true),
+    fact("Who starts it", lobby.control === "organiser" ? "the organiser (nobody hosts)" : lobby.control === "player" ? `the host player${host === "" ? "" : ` (${host})`}` : "–"),
+    fact("CPUs", cpuChips(cpus, lobby.id)),
+    fact(nodes.length > 1 ? "Nodes" : "Node", nodes.length === 0 ? "–" : `${nodes.join(", ")}${isPoolLobby(lobby) ? " · player pool" : ""}`),
+    fact("Use now", RUNNING.has(lobby.state) ? usageLine(cpus.length, lobby.usage) : h("span", { class: "dim" }, "–"), true),
     fact("Port", isNumber(lobby.port) ? String(lobby.port) : "–"),
-    slot === undefined ? null : fact("Open slot", h("span", {}, displayName(slot), isNumber(slot.games) ? h("span", { class: "dim" }, ` · game ${num(slot.games)}`) : null)),
+    fact("Started", `${timeOf(lobby.started_at ?? lobby.created)}${lobby.queued_at ? ` · queued at ${timeOf(lobby.queued_at)}` : ""}`),
+    isPoolLobby(lobby) ? fact("Player request", String(lobby.request)) : null,
   );
   const warnings = lobby.warnings ?? [];
   const wsig = JSON.stringify(warnings);
@@ -632,33 +594,33 @@ function renderInfo(lobby: Lobby | undefined): void {
   }
   infoExit.hidden = !lobby.exit;
   infoExit.textContent = lobby.exit ? `Exit: ${lobby.exit}` : "";
-  stopButton.hidden = !RUNNING.has(lobby.state);
+  stopButton.hidden = !LIVE.has(lobby.state);
   forgetButton.hidden = lobby.state !== "stopped" && lobby.state !== "failed";
   const lsig = JSON.stringify([lobby.state, seats.map((seat) => [seat.name, seat.join]), observers.map((observer) => [observer.name, observer.referee, observer.watch]), lobby.observer_delay_seconds]);
   if (lsig !== linesSignature) {
     linesSignature = lsig;
-    fill(infoLines, RUNNING.has(lobby.state) ? joinBlock(lobby) : null, RUNNING.has(lobby.state) && observers.length > 0 ? watchBlock(lobby) : null);
+    fill(infoLines, LIVE.has(lobby.state) ? joinBlock(lobby) : null, LIVE.has(lobby.state) && observers.length > 0 ? watchBlock(lobby) : null);
   }
 }
 
 function renderBar(): void {
   if (lobbyId === null) return;
   const lobby = currentLobby();
-  const slot = slotOfLobby(lobbyId);
   const name = lobby === undefined ? lobbyId : displayName(lobby);
   barName.textContent = name;
-  const tint = colour(slot?.id ?? lobbyId);
+  const tint = colour(lobbyId);
   bar.style.setProperty("--lobby", tint);
   barSwatch.style.setProperty("--swatch", tint);
-  barSwatch.classList.toggle("slot", slot !== undefined);
   if (lobby === undefined) {
-    barMeta.textContent = store.api === null ? "" : " · not on the host's list";
+    barMeta.textContent = store.api === null ? "" : "not on the host's list";
     barState.replaceChildren();
+    barKind.replaceChildren();
   } else {
     const cpus = (lobby.cpus ?? []).filter(isNumber);
     const map = lobby.map;
-    barMeta.textContent = ` · ${map?.name ?? map?.id ?? "map ?"}${cpus.length > 0 ? ` · CPU ${cpus.join(", ")}` : ""}${slot === undefined ? "" : ` · open slot ${displayName(slot)}`}`;
+    barMeta.textContent = `${map?.name ?? map?.id ?? "map ?"}${isNumber(map?.km) ? ` · ${map.km} km` : ""}${cpus.length > 0 ? ` · CPU ${cpus.join(", ")}` : ""}${(lobby.nodes ?? []).length > 0 ? ` · node ${(lobby.nodes ?? []).join(", ")}` : ""}`;
     barState.replaceChildren(stateChip(lobby.state));
+    barKind.replaceChildren(kindChip(lobby));
   }
   document.title = `${name} · FAF Server Dashboard`;
 }
@@ -667,16 +629,11 @@ function renderFromHost(): void {
   if (lobbyId === null) return;
   const lobby = currentLobby();
   renderBar();
-  renderHostSummary();
-  renderSwitch();
   renderInfo(lobby);
   followLobby(lobbyId, lobby);
 }
 
 on("lists", renderFromHost);
-on("host", () => {
-  if (lobbyId !== null) renderHostSummary();
-});
 
 stopButton.addEventListener("click", () => {
   if (lobbyId !== null) void stopLobby(lobbyId, stopButton);
@@ -684,8 +641,8 @@ stopButton.addEventListener("click", () => {
 forgetButton.addEventListener("click", () => {
   if (lobbyId === null) return;
   // Forgotten, it has no page: back to the overview (a refusal shows as a toast there).
-  void forgetLobby(lobbyId, forgetButton).then(() => {
-    location.hash = "#/";
+  void forgetLobby(lobbyId, forgetButton).then((done) => {
+    if (done) location.hash = "#/lobbies";
   });
 });
 
@@ -728,25 +685,54 @@ function resetView(): void {
   renderIdle("Opening the lobby…");
 }
 
-/** Opens lobby `id` through the host (`store.api`): polls its status every 2 s and follows its events. */
-export function openLobby(id: string): void {
+// ---------------------------------------------------------------- tabs
+
+export type LobbyTab = "game" | "log" | "metrics";
+let stopLog: (() => void) | null = null;
+
+function showTab(tab: LobbyTab): void {
+  for (const button of tabButtons) {
+    const current = button.dataset.lobbyTab === tab;
+    button.classList.toggle("current", current);
+    if (current) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+    if (lobbyId !== null) button.href = `#/lobby/${encodeURIComponent(lobbyId)}${button.dataset.lobbyTab === "game" ? "" : `/${button.dataset.lobbyTab ?? ""}`}`;
+  }
+  for (const panel of tabPanels) panel.hidden = panel.dataset.lobbyPanel !== tab;
+  const host = store.api;
+  if (tab === "log" && stopLog === null && host !== null && lobbyId !== null) {
+    const id = lobbyId;
+    stopLog = followLobbyLog(host, id, logView, () => LIVE.has(lobbyById(id)?.state ?? ""));
+  }
+  if (tab === "metrics" && lobbyId !== null) lobbyCharts.open(lobbyId);
+  else lobbyCharts.close();
+}
+
+/** Opens lobby `id` through the host (`store.api`) on a tab: polls its status every 2 s and follows its events. */
+export function openLobby(id: string, tab: LobbyTab = "game"): void {
   const host = store.api;
   if (host === null) return;
   if (id === lobbyId && api !== null) {
     renderFromHost();
+    showTab(tab);
     return;
   }
   closeLobby();
   lobbyId = id;
   api = host.lobbyApi(id);
+  logView.setLines([], "Loading…");
   renderFromHost();
   refresh = window.setInterval(() => void poll(), POLL_MS);
   follow(api);
   void poll();
+  showTab(tab);
 }
 
 /** Stops following the open lobby: one lobby's seats and events don't mix with another's. */
 export function closeLobby(): void {
+  stopLog?.();
+  stopLog = null;
+  lobbyCharts.close();
   window.clearInterval(refresh);
   refresh = undefined;
   stream?.abort();

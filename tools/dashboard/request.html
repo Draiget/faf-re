@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Ask for a game server · FAF</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233563e9'/%3E%3Cpath d='M9 23V9h12M9 16h9' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body class="request-page">
+    <header class="topbar">
+      <span class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32"><path d="M9 23V9h12M9 16h9" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">Ask for a game server</span>
+          <span class="brand-sub" id="host-line">FAF dedicated server</span>
+        </span>
+      </span>
+      <div class="topbar-right">
+        <span id="pool-pill" class="pill pill-idle"><span class="pill-dot" aria-hidden="true"></span><span id="pool-text">Connecting…</span></span>
+        <button id="theme" class="icon-btn" type="button" aria-label="Theme: automatic" title="Theme: automatic"></button>
+      </div>
+    </header>
+    <main id="main" class="request-main" tabindex="-1"></main>
+    <div id="toasts" class="toasts" aria-live="polite" aria-relevant="additions"></div>
+    <dialog id="confirm" class="dialog" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+      <form method="dialog">
+        <h2 id="confirm-title">Are you sure?</h2>
+        <p id="confirm-text"></p>
+        <div class="dialog-actions">
+          <button class="btn" type="submit" value="cancel" autofocus>Keep it</button>
+          <button class="btn danger" type="submit" value="ok" id="confirm-ok">Confirm</button>
+        </div>
+      </form>
+    </dialog>
+    <script type="module" src="/src/request.ts"></script>
+  </body>
+</html>
