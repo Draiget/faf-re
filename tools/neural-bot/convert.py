@@ -151,7 +151,13 @@ class Converter:
                            "name": "ARMY_%d" % (a["army"] + 1), "faction": a.get("faction"),
                            "start": list(start) if start else None, "brainType": "Human"})
         self.relation = {a["index"]: a["relation"] for a in armies}
-        self.hello = {"map": hello_map, "armies": armies, "config": {"omniscient": False, "armies": [self.me]}}
+        # The ratings the lobby showed (displayed rating = MEAN - 3 DEV, and the rated-game count): the skill a
+        # rating-conditioned policy is asked to play at. faf-neural-ai itself ignores the key.
+        enemies = [players[a["index"] - 1].get("rating") for a in armies if a["relation"] == "enemy"]
+        enemies = [r for r in enemies if r is not None]
+        self.hello = {"map": hello_map, "armies": armies, "config": {"omniscient": False, "armies": [self.me]},
+                      "skill": {"rating": mine.get("rating"), "games": mine.get("games"),
+                                "enemy_rating": round(sum(enemies) / len(enemies), 1) if enemies else None}}
         self.meta = {"source": "faf-replay", "replay": game["id"], "me": self.me, "decision_ticks": every,
                      # no "label_source": to faf-neural-ai's encoder (tools_bc.encode_game) that key means a teacher
                      # labelled the steps; without it the labels come from the player's own orders in "sent"
