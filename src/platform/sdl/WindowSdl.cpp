@@ -726,6 +726,23 @@ namespace platform::window
     }
   }
 
+  bool GetMousePosition(
+    const Handle window,
+    int& x,
+    int& y
+  )
+  {
+    SDL_Window* const native = AsWindow(window);
+    if (native == nullptr || SDL_GetMouseFocus() != native || SDL_GetKeyboardFocus() != native) {
+      return false;
+    }
+    float mouseX = 0.0f;
+    float mouseY = 0.0f;
+    (void)SDL_GetMouseState(&mouseX, &mouseY);
+    ToPixels(native, mouseX, mouseY, x, y);
+    return true;
+  }
+
   void SetTitle(
     const Handle window,
     const char* const utf8Title

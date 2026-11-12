@@ -133,6 +133,10 @@ namespace platform::window
   // SystemCommand event with `command`. Nothing where the desktop has no such menu.
   void AddSystemMenuItem(Handle window, int command, const char* utf8Label);
 
+  // Current cursor in client pixels. False unless this window has mouse and keyboard focus.
+  // Uses window-local input, including on Wayland where desktop cursor positions are unavailable.
+  [[nodiscard]] bool GetMousePosition(Handle window, int& x, int& y);
+
   // Events, without waiting: HasEvents reads what the window system has queued.
   [[nodiscard]] bool HasEvents();
   [[nodiscard]] bool PollEvent(Event& event);
