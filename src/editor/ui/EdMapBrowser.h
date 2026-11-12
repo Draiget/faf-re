@@ -72,6 +72,54 @@ namespace faf::editor
       return std::exchange(mOpenFileAsk, false);
     }
 
+    /** The start screen's pages, drawn in place: the maps on this computer and the FAF vault. */
+    void DrawLocalPage()
+    {
+      DrawLocal();
+    }
+    void DrawVaultPage()
+    {
+      DrawVault();
+    }
+    /** Asked for the vault page (ShowVault), once. */
+    [[nodiscard]] bool TakeSelectVault() noexcept
+    {
+      return std::exchange(mSelectVault, false);
+    }
+    /**
+     * A listed map's card: its title, size and players, and its preview picture (0 until made; asking makes it over
+     * the next frames). False when the game doesn't list it.
+     */
+    bool MapCard(
+      const std::string& scenario,
+      std::string& title,
+      std::string& size,
+      int& players,
+      std::uint64_t& picture,
+      std::string* disk = nullptr
+    );
+    /** A vault map's thumbnail, 0 until fetched (asking fetches it). */
+    [[nodiscard]] std::uint64_t VaultThumbnail(
+      const std::string& url
+    )
+    {
+      return VaultPicture(url);
+    }
+    /** The scenario of a vault map's folder when the game lists it here, else empty. */
+    [[nodiscard]] std::string ScenarioOfFolder(
+      const std::string& folder
+    ) const
+    {
+      return ListedScenario(folder);
+    }
+    /** Opens a listed map (picks it in the play list and opens it). */
+    void OpenListedMap(
+      const std::string& scenario
+    )
+    {
+      OpenMap(scenario);
+    }
+
   private:
     struct Details
     {

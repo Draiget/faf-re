@@ -74,6 +74,8 @@ namespace faf::editor
     {
       NewFlat(kind == "beam" ? "BeamBlueprint" : "TrailEmitterBlueprint");
     }
+    /** File > New effect, and the start screen's New Effect: an effect with one emitter (asks first if edited). */
+    void NewEffect();
     /** Test runs (`/particleopen <game path>`): opens a game emitter. */
     bool OpenGameEmitter(const std::string& path);
     /** Test runs (`/particleswitch <game path>`): the open effect marked edited, then that one opened through the

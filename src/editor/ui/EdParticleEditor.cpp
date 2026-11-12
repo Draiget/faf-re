@@ -501,6 +501,14 @@ namespace faf::editor
     return mDirty ? std::string() : mGamePath;
   }
 
+  void EdParticleEditor::NewEffect()
+  {
+    OpenOther([this] {
+      mGamePath.clear();
+      SetGraph("new_effect", {{"new_emitter", NewEmitter()}}, "");
+    });
+  }
+
   void EdParticleEditor::DrawToolbar()
   {
     if (!ImGui::BeginMenuBar()) {
@@ -518,10 +526,7 @@ namespace faf::editor
         });
       }
       if (ImGui::MenuItem("New effect")) {
-        OpenOther([this] {
-          mGamePath.clear();
-          SetGraph("new_effect", {{"new_emitter", NewEmitter()}}, "");
-        });
+        NewEffect();
       }
       if (ImGui::MenuItem("Browse the game's effects...")) {
         mOpenBrowserAsk = true;

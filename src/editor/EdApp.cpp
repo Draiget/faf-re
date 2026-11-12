@@ -1305,6 +1305,18 @@ namespace faf::editor
           }
           FullHelpText() = mSettings.GetBool(EdSettings::kFullHelp);
           mShell->PanelsWhilePlaying() = mSettings.GetBool(EdSettings::kPanelsWhilePlaying);
+          mShell->HomeAtStart() = mSettings.GetBool(EdSettings::kStartScreen);
+          mShell->HomeVaultItems() = mSettings.GetBool(EdSettings::kVaultItems);
+          // The start screen, unless the command line asks for a map (or a test run for something).
+          bool asked = false;
+          for (const char* const option :
+               {"/open", "/openall", "/openfolder", "/newmap", "/play", "/vaultmap", "/command", "/palette"}) {
+            asked = asked || moho::CFG_GetArgOption(option, 0, nullptr);
+          }
+          if (mShell->HomeAtStart() && !asked) {
+            mShell->ShowHome(0);
+            gpg::Logf("editor: the start screen");
+          }
           return;
         }
         bool changed = false;
@@ -1313,6 +1325,12 @@ namespace faf::editor
         }
         if (mShell->PanelsWhilePlaying() != mSettings.GetBool(EdSettings::kPanelsWhilePlaying)) {
           changed = mSettings.SetBool(EdSettings::kPanelsWhilePlaying, mShell->PanelsWhilePlaying()) || changed;
+        }
+        if (mShell->HomeAtStart() != mSettings.GetBool(EdSettings::kStartScreen)) {
+          changed = mSettings.SetBool(EdSettings::kStartScreen, mShell->HomeAtStart()) || changed;
+        }
+        if (mShell->HomeVaultItems() != mSettings.GetBool(EdSettings::kVaultItems)) {
+          changed = mSettings.SetBool(EdSettings::kVaultItems, mShell->HomeVaultItems()) || changed;
         }
         if (changed) {
           SaveSettings();
@@ -1434,6 +1452,9 @@ namespace faf::editor
             ImGui::Checkbox("Full help text", &FullHelpText());
             SettingLabel("Panels while playing", "The panels stay around the game while a play runs.");
             ImGui::Checkbox("Show the panels while playing", &mShell->PanelsWhilePlaying());
+            SettingLabel("Start screen", "New, recent work, your maps and the FAF vault (File > Start screen).");
+            ImGui::Checkbox("Show the start screen when the editor starts", &mShell->HomeAtStart());
+            ImGui::Checkbox("FAF vault items on the start screen", &mShell->HomeVaultItems());
             SettingLabel("Settings folder", nullptr);
             const std::filesystem::path folder = EditorSettingsFolder();
             ImGui::TextDisabled("%s", folder.string().c_str());
@@ -2079,6 +2100,27 @@ namespace faf::editor
       };
 
       // File
+      add("file.home", "Start screen", "File", "", [this] {
+        mShell->ShowHome(0);
+      }, {}, {}, "New, recent work, your maps and the FAF vault");
+      add("new.mission", "New mission...", "File", "", [] {}, [] {
+        return std::string("missions come with the Mission tools");
+      });
+      add("new.mod", "New mod...", "File", "", [] {}, [] {
+        return std::string("mods come with the Units and mods tools");
+      });
+      add("new.effect", "New effect", "File", "", [this] {
+        mShell->SwitchWorkspace(6);
+        mShell->HideHome();
+        mShell->ShowParticleEditor() = true;
+        mShell->ParticleEditor().NewEffect();
+      }, {}, {}, "A particle effect in the Effects workspace");
+      add("new.material", "New material", "File", "", [this] {
+        mShell->SwitchWorkspace(8);
+        mShell->HideHome();
+        mShell->ShowMaterialEditor() = true;
+        mShell->MaterialEditor().NewGraph();
+      }, {}, {}, "A texture layer's node graph in the Materials workspace");
       add("file.new", "New map...", "File", "Ctrl+N", [this] {
         mShell->OpenNewMap();
       }, notBusy);
@@ -2380,7 +2422,11 @@ namespace faf::editor
       mMenus = {
         EdMenu{
           "&File",
-          {cmd("file.new"),
+          {cmd("file.home"),
+           sep(),
+           cmd("file.new"),
+           cmd("new.effect"),
+           cmd("new.material"),
            cmd("file.open"),
            recent,
            sep(),

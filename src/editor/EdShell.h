@@ -222,6 +222,28 @@ namespace faf::editor
      * the first time). The panels shown in the one left are kept for it.
      */
     void SwitchWorkspace(int workspace);
+    /**
+     * The start screen (design §8 Files) over the panels: `page` 0 Home, 1 On this computer, 2 FAF vault. File > Open
+     * and every "Open a map..." show its pages; a map opening, a workspace tab or Continue put it away.
+     */
+    void ShowHome(int page = 0) noexcept;
+    void HideHome() noexcept
+    {
+      mShowHome = false;
+    }
+    [[nodiscard]] bool HomeShown() const noexcept
+    {
+      return mShowHome;
+    }
+    /** Settings > General: the start screen when the editor starts; its FAF vault rows. */
+    bool& HomeAtStart() noexcept
+    {
+      return mHomeAtStart;
+    }
+    bool& HomeVaultItems() noexcept
+    {
+      return mHomeVaultItems;
+    }
     /** The scene's selection, said in the status bar as a count ("3 markers"). */
     void SetStatusSelection(
       std::string text
@@ -312,6 +334,20 @@ namespace faf::editor
     std::vector<bool> mWorkspaceBuilt;
     bool mWorkspaceStarted = false;
     std::string mStatusSelection;
+    // The start screen (ui/EdHomePage.cpp).
+    void DrawHome(float top, float bottom);
+    void DrawHomePage();
+    void DrawHomeRecent();
+    void DrawHomeVault(bool loggedIn);
+    void DrawHomeSearch(bool loggedIn);
+    bool mShowHome = false;
+    bool mHomeFocusSearch = false;
+    int mHomePage = 0;
+    char mHomeSearch[128] = {};
+    std::string mHomeSearchAsked;
+    double mHomeTypedAt = 0.0;
+    bool mHomeAtStart = true;
+    bool mHomeVaultItems = true;
     /** The toolbar under the title row: Play/Stop (F5) first, then New, Open, Save, Save as, Undo, Redo, and the open
      * map. `top` is where it starts (the title row's height). */
     EdMapBrowser mBrowser;

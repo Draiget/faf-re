@@ -966,6 +966,73 @@ namespace faf::editor
       std::string error;
       std::vector<VaultMap> maps;
       int pages = 0;
+      (void)FetchMaps(query, page, maps, pages, error);
+      {
+        std::lock_guard<std::mutex> lock(mLock);
+        mResults = std::move(maps);
+        mPages = pages;
+        mHaveResults = true;
+      }
+      SetMessage(error.empty() ? std::string() : error);
+      mSearching = false;
+    });
+  }
+
+  void EdFafSession::SearchNamed(
+    const std::string& name,
+    const VaultQuery& query
+  )
+  {
+    if (mState.load() != State::LoggedIn) {
+      return;
+    }
+    {
+      std::lock_guard<std::mutex> lock(mLock);
+      mNamed[name] = Named{};
+    }
+    Run([this, name, query] {
+      Named result;
+      int pages = 0;
+      (void)FetchMaps(query, 1, result.maps, pages, result.error);
+      result.done = true;
+      std::lock_guard<std::mutex> lock(mLock);
+      mNamed[name] = std::move(result);
+    });
+  }
+
+  bool EdFafSession::NamedResults(
+    const std::string& name,
+    std::vector<VaultMap>& maps,
+    std::string& error
+  ) const
+  {
+    std::lock_guard<std::mutex> lock(mLock);
+    const auto found = mNamed.find(name);
+    if (found == mNamed.end() || !found->second.done) {
+      return false;
+    }
+    maps = found->second.maps;
+    error = found->second.error;
+    return true;
+  }
+
+  bool EdFafSession::NamedAsked(
+    const std::string& name
+  ) const
+  {
+    std::lock_guard<std::mutex> lock(mLock);
+    return mNamed.find(name) != mNamed.end();
+  }
+
+  bool EdFafSession::FetchMaps(
+    const VaultQuery& query,
+    const int page,
+    std::vector<VaultMap>& maps,
+    int& pages,
+    std::string& error
+  )
+  {
+    {
       for (int attempt = 0; attempt < 2; ++attempt) {
         HttpCall call;
         call.url = VaultSearchUrl(query, page);
@@ -1004,15 +1071,8 @@ namespace faf::editor
         error.clear();
         break;
       }
-      {
-        std::lock_guard<std::mutex> lock(mLock);
-        mResults = std::move(maps);
-        mPages = pages;
-        mHaveResults = true;
-      }
-      SetMessage(error.empty() ? std::string() : error);
-      mSearching = false;
-    });
+    }
+    return error.empty();
   }
 
   bool EdFafSession::TakeResults(

@@ -875,6 +875,39 @@ namespace faf::editor
     return picture;
   }
 
+  bool EdMapBrowser::MapCard(
+    const std::string& scenario,
+    std::string& title,
+    std::string& size,
+    int& players,
+    std::uint64_t& picture,
+    std::string* const disk
+  )
+  {
+    const std::vector<std::string>& maps = mPlay.Maps();
+    bool listed = false;
+    std::string key; // the play list's spelling, which the details are kept by
+    for (std::size_t i = 0; i < maps.size(); ++i) {
+      if (_stricmp(maps[i].c_str(), scenario.c_str()) == 0) {
+        listed = true;
+        key = maps[i];
+        title = i < mPlay.Titles().size() ? mPlay.Titles()[i] : scenario;
+        break;
+      }
+    }
+    if (!listed) {
+      return false;
+    }
+    const Details& details = DetailsOf(key);
+    size = details.size;
+    players = details.players;
+    picture = details.picture;
+    if (disk != nullptr) {
+      *disk = details.disk;
+    }
+    return true;
+  }
+
   void EdMapBrowser::Update()
   {
     mReadsThisFrame = 0;

@@ -23,6 +23,8 @@ namespace faf::editor
         {EdSettings::kBackgroundFps, "30", {"0", "10", "30", "60"}},
         {EdSettings::kFullHelp, "0", {}},
         {EdSettings::kPanelsWhilePlaying, "1", {}},
+        {EdSettings::kStartScreen, "1", {}},
+        {EdSettings::kVaultItems, "1", {}},
       };
       return kDefinitions;
     }

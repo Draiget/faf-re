@@ -165,6 +165,15 @@ namespace faf::editor
     /** A finished search's maps (once each search). */
     bool TakeResults(std::vector<VaultMap>& maps, int& pages);
     /**
+     * A search kept by name, beside the vault page's (the start screen's "Your uploads", "Most played", its search
+     * box): runs when asked while logged in, its first page kept to read until asked again.
+     */
+    void SearchNamed(const std::string& name, const VaultQuery& query);
+    /** The named search's maps once it finished (`error` says why there are none); false before. */
+    bool NamedResults(const std::string& name, std::vector<VaultMap>& maps, std::string& error) const;
+    /** Whether it was asked (running or done). */
+    [[nodiscard]] bool NamedAsked(const std::string& name) const;
+    /**
      * The bytes behind a link (a map's picture): from the FAF client's preview cache (`%ProgramData%\FAForever\cache\
      * maps\large` or `small`, named after the link's last part, as its AssetService keeps them), else the editor's own
      * cache, else downloaded on a worker thread and kept in the editor's cache. Empty until here; one byte when the
@@ -202,6 +211,15 @@ namespace faf::editor
     bool RefreshAccess(std::string& error);
     void SaveRefreshToken() const;
     void FetchUserName();
+    /** One page of a search (a new access token and again when the old one ran out); false with `error`. */
+    bool FetchMaps(const VaultQuery& query, int page, std::vector<VaultMap>& maps, int& pages, std::string& error);
+    struct Named
+    {
+      bool done = false;
+      std::vector<VaultMap> maps;
+      std::string error;
+    };
+    std::map<std::string, Named> mNamed;
 
     std::filesystem::path mTokenFile;
     std::atomic<State> mState{State::LoggedOut};

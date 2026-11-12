@@ -43,6 +43,10 @@ namespace faf::editor
     static constexpr const char* kFullHelp = "FullHelp";
     /** The panels stay while a play runs (View > Panels while playing). */
     static constexpr const char* kPanelsWhilePlaying = "PanelsWhilePlaying";
+    /** The start screen when the editor starts without a map asked for. */
+    static constexpr const char* kStartScreen = "StartScreen";
+    /** The start screen's FAF vault rows (your uploads, most played, the vault half of its search). */
+    static constexpr const char* kVaultItems = "VaultItems";
 
   private:
     std::map<std::string, std::string, std::less<>> mValues;

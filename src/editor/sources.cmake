@@ -47,6 +47,8 @@ set(FAF_EDITOR_SOURCES
   ui/EdWorkspaces.cpp
   ui/EdStatus.cpp
   ui/EdSettings.cpp
+  ui/EdHomeModel.cpp
+  ui/EdHomePage.cpp
   ui/EdWindowChrome.cpp
   ui/EdTitleBar.cpp
   ui/EdPalette.cpp

@@ -407,7 +407,7 @@ namespace faf::editor
       ImGui::ShowDemoWindow(&mShowDemo);
     }
     DrawSaveAsDialog();
-    mBrowser.Draw();
+    DrawHome(top, statusHeight);
     DrawNewMapDialog();
     DrawPackageDialog();
     DrawStatusBar();
@@ -503,6 +503,7 @@ namespace faf::editor
     const int workspace
   )
   {
+    mShowHome = false;
     if (workspace < 0 || workspace >= static_cast<int>(Workspaces().size()) || workspace == ActiveWorkspace()) {
       return;
     }
