@@ -382,11 +382,45 @@ namespace faf::editor
     ImGui::End();
   }
 
+  void EdParticleEditor::DrawStage()
+  {
+    // The controls first, along the top; the view fills the rest.
+    ImGui::SetCursorPos(ImVec2(ImGui::GetStyle().WindowPadding.x, ImGui::GetStyle().WindowPadding.y));
+    DrawPreviewOptions();
+    ImGui::SameLine();
+    ImGui::TextDisabled("  %s", mName.empty() ? "no effect" : mName.c_str());
+    const float width = std::max(ImGui::GetContentRegionAvail().x, 64.0f);
+    const float height = std::max(ImGui::GetContentRegionAvail().y, 64.0f);
+    mViewport.SetSize(static_cast<int>(width), static_cast<int>(height));
+    mViewport.MarkShown();
+    if (const std::uint64_t image = mViewport.Image(); image != 0) {
+      ImGui::Image(ImTextureRef(static_cast<ImTextureID>(image)), ImVec2(width, height));
+    } else {
+      ImGui::Dummy(ImVec2(width, height));
+    }
+    ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);
+    if (ImGui::IsItemHovered()) {
+      const ImGuiIO& io = ImGui::GetIO();
+      if (io.MouseWheel != 0.0f) {
+        mViewport.Zoom(io.MouseWheel);
+      }
+      if (ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f) || ImGui::IsMouseDragging(ImGuiMouseButton_Right, 0.0f)) {
+        mViewport.Turn(io.MouseDelta.x, io.MouseDelta.y);
+      }
+    }
+  }
+
   void EdParticleEditor::DrawPreviewPane()
   {
+    // In the Effects workspace the effect plays in the middle of the window instead (DrawStage).
+    if (mStaged) {
+      ImGui::PushTextWrapPos(0.0f);
+      ImGui::TextDisabled("The effect plays in the middle of the window.");
+      ImGui::PopTextWrapPos();
+      return;
+    }
     // The particle view: the effect alone, in its own 3D view (EdParticleViewport), not the map. A drag turns round it,
     // the wheel comes closer; the options under it pick the ground, grid, background and height.
-    EdParticleViewport::Options& options = mViewport.Opts();
     const float width = std::max(ImGui::GetContentRegionAvail().x, 64.0f);
     const float height = std::clamp(ImGui::GetContentRegionAvail().y * 0.6f, 64.0f, width);
     mViewport.SetSize(static_cast<int>(width), static_cast<int>(height));
@@ -407,6 +441,12 @@ namespace faf::editor
       }
       ImGui::SetTooltip("Drag to turn round the effect, the wheel to come closer");
     }
+    DrawPreviewOptions();
+  }
+
+  void EdParticleEditor::DrawPreviewOptions()
+  {
+    EdParticleViewport::Options& options = mViewport.Opts();
     // The options as one row that wraps: each control as wide as its text, on the same line while it fits, else on the
     // next (user report: the height slider's text was cut).
     const ImGuiStyle& style = ImGui::GetStyle();

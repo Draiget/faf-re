@@ -74,6 +74,18 @@ namespace faf::editor
     {
       NewFlat(kind == "beam" ? "BeamBlueprint" : "TrailEmitterBlueprint");
     }
+    /**
+     * The Effects workspace's stage: the effect's own view filling the current window (the map view's place), its
+     * controls along the top; drag turns round it, the wheel comes closer. While it is drawn (`SetStaged`), the small
+     * previews in this editor and the browser give way to it.
+     */
+    void DrawStage();
+    void SetStaged(
+      const bool staged
+    ) noexcept
+    {
+      mStaged = staged;
+    }
     /** File > New effect, and the start screen's New Effect: an effect with one emitter (asks first if edited). */
     void NewEffect();
     /** Test runs (`/particleopen <game path>`): opens a game emitter. */
@@ -150,6 +162,10 @@ namespace faf::editor
     bool mOpenSave = false;
     /** The Preview pane: the middle of the 3D view, where the effect plays, magnified. */
     void DrawPreviewPane();
+    /** The preview's controls (play, restart, loop, background, ground, grid, turn, height, cameras), one wrapping row.
+     */
+    void DrawPreviewOptions();
+    bool mStaged = false;
     EdParticleViewport mViewport;
     /** The view comes to the effect's size when one opens. */
     bool mFrameAsk = true;

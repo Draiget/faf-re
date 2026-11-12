@@ -292,6 +292,7 @@ namespace faf::editor
         ImVec4(middle->Pos.x - viewport->Pos.x, middle->Pos.y - viewport->Pos.y, middle->Size.x, middle->Size.y);
     }
     ImGui::End();
+    DrawEffectStage();
     // The panels shown now are the workspace's to keep (layout.ini, [FafEditor][Ui] Panels.<key>=).
     {
       std::vector<std::string>& kept = ShownPanels()[Workspaces()[static_cast<std::size_t>(workspace)].key];
@@ -465,6 +466,32 @@ namespace faf::editor
     }
     ImGui::DockBuilderFinish(dockspaceId);
     gpg::Logf("editor: workspace %s laid out", w.name);
+  }
+
+  void EdShell::DrawEffectStage()
+  {
+    // The Effects workspace: the effect's own view in the map view's place (design §4), while the particle editor or
+    // browser is shown and no play runs.
+    const bool effects = std::string(Workspaces()[static_cast<std::size_t>(ActiveWorkspace())].key) == "effects";
+    const bool staged = effects && (mShowParticleEditor || mShowParticleBrowser) && !mPlay.Active() && !mShowHome;
+    mParticleEditor.SetStaged(staged);
+    if (!staged || mGameView.z < 64.0f || mGameView.w < 64.0f) {
+      return;
+    }
+    const ImGuiViewport* const viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x + mGameView.x, viewport->Pos.y + mGameView.y));
+    ImGui::SetNextWindowSize(ImVec2(mGameView.z, mGameView.w));
+    // A floating window (not NoBringToFrontOnFocus), so the game's view is cut out under it.
+    constexpr ImGuiWindowFlags kFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+      ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar |
+      ImGuiWindowFlags_NoScrollWithMouse;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    if (ImGui::Begin("Effect###EffectStage", nullptr, kFlags)) {
+      mParticleEditor.DrawStage();
+    }
+    ImGui::End();
+    ImGui::PopStyleVar(2);
   }
 
   const std::vector<EdShell::PanelFlag>& EdShell::PanelFlags()

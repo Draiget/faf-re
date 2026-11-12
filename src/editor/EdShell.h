@@ -358,6 +358,8 @@ namespace faf::editor
     void DrawHistoryPanel();
     bool mShowHistory = false;
     void DrawHelpWindow();
+    /** The Effects workspace's stage: the effect's view where the map view is. */
+    void DrawEffectStage();
     /** The Problems panel (ui/EdProblemsPanel.cpp): the check's findings and the log's warnings in one list. */
     void DrawProblemsPanel();
     /** A check finding's place: its script line, its prop's place, or its marker selected and framed. */
