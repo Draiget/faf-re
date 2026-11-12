@@ -1104,7 +1104,13 @@ moho::WEmitterWx::~WEmitterWx()
   if (mPreviewEffect.GetObjectPtr() != nullptr && mSim != nullptr) {
     mSim->mEffectManager->DestroyEffect(mPreviewEffect.GetObjectPtr());
   }
-  WLD_GetDriver()->ReleaseInterlockRef();
+  // Engine change: retail calls the driver unconditionally (0x00666FD0 reads 0x010C4F50 and calls slot +0x94). A
+  // window still open when the game ends outlives the sim driver, and that read of a null driver crashed at exit
+  // (coverage campaign run 2026-11-12, EFX_CreateEmitterWindow then ExitApplication). With no driver there is no
+  // interlock left to release.
+  if (ISTIDriver* const driver = WLD_GetDriver()) {
+    driver->ReleaseInterlockRef();
+  }
 }
 
 /**
