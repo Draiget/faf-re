@@ -739,7 +739,12 @@ namespace platform::window
     float mouseX = 0.0f;
     float mouseY = 0.0f;
     (void)SDL_GetMouseState(&mouseX, &mouseY);
-    ToPixels(native, mouseX, mouseY, x, y);
+    // Cursor coordinates identify a point inside a pixel, not its nearest pixel boundary.
+    // Rounding makes the penultimate row/column scroll and rejects part of the last one.
+    const float density = SDL_GetWindowPixelDensity(native);
+    const float scale = density > 0.0f ? density : 1.0f;
+    x = static_cast<int>(std::floor(mouseX * scale));
+    y = static_cast<int>(std::floor(mouseY * scale));
     int width = 0;
     int height = 0;
     if (!SDL_GetWindowSizeInPixels(native, &width, &height)) {

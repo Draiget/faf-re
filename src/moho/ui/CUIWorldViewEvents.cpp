@@ -3448,7 +3448,8 @@ void moho::CUIWorldView::Frame(
         if (ui_ScreenEdgeScrollView) {
           gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
           const gpg::gal::Head& head = device->GetDeviceContext()->GetHead(0u);
-          if (head.mWindowed) {
+          // SDL's focus-checked cursor query works in both native window modes.
+          if (FAFRE_PLATFORM_POSIX || head.mWindowed) {
             POINT cursorPoint{-1, -1};
 #if FAFRE_PLATFORM_POSIX
             // The head dimensions are client pixels, and Wayland has no desktop cursor position.
