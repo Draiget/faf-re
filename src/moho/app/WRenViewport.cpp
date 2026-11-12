@@ -951,7 +951,8 @@ namespace
 
   /**
    * Engine addition (issue #215): gpg::diag::BuildLabel ("FAF-RE, Draiget & contributors,
-   * build <version or commit> <arch>") in small gray text, centred at the bottom of the first head, while
+   * build <version or commit> <arch>") in small light text with a dark outline (so it reads on the
+   * lobby's striped bottom bar), centred at the bottom of the first head, while
    * the lobby screen is up (a CLobby exists and no game session runs). In a game the
    * same line heads the network-stats panel (F11) instead. The engine draws it after the UI, from
    * the commit compiled into the exe, so no Lua code can change or hide it; there is
@@ -968,7 +969,7 @@ namespace
 
     const char* const label = gpg::diag::BuildLabel();
     const float uiScale = BuildLabelUiScale();
-    const int fontPoints = std::max(1, static_cast<int>(std::lround(9.0f * uiScale)));
+    const int fontPoints = std::max(1, static_cast<int>(std::lround(10.0f * uiScale)));
     boost::SharedPtrRaw<moho::CD3DFont> rawFont = moho::CD3DFont::Create(fontPoints, "Arial");
     moho::CD3DFont* const font = rawFont.px;
     if (font == nullptr) {
@@ -1001,8 +1002,16 @@ namespace
     };
     const moho::Vector3f xAxis{1.0f, 0.0f, 0.0f};
     const moho::Vector3f yAxis{0.0f, -1.0f, 0.0f};
-    constexpr std::uint32_t kGray = 0xB0A0A0A0u; // ARGB: light gray, partly transparent
-    (void)font->Render(label, primBatcher, origin, xAxis, yAxis, kGray, 0.0f, gpg::NaN);
+    // ARGB. The lobby's bottom bar is striped dark and light blue, so the light text gets a
+    // one-pixel dark outline: drawn four times offset first, then the text over it.
+    constexpr std::uint32_t kOutline = 0xE0000000u;
+    constexpr std::uint32_t kText = 0xF0E6E6E6u;
+    constexpr float kOffsets[4][2] = {{-1.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, -1.0f}, {0.0f, 1.0f}};
+    for (const auto& offset : kOffsets) {
+      const moho::Vector3f shifted{origin.x + offset[0], origin.y + offset[1], 0.0f};
+      (void)font->Render(label, primBatcher, shifted, xAxis, yAxis, kOutline, 0.0f, gpg::NaN);
+    }
+    (void)font->Render(label, primBatcher, origin, xAxis, yAxis, kText, 0.0f, gpg::NaN);
 
     primBatcher->Flush();
     rawFont.release();
