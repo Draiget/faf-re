@@ -221,3 +221,20 @@ func TestAPIAuthAndRoutes(t *testing.T) {
 		t.Fatalf("proxy to no lobby: %d", w.Code)
 	}
 }
+
+func TestSeatsKeepTheirStartSpots(t *testing.T) {
+	m := testManager(t)
+	req := CreateRequest{Map: "scmp_009", Seats: []Seat{{Kind: "human", Seat: 5}, {Kind: "human"}, {Kind: "ai", Seat: 2}}}
+	if _, err := m.validate(&req); err != nil {
+		t.Fatal(err)
+	}
+	if req.Seats[0].Seat != 5 || req.Seats[1].Seat != 1 || req.Seats[2].Seat != 2 {
+		t.Fatalf("spots %d %d %d", req.Seats[0].Seat, req.Seats[1].Seat, req.Seats[2].Seat)
+	}
+	for _, bad := range [][]Seat{{{Kind: "human", Seat: 9}}, {{Kind: "human", Seat: 2}, {Kind: "ai", Seat: 2}}} {
+		r := CreateRequest{Map: "scmp_009", Seats: bad}
+		if _, err := m.validate(&r); err == nil {
+			t.Errorf("accepted %+v", bad)
+		}
+	}
+}

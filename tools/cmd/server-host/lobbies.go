@@ -295,12 +295,33 @@ func (m *manager) validate(req *CreateRequest) (Map, error) {
 	if err := validateOptions(req.Options); err != nil {
 		return mp, err
 	}
+	// A seat may name its start spot (`seat`, 1..the map's spots), so a lobby can leave spots empty between players;
+	// a seat without one takes the first spot nobody named.
+	spotTaken := map[int]bool{}
+	for i := range req.Seats {
+		if spot := req.Seats[i].Seat; spot != 0 {
+			if spot < 1 || spot > mp.Players {
+				return mp, fmt.Errorf("seat %d: start spot %d isn't on %s (1..%d)", i+1, spot, mp.Name, mp.Players)
+			}
+			if spotTaken[spot] {
+				return mp, fmt.Errorf("start spot %d is given to two seats", spot)
+			}
+			spotTaken[spot] = true
+		}
+	}
+	nextSpot := 1
 	humans := 0
 	uids := map[int]bool{}
 	nextUID := 1001
 	for i := range req.Seats {
 		s := &req.Seats[i]
-		s.Seat = i + 1
+		if s.Seat == 0 {
+			for spotTaken[nextSpot] {
+				nextSpot++
+			}
+			s.Seat = nextSpot
+			spotTaken[nextSpot] = true
+		}
 		if len(s.Name) > 40 {
 			return mp, fmt.Errorf("seat %d: name too long", s.Seat)
 		}
