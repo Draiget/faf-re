@@ -1,4 +1,5 @@
 #include "CGpgNetInterface.h"
+#include <functional>
 #include "platform/X87Precision.h"
 
 #include <algorithm>
@@ -46,6 +47,8 @@
 #include <shellapi.h>
 #include <wchar.h>
 #include <windows.h>
+#include "legacy/thread/Mutex.h"
+#include "legacy/thread/Thread.h"
 
 using namespace moho;
 
@@ -896,7 +899,7 @@ void CGpgNetInterface::SetTraversalHandler(
 )
 {
   (void)port;
-  boost::mutex::scoped_lock lock(mLock);
+  fa::mutex::scoped_lock lock(mLock);
   gpg::Logf("GPGNET: setting nat handler to %p", static_cast<const void*>(handler->get()));
   boost::AssignWeakFromShared(mNATHandler, *handler);
 }
@@ -1014,13 +1017,13 @@ namespace
    * below). IDA's own analysis names the bind assembler
    * `boost::bind_CGpgNetInterfaceConnect`, confirming the correspondence.
    */
-  [[nodiscard]] boost::function0<void> MakeConnectThreadLaunchCallback(
+  [[nodiscard]] std::function<void()> MakeConnectThreadLaunchCallback(
     CGpgNetInterface* const self,
     const u_long address,
     const u_short port
   )
   {
-    return boost::function0<void>([self, address, port]() {
+    return std::function<void()>([self, address, port]() {
       self->ConnectThread(address, port);
     });
   }
@@ -1037,7 +1040,7 @@ void CGpgNetInterface::Connect(
   const u_short port
 )
 {
-  boost::mutex::scoped_lock lock(mLock);
+  fa::mutex::scoped_lock lock(mLock);
 
   if (mConnectionState != kNetStatePending) {
     throw std::runtime_error("Already connected.");
@@ -1045,9 +1048,9 @@ void CGpgNetInterface::Connect(
 
   mConnectionState = kNetStateConnecting;
 
-  boost::thread* const thread = new boost::thread(MakeConnectThreadLaunchCallback(this, address, port));
+  fa::thread* const thread = new fa::thread(MakeConnectThreadLaunchCallback(this, address, port));
 
-  boost::thread* const oldThread = mConnectThreadWorker;
+  fa::thread* const oldThread = mConnectThreadWorker;
   mConnectThreadWorker = thread;
   if (oldThread != nullptr) {
     delete oldThread;
@@ -1127,12 +1130,12 @@ namespace
    * (manager 0x007BEEE0) by 0x007BEA4B (FUN_007BE9F0) and by the second install at 0x007BECA5; formerly
    * `DispatchSsoPayloadToDestinationRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
    */
-  [[nodiscard]] boost::function0<void> MakeConnectThreadLaunchCallback(
+  [[nodiscard]] std::function<void()> MakeConnectThreadLaunchCallback(
     CGpgNetInterface* const self,
     const fa::string& launchCommandTemplate
   )
   {
-    return boost::function0<void>([self, launchCommandTemplate]() {
+    return std::function<void()>([self, launchCommandTemplate]() {
       self->ConnectThread(launchCommandTemplate);
     });
   }
@@ -1149,7 +1152,7 @@ void CGpgNetInterface::Connect(
   const fa::string& launchCommandTemplate
 )
 {
-  boost::mutex::scoped_lock lock(mLock);
+  fa::mutex::scoped_lock lock(mLock);
 
   if (mConnectionState != kNetStatePending) {
     throw std::runtime_error("Already connected.");
@@ -1157,9 +1160,9 @@ void CGpgNetInterface::Connect(
 
   mConnectionState = kNetStateConnecting;
 
-  boost::thread* const thread = new boost::thread(MakeConnectThreadLaunchCallback(this, launchCommandTemplate));
+  fa::thread* const thread = new fa::thread(MakeConnectThreadLaunchCallback(this, launchCommandTemplate));
 
-  boost::thread* const oldThread = mConnectThreadWorker;
+  fa::thread* const oldThread = mConnectThreadWorker;
   mConnectThreadWorker = thread;
   if (oldThread != nullptr) {
     delete oldThread;
@@ -1177,7 +1180,7 @@ void CGpgNetInterface::WriteCommand(
   const fa::vector<SNetCommandArg>& args
 )
 {
-  boost::mutex::scoped_lock lock(mLock);
+  fa::mutex::scoped_lock lock(mLock);
 
   if (mConnectionState != kNetStateEstablishing) {
     throw std::runtime_error("Gpg.net not connected");
@@ -1210,7 +1213,7 @@ void CGpgNetInterface::WriteCommand(
  */
 void CGpgNetInterface::SendBottleneckCleared()
 {
-  boost::mutex::scoped_lock lock(mLock);
+  fa::mutex::scoped_lock lock(mLock);
 
   if (mConnectionState != kNetStateEstablishing) {
     throw std::runtime_error("Gpg.net not connected");
@@ -1237,7 +1240,7 @@ void CGpgNetInterface::WriteCommandWith1Arg(
   const SNetCommandArg* arg
 )
 {
-  boost::mutex::scoped_lock lock(mLock);
+  fa::mutex::scoped_lock lock(mLock);
 
   if (mConnectionState != kNetStateEstablishing) {
     throw std::runtime_error("Gpg.net not connected");
@@ -1266,7 +1269,7 @@ void CGpgNetInterface::WriteCommandWith2Args(
   const SNetCommandArg* arg2
 )
 {
-  boost::mutex::scoped_lock lock(mLock);
+  fa::mutex::scoped_lock lock(mLock);
 
   if (mConnectionState != kNetStateEstablishing) {
     throw std::runtime_error("Gpg.net not connected");
@@ -1298,7 +1301,7 @@ void CGpgNetInterface::WriteCommandWith3Args(
   const SNetCommandArg* arg3
 )
 {
-  boost::mutex::scoped_lock lock(mLock);
+  fa::mutex::scoped_lock lock(mLock);
 
   if (mConnectionState != kNetStateEstablishing) {
     throw std::runtime_error("Gpg.net not connected");
@@ -1332,7 +1335,7 @@ void CGpgNetInterface::WriteCommandWith4Args(
   const SNetCommandArg* arg4
 )
 {
-  boost::mutex::scoped_lock lock(mLock);
+  fa::mutex::scoped_lock lock(mLock);
 
   if (mConnectionState != kNetStateEstablishing) {
     throw std::runtime_error("Gpg.net not connected");
@@ -1439,7 +1442,7 @@ void CGpgNetInterface::PullTask()
   fa::deque<SNetCommand> pending;
 
   {
-    boost::mutex::scoped_lock lock(mLock);
+    fa::mutex::scoped_lock lock(mLock);
     mCommands.swap(pending);
     if (mQueueEvent) {
       ResetEvent(mQueueEvent);
@@ -2083,7 +2086,7 @@ void CGpgNetInterface::EnqueueCommand(
   int val
 )
 {
-  boost::mutex::scoped_lock lock(mLock);
+  fa::mutex::scoped_lock lock(mLock);
 
   if (mCommands.empty() && mQueueEvent) {
     SetEvent(mQueueEvent);

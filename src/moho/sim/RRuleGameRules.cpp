@@ -22,7 +22,7 @@
 
 #include <cfloat>
 
-#include "boost/thread.h"
+#include "legacy/thread/Mutex.h"
 #include "../resource/RResId.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/lua/ScriptChunkCache.h"
@@ -161,13 +161,13 @@ namespace moho
   {
     // The rules keep their lock inline at +0x38, so it is stored as raw bytes
     // to preserve the layout and constructed in place by the constructor.
-    static_assert(sizeof(boost::mutex) <= 0x08, "boost::mutex must fit RRuleGameRulesImpl::mLockStorage at +0x38");
+    static_assert(sizeof(fa::mutex) <= 0x08, "fa::mutex must fit RRuleGameRulesImpl::mLockStorage at +0x38");
 
-    [[nodiscard]] boost::mutex& RuleMutexView(
+    [[nodiscard]] fa::mutex& RuleMutexView(
       RRuleGameRulesImpl& rules
     ) noexcept
     {
-      return *reinterpret_cast<boost::mutex*>(&rules.mLockStorage[0]);
+      return *reinterpret_cast<fa::mutex*>(&rules.mLockStorage[0]);
     }
 
     template <typename TValue>
@@ -983,7 +983,7 @@ namespace moho
     // 0x00553... constructs the blueprint watcher in place; it has no default
     // state, which is why it is built here rather than in the member list.
     new (mDiskWatchListenerStorage) CDiskWatchListener("*.bp");
-    new (&RuleMutexView(*this)) boost::mutex();
+    new (&RuleMutexView(*this)) fa::mutex();
 
     mLuaState = new (std::nothrow) LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE);
     lua::NameLuaVm(mLuaState->m_state, "GameRules"); // diagnostics label only
@@ -1194,7 +1194,7 @@ namespace moho
       return;
     }
 
-    const boost::mutex::scoped_lock exportLock(RuleMutexView(*this));
+    const fa::mutex::scoped_lock exportLock(RuleMutexView(*this));
 
     LuaPlus::LuaState* const rootState = ResolveRootState(luaState);
     if (!rootState) {
@@ -1234,7 +1234,7 @@ namespace moho
     if (mLuaState == nullptr) {
       return;
     }
-    const boost::mutex::scoped_lock releaseLock(RuleMutexView(*this));
+    const fa::mutex::scoped_lock releaseLock(RuleMutexView(*this));
     LuaPlus::LuaObject globals = mLuaState->GetGlobals();
     globals.SetNil("__blueprints");
     lua_setgcthreshold(mLuaState->m_state, 0);
@@ -1437,7 +1437,7 @@ namespace moho
     // rules' own `lua_State` inside `SynchronizeBlueprintTable`. Without the
     // lock the two threads interleave inside one 5000-entry `SCR_Copy` loop
     // over a single `lua_State`, which corrupts it and faults in `luaV_index`.
-    boost::mutex::scoped_lock rulesLock(RuleMutexView(*this));
+    fa::mutex::scoped_lock rulesLock(RuleMutexView(*this));
 
     // Drain pending file-watcher notifications. Each new path that isn't
     // already enqueued for reload becomes a fresh `LuaReloadRequestNode`

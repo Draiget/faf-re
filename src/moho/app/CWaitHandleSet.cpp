@@ -3,6 +3,7 @@
 #include <cstring>
 #include <new>
 #include <stdexcept>
+#include "legacy/thread/Mutex.h"
 
 using namespace moho;
 
@@ -201,7 +202,7 @@ void CWaitHandleSet::AddHandle(
   const HANDLE handle
 )
 {
-  boost::mutex::scoped_lock l(lock);
+  fa::mutex::scoped_lock l(lock);
 
   // Producer enters
   ++mutatorCount;
@@ -244,7 +245,7 @@ void CWaitHandleSet::RemoveHandle(
   const HANDLE handle
 )
 {
-  boost::mutex::scoped_lock guard(lock);
+  fa::mutex::scoped_lock guard(lock);
 
   // Producer enters
   ++mutatorCount;
@@ -291,7 +292,7 @@ void CWaitHandleSet::MsgWaitEx(
   const DWORD timeoutMs
 )
 {
-  boost::mutex::scoped_lock guard(lock);
+  fa::mutex::scoped_lock guard(lock);
 
   for (;;) {
     while (mutatorCount != 0) {

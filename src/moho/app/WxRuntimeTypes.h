@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "boost/mutex.h"
+#include "legacy/thread/Mutex.h"
 #include "boost/shared_ptr.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/String.h"
@@ -404,7 +404,7 @@ namespace moho
 
     WWinLogWindow* dialog = nullptr;
     fa::vector<CWinLogLine> mCommittedLines;
-    boost::mutex lock{};
+    fa::mutex lock{};
     fa::vector<CWinLogLine> mPendingLines;
 
   private:

@@ -1,8 +1,7 @@
 #pragma once
 
 #include "Stream.h"
-#include "boost/condition.h"
-#include "boost/mutex.h"
+#include "legacy/thread/Condition.h"
 #include "gpg/core/containers/DList.h"
 
 namespace gpg
@@ -135,9 +134,9 @@ namespace gpg
     PipeStream();
 
   protected:
-    boost::mutex mLock{};
+    fa::mutex mLock{};
     BOOL mClosed{false};
-    boost::condition mCond{};
+    fa::condition mCond{};
     DList<PipeStreamBuffer, void> mBuff;
 
   private:

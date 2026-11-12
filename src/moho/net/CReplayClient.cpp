@@ -1,4 +1,5 @@
 #include "CReplayClient.h"
+#include <functional>
 
 #include <cstdint>
 #include <mutex>
@@ -10,6 +11,8 @@
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/Stream.h"
 #include "gpg/core/utils/Logging.h"
+#include "legacy/thread/Mutex.h"
+#include "legacy/thread/Thread.h"
 
 using namespace moho;
 
@@ -22,11 +25,11 @@ namespace
    * Replaces replay worker thread pointer and destroys the previous thread object.
    */
   void ReplaceReplayThread(
-    boost::thread*& slot,
-    boost::thread* replacement
+    fa::thread*& slot,
+    fa::thread* replacement
   )
   {
-    boost::thread* const previous = slot;
+    fa::thread* const previous = slot;
     slot = replacement;
 
     if (previous != nullptr) {
@@ -71,11 +74,11 @@ namespace
    * An earlier reconstruction modelled this as a `void (*)(CReplayClient*)` /
    * self-pointer pair, which has the same size but the wrong call shape.
    */
-  [[nodiscard]] boost::function0<void> MakeReplayThreadCallback(
+  [[nodiscard]] std::function<void()> MakeReplayThreadCallback(
     CReplayClient* const self
   )
   {
-    return boost::function0<void>([self]() {
+    return std::function<void()>([self]() {
       self->ReplayThread();
     });
   }
@@ -285,7 +288,7 @@ void CReplayClient::Start()
   }
 
   if (mReplayThread == nullptr) {
-    auto* const worker = new (std::nothrow) boost::thread(MakeReplayThreadCallback(this));
+    auto* const worker = new (std::nothrow) fa::thread(MakeReplayThreadCallback(this));
     ReplaceReplayThread(mReplayThread, worker);
   }
 
@@ -349,7 +352,7 @@ void CReplayClient::ReplayThread()
     return;
   }
 
-  boost::recursive_mutex::scoped_lock lock(mManager->mLock);
+  fa::recursive_mutex::scoped_lock lock(mManager->mLock);
 
   while (!mReplayThreadStopRequested) {
     if (mReplayPollRequested) {

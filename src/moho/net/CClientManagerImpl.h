@@ -3,7 +3,7 @@
 #pragma once
 #include <memory>
 
-#include "boost/recursive_mutex.h"
+#include "legacy/thread/Mutex.h"
 #include "gpg/core/streams/PipeStream.h"
 #include "gpg/core/time/Timer.h"
 #include "IClientManager.h"
@@ -529,7 +529,7 @@ namespace moho
     [[nodiscard]] bool EveryoneResponsiveSince(int beat);
 
   public:
-    boost::recursive_mutex mLock;
+    fa::recursive_mutex mLock;
     IClientMgrUIInterface* mInterface{nullptr};
     fa::vector<CClientBase*> mClients;
     INetConnector* mConnector{nullptr};

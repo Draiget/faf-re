@@ -23,6 +23,7 @@
 #include "moho/lua/ScriptChunkCache.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/console/CConCommand.h"
+#include "legacy/thread/Mutex.h"
 
 namespace moho
 {
@@ -659,7 +660,7 @@ moho::FWHSThreadState::~FWHSThreadState()
  */
 moho::FWHSLock::~FWHSLock()
 {
-  boost::mutex::scoped_lock guard(mLock);
+  fa::mutex::scoped_lock guard(mLock);
 }
 
 /**
@@ -1412,7 +1413,7 @@ namespace
  */
 void moho::FWHSLock::Wait()
 {
-  boost::mutex::scoped_lock guard(mLock);
+  fa::mutex::scoped_lock guard(mLock);
   while (mIsLocked != 0 || mWaitingLevel != 0) {
     mObjectSender.wait(guard);
   }
@@ -1428,7 +1429,7 @@ void moho::FWHSLock::Wait()
  */
 void moho::FWHSLock::Notify()
 {
-  boost::mutex::scoped_lock guard(mLock);
+  fa::mutex::scoped_lock guard(mLock);
   --mLockLevel;
   if (mWaitingLevel != 0 && mLockLevel == 0) {
     mObjectSender.notify_all();
@@ -1444,7 +1445,7 @@ void moho::FWHSLock::Notify()
  */
 void moho::FWHSLock::Lock()
 {
-  boost::mutex::scoped_lock guard(mLock);
+  fa::mutex::scoped_lock guard(mLock);
   if (mLockLevel != 0 || mIsLocked != 0) {
     ++mWaitingLevel;
     while (mLockLevel != 0 || mIsLocked != 0) {
@@ -1463,7 +1464,7 @@ void moho::FWHSLock::Lock()
  */
 void moho::FWHSLock::NotifyAll()
 {
-  boost::mutex::scoped_lock guard(mLock);
+  fa::mutex::scoped_lock guard(mLock);
   mIsLocked = 0;
   mObjectSender.notify_all();
 }

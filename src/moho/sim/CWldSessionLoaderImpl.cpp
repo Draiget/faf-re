@@ -10,7 +10,6 @@
 #include <optional>
 #include <thread>
 
-#include "boost/thread.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 #include "lua/LuaObject.h"

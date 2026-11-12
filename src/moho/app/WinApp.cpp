@@ -31,7 +31,7 @@
 #include <objbase.h>
 #include <TlHelp32.h>
 
-#include "boost/mutex.h"
+#include "legacy/thread/Mutex.h"
 #include "CWaitHandleSet.h"
 #include "CScApp.h"
 #include "gpg/core/diagnostics/CrashReport.h"
@@ -2657,7 +2657,7 @@ void moho::WINX_PrecreateLogWindow()
   }
 
   WWinLogWindow* const createdLogWindow = new WWinLogWindow();
-  boost::mutex::scoped_lock lock(sLogWindowTarget.lock);
+  fa::mutex::scoped_lock lock(sLogWindowTarget.lock);
   sLogWindowTarget.dialog = createdLogWindow;
 #endif
   // The log window is a developer window, Windows only (WxRuntimeTypes.h).

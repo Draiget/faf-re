@@ -4,7 +4,7 @@
 #include <limits>
 #include <new>
 
-#include "boost/thread.h"
+#include "legacy/thread/Thread.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
@@ -279,14 +279,14 @@ namespace moho
       gpg::Logf("Starting background task \"%s\"", mThreadName.c_str());
       mState = EWldScenarioLoadControlState::kRunning;
 
-      boost::thread* worker = nullptr;
+      fa::thread* worker = nullptr;
       if (mCallback.mEntryPoint && mCallback.mScenario) {
-        worker = new (std::nothrow) boost::thread([this]() {
+        worker = new (std::nothrow) fa::thread([this]() {
           RunWorkerThread();
         });
       }
 
-      boost::thread* const previousWorker = ownerTask.mWorkerThread;
+      fa::thread* const previousWorker = ownerTask.mWorkerThread;
       ownerTask.mWorkerThread = worker;
       if (previousWorker) {
         delete previousWorker;

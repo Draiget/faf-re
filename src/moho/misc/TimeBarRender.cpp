@@ -16,7 +16,6 @@
 #include <mutex>
 #include <vector>
 
-#include "boost/mutex.h"
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/time/Timer.h"

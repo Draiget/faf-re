@@ -45,6 +45,7 @@
 #include "moho/unit/core/Unit.h"
 #include "moho/misc/LaunchInfoBase.h"
 #include "Sim.h"
+#include "legacy/thread/Mutex.h"
 
 using namespace moho;
 
@@ -93,7 +94,7 @@ void CSimDriver::DrawNetworkStatsPanel(
   const float scaleY
 )
 {
-  boost::mutex::scoped_lock lock(mLock); // 0x0073E014 do_lock / 0x0073F40D unlock
+  fa::mutex::scoped_lock lock(mLock); // 0x0073E014 do_lock / 0x0073F40D unlock
 
   // Courier New font handle (0x0073E042). Held as a raw retained handle;
   // released explicitly at function exit (0x0073F3D3 releases the CountedPtr).

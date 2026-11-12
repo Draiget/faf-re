@@ -1,4 +1,4 @@
-# The fa:: (src/legacy/containers, src/legacy/algorithms) and gpg:: (src/gpg/core/containers)
+# The fa:: (src/legacy/containers, src/legacy/algorithms, src/legacy/thread) and gpg:: (src/gpg/core/containers)
 # container templates, mostly checked against a std:: container driven by the same seeded
 # operations. Tests named DISABLED_ show a suspected bug; their comments name it.
 #
@@ -14,6 +14,7 @@ add_executable(faf_container_tests EXCLUDE_FROM_ALL
   LegacyListTests.cpp
   LegacyStringTests.cpp
   LegacyTreeTests.cpp
+  LegacyThreadTests.cpp
   LegacyVectorTests.cpp
 )
 target_link_libraries(faf_container_tests PRIVATE faf_engine gtest_main)

@@ -1,4 +1,5 @@
 #include "moho/app/WxPrivate.h"
+#include "legacy/thread/Mutex.h"
 
 namespace
 {
@@ -263,7 +264,7 @@ void moho::CWinLogTarget::ResetCommittedLinesFromReplayBuffer(
   const fa::vector<fa::string>& replayLines
 )
 {
-  boost::mutex::scoped_lock scopedLock(lock);
+  fa::mutex::scoped_lock scopedLock(lock);
 
   fa::vector<CWinLogLine> rebuiltLines;
   rebuiltLines.reserve(replayLines.size());
@@ -288,7 +289,7 @@ void moho::CWinLogTarget::ResetCommittedLinesFromReplayBuffer(
  */
 void moho::CWinLogTarget::MergePendingLines()
 {
-  boost::mutex::scoped_lock scopedLock(lock);
+  fa::mutex::scoped_lock scopedLock(lock);
 
   const std::size_t pendingCount = mPendingLines.size();
   const std::size_t committedCount = mCommittedLines.size();
@@ -318,7 +319,7 @@ void moho::CWinLogTarget::OnMessage(
   const int previousDepth
 )
 {
-  boost::mutex::scoped_lock scopedLock(lock);
+  fa::mutex::scoped_lock scopedLock(lock);
 
   std::size_t replayStart = 0;
   if (previousDepth > 0) {
@@ -498,7 +499,7 @@ moho::WWinLogWindow::~WWinLogWindow()
  */
 void moho::WWinLogWindow::DetachFromTarget()
 {
-  boost::mutex::scoped_lock scopedLock(mOwnerTarget->lock);
+  fa::mutex::scoped_lock scopedLock(mOwnerTarget->lock);
   mOwnerTarget->dialog = nullptr;
 }
 

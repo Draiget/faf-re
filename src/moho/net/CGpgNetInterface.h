@@ -1,9 +1,8 @@
 #pragma once
 #include "boost/enable_shared_from_this.h"
-#include "boost/mutex.h"
-#include "boost/recursive_mutex.h"
+#include "legacy/thread/Mutex.h"
+#include "legacy/thread/Thread.h"
 #include "boost/shared_ptr.h"
-#include "boost/thread.h"
 #include "boost/weak_ptr.h"
 #include "gpg/core/utils/Sync.h"
 #include "INetNATTraversalProvider.h"
@@ -488,13 +487,13 @@ namespace moho
 
   private:
     // boost::shared_ptr<CGpgNetInterface> mSelf;
-    boost::mutex mLock;
+    fa::mutex mLock;
     DWORD mConnectionState{0};
     INetTCPServer* mTcpServer{nullptr};
     INetTCPSocket* mTcpSocket{nullptr};
     fa::deque<SNetCommand> mCommands;
     HANDLE mQueueEvent{nullptr};
-    boost::thread* mConnectThreadWorker{nullptr};
+    fa::thread* mConnectThreadWorker{nullptr};
     LuaPlus::LuaObject mLobbyObject;
     boost::weak_ptr<INetNATTraversalHandler> mNATHandler;
   };

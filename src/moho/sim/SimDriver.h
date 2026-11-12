@@ -4,11 +4,10 @@
 #include <cstdint>
 #include <new>
 
-#include "boost/condition.h"
-#include "boost/mutex.h"
+#include "legacy/thread/Condition.h"
+#include "legacy/thread/Thread.h"
 #include <memory>
 #include "boost/shared_ptr.h"
-#include "boost/thread.h"
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/streams/Stream.h"
@@ -821,7 +820,7 @@ namespace moho
      * What it does:
      * Runs one dispatch beat, then executes sync publication and sim-rate sampling.
      */
-    void ExecuteDispatchStepLocked(boost::mutex::scoped_lock& lock);
+    void ExecuteDispatchStepLocked(fa::mutex::scoped_lock& lock);
     /**
      * Address: 0x0073DAD0 (FUN_0073DAD0)
      *
@@ -829,7 +828,7 @@ namespace moho
      * Unlocks the driver mutex, runs one `Sim::Sync` publish pass, relocks,
      * verifies historical checksums when available, and enqueues the sync packet.
      */
-    void FinalizeSyncDispatchLocked(boost::mutex::scoped_lock& lock);
+    void FinalizeSyncDispatchLocked(fa::mutex::scoped_lock& lock);
 
     /**
      * Address: 0x0073BDF0 (FUN_0073BDF0, Moho::CSimDriver::ThreadRun)
@@ -879,9 +878,9 @@ namespace moho
     /**
      * Address: 0x0073DD70 (FUN_0073DD70) + exception-recovery tail 0x0073DDF9..0x0073DE2B
      */
-    void PreparePendingSaveRequestLocked(boost::mutex::scoped_lock& lock);
+    void PreparePendingSaveRequestLocked(fa::mutex::scoped_lock& lock);
     // Local source-side adapter for removed out-param command-cookie returns.
-    static void JoinAndDeleteThread(boost::thread*& thread);
+    static void JoinAndDeleteThread(fa::thread*& thread);
 
   private:
     // The five owners below are smart pointers, not raw ones. `~CSimDriver`'s
@@ -906,8 +905,8 @@ namespace moho
     std::unique_ptr<CDecoder> mDecoder;         // +0x2C
     // Constructed and destroyed in place: `boost::mutex::mutex` at 0x0073B5F0,
     // `~mutex` at 0x0073BB1A, both on `this+0x30`.
-    boost::mutex mLock;                  // +0x30
-    boost::thread* mSimThread = nullptr; // +0x38
+    fa::mutex mLock;                     // +0x30
+    fa::thread* mSimThread = nullptr;    // +0x38
     int32_t mOutstandingRequests = 1;    // +0x3C
     gpg::time::Timer mTimer;             // +0x40
     HANDLE mConnectionEvent = nullptr;   // +0x48
@@ -918,10 +917,10 @@ namespace moho
     int64_t mFirstCommandCycleTime = 0; // +0x60
     bool mSimBusy = false;              // +0x68
     // +0x69..+0x6B: compiler-inserted alignment before pointer.
-    boost::thread* mCreateSimThread = nullptr; // +0x6C
+    fa::thread* mCreateSimThread = nullptr;    // +0x6C
     bool mStopCreateSimThread = false;         // +0x70
     // +0x71..+0x73: compiler-inserted alignment before boost::condition.
-    boost::condition mStateChanged;              // +0x74
+    fa::condition mStateChanged;                 // +0x74
     EDriverState mState = EDriverState::Startup; // +0x8C
     SSyncDataQueue mSyncDataQueue;               // +0x90
     HANDLE mSyncDataAvailableEvent = nullptr;    // +0xA4

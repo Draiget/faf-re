@@ -40,6 +40,7 @@
 #include "gpg/core/reflection/Reflection.h"
 
 #include "legacy/algorithms/Sort.h"
+#include "legacy/thread/Mutex.h"
 
 namespace
 {
@@ -588,7 +589,7 @@ namespace moho
     const bool allowCreate
   )
   {
-    boost::mutex::scoped_lock lock(mLock);
+    fa::mutex::scoped_lock lock(mLock);
 
     fa::vector<fa::string> tokens;
     gpg::STR_GetTokens(statPath, "_", tokens);
@@ -624,7 +625,7 @@ namespace moho
     const gpg::StrArg statPath
   )
   {
-    boost::mutex::scoped_lock lock(mLock);
+    fa::mutex::scoped_lock lock(mLock);
 
     fa::vector<fa::string> tokens;
     gpg::STR_GetTokens(statPath, "_", tokens);
@@ -632,7 +633,7 @@ namespace moho
     bool didCreate = false;
     CArmyStatItem* const item = WalkTokenPath(mItem.get(), tokens, true, &didCreate);
     if (didCreate && item != nullptr) {
-      boost::mutex::scoped_lock itemLock(item->mLock);
+      fa::mutex::scoped_lock itemLock(item->mLock);
       item->mType = EStatType::kString;
     }
     return item;
@@ -645,7 +646,7 @@ namespace moho
     const char* statPath
   )
   {
-    boost::mutex::scoped_lock lock(mLock);
+    fa::mutex::scoped_lock lock(mLock);
     CArmyStatItem* const item = TraverseTables(statPath, false);
     if (item == mItem.get()) {
       throw std::runtime_error("Don't be doing that, chief.");
@@ -1327,7 +1328,7 @@ namespace moho
     }
 
     {
-      boost::mutex::scoped_lock itemLock(item->mLock);
+      fa::mutex::scoped_lock itemLock(item->mLock);
       item->mType = EStatType::kString;
     }
     item->SetValue(value);

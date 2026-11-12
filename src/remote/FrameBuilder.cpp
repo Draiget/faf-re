@@ -25,6 +25,7 @@
 #include "moho/sim/SimWorkerPool.h"
 #include "remote/BeatChangeSet.h"
 #include "moho/unit/core/Unit.h"
+#include "legacy/thread/Mutex.h"
 
 // Engine addition, server mode: see FrameBuilder.h. Reads the packet only.
 
@@ -901,7 +902,7 @@ namespace faf::remote
     // Resource deposits the sim added since the last beat go on the session record (the sim
     // only ever appends them).
     if (resources != nullptr) {
-      boost::mutex::scoped_lock lock(resources->lock_);
+      fa::mutex::scoped_lock lock(resources->lock_);
       for (std::size_t i = session.DepositCount(); i < resources->deposits_.size(); ++i) {
         const moho::ResourceDeposit& source = resources->deposits_[i];
         const wire::SDeposit deposit{

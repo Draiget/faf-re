@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <type_traits>
 
-#include "boost/mutex.h"
+#include "legacy/thread/Mutex.h"
 #include "gpg/core/containers/FastVector.h"
 #include "IResources.h"
 #include "ISimResources.h"
@@ -139,7 +139,7 @@ namespace moho
     ) const;
 
   public:
-    boost::mutex lock_;                    // +0x04
+    fa::mutex lock_;                       // +0x04
     fa::vector<ResourceDeposit> deposits_; // +0x0C
   };
 

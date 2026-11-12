@@ -18,6 +18,7 @@
 #include "NetConVars.h"
 #include "NetMessageRanges.h"
 #include "NetPeerTransport.h"
+#include "legacy/thread/Mutex.h"
 using namespace moho;
 
 namespace
@@ -117,7 +118,7 @@ bool CNetUDPConnection::IsDestroyedFlagSet() const noexcept
  */
 float CNetUDPConnection::GetPing()
 {
-  boost::recursive_mutex::scoped_lock lock{mConnector->lock_};
+  fa::recursive_mutex::scoped_lock lock{mConnector->lock_};
   return mPingTime;
 }
 
@@ -130,7 +131,7 @@ float CNetUDPConnection::GetPing()
  */
 float CNetUDPConnection::GetTime()
 {
-  boost::recursive_mutex::scoped_lock lock{mConnector->lock_};
+  fa::recursive_mutex::scoped_lock lock{mConnector->lock_};
   if (!mLastRecv) {
     return -1.0;
   }
@@ -154,7 +155,7 @@ void CNetUDPConnection::Write(
   const uint8_t* begin = data->start;
   const uint8_t* end = data->end;
   const size_t len = static_cast<size_t>(end - begin);
-  boost::recursive_mutex::scoped_lock lock{mConnector->lock_};
+  fa::recursive_mutex::scoped_lock lock{mConnector->lock_};
 
   if (auto* target = mOutputFilterStream) {
     target->VirtWrite(reinterpret_cast<const char*>(begin), len);
@@ -212,7 +213,7 @@ void CNetUDPConnection::Write(
  */
 void CNetUDPConnection::Close()
 {
-  boost::recursive_mutex::scoped_lock lock{mConnector->lock_};
+  fa::recursive_mutex::scoped_lock lock{mConnector->lock_};
   if (mOutputShutdown) {
     return;
   }
@@ -251,7 +252,7 @@ fa::string CNetUDPConnection::ToString()
  */
 void CNetUDPConnection::ScheduleDestroy()
 {
-  boost::recursive_mutex::scoped_lock lock{mConnector->lock_};
+  fa::recursive_mutex::scoped_lock lock{mConnector->lock_};
   Close();
   mScheduleDestroy = true;
 
@@ -262,7 +263,7 @@ void CNetUDPConnection::SetWindow(
   const uint16_t window
 )
 {
-  boost::recursive_mutex::scoped_lock lock{mConnector->lock_};
+  fa::recursive_mutex::scoped_lock lock{mConnector->lock_};
   mWindow = window;
 }
 
@@ -1744,7 +1745,7 @@ void CNetUDPConnection::DispatchFromInput()
       static_cast<unsigned>(mMessage.GetSize())
     );
     {
-      boost::recursive_mutex::scoped_lock lock{mConnector->lock_};
+      fa::recursive_mutex::scoped_lock lock{mConnector->lock_};
       AbortInput();
     }
     mMessage.mBuff.Clear();

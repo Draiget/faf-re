@@ -13,6 +13,9 @@
 #include "moho/resource/CResourceWatcher.h"
 #include "moho/resource/ResourceFactory.h"
 #include "moho/serialization/PrefetchHandleBase.h"
+#include <mutex>
+#include "legacy/thread/Mutex.h"
+#include "legacy/thread/Thread.h"
 
 namespace moho
 {
@@ -30,7 +33,7 @@ namespace
   constexpr int kClockUtc = 1;
 
   moho::ResourceManager* sResourceManager = nullptr;       // 0x010A6398
-  boost::once_flag sResourceManagerOnce = BOOST_ONCE_INIT; // 0x010A639C
+  std::once_flag sResourceManagerOnce;                     // 0x010A639C
 
   /**
    * Address: 0x00BC5AC0 (FUN_00BC5AC0, dynamic initializer for `gTConVar_res_SpewLoadSpam`)
@@ -114,12 +117,12 @@ namespace
    * Sleeps until `until` with the manager unlocked.
    */
   void SleepUnlocked(
-    boost::recursive_mutex::scoped_lock& lock,
-    const boost::xtime& until
+    fa::recursive_mutex::scoped_lock& lock,
+    const fa::xtime& until
   )
   {
     lock.unlock();
-    boost::thread::sleep(until);
+    fa::thread::sleep(until);
     lock.lock();
   }
 } // namespace
@@ -173,7 +176,7 @@ namespace moho
     , mRunning(false)
     , mLoadsInProgress(0)
   {
-    boost::xtime_get(&mLastLoadTime, kClockUtc);
+    fa::xtime_get(&mLastLoadTime, kClockUtc);
     DISK_AddWatchListener(this);
   }
 
@@ -209,7 +212,7 @@ namespace moho
     const SDiskWatchEvent& event
   )
   {
-    boost::recursive_mutex::scoped_lock lock(mLock);
+    fa::recursive_mutex::scoped_lock lock(mLock);
 
     const ResourceRecordSet::iterator first = mRecords.lower_bound(ResourceRecord(event.mPath.c_str(), nullptr));
     const ResourceRecordSet::iterator last = mRecords.upper_bound(
@@ -255,7 +258,7 @@ namespace moho
    */
   void ResourceManager::ActivatePendingFactories()
   {
-    boost::recursive_mutex::scoped_lock lock(mLock);
+    fa::recursive_mutex::scoped_lock lock(mLock);
     mRunning = true;
     for (ResourceFactoryBase* const factory : mPendingFactories) {
       factory->Init();
@@ -275,7 +278,7 @@ namespace moho
     ResourceFactoryBase* const factory
   )
   {
-    boost::recursive_mutex::scoped_lock lock(mLock);
+    fa::recursive_mutex::scoped_lock lock(mLock);
     if (mRunning) {
       mFactories.insert(std::make_pair(factory->mResourceType, factory));
     } else {
@@ -290,7 +293,7 @@ namespace moho
     ResourceFactoryBase* const factory
   )
   {
-    boost::recursive_mutex::scoped_lock lock(mLock);
+    fa::recursive_mutex::scoped_lock lock(mLock);
 
     const auto registered = mFactories.find(factory->mResourceType);
     if (registered != mFactories.end()) {
@@ -320,7 +323,7 @@ namespace moho
     CResourceWatcher* const watcher
   )
   {
-    boost::recursive_mutex::scoped_lock lock(mLock);
+    fa::recursive_mutex::scoped_lock lock(mLock);
     for (ResourceWatch* const watch : watcher->mWatches) {
       if (watch->mNotifying) {
         watch->mWatcher = nullptr;
@@ -336,7 +339,7 @@ namespace moho
    */
   void ResourceManager::ShutdownBackgroundThread()
   {
-    boost::recursive_mutex::scoped_lock lock(mLock);
+    fa::recursive_mutex::scoped_lock lock(mLock);
     mRunning = false;
     if (mPrefetchThread) {
       mPrefetchQueued.notify_all();
@@ -364,11 +367,11 @@ namespace moho
     gpg::SetThreadName(0xFFFFFFFFu, "Prefetcher thread.");
     (void)::SetThreadPriority(::GetCurrentThread(), THREAD_PRIORITY_IDLE);
 
-    boost::recursive_mutex::scoped_lock lock(mLock);
+    fa::recursive_mutex::scoped_lock lock(mLock);
     while (mRunning) {
       if (!res_EnablePrefetching) {
-        boost::xtime until;
-        boost::xtime_get(&until, kClockUtc);
+        fa::xtime until;
+        fa::xtime_get(&until, kClockUtc);
         until.sec += 10;
         SleepUnlocked(lock, until);
         continue;
@@ -384,11 +387,11 @@ namespace moho
         continue;
       }
 
-      boost::xtime now;
-      boost::xtime_get(&now, kClockUtc);
-      boost::xtime quietUntil = mLastLoadTime;
+      fa::xtime now;
+      fa::xtime_get(&now, kClockUtc);
+      fa::xtime quietUntil = mLastLoadTime;
       quietUntil.sec += res_PrefetcherActivityDelay;
-      if (boost::xtime_cmp(now, quietUntil) < 0) {
+      if (fa::xtime_cmp(now, quietUntil) < 0) {
         SleepUnlocked(lock, quietUntil);
         continue;
       }
@@ -425,8 +428,8 @@ namespace moho
       mLoadFinished.notify_all();
       record->mLoading = false;
 
-      boost::xtime napUntil;
-      boost::xtime_get(&napUntil, kClockUtc);
+      fa::xtime napUntil;
+      fa::xtime_get(&napUntil, kClockUtc);
       napUntil.nsec += res_AfterPrefetchDelay * 1000000;
       while (napUntil.nsec >= 1000000000) {
         napUntil.nsec -= 1000000000;
@@ -444,7 +447,7 @@ namespace moho
     const gpg::RType* const type
   )
   {
-    boost::recursive_mutex::scoped_lock lock(mLock);
+    fa::recursive_mutex::scoped_lock lock(mLock);
 
     const fa::string name = IsLiteralName(path) ? fa::string(path) : FindMountedFile(path);
     if (name.empty()) {
@@ -464,7 +467,7 @@ namespace moho
       if (mPrefetchThread) {
         mPrefetchQueued.notify_all();
       } else {
-        mPrefetchThread.reset(new boost::thread([this]() {
+        mPrefetchThread.reset(new fa::thread([this]() {
           PrefetchThread();
         }));
       }
@@ -489,7 +492,7 @@ namespace moho
     const gpg::RType* const type
   )
   {
-    boost::recursive_mutex::scoped_lock lock(mLock);
+    fa::recursive_mutex::scoped_lock lock(mLock);
 
     fa::string name;
     if (IsLiteralName(path)) {
@@ -529,7 +532,7 @@ namespace moho
    */
   boost::shared_ptr<void> ResourceManager::LoadRecord(
     ResourceRecord& record,
-    boost::recursive_mutex::scoped_lock& lock
+    fa::recursive_mutex::scoped_lock& lock
   )
   {
     const boost::shared_ptr<PrefetchData> prefetch = boost::LockWeak(record.mPrefetch);
@@ -577,7 +580,7 @@ namespace moho
     }
     record.mLoading = false;
     --mLoadsInProgress;
-    boost::xtime_get(&mLastLoadTime, kClockUtc);
+    fa::xtime_get(&mLastLoadTime, kClockUtc);
     mLoadFinished.notify_all();
     return resource;
   }
@@ -595,7 +598,7 @@ namespace moho
   ResourceManager* RES_GetResourceManager()
   {
     if (sResourceManager == nullptr) {
-      boost::call_once(&RES_EnsureResourceManager, sResourceManagerOnce);
+      std::call_once(sResourceManagerOnce, &RES_EnsureResourceManager);
     }
     return sResourceManager;
   }

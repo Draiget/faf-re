@@ -7,7 +7,7 @@
 #include <vector>
 #endif
 
-#include "boost/mutex.h"
+#include "legacy/thread/Mutex.h"
 #include <memory>
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -93,7 +93,7 @@ namespace moho
     std::unique_ptr<StatItem> mItem; // +0x04
     // Built in place by the constructor (boost::mutex::mutex 0x00AC1A60 on
     // `this+8`): the lock handle, then the critical-section flag at +0x0C.
-    boost::mutex mLock; // +0x08
+    fa::mutex mLock; // +0x08
   };
 
   static_assert(offsetof(Stats<StatItem>, mItem) == 0x04, "Stats<StatItem>::mItem offset must be 0x04");
@@ -1009,7 +1009,7 @@ namespace moho
     std::unique_ptr<CArmyStatItem> mItem; // +0x04
     // Built in place by the constructor (boost::mutex::mutex 0x00AC1A60 on
     // `this+8`): the lock handle, then the critical-section flag at +0x0C.
-    boost::mutex mLock; // +0x08
+    fa::mutex mLock; // +0x08
   };
 
   static_assert(offsetof(Stats<CArmyStatItem>, mItem) == 0x04, "Stats<CArmyStatItem>::mItem offset must be 0x04");

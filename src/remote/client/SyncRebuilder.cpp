@@ -27,6 +27,7 @@
 #include "moho/sim/SimDriver.h"
 #include "moho/unit/core/Unit.h"
 #include "remote/FrameBuilder.h"
+#include "legacy/thread/Mutex.h"
 
 // Engine addition, server mode: see SyncRebuilder.h.
 
@@ -468,8 +469,8 @@ namespace faf::remote::client
     if (packet.mSimResources.px != nullptr) {
       // Check: the client's deposits are the sim's, in order.
       moho::CSimResources& sim = *packet.mSimResources.px;
-      boost::mutex::scoped_lock simLock(sim.lock_);
-      boost::mutex::scoped_lock ownLock(mResources->lock_);
+      fa::mutex::scoped_lock simLock(sim.lock_);
+      fa::mutex::scoped_lock ownLock(mResources->lock_);
       bool same = sim.deposits_.size() == mResources->deposits_.size();
       for (std::size_t i = 0; same && i < sim.deposits_.size(); ++i) {
         const moho::ResourceDeposit& a = sim.deposits_[i];

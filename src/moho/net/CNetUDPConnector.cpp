@@ -9,7 +9,8 @@
 #include <ctime>
 #include <new>
 
-#include "boost/thread.h"
+#include "legacy/thread/Mutex.h"
+#include "legacy/thread/Thread.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
@@ -160,13 +161,13 @@ CNetUDPConnector::CNetUDPConnector(
   // remains lockable during connector lifetime.
   auto selfOwner = boost::shared_ptr<CNetUDPConnector>(this, [](CNetUDPConnector*) {});
   {
-    boost::recursive_mutex::scoped_lock lock{lock_};
+    fa::recursive_mutex::scoped_lock lock{lock_};
 
     if (event_ != nullptr) { // WSA_INVALID_EVENT
       platform::net::SelectSocketEvents(socket_, event_, platform::net::kEventRead | platform::net::kEventWrite);
     }
 
-    boost::thread([selfOwner]() {
+    fa::thread([selfOwner]() {
       selfOwner->Entry();
     });
   }
@@ -197,7 +198,7 @@ void CNetUDPConnector::Destroy()
     natProvider->SetTraversalHandler(port, &nullHandler);
   }
 
-  boost::recursive_mutex::scoped_lock lock{lock_};
+  fa::recursive_mutex::scoped_lock lock{lock_};
   mNatTraversalProvider.reset();
   for (auto* conn : mConnections.owners()) {
     conn->ScheduleDestroy();
@@ -216,7 +217,7 @@ void CNetUDPConnector::Destroy()
  */
 u_short CNetUDPConnector::GetLocalPort()
 {
-  boost::recursive_mutex::scoped_lock lock{lock_};
+  fa::recursive_mutex::scoped_lock lock{lock_};
   sockaddr_in sa{};
   platform::net::GetLocalAddress(socket_, &sa);
   return ntohs(sa.sin_port);
@@ -235,7 +236,7 @@ CNetUDPConnection* CNetUDPConnector::Connect(
   const u_short port
 )
 {
-  boost::recursive_mutex::scoped_lock lock{lock_};
+  fa::recursive_mutex::scoped_lock lock{lock_};
   SignalSocketEvent();
 
   for (auto* conn : mConnections.owners()) {
@@ -291,7 +292,7 @@ bool CNetUDPConnector::FindNextAddress(
   u_short& outPort
 )
 {
-  boost::recursive_mutex::scoped_lock lock{lock_};
+  fa::recursive_mutex::scoped_lock lock{lock_};
   for (auto* connection : mConnections.owners()) {
     if (connection->GetConnectionState() == kNetStatePending && !connection->IsDestroyScheduled()) {
       outAddress = connection->GetAddr();
@@ -329,7 +330,7 @@ void CNetUDPConnector::Reject(
   const u_short port
 )
 {
-  boost::recursive_mutex::scoped_lock lock{lock_};
+  fa::recursive_mutex::scoped_lock lock{lock_};
   for (auto* connection : mConnections.owners()) {
     if (
       connection->GetAddr() == address && connection->GetPort() == port &&
@@ -351,7 +352,7 @@ void CNetUDPConnector::Reject(
 void CNetUDPConnector::Pull()
 {
   {
-    boost::recursive_mutex::scoped_lock lock{lock_};
+    fa::recursive_mutex::scoped_lock lock{lock_};
     mIsPulling = true;
 
     if (!mInboundTraversalPackets.empty()) {
@@ -403,7 +404,7 @@ void CNetUDPConnector::Pull()
  */
 void CNetUDPConnector::Push()
 {
-  boost::recursive_mutex::scoped_lock lock{lock_};
+  fa::recursive_mutex::scoped_lock lock{lock_};
   bool didFlush = false;
   for (auto* conn : mConnections.owners()) {
     if (conn->FlushOutput()) {
@@ -427,7 +428,7 @@ void CNetUDPConnector::SelectEvent(
   const HANDLE ev
 )
 {
-  boost::recursive_mutex::scoped_lock lock{lock_};
+  fa::recursive_mutex::scoped_lock lock{lock_};
   mSelectedEvent = ev;
   SignalSocketEvent();
 }
@@ -441,7 +442,7 @@ void CNetUDPConnector::SelectEvent(
  */
 void CNetUDPConnector::Debug()
 {
-  boost::recursive_mutex::scoped_lock lock{lock_};
+  fa::recursive_mutex::scoped_lock lock{lock_};
   gpg::Logf("CNetUDPConnector %p:", static_cast<const void*>(this));
   gpg::Logf("  local port=%d", GetLocalPort());
   gpg::Logf("  packet pool size=%d", mPacketPoolSize);
@@ -461,7 +462,7 @@ SSendStampWindow CNetUDPConnector::SnapshotSendStamps(
   const int32_t since
 )
 {
-  boost::recursive_mutex::scoped_lock lock{lock_};
+  fa::recursive_mutex::scoped_lock lock{lock_};
   const uint64_t endTimeUs = static_cast<uint64_t>(GetTime());
   const uint64_t startTimeUs = static_cast<uint64_t>(1000LL * since);
   return mSendStampBuffer.GetBetween(endTimeUs, startTimeUs);
@@ -961,7 +962,7 @@ void CNetUDPConnector::ReceivePacket(
   size_t size
 )
 {
-  boost::recursive_mutex::scoped_lock lock{lock_};
+  fa::recursive_mutex::scoped_lock lock{lock_};
   if (size > kPacketMaxSize) {
     gpg::Logf("Truncating NAT traversal packet from %d to %d bytes", size, kPacketMaxSize);
     size = kPacketMaxSize;
@@ -1008,7 +1009,7 @@ void CNetUDPConnector::Entry()
   gpg::SetThreadName(0xFFFFFFFF, name.c_str());
   THREAD_SetAffinity(false);
   ::SetThreadPriority(::GetCurrentThread(), 2);
-  boost::recursive_mutex::scoped_lock lock{lock_};
+  fa::recursive_mutex::scoped_lock lock{lock_};
   while (true) {
     if (!net_LogPackets && mPacketLogFile != nullptr) {
       ::fclose(mPacketLogFile);

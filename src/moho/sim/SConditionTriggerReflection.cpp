@@ -22,6 +22,7 @@
 #include "moho/sim/CArmyStats.h"
 #include "gpg/core/reflection/RSharedPointerType.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "legacy/thread/Mutex.h"
 
 namespace
 {
@@ -569,7 +570,7 @@ namespace
       return;
     }
 
-    boost::mutex::scoped_lock lock(stats->mLock);
+    fa::mutex::scoped_lock lock(stats->mLock);
     moho::CArmyStatItem* loadedRoot = nullptr;
     const gpg::RRef owner{};
     archive->ReadPointerOwned(&loadedRoot, &owner);
@@ -595,7 +596,7 @@ namespace
   )
   {
     auto* const stats = reinterpret_cast<moho::Stats<moho::CArmyStatItem>*>(objectPtr);
-    boost::mutex::scoped_lock lock(stats->mLock);
+    fa::mutex::scoped_lock lock(stats->mLock);
     archive->WritePointer(stats->mItem.get(), gpg::TrackedPointerState::Owned, gpg::RRef{});
   }
 

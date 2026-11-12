@@ -3,8 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/condition.h"
-#include "boost/thread.h"
+#include "legacy/thread/Condition.h"
+#include "legacy/thread/Thread.h"
 #include "CClientBase.h"
 #include "CMessage.h"
 
@@ -124,8 +124,8 @@ namespace moho
     std::int32_t mReplayBeat{0};             // 0x138
     bool mCurrentSourceAllowed{false};       // 0x13C
     std::uint8_t mReserved13D[3]{};          // 0x13D
-    boost::thread* mReplayThread{nullptr};   // 0x140
-    boost::condition mReplayWorkerCondition; // 0x144
+    fa::thread* mReplayThread{nullptr};      // 0x140
+    fa::condition mReplayWorkerCondition;    // 0x144
     bool mReplayPollRequested{false};        // 0x15C
     bool mReplayThreadStopRequested{false};  // 0x15D
     std::uint8_t mReserved15E[2]{};          // 0x15E

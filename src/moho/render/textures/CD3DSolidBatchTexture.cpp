@@ -2,7 +2,6 @@
 
 #include <map>
 
-#include "boost/mutex.h"
 #include "boost/weak_ptr.h"
 
 namespace moho

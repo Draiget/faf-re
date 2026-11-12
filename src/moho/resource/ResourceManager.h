@@ -4,12 +4,10 @@
 #include <cstdint>
 #include <cstring>
 
-#include "boost/condition.h"
-#include "boost/recursive_mutex.h"
+#include "legacy/thread/Condition.h"
+#include "legacy/thread/Thread.h"
 #include <memory>
 #include "boost/shared_ptr.h"
-#include "boost/thread.h"
-#include "boost/xtime.h"
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/Deque.h"
 #include "legacy/containers/Map.h"
@@ -272,19 +270,19 @@ namespace moho
      * and it has not failed before. The lock is dropped around the factory
      * call; a file change during the load makes it load again.
      */
-    [[nodiscard]] boost::shared_ptr<void> LoadRecord(ResourceRecord& record, boost::recursive_mutex::scoped_lock& lock);
+    [[nodiscard]] boost::shared_ptr<void> LoadRecord(ResourceRecord& record, fa::recursive_mutex::scoped_lock& lock);
 
-    mutable boost::recursive_mutex mLock;                        // +0x30
+    mutable fa::recursive_mutex mLock;                           // +0x30
     fa::vector<ResourceFactoryBase*> mPendingFactories;          // +0x3C
     fa::map<const gpg::RType*, ResourceFactoryBase*> mFactories; // +0x4C
     bool mRunning;                                               // +0x58
     int mLoadsInProgress;                                        // +0x5C
-    boost::xtime mLastLoadTime;                                  // +0x60
+    fa::xtime mLastLoadTime;                                     // +0x60
     ResourceRecordSet mRecords;                                  // +0x70
     fa::deque<boost::weak_ptr<PrefetchData>> mPrefetchQueue;     // +0x7C
-    boost::condition mPrefetchQueued;                            // +0x90
-    boost::condition mLoadFinished;                              // +0xA8
-    std::unique_ptr<boost::thread> mPrefetchThread;              // +0xC0
+    fa::condition mPrefetchQueued;                               // +0x90
+    fa::condition mLoadFinished;                                 // +0xA8
+    std::unique_ptr<fa::thread> mPrefetchThread;                 // +0xC0
   };
 
   // The members end at 0xC4; `boost::xtime`'s 64-bit `sec` makes the class

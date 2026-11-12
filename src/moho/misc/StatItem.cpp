@@ -33,6 +33,7 @@
 #include "platform/Platform.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "legacy/thread/Mutex.h"
 
 namespace
 {
@@ -208,7 +209,7 @@ namespace
     auto* const stats = reinterpret_cast<moho::Stats<moho::StatItem>*>(objectPtr);
     GPG_ASSERT(stats != nullptr);
 
-    boost::mutex::scoped_lock lock(stats->mLock);
+    fa::mutex::scoped_lock lock(stats->mLock);
     const gpg::RRef owner{};
     moho::StatItem* loadedRoot = nullptr;
     archive->ReadPointerOwned(&loadedRoot, &owner);
@@ -229,7 +230,7 @@ namespace
     auto* const stats = reinterpret_cast<moho::Stats<moho::StatItem>*>(objectPtr);
     GPG_ASSERT(stats != nullptr);
 
-    boost::mutex::scoped_lock lock(stats->mLock);
+    fa::mutex::scoped_lock lock(stats->mLock);
     const gpg::RRef rootRef = MakeStatItemRef(stats->mItem.get());
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     gpg::WriteRawPointer(archive, rootRef, gpg::TrackedPointerState::Owned, owner);
@@ -1067,7 +1068,7 @@ namespace moho
     const char* statPath
   )
   {
-    boost::mutex::scoped_lock lock(mLock);
+    fa::mutex::scoped_lock lock(mLock);
     StatItem* const item = GetItem(statPath, false);
     if (item == mItem.get()) {
       throw std::runtime_error("Don't be doing that, chief.");
@@ -1085,7 +1086,7 @@ namespace moho
     const bool allowCreate
   )
   {
-    boost::mutex::scoped_lock lock(mLock);
+    fa::mutex::scoped_lock lock(mLock);
 
     fa::vector<fa::string> tokens;
     gpg::STR_GetTokens(statPath, "_", tokens);
@@ -1105,7 +1106,7 @@ namespace moho
     const gpg::StrArg statPath
   )
   {
-    boost::mutex::scoped_lock lock(mLock);
+    fa::mutex::scoped_lock lock(mLock);
 
     fa::vector<fa::string> tokens;
     gpg::STR_GetTokens(statPath, "_", tokens);
@@ -1125,7 +1126,7 @@ namespace moho
     const gpg::StrArg statPath
   )
   {
-    boost::mutex::scoped_lock lock(mLock);
+    fa::mutex::scoped_lock lock(mLock);
 
     fa::vector<fa::string> tokens;
     gpg::STR_GetTokens(statPath, "_", tokens);
@@ -1133,7 +1134,7 @@ namespace moho
     bool didCreate = false;
     StatItem* const item = WalkStatPath(mItem.get(), tokens, true, &didCreate);
     if (didCreate && item != nullptr) {
-      boost::mutex::scoped_lock itemLock(item->mLock);
+      fa::mutex::scoped_lock itemLock(item->mLock);
       item->mType = EStatType::kString;
     }
     return item;
@@ -1332,7 +1333,7 @@ namespace moho
       return;
     }
 
-    boost::mutex::scoped_lock lock(item->mLock);
+    fa::mutex::scoped_lock lock(item->mLock);
 
     outObject.AssignNewTable(state, 0, 0);
     item->ToLua(state, &outObject);
@@ -1810,7 +1811,7 @@ namespace moho
     fa::string* outValue
   )
   {
-    boost::mutex::scoped_lock lock(mLock);
+    fa::mutex::scoped_lock lock(mLock);
     outValue->assign(mValue, 0, fa::string::npos);
   }
 
@@ -1821,7 +1822,7 @@ namespace moho
     const fa::string& value
   )
   {
-    boost::mutex::scoped_lock lock(mLock);
+    fa::mutex::scoped_lock lock(mLock);
     mValue.assign(value, 0, fa::string::npos);
   }
 
@@ -1851,7 +1852,7 @@ namespace moho
       (void)StorePrimaryValueBits_IntPath(this, &kZeroBits);
       break;
     case EStatType::kString: {
-      boost::mutex::scoped_lock lock(mLock);
+      fa::mutex::scoped_lock lock(mLock);
       mValue.clear();
       break;
     }
@@ -1959,7 +1960,7 @@ namespace moho
       return;
     }
 
-    boost::mutex::scoped_lock lock(mLock);
+    fa::mutex::scoped_lock lock(mLock);
 
     static gpg::RType* sEStatType = nullptr;
     static gpg::RType* sEPulseMode = nullptr;
@@ -2020,7 +2021,7 @@ namespace moho
       return;
     }
 
-    boost::mutex::scoped_lock lock(mLock);
+    fa::mutex::scoped_lock lock(mLock);
 
     static gpg::RType* sEStatType = nullptr;
     static gpg::RType* sEPulseMode = nullptr;
@@ -2505,7 +2506,7 @@ namespace moho
     const std::function<void(const fa::string& path, StatItem& item)>& visit
   )
   {
-    boost::mutex::scoped_lock lock(stats.mLock);
+    fa::mutex::scoped_lock lock(stats.mLock);
     const std::function<void(StatItem*, const fa::string&)> walk =
       [&](StatItem* const parent, const fa::string& prefix) {
       for (StatIntrusiveNode* node = AsChildHead(parent)->next; node != nullptr && node != AsChildHead(parent);
@@ -2531,7 +2532,7 @@ namespace moho
   )
   {
     out.clear();
-    boost::mutex::scoped_lock lock(stats.mLock);
+    fa::mutex::scoped_lock lock(stats.mLock);
     if (!stats.mItem) {
       return;
     }

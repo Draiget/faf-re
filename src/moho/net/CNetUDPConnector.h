@@ -2,7 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/recursive_mutex.h"
+#include "legacy/thread/Mutex.h"
 #include "boost/weak_ptr.h"
 #include "CNetUDPConnection.h"
 #include "Common.h"
@@ -340,7 +340,7 @@ namespace moho
     // +0x00  vptr(INetConnector)
     // +0x04  vptr(INetNATTraversalHandler)
 
-    boost::recursive_mutex lock_;
+    fa::recursive_mutex lock_;
     platform::net::Socket socket_{platform::net::kInvalidSocket};
     HANDLE event_{nullptr};
     boost::weak_ptr<INetNATTraversalProvider> mNatTraversalProvider;

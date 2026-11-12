@@ -6,8 +6,7 @@
 #include <cstdint>
 #include <cstdio>
 
-#include "boost/condition.h"
-#include "boost/mutex.h"
+#include "legacy/thread/Condition.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/core/streams/Stream.h"
@@ -183,14 +182,14 @@ namespace moho
      */
     void NotifyAll();
 
-    boost::mutex mLock;             // +0x00
-    boost::condition mObjectSender; // +0x08
+    fa::mutex mLock;                // +0x00
+    fa::condition mObjectSender;    // +0x08
     std::int32_t mLockLevel = 0;    // +0x20
     std::int32_t mWaitingLevel = 0; // +0x24
     std::uint8_t mIsLocked = 0;     // +0x28
   };
 
-  static_assert(sizeof(boost::mutex) == 0x08, "boost::mutex size must be 0x08");
+  static_assert(sizeof(fa::mutex) == 0x08, "fa::mutex size must be 0x08");
   static_assert(sizeof(FWHSLock) == 0x2C, "FWHSLock size must be 0x2C");
 
   /**

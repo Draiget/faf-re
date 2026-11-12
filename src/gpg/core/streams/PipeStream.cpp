@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include "legacy/thread/Mutex.h"
 
 using namespace gpg;
 
@@ -86,7 +87,7 @@ size_t PipeStream::VirtReadNonBlocking(
  */
 bool PipeStream::VirtAtEnd()
 {
-  boost::mutex::scoped_lock lock(mLock);
+  fa::mutex::scoped_lock lock(mLock);
   return mClosed && (mReadHead == mReadEnd);
 }
 
@@ -101,7 +102,7 @@ void PipeStream::VirtWrite(
   size_t size
 )
 {
-  boost::mutex::scoped_lock lock(mLock);
+  fa::mutex::scoped_lock lock(mLock);
 
   if (mClosed) {
     // Matches engine semantics: throw on write-after-close.
@@ -151,7 +152,7 @@ void PipeStream::VirtWrite(
  */
 void PipeStream::VirtFlush()
 {
-  boost::mutex::scoped_lock lock(mLock);
+  fa::mutex::scoped_lock lock(mLock);
 
   if (mClosed) {
     throw std::runtime_error("Can't write to a pipe stream after output has been closed.");
@@ -176,7 +177,7 @@ void PipeStream::VirtClose(
 {
   // Keep compatibility: close write-end if requested
   if ((mode & ModeSend) != 0) {
-    boost::mutex::scoped_lock lock(mLock);
+    fa::mutex::scoped_lock lock(mLock);
     if (!mClosed) {
       mClosed = true;
       // Publish whatever is currently written
@@ -205,7 +206,7 @@ bool PipeStream::Empty()
  */
 size_t PipeStream::GetLength()
 {
-  boost::mutex::scoped_lock lock(mLock);
+  fa::mutex::scoped_lock lock(mLock);
 
   PipeStreamBuffer* const head = mBuff.front();
   PipeStreamBuffer* const tail = mBuff.back();
@@ -248,7 +249,7 @@ size_t PipeStream::DoRead(
   const bool doWait
 )
 {
-  boost::mutex::scoped_lock lock(mLock);
+  fa::mutex::scoped_lock lock(mLock);
   size_t available = static_cast<size_t>(mReadEnd - mReadHead);
   size_t copied = 0;
 

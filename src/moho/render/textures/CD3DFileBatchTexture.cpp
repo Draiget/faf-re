@@ -5,7 +5,6 @@
 #include <map>
 #include <utility>
 
-#include "boost/mutex.h"
 #include "boost/weak_ptr.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Logging.h"

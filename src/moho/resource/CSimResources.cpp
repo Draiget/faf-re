@@ -5,6 +5,7 @@
 #include <cmath>
 #include <limits>
 #include <new>
+#include "legacy/thread/Mutex.h"
 
 namespace
 {
@@ -111,7 +112,7 @@ namespace moho
     gpg::Rect2i* const pos
   )
   {
-    boost::mutex::scoped_lock lock(lock_);
+    fa::mutex::scoped_lock lock(lock_);
 
     ResourceDeposit deposit{};
     deposit.footprintRect = *pos;
@@ -162,7 +163,7 @@ namespace moho
     EDepositType type
   )
   {
-    boost::mutex::scoped_lock lock(lock_);
+    fa::mutex::scoped_lock lock(lock_);
     for (const ResourceDeposit& deposit : deposits_) {
       if (deposit.depositType == type && RectsOverlapStrict(*pos, deposit.footprintRect)) {
         return true;
@@ -250,7 +251,7 @@ namespace moho
     gpg::Rect2i* area
   )
   {
-    boost::mutex::scoped_lock lock(lock_);
+    fa::mutex::scoped_lock lock(lock_);
     for (const ResourceDeposit& deposit : deposits_) {
       if (deposit.depositType != type) {
         continue;
@@ -346,7 +347,7 @@ namespace moho
     gpg::Rect2f* area
   )
   {
-    boost::mutex::scoped_lock lock(lock_);
+    fa::mutex::scoped_lock lock(lock_);
     for (const ResourceDeposit& deposit : deposits_) {
       if (deposit.depositType != type) {
         continue;

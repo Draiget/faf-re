@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/mutex.h"
+#include "legacy/thread/Mutex.h"
 #include "gpg/core/containers/String.h"
 #include "legacy/containers/String.h"
 #include "moho/containers/TDatTreeItem.h"
@@ -334,7 +334,7 @@ namespace moho
 
     EStatType mType{EStatType::kNone};         // +0x90
     volatile std::int32_t mUseRealtimeSlot{0}; // +0x94
-    mutable boost::mutex mLock;                // +0x98
+    mutable fa::mutex mLock;                   // +0x98
   };
   static_assert(offsetof(StatItem, mSampleTag) == 0x64, "StatItem::mSampleTag offset must be 0x64");
   static_assert(offsetof(StatItem, mSampleHistory) == 0x68, "StatItem::mSampleHistory offset must be 0x68");

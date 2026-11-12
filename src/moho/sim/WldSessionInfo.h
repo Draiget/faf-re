@@ -8,6 +8,7 @@
 #include "gpg/core/utils/Sync.h"
 #include "legacy/containers/String.h"
 #include "moho/containers/TDatList.h"
+#include "legacy/thread/Thread.h"
 
 namespace LuaPlus
 {
@@ -319,7 +320,7 @@ namespace moho
   struct SWldScenarioLoadTask
   {
     SWldScenarioLoadControl* mControl; // 0x00
-    boost::thread* mWorkerThread;      // 0x04
+    fa::thread* mWorkerThread;         // 0x04
 
     /**
      * Address: 0x00885460 (FUN_00885460)

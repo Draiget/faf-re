@@ -53,6 +53,8 @@ set(FAF_ENGINE_SOURCES
   legacy/exceptions/StdExcept.cpp
   legacy/math/Libm.cpp
   legacy/math/X87Math.cpp
+  legacy/thread/Condition.cpp
+  legacy/thread/Mutex.cpp
   lua/LuaAssertion.cpp
   gpg/gal/backends/d3d10/HardwareVertexFormatterD3D10.cpp
   gpg/gal/backends/d3d10/Float16HardwareVertexFormatterD3D10.cpp
