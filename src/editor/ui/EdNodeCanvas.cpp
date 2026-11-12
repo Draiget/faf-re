@@ -1,4 +1,5 @@
 #include "editor/ui/EdNodeCanvas.h"
+#include "editor/ui/EdCanvasFit.h"
 #include "editor/ui/EdUiScale.h"
 
 #include "imgui.h"
@@ -127,8 +128,8 @@ namespace faf::editor
     const std::string& type
   )
   {
-    const float x = (mCanvasW * 0.5f) / mZoom - mPanX - kNodeW * 0.5f;
-    const float y = (mCanvasH * 0.5f) / mZoom - mPanY - 40.0f;
+    const float x = (mCanvasW * 0.5f) / mScale - mPanX - kNodeW * 0.5f;
+    const float y = (mCanvasH * 0.5f) / mScale - mPanY - 40.0f;
     const int id = graph.AddNode(type, std::round(x), std::round(y));
     if (id != 0) {
       Select(id);
@@ -138,7 +139,8 @@ namespace faf::editor
 
   void EdNodeCanvas::Frame(
     const NodeGraph& graph,
-    const bool selectionOnly
+    const bool selectionOnly,
+    const bool readable
   )
   {
     float minX = 1e9f;
@@ -157,11 +159,33 @@ namespace faf::editor
     if (minX > maxX || mCanvasW <= 0.0f) {
       return;
     }
-    const float w = maxX - minX + 80.0f;
-    const float h = maxY - minY + 80.0f;
-    mZoom = std::clamp(std::min(mCanvasW / w, mCanvasH / h), 0.25f, 1.5f);
-    mPanX = mCanvasW / mZoom * 0.5f - (minX + maxX) * 0.5f;
-    mPanY = mCanvasH / mZoom * 0.5f - (minY + maxY) * 0.5f;
+    // Where to look when the whole doesn't fit readably: the selection's middle, else the graph's.
+    float focusX = (minX + maxX) * 0.5f;
+    float focusY = (minY + maxY) * 0.5f;
+    if (readable && !mSelection.empty()) {
+      float sx = 0.0f;
+      float sy = 0.0f;
+      int count = 0;
+      for (const GraphNode& node : graph.Nodes()) {
+        if (mSelection.count(node.id) != 0) {
+          sx += node.x + kNodeW * 0.5f;
+          sy += node.y + NodeHeight(*node.type) * 0.5f;
+          ++count;
+        }
+      }
+      if (count > 0) {
+        focusX = sx / static_cast<float>(count);
+        focusY = sy / static_cast<float>(count);
+      }
+    }
+    // F: everything with a tenth's margin, however small; on open and resize: no smaller than 60 %.
+    const EdCanvasPlace view = FitCanvas(
+      minX, minY, maxX, maxY, mCanvasW, mCanvasH, mUnit, 0.10f, readable ? 0.6f : 0.05f, 1.5f, focusX, focusY
+    );
+    mZoom = view.zoom;
+    mPanX = view.panX;
+    mPanY = view.panY;
+    mScale = mZoom * mUnit;
   }
 
   bool EdNodeCanvas::Draw(
@@ -177,12 +201,22 @@ namespace faf::editor
     }
     mCanvasX = origin.x;
     mCanvasY = origin.y;
+    // Zoom 1 is the graph at the panels' size: a graph unit is Em(1) pixels, so nodes, pins and text grow together
+    // with the UI scale.
+    // A change of the panels' scale is a resize too: the fitted zoom was for the old unit.
+    const float unit = Em(1.0f);
+    const bool resized = size.x != mCanvasW || size.y != mCanvasH || unit != mUnit || graph.Nodes().size() != mFitNodes;
+    mUnit = unit;
     mCanvasW = size.x;
     mCanvasH = size.y;
-    if (mFrameNext) {
-      Frame(graph, false);
+    // Fitted on open and while the canvas changes size, until the view is moved; F fits again.
+    if (mFrameNext || (mAutoFit && resized)) {
+      Frame(graph, false, !mFrameNext || mAutoFit);
       mFrameNext = false;
+      mFitNodes = graph.Nodes().size();
     }
+    mScale = mZoom * mUnit;
+    const float scale = mScale;
 
     ImGui::InvisibleButton(
       "##canvas",
@@ -195,23 +229,23 @@ namespace faf::editor
     dl->AddRectFilled(origin, ImVec2(origin.x + size.x, origin.y + size.y), IM_COL32(24, 24, 26, 255));
 
     const auto toScreen = [&](const float gx, const float gy) {
-      return ImVec2(origin.x + (gx + mPanX) * mZoom, origin.y + (gy + mPanY) * mZoom);
+      return ImVec2(origin.x + (gx + mPanX) * scale, origin.y + (gy + mPanY) * scale);
     };
     const ImVec2 mouse = ImGui::GetIO().MousePos;
-    const float mouseGX = (mouse.x - origin.x) / mZoom - mPanX;
-    const float mouseGY = (mouse.y - origin.y) / mZoom - mPanY;
+    const float mouseGX = (mouse.x - origin.x) / scale - mPanX;
+    const float mouseGY = (mouse.y - origin.y) / scale - mPanY;
 
     // The grid: fine lines every 16 units, strong ones every 128.
     for (const float step : {16.0f, 128.0f}) {
-      const float px = step * mZoom;
+      const float px = step * scale;
       if (px < 6.0f) {
         continue;
       }
       const ImU32 color = step > 16.0f ? IM_COL32(50, 50, 54, 255) : IM_COL32(34, 34, 37, 255);
-      for (float x = std::fmod(mPanX * mZoom, px); x < size.x; x += px) {
+      for (float x = std::fmod(mPanX * scale, px); x < size.x; x += px) {
         dl->AddLine(ImVec2(origin.x + x, origin.y), ImVec2(origin.x + x, origin.y + size.y), color);
       }
-      for (float y = std::fmod(mPanY * mZoom, px); y < size.y; y += px) {
+      for (float y = std::fmod(mPanY * scale, px); y < size.y; y += px) {
         dl->AddLine(ImVec2(origin.x, origin.y + y), ImVec2(origin.x + size.x, origin.y + y), color);
       }
     }
@@ -219,7 +253,7 @@ namespace faf::editor
     // What the mouse is over: a pin first, then the topmost node.
     PinHit pinHit;
     int nodeHit = 0;
-    const float pinReach = (kPinRadius + 4.0f);
+    const float pinReach = (kPinRadius + 4.0f) / std::max(0.5f, mZoom);
     for (auto it = graph.Nodes().rbegin(); it != graph.Nodes().rend() && hovered; ++it) {
       const GraphNode& node = *it;
       for (std::size_t i = 0; i < node.type->inputs.size() && pinHit.node == 0; ++i) {
@@ -246,10 +280,11 @@ namespace faf::editor
     ImGuiIO& io = ImGui::GetIO();
     // Zoom at the mouse.
     if (hovered && io.MouseWheel != 0.0f) {
-      const float old = mZoom;
-      mZoom = std::clamp(mZoom * (io.MouseWheel > 0.0f ? 1.15f : 1.0f / 1.15f), 0.2f, 2.5f);
-      mPanX = (mouse.x - origin.x) / mZoom - (mouse.x - origin.x) / old + mPanX;
-      mPanY = (mouse.y - origin.y) / mZoom - (mouse.y - origin.y) / old + mPanY;
+      const float old = mZoom * mUnit;
+      mZoom = std::clamp(mZoom * (io.MouseWheel > 0.0f ? 1.15f : 1.0f / 1.15f), 0.05f, 2.5f);
+      mPanX = (mouse.x - origin.x) / (mZoom * mUnit) - (mouse.x - origin.x) / old + mPanX;
+      mPanY = (mouse.y - origin.y) / (mZoom * mUnit) - (mouse.y - origin.y) / old + mPanY;
+      mAutoFit = false;
     }
     // Pan with the right or middle button; a right click that didn't move opens the palette.
     if (hovered && (ImGui::IsMouseClicked(ImGuiMouseButton_Right) || ImGui::IsMouseClicked(ImGuiMouseButton_Middle))) {
@@ -260,8 +295,11 @@ namespace faf::editor
     }
     if (mDrag == Drag::Pan) {
       if (ImGui::IsMouseDown(ImGuiMouseButton_Right) || ImGui::IsMouseDown(ImGuiMouseButton_Middle)) {
-        mPanX += io.MouseDelta.x / mZoom;
-        mPanY += io.MouseDelta.y / mZoom;
+        mPanX += io.MouseDelta.x / scale;
+        mPanY += io.MouseDelta.y / scale;
+        if (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f) {
+          mAutoFit = false;
+        }
         if (std::hypot(mouse.x - mDragStartX, mouse.y - mDragStartY) > 4.0f) {
           mRightMoved = true;
         }
@@ -330,9 +368,10 @@ namespace faf::editor
     }
     if (mDrag == Drag::Move) {
       if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-        const float dx = io.MouseDelta.x / mZoom;
-        const float dy = io.MouseDelta.y / mZoom;
+        const float dx = io.MouseDelta.x / scale;
+        const float dy = io.MouseDelta.y / scale;
         if (dx != 0.0f || dy != 0.0f) {
+          mAutoFit = false;
           for (const int id : mSelection) {
             if (const GraphNode* node = graph.Find(id)) {
               graph.MoveNode(id, node->x + dx, node->y + dy);
@@ -389,7 +428,9 @@ namespace faf::editor
         mSelection.clear();
       }
       if (ImGui::IsKeyPressed(ImGuiKey_F)) {
-        Frame(graph, !mSelection.empty());
+        Frame(graph, !mSelection.empty(), false);
+        mAutoFit = true;
+        mFitNodes = graph.Nodes().size();
       }
       if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_D) && !mSelection.empty()) {
         // Duplicates the selection with the links between its nodes, 40 units down and right.
@@ -435,9 +476,9 @@ namespace faf::editor
     }
 
     // Links.
-    const float thickness = std::max(1.5f, 2.5f * mZoom);
+    const float thickness = std::max(1.5f, 2.5f * scale);
     const auto curve = [&](const ImVec2 a, const ImVec2 b, const ImU32 color) {
-      const float reach = std::max(40.0f * mZoom, std::fabs(b.x - a.x) * 0.5f);
+      const float reach = std::max(40.0f * scale, std::fabs(b.x - a.x) * 0.5f);
       dl->AddBezierCubic(a, ImVec2(a.x + reach, a.y), ImVec2(b.x - reach, b.y), b, color, thickness);
     };
     for (const GraphLink& link : graph.Links()) {
@@ -472,13 +513,13 @@ namespace faf::editor
       if (b.x < origin.x || a.x > origin.x + size.x || b.y < origin.y || a.y > origin.y + size.y) {
         continue;
       }
-      const float rounding = 4.0f * mZoom;
+      const float rounding = 4.0f * scale;
       dl->AddRectFilled(
         ImVec2(a.x + 3.0f, a.y + 3.0f), ImVec2(b.x + 3.0f, b.y + 3.0f), IM_COL32(0, 0, 0, 90), rounding
       );
       dl->AddRectFilled(a, b, IM_COL32(36, 36, 40, 245), rounding);
       dl->AddRectFilled(
-        a, ImVec2(b.x, a.y + kHeader * mZoom), NodeCategoryColor(type.category), rounding, ImDrawFlags_RoundCornersTop
+        a, ImVec2(b.x, a.y + kHeader * scale), NodeCategoryColor(type.category), rounding, ImDrawFlags_RoundCornersTop
       );
       const std::string warning = mWarning ? mWarning(node) : std::string();
       const bool selected = mSelection.count(node.id) != 0;
@@ -490,7 +531,7 @@ namespace faf::editor
         dl->AddText(
           font,
           fontSize,
-          ImVec2(a.x + 7.0f * mZoom, a.y + (kHeader * mZoom - fontSize) * 0.5f),
+          ImVec2(a.x + 7.0f * scale, a.y + (kHeader * scale - fontSize) * 0.5f),
           IM_COL32(240, 240, 240, 255),
           type.title.c_str()
         );
@@ -499,15 +540,15 @@ namespace faf::editor
         const ImVec2 p = toScreen(node.x, PinY(node, static_cast<int>(i)));
         const ImU32 color = PinColor(type.inputs[i].type);
         if (graph.InputLink(node.id, static_cast<int>(i)) != nullptr) {
-          dl->AddCircleFilled(p, kPinRadius * mZoom, color);
+          dl->AddCircleFilled(p, kPinRadius * scale, color);
         } else {
-          dl->AddCircle(p, kPinRadius * mZoom, color, 0, 1.5f);
+          dl->AddCircle(p, kPinRadius * scale, color, 0, 1.5f);
         }
         if (showText) {
           dl->AddText(
             font,
             fontSize,
-            ImVec2(p.x + 10.0f * mZoom, p.y - fontSize * 0.5f),
+            ImVec2(p.x + 10.0f * scale, p.y - fontSize * 0.5f),
             IM_COL32(200, 200, 200, 255),
             type.inputs[i].name.c_str()
           );
@@ -521,16 +562,16 @@ namespace faf::editor
           linked = linked || (link.fromNode == node.id && link.fromPin == static_cast<int>(i));
         }
         if (linked) {
-          dl->AddCircleFilled(p, kPinRadius * mZoom, color);
+          dl->AddCircleFilled(p, kPinRadius * scale, color);
         } else {
-          dl->AddCircle(p, kPinRadius * mZoom, color, 0, 1.5f);
+          dl->AddCircle(p, kPinRadius * scale, color, 0, 1.5f);
         }
         if (showText) {
           const ImVec2 textSize = font->CalcTextSizeA(fontSize, 1e9f, 0.0f, type.outputs[i].name.c_str());
           dl->AddText(
             font,
             fontSize,
-            ImVec2(p.x - 10.0f * mZoom - textSize.x, p.y - fontSize * 0.5f),
+            ImVec2(p.x - 10.0f * scale - textSize.x, p.y - fontSize * 0.5f),
             IM_COL32(200, 200, 200, 255),
             type.outputs[i].name.c_str()
           );

@@ -56,6 +56,7 @@ set(FAF_EDITOR_SOURCES
   ui/EdHelpWindow.cpp
   ui/EdProblems.cpp
   ui/EdProblemsPanel.cpp
+  ui/EdCanvasFit.cpp
   ui/EdWindowChrome.cpp
   ui/EdTitleBar.cpp
   ui/EdPalette.cpp

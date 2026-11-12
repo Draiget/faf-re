@@ -17,7 +17,10 @@ namespace faf::editor
    * pins, curved links; the wheel zooms at the mouse, the right or middle button drags the view, a right click (or a
    * link dropped on nothing) opens the palette there; the left button selects (Ctrl toggles, a box from empty space),
    * drags nodes, and drags from a pin to link (from a linked input it picks the link up); Alt+click on a pin cuts its
-   * links; Delete removes, Ctrl+D duplicates, F frames the selection (or everything).
+   * links; Delete removes, Ctrl+D duplicates, F frames the selection (or everything). Zoom 1 is the panels' scale (a
+   * graph unit is Em(1) pixels). The view fits the graph on open and while the canvas changes size, no smaller than
+   * 60 % (then centred on the selection), until it is panned, zoomed or a node moved; F fits all with a tenth's margin
+   * and fitting goes on from there.
    */
   class EdNodeCanvas
   {
@@ -66,10 +69,11 @@ namespace faf::editor
     void Select(int id);
     /** Adds a node of the type at the canvas's centre (the palette panel's double-click or drop). */
     int AddAtCentre(NodeGraph& graph, const std::string& type);
-    /** Frames everything at the next frame. */
+    /** Frames everything at the next frame (a graph opened), and fits again on resizes until moved. */
     void FrameAll() noexcept
     {
       mFrameNext = true;
+      mAutoFit = true;
     }
     /** A palette panel's item being dragged is dropped here: the payload's id. */
     static constexpr const char* kPalettePayload = "FAF_GRAPH_NODE";
@@ -93,7 +97,8 @@ namespace faf::editor
 
     void DrawPalettePopup(NodeGraph& graph);
     bool PaletteList(NodeGraph& graph, const char* filter, float x, float y);
-    void Frame(const NodeGraph& graph, bool selectionOnly);
+    /** Fits the graph (or the selection) to the canvas; `readable`: no smaller than 60 %, centred on the selection. */
+    void Frame(const NodeGraph& graph, bool selectionOnly, bool readable);
 
     ThumbnailFn mThumbnail;
     HasSquareFn mHasSquare;
@@ -103,6 +108,12 @@ namespace faf::editor
     float mPanX = 40.0f;
     float mPanY = 200.0f;
     float mZoom = 1.0f;
+    /** Pixels a graph unit at zoom 1 (Em(1): the panels' scale), and at the zoom now. */
+    float mUnit = 1.0f;
+    float mScale = 1.0f;
+    /** Fitted on open and resize until the view is moved (F fits again); the node count it last fitted. */
+    bool mAutoFit = true;
+    std::size_t mFitNodes = 0;
     float mCanvasX = 0.0f;
     float mCanvasY = 0.0f;
     float mCanvasW = 0.0f;
