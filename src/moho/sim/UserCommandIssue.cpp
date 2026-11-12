@@ -809,9 +809,9 @@ namespace moho
       return; // No-rush rejection; the by-value `data` destructs on return.
     }
 
-    const bool routePreOrders = (ui_TransportPreOrders != 0)
-      && (data.mCommandType != EUnitCommandType::UNITCOMMAND_TransportUnloadSpecificUnits)
-      && (data.mCommandType != EUnitCommandType::UNITCOMMAND_DetachFromTransport);
+    const bool routePreOrders = (ui_TransportPreOrders != 0) &&
+      (data.mCommandType != EUnitCommandType::UNITCOMMAND_TransportUnloadSpecificUnits) &&
+      (data.mCommandType != EUnitCommandType::UNITCOMMAND_DetachFromTransport);
 
     gpg::fastvector<UserUnit*> simUnits{};
     const gpg::fastvector<UserUnit*>* commandUnits = &units;
@@ -831,8 +831,8 @@ namespace moho
         }
         UserEntity* const parent = unit->GetAttachmentParent();
         if (
-          parent != nullptr && parent->IsInCategory(kTransportCategory) &&
-          !parent->IsInCategory(kCarrierCategory) && !unit->IsInCategory(kPodCategory)
+          parent != nullptr && parent->IsInCategory(kTransportCategory) && !parent->IsInCategory(kCarrierCategory) &&
+          !unit->IsInCategory(kPodCategory)
         ) {
           attachedUnits.push_back(unit);
         } else {

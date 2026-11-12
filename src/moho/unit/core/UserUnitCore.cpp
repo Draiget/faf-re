@@ -919,13 +919,19 @@ UserUnit::~UserUnit()
   }
 }
 
-void UserUnit::QueueTransportPreOrders(const gpg::fastvector<UserUnit*>& units, const SSTICommandIssueData& order, const bool clearQueue)
+void UserUnit::QueueTransportPreOrders(
+  const gpg::fastvector<UserUnit*>& units,
+  const SSTICommandIssueData& order,
+  const bool clearQueue
+)
 {
   if (!ui_TransportPreOrders || units.empty()) {
     return;
   }
   SSTICommandIssueData finalOrder = order;
-  if (finalOrder.nextCommandId <= 0 || (static_cast<std::uint32_t>(finalOrder.nextCommandId) & 0xFF000000u) == 0xFF000000u) {
+  if (
+    finalOrder.nextCommandId <= 0 || (static_cast<std::uint32_t>(finalOrder.nextCommandId) & 0xFF000000u) == 0xFF000000u
+  ) {
     static std::int32_t sNextPreOrderId = 0x7F000001;
     finalOrder.nextCommandId = sNextPreOrderId++;
   }
@@ -936,7 +942,10 @@ void UserUnit::QueueTransportPreOrders(const gpg::fastvector<UserUnit*>& units, 
   }
 }
 
-void UserUnit::QueueTransportPreOrder(const SSTICommandIssueData& order, bool clearQueue)
+void UserUnit::QueueTransportPreOrder(
+  const SSTICommandIssueData& order,
+  bool clearQueue
+)
 {
   if (!ui_TransportPreOrders) {
     return;
@@ -951,7 +960,9 @@ void UserUnit::QueueTransportPreOrder(const SSTICommandIssueData& order, bool cl
     queue.clear();
   }
   SSTICommandIssueData finalOrder = order;
-  if (finalOrder.nextCommandId <= 0 || (static_cast<std::uint32_t>(finalOrder.nextCommandId) & 0xFF000000u) == 0xFF000000u) {
+  if (
+    finalOrder.nextCommandId <= 0 || (static_cast<std::uint32_t>(finalOrder.nextCommandId) & 0xFF000000u) == 0xFF000000u
+  ) {
     static std::int32_t sNextPreOrderId = 0x7F000001;
     finalOrder.nextCommandId = sNextPreOrderId++;
   }
@@ -962,14 +973,7 @@ void UserUnit::QueueTransportPreOrder(const SSTICommandIssueData& order, bool cl
       const SCoordsVec2 buildPos{finalOrder.mTarget.mPos.x, finalOrder.mTarget.mPos.z};
       SOccupationResult buildInfo{};
       const bool placeable = USERUNIT_CanBeBuiltAt(
-        *session,
-        finalOrder.mBlueprint,
-        buildPos,
-        false,
-        &buildInfo,
-        nullptr,
-        0,
-        finalOrder.nextCommandId
+        *session, finalOrder.mBlueprint, buildPos, false, &buildInfo, nullptr, 0, finalOrder.nextCommandId
       );
       if (!placeable) {
         gpg::Warnf(
@@ -996,12 +1000,14 @@ void UserUnit::ClearTransportPreOrders()
   }
 }
 
-bool UserUnit::RemoveTransportPreOrderById(const std::int32_t commandId)
+bool UserUnit::RemoveTransportPreOrderById(
+  const std::int32_t commandId
+)
 {
   bool removed = false;
-  for (auto it = sTransportPreOrders.begin(); it != sTransportPreOrders.end(); ) {
+  for (auto it = sTransportPreOrders.begin(); it != sTransportPreOrders.end();) {
     auto& orders = it->second;
-    for (auto orderIt = orders.begin(); orderIt != orders.end(); ) {
+    for (auto orderIt = orders.begin(); orderIt != orders.end();) {
       if (orderIt->nextCommandId == commandId) {
         orderIt = orders.erase(orderIt);
         removed = true;
@@ -1019,7 +1025,10 @@ bool UserUnit::RemoveTransportPreOrderById(const std::int32_t commandId)
   return removed;
 }
 
-bool UserUnit::UpdateTransportPreOrderPositionById(const std::int32_t commandId, const Wm3::Vector3f& newPos)
+bool UserUnit::UpdateTransportPreOrderPositionById(
+  const std::int32_t commandId,
+  const Wm3::Vector3f& newPos
+)
 {
   bool updated = false;
   CWldSession* const session = WLD_GetActiveSession();
@@ -1029,18 +1038,14 @@ bool UserUnit::UpdateTransportPreOrderPositionById(const std::int32_t commandId,
       if (order.nextCommandId == commandId) {
         Wm3::Vector3f targetPos = newPos;
 
-        if (order.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && order.mBlueprint != nullptr && session != nullptr) {
+        if (
+          order.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && order.mBlueprint != nullptr &&
+          session != nullptr
+        ) {
           const SCoordsVec2 buildPos{newPos.x, newPos.z};
           SOccupationResult buildInfo{};
           const bool placeable = USERUNIT_CanBeBuiltAt(
-            *session,
-            order.mBlueprint,
-            buildPos,
-            false,
-            &buildInfo,
-            nullptr,
-            commandId,
-            commandId
+            *session, order.mBlueprint, buildPos, false, &buildInfo, nullptr, commandId, commandId
           );
           if (!placeable) {
             return false;
@@ -1056,7 +1061,9 @@ bool UserUnit::UpdateTransportPreOrderPositionById(const std::int32_t commandId,
   return updated;
 }
 
-void UserUnit::SetSelectionBracketPositionOverride(const Wm3::Vector3f& pos)
+void UserUnit::SetSelectionBracketPositionOverride(
+  const Wm3::Vector3f& pos
+)
 {
   sSelectionBracketPositionOverrides[this->mParams.mEntityId] = pos;
 }
@@ -1176,7 +1183,8 @@ void UserUnit::DispatchDisembarkedPreOrders()
         continue;
       }
       UserEntity* const entity = session->LookupEntityId(static_cast<EntId>(peerEntId));
-      UserUnit* const peerUnit = (entity != nullptr) ? static_cast<UserUnit*>(entity) : (peerEntId == myEntId ? this : nullptr);
+      UserUnit* const peerUnit =
+        (entity != nullptr) ? static_cast<UserUnit*>(entity) : (peerEntId == myEntId ? this : nullptr);
       if (peerUnit == nullptr || peerUnit->mVariableData.mIsDead != 0) {
         continue;
       }
@@ -1211,7 +1219,10 @@ void UserUnit::DispatchDisembarkedPreOrders()
     const bool isClear = (i == 0);
     SSTICommandIssueData dispatchOrder = preOrders[i];
 
-    if (groupUnits.size() == 1 && dispatchOrder.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && dispatchOrder.nextCommandId > 0) {
+    if (
+      groupUnits.size() == 1 && dispatchOrder.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile &&
+      dispatchOrder.nextCommandId > 0
+    ) {
       auto it = sDispatchedPreOrderBuilders.find(dispatchOrder.nextCommandId);
       if (it != sDispatchedPreOrderBuilders.end() && it->second != myEntId) {
         dispatchOrder.mCommandType = EUnitCommandType::UNITCOMMAND_Guard;
@@ -1222,7 +1233,9 @@ void UserUnit::DispatchDisembarkedPreOrders()
       } else {
         sDispatchedPreOrderBuilders[dispatchOrder.nextCommandId] = myEntId;
       }
-    } else if (dispatchOrder.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && dispatchOrder.nextCommandId > 0) {
+    } else if (
+      dispatchOrder.mCommandType == EUnitCommandType::UNITCOMMAND_BuildMobile && dispatchOrder.nextCommandId > 0
+    ) {
       sDispatchedPreOrderBuilders[dispatchOrder.nextCommandId] = myEntId;
     }
 
@@ -2559,7 +2572,10 @@ bool moho::USERUNIT_CanBeBuiltAt(
 {
   (void)allowCommandOverlap;
 
-  if (session.mWldMap == nullptr || session.mWldMap->mTerrainRes == nullptr || session.mWldMap->mTerrainRes->mMap == nullptr) {
+  if (
+    session.mWldMap == nullptr || session.mWldMap->mTerrainRes == nullptr ||
+    session.mWldMap->mTerrainRes->mMap == nullptr
+  ) {
     return true;
   }
 

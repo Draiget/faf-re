@@ -759,7 +759,8 @@ namespace moho
         return;
       }
       const STIMap* const map = (graph.mSession->mWldMap && graph.mSession->mWldMap->mTerrainRes)
-        ? graph.mSession->mWldMap->mTerrainRes->mMap : nullptr;
+        ? graph.mSession->mWldMap->mTerrainRes->mMap
+        : nullptr;
       Wm3::Vector3f clampedPos = mouse;
       if (map != nullptr) {
         clampedPos.x = std::clamp(

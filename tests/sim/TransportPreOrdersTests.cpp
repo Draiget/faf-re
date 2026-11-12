@@ -21,7 +21,9 @@ namespace
       moho::ui_TransportPreOrders = true;
     }
 
-    UserUnit* GetUnit(std::uint32_t entityId)
+    UserUnit* GetUnit(
+      std::uint32_t entityId
+    )
     {
       auto* unit = reinterpret_cast<UserUnit*>(mStorage);
       unit->mParams.mEntityId = entityId;
@@ -38,7 +40,10 @@ namespace
     }
   };
 
-  TEST(TransportPreOrdersTests, InitialStateIsEmpty)
+  TEST(
+    TransportPreOrdersTests,
+    InitialStateIsEmpty
+  )
   {
     MockUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(101);
@@ -47,7 +52,10 @@ namespace
     EXPECT_TRUE(unit->GetTransportPreOrders().empty());
   }
 
-  TEST(TransportPreOrdersTests, QueueSingleOrder)
+  TEST(
+    TransportPreOrdersTests,
+    QueueSingleOrder
+  )
   {
     MockUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(102);
@@ -61,7 +69,10 @@ namespace
     EXPECT_EQ(orders[0].mCommandType, EUnitCommandType::UNITCOMMAND_Move);
   }
 
-  TEST(TransportPreOrdersTests, QueueWithClearQueueReplacesOrders)
+  TEST(
+    TransportPreOrdersTests,
+    QueueWithClearQueueReplacesOrders
+  )
   {
     MockUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(103);
@@ -78,7 +89,10 @@ namespace
     EXPECT_EQ(orders[0].mCommandType, EUnitCommandType::UNITCOMMAND_Patrol);
   }
 
-  TEST(TransportPreOrdersTests, QueueWithoutClearQueueAppendsOrders)
+  TEST(
+    TransportPreOrdersTests,
+    QueueWithoutClearQueueAppendsOrders
+  )
   {
     MockUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(104);
@@ -96,7 +110,10 @@ namespace
     EXPECT_EQ(orders[1].mCommandType, EUnitCommandType::UNITCOMMAND_Attack);
   }
 
-  TEST(TransportPreOrdersTests, ClearPreOrdersEmptiesQueue)
+  TEST(
+    TransportPreOrdersTests,
+    ClearPreOrdersEmptiesQueue
+  )
   {
     MockUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(105);
@@ -110,7 +127,10 @@ namespace
     EXPECT_TRUE(unit->GetTransportPreOrders().empty());
   }
 
-  TEST(TransportPreOrdersTests, DifferentUnitsHaveIndependentQueues)
+  TEST(
+    TransportPreOrdersTests,
+    DifferentUnitsHaveIndependentQueues
+  )
   {
     MockUserUnitScope scope1;
     UserUnit* unit1 = scope1.GetUnit(201);
@@ -135,7 +155,10 @@ namespace
     EXPECT_TRUE(unit2->HasTransportPreOrders());
   }
 
-  TEST(TransportPreOrdersTests, DispatchDisembarkedPreOrdersClearsQueue)
+  TEST(
+    TransportPreOrdersTests,
+    DispatchDisembarkedPreOrdersClearsQueue
+  )
   {
     MockUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(301);
@@ -154,7 +177,10 @@ namespace
     EXPECT_TRUE(unit->GetTransportPreOrders().empty());
   }
 
-  TEST(TransportPreOrdersTests, DispatchDisembarkedPreOrdersNoOpWhenEmpty)
+  TEST(
+    TransportPreOrdersTests,
+    DispatchDisembarkedPreOrdersNoOpWhenEmpty
+  )
   {
     MockUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(302);
@@ -165,7 +191,10 @@ namespace
     EXPECT_TRUE(unit->GetTransportPreOrders().empty());
   }
 
-  TEST(TransportPreOrdersTests, DetachmentTransitionPredicateTriggersDispatch)
+  TEST(
+    TransportPreOrdersTests,
+    DetachmentTransitionPredicateTriggersDispatch
+  )
   {
     MockUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(303);
@@ -205,7 +234,10 @@ namespace
     EXPECT_TRUE(unit->GetTransportPreOrders().empty());
   }
 
-  TEST(TransportPreOrdersTests, MultipleChainedOrdersSequence)
+  TEST(
+    TransportPreOrdersTests,
+    MultipleChainedOrdersSequence
+  )
   {
     MockUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(401);
@@ -242,7 +274,10 @@ namespace
     EXPECT_FALSE(unit->HasTransportPreOrders());
   }
 
-  TEST(TransportPreOrdersTests, ClearQueueDuringQueueing)
+  TEST(
+    TransportPreOrdersTests,
+    ClearQueueDuringQueueing
+  )
   {
     MockUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(402);
@@ -264,7 +299,10 @@ namespace
     EXPECT_EQ(orders[0].mCommandType, EUnitCommandType::UNITCOMMAND_BuildMobile);
   }
 
-  TEST(TransportPreOrdersTests, DestructionClearsPreOrdersSafely)
+  TEST(
+    TransportPreOrdersTests,
+    DestructionClearsPreOrdersSafely
+  )
   {
     {
       MockUserUnitScope scope;
@@ -280,7 +318,10 @@ namespace
     EXPECT_FALSE(unit2->HasTransportPreOrders());
   }
 
-  TEST(TransportPreOrdersTests, SelectionBracketPositionOverrideInitialState)
+  TEST(
+    TransportPreOrdersTests,
+    SelectionBracketPositionOverrideInitialState
+  )
   {
     MockUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(501);
@@ -289,7 +330,10 @@ namespace
     EXPECT_EQ(unit->GetSelectionBracketPositionOverride(), Wm3::Vector3f::ZERO);
   }
 
-  TEST(TransportPreOrdersTests, SetAndClearSelectionBracketPositionOverride)
+  TEST(
+    TransportPreOrdersTests,
+    SetAndClearSelectionBracketPositionOverride
+  )
   {
     MockUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(502);
@@ -304,7 +348,10 @@ namespace
     EXPECT_FALSE(unit->HasSelectionBracketPositionOverride());
     EXPECT_EQ(unit->GetSelectionBracketPositionOverride(), Wm3::Vector3f::ZERO);
   }
-  TEST(TransportPreOrdersTests, StopCommandClearsQueue)
+  TEST(
+    TransportPreOrdersTests,
+    StopCommandClearsQueue
+  )
   {
     MockUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(601);
@@ -319,7 +366,10 @@ namespace
     EXPECT_TRUE(unit->GetTransportPreOrders().empty());
   }
 
-  TEST(TransportPreOrdersTests, RemoveAndDragTransportPreOrderById)
+  TEST(
+    TransportPreOrdersTests,
+    RemoveAndDragTransportPreOrderById
+  )
   {
     MockUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(604);
@@ -347,7 +397,10 @@ namespace
     EXPECT_TRUE(UserUnit::RemoveTransportPreOrderById(cmdId));
     EXPECT_FALSE(unit->HasTransportPreOrders());
   }
-  TEST(TransportPreOrdersTests, SharedGroupPreOrdersCommonCommandId)
+  TEST(
+    TransportPreOrdersTests,
+    SharedGroupPreOrdersCommonCommandId
+  )
   {
     MockUserUnitScope scope1;
     MockUserUnitScope scope2;
@@ -387,7 +440,10 @@ namespace
     EXPECT_FALSE(unit2->HasTransportPreOrders());
   }
 
-  TEST(TransportPreOrdersTests, DisembarkDispatchesGroupPreOrders)
+  TEST(
+    TransportPreOrdersTests,
+    DisembarkDispatchesGroupPreOrders
+  )
   {
     MockUserUnitScope scope1;
     MockUserUnitScope scope2;
@@ -415,7 +471,10 @@ namespace
     EXPECT_FALSE(unit2->HasTransportPreOrders());
   }
 
-  TEST(TransportPreOrdersTests, BuildMobilePreOrderQueueing)
+  TEST(
+    TransportPreOrdersTests,
+    BuildMobilePreOrderQueueing
+  )
   {
     MockUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(901);
@@ -439,7 +498,10 @@ namespace
     EXPECT_FALSE(unit->HasTransportPreOrders());
   }
 
-  TEST(TransportPreOrdersTests, ConVarSwitchTogglesFeature)
+  TEST(
+    TransportPreOrdersTests,
+    ConVarSwitchTogglesFeature
+  )
   {
     MockUserUnitScope scope;
     UserUnit* unit = scope.GetUnit(902);
@@ -467,8 +529,11 @@ namespace
     EXPECT_FALSE(unit->HasTransportPreOrders());
   }
 
-  TEST(TransportPreOrdersTests, DefaultSwitchStateIsFalse)
+  TEST(
+    TransportPreOrdersTests,
+    DefaultSwitchStateIsFalse
+  )
   {
     EXPECT_FALSE(moho::ui_TransportPreOrders);
   }
-}
+} // namespace

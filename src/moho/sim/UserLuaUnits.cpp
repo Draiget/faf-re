@@ -1894,7 +1894,9 @@ int moho::cfunc_SelectUnitsL(
 
 constexpr const char* kSelectCargoUnitsHelpText = "SelectCargoUnits(unitList, [addToCurSel])";
 
-int moho::cfunc_SelectCargoUnitsL(LuaPlus::LuaState* const state)
+int moho::cfunc_SelectCargoUnitsL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -1920,7 +1922,8 @@ int moho::cfunc_SelectCargoUnitsL(LuaPlus::LuaState* const state)
   }
 
   auto addUnit = [&](UserUnit* const userUnit) {
-    if (userUnit == nullptr) return;
+    if (userUnit == nullptr)
+      return;
     IUnit* const iunitBridge = ResolveIUnitBridge(userUnit);
     if (!iunitBridge || iunitBridge->IsDead() || iunitBridge->DestroyQueued()) {
       return;
@@ -1945,7 +1948,9 @@ int moho::cfunc_SelectCargoUnitsL(LuaPlus::LuaState* const state)
   return 0;
 }
 
-int moho::cfunc_SelectCargoUnits(lua_State* const luaContext)
+int moho::cfunc_SelectCargoUnits(
+  lua_State* const luaContext
+)
 {
   return cfunc_SelectCargoUnitsL(moho::SCR_ResolveBindingState(luaContext));
 }

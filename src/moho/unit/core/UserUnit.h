@@ -581,7 +581,11 @@ namespace moho
      * Client-side transport cargo drop pre-orders.
      * Backed by a static registry indexed by mParams.mEntityId so sizeof(UserUnit) remains 0x3E8.
      */
-    static void QueueTransportPreOrders(const gpg::fastvector<UserUnit*>& units, const SSTICommandIssueData& order, bool clearQueue);
+    static void QueueTransportPreOrders(
+      const gpg::fastvector<UserUnit*>& units,
+      const SSTICommandIssueData& order,
+      bool clearQueue
+    );
     void QueueTransportPreOrder(const SSTICommandIssueData& order, bool clearQueue);
     void ClearTransportPreOrders();
     static bool RemoveTransportPreOrderById(std::int32_t commandId);
@@ -589,7 +593,8 @@ namespace moho
     [[nodiscard]] std::vector<SSTICommandIssueData> GetTransportPreOrders() const;
     [[nodiscard]] bool HasTransportPreOrders() const;
     [[nodiscard]] static bool HasAnyTransportPreOrders();
-    [[nodiscard]] static const std::unordered_map<std::uint32_t, std::vector<SSTICommandIssueData>>& GetAllTransportPreOrders();
+    [[nodiscard]] static const std::unordered_map<std::uint32_t, std::vector<SSTICommandIssueData>>&
+    GetAllTransportPreOrders();
     void DispatchDisembarkedPreOrders();
 
     void SetSelectionBracketPositionOverride(const Wm3::Vector3f& pos);

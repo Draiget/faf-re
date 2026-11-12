@@ -2873,7 +2873,9 @@ int moho::cfunc_GetBlueprintUserL(
   }
   return 1;
 }
-int moho::cfunc_UserUnitSetSelectionBracketPositionOverrideL(LuaPlus::LuaState* const state)
+int moho::cfunc_UserUnitSetSelectionBracketPositionOverrideL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kUserUnitSetSelectionBracketPositionOverrideHelpText);
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
@@ -2886,7 +2888,9 @@ int moho::cfunc_UserUnitSetSelectionBracketPositionOverrideL(LuaPlus::LuaState* 
   return 0;
 }
 
-int moho::cfunc_UserUnitSetSelectionBracketPositionOverride(lua_State* const luaContext)
+int moho::cfunc_UserUnitSetSelectionBracketPositionOverride(
+  lua_State* const luaContext
+)
 {
   return cfunc_UserUnitSetSelectionBracketPositionOverrideL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2904,7 +2908,9 @@ CScrLuaInitForm* moho::func_UserUnitSetSelectionBracketPositionOverride_LuaFuncD
   return &binder;
 }
 
-int moho::cfunc_UserUnitClearSelectionBracketPositionOverrideL(LuaPlus::LuaState* const state)
+int moho::cfunc_UserUnitClearSelectionBracketPositionOverrideL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kUserUnitClearSelectionBracketPositionOverrideHelpText);
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
@@ -2915,7 +2921,9 @@ int moho::cfunc_UserUnitClearSelectionBracketPositionOverrideL(LuaPlus::LuaState
   return 0;
 }
 
-int moho::cfunc_UserUnitClearSelectionBracketPositionOverride(lua_State* const luaContext)
+int moho::cfunc_UserUnitClearSelectionBracketPositionOverride(
+  lua_State* const luaContext
+)
 {
   return cfunc_UserUnitClearSelectionBracketPositionOverrideL(moho::SCR_ResolveBindingState(luaContext));
 }

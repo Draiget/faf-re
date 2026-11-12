@@ -1633,7 +1633,8 @@ namespace moho
           bool culledByFrustum = false;
           for (const Wm3::Plane3f& plane : camera.solid2.planes_) {
             const float signedDistance =
-              ((plane.Normal.x * targetPos.x) + (plane.Normal.y * targetPos.y) + (plane.Normal.z * targetPos.z)) - plane.Constant;
+              ((plane.Normal.x * targetPos.x) + (plane.Normal.y * targetPos.y) + (plane.Normal.z * targetPos.z)) -
+              plane.Constant;
             if (signedDistance > 0.0f) {
               culledByFrustum = true;
               break;
@@ -3112,7 +3113,11 @@ namespace moho
   }
 
   void UICommandGraph::DrawPreOrderLines(
-    const GeomCamera3& camera, CD3DPrimBatcher& batcher, const std::int32_t tick, const float tickFraction, const bool isGlow
+    const GeomCamera3& camera,
+    CD3DPrimBatcher& batcher,
+    const std::int32_t tick,
+    const float tickFraction,
+    const bool isGlow
   ) const
   {
     if (!ui_TransportPreOrders || !UserUnit::HasAnyTransportPreOrders()) {
@@ -3139,9 +3144,8 @@ namespace moho
         continue;
       }
 
-      Wm3::Vector3f startPos = unit->HasSelectionBracketPositionOverride()
-        ? unit->GetSelectionBracketPositionOverride()
-        : entity->mVariableData.mCurTransform.pos_;
+      Wm3::Vector3f startPos = unit->HasSelectionBracketPositionOverride() ? unit->GetSelectionBracketPositionOverride()
+                                                                           : entity->mVariableData.mCurTransform.pos_;
 
       Wm3::Vector3f prevPos = startPos;
       for (const SSTICommandIssueData& order : orders) {
@@ -3179,18 +3183,24 @@ namespace moho
         direction.Normalize();
 
         const float segmentLength = std::sqrt(
-          ((targetPos.x - prevPos.x) * (targetPos.x - prevPos.x) + (targetPos.y - prevPos.y) * (targetPos.y - prevPos.y))
-          + (targetPos.z - prevPos.z) * (targetPos.z - prevPos.z)
+          ((targetPos.x - prevPos.x) * (targetPos.x - prevPos.x) +
+           (targetPos.y - prevPos.y) * (targetPos.y - prevPos.y)) +
+          (targetPos.z - prevPos.z) * (targetPos.z - prevPos.z)
         );
         const float smoothRadius = std::min(segmentLength * 0.25f, ui_CurveSmoothness * width);
 
         const float uStart = 1.0f - fa::fmod((static_cast<double>(tick) + tickFraction) * node.mOrderlineAnimRate, 1.0);
 
         EmitHermiteRibbonSegments(
-          batcher, prevPos, targetPos,
+          batcher,
+          prevPos,
+          targetPos,
           Wm3::Vector3f{direction.x * smoothRadius, direction.y * smoothRadius, direction.z * smoothRadius},
           Wm3::Vector3f{direction.x * smoothRadius, direction.y * smoothRadius, direction.z * smoothRadius},
-          width, color, uStart, node.mOrderlineAspectRatio
+          width,
+          color,
+          uStart,
+          node.mOrderlineAspectRatio
         );
 
         prevPos = targetPos;
@@ -3199,7 +3209,8 @@ namespace moho
   }
 
   void UICommandGraph::DrawPreOrderWaypointMarkers(
-    const GeomCamera3& camera, CD3DPrimBatcher& batcher
+    const GeomCamera3& camera,
+    CD3DPrimBatcher& batcher
   ) const
   {
     if (!ui_TransportPreOrders || !UserUnit::HasAnyTransportPreOrders()) {
@@ -3262,8 +3273,12 @@ namespace moho
 
         const CD3DPrimBatcher::Vertex topLeft{targetPos.x - size, targetPos.y, targetPos.z + size, color, 0.0f, 1.0f};
         const CD3DPrimBatcher::Vertex topRight{targetPos.x - size, targetPos.y, targetPos.z - size, color, 0.0f, 0.0f};
-        const CD3DPrimBatcher::Vertex bottomRight{targetPos.x + size, targetPos.y, targetPos.z - size, color, 1.0f, 0.0f};
-        const CD3DPrimBatcher::Vertex bottomLeft{targetPos.x + size, targetPos.y, targetPos.z + size, color, 1.0f, 1.0f};
+        const CD3DPrimBatcher::Vertex bottomRight{
+          targetPos.x + size, targetPos.y, targetPos.z - size, color, 1.0f, 0.0f
+        };
+        const CD3DPrimBatcher::Vertex bottomLeft{
+          targetPos.x + size, targetPos.y, targetPos.z + size, color, 1.0f, 1.0f
+        };
         batcher.DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
       }
     }
@@ -3325,8 +3340,10 @@ namespace moho
         activeKeys.insert(key);
 
         Wm3::Quatf orientation = order.mOri;
-        if (std::abs(orientation.w) < 1e-4f && std::abs(orientation.x) < 1e-4f &&
-            std::abs(orientation.y) < 1e-4f && std::abs(orientation.z) < 1e-4f) {
+        if (
+          std::abs(orientation.w) < 1e-4f && std::abs(orientation.x) < 1e-4f && std::abs(orientation.y) < 1e-4f &&
+          std::abs(orientation.z) < 1e-4f
+        ) {
           orientation = Wm3::Quatf{1.0f, 0.0f, 0.0f, 0.0f};
         }
         const VTransform stance{order.mTarget.mPos, orientation};
@@ -3334,14 +3351,7 @@ namespace moho
         const SCoordsVec2 buildPos{order.mTarget.mPos.x, order.mTarget.mPos.z};
         SOccupationResult buildInfo{};
         const bool canBuild = USERUNIT_CanBeBuiltAt(
-          *mSession,
-          unitBlueprint,
-          buildPos,
-          false,
-          &buildInfo,
-          nullptr,
-          order.nextCommandId,
-          order.nextCommandId
+          *mSession, unitBlueprint, buildPos, false, &buildInfo, nullptr, order.nextCommandId, order.nextCommandId
         );
         const std::int32_t previewColor = canBuild ? kPreviewTranslucentGreen : kPreviewTranslucentRed;
 
@@ -3353,8 +3363,7 @@ namespace moho
           continue;
         }
 
-        RMeshBlueprint* const meshBlueprint =
-          mSession->mRules->GetMeshBlueprint(unitBlueprint->Display.MeshBlueprint);
+        RMeshBlueprint* const meshBlueprint = mSession->mRules->GetMeshBlueprint(unitBlueprint->Display.MeshBlueprint);
         if (meshBlueprint == nullptr || meshBlueprint->mLods.begin() == meshBlueprint->mLods.end()) {
           continue;
         }
@@ -3385,7 +3394,7 @@ namespace moho
       }
     }
 
-    for (auto it = sPreOrderGhostMeshes.begin(); it != sPreOrderGhostMeshes.end(); ) {
+    for (auto it = sPreOrderGhostMeshes.begin(); it != sPreOrderGhostMeshes.end();) {
       if (activeKeys.find(it->first) == activeKeys.end()) {
         it = sPreOrderGhostMeshes.erase(it);
       } else {
@@ -3395,7 +3404,8 @@ namespace moho
   }
 
   void UICommandGraph::DrawPreOrderSkirts(
-    const GeomCamera3& camera, CD3DPrimBatcher& batcher
+    const GeomCamera3& camera,
+    CD3DPrimBatcher& batcher
   ) const
   {
     const_cast<UICommandGraph*>(this)->UpdatePreOrderBuildMeshes();
@@ -3445,14 +3455,7 @@ namespace moho
         const SCoordsVec2 buildPos{order.mTarget.mPos.x, order.mTarget.mPos.z};
         SOccupationResult buildInfo{};
         const bool canBuild = USERUNIT_CanBeBuiltAt(
-          *mSession,
-          unitBlueprint,
-          buildPos,
-          false,
-          &buildInfo,
-          nullptr,
-          order.nextCommandId,
-          order.nextCommandId
+          *mSession, unitBlueprint, buildPos, false, &buildInfo, nullptr, order.nextCommandId, order.nextCommandId
         );
         const std::uint32_t skirtColor = canBuild ? kPreviewSkirtGreen : kPreviewSkirtRed;
         DrawUnitSkirt(heightField, unitBlueprint, camera, order.mTarget.mPos, mSession, &batcher, skirtColor);

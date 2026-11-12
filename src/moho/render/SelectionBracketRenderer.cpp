@@ -359,8 +359,9 @@ namespace moho
 
     // 0x007FCBB5..0x007FCC25: the on-screen size floor. The denominator is
     // built from the entity's *current* transform, not the interpolated one.
-    const float viewportPixelScale =
-      ProjectViewportPixelScaleRow(camera->viewport, hasPositionOverride ? overridePosition : entity->mVariableData.mCurTransform.pos_);
+    const float viewportPixelScale = ProjectViewportPixelScaleRow(
+      camera->viewport, hasPositionOverride ? overridePosition : entity->mVariableData.mCurTransform.pos_
+    );
     if (ren_SelectBracketMinPixelSize > ((maxSelectionSize * bracketThickness) / viewportPixelScale)) {
       bracketThickness = (ren_SelectBracketMinPixelSize * viewportPixelScale) / maxSelectionSize;
     }
@@ -387,11 +388,10 @@ namespace moho
       selectionBox.Center.y += ren_SelectionHeightFudge;
     } else {
       selectionBox.Center.x = selectionBox.Center.x + selectionCenterOffset.x;
-      selectionBox.Center.y = constEntity.GetInterpolatedTransform(interpolationAlpha).pos_.y
-        + ren_SelectionHeightFudge + selectionCenterOffset.y;
+      selectionBox.Center.y = constEntity.GetInterpolatedTransform(interpolationAlpha).pos_.y +
+        ren_SelectionHeightFudge + selectionCenterOffset.y;
       selectionBox.Center.z = selectionBox.Center.z + selectionCenterOffset.z;
     }
-
 
     Wm3::Vector3f boxVertices[8]{};
     selectionBox.ComputeVertices(boxVertices);
