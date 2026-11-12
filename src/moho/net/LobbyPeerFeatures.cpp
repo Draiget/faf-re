@@ -140,37 +140,50 @@ namespace
     return true;
   }
 
-  // Pushes the script's file-local GUI, an upvalue of its SetSlotInfo (the function
-  // at the absolute or upvalue index `function`, or the one wrapped by it). False with
+  // How many wrappers deep the search below follows. Each wrapper keeps the function it
+  // wraps as an upvalue: this wrapper, the engine's own lobby hook, a UI mod or two.
+  constexpr int kWrapperDepth = 4;
+
+  // Pushes the upvalue called `name` of the function at the absolute or upvalue index
+  // `function`, or of a function it holds as an upvalue, `depth` levels down. False with
   // nothing pushed if not found.
+  [[nodiscard]] bool PushUpvalueNamed(
+    lua_State* const state,
+    const int function,
+    const char* const name,
+    const int depth
+  )
+  {
+    const int top = lua_gettop(state);
+    for (int index = 1;; ++index) {
+      const char* const upvalue = lua_getupvalue(state, function, index);
+      if (upvalue == nullptr) {
+        lua_settop(state, top);
+        return false;
+      }
+      if (std::strcmp(upvalue, name) == 0) {
+        return true;
+      }
+      const int type = lua_type(state, -1);
+      if (depth > 0 && (type == LUA_TFUNCTION || type == LUA_CFUNCTION) &&
+          PushUpvalueNamed(state, lua_gettop(state), name, depth - 1)) {
+        // Over the function it was found in.
+        lua_replace(state, top + 1);
+        return true;
+      }
+      lua_pop(state, 1);
+    }
+  }
+
+  // Pushes the script's file-local GUI, an upvalue of its SetSlotInfo, which is found
+  // under whatever wraps it (the function at the absolute or upvalue index `function`).
+  // False with nothing pushed if not found.
   [[nodiscard]] bool PushLobbyGui(
     lua_State* const state,
     const int function
   )
   {
-    const int top = lua_gettop(state);
-    int script = function;
-    if (lua_type(state, script) == LUA_CFUNCTION) {
-      if (lua_getupvalue(state, script, 1) == nullptr) {
-        return false;
-      }
-      script = lua_gettop(state);
-    }
-    for (int index = 1;; ++index) {
-      const char* const name = lua_getupvalue(state, script, index);
-      if (name == nullptr) {
-        lua_settop(state, top);
-        return false;
-      }
-      if (std::strcmp(name, "GUI") == 0) {
-        // Over the wrapped function, when that was pushed first.
-        if (lua_gettop(state) > top + 1) {
-          lua_replace(state, top + 1);
-        }
-        return true;
-      }
-      lua_pop(state, 1);
-    }
+    return PushUpvalueNamed(state, function, "GUI", kWrapperDepth);
   }
 
   // GUI.slots[slot].name:SetTitleTextColor(style). A failure costs the colour only.
@@ -182,7 +195,15 @@ namespace
   )
   {
     const int top = lua_gettop(state);
-    if (PushLobbyGui(state, function) && lua_type(state, -1) == LUA_TTABLE) {
+    const bool found = PushLobbyGui(state, function);
+    if (!found) {
+      static bool saidMissing = false;
+      if (!saidMissing) {
+        saidMissing = true;
+        gpg::Warnf("PEERS: the lobby script's GUI was not found, no style shown");
+      }
+    }
+    if (found && lua_type(state, -1) == LUA_TTABLE) {
       PushField(state, -1, "slots");
       if (lua_type(state, -1) == LUA_TTABLE) {
         lua_pushnumber(state, slot);
