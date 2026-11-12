@@ -13,7 +13,6 @@
 #include <vector>
 
 #include "platform/Window.h"
-#include "platform/posix/Win32WindowPosix.h"
 
 #include <wx/app.h>
 #include <wx/dc.h>
@@ -202,8 +201,12 @@ namespace
 {
   // The window that gets its top-level window's keyboard and mouse events (wxWindow::SetFocus).
   wxWindow* sFocusWindow = nullptr;
-  // Each native window's top-level wxWindow, for delivering its events.
-  std::unordered_map<WXWidget, wxTopLevelWindow*> sTopLevels;
+  // The wxWindow of each window system window (top-level windows and native children), for
+  // delivering its events.
+  std::unordered_map<void*, wxWindow*> sNativeWindows;
+  // Whether one of the program's windows has the keyboard, and the frame told it got it.
+  bool sAppActive = false;
+  wxWindow* sActivatedFrame = nullptr;
 
   [[nodiscard]] std::string Utf8(
     const wxString& text
@@ -230,13 +233,6 @@ namespace
     }
     return utf8;
   }
-
-  [[nodiscard]] void* NativeOf(
-    const WXWidget handle
-  )
-  {
-    return reinterpret_cast<void*>(handle);
-  }
 } // namespace
 
 wxWindow::wxWindow(
@@ -257,26 +253,43 @@ wxWindow::wxWindow(
   m_clientWidth = size.x < 0 ? 0 : size.x;
   m_clientHeight = size.y < 0 ? 0 : size.y;
   if (parent != nullptr) {
-    // A child fills its parent's native window, from the same origin.
     parent->m_children.push_back(this);
+    const int width = size.x < 0 ? parent->m_clientWidth : size.x;
+    const int height = size.y < 0 ? parent->m_clientHeight : size.y;
+    if (
+      void* const child = parent->m_platformWindow != nullptr
+        ? platform::window::CreateChild(
+            parent->m_platformWindow, pos.x < 0 ? 0 : pos.x, pos.y < 0 ? 0 : pos.y, width, height
+          )
+        : nullptr;
+      child != nullptr
+    ) {
+      // A native window of its own inside the parent's (Windows), as wx 2.4.2 made it.
+      m_nativeChild = true;
+      m_shown = true;
+      m_platformWindow = child;
+      m_handle = reinterpret_cast<WXWidget>(platform::window::NativeHandle(child));
+      sNativeWindows[child] = this;
+      platform::window::GetBounds(child, &m_screenX, &m_screenY, &m_clientWidth, &m_clientHeight);
+      return;
+    }
+    // A child fills its parent's native window, from the same origin.
     m_handle = parent->m_handle;
+    m_platformWindow = parent->m_platformWindow;
     m_screenX = parent->m_screenX;
     m_screenY = parent->m_screenY;
-    if (size.x < 0) {
-      m_clientWidth = parent->m_clientWidth;
-    }
-    if (size.y < 0) {
-      m_clientHeight = parent->m_clientHeight;
-    }
+    m_clientWidth = width;
+    m_clientHeight = height;
   }
 }
 
 void wxWindow::SetTopLevel(
-  const WXWidget handle
+  void* const platformWindow
 )
 {
   m_topLevel = true;
-  m_handle = handle;
+  m_platformWindow = platformWindow;
+  m_handle = reinterpret_cast<WXWidget>(platform::window::NativeHandle(platformWindow));
 }
 
 bool wxWindow::Destroy()
@@ -291,8 +304,8 @@ bool wxWindow::Show(
 {
   const bool changed = m_shown != show;
   m_shown = show;
-  if (m_topLevel && m_handle != 0) {
-    platform::window::Show(NativeOf(m_handle), show);
+  if ((m_topLevel || m_nativeChild) && m_platformWindow != nullptr) {
+    platform::window::Show(m_platformWindow, show);
   }
   return changed;
 }
@@ -300,6 +313,9 @@ bool wxWindow::Show(
 void wxWindow::SetFocus()
 {
   sFocusWindow = this;
+  if ((m_topLevel || m_nativeChild) && m_platformWindow != nullptr) {
+    platform::window::SetKeyboardFocus(m_platformWindow);
+  }
 }
 
 wxWindow* wxWindow::FindFocus()
@@ -324,17 +340,25 @@ void wxWindow::SetSize(
 )
 {
   (void)sizeFlags;
-  if (m_topLevel && m_handle != 0) {
+  if (m_nativeChild && m_platformWindow != nullptr) {
+    // x, y in the parent's client area, as wx 2.4.2 placed child windows.
+    platform::window::SetBounds(m_platformWindow, x, y, width, height);
+    platform::window::GetBounds(m_platformWindow, &m_screenX, &m_screenY, &m_clientWidth, &m_clientHeight);
+    return;
+  }
+  if (m_topLevel && m_platformWindow != nullptr) {
     // The window system decides; its answer is what the window has.
-    platform::window::SetBounds(NativeOf(m_handle), x, y, width, height);
+    platform::window::SetBounds(m_platformWindow, x, y, width, height);
     int screenX = 0;
     int screenY = 0;
     int clientWidth = 0;
     int clientHeight = 0;
-    platform::window::GetBounds(NativeOf(m_handle), &screenX, &screenY, &clientWidth, &clientHeight);
+    platform::window::GetBounds(m_platformWindow, &screenX, &screenY, &clientWidth, &clientHeight);
     SetClientArea(screenX, screenY, clientWidth, clientHeight);
     for (wxWindow* const child : m_children) {
-      child->SetClientArea(screenX, screenY, clientWidth, clientHeight);
+      if (!child->IsNativeChild()) {
+        child->SetClientArea(screenX, screenY, clientWidth, clientHeight);
+      }
     }
     return;
   }
@@ -357,6 +381,9 @@ wxWindow::~wxWindow()
   if (sFocusWindow == this) {
     sFocusWindow = nullptr;
   }
+  if (sActivatedFrame == this) {
+    sActivatedFrame = nullptr;
+  }
   if (m_parent != nullptr) {
     std::vector<wxWindow*>& siblings = m_parent->m_children;
     siblings.erase(std::remove(siblings.begin(), siblings.end(), this), siblings.end());
@@ -364,9 +391,9 @@ wxWindow::~wxWindow()
   for (wxWindow* const child : m_children) {
     child->m_parent = nullptr; // the engine deletes its own windows
   }
-  if (m_topLevel && m_handle != 0) {
-    sTopLevels.erase(m_handle);
-    platform::window::Destroy(NativeOf(m_handle));
+  if ((m_topLevel || m_nativeChild) && m_platformWindow != nullptr) {
+    sNativeWindows.erase(m_platformWindow);
+    platform::window::Destroy(m_platformWindow);
   }
   // wx 2.4.2 deletes the handlers still pushed onto a window it destroys.
   while (m_eventHandler != nullptr && m_eventHandler != this) {
@@ -500,9 +527,8 @@ wxTopLevelWindow::wxTopLevelWindow(
   if (native == nullptr) {
     return; // no window system: the window keeps its requested area, as before
   }
-  const WXWidget handle = reinterpret_cast<WXWidget>(native);
-  SetTopLevel(handle);
-  sTopLevels[handle] = this;
+  SetTopLevel(native);
+  sNativeWindows[native] = this;
   int screenX = 0;
   int screenY = 0;
   int clientWidth = 0;
@@ -516,8 +542,8 @@ void wxTopLevelWindow::Maximize(
 )
 {
   m_maximized = maximize;
-  if (GetHandle() != 0) {
-    (maximize ? platform::window::Maximize : platform::window::Restore)(NativeOf(GetHandle()));
+  if (GetPlatformWindow() != nullptr) {
+    (maximize ? platform::window::Maximize : platform::window::Restore)(GetPlatformWindow());
   }
 }
 
@@ -526,8 +552,8 @@ void wxTopLevelWindow::Iconize(
 )
 {
   m_iconized = iconize;
-  if (GetHandle() != 0) {
-    (iconize ? platform::window::Minimize : platform::window::Restore)(NativeOf(GetHandle()));
+  if (GetPlatformWindow() != nullptr) {
+    (iconize ? platform::window::Minimize : platform::window::Restore)(GetPlatformWindow());
   }
 }
 
@@ -538,8 +564,8 @@ bool wxTopLevelWindow::ShowFullScreen(
 {
   (void)style;
   m_fullScreen = show;
-  if (GetHandle() != 0) {
-    platform::window::SetFullscreen(NativeOf(GetHandle()), show);
+  if (GetPlatformWindow() != nullptr) {
+    platform::window::SetFullscreen(GetPlatformWindow(), show);
   }
   return true;
 }
@@ -549,8 +575,8 @@ void wxTopLevelWindow::SetTitle(
 )
 {
   m_title = title;
-  if (GetHandle() != 0) {
-    platform::window::SetTitle(NativeOf(GetHandle()), Utf8(title).c_str());
+  if (GetPlatformWindow() != nullptr) {
+    platform::window::SetTitle(GetPlatformWindow(), Utf8(title).c_str());
   }
 }
 
@@ -558,17 +584,22 @@ void wxTopLevelWindow::SetTitle(
 
 namespace
 {
-  // The window a top-level window's input goes to: the focused window when it is this one or one
-  // of its children (the game's viewport), else its first child, else itself.
+  // The window a native window's input goes to: the focused window when it is this one or one of
+  // its children sharing it (the game's viewport), else its first such child, else itself.
   [[nodiscard]] wxWindow* InputTarget(
-    wxTopLevelWindow* const top
+    wxWindow* const top
   )
   {
-    if (sFocusWindow != nullptr && (sFocusWindow == top || sFocusWindow->GetParent() == top)) {
+    if (
+      sFocusWindow != nullptr &&
+      (sFocusWindow == top || (sFocusWindow->GetParent() == top && !sFocusWindow->IsNativeChild()))
+    ) {
       return sFocusWindow;
     }
-    if (!top->GetChildren().empty()) {
-      return top->GetChildren().front();
+    for (wxWindow* const child : top->GetChildren()) {
+      if (!child->IsNativeChild()) {
+        return child;
+      }
     }
     return top;
   }
@@ -581,6 +612,34 @@ namespace
     event.SetEventObject(window);
     if (wxEvtHandler* const handler = window->GetEventHandler(); handler != nullptr) {
       (void)handler->ProcessEvent(event);
+    }
+  }
+
+  // Native children follow their parent's moves (their screen origin) and, as wxFrame::OnSize did
+  // for a frame's only child, fill its client area when it is the only child.
+  void FollowParent(
+    wxWindow* const top,
+    const bool resized
+  )
+  {
+    const std::vector<wxWindow*>& children = top->GetChildren();
+    for (wxWindow* const child : children) {
+      if (!child->IsNativeChild()) {
+        continue;
+      }
+      if (resized && children.size() == 1u) {
+        const wxSize size = top->GetClientSize();
+        child->SetSize(0, 0, size.x, size.y);
+        wxSizeEvent childEvent(size.x, size.y);
+        Deliver(child, childEvent);
+        continue;
+      }
+      int screenX = 0;
+      int screenY = 0;
+      int width = 0;
+      int height = 0;
+      platform::window::GetBounds(child->GetPlatformWindow(), &screenX, &screenY, &width, &height);
+      child->SetClientArea(screenX, screenY, width, height);
     }
   }
 
@@ -599,7 +658,7 @@ namespace
   }
 
   void DeliverMouse(
-    wxTopLevelWindow* const top,
+    wxWindow* const top,
     const platform::window::Event& source,
     const wxEventType type
   )
@@ -622,7 +681,7 @@ namespace
   }
 
   void DeliverKey(
-    wxTopLevelWindow* const top,
+    wxWindow* const top,
     const wxEventType type,
     const long keyCode,
     const platform::window::Event& source,
@@ -644,7 +703,7 @@ namespace
   // its wx code, besides the key-down; and turns WM_CHAR 1..26 (Ctrl+letter) into the code with
   // ControlDown. SDL reports typed text apart (EventType::Text); these are the keys it doesn't.
   void DeliverCharForKey(
-    wxTopLevelWindow* const top,
+    wxWindow* const top,
     const platform::window::Event& source
   )
   {
@@ -686,11 +745,19 @@ namespace
   )
   {
     using platform::window::EventType;
-    const auto found = sTopLevels.find(reinterpret_cast<WXWidget>(source.window));
-    if (found == sTopLevels.end()) {
+    if (source.type == EventType::Quit) {
+      if (wxTheApp != nullptr) {
+        wxTheApp->ExitMainLoop(); // what wxApp::DoMessage did on WM_QUIT
+      }
       return;
     }
-    wxTopLevelWindow* const top = found->second;
+    const auto found = sNativeWindows.find(source.window);
+    if (found == sNativeWindows.end()) {
+      return;
+    }
+    wxWindow* const top = found->second;
+    // Window state belongs to top-level windows; a native child has input, size and paint.
+    wxTopLevelWindow* const frame = top->IsTopLevel() ? static_cast<wxTopLevelWindow*>(top) : nullptr;
     switch (source.type) {
     case EventType::CloseRequested: {
       wxCloseEvent event(wxEVT_CLOSE_WINDOW);
@@ -702,45 +769,88 @@ namespace
       const wxSize size = top->GetClientSize();
       top->SetClientArea(source.x, source.y, size.x, size.y);
       for (wxWindow* const child : top->GetChildren()) {
-        child->SetClientArea(source.x, source.y, size.x, size.y);
+        if (!child->IsNativeChild()) {
+          child->SetClientArea(source.x, source.y, size.x, size.y);
+        }
       }
+      FollowParent(top, false);
       wxMoveEvent event(source.x, source.y);
       Deliver(top, event);
       return;
     }
     case EventType::Resized: {
-      const wxPoint position = top->GetPosition();
-      top->SetClientArea(position.x, position.y, source.width, source.height);
+      int screenX = 0;
+      int screenY = 0;
+      platform::window::GetBounds(source.window, &screenX, &screenY, nullptr, nullptr);
+      top->SetClientArea(screenX, screenY, source.width, source.height);
       wxSizeEvent event(source.width, source.height);
       Deliver(top, event);
       for (wxWindow* const child : top->GetChildren()) {
-        child->SetClientArea(position.x, position.y, source.width, source.height);
+        if (child->IsNativeChild()) {
+          continue;
+        }
+        child->SetClientArea(screenX, screenY, source.width, source.height);
         wxSizeEvent childEvent(source.width, source.height);
         Deliver(child, childEvent);
       }
+      FollowParent(top, true);
       return;
     }
     case EventType::Minimized:
-      top->NoteIconized(true);
+      if (frame != nullptr) {
+        frame->NoteIconized(true);
+      }
       return;
     case EventType::Maximized:
-      top->NoteIconized(false);
-      top->NoteMaximized(true);
+    case EventType::Restored: {
+      if (frame == nullptr) {
+        return;
+      }
+      // Windows' WM_SIZE carried the new state (SIZE_MAXIMIZED, SIZE_RESTORED) with the size; the
+      // window system may report the state after the size, so the size event follows the state.
+      frame->NoteIconized(false);
+      frame->NoteMaximized(source.type == EventType::Maximized);
+      const wxSize size = top->GetClientSize();
+      wxSizeEvent event(size.x, size.y);
+      Deliver(top, event);
       return;
-    case EventType::Restored:
-      top->NoteIconized(false);
-      top->NoteMaximized(false);
-      return;
+    }
     case EventType::FocusGained:
-      platform::posix::SetFocusedWindow(source.window);
+    case EventType::FocusLost: {
+      // WM_ACTIVATEAPP: the keyboard came to the program or left it. A move between its own
+      // windows (the frame and its viewport, a developer window) is neither.
+      const bool active = source.type == EventType::FocusGained || platform::window::HasKeyboardFocus();
+      if (active == sAppActive) {
+        return;
+      }
+      sAppActive = active;
+      wxWindow* receiver = active ? top : sActivatedFrame;
+      while (receiver != nullptr && !receiver->IsTopLevel()) {
+        receiver = receiver->GetParent();
+      }
+      sActivatedFrame = active ? receiver : nullptr;
+      if (receiver != nullptr) {
+        wxActivateEvent event(active);
+        Deliver(receiver, event);
+      }
       return;
-    case EventType::FocusLost:
-      platform::posix::SetFocusedWindow(nullptr);
+    }
+    case EventType::SystemCommand:
+      if (frame != nullptr) {
+        frame->OnSystemCommand(source.command);
+      }
       return;
     case EventType::Exposed:
-      for (wxWindow* const child : top->GetChildren()) {
+      if (top->IsNativeChild()) {
         wxPaintEvent event;
-        Deliver(child, event);
+        Deliver(top, event);
+        return;
+      }
+      for (wxWindow* const child : top->GetChildren()) {
+        if (!child->IsNativeChild()) {
+          wxPaintEvent event;
+          Deliver(child, event);
+        }
       }
       return;
     case EventType::MouseEnter:

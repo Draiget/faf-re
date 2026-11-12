@@ -448,6 +448,27 @@ public:
   bool m_veto = false;
 };
 
+// wx 2.4.2 wxActivateEvent: the top-level window got (true) or lost the keyboard, as Windows'
+// WM_ACTIVATEAPP told the frame.
+class wxActivateEvent : public wxEvent
+{
+public:
+  explicit wxActivateEvent(
+    const bool active = true,
+    const int id = 0
+  )
+    : wxEvent(id, wxEVT_ACTIVATE)
+    , m_active(active)
+  {}
+
+  bool GetActive() const
+  {
+    return m_active;
+  }
+
+  bool m_active = true;
+};
+
 typedef void (wxObject::*wxObjectEventFunction)(wxEvent&);
 typedef void (wxEvtHandler::*wxEventFunction)(wxEvent&);
 typedef void (wxEvtHandler::*wxCharEventFunction)(wxKeyEvent&);
@@ -457,6 +478,7 @@ typedef void (wxEvtHandler::*wxEraseEventFunction)(wxEraseEvent&);
 typedef void (wxEvtHandler::*wxSizeEventFunction)(wxSizeEvent&);
 typedef void (wxEvtHandler::*wxMoveEventFunction)(wxMoveEvent&);
 typedef void (wxEvtHandler::*wxCloseEventFunction)(wxCloseEvent&);
+typedef void (wxEvtHandler::*wxActivateEventFunction)(wxActivateEvent&);
 
 struct wxEventTableEntry
 {
@@ -581,6 +603,7 @@ protected:                                                                      
 #define EVT_SIZE(func) wxFAF_EVT_ENTRY(wxEVT_SIZE, wxSizeEventFunction, func)
 #define EVT_MOVE(func) wxFAF_EVT_ENTRY(wxEVT_MOVE, wxMoveEventFunction, func)
 #define EVT_CLOSE(func) wxFAF_EVT_ENTRY(wxEVT_CLOSE_WINDOW, wxCloseEventFunction, func)
+#define EVT_ACTIVATE(func) wxFAF_EVT_ENTRY(wxEVT_ACTIVATE, wxActivateEventFunction, func)
 
 // wx 2.4.2: the thirteen mouse event types, all to one sink.
 #define EVT_MOUSE_EVENTS(func)                                                                                         \

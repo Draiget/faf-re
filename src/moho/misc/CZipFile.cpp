@@ -771,15 +771,12 @@ namespace moho
     }
 
     if (entry.mCompressionMethod == kZipCompressionDeflated) {
-      // zlib wants to read one byte past a raw deflate stream before it will
-      // call that stream finished. The engine linked zlib 1.2.3, which copes
-      // with input ending exactly on the last compressed byte. This build ends
-      // up on the zlib 1.1.4 bundled inside wxWindows - the Win32 link resolves
-      // `zlib.lib` out of dependencies\wxWindows-2.4.2\lib because the tree
-      // carries no 32-bit 1.2.3 - and 1.1.4 answers Z_BUF_ERROR after producing
-      // every byte of correct output, on whichever entries happen to end on an
-      // unlucky bit boundary. One spare byte satisfies both versions: a valid
-      // raw stream stops at its own end-of-stream marker and never reads it.
+      // One spare byte after the compressed data. zlib 1.2.3, which both
+      // architectures link (issue #406), copes with input ending exactly on the
+      // last compressed byte; zlib 1.1.4, which x86 linked from wxWindows
+      // before, answered Z_BUF_ERROR on entries ending on an unlucky bit
+      // boundary. The byte stays: a valid raw stream stops at its own
+      // end-of-stream marker and never reads it, so it costs nothing.
       constexpr std::size_t kInflateLookaheadSlack = 1u;
 
       gpg::MemBuffer<char> compressedBytes =

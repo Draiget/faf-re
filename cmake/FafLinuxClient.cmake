@@ -18,18 +18,15 @@ set(_faf_client_windows_only
   "^moho/movie/sfd/DirectSoundMovieSink\\.cpp$"
   # The Win32 crash dialog; gpg/core/diagnostics/posix/DiagnosticsPosix.cpp has the POSIX one.
   "^gpg/core/diagnostics/CrashReportDialog\\.cpp$"
+  # The Windows half of the SDL3 window layer; platform/posix/WindowSdlPosix.cpp is this one.
+  "^platform/windows/"
   # faf_sim compiles its own copy (cmake/FafLinux.cmake).
   "^gpg/gal/MatrixPortable\\.cpp$"
-  # wxWindows 2.4.2 has no Linux port; the wx stand-in (src/platform/posix/wx) covers only what
-  # the game code uses. Left out until their own issues land:
-  #   the Windows entry point (src/platform/posix/ClientMainPosix.cpp takes its place, issue
-  #   #256). WinApp (the main loop), the app windows, the main frame, the viewports and CScApp
-  #   build over the wx stand-in and the POSIX <Windows.h>.
-  "^moho/app/WinMain\\.cpp$"
-  #   the wx script debugger (issue #260);
-  "^moho/misc/(ScrDebugWindow|ScrFileCtrl|ScrSourceCtrl|ScrWatchCtrl|ScrGotoDialog|ScrPauseEvent|TreeData)\\.cpp$"
-  #   the developer windows: emitter editor, log window, reference editor, snapshot folder dialog.
-  "^moho/app/(WEmitterWx|WWinLogWindow|WRefEditDialog|SnapshotDirectoryDialog)\\.cpp$")
+  # The Windows entry point (src/platform/posix/ClientMainPosix.cpp takes its place, issue #256).
+  # WinApp (the main loop), the app windows, the main frame, the viewports, CScApp and the
+  # developer windows build over the application shell (src/platform/shell) and the POSIX
+  # <Windows.h>.
+  "^moho/app/WinMain\\.cpp$")
 
 # Portable files in the Windows backends' folders that the Vulkan backend shares: the DXGI format
 # tables, the Direct3D 11 vertex layouts (D3D11_INPUT_ELEMENT_DESC from the POSIX <d3d11.h>) and
@@ -85,7 +82,7 @@ message(STATUS "faf_client: ${_faf_client_count} client translation units")
 # audio output; FAudio for XACT and X3DAudio (issue #258).
 if(FAF_FETCH_DEPENDENCIES)
   set(FAF_DEPENDENCIES_ONLY DirectX-Headers SDL3 FAudio dxc-linux DirectXTex DirectXMath stb freetype msdfgen
-    libjuice libdatachannel usrsctp plog mbedtls)
+    libjuice libdatachannel usrsctp plog mbedtls imgui)
   include(FafDependencies)
 endif()
 
@@ -98,6 +95,9 @@ set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(SDL_INSTALL OFF CACHE BOOL "" FORCE)
 add_subdirectory("${FAF_DEPENDENCIES_DIR}/SDL3" "${CMAKE_BINARY_DIR}/deps/SDL3" EXCLUDE_FROM_ALL SYSTEM)
 
+# Dear ImGui with its SDL3 backends, for the developer windows (src/platform/sdl/ToolWindow.cpp).
+add_subdirectory("${PROJECT_SOURCE_DIR}/cmake/deps/imgui" "${CMAKE_BINARY_DIR}/deps/imgui")
+
 # FAudio, static, over that SDL3 (its CMakeLists takes SDL3_INCLUDE_DIRS and SDL3_LIBRARIES).
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(SDL3_INCLUDE_DIRS "${FAF_DEPENDENCIES_DIR}/SDL3/include")
@@ -109,14 +109,13 @@ add_subdirectory("${FAF_DEPENDENCIES_DIR}/FAudio" "${CMAKE_BINARY_DIR}/deps/FAud
 # <windows.h>.
 file(WRITE "${CMAKE_BINARY_DIR}/win32-alias/shlobj.h" "#pragma once\n#include <ShlObj.h>\n")
 
-# The part of wxWindows 2.4.2 the game code uses (src/platform/posix/wx/wx/defs.h).
-list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/wx/WxStandIn.cpp")
 # The Win32 window, cursor and key-state calls the UI code makes (platform/posix/win32/Windows.h).
 list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/Win32WindowPosix.cpp")
 # The XACT engine on FAudio's FACT (issue #258).
 list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/XactOverFact.cpp")
-# The native windows and their input on SDL3 (platform/Window.h, issue #256).
-list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/WindowSdl.cpp")
+# The POSIX half of the SDL3 window layer (src/platform/sdl, platform/Window.h, issues #256 and #407);
+# the shell and the shared half come with the engine's sources.
+list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/WindowSdlPosix.cpp")
 # Movie sound on an SDL3 audio stream (moho::sfd::AudioSink; DirectSoundMovieSink.cpp on Windows).
 list(APPEND _faf_client_files "${PROJECT_SOURCE_DIR}/src/platform/posix/SdlMovieSink.cpp")
 # CD3DFont's GDI text calls on FreeType.
@@ -246,10 +245,10 @@ target_link_libraries(faf_ffmpeg INTERFACE m)
 add_library(faf_client_objs OBJECT ${_faf_client_files})
 add_dependencies(faf_client_objs faf_client_dxc faf_client_imaging faf_ffmpeg_build)
 target_link_libraries(faf_client_objs PUBLIC faf_sim_settings Wm3Headers zlib123 faf_monocypher faf_zstd
-  FAudio-static SDL3::SDL3-static  # FAudio names its static target FAudio-static, with no alias
+  FAudio-static SDL3::SDL3-static faf_imgui_sdl  # FAudio names its static target FAudio-static, with no alias
   faf_freetype faf_msdfgen faf_ffmpeg faf_netlink)
 target_include_directories(faf_client_objs PRIVATE
-  "${PROJECT_SOURCE_DIR}/src/platform/posix/wx"
+  "${PROJECT_SOURCE_DIR}/src/platform/shell"
   "${FAF_DEPENDENCIES_DIR}/vulkan/include"
   "${FAF_DEPENDENCIES_DIR}/DirectX-Headers/include/directx")
 
@@ -267,7 +266,7 @@ foreach(_src IN LISTS FAF_HEADLESS_SOURCES)
   endif()
 endforeach()
 target_sources(faf_client PRIVATE "${PROJECT_SOURCE_DIR}/src/headless/GameEntry.cpp")
-target_include_directories(faf_client PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/wx")
+target_include_directories(faf_client PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/shell")
 # The simulation's objects first: their static initializers run in link order, and the client's
 # register factories for the sim's reflected types (SBatchTextureDataFactory.cpp looks up
 # SBatchTextureData, whose type info faf_sim registers). The sim's never need the client's, as

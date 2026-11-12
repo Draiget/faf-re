@@ -36,9 +36,7 @@
 #include "moho/animation/CAniSkel.h"
 #include "legacy/containers/Map.h"
 #include "legacy/containers/Set.h"
-#if FAFRE_PLATFORM_WINDOWS
-#include "moho/app/WEmitterWx.h" // the emitter editor: Windows only (issue #255)
-#endif
+#include "moho/app/WEmitterEditor.h"
 #include "moho/app/WinApp.h"
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/audio/CUserSoundManager.h"
@@ -501,7 +499,7 @@ namespace
   constexpr const char* kConsoleStartupConUiResetViewDescription = "Reset a named camera to the default view";
   constexpr const char* kConsoleStartupConWinShowLogDialogDescription = "Explicit show/hide log dialog box";
   constexpr const char* kConsoleStartupConWinToggleLogDialogDescription = "Show/hide log dialog box";
-  constexpr const char* kConsoleStartupConWxInputBoxDescription = "Text the WWxInputBox dialog.";
+  constexpr const char* kConsoleStartupConInputBoxDescription = "Test the input box dialog.";
   constexpr const char* kConsoleStartupD3DForceDirect3DDebugDescription =
     "Disable shader optimization and allow D3D debugging.";
   constexpr const char* kConsoleStartupD3DForceSoftwareVPDescription = "Force D3d to do vertex processing in software.";
@@ -543,10 +541,8 @@ namespace
   constexpr const char* kConsoleStartupRenShowSkeletonsDescription = "Show mesh skeletons";
   constexpr const char* kConsoleStartupRenUnitSelectionScaleDescription =
     "How much unit selection box extents are scaled (multiplier)";
-#if FAFRE_PLATFORM_WINDOWS // the reference editor is a developer window (WRefEditDialog.cpp)
   constexpr const char* kConsoleStartupSCCreateEntityDialogDescription =
     "Create object editing box for the primary selected unit";
-#endif
   constexpr const char* kConsoleStartupSetFocusArmyDescription = "Pass in army index or -1";
   constexpr const char* kConsoleStartupShadowFidelityDescription = "current shadow fidelity setting";
   constexpr const char* kConsoleStartupShadowFidelitySupportedDescription = "maximum shadow fidelity supported";
@@ -1305,22 +1301,15 @@ void moho::UI_DumpControls(
  */
 void moho::WIN_ToggleLogDialog()
 {
-#if !FAFRE_PLATFORM_WINDOWS
-  // The log window is a wx dialog, which the Linux client doesn't build (issue #255).
-  gpg::Warnf("WIN_ToggleLogDialog: the log window is not available in the Linux client");
-#else
   WWinLogWindow* dialog = sLogWindowTarget.dialog;
   if (dialog == nullptr) {
     WINX_PrecreateLogWindow();
     dialog = sLogWindowTarget.dialog;
   }
 
-  // `wxWindowBase::IsShown()` is inline, so 0x004F3C45 reads the flag directly:
-  // `movzx edx, byte [ecx+0xCC] / shr dl, 1 / not dl / and edx, 1` -- bit 1 of
-  // the state bitfield, which wx 2.4.2 packs as `m_autoLayout:1, m_isShown:1,
-  // m_isEnabled:1, ...`. `Show` is the virtual at `[vptr+0x7C]`.
+  // 0x004F3C45 read the shown flag straight from the window (bit 1 of wx 2.4.2's state bitfield)
+  // and called `Show` through the vtable.
   dialog->Show(!dialog->IsShown());
-#endif
 }
 
 /**
@@ -1345,11 +1334,6 @@ void moho::WIN_ShowLogDialog(
 
   const bool showDialog = std::strcmp(showToken->c_str(), "true") == 0;
 
-#if !FAFRE_PLATFORM_WINDOWS
-  // The log window is a wx dialog, which the Linux client doesn't build (issue #255).
-  (void)showDialog;
-  gpg::Warnf("WIN_ShowLogDialog: the log window is not available in the Linux client");
-#else
   WWinLogWindow* dialog = sLogWindowTarget.dialog;
   if (dialog == nullptr) {
     WINX_PrecreateLogWindow();
@@ -1357,7 +1341,6 @@ void moho::WIN_ShowLogDialog(
   }
 
   dialog->Show(showDialog);
-#endif
 }
 
 /**
@@ -2333,29 +2316,19 @@ void moho::EFX_CreateEmitterWindow(
   const fa::vector<fa::string>& args
 )
 {
-#if !FAFRE_PLATFORM_WINDOWS
-  // The emitter editor is a wx window, which the Linux client doesn't build (issue #255).
-  (void)args;
-  gpg::Warnf("EFX_CreateEmitterWindow: the emitter editor is not available in the Linux client");
-#else
-  // The editor is held through a weak pointer for the Show call; the
-  // WeakPtr<WWinManagedFrame> Set emission is 0x0066A2A0.
-  WeakPtr<WWinManagedFrame> editor;
-
   // 0x00669EDF: the binary loads the active-session global and dereferences it
   // straight away - this command is only reachable from an in-session console.
+  // It held the editor through a WeakPtr for the Show call (0x0066A2A0); the
+  // editor owns itself now (issue #414).
   CWldSession& session = *WLD_GetActiveSession();
 
   const Wm3::Vector3f spawnPosition = session.CursorWorldPos;
   UserEntity* const attachEntity = FirstLiveSelectedUserEntity(session.mSelection);
 
-  editor.Set(
-    args.size() > 1u && attachEntity != nullptr
-      ? new WEmitterWx(attachEntity, spawnPosition, ConCommandArg(args, 1u)->c_str())
-      : new WEmitterWx(nullptr, spawnPosition, nullptr)
-  );
-  editor.GetObjectPtr()->Show(true);
-#endif
+  WEmitterEditor* const editor = args.size() > 1u && attachEntity != nullptr
+    ? new WEmitterEditor(attachEntity, spawnPosition, ConCommandArg(args, 1u)->c_str())
+    : new WEmitterEditor(nullptr, spawnPosition, nullptr);
+  editor->Show(true);
 }
 
 /**
@@ -3894,13 +3867,11 @@ namespace moho
    * Address: 0x00BE9640 (FUN_00BE9640, dynamic initializer for `gCConFunc_SC_CreateEntityDialog`)
    * Address: 0x00C08E80 (FUN_00C08E80, dynamic atexit destructor for `gCConFunc_SC_CreateEntityDialog`)
    */
-#if FAFRE_PLATFORM_WINDOWS // the reference editor is a developer window, Windows only (the Linux client, issue #255)
   CConFunc gCConFunc_SC_CreateEntityDialog(
     "SC_CreateEntityDialog",
     kConsoleStartupSCCreateEntityDialogDescription,
     reinterpret_cast<CConFunc::Callback>(&moho::funcl_SC_CreateEntityDialog)
   );
-#endif
 
   /**
    * Address: 0x00BE7550 (FUN_00BE7550, dynamic initializer for `gCConFunc_quit`)
@@ -4169,15 +4140,14 @@ namespace
   /**
    * Address: 0x00BC73F0 (FUN_00BC73F0, dynamic initializer for `gCConFunc_WxInputBox`)
    * Address: 0x00BF1960 (FUN_00BF1960, dynamic atexit destructor for `gCConFunc_WxInputBox`)
+   *
+   * The binary's command is `WxInputBox`; it is `InputBox` since the box left wxWindows (issue #415).
    */
-#if FAFRE_PLATFORM_WINDOWS
-  // The input box is a wx dialog: not in the Linux client (issue #255).
-  CConFunc gCConFunc_WxInputBox(
-    "WxInputBox",
-    kConsoleStartupConWxInputBoxDescription,
-    reinterpret_cast<CConFunc::Callback>(&CON_WxInputBox)
+  CConFunc gCConFunc_InputBox(
+    "InputBox",
+    kConsoleStartupConInputBoxDescription,
+    reinterpret_cast<CConFunc::Callback>(&CON_InputBox)
   );
-#endif
 
   /**
    * Address: 0x00BC3D00 (FUN_00BC3D00, dynamic initializer for `gTConVar_graphics_Fidelity`)

@@ -1,11 +1,7 @@
-// `DUMP_PromptFilename` (0x007F5500) opens a `wxDirDialog`, so this translation
-// unit pulls in the wx dialog family. wx has to be included first: it needs to
-// own the `windows.h` inclusion so that `wx/msw/winundef.h` can drop the
-// `CreateDialog`/`GetClassInfo` macros before the wx class declarations are
-// parsed.
-#include "platform/WxWidgets.h"
+// `DUMP_PromptFilename` (0x007F5500) asks for a folder: the system's folder picker through the
+// window system (platform::window::PickFolder, issue #411).
+#include "platform/Window.h"
 #include "platform/X87Precision.h"
-#include <wx/dirdlg.h>
 
 #include "moho/app/FrameDumpCommands.h"
 
@@ -78,9 +74,10 @@ namespace moho
    * (0x007F5530..0x007F5563). On acceptance the picked path is converted back
    * to UTF-8 and stored (0x007F56D9..0x007F5705).
    *
-   * wx leaves the x87 control word on its own setting, so the 24-bit precision
-   * the sim runs at is restored right after the dialog closes
-   * (`_controlfp(_PC_24, _MCW_PC)` at 0x007F5745).
+   * The binary's picker was a modal wxDirDialog ("Dump frames to"), which left
+   * the x87 control word on its own setting, so the 24-bit precision the sim
+   * runs at is restored right after the dialog closes (`_controlfp(_PC_24,
+   * _MCW_PC)` at 0x007F5745). Without a window system nothing is asked.
    */
   bool DUMP_PromptFilename()
   {
@@ -95,11 +92,9 @@ namespace moho
 
     bool accepted = false;
 
-    wxDirDialog directoryDialog(
-      nullptr, wxT("Dump frames to"), gpg::STR_Utf8ToWide(defaultDirectory.c_str()).c_str(), wxDD_NEW_DIR_BUTTON
-    );
-    if (directoryDialog.ShowModal() == wxID_OK) {
-      dump_frameDumpName.assign(gpg::STR_WideToUtf8(directoryDialog.GetPath().c_str()), 0, fa::string::npos);
+    std::string folder = defaultDirectory.c_str();
+    if (platform::window::PickFolder("Dump frames to", folder)) {
+      dump_frameDumpName.assign(folder.c_str(), 0, fa::string::npos);
       accepted = true;
     }
 

@@ -12,7 +12,7 @@ namespace faf::editor
 {
   namespace
   {
-    // Retail's kEmitterCurveEditors (src/moho/app/WEmitterWx.cpp), in the file's curve order.
+    // Retail's kEmitterCurveEditors (src/moho/app/WEmitterEditor.cpp), in the file's curve order.
     const EmitterCurveInfo kCurves[kEmitterCurveCount] = {
       {"XDirectionCurve", "Direction, Rate, Lifetime", "X Direction", -1.0f, 1.0f, 0.0f, 0.0f},
       {"YDirectionCurve", "", "Y Direction", -1.0f, 1.0f, 0.5f, 0.0f},
@@ -969,7 +969,7 @@ namespace faf::editor
     const EmitterBlueprint& e
   )
   {
-    // WEmitterWx::WriteBlueprintScript's order and formats.
+    // WEmitterEditor::WriteBlueprintScript's (0x00668340) order and formats.
     std::string out = "EmitterBlueprint {\n";
     Append(out, "\tBlueprintId = '%s',\n", e.blueprintId.c_str());
     Append(out, "\tLifetime = %.2f,\n", static_cast<double>(e.lifetime));

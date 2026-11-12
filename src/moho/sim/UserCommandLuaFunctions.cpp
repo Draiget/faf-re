@@ -33,7 +33,7 @@
 #include "moho/ai/IAiTransport.h"
 #include "moho/ai/IAiBuilder.h"
 #include "moho/app/WxRuntimeTypes.h"
-#include "moho/app/WxUrl.h"
+#include "moho/app/AllowedUrl.h"
 #include "moho/client/Localization.h"
 #include "moho/command/SSTICommandIssueData.h"
 #include "moho/console/CConCommand.h"
@@ -2532,7 +2532,7 @@ namespace moho
     }
 
     const std::wstring wideUrl = gpg::STR_Utf8ToWide(urlText);
-    OpenAllowedUrlByWx(wideUrl);
+    OpenAllowedUrl(wideUrl);
     return 0;
   }
 

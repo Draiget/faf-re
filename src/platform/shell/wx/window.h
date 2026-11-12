@@ -10,10 +10,10 @@
 #include <cstdint>
 #include <vector>
 
-// The native window behind a wxWindow: the window system's handle (platform/Window.h, an
-// SDL_Window* on Linux). A top-level window has its own; a child window shares its top-level
-// window's, which it fills. An integer, as wx 2.4.2's WXWidget (WXHWND) is: the engine casts it
-// with static_cast<uintptr_t>.
+// The native window behind a wxWindow, as the renderers and the system's own window calls take
+// it (platform::window::NativeHandle: the HWND on Windows, the SDL_Window* elsewhere). A top-level
+// window has its own; a child window shares its top-level window's, which it fills. An integer, as
+// wx 2.4.2's WXWidget (WXHWND) is: the engine casts it with static_cast<uintptr_t>.
 typedef std::uintptr_t WXWidget;
 
 class wxWindow : public wxEvtHandler
@@ -42,12 +42,10 @@ public:
   {
     return m_handle;
   }
-  // Set by the window system (issue #256) when it creates the native window.
-  void SetHandle(
-    WXWidget const handle
-  )
+  // The window system's window (platform::window::Handle), null for none.
+  void* GetPlatformWindow() const
   {
-    m_handle = handle;
+    return m_platformWindow;
   }
 
   virtual bool Show(bool show = true);
@@ -67,6 +65,12 @@ public:
   bool IsTopLevel() const
   {
     return m_topLevel;
+  }
+  // A child with a native window of its own (platform::window::CreateChild; Windows), as wx made
+  // child windows. Elsewhere a child fills its parent's window and shares it.
+  bool IsNativeChild() const
+  {
+    return m_nativeChild;
   }
   virtual void Refresh(
     bool eraseBackground = true,
@@ -121,13 +125,15 @@ public:
 
 protected:
   // A top-level window with its own native window (wxTopLevelWindow's constructor).
-  void SetTopLevel(WXWidget handle);
+  void SetTopLevel(void* platformWindow);
 
 private:
   wxWindow* m_parent = nullptr;
   std::vector<wxWindow*> m_children;
   bool m_topLevel = false;
+  bool m_nativeChild = false;
   WXWidget m_handle = 0;
+  void* m_platformWindow = nullptr;
   bool m_shown = false;
   wxEvtHandler* m_eventHandler = this;
   int m_screenX = 0;

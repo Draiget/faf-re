@@ -1,13 +1,15 @@
-// Engine addition (issue #256): platform::window (src/platform/Window.h) on SDL3, for the Linux
-// client. Windows are SDL windows made for Vulkan; their events become platform::window events, and
-// the Win32 window, cursor, clipboard and message-box calls the engine makes
-// (src/platform/posix/Win32WindowPosix.h) are routed here by Init.
+// Engine addition (issues #256, #407): platform::window (src/platform/Window.h) on SDL3, for every
+// platform. Windows are SDL windows; their events become platform::window events. What one system
+// alone needs is behind platform/sdl/WindowSdlPlatform.h.
 
 #include "platform/Window.h"
 
 #include <cmath>
+#include <condition_variable>
 #include <cstdint>
 #include <cstdio>
+#include <deque>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -16,13 +18,19 @@
 #include <Windows.h>
 
 #include "gpg/core/utils/Logging.h"
-#include "platform/posix/Win32WindowPosix.h"
+#include "platform/sdl/WindowSdlPlatform.h"
 
 namespace
 {
   bool gInitialized = false;
-  // The windows made here, the first being the main one (the cursor clip's window).
+  // The windows made here, the first being the main one.
   std::vector<SDL_Window*> gWindows;
+  // Events PollEvent returns before SDL's: typed text, one character each, and what the system
+  // file queued (WindowSdlPlatform.h).
+  std::deque<platform::window::Event> gQueued;
+  platform::window::EventFilter gEventFilter = nullptr;
+  platform::window::sdl::ToolEventHook gToolEventHook = nullptr;
+  platform::window::CursorRequestHandler gCursorRequestHandler = nullptr;
 
   [[nodiscard]] SDL_Window* AsWindow(
     void* const handle
@@ -248,257 +256,32 @@ namespace
     outY = static_cast<int>(std::lround(y * scale));
   }
 
-  // What GetWindowRect, GetClientRect and the cursor's screen position answer from
-  // (Win32WindowPosix.cpp).
-  void PublishWindowRect(
-    SDL_Window* const window
-  )
-  {
-    int x = 0;
-    int y = 0;
-    int width = 0;
-    int height = 0;
-    platform::window::GetBounds(window, &x, &y, &width, &height);
-    platform::posix::SetWindowScreenRect(window, x, y, x + width, y + height);
-  }
-
-  void PublishMonitors()
-  {
-    int count = 0;
-    SDL_DisplayID* const displays = SDL_GetDisplays(&count);
-    std::vector<int> rects;
-    const SDL_DisplayID primary = SDL_GetPrimaryDisplay();
-    // The primary first, as SetMonitors expects.
-    for (int pass = 0; pass < 2 && displays != nullptr; ++pass) {
-      for (int index = 0; index < count; ++index) {
-        if ((pass == 0) != (displays[index] == primary)) {
-          continue;
-        }
-        SDL_Rect bounds{};
-        if (SDL_GetDisplayBounds(displays[index], &bounds)) {
-          rects.insert(rects.end(), {bounds.x, bounds.y, bounds.x + bounds.w, bounds.y + bounds.h});
-        }
-      }
-    }
-    SDL_free(displays);
-    platform::posix::SetMonitors(rects.data(), static_cast<int>(rects.size() / 4u));
-  }
-
-  // --- The Win32 calls routed here (Win32WindowPosix.h) ------------------------------------
-
-  void WarpCursor(
-    const int x,
-    const int y
-  )
-  {
-    (void)SDL_WarpMouseGlobal(static_cast<float>(x), static_cast<float>(y));
-  }
-
-  void Focus(
-    void* const window
-  )
-  {
-    if (window != nullptr) {
-      (void)SDL_RaiseWindow(AsWindow(window));
-    }
-  }
-
-  void ShowWindowCommand(
-    void* const window,
-    const int command
-  )
-  {
-    if (window == nullptr) {
-      return;
-    }
-    switch (command) {
-    case SW_HIDE:
-      (void)SDL_HideWindow(AsWindow(window));
-      break;
-    case SW_MINIMIZE:
-    case SW_SHOWMINIMIZED:
-      (void)SDL_MinimizeWindow(AsWindow(window));
-      break;
-    case SW_SHOWMAXIMIZED:
-      (void)SDL_MaximizeWindow(AsWindow(window));
-      break;
-    case SW_RESTORE:
-      (void)SDL_RestoreWindow(AsWindow(window));
-      break;
-    default:
-      (void)SDL_ShowWindow(AsWindow(window));
-      break;
-    }
-  }
-
-  void SetWindowPosition(
-    void* const window,
-    const int x,
-    const int y,
-    const int width,
-    const int height,
-    const unsigned int flags
-  )
-  {
-    if (window == nullptr) {
-      return;
-    }
-    if ((flags & SWP_NOMOVE) == 0u) {
-      (void)SDL_SetWindowPosition(AsWindow(window), x, y);
-    }
-    if ((flags & SWP_NOSIZE) == 0u) {
-      (void)SDL_SetWindowSize(AsWindow(window), width, height);
-    }
-  }
-
-  void ClipCursor(
-    const bool clip,
-    const int left,
-    const int top,
-    const int right,
-    const int bottom
-  )
-  {
-    if (gWindows.empty()) {
-      return;
-    }
-    SDL_Window* const window = gWindows.front();
-    if (!clip) {
-      (void)SDL_SetWindowMouseRect(window, nullptr);
-      return;
-    }
-    int windowX = 0;
-    int windowY = 0;
-    (void)SDL_GetWindowPosition(window, &windowX, &windowY);
-    const SDL_Rect rect{left - windowX, top - windowY, right - left, bottom - top};
-    (void)SDL_SetWindowMouseRect(window, &rect);
-  }
-
-  void SetTitleHook(
-    void* const window,
-    const char* const utf8Title
-  )
-  {
-    if (window != nullptr) {
-      (void)SDL_SetWindowTitle(AsWindow(window), utf8Title);
-    }
-  }
-
-  void ScreenSaver(
-    const bool allowed
-  )
-  {
-    (void)(allowed ? SDL_EnableScreenSaver() : SDL_DisableScreenSaver());
-  }
-
-  void* CreateCursor(
-    const unsigned int* const bgraBottomUp,
-    const int hotspotX,
-    const int hotspotY
-  )
-  {
-    SDL_Surface* const surface = SDL_CreateSurface(32, 32, SDL_PIXELFORMAT_ARGB8888);
-    if (surface == nullptr) {
-      return nullptr;
-    }
-    // B,G,R,A bytes are ARGB8888 words on a little-endian machine; rows arrive bottom-up.
-    for (int row = 0; row < 32; ++row) {
-      auto* const destination =
-        reinterpret_cast<std::uint32_t*>(static_cast<std::uint8_t*>(surface->pixels) + row * surface->pitch);
-      const unsigned int* const source = bgraBottomUp + (31 - row) * 32;
-      for (int column = 0; column < 32; ++column) {
-        destination[column] = source[column];
-      }
-    }
-    SDL_Cursor* const cursor = SDL_CreateColorCursor(surface, hotspotX, hotspotY);
-    SDL_DestroySurface(surface);
-    return cursor;
-  }
-
-  void DestroyCursor(
-    void* const cursor
-  )
-  {
-    SDL_DestroyCursor(static_cast<SDL_Cursor*>(cursor));
-  }
-
-  void SetCursorHook(
-    void* const cursor
-  )
-  {
-    (void)SDL_SetCursor(cursor != nullptr ? static_cast<SDL_Cursor*>(cursor) : SDL_GetDefaultCursor());
-  }
-
-  void ShowCursorHook(
-    const bool shown
-  )
-  {
-    (void)(shown ? SDL_ShowCursor() : SDL_HideCursor());
-  }
-
-  bool MessageBoxHook(
-    void* const window,
-    const char* const utf8Text,
-    const char* const utf8Caption,
-    const bool yesNo
-  )
-  {
-    if (!yesNo) {
-      (void)SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, utf8Caption, utf8Text, AsWindow(window));
-      return true;
-    }
-    const SDL_MessageBoxButtonData buttons[] = {
-      {SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "No"},
-      {SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 1, "Yes"},
-    };
-    SDL_MessageBoxData data{};
-    data.flags = SDL_MESSAGEBOX_INFORMATION;
-    data.window = AsWindow(window);
-    data.title = utf8Caption;
-    data.message = utf8Text;
-    data.numbuttons = 2;
-    data.buttons = buttons;
-    int chosen = 0;
-    return SDL_ShowMessageBox(&data, &chosen) && chosen == 1;
-  }
-
-  bool SetClipboardText(
-    const char* const utf8Text
-  )
-  {
-    return SDL_SetClipboardText(utf8Text);
-  }
-
-  std::string GetClipboardText()
-  {
-    char* const text = SDL_GetClipboardText();
-    std::string result = text != nullptr ? text : "";
-    SDL_free(text);
-    return result;
-  }
-
-  bool OpenUrlHook(
-    const char* const utf8Url
-  )
-  {
-    return SDL_OpenURL(utf8Url);
-  }
-
-  bool EventsPending()
-  {
-    return platform::window::HasEvents();
-  }
-
-  // --- Events --------------------------------------------------------------------------------
-
   void SetModifierKeyState(
     const SDL_Keycode key,
     const bool down
   )
   {
     if (const int sided = SidedVirtualKeyOf(key); sided != 0) {
-      platform::posix::SetKeyDown(sided, down);
+      platform::window::sdl::OnKey(sided, down);
     }
+  }
+
+  // A window's newest size change in SDL's queue stands for the ones before it: a drag of the
+  // window's edge queues many, and each costs the renderer a new swap chain.
+  [[nodiscard]] bool LaterResizeQueued(
+    const SDL_WindowID windowId
+  )
+  {
+    SDL_Event queued[64];
+    const int count = SDL_PeepEvents(
+      queued, 64, SDL_PEEKEVENT, SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED, SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED
+    );
+    for (int index = 0; index < count; ++index) {
+      if (queued[index].window.windowID == windowId) {
+        return true;
+      }
+    }
+    return false;
   }
 
   [[nodiscard]] bool Translate(
@@ -507,8 +290,12 @@ namespace
   )
   {
     using platform::window::EventType;
+    namespace system = platform::window::sdl;
     out = platform::window::Event{};
     switch (source.type) {
+    case SDL_EVENT_QUIT:
+      out.type = EventType::Quit;
+      return true;
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
       out.type = EventType::CloseRequested;
       out.window = SDL_GetWindowFromID(source.window.windowID);
@@ -518,37 +305,42 @@ namespace
       out.window = SDL_GetWindowFromID(source.window.windowID);
       out.x = source.window.data1;
       out.y = source.window.data2;
-      PublishWindowRect(AsWindow(out.window));
+      system::OnWindowRectChanged(AsWindow(out.window));
       return true;
     case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+      if (LaterResizeQueued(source.window.windowID)) {
+        return false;
+      }
       out.type = EventType::Resized;
       out.window = SDL_GetWindowFromID(source.window.windowID);
       out.width = source.window.data1;
       out.height = source.window.data2;
-      PublishWindowRect(AsWindow(out.window));
+      system::OnWindowRectChanged(AsWindow(out.window));
       return true;
     case SDL_EVENT_WINDOW_MINIMIZED:
       out.type = EventType::Minimized;
       out.window = SDL_GetWindowFromID(source.window.windowID);
-      platform::posix::SetWindowMinimized(out.window, true);
+      system::OnWindowMinimized(AsWindow(out.window), true);
       return true;
     case SDL_EVENT_WINDOW_RESTORED:
       out.type = EventType::Restored;
       out.window = SDL_GetWindowFromID(source.window.windowID);
-      platform::posix::SetWindowMinimized(out.window, false);
+      system::OnWindowMinimized(AsWindow(out.window), false);
       return true;
     case SDL_EVENT_WINDOW_MAXIMIZED:
       out.type = EventType::Maximized;
       out.window = SDL_GetWindowFromID(source.window.windowID);
-      platform::posix::SetWindowMinimized(out.window, false);
+      system::OnWindowMinimized(AsWindow(out.window), false);
       return true;
     case SDL_EVENT_WINDOW_FOCUS_GAINED:
       out.type = EventType::FocusGained;
       out.window = SDL_GetWindowFromID(source.window.windowID);
+      system::OnFocusChanged(AsWindow(out.window));
       return true;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
       out.type = EventType::FocusLost;
       out.window = SDL_GetWindowFromID(source.window.windowID);
+      system::OnFocusChanged(nullptr);
       return true;
     case SDL_EVENT_WINDOW_EXPOSED:
       out.type = EventType::Exposed;
@@ -566,7 +358,7 @@ namespace
     case SDL_EVENT_DISPLAY_REMOVED:
     case SDL_EVENT_DISPLAY_MOVED:
     case SDL_EVENT_DISPLAY_ORIENTATION:
-      PublishMonitors();
+      system::OnDisplaysChanged();
       out.type = EventType::DisplaysChanged;
       return true;
     case SDL_EVENT_MOUSE_MOTION: {
@@ -579,11 +371,13 @@ namespace
       float globalX = 0.0f;
       float globalY = 0.0f;
       (void)SDL_GetGlobalMouseState(&globalX, &globalY);
-      platform::posix::SetCursorScreenPos(static_cast<int>(globalX), static_cast<int>(globalY));
+      system::OnCursorMoved(static_cast<int>(globalX), static_cast<int>(globalY));
       return true;
     }
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
     case SDL_EVENT_MOUSE_BUTTON_UP: {
+      const bool down = source.type == SDL_EVENT_MOUSE_BUTTON_DOWN;
+      SDL_Window* const window = SDL_GetWindowFromID(source.button.windowID);
       int button = 0;
       switch (source.button.button) {
       case SDL_BUTTON_LEFT:
@@ -595,11 +389,22 @@ namespace
       case SDL_BUTTON_RIGHT:
         button = platform::window::kButtonRight;
         break;
-      default:
-        return false; // the side buttons: wx 2.4.2 had none
+      case SDL_BUTTON_X1:
+      case SDL_BUTTON_X2: {
+        // FAF's patch to the retail viewport's window procedure (FA-Binary-Patches
+        // OnWindowMessage, at 0x00430C0E) hands the side buttons on as presses of VK_XBUTTON1 and
+        // VK_XBUTTON2, so key bindings can name them.
+        const int virtualKey = source.button.button == SDL_BUTTON_X1 ? VK_XBUTTON1 : VK_XBUTTON2;
+        system::OnKey(virtualKey, down);
+        out.type = down ? EventType::KeyDown : EventType::KeyUp;
+        out.window = window;
+        out.virtualKey = virtualKey;
+        out.modifiers = ModifiersOf(SDL_GetModState());
+        return true;
       }
-      SDL_Window* const window = SDL_GetWindowFromID(source.button.windowID);
-      const bool down = source.type == SDL_EVENT_MOUSE_BUTTON_DOWN;
+      default:
+        return false;
+      }
       out.type = down ? EventType::MouseDown : EventType::MouseUp;
       out.window = window;
       out.button = button;
@@ -608,7 +413,7 @@ namespace
       out.buttonsDown = ButtonsDownOf(SDL_GetMouseState(nullptr, nullptr));
       out.modifiers = ModifiersOf(SDL_GetModState());
       static constexpr int kButtonKeys[] = {0, VK_LBUTTON, VK_MBUTTON, VK_RBUTTON};
-      platform::posix::SetKeyDown(kButtonKeys[button], down);
+      system::OnKey(kButtonKeys[button], down);
       return true;
     }
     case SDL_EVENT_MOUSE_WHEEL: {
@@ -629,7 +434,7 @@ namespace
       if (virtualKey == 0) {
         return false;
       }
-      platform::posix::SetKeyDown(virtualKey, down);
+      system::OnKey(virtualKey, down);
       out.type = down ? EventType::KeyDown : EventType::KeyUp;
       out.window = SDL_GetWindowFromID(source.key.windowID);
       out.virtualKey = virtualKey;
@@ -643,8 +448,6 @@ namespace
   }
 
   // Typed text arrives as UTF-8 strings; the engine takes one character per event.
-  std::vector<platform::window::Event> gPendingText;
-
   void QueueText(
     const SDL_TextInputEvent& text
   )
@@ -679,10 +482,65 @@ namespace
       event.window = window;
       event.codepoint = codepoint;
       event.modifiers = modifiers;
-      gPendingText.push_back(event);
+      gQueued.push_back(event);
     }
   }
+
+  // The next event for the engine, before the filter sees it.
+  [[nodiscard]] bool NextEvent(
+    platform::window::Event& event
+  )
+  {
+    if (!gQueued.empty()) {
+      event = gQueued.front();
+      gQueued.pop_front();
+      return true;
+    }
+    SDL_Event source{};
+    while (SDL_PollEvent(&source)) {
+      if (gToolEventHook != nullptr && gToolEventHook(&source)) {
+        continue;
+      }
+      if (source.type == SDL_EVENT_TEXT_INPUT) {
+        QueueText(source.text);
+        if (!gQueued.empty()) {
+          event = gQueued.front();
+          gQueued.pop_front();
+          return true;
+        }
+        continue;
+      }
+      if (Translate(source, event)) {
+        return true;
+      }
+    }
+    return false;
+  }
 } // namespace
+
+namespace platform::window::sdl
+{
+  void SetToolEventHook(
+    const ToolEventHook hook
+  )
+  {
+    gToolEventHook = hook;
+  }
+
+  void QueueEvent(
+    const Event& event
+  )
+  {
+    gQueued.push_back(event);
+  }
+
+  bool CallCursorRequestHandler(
+    SDL_Window* const window
+  )
+  {
+    return gCursorRequestHandler != nullptr && gCursorRequestHandler(window);
+  }
+} // namespace platform::window::sdl
 
 namespace platform::window
 {
@@ -691,6 +549,9 @@ namespace platform::window
     if (gInitialized) {
       return true;
     }
+    // Closing the last window asks the engine (the main frame's close shows the escape dialog);
+    // it isn't a request to quit.
+    (void)SDL_SetHint(SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE, "0");
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
       gpg::Warnf("Window system: %s", SDL_GetError());
       return false;
@@ -703,24 +564,8 @@ namespace platform::window
       SDL_MICRO_VERSION,
       SDL_GetCurrentVideoDriver()
     );
-    PublishMonitors();
-
-    platform::posix::gWarpCursorHook = &WarpCursor;
-    platform::posix::gFocusHook = &Focus;
-    platform::posix::gShowWindowHook = &ShowWindowCommand;
-    platform::posix::gSetWindowPosHook = &SetWindowPosition;
-    platform::posix::gClipCursorHook = &ClipCursor;
-    platform::posix::gSetWindowTitleHook = &SetTitleHook;
-    platform::posix::gScreenSaverHook = &ScreenSaver;
-    platform::posix::gCreateCursorHook = &CreateCursor;
-    platform::posix::gDestroyCursorHook = &DestroyCursor;
-    platform::posix::gSetCursorHook = &SetCursorHook;
-    platform::posix::gShowCursorHook = &ShowCursorHook;
-    platform::posix::gMessageBoxHook = &MessageBoxHook;
-    platform::posix::gSetClipboardTextHook = &SetClipboardText;
-    platform::posix::gGetClipboardTextHook = &GetClipboardText;
-    platform::posix::gOpenUrlHook = &OpenUrlHook;
-    platform::posix::gWindowEventsPendingHook = &EventsPending;
+    sdl::OnInit();
+    sdl::OnDisplaysChanged();
     return true;
   }
 
@@ -729,12 +574,14 @@ namespace platform::window
     if (!gInitialized) {
       return;
     }
-    platform::posix::gWindowEventsPendingHook = nullptr;
     for (SDL_Window* const window : gWindows) {
-      platform::posix::ForgetWindow(window);
+      sdl::OnWindowDestroyed(window);
       SDL_DestroyWindow(window);
     }
     gWindows.clear();
+    gQueued.clear();
+    HideSplash();
+    sdl::OnShutdown();
     SDL_Quit();
     gInitialized = false;
   }
@@ -762,20 +609,43 @@ namespace platform::window
     (void)SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_Y_NUMBER, y < 0 ? SDL_WINDOWPOS_CENTERED : y);
     (void)SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, width > 0 ? width : 1024);
     (void)SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, height > 0 ? height : 768);
-    (void)SDL_SetBooleanProperty(properties, SDL_PROP_WINDOW_CREATE_VULKAN_BOOLEAN, true);
     (void)SDL_SetBooleanProperty(properties, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, resizable);
     (void)SDL_SetBooleanProperty(properties, SDL_PROP_WINDOW_CREATE_HIDDEN_BOOLEAN, true);
     (void)SDL_SetBooleanProperty(properties, SDL_PROP_WINDOW_CREATE_HIGH_PIXEL_DENSITY_BOOLEAN, true);
+    sdl::OnCreateProperties(properties);
     SDL_Window* const window = SDL_CreateWindowWithProperties(properties);
     SDL_DestroyProperties(properties);
     if (window == nullptr) {
       gpg::Warnf("Window system: can't create a window: %s", SDL_GetError());
       return nullptr;
     }
-    // Typed text for the chat and the console.
+    // Typed text for the chat, the console and the edit boxes, through the input method.
     (void)SDL_StartTextInput(window);
     gWindows.push_back(window);
-    PublishWindowRect(window);
+    sdl::OnWindowCreated(window);
+    sdl::OnWindowRectChanged(window);
+    return window;
+  }
+
+  Handle CreateChild(
+    const Handle parent,
+    const int x,
+    const int y,
+    const int width,
+    const int height
+  )
+  {
+    if (!gInitialized || parent == nullptr) {
+      return nullptr;
+    }
+    SDL_Window* const window = sdl::CreateChild(AsWindow(parent), x, y, width, height);
+    if (window == nullptr) {
+      return nullptr;
+    }
+    (void)SDL_StartTextInput(window);
+    gWindows.push_back(window);
+    sdl::OnWindowCreated(window);
+    sdl::OnWindowRectChanged(window);
     return window;
   }
 
@@ -786,14 +656,22 @@ namespace platform::window
     if (window == nullptr) {
       return;
     }
+    void* const native = sdl::IsChild(AsWindow(window)) ? sdl::NativeHandleOf(AsWindow(window)) : nullptr;
     for (auto it = gWindows.begin(); it != gWindows.end(); ++it) {
       if (*it == window) {
         gWindows.erase(it);
         break;
       }
     }
-    platform::posix::ForgetWindow(window);
+    // Events still queued for it name a window that is gone.
+    for (auto it = gQueued.begin(); it != gQueued.end();) {
+      it = it->window == window ? gQueued.erase(it) : it + 1;
+    }
+    sdl::OnWindowDestroyed(AsWindow(window));
     SDL_DestroyWindow(AsWindow(window));
+    if (native != nullptr) {
+      sdl::DestroyChildNative(native);
+    }
   }
 
   void Show(
@@ -811,7 +689,9 @@ namespace platform::window
     const char* const utf8Title
   )
   {
-    SetTitleHook(window, utf8Title);
+    if (window != nullptr) {
+      (void)SDL_SetWindowTitle(AsWindow(window), utf8Title != nullptr ? utf8Title : "");
+    }
   }
 
   void SetBounds(
@@ -823,6 +703,10 @@ namespace platform::window
   )
   {
     if (window == nullptr) {
+      return;
+    }
+    if (sdl::SetChildBounds(AsWindow(window), x, y, width, height)) {
+      sdl::OnWindowRectChanged(AsWindow(window));
       return;
     }
     if (x != -1 || y != -1) {
@@ -840,7 +724,7 @@ namespace platform::window
       );
     }
     (void)SDL_SyncWindow(AsWindow(window));
-    PublishWindowRect(AsWindow(window));
+    sdl::OnWindowRectChanged(AsWindow(window));
   }
 
   void Maximize(
@@ -884,7 +768,9 @@ namespace platform::window
     const Handle window
   )
   {
-    Focus(window);
+    if (window != nullptr) {
+      (void)SDL_RaiseWindow(AsWindow(window));
+    }
   }
 
   void GetBounds(
@@ -895,6 +781,9 @@ namespace platform::window
     int* const height
   )
   {
+    if (window != nullptr && sdl::GetChildBounds(AsWindow(window), x, y, width, height)) {
+      return;
+    }
     int positionX = 0;
     int positionY = 0;
     int pixelWidth = 0;
@@ -917,16 +806,63 @@ namespace platform::window
     }
   }
 
+  void SetKeyboardFocus(
+    const Handle window
+  )
+  {
+    if (window != nullptr) {
+      sdl::SetKeyboardFocus(AsWindow(window));
+    }
+  }
+
+  bool HasKeyboardFocus()
+  {
+    return gInitialized && SDL_GetKeyboardFocus() != nullptr;
+  }
+
+  void* NativeHandle(
+    const Handle window
+  )
+  {
+    return window != nullptr ? sdl::NativeHandleOf(AsWindow(window)) : nullptr;
+  }
+
+  Handle FromNativeHandle(
+    void* const native
+  )
+  {
+    if (native == nullptr) {
+      return nullptr;
+    }
+    for (SDL_Window* const window : gWindows) {
+      if (sdl::NativeHandleOf(window) == native) {
+        return window;
+      }
+    }
+    return nullptr;
+  }
+
+  void AddSystemMenuItem(
+    const Handle window,
+    const int command,
+    const char* const utf8Label
+  )
+  {
+    if (window != nullptr) {
+      sdl::AddSystemMenuItem(AsWindow(window), command, utf8Label);
+    }
+  }
+
   bool HasEvents()
   {
     if (!gInitialized) {
       return false;
     }
-    if (!gPendingText.empty()) {
+    if (!gQueued.empty()) {
       return true;
     }
     SDL_PumpEvents();
-    return SDL_HasEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST);
+    return SDL_HasEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST) || !gQueued.empty();
   }
 
   bool PollEvent(
@@ -936,26 +872,188 @@ namespace platform::window
     if (!gInitialized) {
       return false;
     }
-    if (!gPendingText.empty()) {
-      event = gPendingText.front();
-      gPendingText.erase(gPendingText.begin());
-      return true;
-    }
-    SDL_Event source{};
-    while (SDL_PollEvent(&source)) {
-      if (source.type == SDL_EVENT_TEXT_INPUT) {
-        QueueText(source.text);
-        if (!gPendingText.empty()) {
-          event = gPendingText.front();
-          gPendingText.erase(gPendingText.begin());
-          return true;
-        }
-        continue;
-      }
-      if (Translate(source, event)) {
+    while (NextEvent(event)) {
+      if (gEventFilter == nullptr || !gEventFilter(event)) {
         return true;
       }
     }
     return false;
+  }
+
+  void SetEventFilter(
+    const EventFilter filter
+  )
+  {
+    gEventFilter = filter;
+  }
+
+  void SetCursorRequestHandler(
+    const CursorRequestHandler handler
+  )
+  {
+    gCursorRequestHandler = handler;
+  }
+
+  namespace
+  {
+    // One folder pick in flight: what SDL's dialog is given and what its callback answers.
+    struct FolderPick
+    {
+      std::string title;
+      std::string location;
+      std::mutex mutex;
+      std::condition_variable answered;
+      bool done = false;
+      bool chosen = false;
+      std::string path;
+    };
+
+    void SDLCALL OnFolderPicked(
+      void* const userdata,
+      const char* const* const fileList,
+      const int filter
+    )
+    {
+      (void)filter;
+      auto& pick = *static_cast<FolderPick*>(userdata);
+      std::lock_guard<std::mutex> lock(pick.mutex);
+      if (fileList != nullptr && fileList[0] != nullptr) {
+        pick.chosen = true;
+        pick.path = fileList[0];
+      } else if (fileList == nullptr) {
+        gpg::Warnf("Folder picker: %s", SDL_GetError());
+      }
+      pick.done = true;
+      pick.answered.notify_all();
+    }
+
+    // On the main thread, as SDL's dialogs require.
+    void SDLCALL StartFolderPick(
+      void* const userdata
+    )
+    {
+      auto& pick = *static_cast<FolderPick*>(userdata);
+      const SDL_PropertiesID properties = SDL_CreateProperties();
+      (void)SDL_SetStringProperty(properties, SDL_PROP_FILE_DIALOG_TITLE_STRING, pick.title.c_str());
+      if (!pick.location.empty()) {
+        (void)SDL_SetStringProperty(properties, SDL_PROP_FILE_DIALOG_LOCATION_STRING, pick.location.c_str());
+      }
+      (void)SDL_SetBooleanProperty(properties, SDL_PROP_FILE_DIALOG_MANY_BOOLEAN, false);
+      SDL_ShowFileDialogWithProperties(SDL_FILEDIALOG_OPENFOLDER, &OnFolderPicked, &pick, properties);
+      SDL_DestroyProperties(properties);
+    }
+
+    SDL_Window* gSplashWindow = nullptr;
+    SDL_Renderer* gSplashRenderer = nullptr;
+  } // namespace
+
+  bool PickFolder(
+    const char* const utf8Title,
+    std::string& utf8Path
+  )
+  {
+    if (!gInitialized) {
+      return false; // headless: no dialog, the path stays as it is
+    }
+    FolderPick pick;
+    pick.title = utf8Title != nullptr ? utf8Title : "";
+    pick.location = utf8Path;
+    if (SDL_IsMainThread()) {
+      StartFolderPick(&pick);
+      // The window system keeps running (the game's events wait in SDL's queue) until it answers.
+      for (;;) {
+        {
+          std::lock_guard<std::mutex> lock(pick.mutex);
+          if (pick.done) {
+            break;
+          }
+        }
+        SDL_PumpEvents();
+        SDL_Delay(10);
+      }
+    } else {
+      // The main thread opens it when it next reads events; this thread waits, as the binary's
+      // modal wxDirDialog held the thread that asked.
+      if (!SDL_RunOnMainThread(&StartFolderPick, &pick, false)) {
+        return false;
+      }
+      std::unique_lock<std::mutex> lock(pick.mutex);
+      pick.answered.wait(lock, [&pick]() {
+        return pick.done;
+      });
+    }
+    std::lock_guard<std::mutex> lock(pick.mutex);
+    if (!pick.chosen) {
+      return false;
+    }
+    utf8Path = pick.path;
+    return true;
+  }
+
+  bool ShowSplash(
+    const char* const utf8PngPath,
+    const int width,
+    const int height
+  )
+  {
+    HideSplash();
+    if (!gInitialized || utf8PngPath == nullptr || width <= 0 || height <= 0) {
+      return false;
+    }
+    SDL_Surface* const image = SDL_LoadPNG(utf8PngPath);
+    if (image == nullptr) {
+      return false;
+    }
+    gSplashWindow = SDL_CreateWindow(
+      "", width, height, SDL_WINDOW_BORDERLESS | SDL_WINDOW_ALWAYS_ON_TOP | SDL_WINDOW_UTILITY | SDL_WINDOW_HIDDEN
+    );
+    if (gSplashWindow != nullptr) {
+      (void)SDL_SetWindowPosition(gSplashWindow, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+      gSplashRenderer = SDL_CreateRenderer(gSplashWindow, nullptr);
+    }
+    if (gSplashRenderer != nullptr) {
+      SDL_Texture* const texture = SDL_CreateTextureFromSurface(gSplashRenderer, image);
+      (void)SDL_ShowWindow(gSplashWindow);
+      (void)SDL_RenderClear(gSplashRenderer);
+      if (texture != nullptr) {
+        (void)SDL_RenderTexture(gSplashRenderer, texture, nullptr, nullptr);
+      }
+      (void)SDL_RenderPresent(gSplashRenderer);
+      SDL_DestroyTexture(texture);
+    }
+    SDL_DestroySurface(image);
+    if (gSplashRenderer == nullptr) {
+      HideSplash();
+      return false;
+    }
+    return true;
+  }
+
+  void HideSplash()
+  {
+    if (gSplashRenderer != nullptr) {
+      SDL_DestroyRenderer(gSplashRenderer);
+      gSplashRenderer = nullptr;
+    }
+    if (gSplashWindow != nullptr) {
+      SDL_DestroyWindow(gSplashWindow);
+      gSplashWindow = nullptr;
+    }
+  }
+
+  void SetTextInputArea(
+    const Handle window,
+    const int x,
+    const int y,
+    const int width,
+    const int height
+  )
+  {
+    if (window == nullptr) {
+      return;
+    }
+    const SDL_Rect area{x, y, width, height};
+    (void)SDL_SetTextInputArea(AsWindow(window), &area, 0);
+    (void)SDL_StartTextInput(AsWindow(window));
   }
 } // namespace platform::window

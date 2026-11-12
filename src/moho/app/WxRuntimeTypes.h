@@ -2,6 +2,7 @@
 
 #include <cstdarg>
 #include <array>
+#include <functional>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -19,39 +20,13 @@
 #include "moho/misc/WeakPtr.h"
 
 /**
- * wxWidgets 2.4.2 is linked, not recovered: `wxmswu.lib` is the library the
- * shipped binary was built against (sizes and vtable lengths of every class
- * the engine derives from match the binary - see platform/WxWidgets.h). The
- * engine classes below derive from the real wx classes, exactly as their
- * RTTI records (`??_R2...` base-class arrays in dumps/rtti_dump_all.hpp).
+ * The retail binary linked wxWidgets 2.4.2; the engine classes below derive from the application
+ * shell's wx-shaped classes (src/platform/shell, SDL3 underneath, issue #407), as their RTTI
+ * records name wx's (`??_R2...` base-class arrays in dumps/rtti_dump_all.hpp).
  */
 #include "platform/WxWidgets.h"
+#include "platform/sdl/ToolWindow.h"
 #include <wx/wx.h>
-// The Linux client (issue #255) builds the frame, the application and the log target below over
-// the wx stand-in (src/platform/posix/wx); the developer windows need the real library.
-#if FAFRE_PLATFORM_WINDOWS
-#include <wx/bmpbuttn.h>
-#include <wx/dcclient.h>
-#include <wx/ffile.h>
-#include <wx/file.h>
-#include <wx/filename.h>
-#include <wx/image.h>
-#include <wx/layout.h>
-#include <wx/listctrl.h>
-#include <wx/notebook.h>
-#include <wx/splash.h>
-#include <wx/stream.h>
-#include <wx/treectrl.h>
-#include <wx/wfstream.h>
-#endif
-
-// The binary agrees with wx/gdicmn.h: wxWindow::Refresh (0x00968350) reads a
-// wxRect as {x, y, width, height}, and wxApp::Initialize (0x009927E0)
-// allocates the colour database with operator new(0x1C).
-static_assert(sizeof(wxPoint) == 0x8, "wxPoint size must be 0x8");
-static_assert(sizeof(wxSize) == 0x8, "wxSize size must be 0x8");
-static_assert(sizeof(wxRect) == 0x10, "wxRect size must be 0x10");
-static_assert(sizeof(wxColourDatabase) == 0x1C, "wxColourDatabase size must be 0x1C");
 
 /**
  * The game's main frame (RTTI `.?AVWSupComFrame@@`: WSupComFrame > wxFrame,
@@ -110,32 +85,25 @@ public:
   void OnMove(wxMoveEvent& event);
 
   /**
-   * Address: 0x008CDCD0 (FUN_008CDCD0, WSupComFrame::MSWDefWindowProc)
-   *
-   * What it does:
-   * Handles SupCom system-command defaults, including pending-maximize sync
-   * priming and Alt-menu suppression, then forwards other lanes to base wx
-   * default window-proc dispatch.
+   * The retail frame's window procedure (WSupComFrame::MSWWindowProc, 0x008CDD40, and
+   * MSWDefWindowProc, 0x008CDCD0) on the shell's events: a finished size change re-sizes the
+   * viewport and the device and is saved to the preferences, as WM_SIZE (maximized, restored)
+   * and WM_EXITSIZEMOVE after SC_SIZE were.
    */
-#if FAFRE_PLATFORM_WINDOWS
-  long MSWDefWindowProc(WXUINT message, WXWPARAM wParam, WXLPARAM lParam) override;
-#endif
+  void OnSize(wxSizeEvent& event);
 
   /**
-   * Address: 0x008CDD40 (FUN_008CDD40, WSupComFrame::MSWWindowProc)
-   * Mangled: ?MSWWindowProc@WSupComFrame@@UAEJIIJ@Z
-   *
-   * What it does:
-   * Handles SupCom frame resize/maximize/app-activation/system-command
-   * routing, updates persisted window prefs, and forwards unhandled messages
-   * to base frame dispatch.
-   *
-   * Windows only, as MSWDefWindowProc: on Linux the window system (issue #256) reports the
-   * frame's size, activation and closing.
+   * WM_ACTIVATEAPP in WSupComFrame::MSWWindowProc (0x008CDD40): records the active flag and
+   * clips the cursor to the window (lock_fullscreen_cursor_to_window) or frees it.
    */
-#if FAFRE_PLATFORM_WINDOWS
-  long MSWWindowProc(WXUINT message, WXWPARAM wParam, WXLPARAM lParam) override;
-#endif
+  void OnActivate(wxActivateEvent& event);
+
+  /**
+   * WM_SYSCOMMAND in WSupComFrame::MSWWindowProc (0x008CDD40): the system-menu items
+   * CScApp's AppendLuaDebuggerSystemMenu (0x008D42E0) adds, 1 the log window and 2 the Lua
+   * debugger.
+   */
+  void OnSystemCommand(int command) override;
 
   std::uint8_t mUnknown178;
   std::uint8_t mPendingMaximizeSync;
@@ -145,68 +113,12 @@ public:
   DECLARE_EVENT_TABLE()
 };
 
-static_assert(
-  offsetof(WSupComFrame, mPendingMaximizeSync) == 0x179,
-  "WSupComFrame::mPendingMaximizeSync offset must be 0x179"
-);
-static_assert(
-  offsetof(WSupComFrame, mPersistedMaximizeSync) == 0x17A,
-  "WSupComFrame::mPersistedMaximizeSync offset must be 0x17A"
-);
-static_assert(
-  offsetof(WSupComFrame, mIsApplicationActive) == 0x17B,
-  "WSupComFrame::mIsApplicationActive offset must be 0x17B"
-);
-static_assert(sizeof(WSupComFrame) == 0x17C, "WSupComFrame size must be 0x17C");
-
 namespace moho
 {
-  class WWinManagedDialog;
   class CWinLogTarget;
   class WWinLogWindow;
   class WWinLogTextBuilder;
   struct CWinLogLine;
-
-  /**
-   * The event type CLogAdditionEvent carries (0x010A9BF0), numbered by
-   * wxNewEventType in its static initialiser (0x00BC7310) like any
-   * DEFINE_EVENT_TYPE.
-   */
-  extern const wxEventType EVT_LOG_ADDITION;
-
-  /**
-   * The event `CWinLogTarget::OnMessage` posts to the log dialog.
-   *
-   * RTTI: CLogAdditionEvent > wxEvent > wxObject, vftable 0x00E0C9F0 with
-   * wxEvent's 5 slots: slot 0 is wxEvent's inline GetClassInfo (0x004B4310,
-   * returning wxEvent::sm_classwxEvent) - this class declares no class info -
-   * then the compiler's deleting destructor (0x004F3850) and Clone.
-   * OnMessage (0x004F6860) builds one on the stack and hands it to
-   * `wxEvtHandler::AddPendingEvent`, which clones it into the queue.
-   */
-  class CLogAdditionEvent final : public wxEvent
-  {
-  public:
-    CLogAdditionEvent()
-      : wxEvent(0, EVT_LOG_ADDITION)
-    {}
-
-    /**
-     * Address: 0x004F37F0 (FUN_004F37F0)
-     *
-     * What it does:
-     * Allocates and copy-clones one `CLogAdditionEvent` object (0x20 bytes).
-     */
-    wxEvent* Clone() const override;
-  };
-
-  static_assert(sizeof(CLogAdditionEvent) == 0x20, "moho::CLogAdditionEvent size must be 0x20");
-
-  // The usual wx custom-event pair: a typed handler, and a table row that
-  // casts it in two steps (derived-to-base, then to the generic function).
-  // A single cast cannot, because WWinLogWindow's member pointers carry the
-  // multiple-inheritance representation (its WeakObject base).
-  using CLogAdditionEventFunction = void (wxEvtHandler::*)(CLogAdditionEvent&);
 
   /**
    * Wide text-builder helper used by `WWinLogWindow` replay/message formatting.
@@ -437,6 +349,163 @@ namespace moho
   );
   static_assert(sizeof(CWinLogTarget) == 0x34, "moho::CWinLogTarget size must be 0x34");
 
+  /**
+   * The log window (RTTI `.?AVWWinLogWindow@Moho@@`, 0x004F4270), a wx dialog in the binary: the
+   * "Show" box with the Debug, Info, Warn, Error and Custom check boxes and the custom filter, a
+   * Clear button and the output, coloured by category. Dear ImGui in a window of its own since
+   * issue #412 (platform/sdl/ToolWindow.h); its options (`Options.Log.*`) and geometry
+   * (`Windows.Log.*`) are the same preferences, its history the target's 10,000 lines.
+   */
+  class WWinLogWindow final : public platform::tools::ToolWindow
+  {
+  public:
+    /**
+     * Address: 0x004F4270 (FUN_004F4270)
+     *
+     * What it does:
+     * Creates the "Moho Log" window, reads the check boxes, the filter and the geometry from
+     * the preferences and fills the output from the target's committed lines.
+     */
+    WWinLogWindow();
+
+    /**
+     * Address: 0x004F5380 (FUN_004F5380)
+     *
+     * What it does:
+     * Detaches from the log target.
+     */
+    ~WWinLogWindow() override;
+
+    /**
+     * Address: 0x004F6760 (FUN_004F6760)
+     *
+     * What it does:
+     * Clears `mOwnerTarget->dialog` under the target lock.
+     */
+    void DetachFromTarget();
+
+    /**
+     * Address: 0x004F5840 (FUN_004F5840)
+     *
+     * What it does:
+     * Reads the category mask and the lower-cased filter, then refills the output from every
+     * committed line and scrolls to the end.
+     */
+    void RebuildVisibleLinesFromControls();
+
+    /**
+     * Address: 0x004F5AE0 (FUN_004F5AE0)
+     *
+     * What it does:
+     * Applies one committed line against the category and filter and appends it, after the
+     * context lines it follows, to the output.
+     */
+    void AppendCommittedLine(const CWinLogLine& line);
+
+    [[nodiscard]] bool ShouldDisplayCommittedLine(const CWinLogLine& line) const;
+    [[nodiscard]] std::wstring BuildReplayFlushText(std::size_t startIndex) const;
+    [[nodiscard]] std::wstring BuildFormattedCommittedLineText(const CWinLogLine& line) const;
+
+    /**
+     * Address: 0x004F6470 (FUN_004F6470)
+     *
+     * What it does:
+     * Merges the target's pending lines and appends the ones the merge added. The binary ran it
+     * for the CLogAdditionEvent CWinLogTarget::OnMessage posted; the target now raises a flag
+     * any thread may set, and the window merges on the main thread every frame.
+     */
+    void OnTargetPendingLinesChanged();
+
+    // CWinLogTarget::OnMessage, under the target's lock: lines are waiting.
+    void NotePendingLines() noexcept
+    {
+      mLinesPending = true;
+    }
+
+    /**
+     * Address: 0x004F5440 (FUN_004F5440)
+     *
+     * What it does:
+     * Clears the output and resets the target's committed lines to the buffered context.
+     */
+    void Clear();
+
+  protected:
+    void Tick() override;
+    void Draw() override;
+
+  private:
+    struct OutputLine
+    {
+      std::uint32_t styleCategory;
+      std::string utf8;
+    };
+
+    void AppendOutput(std::uint32_t styleCategory, const std::wstring& text);
+    void SaveControls();
+    void SaveGeometry();
+
+    CWinLogTarget* mOwnerTarget = nullptr;
+    std::uint32_t mEnabledCategoriesMask = 0;
+    fa::string mFilterText;
+    std::array<bool, 5> mCategoryChecks{};
+    std::array<char, 256> mFilterEdit{};
+    fa::vector<fa::string> mBufferedLines;
+    std::uint32_t mFirstVisibleLine = 0;
+    std::vector<OutputLine> mOutput;
+    bool mScrollToEnd = true;
+    bool mLinesPending = false;
+    int mSavedX = -1;
+    int mSavedY = -1;
+    int mSavedWidth = -1;
+    int mSavedHeight = -1;
+  };
+
+  /**
+   * The input box (RTTI `.?AVWWxInputBox@Moho@@`, 0x004FC040 in the binary, a wx dialog): a
+   * label, an edit box and OK / Cancel. Dear ImGui since issue #412.
+   */
+  class WInputBox final : public platform::tools::ToolWindow
+  {
+  public:
+    WInputBox(const char* dialogTitle, const char* defaultValue, const char* labelText);
+
+    // wxDialog::ShowModal: true for OK, with the text in `result`.
+    [[nodiscard]] bool RunModal(fa::string* result);
+
+  protected:
+    void Draw() override;
+    void OnCloseRequested() override;
+
+  private:
+    std::string mLabel;
+    std::array<char, 1024> mText{};
+    bool mDone = false;
+    bool mAccepted = false;
+    bool mFocusText = true;
+  };
+
+  /**
+   * Address: 0x004FC870 (FUN_004FC870, WxInputBox)
+   *
+   * What it does:
+   * Runs one modal input box; true when the user pressed OK.
+   */
+  [[nodiscard]] bool
+  InputBox(const char* dialogTitle, const char* defaultValue, const char* labelText, fa::string* resultString);
+
+  /**
+   * Address: 0x004FC900 (FUN_004FC900, ?CON_WxInputBox@Moho@@YAXPAX@Z)
+   *
+   * What it does:
+   * The `InputBox` console command (`WxInputBox` in the binary): asks "What?" with the default
+   * "default" and prints the answer or "Canceled".
+   */
+  void CON_InputBox(const fa::vector<fa::string>& args);
+
+  // Engine addition (issue #412): runs the window system and the developer windows until `done`.
+  void WINX_RunModal(const std::function<bool()>& done);
+
   // The one log target (0x010A9BA0): WWinLogWindow's constructor binds to it,
   // and WINX_PrecreateLogWindow publishes the window through its `dialog`.
   extern CWinLogTarget sLogWindowTarget;
@@ -500,473 +569,6 @@ namespace moho
       m_keepGoing = TRUE;
     }
   };
-
-#if FAFRE_PLATFORM_WINDOWS
-  // The developer windows (bitmap panel and check box, input box, managed dialogs, log window):
-  // not in the Linux client (issue #255).
-
-  /**
-   * A panel that tiles a bitmap across itself on erase-background.
-   *
-   * RTTI: WBitmapPanel > wxPanel, wxPanel's 132 vtable slots; the constructor
-   * (0x004FBCC0) stores the bitmap right after the 0x134-byte wxPanel.
-   * GetEventTable (0x004FBCB0) comes from DECLARE_EVENT_TABLE below.
-   */
-  class WBitmapPanel : public wxPanel
-  {
-  public:
-    /**
-     * Address: 0x004FBCC0 (FUN_004FBCC0, ??0WBitmapPanel@Moho@@QAE@PAVwxWindow@@PAVwxBitmap@@@Z)
-     * Mangled: ??0WBitmapPanel@Moho@@QAE@PAVwxWindow@@PAVwxBitmap@@@Z
-     *
-     * What it does:
-     * Creates the panel under `parentWindow` and keeps `bitmap` for painting.
-     */
-    WBitmapPanel(wxWindow* parentWindow, wxBitmap* bitmap);
-
-    /**
-     * Address: 0x004FBD90 (FUN_004FBD90, ?OnEraseBackground@WBitmapPanel@Moho@@IAEXAAVwxEraseEvent@@@Z)
-     * Mangled: ?OnEraseBackground@WBitmapPanel@Moho@@IAEXAAVwxEraseEvent@@@Z
-     *
-     * What it does:
-     * Tiles the bound bitmap across the panel client span during erase
-     * background, or skips the event when there is nothing to draw.
-     */
-    void OnEraseBackground(wxEraseEvent& eraseEvent);
-
-    wxBitmap* mBitmap; // +0x134
-
-    DECLARE_EVENT_TABLE()
-  };
-
-  static_assert(offsetof(WBitmapPanel, mBitmap) == 0x134, "moho::WBitmapPanel::mBitmap offset must be 0x134");
-
-  /**
-   * A bitmap button that toggles.
-   *
-   * RTTI: WBitmapCheckBox > wxBitmapButton, vftable 0x00E0CE74 with
-   * wxBitmapButton's 142 slots (the dump's 143rd entry, 0x004B004F, is the
-   * dword after the table - no function starts there). The checked byte sits
-   * right after the 0x168-byte wxBitmapButton. GetEventTable (0x004FBE20)
-   * comes from DECLARE_EVENT_TABLE below.
-   */
-  class WBitmapCheckBox : public wxBitmapButton
-  {
-  public:
-    /**
-     * Address: 0x004FBE30 (FUN_004FBE30, ??0WBitmapCheckBox@Moho@@QAE@PAVwxWindow@@HABVwxBitmap@@@Z)
-     * Mangled: ??0WBitmapCheckBox@Moho@@QAE@PAVwxWindow@@HABVwxBitmap@@@Z
-     *
-     * What it does:
-     * Runs `wxBitmapButton`'s constructor with the default button name and
-     * clears the checked byte.
-     */
-    WBitmapCheckBox(wxWindow* parentWindow, int controlId, const wxBitmap& bitmap);
-
-    /**
-     * Address: 0x004FBF10 (FUN_004FBF10, ?IsChecked@WBitmapCheckBox@Moho@@QAE_NXZ)
-     * Mangled: ?IsChecked@WBitmapCheckBox@Moho@@QAE_NXZ
-     *
-     * What it does:
-     * Returns whether the button is checked.
-     */
-    [[nodiscard]] bool IsChecked();
-
-    /**
-     * Address: 0x004FBF20 (FUN_004FBF20, ?SetChecked@WBitmapCheckBox@Moho@@QAEX_N@Z)
-     * Mangled: ?SetChecked@WBitmapCheckBox@Moho@@QAEX_N@Z
-     *
-     * What it does:
-     * Stores the new state; when it actually flips, lets the button pick its
-     * bitmap again (OnSetBitmap, vtable +0x228) and repaints (Refresh, +0xF0).
-     */
-    void SetChecked(bool checked);
-
-    /**
-     * Address: 0x004FC010 (FUN_004FC010)
-     *
-     * What it does:
-     * Toggles the checked state on left-button-up and skips the event on.
-     */
-    void OnLeftUp(wxMouseEvent& event);
-
-    std::uint8_t mIsChecked; // +0x168
-
-    DECLARE_EVENT_TABLE()
-  };
-
-  static_assert(
-    offsetof(WBitmapCheckBox, mIsChecked) == 0x168,
-    "moho::WBitmapCheckBox::mIsChecked offset must be 0x168"
-  );
-
-  /**
-   * The modal input box behind the `WxInputBox` console helper.
-   *
-   * RTTI: WWxInputBox > wxDialog, wxDialog's 145 vtable slots
-   * (vftable 0x00E0D12C). The text control and the caller's result string sit
-   * right after the 0x170-byte wxDialog - in that order: the constructor
-   * stores the control at +0x170 (0x004FC3E3) and the string at +0x174
-   * (0x004FC15F). Its one override (0x004FC7B0, vtable +0xDC) is
-   * wxWindowBase::TransferDataFromWindow - the hook wxDialog::OnOK runs before
-   * EndModal(wxID_OK) - which reads the control through wxTextCtrl::GetValue
-   * (+0x218).
-   */
-  class WWxInputBox : public wxDialog
-  {
-  public:
-    wxTextCtrl* mTextCtrl;     // +0x170
-    fa::string* mResultString; // +0x174
-
-    /**
-     * Address: 0x004FC040 (FUN_004FC040,
-     * ??0WWxInputBox@Moho@@QAE@PBDPBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@msvc8@@00PAV40@@Z)
-     *
-     * What it does:
-     * Creates the dialog (wxDEFAULT_DIALOG_STYLE, the title widened from
-     * UTF-8) and lays it out: the label, the text control seeded with the
-     * default value, and OK/Cancel below them, at least 500 wide.
-     */
-    WWxInputBox(const char* dialogTitle, const char* defaultValue, const char* labelText, fa::string* resultString);
-
-    /**
-     * Address: 0x004FC7B0 (FUN_004FC7B0, vtable +0xDC)
-     *
-     * What it does:
-     * UTF-8 encodes the text control's value into the caller's result string
-     * and returns true, so wxDialog::OnOK goes on to EndModal(wxID_OK).
-     */
-    bool TransferDataFromWindow() override;
-
-    // No event table of its own: vtable slot 6 is wxDialog::GetEventTable
-    // (0x0098B230), the same as the base's.
-  };
-
-  static_assert(offsetof(WWxInputBox, mTextCtrl) == 0x170, "moho::WWxInputBox::mTextCtrl offset must be 0x170");
-  static_assert(offsetof(WWxInputBox, mResultString) == 0x174, "moho::WWxInputBox::mResultString offset must be 0x174");
-  static_assert(sizeof(WWxInputBox) == 0x178, "moho::WWxInputBox size must be 0x178");
-
-  /**
-   * Address: 0x004FC870 (FUN_004FC870,
-   * ?WxInputBox@Moho@@YA_NPBD0PAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@msvc8@@@Z)
-   *
-   * What it does:
-   * Helper that allocates one heap-resident `WWxInputBox`, runs the modal
-   * loop via the dialog's `ShowModal` virtual (slot +0x04 of the dialog
-   * vtable, returns `wxID_OK = 5100` on accept), copies the entered text
-   * into `resultString` via the OnOK override above, then destroys the
-   * dialog. Returns `true` when the user accepted (wxID_OK) and `false`
-   * for cancel / window-close.
-   */
-  [[nodiscard]] bool
-  WxInputBox(const char* dialogTitle, const char* defaultValue, const char* labelText, fa::string* resultString);
-
-  /**
-   * Address: 0x004FC900 (FUN_004FC900, ?CON_WxInputBox@Moho@@YAXPAX@Z)
-   *
-   * What it does:
-   * Console-command callback that opens an interactive `WxInputBox` with
-   * fixed test prompts and prints either the entered text or a "Canceled"
-   * message. Bound to the `WxInputBox` console command (`gCConFunc_WxInputBox`
-   * in CConCommand.cpp).
-   */
-  void CON_WxInputBox(const fa::vector<fa::string>& args);
-
-  /**
-   * A dialog the engine keeps a weak reference to in `managedWindows`, so
-   * WINX_Exit can destroy whatever is still open.
-   *
-   * RTTI: WWinManagedDialog > wxDialog, WeakObject (at +0x170, mdisp 368);
-   * vftable 0x00E0C51C. Slot 0 is wxDialog's inline GetClassInfo and slot 6
-   * wxDialog::GetEventTable (0x0098B230): no class info or event table of its
-   * own.
-   */
-  class WWinManagedDialog : public wxDialog, public WeakObject
-  {
-  public:
-    /**
-     * Address: 0x004F3F50 (FUN_004F3F50)
-     *
-     * What it does:
-     * `wxDialog(parent, id, title, position, size, style, name)`, then files
-     * this dialog in the first `managedWindows` slot whose window is gone, or
-     * a new one (`push_back`, 0x004F70A0). The one caller, WWinLogWindow,
-     * passes (null, -1, wxDefaultPosition, wxDefaultSize, wxCAPTION |
-     * wxSYSTEM_MENU | wxRESIZE_BORDER), which LTCG folded into the body.
-     */
-    WWinManagedDialog(
-      wxWindow* parent,
-      wxWindowID id,
-      const wxString& title,
-      const wxPoint& position,
-      const wxSize& size,
-      long style,
-      const wxString& name
-    );
-
-    /**
-     * Address: 0x004F40A0 (FUN_004F40A0)
-     *
-     * What it does:
-     * Detaches every weak reference still aimed at this dialog, then
-     * ~wxDialog. The deleting destructor (0x004F4080) is the compiler's.
-     */
-    ~WWinManagedDialog() override;
-  };
-
-  static_assert(sizeof(wxDialog) == 0x170, "wxDialog size must be 0x170");
-  static_assert(sizeof(WWinManagedDialog) == 0x174, "moho::WWinManagedDialog size must be 0x174");
-
-  /**
-   * The "Moho Log" dialog: the console log with its category and filter
-   * controls.
-   *
-   * RTTI: WWinLogWindow > WWinManagedDialog, vftable 0x00E0CA14. Slot 6 is
-   * its GetEventTable (0x004F38E0), table 0x00DFF4A8 = {&wxDialog::
-   * sm_eventTable, rows 0x00F59720}: the log-addition event, the five
-   * category check boxes (900-904) and the filter text (905) to the rebuild,
-   * the Clear button (906), size and move.
-   *
-   * The constructor (0x004F4270) also builds the dialog's sizers and
-   * controls and stores them in the pointers below.
-   */
-  class WWinLogWindow : public WWinManagedDialog
-  {
-  public:
-    /**
-     * Address: 0x004F4270 (FUN_004F4270)
-     *
-     * What it does:
-     * Creates the dialog as "Moho Log" (name "MohoDialogBox"), seeds the
-     * members, restores the category, filter and geometry preferences, and
-     * clears the initialising flag.
-     */
-    WWinLogWindow();
-
-    /**
-     * Address: 0x004F5380 (FUN_004F5380)
-     *
-     * What it does:
-     * Detaches from the log target; the members and ~WWinManagedDialog do the
-     * rest. The deleting destructor (0x004F5360) is the compiler's.
-     */
-    ~WWinLogWindow() override;
-
-    [[nodiscard]] std::array<wxCheckBox*, 5> CategoryCheckBoxes() noexcept;
-    [[nodiscard]] std::array<const wxCheckBox*, 5> CategoryCheckBoxes() const noexcept;
-
-    /**
-     * Address: 0x004F5840 (FUN_004F5840)
-     *
-     * What it does:
-     * Rebuilds enabled category/filter state from controls and replays matching
-     * committed target lines into output.
-     */
-    void RebuildVisibleLinesFromControls();
-
-    /**
-     * Address: 0x004F5AE0 (FUN_004F5AE0)
-     *
-     * What it does:
-     * Applies one committed line against filter/category state and appends it to
-     * output and replay buffer state.
-     */
-    void AppendCommittedLine(const CWinLogLine& line);
-
-    /**
-     * Address: 0x004F6760 (FUN_004F6760)
-     *
-     * What it does:
-     * Clears `mOwnerTarget->dialog` under the target lock.
-     */
-    void DetachFromTarget();
-
-    [[nodiscard]] bool ShouldDisplayCommittedLine(const CWinLogLine& line) const;
-    [[nodiscard]] std::wstring BuildReplayFlushText(std::size_t startIndex) const;
-    [[nodiscard]] std::wstring BuildFormattedCommittedLineText(const CWinLogLine& line) const;
-
-    /**
-     * Address: 0x004F6470 (FUN_004F6470)
-     *
-     * What it does:
-     * Merges the target's pending lines and appends just the ones the merge
-     * added. Bound to the log-addition event CWinLogTarget::OnMessage posts.
-     */
-    void OnTargetPendingLinesChanged(CLogAdditionEvent& event);
-
-    /**
-     * Address: 0x004F5590 (FUN_004F5590)
-     *
-     * What it does:
-     * Once the controls are built, rebuilds the visible lines from them and
-     * stores the category and filter state back into the preferences. Bound to
-     * the category check boxes (900-904) and the filter text (905).
-     */
-    void OnFilterOrCategoryControlsChanged(wxCommandEvent& event);
-
-    /**
-     * Address: 0x004F5440 (FUN_004F5440)
-     *
-     * What it does:
-     * Clears the output and rebuilds the target's committed lines from the
-     * buffered replay text. Bound to the Clear button (906).
-     */
-    void OnClear(wxCommandEvent& event);
-
-    /**
-     * Address: 0x004F6640 (FUN_004F6640)
-     *
-     * What it does:
-     * Lays the single child out over the client area, then - once the
-     * controls are built - stores the window's size in `Windows.Log.width` and
-     * `Windows.Log.height`.
-     */
-    void OnSize(wxSizeEvent& event);
-
-    /**
-     * Address: 0x004F6520 (FUN_004F6520)
-     *
-     * What it does:
-     * Once the controls are built, stores the window's position in
-     * `Windows.Log.x` and `Windows.Log.y`.
-     */
-    void OnMove(wxMoveEvent& event);
-
-    /**
-     * Engine addition: `wxDialog::Show`, writing the output held back while the dialog was
-     * hidden into the output control before it appears.
-     */
-    bool Show(bool show = true) override;
-
-    /**
-     * Engine addition: queues `text` for the output control in the colour of `styleCategory`
-     * (what `SetDefaultStyle` + `AppendText` did per line). Consecutive text of one colour shares
-     * a run, and the runs reach the control only while the dialog is shown: a hidden log costs
-     * no rich-edit work, and opening it writes the same text in the same colours.
-     */
-    void AppendOutput(std::uint32_t styleCategory, const std::wstring& text);
-
-    /// Engine addition: writes the queued output runs into the output control.
-    void FlushPendingOutput();
-
-    /// Engine addition: one colour's worth of output not yet in the output control.
-    struct PendingOutputRun
-    {
-      std::uint32_t styleCategory;
-      std::wstring text;
-    };
-
-    bool mIsInitializingControls;                 // +0x174
-    CWinLogTarget* mOwnerTarget;                  // +0x178
-    wxTextCtrl* mOutputTextControl;               // +0x17C
-    wxTextCtrl* mFilterTextControl;               // +0x180
-    std::uint32_t mEnabledCategoriesMask;         // +0x184
-    fa::string mFilterText;                       // +0x188
-    wxCheckBox* mDebugCategoryCheckBox;           // +0x1A4
-    wxCheckBox* mInfoCategoryCheckBox;            // +0x1A8
-    wxCheckBox* mWarnCategoryCheckBox;            // +0x1AC
-    wxCheckBox* mErrorCategoryCheckBox;           // +0x1B0
-    wxCheckBox* mCustomCategoryCheckBox;          // +0x1B4
-    fa::vector<fa::string> mBufferedLines;        // +0x1B8
-    std::uint32_t mFirstVisibleLine;              // +0x1C8
-    std::vector<PendingOutputRun> mPendingOutput; // +0x1CC, engine addition (see AppendOutput)
-
-    DECLARE_EVENT_TABLE()
-  };
-
-  static_assert(
-    offsetof(WWinLogWindow, mIsInitializingControls) == 0x174,
-    "moho::WWinLogWindow::mIsInitializingControls offset must be 0x174"
-  );
-  static_assert(
-    offsetof(WWinLogWindow, mOwnerTarget) == 0x178,
-    "moho::WWinLogWindow::mOwnerTarget offset must be 0x178"
-  );
-  static_assert(
-    offsetof(WWinLogWindow, mOutputTextControl) == 0x17C,
-    "moho::WWinLogWindow::mOutputTextControl offset must be 0x17C"
-  );
-  static_assert(
-    offsetof(WWinLogWindow, mFilterTextControl) == 0x180,
-    "moho::WWinLogWindow::mFilterTextControl offset must be 0x180"
-  );
-  static_assert(
-    offsetof(WWinLogWindow, mEnabledCategoriesMask) == 0x184,
-    "moho::WWinLogWindow::mEnabledCategoriesMask offset must be 0x184"
-  );
-  static_assert(offsetof(WWinLogWindow, mFilterText) == 0x188, "moho::WWinLogWindow::mFilterText offset must be 0x188");
-  static_assert(
-    offsetof(WWinLogWindow, mDebugCategoryCheckBox) == 0x1A4,
-    "moho::WWinLogWindow::mDebugCategoryCheckBox offset must be 0x1A4"
-  );
-  static_assert(
-    offsetof(WWinLogWindow, mCustomCategoryCheckBox) == 0x1B4,
-    "moho::WWinLogWindow::mCustomCategoryCheckBox offset must be 0x1B4"
-  );
-  static_assert(
-    offsetof(WWinLogWindow, mBufferedLines) == 0x1B8,
-    "moho::WWinLogWindow::mBufferedLines offset must be 0x1B8"
-  );
-  static_assert(
-    offsetof(WWinLogWindow, mFirstVisibleLine) == 0x1C8,
-    "moho::WWinLogWindow::mFirstVisibleLine offset must be 0x1C8"
-  );
-  // The binary's object ends at 0x1CC; the engine's pending-output queue follows it.
-  static_assert(
-    offsetof(WWinLogWindow, mPendingOutput) == 0x1CC,
-    "moho::WWinLogWindow::mPendingOutput must follow the binary's 0x1CC-byte object"
-  );
-
-#endif // FAFRE_PLATFORM_WINDOWS: the developer windows
-
-  /**
-   * A frame the engine keeps a weak reference to in `managedFrames`, so
-   * WINX_Exit can destroy whatever is still open.
-   *
-   * RTTI: WWinManagedFrame > wxFrame, WeakObject (at +0x178, mdisp 376);
-   * vftable 0x00E0C764. Slot 0 is wxFrame's inline GetClassInfo and slot 6
-   * wxFrame::GetEventTable (0x0099E7A0).
-   */
-  class WWinManagedFrame : public wxFrame, public WeakObject
-  {
-  public:
-    /**
-     * Address: 0x004F40E0 (FUN_004F40E0)
-     * Mangled: ??0WWinManagedFrame@Moho@@QAE@PAVwxWindow@@HABVwxString@@ABVwxPoint@@ABVwxSize@@J1@Z
-     *
-     * What it does:
-     * `wxFrame(parent, id, title, position, size, style, name)`, then files
-     * this frame in the first `managedFrames` slot whose window is gone, or a
-     * new one (`push_back`, 0x004F7170). The binary's one caller passes
-     * (null, -1, wxDefaultPosition, wxDEFAULT_FRAME_STYLE), which LTCG folded
-     * into the body.
-     */
-    WWinManagedFrame(
-      wxWindow* parent,
-      wxWindowID id,
-      const wxString& title,
-      const wxPoint& position,
-      const wxSize& size,
-      long style,
-      const wxString& name
-    );
-
-    /**
-     * Address: 0x004F4230 (FUN_004F4230)
-     *
-     * What it does:
-     * Detaches every weak reference still aimed at this frame, then ~wxFrame.
-     * The deleting destructor (0x004F4210) is the compiler's.
-     */
-    ~WWinManagedFrame() override;
-  };
-
-  static_assert(sizeof(WWinManagedFrame) == 0x17C, "moho::WWinManagedFrame size must be 0x17C");
-
-  // Every managed dialog / frame still open (elements at 0x010A9B94 /
-  // 0x010A9BD8): filled by the constructors, emptied by WINX_Exit.
-  extern fa::vector<WeakPtr<WWinManagedDialog>> managedWindows;
-  extern fa::vector<WeakPtr<WWinManagedFrame>> managedFrames;
 
   // The main frame (0x010A63B8): WIN_OkBox parents its message box on it,
   // and CScApp::CreateAppFrame sets it to the WSupComFrame.

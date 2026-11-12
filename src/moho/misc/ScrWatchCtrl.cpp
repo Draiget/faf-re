@@ -1,15 +1,16 @@
 #include "moho/misc/ScrWatchCtrl.h"
 
+#include <algorithm>
+#include <cstring>
 #include <sstream>
+
+#include "imgui.h"
 
 #include "gpg/core/containers/String.h"
 #include "lua/LuaTableIterator.h"
-#include "moho/misc/TreeData.h"
 
 namespace
 {
-  constexpr long kWatchTreeStyle = wxTR_HAS_BUTTONS | wxTR_LINES_AT_ROOT | wxTR_HIDE_ROOT | wxTR_FULL_ROW_HIGHLIGHT;
-
   /**
    * Address: 0x004D7280 (FUN_004D7280)
    *
@@ -37,53 +38,27 @@ namespace
   }
 } // namespace
 
-// Table 0x00DFF60C = {&wxTreeListCtrl::sm_eventTable (0x00D52EFC), rows 0x00F596D4};
-// GetEventTable (0x004D6FE0) comes with it.
-BEGIN_EVENT_TABLE(
-  moho::ScrWatchCtrl,
-  wxTreeListCtrl
-)
-END_EVENT_TABLE()
-
 /**
  * Address: 0x004D6FF0 (FUN_004D6FF0, ??0ScrWatchCtrl@Moho@@QAE@PAVwxWindow@@ABHHHHABVwxPoint@@ABVwxSize@@@Z)
  */
 moho::ScrWatchCtrl::ScrWatchCtrl(
-  wxWindow* const parent,
-  const int& id,
   const int nameWidth,
   const int typeWidth,
-  const int valueWidth,
-  const wxPoint& pos,
-  const wxSize& size
+  const int valueWidth
 )
-  : wxTreeListCtrl(parent, id, pos, size, kWatchTreeStyle)
-  , mRoot()
-{
-  AddColumn(wxT("Variable"), nameWidth, false);
-  AddColumn(wxT("Type"), typeWidth, false);
-  AddColumn(wxT("Value"), valueWidth, false);
-  mRoot = AddRoot(wxT("VARIABLES"));
-
-  Connect(
-    GetId(),
-    -1,
-    wxEVT_COMMAND_TREE_ITEM_ACTIVATED,
-    (wxObjectEventFunction)(wxEventFunction)(wxTreeEventFunction)&ScrWatchCtrl::OnItemActivate
-  );
-}
+  : mWidths{nameWidth, typeWidth, valueWidth}
+{}
 
 /**
  * Address: 0x004D7270 (FUN_004D7270, ?Clear@ScrWatchCtrl@Moho@@UAEXXZ)
  */
 void moho::ScrWatchCtrl::Clear()
 {
-  DeleteChildren(mRoot);
+  mRows.clear();
 }
 
 /**
- * Address: 0x004D7220 (FUN_004D7220,
- * ?Update@ScrWatchCtrl@Moho@@QAEXABV?$vector@VScrWatch@Moho@@V?$allocator@VScrWatch@Moho@@@std@@@std@@@Z)
+ * Address: 0x004D7220 (FUN_004D7220)
  */
 void moho::ScrWatchCtrl::Update(
   const fa::vector<ScrWatch>& watches
@@ -91,58 +66,118 @@ void moho::ScrWatchCtrl::Update(
 {
   Clear();
   for (fa::vector<ScrWatch>::const_iterator watch = watches.begin(); watch != watches.end(); ++watch) {
-    AddWatch(mRoot, *watch);
+    AddWatch(mRows, *watch);
   }
-  SortChildren(mRoot);
+  SortRows(mRows);
 }
 
 /**
- * Address: 0x004D7380 (FUN_004D7380, ?OnItemActivate@ScrWatchCtrl@Moho@@QAEXAAVwxTreeEvent@@@Z)
- */
-void moho::ScrWatchCtrl::OnItemActivate(
-  wxTreeEvent& event
-)
-{
-  const wxTreeItemId item = event.GetItem();
-  if (!item.IsOk()) {
-    return;
-  }
-
-  TreeData* const data = static_cast<TreeData*>(GetItemData(item));
-  if (data == nullptr) {
-    return;
-  }
-
-  LuaPlus::LuaObject& table = data->mWatch.obj;
-  if (!table.IsTable()) {
-    return;
-  }
-
-  if (!HasChildren(item)) {
-    for (LuaPlus::LuaTableIterator field(table, true); field; field.Next()) {
-      const fa::string name = FormatWatchKeyForTree(field.GetKey());
-      AddWatch(item, ScrWatch(name, field.GetValue()));
-    }
-    SortChildren(item);
-  }
-
-  if (IsExpanded(item)) {
-    Collapse(item);
-  } else {
-    Expand(item);
-  }
-}
-
-/**
- * Address: 0x004D7580 (FUN_004D7580, ?AddWatch@ScrWatchCtrl@Moho@@AAEXABVwxTreeItemId@@ABVScrWatch@2@@Z)
+ * Address: 0x004D7580 (FUN_004D7580)
  */
 void moho::ScrWatchCtrl::AddWatch(
-  const wxTreeItemId& parent,
+  std::vector<std::unique_ptr<Row>>& parent,
   const ScrWatch& watch
 )
 {
-  const wxTreeItemId item = AppendItem(parent, gpg::STR_Utf8ToWide(watch.name.c_str()).c_str());
-  SetItemData(item, new TreeData(watch));
-  SetItemText(item, 1, gpg::STR_Utf8ToWide(watch.GetType().c_str()).c_str());
-  SetItemText(item, 2, gpg::STR_Utf8ToWide(watch.GetValue().c_str()).c_str());
+  auto row = std::make_unique<Row>();
+  row->watch = watch;
+  row->type = watch.GetType();
+  row->value = watch.GetValue();
+  parent.push_back(std::move(row));
+}
+
+// wxTreeCtrl::SortChildren: by the row's text, which is the watch's name.
+void moho::ScrWatchCtrl::SortRows(
+  std::vector<std::unique_ptr<Row>>& rows
+)
+{
+  std::stable_sort(rows.begin(), rows.end(), [](const std::unique_ptr<Row>& left, const std::unique_ptr<Row>& right) {
+    return std::strcmp(left->watch.name.c_str(), right->watch.name.c_str()) < 0;
+  });
+}
+
+/**
+ * Address: 0x004D7380 (FUN_004D7380)
+ */
+void moho::ScrWatchCtrl::ListFields(
+  Row& row
+)
+{
+  row.listed = true;
+  LuaPlus::LuaObject& table = row.watch.obj;
+  if (!table.IsTable()) {
+    return;
+  }
+  for (LuaPlus::LuaTableIterator field(table, true); field; field.Next()) {
+    const fa::string name = FormatWatchKeyForTree(field.GetKey());
+    AddWatch(row.children, ScrWatch(name, field.GetValue()));
+  }
+  SortRows(row.children);
+}
+
+void moho::ScrWatchCtrl::DrawRow(
+  Row& row
+)
+{
+  ImGui::TableNextRow();
+  ImGui::TableSetColumnIndex(0);
+  ImGui::PushID(&row);
+  const bool isTable = row.watch.obj.IsTable();
+  ImGuiTreeNodeFlags flags =
+    ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick;
+  if (!isTable) {
+    flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+  }
+  const bool open = ImGui::TreeNodeEx("##watch", flags, "%s", row.watch.name.c_str());
+  if (open && isTable && !row.listed) {
+    ListFields(row);
+  }
+  ImGui::TableSetColumnIndex(1);
+  ImGui::TextUnformatted(row.type.c_str());
+  ImGui::TableSetColumnIndex(2);
+  ImGui::TextUnformatted(row.value.c_str());
+  if (open && isTable) {
+    for (const std::unique_ptr<Row>& child : row.children) {
+      DrawRow(*child);
+    }
+    ImGui::TreePop();
+  }
+  ImGui::PopID();
+}
+
+bool moho::ScrWatchCtrl::Draw(
+  const char* const id,
+  int widths[3]
+)
+{
+  constexpr ImGuiTableFlags kFlags = ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersV |
+    ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit;
+  bool resized = false;
+  if (!ImGui::BeginTable(id, 3, kFlags)) {
+    return false;
+  }
+  ImGui::TableSetupScrollFreeze(0, 1);
+  ImGui::TableSetupColumn("Variable", ImGuiTableColumnFlags_WidthFixed, static_cast<float>(mWidths[0]));
+  ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, static_cast<float>(mWidths[1]));
+  ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, static_cast<float>(mWidths[2]));
+  ImGui::TableHeadersRow();
+  for (const std::unique_ptr<Row>& row : mRows) {
+    DrawRow(*row);
+  }
+  // The widths after a drag of a column's edge, for the preferences.
+  if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+    for (int column = 0; column < 3; ++column) {
+      ImGui::TableSetColumnIndex(column);
+      const int width = static_cast<int>(ImGui::GetContentRegionAvail().x + ImGui::GetStyle().CellPadding.x * 2.0f);
+      if (width > 0 && width != mWidths[column]) {
+        mWidths[column] = width;
+        resized = true;
+      }
+    }
+  }
+  ImGui::EndTable();
+  for (int column = 0; column < 3; ++column) {
+    widths[column] = mWidths[column];
+  }
+  return resized;
 }

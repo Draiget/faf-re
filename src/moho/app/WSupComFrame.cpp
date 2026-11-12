@@ -2,18 +2,9 @@
 
 namespace
 {
-#if FAFRE_PLATFORM_WINDOWS
-  // The Win32 messages MSWWindowProc handles; on Linux the window system reports the frame's
-  // size, activation and closing (issue #256).
-  constexpr unsigned int kSupComFrameMessageSize = WM_SIZE;
-  constexpr unsigned int kSupComFrameMessageActivateApp = WM_ACTIVATEAPP;
-  constexpr unsigned int kSupComFrameMessageSysCommand = WM_SYSCOMMAND;
-  constexpr unsigned int kSupComFrameMessageExitSizeMove = WM_EXITSIZEMOVE;
-  constexpr unsigned int kSupComFrameSysCommandSize = SC_SIZE;
-  constexpr unsigned int kSupComFrameSysCommandToggleLogDialog = 0x1u;
-  constexpr unsigned int kSupComFrameSysCommandLuaDebugger = 0x2u;
-  constexpr unsigned int kSupComFrameSysCommandKeyMenu = SC_KEYMENU;
-#endif
+  // The system-menu items CScApp's AppendLuaDebuggerSystemMenu (0x008D42E0) adds.
+  constexpr int kSupComFrameSysCommandToggleLogDialog = 1;
+  constexpr int kSupComFrameSysCommandLuaDebugger = 2;
 
   constexpr const char* kSupComFrameXPreferenceKey = "Windows.Main.x";
   constexpr const char* kSupComFrameYPreferenceKey = "Windows.Main.y";
@@ -23,9 +14,6 @@ namespace
   constexpr const char* kSupComFrameToggleLogDialogCommand = "WIN_ToggleLogDialog";
   constexpr const char* kSupComFrameLuaDebuggerCommand = "SC_LuaDebugger";
   constexpr const char* kSupComFrameCursorLockPreferenceKey = "lock_fullscreen_cursor_to_window";
-
-#if FAFRE_PLATFORM_WINDOWS
-  // The two helpers below serve MSWWindowProc only.
 
   /**
    * Address: 0x008CDBE0 (FUN_008CDBE0)
@@ -122,7 +110,33 @@ namespace
 
     ::ClipCursor(clipRectPtr);
   }
-#endif // FAFRE_PLATFORM_WINDOWS
+
+  // True while the device has a windowed head 0 the frame's size should follow.
+  [[nodiscard]] bool DeviceFollowsFrame()
+  {
+    if (moho::sDeviceLock || moho::ren_Viewport == nullptr || !gpg::gal::Device::IsReady()) {
+      return false;
+    }
+    gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance();
+    gpg::gal::DeviceContext* const activeContext = galDevice != nullptr ? galDevice->GetDeviceContext() : nullptr;
+    return activeContext != nullptr && activeContext->GetHeadCount() > 0 && activeContext->GetHead(0).mWindowed;
+  }
+
+  // The device's head 0 size, or -1 when there is no device.
+  void DeviceHeadSize(
+    int& width,
+    int& height
+  )
+  {
+    width = -1;
+    height = -1;
+    gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance();
+    gpg::gal::DeviceContext* const activeContext = galDevice != nullptr ? galDevice->GetDeviceContext() : nullptr;
+    if (activeContext != nullptr && activeContext->GetHeadCount() > 0) {
+      width = activeContext->GetHead(0).mWidth;
+      height = activeContext->GetHead(0).mHeight;
+    }
+  }
 } // namespace
 
 /**
@@ -163,6 +177,12 @@ EVT_CLOSE(
 EVT_MOVE(
   WSupComFrame::OnMove
 )
+EVT_SIZE(
+  WSupComFrame::OnSize
+)
+EVT_ACTIVATE(
+  WSupComFrame::OnActivate
+)
 END_EVENT_TABLE()
 
 /**
@@ -185,44 +205,6 @@ void WSupComFrame::OnCloseWindow(
 
   (void)moho::ShowEscapeDialog(true);
 }
-
-#if FAFRE_PLATFORM_WINDOWS
-/**
- * Address: 0x008CDCD0 (FUN_008CDCD0, WSupComFrame::MSWDefWindowProc)
- *
- * What it does:
- * Handles SupCom system-command defaults, including pending-maximize sync
- * priming and Alt-menu suppression, then forwards remaining lanes through
- * base wx default-window-proc dispatch.
- */
-long WSupComFrame::MSWDefWindowProc(
-  const WXUINT message,
-  const WXWPARAM wParam,
-  const WXLPARAM lParam
-)
-{
-  auto dispatchBase = [this, message, wParam, lParam]() -> long {
-    return wxFrame::MSWDefWindowProc(message, wParam, lParam);
-  };
-
-  if (message != kSupComFrameMessageSysCommand) {
-    return dispatchBase();
-  }
-
-  if ((wParam & 0xFFF0u) == kSupComFrameSysCommandSize) {
-    mPendingMaximizeSync = 1;
-    if (moho::CD3DDevice* const device = moho::D3D_GetDevice(); device != nullptr) {
-      (void)device->Clear2(true);
-    }
-  }
-
-  if (wParam == kSupComFrameSysCommandKeyMenu && lParam == 0) {
-    return 0;
-  }
-
-  return dispatchBase();
-}
-#endif // FAFRE_PLATFORM_WINDOWS
 
 /**
  * Address: 0x008CDAD0 (FUN_008CDAD0, WSupComFrame::OnMove)
@@ -252,114 +234,76 @@ void WSupComFrame::OnMove(
   preferences->SetInteger(fa::string(kSupComFrameYPreferenceKey), GetPosition().y);
 }
 
-#if FAFRE_PLATFORM_WINDOWS
 /**
- * Address: 0x008CDD40 (FUN_008CDD40, WSupComFrame::MSWWindowProc)
- * Mangled: ?MSWWindowProc@WSupComFrame@@UAEJIIJ@Z
- *
- * What it does:
- * Handles SupCom frame resize/maximize/app-activation/system-command routing,
- * persists window preference keys, and forwards unhandled messages to base
- * frame dispatch.
+ * The size half of WSupComFrame::MSWWindowProc (0x008CDD40). The retail frame re-sized the
+ * viewport and the device when Windows reported a maximize (WM_SIZE, SIZE_MAXIMIZED), a restore
+ * from it, or the end of a drag of the frame's edge (WM_EXITSIZEMOVE after SC_SIZE), and saved
+ * Windows.Main.width/height/maximized. The window system reports the finished size (one event for
+ * a drag, WindowSdl.cpp); the frame follows it while the device is windowed.
  */
-long WSupComFrame::MSWWindowProc(
-  const WXUINT message,
-  const WXWPARAM wParam,
-  const WXLPARAM lParam
+void WSupComFrame::OnSize(
+  wxSizeEvent& event
 )
 {
-  auto dispatchBase = [this, message, wParam, lParam]() -> long {
-    return wxFrame::MSWWindowProc(message, wParam, lParam);
-  };
+  (void)event;
+  if (!DeviceFollowsFrame() || IsIconized()) {
+    return;
+  }
+
+  int headWidth = 0;
+  int headHeight = 0;
+  DeviceHeadSize(headWidth, headHeight);
+  const wxSize clientSize = GetClientSize();
+  const bool maximized = IsMaximized();
+  const bool sizeChanged = clientSize.x != headWidth || clientSize.y != headHeight;
+  if (!sizeChanged && (maximized ? 1 : 0) == mPersistedMaximizeSync) {
+    return;
+  }
+
+  if (sizeChanged) {
+    SyncSupComFrameClientSizeAndViewport(*this);
+  }
 
   moho::IUserPrefs* const preferences = moho::USER_GetPreferences();
-  if (!moho::sDeviceLock && moho::ren_Viewport != nullptr && gpg::gal::Device::IsReady()) {
-    if (gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance(); galDevice != nullptr) {
-      if (
-        gpg::gal::DeviceContext* const activeContext = galDevice->GetDeviceContext();
-        activeContext != nullptr && activeContext->GetHeadCount() > 0
-      ) {
-        (void)activeContext->GetHead(0);
-      }
+  if (preferences != nullptr) {
+    if (!maximized) {
+      const wxSize savedSize = GetClientSize();
+      preferences->SetInteger(fa::string(kSupComFrameWidthPreferenceKey), savedSize.x);
+      preferences->SetInteger(fa::string(kSupComFrameHeightPreferenceKey), savedSize.y);
     }
-
-    if (mPendingMaximizeSync != 0 && message == kSupComFrameMessageExitSizeMove) {
-      SyncSupComFrameClientSizeAndViewport(*this);
-
-      if (preferences != nullptr) {
-        const wxSize clientSize = GetClientSize();
-        preferences->SetInteger(fa::string(kSupComFrameWidthPreferenceKey), clientSize.x);
-        preferences->SetInteger(fa::string(kSupComFrameHeightPreferenceKey), clientSize.y);
-      }
-
-      if (moho::CD3DDevice* const d3dDevice = moho::D3D_GetDevice(); d3dDevice != nullptr) {
-        (void)d3dDevice->Clear2(false);
-      }
-
-      mPendingMaximizeSync = 0;
-    } else if (message == kSupComFrameMessageSize && wParam == SIZE_MAXIMIZED) {
-      SyncSupComFrameClientSizeAndViewport(*this);
-      if (preferences != nullptr) {
-        preferences->SetBoolean(fa::string(kSupComFrameMaximizedPreferenceKey), true);
-      }
-      mPersistedMaximizeSync = 1;
-    }
-
-    if (mPendingMaximizeSync == 0 && message == kSupComFrameMessageSize) {
-      if (wParam == SIZE_RESTORED && mPersistedMaximizeSync != 0) {
-        SyncSupComFrameClientSizeAndViewport(*this);
-        if (preferences != nullptr) {
-          const wxSize clientSize = GetClientSize();
-          preferences->SetInteger(fa::string(kSupComFrameWidthPreferenceKey), clientSize.x);
-          preferences->SetInteger(fa::string(kSupComFrameHeightPreferenceKey), clientSize.y);
-          preferences->SetBoolean(fa::string(kSupComFrameMaximizedPreferenceKey), false);
-        }
-        mPersistedMaximizeSync = 0;
-      }
-
-      return dispatchBase();
-    }
+    preferences->SetBoolean(fa::string(kSupComFrameMaximizedPreferenceKey), maximized);
   }
-
-  if (message == kSupComFrameMessageActivateApp) {
-    const bool isActive = wParam != 0;
-    mIsApplicationActive = isActive ? 1 : 0;
-    if (isActive) {
-      UpdateSupComCursorClipForActivation();
-    } else {
-      ::ClipCursor(nullptr);
-    }
-    return dispatchBase();
-  }
-
-  if (message != kSupComFrameMessageSysCommand) {
-    return dispatchBase();
-  }
-
-  if (wParam == kSupComFrameSysCommandToggleLogDialog) {
-    moho::CON_Execute(kSupComFrameToggleLogDialogCommand);
-    return dispatchBase();
-  }
-
-  if (wParam == kSupComFrameSysCommandLuaDebugger) {
-    moho::CON_Execute(kSupComFrameLuaDebuggerCommand);
-    return dispatchBase();
-  }
-
-  if (wParam != kSupComFrameSysCommandKeyMenu) {
-    return dispatchBase();
-  }
-
-  gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance();
-  if (galDevice == nullptr) {
-    return dispatchBase();
-  }
-
-  gpg::gal::DeviceContext* const activeContext = galDevice->GetDeviceContext();
-  if (activeContext == nullptr || activeContext->GetHeadCount() <= 0 || !activeContext->GetHead(0).mWindowed) {
-    return dispatchBase();
-  }
-
-  return 0;
+  mPersistedMaximizeSync = maximized ? 1 : 0;
+  mPendingMaximizeSync = 0;
 }
-#endif // FAFRE_PLATFORM_WINDOWS: MSWWindowProc
+
+/**
+ * WM_ACTIVATEAPP in WSupComFrame::MSWWindowProc (0x008CDD40).
+ */
+void WSupComFrame::OnActivate(
+  wxActivateEvent& event
+)
+{
+  const bool isActive = event.GetActive();
+  mIsApplicationActive = isActive ? 1 : 0;
+  if (isActive) {
+    UpdateSupComCursorClipForActivation();
+  } else {
+    ::ClipCursor(nullptr);
+  }
+}
+
+/**
+ * WM_SYSCOMMAND in WSupComFrame::MSWWindowProc (0x008CDD40): the log window and the Lua debugger
+ * items of the system menu.
+ */
+void WSupComFrame::OnSystemCommand(
+  const int command
+)
+{
+  if (command == kSupComFrameSysCommandToggleLogDialog) {
+    moho::CON_Execute(kSupComFrameToggleLogDialogCommand);
+  } else if (command == kSupComFrameSysCommandLuaDebugger) {
+    moho::CON_Execute(kSupComFrameLuaDebuggerCommand);
+  }
+}

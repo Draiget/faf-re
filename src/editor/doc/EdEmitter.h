@@ -12,8 +12,9 @@ namespace faf::editor
 {
   // An emitter blueprint file (`EmitterBlueprint { ... }`, the game's effects/emitters/*.bp) as the particle editor
   // edits it: its settings, textures and 21 curves, read from the Lua text and written back in the order and number
-  // format of retail's own emitter editor (WEmitterWx::WriteBlueprintScript and WCurveEditor::WriteCurveScript),
-  // so a file it wrote reads back byte for byte. Keys it doesn't know are kept and written back as they were.
+  // format of retail's own emitter editor (WEmitterEditor::WriteBlueprintScript, 0x00668340, and
+  // WCurveEditor::WriteCurveScript), so a file it wrote reads back byte for byte. Keys it doesn't know are kept and
+  // written back as they were.
 
   /** A curve key: x the time (0 to the curve's XRange), y the value, z a random spread around it. */
   struct EmitterKey

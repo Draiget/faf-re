@@ -6,9 +6,10 @@
 #include "moho/misc/ScrFileCtrl.h"
 #include "moho/misc/StartupHelpers.h"
 
+#include "imgui.h"
+
 namespace
 {
-  constexpr int kSourceNotebookId = 202;
 
   /**
    * The std::find_if predicate for a page by its file. Holds its own copy of
@@ -36,18 +37,44 @@ namespace
 /**
  * Address: 0x004C3500 (FUN_004C3500)
  */
-moho::ScrSourceCtrl::ScrSourceCtrl(
-  wxWindow* const parent
-)
-  : wxNotebook(parent, kSourceNotebookId, wxDefaultPosition, wxDefaultSize, 0, wxT("ScrSourceCtrl"))
-  , mPages()
+moho::ScrSourceCtrl::ScrSourceCtrl()
+  : mPages()
 {}
 
 /**
  * Address: 0x004C3620 (FUN_004C3620)
  * Deleting: 0x004C35B0 (FUN_004C35B0)
+ *
+ * The notebook destroyed its pages with itself.
  */
-moho::ScrSourceCtrl::~ScrSourceCtrl() = default;
+moho::ScrSourceCtrl::~ScrSourceCtrl()
+{
+  for (ScrFileCtrl* const page : mPages) {
+    delete page;
+  }
+  mPages.clear();
+}
+
+void moho::ScrSourceCtrl::SetSelection(
+  const int page
+)
+{
+  mSelection = page;
+  mSelectionRequest = page;
+}
+
+// The notebook's DeletePage: the page goes, and the selection moves to a neighbour.
+void moho::ScrSourceCtrl::DeletePage(
+  const int page
+)
+{
+  delete mPages[page];
+  const int remaining = static_cast<int>(mPages.size()) - 1;
+  if (mSelection >= remaining) {
+    mSelection = remaining - 1;
+  }
+  mSelectionRequest = mSelection;
+}
 
 /**
  * Address: 0x004C3670 (FUN_004C3670)
@@ -59,14 +86,13 @@ bool moho::ScrSourceCtrl::Open(
   const fa::vector<ScrFileCtrl*>::iterator existing =
     std::find_if(mPages.begin(), mPages.end(), ScrFileCtrlHasPath(fileName));
   if (existing == mPages.end()) {
-    ScrFileCtrl* const page = new ScrFileCtrl(this);
+    ScrFileCtrl* const page = new ScrFileCtrl();
     if (!page->Load(fileName)) {
-      page->Destroy();
+      delete page;
       return false;
     }
-
     mPages.push_back(page);
-    AddPage(page, gpg::STR_Utf8ToWide(FILE_Base(fileName.c_str(), false).c_str()).c_str(), true);
+    SetSelection(static_cast<int>(mPages.size()) - 1);
     return true;
   }
 
@@ -240,4 +266,31 @@ void moho::ScrSourceCtrl::ClearCursor()
   for (fa::vector<ScrFileCtrl*>::iterator page = mPages.begin(); page != mPages.end(); ++page) {
     (*page)->ClearCursor();
   }
+}
+
+/**
+ * The notebook's tabs, each named by the file's base name (FILE_Base, as AddPage was given it),
+ * and the selected page.
+ */
+void moho::ScrSourceCtrl::Draw()
+{
+  if (!ImGui::BeginTabBar("##sources", ImGuiTabBarFlags_FittingPolicyScroll)) {
+    return;
+  }
+  for (int index = 0; index < static_cast<int>(mPages.size()); ++index) {
+    ScrFileCtrl* const page = mPages[static_cast<std::size_t>(index)];
+    const fa::string label = FILE_Base(page->mSourcePath.c_str(), false);
+    ImGui::PushID(page);
+    const ImGuiTabItemFlags flags = mSelectionRequest == index ? ImGuiTabItemFlags_SetSelected : 0;
+    if (ImGui::BeginTabItem(label.c_str(), nullptr, flags)) {
+      if (mSelectionRequest < 0) {
+        mSelection = index;
+      }
+      page->Draw();
+      ImGui::EndTabItem();
+    }
+    ImGui::PopID();
+  }
+  mSelectionRequest = -1;
+  ImGui::EndTabBar();
 }

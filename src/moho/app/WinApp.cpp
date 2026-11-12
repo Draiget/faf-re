@@ -40,6 +40,7 @@
 #include "IWinApp.h"
 #include "legacy/containers/Vector.h"
 #include "WxRuntimeTypes.h"
+#include "moho/app/WEmitterEditor.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/TimeBar.h"
@@ -48,6 +49,7 @@
 #include "moho/core/Thread.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "platform/Window.h"
 #if FAFRE_PLATFORM_POSIX
 #include "platform/posix/Win32WindowPosix.h" // the window system's clipboard (issue #256)
 #endif
@@ -73,20 +75,13 @@ namespace moho
 {
   struct STimeBarThreadInfo;
 
-  // managedWindows / managedFrames are defined in WxRuntimeTypes.cpp; this file
-  // registers, drains and destroys their contents through the header's
-  // externs.
-
   /**
    * The log window's target (0x010A9BA0). Its static initialiser 0x00BC7340,
    * listed in the CRT's initialiser table at 0x00C0FA60, runs the
    * constructor (0x004F38F0) and registers the exit-time destructor thunk
    * 0x00BF18D0, which calls ~CWinLogTarget (0x004F39B0).
    */
-#if FAFRE_PLATFORM_WINDOWS
-  // It feeds the log window, a developer window, Windows only (WxRuntimeTypes.h).
   CWinLogTarget sLogWindowTarget{};
-#endif
 } // namespace moho
 
 namespace
@@ -112,19 +107,8 @@ namespace
   );
 #endif
 
-  /**
-   * The splash screen WINX_InitSplash shows (0x010A9BE4), a VC8
-   * `std::auto_ptr<wxSplashScreen>` in the binary: its static constructor
-   * (0x004F7360) nulls it, its exit-time destructor (0x004F7370, registered
-   * by 0x00BC73E0) deletes what is left, and 0x004F7390 is `reset` out of
-   * line.
-   */
-#if FAFRE_PLATFORM_WINDOWS
-  std::unique_ptr<wxSplashScreen> sSplashScreen;
-
-  /** The PNG handler WINX_InitSplash installs on first use (0x010C6D48). */
-  wxPNGHandler* sSplashPngHandler = nullptr;
-#endif
+  // The splash screen WINX_InitSplash shows (0x010A9BE4, a `std::auto_ptr<wxSplashScreen>` in the
+  // binary) is the window system's (platform::window::ShowSplash, issue #407).
 
   using LegacyUnaryCdeclCallback = int(__cdecl*)(int value);
   using LegacyUnaryDispatchAdapter = int(__cdecl*)(LegacyUnaryCdeclCallback* callbackLane, int value);
@@ -1474,40 +1458,17 @@ namespace
   }
 
   /**
-   * Engine addition: `wxApp::Dispatch` without its blocking `GetMessage`.
-   *
-   * The loop below asks `wxApp::Pending` (a `PeekMessage` with PM_NOREMOVE) and then dispatches,
-   * and wx dispatches through `GetMessage`, which waits when the queue is empty by then. A message
-   * another program sends us - `PrintWindow`'s WM_PRINT from a capture tool or overlay - runs
-   * inside those calls, and its paint can take the message `Pending` saw; `GetMessage` then slept
-   * until the next input, the frame loop with it. This takes the message without waiting and hands
-   * it to the same `wxApp::DoMessage` filter (accelerators, dialog navigation) the original uses.
-   * wx is built Unicode and `DoMessage` dispatches with `DispatchMessageW`, so the message must be
-   * taken with `PeekMessageW` too (the original imports only the W pump functions). `PeekMessageA`
-   * turns a typed WM_CHAR into its code-page byte, which the W dispatch then reads as a UTF-16
-   * code unit: Cyrillic "П" (0xCF in 1251) reached the edit box as "Ï" (U+00CF).
+   * Engine addition: one event of the window system (platform/Window.h), through the application
+   * shell, without waiting. wx's `wxApp::Dispatch` (GetMessage) could wait for a message the
+   * `wxApp::Pending` check had seen; the window system answers HasEvents from what it has read.
    */
   bool DispatchPendingMessage()
   {
-#if !FAFRE_PLATFORM_WINDOWS
-    // The window system's events, through the wx stand-in (issue #256).
     if (!wxTheApp->Pending()) {
       return false;
     }
     wxTheApp->Dispatch();
     return true;
-#else
-    MSG message{};
-    if (::PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE) == FALSE) {
-      return false;
-    }
-    if (message.message == WM_QUIT) {
-      wxTheApp->ExitMainLoop(); // what wxApp::DoMessage does on WM_QUIT
-      return true;
-    }
-    wxTheApp->DoMessage(reinterpret_cast<WXMSG*>(&message));
-    return true;
-#endif
   }
 
   DWORD ComputeWaitTimeoutMs()
@@ -2186,6 +2147,12 @@ void moho::WIN_AppExecute(
   }
 
   sSupComApp = app;
+  // The window system (platform/Window.h, SDL3) before anything makes a window (issue #407).
+  if (!platform::window::Init()) {
+    WIN_OkBox("Forged Alliance", "The window system could not be started. See the log for the reason.");
+    sSupComApp = nullptr;
+    return;
+  }
 #if !FAFRE_PLATFORM_WINDOWS
   // No low-level keyboard hook: the window system keeps the desktop's keys (issue #256).
   HMODULE const selfModule = ::GetModuleHandleW(nullptr);
@@ -2267,6 +2234,8 @@ void moho::WIN_AppExecute(
     }
 
     app->Main();
+    // Engine addition (issue #412): the developer windows draw once a frame.
+    platform::tools::RenderAll();
     success = true;
     acceptNewEvent = true;
 
@@ -2308,6 +2277,7 @@ void moho::WIN_AppExecute(
 #endif
 
   RES_Exit();
+  platform::window::Shutdown();
   sSupComApp = nullptr;
 }
 
@@ -2549,6 +2519,9 @@ namespace
       return true;
     }
 
+    // Engine addition (issue #412): the developer windows (the Lua debugger that holds the main
+    // thread here) draw while it waits.
+    platform::tools::RenderAll();
     if (processIdle && wxTheApp != nullptr) {
       processIdle = wxTheApp->ProcessIdle();
     }
@@ -2566,22 +2539,14 @@ namespace
  */
 void moho::WINX_Exit()
 {
-  // The managed dialogs are developer windows, Windows only (WxRuntimeTypes.h).
-#if FAFRE_PLATFORM_WINDOWS
-  for (std::size_t index = 0; index < managedWindows.size(); ++index) {
-    if (WWinManagedDialog* const dialog = managedWindows[index].GetObjectPtr(); dialog != nullptr) {
-      (void)dialog->Destroy();
-      managedWindows[index].UnlinkFromOwnerChain();
-    }
+  // The binary destroyed its managed dialogs here (managedWindows, 0x010A9B94), the log window
+  // among them; it is the one left (issue #412).
+  if (WWinLogWindow* const logWindow = sLogWindowTarget.dialog; logWindow != nullptr) {
+    delete logWindow; // ~WWinLogWindow detaches it from the target
   }
-#endif
 
-  for (std::size_t index = 0; index < managedFrames.size(); ++index) {
-    if (WWinManagedFrame* const frame = managedFrames[index].GetObjectPtr(); frame != nullptr) {
-      (void)frame->Destroy();
-      managedFrames[index].UnlinkFromOwnerChain();
-    }
-  }
+  // The managed frames (managedFrames, 0x010A9BD8) were the emitter editors.
+  WEmitterEditor::DestroyAll();
 }
 
 /**
@@ -2598,47 +2563,27 @@ void moho::WINX_InitSplash(
   const gpg::StrArg filename
 )
 {
-#if !FAFRE_PLATFORM_WINDOWS
-  // No splash window on Linux yet (the window system is issue #256).
-  (void)filename;
-#else
-  if (sSplashPngHandler == nullptr) {
-    sSplashPngHandler = new wxPNGHandler();
-    wxImage::AddHandler(sSplashPngHandler);
-  }
-  sSplashScreen.reset();
+  platform::window::HideSplash();
 
-  wxBitmap bitmap;
-  if (!bitmap.LoadFile(wxString(filename, wxConvUTF8), wxBITMAP_TYPE_PNG)) {
-    return;
-  }
-
-  wxSize splashSize(1024, 768);
+  int splashWidth = 1024;
+  int splashHeight = 768;
   RECT desktopRect{};
   if (::GetWindowRect(nullptr, &desktopRect) != 0) {
-    splashSize.x = desktopRect.right - desktopRect.left;
-    if (splashSize.x >= 1600) {
-      splashSize.x = 1600;
+    splashWidth = desktopRect.right - desktopRect.left;
+    if (splashWidth >= 1600) {
+      splashWidth = 1600;
     }
     // top - bottom, as the binary computes it (0x004F3DFC): never above
     // 1200 for a real rectangle, so the height comes out as 1200.
-    splashSize.y = desktopRect.top - desktopRect.bottom;
-    if (splashSize.y < 1200) {
-      splashSize.y = 1200;
+    splashHeight = desktopRect.top - desktopRect.bottom;
+    if (splashHeight < 1200) {
+      splashHeight = 1200;
     }
   }
 
-  sSplashScreen.reset(new wxSplashScreen(
-    wxBitmap(bitmap.ConvertToImage().Rescale(splashSize.x, splashSize.y)),
-    wxSPLASH_CENTRE_ON_SCREEN,
-    0,
-    nullptr,
-    -1,
-    wxDefaultPosition,
-    splashSize,
-    wxSIMPLE_BORDER | wxSTAY_ON_TOP
-  ));
-#endif
+  // wxSplashScreen(bitmap rescaled to the size, wxSPLASH_CENTRE_ON_SCREEN, wxSIMPLE_BORDER |
+  // wxSTAY_ON_TOP) in the binary.
+  (void)platform::window::ShowSplash(filename, splashWidth, splashHeight);
 }
 
 /**
@@ -2651,7 +2596,6 @@ void moho::WINX_InitSplash(
  */
 void moho::WINX_PrecreateLogWindow()
 {
-#if FAFRE_PLATFORM_WINDOWS
   if (sLogWindowTarget.dialog != nullptr) {
     return;
   }
@@ -2659,8 +2603,30 @@ void moho::WINX_PrecreateLogWindow()
   WWinLogWindow* const createdLogWindow = new WWinLogWindow();
   fa::mutex::scoped_lock lock(sLogWindowTarget.lock);
   sLogWindowTarget.dialog = createdLogWindow;
-#endif
-  // The log window is a developer window, Windows only (WxRuntimeTypes.h).
+}
+
+/**
+ * Engine addition (issue #412): wxDialog::ShowModal's loop for the developer windows on Dear
+ * ImGui. The window system's events go through the shell as in the main loop, and the developer
+ * windows are drawn, until `done` answers true or the program is asked to end.
+ */
+void moho::WINX_RunModal(
+  const std::function<bool()>& done
+)
+{
+  while (!done()) {
+    if (wxTheApp == nullptr) {
+      return;
+    }
+    while (wxTheApp->Pending()) {
+      wxTheApp->Dispatch();
+    }
+    if (!wxGetApp().KeepGoing()) {
+      return;
+    }
+    platform::tools::RenderAll();
+    ::Sleep(5);
+  }
 }
 
 /**
@@ -2672,9 +2638,7 @@ void moho::WINX_PrecreateLogWindow()
  */
 void moho::WINX_ExitSplash()
 {
-#if FAFRE_PLATFORM_WINDOWS
-  sSplashScreen.reset();
-#endif
+  platform::window::HideSplash();
 }
 
 #pragma warning(pop)

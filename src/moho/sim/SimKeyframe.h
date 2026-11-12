@@ -71,8 +71,8 @@ namespace moho
   inline std::atomic<std::int32_t> gSimBeatOrigin{0};
 
   /**
-   * Room for a keyframe packed by `compress2`. x86 links wxWindows' older zlib, which has no
-   * `compressBound` and asks for 0.1% over the size plus 12 bytes; this is above that and above 1.2.3's bound.
+   * Room for a keyframe packed by `compress2`: above zlib 1.2.3's `compressBound` (0.1% over the size
+   * plus 12 bytes), which both architectures link (issue #406).
    */
   [[nodiscard]] constexpr unsigned long SIM_KeyframePackBound(
     const unsigned long size

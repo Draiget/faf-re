@@ -19,7 +19,7 @@ namespace platform::posix
   // SetCursor's new cursor (null: none), and ShowCursor crossing between shown and hidden.
   extern void (*gSetCursorHook)(void* cursor);
   extern void (*gShowCursorHook)(bool shown);
-  // Opens a URL the engine already checked (moho::OpenAllowedUrlByWx) with the desktop's handler:
+  // Opens a URL the engine already checked (moho::OpenAllowedUrl) with the desktop's handler:
   // gOpenUrlHook when the window system set one, else `xdg-open <url>` in the background.
   extern bool (*gOpenUrlHook)(const char* utf8Url);
   void OpenUrl(const char* utf8Url);

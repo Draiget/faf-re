@@ -148,7 +148,6 @@ set(FAF_ENGINE_SOURCES
   gpg/core/time/Timer.cpp
   gpg/core/utils/BoostWrappers.cpp
   moho/audio/CSimSoundManagerSerializer.cpp
-  moho/misc/ScrPauseEvent.cpp
   moho/misc/PausedThread.cpp
   moho/app/WxAppWindows.cpp
   moho/app/WD3DViewport.cpp
@@ -158,7 +157,7 @@ set(FAF_ENGINE_SOURCES
   moho/app/WRenViewport.cpp
   moho/app/NetworkPanel.cpp
   moho/app/NetworkTray.cpp
-  moho/app/WxUrl.cpp
+  moho/app/AllowedUrl.cpp
   moho/containers/BVIntSetSerializer.cpp
   moho/containers/BVIntSetTypeInfo.cpp
   moho/containers/BVSet.cpp
@@ -316,7 +315,6 @@ set(FAF_ENGINE_SOURCES
   moho/misc/ScrFileCtrl.cpp
   moho/misc/ScrSourceCtrl.cpp
   moho/misc/ScrWatch.cpp
-  moho/misc/TreeData.cpp
   moho/misc/ScrWatchCtrl.cpp
   moho/script/CScriptObject.cpp
   moho/lua/CScrLuaObjectFactory.cpp
@@ -783,7 +781,6 @@ set(FAF_ENGINE_SOURCES
   moho/math/Vector3f.cpp
   moho/misc/CZipFile.cpp
   moho/misc/ScrDebugWindow.cpp
-  moho/misc/ScrGotoDialog.cpp
   moho/render/Clutter.cpp
   moho/render/ID3DDepthStencil.cpp
   moho/render/ID3DIndexSheet.cpp
@@ -1103,7 +1100,7 @@ set(FAF_ENGINE_SOURCES
   moho/app/UserWorkerPool.cpp
   moho/app/CWaitHandleSet.cpp
   moho/app/IWinApp.cpp
-  moho/app/WEmitterWx.cpp
+  moho/app/WEmitterEditor.cpp
   moho/app/FrameDumpCommands.cpp
   moho/app/ResolutionCommands.cpp
   moho/app/WinMain.cpp
@@ -1144,4 +1141,9 @@ set(FAF_ENGINE_SOURCES
   moho/movie/sfd/DirectSoundMovieSink.cpp
   moho/movie/sfd/SfdMetadata.cpp
   moho/core/MemoryPool.cpp
+  # The application shell over SDL3 (issues #407, #412): client only (sim_sources.cmake).
+  platform/shell/WxStandIn.cpp
+  platform/sdl/WindowSdl.cpp
+  platform/sdl/ToolWindow.cpp
+  platform/windows/WindowSdlWindows.cpp
 )

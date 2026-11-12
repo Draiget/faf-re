@@ -114,19 +114,13 @@ namespace moho
     virtual CD3DPrimBatcher* GetPrimBatcher() const;
 
     /**
-     * Address: 0x00430B90 (FUN_00430B90)
-     * Mangled: ?MSWWindowProc@WD3DViewport@Moho@@UAEJIIJ@Z
-     *
-     * What it does:
-     * Answers WM_SETCURSOR over the client area itself, handing the cursor to
-     * the D3D device; every other message goes to `wxWindow::MSWWindowProc`.
-     *
-     * Windows only: on Linux the window system (issue #256) delivers the cursor, the network
-     * panel's keys and the side mouse buttons itself.
+     * Engine addition (issue #407): hands the retail window procedure's work
+     * (WD3DViewport::MSWWindowProc, 0x00430B90: the cursor over the client
+     * area, the network panel's key and mouse) to platform/Window.h's cursor
+     * request and event filter. The side mouse buttons arrive as key presses
+     * from the window system itself.
      */
-#if FAFRE_PLATFORM_WINDOWS
-    long MSWWindowProc(WXUINT message, WXWPARAM wParam, WXLPARAM lParam) override;
-#endif
+    static void InstallWindowHooks();
 
     /**
      * Address: 0x00430AC0 (FUN_00430AC0)
@@ -177,10 +171,4 @@ namespace moho
     DECLARE_EVENT_TABLE()
   };
 
-  static_assert(sizeof(wxWindow) == 0x124, "wxWindow size must be 0x124");
-  static_assert(
-    offsetof(WD3DViewport, mBackgroundImage) == 0x124,
-    "moho::WD3DViewport::mBackgroundImage offset must be 0x124"
-  );
-  static_assert(sizeof(WD3DViewport) == 0x128, "moho::WD3DViewport size must be 0x128");
 } // namespace moho

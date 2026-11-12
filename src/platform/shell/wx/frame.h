@@ -82,6 +82,15 @@ public:
     return m_title;
   }
 
+  // An item the engine added to the window's system menu was chosen
+  // (platform::window::AddSystemMenuItem), as WM_SYSCOMMAND reached wx's frames.
+  virtual void OnSystemCommand(
+    const int command
+  )
+  {
+    (void)command;
+  }
+
   // What the window system reports (WxStandIn.cpp's event delivery).
   void NoteMaximized(
     const bool maximized

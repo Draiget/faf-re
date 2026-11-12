@@ -1,99 +1,12 @@
 #include "moho/app/WxPrivate.h"
 
-/**
- * The managed-window registries (elements at 0x010A9B94 / 0x010A9BD8).
- *
- * Everything else about them is compiler-generated: the exit-time destructor
- * registrations 0x00BC7320 / 0x00BC7330, their thunks 0x00BF18B0 /
- * 0x00BF18C0, and the vector destructor bodies 0x004F8180 / 0x004F82D0,
- * whose WeakPtr destructors unlink each slot from its window.
- */
-fa::vector<moho::WeakPtr<moho::WWinManagedDialog>> moho::managedWindows;
-fa::vector<moho::WeakPtr<moho::WWinManagedFrame>> moho::managedFrames;
+#include "imgui.h"
+
+// The managed-window registries (managedWindows 0x010A9B94, managedFrames 0x010A9BD8) held the
+// developer windows for WINX_Exit; those are Dear ImGui windows now (issue #412), which WINX_Exit
+// closes itself.
 wxWindow* moho::sMainWindow = nullptr;
 moho::WRenViewport* moho::ren_Viewport = nullptr;
-
-// The managed dialogs, the bitmap controls and the input box are developer windows, Windows only
-// (WxRuntimeTypes.h; the Linux client, issue #255).
-#if FAFRE_PLATFORM_WINDOWS
-
-/**
- * Address: 0x004F3F50 (FUN_004F3F50)
- *
- * What it does:
- * Creates the dialog through wxDialog's constructor (the inline copy at
- * 0x004A3900), then files it in the first free `managedWindows` slot or a new
- * one.
- */
-moho::WWinManagedDialog::WWinManagedDialog(
-  wxWindow* const parent,
-  const wxWindowID id,
-  const wxString& title,
-  const wxPoint& position,
-  const wxSize& size,
-  const long style,
-  const wxString& name
-)
-  : wxDialog(parent, id, title, position, size, style, name)
-  , WeakObject()
-{
-  for (std::size_t index = 0; index < managedWindows.size(); ++index) {
-    if (managedWindows[index].GetObjectPtr() == nullptr) {
-      managedWindows[index].Set(this);
-      return;
-    }
-  }
-  managedWindows.push_back(WeakPtr<WWinManagedDialog>(this));
-}
-
-/**
- * Address: 0x004F40A0 (FUN_004F40A0)
- *
- * What it does:
- * Nothing of its own: the `WeakObject` base drops the weak references
- * (0x004F40AE), then ~wxDialog follows.
- */
-moho::WWinManagedDialog::~WWinManagedDialog() = default;
-#endif
-
-/**
- * Address: 0x004F40E0 (FUN_004F40E0)
- * Mangled: ??0WWinManagedFrame@Moho@@QAE@PAVwxWindow@@HABVwxString@@ABVwxPoint@@ABVwxSize@@J1@Z
- *
- * What it does:
- * Creates the frame through wxFrame's constructor (the inline copy at
- * 0x004BAB30), then files it in the first free `managedFrames` slot or a new
- * one.
- */
-moho::WWinManagedFrame::WWinManagedFrame(
-  wxWindow* const parent,
-  const wxWindowID id,
-  const wxString& title,
-  const wxPoint& position,
-  const wxSize& size,
-  const long style,
-  const wxString& name
-)
-  : wxFrame(parent, id, title, position, size, style, name)
-  , WeakObject()
-{
-  for (std::size_t index = 0; index < managedFrames.size(); ++index) {
-    if (managedFrames[index].GetObjectPtr() == nullptr) {
-      managedFrames[index].Set(this);
-      return;
-    }
-  }
-  managedFrames.push_back(WeakPtr<WWinManagedFrame>(this));
-}
-
-/**
- * Address: 0x004F4230 (FUN_004F4230)
- *
- * What it does:
- * Nothing of its own: the `WeakObject` base drops the weak references
- * (0x004F423E), then ~wxFrame follows.
- */
-moho::WWinManagedFrame::~WWinManagedFrame() = default;
 
 // MohoApp's constructor (0x004F1F10) and destructor are the compiler's; the
 // argv release at 0x00992070 is wxApp::~wxApp. It overrides only OnInit
@@ -125,281 +38,111 @@ void moho::MohoApp::ExitMainLoop()
 {
   m_keepGoing = FALSE;
 }
-#if FAFRE_PLATFORM_WINDOWS
-namespace
-{
-
-  // ---------------------------------------------------------------------------
-  // WBitmapPanel
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Address: 0x004FBC20 (FUN_004FBC20)
-   *
-   * What it does:
-   * Draws `bitmap` over `rect` in tiles, column by column (the wxWidgets
-   * sample's TileBitmap). The DC and the rectangle arrive in registers.
-   */
-  void TileBitmap(
-    const wxRect& rect,
-    wxDC& dc,
-    wxBitmap& bitmap
-  )
-  {
-    const int width = bitmap.GetWidth();
-    const int height = bitmap.GetHeight();
-    for (int x = rect.x; x < rect.x + rect.width; x += width) {
-      for (int y = rect.y; y < rect.y + rect.height; y += height) {
-        dc.DrawBitmap(bitmap, x, y);
-      }
-    }
-  }
-} // namespace
-
 /**
- * Address: 0x004FBCC0 (FUN_004FBCC0)
- * Mangled: ??0WBitmapPanel@Moho@@QAE@PAVwxWindow@@PAVwxBitmap@@@Z
+ * Address: 0x004FC040 (FUN_004FC040, WWxInputBox::WWxInputBox)
  *
  * What it does:
- * Creates the panel with wxPanel's defaults (the inline copy at 0x004FB890)
- * and keeps `bitmap`.
+ * The input box: the label above an edit box holding the default value, then OK and Cancel.
+ * wx laid them out with box sizers; Dear ImGui draws them (issue #412).
  */
-moho::WBitmapPanel::WBitmapPanel(
-  wxWindow* const parentWindow,
-  wxBitmap* const bitmap
-)
-  : wxPanel(parentWindow)
-  , mBitmap(bitmap)
-{}
-
-// Table 0x00DFF48C = {&wxPanel::sm_eventTable (0x00D5A910), rows 0x00F59814};
-// GetEventTable (0x004FBCB0) comes with it.
-BEGIN_EVENT_TABLE(
-  moho::WBitmapPanel,
-  wxPanel
-)
-EVT_ERASE_BACKGROUND(
-  moho::WBitmapPanel::OnEraseBackground
-)
-END_EVENT_TABLE()
-
-/**
- * Address: 0x004FBD90 (FUN_004FBD90)
- * Mangled: ?OnEraseBackground@WBitmapPanel@Moho@@IAEXAAVwxEraseEvent@@@Z
- *
- * What it does:
- * Tiles the bitmap over the client area into the erase event's DC; without a
- * usable bitmap the event is skipped so the default erase runs.
- */
-void moho::WBitmapPanel::OnEraseBackground(
-  wxEraseEvent& eraseEvent
-)
-{
-  if (mBitmap == nullptr || !mBitmap->Ok()) {
-    eraseEvent.Skip();
-    return;
-  }
-
-  int width = 0;
-  int height = 0;
-  GetClientSize(&width, &height);
-  TileBitmap(wxRect(0, 0, width, height), *eraseEvent.GetDC(), *mBitmap);
-}
-
-// ---------------------------------------------------------------------------
-// WBitmapCheckBox
-// ---------------------------------------------------------------------------
-
-/**
- * Address: 0x004FBE30 (FUN_004FBE30)
- * Mangled: ??0WBitmapCheckBox@Moho@@QAE@PAVwxWindow@@HABVwxBitmap@@@Z
- *
- * What it does:
- * Creates the button with style 0 (not wxBU_AUTODRAW; the inline copy of
- * wxBitmapButton's constructor at 0x004FBB60) and starts unchecked.
- */
-moho::WBitmapCheckBox::WBitmapCheckBox(
-  wxWindow* const parentWindow,
-  const int controlId,
-  const wxBitmap& bitmap
-)
-  : wxBitmapButton(parentWindow, controlId, bitmap, wxDefaultPosition, wxDefaultSize, 0)
-  , mIsChecked(0)
-{}
-
-// Table 0x00DFF494 = {&wxBitmapButton::sm_eventTable - wxControl's, 0x00D54D70
-// - rows 0x00F5983C}; GetEventTable (0x004FBE20) comes with it.
-BEGIN_EVENT_TABLE(
-  moho::WBitmapCheckBox,
-  wxBitmapButton
-)
-EVT_LEFT_UP(
-  moho::WBitmapCheckBox::OnLeftUp
-)
-END_EVENT_TABLE()
-
-/**
- * Address: 0x004FBF10 (FUN_004FBF10, ?IsChecked@WBitmapCheckBox@Moho@@QAE_NXZ)
- * Mangled: ?IsChecked@WBitmapCheckBox@Moho@@QAE_NXZ
- *
- * What it does:
- * Returns whether the button is checked.
- */
-bool moho::WBitmapCheckBox::IsChecked()
-{
-  return mIsChecked != 0;
-}
-
-/**
- * Address: 0x004FBF20 (FUN_004FBF20, ?SetChecked@WBitmapCheckBox@Moho@@QAEX_N@Z)
- * Mangled: ?SetChecked@WBitmapCheckBox@Moho@@QAEX_N@Z
- *
- * What it does:
- * On a change of state, swaps the label and selected bitmaps - each set lets
- * the button pick its bitmap again (OnSetBitmap) - repaints, and stores the
- * new state.
- */
-void moho::WBitmapCheckBox::SetChecked(
-  const bool checked
-)
-{
-  if (static_cast<std::uint8_t>(checked) == mIsChecked) {
-    return;
-  }
-
-  const wxBitmap selected(GetBitmapSelected());
-  const wxBitmap label(GetBitmapLabel());
-  SetBitmapLabel(selected);
-  SetBitmapSelected(label);
-  Refresh();
-  mIsChecked = checked ? 1 : 0;
-}
-
-/**
- * Address: 0x004FC010 (FUN_004FC010)
- *
- * What it does:
- * Toggles the checked state on button-up, then lets the event carry on to
- * the button's own handling.
- */
-void moho::WBitmapCheckBox::OnLeftUp(
-  wxMouseEvent& event
-)
-{
-  SetChecked(mIsChecked == 0);
-  event.Skip();
-}
-
-// ---------------------------------------------------------------------------
-// WWxInputBox
-// ---------------------------------------------------------------------------
-
-/**
- * Address: 0x004FC040 (FUN_004FC040)
- * Mangled: ??0WWxInputBox@Moho@@QAE@PBDPBV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@msvc8@@00PAV40@@Z
- *
- * What it does:
- * Creates the dialog (wxDialog's inline copy at 0x004A3900) and lays it out
- * top to bottom, at least 500 wide: the centred label, the text control
- * seeded with the default value, and a centred OK (the default button) /
- * Cancel row; then sizes itself to that.
- */
-moho::WWxInputBox::WWxInputBox(
+moho::WInputBox::WInputBox(
   const char* const dialogTitle,
   const char* const defaultValue,
-  const char* const labelText,
-  fa::string* const resultString
+  const char* const labelText
 )
-  : wxDialog(
-      nullptr,
-      -1,
-      gpg::STR_Utf8ToWide(dialogTitle).c_str(),
-      wxDefaultPosition,
-      wxDefaultSize,
-      wxDEFAULT_DIALOG_STYLE
-    )
-  , mResultString(resultString)
+  : platform::tools::ToolWindow(dialogTitle, 360, 140)
+  , mLabel(labelText != nullptr ? labelText : "")
 {
-  wxBoxSizer* const topSizer = new wxBoxSizer(wxVERTICAL);
-  topSizer->SetMinSize(500, 0);
+  std::snprintf(mText.data(), mText.size(), "%s", defaultValue != nullptr ? defaultValue : "");
+}
 
-  topSizer->Add(
-    new wxStaticText(this, -1, gpg::STR_Utf8ToWide(labelText).c_str(), wxDefaultPosition, wxDefaultSize, 0),
-    0,
-    wxALL | wxALIGN_CENTER,
-    10
-  );
+void moho::WInputBox::Draw()
+{
+  ImGui::TextUnformatted(mLabel.c_str());
+  ImGui::SetNextItemWidth(-1.0f);
+  if (mFocusText) {
+    ImGui::SetKeyboardFocusHere();
+    mFocusText = false;
+  }
+  const bool entered = ImGui::InputText("##answer", mText.data(), mText.size(), ImGuiInputTextFlags_EnterReturnsTrue);
+  if (ImGui::Button("OK") || entered) {
+    mAccepted = true;
+    mDone = true;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+    mDone = true;
+  }
+}
 
-  mTextCtrl = new wxTextCtrl(this, -1, gpg::STR_Utf8ToWide(defaultValue).c_str(), wxDefaultPosition, wxDefaultSize, 0);
-  topSizer->Add(mTextCtrl, 1, wxALL | wxEXPAND, 10);
-
-  wxBoxSizer* const buttonSizer = new wxBoxSizer(wxHORIZONTAL);
-  wxButton* const okButton = new wxButton(this, wxID_OK, wxT("OK"), wxDefaultPosition, wxDefaultSize, 0);
-  buttonSizer->Add(okButton, 0, wxALL, 10);
-  buttonSizer->Add(new wxButton(this, wxID_CANCEL, wxT("Cancel"), wxDefaultPosition, wxDefaultSize, 0), 0, wxALL, 10);
-  topSizer->Add(buttonSizer, 0, wxALIGN_CENTER, 0);
-
-  okButton->SetDefault();
-  SetSizer(topSizer);
-  topSizer->SetSizeHints(this);
+void moho::WInputBox::OnCloseRequested()
+{
+  mDone = true;
 }
 
 /**
- * Address: 0x004FC7B0 (FUN_004FC7B0)
+ * Address: 0x004FC7B0 (FUN_004FC7B0, WWxInputBox::TransferDataFromWindow) and wxDialog::ShowModal
  *
  * What it does:
- * Writes the text control's value, UTF-8 encoded (gpg::STR_WideToUtf8,
- * 0x00938680), into the caller's string and lets wxDialog::OnOK close.
+ * Shows the box and runs the window system until OK, Cancel or the close button; with OK the
+ * edit box's text goes to `result`.
  */
-bool moho::WWxInputBox::TransferDataFromWindow()
+bool moho::WInputBox::RunModal(
+  fa::string* const result
+)
 {
-  *mResultString = gpg::STR_WideToUtf8(mTextCtrl->GetValue().c_str());
-  return true;
+  if (!IsValid()) {
+    return false;
+  }
+  Show(true);
+  WINX_RunModal([this]() {
+    return mDone;
+  });
+  Show(false);
+  if (mAccepted && result != nullptr) {
+    *result = mText.data();
+  }
+  return mAccepted;
 }
 
 /**
- * Address: 0x004FC870 (FUN_004FC870)
+ * Address: 0x004FC870 (FUN_004FC870, WxInputBox)
  *
  * What it does:
- * Runs one modal WWxInputBox (0x178 bytes) and destroys it; true when the
- * user pressed OK.
+ * Runs one modal input box and destroys it; true when the user pressed OK.
  */
-bool moho::WxInputBox(
+bool moho::InputBox(
   const char* const dialogTitle,
   const char* const defaultValue,
   const char* const labelText,
   fa::string* const resultString
 )
 {
-  WWxInputBox* const dialog = new WWxInputBox(dialogTitle, defaultValue, labelText, resultString);
-  const bool accepted = dialog->ShowModal() == wxID_OK;
-  dialog->Destroy();
-  return accepted;
+  WInputBox dialog(dialogTitle, defaultValue, labelText);
+  return dialog.RunModal(resultString);
 }
 
 /**
  * Address: 0x004FC900 (FUN_004FC900, ?CON_WxInputBox@Moho@@YAXPAX@Z)
  *
  * What it does:
- * Console-command callback registered as `WxInputBox`. Pops up a modal
- * input box with the fixed prompt "What?", default "default", and label
- * "Type your answer below.", then prints the entered text (or "Canceled"
- * when dismissed) through `Moho::CON_Printf`.
+ * Console-command callback registered as `InputBox` (`WxInputBox` in the binary). Pops up a modal
+ * input box with the fixed prompt "What?", default "default", and label "Type your answer
+ * below.", then prints the entered text (or "Canceled" when dismissed) through `Moho::CON_Printf`.
  */
-void moho::CON_WxInputBox(
+void moho::CON_InputBox(
   const fa::vector<fa::string>& args
 )
 {
   (void)args;
 
   fa::string enteredText;
-  if (WxInputBox("What?", "default", "Type your answer below.", &enteredText)) {
+  if (InputBox("What?", "default", "Type your answer below.", &enteredText)) {
     CON_Printf("You entered \"%s\"", enteredText.c_str());
   } else {
     CON_Printf("Canceled");
   }
 }
-#endif // FAFRE_PLATFORM_WINDOWS: the developer windows
 namespace moho
 {
 

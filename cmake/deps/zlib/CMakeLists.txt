@@ -1,5 +1,5 @@
-# zlib 1.2.3, the version the shipped binary carries (x64 links it; Win32 links
-# wx's 1.1.4, see cmake/deps/wxwindows).
+# zlib 1.2.3, the version the shipped binary carries. x64 and x86 both link it (x86 linked
+# wxWindows' 1.1.4 until issue #406).
 #
 # dependencies/zlib-1.2.3 is the madler/zlib submodule at v1.2.3 with
 # dependencies/patches/zlib_1_2_3_faf_required.patch applied (the FAF

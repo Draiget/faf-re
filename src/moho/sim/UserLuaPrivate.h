@@ -75,10 +75,6 @@
 #include "moho/audio/HSound.h"
 #include "platform/WxWidgets.h"
 #include <wx/app.h>
-#include <wx/dialog.h>
-#include <wx/sizer.h>
-#include <wx/treectrl.h>
-#include <wx/treelistctrl.h>
 #include "moho/command/CCommandDb.h"
 #include "moho/command/CommandIssueHelper.h"
 #include "moho/sim/BuildQueueCommandDecrement.h"

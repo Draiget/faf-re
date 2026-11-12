@@ -269,9 +269,9 @@ set(_faf_download_DirectX-Headers
     "DirectX-Headers-1.619.5"
     "DirectX-Headers-1.619.5.tar.gz")
 
-# SDL 3.4.18 (zlib): the Linux client's window, input and audio output (issues #255, #256) and
-# FAudio's platform layer. The release archive; cmake/FafLinuxClient.cmake builds it static.
-# Linux only, like DirectX-Headers.
+# SDL 3.4.18 (zlib): the client's window, input, dialogs and developer-window renderer on every
+# platform (issues #256, #407), the Linux client's audio output and FAudio's platform layer. The
+# release archive; cmake/deps/sdl3 (Windows) and cmake/FafLinuxClient.cmake build it static.
 set(_faf_download_SDL3
     "https://github.com/libsdl-org/SDL/releases/download/release-3.4.18/SDL3-3.4.18.tar.gz"
     "9c75cf16330322c217dedd2e0609f1124f1b54b8633e763467b4684d0f4334a3"
@@ -487,10 +487,10 @@ faf_dependency_download(mbedtls)
 faf_dependency_download(monocypher)
 faf_dependency_download(DirectXTex)
 faf_dependency_download(imgui)
+faf_dependency_download(SDL3)
 if(FAF_DEPENDENCIES_ONLY)
   # Linux only (see their entries above): a run that doesn't name them skips them.
   faf_dependency_download(DirectX-Headers)
-  faf_dependency_download(SDL3)
   faf_dependency_download(FAudio)
   faf_dependency_download(dxc-linux)
   faf_dependency_download(DirectXMath)

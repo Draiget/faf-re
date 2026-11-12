@@ -1,7 +1,7 @@
 # Engine addition (dedicated-server plan WPL.3, WPL.4, WPR.11): the simulation's
 # translation units, FAF_SIM_SOURCES: FAF_ENGINE_SOURCES (sources.cmake, which
 # must be included first) without the ones that exist only for the client
-# (window, render device, UI, audio output, movies, the wx script debugger,
+# (window, render device, UI, audio output, movies, the script debugger,
 # the user world). The order of what remains is the engine's, so the
 # static-init order is the Windows build's.
 #
@@ -28,8 +28,8 @@ set(_faf_client_only_patterns
   "^moho/particles/(BeamRenderHelpers|ParticleRenderBuckets|ParticleRenderWorkItem|CWorldParticles)\\.cpp$"
   # Audio output (the sim's sound manager and parameters stay).
   "^moho/audio/(AudioEngine|CUserSoundManager|IUserSoundManager|XactClock|SofdecRuntime|SoundEngineResolve)\\.cpp$"
-  # The wx script debugger's windows.
-  "^moho/misc/(ScrDebugWindow|ScrFileCtrl|ScrSourceCtrl|ScrWatchCtrl|ScrGotoDialog|ScrPauseEvent|TreeData)\\.cpp$"
+  # The script debugger's windows (Dear ImGui, issue #413).
+  "^moho/misc/(ScrDebugWindow|ScrFileCtrl|ScrSourceCtrl|ScrWatchCtrl)\\.cpp$"
   # D3D device resources.
   "^moho/misc/ID3DDeviceResources\\.cpp$"
   # The user world: session, user-side armies, entities and units.
@@ -68,7 +68,10 @@ set(_faf_client_only_patterns
   # report and the minidump without it).
   "^gpg/core/diagnostics/CrashReportDialog\\.cpp$"
   # The frame-stall sampler (FAF_FRAME_SAMPLER; the client's frame loop marks it).
-  "^gpg/core/diagnostics/FrameSampler\\.cpp$")
+  "^gpg/core/diagnostics/FrameSampler\\.cpp$"
+  # The application shell, its windows and the developer windows on SDL3 (issues #407, #412).
+  "^platform/(shell|sdl)/"
+  "^platform/windows/WindowSdlWindows\\.cpp$")
 
 set(_faf_sim_patterns
   # Decals the sim creates and expires (CDecalBuffer::CleanupTick runs on

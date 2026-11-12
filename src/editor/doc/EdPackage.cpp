@@ -39,10 +39,8 @@ namespace faf::editor
       if (deflateInit2(&stream, Z_BEST_COMPRESSION, Z_DEFLATED, -MAX_WBITS, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
         return {};
       }
-      // zlib 1.2.3's deflateBound for any settings, by hand: the x86 build links wx's zlib 1.1.4 (as the game
-      // does), which has no deflateBound, so the x86 editor didn't link.
-      const std::size_t length = data.size();
-      std::string out(length + ((length + 7) >> 3) + ((length + 63) >> 6) + 11 + 16, '\0');
+      // Both architectures link zlib 1.2.3 (issue #406), which has deflateBound.
+      std::string out(deflateBound(&stream, static_cast<uLong>(data.size())), '\0');
       stream.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(data.data()));
       stream.avail_in = static_cast<uInt>(data.size());
       stream.next_out = reinterpret_cast<Bytef*>(out.data());

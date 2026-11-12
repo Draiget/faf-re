@@ -1,5 +1,8 @@
 #include "moho/app/WxPrivate.h"
 #include "moho/app/NetworkPanel.h"
+#include "platform/Window.h"
+
+#include <cmath>
 
 // ---------------------------------------------------------------------------
 // WD3DViewport
@@ -36,6 +39,7 @@ moho::WD3DViewport::WD3DViewport(
   , mBackgroundImage(nullptr)
 {
   (void)position;
+  InstallWindowHooks();
 }
 
 /**
@@ -175,85 +179,127 @@ void moho::WD3DViewport::PaintWithoutMessage()
   D3D_GetDevice()->Paint();
 }
 
-#if FAFRE_PLATFORM_WINDOWS
 namespace
 {
-  constexpr std::uint16_t kClientHitTestCode = HTCLIENT;
-}
-
-/**
- * Address: 0x00430B90 (FUN_00430B90)
- * Mangled: ?MSWWindowProc@WD3DViewport@Moho@@UAEJIIJ@Z
- *
- * What it does:
- * Takes WM_SETCURSOR over the client area: with d3d_WindowsCursor the device
- * shows its own cursor once its pixels are ready; otherwise the Win32 cursor
- * is cleared first. Every other message goes to wxWindow::MSWWindowProc (the
- * FAF-patched image routes that call through a hook at 0x01291029).
- */
-long moho::WD3DViewport::MSWWindowProc(
-  const WXUINT message,
-  const WXWPARAM wParam,
-  const WXLPARAM lParam
-)
-{
-  CD3DDevice* const device = D3D_GetDevice();
-  if (device != nullptr) {
-    const bool setCursorMessage = message == WM_SETCURSOR;
-    const bool clientHit = static_cast<std::uint16_t>(lParam & 0xFFFF) == kClientHitTestCode;
-
-    if (d3d_WindowsCursor) {
-      if (setCursorMessage && clientHit && device->IsCursorPixelSourceReady()) {
-        D3D_InitCursor();
+  /**
+   * Address: 0x00430B90 (FUN_00430B90, WD3DViewport::MSWWindowProc), its WM_SETCURSOR half.
+   *
+   * The window system asks for the cursor over the client area (WindowSdlWindows.cpp passes
+   * WM_SETCURSOR with HTCLIENT here): with d3d_WindowsCursor the device shows its own cursor once
+   * its pixels are ready; otherwise the system cursor is cleared first, for Direct3D 9's
+   * hardware cursor.
+   */
+  bool ViewportCursorRequest(
+    platform::window::Handle const window
+  )
+  {
+    (void)window;
+    moho::CD3DDevice* const device = moho::D3D_GetDevice();
+    if (device == nullptr) {
+      return false;
+    }
+    if (moho::d3d_WindowsCursor) {
+      if (device->IsCursorPixelSourceReady()) {
+        moho::D3D_InitCursor();
         (void)device->ShowCursor(device->IsCursorShowing());
-        return 1;
+        return true;
       }
-    } else if (setCursorMessage && clientHit && (device->IsCursorPixelSourceReady() || !device->IsCursorShowing())) {
+      return false;
+    }
+    if (device->IsCursorPixelSourceReady() || !device->IsCursorShowing()) {
       ::SetCursor(nullptr);
-      D3D_InitCursor();
+      moho::D3D_InitCursor();
       (void)device->ShowCursor(device->IsCursorShowing());
-      return 1;
+      return true;
     }
+    return false;
   }
 
-  // Engine addition (issue #322): Ctrl+Shift+F11 flips the network panel, here so it works
-  // in the lobby, in a game and in fullscreen without the Lua key map. F11 alone is FAF's
-  // connectivity screen. Only the first press of a held key counts (lParam bit 30).
-  if (
-    message == WM_KEYDOWN && wParam == VK_F11 && (lParam & 0x40000000) == 0 &&
-    (::GetKeyState(VK_CONTROL) & 0x8000) != 0 && (::GetKeyState(VK_SHIFT) & 0x8000) != 0
-  ) {
-    NETPANEL_Toggle();
-    return 0;
-  }
-
-  // Engine addition (issue #322): presses on the open network panel go to the panel, with
-  // the release that ends them; the game never sees them. Moves still reach the game.
-  if ((message >= WM_MOUSEMOVE && message <= WM_MBUTTONDBLCLK) || message == WM_MOUSEWHEEL) {
-    const HWND window = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(GetHandle()));
-    POINT at{static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
-    if (message == WM_MOUSEWHEEL) {
-      ::ScreenToClient(window, &at); // the wheel's position is on the screen
-    }
-    RECT client{};
-    ::GetClientRect(window, &client);
-    const int wheel = message == WM_MOUSEWHEEL ? static_cast<short>(HIWORD(wParam)) : 0;
-    if (NETPANEL_OnMouse(window, message, at.x, at.y, client.right, client.bottom, wheel)) {
+  // The window procedure's mouse messages, for the network panel (NetworkPanel.h).
+  [[nodiscard]] unsigned MouseMessageOf(
+    const platform::window::Event& event
+  )
+  {
+    using platform::window::EventType;
+    const bool doubleClick = event.clicks >= 2;
+    switch (event.type) {
+    case EventType::MouseMove:
+      return WM_MOUSEMOVE;
+    case EventType::MouseWheel:
+      return WM_MOUSEWHEEL;
+    case EventType::MouseDown:
+      switch (event.button) {
+      case platform::window::kButtonLeft:
+        return doubleClick ? WM_LBUTTONDBLCLK : WM_LBUTTONDOWN;
+      case platform::window::kButtonMiddle:
+        return doubleClick ? WM_MBUTTONDBLCLK : WM_MBUTTONDOWN;
+      case platform::window::kButtonRight:
+        return doubleClick ? WM_RBUTTONDBLCLK : WM_RBUTTONDOWN;
+      default:
+        return 0;
+      }
+    case EventType::MouseUp:
+      switch (event.button) {
+      case platform::window::kButtonLeft:
+        return WM_LBUTTONUP;
+      case platform::window::kButtonMiddle:
+        return WM_MBUTTONUP;
+      case platform::window::kButtonRight:
+        return WM_RBUTTONUP;
+      default:
+        return 0;
+      }
+    default:
       return 0;
     }
   }
 
-  // FAF hot-patch (FA-Binary-Patches OnWindowMessage): 0x00430C0E calls 0x01291029 instead of
-  // wxWindow::MSWWindowProc, which hands the side mouse buttons to wx as key presses of
-  // VK_XBUTTON1/VK_XBUTTON2, so they can be bound like keys. lParam: repeat count 1, scan
-  // code 0xFF, and for the release the previous-state and transition bits.
-  if (message == WM_XBUTTONDOWN || message == WM_XBUTTONUP) {
-    const bool pressed = message == WM_XBUTTONDOWN;
-    const WXWPARAM virtualKey = static_cast<WXWPARAM>(HIWORD(wParam)) + 4u;
-    const WXLPARAM keyInfo = static_cast<WXLPARAM>(pressed ? 0x00FF0001u : 0xC0FF0001u);
-    return wxWindow::MSWWindowProc(pressed ? WM_KEYDOWN : WM_KEYUP, virtualKey, keyInfo);
-  }
+  /**
+   * The rest of WD3DViewport::MSWWindowProc (0x00430B90): what the game window's events meet
+   * before the UI does.
+   */
+  bool ViewportEventFilter(
+    const platform::window::Event& event
+  )
+  {
+    using platform::window::EventType;
+    if (moho::sMainWindow == nullptr || event.window != moho::sMainWindow->GetPlatformWindow()) {
+      return false;
+    }
 
-  return wxWindow::MSWWindowProc(message, wParam, lParam);
+    // Engine addition (issue #322): Ctrl+Shift+F11 flips the network panel, here so it works
+    // in the lobby, in a game and in fullscreen without the Lua key map. F11 alone is FAF's
+    // connectivity screen. Only the first press of a held key counts.
+    if (
+      event.type == EventType::KeyDown && event.virtualKey == VK_F11 && !event.repeat &&
+      (event.modifiers & platform::window::kModifierControl) != 0 &&
+      (event.modifiers & platform::window::kModifierShift) != 0
+    ) {
+      moho::NETPANEL_Toggle();
+      return true;
+    }
+
+    // Engine addition (issue #322): presses on the open network panel go to the panel, with
+    // the release that ends them; the game never sees them. Moves still reach the game.
+    if (const unsigned message = MouseMessageOf(event); message != 0) {
+      int clientWidth = 0;
+      int clientHeight = 0;
+      platform::window::GetBounds(event.window, nullptr, nullptr, &clientWidth, &clientHeight);
+      const int wheel = event.type == EventType::MouseWheel ? static_cast<int>(std::lround(event.wheel * 120.0f)) : 0;
+      return moho::NETPANEL_OnMouse(
+        platform::window::NativeHandle(event.window), message, event.x, event.y, clientWidth, clientHeight, wheel
+      );
+    }
+    return false;
+  }
+} // namespace
+
+/**
+ * Engine addition (issue #407): the viewport's share of the retail window procedure goes to the
+ * window system's cursor request and event filter (platform/Window.h), on every platform.
+ */
+void moho::WD3DViewport::InstallWindowHooks()
+{
+  platform::window::SetCursorRequestHandler(&ViewportCursorRequest);
+  platform::window::SetEventFilter(&ViewportEventFilter);
 }
-#endif // FAFRE_PLATFORM_WINDOWS

@@ -1,10 +1,17 @@
 // Engine addition (dedicated-server plan WPL.4, WPR.11): the reflection editor
-// window (WRefEditDialog, a wxDialog over one reflected object) and the
-// SC_CreateEntityDialog console command that opens it on the selected unit's
-// blueprint, moved unchanged out of Sim.cpp: both are user-side wx code, and
-// the simulation's objects carry no wx.
+// window (WRefEditDialog over one reflected object) and the SC_CreateEntityDialog
+// console command that opens it on the selected unit's blueprint, moved out of
+// Sim.cpp: both are user-side window code. A wx dialog with a tree list in the
+// binary; Dear ImGui in a window of its own since issue #414.
 
+#include <array>
 #include <cstdint>
+#include <cstdio>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "imgui.h"
 
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/containers/String.h"
@@ -15,12 +22,7 @@
 #include "moho/sim/Sim.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/UserUnit.h"
-#include "platform/WxWidgets.h"
-#include <wx/app.h>
-#include <wx/dialog.h>
-#include <wx/sizer.h>
-#include <wx/treectrl.h>
-#include <wx/treelistctrl.h>
+#include "platform/sdl/ToolWindow.h"
 
 using namespace moho;
 
@@ -40,65 +42,57 @@ namespace moho
    * Address: 0x004A47C0 (FUN_004A47C0, ?REF_CreateEditDialog@Moho@@YAXPAVwxWindow@@ABVRRef@gpg@@PBD_N@Z)
    *
    * What it does:
-   * Opens a modeless reflection editor on `ref`, titled `name`. Nothing reads
-   * the parent or the flag: the dialog is always top-level, and the shipped
-   * code has both dropped at the one call site.
+   * Opens a modeless reflection editor on `ref`, titled `name`. The binary took a parent window
+   * and a flag that nothing read: the dialog is always top-level, and the shipped code has both
+   * dropped at the one call site.
    */
-  void REF_CreateEditDialog(wxWindow* parent, const gpg::RRef& ref, const char* name, bool);
+  void REF_CreateEditDialog(const gpg::RRef& ref, const char* name);
 
   /**
    * VFTABLE: 0x00E06F18 (??_7CRefTreeItemData@Moho@@6B@)
    *
-   * One row of the reflection editor: the value it shows, whether its value
-   * may be edited, its label, and whether its children have been listed.
-   * The deleting destructor (0x004A3D30) is the compiler's.
+   * One row of the reflection editor: the value it shows, whether its value may be edited, its
+   * label, and whether its children have been listed. The binary's was the tree control's item
+   * data; here the row also holds what the tree list's columns showed and its children.
    */
-  class CRefTreeItemData : public wxTreeItemData
+  class CRefTreeItemData
   {
   public:
     /**
      * Address: 0x004A3CB0 (FUN_004A3CB0)
      *
      * What it does:
-     * Copies the row's reference, edit flag and label; its children are not
-     * listed yet.
+     * Copies the row's reference, edit flag and label; its children are not listed yet.
      */
     CRefTreeItemData(const gpg::RRef& ref, bool editable, const fa::string& name);
 
-    gpg::RRef mRef;   // +0x08
-    bool mEditable;   // +0x10
-    fa::string mName; // +0x14
-    bool mPopulated;  // +0x30
+    gpg::RRef mRef;
+    bool mEditable;
+    fa::string mName;
+    bool mPopulated;
+    bool mHasChildren = false;
+    std::string mValue;       // the Value column
+    std::string mDescription; // the Description column
+    std::vector<std::unique_ptr<CRefTreeItemData>> mChildren;
   };
-
-  static_assert(offsetof(CRefTreeItemData, mRef) == 0x08, "CRefTreeItemData::mRef offset must be 0x08");
-  static_assert(offsetof(CRefTreeItemData, mEditable) == 0x10, "CRefTreeItemData::mEditable offset must be 0x10");
-  static_assert(offsetof(CRefTreeItemData, mName) == 0x14, "CRefTreeItemData::mName offset must be 0x14");
-  static_assert(offsetof(CRefTreeItemData, mPopulated) == 0x30, "CRefTreeItemData::mPopulated offset must be 0x30");
-  static_assert(sizeof(CRefTreeItemData) == 0x34, "CRefTreeItemData size must be 0x34");
 
   /**
    * VFTABLE: 0x00E06F24 (??_7WRefEditDialog@Moho@@6B@)
    *
-   * A modeless window over one reflected object: a tree of its fields and
-   * elements with their values and field descriptions. Rows list their
-   * children the first time they are expanded, and a writable field's value
-   * is edited in place (the Value column, through FA's column edit in its
-   * wxTreeListCtrl).
-   *
-   * Slot 0 is wxDialog::GetClassInfo (0x004A3970); 47, 139 and 140 are inline
-   * wx copies. The destructor (0x004A4100, deleting 0x004A40E0) is the
-   * compiler's.
+   * A modeless window over one reflected object: a tree of its fields and elements with their
+   * values and field descriptions. Rows list their children the first time they are expanded,
+   * and a writable field's value is edited in place (double-click the row, Enter to write it,
+   * Escape to cancel), as the binary's tree list edited its Value column.
    */
-  class WRefEditDialog : public wxDialog
+  class WRefEditDialog final : public platform::tools::ToolWindow
   {
   public:
     /**
      * Address: 0x004A3DB0 (FUN_004A3DB0, ??0WRefEditDialog@Moho@@QAE@@Z)
      *
      * What it does:
-     * A resizable 640x480 dialog titled `name`, filled by a Property/Value/
-     * Description tree list whose hidden root is `ref`.
+     * A resizable 640x480 window titled `name`, filled by a Property/Value/Description tree
+     * whose hidden root is `ref`.
      */
     WRefEditDialog(const gpg::RRef& ref, const char* name);
 
@@ -106,118 +100,51 @@ namespace moho
      * Address: 0x004A4110 (FUN_004A4110)
      *
      * What it does:
-     * Adds a row for `ref` labelled `name` under `parent`, or as the root when
-     * `parent` is not set. The row gets an expand button when the value has
-     * fields or elements.
+     * Adds a row for `ref` labelled `name` under `parent`, or as the root when there is no
+     * parent. The row can be expanded when the value has fields or elements.
      */
-    wxTreeItemId AddItem(const wxTreeItemId& parent, const fa::string& name, const gpg::RRef& ref, bool editable);
+    CRefTreeItemData* AddItem(CRefTreeItemData* parent, const fa::string& name, const gpg::RRef& ref, bool editable);
 
     /**
      * Address: 0x004A4260 (FUN_004A4260)
      *
      * What it does:
-     * Lists `ref`'s fields under `parent`, each with its value and description,
-     * then its elements as "[i] = " rows. A field is editable when both of its
-     * low flag bits are set; an element when `parent` is.
+     * Lists `ref`'s fields under `parent`, each with its value and description, then its
+     * elements as "[i] = " rows. A field is editable when both of its low flag bits are set; an
+     * element when `parent` is.
      */
-    void AddChildren(const wxTreeItemId& parent, const gpg::RRef& ref);
+    void AddChildren(CRefTreeItemData* parent, const gpg::RRef& ref);
 
     /**
-     * Address: 0x004A45C0 (FUN_004A45C0)
+     * Address: 0x004A4710 (FUN_004A4710, OnEndLabelEdit)
      *
      * What it does:
-     * Writes `value` into mActiveItem's reference and shows the value back as
-     * the type prints it. Nothing in the image calls this, and nothing ever
-     * sets mActiveItem.
+     * Writes the edited text into the row's reference unless the edit was cancelled, then
+     * shows the value as the type prints it back.
      */
-    void SetValue(const wxString& value);
+    void EndEdit(bool cancelled);
 
+  protected:
+    void Tick() override;
+    void Draw() override;
     /**
-     * Address: 0x004A4530 (FUN_004A4530)
+     * Address: 0x004A4530 (FUN_004A4530, OnClose)
      *
      * What it does:
-     * Destroys the dialog.
+     * Destroys the window.
      */
-    void OnClose(wxCloseEvent& event);
+    void OnCloseRequested() override;
 
-    /**
-     * Address: 0x004A4540 (FUN_004A4540)
-     *
-     * What it does:
-     * Lists the row's children the first time it opens.
-     */
-    void OnItemExpanding(wxTreeEvent& event);
+  private:
+    void DrawRow(CRefTreeItemData& row);
 
-    /**
-     * Address: 0x004A4580 (FUN_004A4580)
-     *
-     * What it does:
-     * Starts editing an editable row's Value column.
-     */
-    void OnItemActivated(wxTreeEvent& event);
-
-    /**
-     * Address: 0x004A46E0 (FUN_004A46E0)
-     *
-     * What it does:
-     * Vetoes editing a row that is not editable.
-     */
-    void OnBeginLabelEdit(wxTreeEvent& event);
-
-    /**
-     * Address: 0x004A4710 (FUN_004A4710)
-     *
-     * What it does:
-     * Writes the edited text into the row's reference unless the edit was
-     * cancelled. The tree keeps the text as typed.
-     */
-    void OnEndLabelEdit(wxTreeEvent& event);
-
-    wxTreeListCtrl* mTree;    // +0x170
-    wxTreeItemId mActiveItem; // +0x174
-
-    DECLARE_EVENT_TABLE()
+    std::unique_ptr<CRefTreeItemData> mRoot;
+    CRefTreeItemData* mActiveItem = nullptr; // the row whose value is being edited
+    std::array<char, 512> mEditText{};
+    bool mFocusEdit = false;
+    bool mCloseRequested = false;
   };
-
-  static_assert(offsetof(WRefEditDialog, mTree) == 0x170, "WRefEditDialog::mTree offset must be 0x170");
-  static_assert(offsetof(WRefEditDialog, mActiveItem) == 0x174, "WRefEditDialog::mActiveItem offset must be 0x174");
-  static_assert(sizeof(WRefEditDialog) == 0x178, "WRefEditDialog size must be 0x178");
 } // namespace moho
-
-namespace
-{
-  // wxTR_ROW_LINES | wxTR_EDIT_LABELS on top of the watch panes' style: a
-  // grid of rows whose labels can be edited.
-  constexpr long kRefTreeStyle = wxTR_HAS_BUTTONS | wxTR_LINES_AT_ROOT | wxTR_EDIT_LABELS | wxTR_ROW_LINES |
-    wxTR_HIDE_ROOT | wxTR_FULL_ROW_HIGHLIGHT;
-} // namespace
-
-// Table 0x00DFFB08 = {&wxDialog::sm_eventTable (0x00D540E8), rows 0x00F59378};
-// GetEventTable (0x004A3DA0) comes with it.
-BEGIN_EVENT_TABLE(
-  moho::WRefEditDialog,
-  wxDialog
-)
-EVT_CLOSE(
-  moho::WRefEditDialog::OnClose
-)
-EVT_TREE_ITEM_EXPANDING(
-  -1,
-  moho::WRefEditDialog::OnItemExpanding
-)
-EVT_TREE_ITEM_ACTIVATED(
-  -1,
-  moho::WRefEditDialog::OnItemActivated
-)
-EVT_TREE_BEGIN_LABEL_EDIT(
-  -1,
-  moho::WRefEditDialog::OnBeginLabelEdit
-)
-EVT_TREE_END_LABEL_EDIT(
-  -1,
-  moho::WRefEditDialog::OnEndLabelEdit
-)
-END_EVENT_TABLE()
 
 /**
  * Address: 0x004A3CB0 (FUN_004A3CB0)
@@ -240,58 +167,41 @@ moho::WRefEditDialog::WRefEditDialog(
   const gpg::RRef& ref,
   const char* const name
 )
-  : wxDialog(
-      nullptr,
-      -1,
-      wxString(name, wxConvUTF8),
-      wxDefaultPosition,
-      wxSize(640, 480),
-      wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER
-    )
+  : platform::tools::ToolWindow(name, 640, 480)
 {
-  mTree = new wxTreeListCtrl(this, -1, wxDefaultPosition, wxDefaultSize, kRefTreeStyle);
-  mTree->AddColumn(wxT("Property"), 200, true);
-  mTree->AddColumn(wxT("Value"), 200, false);
-  mTree->AddColumn(wxT("Description"), 600, false);
-  mTree->Expand(AddItem(wxTreeItemId(), "", ref, true));
-
-  wxBoxSizer* const sizer = new wxBoxSizer(wxVERTICAL);
-  sizer->Add(mTree, 1, wxEXPAND | wxALL, 0);
-  SetSizer(sizer);
-  Layout();
+  // The hidden root, expanded at once (mTree->Expand(AddItem(...)) in the binary).
+  CRefTreeItemData* const root = AddItem(nullptr, "", ref, true);
+  root->mPopulated = true;
+  AddChildren(root, ref);
 }
 
 /**
  * Address: 0x004A4110 (FUN_004A4110)
  */
-wxTreeItemId moho::WRefEditDialog::AddItem(
-  const wxTreeItemId& parent,
+moho::CRefTreeItemData* moho::WRefEditDialog::AddItem(
+  CRefTreeItemData* const parent,
   const fa::string& name,
   const gpg::RRef& ref,
   const bool editable
 )
 {
-  const wxString label(name.c_str(), wxConvUTF8);
-  wxTreeItemId item;
-  if (parent.IsOk()) {
-    item = mTree->AppendItem(parent, label);
-  } else {
-    item = mTree->AddRoot(label);
-  }
-  mTree->SetItemData(item, new CRefTreeItemData(ref, editable, name));
-
+  auto item = std::make_unique<CRefTreeItemData>(ref, editable, name);
   const gpg::RIndexed* const indexed = ref.IsIndexed();
-  if (ref.GetNumFields() != 0 || (indexed != nullptr && indexed->GetCount(ref.mObj) != 0)) {
-    mTree->SetItemHasChildren(item, true);
+  item->mHasChildren = ref.GetNumFields() != 0 || (indexed != nullptr && indexed->GetCount(ref.mObj) != 0);
+  CRefTreeItemData* const added = item.get();
+  if (parent != nullptr) {
+    parent->mChildren.push_back(std::move(item));
+  } else {
+    mRoot = std::move(item);
   }
-  return item;
+  return added;
 }
 
 /**
  * Address: 0x004A4260 (FUN_004A4260)
  */
 void moho::WRefEditDialog::AddChildren(
-  const wxTreeItemId& parent,
+  CRefTreeItemData* const parent,
   const gpg::RRef& ref
 )
 {
@@ -299,110 +209,134 @@ void moho::WRefEditDialog::AddChildren(
   for (int i = 0; i < fieldCount; ++i) {
     const gpg::RField& field = ref.mType->fields_[i];
     const gpg::RRef value = ref.GetField(i);
-    const wxTreeItemId item = AddItem(parent, field.mName, value, (field.mFlags & 3) == 3);
-    mTree->SetItemText(item, 1, wxString(value.GetLexical().c_str(), wxConvUTF8));
-    mTree->SetItemText(item, 2, wxString(field.mDesc, wxConvUTF8));
+    CRefTreeItemData* const item = AddItem(parent, field.mName, value, (field.mFlags & 3) == 3);
+    item->mValue = value.GetLexical().c_str();
+    item->mDescription = field.mDesc != nullptr ? field.mDesc : "";
   }
 
   if (ref.IsIndexed() != nullptr) {
-    const CRefTreeItemData* const parentData = static_cast<CRefTreeItemData*>(mTree->GetItemData(parent));
     // The count and index are signed in the binary (jle/jl).
     const int count = static_cast<int>(ref.GetCount());
     for (int i = 0; i < count; ++i) {
-      AddItem(parent, gpg::STR_Printf("[%d] = ", i), ref[i], parentData->mEditable);
+      AddItem(parent, gpg::STR_Printf("[%d] = ", i), ref[i], parent->mEditable);
     }
   }
 }
 
-/**
- * Address: 0x004A45C0 (FUN_004A45C0)
- */
-void moho::WRefEditDialog::SetValue(
-  const wxString& value
+void moho::WRefEditDialog::EndEdit(
+  const bool cancelled
 )
 {
-  const CRefTreeItemData* const data = static_cast<CRefTreeItemData*>(mTree->GetItemData(mActiveItem));
-  const fa::string text = gpg::STR_WideToUtf8(value.c_str());
-  data->mRef.SetLexical(text.c_str());
-  mTree->SetItemText(mActiveItem, 1, wxString(data->mRef.GetLexical().c_str(), wxConvUTF8));
+  if (mActiveItem == nullptr) {
+    return;
+  }
+  if (!cancelled) {
+    mActiveItem->mRef.SetLexical(mEditText.data());
+    mActiveItem->mValue = mActiveItem->mRef.GetLexical().c_str();
+  }
+  mActiveItem = nullptr;
 }
 
-/**
- * Address: 0x004A4530 (FUN_004A4530)
- */
-void moho::WRefEditDialog::OnClose(
-  wxCloseEvent& event
-)
+void moho::WRefEditDialog::OnCloseRequested()
 {
-  Destroy();
+  mCloseRequested = true;
+  Show(false);
 }
 
-/**
- * Address: 0x004A4540 (FUN_004A4540)
- */
-void moho::WRefEditDialog::OnItemExpanding(
-  wxTreeEvent& event
-)
+void moho::WRefEditDialog::Tick()
 {
-  const wxTreeItemId item = event.GetItem();
-  CRefTreeItemData* const data = static_cast<CRefTreeItemData*>(mTree->GetItemData(item));
-  if (!data->mPopulated) {
-    data->mPopulated = true;
-    AddChildren(item, data->mRef);
+  if (mCloseRequested) {
+    delete this; // the binary's OnClose destroys the dialog
   }
 }
 
-/**
- * Address: 0x004A4580 (FUN_004A4580)
- */
-void moho::WRefEditDialog::OnItemActivated(
-  wxTreeEvent& event
+void moho::WRefEditDialog::DrawRow(
+  CRefTreeItemData& row
 )
 {
-  const wxTreeItemId item = event.GetItem();
-  const CRefTreeItemData* const data = static_cast<CRefTreeItemData*>(mTree->GetItemData(item));
-  if (data->mEditable) {
-    mTree->EditLabel(item, 1);
+  ImGui::TableNextRow();
+  ImGui::TableSetColumnIndex(0);
+  ImGui::PushID(&row);
+  ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_OpenOnArrow;
+  if (!row.mHasChildren) {
+    flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
   }
+  const bool open = ImGui::TreeNodeEx("##row", flags, "%s", row.mName.c_str());
+  // Address: 0x004A4540 (FUN_004A4540, OnItemExpanding): the children are listed the first time.
+  if (open && row.mHasChildren && !row.mPopulated) {
+    row.mPopulated = true;
+    AddChildren(&row, row.mRef);
+  }
+  // Address: 0x004A4580 (FUN_004A4580, OnItemActivated) and 0x004A46E0 (OnBeginLabelEdit): only
+  // an editable row's value is edited.
+  if (row.mEditable && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+    EndEdit(true);
+    mActiveItem = &row;
+    std::snprintf(mEditText.data(), mEditText.size(), "%s", row.mValue.c_str());
+    mFocusEdit = true;
+  }
+
+  ImGui::TableSetColumnIndex(1);
+  if (mActiveItem == &row) {
+    ImGui::SetNextItemWidth(-1.0f);
+    if (mFocusEdit) {
+      ImGui::SetKeyboardFocusHere();
+      mFocusEdit = false;
+    }
+    if (ImGui::InputText("##value", mEditText.data(), mEditText.size(), ImGuiInputTextFlags_EnterReturnsTrue)) {
+      EndEdit(false);
+    } else if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+      EndEdit(true);
+    }
+  } else {
+    ImGui::TextUnformatted(row.mValue.c_str());
+  }
+  ImGui::TableSetColumnIndex(2);
+  ImGui::TextUnformatted(row.mDescription.c_str());
+
+  if (open && row.mHasChildren) {
+    for (const std::unique_ptr<CRefTreeItemData>& child : row.mChildren) {
+      DrawRow(*child);
+    }
+    ImGui::TreePop();
+  }
+  ImGui::PopID();
 }
 
-/**
- * Address: 0x004A46E0 (FUN_004A46E0)
- */
-void moho::WRefEditDialog::OnBeginLabelEdit(
-  wxTreeEvent& event
-)
+void moho::WRefEditDialog::Draw()
 {
-  const CRefTreeItemData* const data = static_cast<CRefTreeItemData*>(mTree->GetItemData(event.GetItem()));
-  if (!data->mEditable) {
-    event.Veto();
+  constexpr ImGuiTableFlags kTableFlags = ImGuiTableFlags_Resizable | ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersV |
+    ImGuiTableFlags_BordersOuterH | ImGuiTableFlags_ScrollY;
+  if (!ImGui::BeginTable("##ref", 3, kTableFlags)) {
+    return;
   }
-}
-
-/**
- * Address: 0x004A4710 (FUN_004A4710)
- */
-void moho::WRefEditDialog::OnEndLabelEdit(
-  wxTreeEvent& event
-)
-{
-  const CRefTreeItemData* const data = static_cast<CRefTreeItemData*>(mTree->GetItemData(event.GetItem()));
-  if (!event.IsEditCancelled()) {
-    data->mRef.SetLexical(gpg::STR_WideToUtf8(event.GetLabel().c_str()).c_str());
+  ImGui::TableSetupScrollFreeze(0, 1);
+  ImGui::TableSetupColumn("Property", ImGuiTableColumnFlags_WidthFixed, 200.0f);
+  ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthFixed, 200.0f);
+  ImGui::TableSetupColumn("Description", ImGuiTableColumnFlags_WidthStretch);
+  ImGui::TableHeadersRow();
+  if (mRoot != nullptr) {
+    // The root row is hidden (wxTR_HIDE_ROOT): its children are the top rows.
+    for (const std::unique_ptr<CRefTreeItemData>& child : mRoot->mChildren) {
+      DrawRow(*child);
+    }
   }
+  ImGui::EndTable();
 }
 
 /**
  * Address: 0x004A47C0 (FUN_004A47C0, ?REF_CreateEditDialog@Moho@@YAXPAVwxWindow@@ABVRRef@gpg@@PBD_N@Z)
  */
 void moho::REF_CreateEditDialog(
-  [[maybe_unused]] wxWindow* const parent,
   const gpg::RRef& ref,
-  const char* const name,
-  const bool
+  const char* const name
 )
 {
   WRefEditDialog* const dialog = new WRefEditDialog(ref, name);
+  if (!dialog->IsValid()) {
+    delete dialog;
+    return;
+  }
   dialog->Show(true);
 }
 /**
@@ -474,5 +408,5 @@ void moho::func_SC_CreateEntityDialog_chunk()
   gpg::RRef blueprintRef(const_cast<RUnitBlueprint*>(blueprint), gpg::LookupRType(typeid(RUnitBlueprint)));
   // The binary passes only the reference and the name (0x008D40FC): the
   // parent and the flag are dropped, so their values are not recorded.
-  REF_CreateEditDialog(nullptr, blueprintRef, blueprint->mBlueprintId.c_str(), false);
+  REF_CreateEditDialog(blueprintRef, blueprint->mBlueprintId.c_str());
 }

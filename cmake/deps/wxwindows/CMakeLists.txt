@@ -69,15 +69,8 @@ function(faf_wx_library name)
   set_target_properties(${name} PROPERTIES FOLDER "dependencies/wxWindows" CXX_STANDARD 14)
 endfunction()
 
-# --- zlib 1.1.4 (wx's copy) ------------------------------------------------------
-# The engine links this one on Win32, as the shipped exe does; x64 links
-# zlib 1.2.3 (cmake/deps/zlib).
-faf_wx_library(wx_zlib
-  zlib/adler32.c zlib/compress.c zlib/crc32.c zlib/gzio.c zlib/uncompr.c
-  zlib/deflate.c zlib/trees.c zlib/zutil.c zlib/inflate.c zlib/infblock.c
-  zlib/inftrees.c zlib/infcodes.c zlib/infutil.c zlib/inffast.c)
-# src/zlib/makefile.vc builds with its own CFLAGS: -O2, not makevc.env's /O1.
-target_compile_options(wx_zlib PRIVATE /O2)
+# wx's own zlib 1.1.4 is not built: libpng and the engine use zlib 1.2.3
+# (cmake/deps/zlib) on both architectures (issue #406).
 
 # --- libpng ----------------------------------------------------------------------
 faf_wx_library(wx_png
