@@ -588,7 +588,7 @@ namespace
     const int graphBottomY = graphHalfHeight + graphHeightBase;
 
     // 0x007F411A..0x007F413C: retained 10pt Courier New font handle.
-    CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(10, "Courier New");
+    moho::CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(10, "Courier New");
     CD3DFont* const font = fontHandle.tex;
 
     // 0x007F414F..0x007F41B8: vertical extents from font metrics (ceil + 1).
