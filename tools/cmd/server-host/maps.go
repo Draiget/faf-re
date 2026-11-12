@@ -20,6 +20,9 @@ type Map struct {
 	Players     int    `json:"players"`
 	Description string `json:"description"`
 	Source      string `json:"source"`
+	HasOptions  bool   `json:"has_options"` // plan WP17.20: its own <map>_options.lua (adaptive maps)
+
+	optionsFile string
 }
 
 var (
@@ -108,8 +111,14 @@ func scanMaps(dirs []mapDir) []Map {
 				continue
 			}
 			seen[id] = true
-			out = append(out, Map{ID: id, Name: name, File: "/maps/" + e.Name() + "/" + filepath.Base(files[0]),
-				Size: size, KM: kmOf(size), Players: players, Description: desc, Source: d.label})
+			mp := Map{ID: id, Name: name, File: "/maps/" + e.Name() + "/" + filepath.Base(files[0]),
+				Size: size, KM: kmOf(size), Players: players, Description: desc, Source: d.label}
+			if opts := strings.TrimSuffix(files[0], "_scenario.lua") + "_options.lua"; opts != files[0] {
+				if _, err := os.Stat(opts); err == nil {
+					mp.HasOptions, mp.optionsFile = true, opts
+				}
+			}
+			out = append(out, mp)
 		}
 	}
 	sort.Slice(out, func(i, j int) bool {

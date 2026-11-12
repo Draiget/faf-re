@@ -115,7 +115,7 @@ func TestValidateAndMatchFile(t *testing.T) {
 	if f := req.Seats[2].Faction; f < 1 || f > 4 {
 		t.Fatalf("random faction not resolved: %d", f)
 	}
-	l := &Lobby{ID: "l1", Name: "test", Control: req.Control, Seats: req.Seats, Options: map[string]string{"Victory": "sandbox"}}
+	l := &Lobby{ID: "l1", Name: "test", Control: req.Control, Seats: req.Seats, Options: map[string]any{"Victory": "sandbox"}}
 	text := matchFile(l, mp.File)
 	for _, want := range []string{"MatchLobbyControl = 'player'", "['1001'] = '" + req.Seats[0].token + "'", "ScenarioFile = '/maps/SCMP_009/SCMP_009_scenario.lua'",
 		"Victory = 'sandbox'", "PlayerName = 'O\\'Neil'", "AIPersonality = 'rush'", "StartSpot = 3"} {
@@ -127,8 +127,8 @@ func TestValidateAndMatchFile(t *testing.T) {
 		{Map: "nope", Seats: []Seat{{Kind: "human"}}},
 		{Map: "scmp_009", Seats: []Seat{{Kind: "ai"}}},
 		{Map: "scmp_009", Seats: make([]Seat, 9)},
-		{Map: "scmp_009", Seats: []Seat{{Kind: "human"}}, Options: map[string]string{"ScenarioFile": "/x"}},
-		{Map: "scmp_009", Seats: []Seat{{Kind: "human"}}, Options: map[string]string{"bad key": "1"}},
+		{Map: "scmp_009", Seats: []Seat{{Kind: "human"}}, Options: map[string]any{"ScenarioFile": "/x"}},
+		{Map: "scmp_009", Seats: []Seat{{Kind: "human"}}, Options: map[string]any{"bad key": "1"}},
 		{Map: "scmp_009", Seats: []Seat{{Kind: "ai", AI: "nobody"}, {Kind: "human"}}},
 		{Map: "scmp_009", Seats: []Seat{{Kind: "human", UID: 5}, {Kind: "human", UID: 5}}},
 		{Map: "scmp_009", Seats: []Seat{{Kind: "human"}}, Control: "anyone"},

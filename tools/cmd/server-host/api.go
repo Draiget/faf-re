@@ -21,6 +21,7 @@ type api struct {
 	m          *manager
 	maps       func() []Map
 	procDir    string
+	settings   *settingsSource // plan WP17.20
 	hostName   string
 }
 
@@ -91,6 +92,31 @@ func (a *api) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "plan": place(a.m.machine(), req)})
+	case p == "/api/v1/settings" && r.Method == http.MethodGet:
+		// Plan WP17.20: the lobby options, AIs and, with ?map=<id>, that map's own options, with their defaults.
+		var mp *Map
+		if id := r.URL.Query().Get("map"); id != "" {
+			for _, x := range a.maps() {
+				if x.ID == strings.ToLower(id) {
+					found := x
+					mp = &found
+				}
+			}
+			if mp == nil {
+				fail(w, http.StatusNotFound, fmt.Errorf("no map %q", id))
+				return
+			}
+		}
+		if a.settings == nil {
+			fail(w, http.StatusNotFound, errors.New("this host doesn't describe settings"))
+			return
+		}
+		s, err := a.settings.get(mp)
+		if err != nil {
+			fail(w, http.StatusBadGateway, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": s})
 	case p == "/api/v1/lobbies" && r.Method == http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "lobbies": a.m.list()})
 	case p == "/api/v1/lobbies" && r.Method == http.MethodPost:

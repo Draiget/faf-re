@@ -146,3 +146,25 @@ func TestParseCPUListAndNodeMeminfo(t *testing.T) {
 		t.Fatalf("got %v", kb)
 	}
 }
+
+func TestParseSettings(t *testing.T) {
+	data := []byte(`{"lobby": {"globalOpts": [
+	  {"key": "Victory", "label": "<LOC x>Victory Condition", "default": 1, "values": [{"key": "demoralization", "text": "<LOC y>Assassination"}, {"key": "sandbox", "text": "Sandbox"}]},
+	  {"key": "UnitCap", "label": "Unit Cap", "default": 2, "values": ["125", "250", "500"]}],
+	  "teamOptions": [], "AIOpts": [{"key": "CheatMult", "label": "Cheat", "default": 1, "values": [1.5, 2]}]},
+	 "ai": [{"key": "adaptive", "name": "<LOC z>AI: Adaptive", "rating": 600}],
+	 "map": [{"key": "automex", "label": "mexes", "default": 1, "values": [{"key": 1, "text": "enabled"}]}]}`)
+	s, err := parseSettings(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(s.Options) != 3 || s.Options[0].Default != "demoralization" || s.Options[0].Label != "Victory Condition" || s.Options[0].Values[0].Text != "Assassination" {
+		t.Fatalf("options %+v", s.Options)
+	}
+	if s.Options[1].Default != "250" || len(s.Options[1].Values) != 3 || s.Options[2].Group != "ai" || s.Options[2].Default != 1.5 {
+		t.Fatalf("plain values: %+v / %+v", s.Options[1], s.Options[2])
+	}
+	if len(s.AI) != 1 || s.AI[0].Name != "AI: Adaptive" || len(s.MapOptions) != 1 || s.MapOptions[0].Default != float64(1) {
+		t.Fatalf("ai %+v map %+v", s.AI, s.MapOptions)
+	}
+}

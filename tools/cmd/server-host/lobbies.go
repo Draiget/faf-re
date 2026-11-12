@@ -56,7 +56,7 @@ type Lobby struct {
 	Name           string            `json:"name"`
 	State          string            `json:"state"` // starting, lobby, game, ended, failed, stopped
 	Map            LobbyMap          `json:"map"`
-	Options        map[string]string `json:"options"`
+	Options        map[string]any    `json:"options"`
 	CPUs           []int             `json:"cpus"`
 	CPUsAllowed    string            `json:"cpus_allowed,omitempty"`
 	Port           int               `json:"port"`
@@ -90,7 +90,7 @@ type Lobby struct {
 type CreateRequest struct {
 	Name           string            `json:"name"`
 	Map            string            `json:"map"`
-	Options        map[string]string `json:"options"`
+	Options        map[string]any    `json:"options"`
 	Seats          []Seat            `json:"seats"`
 	Observers      []Observer        `json:"observers"`
 	ObserverDelay  float64           `json:"observer_delay_seconds"`
@@ -125,6 +125,8 @@ type manager struct {
 	nodes   func() []Node
 	links   func() []Link
 	procDir string
+	// Plan WP17.20: FAF's settings and defaults; nil without them (tests).
+	settings *settingsSource
 }
 
 func newManager(cfg config, maps func() []Map, cpus func() []CPU) *manager {
@@ -148,8 +150,9 @@ var (
 	fixedOptions = map[string]bool{"ScenarioFile": true, "TeamLock": true}
 )
 
-func defaultOptions() map[string]string {
-	return map[string]string{
+// defaultOptions is what a lobby starts from when the settings catalog can't be read (WP17.20 gives FAF's own).
+func defaultOptions() map[string]any {
+	return map[string]any{
 		"Victory": "demoralization", "Share": "FullShare", "UnitCap": "1000", "GameSpeed": "normal",
 		"FogOfWar": "explored", "CheatsEnabled": "false", "CivilianAlliance": "enemy", "Timeouts": "3",
 		"NoRushOption": "Off", "PrebuiltUnits": "Off", "RevealCivilians": "Yes", "TeamSpawn": "fixed", "Score": "no",
@@ -165,6 +168,20 @@ func randomHex(n int) string {
 func randomInt(n int) int {
 	v, _ := rand.Int(rand.Reader, big.NewInt(int64(n)))
 	return int(v.Int64())
+}
+
+// luaValue writes an option's value for Lua: a string quoted, a number as it is, true/false.
+func luaValue(v any) string {
+	switch value := v.(type) {
+	case float64:
+		return strconv.FormatFloat(value, 'f', -1, 64)
+	case bool:
+		return strconv.FormatBool(value)
+	case string:
+		return luaString(value)
+	default:
+		return luaString(fmt.Sprint(value))
+	}
 }
 
 // luaString quotes s for Lua, escaping what a single-quoted string can't hold.
@@ -228,8 +245,14 @@ func (m *manager) validate(req *CreateRequest) (Map, error) {
 		if !reOptionKey.MatchString(k) || fixedOptions[k] {
 			return mp, fmt.Errorf("game option %q can't be set", k)
 		}
-		if len(v) > 64 || strings.ContainsAny(v, "\n\r") {
-			return mp, fmt.Errorf("game option %s: value too long or not one line", k)
+		switch value := v.(type) {
+		case string:
+			if len(value) > 64 || strings.ContainsAny(value, "\n\r") {
+				return mp, fmt.Errorf("game option %s: value too long or not one line", k)
+			}
+		case float64, bool:
+		default:
+			return mp, fmt.Errorf("game option %s: a string, number or true/false", k)
 		}
 	}
 	humans := 0
@@ -350,7 +373,7 @@ func matchFile(l *Lobby, scenario string) string {
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		fmt.Fprintf(&b, "    %s = %s,\n", k, luaString(l.Options[k]))
+		fmt.Fprintf(&b, "    %s = %s,\n", k, luaValue(l.Options[k]))
 	}
 	b.WriteString("  },\n  PlayerOptions = {\n")
 	for _, s := range l.Seats {
@@ -526,7 +549,16 @@ func (m *manager) create(req CreateRequest) (*Lobby, int, error) {
 	if req.Name == "" {
 		req.Name = mp.Name
 	}
+	// Plan WP17.20: every option at FAF's default (the game's and the map's own), then the request's.
 	opts := defaultOptions()
+	if m.settings != nil {
+		if s, err := m.settings.get(&mp); err == nil {
+			opts = map[string]any{}
+			for _, o := range append(s.Options, s.MapOptions...) {
+				opts[o.Key] = o.Default
+			}
+		}
+	}
 	for k, v := range req.Options {
 		opts[k] = v
 	}
@@ -739,7 +771,7 @@ func (m *manager) snapshot(l *Lobby) *Lobby {
 	c.Seats = append([]Seat(nil), l.Seats...)
 	c.Observers = append([]Observer{}, l.Observers...)
 	c.CPUs = append([]int(nil), l.CPUs...)
-	c.Options = map[string]string{}
+	c.Options = map[string]any{}
 	for k, v := range l.Options {
 		c.Options[k] = v
 	}

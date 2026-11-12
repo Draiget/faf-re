@@ -137,7 +137,9 @@ func main() {
 		}
 		return readNodes("/sys/devices/system/node", ids)
 	}
-	a := &api{token: token, corsOrigin: *cors, m: m, maps: listMaps, procDir: "/proc", hostName: hostName()}
+	settings := &settingsSource{serverBin: *serverBin, engineArgs: strings.Fields(*engineArgs), workDir: *runs}
+	m.settings = settings
+	a := &api{token: token, corsOrigin: *cors, m: m, maps: listMaps, procDir: "/proc", hostName: hostName(), settings: settings}
 	srv := &http.Server{Addr: *listen, Handler: a, ReadHeaderTimeout: 5 * time.Second, MaxHeaderBytes: 16 << 10}
 
 	sig := make(chan os.Signal, 1)
