@@ -1881,6 +1881,16 @@ namespace faf::editor
         return true;
       }
 
+      /** Whether the mouse is over the game's view (its own window, where ImGui doesn't see the mouse). */
+      [[nodiscard]] bool MouseOverView() const
+      {
+        const HWND view = HandleOf(moho::ren_Viewport);
+        RECT rect{};
+        POINT cursor{};
+        return view != nullptr && ::IsWindowVisible(view) && ::GetWindowRect(view, &rect) && ::GetCursorPos(&cursor) &&
+          ::PtInRect(&rect, cursor) && ImGui::GetCurrentContext() != nullptr && !ImGui::GetIO().WantCaptureMouse;
+      }
+
       /** F6 while a play runs: the editor's view in front of it, or the game's again. */
       void ToggleEditorView()
       {
@@ -2592,6 +2602,13 @@ namespace faf::editor
       add("view.resetlayout", "Reset this workspace's layout", "View", "", [this] {
         mShell->ResetLayout();
       });
+      // Help: F1 the topic of the panel under the mouse (over the map view, the view's).
+      add("help.open", "Help", "Help", "F1", [this] {
+        mShell->OpenHelp(MouseOverView() ? std::string("view") : mShell->HelpTopicUnderMouse());
+      }, {}, {}, "The help topic of the panel under the mouse");
+      add("help.tour", "Tour", "Help", "", [this] {
+        mShell->StartTour();
+      }, {}, {}, "A few steps around the window");
       add("view.palette", "Command palette", "View", "Ctrl+K, Ctrl+Shift+P", [] {
         OpenCommandPalette();
       }, {}, {}, "Find any command by a few of its letters");
@@ -2811,6 +2828,7 @@ namespace faf::editor
            cmd("view.imguidemo")}
         },
         EdMenu{"&Play", {cmd("play.toggle"), cmd("play.editorview"), playMaps}},
+        EdMenu{"&Help", {cmd("help.open"), cmd("help.tour"), sep(), cmd("view.palette"), cmd("settings.keys")}},
       };
       const auto clashes = c.Clashes();
       for (const auto& [a, b] : clashes) {

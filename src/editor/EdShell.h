@@ -248,6 +248,10 @@ namespace faf::editor
     {
       return mShowHistory;
     }
+    /** Help (ui/EdHelpWindow.cpp): the Help window on a topic (ui/EdHelpTopics), F1's topic, the tour. */
+    void OpenHelp(const std::string& topic);
+    [[nodiscard]] std::string HelpTopicUnderMouse() const;
+    void StartTour();
     /** The scene's selection, said in the status bar as a count ("3 markers"). */
     void SetStatusSelection(
       std::string text
@@ -347,6 +351,13 @@ namespace faf::editor
     /** View > History (ui/EdHistoryPanel.cpp): the edits, a click goes back or forward to one. */
     void DrawHistoryPanel();
     bool mShowHistory = false;
+    void DrawHelpWindow();
+    void DrawTour();
+    bool mShowHelp = false;
+    bool mHelpFront = false;
+    std::string mHelpTopic = "view";
+    char mHelpSearch[96] = {};
+    int mTourStep = -1;
     bool mShowHome = false;
     bool mHomeFocusSearch = false;
     bool mHomeFront = false;

@@ -411,6 +411,8 @@ namespace faf::editor
     }
     DrawSaveAsDialog();
     DrawHome(top, statusHeight);
+    DrawHelpWindow();
+    DrawTour();
     DrawNewMapDialog();
     DrawPackageDialog();
     DrawStatusBar();
