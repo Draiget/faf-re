@@ -18,6 +18,8 @@
 #include "editor/doc/EdDocument.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/core/utils/Logging.h"
+#include "editor/ui/EdStatus.h"
+#include "editor/ui/EdThemeColors.h"
 #include "editor/ui/EdWorkspaces.h"
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -512,6 +514,7 @@ namespace faf::editor
     mTools.SetReadOnly(w.readOnly);
     ImGui::MarkIniSettingsDirty();
     gpg::Logf("editor: workspace %s", w.name);
+    PostStatusMessage(std::string(w.name) + " workspace");
   }
 
   void EdShell::DrawToolbar(
@@ -1577,30 +1580,105 @@ namespace faf::editor
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8.0f, 2.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     if (ImGui::Begin("##StatusBar", nullptr, kFlags)) {
-      ImGui::Text("%s", mApi.empty() ? "?" : mApi.c_str());
+      // The items (design §3), each with how much it is wanted when the window is narrow (0 always stays; the
+      // highest number goes first): the mode, warnings, cursor and ruler, selection, the last message, the undo step,
+      // then the renderer and the GPU.
+      enum class Look
+      {
+        Plain,
+        Dim,
+        Warn,
+        Accent
+      };
+      struct Item
+      {
+        std::string text;
+        int priority;
+        Look look;
+      };
+      std::vector<Item> items;
+      const EdWorkspace& workspace = Workspaces()[static_cast<std::size_t>(ActiveWorkspace())];
+      std::string mode = mPlay.Active() ? mPlay.StateText() : workspace.readOnly ? "Review (read-only)" : "Editing";
+      items.push_back({mApi.empty() ? "?" : mApi, 7, Look::Plain});
       if (!mAdapter.empty()) {
-        ImGui::SameLine();
-        ImGui::TextDisabled("| %s", mAdapter.c_str());
+        items.push_back({mAdapter, 8, Look::Dim});
       }
-      ImGui::SameLine();
-      ImGui::TextDisabled("| %s", mPlay.StateText());
+      items.push_back({mode, 0, mPlay.Active() || workspace.readOnly ? Look::Accent : Look::Dim});
       const int warnings = mLog.WarningCount();
+      const std::size_t warningsAt = items.size();
       if (warnings > 0) {
-        ImGui::SameLine();
-        ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "| %d warnings in the log", warnings);
+        items.push_back({std::to_string(warnings) + (warnings == 1 ? " warning" : " warnings"), 1, Look::Warn});
       }
       if (!mTools.CursorText().empty()) {
-        ImGui::SameLine();
-        ImGui::TextDisabled("| %s", mTools.CursorText().c_str());
+        items.push_back({mTools.CursorText(), 2, Look::Dim});
       }
       if (!mTools.RulerText().empty()) {
-        ImGui::SameLine();
-        ImGui::TextColored(ImVec4(1.0f, 0.86f, 0.40f, 1.0f), "| ruler %s", mTools.RulerText().c_str());
+        items.push_back({"ruler " + mTools.RulerText(), 2, Look::Warn});
       }
-      char text[32];
-      (void)std::snprintf(text, sizeof(text), "%.0f fps", ImGui::GetIO().Framerate);
-      ImGui::SameLine(ImGui::GetWindowWidth() - ImGui::CalcTextSize(text).x - 12.0f);
-      ImGui::TextUnformatted(text);
+      if (const std::string count = SelectionCountText(mStatusSelection); !count.empty()) {
+        items.push_back({count + " selected", 3, Look::Plain});
+      }
+      if (const char* const step = mDocument.UndoStepName(); step != nullptr) {
+        items.push_back({std::string("Undo: ") + step, 5, Look::Dim});
+      }
+      if (!StatusMessage().empty()) {
+        items.push_back({StatusMessage() + " (" + AgoText(StatusClock() - StatusMessageTime()) + ")", 4, Look::Dim});
+      }
+      char fps[32];
+      (void)std::snprintf(fps, sizeof(fps), "%.0f fps", ImGui::GetIO().Framerate);
+      const float fpsWidth = ImGui::CalcTextSize(fps).x;
+
+      const float gap = Em(18.0f);
+      std::vector<float> widths;
+      std::vector<int> priorities;
+      for (const Item& item : items) {
+        widths.push_back(ImGui::CalcTextSize(item.text.c_str()).x);
+        priorities.push_back(item.priority);
+      }
+      const float room = ImGui::GetContentRegionAvail().x - fpsWidth - gap;
+      const ImU32 dot = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+      bool first = true;
+      for (const std::size_t i : FitStatusItems(widths, priorities, room, gap)) {
+        const Item& item = items[i];
+        if (!first) {
+          ImGui::SameLine(0.0f, gap * 0.5f);
+          // A dot between items.
+          const ImVec2 at = ImGui::GetCursorScreenPos();
+          ImGui::GetWindowDrawList()->AddCircleFilled(
+            ImVec2(at.x - gap * 0.25f, at.y + ImGui::GetTextLineHeight() * 0.5f), Em(1.5f), dot
+          );
+          ImGui::SameLine(0.0f, gap * 0.5f);
+        }
+        first = false;
+        switch (item.look) {
+        case Look::Plain:
+          ImGui::TextUnformatted(item.text.c_str());
+          break;
+        case Look::Dim:
+          ImGui::TextDisabled("%s", item.text.c_str());
+          break;
+        case Look::Warn:
+          ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "%s", item.text.c_str());
+          break;
+        case Look::Accent:
+          ImGui::TextColored(AccentColor(), "%s", item.text.c_str());
+          break;
+        }
+        // The warnings open the log, where they are (the Problems panel takes this over when it exists).
+        if (i == warningsAt && warnings > 0) {
+          if (ImGui::IsItemHovered()) {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            ImGui::SetTooltip("Show the log");
+          }
+          if (ImGui::IsItemClicked()) {
+            mShowLog = true;
+            ImGui::SetWindowFocus(Panel(kLogWindow));
+            gpg::Logf("editor: status bar: the log, for its %d warnings", warnings);
+          }
+        }
+      }
+      ImGui::SameLine(ImGui::GetWindowWidth() - fpsWidth - Em(12.0f));
+      ImGui::TextUnformatted(fps);
     }
     ImGui::End();
     ImGui::PopStyleVar(2);

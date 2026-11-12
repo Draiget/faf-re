@@ -45,6 +45,7 @@ set(FAF_EDITOR_SOURCES
   ui/EdKeymap.cpp
   ui/EdKeysPage.cpp
   ui/EdWorkspaces.cpp
+  ui/EdStatus.cpp
   ui/EdWindowChrome.cpp
   ui/EdTitleBar.cpp
   ui/EdPalette.cpp

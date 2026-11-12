@@ -45,6 +45,7 @@
 #include "editor/ui/EdKeymap.h"
 #include "editor/ui/EdKeysPage.h"
 #include "editor/ui/EdPalette.h"
+#include "editor/ui/EdStatus.h"
 #include "editor/ui/EdTheme.h"
 #include "editor/ui/EdThemeStyle.h"
 #include "editor/ui/EdUiScale.h"
@@ -1231,6 +1232,7 @@ namespace faf::editor
         std::ofstream out(mKeysFile, std::ios::binary | std::ios::trunc);
         out << WriteKeymap(mCommands, mKeyDefaults);
         gpg::Logf("editor: keys written to %s", mKeysFile.string().c_str());
+        PostStatusMessage("Keys saved");
       }
 
       /** The tool strip shows each tool's key (tool.N). */
@@ -2255,6 +2257,14 @@ namespace faf::editor
     void EditorApp::UpdateTitle()
     {
       mCommands.SetTitle("play.toggle", mPlay.Active() ? "Stop" : "Play");
+      // Undo and Redo name their step (design §5); the status bar counts the selection.
+      const char* const undo = mDocument.UndoStepName();
+      const char* const redo = mDocument.RedoStepName();
+      mCommands.SetTitle("edit.undo", undo != nullptr ? std::string("Undo ") + undo : std::string("Undo"));
+      mCommands.SetTitle("edit.redo", redo != nullptr ? std::string("Redo ") + redo : std::string("Redo"));
+      if (mShell != nullptr) {
+        mShell->SetStatusSelection(mScene.Attached() ? mScene.SelectionText() : std::string());
+      }
       std::wstring title = mBaseTitle;
       if (mPlay.Active() && !mPlay.Maps().empty()) {
         const std::size_t at = static_cast<std::size_t>(mPlay.Selected());
@@ -3293,6 +3303,7 @@ namespace faf::editor
       std::string message;
       if (mDocument.Save(message)) {
         gpg::Logf("editor: %s", message.c_str());
+        PostStatusMessage("Saved " + mDocument.FolderName());
       } else {
         gpg::Warnf("editor: %s", message.c_str());
       }

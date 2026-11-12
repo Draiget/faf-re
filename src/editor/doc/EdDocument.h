@@ -570,6 +570,46 @@ namespace faf::editor
     {
       mUndoOrder.push_back(kind);
     }
+    /** What an edit of this kind is, for "Undo <step>" and the status bar: "height stroke", "props", ... */
+    [[nodiscard]] static const char* EditKindName(
+      const EditKind kind
+    ) noexcept
+    {
+      switch (kind) {
+      case EditKind::Heights:
+        return "height stroke";
+      case EditKind::Masks:
+        return "texture paint";
+      case EditKind::Layers:
+        return "texture layers";
+      case EditKind::Props:
+        return "props";
+      case EditKind::SaveData:
+        return "markers, units and armies";
+      case EditKind::Decals:
+        return "decals";
+      case EditKind::Water:
+        return "water";
+      case EditKind::Lighting:
+        return "lighting";
+      case EditKind::Skybox:
+        return "sky";
+      case EditKind::Waves:
+        return "waves";
+      case EditKind::TerrainTypes:
+        return "terrain types";
+      }
+      return "edit";
+    }
+    /** The step Undo (Redo) would take back, or null when there is none. */
+    [[nodiscard]] const char* UndoStepName() const noexcept
+    {
+      return mUndoOrder.empty() ? nullptr : EditKindName(mUndoOrder.back());
+    }
+    [[nodiscard]] const char* RedoStepName() const noexcept
+    {
+      return mRedoOrder.empty() ? nullptr : EditKindName(mRedoOrder.back());
+    }
     /** Whether there is an edit to undo (redo), for the toolbar. */
     [[nodiscard]] bool CanUndo() const noexcept
     {

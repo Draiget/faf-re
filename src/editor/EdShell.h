@@ -222,6 +222,13 @@ namespace faf::editor
      * the first time). The panels shown in the one left are kept for it.
      */
     void SwitchWorkspace(int workspace);
+    /** The scene's selection, said in the status bar as a count ("3 markers"). */
+    void SetStatusSelection(
+      std::string text
+    )
+    {
+      mStatusSelection = std::move(text);
+    }
     /** The ids of the panels shown now (PanelId), in the shell's order. */
     [[nodiscard]] std::vector<std::string> ShownPanelIds() const;
     /** File > Save as new map folder: the dialog asks for the folder's name. */
@@ -304,6 +311,7 @@ namespace faf::editor
     /** The workspaces whose dock space has been laid out this run. */
     std::vector<bool> mWorkspaceBuilt;
     bool mWorkspaceStarted = false;
+    std::string mStatusSelection;
     /** The toolbar under the title row: Play/Stop (F5) first, then New, Open, Save, Save as, Undo, Redo, and the open
      * map. `top` is where it starts (the title row's height). */
     EdMapBrowser mBrowser;
