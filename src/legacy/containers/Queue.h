@@ -42,7 +42,7 @@ namespace fa
       : _Mycont(cont)
     {}
 
-    // Копирование и присваивание – тривиальные, layout не меняют
+    // Copy and assignment are trivial and don't change the layout
     queue(
       const queue& other
     )
@@ -58,7 +58,7 @@ namespace fa
       return *this;
     }
 
-    // Можно добавить move, если собираешь под C++11+ (layout не трогает)
+    // Move operations for C++11 and later (they don't touch the layout)
     queue(
       queue&& other
     ) MSVC8_QUEUE_NOEXCEPT :
@@ -120,7 +120,7 @@ namespace fa
       _Mycont.push_back(value);
     }
 
-    // Опционально, если собираешься под C++11+
+    // Move push for C++11 and later
     void push(
       value_type&& value
     )
@@ -142,7 +142,7 @@ namespace fa
       swap(_Mycont, other._Mycont);
     }
 
-    // Доступ к контейнеру, если нужно мимикрировать STL
+    // Access to the underlying container, mirroring the STL
     container_type& _Get_container()
     {
       return _Mycont;
@@ -154,7 +154,7 @@ namespace fa
     }
   };
 
-  // Можно добавить свободную функцию swap, как в STL
+  // Free swap function, as in the STL
   template <class T, class C>
   inline void swap(
     queue<T, C>& a,
