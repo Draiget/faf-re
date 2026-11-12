@@ -1,6 +1,5 @@
 #include "moho/render/BounceLight.h"
 
-#include "moho/render/BoundDepthSupport.h"
 #include <algorithm>
 #include <cstdint>
 
@@ -12,6 +11,7 @@
 #include "moho/console/CConCommand.h"
 #include "moho/math/VMatrix4.h"
 #include "moho/render/BounceLightShader.h"
+#include "moho/render/BoundDepthSupport.h"
 #include "moho/render/camera/GeomCamera3.h"
 
 namespace moho

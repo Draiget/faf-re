@@ -1,6 +1,5 @@
 #include "moho/render/AmbientOcclusionRenderer.h"
 
-#include "moho/render/BoundDepthSupport.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -17,6 +16,7 @@
 #include "moho/console/CConCommand.h"
 #include "moho/math/VMatrix4.h"
 #include "moho/render/AmbientOcclusionShader.h"
+#include "moho/render/BoundDepthSupport.h"
 #include "moho/render/ID3DRenderTarget.h"
 #include "moho/render/Shadow.h"
 #include "moho/render/camera/GeomCamera3.h"
