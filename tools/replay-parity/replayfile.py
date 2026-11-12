@@ -194,15 +194,16 @@ def started_by_matchmaker(data, pos):
 
 
 def live_client_desync(recorded, beat, sim, theirs):
-    """True when a mismatch is the live game's, not ours: at that beat at least as many of the
-    recorded clients agree with the sim as with the one that differs (26946725: nine clients and
-    the sim on one checksum at beat 6700, Paulosan alone on another). A tie counts: two players
-    who split one against one each recorded their own checksum, and the sim matching one of them
-    exactly is not a bug of ours (run 41660446996: most of its desyncs). The game then goes on
-    checking against that side. `recorded` is replay_checksums() of the replay."""
-    votes = recorded.get(beat, {})
-    agree = len(votes.get(sim, []))
-    return agree > 0 and agree >= len(votes.get(theirs, []))
+    """True when a mismatch is the live game's, not ours: at that beat the live players recorded
+    different checksums and the sim's equals one of them exactly, so it played as a real client did
+    and no build can match both sides (26946725: nine clients and the sim on one checksum at beat
+    6700, Paulosan alone on another; run 41660446996: most of its desyncs, one against one). The
+    sim's side may be the smaller one: a player who leaves can split the rest (28083432: emi_nem
+    left at 7900, at 7950 three players on one checksum and two on the sim's, which the sim then
+    equals at all 107 split beats to the end). The client that differs is not checked again; the
+    sim's side still is, so a sim that leaves it later is a desync. `recorded` is
+    replay_checksums() of the replay."""
+    return theirs != sim and len(recorded.get(beat, {}).get(sim, [])) > 0
 
 
 MISMATCH_RE = re.compile(r"Checksum for beat (\d+) mismatched: ([0-9a-f]{32}) \(sim\) != ([0-9a-f]{32}) \((.*)\)\.")

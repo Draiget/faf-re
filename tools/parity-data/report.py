@@ -147,8 +147,9 @@ def main():
     live = [r for r in results.values() if r.get("live_desyncs")]
     if live:
         lines += ["## Live game split, these pass (%d)" % len(live), "",
-                  "The live players recorded different checksums at one beat and the sim equals the larger side or, "
-                  "when they tie, one of them. No build can match both, so this is not a desync.", ""]
+                  "The live players recorded different checksums at one beat and the sim's equals one of them, "
+                  "on the larger side or the smaller. No build can match both, so this is not a desync. The sim's "
+                  "side is still checked for the rest of the game; the listed players are not.", ""]
         lines += ["- %d: %s" % (r["id"], ", ".join("%s at beat %d" % (d["client"], d["beat"]) for d in r["live_desyncs"]))
                   for r in sorted(live, key=lambda r: r["id"])] + [""]
     passed = sorted((r for r in results.values() if r["verdict"] == "pass" and r.get("wall_s")), key=lambda r: r["id"])

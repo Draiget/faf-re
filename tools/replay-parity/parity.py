@@ -936,9 +936,8 @@ class Game:
                 self.notes.append(line.strip()[:200])
 
     def live_client_desync(self, beat, sim, theirs):
-        """True when the mismatch is the live game's, not ours: at that beat at least as many
-        of the recorded clients agree with the sim as with the one that differs (26946725: nine
-        clients and the sim on one checksum at beat 6700, Paulosan alone on another)."""
+        """True when the mismatch is the live game's, not ours: at that beat the sim's checksum
+        equals one a live player recorded (replayfile.live_client_desync)."""
         if self.recorded is None:
             try:
                 self.recorded = replay_checksums(open(pool_path(self.id, "scfareplay"), "rb").read())

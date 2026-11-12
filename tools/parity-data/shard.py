@@ -15,8 +15,9 @@ Verdicts are the parity runner's (tools/replay-parity/parity.py, HeadlessGame): 
 not be got ready) and not-run (no time left in the job, or stopped at its time limit; a later run
 with --after picks those up). What fits is judged by the plan's estimates times the ratio of
 measured to estimated time of the replays the job has finished. A mismatch is the live game's,
-not ours, when at least as many of the recorded clients agree with the sim at that beat as with
-the one that differs; that client is not counted again for the rest of the game (live_desyncs).
+not ours, when the live players recorded different checksums at that beat and the sim's equals
+one of them (replayfile.live_client_desync); the client that differs is not counted again for
+the rest of the game (live_desyncs).
 
 With --oracle-check (dedicated-server plan WPR.54) every replay plays unfocused with headless's
 --oracle-check: each beat, for every army, the visibility oracle against what the sim publishes
