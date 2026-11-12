@@ -321,20 +321,6 @@ namespace moho
     float mDopplerScaler;        // +0x60
   };
 
-  struct AudioEngineRef
-  {
-    AudioEngine* mEngine;                     // +0x00
-    boost::detail::sp_counted_base* mControl; // +0x04
-  };
-
-  struct AudioEngineRefVector
-  {
-    void* mAllocatorCookie;    // +0x00
-    AudioEngineRef* mStart;    // +0x04
-    AudioEngineRef* mFinish;   // +0x08
-    AudioEngineRef* mCapacity; // +0x0C
-  };
-
   struct SoundConfiguration
   {
     /**
@@ -352,7 +338,13 @@ namespace moho
     SoundConfiguration() noexcept;
 
     gpg::time::Timer mTime;                     // +0x00
-    AudioEngineRefVector mEngines;              // +0x08
+    /// Address: 0x004DE470 (FUN_004DE470 -- the element destroy range), 0x004DDFE0 (FUN_004DDFE0 -- the
+    /// checked element-array allocation), 0x004DD210 (FUN_004DD210 -- iterator offset), 0x004D9230 (FUN_004D9230 --
+    /// an element copy), 0x004DC3B0 (FUN_004DC3B0 -- `insert`), 0x004DB1D0 (FUN_004DB1D0 -- the `push_back` in
+    /// `AudioEngine::Create`) and 0x004DB240 (FUN_004DB240 -- `erase`) are this vector's
+    /// `fa::vector<boost::shared_ptr<AudioEngine>>` members; formerly hand-written over an `AudioEngineRef`
+    /// `{engine, control block}` pair in AudioEngine.cpp.
+    fa::vector<boost::shared_ptr<AudioEngine>> mEngines; // +0x08
     gpg::MemBuffer<char> mGlobalSettingsBuffer; // +0x18
     std::uint8_t mNoSound;                      // +0x28
     std::uint8_t mReserved29[0x03];             // +0x29
@@ -444,8 +436,6 @@ namespace moho
   static_assert(sizeof(Audio3DListener) == 0x34, "Audio3DListener size must be 0x34");
   static_assert(sizeof(Audio3DDspSettings) == 0x30, "Audio3DDspSettings size must be 0x30");
   static_assert(sizeof(Audio3DEmitter) == 0x64, "Audio3DEmitter size must be 0x64");
-  static_assert(sizeof(AudioEngineRef) == 0x08, "AudioEngineRef size must be 0x08");
-  static_assert(sizeof(AudioEngineRefVector) == 0x10, "AudioEngineRefVector size must be 0x10");
   static_assert(offsetof(SoundConfiguration, mTime) == 0x00, "SoundConfiguration::mTime offset must be 0x00");
   static_assert(offsetof(SoundConfiguration, mEngines) == 0x08, "SoundConfiguration::mEngines offset must be 0x08");
   static_assert(

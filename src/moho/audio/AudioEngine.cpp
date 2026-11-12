@@ -57,8 +57,7 @@ namespace
   bool IsSoundEnabled()
   {
     const moho::SoundConfiguration* const soundConfiguration = moho::sSoundConfiguration.get();
-    return soundConfiguration != nullptr && soundConfiguration->mEngines.mStart != nullptr &&
-      soundConfiguration->mEngines.mFinish != soundConfiguration->mEngines.mStart && soundConfiguration->mNoSound == 0;
+    return soundConfiguration != nullptr && !soundConfiguration->mEngines.empty() && soundConfiguration->mNoSound == 0;
   }
 
   [[maybe_unused]] const bool gSoundEnabledSet = (moho::sSoundEnabled = &IsSoundEnabled, true);
@@ -126,86 +125,6 @@ namespace
 namespace moho
 {
   const char* func_SoundErrorCodeToMsg(int errorCode);
-}
-
-/**
- * Address: 0x004DE470 (FUN_004DE470)
- *
- * What it does:
- * Releases one contiguous range of `AudioEngineRef` control lanes.
- */
-[[nodiscard]] std::uintptr_t ReleaseAudioEngineRefControlRange(
-  moho::AudioEngineRef* const begin,
-  moho::AudioEngineRef* const end
-) noexcept
-{
-  std::uintptr_t lastControlAddress = 0u;
-  if (begin == nullptr || end == nullptr) {
-    return lastControlAddress;
-  }
-
-  for (moho::AudioEngineRef* entry = begin; entry != end; ++entry) {
-    auto* const control = entry->mControl;
-    if (control == nullptr) {
-      continue;
-    }
-
-    lastControlAddress = reinterpret_cast<std::uintptr_t>(control);
-    control->release();
-  }
-
-  return lastControlAddress;
-}
-
-namespace
-{
-  /**
-   * The payload half of `sp_counted_impl_p<AudioEngineImpl*>`. Deriving from
-   * boost's own control-block base puts the vptr and both counts exactly where
-   * boost puts them, so the owned-pointer slot lands at +0x0C without this
-   * file having to name a vtable lane of its own.
-   */
-  struct SpCountedImplAudioEngineBlock : boost::detail::sp_counted_base
-  {
-    moho::AudioEngineImpl** mOwnedSlot; // +0x0C
-  };
-
-  static_assert(sizeof(SpCountedImplAudioEngineBlock) == 0x10, "SpCountedImplAudioEngineBlock size must be 0x10");
-
-  void DestroyAudioEngineImplOwnedSlotCore(
-    moho::AudioEngineImpl** const ownedSlot
-  ) noexcept
-  {
-    if (ownedSlot == nullptr) {
-      return;
-    }
-
-    moho::AudioEngineImpl* const impl = *ownedSlot;
-    if (impl != nullptr) {
-      impl->~AudioEngineImpl();
-      operator delete(impl);
-    }
-
-    operator delete(ownedSlot);
-  }
-} // namespace
-
-/**
- * Address: 0x004DE750 (FUN_004DE750)
- *
- * What it does:
- * Releases one `sp_counted_impl_p<AudioEngine>` owned slot by destroying the
- * pointed `AudioEngineImpl` and deleting the slot storage.
- */
-[[maybe_unused]] void DestroyAudioEngineImplOwnedByCountedBlock(
-  SpCountedImplAudioEngineBlock* const countedBlock
-) noexcept
-{
-  if (countedBlock == nullptr) {
-    return;
-  }
-
-  DestroyAudioEngineImplOwnedSlotCore(countedBlock->mOwnedSlot);
 }
 
 namespace
@@ -766,248 +685,6 @@ namespace
   }
 
   /**
-   * Address: 0x004DDFE0 (FUN_004DDFE0)
-   *
-   * What it does:
-   * Allocates one contiguous array of `AudioEngineRef` elements (8 bytes
-   * each on x86) and raises `std::bad_alloc` when element-count
-   * multiplication overflows.
-   */
-  [[nodiscard]] void* AllocateAudioEngineRefArrayChecked(
-    const std::uint32_t elementCount
-  )
-  {
-    constexpr std::size_t kElementBytes = sizeof(moho::AudioEngineRef);
-    if (elementCount != 0u && (std::numeric_limits<std::uint32_t>::max() / elementCount) < kElementBytes) {
-      throw std::bad_alloc{};
-    }
-
-    return operator new(static_cast<std::size_t>(elementCount) * kElementBytes);
-  }
-
-  /**
-   * Address: 0x004DD210 (FUN_004DD210)
-   *
-   * What it does:
-   * Stores one `AudioEngineRef*` advanced by one element index.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::AudioEngineRef** ComputeAudioEngineRefOffset(
-    moho::AudioEngineRef** const outSlot,
-    moho::AudioEngineRef* const* const base,
-    const int index
-  ) noexcept
-  {
-    *outSlot = *base + index;
-    return outSlot;
-  }
-
-  [[maybe_unused]] void ReserveEngineRefCapacity(
-    moho::AudioEngineRefVector& engines,
-    const std::size_t requiredCount
-  )
-  {
-    const std::size_t currentCount = engines.mStart == nullptr || engines.mFinish == nullptr
-      ? 0u
-      : static_cast<std::size_t>(engines.mFinish - engines.mStart);
-    const std::size_t currentCapacity = engines.mStart == nullptr || engines.mCapacity == nullptr
-      ? 0u
-      : static_cast<std::size_t>(engines.mCapacity - engines.mStart);
-    if (requiredCount <= currentCapacity) {
-      return;
-    }
-
-    const std::size_t targetCapacity = (std::max)(requiredCount, currentCapacity == 0u ? 4u : currentCapacity * 2u);
-    if (targetCapacity > std::numeric_limits<std::uint32_t>::max()) {
-      throw std::bad_alloc{};
-    }
-
-    auto* const newStorage = static_cast<moho::AudioEngineRef*>(
-      AllocateAudioEngineRefArrayChecked(static_cast<std::uint32_t>(targetCapacity))
-    );
-    if (currentCount != 0u) {
-      // Trivially relocatable element array copy in the owning array's growth path.
-      std::memcpy(newStorage, engines.mStart, currentCount * sizeof(moho::AudioEngineRef));
-    }
-
-    operator delete(engines.mStart);
-    engines.mStart = newStorage;
-    engines.mFinish = newStorage + currentCount;
-    engines.mCapacity = newStorage + targetCapacity;
-  }
-
-  [[nodiscard]] const boost::SharedPtrLayout<moho::AudioEngine>& AsSharedLayout(
-    const boost::shared_ptr<moho::AudioEngine>& value
-  )
-  {
-    return *reinterpret_cast<const boost::SharedPtrLayout<moho::AudioEngine>*>(&value);
-  }
-
-  static_assert(
-    sizeof(moho::AudioEngineRef) == sizeof(boost::SharedCountPair),
-    "AudioEngineRef size must match SharedCountPair"
-  );
-
-  [[nodiscard]] boost::SharedCountPair* AsSharedCountPair(
-    moho::AudioEngineRef* const ref
-  ) noexcept
-  {
-    return reinterpret_cast<boost::SharedCountPair*>(ref);
-  }
-
-  [[nodiscard]] const boost::SharedCountPair* AsSharedCountPair(
-    const moho::AudioEngineRef* const ref
-  ) noexcept
-  {
-    return reinterpret_cast<const boost::SharedCountPair*>(ref);
-  }
-
-  /**
-   * Address: 0x004D9230 (FUN_004D9230)
-   *
-   * What it does:
-   * Copies one `shared_ptr<AudioEngine>` layout from one stored engine-ref
-   * lane and retains the shared control block when present.
-   */
-  [[nodiscard]] boost::shared_ptr<moho::AudioEngine> CopyEngineRefShared(
-    const moho::AudioEngineRef& ref
-  )
-  {
-    boost::shared_ptr<moho::AudioEngine> result;
-    auto& view = *reinterpret_cast<boost::SharedPtrLayout<moho::AudioEngine>*>(&result);
-    view.px = ref.mEngine;
-    view.pi = ref.mControl;
-    if (view.pi != nullptr) {
-      view.pi->add_ref_copy();
-    }
-    return result;
-  }
-
-  /**
-   * Address: 0x004DC3B0 (FUN_004DC3B0)
-   *
-   * What it does:
-   * Inserts one shared audio-engine pair at the requested vector position,
-   * shifting existing lanes or reallocating storage as needed while preserving
-   * shared-control retain/release semantics.
-   */
-  void InsertAudioEngineRefAt(
-    moho::AudioEngineRefVector& refs,
-    moho::AudioEngineRef* insertAt,
-    const boost::shared_ptr<moho::AudioEngine>& engineRef
-  )
-  {
-    constexpr std::size_t kMaxAudioEngineRefs = 0x1FFFFFFFu;
-
-    const auto& incoming = AsSharedLayout(engineRef);
-    struct SharedPairRetainGuard
-    {
-      boost::SharedCountPair value;
-      ~SharedPairRetainGuard()
-      {
-        if (value.pi != nullptr) {
-          value.pi->release();
-        }
-      }
-    } retained{{incoming.px, incoming.pi}};
-    if (retained.value.pi != nullptr) {
-      retained.value.pi->add_ref_copy();
-    }
-
-    const std::size_t size =
-      refs.mStart == nullptr || refs.mFinish == nullptr ? 0u : static_cast<std::size_t>(refs.mFinish - refs.mStart);
-    const std::size_t capacity =
-      refs.mStart == nullptr || refs.mCapacity == nullptr ? 0u : static_cast<std::size_t>(refs.mCapacity - refs.mStart);
-
-    if (size >= kMaxAudioEngineRefs) {
-      throw std::length_error("vector<T> too long");
-    }
-
-    std::size_t insertIndex = size;
-    if (refs.mStart != nullptr && insertAt != nullptr) {
-      insertIndex = static_cast<std::size_t>(insertAt - refs.mStart);
-      if (insertIndex > size) {
-        insertIndex = size;
-      }
-    }
-
-    if (size < capacity && refs.mStart != nullptr) {
-      moho::AudioEngineRef* const position = refs.mStart + insertIndex;
-      if (position != refs.mFinish) {
-        for (moho::AudioEngineRef* dst = refs.mFinish; dst != position; --dst) {
-          moho::AudioEngineRef* const src = dst - 1;
-          if (dst != refs.mFinish && dst->mControl != nullptr) {
-            dst->mControl->release();
-          }
-          dst->mEngine = src->mEngine;
-          dst->mControl = src->mControl;
-          if (dst->mControl != nullptr) {
-            dst->mControl->add_ref_copy();
-          }
-        }
-
-        if (position->mControl != nullptr) {
-          position->mControl->release();
-        }
-      }
-
-      position->mEngine = static_cast<moho::AudioEngine*>(retained.value.px);
-      position->mControl = retained.value.pi;
-      if (position->mControl != nullptr) {
-        position->mControl->add_ref_copy();
-      }
-      ++refs.mFinish;
-      return;
-    }
-
-    std::size_t newCapacity = 0u;
-    if (kMaxAudioEngineRefs - (capacity >> 1u) >= capacity) {
-      newCapacity = capacity + (capacity >> 1u);
-    }
-    if (newCapacity < size + 1u) {
-      newCapacity = size + 1u;
-    }
-    if (newCapacity > kMaxAudioEngineRefs) {
-      throw std::length_error("vector<T> too long");
-    }
-
-    auto* const newStorage =
-      static_cast<moho::AudioEngineRef*>(AllocateAudioEngineRefArrayChecked(static_cast<std::uint32_t>(newCapacity)));
-
-    moho::AudioEngineRef* write = newStorage;
-    for (std::size_t i = 0; i < insertIndex; ++i, ++write) {
-      write->mEngine = refs.mStart[i].mEngine;
-      write->mControl = refs.mStart[i].mControl;
-      if (write->mControl != nullptr) {
-        write->mControl->add_ref_copy();
-      }
-    }
-
-    write->mEngine = static_cast<moho::AudioEngine*>(retained.value.px);
-    write->mControl = retained.value.pi;
-    if (write->mControl != nullptr) {
-      write->mControl->add_ref_copy();
-    }
-    ++write;
-
-    for (std::size_t i = insertIndex; i < size; ++i, ++write) {
-      write->mEngine = refs.mStart[i].mEngine;
-      write->mControl = refs.mStart[i].mControl;
-      if (write->mControl != nullptr) {
-        write->mControl->add_ref_copy();
-      }
-    }
-
-    if (refs.mStart != nullptr) {
-      (void)ReleaseAudioEngineRefControlRange(refs.mStart, refs.mFinish);
-      operator delete(refs.mStart);
-    }
-
-    refs.mStart = newStorage;
-    refs.mFinish = newStorage + size + 1u;
-    refs.mCapacity = newStorage + newCapacity;
-  }
-
-  /**
    * Address: 0x004DB1D0 (FUN_004DB1D0)
    *
    * What it does:
@@ -1019,43 +696,10 @@ namespace
     const boost::shared_ptr<moho::AudioEngine>& engineRef
   )
   {
-    const auto& engineLayout = AsSharedLayout(engineRef);
-    if (engineLayout.px == nullptr) {
+    if (engineRef.get() == nullptr) {
       return;
     }
-
-    moho::AudioEngineRefVector& engines = configuration.mEngines;
-    InsertAudioEngineRefAt(engines, engines.mFinish, engineRef);
-  }
-
-  /**
-   * Address: 0x004DB240 (FUN_004DB240)
-   *
-   * What it does:
-   * Erases one `AudioEngineRef` lane at `eraseAt` by shifting the tail
-   * `[eraseAt + 1, mFinish)` left, releasing the final duplicated control lane,
-   * decrementing `mFinish`, and returning/storing the next iterator lane.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::AudioEngineRef** EraseAudioEngineRefAndStoreNext(
-    moho::AudioEngineRefVector& refs,
-    moho::AudioEngineRef** const outNext,
-    moho::AudioEngineRef* const eraseAt
-  )
-  {
-    const moho::AudioEngineRef* const oldFinish = refs.mFinish;
-    boost::SharedCountPair* destination = AsSharedCountPair(eraseAt);
-    const boost::SharedCountPair* source = AsSharedCountPair(eraseAt + 1);
-    const boost::SharedCountPair* const sourceEnd = AsSharedCountPair(oldFinish);
-    while (source != sourceEnd) {
-      (void)boost::AssignSharedPairRetain(destination, source);
-      ++destination;
-      ++source;
-    }
-
-    (void)ReleaseAudioEngineRefControlRange(refs.mFinish - 1, refs.mFinish);
-    refs.mFinish -= 1;
-    *outNext = eraseAt;
-    return outNext;
+    configuration.mEngines.push_back(engineRef);
   }
 
   /**
@@ -1150,10 +794,7 @@ namespace
     loader->mName.mySize = 0u;
     loader->mName.bx.buf[0] = '\0';
 
-    auto& bufferOwner = reinterpret_cast<boost::SharedPtrLayout<char>&>(loader->mBuffer.mData);
-    if (bufferOwner.pi != nullptr) {
-      bufferOwner.pi->release();
-    }
+    loader->mBuffer.mData.reset();
   }
 
   /**
@@ -1954,19 +1595,17 @@ namespace moho
    */
   SoundConfiguration::~SoundConfiguration()
   {
-    if (mEngines.mStart != nullptr && mEngines.mFinish != nullptr) {
-      for (AudioEngineRef* entry = mEngines.mStart; entry != mEngines.mFinish; ++entry) {
-        AudioEngine* const engine = entry->mEngine;
-        if (engine == nullptr) {
-          continue;
-        }
+    for (const boost::shared_ptr<AudioEngine>& entry : mEngines) {
+      AudioEngine* const engine = entry.get();
+      if (engine == nullptr) {
+        continue;
+      }
 
-        AudioEngineImpl* const impl = engine->mImpl;
-        engine->mImpl = nullptr;
-        if (impl != nullptr) {
-          impl->~AudioEngineImpl();
-          operator delete(impl);
-        }
+      AudioEngineImpl* const impl = engine->mImpl;
+      engine->mImpl = nullptr;
+      if (impl != nullptr) {
+        impl->~AudioEngineImpl();
+        operator delete(impl);
       }
     }
 
@@ -1975,31 +1614,12 @@ namespace moho
       mAudioModule = nullptr;
     }
 
-    if (mEngines.mStart != nullptr) {
-      for (AudioEngineRef* entry = mEngines.mStart; entry != mEngines.mFinish; ++entry) {
-        auto* const control = entry->mControl;
-        if (control != nullptr) {
-          control->release();
-        }
-        entry->mEngine = nullptr;
-        entry->mControl = nullptr;
-      }
-      operator delete[](mEngines.mStart);
-    }
-
-    mEngines.mAllocatorCookie = nullptr;
-    mEngines.mStart = nullptr;
-    mEngines.mFinish = nullptr;
-    mEngines.mCapacity = nullptr;
+    // The engine references are released, and the storage freed, by `mEngines`' own destructor.
   }
 
   std::uint32_t SoundConfiguration::EngineCount() const
   {
-    if (mEngines.mStart == nullptr || mEngines.mFinish == nullptr) {
-      return 0u;
-    }
-
-    return static_cast<std::uint32_t>(mEngines.mFinish - mEngines.mStart);
+    return static_cast<std::uint32_t>(mEngines.size());
   }
 
   AudioEngineImpl* SoundConfiguration::EngineImplAt(
@@ -2011,7 +1631,7 @@ namespace moho
       return nullptr;
     }
 
-    AudioEngine* const engine = mEngines.mStart[index].mEngine;
+    AudioEngine* const engine = mEngines[index].get();
     if (engine == nullptr) {
       return nullptr;
     }
@@ -2294,14 +1914,11 @@ namespace moho
     }
 
     const SoundConfiguration* const configuration = sSoundConfiguration.get();
-    if (
-      configuration == nullptr || configuration->mEngines.mStart == nullptr ||
-      configuration->mEngines.mStart == configuration->mEngines.mFinish || configuration->mNoSound != 0u
-    ) {
+    if (configuration == nullptr || configuration->mEngines.empty() || configuration->mNoSound != 0u) {
       return false;
     }
 
-    AudioEngine* const engine = configuration->mEngines.mStart->mEngine;
+    AudioEngine* const engine = configuration->mEngines[0].get();
     if (engine == nullptr || engine->mImpl == nullptr || engine->mImpl->mInstance == nullptr) {
       return false;
     }
@@ -2324,14 +1941,11 @@ namespace moho
   )
   {
     const SoundConfiguration* const configuration = sSoundConfiguration.get();
-    if (
-      configuration == nullptr || configuration->mEngines.mStart == nullptr ||
-      configuration->mEngines.mStart == configuration->mEngines.mFinish || configuration->mNoSound != 0u
-    ) {
+    if (configuration == nullptr || configuration->mEngines.empty() || configuration->mNoSound != 0u) {
       return gpg::NaN;
     }
 
-    AudioEngine* const engine = configuration->mEngines.mStart->mEngine;
+    AudioEngine* const engine = configuration->mEngines[0].get();
     if (engine == nullptr || engine->mImpl == nullptr || engine->mImpl->mInstance == nullptr) {
       return gpg::NaN;
     }
@@ -2357,14 +1971,11 @@ namespace moho
   )
   {
     const SoundConfiguration* const configuration = sSoundConfiguration.get();
-    if (
-      configuration == nullptr || configuration->mEngines.mStart == nullptr ||
-      configuration->mEngines.mStart == configuration->mEngines.mFinish || configuration->mNoSound != 0u
-    ) {
+    if (configuration == nullptr || configuration->mEngines.empty() || configuration->mNoSound != 0u) {
       return;
     }
 
-    AudioEngine* const engine = configuration->mEngines.mStart->mEngine;
+    AudioEngine* const engine = configuration->mEngines[0].get();
     if (engine == nullptr || engine->mImpl == nullptr || engine->mImpl->mInstance == nullptr) {
       return;
     }
@@ -2388,18 +1999,14 @@ namespace moho
   )
   {
     SoundConfiguration* const configuration = sSoundConfiguration.get();
-    if (
-      configuration == nullptr || bankName == nullptr || configuration->mEngines.mStart == nullptr ||
-      configuration->mEngines.mFinish == nullptr
-    ) {
+    if (configuration == nullptr || bankName == nullptr || configuration->mEngines.empty()) {
       return {};
     }
 
-    const std::size_t engineCount =
-      static_cast<std::size_t>(configuration->mEngines.mFinish - configuration->mEngines.mStart);
+    const std::size_t engineCount = configuration->mEngines.size();
     for (std::size_t engineIndex = 0; engineIndex < engineCount; ++engineIndex) {
-      const AudioEngineRef& engineRef = configuration->mEngines.mStart[engineIndex];
-      AudioEngine* const engine = engineRef.mEngine;
+      const boost::shared_ptr<AudioEngine>& engineRef = configuration->mEngines[engineIndex];
+      AudioEngine* const engine = engineRef.get();
       if (engine == nullptr || engine->mImpl == nullptr || engine->mImpl->mBanks.empty()) {
         continue;
       }
@@ -2410,7 +2017,7 @@ namespace moho
         if (loader == nullptr || ::_stricmp(bankName, loader->mName.c_str()) != 0) {
           continue;
         }
-        return CopyEngineRefShared(engineRef);
+        return engineRef;
       }
     }
 
@@ -2545,6 +2152,9 @@ namespace moho
 
     AudioEngine* const createdEngine = new AudioEngine(voicePath);
 
+    // Address: 0x004DE750 (FUN_004DE750 -- this shared_ptr's `sp_counted_impl_p<AudioEngine>::dispose`: deletes the
+    // engine, whose destructor deletes its `AudioEngineImpl`; formerly `DestroyAudioEngineImplOwnedByCountedBlock`
+    // over a hand-made control-block layout in this file.)
     boost::shared_ptr<AudioEngine> result(createdEngine);
     if (sSoundConfiguration && createdEngine != nullptr) {
       RegisterEngineRef(*sSoundConfiguration, result);
