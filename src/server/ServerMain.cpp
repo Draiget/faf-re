@@ -59,6 +59,7 @@
 #include "moho/app/IWinApp.h"
 #include "moho/app/WinApp.h"
 #include "moho/core/ThreadPlacement.h"
+#include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/math/MathReflection.h"
 #include "moho/misc/LaunchInfoBase.h"
@@ -108,7 +109,8 @@ namespace
   constexpr const char* kServerName = "server";
 
   constexpr const char* kUsage =
-    "usage: server --match <file.lua> --out <dir> /init <init.lua> | --data <dir> [--cpus <list>] [--full-effects] "
+    "usage: server --match <file.lua> --out <dir> /init <init.lua> | --data <dir> [--describe-settings <file.json> "
+    "[--map <scenario>]] [--cpus <list>] [--full-effects] "
     "[--speed <n>] "
     "[--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
     "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] "
@@ -1110,6 +1112,101 @@ namespace
     } else {
       out += "null";
     }
+  }
+
+  /**
+   * Plan WP17.20: the settings a lobby can set, as FAF's own Lua defines them (they are computed: loops, functions),
+   * run through the engine's import on the game's mounted data, as JSON: `lobby` the tables of
+   * `/lua/ui/lobby/lobbyOptions.lua` (`globalOpts`, `teamOptions`, `AIOpts`), `ai` what
+   * `/lua/ui/lobby/aitypes.lua`'s `GetAItypes()` answers (mod AIs included), and `map` the `options` of the map's
+   * `<map>_options.lua` when `mapScenario` names a map that has one (adaptive maps). Exit 0 when written.
+   */
+  [[nodiscard]] int DescribeSettings(
+    const std::string& outPath,
+    const std::string& mapScenario,
+    const std::string& mapOptions
+  )
+  {
+    // A Lua state with the engine's "Core" bindings (doscript, the disk access `import` uses) and FAF's `import`
+    // (/lua/system/import.lua) with the string and table helpers (/lua/system/utils.lua), as /lua/RuleInit.lua sets up
+    // the rules state. Not /lua/globalInit.lua: its localization and audio setup reach for user-side bindings
+    // (AudioSetLanguage) a server doesn't have, and the option files need none of it.
+    static LuaPlus::LuaState sState(LuaPlus::LuaState::LIB_BASE);
+    LuaPlus::LuaState* const state = &sState;
+    if (moho::CScrLuaInitFormSet* const core = moho::SCR_FindLuaInitFormSet("Core"); core != nullptr) {
+      core->RunInits(state);
+    }
+    (void)moho::SCR_LuaDoString("__diskwatch = {}", state); // globalInit.lua makes it before import.lua uses it
+    // aitypes.lua's GetAItypes() reads the player's selected mods (mods.lua GetSelectedMods -> GetPreference, a user
+    // binding): a server has no player preferences, so every preference is its default (no mod selected).
+    (void)moho::SCR_LuaDoString("GetPreference = function(_, default) return default end", state);
+    for (const char* const script : {"/lua/system/import.lua", "/lua/system/utils.lua"}) {
+      if (!moho::SCR_LuaDoScript(state, script, nullptr)) {
+        std::printf("--describe-settings: %s didn't run (is the game's data mounted? /init)\n", script);
+        return kExitBadInput;
+      }
+    }
+    std::string json = "{";
+    const auto moduleTables = [&](const char* const module, std::initializer_list<const char*> names) {
+      LuaPlus::LuaObject object = moho::SCR_Import(state, module);
+      std::string part = "{";
+      bool first = true;
+      for (const char* const name : names) {
+        LuaPlus::LuaObject value = object.IsTable() ? object[name] : LuaPlus::LuaObject(state);
+        part += std::string(first ? "" : ",") + faf::server::JsonString(name) + ":";
+        first = false;
+        LuaToJson(value, part);
+      }
+      return part + "}";
+    };
+    json += "\"lobby\":" + moduleTables("/lua/ui/lobby/lobbyOptions.lua", {"globalOpts", "teamOptions", "AIOpts"});
+    // (a module that failed to import is reported in the log by SCR_Import and comes out as nulls here)
+    {
+      LuaPlus::LuaObject aitypes = moho::SCR_Import(state, "/lua/ui/lobby/aitypes.lua");
+      LuaPlus::LuaObject get = aitypes.IsTable() ? aitypes["GetAItypes"] : LuaPlus::LuaObject(state);
+      json += ",\"ai\":";
+      if (get.IsFunction()) {
+        LuaPlus::LuaFunction<LuaPlus::LuaObject> call(get);
+        LuaToJson(call(), json);
+      } else {
+        json += "null";
+      }
+    }
+    json += ",\"map\":";
+    // `mapOptions`: the map's <map>_options.lua as a file on disk (the host knows each map's folder; a vault map's
+    // isn't always mounted under /maps/); else derived from a mounted scenario path.
+    std::string text;
+    if (!mapOptions.empty()) {
+      std::ifstream file(mapOptions, std::ios::binary);
+      text.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+    }
+    LuaPlus::LuaObject mapTable(state);
+    if (!text.empty()) {
+      (void)moho::SCR_LuaDoString("options = nil", state);
+      if (moho::SCR_LuaDoString(text.c_str(), state)) {
+        mapTable = state->GetGlobal("options");
+      }
+    } else if (const std::size_t at = mapScenario.rfind("_scenario.lua"); at != std::string::npos) {
+      LuaPlus::LuaObject env;
+      env.AssignNewTable(state, 0, 0);
+      if (moho::SCR_LuaDoFile(state, (mapScenario.substr(0, at) + "_options.lua").c_str(), &env)) {
+        mapTable = env["options"];
+      }
+    }
+    if (mapTable.IsTable()) {
+      LuaToJson(mapTable, json);
+    } else {
+      json += "null";
+    }
+    json += "}\n";
+    std::ofstream out(outPath, std::ios::binary | std::ios::trunc);
+    out << json;
+    if (!out) {
+      std::printf("--describe-settings: cannot write %s\n", outPath.c_str());
+      return kExitBadInput;
+    }
+    std::printf("Settings: %zu bytes of JSON in %s\n", json.size(), outPath.c_str());
+    return 0;
   }
 
   void WriteResult(
@@ -3228,7 +3325,16 @@ int main(
 
   std::string matchPath;
   std::string outDir;
-  if (!ReadOption("--match", matchPath) || !ReadOption("--out", outDir)) {
+  // Plan WP17.20: `--describe-settings <file.json> [--map <scenario>]` writes the game's settings and exits.
+  std::string describePath;
+  const bool describe = ReadOption("--describe-settings", describePath);
+  if (describe && !ReadOption("--out", outDir)) {
+    outDir = std::filesystem::path(describePath).parent_path().string();
+    if (outDir.empty()) {
+      outDir = ".";
+    }
+  }
+  if (!describe && (!ReadOption("--match", matchPath) || !ReadOption("--out", outDir))) {
     std::printf("%s", kUsage);
     return kExitBadInput;
   }
@@ -3302,6 +3408,21 @@ int main(
   moho::USER_LoadPreferences(fa::string("Game.prefs"));
   platform::SetX87PrecisionControl(_PC_24);
   moho::PlaceCurrentThread(moho::EThreadRole::Main);
+  if (describe) {
+    std::string mapScenario;
+    std::string mapOptions;
+    (void)ReadOption("--map", mapScenario);
+    (void)ReadOption("--map-options-file", mapOptions);
+    int describeCode = kExitBadInput;
+    try {
+      describeCode = DescribeSettings(describePath, mapScenario, mapOptions);
+    } catch (const std::exception& error) {
+      std::printf("--describe-settings: %s\n", error.what());
+    }
+    // Nothing of a game was made: leave without the engine's teardown, which expects a session.
+    std::fflush(stdout);
+    std::_Exit(describeCode);
+  }
 
   int code = kExitCrash;
   SMatchEnd end;
