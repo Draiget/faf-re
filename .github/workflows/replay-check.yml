@@ -49,7 +49,7 @@ env:
   # api-ms-win-core-synch-l1-2-0.dll, which headless's import check refuses (run 41295222768).
   LLVM_VERSION: "22.1.7"
   # Part of the Linux headless build's cache key, the same as the Replay parity workflow's.
-  BUILD_CACHE: "v1"
+  BUILD_CACHE: "v2"
   # windows-x64-server is windows-x64 built with server mode (FAF_SERVER_MODE, the -server preset): the two play the
   # same replays on one platform, so the server's code compiled in is shown to change no game (plan WP16.2, I1).
   DEFAULT_PLATFORMS: '["linux-x64", "windows-x64", "windows-x64-server", "windows-x86"]'
@@ -241,7 +241,11 @@ jobs:
     needs: plan
     if: contains(fromJSON(needs.plan.outputs.platforms), 'linux-x64')
     runs-on: ubuntu-24.04
+    # The pinned toolchain's system (cmake/toolchains/linux-clang-pins.cmake, tools/linux/toolchain.sh).
+    container: ubuntu:22.04@sha256:076e7bf82319619f28dd0aa9c02ab34b055ad37100395b4f49a2ffba04fb5e11
     steps:
+      # git for the checkout, zstd for the caches the runner's own jobs compress with it.
+      - run: apt-get update && apt-get install -y --no-install-recommends git ca-certificates zstd
       # A fork's code in a pull_request_target run: checkout refuses it without the opt-in. The
       # `replay check` label is the review that makes it safe (see the top of this file).
       - uses: actions/checkout@v7
@@ -252,7 +256,8 @@ jobs:
       # The Replay parity workflow's build of the same sources, when it made one (restore only).
       - id: sources
         run: |
-          tree=$(git ls-tree HEAD CMakeLists.txt CMakePresets.json cmake data dependencies src tests | sha256sum | cut -c1-20)
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          tree=$(git ls-tree HEAD CMakeLists.txt CMakePresets.json cmake data dependencies src tests tools/linux | sha256sum | cut -c1-20)
           echo "key=headless-$BUILD_CACHE-$tree" >> "$GITHUB_OUTPUT"
       - id: built
         uses: actions/cache/restore@v6
@@ -260,12 +265,7 @@ jobs:
           path: build/linux-clang-x64-release/headless
           key: ${{ steps.sources.outputs.key }}
       - if: steps.built.outputs.cache-hit != 'true'
-        run: |
-          bash .github/scripts/apt-mirrors.sh  # a mirror that does not resolve is dropped first
-          sudo apt-get update
-          v=1:18.1.3-1ubuntu1
-          sudo apt-get install -y --no-install-recommends ninja-build \
-            clang-18=$v lld-18=$v llvm-18=$v libc++-18-dev=$v libc++abi-18-dev=$v libunwind-18-dev=$v
+        run: bash tools/linux/toolchain.sh
       - if: steps.built.outputs.cache-hit != 'true'
         uses: actions/cache/restore@v6
         with:
