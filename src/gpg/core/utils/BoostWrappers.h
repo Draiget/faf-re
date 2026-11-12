@@ -675,15 +675,6 @@ namespace boost
   static_assert(sizeof(SharedControlTriplet) == 0x0C, "SharedControlTriplet size must be 0x0C");
 
   /**
-   * Address: 0x00935E30 (FUN_00935E30)
-   *
-   * What it does:
-   * Clears one current-thread value from one TSS slot, runs its cleanup
-   * callback when present, and then destroys that slot descriptor.
-   */
-  void ResetCurrentThreadValueAndDestroyTss(detail::tss* tssSlot);
-
-  /**
    * Address: 0x0055AA90 (FUN_0055AA90, boost::shared_ptr_RScmResource::~shared_ptr_RScmResource)
    *
    * What it does:
@@ -731,49 +722,6 @@ namespace boost
 
   /** Releases `resource`'s control block and clears its pointee lane. */
   void ReleaseSharedResource(boost::shared_ptr<moho::RScmResource>& resource) noexcept;
-
-  /**
-   * Address: 0x0055FBD0 (FUN_0055FBD0, Moho::WeakPtr_RScmResource::WeakPtr_RScmResource)
-   *
-   * What it does:
-   * Initializes one weak `RScmResource` pointer pair from one source
-   * `(px,pi)` lane by weak-retaining the incoming control block and
-   * weak-releasing the replaced control lane.
-   */
-  [[nodiscard]] moho::RScmResource** ConstructWeakPtrRScmResourceFromShared(
-    const SharedPtrRaw<moho::RScmResource>* sourceShared,
-    SharedPtrRaw<moho::RScmResource>* outWeak
-  ) noexcept;
-
-  /**
-   * Address: 0x00539450 (FUN_00539450, boost::enable_shared_from_this<Moho::RScmResource>::shared_from_this)
-   * Mangled:
-   * ?shared_from_this@?$enable_shared_from_this@VRScmResource@Moho@@@boost@@QAE?AV?$shared_ptr@VRScmResource@Moho@@@2@XZ
-   *
-   * What it does:
-   * Constructs one `shared_ptr<RScmResource>` from one
-   * `enable_shared_from_this<RScmResource>` weak-this lane by building the
-   * output shared-count from the source control lane and then copying `px`.
-   */
-  [[nodiscard]] SharedPtrRaw<moho::RScmResource>* ConstructSharedPtrRScmResourceFromWeakThis(
-    const SharedPtrRaw<moho::RScmResource>* sourceWeakThis,
-    SharedPtrRaw<moho::RScmResource>* outShared
-  );
-
-  /**
-   * Address: 0x00796D40 (FUN_00796D40, boost::enable_shared_from_this<Moho::CMauiFrame>::shared_from_this)
-   * Mangled:
-   * ?shared_from_this@?$enable_shared_from_this@VCMauiFrame@Moho@@@boost@@QAE?AV?$shared_ptr@VCMauiFrame@Moho@@@2@XZ
-   *
-   * What it does:
-   * Constructs one `shared_ptr<CMauiFrame>` from one
-   * `enable_shared_from_this<CMauiFrame>` weak-this lane by building the
-   * output shared-count from the source control lane and then copying `px`.
-   */
-  [[nodiscard]] SharedPtrRaw<moho::CMauiFrame>* ConstructSharedPtrCMauiFrameFromWeakThis(
-    const SharedPtrRaw<moho::CMauiFrame>* sourceWeakThis,
-    SharedPtrRaw<moho::CMauiFrame>* outShared
-  );
 
   /**
    * Address: 0x00445550 (FUN_00445550)
@@ -1443,52 +1391,12 @@ namespace boost
   }
 
   /**
-   * Address: 0x00539420 (FUN_00539420)
-   * Address: 0x005395D0 (FUN_005395D0)
-   * Address: 0x00539AC0 (FUN_00539AC0)
-   * Address: 0x0053A080 (FUN_0053A080)
-   *
-   * What it does:
-   * Clears one two-dword lane and returns the caller-owned output slot.
-   */
-  [[nodiscard]] SharedCountPair* ZeroDwordPairLane(SharedCountPair* outLane) noexcept;
-
-  /**
-   * Address: 0x00539470 (FUN_00539470)
-   * Address: 0x0053B480 (FUN_0053B480)
-   * Address: 0x00540250 (FUN_00540250)
-   * Address: 0x00540820 (FUN_00540820)
-   * Address: 0x00540D80 (FUN_00540D80)
-   * Address: 0x00540DA0 (FUN_00540DA0)
-   *
-   * What it does:
-   * Stores one dword lane value into caller-provided output storage.
-   */
-  [[nodiscard]] std::uint32_t* StoreDwordLane(std::uint32_t* outLane, std::uint32_t value) noexcept;
-
-  /**
-   * Address: 0x00540D90 (FUN_00540D90)
-   *
-   * What it does:
-   * Copies one dword lane value from source storage into caller output.
-   */
-  [[nodiscard]] std::uint32_t* CopyDwordLane(std::uint32_t* outLane, const std::uint32_t* sourceLane) noexcept;
-
-  /**
    * Address: 0x0053B470 (FUN_0053B470)
    *
    * What it does:
    * Clears one single dword lane and returns the caller-owned output slot.
    */
   [[nodiscard]] std::uint32_t* ZeroDwordLane(std::uint32_t* outLane) noexcept;
-
-  /**
-   * Address: 0x00539AD0 (FUN_00539AD0)
-   *
-   * What it does:
-   * Swaps one dword lane between two caller-provided output slots.
-   */
-  [[nodiscard]] std::uint32_t* SwapDwordLane(std::uint32_t* leftLane, std::uint32_t* rightLane) noexcept;
 
   /**
    * Address: 0x00443910 (FUN_00443910)
@@ -1627,33 +1535,6 @@ namespace boost
   }
 
   /**
-   * Address: 0x0053B3D0 (FUN_0053B3D0, boost::detail::sp_counted_impl_p<Moho::RScaResource>::dispose)
-   *
-   * What it does:
-   * Deletes one owned `RScaResource` pointee bound to this shared-count
-   * control lane when present.
-   */
-  void SpCountedImplPDisposeRScaResource(SpCountedImplStorage<moho::RScaResource>* countedImpl) noexcept;
-
-  /**
-   * Address: 0x0053B400 (FUN_0053B400, boost::detail::sp_counted_impl_p<Moho::RScaResource>::destroy)
-   *
-   * What it does:
-   * Frees the control block itself once both use and weak counts reach
-   * zero (the pointee was already released by `dispose()`).
-   */
-  void SpCountedImplPDestroyRScaResource(SpCountedImplStorage<moho::RScaResource>* self) noexcept;
-
-  /**
-   * Address: 0x005CC7E0 (FUN_005CC7E0, boost::detail::sp_counted_impl_p<Moho::Stats<Moho::StatItem>>::dispose)
-   *
-   * What it does:
-   * Deletes one owned `Stats_StatItem` pointee bound to this shared-count
-   * control lane when present.
-   */
-  void SpCountedImplPDisposeStatsStatItem(SpCountedImplStorage<moho::Stats_StatItem>* countedImpl) noexcept;
-
-  /**
    * Address: 0x007FBE60 (FUN_007FBE60, boost::detail::sp_counted_impl_p<Moho::IRenTerrain>::dispose)
    *
    * What it does:
@@ -1665,66 +1546,15 @@ namespace boost
   /**
 
   / **
-   * Address: 0x00765720 (FUN_00765720, boost::detail::sp_counted_impl_p<Moho::PathPreviewFinder>::dispose)
-   *
-   * What it does:
-   * Disposes one `PathPreviewFinder` pointee by unlinking its intrusive
-   * queue node lanes and releasing the owned runtime object memory.
-   */
-  void SpCountedImplPDisposePathPreviewFinder(SpCountedImplStorage<moho::PathPreviewFinder>* countedImpl) noexcept;
 
-  /**
-   * Address: 0x00884810 (FUN_00884810, boost::detail::sp_counted_impl_pd<_iobuf*,Moho::SFileStarCloser>::dispose)
-   *
-   * What it does:
-   * Closes one owned `FILE*` lane through `fclose` when that file pointer is
-   * present in the file-star-closer control block.
-   */
-  void SpCountedImplPdDisposeSFileStarCloser(SpCountedImplStorage<void>* countedImpl) noexcept;
 
-  /**
-   * Address: 0x0054EDC0 (FUN_0054EDC0, boost::detail::sp_counted_impl_pd<Moho::CAniDefaultSkel *, void (__cdecl *)(void
-   * *)>::dispose)
-   *
-   * What it does:
-   * Invokes the stored raw-function deleter lane for one `CAniDefaultSkel*`
-   * pointee when both lanes are present in the control block.
-   */
-  void SpCountedImplPdDisposeCAniDefaultSkelFunctionDeleter(SpCountedImplStorage<void>* countedImpl) noexcept;
 
-  /**
-   * Address: 0x0054EE00 (FUN_0054EE00, boost::detail::sp_counted_impl_pd<Moho::CAniDefaultSkel *, void (__cdecl *)(void
-   * *)>::destroy)
-   *
-   * What it does:
-   * Frees the control block itself once both use and weak counts reach
-   * zero (the pointee was already released by `dispose()`).
-   */
-  void SpCountedImplPdDestroyCAniDefaultSkelFunctionDeleter(SpCountedImplStorage<void>* self) noexcept;
 
-  /**
-   * Address: 0x0054EDD0 (FUN_0054EDD0, boost::detail::sp_counted_impl_pd<Moho::CAniDefaultSkel *, void (__cdecl *)(void
-   * *)>::get_deleter)
-   *
-   * What it does:
-   * Returns the stored raw-function deleter lane at offset `+0x10` when the
-   * queried `type_info` matches `void (__cdecl *)(void *)`.
-   */
-  [[nodiscard]] void* SpCountedImplPdGetDeleterCAniDefaultSkelFunctionDeleter(
-    SpCountedImplStorage<void>* countedImpl,
-    detail::sp_typeinfo const& requestedType
-  ) noexcept;
 
   /**
   / **
    * Address: 0x00923920 (FUN_00923920, boost::detail::sp_counted_impl_p<std::basic_stringstream<char,
   std::char_traits<char>, std::allocator<char>>>::dispose)
-   *
-   * What it does:
-   * Deletes one owned `std::basic_stringstream<char,...>` pointee bound to
-   * this shared-count control lane when present.
-   */
-  void SpCountedImplPDisposeStdStringstreamChar(SpCountedImplStorage<void>* countedImpl) noexcept;
 
   /**
    * Address: 0x00935520 (FUN_00935520, boost::detail::sp_counted_impl_p<gpg::HaStar::ClusterCache::Impl>::dispose)
@@ -1739,323 +1569,30 @@ namespace boost
   void SpCountedImplPDisposeClusterCacheImpl(SpCountedImplStorage<void>* countedImpl) noexcept;
 
   /**
-   * Address: 0x009418D0 (FUN_009418D0, boost::detail::sp_counted_impl_p<gpg::gal::EffectTechniqueD3D9>::dispose)
-   *
-   * What it does:
-   * Deletes one owned `EffectTechniqueD3D9` pointee bound to this
-   * shared-count control lane when present.
-   */
-  void
-  SpCountedImplPDisposeEffectTechniqueD3D9(SpCountedImplStorage<gpg::gal::EffectTechniqueD3D9>* countedImpl) noexcept;
-
-  /**
-   * Address: 0x009418E0 (FUN_009418E0, boost::detail::sp_counted_impl_p<gpg::gal::EffectVariableD3D9>::dispose)
-   *
-   * What it does:
-   * Deletes one owned `EffectVariableD3D9` pointee bound to this
-   * shared-count control lane when present.
-   */
-  void
-  SpCountedImplPDisposeEffectVariableD3D9(SpCountedImplStorage<gpg::gal::EffectVariableD3D9>* countedImpl) noexcept;
-
-  /**
-   * Address: 0x0094B7E0 (FUN_0094B7E0, boost::detail::sp_counted_impl_p<gpg::gal::EffectTechniqueD3D10>::dispose)
-   *
-   * What it does:
-   * Deletes one owned `EffectTechniqueD3D10` pointee bound to this
-   * shared-count control lane when present.
-   */
-  void
-  SpCountedImplPDisposeEffectTechniqueD3D10(SpCountedImplStorage<gpg::gal::EffectTechniqueD3D10>* countedImpl) noexcept;
-
-  /**
-   * Address: 0x0094B7F0 (FUN_0094B7F0, boost::detail::sp_counted_impl_p<gpg::gal::EffectVariableD3D10>::dispose)
-   *
-   * What it does:
-   * Deletes one owned `EffectVariableD3D10` pointee bound to this
-   * shared-count control lane when present.
-   */
-  void
-  SpCountedImplPDisposeEffectVariableD3D10(SpCountedImplStorage<gpg::gal::EffectVariableD3D10>* countedImpl) noexcept;
-
-  /**
-   * Address: 0x0094E0A0 (FUN_0094E0A0, boost::detail::sp_counted_impl_pd<char*, void (__cdecl*)(void*)>::dispose)
-   *
-   * What it does:
-   * Invokes the stored byte-pointer deleter lane for one
-   * `sp_counted_impl_pd<char*,void(*)(void*)>` control block.
-   */
-  void SpCountedImplPdDisposeCharPointerFunctionDeleter(SpCountedImplPdCharPointerStorage* countedImpl) noexcept;
-
-  /**
-   * Address: 0x005CC830 (FUN_005CC830, boost::detail::sp_counted_impl_p<Moho::Stats<Moho::StatItem>>::dtr)
-   *
-   * What it does:
-   * Runs one scalar-deleting destructor thunk for
-   * `sp_counted_impl_p<Stats<StatItem>>`.
-   */
-  [[nodiscard]] SpCountedImplStorage<moho::Stats_StatItem>* SpCountedImplPDeletingDtorStatsStatItem(
-    SpCountedImplStorage<moho::Stats_StatItem>* countedImpl,
-    unsigned char deleteFlag
-  ) noexcept;
-
-  /**
-   * Address: 0x00756080 (FUN_00756080, boost::detail::sp_counted_impl_p<Moho::ISimResources>::dtr)
-   *
-   * What it does:
-   * Runs one scalar-deleting destructor thunk for
-   * `sp_counted_impl_p<ISimResources>`.
-   */
-  [[nodiscard]] SpCountedImplStorage<moho::ISimResources>* SpCountedImplPDeletingDtorISimResources(
-    SpCountedImplStorage<moho::ISimResources>* countedImpl,
-    unsigned char deleteFlag
-  ) noexcept;
-
-  /**
   / **
-   * Address: 0x00765770 (FUN_00765770, boost::detail::sp_counted_impl_p<Moho::PathPreviewFinder>::dtr)
-   *
-   * What it does:
-   * Runs one scalar-deleting destructor thunk for
-   * `sp_counted_impl_p<PathPreviewFinder>`.
-   */
-  [[nodiscard]] SpCountedImplStorage<moho::PathPreviewFinder>* SpCountedImplPDeletingDtorPathPreviewFinder(
-    SpCountedImplStorage<moho::PathPreviewFinder>* countedImpl,
-    unsigned char deleteFlag
-  ) noexcept;
 
-  /**
-   * Address: 0x00923940 (FUN_00923940, boost::detail::sp_counted_impl_p<std::basic_stringstream<char,
-   * std::char_traits<char>, std::allocator<char>>>::dtr)
-   *
-   * What it does:
-   * Runs one scalar-deleting destructor thunk for
-   * `sp_counted_impl_p<std::basic_stringstream<char,...>>`.
-   */
-  [[nodiscard]] SpCountedImplStorage<void>* SpCountedImplPDeletingDtorStdStringstreamChar(
-    SpCountedImplStorage<void>* countedImpl,
-    unsigned char deleteFlag
-  ) noexcept;
 
-  /**
-   * Address: 0x009325F0 (FUN_009325F0, boost::detail::sp_counted_impl_p<gpg::HaStar::ClusterCache::Impl>::dtr)
-   *
-   * What it does:
-   * Runs one scalar-deleting destructor thunk for
-   * `sp_counted_impl_p<ClusterCache::Impl>`.
-   */
-  [[nodiscard]] SpCountedImplStorage<void>* SpCountedImplPDeletingDtorClusterCacheImpl(
-    SpCountedImplStorage<void>* countedImpl,
-    unsigned char deleteFlag
-  ) noexcept;
 
-  /**
-   * Address: 0x009418F0 (FUN_009418F0, boost::detail::sp_counted_impl_p<gpg::gal::EffectTechniqueD3D9>::dtr)
-   *
-   * What it does:
-   * Runs one scalar-deleting destructor thunk for
-   * `sp_counted_impl_p<EffectTechniqueD3D9>`.
-   */
-  [[nodiscard]] SpCountedImplStorage<gpg::gal::EffectTechniqueD3D9>* SpCountedImplPDeletingDtorEffectTechniqueD3D9(
-    SpCountedImplStorage<gpg::gal::EffectTechniqueD3D9>* countedImpl,
-    unsigned char deleteFlag
-  ) noexcept;
 
-  /**
-   * Address: 0x00941910 (FUN_00941910, boost::detail::sp_counted_impl_p<gpg::gal::EffectVariableD3D9>::dtr)
-   *
-   * What it does:
-   * Runs one scalar-deleting destructor thunk for
-   * `sp_counted_impl_p<EffectVariableD3D9>`.
-   */
-  [[nodiscard]] SpCountedImplStorage<gpg::gal::EffectVariableD3D9>* SpCountedImplPDeletingDtorEffectVariableD3D9(
-    SpCountedImplStorage<gpg::gal::EffectVariableD3D9>* countedImpl,
-    unsigned char deleteFlag
-  ) noexcept;
 
-  /**
-   * Address: 0x0094B800 (FUN_0094B800, boost::detail::sp_counted_impl_p<gpg::gal::EffectTechniqueD3D10>::dtr)
-   *
-   * What it does:
-   * Runs one scalar-deleting destructor thunk for
-   * `sp_counted_impl_p<EffectTechniqueD3D10>`.
-   */
-  [[nodiscard]] SpCountedImplStorage<gpg::gal::EffectTechniqueD3D10>* SpCountedImplPDeletingDtorEffectTechniqueD3D10(
-    SpCountedImplStorage<gpg::gal::EffectTechniqueD3D10>* countedImpl,
-    unsigned char deleteFlag
-  ) noexcept;
 
-  /**
-   * Address: 0x0094B820 (FUN_0094B820, boost::detail::sp_counted_impl_p<gpg::gal::EffectVariableD3D10>::dtr)
-   *
-   * What it does:
-   * Runs one scalar-deleting destructor thunk for
-   * `sp_counted_impl_p<EffectVariableD3D10>`.
-   */
-  [[nodiscard]] SpCountedImplStorage<gpg::gal::EffectVariableD3D10>* SpCountedImplPDeletingDtorEffectVariableD3D10(
-    SpCountedImplStorage<gpg::gal::EffectVariableD3D10>* countedImpl,
-    unsigned char deleteFlag
-  ) noexcept;
 
-  /**
-   * Address: 0x0094E260 (FUN_0094E260, boost::detail::sp_counted_impl_pd<char*, void (__cdecl*)(void*)>::dtr)
-   *
-   * What it does:
-   * Runs one scalar-deleting destructor thunk for
-   * `sp_counted_impl_pd<char*, void(__cdecl*)(void*)>`.
-   */
-  [[nodiscard]] SpCountedImplPdCharPointerStorage* SpCountedImplPdDeletingDtorCharPointerFunctionDeleter(
-    SpCountedImplPdCharPointerStorage* countedImpl,
-    unsigned char deleteFlag
-  ) noexcept;
 
-  /**
-   * Address: 0x007FBE80 (FUN_007FBE80, boost::detail::sp_counted_impl_p<Moho::IRenTerrain>::dtr)
-   *
-   * What it does:
-   * Runs one scalar-deleting destructor thunk for `sp_counted_impl_p<IRenTerrain>`.
-   */
-  [[nodiscard]] SpCountedImplStorage<moho::IRenTerrain>* SpCountedImplPDeletingDtorIRenTerrain(
-    SpCountedImplStorage<moho::IRenTerrain>* countedImpl,
-    unsigned char deleteFlag
-  ) noexcept;
 
-  /**
-   * Address: 0x007FC1F0 (FUN_007FC1F0, boost::detail::sp_counted_impl_p<Moho::CD3DTextureBatcher>::dtr)
-   *
-   * What it does:
-   * Runs one scalar-deleting destructor thunk for `sp_counted_impl_p<CD3DTextureBatcher>`.
-   */
-  [[nodiscard]] SpCountedImplStorage<moho::CD3DTextureBatcher>* SpCountedImplPDeletingDtorCD3DTextureBatcher(
-    SpCountedImplStorage<moho::CD3DTextureBatcher>* countedImpl,
-    unsigned char deleteFlag
-  ) noexcept;
 
-  /**
-   * Address: 0x007FC210 (FUN_007FC210, boost::detail::sp_counted_impl_p<Moho::CD3DPrimBatcher>::dtr)
-   *
-   * What it does:
-   * Runs one scalar-deleting destructor thunk for `sp_counted_impl_p<CD3DPrimBatcher>`.
-   */
-  [[nodiscard]] SpCountedImplStorage<moho::CD3DPrimBatcher>* SpCountedImplPDeletingDtorCD3DPrimBatcher(
-    SpCountedImplStorage<moho::CD3DPrimBatcher>* countedImpl,
-    unsigned char deleteFlag
-  ) noexcept;
 
-  /**
-   * Address: 0x00884870 (FUN_00884870, boost::detail::sp_counted_impl_pd<_iobuf*,Moho::SFileStarCloser>::dtr)
-   *
-   * What it does:
-   * Runs one scalar-deleting destructor thunk for one
-   * `sp_counted_impl_pd<FILE*,SFileStarCloser>` lane.
-   */
-  [[nodiscard]] SpCountedImplStorage<void>*
-  SpCountedImplPdDeletingDtorFileStarCloser(SpCountedImplStorage<void>* countedImpl, unsigned char deleteFlag) noexcept;
 
-  /**
-   * Address: 0x0089B910 (FUN_0089B910, boost::detail::sp_counted_impl_p<Moho::SSessionSaveData>::dtr)
-   *
-   * What it does:
-   * Runs one scalar-deleting destructor thunk for `sp_counted_impl_p<SSessionSaveData>`.
-   */
-  [[nodiscard]] SpCountedImplStorage<moho::SSessionSaveData>* SpCountedImplPDeletingDtorSSessionSaveData(
-    SpCountedImplStorage<moho::SSessionSaveData>* countedImpl,
-    unsigned char deleteFlag
-  ) noexcept;
 
-  /**
-   * Address: 0x00884820 (FUN_00884820, boost::detail::sp_counted_impl_pd<_iobuf*,Moho::SFileStarCloser>::get_deleter)
-   *
-   * What it does:
-   * Returns the file-closer deleter lane at `+0x10` when the requested
-   * `type_info` matches `Moho::SFileStarCloser`.
-   */
-  [[nodiscard]] void* SpCountedImplPdGetDeleterSFileStarCloser(
-    SpCountedImplStorage<void>* countedImpl,
-    detail::sp_typeinfo const& requestedType
-  ) noexcept;
 
-  /**
-   * Address: 0x004DE780 (FUN_004DE780, boost::detail::sp_counted_impl_p<Moho::AudioEngine>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  [[nodiscard]] void* SpCountedImplPGetDeleterNullAudioEngine(detail::sp_typeinfo const& requestedType) noexcept;
 
-  /**
-   * Address: 0x0053B3F0 (FUN_0053B3F0, boost::detail::sp_counted_impl_p<Moho::RScaResource>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  [[nodiscard]] void* SpCountedImplPGetDeleterNullRScaResource(detail::sp_typeinfo const& requestedType) noexcept;
 
-  /**
-   * Address: 0x00755FD0 (FUN_00755FD0, boost::detail::sp_counted_impl_p<Moho::ISimResources>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  [[nodiscard]] void* SpCountedImplPGetDeleterNullISimResources(detail::sp_typeinfo const& requestedType) noexcept;
 
-  /**
-   * Address: 0x00765760 (FUN_00765760, boost::detail::sp_counted_impl_p<Moho::PathPreviewFinder>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  [[nodiscard]] void* SpCountedImplPGetDeleterNullPathPreviewFinder(detail::sp_typeinfo const& requestedType) noexcept;
 
-  /**
-   * Address: 0x007FBE70 (FUN_007FBE70, boost::detail::sp_counted_impl_p<Moho::IRenTerrain>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  [[nodiscard]] void* SpCountedImplPGetDeleterNullIRenTerrain(detail::sp_typeinfo const& requestedType) noexcept;
 
-  /**
-   * Address: 0x007FC190 (FUN_007FC190, boost::detail::sp_counted_impl_p<Moho::CD3DTextureBatcher>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  [[nodiscard]] void* SpCountedImplPGetDeleterNullCD3DTextureBatcher(detail::sp_typeinfo const& requestedType) noexcept;
 
-  /**
-   * Address: 0x007FC1E0 (FUN_007FC1E0, boost::detail::sp_counted_impl_p<Moho::CD3DPrimBatcher>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  [[nodiscard]] void* SpCountedImplPGetDeleterNullCD3DPrimBatcher(detail::sp_typeinfo const& requestedType) noexcept;
 
-  /**
-   * Address: 0x0089B8A0 (FUN_0089B8A0, boost::detail::sp_counted_impl_p<Moho::SSessionSaveData>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  [[nodiscard]] void* SpCountedImplPGetDeleterNullSSessionSaveData(detail::sp_typeinfo const& requestedType) noexcept;
 
-  /**
-   * Address: 0x0089BCB0 (FUN_0089BCB0, boost::detail::sp_counted_impl_p<Moho::UICommandGraph>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  [[nodiscard]] void* SpCountedImplPGetDeleterNullUICommandGraph(detail::sp_typeinfo const& requestedType) noexcept;
 
-  /**
-   * Address: 0x00923720 (FUN_00923720, boost::detail::sp_counted_impl_p<std::basic_stringstream<char,
-   * std::char_traits<char>, std::allocator<char>>>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  [[nodiscard]] void*
-  SpCountedImplPGetDeleterNullStdStringstreamChar(detail::sp_typeinfo const& requestedType) noexcept;
 
   /**
    * Address: 0x00931ED0 (FUN_00931ED0, boost::detail::sp_counted_impl_p<gpg::HaStar::ClusterCache::Impl>::get_deleter)
@@ -2064,35 +1601,6 @@ namespace boost
    * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
    */
   [[nodiscard]] void* SpCountedImplPGetDeleterNullClusterCacheImpl(detail::sp_typeinfo const& requestedType) noexcept;
-
-  /**
-   * Address: 0x00941680 (FUN_00941680, boost::detail::sp_counted_impl_p<gpg::gal::EffectTechniqueD3D9>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  [[nodiscard]] void*
-  SpCountedImplPGetDeleterNullEffectTechniqueD3D9(detail::sp_typeinfo const& requestedType) noexcept;
-
-  /**
-   * Address: 0x009416B0 (FUN_009416B0, boost::detail::sp_counted_impl_p<gpg::gal::EffectVariableD3D9>::get_deleter)
-   *
-   * What it does:
-   * Returns the null deleter-query lane for this `sp_counted_impl_p<T>` specialization.
-   */
-  [[nodiscard]] void* SpCountedImplPGetDeleterNullEffectVariableD3D9(detail::sp_typeinfo const& requestedType) noexcept;
-
-  /**
-   * Address: 0x0094E0B0 (FUN_0094E0B0, boost::detail::sp_counted_impl_pd<char*, void (__cdecl*)(void*)>::get_deleter)
-   *
-   * What it does:
-   * Returns the stored deleter lane when queried with
-   * `typeid(void (__cdecl*)(void*))`; otherwise returns null.
-   */
-  [[nodiscard]] void* SpCountedImplPdGetDeleterCharPointerFunctionDeleter(
-    SpCountedImplPdCharPointerStorage* countedImpl,
-    detail::sp_typeinfo const& requestedType
-  ) noexcept;
 
   /**
    * Address: 0x00446C40 (FUN_00446C40)
@@ -2161,23 +1669,6 @@ namespace boost
   [[nodiscard]] std::int32_t SpCountedBaseUseCount(const detail::sp_counted_base* control) noexcept;
 
   /**
-   * Address: 0x00446FB0 (FUN_00446FB0)
-   *
-   * What it does:
-   * Increments one weak-count lane and returns the same control pointer.
-   */
-  [[nodiscard]] detail::sp_counted_base* SpCountedBaseWeakAddRefReturn(detail::sp_counted_base* control) noexcept;
-
-  /**
-   * Address: 0x00446FC0 (FUN_00446FC0)
-   *
-   * What it does:
-   * Releases one weak-owner reference from one control-pointer slot.
-   */
-  [[nodiscard]] detail::sp_counted_base*
-  SpCountedBaseWeakReleaseFromSlot(detail::sp_counted_base** controlSlot) noexcept;
-
-  /**
    * Address: 0x00446FE0 (FUN_00446FE0)
    *
    * What it does:
@@ -2188,36 +1679,6 @@ namespace boost
     detail::sp_counted_base** targetControlSlot,
     detail::sp_counted_base* const* sourceControlSlot
   ) noexcept;
-
-  /**
-   * Address: 0x00796FC0 (FUN_00796FC0)
-   * Address: 0x007BD790 (FUN_007BD790)
-   *
-   * What it does:
-   * Rebinds one weak-owner `(px,pi)` pair from a raw incoming shared
-   * control slot: copies the new `px`, then delegates the control-block
-   * rebind to `SpCountedBaseWeakAssignSlot` (weak-retain the incoming
-   * control, weak-release the previously bound one). This is
-   * `boost::detail::weak_count::operator=(shared_count const&)` composed
-   * with the `px` copy that `weak_ptr<T>::operator=(shared_ptr<T> const&)`
-   * performs around it, decompiled straight from one real per-T binary
-   * emission (see `LegacyContainerFillLanes.cpp`'s
-   * `ReplaceWeakOwnerPairAndRetainIncoming`/`...7BD790` call sites).
-   */
-  [[nodiscard]] SharedCountPair* AssignWeakPairFromSharedControlSlot(
-    SharedCountPair* destination,
-    void* incomingObject,
-    detail::sp_counted_base* const* incomingControlSlot
-  ) noexcept;
-
-  /**
-   * Address: 0x00447020 (FUN_00447020)
-   *
-   * What it does:
-   * Returns shared-owner use-count from one control-pointer slot, or zero
-   * when no control block is present.
-   */
-  [[nodiscard]] std::int32_t SpCountedBaseUseCountFromSlotOrZero(detail::sp_counted_base* const* controlSlot) noexcept;
 
   /**
    * Address: 0x0044DDD0 (FUN_0044DDD0, throw_BadWeakPtrException)
@@ -2241,25 +1702,6 @@ namespace boost
   );
 
   /**
-   * Address: 0x004470A0 (FUN_004470A0)
-   *
-   * What it does:
-   * Constructs one `boost::bad_weak_ptr` exception object in caller-provided
-   * storage.
-   */
-  [[nodiscard]] boost::bad_weak_ptr* ConstructBadWeakPtr(boost::bad_weak_ptr* outException);
-
-  /**
-   * Address: 0x004470D0 (FUN_004470D0)
-   *
-   * What it does:
-   * Runs one `boost::bad_weak_ptr` deleting-destructor lane controlled by
-   * the low bit of `deleteFlag`.
-   */
-  [[nodiscard]] boost::bad_weak_ptr*
-  DestructBadWeakPtr(boost::bad_weak_ptr* exceptionObject, unsigned char deleteFlag) noexcept;
-
-  /**
    * Address: 0x004DBBC0 (FUN_004DBBC0)
    *
    * What it does:
@@ -2280,50 +1722,6 @@ namespace boost
   // `GetBadPtrContainerMessage` reading through a
   // a deleted overlay copy of that same layout (RULE ONE),
   // removed 2026-09-18. Call `what()` on the exception instead.)
-
-  /**
-   * Address: 0x00491360 (FUN_00491360)
-   *
-   * What it does:
-   * Runs one deleting-destructor thunk for `boost::bad_ptr_container_operation`,
-   * forwarding through `std::exception` teardown and optional operator delete.
-   */
-  [[nodiscard]] boost::bad_ptr_container_operation* DestructBadPtrContainerOperation(
-    boost::bad_ptr_container_operation* exceptionObject,
-    unsigned char deleteFlag
-  ) noexcept;
-
-  /**
-   * Address: 0x004913B0 (FUN_004913B0)
-   *
-   * What it does:
-   * Runs one deleting-destructor thunk for `boost::bad_pointer`,
-   * forwarding through `std::exception` teardown and optional operator delete.
-   */
-  [[nodiscard]] boost::bad_pointer*
-  DestructBadPointer(boost::bad_pointer* exceptionObject, unsigned char deleteFlag) noexcept;
-
-  /**
-   * Address: 0x0049C140 (FUN_0049C140)
-   *
-   * What it does:
-   * Copy-constructs one `boost::bad_pointer` exception into caller-provided
-   * storage, preserving the legacy pointer-container exception chain.
-   */
-  [[nodiscard]] boost::bad_pointer*
-  ConstructBadPointerFromCopy(boost::bad_pointer* outException, const boost::bad_pointer& sourceException);
-
-  /**
-   * Address: 0x0049C170 (FUN_0049C170)
-   *
-   * What it does:
-   * Copy-constructs one `boost::bad_ptr_container_operation` exception into
-   * caller-provided storage.
-   */
-  [[nodiscard]] boost::bad_ptr_container_operation* ConstructBadPtrContainerOperationFromCopy(
-    boost::bad_ptr_container_operation* outException,
-    const boost::bad_ptr_container_operation& sourceException
-  );
 
   /**
    * Address: 0x00446920 (FUN_00446920)
@@ -2374,18 +1772,6 @@ namespace boost
    * incoming `pi` then weak-releasing the previous `pi`.
    */
   SharedCountPair* AssignWeakPairFromShared(SharedCountPair* outPair, const SharedCountPair* sourcePair) noexcept;
-
-  /**
-   * Address: 0x004414F0 (FUN_004414F0)
-   * Address: 0x0043F7E0 (FUN_0043F7E0)
-   * Address: 0x0043FCF0 (FUN_0043FCF0)
-   *
-   * What it does:
-   * Same weak-owner `(px,pi)` rebind helper as `AssignWeakPairFromShared`,
-   * but with caller argument order `(source, destination)`.
-   */
-  SharedCountPair*
-  AssignWeakPairFromSharedReversed(const SharedCountPair* sourcePair, SharedCountPair* outPair) noexcept;
 
   /**
    * Address: 0x007DD160 (FUN_007DD160)
@@ -2465,14 +1851,6 @@ namespace boost
   }
 
   /**
-   * Address: 0x0043E3B0 (FUN_0043E3B0)
-   *
-   * What it does:
-   * Alias lane for `AssignSharedPairRetain` with identical behavior.
-   */
-  SharedCountPair* AssignSharedPairRetainAlias(SharedCountPair* outPair, const SharedCountPair* sourcePair) noexcept;
-
-  /**
    * Address: 0x00740270 (FUN_00740270)
    *
    * What it does:
@@ -2489,20 +1867,6 @@ namespace boost
    * control block referenced from the pair lanes.
    */
   [[nodiscard]] SharedCountPair* ReleaseSharedCountRange(SharedCountPair* begin, SharedCountPair* end) noexcept;
-
-  /**
-   * Address: 0x007E27C0 (FUN_007E27C0)
-   * Address: 0x007E2820 (FUN_007E2820)
-   * Address: 0x007E28A0 (FUN_007E28A0)
-   *
-   * What it does:
-   * Clears one `(px,pi)` pair to `{nullptr,nullptr}` and releases the
-   * shared control block that used to be bound, disposing/destroying it on
-   * the final strong/weak transitions. Decompiled straight from three real
-   * per-T binary emissions (see `LegacyContainerFillLanes.cpp`'s
-   * `ResetSharedOwnerPairAndReleaseBatchA/B/C` call sites).
-   */
-  [[nodiscard]] SharedCountPair* ReleaseSharedPairAndClear(SharedCountPair* pair) noexcept;
 
   template <class T>
   [[nodiscard]] SharedPtrRaw<T> SharedPtrRawFromSharedBorrow(

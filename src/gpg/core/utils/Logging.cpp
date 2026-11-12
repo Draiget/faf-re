@@ -457,19 +457,6 @@ void gpg::InitLogContextSingleton()
 }
 
 /**
- * Address: 0x00937B30 (FUN_00937B30)
- *
- * What it does:
- * Initializes the global log-context singleton on first use and returns the
- * process-global context pointer lane.
- */
-[[maybe_unused]] gpg::LogContext* gpg::GetLogContextSingleton()
-{
-  std::call_once(g_LogOnce, &InitLogContextSingleton);
-  return g_LogCtx;
-}
-
-/**
  * Address: 0x009368C0 (FUN_009368C0)
  *
  * What it does:
@@ -1605,15 +1592,6 @@ fa::string gpg::GetRecentLogLines()
   fa::string result;
   result.assign_owned(stream.str());
   return result;
-}
-
-FILETIME gpg::FileTimeLocal()
-{
-  FILETIME ftUtc{};
-  FILETIME ftLocal{};
-  GetSystemTimeAsFileTime(&ftUtc);
-  FileTimeToLocalFileTime(&ftUtc, &ftLocal);
-  return ftLocal;
 }
 
 /**

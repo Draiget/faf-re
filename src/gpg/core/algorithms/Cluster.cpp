@@ -1976,40 +1976,6 @@ namespace gpg::HaStar
   ICache::ICache() = default;
 
   /**
-   * Address: 0x0076B8B0 (FUN_0076B8B0)
-   *
-   * IDA signature:
-   * _DWORD *__usercall sub_76B8B0@<eax>(_DWORD *result@<eax>)
-   *
-   * What it does:
-   * Writes the `IOccupationSource` vtable lane and returns the same object
-   * pointer.
-   */
-  IOccupationSource* InitializeOccupationSourceVTableCloneA(
-    IOccupationSource* const source
-  )
-  {
-    return WriteOccupationSourceVTable(source);
-  }
-
-  /**
-   * Address: 0x0076CB70 (FUN_0076CB70)
-   *
-   * IDA signature:
-   * _DWORD *__usercall sub_76CB70@<eax>(_DWORD *result@<eax>)
-   *
-   * What it does:
-   * Clone entry that writes the same `IOccupationSource` vtable lane and returns
-   * the same object pointer.
-   */
-  IOccupationSource* InitializeOccupationSourceVTableCloneB(
-    IOccupationSource* const source
-  )
-  {
-    return WriteOccupationSourceVTable(source);
-  }
-
-  /**
    * Address: 0x00765840 (FUN_00765840, ??0Cluster@HaStar@gpg@@QAE@ABV012@@Z)
    */
   Cluster::Cluster(
@@ -2797,18 +2763,6 @@ namespace gpg::HaStar
   }
 
   /**
-   * Address: 0x008E3C80 (FUN_008E3C80)
-   */
-  void Subcluster::ResetStorage(
-    const int width,
-    const int height
-  )
-  {
-    DestroySubclusterStorage(*this);
-    CreateSubclusterStorage(*this, width, height);
-  }
-
-  /**
    * Address: 0x008E3CD0 (FUN_008E3CD0,
    * ??0ClusterMap@HaStar@gpg@@QAE@PAUIOccupationSource@12@IIABVClusterCache@12@IABV?$Rect2@H@2@@Z)
    */
@@ -3289,22 +3243,6 @@ namespace gpg::HaStar
         }
         clusters.mArray[index] = found->second;
       }
-    }
-  }
-
-  /**
-   * Address: 0x008E3BC0 (FUN_008E3BC0,
-   * ?EnsureClusterExists@ClusterMap@HaStar@gpg@@QAEXHHH@Z)
-   */
-  void ClusterMap::EnsureClusterExists(
-    const int width,
-    const unsigned int height,
-    const int level
-  )
-  {
-    int clusterBudget = INT_MAX;
-    while (!WorkOnCluster(width, static_cast<int>(height), level, clusterBudget)) {
-      clusterBudget = INT_MAX;
     }
   }
 

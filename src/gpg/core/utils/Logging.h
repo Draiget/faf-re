@@ -529,15 +529,6 @@ namespace gpg
   void InitLogContextSingleton();
 
   /**
-   * Address: 0x00937B30 (FUN_00937B30)
-   *
-   * What it does:
-   * Initializes the global log-context singleton on first use and returns the
-   * process-global context pointer lane.
-   */
-  LogContext* GetLogContextSingleton();
-
-  /**
    * One-time initializer for logging singleton.
    */
   inline void InitLogSingleton()
@@ -608,8 +599,6 @@ namespace gpg
    * UTF-8 text blob.
    */
   fa::string GetRecentLogLines();
-
-  FILETIME FileTimeLocal();
 
   /**
    * Address: 0x00485CB0 (FUN_00485CB0, func_FileTimeToString)

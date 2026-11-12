@@ -46,11 +46,6 @@ namespace gpg::diag
     return FAF_BUILD_DESCRIBE;
   }
 
-  const char* BuildBranch() noexcept
-  {
-    return FAF_BUILD_BRANCH;
-  }
-
   const char* BuildArch() noexcept
   {
     return FAF_BUILD_ARCH;

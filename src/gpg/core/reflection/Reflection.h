@@ -945,34 +945,6 @@ namespace gpg
     [[nodiscard]] moho::CEconomyEvent** TryUpcastCEconomyEventPointerSlot() const;
 
     /**
-     * Address: 0x006EC5E0 (FUN_006EC5E0, gpg::RRef::TryUpcast_Listener_ECommandEvent)
-     *
-     * What it does:
-     * Upcasts this reflected reference to one `Listener<ECommandEvent>` object
-     * lane and throws `gpg::BadRefCast` on type mismatch.
-     */
-    [[nodiscard]] moho::Listener<moho::ECommandEvent>* TryUpcastListenerECommandEvent() const;
-
-    /**
-     * Address: 0x006F93D0 (FUN_006F93D0, gpg::RRef::TryUpcast_Listener_EUnitCommandQueueStatus)
-     *
-     * What it does:
-     * Upcasts this reflected reference to one
-     * `Listener<EUnitCommandQueueStatus>` object lane and throws
-     * `gpg::BadRefCast` on type mismatch.
-     */
-    [[nodiscard]] moho::Listener<moho::EUnitCommandQueueStatus>* TryUpcastListenerEUnitCommandQueueStatus() const;
-
-    /**
-     * Address: 0x006FD290 (FUN_006FD290, gpg::RRef::TryUpcast_Prop)
-     *
-     * What it does:
-     * Upcasts this reflected reference to one `Prop` object lane and throws
-     * `gpg::BadRefCast` on type mismatch.
-     */
-    [[nodiscard]] moho::Prop* TryUpcastProp() const;
-
-    /**
      * Address: 0x0054E230 (FUN_0054E230, gpg::RRef::TryUpcast_CAniPose)
      *
      * What it does:
@@ -1637,15 +1609,6 @@ namespace gpg
    * into caller-owned output storage.
    */
   RRef* PackRRef_IEffect_P(RRef* out, moho::IEffect** value);
-
-  /**
-   * Address: 0x00761B70 (FUN_00761B70)
-   *
-   * What it does:
-   * Builds one reflected reference from the `index`-th contiguous
-   * `SAudioRequest` lane starting at `(*firstElementSlot)`.
-   */
-  RRef* RRef_SAudioRequestArraySlot(RRef* out, moho::SAudioRequest* const* firstElementSlot, int index);
 
   /**
    * Address: 0x006755A0 (FUN_006755A0, helper lane)

@@ -487,71 +487,6 @@ namespace gpg
   }
 
   /**
-   * Address: 0x006424B0 (FUN_006424B0)
-   *
-   * What it does:
-   * Packs one `RRef_VectorBoolReference` result into caller-owned output
-   * storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_VectorBoolReference(
-    RRef* const out,
-    std::vector<bool>::reference* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<std::vector<bool>::reference>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x00517030 (FUN_00517030)
-   *
-   * What it does:
-   * Adapts one register-lane call shape into `gpg::RRef_Vector3f` and writes
-   * the resulting `(mObj, mType)` pair into caller-provided storage.
-   */
-  [[maybe_unused]] gpg::RRef* BuildVector3fRefAdapterLane(
-    Wm3::Vector3f* const value,
-    gpg::RRef* const out
-  )
-  {
-    if (out == nullptr) {
-      return nullptr;
-    }
-
-    gpg::RRef temp{};
-    temp = gpg::MakeRRef<Wm3::Vector3f>(value);
-    out->mObj = temp.mObj;
-    out->mType = temp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x005133B0 (FUN_005133B0)
-   *
-   * What it does:
-   * Adapts one register-lane call shape into `gpg::RRef_string` and writes the
-   * resulting `(mObj, mType)` pair into caller-provided storage.
-   */
-  [[maybe_unused]] gpg::RRef* BuildStringRefAdapterLane(
-    fa::string* const value,
-    gpg::RRef* const out
-  )
-  {
-    if (out == nullptr) {
-      return nullptr;
-    }
-
-    gpg::RRef temp{};
-    temp = gpg::MakeRRef<fa::string>(value);
-    out->mObj = temp.mObj;
-    out->mType = temp.mType;
-    return out;
-  }
-
-  /**
    * Address: 0x00402D30 (FUN_00402D30, sub_402D30)
    *
    * What it does:
@@ -583,25 +518,6 @@ namespace gpg
   {
     RRef tmp{};
     tmp = gpg::MakeRRef<unsigned long>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x0084A280 (FUN_0084A280)
-   *
-   * What it does:
-   * Thin wrapper that materializes a temporary `RRef_EEconResource` and copies
-   * lanes out.
-   */
-  gpg::RRef* AssignEEconResourceRefAdapter(
-    RRef* const out,
-    moho::EEconResource* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::EEconResource>(value);
     out->mObj = tmp.mObj;
     out->mType = tmp.mType;
     return out;
@@ -760,25 +676,6 @@ namespace gpg
   }
 
   /**
-   * Address: 0x0084A2B0 (FUN_0084A2B0)
-   *
-   * What it does:
-   * Thin wrapper that materializes a temporary `RRef_ERuleBPUnitToggleCaps` and
-   * copies lanes out.
-   */
-  gpg::RRef* AssignERuleBPUnitToggleCapsRefAdapter(
-    RRef* const out,
-    moho::ERuleBPUnitToggleCaps* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::ERuleBPUnitToggleCaps>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
    * Address: 0x0084A380 (FUN_0084A380)
    * Address: 0x008CD130 (FUN_008CD130)
    *
@@ -885,103 +782,6 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00642370 (FUN_00642370)
-   *
-   * What it does:
-   * Packs one `RRef_CAnimationManipulator` result into caller-owned output
-   * storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_CAnimationManipulator(
-    RRef* const out,
-    moho::CAnimationManipulator* const value
-  )
-  {
-    RRef tmp{};
-    (void)RRef_CAnimationManipulator(&tmp, value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x00645630 (FUN_00645630)
-   *
-   * What it does:
-   * Packs one `RRef_CRotateManipulator` result into caller-owned output
-   * storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_CRotateManipulator(
-    RRef* const out,
-    moho::CRotateManipulator* const value
-  )
-  {
-    RRef tmp{};
-    (void)RRef_CRotateManipulator(&tmp, value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x006469D0 (FUN_006469D0)
-   *
-   * What it does:
-   * Packs one `RRef_CSlaveManipulator` result into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_CSlaveManipulator(
-    RRef* const out,
-    moho::CSlaveManipulator* const value
-  )
-  {
-    RRef tmp{};
-    (void)RRef_CSlaveManipulator(&tmp, value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x006488A0 (FUN_006488A0)
-   *
-   * What it does:
-   * Packs one `RRef_CSlideManipulator` result into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_CSlideManipulator(
-    RRef* const out,
-    moho::CSlideManipulator* const value
-  )
-  {
-    RRef tmp{};
-    (void)RRef_CSlideManipulator(&tmp, value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x00649B80 (FUN_00649B80)
-   *
-   * What it does:
-   * Packs one `RRef_CStorageManipulator` result into caller-owned output
-   * storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_CStorageManipulator(
-    RRef* const out,
-    moho::CStorageManipulator* const value
-  )
-  {
-    if (!out) {
-      return nullptr;
-    }
-
-    RRef tmp{};
-    (void)RRef_CStorageManipulator(&tmp, value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
    * Address: 0x00649C00 (FUN_00649C00, gpg::RRef_CStorageManipulator)
    *
    * What it does:
@@ -1004,31 +804,6 @@ namespace gpg
   }
 
   /**
-   * Address: 0x0064B470 (FUN_0064B470)
-   * Address: 0x00635460 (FUN_00635460)
-   * Address: 0x006372A0 (FUN_006372A0)
-   *
-   * What it does:
-   * Packs one `RRef_CThrustManipulator` result into caller-owned output
-   * storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_CThrustManipulator(
-    RRef* const out,
-    moho::CThrustManipulator* const value
-  )
-  {
-    if (!out) {
-      return nullptr;
-    }
-
-    RRef tmp{};
-    (void)RRef_CThrustManipulator(&tmp, value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
    * Address: 0x0064B530 (FUN_0064B530, gpg::RRef_CThrustManipulator)
    *
    * What it does:
@@ -1048,100 +823,6 @@ namespace gpg
       gCThrustManipulatorRRefType,
       gCThrustManipulatorRRefCache
     );
-  }
-
-  /**
-   * Address: 0x0063CAE0 (FUN_0063CAE0)
-   *
-   * What it does:
-   * Packs one `RRef_CAniActor` result into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_CAniActor(
-    RRef* const out,
-    moho::CAniActor* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CAniActor>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x0063E680 (FUN_0063E680)
-   *
-   * What it does:
-   * Packs one `RRef_IAniManipulator` result into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_IAniManipulator(
-    RRef* const out,
-    moho::IAniManipulator* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::IAniManipulator>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x0063CF70 (FUN_0063CF70)
-   *
-   * What it does:
-   * Packs one `RRef_SAniManipBinding` result into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_SAniManipBinding(
-    RRef* const out,
-    moho::SAniManipBinding* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::SAniManipBinding>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x0063E6B0 (FUN_0063E6B0)
-   *
-   * What it does:
-   * Packs one `RRef_IAniManipulator_P` result into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_IAniManipulator_P(
-    RRef* const out,
-    moho::IAniManipulator** const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::IAniManipulator*>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x006DDDC0 (FUN_006DDDC0)
-   *
-   * What it does:
-   * Packs one `RRef_CFireWeaponTask` result into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_CFireWeaponTask(
-    RRef* const out,
-    moho::CFireWeaponTask* const value
-  )
-  {
-    if (!out) {
-      return nullptr;
-    }
-
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CFireWeaponTask>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
   }
 
   /**
@@ -1377,34 +1058,6 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00761B70 (FUN_00761B70)
-   *
-   * What it does:
-   * Builds one reflected reference from the `index`-th contiguous
-   * `SAudioRequest` lane starting at `(*firstElementSlot)`.
-   */
-  gpg::RRef* RRef_SAudioRequestArraySlot(
-    RRef* const out,
-    moho::SAudioRequest* const* const firstElementSlot,
-    const int index
-  )
-  {
-    if (out == nullptr) {
-      return nullptr;
-    }
-
-    moho::SAudioRequest* const firstElement = (firstElementSlot != nullptr) ? *firstElementSlot : nullptr;
-    if (firstElement == nullptr) {
-      out->mObj = nullptr;
-      out->mType = nullptr;
-      return out;
-    }
-
-    *out = gpg::MakeRRef<moho::SAudioRequest>(firstElement + static_cast<std::ptrdiff_t>(index));
-    return out;
-  }
-
-  /**
    * Address: 0x006755A0 (FUN_006755A0, helper lane)
    *
    * What it does:
@@ -1441,29 +1094,6 @@ namespace gpg
   {
     RRef tmp{};
     tmp = gpg::MakeRRef<moho::Prop>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x00553CD0 (FUN_00553CD0)
-   *
-   * What it does:
-   * Materializes one temporary `RRef_EntId` and copies object/type lanes into
-   * caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_EntId(
-    RRef* const out,
-    std::int32_t* const value
-  )
-  {
-    if (!out) {
-      return nullptr;
-    }
-
-    RRef tmp{};
-    tmp = gpg::MakeRRef<std::int32_t>(value);
     out->mObj = tmp.mObj;
     out->mType = tmp.mType;
     return out;
@@ -1641,29 +1271,6 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00559470 (FUN_00559470)
-   *
-   * What it does:
-   * Materializes one temporary `RRef_SSTIEntityAttachInfo` and copies
-   * object/type lanes into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_SSTIEntityAttachInfo(
-    RRef* const out,
-    moho::SSTIEntityAttachInfo* const value
-  )
-  {
-    if (!out) {
-      return nullptr;
-    }
-
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::SSTIEntityAttachInfo>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
    * Address: 0x00768C70 (FUN_00768C70)
    *
    * What it does:
@@ -1700,29 +1307,6 @@ namespace gpg
   {
     RRef tmp{};
     tmp = gpg::MakeRRef<moho::RBlueprint>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x00557A60 (FUN_00557A60)
-   *
-   * What it does:
-   * Materializes one temporary `RRef_RBlueprint_P` and copies object/type lanes
-   * into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_RBlueprintPointer(
-    RRef* const out,
-    moho::RBlueprint** const value
-  )
-  {
-    if (!out) {
-      return nullptr;
-    }
-
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::RBlueprint*>(value);
     out->mObj = tmp.mObj;
     out->mType = tmp.mType;
     return out;
@@ -1802,53 +1386,6 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00517060 (FUN_00517060)
-   *
-   * What it does:
-   * Adapts one register-lane call shape into `gpg::RRef_REmitterCurveKey` and
-   * writes the resulting `(mObj, mType)` pair into caller-provided storage.
-   */
-  [[maybe_unused]] gpg::RRef* BuildEmitterCurveKeyRefAdapterLane(
-    moho::REmitterCurveKey* const value,
-    gpg::RRef* const out
-  )
-  {
-    if (out == nullptr) {
-      return nullptr;
-    }
-
-    gpg::RRef temp{};
-    temp = gpg::MakeRRef<moho::REmitterCurveKey>(value);
-    out->mObj = temp.mObj;
-    out->mType = temp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x005171D0 (FUN_005171D0)
-   *
-   * What it does:
-   * Adapts one register-lane call shape into
-   * `gpg::RRef_REmitterBlueprintCurve` and writes the resulting
-   * `(mObj, mType)` pair into caller-provided storage.
-   */
-  [[maybe_unused]] gpg::RRef* BuildEmitterBlueprintCurveRefAdapterLane(
-    moho::REmitterBlueprintCurve* const value,
-    gpg::RRef* const out
-  )
-  {
-    if (out == nullptr) {
-      return nullptr;
-    }
-
-    gpg::RRef temp{};
-    temp = gpg::MakeRRef<moho::REmitterBlueprintCurve>(value);
-    out->mObj = temp.mObj;
-    out->mType = temp.mType;
-    return out;
-  }
-
-  /**
    * Address: 0x00511170 (FUN_00511170, gpg::RRef_RBeamBlueprint pack lane)
    *
    * What it does:
@@ -1881,67 +1418,6 @@ namespace gpg
   {
     RRef tmp{};
     tmp = gpg::MakeRRef<moho::RTrailBlueprint>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x0051CF60 (FUN_0051CF60)
-   *
-   * What it does:
-   * Adapts one register-lane call shape into `gpg::RRef_RProjectileBlueprint`
-   * and writes the resulting `(mObj, mType)` pair into caller-provided storage.
-   */
-  [[maybe_unused]] gpg::RRef* BuildProjectileBlueprintRefAdapterLane(
-    moho::RProjectileBlueprint* const value,
-    gpg::RRef* const out
-  )
-  {
-    if (out == nullptr) {
-      return nullptr;
-    }
-
-    gpg::RRef temp{};
-    temp = gpg::MakeRRef<moho::RProjectileBlueprint>(value);
-    out->mObj = temp.mObj;
-    out->mType = temp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x00500480 (FUN_00500480)
-   *
-   * What it does:
-   * Materializes one reflected reference for `CColPrimitive<Wm3::Sphere3f>` and
-   * copies the resulting lanes into `out`.
-   */
-  gpg::RRef* AssignCColPrimitiveSphere3fRef(
-    RRef* const out,
-    moho::CColPrimitive<Wm3::Sphere3f>* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CColPrimitive<Wm3::Sphere3f>>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x005005C0 (FUN_005005C0)
-   *
-   * What it does:
-   * Materializes one reflected reference for `CColPrimitive<Wm3::Box3f>` and copies
-   * the resulting lanes into `out`.
-   */
-  gpg::RRef* AssignCColPrimitiveBox3fRef(
-    RRef* const out,
-    moho::CColPrimitive<Wm3::Box3f>* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CColPrimitive<Wm3::Box3f>>(value);
     out->mObj = tmp.mObj;
     out->mType = tmp.mType;
     return out;
@@ -2314,29 +1790,6 @@ namespace gpg
   }
 
   /**
-   * Address: 0x0055E840 (FUN_0055E840)
-   *
-   * What it does:
-   * Materializes one temporary `RRef_UnitWeaponInfo` and copies object/type
-   * lanes into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_UnitWeaponInfo(
-    RRef* const out,
-    moho::UnitWeaponInfo* const value
-  )
-  {
-    if (!out) {
-      return nullptr;
-    }
-
-    RRef tmp{};
-    (void)RRef_UnitWeaponInfo(&tmp, value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
    * Address: 0x005DF090 (FUN_005DF090)
    *
    * What it does:
@@ -2424,50 +1877,6 @@ namespace gpg
   {
     RRef tmp{};
     tmp = gpg::MakeRRef<moho::HPathCell>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x007126B0 (FUN_007126B0)
-   *
-   * What it does:
-   * Packs one `RRef_CArmyStats` result into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_CArmyStats(
-    RRef* const out,
-    moho::CArmyStats* const value
-  )
-  {
-    if (!out) {
-      return nullptr;
-    }
-
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CArmyStats>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x00712900 (FUN_00712900)
-   *
-   * What it does:
-   * Packs one `RRef_Stats_CArmyStatItem` result into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_Stats_CArmyStatItem(
-    RRef* const out,
-    moho::Stats<moho::CArmyStatItem>* const value
-  )
-  {
-    if (!out) {
-      return nullptr;
-    }
-
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::Stats<moho::CArmyStatItem>>(value);
     out->mObj = tmp.mObj;
     out->mType = tmp.mType;
     return out;
@@ -2814,116 +2223,6 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00712740 (FUN_00712740)
-   *
-   * What it does:
-   * Packs one `RRef_STrigger` result into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_STrigger(
-    RRef* const out,
-    moho::STrigger* const value
-  )
-  {
-    if (!out) {
-      return nullptr;
-    }
-
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::STrigger>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x00712700 (FUN_00712700)
-   *
-   * What it does:
-   * Packs one `RRef_SCondition` result into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_SCondition(
-    RRef* const out,
-    moho::SCondition* const value
-  )
-  {
-    if (!out) {
-      return nullptr;
-    }
-
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::SCondition>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x0064C930 (FUN_0064C930)
-   *
-   * What it does:
-   * Packs one `RRef_RDebugCollision` result into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_RDebugCollision(
-    RRef* const out,
-    moho::RDebugCollision* const value
-  )
-  {
-    if (!out) {
-      return nullptr;
-    }
-
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::RDebugCollision>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x0064F800 (FUN_0064F800)
-   *
-   * What it does:
-   * Packs one `RRef_RDebugGrid` result into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_RDebugGrid(
-    RRef* const out,
-    moho::RDebugGrid* const value
-  )
-  {
-    if (!out) {
-      return nullptr;
-    }
-
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::RDebugGrid>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x0064F830 (FUN_0064F830)
-   *
-   * What it does:
-   * Packs one `RRef_RDebugRadar` result into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* PackRRef_RDebugRadar(
-    RRef* const out,
-    moho::RDebugRadar* const value
-  )
-  {
-    if (!out) {
-      return nullptr;
-    }
-
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::RDebugRadar>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
    * Address: 0x00651170 (FUN_00651170, gpg::RRef_RDebugNavPath pack lane)
    *
    * What it does:
@@ -3039,25 +2338,6 @@ namespace gpg
   }
 
   /**
-   * Address: 0x0076FDC0 (FUN_0076FDC0)
-   *
-   * What it does:
-   * Thin wrapper that materializes a temporary `RRef_CIntelCounterHandle` and
-   * copies `(mObj,mType)` lanes into caller-owned output storage.
-   */
-  [[maybe_unused]] gpg::RRef* AssignCIntelCounterHandleRef(
-    RRef* const out,
-    moho::CIntelCounterHandle* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CIntelCounterHandle>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
    * Address: 0x006BAC70 (FUN_006BAC70)
    *
    * What it does:
@@ -3114,25 +2394,6 @@ namespace gpg
   }
 
   /**
-   * Address: 0x0089B150 (FUN_0089B150)
-   *
-   * What it does:
-   * Materializes one temporary `RRef_SSessionSaveData` and copies `{mObj,mType}`
-   * lanes into caller-provided output storage.
-   */
-  [[maybe_unused]] gpg::RRef* AssignSSessionSaveDataRef(
-    RRef* const out,
-    moho::SSessionSaveData* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::SSessionSaveData>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
    * Address: 0x00920500 (FUN_00920500, sub_920500)
    *
    * What it does:
@@ -3151,309 +2412,4 @@ namespace gpg
     return out;
   }
 
-  /**
-   * Address: 0x0084A360 (FUN_0084A360)
-   *
-   * What it does:
-   * Thin wrapper that materializes a temporary `RRef::CurrentUIState` result and
-   * copies lanes out.
-   */
-  gpg::RRef* AssignCurrentUIStateRefAdapter(
-    RRef* const out
-  )
-  {
-    RRef tmp{};
-    RRef::CurrentUIState(&tmp);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x004E4BF0 (FUN_004E4BF0)
-   *
-   * What it does:
-   * Packs one `RRef_CSndVar` result into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_CSndVar(
-    RRef* const out,
-    moho::CSndVar* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CSndVar>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x004E4D00 (FUN_004E4D00)
-   *
-   * What it does:
-   * Packs one `RRef_CSndParams` result into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_CSndParams(
-    RRef* const out,
-    moho::CSndParams* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CSndParams>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x004E54E0 (FUN_004E54E0)
-   *
-   * What it does:
-   * Packs one `RRef_CSndParams_P` result into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_CSndParamsPointer(
-    RRef* const out,
-    moho::CSndParams** const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CSndParams*>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x004E6640 (FUN_004E6640)
-   *
-   * What it does:
-   * Packs one `RRef_CSndParams_P` result into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_CSndParamsPointerSecondary(
-    RRef* const out,
-    moho::CSndParams** const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CSndParams*>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x0054E200 (FUN_0054E200)
-   *
-   * What it does:
-   * Packs one `RRef_CAniPose` result into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_CAniPose(
-    RRef* const out,
-    moho::CAniPose* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CAniPose>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x00553D00 (FUN_00553D00)
-   *
-   * What it does:
-   * Packs one `RRef_SOCellPos` result into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_SOCellPos(
-    RRef* const out,
-    moho::SOCellPos* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::SOCellPos>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x0059DD60 (FUN_0059DD60)
-   *
-   * What it does:
-   * Packs one `RRef_CAiFormationInstance` result into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_CAiFormationInstance(
-    RRef* const out,
-    moho::CAiFormationInstance* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CAiFormationInstance>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x005ABB80 (FUN_005ABB80)
-   *
-   * What it does:
-   * Packs one `RRef_CAiPathFinder` result into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_CAiPathFinder(
-    RRef* const out,
-    moho::CAiPathFinder* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CAiPathFinder>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x005DF570 (FUN_005DF570)
-   *
-   * What it does:
-   * Packs one `RRef_LAiAttackerImpl` result into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_LAiAttackerImpl(
-    RRef* const out,
-    moho::LAiAttackerImpl* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::LAiAttackerImpl>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x005DF5A0 (FUN_005DF5A0)
-   *
-   * What it does:
-   * Packs one `RRef_CAcquireTargetTask` result into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_CAcquireTargetTask(
-    RRef* const out,
-    moho::CAcquireTargetTask* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CAcquireTargetTask>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x00605780 (FUN_00605780)
-   *
-   * What it does:
-   * Packs one `RRef_CUnitCaptureTask` result into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_CUnitCaptureTask(
-    RRef* const out,
-    moho::CUnitCaptureTask* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CUnitCaptureTask>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x0060C7A0 (FUN_0060C7A0)
-   *
-   * What it does:
-   * Packs one `RRef_CUnitGetBuiltTask` result into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_CUnitGetBuiltTask(
-    RRef* const out,
-    moho::CUnitGetBuiltTask* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CUnitGetBuiltTask>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x00614B50 (FUN_00614B50)
-   *
-   * What it does:
-   * Packs one `RRef_CUnitGuardTask` result into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_CUnitGuardTask(
-    RRef* const out,
-    moho::CUnitGuardTask* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CUnitGuardTask>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x006282E0 (FUN_006282E0)
-   *
-   * What it does:
-   * Packs one `RRef_CUnitUnloadUnits` result into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_CUnitUnloadUnits(
-    RRef* const out,
-    moho::CUnitUnloadUnits* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::CUnitUnloadUnits>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x0063E800 (FUN_0063E800)
-   *
-   * What it does:
-   * Packs one `RRef_shared_ptr_CAniPose` result into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_SharedPtrCAniPose(
-    RRef* const out,
-    boost::shared_ptr<moho::CAniPose>* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<boost::shared_ptr<moho::CAniPose>>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
-
-  /**
-   * Address: 0x0067F600 (FUN_0067F600)
-   *
-   * What it does:
-   * Packs one `RRef_Entity` result into caller-owned output storage.
-   */
-  gpg::RRef* PackRRef_Entity(
-    RRef* const out,
-    moho::Entity* const value
-  )
-  {
-    RRef tmp{};
-    tmp = gpg::MakeRRef<moho::Entity>(value);
-    out->mObj = tmp.mObj;
-    out->mType = tmp.mType;
-    return out;
-  }
 } // namespace gpg

@@ -18,9 +18,6 @@ namespace gpg::diag
   /// `git describe --tags --dirty` output, e.g. "v1.1.1-186-ga48d131-dirty".
   [[nodiscard]] const char* BuildDescribe() noexcept;
 
-  /// Branch the commit was built on ("detached" without one).
-  [[nodiscard]] const char* BuildBranch() noexcept;
-
   /// Target architecture: "x64", "x86" or "x64-linux".
   [[nodiscard]] const char* BuildArch() noexcept;
 

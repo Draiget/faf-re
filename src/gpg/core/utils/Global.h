@@ -84,8 +84,6 @@ namespace gpg
    */
   void SetMemHook(mem_hook_t hook);
 
-  mem_hook_t GetMemHook();
-
   /**
    * Address: 0x00958D60 (FUN_00958D60, func_GetHeapInfo)
    *

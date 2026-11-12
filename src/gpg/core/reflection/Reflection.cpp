@@ -1604,25 +1604,6 @@ namespace gpg
   }
 
   /**
-   * Address: 0x006E3670 (FUN_006E3670, RPointerType_CUnitCommand non-deleting cleanup body)
-   *
-   * What it does:
-   * Clears reflected base/field vector lanes for one `RPointerType<CUnitCommand>`
-   * instance while preserving outer storage ownership.
-   */
-  [[maybe_unused]] void DestroyCUnitCommandPointerTypeBody(
-    gpg::RPointerType<moho::CUnitCommand>* const typeInfo
-  ) noexcept
-  {
-    if (typeInfo == nullptr) {
-      return;
-    }
-
-    typeInfo->fields_ = {};
-    typeInfo->bases_ = {};
-  }
-
-  /**
    * Address: 0x00905FD0 (FUN_00905FD0, gpg::Rect2iTypeInfo::Rect2iTypeInfo)
    *
    * What it does:
@@ -1700,25 +1681,6 @@ namespace gpg
     AddRect2FloatField(this, "x1", offsetof(Rect2f, x1));
     AddRect2FloatField(this, "y1", offsetof(Rect2f, z1));
     Finish();
-  }
-
-  /**
-   * Address: 0x00596690 (FUN_00596690, deleting-destructor thunk)
-   *
-   * What it does:
-   * Runs one `REnumType` destructor lane and conditionally frees this object
-   * storage when the low delete flag bit is set.
-   */
-  [[maybe_unused]] gpg::REnumType* DestroyREnumTypeAndMaybeDelete(
-    gpg::REnumType* const object,
-    const unsigned char deleteFlag
-  ) noexcept
-  {
-    object->~REnumType();
-    if ((deleteFlag & 1u) != 0u) {
-      ::operator delete(static_cast<void*>(object));
-    }
-    return object;
   }
 
   /**

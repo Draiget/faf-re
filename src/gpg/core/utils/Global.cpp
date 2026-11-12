@@ -1938,11 +1938,6 @@ void gpg::SetMemHook(
   gMemHook = hook;
 }
 
-gpg::mem_hook_t gpg::GetMemHook()
-{
-  return gMemHook;
-}
-
 extern "C" void* __cdecl malloc_0(std::uint32_t size);
 
 /**

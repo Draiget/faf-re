@@ -278,15 +278,6 @@ namespace gpg::HaStar
      * Destroys all cluster elements and releases the backing array.
      */
     ~Subcluster();
-
-    /**
-     * Address: 0x008E3C80 (FUN_008E3C80)
-     *
-     * What it does:
-     * Reinitializes storage for a new width x height cluster grid by
-     * destroying any existing storage and constructing a fresh array.
-     */
-    void ResetStorage(int width, int height);
   };
 
   class IOccupationSource
@@ -294,34 +285,6 @@ namespace gpg::HaStar
   public:
     virtual void GetOccupationData(int worldX, int worldY, OccupationData& outData) = 0;
   };
-
-  /**
-   * Address: 0x0076B8B0 (FUN_0076B8B0)
-   *
-   * IOccupationSource *
-   *
-   * IDA signature:
-   * _DWORD *__usercall sub_76B8B0@<eax>(_DWORD *result@<eax>)
-   *
-   * What it does:
-   * Writes the `IOccupationSource` vtable pointer into one object lane and
-   * returns the same object pointer.
-   */
-  [[nodiscard]] IOccupationSource* InitializeOccupationSourceVTableCloneA(IOccupationSource* source);
-
-  /**
-   * Address: 0x0076CB70 (FUN_0076CB70)
-   *
-   * IOccupationSource *
-   *
-   * IDA signature:
-   * _DWORD *__usercall sub_76CB70@<eax>(_DWORD *result@<eax>)
-   *
-   * What it does:
-   * Clone entry that writes the same `IOccupationSource` vtable pointer into
-   * one object lane and returns that object pointer.
-   */
-  [[nodiscard]] IOccupationSource* InitializeOccupationSourceVTableCloneB(IOccupationSource* source);
 
   /**
    * The real backing object referenced by `ClusterCache`'s shared handle.
@@ -553,15 +516,6 @@ namespace gpg::HaStar
      * Rebuilds one cluster node and updates check/progress bits.
      */
     [[nodiscard]] bool WorkOnCluster(int width, int height, int level, int& budget);
-
-    /**
-     * Address: 0x008E3BC0 (FUN_008E3BC0,
-     * ?EnsureClusterExists@ClusterMap@HaStar@gpg@@QAEXHHH@Z)
-     *
-     * What it does:
-     * Forces the requested cluster to be available by repeatedly running background work.
-     */
-    void EnsureClusterExists(int width, unsigned int height, int level);
 
     /**
      * Engine addition (replay keyframes): the rebuild state and every cluster's data. A saved

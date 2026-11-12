@@ -522,36 +522,6 @@ namespace gpg
   }
 
   /**
-   * Address: 0x006EC5E0 (FUN_006EC5E0, gpg::RRef::TryUpcast_Listener_ECommandEvent)
-   *
-   * What it does:
-   * Upcasts this reflected reference to one `Listener<ECommandEvent>` object
-   * lane and throws `BadRefCast` with source/target names on mismatch.
-   */
-  moho::Listener<moho::ECommandEvent>* RRef::TryUpcastListenerECommandEvent() const
-  {
-    static RType* sListenerCommandEventType = nullptr;
-    return TryUpcastValueOrThrow<moho::Listener<moho::ECommandEvent>>(
-      *this, typeid(moho::Listener<moho::ECommandEvent>), sListenerCommandEventType
-    );
-  }
-
-  /**
-   * Address: 0x006F93D0 (FUN_006F93D0, gpg::RRef::TryUpcast_Listener_EUnitCommandQueueStatus)
-   *
-   * What it does:
-   * Upcasts this reflected reference to one `Listener<EUnitCommandQueueStatus>`
-   * object lane and throws `BadRefCast` with source/target names on mismatch.
-   */
-  moho::Listener<moho::EUnitCommandQueueStatus>* RRef::TryUpcastListenerEUnitCommandQueueStatus() const
-  {
-    static RType* sListenerQueueStatusType = nullptr;
-    return TryUpcastValueOrThrow<moho::Listener<moho::EUnitCommandQueueStatus>>(
-      *this, typeid(moho::Listener<moho::EUnitCommandQueueStatus>), sListenerQueueStatusType
-    );
-  }
-
-  /**
    * Address: 0x0054E230 (FUN_0054E230, gpg::RRef::TryUpcast_CAniPose)
    *
    * What it does:
@@ -575,19 +545,6 @@ namespace gpg
   {
     static RType* sPositionHistoryType = nullptr;
     return TryUpcastValueOrThrow<moho::PositionHistory>(*this, typeid(moho::PositionHistory), sPositionHistoryType);
-  }
-
-  /**
-   * Address: 0x006FD290 (FUN_006FD290, gpg::RRef::TryUpcast_Prop)
-   *
-   * What it does:
-   * Upcasts this reflected reference to one `Prop` object lane and throws
-   * `BadRefCast` with source/target names on mismatch.
-   */
-  moho::Prop* RRef::TryUpcastProp() const
-  {
-    static RType* sPropType = nullptr;
-    return TryUpcastValueOrThrow<moho::Prop>(*this, typeid(moho::Prop), sPropType);
   }
 
   /**
