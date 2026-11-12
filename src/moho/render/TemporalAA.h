@@ -35,8 +35,9 @@ namespace moho
     [[nodiscard]] bool IsActive();
 
     /**
-     * This frame's camera for the world passes: `camera` with its projection moved by this frame's offset, and, with
-     * `allowScale` (the post passes will run) and ren_RenderScale under 1, a smaller viewport.
+     * This frame's camera for the world passes: `camera` with its projection moved by this frame's offset and, with
+     * ren_RenderScale under 1, a smaller viewport. `allowScale` says the post passes will run; without them, or
+     * without history buffers, it is `camera` unchanged and nothing waits for a resolve.
      */
     [[nodiscard]] GeomCamera3* Jitter(const GeomCamera3& camera, bool allowScale);
 

@@ -236,7 +236,17 @@ float3 Tangent(float3 center, int2 pixel, int2 step)
 {
     const float3 forward = WorldPositionAt(pixel + step) - center;
     const float3 backward = center - WorldPositionAt(pixel - step);
-    return dot(forward, forward) < dot(backward, backward) ? forward : backward;
+    const float ahead = dot(forward, forward);
+    const float behind = dot(backward, backward);
+    // At the view's edge one neighbour is clamped onto the pixel itself, a zero step: take the other one (a zero
+    // tangent made the normal 0/0, NaN, on the view's left column and top row).
+    if (behind <= 1.0e-12) {
+        return forward;
+    }
+    if (ahead <= 1.0e-12) {
+        return backward;
+    }
+    return ahead < behind ? forward : backward;
 }
 
 // The sim's heightfield: one sample per world unit, raw heights in 1/128 units.
@@ -333,7 +343,8 @@ void AoCS(uint3 id : SV_DispatchThreadID)
         return;
     }
 
-    float3 normal = normalize(cross(Tangent(center, pixel, int2(2, 0)), Tangent(center, pixel, int2(0, 2))));
+    const float3 across = cross(Tangent(center, pixel, int2(2, 0)), Tangent(center, pixel, int2(0, 2)));
+    float3 normal = (dot(across, across) > 1.0e-20) ? normalize(across) : float3(0.0, 1.0, 0.0);
     if (dot(normal, Eye.xyz - center) < 0.0) {
         normal = -normal;
     }

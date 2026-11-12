@@ -1,5 +1,6 @@
 #include "moho/render/TemporalAA.h"
 
+#include "moho/render/BoundDepthSupport.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -75,15 +76,6 @@ namespace moho
       return result;
     }
 
-    [[nodiscard]] bool BackendReadsBoundDepth(
-      gpg::gal::Device& device
-    )
-    {
-      const gpg::gal::DeviceContext* const context = device.GetDeviceContext();
-      return context != nullptr &&
-        (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 ||
-         context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
-    }
   } // namespace
 
   TemporalAA& TemporalAA::Get()
@@ -172,13 +164,18 @@ namespace moho
     std::copy(eye, eye + 3, mHistoryEye);
 
     mJittered = camera;
-    // ren_RenderScale: the world is drawn into the top-left share of the view; the resolve rebuilds the rest. Only
-    // when the history for the full view exists, so a resolve that couldn't run never leaves the world in a corner.
     const float fullWidth = std::max(camera.viewport.r[3].z, 1.0f);
     const float fullHeight = std::max(camera.viewport.r[3].w, 1.0f);
-    mScale = (allowScale && EnsureHistory(static_cast<int>(fullWidth), static_cast<int>(fullHeight)))
-      ? std::clamp(ren_RenderScale, 0.5f, 1.0f)
-      : 1.0f;
+    // Without the post passes or the history buffers the resolve can't run: an offset nothing takes back would
+    // shake the picture by a fraction of a pixel every frame, so the world is drawn as it is.
+    if (!allowScale || !EnsureHistory(static_cast<int>(fullWidth), static_cast<int>(fullHeight))) {
+      mPending = false;
+      mHistoryValid = false;
+      return &mJittered;
+    }
+    // ren_RenderScale: the world is drawn into the top-left share of the view; the resolve rebuilds the rest (only
+    // with the history for the full view, so a resolve that couldn't run never leaves the world in a corner).
+    mScale = std::clamp(ren_RenderScale, 0.5f, 1.0f);
     const float width = std::max(std::floor(fullWidth * mScale), 1.0f);
     const float height = std::max(std::floor(fullHeight * mScale), 1.0f);
     // 8 offsets of the Halton (2, 3) sequence, within the pixel; in clip space x grows right and y up.
