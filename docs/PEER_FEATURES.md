@@ -32,8 +32,13 @@ Feature traffic for the lobby goes in this message with a first byte other than 
 | `FastAck` | 2 | `net_FastRetransmit` was on as the game began | This client acknowledges within `net_FastAckDelay`, which the shared start takes off that peer's ping |
 | `SignedStyle` | 3 | In the lobby, when this client has a valid style key | This client answers a style challenge |
 | `Rejoin` | 4 | `net_RejoinAccept` is on | A client that restarts can take its seat back (#275). With any client that didn't announce it, a lost link behaves as in the original game |
+| `ServerSession` | 5 | Always, in a build with server mode (`FAF_SERVER_MODE`) | This client can play a game whose only sim runs on a game server (`/connectserver`, a launcher's `JoinServer`). It is announced to a launcher too, see below |
 
 `SignedStyle` is announced only in the lobby. A player who announces it can prove a style with a key: the other player sends a random challenge (kind 1), and the answer (kind 2) is the colour with a signature over both players' ids, the challenge and the colour (`src/remote/net/StyleProof.h`). The engine keeps only the public key. The key file is `peer_style.key` beside the exe, or `/peerstylekey <file>`: the seed in hex, then the colour as `rrggbb`. A proven colour shows on the player's name in the lobby: the engine wraps the lobby script's `SetSlotInfo` (`CLobbyPeerFeatures::InstallSlotStyles`), with no script file of its own.
+
+## To the launcher
+
+A launcher can't see the game links, so it asks: started with `/gpgnetfeatures`, the game sends GPGNet `PeerFeatures <mask> <build>` right after it connects, before its first `GameState`. The mask is the announcement's, as decimal text (GPGNet's numbers are 32-bit); only the features a build has whatever the session's switches are in it, today `ServerSession`. A launcher reads bit 5 before it answers the game's `Idle` with `JoinServer` instead of `CreateLobby` ([LAUNCHER_ADAPTER_CONTRACT.md](LAUNCHER_ADAPTER_CONTRACT.md#10-games-on-a-game-server)). Without the switch nothing is sent, and a retail game ignores the switch, so it never answers.
 
 ## Adding a feature
 

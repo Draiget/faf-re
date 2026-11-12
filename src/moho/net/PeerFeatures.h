@@ -33,6 +33,9 @@ namespace moho
     SignedStyle = 3,
     /// A client that restarts can take its seat back (issue #275).
     Rejoin = 4,
+    /// Built with server mode: this client can play a game whose only sim runs on a game server (`/connectserver`,
+    /// a launcher's `JoinServer`). Also announced to a launcher that asks (`/gpgnetfeatures`).
+    ServerSession = 5,
   };
 
   /// The first payload byte of a peer features message; other values are feature traffic.
@@ -51,6 +54,9 @@ namespace moho
   {
     return std::uint64_t{1} << static_cast<std::uint8_t>(feature);
   }
+
+  /// The features this build has whatever the session's switches (`ServerSession`), in every announcement.
+  [[nodiscard]] std::uint64_t PeerBuildMask() noexcept;
 
   /// Writes the announcement payload, with this build's name.
   void WritePeerAnnouncement(CMessageStream& stream, std::uint64_t mask);

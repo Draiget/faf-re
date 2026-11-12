@@ -43,10 +43,10 @@ namespace faf::remote
     // malformed launch line from reaching the network.
     constexpr std::size_t kMaxTokenLength = 1024;
 
-    constexpr std::array<const char*, 8> kLockstepStartupFlags{
+    // `/gpgnet` isn't one (plan WP12.2): with a server session it is only the launcher's channel.
+    constexpr std::array<const char*, 7> kLockstepStartupFlags{
       "/hostgame",
       "/joingame",
-      "/gpgnet",
       "/replay",
       "/load",
       "/scenario",
@@ -93,33 +93,76 @@ namespace faf::remote
       }
     }
 
-    if (!ReadOneArg("/connectserver", request.endpoint)) {
+    std::string endpoint;
+    if (!ReadOneArg("/connectserver", endpoint)) {
       error = "/connectserver needs the server's address as host:port.";
       return EServerConnectArgs::Invalid;
     }
-
-    u_long address = 0;
-    u_short port = 0;
-    if (!moho::NET_GetAddrInfo(request.endpoint.c_str(), 0, false, address, port) || port == 0) {
-      error = "Invalid address:port for the game server: \"" + request.endpoint + "\".";
-      return EServerConnectArgs::Invalid;
-    }
-    request.address = address;
-    request.port = port;
-
-    if (!ReadOneArg("/servertoken", request.token) || !IsTokenText(request.token)) {
+    std::string token;
+    if (!ReadOneArg("/servertoken", token) || !IsTokenText(token)) {
       error = "/connectserver needs /servertoken with the token the launcher was given.";
       return EServerConnectArgs::Invalid;
     }
-
     std::string uid;
     if (!ReadOneArg("/serveruid", uid) || std::atoi(uid.c_str()) <= 0) {
       error = "/connectserver needs /serveruid with the player's id, which the token was made for.";
       return EServerConnectArgs::Invalid;
     }
-    request.uid = std::atoi(uid.c_str());
+    return MakeServerConnectRequest(endpoint, token, std::atoi(uid.c_str()), request, error)
+      ? EServerConnectArgs::Valid
+      : EServerConnectArgs::Invalid;
+  }
 
-    return EServerConnectArgs::Valid;
+  bool MakeServerConnectRequest(
+    const std::string_view endpoint,
+    const std::string_view token,
+    const std::int32_t uid,
+    SServerConnectRequest& request,
+    std::string& error
+  )
+  {
+    // The session's channel takes an IPv4 address and port (`StartServerSession`); a name isn't looked up.
+    const std::string endpointText(endpoint);
+    net::SEndpoint parsed;
+    if (!net::ParseEndpoint(endpointText, parsed)) {
+      error = "The game server's address must be an IPv4 address and port: \"" + endpointText + "\".";
+      return false;
+    }
+    if (!IsTokenText(token)) {
+      error = "The game server's token must be 1 to " + std::to_string(kMaxTokenLength) +
+        " printable characters without spaces.";
+      return false;
+    }
+    if (uid <= 0) {
+      error = "The player's id for the game server must be above 0, not " + std::to_string(uid) + ".";
+      return false;
+    }
+    request.endpoint = endpointText;
+    request.address = parsed.ip;
+    request.port = parsed.port;
+    request.token.assign(token);
+    request.uid = uid;
+    return true;
+  }
+
+  bool IsPeerLinkCommand(
+    const std::string_view command
+  )
+  {
+    // The shipped engine's lobby and link commands (CGpgNetInterface::PullTask), the ICE adapter's and the native
+    // links' (moho/net/NetlinkPeers.cpp, netlink/EngineLinks.h).
+    constexpr std::array<std::string_view, 9> kCommands{
+      "CreateLobby",
+      "HostGame",
+      "JoinGame",
+      "ConnectToPeer",
+      "DisconnectFromPeer",
+      "SendNatPacket",
+      "EjectPlayer",
+      "IceServers",
+      "IceMsg",
+    };
+    return std::ranges::find(kCommands, command) != kCommands.end() || command.starts_with("Netlink");
   }
 
   namespace
@@ -499,43 +542,56 @@ namespace faf::remote
     case EServerConnectArgs::Valid:
       break;
     }
+    std::string told; // the player has seen it; there is no launcher to tell
+    return StartServerSession(request, startLobbyUi, told);
+  }
 
+  bool ServerSessionStarted()
+  {
+    return sSession != nullptr;
+  }
+
+  EServerSessionStart StartServerSession(
+    const SServerConnectRequest& request,
+    bool (*const startLobbyUi)(),
+    std::string& error
+  )
+  {
+    if (sSession != nullptr) {
+      error = "a server session is already running";
+      return EServerSessionStart::Failed;
+    }
     gpg::Logf("Server session requested: %s as player %d", request.endpoint.c_str(), request.uid);
+    const auto fail = [&](std::string text) {
+      moho::WIN_OkBox("Ack!", text.c_str());
+      error = std::move(text);
+      sSession.reset();
+      return EServerSessionStart::Failed;
+    };
 
     // Plan WP12.1: the channel first (one handshake, the token), then the lobby over it.
     net::SEndpoint server;
     if (!net::ParseEndpoint(request.endpoint, server)) {
-      moho::WIN_OkBox(
-        "Ack!", ("The game server's address must be an IPv4 address and port: \"" + request.endpoint + "\".").c_str()
-      );
-      return EServerSessionStart::Failed;
+      return fail("The game server's address must be an IPv4 address and port: \"" + request.endpoint + "\".");
     }
     sSession = std::make_unique<SServerSession>(request.uid, net::MakeToken(request.token), server);
     if (std::string openError; !sSession->link.Open(openError)) {
-      moho::WIN_OkBox("Ack!", ("Can't reach the game server: " + openError).c_str());
-      sSession.reset();
-      return EServerSessionStart::Failed;
+      return fail("Can't reach the game server: " + openError);
     }
     const auto start = std::chrono::steady_clock::now();
     while (sSession->link.State() == net::CClientLink::EState::Connecting) {
       if (std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() > kConnectSeconds) {
-        moho::WIN_OkBox("Ack!", ("The game server at " + request.endpoint + " doesn't answer.").c_str());
-        sSession.reset();
-        return EServerSessionStart::Failed;
+        return fail("The game server at " + request.endpoint + " doesn't answer.");
       }
       sSession->link.Pump(NowUs());
       sSession->link.Wait(20);
     }
     if (sSession->link.State() != net::CClientLink::EState::Connected) {
       const auto refusal = sSession->link.Refusal();
-      moho::WIN_OkBox(
-        "Ack!",
-        ("The game server refused this player" +
-         (refusal ? " (reason " + std::to_string(static_cast<int>(*refusal)) + ")" : std::string()) + ".")
-          .c_str()
+      return fail(
+        "The game server refused this player" +
+        (refusal ? " (reason " + std::to_string(static_cast<int>(*refusal)) + ")" : std::string()) + "."
       );
-      sSession.reset();
-      return EServerSessionStart::Failed;
     }
     gpg::Logf("Server session: connected to %s", request.endpoint.c_str());
     sSession->channel.KeepAlive(); // the stall cover counts from the game thread's last pump
@@ -545,9 +601,7 @@ namespace faf::remote
     // the lobby as GPGNet's commands would (moho/app/ServerLobbyUi.h); `InternalCreateLobby` takes
     // `TakeServerLobbyConnector`.
     if (startLobbyUi == nullptr || !startLobbyUi()) {
-      moho::WIN_OkBox("Ack!", "Unable to start the lobby.");
-      sSession.reset();
-      return EServerSessionStart::Failed;
+      return fail("Unable to start the lobby.");
     }
     return EServerSessionStart::Started;
   }

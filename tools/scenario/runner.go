@@ -398,6 +398,13 @@ func (r *runner) check(e Expect) []string {
 			fails = append(fails, fmt.Sprintf("TURN allocations %d < %d (relay not used)", n, e.MinTurnAllocations))
 		}
 	}
+	if e.OwnServerTokenOnly {
+		res := r.l.CheckServerTokens()
+		for _, n := range res.Notes {
+			r.j.Note(journal.Note, 0, "server tokens: "+n, nil)
+		}
+		fails = append(fails, res.Fails...)
+	}
 	if e.RelayOnly {
 		total := 0
 		for _, rec := range r.j.Query(func(rec journal.Record) bool {

@@ -29,6 +29,15 @@ namespace
   constexpr std::chrono::seconds kRejoinReportingSilenceSeconds{20};
 } // namespace
 
+std::uint64_t moho::PeerBuildMask() noexcept
+{
+#if FAF_SERVER_MODE
+  return PeerFeatureBit(EPeerFeature::ServerSession);
+#else
+  return 0u;
+#endif
+}
+
 void moho::WritePeerAnnouncement(
   CMessageStream& stream,
   const std::uint64_t mask
@@ -67,7 +76,7 @@ std::uint64_t CPeerFeatures::LocalMask(
   const CClientManagerImpl& manager
 )
 {
-  std::uint64_t mask = 0;
+  std::uint64_t mask = PeerBuildMask();
   if (manager.mStreamCheck != nullptr) {
     mask |= PeerFeatureBit(EPeerFeature::OrderStreamCheck);
   }

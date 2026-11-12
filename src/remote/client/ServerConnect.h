@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "remote/net/LobbySignals.h"
@@ -39,10 +40,36 @@ namespace faf::remote
   /**
    * Reads `/connectserver` and `/servertoken` from the command line. `/servertoken` without
    * `/connectserver` counts as absent. `/connectserver` together with a lockstep startup flag
-   * (`/hostgame`, `/joingame`, `/gpgnet`, `/replay`, `/load`, `/scenario`, `/map`, `/perf`) is
-   * invalid.
+   * (`/hostgame`, `/joingame`, `/replay`, `/load`, `/scenario`, `/map`, `/perf`) is invalid. `/gpgnet` is allowed:
+   * it is the launcher's channel (states, results), and its lobby commands are ignored (`IsPeerLinkCommand`).
    */
   [[nodiscard]] EServerConnectArgs ReadServerConnectArgs(SServerConnectRequest& request, std::string& error);
+
+  /**
+   * Plan WP12.2: one connection string's parts, as a launcher hands them over (the switches, or GPGNet's
+   * `JoinServer address token uid`), checked as the switches are: an IPv4 `host:port`, a token of 1 to 1024 printable
+   * characters without spaces, a uid above 0. False with `error` saying what is wrong; the token never appears in it.
+   */
+  [[nodiscard]] bool MakeServerConnectRequest(
+    std::string_view endpoint,
+    std::string_view token,
+    std::int32_t uid,
+    SServerConnectRequest& request,
+    std::string& error
+  );
+
+  /**
+   * Plan WP12.2: a launcher command that makes, joins or links a peer-to-peer lobby (`CreateLobby`, `HostGame`,
+   * `JoinGame`, `ConnectToPeer`, `DisconnectFromPeer`, `SendNatPacket`, `EjectPlayer`, the adapter's and the native
+   * links' own). A game on a game server has no such lobby or links: it ignores them, so an unchanged ICE adapter
+   * (which answers the game's `Idle` with `CreateLobby`) does no harm.
+   */
+  [[nodiscard]] bool IsPeerLinkCommand(std::string_view command);
+
+  /** The GPGNet command a launcher sends in place of `CreateLobby` to put this game on a game server (plan WP12.2). */
+  inline constexpr const char* kJoinServerCommand = "JoinServer";
+  /** The game's answer to it: `ServerSession <"connected" | "failed" | "refused"> <why>`, never the token. */
+  inline constexpr const char* kServerSessionCommand = "ServerSession";
 
   enum class EServerSessionStart
   {
@@ -58,6 +85,17 @@ namespace faf::remote
    * (this file stays out of the UI, which headless lacks).
    */
   [[nodiscard]] EServerSessionStart StartServerSessionFromCommandLine(bool (*startLobbyUi)());
+
+  /**
+   * Plan WP12.2: the same from a checked request (`MakeServerConnectRequest`), for a launcher's `JoinServer`: the
+   * channel to the server (waiting up to 15 s for its answer), then `startLobbyUi`. On a failure the player is told
+   * why and `error` says it for the launcher.
+   */
+  [[nodiscard]] EServerSessionStart
+  StartServerSession(const SServerConnectRequest& request, bool (*startLobbyUi)(), std::string& error);
+
+  /** A server session was started in this process (from the command line or a launcher's `JoinServer`). */
+  [[nodiscard]] bool ServerSessionStarted();
 
   /**
    * Plan WP2.12: the server's next lobby signal (remote/net/LobbySignals.h), if it is next in line: the lobby's own

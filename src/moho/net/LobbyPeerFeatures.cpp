@@ -359,7 +359,7 @@ void CLobbyPeerFeatures::PeerEstablished(
     return;
   }
 
-  const std::uint64_t mask = mKey != nullptr ? PeerFeatureBit(EPeerFeature::SignedStyle) : 0u;
+  const std::uint64_t mask = PeerBuildMask() | (mKey != nullptr ? PeerFeatureBit(EPeerFeature::SignedStyle) : 0u);
   CMessage message(ELobbyMsg::LOBMSG_PeerFeatures);
   CMessageStream stream(message);
   WritePeerAnnouncement(stream, mask);

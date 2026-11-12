@@ -15,6 +15,10 @@ func TestShippedScenarios(t *testing.T) {
 	if err != nil || len(files) == 0 {
 		t.Fatalf("no scenarios found: %v", err)
 	}
+	// Mode server scenarios name the server and the seats' tokens through the environment in real runs.
+	t.Setenv("FAF_TEST_SERVER", "10.0.0.1:27050")
+	t.Setenv("FAF_TEST_TOKEN_1001", "test-token-one")
+	t.Setenv("FAF_TEST_TOKEN_1002", "test-token-two")
 	for _, f := range files {
 		sc, err := Load(f)
 		if err != nil {

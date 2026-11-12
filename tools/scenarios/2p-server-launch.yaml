@@ -1,0 +1,55 @@
+name: 2p-server-launch
+description: >
+  Two server-mode clients started the way the FAF client starts a game (/gpgnet), put on one dedicated game server
+  instead of a peer lobby: player 1001 by GPGNet's JoinServer in place of CreateLobby, player 1002 by
+  /connectserver /servertoken /serveruid on its command line next to /gpgnet (it then ignores the CreateLobby an
+  unchanged ICE adapter sends). Each is handed its own connection string only. The server (match2net's seats 1001
+  and 1002 with these tokens, no lobby) launches once both are in; both load and play from its views.
+  FAF_TEST_SERVER is the server's IPv4 host:port, FAF_TEST_TOKEN_1001 / FAF_TEST_TOKEN_1002 the seats' tokens,
+  FAF_SERVER_CLIENT_EXE a server-mode build (preset clang-x64-release-server).
+timeout: 10m
+
+mode: server
+server:
+  address: '$FAF_TEST_SERVER'
+  delivery: gpgnet
+
+game:
+  exe: '$FAF_SERVER_CLIENT_EXE'
+  init: init_faf.lua
+  args: ['/d3d11']
+  nosound: true
+  tile: true
+  window: { width: 1280, height: 720 }
+
+players:
+  - { uid: 1001, name: Seat One, serverToken: '$FAF_TEST_TOKEN_1001' }
+  - { uid: 1002, name: Seat Two, serverToken: '$FAF_TEST_TOKEN_1002', serverDelivery: args }
+
+steps:
+  - start: all
+  - waitMessage: { uid: 1001, cmd: ServerSession, arg: connected, timeout: 2m }
+  - waitState: { uids: all, state: Launching, timeout: 4m }
+  - note: both games launched from the server's configuration; letting them play
+  - wait: 60s
+
+expect:
+  allLaunched: true
+  noDesync: true
+  ownServerTokenOnly: true
+  present:
+    - { uid: 1001, cmd: PeerFeatures }
+    - { uid: 1002, cmd: PeerFeatures }
+    - { uid: 1001, kind: gpgnet.out, cmd: JoinServer }
+    - { uid: 1002, kind: gpgnet.out, cmd: CreateLobby }
+  absent:
+    - { uid: 1002, kind: gpgnet.out, cmd: JoinServer }
+    - { cmd: ServerSession, arg: failed }
+    - { cmd: ServerSession, arg: refused }
+  logsContain:
+    - { uids: all, pattern: 'Server session: connected to ' }
+    - { uids: all, pattern: 'server driver: loaded; told the server' }
+    - { uids: [1001], pattern: 'GPGNET: the launcher puts this game on the game server at ' }
+    - { uids: [1002], pattern: 'GPGNET: CreateLobby ignored: this game plays on a game server' }
+  logsAbsent:
+    - { uids: all, pattern: 'Lua error|SERVER LOBBY: the server''s launch' }

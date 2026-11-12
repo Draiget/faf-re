@@ -79,6 +79,9 @@ type Config struct {
 	// Native runs the game with no adapter, linking every peer itself
 	// (native.go, issue #274).
 	Native *Native `json:"native,omitempty"`
+	// Server puts the game on a dedicated game server instead of a peer lobby
+	// (server.go, plan WP12.2): this seat's connection string only.
+	Server *ServerJoin `json:"server,omitempty"`
 }
 
 // CheckNoFullscreen refuses a fullscreen request anywhere on a command line.
@@ -138,6 +141,10 @@ type Seat struct {
 	// next game to connect is one coming back (native.go).
 	nativePeers     []gpgnet.Message
 	nativeReturning bool
+
+	// What the game announced to its launcher (PeerFeatures, server.go).
+	features      uint64
+	featuresKnown bool
 }
 
 // New validates cfg and opens the seat's GPGNet endpoint and lobby port.
@@ -381,6 +388,9 @@ func (c Config) GameArgs(gpgPort int) []string {
 	if c.Native != nil {
 		args = append(args, c.Native.nativeArgs()...)
 	}
+	if c.Server != nil {
+		args = append(args, c.Server.args(c.UID)...)
+	}
 	// faf-re sends desync telemetry to its public server by default; test games stay off it
 	// unless the scenario configures telemetry itself.
 	if !hasArg(c.Args, "/telemetry") {
@@ -413,6 +423,7 @@ func (s *Seat) startGame(gpgPort int) error {
 	}
 	args := c.GameArgs(gpgPort)
 	cmdline := procs.CommandLine(c.Exe, args)
+	shownCmdline := procs.CommandLine(c.Exe, RedactArgs(args)) // the journal never holds a server token
 
 	// Always leave a way to start the same instance by hand.
 	script := fmt.Sprintf("@echo off\r`ncd /d \"%s\"\r`n%s\r`n", dir, cmdline)
@@ -425,7 +436,7 @@ func (s *Seat) startGame(gpgPort int) error {
 		s.external = true
 		s.mu.Unlock()
 		s.emit(journal.Record{Kind: journal.ProcExternal, UID: uid, Text: "waiting for a game started by hand",
-			Data: map[string]any{"exe": c.Exe, "dir": dir, "args": procs.Arguments(args)}})
+			Data: map[string]any{"exe": c.Exe, "dir": dir, "args": procs.Arguments(RedactArgs(args))}})
 		fmt.Printf("`n== player %d (%s): start the game yourself ==`n   working dir : %s`n   command     : %s`n   VS args     : %s`n`n",
 			uid, c.Name, dir, cmdline, procs.Arguments(args))
 		return nil
@@ -439,7 +450,7 @@ func (s *Seat) startGame(gpgPort int) error {
 	s.game = proc
 	s.mu.Unlock()
 	s.emit(journal.Record{Kind: journal.ProcStart, UID: uid, Text: "game",
-		Data: map[string]any{"pid": proc.Pid(), "cmd": cmdline, "dir": dir}})
+		Data: map[string]any{"pid": proc.Pid(), "cmd": shownCmdline, "dir": dir}})
 	go s.watchExit(proc, "game")
 	return nil
 }
@@ -527,11 +538,16 @@ func (s *Seat) watchExit(proc *procs.Process, what string) {
 func (s *Seat) onMessage(m gpgnet.Message) {
 	uid := s.cfg.UID
 	s.emit(journal.Record{Kind: journal.GpgIn, UID: uid, Command: m.Command, Args: m.Args})
+	s.noteFeatures(m)
 	if s.cfg.Native != nil {
 		s.nativeIncoming(m)
 		if m.Command == "GameState" && m.Str(0) == "Idle" {
 			s.nativeIceServers()
 		}
+	}
+	if m.Command == "GameState" && m.Str(0) == "Idle" && s.cfg.Server != nil && s.cfg.Server.Delivery != DeliverArgs {
+		s.joinServer() // in CreateLobby's place (plan WP12.2)
+		return
 	}
 	if m.Command == "GameState" && m.Str(0) == "Idle" && s.cfg.Contract == nil {
 		mode := 0
@@ -564,7 +580,7 @@ func (s *Seat) Send(m gpgnet.Message) error {
 		}
 	}
 	err := s.endpoint.Send(m)
-	rec := journal.Record{Kind: journal.GpgOut, UID: s.cfg.UID, Command: m.Command, Args: m.Args}
+	rec := journal.Record{Kind: journal.GpgOut, UID: s.cfg.UID, Command: m.Command, Args: recordArgs(m)}
 	if err != nil {
 		rec.Text = "send failed: " + err.Error()
 	}

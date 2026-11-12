@@ -366,6 +366,14 @@ namespace moho
     void PullTask();
 
     /**
+     * Engine addition (plan WP12.2), not in the binary: the launcher's `CreateLobby` has made a lobby here.
+     */
+    [[nodiscard]] bool HasLobby() const noexcept
+    {
+      return mLobbyObject.m_state != nullptr;
+    }
+
+    /**
      * Address: 0x007B7A30
      *
      * @param args

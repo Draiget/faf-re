@@ -392,6 +392,8 @@ target_link_options(faf_server_probe PRIVATE -Wl,--error-limit=0)
 # server-mode build runs them on faf_engine.
 add_executable(faf_remote_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/remote/WireTests.cpp"
   "${PROJECT_SOURCE_DIR}/tests/remote/EffectHostingTests.cpp"
+  # Plan WP12.2: the launcher's connection string and the commands a game on a game server ignores.
+  "${PROJECT_SOURCE_DIR}/tests/remote/LaunchPathTests.cpp"
   # Plan WP9.5: a beam's create parameters from the server's recorder, through the lane, into the client's beam.
   "${PROJECT_SOURCE_DIR}/src/server/EffectOpEncoder.cpp" "${PROJECT_SOURCE_DIR}/src/server/EffectOpRecorder.cpp")
 target_link_libraries(faf_remote_tests PRIVATE faf_sim gtest_main)

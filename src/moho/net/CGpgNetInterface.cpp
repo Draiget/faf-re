@@ -37,6 +37,12 @@
 
 #include "moho/net/INetNATTraversalProviderWeakPtrReflection.h"
 #include "moho/net/NetlinkPeers.h"
+#include "moho/net/PeerFeatures.h"
+#include "gpg/core/diagnostics/BuildInfo.h"
+#if FAF_SERVER_MODE
+#include "moho/app/ServerLobbyUi.h"
+#include "remote/client/ServerConnect.h"
+#endif
 #include "moho/sim/ISTIDriver.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/ui/IUIManager.h"
@@ -1455,6 +1461,14 @@ void CGpgNetInterface::PullTask()
 
     try {
       const auto commandName = command.mName.view();
+#if FAF_SERVER_MODE
+      // Engine addition (plan WP12.2): the launcher's `JoinServer`, and in a server session its lobby and link
+      // commands, which that session ignores.
+      if (SERVERLOBBY_HandleGpgNetCommand(*this, command.mName, command.mArgs)) {
+        pending.pop_front();
+        continue;
+      }
+#endif
       if (NATIVENET_HandleCommand(command.mName, command.mArgs)) {
         // Engine addition (issue #274): native mode's own messages. The lobby
         // server's JoinGame / ConnectToPeer go on below, rewritten.
@@ -1546,6 +1560,27 @@ void CGpgNetInterface::Connected(
   if (!args.empty()) {
     throw std::runtime_error("Wrong number of arguments to Connected command, expected 0");
   }
+
+  // Engine addition (issue #285, plan WP12.2): a launcher that asks with /gpgnetfeatures gets this build's peer
+  // announcement (docs/PEER_FEATURES.md) before the game's first state, so it knows at `Idle` whether it may send
+  // `JoinServer` in place of `CreateLobby`. The mask goes as decimal text: GPGNet's numbers are 32-bit.
+  if (moho::CFG_GetArgOption(gpg::StrArg{"/gpgnetfeatures"}, 0u, nullptr)) {
+    const SNetCommandArg maskArg(gpg::STR_Printf("%llu", static_cast<unsigned long long>(PeerBuildMask())));
+    const SNetCommandArg buildArg{fa::string{gpg::diag::BuildCommitShort()}};
+    WriteCommandWith2Args("PeerFeatures", &maskArg, &buildArg);
+    gpg::Logf("GPGNET: told the launcher this build's features (%s).", maskArg.mStr.c_str());
+  }
+
+#if FAF_SERVER_MODE
+  // Engine addition (plan WP12.2): started with /connectserver too, the game is on a game server already: the
+  // launcher hears the usual first state and nothing starts peer links (the server is the only link).
+  if (faf::remote::ServerSessionStarted()) {
+    gpg::Logf("GPGNET: entering idle state; this game plays on a game server, so no lobby or peer links from here.");
+    SNetCommandArg idleArg(fa::string("Idle"));
+    WriteCommandWith1Arg("GameState", &idleArg);
+    return;
+  }
+#endif
 
   // Engine addition (issue #275): the lobby server takes Idle from a host as "this game is a lobby
   // again" (FAF server, gameconnection.py), and the game is running. Results still go as usual.

@@ -750,6 +750,21 @@ namespace
     case faf::remote::EServerSessionStart::NotRequested:
       break;
     case faf::remote::EServerSessionStart::Started:
+      // Plan WP12.2: a launcher that started the game with /gpgnet too keeps it as its channel (states, results);
+      // its lobby and link commands are ignored (ServerLobbyUi.h).
+      if (moho::CFG_GetArgOption("/gpgnet", 1, &args) && !args.empty()) {
+        u_long address = 0;
+        u_short port = 0;
+        if (moho::NET_GetAddrInfo(args[0].c_str(), 0, true, address, port) && port != 0) {
+          try {
+            moho::GPGNET_Attach(address, port);
+          } catch (const std::exception& exception) {
+            gpg::Warnf("Server session: can't reach the launcher: %s", exception.what());
+          }
+        } else {
+          gpg::Warnf("Server session: invalid launcher address \"%s\".", args[0].c_str());
+        }
+      }
       return;
     case faf::remote::EServerSessionStart::Failed:
       if (gShellApp != nullptr) {

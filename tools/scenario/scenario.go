@@ -193,6 +193,11 @@ type Expect struct {
 	LogsContain []LogsAgree `yaml:"logsContain"`
 	// LogsAbsent: no listed player's game log holds a matching line.
 	LogsAbsent []LogsAgree `yaml:"logsAbsent"`
+	// OwnServerTokenOnly (mode server): every game was handed its own
+	// connection string and never another player's token: not in what it was
+	// sent, its command line or its log; the journal holds token tags only
+	// (launcher.CheckServerTokens, plan WP2.9).
+	OwnServerTokenOnly bool `yaml:"ownServerTokenOnly"`
 }
 
 // LogsAgree requires every listed player's game log (<run>/game-<uid>.log,

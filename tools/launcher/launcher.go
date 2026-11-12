@@ -378,6 +378,12 @@ func (l *Launcher) seatConfig(p *Player) seat.Config {
 			sc.Contract = l.contractFor(pc)
 		}
 	}
+	if c.Mode == ModeServer {
+		// Plan WP2.9: this player's connection string, never another's. The
+		// server's lobby signals pick the lobby script, not /players.
+		sc.AutoLobby = false
+		sc.Server = &seat.ServerJoin{Address: c.Server.Address, Token: pc.ServerToken, Delivery: pc.ServerDelivery}
+	}
 	if c.Mode == ModeICE {
 		sc.ICE = &seat.ICE{Adapter: c.ICE.Adapter, GameID: c.GameID,
 			ForceRelay: c.ICE.ForceRelay, LogLevel: c.ICE.LogLevel}
@@ -496,8 +502,8 @@ func (l *Launcher) onLeave(p *Player) {
 	l.mu.Lock()
 	closed := l.closed
 	l.mu.Unlock()
-	if closed || l.cfg.Leave == LeaveNever {
-		return
+	if closed || l.cfg.Leave == LeaveNever || l.cfg.Mode == ModeServer {
+		return // in ModeServer the game server tells the others
 	}
 	if l.cfg.Leave == LeaveInLobby && l.anyLaunched() {
 		return
@@ -637,8 +643,15 @@ func (l *Launcher) addr(viewer, target *Player) (string, error) {
 	}
 }
 
+// errServerSignals refuses lobby steps in ModeServer: the game server signals
+// the lobby (who hosts, who joins) itself.
+var errServerSignals = errors.New("mode server: the game server signals the lobby; scenarios have no host or join steps")
+
 // HostGame makes uid the host once its game is in the lobby.
 func (l *Launcher) HostGame(ctx context.Context, uid int) error {
+	if l.cfg.Mode == ModeServer {
+		return errServerSignals
+	}
 	p, err := l.Player(uid)
 	if err != nil {
 		return err
@@ -661,6 +674,9 @@ func (l *Launcher) HostGame(ctx context.Context, uid int) error {
 // JoinGame connects uid to the host and to every player already in, in the
 // order the FAF lobby server uses.
 func (l *Launcher) JoinGame(ctx context.Context, uid int) error {
+	if l.cfg.Mode == ModeServer {
+		return errServerSignals
+	}
 	host := l.Host()
 	if host == 0 {
 		return errors.New("join before anyone hosts")
