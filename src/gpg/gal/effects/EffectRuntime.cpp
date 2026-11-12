@@ -271,6 +271,21 @@ namespace gpg::gal::effects
       }
       mDescription = ParseEffect(translatedSource);
     }
+    // Engine addition (ren_RayWaterReflections): the water effect (it samples the sky cube and the refraction copy,
+    // and has the eye and the view-projection) gets the ray constants too, for its traced reflections.
+    const auto hasSampler = [&](const std::string_view name) {
+      return std::any_of(mDescription.samplers.begin(), mDescription.samplers.end(), [&](const SamplerDesc& sampler) {
+        return sampler.name == name;
+      });
+    };
+    if (
+      gRayQueryShaders && FindParameter(kRayShadowParameter) < 0 && hasSampler("SkySampler") &&
+      hasSampler("RefractionSampler") && FindParameter("ViewPosition") >= 0 && FindParameter("WorldToView") >= 0 &&
+      FindParameter("Projection") >= 0 && FindParameter("ViewportScaleOffset") >= 0
+    ) {
+      translatedSource.insert(0U, RayShadowDeclaration());
+      mDescription = ParseEffect(translatedSource);
+    }
     if (!originalSource.empty()) {
       ApplyDirect3D9PassStates(originalSource, mDescription);
     }

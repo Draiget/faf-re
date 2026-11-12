@@ -268,6 +268,78 @@ technique10 Lit
   }
 }
 
+// Engine addition (ren_RayWaterReflections): water2.fx's sky lookup becomes a traced reflection mixed over the
+// sky, whatever its input parameter is called, and the effect compiles for both targets.
+TEST(
+  GalShaderCompiler,
+  RayTracedWaterReflectionsCompileForBothTargets
+)
+{
+  if (Compiler() == nullptr) {
+    GTEST_SKIP() << Unavailable();
+  }
+  const ShaderCompiler& compiler = *Compiler();
+  gRayQueryShaders = true;
+  const std::string source = std::string(RayShadowDeclaration()) + R"fx(
+float3 ViewPosition;
+float4x4 WorldToView;
+float4x4 Projection;
+float4 ViewportScaleOffset;
+texture SkyMap;
+samplerCUBE SkySampler = sampler_state { Texture = (SkyMap); };
+texture RefractionTexture;
+sampler RefractionSampler = sampler_state { Texture = (RefractionTexture); };
+struct WaterOut
+{
+    float4 mPos : POSITION;
+    float4 mScreenPos : TEXCOORD0;
+    float3 mViewVec : TEXCOORD1;
+};
+WaterOut WaterVS( float3 position : POSITION )
+{
+    WaterOut o;
+    float4x4 wvp = mul( WorldToView, Projection );
+    o.mPos = mul( float4( position, 1 ), wvp );
+    o.mScreenPos = o.mPos;
+    o.mViewVec = ViewPosition - position;
+    return o;
+}
+float4 WaterPS( WaterOut water ) : COLOR0
+{
+    float3 viewVector = normalize( water.mViewVec );
+    float3 R = reflect( -viewVector, float3( 0, 1, 0 ) );
+    float4 refracted = tex2D( RefractionSampler, water.mScreenPos.xy / water.mScreenPos.w );
+    float4 skyReflection = texCUBE( SkySampler, R );
+    return lerp( refracted, skyReflection, 0.3 );
+}
+technique10 Water
+{
+    pass P0
+    {
+        SetVertexShader( CompileShader( vs_4_0, WaterVS() ) );
+        SetPixelShader( CompileShader( ps_4_0, WaterPS() ) );
+    }
+}
+)fx";
+  const Generated generated = Generate(source);
+  gRayQueryShaders = false;
+  const std::string& hlsl = generated.modern.hlsl;
+  EXPECT_NE(hlsl.find("RayQuery<"), std::string::npos) << hlsl;
+  EXPECT_NE(hlsl.find("faf_ray_water(ViewPosition - water.mViewVec, R"), std::string::npos) << hlsl;
+  EXPECT_NE(hlsl.find("faf_water_hit.z)"), std::string::npos) << hlsl;
+  ASSERT_EQ(generated.modern.entries.size(), 2U);
+  for (const ShaderEntry& entry : generated.modern.entries) {
+    const CompiledShader dxil = compiler.Compile(hlsl, entry, ShaderTarget::Dxil);
+    EXPECT_TRUE(dxil.succeeded) << entry.name << ":\n" << dxil.messages;
+    const CompiledShader spirv = compiler.Compile(hlsl, entry, ShaderTarget::Spirv);
+    EXPECT_TRUE(spirv.succeeded) << entry.name << ":\n" << spirv.messages;
+  }
+
+  // Without ray queries the sky lookup stays as it is.
+  const Generated plain = Generate(source);
+  EXPECT_EQ(plain.modern.hlsl.find("faf_ray_water"), std::string::npos);
+}
+
 // Engine addition (tessellation): the generated hull and domain entry points compile for both targets with the
 // vertex and pixel shaders of the same pass.
 TEST(

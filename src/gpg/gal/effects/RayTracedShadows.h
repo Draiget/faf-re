@@ -35,7 +35,8 @@ namespace gpg::gal::effects
    *     ren_RayAo reads; tangent of the sun's angular radius, 0 for hard shadows (ren_RaySunAngle); rays per
    *     ground point over the sun's disc (ren_RaySoftRays)).
    */
-  inline constexpr std::uint32_t kRayShadowVectors = 8U;
+  // [8]: ren_RayWaterReflections - 1 when the water traces its reflections, their reach in world units.
+  inline constexpr std::uint32_t kRayShadowVectors = 9U;
   inline constexpr std::string_view kRayShadowParameter = "faf_RayShadows";
 
   struct RayShadowConstants

@@ -29,7 +29,7 @@ namespace gpg::gal::effects
 
   std::string_view RayShadowDeclaration() noexcept
   {
-    return "float4 faf_RayShadows[8]; // engine addition (ren_RayTracedShadows), filled by the backend\n";
+    return "float4 faf_RayShadows[9]; // engine addition (ren_RayTracedShadows), filled by the backend\n";
   }
 
   bool IsShadowLookupSampler(
@@ -93,7 +93,7 @@ float4 tex2Dgrad(faf_shadow_sampler s, float2 uv, float2 dx, float2 dy) { return
 // ---- end of the cascade lookups ----
 )hlsl";
 
-    static_assert(kRayShadowVectors == 8U, "RayShadowDeclaration's array length");
+    static_assert(kRayShadowVectors == 9U, "RayShadowDeclaration's array length");
 
     // Engine addition (ren_RayTracedShadows): the lookups' third argument, the point's whole shadow
     // coordinate (RayTracedShadows.h). A call site whose coordinate has no depth passes a z of -1e30,
@@ -352,6 +352,129 @@ float4 tex2D(faf_shadow_sampler s, float2 uv, float4 full)
     return texel;
 }
 )hlsl";
+
+    // Engine addition (ren_RayWaterReflections): water2.fx reflects the sky cubemap and a mirrored copy of the units.
+    // `faf_ray_water` traces the reflected ray into the ray-traced scene (ground and meshes); where it meets
+    // something that is on the screen, it returns where (in the refraction copy's coordinates, the frame drawn
+    // before the water) and how much to take of it (less towards the screen's edges); otherwise zero, and the
+    // sky stays. The call site mixes the copy's colour there into the sky reflection.
+    constexpr const char* kRayWaterHelpers = R"hlsl(
+[[vk::binding(0, 2)]] RaytracingAccelerationStructure faf_RayScene : register(t0, space1);
+float3 faf_ray_water(float3 surface, float3 direction, float4x4 worldToClip, float4 viewportScaleOffset)
+{
+    if (faf_RayShadows[8].x <= 0 || direction.y <= 0.01) {
+        return float3(0, 0, 0);
+    }
+    RayDesc ray;
+    ray.Origin = surface + float3(0, 0.05, 0);
+    ray.Direction = normalize(direction);
+    ray.TMin = 0.1;
+    ray.TMax = faf_RayShadows[8].y;
+    RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> query;
+    query.TraceRayInline(faf_RayScene, RAY_FLAG_NONE, 3, ray);
+    query.Proceed();
+    if (query.CommittedStatus() != COMMITTED_TRIANGLE_HIT) {
+        return float3(0, 0, 0);
+    }
+    const float3 hit = ray.Origin + ray.Direction * query.CommittedRayT();
+    const float4 clip = mul(float4(hit, 1), worldToClip);
+    if (clip.w <= 0) {
+        return float3(0, 0, 0);
+    }
+    const float2 ndc = clip.xy / clip.w;
+    const float edge = saturate((1 - max(abs(ndc.x), abs(ndc.y))) * 8);
+    return float3(ndc * viewportScaleOffset.xy + viewportScaleOffset.zw, edge);
+}
+)hlsl";
+
+    /**
+     * Engine addition (ren_RayWaterReflections): rewrites water2.fx's `float4 <name> = texCUBE(SkySampler, <R>);` in
+     * a function that takes `inV` with `mViewVec` (the water surface's offset from the eye) into a traced
+     * reflection mixed over the sky. Returns the body unchanged when it doesn't have that shape.
+     */
+    [[nodiscard]] std::string PassWaterRays(
+      const std::string& body
+    )
+    {
+      const auto skipSpace = [&](std::size_t at) {
+        while (at < body.size() && std::isspace(static_cast<unsigned char>(body[at])) != 0) {
+          ++at;
+        }
+        return at;
+      };
+      const auto expect = [&](std::size_t at, const std::string_view word) -> std::size_t {
+        at = skipSpace(at);
+        return body.compare(at, word.size(), word) == 0 ? at + word.size() : std::string::npos;
+      };
+      // The parameter that carries the surface's offset from the eye: `<name> . mViewVec` (water2.fx's `inV`).
+      const std::size_t member = body.find("mViewVec");
+      if (member == std::string::npos) {
+        return body;
+      }
+      std::size_t dot = member;
+      while (dot > 0U && std::isspace(static_cast<unsigned char>(body[dot - 1U])) != 0) {
+        --dot;
+      }
+      if (dot == 0U || body[dot - 1U] != '.') {
+        return body;
+      }
+      std::size_t nameEnd = dot - 1U;
+      while (nameEnd > 0U && std::isspace(static_cast<unsigned char>(body[nameEnd - 1U])) != 0) {
+        --nameEnd;
+      }
+      std::size_t nameBegin = nameEnd;
+      while (nameBegin > 0U &&
+             (std::isalnum(static_cast<unsigned char>(body[nameBegin - 1U])) != 0 || body[nameBegin - 1U] == '_')) {
+        --nameBegin;
+      }
+      if (nameBegin == nameEnd) {
+        return body;
+      }
+      const std::string input = body.substr(nameBegin, nameEnd - nameBegin);
+      std::size_t search = 0U;
+      while (true) {
+        const std::size_t call = body.find("texCUBE", search);
+        if (call == std::string::npos) {
+          return body;
+        }
+        search = call + 7U;
+        // texCUBE ( SkySampler , <direction> ) ;
+        std::size_t at = expect(call + 7U, "(");
+        if (
+          at == std::string::npos || (at = expect(at, "SkySampler")) == std::string::npos ||
+          (at = expect(at, ",")) == std::string::npos
+        ) {
+          continue;
+        }
+        const std::size_t directionBegin = skipSpace(at);
+        const std::size_t directionEnd = body.find(')', directionBegin);
+        if (directionEnd == std::string::npos) {
+          return body;
+        }
+        const std::string direction = body.substr(directionBegin, directionEnd - directionBegin);
+        if (direction.find_first_of("(,") != std::string::npos) {
+          continue; // only a plain name
+        }
+        const std::size_t semicolon = expect(directionEnd + 1U, ";");
+        if (semicolon == std::string::npos) {
+          continue;
+        }
+        // Back from the call to the statement's start: `float4 <name> =`.
+        const std::size_t statement = body.find_last_of(";{}", call);
+        const std::size_t begin = (statement == std::string::npos) ? 0U : statement + 1U;
+        const std::string head = body.substr(begin, call - begin);
+        if (head.find("float4") == std::string::npos || head.find('=') == std::string::npos) {
+          continue;
+        }
+        const std::string call_text = body.substr(call, semicolon - 1U - call);
+        std::string out = body.substr(0U, begin);
+        out += " float3 faf_water_hit = faf_ray_water(ViewPosition - " + input + ".mViewVec, " + direction +
+          ", mul(WorldToView, Projection), ViewportScaleOffset);";
+        out += head + "lerp(" + call_text + ", tex2D(RefractionSampler, faf_water_hit.xy), faf_water_hit.z);";
+        out += body.substr(semicolon);
+        return out;
+      }
+    }
 
     /**
      * Engine addition (ren_RayTracedShadows): gives each `tex2D(<shadow sampler>, <coords>.xy ...)` call in
@@ -1389,6 +1512,22 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
       }
     }
 
+    // Engine addition (ren_RayWaterReflections): water2.fx, given the ray constants (EffectRuntime.cpp) and none of
+    // the shadow helpers (which declare the ray scene too).
+    const auto hasParameter = [&](const std::string_view name) {
+      return std::any_of(description.parameters.begin(), description.parameters.end(), [&](const Parameter& parameter) {
+        return parameter.name == name;
+      });
+    };
+    const auto hasSampler = [&](const std::string_view name) {
+      return std::any_of(description.samplers.begin(), description.samplers.end(), [&](const SamplerDesc& sampler) {
+        return sampler.name == name;
+      });
+    };
+    const bool rayWater = gRayQueryShaders && !shadowCascades && hasParameter(kRayShadowParameter) &&
+      hasSampler("SkySampler") && hasSampler("RefractionSampler") && hasParameter("ViewPosition") &&
+      hasParameter("WorldToView") && hasParameter("Projection") && hasParameter("ViewportScaleOffset");
+
     // ---- parameters a function writes -------------------------------------------
     std::map<std::string, const Parameter*> numericParameters;
     for (const Parameter& parameter : description.parameters) {
@@ -1503,6 +1642,9 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
           numericParameters.count(parameter->name) != 0U || parameter->parameterClass == ParameterClass::Struct
         ) {
           body += GlobalDeclaration(*parameter) + "\n";
+          if (rayWater && parameter->name == kRayShadowParameter) {
+            body += kRayWaterHelpers;
+          }
           if (shadowCascades && parameter->name == kShadowCascadeParameter) {
             body += kShadowCascadeHelpers;
             body += kShadowCoordinateHelpers;
@@ -1561,6 +1703,9 @@ float4 tex3Dlod(faf_sampler s, float4 uv) { return s.t3.SampleLevel(s.s, uv.xyz,
         const std::size_t open = original.find('{', original.find(')'));
         if (shadowCascades) {
           functionBody = PassShadowCoordinates(functionBody, shadowLookupSamplers);
+        }
+        if (rayWater) {
+          functionBody = PassWaterRays(functionBody);
         }
         body += ReplaceSamplerTypes(original.substr(0U, open)) + "{" + copies + ReplaceSamplerTypes(functionBody) + "}";
         continue;

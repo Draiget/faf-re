@@ -30,6 +30,8 @@ namespace moho
   int ren_RayShadowFailTest = 0;
   // Engine addition (ren_RaySunAngle): soft shadows from a sun that is a disc, not a point.
   float ren_RaySunAngle = 3.0f;
+  int ren_RayWaterReflections = 0;
+  float ren_RayWaterReach = 400.0f;
   int ren_RaySoftRays = 4;
   // Engine addition (ren_RayAlphaShadows): alpha-tested meshes (trees) in the scene too.
   int ren_RayAlphaShadows = 1;
@@ -75,6 +77,18 @@ namespace moho
       "ren_RaySoftRays",
       "Ray-traced shadows with ren_RaySunAngle: rays per ground point (1-16); units use their own 5-tap filter.",
       &ren_RaySoftRays
+    );
+    TConVar<int> gTConVar_ren_RayWaterReflections(
+      "ren_RayWaterReflections",
+      "With ren_RayTracedShadows: the water reflects the ground, hills and units around it, by a ray traced from each "
+      "water pixel into the scene, where what it meets is on the screen (the sky stays elsewhere). 1 on, 0 off "
+      "(default).",
+      &ren_RayWaterReflections
+    );
+    TConVar<float> gTConVar_ren_RayWaterReach(
+      "ren_RayWaterReach",
+      "ren_RayWaterReflections: the longest reflected ray, world units (400 the default).",
+      &ren_RayWaterReach
     );
     TConVar<int> gTConVar_ren_RayAlphaShadows(
       "ren_RayAlphaShadows",
@@ -625,6 +639,9 @@ namespace moho
     const float sunAngle = std::clamp(ren_RaySunAngle, 0.0f, 20.0f);
     vectors[7][2] = std::tan(sunAngle * 0.0174532925f);
     vectors[7][3] = static_cast<float>(std::clamp(ren_RaySoftRays, 1, 16));
+    // ren_RayWaterReflections: the water traces its reflections into this scene.
+    vectors[8][0] = (ren_RayWaterReflections > 0) ? 1.0f : 0.0f;
+    vectors[8][1] = std::max(ren_RayWaterReach, 1.0f);
     Publish(vectors);
     gMeshDepthSkipsTraced = !mMeshesMissing;
     gMeshDepthSkipsAlpha = !mAlphaMissing;

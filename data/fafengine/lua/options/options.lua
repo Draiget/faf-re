@@ -336,6 +336,25 @@ do
                 },
             })
         end
+        if Supported('ren_RayWaterReflections') then
+            table.insert(video.items, math.min(position + 2, table.getn(video.items) + 1), {
+                title = 'Ray-traced water reflections',
+                key = 'ray_water_optin',
+                type = 'toggle',
+                default = 0,
+                tip = 'With ray-traced shadows on: lakes and the sea reflect the hills, ground and units around them, '
+                    .. 'not only the sky.',
+                set = function(key, value, startup)
+                    ConExecute('ren_RayWaterReflections ' .. tostring(value))
+                end,
+                custom = {
+                    states = {
+                        { text = '<LOC _On>', key = 1 },
+                        { text = '<LOC _Off>', key = 0 },
+                    },
+                },
+            })
+        end
         if Supported('ren_RaySunAngle') then
             table.insert(video.items, math.min(position + 2, table.getn(video.items) + 1), {
                 title = 'Soft ray-traced shadows',
