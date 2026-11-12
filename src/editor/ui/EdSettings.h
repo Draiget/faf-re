@@ -47,6 +47,12 @@ namespace faf::editor
     static constexpr const char* kStartScreen = "StartScreen";
     /** The start screen's FAF vault rows (your uploads, most played, the vault half of its search). */
     static constexpr const char* kVaultItems = "VaultItems";
+    /** Autosave while a map has unsaved changes. */
+    static constexpr const char* kAutosave = "Autosave";
+    /** Minutes between autosaves: 1, 2, 5 or 10. */
+    static constexpr const char* kAutosaveMinutes = "AutosaveMinutes";
+    /** Backups of a map's files a map keeps (made before the first save of a session): 0, 3, 10 or 30. */
+    static constexpr const char* kBackups = "Backups";
 
   private:
     std::map<std::string, std::string, std::less<>> mValues;

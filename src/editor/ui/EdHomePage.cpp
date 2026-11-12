@@ -62,6 +62,7 @@ namespace faf::editor
     mShowHome = true;
     mHomePage = std::clamp(page, 0, 2);
     mHomeFocusSearch = page == 0;
+    mHomeFront = true;
   }
 
   void EdShell::DrawHome(
@@ -99,8 +100,12 @@ namespace faf::editor
     ImGui::PopStyleColor();
     ImGui::PopStyleVar(3);
     if (shown) {
-      // Over the panels whatever gets the focus behind it.
-      ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+      // In front of the panels when it opens; not every frame, which would cover the dialogs opened over it
+      // (Recover, Save changes?, Settings, New map). Docked panels can't come over it later (their host stays back).
+      // Not over a dialog already open (the recovery offer opens on the first frame, before this).
+      if (std::exchange(mHomeFront, false) && ImGui::GetTopMostPopupModal() == nullptr) {
+        ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+      }
 
       // The left column: the pages, then Recover, Tour and Help, the open map's Continue, and the switch.
       ImGui::BeginChild("##homeleft", ImVec2(Em(220.0f), 0.0f));

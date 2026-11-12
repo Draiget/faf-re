@@ -25,6 +25,9 @@ namespace faf::editor
         {EdSettings::kPanelsWhilePlaying, "1", {}},
         {EdSettings::kStartScreen, "1", {}},
         {EdSettings::kVaultItems, "1", {}},
+        {EdSettings::kAutosave, "1", {}},
+        {EdSettings::kAutosaveMinutes, "1", {"1", "2", "5", "10"}},
+        {EdSettings::kBackups, "10", {"0", "3", "10", "30"}},
       };
       return kDefinitions;
     }

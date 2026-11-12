@@ -1,4 +1,5 @@
 #include "editor/doc/EdDocument.h"
+#include "editor/doc/EdAutosave.h"
 #include "editor/doc/EdRecentMaps.h"
 #include "editor/doc/EdAdaptiveTables.h"
 #include "editor/view/EdLiveTerrain.h"
@@ -429,11 +430,83 @@ namespace faf::editor
     }
   }
 
+  bool EdDocument::Guarded(
+    std::function<void()> proceed
+  )
+  {
+    if (mGuardPassed || !mModified || mState != State::Open || !mUnsavedGuard) {
+      return false;
+    }
+    return mUnsavedGuard([this, proceed = std::move(proceed)] {
+      mGuardPassed = true;
+      proceed();
+      mGuardPassed = false;
+    });
+  }
+
+  bool EdDocument::WriteSnapshot(
+    const std::filesystem::path& folder,
+    std::string& error
+  )
+  {
+    if (mState != State::Open || mMap == nullptr) {
+      error = "no map is open";
+      return false;
+    }
+    if (mMap->mTerrainRes == nullptr || !mMap->mTerrainRes->GetBool()) {
+      error = "the terrain is still being prepared";
+      return false;
+    }
+    std::error_code code;
+    std::filesystem::create_directories(folder, code);
+    if (code) {
+      error = "can't make " + folder.string() + ": " + code.message();
+      return false;
+    }
+    const std::filesystem::path disk = MapDiskFile();
+    const std::string scmapName = disk.empty() ? FolderName() + ".scmap" : disk.filename().string();
+    MarkKeptImages();
+    if (!WriteMapFile(*mMap, mFileRecords, folder / scmapName, error)) {
+      return false;
+    }
+    // Every Lua file as Save would write it, the "as saved" texts untouched.
+    SyncEffectScript();
+    std::string scenario = mScenario;
+    if (const ReclaimTotals reclaim = PropReclaim(); reclaim.props > 0) {
+      scenario = WithScenarioReclaim(scenario, reclaim.mass, reclaim.energy);
+    }
+    const std::pair<const std::string*, std::string> files[] = {
+      {&mFacts.scenarioPath, scenario},
+      {&mFacts.savePath, mSave.Loaded() ? mSave.Text() : std::string()},
+      {&mFacts.scriptPath, mScript},
+      {&mFacts.tablesPath, mTables},
+      {&mFacts.optionsPath, mOptions},
+    };
+    for (const auto& [gamePath, text] : files) {
+      if (gamePath->empty() || text.empty()) {
+        continue;
+      }
+      const std::filesystem::path file = folder / gamePath->substr(gamePath->find_last_of('/') + 1);
+      std::ofstream out(file, std::ios::binary | std::ios::trunc);
+      out.write(text.data(), static_cast<std::streamsize>(text.size()));
+      if (!out) {
+        error = "can't write " + file.string();
+        return false;
+      }
+    }
+    return true;
+  }
+
   bool EdDocument::Open(
     const std::string& scenarioPath
   )
   {
     if (mState == State::Loading) {
+      return false;
+    }
+    if (Guarded([this, scenarioPath] {
+      (void)Open(scenarioPath);
+    })) {
       return false;
     }
     Close();
@@ -454,6 +527,13 @@ namespace faf::editor
   {
     if (mState == State::Loading) {
       message = "A map is still opening.";
+      return false;
+    }
+    if (Guarded([this, settings] {
+      std::string ignored;
+      (void)CreateNew(settings, ignored);
+    })) {
+      message = "The open map has unsaved changes: answer the question first.";
       return false;
     }
     if (
@@ -2095,24 +2175,15 @@ namespace faf::editor
       message = "The map isn't ready yet (its terrain is still being prepared); save again in a moment.";
       return false;
     }
-    std::error_code error;
-    if (!mBackedUp) {
-      char stamp[32];
-      const std::time_t now = std::time(nullptr);
-      std::tm local{};
-      (void)localtime_s(&local, &now);
-      (void)std::strftime(stamp, sizeof(stamp), "%Y%m%d-%H%M%S", &local);
-      const std::filesystem::path backup = file.parent_path() / ".editor_backup" / stamp;
-      std::filesystem::create_directories(backup, error);
-      if (!error) {
-        std::filesystem::copy_file(
-          file, backup / file.filename(), std::filesystem::copy_options::overwrite_existing, error
-        );
-      }
-      if (error) {
-        message = "The backup of " + file.string() + " failed (" + error.message() + "); nothing was saved.";
+    // Before the session's first save: the map's files (all five) backed up outside the maps folder.
+    if (!mBackedUp && !mBackupRoot.empty() && mBackupKeep > 0) {
+      std::filesystem::path made;
+      std::string failure;
+      if (!BackupMapFolder(file.parent_path(), mBackupRoot, mBackupKeep, made, failure)) {
+        message = "The backup failed (" + failure + "); nothing was saved.";
         return false;
       }
+      gpg::Logf("editor: the map's files backed up to %s", made.string().c_str());
       mBackedUp = true;
     }
     std::string failure;

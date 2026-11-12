@@ -153,12 +153,42 @@ namespace faf::editor
       return mMap.get();
     }
     /**
-     * Saves the map's `.scmap` over its own file, when it has one on disk (a map in the game's archives has
-     * none; it is saved as a new folder instead). Before the first overwrite of a session the old file is
-     * copied to `<map folder>/.editor_backup/<time>/`. The scenario, save and script files are left as they
-     * are: nothing edits them yet. `message` says what happened, for the log and the status bar.
+     * Saves the map over its own files, when it has them on disk (a map in the game's archives has none; it is
+     * saved as a new folder instead): the `.scmap` and the Lua files that changed. Before the first save of a
+     * session the map's files are backed up outside the maps folder (SetBackups). `message` says what happened, for
+     * the log and the status bar.
      */
     bool Save(std::string& message);
+
+    /** Where Save backs the map's files up first (`<root>/<map folder>/<time>/`) and how many backups a map keeps
+     * (0: no backups). */
+    void SetBackups(
+      std::filesystem::path root,
+      const int keep
+    )
+    {
+      mBackupRoot = std::move(root);
+      mBackupKeep = keep;
+    }
+
+    /**
+     * Autosave: every file of the map (the `.scmap` and its Lua files, as Save would write them) into `folder`,
+     * which is made; the document stays as it is (unsaved, its baselines unmoved), so a later Save still writes
+     * what changed. False with `error` when the map can't be written yet or a file fails.
+     */
+    bool WriteSnapshot(const std::filesystem::path& folder, std::string& error);
+
+    /**
+     * Asked before Open and CreateNew drop unsaved changes: the guard (the editor's "Save changes?" question)
+     * returns true when it takes over, and calls `proceed` once the user chose to go on (after saving or not);
+     * false lets the call go ahead now. No guard, or no changes: the call goes ahead.
+     */
+    void SetUnsavedGuard(
+      std::function<bool(std::function<void()> proceed)> guard
+    )
+    {
+      mUnsavedGuard = std::move(guard);
+    }
 
     /**
      * The FAF vault (its `maps` folder holds the mapper's maps). Save writes over a map only there: the
@@ -710,6 +740,12 @@ namespace faf::editor
     [[nodiscard]] std::uint64_t MasksHash() const;
     bool mModified = false;
     bool mBackedUp = false;
+    std::filesystem::path mBackupRoot;
+    int mBackupKeep = 10;
+    std::function<bool(std::function<void()>)> mUnsavedGuard;
+    bool mGuardPassed = false;
+    /** The guard, when there are changes to lose: true when it took over (the caller stops). */
+    bool Guarded(std::function<void()> proceed);
     std::filesystem::path mVault;
     /** Set by SaveAsNewFolder: where Save writes from then on (else the map's own file). */
     std::filesystem::path mSaveTarget;

@@ -29,6 +29,7 @@
 #include <string>
 #include <vector>
 
+#include "editor/doc/EdAutosave.h"
 #include "editor/doc/EdDocument.h"
 #include "editor/doc/EdMapFile.h"
 #include "editor/doc/EdRoundTrip.h"
@@ -43,6 +44,7 @@
 #include "editor/ui/EdCommands.h"
 #include "editor/ui/EdFonts.h"
 #include "editor/ui/EdHelp.h"
+#include "editor/ui/EdHomeModel.h"
 #include "editor/ui/EdKeymap.h"
 #include "editor/ui/EdKeysPage.h"
 #include "editor/ui/EdPalette.h"
@@ -388,6 +390,8 @@ namespace faf::editor
     void OnMenuCommand(UINT command);
     bool OnViewportMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
     [[nodiscard]] bool EditorViewOverPlay();
+    /** The window's close and File > Exit with unsaved changes: the question asked first; true when it was. */
+    bool AskBeforeExit();
     /** The title row's menu that Alt and this letter opens, or -1. */
     [[nodiscard]] int MenuIndexForKey(char key);
     /** What a point of the frame (screen coordinates) is, by the title row's layout (own caption only). */
@@ -707,6 +711,9 @@ namespace faf::editor
           (void)::SetFocus(gPanelWindow);
           return 0;
         }
+      }
+      if (message == WM_CLOSE && AskBeforeExit()) {
+        return 0;
       }
       if (message == WM_CLOSE) {
         gWindowClosing = true;
@@ -1452,6 +1459,40 @@ namespace faf::editor
             ImGui::Checkbox("Full help text", &FullHelpText());
             SettingLabel("Panels while playing", "The panels stay around the game while a play runs.");
             ImGui::Checkbox("Show the panels while playing", &mShell->PanelsWhilePlaying());
+            SettingLabel(
+              "Autosave",
+              "While a map has unsaved changes, a copy of its files is kept outside the maps folder; if the "
+              "editor stops, the next start offers it (File > Recover)."
+            );
+            bool autosave = mSettings.GetBool(EdSettings::kAutosave);
+            if (ImGui::Checkbox("Autosave", &autosave)) {
+              (void)mSettings.SetBool(EdSettings::kAutosave, autosave);
+              mAutosaveOn = autosave && !mAutosaveRoot.empty();
+              SaveSettings();
+            }
+            ImGui::SameLine();
+            if (
+              SettingChoice(
+                EdSettings::kAutosaveMinutes, {{"1", "every minute"}, {"2", "2 min"}, {"5", "5 min"}, {"10", "10 min"}}
+              )
+            ) {
+              mAutosaveEvery = 60.0 * mSettings.GetInt(EdSettings::kAutosaveMinutes);
+            }
+            SettingLabel(
+              "Backups",
+              "Before the first save of a session, the map's files are copied into the backups folder; "
+              "each map keeps this many."
+            );
+            if (SettingChoice(EdSettings::kBackups, {{"0", "None"}, {"3", "3"}, {"10", "10"}, {"30", "30"}})) {
+              mDocument.SetBackups(mBackupRoot, mSettings.GetInt(EdSettings::kBackups));
+            }
+            ImGui::TextDisabled("%s", mBackupRoot.string().c_str());
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Open##backups")) {
+              std::error_code ignored;
+              std::filesystem::create_directories(mBackupRoot, ignored);
+              (void)::ShellExecuteW(nullptr, L"open", mBackupRoot.wstring().c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+            }
             SettingLabel("Start screen", "New, recent work, your maps and the FAF vault (File > Start screen).");
             ImGui::Checkbox("Show the start screen when the editor starts", &mShell->HomeAtStart());
             ImGui::Checkbox("FAF vault items on the start screen", &mShell->HomeVaultItems());
@@ -1575,6 +1616,271 @@ namespace faf::editor
         ImGui::End();
       }
 
+      /**
+       * Autosave's and backups' folders and switches, after settings.ini is read: `%LOCALAPPDATA%\FAForever\Editor\
+       * autosave` and `backups`. A test run autosaves only with `/autosavefolder <path>` (and backs up into
+       * `/backupfolder <path>` if given), so it never touches the user's.
+       */
+      void SetUpAutosave()
+      {
+        const std::filesystem::path settings = EditorSettingsFolder();
+        bool testFolders = false;
+        if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/autosavefolder", 1, &value) && !value.empty()) {
+          mAutosaveRoot = std::filesystem::path(value[0].c_str());
+          testFolders = true;
+        } else if (!settings.empty() && !gTestRun) {
+          mAutosaveRoot = settings / "autosave";
+        }
+        if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/backupfolder", 1, &value) && !value.empty()) {
+          mBackupRoot = std::filesystem::path(value[0].c_str());
+        } else if (!settings.empty()) {
+          mBackupRoot = settings / "backups";
+        }
+        mAutosaveEvery = 60.0 * mSettings.GetInt(EdSettings::kAutosaveMinutes);
+        if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/autosaveevery", 1, &value) && !value.empty()) {
+          mAutosaveEvery = std::max(1.0, std::atof(value[0].c_str()));
+        }
+        mAutosaveOn = !mAutosaveRoot.empty() && (testFolders || mSettings.GetBool(EdSettings::kAutosave));
+        mDocument.SetBackups(mBackupRoot, mSettings.GetInt(EdSettings::kBackups));
+        // One question before a map with unsaved changes is dropped (open, recent, new map, recover, exit); a test
+        // run drops it without asking.
+        mAskInTests = moho::CFG_GetArgOption("/askunsaved", 0, nullptr);
+        mDocument.SetUnsavedGuard([this](std::function<void()> proceed) {
+          if (gTestRun && !mAskInTests) {
+            return false;
+          }
+          mGuardProceed = std::move(proceed);
+          mGuardAsk = true;
+          return true;
+        });
+        mRecoverable = mAutosaveRoot.empty() ? std::vector<EdAutosaveEntry>{} : ListAutosaves(mAutosaveRoot);
+        mShowRecover = !mRecoverable.empty();
+        gpg::Logf(
+          "editor: autosave %s (every %.0f s into %s), %zu autosaved map%s to recover",
+          mAutosaveOn ? "on" : "off",
+          mAutosaveEvery,
+          mAutosaveRoot.string().c_str(),
+          mRecoverable.size(),
+          mRecoverable.size() == 1 ? "" : "s"
+        );
+      }
+
+      /**
+       * Each frame: with unsaved changes, an autosave once the interval passed since the last one (or since the
+       * changes began) and nothing was pressed for 3 s; not during a play. Only maps with files of their own on disk
+       * (Recover puts the files back there).
+       */
+      void DriveAutosave()
+      {
+        const double now = StatusClock();
+        const bool pressed = ImGui::IsAnyMouseDown() || (::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0 ||
+          (::GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0 || (::GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0 ||
+          !ImGui::GetIO().InputQueueCharacters.empty();
+        if (pressed) {
+          mLastInput = now;
+        }
+        const bool open = mDocument.GetState() == EdDocument::State::Open;
+        if (!open || !mDocument.Modified()) {
+          mModifiedSince = -1.0;
+          return;
+        }
+        if (mModifiedSince < 0.0) {
+          mModifiedSince = now;
+        }
+        if (!mAutosaveOn || mPlay.Active() || mDocument.MapDiskFile().empty()) {
+          return;
+        }
+        if (!AutosaveDue(now, true, std::max(mLastAutosave, mModifiedSince), mLastInput, mAutosaveEvery, 3.0)) {
+          return;
+        }
+        mLastAutosave = now;
+        const auto started = std::chrono::steady_clock::now();
+        const std::filesystem::path folder = mAutosaveRoot / mDocument.FolderName();
+        std::string error;
+        if (!mDocument.WriteSnapshot(folder, error)) {
+          gpg::Warnf("editor: autosave of %s failed: %s", mDocument.FolderName().c_str(), error.c_str());
+          return;
+        }
+        EdAutosaveEntry entry;
+        entry.scenario = mDocument.Path();
+        entry.title = mDocument.FolderName();
+        for (std::size_t i = 0; i < mPlay.Maps().size() && i < mPlay.Titles().size(); ++i) {
+          if (_stricmp(mPlay.Maps()[i].c_str(), mDocument.Path().c_str()) == 0) {
+            entry.title = mPlay.Titles()[i];
+          }
+        }
+        entry.disk = mDocument.MapDiskFile().parent_path();
+        entry.time = static_cast<std::int64_t>(std::time(nullptr));
+        std::ofstream(folder / "autosave.txt", std::ios::binary | std::ios::trunc) << AutosaveNote(entry);
+        const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+        gpg::Logf("editor: autosaved %s into %s in %.0f ms", entry.title.c_str(), folder.string().c_str(), ms);
+        char clock[16];
+        const std::time_t t = std::time(nullptr);
+        std::tm local{};
+        (void)localtime_s(&local, &t);
+        (void)std::strftime(clock, sizeof(clock), "%H:%M", &local);
+        PostStatusMessage(std::string("Autosaved ") + clock);
+        mRecoverable = ListAutosaves(mAutosaveRoot);
+      }
+
+      /** Recover: the map's files backed up, the autosave's put in their place, the map opened. */
+      void Recover(
+        const EdAutosaveEntry& entry
+      )
+      {
+        // The open map's unsaved changes are asked about before any file is touched.
+        if ((!gTestRun || mAskInTests) && mDocument.GetState() == EdDocument::State::Open && mDocument.Modified()) {
+          mGuardProceed = [this, entry] {
+            Recover(entry);
+          };
+          mGuardAsk = true;
+          return;
+        }
+        std::filesystem::path backup;
+        std::string error;
+        if (!RestoreAutosave(entry, mBackupRoot, std::max(3, mSettings.GetInt(EdSettings::kBackups)), backup, error)) {
+          gpg::Warnf("editor: recover %s: %s", entry.title.c_str(), error.c_str());
+          PostStatusMessage("Recover failed: " + error);
+          return;
+        }
+        gpg::Logf(
+          "editor: recovered %s from %s (its files before are in %s)",
+          entry.title.c_str(),
+          entry.folder.string().c_str(),
+          backup.string().c_str()
+        );
+        RemoveAutosave(entry.folder);
+        mRecoverable = ListAutosaves(mAutosaveRoot);
+        mShell->HideHome();
+        mShell->Browser().OpenListedMap(entry.scenario);
+        PostStatusMessage("Recovered " + entry.title);
+      }
+
+      /**
+       * The autosaves left by a crash or a close without saving, offered at the start and from File > Recover: each
+       * with Recover (the map's files backed up first), Discard, or keep for later.
+       */
+      void DrawRecover()
+      {
+        if (mShowRecover && !ImGui::IsPopupOpen("Recover unsaved work")) {
+          ImGui::OpenPopup("Recover unsaved work");
+          gpg::Logf("editor: the recovery offer opens (%zu maps)", mRecoverable.size());
+        }
+        ImGui::SetNextWindowSize(ImVec2(Em(640.0f), 0.0f), ImGuiCond_Appearing);
+        if (!ImGui::BeginPopupModal("Recover unsaved work", &mShowRecover)) {
+          return;
+        }
+        // In front of the start screen, which is made a frame after this opens at the start (a window made later
+        // goes in front of the ones before it).
+        ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextUnformatted(
+          "The editor autosaved these maps and they weren't saved since (it closed without saving, or stopped). "
+          "Recover puts the autosave's files in the map's folder and opens it; the map's files from before are backed "
+          "up first."
+        );
+        ImGui::PopTextWrapPos();
+        ImGui::Spacing();
+        const double now = static_cast<double>(std::time(nullptr));
+        std::optional<EdAutosaveEntry> recover;
+        std::optional<std::filesystem::path> discard;
+        for (const EdAutosaveEntry& entry : mRecoverable) {
+          ImGui::PushID(entry.folder.string().c_str());
+          ImGui::Separator();
+          ImGui::TextUnformatted(entry.title.c_str());
+          ImGui::SameLine();
+          ImGui::TextDisabled("autosaved %s", AgoText(now - static_cast<double>(entry.time)).c_str());
+          ImGui::TextDisabled("%s", entry.disk.string().c_str());
+          if (ImGui::Button("Recover")) {
+            recover = entry;
+          }
+          ImGui::SameLine();
+          if (ImGui::Button("Discard")) {
+            discard = entry.folder;
+          }
+          ImGui::PopID();
+        }
+        ImGui::Separator();
+        if (ImGui::Button("Later")) {
+          mShowRecover = false;
+          ImGui::CloseCurrentPopup();
+        }
+        if (mRecoverable.empty()) {
+          mShowRecover = false;
+          ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+        if (discard) {
+          gpg::Logf("editor: autosave discarded: %s", discard->string().c_str());
+          RemoveAutosave(*discard);
+          mRecoverable = ListAutosaves(mAutosaveRoot);
+        }
+        if (recover) {
+          mShowRecover = false;
+          Recover(*recover);
+        }
+      }
+
+      /** The "Save changes?" question before unsaved changes are dropped: Save, Don't save, Cancel. */
+      void DrawUnsavedQuestion()
+      {
+        constexpr const char* kTitle = "Save changes?";
+        if (std::exchange(mGuardAsk, false)) {
+          ImGui::OpenPopup(kTitle);
+          gpg::Logf("editor: unsaved changes in %s: asked before going on", mDocument.FolderName().c_str());
+        }
+        if (!ImGui::BeginPopupModal(kTitle, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+          return;
+        }
+        ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+        ImGui::Text("%s has unsaved changes.", mDocument.FolderName().c_str());
+        ImGui::TextDisabled("Save them before going on?");
+        ImGui::Spacing();
+        std::function<void()> proceed;
+        if (ImGui::Button("Save")) {
+          SaveDocument();
+          if (!mDocument.Modified()) {
+            proceed = std::move(mGuardProceed);
+          }
+          ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Don't save")) {
+          gpg::Logf("editor: %s: changes dropped", mDocument.FolderName().c_str());
+          if (!mAutosaveRoot.empty()) {
+            RemoveAutosave(mAutosaveRoot / mDocument.FolderName());
+            mRecoverable = ListAutosaves(mAutosaveRoot);
+          }
+          // Dropped: what comes next doesn't ask again.
+          mDocument.SetModified(false);
+          proceed = std::move(mGuardProceed);
+          ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+          mGuardProceed = nullptr;
+          ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+        if (proceed) {
+          proceed();
+        }
+      }
+
+      /** The question before the editor closes with unsaved changes (not in test runs); true when it was asked. */
+      bool AskBeforeExit()
+      {
+        if ((gTestRun && !mAskInTests) || mDocument.GetState() != EdDocument::State::Open || !mDocument.Modified()) {
+          return false;
+        }
+        mGuardProceed = [this] {
+          mShell->RequestExit();
+        };
+        mGuardAsk = true;
+        (void)::SetFocus(gPanelWindow);
+        return true;
+      }
+
       /** F6 while a play runs: the editor's view in front of it, or the game's again. */
       void ToggleEditorView()
       {
@@ -1617,6 +1923,22 @@ namespace faf::editor
       std::string mStartTitleBar;
       std::string mStartRenderer;
       std::chrono::steady_clock::time_point mLastBackgroundFrame = std::chrono::steady_clock::now();
+      // Autosave and recovery (doc/EdAutosave): where autosaves and backups go (`/autosavefolder`,
+      // `/backupfolder` for test runs), every how many seconds (`/autosaveevery`), the clock's marks.
+      std::filesystem::path mAutosaveRoot;
+      std::filesystem::path mBackupRoot;
+      bool mAutosaveOn = false;
+      double mAutosaveEvery = 60.0;
+      double mLastAutosave = 0.0;
+      double mLastInput = 0.0;
+      double mModifiedSince = -1.0;
+      std::vector<EdAutosaveEntry> mRecoverable;
+      bool mShowRecover = false;
+      // The "Save changes?" question: what to do once answered.
+      std::function<void()> mGuardProceed;
+      bool mGuardAsk = false;
+      /** `/askunsaved`: a test run asks the question too (else test runs drop changes without asking). */
+      bool mAskInTests = false;
       /** The key whose press ran a command in the view: its release doesn't reach the scene or the game. */
       unsigned mSwallowKeyUp = 0;
       /** The scenario path of each item File > Open Recent shows, by its place. */
@@ -1989,6 +2311,7 @@ namespace faf::editor
       };
       RegisterCommands();
       LoadKeymap();
+      SetUpAutosave();
       mShell->SetCommands(&mCommands, &mMenus);
       SetUpWindowChrome(frame);
       // The game view's ambient occlusion makes its GPU programs on first use, which the editor's own view never
@@ -2180,8 +2503,16 @@ namespace faf::editor
         c.Add(std::move(recent));
       }
       add("file.exit", "Exit", "File", "Alt+F4", [this] {
-        mShell->RequestExit();
+        if (!AskBeforeExit()) {
+          mShell->RequestExit();
+        }
       });
+      add("file.recover", "Recover an autosaved map...", "File", "", [this] {
+        mRecoverable = ListAutosaves(mAutosaveRoot);
+        mShowRecover = true;
+      }, [this]() -> std::string {
+        return mRecoverable.empty() ? "there is no autosaved map" : "";
+      }, {}, "Maps the editor autosaved and that weren't saved since");
 
       // Edit
       add("edit.undo", "Undo", "Edit", "Ctrl+Z", [this] {
@@ -2434,6 +2765,7 @@ namespace faf::editor
            cmd("file.saveas"),
            cmd("file.package"),
            sep(),
+           cmd("file.recover"),
            cmd("settings.open"),
            sep(),
            cmd("file.exit")}
@@ -2644,6 +2976,11 @@ namespace faf::editor
     bool EditorViewOverPlay()
     {
       return gEditorApp != nullptr && gEditorApp->EditorViewOverPlay();
+    }
+
+    bool AskBeforeExit()
+    {
+      return gEditorApp != nullptr && gEditorApp->AskBeforeExit();
     }
 
     void OnMenuCommand(
@@ -3247,6 +3584,9 @@ namespace faf::editor
         mShell->Draw();
         SyncSettings();
         DrawSettings();
+        DrawRecover();
+        DrawUnsavedQuestion();
+        DriveAutosave();
         // `/focuspanel <window>` (test runs): that panel in front, a while after the map opened (opening fronts Info).
         if (mFocusPanelFrames < 90 && mDocument.GetState() == EdDocument::State::Open) {
           if (
@@ -3660,6 +4000,11 @@ namespace faf::editor
       if (mDocument.Save(message)) {
         gpg::Logf("editor: %s", message.c_str());
         PostStatusMessage("Saved " + mDocument.FolderName());
+        // Saved: its autosave is behind it now.
+        if (!mAutosaveRoot.empty()) {
+          RemoveAutosave(mAutosaveRoot / mDocument.FolderName());
+          mRecoverable = ListAutosaves(mAutosaveRoot);
+        }
       } else {
         gpg::Warnf("editor: %s", message.c_str());
       }

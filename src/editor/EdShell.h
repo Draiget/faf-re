@@ -342,6 +342,7 @@ namespace faf::editor
     void DrawHomeSearch(bool loggedIn);
     bool mShowHome = false;
     bool mHomeFocusSearch = false;
+    bool mHomeFront = false;
     int mHomePage = 0;
     char mHomeSearch[128] = {};
     std::string mHomeSearchAsked;
