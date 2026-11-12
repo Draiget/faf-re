@@ -1161,7 +1161,7 @@ namespace moho
 
     mParams.start_[EFFECT_TICKCOUNT] = mParams.start_[EFFECT_TICKINCREMENT] + mParams.start_[EFFECT_TICKCOUNT];
 
-    if (dbg_Emitter) {
+    if (dbg_Emitter && !EffectTickOnWorker()) {
       Sim* const sim = mManager->GetSim();
       CDebugCanvas* const debugCanvas = sim->GetDebugCanvas();
       VMatrix4 startMatrix{};

@@ -273,4 +273,13 @@ namespace moho
    * thread is running, or null outside one. `Sim::GetParticleBuffer` returns it when set.
    */
   [[nodiscard]] SParticleBuffer* EffectTickChunkParticleBuffer() noexcept;
+
+  /**
+   * Engine addition (`sim_ParallelEffects`): true while this thread ticks a chunk of effects on a sim worker.
+   * `TickParallel` falls back to the serial walk while a `dbg_` effect switch is on, but reads them once per tick:
+   * a switch turned on from the UI thread mid-tick reached the workers, and several of them then pushed into the
+   * sim's one debug-line vector at once (a write past its end in a coverage run, 2026-11-12). The debug drawing
+   * skips such a tick; the next one is serial and draws.
+   */
+  [[nodiscard]] bool EffectTickOnWorker() noexcept;
 } // namespace moho

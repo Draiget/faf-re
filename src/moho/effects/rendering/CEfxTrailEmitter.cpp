@@ -502,7 +502,7 @@ namespace moho
     SParticleBuffer* const particleBuffer = sim->GetParticleBuffer();
     particleBuffer->mTrails.push_back(trail);
 
-    if (dbg_Trail) {
+    if (dbg_Trail && !EffectTickOnWorker()) {
       CDebugCanvas* const debugCanvas = sim->GetDebugCanvas();
       SDebugLine line{};
       line.p0.x = direction.y;

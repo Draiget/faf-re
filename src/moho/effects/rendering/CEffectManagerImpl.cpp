@@ -725,6 +725,11 @@ namespace moho
     return chunk != nullptr ? &chunk->mParticles : nullptr;
   }
 
+  bool EffectTickOnWorker() noexcept
+  {
+    return tEffectTickChunk != nullptr;
+  }
+
   /**
    * Address: 0x0066B570 (FUN_0066B570, Moho::CEffectManagerImpl::PurgeDestroyedEffects)
    */

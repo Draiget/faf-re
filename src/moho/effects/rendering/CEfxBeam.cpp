@@ -22,6 +22,7 @@
 #include "Wm3Sphere3.h"
 
 #include "moho/particles/SParticleBuffer.h"
+#include "moho/effects/rendering/CEffectManagerImpl.h"
 #include "moho/sim/CDebugCanvas.h"
 #include "moho/ui/SDebugLine.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -733,7 +734,8 @@ namespace moho
       }
     }
 
-    if (!dbg_EfxBeams) {
+    // Engine change: not from a sim worker (EffectTickOnWorker, CEffectManagerImpl.h).
+    if (!dbg_EfxBeams || EffectTickOnWorker()) {
       return;
     }
 
