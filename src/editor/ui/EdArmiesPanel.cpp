@@ -2,6 +2,7 @@
 // settings.
 
 #include <algorithm>
+#include "editor/ui/EdThemeColors.h"
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -30,7 +31,6 @@ namespace faf::editor
       ImVec4(0.85f, 0.25f, 0.25f, 1.0f),
       ImVec4(0.90f, 0.75f, 0.25f, 1.0f),
     };
-    const ImU32 kAccentBorder = IM_COL32(230, 150, 60, 255);
 
     struct ArmyCard
     {
@@ -138,7 +138,7 @@ namespace faf::editor
       const ImU32 background = ImGui::GetColorU32(ImGui::IsItemHovered() ? ImGuiCol_FrameBgHovered : ImGuiCol_FrameBg);
       draw->AddRectFilled(at, ImVec2(at.x + width, at.y + height), background, 5.0f);
       if (chosen) {
-        draw->AddRect(at, ImVec2(at.x + width, at.y + height), kAccentBorder, 5.0f, 0, 1.5f);
+        draw->AddRect(at, ImVec2(at.x + width, at.y + height), AccentU32(), 5.0f, 0, 1.5f);
       }
       // The badge: the slot number, or a tag for an extra army.
       const ImVec2 badgeAt(at.x + pad, at.y + ImGui::GetStyle().FramePadding.y);
@@ -162,14 +162,14 @@ namespace faf::editor
       const float whereWidth = ImGui::CalcTextSize(where).x;
       draw->AddText(
         ImVec2(at.x + width - buttons - pad - whereWidth, badgeAt.y),
-        army.start || civilian ? ImGui::GetColorU32(ImGuiCol_TextDisabled) : IM_COL32(240, 180, 70, 255),
+        army.start || civilian ? ImGui::GetColorU32(ImGuiCol_TextDisabled) : AccentU32(),
         where
       );
       // Its mirror's slot beside its name, in the accent colour.
       if (!mirror.empty()) {
         const std::string tag = "<> " + mirror;
         draw->AddText(
-          ImVec2(textX + ImGui::CalcTextSize(army.name.c_str()).x + pad * 2.0f, badgeAt.y), kAccentBorder, tag.c_str()
+          ImVec2(textX + ImGui::CalcTextSize(army.name.c_str()).x + pad * 2.0f, badgeAt.y), AccentU32(), tag.c_str()
         );
       }
       char detail[160];

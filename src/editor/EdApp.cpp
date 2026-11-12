@@ -11,6 +11,7 @@
 #include <Windows.h>
 #include <windowsx.h>
 #include <dwmapi.h>
+#include <shellapi.h>
 #include <ShlObj.h>
 #include <commdlg.h>
 
@@ -41,6 +42,8 @@
 #include "editor/ui/EdFonts.h"
 #include "editor/ui/EdHelp.h"
 #include "editor/ui/EdPalette.h"
+#include "editor/ui/EdTheme.h"
+#include "editor/ui/EdThemeStyle.h"
 #include "editor/ui/EdWindowChrome.h"
 #include "editor/ui/EdImGuiRenderer.h"
 #include "editor/view/EdLiveTerrain.h"
@@ -115,6 +118,12 @@ namespace faf::editor
       return std::strcmp(name, "Ui") == 0 ? &gUiScaleRead : nullptr;
     }
 
+    // The theme the user chose (View > Theme), kept beside the scale as Theme=<name>: read at the first frame. The one
+    // on screen can differ: `/theme` (test runs) shows one without keeping it, as the other test options keep nothing.
+    std::string gThemeRead;
+    std::string gThemeNow;
+    std::string gThemeKept;
+
     void UiSettingsLine(
       ImGuiContext*,
       ImGuiSettingsHandler*,
@@ -125,6 +134,10 @@ namespace faf::editor
       if (float scale = 0.0f; std::sscanf(line, "Scale=%f", &scale) == 1 && scale >= 0.5f && scale <= 3.0f) {
         gUiScaleRead = scale;
       }
+      if (std::strncmp(line, "Theme=", 6) == 0 && line[6] != 0) {
+        gThemeRead = line + 6;
+        gThemeKept = gThemeRead;
+      }
     }
 
     void UiSettingsWrite(
@@ -133,7 +146,11 @@ namespace faf::editor
       ImGuiTextBuffer* const out
     )
     {
-      out->appendf("[%s][Ui]\nScale=%.3f\n\n", handler->TypeName, static_cast<double>(gUiScaleNow));
+      out->appendf("[%s][Ui]\nScale=%.3f\n", handler->TypeName, static_cast<double>(gUiScaleNow));
+      if (!gThemeKept.empty()) {
+        out->appendf("Theme=%s\n", gThemeKept.c_str());
+      }
+      out->append("\n");
     }
 
     // The window procedures the editor put in front of the game's, and what they replaced.
@@ -847,6 +864,11 @@ namespace faf::editor
       ViewState mViewStateSaved;
       /** The style at the screen's DPI, before the user's UI scale; the scale in use on it. */
       ImGuiStyle mBaseStyle;
+      float mDpiScale = 1.0f;
+      std::vector<EdTheme> mThemes;
+      std::filesystem::path mThemeFolder;
+      std::filesystem::file_time_type mThemeStamp{};
+      double mThemeCheckAt = 0.0;
       float mUiScaleApplied = 1.0f;
       bool mSoundFocused = true;
 
@@ -878,8 +900,193 @@ namespace faf::editor
        * Before a frame: the scale read from layout.ini at the first frame into the toolbar's, `/uiscale <x>` (test
        * runs) once, then any change applied (sizes from the DPI style, fonts by FontScaleMain) and marked for saving.
        */
+      /** The themes: the built-ins and the settings folder's `themes\*.lua` (a first run leaves an example there). */
+      void LoadThemeList()
+      {
+        const std::filesystem::path settings = EditorSettingsFolder();
+        mThemeFolder = settings.empty() ? std::filesystem::path{} : settings / "themes";
+        std::error_code error;
+        if (!mThemeFolder.empty() && !std::filesystem::exists(mThemeFolder, error)) {
+          std::filesystem::create_directories(mThemeFolder, error);
+          std::string example(BuiltInThemeSources()[1]);
+          const std::size_t at = example.find("name = 'FAF Blue'");
+          if (at != std::string::npos) {
+            example.replace(at, 17, "name = 'My theme'");
+          }
+          std::ofstream(mThemeFolder / "my_theme.lua.example", std::ios::binary)
+            << "-- Rename to my_theme.lua and change it: the editor picks it up at once (View > Theme).\n"
+            << "-- Colours are any of ImGui's by name (ImGuiCol_ without the prefix).\n"
+            << example;
+        }
+        mThemes = LoadThemes(mThemeFolder);
+        mThemeStamp = ThemeFolderStamp();
+        for (const EdTheme& theme : mThemes) {
+          for (const std::string& problem : theme.problems) {
+            gpg::Warnf("editor: theme %s: %s", theme.name.c_str(), problem.c_str());
+          }
+        }
+        gpg::Logf("editor: %zu themes (%s)", mThemes.size(), mThemeFolder.string().c_str());
+      }
+
+      /**
+       * The theme by name (the first when there's none of that name), over ImGui's sizes at the screen's DPI. `keep`:
+       * the user picked it, so layout.ini keeps it; the start, `/theme` and reloads only show it.
+       */
+      void SetTheme(
+        const std::string& name,
+        const bool keep = false
+      )
+      {
+        if (mThemes.empty()) {
+          mThemes.push_back(ReadTheme(std::string(BuiltInThemeSources().front()), "built-in theme"));
+        }
+        const EdTheme* theme = &mThemes.front();
+        for (const EdTheme& candidate : mThemes) {
+          if (candidate.name == name) {
+            theme = &candidate;
+          }
+        }
+        ImGuiStyle style; // ImGui's own sizes at 100 %
+        style.WindowRounding = 2.0f;
+        style.FrameRounding = 3.0f;
+        style.TabRounding = 3.0f;
+        for (const std::string& unknown : ApplyTheme(*theme, style)) {
+          gpg::Warnf("editor: theme %s: ImGui has no colour %s", theme->name.c_str(), unknown.c_str());
+        }
+        style.ScaleAllSizes(mDpiScale);
+        style.FontScaleDpi = mDpiScale;
+        mBaseStyle = style; // the user's UI scale is applied over this (ApplyUiScale)
+        ImGui::GetStyle() = style;
+        mUiScaleApplied = -1.0f;
+        if (keep && gThemeKept != theme->name) {
+          gThemeKept = theme->name;
+          if (ImGui::GetCurrentContext() != nullptr && ImGui::GetCurrentContext()->SettingsLoaded) {
+            ImGui::MarkIniSettingsDirty();
+          }
+        }
+        if (gThemeNow != theme->name) {
+          gThemeNow = theme->name;
+          gpg::Logf(
+            "editor: theme %s%s",
+            theme->name.c_str(),
+            theme->file.empty() ? " (built-in)" : (" from " + theme->file).c_str()
+          );
+        }
+      }
+
+      /** The newest change in the themes folder (its .lua files), to reload them when one changes. */
+      [[nodiscard]] std::filesystem::file_time_type ThemeFolderStamp() const
+      {
+        std::filesystem::file_time_type newest{};
+        std::error_code error;
+        if (mThemeFolder.empty() || !std::filesystem::is_directory(mThemeFolder, error)) {
+          return newest;
+        }
+        for (const auto& entry : std::filesystem::directory_iterator(mThemeFolder, error)) {
+          if (entry.path().extension() == ".lua") {
+            newest = std::max(newest, entry.last_write_time(error));
+          }
+        }
+        // A file taken away changes nothing else: its count goes into the stamp.
+        return newest +
+          std::filesystem::file_time_type::duration(
+                 std::distance(std::filesystem::directory_iterator(mThemeFolder, error), {})
+          );
+      }
+
+      /** Once a second: a theme file written, added or removed reloads them and puts the current one on again. */
+      void WatchThemes()
+      {
+        const double now = ImGui::GetTime();
+        if (now < mThemeCheckAt) {
+          return;
+        }
+        mThemeCheckAt = now + 1.0;
+        if (ThemeFolderStamp() == mThemeStamp) {
+          return;
+        }
+        LoadThemeList();
+        RegisterThemeCommands();
+        const std::string current = gThemeNow;
+        gThemeNow.clear();
+        SetTheme(current);
+        gpg::Logf("editor: themes reloaded");
+      }
+
+      /** View > Theme: one command a theme (in the palette as "Theme: <name>"), reload, the folder. */
+      void RegisterThemeCommands()
+      {
+        for (std::size_t i = 0; i < 64; ++i) {
+          if (mCommands.Find("view.theme." + std::to_string(i)) == nullptr && i >= mThemes.size()) {
+            break;
+          }
+          if (i >= mThemes.size()) {
+            // A theme that went away: its command stays, but says so.
+            mCommands.Add(EdCommand{"view.theme." + std::to_string(i), "Theme: (removed)", "View", "", "", [] {}, [] {
+              return std::string("the theme's file is gone");
+            }, {}});
+            continue;
+          }
+          const std::string name = mThemes[i].name;
+          mCommands.Add(
+            EdCommand{
+              "view.theme." + std::to_string(i),
+              "Theme: " + name,
+              "View",
+              "",
+              mThemes[i].file.empty() ? "Built in" : mThemes[i].file,
+              [this, name] {
+            SetTheme(name, true);
+          },
+              {},
+              [name] {
+            return gThemeNow == name;
+          },
+            }
+          );
+        }
+        mCommands.Add(
+          EdCommand{"view.theme.reload", "Reload themes", "View", "", "Read the themes folder again", [this] {
+          LoadThemeList();
+          RegisterThemeCommands();
+          const std::string current = gThemeNow;
+          gThemeNow.clear();
+          SetTheme(current);
+        }, {}, {}}
+        );
+        mCommands.Add(
+          EdCommand{
+            "view.theme.folder",
+            "Open the themes folder",
+            "View",
+            "",
+            "Your own themes: *.lua files (my_theme.lua.example shows how)",
+            [this] {
+          (void)::ShellExecuteW(nullptr, L"open", mThemeFolder.wstring().c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+        },
+            [this]() -> std::string {
+          return mThemeFolder.empty() ? "there is no settings folder" : "";
+        },
+            {}
+          }
+        );
+      }
+
       void ApplyUiScale()
       {
+        // The theme layout.ini names (read at the first frame), `/theme <name>` (test runs) once, then file changes.
+        if (!gThemeRead.empty()) {
+          SetTheme(gThemeRead);
+          gThemeRead.clear();
+        }
+        static bool themeArgDone = false;
+        if (!themeArgDone && ImGui::GetCurrentContext()->SettingsLoaded) {
+          themeArgDone = true;
+          if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/theme", 1, &value) && !value.empty()) {
+            SetTheme(value[0].c_str());
+          }
+        }
+        WatchThemes();
         float& scale = mShell->UiScale();
         if (gUiScaleRead > 0.0f) {
           scale = gUiScaleRead;
@@ -1335,25 +1542,12 @@ namespace faf::editor
         io.IniFilename = mIniPath.c_str();
       }
 
-      ImGui::StyleColorsDark();
-      ImGuiStyle& style = ImGui::GetStyle();
-      style.WindowRounding = 2.0f;
-      style.FrameRounding = 3.0f;
-      style.TabRounding = 3.0f;
-      style.Colors[ImGuiCol_WindowBg] = ImVec4(0.110f, 0.122f, 0.145f, 0.97f);
-      // Popups, menus and tooltips: opaque, so the panel under them doesn't show through.
-      style.Colors[ImGuiCol_PopupBg] = ImVec4(0.090f, 0.100f, 0.122f, 1.0f);
-      style.Colors[ImGuiCol_TitleBgActive] = ImVec4(0.18f, 0.20f, 0.24f, 1.0f);
-      style.Colors[ImGuiCol_Header] = ImVec4(0.89f, 0.58f, 0.26f, 0.30f);
-      style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.89f, 0.58f, 0.26f, 0.45f);
-      style.Colors[ImGuiCol_CheckMark] = ImVec4(0.89f, 0.58f, 0.26f, 1.0f);
-      style.Colors[ImGuiCol_SliderGrab] = ImVec4(0.89f, 0.58f, 0.26f, 1.0f);
-
-      const float dpiScale = ImGui_ImplWin32_GetDpiScaleForHwnd(gPanelWindow);
-      style.ScaleAllSizes(dpiScale);
-      style.FontScaleDpi = dpiScale;
+      // The look is a theme (ui/EdTheme: Lua files, built-in and the user's); the first built-in, Editor Dark, is the
+      // editor's look from before themes. The theme in layout.ini replaces it at the first frame.
+      mDpiScale = ImGui_ImplWin32_GetDpiScaleForHwnd(gPanelWindow);
       io.ConfigDpiScaleFonts = true;
-      mBaseStyle = style; // the user's UI scale is applied over this (ApplyUiScale)
+      LoadThemeList();
+      SetTheme(mThemes.empty() ? std::string() : mThemes.front().name);
 
       std::error_code error;
       const std::filesystem::path segoe = "C:\\Windows\\Fonts\\segoeui.ttf";
@@ -1504,6 +1698,7 @@ namespace faf::editor
       add("view.palette", "Command palette", "View", "Ctrl+K, Ctrl+Shift+P", [] {
         OpenCommandPalette();
       }, {}, {}, "Find any command by a few of its letters");
+      RegisterThemeCommands();
 
       // Play
       add("play.toggle", "Play", "Play", "F5", [this] {
@@ -1585,6 +1780,26 @@ namespace faf::editor
         }
         return items;
       };
+      EdMenuItem themes;
+      themes.label = "&Theme";
+      themes.provider = [this] {
+        std::vector<EdMenuItem> items;
+        for (std::size_t i = 0; i < mThemes.size(); ++i) {
+          EdMenuItem item;
+          item.command = "view.theme." + std::to_string(i);
+          item.label = mThemes[i].name;
+          items.push_back(std::move(item));
+        }
+        EdMenuItem line;
+        line.separator = true;
+        items.push_back(std::move(line));
+        for (const char* const id : {"view.theme.reload", "view.theme.folder"}) {
+          EdMenuItem item;
+          item.command = id;
+          items.push_back(std::move(item));
+        }
+        return items;
+      };
       EdMenuItem playMaps;
       playMaps.label = "&Map";
       playMaps.provider = [this] {
@@ -1610,17 +1825,32 @@ namespace faf::editor
            cmd("file.exit")}
         },
         EdMenu{"&Edit", {cmd("edit.undo"), cmd("edit.redo"), sep(), cmd("edit.delete")}},
-        EdMenu{"&View", {cmd("view.tools"),         cmd("view.map"),
-                         cmd("view.info"),          cmd("view.markers"),
-                         cmd("view.check"),         cmd("view.script"),
-                         cmd("view.lighting"),      cmd("view.armies"),
-                         cmd("view.properties"),    cmd("view.material"),
-                         cmd("view.particle"),      cmd("view.particlebrowser"),
-                         cmd("view.adaptive"),      sep(),
-                         cmd("view.palette"),       sep(),
-                         cmd("view.fullhelp"),      cmd("view.log"),
-                         cmd("view.panelsplaying"), sep(),
-                         cmd("view.resetlayout"),   cmd("view.imguidemo")}},
+        EdMenu{
+          "&View",
+          {cmd("view.tools"),
+           cmd("view.map"),
+           cmd("view.info"),
+           cmd("view.markers"),
+           cmd("view.check"),
+           cmd("view.script"),
+           cmd("view.lighting"),
+           cmd("view.armies"),
+           cmd("view.properties"),
+           cmd("view.material"),
+           cmd("view.particle"),
+           cmd("view.particlebrowser"),
+           cmd("view.adaptive"),
+           sep(),
+           cmd("view.palette"),
+           themes,
+           sep(),
+           cmd("view.fullhelp"),
+           cmd("view.log"),
+           cmd("view.panelsplaying"),
+           sep(),
+           cmd("view.resetlayout"),
+           cmd("view.imguidemo")}
+        },
         EdMenu{"&Play", {cmd("play.toggle"), playMaps}},
       };
       const auto clashes = c.Clashes();

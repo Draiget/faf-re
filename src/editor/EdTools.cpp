@@ -1,4 +1,5 @@
 #include "editor/EdTools.h"
+#include "editor/ui/EdThemeColors.h"
 #include "editor/ui/EdUiScale.h"
 #include "editor/tools/EdShaderSlots.h"
 #include "editor/ui/EdHelp.h"
@@ -15,12 +16,6 @@ namespace faf::editor
 {
   namespace
   {
-    const ImU32 kAccent = IM_COL32(227, 148, 67, 255);
-    const ImU32 kAccentSoft = IM_COL32(227, 148, 67, 40);
-    const ImU32 kIconIdle = IM_COL32(139, 147, 157, 255);
-    const ImU32 kIconHot = IM_COL32(216, 220, 225, 255);
-    const ImU32 kCellBack = IM_COL32(21, 24, 29, 255);
-    const ImU32 kCellLine = IM_COL32(58, 65, 75, 255);
 
     struct ToolInfo
     {
@@ -86,7 +81,7 @@ namespace faf::editor
       case 6: // marker pin
         draw->AddCircleFilled(at(0.5f, 0.38f), s * 0.28f, color);
         draw->AddTriangleFilled(at(0.25f, 0.5f), at(0.75f, 0.5f), at(0.5f, 0.94f), color);
-        draw->AddCircleFilled(at(0.5f, 0.38f), s * 0.11f, kCellBack);
+        draw->AddCircleFilled(at(0.5f, 0.38f), s * 0.11f, SurfaceU32());
         break;
       case 7: // a tank: hull, turret, barrel
         draw->AddRectFilled(at(0.1f, 0.55f), at(0.9f, 0.85f), color, s * 0.06f);
@@ -195,8 +190,8 @@ namespace faf::editor
       const auto at = [&](const float u, const float v) {
         return ImVec2(a.x + u * w, a.y + v * w);
       };
-      draw->AddRectFilled(a, ImVec2(a.x + w, a.y + w), kCellBack, 2.0f);
-      draw->AddRect(a, ImVec2(a.x + w, a.y + w), kCellLine, 2.0f);
+      draw->AddRectFilled(a, ImVec2(a.x + w, a.y + w), SurfaceU32(), 2.0f);
+      draw->AddRect(a, ImVec2(a.x + w, a.y + w), LineU32(), 2.0f);
       const auto line = [&](const ImVec2 from, const ImVec2 to) {
         // dashed
         for (int i = 0; i < 8; i += 2) {
@@ -205,7 +200,7 @@ namespace faf::editor
           draw->AddLine(
             ImVec2(from.x + (to.x - from.x) * t0, from.y + (to.y - from.y) * t0),
             ImVec2(from.x + (to.x - from.x) * t1, from.y + (to.y - from.y) * t1),
-            kAccent,
+            AccentU32(),
             1.2f
           );
         }
@@ -219,13 +214,11 @@ namespace faf::editor
       if (mode == 4 || mode == 7)
         line(at(1.0f, 0.0f), at(0.0f, 1.0f));
       if (mode == 5 || mode == 8 || mode == 9)
-        draw->AddCircleFilled(at(0.5f, 0.5f), s * 0.05f, kAccent);
+        draw->AddCircleFilled(at(0.5f, 0.5f), s * 0.05f, AccentU32());
       ImVec2 copies[8];
       const int count = SymmetryCopies(mode, 0.27f, 0.22f, n, copies);
       for (int i = 0; i < count; ++i) {
-        draw->AddCircleFilled(
-          at(copies[i].x, copies[i].y), s * 0.075f, i == 0 ? IM_COL32(255, 255, 255, 255) : kAccent
-        );
+        draw->AddCircleFilled(at(copies[i].x, copies[i].y), s * 0.075f, i == 0 ? InkU32() : AccentU32());
       }
     }
 
@@ -263,8 +256,9 @@ namespace faf::editor
         }
         const bool on = i == chosen;
         if (on) {
-          ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.89f, 0.58f, 0.26f, 0.30f));
-          ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.83f, 0.65f, 1.0f));
+          // The chosen one filled with the accent, its text the theme's (readable on both light and dark themes).
+          ImGui::PushStyleColor(ImGuiCol_Button, AccentColor(0.30f));
+          ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_Text));
         }
         if (ImGui::Button(labels[i], ImVec2(width, 0.0f))) {
           chosen = i;
@@ -342,10 +336,10 @@ namespace faf::editor
         }
         const ImVec2 q(p.x + cell, p.y + cell);
         if (i == mTool) {
-          draw->AddRectFilled(p, q, kAccentSoft, 4.0f);
-          draw->AddRectFilled(p, ImVec2(p.x + 2.0f, q.y), kAccent);
+          draw->AddRectFilled(p, q, AccentU32(0.16f), 4.0f);
+          draw->AddRectFilled(p, ImVec2(p.x + 2.0f, q.y), AccentU32());
         } else if (hovered) {
-          draw->AddRectFilled(p, q, IM_COL32(42, 47, 55, 255), 4.0f);
+          draw->AddRectFilled(p, q, SurfaceHotU32(), 4.0f);
         }
         const float icon = cell * 0.56f;
         DrawToolIcon(
@@ -353,13 +347,13 @@ namespace faf::editor
           i,
           ImVec2(p.x + (cell - icon) * 0.5f, p.y + (cell - icon) * 0.5f),
           icon,
-          i == mTool ? kAccent : (hovered ? kIconHot : kIconIdle)
+          i == mTool ? AccentU32() : (hovered ? InkU32() : InkDimU32())
         );
         draw->AddText(
           ImGui::GetFont(),
           ImGui::GetFontSize() * 0.62f,
           ImVec2(q.x - ImGui::GetFontSize() * 0.45f, q.y - ImGui::GetFontSize() * 0.7f),
-          IM_COL32(93, 100, 109, 255),
+          InkDimU32(),
           kTools[i].key
         );
         ImGui::PopID();
@@ -488,14 +482,9 @@ namespace faf::editor
       if (hovered) {
         ImGui::SetTooltip("%s%s", kSymmetry[i].name, kSymmetry[i].square ? " (square maps)" : "");
       }
-      draw->AddRectFilled(
-        p, ImVec2(p.x + cell, p.y + cell + labelHeight), on ? kAccentSoft : IM_COL32(34, 38, 45, 255), 4.0f
-      );
+      draw->AddRectFilled(p, ImVec2(p.x + cell, p.y + cell + labelHeight), on ? AccentU32(0.16f) : SurfaceU32(), 4.0f);
       draw->AddRect(
-        p,
-        ImVec2(p.x + cell, p.y + cell + labelHeight),
-        on ? kAccent : (hovered ? IM_COL32(74, 83, 95, 255) : kCellLine),
-        4.0f
+        p, ImVec2(p.x + cell, p.y + cell + labelHeight), on ? AccentU32() : (hovered ? InkDimU32() : LineU32()), 4.0f
       );
       DrawSymmetryIcon(draw, i, mNWay, ImVec2(p.x + cell * 0.12f, p.y + cell * 0.06f), cell * 0.76f);
       const float labelSize = ImGui::GetFontSize() * 0.66f;
@@ -504,7 +493,7 @@ namespace faf::editor
         ImGui::GetFont(),
         labelSize,
         ImVec2(p.x + (cell - textSize.x) * 0.5f, p.y + cell * 0.86f),
-        on ? IM_COL32(255, 211, 166, 255) : kIconIdle,
+        on ? AccentU32() : InkDimU32(),
         kSymmetry[i].name,
         nullptr,
         cell
@@ -763,7 +752,7 @@ namespace faf::editor
         ImGui::Image(static_cast<ImTextureID>(image), ImVec2(thumb, thumb));
       } else {
         ImGui::Dummy(ImVec2(thumb, thumb));
-        ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + thumb, at.y + thumb), IM_COL32(58, 65, 75, 255));
+        ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + thumb, at.y + thumb), LineU32());
       }
       if (ImGui::IsItemClicked()) {
         mBrowseSlot = slot;
@@ -1666,7 +1655,7 @@ namespace faf::editor
           if (const std::uint64_t image = PropPicture(blueprint); image != 0U) {
             draw->AddImage(static_cast<ImTextureID>(image), at, ImVec2(at.x + picture, at.y + picture));
           } else {
-            draw->AddRect(at, ImVec2(at.x + picture, at.y + picture), IM_COL32(58, 65, 75, 255));
+            draw->AddRect(at, ImVec2(at.x + picture, at.y + picture), LineU32());
           }
           draw->AddText(
             ImVec2(at.x + picture + 6.0f, at.y + (picture - ImGui::GetTextLineHeight()) * 0.5f),
@@ -1885,7 +1874,7 @@ namespace faf::editor
           draw->AddImage(static_cast<ImTextureID>(image), p, ImVec2(p.x + cell, p.y + cell));
         }
         if (texture.path == mDecalTexture) {
-          draw->AddRect(p, ImVec2(p.x + cell, p.y + cell), kAccent, 3.0f, 0, 2.0f);
+          draw->AddRect(p, ImVec2(p.x + cell, p.y + cell), AccentU32(), 3.0f, 0, 2.0f);
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
           ImGui::SetTooltip(
@@ -2023,7 +2012,7 @@ namespace faf::editor
           if (image != 0U) {
             draw->AddImage(static_cast<ImTextureID>(image), at, ImVec2(at.x + icon, at.y + icon));
           } else {
-            draw->AddRect(at, ImVec2(at.x + icon, at.y + icon), IM_COL32(58, 65, 75, 255));
+            draw->AddRect(at, ImVec2(at.x + icon, at.y + icon), LineU32());
           }
           const float textY = at.y + (icon - ImGui::GetTextLineHeight()) * 0.5f;
           draw->AddText(ImVec2(at.x + icon + 6.0f, textY), ImGui::GetColorU32(ImGuiCol_Text), id.c_str());

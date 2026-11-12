@@ -1,6 +1,7 @@
 // The Info panel (what the open map is) and the Markers panel (its markers as a tree), EdShell's right-hand panels.
 
 #include "editor/EdShell.h"
+#include "editor/ui/EdThemeColors.h"
 #include "editor/ui/EdUiScale.h"
 #include "editor/doc/EdAdaptiveTables.h"
 
@@ -35,11 +36,6 @@ namespace faf::editor
     constexpr const char* kInfoWindow = "Info";
     constexpr const char* kMarkersWindow = "Markers";
 
-    constexpr ImU32 kChipFill = IM_COL32(48, 56, 68, 255);
-    constexpr ImU32 kCardFill = IM_COL32(36, 42, 52, 255);
-    constexpr ImU32 kCardLine = IM_COL32(58, 66, 78, 255);
-    constexpr ImU32 kAccent = IM_COL32(232, 145, 60, 255);
-
     /** ARGB (the saves' colours) to ImGui's ABGR. */
     ImU32 FromArgb(
       const std::uint32_t argb
@@ -51,7 +47,7 @@ namespace faf::editor
     /** A rounded label inline with the text, wrapping to the next line when the row is full. */
     void Chip(
       const char* const text,
-      const ImU32 fill = kChipFill,
+      const ImU32 fill = ChipU32(),
       const ImU32 ink = 0
     )
     {
@@ -81,7 +77,7 @@ namespace faf::editor
 
     void Chips(
       const std::vector<std::string>& texts,
-      const ImU32 fill = kChipFill,
+      const ImU32 fill = ChipU32(),
       const ImU32 ink = 0
     )
     {
@@ -296,8 +292,8 @@ namespace faf::editor
         ImGui::Dummy(ImVec2(width, height));
         const ImVec2 min = ImGui::GetItemRectMin();
         ImDrawList* const draw = ImGui::GetWindowDrawList();
-        draw->AddRectFilled(min, ImVec2(min.x + width, min.y + height), kCardFill, 6.0f);
-        draw->AddRect(min, ImVec2(min.x + width, min.y + height), kCardLine, 6.0f);
+        draw->AddRectFilled(min, ImVec2(min.x + width, min.y + height), SurfaceU32(), 6.0f);
+        draw->AddRect(min, ImVec2(min.x + width, min.y + height), LineU32(), 6.0f);
         char number[32];
         (void)std::snprintf(number, sizeof(number), "%d", cards[i].second);
         draw->AddText(
@@ -336,7 +332,7 @@ namespace faf::editor
           ImGui::Image(static_cast<ImTextureID>(image), ImVec2(thumb, thumb));
         } else {
           ImGui::Dummy(ImVec2(thumb, thumb));
-          ImGui::GetWindowDrawList()->AddRectFilled(at, ImVec2(at.x + thumb, at.y + thumb), kChipFill, 3.0f);
+          ImGui::GetWindowDrawList()->AddRectFilled(at, ImVec2(at.x + thumb, at.y + thumb), ChipU32(), 3.0f);
         }
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
           ImGui::SetTooltip("%s", facts.layers[i].c_str());
@@ -357,9 +353,9 @@ namespace faf::editor
     // Armies: the players, then the extra (neutral, civilian) armies dimmer.
     ImGui::Spacing();
     ImGui::SeparatorText("Armies");
-    Chips(mDocument.Armies(), IM_COL32(52, 74, 60, 255));
+    Chips(mDocument.Armies(), IM_COL32(90, 170, 110, 90));
     if (const std::vector<std::string> extra = mDocument.ExtraArmies(); !extra.empty()) {
-      Chips(extra, kChipFill, ImGui::GetColorU32(ImGuiCol_TextDisabled));
+      Chips(extra, ChipU32(), ImGui::GetColorU32(ImGuiCol_TextDisabled));
     }
 
     // Markers: the kinds and their counts, with the tree in its own panel.
@@ -553,7 +549,7 @@ namespace faf::editor
               );
               draw->AddText(
                 ImVec2(row.x + line * 1.2f, row.y),
-                isSelected ? kAccent : ImGui::GetColorU32(ImGuiCol_Text),
+                isSelected ? AccentU32() : ImGui::GetColorU32(ImGuiCol_Text),
                 marker.name.c_str()
               );
               float x = 0.0f, y = 0.0f, z = 0.0f;

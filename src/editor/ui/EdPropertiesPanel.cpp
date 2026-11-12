@@ -2,6 +2,7 @@
 // header with its kind and name, its transform as labelled rows, then what its kind has.
 
 #include <cctype>
+#include "editor/ui/EdThemeColors.h"
 #include <cstdint>
 #include <cstdio>
 #include <iterator>
@@ -130,7 +131,7 @@ namespace faf::editor
           ImGui::Image(static_cast<ImTextureID>(image), ImVec2(side, side));
         } else {
           ImGui::Dummy(ImVec2(side, side));
-          ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + side, at.y + side), IM_COL32(58, 65, 75, 255), 4.0f);
+          ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + side, at.y + side), LineU32(), 4.0f);
         }
         ImGui::SameLine();
         ImGui::BeginGroup();
@@ -644,7 +645,7 @@ namespace faf::editor
           continue;
         }
         const bool isCurrent = blueprint == current;
-        draw->AddRectFilled(at, ImVec2(at.x + tile, at.y + tile), IM_COL32(24, 27, 32, 255), 4.0f);
+        draw->AddRectFilled(at, ImVec2(at.x + tile, at.y + tile), SurfaceU32(), 4.0f);
         if (const std::uint64_t image = mTools.PropPicture(blueprint); image != 0U) {
           draw->AddImage(
             static_cast<ImTextureID>(image),
@@ -652,9 +653,7 @@ namespace faf::editor
             ImVec2(at.x + tile - 2.0f, at.y + tile - 2.0f)
           );
         }
-        const ImU32 border = isCurrent ? IM_COL32(227, 148, 66, 255)
-          : hovered                    ? IM_COL32(200, 200, 200, 255)
-                                       : IM_COL32(58, 65, 75, 255);
+        const ImU32 border = isCurrent ? AccentU32() : hovered ? InkU32() : LineU32();
         draw->AddRect(at, ImVec2(at.x + tile, at.y + tile), border, 4.0f, 0, isCurrent ? 2.0f : 1.0f);
         std::string name = shortName(blueprint);
         while (name.size() > 3 && ImGui::CalcTextSize(name.c_str()).x > tile) {

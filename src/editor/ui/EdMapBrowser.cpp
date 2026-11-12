@@ -1,4 +1,5 @@
 #include "editor/ui/EdMapBrowser.h"
+#include "editor/ui/EdThemeColors.h"
 #include "editor/ui/EdUiScale.h"
 #include "editor/EdPath.h"
 
@@ -129,7 +130,6 @@ namespace faf::editor
 
   namespace
   {
-    const ImVec4 kAccent(0.89f, 0.58f, 0.26f, 1.0f);
     const ImVec4 kGood(0.45f, 0.80f, 0.45f, 1.0f);
     const ImVec4 kBad(0.95f, 0.45f, 0.40f, 1.0f);
 
@@ -150,9 +150,13 @@ namespace faf::editor
       const ImVec2& size = ImVec2(0.0f, 0.0f)
     )
     {
-      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(kAccent.x * 0.85f, kAccent.y * 0.85f, kAccent.z * 0.85f, 1.0f));
-      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kAccent);
-      ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(kAccent.x * 0.7f, kAccent.y * 0.7f, kAccent.z * 0.7f, 1.0f));
+      ImGui::PushStyleColor(
+        ImGuiCol_Button, ImVec4(AccentColor().x * 0.85f, AccentColor().y * 0.85f, AccentColor().z * 0.85f, 1.0f)
+      );
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, AccentColor());
+      ImGui::PushStyleColor(
+        ImGuiCol_ButtonActive, ImVec4(AccentColor().x * 0.7f, AccentColor().y * 0.7f, AccentColor().z * 0.7f, 1.0f)
+      );
       ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.08f, 0.08f, 0.09f, 1.0f));
       ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, ImGui::GetFrameHeight() * 0.25f);
       const bool pressed = ImGui::Button(label, size);
@@ -190,7 +194,7 @@ namespace faf::editor
           ImVec2(at.x + radius + std::cos(a) * (radius - 2.0f), at.y + radius + std::sin(a) * (radius - 2.0f))
         );
       }
-      draw->PathStroke(ImGui::GetColorU32(kAccent), 0, std::max(2.0f, radius * 0.22f));
+      draw->PathStroke(ImGui::GetColorU32(AccentColor()), 0, std::max(2.0f, radius * 0.22f));
     }
 
     /** A small rounded label (a map's size, players); `onPicture` gives it a dark backing to read over a picture. */
@@ -1228,7 +1232,7 @@ namespace faf::editor
         ImGui::GetWindowDrawList()->AddRect(
           at,
           ImVec2(at.x + boxW, at.y + boxH),
-          ImGui::GetColorU32(ImVec4(kAccent.x, kAccent.y, kAccent.z, 0.6f)),
+          ImGui::GetColorU32(ImVec4(AccentColor().x, AccentColor().y, AccentColor().z, 0.6f)),
           ImGui::GetFrameHeight() * 0.3f,
           0,
           1.5f
@@ -1252,7 +1256,7 @@ namespace faf::editor
         // The page's link, for a browser the editor couldn't open (or another device).
         if (mLinkFailed) {
           ImGui::Spacing();
-          ImGui::TextColored(kAccent, "The browser didn't open. Open this link yourself:");
+          ImGui::TextColored(AccentColor(), "The browser didn't open. Open this link yourself:");
         } else {
           ImGui::TextDisabled("Or open this link in any browser:");
         }
@@ -1300,7 +1304,7 @@ namespace faf::editor
     }
     // Unpacking (all received): the bar full, its text saying so.
     const bool unpacking = total > 0.0 && received >= total;
-    ImGui::PushStyleColor(ImGuiCol_PlotHistogram, kAccent);
+    ImGui::PushStyleColor(ImGuiCol_PlotHistogram, AccentColor());
     ImGui::ProgressBar(
       total > 0.0 ? static_cast<float>(received / total) : -1.0f * static_cast<float>(ImGui::GetTime()),
       ImVec2(width < 0.0f && width > -1.5f ? ImGui::GetContentRegionAvail().x : width, 0.0f),
@@ -1469,7 +1473,7 @@ namespace faf::editor
             ImGui::SetCursorScreenPos(
               ImVec2(at.x + ImGui::GetStyle().FramePadding.x, at.y + ImGui::GetStyle().FramePadding.y)
             );
-            Chip("Ranked", kAccent, true);
+            Chip("Ranked", AccentColor(), true);
             ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + w + ImGui::GetStyle().ItemSpacing.y));
           }
           ImGui::PushFont(gBoldFont, 0.0f);

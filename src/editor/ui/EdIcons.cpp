@@ -1,4 +1,5 @@
 #include "editor/ui/EdIcons.h"
+#include "editor/ui/EdThemeColors.h"
 
 #include <algorithm>
 #include <cmath>
@@ -194,10 +195,8 @@ namespace faf::editor
 
     ImU32 fill = 0;
     if (toggle && on) {
-      const ImVec4 lit = held ? ImVec4(0.48f, 0.31f, 0.14f, 1.0f)
-        : hovered             ? ImVec4(0.66f, 0.44f, 0.20f, 1.0f)
-                              : ImVec4(0.55f, 0.36f, 0.16f, 1.0f);
-      fill = ImGui::GetColorU32(lit);
+      // The theme's accent, filled (a pressed toggle looks the same in every theme and panel).
+      fill = AccentU32(held ? 0.70f : hovered ? 0.58f : 0.45f);
     } else {
       fill = ImGui::GetColorU32(held ? ImGuiCol_ButtonActive : hovered ? ImGuiCol_ButtonHovered : ImGuiCol_Button);
     }
