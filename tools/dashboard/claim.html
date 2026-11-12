@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Host a game · FAF Server</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233563e9'/%3E%3Cpath d='M9 23V9h12M9 16h9' stroke='white' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32"><path d="M9 23V9h12M9 16h9" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </span>
+        <div class="brand-text">
+          <h1>FAF Server</h1>
+          <span class="brand-sub" id="brand-sub">Host your own game on an open slot</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span id="connection" class="pill pill-idle" role="status" aria-live="polite"><span class="pill-dot" aria-hidden="true"></span><span id="connection-text">No claim code yet</span></span>
+        <button id="theme" class="icon-btn" type="button" aria-label="Theme: automatic" title="Theme: automatic"></button>
+      </div>
+    </header>
+
+    <main id="main" class="page claim-page" tabindex="-1">
+      <section class="card connect-card" aria-labelledby="claim-connect-title">
+        <div class="connect-head">
+          <div class="connect-heading">
+            <h2 id="claim-connect-title">Claim code</h2>
+            <span id="claim-connect-summary" class="dim connect-summary">The server's operator gives you a link, or its address and a claim code</span>
+          </div>
+          <button id="claim-connect-toggle" class="btn ghost small" type="button" aria-expanded="true" aria-controls="claim-connect-form" hidden>Change</button>
+        </div>
+        <form id="claim-connect-form" class="connect-form" novalidate>
+          <div class="field">
+            <label for="claim-host">Server address</label>
+            <input id="claim-host" type="url" spellcheck="false" autocomplete="url" placeholder="https://games.example.org:27180" />
+          </div>
+          <div class="field">
+            <label for="claim-code">Claim code</label>
+            <input id="claim-code" spellcheck="false" autocomplete="off" placeholder="16 letters and digits" />
+          </div>
+          <button id="claim-open" class="btn primary" type="submit">Open</button>
+        </form>
+        <p id="claim-connect-error" class="form-error" role="alert" hidden></p>
+      </section>
+
+      <section id="claim-gone" class="card claim-gone" role="alert" hidden></section>
+
+      <section id="claim-slot" class="card hero claim-hero" aria-labelledby="claim-slot-name" hidden>
+        <div class="hero-top">
+          <div class="hero-heading">
+            <p class="eyebrow" id="claim-slot-eyebrow">Open slot</p>
+            <h2 id="claim-slot-name" class="hero-title">Slot</h2>
+          </div>
+          <div id="claim-slot-state"></div>
+        </div>
+        <dl id="claim-slot-tiles" class="tiles"></dl>
+      </section>
+
+      <form id="claim-form" class="card claim-form" novalidate hidden aria-labelledby="claim-form-title">
+        <div class="card-head">
+          <h2 id="claim-form-title">Set up your game</h2>
+          <span class="dim" id="claim-form-meta"></span>
+        </div>
+
+        <div class="form-section">
+          <div class="field claim-player">
+            <label for="claim-player">Your name <span class="dim">(seat 1, you host the game)</span></label>
+            <input id="claim-player" maxlength="40" autocomplete="nickname" spellcheck="false" placeholder="Your player name" />
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="section-head"><h3 id="claim-map-title">Map</h3><span class="dim" id="claim-map-count"></span></div>
+          <div class="map-tools">
+            <label class="sr-only" for="claim-map-search">Search maps</label>
+            <input id="claim-map-search" type="search" placeholder="Search maps by name or id" spellcheck="false" />
+            <label class="check" for="claim-map-fit"><input id="claim-map-fit" type="checkbox" checked /><span id="claim-map-fit-text">Only maps that fit</span></label>
+          </div>
+          <div id="claim-map-list" class="map-list" role="radiogroup" aria-labelledby="claim-map-title"></div>
+          <div id="claim-map-selected" class="map-selected" aria-live="polite"></div>
+        </div>
+
+        <div class="form-section">
+          <div class="section-head"><h3>Seats</h3><span class="dim" id="claim-seat-count"></span></div>
+          <p class="dim small section-help">Each human seat gets a join line of its own once the game is set up: hand it to the friend who plays there.</p>
+          <div id="claim-seats" class="seat-rows"></div>
+          <button id="claim-seat-add" class="btn small add-seat" type="button">Add a seat</button>
+        </div>
+
+        <div class="form-section">
+          <div class="section-head"><h3>Game settings</h3><span class="dim" id="claim-settings-meta"></span></div>
+          <p class="dim small section-help">The slot's own picks are marked “slot”; everything else starts at FAF's default. You can still change them in your game's lobby screen.</p>
+          <p id="claim-settings-note" class="settings-note" hidden>This server doesn't list its settings yet: the usual ones are shown.</p>
+          <div class="settings-tools">
+            <label class="sr-only" for="claim-settings-filter">Filter settings</label>
+            <input id="claim-settings-filter" type="search" placeholder="Filter settings" spellcheck="false" />
+            <button id="claim-settings-reset" class="btn ghost small" type="button" hidden>All to default</button>
+          </div>
+          <div id="claim-settings"></div>
+        </div>
+
+        <div class="form-actions">
+          <p id="claim-submit-note" class="submit-note" aria-live="polite"></p>
+          <button id="claim-submit" class="btn primary" type="submit">Claim the slot</button>
+        </div>
+        <p id="claim-error" class="form-error" role="alert" hidden></p>
+      </form>
+
+      <section id="claim-lobby" class="card created claim-lobby" aria-live="polite" hidden></section>
+    </main>
+
+    <div id="toasts" class="toasts" aria-live="polite" aria-relevant="additions"></div>
+
+    <dialog id="confirm" class="dialog" aria-labelledby="confirm-title" aria-describedby="confirm-text">
+      <form method="dialog">
+        <h2 id="confirm-title">Are you sure?</h2>
+        <p id="confirm-text"></p>
+        <div class="dialog-actions">
+          <button class="btn" type="submit" value="cancel" autofocus>Cancel</button>
+          <button class="btn danger" type="submit" value="ok" id="confirm-ok">Confirm</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script type="module" src="/src/claim.ts"></script>
+  </body>
+</html>

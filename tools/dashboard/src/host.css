@@ -1278,6 +1278,37 @@ table.alloc a {
   gap: 0.6rem;
 }
 
+.slot-fields .slot-reopen {
+  grid-column: 1 / -1;
+  min-height: 0;
+  white-space: normal;
+}
+
+.preset-chip {
+  margin-left: 0.4rem;
+}
+
+/* An open slot's claim code and the link players open to claim it. */
+.claim {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.claim:empty {
+  display: none;
+}
+
+.claim-link .cmd {
+  font-size: 0.74rem;
+}
+
+.claim-note {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--warn);
+}
+
 .settings-tools {
   display: flex;
   gap: 0.5rem;

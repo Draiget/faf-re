@@ -92,6 +92,12 @@ Pick cells on the heatmap, or leave **Auto** on with a number of cores. Either w
 
 A lobby left open longer than its lobby minutes starts as it is.
 
+### Open slots
+
+Next to the tournament lobbies, the same host can hold capacity for players who host their own game. An open slot has a name, the most players it takes, the map size it is sized for, its CPUs (Auto or picked, through the same planner and warnings as a lobby), the lobby minutes, default settings, and whether it opens again after each game. Making several at once with Auto places each with the ones before it holding their CPUs, so they get different cores. An open slot's CPUs count as taken: the heatmap shows them in the slot's colour, and the planner warns `shared_cpu` on them. Open slots count against `--max-lobbies` with the running lobbies.
+
+Each slot has a claim code, and a claim link to the dashboard's claim page (`claim.html?host=<host>&code=<code>`), which the operator hands to a player. The player needs no admin token: on the claim page they pick the map, the seats (friends and AIs, up to the slot's players), the game options and the map's own options, starting from the slot's defaults. The slot then becomes a player-hosted lobby on the slot's CPUs (`control` `player`): seat 1 is the claiming player, who changes game options (not the map) in their own game's lobby screen and presses Launch; the page shows every human seat's join line for the host to hand to their friends. When the game ends the slot opens again with a new claim code, so the old one stops working; a slot made with `"reopen": false` ends instead. Freeing a slot from the operator's page stops a game running on it.
+
 ### Joining
 
 After a lobby is made, each human seat has a join line, for example `/connectserver 203.0.113.5:27200 /servertoken 0bc7…88 /serveruid 1001`. The player starts the server-mode game from FAF's `bin_x64` folder with it:
@@ -151,6 +157,9 @@ The host (`server-host`):
 | `GET /api/v1/settings[?map=<id>]` | the game's settings as FAF's Lua defines them (the server binary reads them, `--describe-settings`): `options` (each `key`, `label`, `help`, `default`, `group` rules, teams or ai, and its `values`), `ai` (each `key`, `name`, `rating`) and, with a map that has its own `_options.lua` (adaptive maps; `has_options` in `/maps`), `map_options`. A lobby starts from every option's default and the request's `options` (game and map options together, values as strings or numbers as FAF has them) change them |
 | `GET /api/v1/lobbies` | every lobby: `id`, `name`, `state`, `map`, `cpus`, `port`, `seats` (with each human's `join` line), `observers` (each `name`, `referee`, `watch` line), `observer_delay_seconds`, `observe_port`, `hint`, `nodes`, `warnings` (the placement's), `usage` (its server's `cpu_cores` and `rss_mb`, every 2 s), `phase`, `beat`, `exit` |
 | `POST /api/v1/lobbies` | a new lobby: `{"map": "scmp_009", "seats": [{"kind": "human", "name": "Ann", "faction": 1, "team": 2}, {"kind": "ai", "ai": "adaptive", "faction": 2, "team": 3}], "options": {"Victory": "demoralization"}, "control": "player", "start_when_ready": 10, "lobby_minutes": 60, "observers": [{"name": "Caster"}, {"name": "Ref", "referee": true}], "observer_delay_seconds": 120, "cpus": "auto", "cores": 1}`; `cpus` may instead list CPU ids. Faction 1-4 (UEF, Aeon, Cybran, Seraphim) or 5 (random, chosen by the host); team 1 is no team, 2-9 teams 1-8 |
+| `GET /api/v1/slots` | the open slots: `id`, `name`, `state` (`open`, `claimed` while its lobby's server starts, `lobby`, `game`, `ended`), `max_players`, `km`, `cpus`, `nodes`, `warnings`, `claim_code`, `lobby` (the lobby it became, or null), `host_player`, `lobby_minutes`, `options`, `reopen`, `games` (hosted so far), `created` |
+| `POST /api/v1/slots` | new slots: `{"name": "Public 4v4", "max_players": 8, "km": 20, "cores": 2, "count": 3, "lobby_minutes": 60, "options": {"Victory": "demoralization"}, "reopen": true}`; `cpus` may list CPU ids instead of `cores`. A slot that doesn't fit is refused (`409`) unless `"force": true`, and then none of the batch is made |
+| `DELETE /api/v1/slots/<id>` | frees the slot, and stops the game on it if it was claimed |
 | `DELETE /api/v1/lobbies/<id>` | stops the lobby's server (SIGTERM, a kill after 10 s); `?forget=1` then removes it from the list |
 | `/api/v1/lobbies/<id>/api/v1/...` | that lobby's own API, below, with the host's token |
 
@@ -164,6 +173,15 @@ A lobby (`server --rest`, or through the host):
 | `GET /api/v1/events` | Server-Sent Events: `joined`, `left`, `away`, `back`, `host`, `ready`, `countdown`, `countdown_cancelled`, `launched`, `game_started`, `result`, `stats`, `game_ended`, `content`, and every console line as `log` |
 
 The details of each op are in [SWITCHES.md](SWITCHES.md) under `--control` and `--rest`.
+
+A player's claim of an open slot (no `Authorization`: the claim code in the path is the credential; `404` for a code no slot has):
+
+| Request | Does |
+|---|---|
+| `GET /api/v1/claim/<code>` | `claim`: the `slot` (`id`, `name`, `state`, `max_players`, `km`, `cores`, `lobby_minutes`, `options`) and, once claimed, the `lobby` (`id`, `name`, `state`, `phase`, `beat`, `map`, `seats` with each human's `join` line, `options`, `port`) |
+| `GET /api/v1/claim/<code>/maps` | the maps, as `/api/v1/maps` |
+| `GET /api/v1/claim/<code>/settings[?map=<id>]` | the settings, as `/api/v1/settings` |
+| `POST /api/v1/claim/<code>` | claims the slot: `{"player": "Ann", "map": "adaptive_adrastea.v0004", "seats": [{"kind": "human"}, {"kind": "human", "name": "Bo"}, {"kind": "ai", "ai": "rush"}], "options": {"UnitCap": "500", "automex": 2}, "start_when_ready": 0}`; seat 1 must be a human (the claiming player); no seats means the host alone. The `options` go over the slot's. Answers as GET, with the lobby; `409` if the slot is already claimed |
 
 ## When it doesn't work
 

@@ -174,6 +174,27 @@ function usageLine(cpus: number, usage: Lobby["usage"]): Child {
   );
 }
 
+/**
+ * The page a player opens to claim a slot: this dashboard's claim.html next to this page, with the host's address and
+ * the code in the query.
+ */
+export function claimLink(hostBase: string, code: string): string {
+  const url = new URL("claim.html", window.location.href);
+  url.search = new URLSearchParams({ host: hostBase, code }).toString();
+  url.hash = "";
+  return url.toString();
+}
+
+/** A host address only this machine can reach (players elsewhere can't use a link to it). */
+function loopback(base: string): boolean {
+  try {
+    const name = new URL(base).hostname.replace(/^\[|\]$/g, "");
+    return name === "localhost" || name === "::1" || /^127\./.test(name);
+  } catch {
+    return false;
+  }
+}
+
 function fact(label: string, value: Child, wide = false): HTMLElement {
   return h("div", { class: `fact-item${wide ? " wide" : ""}` }, h("dt", {}, label), h("dd", {}, value));
 }
@@ -344,25 +365,39 @@ function slotItem(id: string): Item {
       meta,
       icon("users", "icon tiny"),
       h("span", {}, `up to ${isNumber(slot.max_players) ? slot.max_players : "?"} players`),
+      isNumber(slot.km) ? h("span", { class: "dim" }, ` · maps up to ${slot.km} km`) : null,
       slot.host_player ? h("span", { class: "dim" }, ` · hosted by `, h("b", {}, slot.host_player)) : null,
       lobby?.map ? h("span", { class: "dim" }, ` · ${lobby.map.name ?? lobby.map.id ?? ""}`) : null,
       lobby?.phase === "game" && isNumber(lobby.beat) ? h("span", { class: "dim" }, ` · ${clock(lobby.beat)}`) : null,
     );
     const claim = typeof slot.claim_code === "string" && slot.claim_code !== "" ? slot.claim_code : null;
-    const csig = `${slot.state}|${claim ?? ""}`;
+    const hostBase = store.api?.base ?? "";
+    const csig = `${slot.state}|${claim ?? ""}|${hostBase}`;
     if (csig !== codeSignature) {
       codeSignature = csig;
+      const shown = claim !== null && (slot.state === "open" || slot.state === "claimed");
+      const link = shown && hostBase !== "" ? claimLink(hostBase, claim) : null;
       fill(
         code,
-        claim === null || (slot.state !== "open" && slot.state !== "claimed")
-          ? null
-          : h(
+        shown
+          ? h(
               "div",
               { class: "join-cmd" },
               h("span", { class: "claim-label small" }, "Claim code"),
               h("code", { class: "cmd" }, claim),
               copyButton(claim, `Copy the claim code of ${displayName(slot)}`),
+            )
+          : null,
+        link === null
+          ? null
+          : h(
+              "div",
+              { class: "join-cmd claim-link" },
+              h("span", { class: "claim-label small" }, "Claim link"),
+              h("a", { class: "cmd", href: link, target: "_blank", rel: "noopener" }, link),
+              copyButton(link, `Copy the claim link of ${displayName(slot)}`),
             ),
+        link !== null && loopback(hostBase) ? h("p", { class: "claim-note" }, `The link points at ${new URL(hostBase).host}, which only this machine reaches: connect with the host's public address to hand it out.`) : null,
       );
     }
     const cpus = (slot.cpus ?? []).filter(isNumber);
@@ -371,6 +406,8 @@ function slotItem(id: string): Item {
       fact("CPUs", cpuChips(cpus, id)),
       fact(nodes.length > 1 ? "Nodes" : "Node", nodes.length === 0 ? "–" : nodes.join(", ")),
       fact("Use", lobby !== undefined ? usageLine(cpus.length, lobby.usage) : h("span", { class: "dim" }, "held, not claimed"), true),
+      fact("Games", isNumber(slot.games) ? String(slot.games) : "–"),
+      fact("After a game", slot.reopen === false ? "ends" : slot.reopen === true ? "reopens" : "–"),
     );
     const list = slot.warnings ?? [];
     const sig = JSON.stringify(list);

@@ -1,0 +1,182 @@
+/* The player's claim page (claim.html): one column of the dashboard's cards, the configuration panel's map list,
+   seats and settings at full width, and the claimed lobby's join lines. */
+
+.claim-page {
+  max-width: 58rem;
+}
+
+.claim-hero .tiles {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+}
+
+.claim-hero .tile-sub {
+  margin: 0.15rem 0 0;
+}
+
+.claim-gone {
+  text-align: center;
+  padding: 1.6rem 1.2rem;
+}
+
+.claim-gone p {
+  margin: 0 auto 0.35rem;
+  max-width: 40rem;
+}
+
+.claim-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.claim-form .card-head {
+  margin-bottom: 0.3rem;
+}
+
+.claim-player {
+  max-width: 24rem;
+}
+
+.map-tools {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.map-tools input[type="search"] {
+  flex: 1 1 16rem;
+}
+
+.claim-form .map-list {
+  max-height: 22rem;
+}
+
+.map-item.misfit:not(.selected) .map-name {
+  color: var(--muted);
+}
+
+.misfit-text {
+  color: var(--warn);
+  font-weight: 650;
+}
+
+.map-selected .warnings {
+  margin-top: 0.5rem;
+}
+
+/* Every seat row has four fields: kind, who (name or AI), faction, team. */
+.claim-form .seat-fields,
+.claim-form .seat-row.kind-ai .seat-fields {
+  grid-template-columns: 7rem minmax(0, 1fr) 8rem 8rem;
+}
+
+.claim-form .host-seat {
+  background: color-mix(in srgb, var(--accent-soft) 60%, var(--surface-2));
+}
+
+.field-label {
+  font-size: 0.8rem;
+  font-weight: 550;
+  color: var(--muted);
+}
+
+.fixed-value {
+  display: flex;
+  align-items: center;
+  min-height: 2.35rem;
+  padding: 0 0.1rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 44rem) {
+  .claim-form .seat-fields,
+  .claim-form .seat-row.kind-ai .seat-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.claim-form .form-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+}
+
+.claim-form .form-actions .btn {
+  min-width: 11rem;
+}
+
+/* The claimed lobby. */
+
+.claim-lobby .created-head {
+  flex-wrap: wrap;
+}
+
+.created-icon.ended {
+  color: var(--muted);
+  background: var(--neutral-soft);
+}
+
+.lobby-state {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.claim-steps {
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-size: 0.88rem;
+}
+
+.claim-steps ol {
+  margin: 0 0 0.45rem;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.claim-steps p {
+  margin: 0;
+}
+
+.claim-steps .inline-code {
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+  font-size: 0.78rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: 5px;
+  background: var(--surface-3);
+}
+
+.claim-seats .claim-seat {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--neutral);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.claim-seats .claim-seat.kind-human {
+  border-left-color: var(--accent);
+}
+
+.claim-seats .claim-seat.host {
+  background: color-mix(in srgb, var(--accent-soft) 60%, var(--surface));
+}
+
+.claim-seat .chip.tiny {
+  margin-right: 0.1rem;
+}
+
+.ai-line {
+  margin: 0;
+}

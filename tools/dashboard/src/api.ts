@@ -216,19 +216,93 @@ export interface Slot {
   /** Once claimed: the lobby it became (a lobby like any other). */
   lobby?: string | null;
   host_player?: string | null;
+  /** The map size it was sized for, km. */
+  km?: number | null;
+  lobby_minutes?: number | null;
+  /** The operator's default game options for the games on it. */
+  options?: Record<string, SettingKey> | null;
+  /** When its game ends it opens again with a new claim code (else it ends). */
+  reopen?: boolean | null;
+  /** Games hosted on it so far. */
+  games?: number | null;
+  created?: string | null;
   [key: string]: unknown;
 }
 
 export interface NewSlots {
   name: string;
   max_players: number;
+  /** The largest map expected, for the estimate (the host's default is 20). */
+  km?: number;
   cores?: number;
   cpus?: number[];
   lobby_minutes: number;
   /** How many identical slots. */
   count: number;
   options?: Record<string, SettingKey>;
+  /** Open again with a new code after each game (the host's default is true). */
+  reopen?: boolean;
   force?: boolean;
+}
+
+// ---------------------------------------------------------------- the claim API (players, no admin token)
+
+/** The slot as its claim code shows it to the player. */
+export interface ClaimSlot {
+  id: string;
+  name?: string | null;
+  /** open, claimed, lobby, game, ended. */
+  state: string;
+  max_players?: number | null;
+  /** The map size it was sized for. */
+  km?: number | null;
+  cores?: number | null;
+  lobby_minutes?: number | null;
+  /** The operator's defaults; the claim's own options go over them. */
+  options?: Record<string, SettingKey> | null;
+}
+
+/** The claimed lobby as its host player sees it, with every human seat's join line. */
+export interface ClaimLobby {
+  id: string;
+  name?: string | null;
+  /** starting, lobby, game, ended, failed, stopped. */
+  state: string;
+  phase?: string | null;
+  beat?: number | null;
+  map?: { id?: string; name?: string | null; km?: number | null; players?: number | null } | null;
+  seats?: LobbySeat[] | null;
+  options?: Record<string, SettingKey> | null;
+  port?: number | null;
+}
+
+export interface ClaimView {
+  slot: ClaimSlot;
+  /** Null until the slot is claimed. */
+  lobby: ClaimLobby | null;
+}
+
+export interface ClaimSeat {
+  kind: "human" | "ai";
+  /** Seat 1 (the host) defaults to the claim's `player`; other humans to "Player N". */
+  name?: string;
+  ai?: string;
+  /** 1 UEF, 2 Aeon, 3 Cybran, 4 Seraphim, 5 random. */
+  faction?: number;
+  /** 1 = no team, 2.. = team 1.. (FAF's numbering). */
+  team?: number;
+}
+
+/** `POST /api/v1/claim/<code>`: the player's own game. */
+export interface ClaimRequest {
+  /** The host player's name, 1..40 characters. */
+  player: string;
+  map: string;
+  /** Up to the slot's max_players; seat 1 is the host, a human. None: just the host. */
+  seats?: ClaimSeat[];
+  /** Over the slot's options; the rest are FAF's defaults. */
+  options?: Record<string, SettingKey>;
+  start_when_ready?: number;
 }
 
 export interface MapInfo {
@@ -306,6 +380,8 @@ export interface Lobby {
   /** The placement's warnings when it was made. */
   warnings?: PlacementWarning[] | null;
   usage?: Usage | null;
+  /** The open slot it was claimed from (plan WP17.18). */
+  slot?: string | null;
   [key: string]: unknown;
 }
 
@@ -373,6 +449,43 @@ async function readAnswer(response: Response): Promise<Answer> {
   } catch {
     return { ok: false };
   }
+}
+
+/**
+ * One JSON request to `base + path`, with the token as a bearer token when there is one (the claim API has none).
+ * Throws `ApiError` with the HTTP status and the answer's reason when it isn't `ok`.
+ */
+async function requestJson(base: string, token: string | null, method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<Answer> {
+  const headers: Record<string, string> = {};
+  if (token !== null) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  if (body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+  const response = await fetch(`${base}${path}`, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+    signal,
+  });
+  const answer = await readAnswer(response);
+  if (!response.ok || !answer.ok) {
+    throw new ApiError(answer.error ?? `${method} ${path}: HTTP ${response.status}`, response.status);
+  }
+  return answer;
+}
+
+function settingsFrom(raw: Partial<Settings> | undefined): Settings {
+  return {
+    options: Array.isArray(raw?.options) ? raw.options : [],
+    ai: Array.isArray(raw?.ai) ? raw.ai : [],
+    map_options: Array.isArray(raw?.map_options) ? raw.map_options : [],
+  };
+}
+
+function settingsQuery(mapId?: string): string {
+  return mapId === undefined || mapId === "" ? "" : `?map=${encodeURIComponent(mapId)}`;
 }
 
 export class ServerApi {
@@ -492,22 +605,8 @@ export class HostApi {
     this.token = token;
   }
 
-  private async request(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<Answer> {
-    const headers: Record<string, string> = { Authorization: `Bearer ${this.token}` };
-    if (body !== undefined) {
-      headers["Content-Type"] = "application/json";
-    }
-    const response = await fetch(`${this.base}${path}`, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal,
-    });
-    const answer = await readAnswer(response);
-    if (!response.ok || !answer.ok) {
-      throw new ApiError(answer.error ?? `${method} ${path}: HTTP ${response.status}`, response.status);
-    }
-    return answer;
+  private request(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<Answer> {
+    return requestJson(this.base, this.token, method, path, body, signal);
   }
 
   /** `GET /api/v1/host`. A plain server (no host) answers 404. */
@@ -565,13 +664,7 @@ export class HostApi {
 
   /** `GET /api/v1/settings[?map=<id>]`: FAF's lobby options, the AIs, and the map's own options. */
   async settings(mapId?: string, signal?: AbortSignal): Promise<Settings> {
-    const query = mapId === undefined || mapId === "" ? "" : `?map=${encodeURIComponent(mapId)}`;
-    const settings = (await this.request("GET", `/api/v1/settings${query}`, undefined, signal)).settings as Partial<Settings> | undefined;
-    return {
-      options: Array.isArray(settings?.options) ? settings.options : [],
-      ai: Array.isArray(settings?.ai) ? settings.ai : [],
-      map_options: Array.isArray(settings?.map_options) ? settings.map_options : [],
-    };
+    return settingsFrom((await this.request("GET", `/api/v1/settings${settingsQuery(mapId)}`, undefined, signal)).settings as Partial<Settings> | undefined);
   }
 
   /** `GET /api/v1/slots`: capacity held for players who host themselves. */
@@ -594,5 +687,52 @@ export class HostApi {
   /** The lobby's own server API, proxied by the host with the host's token. */
   lobbyApi(id: string): ServerApi {
     return new ServerApi(`${this.base}/api/v1/lobbies/${encodeURIComponent(id)}`, this.token);
+  }
+}
+
+function claimViewFrom(raw: unknown): ClaimView {
+  const view = (raw ?? {}) as Partial<ClaimView>;
+  const slot = (view.slot ?? { id: "", state: "" }) as ClaimSlot;
+  const lobby = view.lobby ?? null;
+  return { slot, lobby: lobby === null ? null : { ...lobby, seats: Array.isArray(lobby.seats) ? lobby.seats : [] } };
+}
+
+/**
+ * A player's claim of an open slot (plan WP17.18): the claim code is the credential, so no Authorization header is
+ * sent. Errors throw `ApiError`: 404 for an unknown code (or one that stopped working when its slot reopened after a
+ * game), 409 when the slot is already claimed, 400 with the host's reason for a bad claim.
+ */
+export class ClaimApi {
+  readonly base: string;
+  readonly code: string;
+
+  constructor(base: string, code: string) {
+    this.base = base.replace(/\/+$/, "");
+    this.code = code.trim();
+  }
+
+  private request(method: string, sub: string, body?: unknown, signal?: AbortSignal): Promise<Answer> {
+    return requestJson(this.base, null, method, `/api/v1/claim/${encodeURIComponent(this.code)}${sub}`, body, signal);
+  }
+
+  /** `GET /api/v1/claim/<code>`: the slot and, once claimed, its lobby. */
+  async view(signal?: AbortSignal): Promise<ClaimView> {
+    return claimViewFrom((await this.request("GET", "", undefined, signal)).claim);
+  }
+
+  /** `GET /api/v1/claim/<code>/maps`: the host's maps, as `/api/v1/maps` gives them. */
+  async maps(signal?: AbortSignal): Promise<MapInfo[]> {
+    const answer = await this.request("GET", "/maps", undefined, signal);
+    return Array.isArray(answer.maps) ? (answer.maps as MapInfo[]) : [];
+  }
+
+  /** `GET /api/v1/claim/<code>/settings[?map=<id>]`: as `/api/v1/settings`. */
+  async settings(mapId?: string, signal?: AbortSignal): Promise<Settings> {
+    return settingsFrom((await this.request("GET", `/settings${settingsQuery(mapId)}`, undefined, signal)).settings as Partial<Settings> | undefined);
+  }
+
+  /** `POST /api/v1/claim/<code>`: claims the slot; the answer is the view with the new lobby. */
+  async claim(request: ClaimRequest, signal?: AbortSignal): Promise<ClaimView> {
+    return claimViewFrom((await this.request("POST", "", request, signal)).claim);
   }
 }

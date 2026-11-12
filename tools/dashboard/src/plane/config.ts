@@ -2,11 +2,12 @@
 // lobby control, countdown) or open slots (players, count, default settings), and where it goes: Auto or CPUs picked
 // on the heatmap, planned by the host on every change with its estimate and warnings before anything starts.
 
-import { ApiError, type Lobby, type MapInfo, type NewLobby, type NewSeat, type NewSlots, type PlanRequest, type SettingKey, type SettingOption, type Settings } from "../api.ts";
+import { ApiError, type Lobby, type MapInfo, type NewLobby, type NewSeat, type NewSlots, type PlanRequest, type SettingKey, type Settings } from "../api.ts";
 import { byId, fill, h, icon, isNumber, num, type Child } from "../dom.ts";
 import { toast } from "../ui.ts";
 import { rate } from "./capacity.ts";
 import { joinBlock, warningList, watchBlock } from "./lists.ts";
+import { countChanges, FALLBACK_OPTIONS, filterOptions, pruneChosen, renderOptions } from "./options.ts";
 import { actions, displayName, emit, on, plural, store } from "./store.ts";
 
 const PLAN_DEBOUNCE_MS = 250;
@@ -24,6 +25,7 @@ const nameInput = byId<HTMLInputElement>("cfg-name");
 const maxPlayers = byId<HTMLSelectElement>("cfg-max-players");
 const slotCount = byId<HTMLInputElement>("cfg-count");
 const slotKm = byId<HTMLSelectElement>("cfg-km");
+const slotReopen = byId<HTMLInputElement>("cfg-reopen");
 const mapSearch = byId<HTMLInputElement>("cfg-map-search");
 const mapList = byId<HTMLElement>("cfg-map-list");
 const mapCount = byId<HTMLElement>("cfg-map-count");
@@ -223,26 +225,7 @@ function onMapChanged(): void {
 
 // ---------------------------------------------------------------- settings catalog
 
-const GROUPS: [string, string][] = [
-  ["rules", "Rules"],
-  ["units", "Units"],
-  ["teams", "Teams"],
-  ["ai", "AI"],
-  ["other", "Other"],
-];
-
-/** The usual options, for a host that doesn't list its settings yet. */
-const FALLBACK: SettingOption[] = [
-  { key: "Victory", label: "Victory Condition", group: "rules", default: "demoralization", values: [{ key: "demoralization", text: "Assassination" }, { key: "domination", text: "Supremacy" }, { key: "eradication", text: "Annihilation" }, { key: "sandbox", text: "Sandbox" }] },
-  { key: "Share", label: "Share Conditions", group: "rules", default: "FullShare", values: [{ key: "FullShare", text: "Full Share" }, { key: "ShareUntilDeath", text: "Share Until Death" }, { key: "PartialShare", text: "Partial Share" }, { key: "TransferToKiller", text: "Transfer To Killer" }, { key: "Defectors", text: "Defectors" }, { key: "CivilianDeserter", text: "Civilian Deserter" }] },
-  { key: "FogOfWar", label: "Fog of War", group: "rules", default: "explored", values: [{ key: "explored", text: "Explored" }, { key: "none", text: "None" }] },
-  { key: "GameSpeed", label: "Game Speed", group: "rules", default: "normal", values: [{ key: "normal", text: "Normal" }, { key: "fast", text: "Fast" }, { key: "adjustable", text: "Adjustable" }] },
-  { key: "CheatsEnabled", label: "Cheating", group: "rules", default: "false", values: [{ key: "false", text: "Off" }, { key: "true", text: "On" }] },
-  { key: "Timeouts", label: "Allowed Pauses", group: "rules", default: "3", values: [{ key: "0", text: "None" }, { key: "3", text: "Three" }, { key: "-1", text: "Infinite" }] },
-  { key: "NoRushOption", label: "No Rush Timer", group: "rules", default: "Off", values: [{ key: "Off", text: "Off" }, ...["1", "2", "3", "4", "5", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55", "60"].map((m) => ({ key: m, text: `${m} minutes` }))] },
-  { key: "UnitCap", label: "Unit Cap", group: "units", default: "1000", values: ["125", "250", "375", "500", "625", "750", "875", "1000", "1250", "1500"].map((x) => ({ key: x, text: x })) },
-  { key: "PrebuiltUnits", label: "Prebuilt Units", group: "units", default: "Off", values: [{ key: "Off", text: "Off" }, { key: "On", text: "On" }] },
-];
+const FALLBACK = FALLBACK_OPTIONS;
 
 function settingsKey(): string {
   return kind === "lobby" ? mapId : "";
@@ -279,124 +262,31 @@ async function loadSettings(): Promise<void> {
   }
 }
 
-function sameKey(a: SettingKey | null | undefined, b: SettingKey | null | undefined): boolean {
-  return a !== null && a !== undefined && b !== null && b !== undefined && String(a) === String(b);
-}
-
 function useSettings(next: Settings): void {
   settings = next;
   // Changes that still mean something on this map stay; the rest (another map's options) go.
-  const valid = new Map<string, SettingOption>();
-  for (const option of [...next.options, ...next.map_options]) valid.set(option.key, option);
-  for (const [key, value] of [...chosen]) {
-    const option = valid.get(key);
-    if (option === undefined || !option.values.some((candidate) => sameKey(candidate.key, value))) chosen.delete(key);
-  }
+  pruneChosen(chosen, next);
   settingsNote.hidden = settingsSupported;
   renderSettings();
   renderSeats();
 }
 
-function optionField(option: SettingOption): HTMLElement {
-  const id = `set-${option.key}`;
-  const select = h("select", { id, "data-key": option.key });
-  const defaultIndex = option.values.findIndex((value) => sameKey(value.key, option.default));
-  option.values.forEach((value, index) => {
-    const text = value.text ?? String(value.key);
-    select.append(h("option", { value: String(index), title: value.help ?? "" }, index === defaultIndex ? `${text} (default)` : text));
-  });
-  const current = chosen.get(option.key);
-  const currentIndex = current === undefined ? defaultIndex : option.values.findIndex((value) => sameKey(value.key, current));
-  select.value = String(Math.max(0, currentIndex));
-  const reset = h("button", { type: "button", class: "reset", "aria-label": `Reset ${option.label ?? option.key} to its default`, title: "Back to the default" }, "↺");
-  const helpId = `${id}-help`;
-  const help = option.help ? h("span", { id: helpId, class: "sr-only" }, option.help) : null;
-  if (help !== null) select.setAttribute("aria-describedby", helpId);
-  const field = h(
-    "div",
-    { class: "field setting", "data-search": `${option.label ?? ""} ${option.key}`.toLowerCase(), title: option.help ?? "" },
-    h("label", { for: id }, h("span", { class: "changed-dot", "aria-hidden": "true" }), option.label ?? option.key),
-    h("div", { class: "setting-row" }, select, reset),
-    help,
-  );
-  const sync = (): void => {
-    const changed = chosen.has(option.key);
-    field.classList.toggle("changed", changed);
-    reset.hidden = !changed;
-    const value = option.values[Number(select.value)];
-    select.title = value?.help ?? option.help ?? "";
-  };
-  select.addEventListener("change", () => {
-    const value = option.values[Number(select.value)];
-    if (value === undefined || sameKey(value.key, option.default)) chosen.delete(option.key);
-    else chosen.set(option.key, value.key);
-    sync();
-    renderSettingsCounts();
-  });
-  reset.addEventListener("click", () => {
-    chosen.delete(option.key);
-    select.value = String(Math.max(0, defaultIndex));
-    sync();
-    renderSettingsCounts();
-    select.focus();
-  });
-  sync();
-  return field;
-}
-
 function renderSettings(): void {
   if (settings === null) return;
-  const groups: { id: string; title: string; options: SettingOption[] }[] = [];
-  for (const [id, title] of GROUPS) {
-    const options = settings.options.filter((option) => (option.group ?? "other") === id);
-    if (options.length > 0) groups.push({ id, title, options });
-  }
-  const others = settings.options.filter((option) => !GROUPS.some(([id]) => id === (option.group ?? "other")));
-  if (others.length > 0) groups.push({ id: "more", title: "More", options: others });
-  if (kind === "lobby" && settings.map_options.length > 0) {
-    groups.push({ id: "map", title: `Map options (${selectedMap()?.name ?? "this map"})`, options: settings.map_options });
-  }
-  settingsBox.replaceChildren(
-    ...groups.map((group, index) =>
-      h(
-        "details",
-        { class: `set-group${group.id === "map" ? " map-group" : ""}`, "data-group": group.id, open: index === 0 || group.id === "map" },
-        h("summary", {}, h("span", { class: "set-title" }, group.title), h("span", { class: "set-count dim small" })),
-        h("div", { class: "set-grid" }, ...group.options.map(optionField)),
-      ),
-    ),
-  );
+  renderOptions(settingsBox, settings, kind === "lobby" ? (selectedMap()?.name ?? "this map") : null, { chosen, onChange: renderSettingsCounts });
   renderSettingsCounts();
   applySettingsFilter();
 }
 
 function renderSettingsCounts(): void {
-  let total = 0;
-  for (const group of settingsBox.querySelectorAll<HTMLDetailsElement>(".set-group")) {
-    const fields = group.querySelectorAll(".setting");
-    const changed = group.querySelectorAll(".setting.changed").length;
-    total += changed;
-    const count = group.querySelector(".set-count");
-    if (count !== null) count.textContent = `${fields.length}${changed > 0 ? ` · ${changed} changed` : ""}`;
-    group.classList.toggle("has-changes", changed > 0);
-  }
+  const total = countChanges(settingsBox);
   const count = (settings?.options.length ?? 0) + (kind === "lobby" ? (settings?.map_options.length ?? 0) : 0);
   settingsMeta.textContent = total === 0 ? `${count} settings, all default` : `${count} settings · ${total} changed`;
   settingsReset.hidden = total === 0;
 }
 
 function applySettingsFilter(): void {
-  const query = settingsFilter.value.trim().toLowerCase();
-  for (const group of settingsBox.querySelectorAll<HTMLDetailsElement>(".set-group")) {
-    let shown = 0;
-    for (const field of group.querySelectorAll<HTMLElement>(".setting")) {
-      const match = query === "" || (field.dataset.search ?? "").includes(query);
-      field.hidden = !match;
-      if (match) shown += 1;
-    }
-    group.hidden = shown === 0;
-    if (query !== "" && shown > 0) group.open = true;
-  }
+  filterOptions(settingsBox, settingsFilter.value);
 }
 
 settingsFilter.addEventListener("input", applySettingsFilter);
@@ -709,7 +599,7 @@ async function submit(): Promise<void> {
     const count = Math.round(Number(slotCount.value) || 1);
     if (count < 1 || count > 16) return fail("Make 1 to 16 slots at once.", slotCount);
     const placement = placementFields();
-    const request: NewSlots = { name: name || "Open slot", max_players: Number(maxPlayers.value) || 8, lobby_minutes: lobbyMinutes, count, options };
+    const request: NewSlots = { name: name || "Open slot", max_players: Number(maxPlayers.value) || 8, km: km(), lobby_minutes: lobbyMinutes, count, options, reopen: slotReopen.checked };
     if (placement.cpus === "auto") request.cores = placement.cores;
     else request.cpus = placement.cpus;
     if (force) request.force = true;

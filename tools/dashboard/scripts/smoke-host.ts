@@ -3,11 +3,14 @@
 // The machine with its NUMA nodes and links, a wrong token, the maps, a cost hint, the planner (auto, by hand across
 // nodes, an unknown CPU), a lobby refused without force, then a lobby with an observer and a referee: started on "auto"
 // CPUs, each watcher's watch line back, its own status through the host's proxy, its nodes, warnings and usage listed,
-// stopped and forgotten. The settings catalog and open slots are checked when the host has them (SKIP on 404).
+// stopped and forgotten. The settings catalog and open slots are checked when the host has them (SKIP on 404): two
+// slots on Auto on different CPUs held on the host, a claim view with the code alone (no token), a wrong code (404), a
+// claim with a human and an AI (join line, slot claimed with its lobby), a second claim (409), then both freed, which
+// stops the claimed game and makes the code answer 404.
 // Exit 0 when every check passed.
 
 import { readFileSync } from "node:fs";
-import { ApiError, HostApi, type Lobby, type PlacementWarning, type Plan } from "../src/api.ts";
+import { ApiError, ClaimApi, HostApi, type Lobby, type PlacementWarning, type Plan, type Slot } from "../src/api.ts";
 
 const [url, tokenFile, mapArg] = process.argv.slice(2);
 if (!url || !tokenFile) {
@@ -201,26 +204,107 @@ try {
   else check("settings", false, String(error));
 }
 
-// Open slots (WP17.18), once the host has them.
+// Open slots (WP17.18), once the host has them: two slots on Auto, a player's claim of one with the claim code alone
+// (no token), then both freed, which stops the claimed one's game.
+let slotsSupported = true;
 try {
-  const before = await host.slots();
-  const made = await host.createSlots({ name: "dashboard smoke slot", max_players: 4, cores: 1, lobby_minutes: 5, count: 2 });
-  check(
-    "slots create",
-    made.length === 2 && made.every((slot) => slot.state === "open" && typeof slot.claim_code === "string" && slot.claim_code !== "" && (slot.cpus ?? []).length === 1 && (slot.nodes ?? []).length === 1),
-    JSON.stringify(made.map((slot) => ({ id: slot.id, state: slot.state, cpus: slot.cpus, nodes: slot.nodes, claim: slot.claim_code }))),
-  );
-  check("slots on different CPUs", new Set(made.flatMap((slot) => slot.cpus ?? [])).size === 2, made.map((slot) => (slot.cpus ?? []).join(",")).join(" / "));
-  const held = await host.plan({ players: 2, km, cpus: made[0]?.cpus ?? [] });
-  check("planner counts a slot's CPUs as taken", held.warnings.some((warning) => warning.code === "shared_cpu"), planText(held));
-  const listedSlots = await host.slots();
-  check("slots listed", made.every((slot) => listedSlots.some((item) => item.id === slot.id)) && listedSlots.length === before.length + 2, `${listedSlots.length} slots`);
-  for (const slot of made) await host.deleteSlot(slot.id);
-  const left = await host.slots();
-  check("slots freed", !made.some((slot) => left.some((item) => item.id === slot.id)), `${left.length} slots left`);
+  await host.slots();
 } catch (error) {
-  if (error instanceof ApiError && error.status === 404) skip("slots", "the host has no /api/v1/slots yet");
-  else check("slots", false, String(error));
+  if (error instanceof ApiError && error.status === 404) {
+    slotsSupported = false;
+    skip("slots", "the host has no /api/v1/slots yet");
+  } else {
+    check("slots", false, String(error));
+  }
+}
+if (slotsSupported) {
+  const made: Slot[] = [];
+  let claimedLobby = "";
+  try {
+    const before = await host.slots();
+    made.push(...(await host.createSlots({ name: "dashboard smoke slot", max_players: 2, km: 10, lobby_minutes: 5, count: 2 })));
+    check(
+      "slots create",
+      made.length === 2 && made.every((slot) => slot.state === "open" && typeof slot.claim_code === "string" && slot.claim_code !== "" && (slot.cpus ?? []).length >= 1 && (slot.nodes ?? []).length >= 1 && slot.km === 10 && slot.max_players === 2 && slot.reopen === true && slot.games === 0),
+      JSON.stringify(made.map((slot) => ({ id: slot.id, state: slot.state, cpus: slot.cpus, nodes: slot.nodes, km: slot.km, reopen: slot.reopen, games: slot.games, claim: slot.claim_code }))),
+    );
+    const [first, second] = made;
+    const firstCpus = first?.cpus ?? [];
+    const secondCpus = second?.cpus ?? [];
+    check("slots on different CPUs", firstCpus.length > 0 && secondCpus.length > 0 && !firstCpus.some((cpu) => secondCpus.includes(cpu)), `${firstCpus.join(",")} / ${secondCpus.join(",")}`);
+    const machine = await host.host();
+    const heldOn = (slot: Slot): boolean => (slot.cpus ?? []).every((cpu) => machine.cpus.find((item) => item.id === cpu)?.lobbies?.includes(slot.id) === true);
+    check("slots held on the host's CPUs", made.every(heldOn), made.map((slot) => `${slot.id}: ${(slot.cpus ?? []).map((cpu) => `${cpu}=[${(machine.cpus.find((item) => item.id === cpu)?.lobbies ?? []).join(",")}]`).join(" ")}`).join("; "));
+    const held = await host.plan({ players: 2, km, cpus: firstCpus });
+    check("planner counts a slot's CPUs as taken", held.warnings.some((warning) => warning.code === "shared_cpu"), planText(held));
+    const listedSlots = await host.slots();
+    check("slots listed", made.every((slot) => listedSlots.some((item) => item.id === slot.id)) && listedSlots.length === before.length + 2, `${listedSlots.length} slots`);
+
+    // The claim API takes the code as its credential: ClaimApi sends no Authorization header.
+    const claimApi = new ClaimApi(url, first?.claim_code ?? "");
+    const openView = await claimApi.view();
+    check("claim view without a token", openView.slot.id === first?.id && openView.slot.state === "open" && openView.lobby === null && openView.slot.max_players === 2 && openView.slot.km === 10, JSON.stringify(openView));
+    try {
+      await new ClaimApi(url, "0123456789abcdef").view();
+      check("claim with a wrong code", false, "no error");
+    } catch (error) {
+      check("claim with a wrong code", error instanceof ApiError && error.status === 404, String(error));
+    }
+    const claimMaps = await claimApi.maps();
+    const claimMap = claimMaps.find((candidate) => candidate.id === mapArg && (candidate.players ?? 0) >= 2) ?? claimMaps.find((candidate) => (candidate.players ?? 0) >= 2);
+    check("claim maps", claimMap !== undefined && claimMaps.length === maps.length, `${claimMaps.length} maps; using ${claimMap?.id} (${claimMap?.km} km, ${claimMap?.players} spots)`);
+    if (claimMap !== undefined) {
+      const claimed = await claimApi.claim({ player: "Smoke", map: claimMap.id, seats: [{ kind: "human" }, { kind: "ai", ai: "rush" }], options: { Victory: "sandbox" } });
+      const claimedSeats = claimed.lobby?.seats ?? [];
+      const hostSeat = claimedSeats.find((seat) => seat.seat === 1);
+      claimedLobby = claimed.lobby?.id ?? "";
+      check(
+        "claim",
+        claimed.lobby !== null && claimedSeats.length === 2 && hostSeat?.kind === "human" && hostSeat.name === "Smoke" && (hostSeat.join ?? "").includes("/connectserver") && claimedSeats.some((seat) => seat.kind === "ai" && seat.ai === "rush") && String(claimed.lobby.options?.Victory) === "sandbox",
+        `lobby ${claimed.lobby?.id} ${claimed.lobby?.state} on ${claimed.lobby?.map?.id}, seats ${JSON.stringify(claimedSeats.map((seat) => ({ seat: seat.seat, kind: seat.kind, name: seat.name, ai: seat.ai, join: seat.join })))}, Victory ${String(claimed.lobby?.options?.Victory)}`,
+      );
+      const afterClaim = (await host.slots()).find((slot) => slot.id === first?.id);
+      check("slot listed as claimed", afterClaim !== undefined && (afterClaim.state === "claimed" || afterClaim.state === "lobby") && afterClaim.lobby === claimedLobby && claimedLobby !== "" && afterClaim.host_player === "Smoke" && afterClaim.games === 1, JSON.stringify(afterClaim));
+      const claimedListed = (await host.lobbies()).find((item) => item.id === claimedLobby);
+      check("claimed lobby listed with its slot", claimedListed?.slot === first?.id && claimedListed?.control === "player", `slot ${claimedListed?.slot}, control ${claimedListed?.control}`);
+      try {
+        await claimApi.claim({ player: "Smoke again", map: claimMap.id });
+        check("second claim refused", false, "no error");
+      } catch (error) {
+        check("second claim refused", error instanceof ApiError && error.status === 409, String(error));
+      }
+      const again = await claimApi.view();
+      check("claim view shows the lobby", again.lobby?.id === claimedLobby && (again.lobby?.seats ?? []).length === 2, `${again.slot.state}, lobby ${again.lobby?.id} ${again.lobby?.state}`);
+    } else {
+      skip("claim", "no map with 2 or more start spots");
+    }
+
+    for (const slot of made) await host.deleteSlot(slot.id);
+    let stoppedState = claimedLobby === "" ? "none" : "";
+    if (claimedLobby !== "") {
+      const stopDeadline = Date.now() + 15000;
+      while (Date.now() < stopDeadline) {
+        stoppedState = (await host.lobbies()).find((item) => item.id === claimedLobby)?.state ?? "gone";
+        if (stoppedState === "stopped" || stoppedState === "ended" || stoppedState === "gone") break;
+        await sleep(500);
+      }
+      check("freeing a claimed slot stops its game", stoppedState === "stopped" || stoppedState === "ended", `lobby ${claimedLobby} ${stoppedState}`);
+      await host.forgetLobby(claimedLobby).catch(() => undefined);
+    }
+    const left = await host.slots();
+    check("slots freed", !made.some((slot) => left.some((item) => item.id === slot.id)), `${left.length} slots left`);
+    try {
+      await claimApi.view();
+      check("freed slot's code stops working", false, "no error");
+    } catch (error) {
+      check("freed slot's code stops working", error instanceof ApiError && error.status === 404, String(error));
+    }
+  } catch (error) {
+    check("slots", false, String(error));
+    // Whatever was made is freed, so a failed run doesn't leave CPUs held.
+    for (const slot of made) await host.deleteSlot(slot.id).catch(() => undefined);
+    if (claimedLobby !== "") await host.forgetLobby(claimedLobby).catch(() => undefined);
+  }
 }
 
 console.log(failed === 0 ? "HOST SMOKE PASSED" : `HOST SMOKE FAILED (${failed})`);
