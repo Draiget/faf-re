@@ -62,6 +62,7 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/math/MathReflection.h"
 #include "moho/misc/LaunchInfoBase.h"
+#include "moho/effects/rendering/CEffectManagerImpl.h"
 #include "moho/misc/SessionStartup.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/net/CClientManagerImpl.h"
@@ -107,7 +108,8 @@ namespace
   constexpr const char* kServerName = "server";
 
   constexpr const char* kUsage =
-    "usage: server --match <file.lua> --out <dir> /init <init.lua> | --data <dir> [--cpus <list>] [--speed <n>] "
+    "usage: server --match <file.lua> --out <dir> /init <init.lua> | --data <dir> [--cpus <list>] [--full-effects] "
+    "[--speed <n>] "
     "[--stop-beat <n>] [--timeout <minutes>] [--status-minutes <n>] "
     "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] "
     "[--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view "
@@ -3274,6 +3276,10 @@ int main(
       );
     }
   }
+  // Plan WP9.4: effects only run out their lifetime, no particles or emitter curves, as headless does
+  // (`EFFECT_SetLifetimeOnly`, same results): nobody draws the server's particles and none go on the wire.
+  // `--full-effects` keeps them (an A/B, or a later WP9 step that needs them).
+  moho::EFFECT_SetLifetimeOnly(!moho::CFG_GetArgOption("--full-effects", 0, nullptr));
   std::error_code directoryError;
   std::filesystem::create_directories(outDir, directoryError);
 
