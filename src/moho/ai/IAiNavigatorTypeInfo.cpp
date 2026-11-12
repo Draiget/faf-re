@@ -58,13 +58,17 @@ const char* IAiNavigatorTypeInfo::GetName() const
  * What it does:
  * Registers the navigator-event broadcaster as a reflected base at offset 4.
  */
-void IAiNavigatorTypeInfo::AddBase_Broadcaster_EAiNavigatorEvent(gpg::RType* const typeInfo)
+void IAiNavigatorTypeInfo::AddBase_Broadcaster_EAiNavigatorEvent(
+  gpg::RType* const typeInfo
+)
 {
   static gpg::RType* sBroadcasterType = nullptr;
   if (!sBroadcasterType) {
     sBroadcasterType = gpg::LookupRType(typeid(Broadcaster<EAiNavigatorEvent>));
   }
-  gpg::AddBaseIfPresent(typeInfo, sBroadcasterType, gpg::BaseSubobjectOffset<IAiNavigator, Broadcaster<EAiNavigatorEvent>>());
+  gpg::AddBaseIfPresent(
+    typeInfo, sBroadcasterType, gpg::BaseSubobjectOffset<IAiNavigator, Broadcaster<EAiNavigatorEvent>>()
+  );
 }
 
 void IAiNavigatorTypeInfo::Init()
@@ -105,4 +109,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_IAiNavigatorTypeInfo_2d060b, moho::register_IAiNavigatorTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_IAiNavigatorTypeInfo_2d060b,
+  moho::register_IAiNavigatorTypeInfo
+)

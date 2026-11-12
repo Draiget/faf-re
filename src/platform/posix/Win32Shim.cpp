@@ -2,11 +2,12 @@
 // CRT calls declared in platform/posix/win32/Windows.h, for the Linux build. Windows builds do
 // not compile this file.
 
-#if !defined(_WIN32)
+#if !FAFRE_PLATFORM_WINDOWS
 
 #include "platform/posix/win32/Windows.h"
 #include "platform/posix/win32/io.h"
 #include "gpg/core/containers/String.h"
+#include "platform/posix/NativePath.h"
 
 #include <algorithm>
 #include <atomic>
@@ -24,6 +25,7 @@
 #include <fstream>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <thread>
 #include <typeinfo>
@@ -47,7 +49,9 @@ namespace
 {
   thread_local DWORD tLastError = 0;
 
-  [[nodiscard]] DWORD ErrnoToWin32(const int error) noexcept
+  [[nodiscard]] DWORD ErrnoToWin32(
+    const int error
+  ) noexcept
   {
     switch (error) {
     case 0:
@@ -76,7 +80,9 @@ namespace
   }
 
   /// UTF-8 of a wide (UTF-32 on Linux) path.
-  [[nodiscard]] std::string NarrowPath(const wchar_t* const path)
+  [[nodiscard]] std::string NarrowPath(
+    const wchar_t* const path
+  )
   {
     std::string out;
     if (path == nullptr) {
@@ -104,7 +110,9 @@ namespace
   }
 
   /// The wide (UTF-32) form of a UTF-8 string.
-  [[nodiscard]] std::wstring WidenUtf8(const std::string& text)
+  [[nodiscard]] std::wstring WidenUtf8(
+    const std::string& text
+  )
   {
     std::wstring out;
     for (std::size_t at = 0; at < text.size();) {
@@ -130,7 +138,10 @@ namespace
     return out;
   }
 
-  [[nodiscard]] bool SameNameIgnoringCase(const char* a, const char* b) noexcept
+  [[nodiscard]] bool SameNameIgnoringCase(
+    const char* a,
+    const char* b
+  ) noexcept
   {
     for (; *a != '\0' && *b != '\0'; ++a, ++b) {
       if (std::tolower(static_cast<unsigned char>(*a)) != std::tolower(static_cast<unsigned char>(*b))) {
@@ -152,7 +163,9 @@ namespace
    * given (a file about to be created). The result names an existing file whenever Windows
    * would have found one.
    */
-  [[nodiscard]] std::string ResolveCaseOnDisk(std::string path)
+  [[nodiscard]] std::string ResolveCaseOnDisk(
+    std::string path
+  )
   {
     if (path.empty() || ::access(path.c_str(), F_OK) == 0) {
       return path;
@@ -195,7 +208,9 @@ namespace
     return resolved;
   }
 
-  [[nodiscard]] std::string ResolveCase(std::string path)
+  [[nodiscard]] std::string ResolveCase(
+    std::string path
+  )
   {
     if (sPathSpellingTrace.load(std::memory_order_relaxed) == nullptr) {
       return ResolveCaseOnDisk(std::move(path));
@@ -203,14 +218,25 @@ namespace
     std::string resolved = ResolveCaseOnDisk(path);
     // The lookup can also drop doubled slashes, which are no spelling.
     const auto singleSlashes = [](std::string text) {
-      text.erase(std::unique(text.begin(), text.end(), [](const char a, const char b) { return a == '/' && b == '/'; }), text.end());
+      text.erase(
+        std::unique(
+          text.begin(),
+          text.end(),
+          [](const char a, const char b) {
+        return a == '/' && b == '/';
+      }
+        ),
+        text.end()
+      );
       return text;
     };
     if (singleSlashes(resolved) != singleSlashes(path)) {
       std::lock_guard<std::mutex> guard(sPathSpellingLock);
       std::string line = path + "\t" + resolved + "\n";
-      if (std::FILE* const file = sPathSpellingTrace.load(std::memory_order_relaxed);
-          file != nullptr && sPathSpellingSeen.insert(line).second) {
+      if (
+        std::FILE* const file = sPathSpellingTrace.load(std::memory_order_relaxed);
+        file != nullptr && sPathSpellingSeen.insert(line).second
+      ) {
         (void)std::fputs(line.c_str(), file);
         (void)std::fflush(file);
       }
@@ -218,7 +244,9 @@ namespace
     return resolved;
   }
 
-  [[nodiscard]] std::string SlashPath(const char* const path)
+  [[nodiscard]] std::string SlashPath(
+    const char* const path
+  )
   {
     std::string out = path != nullptr ? path : "";
     for (char& c : out) {
@@ -232,9 +260,19 @@ namespace
   /// Every HANDLE this file hands out points at one of these.
   struct ShimHandle
   {
-    enum class Kind { Event, Semaphore, Mutex, File, Mapping, Thread };
+    enum class Kind
+    {
+      Event,
+      Semaphore,
+      Mutex,
+      File,
+      Mapping,
+      Thread
+    };
 
-    explicit ShimHandle(const Kind kind) noexcept
+    explicit ShimHandle(
+      const Kind kind
+    ) noexcept
       : kind(kind)
     {}
     virtual ~ShimHandle() = default;
@@ -334,7 +372,9 @@ namespace
   std::mutex gApcQueuesLock;
   std::unordered_map<DWORD, std::shared_ptr<ApcQueue>> gApcQueues;
 
-  [[nodiscard]] std::shared_ptr<ApcQueue> ApcQueueOf(const DWORD threadId)
+  [[nodiscard]] std::shared_ptr<ApcQueue> ApcQueueOf(
+    const DWORD threadId
+  )
   {
     const std::lock_guard<std::mutex> lock(gApcQueuesLock);
     std::shared_ptr<ApcQueue>& queue = gApcQueues[threadId];
@@ -410,62 +450,132 @@ namespace
   const HANDLE kCurrentThreadPseudoHandle = reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-2));
   const HANDLE kCurrentProcessPseudoHandle = reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
 
-  [[nodiscard]] ShimHandle* AsShimHandle(const HANDLE handle) noexcept
+  /// The open handles, as Windows keeps them: a HANDLE is its object's address, this table holds one
+  /// reference and every call that uses a handle holds another while it runs. A closed handle then
+  /// fails with ERROR_INVALID_HANDLE instead of reaching freed memory (a connector thread may still
+  /// signal an event its owner has closed, as ~CSimDriver does before its client manager stops), and an
+  /// object another thread is waiting on or signalling lives until that call returns.
+  /// Built on first use and never destroyed: static constructors in other files create events before
+  /// this file's globals would exist, and threads may still signal while the process exits.
+  struct HandleTable
+  {
+    std::shared_mutex lock;
+    std::unordered_map<HANDLE, std::shared_ptr<ShimHandle>> handles;
+  };
+
+  [[nodiscard]] HandleTable& Handles()
+  {
+    static HandleTable* const table = new HandleTable();
+    return *table;
+  }
+
+  [[nodiscard]] HANDLE Register(
+    std::shared_ptr<ShimHandle> object
+  )
+  {
+    const HANDLE handle = object.get();
+    HandleTable& table = Handles();
+    const std::unique_lock lock(table.lock);
+    table.handles.emplace(handle, std::move(object));
+    return handle;
+  }
+
+  [[nodiscard]] std::shared_ptr<ShimHandle> AsShimHandle(
+    const HANDLE handle
+  )
   {
     if (handle == nullptr || handle == INVALID_HANDLE_VALUE || handle == kCurrentThreadPseudoHandle) {
       return nullptr;
     }
-    return static_cast<ShimHandle*>(handle);
+    HandleTable& table = Handles();
+    const std::shared_lock lock(table.lock);
+    const auto found = table.handles.find(handle);
+    return found != table.handles.end() ? found->second : nullptr;
   }
 
-  [[nodiscard]] WaitObject* AsWaitObject(const HANDLE handle) noexcept
+  [[nodiscard]] std::shared_ptr<WaitObject> AsWaitObject(
+    const HANDLE handle
+  )
   {
-    ShimHandle* const object = AsShimHandle(handle);
-    return object != nullptr && (object->kind == ShimHandle::Kind::Event || object->kind == ShimHandle::Kind::Semaphore ||
-                                 object->kind == ShimHandle::Kind::Mutex)
-             ? static_cast<WaitObject*>(object)
-             : nullptr;
+    std::shared_ptr<ShimHandle> object = AsShimHandle(handle);
+    return object != nullptr &&
+        (object->kind == ShimHandle::Kind::Event || object->kind == ShimHandle::Kind::Semaphore ||
+         object->kind == ShimHandle::Kind::Mutex)
+      ? std::static_pointer_cast<WaitObject>(std::move(object))
+      : nullptr;
   }
 
-  [[nodiscard]] FileObject* AsFileObject(const HANDLE handle) noexcept
+  [[nodiscard]] std::shared_ptr<FileObject> AsFileObject(
+    const HANDLE handle
+  )
   {
-    ShimHandle* const object = AsShimHandle(handle);
-    return object != nullptr && object->kind == ShimHandle::Kind::File ? static_cast<FileObject*>(object) : nullptr;
+    std::shared_ptr<ShimHandle> object = AsShimHandle(handle);
+    return object != nullptr && object->kind == ShimHandle::Kind::File
+      ? std::static_pointer_cast<FileObject>(std::move(object))
+      : nullptr;
   }
 
-  [[nodiscard]] pthread_mutex_t* SectionMutex(CRITICAL_SECTION* const section) noexcept
+  [[nodiscard]] pthread_mutex_t* SectionMutex(
+    CRITICAL_SECTION* const section
+  ) noexcept
   {
     static_assert(sizeof(pthread_mutex_t) <= sizeof(section->storage), "CRITICAL_SECTION storage too small");
     return reinterpret_cast<pthread_mutex_t*>(section->storage);
   }
 } // namespace
 
-// --- Synchronisation ---------------------------------------------------------------------
-
-HANDLE CreateEventW(void*, const BOOL manualReset, const BOOL initialState, const wchar_t*)
+std::string platform::posix::NativePath(
+  const char* const path
+)
 {
-  auto* const event = new WaitObject(ShimHandle::Kind::Event);
-  event->manualReset = manualReset != FALSE;
-  event->count = initialState != FALSE ? 1 : 0;
-  return event;
+  return SlashPath(path);
 }
 
-HANDLE CreateEventA(void* const attributes, const BOOL manualReset, const BOOL initialState, const char*)
+// --- Synchronisation ---------------------------------------------------------------------
+
+HANDLE CreateEventW(
+  void*,
+  const BOOL manualReset,
+  const BOOL initialState,
+  const wchar_t*
+)
+{
+  const auto event = std::make_shared<WaitObject>(ShimHandle::Kind::Event);
+  event->manualReset = manualReset != FALSE;
+  event->count = initialState != FALSE ? 1 : 0;
+  return Register(event);
+}
+
+HANDLE CreateEventA(
+  void* const attributes,
+  const BOOL manualReset,
+  const BOOL initialState,
+  const char*
+)
 {
   return CreateEventW(attributes, manualReset, initialState, nullptr);
 }
 
-HANDLE CreateSemaphoreW(void*, const LONG initialCount, const LONG maximumCount, const wchar_t*)
+HANDLE CreateSemaphoreW(
+  void*,
+  const LONG initialCount,
+  const LONG maximumCount,
+  const wchar_t*
+)
 {
-  auto* const semaphore = new WaitObject(ShimHandle::Kind::Semaphore);
+  const auto semaphore = std::make_shared<WaitObject>(ShimHandle::Kind::Semaphore);
   semaphore->count = initialCount;
   semaphore->maximum = maximumCount;
-  return semaphore;
+  return Register(semaphore);
 }
 
-BOOL ReleaseSemaphore(const HANDLE handle, const LONG releaseCount, LONG* const previousCount)
+BOOL ReleaseSemaphore(
+  const HANDLE handle,
+  const LONG releaseCount,
+  LONG* const previousCount
+)
 {
-  WaitObject* const object = AsWaitObject(handle);
+  const std::shared_ptr<WaitObject> object = AsWaitObject(handle);
   if (object == nullptr || object->kind != ShimHandle::Kind::Semaphore || releaseCount <= 0) {
     tLastError = ERROR_INVALID_HANDLE;
     return FALSE;
@@ -485,24 +595,34 @@ BOOL ReleaseSemaphore(const HANDLE handle, const LONG releaseCount, LONG* const 
   return TRUE;
 }
 
-HANDLE CreateMutexW(void*, const BOOL initialOwner, const wchar_t*)
+HANDLE CreateMutexW(
+  void*,
+  const BOOL initialOwner,
+  const wchar_t*
+)
 {
-  auto* const mutex = new WaitObject(ShimHandle::Kind::Mutex);
+  const auto mutex = std::make_shared<WaitObject>(ShimHandle::Kind::Mutex);
   mutex->count = 1;
   if (initialOwner != FALSE) {
     mutex->AcquireLocked();
   }
-  return mutex;
+  return Register(mutex);
 }
 
-HANDLE CreateMutexA(void* const attributes, const BOOL initialOwner, const char*)
+HANDLE CreateMutexA(
+  void* const attributes,
+  const BOOL initialOwner,
+  const char*
+)
 {
   return CreateMutexW(attributes, initialOwner, nullptr);
 }
 
-BOOL ReleaseMutex(const HANDLE handle)
+BOOL ReleaseMutex(
+  const HANDLE handle
+)
 {
-  WaitObject* const object = AsWaitObject(handle);
+  const std::shared_ptr<WaitObject> object = AsWaitObject(handle);
   if (object == nullptr || object->kind != ShimHandle::Kind::Mutex) {
     tLastError = ERROR_INVALID_HANDLE;
     return FALSE;
@@ -522,9 +642,11 @@ BOOL ReleaseMutex(const HANDLE handle)
   return TRUE;
 }
 
-BOOL SetEvent(const HANDLE handle)
+BOOL SetEvent(
+  const HANDLE handle
+)
 {
-  WaitObject* const object = AsWaitObject(handle);
+  const std::shared_ptr<WaitObject> object = AsWaitObject(handle);
   if (object == nullptr || object->kind != ShimHandle::Kind::Event) {
     tLastError = ERROR_INVALID_HANDLE;
     return FALSE;
@@ -541,9 +663,11 @@ BOOL SetEvent(const HANDLE handle)
   return TRUE;
 }
 
-BOOL ResetEvent(const HANDLE handle)
+BOOL ResetEvent(
+  const HANDLE handle
+)
 {
-  WaitObject* const object = AsWaitObject(handle);
+  const std::shared_ptr<WaitObject> object = AsWaitObject(handle);
   if (object == nullptr || object->kind != ShimHandle::Kind::Event) {
     tLastError = ERROR_INVALID_HANDLE;
     return FALSE;
@@ -553,31 +677,40 @@ BOOL ResetEvent(const HANDLE handle)
   return TRUE;
 }
 
-DWORD WaitForSingleObject(const HANDLE handle, const DWORD milliseconds)
+DWORD WaitForSingleObject(
+  const HANDLE handle,
+  const DWORD milliseconds
+)
 {
-  WaitObject* const object = AsWaitObject(handle);
+  const std::shared_ptr<WaitObject> object = AsWaitObject(handle);
   if (object == nullptr) {
     tLastError = ERROR_INVALID_HANDLE;
     return WAIT_FAILED;
   }
   std::unique_lock<std::mutex> lock(object->mutex);
   if (milliseconds == INFINITE) {
-    object->signalled.wait(lock, [object] { return object->ReadyLocked(); });
-  } else if (!object->signalled.wait_for(
-               lock, std::chrono::milliseconds(milliseconds), [object] { return object->ReadyLocked(); }
-             )) {
+    object->signalled.wait(lock, [object] {
+      return object->ReadyLocked();
+    });
+  } else if (!object->signalled.wait_for(lock, std::chrono::milliseconds(milliseconds), [object] {
+    return object->ReadyLocked();
+  })) {
     return WAIT_TIMEOUT;
   }
   object->AcquireLocked();
   return WAIT_OBJECT_0;
 }
 
-DWORD WaitForSingleObjectEx(const HANDLE handle, const DWORD milliseconds, const BOOL alertable)
+DWORD WaitForSingleObjectEx(
+  const HANDLE handle,
+  const DWORD milliseconds,
+  const BOOL alertable
+)
 {
   if (alertable == FALSE) {
     return WaitForSingleObject(handle, milliseconds);
   }
-  WaitObject* const object = AsWaitObject(handle);
+  const std::shared_ptr<WaitObject> object = AsWaitObject(handle);
   if (object == nullptr) {
     tLastError = ERROR_INVALID_HANDLE;
     return WAIT_FAILED;
@@ -590,7 +723,9 @@ DWORD WaitForSingleObjectEx(const HANDLE handle, const DWORD milliseconds, const
     }
     {
       std::unique_lock<std::mutex> lock(object->mutex);
-      if (object->signalled.wait_for(lock, std::chrono::milliseconds(1), [object] { return object->ReadyLocked(); })) {
+      if (object->signalled.wait_for(lock, std::chrono::milliseconds(1), [object] {
+        return object->ReadyLocked();
+      })) {
         object->AcquireLocked();
         return WAIT_OBJECT_0;
       }
@@ -601,37 +736,41 @@ DWORD WaitForSingleObjectEx(const HANDLE handle, const DWORD milliseconds, const
   }
 }
 
-DWORD WaitForMultipleObjects(const DWORD count, const HANDLE* const handles, const BOOL waitAll, const DWORD milliseconds)
+DWORD WaitForMultipleObjects(
+  const DWORD count,
+  const HANDLE* const handles,
+  const BOOL waitAll,
+  const DWORD milliseconds
+)
 {
-  // Polls: the engine waits on a handful of handles at most.
+  // Polls: the engine waits on a handful of handles at most. The objects are looked up once, and held
+  // for the whole wait as Windows holds them.
+  std::vector<std::shared_ptr<WaitObject>> objects(count);
+  for (DWORD index = 0; index < count; ++index) {
+    objects[index] = AsWaitObject(handles[index]);
+    if (objects[index] == nullptr) {
+      tLastError = ERROR_INVALID_HANDLE;
+      return WAIT_FAILED;
+    }
+  }
   const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(milliseconds);
   for (;;) {
     if (waitAll != FALSE) {
       bool all = true;
       for (DWORD index = 0; index < count && all; ++index) {
-        WaitObject* const object = AsWaitObject(handles[index]);
-        if (object == nullptr) {
-          tLastError = ERROR_INVALID_HANDLE;
-          return WAIT_FAILED;
-        }
-        std::lock_guard<std::mutex> lock(object->mutex);
-        all = object->ReadyLocked();
+        std::lock_guard<std::mutex> lock(objects[index]->mutex);
+        all = objects[index]->ReadyLocked();
       }
       if (all) {
         for (DWORD index = 0; index < count; ++index) {
-          WaitObject* const object = AsWaitObject(handles[index]);
-          std::lock_guard<std::mutex> lock(object->mutex);
-          object->AcquireLocked();
+          std::lock_guard<std::mutex> lock(objects[index]->mutex);
+          objects[index]->AcquireLocked();
         }
         return WAIT_OBJECT_0;
       }
     } else {
       for (DWORD index = 0; index < count; ++index) {
-        WaitObject* const object = AsWaitObject(handles[index]);
-        if (object == nullptr) {
-          tLastError = ERROR_INVALID_HANDLE;
-          return WAIT_FAILED;
-        }
+        WaitObject* const object = objects[index].get();
         std::lock_guard<std::mutex> lock(object->mutex);
         if (object->ReadyLocked()) {
           object->AcquireLocked();
@@ -646,21 +785,31 @@ DWORD WaitForMultipleObjects(const DWORD count, const HANDLE* const handles, con
   }
 }
 
-BOOL CloseHandle(const HANDLE handle)
+BOOL CloseHandle(
+  const HANDLE handle
+)
 {
   if (handle == kCurrentThreadPseudoHandle || handle == kCurrentProcessPseudoHandle) {
     return TRUE;
   }
-  ShimHandle* const object = AsShimHandle(handle);
-  if (object == nullptr) {
-    tLastError = ERROR_INVALID_HANDLE;
-    return FALSE;
+  std::shared_ptr<ShimHandle> object; // released after the lock: a file closes its descriptor then
+  {
+    HandleTable& table = Handles();
+    const std::unique_lock lock(table.lock);
+    const auto found = table.handles.find(handle);
+    if (found == table.handles.end()) {
+      tLastError = ERROR_INVALID_HANDLE;
+      return FALSE;
+    }
+    object = std::move(found->second);
+    table.handles.erase(found);
   }
-  delete object;
   return TRUE;
 }
 
-void InitializeCriticalSection(CRITICAL_SECTION* const section)
+void InitializeCriticalSection(
+  CRITICAL_SECTION* const section
+)
 {
   pthread_mutexattr_t attributes;
   (void)::pthread_mutexattr_init(&attributes);
@@ -670,28 +819,39 @@ void InitializeCriticalSection(CRITICAL_SECTION* const section)
   section->initialized = true;
 }
 
-BOOL InitializeCriticalSectionAndSpinCount(CRITICAL_SECTION* const section, DWORD)
+BOOL InitializeCriticalSectionAndSpinCount(
+  CRITICAL_SECTION* const section,
+  DWORD
+)
 {
   InitializeCriticalSection(section);
   return TRUE;
 }
 
-void EnterCriticalSection(CRITICAL_SECTION* const section)
+void EnterCriticalSection(
+  CRITICAL_SECTION* const section
+)
 {
   (void)::pthread_mutex_lock(SectionMutex(section));
 }
 
-BOOL TryEnterCriticalSection(CRITICAL_SECTION* const section)
+BOOL TryEnterCriticalSection(
+  CRITICAL_SECTION* const section
+)
 {
   return ::pthread_mutex_trylock(SectionMutex(section)) == 0 ? TRUE : FALSE;
 }
 
-void LeaveCriticalSection(CRITICAL_SECTION* const section)
+void LeaveCriticalSection(
+  CRITICAL_SECTION* const section
+)
 {
   (void)::pthread_mutex_unlock(SectionMutex(section));
 }
 
-void DeleteCriticalSection(CRITICAL_SECTION* const section)
+void DeleteCriticalSection(
+  CRITICAL_SECTION* const section
+)
 {
   if (section->initialized) {
     (void)::pthread_mutex_destroy(SectionMutex(section));
@@ -721,12 +881,17 @@ DWORD GetCurrentProcessId()
   return static_cast<DWORD>(::getpid());
 }
 
-void Sleep(const DWORD milliseconds)
+void Sleep(
+  const DWORD milliseconds
+)
 {
   std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
 }
 
-DWORD SleepEx(const DWORD milliseconds, const BOOL alertable)
+DWORD SleepEx(
+  const DWORD milliseconds,
+  const BOOL alertable
+)
 {
   if (alertable == FALSE) {
     Sleep(milliseconds);
@@ -738,7 +903,9 @@ DWORD SleepEx(const DWORD milliseconds, const BOOL alertable)
   ApcQueue& queue = CurrentApcQueue();
   {
     std::unique_lock<std::mutex> lock(queue.mutex);
-    const auto hasCalls = [&queue] { return !queue.calls.empty(); };
+    const auto hasCalls = [&queue] {
+      return !queue.calls.empty();
+    };
     if (milliseconds == INFINITE) {
       queue.queued.wait(lock, hasCalls);
     } else if (!queue.queued.wait_for(lock, std::chrono::milliseconds(milliseconds), hasCalls)) {
@@ -749,7 +916,11 @@ DWORD SleepEx(const DWORD milliseconds, const BOOL alertable)
   return WAIT_IO_COMPLETION;
 }
 
-HANDLE OpenThread(DWORD, BOOL, const DWORD threadId)
+HANDLE OpenThread(
+  DWORD,
+  BOOL,
+  const DWORD threadId
+)
 {
   char taskPath[64]{};
   std::snprintf(taskPath, sizeof(taskPath), "/proc/self/task/%u", static_cast<unsigned>(threadId));
@@ -757,20 +928,24 @@ HANDLE OpenThread(DWORD, BOOL, const DWORD threadId)
     tLastError = ERROR_INVALID_PARAMETER;
     return nullptr;
   }
-  auto* const thread = new ThreadObject();
+  const auto thread = std::make_shared<ThreadObject>();
   thread->threadId = threadId;
   thread->queue = ApcQueueOf(threadId);
-  return thread;
+  return Register(thread);
 }
 
-DWORD QueueUserAPC(const PAPCFUNC function, const HANDLE threadHandle, const ULONG_PTR data)
+DWORD QueueUserAPC(
+  const PAPCFUNC function,
+  const HANDLE threadHandle,
+  const ULONG_PTR data
+)
 {
-  ShimHandle* const object = AsShimHandle(threadHandle);
+  const std::shared_ptr<ShimHandle> object = AsShimHandle(threadHandle);
   std::shared_ptr<ApcQueue> queue;
   if (threadHandle == kCurrentThreadPseudoHandle) {
     queue = ApcQueueOf(static_cast<DWORD>(::syscall(SYS_gettid)));
   } else if (object != nullptr && object->kind == ShimHandle::Kind::Thread) {
-    queue = static_cast<ThreadObject*>(object)->queue;
+    queue = static_cast<ThreadObject*>(object.get())->queue;
   }
   if (function == nullptr || queue == nullptr) {
     tLastError = ERROR_INVALID_HANDLE;
@@ -784,7 +959,9 @@ DWORD QueueUserAPC(const PAPCFUNC function, const HANDLE threadHandle, const ULO
   return 1;
 }
 
-HMODULE GetModuleHandleA(const char* const moduleName)
+HMODULE GetModuleHandleA(
+  const char* const moduleName
+)
 {
   void* const module = ::dlopen(moduleName, RTLD_NOW | RTLD_NOLOAD);
   if (module != nullptr) {
@@ -793,7 +970,9 @@ HMODULE GetModuleHandleA(const char* const moduleName)
   return module;
 }
 
-HMODULE GetModuleHandleW(const wchar_t* const moduleName)
+HMODULE GetModuleHandleW(
+  const wchar_t* const moduleName
+)
 {
   if (moduleName == nullptr) {
     extern char __executable_start;
@@ -802,14 +981,21 @@ HMODULE GetModuleHandleW(const wchar_t* const moduleName)
   return GetModuleHandleA(NarrowPath(moduleName).c_str());
 }
 
-BOOL InitOnceExecuteOnce(const PINIT_ONCE initOnce, const PINIT_ONCE_FN function, const PVOID parameter, PVOID* const context)
+BOOL InitOnceExecuteOnce(
+  const PINIT_ONCE initOnce,
+  const PINIT_ONCE_FN function,
+  const PVOID parameter,
+  PVOID* const context
+)
 {
   for (;;) {
     int state = __atomic_load_n(&initOnce->state, __ATOMIC_ACQUIRE);
     if (state == 2) {
       return TRUE;
     }
-    if (state == 0 && __atomic_compare_exchange_n(&initOnce->state, &state, 1, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
+    if (
+      state == 0 && __atomic_compare_exchange_n(&initOnce->state, &state, 1, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)
+    ) {
       const BOOL done = function(initOnce, parameter, context);
       __atomic_store_n(&initOnce->state, done != FALSE ? 2 : 0, __ATOMIC_RELEASE);
       return done;
@@ -848,38 +1034,86 @@ const wchar_t* GetCommandLineW()
   return sCommandLine;
 }
 
+const char* GetCommandLineA()
+{
+  // The same line, byte for byte (the arguments are UTF-8 already).
+  static char sCommandLine[8192];
+  static INIT_ONCE sOnce = INIT_ONCE_STATIC_INIT;
+  (void)InitOnceExecuteOnce(&sOnce, [](PINIT_ONCE, PVOID, PVOID*) -> BOOL {
+    const int fd = ::open("/proc/self/cmdline", O_RDONLY | O_CLOEXEC);
+    if (fd < 0) {
+      return TRUE;
+    }
+    char raw[8192];
+    const ssize_t got = ::read(fd, raw, sizeof(raw) - 1);
+    (void)::close(fd);
+    std::size_t out = 0;
+    for (ssize_t at = 0; at < got && out + 1 < sizeof(sCommandLine); ++at) {
+      if (raw[at] == '\0') {
+        if (at + 1 < got) {
+          sCommandLine[out++] = ' ';
+        }
+      } else {
+        sCommandLine[out++] = raw[at];
+      }
+    }
+    sCommandLine[out] = '\0';
+    return TRUE;
+  }, nullptr, nullptr);
+  return sCommandLine;
+}
+
 HANDLE GetProcessHeap()
 {
   static int sProcessHeap = 0;
   return &sProcessHeap;
 }
 
-HANDLE HeapCreate(DWORD, SIZE_T, SIZE_T)
+HANDLE HeapCreate(
+  DWORD,
+  SIZE_T,
+  SIZE_T
+)
 {
   return GetProcessHeap();
 }
 
-void* HeapAlloc(HANDLE, const DWORD flags, const SIZE_T bytes)
+void* HeapAlloc(
+  HANDLE,
+  const DWORD flags,
+  const SIZE_T bytes
+)
 {
-  void* const block = (flags & HEAP_ZERO_MEMORY) != 0 ? std::calloc(1, bytes != 0 ? bytes : 1) : std::malloc(bytes != 0 ? bytes : 1);
+  void* const block =
+    (flags & HEAP_ZERO_MEMORY) != 0 ? std::calloc(1, bytes != 0 ? bytes : 1) : std::malloc(bytes != 0 ? bytes : 1);
   if (block == nullptr) {
     tLastError = ERROR_NOT_ENOUGH_MEMORY;
   }
   return block;
 }
 
-BOOL HeapFree(HANDLE, DWORD, void* const memory)
+BOOL HeapFree(
+  HANDLE,
+  DWORD,
+  void* const memory
+)
 {
   std::free(memory);
   return TRUE;
 }
 
-SIZE_T HeapSize(HANDLE, DWORD, const void* const memory)
+SIZE_T HeapSize(
+  HANDLE,
+  DWORD,
+  const void* const memory
+)
 {
   return memory != nullptr ? ::malloc_usable_size(const_cast<void*>(memory)) : static_cast<SIZE_T>(-1);
 }
 
-HMODULE LoadLibraryA(const char* const fileName)
+HMODULE LoadLibraryA(
+  const char* const fileName
+)
 {
   void* const module = ::dlopen(fileName, RTLD_NOW | RTLD_LOCAL);
   if (module == nullptr) {
@@ -888,12 +1122,17 @@ HMODULE LoadLibraryA(const char* const fileName)
   return module;
 }
 
-void* GetProcAddress(const HMODULE module, const char* const procName)
+void* GetProcAddress(
+  const HMODULE module,
+  const char* const procName
+)
 {
   return module != nullptr ? ::dlsym(module, procName) : nullptr;
 }
 
-BOOL FreeLibrary(const HMODULE module)
+BOOL FreeLibrary(
+  const HMODULE module
+)
 {
   return module != nullptr && ::dlclose(module) == 0 ? TRUE : FALSE;
 }
@@ -907,7 +1146,16 @@ DWORD GetTickCount()
   );
 }
 
-BOOL QueryPerformanceCounter(LARGE_INTEGER* const count)
+ULONGLONG GetTickCount64()
+{
+  timespec now{};
+  ::clock_gettime(CLOCK_MONOTONIC, &now);
+  return static_cast<ULONGLONG>(now.tv_sec) * 1000u + static_cast<ULONGLONG>(now.tv_nsec) / 1000000u;
+}
+
+BOOL QueryPerformanceCounter(
+  LARGE_INTEGER* const count
+)
 {
   timespec now{};
   ::clock_gettime(CLOCK_MONOTONIC, &now);
@@ -915,25 +1163,44 @@ BOOL QueryPerformanceCounter(LARGE_INTEGER* const count)
   return TRUE;
 }
 
-BOOL QueryPerformanceFrequency(LARGE_INTEGER* const frequency)
+BOOL QueryPerformanceFrequency(
+  LARGE_INTEGER* const frequency
+)
 {
   frequency->QuadPart = 1000000000LL; // QueryPerformanceCounter counts nanoseconds here
   return TRUE;
 }
 
-void GetSystemInfo(SYSTEM_INFO* const info)
+void GetSystemInfo(
+  SYSTEM_INFO* const info
+)
 {
   *info = SYSTEM_INFO{};
   info->dwPageSize = static_cast<DWORD>(::sysconf(_SC_PAGESIZE));
   const long processors = ::sysconf(_SC_NPROCESSORS_ONLN);
   info->dwNumberOfProcessors = processors > 0 ? static_cast<DWORD>(processors) : 1u;
   info->dwActiveProcessorMask = info->dwNumberOfProcessors >= sizeof(DWORD_PTR) * 8
-                                  ? ~DWORD_PTR{0}
-                                  : (DWORD_PTR{1} << info->dwNumberOfProcessors) - 1u;
+    ? ~DWORD_PTR{0}
+    : (DWORD_PTR{1} << info->dwNumberOfProcessors) - 1u;
   info->dwAllocationGranularity = 65536u;
 }
 
-BOOL GetVersionExW(OSVERSIONINFOW* const info)
+BOOL TerminateProcess(
+  const HANDLE process,
+  const UINT exitCode
+)
+{
+  // Only this process is ever named (GetCurrentProcess's pseudo-handle).
+  if (process != GetCurrentProcess()) {
+    tLastError = ERROR_INVALID_HANDLE;
+    return FALSE;
+  }
+  std::_Exit(static_cast<int>(exitCode));
+}
+
+BOOL GetVersionExW(
+  OSVERSIONINFOW* const info
+)
 {
   if (info == nullptr) {
     return FALSE;
@@ -951,13 +1218,17 @@ DWORD GetLastError()
   return tLastError;
 }
 
-void SetLastError(const DWORD error)
+void SetLastError(
+  const DWORD error
+)
 {
   tLastError = error;
 }
 
 /// A kernel CPU list such as "0-7,16-23" from a sysfs file; CPUs above 63 are left out, and an unreadable file is 0.
-[[nodiscard]] static DWORD_PTR ReadCpuListFile(const char* const path)
+[[nodiscard]] static DWORD_PTR ReadCpuListFile(
+  const char* const path
+)
 {
   std::ifstream file(path);
   std::string list;
@@ -1003,7 +1274,11 @@ void SetLastError(const DWORD error)
 }
 [[maybe_unused]] static const bool sProcessCpuSetRead = (static_cast<void>(ProcessCpuSet()), true);
 
-BOOL GetProcessAffinityMask(HANDLE, DWORD_PTR* const processMask, DWORD_PTR* const systemMask)
+BOOL GetProcessAffinityMask(
+  HANDLE,
+  DWORD_PTR* const processMask,
+  DWORD_PTR* const systemMask
+)
 {
   const cpu_set_t& set = ProcessCpuSet();
   DWORD_PTR mask = 0;
@@ -1024,7 +1299,11 @@ BOOL GetProcessAffinityMask(HANDLE, DWORD_PTR* const processMask, DWORD_PTR* con
   return TRUE;
 }
 
-DWORD GetEnvironmentVariableA(const char* const name, char* const buffer, const DWORD size)
+DWORD GetEnvironmentVariableA(
+  const char* const name,
+  char* const buffer,
+  const DWORD size
+)
 {
   const char* const value = name != nullptr ? std::getenv(name) : nullptr;
   if (value == nullptr) {
@@ -1039,27 +1318,37 @@ DWORD GetEnvironmentVariableA(const char* const name, char* const buffer, const 
   return static_cast<DWORD>(length);
 }
 
-void OutputDebugStringA(const char* const text)
+void OutputDebugStringA(
+  const char* const text
+)
 {
   if (text != nullptr) {
     (void)std::fputs(text, stderr);
   }
 }
 
-void OutputDebugStringW(const wchar_t* const text)
+void OutputDebugStringW(
+  const wchar_t* const text
+)
 {
   if (text != nullptr) {
     (void)std::fputs(NarrowPath(text).c_str(), stderr);
   }
 }
 
-BOOL SetThreadPriority(HANDLE, int)
+BOOL SetThreadPriority(
+  HANDLE,
+  int
+)
 {
   // A scheduling hint; the server keeps the default policy.
   return TRUE;
 }
 
-DWORD_PTR SetThreadAffinityMask(const HANDLE thread, const DWORD_PTR mask)
+DWORD_PTR SetThreadAffinityMask(
+  const HANDLE thread,
+  const DWORD_PTR mask
+)
 {
   if (thread != kCurrentThreadPseudoHandle || mask == 0) {
     tLastError = ERROR_INVALID_PARAMETER;
@@ -1089,7 +1378,9 @@ DWORD_PTR SetThreadAffinityMask(const HANDLE thread, const DWORD_PTR mask)
 }
 
 BOOL GetLogicalProcessorInformationEx(
-  const LOGICAL_PROCESSOR_RELATIONSHIP relation, SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* const buffer, DWORD* const length
+  const LOGICAL_PROCESSOR_RELATIONSHIP relation,
+  SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* const buffer,
+  DWORD* const length
 )
 {
   if (length == nullptr) {
@@ -1153,15 +1444,23 @@ BOOL GetLogicalProcessorInformationEx(
 
 // --- Memory ------------------------------------------------------------------------------
 
-LPVOID VirtualAlloc(const LPVOID address, const SIZE_T size, const DWORD allocationType, const DWORD protect)
+LPVOID VirtualAlloc(
+  const LPVOID address,
+  const SIZE_T size,
+  const DWORD allocationType,
+  const DWORD protect
+)
 {
-  const int protection = protect == PAGE_NOACCESS ? PROT_NONE : protect == PAGE_READONLY ? PROT_READ : (PROT_READ | PROT_WRITE);
+  const int protection = protect == PAGE_NOACCESS ? PROT_NONE
+    : protect == PAGE_READONLY                    ? PROT_READ
+                                                  : (PROT_READ | PROT_WRITE);
   if (address != nullptr && (allocationType & MEM_COMMIT) != 0 && (allocationType & MEM_RESERVE) == 0) {
     // Commit within a reservation.
     return ::mprotect(address, size, protection) == 0 ? address : nullptr;
   }
-  void* const mapped =
-    ::mmap(address, size, (allocationType & MEM_COMMIT) != 0 ? protection : PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  void* const mapped = ::mmap(
+    address, size, (allocationType & MEM_COMMIT) != 0 ? protection : PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0
+  );
   if (mapped == MAP_FAILED) {
     SetErrnoError();
     return nullptr;
@@ -1169,7 +1468,11 @@ LPVOID VirtualAlloc(const LPVOID address, const SIZE_T size, const DWORD allocat
   return mapped;
 }
 
-BOOL VirtualFree(const LPVOID address, const SIZE_T size, const DWORD freeType)
+BOOL VirtualFree(
+  const LPVOID address,
+  const SIZE_T size,
+  const DWORD freeType
+)
 {
   if ((freeType & MEM_RELEASE) != 0) {
     // MEM_RELEASE passes size 0 on Windows; the reservation's size is not known here.
@@ -1178,7 +1481,11 @@ BOOL VirtualFree(const LPVOID address, const SIZE_T size, const DWORD freeType)
   return ::mprotect(address, size, PROT_NONE) == 0 ? TRUE : FALSE;
 }
 
-SIZE_T VirtualQuery(const LPCVOID address, MEMORY_BASIC_INFORMATION* const info, const SIZE_T length)
+SIZE_T VirtualQuery(
+  const LPCVOID address,
+  MEMORY_BASIC_INFORMATION* const info,
+  const SIZE_T length
+)
 {
   if (info == nullptr || length < sizeof(MEMORY_BASIC_INFORMATION)) {
     return 0;
@@ -1215,7 +1522,9 @@ SIZE_T VirtualQuery(const LPCVOID address, MEMORY_BASIC_INFORMATION* const info,
   return sizeof(MEMORY_BASIC_INFORMATION);
 }
 
-HLOCAL LocalFree(const HLOCAL memory)
+HLOCAL LocalFree(
+  const HLOCAL memory
+)
 {
   std::free(memory);
   return nullptr;
@@ -1224,7 +1533,13 @@ HLOCAL LocalFree(const HLOCAL memory)
 // --- Files -------------------------------------------------------------------------------
 
 HANDLE CreateFileA(
-  const char* const path, const DWORD desiredAccess, DWORD, void*, const DWORD creation, DWORD, HANDLE
+  const char* const path,
+  const DWORD desiredAccess,
+  DWORD,
+  void*,
+  const DWORD creation,
+  DWORD,
+  HANDLE
 )
 {
   int flags = 0;
@@ -1253,10 +1568,10 @@ HANDLE CreateFileA(
     SetErrnoError();
     return INVALID_HANDLE_VALUE;
   }
-  auto* const file = new FileObject();
+  const auto file = std::make_shared<FileObject>();
   file->fd = fd;
   tLastError = ERROR_SUCCESS;
-  return file;
+  return Register(file);
 }
 
 HANDLE CreateFileW(
@@ -1272,9 +1587,15 @@ HANDLE CreateFileW(
   return CreateFileA(NarrowPath(path).c_str(), desiredAccess, shareMode, security, creation, flags, templateFile);
 }
 
-BOOL ReadFile(const HANDLE handle, void* const buffer, const DWORD bytesToRead, DWORD* const bytesRead, void*)
+BOOL ReadFile(
+  const HANDLE handle,
+  void* const buffer,
+  const DWORD bytesToRead,
+  DWORD* const bytesRead,
+  void*
+)
 {
-  FileObject* const file = AsFileObject(handle);
+  const std::shared_ptr<FileObject> file = AsFileObject(handle);
   if (file == nullptr) {
     tLastError = ERROR_INVALID_HANDLE;
     return FALSE;
@@ -1303,9 +1624,15 @@ BOOL ReadFile(const HANDLE handle, void* const buffer, const DWORD bytesToRead, 
   return TRUE;
 }
 
-BOOL WriteFile(const HANDLE handle, const void* const buffer, const DWORD bytesToWrite, DWORD* const bytesWritten, void*)
+BOOL WriteFile(
+  const HANDLE handle,
+  const void* const buffer,
+  const DWORD bytesToWrite,
+  DWORD* const bytesWritten,
+  void*
+)
 {
-  FileObject* const file = AsFileObject(handle);
+  const std::shared_ptr<FileObject> file = AsFileObject(handle);
   if (file == nullptr) {
     tLastError = ERROR_INVALID_HANDLE;
     return FALSE;
@@ -1331,9 +1658,14 @@ BOOL WriteFile(const HANDLE handle, const void* const buffer, const DWORD bytesT
   return TRUE;
 }
 
-BOOL SetFilePointerEx(const HANDLE handle, const LARGE_INTEGER distance, LARGE_INTEGER* const newPosition, const DWORD moveMethod)
+BOOL SetFilePointerEx(
+  const HANDLE handle,
+  const LARGE_INTEGER distance,
+  LARGE_INTEGER* const newPosition,
+  const DWORD moveMethod
+)
 {
-  FileObject* const file = AsFileObject(handle);
+  const std::shared_ptr<FileObject> file = AsFileObject(handle);
   if (file == nullptr) {
     tLastError = ERROR_INVALID_HANDLE;
     return FALSE;
@@ -1350,12 +1682,17 @@ BOOL SetFilePointerEx(const HANDLE handle, const LARGE_INTEGER distance, LARGE_I
   return TRUE;
 }
 
-DWORD SetFilePointer(const HANDLE handle, const LONG distance, LONG* const distanceHigh, const DWORD moveMethod)
+DWORD SetFilePointer(
+  const HANDLE handle,
+  const LONG distance,
+  LONG* const distanceHigh,
+  const DWORD moveMethod
+)
 {
   LARGE_INTEGER move{};
   move.QuadPart = distanceHigh != nullptr
-                    ? (static_cast<std::int64_t>(*distanceHigh) << 32) | static_cast<std::uint32_t>(distance)
-                    : static_cast<std::int64_t>(distance);
+    ? (static_cast<std::int64_t>(*distanceHigh) << 32) | static_cast<std::uint32_t>(distance)
+    : static_cast<std::int64_t>(distance);
   LARGE_INTEGER result{};
   if (!SetFilePointerEx(handle, move, &result, moveMethod)) {
     return INVALID_SET_FILE_POINTER;
@@ -1366,9 +1703,12 @@ DWORD SetFilePointer(const HANDLE handle, const LONG distance, LONG* const dista
   return static_cast<DWORD>(result.QuadPart & 0xFFFFFFFF);
 }
 
-BOOL GetFileSizeEx(const HANDLE handle, LARGE_INTEGER* const size)
+BOOL GetFileSizeEx(
+  const HANDLE handle,
+  LARGE_INTEGER* const size
+)
 {
-  FileObject* const file = AsFileObject(handle);
+  const std::shared_ptr<FileObject> file = AsFileObject(handle);
   struct stat status{};
   if (file == nullptr || ::fstat(file->fd, &status) != 0) {
     tLastError = ERROR_INVALID_HANDLE;
@@ -1378,7 +1718,10 @@ BOOL GetFileSizeEx(const HANDLE handle, LARGE_INTEGER* const size)
   return TRUE;
 }
 
-DWORD GetFileSize(const HANDLE handle, DWORD* const sizeHigh)
+DWORD GetFileSize(
+  const HANDLE handle,
+  DWORD* const sizeHigh
+)
 {
   LARGE_INTEGER size{};
   if (!GetFileSizeEx(handle, &size)) {
@@ -1391,13 +1734,20 @@ DWORD GetFileSize(const HANDLE handle, DWORD* const sizeHigh)
 }
 
 HANDLE CreateFileMappingW(
-  const HANDLE file, void*, const DWORD protect, const DWORD maximumSizeHigh, const DWORD maximumSizeLow, const wchar_t*
+  const HANDLE file,
+  void*,
+  const DWORD protect,
+  const DWORD maximumSizeHigh,
+  const DWORD maximumSizeLow,
+  const wchar_t*
 )
 {
-  FileObject* const source = AsFileObject(file);
+  const std::shared_ptr<FileObject> source = AsFileObject(file);
   struct stat status{};
-  if (source == nullptr || protect != PAGE_READONLY || maximumSizeHigh != 0 || maximumSizeLow != 0 ||
-      ::fstat(source->fd, &status) != 0) {
+  if (
+    source == nullptr || protect != PAGE_READONLY || maximumSizeHigh != 0 || maximumSizeLow != 0 ||
+    ::fstat(source->fd, &status) != 0
+  ) {
     tLastError = ERROR_INVALID_PARAMETER;
     return nullptr;
   }
@@ -1411,24 +1761,30 @@ HANDLE CreateFileMappingW(
     SetErrnoError();
     return nullptr;
   }
-  auto* const mapping = new MappingObject();
+  const auto mapping = std::make_shared<MappingObject>();
   mapping->fd = fd;
   mapping->size = static_cast<std::size_t>(status.st_size);
   tLastError = ERROR_SUCCESS;
-  return mapping;
+  return Register(mapping);
 }
 
 void* MapViewOfFile(
-  const HANDLE mappingHandle, const DWORD desiredAccess, const DWORD offsetHigh, const DWORD offsetLow, const std::size_t bytes
+  const HANDLE mappingHandle,
+  const DWORD desiredAccess,
+  const DWORD offsetHigh,
+  const DWORD offsetLow,
+  const std::size_t bytes
 )
 {
-  ShimHandle* const object = AsShimHandle(mappingHandle);
-  if (object == nullptr || object->kind != ShimHandle::Kind::Mapping || desiredAccess != FILE_MAP_READ ||
-      offsetHigh != 0 || offsetLow != 0) {
+  const std::shared_ptr<ShimHandle> object = AsShimHandle(mappingHandle);
+  if (
+    object == nullptr || object->kind != ShimHandle::Kind::Mapping || desiredAccess != FILE_MAP_READ ||
+    offsetHigh != 0 || offsetLow != 0
+  ) {
     tLastError = ERROR_INVALID_PARAMETER;
     return nullptr;
   }
-  const auto* const mapping = static_cast<const MappingObject*>(object);
+  const auto* const mapping = static_cast<const MappingObject*>(object.get());
   const std::size_t length = bytes != 0 ? bytes : mapping->size;
   void* const view = ::mmap(nullptr, length, PROT_READ, MAP_PRIVATE, mapping->fd, 0);
   if (view == MAP_FAILED) {
@@ -1440,12 +1796,16 @@ void* MapViewOfFile(
   return view;
 }
 
-BOOL UnmapViewOfFile(const void* const view)
+BOOL UnmapViewOfFile(
+  const void* const view
+)
 {
   std::size_t length = 0;
   {
     const std::lock_guard<std::mutex> lock(gViewLock);
-    const auto found = std::find_if(gViews.begin(), gViews.end(), [view](const auto& entry) { return entry.first == view; });
+    const auto found = std::find_if(gViews.begin(), gViews.end(), [view](const auto& entry) {
+      return entry.first == view;
+    });
     if (found == gViews.end()) {
       tLastError = ERROR_INVALID_PARAMETER;
       return FALSE;
@@ -1456,15 +1816,19 @@ BOOL UnmapViewOfFile(const void* const view)
   return ::munmap(const_cast<void*>(view), length) == 0 ? TRUE : FALSE;
 }
 
-BOOL FlushFileBuffers(const HANDLE handle)
+BOOL FlushFileBuffers(
+  const HANDLE handle
+)
 {
-  FileObject* const file = AsFileObject(handle);
+  const std::shared_ptr<FileObject> file = AsFileObject(handle);
   return file != nullptr && ::fsync(file->fd) == 0 ? TRUE : FALSE;
 }
 
-BOOL SetEndOfFile(const HANDLE handle)
+BOOL SetEndOfFile(
+  const HANDLE handle
+)
 {
-  FileObject* const file = AsFileObject(handle);
+  const std::shared_ptr<FileObject> file = AsFileObject(handle);
   if (file == nullptr) {
     return FALSE;
   }
@@ -1472,7 +1836,9 @@ BOOL SetEndOfFile(const HANDLE handle)
   return position >= 0 && ::ftruncate(file->fd, position) == 0 ? TRUE : FALSE;
 }
 
-DWORD GetFileAttributesA(const char* const path)
+DWORD GetFileAttributesA(
+  const char* const path
+)
 {
   struct stat status{};
   if (::stat(SlashPath(path).c_str(), &status) != 0) {
@@ -1486,12 +1852,18 @@ DWORD GetFileAttributesA(const char* const path)
   return attributes;
 }
 
-DWORD GetFileAttributesW(const wchar_t* const path)
+DWORD GetFileAttributesW(
+  const wchar_t* const path
+)
 {
   return GetFileAttributesA(NarrowPath(path).c_str());
 }
 
-BOOL MoveFileExW(const wchar_t* const from, const wchar_t* const to, const DWORD flags)
+BOOL MoveFileExW(
+  const wchar_t* const from,
+  const wchar_t* const to,
+  const DWORD flags
+)
 {
   const std::string source = ResolveCase(NarrowPath(from));
   const std::string target = ResolveCase(NarrowPath(to));
@@ -1506,12 +1878,54 @@ BOOL MoveFileExW(const wchar_t* const from, const wchar_t* const to, const DWORD
   return TRUE;
 }
 
-BOOL MoveFileW(const wchar_t* const from, const wchar_t* const to)
+BOOL MoveFileExA(
+  const char* const from,
+  const char* const to,
+  const DWORD flags
+)
+{
+  const std::string source = SlashPath(from);
+  const std::string target = SlashPath(to);
+  if ((flags & MOVEFILE_REPLACE_EXISTING) == 0 && ::access(target.c_str(), F_OK) == 0) {
+    tLastError = ERROR_ALREADY_EXISTS;
+    return FALSE;
+  }
+  if (::rename(source.c_str(), target.c_str()) != 0) {
+    SetErrnoError();
+    return FALSE;
+  }
+  return TRUE;
+}
+
+BOOL CopyFileW(
+  const wchar_t* const from,
+  const wchar_t* const to,
+  const BOOL failIfExists
+)
+{
+  const std::filesystem::path source = ResolveCase(NarrowPath(from));
+  const std::filesystem::path target = ResolveCase(NarrowPath(to));
+  std::error_code error;
+  const auto options =
+    failIfExists ? std::filesystem::copy_options::none : std::filesystem::copy_options::overwrite_existing;
+  if (!std::filesystem::copy_file(source, target, options, error)) {
+    tLastError = error ? ErrnoToWin32(error.value()) : ERROR_ALREADY_EXISTS;
+    return FALSE;
+  }
+  return TRUE;
+}
+
+BOOL MoveFileW(
+  const wchar_t* const from,
+  const wchar_t* const to
+)
 {
   return MoveFileExW(from, to, 0);
 }
 
-BOOL DeleteFileA(const char* const path)
+BOOL DeleteFileA(
+  const char* const path
+)
 {
   if (::unlink(SlashPath(path).c_str()) != 0) {
     SetErrnoError();
@@ -1520,12 +1934,17 @@ BOOL DeleteFileA(const char* const path)
   return TRUE;
 }
 
-BOOL DeleteFileW(const wchar_t* const path)
+BOOL DeleteFileW(
+  const wchar_t* const path
+)
 {
   return DeleteFileA(NarrowPath(path).c_str());
 }
 
-BOOL CreateDirectoryW(const wchar_t* const path, void*)
+BOOL CreateDirectoryW(
+  const wchar_t* const path,
+  void*
+)
 {
   if (::mkdir(ResolveCase(NarrowPath(path)).c_str(), 0755) != 0) {
     SetErrnoError();
@@ -1535,7 +1954,12 @@ BOOL CreateDirectoryW(const wchar_t* const path, void*)
 }
 
 BOOL ReplaceFileW(
-  const wchar_t* const replacedFile, const wchar_t* const replacementFile, const wchar_t* const backupFile, DWORD, void*, void*
+  const wchar_t* const replacedFile,
+  const wchar_t* const replacementFile,
+  const wchar_t* const backupFile,
+  DWORD,
+  void*,
+  void*
 )
 {
   const std::string replaced = ResolveCase(NarrowPath(replacedFile));
@@ -1558,7 +1982,10 @@ BOOL ReplaceFileW(
   return TRUE;
 }
 
-BOOL CreateDirectoryA(const char* const path, void*)
+BOOL CreateDirectoryA(
+  const char* const path,
+  void*
+)
 {
   if (::mkdir(SlashPath(path).c_str(), 0755) != 0) {
     SetErrnoError();
@@ -1567,12 +1994,18 @@ BOOL CreateDirectoryA(const char* const path, void*)
   return TRUE;
 }
 
-void FAF_SetPathSpellingTrace(std::FILE* const file)
+void FAF_SetPathSpellingTrace(
+  std::FILE* const file
+)
 {
   sPathSpellingTrace.store(file, std::memory_order_relaxed);
 }
 
-char* _fullpath(char* const absolutePath, const char* const relativePath, const std::size_t maxLength)
+char* _fullpath(
+  char* const absolutePath,
+  const char* const relativePath,
+  const std::size_t maxLength
+)
 {
   if (relativePath == nullptr) {
     errno = EINVAL;
@@ -1596,8 +2029,14 @@ char* _fullpath(char* const absolutePath, const char* const relativePath, const 
 }
 
 int WideCharToMultiByte(
-  UINT, DWORD, const wchar_t* const wide, const int wideLength, char* const multiByte, const int multiByteLength,
-  const char*, BOOL* const usedDefaultChar
+  UINT,
+  DWORD,
+  const wchar_t* const wide,
+  const int wideLength,
+  char* const multiByte,
+  const int multiByteLength,
+  const char*,
+  BOOL* const usedDefaultChar
 )
 {
   if (usedDefaultChar != nullptr) {
@@ -1625,7 +2064,12 @@ int WideCharToMultiByte(
 }
 
 int MultiByteToWideChar(
-  UINT, DWORD, const char* const multiByte, const int multiByteLength, wchar_t* const wide, const int wideLength
+  UINT,
+  DWORD,
+  const char* const multiByte,
+  const int multiByteLength,
+  wchar_t* const wide,
+  const int wideLength
 )
 {
   if (multiByte == nullptr) {
@@ -1648,12 +2092,18 @@ int MultiByteToWideChar(
   return static_cast<int>(out.size());
 }
 
-BOOL PathFileExistsW(const wchar_t* const path)
+BOOL PathFileExistsW(
+  const wchar_t* const path
+)
 {
   return ::access(ResolveCase(NarrowPath(path)).c_str(), F_OK) == 0 ? TRUE : FALSE;
 }
 
-DWORD GetModuleFileNameW(const HMODULE module, wchar_t* const fileName, const DWORD size)
+DWORD GetModuleFileNameW(
+  const HMODULE module,
+  wchar_t* const fileName,
+  const DWORD size
+)
 {
   if (module != nullptr || fileName == nullptr || size == 0) {
     tLastError = ERROR_INVALID_PARAMETER;
@@ -1678,7 +2128,10 @@ DWORD GetModuleFileNameW(const HMODULE module, wchar_t* const fileName, const DW
   return static_cast<DWORD>(wide.size());
 }
 
-BOOL SetProcessAffinityMask(const HANDLE process, const DWORD_PTR processMask)
+BOOL SetProcessAffinityMask(
+  const HANDLE process,
+  const DWORD_PTR processMask
+)
 {
   if (process != kCurrentProcessPseudoHandle || processMask == 0) {
     tLastError = ERROR_INVALID_PARAMETER;
@@ -1700,7 +2153,62 @@ BOOL SetProcessAffinityMask(const HANDLE process, const DWORD_PTR processMask)
   return TRUE;
 }
 
-HRESULT SHGetFolderPathW(HWND, const int folder, HANDLE, DWORD, wchar_t* const path)
+namespace
+{
+  /**
+   * The folder xdg-user-dirs names for `key` (XDG_DOCUMENTS_DIR, XDG_DESKTOP_DIR), read as
+   * `xdg-user-dir` reads it: `<configHome>/user-dirs.dirs` holds shell lines KEY="$HOME/<path>" or
+   * KEY="/<path>", and the last one wins. A desktop in another language names its own folder there
+   * (~/Dokumente, ~/Bureau). Empty when there is no such file or line; the environment variable of
+   * the same name comes next, as `xdg-user-dir` falls back to it.
+   */
+  [[nodiscard]] std::string XdgUserDirectory(
+    const std::string& home,
+    const std::string& configHome,
+    const char* const key
+  )
+  {
+    std::string found;
+    const std::string prefix = std::string(key) + "=";
+    std::ifstream file(configHome + "/user-dirs.dirs");
+    for (std::string line; std::getline(file, line);) {
+      const std::size_t start = line.find_first_not_of(" \t");
+      if (start == std::string::npos || line.compare(start, prefix.size(), prefix) != 0) {
+        continue;
+      }
+      std::string value = line.substr(start + prefix.size());
+      while (!value.empty() && (value.back() == '\r' || value.back() == ' ' || value.back() == '\t')) {
+        value.pop_back();
+      }
+      if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+        value = value.substr(1, value.size() - 2);
+      }
+      if (value.rfind("$HOME", 0) == 0 && (value.size() == 5 || value[5] == '/')) {
+        found = home + value.substr(5);
+      } else if (!value.empty() && value[0] == '/') {
+        found = value;
+      }
+    }
+    if (found.empty()) {
+      const char* const environment = std::getenv(key);
+      if (environment != nullptr && environment[0] == '/') {
+        found = environment;
+      }
+    }
+    while (found.size() > 1 && found.back() == '/') {
+      found.pop_back();
+    }
+    return found;
+  }
+} // namespace
+
+HRESULT SHGetFolderPathW(
+  HWND,
+  const int folder,
+  HANDLE,
+  DWORD,
+  wchar_t* const path
+)
 {
   if (path == nullptr) {
     return E_INVALIDARG;
@@ -1713,8 +2221,13 @@ HRESULT SHGetFolderPathW(HWND, const int folder, HANDLE, DWORD, wchar_t* const p
     const char* const value = std::getenv(variable);
     return value != nullptr && value[0] == '/' ? std::string(value) : std::string(home) + fallback;
   };
+  const auto userDirectory = [&](const char* const key, const char* const fallback) {
+    const std::string named = XdgUserDirectory(home, fromEnvironment("XDG_CONFIG_HOME", "/.config"), key);
+    return named.empty() ? std::string(home) + fallback : named;
+  };
+  const int kind = folder & ~CSIDL_FLAG_CREATE;
   std::string resolved;
-  switch (folder & ~CSIDL_FLAG_CREATE) {
+  switch (kind) {
   case CSIDL_LOCAL_APPDATA:
     resolved = fromEnvironment("XDG_DATA_HOME", "/.local/share");
     break;
@@ -1722,11 +2235,11 @@ HRESULT SHGetFolderPathW(HWND, const int folder, HANDLE, DWORD, wchar_t* const p
     resolved = fromEnvironment("XDG_CONFIG_HOME", "/.config");
     break;
   case CSIDL_PERSONAL:
-    resolved = std::string(home) + "/Documents";
+    resolved = userDirectory("XDG_DOCUMENTS_DIR", "/Documents");
     break;
   case CSIDL_DESKTOP:
   case CSIDL_DESKTOPDIRECTORY:
-    resolved = std::string(home) + "/Desktop";
+    resolved = userDirectory("XDG_DESKTOP_DIR", "/Desktop");
     break;
   default:
     return E_FAIL;
@@ -1735,21 +2248,39 @@ HRESULT SHGetFolderPathW(HWND, const int folder, HANDLE, DWORD, wchar_t* const p
   if (wide.size() >= MAX_PATH) {
     return E_FAIL;
   }
+  // Windows' known folders always exist, and callers create only their own subfolders below them
+  // (the replay and saved-game folders, one level at a time); a home folder here may have no
+  // ~/.local/share or the documents folder (a fresh account, a container). The folders the engine
+  // writes below are made here; the desktop, which only Lua's SHGetFolderPath("DESKTOP") asks for,
+  // only with CSIDL_FLAG_CREATE, as Windows creates a missing folder only then.
+  const bool engineWritesBelow = kind == CSIDL_LOCAL_APPDATA || kind == CSIDL_APPDATA || kind == CSIDL_PERSONAL;
+  if (engineWritesBelow || (folder & CSIDL_FLAG_CREATE) != 0) {
+    std::error_code created;
+    std::filesystem::create_directories(resolved, created);
+  }
   std::wmemcpy(path, wide.c_str(), wide.size() + 1);
   return S_OK;
 }
 
-int SHFileOperationA(SHFILEOPSTRUCTA*)
+int SHFileOperationA(
+  SHFILEOPSTRUCTA*
+)
 {
   return static_cast<int>(ERROR_NOT_SUPPORTED);
 }
 
-int SHFileOperationW(SHFILEOPSTRUCTW*)
+int SHFileOperationW(
+  SHFILEOPSTRUCTW*
+)
 {
   return static_cast<int>(ERROR_NOT_SUPPORTED);
 }
 
-BOOL DosDateTimeToFileTime(const WORD fatDate, const WORD fatTime, FILETIME* const fileTime)
+BOOL DosDateTimeToFileTime(
+  const WORD fatDate,
+  const WORD fatTime,
+  FILETIME* const fileTime
+)
 {
   std::tm parts{};
   parts.tm_year = ((fatDate >> 9) & 0x7F) + 80;
@@ -1773,7 +2304,15 @@ BOOL DosDateTimeToFileTime(const WORD fatDate, const WORD fatTime, FILETIME* con
 
 // --- Messages ----------------------------------------------------------------------------
 
-DWORD FormatMessageA(const DWORD flags, const void*, const DWORD messageId, DWORD, char* const buffer, const DWORD size, va_list*)
+DWORD FormatMessageA(
+  const DWORD flags,
+  const void*,
+  const DWORD messageId,
+  DWORD,
+  char* const buffer,
+  const DWORD size,
+  va_list*
+)
 {
   const char* const text = std::strerror(static_cast<int>(messageId));
   const std::size_t length = std::strlen(text);
@@ -1795,7 +2334,15 @@ DWORD FormatMessageA(const DWORD flags, const void*, const DWORD messageId, DWOR
   return static_cast<DWORD>(copied);
 }
 
-DWORD FormatMessageW(const DWORD flags, const void*, const DWORD messageId, DWORD, wchar_t* const buffer, const DWORD size, va_list*)
+DWORD FormatMessageW(
+  const DWORD flags,
+  const void*,
+  const DWORD messageId,
+  DWORD,
+  wchar_t* const buffer,
+  const DWORD size,
+  va_list*
+)
 {
   const char* const text = std::strerror(static_cast<int>(messageId));
   const std::size_t length = std::strlen(text);
@@ -1823,13 +2370,17 @@ DWORD FormatMessageW(const DWORD flags, const void*, const DWORD messageId, DWOR
 
 // --- MSVC CRT names ----------------------------------------------------------------------
 
-char* _ctime64(const __time64_t* const time) noexcept
+char* _ctime64(
+  const __time64_t* const time
+) noexcept
 {
   const std::time_t value = static_cast<std::time_t>(*time);
   return std::ctime(&value);
 }
 
-void _ftime64(__timeb64* const out) noexcept
+void _ftime64(
+  __timeb64* const out
+) noexcept
 {
   timeval now{};
   ::gettimeofday(&now, nullptr);
@@ -1839,7 +2390,11 @@ void _ftime64(__timeb64* const out) noexcept
   out->dstflag = 0;
 }
 
-int fopen_s(std::FILE** const file, const char* const path, const char* const mode) noexcept
+int fopen_s(
+  std::FILE** const file,
+  const char* const path,
+  const char* const mode
+) noexcept
 {
   if (file == nullptr) {
     return EINVAL;
@@ -1848,12 +2403,21 @@ int fopen_s(std::FILE** const file, const char* const path, const char* const mo
   return *file != nullptr ? 0 : errno;
 }
 
-int _wfopen_s(std::FILE** const file, const wchar_t* const path, const wchar_t* const mode) noexcept
+int _wfopen_s(
+  std::FILE** const file,
+  const wchar_t* const path,
+  const wchar_t* const mode
+) noexcept
 {
   return fopen_s(file, NarrowPath(path).c_str(), NarrowPath(mode).c_str());
 }
 
-int strncpy_s(char* const dest, const std::size_t destSize, const char* const src, const std::size_t count) noexcept
+int strncpy_s(
+  char* const dest,
+  const std::size_t destSize,
+  const char* const src,
+  const std::size_t count
+) noexcept
 {
   if (dest == nullptr || destSize == 0) {
     return EINVAL;
@@ -1877,12 +2441,21 @@ int strncpy_s(char* const dest, const std::size_t destSize, const char* const sr
   return 0;
 }
 
-int strcpy_s(char* const dest, const std::size_t destSize, const char* const src) noexcept
+int strcpy_s(
+  char* const dest,
+  const std::size_t destSize,
+  const char* const src
+) noexcept
 {
   return strncpy_s(dest, destSize, src, src != nullptr ? std::strlen(src) : 0);
 }
 
-int vsprintf_s(char* const buffer, const std::size_t size, const char* const format, va_list arguments) noexcept
+int vsprintf_s(
+  char* const buffer,
+  const std::size_t size,
+  const char* const format,
+  va_list arguments
+) noexcept
 {
   if (buffer == nullptr || size == 0 || format == nullptr) {
     return -1;
@@ -1895,7 +2468,12 @@ int vsprintf_s(char* const buffer, const std::size_t size, const char* const for
   return written;
 }
 
-int sprintf_s(char* const buffer, const std::size_t size, const char* const format, ...) noexcept
+int sprintf_s(
+  char* const buffer,
+  const std::size_t size,
+  const char* const format,
+  ...
+) noexcept
 {
   va_list arguments;
   va_start(arguments, format);
@@ -1904,7 +2482,11 @@ int sprintf_s(char* const buffer, const std::size_t size, const char* const form
   return written;
 }
 
-int _memicmp(const void* const lhs, const void* const rhs, const std::size_t count) noexcept
+int _memicmp(
+  const void* const lhs,
+  const void* const rhs,
+  const std::size_t count
+) noexcept
 {
   const auto* const a = static_cast<const unsigned char*>(lhs);
   const auto* const b = static_cast<const unsigned char*>(rhs);
@@ -1918,7 +2500,10 @@ int _memicmp(const void* const lhs, const void* const rhs, const std::size_t cou
   return 0;
 }
 
-unsigned int _controlfp(const unsigned int newValue, const unsigned int mask) noexcept
+unsigned int _controlfp(
+  const unsigned int newValue,
+  const unsigned int mask
+) noexcept
 {
   // Windows x64: the rounding and exception-mask fields apply to the x87 control word and to
   // MXCSR; the precision field is not supported (ignored). Only the rounding field and the
@@ -1944,18 +2529,27 @@ namespace
 {
   constexpr std::uint64_t kFileTimeUnixEpoch = 116444736000000000ull; // 1970-01-01 in FILETIME ticks
 
-  void ToFileTime(const std::uint64_t ticks, FILETIME* const out) noexcept
+  void ToFileTime(
+    const std::uint64_t ticks,
+    FILETIME* const out
+  ) noexcept
   {
     out->dwLowDateTime = static_cast<DWORD>(ticks & 0xFFFFFFFFu);
     out->dwHighDateTime = static_cast<DWORD>(ticks >> 32);
   }
 
-  [[nodiscard]] std::uint64_t FromFileTime(const FILETIME& in) noexcept
+  [[nodiscard]] std::uint64_t FromFileTime(
+    const FILETIME& in
+  ) noexcept
   {
     return (static_cast<std::uint64_t>(in.dwHighDateTime) << 32) | in.dwLowDateTime;
   }
 
-  void ToSystemTime(const std::tm& parts, const unsigned milliseconds, SYSTEMTIME* const out) noexcept
+  void ToSystemTime(
+    const std::tm& parts,
+    const unsigned milliseconds,
+    SYSTEMTIME* const out
+  ) noexcept
   {
     out->wYear = static_cast<WORD>(parts.tm_year + 1900);
     out->wMonth = static_cast<WORD>(parts.tm_mon + 1);
@@ -1968,27 +2562,38 @@ namespace
   }
 } // namespace
 
-void GetSystemTimeAsFileTime(FILETIME* const fileTime)
+void GetSystemTimeAsFileTime(
+  FILETIME* const fileTime
+)
 {
   timespec now{};
   ::clock_gettime(CLOCK_REALTIME, &now);
   ToFileTime(
-    kFileTimeUnixEpoch + static_cast<std::uint64_t>(now.tv_sec) * 10000000ull + static_cast<std::uint64_t>(now.tv_nsec) / 100u,
+    kFileTimeUnixEpoch + static_cast<std::uint64_t>(now.tv_sec) * 10000000ull +
+      static_cast<std::uint64_t>(now.tv_nsec) / 100u,
     fileTime
   );
 }
 
-BOOL FileTimeToLocalFileTime(const FILETIME* const fileTime, FILETIME* const localFileTime)
+BOOL FileTimeToLocalFileTime(
+  const FILETIME* const fileTime,
+  FILETIME* const localFileTime
+)
 {
   const std::uint64_t ticks = FromFileTime(*fileTime);
   const std::time_t seconds = static_cast<std::time_t>((ticks - kFileTimeUnixEpoch) / 10000000ull);
   std::tm local{};
   ::localtime_r(&seconds, &local);
-  ToFileTime(ticks + static_cast<std::uint64_t>(static_cast<std::int64_t>(local.tm_gmtoff) * 10000000ll), localFileTime);
+  ToFileTime(
+    ticks + static_cast<std::uint64_t>(static_cast<std::int64_t>(local.tm_gmtoff) * 10000000ll), localFileTime
+  );
   return TRUE;
 }
 
-BOOL FileTimeToSystemTime(const FILETIME* const fileTime, SYSTEMTIME* const systemTime)
+BOOL FileTimeToSystemTime(
+  const FILETIME* const fileTime,
+  SYSTEMTIME* const systemTime
+)
 {
   const std::uint64_t ticks = FromFileTime(*fileTime);
   const std::time_t seconds = static_cast<std::time_t>((ticks - kFileTimeUnixEpoch) / 10000000ull);
@@ -1998,7 +2603,9 @@ BOOL FileTimeToSystemTime(const FILETIME* const fileTime, SYSTEMTIME* const syst
   return TRUE;
 }
 
-void GetLocalTime(SYSTEMTIME* const systemTime)
+void GetLocalTime(
+  SYSTEMTIME* const systemTime
+)
 {
   timespec now{};
   ::clock_gettime(CLOCK_REALTIME, &now);
@@ -2007,7 +2614,9 @@ void GetLocalTime(SYSTEMTIME* const systemTime)
   ToSystemTime(parts, static_cast<unsigned>(now.tv_nsec / 1000000), systemTime);
 }
 
-void GetSystemTime(SYSTEMTIME* const systemTime)
+void GetSystemTime(
+  SYSTEMTIME* const systemTime
+)
 {
   timespec now{};
   ::clock_gettime(CLOCK_REALTIME, &now);
@@ -2016,7 +2625,11 @@ void GetSystemTime(SYSTEMTIME* const systemTime)
   ToSystemTime(parts, static_cast<unsigned>(now.tv_nsec / 1000000), systemTime);
 }
 
-BOOL GetFileAttributesExA(const char* const path, const GET_FILEEX_INFO_LEVELS level, void* const information)
+BOOL GetFileAttributesExA(
+  const char* const path,
+  const GET_FILEEX_INFO_LEVELS level,
+  void* const information
+)
 {
   if (level != GetFileExInfoStandard || information == nullptr) {
     tLastError = ERROR_INVALID_PARAMETER;
@@ -2034,7 +2647,8 @@ BOOL GetFileAttributesExA(const char* const path, const GET_FILEEX_INFO_LEVELS l
     data->dwFileAttributes |= FILE_ATTRIBUTE_READONLY;
   }
   const auto toTicks = [](const timespec& time) {
-    return kFileTimeUnixEpoch + static_cast<std::uint64_t>(time.tv_sec) * 10000000ull + static_cast<std::uint64_t>(time.tv_nsec) / 100u;
+    return kFileTimeUnixEpoch + static_cast<std::uint64_t>(time.tv_sec) * 10000000ull +
+      static_cast<std::uint64_t>(time.tv_nsec) / 100u;
   };
   ToFileTime(toTicks(status.st_ctim), &data->ftCreationTime);
   ToFileTime(toTicks(status.st_atim), &data->ftLastAccessTime);
@@ -2045,12 +2659,170 @@ BOOL GetFileAttributesExA(const char* const path, const GET_FILEEX_INFO_LEVELS l
   return TRUE;
 }
 
-BOOL GetFileAttributesExW(const wchar_t* const path, const GET_FILEEX_INFO_LEVELS level, void* const information)
+BOOL GetFileAttributesExW(
+  const wchar_t* const path,
+  const GET_FILEEX_INFO_LEVELS level,
+  void* const information
+)
 {
   return GetFileAttributesExA(NarrowPath(path).c_str(), level, information);
 }
 
-void GetCurrentProcessorNumberEx(PROCESSOR_NUMBER* const number)
+namespace
+{
+  // One FindFirstFileA search: the folder and the wildcard its entries are matched against.
+  struct Win32FindSearch
+  {
+    DIR* directory = nullptr;
+    std::string folder;  // with a trailing '/'
+    std::string pattern; // the last component of the request, '*' and '?' wildcards
+  };
+
+  // The next entry of `search` that matches its pattern, case-insensitively as on Windows.
+  [[nodiscard]] bool NextMatch(
+    Win32FindSearch& search,
+    WIN32_FIND_DATAA* const found
+  )
+  {
+    while (dirent* const entry = ::readdir(search.directory)) {
+      if (::fnmatch(search.pattern.c_str(), entry->d_name, FNM_CASEFOLD) != 0) {
+        continue;
+      }
+      WIN32_FILE_ATTRIBUTE_DATA attributes{};
+      if (!GetFileAttributesExA((search.folder + entry->d_name).c_str(), GetFileExInfoStandard, &attributes)) {
+        continue; // gone since the listing
+      }
+      *found = WIN32_FIND_DATAA{};
+      found->dwFileAttributes = attributes.dwFileAttributes;
+      found->ftCreationTime = attributes.ftCreationTime;
+      found->ftLastAccessTime = attributes.ftLastAccessTime;
+      found->ftLastWriteTime = attributes.ftLastWriteTime;
+      found->nFileSizeHigh = attributes.nFileSizeHigh;
+      found->nFileSizeLow = attributes.nFileSizeLow;
+      std::snprintf(found->cFileName, sizeof(found->cFileName), "%s", entry->d_name);
+      return true;
+    }
+    return false;
+  }
+} // namespace
+
+HANDLE FindFirstFileA(
+  const char* const fileName,
+  WIN32_FIND_DATAA* const found
+)
+{
+  if (fileName == nullptr || found == nullptr) {
+    tLastError = ERROR_INVALID_PARAMETER;
+    return INVALID_HANDLE_VALUE;
+  }
+  std::string request(fileName);
+  std::replace(request.begin(), request.end(), '\\', '/');
+  const std::size_t slash = request.find_last_of('/');
+  auto search = std::make_unique<Win32FindSearch>();
+  // Only the folder part is a path to resolve; the last part is the wildcard.
+  search->folder = (slash == std::string::npos) ? std::string(".") : SlashPath(request.substr(0, slash).c_str());
+  search->pattern = (slash == std::string::npos) ? request : request.substr(slash + 1);
+  search->directory = ::opendir(search->folder.c_str());
+  if (search->directory == nullptr) {
+    SetErrnoError();
+    return INVALID_HANDLE_VALUE;
+  }
+  search->folder += '/';
+  if (!NextMatch(*search, found)) {
+    ::closedir(search->directory);
+    tLastError = ERROR_FILE_NOT_FOUND;
+    return INVALID_HANDLE_VALUE;
+  }
+  return search.release();
+}
+
+BOOL FindNextFileA(
+  const HANDLE handle,
+  WIN32_FIND_DATAA* const found
+)
+{
+  if (handle == nullptr || handle == INVALID_HANDLE_VALUE || found == nullptr) {
+    tLastError = ERROR_INVALID_HANDLE;
+    return FALSE;
+  }
+  if (!NextMatch(*static_cast<Win32FindSearch*>(handle), found)) {
+    tLastError = ERROR_NO_MORE_FILES;
+    return FALSE;
+  }
+  return TRUE;
+}
+
+namespace
+{
+  void WidenFound(
+    const WIN32_FIND_DATAA& narrow,
+    WIN32_FIND_DATAW* const wide
+  )
+  {
+    *wide = WIN32_FIND_DATAW{};
+    wide->dwFileAttributes = narrow.dwFileAttributes;
+    wide->ftCreationTime = narrow.ftCreationTime;
+    wide->ftLastAccessTime = narrow.ftLastAccessTime;
+    wide->ftLastWriteTime = narrow.ftLastWriteTime;
+    wide->nFileSizeHigh = narrow.nFileSizeHigh;
+    wide->nFileSizeLow = narrow.nFileSizeLow;
+    const std::wstring name = WidenUtf8(narrow.cFileName);
+    const std::size_t count = (std::min)(name.size(), static_cast<std::size_t>(MAX_PATH - 1));
+    std::copy_n(name.c_str(), count, wide->cFileName);
+    wide->cFileName[count] = L'\0';
+  }
+} // namespace
+
+HANDLE FindFirstFileW(
+  const wchar_t* const fileName,
+  WIN32_FIND_DATAW* const found
+)
+{
+  if (fileName == nullptr || found == nullptr) {
+    tLastError = ERROR_INVALID_PARAMETER;
+    return INVALID_HANDLE_VALUE;
+  }
+  WIN32_FIND_DATAA narrow{};
+  const HANDLE search = FindFirstFileA(NarrowPath(fileName).c_str(), &narrow);
+  if (search != INVALID_HANDLE_VALUE) {
+    WidenFound(narrow, found);
+  }
+  return search;
+}
+
+BOOL FindNextFileW(
+  const HANDLE search,
+  WIN32_FIND_DATAW* const found
+)
+{
+  if (found == nullptr) {
+    tLastError = ERROR_INVALID_PARAMETER;
+    return FALSE;
+  }
+  WIN32_FIND_DATAA narrow{};
+  if (!FindNextFileA(search, &narrow)) {
+    return FALSE;
+  }
+  WidenFound(narrow, found);
+  return TRUE;
+}
+
+BOOL FindClose(
+  const HANDLE handle
+)
+{
+  if (handle == nullptr || handle == INVALID_HANDLE_VALUE) {
+    return FALSE;
+  }
+  auto* const search = static_cast<Win32FindSearch*>(handle);
+  ::closedir(search->directory);
+  delete search;
+  return TRUE;
+}
+
+void GetCurrentProcessorNumberEx(
+  PROCESSOR_NUMBER* const number
+)
 {
   const int cpu = ::sched_getcpu();
   number->Group = 0;
@@ -2058,7 +2830,11 @@ void GetCurrentProcessorNumberEx(PROCESSOR_NUMBER* const number)
   number->Reserved = 0;
 }
 
-BOOL SetThreadGroupAffinity(const HANDLE thread, const GROUP_AFFINITY* const affinity, GROUP_AFFINITY* const previous)
+BOOL SetThreadGroupAffinity(
+  const HANDLE thread,
+  const GROUP_AFFINITY* const affinity,
+  GROUP_AFFINITY* const previous
+)
 {
   if (affinity == nullptr || affinity->Group != 0) {
     tLastError = ERROR_INVALID_PARAMETER;
@@ -2075,7 +2851,11 @@ BOOL SetThreadGroupAffinity(const HANDLE thread, const GROUP_AFFINITY* const aff
   return TRUE;
 }
 
-BOOL SetThreadIdealProcessorEx(const HANDLE thread, PROCESSOR_NUMBER* const ideal, PROCESSOR_NUMBER* const previous)
+BOOL SetThreadIdealProcessorEx(
+  const HANDLE thread,
+  PROCESSOR_NUMBER* const ideal,
+  PROCESSOR_NUMBER* const previous
+)
 {
   if (thread != kCurrentThreadPseudoHandle || ideal == nullptr || ideal->Group != 0) {
     tLastError = ERROR_INVALID_PARAMETER;
@@ -2087,7 +2867,10 @@ BOOL SetThreadIdealProcessorEx(const HANDLE thread, PROCESSOR_NUMBER* const idea
   return TRUE;
 }
 
-BOOL GetNumaProcessorNode(UCHAR, UCHAR* const nodeNumber)
+BOOL GetNumaProcessorNode(
+  UCHAR,
+  UCHAR* const nodeNumber
+)
 {
   if (nodeNumber != nullptr) {
     *nodeNumber = 0;
@@ -2095,7 +2878,10 @@ BOOL GetNumaProcessorNode(UCHAR, UCHAR* const nodeNumber)
   return TRUE;
 }
 
-BOOL GetNumaNodeProcessorMask(const UCHAR node, ULONGLONG* const processorMask)
+BOOL GetNumaNodeProcessorMask(
+  const UCHAR node,
+  ULONGLONG* const processorMask
+)
 {
   if (node != 0 || processorMask == nullptr) {
     return FALSE;
@@ -2107,7 +2893,12 @@ BOOL GetNumaNodeProcessorMask(const UCHAR node, ULONGLONG* const processorMask)
   return TRUE;
 }
 
-int _vsnprintf(char* const buffer, const std::size_t count, const char* const format, va_list arguments) noexcept
+int _vsnprintf(
+  char* const buffer,
+  const std::size_t count,
+  const char* const format,
+  va_list arguments
+) noexcept
 {
   // MSVC: the text, terminated when it is shorter than `count`; exactly `count` characters
   // and no terminator when it fills the buffer; -1 (and `count` characters) when it does not fit.
@@ -2130,13 +2921,23 @@ int _vsnprintf(char* const buffer, const std::size_t count, const char* const fo
   }
   return length == count ? needed : -1;
 }
-int _vsnwprintf(wchar_t* const buffer, const std::size_t count, const wchar_t* const format, va_list arguments) noexcept
+int _vsnwprintf(
+  wchar_t* const buffer,
+  const std::size_t count,
+  const wchar_t* const format,
+  va_list arguments
+) noexcept
 {
   const int written = std::vswprintf(buffer, count, format, arguments);
   return written < 0 ? -1 : written;
 }
 
-int _snprintf(char* const buffer, const std::size_t count, const char* const format, ...) noexcept
+int _snprintf(
+  char* const buffer,
+  const std::size_t count,
+  const char* const format,
+  ...
+) noexcept
 {
   va_list arguments;
   va_start(arguments, format);
@@ -2154,13 +2955,18 @@ namespace
     std::size_t next = 0;
   };
 
-  [[nodiscard]] __time64_t ToTime64(const struct timespec& time) noexcept
+  [[nodiscard]] __time64_t ToTime64(
+    const struct timespec& time
+  ) noexcept
   {
     return static_cast<__time64_t>(time.tv_sec);
   }
 } // namespace
 
-std::intptr_t _findfirst64(const char* const spec, __finddata64_t* const data)
+std::intptr_t _findfirst64(
+  const char* const spec,
+  __finddata64_t* const data
+)
 {
   if (spec == nullptr || data == nullptr) {
     errno = EINVAL;
@@ -2168,7 +2974,9 @@ std::intptr_t _findfirst64(const char* const spec, __finddata64_t* const data)
   }
   const std::string path = SlashPath(spec);
   const std::size_t slash = path.find_last_of('/');
-  const std::string directory = slash == std::string::npos ? std::string(".") : slash == 0 ? std::string("/") : path.substr(0, slash);
+  const std::string directory = slash == std::string::npos ? std::string(".")
+    : slash == 0                                           ? std::string("/")
+                                                           : path.substr(0, slash);
   std::string pattern = slash == std::string::npos ? path : path.substr(slash + 1);
   if (pattern == "*.*") {
     pattern = "*";
@@ -2219,7 +3027,10 @@ std::intptr_t _findfirst64(const char* const spec, __finddata64_t* const data)
   return reinterpret_cast<std::intptr_t>(search.release());
 }
 
-int _findnext64(const std::intptr_t handle, __finddata64_t* const data)
+int _findnext64(
+  const std::intptr_t handle,
+  __finddata64_t* const data
+)
 {
   auto* const search = reinterpret_cast<FindSearch*>(handle);
   if (handle == -1 || search == nullptr || data == nullptr) {
@@ -2234,7 +3045,9 @@ int _findnext64(const std::intptr_t handle, __finddata64_t* const data)
   return 0;
 }
 
-int _findclose(const std::intptr_t handle)
+int _findclose(
+  const std::intptr_t handle
+)
 {
   if (handle == -1 || handle == 0) {
     errno = EINVAL;
@@ -2252,7 +3065,11 @@ char** __argv = nullptr;
 
 namespace
 {
-  __attribute__((constructor(101))) void CaptureCommandLine(const int argc, char** const argv, char**)
+  __attribute__((constructor(101))) void CaptureCommandLine(
+    const int argc,
+    char** const argv,
+    char**
+  )
   {
     __argc = argc;
     __argv = argv;
@@ -2262,7 +3079,9 @@ namespace
 // MSVC's polymorphic typeid entry point (gpg/core/reflection/Reflection.cpp calls it on objects
 // of unknown dynamic type). In the Itanium ABI every vtable of an object, primary or secondary,
 // holds the complete object's type_info in the slot before its address point.
-extern "C" void* __RTtypeid(void* const object)
+extern "C" void* __RTtypeid(
+  void* const object
+)
 {
   if (object == nullptr) {
     throw std::bad_typeid();
@@ -2271,4 +3090,4 @@ extern "C" void* __RTtypeid(void* const object)
   return vtable[-1];
 }
 
-#endif // !defined(_WIN32)
+#endif // !FAFRE_PLATFORM_WINDOWS

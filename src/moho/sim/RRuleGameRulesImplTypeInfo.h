@@ -40,7 +40,7 @@ namespace moho
     const char* GetName() const override;
 
     /**
-       * Address: 0x0052B640 (FUN_0052B640)
+     * Address: 0x0052B640 (FUN_0052B640)
      *
      * What it does:
      * Sets RRuleGameRulesImpl size metadata, registers the RRuleGameRules base,

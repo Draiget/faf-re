@@ -20,7 +20,9 @@ namespace moho
    * What it does:
    * Subscribes this listener to the session's pause broadcaster (+0x08).
    */
-  void PauseListener::AttachToSessionListenerLane(CWldSession* const session)
+  void PauseListener::AttachToSessionListenerLane(
+    CWldSession* const session
+  )
   {
     session->mPauseBroadcaster.AddListener(this);
   }
@@ -32,7 +34,9 @@ namespace moho
    * Detaches this pause-listener node from its current lane and leaves it
    * self-linked.
    */
-  void PauseListener::DetachFromSessionListenerLane(CWldSession* const)
+  void PauseListener::DetachFromSessionListenerLane(
+    CWldSession* const
+  )
   {
     ListUnlink();
   }
@@ -51,16 +55,16 @@ namespace moho
    * `LuaFunction::Call_Bool` forwarder idiom; the module/key LuaObjects are
    * released before the call, matching the original destructor ordering.
    */
-  void PauseListener::OnEvent(const SPauseEvent event)
+  void PauseListener::OnEvent(
+    const SPauseEvent event
+  )
   {
     // The whole body is guarded (runtime_error, try states 0..5, handler
     // 0x008696DA).
     try {
       LuaPlus::LuaState* const luaState = WLD_GetSession()->mState;
 
-      LuaPlus::LuaFunction onUserPauseFn(
-        SCR_Import(luaState, "/lua/ui/game/gamemain.lua")["OnUserPause"]
-      );
+      LuaPlus::LuaFunction onUserPauseFn(SCR_Import(luaState, "/lua/ui/game/gamemain.lua")["OnUserPause"]);
       onUserPauseFn.Call_Bool(event.mPaused);
     } catch (const fa::runtime_error& error) {
       gpg::Warnf("Error running '/lua/ui/game/gamemain.lua:OnUserPause': %s", error.what());

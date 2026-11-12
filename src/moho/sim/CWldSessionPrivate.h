@@ -140,21 +140,21 @@
 #include "remote/client/SessionSummary.h"
 #endif
 
-  /**
-   * One formation-placement ghost: the preview mesh `MeshRenderer` handed back
-   * and the "UnitFormationPreview" material it was shaded with.
-   *
-   * The implicit destructor is the binary's FUN_00859E90 - it drops the
-   * last-declared member first (`mMaterial`, then `mMesh`), which is exactly
-   * what MSVC emits for this member order. No source line spells it out.
-   */
-  struct SFormationPreviewGhost
-  {
-    boost::shared_ptr<moho::MeshInstance> mMesh;     // +0x00
-    boost::shared_ptr<moho::MeshMaterial> mMaterial; // +0x08
-  };
-  static_assert(sizeof(SFormationPreviewGhost) == 0x10, "SFormationPreviewGhost size must be 0x10");
-  extern fa::vector<SFormationPreviewGhost> gFormationPreviews;
+/**
+ * One formation-placement ghost: the preview mesh `MeshRenderer` handed back
+ * and the "UnitFormationPreview" material it was shaded with.
+ *
+ * The implicit destructor is the binary's FUN_00859E90 - it drops the
+ * last-declared member first (`mMaterial`, then `mMesh`), which is exactly
+ * what MSVC emits for this member order. No source line spells it out.
+ */
+struct SFormationPreviewGhost
+{
+  boost::shared_ptr<moho::MeshInstance> mMesh;     // +0x00
+  boost::shared_ptr<moho::MeshMaterial> mMaterial; // +0x08
+};
+static_assert(sizeof(SFormationPreviewGhost) == 0x10, "SFormationPreviewGhost size must be 0x10");
+extern fa::vector<SFormationPreviewGhost> gFormationPreviews;
 namespace moho
 {
   /** Engine addition (replay timeline): a new sim is on its way behind the session, which takes no beats until then. */
@@ -228,8 +228,14 @@ namespace moho
   };
 
   static_assert(sizeof(UICommandGraphNode) == 0x54, "UICommandGraphNode size must be 0x54");
-  static_assert(offsetof(UICommandGraphNode, mWaypointTexture) == 0x44, "UICommandGraphNode::mWaypointTexture offset must be 0x44");
-  static_assert(offsetof(UICommandGraphNode, mArrowheadTexture) == 0x4C, "UICommandGraphNode::mArrowheadTexture offset must be 0x4C");
+  static_assert(
+    offsetof(UICommandGraphNode, mWaypointTexture) == 0x44,
+    "UICommandGraphNode::mWaypointTexture offset must be 0x44"
+  );
+  static_assert(
+    offsetof(UICommandGraphNode, mArrowheadTexture) == 0x4C,
+    "UICommandGraphNode::mArrowheadTexture offset must be 0x4C"
+  );
 
   class UICommandGraph
   {
@@ -242,7 +248,10 @@ namespace moho
      * decompile's declared first parameter is misleading here.
      */
     friend void DrawPathPreview(
-      UICommandGraph& graph, const GeomCamera3& camera, CD3DPrimBatcher& batcher, std::int32_t tick,
+      UICommandGraph& graph,
+      const GeomCamera3& camera,
+      CD3DPrimBatcher& batcher,
+      std::int32_t tick,
       float tickFraction
     );
 
@@ -251,9 +260,7 @@ namespace moho
      * `DragRelease`'s worker in UiRuntimeTypes.cpp) needs `mSession` and
      * `mMapAB0` plus the hash primitives below.
      */
-    friend void ProcessCommandDrag(
-      const Wm3::Vector3f& mouse, UICommandGraph& graph, CmdId cmdId, bool released
-    );
+    friend void ProcessCommandDrag(const Wm3::Vector3f& mouse, UICommandGraph& graph, CmdId cmdId, bool released);
 
     /**
      * `sub_82A030` (`UICommandDragger::OnCurrentDraggerReplaced`'s worker in
@@ -294,14 +301,14 @@ namespace moho
      */
     struct UICommandGraphDrawNode
     {
-      CmdId mCommandId;                    // +0x00
+      CmdId mCommandId; // +0x00
       /// The command's issue helper; its chain holds every draw node for it.
       WeakPtr<UserCommandIssueHelper> mHelperLink; // +0x04
-      Wm3::Vector3f mPositionSum;          // +0x0C
-      float mWeight;                       // +0x18
-      std::uint8_t mHasResolvedPosition;   // +0x1C
-      std::uint8_t mIsChainBoundary;       // +0x1D
-      std::uint8_t mIsVisible;             // +0x1E
+      Wm3::Vector3f mPositionSum;                  // +0x0C
+      float mWeight;                               // +0x18
+      std::uint8_t mHasResolvedPosition;           // +0x1C
+      std::uint8_t mIsChainBoundary;               // +0x1D
+      std::uint8_t mIsVisible;                     // +0x1E
       /**
        * The node's drawable mesh, owned strongly. `sub_826550` decrements the
        * control block's use count at +0x04 and calls disposal on last release.
@@ -316,22 +323,22 @@ namespace moho
        * uses it in place of the computed from/to tangent whenever it's
        * non-zero.
        */
-      Wm3::Vector3f mOrientationHint;      // +0x28
-      Wm3::Vector3f mPreviousCentroid;     // +0x34
+      Wm3::Vector3f mOrientationHint;  // +0x28
+      Wm3::Vector3f mPreviousCentroid; // +0x34
       /**
        * Render scale driven by how busy the node is: `RecomputeDrawNodeOrientation`
        * sets it to `sqrt(units on the busier edge lane)`, and the waypoint and
        * ETA-label passes multiply their style scale by it. Was `field_0x40`
        * until 0x008275B0's write at 0x008279E8 pinned the meaning.
        */
-      float mUnitCountScale;               // +0x40
+      float mUnitCountScale; // +0x40
       /**
        * The game tick this order is estimated to finish on, propagated through
        * the edge graph by `ResolveDrawNodeCompletionTick`. `DisplayCommandNode`
        * subtracts the current tick from it to render "ETA: mm:ss". Was
        * `field_0x44` until 0x008272A0's write at 0x008272E0 pinned the meaning.
        */
-      std::uint32_t mCompletionTick;       // +0x44
+      std::uint32_t mCompletionTick; // +0x44
       /**
        * The two edge lists: `mLaneA` holds the edges arriving here, `mLaneB`
        * the edges leaving. Each holds one inline edge, with 8-byte alignment;
@@ -379,8 +386,8 @@ namespace moho
       /// call `SetTexture(boost::shared_ptr<ID3DTextureSheet>)` at 0x00829226
       /// and 0x00829396, and only the flat-white node pass at 0x0082952C takes
       /// the `CD3DBatchTexture` overload.
-      boost::SharedPtrRaw<ID3DTextureSheet> mTexture;   // +0x00
-      fa::vector<CommandGraphEdge*> mEdges;          // +0x08
+      boost::SharedPtrRaw<ID3DTextureSheet> mTexture; // +0x00
+      fa::vector<CommandGraphEdge*> mEdges;           // +0x08
     };
     static_assert(sizeof(CommandGraphTreeBucket) == 0x18, "CommandGraphTreeBucket size must be 0x18");
 
@@ -431,10 +438,10 @@ namespace moho
        * it back (clamped to `ui_CommandGraphMaxNodeUnits`) as the edge's
        * apparent unit weight in 0x008275B0's orientation-hint accumulation.
        */
-      std::uint32_t mTouchCount{};          // +0x00, confirmed by FUN_00826960/FUN_008275B0
-      float mBaseWidth{};                   // +0x04, confirmed by FUN_008288D0.c:85 and FUN_00826960
-      UICommandGraphDrawNode* mFromNode{};  // +0x08
-      UICommandGraphDrawNode* mToNode{};    // +0x0C
+      std::uint32_t mTouchCount{};         // +0x00, confirmed by FUN_00826960/FUN_008275B0
+      float mBaseWidth{};                  // +0x04, confirmed by FUN_008288D0.c:85 and FUN_00826960
+      UICommandGraphDrawNode* mFromNode{}; // +0x08
+      UICommandGraphDrawNode* mToNode{};   // +0x0C
       /**
        * Per-lane bundle-spacing index, both written by 0x008275B0 as
        * `(loopIndex / max(laneCount - 1, 1)) - 0.5`: `mLaneBDistribution`
@@ -442,8 +449,8 @@ namespace moho
        * endpoint), `mLaneADistribution` while walking `mToNode->mLaneA`
        * (this edge seen from its "to" endpoint).
        */
-      float mLaneBDistribution{};           // +0x10, confirmed by FUN_008275B0
-      float mLaneADistribution{};           // +0x14, confirmed by FUN_008275B0
+      float mLaneBDistribution{}; // +0x10, confirmed by FUN_008275B0
+      float mLaneADistribution{}; // +0x14, confirmed by FUN_008275B0
       /**
        * When set, 0x008288D0 skips `ResolveDrawNodeHighlightState` entirely
        * and draws this edge with the owning `CommandGraphNode`'s
@@ -453,17 +460,26 @@ namespace moho
        * per-edge override color/alpha; neither offset is actually read
        * anywhere in 0x008288D0, so that guess has been dropped).
        */
-      bool mForceHighlightStyle{};           // +0x18
-      std::uint8_t mUnknown19_1B[0x03]{};    // +0x19, unconfirmed - not touched by FUN_00826960/FUN_008275B0
+      bool mForceHighlightStyle{};        // +0x18
+      std::uint8_t mUnknown19_1B[0x03]{}; // +0x19, unconfirmed - not touched by FUN_00826960/FUN_008275B0
     };
 
     static_assert(sizeof(CommandGraphEdge) == 0x1C, "CommandGraphEdge size must be 0x1C");
     static_assert(offsetof(CommandGraphEdge, mBaseWidth) == 0x04, "CommandGraphEdge::mBaseWidth offset must be 0x04");
     static_assert(offsetof(CommandGraphEdge, mFromNode) == 0x08, "CommandGraphEdge::mFromNode offset must be 0x08");
     static_assert(offsetof(CommandGraphEdge, mToNode) == 0x0C, "CommandGraphEdge::mToNode offset must be 0x0C");
-    static_assert(offsetof(CommandGraphEdge, mLaneBDistribution) == 0x10, "CommandGraphEdge::mLaneBDistribution offset must be 0x10");
-    static_assert(offsetof(CommandGraphEdge, mLaneADistribution) == 0x14, "CommandGraphEdge::mLaneADistribution offset must be 0x14");
-    static_assert(offsetof(CommandGraphEdge, mForceHighlightStyle) == 0x18, "CommandGraphEdge::mForceHighlightStyle offset must be 0x18");
+    static_assert(
+      offsetof(CommandGraphEdge, mLaneBDistribution) == 0x10,
+      "CommandGraphEdge::mLaneBDistribution offset must be 0x10"
+    );
+    static_assert(
+      offsetof(CommandGraphEdge, mLaneADistribution) == 0x14,
+      "CommandGraphEdge::mLaneADistribution offset must be 0x14"
+    );
+    static_assert(
+      offsetof(CommandGraphEdge, mForceHighlightStyle) == 0x18,
+      "CommandGraphEdge::mForceHighlightStyle offset must be 0x18"
+    );
 
     using DrawNodeMap = fa::hash_map<UserCommandIssueHelper*, UICommandGraphDrawNode>;
     using DrawNodePair = std::pair<UICommandGraphDrawNode*, UICommandGraphDrawNode*>;
@@ -501,9 +517,7 @@ namespace moho
      * other friends above because it names `UICommandGraphDrawNode`, which is
      * only complete from this point on.
      */
-    friend std::int32_t EstimateDrawNodeWorkTicks(
-      UICommandGraph& graph, UICommandGraphDrawNode& drawNode
-    );
+    friend std::int32_t EstimateDrawNodeWorkTicks(UICommandGraph& graph, UICommandGraphDrawNode& drawNode);
 
     /**
      * `LinkCommandGraphEdge` (0x00826960) needs `mMapC`/`mMapD`/`mNodes` and
@@ -514,7 +528,10 @@ namespace moho
      * out-of-line definition, for the full address decomposition.
      */
     friend void LinkCommandGraphEdge(
-      UICommandGraphDrawNode& toNode, UICommandGraphDrawNode& fromNode, UICommandGraph& graph, bool forceHighlight
+      UICommandGraphDrawNode& toNode,
+      UICommandGraphDrawNode& fromNode,
+      UICommandGraph& graph,
+      bool forceHighlight
     );
 
     /**
@@ -574,7 +591,7 @@ namespace moho
      * field.
      */
     [[nodiscard]] ECommandNodeHighlightState
-      ResolveDrawNodeHighlightState(const UICommandGraphDrawNode& drawNode) const;
+    ResolveDrawNodeHighlightState(const UICommandGraphDrawNode& drawNode) const;
 
   private:
     /**
@@ -633,7 +650,8 @@ namespace moho
      * vector.
      */
     static CommandGraphTreeBucket* InitCommandGraphTreeBucketValue(
-      CommandGraphTreeBucket* destination, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
+      CommandGraphTreeBucket* destination,
+      const boost::SharedPtrRaw<ID3DTextureSheet>& texture
     );
 
     /**
@@ -673,7 +691,10 @@ namespace moho
      * explicitly via `sub_82D330` (`InitCommandGraphTreeBucketValue` above).
      */
     static CommandGraphTreeNode* AttachCommandGraphNodeAt(
-      CommandGraphTree& tree, bool addLeft, CommandGraphTreeNode* where, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
+      CommandGraphTree& tree,
+      bool addLeft,
+      CommandGraphTreeNode* where,
+      const boost::SharedPtrRaw<ID3DTextureSheet>& texture
     );
 
     /**
@@ -688,7 +709,7 @@ namespace moho
      * for this map instantiation.
      */
     static CommandGraphTreeNode*
-      AttachCommandGraphNodeUnique(CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture);
+    AttachCommandGraphNodeUnique(CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture);
 
     /**
      * Address: 0x0082CC80 (FUN_0082CC80, sub_82CC80)
@@ -704,7 +725,9 @@ namespace moho
      * `lower_bound` result feeding straight back in as the hint.
      */
     static CommandGraphTreeNode* AttachCommandGraphNodeHinted(
-      CommandGraphTree& tree, CommandGraphTreeNode* hint, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
+      CommandGraphTree& tree,
+      CommandGraphTreeNode* hint,
+      const boost::SharedPtrRaw<ID3DTextureSheet>& texture
     );
 
     /**
@@ -721,7 +744,7 @@ namespace moho
      * `CommandGraphTreeBucket::mEdges.push_back` (0x0082BCB0).
      */
     static fa::vector<CommandGraphEdge*>&
-      FindOrInsertCommandGraphBucket(CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture);
+    FindOrInsertCommandGraphBucket(CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture);
 
     /**
      * Address: 0x00824740 (FUN_00824740, func_OnCommandGraphShow)
@@ -884,7 +907,8 @@ namespace moho
      * screen size via the camera's viewport perspective-width row, colored
      * and scaled by `ResolveDrawNodeHighlightState`.
      */
-    void DrawWaypointMarker(const GeomCamera3& camera, CD3DPrimBatcher& batcher, UICommandGraphDrawNode& drawNode) const;
+    void
+    DrawWaypointMarker(const GeomCamera3& camera, CD3DPrimBatcher& batcher, UICommandGraphDrawNode& drawNode) const;
 
     /**
      * Address: 0x00828DD0 (FUN_00828DD0, sub_828DD0)
@@ -902,7 +926,11 @@ namespace moho
      * What it does:
      * Draws the "ETA: mm:ss" text label above one command-graph draw node.
      */
-    void DisplayCommandNode(const GeomCamera3& camera, const UICommandGraphDrawNode& drawNode, CD3DPrimBatcher& batcher) const;
+    void DisplayCommandNode(
+      const GeomCamera3& camera,
+      const UICommandGraphDrawNode& drawNode,
+      CD3DPrimBatcher& batcher
+    ) const;
 
     /**
      * Address: 0x008288D0 (FUN_008288D0, sub_8288D0)
@@ -912,8 +940,12 @@ namespace moho
      * nodes' averaged positions.
      */
     void DrawCommandOrderline(
-      const GeomCamera3& camera, CD3DPrimBatcher& batcher, std::int32_t tick, float tickFraction,
-      const CommandGraphEdge& edge, bool isGlow
+      const GeomCamera3& camera,
+      CD3DPrimBatcher& batcher,
+      std::int32_t tick,
+      float tickFraction,
+      const CommandGraphEdge& edge,
+      bool isGlow
     ) const;
 
   public:
@@ -936,7 +968,8 @@ namespace moho
      * siblings above, which are only ever called from here): its real caller
      * is `CWldSession::RenderCommandGraph` (0x0085AF40), outside this class.
      */
-    void DrawCommandGraphMesh(const GeomCamera3& camera, CD3DPrimBatcher& batcher, std::int32_t tick, float tickFraction);
+    void
+    DrawCommandGraphMesh(const GeomCamera3& camera, CD3DPrimBatcher& batcher, std::int32_t tick, float tickFraction);
     void DrawPreOrderLines(const GeomCamera3& camera, CD3DPrimBatcher& batcher, std::int32_t tick, float tickFraction, bool isGlow) const;
     void DrawPreOrderWaypointMarkers(const GeomCamera3& camera, CD3DPrimBatcher& batcher) const;
     void UpdatePreOrderBuildMeshes();
@@ -969,9 +1002,8 @@ namespace moho
      *
      * Returns the winning node's command id, or -1 when none qualifies.
      */
-    [[nodiscard]] CmdId ResolveCursorHighlightCommandId(
-      const GeomCamera3& camera, const Wm3::Vector2f& cursorScreenPos
-    ) const;
+    [[nodiscard]] CmdId
+    ResolveCursorHighlightCommandId(const GeomCamera3& camera, const Wm3::Vector2f& cursorScreenPos) const;
 
   private:
     std::uint8_t mNeedsRebuild; // +0x0000
@@ -979,11 +1011,11 @@ namespace moho
     CommandGraphNode mNodes[40];        // +0x0004
     CWldSession* mSession;              // +0x0D24
     void* mSessionRes1;                 // +0x0D28
-    CountedPtr<CD3DFont> mDebugFont;               // +0x0D2C
-    DrawNodeMap mMapAB0;  // +0x0D30
-    DrawNodeMap mMapAB1;  // +0x0D58
-    EdgeMap mMapC;    // +0x0D80
-    WidthMap mMapD;    // +0x0DA8
+    CountedPtr<CD3DFont> mDebugFont;    // +0x0D2C
+    DrawNodeMap mMapAB0;                // +0x0D30
+    DrawNodeMap mMapAB1;                // +0x0D58
+    EdgeMap mMapC;                      // +0x0D80
+    WidthMap mMapD;                     // +0x0DA8
     CommandGraphTree mCommandGraphTree; // +0x0DD0
   };
 
@@ -1029,11 +1061,12 @@ namespace moho
     "UICommandGraphDrawNode::mLaneB offset must be 0x60"
   );
   static_assert(
-    sizeof(UICommandGraph::CommandGraphTreeNode) == 0x28, "UICommandGraph::CommandGraphTreeNode size must be 0x28"
+    sizeof(UICommandGraph::CommandGraphTreeNode) == 0x28,
+    "UICommandGraph::CommandGraphTreeNode size must be 0x28"
   );
   static_assert(sizeof(UICommandGraph::CommandGraphTree) == 0x0C, "UICommandGraph::CommandGraphTree size must be 0x0C");
   static_assert(sizeof(UICommandGraph) == 0xDDC, "UICommandGraph size must be 0xDDC");
-    extern boost::scoped_ptr<ISTIDriver> sSimDriver;
+  extern boost::scoped_ptr<ISTIDriver> sSimDriver;
 
   /**
    * Address: 0x00826F10 (FUN_00826F10, sub_826F10)
@@ -1051,9 +1084,8 @@ namespace moho
    *
    * Body below, after the anonymous-namespace helpers it uses.
    */
-  [[nodiscard]] std::int32_t EstimateDrawNodeWorkTicks(
-    UICommandGraph& graph, UICommandGraph::UICommandGraphDrawNode& drawNode
-  );
+  [[nodiscard]] std::int32_t
+  EstimateDrawNodeWorkTicks(UICommandGraph& graph, UICommandGraph::UICommandGraphDrawNode& drawNode);
 
   /**
    * Address: 0x00821F50 (FUN_00821F50, Moho::UnitCommandCapToCommandType)
@@ -1062,8 +1094,8 @@ namespace moho
    * symbol.
    */
   [[nodiscard]] EUnitCommandType UnitCommandCapToCommandType(ERuleBPUnitCommandCaps commandCap);
-namespace
-{
+  namespace
+  {
 
     // GetHoveredUserEntity is now CWldSession::GetHoveredUserEntity, a public
     // member (declared near GetCursorInfo() in the header) - promoted so the
@@ -1072,12 +1104,18 @@ namespace
     // ResolveIUnitBridge was a duplicate of UserUnit.h's GetIUnitBridge -
     // callers below now use that instead.
 
-    [[nodiscard]] bool ContainsUnitPtr(const fa::vector<UserUnit*>& units, const UserUnit* const unit)
+    [[nodiscard]] bool ContainsUnitPtr(
+      const fa::vector<UserUnit*>& units,
+      const UserUnit* const unit
+    )
     {
       return std::find(units.begin(), units.end(), unit) != units.end();
     }
 
-    void AppendUnitUnique(fa::vector<UserUnit*>& units, UserUnit* const unit)
+    void AppendUnitUnique(
+      fa::vector<UserUnit*>& units,
+      UserUnit* const unit
+    )
     {
       if (unit == nullptr || ContainsUnitPtr(units, unit)) {
         return;
@@ -1103,7 +1141,9 @@ namespace
      * its position, which sits at +0x08 in the source and +0x0C in the
      * destination (0x008BEC94..0x008BECAA). Any other kind sets only the kind.
      */
-    [[nodiscard]] UserTarget MakeUserTargetFromSSTITarget(const SSTITarget& source)
+    [[nodiscard]] UserTarget MakeUserTargetFromSSTITarget(
+      const SSTITarget& source
+    )
     {
       UserTarget target{};
       target.targetType = static_cast<UserTargetType>(source.mType);
@@ -1139,7 +1179,9 @@ namespace
      * `mVariableData.mTarget1`. An empty queue goes straight to the fallback,
      * which is how a command with no local edits gets its sim-side target.
      */
-    [[nodiscard]] UserTarget ResolveCommandIssueTarget(const UserCommandIssueHelper& helper)
+    [[nodiscard]] UserTarget ResolveCommandIssueTarget(
+      const UserCommandIssueHelper& helper
+    )
     {
       for (std::size_t index = helper.mLocalQueue.size(); index != 0u; --index) {
         const UserCommandIssueLocalEvent& event = helper.mLocalQueue[index - 1u];
@@ -1164,7 +1206,9 @@ namespace
      * released before returning. Callers: `func_ProcessCommandDrag`
      * (0x00829B40) and `EstimateDrawNodeWorkTicks` (0x00826F10).
      */
-    [[maybe_unused]] [[nodiscard]] UserEntity* ResolveCommandTargetEntity(const UserCommandIssueHelper& helper)
+    [[maybe_unused]] [[nodiscard]] UserEntity* ResolveCommandTargetEntity(
+      const UserCommandIssueHelper& helper
+    )
     {
       const UserTarget target = ResolveCommandIssueTarget(helper);
       return target.targetType == UserTargetType::Entity ? target.targetEntity.GetObjectPtr() : nullptr;
@@ -1179,7 +1223,8 @@ namespace
      * invalid vector. The transient target is released on the way out.
      */
     [[maybe_unused]] [[nodiscard]] Wm3::Vector3f* ResolveCommandIssueTargetPosition(
-      Wm3::Vector3f* const outPosition, const UserCommandIssueHelper& helper
+      Wm3::Vector3f* const outPosition,
+      const UserCommandIssueHelper& helper
     )
     {
       if (outPosition == nullptr) {
@@ -1190,7 +1235,10 @@ namespace
       return outPosition;
     }
 
-    [[maybe_unused]] void CollectSessionUserUnits(CWldSession* const session, fa::vector<UserUnit*>& outUnits)
+    [[maybe_unused]] void CollectSessionUserUnits(
+      CWldSession* const session,
+      fa::vector<UserUnit*>& outUnits
+    )
     {
       outUnits.clear();
       if (session == nullptr) {
@@ -1218,18 +1266,21 @@ namespace
      * Looks one live command-issue helper up by id, returning null when the
      * manager's map has no entry (the walk lands on the sentinel head).
      */
-    [[maybe_unused]] [[nodiscard]] UserCommandIssueHelper* FindCommandIssueHelper(CommandManager& manager, const CmdId commandId)
+    [[maybe_unused]] [[nodiscard]] UserCommandIssueHelper* FindCommandIssueHelper(
+      CommandManager& manager,
+      const CmdId commandId
+    )
     {
       const auto found = manager.mCommands.find(commandId);
       return found == manager.mCommands.end() ? nullptr : found->second;
     }
-}
+  } // namespace
 
-}
+} // namespace moho
 
 namespace moho
 {
   extern bool gSessionShowedTick;
   extern bool gFrameClockResetPending;
   extern bool gReadyAfterFirstFrame;
-}
+} // namespace moho

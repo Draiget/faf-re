@@ -41,19 +41,17 @@ namespace moho
   class Stats;
   class CD3DBatchTexture;
   struct SSyncData;
-}
+} // namespace moho
 
 namespace faf::remote::client
 {
   /** The client's mesh blueprint for each ordinal of the meshes table (null: not in its rules). */
-  [[nodiscard]] std::vector<moho::RMeshBlueprint*> ResolveMeshes(
-    moho::RRuleGameRules& rules, const wire::SContentTables& tables
-  );
+  [[nodiscard]] std::vector<moho::RMeshBlueprint*>
+  ResolveMeshes(moho::RRuleGameRules& rules, const wire::SContentTables& tables);
 
   /** The client's blueprint for each ordinal of the blueprints table (null: not in its rules). */
-  [[nodiscard]] std::vector<const moho::REntityBlueprint*> ResolveBlueprints(
-    moho::RRuleGameRules& rules, const wire::SContentTables& tables
-  );
+  [[nodiscard]] std::vector<const moho::REntityBlueprint*>
+  ResolveBlueprints(moho::RRuleGameRules& rules, const wire::SContentTables& tables);
 
   struct SRebuildStats
   {
@@ -64,38 +62,39 @@ namespace faf::remote::client
     std::uint64_t erased = 0;
     std::uint64_t deleted = 0;
     std::uint64_t entityUpdates = 0;
-    std::uint64_t settleUpdates = 0;       // an update only to bring the last transform to rest
+    std::uint64_t settleUpdates = 0; // an update only to bring the last transform to rest
     // Checks against the packet the rebuilder was handed (loopback: the server's packet).
     std::uint64_t createdNotInPacket = 0;
     std::uint64_t packetCreatedNotRebuilt = 0; // e.g. created and deleted in one beat
     std::uint64_t blueprintMismatches = 0;
-    std::uint64_t noBlueprint = 0;       // creations with no blueprint (the sim's packet has none either unless blueprintMismatches)
+    std::uint64_t noBlueprint =
+      0; // creations with no blueprint (the sim's packet has none either unless blueprintMismatches)
     std::uint64_t eraseMismatches = 0;
     std::uint64_t deleteMismatches = 0;
     std::uint64_t packetUpdatesDropped = 0; // entity or unit updates for ids the client does not hold
     std::uint64_t unitChangesWithoutUpdate = 0;
-    std::uint64_t entityDataBorrowed = 0;  // updates the packet also has (compared, not used)
-    std::uint64_t meshMismatches = 0;      // client's mesh blueprint versus the packet's
+    std::uint64_t entityDataBorrowed = 0; // updates the packet also has (compared, not used)
+    std::uint64_t meshMismatches = 0;     // client's mesh blueprint versus the packet's
     std::uint64_t meshResourceMismatches = 0;
-    std::uint64_t soundMismatches = 0;     // client's ambient/rumble params versus the packet's
+    std::uint64_t soundMismatches = 0; // client's ambient/rumble params versus the packet's
     std::uint64_t underlayMismatches = 0;
-    std::uint64_t unknownTableIds = 0;     // a sound or name id the session tables do not have
-    std::uint64_t unitConstantsMissing = 0;   // creation constants that differ from the packet's
-    std::uint64_t tickMismatches = 0;         // creation tick (the beat's) versus the packet's
-    std::uint64_t statsApplied = 0;           // unit stat items written into client trees
-    std::uint64_t unitUpdates = 0;            // unit updates built by the client
-    std::uint64_t unitPosesBorrowed = 0;      // of them, with the packet's poses (the pose lane is WP8)
-    std::uint64_t posesMade = 0;              // with `SetNoSim`: client poses made (a new unit or skeleton)
-    std::uint64_t poseBeats = 0;              // units given a new pose from the lane's bones
+    std::uint64_t unknownTableIds = 0;      // a sound or name id the session tables do not have
+    std::uint64_t unitConstantsMissing = 0; // creation constants that differ from the packet's
+    std::uint64_t tickMismatches = 0;       // creation tick (the beat's) versus the packet's
+    std::uint64_t statsApplied = 0;         // unit stat items written into client trees
+    std::uint64_t unitUpdates = 0;          // unit updates built by the client
+    std::uint64_t unitPosesBorrowed = 0;    // of them, with the packet's poses (the pose lane is WP8)
+    std::uint64_t posesMade = 0;            // with `SetNoSim`: client poses made (a new unit or skeleton)
+    std::uint64_t poseBeats = 0;            // units given a new pose from the lane's bones
     std::uint64_t poseBonesApplied = 0;
-    std::uint64_t poseBonesBad = 0;           // an index past the skeleton's bones, or a whole pose of another size
-    std::uint64_t posesWithoutMesh = 0;       // lane bones for a unit with no skeleton yet
-    std::uint64_t unitDataMismatches = 0;     // client-built unit data versus the packet's, poses aside
-    std::uint64_t depositMismatches = 0;      // beats whose client deposits differ from the sim's
-    std::uint64_t terrainEdits = 0;           // terrain edits written into the client's height field
-    std::uint64_t terrainRectMismatches = 0;  // beats whose changed-terrain rectangles differ from the sim's
+    std::uint64_t poseBonesBad = 0;          // an index past the skeleton's bones, or a whole pose of another size
+    std::uint64_t posesWithoutMesh = 0;      // lane bones for a unit with no skeleton yet
+    std::uint64_t unitDataMismatches = 0;    // client-built unit data versus the packet's, poses aside
+    std::uint64_t depositMismatches = 0;     // beats whose client deposits differ from the sim's
+    std::uint64_t terrainEdits = 0;          // terrain edits written into the client's height field
+    std::uint64_t terrainRectMismatches = 0; // beats whose changed-terrain rectangles differ from the sim's
 
-    std::uint64_t positionsOutOfRange = 0;  // shown more than a unit from the sim: clamped by the quantiser
+    std::uint64_t positionsOutOfRange = 0; // shown more than a unit from the sim: clamped by the quantiser
     double maxPositionError = 0.0;         // shown versus packet, world units, any axis
     double maxOrientationError = 0.0;      // shown versus packet, degrees between the two rotations
     double decodeSeconds = 0.0;            // DecodeFrame
@@ -107,7 +106,8 @@ namespace faf::remote::client
   {
   public:
     CSyncRebuilder(
-      const wire::SFrameCodec& codec, std::vector<const moho::REntityBlueprint*> blueprints,
+      const wire::SFrameCodec& codec,
+      std::vector<const moho::REntityBlueprint*> blueprints,
       std::vector<moho::RMeshBlueprint*> meshes
     );
 
@@ -125,7 +125,10 @@ namespace faf::remote::client
 
     ~CSyncRebuilder();
 
-    [[nodiscard]] const SRebuildStats& Stats() const noexcept { return mStats; }
+    [[nodiscard]] const SRebuildStats& Stats() const noexcept
+    {
+      return mStats;
+    }
     /**
      * Height cells where the client's field differs from the sim's now. The sim may run beats
      * ahead of the frames (its field is live), so this is 0 only when the frames have caught up,
@@ -139,10 +142,18 @@ namespace faf::remote::client
      */
     void SeedTerrain(const moho::CHeightField& heights);
     /** The last frame decoded: the baseline the next frame must name. */
-    [[nodiscard]] const wire::SViewFrame* Baseline() const noexcept { return mHasShown ? &mShown : nullptr; }
+    [[nodiscard]] const wire::SViewFrame* Baseline() const noexcept
+    {
+      return mHasShown ? &mShown : nullptr;
+    }
 
   private:
-    bool ApplyFrame(wire::SViewFrame frame, std::size_t wireBytes, moho::SSyncData& packet, std::chrono::steady_clock::time_point start);
+    bool ApplyFrame(
+      wire::SViewFrame frame,
+      std::size_t wireBytes,
+      moho::SSyncData& packet,
+      std::chrono::steady_clock::time_point start
+    );
 
     struct SHeldEntity
     {
@@ -160,7 +171,12 @@ namespace faf::remote::client
     };
 
     /** Plan WP8.3: `held`'s poses for this beat from the lane's `bones` (null: none came), into `data`. */
-    void UpdatePoses(const wire::SEntityRecord& record, SHeldEntity& held, const wire::SUnitPose* bones, moho::SSTIUnitVariableData& data);
+    void UpdatePoses(
+      const wire::SEntityRecord& record,
+      SHeldEntity& held,
+      const wire::SUnitPose* bones,
+      moho::SSTIUnitVariableData& data
+    );
 
     /** A frame's unit detail into a unit's data, with the client's own blueprints and names. */
     void UnpackUnitDetail(const wire::SUnitDetail& detail, moho::SSTIUnitVariableData& data);
@@ -179,20 +195,39 @@ namespace faf::remote::client
 
     /** The session tables the frames' sound and name ids refer to (WP7.2). */
   public:
-    void SetSessionTables(wire::CSessionTableReaders* session) noexcept { mSession = session; }
+    void SetSessionTables(
+      wire::CSessionTableReaders* session
+    ) noexcept
+    {
+      mSession = session;
+    }
     /**
      * A client with no sim behind it (a server's player, the probe): its packets carry neither the sim's deposits nor
      * its height field, so the session tables' deposits are the packet's from the first beat, and its terrain edits
      * go on the heights `SeedTerrain` gave (without a seed they are only counted).
      */
-    void SetNoSim() noexcept { mNoSim = true; }
+    void SetNoSim() noexcept
+    {
+      mNoSim = true;
+    }
     /**
      * Plan WP8.3, with `SetNoSim`: the next `ApplyFrame`'s pose lane (wire/PoseLane.h, ascending ids), or null when
-     * the view had none. Units get poses of the client's own: made from their mesh's skeleton, the lane's bones on them.
+     * the view had none. Units get poses of the client's own: made from their mesh's skeleton, the lane's bones on
+     * them.
      */
-    void SetPoseLane(const std::vector<wire::SUnitPose>* lane) noexcept { mPoseLane = lane; }
+    void SetPoseLane(
+      const std::vector<wire::SUnitPose>* lane
+    ) noexcept
+    {
+      mPoseLane = lane;
+    }
     /** The client's rules (the category universe of unit category sets). */
-    void SetRules(moho::RRuleGameRules* rules) noexcept { mRules = rules; }
+    void SetRules(
+      moho::RRuleGameRules* rules
+    ) noexcept
+    {
+      mRules = rules;
+    }
 
   private:
     struct SUnderlay
@@ -217,14 +252,14 @@ namespace faf::remote::client
     std::vector<const moho::REntityBlueprint*> mBlueprints;
     std::vector<moho::RMeshBlueprint*> mMeshes;
     std::vector<SMeshResource> mMeshResources;
-    wire::CSessionTableReaders* mSession = nullptr; // takes the terrain edits
-    bool mNoSim = false;                            // `SetNoSim`
+    wire::CSessionTableReaders* mSession = nullptr;          // takes the terrain edits
+    bool mNoSim = false;                                     // `SetNoSim`
     const std::vector<wire::SUnitPose>* mPoseLane = nullptr; // `SetPoseLane`
     moho::RRuleGameRules* mRules = nullptr;
-    std::vector<moho::CSndParams*> mSounds;   // by sound id, resolved on first use
-    std::vector<SUnderlay> mUnderlays;        // by name id
-    boost::shared_ptr<moho::CSimResources> mResources; // the client's deposits (WP11.2)
-    boost::shared_ptr<moho::CHeightField> mTerrain;    // the client's copy of the sim's heights (WP11.2)
+    std::vector<moho::CSndParams*> mSounds;              // by sound id, resolved on first use
+    std::vector<SUnderlay> mUnderlays;                   // by name id
+    boost::shared_ptr<moho::CSimResources> mResources;   // the client's deposits (WP11.2)
+    boost::shared_ptr<moho::CHeightField> mTerrain;      // the client's copy of the sim's heights (WP11.2)
     boost::SharedPtrRaw<moho::CHeightField> mSimTerrain; // the sim's, for the check (a counted reference)
     std::size_t mDepositsApplied = 0;
     wire::SViewFrame mShown;

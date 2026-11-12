@@ -10,7 +10,13 @@ namespace moho
    * Validates whether `moveUnit` can occupy/move through `*pos` while filtering
    * nearby collision occupants against movement/attachment/formation rules.
    */
-  bool COORDS_CanMoveAt(SOCellPos* pos, COGrid* grid, Unit* moveUnit, bool disallowAttached, Unit* ignoreUnit)
+  bool COORDS_CanMoveAt(
+    SOCellPos* pos,
+    COGrid* grid,
+    Unit* moveUnit,
+    bool disallowAttached,
+    Unit* ignoreUnit
+  )
   {
     if (moveUnit == nullptr) {
       return false;
@@ -156,7 +162,11 @@ namespace moho
    * The conversion is the same one `SFootprint::ToCellPos` performs, and it
    * rounds: the binary uses two bare fistp stores with no __ftol call.
    */
-  bool UnitIsBlockedAt(const Wm3::Vec3f& worldPosition, Unit* const unit, const int mode)
+  bool UnitIsBlockedAt(
+    const Wm3::Vec3f& worldPosition,
+    Unit* const unit,
+    const int mode
+  )
   {
     const SFootprint& footprint = unit->GetFootprint();
     const SOCellPos cellPos = footprint.ToCellPos(worldPosition);
@@ -170,7 +180,9 @@ namespace moho
    * What it does:
    * See the header declaration - density folded over the bounding-box volume.
    */
-  float BlueprintCollisionMass(const RUnitBlueprint& blueprint) noexcept
+  float BlueprintCollisionMass(
+    const RUnitBlueprint& blueprint
+  ) noexcept
   {
     return blueprint.mAverageDensity * blueprint.mSizeZ * blueprint.mSizeY * blueprint.mSizeX;
   }
@@ -183,7 +195,10 @@ namespace moho
    * See the header declaration - the footprint-flag gate on receiving an
    * impulse.
    */
-  bool CollisionImpulseAllowed(const Unit& pushed, const Unit& against) noexcept
+  bool CollisionImpulseAllowed(
+    const Unit& pushed,
+    const Unit& against
+  ) noexcept
   {
     const std::uint8_t pushedFlags = static_cast<std::uint8_t>(pushed.GetFootprint().mFlags);
     const std::uint8_t againstFlags = static_cast<std::uint8_t>(against.GetFootprint().mFlags);
@@ -206,7 +221,10 @@ namespace moho
    *   - the mass comparison is the momentum split, strengthened from the
    *     binary's `share > 0.1` acceptance to a clear-dominance margin.
    */
-  bool UnitCanShoveAside(const Unit& mover, const Unit& obstacle) noexcept
+  bool UnitCanShoveAside(
+    const Unit& mover,
+    const Unit& obstacle
+  ) noexcept
   {
     if constexpr (!kBumpThroughSpamEnabled) {
       return false;
@@ -236,7 +254,10 @@ namespace moho
    * Returns true when `unit` cannot place its footprint at `worldPosition`
    * due to map bounds or occupancy-cap fit checks.
    */
-  bool UnitWontFitAt(const Wm3::Vec3f& worldPosition, const Unit* const unit)
+  bool UnitWontFitAt(
+    const Wm3::Vec3f& worldPosition,
+    const Unit* const unit
+  )
   {
     const SFootprint& footprint = unit->GetFootprint();
     const Sim& sim = *unit->SimulationRef;
@@ -273,7 +294,9 @@ namespace
   constexpr const char* kUnitOnProductionActiveScript = "OnProductionActive";
   constexpr const char* kUnitOnProductionInactiveScript = "OnProductionInActive";
 
-  void ClearGuardFormation(Unit* const unit)
+  void ClearGuardFormation(
+    Unit* const unit
+  )
   {
     if (unit == nullptr) {
       return;
@@ -284,7 +307,9 @@ namespace
     delete guardFormation;
   }
 
-  [[nodiscard]] const char* UnitStateToDebugLexical(const EUnitState state) noexcept
+  [[nodiscard]] const char* UnitStateToDebugLexical(
+    const EUnitState state
+  ) noexcept
   {
     switch (state) {
     case UNITSTATE_Immobile:
@@ -382,7 +407,10 @@ namespace
     }
   }
 
-  void AddIntStatCounter(StatItem* const statItem, const long delta) noexcept
+  void AddIntStatCounter(
+    StatItem* const statItem,
+    const long delta
+  ) noexcept
   {
     if (!statItem) {
       return;
@@ -426,7 +454,10 @@ namespace
     (void)armyStats->AddBlueprintStatDelta(statPath, blueprint, delta);
   }
 
-  void IncrementArmyIntStatByName(CArmyStats* const armyStats, const char* const statPath)
+  void IncrementArmyIntStatByName(
+    CArmyStats* const armyStats,
+    const char* const statPath
+  )
   {
     if (armyStats == nullptr || statPath == nullptr) {
       return;
@@ -441,7 +472,9 @@ namespace
     AddIntStatCounter(item, 1L);
   }
 
-  [[nodiscard]] bool IsWithinPlayableRectOrNotCommander(const Unit& unit)
+  [[nodiscard]] bool IsWithinPlayableRectOrNotCommander(
+    const Unit& unit
+  )
   {
     static const std::string kCommanderCategory = "COMMAND";
     if (!unit.Entity::IsInCategory(kCommanderCategory.c_str())) {
@@ -456,11 +489,16 @@ namespace
 
     const Wm3::Vec3f& position = unit.GetPosition();
     const gpg::Rect2i playableRect = mapData->mPlayableRect;
-    return !(static_cast<float>(playableRect.x0) > position.x || static_cast<float>(playableRect.z0) > position.z ||
-             position.x > static_cast<float>(playableRect.x1) || position.z > static_cast<float>(playableRect.z1));
+    return !(
+      static_cast<float>(playableRect.x0) > position.x || static_cast<float>(playableRect.z0) > position.z ||
+      position.x > static_cast<float>(playableRect.x1) || position.z > static_cast<float>(playableRect.z1)
+    );
   }
 
-  void IncrementAIDebugStateStat(CArmyStats* const armyStats, const fa::string& statPath)
+  void IncrementAIDebugStateStat(
+    CArmyStats* const armyStats,
+    const fa::string& statPath
+  )
   {
     if (!armyStats || statPath.empty()) {
       return;
@@ -475,13 +513,19 @@ namespace
     AddIntStatCounter(item, 1L);
   }
 
-  [[nodiscard]] std::int32_t PickUniformIndexFromU32(const std::uint32_t randomValue, const std::uint32_t count) noexcept
+  [[nodiscard]] std::int32_t PickUniformIndexFromU32(
+    const std::uint32_t randomValue,
+    const std::uint32_t count
+  ) noexcept
   {
     const std::uint64_t product = static_cast<std::uint64_t>(randomValue) * static_cast<std::uint64_t>(count);
     return static_cast<std::int32_t>(product >> 32u);
   }
 
-  [[nodiscard]] bool HasFootprintFlag(const EFootprintFlags value, const EFootprintFlags flag) noexcept
+  [[nodiscard]] bool HasFootprintFlag(
+    const EFootprintFlags value,
+    const EFootprintFlags flag
+  ) noexcept
   {
     return (static_cast<std::uint8_t>(value) & static_cast<std::uint8_t>(flag)) != 0u;
   }
@@ -501,7 +545,9 @@ namespace
   // (0x0044F7E0, called at 0x006A8CF3; inlined with the same length-> 0
   // threshold and reciprocal multiply at 0x0062EAD8-0x0062EB4B). There is
   // no near-zero tolerance: any positive length normalises.
-  [[nodiscard]] Wm3::Vector3f ForwardXZ(const Unit& unit) noexcept
+  [[nodiscard]] Wm3::Vector3f ForwardXZ(
+    const Unit& unit
+  ) noexcept
   {
     const moho::VAxes3 axes(unit.GetTransform().orient_);
     const Wm3::Vector3f flattened{axes.vZ.x, 0.0f, axes.vZ.z};
@@ -539,7 +585,8 @@ namespace
     const Wm3::Vector3f& currentPosition
   ) noexcept
   {
-    const float gravityMagnitude = std::sqrt((gravity.x * gravity.x) + (gravity.y * gravity.y) + (gravity.z * gravity.z));
+    const float gravityMagnitude =
+      std::sqrt((gravity.x * gravity.x) + (gravity.y * gravity.y) + (gravity.z * gravity.z));
 
     // 0x0062CF38-0x0062CF83: `-0.0f - g` per lane, then Wm3 `Normalize`
     // (0x00452AF0).
@@ -611,7 +658,10 @@ namespace
     return out;
   }
 
-  void FillReservedOgridRect(Unit& unit, const bool occupied) noexcept
+  void FillReservedOgridRect(
+    Unit& unit,
+    const bool occupied
+  ) noexcept
   {
     if (!unit.SimulationRef || !unit.SimulationRef->mOGrid) {
       return;
@@ -626,7 +676,9 @@ namespace
   }
 
   // 0x006A7827..0x006A784F: `addss 0.5`, stored to float, then the inlined floor.
-  [[nodiscard]] std::int32_t RoundOccupyRectEdge(const float value) noexcept
+  [[nodiscard]] std::int32_t RoundOccupyRectEdge(
+    const float value
+  ) noexcept
   {
     return fa::FloorToIntX87(value + 0.5f);
   }
@@ -648,7 +700,10 @@ namespace
   /**
    * Address: 0x0062EAC0 (FUN_0062EAC0, func_UnitMoreInLineToOther)
    */
-  [[nodiscard]] const Unit* UnitMoreInLineToOther(const Unit* const a1, const Unit* const a2) noexcept
+  [[nodiscard]] const Unit* UnitMoreInLineToOther(
+    const Unit* const a1,
+    const Unit* const a2
+  ) noexcept
   {
     if (!a1 || !a2) {
       return nullptr;
@@ -674,10 +729,8 @@ namespace
 
     // 0x0062ED8F-0x0062EDD4: dot products accumulate `(y + z) + x` for the
     // first and `(z + y) + x` for the second.
-    const float a2Alignment =
-      ((a2ToA1.y * a2Forward.y) + (a2ToA1.z * a2Forward.z)) + (a2ToA1.x * a2Forward.x);
-    const float a1Alignment =
-      ((a1ToA2.z * a1Forward.z) + (a1ToA2.y * a1Forward.y)) + (a1ToA2.x * a1Forward.x);
+    const float a2Alignment = ((a2ToA1.y * a2Forward.y) + (a2ToA1.z * a2Forward.z)) + (a2ToA1.x * a2Forward.x);
+    const float a1Alignment = ((a1ToA2.z * a1Forward.z) + (a1ToA2.y * a1Forward.y)) + (a1ToA2.x * a1Forward.x);
     if (a2Alignment <= 0.0f && a1Alignment <= 0.0f) {
       return nullptr;
     }
@@ -687,17 +740,17 @@ namespace
   }
 }
 
-
-
 /**
-  * Alias of FUN_00593970 (non-canonical helper lane).
+ * Alias of FUN_00593970 (non-canonical helper lane).
  *
  * What it does:
  * Public wrapper that mirrors the anonymous-namespace `GetUnitOptional`
  * helper: non-throwing conversion from Lua payload to `Unit*`, returning
  * null when the payload is missing or of a non-unit runtime type.
  */
-moho::Unit* moho::SCR_GetUnitOptional(const LuaPlus::LuaObject& unitObject)
+moho::Unit* moho::SCR_GetUnitOptional(
+  const LuaPlus::LuaObject& unitObject
+)
 {
   static gpg::RType* sUnitType = nullptr;
   if (sUnitType == nullptr) {
@@ -725,13 +778,16 @@ CScrLuaMetatableFactory<Unit>& CScrLuaMetatableFactory<Unit>::Instance()
   return sInstance;
 }
 
-LuaPlus::LuaObject CScrLuaMetatableFactory<Unit>::Create(LuaPlus::LuaState* const state)
+LuaPlus::LuaObject CScrLuaMetatableFactory<Unit>::Create(
+  LuaPlus::LuaState* const state
+)
 {
   return SCR_CreateSimpleMetatable(state);
 }
 
 /**
- * Address: 0x00564660 (FUN_00564660, ?ARMOR_GetArmorDefinations@Moho@@YA?AV?$list@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@PAVLuaState@LuaPlus@@VStrArg@gpg@@@Z)
+ * Address: 0x00564660 (FUN_00564660,
+ * ?ARMOR_GetArmorDefinations@Moho@@YA?AV?$list@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@PAVLuaState@LuaPlus@@VStrArg@gpg@@@Z)
  *
  * What it does:
  * Loads `/lua/armordefinition.lua`, resolves `armordefinition` table rows for
@@ -795,7 +851,9 @@ fa::list<fa::string> moho::ARMOR_GetArmorDefinations(
  * What it does:
  * Stores one stunned-state tick lane.
  */
-void Unit::SetStunnedStateRaw(const std::int32_t stunnedState) noexcept
+void Unit::SetStunnedStateRaw(
+  const std::int32_t stunnedState
+) noexcept
 {
   mUnitVarDat.mStunTicks = stunnedState;
 }
@@ -806,7 +864,9 @@ void Unit::SetStunnedStateRaw(const std::int32_t stunnedState) noexcept
  * What it does:
  * Stores one overcharge-paused boolean lane.
  */
-void Unit::SetOverchargePausedFlag(const bool paused) noexcept
+void Unit::SetOverchargePausedFlag(
+  const bool paused
+) noexcept
 {
   mUnitVarDat.mOverchargePaused = paused;
 }
@@ -850,7 +910,9 @@ bool Unit::IsValidTargetFlag() const noexcept
  * What it does:
  * Stores one valid-target boolean lane.
  */
-void Unit::SetIsValidTargetFlag(const bool validTarget) noexcept
+void Unit::SetIsValidTargetFlag(
+  const bool validTarget
+) noexcept
 {
   mUnitVarDat.mIsValidTarget = validTarget;
 }
@@ -872,7 +934,9 @@ float Unit::GetShieldRatioRaw() const noexcept
  * What it does:
  * Stores one shield-ratio float lane.
  */
-void Unit::SetShieldRatioRaw(const float shieldRatio) noexcept
+void Unit::SetShieldRatioRaw(
+  const float shieldRatio
+) noexcept
 {
   mUnitVarDat.mShieldRatio = shieldRatio;
 }
@@ -884,7 +948,10 @@ void Unit::SetShieldRatioRaw(const float shieldRatio) noexcept
  * Rebinds this unit's creator weak-reference lane and marks game-data sync
  * dirty for replication.
  */
-void moho::AssignCreatorWeakRefAndMarkSyncDirty(Unit* const unit, Unit* const creator)
+void moho::AssignCreatorWeakRefAndMarkSyncDirty(
+  Unit* const unit,
+  Unit* const creator
+)
 {
   unit->CreatorRef.Set(creator);
   unit->NeedSyncGameData = true;
@@ -1077,18 +1144,18 @@ namespace
 namespace moho
 {
 
-/**
- * Address: 0x0055C020 (FUN_0055C020, preregister_UnitWeaponInfoTypeInfo)
- *
- * What it does:
- * Constructs/preregisters RTTI metadata for `UnitWeaponInfo`.
- */
-gpg::RType* preregister_UnitWeaponInfoTypeInfo()
-{
-  static UnitWeaponInfoTypeInfo typeInfo;
-  gpg::PreRegisterRType(typeid(UnitWeaponInfo), &typeInfo);
-  return &typeInfo;
-}
+  /**
+   * Address: 0x0055C020 (FUN_0055C020, preregister_UnitWeaponInfoTypeInfo)
+   *
+   * What it does:
+   * Constructs/preregisters RTTI metadata for `UnitWeaponInfo`.
+   */
+  gpg::RType* preregister_UnitWeaponInfoTypeInfo()
+  {
+    static UnitWeaponInfoTypeInfo typeInfo;
+    gpg::PreRegisterRType(typeid(UnitWeaponInfo), &typeInfo);
+    return &typeInfo;
+  }
 
 #include "UnitReflection.inl"
 

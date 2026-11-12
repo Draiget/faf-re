@@ -18,13 +18,17 @@ namespace faf::server
   inline constexpr float kCalmShare = 0.85f;
 
   /** `WLD_GetSimRate`'s scale: speed +0 is ten beats a second, and ten steps are ten times that. */
-  [[nodiscard]] inline double SecondsPerBeat(const int speed)
+  [[nodiscard]] inline double SecondsPerBeat(
+    const int speed
+  )
   {
     return 0.1 / std::pow(10.0, speed * 0.1);
   }
 
   /** The nearest speed step to a rate of beats, within what the game-speed controls allow. */
-  [[nodiscard]] inline int SpeedOfBeatRate(const double beatsPerSecond)
+  [[nodiscard]] inline int SpeedOfBeatRate(
+    const double beatsPerSecond
+  )
   {
     constexpr int kMinSpeed = -10;
     constexpr int kMaxSpeed = 50;
@@ -56,11 +60,15 @@ namespace faf::server
   {
   public:
     /** Warns when a beat takes `warnBeatMs` or more. */
-    explicit CSpeedWatch(const float warnBeatMs)
+    explicit CSpeedWatch(
+      const float warnBeatMs
+    )
       : mWarnBeatMs(warnBeatMs)
     {}
 
-    [[nodiscard]] SSpeedNews Update(const SSpeedSample& sample)
+    [[nodiscard]] SSpeedNews Update(
+      const SSpeedSample& sample
+    )
     {
       SSpeedNews news;
       if (!mStarted) {

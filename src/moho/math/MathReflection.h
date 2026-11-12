@@ -158,16 +158,15 @@ namespace moho
   [[nodiscard]] const VAxes3& Identity<VAxes3>();
 
   /**
-   * Address: 0x004ED000 (FUN_004ED000, ?ToString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVVAxes3@1@@Z)
-   * Mangled: ?ToString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVVAxes3@1@@Z
+   * Address: 0x004ED000 (FUN_004ED000,
+   * ?ToString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVVAxes3@1@@Z) Mangled:
+   * ?ToString@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVVAxes3@1@@Z
    *
    * What it does:
    * Formats one `VAxes3` basis as `X=(...) Y=(...) Z=(...)` by reusing the
    * vector-lane string formatter.
    */
   [[nodiscard]] fa::string ToString(const VAxes3& value);
-
-
 
   class AxisAlignedBox3fTypeInfo final : public gpg::RType
   {

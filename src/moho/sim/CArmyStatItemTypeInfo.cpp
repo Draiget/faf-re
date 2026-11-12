@@ -5,14 +5,17 @@
 #include <typeinfo>
 
 #include "moho/misc/StatItem.h"
-#include "moho/sim/CArmyStats.h"
+#include "moho/sim/CArmyStats.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
   moho::CArmyStatItemTypeInfo gCArmyStatItemTypeInfo;
 
-  [[nodiscard]] gpg::RRef MakeCArmyStatItemRef(moho::CArmyStatItem* const object)
+  [[nodiscard]] gpg::RRef MakeCArmyStatItemRef(
+    moho::CArmyStatItem* const object
+  )
   {
     gpg::RRef out{};
     out.mObj = object;
@@ -78,7 +81,9 @@ namespace moho
   /**
    * Address: 0x0070EE90 (FUN_0070EE90)
    */
-  gpg::RType* CArmyStatItemTypeInfo::AssignLifecycleCallbacks(gpg::RType* const typeInfo)
+  gpg::RType* CArmyStatItemTypeInfo::AssignLifecycleCallbacks(
+    gpg::RType* const typeInfo
+  )
   {
     typeInfo->newRefFunc_ = &CArmyStatItemTypeInfo::NewRef;
     typeInfo->ctorRefFunc_ = &CArmyStatItemTypeInfo::CtrRef;
@@ -99,7 +104,9 @@ namespace moho
   /**
    * Address: 0x00711260 (FUN_00711260)
    */
-  gpg::RRef CArmyStatItemTypeInfo::CtrRef(void* const objectPtr)
+  gpg::RRef CArmyStatItemTypeInfo::CtrRef(
+    void* const objectPtr
+  )
   {
     auto* const object = reinterpret_cast<CArmyStatItem*>(objectPtr);
     if (object) {
@@ -111,7 +118,9 @@ namespace moho
   /**
    * Address: 0x00711240 (FUN_00711240)
    */
-  void CArmyStatItemTypeInfo::Delete(void* const objectPtr)
+  void CArmyStatItemTypeInfo::Delete(
+    void* const objectPtr
+  )
   {
     auto* const object = reinterpret_cast<CArmyStatItem*>(objectPtr);
     delete object;
@@ -120,7 +129,9 @@ namespace moho
   /**
    * Address: 0x007112E0 (FUN_007112E0)
    */
-  void CArmyStatItemTypeInfo::Destruct(void* const objectPtr)
+  void CArmyStatItemTypeInfo::Destruct(
+    void* const objectPtr
+  )
   {
     auto* const object = reinterpret_cast<CArmyStatItem*>(objectPtr);
     if (!object) {
@@ -133,7 +144,9 @@ namespace moho
   /**
    * Address: 0x00712500 (FUN_00712500)
    */
-  void CArmyStatItemTypeInfo::AddBase_StatItem(gpg::RType* const typeInfo)
+  void CArmyStatItemTypeInfo::AddBase_StatItem(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBaseViaSlot<StatItem>(typeInfo);
   }
@@ -148,7 +161,10 @@ namespace gpg
    * Builds one typed reflection reference for `moho::CArmyStatItem*`,
    * preserving dynamic-derived ownership and base-offset adjustment.
    */
-  gpg::RRef* RRef_CArmyStatItem(gpg::RRef* const outRef, moho::CArmyStatItem* const value)
+  gpg::RRef* RRef_CArmyStatItem(
+    gpg::RRef* const outRef,
+    moho::CArmyStatItem* const value
+  )
   {
     if (!outRef) {
       return nullptr;
@@ -221,7 +237,9 @@ namespace
   CArmyStatItemTypeInfoBootstrap gCArmyStatItemTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CArmyStatItemTypeInfo_657ad0, moho::register_CArmyStatItemTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CArmyStatItemTypeInfo_657ad0,
+  moho::register_CArmyStatItemTypeInfo
+)

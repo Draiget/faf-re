@@ -13,14 +13,18 @@ namespace gpg::gal::effects
 {
   namespace
   {
-    [[nodiscard]] std::uint32_t FloatBits(const float value) noexcept
+    [[nodiscard]] std::uint32_t FloatBits(
+      const float value
+    ) noexcept
     {
       std::uint32_t bits = 0U;
       std::memcpy(&bits, &value, sizeof(bits));
       return bits;
     }
 
-    [[nodiscard]] float BitsFloat(const std::uint32_t bits) noexcept
+    [[nodiscard]] float BitsFloat(
+      const std::uint32_t bits
+    ) noexcept
     {
       float value = 0.0f;
       std::memcpy(&value, &bits, sizeof(value));
@@ -30,7 +34,10 @@ namespace gpg::gal::effects
     const TextureBinding kNoBinding{};
   } // namespace
 
-  void ParameterStore::Initialize(const EffectDescription& description, const ConstantLayout& layout)
+  void ParameterStore::Initialize(
+    const EffectDescription& description,
+    const ConstantLayout& layout
+  )
   {
     mDescription = &description;
     mLayout = &layout;
@@ -61,7 +68,9 @@ namespace gpg::gal::effects
     mVersion = 1U;
   }
 
-  ParameterStore::Target ParameterStore::Find(const std::uint32_t parameter) const noexcept
+  ParameterStore::Target ParameterStore::Find(
+    const std::uint32_t parameter
+  ) const noexcept
   {
     Target target;
     if (mDescription == nullptr || parameter >= mSlotByParameter.size()) {
@@ -75,7 +84,12 @@ namespace gpg::gal::effects
     return target;
   }
 
-  void ParameterStore::WriteComponent(const std::uint32_t offset, const ScalarType type, const std::uint32_t bits, const bool fromFloat)
+  void ParameterStore::WriteComponent(
+    const std::uint32_t offset,
+    const ScalarType type,
+    const std::uint32_t bits,
+    const bool fromFloat
+  )
   {
     if (offset + 4U > mImage.size()) {
       return;
@@ -100,19 +114,28 @@ namespace gpg::gal::effects
     std::memcpy(mImage.data() + offset, &stored, sizeof(stored));
   }
 
-  void ParameterStore::WriteMatrix(const Target& target, const std::uint32_t element, const float* const matrix16)
+  void ParameterStore::WriteMatrix(
+    const Target& target,
+    const std::uint32_t element,
+    const float* const matrix16
+  )
   {
     const Parameter& parameter = *target.parameter;
     const std::uint32_t base = target.slot->offset + element * target.slot->elementStride;
     for (std::uint32_t row = 0U; row < parameter.rows && row < 4U; ++row) {
       for (std::uint32_t column = 0U; column < parameter.columns && column < 4U; ++column) {
-        const std::uint32_t offset = parameter.columnMajor ? base + column * 16U + row * 4U : base + row * 16U + column * 4U;
+        const std::uint32_t offset =
+          parameter.columnMajor ? base + column * 16U + row * 4U : base + row * 16U + column * 4U;
         WriteComponent(offset, parameter.scalarType, FloatBits(matrix16[row * 4U + column]), true);
       }
     }
   }
 
-  void ParameterStore::SetFloats(const std::uint32_t parameter, const float* const values, const std::uint32_t count)
+  void ParameterStore::SetFloats(
+    const std::uint32_t parameter,
+    const float* const values,
+    const std::uint32_t count
+  )
   {
     const Target target = Find(parameter);
     if (target.slot == nullptr || values == nullptr) {
@@ -135,14 +158,19 @@ namespace gpg::gal::effects
       if (description.scalarType == ScalarType::Float && columns == 4U) {
         const std::size_t offset = target.slot->offset;
         if (offset < mImage.size()) {
-          const std::size_t bytes = std::min<std::size_t>(std::min<std::size_t>(count, std::size_t{elements} * 4U) * 4U, mImage.size() - offset);
+          const std::size_t bytes = std::min<std::size_t>(
+            std::min<std::size_t>(count, std::size_t{elements} * 4U) * 4U, mImage.size() - offset
+          );
           std::memcpy(mImage.data() + offset, values, bytes);
         }
         break;
       }
       for (std::uint32_t index = 0U; index < count && index / columns < elements; ++index) {
         WriteComponent(
-          target.slot->offset + (index / columns) * 16U + (index % columns) * 4U, description.scalarType, FloatBits(values[index]), true
+          target.slot->offset + (index / columns) * 16U + (index % columns) * 4U,
+          description.scalarType,
+          FloatBits(values[index]),
+          true
         );
       }
       break;
@@ -168,7 +196,11 @@ namespace gpg::gal::effects
     ++mVersion;
   }
 
-  void ParameterStore::SetPacked(const std::uint32_t parameter, const void* const data, const std::uint32_t bytes)
+  void ParameterStore::SetPacked(
+    const std::uint32_t parameter,
+    const void* const data,
+    const std::uint32_t bytes
+  )
   {
     const Target target = Find(parameter);
     if (target.slot == nullptr || data == nullptr) {
@@ -190,7 +222,9 @@ namespace gpg::gal::effects
             for (std::uint32_t row = 0U; row < registers; ++row) {
               for (std::uint32_t column = 0U; column < perRegister && next < wordCount; ++column) {
                 WriteComponent(
-                  base + member.offset + memberElement * member.elementStride + row * 16U + column * 4U, member.scalarType, words[next++],
+                  base + member.offset + memberElement * member.elementStride + row * 16U + column * 4U,
+                  member.scalarType,
+                  words[next++],
                   false
                 );
               }
@@ -202,13 +236,16 @@ namespace gpg::gal::effects
       return;
     }
 
-    if (description.parameterClass != ParameterClass::Scalar && description.parameterClass != ParameterClass::Vector &&
-        description.parameterClass != ParameterClass::Matrix) {
+    if (
+      description.parameterClass != ParameterClass::Scalar && description.parameterClass != ParameterClass::Vector &&
+      description.parameterClass != ParameterClass::Matrix
+    ) {
       return;
     }
     const bool matrix = description.parameterClass == ParameterClass::Matrix;
     const std::uint32_t registers = matrix ? (description.columnMajor ? description.columns : description.rows) : 1U;
-    const std::uint32_t perRegister = matrix ? (description.columnMajor ? description.rows : description.columns) : description.columns;
+    const std::uint32_t perRegister =
+      matrix ? (description.columnMajor ? description.rows : description.columns) : description.columns;
     for (std::uint32_t element = 0U; element < elements && next < wordCount; ++element) {
       const std::uint32_t base = target.slot->offset + element * target.slot->elementStride;
       if (matrix && description.columnMajor) {
@@ -229,15 +266,18 @@ namespace gpg::gal::effects
     ++mVersion;
   }
 
-  void ParameterStore::SetVector(const std::uint32_t parameter, const float* const vector4)
+  void ParameterStore::SetVector(
+    const std::uint32_t parameter,
+    const float* const vector4
+  )
   {
     const Target target = Find(parameter);
     if (target.slot == nullptr || vector4 == nullptr) {
       return;
     }
     const Parameter& description = *target.parameter;
-    const std::uint32_t components =
-      (description.parameterClass == ParameterClass::Vector) ? std::min<std::uint32_t>(description.columns, 4U)
+    const std::uint32_t components = (description.parameterClass == ParameterClass::Vector)
+      ? std::min<std::uint32_t>(description.columns, 4U)
       : (description.parameterClass == ParameterClass::Scalar) ? 1U
                                                                : 4U;
     for (std::uint32_t column = 0U; column < components; ++column) {
@@ -246,7 +286,11 @@ namespace gpg::gal::effects
     ++mVersion;
   }
 
-  void ParameterStore::SetVectorArray(const std::uint32_t parameter, const float* const vectors4, const std::uint32_t count)
+  void ParameterStore::SetVectorArray(
+    const std::uint32_t parameter,
+    const float* const vectors4,
+    const std::uint32_t count
+  )
   {
     const Target target = Find(parameter);
     if (target.slot == nullptr || vectors4 == nullptr) {
@@ -258,15 +302,20 @@ namespace gpg::gal::effects
     for (std::uint32_t element = 0U; element < std::min(count, elements); ++element) {
       for (std::uint32_t column = 0U; column < components; ++column) {
         WriteComponent(
-          target.slot->offset + element * target.slot->elementStride + column * 4U, description.scalarType,
-          FloatBits(vectors4[element * 4U + column]), true
+          target.slot->offset + element * target.slot->elementStride + column * 4U,
+          description.scalarType,
+          FloatBits(vectors4[element * 4U + column]),
+          true
         );
       }
     }
     ++mVersion;
   }
 
-  void ParameterStore::SetMatrix(const std::uint32_t parameter, const float* const matrix16)
+  void ParameterStore::SetMatrix(
+    const std::uint32_t parameter,
+    const float* const matrix16
+  )
   {
     const Target target = Find(parameter);
     if (target.slot == nullptr || matrix16 == nullptr) {
@@ -280,7 +329,11 @@ namespace gpg::gal::effects
     SetFloats(parameter, matrix16, 16U);
   }
 
-  void ParameterStore::SetMatrixArray(const std::uint32_t parameter, const float* const matrices16, const std::uint32_t count)
+  void ParameterStore::SetMatrixArray(
+    const std::uint32_t parameter,
+    const float* const matrices16,
+    const std::uint32_t count
+  )
   {
     const Target target = Find(parameter);
     if (target.slot == nullptr || matrices16 == nullptr || target.parameter->parameterClass != ParameterClass::Matrix) {
@@ -293,7 +346,10 @@ namespace gpg::gal::effects
     ++mVersion;
   }
 
-  void ParameterStore::SetScalar(const std::uint32_t parameter, const double value)
+  void ParameterStore::SetScalar(
+    const std::uint32_t parameter,
+    const double value
+  )
   {
     const Target target = Find(parameter);
     if (target.slot == nullptr) {
@@ -313,7 +369,10 @@ namespace gpg::gal::effects
     ++mVersion;
   }
 
-  void ParameterStore::SetTexture(const std::uint32_t parameter, const boost::shared_ptr<Texture>& texture)
+  void ParameterStore::SetTexture(
+    const std::uint32_t parameter,
+    const boost::shared_ptr<Texture>& texture
+  )
   {
     if (parameter >= mBindings.size()) {
       return;
@@ -324,7 +383,10 @@ namespace gpg::gal::effects
     ++mTextureVersion;
   }
 
-  void ParameterStore::SetRenderTarget(const std::uint32_t parameter, const boost::shared_ptr<RenderTarget>& renderTarget)
+  void ParameterStore::SetRenderTarget(
+    const std::uint32_t parameter,
+    const boost::shared_ptr<RenderTarget>& renderTarget
+  )
   {
     if (parameter >= mBindings.size()) {
       return;
@@ -335,7 +397,9 @@ namespace gpg::gal::effects
     ++mTextureVersion;
   }
 
-  const TextureBinding& ParameterStore::Binding(const std::uint32_t parameter) const
+  const TextureBinding& ParameterStore::Binding(
+    const std::uint32_t parameter
+  ) const
   {
     return (parameter < mBindings.size()) ? mBindings[parameter] : kNoBinding;
   }

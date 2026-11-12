@@ -58,7 +58,6 @@ namespace moho
     void Init() override;
   };
 
-
   static_assert(sizeof(EPathTypeTypeInfo) == 0x78, "EPathTypeTypeInfo size must be 0x78");
 
   /**

@@ -40,7 +40,9 @@ void moho::PLAT_Init() {}
 
 void moho::PLAT_Exit() {}
 
-void moho::PLAT_InitErrorReportOutputDir(const wchar_t* const outputDir)
+void moho::PLAT_InitErrorReportOutputDir(
+  const wchar_t* const outputDir
+)
 {
   const std::lock_guard<std::mutex> lock(gReportFilesLock);
   gReportOutputDir = outputDir != nullptr ? outputDir : L"";
@@ -49,7 +51,9 @@ void moho::PLAT_InitErrorReportOutputDir(const wchar_t* const outputDir)
   }
 }
 
-void moho::PLAT_RegisterFileForErrorReport(const wchar_t* const file)
+void moho::PLAT_RegisterFileForErrorReport(
+  const wchar_t* const file
+)
 {
   if (file == nullptr || file[0] == L'\0') {
     return;
@@ -69,7 +73,11 @@ std::wstring moho::PLAT_GetErrorReportOutputDir()
   return gReportOutputDir;
 }
 
-std::uint32_t moho::PLAT_GetCallStack(void* const contextRecord, const std::uint32_t maxFrames, std::uintptr_t* const outFrames)
+std::uint32_t moho::PLAT_GetCallStack(
+  void* const contextRecord,
+  const std::uint32_t maxFrames,
+  std::uintptr_t* const outFrames
+)
 {
   // Only the calling thread's own stack: a fault context's stack is the signal handler's.
   (void)contextRecord;
@@ -86,7 +94,10 @@ std::uint32_t moho::PLAT_GetCallStack(void* const contextRecord, const std::uint
   return written;
 }
 
-bool moho::PLAT_GetSymbolInfo(const std::uintptr_t address, SPlatSymbolInfo* const outInfo)
+bool moho::PLAT_GetSymbolInfo(
+  const std::uintptr_t address,
+  SPlatSymbolInfo* const outInfo
+)
 {
   if (outInfo == nullptr) {
     return false;
@@ -109,10 +120,16 @@ bool moho::PLAT_GetSymbolInfo(const std::uintptr_t address, SPlatSymbolInfo* con
 
 fa::string moho::SPlatSymbolInfo::FormatResolvedLine() const
 {
-  return gpg::STR_Printf("%s + %zu bytes (%s(%u) + %u bytes)", symbol.c_str(), symDis, filename.c_str(), lineNum, lineDis);
+  return gpg::STR_Printf(
+    "%s + %zu bytes (%s(%u) + %u bytes)", symbol.c_str(), symDis, filename.c_str(), lineNum, lineDis
+  );
 }
 
-fa::string moho::PLAT_FormatCallstack(std::int32_t firstFrame, const std::int32_t endFrame, const std::uintptr_t* const frames)
+fa::string moho::PLAT_FormatCallstack(
+  std::int32_t firstFrame,
+  const std::int32_t endFrame,
+  const std::uintptr_t* const frames
+)
 {
   fa::string formatted;
   formatted.assign_owned("");
@@ -139,7 +156,10 @@ fa::string moho::PLAT_FormatCallstack(std::int32_t firstFrame, const std::int32_
   return formatted;
 }
 
-fa::string moho::PLAT_UnDecorateSymbolName(const char* const name, const bool stripLeadingUnderscore)
+fa::string moho::PLAT_UnDecorateSymbolName(
+  const char* const name,
+  const bool stripLeadingUnderscore
+)
 {
   (void)stripLeadingUnderscore;
   fa::string result;
@@ -161,7 +181,10 @@ fa::string moho::WIN_GetLastError()
   return gpg::STR_Printf("error %u (%s)", static_cast<unsigned>(errorCode), std::strerror(static_cast<int>(errorCode)));
 }
 
-void moho::WIN_OkBox(const gpg::StrArg caption, const gpg::StrArg text)
+void moho::WIN_OkBox(
+  const gpg::StrArg caption,
+  const gpg::StrArg text
+)
 {
   std::fprintf(stderr, "[%s] %s\n", caption != nullptr ? caption : "", text != nullptr ? text : "");
   std::fflush(stderr);

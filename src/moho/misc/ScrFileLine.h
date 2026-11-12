@@ -42,20 +42,13 @@ namespace moho
     virtual ~ScrFileLine();
 
   public:
-    int mMarkerState;                 // +0x04
-    fa::string mLineNumberText;    // +0x08
-    fa::string mSourceText;        // +0x24
+    int mMarkerState;           // +0x04
+    fa::string mLineNumberText; // +0x08
+    fa::string mSourceText;     // +0x24
   };
 
   static_assert(offsetof(ScrFileLine, mMarkerState) == 0x04, "ScrFileLine::mMarkerState offset must be 0x04");
-  static_assert(
-    offsetof(ScrFileLine, mLineNumberText) == 0x08,
-    "ScrFileLine::mLineNumberText offset must be 0x08"
-  );
-  static_assert(
-    offsetof(ScrFileLine, mSourceText) == 0x24,
-    "ScrFileLine::mSourceText offset must be 0x24"
-  );
+  static_assert(offsetof(ScrFileLine, mLineNumberText) == 0x08, "ScrFileLine::mLineNumberText offset must be 0x08");
+  static_assert(offsetof(ScrFileLine, mSourceText) == 0x24, "ScrFileLine::mSourceText offset must be 0x24");
   static_assert(sizeof(ScrFileLine) == 0x40, "ScrFileLine size must be 0x40");
 } // namespace moho
-

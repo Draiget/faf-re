@@ -12,7 +12,10 @@
 
 namespace
 {
-  void Check(const bool ok, const char* const what)
+  void Check(
+    const bool ok,
+    const char* const what
+  )
   {
     EXPECT_TRUE(ok) << what;
   }
@@ -30,7 +33,14 @@ namespace
     int slowStarts = 0;
     int slowEnds = 0;
 
-    void Play(CSpeedWatch& watch, const int from, const int to, const int requested, const int speed, const float beatMs)
+    void Play(
+      CSpeedWatch& watch,
+      const int from,
+      const int to,
+      const int requested,
+      const int speed,
+      const float beatMs
+    )
     {
       for (int second = from; second < to; ++second) {
         const SSpeedNews news = watch.Update(SSpeedSample{static_cast<double>(second), requested, speed, beatMs});
@@ -50,7 +60,10 @@ namespace
     CSpeedWatch watch(90.0f);
     SRun run;
     run.Play(watch, 0, 3600, 1, 1, 60.0f);
-    Check(run.requestChanges == 0 && run.speedChanges == 0 && run.slowStarts == 0 && run.slowEnds == 0, "an hour of steady speed says nothing");
+    Check(
+      run.requestChanges == 0 && run.speedChanges == 0 && run.slowStarts == 0 && run.slowEnds == 0,
+      "an hour of steady speed says nothing"
+    );
   }
 
   void SpeedChangeMustHold()
@@ -121,9 +134,45 @@ namespace
   }
 } // namespace
 
-TEST(Existing_SpeedWatch, QuietWhileSteady) { QuietWhileSteady(); }
-TEST(Existing_SpeedWatch, SpeedChangeMustHold) { SpeedChangeMustHold(); }
-TEST(Existing_SpeedWatch, RequestReportedAtOnce) { RequestReportedAtOnce(); }
-TEST(Existing_SpeedWatch, SlowWarnsOnce) { SlowWarnsOnce(); }
-TEST(Existing_SpeedWatch, NoMeasureNoWarning) { NoMeasureNoWarning(); }
-TEST(Existing_SpeedWatch, SpeedScale) { SpeedScale(); }
+TEST(
+  Existing_SpeedWatch,
+  QuietWhileSteady
+)
+{
+  QuietWhileSteady();
+}
+TEST(
+  Existing_SpeedWatch,
+  SpeedChangeMustHold
+)
+{
+  SpeedChangeMustHold();
+}
+TEST(
+  Existing_SpeedWatch,
+  RequestReportedAtOnce
+)
+{
+  RequestReportedAtOnce();
+}
+TEST(
+  Existing_SpeedWatch,
+  SlowWarnsOnce
+)
+{
+  SlowWarnsOnce();
+}
+TEST(
+  Existing_SpeedWatch,
+  NoMeasureNoWarning
+)
+{
+  NoMeasureNoWarning();
+}
+TEST(
+  Existing_SpeedWatch,
+  SpeedScale
+)
+{
+  SpeedScale();
+}

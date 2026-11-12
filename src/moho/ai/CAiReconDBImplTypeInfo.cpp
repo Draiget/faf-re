@@ -82,9 +82,7 @@ namespace
      */
     void SetCount(void* obj, int count) const override;
   };
-  static_assert(
-    sizeof(ReconBlipPointerVectorType) == 0x68, "ReconBlipPointerVectorType size must be 0x68"
-  );
+  static_assert(sizeof(ReconBlipPointerVectorType) == 0x68, "ReconBlipPointerVectorType size must be 0x68");
 
   class ReconBlipMapType final : public gpg::RType
   {
@@ -169,7 +167,9 @@ namespace
     return gSReconKeyType;
   }
 
-  [[nodiscard]] gpg::RRef MakeReconBlipObjectRef(ReconBlip* object)
+  [[nodiscard]] gpg::RRef MakeReconBlipObjectRef(
+    ReconBlip* object
+  )
   {
     gpg::RRef out{};
     out.mObj = nullptr;
@@ -195,7 +195,9 @@ namespace
     return out;
   }
 
-  [[nodiscard]] gpg::RRef MakeReconBlipPointerSlotRef(ReconBlip** slot)
+  [[nodiscard]] gpg::RRef MakeReconBlipPointerSlotRef(
+    ReconBlip** slot
+  )
   {
     if (gpg::RType* const pointerType = CachedReconBlipPointerType(); pointerType != nullptr) {
       gpg::RRef out{};
@@ -207,7 +209,9 @@ namespace
     return MakeReconBlipObjectRef(slot ? *slot : nullptr);
   }
 
-  [[nodiscard]] ReconBlip* DecodeTrackedReconBlipPointer(const gpg::TrackedPointerInfo& tracked)
+  [[nodiscard]] ReconBlip* DecodeTrackedReconBlipPointer(
+    const gpg::TrackedPointerInfo& tracked
+  )
   {
     if (!tracked.object) {
       return nullptr;
@@ -241,7 +245,9 @@ namespace
    * Invokes slot-0 delete-with-flag semantics with flag `1` when the runtime
    * object pointer is non-null.
    */
-  void DeleteAiReconDbObject(void* const object)
+  void DeleteAiReconDbObject(
+    void* const object
+  )
   {
     auto* const runtime = static_cast<DeleteWithFlagSlot0*>(object);
     if (!runtime) {
@@ -258,7 +264,9 @@ namespace
    * Invokes slot-0 delete-with-flag semantics with flag `0` (non-deleting
    * destructor path).
    */
-  void DestroyAiReconDbObject(void* const object)
+  void DestroyAiReconDbObject(
+    void* const object
+  )
   {
     (void)static_cast<DeleteWithFlagSlot0*>(object)->DeleteWithFlag(0);
   }
@@ -275,7 +283,9 @@ namespace
     return gpg::MakeTypedRef(new CAiReconDBImpl(nullptr, false), gpg::RTypeOf<CAiReconDBImpl>());
   }
 
-  [[maybe_unused]] void DeleteAiReconDbOwned(void* object)
+  [[maybe_unused]] void DeleteAiReconDbOwned(
+    void* object
+  )
   {
     delete static_cast<CAiReconDBImpl*>(object);
   }
@@ -287,7 +297,9 @@ namespace
    * Runs one in-place `CAiReconDBImpl` default construction lane and wraps the
    * resulting storage pointer as one reflected `RRef_CAiReconDBImpl` payload.
    */
-  [[nodiscard]] gpg::RRef ConstructAiReconDbRefInPlace(void* objectStorage)
+  [[nodiscard]] gpg::RRef ConstructAiReconDbRefInPlace(
+    void* objectStorage
+  )
   {
     auto* const recon = static_cast<CAiReconDBImpl*>(objectStorage);
     CAiReconDBImpl* constructed = nullptr;
@@ -300,7 +312,9 @@ namespace
     return out;
   }
 
-  [[maybe_unused]] void DestroyAiReconDbInPlace(void* object)
+  [[maybe_unused]] void DestroyAiReconDbInPlace(
+    void* object
+  )
   {
     auto* const recon = static_cast<CAiReconDBImpl*>(object);
     if (recon) {
@@ -315,7 +329,9 @@ namespace
    * Lazily resolves `IAiReconDB::sType`, builds a zero-offset `gpg::RField`,
    * and registers `IAiReconDB` as a base of `typeInfo`.
    */
-  void AddIAiReconDBBase(gpg::RType* typeInfo)
+  void AddIAiReconDBBase(
+    gpg::RType* typeInfo
+  )
   {
     gpg::AddReflectedBase<IAiReconDB>(typeInfo);
   }
@@ -326,7 +342,9 @@ namespace
     return sName.c_str();
   }
 
-  fa::string ReconBlipPointerVectorType::GetLexical(const gpg::RRef& ref) const
+  fa::string ReconBlipPointerVectorType::GetLexical(
+    const gpg::RRef& ref
+  ) const
   {
     const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
@@ -345,7 +363,10 @@ namespace
     serSaveFunc_ = &SerializeReconBlipPointerVector;
   }
 
-  gpg::RRef ReconBlipPointerVectorType::SubscriptIndex(void* const obj, const int ind) const
+  gpg::RRef ReconBlipPointerVectorType::SubscriptIndex(
+    void* const obj,
+    const int ind
+  ) const
   {
     auto* const storage = static_cast<fa::vector<ReconBlip*>*>(obj);
     if (!storage || ind < 0 || static_cast<size_t>(ind) >= storage->size()) {
@@ -355,13 +376,18 @@ namespace
     return MakeReconBlipPointerSlotRef(storage->data() + ind);
   }
 
-  size_t ReconBlipPointerVectorType::GetCount(void* const obj) const
+  size_t ReconBlipPointerVectorType::GetCount(
+    void* const obj
+  ) const
   {
     const auto* const storage = static_cast<const fa::vector<ReconBlip*>*>(obj);
     return storage ? storage->size() : 0u;
   }
 
-  void ReconBlipPointerVectorType::SetCount(void* const obj, const int count) const
+  void ReconBlipPointerVectorType::SetCount(
+    void* const obj,
+    const int count
+  ) const
   {
     auto* const storage = static_cast<fa::vector<ReconBlip*>*>(obj);
     GPG_ASSERT(storage != nullptr);
@@ -380,7 +406,9 @@ namespace
     return sName.c_str();
   }
 
-  fa::string ReconBlipMapType::GetLexical(const gpg::RRef& ref) const
+  fa::string ReconBlipMapType::GetLexical(
+    const gpg::RRef& ref
+  ) const
   {
     const fa::string base = gpg::RType::GetLexical(ref);
     const auto* const storage = static_cast<const ReconBlipMap*>(ref.mObj);
@@ -410,14 +438,18 @@ namespace
    * so a mid-read failure leaves the destination untouched rather than
    * partially overwritten.
    */
-  void DeserializeReconBlipPointerVector(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
+  void DeserializeReconBlipPointerVector(
+    gpg::ReadArchive* const archive,
+    const std::intptr_t objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
   {
     if (!archive || objectPtr == 0) {
       return;
     }
 
-    auto* const storage =
-      reinterpret_cast<fa::vector<ReconBlip*>*>(objectPtr);
+    auto* const storage = reinterpret_cast<fa::vector<ReconBlip*>*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
@@ -437,15 +469,18 @@ namespace
   /**
    * Address: 0x005C59F0 (FUN_005C59F0)
    */
-  void SerializeReconBlipPointerVector(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
+  void SerializeReconBlipPointerVector(
+    gpg::WriteArchive* const archive,
+    const std::intptr_t objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
   {
     if (!archive || objectPtr == 0) {
       return;
     }
 
-    const auto* const storage = reinterpret_cast<const fa::vector<ReconBlip*>*>(
-      objectPtr
-    );
+    const auto* const storage = reinterpret_cast<const fa::vector<ReconBlip*>*>(objectPtr);
 
     const unsigned int count = static_cast<unsigned int>(storage->size());
     archive->WriteUInt(count);
@@ -460,15 +495,18 @@ namespace
   /**
    * Address: 0x005C6210 (FUN_005C6210)
    */
-  void DeserializeReconBlipMapStorage(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
+  void DeserializeReconBlipMapStorage(
+    gpg::ReadArchive* const archive,
+    const std::intptr_t objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
   {
     if (!archive || objectPtr == 0) {
       return;
     }
 
-    auto* const storage = reinterpret_cast<ReconBlipMap*>(
-      objectPtr
-    );
+    auto* const storage = reinterpret_cast<ReconBlipMap*>(objectPtr);
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
@@ -495,15 +533,18 @@ namespace
   /**
    * Address: 0x005C6390 (FUN_005C6390)
    */
-  void SerializeReconBlipMapStorage(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const ownerRef)
+  void SerializeReconBlipMapStorage(
+    gpg::WriteArchive* const archive,
+    const std::intptr_t objectPtr,
+    const int,
+    gpg::RRef* const ownerRef
+  )
   {
     if (!archive || objectPtr == 0) {
       return;
     }
 
-    const auto* const storage = reinterpret_cast<const ReconBlipMap*>(
-      objectPtr
-    );
+    const auto* const storage = reinterpret_cast<const ReconBlipMap*>(objectPtr);
 
     const unsigned int count = storage ? static_cast<unsigned int>(storage->size()) : 0u;
     archive->WriteUInt(count);
@@ -669,7 +710,16 @@ void moho::register_RMultiMapType_SReconKey_ReconBlipPtr()
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CAiReconDBImplTypeInfo_049ac2, moho::register_CAiReconDBImplTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CAiReconDBImplTypeInfo_049ac2,
+  moho::register_CAiReconDBImplTypeInfo
+)
 
-GPG_PREREGISTER_INIT(preregister_RVectorType_ReconBlipPtr_049ac2, moho::preregister_RVectorType_ReconBlipPtr)
-GPG_PREREGISTER_INIT(preregister_RMultiMapType_SReconKey_ReconBlipPtr_049ac2, moho::preregister_RMultiMapType_SReconKey_ReconBlipPtr)
+GPG_PREREGISTER_INIT(
+  preregister_RVectorType_ReconBlipPtr_049ac2,
+  moho::preregister_RVectorType_ReconBlipPtr
+)
+GPG_PREREGISTER_INIT(
+  preregister_RMultiMapType_SReconKey_ReconBlipPtr_049ac2,
+  moho::preregister_RMultiMapType_SReconKey_ReconBlipPtr
+)

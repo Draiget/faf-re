@@ -13,7 +13,9 @@ namespace faf_core_tests
   {
     // `HandleAssertFailure` hands its message to the die handler and returns when none is set, so an engine
     // assertion inside a test would pass unseen. This handler turns it into a test failure.
-    void FailOnEngineAssertion(const char* const message)
+    void FailOnEngineAssertion(
+      const char* const message
+    )
     {
       ADD_FAILURE() << "engine assertion: " << (message != nullptr ? message : "(null)");
     }
@@ -21,8 +23,14 @@ namespace faf_core_tests
     class EngineAssertEnvironment final : public ::testing::Environment
     {
     public:
-      void SetUp() override { mPrevious = gpg::SetDieHandler(&FailOnEngineAssertion); }
-      void TearDown() override { (void)gpg::SetDieHandler(mPrevious); }
+      void SetUp() override
+      {
+        mPrevious = gpg::SetDieHandler(&FailOnEngineAssertion);
+      }
+      void TearDown() override
+      {
+        (void)gpg::SetDieHandler(mPrevious);
+      }
 
     private:
       gpg::die_handler_t mPrevious = nullptr;
@@ -36,8 +44,8 @@ namespace faf_core_tests
 
   TempDir::TempDir()
   {
-    const std::string name = "faf_core_tests_" + std::to_string(::GetCurrentProcessId()) + "_" +
-                             std::to_string(gTempDirCounter.fetch_add(1u));
+    const std::string name =
+      "faf_core_tests_" + std::to_string(::GetCurrentProcessId()) + "_" + std::to_string(gTempDirCounter.fetch_add(1u));
     mPath = std::filesystem::temp_directory_path() / name;
     std::error_code error;
     std::filesystem::remove_all(mPath, error);
@@ -51,7 +59,10 @@ namespace faf_core_tests
     std::filesystem::remove_all(mPath, error);
   }
 
-  std::string PatternBytes(const std::size_t size, std::uint32_t seed)
+  std::string PatternBytes(
+    const std::size_t size,
+    std::uint32_t seed
+  )
   {
     std::string bytes(size, '\0');
     for (std::size_t index = 0; index < size; ++index) {
@@ -61,7 +72,9 @@ namespace faf_core_tests
     return bytes;
   }
 
-  std::string ReadWholeFile(const std::string& path)
+  std::string ReadWholeFile(
+    const std::string& path
+  )
   {
     std::string bytes;
     std::FILE* file = nullptr;
@@ -81,7 +94,10 @@ namespace faf_core_tests
     return bytes;
   }
 
-  void WriteWholeFile(const std::string& path, const std::string& bytes)
+  void WriteWholeFile(
+    const std::string& path,
+    const std::string& bytes
+  )
   {
     std::FILE* file = nullptr;
     if (fopen_s(&file, path.c_str(), "wb") != 0 || file == nullptr) {
@@ -94,7 +110,10 @@ namespace faf_core_tests
     std::fclose(file);
   }
 
-  std::string ToHex(const void* const data, const std::size_t size)
+  std::string ToHex(
+    const void* const data,
+    const std::size_t size
+  )
   {
     static constexpr char kDigits[] = "0123456789abcdef";
     const auto* const bytes = static_cast<const unsigned char*>(data);

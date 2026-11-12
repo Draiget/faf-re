@@ -43,7 +43,10 @@ CMessage::~CMessage()
  * What it does:
  * Initializes message buffer with 3-byte header and requested payload space.
  */
-CMessage::CMessage(const MessageType type, size_t size)
+CMessage::CMessage(
+  const MessageType type,
+  size_t size
+)
 {
   InitializeHeaderForPayloadSizeAndType(size, type);
   mPos = 0;
@@ -55,7 +58,9 @@ CMessage::CMessage(const MessageType type, size_t size)
  * What it does:
  * Resizes wire storage to `payloadSize + 3` and writes the two-byte wire-size header.
  */
-void CMessage::InitializeHeaderForPayloadSize(const size_t payloadSize)
+void CMessage::InitializeHeaderForPayloadSize(
+  const size_t payloadSize
+)
 {
   const auto wireSize = payloadSize + kHeaderSize;
   constexpr char fill = 0;
@@ -69,7 +74,10 @@ void CMessage::InitializeHeaderForPayloadSize(const size_t payloadSize)
  * What it does:
  * Rebuilds wire header for payload size and writes message type byte 0.
  */
-void CMessage::InitializeHeaderForPayloadSizeAndType(const size_t payloadSize, const MessageType type)
+void CMessage::InitializeHeaderForPayloadSizeAndType(
+  const size_t payloadSize,
+  const MessageType type
+)
 {
   InitializeHeaderForPayloadSize(payloadSize);
   SetType(type);
@@ -81,7 +89,9 @@ void CMessage::InitializeHeaderForPayloadSizeAndType(const size_t payloadSize, c
  * What it does:
  * Deep-copies message storage and read cursor for host-side containers/callers.
  */
-CMessage::CMessage(const CMessage& other)
+CMessage::CMessage(
+  const CMessage& other
+)
 {
   mBuff.ResetFrom(other.mBuff);
   mPos = other.mPos;
@@ -93,7 +103,9 @@ CMessage::CMessage(const CMessage& other)
  * What it does:
  * Deep-copy assignment for message storage and read cursor.
  */
-CMessage& CMessage::operator=(const CMessage& other)
+CMessage& CMessage::operator=(
+  const CMessage& other
+)
 {
   if (this == &other) {
     return *this;
@@ -110,7 +122,9 @@ CMessage& CMessage::operator=(const CMessage& other)
  * What it does:
  * Transfers message state by clone+reset semantics.
  */
-CMessage::CMessage(CMessage&& other)
+CMessage::CMessage(
+  CMessage&& other
+)
 {
   mBuff.ResetFrom(other.mBuff);
   mPos = other.mPos;
@@ -123,7 +137,9 @@ CMessage::CMessage(CMessage&& other)
  * What it does:
  * Move assignment via clone+reset semantics.
  */
-CMessage& CMessage::operator=(CMessage&& other)
+CMessage& CMessage::operator=(
+  CMessage&& other
+)
 {
   if (this == &other) {
     return *this;
@@ -158,7 +174,10 @@ int CMessage::GetMessageSize()
  * What it does:
  * Appends raw bytes, updates header size bytes, and returns header high-byte.
  */
-unsigned int CMessage::Append(const char* ptr, const size_t size)
+unsigned int CMessage::Append(
+  const char* ptr,
+  const size_t size
+)
 {
   if (mBuff.Size() + size >= kMaxWireSizeExclusive) {
     throw std::runtime_error{std::string{"Message too large"}};
@@ -178,7 +197,9 @@ unsigned int CMessage::Append(const char* ptr, const size_t size)
  * Appends one payload byte in-place when capacity allows, otherwise routes
  * through fastvector insert-grow for a single-byte range.
  */
-void CMessage::AppendChar(const char* const ptr)
+void CMessage::AppendChar(
+  const char* const ptr
+)
 {
   char* const end = mBuff.end_;
   if (end == mBuff.capacity_) {
@@ -211,7 +232,9 @@ void CMessage::Clear() noexcept
  * What it does:
  * Reads a complete wire message (header first, then payload).
  */
-bool CMessage::ReadMessage(gpg::Stream* stream)
+bool CMessage::ReadMessage(
+  gpg::Stream* stream
+)
 {
   constexpr char fill = 0;
   mBuff.Resize(kHeaderSize, fill);
@@ -238,7 +261,9 @@ bool CMessage::ReadMessage(gpg::Stream* stream)
  * A header claiming fewer than 3 bytes makes this return false for good;
  * callers that read remote streams check `HasInvalidLength()` for it.
  */
-bool CMessage::Read(gpg::Stream* stream)
+bool CMessage::Read(
+  gpg::Stream* stream
+)
 {
   if (!HasReadLength()) {
     if (mBuff.Size() == 0) {

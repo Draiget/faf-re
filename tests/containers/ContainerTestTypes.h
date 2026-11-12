@@ -43,13 +43,17 @@ namespace faf_container_tests
       ++live;
     }
 
-    explicit BasicTracked(const int v) noexcept
+    explicit BasicTracked(
+      const int v
+    ) noexcept
       : value(v)
     {
       ++live;
     }
 
-    BasicTracked(const BasicTracked& other) noexcept
+    BasicTracked(
+      const BasicTracked& other
+    ) noexcept
       : value(other.value)
     {
       Check(other);
@@ -64,7 +68,9 @@ namespace faf_container_tests
       ++live;
     }
 
-    BasicTracked& operator=(const BasicTracked& other) noexcept
+    BasicTracked& operator=(
+      const BasicTracked& other
+    ) noexcept
     {
       Check(other);
       Check(*this);
@@ -90,23 +96,34 @@ namespace faf_container_tests
       --live;
     }
 
-    friend bool operator==(const BasicTracked& a, const BasicTracked& b) noexcept
+    friend bool operator==(
+      const BasicTracked& a,
+      const BasicTracked& b
+    ) noexcept
     {
       return a.value == b.value;
     }
 
-    friend bool operator<(const BasicTracked& a, const BasicTracked& b) noexcept
+    friend bool operator<(
+      const BasicTracked& a,
+      const BasicTracked& b
+    ) noexcept
     {
       return a.value < b.value;
     }
 
-    friend std::ostream& operator<<(std::ostream& out, const BasicTracked& t)
+    friend std::ostream& operator<<(
+      std::ostream& out,
+      const BasicTracked& t
+    )
     {
       return out << "Tracked(" << t.value << ")";
     }
 
   private:
-    static void Check(const BasicTracked& t) noexcept
+    static void Check(
+      const BasicTracked& t
+    ) noexcept
     {
       if (t.magic != kAlive) {
         ++badAccesses;
@@ -119,7 +136,10 @@ namespace faf_container_tests
 
   /** The `value`s of a range of `BasicTracked`, or the range itself for plain ints. */
   template <class It>
-  [[nodiscard]] std::vector<int> Values(It first, It last)
+  [[nodiscard]] std::vector<int> Values(
+    It first,
+    It last
+  )
   {
     std::vector<int> out;
     for (; first != last; ++first) {
@@ -133,7 +153,9 @@ namespace faf_container_tests
   }
 
   template <class Container>
-  [[nodiscard]] std::vector<int> Values(const Container& c)
+  [[nodiscard]] std::vector<int> Values(
+    const Container& c
+  )
   {
     return Values(c.begin(), c.end());
   }

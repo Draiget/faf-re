@@ -21,7 +21,9 @@ namespace faf::headless
     constexpr const char* kKindNames[] = {"units", "blips", "props", "projectiles", "other"};
   } // namespace
 
-  CReplayOracleCheck::CReplayOracleCheck(const std::string& digestPath)
+  CReplayOracleCheck::CReplayOracleCheck(
+    const std::string& digestPath
+  )
     : mDigestsWanted(!digestPath.empty())
   {
     if (mDigestsWanted && fopen_s(&mDigests, digestPath.c_str(), "w") != 0) {
@@ -52,7 +54,10 @@ namespace faf::headless
     moho::Sim::SetSyncObserver(nullptr);
   }
 
-  void CReplayOracleCheck::OnSyncWalkDone(moho::Sim& sim, const moho::SSyncData& packet)
+  void CReplayOracleCheck::OnSyncWalkDone(
+    moho::Sim& sim,
+    const moho::SSyncData& packet
+  )
   {
     (void)packet;
     const std::int32_t focusArmy = sim.mSyncFilter.focusArmy;
@@ -107,13 +112,24 @@ namespace faf::headless
       if (difference != nullptr && mExamples.size() < kLoggedDifferences) {
         char line[320];
         std::snprintf(
-          line, sizeof(line),
+          line,
+          sizeof(line),
           "beat %u id 0x%08X %s: %s (army %d; oracle published=%d mode=%d; sim interface=%d flag=%d mode=%d; "
           "viz focus/ally/enemy/neutral %d/%d/%d/%d; destroying=%d)",
-          sim.mCurBeat, static_cast<unsigned>(entity->id_), kKindNames[kind], difference, entity->GetArmyIndex(),
-          oracle.published ? 1 : 0, static_cast<int>(oracle.mode), simPublished ? 1 : 0,
-          static_cast<int>(entity->mVarDat.mVisibilityHidden), static_cast<int>(simMode), entity->mVizToFocusPlayer,
-          entity->mVizToAllies, entity->mVizToEnemies, entity->mVizToNeutrals,
+          sim.mCurBeat,
+          static_cast<unsigned>(entity->id_),
+          kKindNames[kind],
+          difference,
+          entity->GetArmyIndex(),
+          oracle.published ? 1 : 0,
+          static_cast<int>(oracle.mode),
+          simPublished ? 1 : 0,
+          static_cast<int>(entity->mVarDat.mVisibilityHidden),
+          static_cast<int>(simMode),
+          entity->mVizToFocusPlayer,
+          entity->mVizToAllies,
+          entity->mVizToEnemies,
+          entity->mVizToNeutrals,
           static_cast<int>(entity->mOnDestroyDispatched)
         );
         mExamples.emplace_back(line);
@@ -126,7 +142,10 @@ namespace faf::headless
     }
   }
 
-  void CReplayOracleCheck::CompareSpatial(moho::Sim& sim, const std::int32_t focusArmy)
+  void CReplayOracleCheck::CompareSpatial(
+    moho::Sim& sim,
+    const std::int32_t focusArmy
+  )
   {
     mSpatial.Build(sim);
     const std::int32_t armyCount = static_cast<std::int32_t>(sim.mArmiesList.size());
@@ -144,16 +163,25 @@ namespace faf::headless
         const auto mismatch = std::mismatch(mBruteIds.begin(), mBruteIds.end(), mSpatialIds.begin(), mSpatialIds.end());
         char line[200];
         std::snprintf(
-          line, sizeof(line), "beat %u army %d: spatial set differs (brute %zu, spatial %zu; first brute 0x%08X spatial 0x%08X)",
-          sim.mCurBeat, army, mBruteIds.size(), mSpatialIds.size(),
-          mismatch.first != mBruteIds.end() ? *mismatch.first : 0u, mismatch.second != mSpatialIds.end() ? *mismatch.second : 0u
+          line,
+          sizeof(line),
+          "beat %u army %d: spatial set differs (brute %zu, spatial %zu; first brute 0x%08X spatial 0x%08X)",
+          sim.mCurBeat,
+          army,
+          mBruteIds.size(),
+          mSpatialIds.size(),
+          mismatch.first != mBruteIds.end() ? *mismatch.first : 0u,
+          mismatch.second != mSpatialIds.end() ? *mismatch.second : 0u
         );
         mExamples.emplace_back(line);
       }
     }
   }
 
-  void CReplayOracleCheck::WriteDigests(moho::Sim& sim, const std::int32_t focusArmy)
+  void CReplayOracleCheck::WriteDigests(
+    moho::Sim& sim,
+    const std::int32_t focusArmy
+  )
   {
     const std::int32_t armyCount = static_cast<std::int32_t>(sim.mArmiesList.size());
     const std::int32_t first = focusArmy == -1 ? 0 : focusArmy;
@@ -180,7 +208,8 @@ namespace faf::headless
         visible += sent ? 1u : 0u;
         add(static_cast<std::uint32_t>(entity->id_));
         add(
-          (view.published ? 1u : 0u) | (sent ? 2u : 0u) | (shown ? 4u : 0u) | (static_cast<std::uint32_t>(view.mode) << 8)
+          (view.published ? 1u : 0u) | (sent ? 2u : 0u) | (shown ? 4u : 0u) |
+          (static_cast<std::uint32_t>(view.mode) << 8)
         );
       }
       std::fprintf(
@@ -206,25 +235,37 @@ namespace faf::headless
     const std::lock_guard<std::mutex> guard(mLock);
     char text[256];
     std::snprintf(
-      text, sizeof(text), "oracle check: focus %d, %llu beats, %llu entity-beats differ", mFocusArmy,
-      static_cast<unsigned long long>(mBeats), static_cast<unsigned long long>(failures)
+      text,
+      sizeof(text),
+      "oracle check: focus %d, %llu beats, %llu entity-beats differ",
+      mFocusArmy,
+      static_cast<unsigned long long>(mBeats),
+      static_cast<unsigned long long>(failures)
     );
     std::string summary = text;
     std::snprintf(
-      text, sizeof(text), "; spatial oracle: %llu army-beats, %llu differ from brute force",
-      static_cast<unsigned long long>(mSpatialViews), static_cast<unsigned long long>(mSpatialDiffers)
+      text,
+      sizeof(text),
+      "; spatial oracle: %llu army-beats, %llu differ from brute force",
+      static_cast<unsigned long long>(mSpatialViews),
+      static_cast<unsigned long long>(mSpatialDiffers)
     );
     summary += text;
     for (std::size_t kind = 0; kind < kKindCount; ++kind) {
       const SCounts& counts = mCounts[kind];
       std::snprintf(
-        text, sizeof(text),
+        text,
+        sizeof(text),
         "\n  %s: %llu checked, %llu published by both, %llu only by the oracle, %llu only by the sim, %llu mode "
         "differs; sent %llu, mesh shown %llu",
-        kKindNames[kind], static_cast<unsigned long long>(counts.checked),
-        static_cast<unsigned long long>(counts.published), static_cast<unsigned long long>(counts.onlyOracle),
-        static_cast<unsigned long long>(counts.onlySim), static_cast<unsigned long long>(counts.modeDiffers),
-        static_cast<unsigned long long>(counts.sent), static_cast<unsigned long long>(counts.meshShown)
+        kKindNames[kind],
+        static_cast<unsigned long long>(counts.checked),
+        static_cast<unsigned long long>(counts.published),
+        static_cast<unsigned long long>(counts.onlyOracle),
+        static_cast<unsigned long long>(counts.onlySim),
+        static_cast<unsigned long long>(counts.modeDiffers),
+        static_cast<unsigned long long>(counts.sent),
+        static_cast<unsigned long long>(counts.meshShown)
       );
       summary += text;
     }

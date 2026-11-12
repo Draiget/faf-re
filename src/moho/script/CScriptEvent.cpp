@@ -391,7 +391,8 @@ namespace
    * caller-provided output storage.
    */
   [[maybe_unused]] gpg::RRef* StoreCScriptObjectPointerRef(
-    gpg::RRef* const outRef, CScriptObject** const scriptObjectSlot
+    gpg::RRef* const outRef,
+    CScriptObject** const scriptObjectSlot
   )
   {
     *outRef = gpg::MakeRRef<moho::CScriptObject*>(scriptObjectSlot);
@@ -405,7 +406,10 @@ namespace
    * Writes one `gpg::RRef` lane for a CScriptEvent pointer into
    * caller-provided output storage.
    */
-  [[maybe_unused]] gpg::RRef* StoreCScriptEventRef(gpg::RRef* const outRef, CScriptEvent* const event)
+  [[maybe_unused]] gpg::RRef* StoreCScriptEventRef(
+    gpg::RRef* const outRef,
+    CScriptEvent* const event
+  )
   {
     *outRef = gpg::MakeRRef<moho::CScriptEvent>(event);
     return outRef;
@@ -428,7 +432,9 @@ namespace
   /**
    * Address: 0x004CB5E0 (FUN_004CB5E0, CScriptEventTypeInfo::deleteFunc_)
    */
-  void DeleteScriptEventOwned(void* object)
+  void DeleteScriptEventOwned(
+    void* object
+  )
   {
     delete static_cast<CScriptEvent*>(object);
   }
@@ -437,7 +443,9 @@ namespace
    * Address: 0x004CB600 (FUN_004CB600, CScriptEventTypeInfo::ctorRefFunc_)
    */
   [[nodiscard]]
-  gpg::RRef ConstructScriptEventRefInPlace(void* objectStorage)
+  gpg::RRef ConstructScriptEventRefInPlace(
+    void* objectStorage
+  )
   {
     auto* const event = static_cast<CScriptEvent*>(objectStorage);
     if (event) {
@@ -451,7 +459,9 @@ namespace
   /**
    * Address: 0x004CB670 (FUN_004CB670, CScriptEventTypeInfo::dtrFunc_)
    */
-  void DestroyScriptEventInPlace(void* object)
+  void DestroyScriptEventInPlace(
+    void* object
+  )
   {
     auto* const event = static_cast<CScriptEvent*>(object);
     if (event) {
@@ -465,7 +475,9 @@ namespace
    * What it does:
    * Assigns `newRefFunc_` and `ctorRefFunc_` callback lanes on one RType.
    */
-  [[maybe_unused]] gpg::RType* ConfigureScriptEventRefCreateCallbacks(gpg::RType* const typeInfo)
+  [[maybe_unused]] gpg::RType* ConfigureScriptEventRefCreateCallbacks(
+    gpg::RType* const typeInfo
+  )
   {
     typeInfo->newRefFunc_ = &CreateScriptEventRefOwned;
     typeInfo->ctorRefFunc_ = &ConstructScriptEventRefInPlace;
@@ -478,7 +490,9 @@ namespace
    * What it does:
    * Assigns `deleteFunc_` and `dtrFunc_` callback lanes on one RType.
    */
-  [[maybe_unused]] gpg::RType* ConfigureScriptEventRefDestroyCallbacks(gpg::RType* const typeInfo)
+  [[maybe_unused]] gpg::RType* ConfigureScriptEventRefDestroyCallbacks(
+    gpg::RType* const typeInfo
+  )
   {
     typeInfo->deleteFunc_ = &DeleteScriptEventOwned;
     typeInfo->dtrFunc_ = &DestroyScriptEventInPlace;
@@ -491,7 +505,9 @@ namespace
    * What it does:
    * Assigns all reflection object-lifecycle callback lanes on one RType.
    */
-  [[maybe_unused]] gpg::RType* ConfigureScriptEventRefCallbacks(gpg::RType* const typeInfo)
+  [[maybe_unused]] gpg::RType* ConfigureScriptEventRefCallbacks(
+    gpg::RType* const typeInfo
+  )
   {
     (void)ConfigureScriptEventRefCreateCallbacks(typeInfo);
     (void)ConfigureScriptEventRefDestroyCallbacks(typeInfo);
@@ -504,7 +520,9 @@ namespace
    * What it does:
    * Clears one reflected reference payload to `{nullptr, nullptr}`.
    */
-  [[maybe_unused]] gpg::RRef* ClearRRef(gpg::RRef* const outRef)
+  [[maybe_unused]] gpg::RRef* ClearRRef(
+    gpg::RRef* const outRef
+  )
   {
     outRef->mObj = nullptr;
     outRef->mType = nullptr;
@@ -520,25 +538,22 @@ namespace moho
 /**
  * Address: 0x004C9420 (FUN_004C9420, ??0CScriptEvent@Moho@@QAE@@Z)
  */
-CScriptEvent::CScriptEvent()
-{
-}
+CScriptEvent::CScriptEvent() {}
 
 /**
  * Address: 0x006D30F0 (FUN_006D30F0, ??0CScriptEvent@Moho@@QAE@@Z_0)
  */
-CScriptEvent::CScriptEvent(const LuaPlus::LuaObject& scriptFactory)
+CScriptEvent::CScriptEvent(
+  const LuaPlus::LuaObject& scriptFactory
+)
   : CTaskEvent()
   , CScriptObject(scriptFactory, LuaPlus::LuaObject{}, LuaPlus::LuaObject{}, LuaPlus::LuaObject{})
-{
-}
+{}
 
 /**
  * Address: 0x004C94C0 (FUN_004C94C0, ??1CScriptEvent@Moho@@UAE@XZ)
  */
-CScriptEvent::~CScriptEvent()
-{
-}
+CScriptEvent::~CScriptEvent() {}
 
 /**
  * Address: 0x004C93E0 (FUN_004C93E0, ?GetClass@CScriptEvent@Moho@@UBEPAVRType@gpg@@XZ)
@@ -572,7 +587,9 @@ gpg::RRef CScriptEvent::GetDerivedObjectRef()
 /**
  * Address: 0x004CB820 (FUN_004CB820, Moho::CScriptEvent::MemberDeserialize)
  */
-void CScriptEvent::MemberDeserialize(gpg::ReadArchive* const archive)
+void CScriptEvent::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   gpg::RRef ownerRef{};
 
@@ -590,7 +607,9 @@ void CScriptEvent::MemberDeserialize(gpg::ReadArchive* const archive)
 /**
  * Address: 0x004CB8A0 (FUN_004CB8A0, Moho::CScriptEvent::MemberSerialize)
  */
-void CScriptEvent::MemberSerialize(gpg::WriteArchive* const archive) const
+void CScriptEvent::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   gpg::RRef ownerRef{};
 
@@ -608,7 +627,9 @@ void CScriptEvent::MemberSerialize(gpg::WriteArchive* const archive) const
 /**
  * Address: 0x004C8270 (FUN_004C8270, func_GetCObj_CScriptObject)
  */
-CScriptObject* moho::SCR_GetScriptObjectFromLuaObject(const LuaPlus::LuaObject& object)
+CScriptObject* moho::SCR_GetScriptObjectFromLuaObject(
+  const LuaPlus::LuaObject& object
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -618,7 +639,9 @@ CScriptObject* moho::SCR_GetScriptObjectFromLuaObject(const LuaPlus::LuaObject& 
   return *scriptObjectSlot;
 }
 
-CScriptObject** moho::SCR_FromLua_CScriptObject(const LuaPlus::LuaObject& object)
+CScriptObject** moho::SCR_FromLua_CScriptObject(
+  const LuaPlus::LuaObject& object
+)
 {
   return moho::SCR_ScriptObjectSlot(object);
 }
@@ -630,7 +653,10 @@ CScriptObject** moho::SCR_FromLua_CScriptObject(const LuaPlus::LuaObject& object
  * Converts one Lua `_c_object` payload to `CScriptEvent*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CScriptEvent* moho::SCR_FromLua_CScriptEvent(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+CScriptEvent* moho::SCR_FromLua_CScriptEvent(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -657,7 +683,9 @@ CScriptEvent* moho::SCR_FromLua_CScriptEvent(const LuaPlus::LuaObject& object, L
 /**
  * Address: 0x005936C0 (FUN_005936C0, Moho::SCR_FromLua_Unit)
  */
-Unit* moho::SCR_FromLua_Unit(const LuaPlus::LuaObject& object)
+Unit* moho::SCR_FromLua_Unit(
+  const LuaPlus::LuaObject& object
+)
 {
   LuaPlus::LuaState* const activeState = object.GetActiveState();
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
@@ -689,7 +717,10 @@ Unit* moho::SCR_FromLua_Unit(const LuaPlus::LuaObject& object)
  * Converts one Lua `_c_object` payload to `CUnitScriptTask*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CUnitScriptTask* moho::SCR_FromLua_CUnitScriptTask(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+CUnitScriptTask* moho::SCR_FromLua_CUnitScriptTask(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -720,7 +751,10 @@ CUnitScriptTask* moho::SCR_FromLua_CUnitScriptTask(const LuaPlus::LuaObject& obj
  * Converts one Lua `_c_object` payload to `UnitWeapon*` and raises Lua errors
  * for missing, destroyed, or type-mismatched game objects.
  */
-UnitWeapon* moho::SCR_FromLua_UnitWeapon(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+UnitWeapon* moho::SCR_FromLua_UnitWeapon(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -752,7 +786,10 @@ UnitWeapon* moho::SCR_FromLua_UnitWeapon(const LuaPlus::LuaObject& object, LuaPl
  * for missing payload or wrong runtime type, and returns nullptr for
  * destroyed game objects.
  */
-UnitWeapon* moho::SCR_FromLua_UnitWeaponOpt(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+UnitWeapon* moho::SCR_FromLua_UnitWeaponOpt(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -782,7 +819,10 @@ UnitWeapon* moho::SCR_FromLua_UnitWeaponOpt(const LuaPlus::LuaObject& object, Lu
  * Converts one Lua `_c_object` payload to `CAimManipulator*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CAimManipulator* moho::SCR_FromLua_CAimManipulator(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CAimManipulator* moho::SCR_FromLua_CAimManipulator(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -917,7 +957,10 @@ CCollisionManipulator* moho::SCR_FromLua_CCollisionManipulator(
  * Converts one Lua `_c_object` payload to `IAniManipulator*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-IAniManipulator* moho::SCR_FromLua_IAniManipulator(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+IAniManipulator* moho::SCR_FromLua_IAniManipulator(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -949,7 +992,10 @@ IAniManipulator* moho::SCR_FromLua_IAniManipulator(const LuaPlus::LuaObject& obj
  * errors for missing payload or wrong runtime type, and returns nullptr for
  * destroyed game objects.
  */
-IAniManipulator* moho::SCR_FromLua_IAniManipulatorOpt(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+IAniManipulator* moho::SCR_FromLua_IAniManipulatorOpt(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -979,7 +1025,10 @@ IAniManipulator* moho::SCR_FromLua_IAniManipulatorOpt(const LuaPlus::LuaObject& 
  * Converts one Lua `_c_object` payload to `IEffect*` and raises Lua errors
  * for missing, destroyed, or type-mismatched game objects.
  */
-IEffect* moho::SCR_FromLua_IEffect(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+IEffect* moho::SCR_FromLua_IEffect(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1011,7 +1060,10 @@ IEffect* moho::SCR_FromLua_IEffect(const LuaPlus::LuaObject& object, LuaPlus::Lu
  * missing payload or wrong runtime type, and returns nullptr for destroyed
  * game objects.
  */
-IEffect* moho::SCR_FromLua_IEffectOpt(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+IEffect* moho::SCR_FromLua_IEffectOpt(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1042,7 +1094,10 @@ IEffect* moho::SCR_FromLua_IEffectOpt(const LuaPlus::LuaObject& object, LuaPlus:
  * for missing payload or wrong runtime type, and returns nullptr for
  * destroyed game objects.
  */
-CDecalHandle* moho::SCR_FromLua_CDecalHandleOpt(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+CDecalHandle* moho::SCR_FromLua_CDecalHandleOpt(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1090,7 +1145,8 @@ CAnimationManipulator* moho::SCR_FromLua_CAnimationManipulator(
   }
 
   const gpg::RRef sourceRef = SCR_MakeScriptObjectRef(scriptObject);
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, gpg::CachedLookup<CAnimationManipulator>(CAnimationManipulator::sType));
+  const gpg::RRef upcast =
+    gpg::REF_UpcastPtr(sourceRef, gpg::CachedLookup<CAnimationManipulator>(CAnimationManipulator::sType));
   if (!upcast.mObj) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kIncorrectGameObjectTypeError);
     return nullptr;
@@ -1141,7 +1197,10 @@ CRotateManipulator* moho::SCR_FromLua_CRotateManipulator(
  * Converts one Lua `_c_object` payload to `CSlaveManipulator*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CSlaveManipulator* moho::SCR_FromLua_CSlaveManipulator(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+CSlaveManipulator* moho::SCR_FromLua_CSlaveManipulator(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1208,7 +1267,10 @@ CThrustManipulator* moho::SCR_FromLua_CThrustManipulator(
  * Converts one Lua `_c_object` payload to `CSlideManipulator*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CSlideManipulator* moho::SCR_FromLua_CSlideManipulator(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+CSlideManipulator* moho::SCR_FromLua_CSlideManipulator(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1240,7 +1302,10 @@ CSlideManipulator* moho::SCR_FromLua_CSlideManipulator(const LuaPlus::LuaObject&
  * Converts one Lua `_c_object` payload to `CollisionBeamEntity*` and raises
  * Lua errors for missing, destroyed, or type-mismatched game objects.
  */
-CollisionBeamEntity* moho::SCR_FromLua_CollisionBeamEntity(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CollisionBeamEntity* moho::SCR_FromLua_CollisionBeamEntity(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1272,7 +1337,10 @@ CollisionBeamEntity* moho::SCR_FromLua_CollisionBeamEntity(const LuaPlus::LuaObj
  * Converts one Lua `_c_object` payload to `MotorFallDown*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-MotorFallDown* moho::SCR_FromLua_MotorFallDown(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+MotorFallDown* moho::SCR_FromLua_MotorFallDown(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1303,7 +1371,10 @@ MotorFallDown* moho::SCR_FromLua_MotorFallDown(const LuaPlus::LuaObject& object,
  * Converts one Lua `_c_object` payload to `CUnitCommand*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CUnitCommand* moho::SCR_FromLua_CUnitCommand(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+CUnitCommand* moho::SCR_FromLua_CUnitCommand(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1335,7 +1406,10 @@ CUnitCommand* moho::SCR_FromLua_CUnitCommand(const LuaPlus::LuaObject& object, L
  * missing payload or wrong runtime type, and returns nullptr for destroyed
  * game objects.
  */
-HSound* moho::SCR_FromLua_HSoundOpt(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+HSound* moho::SCR_FromLua_HSoundOpt(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1365,7 +1439,10 @@ HSound* moho::SCR_FromLua_HSoundOpt(const LuaPlus::LuaObject& object, LuaPlus::L
  * Converts one Lua `_c_object` payload to `HSound*` and raises Lua errors for
  * missing, destroyed, or type-mismatched game objects.
  */
-HSound* moho::SCR_FromLua_HSound(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+HSound* moho::SCR_FromLua_HSound(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1396,7 +1473,10 @@ HSound* moho::SCR_FromLua_HSound(const LuaPlus::LuaObject& object, LuaPlus::LuaS
  * Converts one Lua `_c_object` payload to `CDamage*` and raises Lua errors
  * for missing, destroyed, or type-mismatched game objects.
  */
-CDamage* moho::SCR_FromLua_CDamage(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+CDamage* moho::SCR_FromLua_CDamage(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1428,7 +1508,10 @@ CDamage* moho::SCR_FromLua_CDamage(const LuaPlus::LuaObject& object, LuaPlus::Lu
  * Converts one Lua `_c_object` payload to `CPathDebugger*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CPathDebugger* moho::SCR_FromLua_CPathDebugger(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+CPathDebugger* moho::SCR_FromLua_CPathDebugger(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1459,7 +1542,10 @@ CPathDebugger* moho::SCR_FromLua_CPathDebugger(const LuaPlus::LuaObject& object,
  * Converts one Lua `_c_object` payload to `UserEntity*` and raises Lua errors
  * for missing, destroyed, or type-mismatched game objects.
  */
-UserEntity* moho::SCR_FromLua_UserEntity(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+UserEntity* moho::SCR_FromLua_UserEntity(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1490,7 +1576,10 @@ UserEntity* moho::SCR_FromLua_UserEntity(const LuaPlus::LuaObject& object, LuaPl
  * Converts one Lua `_c_object` payload to `UserUnit*` and raises Lua errors
  * for missing, destroyed, or type-mismatched game objects.
  */
-UserUnit* moho::SCR_FromLua_UserUnit(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+UserUnit* moho::SCR_FromLua_UserUnit(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1521,7 +1610,10 @@ UserUnit* moho::SCR_FromLua_UserUnit(const LuaPlus::LuaObject& object, LuaPlus::
  * Converts one Lua `_c_object` payload to `CAiBrain*` and raises Lua errors
  * for missing, destroyed, or type-mismatched game objects.
  */
-CAiBrain* moho::SCR_FromLua_CAiBrain(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CAiBrain* moho::SCR_FromLua_CAiBrain(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1552,7 +1644,10 @@ CAiBrain* moho::SCR_FromLua_CAiBrain(const LuaPlus::LuaObject& object, LuaPlus::
  * Converts one Lua `_c_object` payload to `CAiAttackerImpl*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CAiAttackerImpl* moho::SCR_FromLua_CAiAttackerImpl(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CAiAttackerImpl* moho::SCR_FromLua_CAiAttackerImpl(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1583,7 +1678,10 @@ CAiAttackerImpl* moho::SCR_FromLua_CAiAttackerImpl(const LuaPlus::LuaObject& obj
  * Converts one Lua `_c_object` payload to `CAiPersonality*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CAiPersonality* moho::SCR_FromLua_CAiPersonality(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CAiPersonality* moho::SCR_FromLua_CAiPersonality(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1614,7 +1712,10 @@ CAiPersonality* moho::SCR_FromLua_CAiPersonality(const LuaPlus::LuaObject& objec
  * Converts one Lua `_c_object` payload to `CAiNavigatorImpl*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CAiNavigatorImpl* moho::SCR_FromLua_CAiNavigatorImpl(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CAiNavigatorImpl* moho::SCR_FromLua_CAiNavigatorImpl(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1646,7 +1747,10 @@ CAiNavigatorImpl* moho::SCR_FromLua_CAiNavigatorImpl(const LuaPlus::LuaObject& o
  * missing payload or wrong runtime type, and returns nullptr for destroyed
  * game objects.
  */
-CPlatoon* moho::SCR_FromLua_CPlatoonOpt(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CPlatoon* moho::SCR_FromLua_CPlatoonOpt(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1676,7 +1780,10 @@ CPlatoon* moho::SCR_FromLua_CPlatoonOpt(const LuaPlus::LuaObject& object, LuaPlu
  * Converts one Lua `_c_object` payload to `CPlatoon*` and raises Lua errors
  * for missing, destroyed, or type-mismatched game objects.
  */
-CPlatoon* moho::SCR_FromLua_CPlatoon(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CPlatoon* moho::SCR_FromLua_CPlatoon(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1707,7 +1814,10 @@ CPlatoon* moho::SCR_FromLua_CPlatoon(const LuaPlus::LuaObject& object, LuaPlus::
  * Converts one Lua `_c_object` payload to `CMauiBorder*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CMauiBorder* moho::SCR_FromLua_CMauiBorder(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CMauiBorder* moho::SCR_FromLua_CMauiBorder(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1739,7 +1849,10 @@ CMauiBorder* moho::SCR_FromLua_CMauiBorder(const LuaPlus::LuaObject& object, Lua
  * Converts one Lua `_c_object` payload to `CMauiMesh*` and raises Lua errors
  * for missing, destroyed, or type-mismatched game objects.
  */
-CMauiMesh* moho::SCR_FromLua_CMauiMesh(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CMauiMesh* moho::SCR_FromLua_CMauiMesh(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1771,7 +1884,10 @@ CMauiMesh* moho::SCR_FromLua_CMauiMesh(const LuaPlus::LuaObject& object, LuaPlus
  * Converts one Lua `_c_object` payload to `CDiscoveryService*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CDiscoveryService* moho::SCR_FromLua_CDiscoveryService(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CDiscoveryService* moho::SCR_FromLua_CDiscoveryService(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1804,7 +1920,10 @@ CDiscoveryService* moho::SCR_FromLua_CDiscoveryService(const LuaPlus::LuaObject&
  * errors for missing payload or wrong runtime type, and returns nullptr for
  * destroyed game objects.
  */
-CDiscoveryService* moho::SCR_FromLua_CDiscoveryServiceOpt(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CDiscoveryService* moho::SCR_FromLua_CDiscoveryServiceOpt(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1836,7 +1955,10 @@ CDiscoveryService* moho::SCR_FromLua_CDiscoveryServiceOpt(const LuaPlus::LuaObje
  * missing payload or wrong runtime type, and returns nullptr for destroyed
  * game objects.
  */
-CLobby* moho::SCR_FromLua_CLobbyOpt(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CLobby* moho::SCR_FromLua_CLobbyOpt(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1867,7 +1989,10 @@ CLobby* moho::SCR_FromLua_CLobbyOpt(const LuaPlus::LuaObject& object, LuaPlus::L
  * Converts one Lua `_c_object` payload to `CLobby*` and raises Lua errors
  * for missing, destroyed, or type-mismatched game objects.
  */
-CLobby* moho::SCR_FromLua_CLobby(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CLobby* moho::SCR_FromLua_CLobby(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1899,7 +2024,10 @@ CLobby* moho::SCR_FromLua_CLobby(const LuaPlus::LuaObject& object, LuaPlus::LuaS
  * Converts one Lua `_c_object` payload to `CameraImpl*` and raises Lua errors
  * for missing, destroyed, or type-mismatched game objects.
  */
-CameraImpl* moho::SCR_FromLua_CameraImpl(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CameraImpl* moho::SCR_FromLua_CameraImpl(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1930,7 +2058,10 @@ CameraImpl* moho::SCR_FromLua_CameraImpl(const LuaPlus::LuaObject& object, LuaPl
  * Converts one Lua `_c_object` payload to `CUIWorldView*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CUIWorldView* moho::SCR_FromLua_CUIWorldView(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CUIWorldView* moho::SCR_FromLua_CUIWorldView(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   LuaPlus::LuaState* activeState = state;
   if (!activeState) {
@@ -1967,7 +2098,10 @@ CUIWorldView* moho::SCR_FromLua_CUIWorldView(const LuaPlus::LuaObject& object, L
  * Converts one Lua `_c_object` payload to `CUIWorldMesh*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CUIWorldMesh* moho::SCR_FromLua_CUIWorldMesh(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CUIWorldMesh* moho::SCR_FromLua_CUIWorldMesh(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -1999,7 +2133,10 @@ CUIWorldMesh* moho::SCR_FromLua_CUIWorldMesh(const LuaPlus::LuaObject& object, L
  * Converts one Lua `_c_object` payload to `CMauiHistogram*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CMauiHistogram* moho::SCR_FromLua_CMauiHistogram(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CMauiHistogram* moho::SCR_FromLua_CMauiHistogram(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -2031,7 +2168,10 @@ CMauiHistogram* moho::SCR_FromLua_CMauiHistogram(const LuaPlus::LuaObject& objec
  * Converts one Lua `_c_object` payload to `CUIMapPreview*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CUIMapPreview* moho::SCR_FromLua_CUIMapPreview(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CUIMapPreview* moho::SCR_FromLua_CUIMapPreview(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -2063,7 +2203,10 @@ CUIMapPreview* moho::SCR_FromLua_CUIMapPreview(const LuaPlus::LuaObject& object,
  * Converts one Lua `_c_object` payload to `CMauiCursor*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CMauiCursor* moho::SCR_FromLua_CMauiCursor(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CMauiCursor* moho::SCR_FromLua_CMauiCursor(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -2088,7 +2231,6 @@ CMauiCursor* moho::SCR_FromLua_CMauiCursor(const LuaPlus::LuaObject& object, Lua
   return reinterpret_cast<CMauiCursor*>(upcast.mObj);
 }
 
-
 /**
  * Address: 0x0079C9C0 (FUN_0079C9C0, Moho::SCR_FromLua_CMauiItemList)
  *
@@ -2096,7 +2238,10 @@ CMauiCursor* moho::SCR_FromLua_CMauiCursor(const LuaPlus::LuaObject& object, Lua
  * Converts one Lua `_c_object` payload to `CMauiItemList*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CMauiItemList* moho::SCR_FromLua_CMauiItemList(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CMauiItemList* moho::SCR_FromLua_CMauiItemList(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -2127,7 +2272,10 @@ CMauiItemList* moho::SCR_FromLua_CMauiItemList(const LuaPlus::LuaObject& object,
  * Converts one Lua `_c_object` payload to `CMauiMovie*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CMauiMovie* moho::SCR_FromLua_CMauiMovie(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CMauiMovie* moho::SCR_FromLua_CMauiMovie(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -2159,7 +2307,10 @@ CMauiMovie* moho::SCR_FromLua_CMauiMovie(const LuaPlus::LuaObject& object, LuaPl
  * Converts one Lua `_c_object` payload to `CMauiScrollbar*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CMauiScrollbar* moho::SCR_FromLua_CMauiScrollbar(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CMauiScrollbar* moho::SCR_FromLua_CMauiScrollbar(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -2191,7 +2342,10 @@ CMauiScrollbar* moho::SCR_FromLua_CMauiScrollbar(const LuaPlus::LuaObject& objec
  * Converts one Lua `_c_object` payload to `CMauiText*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CMauiText* moho::SCR_FromLua_CMauiText(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CMauiText* moho::SCR_FromLua_CMauiText(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -2223,7 +2377,10 @@ CMauiText* moho::SCR_FromLua_CMauiText(const LuaPlus::LuaObject& object, LuaPlus
  * Converts one Lua `_c_object` payload to `CMauiControl*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CMauiControl* moho::SCR_FromLua_CMauiControl(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CMauiControl* moho::SCR_FromLua_CMauiControl(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -2255,7 +2412,10 @@ CMauiControl* moho::SCR_FromLua_CMauiControl(const LuaPlus::LuaObject& object, L
  * Converts one Lua `_c_object` payload to `CMauiEdit*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CMauiEdit* moho::SCR_FromLua_CMauiEdit(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CMauiEdit* moho::SCR_FromLua_CMauiEdit(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -2287,7 +2447,10 @@ CMauiEdit* moho::SCR_FromLua_CMauiEdit(const LuaPlus::LuaObject& object, LuaPlus
  * Converts one Lua `_c_object` payload to `CMauiBitmap*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CMauiBitmap* moho::SCR_FromLua_CMauiBitmap(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CMauiBitmap* moho::SCR_FromLua_CMauiBitmap(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -2319,7 +2482,10 @@ CMauiBitmap* moho::SCR_FromLua_CMauiBitmap(const LuaPlus::LuaObject& object, Lua
  * Converts one Lua `_c_object` payload to `CMauiFrame*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CMauiFrame* moho::SCR_FromLua_CMauiFrame(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+CMauiFrame* moho::SCR_FromLua_CMauiFrame(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -2351,7 +2517,10 @@ CMauiFrame* moho::SCR_FromLua_CMauiFrame(const LuaPlus::LuaObject& object, LuaPl
  * Converts one Lua `_c_object` payload to `CMauiLuaDragger*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-CMauiLuaDragger* moho::SCR_FromLua_CMauiLuaDragger(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+CMauiLuaDragger* moho::SCR_FromLua_CMauiLuaDragger(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -2379,7 +2548,10 @@ CMauiLuaDragger* moho::SCR_FromLua_CMauiLuaDragger(const LuaPlus::LuaObject& obj
 /**
  * Address: 0x005A8020 (FUN_005A8020, Moho::SCR_FromLua_Entity)
  */
-Entity* moho::SCR_FromLua_Entity(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+Entity* moho::SCR_FromLua_Entity(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   LuaPlus::LuaState* activeState = state;
   if (!activeState) {
@@ -2416,7 +2588,9 @@ Entity* moho::SCR_FromLua_Entity(const LuaPlus::LuaObject& object, LuaPlus::LuaS
  * missing payload or wrong runtime type, and returns nullptr for destroyed
  * game objects.
  */
-Entity* moho::SCR_FromLua_EntityOpt(const LuaPlus::LuaObject& object)
+Entity* moho::SCR_FromLua_EntityOpt(
+  const LuaPlus::LuaObject& object
+)
 {
   LuaPlus::LuaState* const activeState = object.GetActiveState();
 
@@ -2448,7 +2622,10 @@ Entity* moho::SCR_FromLua_EntityOpt(const LuaPlus::LuaObject& object)
  * Converts one Lua `_c_object` payload to `ReconBlip*` and raises Lua
  * errors for missing, destroyed, or type-mismatched game objects.
  */
-ReconBlip* moho::SCR_FromLua_ReconBlip(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+ReconBlip* moho::SCR_FromLua_ReconBlip(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -2479,7 +2656,9 @@ ReconBlip* moho::SCR_FromLua_ReconBlip(const LuaPlus::LuaObject& object, LuaPlus
  * Converts one Lua `_c_object` payload to `Entity*` without raising Lua
  * errors; returns nullptr for missing, destroyed, or type-mismatched values.
  */
-Entity* moho::SCR_FromLuaNoError_Entity(const LuaPlus::LuaObject& object)
+Entity* moho::SCR_FromLuaNoError_Entity(
+  const LuaPlus::LuaObject& object
+)
 {
   CScriptObject* const scriptObject = SCR_GetScriptObjectFromLuaObject(object);
   if (!scriptObject) {
@@ -2498,7 +2677,10 @@ Entity* moho::SCR_FromLuaNoError_Entity(const LuaPlus::LuaObject& object)
 /**
  * Address: 0x006A44C0 (FUN_006A44C0, Moho::SCR_FromLua_Projectile)
  */
-Projectile* moho::SCR_FromLua_Projectile(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+Projectile* moho::SCR_FromLua_Projectile(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -2530,7 +2712,10 @@ Projectile* moho::SCR_FromLua_Projectile(const LuaPlus::LuaObject& object, LuaPl
  * for missing payload or wrong runtime type, and returns nullptr for
  * destroyed game objects.
  */
-Projectile* moho::SCR_FromLua_ProjectileOpt(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state)
+Projectile* moho::SCR_FromLua_ProjectileOpt(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -2556,7 +2741,10 @@ Projectile* moho::SCR_FromLua_ProjectileOpt(const LuaPlus::LuaObject& object, Lu
 /**
  * Address: 0x006FD1C0 (FUN_006FD1C0, Moho::SCR_FromLua_Prop)
  */
-Prop* moho::SCR_FromLua_Prop(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+Prop* moho::SCR_FromLua_Prop(
+  const LuaPlus::LuaObject& object,
+  LuaPlus::LuaState* const state
+)
 {
   CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
   if (!scriptObjectSlot) {
@@ -2581,9 +2769,11 @@ Prop* moho::SCR_FromLua_Prop(const LuaPlus::LuaObject& object, LuaPlus::LuaState
 }
 
 /**
-  * Alias of FUN_004C9030 (non-canonical helper lane).
+ * Alias of FUN_004C9030 (non-canonical helper lane).
  */
-gpg::RRef moho::SCR_MakeScriptObjectRef(CScriptObject* object)
+gpg::RRef moho::SCR_MakeScriptObjectRef(
+  CScriptObject* object
+)
 {
   gpg::RRef out{};
   out = gpg::MakeRRef<moho::CScriptObject>(object);
@@ -2593,7 +2783,9 @@ gpg::RRef moho::SCR_MakeScriptObjectRef(CScriptObject* object)
 /**
  * Address: 0x004CBE30 (FUN_004CBE30, func_UpCastCScriptEventUnsafe)
  */
-CScriptEvent* moho::SCR_UpCastScriptEventUnsafe(const gpg::RRef& source)
+CScriptEvent* moho::SCR_UpCastScriptEventUnsafe(
+  const gpg::RRef& source
+)
 {
   const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<CScriptEvent>());
   return static_cast<CScriptEvent*>(upcast.mObj);
@@ -2602,7 +2794,9 @@ CScriptEvent* moho::SCR_UpCastScriptEventUnsafe(const gpg::RRef& source)
 /**
  * Address: 0x004CB980 (FUN_004CB980, sub_4CB980)
  */
-CScriptEvent* moho::SCR_GetScriptEventFromLuaObject(const LuaPlus::LuaObject& object)
+CScriptEvent* moho::SCR_GetScriptEventFromLuaObject(
+  const LuaPlus::LuaObject& object
+)
 {
   CScriptObject* const scriptObject = SCR_GetScriptObjectFromLuaObject(object);
   if (!scriptObject) {
@@ -2627,7 +2821,9 @@ void moho::register_CScriptEventTypeInfo()
 /**
  * Address: 0x004CB760 (FUN_004CB760, Moho::CScriptEventTypeInfo::AddBase_CScriptObject)
  */
-void CScriptEventTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
+void CScriptEventTypeInfo::AddBase_CScriptObject(
+  gpg::RType* const typeInfo
+)
 {
   gpg::RType* const scriptObjectType = gpg::RTypeOf<CScriptObject>();
   gpg::AddReflectedBaseType(typeInfo, scriptObjectType, gpg::BaseSubobjectOffset<CScriptEvent, CScriptObject>());
@@ -2636,7 +2832,9 @@ void CScriptEventTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
 /**
  * Address: 0x004CB7C0 (FUN_004CB7C0, Moho::CScriptEventTypeInfo::AddBase_CTaskEvent)
  */
-void CScriptEventTypeInfo::AddBase_CTaskEvent(gpg::RType* const typeInfo)
+void CScriptEventTypeInfo::AddBase_CTaskEvent(
+  gpg::RType* const typeInfo
+)
 {
   gpg::AddReflectedBase<CTaskEvent>(typeInfo);
 }
@@ -2667,12 +2865,17 @@ void CScriptEventTypeInfo::Init()
   Finish();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CScriptEventTypeInfo_4715db, moho::register_CScriptEventTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CScriptEventTypeInfo_4715db,
+  moho::register_CScriptEventTypeInfo
+)
 
-GPG_PREREGISTER_INIT(PreRegisterCScriptEventTypeInfo_4715db, PreRegisterCScriptEventTypeInfo)
+GPG_PREREGISTER_INIT(
+  PreRegisterCScriptEventTypeInfo_4715db,
+  PreRegisterCScriptEventTypeInfo
+)
 
 namespace moho
 {

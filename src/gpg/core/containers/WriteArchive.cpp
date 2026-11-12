@@ -19,194 +19,236 @@ using namespace gpg;
 
 namespace
 {
-struct LegacyValueFloatLane
-{
+  struct LegacyValueFloatLane
+  {
     float number;
-};
+  };
 
-[[noreturn]] void ThrowSerializationError(const char* const message)
-{
+  [[noreturn]] void ThrowSerializationError(
+    const char* const message
+  )
+  {
     throw SerializationError(message ? message : "");
-}
+  }
 
-[[noreturn]] void ThrowSerializationError(const fa::string& message)
-{
+  [[noreturn]] void ThrowSerializationError(
+    const fa::string& message
+  )
+  {
     throw SerializationError(message.c_str());
-}
+  }
 
-const char* SafeTypeName(const RType* const type)
-{
+  const char* SafeTypeName(
+    const RType* const type
+  )
+  {
     return type ? type->GetName() : "null";
-}
+  }
 
-constexpr char kArchiveTokenBytes[] = {'}', 'N', '0', '*', '{'};
-using TrackedPointerMap = fa::map<RRef, WriteArchive::TrackedPointerRecord, RRefCompare>;
+  constexpr char kArchiveTokenBytes[] = {'}', 'N', '0', '*', '{'};
+  using TrackedPointerMap = fa::map<RRef, WriteArchive::TrackedPointerRecord, RRefCompare>;
 
-class BinaryWriteArchive;
+  class BinaryWriteArchive;
 
-// Defined below `BinaryWriteArchive`, which owns the stream handle these lanes
-// write through. This replaces a deleted overlay reach-in
-// struct that cast the archive to `{ uint8_t[0x28]; FILE* stream; }` and read
-// offset 0x28 directly. That read was out of bounds: the class was 0x24 bytes
-// here (its base was 4 short and the duplicate handle was missing), so the lane
-// picked up whatever followed the allocation and handed it to `fwrite`.
-void WriteBinaryCompatibilityLane(
-    BinaryWriteArchive* archive,
-    const void* buffer,
-    std::size_t elementSize
-);
+  // Defined below `BinaryWriteArchive`, which owns the stream handle these lanes
+  // write through. This replaces a deleted overlay reach-in
+  // struct that cast the archive to `{ uint8_t[0x28]; FILE* stream; }` and read
+  // offset 0x28 directly. That read was out of bounds: the class was 0x24 bytes
+  // here (its base was 4 short and the duplicate handle was missing), so the lane
+  // picked up whatever followed the allocation and handed it to `fwrite`.
+  void WriteBinaryCompatibilityLane(BinaryWriteArchive* archive, const void* buffer, std::size_t elementSize);
 
-/**
- * Address: 0x00905200 (FUN_00905200)
- *
- * What it does:
- * Writes one one-byte scalar lane to the binary archive stream at `this+0x28`.
- */
-[[maybe_unused]] void WriteBinaryCompatibilityLaneA(BinaryWriteArchive* const archive, const void* const buffer)
-{
+  /**
+   * Address: 0x00905200 (FUN_00905200)
+   *
+   * What it does:
+   * Writes one one-byte scalar lane to the binary archive stream at `this+0x28`.
+   */
+  [[maybe_unused]] void WriteBinaryCompatibilityLaneA(
+    BinaryWriteArchive* const archive,
+    const void* const buffer
+  )
+  {
     WriteBinaryCompatibilityLane(archive, buffer, 1u);
-}
+  }
 
-/**
- * Address: 0x00905240 (FUN_00905240)
- *
- * What it does:
- * Writes one one-byte scalar lane to the binary archive stream at `this+0x28`.
- */
-[[maybe_unused]] void WriteBinaryCompatibilityLaneB(BinaryWriteArchive* const archive, const void* const buffer)
-{
+  /**
+   * Address: 0x00905240 (FUN_00905240)
+   *
+   * What it does:
+   * Writes one one-byte scalar lane to the binary archive stream at `this+0x28`.
+   */
+  [[maybe_unused]] void WriteBinaryCompatibilityLaneB(
+    BinaryWriteArchive* const archive,
+    const void* const buffer
+  )
+  {
     WriteBinaryCompatibilityLane(archive, buffer, 1u);
-}
+  }
 
-/**
- * Address: 0x00905280 (FUN_00905280)
- *
- * What it does:
- * Writes one one-byte scalar lane to the binary archive stream at `this+0x28`.
- */
-[[maybe_unused]] void WriteBinaryCompatibilityLaneC(BinaryWriteArchive* const archive, const void* const buffer)
-{
+  /**
+   * Address: 0x00905280 (FUN_00905280)
+   *
+   * What it does:
+   * Writes one one-byte scalar lane to the binary archive stream at `this+0x28`.
+   */
+  [[maybe_unused]] void WriteBinaryCompatibilityLaneC(
+    BinaryWriteArchive* const archive,
+    const void* const buffer
+  )
+  {
     WriteBinaryCompatibilityLane(archive, buffer, 1u);
-}
+  }
 
-/**
- * Address: 0x009052C0 (FUN_009052C0)
- *
- * What it does:
- * Writes one two-byte scalar lane to the binary archive stream at `this+0x28`.
- */
-[[maybe_unused]] void WriteBinaryCompatibilityLaneD(BinaryWriteArchive* const archive, const void* const buffer)
-{
+  /**
+   * Address: 0x009052C0 (FUN_009052C0)
+   *
+   * What it does:
+   * Writes one two-byte scalar lane to the binary archive stream at `this+0x28`.
+   */
+  [[maybe_unused]] void WriteBinaryCompatibilityLaneD(
+    BinaryWriteArchive* const archive,
+    const void* const buffer
+  )
+  {
     WriteBinaryCompatibilityLane(archive, buffer, 2u);
-}
+  }
 
-/**
- * Address: 0x00905300 (FUN_00905300)
- *
- * What it does:
- * Writes one two-byte scalar lane to the binary archive stream at `this+0x28`.
- */
-[[maybe_unused]] void WriteBinaryCompatibilityLaneE(BinaryWriteArchive* const archive, const void* const buffer)
-{
+  /**
+   * Address: 0x00905300 (FUN_00905300)
+   *
+   * What it does:
+   * Writes one two-byte scalar lane to the binary archive stream at `this+0x28`.
+   */
+  [[maybe_unused]] void WriteBinaryCompatibilityLaneE(
+    BinaryWriteArchive* const archive,
+    const void* const buffer
+  )
+  {
     WriteBinaryCompatibilityLane(archive, buffer, 2u);
-}
+  }
 
-/**
- * Address: 0x00905340 (FUN_00905340)
- *
- * What it does:
- * Writes one four-byte scalar lane to the binary archive stream at `this+0x28`.
- */
-[[maybe_unused]] void WriteBinaryCompatibilityLaneF(BinaryWriteArchive* const archive, const void* const buffer)
-{
+  /**
+   * Address: 0x00905340 (FUN_00905340)
+   *
+   * What it does:
+   * Writes one four-byte scalar lane to the binary archive stream at `this+0x28`.
+   */
+  [[maybe_unused]] void WriteBinaryCompatibilityLaneF(
+    BinaryWriteArchive* const archive,
+    const void* const buffer
+  )
+  {
     WriteBinaryCompatibilityLane(archive, buffer, 4u);
-}
+  }
 
-/**
- * Address: 0x00905380 (FUN_00905380)
- *
- * What it does:
- * Writes one four-byte scalar lane to the binary archive stream at `this+0x28`.
- */
-[[maybe_unused]] void WriteBinaryCompatibilityLaneG(BinaryWriteArchive* const archive, const void* const buffer)
-{
+  /**
+   * Address: 0x00905380 (FUN_00905380)
+   *
+   * What it does:
+   * Writes one four-byte scalar lane to the binary archive stream at `this+0x28`.
+   */
+  [[maybe_unused]] void WriteBinaryCompatibilityLaneG(
+    BinaryWriteArchive* const archive,
+    const void* const buffer
+  )
+  {
     WriteBinaryCompatibilityLane(archive, buffer, 4u);
-}
+  }
 
-/**
- * Address: 0x009053C0 (FUN_009053C0)
- *
- * What it does:
- * Writes one four-byte scalar lane to the binary archive stream at `this+0x28`.
- */
-[[maybe_unused]] void WriteBinaryCompatibilityLaneH(BinaryWriteArchive* const archive, const void* const buffer)
-{
+  /**
+   * Address: 0x009053C0 (FUN_009053C0)
+   *
+   * What it does:
+   * Writes one four-byte scalar lane to the binary archive stream at `this+0x28`.
+   */
+  [[maybe_unused]] void WriteBinaryCompatibilityLaneH(
+    BinaryWriteArchive* const archive,
+    const void* const buffer
+  )
+  {
     WriteBinaryCompatibilityLane(archive, buffer, 4u);
-}
+  }
 
-/**
- * Address: 0x00905400 (FUN_00905400)
- *
- * What it does:
- * Writes one four-byte scalar lane to the binary archive stream at `this+0x28`.
- */
-[[maybe_unused]] void WriteBinaryCompatibilityLaneI(BinaryWriteArchive* const archive, const void* const buffer)
-{
+  /**
+   * Address: 0x00905400 (FUN_00905400)
+   *
+   * What it does:
+   * Writes one four-byte scalar lane to the binary archive stream at `this+0x28`.
+   */
+  [[maybe_unused]] void WriteBinaryCompatibilityLaneI(
+    BinaryWriteArchive* const archive,
+    const void* const buffer
+  )
+  {
     WriteBinaryCompatibilityLane(archive, buffer, 4u);
-}
+  }
 
-/**
- * Address: 0x00905440 (FUN_00905440)
- *
- * What it does:
- * Writes one eight-byte scalar lane to the binary archive stream at `this+0x28`.
- */
-[[maybe_unused]] void WriteBinaryCompatibilityLaneJ(BinaryWriteArchive* const archive, const void* const buffer)
-{
+  /**
+   * Address: 0x00905440 (FUN_00905440)
+   *
+   * What it does:
+   * Writes one eight-byte scalar lane to the binary archive stream at `this+0x28`.
+   */
+  [[maybe_unused]] void WriteBinaryCompatibilityLaneJ(
+    BinaryWriteArchive* const archive,
+    const void* const buffer
+  )
+  {
     WriteBinaryCompatibilityLane(archive, buffer, 8u);
-}
+  }
 
-/**
- * Address: 0x00905480 (FUN_00905480)
- *
- * What it does:
- * Writes one eight-byte scalar lane to the binary archive stream at `this+0x28`.
- */
-[[maybe_unused]] void WriteBinaryCompatibilityLaneK(BinaryWriteArchive* const archive, const void* const buffer)
-{
+  /**
+   * Address: 0x00905480 (FUN_00905480)
+   *
+   * What it does:
+   * Writes one eight-byte scalar lane to the binary archive stream at `this+0x28`.
+   */
+  [[maybe_unused]] void WriteBinaryCompatibilityLaneK(
+    BinaryWriteArchive* const archive,
+    const void* const buffer
+  )
+  {
     WriteBinaryCompatibilityLane(archive, buffer, 8u);
-}
+  }
 
-/**
- * Address: 0x009054C0 (FUN_009054C0)
- *
- * What it does:
- * Writes one four-byte scalar lane to the binary archive stream at `this+0x28`.
- */
-[[maybe_unused]] void WriteBinaryCompatibilityLaneL(BinaryWriteArchive* const archive, const void* const buffer)
-{
+  /**
+   * Address: 0x009054C0 (FUN_009054C0)
+   *
+   * What it does:
+   * Writes one four-byte scalar lane to the binary archive stream at `this+0x28`.
+   */
+  [[maybe_unused]] void WriteBinaryCompatibilityLaneL(
+    BinaryWriteArchive* const archive,
+    const void* const buffer
+  )
+  {
     WriteBinaryCompatibilityLane(archive, buffer, 4u);
-}
+  }
 
-/**
- * Address: 0x00905500 (FUN_00905500)
- *
- * What it does:
- * Writes one one-byte scalar lane to the binary archive stream at `this+0x28`.
- */
-[[maybe_unused]] void WriteBinaryCompatibilityLaneM(BinaryWriteArchive* const archive, const void* const buffer)
-{
+  /**
+   * Address: 0x00905500 (FUN_00905500)
+   *
+   * What it does:
+   * Writes one one-byte scalar lane to the binary archive stream at `this+0x28`.
+   */
+  [[maybe_unused]] void WriteBinaryCompatibilityLaneM(
+    BinaryWriteArchive* const archive,
+    const void* const buffer
+  )
+  {
     WriteBinaryCompatibilityLane(archive, buffer, 1u);
-}
+  }
 
-class TextWriteArchive final : public gpg::WriteArchive
-{
-public:
-    explicit TextWriteArchive(const boost::shared_ptr<std::ostream>& stream)
-        : mStreamRef(stream)
-        , mStream(stream.get())
-    {
-    }
+  class TextWriteArchive final : public gpg::WriteArchive
+  {
+  public:
+    explicit TextWriteArchive(
+      const boost::shared_ptr<std::ostream>& stream
+    )
+      : mStreamRef(stream)
+      , mStream(stream.get())
+    {}
 
     /**
      * Address: 0x009391E0 (FUN_009391E0, ??1TextWriteArchive@@QAE@@Z)
@@ -225,34 +267,37 @@ public:
      * Writes one byte span as grouped lowercase hex pairs (`32` bytes per line,
      * extra separator after every fourth byte).
      */
-    void WriteBytes(char* bytes, size_t byteCount) override
+    void WriteBytes(
+      char* bytes,
+      size_t byteCount
+    ) override
     {
-        if (byteCount == 0u) {
-            return;
+      if (byteCount == 0u) {
+        return;
+      }
+
+      int lineColumn = 0;
+      for (size_t i = 0; i < byteCount; ++i) {
+        const unsigned char value = static_cast<unsigned char>(bytes[i]);
+        const fa::string encodedByte = STR_Printf("%02x", static_cast<unsigned int>(value));
+        (*mStream) << encodedByte.c_str();
+
+        ++lineColumn;
+        if (lineColumn == 32) {
+          mStream->put('\n');
+          lineColumn = 0;
+          continue;
         }
 
-        int lineColumn = 0;
-        for (size_t i = 0; i < byteCount; ++i) {
-            const unsigned char value = static_cast<unsigned char>(bytes[i]);
-            const fa::string encodedByte = STR_Printf("%02x", static_cast<unsigned int>(value));
-            (*mStream) << encodedByte.c_str();
-
-            ++lineColumn;
-            if (lineColumn == 32) {
-                mStream->put('\n');
-                lineColumn = 0;
-                continue;
-            }
-
-            mStream->put(' ');
-            if ((lineColumn & 3) == 0) {
-                mStream->put(' ');
-            }
+        mStream->put(' ');
+        if ((lineColumn & 3) == 0) {
+          mStream->put(' ');
         }
+      }
 
-        if (lineColumn != 0) {
-            mStream->put('\n');
-        }
+      if (lineColumn != 0) {
+        mStream->put('\n');
+      }
     }
 
     /**
@@ -262,134 +307,160 @@ public:
      * Writes one quoted, escaped text lane (`\\n`, `\\t`, `\\\"`, `\\\\`, octal
      * escapes for non-printable bytes), then terminates the record with newline.
      */
-    void WriteString(fa::string* const value) override
+    void WriteString(
+      fa::string* const value
+    ) override
     {
-        mStream->put('"');
-        const char* const data = value->c_str();
-        const size_t size = value->size();
-        for (size_t i = 0; i < size; ++i) {
-            const unsigned char c = static_cast<unsigned char>(data[i]);
-            switch (c) {
-            case '\n':
-                (*mStream) << "\\n";
-                break;
-            case '\t':
-                (*mStream) << "\\t";
-                break;
-            case '"':
-                (*mStream) << "\\\"";
-                break;
-            case '\\':
-                (*mStream) << "\\\\";
-                break;
-            default:
-                if (c < 0x20u || c > 0x7Eu) {
-                    const fa::string octalByte = STR_Printf("%03o", static_cast<unsigned int>(c));
-                    (*mStream) << "\\" << octalByte.c_str();
-                } else {
-                    mStream->put(static_cast<char>(c));
-                }
-                break;
-            }
+      mStream->put('"');
+      const char* const data = value->c_str();
+      const size_t size = value->size();
+      for (size_t i = 0; i < size; ++i) {
+        const unsigned char c = static_cast<unsigned char>(data[i]);
+        switch (c) {
+        case '\n':
+          (*mStream) << "\\n";
+          break;
+        case '\t':
+          (*mStream) << "\\t";
+          break;
+        case '"':
+          (*mStream) << "\\\"";
+          break;
+        case '\\':
+          (*mStream) << "\\\\";
+          break;
+        default:
+          if (c < 0x20u || c > 0x7Eu) {
+            const fa::string octalByte = STR_Printf("%03o", static_cast<unsigned int>(c));
+            (*mStream) << "\\" << octalByte.c_str();
+          } else {
+            mStream->put(static_cast<char>(c));
+          }
+          break;
         }
-        mStream->put('"');
-        mStream->put('\n');
+      }
+      mStream->put('"');
+      mStream->put('\n');
     }
 
     /**
      * Address: 0x0093EB40 (FUN_0093EB40, TextWriteArchive::WriteFloat)
      */
-    void WriteFloat(float value) override
+    void WriteFloat(
+      float value
+    ) override
     {
-        WriteScalarWithTrailingSpace(value);
+      WriteScalarWithTrailingSpace(value);
     }
 
     /**
      * Address: 0x0093EB20 (FUN_0093EB20, TextWriteArchive::WriteUInt64)
      */
-    void WriteUInt64(uint64_t value) override
+    void WriteUInt64(
+      uint64_t value
+    ) override
     {
-        WriteScalarWithTrailingSpace(static_cast<unsigned long long>(value));
+      WriteScalarWithTrailingSpace(static_cast<unsigned long long>(value));
     }
 
     /**
      * Address: 0x0093EB00 (FUN_0093EB00, TextWriteArchive::WriteInt64)
      */
-    void WriteInt64(int64_t value) override
+    void WriteInt64(
+      int64_t value
+    ) override
     {
-        WriteScalarWithTrailingSpace(static_cast<long long>(value));
+      WriteScalarWithTrailingSpace(static_cast<long long>(value));
     }
 
     /**
      * Address: 0x0093EAE0 (FUN_0093EAE0, TextWriteArchive::WriteULong)
      */
-    void WriteULong(unsigned long value) override
+    void WriteULong(
+      unsigned long value
+    ) override
     {
-        WriteScalarWithTrailingSpace(value);
+      WriteScalarWithTrailingSpace(value);
     }
 
     /**
      * Address: 0x0093EAC0 (FUN_0093EAC0, TextWriteArchive::WriteLong)
      */
-    void WriteLong(long value) override
+    void WriteLong(
+      long value
+    ) override
     {
-        WriteScalarWithTrailingSpace(value);
+      WriteScalarWithTrailingSpace(value);
     }
 
     /**
      * Address: 0x0093EAA0 (FUN_0093EAA0, TextWriteArchive::WriteUInt)
      */
-    void WriteUInt(unsigned int value) override
+    void WriteUInt(
+      unsigned int value
+    ) override
     {
-        WriteScalarWithTrailingSpace(value);
+      WriteScalarWithTrailingSpace(value);
     }
 
     /**
      * Address: 0x0093EA80 (FUN_0093EA80, TextWriteArchive::WriteInt)
      */
-    void WriteInt(int value) override
+    void WriteInt(
+      int value
+    ) override
     {
-        WriteScalarWithTrailingSpace(value);
+      WriteScalarWithTrailingSpace(value);
     }
 
     /**
      * Address: 0x0093EA60 (FUN_0093EA60, TextWriteArchive::WriteUShort)
      */
-    void WriteUShort(unsigned short value) override
+    void WriteUShort(
+      unsigned short value
+    ) override
     {
-        WriteScalarWithTrailingSpace(value);
+      WriteScalarWithTrailingSpace(value);
     }
 
     /**
      * Address: 0x0093EA40 (FUN_0093EA40, TextWriteArchive::WriteShort)
      */
-    void WriteShort(short value) override
+    void WriteShort(
+      short value
+    ) override
     {
-        WriteScalarWithTrailingSpace(value);
+      WriteScalarWithTrailingSpace(value);
     }
 
     /**
      * Address: 0x0093EA20 (FUN_0093EA20, TextWriteArchive::WriteUByte)
      */
-    void WriteUByte(unsigned __int8 value) override
+    void WriteUByte(
+      unsigned __int8 value
+    ) override
     {
-        WriteScalarWithTrailingSpace(static_cast<int>(value));
+      WriteScalarWithTrailingSpace(static_cast<int>(value));
     }
 
     /**
      * Address: 0x0093EA00 (FUN_0093EA00, TextWriteArchive::WriteByte)
      */
-    void WriteByte(__int8 value) override
+    void WriteByte(
+      __int8 value
+    ) override
     {
-        WriteScalarWithTrailingSpace(static_cast<int>(value));
+      WriteScalarWithTrailingSpace(static_cast<int>(value));
     }
 
     /**
      * Address: 0x0093E9E0 (FUN_0093E9E0, TextWriteArchive::WriteBool)
      */
-    void WriteBool(bool value) override
+    void WriteBool(
+      bool value
+    ) override
     {
-        WriteScalarWithTrailingSpace(value);
+      WriteScalarWithTrailingSpace(value);
     }
 
     /**
@@ -405,38 +476,43 @@ public:
      *
      * Address: 0x008CCE10 (FUN_008CCE10, the shared CRT stream-put body cited above)
      */
-    void WriteMarker(int marker) override
+    void WriteMarker(
+      int marker
+    ) override
     {
-        mStream->put(kArchiveTokenBytes[marker]);
-        mStream->put(' ');
+      mStream->put(kArchiveTokenBytes[marker]);
+      mStream->put(' ');
     }
 
-private:
+  private:
     template <typename T>
-    void WriteScalarWithTrailingSpace(const T& value)
+    void WriteScalarWithTrailingSpace(
+      const T& value
+    )
     {
-        (*mStream) << value;
-        mStream->put(' ');
+      (*mStream) << value;
+      mStream->put(' ');
     }
 
-private:
-    boost::shared_ptr<std::ostream> mStreamRef;   // +0x20
-    std::ostream* mStream;                        // +0x28
-};
+  private:
+    boost::shared_ptr<std::ostream> mStreamRef; // +0x20
+    std::ostream* mStream;                      // +0x28
+  };
 
-// `CreateTextWriteArchive` (0x00939280) allocates 0x2C and writes [esi+20h],
-// [esi+24h], [esi+28h] -- the same three offsets as the binary archive. This
-// class already carried the shared-owner + raw-duplicate pair; the assert is
-// what pins the base at 0x20 from a second, independent site.
+  // `CreateTextWriteArchive` (0x00939280) allocates 0x2C and writes [esi+20h],
+  // [esi+24h], [esi+28h] -- the same three offsets as the binary archive. This
+  // class already carried the shared-owner + raw-duplicate pair; the assert is
+  // what pins the base at 0x20 from a second, independent site.
 
-class BinaryWriteArchive final : public gpg::WriteArchive
-{
-public:
-    explicit BinaryWriteArchive(const boost::shared_ptr<std::FILE>& file)
-        : mFile(file)
-        , mCachedFile(file.get())
-    {
-    }
+  class BinaryWriteArchive final : public gpg::WriteArchive
+  {
+  public:
+    explicit BinaryWriteArchive(
+      const boost::shared_ptr<std::FILE>& file
+    )
+      : mFile(file)
+      , mCachedFile(file.get())
+    {}
 
     /**
      * Address: 0x009046C0 (FUN_009046C0)
@@ -454,11 +530,14 @@ public:
      * Writes one raw byte lane (`fwrite(bytes, byteCount, 1, stream)`) and
      * throws `SerializationError("nowrite")` when the stream write fails.
      */
-    void WriteBytes(char* bytes, size_t byteCount) override
+    void WriteBytes(
+      char* bytes,
+      size_t byteCount
+    ) override
     {
-        if (std::fwrite(bytes, byteCount, 1u, mCachedFile) != 1u) {
-            ThrowSerializationError("nowrite");
-        }
+      if (std::fwrite(bytes, byteCount, 1u, mCachedFile) != 1u) {
+        ThrowSerializationError("nowrite");
+      }
     }
 
     /**
@@ -468,18 +547,20 @@ public:
      * Writes one length-prefixed string lane to the archive stream and throws
      * `SerializationError("nowrite")` when either write fails.
      */
-    void WriteString(fa::string* const value) override
+    void WriteString(
+      fa::string* const value
+    ) override
     {
-        std::FILE* const file = mCachedFile;
-        const std::uint32_t byteCount = static_cast<std::uint32_t>(value->size());
+      std::FILE* const file = mCachedFile;
+      const std::uint32_t byteCount = static_cast<std::uint32_t>(value->size());
 
-        if (!file || std::fwrite(&byteCount, sizeof(byteCount), 1u, file) != 1u) {
-            ThrowSerializationError("nowrite");
-        }
+      if (!file || std::fwrite(&byteCount, sizeof(byteCount), 1u, file) != 1u) {
+        ThrowSerializationError("nowrite");
+      }
 
-        if (byteCount != 0u && std::fwrite(value->raw_data_unsafe(), byteCount, 1u, file) != 1u) {
-            ThrowSerializationError("nowrite");
-        }
+      if (byteCount != 0u && std::fwrite(value->raw_data_unsafe(), byteCount, 1u, file) != 1u) {
+        ThrowSerializationError("nowrite");
+      }
     }
 
     /**
@@ -489,9 +570,11 @@ public:
      * Writes one 32-bit float lane and throws `SerializationError("nowrite")`
      * when the stream write fails.
      */
-    void WriteFloat(float value) override
+    void WriteFloat(
+      float value
+    ) override
     {
-        WriteScalarNowrite(value, 4u);
+      WriteScalarNowrite(value, 4u);
     }
 
     /**
@@ -501,9 +584,11 @@ public:
      * Writes one 64-bit unsigned lane and throws `SerializationError("nowrite")`
      * when the stream write fails.
      */
-    void WriteUInt64(uint64_t value) override
+    void WriteUInt64(
+      uint64_t value
+    ) override
     {
-        WriteScalarNowrite(value, 8u);
+      WriteScalarNowrite(value, 8u);
     }
 
     /**
@@ -513,9 +598,11 @@ public:
      * Writes one 64-bit signed lane and throws `SerializationError("nowrite")`
      * when the stream write fails.
      */
-    void WriteInt64(int64_t value) override
+    void WriteInt64(
+      int64_t value
+    ) override
     {
-        WriteScalarNowrite(value, 8u);
+      WriteScalarNowrite(value, 8u);
     }
 
     /**
@@ -525,9 +612,11 @@ public:
      * Writes one unsigned long lane and throws `SerializationError("nowrite")`
      * when the stream write fails.
      */
-    void WriteULong(unsigned long value) override
+    void WriteULong(
+      unsigned long value
+    ) override
     {
-        WriteScalarNowrite(value, 4u);
+      WriteScalarNowrite(value, 4u);
     }
 
     /**
@@ -537,9 +626,11 @@ public:
      * Writes one signed long lane and throws `SerializationError("nowrite")`
      * when the stream write fails.
      */
-    void WriteLong(long value) override
+    void WriteLong(
+      long value
+    ) override
     {
-        WriteScalarNowrite(value, 4u);
+      WriteScalarNowrite(value, 4u);
     }
 
     /**
@@ -549,9 +640,11 @@ public:
      * Writes one 32-bit unsigned lane and throws `SerializationError("nowrite")`
      * when the stream write fails.
      */
-    void WriteUInt(unsigned int value) override
+    void WriteUInt(
+      unsigned int value
+    ) override
     {
-        WriteScalarNowrite(value, 4u);
+      WriteScalarNowrite(value, 4u);
     }
 
     /**
@@ -561,9 +654,11 @@ public:
      * Writes one 32-bit signed lane and throws `SerializationError("nowrite")`
      * when the stream write fails.
      */
-    void WriteInt(int value) override
+    void WriteInt(
+      int value
+    ) override
     {
-        WriteScalarNowrite(value, 4u);
+      WriteScalarNowrite(value, 4u);
     }
 
     /**
@@ -573,9 +668,11 @@ public:
      * Writes one unsigned 16-bit lane and throws `SerializationError("nowrite")`
      * when the stream write fails.
      */
-    void WriteUShort(unsigned short value) override
+    void WriteUShort(
+      unsigned short value
+    ) override
     {
-        WriteScalarNowrite(value, 2u);
+      WriteScalarNowrite(value, 2u);
     }
 
     /**
@@ -585,9 +682,11 @@ public:
      * Writes one signed 16-bit lane and throws `SerializationError("nowrite")`
      * when the stream write fails.
      */
-    void WriteShort(short value) override
+    void WriteShort(
+      short value
+    ) override
     {
-        WriteScalarNowrite(value, 2u);
+      WriteScalarNowrite(value, 2u);
     }
 
     /**
@@ -597,9 +696,11 @@ public:
      * Writes one unsigned byte lane and throws `SerializationError("nowrite")`
      * when the stream write fails.
      */
-    void WriteUByte(unsigned __int8 value) override
+    void WriteUByte(
+      unsigned __int8 value
+    ) override
     {
-        WriteScalarNowrite(value, 1u);
+      WriteScalarNowrite(value, 1u);
     }
 
     /**
@@ -609,9 +710,11 @@ public:
      * Writes one signed byte lane and throws `SerializationError("nowrite")`
      * when the stream write fails.
      */
-    void WriteByte(__int8 value) override
+    void WriteByte(
+      __int8 value
+    ) override
     {
-        WriteScalarNowrite(value, 1u);
+      WriteScalarNowrite(value, 1u);
     }
 
     /**
@@ -621,9 +724,11 @@ public:
      * Writes one boolean lane as one byte and throws
      * `SerializationError("nowrite")` when the stream write fails.
      */
-    void WriteBool(bool value) override
+    void WriteBool(
+      bool value
+    ) override
     {
-        WriteScalarNowrite(value, 1u);
+      WriteScalarNowrite(value, 1u);
     }
 
     /**
@@ -634,13 +739,15 @@ public:
      * runtime `ArchiveToken` ordinal lane and throws `SerializationError("nowrite")`
      * when the marker write fails.
      */
-    void WriteMarker(int marker) override
+    void WriteMarker(
+      int marker
+    ) override
     {
-        std::FILE* const file = mCachedFile;
-        const char markerByte = kArchiveTokenBytes[marker];
-        if (!file || std::fwrite(&markerByte, 1u, 1u, file) != 1u) {
-            ThrowSerializationError("nowrite");
-        }
+      std::FILE* const file = mCachedFile;
+      const char markerByte = kArchiveTokenBytes[marker];
+      if (!file || std::fwrite(&markerByte, 1u, 1u, file) != 1u) {
+        ThrowSerializationError("nowrite");
+      }
     }
 
     /**
@@ -651,136 +758,229 @@ public:
      * each of which is `fwrite(buffer, <width>, 1, this->file)` against the
      * duplicate handle at +0x28.
      */
-    void WriteScalarLane(const void* const buffer, const std::size_t elementSize)
+    void WriteScalarLane(
+      const void* const buffer,
+      const std::size_t elementSize
+    )
     {
-        if (std::fwrite(buffer, elementSize, 1u, mCachedFile) != 1u) {
-            ThrowSerializationError("nowrite");
-        }
+      if (std::fwrite(buffer, elementSize, 1u, mCachedFile) != 1u) {
+        ThrowSerializationError("nowrite");
+      }
     }
 
-private:
+  private:
     template <typename T>
-    void WriteScalarNowrite(const T& value, std::size_t elementSize)
+    void WriteScalarNowrite(
+      const T& value,
+      std::size_t elementSize
+    )
     {
-        if (std::fwrite(&value, elementSize, 1u, mCachedFile) != 1u) {
-            ThrowSerializationError("nowrite");
-        }
+      if (std::fwrite(&value, elementSize, 1u, mCachedFile) != 1u) {
+        ThrowSerializationError("nowrite");
+      }
     }
 
-private:
+  private:
     // `gpg::CreateBinaryWriteArchive` (0x00904740) allocates 0x2C and sets the
     // shared owner's `px`/`pn.pi_` pair at +0x20/+0x24 and then a plain
     // duplicate of the same handle at +0x28. Every write slot uses the
     // duplicate: `BinaryWriteArchive::WriteBytes` (0x00904A60) decompiles as
     // `fwrite(Buffer, ElementSize, 1u, *(this + 10))` on a `FILE**`, and
     // 10 * 4 == 0x28. Carrying it is what makes this class 0x2C, not 0x28.
-    boost::shared_ptr<std::FILE> mFile;   // +0x20
-    std::FILE* mCachedFile = nullptr;     // +0x28
-};
+    boost::shared_ptr<std::FILE> mFile; // +0x20
+    std::FILE* mCachedFile = nullptr;   // +0x28
+  };
 
-/**
- * Engine addition, see `CreateFastBinaryWriteArchive`. Each value has the width `BinaryWriteArchive` gives it.
- */
-class FastBinaryWriteArchive final : public gpg::WriteArchive
-{
-public:
-    explicit FastBinaryWriteArchive(const boost::shared_ptr<std::FILE>& file)
-        : mFile(file)
-        , mBuffer(std::make_unique<char[]>(kBufferBytes))
+  /**
+   * Engine addition, see `CreateFastBinaryWriteArchive`. Each value has the width `BinaryWriteArchive` gives it.
+   */
+  class FastBinaryWriteArchive final : public gpg::WriteArchive
+  {
+  public:
+    explicit FastBinaryWriteArchive(
+      const boost::shared_ptr<std::FILE>& file
+    )
+      : mFile(file)
+      , mBuffer(std::make_unique<char[]>(kBufferBytes))
     {
-        mFastObjRefs = &mIndex;
+      mFastObjRefs = &mIndex;
     }
 
-    explicit FastBinaryWriteArchive(gpg::WriteArchiveSink& sink)
-        : mSink(&sink)
-        , mBuffer(std::make_unique<char[]>(kBufferBytes))
+    explicit FastBinaryWriteArchive(
+      gpg::WriteArchiveSink& sink
+    )
+      : mSink(&sink)
+      , mBuffer(std::make_unique<char[]>(kBufferBytes))
     {
-        mFastObjRefs = &mIndex;
+      mFastObjRefs = &mIndex;
     }
 
     ~FastBinaryWriteArchive() override
     {
-        // After a failed write the caller has its exception, and a flush that fails here shows in the file's size.
-        (void)Emit(mBuffer.get(), mUsed);
+      // After a failed write the caller has its exception, and a flush that fails here shows in the file's size.
+      (void)Emit(mBuffer.get(), mUsed);
     }
 
-    void WriteBytes(char* const bytes, const size_t byteCount) override { Put(bytes, byteCount); }
-
-    void WriteString(fa::string* const value) override
+    void WriteBytes(
+      char* const bytes,
+      const size_t byteCount
+    ) override
     {
-        const std::uint32_t byteCount = static_cast<std::uint32_t>(value->size());
-        Scalar<4u>(byteCount);
-        if (byteCount != 0u) {
-            Put(value->raw_data_unsafe(), byteCount);
-        }
+      Put(bytes, byteCount);
     }
 
-    void WriteFloat(const float value) override { Scalar<4u>(value); }
-    void WriteUInt64(const uint64_t value) override { Scalar<8u>(value); }
-    void WriteInt64(const int64_t value) override { Scalar<8u>(value); }
-    void WriteULong(const unsigned long value) override { Scalar<4u>(value); }
-    void WriteLong(const long value) override { Scalar<4u>(value); }
-    void WriteUInt(const unsigned int value) override { Scalar<4u>(value); }
-    void WriteInt(const int value) override { Scalar<4u>(value); }
-    void WriteUShort(const unsigned short value) override { Scalar<2u>(value); }
-    void WriteShort(const short value) override { Scalar<2u>(value); }
-    void WriteUByte(const unsigned __int8 value) override { Scalar<1u>(value); }
-    void WriteByte(const __int8 value) override { Scalar<1u>(value); }
-    void WriteBool(const bool value) override { Scalar<1u>(value); }
-    void WriteMarker(const int marker) override { Scalar<1u>(kArchiveTokenBytes[marker]); }
-
-    void EndSection(const bool skipOwnershipValidation) override
+    void WriteString(
+      fa::string* const value
+    ) override
     {
-        gpg::WriteArchive::EndSection(skipOwnershipValidation);
-        Flush();
+      const std::uint32_t byteCount = static_cast<std::uint32_t>(value->size());
+      Scalar<4u>(byteCount);
+      if (byteCount != 0u) {
+        Put(value->raw_data_unsafe(), byteCount);
+      }
     }
 
-private:
+    void WriteFloat(
+      const float value
+    ) override
+    {
+      Scalar<4u>(value);
+    }
+    void WriteUInt64(
+      const uint64_t value
+    ) override
+    {
+      Scalar<8u>(value);
+    }
+    void WriteInt64(
+      const int64_t value
+    ) override
+    {
+      Scalar<8u>(value);
+    }
+    void WriteULong(
+      const unsigned long value
+    ) override
+    {
+      Scalar<4u>(value);
+    }
+    void WriteLong(
+      const long value
+    ) override
+    {
+      Scalar<4u>(value);
+    }
+    void WriteUInt(
+      const unsigned int value
+    ) override
+    {
+      Scalar<4u>(value);
+    }
+    void WriteInt(
+      const int value
+    ) override
+    {
+      Scalar<4u>(value);
+    }
+    void WriteUShort(
+      const unsigned short value
+    ) override
+    {
+      Scalar<2u>(value);
+    }
+    void WriteShort(
+      const short value
+    ) override
+    {
+      Scalar<2u>(value);
+    }
+    void WriteUByte(
+      const unsigned __int8 value
+    ) override
+    {
+      Scalar<1u>(value);
+    }
+    void WriteByte(
+      const __int8 value
+    ) override
+    {
+      Scalar<1u>(value);
+    }
+    void WriteBool(
+      const bool value
+    ) override
+    {
+      Scalar<1u>(value);
+    }
+    void WriteMarker(
+      const int marker
+    ) override
+    {
+      Scalar<1u>(kArchiveTokenBytes[marker]);
+    }
+
+    void EndSection(
+      const bool skipOwnershipValidation
+    ) override
+    {
+      gpg::WriteArchive::EndSection(skipOwnershipValidation);
+      Flush();
+    }
+
+  private:
     static constexpr std::size_t kBufferBytes = std::size_t{4} * 1024u * 1024u;
 
     template <std::size_t Width, typename T>
-    void Scalar(const T& value)
+    void Scalar(
+      const T& value
+    )
     {
-        static_assert(Width <= sizeof(T));
-        if (kBufferBytes - mUsed < Width) {
-            Flush();
-        }
-        std::memcpy(mBuffer.get() + mUsed, &value, Width);
-        mUsed += Width;
+      static_assert(Width <= sizeof(T));
+      if (kBufferBytes - mUsed < Width) {
+        Flush();
+      }
+      std::memcpy(mBuffer.get() + mUsed, &value, Width);
+      mUsed += Width;
     }
 
-    void Put(const void* const bytes, const std::size_t byteCount)
+    void Put(
+      const void* const bytes,
+      const std::size_t byteCount
+    )
     {
-        if (kBufferBytes - mUsed < byteCount) {
-            Flush();
-            if (byteCount >= kBufferBytes) {
-                if (!Emit(bytes, byteCount)) {
-                    ThrowSerializationError("nowrite");
-                }
-                return;
-            }
+      if (kBufferBytes - mUsed < byteCount) {
+        Flush();
+        if (byteCount >= kBufferBytes) {
+          if (!Emit(bytes, byteCount)) {
+            ThrowSerializationError("nowrite");
+          }
+          return;
         }
-        if (byteCount != 0u) {
-            std::memcpy(mBuffer.get() + mUsed, bytes, byteCount);
-            mUsed += byteCount;
-        }
+      }
+      if (byteCount != 0u) {
+        std::memcpy(mBuffer.get() + mUsed, bytes, byteCount);
+        mUsed += byteCount;
+      }
     }
 
     void Flush()
     {
-        const std::size_t used = mUsed;
-        mUsed = 0u;
-        if (used != 0u && !Emit(mBuffer.get(), used)) {
-            ThrowSerializationError("nowrite");
-        }
+      const std::size_t used = mUsed;
+      mUsed = 0u;
+      if (used != 0u && !Emit(mBuffer.get(), used)) {
+        ThrowSerializationError("nowrite");
+      }
     }
 
-    [[nodiscard]] bool Emit(const void* const bytes, const std::size_t byteCount)
+    [[nodiscard]] bool Emit(
+      const void* const bytes,
+      const std::size_t byteCount
+    )
     {
-        if (mSink != nullptr) {
-            return mSink->Write(bytes, byteCount);
-        }
-        return byteCount == 0u || std::fwrite(bytes, byteCount, 1u, mFile.get()) == 1u;
+      if (mSink != nullptr) {
+        return mSink->Write(bytes, byteCount);
+      }
+      return byteCount == 0u || std::fwrite(bytes, byteCount, 1u, mFile.get()) == 1u;
     }
 
     boost::shared_ptr<std::FILE> mFile;
@@ -788,36 +988,35 @@ private:
     std::unique_ptr<char[]> mBuffer;
     std::size_t mUsed = 0u;
     TrackedPointerIndex mIndex;
-};
+  };
 
-
-void WriteBinaryCompatibilityLane(
+  void WriteBinaryCompatibilityLane(
     BinaryWriteArchive* const archive,
     const void* const buffer,
     const std::size_t elementSize
-)
-{
+  )
+  {
     archive->WriteScalarLane(buffer, elementSize);
-}
+  }
 
-/**
- * Address: 0x00904940 (FUN_00904940)
- *
- * What it does:
- * Runs one deleting-destructor thunk for `BinaryWriteArchive`, forwarding
- * through non-deleting teardown and optional storage release.
- */
-[[maybe_unused]] [[nodiscard]] BinaryWriteArchive* DestroyBinaryWriteArchiveDeleting(
+  /**
+   * Address: 0x00904940 (FUN_00904940)
+   *
+   * What it does:
+   * Runs one deleting-destructor thunk for `BinaryWriteArchive`, forwarding
+   * through non-deleting teardown and optional storage release.
+   */
+  [[maybe_unused]] [[nodiscard]] BinaryWriteArchive* DestroyBinaryWriteArchiveDeleting(
     BinaryWriteArchive* const archive,
     const unsigned char deleteFlag
-)
-{
+  )
+  {
     archive->~BinaryWriteArchive();
     if ((deleteFlag & 1u) != 0u) {
-        ::operator delete(static_cast<void*>(archive));
+      ::operator delete(static_cast<void*>(archive));
     }
     return archive;
-}
+  }
 } // namespace
 
 /**
@@ -847,10 +1046,10 @@ void WriteBinaryCompatibilityLane(
  * the empty-tree sentinel head, identical pattern to FUN_00950540 above)
  */
 WriteArchive::WriteArchive()
-    : mRefCounts()
-    , mObjRefs()
+  : mRefCounts()
+  , mObjRefs()
 {
-    SerHelperBase::InitNewHelpers();
+  SerHelperBase::InitNewHelpers();
 }
 
 /**
@@ -870,11 +1069,14 @@ WriteArchive::~WriteArchive() = default;
  * Reads one numeric lane from a legacy value payload and forwards it to
  * `WriteFloat`.
  */
-WriteArchive* WriteArchive::WriteValue(const void* const valueLane, const int /*unusedTag*/)
+WriteArchive* WriteArchive::WriteValue(
+  const void* const valueLane,
+  const int /*unusedTag*/
+)
 {
-    const auto* const value = static_cast<const LegacyValueFloatLane*>(valueLane);
-    WriteFloat(value->number);
-    return this;
+  const auto* const value = static_cast<const LegacyValueFloatLane*>(valueLane);
+  WriteFloat(value->number);
+  return this;
 }
 
 /**
@@ -884,12 +1086,15 @@ WriteArchive* WriteArchive::WriteValue(const void* const valueLane, const int /*
  * Wraps one Lua `lua_State*` pointer lane into an `RRef` and forwards it as
  * one unowned tracked pointer entry with caller-provided owner context.
  */
-WriteArchive* WriteArchive::WriteTThread(lua_State* const threadState, const RRef& ownerRef)
+WriteArchive* WriteArchive::WriteTThread(
+  lua_State* const threadState,
+  const RRef& ownerRef
+)
 {
-    RRef objectRef{};
-    objectRef = gpg::MakeRRef<lua_State>(threadState);
-    WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
-    return this;
+  RRef objectRef{};
+  objectRef = gpg::MakeRRef<lua_State>(threadState);
+  WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
+  return this;
 }
 
 /**
@@ -899,12 +1104,15 @@ WriteArchive* WriteArchive::WriteTThread(lua_State* const threadState, const RRe
  * Wraps one Lua `TString*` pointer lane into an `RRef` and forwards it as one
  * unowned tracked pointer entry with caller-provided owner context.
  */
-WriteArchive* WriteArchive::WriteTString(TString* const value, const RRef& ownerRef)
+WriteArchive* WriteArchive::WriteTString(
+  TString* const value,
+  const RRef& ownerRef
+)
 {
-    RRef objectRef{};
-    objectRef = gpg::MakeRRef<TString>(value);
-    WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
-    return this;
+  RRef objectRef{};
+  objectRef = gpg::MakeRRef<TString>(value);
+  WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
+  return this;
 }
 
 /**
@@ -914,12 +1122,15 @@ WriteArchive* WriteArchive::WriteTString(TString* const value, const RRef& owner
  * Wraps one Lua `Table*` pointer lane into an `RRef` and forwards it as one
  * unowned tracked pointer entry with caller-provided owner context.
  */
-WriteArchive* WriteArchive::WriteTTable(Table* const table, const RRef& ownerRef)
+WriteArchive* WriteArchive::WriteTTable(
+  Table* const table,
+  const RRef& ownerRef
+)
 {
-    RRef objectRef{};
-    objectRef = gpg::MakeRRef<Table>(table);
-    WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
-    return this;
+  RRef objectRef{};
+  objectRef = gpg::MakeRRef<Table>(table);
+  WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
+  return this;
 }
 
 /**
@@ -929,12 +1140,15 @@ WriteArchive* WriteArchive::WriteTTable(Table* const table, const RRef& ownerRef
  * Wraps one Lua `LClosure*` pointer lane into an `RRef` and forwards it as
  * one unowned tracked pointer entry with caller-provided owner context.
  */
-WriteArchive* WriteArchive::WriteFunction(LClosure* const closure, const RRef& ownerRef)
+WriteArchive* WriteArchive::WriteFunction(
+  LClosure* const closure,
+  const RRef& ownerRef
+)
 {
-    RRef objectRef{};
-    objectRef = gpg::MakeRRef<LClosure>(closure);
-    WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
-    return this;
+  RRef objectRef{};
+  objectRef = gpg::MakeRRef<LClosure>(closure);
+  WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
+  return this;
 }
 
 /**
@@ -944,12 +1158,15 @@ WriteArchive* WriteArchive::WriteFunction(LClosure* const closure, const RRef& o
  * Wraps one Lua `Udata*` pointer lane into an `RRef` and forwards it as one
  * unowned tracked pointer entry with caller-provided owner context.
  */
-WriteArchive* WriteArchive::WriteUserdata(Udata* const userdata, const RRef& ownerRef)
+WriteArchive* WriteArchive::WriteUserdata(
+  Udata* const userdata,
+  const RRef& ownerRef
+)
 {
-    RRef objectRef{};
-    objectRef = gpg::MakeRRef<Udata>(userdata);
-    WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
-    return this;
+  RRef objectRef{};
+  objectRef = gpg::MakeRRef<Udata>(userdata);
+  WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
+  return this;
 }
 
 /**
@@ -959,12 +1176,15 @@ WriteArchive* WriteArchive::WriteUserdata(Udata* const userdata, const RRef& own
  * Wraps one Lua `CClosure*` pointer lane into an `RRef` and forwards it as
  * one unowned tracked pointer entry with caller-provided owner context.
  */
-WriteArchive* WriteArchive::WriteCFunction(CClosure* const closure, const RRef& ownerRef)
+WriteArchive* WriteArchive::WriteCFunction(
+  CClosure* const closure,
+  const RRef& ownerRef
+)
 {
-    RRef objectRef{};
-    objectRef = gpg::MakeRRef<CClosure>(closure);
-    WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
-    return this;
+  RRef objectRef{};
+  objectRef = gpg::MakeRRef<CClosure>(closure);
+  WriteRawPointer(this, objectRef, TrackedPointerState::Unowned, ownerRef);
+  return this;
 }
 
 /**
@@ -974,48 +1194,57 @@ WriteArchive* WriteArchive::WriteCFunction(CClosure* const closure, const RRef& 
  * What it does:
  * Emits a type-handle table reference or introduces a new type handle.
  */
-void WriteArchive::WriteRefCounts(const RType* const type)
+void WriteArchive::WriteRefCounts(
+  const RType* const type
+)
 {
-    const fa::map<const RType*, int>::iterator it = mRefCounts.find(type);
-    if (it == mRefCounts.end()) {
-        WriteInt(-1);
-        fa::string typeName(type->GetName());
-        WriteString(&typeName);
-        WriteInt(type->version_);
-        (void)mRefCounts.insert({type, static_cast<int>(mRefCounts.size())});
-        return;
-    }
+  const fa::map<const RType*, int>::iterator it = mRefCounts.find(type);
+  if (it == mRefCounts.end()) {
+    WriteInt(-1);
+    fa::string typeName(type->GetName());
+    WriteString(&typeName);
+    WriteInt(type->version_);
+    (void)mRefCounts.insert({type, static_cast<int>(mRefCounts.size())});
+    return;
+  }
 
-    WriteInt(it->second);
+  WriteInt(it->second);
 }
 
 /**
  * Address: 0x00953CA0 (FUN_00953CA0)
- * Demangled: public: void __thiscall gpg::WriteArchive::Write(class gpg::RType const *,void const *,class gpg::RRef const &)
+ * Demangled: public: void __thiscall gpg::WriteArchive::Write(class gpg::RType const *,void const *,class gpg::RRef
+ * const &)
  *
  * What it does:
  * Writes one typed object payload using reflection serializer callbacks.
  */
-void WriteArchive::Write(const RType* const type, const void* const object, const RRef& ownerRef)
+void WriteArchive::Write(
+  const RType* const type,
+  const void* const object,
+  const RRef& ownerRef
+)
 {
-    if (!type->serSaveFunc_) {
-        const RIndexed* pointerType = type->IsPointer();
-        if (pointerType) {
-            const RRef pointerRef = pointerType->SubscriptIndex(const_cast<void*>(object), 0);
-            WriteRawPointer(this, pointerRef, TrackedPointerState::Unowned, ownerRef);
-            return;
-        }
-
-        ThrowSerializationError(STR_Printf(
-            "Error while creating archive: encounted an object of type \"%s\", but we have no serializer for it.",
-            SafeTypeName(type)
-        ));
+  if (!type->serSaveFunc_) {
+    const RIndexed* pointerType = type->IsPointer();
+    if (pointerType) {
+      const RRef pointerRef = pointerType->SubscriptIndex(const_cast<void*>(object), 0);
+      WriteRawPointer(this, pointerRef, TrackedPointerState::Unowned, ownerRef);
+      return;
     }
 
-    WriteMarker(static_cast<int>(ArchiveToken::ObjectStart));
-    WriteRefCounts(type);
-    type->serSaveFunc_(this, reinterpret_cast<std::intptr_t>(const_cast<void*>(object)), type->version_, const_cast<RRef*>(&ownerRef));
-    WriteMarker(static_cast<int>(ArchiveToken::ObjectTerminator));
+    ThrowSerializationError(STR_Printf(
+      "Error while creating archive: encounted an object of type \"%s\", but we have no serializer for it.",
+      SafeTypeName(type)
+    ));
+  }
+
+  WriteMarker(static_cast<int>(ArchiveToken::ObjectStart));
+  WriteRefCounts(type);
+  type->serSaveFunc_(
+    this, reinterpret_cast<std::intptr_t>(const_cast<void*>(object)), type->version_, const_cast<RRef*>(&ownerRef)
+  );
+  WriteMarker(static_cast<int>(ArchiveToken::ObjectTerminator));
 }
 
 /**
@@ -1026,28 +1255,31 @@ void WriteArchive::Write(const RType* const type, const void* const object, cons
  * Pre-registers one non-null object pointer into the tracked-pointer map so
  * nested writes can emit `ExistingPointer` references to that object.
  */
-WriteArchive& WriteArchive::PreCreatedPtr(const RRef& objectRef)
+WriteArchive& WriteArchive::PreCreatedPtr(
+  const RRef& objectRef
+)
 {
-    if (!objectRef.mObj) {
-        ThrowSerializationError("Error while creating archive: NULL pre-created pointers are not allowed.");
-    }
+  if (!objectRef.mObj) {
+    ThrowSerializationError("Error while creating archive: NULL pre-created pointers are not allowed.");
+  }
 
-    const bool known = mFastObjRefs != nullptr ? mFastObjRefs->Find(objectRef) != nullptr : mObjRefs.find(objectRef) != mObjRefs.end();
-    if (known) {
-        ThrowSerializationError(
-            "Error while creating archive: can't register pre-created pointer because it has already been serialized."
-        );
-    }
+  const bool known =
+    mFastObjRefs != nullptr ? mFastObjRefs->Find(objectRef) != nullptr : mObjRefs.find(objectRef) != mObjRefs.end();
+  if (known) {
+    ThrowSerializationError(
+      "Error while creating archive: can't register pre-created pointer because it has already been serialized."
+    );
+  }
 
-    WriteArchive::TrackedPointerRecord record{};
-    record.index = static_cast<int>(mFastObjRefs != nullptr ? mFastObjRefs->Size() : mObjRefs.size());
-    record.ownership = TrackedPointerState::Owned;
-    if (mFastObjRefs != nullptr) {
-        (void)mFastObjRefs->Insert(objectRef, record);
-    } else {
-        (void)mObjRefs.insert({objectRef, record});
-    }
-    return *this;
+  WriteArchive::TrackedPointerRecord record{};
+  record.index = static_cast<int>(mFastObjRefs != nullptr ? mFastObjRefs->Size() : mObjRefs.size());
+  record.ownership = TrackedPointerState::Owned;
+  if (mFastObjRefs != nullptr) {
+    (void)mFastObjRefs->Insert(objectRef, record);
+  } else {
+    (void)mObjRefs.insert({objectRef, record});
+  }
+  return *this;
 }
 
 /**
@@ -1083,37 +1315,38 @@ WriteArchive& WriteArchive::PreCreatedPtr(const RRef& objectRef)
  * Address: 0x00952300 (FUN_00952300, mObjRefs's `~map()`/`erase(begin(),end())`
  * body described above)
  */
-void WriteArchive::EndSection(const bool skipOwnershipValidation)
+void WriteArchive::EndSection(
+  const bool skipOwnershipValidation
+)
 {
-    if (mFastObjRefs != nullptr) {
-        for (std::uint32_t index = 0u; !skipOwnershipValidation && index < mFastObjRefs->Size(); ++index) {
-            const TrackedPointerIndex::Entry& entry = mFastObjRefs->At(index);
-            if (entry.record.ownership == TrackedPointerState::Unowned) {
-                ThrowSerializationError(STR_Printf(
-                    "Error while creating archive: nobody claimed ownership of %s 0x%08llx",
-                    SafeTypeName(entry.key.mType),
-                    static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(entry.key.mObj))
-                ));
-            }
-        }
-        mFastObjRefs->Clear();
+  if (mFastObjRefs != nullptr) {
+    for (std::uint32_t index = 0u; !skipOwnershipValidation && index < mFastObjRefs->Size(); ++index) {
+      const TrackedPointerIndex::Entry& entry = mFastObjRefs->At(index);
+      if (entry.record.ownership == TrackedPointerState::Unowned) {
+        ThrowSerializationError(STR_Printf(
+          "Error while creating archive: nobody claimed ownership of %s 0x%08llx",
+          SafeTypeName(entry.key.mType),
+          static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(entry.key.mObj))
+        ));
+      }
     }
+    mFastObjRefs->Clear();
+  }
 
-    if (!skipOwnershipValidation) {
-        for (TrackedPointerMap::const_iterator it = mObjRefs.begin(); it != mObjRefs.end(); ++it) {
-            if (it->second.ownership == TrackedPointerState::Unowned) {
-                ThrowSerializationError(STR_Printf(
-                    "Error while creating archive: nobody claimed ownership of %s 0x%08llx",
-                    SafeTypeName(it->first.mType),
-                    static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(it->first.mObj))
-                ));
-            }
-
-        }
+  if (!skipOwnershipValidation) {
+    for (TrackedPointerMap::const_iterator it = mObjRefs.begin(); it != mObjRefs.end(); ++it) {
+      if (it->second.ownership == TrackedPointerState::Unowned) {
+        ThrowSerializationError(STR_Printf(
+          "Error while creating archive: nobody claimed ownership of %s 0x%08llx",
+          SafeTypeName(it->first.mType),
+          static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(it->first.mObj))
+        ));
+      }
     }
+  }
 
-    mRefCounts.clear();
-    mObjRefs.clear();
+  mRefCounts.clear();
+  mObjRefs.clear();
 }
 
 /**
@@ -1125,7 +1358,7 @@ void WriteArchive::EndSection(const bool skipOwnershipValidation)
  */
 void WriteArchive::Close()
 {
-    EndSection(false);
+  EndSection(false);
 }
 
 /**
@@ -1139,28 +1372,37 @@ void WriteArchive::Close()
  * null on allocation failure) and constructs unconditionally -- matching the
  * sibling CreateTextWriteArchive.
  */
-WriteArchive* gpg::CreateBinaryWriteArchive(const boost::shared_ptr<std::FILE>& file)
+WriteArchive* gpg::CreateBinaryWriteArchive(
+  const boost::shared_ptr<std::FILE>& file
+)
 {
-    return new (std::nothrow) BinaryWriteArchive(file);
+  return new (std::nothrow) BinaryWriteArchive(file);
 }
 
-WriteArchive* gpg::CreateFastBinaryWriteArchive(const boost::shared_ptr<std::FILE>& file)
+WriteArchive* gpg::CreateFastBinaryWriteArchive(
+  const boost::shared_ptr<std::FILE>& file
+)
 {
-    return new FastBinaryWriteArchive(file);
+  return new FastBinaryWriteArchive(file);
 }
 
-WriteArchive* gpg::CreateFastBinaryWriteArchive(WriteArchiveSink& sink)
+WriteArchive* gpg::CreateFastBinaryWriteArchive(
+  WriteArchiveSink& sink
+)
 {
-    return new FastBinaryWriteArchive(sink);
+  return new FastBinaryWriteArchive(sink);
 }
 
 /**
- * Address: 0x00939280 (FUN_00939280, ?CreateTextWriteArchive@gpg@@YAPAVWriteArchive@1@ABV?$shared_ptr@V?$basic_ostream@DU?$char_traits@D@std@@@std@@@boost@@@Z_0)
+ * Address: 0x00939280 (FUN_00939280,
+ * ?CreateTextWriteArchive@gpg@@YAPAVWriteArchive@1@ABV?$shared_ptr@V?$basic_ostream@DU?$char_traits@D@std@@@std@@@boost@@@Z_0)
  *
  * What it does:
  * Creates one text-backed concrete `WriteArchive` bound to an output stream.
  */
-WriteArchive* gpg::CreateTextWriteArchive(const boost::shared_ptr<std::ostream>& stream)
+WriteArchive* gpg::CreateTextWriteArchive(
+  const boost::shared_ptr<std::ostream>& stream
+)
 {
-    return new (std::nothrow) TextWriteArchive(stream);
+  return new (std::nothrow) TextWriteArchive(stream);
 }

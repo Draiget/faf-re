@@ -26,12 +26,17 @@
 
 namespace
 {
-  [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept
+  [[nodiscard]] moho::ETaskState NextTaskState(
+    const moho::ETaskState state
+  ) noexcept
   {
     return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
   }
 
-  [[nodiscard]] bool MatchesManualFireProfile(const moho::RUnitBlueprintWeapon* const weaponBlueprint, const std::int32_t isNuclearMode)
+  [[nodiscard]] bool MatchesManualFireProfile(
+    const moho::RUnitBlueprintWeapon* const weaponBlueprint,
+    const std::int32_t isNuclearMode
+  )
   {
     if (weaponBlueprint == nullptr) {
       return false;
@@ -205,8 +210,7 @@ namespace moho
     const Wm3::Vec3f targetPos = mTarget.GetTargetPosGun(false);
     const Wm3::Vec3f unitPos = unit->GetPosition();
     const float groundDistance = std::sqrt(
-      ((unitPos.x - targetPos.x) * (unitPos.x - targetPos.x))
-      + ((unitPos.z - targetPos.z) * (unitPos.z - targetPos.z))
+      ((unitPos.x - targetPos.x) * (unitPos.x - targetPos.x)) + ((unitPos.z - targetPos.z) * (unitPos.z - targetPos.z))
     );
 
     switch (mTaskState) {
@@ -235,8 +239,8 @@ namespace moho
         return 1;
       }
 
-      // 0x0060B5BA `comiss` + `jbe`: an unordered compare takes the branch too, so a NaN distance (a target at NaN, 26935320 at
-      // beat 13621) counts as in the band, and an immobile launcher keeps the order instead of ending it.
+      // 0x0060B5BA `comiss` + `jbe`: an unordered compare takes the branch too, so a NaN distance (a target at NaN,
+      // 26935320 at beat 13621) counts as in the band, and an immobile launcher keeps the order instead of ending it.
       if (!(groundDistance > maxRadius)) {
         // In the band: stop moving and make sure a round is loaded.
         if (unit->IsMobile() && navigator) {
@@ -317,9 +321,7 @@ namespace moho
 
     default:
       gpg::HandleAssertFailure(
-        "Reached the supposably unreachable.",
-        910,
-        "c:\\work\\rts\\main\\code\\src\\sim\\AiUnitCommands.cpp"
+        "Reached the supposably unreachable.", 910, "c:\\work\\rts\\main\\code\\src\\sim\\AiUnitCommands.cpp"
       );
       return -1;
     }
@@ -340,7 +342,9 @@ namespace moho
    *   4. `mWeapon` at +0x54, read as a tracked pointer.
    *   5. `mIsNuclear` at +0x58, read through the `ESiloType` reflected type.
    */
-  void CUnitFireAtTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CUnitFireAtTask::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -371,7 +375,9 @@ namespace moho
    * `mWeapon` (as an unowned tracked pointer), then `mIsNuclear` (through the
    * `ESiloType` reflected type).
    */
-  void CUnitFireAtTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CUnitFireAtTask::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;
@@ -445,7 +451,10 @@ namespace gpg
    * Builds one typed reflection reference for `moho::CUnitFireAtTask*`,
    * preserving dynamic-derived ownership and base-offset adjustment.
    */
-  gpg::RRef* RRef_CUnitFireAtTask(gpg::RRef* const outRef, moho::CUnitFireAtTask* const value)
+  gpg::RRef* RRef_CUnitFireAtTask(
+    gpg::RRef* const outRef,
+    moho::CUnitFireAtTask* const value
+  )
   {
     return gpg::WriteDerivedRef(outRef, value);
   }
@@ -457,7 +466,10 @@ namespace gpg
    * Wrapper lane that materializes one temporary `RRef_CUnitFireAtTask` and
    * copies object/type fields into the destination reference record.
    */
-  gpg::RRef* AssignCUnitFireAtTaskRef(gpg::RRef* const outRef, moho::CUnitFireAtTask* const value)
+  gpg::RRef* AssignCUnitFireAtTaskRef(
+    gpg::RRef* const outRef,
+    moho::CUnitFireAtTask* const value
+  )
   {
     if (!outRef) {
       return nullptr;

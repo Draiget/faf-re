@@ -58,12 +58,16 @@ namespace moho
        * converts each `T*` its source iterator yields through this, which is the
        * stack `Entry` 0x00822C50 builds per element.
        */
-      Entry(T* const object) noexcept
+      Entry(
+        T* const object
+      ) noexcept
         : mObject(object)
         , mRef(object)
       {}
 
-      [[nodiscard]] bool operator<(const Entry& other) const noexcept
+      [[nodiscard]] bool operator<(
+        const Entry& other
+      ) const noexcept
       {
         return mObject < other.mObject;
       }
@@ -91,7 +95,10 @@ namespace moho
 
       iterator() = default;
 
-      iterator(const WeakSet* const set, const tree_iterator it) noexcept
+      iterator(
+        const WeakSet* const set,
+        const tree_iterator it
+      ) noexcept
         : mSet(set)
         , mIt(it)
       {}
@@ -126,14 +133,18 @@ namespace moho
         return *this;
       }
 
-      iterator operator++(int)
+      iterator operator++(
+        int
+      )
       {
         iterator previous = *this;
         ++*this;
         return previous;
       }
 
-      [[nodiscard]] bool operator==(const iterator& other) const noexcept
+      [[nodiscard]] bool operator==(
+        const iterator& other
+      ) const noexcept
       {
         return mIt == other.mIt;
       }
@@ -169,7 +180,9 @@ namespace moho
      * Copies the live objects only: building `other.begin()` erases `other`'s
      * leading dead entries, and each `++` the rest.
      */
-    WeakSet(const WeakSet& other)
+    WeakSet(
+      const WeakSet& other
+    )
       : mSet(other.begin(), other.end())
     {}
 
@@ -216,7 +229,9 @@ namespace moho
      * Inserts `object` unless it is already there; returns the entry's cursor
      * and whether it was new.
      */
-    std::pair<iterator, bool> Add(T* const object)
+    std::pair<iterator, bool> Add(
+      T* const object
+    )
     {
       const Entry entry(object);
       const std::pair<tree_iterator, bool> result = mSet.insert(entry);
@@ -234,7 +249,10 @@ namespace moho
      * (0x00868AF0, 0x00868A00; see `fa::set::insert(first, last)`).
      */
     template <class InputIt>
-    void Add(const InputIt first, const InputIt last)
+    void Add(
+      const InputIt first,
+      const InputIt last
+    )
     {
       mSet.insert(first, last);
     }
@@ -245,7 +263,9 @@ namespace moho
      * `erase(it)` (0x0066A550 / 0x007B30D0), then `SkipDead`. Inlined at each
      * use, as in the dragger's selectability prune (0x00863EB3..0x00863EC1).
      */
-    iterator Erase(const iterator it)
+    iterator Erase(
+      const iterator it
+    )
     {
       return iterator(this, SkipDead(mSet.erase(it.base())));
     }
@@ -266,7 +286,9 @@ namespace moho
      * The entry for `object` through the set's `find` (0x007FDFE0), or `end()`.
      * A dead entry is returned as it is.
      */
-    [[nodiscard]] iterator Find(T* const object) const
+    [[nodiscard]] iterator Find(
+      T* const object
+    ) const
     {
       const Entry entry(object);
       return iterator(this, mSet.find(entry));
@@ -281,7 +303,9 @@ namespace moho
      * What it does:
      * Erases the entry for `object`; returns how many went (0 or 1).
      */
-    size_type Remove(T* const object)
+    size_type Remove(
+      T* const object
+    )
     {
       const Entry entry(object);
       return mSet.erase(entry);
@@ -355,7 +379,9 @@ namespace moho
      * 0x007B30D0) until a live one or the end; returns where it stopped. The
      * death test is `slot != 0 && slot - 8 != 0`, the decode of the `WeakPtr`.
      */
-    tree_iterator SkipDead(tree_iterator it) const
+    tree_iterator SkipDead(
+      tree_iterator it
+    ) const
     {
       while (it != mSet.end() && it->mRef.GetObjectPtr() == nullptr) {
         it = mSet.erase(it);

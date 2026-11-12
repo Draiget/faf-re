@@ -48,7 +48,9 @@ namespace moho
   static_assert(sizeof(WorldShapeRecord) == 112, "WorldShapeRecord must match ShapeRecord");
 
   /** Quads each kind expands to. */
-  [[nodiscard]] constexpr std::uint32_t WorldShapeQuadCount(const WorldShapeKind kind) noexcept
+  [[nodiscard]] constexpr std::uint32_t WorldShapeQuadCount(
+    const WorldShapeKind kind
+  ) noexcept
   {
     return kind == WorldShapeKind::Line ? 1U : kind == WorldShapeKind::Rect ? 4U : kDrawOvalSegmentCount;
   }

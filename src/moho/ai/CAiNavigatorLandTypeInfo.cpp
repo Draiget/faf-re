@@ -27,7 +27,9 @@ namespace
    * Adds the reflected `CAiNavigatorImpl` base entry to the land navigator
    * RTTI node.
    */
-  void AddCAiNavigatorImplBase(gpg::RType& typeInfo)
+  void AddCAiNavigatorImplBase(
+    gpg::RType& typeInfo
+  )
   {
     gpg::AddReflectedBase<CAiNavigatorImpl>(&typeInfo);
   }
@@ -98,4 +100,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CAiNavigatorLandTypeInfo_fd73e5, moho::register_CAiNavigatorLandTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CAiNavigatorLandTypeInfo_fd73e5,
+  moho::register_CAiNavigatorLandTypeInfo
+)

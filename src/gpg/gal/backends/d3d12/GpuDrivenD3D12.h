@@ -33,10 +33,22 @@ namespace gpg::gal
     GpuBufferD3D12(DeviceD3D12& device, const GpuBufferDesc& desc);
     ~GpuBufferD3D12() override;
 
-    [[nodiscard]] d3d12::TrackedResource& Resource() noexcept { return mResource; }
-    [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE ShaderView() const noexcept { return mShaderView; }
-    [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE WriteView() const noexcept { return mWriteView; }
-    [[nodiscard]] std::uint64_t ByteWidth() const noexcept { return mByteWidth; }
+    [[nodiscard]] d3d12::TrackedResource& Resource() noexcept
+    {
+      return mResource;
+    }
+    [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE ShaderView() const noexcept
+    {
+      return mShaderView;
+    }
+    [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE WriteView() const noexcept
+    {
+      return mWriteView;
+    }
+    [[nodiscard]] std::uint64_t ByteWidth() const noexcept
+    {
+      return mByteWidth;
+    }
 
   private:
     d3d12::TrackedResource mResource;
@@ -51,7 +63,7 @@ namespace gpg::gal
     GpuProgramD3D12() = default;
     ~GpuProgramD3D12() override;
 
-    GpuProgramDesc mDesc{};          // the render state (source pointers are not kept)
+    GpuProgramDesc mDesc{}; // the render state (source pointers are not kept)
     std::string mName;
     std::vector<std::uint8_t> mVertexCode;
     std::vector<std::uint8_t> mPixelCode;
@@ -60,6 +72,7 @@ namespace gpg::gal
     /** Draw pipelines by (render-target format, depth format). */
     /// By render-target format, depth format and - for inheritDepthStencil programs - the
     /// engine's depth-stencil state at the draw (DepthStencilDesc::PackedKey, else 0).
-    std::map<std::tuple<DXGI_FORMAT, DXGI_FORMAT, std::uint64_t>, Microsoft::WRL::ComPtr<ID3D12PipelineState>> mPipelines;
+    std::map<std::tuple<DXGI_FORMAT, DXGI_FORMAT, std::uint64_t>, Microsoft::WRL::ComPtr<ID3D12PipelineState>>
+      mPipelines;
   };
 } // namespace gpg::gal

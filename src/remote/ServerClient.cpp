@@ -18,7 +18,9 @@ namespace faf::remote
     constexpr std::uint64_t kRefusalsLoggedPerOp = 3u;
   } // namespace
 
-  bool SeatMaySend(const moho::ECmdStreamOp op) noexcept
+  bool SeatMaySend(
+    const moho::ECmdStreamOp op
+  ) noexcept
   {
     switch (op) {
     case moho::ECmdStreamOp::CMDST_RequestPause:
@@ -52,14 +54,21 @@ namespace faf::remote
   }
 
   CServerClient::CServerClient(
-    moho::CClientManagerImpl& manager, const char* const name, const std::int32_t index, const std::int32_t ownerId,
-    moho::BVIntSet& sources, const std::uint32_t sourceId
+    moho::CClientManagerImpl& manager,
+    const char* const name,
+    const std::int32_t index,
+    const std::int32_t ownerId,
+    moho::BVIntSet& sources,
+    const std::uint32_t sourceId
   )
     : CClientBase(index, &manager, name, ownerId, sources, sourceId)
   {}
 
   CServerClient& CServerClient::Create(
-    moho::CClientManagerImpl& manager, const char* const name, const std::int32_t index, const std::int32_t ownerId,
+    moho::CClientManagerImpl& manager,
+    const char* const name,
+    const std::int32_t index,
+    const std::int32_t ownerId,
     const std::uint32_t sourceId
   )
   {
@@ -70,7 +79,9 @@ namespace faf::remote
     return *seat;
   }
 
-  void CServerClient::Process(moho::CMessage& message)
+  void CServerClient::Process(
+    moho::CMessage& message
+  )
   {
     std::scoped_lock lock(mManager->mLock);
 
@@ -110,18 +121,24 @@ namespace faf::remote
     CClientBase::Debug();
   }
 
-  bool CServerClient::ReceiveCommand(moho::CMessage& message, std::int32_t* const beat)
+  bool CServerClient::ReceiveCommand(
+    moho::CMessage& message,
+    std::int32_t* const beat
+  )
   {
     std::scoped_lock lock(mManager->mLock);
 
     const std::uint8_t type = message.GetType().raw();
     const auto op = static_cast<moho::ECmdStreamOp>(type);
     // Plan WP15.4: past its pause budget a player's pause is refused like a command it may not send.
-    const bool pauseSpent = op == moho::ECmdStreamOp::CMDST_RequestPause && !mPauseAllowed.load(std::memory_order_relaxed);
+    const bool pauseSpent =
+      op == moho::ECmdStreamOp::CMDST_RequestPause && !mPauseAllowed.load(std::memory_order_relaxed);
     if (type >= kOpCount || !SeatMaySend(op) || pauseSpent) {
       const std::size_t slot = type < kOpCount ? type : 0u;
       if (++mRefused[slot] <= kRefusalsLoggedPerOp) {
-        gpg::Logf("Seat %d:%s: refused message type %d from its player", mIndex, mNickname.c_str(), static_cast<int>(type));
+        gpg::Logf(
+          "Seat %d:%s: refused message type %d from its player", mIndex, mNickname.c_str(), static_cast<int>(type)
+        );
       }
       return false;
     }
@@ -135,7 +152,9 @@ namespace faf::remote
     return true;
   }
 
-  void CServerClient::AppendFromServer(moho::CMessage& message)
+  void CServerClient::AppendFromServer(
+    moho::CMessage& message
+  )
   {
     std::scoped_lock lock(mManager->mLock);
     CClientBase::Process(message);
@@ -148,7 +167,9 @@ namespace faf::remote
     CClientBase::Process(ready);
   }
 
-  void CServerClient::SetBeatHook(BeatHook hook)
+  void CServerClient::SetBeatHook(
+    BeatHook hook
+  )
   {
     std::scoped_lock lock(mManager->mLock);
     mBeatHook = std::move(hook);

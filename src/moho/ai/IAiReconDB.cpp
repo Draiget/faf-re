@@ -21,11 +21,9 @@ IAiReconDB::IAiReconDB() = default;
 IAiReconDB::~IAiReconDB() = default;
 
 /**
-  * Alias of FUN_005C29C0 (non-canonical helper lane).
+ * Alias of FUN_005C29C0 (non-canonical helper lane).
  *
  * What it does:
  * No-op checksum update hook in the base recon DB interface lane.
  */
-void IAiReconDB::UpdateSimChecksum()
-{
-}
+void IAiReconDB::UpdateSimChecksum() {}

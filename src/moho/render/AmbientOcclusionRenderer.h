@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 #include "boost/shared_ptr.h"
 
@@ -41,7 +42,8 @@ namespace moho
      * `shadow`, when it drew this frame's sun shadow, keeps contact shadows to the points it lights:
      * it already shades the rest, and a second darkening turned the ground under trees near-black.
      */
-    void Render(const GeomCamera3& camera, int x, int y, int width, int height, float shadowReach, const Shadow* shadow);
+    void
+    Render(const GeomCamera3& camera, int x, int y, int width, int height, float shadowReach, const Shadow* shadow);
 
   private:
     /** Re-bakes terrain shadows when the map's heightfield or the sun changed; false when there are none. */
@@ -50,6 +52,7 @@ namespace moho
     gpg::gal::Device* mDevice = nullptr;
     bool mSupported = false;
     boost::shared_ptr<gpg::gal::GpuProgram> mCompute;
+    std::string mRaySource; // the compute source, with FAF_RAY_QUERY defined where the device traces rays (ren_RayAo)
     boost::shared_ptr<gpg::gal::GpuProgram> mBake;
     boost::shared_ptr<gpg::gal::GpuBuffer> mHeights;
     boost::shared_ptr<gpg::gal::GpuBuffer> mTerrainShadow;

@@ -97,12 +97,12 @@ namespace
   [[nodiscard]] int SessionLeadBeats() noexcept
   {
     switch (gDriverSessionPacing.load(std::memory_order_relaxed)) {
-      case ESimSessionPacing::Replay:
-        return std::max(0, sim_ReplayLead);
-      case ESimSessionPacing::Local:
-        return std::max(0, sim_LocalLead);
-      case ESimSessionPacing::Network:
-        break;
+    case ESimSessionPacing::Replay:
+      return std::max(0, sim_ReplayLead);
+    case ESimSessionPacing::Local:
+      return std::max(0, sim_LocalLead);
+    case ESimSessionPacing::Network:
+      break;
     }
     return 0;
   }
@@ -134,8 +134,8 @@ namespace
     std::int32_t mLastTick = 0;
     std::int64_t mLastTickCycles = 0;
     std::int64_t mNextLogCycles = 0;
-    float mLagMs = 0.0f;   // clamped to +/- wld_SkewMaxLag: what the correction acts on
-    float mDriftMs = 0.0f; // unclamped: what actually happened, for the log
+    float mLagMs = 0.0f;              // clamped to +/- wld_SkewMaxLag: what the correction acts on
+    float mDriftMs = 0.0f;            // unclamped: what actually happened, for the log
     bool mSharedStartPending = false; // network session: not measured against the shared start yet
     std::int32_t mFirstTick = 0;
     bool mCorrecting = false; // the display clock acts on it: wld_SkewCorrection, for every player of a network game
@@ -148,20 +148,26 @@ namespace
   constexpr std::int32_t kSharedStartWaitTicks = 50;
 
   /// A tick's length in ms at `simRate` (10 ticks a second at 0, x10 per 10 steps).
-  [[nodiscard]] float TickMs(const int simRate)
+  [[nodiscard]] float TickMs(
+    const int simRate
+  )
   {
     return 100.0f / std::pow(10.0f, static_cast<float>(simRate) * 0.1f);
   }
 
   /// A lag within +/- wld_SkewMaxLag: what the correction acts on.
-  [[nodiscard]] float ClampLag(const float lagMs)
+  [[nodiscard]] float ClampLag(
+    const float lagMs
+  )
   {
     const float maxLagMs = std::max(0.0f, wld_SkewMaxLag) * 1000.0f;
     return std::clamp(lagMs, -maxLagMs, maxLagMs);
   }
 
   /// The display-clock factor `WLD_GetSimRate` makes of a lag, for the log.
-  [[nodiscard]] float SkewDisplayFactor(const float lagMs)
+  [[nodiscard]] float SkewDisplayFactor(
+    const float lagMs
+  )
   {
     if (!gSkewClock.mCorrecting) {
       return 1.0f;
@@ -171,7 +177,12 @@ namespace
   }
 
   /// Network sessions: once the shared start is known, the tick just shown is measured against it.
-  void ApplySharedStart(SkewClock& clock, const std::int32_t tick, const int simRate, CClientManagerImpl& manager)
+  void ApplySharedStart(
+    SkewClock& clock,
+    const std::int32_t tick,
+    const int simRate,
+    CClientManagerImpl& manager
+  )
   {
     if (tick - clock.mFirstTick > kSharedStartWaitTicks) {
       clock.mSharedStartPending = false;
@@ -189,25 +200,37 @@ namespace
     clock.mLagMs = ClampLag(lagMs);
     clock.mDriftMs = lagMs;
     if (wld_SkewLog > 0) {
-      gpg::Logf("SkewClock: tick %d shown %+.3f s after the shared start, due at %+.3f s: lag %+.3f s", tick,
-        static_cast<float>(shownUs - sharedStartUs) * 0.000001f, static_cast<float>(tick) * tickMs * 0.001f, lagMs * 0.001f);
+      gpg::Logf(
+        "SkewClock: tick %d shown %+.3f s after the shared start, due at %+.3f s: lag %+.3f s",
+        tick,
+        static_cast<float>(shownUs - sharedStartUs) * 0.000001f,
+        static_cast<float>(tick) * tickMs * 0.001f,
+        lagMs * 0.001f
+      );
     }
   }
 
-  void LogSkewCorrection(const bool correcting, const std::int32_t tick)
+  void LogSkewCorrection(
+    const bool correcting,
+    const std::int32_t tick
+  )
   {
     if (wld_SkewCorrection == 0) {
       return;
     }
     gpg::Logf(
-      "SkewClock: tick %d correction %s", tick,
+      "SkewClock: tick %d correction %s",
+      tick,
       correcting ? "on, every player runs it"
                  : "waits: it needs a network game where every player announces it (net_PeerFeatures)"
     );
   }
 
   void UpdateSkewClock(
-    const SSyncData& beat, const std::int64_t now, const int simRate, CClientManagerImpl* const sharedStartFrom,
+    const SSyncData& beat,
+    const std::int64_t now,
+    const int simRate,
+    CClientManagerImpl* const sharedStartFrom,
     const bool correcting
   )
   {
@@ -259,7 +282,11 @@ namespace
     if (wld_SkewLog > 0 && now >= clock.mNextLogCycles) {
       gpg::Logf(
         "SkewClock: tick %d lag %+.3f s (unclamped %+.3f s), display speed x%.3f, sim rate %d, correction %s",
-        beat.mCurTick, clock.mLagMs * 0.001f, clock.mDriftMs * 0.001f, SkewDisplayFactor(clock.mLagMs), simRate,
+        beat.mCurTick,
+        clock.mLagMs * 0.001f,
+        clock.mDriftMs * 0.001f,
+        SkewDisplayFactor(clock.mLagMs),
+        simRate,
         clock.mCorrecting ? "on" : "off"
       );
       clock.mNextLogCycles = now + gpg::time::MillisecondsToCycles(static_cast<float>(wld_SkewLog) * 1000.0f);
@@ -377,7 +404,10 @@ namespace
    * compare: -0.0f and +0.0f count as equal, and a NaN anywhere makes the
    * matrices unequal even against itself.
    */
-  [[nodiscard]] bool AreGalMatricesEqual(const gpg::gal::Matrix& lhs, const gpg::gal::Matrix& rhs) noexcept
+  [[nodiscard]] bool AreGalMatricesEqual(
+    const gpg::gal::Matrix& lhs,
+    const gpg::gal::Matrix& rhs
+  ) noexcept
   {
     for (int row = 0; row < 4; ++row) {
       for (int column = 0; column < 4; ++column) {
@@ -400,7 +430,10 @@ namespace
    * compared fields the binary ignores, and compared bit patterns rather than
    * float values, inverting the NaN case.
    */
-  bool AreGeomCameraVectorsEqual(const fa::vector<GeomCamera3>& lhs, const fa::vector<GeomCamera3>& rhs)
+  bool AreGeomCameraVectorsEqual(
+    const fa::vector<GeomCamera3>& lhs,
+    const fa::vector<GeomCamera3>& rhs
+  )
   {
     if (lhs.size() != rhs.size()) {
       return false;
@@ -430,7 +463,9 @@ namespace
    * `floor(10 * log10(rate))` - the inverse of WLD_GetSimRate's
    * `pow(10, speed * 0.1f)`.
    */
-  int RATE_GameRateToSpeed(const float rate)
+  int RATE_GameRateToSpeed(
+    const float rate
+  )
   {
     // 0x0055AE19..0x0055AE36: `log(rate) / log(10.0)` with both logarithms on
     // the x87 stack, times 10.0f (0x00DFF31C), stored to float.
@@ -466,11 +501,12 @@ namespace
      * Stores the stat item at +0x00 and starts the timer at +0x08
      * (0x009556D0). Zero references: both users inline it.
      */
-    explicit ScopedStatTimer(StatItem* const stat)
+    explicit ScopedStatTimer(
+      StatItem* const stat
+    )
       : mStat(stat)
       , mTimer()
-    {
-    }
+    {}
 
     /**
      * Address: 0x0073B060 (FUN_0073B060)
@@ -499,7 +535,9 @@ namespace
   };
   static_assert(sizeof(ScopedStatTimer) == 0x10, "ScopedStatTimer size must be 0x10");
 
-  bool IsZeroDigest(const gpg::MD5Digest& digest)
+  bool IsZeroDigest(
+    const gpg::MD5Digest& digest
+  )
   {
     return digest.vals[0] == 0 && digest.vals[1] == 0 && digest.vals[2] == 0 && digest.vals[3] == 0;
   }
@@ -547,7 +585,9 @@ SSyncData::~SSyncData()
   mStream = nullptr;
 }
 
-void SSyncData::QueuePendingCommandEventRemoval(const CmdId commandId)
+void SSyncData::QueuePendingCommandEventRemoval(
+  const CmdId commandId
+)
 {
   mPendingCommandEventRemovals.push_back(commandId);
 }
@@ -559,7 +599,10 @@ void SSyncData::QueuePendingCommandEventRemoval(const CmdId commandId)
  * Appends one unit-create sync packet to `syncData->mNewUnits` and returns
  * the inserted element pointer.
  */
-SCreateUnitParams* moho::QueueCreateUnitParams(SSyncData* const syncData, const SCreateUnitParams& params)
+SCreateUnitParams* moho::QueueCreateUnitParams(
+  SSyncData* const syncData,
+  const SCreateUnitParams& params
+)
 {
   if (!syncData) {
     return nullptr;
@@ -587,7 +630,8 @@ SCreateUnitParams* moho::QueueCreateUnitParams(SSyncData* const syncData, const 
 SEntityVariableUpdateEntry* moho::QueueEntityVariableUpdate(
   SSyncData* const syncData,
   const EntId entityId,
-  const SSTIEntityVariableData& variableData)
+  const SSTIEntityVariableData& variableData
+)
 {
   if (!syncData) {
     return nullptr;
@@ -649,7 +693,8 @@ namespace moho
 moho::SUnitVariableUpdateEntry* moho::QueueUnitVariableUpdate(
   SSyncData* const syncData,
   const EntId entityId,
-  const SSTIUnitVariableData& variableData)
+  const SSTIUnitVariableData& variableData
+)
 {
   if (!syncData) {
     return nullptr;
@@ -679,7 +724,10 @@ moho::SUnitVariableUpdateEntry* moho::QueueUnitVariableUpdate(
   return stored;
 }
 
-void moho::SetUnitUpdateReconFlags(SUnitVariableUpdateEntry* const entry, const std::int32_t reconFlags) noexcept
+void moho::SetUnitUpdateReconFlags(
+  SUnitVariableUpdateEntry* const entry,
+  const std::int32_t reconFlags
+) noexcept
 {
   if (entry != nullptr) {
     entry->mReconFlags = reconFlags;
@@ -749,7 +797,9 @@ bool SSyncDataQueue::Empty() const
  * quietly would drop the payload and still wake the waiter with nothing
  * queued.
  */
-void SSyncDataQueue::PushBack(SSyncData* data)
+void SSyncDataQueue::PushBack(
+  SSyncData* data
+)
 {
   boost::EnsurePtrContainerPushBackInputNotNull(data);
   mSyncdat.push_back(data);
@@ -800,7 +850,9 @@ void SSyncDataQueue::ClearAndDelete()
  * `Moho::CSimDriver::GetSyncData` (FUN_0073C520), preserving the MSVC8
  * out-of-line symbol shape for the ptr_sequence_adapter emission.
  */
-SSyncData* moho::PopFrontSSyncDataPtrDeque(SSyncDataQueue& queue)
+SSyncData* moho::PopFrontSSyncDataPtrDeque(
+  SSyncDataQueue& queue
+)
 {
   if (queue.Empty()) {
     throw boost::bad_ptr_container_operation("'pop_front()' on empty container");
@@ -840,14 +892,35 @@ SSyncData* moho::PopFrontSSyncDataPtrDeque(SSyncDataQueue& queue)
  * connection and sync events, builds the marshaller that turns this driver's
  * `ISTIDriver` calls into command-stream messages, and starts the
  * create-sim bootstrap thread.
- * `boost::function0<void>` as `new boost::thread(boost::bind(&CSimDriver::ThreadCreateSim, this))` below and `new boost::thread(boost::bind(&CSimDriver::ThreadRun, this))` in `ThreadCreateSim` instantiate it: one F = `bind_t<void, _mfi::mf0<void, CSimDriver>, _bi::list1<_bi::value<CSimDriver*>>>` (RTTI 0x00F802D8) serves both sites, the member pointer being data (0x0073B85A pushes 0x0073D260, 0x0073D638 pushes 0x0073BDF0); its static vtable is {manager 0x010C79E4, invoker 0x010C79E8}, guard bit 0x010C79EC:
- * Address: 0x00741810 (FUN_00741810 -- `function0<void>::function0<F>(F)`: `vtable = 0`, then `assign_to(f)`; EAX = the temporary, F by value, `ret 8`; callers 0x0073B865 (this constructor), 0x0073D642 (`ThreadCreateSim`); formerly the hand-written `BuildDeferredDriverCallback` in this file (RULE ONE), removed 2026-09-30.)
- * Address: 0x00741D70 (FUN_00741D70 -- `function0<void>::assign_to<F>(F)`: the magic-static `stored_vtable(f)` with `basic_vtable0(F)`/`init` inlined, `has_empty_target` 0x00412B30, the 8-byte bind_t placement-copied into `functor` (+0x08), `vtable = &stored_vtable`; caller 0x00741810; formerly `BuildCallLaterCallback` in this file, a lambda that instantiated a different F (RULE ONE), removed 2026-09-30.)
- * Address: 0x00742540 (FUN_00742540 -- `basic_vtable0<void>::basic_vtable0<F>(F)` out of line, `this` folded to the static 0x010C79E4: stores invoker 0x00742E20 / manager 0x00742E30 and returns `this`, `ret 8`; zero callers, unreachable (0x00741D70 inlines it); formerly `InitializeDeferredSimDriverCallableVtable` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
- * Address: 0x00742B00 (FUN_00742B00 -- `basic_vtable0<void>::init<F>(F)` out of line: the same two stores, `ret 8`; zero callers, unreachable; formerly `BindDeferredSimDriverCallableHandlers` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
- * Address: 0x00742DB0 (FUN_00742DB0 -- `basic_vtable0<void>::init<F>(F, function_obj_tag)` out of line: the same two stores, `ret 0xC` for F plus the tag; zero callers, unreachable; formerly the second address of `BindDeferredSimDriverCallableHandlers` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
- * Address: 0x00742E20 (FUN_00742E20 -- `void_function_obj_invoker0<F, void>::invoke(function_buffer&)`: `ecx = buf[+4]` (the bound CSimDriver*), `jmp buf[+0]` (the member pointer); reached through the invoker slot 0x010C79E8 stored at 0x00741D86, i.e. by `boost::thread`'s thread proc; formerly `InvokeDeferredSimDriverCallback` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
- * Address: 0x00742E30 (FUN_00742E30 -- `functor_manager<F, std::allocator<function_base>>::manage` with the in-buffer `manager(..., mpl::true_)` inlined: op 3 returns `&typeid(F)` 0x00F802D8, 0 copies the two words, 1 does nothing, 2 compares through `type_info::operator==` 0x00A8247D; reached through the manager slot 0x010C79E4 stored at 0x00741D90, called by the temporaries' `~function0` at 0x0073B8B1 and 0x0073D683; formerly `ManageDeferredSimDriverCallbackPayload` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+ * `boost::function0<void>` as `new boost::thread(boost::bind(&CSimDriver::ThreadCreateSim, this))` below and `new
+ * boost::thread(boost::bind(&CSimDriver::ThreadRun, this))` in `ThreadCreateSim` instantiate it: one F = `bind_t<void,
+ * _mfi::mf0<void, CSimDriver>, _bi::list1<_bi::value<CSimDriver*>>>` (RTTI 0x00F802D8) serves both sites, the member
+ * pointer being data (0x0073B85A pushes 0x0073D260, 0x0073D638 pushes 0x0073BDF0); its static vtable is {manager
+ * 0x010C79E4, invoker 0x010C79E8}, guard bit 0x010C79EC: Address: 0x00741810 (FUN_00741810 --
+ * `function0<void>::function0<F>(F)`: `vtable = 0`, then `assign_to(f)`; EAX = the temporary, F by value, `ret 8`;
+ * callers 0x0073B865 (this constructor), 0x0073D642 (`ThreadCreateSim`); formerly the hand-written
+ * `BuildDeferredDriverCallback` in this file (RULE ONE), removed 2026-09-30.) Address: 0x00741D70 (FUN_00741D70 --
+ * `function0<void>::assign_to<F>(F)`: the magic-static `stored_vtable(f)` with `basic_vtable0(F)`/`init` inlined,
+ * `has_empty_target` 0x00412B30, the 8-byte bind_t placement-copied into `functor` (+0x08), `vtable = &stored_vtable`;
+ * caller 0x00741810; formerly `BuildCallLaterCallback` in this file, a lambda that instantiated a different F (RULE
+ * ONE), removed 2026-09-30.) Address: 0x00742540 (FUN_00742540 -- `basic_vtable0<void>::basic_vtable0<F>(F)` out of
+ * line, `this` folded to the static 0x010C79E4: stores invoker 0x00742E20 / manager 0x00742E30 and returns `this`, `ret
+ * 8`; zero callers, unreachable (0x00741D70 inlines it); formerly `InitializeDeferredSimDriverCallableVtable` in
+ * moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.) Address: 0x00742B00 (FUN_00742B00 --
+ * `basic_vtable0<void>::init<F>(F)` out of line: the same two stores, `ret 8`; zero callers, unreachable; formerly
+ * `BindDeferredSimDriverCallableHandlers` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.) Address:
+ * 0x00742DB0 (FUN_00742DB0 -- `basic_vtable0<void>::init<F>(F, function_obj_tag)` out of line: the same two stores,
+ * `ret 0xC` for F plus the tag; zero callers, unreachable; formerly the second address of
+ * `BindDeferredSimDriverCallableHandlers` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.) Address:
+ * 0x00742E20 (FUN_00742E20 -- `void_function_obj_invoker0<F, void>::invoke(function_buffer&)`: `ecx = buf[+4]` (the
+ * bound CSimDriver*), `jmp buf[+0]` (the member pointer); reached through the invoker slot 0x010C79E8 stored at
+ * 0x00741D86, i.e. by `boost::thread`'s thread proc; formerly `InvokeDeferredSimDriverCallback` in
+ * moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.) Address: 0x00742E30 (FUN_00742E30 --
+ * `functor_manager<F, std::allocator<function_base>>::manage` with the in-buffer `manager(..., mpl::true_)` inlined: op
+ * 3 returns `&typeid(F)` 0x00F802D8, 0 copies the two words, 1 does nothing, 2 compares through `type_info::operator==`
+ * 0x00A8247D; reached through the manager slot 0x010C79E4 stored at 0x00741D90, called by the temporaries' `~function0`
+ * at 0x0073B8B1 and 0x0073D683; formerly `ManageDeferredSimDriverCallbackPayload` in moho/sim/SimRecoveryRuntime.cpp
+ * (RULE ONE), removed 2026-09-30.)
  */
 CSimDriver::CSimDriver(
   fa::auto_ptr<gpg::Stream> stream,
@@ -954,7 +1027,9 @@ CSimDriver::~CSimDriver()
  * What it does:
  * Runs destructor logic and conditionally frees object storage.
  */
-CSimDriver* CSimDriver::DestroyWithDeleteFlag(const std::uint8_t deleteFlag)
+CSimDriver* CSimDriver::DestroyWithDeleteFlag(
+  const std::uint8_t deleteFlag
+)
 {
   this->~CSimDriver();
   if ((deleteFlag & 0x1u) != 0u) {
@@ -963,7 +1038,9 @@ CSimDriver* CSimDriver::DestroyWithDeleteFlag(const std::uint8_t deleteFlag)
   return this;
 }
 
-void CSimDriver::JoinAndDeleteThread(boost::thread*& thread)
+void CSimDriver::JoinAndDeleteThread(
+  boost::thread*& thread
+)
 {
   if (!thread) {
     return;
@@ -1000,7 +1077,9 @@ void CSimDriver::MarkFirstConnectionActivityLocked()
  * Unlocks the driver mutex, serializes Sim state into the request archive,
  * records success/failure completion payload, then relocks and signals waiters.
  */
-void CSimDriver::PreparePendingSaveRequestLocked(boost::mutex::scoped_lock& lock)
+void CSimDriver::PreparePendingSaveRequestLocked(
+  boost::mutex::scoped_lock& lock
+)
 {
   if (!mSaveGameRequest) {
     return;
@@ -1039,7 +1118,9 @@ void CSimDriver::PreparePendingSaveRequestLocked(boost::mutex::scoped_lock& lock
  * Unlocks the driver mutex, runs one `Sim::Sync` publish pass, relocks,
  * verifies historical checksums when available, and enqueues the sync packet.
  */
-void CSimDriver::FinalizeSyncDispatchLocked(boost::mutex::scoped_lock& lock)
+void CSimDriver::FinalizeSyncDispatchLocked(
+  boost::mutex::scoped_lock& lock
+)
 {
   mActiveSyncFilter.CopyFrom(mPendingSyncFilter);
 
@@ -1109,7 +1190,9 @@ void CSimDriver::FinalizeSyncDispatchLocked(boost::mutex::scoped_lock& lock)
  * handshake); FA-Binary-Patches #173 (Remove old desync-fix code, 3840)
  * restored the original.
  */
-void CSimDriver::ExecuteDispatchStepLocked(boost::mutex::scoped_lock& lock)
+void CSimDriver::ExecuteDispatchStepLocked(
+  boost::mutex::scoped_lock& lock
+)
 {
   FAF_PROFILE_ZONE_NAMED("SimTick");
   const int32_t beatToDispatch = mDispatchBeat;
@@ -1191,7 +1274,9 @@ HANDLE CSimDriver::GetSyncDataAvailableEvent()
  * Address: 0x0073B1B0 (FUN_0073B1B0), ISTIDriver slot 12
  * Updates the pending sync-filter focus army and marks first connection activity when it changes.
  */
-void CSimDriver::SetArmyIndex(const int armyIndex)
+void CSimDriver::SetArmyIndex(
+  const int armyIndex
+)
 {
   boost::mutex::scoped_lock lock(mLock);
   if (mPendingSyncFilter.focusArmy == armyIndex) {
@@ -1202,7 +1287,9 @@ void CSimDriver::SetArmyIndex(const int armyIndex)
   MarkFirstConnectionActivityLocked();
 }
 
-void CSimDriver::SetPendingFocusArmyRaw(const std::int32_t focusArmy) noexcept
+void CSimDriver::SetPendingFocusArmyRaw(
+  const std::int32_t focusArmy
+) noexcept
 {
   mPendingSyncFilter.focusArmy = focusArmy;
 }
@@ -1211,7 +1298,9 @@ void CSimDriver::SetPendingFocusArmyRaw(const std::int32_t focusArmy) noexcept
  * Address: 0x0073B240 (FUN_0073B240), ISTIDriver slot 16
  * Updates the pending sync-filter option flag.
  */
-void CSimDriver::SetSyncFilterOptionFlag(const bool value)
+void CSimDriver::SetSyncFilterOptionFlag(
+  const bool value
+)
 {
   boost::mutex::scoped_lock lock(mLock);
   mPendingSyncFilter.optionFlag = value;
@@ -1221,7 +1310,9 @@ void CSimDriver::SetSyncFilterOptionFlag(const bool value)
  * Address: 0x0073B270 (FUN_0073B270), ISTIDriver slot 13
  * Replaces pending sync-filter cameras only when content differs.
  */
-void CSimDriver::SetGeomCams(const fa::vector<GeomCamera3>& geoCams)
+void CSimDriver::SetGeomCams(
+  const fa::vector<GeomCamera3>& geoCams
+)
 {
   boost::mutex::scoped_lock lock(mLock);
   if (!AreGeomCameraVectorsEqual(mPendingSyncFilter.geoCams, geoCams)) {
@@ -1234,7 +1325,9 @@ void CSimDriver::SetGeomCams(const fa::vector<GeomCamera3>& geoCams)
  * Retail build executes compare-only logic for mask block A; no state mutation occurs.
  * Verified in raw bytes: 0x0073B43D = EB 3C (unconditional jump over copy block).
  */
-void CSimDriver::SetSyncFilterMaskA(const SSyncFilterMaskBlock& block)
+void CSimDriver::SetSyncFilterMaskA(
+  const SSyncFilterMaskBlock& block
+)
 {
   boost::mutex::scoped_lock lock(mLock);
   (void)mPendingSyncFilter.maskA.Equals(&block);
@@ -1244,7 +1337,9 @@ void CSimDriver::SetSyncFilterMaskA(const SSyncFilterMaskBlock& block)
  * Address: 0x0073B4B0 (FUN_0073B4B0), ISTIDriver slot 15
  * Replaces pending sync-filter mask block B when the incoming block differs.
  */
-void CSimDriver::SetSyncFilterMaskB(const SSyncFilterMaskBlock& block)
+void CSimDriver::SetSyncFilterMaskB(
+  const SSyncFilterMaskBlock& block
+)
 {
   boost::mutex::scoped_lock lock(mLock);
   if (mPendingSyncFilter.maskB.Equals(&block)) {
@@ -1384,8 +1479,10 @@ void CSimDriver::ThreadCreateSim()
       continue;
     }
 
-    if (mSaveGameRequest != nullptr && !mWantsToSave
-        && (mState == EDriverState::Dispatching || mState == EDriverState::Ready)) {
+    if (
+      mSaveGameRequest != nullptr && !mWantsToSave &&
+      (mState == EDriverState::Dispatching || mState == EDriverState::Ready)
+    ) {
       PreparePendingSaveRequestLocked(lock);
       continue;
     }
@@ -1465,8 +1562,10 @@ void CSimDriver::ThreadRun()
 
     // Nothing is issued until the sim has published at least one sync, every
     // outstanding request has been answered, and the sync queue has room.
-    if (!holdIssue && mLastSyncCycleTime != 0 && mOutstandingRequests == 0
-        && mSyncDataQueue.Size() < kMaxQueuedSyncPacketsBeforeStalling) {
+    if (
+      !holdIssue && mLastSyncCycleTime != 0 && mOutstandingRequests == 0 &&
+      mSyncDataQueue.Size() < kMaxQueuedSyncPacketsBeforeStalling
+    ) {
       int lastBeatToIssue = mNextIssueBeat - 1;
       const int beatCeiling = mLastDequeuedBeat + kMaxBeatsAheadOfExecuted;
 
@@ -1591,8 +1690,7 @@ void CSimDriver::ThreadRun()
         (void)WaitForSingleObject(mConnectionEvent, static_cast<DWORD>(waitMilliseconds));
       }
       if (sim_IssueThreadDebugLevel >= 2) {
-        const std::int64_t elapsedMicroseconds =
-          gpg::time::CyclesToMicroseconds(mTimer.ElapsedCycles() - now);
+        const std::int64_t elapsedMicroseconds = gpg::time::CyclesToMicroseconds(mTimer.ElapsedCycles() - now);
         gpg::Debugf(
           "ISSUE: thread awaking, elapsed=%d.%03dms.",
           static_cast<int>(elapsedMicroseconds / 1000),
@@ -1705,7 +1803,9 @@ bool CSimDriver::HasSyncData()
  * Address: 0x0073C520 (FUN_0073C520), ISTIDriver slot 9
  * Waits for, pops, and returns the next sync packet.
  */
-void CSimDriver::GetSyncData(SSyncData*& outSyncData)
+void CSimDriver::GetSyncData(
+  SSyncData*& outSyncData
+)
 {
   outSyncData = nullptr;
 
@@ -1732,7 +1832,8 @@ void CSimDriver::GetSyncData(SSyncData*& outSyncData)
         const float room = static_cast<float>(net_AdaptiveLagMax) - net_Lag;
         const float before = sAdaptiveLagExtraMs;
         const float sinceChange = gpg::time::CyclesToMilliseconds(takenAt - sAdaptiveChangedAt);
-        const bool pause = mLastDequeuedBeat >= kAdaptiveLagFirstBeat && gap >= millisecondsPerBeat + kAdaptivePauseOverBeatMs;
+        const bool pause =
+          mLastDequeuedBeat >= kAdaptiveLagFirstBeat && gap >= millisecondsPerBeat + kAdaptivePauseOverBeatMs;
         if (pause && sAdaptiveLagExtraMs > 0.0f && sinceChange < kAdaptiveLagRiseEveryMs) {
           // A burst of pauses is one event: a spike on the machine doesn't take it to the top at once.
         } else if (pause) {
@@ -1843,7 +1944,9 @@ double CSimDriver::GetSimSpeed()
  * Stamps `mLastSyncCycleTime`, signals the connection event, and writes the
  * current command-cookie lane to one output pointer.
  */
-std::int32_t* CSimDriver::SignalConnectionAndWriteCommandCookie(std::int32_t* const outCommandCookie)
+std::int32_t* CSimDriver::SignalConnectionAndWriteCommandCookie(
+  std::int32_t* const outCommandCookie
+)
 {
   mLastSyncCycleTime = mTimer.ElapsedCycles();
   if (mConnectionEvent != nullptr) {
@@ -1863,7 +1966,9 @@ std::int32_t* CSimDriver::SignalConnectionAndWriteCommandCookie(std::int32_t* co
  * What it does:
  * Stores one driver-state lane and notifies all waiters on `mStateChanged`.
  */
-void CSimDriver::SetStateAndNotify(const EDriverState state)
+void CSimDriver::SetStateAndNotify(
+  const EDriverState state
+)
 {
   mState = state;
   mStateChanged.notify_all();
@@ -1877,7 +1982,9 @@ void CSimDriver::SetStateAndNotify(const EDriverState state)
  * `mState` to `Dispatching` when the available beat has reached
  * `mDispatchBeat`.
  */
-void CSimDriver::PromoteToDispatchingWhenBeatAvailable(const int beatQuerySeed)
+void CSimDriver::PromoteToDispatchingWhenBeatAvailable(
+  const int beatQuerySeed
+)
 {
   int availableBeat = beatQuerySeed;
   mClientManager->GetAvailableBeat(availableBeat);
@@ -1892,7 +1999,9 @@ void CSimDriver::PromoteToDispatchingWhenBeatAvailable(const int beatQuerySeed)
  * Address: 0x0073C660 (FUN_0073C660), ISTIDriver slot 17
  * Marshals CMDST_RequestPause and reports command-cookie result.
  */
-void CSimDriver::RequestPause(std::int32_t* const outCommandCookie)
+void CSimDriver::RequestPause(
+  std::int32_t* const outCommandCookie
+)
 {
   boost::mutex::scoped_lock lock(mLock);
   mMarshaller->RequestPause();
@@ -1906,7 +2015,9 @@ void CSimDriver::RequestPause(std::int32_t* const outCommandCookie)
  * Address: 0x0073C700 (FUN_0073C700), ISTIDriver slot 18
  * Marshals CMDST_Resume and reports command-cookie result.
  */
-void CSimDriver::Resume(std::int32_t* const outCommandCookie)
+void CSimDriver::Resume(
+  std::int32_t* const outCommandCookie
+)
 {
   boost::mutex::scoped_lock lock(mLock);
   mMarshaller->Resume();
@@ -1932,7 +2043,12 @@ CmdId CSimDriver::SingleStep()
  * Address: 0x0073C840 (FUN_0073C840), ISTIDriver slot 20
  * Marshals CMDST_CreateUnit and reports command-cookie result.
  */
-CmdId CSimDriver::CreateUnit(const uint32_t armyIndex, const RResId& id, const SCoordsVec2& pos, const float heading)
+CmdId CSimDriver::CreateUnit(
+  const uint32_t armyIndex,
+  const RResId& id,
+  const SCoordsVec2& pos,
+  const float heading
+)
 {
   boost::mutex::scoped_lock lock(mLock);
   mMarshaller->CreateUnit(armyIndex, id, pos, heading);
@@ -1944,7 +2060,10 @@ CmdId CSimDriver::CreateUnit(const uint32_t armyIndex, const RResId& id, const S
  * Address: 0x0073C8F0 (FUN_0073C8F0), ISTIDriver slot 21
  * Marshals CMDST_CreateProp and reports command-cookie result.
  */
-CmdId CSimDriver::CreateProp(const char* id, const Wm3::Vec3f& loc)
+CmdId CSimDriver::CreateProp(
+  const char* id,
+  const Wm3::Vec3f& loc
+)
 {
   boost::mutex::scoped_lock lock(mLock);
   mMarshaller->CreateProp(id, loc);
@@ -1956,7 +2075,9 @@ CmdId CSimDriver::CreateProp(const char* id, const Wm3::Vec3f& loc)
  * Address: 0x0073C990 (FUN_0073C990), ISTIDriver slot 22
  * Marshals CMDST_DestroyEntity and reports command-cookie result.
  */
-CmdId CSimDriver::DestroyEntity(const EntId entityId)
+CmdId CSimDriver::DestroyEntity(
+  const EntId entityId
+)
 {
   boost::mutex::scoped_lock lock(mLock);
   mMarshaller->DestroyEntity(entityId);
@@ -1968,7 +2089,10 @@ CmdId CSimDriver::DestroyEntity(const EntId entityId)
  * Address: 0x0073CA30 (FUN_0073CA30), ISTIDriver slot 23
  * Marshals CMDST_WarpEntity and reports command-cookie result.
  */
-CmdId CSimDriver::WarpEntity(const EntId entityId, const VTransform& transform)
+CmdId CSimDriver::WarpEntity(
+  const EntId entityId,
+  const VTransform& transform
+)
 {
   boost::mutex::scoped_lock lock(mLock);
   mMarshaller->WarpEntity(entityId, transform);
@@ -1980,7 +2104,11 @@ CmdId CSimDriver::WarpEntity(const EntId entityId, const VTransform& transform)
  * Address: 0x0073CAD0 (FUN_0073CAD0), ISTIDriver slot 24
  * Marshals CMDST_ProcessInfoPair and reports command-cookie result.
  */
-CmdId CSimDriver::ProcessInfoPair(const EntId entityId, const gpg::StrArg key, const gpg::StrArg val)
+CmdId CSimDriver::ProcessInfoPair(
+  const EntId entityId,
+  const gpg::StrArg key,
+  const gpg::StrArg val
+)
 {
   boost::mutex::scoped_lock lock(mLock);
   mMarshaller->ProcessInfoPair(entityId, key, val);
@@ -1993,7 +2121,9 @@ CmdId CSimDriver::ProcessInfoPair(const EntId entityId, const gpg::StrArg key, c
  * Marshals CMDST_IssueCommand and reports command-cookie result.
  */
 CmdId CSimDriver::IssueCommand(
-  const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& data, const bool clear
+  const BVSet<EntId, EntIdUniverse>& entities,
+  const SSTICommandIssueData& data,
+  const bool clear
 )
 {
   boost::mutex::scoped_lock lock(mLock);
@@ -2006,7 +2136,9 @@ CmdId CSimDriver::IssueCommand(
  * Marshals CMDST_IssueFactoryCommand and reports command-cookie result.
  */
 CmdId CSimDriver::IssueFactoryCommand(
-  const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& data, const bool clear
+  const BVSet<EntId, EntIdUniverse>& entities,
+  const SSTICommandIssueData& data,
+  const bool clear
 )
 {
   boost::mutex::scoped_lock lock(mLock);
@@ -2019,7 +2151,10 @@ CmdId CSimDriver::IssueFactoryCommand(
  * Address: 0x0073CCB0 (FUN_0073CCB0), ISTIDriver slot 27
  * Marshals CMDST_IncreaseCommandCount and reports command-cookie result.
  */
-CmdId CSimDriver::IncreaseCommandCount(const CmdId id, const int count)
+CmdId CSimDriver::IncreaseCommandCount(
+  const CmdId id,
+  const int count
+)
 {
   boost::mutex::scoped_lock lock(mLock);
   mMarshaller->IncreaseCommandCount(id, count);
@@ -2032,7 +2167,10 @@ CmdId CSimDriver::IncreaseCommandCount(const CmdId id, const int count)
  * Marshals CMDST_DecreaseCommandCount and returns the resulting command cookie
  * (the binary writes `mNextIssueBeat` into a caller-provided out pointer).
  */
-CmdId CSimDriver::DecreaseCommandCount(const CmdId id, const int count)
+CmdId CSimDriver::DecreaseCommandCount(
+  const CmdId id,
+  const int count
+)
 {
   boost::mutex::scoped_lock lock(mLock);
   mMarshaller->DecreaseCommandCount(id, count);
@@ -2044,7 +2182,10 @@ CmdId CSimDriver::DecreaseCommandCount(const CmdId id, const int count)
  * Address: 0x0073CDF0 (FUN_0073CDF0), ISTIDriver slot 29
  * Marshals CMDST_SetCommandTarget and reports command-cookie result.
  */
-CmdId CSimDriver::SetCommandTarget(const CmdId id, const SSTITarget& target)
+CmdId CSimDriver::SetCommandTarget(
+  const CmdId id,
+  const SSTITarget& target
+)
 {
   boost::mutex::scoped_lock lock(mLock);
   mMarshaller->SetCommandTarget(id, target);
@@ -2056,7 +2197,10 @@ CmdId CSimDriver::SetCommandTarget(const CmdId id, const SSTITarget& target)
  * Address: 0x0073CE90 (FUN_0073CE90), ISTIDriver slot 30
  * Marshals CMDST_SetCommandType and reports command-cookie result.
  */
-CmdId CSimDriver::SetCommandType(const CmdId id, const EUnitCommandType type)
+CmdId CSimDriver::SetCommandType(
+  const CmdId id,
+  const EUnitCommandType type
+)
 {
   boost::mutex::scoped_lock lock(mLock);
   mMarshaller->SetCommandType(id, type);
@@ -2069,7 +2213,9 @@ CmdId CSimDriver::SetCommandType(const CmdId id, const EUnitCommandType type)
  * Marshals CMDST_SetCommandCells and reports command-cookie result.
  */
 CmdId CSimDriver::SetCommandCells(
-  const CmdId id, const gpg::core::FastVector<SOCellPos>& cells, const Wm3::Vector3<float>& target
+  const CmdId id,
+  const gpg::core::FastVector<SOCellPos>& cells,
+  const Wm3::Vector3<float>& target
 )
 {
   boost::mutex::scoped_lock lock(mLock);
@@ -2082,7 +2228,10 @@ CmdId CSimDriver::SetCommandCells(
  * Address: 0x0073CFD0 (FUN_0073CFD0), ISTIDriver slot 32
  * Marshals CMDST_RemoveCommandFromQueue and reports command-cookie result.
  */
-CmdId CSimDriver::RemoveCommandFromUnitQueue(const CmdId id, const EntId unitId)
+CmdId CSimDriver::RemoveCommandFromUnitQueue(
+  const CmdId id,
+  const EntId unitId
+)
 {
   boost::mutex::scoped_lock lock(mLock);
   mMarshaller->RemoveCommandFromUnitQueue(id, unitId);
@@ -2094,7 +2243,10 @@ CmdId CSimDriver::RemoveCommandFromUnitQueue(const CmdId id, const EntId unitId)
  * Address: 0x0073D070 (FUN_0073D070), ISTIDriver slot 33
  * Marshals CMDST_ExecuteLuaInSim and reports command-cookie result.
  */
-CmdId CSimDriver::ExecuteLuaInSim(const char* lua, const LuaPlus::LuaObject& args)
+CmdId CSimDriver::ExecuteLuaInSim(
+  const char* lua,
+  const LuaPlus::LuaObject& args
+)
 {
   boost::mutex::scoped_lock lock(mLock);
   mMarshaller->ExecuteLuaInSim(lua, args);
@@ -2107,7 +2259,9 @@ CmdId CSimDriver::ExecuteLuaInSim(const char* lua, const LuaPlus::LuaObject& arg
  * Marshals CMDST_LuaSimCallback and reports command-cookie result.
  */
 CmdId CSimDriver::LuaSimCallback(
-  const char* fnName, const LuaPlus::LuaObject& args, const BVSet<EntId, EntIdUniverse>& entities
+  const char* fnName,
+  const LuaPlus::LuaObject& args,
+  const BVSet<EntId, EntIdUniverse>& entities
 )
 {
   boost::mutex::scoped_lock lock(mLock);
@@ -2165,7 +2319,9 @@ void CSimDriver::ReleaseInterlockRef()
  * Address: 0x0073DF60 (FUN_0073DF60), ISTIDriver slot 38
  * Queues a save-game request and wakes dispatch waiters.
  */
-void CSimDriver::RequestSaveGame(ISaveRequest* request)
+void CSimDriver::RequestSaveGame(
+  ISaveRequest* request
+)
 {
   boost::mutex::scoped_lock lock(mLock);
   mSaveGameRequest = request;
@@ -2189,7 +2345,11 @@ SimDriverNetworkStatsDrawHook moho::sSimDriverNetworkStatsDraw = nullptr;
  * sSimDriverNetworkStatsDraw.
  */
 void CSimDriver::DrawNetworkStats(
-  CD3DPrimBatcher* batcher, const float anchorX, const float anchorY, const float scaleX, const float scaleY
+  CD3DPrimBatcher* batcher,
+  const float anchorX,
+  const float anchorY,
+  const float scaleX,
+  const float scaleY
 )
 {
   if (sSimDriverNetworkStatsDraw != nullptr) {
@@ -2306,12 +2466,16 @@ namespace
   );
 } // namespace
 
-void moho::SIM_SetIssueWhilePaused(const bool issue) noexcept
+void moho::SIM_SetIssueWhilePaused(
+  const bool issue
+) noexcept
 {
   gIssueWhilePaused.store(issue, std::memory_order_relaxed);
 }
 
-void moho::SIM_SetSessionPacing(const ESimSessionPacing pacing) noexcept
+void moho::SIM_SetSessionPacing(
+  const ESimSessionPacing pacing
+) noexcept
 {
   gDriverSessionPacing.store(pacing, std::memory_order_relaxed);
   gLeadSimSpeedEstimate.store(0.0f, std::memory_order_relaxed);

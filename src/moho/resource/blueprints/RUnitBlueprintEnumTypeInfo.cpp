@@ -11,8 +11,6 @@
 namespace
 {
 
-
-
   // Address: 0x010AB05C -- process-global `PrimitiveSerHelper<
   // ERuleBPUnitMovementType,int>` singleton (constructed by FUN_00BC8930,
   // self-registering via `__xc_a`).
@@ -73,7 +71,11 @@ namespace
    */
   gpg::PrimitiveSerHelper<moho::ERuleBPUnitToggleCaps, int> gERuleBPUnitToggleCapsPrimitiveSerializer;
 
-  void AddEnumEntry(gpg::REnumType* const typeInfo, const char* const token, const int value)
+  void AddEnumEntry(
+    gpg::REnumType* const typeInfo,
+    const char* const token,
+    const int value
+  )
   {
     typeInfo->AddEnum(typeInfo->StripPrefix(token), value);
   }
@@ -186,7 +188,9 @@ namespace moho
    * What it does:
    * Registers the reflected `ERuleBPUnitBuildRestriction` token/value table.
    */
-  void ERuleBPUnitBuildRestrictionTypeInfo::AddEnums(gpg::REnumType* const typeInfo)
+  void ERuleBPUnitBuildRestrictionTypeInfo::AddEnums(
+    gpg::REnumType* const typeInfo
+  )
   {
     AddEnumEntry(typeInfo, "RULEUBR_None", 0);
     AddEnumEntry(typeInfo, "RULEUBR_Bridge", 1);
@@ -195,7 +199,8 @@ namespace moho
   }
 
   /**
-   * Address: 0x00520310 (FUN_00520310, Moho::ERuleBPUnitWeaponBallisticArcTypeInfo::ERuleBPUnitWeaponBallisticArcTypeInfo)
+   * Address: 0x00520310 (FUN_00520310,
+   * Moho::ERuleBPUnitWeaponBallisticArcTypeInfo::ERuleBPUnitWeaponBallisticArcTypeInfo)
    *
    * What it does:
    * Constructs the `ERuleBPUnitWeaponBallisticArc` enum type descriptor and
@@ -237,7 +242,9 @@ namespace moho
    * Registers the reflected `ERuleBPUnitWeaponBallisticArc` token/value
    * table.
    */
-  void ERuleBPUnitWeaponBallisticArcTypeInfo::AddEnums(gpg::REnumType* const typeInfo)
+  void ERuleBPUnitWeaponBallisticArcTypeInfo::AddEnums(
+    gpg::REnumType* const typeInfo
+  )
   {
     AddEnumEntry(typeInfo, "RULEUBA_None", 0);
     AddEnumEntry(typeInfo, "RULEUBA_LowArc", 1);
@@ -286,7 +293,9 @@ namespace moho
    * What it does:
    * Registers the reflected `ERuleBPUnitWeaponTargetType` token/value table.
    */
-  void ERuleBPUnitWeaponTargetTypeTypeInfo::AddEnums(gpg::REnumType* const typeInfo)
+  void ERuleBPUnitWeaponTargetTypeTypeInfo::AddEnums(
+    gpg::REnumType* const typeInfo
+  )
   {
     AddEnumEntry(typeInfo, "RULEWTT_Unit", 0);
     AddEnumEntry(typeInfo, "RULEWTT_Projectile", 1);
@@ -335,7 +344,9 @@ namespace moho
    * What it does:
    * Registers the reflected `ERuleBPUnitMovementType` token/value table.
    */
-  void ERuleBPUnitMovementTypeTypeInfo::AddEnums(gpg::REnumType* const typeInfo)
+  void ERuleBPUnitMovementTypeTypeInfo::AddEnums(
+    gpg::REnumType* const typeInfo
+  )
   {
     AddEnumEntry(typeInfo, "RULEUMT_None", 0);
     AddEnumEntry(typeInfo, "RULEUMT_Land", 1);
@@ -391,7 +402,9 @@ namespace moho
    * What it does:
    * Registers the reflected `ERuleBPUnitCommandCaps` token/value table.
    */
-  void ERuleBPUnitCommandCapsTypeInfo::AddEnums(gpg::REnumType* const typeInfo)
+  void ERuleBPUnitCommandCapsTypeInfo::AddEnums(
+    gpg::REnumType* const typeInfo
+  )
   {
     AddEnumEntry(typeInfo, "RULEUCC_Move", 1);
     AddEnumEntry(typeInfo, "RULEUCC_Stop", 2);
@@ -462,7 +475,9 @@ namespace moho
    * What it does:
    * Registers the reflected `ERuleBPUnitToggleCaps` token/value table.
    */
-  void ERuleBPUnitToggleCapsTypeInfo::AddEnums(gpg::REnumType* const typeInfo)
+  void ERuleBPUnitToggleCapsTypeInfo::AddEnums(
+    gpg::REnumType* const typeInfo
+  )
   {
     AddEnumEntry(typeInfo, "RULEUTC_ShieldToggle", 1);
     AddEnumEntry(typeInfo, "RULEUTC_WeaponToggle", 2);
@@ -517,7 +532,9 @@ namespace moho
    * What it does:
    * Registers the reflected `UnitWeaponRangeCategory` token/value table.
    */
-  void UnitWeaponRangeCategoryTypeInfo::AddEnums(gpg::REnumType* const typeInfo)
+  void UnitWeaponRangeCategoryTypeInfo::AddEnums(
+    gpg::REnumType* const typeInfo
+  )
   {
     AddEnumEntry(typeInfo, "UWRC_Undefined", 0);
     AddEnumEntry(typeInfo, "UWRC_DirectFire", 1);
@@ -603,13 +620,33 @@ namespace
   RUnitBlueprintEnumTypeInfoBootstrap gRUnitBlueprintEnumTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_ERuleBPUnitBuildRestrictionTypeInfo_8d2279, moho::register_ERuleBPUnitBuildRestrictionTypeInfo)
-GPG_PREREGISTER_INIT(register_ERuleBPUnitWeaponBallisticArcTypeInfo_8d2279, moho::register_ERuleBPUnitWeaponBallisticArcTypeInfo)
-GPG_PREREGISTER_INIT(register_ERuleBPUnitWeaponTargetTypeTypeInfo_8d2279, moho::register_ERuleBPUnitWeaponTargetTypeTypeInfo)
-GPG_PREREGISTER_INIT(register_ERuleBPUnitMovementTypeTypeInfo_8d2279, moho::register_ERuleBPUnitMovementTypeTypeInfo)
-GPG_PREREGISTER_INIT(register_ERuleBPUnitCommandCapsTypeInfo_8d2279, moho::register_ERuleBPUnitCommandCapsTypeInfo)
-GPG_PREREGISTER_INIT(register_ERuleBPUnitToggleCapsTypeInfo_8d2279, moho::register_ERuleBPUnitToggleCapsTypeInfo)
-GPG_PREREGISTER_INIT(register_UnitWeaponRangeCategoryTypeInfo_8d2279, moho::register_UnitWeaponRangeCategoryTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_ERuleBPUnitBuildRestrictionTypeInfo_8d2279,
+  moho::register_ERuleBPUnitBuildRestrictionTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_ERuleBPUnitWeaponBallisticArcTypeInfo_8d2279,
+  moho::register_ERuleBPUnitWeaponBallisticArcTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_ERuleBPUnitWeaponTargetTypeTypeInfo_8d2279,
+  moho::register_ERuleBPUnitWeaponTargetTypeTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_ERuleBPUnitMovementTypeTypeInfo_8d2279,
+  moho::register_ERuleBPUnitMovementTypeTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_ERuleBPUnitCommandCapsTypeInfo_8d2279,
+  moho::register_ERuleBPUnitCommandCapsTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_ERuleBPUnitToggleCapsTypeInfo_8d2279,
+  moho::register_ERuleBPUnitToggleCapsTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_UnitWeaponRangeCategoryTypeInfo_8d2279,
+  moho::register_UnitWeaponRangeCategoryTypeInfo
+)

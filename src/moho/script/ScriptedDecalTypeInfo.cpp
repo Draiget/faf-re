@@ -15,7 +15,9 @@ namespace
    * What it does:
    * Registers CScriptObject as reflected base at zero offset.
    */
-  void AddBase_CScriptObject(gpg::RType* const typeInfo)
+  void AddBase_CScriptObject(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RType* baseType = CScriptObject::StaticGetClass();
     if (!baseType) {
@@ -65,4 +67,7 @@ void ScriptedDecalTypeInfo::Init()
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_ScriptedDecalTypeInfo_3ff0a1, preregister_ScriptedDecalTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_ScriptedDecalTypeInfo_3ff0a1,
+  preregister_ScriptedDecalTypeInfo
+)

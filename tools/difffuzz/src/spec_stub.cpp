@@ -26,13 +26,19 @@ namespace difffuzz
   namespace spec
   {
     // Register encodings for the mod/rm and SIB-free forms used below.
-    constexpr unsigned kRegEax = 0, kRegEcx = 1, kRegEdx = 2, kRegEbx = 3, kRegEsp = 4, kRegEbp = 5, kRegEsi = 6, kRegEdi = 7;
+    constexpr unsigned kRegEax = 0, kRegEcx = 1, kRegEdx = 2, kRegEbx = 3, kRegEsp = 4, kRegEbp = 5, kRegEsi = 6,
+                       kRegEdi = 7;
 
-    int BuildStub(const Entry& entry, unsigned char* code)
+    int BuildStub(
+      const Entry& entry,
+      unsigned char* code
+    )
     {
       unsigned char* p = code;
 
-      const auto emit8 = [&p](const unsigned char b) { *p++ = b; };
+      const auto emit8 = [&p](const unsigned char b) {
+        *p++ = b;
+      };
       const auto emit32 = [&p](const std::uint32_t v) {
         std::memcpy(p, &v, 4);
         p += 4;
@@ -56,7 +62,8 @@ namespace difffuzz
 
       // Prologue: push ebp; mov ebp, esp; push ebx; push esi; push edi; sub esp, N
       emit8(0x55); // push ebp
-      emit8(0x8B); emit8(0xEC); // mov ebp, esp
+      emit8(0x8B);
+      emit8(0xEC); // mov ebp, esp
       emit8(0x53); // push ebx
       emit8(0x56); // push esi
       emit8(0x57); // push edi
@@ -69,7 +76,9 @@ namespace difffuzz
         }
       }
       if (stackWords > 0) {
-        emit8(0x81); emit8(0xEC); emit32(static_cast<std::uint32_t>(stackWords * 4)); // sub esp, N
+        emit8(0x81);
+        emit8(0xEC);
+        emit32(static_cast<std::uint32_t>(stackWords * 4)); // sub esp, N
       }
 
       // Stack arguments: spec slot n (0x80|n) is the nth dword above the
@@ -126,24 +135,38 @@ namespace difffuzz
       // in the selected rows; it is saved in the prologue).
       if (entry.ret == kRetSt0Float || entry.ret == kRetSt0Double) {
         // mov edi, [ebp+12]
-        emit8(0x8B); emit8(0x7D); emit8(0x0C);
+        emit8(0x8B);
+        emit8(0x7D);
+        emit8(0x0C);
         if (entry.ret == kRetSt0Float) {
-          emit8(0xD9); emit8(0x1F); // fstp dword ptr [edi]
+          emit8(0xD9);
+          emit8(0x1F); // fstp dword ptr [edi]
         } else {
-          emit8(0xDD); emit8(0x1F); // fstp qword ptr [edi]
+          emit8(0xDD);
+          emit8(0x1F); // fstp qword ptr [edi]
         }
       } else if (entry.ret == kRetEdxEax) {
         // mov edi, [ebp+12]; mov [edi], eax; mov [edi+4], edx
-        emit8(0x8B); emit8(0x7D); emit8(0x0C);
-        emit8(0x89); emit8(0x07);
-        emit8(0x89); emit8(0x57); emit8(0x04);
+        emit8(0x8B);
+        emit8(0x7D);
+        emit8(0x0C);
+        emit8(0x89);
+        emit8(0x07);
+        emit8(0x89);
+        emit8(0x57);
+        emit8(0x04);
       } else if (entry.ret == kRetEax) {
-        emit8(0x8B); emit8(0x7D); emit8(0x0C); // mov edi, [ebp+12]
-        emit8(0x89); emit8(0x07); // mov [edi], eax
+        emit8(0x8B);
+        emit8(0x7D);
+        emit8(0x0C); // mov edi, [ebp+12]
+        emit8(0x89);
+        emit8(0x07); // mov [edi], eax
       }
       // A callee-pops entry has already advanced esp past its arguments, so
       // esp is restored from the frame, never incremented by hand.
-      emit8(0x8D); emit8(0x65); emit8(0xF4); // lea esp, [ebp-12]
+      emit8(0x8D);
+      emit8(0x65);
+      emit8(0xF4); // lea esp, [ebp-12]
       emit8(0x5F); // pop edi
       emit8(0x5E); // pop esi
       emit8(0x5B); // pop ebx

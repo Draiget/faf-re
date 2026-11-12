@@ -25,7 +25,7 @@ def main():
     parser.add_argument("--maps", required=True, help="the cached maps")
     parser.add_argument("--m28", required=True, help="the cached M28AI versions")
     parser.add_argument("--out", required=True)
-    parser.add_argument("--game-version", type=int, default=3835)
+    parser.add_argument("--game-version", type=int, default=3840)
     parser.add_argument("--delay", type=float, default=1.0, help="seconds between requests to FAF")
     args = parser.parse_args()
     with open(args.plan, encoding="utf-8") as f:

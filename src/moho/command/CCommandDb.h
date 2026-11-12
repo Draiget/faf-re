@@ -72,7 +72,7 @@ namespace moho
      */
     ~CCommandDB();
 
-    Sim* sim;                                     // +0x0000
+    Sim* sim; // +0x0000
     /**
      * Command id -> owned command lookup.
      *
@@ -92,9 +92,9 @@ namespace moho
     // (0x006E15D0 and 0x006E1955). Script ids have the high bit set and
     // follow player ids when commands publish events or retire.
     using CommandMap = fa::map<CmdId, CUnitCommand*, std::less<std::uint32_t>>;
-    CommandMap commands;                         // +0x0004
-    IdPool pool;                                  // +0x0010
-    fa::vector<CmdId> pendingReleasedCmdIds;   // +0x0CC0
+    CommandMap commands;                     // +0x0004
+    IdPool pool;                             // +0x0010
+    fa::vector<CmdId> pendingReleasedCmdIds; // +0x0CC0
 
     /**
      * What it does:
@@ -102,9 +102,8 @@ namespace moho
      * its members are loaded over it afterwards.
      * Inlined into `SerConstructHelper<CCommandDB>::Construct` 0x006E1220.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * What it does:
@@ -112,7 +111,10 @@ namespace moho
      * Inlined into `SerSaveConstructHelper<CCommandDB>::SaveConstructArgs` 0x006E1040.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     /**

@@ -14,9 +14,9 @@
 
 // Engine addition, dedicated server (plan WP15.3; design research/WP13.1-observer-stream.md): the game's live replay to
 // FAF's replay service, as a game client sends its own (`VCR_OpenGPGNetURI` with a `gpgnet://` address in write mode:
-// `OpenGPGNetSocket` connects, sends `'P'` and the path with its NUL, then the replay's bytes). A thread of its own sends
-// the replay log, each byte no sooner than the delay after the server wrote it; a dropped connection is made again and
-// the replay sent from its start, as the service takes whole replays. Linux only, as the server.
+// `OpenGPGNetSocket` connects, sends `'P'` and the path with its NUL, then the replay's bytes). A thread of its own
+// sends the replay log, each byte no sooner than the delay after the server wrote it; a dropped connection is made
+// again and the replay sent from its start, as the service takes whole replays. Linux only, as the server.
 
 namespace faf::server
 {
@@ -42,7 +42,10 @@ namespace faf::server
     void Start();
     void Stop();
     /** The whole replay has gone (the log is finished and every byte sent), or the sender gave up. */
-    [[nodiscard]] bool Done() const noexcept { return mDone.load(std::memory_order_relaxed); }
+    [[nodiscard]] bool Done() const noexcept
+    {
+      return mDone.load(std::memory_order_relaxed);
+    }
     [[nodiscard]] std::vector<std::string> TakeNews();
 
   private:

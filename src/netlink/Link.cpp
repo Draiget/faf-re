@@ -27,15 +27,15 @@ namespace faf::netlink
     std::atomic<std::uint64_t> sWirePackets{0};
     std::atomic<std::uint64_t> sWireBytes{0};
 
-    constexpr auto kGatherTimeout = 5000ms;          // gatheringFuture cancel
+    constexpr auto kGatherTimeout = 5000ms; // gatheringFuture cancel
     // libjuice tries a silent ICE server for 23.5 s. The offerer waits kAwaitCandidatesTimeout for
     // the answer, relayed both ways by the lobby server, so what was found by now goes out.
     constexpr auto kGatherSendFound = 4000ms;
-    constexpr auto kAwaitCandidatesTimeout = 6000ms; // no answer to our candidates
-    constexpr auto kCheckTimeout = 15000ms;          // startIce loop
-    constexpr auto kRetryAfterFailure = 5000ms;      // offerer, attempt never connected
-    constexpr auto kEchoInterval = 1000ms;           // ECHO_INTERVAL
-    constexpr std::int64_t kEchoTimeoutMs = 10000;   // connection lost without echo answer
+    constexpr auto kAwaitCandidatesTimeout = 6000ms;         // no answer to our candidates
+    constexpr auto kCheckTimeout = 15000ms;                  // startIce loop
+    constexpr auto kRetryAfterFailure = 5000ms;              // offerer, attempt never connected
+    constexpr auto kEchoInterval = 1000ms;                   // ECHO_INTERVAL
+    constexpr std::int64_t kEchoTimeoutMs = 10000;           // connection lost without echo answer
     constexpr auto kForceInterval = std::chrono::minutes(2); // FORCE_SRFLX_RELAY_INTERVAL
     constexpr std::uint32_t kForceSrflxCount = 1;
     constexpr std::uint32_t kForceRelayCount = 2;
@@ -49,7 +49,11 @@ namespace faf::netlink
 
     // Issue #240: whether a marked ufrag offers `tag` after the prefix (and an
     // optional "w+").
-    bool OffersAfterPrefix(const std::string& ufrag, const std::string& prefix, const std::string_view tag)
+    bool OffersAfterPrefix(
+      const std::string& ufrag,
+      const std::string& prefix,
+      const std::string_view tag
+    )
     {
       std::string_view rest(ufrag);
       if (rest.rfind(prefix, 0) != 0) {
@@ -67,7 +71,9 @@ namespace faf::netlink
       return std::chrono::duration_cast<std::chrono::microseconds>(Link::Clock::now().time_since_epoch()).count();
     }
 
-    std::string RandomToken(const std::size_t length)
+    std::string RandomToken(
+      const std::size_t length
+    )
     {
       static constexpr char kAlphabet[] = "abcdefghijklmnopqrstuvwxyz0123456789";
       thread_local std::mt19937_64 rng{std::random_device{}()};
@@ -79,7 +85,10 @@ namespace faf::netlink
       return s;
     }
 
-    std::string SdpAttribute(const std::string& sdp, const std::string_view name)
+    std::string SdpAttribute(
+      const std::string& sdp,
+      const std::string_view name
+    )
     {
       std::istringstream in(sdp);
       std::string line;
@@ -96,7 +105,9 @@ namespace faf::netlink
     }
 
     // Issue #322: the word after " typ " in an SDP candidate line, empty when there is none.
-    std::string CandidateTypeOf(const std::string_view line)
+    std::string CandidateTypeOf(
+      const std::string_view line
+    )
     {
       const std::size_t at = line.find(" typ ");
       if (at == std::string_view::npos) {
@@ -106,7 +117,9 @@ namespace faf::netlink
       return std::string(rest.substr(0, rest.find(' ')));
     }
 
-    std::string Lower(std::string s)
+    std::string Lower(
+      std::string s
+    )
     {
       for (char& ch : s) {
         ch = static_cast<char>(ch >= 'A' && ch <= 'Z' ? ch - 'A' + 'a' : ch);
@@ -158,23 +171,34 @@ namespace faf::netlink
         return instance;
       }
 
-      void Schedule(const void* owner, const Link::Clock::time_point due, std::string bytes, Send send)
+      void Schedule(
+        const void* owner,
+        const Link::Clock::time_point due,
+        std::string bytes,
+        Send send
+      )
       {
         std::lock_guard lock(mMutex);
         mQueue.emplace(due, Item{owner, std::move(bytes), std::move(send)});
         if (!mThread.joinable()) {
-          mThread = std::thread([this] { Loop(); });
+          mThread = std::thread([this] {
+            Loop();
+          });
         }
         mWake.notify_one();
       }
 
-      void Cancel(const void* owner)
+      void Cancel(
+        const void* owner
+      )
       {
         std::unique_lock lock(mMutex);
         for (auto it = mQueue.begin(); it != mQueue.end();) {
           it = it->second.owner == owner ? mQueue.erase(it) : std::next(it);
         }
-        mIdle.wait(lock, [&] { return mBusy != owner; });
+        mIdle.wait(lock, [&] {
+          return mBusy != owner;
+        });
       }
 
       ~DelayedSender()
@@ -247,10 +271,17 @@ namespace faf::netlink
         return instance;
       }
 
-      bool Enabled() const { return !mPath.empty(); }
+      bool Enabled() const
+      {
+        return !mPath.empty();
+      }
 
       // False: lost on the way. Else `delay` is how long it stays in flight.
-      bool Roll(Link::Clock::duration& delay, const std::int64_t localId, const std::int64_t remoteId)
+      bool Roll(
+        Link::Clock::duration& delay,
+        const std::int64_t localId,
+        const std::int64_t remoteId
+      )
       {
         std::lock_guard lock(mMutex);
         const Link::Clock::time_point now = Link::Clock::now();
@@ -283,7 +314,9 @@ namespace faf::netlink
 
       // The setting just read, once after each change, for one link to log so
       // a run shows what every process applied.
-      bool TakeChange(std::string& text)
+      bool TakeChange(
+        std::string& text
+      )
       {
         std::lock_guard lock(mMutex);
         if (mChange.empty()) {
@@ -317,8 +350,16 @@ namespace faf::netlink
         if (std::fscanf(f, "%lld %lld %lf %d %d %lld", &latency, &jitter, &loss, &blocked, &burst, &only) >= 4) {
           if (!mRead || latency != mLatencyUs || jitter != mJitterUs || loss != mLoss || (blocked != 0) != mBlocked) {
             char line[160];
-            std::snprintf(line, sizeof(line), "test shaping (%s): %lld us + up to %lld us jitter, loss %.3f%s",
-                          mPath.c_str(), latency, jitter, loss, blocked != 0 ? ", blocked" : "");
+            std::snprintf(
+              line,
+              sizeof(line),
+              "test shaping (%s): %lld us + up to %lld us jitter, loss %.3f%s",
+              mPath.c_str(),
+              latency,
+              jitter,
+              loss,
+              blocked != 0 ? ", blocked" : ""
+            );
             mChange = line;
           }
           mRead = true;
@@ -353,21 +394,34 @@ namespace faf::netlink
     std::vector<std::function<void()>> actions;
   };
 
-  const char* LinkStateName(const LinkState state)
+  const char* LinkStateName(
+    const LinkState state
+  )
   {
     switch (state) {
-      case LinkState::New: return "new";
-      case LinkState::Gathering: return "gathering";
-      case LinkState::AwaitingCandidates: return "awaitingCandidates";
-      case LinkState::Checking: return "checking";
-      case LinkState::Connected: return "connected";
-      case LinkState::Disconnected: return "disconnected";
+    case LinkState::New:
+      return "new";
+    case LinkState::Gathering:
+      return "gathering";
+    case LinkState::AwaitingCandidates:
+      return "awaitingCandidates";
+    case LinkState::Checking:
+      return "checking";
+    case LinkState::Connected:
+      return "connected";
+    case LinkState::Disconnected:
+      return "disconnected";
     }
     return "new";
   }
 
-  Link::Link(LinkOptions options, LinkCallbacks callbacks)
-    : mOptions(std::move(options)), mCallbacks(std::move(callbacks)), mIn(std::make_unique<Internals>())
+  Link::Link(
+    LinkOptions options,
+    LinkCallbacks callbacks
+  )
+    : mOptions(std::move(options))
+    , mCallbacks(std::move(callbacks))
+    , mIn(std::make_unique<Internals>())
   {}
 
   Link::~Link()
@@ -375,7 +429,9 @@ namespace faf::netlink
     Close();
   }
 
-  void Link::Run(Pending& p)
+  void Link::Run(
+    Pending& p
+  )
   {
     for (auto& action : p.actions) {
       action();
@@ -383,18 +439,28 @@ namespace faf::netlink
     p.actions.clear();
   }
 
-  void Link::Log(Pending& out, std::string text)
+  void Link::Log(
+    Pending& out,
+    std::string text
+  )
   {
     if (mCallbacks.onLog) {
-      out.actions.push_back([this, t = std::move(text)] { mCallbacks.onLog(t); });
+      out.actions.push_back([this, t = std::move(text)] {
+        mCallbacks.onLog(t);
+      });
     }
   }
 
-  void Link::SetStateLocked(Pending& out, const LinkState state)
+  void Link::SetStateLocked(
+    Pending& out,
+    const LinkState state
+  )
   {
     mState = state;
     if (mCallbacks.onState) {
-      out.actions.push_back([this, state] { mCallbacks.onState(state); });
+      out.actions.push_back([this, state] {
+        mCallbacks.onState(state);
+      });
     }
   }
 
@@ -413,7 +479,9 @@ namespace faf::netlink
     Run(p);
   }
 
-  void Link::OnSignal(const CandidatesMessage& remote)
+  void Link::OnSignal(
+    const CandidatesMessage& remote
+  )
   {
     std::lock_guard lock(mMutex);
     if (!mClosed) {
@@ -421,7 +489,9 @@ namespace faf::netlink
     }
   }
 
-  void Link::OnSignalText(const std::string& json)
+  void Link::OnSignalText(
+    const std::string& json
+  )
   {
     std::shared_ptr<WebRtcChannel> rtc;
     {
@@ -440,7 +510,9 @@ namespace faf::netlink
     }
   }
 
-  void Link::StartWebRtcLocked(Pending& out)
+  void Link::StartWebRtcLocked(
+    Pending& out
+  )
   {
     WebRtcOptions o;
     o.localId = mOptions.localId;
@@ -473,7 +545,9 @@ namespace faf::netlink
     mRtc->Start();
   }
 
-  void Link::DropWebRtcLocked(Pending& out)
+  void Link::DropWebRtcLocked(
+    Pending& out
+  )
   {
     if (!mRtc) {
       return;
@@ -483,7 +557,9 @@ namespace faf::netlink
       std::lock_guard lock(mLaneRtcMutex);
       mLaneRtc.reset();
     }
-    out.actions.push_back([rtc = std::move(mRtc)] { rtc->Close(); });
+    out.actions.push_back([rtc = std::move(mRtc)] {
+      rtc->Close();
+    });
     mRtc.reset();
   }
 
@@ -537,7 +613,9 @@ namespace faf::netlink
     return s;
   }
 
-  std::uint32_t Link::AttemptsInLastTwoMinutesLocked(const Clock::time_point now) const
+  std::uint32_t Link::AttemptsInLastTwoMinutesLocked(
+    const Clock::time_point now
+  ) const
   {
     std::uint32_t n = 0;
     for (const Clock::time_point t : mAttemptTimes) {
@@ -549,7 +627,10 @@ namespace faf::netlink
   }
 
   // CandidateUtil.isAllowedCandidate with PeerIceModule's flags.
-  bool Link::AllowedLocked(const CandidateType type, const Clock::time_point now) const
+  bool Link::AllowedLocked(
+    const CandidateType type,
+    const Clock::time_point now
+  ) const
   {
     // Issue #322: the player's pick in the network panel holds over the policy.
     // /nativenetrelay (forceRelay) still holds over "no relay".
@@ -560,17 +641,21 @@ namespace faf::netlink
     }
     if (mode == PathChoice::Mode::NoRelay && !mOptions.forceRelay) {
       return type == CandidateType::Host || type == CandidateType::ServerReflexive ||
-             type == CandidateType::PeerReflexive;
+        type == CandidateType::PeerReflexive;
     }
     const std::uint32_t previous = AttemptsInLastTwoMinutesLocked(now);
     const bool allowHost = previous < kForceSrflxCount && !mOptions.forceRelay;
     const bool allowReflexive = previous < kForceRelayCount && !mOptions.forceRelay;
     switch (type) {
-      case CandidateType::Host: return allowHost;
-      case CandidateType::ServerReflexive:
-      case CandidateType::PeerReflexive: return allowReflexive;
-      case CandidateType::Relayed: return true;
-      default: return false;
+    case CandidateType::Host:
+      return allowHost;
+    case CandidateType::ServerReflexive:
+    case CandidateType::PeerReflexive:
+      return allowReflexive;
+    case CandidateType::Relayed:
+      return true;
+    default:
+      return false;
     }
   }
 
@@ -607,7 +692,10 @@ namespace faf::netlink
 
   // Issue #322: our peer's player picked a path; follow it on this attempt. "auto"
   // starts the attempt policy afresh, as the pick did on the peer's side.
-  void Link::NotePeerPathLocked(Pending& out, const std::string& path)
+  void Link::NotePeerPathLocked(
+    Pending& out,
+    const std::string& path
+  )
   {
     if (path == "relay") {
       mPeerMode = PathChoice::Mode::RelayOnly;
@@ -622,7 +710,10 @@ namespace faf::netlink
     Log(out, "the peer picked the path " + path + " for this attempt");
   }
 
-  void Link::NoteRemoteUfragLocked(Pending& out, const std::string& ufrag)
+  void Link::NoteRemoteUfragLocked(
+    Pending& out,
+    const std::string& ufrag
+  )
   {
     mRemoteUfrag = ufrag;
     mRemoteMarked = !mOptions.ufragPrefix.empty() && mRemoteUfrag.rfind(mOptions.ufragPrefix, 0) == 0;
@@ -652,7 +743,10 @@ namespace faf::netlink
     mLaneKeyed = true;
   }
 
-  void Link::InitiateLocked(Pending& out, const CandidatesMessage* remote)
+  void Link::InitiateLocked(
+    Pending& out,
+    const CandidatesMessage* remote
+  )
   {
     // PeerIceModule.initiateIce: only from NEW or DISCONNECTED.
     if (mClosed || (mState != LinkState::New && mState != LinkState::Disconnected)) {
@@ -687,7 +781,8 @@ namespace faf::netlink
     // Issue #322: "relay via host:port" keeps that TURN server only, when it is in the list.
     bool chosenTurnListed = false;
     for (const IceServer& s : mOptions.iceServers) {
-      chosenTurnListed = chosenTurnListed || (s.kind == IceServer::Kind::Turn && IceServerName(s) == mChoice.turnServer);
+      chosenTurnListed =
+        chosenTurnListed || (s.kind == IceServer::Kind::Turn && IceServerName(s) == mChoice.turnServer);
     }
     if (!mChoice.turnServer.empty() && !chosenTurnListed) {
       Log(out, "TURN server " + mChoice.turnServer + " is no longer in the list, using every TURN server");
@@ -799,17 +894,24 @@ namespace faf::netlink
 
   // CandidateUtil.unpackCandidates: same generation, an address, an allowed type;
   // libjuice relays and connects over UDP only.
-  bool Link::UsableRemoteLocked(const Candidate& c, const Clock::time_point now) const
+  bool Link::UsableRemoteLocked(
+    const Candidate& c,
+    const Clock::time_point now
+  ) const
   {
     return c.generation == 0 && !c.ip.empty() && c.port > 0 && AllowedLocked(c.type, now) && Lower(c.protocol) == "udp";
   }
 
-  std::string Link::RemoteDescriptionLocked(const CandidatesMessage& remote, const Clock::time_point now) const
+  std::string Link::RemoteDescriptionLocked(
+    const CandidatesMessage& remote,
+    const Clock::time_point now
+  ) const
   {
     std::string sdp = "a=ice-ufrag:" + remote.ufrag + "\r\na=ice-pwd:" + remote.password + "\r\n";
     std::vector<Candidate> sorted = remote.candidates;
-    std::stable_sort(sorted.begin(), sorted.end(),
-                     [](const Candidate& a, const Candidate& b) { return a.priority > b.priority; });
+    std::stable_sort(sorted.begin(), sorted.end(), [](const Candidate& a, const Candidate& b) {
+      return a.priority > b.priority;
+    });
     for (const Candidate& c : sorted) {
       // CandidateUtil.unpackCandidates: same generation, an address, an
       // allowed type; libjuice relays and connects over UDP only.
@@ -821,7 +923,10 @@ namespace faf::netlink
     return sdp;
   }
 
-  void Link::SendCandidatesLocked(Pending& out, const Clock::time_point now)
+  void Link::SendCandidatesLocked(
+    Pending& out,
+    const Clock::time_point now
+  )
   {
     std::vector<Candidate> gathered;
     {
@@ -837,9 +942,9 @@ namespace faf::netlink
     msg.ufrag = SdpAttribute(sdp, "ice-ufrag");
     msg.password = SdpAttribute(sdp, "ice-pwd");
     if (mChoicePicked && mRemoteMarked) {
-      msg.fafPath = mChoice.mode == PathChoice::Mode::RelayOnly ? "relay" :
-                    mChoice.mode == PathChoice::Mode::NoRelay  ? "norelay" :
-                                                                 "auto";
+      msg.fafPath = mChoice.mode == PathChoice::Mode::RelayOnly ? "relay"
+        : mChoice.mode == PathChoice::Mode::NoRelay             ? "norelay"
+                                                                : "auto";
       // "auto" restarts the peer's policy once; later attempts escalate as usual.
       mChoicePicked = mChoice.mode != PathChoice::Mode::Auto;
     }
@@ -852,20 +957,27 @@ namespace faf::netlink
       msg.candidates.push_back(std::move(c));
     }
     // CandidatePacket.compareTo: highest priority first.
-    std::stable_sort(msg.candidates.begin(), msg.candidates.end(),
-                     [](const Candidate& a, const Candidate& b) { return a.priority > b.priority; });
+    std::stable_sort(msg.candidates.begin(), msg.candidates.end(), [](const Candidate& a, const Candidate& b) {
+      return a.priority > b.priority;
+    });
 
     SetStateLocked(out, LinkState::AwaitingCandidates);
     std::ostringstream log;
     log << "sending " << msg.candidates.size() << " candidates";
     Log(out, log.str());
     if (mCallbacks.onSignal) {
-      out.actions.push_back([this, m = std::move(msg)] { mCallbacks.onSignal(m); });
+      out.actions.push_back([this, m = std::move(msg)] {
+        mCallbacks.onSignal(m);
+      });
     }
     mAwaitDeadline = now + kAwaitCandidatesTimeout;
   }
 
-  void Link::ApplyRemoteLocked(Pending& out, const CandidatesMessage& remote, const Clock::time_point now)
+  void Link::ApplyRemoteLocked(
+    Pending& out,
+    const CandidatesMessage& remote,
+    const Clock::time_point now
+  )
   {
     if (!mOptions.offerer) {
       // A new offer while busy: stop and answer it (PeerIceModule:303).
@@ -889,10 +1001,13 @@ namespace faf::netlink
     // Issue #275: an answer with nothing this link may use can't connect, so start again
     // now (the retry waits kRetryAfterFailure) rather than after kCheckTimeout of checks
     // against nothing. A peer answers that way when its relay isn't there yet.
-    const bool anyUsable = std::any_of(remote.candidates.begin(), remote.candidates.end(),
-                                       [&](const Candidate& c) { return UsableRemoteLocked(c, now); });
+    const bool anyUsable = std::any_of(remote.candidates.begin(), remote.candidates.end(), [&](const Candidate& c) {
+      return UsableRemoteLocked(c, now);
+    });
     if (!anyUsable) {
-      Log(out, "the answer holds no candidate this link may use (" + std::to_string(remote.candidates.size()) + " sent)");
+      Log(
+        out, "the answer holds no candidate this link may use (" + std::to_string(remote.candidates.size()) + " sent)"
+      );
       ConnectionLostLocked(out, "no usable candidates in the answer", now);
       return;
     }
@@ -908,7 +1023,11 @@ namespace faf::netlink
     mCheckDeadline = now + kCheckTimeout;
   }
 
-  void Link::ConnectionLostLocked(Pending& out, const char* reason, const Clock::time_point now)
+  void Link::ConnectionLostLocked(
+    Pending& out,
+    const char* reason,
+    const Clock::time_point now
+  )
   {
     if (mState == LinkState::Disconnected) {
       return;
@@ -917,7 +1036,9 @@ namespace faf::netlink
     Log(out, std::string("connection lost: ") + reason + " (state " + LinkStateName(previous) + ")");
     const bool wasConnected = mConnected.exchange(false);
     if (wasConnected && mCallbacks.onConnected) {
-      out.actions.push_back([this] { mCallbacks.onConnected(false); });
+      out.actions.push_back([this] {
+        mCallbacks.onConnected(false);
+      });
     }
     SetStateLocked(out, LinkState::Disconnected);
     DropWebRtcLocked(out);
@@ -1027,8 +1148,9 @@ namespace faf::netlink
       if ((juiceStateChanged || mState == LinkState::Checking) && mAgent != nullptr) {
         if (juiceState == JUICE_STATE_FAILED && (mState == LinkState::Checking || mState == LinkState::Connected)) {
           ConnectionLostLocked(p, "ICE failed", now);
-        } else if (mState == LinkState::Checking &&
-                   (juiceState == JUICE_STATE_CONNECTED || juiceState == JUICE_STATE_COMPLETED)) {
+        } else if (
+          mState == LinkState::Checking && (juiceState == JUICE_STATE_CONNECTED || juiceState == JUICE_STATE_COMPLETED)
+        ) {
           mCheckDeadline.reset();
           mConnected = true;
           char local[JUICE_MAX_CANDIDATE_SDP_STRING_LEN] = {};
@@ -1039,7 +1161,9 @@ namespace faf::netlink
             mRemoteType = CandidateTypeOf(remote);
           }
           if (mCallbacks.onConnected) {
-            p.actions.push_back([this] { mCallbacks.onConnected(true); });
+            p.actions.push_back([this] {
+              mCallbacks.onConnected(true);
+            });
           }
           SetStateLocked(p, LinkState::Connected);
           mNextEcho = now;
@@ -1082,20 +1206,26 @@ namespace faf::netlink
       if (mOurPeer.load() && !mOurPeerReported.exchange(true)) {
         Log(p, "the peer is ours (netlink probe answered)");
         if (mCallbacks.onOurPeer) {
-          p.actions.push_back([this] { mCallbacks.onOurPeer(); });
+          p.actions.push_back([this] {
+            mCallbacks.onOurPeer();
+          });
         }
       }
 
       // Issue #239: the offerer opens the data channel once the peer is ours
       // and offers WebRTC too; the answerer starts on its first signal.
-      if (mState == LinkState::Connected && mOptions.offerer && mOptions.webrtc && mRemoteWebRtc && mOurPeer.load() &&
-          !mRtc && !mWebRtcGaveUp) {
+      if (
+        mState == LinkState::Connected && mOptions.offerer && mOptions.webrtc && mRemoteWebRtc && mOurPeer.load() &&
+        !mRtc && !mWebRtcGaveUp
+      ) {
         StartWebRtcLocked(p);
       }
       if (mRtc) {
         for (std::string& signal : mRtc->TakeSignals()) {
           if (mCallbacks.onSignalText) {
-            p.actions.push_back([this, signal = std::move(signal)] { mCallbacks.onSignalText(signal); });
+            p.actions.push_back([this, signal = std::move(signal)] {
+              mCallbacks.onSignalText(signal);
+            });
           }
         }
         if (mRtc->HasFailed()) {
@@ -1107,12 +1237,16 @@ namespace faf::netlink
 
       // Issue #240: with a peer that is ours and offers it, game datagrams
       // move onto the redundant lane.
-      if (mState == LinkState::Connected && mOptions.redundancy > 0 && mRemoteLane && mOurPeer.load() &&
-          !mLaneActive.load()) {
+      if (
+        mState == LinkState::Connected && mOptions.redundancy > 0 && mRemoteLane && mOurPeer.load() &&
+        !mLaneActive.load()
+      ) {
         mLaneActive = true;
-        Log(p, "game datagrams move onto the redundant lane, each repeated up to " +
-                 std::to_string(mOptions.redundancy) + " times until acked" +
-                 (mLaneKeyed ? ", encrypted" : ", not encrypted"));
+        Log(
+          p,
+          "game datagrams move onto the redundant lane, each repeated up to " + std::to_string(mOptions.redundancy) +
+            " times until acked" + (mLaneKeyed ? ", encrypted" : ", not encrypted")
+        );
       }
 
       if (mState == LinkState::Disconnected && mRestartAt && now >= *mRestartAt) {
@@ -1126,7 +1260,10 @@ namespace faf::netlink
     }
   }
 
-  bool Link::Send(const void* data, const std::size_t size)
+  bool Link::Send(
+    const void* data,
+    const std::size_t size
+  )
   {
     if (!mConnected.load()) {
       std::lock_guard lock(mMutex);
@@ -1186,9 +1323,14 @@ namespace faf::netlink
     if (mOptions.duplicateGapMs == 0) {
       SendFramed(buf, size + 1);
     } else if (mOptions.duplicateGapMs > 0) {
-      DelayedSender::Get().Schedule(this, Clock::now() + std::chrono::milliseconds(mOptions.duplicateGapMs),
-                                    std::string(buf, size + 1),
-                                    [this](const std::string& b) { SendFramed(b.data(), b.size()); });
+      DelayedSender::Get().Schedule(
+        this,
+        Clock::now() + std::chrono::milliseconds(mOptions.duplicateGapMs),
+        std::string(buf, size + 1),
+        [this](const std::string& b) {
+        SendFramed(b.data(), b.size());
+      }
+      );
     }
     std::lock_guard lock(mMutex);
     ++mStats.dataSent;
@@ -1215,7 +1357,10 @@ namespace faf::netlink
     return *mLane;
   }
 
-  void Link::LaneDeliver(const std::uint8_t* const data, const std::size_t size)
+  void Link::LaneDeliver(
+    const std::uint8_t* const data,
+    const std::size_t size
+  )
   {
     if (mOptions.redundancy <= 0) {
       mInvalidReceived.fetch_add(1);
@@ -1253,7 +1398,9 @@ namespace faf::netlink
     LaneTransmit(datagrams);
   }
 
-  void Link::LaneTransmit(const std::vector<std::vector<std::uint8_t>>& datagrams)
+  void Link::LaneTransmit(
+    const std::vector<std::vector<std::uint8_t>>& datagrams
+  )
   {
     if (datagrams.empty()) {
       return;
@@ -1293,7 +1440,10 @@ namespace faf::netlink
     return {sWirePackets.load(std::memory_order_relaxed), sWireBytes.load(std::memory_order_relaxed)};
   }
 
-  bool Link::SendFramed(const char* framed, const std::size_t size)
+  bool Link::SendFramed(
+    const char* framed,
+    const std::size_t size
+  )
   {
     sWirePackets.fetch_add(1, std::memory_order_relaxed);
     sWireBytes.fetch_add(size, std::memory_order_relaxed);
@@ -1303,21 +1453,31 @@ namespace faf::netlink
         return true; // tests only: lost on the way
       }
       if (delay > Clock::duration::zero()) {
-        DelayedSender::Get().Schedule(this, Clock::now() + delay, std::string(framed, size),
-                                      [this](const std::string& b) { SendFramedNow(b.data(), b.size()); });
+        DelayedSender::Get().Schedule(
+          this, Clock::now() + delay, std::string(framed, size), [this](const std::string& b) {
+          SendFramedNow(b.data(), b.size());
+        }
+        );
         return true;
       }
     }
     return SendFramedNow(framed, size);
   }
 
-  bool Link::SendFramedNow(const char* framed, const std::size_t size)
+  bool Link::SendFramedNow(
+    const char* framed,
+    const std::size_t size
+  )
   {
     std::shared_lock agentLock(mIn->agentMutex);
     return mAgent != nullptr && juice_send(mAgent, framed, size) == 0;
   }
 
-  bool Link::SendWebRtc(const std::shared_ptr<WebRtcChannel>& rtc, const void* data, const std::size_t size)
+  bool Link::SendWebRtc(
+    const std::shared_ptr<WebRtcChannel>& rtc,
+    const void* data,
+    const std::size_t size
+  )
   {
     if (!rtc) {
       return false;
@@ -1333,9 +1493,11 @@ namespace faf::netlink
       return true; // tests only: lost on the way
     }
     if (delay > Clock::duration::zero()) {
-      DelayedSender::Get().Schedule(this, Clock::now() + delay,
-                                    std::string(static_cast<const char*>(data), size),
-                                    [rtc](const std::string& b) { rtc->Send(b.data(), b.size()); });
+      DelayedSender::Get().Schedule(
+        this, Clock::now() + delay, std::string(static_cast<const char*>(data), size), [rtc](const std::string& b) {
+        rtc->Send(b.data(), b.size());
+      }
+      );
       return true;
     }
     return rtc->Send(data, size);
@@ -1364,7 +1526,11 @@ namespace faf::netlink
     DestroyAgentLocked();
   }
 
-  void Link::Internals::OnState(juice_agent_t* /*agent*/, const juice_state_t state, void* user)
+  void Link::Internals::OnState(
+    juice_agent_t* /*agent*/,
+    const juice_state_t state,
+    void* user
+  )
   {
     Internals& in = *static_cast<Link*>(user)->mIn;
     std::lock_guard cb(in.cbMutex);
@@ -1372,7 +1538,11 @@ namespace faf::netlink
     in.juiceStateChanged = true;
   }
 
-  void Link::Internals::OnCandidate(juice_agent_t* /*agent*/, const char* sdp, void* user)
+  void Link::Internals::OnCandidate(
+    juice_agent_t* /*agent*/,
+    const char* sdp,
+    void* user
+  )
   {
     std::optional<Candidate> c = CandidateFromSdp(sdp);
     if (!c) {
@@ -1383,14 +1553,22 @@ namespace faf::netlink
     in.candidates.push_back(std::move(*c));
   }
 
-  void Link::Internals::OnGatheringDone(juice_agent_t* /*agent*/, void* user)
+  void Link::Internals::OnGatheringDone(
+    juice_agent_t* /*agent*/,
+    void* user
+  )
   {
     Internals& in = *static_cast<Link*>(user)->mIn;
     std::lock_guard cb(in.cbMutex);
     in.gatheringDone = true;
   }
 
-  void Link::Internals::OnRecv(juice_agent_t* agent, const char* data, const std::size_t size, void* user)
+  void Link::Internals::OnRecv(
+    juice_agent_t* agent,
+    const char* data,
+    const std::size_t size,
+    void* user
+  )
   {
     auto* self = static_cast<Link*>(user);
     if (size == 0) {
@@ -1416,12 +1594,18 @@ namespace faf::netlink
         // delayed and dropped like every other send, so the offerer's rtt
         // covers both directions.
         Clock::duration delay{};
-        if (TestShaping::Get().Enabled() && !TestShaping::Get().Roll(delay, self->mOptions.localId, self->mOptions.remoteId)) {
+        if (
+          TestShaping::Get().Enabled() &&
+          !TestShaping::Get().Roll(delay, self->mOptions.localId, self->mOptions.remoteId)
+        ) {
           return; // tests only: lost on the way
         }
         if (delay > Clock::duration::zero()) {
-          DelayedSender::Get().Schedule(self, Clock::now() + delay, std::string(data, size),
-                                        [self](const std::string& b) { self->SendFramedNow(b.data(), b.size()); });
+          DelayedSender::Get().Schedule(
+            self, Clock::now() + delay, std::string(data, size), [self](const std::string& b) {
+            self->SendFramedNow(b.data(), b.size());
+          }
+          );
         } else {
           juice_send(agent, data, size);
         }

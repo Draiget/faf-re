@@ -40,8 +40,10 @@ namespace faf::remote::net
 
   enum ELobbySignalFlags : std::uint8_t
   {
-    kLobbySignalAutoLobby = 1u, // `Host`, `Join`: FAF's automatch lobby (autolobby.lua) instead of the custom game lobby
-    kLobbySignalOrganised = 2u, // `Host`, `Join` (plan WP17.6): an organiser-run lobby; the screen shows it and changes nothing
+    kLobbySignalAutoLobby =
+      1u, // `Host`, `Join`: FAF's automatch lobby (autolobby.lua) instead of the custom game lobby
+    kLobbySignalOrganised =
+      2u, // `Host`, `Join` (plan WP17.6): an organiser-run lobby; the screen shows it and changes nothing
   };
 
   struct SLobbySignal
@@ -64,5 +66,6 @@ namespace faf::remote::net
   /** The message of a launch request: `kLobbyLaunchRequest`, then the configuration's bytes. */
   [[nodiscard]] std::vector<std::uint8_t> EncodeLaunchRequest(std::span<const std::uint8_t> configuration);
   /** True for a launch request; `configuration` is then its bytes. */
-  [[nodiscard]] bool IsLaunchRequest(std::span<const std::uint8_t> message, std::span<const std::uint8_t>& configuration);
+  [[nodiscard]] bool
+  IsLaunchRequest(std::span<const std::uint8_t> message, std::span<const std::uint8_t>& configuration);
 } // namespace faf::remote::net

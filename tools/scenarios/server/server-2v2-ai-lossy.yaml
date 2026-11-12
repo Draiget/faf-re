@@ -1,0 +1,22 @@
+kind: server
+name: server-2v2-ai-lossy
+description: >
+  Plan WP16.4: two remote players on one team against two AIs; Seat 1001's link drops 10 % of datagrams with 50 ms
+  each way and 20 ms jitter (faf_server_probe's own impairment, both directions). Every view still decodes and every
+  frame check matches; the replay plays back.
+map: /maps/scmp_009/scmp_009_scenario.lua
+seats:
+  - uid: 1001
+    team: 2
+    args: ["--loss", "10","--latency-ms", "50", "--jitter-ms", "20", "--order-at", "30"]
+  - uid: 1002
+    team: 2
+ais:
+  - team: 3
+  - team: 3
+server:
+  stopBeat: 1800
+timeout: 10m
+expect:
+  clean: true
+  playback: true

@@ -25,7 +25,9 @@ namespace
     return sInstance;
   }
 
-  [[nodiscard]] gpg::RRef MakeCUnitCarrierRetrieveRef(moho::CUnitCarrierRetrieve* const object)
+  [[nodiscard]] gpg::RRef MakeCUnitCarrierRetrieveRef(
+    moho::CUnitCarrierRetrieve* const object
+  )
   {
     gpg::RRef ref{};
     ref = gpg::MakeRRef<moho::CUnitCarrierRetrieve>(object);
@@ -78,7 +80,9 @@ namespace moho
   /**
    * Address: 0x00607E20 (FUN_00607E20, Moho::CUnitCarrierRetrieveTypeInfo::AddBase_CCommandTask)
    */
-  void __stdcall CUnitCarrierRetrieveTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void __stdcall CUnitCarrierRetrieveTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CCommandTask>(typeInfo);
   }
@@ -99,7 +103,9 @@ namespace moho
    * Placement-constructs one carrier-retrieve task runtime lane in caller
    * storage and returns typed reflection reference.
    */
-  gpg::RRef CUnitCarrierRetrieveTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitCarrierRetrieveTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const object = gpg::ConstructInStorage<moho::CUnitCarrierRetrieve>(objectStorage);
     return MakeCUnitCarrierRetrieveRef(object);
@@ -108,7 +114,9 @@ namespace moho
   /**
    * Address: 0x00607A80 (FUN_00607A80, Moho::CUnitCarrierRetrieveTypeInfo::Delete)
    */
-  void CUnitCarrierRetrieveTypeInfo::Delete(void* const objectStorage)
+  void CUnitCarrierRetrieveTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<moho::CUnitCarrierRetrieve*>(objectStorage);
   }
@@ -116,7 +124,9 @@ namespace moho
   /**
    * Address: 0x00607B40 (FUN_00607B40, Moho::CUnitCarrierRetrieveTypeInfo::Destruct)
    */
-  void CUnitCarrierRetrieveTypeInfo::Destruct(void* const objectStorage)
+  void CUnitCarrierRetrieveTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     auto* const object = static_cast<moho::CUnitCarrierRetrieve*>(objectStorage);
     if (!object) {
@@ -135,7 +145,9 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CUnitCarrierRetrieveTypeInfo_a01e2d, moho::register_CUnitCarrierRetrieveTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CUnitCarrierRetrieveTypeInfo_a01e2d,
+  moho::register_CUnitCarrierRetrieveTypeInfo
+)

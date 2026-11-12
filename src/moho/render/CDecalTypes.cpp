@@ -296,7 +296,9 @@ namespace moho
    * Constructs one `SDecalInfo` object in preallocated storage and returns the
    * constructed object lane.
    */
-  [[maybe_unused]] SDecalInfo* ConstructSDecalInfoInPlace(SDecalInfo* const storage)
+  [[maybe_unused]] SDecalInfo* ConstructSDecalInfoInPlace(
+    SDecalInfo* const storage
+  )
   {
     if (storage == nullptr) {
       return nullptr;
@@ -433,7 +435,9 @@ namespace moho
    * Loads decal position/size/rotation vectors plus texture/type lanes and
    * runtime metadata fields from archive payload.
    */
-  void SDecalInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SDecalInfo::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -474,7 +478,9 @@ namespace moho
    * Saves decal position/size/rotation vectors plus texture/type lanes and
    * runtime metadata fields to archive payload.
    */
-  void SDecalInfo::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SDecalInfo::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;
@@ -500,4 +506,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_RListType_SDecalInfo_874f42, preregister_RListType_SDecalInfo)
+GPG_PREREGISTER_INIT(
+  preregister_RListType_SDecalInfo_874f42,
+  preregister_RListType_SDecalInfo
+)

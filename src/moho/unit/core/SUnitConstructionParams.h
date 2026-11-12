@@ -25,7 +25,8 @@ namespace moho
   {
     /**
      * Address: 0x00585AB0 (FUN_00585AB0, Moho::SUnitConstructionParams::SUnitConstructionParams)
-     * Mangled: ??0SUnitConstructionParams@Moho@@QAE@HABUdeprecated_struct_VecQuatB@@PAVCArmyImpl@1@PAVRUnitBlueprint@1@PAVUnit@1@E@Z
+     * Mangled:
+     * ??0SUnitConstructionParams@Moho@@QAE@HABUdeprecated_struct_VecQuatB@@PAVCArmyImpl@1@PAVRUnitBlueprint@1@PAVUnit@1@E@Z
      *
      * What it does:
      * Initializes one unit-construction payload from full transform/layer/
@@ -71,10 +72,12 @@ namespace moho
 
   static_assert(offsetof(SUnitConstructionParams, mArmy) == 0x00, "SUnitConstructionParams::mArmy offset must be 0x00");
   static_assert(
-    offsetof(SUnitConstructionParams, mBlueprint) == 0x04, "SUnitConstructionParams::mBlueprint offset must be 0x04"
+    offsetof(SUnitConstructionParams, mBlueprint) == 0x04,
+    "SUnitConstructionParams::mBlueprint offset must be 0x04"
   );
   static_assert(
-    offsetof(SUnitConstructionParams, mTransform) == 0x08, "SUnitConstructionParams::mTransform offset must be 0x08"
+    offsetof(SUnitConstructionParams, mTransform) == 0x08,
+    "SUnitConstructionParams::mTransform offset must be 0x08"
   );
   static_assert(
     offsetof(SUnitConstructionParams, mUseLayerOverride) == 0x24,
@@ -85,14 +88,16 @@ namespace moho
     "SUnitConstructionParams::mFixElevation offset must be 0x25"
   );
   static_assert(
-    offsetof(SUnitConstructionParams, mLayer) == 0x28, "SUnitConstructionParams::mLayer offset must be 0x28"
+    offsetof(SUnitConstructionParams, mLayer) == 0x28,
+    "SUnitConstructionParams::mLayer offset must be 0x28"
   );
   static_assert(
     offsetof(SUnitConstructionParams, mLinkSourceUnit) == 0x2C,
     "SUnitConstructionParams::mLinkSourceUnit offset must be 0x2C"
   );
   static_assert(
-    offsetof(SUnitConstructionParams, mComplete) == 0x30, "SUnitConstructionParams::mComplete offset must be 0x30"
+    offsetof(SUnitConstructionParams, mComplete) == 0x30,
+    "SUnitConstructionParams::mComplete offset must be 0x30"
   );
   static_assert(sizeof(SUnitConstructionParams) == 0x34, "SUnitConstructionParams size must be 0x34");
 } // namespace moho

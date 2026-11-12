@@ -1,88 +1,96 @@
 // Part of Unit.cpp, included there: lifetime stats and guard formations.
 
-  void DecrementUnitArmyLifetimeStats(Unit& unit)
-  {
-    CArmyImpl* const army = unit.ArmyRef;
-    if (army == nullptr) {
-      return;
-    }
-
-    const RUnitBlueprint* const blueprint = unit.GetBlueprint();
-    if (blueprint == nullptr) {
-      return;
-    }
-
-    CArmyStats* const armyStats = army->GetArmyStats();
-    if (armyStats == nullptr) {
-      return;
-    }
-
-    if (unit.IsBeingBuilt()) {
-      IncrementArmyBlueprintFloatStat(armyStats, "Units_BeingBuilt", blueprint, -1.0f);
-      return;
-    }
-
-    if (blueprint->General.CapCost > 0.0f) {
-      IncrementArmyBlueprintFloatStat(armyStats, "Units_Active", blueprint, -1.0f);
-      const std::int32_t delta = -1;
-      (void)armyStats->UpdateUnitStat("Units_Active", &delta);
-    }
+void DecrementUnitArmyLifetimeStats(
+  Unit& unit
+)
+{
+  CArmyImpl* const army = unit.ArmyRef;
+  if (army == nullptr) {
+    return;
   }
 
-  void DetachAndDestroyUnitTransport(Unit& unit)
-  {
-    if (unit.AiTransport == nullptr) {
-      return;
-    }
-
-    EntitySetTemplate<Unit> detachedUnits = unit.AiTransport->TransportDetachAllUnits(true);
-    (void)detachedUnits;
-    DeleteAndNull(unit.AiTransport);
+  const RUnitBlueprint* const blueprint = unit.GetBlueprint();
+  if (blueprint == nullptr) {
+    return;
   }
 
-  void ClearUnitOwnedSidecars(Unit& unit)
-  {
-    DeleteAndNull(unit.AiCommandDispatch);
-
-    if (unit.CommandQueue != nullptr) {
-      unit.CommandQueue->ClearCommandQueue();
-    }
-
-    DeleteAndNull(unit.AiAttacker);
-    DetachAndDestroyUnitTransport(unit);
-    DeleteAndNull(unit.AiNavigator);
-    DeleteAndNull(unit.AiSteering);
-    DeleteAndNull(unit.UnitMotion);
-    DeleteAndNull(unit.AiBuilder);
-    DeleteAndNull(unit.AiSiloBuild);
-    DeleteAndNull(unit.CommandQueue);
-    DeleteAndNull(unit.AniActor);
+  CArmyStats* const armyStats = army->GetArmyStats();
+  if (armyStats == nullptr) {
+    return;
   }
-  /**
-   * Address: 0x007736A0 (FUN_007736A0, sub_7736A0)
-   *
-   * IDA signature:
-   * float *__userpurge sub_7736A0(
-   *     Moho::SEconValue *dest@<eax>, Moho::CEconRequest *request@<edx>, Moho::SEconValue *desired);
-   *
-   * What it does:
-   * Clamps `desired` to what remains in `request.mGranted` (component-wise
-   * min), writes the clamped amount into `dest`, then reduces
-   * `request.mGranted` by that withdrawn amount (floored at zero).
-   */
-  SEconValue& WithdrawFromGrantedEconValue(SEconValue& dest, CEconRequest& request, const SEconValue& desired)
-  {
-    dest.energy = std::min(desired.energy, request.mGranted.energy);
-    dest.mass = std::min(desired.mass, request.mGranted.mass);
 
-    request.mGranted.energy = std::max(0.0f, request.mGranted.energy - dest.energy);
-    request.mGranted.mass = std::max(0.0f, request.mGranted.mass - dest.mass);
+  if (unit.IsBeingBuilt()) {
+    IncrementArmyBlueprintFloatStat(armyStats, "Units_BeingBuilt", blueprint, -1.0f);
+    return;
+  }
 
-    return dest;
+  if (blueprint->General.CapCost > 0.0f) {
+    IncrementArmyBlueprintFloatStat(armyStats, "Units_Active", blueprint, -1.0f);
+    const std::int32_t delta = -1;
+    (void)armyStats->UpdateUnitStat("Units_Active", &delta);
   }
 }
 
+void DetachAndDestroyUnitTransport(
+  Unit& unit
+)
+{
+  if (unit.AiTransport == nullptr) {
+    return;
+  }
 
+  EntitySetTemplate<Unit> detachedUnits = unit.AiTransport->TransportDetachAllUnits(true);
+  (void)detachedUnits;
+  DeleteAndNull(unit.AiTransport);
+}
+
+void ClearUnitOwnedSidecars(
+  Unit& unit
+)
+{
+  DeleteAndNull(unit.AiCommandDispatch);
+
+  if (unit.CommandQueue != nullptr) {
+    unit.CommandQueue->ClearCommandQueue();
+  }
+
+  DeleteAndNull(unit.AiAttacker);
+  DetachAndDestroyUnitTransport(unit);
+  DeleteAndNull(unit.AiNavigator);
+  DeleteAndNull(unit.AiSteering);
+  DeleteAndNull(unit.UnitMotion);
+  DeleteAndNull(unit.AiBuilder);
+  DeleteAndNull(unit.AiSiloBuild);
+  DeleteAndNull(unit.CommandQueue);
+  DeleteAndNull(unit.AniActor);
+}
+/**
+ * Address: 0x007736A0 (FUN_007736A0, sub_7736A0)
+ *
+ * IDA signature:
+ * float *__userpurge sub_7736A0(
+ *     Moho::SEconValue *dest@<eax>, Moho::CEconRequest *request@<edx>, Moho::SEconValue *desired);
+ *
+ * What it does:
+ * Clamps `desired` to what remains in `request.mGranted` (component-wise
+ * min), writes the clamped amount into `dest`, then reduces
+ * `request.mGranted` by that withdrawn amount (floored at zero).
+ */
+SEconValue& WithdrawFromGrantedEconValue(
+  SEconValue& dest,
+  CEconRequest& request,
+  const SEconValue& desired
+)
+{
+  dest.energy = std::min(desired.energy, request.mGranted.energy);
+  dest.mass = std::min(desired.mass, request.mGranted.mass);
+
+  request.mGranted.energy = std::max(0.0f, request.mGranted.energy - dest.energy);
+  request.mGranted.mass = std::max(0.0f, request.mGranted.mass - dest.mass);
+
+  return dest;
+}
+}
 
 /**
  * Address: 0x006AD750 (FUN_006AD750, func_SetExtraStorage)
@@ -90,7 +98,9 @@
  * IDA signature:
  * void callcnv_F3 func_SetExtraStorage(Moho::CEconStorage **a1@<eax>, Moho::CEconStorage *a2@<ecx>);
  */
-void Unit::SetExtraStorage(CEconStorage* const newStorage)
+void Unit::SetExtraStorage(
+  CEconStorage* const newStorage
+)
 {
   DestroyUnitExtraStorage(mExtraStorage);
   mExtraStorage = newStorage;
@@ -152,7 +162,8 @@ void Unit::HandleResourceManagement()
   }
 
   SEconValue producedThisTick{
-    mUnitVarDat.mAttributes.productionPerSecondEnergy * productionRate, mUnitVarDat.mAttributes.productionPerSecondMass * productionRate
+    mUnitVarDat.mAttributes.productionPerSecondEnergy * productionRate,
+    mUnitVarDat.mAttributes.productionPerSecondMass * productionRate
   };
   producedThisTick.energy *= 0.1f;
   producedThisTick.mass *= 0.1f;
@@ -228,7 +239,11 @@ void Unit::UpdateGuardFormation()
  * slots, the guarded-by list, the armor-multiplier map head, the economy-event
  * list, the info cache, the occupancy rect, and the recon/blip vectors.
  */
-Unit::Unit(Sim* sim) : IUnit(), Entity(sim, ENTITYTYPE_Unit)
+Unit::Unit(
+  Sim* sim
+)
+  : IUnit()
+  , Entity(sim, ENTITYTYPE_Unit)
 {
   UnitMotion = nullptr;
   CommandQueue = nullptr;
@@ -320,7 +335,9 @@ namespace
    * occupancy grid, which is what the binary's four `frndint`s plus sign
    * fixups come out to (Unit::Unit, 0x006A618F..0x006A6220).
    */
-  [[nodiscard]] gpg::Rect2i SkirtRectToOgridRect(const gpg::Rect2f& skirt) noexcept
+  [[nodiscard]] gpg::Rect2i SkirtRectToOgridRect(
+    const gpg::Rect2f& skirt
+  ) noexcept
   {
     return gpg::Rect2i{
       fa::FloorToIntX87(skirt.x0),
@@ -330,8 +347,6 @@ namespace
     };
   }
 }
-
-
 
 /**
  * Address: 0x006A53F0 (FUN_006A53F0, ??0Unit@Moho@@AAE@ABUSUnitConstructionParams@1@@Z)
@@ -352,7 +367,9 @@ namespace
  * into `ArmyPool`, and runs `OnCreate` plus either `OnStartBeingBuilt` or
  * `OnStopBeingBuilt`.
  */
-Unit::Unit(const SUnitConstructionParams& params)
+Unit::Unit(
+  const SUnitConstructionParams& params
+)
   : IUnit()
   , Entity(
       const_cast<REntityBlueprint*>(static_cast<const REntityBlueprint*>(params.mBlueprint)),
@@ -496,8 +513,7 @@ Unit::Unit(const SUnitConstructionParams& params)
   RMeshBlueprint* placeholderMesh = nullptr;
   const fa::string placeholderName = gpg::STR_ToLower(blueprint.Display.PlaceholderMeshName.c_str());
   if (!placeholderName.empty()) {
-    const fa::string meshPath =
-      gpg::STR_Printf("/units/%s/%s_mesh", placeholderName.c_str(), placeholderName.c_str());
+    const fa::string meshPath = gpg::STR_Printf("/units/%s/%s_mesh", placeholderName.c_str(), placeholderName.c_str());
     fa::string meshFileName{};
     (void)gpg::STR_CopyFilename(&meshFileName, &meshPath);
 
@@ -542,8 +558,7 @@ Unit::Unit(const SUnitConstructionParams& params)
   const ERuleBPUnitMovementType motionType = blueprint.Physics.MotionType;
   if (motionType >= RULEUMT_Land && motionType <= RULEUMT_AmphibiousFloating) {
     UnitMotion = new CUnitMotion(this);
-    AiNavigator =
-      motionType == RULEUMT_Air ? AI_CreateAirNavigator(this) : AI_CreatePathingNavigator(this);
+    AiNavigator = motionType == RULEUMT_Air ? AI_CreateAirNavigator(this) : AI_CreatePathingNavigator(this);
     AiSteering = AI_CreateSteering(this, UnitMotion, mVarDat.mLayerMask);
   } else {
     // Immobile units claim their footprint at spawn. Ferry beacons and in-place

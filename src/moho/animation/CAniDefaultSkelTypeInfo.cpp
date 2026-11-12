@@ -46,17 +46,19 @@ namespace moho
   }
 
   /**
- * Address: 0x0054DDF0 (FUN_0054DDF0, Moho::CAniDefaultSkelTypeInfo::AddBase_CAniSkel)
- *
- * What it does:
- * Registers `CAniSkel` as this type's reflected base at offset 0.
- */
-void CAniDefaultSkelTypeInfo::AddBase_CAniSkel(gpg::RType* const typeInfo)
-{
-  gpg::AddReflectedBase<moho::CAniSkel>(typeInfo);
-}
+   * Address: 0x0054DDF0 (FUN_0054DDF0, Moho::CAniDefaultSkelTypeInfo::AddBase_CAniSkel)
+   *
+   * What it does:
+   * Registers `CAniSkel` as this type's reflected base at offset 0.
+   */
+  void CAniDefaultSkelTypeInfo::AddBase_CAniSkel(
+    gpg::RType* const typeInfo
+  )
+  {
+    gpg::AddReflectedBase<moho::CAniSkel>(typeInfo);
+  }
 
-/**
+  /**
    * Address: 0x0054A990 (FUN_0054A990)
    *
    * What it does:
@@ -92,4 +94,7 @@ void CAniDefaultSkelTypeInfo::AddBase_CAniSkel(gpg::RType* const typeInfo)
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_CAniDefaultSkelTypeInfo_08e177, moho::preregister_CAniDefaultSkelTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_CAniDefaultSkelTypeInfo_08e177,
+  moho::preregister_CAniDefaultSkelTypeInfo
+)

@@ -46,32 +46,34 @@ INetDatagramSocket::~INetDatagramSocket() = default;
  * Opens/configures non-blocking broadcast UDP socket, binds it to `port`,
  * and returns datagram-socket implementation bound to `handler`.
  */
-INetDatagramSocket* moho::NET_OpenDatagramSocket(const u_short port, INetDatagramHandler* handler)
+INetDatagramSocket* moho::NET_OpenDatagramSocket(
+  const u_short port,
+  INetDatagramHandler* handler
+)
 {
   if (!NET_Init()) {
     return nullptr;
   }
 
-  const SOCKET sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-  if (sock == INVALID_SOCKET) {
+  const platform::net::Socket sock = platform::net::OpenSocket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (sock == platform::net::kInvalidSocket) {
     gpg::Logf("NET_OpenDatagramSocket: socket() failed: %s", NET_GetWinsockErrorString());
     return nullptr;
   }
 
   {
-    BOOL on = TRUE;
-    if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char*>(&on), sizeof(on)) == SOCKET_ERROR) {
+    const int on = 1; // a BOOL TRUE
+    if (platform::net::SetOption(sock, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on)) == platform::net::kSocketError) {
       gpg::Logf("NET_OpenDatagramSocket: setsockopt(SO_BROADCAST) failed : %s", NET_GetWinsockErrorString());
-      closesocket(sock);
+      platform::net::CloseSocket(sock);
       return nullptr;
     }
   }
 
   {
-    u_long nonBlocking = 1;
-    if (ioctlsocket(sock, FIONBIO, &nonBlocking) == SOCKET_ERROR) {
+    if (platform::net::SetNonBlocking(sock) == platform::net::kSocketError) {
       gpg::Logf("NET_OpenDatagramSocket: ioctlsocket(FIONBIO) failed: %s", NET_GetWinsockErrorString());
-      closesocket(sock);
+      platform::net::CloseSocket(sock);
       return nullptr;
     }
   }
@@ -80,9 +82,9 @@ INetDatagramSocket* moho::NET_OpenDatagramSocket(const u_short port, INetDatagra
   name.sin_family = AF_INET;
   name.sin_port = htons(port);
   name.sin_addr.s_addr = htonl(INADDR_ANY);
-  if (bind(sock, reinterpret_cast<const sockaddr*>(&name), static_cast<int>(sizeof(name))) == SOCKET_ERROR) {
+  if (platform::net::Bind(sock, name) == platform::net::kSocketError) {
     gpg::Logf("NET_OpenDatagramSocket: bind() failed: %s", NET_GetWinsockErrorString());
-    closesocket(sock);
+    platform::net::CloseSocket(sock);
     return nullptr;
   }
 

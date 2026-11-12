@@ -267,8 +267,9 @@ namespace gpg
      * Endianness: bytes are emitted as-is (little-endian on x86).
      */
     template <class T>
-    std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> && !std::is_enum_v<T>, void>
-    Write(const T& value)
+    std::enable_if_t<std::is_trivially_copyable_v<T> && !std::is_pointer_v<T> && !std::is_enum_v<T>, void> Write(
+      const T& value
+    )
     {
       Write(reinterpret_cast<const char*>(&value), sizeof(T));
     }
@@ -279,7 +280,9 @@ namespace gpg
      * Write enum by its underlying integral type.
      */
     template <class E>
-    std::enable_if_t<std::is_enum_v<E>, void> Write(const E value)
+    std::enable_if_t<std::is_enum_v<E>, void> Write(
+      const E value
+    )
     {
       using U = std::underlying_type_t<E>;
       U tmp = static_cast<U>(value);
@@ -292,7 +295,9 @@ namespace gpg
      * Write fixed-size C array (e.g., byte blobs).
      */
     template <class T, std::size_t N>
-    std::enable_if_t<std::is_trivially_copyable_v<T>, void> Write(const T (&arr)[N])
+    std::enable_if_t<std::is_trivially_copyable_v<T>, void> Write(
+      const T (&arr)[N]
+    )
     {
       Write(reinterpret_cast<const char*>(arr), sizeof(arr));
     }
@@ -350,7 +355,9 @@ namespace gpg
      * NOTE: Inlined
      * @param vec
      */
-    void Write(const core::FastVector<char>& vec)
+    void Write(
+      const core::FastVector<char>& vec
+    )
     {
       Write(vec.start_, vec.Size());
     }

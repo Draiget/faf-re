@@ -2,8 +2,8 @@
 
 namespace gpg::gal
 {
-namespace
-{
+  namespace
+  {
 
     /**
      * Address: 0x009033A0 (FUN_009033A0)
@@ -12,7 +12,9 @@ namespace
      * Converts DXGI texture-format tokens to GAL texture-format tokens through
      * the recovered 89-entry mapping table, with fallback format token `20`.
      */
-    int MapDxgiToGalTextureFormat(const int dxgiFormat)
+    int MapDxgiToGalTextureFormat(
+      const int dxgiFormat
+    )
     {
       for (const DXGIFormatPair& pair : kTextureDxgiGalPairs) {
         if (pair.dxgi == dxgiFormat) {
@@ -30,7 +32,10 @@ namespace
      * Creates a staging texture copy (`usage=3`, `bind=0`, `cpuAccess=0x20000`) from
      * the source texture and issues a native D3D10 copy-resource from source to staging.
      */
-    ID3D10Texture2D* CreateStagingTextureCopyOrThrow(Device* const device, ID3D10Texture2D* const sourceTexture)
+    ID3D10Texture2D* CreateStagingTextureCopyOrThrow(
+      Device* const device,
+      ID3D10Texture2D* const sourceTexture
+    )
     {
       D3D10_TEXTURE2D_DESC textureDesc{};
       sourceTexture->GetDesc(&textureDesc);
@@ -55,12 +60,13 @@ namespace
      * What it does:
      * Executes the recovered non-deleting destructor body lanes for `TextureD3D10`.
      */
-    void DestroyTextureD3D10Body(TextureD3D10* const texture)
+    void DestroyTextureD3D10Body(
+      TextureD3D10* const texture
+    )
     {
       texture->DestroyState();
     }
-}
-
+  } // namespace
 
   /**
    * Address: 0x00903310 (FUN_00903310)
@@ -90,7 +96,9 @@ namespace
    * handles, then rebuilds mip/format-dependent lock state.
    */
   TextureD3D10::TextureD3D10(
-    const TextureContext* const context, ID3D10Texture2D* const texture, ID3D10ShaderResourceView* const shaderResourceView
+    const TextureContext* const context,
+    ID3D10Texture2D* const texture,
+    ID3D10ShaderResourceView* const shaderResourceView
   )
     : context_()
     , texture_(nullptr)
@@ -136,7 +144,11 @@ namespace
    * read-only lock of a texture without CPU read access goes through a
    * staging copy.
    */
-  TextureLockRect TextureD3D10::Lock(const int level, const RECT& rect, const int flags)
+  TextureLockRect TextureD3D10::Lock(
+    const int level,
+    const RECT& rect,
+    const int flags
+  )
   {
     static_cast<void>(rect);
 
@@ -194,7 +206,9 @@ namespace
    * What it does:
    * Unmaps one texture level and clears lock-tracking state lanes.
    */
-  int TextureD3D10::Unlock(const int level)
+  int TextureD3D10::Unlock(
+    const int level
+  )
   {
     if (texture_ == nullptr) {
       ThrowGalError("TextureD3D10.cpp", 137, "attempt to map invalid texture");
@@ -233,7 +247,9 @@ namespace
    * Releases one mapping by unlocking its level - a virtual call to slot 3
    * (`mov eax,[ecx]; call [eax+0xC]`), `ret 0x10` for the by-value rect.
    */
-  int TextureD3D10::Unlock(const TextureLockRect lock)
+  int TextureD3D10::Unlock(
+    const TextureLockRect lock
+  )
   {
     return Unlock(lock.level);
   }
@@ -244,7 +260,9 @@ namespace
    * What it does:
    * Serializes texture bytes into the caller-provided memory buffer.
    */
-  void TextureD3D10::SaveToBuffer(gpg::MemBuffer<char>* const outBuffer)
+  void TextureD3D10::SaveToBuffer(
+    gpg::MemBuffer<char>* const outBuffer
+  )
   {
     if (texture_ == nullptr) {
       ThrowGalError("TextureD3D10.cpp", 172, "attempt to unlock invalid texture");
@@ -343,7 +361,9 @@ namespace
    * allocates per-level lock-history storage.
    */
   void TextureD3D10::InitializeState(
-    const TextureContext* const context, ID3D10Texture2D* const texture, ID3D10ShaderResourceView* const shaderResourceView
+    const TextureContext* const context,
+    ID3D10Texture2D* const texture,
+    ID3D10ShaderResourceView* const shaderResourceView
   )
   {
     DestroyState();
@@ -375,5 +395,4 @@ namespace
       ThrowGalError("TextureD3D10.cpp", 213, "unsupported texture format");
     }
   }
-}
-
+} // namespace gpg::gal

@@ -44,7 +44,11 @@ namespace gpg::gal::backend
   [[nodiscard]] bool Direct3D10TechniqueCull() noexcept;
 
   /** `ThrowHresult` when `result` failed. */
-  inline void CheckHresult(const char* const file, const int line, const HRESULT result)
+  inline void CheckHresult(
+    const char* const file,
+    const int line,
+    const HRESULT result
+  )
   {
     if (FAILED(result)) {
       ThrowHresult(file, line, result);

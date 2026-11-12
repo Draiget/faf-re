@@ -19,7 +19,10 @@ namespace faf::headless
     constexpr std::uint32_t kNamedExamples = 12;
   } // namespace
 
-  CReplayTargetAudit::CReplayTargetAudit(moho::RRuleGameRules& rules, remote::CViewFrames& views)
+  CReplayTargetAudit::CReplayTargetAudit(
+    moho::RRuleGameRules& rules,
+    remote::CViewFrames& views
+  )
     : mViews(views)
     , mLuaState(new LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE))
     , mCapture([](moho::CMessage&) {}, nullptr)
@@ -43,12 +46,17 @@ namespace faf::headless
     moho::CDecoder::SetMessageObserver(nullptr, nullptr);
   }
 
-  void CReplayTargetAudit::Observe(const moho::CMessage& message, void* const context)
+  void CReplayTargetAudit::Observe(
+    const moho::CMessage& message,
+    void* const context
+  )
   {
     static_cast<CReplayTargetAudit*>(context)->OnMessage(message);
   }
 
-  void CReplayTargetAudit::OnMessage(const moho::CMessage& message)
+  void CReplayTargetAudit::OnMessage(
+    const moho::CMessage& message
+  )
   {
     if (mInside) {
       return; // this audit's own decoder
@@ -58,7 +66,9 @@ namespace faf::headless
     mInside = false;
   }
 
-  void CReplayTargetAudit::CSink::SetCommandSource(const moho::CommandSourceId sourceId)
+  void CReplayTargetAudit::CSink::SetCommandSource(
+    const moho::CommandSourceId sourceId
+  )
   {
     mOwner.mArmy = -1;
     if (const moho::Sim* const sim = mOwner.mViews.LastSim(); sim != nullptr) {
@@ -73,13 +83,17 @@ namespace faf::headless
     CCommandIdRewriter::SetCommandSource(sourceId);
   }
 
-  bool CReplayTargetAudit::CSink::AllowTarget(const std::uint32_t id)
+  bool CReplayTargetAudit::CSink::AllowTarget(
+    const std::uint32_t id
+  )
   {
     mOwner.NoteTarget(id);
     return true;
   }
 
-  void CReplayTargetAudit::NoteTarget(const std::uint32_t id)
+  void CReplayTargetAudit::NoteTarget(
+    const std::uint32_t id
+  )
   {
     if (mArmy < 0 || static_cast<std::size_t>(mArmy) >= mViews.ViewCount()) {
       return;
@@ -100,7 +114,9 @@ namespace faf::headless
       ++mExampleCount;
       char text[96];
       const moho::Sim* const sim = mViews.LastSim();
-      std::snprintf(text, sizeof(text), " [army %d named %08x at beat %u]", mArmy, id, sim != nullptr ? sim->mCurBeat : 0u);
+      std::snprintf(
+        text, sizeof(text), " [army %d named %08x at beat %u]", mArmy, id, sim != nullptr ? sim->mCurBeat : 0u
+      );
       mExamples += text;
     }
   }
@@ -110,7 +126,8 @@ namespace faf::headless
     std::string line = "targets named: " + std::to_string(mRenumbered) + " renumbered;";
     for (std::size_t family = 0; family < kFamilies; ++family) {
       if (mHeld[family] + mNotHeld[family] != 0u) {
-        line += " family " + std::to_string(family) + ": " + std::to_string(mHeld[family]) + " held, " + std::to_string(mNotHeld[family]) + " not;";
+        line += " family " + std::to_string(family) + ": " + std::to_string(mHeld[family]) + " held, " +
+          std::to_string(mNotHeld[family]) + " not;";
       }
     }
     return line + mExamples;

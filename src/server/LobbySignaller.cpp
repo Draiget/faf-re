@@ -11,10 +11,15 @@ namespace faf::server
   using remote::net::ELobbySignal;
   using remote::net::SLobbySignal;
 
-  std::string CheckLaunch(const SLaunchFacts& requested, const SLaunchFacts& match)
+  std::string CheckLaunch(
+    const SLaunchFacts& requested,
+    const SLaunchFacts& match
+  )
   {
     const auto lower = [](std::string text) {
-      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
       return text;
     };
     if (lower(requested.scenario) != lower(match.scenario)) {
@@ -33,21 +38,31 @@ namespace faf::server
     return {};
   }
 
-  CLobbySignaller::CLobbySignaller(std::string scenario, const std::uint8_t flags)
+  CLobbySignaller::CLobbySignaller(
+    std::string scenario,
+    const std::uint8_t flags
+  )
     : mScenario(std::move(scenario))
     , mFlags(flags)
   {}
 
-  void CLobbySignaller::AddParticipant(const std::int32_t uid, std::string name)
+  void CLobbySignaller::AddParticipant(
+    const std::int32_t uid,
+    std::string name
+  )
   {
     if (uid > 0 && Find(uid) == nullptr) {
       mParticipants.push_back(SParticipant{uid, std::move(name)});
     }
   }
 
-  CLobbySignaller::SParticipant* CLobbySignaller::Find(const std::int32_t uid) noexcept
+  CLobbySignaller::SParticipant* CLobbySignaller::Find(
+    const std::int32_t uid
+  ) noexcept
   {
-    const auto found = std::find_if(mParticipants.begin(), mParticipants.end(), [uid](const SParticipant& p) { return p.uid == uid; });
+    const auto found = std::find_if(mParticipants.begin(), mParticipants.end(), [uid](const SParticipant& p) {
+      return p.uid == uid;
+    });
     return found == mParticipants.end() ? nullptr : &*found;
   }
 
@@ -58,7 +73,11 @@ namespace faf::server
 
   std::size_t CLobbySignaller::InLobby() const noexcept
   {
-    return static_cast<std::size_t>(std::count_if(mParticipants.begin(), mParticipants.end(), [](const SParticipant& p) { return p.lobbied && !p.left; }));
+    return static_cast<std::size_t>(
+      std::count_if(mParticipants.begin(), mParticipants.end(), [](const SParticipant& p) {
+      return p.lobbied && !p.left;
+    })
+    );
   }
 
   std::vector<std::int32_t> CLobbySignaller::InLobbyUids() const
@@ -72,12 +91,19 @@ namespace faf::server
     return uids;
   }
 
-  void CLobbySignaller::Push(std::vector<SOutgoing>& out, const std::int32_t to, const SLobbySignal& signal)
+  void CLobbySignaller::Push(
+    std::vector<SOutgoing>& out,
+    const std::int32_t to,
+    const SLobbySignal& signal
+  )
   {
     out.push_back(SOutgoing{to, remote::net::EncodeLobbySignal(signal)});
   }
 
-  void CLobbySignaller::GiveRole(SParticipant& participant, std::vector<SOutgoing>& out)
+  void CLobbySignaller::GiveRole(
+    SParticipant& participant,
+    std::vector<SOutgoing>& out
+  )
   {
     SParticipant& host = mParticipants[mHost];
     participant.lobbied = true;
@@ -97,7 +123,9 @@ namespace faf::server
     }
   }
 
-  void CLobbySignaller::GiveRoles(std::vector<SOutgoing>& out)
+  void CLobbySignaller::GiveRoles(
+    std::vector<SOutgoing>& out
+  )
   {
     SParticipant& host = mParticipants[mHost];
     if (!host.in || host.left || host.away) {
@@ -113,7 +141,9 @@ namespace faf::server
     }
   }
 
-  void CLobbySignaller::Succeed(std::vector<SOutgoing>& out)
+  void CLobbySignaller::Succeed(
+    std::vector<SOutgoing>& out
+  )
   {
     // The next in the match's order after the host who hasn't left: one whose channel is up, else one still to come,
     // else one that is away too (whose roles then wait for it to be heard again).
@@ -142,7 +172,10 @@ namespace faf::server
     GiveRoles(out);
   }
 
-  void CLobbySignaller::OnJoined(const std::int32_t uid, std::vector<SOutgoing>& out)
+  void CLobbySignaller::OnJoined(
+    const std::int32_t uid,
+    std::vector<SOutgoing>& out
+  )
   {
     SParticipant* const participant = Find(uid);
     if (participant == nullptr || participant->in || participant->left) {
@@ -165,7 +198,10 @@ namespace faf::server
     // Otherwise its role waits for the host.
   }
 
-  void CLobbySignaller::OnLeft(const std::int32_t uid, std::vector<SOutgoing>& out)
+  void CLobbySignaller::OnLeft(
+    const std::int32_t uid,
+    std::vector<SOutgoing>& out
+  )
   {
     SParticipant* const participant = Find(uid);
     if (participant == nullptr || participant->left) {
@@ -188,7 +224,10 @@ namespace faf::server
     }
   }
 
-  void CLobbySignaller::OnAway(const std::int32_t uid, std::vector<SOutgoing>& out)
+  void CLobbySignaller::OnAway(
+    const std::int32_t uid,
+    std::vector<SOutgoing>& out
+  )
   {
     SParticipant* const participant = Find(uid);
     if (participant == nullptr || participant->left || participant->away) {
@@ -200,7 +239,10 @@ namespace faf::server
     }
   }
 
-  void CLobbySignaller::OnBack(const std::int32_t uid, std::vector<SOutgoing>& out)
+  void CLobbySignaller::OnBack(
+    const std::int32_t uid,
+    std::vector<SOutgoing>& out
+  )
   {
     SParticipant* const participant = Find(uid);
     if (participant == nullptr || participant->left || !participant->away) {

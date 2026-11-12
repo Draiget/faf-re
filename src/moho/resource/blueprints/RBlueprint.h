@@ -11,13 +11,13 @@ namespace gpg
 {
   class RField;
   class RType;
-}
+} // namespace gpg
 
 namespace LuaPlus
 {
   class LuaObject;
   class LuaState;
-}
+} // namespace LuaPlus
 
 namespace moho
 {
@@ -36,9 +36,9 @@ namespace moho
 
     // +0x00 is gpg::RObject's vptr.
     RRuleGameRules* mOwner;         // +0x04
-    fa::string mBlueprintId;     // +0x08
-    fa::string mDescription;     // +0x24
-    fa::string mSource;          // +0x40
+    fa::string mBlueprintId;        // +0x08
+    fa::string mDescription;        // +0x24
+    fa::string mSource;             // +0x40
     std::int32_t mBlueprintOrdinal; // +0x5C
 
     /**
@@ -74,9 +74,8 @@ namespace moho
      * binary's derived constructors do when they invoke the base constructor on
      * themselves - there is no temporary base object anywhere in this chain.
      */
-    static void InitIdentity(
-      RRuleGameRules* owner, const RResId& resId, fa::string& outBlueprintId, std::int32_t& outOrdinal
-    );
+    static void
+    InitIdentity(RRuleGameRules* owner, const RResId& resId, fa::string& outBlueprintId, std::int32_t& outOrdinal);
 
     /**
      * Address: 0x0050DE60 (FUN_0050DE60)

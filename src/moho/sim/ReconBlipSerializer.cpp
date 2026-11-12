@@ -20,7 +20,10 @@ namespace
    * What it does:
    * Fills one reflected object reference from a `ReconBlip*` lane.
    */
-  [[maybe_unused]] gpg::RRef* FillReconBlipObjectRef(gpg::RRef* const outRef, moho::ReconBlip* const object)
+  [[maybe_unused]] gpg::RRef* FillReconBlipObjectRef(
+    gpg::RRef* const outRef,
+    moho::ReconBlip* const object
+  )
   {
     if (!outRef) {
       return nullptr;
@@ -67,7 +70,9 @@ namespace moho
    * What it does:
    * Deserializes `ReconBlip` reflected member lanes in binary order.
    */
-  void ReconBlip::MemberDeserialize(gpg::ReadArchive* const archive)
+  void ReconBlip::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     const gpg::RRef ownerRef{};
 
@@ -86,7 +91,9 @@ namespace moho
    * What it does:
    * Serializes `ReconBlip` reflected member lanes in binary order.
    */
-  void ReconBlip::MemberSerialize(gpg::WriteArchive* const archive) const
+  void ReconBlip::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     const gpg::RRef ownerRef{};
 

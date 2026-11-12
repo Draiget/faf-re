@@ -9,18 +9,25 @@ namespace faf::remote::wire
 {
   namespace
   {
-    [[nodiscard]] std::uint32_t ZigZag(const std::int32_t value) noexcept
+    [[nodiscard]] std::uint32_t ZigZag(
+      const std::int32_t value
+    ) noexcept
     {
       return (static_cast<std::uint32_t>(value) << 1) ^ static_cast<std::uint32_t>(value >> 31);
     }
 
-    [[nodiscard]] std::int32_t UnZigZag(const std::uint32_t value) noexcept
+    [[nodiscard]] std::int32_t UnZigZag(
+      const std::uint32_t value
+    ) noexcept
     {
       return static_cast<std::int32_t>(value >> 1) ^ -static_cast<std::int32_t>(value & 1u);
     }
 
     /** `value * steps` rounded, clamped to a range a zigzag varuint holds (and NaN to 0). */
-    [[nodiscard]] std::int32_t Quantize(const float value, const float steps) noexcept
+    [[nodiscard]] std::int32_t Quantize(
+      const float value,
+      const float steps
+    ) noexcept
     {
       const double scaled = static_cast<double>(value) * steps;
       if (!(scaled == scaled)) {
@@ -30,7 +37,10 @@ namespace faf::remote::wire
       return static_cast<std::int32_t>(std::llround(scaled < -kLimit ? -kLimit : (scaled > kLimit ? kLimit : scaled)));
     }
 
-    void WriteBone(const SPoseBone& bone, BitWriter& out)
+    void WriteBone(
+      const SPoseBone& bone,
+      BitWriter& out
+    )
     {
       for (const std::int32_t value : bone.position) {
         out.WriteVarUint(ZigZag(value));
@@ -42,7 +52,10 @@ namespace faf::remote::wire
       out.WriteBool(bone.skipInterp);
     }
 
-    [[nodiscard]] bool ReadBone(BitReader& in, SPoseBone& bone)
+    [[nodiscard]] bool ReadBone(
+      BitReader& in,
+      SPoseBone& bone
+    )
     {
       for (std::int32_t& value : bone.position) {
         value = UnZigZag(in.ReadVarUint());
@@ -56,7 +69,12 @@ namespace faf::remote::wire
     }
   } // namespace
 
-  SPoseBone QuantizeBone(const float position[3], const float rotation[4], const bool visible, const bool skipInterp) noexcept
+  SPoseBone QuantizeBone(
+    const float position[3],
+    const float rotation[4],
+    const bool visible,
+    const bool skipInterp
+  ) noexcept
   {
     SPoseBone bone;
     for (std::size_t i = 0; i < 3; ++i) {
@@ -70,7 +88,11 @@ namespace faf::remote::wire
     return bone;
   }
 
-  void DequantizeBone(const SPoseBone& bone, float position[3], float rotation[4]) noexcept
+  void DequantizeBone(
+    const SPoseBone& bone,
+    float position[3],
+    float rotation[4]
+  ) noexcept
   {
     for (std::size_t i = 0; i < 3; ++i) {
       position[i] = static_cast<float>(bone.position[i]) / kPosePositionSteps;
@@ -91,7 +113,10 @@ namespace faf::remote::wire
     }
   }
 
-  bool EncodePoseLane(const std::span<const SUnitPose> units, BitWriter& out)
+  bool EncodePoseLane(
+    const std::span<const SUnitPose> units,
+    BitWriter& out
+  )
   {
     if (units.size() > kMaxPoseUnits) {
       return false;
@@ -100,8 +125,10 @@ namespace faf::remote::wire
     std::uint32_t lastId = 0;
     bool first = true;
     for (const SUnitPose& unit : units) {
-      if ((!first && unit.id <= lastId) || unit.bones.size() > SUnitPose::kMaxBones
-          || (!unit.whole && unit.indices.size() != unit.bones.size())) {
+      if (
+        (!first && unit.id <= lastId) || unit.bones.size() > SUnitPose::kMaxBones ||
+        (!unit.whole && unit.indices.size() != unit.bones.size())
+      ) {
         return false;
       }
       out.WriteVarUint(first ? unit.id : unit.id - lastId);
@@ -124,7 +151,10 @@ namespace faf::remote::wire
     return true;
   }
 
-  bool DecodePoseLane(BitReader& in, std::vector<SUnitPose>& out)
+  bool DecodePoseLane(
+    BitReader& in,
+    std::vector<SUnitPose>& out
+  )
   {
     out.clear();
     const std::uint32_t count = in.ReadVarUint();

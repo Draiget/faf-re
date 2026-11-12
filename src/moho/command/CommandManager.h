@@ -40,9 +40,9 @@ namespace moho
     explicit CommandManager(std::uint32_t sourceId);
 
     /// Recycling pool the manager draws command ids from.
-    IdPool mIdPool;              // +0x0000
+    IdPool mIdPool; // +0x0000
     /// Command-source byte; ids whose source matches are recycled locally.
-    std::uint8_t mSourceId;      // +0x0CB0
+    std::uint8_t mSourceId; // +0x0CB0
     std::uint8_t pad_0CB1_0CB4[0x03];
 
     /// Live commands by id. Entries are owned by the manager.

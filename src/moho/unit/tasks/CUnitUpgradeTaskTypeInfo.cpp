@@ -4,7 +4,8 @@
 #include <typeinfo>
 
 #include "moho/task/CCommandTask.h"
-#include "moho/unit/tasks/CUnitUpgradeTask.h"
+#include "moho/unit/tasks/CUnitUpgradeTask.h"
+
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -21,7 +22,9 @@ namespace
     return sInstance;
   }
 
-  [[nodiscard]] gpg::RRef MakeCUnitUpgradeTaskRef(moho::CUnitUpgradeTask* const task)
+  [[nodiscard]] gpg::RRef MakeCUnitUpgradeTaskRef(
+    moho::CUnitUpgradeTask* const task
+  )
   {
     gpg::RRef ref{};
     ref = gpg::MakeRRef<moho::CUnitUpgradeTask>(task);
@@ -74,7 +77,9 @@ namespace moho
   /**
    * Address: 0x005FD140 (FUN_005FD140, Moho::CUnitUpgradeTaskTypeInfo::AddBase_CCommandTask)
    */
-  void __stdcall CUnitUpgradeTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void __stdcall CUnitUpgradeTaskTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CCommandTask>(typeInfo);
   }
@@ -91,7 +96,9 @@ namespace moho
   /**
    * Address: 0x005FC2E0 (FUN_005FC2E0, Moho::CUnitUpgradeTaskTypeInfo::CtrRef)
    */
-  gpg::RRef CUnitUpgradeTaskTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitUpgradeTaskTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const task = gpg::ConstructInStorage<CUnitUpgradeTask>(objectStorage);
     return MakeCUnitUpgradeTaskRef(task);
@@ -100,7 +107,9 @@ namespace moho
   /**
    * Address: 0x005FC2C0 (FUN_005FC2C0, Moho::CUnitUpgradeTaskTypeInfo::Delete)
    */
-  void CUnitUpgradeTaskTypeInfo::Delete(void* const objectStorage)
+  void CUnitUpgradeTaskTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CUnitUpgradeTask*>(objectStorage);
   }
@@ -108,7 +117,9 @@ namespace moho
   /**
    * Address: 0x005FC350 (FUN_005FC350, Moho::CUnitUpgradeTaskTypeInfo::Destruct)
    */
-  void CUnitUpgradeTaskTypeInfo::Destruct(void* const objectStorage)
+  void CUnitUpgradeTaskTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     auto* const task = static_cast<CUnitUpgradeTask*>(objectStorage);
     if (!task) {
@@ -127,8 +138,9 @@ namespace moho
   }
 } // namespace moho
 
-
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CUnitUpgradeTaskTypeInfo_cbc000, moho::register_CUnitUpgradeTaskTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CUnitUpgradeTaskTypeInfo_cbc000,
+  moho::register_CUnitUpgradeTaskTypeInfo
+)

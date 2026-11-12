@@ -49,7 +49,10 @@ namespace
 {
   using Clock = std::chrono::steady_clock;
 
-  void Check(const bool ok, const char* what)
+  void Check(
+    const bool ok,
+    const char* what
+  )
   {
     EXPECT_TRUE(ok) << what;
     std::printf("%s %s\n", ok ? "ok  " : "FAIL", what);
@@ -64,7 +67,10 @@ namespace
     std::vector<int> order;
     std::vector<Clock::time_point> at;
 
-    void ReceiveMessage(CMessage* message, CMessageDispatcher* /*dispatcher*/) override
+    void ReceiveMessage(
+      CMessage* message,
+      CMessageDispatcher* /*dispatcher*/
+    ) override
     {
       int index = -1;
       if (message->GetSize() >= 3 + sizeof(index)) {
@@ -91,7 +97,10 @@ namespace
     Clock::time_point lostAt{};
     Clock::time_point resentAt{}; // its first resend
 
-    void SendDatagram(const void* data, const std::size_t size) override
+    void SendDatagram(
+      const void* data,
+      const std::size_t size
+    ) override
     {
       const auto* bytes = static_cast<const unsigned char*>(data);
       if (size > kSequenceOffset + 1 && bytes[0] == PT_Data && armed.load()) {
@@ -116,7 +125,10 @@ namespace
     }
   };
 
-  void Write(INetConnection* c, const int index)
+  void Write(
+    INetConnection* c,
+    const int index
+  )
   {
     CMessage m(MessageType(static_cast<std::uint8_t>(kMessageType)));
     m.Append(reinterpret_cast<const char*>(&index), sizeof(index));
@@ -138,7 +150,11 @@ namespace
   // packet after message kArmAt is lost once. Returns the longest time a
   // message written from kArmAt on waited from its send to its arrival (the
   // earlier ones include the connection handshake).
-  Result RunRetransmit(const int intervalMs, const int count, const bool fast)
+  Result RunRetransmit(
+    const int intervalMs,
+    const int count,
+    const bool fast
+  )
   {
     net_FastRetransmit = fast ? 1 : 0;
     Result r;
@@ -192,9 +208,10 @@ namespace
     }
     if (r.inOrder) {
       for (int i = kArmAt; i < count; ++i) {
-        const double ms =
-          std::chrono::duration<double, std::milli>(atB.at[static_cast<std::size_t>(i)] - sentAt[static_cast<std::size_t>(i)])
-            .count();
+        const double ms = std::chrono::duration<double, std::milli>(
+                            atB.at[static_cast<std::size_t>(i)] - sentAt[static_cast<std::size_t>(i)]
+        )
+                            .count();
         r.longestWaitMs = std::max(r.longestWaitMs, ms);
       }
     }
@@ -213,17 +230,28 @@ namespace
     return r;
   }
 
-  void Report(const char* label, const Result& r)
+  void Report(
+    const char* label,
+    const Result& r
+  )
   {
     std::printf(
-      "  %s: lost packet dropped %s, sent again %d time(s), first resend %.1f ms after the loss, longest wait %.1f ms\n",
-      label, r.dropped ? "yes" : "no", r.resends, r.resendAfterMs, r.longestWaitMs
+      "  %s: lost packet dropped %s, sent again %d time(s), first resend %.1f ms after the loss, longest wait %.1f "
+      "ms\n",
+      label,
+      r.dropped ? "yes" : "no",
+      r.resends,
+      r.resendAfterMs,
+      r.longestWaitMs
     );
     Check(r.dropped && r.inOrder, "every message arrived once and in order after the loss");
   }
 } // namespace
 
-TEST(Existing_FastRetransmit, FastSender)
+TEST(
+  Existing_FastRetransmit,
+  FastSender
+)
 {
   ASSERT_TRUE(NET_Init()) << "NET_Init failed";
   auto median = [](const int intervalMs, const int count, const bool fast, const char* label) {
@@ -245,7 +273,10 @@ TEST(Existing_FastRetransmit, FastSender)
   net_FastRetransmit = 0;
 }
 
-TEST(Existing_FastRetransmit, GameRate)
+TEST(
+  Existing_FastRetransmit,
+  GameRate
+)
 {
   ASSERT_TRUE(NET_Init()) << "NET_Init failed";
   auto median = [](const int intervalMs, const int count, const bool fast, const char* label) {

@@ -64,7 +64,9 @@ namespace
    * Build-range tests measure the gap between footprint edges, so each unit
    * contributes its widest side (0x005FB4F4-0x005FB518).
    */
-  [[nodiscard]] float FootprintExtent(const moho::SFootprint& footprint) noexcept
+  [[nodiscard]] float FootprintExtent(
+    const moho::SFootprint& footprint
+  ) noexcept
   {
     return static_cast<float>(std::max(footprint.mSizeX, footprint.mSizeZ));
   }
@@ -73,7 +75,10 @@ namespace
    * Share of `value` one unit of `cost` buys. A recipient with no recorded
    * cost yields the binary's fixed half-step instead of dividing by zero.
    */
-  [[nodiscard]] float CostFraction(const float value, const float cost) noexcept
+  [[nodiscard]] float CostFraction(
+    const float value,
+    const float cost
+  ) noexcept
   {
     return (cost > 0.0f) ? (value / cost) : kUnknownCostFraction;
   }
@@ -105,7 +110,10 @@ namespace moho
    * Initializes one sacrifice-task lane from parent command-task and command
    * payload ownership context.
    */
-  CUnitSacrificeTask::CUnitSacrificeTask(CCommandTask* const parentTask, Unit* const targetUnit)
+  CUnitSacrificeTask::CUnitSacrificeTask(
+    CCommandTask* const parentTask,
+    Unit* const targetUnit
+  )
     : CCommandTask(parentTask)
     , Listener<ECommandEvent>()
     , mCommand(nullptr)
@@ -163,7 +171,10 @@ namespace moho
    * Allocates one sacrifice-task object and forwards constructor arguments
    * into in-place construction.
    */
-  CUnitSacrificeTask* CUnitSacrificeTask::Create(CCommandTask* const parentTask, Unit* const targetUnit)
+  CUnitSacrificeTask* CUnitSacrificeTask::Create(
+    CCommandTask* const parentTask,
+    Unit* const targetUnit
+  )
   {
     void* const storage = ::operator new(sizeof(CUnitSacrificeTask));
     if (!storage) {
@@ -185,7 +196,9 @@ namespace moho
    * Refreshes sacrifice target weak-unit ownership from current command target
    * payload, resets task state to preparing, and wakes owner task thread.
    */
-  void CUnitSacrificeTask::OnEvent(ECommandEvent)
+  void CUnitSacrificeTask::OnEvent(
+    ECommandEvent
+  )
   {
     if (mTaskState >= TASKSTATE_Starting) {
       return;
@@ -209,7 +222,9 @@ namespace moho
    * Deserializes sacrifice-task runtime state in binary lane order: command-task
    * base, current command pointer lane, then target weak unit lane.
    */
-  void CUnitSacrificeTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CUnitSacrificeTask::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -228,7 +243,9 @@ namespace moho
    * Serializes sacrifice-task runtime state in binary lane order: command-task
    * base, current command raw pointer lane, then target weak unit lane.
    */
-  void CUnitSacrificeTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CUnitSacrificeTask::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;
@@ -296,12 +313,16 @@ namespace moho
       }
 
       Unit* approachTarget = target;
-      if (target->IsBeingBuilt() && target->GetCreator() != nullptr
-          && target->GetCreator()->IsInCategory(kFactoryCategoryName)) {
+      if (
+        target->IsBeingBuilt() && target->GetCreator() != nullptr &&
+        target->GetCreator()->IsInCategory(kFactoryCategoryName)
+      ) {
         // Still on the factory pad: stand at the factory, not inside it.
         approachTarget = target->GetCreator();
-      } else if (target->IsUnitState(UNITSTATE_Upgrading) && target->GetFocusEntity() != nullptr
-                 && target->GetFocusEntity()->IsUnit() != nullptr) {
+      } else if (
+        target->IsUnitState(UNITSTATE_Upgrading) && target->GetFocusEntity() != nullptr &&
+        target->GetFocusEntity()->IsUnit() != nullptr
+      ) {
         // An upgrading recipient hands the sacrifice on to the unit it is
         // becoming; that unit is adopted as the task target for good.
         mTargetUnit.Set(target->GetFocusEntity()->IsUnit());
@@ -334,9 +355,8 @@ namespace moho
       const Wm3::Vec3f& ownerPos = owner.GetPosition();
       const float deltaX = ownerPos.x - targetPos.x;
       const float deltaZ = ownerPos.z - targetPos.z;
-      const float gap = std::sqrt((deltaX * deltaX) + (deltaZ * deltaZ))
-                        - FootprintExtent(owner.GetFootprint())
-                        - FootprintExtent(target->GetFootprint());
+      const float gap = std::sqrt((deltaX * deltaX) + (deltaZ * deltaZ)) - FootprintExtent(owner.GetFootprint()) -
+        FootprintExtent(target->GetFootprint());
 
       if (gap > owner.GetBlueprint()->Economy.MaxBuildDistance) {
         return -1;

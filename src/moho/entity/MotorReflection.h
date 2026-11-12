@@ -91,5 +91,3 @@ namespace moho
    */
   void register_MotorSerializer();
 } // namespace moho
-
-

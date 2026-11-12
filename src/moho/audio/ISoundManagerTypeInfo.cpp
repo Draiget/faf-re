@@ -83,4 +83,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_ISoundManagerTypeInfo_7eadb0, moho::register_ISoundManagerTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_ISoundManagerTypeInfo_7eadb0,
+  moho::register_ISoundManagerTypeInfo
+)

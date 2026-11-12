@@ -51,7 +51,12 @@ namespace moho
      * first beats only count, and go to this client's own replay.
      */
     CRejoinFeed(
-      CClientManagerImpl& manager, std::unique_ptr<gpg::Stream> recording, int handoverBeat, bool live, int recordingPeer = -1, int skipBeats = 0
+      CClientManagerImpl& manager,
+      std::unique_ptr<gpg::Stream> recording,
+      int handoverBeat,
+      bool live,
+      int recordingPeer = -1,
+      int skipBeats = 0
     );
     ~CRejoinFeed();
 
@@ -68,10 +73,16 @@ namespace moho
      */
     [[nodiscard]] bool HoldIssue(int32_t& nextIssueBeat);
 
-    [[nodiscard]] bool CatchingUp() const { return mCatchingUp; }
+    [[nodiscard]] bool CatchingUp() const
+    {
+      return mCatchingUp;
+    }
 
     /// The beats a sim loaded from a save starts past; 0 without one.
-    [[nodiscard]] int32_t SkippedBeats() const { return mSkippedBeats; }
+    [[nodiscard]] int32_t SkippedBeats() const
+    {
+      return mSkippedBeats;
+    }
 
     /// Where this client has got taking its seat back, for its own player and its peers.
     [[nodiscard]] SRejoinStatus Status() const;
@@ -88,8 +99,10 @@ namespace moho
     void FinishCatchUp();
     /// One peer's report. When every peer has reported, settles the cut and tells them.
     void NotePeerReport(const CNetClient& peer, CMessage& msg);
-    /// Queues one client's messages from `backlog`, skipping those of beats up to `skipThrough`. Returns the beat it reached.
-    int32_t QueueBacklog(CClientBase& client, gpg::PipeStream& backlog, int32_t startBeat, int32_t skipThrough, int32_t stopAt);
+    /// Queues one client's messages from `backlog`, skipping those of beats up to `skipThrough`. Returns the beat it
+    /// reached.
+    int32_t
+    QueueBacklog(CClientBase& client, gpg::PipeStream& backlog, int32_t startBeat, int32_t skipThrough, int32_t stopAt);
     /// Reads one recorded beat: other clients' data into their queues, the local client's into `mHeld`.
     [[nodiscard]] bool ReadRecordedBeat();
     /// Moves one beat of `mHeld` into the local client's queue.
@@ -197,12 +210,8 @@ namespace moho
    * first one for the game's recording. Client indices are the command sources, as
    * `BuildLaunchInfo` assigns them. `REJOIN_PollSetup` does the rest, once a frame.
    */
-  [[nodiscard]] bool REJOIN_BeginSetup(
-    const char* peers,
-    int localSource,
-    unsigned short localPort,
-    fa::string* failureReason
-  );
+  [[nodiscard]] bool
+  REJOIN_BeginSetup(const char* peers, int localSource, unsigned short localPort, fa::string* failureReason);
 
   /// Whether `REJOIN_BeginSetup` has started something `REJOIN_PollSetup` hasn't finished.
   [[nodiscard]] bool REJOIN_SetupPending();

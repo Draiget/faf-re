@@ -41,10 +41,10 @@ namespace faf::headless
     std::vector<std::uint32_t> mIds;
     std::vector<std::uint32_t> mPacketIds;
     std::uint64_t mBeats = 0;
-    std::uint64_t mChanged = 0;           // change-set entities, all beats
-    std::uint64_t mPacketRecords = 0;     // distinct packet ids, all beats
-    std::uint64_t mPacketNotInSet = 0;    // failure
-    std::uint64_t mPublishedSilent = 0;   // failure: the view publishes it, the packet has no record
+    std::uint64_t mChanged = 0;         // change-set entities, all beats
+    std::uint64_t mPacketRecords = 0;   // distinct packet ids, all beats
+    std::uint64_t mPacketNotInSet = 0;  // failure
+    std::uint64_t mPublishedSilent = 0; // failure: the view publishes it, the packet has no record
     std::array<std::uint64_t, kKindCount> mUnpublishedByKind{}; // in the set, not published at this focus
     std::vector<std::string> mExamples;
   };

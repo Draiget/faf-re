@@ -149,7 +149,7 @@ namespace moho
     Wm3::Vector3f* ComputeDirectionToReferenceBone(Wm3::Vector3f* outDirection, const Wm3::Vector3f& targetPoint) const;
 
   public:
-    WeakPtr<Unit> mGoalUnit;        // +0x80
+    WeakPtr<Unit> mGoalUnit; // +0x80
     /**
      * The pair the `CBuilderArmManipulatorGetHeadingPitch` /
      * `SetHeadingPitch` Lua binders read and write. MSVC emitted an
@@ -162,24 +162,30 @@ namespace moho
      * Address: 0x00635950 (FUN_00635950 -- reads `mHeading`; formerly `GetRuntimeScalar88`.)
      * Address: 0x00635970 (FUN_00635970 -- writes both; formerly `SetRuntimeScalars88And8C`.)
      */
-    float mHeading;                 // +0x88
+    float mHeading; // +0x88
     /// Address: 0x00635960 (FUN_00635960 -- reads it; formerly `GetRuntimeScalar8C`.)
     float mPitch;                   // +0x8C
     std::int32_t mReferenceBoneIdx; // +0x90
     bool mTrackingScriptActive;     // +0x94
     std::uint8_t mPad95_97[0x03]{};
-    float mHeadingCenter;   // +0x98
-    float mHeadingHalfArc;  // +0x9C
-    float mHeadingMaxSlew;  // +0xA0
-    float mPitchCenter;     // +0xA4
-    float mPitchHalfArc;    // +0xA8
-    float mPitchMaxSlew;    // +0xAC
-    bool mOnTarget;         // +0xB0
+    float mHeadingCenter;  // +0x98
+    float mHeadingHalfArc; // +0x9C
+    float mHeadingMaxSlew; // +0xA0
+    float mPitchCenter;    // +0xA4
+    float mPitchHalfArc;   // +0xA8
+    float mPitchMaxSlew;   // +0xAC
+    bool mOnTarget;        // +0xB0
     std::uint8_t mPadB1_B7[0x07]{};
   };
 
-  static_assert(offsetof(CBuilderArmManipulator, mGoalUnit) == 0x80, "CBuilderArmManipulator::mGoalUnit offset must be 0x80");
-  static_assert(offsetof(CBuilderArmManipulator, mHeading) == 0x88, "CBuilderArmManipulator::mHeading offset must be 0x88");
+  static_assert(
+    offsetof(CBuilderArmManipulator, mGoalUnit) == 0x80,
+    "CBuilderArmManipulator::mGoalUnit offset must be 0x80"
+  );
+  static_assert(
+    offsetof(CBuilderArmManipulator, mHeading) == 0x88,
+    "CBuilderArmManipulator::mHeading offset must be 0x88"
+  );
   static_assert(offsetof(CBuilderArmManipulator, mPitch) == 0x8C, "CBuilderArmManipulator::mPitch offset must be 0x8C");
   static_assert(
     offsetof(CBuilderArmManipulator, mReferenceBoneIdx) == 0x90,

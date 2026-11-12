@@ -35,7 +35,7 @@ namespace moho
   {
     enum Flags : std::uint32_t
     {
-      kValid = 1U << 0U,                ///< the classifier did not drop it before the per-frame tests
+      kValid = 1U << 0U, ///< the classifier did not drop it before the per-frame tests
       kFriendly = 1U << 1U,
       kStunned = 1U << 2U,
       kPaused = 1U << 3U,
@@ -51,8 +51,8 @@ namespace moho
     float mImpact = 0.0f;
     float mCurrentPosition[3] = {};
     std::uint32_t mFlags = 0U;
-    float mIconFadeInZoom = 0.0f;       ///< the mesh's `mIconFadeInZoom` (with kHasMesh)
-    std::uint32_t mColor = 0U;          ///< the base icon's tint, `PlaceUnitIcon`'s colour before the blink test
+    float mIconFadeInZoom = 0.0f;           ///< the mesh's `mIconFadeInZoom` (with kHasMesh)
+    std::uint32_t mColor = 0U;              ///< the base icon's tint, `PlaceUnitIcon`'s colour before the blink test
     std::uint32_t mIconSlots = 0xFFFFFFFFU; ///< atlas slot of the icon (low 16 bits) and the selected icon (high)
     std::int32_t mUnderlaySlotOrNone = -1;  ///< atlas slot of the identified underlay, -1 for none
     std::int32_t mLastFocusDamageTick = 0;  ///< `mLastFocusDamageGameTick`
@@ -69,17 +69,17 @@ namespace moho
       kNisRenderIcons = 1U << 0U,
       kRenderIcons = 1U << 1U,
       kAlwaysRenderIcons = 1U << 2U,
-      kBlinkHidden = 1U << 3U,          ///< the shared blink phase is in its hidden half
+      kBlinkHidden = 1U << 3U, ///< the shared blink phase is in its hidden half
       kHasPlayableRect = 1U << 4U,
     };
 
-    float mViewProjection[16] = {};     ///< `GeomCamera3::viewProjection`, rows r[0]..r[3]
-    float mViewport[4] = {};            ///< `Project`'s x0, x1, y0, y1
-    float mPlayableRect[4] = {};        ///< x0, z0, x1, z1
+    float mViewProjection[16] = {}; ///< `GeomCamera3::viewProjection`, rows r[0]..r[3]
+    float mViewport[4] = {};        ///< `Project`'s x0, x1, y0, y1
+    float mPlayableRect[4] = {};    ///< x0, z0, x1, z1
     float mTickFraction = 0.0f;
     float mCurrentZoom = 0.0f;
-    float mMaxZoomFade = 0.0f;          ///< `GetMaxZoom() * 0.89f`
-    float mBlinkTicks = 0.0f;           ///< `ui_StrategicIconBlinkDuration * 10`
+    float mMaxZoomFade = 0.0f; ///< `GetMaxZoom() * 0.89f`
+    float mBlinkTicks = 0.0f;  ///< `ui_StrategicIconBlinkDuration * 10`
     std::uint32_t mCount = 0U;
     std::uint32_t mFlags = 0U;
     std::uint32_t mHovered = 0xFFFFFFFFU; ///< source index of the hovered unit, or none
@@ -263,7 +263,15 @@ void ClassifyIconsCS(uint3 thread : SV_DispatchThreadID)
 
     // The hovered unit takes its hovered texture and goes to the one hovered slot, drawn last.
     bool hovered = index == Hovered;
-    bool selected = (SelectionBits[index >> 5] & (1u << (index & 31u))) != 0u;
+    // The selection array holds one word when nothing is selected: the index is clamped so the read
+    // stays inside it (D3D12 returns 0 for a read past the end; Vulkan leaves it undefined, and a
+    // software rasterizer faults), and a word past the end counts as unselected.
+    uint selectionWords;
+    uint selectionStride;
+    SelectionBits.GetDimensions(selectionWords, selectionStride);
+    uint selectionWord = index >> 5;
+    uint selectionBits = SelectionBits[min(selectionWord, selectionWords - 1u)];
+    bool selected = selectionWord < selectionWords && (selectionBits & (1u << (index & 31u))) != 0u;
     uint slots = hovered ? source.hoveredIconSlots : source.iconSlots;
     uint iconSlot = selected ? (slots >> 16) : (slots & 0xFFFFu);
     if (iconSlot == kNoSlot)
@@ -335,7 +343,12 @@ void CompactIconsCS(uint thread : SV_GroupIndex)
     // Inclusive scan over the threads (Hillis-Steele), all four runs at once.
     [unroll] for (uint stride = 1u; stride < 1024u; stride <<= 1)
     {
-        uint4 add = thread >= stride ? sOffsets[thread - stride] : uint4(0u, 0u, 0u, 0u);
+        // HLSL may evaluate both arms of ?:, so the index itself stays inside the array: a thread
+        // below the stride reads its own slot and adds nothing (a negative index faults on a
+        // software rasterizer, where a GPU returns junk the select then drops).
+        bool hasPrevious = thread >= stride;
+        uint4 previous = sOffsets[hasPrevious ? thread - stride : thread];
+        uint4 add = hasPrevious ? previous : uint4(0u, 0u, 0u, 0u);
         GroupMemoryBarrierWithGroupSync();
         sOffsets[thread] += add;
         GroupMemoryBarrierWithGroupSync();
@@ -362,7 +375,10 @@ void CompactIconsCS(uint thread : SV_GroupIndex)
         // The hovered slot after the four runs, then the DrawInstanced arguments: 24 vertices per
         // icon, one instance per record.
         uint total = totals.x + totals.y + totals.z + totals.w;
-        if (Hovered < Count && RunIn[Hovered] == kHoveredRun)
+        // Hovered is 0xFFFFFFFF with nothing hovered, and HLSL evaluates both sides of &&: the read
+        // is clamped into the buffer (Count is at least 1 here) so it never goes past its end.
+        uint hoveredRun = RunIn[min(Hovered, Count - 1u)];
+        if (Hovered < Count && hoveredRun == kHoveredRun)
         {
             Output[total] = StagedIn[Hovered];
             total += 1u;

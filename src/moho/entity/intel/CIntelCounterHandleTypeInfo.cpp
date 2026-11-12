@@ -48,7 +48,9 @@ namespace moho
   /**
    * Address: 0x0076FD30 (FUN_0076FD30, Moho::CIntelCounterHandleTypeInfo::AddBase_CIntelPosHandle)
    */
-  void CIntelCounterHandleTypeInfo::AddBase_CIntelPosHandle(gpg::RType* const typeInfo)
+  void CIntelCounterHandleTypeInfo::AddBase_CIntelPosHandle(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBaseType(typeInfo, CIntelPosHandle::StaticGetClass());
   }
@@ -56,4 +58,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_CIntelCounterHandleTypeInfo_03281c, moho::preregister_CIntelCounterHandleTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_CIntelCounterHandleTypeInfo_03281c,
+  moho::preregister_CIntelCounterHandleTypeInfo
+)

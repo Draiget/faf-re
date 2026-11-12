@@ -32,13 +32,13 @@ namespace
    * Promotes one weak `AudioEngine` handle to a shared handle when the engine
    * is still alive.
    */
-  [[nodiscard]] boost::shared_ptr<moho::AudioEngine>
-  LockWeakAudioEngine(const boost::weak_ptr<moho::AudioEngine>& weakEngine)
+  [[nodiscard]] boost::shared_ptr<moho::AudioEngine> LockWeakAudioEngine(
+    const boost::weak_ptr<moho::AudioEngine>& weakEngine
+  )
   {
     return weakEngine.lock();
   }
 } // namespace
-
 
 namespace moho
 {
@@ -49,16 +49,20 @@ namespace moho
    * Returns a resolved engine handle according to cached resolve state and
    * current sound-configuration availability.
    */
-  boost::shared_ptr<AudioEngine>* CSndParams::GetEngine(boost::shared_ptr<AudioEngine>* const outEngine) const
+  boost::shared_ptr<AudioEngine>* CSndParams::GetEngine(
+    boost::shared_ptr<AudioEngine>* const outEngine
+  ) const
   {
     if (outEngine == nullptr) {
       return outEngine;
     }
 
     const SoundConfiguration* const configuration = sSoundConfiguration.get();
-    if (configuration == nullptr || configuration->mEngines.mStart == nullptr ||
-        configuration->mEngines.mFinish == nullptr || configuration->mEngines.mStart == configuration->mEngines.mFinish ||
-        configuration->mNoSound != 0u) {
+    if (
+      configuration == nullptr || configuration->mEngines.mStart == nullptr ||
+      configuration->mEngines.mFinish == nullptr || configuration->mEngines.mStart == configuration->mEngines.mFinish ||
+      configuration->mNoSound != 0u
+    ) {
       *outEngine = {};
       return outEngine;
     }
@@ -114,7 +118,6 @@ namespace moho
       resolvedEngine = SND_FindEngine(mBank.c_str());
       mEngine = resolvedEngine;
 
-
       if (resolvedEngine.get() == nullptr) {
         gpg::Warnf("Error resolving bank '%s' to audio engine", mBank.c_str());
         mResolvePolicy = kResolvePolicyMissingEngine;
@@ -164,8 +167,10 @@ namespace moho
     }
 
     const SoundConfiguration* const configuration = sSoundConfiguration.get();
-    if (configuration != nullptr && configuration->mEngines.mStart != nullptr &&
-        configuration->mEngines.mStart != configuration->mEngines.mFinish && configuration->mNoSound == 0u) {
+    if (
+      configuration != nullptr && configuration->mEngines.mStart != nullptr &&
+      configuration->mEngines.mStart != configuration->mEngines.mFinish && configuration->mNoSound == 0u
+    ) {
       gpg::Warnf("SND: Couldn't find variable %s", mName.c_str());
     }
 

@@ -36,7 +36,9 @@ namespace
    * first two entries of `IConOutputHandler`'s vtable and wrote through them
    * into the code image.
    */
-  gpg::RRef MakeConOutputHandlerPointerRef(moho::CLuaConOutputHandler*& handlerSlot)
+  gpg::RRef MakeConOutputHandlerPointerRef(
+    moho::CLuaConOutputHandler*& handlerSlot
+  )
   {
     gpg::RRef ref{};
     ref.mObj = &handlerSlot;
@@ -52,7 +54,9 @@ namespace
    * - `mObj` is pointer to userdata value slot (pointer-to-pointer payload),
    * - `mType` is reflection type stored next to that slot.
    */
-  gpg::RRef ExtractUserDataSlotRef(const LuaPlus::LuaObject& userDataObject)
+  gpg::RRef ExtractUserDataSlotRef(
+    const LuaPlus::LuaObject& userDataObject
+  )
   {
     if (!userDataObject.IsUserData()) {
       return gpg::RRef{};
@@ -61,7 +65,11 @@ namespace
     return userDataObject.GetUserData();
   }
 
-  void ValidateLuaArgCount(LuaPlus::LuaState* const state, const char* const help, const int expectedCount)
+  void ValidateLuaArgCount(
+    LuaPlus::LuaState* const state,
+    const char* const help,
+    const int expectedCount
+  )
   {
     const int actualCount = lua_gettop(state->m_state);
     if (actualCount != expectedCount) {
@@ -70,7 +78,10 @@ namespace
   }
 
   [[nodiscard]]
-  bool IsLuaFunctionLike(const LuaPlus::LuaState* const state, const int stackIndex)
+  bool IsLuaFunctionLike(
+    const LuaPlus::LuaState* const state,
+    const int stackIndex
+  )
   {
     return (lua_type(state->m_state, stackIndex) | 1) == LUA_TFUNCTION;
   }
@@ -81,7 +92,10 @@ namespace
    * What it does:
    * Calls callback with one string argument and restores prior stack top.
    */
-  void LuaCallStr(const LuaPlus::LuaObject& callback, const char* text)
+  void LuaCallStr(
+    const LuaPlus::LuaObject& callback,
+    const char* text
+  )
   {
     lua_State* const activeState = callback.GetActiveCState();
     const int savedTop = lua_gettop(activeState);
@@ -99,7 +113,9 @@ namespace
    * Unlinks handler from its current list position and relinks it at the tail
    * of the global console output handler list.
    */
-  void RelinkConOutputHandlerTail(moho::CLuaConOutputHandler* const handler)
+  void RelinkConOutputHandlerTail(
+    moho::CLuaConOutputHandler* const handler
+  )
   {
     if (handler == nullptr) {
       return;
@@ -109,7 +125,9 @@ namespace
   }
 
   template <typename TObject>
-  void MaterializeReflectionSingleton(TObject& singleton)
+  void MaterializeReflectionSingleton(
+    TObject& singleton
+  )
   {
     (void)singleton;
   }
@@ -175,7 +193,9 @@ namespace
 /**
  * Address: 0x0041E840 (FUN_0041E840, ??0CLuaConOutputHandler@Moho@@QAE@ABVLuaObject@LuaPlus@@@Z)
  */
-moho::CLuaConOutputHandler::CLuaConOutputHandler(const LuaPlus::LuaObject& callback)
+moho::CLuaConOutputHandler::CLuaConOutputHandler(
+  const LuaPlus::LuaObject& callback
+)
   : IConOutputHandler()
   , mCallback(callback)
 {}
@@ -212,7 +232,7 @@ gpg::RType* moho::CLuaConOutputHandler::GetClass() const
 /**
  * Address: 0x0041E820 (FUN_0041E820, ?GetDerivedObjectRef@CLuaConOutputHandler@Moho@@UAE?AVRRef@gpg@@XZ)
  * Address: 0x00421B60 (FUN_00421B60, sub_421B60 helper lane)
-  * Alias of FUN_004220D0 (non-canonical helper lane).
+ * Alias of FUN_004220D0 (non-canonical helper lane).
  */
 gpg::RRef moho::CLuaConOutputHandler::GetDerivedObjectRef()
 {
@@ -224,13 +244,15 @@ gpg::RRef moho::CLuaConOutputHandler::GetDerivedObjectRef()
 /**
  * Address: 0x0041E8B0 (FUN_0041E8B0, sub_41E8B0)
  */
-void moho::CLuaConOutputHandler::Handle(const char* const text)
+void moho::CLuaConOutputHandler::Handle(
+  const char* const text
+)
 {
   LuaCallStr(mCallback, text);
 }
 
 /**
-  * Alias of FUN_1001FDE0 (non-canonical helper lane).
+ * Alias of FUN_1001FDE0 (non-canonical helper lane).
  */
 moho::CScrLuaMetatableFactory<moho::CLuaConOutputHandler*>::CScrLuaMetatableFactory()
   : CScrLuaObjectFactory(CScrLuaObjectFactory::AllocateFactoryObjectIndex())
@@ -245,7 +267,9 @@ moho::CScrLuaMetatableFactory<moho::CLuaConOutputHandler*>::Instance()
 /**
  * Address: 0x00420DA0 (FUN_00420DA0)
  */
-LuaPlus::LuaObject moho::CScrLuaMetatableFactory<moho::CLuaConOutputHandler*>::Create(LuaPlus::LuaState* const state)
+LuaPlus::LuaObject moho::CScrLuaMetatableFactory<moho::CLuaConOutputHandler*>::Create(
+  LuaPlus::LuaState* const state
+)
 {
   return SCR_CreateSimpleMetatable(state);
 }
@@ -266,7 +290,9 @@ const char* moho::CLuaConOutputHandlerTypeInfo::GetName() const
 /**
  * Address: 0x004208B0 (FUN_004208B0, Moho::CLuaConOutputHandlerTypeInfo::AddBase_RObject)
  */
-void moho::CLuaConOutputHandlerTypeInfo::AddBaseRObject(gpg::RType* const typeInfo)
+void moho::CLuaConOutputHandlerTypeInfo::AddBaseRObject(
+  gpg::RType* const typeInfo
+)
 {
   gpg::RType* const rObjectType = gpg::RTypeOf<gpg::RObject>();
   gpg::AddReflectedBaseType(typeInfo, rObjectType, gpg::BaseSubobjectOffset<CLuaConOutputHandler, gpg::RObject>());
@@ -340,8 +366,10 @@ moho::CScrLuaInitForm* moho::register_RemoveConsoleOutputReciever_LuaFuncDef()
 /**
  * Address: 0x00420910 (FUN_00420910, sub_420910)
  */
-LuaPlus::LuaObject
-moho::SCR_CreateLuaConOutputHandlerObject(LuaPlus::LuaState* const state, CLuaConOutputHandler* const handler)
+LuaPlus::LuaObject moho::SCR_CreateLuaConOutputHandlerObject(
+  LuaPlus::LuaState* const state,
+  CLuaConOutputHandler* const handler
+)
 {
   LuaPlus::LuaObject out;
   LuaPlus::LuaObject metatable = CScrLuaMetatableFactory<CLuaConOutputHandler*>::Instance().Get(state);
@@ -359,7 +387,9 @@ moho::SCR_CreateLuaConOutputHandlerObject(LuaPlus::LuaState* const state, CLuaCo
  * Address: 0x004209D0 (FUN_004209D0, func_GetCObj_ConOutputHandler)
  * Address: 0x00421020 (FUN_00421020, sub_421020 helper lane)
  */
-moho::CLuaConOutputHandler** moho::SCR_GetLuaConOutputHandlerSlot(const LuaPlus::LuaObject& object)
+moho::CLuaConOutputHandler** moho::SCR_GetLuaConOutputHandlerSlot(
+  const LuaPlus::LuaObject& object
+)
 {
   LuaPlus::LuaObject payload(object);
   if (payload.IsTable()) {
@@ -378,7 +408,9 @@ moho::CLuaConOutputHandler** moho::SCR_GetLuaConOutputHandlerSlot(const LuaPlus:
 /**
  * Address: 0x0041EB00 (FUN_0041EB00, cfunc_AddConsoleOutputReciever)
  */
-int moho::cfunc_AddConsoleOutputReciever(lua_State* const luaContext)
+int moho::cfunc_AddConsoleOutputReciever(
+  lua_State* const luaContext
+)
 {
   auto* const state = moho::SCR_ResolveBindingState(luaContext);
   return cfunc_AddConsoleOutputRecieverL(state);
@@ -387,7 +419,9 @@ int moho::cfunc_AddConsoleOutputReciever(lua_State* const luaContext)
 /**
  * Address: 0x0041EB80 (FUN_0041EB80, cfunc_AddConsoleOutputRecieverL)
  */
-int moho::cfunc_AddConsoleOutputRecieverL(LuaPlus::LuaState* const state)
+int moho::cfunc_AddConsoleOutputRecieverL(
+  LuaPlus::LuaState* const state
+)
 {
   ValidateLuaArgCount(state, kAddConOutputReceiverHelp, 1);
   if (!IsLuaFunctionLike(state, 1)) {
@@ -408,7 +442,9 @@ int moho::cfunc_AddConsoleOutputRecieverL(LuaPlus::LuaState* const state)
 /**
  * Address: 0x0041ED00 (FUN_0041ED00, cfunc_RemoveConsoleOutputReciever)
  */
-int moho::cfunc_RemoveConsoleOutputReciever(lua_State* const luaContext)
+int moho::cfunc_RemoveConsoleOutputReciever(
+  lua_State* const luaContext
+)
 {
   auto* const state = moho::SCR_ResolveBindingState(luaContext);
   return cfunc_RemoveConsoleOutputRecieverL(state);
@@ -417,7 +453,9 @@ int moho::cfunc_RemoveConsoleOutputReciever(lua_State* const luaContext)
 /**
  * Address: 0x0041ED80 (FUN_0041ED80, cfunc_RemoveConsoleOutputRecieverL)
  */
-int moho::cfunc_RemoveConsoleOutputRecieverL(LuaPlus::LuaState* const state)
+int moho::cfunc_RemoveConsoleOutputRecieverL(
+  LuaPlus::LuaState* const state
+)
 {
   ValidateLuaArgCount(state, kRemoveConOutputReceiverHelp, 1);
 

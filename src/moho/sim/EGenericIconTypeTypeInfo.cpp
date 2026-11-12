@@ -12,7 +12,8 @@ namespace moho
 {
   /**
    * Address: 0x0085B120 (FUN_0085B120, static-init lane)
-   * Address: 0x00C07110 (FUN_00C07110, atexit destructor of the EGenericIconTypeTypeInfo object; registered by 0x00BE5B40)
+   * Address: 0x00C07110 (FUN_00C07110, atexit destructor of the EGenericIconTypeTypeInfo object; registered by
+   * 0x00BE5B40)
    *
    * What it does:
    * Constructs the static descriptor on first call; the constructor is what
@@ -81,4 +82,7 @@ namespace moho
 // Phase-1 pre-registration: gpg::RRef_EGenericIconType resolves the enum
 // through gpg::LookupRType when it builds a reflected reference, so the
 // descriptor must exist before that consumer runs. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_EGenericIconTypeTypeInfo_85b120, moho::preregister_EGenericIconTypeTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_EGenericIconTypeTypeInfo_85b120,
+  moho::preregister_EGenericIconTypeTypeInfo
+)

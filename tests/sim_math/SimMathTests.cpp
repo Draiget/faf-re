@@ -66,28 +66,36 @@ namespace
   constexpr int kRandomCasesWide = 160; // functions with many float arguments
 
   // ---------------------------------------------------------------- formatting
-  std::string Hex(const float value)
+  std::string Hex(
+    const float value
+  )
   {
     char text[16];
     std::snprintf(text, sizeof(text), "%08X", std::bit_cast<std::uint32_t>(value));
     return text;
   }
 
-  std::string Hex(const double value)
+  std::string Hex(
+    const double value
+  )
   {
     char text[24];
     std::snprintf(text, sizeof(text), "%016llX", static_cast<unsigned long long>(std::bit_cast<std::uint64_t>(value)));
     return text;
   }
 
-  std::string Hex(const std::int32_t value)
+  std::string Hex(
+    const std::int32_t value
+  )
   {
     char text[16];
     std::snprintf(text, sizeof(text), "i%08X", static_cast<std::uint32_t>(value));
     return text;
   }
 
-  std::string Hex(const std::uint32_t value)
+  std::string Hex(
+    const std::uint32_t value
+  )
   {
     char text[16];
     std::snprintf(text, sizeof(text), "u%08X", value);
@@ -95,14 +103,19 @@ namespace
   }
 
   template <class... T>
-  std::string Join(const T&... values)
+  std::string Join(
+    const T&... values
+  )
   {
     std::string out;
     ((out += (out.empty() ? "" : " ") + Hex(values)), ...);
     return out;
   }
 
-  std::string JoinFloats(const float* const values, const int count)
+  std::string JoinFloats(
+    const float* const values,
+    const int count
+  )
   {
     std::string out;
     for (int i = 0; i < count; ++i) {
@@ -117,7 +130,10 @@ namespace
   {
     std::uint64_t state;
 
-    explicit InputStream(const std::string& name, const int salt)
+    explicit InputStream(
+      const std::string& name,
+      const int salt
+    )
       : state(0x9E3779B97F4A7C15ull ^ static_cast<std::uint64_t>(salt))
     {
       for (const char c : name) {
@@ -172,30 +188,39 @@ namespace
       return static_cast<double>(Float());
     }
 
-    std::int32_t Int() { return static_cast<std::int32_t>(Next()); }
-    std::int16_t Short() { return static_cast<std::int16_t>(Next()); }
-    std::uint8_t Byte() { return static_cast<std::uint8_t>(Next()); }
+    std::int32_t Int()
+    {
+      return static_cast<std::int32_t>(Next());
+    }
+    std::int16_t Short()
+    {
+      return static_cast<std::int16_t>(Next());
+    }
+    std::uint8_t Byte()
+    {
+      return static_cast<std::uint8_t>(Next());
+    }
   };
 
   const std::vector<float>& EdgeFloats()
   {
     static const std::vector<float> values = [] {
       const std::uint32_t bits[] = {
-        0x00000000u, 0x80000000u, // +-0
-        0x00000001u, 0x80000001u, 0x007FFFFFu, 0x00400000u, // denormals
-        0x00800000u, 0x80800000u, // +-FLT_MIN
-        0x7F7FFFFFu, 0xFF7FFFFFu, // +-FLT_MAX
-        0x7F800000u, 0xFF800000u, // +-inf
-        0x7FC00000u, 0xFFC00000u, 0x7FA00000u, // quiet NaNs, a signalling NaN
-        0x3F800000u, 0xBF800000u, 0x3F000000u, 0xBF000000u, // +-1, +-0.5
-        0x3FC00000u, 0xC0200000u, 0x40200000u, 0xBFC00000u, // +-1.5, +-2.5 (halfway)
+        0x00000000u, 0x80000000u,                                        // +-0
+        0x00000001u, 0x80000001u, 0x007FFFFFu, 0x00400000u,              // denormals
+        0x00800000u, 0x80800000u,                                        // +-FLT_MIN
+        0x7F7FFFFFu, 0xFF7FFFFFu,                                        // +-FLT_MAX
+        0x7F800000u, 0xFF800000u,                                        // +-inf
+        0x7FC00000u, 0xFFC00000u, 0x7FA00000u,                           // quiet NaNs, a signalling NaN
+        0x3F800000u, 0xBF800000u, 0x3F000000u, 0xBF000000u,              // +-1, +-0.5
+        0x3FC00000u, 0xC0200000u, 0x40200000u, 0xBFC00000u,              // +-1.5, +-2.5 (halfway)
         0x3EFFFFFFu, 0x3F7FFFFFu, 0x3F800001u, 0x4049000Fu, 0x42C90000u, // near 0.5 / 1, 3.1415927, 100.5
-        0x40490FDBu, 0x3FC90FDBu, 0x40C90FDBu, // pi, pi/2, 2pi
-        0x4B000000u, 0x4AFFFFFFu, 0x4B7FFFFFu, 0x4B800000u, // 2^23, 2^23 - 0.5, 2^24 - 1, 2^24
+        0x40490FDBu, 0x3FC90FDBu, 0x40C90FDBu,                           // pi, pi/2, 2pi
+        0x4B000000u, 0x4AFFFFFFu, 0x4B7FFFFFu, 0x4B800000u,              // 2^23, 2^23 - 0.5, 2^24 - 1, 2^24
         0x4EFFFFFFu, 0x4F000000u, 0xCF000000u, 0xCF000001u, 0x4F32D05Eu, // near +-2^31, 3e9
         0x0DA24260u, 0x1E3CE508u, 0x15F79688u, 0x5F0AC723u, 0x5F8AC723u, // 1e-30, 1e-20, 1e-25, 1e19, 2e19
-        0x41AB54C2u, 0x3F052EAAu, // pow(x, 2) and asin parity cases
-        0x358637BDu, 0x49742400u, 0x3DCCCCCDu, 0xC2C80000u, // 1e-6, 1e6, 0.1, -100
+        0x41AB54C2u, 0x3F052EAAu,                                        // pow(x, 2) and asin parity cases
+        0x358637BDu, 0x49742400u, 0x3DCCCCCDu, 0xC2C80000u,              // 1e-6, 1e6, 0.1, -100
       };
       std::vector<float> out;
       for (const std::uint32_t b : bits) {
@@ -212,7 +237,12 @@ namespace
     std::vector<std::string> order;
     std::map<std::string, std::string> lines; // "name idx" -> "inputs -> outputs"
 
-    void Add(const std::string& name, const int index, const std::string& inputs, const std::string& outputs)
+    void Add(
+      const std::string& name,
+      const int index,
+      const std::string& inputs,
+      const std::string& outputs
+    )
     {
       char key[160];
       std::snprintf(key, sizeof(key), "%s %d", name.c_str(), index);
@@ -224,7 +254,12 @@ namespace
   using Unary = std::function<std::string(float)>;
 
   /** One float argument: the edge list, then `randomCount` stream values. */
-  void RunUnary(Results& results, const std::string& name, const Unary& fn, const bool positive = false)
+  void RunUnary(
+    Results& results,
+    const std::string& name,
+    const Unary& fn,
+    const bool positive = false
+  )
   {
     int index = 0;
     for (const float x : EdgeFloats()) {
@@ -239,7 +274,10 @@ namespace
 
   /** Several float arguments: every pair from a short edge list, then random. */
   void RunFloats(
-    Results& results, const std::string& name, const int arity, const std::function<std::string(const float*)>& fn,
+    Results& results,
+    const std::string& name,
+    const int arity,
+    const std::function<std::string(const float*)>& fn,
     const int randomCount = kRandomCases
   )
   {
@@ -263,7 +301,10 @@ namespace
   }
 
   void RunDoubles(
-    Results& results, const std::string& name, const int arity, const std::function<std::string(const double*)>& fn
+    Results& results,
+    const std::string& name,
+    const int arity,
+    const std::function<std::string(const double*)>& fn
   )
   {
     int index = 0;
@@ -292,15 +333,21 @@ namespace
   }
 
   // --------------------------------------------------------------- the cases
-  void RunAll(Results& r)
+  void RunAll(
+    Results& r
+  )
   {
     // fistp-style rounding (float-to-cell conversions).
-    RunUnary(r, "RoundToInt", [](const float x) { return Hex(fa::RoundToInt(x)); });
+    RunUnary(r, "RoundToInt", [](const float x) {
+      return Hex(fa::RoundToInt(x));
+    });
 
     // Twister word scaling (CRandomStream::FRand).
     {
       int index = 0;
-      const std::uint32_t words[] = {0u, 1u, 0x7FFFFFFFu, 0x80000000u, 0x80000001u, 0xFFFFFF7Fu, 0xFFFFFF80u, 0xFFFFFFFFu};
+      const std::uint32_t words[] = {
+        0u, 1u, 0x7FFFFFFFu, 0x80000000u, 0x80000001u, 0xFFFFFF7Fu, 0xFFFFFF80u, 0xFFFFFFFFu
+      };
       for (const float factor : EdgeFloats()) {
         for (const std::uint32_t word : words) {
           r.Add("MulTwisterWord", index++, Join(factor, word), Hex(fa::MulTwisterWord(factor, word)));
@@ -335,16 +382,19 @@ namespace
       fa::ScaleVectorToLengthOfX87(out, a, a + 3, a[6]);
       return JoinFloats(out, 3);
     });
-    RunFloats(r, "VectorLengthZYXX87", 3, [](const float* a) { return Hex(fa::VectorLengthZYXX87(a)); });
+    RunFloats(r, "VectorLengthZYXX87", 3, [](const float* a) {
+      return Hex(fa::VectorLengthZYXX87(a));
+    });
 
     // Box-vs-box separating-axis radius: box = center(3), axes(9), extents(3); then the axis.
-    RunFloats(
-      r, "BoxRadiusOnAxisX87", 18, [](const float* a) { return Hex(fa::BoxRadiusOnAxisX87(a, a + 15)); },
-      kRandomCasesWide
-    );
+    RunFloats(r, "BoxRadiusOnAxisX87", 18, [](const float* a) {
+      return Hex(fa::BoxRadiusOnAxisX87(a, a + 15));
+    }, kRandomCasesWide);
 
     // MSVC8 CRT fmod/frexp.
-    RunDoubles(r, "fmod", 2, [](const double* a) { return Hex(fa::fmod(a[0], a[1])); });
+    RunDoubles(r, "fmod", 2, [](const double* a) {
+      return Hex(fa::fmod(a[0], a[1]));
+    });
     RunDoubles(r, "frexp", 1, [](const double* a) {
       int exponent = 0x5A5A5A5A;
       const double mantissa = fa::frexp(a[0], &exponent);
@@ -352,11 +402,15 @@ namespace
     });
 
     // Products and half sums under 24-bit precision.
-    RunFloats(r, "MultiplyX87", 2, [](const float* a) { return Hex(fa::MultiplyX87(a[0], a[1])); });
+    RunFloats(r, "MultiplyX87", 2, [](const float* a) {
+      return Hex(fa::MultiplyX87(a[0], a[1]));
+    });
     {
       int index = 0;
       InputStream in("MultiplyIntegerX87", 2);
-      const std::int32_t ints[] = {0, 1, -1, 2028178766, 0x7FFFFFFF, static_cast<std::int32_t>(0x80000000u), 16777217, -16777217};
+      const std::int32_t ints[] = {
+        0, 1, -1, 2028178766, 0x7FFFFFFF, static_cast<std::int32_t>(0x80000000u), 16777217, -16777217
+      };
       for (const float factor : EdgeFloats()) {
         for (const std::int32_t integer : ints) {
           r.Add("MultiplyIntegerX87", index++, Join(integer, factor), Hex(fa::MultiplyIntegerX87(integer, factor)));
@@ -368,8 +422,12 @@ namespace
         r.Add("MultiplyIntegerX87", index++, Join(integer, factor), Hex(fa::MultiplyIntegerX87(integer, factor)));
       }
     }
-    RunFloats(r, "HalfSumX87", 2, [](const float* a) { return Hex(fa::HalfSumX87(a[0], a[1])); });
-    RunFloats(r, "HalfAbsDifferenceX87", 2, [](const float* a) { return Hex(fa::HalfAbsDifferenceX87(a[0], a[1])); });
+    RunFloats(r, "HalfSumX87", 2, [](const float* a) {
+      return Hex(fa::HalfSumX87(a[0], a[1]));
+    });
+    RunFloats(r, "HalfAbsDifferenceX87", 2, [](const float* a) {
+      return Hex(fa::HalfAbsDifferenceX87(a[0], a[1]));
+    });
 
     // Terrain interpolation.
     RunFloats(r, "BilinearHeight", 6, [](const float* a) {
@@ -377,53 +435,93 @@ namespace
     });
 
     // x87 transcendentals.
-    RunUnary(r, "sinf", [](const float x) { return Hex(fa::sinf(x)); });
-    RunUnary(r, "cosf", [](const float x) { return Hex(fa::cosf(x)); });
-    RunUnary(r, "tanf", [](const float x) { return Hex(fa::tanf(x)); });
-    RunUnary(r, "atanf", [](const float x) { return Hex(fa::atanf(x)); });
-    RunFloats(r, "atan2f", 2, [](const float* a) { return Hex(fa::atan2f(a[0], a[1])); });
+    RunUnary(r, "sinf", [](const float x) {
+      return Hex(fa::sinf(x));
+    });
+    RunUnary(r, "cosf", [](const float x) {
+      return Hex(fa::cosf(x));
+    });
+    RunUnary(r, "tanf", [](const float x) {
+      return Hex(fa::tanf(x));
+    });
+    RunUnary(r, "atanf", [](const float x) {
+      return Hex(fa::atanf(x));
+    });
+    RunFloats(r, "atan2f", 2, [](const float* a) {
+      return Hex(fa::atan2f(a[0], a[1]));
+    });
     RunFloats(r, "Atan2Difference", 4, [](const float* a) {
       return Hex(fa::Atan2Difference(a[0], a[1], a[2], a[3]));
     });
-    RunFloats(r, "Atan2Plus", 3, [](const float* a) { return Hex(fa::Atan2Plus(a[0], a[1], a[2])); });
-    RunFloats(r, "SinTimesCos", 2, [](const float* a) { return Hex(fa::SinTimesCos(a[0], a[1])); });
+    RunFloats(r, "Atan2Plus", 3, [](const float* a) {
+      return Hex(fa::Atan2Plus(a[0], a[1], a[2]));
+    });
+    RunFloats(r, "SinTimesCos", 2, [](const float* a) {
+      return Hex(fa::SinTimesCos(a[0], a[1]));
+    });
     RunFloats(r, "SinOfProductTimes", 3, [](const float* a) {
       return Hex(fa::SinOfProductTimes(a[0], a[1], a[2]));
     });
-    RunFloats(r, "CosTimesCos", 2, [](const float* a) { return Hex(fa::CosTimesCos(a[0], a[1])); });
-    RunFloats(
-      r, "SlerpSphericalBlend", 11,
-      [](const float* a) {
-        float out[4];
-        fa::SlerpSphericalBlend(out, a, a + 4, a[8], a[9], a[10]);
-        return JoinFloats(out, 4);
-      },
-      kRandomCasesWide
-    );
+    RunFloats(r, "CosTimesCos", 2, [](const float* a) {
+      return Hex(fa::CosTimesCos(a[0], a[1]));
+    });
+    RunFloats(r, "SlerpSphericalBlend", 11, [](const float* a) {
+      float out[4];
+      fa::SlerpSphericalBlend(out, a, a + 4, a[8], a[9], a[10]);
+      return JoinFloats(out, 4);
+    }, kRandomCasesWide);
 
     // /Oi exp and log expansions; the edge-cost logarithm; the Gaussian's (IntrinsicLn).
-    RunUnary(r, "IntrinsicExp", [](const float x) { return Hex(fa::IntrinsicExp(x)); });
-    RunUnary(r, "IntrinsicLn", [](const float x) { return Hex(fa::IntrinsicLn(x)); });
-    RunUnary(r, "IntrinsicLog10", [](const float x) { return Hex(fa::IntrinsicLog10(x)); });
+    RunUnary(r, "IntrinsicExp", [](const float x) {
+      return Hex(fa::IntrinsicExp(x));
+    });
+    RunUnary(r, "IntrinsicLn", [](const float x) {
+      return Hex(fa::IntrinsicLn(x));
+    });
+    RunUnary(r, "IntrinsicLog10", [](const float x) {
+      return Hex(fa::IntrinsicLog10(x));
+    });
     RunFloats(r, "IntrinsicLnQuotient", 2, [](const float* a) {
       return Hex(fa::IntrinsicLnQuotient(a[0], static_cast<double>(a[1])));
     });
-    RunFloats(r, "ScaledLnQuotient", 3, [](const float* a) { return Hex(fa::ScaledLnQuotient(a[0], a[1], a[2])); });
+    RunFloats(r, "ScaledLnQuotient", 3, [](const float* a) {
+      return Hex(fa::ScaledLnQuotient(a[0], a[1], a[2]));
+    });
 
     // CRT-dispatched functions (x87 bodies at the caller's precision; the
     // others through the host CRT, WPL.11).
-    RunUnary(r, "asinf", [](const float x) { return Hex(fa::asinf(x)); });
-    RunUnary(r, "acosf", [](const float x) { return Hex(fa::acosf(x)); });
-    RunDoubles(r, "acos", 1, [](const double* a) { return Hex(fa::acos(a[0])); });
-    RunDoubles(r, "asin", 1, [](const double* a) { return Hex(fa::asin(a[0])); });
-    RunDoubles(r, "pow", 2, [](const double* a) { return Hex(fa::pow(a[0], a[1])); });
-    RunUnary(r, "expf", [](const float x) { return Hex(fa::expf(x)); });
-    RunUnary(r, "logf", [](const float x) { return Hex(fa::logf(x)); });
-    RunFloats(r, "powf", 2, [](const float* a) { return Hex(fa::powf(a[0], a[1])); });
+    RunUnary(r, "asinf", [](const float x) {
+      return Hex(fa::asinf(x));
+    });
+    RunUnary(r, "acosf", [](const float x) {
+      return Hex(fa::acosf(x));
+    });
+    RunDoubles(r, "acos", 1, [](const double* a) {
+      return Hex(fa::acos(a[0]));
+    });
+    RunDoubles(r, "asin", 1, [](const double* a) {
+      return Hex(fa::asin(a[0]));
+    });
+    RunDoubles(r, "pow", 2, [](const double* a) {
+      return Hex(fa::pow(a[0], a[1]));
+    });
+    RunUnary(r, "expf", [](const float x) {
+      return Hex(fa::expf(x));
+    });
+    RunUnary(r, "logf", [](const float x) {
+      return Hex(fa::logf(x));
+    });
+    RunFloats(r, "powf", 2, [](const float* a) {
+      return Hex(fa::powf(a[0], a[1]));
+    });
 
     // sqrt as sim code calls it: float in and out, and a widened float in double.
-    RunUnary(r, "sqrt_float", [](const float x) { return Hex(std::sqrt(x)); });
-    RunUnary(r, "sqrt_double", [](const float x) { return Hex(std::sqrt(static_cast<double>(x))); });
+    RunUnary(r, "sqrt_float", [](const float x) {
+      return Hex(std::sqrt(x));
+    });
+    RunUnary(r, "sqrt_double", [](const float x) {
+      return Hex(std::sqrt(static_cast<double>(x)));
+    });
 
 #if !defined(FAF_SIM_MATH_SUBSET)
     // Pathfinder edge-cost bucket: ceil(ln(cost / distance) * 6), clamped.
@@ -438,7 +536,8 @@ namespace
         const gpg::HaStar::Cluster::Node to{in.Byte(), in.Byte()};
         const float cost = (i & 1) ? in.Positive() : in.Float();
         r.Add(
-          "NodeCostTo", index++,
+          "NodeCostTo",
+          index++,
           Join(static_cast<std::uint32_t>(from.x | (from.z << 8) | (to.x << 16) | (to.z << 24)), cost),
           Hex(static_cast<std::int32_t>(gpg::HaStar::Cluster::Node::CostTo(from, to, cost)))
         );
@@ -453,9 +552,14 @@ namespace
       const std::int16_t edges[] = {0, 1, -1, -2, 255, 256, 1023, 1024, 32767, -32768};
       auto add = [&](const moho::SOCellPos a, const moho::SOCellPos b) {
         r.Add(
-          "NavigatorCells", index++,
-          Join(static_cast<std::int32_t>(a.x), static_cast<std::int32_t>(a.z), static_cast<std::int32_t>(b.x),
-               static_cast<std::int32_t>(b.z)),
+          "NavigatorCells",
+          index++,
+          Join(
+            static_cast<std::int32_t>(a.x),
+            static_cast<std::int32_t>(a.z),
+            static_cast<std::int32_t>(b.x),
+            static_cast<std::int32_t>(b.z)
+          ),
           Join(moho::CellDistance(a, b), moho::ManhattanDistance(a, b))
         );
       };
@@ -521,7 +625,10 @@ namespace
 namespace
 {
   /** Reads "name index rest" lines (comments skipped) into `into`, overwriting. */
-  bool ReadCaseFile(const char* const path, std::map<std::string, std::string>& into)
+  bool ReadCaseFile(
+    const char* const path,
+    std::map<std::string, std::string>& into
+  )
   {
     std::FILE* const in = std::fopen(path, "rb");
     if (in == nullptr) {
@@ -549,7 +656,9 @@ namespace
    * (input, output) bit pairs per block of 2^20 inputs, "function block hash". The same sweep
    * on another platform, diffed, finds every input whose result differs.
    */
-  int RunSweep(const char* const name)
+  int RunSweep(
+    const char* const name
+  )
   {
     using UnaryFloat = float (*)(float);
     struct Entry
@@ -558,19 +667,57 @@ namespace
       UnaryFloat fn;
     };
     static const Entry kFunctions[] = {
-      {"sinf", [](const float x) { return fa::sinf(x); }},
-      {"cosf", [](const float x) { return fa::cosf(x); }},
-      {"tanf", [](const float x) { return fa::tanf(x); }},
-      {"atanf", [](const float x) { return fa::atanf(x); }},
-      {"asinf", [](const float x) { return fa::asinf(x); }},
-      {"acosf", [](const float x) { return fa::acosf(x); }},
-      {"expf", [](const float x) { return fa::expf(x); }},
-      {"logf", [](const float x) { return fa::logf(x); }},
-      {"IntrinsicExp", [](const float x) { return fa::IntrinsicExp(x); }},
-      {"IntrinsicLn", [](const float x) { return fa::IntrinsicLn(x); }},
-      {"IntrinsicLog10", [](const float x) { return fa::IntrinsicLog10(x); }},
-      {"sqrt_float", [](const float x) { return std::sqrt(x); }},
-      {"RoundToInt", [](const float x) { return std::bit_cast<float>(fa::RoundToInt(x)); }},
+      {"sinf",
+       [](const float x) {
+      return fa::sinf(x);
+    }},
+      {"cosf",
+       [](const float x) {
+      return fa::cosf(x);
+    }},
+      {"tanf",
+       [](const float x) {
+      return fa::tanf(x);
+    }},
+      {"atanf",
+       [](const float x) {
+      return fa::atanf(x);
+    }},
+      {"asinf",
+       [](const float x) {
+      return fa::asinf(x);
+    }},
+      {"acosf",
+       [](const float x) {
+      return fa::acosf(x);
+    }},
+      {"expf",
+       [](const float x) {
+      return fa::expf(x);
+    }},
+      {"logf",
+       [](const float x) {
+      return fa::logf(x);
+    }},
+      {"IntrinsicExp",
+       [](const float x) {
+      return fa::IntrinsicExp(x);
+    }},
+      {"IntrinsicLn",
+       [](const float x) {
+      return fa::IntrinsicLn(x);
+    }},
+      {"IntrinsicLog10",
+       [](const float x) {
+      return fa::IntrinsicLog10(x);
+    }},
+      {"sqrt_float",
+       [](const float x) {
+      return std::sqrt(x);
+    }},
+      {"RoundToInt", [](const float x) {
+      return std::bit_cast<float>(fa::RoundToInt(x));
+    }},
     };
     UnaryFloat fn = nullptr;
     for (const Entry& entry : kFunctions) {
@@ -590,7 +737,9 @@ namespace
         hash = (hash ^ bits) * 1099511628211ull;
         hash = (hash ^ out) * 1099511628211ull;
       }
-      std::printf("%s %llu %016llx\n", name, static_cast<unsigned long long>(block), static_cast<unsigned long long>(hash));
+      std::printf(
+        "%s %llu %016llx\n", name, static_cast<unsigned long long>(block), static_cast<unsigned long long>(hash)
+      );
     }
     return 0;
   }
@@ -598,7 +747,10 @@ namespace
   std::string gGoldenPath;
   std::string gKnownPath;
 
-  void RunParityCheck(const char* path, const char* knownPath)
+  void RunParityCheck(
+    const char* path,
+    const char* knownPath
+  )
   {
     ASSERT_NE(path, nullptr) << "Golden file path must be provided";
     std::map<std::string, std::string> golden;
@@ -648,7 +800,12 @@ namespace
     }
     std::printf(
       "faf_sim_math_tests (%s): %zu cases, %d differ, %d missing from %s (%d known platform difference(s) applied)\n",
-      PlatformName(), results.order.size(), total, missing, path, known
+      PlatformName(),
+      results.order.size(),
+      total,
+      missing,
+      path,
+      known
     );
     const std::size_t skipped = golden.size() - (results.order.size() - static_cast<std::size_t>(missing));
 #if defined(FAF_SIM_MATH_SUBSET)
@@ -681,7 +838,10 @@ namespace
     return std::filesystem::current_path(ec);
   }
 
-  std::filesystem::path FindInAncestors(const std::filesystem::path& startDir, const std::filesystem::path& relativeTarget)
+  std::filesystem::path FindInAncestors(
+    const std::filesystem::path& startDir,
+    const std::filesystem::path& relativeTarget
+  )
   {
     std::error_code ec;
     std::filesystem::path cur = std::filesystem::absolute(startDir, ec);
@@ -728,7 +888,9 @@ namespace
     return {};
   }
 
-  std::string ResolveKnownPath(const std::string& resolvedGolden)
+  std::string ResolveKnownPath(
+    const std::string& resolvedGolden
+  )
   {
     if (!gKnownPath.empty()) {
       return gKnownPath;
@@ -751,14 +913,20 @@ namespace
   }
 } // namespace
 
-TEST(Existing_SimMath, GoldenParity)
+TEST(
+  Existing_SimMath,
+  GoldenParity
+)
 {
   const std::string golden = ResolveGoldenPath();
   const std::string known = ResolveKnownPath(golden);
   RunParityCheck(golden.empty() ? nullptr : golden.c_str(), known.empty() ? nullptr : known.c_str());
 }
 
-int main(int argc, char** argv)
+int main(
+  int argc,
+  char** argv
+)
 {
   if (argc > 2 && std::strcmp(argv[1], "--sweep") == 0) {
 #if defined(_PC_24)
@@ -784,7 +952,9 @@ int main(int argc, char** argv)
       std::fprintf(stderr, "cannot write %s\n", path);
       return 2;
     }
-    std::fprintf(out, "# faf_sim_math_tests golden values (plan WPL.23), generated on %s. One line per case:\n", PlatformName());
+    std::fprintf(
+      out, "# faf_sim_math_tests golden values (plan WPL.23), generated on %s. One line per case:\n", PlatformName()
+    );
     std::fprintf(out, "# name index inputs -> outputs (hex bit patterns; i/u prefixes for integers).\n");
     for (const std::string& key : results.order) {
       std::fprintf(out, "%s %s\n", key.c_str(), results.lines[key].c_str());

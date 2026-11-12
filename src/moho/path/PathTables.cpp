@@ -52,7 +52,10 @@ namespace
    */
   struct PathQueueCellLess
   {
-    [[nodiscard]] bool operator()(const moho::SOCellPos& lhs, const moho::SOCellPos& rhs) const noexcept
+    [[nodiscard]] bool operator()(
+      const moho::SOCellPos& lhs,
+      const moho::SOCellPos& rhs
+    ) const noexcept
     {
       return PackCellKey(lhs) < PackCellKey(rhs);
     }
@@ -68,10 +71,10 @@ namespace
    * indices that must already have succeeded before diagonal `i` is allowed,
    * which is what stops a unit cutting the corner between two blocked cells.
    */
-  constexpr std::int8_t kStepOffsetX[8] = { 0, -1, 0, 1, -1, -1, 1, 1 };
-  constexpr std::int8_t kStepOffsetZ[8] = { -1, 0, 1, 0, -1, 1, 1, -1 };
-  constexpr std::uint8_t kStepGate[8] = { 0u, 0u, 0u, 0u, 3u, 6u, 12u, 9u };
-  constexpr float kStepCost[8] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.414f, 1.414f, 1.414f, 1.414f };
+  constexpr std::int8_t kStepOffsetX[8] = {0, -1, 0, 1, -1, -1, 1, 1};
+  constexpr std::int8_t kStepOffsetZ[8] = {-1, 0, 1, 0, -1, 1, 1, -1};
+  constexpr std::uint8_t kStepGate[8] = {0u, 0u, 0u, 0u, 3u, 6u, 12u, 9u};
+  constexpr float kStepCost[8] = {1.0f, 1.0f, 1.0f, 1.0f, 1.414f, 1.414f, 1.414f, 1.414f};
 
   /**
    * Engine addition (`sim_PathTraverseCache`): the traveler's `CanTraverseCell`
@@ -123,7 +126,8 @@ namespace moho
   bool sim_PathTraverseCache = true;
   TConVar<bool> gTConVar_sim_PathTraverseCache(
     "sim_PathTraverseCache",
-    "Remember a cell's traversability for the rest of one pathfinding pass instead of asking the unit again (same paths).",
+    "Remember a cell's traversability for the rest of one pathfinding pass instead of asking the unit again (same "
+    "paths).",
     &sim_PathTraverseCache
   );
 
@@ -149,8 +153,7 @@ namespace moho
    *   +0x74 : mExpandCount    expansions performed for this traveler
    *   +0x78 : mPathCap        traveler-supplied expansion cap
    */
-  struct PathQueue::ImplBase
-    : gpg::AStarSearch<SOCellPos, PathQueue::ImplBase, PathQueueCellTraits, true>
+  struct PathQueue::ImplBase : gpg::AStarSearch<SOCellPos, PathQueue::ImplBase, PathQueueCellTraits, true>
   {
     /** How one expansion ends: `ExpandNode`'s answer, which `WorkOnce` returns. */
     enum class Step : std::int32_t
@@ -177,8 +180,7 @@ namespace moho
       , mBudget(0)
       , mExpandCount(0)
       , mPathCap(0)
-    {
-    }
+    {}
 
     /**
      * Address: 0x00765BE0 (FUN_00765BE0, ~ImplBase, `this` in ESI)
@@ -219,14 +221,14 @@ namespace moho
     void SaveExact(gpg::WriteArchive* archive, const PathTables& owner);
     void LoadExact(gpg::ReadArchive* archive, const PathTables& owner);
 
-    gpg::DList<IPathTraveler> mTraveler;    // +0x4C
-    SOCellPos mClosestCell;                 // +0x54
-    float mClosestDistance;                 // +0x58
-    gpg::HaStar::ClusterMap* mClusterMap;   // +0x5C
-    std::int32_t mBudget;                   // +0x60
-    fa::vector<SOCellPos> mResultCells;  // +0x64
-    std::int32_t mExpandCount;              // +0x74
-    std::int32_t mPathCap;                  // +0x78
+    gpg::DList<IPathTraveler> mTraveler;  // +0x4C
+    SOCellPos mClosestCell;               // +0x54
+    float mClosestDistance;               // +0x58
+    gpg::HaStar::ClusterMap* mClusterMap; // +0x5C
+    std::int32_t mBudget;                 // +0x60
+    fa::vector<SOCellPos> mResultCells;   // +0x64
+    std::int32_t mExpandCount;            // +0x74
+    std::int32_t mPathCap;                // +0x78
 
   private:
     [[nodiscard]] bool CollectNeighbours(const SOCellPos& cell, neighbour_list& outNeighbours);
@@ -237,11 +239,23 @@ namespace moho
 
   static_assert(sizeof(PathQueue::ImplBase) == 0x7C, "PathQueue::ImplBase size must be 0x7C");
   static_assert(offsetof(PathQueue::ImplBase, mTraveler) == 0x4C, "PathQueue::ImplBase::mTraveler offset must be 0x4C");
-  static_assert(offsetof(PathQueue::ImplBase, mClosestCell) == 0x54, "PathQueue::ImplBase::mClosestCell offset must be 0x54");
-  static_assert(offsetof(PathQueue::ImplBase, mClusterMap) == 0x5C, "PathQueue::ImplBase::mClusterMap offset must be 0x5C");
+  static_assert(
+    offsetof(PathQueue::ImplBase, mClosestCell) == 0x54,
+    "PathQueue::ImplBase::mClosestCell offset must be 0x54"
+  );
+  static_assert(
+    offsetof(PathQueue::ImplBase, mClusterMap) == 0x5C,
+    "PathQueue::ImplBase::mClusterMap offset must be 0x5C"
+  );
   static_assert(offsetof(PathQueue::ImplBase, mBudget) == 0x60, "PathQueue::ImplBase::mBudget offset must be 0x60");
-  static_assert(offsetof(PathQueue::ImplBase, mResultCells) == 0x64, "PathQueue::ImplBase::mResultCells offset must be 0x64");
-  static_assert(offsetof(PathQueue::ImplBase, mExpandCount) == 0x74, "PathQueue::ImplBase::mExpandCount offset must be 0x74");
+  static_assert(
+    offsetof(PathQueue::ImplBase, mResultCells) == 0x64,
+    "PathQueue::ImplBase::mResultCells offset must be 0x64"
+  );
+  static_assert(
+    offsetof(PathQueue::ImplBase, mExpandCount) == 0x74,
+    "PathQueue::ImplBase::mExpandCount offset must be 0x74"
+  );
   static_assert(offsetof(PathQueue::ImplBase, mPathCap) == 0x78, "PathQueue::ImplBase::mPathCap offset must be 0x78");
 
   /**
@@ -264,7 +278,9 @@ namespace moho
    * What it does:
    * A* traits hook - defers the distance estimate to the traveler being served.
    */
-  float PathQueue::ImplBase::GetHeuristicCost(const SOCellPos& cell) const
+  float PathQueue::ImplBase::GetHeuristicCost(
+    const SOCellPos& cell
+  ) const
   {
     const IPathTraveler* const traveler = CurrentTraveler();
     if (traveler == nullptr) {
@@ -281,7 +297,10 @@ namespace moho
    * this query, so a search that runs out of budget can still hand back the
    * closest approach instead of failing outright.
    */
-  void PathQueue::ImplBase::NoteCandidateCell(const SOCellPos& cell, const float estimate) noexcept
+  void PathQueue::ImplBase::NoteCandidateCell(
+    const SOCellPos& cell,
+    const float estimate
+  ) noexcept
   {
     if (mClosestDistance > estimate) {
       mClosestCell = cell;
@@ -293,7 +312,10 @@ namespace moho
    * `traveler.CanTraverseCell(cell)`, through the pass cache when
    * `sim_PathTraverseCache` is on and a pass is running.
    */
-  [[nodiscard]] bool CanTraverseCellCached(IPathTraveler& traveler, const SOCellPos& cell)
+  [[nodiscard]] bool CanTraverseCellCached(
+    IPathTraveler& traveler,
+    const SOCellPos& cell
+  )
   {
     TraverseCache& cache = tTraverseCache;
     if (!sim_PathTraverseCache || cache.mPassDepth <= 0) {
@@ -322,7 +344,10 @@ namespace moho
    * `acceptedMask`, so a diagonal is offered only once both of its adjacent
    * cardinals have been accepted.
    */
-  bool PathQueue::ImplBase::AddAdjacentCells(const SOCellPos& cell, neighbour_list& outNeighbours)
+  bool PathQueue::ImplBase::AddAdjacentCells(
+    const SOCellPos& cell,
+    neighbour_list& outNeighbours
+  )
   {
     IPathTraveler* const traveler = CurrentTraveler();
     if (traveler == nullptr) {
@@ -375,7 +400,11 @@ namespace moho
    * Returns false only when the cluster build ran out of budget, which aborts
    * the whole query rather than yielding a partial neighbour set.
    */
-  bool PathQueue::ImplBase::AddClusterEdges(const SOCellPos& cell, const int level, neighbour_list& outNeighbours)
+  bool PathQueue::ImplBase::AddClusterEdges(
+    const SOCellPos& cell,
+    const int level,
+    neighbour_list& outNeighbours
+  )
   {
     IPathTraveler* const traveler = CurrentTraveler();
     if (traveler == nullptr) {
@@ -388,8 +417,7 @@ namespace moho
     const int cellX = static_cast<std::uint16_t>(cell.x);
     const int cellZ = static_cast<std::uint16_t>(cell.z);
 
-    const gpg::Rect2i clusterBounds =
-      clusterMap.ClusterIndexRect(cellX, cellZ, static_cast<std::uint8_t>(level));
+    const gpg::Rect2i clusterBounds = clusterMap.ClusterIndexRect(cellX, cellZ, static_cast<std::uint8_t>(level));
 
     for (int clusterX = clusterBounds.x0; clusterX < clusterBounds.x1; ++clusterX) {
       const int originX = clusterX << originShift;
@@ -405,20 +433,19 @@ namespace moho
 
         // Hold the payload across the walk by taking a counted handle:
         // WorkOnCluster on a neighbouring cluster can otherwise evict it.
-        const gpg::HaStar::Cluster clusterHandle =
-          subcluster.mArray[clusterX + clusterZ * subcluster.mWidth];
+        const gpg::HaStar::Cluster clusterHandle = subcluster.mArray[clusterX + clusterZ * subcluster.mWidth];
         gpg::HaStar::Cluster::Data* const data = clusterHandle.mData;
 
         const std::uint32_t nodeCount = (data != nullptr) ? data->mNodeCount : 0u;
         const gpg::HaStar::Cluster::Node* const nodes = (data != nullptr) ? data->mNodes : nullptr;
-        const auto* const edges = (data != nullptr)
-          ? reinterpret_cast<const std::int8_t*>(nodes + nodeCount)
-          : nullptr;
+        const auto* const edges = (data != nullptr) ? reinterpret_cast<const std::int8_t*>(nodes + nodeCount) : nullptr;
 
         std::uint32_t fromIndex = 0u;
         for (; fromIndex < nodeCount; ++fromIndex) {
-          if (nodes[fromIndex].x == static_cast<std::uint8_t>(cellX - originX)
-              && nodes[fromIndex].z == static_cast<std::uint8_t>(cellZ - originZ)) {
+          if (
+            nodes[fromIndex].x == static_cast<std::uint8_t>(cellX - originX) &&
+            nodes[fromIndex].z == static_cast<std::uint8_t>(cellZ - originZ)
+          ) {
             break;
           }
         }
@@ -428,9 +455,8 @@ namespace moho
               continue;
             }
 
-            const std::uint32_t edgeIndex = (fromIndex >= toIndex)
-              ? toIndex + ((fromIndex * (fromIndex - 1u)) >> 1)
-              : fromIndex + ((toIndex * (toIndex - 1u)) >> 1);
+            const std::uint32_t edgeIndex = (fromIndex >= toIndex) ? toIndex + ((fromIndex * (fromIndex - 1u)) >> 1)
+                                                                   : fromIndex + ((toIndex * (toIndex - 1u)) >> 1);
 
             // A negative bucket means the pair is unreachable inside the cluster.
             if (edges[edgeIndex] < 0) {
@@ -451,8 +477,7 @@ namespace moho
             }
 
             float cost = gpg::HaStar::Cluster::DequantizeEdgeCost(
-              edges[edgeIndex],
-              gpg::HaStar::Cluster::NodeOctileDistance(*data, fromIndex, toIndex)
+              edges[edgeIndex], gpg::HaStar::Cluster::NodeOctileDistance(*data, fromIndex, toIndex)
             );
 
             if (!traveler->IsInBounds(cell, candidate, &cost)) {
@@ -462,7 +487,6 @@ namespace moho
             outNeighbours.push_back(neighbour_type{candidate, cost});
           }
         }
-
       }
     }
     return true;
@@ -476,7 +500,11 @@ namespace moho
    * walkable neighbour cells at level 0, the cluster-graph edges above it.
    * False when a cluster build ran out of budget.
    */
-  bool PathQueue::ImplBase::AddNeighbours(const SOCellPos& cell, const int level, neighbour_list& outNeighbours)
+  bool PathQueue::ImplBase::AddNeighbours(
+    const SOCellPos& cell,
+    const int level,
+    neighbour_list& outNeighbours
+  )
   {
     return (level == 0) ? AddAdjacentCells(cell, outNeighbours) : AddClusterEdges(cell, level, outNeighbours);
   }
@@ -497,7 +525,10 @@ namespace moho
    * sits on that level's cluster grid, since only grid-aligned cells carry
    * cluster nodes.
    */
-  bool PathQueue::ImplBase::CollectNeighbours(const SOCellPos& cell, neighbour_list& outNeighbours)
+  bool PathQueue::ImplBase::CollectNeighbours(
+    const SOCellPos& cell,
+    neighbour_list& outNeighbours
+  )
   {
     IPathTraveler* const traveler = CurrentTraveler();
     if (traveler == nullptr) {
@@ -522,9 +553,9 @@ namespace moho
         return false;
       }
 
-      if (level > 0
-          && !traveler->ShouldSearchRect(
-               clusterMap.ClusterRect(cellX, cellZ, static_cast<std::uint8_t>(level)))) {
+      if (
+        level > 0 && !traveler->ShouldSearchRect(clusterMap.ClusterRect(cellX, cellZ, static_cast<std::uint8_t>(level)))
+      ) {
         return true;
       }
     }
@@ -544,7 +575,10 @@ namespace moho
    * Note the budget is spent before the goal test, so reaching the goal on the
    * final unit of budget still costs it.
    */
-  PathQueue::ImplBase::Step PathQueue::ImplBase::ExpandNode(const SOCellPos& cell, neighbour_list& outNeighbours)
+  PathQueue::ImplBase::Step PathQueue::ImplBase::ExpandNode(
+    const SOCellPos& cell,
+    neighbour_list& outNeighbours
+  )
   {
     --mBudget;
     ++mExpandCount;
@@ -597,9 +631,9 @@ namespace moho
 
     // The `PathTables` this queue searches: `BeginQuery` picks each
     // traveler's cluster map out of it (`[[owner] + 0x1C][footprintIndex]`).
-    PathTables* mOwner;                           // +0x00
-    gpg::DList<IPathTraveler> mPendingTravelers;  // +0x04
-    ImplBase mBase;                               // +0x0C
+    PathTables* mOwner;                          // +0x00
+    gpg::DList<IPathTraveler> mPendingTravelers; // +0x04
+    ImplBase mBase;                              // +0x0C
   };
 
   static_assert(sizeof(PathQueue::Impl) == 0x88, "PathQueue::Impl size must be 0x88");
@@ -751,7 +785,9 @@ namespace moho
      * What it does:
      * `delete` of a reflected `PathQueue`, its destructor inlined.
      */
-    void DeletePathQueueRefCallback(void* const objectStorage)
+    void DeletePathQueueRefCallback(
+      void* const objectStorage
+    )
     {
       delete static_cast<PathQueue*>(objectStorage);
     }
@@ -763,7 +799,9 @@ namespace moho
      * Destroys a `PathQueue` in place: its `Impl` is deleted and the pointer
      * left as it was.
      */
-    void DestructPathQueueRefCallback(void* const objectStorage)
+    void DestructPathQueueRefCallback(
+      void* const objectStorage
+    )
     {
       static_cast<PathQueue*>(objectStorage)->~PathQueue();
     }
@@ -788,7 +826,9 @@ namespace moho
      * Constructs an empty `PathQueue` in caller storage, as a reflected
      * reference.
      */
-    [[nodiscard]] gpg::RRef ConstructPathQueueRefCallback(void* const objectStorage)
+    [[nodiscard]] gpg::RRef ConstructPathQueueRefCallback(
+      void* const objectStorage
+    )
     {
       gpg::RRef objectRef{};
       objectRef = gpg::MakeRRef<moho::PathQueue>(::new (objectStorage) PathQueue());
@@ -801,7 +841,9 @@ namespace moho
      * What it does:
      * `delete` of a reflected `PathQueue::Impl`.
      */
-    void DeletePathQueueImplRefCallback(void* const objectStorage)
+    void DeletePathQueueImplRefCallback(
+      void* const objectStorage
+    )
     {
       delete static_cast<PathQueue::Impl*>(objectStorage);
     }
@@ -812,7 +854,9 @@ namespace moho
      * What it does:
      * Destroys a `PathQueue::Impl` in place, leaving its storage.
      */
-    void DestructPathQueueImplRefCallback(void* const objectStorage)
+    void DestructPathQueueImplRefCallback(
+      void* const objectStorage
+    )
     {
       static_cast<PathQueue::Impl*>(objectStorage)->~Impl();
     }
@@ -835,7 +879,9 @@ namespace moho
      * Constructs a `PathQueue::Impl` in caller storage, as a reflected
      * reference.
      */
-    [[nodiscard]] gpg::RRef ConstructPathQueueImplRefCallback(void* const objectStorage)
+    [[nodiscard]] gpg::RRef ConstructPathQueueImplRefCallback(
+      void* const objectStorage
+    )
     {
       return gpg::MakeRRef(::new (objectStorage) PathQueue::Impl());
     }
@@ -847,7 +893,9 @@ namespace moho
      * Binds `PathQueue` reflection lifecycle callbacks (`new/ctor/delete/dtr`)
      * into one destination `gpg::RType` lane.
      */
-    [[nodiscard]] gpg::RType* BindPathQueueTypeInfoLifecycleCallbacks(gpg::RType* const typeInfo) noexcept
+    [[nodiscard]] gpg::RType* BindPathQueueTypeInfoLifecycleCallbacks(
+      gpg::RType* const typeInfo
+    ) noexcept
     {
       return gpg::BindRTypeLifecycleCallbacks(
         typeInfo,
@@ -865,7 +913,9 @@ namespace moho
      * Binds `PathQueue::Impl` reflection lifecycle callbacks
      * (`new/ctor/delete/dtr`) into one destination `gpg::RType` lane.
      */
-    [[nodiscard]] gpg::RType* BindPathQueueImplTypeInfoLifecycleCallbacks(gpg::RType* const typeInfo) noexcept
+    [[nodiscard]] gpg::RType* BindPathQueueImplTypeInfoLifecycleCallbacks(
+      gpg::RType* const typeInfo
+    ) noexcept
     {
       return gpg::BindRTypeLifecycleCallbacks(
         typeInfo,
@@ -991,9 +1041,7 @@ namespace moho
       offsetof(PathQueueImplSerializerHelper, mSaveCallback) == 0x10,
       "PathQueueImplSerializerHelper::mSaveCallback offset must be 0x10"
     );
-    static_assert(
-      sizeof(PathQueueImplSerializerHelper) == 0x14, "PathQueueImplSerializerHelper size must be 0x14"
-    );
+    static_assert(sizeof(PathQueueImplSerializerHelper) == 0x14, "PathQueueImplSerializerHelper size must be 0x14");
 
     PathQueueImplSerializerHelper gPathQueueImplSerializerHelper;
 
@@ -1099,7 +1147,9 @@ namespace moho
    * gets a fresh zeroed owner reference, as in the binary. The spliced ring's
    * first node that the binary leaves in EAX is discarded by its caller.
    */
-  void PathQueue::Impl::MemberDeserialize(gpg::ReadArchive* const archive)
+  void PathQueue::Impl::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     gpg::RRef ownerRef{};
     archive->ReadPointer(&mOwner, &ownerRef);
@@ -1142,7 +1192,9 @@ namespace moho
    * resolved once into a function-local cache and every write gets a fresh
    * zeroed owner reference, as in the binary.
    */
-  void PathQueue::Impl::MemberSerialize(gpg::WriteArchive* const archive) const
+  void PathQueue::Impl::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     gpg::RRef ownerRef{};
     archive->WritePointer<moho::PathTables>(mOwner, gpg::TrackedPointerState::Unowned, ownerRef);
@@ -1167,7 +1219,10 @@ namespace moho
     }
   }
 
-  void PathQueue::ImplBase::SaveExact(gpg::WriteArchive* const archive, const PathTables& owner)
+  void PathQueue::ImplBase::SaveExact(
+    gpg::WriteArchive* const archive,
+    const PathTables& owner
+  )
   {
     archive->WriteInt(owner.FootprintOfClusterMap(mClusterMap));
     archive->WriteShort(mClosestCell.x);
@@ -1185,7 +1240,9 @@ namespace moho
     }
 
     std::uint32_t nodeCount = 0;
-    mNodes.ForEach([&nodeCount](const node_type&) { ++nodeCount; });
+    mNodes.ForEach([&nodeCount](const node_type&) {
+      ++nodeCount;
+    });
     archive->WriteUInt(nodeCount);
     mNodes.ForEach([archive](const node_type& node) {
       archive->WriteShort(node.mCell.x);
@@ -1218,7 +1275,10 @@ namespace moho
     archive->WriteInt(mOpen.FreeHandle());
   }
 
-  void PathQueue::ImplBase::LoadExact(gpg::ReadArchive* const archive, const PathTables& owner)
+  void PathQueue::ImplBase::LoadExact(
+    gpg::ReadArchive* const archive,
+    const PathTables& owner
+  )
   {
     std::int32_t footprint = -1;
     archive->ReadInt(&footprint);
@@ -1340,8 +1400,8 @@ namespace moho
 
   struct OccupySourceBinding final : public gpg::HaStar::IOccupationSource
   {
-    COGrid* mGrid;                // +0x04
-    SNamedFootprint* mFootprint;  // +0x08
+    COGrid* mGrid;               // +0x04
+    SNamedFootprint* mFootprint; // +0x08
 
     /**
      * Address: 0x0076B750 (FUN_0076B750, ??0OccupySourceBinding@Moho@@QAE@@Z_0)
@@ -1383,7 +1443,8 @@ namespace moho
   static_assert(sizeof(OccupySourceBinding) == 0x0C, "OccupySourceBinding size must be 0x0C");
   static_assert(offsetof(OccupySourceBinding, mGrid) == 0x04, "OccupySourceBinding::mGrid offset must be 0x04");
   static_assert(
-    offsetof(OccupySourceBinding, mFootprint) == 0x08, "OccupySourceBinding::mFootprint offset must be 0x08"
+    offsetof(OccupySourceBinding, mFootprint) == 0x08,
+    "OccupySourceBinding::mFootprint offset must be 0x08"
   );
 
   /**
@@ -1408,17 +1469,20 @@ namespace moho
      */
     ~Impl();
 
-    std::int32_t mWidth;                          // +0x00
-    std::int32_t mHeight;                         // +0x04
-    fa::vector<OccupySourceBinding> mSources;  // +0x08
-    fa::vector<ClusterMap*> mMaps;             // +0x18
-    gpg::HaStar::ClusterCache mClusterCache;      // +0x28
+    std::int32_t mWidth;                      // +0x00
+    std::int32_t mHeight;                     // +0x04
+    fa::vector<OccupySourceBinding> mSources; // +0x08
+    fa::vector<ClusterMap*> mMaps;            // +0x18
+    gpg::HaStar::ClusterCache mClusterCache;  // +0x28
   };
 
   static_assert(sizeof(PathTables::Impl) == 0x30, "PathTables::Impl size must be 0x30");
   static_assert(offsetof(PathTables::Impl, mSources) == 0x08, "PathTables::Impl::mSources offset must be 0x08");
   static_assert(offsetof(PathTables::Impl, mMaps) == 0x18, "PathTables::Impl::mMaps offset must be 0x18");
-  static_assert(offsetof(PathTables::Impl, mClusterCache) == 0x28, "PathTables::Impl::mClusterCache offset must be 0x28");
+  static_assert(
+    offsetof(PathTables::Impl, mClusterCache) == 0x28,
+    "PathTables::Impl::mClusterCache offset must be 0x28"
+  );
 } // namespace moho
 
 namespace
@@ -1456,7 +1520,9 @@ namespace moho
    * What it does:
    * Allocates the `Impl`, then records the `PathTables` it searches.
    */
-  PathQueue::PathQueue(PathTables* const owner)
+  PathQueue::PathQueue(
+    PathTables* const owner
+  )
     : mImpl(new Impl())
   {
     mImpl->mOwner = owner;
@@ -1474,7 +1540,9 @@ namespace moho
    * Reads the owned `Impl` and installs it; the `Impl` it replaces is deleted
    * after the store, which is `scoped_ptr::reset`.
    */
-  void PathQueue::MemberDeserialize(gpg::ReadArchive* const archive)
+  void PathQueue::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     Impl* loaded = nullptr;
     const gpg::RRef owner{};
@@ -1488,7 +1556,9 @@ namespace moho
    * `PathQueueSerializer::Serialize` (0x00766980), which builds the
    * reference through `gpg::MakeRRef<Impl>` (0x0076A5F0).
    */
-  void PathQueue::MemberSerialize(gpg::WriteArchive* const archive) const
+  void PathQueue::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     const gpg::RRef owner{};
     archive->WritePointer(mImpl.get(), gpg::TrackedPointerState::Owned, owner);
@@ -1506,7 +1576,10 @@ namespace moho
    * the pending ring into the active slot, and seeds the search at its anchor
    * cell.
    */
-  void PathQueue::ImplBase::BeginQuery(IPathTraveler& traveler, PathTables& owner)
+  void PathQueue::ImplBase::BeginQuery(
+    IPathTraveler& traveler,
+    PathTables& owner
+  )
   {
     // "mTraveler.empty()", PathQueue.cpp:148
     assert(mTraveler.empty());
@@ -1550,7 +1623,9 @@ namespace moho
    * The path is built even on failure - the traveler still gets the closest
    * approach through `OnPathRejected` and can decide what to do with it.
    */
-  void PathQueue::ImplBase::FinishQuery(const bool reachedGoal)
+  void PathQueue::ImplBase::FinishQuery(
+    const bool reachedGoal
+  )
   {
     IPathTraveler* const traveler = CurrentTraveler();
 
@@ -1578,12 +1653,16 @@ namespace moho
   /**
    * Address: 0x00766047 (inlined into the query-setup lane at 0x00765FE0)
    */
-  gpg::HaStar::ClusterMap* PathTables::ClusterMapForFootprint(const std::int32_t footprintIndex) const
+  gpg::HaStar::ClusterMap* PathTables::ClusterMapForFootprint(
+    const std::int32_t footprintIndex
+  ) const
   {
     return mImpl->mMaps[footprintIndex];
   }
 
-  std::int32_t PathTables::FootprintOfClusterMap(const gpg::HaStar::ClusterMap* const map) const
+  std::int32_t PathTables::FootprintOfClusterMap(
+    const gpg::HaStar::ClusterMap* const map
+  ) const
   {
     for (std::size_t index = 0; index < mImpl->mMaps.size(); ++index) {
       if (mImpl->mMaps[index] == map) {
@@ -1593,7 +1672,9 @@ namespace moho
     return -1;
   }
 
-  void PathTables::SaveExact(gpg::WriteArchive* const archive) const
+  void PathTables::SaveExact(
+    gpg::WriteArchive* const archive
+  ) const
   {
     for (const ClusterMap* const map : mImpl->mMaps) {
       if (map != nullptr) {
@@ -1602,7 +1683,9 @@ namespace moho
     }
   }
 
-  void PathTables::LoadExact(gpg::ReadArchive* const archive)
+  void PathTables::LoadExact(
+    gpg::ReadArchive* const archive
+  )
   {
     std::unordered_map<std::string, gpg::HaStar::Cluster> shared;
     for (ClusterMap* const map : mImpl->mMaps) {
@@ -1628,7 +1711,9 @@ namespace moho
    * That is what makes pathfinding here incremental across frames rather than a
    * single blocking search.
    */
-  void PathQueue::Work(int& budget)
+  void PathQueue::Work(
+    int& budget
+  )
   {
     while (budget > 0) {
       Impl& impl = *mImpl;
@@ -1676,7 +1761,10 @@ namespace moho
    * queue already has in flight. Only a single `WorkOnce` pass runs: whatever
    * the budget buys is what the traveller gets, and it is notified either way.
    */
-  void PathQueue::WorkImmediate(int& budget, IPathTraveler& traveller)
+  void PathQueue::WorkImmediate(
+    int& budget,
+    IPathTraveler& traveller
+  )
   {
     ImplBase scratch;
 
@@ -1696,7 +1784,9 @@ namespace moho
     scratch.FinishQuery(step == ImplBase::Step::GoalReached);
   }
 
-  void PathQueue::QueueTraveler(IPathTraveler& traveller)
+  void PathQueue::QueueTraveler(
+    IPathTraveler& traveller
+  )
   {
     mImpl->mPendingTravelers.push_back(&traveller);
   }
@@ -1708,7 +1798,10 @@ namespace moho
    * Stores the new queue in the owner's slot, then deletes the previous one
    * (`~PathQueue` deletes its `Impl`) -- `scoped_ptr::reset` inlined.
    */
-  void PathQueue::Move(PathQueue** const slot, PathQueue* const replacement) noexcept
+  void PathQueue::Move(
+    PathQueue** const slot,
+    PathQueue* const replacement
+  ) noexcept
   {
     PathQueue* const previous = *slot;
     *slot = replacement;
@@ -1725,8 +1818,7 @@ namespace moho
   OccupySourceBinding::OccupySourceBinding()
     : mGrid(nullptr)
     , mFootprint(nullptr)
-  {
-  }
+  {}
 
   /**
    * Address: 0x0076B760 (FUN_0076B760, ??0OccupySourceBinding@Moho@@QAE@@Z_1)
@@ -1735,11 +1827,13 @@ namespace moho
    * Initializes one path occupation-source binding with explicit grid and
    * footprint owners.
    */
-  OccupySourceBinding::OccupySourceBinding(COGrid* const grid, SNamedFootprint* const footprint)
+  OccupySourceBinding::OccupySourceBinding(
+    COGrid* const grid,
+    SNamedFootprint* const footprint
+  )
     : mGrid(grid)
     , mFootprint(footprint)
-  {
-  }
+  {}
 
   /**
    * Address: 0x0076CB50 (FUN_0076CB50, ??0OccupySourceBinding@Moho@@QAE@@Z)
@@ -1747,11 +1841,12 @@ namespace moho
    * What it does:
    * Copy-constructs one path occupation-source binding owner pair.
    */
-  OccupySourceBinding::OccupySourceBinding(const OccupySourceBinding& other)
+  OccupySourceBinding::OccupySourceBinding(
+    const OccupySourceBinding& other
+  )
     : mGrid(other.mGrid)
     , mFootprint(other.mFootprint)
-  {
-  }
+  {}
 
   /**
    * Address: 0x0076B770 (FUN_0076B770, Moho::OccupySourceBinding::GetOccupyData)
@@ -1777,13 +1872,15 @@ namespace moho
 
     const std::uint32_t footprintWidth = static_cast<std::uint32_t>(mFootprint->mSizeX);
     const std::uint32_t footprintHeight = static_cast<std::uint32_t>(mFootprint->mSizeZ);
-    const std::uint32_t activeRowCount = footprintHeight + static_cast<std::uint32_t>(kOccupationResultColumnCount - 1u);
+    const std::uint32_t activeRowCount =
+      footprintHeight + static_cast<std::uint32_t>(kOccupationResultColumnCount - 1u);
     const std::uint32_t widthMask = (1u << footprintWidth) - 1u;
 
     std::array<std::uint32_t, kMaxRowMaskCount> rowMasks{};
     for (std::uint32_t row = 0; row < activeRowCount && row < rowMasks.size(); ++row) {
       rowMasks[row] = 0x1FFu;
-      for (std::uint32_t x = 0; x < (footprintWidth + static_cast<std::uint32_t>(kOccupationResultColumnCount - 1u)); ++x) {
+      for (std::uint32_t x = 0; x < (footprintWidth + static_cast<std::uint32_t>(kOccupationResultColumnCount - 1u));
+           ++x) {
         SOCellPos cellPos{};
         cellPos.x = static_cast<std::int16_t>(worldX + static_cast<int>(x));
         cellPos.z = static_cast<std::int16_t>(worldY + static_cast<int>(row));
@@ -1871,12 +1968,7 @@ namespace moho
       area.x1 = static_cast<int>(footprint.mSizeX) + 1;
       area.z1 = static_cast<int>(footprint.mSizeZ) + 1;
       mImpl->mMaps[index] = new ClusterMap(
-        &source,
-        static_cast<unsigned int>(width),
-        static_cast<unsigned int>(height),
-        mImpl->mClusterCache,
-        2u,
-        area
+        &source, static_cast<unsigned int>(width), static_cast<unsigned int>(height), mImpl->mClusterCache, 2u, area
       );
       ++index;
     }
@@ -1899,7 +1991,9 @@ namespace moho
   /**
    * Address: 0x0076BC10 (FUN_0076BC10)
    */
-  void PathTables::UpdateBackground(int* budget)
+  void PathTables::UpdateBackground(
+    int* budget
+  )
   {
     if (!budget || !mImpl) {
       return;
@@ -1929,7 +2023,9 @@ namespace moho
   /// which every live `ClusterMap` does (`::operator new(sizeof(ClusterMap))`
   /// in the `PathTables` constructor). A pointer into the image, a reserved
   /// or free region, or a read-only page is corruption by definition.
-  [[nodiscard]] bool ClusterMapPointerLooksLive(const ClusterMap* const cluster) noexcept
+  [[nodiscard]] bool ClusterMapPointerLooksLive(
+    const ClusterMap* const cluster
+  ) noexcept
   {
     MEMORY_BASIC_INFORMATION info{};
     if (::VirtualQuery(cluster, &info, sizeof(info)) != sizeof(info)) {
@@ -1939,8 +2035,7 @@ namespace moho
       return false;
     }
 
-    constexpr DWORD kWritableMask = PAGE_READWRITE | PAGE_WRITECOPY
-                                  | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
+    constexpr DWORD kWritableMask = PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY;
     if ((info.Protect & kWritableMask) == 0u || (info.Protect & PAGE_GUARD) != 0u) {
       return false;
     }
@@ -1968,7 +2063,8 @@ namespace moho
     MEMORY_BASIC_INFORMATION info{};
     const bool queried = ::VirtualQuery(cluster, &info, sizeof(info)) == sizeof(info);
     (void)std::snprintf(
-      line, sizeof(line),
+      line,
+      sizeof(line),
       "[CLUSTERLANE] bad slot=%p index=%d cluster=%p state=%08lX type=%08lX protect=%08lX\n",
       static_cast<const void*>(slot),
       static_cast<int>(slot - impl->mMaps.begin()),
@@ -1985,7 +2081,8 @@ namespace moho
     sDumpedLane = true;
 
     (void)std::snprintf(
-      line, sizeof(line),
+      line,
+      sizeof(line),
       "[CLUSTERLANE] impl=%p first=%p last=%p end=%p count=%d\n",
       static_cast<const void*>(impl),
       static_cast<const void*>(impl->mMaps.begin()),
@@ -1997,8 +2094,11 @@ namespace moho
 
     for (ClusterMap** it = impl->mMaps.begin(); it != impl->mMaps.end(); ++it) {
       (void)std::snprintf(
-        line, sizeof(line), "[CLUSTERLANE]   [%d] = %p\n",
-        static_cast<int>(it - impl->mMaps.begin()), static_cast<const void*>(*it)
+        line,
+        sizeof(line),
+        "[CLUSTERLANE]   [%d] = %p\n",
+        static_cast<int>(it - impl->mMaps.begin()),
+        static_cast<const void*>(*it)
       );
       ::OutputDebugStringA(line);
     }
@@ -2007,7 +2107,9 @@ namespace moho
   /**
    * Address: 0x0076BBD0 (FUN_0076BBD0, Moho::PathQueue::DirtyClusters)
    */
-  void PathTables::DirtyClusters(const gpg::Rect2i& dirtyRect)
+  void PathTables::DirtyClusters(
+    const gpg::Rect2i& dirtyRect
+  )
   {
     if (!mImpl) {
       return;
@@ -2043,5 +2145,11 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(RegisterPathQueueTypeInfo_96e1d0, moho::RegisterPathQueueTypeInfo)
-GPG_PREREGISTER_INIT(RegisterPathQueueImplTypeInfo_96e1d0, moho::RegisterPathQueueImplTypeInfo)
+GPG_PREREGISTER_INIT(
+  RegisterPathQueueTypeInfo_96e1d0,
+  moho::RegisterPathQueueTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  RegisterPathQueueImplTypeInfo_96e1d0,
+  moho::RegisterPathQueueImplTypeInfo
+)

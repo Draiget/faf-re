@@ -32,8 +32,11 @@ namespace moho
      * Scans weapon-blueprint lanes matching `mRangeCategory` and emits
      * `{center.x, center.z, minRange, maxRange}`.
      */
-    [[nodiscard]] bool
-    Range(SRangeExtractionPayload* outRange, const RUnitBlueprint* unitBlueprint, const Wm3::Vec3f& center) const override;
+    [[nodiscard]] bool Range(
+      SRangeExtractionPayload* outRange,
+      const RUnitBlueprint* unitBlueprint,
+      const Wm3::Vec3f& center
+    ) const override;
 
     /**
      * Address: 0x007EC5B0 (FUN_007EC5B0, Moho::WeaponExtractor::Extract)
@@ -55,7 +58,10 @@ namespace moho
   };
 
 #if defined(_M_IX86)
-  static_assert(offsetof(WeaponExtractor, mRangeCategory) == 0x04, "WeaponExtractor::mRangeCategory offset must be 0x04");
+  static_assert(
+    offsetof(WeaponExtractor, mRangeCategory) == 0x04,
+    "WeaponExtractor::mRangeCategory offset must be 0x04"
+  );
   static_assert(sizeof(WeaponExtractor) == 0x08, "WeaponExtractor size must be 0x08");
 #endif
 } // namespace moho

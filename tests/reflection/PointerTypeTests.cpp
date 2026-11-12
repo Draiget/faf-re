@@ -58,13 +58,17 @@ namespace faf_reflection_tests
     int first = 0;
     int second = 0;
 
-    void MemberSerialize(gpg::WriteArchive* const archive) const
+    void MemberSerialize(
+      gpg::WriteArchive* const archive
+    ) const
     {
       archive->WriteInt(first);
       archive->WriteInt(second);
     }
 
-    void MemberDeserialize(gpg::ReadArchive* const archive)
+    void MemberDeserialize(
+      gpg::ReadArchive* const archive
+    )
     {
       archive->ReadInt(&first);
       archive->ReadInt(&second);
@@ -85,15 +89,23 @@ namespace
   class ReflPairTypeInfo final : public gpg::RType
   {
   public:
-    ReflPairTypeInfo() { gpg::PreRegisterRType(typeid(ReflPair), this); }
+    ReflPairTypeInfo()
+    {
+      gpg::PreRegisterRType(typeid(ReflPair), this);
+    }
 
-    [[nodiscard]] const char* GetName() const override { return "faf_reflection_tests::ReflPair"; }
+    [[nodiscard]] const char* GetName() const override
+    {
+      return "faf_reflection_tests::ReflPair";
+    }
 
     void Init() override
     {
       size_ = static_cast<int>(sizeof(ReflPair));
       version_ = 2;
-      newRefFunc_ = []() { return gpg::RRef{new ReflPair, gpg::RTypeOf<ReflPair>()}; };
+      newRefFunc_ = []() {
+        return gpg::RRef{new ReflPair, gpg::RTypeOf<ReflPair>()};
+      };
       deleteFunc_ = [](void* const object) {
         ++gPairsDeleted;
         delete static_cast<ReflPair*>(object);
@@ -154,7 +166,9 @@ namespace
   // comes after the startup pass that finishes types, so they have no name entry and size 0 there; Windows has
   // every one finished. Whether a server's keyframes or saves reach them is unchecked. The next test shows it
   // (disabled on Linux); the others skip unfinished types on Linux only.
-  bool UnfinishedOnLinux(const gpg::RType* const type)
+  bool UnfinishedOnLinux(
+    const gpg::RType* const type
+  )
   {
 #if defined(__linux__)
     return type != nullptr && gpg::REF_FindTypeNamed(type->GetName()) != type;
@@ -165,9 +179,15 @@ namespace
   }
 
 #if defined(__linux__)
-  TEST(ReflectionPointerTypes, DISABLED_EveryPointerTypeIsFinished)
+  TEST(
+    ReflectionPointerTypes,
+    DISABLED_EveryPointerTypeIsFinished
+  )
 #else
-  TEST(ReflectionPointerTypes, EveryPointerTypeIsFinished)
+  TEST(
+    ReflectionPointerTypes,
+    EveryPointerTypeIsFinished
+  )
 #endif
   {
     for (const PointerCase& pointer : PointerCases()) {
@@ -177,7 +197,10 @@ namespace
     }
   }
 
-  TEST(ReflectionPointerTypes, NamedAfterThePointeeWithAStar)
+  TEST(
+    ReflectionPointerTypes,
+    NamedAfterThePointeeWithAStar
+  )
   {
     for (const PointerCase& pointer : PointerCases()) {
       if (UnfinishedOnLinux(pointer.type)) {
@@ -193,7 +216,10 @@ namespace
     }
   }
 
-  TEST(ReflectionPointerTypes, AnEmptySlotReadsNullAndHoldsNothing)
+  TEST(
+    ReflectionPointerTypes,
+    AnEmptySlotReadsNullAndHoldsNothing
+  )
   {
     for (const PointerCase& pointer : PointerCases()) {
       void* slot = nullptr;
@@ -208,7 +234,10 @@ namespace
     }
   }
 
-  TEST(ReflectionPointerTypes, ASetSlotCountsOneElement)
+  TEST(
+    ReflectionPointerTypes,
+    ASetSlotCountsOneElement
+  )
   {
     int target = 0;
     for (const PointerCase& pointer : PointerCases()) {
@@ -217,7 +246,10 @@ namespace
     }
   }
 
-  TEST(ReflectionPointerTypes, AssignPointerTakesNullAndRefusesOtherTypes)
+  TEST(
+    ReflectionPointerTypes,
+    AssignPointerTakesNullAndRefusesOtherTypes
+  )
   {
     int target = 0;
     int notAnObject = 5;
@@ -233,7 +265,10 @@ namespace
     }
   }
 
-  TEST(ReflectionPointerTypes, CountZeroClearsTheSlotAndMoreThanOneIsRefused)
+  TEST(
+    ReflectionPointerTypes,
+    CountZeroClearsTheSlotAndMoreThanOneIsRefused
+  )
   {
     int target = 0;
     for (const PointerCase& pointer : PointerCases()) {
@@ -247,7 +282,10 @@ namespace
     }
   }
 
-  TEST(ReflectionPointerTypes, SlotLanesCreateCopyAndMoveTheAddress)
+  TEST(
+    ReflectionPointerTypes,
+    SlotLanesCreateCopyAndMoveTheAddress
+  )
   {
     int target = 0;
     for (const PointerCase& pointer : PointerCases()) {
@@ -287,7 +325,10 @@ namespace
     }
   }
 
-  TEST(ReflectionPointerTypes, CheckedSlotUpcastsReturnTheSlotOrThrow)
+  TEST(
+    ReflectionPointerTypes,
+    CheckedSlotUpcastsReturnTheSlotOrThrow
+  )
   {
     int notASlot = 0;
     const gpg::RRef intRef{&notASlot, gpg::RTypeOf<int>()};
@@ -306,7 +347,10 @@ namespace
     }
   }
 
-  TEST(ReflectionPointerTypes, MakeRRefOfASlotUsesThePointerType)
+  TEST(
+    ReflectionPointerTypes,
+    MakeRRefOfASlotUsesThePointerType
+  )
   {
     moho::SimArmy* army = nullptr;
     const gpg::RRef ref = gpg::MakeRRef(&army);
@@ -327,10 +371,16 @@ namespace
   class ReflectionContainers : public ArchiveFixture
   {
   protected:
-    void SetUp() override { gPairsDeleted = 0; }
+    void SetUp() override
+    {
+      gPairsDeleted = 0;
+    }
   };
 
-  TEST_F(ReflectionContainers, SimArmyPointerVectorIsIndexedAndCounted)
+  TEST_F(
+    ReflectionContainers,
+    SimArmyPointerVectorIsIndexedAndCounted
+  )
   {
     // RVectorType<SimArmy*>: GetName 0x0074CB70, Init 0x0074CBF0 (version 1), GetLexical 0x0074CC10.
     gpg::RType* const type = gpg::RTypeOf<fa::vector<moho::SimArmy*>>();
@@ -358,19 +408,26 @@ namespace
     EXPECT_EQ(lexical.substr(lexical.size() - 8), ", size=3");
   }
 
-  TEST_F(ReflectionContainers, SimArmyPointerVectorRoundTripsNullArmies)
+  TEST_F(
+    ReflectionContainers,
+    SimArmyPointerVectorRoundTripsNullArmies
+  )
   {
     // SerializeSimArmyPtrVector 0x0074E350: the count, then each army as an unowned tracked pointer.
     gpg::RType* const type = gpg::RTypeOf<fa::vector<moho::SimArmy*>>();
     fa::vector<moho::SimArmy*> armies;
     armies.resize(2);
-    const std::string bytes = Write([&](gpg::WriteArchive& archive) { archive.Write(type, &armies, gpg::RRef{}); });
+    const std::string bytes = Write([&](gpg::WriteArchive& archive) {
+      archive.Write(type, &armies, gpg::RRef{});
+    });
     const std::string expected = Bytes().NewObject("vector<SimArmy*>", 1).U32(2).Token('0').Token('0').End().str();
     EXPECT_EQ(ToHex(bytes), ToHex(expected));
 
     fa::vector<moho::SimArmy*> back;
     back.resize(5);
-    Read(bytes, [&](gpg::ReadArchive& archive) { archive.Read(type, &back, gpg::RRef{}); });
+    Read(bytes, [&](gpg::ReadArchive& archive) {
+      archive.Read(type, &back, gpg::RRef{});
+    });
     ASSERT_EQ(back.size(), 2u);
     EXPECT_EQ(back[0], nullptr);
     EXPECT_EQ(back[1], nullptr);
@@ -380,7 +437,10 @@ namespace
   // RListType / RSharedPointerType
   // ---------------------------------------------------------------------------------------------
 
-  TEST_F(ReflectionContainers, ListTypeIsNamedAfterItsElement)
+  TEST_F(
+    ReflectionContainers,
+    ListTypeIsNamedAfterItsElement
+  )
   {
     gpg::RType* const type = gpg::RTypeOf<fa::list<ReflPair>>();
     ASSERT_EQ(type, &gPairListType);
@@ -395,30 +455,53 @@ namespace
     EXPECT_EQ(lexical.substr(lexical.size() - 8), ", size=2");
   }
 
-  TEST_F(ReflectionContainers, ListOfValuesRoundTrips)
+  TEST_F(
+    ReflectionContainers,
+    ListOfValuesRoundTrips
+  )
   {
     fa::list<ReflPair> list;
     list.push_back(ReflPair{1, 2});
     list.push_back(ReflPair{-3, 4});
     list.push_back(ReflPair{5, -6});
     gpg::RType* const type = gpg::RTypeOf<fa::list<ReflPair>>();
-    const std::string bytes = Write([&](gpg::WriteArchive& archive) { archive.Write(type, &list, gpg::RRef{}); });
+    const std::string bytes = Write([&](gpg::WriteArchive& archive) {
+      archive.Write(type, &list, gpg::RRef{});
+    });
 
     std::string listName = std::string("list<") + kPairName + ">";
     const std::string expected = Bytes()
                                    .NewObject(listName, 1)
                                    .U32(3)
-                                   .NewObject(kPairName, 2).I32(1).I32(2).End()
-                                   .KnownObject(1).I32(-3).I32(4).End()
-                                   .KnownObject(1).I32(5).I32(-6).End()
+                                   .NewObject(kPairName, 2)
+                                   .I32(1)
+                                   .I32(2)
+                                   .End()
+                                   .KnownObject(1)
+                                   .I32(-3)
+                                   .I32(4)
+                                   .End()
+                                   .KnownObject(1)
+                                   .I32(5)
+                                   .I32(-6)
+                                   .End()
                                    .End()
                                    .str();
     EXPECT_EQ(ToHex(bytes), ToHex(expected));
-    EXPECT_EQ(Write([&](gpg::WriteArchive& archive) { archive.Write(type, &list, gpg::RRef{}); }, faf_reflection_tests::WriterKind::FastSink), bytes);
+    EXPECT_EQ(
+      Write(
+        [&](gpg::WriteArchive& archive) {
+      archive.Write(type, &list, gpg::RRef{});
+    }, faf_reflection_tests::WriterKind::FastSink
+      ),
+      bytes
+    );
 
     fa::list<ReflPair> back;
     back.push_back(ReflPair{9, 9}); // replaced, not appended to
-    Read(bytes, [&](gpg::ReadArchive& archive) { archive.Read(type, &back, gpg::RRef{}); });
+    Read(bytes, [&](gpg::ReadArchive& archive) {
+      archive.Read(type, &back, gpg::RRef{});
+    });
     ASSERT_EQ(back.size(), 3u);
     auto it = back.begin();
     EXPECT_EQ(it->first, 1);
@@ -429,7 +512,10 @@ namespace
     EXPECT_EQ(it->second, -6);
   }
 
-  TEST_F(ReflectionContainers, ListOfEntityPointersWritesEachAsATrackedPointer)
+  TEST_F(
+    ReflectionContainers,
+    ListOfEntityPointersWritesEachAsATrackedPointer
+  )
   {
     // RListType<Entity*> (EntityDb.cpp): the count, then each element as an unowned tracked pointer (`0` for null).
     gpg::RType* const type = gpg::RTypeOf<fa::list<moho::Entity*>>();
@@ -438,11 +524,15 @@ namespace
     fa::list<moho::Entity*> entities;
     entities.push_back(nullptr);
     entities.push_back(nullptr);
-    const std::string bytes = Write([&](gpg::WriteArchive& archive) { archive.Write(type, &entities, gpg::RRef{}); });
+    const std::string bytes = Write([&](gpg::WriteArchive& archive) {
+      archive.Write(type, &entities, gpg::RRef{});
+    });
     EXPECT_EQ(ToHex(bytes), ToHex(Bytes().NewObject("list<Entity*>", 1).U32(2).Token('0').Token('0').End().str()));
 
     fa::list<moho::Entity*> back;
-    Read(bytes, [&](gpg::ReadArchive& archive) { archive.Read(type, &back, gpg::RRef{}); });
+    Read(bytes, [&](gpg::ReadArchive& archive) {
+      archive.Read(type, &back, gpg::RRef{});
+    });
     ASSERT_EQ(back.size(), 2u);
     EXPECT_EQ(back.front(), nullptr);
 
@@ -457,13 +547,17 @@ namespace
         archive.Read(type, &refused, gpg::RRef{});
         ADD_FAILURE() << "no throw";
       } catch (const gpg::SerializationError& error) {
-        EXPECT_NE(std::string(error.what()).find("expected a pointer to an object of type \"Entity\""), std::string::npos)
-          << error.what();
+        EXPECT_NE(
+          std::string(error.what()).find("expected a pointer to an object of type \"Entity\""), std::string::npos
+        ) << error.what();
       }
     });
   }
 
-  TEST_F(ReflectionContainers, SharedPointerTypeViewsItsPointee)
+  TEST_F(
+    ReflectionContainers,
+    SharedPointerTypeViewsItsPointee
+  )
   {
     gpg::RType* const type = gpg::RTypeOf<boost::shared_ptr<ReflPair>>();
     ASSERT_EQ(type, &gPairSharedType);
@@ -489,7 +583,10 @@ namespace
     EXPECT_NE(lexical.find(kPairName), std::string::npos) << lexical;
   }
 
-  TEST_F(ReflectionContainers, SharedPointersReadBackSharingOneObject)
+  TEST_F(
+    ReflectionContainers,
+    SharedPointersReadBackSharingOneObject
+  )
   {
     boost::shared_ptr<ReflPair> pair(new ReflPair{11, 12});
     const std::string bytes = Write([&](gpg::WriteArchive& archive) {
@@ -497,7 +594,8 @@ namespace
       archive.WritePointer(pair.get(), gpg::TrackedPointerState::Shared, gpg::RRef{});
     });
     EXPECT_EQ(
-      ToHex(bytes), ToHex(Bytes().Token('N').I32(-1).Str(kPairName).I32(2).I32(11).I32(12).End().Token('*').I32(0).str())
+      ToHex(bytes),
+      ToHex(Bytes().Token('N').I32(-1).Str(kPairName).I32(2).I32(11).I32(12).End().Token('*').I32(0).str())
     );
 
     boost::shared_ptr<ReflPair> first;
@@ -519,7 +617,10 @@ namespace
     EXPECT_EQ(gPairsDeleted, 1); // freed through the type's delete lane (ReadPointerShared, serialization.h:392)
   }
 
-  TEST_F(ReflectionContainers, SharedThenOwnedIsAnOwnershipConflict)
+  TEST_F(
+    ReflectionContainers,
+    SharedThenOwnedIsAnOwnershipConflict
+  )
   {
     ReflPair pair{1, 1};
     const std::string bytes = Write([&](gpg::WriteArchive& archive) {
@@ -544,7 +645,10 @@ namespace
   // map<string,float> and list<Rect2i>
   // ---------------------------------------------------------------------------------------------
 
-  TEST_F(ReflectionContainers, ArmourMultiplierMapRoundTripsInKeyOrder)
+  TEST_F(
+    ReflectionContainers,
+    ArmourMultiplierMapRoundTripsInKeyOrder
+  )
   {
     // RMapStringFloatTypeInfo: registered under std::map<std::string,float> (the unit's armour multipliers,
     // UnitSave.cpp) and stored as fa::map<fa::string,float>; the count, then each key and value.
@@ -560,27 +664,37 @@ namespace
     const std::string lexical(gpg::RRef{&armour, type}.GetLexical().view());
     EXPECT_EQ(lexical.substr(lexical.size() - 8), ", size=3");
 
-    const std::string bytes = Write([&](gpg::WriteArchive& archive) { archive.Write(type, &armour, gpg::RRef{}); });
+    const std::string bytes = Write([&](gpg::WriteArchive& archive) {
+      archive.Write(type, &armour, gpg::RRef{});
+    });
     const std::string expected = Bytes()
                                    .NewObject("map<std::string,float>", 1)
                                    .U32(3)
-                                   .Str("Commander").F32(0.5f)
-                                   .Str("Experimental").F32(0.25f)
-                                   .Str("Normal").F32(1.0f)
+                                   .Str("Commander")
+                                   .F32(0.5f)
+                                   .Str("Experimental")
+                                   .F32(0.25f)
+                                   .Str("Normal")
+                                   .F32(1.0f)
                                    .End()
                                    .str();
     EXPECT_EQ(ToHex(bytes), ToHex(expected));
 
     fa::map<fa::string, float> back;
     back[fa::string("Stale")] = 9.0f;
-    Read(bytes, [&](gpg::ReadArchive& archive) { archive.Read(type, &back, gpg::RRef{}); });
+    Read(bytes, [&](gpg::ReadArchive& archive) {
+      archive.Read(type, &back, gpg::RRef{});
+    });
     ASSERT_EQ(back.size(), 3u);
     EXPECT_EQ(back[fa::string("Commander")], 0.5f);
     EXPECT_EQ(back[fa::string("Normal")], 1.0f);
     EXPECT_EQ(back.find(fa::string("Stale")), back.end());
   }
 
-  TEST_F(ReflectionContainers, Rect2ListUsesTheBinarysFieldOrder)
+  TEST_F(
+    ReflectionContainers,
+    Rect2ListUsesTheBinarysFieldOrder
+  )
   {
     // RListType<Rect2i> (CAiPathFinderTypeInfo.cpp); Rect2<int> saves x0 z0 x1 z1 (0x00905D00) and Rect2<float>
     // saves x0 x1 z0 z1 (0x00905D80: +0, +8, +4, +0xC).
@@ -591,18 +705,32 @@ namespace
     fa::list<gpg::Rect2i> rects;
     rects.push_back(gpg::Rect2i{1, 2, 3, 4});
     rects.push_back(gpg::Rect2i{-5, -6, 7, 8});
-    const std::string bytes = Write([&](gpg::WriteArchive& archive) { archive.Write(listType, &rects, gpg::RRef{}); });
+    const std::string bytes = Write([&](gpg::WriteArchive& archive) {
+      archive.Write(listType, &rects, gpg::RRef{});
+    });
     const std::string expected = Bytes()
                                    .NewObject("list<Rect2i>", 1)
                                    .U32(2)
-                                   .NewObject("Rect2i", 0).I32(1).I32(2).I32(3).I32(4).End()
-                                   .KnownObject(1).I32(-5).I32(-6).I32(7).I32(8).End()
+                                   .NewObject("Rect2i", 0)
+                                   .I32(1)
+                                   .I32(2)
+                                   .I32(3)
+                                   .I32(4)
+                                   .End()
+                                   .KnownObject(1)
+                                   .I32(-5)
+                                   .I32(-6)
+                                   .I32(7)
+                                   .I32(8)
+                                   .End()
                                    .End()
                                    .str();
     EXPECT_EQ(ToHex(bytes), ToHex(expected));
 
     fa::list<gpg::Rect2i> back;
-    Read(bytes, [&](gpg::ReadArchive& archive) { archive.Read(listType, &back, gpg::RRef{}); });
+    Read(bytes, [&](gpg::ReadArchive& archive) {
+      archive.Read(listType, &back, gpg::RRef{});
+    });
     ASSERT_EQ(back.size(), 2u);
     EXPECT_EQ(back.back().x0, -5);
     EXPECT_EQ(back.back().z0, -6);
@@ -610,14 +738,17 @@ namespace
     EXPECT_EQ(back.back().z1, 8);
 
     gpg::Rect2f rect{0.5f, 1.5f, 2.5f, 3.5f};
-    const std::string floatBytes =
-      Write([&](gpg::WriteArchive& archive) { archive.Write(gpg::RTypeOf<gpg::Rect2f>(), &rect, gpg::RRef{}); });
+    const std::string floatBytes = Write([&](gpg::WriteArchive& archive) {
+      archive.Write(gpg::RTypeOf<gpg::Rect2f>(), &rect, gpg::RRef{});
+    });
     EXPECT_EQ(
       ToHex(floatBytes),
       ToHex(Bytes().NewObject("Rect2f", 0).F32(rect.x0).F32(rect.x1).F32(rect.z0).F32(rect.z1).End().str())
     );
     gpg::Rect2f floatBack{};
-    Read(floatBytes, [&](gpg::ReadArchive& archive) { archive.Read(gpg::RTypeOf<gpg::Rect2f>(), &floatBack, gpg::RRef{}); });
+    Read(floatBytes, [&](gpg::ReadArchive& archive) {
+      archive.Read(gpg::RTypeOf<gpg::Rect2f>(), &floatBack, gpg::RRef{});
+    });
     EXPECT_EQ(floatBack.x0, rect.x0);
     EXPECT_EQ(floatBack.z0, rect.z0);
     EXPECT_EQ(floatBack.x1, rect.x1);

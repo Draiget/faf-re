@@ -33,7 +33,10 @@ namespace gpg::gal
     GpuBufferVulkan(DeviceVulkan& device, const GpuBufferDesc& desc);
     ~GpuBufferVulkan() override;
 
-    [[nodiscard]] vulkan::TrackedBuffer& Buffer() noexcept { return mBuffer; }
+    [[nodiscard]] vulkan::TrackedBuffer& Buffer() noexcept
+    {
+      return mBuffer;
+    }
 
   private:
     vulkan::TrackedBuffer mBuffer;

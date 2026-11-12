@@ -135,7 +135,8 @@ namespace moho
   static_assert(offsetof(BeamDrawContext, sheet) == 0x00, "BeamDrawContext::sheet offset must be 0x00");
   static_assert(offsetof(BeamDrawContext, maxQuadCount) == 0x04, "BeamDrawContext::maxQuadCount offset must be 0x04");
   static_assert(
-    offsetof(BeamDrawContext, maxVertexCount) == 0x08, "BeamDrawContext::maxVertexCount offset must be 0x08"
+    offsetof(BeamDrawContext, maxVertexCount) == 0x08,
+    "BeamDrawContext::maxVertexCount offset must be 0x08"
   );
   static_assert(offsetof(BeamDrawContext, quadCount) == 0x0C, "BeamDrawContext::quadCount offset must be 0x0C");
   static_assert(offsetof(BeamDrawContext, writeCursor) == 0x10, "BeamDrawContext::writeCursor offset must be 0x10");
@@ -147,24 +148,21 @@ namespace moho
    * What it does:
    * Map key for the beam render buckets: the two texture sheets a beam draws
    * with, plus its blend mode.
-   * Address: 0x004921D0 (FUN_004921D0 -- the key's implicit default constructor -- both `TextureSheetHandle` members start empty for `fa::map<SBeamBucketKey, fa::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `InitializeBeamTextureBucketKeyHandles` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x004921D0 (FUN_004921D0 -- the key's implicit default constructor -- both `TextureSheetHandle` members
+   * start empty for `fa::map<SBeamBucketKey, fa::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24,
+   * node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `InitializeBeamTextureBucketKeyHandles`
+   * in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
    */
   struct SBeamBucketKey
   {
-    TextureSheetHandle texture0;   // +0x00
-    TextureSheetHandle texture1;   // +0x08
-    std::int32_t blendMode = 0;    // +0x10
+    TextureSheetHandle texture0; // +0x00
+    TextureSheetHandle texture1; // +0x08
+    std::int32_t blendMode = 0;  // +0x10
   };
 
-  static_assert(
-    offsetof(SBeamBucketKey, texture0) == 0x00, "SBeamBucketKey::texture0 offset must be 0x00"
-  );
-  static_assert(
-    offsetof(SBeamBucketKey, texture1) == 0x08, "SBeamBucketKey::texture1 offset must be 0x08"
-  );
-  static_assert(
-    offsetof(SBeamBucketKey, blendMode) == 0x10, "SBeamBucketKey::blendMode offset must be 0x10"
-  );
+  static_assert(offsetof(SBeamBucketKey, texture0) == 0x00, "SBeamBucketKey::texture0 offset must be 0x00");
+  static_assert(offsetof(SBeamBucketKey, texture1) == 0x08, "SBeamBucketKey::texture1 offset must be 0x08");
+  static_assert(offsetof(SBeamBucketKey, blendMode) == 0x10, "SBeamBucketKey::blendMode offset must be 0x10");
   static_assert(sizeof(SBeamBucketKey) == 0x14, "SBeamBucketKey size must be 0x14");
 
   /**
@@ -174,16 +172,13 @@ namespace moho
    */
   struct BeamBucketKeyLess
   {
-    [[nodiscard]] bool operator()(
-      const SBeamBucketKey& lhs, const SBeamBucketKey& rhs
-    ) const noexcept;
+    [[nodiscard]] bool operator()(const SBeamBucketKey& lhs, const SBeamBucketKey& rhs) const noexcept;
   };
 
   // Binary-facing layout: the MSVC8 tree header is 0x0C bytes, which `std::map`
   // only measures under `_ITERATOR_DEBUG_LEVEL=2`. Using the legacy tree keeps
   // `CWorldParticles` at 0xDC in every build configuration.
-  using BeamBucketMap =
-    fa::map<SBeamBucketKey, fa::vector<SWorldBeam>, BeamBucketKeyLess>;
+  using BeamBucketMap = fa::map<SBeamBucketKey, fa::vector<SWorldBeam>, BeamBucketKeyLess>;
 
   /**
    * What it does:
@@ -195,36 +190,35 @@ namespace moho
    * `fa::vector<SBeamVertex>`'s copy steps. Formerly transcribed
    * as `CopyBeamRenderVertexLanePacked` in BeamRenderHelpers.cpp, removed
    * 2026-09-10.)
-   * Address: 0x0049FEF0 (FUN_0049FEF0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SBeamVertex` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `CopySingleFifteenFloatLaneAndReturnDestination` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x004A0040 (FUN_004A0040 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SBeamVertex` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `CopySingleFifteenFloatLaneIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x004A06B0 (FUN_004A06B0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SBeamVertex` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly `CopySingleFifteenFloatLaneIfDestinationPresentDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0049FEF0 (FUN_0049FEF0 -- the compiler-generated copy constructor (placement copy into a raw slot) of
+   * `SBeamVertex` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly
+   * `CopySingleFifteenFloatLaneAndReturnDestination` in moho/particles/CWorldParticles.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x004A0040 (FUN_004A0040 -- the compiler-generated copy constructor (placement copy into a
+   * raw slot) of `SBeamVertex` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly
+   * `CopySingleFifteenFloatLaneIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed
+   * 2026-09-10.) Address: 0x004A06B0 (FUN_004A06B0 -- the compiler-generated copy constructor (placement copy into a
+   * raw slot) of `SBeamVertex` as emitted for its `fa::vector` instantiation; zero callers, unreachable; formerly
+   * `CopySingleFifteenFloatLaneIfDestinationPresentDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE),
+   * removed 2026-09-10.)
    */
   struct SBeamVertex
   {
-    Wm3::Vector3<float> worldPosition;   // +0x00
-    Wm3::Vector3<float> axis;            // +0x0C
-    float width;                         // +0x18
-    Vector4f color;                      // +0x1C
-    float sideSign;                      // +0x2C
-    float repeatCoord;                   // +0x30
-    float uShift;                        // +0x34
-    float vShift;                        // +0x38
+    Wm3::Vector3<float> worldPosition; // +0x00
+    Wm3::Vector3<float> axis;          // +0x0C
+    float width;                       // +0x18
+    Vector4f color;                    // +0x1C
+    float sideSign;                    // +0x2C
+    float repeatCoord;                 // +0x30
+    float uShift;                      // +0x34
+    float vShift;                      // +0x38
   };
 
-  static_assert(
-    offsetof(SBeamVertex, worldPosition) == 0x00,
-    "SBeamVertex::worldPosition offset must be 0x00"
-  );
+  static_assert(offsetof(SBeamVertex, worldPosition) == 0x00, "SBeamVertex::worldPosition offset must be 0x00");
   static_assert(offsetof(SBeamVertex, axis) == 0x0C, "SBeamVertex::axis offset must be 0x0C");
   static_assert(offsetof(SBeamVertex, width) == 0x18, "SBeamVertex::width offset must be 0x18");
   static_assert(offsetof(SBeamVertex, color) == 0x1C, "SBeamVertex::color offset must be 0x1C");
-  static_assert(
-    offsetof(SBeamVertex, sideSign) == 0x2C, "SBeamVertex::sideSign offset must be 0x2C"
-  );
-  static_assert(
-    offsetof(SBeamVertex, repeatCoord) == 0x30,
-    "SBeamVertex::repeatCoord offset must be 0x30"
-  );
+  static_assert(offsetof(SBeamVertex, sideSign) == 0x2C, "SBeamVertex::sideSign offset must be 0x2C");
+  static_assert(offsetof(SBeamVertex, repeatCoord) == 0x30, "SBeamVertex::repeatCoord offset must be 0x30");
   static_assert(offsetof(SBeamVertex, uShift) == 0x34, "SBeamVertex::uShift offset must be 0x34");
   static_assert(offsetof(SBeamVertex, vShift) == 0x38, "SBeamVertex::vShift offset must be 0x38");
   static_assert(sizeof(SBeamVertex) == 0x3C, "SBeamVertex size must be 0x3C");
@@ -247,32 +241,25 @@ namespace moho
      * transcribed as `CopyConstructParticleBucketKey` in
      * moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-22.)
      */
-    float sortScalar = 0.0f;              // +0x00
-    bool dragEnabled = false;             // +0x04  SWorldParticle::mDragEnabled
-    std::uint8_t statePadding[0x03]{};    // +0x05
-    TextureSheetHandle texture0;          // +0x08
-    TextureSheetHandle texture1;          // +0x10
+    float sortScalar = 0.0f;           // +0x00
+    bool dragEnabled = false;          // +0x04  SWorldParticle::mDragEnabled
+    std::uint8_t statePadding[0x03]{}; // +0x05
+    TextureSheetHandle texture0;       // +0x08
+    TextureSheetHandle texture1;       // +0x10
     fa::string tag;                    // +0x18
-    std::int32_t blendMode = 0;           // +0x34
-    std::int32_t zMode = 0;               // +0x38
+    std::int32_t blendMode = 0;        // +0x34
+    std::int32_t zMode = 0;            // +0x38
   };
 
+  static_assert(offsetof(SParticleBucketKey, sortScalar) == 0x00, "SParticleBucketKey::sortScalar offset must be 0x00");
   static_assert(
-    offsetof(SParticleBucketKey, sortScalar) == 0x00, "SParticleBucketKey::sortScalar offset must be 0x00"
+    offsetof(SParticleBucketKey, dragEnabled) == 0x04,
+    "SParticleBucketKey::dragEnabled offset must be 0x04"
   );
-  static_assert(
-    offsetof(SParticleBucketKey, dragEnabled) == 0x04, "SParticleBucketKey::dragEnabled offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SParticleBucketKey, texture0) == 0x08, "SParticleBucketKey::texture0 offset must be 0x08"
-  );
-  static_assert(
-    offsetof(SParticleBucketKey, texture1) == 0x10, "SParticleBucketKey::texture1 offset must be 0x10"
-  );
+  static_assert(offsetof(SParticleBucketKey, texture0) == 0x08, "SParticleBucketKey::texture0 offset must be 0x08");
+  static_assert(offsetof(SParticleBucketKey, texture1) == 0x10, "SParticleBucketKey::texture1 offset must be 0x10");
   static_assert(offsetof(SParticleBucketKey, tag) == 0x18, "SParticleBucketKey::tag offset must be 0x18");
-  static_assert(
-    offsetof(SParticleBucketKey, blendMode) == 0x34, "SParticleBucketKey::blendMode offset must be 0x34"
-  );
+  static_assert(offsetof(SParticleBucketKey, blendMode) == 0x34, "SParticleBucketKey::blendMode offset must be 0x34");
   static_assert(offsetof(SParticleBucketKey, zMode) == 0x38, "SParticleBucketKey::zMode offset must be 0x38");
   static_assert(sizeof(SParticleBucketKey) == 0x3C, "SParticleBucketKey size must be 0x3C");
 
@@ -291,17 +278,17 @@ namespace moho
      * `CopyConstructTrailBucketKey` in moho/particles/CWorldParticles.cpp
      * (RULE ONE), removed 2026-09-22.)
      */
-    float sortScalar = 0.0f;              // +0x00
-    TextureSheetHandle texture0;          // +0x04
-    TextureSheetHandle texture1;          // +0x0C
-    fa::string tag;                    // +0x14
+    float sortScalar = 0.0f;     // +0x00
+    TextureSheetHandle texture0; // +0x04
+    TextureSheetHandle texture1; // +0x0C
+    fa::string tag;              // +0x14
     /**
      * Blueprint `BlendMode`, copied straight out of `SWorldTrail::mBlendMode`.
      * A `std::int32_t`, not a float: `IsTrailBucketKeyRhsLessThanLhs`
      * (0x0049253F) loads this lane with `mov`/`cmp`/`setl`, a signed integer
      * compare, where it loads `sortScalar` at +0x00 with `movss`/`ucomiss`.
      */
-    std::int32_t blendMode = 0;           // +0x30
+    std::int32_t blendMode = 0; // +0x30
   };
 
   static_assert(offsetof(STrailBucketKey, sortScalar) == 0x00, "STrailBucketKey::sortScalar offset must be 0x00");
@@ -364,9 +351,8 @@ namespace moho
    * What it does:
    * Strict-weak ordering comparator for world-particle bucket keys.
    */
-  [[nodiscard]] bool IsParticleBucketKeyRhsLessThanLhs(
-    const SParticleBucketKey& lhs, const SParticleBucketKey& rhs
-  ) noexcept;
+  [[nodiscard]] bool
+  IsParticleBucketKeyRhsLessThanLhs(const SParticleBucketKey& lhs, const SParticleBucketKey& rhs) noexcept;
 
   /**
    * Address: 0x00492310 (FUN_00492310, sub_492310)
@@ -374,9 +360,8 @@ namespace moho
    * What it does:
    * Equality comparator for world-particle bucket keys.
    */
-  [[nodiscard]] bool AreParticleBucketKeysEquivalent(
-    const SParticleBucketKey& lhs, const SParticleBucketKey& rhs
-  ) noexcept;
+  [[nodiscard]] bool
+  AreParticleBucketKeysEquivalent(const SParticleBucketKey& lhs, const SParticleBucketKey& rhs) noexcept;
 
   /**
    * Address: 0x00494B90 (FUN_00494B90, sub_494B90)
@@ -385,10 +370,7 @@ namespace moho
    * Copies one world-particle bucket key into destination storage while
    * preserving weak-handle control semantics for both texture lanes.
    */
-  SParticleBucketKey* CopyParticleBucketKey(
-    SParticleBucketKey* destination,
-    const SParticleBucketKey* source
-  ) noexcept;
+  SParticleBucketKey* CopyParticleBucketKey(SParticleBucketKey* destination, const SParticleBucketKey* source) noexcept;
 
   /**
    * Address: 0x00492390 (FUN_00492390, sub_492390)
@@ -396,9 +378,7 @@ namespace moho
    * What it does:
    * Builds one trail bucket key from one `STrail` runtime payload.
    */
-  STrailBucketKey* InitializeTrailBucketKeyFromTrail(
-    STrailBucketKey* key, const SWorldTrail& trail
-  );
+  STrailBucketKey* InitializeTrailBucketKeyFromTrail(STrailBucketKey* key, const SWorldTrail& trail);
 
   /**
    * Address: 0x00492520 (FUN_00492520, sub_492520)
@@ -406,9 +386,7 @@ namespace moho
    * What it does:
    * Strict-weak ordering comparator for trail bucket keys.
    */
-  [[nodiscard]] bool IsTrailBucketKeyRhsLessThanLhs(
-    const STrailBucketKey& lhs, const STrailBucketKey& rhs
-  ) noexcept;
+  [[nodiscard]] bool IsTrailBucketKeyRhsLessThanLhs(const STrailBucketKey& lhs, const STrailBucketKey& rhs) noexcept;
 
   /**
    * Address: 0x00492590 (FUN_00492590, sub_492590)
@@ -416,9 +394,7 @@ namespace moho
    * What it does:
    * Equality comparator for trail bucket keys.
    */
-  [[nodiscard]] bool AreTrailBucketKeysEquivalent(
-    const STrailBucketKey& lhs, const STrailBucketKey& rhs
-  ) noexcept;
+  [[nodiscard]] bool AreTrailBucketKeysEquivalent(const STrailBucketKey& lhs, const STrailBucketKey& rhs) noexcept;
 
   /**
    * Address: 0x00494D90 (FUN_00494D90, sub_494D90)
@@ -427,10 +403,7 @@ namespace moho
    * Copies one world-trail bucket key into destination storage while
    * preserving weak-handle control semantics for both texture lanes.
    */
-  STrailBucketKey* CopyTrailBucketKey(
-    STrailBucketKey* destination,
-    const STrailBucketKey* source
-  ) noexcept;
+  STrailBucketKey* CopyTrailBucketKey(STrailBucketKey* destination, const STrailBucketKey* source) noexcept;
 
   /**
    * Address: 0x00492EF0 (FUN_00492EF0, sub_492EF0)

@@ -23,10 +23,10 @@ namespace moho
    */
   struct STrailSegmentBuffer
   {
-    ID3DVertexSheet* vertexSheet = nullptr;    // +0x00
-    std::uint8_t unknown04_0F[0x0C]{};         // +0x04
-    std::uint32_t maxSegments = 0U;            // +0x10
-    void* mappedVertexData = nullptr;          // +0x14
+    ID3DVertexSheet* vertexSheet = nullptr; // +0x00
+    std::uint8_t unknown04_0F[0x0C]{};      // +0x04
+    std::uint32_t maxSegments = 0U;         // +0x10
+    void* mappedVertexData = nullptr;       // +0x14
   };
 
   static_assert(
@@ -84,16 +84,16 @@ namespace moho
      */
     void SelectTechnique() const;
 
-    bool dragEnabled = false;                                  // +0x00  SWorldParticle::mDragEnabled
-    std::uint8_t statePadding01_03[0x03]{};                    // +0x01
-    CParticleTexture::TextureResourceHandle texture0;          // +0x04
-    CParticleTexture::TextureResourceHandle texture1;          // +0x0C
-    fa::string tag;                                         // +0x14
-    std::int32_t blendMode = 0;                                // +0x30
-    std::int32_t zMode = 0;                                    // +0x34
-    fa::vector<SWorldParticle> pendingParticles; // +0x38
+    bool dragEnabled = false;                             // +0x00  SWorldParticle::mDragEnabled
+    std::uint8_t statePadding01_03[0x03]{};               // +0x01
+    CParticleTexture::TextureResourceHandle texture0;     // +0x04
+    CParticleTexture::TextureResourceHandle texture1;     // +0x0C
+    fa::string tag;                                       // +0x14
+    std::int32_t blendMode = 0;                           // +0x30
+    std::int32_t zMode = 0;                               // +0x34
+    fa::vector<SWorldParticle> pendingParticles;          // +0x38
     fa::vector<SParticleRenderWorkItem*> activeWorkItems; // +0x48
-    CWorldParticles* owner = nullptr;                          // +0x58
+    CWorldParticles* owner = nullptr;                     // +0x58
   };
 
   static_assert(
@@ -113,10 +113,7 @@ namespace moho
     offsetof(SParticleRenderBucket, blendMode) == 0x30,
     "SParticleRenderBucket::blendMode offset must be 0x30"
   );
-  static_assert(
-    offsetof(SParticleRenderBucket, zMode) == 0x34,
-    "SParticleRenderBucket::zMode offset must be 0x34"
-  );
+  static_assert(offsetof(SParticleRenderBucket, zMode) == 0x34, "SParticleRenderBucket::zMode offset must be 0x34");
   static_assert(
     offsetof(SParticleRenderBucket, pendingParticles) == 0x38,
     "SParticleRenderBucket::pendingParticles offset must be 0x38"
@@ -125,10 +122,7 @@ namespace moho
     offsetof(SParticleRenderBucket, activeWorkItems) == 0x48,
     "SParticleRenderBucket::activeWorkItems offset must be 0x48"
   );
-  static_assert(
-    offsetof(SParticleRenderBucket, owner) == 0x58,
-    "SParticleRenderBucket::owner offset must be 0x58"
-  );
+  static_assert(offsetof(SParticleRenderBucket, owner) == 0x58, "SParticleRenderBucket::owner offset must be 0x58");
   static_assert(sizeof(SParticleRenderBucket) == 0x5C, "SParticleRenderBucket size must be 0x5C");
 
   /**
@@ -155,29 +149,20 @@ namespace moho
      */
     void SelectTechnique() const;
 
-    CParticleTexture::TextureResourceHandle texture0;         // +0x00
-    CParticleTexture::TextureResourceHandle texture1;         // +0x08
-    fa::string tag;                                        // +0x10
-    std::int32_t blendMode = 0;                               // +0x2C  blueprint BlendMode
-    std::uint32_t renderStartIndex = 0U;                      // +0x30
-    fa::vector<SWorldTrail> pendingTrails; // +0x34
+    CParticleTexture::TextureResourceHandle texture0;     // +0x00
+    CParticleTexture::TextureResourceHandle texture1;     // +0x08
+    fa::string tag;                                       // +0x10
+    std::int32_t blendMode = 0;                           // +0x2C  blueprint BlendMode
+    std::uint32_t renderStartIndex = 0U;                  // +0x30
+    fa::vector<SWorldTrail> pendingTrails;                // +0x34
     fa::vector<SParticleRenderWorkItem*> activeWorkItems; // +0x44
-    CWorldParticles* owner = nullptr;                         // +0x54
+    CWorldParticles* owner = nullptr;                     // +0x54
   };
 
-  static_assert(
-    offsetof(STrailRenderBucket, texture0) == 0x00,
-    "STrailRenderBucket::texture0 offset must be 0x00"
-  );
-  static_assert(
-    offsetof(STrailRenderBucket, texture1) == 0x08,
-    "STrailRenderBucket::texture1 offset must be 0x08"
-  );
+  static_assert(offsetof(STrailRenderBucket, texture0) == 0x00, "STrailRenderBucket::texture0 offset must be 0x00");
+  static_assert(offsetof(STrailRenderBucket, texture1) == 0x08, "STrailRenderBucket::texture1 offset must be 0x08");
   static_assert(offsetof(STrailRenderBucket, tag) == 0x10, "STrailRenderBucket::tag offset must be 0x10");
-  static_assert(
-    offsetof(STrailRenderBucket, blendMode) == 0x2C,
-    "STrailRenderBucket::blendMode offset must be 0x2C"
-  );
+  static_assert(offsetof(STrailRenderBucket, blendMode) == 0x2C, "STrailRenderBucket::blendMode offset must be 0x2C");
   static_assert(
     offsetof(STrailRenderBucket, renderStartIndex) == 0x30,
     "STrailRenderBucket::renderStartIndex offset must be 0x30"
@@ -213,11 +198,8 @@ namespace moho
    * Initializes one trail render bucket key/runtime lane from one trail payload
    * and stores owner context.
    */
-  STrailRenderBucket* InitializeTrailRenderBucketFromTrail(
-    STrailRenderBucket& bucket,
-    const SWorldTrail& trail,
-    CWorldParticles* owner
-  );
+  STrailRenderBucket*
+  InitializeTrailRenderBucketFromTrail(STrailRenderBucket& bucket, const SWorldTrail& trail, CWorldParticles* owner);
 
   /**
    * Address: 0x00493C30 (FUN_00493C30, func_RenderParticle2)
@@ -296,7 +278,7 @@ namespace moho
    * What it does:
    * Releases one particle render bucket runtime lane including key state,
    * pending payload lanes, and active work-item lanes.
-  */
+   */
   void DestroyParticleRenderBucket(SParticleRenderBucket& bucket);
 
   /**

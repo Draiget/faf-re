@@ -25,7 +25,10 @@ namespace
     int payload;
   };
 
-  [[nodiscard]] bool KeyLess(const Keyed& a, const Keyed& b)
+  [[nodiscard]] bool KeyLess(
+    const Keyed& a,
+    const Keyed& b
+  )
   {
     return a.key < b.key;
   }
@@ -41,7 +44,11 @@ namespace
     Sawtooth,
   };
 
-  [[nodiscard]] std::vector<int> Make(const Pattern pattern, const std::size_t n, std::mt19937& rng)
+  [[nodiscard]] std::vector<int> Make(
+    const Pattern pattern,
+    const std::size_t n,
+    std::mt19937& rng
+  )
   {
     std::vector<int> v(n);
     for (std::size_t i = 0; i < n; ++i) {
@@ -86,7 +93,10 @@ namespace
   constexpr std::size_t kSizes[] = {0, 1, 2, 3, 4, 31, 32, 33, 40, 41, 42, 100, 257, 1000, 20000};
 } // namespace
 
-TEST(FaSort, MatchesStdSortOnEveryPattern)
+TEST(
+  FaSort,
+  MatchesStdSortOnEveryPattern
+)
 {
   std::mt19937 rng(1);
   for (const Pattern pattern : kPatterns) {
@@ -101,7 +111,10 @@ TEST(FaSort, MatchesStdSortOnEveryPattern)
   }
 }
 
-TEST(FaSort, CustomComparator)
+TEST(
+  FaSort,
+  CustomComparator
+)
 {
   std::mt19937 rng(2);
   for (const std::size_t n : kSizes) {
@@ -113,7 +126,10 @@ TEST(FaSort, CustomComparator)
   }
 }
 
-TEST(FaSort, KeyedSortIsAPermutationInKeyOrder)
+TEST(
+  FaSort,
+  KeyedSortIsAPermutationInKeyOrder
+)
 {
   std::mt19937 rng(3);
   for (const std::size_t n : kSizes) {
@@ -138,7 +154,10 @@ TEST(FaSort, KeyedSortIsAPermutationInKeyOrder)
   }
 }
 
-TEST(FaSort, HeapFallbackSortsWhenTheDepthBudgetIsSpent)
+TEST(
+  FaSort,
+  HeapFallbackSortsWhenTheDepthBudgetIsSpent
+)
 {
   std::mt19937 rng(4);
   for (const std::ptrdiff_t budget : {0, 1, 2}) {
@@ -152,7 +171,10 @@ TEST(FaSort, HeapFallbackSortsWhenTheDepthBudgetIsSpent)
   }
 }
 
-TEST(FaSort, MakeHeapAndSortHeap)
+TEST(
+  FaSort,
+  MakeHeapAndSortHeap
+)
 {
   std::mt19937 rng(5);
   for (std::size_t n = 0; n < 200; ++n) {
@@ -166,7 +188,10 @@ TEST(FaSort, MakeHeapAndSortHeap)
   }
 }
 
-TEST(FaSort, PartitionSplitsAroundThePivot)
+TEST(
+  FaSort,
+  PartitionSplitsAroundThePivot
+)
 {
   std::mt19937 rng(6);
   for (int round = 0; round < 2000; ++round) {
@@ -174,7 +199,8 @@ TEST(FaSort, PartitionSplitsAroundThePivot)
     std::vector<int> v = Make(round % 3 == 0 ? Pattern::FewDistinct : Pattern::Random, n, rng);
     std::vector<int> sortedBefore = v;
     std::sort(sortedBefore.begin(), sortedBefore.end());
-    const std::pair<int*, int*> equal = fa::detail::unguarded_partition(v.data(), v.data() + v.size(), std::less<int>{});
+    const std::pair<int*, int*> equal =
+      fa::detail::unguarded_partition(v.data(), v.data() + v.size(), std::less<int>{});
     ASSERT_LT(equal.first, equal.second);
     const int pivot = *equal.first;
     for (const int* p = v.data(); p != equal.first; ++p) {
@@ -191,7 +217,10 @@ TEST(FaSort, PartitionSplitsAroundThePivot)
   }
 }
 
-TEST(FaSort, InsertionSortIsStable)
+TEST(
+  FaSort,
+  InsertionSortIsStable
+)
 {
   // MSVC8's _Insertion_sort shifts each element past the greater ones only, so equal keys keep
   // their order.
@@ -211,7 +240,10 @@ TEST(FaSort, InsertionSortIsStable)
   }
 }
 
-TEST(FaSort, RotateMatchesStdRotate)
+TEST(
+  FaSort,
+  RotateMatchesStdRotate
+)
 {
   for (std::size_t n = 0; n <= 14; ++n) {
     for (std::size_t middle = 0; middle <= n; ++middle) {
@@ -225,7 +257,10 @@ TEST(FaSort, RotateMatchesStdRotate)
   }
 }
 
-TEST(FaSort, Median3OrdersThree)
+TEST(
+  FaSort,
+  Median3OrdersThree
+)
 {
   std::vector<int> v{1, 2, 3};
   do {
@@ -240,7 +275,10 @@ TEST(FaSort, Median3OrdersThree)
 
 // --- remove ------------------------------------------------------------------------------------
 
-TEST(FaRemove, MatchesStdRemove)
+TEST(
+  FaRemove,
+  MatchesStdRemove
+)
 {
   std::mt19937 rng(8);
   for (int round = 0; round < 3000; ++round) {
@@ -257,10 +295,15 @@ TEST(FaRemove, MatchesStdRemove)
   }
 }
 
-TEST(FaRemove, RemoveIfMatchesStdRemoveIf)
+TEST(
+  FaRemove,
+  RemoveIfMatchesStdRemoveIf
+)
 {
   std::mt19937 rng(9);
-  const auto odd = [](const int x) { return (x & 1) != 0; };
+  const auto odd = [](const int x) {
+    return (x & 1) != 0;
+  };
   for (int round = 0; round < 3000; ++round) {
     std::vector<int> v(rng() % 30u);
     for (int& x : v) {
@@ -274,7 +317,10 @@ TEST(FaRemove, RemoveIfMatchesStdRemoveIf)
   }
 }
 
-TEST(FaRemove, NothingAndEverything)
+TEST(
+  FaRemove,
+  NothingAndEverything
+)
 {
   std::vector<int> v{1, 2, 3};
   EXPECT_EQ(fa::remove(v.data(), v.data() + 3, 9), v.data() + 3);
@@ -283,10 +329,22 @@ TEST(FaRemove, NothingAndEverything)
   EXPECT_EQ(fa::remove(same.data(), same.data() + 3, 4), same.data());
   int* const none = nullptr;
   EXPECT_EQ(fa::remove(none, none, 1), none);
-  EXPECT_EQ(fa::remove_if(none, none, [](int) { return true; }), none);
+  EXPECT_EQ(
+    fa::remove_if(
+      none,
+      none,
+      [](int) {
+    return true;
+  }
+    ),
+    none
+  );
 }
 
-TEST(FaRemove, WorksOnListIterators)
+TEST(
+  FaRemove,
+  WorksOnListIterators
+)
 {
   fa::list<int> list;
   std::list<int> ref;

@@ -33,7 +33,10 @@ namespace faf::headless
     CReplayBoneStats(const CReplayBoneStats&) = delete;
     CReplayBoneStats& operator=(const CReplayBoneStats&) = delete;
 
-    [[nodiscard]] bool IsOpen() const noexcept { return mFile != nullptr; }
+    [[nodiscard]] bool IsOpen() const noexcept
+    {
+      return mFile != nullptr;
+    }
 
     void OnPacket(const moho::SSyncData& packet);
 

@@ -42,7 +42,10 @@ namespace gpg::gal::backend
 
     /** Frees the copy. `Released` stays true until the next `Reset`. */
     void Release() noexcept;
-    [[nodiscard]] bool Released() const noexcept { return mBytes.empty(); }
+    [[nodiscard]] bool Released() const noexcept
+    {
+      return mBytes.empty();
+    }
 
     /**
      * The address a lock of `size` bytes at `offset` returns (`size` 0 locks
@@ -53,8 +56,14 @@ namespace gpg::gal::backend
     /** Checks the guard band after the range the last `Map` returned. */
     void CheckGuard(const char* kind);
 
-    [[nodiscard]] std::uint8_t* data() noexcept { return mBytes.data(); }
-    [[nodiscard]] const std::uint8_t* data() const noexcept { return mBytes.data(); }
+    [[nodiscard]] std::uint8_t* data() noexcept
+    {
+      return mBytes.data();
+    }
+    [[nodiscard]] const std::uint8_t* data() const noexcept
+    {
+      return mBytes.data();
+    }
 
   private:
     void Arm(std::size_t from);
@@ -62,7 +71,7 @@ namespace gpg::gal::backend
 
     std::vector<std::uint8_t> mBytes;
     std::uint32_t mByteWidth = 0;
-    std::uint32_t mMappedEnd = 0;    // the end of the range the last Map returned
-    std::size_t mGuardStart = 0;     // where the armed band starts
+    std::uint32_t mMappedEnd = 0; // the end of the range the last Map returned
+    std::size_t mGuardStart = 0;  // where the armed band starts
   };
 } // namespace gpg::gal::backend

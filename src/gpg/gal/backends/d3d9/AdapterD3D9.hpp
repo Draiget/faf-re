@@ -68,8 +68,8 @@ namespace gpg::gal
     void AddMode(const AdapterModeD3D9& mode);
 
   public:
-    std::uint32_t vendorId = 0;             // +0x04
-    std::uint32_t deviceId = 0;             // +0x08
+    std::uint32_t vendorId = 0;          // +0x04
+    std::uint32_t deviceId = 0;          // +0x08
     fa::string driver{};                 // +0x0C
     fa::string deviceName{};             // +0x28
     fa::string description{};            // +0x44

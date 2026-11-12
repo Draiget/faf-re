@@ -19,7 +19,9 @@ namespace moho
   /**
    * Address: 0x00699C10 (FUN_00699C10, Moho::SPhysConstants::MemberDeserialize)
    */
-  void SPhysConstants::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SPhysConstants::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -33,7 +35,9 @@ namespace moho
   /**
    * Address: 0x00699C50 (FUN_00699C50, Moho::SPhysConstants::MemberSerialize)
    */
-  void SPhysConstants::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SPhysConstants::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {

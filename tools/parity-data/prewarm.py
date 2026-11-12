@@ -268,7 +268,7 @@ def main():
         if name == "replays":
             p.add_argument("--bucket", type=int, required=True)
             p.add_argument("--cache", required=True)
-            p.add_argument("--game-version", type=int, default=3835)
+            p.add_argument("--game-version", type=int, default=3840)
         else:
             p.add_argument("--index", required=True, help="folder holding the buckets' index.jsonl files")
             p.add_argument("--maps", required=True)

@@ -25,8 +25,11 @@ namespace moho
      * Uses shield radius when present, else scans countermeasure weapon lanes
      * and emits `{center.x, center.z, minRange, maxRange}`.
      */
-    [[nodiscard]] bool
-    Range(SRangeExtractionPayload* outRange, const RUnitBlueprint* unitBlueprint, const Wm3::Vec3f& center) const override;
+    [[nodiscard]] bool Range(
+      SRangeExtractionPayload* outRange,
+      const RUnitBlueprint* unitBlueprint,
+      const Wm3::Vec3f& center
+    ) const override;
 
     /**
      * Address: 0x007EC880 (FUN_007EC880, Moho::CountermeasureExtractor::Extract)

@@ -34,7 +34,10 @@ namespace moho
 
     // gMutex held. The connector's destructor forgets its entry first, so a
     // connector found in gConnectors is alive.
-    void QueueLocked(CNetUDPConnector* connector, SNetDeliveredDatagram d)
+    void QueueLocked(
+      CNetUDPConnector* connector,
+      SNetDeliveredDatagram d
+    )
     {
       const auto c = gConnectors.find(connector);
       if (c == gConnectors.end() || c->second.delivered.size() >= kMaxDelivered) {
@@ -46,7 +49,9 @@ namespace moho
   } // namespace
 
   void NET_SetPeerTransport(
-    CNetUDPConnector* connector, const std::uint32_t addrHost, const std::uint16_t portHost,
+    CNetUDPConnector* connector,
+    const std::uint32_t addrHost,
+    const std::uint16_t portHost,
     std::shared_ptr<INetPeerTransport> transport
   )
   {
@@ -69,7 +74,10 @@ namespace moho
   }
 
   bool NET_SendThroughPeerTransport(
-    const CNetUDPConnector* connector, const std::uint32_t addrHost, const std::uint16_t portHost, const void* data,
+    const CNetUDPConnector* connector,
+    const std::uint32_t addrHost,
+    const std::uint16_t portHost,
+    const void* data,
     const std::size_t size
   )
   {
@@ -113,7 +121,10 @@ namespace moho
   }
 
   void NET_DeliverFromPeerTransport(
-    CNetUDPConnector* connector, const std::uint32_t addrHost, const std::uint16_t portHost, const void* data,
+    CNetUDPConnector* connector,
+    const std::uint32_t addrHost,
+    const std::uint16_t portHost,
+    const void* data,
     const std::size_t size
   )
   {
@@ -138,7 +149,10 @@ namespace moho
     QueueLocked(connector, std::move(d));
   }
 
-  void NET_TakeDeliveredDatagrams(const CNetUDPConnector* connector, std::vector<SNetDeliveredDatagram>& out)
+  void NET_TakeDeliveredDatagrams(
+    const CNetUDPConnector* connector,
+    std::vector<SNetDeliveredDatagram>& out
+  )
   {
     std::lock_guard lock(gMutex);
     const auto c = gConnectors.find(connector);
@@ -149,7 +163,9 @@ namespace moho
     c->second.delivered.clear();
   }
 
-  void NET_ForgetPeerTransports(const CNetUDPConnector* connector)
+  void NET_ForgetPeerTransports(
+    const CNetUDPConnector* connector
+  )
   {
     std::lock_guard lock(gMutex);
     for (auto it = gAnySender.begin(); it != gAnySender.end();) {

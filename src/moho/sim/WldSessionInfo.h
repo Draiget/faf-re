@@ -37,7 +37,7 @@ namespace moho
    */
   struct SWldSessionInfo
   {
-    fa::string mMapName;                        // 0x00
+    fa::string mMapName;                           // 0x00
     boost::shared_ptr<LaunchInfoBase> mLaunchInfo; // 0x1C
     bool mIsBeingRecorded;                         // 0x24
     bool mIsReplay;                                // 0x25
@@ -60,14 +60,17 @@ namespace moho
   static_assert(offsetof(SWldSessionInfo, mMapName) == 0x00, "SWldSessionInfo::mMapName offset must be 0x00");
   static_assert(offsetof(SWldSessionInfo, mLaunchInfo) == 0x1C, "SWldSessionInfo::mLaunchInfo offset must be 0x1C");
   static_assert(
-    offsetof(SWldSessionInfo, mIsBeingRecorded) == 0x24, "SWldSessionInfo::mIsBeingRecorded offset must be 0x24"
+    offsetof(SWldSessionInfo, mIsBeingRecorded) == 0x24,
+    "SWldSessionInfo::mIsBeingRecorded offset must be 0x24"
   );
   static_assert(offsetof(SWldSessionInfo, mIsReplay) == 0x25, "SWldSessionInfo::mIsReplay offset must be 0x25");
   static_assert(
-    offsetof(SWldSessionInfo, mIsMultiplayer) == 0x26, "SWldSessionInfo::mIsMultiplayer offset must be 0x26"
+    offsetof(SWldSessionInfo, mIsMultiplayer) == 0x26,
+    "SWldSessionInfo::mIsMultiplayer offset must be 0x26"
   );
   static_assert(
-    offsetof(SWldSessionInfo, mClientManager) == 0x28, "SWldSessionInfo::mClientManager offset must be 0x28"
+    offsetof(SWldSessionInfo, mClientManager) == 0x28,
+    "SWldSessionInfo::mClientManager offset must be 0x28"
   );
   static_assert(offsetof(SWldSessionInfo, mSourceId) == 0x2C, "SWldSessionInfo::mSourceId offset must be 0x2C");
 
@@ -186,7 +189,8 @@ namespace moho
 
   static_assert(sizeof(SWldScenarioLoadWakeSet) == 0x18, "SWldScenarioLoadWakeSet size must be 0x18");
   static_assert(
-    offsetof(SWldScenarioLoadWakeSet, mWakeEvent) == 0x00, "SWldScenarioLoadWakeSet::mWakeEvent offset must be 0x00"
+    offsetof(SWldScenarioLoadWakeSet, mWakeEvent) == 0x00,
+    "SWldScenarioLoadWakeSet::mWakeEvent offset must be 0x00"
   );
   static_assert(
     offsetof(SWldScenarioLoadWakeSet, mQueueSemaphore) == 0x04,
@@ -204,7 +208,14 @@ namespace moho
    *
    * What it does:
    * Stores loader worker entry callback and bound scenario owner.
-   * Address: 0x00886B00 (FUN_00886B00 -- `boost::detail::function::void_function_obj_invoker1<F, void, CBackgroundTaskControl*>::invoke` for this callback's in-buffer functor `F = bind_t<void, mf1<void, SWldScenarioInfo, CBackgroundTaskControl*>, list2<value<SWldScenarioInfo*>, arg<1>>>`: pushes the argument and calls the stored member pointer (+0x08, `WorldSessionUserLoad` 0x00885DE0) with the bound scenario (+0x0C) in ECX; no direct callers -- stored as the invoker slot (+4) of the static vtable at 0x010C79BC (manager 0x00886B20) by 0x00886986 (FUN_00886970, `assign_to` from the functor constructor 0x008868A0 that `CWldSessionLoaderImpl::Update` calls at 0x00885C95) and by the three register-shape installs at 0x008869F0, 0x00886A60 and 0x00886AB0; formerly `InvokeContextUnaryThunkRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
+   * Address: 0x00886B00 (FUN_00886B00 -- `boost::detail::function::void_function_obj_invoker1<F, void,
+   * CBackgroundTaskControl*>::invoke` for this callback's in-buffer functor `F = bind_t<void, mf1<void,
+   * SWldScenarioInfo, CBackgroundTaskControl*>, list2<value<SWldScenarioInfo*>, arg<1>>>`: pushes the argument and
+   * calls the stored member pointer (+0x08, `WorldSessionUserLoad` 0x00885DE0) with the bound scenario (+0x0C) in ECX;
+   * no direct callers -- stored as the invoker slot (+4) of the static vtable at 0x010C79BC (manager 0x00886B20) by
+   * 0x00886986 (FUN_00886970, `assign_to` from the functor constructor 0x008868A0 that `CWldSessionLoaderImpl::Update`
+   * calls at 0x00885C95) and by the three register-shape installs at 0x008869F0, 0x00886A60 and 0x00886AB0; formerly
+   * `InvokeContextUnaryThunkRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-30.)
    */
   struct SWldScenarioLoadCallbackStorage
   {
@@ -242,7 +253,7 @@ namespace moho
   struct SWldScenarioLoadControl
   {
     gpg::core::Mutex mMutex;                   // 0x00
-    fa::string mThreadName;                 // 0x08
+    fa::string mThreadName;                    // 0x08
     SWldScenarioLoadCallbackStorage mCallback; // 0x24
     EWldScenarioLoadControlState mState;       // 0x48
     std::uint32_t mProgressToken;              // 0x4C
@@ -295,16 +306,20 @@ namespace moho
 
   static_assert(sizeof(SWldScenarioLoadControl) == 0x70, "SWldScenarioLoadControl size must be 0x70");
   static_assert(
-    offsetof(SWldScenarioLoadControl, mThreadName) == 0x08, "SWldScenarioLoadControl::mThreadName offset must be 0x08"
+    offsetof(SWldScenarioLoadControl, mThreadName) == 0x08,
+    "SWldScenarioLoadControl::mThreadName offset must be 0x08"
   );
   static_assert(
-    offsetof(SWldScenarioLoadControl, mCallback) == 0x24, "SWldScenarioLoadControl::mCallback offset must be 0x24"
+    offsetof(SWldScenarioLoadControl, mCallback) == 0x24,
+    "SWldScenarioLoadControl::mCallback offset must be 0x24"
   );
   static_assert(
-    offsetof(SWldScenarioLoadControl, mState) == 0x48, "SWldScenarioLoadControl::mState offset must be 0x48"
+    offsetof(SWldScenarioLoadControl, mState) == 0x48,
+    "SWldScenarioLoadControl::mState offset must be 0x48"
   );
   static_assert(
-    offsetof(SWldScenarioLoadControl, mWakeSet) == 0x54, "SWldScenarioLoadControl::mWakeSet offset must be 0x54"
+    offsetof(SWldScenarioLoadControl, mWakeSet) == 0x54,
+    "SWldScenarioLoadControl::mWakeSet offset must be 0x54"
   );
   static_assert(
     offsetof(SWldScenarioLoadControl, mDisposeAfterWorkerExit) == 0x6C,
@@ -352,7 +367,8 @@ namespace moho
   static_assert(sizeof(SWldScenarioLoadTask) == 0x08, "SWldScenarioLoadTask size must be 0x08");
   static_assert(offsetof(SWldScenarioLoadTask, mControl) == 0x00, "SWldScenarioLoadTask::mControl offset must be 0x00");
   static_assert(
-    offsetof(SWldScenarioLoadTask, mWorkerThread) == 0x04, "SWldScenarioLoadTask::mWorkerThread offset must be 0x04"
+    offsetof(SWldScenarioLoadTask, mWorkerThread) == 0x04,
+    "SWldScenarioLoadTask::mWorkerThread offset must be 0x04"
   );
 
   /**
@@ -400,7 +416,8 @@ namespace moho
   static_assert(offsetof(SWldScenarioInfo, mMapName) == 0x08, "SWldScenarioInfo::mMapName offset must be 0x08");
   static_assert(offsetof(SWldScenarioInfo, mGameMods) == 0x24, "SWldScenarioInfo::mGameMods offset must be 0x24");
   static_assert(
-    offsetof(SWldScenarioInfo, mUnloadRequested) == 0x40, "SWldScenarioInfo::mUnloadRequested offset must be 0x40"
+    offsetof(SWldScenarioInfo, mUnloadRequested) == 0x40,
+    "SWldScenarioInfo::mUnloadRequested offset must be 0x40"
   );
   static_assert(offsetof(SWldScenarioInfo, mLoaded) == 0x41, "SWldScenarioInfo::mLoaded offset must be 0x41");
   static_assert(offsetof(SWldScenarioInfo, mLoadTask) == 0x44, "SWldScenarioInfo::mLoadTask offset must be 0x44");

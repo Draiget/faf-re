@@ -30,7 +30,8 @@ namespace faf::server
      * From any thread: the bytes from `offset` written at or before `untilUs`, at most `maxBytes`, appended to `out`.
      * Returns how many; 0 when none are that old yet (or `offset` is past them).
      */
-    std::size_t Read(std::size_t offset, std::uint64_t untilUs, std::size_t maxBytes, std::vector<std::uint8_t>& out) const;
+    std::size_t
+    Read(std::size_t offset, std::uint64_t untilUs, std::size_t maxBytes, std::vector<std::uint8_t>& out) const;
     [[nodiscard]] std::size_t Size() const;
     [[nodiscard]] bool Finished() const;
 
@@ -42,7 +43,8 @@ namespace faf::server
     bool mFinished = false;
   };
 
-  /** A replay stream that writes to `inner` (the replay file) and to `log`. Write and flush only, as `CDecoder` uses it. */
+  /** A replay stream that writes to `inner` (the replay file) and to `log`. Write and flush only, as `CDecoder` uses
+   * it. */
   class CReplayTee final : public gpg::Stream
   {
   public:

@@ -33,7 +33,9 @@ namespace
   constexpr std::uint32_t kWeaponDepthAlpha = 0xAF000000u;
   constexpr std::uint32_t kWeaponDepthMask = 0x00FFFFFFu;
 
-  [[nodiscard]] std::uint32_t ResolveWeaponDebugDepth(const moho::Unit& unit) noexcept
+  [[nodiscard]] std::uint32_t ResolveWeaponDebugDepth(
+    const moho::Unit& unit
+  ) noexcept
   {
     // 0x00652E56..0x00652E62: Unit+0x154 owns the army; army+0x150 is player color.
     const std::uint32_t raw = unit.ArmyRef->mVarDat.mPlayerColorBgra;
@@ -46,7 +48,10 @@ namespace
   // the engine uses: a rotation about X, which is what a label pitch is. It
   // then rotates via `Moho::MultQuadVec(&v47, &v41, &v36)`, not
   // `Wm3::MultiplyQuaternionVector`.
-  [[nodiscard]] Wm3::Vector3f BuildWeaponLabelOffset(const float angle, const float radius) noexcept
+  [[nodiscard]] Wm3::Vector3f BuildWeaponLabelOffset(
+    const float angle,
+    const float radius
+  ) noexcept
   {
     Wm3::Vector3f orbitOffset{};
     orbitOffset.x = std::cos(angle) * radius;
@@ -112,7 +117,9 @@ namespace moho
   /**
    * Address: 0x00652E00 (FUN_00652E00, Moho::RDebugWeapons::OnTick)
    */
-  void RDebugWeapons::Tick(Sim* const sim)
+  void RDebugWeapons::Tick(
+    Sim* const sim
+  )
   {
     if (sim == nullptr || sim->mEntityDB == nullptr) {
       return;
@@ -154,7 +161,8 @@ namespace moho
             const RUnitBlueprintWeapon& weaponBlueprint = weaponBlueprints[weaponIndex];
 
             SDebugWorldText label{};
-            label.position = unitPosition + BuildWeaponLabelOffset(kWeaponLabelAngleStep * static_cast<float>(weaponIndex), radius);
+            label.position =
+              unitPosition + BuildWeaponLabelOffset(kWeaponLabelAngleStep * static_cast<float>(weaponIndex), radius);
             label.text.assign_owned(weaponBlueprint.DisplayName.view());
             label.style = kWeaponLabelStyle;
             label.depth = depth;

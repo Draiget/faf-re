@@ -38,7 +38,9 @@ namespace gpg::gal
   class PipelineMemo
   {
   public:
-    [[nodiscard]] Pipeline Find(const Inputs& inputs) const noexcept
+    [[nodiscard]] Pipeline Find(
+      const Inputs& inputs
+    ) const noexcept
     {
       const Entry& entry = mEntries[Slot(inputs)];
       if (entry.pipeline != Pipeline{} && std::memcmp(&entry.inputs, &inputs, sizeof(Inputs)) == 0) {
@@ -47,7 +49,10 @@ namespace gpg::gal
       return Pipeline{};
     }
 
-    void Store(const Inputs& inputs, const Pipeline pipeline) noexcept
+    void Store(
+      const Inputs& inputs,
+      const Pipeline pipeline
+    ) noexcept
     {
       Entry& entry = mEntries[Slot(inputs)];
       std::memcpy(static_cast<void*>(&entry.inputs), &inputs, sizeof(Inputs));
@@ -69,7 +74,9 @@ namespace gpg::gal
       Pipeline pipeline{};
     };
 
-    [[nodiscard]] static std::size_t Slot(const Inputs& inputs) noexcept
+    [[nodiscard]] static std::size_t Slot(
+      const Inputs& inputs
+    ) noexcept
     {
       const auto* const bytes = reinterpret_cast<const unsigned char*>(&inputs);
       std::uint64_t hash = 0U;

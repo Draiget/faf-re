@@ -33,7 +33,8 @@ namespace moho
 
   /**
    * Address: 0x00615270 (FUN_00615270, sub_615270)
-   * Address: 0x00BF9F30 (FUN_00BF9F30, atexit destructor of the CUnitMeleeAttackTargetTaskTypeInfo object; registered by 0x00BD0DE0)
+   * Address: 0x00BF9F30 (FUN_00BF9F30, atexit destructor of the CUnitMeleeAttackTargetTaskTypeInfo object; registered
+   * by 0x00BD0DE0)
    *
    * What it does:
    * Constructs the static descriptor in place on first call and returns it,
@@ -71,7 +72,9 @@ namespace moho
    */
   void CUnitMeleeAttackTargetTaskTypeInfo::Init()
   {
-    static_assert(sizeof(moho::CUnitMeleeAttackTargetTask) == 0x90, "moho::CUnitMeleeAttackTargetTask is 0x90 bytes on x86");
+    static_assert(
+      sizeof(moho::CUnitMeleeAttackTargetTask) == 0x90, "moho::CUnitMeleeAttackTargetTask is 0x90 bytes on x86"
+    );
     size_ = sizeof(moho::CUnitMeleeAttackTargetTask);
     (void)gpg::BindRTypeLifecycleCallbacks(
       this,
@@ -93,7 +96,9 @@ namespace moho
    * What it does:
    * Registers `CCommandTask` as the primary reflection base.
    */
-  void CUnitMeleeAttackTargetTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void CUnitMeleeAttackTargetTaskTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CCommandTask>(typeInfo);
   }
@@ -105,9 +110,13 @@ namespace moho
    * Registers `Listener<EAiAttackerEvent>` as a secondary base at offset
    * `0x34`.
    */
-  void CUnitMeleeAttackTargetTaskTypeInfo::AddBase_Listener_EAiAttackerEvent(gpg::RType* const typeInfo)
+  void CUnitMeleeAttackTargetTaskTypeInfo::AddBase_Listener_EAiAttackerEvent(
+    gpg::RType* const typeInfo
+  )
   {
-    gpg::AddReflectedBase<moho::Listener<moho::EAiAttackerEvent>>(typeInfo, gpg::BaseSubobjectOffset<CUnitMeleeAttackTargetTask, Listener<EAiAttackerEvent>>());
+    gpg::AddReflectedBase<moho::Listener<moho::EAiAttackerEvent>>(
+      typeInfo, gpg::BaseSubobjectOffset<CUnitMeleeAttackTargetTask, Listener<EAiAttackerEvent>>()
+    );
   }
 
   /**
@@ -117,9 +126,13 @@ namespace moho
    * Registers `Listener<ECommandEvent>` as a secondary base at offset
    * `0x44`.
    */
-  void CUnitMeleeAttackTargetTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const typeInfo)
+  void CUnitMeleeAttackTargetTaskTypeInfo::AddBase_Listener_ECommandEvent(
+    gpg::RType* const typeInfo
+  )
   {
-    gpg::AddReflectedBase<moho::Listener<moho::ECommandEvent>>(typeInfo, gpg::BaseSubobjectOffset<CUnitMeleeAttackTargetTask, Listener<ECommandEvent>>());
+    gpg::AddReflectedBase<moho::Listener<moho::ECommandEvent>>(
+      typeInfo, gpg::BaseSubobjectOffset<CUnitMeleeAttackTargetTask, Listener<ECommandEvent>>()
+    );
   }
 
   /**
@@ -142,7 +155,9 @@ namespace moho
    * Placement-constructs one `CUnitMeleeAttackTargetTask` in caller-provided
    * storage and returns typed reflection ref.
    */
-  gpg::RRef CUnitMeleeAttackTargetTaskTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitMeleeAttackTargetTaskTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const task = gpg::ConstructInStorage<CUnitMeleeAttackTargetTask>(objectStorage);
     return gpg::RRef{task, gpg::RTypeOf<moho::CUnitMeleeAttackTargetTask>()};
@@ -154,7 +169,9 @@ namespace moho
    * What it does:
    * Deletes one heap-owned `CUnitMeleeAttackTargetTask`.
    */
-  void CUnitMeleeAttackTargetTaskTypeInfo::Delete(void* const objectStorage)
+  void CUnitMeleeAttackTargetTaskTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CUnitMeleeAttackTargetTask*>(objectStorage);
   }
@@ -166,7 +183,9 @@ namespace moho
    * Runs in-place destructor for one `CUnitMeleeAttackTargetTask` without
    * deallocating storage.
    */
-  void CUnitMeleeAttackTargetTaskTypeInfo::Destruct(void* const objectStorage)
+  void CUnitMeleeAttackTargetTaskTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     auto* const task = static_cast<CUnitMeleeAttackTargetTask*>(objectStorage);
     task->~CUnitMeleeAttackTargetTask();

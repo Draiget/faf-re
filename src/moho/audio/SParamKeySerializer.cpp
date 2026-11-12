@@ -13,7 +13,9 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<SParamKey>::Deserialize` 0x004DEFD0.
    */
-  void SParamKey::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SParamKey::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -28,7 +30,9 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<SParamKey>::Serialize` 0x004DF010.
    */
-  void SParamKey::MemberSerialize(gpg::WriteArchive* const archive)
+  void SParamKey::MemberSerialize(
+    gpg::WriteArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;

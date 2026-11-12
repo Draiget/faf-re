@@ -32,7 +32,9 @@ namespace
    * A marker bitmap: the mounted path resolved through the VFS, loaded as a
    * BMP. Inlined at each of the constructor's five images.
    */
-  wxBitmap LoadMarkerBitmap(const char* const mountedPath)
+  wxBitmap LoadMarkerBitmap(
+    const char* const mountedPath
+  )
   {
     fa::string diskPath;
     (void)moho::DISK_GetVFS()->FindFile(&diskPath, mountedPath, nullptr);
@@ -42,16 +44,27 @@ namespace
 
 // Table 0x00DFF644 = {&wxListCtrl::sm_eventTable (0x00D56818), rows 0x00F59654};
 // GetEventTable (0x004C1ED0) comes with it.
-BEGIN_EVENT_TABLE(moho::ScrFileCtrl, wxListCtrl)
-  EVT_SIZE(moho::ScrFileCtrl::OnSize)
+BEGIN_EVENT_TABLE(
+  moho::ScrFileCtrl,
+  wxListCtrl
+)
+EVT_SIZE(
+  moho::ScrFileCtrl::OnSize
+)
 END_EVENT_TABLE()
 
 /**
  * Address: 0x004C1EE0 (FUN_004C1EE0)
  */
-moho::ScrFileCtrl::ScrFileCtrl(wxWindow* const parent)
+moho::ScrFileCtrl::ScrFileCtrl(
+  wxWindow* const parent
+)
   : wxListCtrl(
-      parent, -1, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_VIRTUAL | wxLC_NO_HEADER | wxLC_SINGLE_SEL
+      parent,
+      -1,
+      wxDefaultPosition,
+      wxDefaultSize,
+      wxLC_REPORT | wxLC_VIRTUAL | wxLC_NO_HEADER | wxLC_SINGLE_SEL
     )
   , mCursorLine(0)
   , mImageList(nullptr)
@@ -71,7 +84,9 @@ moho::ScrFileCtrl::ScrFileCtrl(wxWindow* const parent)
   InsertColumn(kSourceColumn, wxT("source"), wxLIST_FORMAT_LEFT, -1);
 
   Connect(
-    GetId(), -1, wxEVT_COMMAND_LIST_ITEM_ACTIVATED,
+    GetId(),
+    -1,
+    wxEVT_COMMAND_LIST_ITEM_ACTIVATED,
     (wxObjectEventFunction)(wxEventFunction)(wxListEventFunction)&ScrFileCtrl::OnLineActivated
   );
 }
@@ -90,7 +105,9 @@ moho::ScrFileCtrl::~ScrFileCtrl() = default;
  * the loop keeps appending empty lines. A last line with no newline is
  * dropped. Both as shipped.
  */
-bool moho::ScrFileCtrl::Load(const fa::string& fileName)
+bool moho::ScrFileCtrl::Load(
+  const fa::string& fileName
+)
 {
   Clear();
   if (fileName.empty()) {
@@ -135,7 +152,9 @@ void moho::ScrFileCtrl::Clear()
 /**
  * Address: 0x004C2A40 (FUN_004C2A40)
  */
-void moho::ScrFileCtrl::FindFirst(const fa::string& text)
+void moho::ScrFileCtrl::FindFirst(
+  const fa::string& text
+)
 {
   const int lineCount = static_cast<int>(mLines.size());
   bool found = false;
@@ -151,7 +170,9 @@ void moho::ScrFileCtrl::FindFirst(const fa::string& text)
 /**
  * Address: 0x004C2AE0 (FUN_004C2AE0)
  */
-void moho::ScrFileCtrl::FindNext(const fa::string& text)
+void moho::ScrFileCtrl::FindNext(
+  const fa::string& text
+)
 {
   const long selected = GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
   if (selected < 0) {
@@ -172,7 +193,9 @@ void moho::ScrFileCtrl::FindNext(const fa::string& text)
 /**
  * Address: 0x004C2B90 (FUN_004C2B90)
  */
-void moho::ScrFileCtrl::FindPrevious(const fa::string& text)
+void moho::ScrFileCtrl::FindPrevious(
+  const fa::string& text
+)
 {
   const long selected = GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
   if (selected < 0) {
@@ -192,7 +215,9 @@ void moho::ScrFileCtrl::FindPrevious(const fa::string& text)
 /**
  * Address: 0x004C2C20 (FUN_004C2C20)
  */
-void moho::ScrFileCtrl::GotoLine(const int line)
+void moho::ScrFileCtrl::GotoLine(
+  const int line
+)
 {
   const int index = line - 1;
   if (index > -1 && index < static_cast<int>(mLines.size())) {
@@ -204,20 +229,22 @@ void moho::ScrFileCtrl::GotoLine(const int line)
 /**
  * Address: 0x004C2C60 (FUN_004C2C60)
  */
-void moho::ScrFileCtrl::EnableBreakpoints(const bool enable)
+void moho::ScrFileCtrl::EnableBreakpoints(
+  const bool enable
+)
 {
   const int lineCount = static_cast<int>(mLines.size());
   for (int index = 0; index < lineCount; ++index) {
     ScrFileLine& fileLine = mLines[index];
     switch (fileLine.mMarkerState) {
-      case kCursorOnBreakpointMarker:
-      case kCursorOnDisabledBreakpointMarker:
-        fileLine.mMarkerState = enable ? kCursorOnBreakpointMarker : kCursorOnDisabledBreakpointMarker;
-        break;
-      case kBreakpointMarker:
-      case kDisabledBreakpointMarker:
-        fileLine.mMarkerState = enable ? kBreakpointMarker : kDisabledBreakpointMarker;
-        break;
+    case kCursorOnBreakpointMarker:
+    case kCursorOnDisabledBreakpointMarker:
+      fileLine.mMarkerState = enable ? kCursorOnBreakpointMarker : kCursorOnDisabledBreakpointMarker;
+      break;
+    case kBreakpointMarker:
+    case kDisabledBreakpointMarker:
+      fileLine.mMarkerState = enable ? kBreakpointMarker : kDisabledBreakpointMarker;
+      break;
     }
     RefreshItem(index);
   }
@@ -226,7 +253,9 @@ void moho::ScrFileCtrl::EnableBreakpoints(const bool enable)
 /**
  * Address: 0x004C2CF0 (FUN_004C2CF0)
  */
-void moho::ScrFileCtrl::RemoveBreakpoint(const int line)
+void moho::ScrFileCtrl::RemoveBreakpoint(
+  const int line
+)
 {
   const int index = line - 1;
   if (index < 0 || index >= static_cast<int>(mLines.size())) {
@@ -235,14 +264,14 @@ void moho::ScrFileCtrl::RemoveBreakpoint(const int line)
 
   ScrFileLine& fileLine = mLines[index];
   switch (fileLine.mMarkerState) {
-    case kCursorOnBreakpointMarker:
-    case kCursorOnDisabledBreakpointMarker:
-      fileLine.mMarkerState = kCursorMarker;
-      break;
-    case kBreakpointMarker:
-    case kDisabledBreakpointMarker:
-      fileLine.mMarkerState = kNoMarker;
-      break;
+  case kCursorOnBreakpointMarker:
+  case kCursorOnDisabledBreakpointMarker:
+    fileLine.mMarkerState = kCursorMarker;
+    break;
+  case kBreakpointMarker:
+  case kDisabledBreakpointMarker:
+    fileLine.mMarkerState = kNoMarker;
+    break;
   }
   RefreshItem(index);
 }
@@ -261,22 +290,24 @@ void moho::ScrFileCtrl::RemoveAllBreakpoints()
 /**
  * Address: 0x004C2DE0 (FUN_004C2DE0)
  */
-bool moho::ScrFileCtrl::SetCursorLine(const int line)
+bool moho::ScrFileCtrl::SetCursorLine(
+  const int line
+)
 {
   const int index = line - 1;
   if (index > -1 && index < static_cast<int>(mLines.size())) {
     ScrFileLine& fileLine = mLines[index];
     mCursorLine = line;
     switch (fileLine.mMarkerState) {
-      case kNoMarker:
-        fileLine.mMarkerState = kCursorMarker;
-        break;
-      case kBreakpointMarker:
-        fileLine.mMarkerState = kCursorOnBreakpointMarker;
-        break;
-      case kDisabledBreakpointMarker:
-        fileLine.mMarkerState = kCursorOnDisabledBreakpointMarker;
-        break;
+    case kNoMarker:
+      fileLine.mMarkerState = kCursorMarker;
+      break;
+    case kBreakpointMarker:
+      fileLine.mMarkerState = kCursorOnBreakpointMarker;
+      break;
+    case kDisabledBreakpointMarker:
+      fileLine.mMarkerState = kCursorOnDisabledBreakpointMarker;
+      break;
     }
     RefreshItem(index);
     EnsureVisible(index);
@@ -300,15 +331,15 @@ void moho::ScrFileCtrl::ClearCursor()
   ScrFileLine& fileLine = mLines[index];
   mCursorLine = 0;
   switch (fileLine.mMarkerState) {
-    case kCursorMarker:
-      fileLine.mMarkerState = kNoMarker;
-      break;
-    case kCursorOnBreakpointMarker:
-      fileLine.mMarkerState = kBreakpointMarker;
-      break;
-    case kCursorOnDisabledBreakpointMarker:
-      fileLine.mMarkerState = kDisabledBreakpointMarker;
-      break;
+  case kCursorMarker:
+    fileLine.mMarkerState = kNoMarker;
+    break;
+  case kCursorOnBreakpointMarker:
+    fileLine.mMarkerState = kBreakpointMarker;
+    break;
+  case kCursorOnDisabledBreakpointMarker:
+    fileLine.mMarkerState = kDisabledBreakpointMarker;
+    break;
   }
   RefreshItem(index);
 }
@@ -316,7 +347,10 @@ void moho::ScrFileCtrl::ClearCursor()
 /**
  * Address: 0x004C2F30 (FUN_004C2F30)
  */
-wxString moho::ScrFileCtrl::OnGetItemText(const long item, const long column) const
+wxString moho::ScrFileCtrl::OnGetItemText(
+  const long item,
+  const long column
+) const
 {
   if (column == 1) {
     return gpg::STR_Utf8ToWide(mLines[item].mLineNumberText.c_str()).c_str();
@@ -330,7 +364,9 @@ wxString moho::ScrFileCtrl::OnGetItemText(const long item, const long column) co
 /**
  * Address: 0x004C2F10 (FUN_004C2F10)
  */
-int moho::ScrFileCtrl::OnGetItemImage(const long item) const
+int moho::ScrFileCtrl::OnGetItemImage(
+  const long item
+) const
 {
   return mLines[item].mMarkerState;
 }
@@ -343,7 +379,9 @@ int moho::ScrFileCtrl::OnGetItemImage(const long item) const
  * (0x011040AC) and the even-line colour (0x0110409C). The attribute's
  * constructor (0x004C1A60) has the text colour and the font folded in.
  */
-wxListItemAttr* moho::ScrFileCtrl::OnGetItemAttr(const long item) const
+wxListItemAttr* moho::ScrFileCtrl::OnGetItemAttr(
+  const long item
+) const
 {
   static wxFont sourceFont(10, wxDEFAULT, wxNORMAL, wxNORMAL, false, wxT("Courier New"));
   static wxColour textColour(0, 0, 0);
@@ -355,29 +393,31 @@ wxListItemAttr* moho::ScrFileCtrl::OnGetItemAttr(const long item) const
 /**
  * Address: 0x004C3270 (FUN_004C3270)
  */
-void moho::ScrFileCtrl::OnLineActivated(wxListEvent& event)
+void moho::ScrFileCtrl::OnLineActivated(
+  wxListEvent& event
+)
 {
   const long item = event.GetIndex();
   ScrFileLine& fileLine = mLines[item];
   switch (fileLine.mMarkerState) {
-    case kNoMarker:
-      fileLine.mMarkerState = kBreakpointMarker;
-      SCR_AddBreakpoint(ScrBreakpoint(mSourcePath, item + 1));
-      break;
-    case kCursorMarker:
-      fileLine.mMarkerState = kCursorOnBreakpointMarker;
-      SCR_AddBreakpoint(ScrBreakpoint(mSourcePath, item + 1));
-      break;
-    case kCursorOnBreakpointMarker:
-    case kCursorOnDisabledBreakpointMarker:
-      fileLine.mMarkerState = kCursorMarker;
-      SCR_RemoveBreakpoint(ScrBreakpoint(mSourcePath, item + 1));
-      break;
-    case kBreakpointMarker:
-    case kDisabledBreakpointMarker:
-      fileLine.mMarkerState = kNoMarker;
-      SCR_RemoveBreakpoint(ScrBreakpoint(mSourcePath, item + 1));
-      break;
+  case kNoMarker:
+    fileLine.mMarkerState = kBreakpointMarker;
+    SCR_AddBreakpoint(ScrBreakpoint(mSourcePath, item + 1));
+    break;
+  case kCursorMarker:
+    fileLine.mMarkerState = kCursorOnBreakpointMarker;
+    SCR_AddBreakpoint(ScrBreakpoint(mSourcePath, item + 1));
+    break;
+  case kCursorOnBreakpointMarker:
+  case kCursorOnDisabledBreakpointMarker:
+    fileLine.mMarkerState = kCursorMarker;
+    SCR_RemoveBreakpoint(ScrBreakpoint(mSourcePath, item + 1));
+    break;
+  case kBreakpointMarker:
+  case kDisabledBreakpointMarker:
+    fileLine.mMarkerState = kNoMarker;
+    SCR_RemoveBreakpoint(ScrBreakpoint(mSourcePath, item + 1));
+    break;
   }
   RefreshItem(item);
 }
@@ -385,7 +425,9 @@ void moho::ScrFileCtrl::OnLineActivated(wxListEvent& event)
 /**
  * Address: 0x004C33D0 (FUN_004C33D0)
  */
-void moho::ScrFileCtrl::OnSize(wxSizeEvent& event)
+void moho::ScrFileCtrl::OnSize(
+  wxSizeEvent& event
+)
 {
   SetColumnWidth(kSourceColumn, event.GetSize().x - 100);
 }

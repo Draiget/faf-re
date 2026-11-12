@@ -102,9 +102,7 @@ namespace moho
 
   static_assert(sizeof(CD3DRenderTarget::SurfaceHandle) == 0x08, "CD3DRenderTarget::SurfaceHandle size must be 0x08");
   static_assert(offsetof(CD3DRenderTarget, mLink) == 0x04, "CD3DRenderTarget::mLink offset must be 0x04");
-  static_assert(
-    offsetof(CD3DRenderTarget, mOwnerDevice) == 0x0C, "CD3DRenderTarget::mOwnerDevice offset must be 0x0C"
-  );
+  static_assert(offsetof(CD3DRenderTarget, mOwnerDevice) == 0x0C, "CD3DRenderTarget::mOwnerDevice offset must be 0x0C");
   static_assert(
     offsetof(CD3DRenderTarget, mRenderTargetContext) == 0x10,
     "CD3DRenderTarget::mRenderTargetContext offset must be 0x10"

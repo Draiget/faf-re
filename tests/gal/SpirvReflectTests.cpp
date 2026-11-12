@@ -28,16 +28,26 @@ namespace
   class Module
   {
   public:
-    Module() { mWords = {0x07230203U, 0x00010000U, 0U, 100U, 0U}; }
+    Module()
+    {
+      mWords = {0x07230203U, 0x00010000U, 0U, 100U, 0U};
+    }
 
-    void Op(const std::uint16_t opcode, const std::initializer_list<std::uint32_t> operands)
+    void Op(
+      const std::uint16_t opcode,
+      const std::initializer_list<std::uint32_t> operands
+    )
     {
       mWords.push_back((static_cast<std::uint32_t>(operands.size() + 1U) << 16U) | opcode);
       mWords.insert(mWords.end(), operands.begin(), operands.end());
     }
 
     /** An instruction whose operands are `operands` followed by the literal string `text`. */
-    void OpString(const std::uint16_t opcode, const std::initializer_list<std::uint32_t> operands, const std::string& text)
+    void OpString(
+      const std::uint16_t opcode,
+      const std::initializer_list<std::uint32_t> operands,
+      const std::string& text
+    )
     {
       std::vector<std::uint32_t> literal((text.size() + 4U) / 4U, 0U);
       std::memcpy(literal.data(), text.data(), text.size());
@@ -53,8 +63,14 @@ namespace
       return bytes;
     }
 
-    [[nodiscard]] std::size_t WordCount() const noexcept { return mWords.size(); }
-    std::vector<std::uint32_t>& Words() noexcept { return mWords; }
+    [[nodiscard]] std::size_t WordCount() const noexcept
+    {
+      return mWords.size();
+    }
+    std::vector<std::uint32_t>& Words() noexcept
+    {
+      return mWords;
+    }
 
   private:
     std::vector<std::uint32_t> mWords;
@@ -183,7 +199,10 @@ namespace
     return module;
   }
 
-  const SpirvInterfaceVariable* Find(const std::vector<SpirvInterfaceVariable>& variables, const std::uint32_t id)
+  const SpirvInterfaceVariable* Find(
+    const std::vector<SpirvInterfaceVariable>& variables,
+    const std::uint32_t id
+  )
   {
     for (const SpirvInterfaceVariable& variable : variables) {
       if (variable.id == id) {
@@ -193,13 +212,19 @@ namespace
     return nullptr;
   }
 
-  bool HasBytes(const std::vector<std::uint8_t>& code, const std::string& text)
+  bool HasBytes(
+    const std::vector<std::uint8_t>& code,
+    const std::string& text
+  )
   {
     return std::search(code.begin(), code.end(), text.begin(), text.end()) != code.end();
   }
 } // namespace
 
-TEST(GalSpirvReflect, InterfaceVariablesTakeLocationShapeAndSemantic)
+TEST(
+  GalSpirvReflect,
+  InterfaceVariablesTakeLocationShapeAndSemantic
+)
 {
   const SpirvInterface result = ReflectSpirvInterface(InterfaceModule().Bytes());
   ASSERT_EQ(result.inputs.size(), 7U) << "the input without a Location or BuiltIn is left out";
@@ -268,7 +293,10 @@ TEST(GalSpirvReflect, InterfaceVariablesTakeLocationShapeAndSemantic)
   EXPECT_EQ(Find(result.inputs, kPrivateVariable), nullptr);
 }
 
-TEST(GalSpirvReflect, MalformedModulesGiveAnEmptyInterface)
+TEST(
+  GalSpirvReflect,
+  MalformedModulesGiveAnEmptyInterface
+)
 {
   EXPECT_TRUE(ReflectSpirvInterface({}).inputs.empty());
 
@@ -296,10 +324,14 @@ TEST(GalSpirvReflect, MalformedModulesGiveAnEmptyInterface)
   EXPECT_EQ(ReflectSpirvInterface(code).inputs.size(), 7U);
 }
 
-TEST(GalSpirvReflect, InputLocationsCanBeMovedById)
+TEST(
+  GalSpirvReflect,
+  InputLocationsCanBeMovedById
+)
 {
   const std::vector<std::uint8_t> code = InterfaceModule().Bytes();
-  const std::vector<std::uint8_t> patched = PatchSpirvInputLocations(code, {{kInPosition, 7U}, {kInUv, 3U}, {999U, 1U}});
+  const std::vector<std::uint8_t> patched =
+    PatchSpirvInputLocations(code, {{kInPosition, 7U}, {kInUv, 3U}, {999U, 1U}});
   ASSERT_EQ(patched.size(), code.size());
   const SpirvInterface result = ReflectSpirvInterface(patched);
   EXPECT_EQ(Find(result.inputs, kInPosition)->location, 7U);
@@ -318,7 +350,10 @@ TEST(GalSpirvReflect, InputLocationsCanBeMovedById)
   EXPECT_EQ(PatchSpirvInputLocations(truncatedBytes, {{kInPosition, 7U}}), truncatedBytes);
 }
 
-TEST(GalSpirvReflect, StrippingRemovesOnlyTheReflectionDecorations)
+TEST(
+  GalSpirvReflect,
+  StrippingRemovesOnlyTheReflectionDecorations
+)
 {
   const Module module = InterfaceModule();
   const std::vector<std::uint8_t> code = module.Bytes();
@@ -331,8 +366,10 @@ TEST(GalSpirvReflect, StrippingRemovesOnlyTheReflectionDecorations)
   EXPECT_FALSE(HasBytes(stripped, "TEXCOORD3"));
   EXPECT_FALSE(HasBytes(stripped, "MEMBER"));
   EXPECT_TRUE(HasBytes(stripped, "SPV_KHR_storage_buffer_storage_class"));
-  EXPECT_EQ(std::vector<std::uint8_t>(stripped.begin(), stripped.begin() + 20), std::vector<std::uint8_t>(code.begin(), code.begin() + 20))
-    << "the header is kept";
+  EXPECT_EQ(
+    std::vector<std::uint8_t>(stripped.begin(), stripped.begin() + 20),
+    std::vector<std::uint8_t>(code.begin(), code.begin() + 20)
+  ) << "the header is kept";
 
   // Locations, types and built-ins survive; the semantics are gone.
   const SpirvInterface result = ReflectSpirvInterface(stripped);

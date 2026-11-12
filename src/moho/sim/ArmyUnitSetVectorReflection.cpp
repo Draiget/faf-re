@@ -54,7 +54,10 @@ namespace
  * What it does:
  * Builds one reflected reference lane for `EntitySetTemplate<Unit>`.
  */
-gpg::RRef* gpg::RRef_UnitSetBase(gpg::RRef* const outRef, moho::EntitySetTemplate<moho::Unit>* const value)
+gpg::RRef* gpg::RRef_UnitSetBase(
+  gpg::RRef* const outRef,
+  moho::EntitySetTemplate<moho::Unit>* const value
+)
 {
   if (outRef == nullptr) {
     return nullptr;
@@ -78,7 +81,10 @@ gpg::RRef* gpg::RRef_UnitSetBase(gpg::RRef* const outRef, moho::EntitySetTemplat
  * `RRef_UnitSetBase` above is a separate, simpler binary
  * function used by other callers.
  */
-gpg::RRef* gpg::MakeUnitSetDerivedRef(gpg::RRef* const outRef, moho::EntitySetTemplate<moho::Unit>* const value)
+gpg::RRef* gpg::MakeUnitSetDerivedRef(
+  gpg::RRef* const outRef,
+  moho::EntitySetTemplate<moho::Unit>* const value
+)
 {
   if (outRef == nullptr) {
     return nullptr;
@@ -112,7 +118,8 @@ gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::~RVectorType() = default;
  */
 const char* gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::GetName() const
 {
-  static const fa::string sName = gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>()->GetName());
+  static const fa::string sName =
+    gpg::STR_Printf("vector<%s>", gpg::RTypeOf<moho::EntitySetTemplate<moho::Unit>>()->GetName());
   return sName.c_str();
 }
 
@@ -123,7 +130,9 @@ const char* gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::GetName() con
  * Appends the element count to the base `RType::GetLexical` text, matching
  * the binary's `"%s, size=%d"` formatting of the inherited lexical form.
  */
-fa::string gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
@@ -143,7 +152,10 @@ void gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::Init()
 }
 
 void gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SerLoad(
-  ReadArchive* const archive, const std::intptr_t objectPtr, const int, RRef* const
+  ReadArchive* const archive,
+  const std::intptr_t objectPtr,
+  const int,
+  RRef* const
 )
 {
   auto* const storage = reinterpret_cast<EntitySetVector*>(objectPtr);
@@ -162,7 +174,10 @@ void gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SerLoad(
 }
 
 void gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SerSave(
-  WriteArchive* const archive, const std::intptr_t objectPtr, const int, RRef* const ownerRef
+  WriteArchive* const archive,
+  const std::intptr_t objectPtr,
+  const int,
+  RRef* const ownerRef
 )
 {
   const auto* const storage = reinterpret_cast<const EntitySetVector*>(objectPtr);
@@ -172,7 +187,10 @@ void gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SerSave(
   }
 }
 
-gpg::RRef gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SubscriptIndex(void* const obj, const int ind) const
+gpg::RRef gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SubscriptIndex(
+  void* const obj,
+  const int ind
+) const
 {
   auto* const storage = static_cast<EntitySetVector*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -189,13 +207,18 @@ gpg::RRef gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SubscriptIndex(
   return out;
 }
 
-size_t gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::GetCount(void* const obj) const
+size_t gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::GetCount(
+  void* const obj
+) const
 {
   const auto* const storage = static_cast<const EntitySetVector*>(obj);
   return storage ? storage->size() : 0u;
 }
 
-void gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SetCount(void* const obj, const int count) const
+void gpg::RVectorType<moho::EntitySetTemplate<moho::Unit>>::SetCount(
+  void* const obj,
+  const int count
+) const
 {
   auto* const storage = static_cast<EntitySetVector*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -233,4 +256,7 @@ void moho::register_EntitySetTemplateUnitVectorTypeStartup()
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_EntitySetTemplateUnitVectorType_50022b, moho::register_EntitySetTemplateUnitVectorType)
+GPG_PREREGISTER_INIT(
+  register_EntitySetTemplateUnitVectorType_50022b,
+  moho::register_EntitySetTemplateUnitVectorType
+)

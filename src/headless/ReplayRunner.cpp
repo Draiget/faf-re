@@ -1,7 +1,9 @@
 #include "headless/ReplayRunner.h"
+#include "headless/BotObservation.h"
 #include "headless/SessionLoad.h"
 #include "headless/ReplayLuaState.h"
 #include "headless/ReplaySyncWriters.h"
+#include "headless/StateDigest.h"
 
 #if FAF_SERVER_MODE
 #include "remote/client/LoopbackLink.h"
@@ -84,7 +86,9 @@ namespace faf::headless
   {
     using Clock = std::chrono::steady_clock;
 
-    [[nodiscard]] double SecondsSince(const Clock::time_point start)
+    [[nodiscard]] double SecondsSince(
+      const Clock::time_point start
+    )
     {
       return std::chrono::duration<double>(Clock::now() - start).count();
     }
@@ -95,9 +99,11 @@ namespace faf::headless
 #if defined(_WIN32)
       PROCESS_MEMORY_COUNTERS_EX counters{};
       counters.cb = sizeof(counters);
-      if (::K32GetProcessMemoryInfo(
-            ::GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters), sizeof(counters)
-          )) {
+      if (
+        ::K32GetProcessMemoryInfo(
+          ::GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters), sizeof(counters)
+        )
+      ) {
         return static_cast<double>(counters.PrivateUsage) / 1048576.0;
       }
       return 0.0;
@@ -120,7 +126,9 @@ namespace faf::headless
     class ChecksumLogWatch final : public gpg::LogTarget
     {
     public:
-      explicit ChecksumLogWatch(std::string label)
+      explicit ChecksumLogWatch(
+        std::string label
+      )
         : gpg::LogTarget(true)
         , mLabel(std::move(label))
       {}
@@ -135,15 +143,20 @@ namespace faf::headless
         (void)level;
         (void)context;
         (void)previousDepth;
-        if (std::strstr(message.c_str(), "Checksum for beat ") != nullptr
-            && std::strstr(message.c_str(), " mismatched: ") != nullptr) {
+        if (
+          std::strstr(message.c_str(), "Checksum for beat ") != nullptr &&
+          std::strstr(message.c_str(), " mismatched: ") != nullptr
+        ) {
           mMismatches.fetch_add(1, std::memory_order_relaxed);
           std::printf("[%s] DESYNC-LINE %s\n", mLabel.c_str(), message.c_str());
           std::fflush(stdout);
         }
       }
 
-      [[nodiscard]] int Mismatches() const noexcept { return mMismatches.load(std::memory_order_relaxed); }
+      [[nodiscard]] int Mismatches() const noexcept
+      {
+        return mMismatches.load(std::memory_order_relaxed);
+      }
 
     private:
       std::string mLabel;
@@ -159,7 +172,9 @@ namespace faf::headless
 
     ReplayClientEvents gReplayClientEvents;
 
-    [[nodiscard]] bool IsZero(const gpg::MD5Digest& digest) noexcept
+    [[nodiscard]] bool IsZero(
+      const gpg::MD5Digest& digest
+    ) noexcept
     {
       return (digest.vals[0] | digest.vals[1] | digest.vals[2] | digest.vals[3]) == 0u;
     }
@@ -180,7 +195,9 @@ namespace faf::headless
      * name the key is not decoded: the garbage of a whole game's decoding is tens of megabytes.
      */
     [[nodiscard]] bool InspectSync(
-      moho::SSyncData& packet, LuaPlus::LuaState* const state, std::map<std::string, SSyncKeySeen>* const keys
+      moho::SSyncData& packet,
+      LuaPlus::LuaState* const state,
+      std::map<std::string, SSyncKeySeen>* const keys
     )
     {
       if (packet.mStream == nullptr || state == nullptr) {
@@ -211,152 +228,10 @@ namespace faf::headless
       return !gameEnded.IsNil() && (!gameEnded.IsBoolean() || gameEnded.GetBoolean());
     }
 
-    /**
-     * A digest of what the sim published in one beat, independent of `sim_ChecksumPeriod` and
-     * never touching the sim's checksum context: creations, every entity and unit update,
-     * deletions, every army's economy, and the Lua `Sync` bytes. Desync reports are left out
-     * (they depend on the checksum period by design). 64-bit FNV-1a, field by field.
-     */
-    class CStateDigest
-    {
-    public:
-      template <typename T>
-      void Add(const T& value) noexcept
-      {
-        static_assert(std::is_arithmetic_v<T> || std::is_enum_v<T>);
-        Bytes(&value, sizeof(value));
-      }
-
-      void Bytes(const void* const data, const std::size_t size) noexcept
-      {
-        const auto* const bytes = static_cast<const unsigned char*>(data);
-        for (std::size_t i = 0; i < size; ++i) {
-          mHash ^= bytes[i];
-          mHash *= 0x100000001B3ull;
-        }
-      }
-
-      void Text(const char* const text) noexcept { Bytes(text, text != nullptr ? std::strlen(text) + 1u : 0u); }
-
-      [[nodiscard]] std::uint64_t Value() const noexcept { return mHash; }
-
-    private:
-      std::uint64_t mHash = 0xCBF29CE484222325ull;
-    };
-
-    void AddTransform(CStateDigest& digest, const moho::VTransform& transform) noexcept
-    {
-      digest.Add(transform.orient_.x);
-      digest.Add(transform.orient_.y);
-      digest.Add(transform.orient_.z);
-      digest.Add(transform.orient_.w);
-      digest.Add(transform.pos_.x);
-      digest.Add(transform.pos_.y);
-      digest.Add(transform.pos_.z);
-    }
-
-    [[nodiscard]] std::uint64_t DigestPublishedState(const moho::SSyncData& packet)
-    {
-      CStateDigest digest;
-      digest.Add(packet.mCurBeat);
-      digest.Add(packet.mCurTick);
-      for (const moho::SCreateEntityParams& params : packet.mNewEntities) {
-        digest.Add(params.mEntityId);
-        digest.Text(params.mBlueprint != nullptr ? params.mBlueprint->mBlueprintId.c_str() : nullptr);
-      }
-      for (const moho::SCreateUnitParams& params : packet.mNewUnits) {
-        digest.Add(params.mEntityId);
-        digest.Text(params.mBlueprint != nullptr ? params.mBlueprint->mBlueprintId.c_str() : nullptr);
-      }
-      for (const moho::SEntityVariableUpdateEntry& update : packet.mEntityUpdates) {
-        const moho::SSTIEntityVariableData& data = update.mVariableData;
-        digest.Add(update.mEntityId);
-        digest.Add(data.mScale.x);
-        digest.Add(data.mScale.y);
-        digest.Add(data.mScale.z);
-        digest.Add(data.mHealth);
-        digest.Add(data.mMaxHealth);
-        digest.Add(data.mIsBeingBuilt);
-        digest.Add(data.mIsDead);
-        digest.Add(data.mDestroyedByKill);
-        AddTransform(digest, data.mCurTransform);
-        AddTransform(digest, data.mLastTransform);
-        digest.Add(data.mCurImpactValue);
-        digest.Add(data.mFractionComplete);
-        digest.Add(data.mAttachmentParentRef);
-        digest.Add(data.mVisibilityHidden);
-        digest.Add(data.mVisibilityMode);
-        digest.Add(data.mLayerMask);
-      }
-      for (const moho::SUnitVariableUpdateEntry& update : packet.mUnitUpdates) {
-        const moho::SSTIUnitVariableData& data = update.mVariableData;
-        digest.Add(update.mEntityId);
-        digest.Add(update.mReconFlags);
-        digest.Add(data.mCreator);
-        digest.Add(data.mAutoMode);
-        digest.Add(data.mIsBusy);
-        digest.Add(data.mFuelRatio);
-        digest.Add(data.mShieldRatio);
-        digest.Add(data.mStunTicks);
-        digest.Add(data.mIsPaused);
-        digest.Add(data.mJobType);
-        digest.Add(data.mFireState);
-        digest.Add(data.mWorkProgress);
-        digest.Add(data.mTacticalSiloBuildCount);
-        digest.Add(data.mNukeSiloBuildCount);
-        digest.Add(data.mTacticalSiloStorageCount);
-        digest.Add(data.mNukeSiloStorageCount);
-        digest.Add(data.mProduced.ENERGY);
-        digest.Add(data.mProduced.MASS);
-        digest.Add(data.mResourcesSpent.ENERGY);
-        digest.Add(data.mResourcesSpent.MASS);
-        digest.Add(data.mMaintainenceCost.ENERGY);
-        digest.Add(data.mMaintainenceCost.MASS);
-        digest.Add(data.mFocusUnit);
-        digest.Add(data.mGuardedUnit);
-        digest.Add(data.mTargetBlip);
-        digest.Add(data.mScriptbits);
-        digest.Add(data.mUnitStates);
-        for (const moho::CmdId id : data.mCommands) {
-          digest.Add(id);
-        }
-        for (const moho::CmdId id : data.mBuildQueue) {
-          digest.Add(id);
-        }
-      }
-      for (const moho::EntId id : packet.mEraseIds) {
-        digest.Add(id);
-      }
-      for (const moho::EntId id : packet.mDeleteIds) {
-        digest.Add(id);
-      }
-      for (const moho::SSTIArmyVariableData& army : packet.mArmyUpdates) {
-        const moho::SEconTotals& economy = army.mEconomyTotals;
-        for (const auto* pair : {&economy.mStored, &economy.mIncome, &economy.mReclaimed, &economy.mLastUseRequested,
-                                 &economy.mLastUseActual}) {
-          digest.Add(pair->ENERGY);
-          digest.Add(pair->MASS);
-        }
-        digest.Add(economy.mMaxStorage.ENERGY);
-        digest.Add(economy.mMaxStorage.MASS);
-      }
-      // The Lua `Sync` bytes, read whole and rewound for the decode that follows.
-      if (packet.mStream != nullptr) {
-        char buffer[4096];
-        for (;;) {
-          const std::size_t read = packet.mStream->Read(buffer, sizeof(buffer));
-          if (read == 0) {
-            break;
-          }
-          digest.Bytes(buffer, read);
-        }
-        (void)packet.mStream->VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, 0);
-      }
-      return digest.Value();
-    }
-
     /** The Lua `Sync` payload's size in bytes, leaving the stream at its start. */
-    [[nodiscard]] std::uint64_t SyncStreamBytes(const moho::SSyncData& packet)
+    [[nodiscard]] std::uint64_t SyncStreamBytes(
+      const moho::SSyncData& packet
+    )
     {
       if (packet.mStream == nullptr) {
         return 0;
@@ -373,19 +248,38 @@ namespace faf::headless
       "entity_update_bytes,unit_update_bytes,army_update_bytes,lua_sync_bytes\n";
 
     /** One CSV row of per-lane element counts and the in-memory bytes of the big lanes (M0.2). */
-    void WriteLaneSizes(std::FILE* const file, const moho::SSyncData& packet)
+    void WriteLaneSizes(
+      std::FILE* const file,
+      const moho::SSyncData& packet
+    )
     {
       std::fprintf(
         file,
         "%d,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%zu,%llu\n",
-        packet.mCurBeat, packet.mNewEntities.size(), packet.mNewUnits.size(), packet.mEntityUpdates.size(),
-        packet.mUnitUpdates.size(), packet.mDeleteIds.size(), packet.mEraseIds.size(), packet.mArmyUpdates.size(),
-        packet.mNewGrids.size(), packet.mPublishedCommandDescriptors.size(), packet.mPublishedCommandPackets.size(),
-        packet.mPendingCommandEventRemovals.size(), packet.mPendingReleasedCommandIds.size(), packet.mAddDecals.size(),
-        packet.mRemoveDecals.size(), packet.mCamShakeParams.size(), packet.mFollowCameras.size(),
-        packet.mPoseUpdates.size(), static_cast<std::size_t>(packet.mAudioRequests.end() - packet.mAudioRequests.begin()),
-        packet.mPlayableRectUpdates.size(), packet.mPrintField.size(), packet.mSyncExtraUnitData.size(),
-        packet.mDesyncs.size(), packet.mEntityUpdates.size() * sizeof(moho::SEntityVariableUpdateEntry),
+        packet.mCurBeat,
+        packet.mNewEntities.size(),
+        packet.mNewUnits.size(),
+        packet.mEntityUpdates.size(),
+        packet.mUnitUpdates.size(),
+        packet.mDeleteIds.size(),
+        packet.mEraseIds.size(),
+        packet.mArmyUpdates.size(),
+        packet.mNewGrids.size(),
+        packet.mPublishedCommandDescriptors.size(),
+        packet.mPublishedCommandPackets.size(),
+        packet.mPendingCommandEventRemovals.size(),
+        packet.mPendingReleasedCommandIds.size(),
+        packet.mAddDecals.size(),
+        packet.mRemoveDecals.size(),
+        packet.mCamShakeParams.size(),
+        packet.mFollowCameras.size(),
+        packet.mPoseUpdates.size(),
+        static_cast<std::size_t>(packet.mAudioRequests.end() - packet.mAudioRequests.begin()),
+        packet.mPlayableRectUpdates.size(),
+        packet.mPrintField.size(),
+        packet.mSyncExtraUnitData.size(),
+        packet.mDesyncs.size(),
+        packet.mEntityUpdates.size() * sizeof(moho::SEntityVariableUpdateEntry),
         packet.mUnitUpdates.size() * sizeof(moho::SUnitVariableUpdateEntry),
         packet.mArmyUpdates.size() * sizeof(moho::SSTIArmyVariableData),
         static_cast<unsigned long long>(SyncStreamBytes(packet))
@@ -394,7 +288,9 @@ namespace faf::headless
 
   } // namespace
 
-  void InstallChecksumWatch(const std::string& label)
+  void InstallChecksumWatch(
+    const std::string& label
+  )
   {
     if (gChecksumWatch == nullptr) {
       gChecksumWatch = new ChecksumLogWatch(label);
@@ -406,7 +302,9 @@ namespace faf::headless
     return gChecksumWatch != nullptr ? gChecksumWatch->Mismatches() : 0;
   }
 
-  SReplayResult RunReplay(const SReplayOptions& options)
+  SReplayResult RunReplay(
+    const SReplayOptions& options
+  )
   {
     SReplayResult result{};
     const Clock::time_point loadStart = Clock::now();
@@ -477,10 +375,12 @@ namespace faf::headless
         result.error = "--rejoin-source out of range";
         return result;
       }
-      if (options.focusArmy < 0
-          || !launchInfo->mArmyLaunchInfo[static_cast<std::size_t>(options.focusArmy)].mUnitSources.Contains(
-            static_cast<unsigned int>(options.rejoinSource)
-          )) {
+      if (
+        options.focusArmy < 0 ||
+        !launchInfo->mArmyLaunchInfo[static_cast<std::size_t>(options.focusArmy)].mUnitSources.Contains(
+          static_cast<unsigned int>(options.rejoinSource)
+        )
+      ) {
         result.error = "--rejoin-source needs --focus on an army of that source";
         return result;
       }
@@ -525,7 +425,9 @@ namespace faf::headless
       netConfig.holdViewsForJoin = !options.targetAudit;
       seatNet = std::make_unique<faf::server::CServerNet>(netConfig);
       for (faf::remote::CServerClient* const seat : seatFeed->Seats()) {
-        seatNet->AddSeat(seat->GetIndex(), seat->GetNickname().c_str(), "seat-" + std::to_string(seat->GetIndex()), *seat);
+        seatNet->AddSeat(
+          seat->GetIndex(), seat->GetNickname().c_str(), "seat-" + std::to_string(seat->GetIndex()), *seat
+        );
       }
       std::string netError;
       if (!seatNet->Start(netError)) {
@@ -573,7 +475,9 @@ namespace faf::headless
         std::fprintf(orderFile, "%d %s\n", ordinal, blueprint->mBlueprintId.c_str());
       }
       std::fclose(orderFile);
-      std::printf("[%s] blueprint order: %d blueprints written to %s\n", label, ordinal, options.blueprintOrderPath.c_str());
+      std::printf(
+        "[%s] blueprint order: %d blueprints written to %s\n", label, ordinal, options.blueprintOrderPath.c_str()
+      );
     }
 
 #if FAF_SERVER_MODE
@@ -648,6 +552,35 @@ namespace faf::headless
       syncWriters.Enable();
     }
 
+    // `--bot-obs`: the focus army's view and its player's commands, from the sim's first message.
+    std::unique_ptr<CBotObservation> botObs;
+    if (!options.botObsPath.empty()) {
+      if (options.focusArmy < 0 || static_cast<std::size_t>(options.focusArmy) >= launchInfo->mArmyLaunchInfo.size()) {
+        result.error = "--bot-obs needs --focus on an army";
+        return result;
+      }
+      std::vector<std::uint32_t> sources;
+      const moho::BVIntSet& unitSources =
+        launchInfo->mArmyLaunchInfo[static_cast<std::size_t>(options.focusArmy)].mUnitSources;
+      for (unsigned int source = unitSources.GetNext(~0u); source != unitSources.Max();
+           source = unitSources.GetNext(source)) {
+        sources.push_back(source);
+      }
+      if (sources.empty()) {
+        std::printf(
+          "[%s] warning: --bot-obs army %d has no command source (an AI slot): the file will hold no commands\n",
+          label,
+          options.focusArmy
+        );
+      }
+      botObs = std::make_unique<CBotObservation>(*rules, options.focusArmy, std::move(sources), options.botObsEvery);
+      if (!botObs->Open(options.botObsPath, options.replayPath)) {
+        result.error = "cannot write " + options.botObsPath;
+        return result;
+      }
+      botObs->Install();
+    }
+
 #if FAF_SERVER_MODE
     // `--command-check`: watches the sim's decoder from its first message.
     std::unique_ptr<CReplayCommandCheck> commandCheck;
@@ -678,12 +611,14 @@ namespace faf::headless
     std::unique_ptr<CReplayViewPacketCheck> viewPackets;
     if (!options.viewPacketsPath.empty()) {
       viewPackets = std::make_unique<CReplayViewPacketCheck>(
-        options.viewPacketsArmy, options.viewPacketsPath, options.viewPacketsEntriesPath,
+        options.viewPacketsArmy,
+        options.viewPacketsPath,
+        options.viewPacketsEntriesPath,
         static_cast<std::uint32_t>(options.viewPacketsEntriesEvery)
       );
       if (!viewPackets->IsOpen()) {
-        result.error = "cannot write " + options.viewPacketsPath
-          + (options.viewPacketsEntriesPath.empty() ? "" : " or " + options.viewPacketsEntriesPath);
+        result.error = "cannot write " + options.viewPacketsPath +
+          (options.viewPacketsEntriesPath.empty() ? "" : " or " + options.viewPacketsEntriesPath);
         return result;
       }
       viewPackets->Install();
@@ -716,7 +651,11 @@ namespace faf::headless
     std::FILE* viewDumpFile = nullptr; // left open: the sim may run on past this function's end
     if (!options.viewBenchPath.empty()) {
       viewBench = std::make_unique<CReplayViewBench>(
-        options.viewBenchPath, tables, mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, options.viewBenchCheck
+        options.viewBenchPath,
+        tables,
+        mapBounds.Max.x - mapBounds.Min.x,
+        mapBounds.Max.z - mapBounds.Min.z,
+        options.viewBenchCheck
       );
       if (!viewBench->IsOpen()) {
         result.error = "cannot write " + options.viewBenchPath;
@@ -746,7 +685,9 @@ namespace faf::headless
           viewBench->EnableLuaSpy();
         }
         if (options.luaMoveBeat >= 0) {
-          viewBench->AddLuaMove(options.luaMoveBeat, static_cast<std::size_t>(options.luaMoveView), options.luaMoveArmy);
+          viewBench->AddLuaMove(
+            options.luaMoveBeat, static_cast<std::size_t>(options.luaMoveView), options.luaMoveArmy
+          );
         }
         if (options.luaResyncBeat >= 0) {
           viewBench->AddLuaResync(options.luaResyncBeat, static_cast<std::size_t>(options.luaResyncView));
@@ -777,13 +718,33 @@ namespace faf::headless
           }
         }
         seatNet->QueueView(
-          seat->GetIndex(), faf::server::MakeGameInfo(mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, playerArmy, static_cast<std::uint32_t>(seat->GetIndex()))
+          seat->GetIndex(),
+          faf::server::MakeGameInfo(
+            mapBounds.Max.x - mapBounds.Min.x,
+            mapBounds.Max.z - mapBounds.Min.z,
+            playerArmy,
+            static_cast<std::uint32_t>(seat->GetIndex())
+          )
         );
       }
       seatViews = std::make_unique<faf::server::CServerViews>(
-        tables, *rules, mapBounds.Max.x - mapBounds.Min.x, mapBounds.Max.z - mapBounds.Min.z, *seatNet, std::move(players),
-        static_cast<unsigned int>(std::max(options.viewPipelineThreads, 1)), options.viewTeams
+        tables,
+        *rules,
+        mapBounds.Max.x - mapBounds.Min.x,
+        mapBounds.Max.z - mapBounds.Min.z,
+        *seatNet,
+        std::move(players),
+        static_cast<unsigned int>(std::max(options.viewPipelineThreads, 1)),
+        options.viewTeams
       );
+      if (options.poseBudgetKbps > 0) {
+        seatViews->SetPoseBudget(
+          static_cast<std::size_t>(options.poseBudgetKbps) * 1024u / 10u
+        ); // plan WP8.2, as the server's
+      }
+      if (options.poseCheck) {
+        seatViews->EnablePoseCheck();
+      }
       seatViews->Install();
     }
     std::unique_ptr<CReplayTargetAudit> targetAudit;
@@ -795,10 +756,14 @@ namespace faf::headless
 
     moho::IClientManager* const clientManager = sessionInfo->mClientManager;
     sessionInfo->mClientManager = nullptr;
-    moho::SIM_SetSessionPacing(rejoinRehearsal || liveRejoin ? moho::ESimSessionPacing::Network : moho::ESimSessionPacing::Replay);
-    std::unique_ptr<moho::ISTIDriver> driver(moho::SIM_CreateDriver(
-      static_cast<moho::CClientManagerImpl*>(clientManager), nullptr, sessionInfo->mLaunchInfo, sessionInfo->mSourceId
-    ));
+    moho::SIM_SetSessionPacing(
+      rejoinRehearsal || liveRejoin ? moho::ESimSessionPacing::Network : moho::ESimSessionPacing::Replay
+    );
+    std::unique_ptr<moho::ISTIDriver> driver(
+      moho::SIM_CreateDriver(
+        static_cast<moho::CClientManagerImpl*>(clientManager), nullptr, sessionInfo->mLaunchInfo, sessionInfo->mSourceId
+      )
+    );
     auto* const simDriver = static_cast<moho::CSimDriver*>(driver.get());
 #if FAF_HEADLESS_NET
     // Ahead of the driver going away, on every way out: the network's thread touches its seats.
@@ -833,8 +798,10 @@ namespace faf::headless
       result.error = "cannot write " + options.stateDigestPath;
       return result;
     }
-    if (!options.digestPath.empty() && fopen_s(&digestFile, options.digestPath.c_str(), "w") != 0) {
-      digestFile = nullptr;
+    // A live game's replay (a server's observer stream, gpgnet://): its digests are read as they're written, so the
+    // file is opened shared (`fopen_s` denies other readers on Windows until it is closed).
+    const bool liveReplay = options.replayPath.rfind("gpgnet://", 0) == 0;
+    if (!options.digestPath.empty() && (digestFile = std::fopen(options.digestPath.c_str(), "w")) == nullptr) {
       result.error = "cannot write " + options.digestPath;
       return result;
     }
@@ -843,7 +810,11 @@ namespace faf::headless
     std::unique_ptr<CReplayKeyframes> keyframes;
     if (options.keyframeEvery > 0) {
       keyframes = std::make_unique<CReplayKeyframes>(
-        options.keyframeDir, options.keyframeEvery, options.keyframeKeep || options.keyframePrepare, options.label, options.keyframeIndex
+        options.keyframeDir,
+        options.keyframeEvery,
+        options.keyframeKeep || options.keyframePrepare,
+        options.label,
+        options.keyframeIndex
       );
     }
 
@@ -936,8 +907,10 @@ namespace faf::headless
         // `WLD_DoPostInitializing` / `WLD_DoWaiting`: the first beat is out and this client
         // is ready; once every client is, the issue thread may run.
         if (result.started && !ready) {
-          if (moho::CClientManagerImpl* const manager = driver->GetClientManager();
-              manager != nullptr && manager->IsEveryoneReady()) {
+          if (
+            moho::CClientManagerImpl* const manager = driver->GetClientManager();
+            manager != nullptr && manager->IsEveryoneReady()
+          ) {
             driver->DecrementOutstandingRequestsAndSignal();
             ready = true;
           }
@@ -968,6 +941,9 @@ namespace faf::headless
             if (!IsZero(digest)) {
               std::fprintf(digestFile, "%d %s\n", packet->mCurBeat, digest.ToString().c_str());
               ++result.digestsWritten;
+              if (liveReplay) {
+                std::fflush(digestFile); // plan WP13.3: a shadow verifier reads them while the game goes on
+              }
             }
           }
         }
@@ -977,9 +953,14 @@ namespace faf::headless
         }
         if (stateDigestFile != nullptr) {
           std::fprintf(
-            stateDigestFile, "%d %016llx\n", packet->mCurBeat,
+            stateDigestFile,
+            "%d %016llx\n",
+            packet->mCurBeat,
             static_cast<unsigned long long>(DigestPublishedState(*packet))
           );
+        }
+        if (botObs) {
+          botObs->OnPacket(*packet);
         }
         // The first packet means the sim exists and has its copy of the blueprints.
         if (rules && !options.keepClientData && !releasedScriptBlueprints) {
@@ -993,18 +974,20 @@ namespace faf::headless
           if (dump != nullptr) {
             std::string bytes;
             char buffer[4096];
-            for (std::size_t read = packet->mStream->Read(buffer, sizeof(buffer)); read != 0u; read = packet->mStream->Read(buffer, sizeof(buffer))) {
+            for (std::size_t read = packet->mStream->Read(buffer, sizeof(buffer)); read != 0u;
+                 read = packet->mStream->Read(buffer, sizeof(buffer))) {
               bytes.append(buffer, read);
             }
             (void)packet->mStream->VirtSeek(gpg::Stream::ModeReceive, gpg::Stream::OriginBegin, 0);
-            const std::uint32_t head[2] = {static_cast<std::uint32_t>(packet->mCurBeat), static_cast<std::uint32_t>(bytes.size())};
+            const std::uint32_t head[2] = {
+              static_cast<std::uint32_t>(packet->mCurBeat), static_cast<std::uint32_t>(bytes.size())
+            };
             std::fwrite(head, sizeof(head), 1u, dump);
             std::fwrite(bytes.data(), 1u, bytes.size(), dump);
             std::fclose(dump);
           }
         }
-        const bool syncSaysEnded =
-          InspectSync(*packet, syncState, options.syncKeysPath.empty() ? nullptr : &syncKeys);
+        const bool syncSaysEnded = InspectSync(*packet, syncState, options.syncKeysPath.empty() ? nullptr : &syncKeys);
         if (!result.gameEnded && syncSaysEnded) {
           result.gameEnded = true;
           std::printf("[%s] GAME-ENDED beat %d\n", label, packet->mCurBeat);
@@ -1132,12 +1115,24 @@ namespace faf::headless
 #if FAF_HEADLESS_NET
     if (seatNet) {
       std::printf(
-        "[%s] seat network: %.1f MB sent, %.1f KB/s, %llu view lanes failed\n", label, static_cast<double>(seatNet->BytesSent()) / 1048576.0,
+        "[%s] seat network: %.1f MB sent, %.1f KB/s, %llu view lanes failed\n",
+        label,
+        static_cast<double>(seatNet->BytesSent()) / 1048576.0,
         static_cast<double>(seatNet->BytesSent()) / 1024.0 / std::max(SecondsSince(playStart), 1.0),
         static_cast<unsigned long long>(seatViews ? seatViews->Failures() : 0u)
       );
       if (seatViews) {
-        std::printf("[%s] %s\n[%s] %s\n", label, seatViews->LaneReport().c_str(), label, seatNet->Intake().Report().c_str());
+        std::printf(
+          "[%s] %s\n[%s] %s\n", label, seatViews->LaneReport().c_str(), label, seatNet->Intake().Report().c_str()
+        );
+        if (options.poseCheck) {
+          std::printf(
+            "[%s] pose check: %s; %zu units owed at the end\n",
+            label,
+            seatViews->PoseCheckReport().c_str(),
+            seatViews->OwedPoses()
+          );
+        }
       }
       if (targetAudit) {
         std::printf("[%s] %s\n", label, targetAudit->Summary().c_str());
@@ -1146,7 +1141,14 @@ namespace faf::headless
     }
 #endif
     if (pacePeriod > 0.0) {
-      std::printf("[%s] pace %d ms: %d of %d beats late, %.1f s lost\n", label, options.paceMs, lateBeats, result.beats, lateSeconds);
+      std::printf(
+        "[%s] pace %d ms: %d of %d beats late, %.1f s lost\n",
+        label,
+        options.paceMs,
+        lateBeats,
+        result.beats,
+        lateSeconds
+      );
       std::fflush(stdout);
     }
     if (digestFile != nullptr) {
@@ -1157,6 +1159,10 @@ namespace faf::headless
     }
     if (laneSizesFile != nullptr) {
       std::fclose(laneSizesFile);
+    }
+    if (botObs) {
+      botObs->Finish();
+      result.botObsSummary = botObs->Summary();
     }
     if (boneStats) {
       result.boneSummary = boneStats->Finish();
@@ -1244,13 +1250,18 @@ namespace faf::headless
     // The driver, sim and session objects are left to the process exit: the caller ends the
     // process once the verdict is out, as nothing after it is observed.
     (void)driver.release();
+    // Its decoder may still be called on the sim's thread, which the driver left running.
+    (void)botObs.release();
     (void)sessionState.release();
     (void)rules.release();
     (void)wldMap.release();
     return result;
   }
 
-  SReplayResult RunSeekPlan(const SReplayOptions& options, const std::vector<int>& plan)
+  SReplayResult RunSeekPlan(
+    const SReplayOptions& options,
+    const std::vector<int>& plan
+  )
   {
     const char* const label = options.label.c_str();
     std::map<int, std::string> keyframes;
@@ -1265,7 +1276,9 @@ namespace faf::headless
       if (step >= plan.size() || beat < plan[step]) {
         return false;
       }
-      std::printf("[%s] seek %zu: at beat %d, %.2fs after it was asked for\n", label, step, beat, SecondsSince(seekStart));
+      std::printf(
+        "[%s] seek %zu: at beat %d, %.2fs after it was asked for\n", label, step, beat, SecondsSince(seekStart)
+      );
       std::fflush(stdout);
       ++step;
       seekStart = Clock::now();
@@ -1295,7 +1308,13 @@ namespace faf::headless
       const SReplayResult result = RunReplay(run);
       std::printf(
         "[%s] seek session %d: up to beat %d, %d beats, load %.2fs, play %.1fs, teardown %.2fs, process %.0f MB\n",
-        label, session, result.lastBeat, result.beats, result.loadSeconds, result.playSeconds, result.tearDownSeconds,
+        label,
+        session,
+        result.lastBeat,
+        result.beats,
+        result.loadSeconds,
+        result.playSeconds,
+        result.tearDownSeconds,
         ProcessMegabytes()
       );
       if (!result.keyframeSummary.empty()) {
@@ -1326,7 +1345,11 @@ namespace faf::headless
       run.resumeFrom = after != keyframes.begin() ? std::prev(after)->second : std::string{};
       seekStart = Clock::now();
       std::printf(
-        "[%s] seek %zu: from beat %d to beat %d, by %s\n", label, step, result.lastBeat, plan[step],
+        "[%s] seek %zu: from beat %d to beat %d, by %s\n",
+        label,
+        step,
+        result.lastBeat,
+        plan[step],
         run.resumeFrom.empty() ? "the replay's start" : run.resumeFrom.c_str()
       );
       std::fflush(stdout);

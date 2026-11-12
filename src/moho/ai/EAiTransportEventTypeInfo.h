@@ -53,7 +53,6 @@ namespace moho
     void AddEnums();
   };
 
-
   /**
    * Address: 0x00BCED10 (FUN_00BCED10, register_EAiTransportEventTypeInfo)
    *

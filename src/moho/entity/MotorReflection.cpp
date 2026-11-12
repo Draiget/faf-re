@@ -105,7 +105,9 @@ namespace
   [[maybe_unused]] MotorReflectionBootstrap gMotorReflectionBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_MotorTypeInfo_5e60b9, moho::register_MotorTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_MotorTypeInfo_5e60b9,
+  moho::register_MotorTypeInfo
+)

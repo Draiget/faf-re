@@ -3,10 +3,10 @@
 namespace
 {
 
-
-
-
-  CUnitCommand* FindCommandById(CCommandDB* commandDb, const CmdId cmdId)
+  CUnitCommand* FindCommandById(
+    CCommandDB* commandDb,
+    const CmdId cmdId
+  )
   {
     if (!commandDb || !commandDb->commands.header_ptr()) {
       return nullptr;
@@ -24,14 +24,18 @@ namespace
     return it->second;
   }
 
-  void InitSimDebugEntitySet(EntitySetTemplate<Unit>& outSet)
+  void InitSimDebugEntitySet(
+    EntitySetTemplate<Unit>& outSet
+  )
   {
     outSet.mNext = &outSet;
     outSet.mPrev = &outSet;
     outSet.mVec.RebindInlineNoFree();
   }
 
-  void DestroySimDebugEntitySet(EntitySetTemplate<Unit>& set)
+  void DestroySimDebugEntitySet(
+    EntitySetTemplate<Unit>& set
+  )
   {
     set.mVec.ResetStorageToInline();
 
@@ -44,13 +48,17 @@ namespace
     set.mPrev = &set;
   }
 
-  CSimConCommand* FindSimConCommand(const std::string& commandName)
+  CSimConCommand* FindSimConCommand(
+    const std::string& commandName
+  )
   {
     return moho::FindRegisteredSimConCommand(commandName);
   }
 
   [[nodiscard]]
-  bool IsSimCommandWhitespace(const char ch) noexcept
+  bool IsSimCommandWhitespace(
+    const char ch
+  ) noexcept
   {
     return gpg::STR_IsAsciiWhitespace(ch);
   }
@@ -62,7 +70,11 @@ namespace
     Comment,
   };
 
-  void ParseOneSimCommand(const std::string& input, std::vector<std::string>& outTokens, std::string& outRemainder)
+  void ParseOneSimCommand(
+    const std::string& input,
+    std::vector<std::string>& outTokens,
+    std::string& outRemainder
+  )
   {
     outTokens.clear();
     outRemainder.clear();
@@ -134,7 +146,9 @@ namespace
   }
 
   [[nodiscard]]
-  bool SimCommandTokenNeedsQuotes(const std::string& token)
+  bool SimCommandTokenNeedsQuotes(
+    const std::string& token
+  )
   {
     if (token.empty()) {
       return true;
@@ -150,7 +164,9 @@ namespace
   }
 
   [[nodiscard]]
-  std::string UnparseSimCommand(const std::vector<std::string>& tokens)
+  std::string UnparseSimCommand(
+    const std::vector<std::string>& tokens
+  )
   {
     std::string text;
 
@@ -177,8 +193,7 @@ namespace
 
     return text;
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x007466D0 (FUN_007466D0, ?GetCurrentCommandSource@Sim@Moho@@QBEPBUSSTICommandSource@2@XZ)
@@ -215,7 +230,9 @@ const char* Sim::GetCurrentCommandSourceName() const
 /**
  * Address: 0x00748650 (FUN_00748650, ?SetCommandSource@Sim@Moho@@UAEXI@Z)
  */
-void Sim::SetCommandSource(const CommandSourceId sourceId)
+void Sim::SetCommandSource(
+  const CommandSourceId sourceId
+)
 {
   if (sourceId == kInvalidCommandSource || sourceId < static_cast<CommandSourceId>(mCommandSources.size())) {
     mCurCommandSource = static_cast<int32_t>(sourceId);
@@ -271,7 +288,10 @@ void Sim::OnCommandSourceTerminated()
  * `CCommandDB`'s own real typed member (`CCommandDb.h`) and is always valid
  * once `Sim` is constructed.
  */
-bool Sim::ValidateNewCommandId(const CmdId cmdId, const char* callsiteName) const
+bool Sim::ValidateNewCommandId(
+  const CmdId cmdId,
+  const char* callsiteName
+) const
 {
   const char* callsite = callsiteName ? callsiteName : "Sim";
 
@@ -317,7 +337,9 @@ bool Sim::ValidateNewCommandId(const CmdId cmdId, const char* callsiteName) cons
  * queues.
  */
 void Sim::IssueCommand(
-  const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& commandIssueData, const bool clearQueue
+  const BVSet<EntId, EntIdUniverse>& entities,
+  const SSTICommandIssueData& commandIssueData,
+  const bool clearQueue
 )
 {
   if (!ValidateNewCommandId(commandIssueData.nextCommandId, "IssueCommand")) {
@@ -368,7 +390,9 @@ void Sim::IssueCommand(
  * issues one shared factory command to every eligible builder.
  */
 void Sim::IssueFactoryCommand(
-  const BVSet<EntId, EntIdUniverse>& entities, const SSTICommandIssueData& commandIssueData, const bool clearQueue
+  const BVSet<EntId, EntIdUniverse>& entities,
+  const SSTICommandIssueData& commandIssueData,
+  const bool clearQueue
 )
 {
   if (!ValidateNewCommandId(commandIssueData.nextCommandId, "IssueFactoryCommand")) {
@@ -415,7 +439,10 @@ void Sim::IssueFactoryCommand(
 /**
  * Address: 0x00749680 (FUN_00749680, ?IncreaseCommandCount@Sim@Moho@@UAEXVCmdId@2@H@Z)
  */
-void Sim::IncreaseCommandCount(const CmdId cmdId, const int count)
+void Sim::IncreaseCommandCount(
+  const CmdId cmdId,
+  const int count
+)
 {
   CUnitCommand* command = FindCommandById(mCommandDB, cmdId);
   if (command && OkayToMessWith(command)) {
@@ -426,7 +453,10 @@ void Sim::IncreaseCommandCount(const CmdId cmdId, const int count)
 /**
  * Address: 0x007496E0 (FUN_007496E0, ?DecreaseCommandCount@Sim@Moho@@UAEXVCmdId@2@H@Z)
  */
-void Sim::DecreaseCommandCount(const CmdId cmdId, const int count)
+void Sim::DecreaseCommandCount(
+  const CmdId cmdId,
+  const int count
+)
 {
   CUnitCommand* command = FindCommandById(mCommandDB, cmdId);
   if (command && OkayToMessWith(command)) {
@@ -437,7 +467,10 @@ void Sim::DecreaseCommandCount(const CmdId cmdId, const int count)
 /**
  * Address: 0x00749740 (FUN_00749740, ?SetCommandTarget@Sim@Moho@@UAEXVCmdId@2@ABUSSTITarget@2@@Z)
  */
-void Sim::SetCommandTarget(const CmdId cmdId, const SSTITarget& target)
+void Sim::SetCommandTarget(
+  const CmdId cmdId,
+  const SSTITarget& target
+)
 {
   CUnitCommand* command = FindCommandById(mCommandDB, cmdId);
   if (!command || !OkayToMessWith(command)) {
@@ -452,7 +485,10 @@ void Sim::SetCommandTarget(const CmdId cmdId, const SSTITarget& target)
 /**
  * Address: 0x00749800 (FUN_00749800, ?SetCommandType@Sim@Moho@@UAEXVCmdId@2@W4EUnitCommandType@2@@Z)
  */
-void Sim::SetCommandType(const CmdId cmdId, const EUnitCommandType commandType)
+void Sim::SetCommandType(
+  const CmdId cmdId,
+  const EUnitCommandType commandType
+)
 {
   CUnitCommand* command = FindCommandById(mCommandDB, cmdId);
   if (!command || !OkayToMessWith(command)) {
@@ -464,10 +500,13 @@ void Sim::SetCommandType(const CmdId cmdId, const EUnitCommandType commandType)
 }
 
 /**
- * Address: 0x00749860 (FUN_00749860, ?SetCommandCells@Sim@Moho@@UAEXVCmdId@2@ABV?$fastvector@USOCellPos@Moho@@@gpg@@ABV?$Vector3@M@Wm3@@@Z)
+ * Address: 0x00749860 (FUN_00749860,
+ * ?SetCommandCells@Sim@Moho@@UAEXVCmdId@2@ABV?$fastvector@USOCellPos@Moho@@@gpg@@ABV?$Vector3@M@Wm3@@@Z)
  */
 void Sim::SetCommandCells(
-  const CmdId cmdId, const gpg::core::FastVector<SOCellPos>& cells, const Wm3::Vector3<float>& targetPosition
+  const CmdId cmdId,
+  const gpg::core::FastVector<SOCellPos>& cells,
+  const Wm3::Vector3<float>& targetPosition
 )
 {
   CUnitCommand* command = FindCommandById(mCommandDB, cmdId);
@@ -493,7 +532,10 @@ void Sim::SetCommandCells(
 /**
  * Address: 0x00749970 (FUN_00749970, ?RemoveCommandFromUnitQueue@Sim@Moho@@UAEXVCmdId@2@VEntId@2@@Z)
  */
-void Sim::RemoveCommandFromUnitQueue(const CmdId cmdId, const EntId unitId)
+void Sim::RemoveCommandFromUnitQueue(
+  const CmdId cmdId,
+  const EntId unitId
+)
 {
   // 0x0074997B..0x007499F9: the unit comes from the sim's entity DB (not from
   // the command's own unit set), and the checks run entity, entity
@@ -563,7 +605,9 @@ void Sim::TryParseSimCommand(
     if (!parsedCommand.empty()) {
       CSimConCommand* const simCommand = FindSimConCommand(parsedCommand.front());
       if (!simCommand) {
-        Printf("Unknown sim command '%s' [invoked by %s]", parsedCommand.front().c_str(), GetCurrentCommandSourceName());
+        Printf(
+          "Unknown sim command '%s' [invoked by %s]", parsedCommand.front().c_str(), GetCurrentCommandSourceName()
+        );
       } else {
         // 0x00734963 skips the check when the stored flag is nonzero.
         const bool requiresCheat = simCommand->mAllowWithoutCheats == 0;

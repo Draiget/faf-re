@@ -114,11 +114,11 @@ namespace moho
     ~CSaveGameRequestImpl();
 
   private:
-    fa::string mSavePath;                    // +0x04
-    fa::string mSessionName;                 // +0x20
-    LuaPlus::LuaObject mCompletionCallback;     // +0x3C
-    boost::shared_ptr<std::FILE> mFile;         // +0x50
-    gpg::WriteArchive* mArchive = nullptr;      // +0x58
+    fa::string mSavePath;                   // +0x04
+    fa::string mSessionName;                // +0x20
+    LuaPlus::LuaObject mCompletionCallback; // +0x3C
+    boost::shared_ptr<std::FILE> mFile;     // +0x50
+    gpg::WriteArchive* mArchive = nullptr;  // +0x58
   };
 
   static_assert(sizeof(boost::shared_ptr<std::FILE>) == 0x8, "shared_ptr<FILE> size must be 0x8");

@@ -40,7 +40,7 @@ namespace gpg::gal::effects
 
     std::string name;
     Kind kind = Kind::String;
-    std::string text;   // String
+    std::string text;    // String
     double number = 0.0; // Int, Float, Bool (0 / 1)
   };
 
@@ -73,14 +73,14 @@ namespace gpg::gal::effects
     std::string typeName;
     ParameterClass parameterClass = ParameterClass::Other;
     ScalarType scalarType = ScalarType::Float;
-    std::uint32_t rows = 1;       // matrices: rows; vectors and scalars: 1
-    std::uint32_t columns = 1;    // vectors: components
-    std::uint32_t elements = 0;   // array size; 0 for a single value
-    std::vector<float> defaults;  // packed row by row, element by element; empty for zero
-    bool columnMajor = false;     // declared `column_major`
-    bool unsized = false;         // `float k[] = {...}`: `elements` counts the initializer
+    std::uint32_t rows = 1;      // matrices: rows; vectors and scalars: 1
+    std::uint32_t columns = 1;   // vectors: components
+    std::uint32_t elements = 0;  // array size; 0 for a single value
+    std::vector<float> defaults; // packed row by row, element by element; empty for zero
+    bool columnMajor = false;    // declared `column_major`
+    bool unsized = false;        // `float k[] = {...}`: `elements` counts the initializer
     Annotations annotations;
-    std::size_t begin = 0;        // the declaration's span in the parsed source
+    std::size_t begin = 0; // the declaration's span in the parsed source
     std::size_t end = 0;
   };
 
@@ -109,9 +109,9 @@ namespace gpg::gal::effects
   {
     bool alphaToCoverage = false;
     bool enable = false;
-    std::uint8_t srcBlend = 2;      // ONE
-    std::uint8_t destBlend = 1;     // ZERO
-    std::uint8_t blendOp = 1;       // ADD
+    std::uint8_t srcBlend = 2;  // ONE
+    std::uint8_t destBlend = 1; // ZERO
+    std::uint8_t blendOp = 1;   // ADD
     std::uint8_t srcBlendAlpha = 2;
     std::uint8_t destBlendAlpha = 1;
     std::uint8_t blendOpAlpha = 1;
@@ -141,13 +141,17 @@ namespace gpg::gal::effects
     [[nodiscard]] std::uint64_t PackedKey() const noexcept
     {
       const auto face = [](const StencilFaceDesc& desc) {
-        return static_cast<std::uint64_t>(desc.failOp & 0x0FU) | (static_cast<std::uint64_t>(desc.depthFailOp & 0x0FU) << 4U) |
-               (static_cast<std::uint64_t>(desc.passOp & 0x0FU) << 8U) | (static_cast<std::uint64_t>(desc.func & 0x0FU) << 12U);
+        return static_cast<std::uint64_t>(desc.failOp & 0x0FU) |
+          (static_cast<std::uint64_t>(desc.depthFailOp & 0x0FU) << 4U) |
+          (static_cast<std::uint64_t>(desc.passOp & 0x0FU) << 8U) |
+          (static_cast<std::uint64_t>(desc.func & 0x0FU) << 12U);
       };
-      return static_cast<std::uint64_t>(depthEnable ? 1U : 0U) | (static_cast<std::uint64_t>(depthWrite ? 1U : 0U) << 1U) |
-             (static_cast<std::uint64_t>(depthFunc & 0x0FU) << 2U) | (static_cast<std::uint64_t>(stencilEnable ? 1U : 0U) << 6U) |
-             (static_cast<std::uint64_t>(stencilReadMask) << 8U) | (static_cast<std::uint64_t>(stencilWriteMask) << 16U) |
-             (face(front) << 24U) | (face(back) << 40U);
+      return static_cast<std::uint64_t>(depthEnable ? 1U : 0U) |
+        (static_cast<std::uint64_t>(depthWrite ? 1U : 0U) << 1U) |
+        (static_cast<std::uint64_t>(depthFunc & 0x0FU) << 2U) |
+        (static_cast<std::uint64_t>(stencilEnable ? 1U : 0U) << 6U) |
+        (static_cast<std::uint64_t>(stencilReadMask) << 8U) | (static_cast<std::uint64_t>(stencilWriteMask) << 16U) |
+        (face(front) << 24U) | (face(back) << 40U);
     }
   };
 
@@ -181,8 +185,8 @@ namespace gpg::gal::effects
     Kind kind = Kind::Texture2D;
     // Fields a sampler_state leaves out take the Direct3D 10/11 defaults, as
     // the effect frameworks of those APIs (and so the D3D11 backend) give them.
-    std::uint32_t filter = 0x15;  // MIN_MAG_MIP_LINEAR
-    std::uint8_t addressU = 3;    // CLAMP
+    std::uint32_t filter = 0x15; // MIN_MAG_MIP_LINEAR
+    std::uint8_t addressU = 3;   // CLAMP
     std::uint8_t addressV = 3;
     std::uint8_t addressW = 3;
     std::uint32_t maxAnisotropy = 16;
@@ -256,7 +260,7 @@ namespace gpg::gal::effects
     std::vector<StructType> structs;
     std::vector<SamplerDesc> samplers;
     std::vector<Technique> techniques;
-    std::vector<std::string> notes; // what the parser could not represent
+    std::vector<std::string> notes;   // what the parser could not represent
     bool direct3D9PassStates = false; // ApplyDirect3D9PassStates read the original source
 
     [[nodiscard]] const Parameter* FindParameter(std::string_view name) const noexcept;

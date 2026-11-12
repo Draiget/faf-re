@@ -40,7 +40,10 @@ namespace moho
      * inlined into the three queue edits.)
      */
     UserManagerHelperEntry(
-      const CmdId commandId, const EUserQueueEdit edit, UserCommandIssueHelper* const helper, const CmdId index
+      const CmdId commandId,
+      const EUserQueueEdit edit,
+      UserCommandIssueHelper* const helper,
+      const CmdId index
     ) noexcept
       : mCommandId(commandId)
       , mEdit(edit)
@@ -55,7 +58,10 @@ namespace moho
   };
   static_assert(sizeof(UserManagerHelperEntry) == 0x10, "UserManagerHelperEntry size must be 0x10");
   static_assert(offsetof(UserManagerHelperEntry, mEdit) == 0x04, "UserManagerHelperEntry::mEdit offset must be 0x04");
-  static_assert(offsetof(UserManagerHelperEntry, mHelper) == 0x08, "UserManagerHelperEntry::mHelper offset must be 0x08");
+  static_assert(
+    offsetof(UserManagerHelperEntry, mHelper) == 0x08,
+    "UserManagerHelperEntry::mHelper offset must be 0x08"
+  );
   static_assert(offsetof(UserManagerHelperEntry, mIndex) == 0x0C, "UserManagerHelperEntry::mIndex offset must be 0x0C");
 
   /**
@@ -94,20 +100,24 @@ namespace moho
      */
     explicit UserCommandQueue(UserUnit* owner);
 
-    UserUnit* ownerUnit;                                                  // +0x00
-    std::uint32_t mUnknown04;                                             // +0x04
+    UserUnit* ownerUnit;                                                 // +0x00
+    std::uint32_t mUnknown04;                                            // +0x04
     gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2> primaryLinks;  // +0x08
-    fa::deque<UserManagerHelperEntry> issueQueue;                      // +0x28
-    std::uint32_t mUnknown3C;                                             // +0x3C
+    fa::deque<UserManagerHelperEntry> issueQueue;                        // +0x28
+    std::uint32_t mUnknown3C;                                            // +0x3C
     gpg::fastvector_n<WeakPtr<UserCommandIssueHelper>, 2> resolvedLinks; // +0x40
-    std::uint8_t resolvedLinksDirty;                                      // +0x60
+    std::uint8_t resolvedLinksDirty;                                     // +0x60
     std::uint8_t pad_0061_0068[0x07];
   };
   static_assert(offsetof(UserCommandQueue, primaryLinks) == 0x08, "UserCommandQueue::primaryLinks offset must be 0x08");
   static_assert(offsetof(UserCommandQueue, issueQueue) == 0x28, "UserCommandQueue::issueQueue offset must be 0x28");
-  static_assert(offsetof(UserCommandQueue, resolvedLinks) == 0x40, "UserCommandQueue::resolvedLinks offset must be 0x40");
   static_assert(
-    offsetof(UserCommandQueue, resolvedLinksDirty) == 0x60, "UserCommandQueue::resolvedLinksDirty offset must be 0x60"
+    offsetof(UserCommandQueue, resolvedLinks) == 0x40,
+    "UserCommandQueue::resolvedLinks offset must be 0x40"
+  );
+  static_assert(
+    offsetof(UserCommandQueue, resolvedLinksDirty) == 0x60,
+    "UserCommandQueue::resolvedLinksDirty offset must be 0x60"
   );
   static_assert(sizeof(UserCommandQueue) == 0x68, "UserCommandQueue size must be 0x68");
 } // namespace moho

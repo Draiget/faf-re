@@ -20,7 +20,9 @@ namespace moho
 
   template <std::size_t InlineVertices>
   SplatOutputBudget PrepareSplatOutput(
-    gpg::core::FastVectorN<CWldSplat::SplatVertex, InlineVertices>& vertices, int tier)
+    gpg::core::FastVectorN<CWldSplat::SplatVertex, InlineVertices>& vertices,
+    int tier
+  )
   {
     static_assert(InlineVertices == 1000 || InlineVertices == 10000);
     constexpr std::size_t inlineQuads = InlineVertices / 4;
@@ -46,7 +48,9 @@ namespace moho
       std::size_t failedBytes = 0;
       unsigned skippedCalls = 0;
 
-      bool Allow(std::size_t requestedBytes)
+      bool Allow(
+        std::size_t requestedBytes
+      )
       {
         if (requestedBytes >= failedBytes && skippedCalls != 0) {
           --skippedCalls;
@@ -54,12 +58,16 @@ namespace moho
         }
         return true;
       }
-      void Failed(std::size_t requestedBytes)
+      void Failed(
+        std::size_t requestedBytes
+      )
       {
         failedBytes = requestedBytes;
         skippedCalls = 32;
       }
-      void Succeeded(std::size_t requestedBytes)
+      void Succeeded(
+        std::size_t requestedBytes
+      )
       {
         // A smaller successful request must not erase a larger failure.
         if (requestedBytes >= failedBytes) {
@@ -80,7 +88,9 @@ namespace moho
 
   template <std::size_t InlineVertices>
   bool TryGrowSplatOutput(
-    gpg::core::FastVectorN<CWldSplat::SplatVertex, InlineVertices>& vertices, SplatOutputBudget& budget)
+    gpg::core::FastVectorN<CWldSplat::SplatVertex, InlineVertices>& vertices,
+    SplatOutputBudget& budget
+  )
   {
     if (budget.available >= budget.limit) {
       return false;

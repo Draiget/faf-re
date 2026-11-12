@@ -145,14 +145,14 @@ namespace moho
     static gpg::RType* StaticGetClass();
 
   public:
-    std::uint32_t mUnknown44;         // +0x44
-    gpg::fastvector_n<float, 26> mParams; // +0x48
+    std::uint32_t mUnknown44;                                  // +0x44
+    gpg::fastvector_n<float, 26> mParams;                      // +0x48
     gpg::fastvector_n<CParticleTexture*, 2> mParticleTextures; // +0xC0
-    gpg::fastvector_n<fa::string, 2> mStrings; // +0xD8
-    SEntAttachInfo mEntityInfo;       // +0x120
-    std::uint8_t mNewAttachment;      // +0x14C
-    std::uint8_t mPad14D[0x03];       // +0x14D
-    VMatrix4 mMatrix;                 // +0x150
+    gpg::fastvector_n<fa::string, 2> mStrings;                 // +0xD8
+    SEntAttachInfo mEntityInfo;                                // +0x120
+    std::uint8_t mNewAttachment;                               // +0x14C
+    std::uint8_t mPad14D[0x03];                                // +0x14D
+    VMatrix4 mMatrix;                                          // +0x150
   };
 
   static_assert(offsetof(CEffectImpl, mUnknown44) == 0x44, "CEffectImpl::mUnknown44 offset must be 0x44");
@@ -164,18 +164,23 @@ namespace moho
   static_assert(offsetof(CEffectImpl, mParams.end_) == 0x4C, "CEffectImpl::mParams.end_ offset must be 0x4C");
   static_assert(offsetof(CEffectImpl, mParams.capacity_) == 0x50, "CEffectImpl::mParams.capacity_ offset must be 0x50");
   static_assert(
-    offsetof(CEffectImpl, mParams.originalVec_) == 0x54, "CEffectImpl::mParams.originalVec_ offset must be 0x54"
+    offsetof(CEffectImpl, mParams.originalVec_) == 0x54,
+    "CEffectImpl::mParams.originalVec_ offset must be 0x54"
   );
-  static_assert(offsetof(CEffectImpl, mParams.inlineVec_) == 0x58, "CEffectImpl::mParams.inlineVec_ offset must be 0x58");
   static_assert(
-    offsetof(CEffectImpl, mParticleTextures) == 0xC0, "CEffectImpl::mParticleTextures offset must be 0xC0"
+    offsetof(CEffectImpl, mParams.inlineVec_) == 0x58,
+    "CEffectImpl::mParams.inlineVec_ offset must be 0x58"
   );
+  static_assert(offsetof(CEffectImpl, mParticleTextures) == 0xC0, "CEffectImpl::mParticleTextures offset must be 0xC0");
   static_assert(
     offsetof(CEffectImpl, mParticleTextures.inlineVec_) == 0xD0,
     "CEffectImpl::mParticleTextures.inlineVec_ offset must be 0xD0"
   );
   static_assert(offsetof(CEffectImpl, mStrings) == 0xD8, "CEffectImpl::mStrings offset must be 0xD8");
-  static_assert(offsetof(CEffectImpl, mStrings.inlineVec_) == 0xE8, "CEffectImpl::mStrings.inlineVec_ offset must be 0xE8");
+  static_assert(
+    offsetof(CEffectImpl, mStrings.inlineVec_) == 0xE8,
+    "CEffectImpl::mStrings.inlineVec_ offset must be 0xE8"
+  );
   static_assert(offsetof(CEffectImpl, mEntityInfo) == 0x120, "CEffectImpl::mEntityInfo offset must be 0x120");
   static_assert(offsetof(CEffectImpl, mNewAttachment) == 0x14C, "CEffectImpl::mNewAttachment offset must be 0x14C");
   static_assert(offsetof(CEffectImpl, mMatrix) == 0x150, "CEffectImpl::mMatrix offset must be 0x150");

@@ -39,7 +39,8 @@ namespace moho
 
   static_assert(offsetof(CEntityDbAllUnitsNode, key) == 0x0C, "CEntityDbAllUnitsNode::key offset must be 0x0C");
   static_assert(
-    offsetof(CEntityDbAllUnitsNode, unitListNode) == 0x10, "CEntityDbAllUnitsNode::unitListNode offset must be 0x10"
+    offsetof(CEntityDbAllUnitsNode, unitListNode) == 0x10,
+    "CEntityDbAllUnitsNode::unitListNode offset must be 0x10"
   );
   static_assert(sizeof(CEntityDbAllUnitsNode) == 0x18, "CEntityDbAllUnitsNode size must be 0x18");
 
@@ -56,7 +57,7 @@ namespace moho
   {
     fa::vector<CEntityDbBoundedPropQueueNode> heap; // +0x00 (proxy +0x00, first +0x04, last +0x08, end +0x0C)
     fa::vector<std::int32_t> handleSlots;           // +0x10 (proxy +0x10, first +0x14, last +0x18, end +0x1C)
-    std::int32_t lastHandle = -1;                      // +0x20
+    std::int32_t lastHandle = -1;                   // +0x20
 
     /**
      * Address: 0x00685980 (FUN_00685980)
@@ -153,12 +154,19 @@ namespace moho
      */
     void Swap(std::int32_t lhs, std::int32_t rhs) noexcept;
   };
+  static_assert(sizeof(CEntityDbBoundedPropQueue) == 0x24, "CEntityDbBoundedPropQueue size must be 0x24");
   static_assert(
-    sizeof(CEntityDbBoundedPropQueue) == 0x24, "CEntityDbBoundedPropQueue size must be 0x24"
+    offsetof(CEntityDbBoundedPropQueue, heap) == 0x00,
+    "CEntityDbBoundedPropQueue::heap offset must be 0x00"
   );
-  static_assert(offsetof(CEntityDbBoundedPropQueue, heap) == 0x00, "CEntityDbBoundedPropQueue::heap offset must be 0x00");
-  static_assert(offsetof(CEntityDbBoundedPropQueue, handleSlots) == 0x10, "CEntityDbBoundedPropQueue::handleSlots offset must be 0x10");
-  static_assert(offsetof(CEntityDbBoundedPropQueue, lastHandle) == 0x20, "CEntityDbBoundedPropQueue::lastHandle offset must be 0x20");
+  static_assert(
+    offsetof(CEntityDbBoundedPropQueue, handleSlots) == 0x10,
+    "CEntityDbBoundedPropQueue::handleSlots offset must be 0x10"
+  );
+  static_assert(
+    offsetof(CEntityDbBoundedPropQueue, lastHandle) == 0x20,
+    "CEntityDbBoundedPropQueue::lastHandle offset must be 0x20"
+  );
 
   /**
    * Iterator payload used by all-army unit scans against `EntityDB::mAllUnits`.
@@ -251,8 +259,10 @@ namespace moho
     [[nodiscard]] std::int32_t AddBoundedProp(Prop* prop);
 
     /**
-     * Address: 0x00684CE0 (FUN_00684CE0, ?RemoveBoundedProp@EntityDB@Moho@@QAEXW4Handle@?$PriorityQueue@USPropPriorityInfo@Moho@@V?$WeakPtr@VProp@Moho@@@2@@gpg@@@Z)
-     * Mangled: ?RemoveBoundedProp@EntityDB@Moho@@QAEXW4Handle@?$PriorityQueue@USPropPriorityInfo@Moho@@V?$WeakPtr@VProp@Moho@@@2@@gpg@@@Z
+     * Address: 0x00684CE0 (FUN_00684CE0,
+     * ?RemoveBoundedProp@EntityDB@Moho@@QAEXW4Handle@?$PriorityQueue@USPropPriorityInfo@Moho@@V?$WeakPtr@VProp@Moho@@@2@@gpg@@@Z)
+     * Mangled:
+     * ?RemoveBoundedProp@EntityDB@Moho@@QAEXW4Handle@?$PriorityQueue@USPropPriorityInfo@Moho@@V?$WeakPtr@VProp@Moho@@@2@@gpg@@@Z
      *
      * What it does:
      * Removes one bounded-prop queue lane by handle when the handle resolves
@@ -300,7 +310,7 @@ namespace moho
     [[nodiscard]] CEntityDbAllUnitsNode* AllUnitsEnd() const;
 
     /**
-      * Alias of FUN_005C87A0 (non-canonical helper lane).
+     * Alias of FUN_005C87A0 (non-canonical helper lane).
      *
      * What it does:
      * Advances one all-units tree iterator node to its in-order successor.
@@ -309,7 +319,7 @@ namespace moho
     static CEntityDbAllUnitsNode* NextAllUnitsNode(CEntityDbAllUnitsNode* node) noexcept;
 
     /**
-      * Alias of FUN_005C87A0 (non-canonical helper lane).
+     * Alias of FUN_005C87A0 (non-canonical helper lane).
      *
      * What it does:
      * Converts one all-units tree node payload into the owning `Unit*`.
@@ -351,9 +361,6 @@ namespace moho
      * returns the head node, i.e. `end()`, in that case).
      */
     [[nodiscard]] Entity* FindEntityById(std::uint32_t entityId) const noexcept;
-
-
-
 
     /**
      * What it does:
@@ -427,7 +434,7 @@ namespace moho
     // is `std::map_EntId_Entity::find` (0x006856C0). The node layout is the
     // `CEntityDbAllUnitsNode` view below (`AllUnitsHead()` hands it out for
     // the family-boundary iterators).
-    fa::map<std::uint32_t, Entity*> mAllUnits;    // +0x00
+    fa::map<std::uint32_t, Entity*> mAllUnits; // +0x00
     // `std::map<unsigned int, Moho::IdPool>` (`Moho::EntityDB::mIdPool` in the
     // binary). Confirmed against `gpg/core/containers/ArchiveSerialization.cpp`
     // and `EntityDb.cpp`'s own reflection typing, both of which read this field
@@ -436,7 +443,7 @@ namespace moho
     // `FUN_006881C0` (buy_node), `FUN_006880A0`/`FUN_00688120` (rotate_left/
     // rotate_right) -- all cited on `legacy/containers/RbTree.h`'s shared
     // members, not reimplemented here (RULE ONE).
-    fa::map<std::uint32_t, IdPool> mIdPoolTree;  // +0x0C
+    fa::map<std::uint32_t, IdPool> mIdPoolTree; // +0x0C
     // Every live entity set (`EntitySetBase` and each `EntitySetTemplate<T>`),
     // for `Purge` to drop destroyed entities from and `SerSets` to save.
     TDatList<EntitySetBase, void> mRegisteredEntitySets; // +0x18
@@ -445,15 +452,19 @@ namespace moho
     // appends with `push_back`, `Purge` (0x00684560) drains it, and
     // `MemberSerialize` (0x006897F0) writes it whole at `this + 0x20`. Every
     // live entity is in `mAllUnits`, not here.
-    fa::list<Entity*> mEntList;                  // +0x20
+    fa::list<Entity*> mEntList;              // +0x20
     CEntityDbBoundedPropQueue mBoundedProps; // +0x2C
   };
 
   static_assert(offsetof(EntityDB, mAllUnits) == 0x00, "EntityDB::mAllUnits offset must be 0x00");
-  static_assert(sizeof(fa::map<std::uint32_t, Entity*>) == 0x0C, "EntityDB::mAllUnits must be the 12-byte MSVC8 map header");
+  static_assert(
+    sizeof(fa::map<std::uint32_t, Entity*>) == 0x0C,
+    "EntityDB::mAllUnits must be the 12-byte MSVC8 map header"
+  );
   static_assert(offsetof(EntityDB, mIdPoolTree) == 0x0C, "EntityDB::mIdPoolTree offset must be 0x0C");
   static_assert(
-    offsetof(EntityDB, mRegisteredEntitySets) == 0x18, "EntityDB::mRegisteredEntitySets offset must be 0x18"
+    offsetof(EntityDB, mRegisteredEntitySets) == 0x18,
+    "EntityDB::mRegisteredEntitySets offset must be 0x18"
   );
   static_assert(offsetof(EntityDB, mEntList) == 0x20, "EntityDB::mEntList offset must be 0x20");
   static_assert(offsetof(EntityDB, mBoundedProps) == 0x2C, "EntityDB::mBoundedProps offset must be 0x2C");

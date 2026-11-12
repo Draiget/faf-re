@@ -88,13 +88,15 @@ namespace
   constexpr const char* kNavigatorSetDestUnitHelpText =
     "Set the navigator's destination as another unit (chase/follow)";
   constexpr const char* kNavigatorAbortMoveMethodName = "AbortMove";
-  constexpr const char* kNavigatorAbortMoveHelpText = "Abort the current move and put the navigator back to an idle state";
+  constexpr const char* kNavigatorAbortMoveHelpText =
+    "Abort the current move and put the navigator back to an idle state";
   constexpr const char* kNavigatorBroadcastResumeTaskEventMethodName = "BroadcastResumeTaskEvent";
   constexpr const char* kNavigatorBroadcastResumeTaskEventHelpText =
     "Broadcast event to resume any listening task that is currently suspended";
   constexpr const char* kNavigatorSetSpeedThroughGoalMethodName = "SetSpeedThroughGoal";
   constexpr const char* kNavigatorSetSpeedThroughGoalHelpText =
-    " Set flag in navigator so the unit will know whether to stop at final goal  or speed through it. This would be set "
+    " Set flag in navigator so the unit will know whether to stop at final goal  or speed through it. This would be "
+    "set "
     "to True during a patrol or a series  of waypoints in a complex path.";
   constexpr const char* kNavigatorGetCurrentTargetPosMethodName = "GetCurrentTargetPos";
   constexpr const char* kNavigatorGetCurrentTargetPosHelpText =
@@ -127,7 +129,6 @@ namespace
     return static_cast<TObject*>(upcast.mObj);
   }
 
-
   template <typename TObject>
   void WritePointerWithType(
     gpg::WriteArchive* const archive,
@@ -147,7 +148,9 @@ namespace
    * What it does:
    * Returns `CScrLuaMetatableFactory<CAiNavigatorImpl>::sInstance.Get(state)`.
    */
-  [[nodiscard]] LuaPlus::LuaObject GetNavigatorImplFactoryMetatable(LuaPlus::LuaState* const state)
+  [[nodiscard]] LuaPlus::LuaObject GetNavigatorImplFactoryMetatable(
+    LuaPlus::LuaState* const state
+  )
   {
     return CScrLuaMetatableFactory<CAiNavigatorImpl>::Instance().Get(state);
   }
@@ -167,8 +170,10 @@ namespace
     const SFootprint& footprint
   ) noexcept
   {
-    const std::int32_t minXCell = static_cast<std::int32_t>(std::lrintf(worldPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f)));
-    const std::int32_t minZCell = static_cast<std::int32_t>(std::lrintf(worldPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)));
+    const std::int32_t minXCell =
+      static_cast<std::int32_t>(std::lrintf(worldPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f)));
+    const std::int32_t minZCell =
+      static_cast<std::int32_t>(std::lrintf(worldPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)));
 
     const std::int16_t packedMinX = static_cast<std::int16_t>(minXCell);
     const std::int16_t packedMinZ = static_cast<std::int16_t>(minZCell);
@@ -204,7 +209,9 @@ CScrLuaMetatableFactory<CAiNavigatorImpl> CScrLuaMetatableFactory<CAiNavigatorIm
  * Resolves one navigator and one world-space target position, then builds a
  * one-cell goal rectangle and forwards it to `IAiNavigator::SetGoal`.
  */
-int moho::cfunc_CAiNavigatorImplSetGoalL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiNavigatorImplSetGoalL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kNavigatorSetGoalHelpText);
 
@@ -226,7 +233,9 @@ int moho::cfunc_CAiNavigatorImplSetGoalL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiNavigatorImplSetGoalL`.
  */
-int moho::cfunc_CAiNavigatorImplSetGoal(lua_State* const luaContext)
+int moho::cfunc_CAiNavigatorImplSetGoal(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiNavigatorImplSetGoalL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -257,7 +266,9 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplSetGoal_LuaFuncDef()
  * Resolves one navigator and one destination entity object, then forwards the
  * destination lane to `IAiNavigator::SetDestUnit`.
  */
-int moho::cfunc_CAiNavigatorImplSetDestUnitL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiNavigatorImplSetDestUnitL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kNavigatorSetDestUnitHelpText);
 
@@ -277,7 +288,9 @@ int moho::cfunc_CAiNavigatorImplSetDestUnitL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiNavigatorImplSetDestUnitL`.
  */
-int moho::cfunc_CAiNavigatorImplSetDestUnit(lua_State* const luaContext)
+int moho::cfunc_CAiNavigatorImplSetDestUnit(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiNavigatorImplSetDestUnitL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -307,7 +320,9 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplSetDestUnit_LuaFuncDef()
  * What it does:
  * Resolves one navigator and dispatches its abort-move path.
  */
-int moho::cfunc_CAiNavigatorImplAbortMoveL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiNavigatorImplAbortMoveL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kNavigatorAbortMoveHelpText);
 
@@ -324,7 +339,9 @@ int moho::cfunc_CAiNavigatorImplAbortMoveL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiNavigatorImplAbortMoveL`.
  */
-int moho::cfunc_CAiNavigatorImplAbortMove(lua_State* const luaContext)
+int moho::cfunc_CAiNavigatorImplAbortMove(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiNavigatorImplAbortMoveL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -354,7 +371,9 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplAbortMove_LuaFuncDef()
  * What it does:
  * Resolves one navigator and broadcasts the resume-task event to listeners.
  */
-int moho::cfunc_CAiNavigatorImplBroadcastResumeTaskEventL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiNavigatorImplBroadcastResumeTaskEventL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kNavigatorBroadcastResumeTaskEventHelpText);
 
@@ -371,7 +390,9 @@ int moho::cfunc_CAiNavigatorImplBroadcastResumeTaskEventL(LuaPlus::LuaState* con
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiNavigatorImplBroadcastResumeTaskEventL`.
  */
-int moho::cfunc_CAiNavigatorImplBroadcastResumeTaskEvent(lua_State* const luaContext)
+int moho::cfunc_CAiNavigatorImplBroadcastResumeTaskEvent(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiNavigatorImplBroadcastResumeTaskEventL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -402,7 +423,9 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplBroadcastResumeTaskEvent_LuaFuncDef(
  * Resolves one navigator and one boolean lane, then forwards it to
  * `IAiNavigator::SetSpeedThroughGoal`.
  */
-int moho::cfunc_CAiNavigatorImplSetSpeedThroughGoalL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiNavigatorImplSetSpeedThroughGoalL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kNavigatorSetSpeedThroughGoalHelpText);
 
@@ -421,7 +444,9 @@ int moho::cfunc_CAiNavigatorImplSetSpeedThroughGoalL(LuaPlus::LuaState* const st
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiNavigatorImplSetSpeedThroughGoalL`.
  */
-int moho::cfunc_CAiNavigatorImplSetSpeedThroughGoal(lua_State* const luaContext)
+int moho::cfunc_CAiNavigatorImplSetSpeedThroughGoal(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiNavigatorImplSetSpeedThroughGoalL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -451,7 +476,9 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplSetSpeedThroughGoal_LuaFuncDef()
  * What it does:
  * Resolves one navigator and returns current target world position to Lua.
  */
-int moho::cfunc_CAiNavigatorImplGetCurrentTargetPosL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiNavigatorImplGetCurrentTargetPosL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kNavigatorGetCurrentTargetPosHelpText);
 
@@ -471,7 +498,9 @@ int moho::cfunc_CAiNavigatorImplGetCurrentTargetPosL(LuaPlus::LuaState* const st
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiNavigatorImplGetCurrentTargetPosL`.
  */
-int moho::cfunc_CAiNavigatorImplGetCurrentTargetPos(lua_State* const luaContext)
+int moho::cfunc_CAiNavigatorImplGetCurrentTargetPos(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiNavigatorImplGetCurrentTargetPosL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -501,7 +530,9 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplGetCurrentTargetPos_LuaFuncDef()
  * What it does:
  * Resolves one navigator and returns current goal world position to Lua.
  */
-int moho::cfunc_CAiNavigatorImplGetGoalPosL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiNavigatorImplGetGoalPosL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kNavigatorGetGoalPosHelpText);
 
@@ -521,7 +552,9 @@ int moho::cfunc_CAiNavigatorImplGetGoalPosL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiNavigatorImplGetGoalPosL`.
  */
-int moho::cfunc_CAiNavigatorImplGetGoalPos(lua_State* const luaContext)
+int moho::cfunc_CAiNavigatorImplGetGoalPos(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiNavigatorImplGetGoalPosL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -551,7 +584,9 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplGetGoalPos_LuaFuncDef()
  * What it does:
  * Resolves one navigator and pushes its status enum as a Lua number.
  */
-int moho::cfunc_CAiNavigatorImplGetStatusL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiNavigatorImplGetStatusL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kNavigatorEmptyHelpText);
@@ -571,7 +606,9 @@ int moho::cfunc_CAiNavigatorImplGetStatusL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiNavigatorImplGetStatusL`.
  */
-int moho::cfunc_CAiNavigatorImplGetStatus(lua_State* const luaContext)
+int moho::cfunc_CAiNavigatorImplGetStatus(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiNavigatorImplGetStatusL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -602,7 +639,9 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplGetStatus_LuaFuncDef()
  * Resolves one navigator and returns whether its current path is considered
  * valid.
  */
-int moho::cfunc_CAiNavigatorImplHasGoodPathL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiNavigatorImplHasGoodPathL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kNavigatorEmptyHelpText);
@@ -622,7 +661,9 @@ int moho::cfunc_CAiNavigatorImplHasGoodPathL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiNavigatorImplHasGoodPathL`.
  */
-int moho::cfunc_CAiNavigatorImplHasGoodPath(lua_State* const luaContext)
+int moho::cfunc_CAiNavigatorImplHasGoodPath(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiNavigatorImplHasGoodPathL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -653,7 +694,9 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplHasGoodPath_LuaFuncDef()
  * Resolves one navigator and returns whether it is currently following a
  * formation leader.
  */
-int moho::cfunc_CAiNavigatorImplFollowingLeaderL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiNavigatorImplFollowingLeaderL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kNavigatorEmptyHelpText);
@@ -673,7 +716,9 @@ int moho::cfunc_CAiNavigatorImplFollowingLeaderL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiNavigatorImplFollowingLeaderL`.
  */
-int moho::cfunc_CAiNavigatorImplFollowingLeader(lua_State* const luaContext)
+int moho::cfunc_CAiNavigatorImplFollowingLeader(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiNavigatorImplFollowingLeaderL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -703,7 +748,9 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplFollowingLeader_LuaFuncDef()
  * What it does:
  * Resolves one navigator and applies one boolean ignore-formation flag.
  */
-int moho::cfunc_CAiNavigatorImplIgnoreFormationL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiNavigatorImplIgnoreFormationL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kNavigatorEmptyHelpText);
 
@@ -722,7 +769,9 @@ int moho::cfunc_CAiNavigatorImplIgnoreFormationL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiNavigatorImplIgnoreFormationL`.
  */
-int moho::cfunc_CAiNavigatorImplIgnoreFormation(lua_State* const luaContext)
+int moho::cfunc_CAiNavigatorImplIgnoreFormation(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiNavigatorImplIgnoreFormationL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -752,7 +801,9 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplIgnoreFormation_LuaFuncDef()
  * What it does:
  * Resolves one navigator and returns whether formation constraints are ignored.
  */
-int moho::cfunc_CAiNavigatorImplIsIgnorningFormationL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiNavigatorImplIsIgnorningFormationL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kNavigatorEmptyHelpText);
@@ -772,7 +823,9 @@ int moho::cfunc_CAiNavigatorImplIsIgnorningFormationL(LuaPlus::LuaState* const s
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiNavigatorImplIsIgnorningFormationL`.
  */
-int moho::cfunc_CAiNavigatorImplIsIgnorningFormation(lua_State* const luaContext)
+int moho::cfunc_CAiNavigatorImplIsIgnorningFormation(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiNavigatorImplIsIgnorningFormationL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -802,7 +855,9 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplIsIgnorningFormation_LuaFuncDef()
  * What it does:
  * Resolves one navigator and returns whether it has reached its goal area.
  */
-int moho::cfunc_CAiNavigatorImplAtgoalL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiNavigatorImplAtgoalL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kNavigatorEmptyHelpText);
@@ -822,7 +877,9 @@ int moho::cfunc_CAiNavigatorImplAtgoalL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiNavigatorImplAtgoalL`.
  */
-int moho::cfunc_CAiNavigatorImplAtgoal(lua_State* const luaContext)
+int moho::cfunc_CAiNavigatorImplAtgoal(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiNavigatorImplAtgoalL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -853,7 +910,9 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplAtgoal_LuaFuncDef()
  * Resolves one navigator plus goal-position lane, builds one-cell goal rect,
  * and returns `CanPathTo(...)` as Lua boolean.
  */
-int moho::cfunc_CAiNavigatorImplCanPathToGoalL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiNavigatorImplCanPathToGoalL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   const int argumentCount = lua_gettop(rawState);
@@ -884,7 +943,9 @@ int moho::cfunc_CAiNavigatorImplCanPathToGoalL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiNavigatorImplCanPathToGoalL`.
  */
-int moho::cfunc_CAiNavigatorImplCanPathToGoal(lua_State* const luaContext)
+int moho::cfunc_CAiNavigatorImplCanPathToGoal(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiNavigatorImplCanPathToGoalL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -918,8 +979,11 @@ CScrLuaInitForm* moho::func_CAiNavigatorImplCanPathToGoal_LuaFuncDef()
 CScrLuaInitForm* moho::register_CAiNavigatorImplLuaInitFormAnchor()
 {
   static CScrLuaClassBinder binder(
-    SimLuaInitSet(), "moho.navigator_methods", &CScrLuaMetatableFactory<CAiNavigatorImpl>::Instance(),
-    "CAiNavigatorImpl", ""
+    SimLuaInitSet(),
+    "moho.navigator_methods",
+    &CScrLuaMetatableFactory<CAiNavigatorImpl>::Instance(),
+    "CAiNavigatorImpl",
+    ""
   );
   return &binder;
 }
@@ -1134,9 +1198,12 @@ CScrLuaMetatableFactory<CAiNavigatorImpl>& CScrLuaMetatableFactory<CAiNavigatorI
 }
 
 /**
- * Address: 0x005A7310 (FUN_005A7310, ?Create@?$CScrLuaMetatableFactory@VCAiNavigatorImpl@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
+ * Address: 0x005A7310 (FUN_005A7310,
+ * ?Create@?$CScrLuaMetatableFactory@VCAiNavigatorImpl@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
  */
-LuaPlus::LuaObject CScrLuaMetatableFactory<CAiNavigatorImpl>::Create(LuaPlus::LuaState* const state)
+LuaPlus::LuaObject CScrLuaMetatableFactory<CAiNavigatorImpl>::Create(
+  LuaPlus::LuaState* const state
+)
 {
   return SCR_CreateSimpleMetatable(state);
 }
@@ -1155,7 +1222,9 @@ CAiNavigatorImpl::CAiNavigatorImpl()
 /**
  * Address: 0x005A33E0 (FUN_005A33E0, unit ctor)
  */
-CAiNavigatorImpl::CAiNavigatorImpl(Unit* const unit)
+CAiNavigatorImpl::CAiNavigatorImpl(
+  Unit* const unit
+)
   : CAiNavigatorImpl()
 {
   GPG_ASSERT(unit != nullptr);
@@ -1195,7 +1264,10 @@ CAiNavigatorImpl::~CAiNavigatorImpl()
  * Loads reflected base lanes (`IAiNavigator`, `CScriptObject`, `CTask`)
  * followed by unit pointer, ignore-formation flag, and navigator status.
  */
-void CAiNavigatorImpl::MemberDeserialize(gpg::ReadArchive* const archive, const int version)
+void CAiNavigatorImpl::MemberDeserialize(
+  gpg::ReadArchive* const archive,
+  const int version
+)
 {
   if (!archive) {
     return;
@@ -1218,7 +1290,6 @@ void CAiNavigatorImpl::MemberDeserialize(gpg::ReadArchive* const archive, const 
   EAiNavigatorStatus status = AINAVSTATUS_Idle;
   archive->Read(gpg::RTypeOf<EAiNavigatorStatus>(), &status, ownerRef);
 
-
   mUnit = loadedUnit;
   mIgnoreFormation = ignoreFormation ? 1u : 0u;
   mStatus = status;
@@ -1231,7 +1302,10 @@ void CAiNavigatorImpl::MemberDeserialize(gpg::ReadArchive* const archive, const 
  * Saves reflected base lanes (`IAiNavigator`, `CScriptObject`, `CTask`)
  * followed by unit pointer, ignore-formation flag, and navigator status.
  */
-void CAiNavigatorImpl::MemberSerialize(gpg::WriteArchive* const archive, const int version) const
+void CAiNavigatorImpl::MemberSerialize(
+  gpg::WriteArchive* const archive,
+  const int version
+) const
 {
   if (!archive) {
     return;
@@ -1276,7 +1350,9 @@ gpg::RRef CAiNavigatorImpl::GetDerivedObjectRef()
 /**
  * Address: 0x005A3610 (FUN_005A3610, ?GetMetatable@CAiNavigatorImpl@Moho@@QAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
  */
-LuaPlus::LuaObject CAiNavigatorImpl::GetMetatable(LuaPlus::LuaState* const luaState)
+LuaPlus::LuaObject CAiNavigatorImpl::GetMetatable(
+  LuaPlus::LuaState* const luaState
+)
 {
   if (!luaState) {
     return {};
@@ -1342,8 +1418,7 @@ EAiNavigatorStatus CAiNavigatorImpl::GetStatus() const
 /**
  * Address: 0x005A2D10 (FUN_005A2D10)
  */
-void CAiNavigatorImpl::Func1()
-{}
+void CAiNavigatorImpl::Func1() {}
 
 /**
  * Address: 0x005A2D20 (FUN_005A2D20)
@@ -1356,7 +1431,9 @@ SNavPath* CAiNavigatorImpl::GetNavPath() const
 /**
  * Address: 0x005A36F0 (FUN_005A36F0)
  */
-void CAiNavigatorImpl::PushStack(LuaPlus::LuaState* const luaState)
+void CAiNavigatorImpl::PushStack(
+  LuaPlus::LuaState* const luaState
+)
 {
   mLuaObj.PushStack(luaState);
 }
@@ -1373,7 +1450,6 @@ bool CAiNavigatorImpl::NavigatorMakeIdle()
   mStatus = AINAVSTATUS_Idle;
   return true;
 }
-
 
 namespace
 {

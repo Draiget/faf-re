@@ -12,7 +12,9 @@ namespace gpg::gal
    * Initializes variable wrapper lanes and retains the backing effect interface.
    */
   EffectVariableD3D10::EffectVariableD3D10(
-    const char* const name, ID3D10Effect* const dxEffect, ID3D10EffectVariable* const variableHandle
+    const char* const name,
+    ID3D10Effect* const dxEffect,
+    ID3D10EffectVariable* const variableHandle
   )
     : name_()
     , dxEffect_(dxEffect)
@@ -58,7 +60,9 @@ namespace gpg::gal
    * D3D10 cube render-target slot keeps an empty body and only owns by-value
    * `shared_ptr` release semantics.
    */
-  void EffectVariableD3D10::SetCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget> cubeTarget)
+  void EffectVariableD3D10::SetCubeRenderTarget(
+    const boost::shared_ptr<CubeRenderTarget> cubeTarget
+  )
   {
     static_cast<void>(cubeTarget);
   }
@@ -69,7 +73,9 @@ namespace gpg::gal
    * What it does:
    * Binds a render-target-backed shader-resource view into this effect slot.
    */
-  void EffectVariableD3D10::SetRenderTarget(const boost::shared_ptr<RenderTarget> renderTarget)
+  void EffectVariableD3D10::SetRenderTarget(
+    const boost::shared_ptr<RenderTarget> renderTarget
+  )
   {
     ID3D10ShaderResourceView* const shaderResourceView = (renderTarget.get() != nullptr)
       ? static_cast<RenderTargetD3D10*>(renderTarget.get())->GetShaderResourceViewOrThrow()
@@ -86,7 +92,9 @@ namespace gpg::gal
    * What it does:
    * Binds a texture shader-resource view into this effect slot.
    */
-  void EffectVariableD3D10::SetTexture(const boost::shared_ptr<Texture> texture)
+  void EffectVariableD3D10::SetTexture(
+    const boost::shared_ptr<Texture> texture
+  )
   {
     ID3D10ShaderResourceView* const shaderResourceView =
       (texture.get() != nullptr) ? static_cast<TextureD3D10*>(texture.get())->GetShaderResourceViewOrThrow() : nullptr;
@@ -102,7 +110,9 @@ namespace gpg::gal
    * What it does:
    * Converts to matrix lane and writes one matrix payload.
    */
-  void EffectVariableD3D10::SetMatrix4x4(const Matrix* const matrix)
+  void EffectVariableD3D10::SetMatrix4x4(
+    const Matrix* const matrix
+  )
   {
     const HRESULT result = variableHandle_->AsMatrix()->SetMatrix(const_cast<float*>(&matrix->r[0].x));
     if (result < 0) {
@@ -116,7 +126,9 @@ namespace gpg::gal
    * What it does:
    * Converts to scalar lane and writes a boolean value.
    */
-  void EffectVariableD3D10::SetBool(const bool value)
+  void EffectVariableD3D10::SetBool(
+    const bool value
+  )
   {
     const HRESULT result = variableHandle_->AsScalar()->SetBool(value ? TRUE : FALSE);
     if (result < 0) {
@@ -130,7 +142,9 @@ namespace gpg::gal
    * What it does:
    * Converts to scalar lane and writes an integer value.
    */
-  void EffectVariableD3D10::SetInt(const int value)
+  void EffectVariableD3D10::SetInt(
+    const int value
+  )
   {
     const HRESULT result = variableHandle_->AsScalar()->SetInt(value);
     if (result < 0) {
@@ -144,7 +158,9 @@ namespace gpg::gal
    * What it does:
    * Converts to scalar lane and writes a float value.
    */
-  void EffectVariableD3D10::SetFloat(const float value)
+  void EffectVariableD3D10::SetFloat(
+    const float value
+  )
   {
     const HRESULT result = variableHandle_->AsScalar()->SetFloat(value);
     if (result < 0) {
@@ -158,7 +174,9 @@ namespace gpg::gal
    * What it does:
    * Converts to vector lane and writes one vector payload.
    */
-  void EffectVariableD3D10::SetVector(const float* const value)
+  void EffectVariableD3D10::SetVector(
+    const float* const value
+  )
   {
     const HRESULT result = variableHandle_->AsVector()->SetFloatVector(const_cast<float*>(value));
     if (result < 0) {
@@ -174,7 +192,10 @@ namespace gpg::gal
    * What it does:
    * Writes `byteCount` raw bytes to the variable.
    */
-  void EffectVariableD3D10::SetValue(const void* const data, const std::uint32_t byteCount)
+  void EffectVariableD3D10::SetValue(
+    const void* const data,
+    const std::uint32_t byteCount
+  )
   {
     const HRESULT result = variableHandle_->SetRawValue(const_cast<void*>(data), 0U, byteCount);
     if (result < 0) {
@@ -190,7 +211,10 @@ namespace gpg::gal
    * What it does:
    * Writes `count` floats as raw bytes (`count * 4`).
    */
-  void EffectVariableD3D10::SetFloatArray(const std::uint32_t count, const float* const values)
+  void EffectVariableD3D10::SetFloatArray(
+    const std::uint32_t count,
+    const float* const values
+  )
   {
     const HRESULT result = variableHandle_->SetRawValue(const_cast<float*>(values), 0U, count * 4U);
     if (result < 0) {
@@ -210,7 +234,10 @@ namespace gpg::gal
    * back to `SetRawValue` with the pointer, but sized as `count` floats
    * (`count * 4` bytes), not `count` matrices. Kept as the binary has it.
    */
-  void EffectVariableD3D10::SetMatrixArray(const std::uint32_t count, const Matrix* const matrices)
+  void EffectVariableD3D10::SetMatrixArray(
+    const std::uint32_t count,
+    const Matrix* const matrices
+  )
   {
     auto* const parameterAddress = reinterpret_cast<float*>(const_cast<const Matrix**>(&matrices));
     HRESULT result = variableHandle_->AsMatrix()->SetMatrixArray(parameterAddress, 0U, count);
@@ -233,7 +260,10 @@ namespace gpg::gal
    * 0x0094C704) -- the same slip as the D3D9 twin. Nothing in the binary
    * calls the slot.
    */
-  void EffectVariableD3D10::SetVectorArray(const std::uint32_t count, const float* const vectors4)
+  void EffectVariableD3D10::SetVectorArray(
+    const std::uint32_t count,
+    const float* const vectors4
+  )
   {
     auto* const parameterAddress = reinterpret_cast<float*>(const_cast<const float**>(&vectors4));
     const HRESULT result = variableHandle_->AsVector()->SetFloatVectorArray(parameterAddress, 0U, count);
@@ -248,7 +278,10 @@ namespace gpg::gal
    * What it does:
    * Reads a boolean annotation by name from this variable handle.
    */
-  bool EffectVariableD3D10::GetAnnotationBool(bool* const outValue, const fa::string& annotationName)
+  bool EffectVariableD3D10::GetAnnotationBool(
+    bool* const outValue,
+    const fa::string& annotationName
+  )
   {
     if (variableHandle_ == nullptr) {
       ThrowGalError("EffectVariableD3D10.cpp", 154, "invalid effect variable");
@@ -275,7 +308,10 @@ namespace gpg::gal
    * What it does:
    * Reads an integer annotation by name from this variable handle.
    */
-  bool EffectVariableD3D10::GetAnnotationInt(int* const outValue, const fa::string& annotationName)
+  bool EffectVariableD3D10::GetAnnotationInt(
+    int* const outValue,
+    const fa::string& annotationName
+  )
   {
     if (variableHandle_ == nullptr) {
       ThrowGalError("EffectVariableD3D10.cpp", 173, "invalid effect variable");
@@ -300,7 +336,10 @@ namespace gpg::gal
    * What it does:
    * Reads a float annotation by name from this variable handle.
    */
-  bool EffectVariableD3D10::GetAnnotationFloat(float* const outValue, const fa::string& annotationName)
+  bool EffectVariableD3D10::GetAnnotationFloat(
+    float* const outValue,
+    const fa::string& annotationName
+  )
   {
     if (variableHandle_ == nullptr) {
       ThrowGalError("EffectVariableD3D10.cpp", 189, "invalid effect variable");
@@ -325,7 +364,10 @@ namespace gpg::gal
    * What it does:
    * Reads a string annotation by name from this variable handle.
    */
-  bool EffectVariableD3D10::GetAnnotationString(fa::string* const outValue, const fa::string& annotationName)
+  bool EffectVariableD3D10::GetAnnotationString(
+    fa::string* const outValue,
+    const fa::string& annotationName
+  )
   {
     if (variableHandle_ == nullptr) {
       ThrowGalError("EffectVariableD3D10.cpp", 205, "invalid effect variable");
@@ -345,5 +387,4 @@ namespace gpg::gal
     outValue->assign_owned((text != nullptr) ? text : "");
     return true;
   }
-}
-
+} // namespace gpg::gal

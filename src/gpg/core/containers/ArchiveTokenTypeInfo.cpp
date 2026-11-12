@@ -106,4 +106,7 @@ namespace gpg
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_ArchiveTokenTypeInfoStartup_20b238, gpg::register_ArchiveTokenTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_ArchiveTokenTypeInfoStartup_20b238,
+  gpg::register_ArchiveTokenTypeInfoStartup
+)

@@ -59,25 +59,26 @@ namespace moho
     void ResetRenderResources() noexcept;
 
   public:
-    std::uint32_t mIndexCount = 0;                                  // +0x04
-    std::uint32_t mVertexCount = 0;                                 // +0x08
-    RenderGeometryBuffers mGeometry;                                // +0x0C
+    std::uint32_t mIndexCount = 0;   // +0x04
+    std::uint32_t mVertexCount = 0;  // +0x08
+    RenderGeometryBuffers mGeometry; // +0x0C
     /**
      * Write cursor, in whole `Wm3::Circle2f` instances, into the dynamic
      * per-instance vertex buffer below. `Init` sizes that buffer to 12288
      * circles and `LockVisionInstanceRange` (0x0081CCB0) sub-allocates from it
      * with `D3DLOCK_NOOVERWRITE`, wrapping back to 0 with `D3DLOCK_DISCARD`.
      */
-    std::uint32_t mInstanceRingCursor = 0;                          // +0x24
-    boost::shared_ptr<gpg::gal::VertexBuffer> mVertexBuffer2;   // +0x28
-    CRenFrame mFrame;                                               // +0x30
+    std::uint32_t mInstanceRingCursor = 0;                    // +0x24
+    boost::shared_ptr<gpg::gal::VertexBuffer> mVertexBuffer2; // +0x28
+    CRenFrame mFrame;                                         // +0x30
   };
 
   static_assert(offsetof(VisionRenderer, mIndexCount) == 0x04, "VisionRenderer::mIndexCount offset must be 0x04");
   static_assert(offsetof(VisionRenderer, mVertexCount) == 0x08, "VisionRenderer::mVertexCount offset must be 0x08");
   static_assert(offsetof(VisionRenderer, mGeometry) == 0x0C, "VisionRenderer::mGeometry offset must be 0x0C");
   static_assert(
-    offsetof(VisionRenderer, mInstanceRingCursor) == 0x24, "VisionRenderer::mInstanceRingCursor offset must be 0x24"
+    offsetof(VisionRenderer, mInstanceRingCursor) == 0x24,
+    "VisionRenderer::mInstanceRingCursor offset must be 0x24"
   );
   static_assert(offsetof(VisionRenderer, mVertexBuffer2) == 0x28, "VisionRenderer::mVertexBuffer2 offset must be 0x28");
   static_assert(offsetof(VisionRenderer, mFrame) == 0x30, "VisionRenderer::mFrame offset must be 0x30");

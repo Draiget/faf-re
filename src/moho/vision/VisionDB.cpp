@@ -26,7 +26,8 @@ namespace moho
   bool wld_VisionRepeatInsert = true;
   TConVar<bool> gTConVar_wld_VisionRepeatInsert(
     "wld_VisionRepeatInsert",
-    "Insert a vision entry identical to the previous one where the tree walk would put it, without walking (same tree).",
+    "Insert a vision entry identical to the previous one where the tree walk would put it, without walking (same "
+    "tree).",
     &wld_VisionRepeatInsert
   );
 } // namespace moho
@@ -39,7 +40,10 @@ namespace
    * binary keeps an uncalled out-of-line copy at 0x0081A7F0; `Entry::Contains`
    * inlines it once per circle.
    */
-  [[nodiscard]] bool CircleContains(const Wm3::Circle2f& outer, const Wm3::Circle2f& inner) noexcept
+  [[nodiscard]] bool CircleContains(
+    const Wm3::Circle2f& outer,
+    const Wm3::Circle2f& inner
+  ) noexcept
   {
     if (inner.Radius > outer.Radius) {
       return false;
@@ -56,10 +60,16 @@ namespace
    * keeps an uncalled out-of-line copy at 0x0081A840; `VisionDB::TryAdd`
    * inlines it.
    */
-  [[nodiscard]] Wm3::Circle2f InterpolateCircle(const Wm3::Circle2f& from, const Wm3::Circle2f& to, const float t) noexcept
+  [[nodiscard]] Wm3::Circle2f InterpolateCircle(
+    const Wm3::Circle2f& from,
+    const Wm3::Circle2f& to,
+    const float t
+  ) noexcept
   {
     return Wm3::Circle2f{
-      Wm3::Vector2f{from.Center.x + ((to.Center.x - from.Center.x) * t), from.Center.y + ((to.Center.y - from.Center.y) * t)},
+      Wm3::Vector2f{
+        from.Center.x + ((to.Center.x - from.Center.x) * t), from.Center.y + ((to.Center.y - from.Center.y) * t)
+      },
       ((to.Radius - from.Radius) * t) + from.Radius
     };
   }
@@ -77,7 +87,10 @@ namespace
    * entries it contains.
    */
   [[nodiscard]] EVisionEntryResult EvaluateVisionEntry(
-    const VisionDB::Entry& entry, const Wm3::Box2f& box, const float interpolant, Wm3::Circle2f& sampled
+    const VisionDB::Entry& entry,
+    const Wm3::Box2f& box,
+    const float interpolant,
+    Wm3::Circle2f& sampled
   )
   {
     sampled = InterpolateCircle(entry.mPrevCircle, entry.mCurCircle, interpolant);
@@ -94,21 +107,24 @@ namespace
   /// `VisionDB::TryAdd`'s depth-first walk, into any vector-like accumulator.
   template <class Accumulator>
   void AccumulateVisibleCircles(
-    Accumulator& accumulator, const VisionDB::Entry* const entry, const Wm3::Box2f& box, const float interpolant
+    Accumulator& accumulator,
+    const VisionDB::Entry* const entry,
+    const Wm3::Box2f& box,
+    const float interpolant
   )
   {
     Wm3::Circle2f sampled{};
     switch (EvaluateVisionEntry(*entry, box, interpolant, sampled)) {
-      case EVisionEntryResult::Outside:
-        return;
-      case EVisionEntryResult::Circle:
-        accumulator.push_back(sampled);
-        return;
-      case EVisionEntryResult::Descend:
-        for (const VisionDB::Entry* child = entry->mContained; child != nullptr; child = child->mNext) {
-          AccumulateVisibleCircles(accumulator, child, box, interpolant);
-        }
-        return;
+    case EVisionEntryResult::Outside:
+      return;
+    case EVisionEntryResult::Circle:
+      accumulator.push_back(sampled);
+      return;
+    case EVisionEntryResult::Descend:
+      for (const VisionDB::Entry* child = entry->mContained; child != nullptr; child = child->mNext) {
+        AccumulateVisibleCircles(accumulator, child, box, interpolant);
+      }
+      return;
     }
   }
 
@@ -151,7 +167,7 @@ namespace
    * falls back to the original walk, so the tree comes out exactly as the binary builds it. Only
    * the main thread edits the tree (the serial half of the sync apply).
    */
-  std::unordered_map<const VisionDB::Entry*, VisionDB::Entry*> gChainTails; // parent -> last node it contains
+  std::unordered_map<const VisionDB::Entry*, VisionDB::Entry*> gChainTails;    // parent -> last node it contains
   std::unordered_map<const VisionDB::Entry*, VisionDB::Entry*> gChainPrevious; // node -> node linking to it
 
   /**
@@ -180,7 +196,9 @@ namespace
   }
 
   /// The last node of the chain `parent` contains, from the hint when it is still true.
-  [[nodiscard]] VisionDB::Entry* ChainTailHint(const VisionDB::Entry* const parent) noexcept
+  [[nodiscard]] VisionDB::Entry* ChainTailHint(
+    const VisionDB::Entry* const parent
+  ) noexcept
   {
     if (parent == nullptr || !wld_VisionChainHints) {
       return nullptr;
@@ -193,7 +211,10 @@ namespace
   }
 
   /// The node of `parent`'s chain that links to `entry`, from the hint when it is still true.
-  [[nodiscard]] VisionDB::Entry* ChainPreviousHint(const VisionDB::Entry* const parent, const VisionDB::Entry* const entry) noexcept
+  [[nodiscard]] VisionDB::Entry* ChainPreviousHint(
+    const VisionDB::Entry* const parent,
+    const VisionDB::Entry* const entry
+  ) noexcept
   {
     if (!wld_VisionChainHints) {
       return nullptr;
@@ -205,7 +226,10 @@ namespace
     return it->second;
   }
 
-  [[nodiscard]] bool SameCircle(const Wm3::Circle2f& lhs, const Wm3::Circle2f& rhs) noexcept
+  [[nodiscard]] bool SameCircle(
+    const Wm3::Circle2f& lhs,
+    const Wm3::Circle2f& rhs
+  ) noexcept
   {
     return lhs.Center.x == rhs.Center.x && lhs.Center.y == rhs.Center.y && lhs.Radius == rhs.Radius;
   }
@@ -222,7 +246,10 @@ namespace
     std::vector<const VisionDB::Entry*> mRootChain;
     std::vector<std::vector<const VisionDB::Entry*>> mChildChains; // one per mRootChain entry
 
-    void Refresh(const VisionDB& db, const VisionDB::Entry* const root)
+    void Refresh(
+      const VisionDB& db,
+      const VisionDB::Entry* const root
+    )
     {
       if (mDb == &db && mRoot == root && mEdits == gVisionTreeEdits) {
         return;
@@ -264,7 +291,9 @@ VisionDB::Entry::Entry() noexcept
   , mCurCircle(Wm3::Vector2f{}, 0.0f)
 {}
 
-bool VisionDB::Entry::Contains(const Entry& other) const noexcept
+bool VisionDB::Entry::Contains(
+  const Entry& other
+) const noexcept
 {
   return CircleContains(mPrevCircle, other.mPrevCircle) && CircleContains(mCurCircle, other.mCurCircle);
 }
@@ -277,7 +306,9 @@ bool VisionDB::Entry::Contains(const Entry& other) const noexcept
  * Appends `entry` after the last node of the chain this node is in; `entry`
  * joins that chain's parent.
  */
-void VisionDB::Entry::AddToChain(Entry* const entry) noexcept
+void VisionDB::Entry::AddToChain(
+  Entry* const entry
+) noexcept
 {
   // Engine addition: start from the remembered tail (see gChainTails); the walk below then
   // finishes in one step instead of crossing the whole chain.
@@ -308,7 +339,9 @@ void VisionDB::Entry::AddToChain(Entry* const entry) noexcept
   }
 }
 
-void VisionDB::Entry::AddContained(Entry* const entry) noexcept
+void VisionDB::Entry::AddContained(
+  Entry* const entry
+) noexcept
 {
   // Inlined, the call steps to `mContained->mNext` first and links directly
   // when that is null; same result as walking from `mContained`.
@@ -342,7 +375,9 @@ void VisionDB::Entry::AddContained(Entry* const entry) noexcept
  * node's parent). The nodes `entry` contained move up into this node's chain,
  * and `entry` is left with no links.
  */
-void VisionDB::Entry::RemoveFromChain(Entry* const entry) noexcept
+void VisionDB::Entry::RemoveFromChain(
+  Entry* const entry
+) noexcept
 {
   // Engine addition (see gChainTails): the node linking to `entry`, if it is the tail.
   Entry* newTail = nullptr;
@@ -402,7 +437,9 @@ void VisionDB::Entry::Remove() noexcept
  * The binary re-tests the chosen child at the top of the loop (`jmp 0x81B311`
  * at 0x0081B44C), the shape its tail-recursive source compiles to.
  */
-void VisionDB::Entry::PutInChain(Entry* root) noexcept
+void VisionDB::Entry::PutInChain(
+  Entry* root
+) noexcept
 {
   while (root->Contains(*this)) {
     Entry* child = root->mContained;
@@ -458,8 +495,11 @@ VisionDB::Pool::~Pool()
  * them first when the free list is empty - and initialises it with the two
  * circles, the emitter flag, no links and not visible.
  */
-VisionDB::Entry*
-VisionDB::Pool::NewEntry(const Wm3::Circle2f& previous, const Wm3::Circle2f& current, const bool isReal)
+VisionDB::Entry* VisionDB::Pool::NewEntry(
+  const Wm3::Circle2f& previous,
+  const Wm3::Circle2f& current,
+  const bool isReal
+)
 {
   if (mFreeEntries.empty()) {
     Entry* const block = new Entry[kEntriesPerBlock];
@@ -490,7 +530,9 @@ VisionDB::Pool::NewEntry(const Wm3::Circle2f& previous, const Wm3::Circle2f& cur
  * Clears the entry's links and both flags (the circles are left as they
  * were) and appends it to the free list.
  */
-void VisionDB::Pool::FreeEntry(Entry* const entry)
+void VisionDB::Pool::FreeEntry(
+  Entry* const entry
+)
 {
   entry->mParent = nullptr;
   entry->mContained = nullptr;
@@ -507,7 +549,10 @@ void VisionDB::Pool::FreeEntry(Entry* const entry)
  * What it does:
  * Stores the owning database and the entry.
  */
-VisionDB::Handle::Handle(VisionDB* const db, Entry* const entry) noexcept
+VisionDB::Handle::Handle(
+  VisionDB* const db,
+  Entry* const entry
+) noexcept
   : mDB(db)
   , mEntry(entry)
 {}
@@ -543,8 +588,10 @@ void VisionDB::Handle::Update(
   const Wm3::Circle2f previousCircle{previous, radius};
   const Wm3::Circle2f currentCircle{next, radius};
   // Engine addition, see gVisionEntryEdits.
-  if (mEntry->mVisible != visible || !SameCircle(mEntry->mPrevCircle, previousCircle) ||
-      !SameCircle(mEntry->mCurCircle, currentCircle)) {
+  if (
+    mEntry->mVisible != visible || !SameCircle(mEntry->mPrevCircle, previousCircle) ||
+    !SameCircle(mEntry->mCurCircle, currentCircle)
+  ) {
     ++gVisionEntryEdits;
   }
 
@@ -581,7 +628,10 @@ VisionDB::VisionDB()
  * `rootNode_`, and recursively subdivides the area via `GenerateQuadTree`
  * starting at level 0 with maxLevel 1.
  */
-void VisionDB::Init(const float width, const float height)
+void VisionDB::Init(
+  const float width,
+  const float height
+)
 {
   rootNode_ = nullptr;
   NoteVisionTreeEdit(); // engine addition, see gVisionTreeEdits
@@ -614,7 +664,8 @@ void VisionDB::GenerateQuadTree(
   Entry* const parent,
   const Wm3::Vector2f& size,
   const int level,
-  const int maxLevel)
+  const int maxLevel
+)
 {
   if (level >= maxLevel) {
     return;
@@ -646,17 +697,22 @@ void VisionDB::GenerateQuadTree(
  * (radius 0 until the first `Handle::Update`), puts it in the tree from the
  * root and wraps it in a new `Handle`.
  */
-VisionDB::Handle* VisionDB::NewHandle(const Wm3::Vector2f& current, const Wm3::Vector2f& previous)
+VisionDB::Handle* VisionDB::NewHandle(
+  const Wm3::Vector2f& current,
+  const Wm3::Vector2f& previous
+)
 {
   Entry* const entry = pool_.NewEntry(Wm3::Circle2f{previous, 0.0f}, Wm3::Circle2f{current, 0.0f}, true);
 
   // Engine addition (see gLastNewEntry): with no edit since the last insertion, an identical
   // entry would walk to that entry and become its first child.
   Entry* const last = gLastNewEntry.mEntry;
-  if (wld_VisionRepeatInsert && last != nullptr && gLastNewEntry.mDb == this && gLastNewEntry.mTreeEdits == gVisionTreeEdits &&
-      gLastNewEntry.mEntryEdits == gVisionEntryEdits && last->mContained == nullptr &&
-      SameCircle(last->mPrevCircle, entry->mPrevCircle) && SameCircle(last->mCurCircle, entry->mCurCircle) &&
-      last->Contains(*entry)) {
+  if (
+    wld_VisionRepeatInsert && last != nullptr && gLastNewEntry.mDb == this &&
+    gLastNewEntry.mTreeEdits == gVisionTreeEdits && gLastNewEntry.mEntryEdits == gVisionEntryEdits &&
+    last->mContained == nullptr && SameCircle(last->mPrevCircle, entry->mPrevCircle) &&
+    SameCircle(last->mCurCircle, entry->mCurCircle) && last->Contains(*entry)
+  ) {
     last->AddContained(entry);
   } else {
     entry->PutInChain(rootNode_);
@@ -768,7 +824,8 @@ void VisionDB::CollectVisibleCircles(
 
   tasks.assign(1u, Task{rootNode_, {}});
   std::size_t subtrees = 1u;
-  for (int depth = 0; depth < kVisionParallelMaxExpandDepth && subtrees != 0u && subtrees < kVisionParallelTargetSubtrees;
+  for (int depth = 0;
+       depth < kVisionParallelMaxExpandDepth && subtrees != 0u && subtrees < kVisionParallelTargetSubtrees;
        ++depth) {
     expanded.clear();
     subtrees = 0u;
@@ -780,17 +837,17 @@ void VisionDB::CollectVisibleCircles(
 
       Wm3::Circle2f sampled{};
       switch (EvaluateVisionEntry(*task.mSubtree, box, interpolant, sampled)) {
-        case EVisionEntryResult::Outside:
-          break;
-        case EVisionEntryResult::Circle:
-          expanded.push_back(Task{nullptr, sampled});
-          break;
-        case EVisionEntryResult::Descend:
-          forEachChild(task.mSubtree, [&](const Entry* const child) {
-            expanded.push_back(Task{child, {}});
-            ++subtrees;
-          });
-          break;
+      case EVisionEntryResult::Outside:
+        break;
+      case EVisionEntryResult::Circle:
+        expanded.push_back(Task{nullptr, sampled});
+        break;
+      case EVisionEntryResult::Descend:
+        forEachChild(task.mSubtree, [&](const Entry* const child) {
+          expanded.push_back(Task{child, {}});
+          ++subtrees;
+        });
+        break;
       }
     }
     tasks.swap(expanded);
@@ -815,13 +872,15 @@ void VisionDB::CollectVisibleCircles(
   if (parts.size() < chunkCount) {
     parts.resize(chunkCount);
   }
-  CUserWorkerPool::Get().ParallelFor(tasks.size(), kVisionParallelGrain, [&](const std::size_t begin, const std::size_t end) {
+  CUserWorkerPool::Get().ParallelFor(
+    tasks.size(), kVisionParallelGrain, [&](const std::size_t begin, const std::size_t end) {
     std::vector<Wm3::Circle2f>& part = parts[begin / kVisionParallelGrain];
     part.clear();
     for (std::size_t i = begin; i < end; ++i) {
       runTask(part, tasks[i]);
     }
-  });
+  }
+  );
 
   for (std::size_t chunk = 0; chunk < chunkCount; ++chunk) {
     for (const Wm3::Circle2f& circle : parts[chunk]) {
@@ -830,7 +889,9 @@ void VisionDB::CollectVisibleCircles(
   }
 }
 
-void VisionDB::CollectEmitters(std::vector<EmitterCircles>& emitters) const
+void VisionDB::CollectEmitters(
+  std::vector<EmitterCircles>& emitters
+) const
 {
   emitters.clear();
   if (rootNode_ == nullptr) {

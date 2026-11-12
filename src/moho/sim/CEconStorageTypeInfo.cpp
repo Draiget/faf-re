@@ -20,21 +20,31 @@ namespace
     return sInstance;
   }
 
-  struct Bootstrap { Bootstrap() { moho::register_CEconStorageTypeInfoStartup(); } };
+  struct Bootstrap
+  {
+    Bootstrap()
+    {
+      moho::register_CEconStorageTypeInfoStartup();
+    }
+  };
   Bootstrap gBootstrap;
 } // namespace
 
 /**
  * Address: 0x00773320 (FUN_00773320, Moho::CEconStorageTypeInfo::CEconStorageTypeInfo)
  */
-CEconStorageTypeInfo::CEconStorageTypeInfo() : gpg::RType()
+CEconStorageTypeInfo::CEconStorageTypeInfo()
+  : gpg::RType()
 {
   gpg::PreRegisterRType(typeid(CEconStorage), this);
 }
 
 CEconStorageTypeInfo::~CEconStorageTypeInfo() = default;
 
-const char* CEconStorageTypeInfo::GetName() const { return "CEconStorage"; }
+const char* CEconStorageTypeInfo::GetName() const
+{
+  return "CEconStorage";
+}
 
 void CEconStorageTypeInfo::Init()
 {
@@ -52,7 +62,9 @@ void moho::register_CEconStorageTypeInfoStartup()
   (void)Acquire();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CEconStorageTypeInfoStartup_e016aa, moho::register_CEconStorageTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CEconStorageTypeInfoStartup_e016aa,
+  moho::register_CEconStorageTypeInfoStartup
+)

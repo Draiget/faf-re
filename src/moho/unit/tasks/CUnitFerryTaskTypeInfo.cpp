@@ -22,7 +22,9 @@ namespace
     return sInstance;
   }
 
-  [[nodiscard]] gpg::RRef MakeCUnitFerryTaskRef(moho::CUnitFerryTask* const object)
+  [[nodiscard]] gpg::RRef MakeCUnitFerryTaskRef(
+    moho::CUnitFerryTask* const object
+  )
   {
     return gpg::RRef{object, gpg::RTypeOf<moho::CUnitFerryTask>()};
   }
@@ -34,7 +36,9 @@ namespace
    * Binds lifecycle callback lanes (`new/ctor/delete/destruct`) for one
    * `CUnitFerryTaskTypeInfo` descriptor.
    */
-  [[maybe_unused]] gpg::RType* BindCUnitFerryTaskTypeLifecycleCallbacks(gpg::RType* const typeInfo) noexcept
+  [[maybe_unused]] gpg::RType* BindCUnitFerryTaskTypeLifecycleCallbacks(
+    gpg::RType* const typeInfo
+  ) noexcept
   {
     typeInfo->newRefFunc_ = &moho::CUnitFerryTaskTypeInfo::NewRef;
     typeInfo->ctorRefFunc_ = &moho::CUnitFerryTaskTypeInfo::CtrRef;
@@ -83,7 +87,9 @@ namespace moho
   /**
    * Address: 0x006104B0 (FUN_006104B0, Moho::CUnitFerryTaskTypeInfo::AddBase_CCommandTask)
    */
-  void __stdcall CUnitFerryTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void __stdcall CUnitFerryTaskTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CCommandTask>(typeInfo);
   }
@@ -100,7 +106,9 @@ namespace moho
   /**
    * Address: 0x00610280 (FUN_00610280, Moho::CUnitFerryTaskTypeInfo::CtrRef)
    */
-  gpg::RRef CUnitFerryTaskTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitFerryTaskTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const object = gpg::ConstructInStorage<CUnitFerryTask>(objectStorage);
     return MakeCUnitFerryTaskRef(object);
@@ -109,7 +117,9 @@ namespace moho
   /**
    * Address: 0x00610260 (FUN_00610260, Moho::CUnitFerryTaskTypeInfo::Delete)
    */
-  void CUnitFerryTaskTypeInfo::Delete(void* const objectStorage)
+  void CUnitFerryTaskTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CUnitFerryTask*>(objectStorage);
   }
@@ -117,7 +127,9 @@ namespace moho
   /**
    * Address: 0x00610330 (FUN_00610330, Moho::CUnitFerryTaskTypeInfo::Destruct)
    */
-  void CUnitFerryTaskTypeInfo::Destruct(void* const objectStorage)
+  void CUnitFerryTaskTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     auto* const object = static_cast<CUnitFerryTask*>(objectStorage);
     if (!object) {
@@ -136,7 +148,9 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CUnitFerryTaskTypeInfo_71ac00, moho::register_CUnitFerryTaskTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CUnitFerryTaskTypeInfo_71ac00,
+  moho::register_CUnitFerryTaskTypeInfo
+)

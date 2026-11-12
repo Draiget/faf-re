@@ -8,7 +8,9 @@
 namespace
 {
 
-  gpg::RType* LookupRTypeWithTinyThreadCache(const std::type_info& dynamicTypeInfo)
+  gpg::RType* LookupRTypeWithTinyThreadCache(
+    const std::type_info& dynamicTypeInfo
+  )
   {
     struct CachedTypeInfoEntry
     {
@@ -55,7 +57,9 @@ namespace
    * static type; derived runtime types are resolved and back-adjusted to the
    * complete object start.
    */
-  gpg::RRef MakeSimOwnerRef(Sim* sim)
+  gpg::RRef MakeSimOwnerRef(
+    Sim* sim
+  )
   {
     gpg::RType* const simType = gpg::RTypeOf<Sim>();
 
@@ -86,8 +90,10 @@ namespace
     return out;
   }
 
-
-  void WriteArchiveUIntCompat(gpg::WriteArchive* archive, const std::uint32_t value)
+  void WriteArchiveUIntCompat(
+    gpg::WriteArchive* archive,
+    const std::uint32_t value
+  )
   {
     if (!archive) {
       return;
@@ -109,8 +115,7 @@ namespace
     }
     return rectType;
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x00745020 (FUN_00745020, ?SerMapData@Sim@Moho@@AAEXAAVWriteArchive@gpg@@H@Z)
@@ -121,7 +126,9 @@ namespace
  * - the size of `mLoadedMapRects` (+0x0A08);
  * - each loaded `Rect2i` element.
  */
-void Sim::SerMapData(gpg::WriteArchive* const archive)
+void Sim::SerMapData(
+  gpg::WriteArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -151,7 +158,9 @@ void Sim::SerMapData(gpg::WriteArchive* const archive)
  * same length as the loaded list. The overlay version skipped both steps for
  * an empty list and kept whatever the cache held before the load.
  */
-void Sim::SerMapData(gpg::ReadArchive* const archive)
+void Sim::SerMapData(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -182,7 +191,9 @@ void Sim::SerMapData(gpg::ReadArchive* const archive)
  * Serializes owned army pointers from `mArmiesList` as count + owned
  * `SimArmy` raw-pointer entries.
  */
-void Sim::SerArmies(gpg::WriteArchive* const archive)
+void Sim::SerArmies(
+  gpg::WriteArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -204,7 +215,9 @@ void Sim::SerArmies(gpg::WriteArchive* const archive)
  * Reads owned army pointers from archive into `mArmiesList` using
  * archive-count resize + per-entry owned pointer load.
  */
-void Sim::SerArmies(gpg::ReadArchive* const archive)
+void Sim::SerArmies(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -230,7 +243,9 @@ void Sim::SerArmies(gpg::ReadArchive* const archive)
  * Writes one unowned entity-pointer chain from `mCoordEntities` and
  * terminates the stream with a null entity sentinel.
  */
-void Sim::SerDirtyEnts(gpg::WriteArchive* const archive)
+void Sim::SerDirtyEnts(
+  gpg::WriteArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -251,7 +266,9 @@ void Sim::SerDirtyEnts(gpg::WriteArchive* const archive)
  * Reads one unowned entity-pointer stream and relinks each loaded entity's
  * coord-node into `mCoordEntities` until a null sentinel is encountered.
  */
-void Sim::SerDirtyEnts(gpg::ReadArchive* const archive)
+void Sim::SerDirtyEnts(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -280,7 +297,10 @@ namespace
    * globals table at the end of the load-serialization pass. `table` is taken by
    * value (an owned copy destroyed on return), matching the binary.
    */
-  void ReadLuaTableEntriesFromArchive(gpg::ReadArchive* const archive, LuaPlus::LuaObject table)
+  void ReadLuaTableEntriesFromArchive(
+    gpg::ReadArchive* const archive,
+    LuaPlus::LuaObject table
+  )
   {
     gpg::RType* luaObjectType = LuaPlus::LuaObject::sType;
     if (!luaObjectType) {
@@ -325,28 +345,34 @@ namespace
    * Both halves register the same nine in the same order, which is also what
    * keeps the two tracked-pointer tables index-aligned.
    */
-  void CollectSimArchiveRoots(moho::Sim* const sim, gpg::RRef (&outRoots)[9])
+  void CollectSimArchiveRoots(
+    moho::Sim* const sim,
+    gpg::RRef (&outRoots)[9]
+  )
   {
     outRoots[0] = MakeSimOwnerRef(sim);
     outRoots[1] = gpg::MakeRRef<LuaPlus::LuaState>(sim->mLuaState);
     outRoots[2] = gpg::MakeRRef<moho::RRuleGameRules>(sim->mRules);
-    outRoots[3] = gpg::MakeRRef<moho::SRuleFootprintsBlueprint>(const_cast<moho::SRuleFootprintsBlueprint*>(sim->mRules->GetFootprints()));
+    outRoots[3] = gpg::MakeRRef<moho::SRuleFootprintsBlueprint>(
+      const_cast<moho::SRuleFootprintsBlueprint*>(sim->mRules->GetFootprints())
+    );
     (void)gpg::RRef_STIMap(&outRoots[4], sim->mMapData);
     outRoots[5] = gpg::MakeRRef<moho::PathTables>(sim->mPathTables);
     outRoots[6] = gpg::MakeRRef<moho::CTaskStage>(&sim->mTaskStageA);
     outRoots[7] = gpg::MakeRRef<moho::CTaskStage>(&sim->mDiskWatcherTaskStage);
     outRoots[8] = gpg::MakeRRef<moho::CTaskStage>(&sim->mTaskStageB);
   }
-}
-
+} // namespace
 
 /**
-  * Alias of FUN_00754C60 (non-canonical helper lane).
+ * Alias of FUN_00754C60 (non-canonical helper lane).
  *
  * What it does:
  * Core Sim load-serialization routine used by Sim serializer callback.
  */
-void Sim::SerializeLoadBody(gpg::ReadArchive* archive)
+void Sim::SerializeLoadBody(
+  gpg::ReadArchive* archive
+)
 {
   if (!archive) {
     return;
@@ -425,7 +451,9 @@ void Sim::SerializeLoadBody(gpg::ReadArchive* archive)
     // The entities' load rebuilt these bits differently from play: a prop's footprint is not
     // occupied again, and a release clears cells a neighbour also covers until something re-marks them.
     for (gpg::BitArray2D* const bits : {&mOGrid->terrainOccupation, &mOGrid->waterOccupation, &mOGrid->mOccupation}) {
-      archive->ReadBytes(reinterpret_cast<char*>(bits->ptr), static_cast<std::size_t>(bits->size) * sizeof(std::int32_t));
+      archive->ReadBytes(
+        reinterpret_cast<char*>(bits->ptr), static_cast<std::size_t>(bits->size) * sizeof(std::int32_t)
+      );
     }
   }
 }
@@ -437,7 +465,9 @@ void Sim::SerializeLoadBody(gpg::ReadArchive* archive)
  * Writes active sim-console variables as `(name, lexical value)` string pairs
  * and terminates the lane with an empty string name sentinel.
  */
-void Sim::SerVars(gpg::WriteArchive* archive)
+void Sim::SerVars(
+  gpg::WriteArchive* archive
+)
 {
   if (!archive) {
     return;
@@ -479,7 +509,9 @@ void Sim::SerVars(gpg::WriteArchive* archive)
  * counter, then applies the value through the instance's reflection RRef via
  * SetLexical. Unknown names are logged.
  */
-void Sim::SerVars(gpg::ReadArchive* const archive)
+void Sim::SerVars(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -525,7 +557,9 @@ void Sim::SerVars(gpg::ReadArchive* const archive)
  * What it does:
  * Core Sim save-serialization routine used by Sim serializer callback.
  */
-void Sim::SerializeSaveBody(gpg::WriteArchive* archive)
+void Sim::SerializeSaveBody(
+  gpg::WriteArchive* archive
+)
 {
   if (!archive) {
     return;
@@ -573,7 +607,9 @@ void Sim::SerializeSaveBody(gpg::WriteArchive* archive)
     mPathTables->SaveExact(archive);
     mOGrid->mEntityOccupationManager.SaveBucketOrder(archive, *mEntityDB);
     for (gpg::BitArray2D* const bits : {&mOGrid->terrainOccupation, &mOGrid->waterOccupation, &mOGrid->mOccupation}) {
-      archive->WriteBytes(reinterpret_cast<char*>(bits->ptr), static_cast<std::size_t>(bits->size) * sizeof(std::int32_t));
+      archive->WriteBytes(
+        reinterpret_cast<char*>(bits->ptr), static_cast<std::size_t>(bits->size) * sizeof(std::int32_t)
+      );
     }
   }
 }
@@ -591,7 +627,9 @@ void Sim::SerializeSaveBody(gpg::WriteArchive* archive)
  * re-binds each loaded prop into the entity DB bounded-prop queue, then re-syncs
  * the playable rectangle and fires the `OnPostLoad` Lua callback.
  */
-void Sim::Load(LaunchInfoLoad* const loadInfo)
+void Sim::Load(
+  LaunchInfoLoad* const loadInfo
+)
 {
   gpg::ReadArchive* const archive = loadInfo->mReadArchive;
 
@@ -599,9 +637,11 @@ void Sim::Load(LaunchInfoLoad* const loadInfo)
   // game, from the map's own terrain before a keyframe's flattened rects or the save change it, so
   // a client loading a game fills them exactly as the others did at its start. Only a session with
   // them on, for a scenario that names them, parses it here.
-  if (FAF_IsSimFixActive(EFafSimFix::WaterBodies) &&
-      std::string_view(loadInfo->mScenarioInfo.c_str(), loadInfo->mScenarioInfo.size()).find("WaterBodies") !=
-        std::string_view::npos) {
+  if (
+    FAF_IsSimFixActive(EFafSimFix::WaterBodies) &&
+    std::string_view(loadInfo->mScenarioInfo.c_str(), loadInfo->mScenarioInfo.size()).find("WaterBodies") !=
+      std::string_view::npos
+  ) {
     LuaPlus::LuaObject scenarioInfo{};
     (void)SCR_FromString(&scenarioInfo, loadInfo->mScenarioInfo, mLuaState);
     mMapData->InstallWaterBodies(scenarioInfo);
@@ -710,7 +750,9 @@ void Sim::Load(LaunchInfoLoad* const loadInfo)
  * Checks NIS-state save gate through `/lua/cinematics.lua::IsOpEnded`,
  * then writes this `Sim` object to the supplied archive.
  */
-void Sim::SaveState(gpg::WriteArchive* const archive)
+void Sim::SaveState(
+  gpg::WriteArchive* const archive
+)
 {
   // No handler here: a script error, or a module without IsOpEnded (the
   // LuaFunction constructor raises that), reaches the caller like the throw.

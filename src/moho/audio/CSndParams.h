@@ -15,7 +15,7 @@ namespace LuaPlus
 {
   class LuaObject;
   class LuaState;
-}
+} // namespace LuaPlus
 
 namespace gpg
 {
@@ -24,7 +24,7 @@ namespace gpg
   class WriteArchive;
   class SerConstructResult;
   class SerSaveConstructArgsResult;
-}
+} // namespace gpg
 
 namespace gpg
 {
@@ -66,7 +66,9 @@ namespace moho
      * builds (0x004DFD54..0x004DFD64) and `UserEntity`'s ambient loop
      * (0x008B85E0) -- so this out-of-line copy has no caller.
      */
-    explicit HSndEntityLoop(CSndParams* const params = nullptr) noexcept
+    explicit HSndEntityLoop(
+      CSndParams* const params = nullptr
+    ) noexcept
       : WeakObject()
       , mLoopIndex(-1)
       , mParams(params)
@@ -96,9 +98,8 @@ namespace moho
      * by the descriptor cache. Inlined into `SerConstructHelper<CSndParams>::Construct`
      * 0x004E0E10.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x004E0CD0 (FUN_004E0CD0)
@@ -108,7 +109,10 @@ namespace moho
      * descriptor per key.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     inline static gpg::RType* sType = nullptr;
@@ -171,13 +175,13 @@ namespace moho
     [[nodiscard]] boost::shared_ptr<AudioEngine> DoResolve() const;
 
   public:
-    fa::string mBank;                    // +0x00
-    fa::string mCue;                     // +0x1C
-    CSndVar* mLodCutoff;                    // +0x38
-    CSndVar* mRpcLoopVariable;              // +0x3C
-    mutable std::uint32_t mResolvePolicy;   // +0x40
-    mutable std::uint16_t mBankId;          // +0x44
-    mutable std::uint16_t mCueId;           // +0x46
+    fa::string mBank;                             // +0x00
+    fa::string mCue;                              // +0x1C
+    CSndVar* mLodCutoff;                          // +0x38
+    CSndVar* mRpcLoopVariable;                    // +0x3C
+    mutable std::uint32_t mResolvePolicy;         // +0x40
+    mutable std::uint16_t mBankId;                // +0x44
+    mutable std::uint16_t mCueId;                 // +0x46
     mutable boost::weak_ptr<AudioEngine> mEngine; // +0x48
   };
 
@@ -208,7 +212,9 @@ namespace moho
    * remote client resolves the sounds the server names this way. Empty names: no variable.
    */
   [[nodiscard]] CSndParams* SND_FindOrCreateParams(
-    const fa::string& bankName, const fa::string& cueName, const fa::string& lodCutoffName,
+    const fa::string& bankName,
+    const fa::string& cueName,
+    const fa::string& lodCutoffName,
     const fa::string& rpcLoopName
   );
 #endif

@@ -37,11 +37,11 @@ namespace moho
   struct SMsdfStrikeGlyph
   {
     std::uint32_t mCodepoint = 0;
-    std::int32_t mLeft = 0;   // pixels from the pen to the bitmap's left edge
-    std::int32_t mTop = 0;    // pixels from the baseline up to its top edge
+    std::int32_t mLeft = 0; // pixels from the pen to the bitmap's left edge
+    std::int32_t mTop = 0;  // pixels from the baseline up to its top edge
     std::int32_t mWidth = 0;
     std::int32_t mHeight = 0;
-    float mAdvance = 0.0f;    // pixels
+    float mAdvance = 0.0f;     // pixels
     std::uint32_t mOffset = 0; // into mCoverage, rows from the top, one byte a pixel
   };
 
@@ -58,16 +58,16 @@ namespace moho
     // Two atlases and the 3 texels between them fit across CD3DFont's 2048-texel page; at 1024 each font took a
     // row of its own, and the page ran out after a few fonts.
     std::int32_t mAtlasWidth = 1022;
-    std::int32_t mHeightStep = 256;     // the atlas grows in these steps until the glyphs fit
+    std::int32_t mHeightStep = 256; // the atlas grows in these steps until the glyphs fit
     std::int32_t mMaxAtlasHeight = 4096;
     double mEmPixels = 48.0;
-    double mDistanceRange = 12.0;       // atlas texels covered by the values 0..1
-    double mMiterLimit = 1.0;           // glyph boxes hold sharp corners' miters up to this many ranges
+    double mDistanceRange = 12.0; // atlas texels covered by the values 0..1
+    double mMiterLimit = 1.0;     // glyph boxes hold sharp corners' miters up to this many ranges
     // Empty texels between boxes. Two boxes side by side can have different channels high, and a blend
     // of those has a median near the outline, so a sample past a box's edge would draw a line. Samples
     // land there under Direct3D 9 with antialiasing on, which drew such lines beside some glyphs.
     std::int32_t mGlyphSpacing = 3;
-    std::int32_t mThreads = 1;          // the output doesn't depend on it
+    std::int32_t mThreads = 1; // the output doesn't depend on it
     // A font past one of these is refused rather than drawn in part (issue #305). None changes the output
     // of a font within them, so they aren't part of the cache key. The game's fonts are far inside.
     std::int32_t mMaxFontGlyphs = 65535;
@@ -83,7 +83,7 @@ namespace moho
     // since it depends on the machine. 0 is no limit.
     double mMaxSeconds = 0.0;
     const std::atomic<bool>* mCancel = nullptr; // a cook gives up when this turns true, for shutdown
-    std::vector<std::int32_t> mStrikeSizes; // pixel sizes also rasterized as bitmaps (a mod's font; see below)
+    std::vector<std::int32_t> mStrikeSizes;     // pixel sizes also rasterized as bitmaps (a mod's font; see below)
     std::vector<std::uint32_t> mCodepoints;
   };
 
@@ -108,7 +108,7 @@ namespace moho
   {
     float mP0[2] = {};
     float mP1[2] = {};
-    float mP2[2] = {};     // unused for a line
+    float mP2[2] = {}; // unused for a line
     std::uint32_t mColor = 0u;
     std::uint32_t mKind = 0u; // 1 a line, 2 a quadratic
     // Unit directions at both ends, and the unit bisectors of the corners there with the edges before and
@@ -141,7 +141,8 @@ namespace moho
     MsdfCookPlan& operator=(const MsdfCookPlan&) = delete;
 
     /** False with `error` set for a font the options refuse; `TimedOut` then says whether it ran out of time. */
-    [[nodiscard]] bool Prepare(const void* fontBytes, std::size_t byteCount, const SMsdfCookOptions& options, std::string& error);
+    [[nodiscard]] bool
+    Prepare(const void* fontBytes, std::size_t byteCount, const SMsdfCookOptions& options, std::string& error);
 
     /** False with `error` set when the cook ran out of time or was cancelled; the plan is then of no use. */
     [[nodiscard]] bool GenerateOnCpu(std::string& error);
@@ -165,7 +166,8 @@ namespace moho
     std::unique_ptr<Impl> mImpl;
   };
 
-  /** What an atlas holds by default: ASCII, Latin-1, Latin Extended-A, Cyrillic, General Punctuation, and a few signs. */
+  /** What an atlas holds by default: ASCII, Latin-1, Latin Extended-A, Cyrillic, General Punctuation, and a few signs.
+   */
   [[nodiscard]] std::vector<std::uint32_t> MSDF_DefaultCodepoints();
 
   /** The options every atlas is cooked with, for the default characters. */
@@ -185,7 +187,11 @@ namespace moho
    * a font, glyphs that don't fit, a font past the options' limits, or a cook out of time.
    */
   [[nodiscard]] bool MSDF_CookFont(
-    const void* fontBytes, std::size_t byteCount, const SMsdfCookOptions& options, SMsdfFontAtlas& out, std::string& error
+    const void* fontBytes,
+    std::size_t byteCount,
+    const SMsdfCookOptions& options,
+    SMsdfFontAtlas& out,
+    std::string& error
   );
 
   /**

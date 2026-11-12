@@ -24,13 +24,13 @@ namespace moho
   {
     CStratumMaterial() = default;
 
-    fa::string mPath{};                               // +0x00
-    float mScaleX{1.0f};                                 // +0x1C
-    float mScaleY{1.0f};                                 // +0x20
-    float v3{0.0f};                                      // +0x24
-    float v4{1.0f};                                      // +0x28
+    fa::string mPath{};                                       // +0x00
+    float mScaleX{1.0f};                                      // +0x1C
+    float mScaleY{1.0f};                                      // +0x20
+    float v3{0.0f};                                           // +0x24
+    float v4{1.0f};                                           // +0x28
     boost::SharedPtrRaw<RD3DTextureResource> mTextureSheet{}; // +0x2C
-    float mSize{1.0f};                                   // +0x34
+    float mSize{1.0f};                                        // +0x34
 
     /**
      * Address: 0x0089F0A0 (FUN_0089F0A0, Moho::CStratumMaterial::~CStratumMaterial)
@@ -63,7 +63,10 @@ namespace moho
   static_assert(sizeof(CStratumMaterial) == 0x38, "CStratumMaterial size must be 0x38");
   static_assert(offsetof(CStratumMaterial, mPath) == 0x00, "CStratumMaterial::mPath offset must be 0x00");
   static_assert(offsetof(CStratumMaterial, mScaleX) == 0x1C, "CStratumMaterial::mScaleX offset must be 0x1C");
-  static_assert(offsetof(CStratumMaterial, mTextureSheet) == 0x2C, "CStratumMaterial::mTextureSheet offset must be 0x2C");
+  static_assert(
+    offsetof(CStratumMaterial, mTextureSheet) == 0x2C,
+    "CStratumMaterial::mTextureSheet offset must be 0x2C"
+  );
   static_assert(offsetof(CStratumMaterial, mSize) == 0x34, "CStratumMaterial::mSize offset must be 0x34");
 
   /**
@@ -108,38 +111,38 @@ namespace moho
     void SetSizeTo(IWldTerrainRes* terrainRes);
 
   public:
-    std::uint8_t byte0{0};                       // +0x00
-    std::uint8_t byte1{0};                       // +0x01
-    std::uint8_t pad02_03[2]{};                  // +0x02
-    fa::string mShaderName{};                 // +0x04
+    std::uint8_t byte0{0};      // +0x00
+    std::uint8_t byte1{0};      // +0x01
+    std::uint8_t pad02_03[2]{}; // +0x02
+    fa::string mShaderName{};   // +0x04
     /// The stratum-mask textures' own dimensions, half the chart size:
     /// `CWldTerrainRes::Reset` halves each axis (0x008A65AC/0x008A65B1) and
     /// stores them here (0x008A65B3, 0x008A65B9) right before creating the
     /// two masks below at that size.
-    std::uint32_t mStratumMaskWidth{0};          // +0x20
-    std::uint32_t mStratumMaskHeight{0};         // +0x24
+    std::uint32_t mStratumMaskWidth{0};                       // +0x20
+    std::uint32_t mStratumMaskHeight{0};                      // +0x24
     boost::SharedPtrRaw<RD3DTextureResource> mStratumMask0{}; // +0x28
     boost::SharedPtrRaw<RD3DTextureResource> mStratumMask1{}; // +0x30
-    CStratumMaterial mLowerAlbedoTexture{};      // +0x38
-    CStratumMaterial mStratum0AlbedoTexture{};   // +0x70
-    CStratumMaterial mStratum1AlbedoTexture{};   // +0xA8
-    CStratumMaterial mStratum2AlbedoTexture{};   // +0xE0
-    CStratumMaterial mStratum3AlbedoTexture{};   // +0x118
-    CStratumMaterial mStratum4AlbedoTexture{};   // +0x150
-    CStratumMaterial mStratum5AlbedoTexture{};   // +0x188
-    CStratumMaterial mStratum6AlbedoTexture{};   // +0x1C0
-    CStratumMaterial mStratum7AlbedoTexture{};   // +0x1F8
-    CStratumMaterial mUpperAlbedoTexture{};      // +0x230
-    CStratumMaterial mLowerNormalTexture{};      // +0x268
-    CStratumMaterial mStratum0NormalTexture{};   // +0x2A0
-    CStratumMaterial mStratum1NormalTexture{};   // +0x2D8
-    CStratumMaterial mStratum2NormalTexture{};   // +0x310
-    CStratumMaterial mStratum3NormalTexture{};   // +0x348
-    CStratumMaterial mStratum4NormalTexture{};   // +0x380
-    CStratumMaterial mStratum5NormalTexture{};   // +0x3B8
-    CStratumMaterial mStratum6NormalTexture{};   // +0x3F0
-    CStratumMaterial mStratum7NormalTexture{};   // +0x428
-    CStratumMaterial mUpperNormalTexture{};      // +0x460
+    CStratumMaterial mLowerAlbedoTexture{};                   // +0x38
+    CStratumMaterial mStratum0AlbedoTexture{};                // +0x70
+    CStratumMaterial mStratum1AlbedoTexture{};                // +0xA8
+    CStratumMaterial mStratum2AlbedoTexture{};                // +0xE0
+    CStratumMaterial mStratum3AlbedoTexture{};                // +0x118
+    CStratumMaterial mStratum4AlbedoTexture{};                // +0x150
+    CStratumMaterial mStratum5AlbedoTexture{};                // +0x188
+    CStratumMaterial mStratum6AlbedoTexture{};                // +0x1C0
+    CStratumMaterial mStratum7AlbedoTexture{};                // +0x1F8
+    CStratumMaterial mUpperAlbedoTexture{};                   // +0x230
+    CStratumMaterial mLowerNormalTexture{};                   // +0x268
+    CStratumMaterial mStratum0NormalTexture{};                // +0x2A0
+    CStratumMaterial mStratum1NormalTexture{};                // +0x2D8
+    CStratumMaterial mStratum2NormalTexture{};                // +0x310
+    CStratumMaterial mStratum3NormalTexture{};                // +0x348
+    CStratumMaterial mStratum4NormalTexture{};                // +0x380
+    CStratumMaterial mStratum5NormalTexture{};                // +0x3B8
+    CStratumMaterial mStratum6NormalTexture{};                // +0x3F0
+    CStratumMaterial mStratum7NormalTexture{};                // +0x428
+    CStratumMaterial mUpperNormalTexture{};                   // +0x460
   };
 
   static_assert(sizeof(StratumMaterial) == 0x498, "StratumMaterial size must be 0x498");
@@ -147,9 +150,11 @@ namespace moho
   static_assert(offsetof(StratumMaterial, mStratumMask0) == 0x28, "StratumMaterial::mStratumMask0 offset must be 0x28");
   static_assert(offsetof(StratumMaterial, mStratumMask1) == 0x30, "StratumMaterial::mStratumMask1 offset must be 0x30");
   static_assert(
-    offsetof(StratumMaterial, mLowerAlbedoTexture) == 0x38, "StratumMaterial::mLowerAlbedoTexture offset must be 0x38"
+    offsetof(StratumMaterial, mLowerAlbedoTexture) == 0x38,
+    "StratumMaterial::mLowerAlbedoTexture offset must be 0x38"
   );
   static_assert(
-    offsetof(StratumMaterial, mUpperNormalTexture) == 0x460, "StratumMaterial::mUpperNormalTexture offset must be 0x460"
+    offsetof(StratumMaterial, mUpperNormalTexture) == 0x460,
+    "StratumMaterial::mUpperNormalTexture offset must be 0x460"
   );
 } // namespace moho

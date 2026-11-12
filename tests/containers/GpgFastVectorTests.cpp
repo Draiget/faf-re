@@ -24,7 +24,9 @@ namespace
   using gpg::core::FastVectorN;
 
   template <class E>
-  [[nodiscard]] E Make(const int v)
+  [[nodiscard]] E Make(
+    const int v
+  )
   {
     if constexpr (std::is_same_v<E, int>) {
       return v;
@@ -61,13 +63,19 @@ namespace
     }
   }
 
-  [[nodiscard]] std::size_t Pick(std::mt19937& rng, const std::size_t maxInclusive)
+  [[nodiscard]] std::size_t Pick(
+    std::mt19937& rng,
+    const std::size_t maxInclusive
+  )
   {
     return std::uniform_int_distribution<std::size_t>(0, maxInclusive)(rng);
   }
 
   template <class E>
-  void RunFastVectorRandomOps(const unsigned seed, const int steps)
+  void RunFastVectorRandomOps(
+    const unsigned seed,
+    const int steps
+  )
   {
     ResetCounters<E>();
     {
@@ -188,7 +196,9 @@ namespace
   }
 
   template <class E, std::size_t N>
-  void CheckInlineInvariant(const FastVectorN<E, N>& v)
+  void CheckInlineInvariant(
+    const FastVectorN<E, N>& v
+  )
   {
     ASSERT_EQ(v.originalVec_, v.InlineStorage());
     ASSERT_LE(v.Size(), v.Capacity());
@@ -198,7 +208,10 @@ namespace
   }
 
   template <class E, std::size_t N>
-  void RunFastVectorNRandomOps(const unsigned seed, const int steps)
+  void RunFastVectorNRandomOps(
+    const unsigned seed,
+    const int steps
+  )
   {
     using Vec = FastVectorN<E, N>;
     ResetCounters<E>();
@@ -369,7 +382,10 @@ namespace
   }
 } // namespace
 
-TEST(GpgFastVector, EmptyVectorHasNoStorage)
+TEST(
+  GpgFastVector,
+  EmptyVectorHasNoStorage
+)
 {
   const FastVector<int> v;
   EXPECT_TRUE(v.Empty());
@@ -380,7 +396,10 @@ TEST(GpgFastVector, EmptyVectorHasNoStorage)
   EXPECT_EQ(v.rbegin(), v.rend());
 }
 
-TEST(GpgFastVector, PushBackDoublesFromFour)
+TEST(
+  GpgFastVector,
+  PushBackDoublesFromFour
+)
 {
   FastVector<int> v;
   std::vector<std::size_t> capacities;
@@ -393,7 +412,10 @@ TEST(GpgFastVector, PushBackDoublesFromFour)
   EXPECT_EQ(capacities, (std::vector<std::size_t>{4, 8, 16, 32, 64}));
 }
 
-TEST(GpgFastVector, ResizeZeroFillsTrivialElements)
+TEST(
+  GpgFastVector,
+  ResizeZeroFillsTrivialElements
+)
 {
   FastVector<int> v;
   for (int i = 1; i <= 6; ++i) {
@@ -406,7 +428,10 @@ TEST(GpgFastVector, ResizeZeroFillsTrivialElements)
   EXPECT_EQ(Values(v), (std::vector<int>{1, 2, 0, 0, 0, 0, 0}));
 }
 
-TEST(GpgFastVector, EraseRejectsRangesOutsideTheVector)
+TEST(
+  GpgFastVector,
+  EraseRejectsRangesOutsideTheVector
+)
 {
   FastVector<int> v;
   for (int i = 0; i < 5; ++i) {
@@ -422,7 +447,10 @@ TEST(GpgFastVector, EraseRejectsRangesOutsideTheVector)
   EXPECT_EQ(empty.erase(empty.begin(), empty.end()), nullptr);
 }
 
-TEST(GpgFastVector, CopyAssignmentKeepsOrGrowsTheStorage)
+TEST(
+  GpgFastVector,
+  CopyAssignmentKeepsOrGrowsTheStorage
+)
 {
   FastVector<int> big;
   FastVector<int> small;
@@ -442,28 +470,40 @@ TEST(GpgFastVector, CopyAssignmentKeepsOrGrowsTheStorage)
   EXPECT_EQ(Values(target), std::vector<int>{42});
 }
 
-TEST(GpgFastVector, RandomOpsMatchStdVectorInt)
+TEST(
+  GpgFastVector,
+  RandomOpsMatchStdVectorInt
+)
 {
   for (unsigned seed = 1; seed <= 4; ++seed) {
     RunFastVectorRandomOps<int>(seed, 2500);
   }
 }
 
-TEST(GpgFastVector, RandomOpsMatchStdVectorTrackedElement)
+TEST(
+  GpgFastVector,
+  RandomOpsMatchStdVectorTrackedElement
+)
 {
   for (unsigned seed = 11; seed <= 13; ++seed) {
     RunFastVectorRandomOps<Tracked>(seed, 2500);
   }
 }
 
-TEST(GpgFastVector, RandomOpsMatchStdVectorCopyRelocatedElement)
+TEST(
+  GpgFastVector,
+  RandomOpsMatchStdVectorCopyRelocatedElement
+)
 {
   RunFastVectorRandomOps<TrackedCopyRelocated>(21, 2500);
 }
 
 // The storage hooks exist on 64-bit builds only (FastVector.h), where SimBlockLane accounts for them.
 #if defined(_M_X64) || defined(__x86_64__)
-TEST(GpgFastVector, UIntStorageHooksSeeEveryBlock)
+TEST(
+  GpgFastVector,
+  UIntStorageHooksSeeEveryBlock
+)
 {
   using Hook = void (*)(const void*, std::size_t);
   using FreeHook = void (*)(const void*);
@@ -513,7 +553,10 @@ TEST(GpgFastVector, UIntStorageHooksSeeEveryBlock)
 
 // --- FastVectorN -------------------------------------------------------------------------------
 
-TEST(GpgFastVectorN, StartsInlineAndReturnsToInline)
+TEST(
+  GpgFastVectorN,
+  StartsInlineAndReturnsToInline
+)
 {
   FastVectorN<int, 4> v;
   EXPECT_TRUE(v.UsingInlineStorage());
@@ -535,7 +578,10 @@ TEST(GpgFastVectorN, StartsInlineAndReturnsToInline)
   EXPECT_EQ(Values(v), std::vector<int>{9});
 }
 
-TEST(GpgFastVectorN, MoveFromAnInlineSource)
+TEST(
+  GpgFastVectorN,
+  MoveFromAnInlineSource
+)
 {
   FastVectorN<int, 4> source;
   source.push_back(1);
@@ -562,7 +608,10 @@ TEST(GpgFastVectorN, MoveFromAnInlineSource)
 // that storage holds, and later pushes write past it. Minimal input: a FastVectorN<int, 4> with
 // {7} takes `= std::move(x)` from one holding 5 elements; after ResetStorageToInline its
 // capacity is 7, not 4.
-TEST(GpgFastVectorN, DISABLED_MoveFromAHeapSourceKeepsTheInlineCapacity)
+TEST(
+  GpgFastVectorN,
+  DISABLED_MoveFromAHeapSourceKeepsTheInlineCapacity
+)
 {
   FastVectorN<int, 4> heapA;
   FastVectorN<int, 4> heapB;
@@ -582,7 +631,10 @@ TEST(GpgFastVectorN, DISABLED_MoveFromAHeapSourceKeepsTheInlineCapacity)
   EXPECT_EQ(moved.Capacity(), 4u);
 }
 
-TEST(GpgFastVectorN, SizedConstructorFillsWithZero)
+TEST(
+  GpgFastVectorN,
+  SizedConstructorFillsWithZero
+)
 {
   const FastVectorN<int, 4> small(3);
   EXPECT_TRUE(small.UsingInlineStorage());
@@ -593,7 +645,10 @@ TEST(GpgFastVectorN, SizedConstructorFillsWithZero)
   EXPECT_EQ(big.Capacity(), 9u);
 }
 
-TEST(GpgFastVectorN, AddAllReplacesTheContents)
+TEST(
+  GpgFastVectorN,
+  AddAllReplacesTheContents
+)
 {
   FastVectorN<int, 2> a;
   FastVectorN<int, 2> b;
@@ -611,7 +666,10 @@ TEST(GpgFastVectorN, AddAllReplacesTheContents)
   EXPECT_EQ(Values(a), (std::vector<int>{7, 8, 9}));
 }
 
-TEST(GpgFastVectorN, InsertAtEveryPositionWithinCapacity)
+TEST(
+  GpgFastVectorN,
+  InsertAtEveryPositionWithinCapacity
+)
 {
   for (std::size_t pos = 0; pos <= 4; ++pos) {
     for (std::size_t count = 0; count <= 4; ++count) {
@@ -633,7 +691,10 @@ TEST(GpgFastVectorN, InsertAtEveryPositionWithinCapacity)
   }
 }
 
-TEST(GpgFastVectorN, RandomOpsMatchStdVectorInt)
+TEST(
+  GpgFastVectorN,
+  RandomOpsMatchStdVectorInt
+)
 {
   for (unsigned seed = 1; seed <= 3; ++seed) {
     RunFastVectorNRandomOps<int, 4>(seed, 2500);
@@ -642,7 +703,10 @@ TEST(GpgFastVectorN, RandomOpsMatchStdVectorInt)
   RunFastVectorNRandomOps<int, 16>(5, 2500);
 }
 
-TEST(GpgFastVectorN, RandomOpsMatchStdVectorTrackedElement)
+TEST(
+  GpgFastVectorN,
+  RandomOpsMatchStdVectorTrackedElement
+)
 {
   for (unsigned seed = 11; seed <= 12; ++seed) {
     RunFastVectorNRandomOps<Tracked, 4>(seed, 2500);
@@ -650,12 +714,18 @@ TEST(GpgFastVectorN, RandomOpsMatchStdVectorTrackedElement)
   RunFastVectorNRandomOps<Tracked, 1>(13, 2500);
 }
 
-TEST(GpgFastVectorN, RandomOpsMatchStdVectorCopyRelocatedElement)
+TEST(
+  GpgFastVectorN,
+  RandomOpsMatchStdVectorCopyRelocatedElement
+)
 {
   RunFastVectorNRandomOps<TrackedCopyRelocated, 3>(21, 2500);
 }
 
-TEST(GpgFastVectorN, InitHelpersBindTheInlineStorage)
+TEST(
+  GpgFastVectorN,
+  InitHelpersBindTheInlineStorage
+)
 {
   gpg::fastvector_n<int, 2> source;
   source.push_back(1);
@@ -678,7 +748,10 @@ TEST(GpgFastVectorN, InitHelpersBindTheInlineStorage)
 
 // --- FastVectorInline --------------------------------------------------------------------------
 
-TEST(GpgFastVectorInline, ExternalInlineStorageAndRelease)
+TEST(
+  GpgFastVectorInline,
+  ExternalInlineStorageAndRelease
+)
 {
   alignas(8) int storage[4]{};
   FastVectorInline<int> v;
@@ -715,7 +788,10 @@ TEST(GpgFastVectorInline, ExternalInlineStorageAndRelease)
   EXPECT_EQ(v.Capacity(), 4u);
 }
 
-TEST(GpgFastVectorInline, InsertRangeMatchesStdInsert)
+TEST(
+  GpgFastVectorInline,
+  InsertRangeMatchesStdInsert
+)
 {
   std::mt19937 rng(31);
   alignas(8) int storage[3]{};
@@ -741,7 +817,10 @@ TEST(GpgFastVectorInline, InsertRangeMatchesStdInsert)
   }
 }
 
-TEST(GpgFastVectorInline, AssignFrom)
+TEST(
+  GpgFastVectorInline,
+  AssignFrom
+)
 {
   alignas(8) int storageA[2]{};
   alignas(8) int storageB[2]{};
@@ -767,7 +846,10 @@ TEST(GpgFastVectorInline, AssignFrom)
 // ReallocateForInsert / InsertRange (FastVector.h, ReallocateForInsert and InsertRange calls in
 // their bodies), so instantiating them adds -Wunused-result warnings, and src/ has no caller.
 
-TEST(GpgFastVectorLegacy, ReallocateForInsertSplicesTheRange)
+TEST(
+  GpgFastVectorLegacy,
+  ReallocateForInsertSplicesTheRange
+)
 {
   std::mt19937 rng(41);
   FastVector<int> v;
@@ -780,7 +862,10 @@ TEST(GpgFastVectorLegacy, ReallocateForInsertSplicesTheRange)
       source.push_back(static_cast<int>(rng() % 1000u));
     }
     const std::size_t capacity = ref.size() + count + Pick(rng, 4);
-    ASSERT_EQ(gpg::core::legacy::ReallocateForInsert(v, capacity, v.begin() + pos, source.data(), source.data() + count), capacity);
+    ASSERT_EQ(
+      gpg::core::legacy::ReallocateForInsert(v, capacity, v.begin() + pos, source.data(), source.data() + count),
+      capacity
+    );
     ref.insert(ref.begin() + static_cast<std::ptrdiff_t>(pos), source.begin(), source.end());
     ASSERT_EQ(Values(v), ref) << "step " << step;
     ASSERT_EQ(gpg::core::legacy::Count(v), ref.size());
@@ -796,7 +881,10 @@ TEST(GpgFastVectorLegacy, ReallocateForInsertSplicesTheRange)
   }
 }
 
-TEST(GpgFastVectorLegacy, EnsureCapacityAndAccessors)
+TEST(
+  GpgFastVectorLegacy,
+  EnsureCapacityAndAccessors
+)
 {
   FastVector<int> target;
   target.PushBack(5);
@@ -810,14 +898,22 @@ TEST(GpgFastVectorLegacy, EnsureCapacityAndAccessors)
   EXPECT_EQ(Values(target), std::vector<int>{5});
 }
 
-TEST(GpgFastVectorLegacy, InlineOriginKeepsItsCapacityHeader)
+TEST(
+  GpgFastVectorLegacy,
+  InlineOriginKeepsItsCapacityHeader
+)
 {
   FastVectorN<int, 4> v;
   for (int i = 0; i < 3; ++i) {
     v.push_back(i);
   }
   const int extra[] = {10, 11, 12};
-  EXPECT_EQ(gpg::core::legacy::ReallocateForInsert(static_cast<FastVector<int>&>(v), 6u, v.end(), extra, extra + 3, v.originalVec_), 6u);
+  EXPECT_EQ(
+    gpg::core::legacy::ReallocateForInsert(
+      static_cast<FastVector<int>&>(v), 6u, v.end(), extra, extra + 3, v.originalVec_
+    ),
+    6u
+  );
   EXPECT_FALSE(v.UsingInlineStorage());
   EXPECT_EQ(Values(v), (std::vector<int>{0, 1, 2, 10, 11, 12}));
   v.ResetStorageToInline();
@@ -829,10 +925,13 @@ TEST(GpgFastVectorLegacy, InlineOriginKeepsItsCapacityHeader)
   (void)gpg::core::legacy::BindExternalWindow(window, 6u, buffer, metadata);
   EXPECT_EQ(metadata, buffer);
   EXPECT_EQ(gpg::core::legacy::CapacityCount(window), 6u);
-  window.start_ = window.end_ = window.capacity_ = nullptr;  // the window's storage is not owned
+  window.start_ = window.end_ = window.capacity_ = nullptr; // the window's storage is not owned
 }
 
-TEST(GpgFastVectorLegacy, CopyDwordRangeForward)
+TEST(
+  GpgFastVectorLegacy,
+  CopyDwordRangeForward
+)
 {
   // The null test is per slot, on the running address (MSVC's `if (dest != 0)` construct
   // idiom), so only the first slot of a null destination is skipped; a null destination is not

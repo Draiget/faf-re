@@ -22,15 +22,16 @@ namespace moho
     constexpr const char* kUnreachableMessage = "Reached the supposably unreachable.";
     constexpr const char* kD3DResSourcePath = "c:\\work\\rts\\main\\code\\src\\core\\D3DRes.cpp";
 
-    [[noreturn]] void InvokeD3DResUnreachableAt(const int lineNumber)
+    [[noreturn]] void InvokeD3DResUnreachableAt(
+      const int lineNumber
+    )
     {
       gpg::HandleAssertFailure(kUnreachableMessage, lineNumber, kD3DResSourcePath);
       // HandleAssertFailure is declared `noreturn` in the binary but the
       // SDK declaration does not carry that annotation; fall back to an
       // infinite loop so the C++20 `noreturn` contract is satisfied on
       // the off-chance HandleAssertFailure ever returns.
-      for (;;) {
-      }
+      for (;;) {}
     }
   } // namespace
 

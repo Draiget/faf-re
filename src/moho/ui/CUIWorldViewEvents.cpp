@@ -66,8 +66,7 @@ namespace
     screenPoint.z = 0.0f;
     return screenPoint;
   }
-}
-
+} // namespace
 
 // --- FAF community binary-patch addition: WorldView:SetCustomRender. No
 // `Address:` block -- this method never existed in the original 2007 binary;
@@ -315,7 +314,6 @@ namespace
   constexpr std::int32_t kBuildPreviewMeshColor = static_cast<std::int32_t>(0xFF00FF00u);
 }
 
-
 /**
  * Address: 0x008529C0 (FUN_008529C0, struct_WorldView_object::struct_WorldView_object)
  *
@@ -332,11 +330,7 @@ moho::CBuildDragPreview::CBuildDragPreview()
   , mUnitPlaceMaterial()
   , mDecal(nullptr)
   , mActiveCommandMode(moho::COMMOD_None)
-  , mStart(
-      gpg::NaN,
-      gpg::NaN,
-      gpg::NaN
-    )
+  , mStart(gpg::NaN, gpg::NaN, gpg::NaN)
   , mEnd(mStart)
   , mPreviewInvalid(false)
   , mQueuedGhostsHidden(false)
@@ -482,8 +476,7 @@ namespace
 
     return false;
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x008534F0 (FUN_008534F0, sub_8534F0)
@@ -499,7 +492,8 @@ void moho::CBuildDragPreview::RefreshQueuedBuildGhosts()
   // Engine change: orders reach this map from the sim, once per beat, and walking every army's orders
   // for each view of each frame was 3 % of a frame in a 12-player game.
   const std::uint16_t stamp = static_cast<std::uint16_t>(
-    static_cast<std::uint32_t>(session->mGameTick) * 31U + static_cast<std::uint32_t>(session->mCommandManager->mCommands.size())
+    static_cast<std::uint32_t>(session->mGameTick) * 31U +
+    static_cast<std::uint32_t>(session->mCommandManager->mCommands.size())
   );
   if (moho::ren_BuildGhostsPerBeat && stamp == mQueuedGhostStamp) {
     return;
@@ -663,8 +657,7 @@ namespace
     );
     return sInvalid;
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x00823220 (FUN_00823220, sub_823220)
@@ -1469,9 +1462,7 @@ int moho::cfunc_CUIWorldViewIsCartographicL(
 
   LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
-  lua_pushboolean(
-    state->m_state, worldView->CanShake()
-  );
+  lua_pushboolean(state->m_state, worldView->CanShake());
   (void)lua_gettop(state->m_state);
   return 1;
 }
@@ -1790,7 +1781,6 @@ namespace
     "moho.UIWorldView:__init(parent_control, cameraName, depth, isMiniMap, trackCamera)";
 }
 
-
 /**
  * Address: 0x0086E480 (FUN_0086E480, Moho::CUIWorldView::CUIWorldView)
  *
@@ -1821,8 +1811,7 @@ moho::CUIWorldView::CUIWorldView(
   // stores at 0x0086E4F9..0x0086E742 write.
   SetDebugName(fa::string(name));
 
-  moho::STIMap* const map =
-    mWldSession->mWldMap->mTerrainRes->mMap;
+  moho::STIMap* const map = mWldSession->mWldMap->mTerrainRes->mMap;
   LuaPlus::LuaState* const activeState = luaObj->GetActiveState();
   moho::RCamManager* const camManager = moho::CAM_GetManager();
   mCamera.reset(camManager->CreateCamera(gpg::StrArg(name), *map, activeState));
@@ -2560,10 +2549,7 @@ void moho::CUIWorldView::DoRender(
     const float width = CScriptLazyVar_float::GetValue(&mWidthLV);
     const float height = CScriptLazyVar_float::GetValue(&mHeightLV);
 
-    if (
-      mCachedViewLeft != left || mCachedViewTop != top ||
-      mCachedViewWidth != width || mCachedViewHeight != height
-    ) {
+    if (mCachedViewLeft != left || mCachedViewTop != top || mCachedViewWidth != width || mCachedViewHeight != height) {
       mCachedViewLeft = left;
       mCachedViewTop = top;
       mCachedViewWidth = width;
@@ -2662,7 +2648,6 @@ void moho::CUIWorldView::UpdateSelection(
     const EEntityType volumeEntityMask =
       (cameraZoom <= 150.0f) ? static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Prop) : ENTITYTYPE_Unit;
     (void)spatialDb->CollectInVolume(collected, volumeEntityMask, &selectionSolid);
-
 
     float bestDistSq = std::numeric_limits<float>::max();
 
@@ -2809,10 +2794,7 @@ void moho::CUIWorldView::UpdateSelection(
         // redirect (0x0086FDEF `jne 0x0086FE2B`); only a miss tests FACTORY
         // (0x0086FE1D), whose result is the flag. Then 0x0086FE6D re-reads
         // GetAttachmentParent() into the best candidate.
-        if (
-          attachmentParentAsUnit->IsInCategory("TRANSPORTATION") ||
-          attachmentParentAsUnit->IsInCategory("FACTORY")
-        ) {
+        if (attachmentParentAsUnit->IsInCategory("TRANSPORTATION") || attachmentParentAsUnit->IsInCategory("FACTORY")) {
           bestCandidate = attachmentParent;
         }
       }
@@ -2988,8 +2970,7 @@ namespace
     formation->mReady = false;
     formation->Reset();
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x00870310 (FUN_00870310, sub_870310)
@@ -3244,7 +3225,8 @@ bool moho::CUIWorldView::HandleEvent(
       auto* const storage = static_cast<CameraDragger*>(::operator new(sizeof(CameraDragger), std::nothrow));
       IMauiDragger* dragger = nullptr;
       if (storage != nullptr) {
-        dragger = new (storage) CameraDragger(mCamera.get(), cursorInfo.mMouseScreenPos, this, &moho::CameraImpl::CameraPan);
+        dragger =
+          new (storage) CameraDragger(mCamera.get(), cursorInfo.mMouseScreenPos, this, &moho::CameraImpl::CameraPan);
       }
       func_PostDragger(GetRootFrame(), dragger, &eventData);
     }
@@ -3360,7 +3342,6 @@ bool moho::CUIWorldView::HandleEvent(
     CommandModeData rightCommand{};
     (void)func_GetRightMouseButtonAction(&rightCommand, &cursorInfo, eventData.mModifiers, mWldSession);
     mCommandData = rightCommand;
-
 
     if (mCommandData.mMode != COMMOD_Order) {
       return false;
@@ -3688,7 +3669,6 @@ int moho::cfunc_AddBlinkyBoxL(
 namespace
 {
 
-
   [[nodiscard]] const char* LuaStringOrEmpty(
     const LuaPlus::LuaObject& object
   ) noexcept
@@ -3744,8 +3724,7 @@ namespace
     // arm's front LOD.
     return moho::GetModel(lodBegin->mMeshName.c_str(), nullptr);
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x00857BE0 (FUN_00857BE0, cfunc_AddCommandFeedbackBlipL)
@@ -3800,13 +3779,7 @@ int moho::cfunc_AddCommandFeedbackBlipL(
   // the camera zoomed out.
   MeshInstance* const meshInstance = renderer != nullptr
     ? renderer->CreateMeshInstance(
-        worldSession->mGameTick,
-        -1,
-        modelResource,
-        meshScale,
-        false,
-        material,
-        std::numeric_limits<float>::max()
+        worldSession->mGameTick, -1, modelResource, meshScale, false, material, std::numeric_limits<float>::max()
       )
     : nullptr;
   if (meshInstance == nullptr) {

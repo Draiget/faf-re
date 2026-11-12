@@ -32,9 +32,8 @@ namespace moho
      * Reads the model path and hands back the skeleton of that model, shared.
      * Inlined into `SerConstructHelper<CAniResourceSkel>::Construct` 0x005388C0.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x00538770 (FUN_00538770)
@@ -43,7 +42,10 @@ namespace moho
      * Saves the model name as a mounted path.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     static gpg::RType* sType;

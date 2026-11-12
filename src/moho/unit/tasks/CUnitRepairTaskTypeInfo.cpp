@@ -79,7 +79,9 @@ namespace moho
    * What it does:
    * Registers `CCommandTask` as the primary reflection base at offset 0.
    */
-  void __stdcall CUnitRepairTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void __stdcall CUnitRepairTaskTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CCommandTask>(typeInfo);
   }
@@ -91,9 +93,13 @@ namespace moho
    * Registers `Listener<ECommandEvent>` as the secondary reflection base at
    * offset `0x34`.
    */
-  void __stdcall CUnitRepairTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const typeInfo)
+  void __stdcall CUnitRepairTaskTypeInfo::AddBase_Listener_ECommandEvent(
+    gpg::RType* const typeInfo
+  )
   {
-    gpg::AddReflectedBase<moho::Listener<moho::ECommandEvent>>(typeInfo, gpg::BaseSubobjectOffset<CUnitRepairTask, Listener<ECommandEvent>>());
+    gpg::AddReflectedBase<moho::Listener<moho::ECommandEvent>>(
+      typeInfo, gpg::BaseSubobjectOffset<CUnitRepairTask, Listener<ECommandEvent>>()
+    );
   }
 
   /**
@@ -119,7 +125,9 @@ namespace moho
    * Placement-constructs one repair-task reflection object in caller-provided
    * storage and returns its typed reflection reference.
    */
-  gpg::RRef CUnitRepairTaskTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitRepairTaskTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const task = gpg::ConstructInStorage<CUnitRepairTask>(objectStorage);
 
@@ -135,7 +143,9 @@ namespace moho
    * Deletes one heap-owned repair-task reflection object through the deleting
    * destructor lane.
    */
-  void CUnitRepairTaskTypeInfo::Delete(void* const objectStorage)
+  void CUnitRepairTaskTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CUnitRepairTask*>(objectStorage);
   }
@@ -147,7 +157,9 @@ namespace moho
    * Runs the non-deleting destructor lane for one repair-task reflection
    * object.
    */
-  void CUnitRepairTaskTypeInfo::Destruct(void* const objectStorage)
+  void CUnitRepairTaskTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     auto* const task = static_cast<CUnitRepairTask*>(objectStorage);
     if (!task) {
@@ -169,7 +181,9 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CUnitRepairTaskTypeInfo_348fbb, moho::register_CUnitRepairTaskTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CUnitRepairTaskTypeInfo_348fbb,
+  moho::register_CUnitRepairTaskTypeInfo
+)

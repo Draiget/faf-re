@@ -43,7 +43,8 @@ namespace gpg::gal
      * Pixel-shader invocations and rasterised primitives of one region call
      * (FAF_GPU_PROFILE_PIXELS=1 and a backend that measures them).
      */
-    void AddGpuPipelineStatistics(std::uint32_t region, std::uint64_t pixelInvocations, std::uint64_t primitives) noexcept;
+    void
+    AddGpuPipelineStatistics(std::uint32_t region, std::uint64_t pixelInvocations, std::uint64_t primitives) noexcept;
     /** FAF_GPU_PROFILE_PIXELS=1: backends also count pixels and primitives per region (read once). */
     [[nodiscard]] static bool PixelStatisticsEnabled() noexcept;
     /** GPU time of one whole frame (first command to Present), possibly frames later. */
@@ -59,14 +60,17 @@ namespace gpg::gal
      */
     struct Summary
     {
-      std::uint64_t frames = 0U;          // frames ended so far
+      std::uint64_t frames = 0U; // frames ended so far
       DrawStatistics lastFrame{};
       double lastFrameWallMilliseconds = 0.0;
-      std::uint32_t intervalFrames = 0U;  // 0: no profiled interval yet
+      std::uint32_t intervalFrames = 0U;    // 0: no profiled interval yet
       double intervalCpuMilliseconds = 0.0; // the outermost pass ("Frame"), per frame
       double intervalGpuMilliseconds = 0.0; // whole frame, per frame
     };
-    [[nodiscard]] const Summary& GetSummary() const noexcept { return mSummary; }
+    [[nodiscard]] const Summary& GetSummary() const noexcept
+    {
+      return mSummary;
+    }
 
   private:
     [[nodiscard]] static int ReadInterval() noexcept;
@@ -107,7 +111,9 @@ namespace gpg::gal
   class RenderProfileScope
   {
   public:
-    explicit RenderProfileScope(const char* const name) noexcept
+    explicit RenderProfileScope(
+      const char* const name
+    ) noexcept
     {
       if (RenderProfiler::Enabled()) {
         mRegion = RenderProfiler::Get().Region(name);

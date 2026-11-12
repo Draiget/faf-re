@@ -1,0 +1,36 @@
+name: 1p-coverage-live
+description: >
+  Coverage of the game client in a live game (tools/coverage/tour): the instrumented client
+  (covclient_x64.exe in bin_x64) on faf_re_lockstep, its army driven by the map's scripted AI, with the
+  client tour (tools/coverage/tour) in its live mode; the tour quits the game when it is done, which
+  writes the coverage counters (LLVM_PROFILE_FILE set for mpemu). Needs the live init file from tests/README.md
+  as init_tour_live.lua in C:\ProgramData\FAForever\bin; run tools/coverage/tour/drive.ps1 beside it for
+  the mouse clicks.
+timeout: 15m
+
+mode: direct
+lobby: auto
+map: faf_re_lockstep
+gameOptions:
+  LockstepAI: rush
+  Victory: sandbox
+
+game:
+  exe: '%ProgramData%\FAForever\bin_x64\covclient_x64.exe'
+  init: init_tour_live.lua
+  nosound: true
+
+players:
+  - { uid: 1, name: CovLive, faction: uef, args: ['/title', 'coverage-live', '/tourlive', '/tourexit'] }
+
+steps:
+  - start: all
+  - host: 1
+  - waitState: { uids: all, state: Launching, timeout: 3m }
+  - wait: 420s
+
+expect:
+  allLaunched: true
+  noCrash: true
+  logsContain:
+    - { uids: all, pattern: 'TOUR: done' }

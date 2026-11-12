@@ -83,10 +83,10 @@ namespace gpg::gal::effects
   /** Where one parameter lives in $Globals (row-major packing, -Zpr). */
   struct ConstantSlot
   {
-    std::uint32_t parameter = 0;     // index into EffectDescription::parameters
-    std::uint32_t offset = 0;        // bytes from the start of $Globals
-    std::uint32_t size = 0;          // bytes the shader reads
-    std::uint32_t elementStride = 0; // bytes between array elements
+    std::uint32_t parameter = 0;         // index into EffectDescription::parameters
+    std::uint32_t offset = 0;            // bytes from the start of $Globals
+    std::uint32_t size = 0;              // bytes the shader reads
+    std::uint32_t elementStride = 0;     // bytes between array elements
     std::vector<ConstantMember> members; // struct parameters only
   };
 

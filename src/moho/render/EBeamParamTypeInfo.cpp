@@ -112,4 +112,7 @@ void EBeamParamTypeInfo::Init()
 // Phase-1 pre-registration: the beam Lua bindings resolve EBeamParam through
 // gpg::LookupRType (ResolveEBeamParamType) to translate parameter names, so
 // the descriptor must exist before that consumer runs. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_EBeamParamTypeInfo_770ac0, moho::preregister_EBeamParamTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_EBeamParamTypeInfo_770ac0,
+  moho::preregister_EBeamParamTypeInfo
+)

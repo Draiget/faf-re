@@ -75,14 +75,19 @@ namespace
     moho::SEconValue savedReclaimPerSecond{0.0f, 0.0f};
   };
 
-  [[nodiscard]] constexpr moho::ETaskState NextTaskState(const moho::ETaskState current) noexcept
+  [[nodiscard]] constexpr moho::ETaskState NextTaskState(
+    const moho::ETaskState current
+  ) noexcept
   {
     return static_cast<moho::ETaskState>(static_cast<int>(current) + 1);
   }
 
-  [[nodiscard]] constexpr int MaxFootprintExtent(const moho::SFootprint& footprint) noexcept
+  [[nodiscard]] constexpr int MaxFootprintExtent(
+    const moho::SFootprint& footprint
+  ) noexcept
   {
-    return (footprint.mSizeX >= footprint.mSizeZ) ? static_cast<int>(footprint.mSizeX) : static_cast<int>(footprint.mSizeZ);
+    return (footprint.mSizeX >= footprint.mSizeZ) ? static_cast<int>(footprint.mSizeX)
+                                                  : static_cast<int>(footprint.mSizeZ);
   }
 
   [[nodiscard]] moho::SFootprint FallbackReclaimFootprint() noexcept
@@ -98,7 +103,11 @@ namespace
     return footprint;
   }
 
-  [[nodiscard]] bool QueryReclaimCosts(moho::Unit* const unit, moho::Entity* const targetEntity, ReclaimCostInfo& outCosts)
+  [[nodiscard]] bool QueryReclaimCosts(
+    moho::Unit* const unit,
+    moho::Entity* const targetEntity,
+    ReclaimCostInfo& outCosts
+  )
   {
     if (unit == nullptr || targetEntity == nullptr) {
       return false;
@@ -110,16 +119,8 @@ namespace
     LuaPlus::LuaObject arg4{};
     LuaPlus::LuaObject arg5{};
     if (
-      !unit->RunScriptMultiRet(
-        kGetReclaimCostsScript,
-        reclaimResults,
-        targetEntity->mLuaObj,
-        arg2,
-        arg3,
-        arg4,
-        arg5
-      )
-      || reclaimResults.size() != 3
+      !unit->RunScriptMultiRet(kGetReclaimCostsScript, reclaimResults, targetEntity->mLuaObj, arg2, arg3, arg4, arg5) ||
+      reclaimResults.size() != 3
     ) {
       return false;
     }
@@ -134,7 +135,9 @@ namespace
     return true;
   }
 
-  [[nodiscard]] moho::CEconomy* ResolveArmyEconomy(moho::Unit* const unit) noexcept
+  [[nodiscard]] moho::CEconomy* ResolveArmyEconomy(
+    moho::Unit* const unit
+  ) noexcept
   {
     if (unit == nullptr || unit->ArmyRef == nullptr) {
       return nullptr;
@@ -169,7 +172,6 @@ namespace
     economy->mTotals.mReclaimed.ENERGY += reclaimedEnergy;
     economy->mTotals.mReclaimed.MASS += reclaimedMass;
   }
-
 
 } // namespace
 
@@ -314,7 +316,9 @@ namespace moho
    * Refreshes reclaim target from current command payload, rebinds unit focus
    * target, clears per-task progress state, and wakes owner task thread.
    */
-  void CUnitReclaimTask::OnEvent(ECommandEvent)
+  void CUnitReclaimTask::OnEvent(
+    ECommandEvent
+  )
   {
     SetReclaimScriptActive(false);
 
@@ -364,8 +368,8 @@ namespace moho
       }
 
       if (
-        targetEntity == nullptr || targetEntity->DestroyQueuedFlag != 0u
-        || (targetUnit != nullptr && !targetUnit->GetAttributes().mReclaimable)
+        targetEntity == nullptr || targetEntity->DestroyQueuedFlag != 0u ||
+        (targetUnit != nullptr && !targetUnit->GetAttributes().mReclaimable)
       ) {
         if (mHasStarted) {
           SetReclaimScriptActive(false);
@@ -394,7 +398,8 @@ namespace moho
     targetUnit = (targetEntity != nullptr) ? targetEntity->IsUnit() : nullptr;
 
     const Wm3::Vector3f targetPosition = (targetEntity != nullptr) ? targetEntity->GetPositionWm3() : mTargetPosition;
-    const SFootprint targetFootprint = (targetEntity != nullptr) ? targetEntity->GetFootprint() : FallbackReclaimFootprint();
+    const SFootprint targetFootprint =
+      (targetEntity != nullptr) ? targetEntity->GetFootprint() : FallbackReclaimFootprint();
 
     const Wm3::Vector3f& unitPosition = mUnit->GetPosition();
     const float distanceX = unitPosition.x - targetPosition.x;
@@ -407,250 +412,248 @@ namespace moho
       rawDistance - static_cast<float>(unitFootprintExtent) - static_cast<float>(targetFootprintExtent);
 
     switch (mTaskState) {
-      case TASKSTATE_Preparing: {
-        if (targetEntity != nullptr && !targetEntity->IsBeingBuilt()) {
-          bool invalidCategory = true;
-          if (targetEntity->IsInCategory(kReclaimableCategoryName)) {
-            invalidCategory = (targetEntity == static_cast<Entity*>(mUnit));
-          }
-
-          if (invalidCategory) {
-            *mDispatchResult = kAiResultRetryOrRetarget;
-            return -1;
-          }
+    case TASKSTATE_Preparing: {
+      if (targetEntity != nullptr && !targetEntity->IsBeingBuilt()) {
+        bool invalidCategory = true;
+        if (targetEntity->IsInCategory(kReclaimableCategoryName)) {
+          invalidCategory = (targetEntity == static_cast<Entity*>(mUnit));
         }
 
-        Wm3::Vector3f moveTargetPosition = targetPosition;
-        const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
-        if (contactDistance > blueprint->Economy.MaxBuildDistance || rawDistance < 1.0f) {
-          const SCoordsVec2 goalXZ{moveTargetPosition.x, moveTargetPosition.z};
-          gpg::Rect2i reserveRect{};
-          (void)COORDS_ToGridRect(&reserveRect, goalXZ, targetFootprint);
-
-          const bool useWholeMap = (mUnit->ArmyRef != nullptr) ? mUnit->ArmyRef->UseWholeMap() : false;
-          gpg::Rect2f moveSkirt{
-            static_cast<float>(reserveRect.x0),
-            static_cast<float>(reserveRect.z0),
-            static_cast<float>(reserveRect.x1),
-            static_cast<float>(reserveRect.z1),
-          };
-          (void)PrepareMove(1, mUnit, &moveTargetPosition, &moveSkirt, useWholeMap);
-
-          const SOCellPos targetCell = mUnit->GetFootprint().ToCellPos(moveTargetPosition);
-          NewMoveTask(SNavGoal(targetCell), this, 0, nullptr, 0);
-        }
-
-        mTaskState = NextTaskState(mTaskState);
-        return 0;
-      }
-
-      case TASKSTATE_Waiting: {
-        if (mTargetHasNoMotor) {
+        if (invalidCategory) {
           *mDispatchResult = kAiResultRetryOrRetarget;
           return -1;
         }
-
-        const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
-        float maxReclaimDistance = blueprint->Economy.MaxBuildDistance;
-        if (mUnit->IsUnitState(UNITSTATE_Patrolling)) {
-          maxReclaimDistance = std::max(maxReclaimDistance, blueprint->AI.GuardScanRadius);
-        }
-
-        if (contactDistance > maxReclaimDistance) {
-          if (mHasStarted) {
-            SetReclaimScriptActive(false);
-          }
-          *mDispatchResult = kAiResultRetryOrRetarget;
-          return -1;
-        }
-
-        if (targetEntity != nullptr) {
-          if (ReconBlip* const reconBlip = targetEntity->IsReconBlip(); reconBlip != nullptr) {
-            Unit* const creator = reconBlip->GetCreator();
-            mTargetEntity.Set(static_cast<Entity*>(creator));
-            targetEntity = mTargetEntity.GetObjectPtr();
-            targetUnit = (targetEntity != nullptr) ? targetEntity->IsUnit() : nullptr;
-            if (targetEntity == nullptr) {
-              return -1;
-            }
-          }
-        }
-
-        if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr && targetEntity != nullptr) {
-          builder->BuilderSetAimTarget(targetEntity->GetPositionWm3());
-        }
-
-        SetReclaimScriptActive(true);
-        mTaskState = NextTaskState(mTaskState);
-        return 0;
       }
 
-      case TASKSTATE_Starting: {
-        targetEntity = mTargetEntity.GetObjectPtr();
-        targetUnit = (targetEntity != nullptr) ? targetEntity->IsUnit() : nullptr;
-        if (targetEntity == nullptr || targetUnit == nullptr || targetEntity->IsBeingBuilt()) {
-          mTaskState = NextTaskState(mTaskState);
-          return 1;
-        }
+      Wm3::Vector3f moveTargetPosition = targetPosition;
+      const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
+      if (contactDistance > blueprint->Economy.MaxBuildDistance || rawDistance < 1.0f) {
+        const SCoordsVec2 goalXZ{moveTargetPosition.x, moveTargetPosition.z};
+        gpg::Rect2i reserveRect{};
+        (void)COORDS_ToGridRect(&reserveRect, goalXZ, targetFootprint);
 
-        if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr && rawDistance > 1.0f) {
-          if (!builder->BuilderGetOnTarget()) {
-            return 1;
-          }
-        }
+        const bool useWholeMap = (mUnit->ArmyRef != nullptr) ? mUnit->ArmyRef->UseWholeMap() : false;
+        gpg::Rect2f moveSkirt{
+          static_cast<float>(reserveRect.x0),
+          static_cast<float>(reserveRect.z0),
+          static_cast<float>(reserveRect.x1),
+          static_cast<float>(reserveRect.z1),
+        };
+        (void)PrepareMove(1, mUnit, &moveTargetPosition, &moveSkirt, useWholeMap);
 
-        if (contactDistance > mUnit->GetBlueprint()->Economy.MaxBuildDistance) {
-          return -1;
-        }
-
-        ReclaimCostInfo reclaimCosts{};
-        if (!QueryReclaimCosts(mUnit, targetEntity, reclaimCosts)) {
-          gpg::Warnf(kFailedReclaimCostWarning);
-          return -1;
-        }
-
-        mUnit->mUnitVarDat.mUnitStates |= kUnitStateReclaimingMask;
-        mUnit->SetFocusEntity(targetEntity);
-
-        float reclaimHealthDelta = targetEntity->mVarDat.mMaxHealth / reclaimCosts.reclaimTime;
-        if (targetUnit->GetAttributes().regenRate > 0.0f) {
-          reclaimHealthDelta += targetUnit->GetAttributes().regenRate * 0.1f;
-        }
-
-        if (targetEntity->mVarDat.mHealth <= reclaimHealthDelta) {
-          if (!mUnit->IsUnitState(UNITSTATE_Guarding) && !mUnit->IsUnitState(UNITSTATE_AssistingCommander)) {
-            targetEntity->RunScriptUnit(kOnReclaimedScript, mUnit);
-
-            LuaPlus::LuaObject newEntityObject = targetEntity->RunScriptCreateWreckageProp(0.0f);
-            targetEntity->Destroy();
-            if (newEntityObject.IsNil()) {
-              mTargetEntity.Set(nullptr);
-            } else {
-              mTargetEntity.Set(SCR_FromLua_EntityOpt(newEntityObject));
-              mUnit->SetFocusEntity(mTargetEntity.GetObjectPtr());
-            }
-
-            mTaskState = NextTaskState(mTaskState);
-          }
-        } else {
-          targetEntity->AdjustHealth(nullptr, -reclaimHealthDelta);
-          if (targetUnit != nullptr) {
-            targetUnit->mUnitVarDat.mUnitStates |= kUnitStateNoReclaimMask;
-          }
-        }
-
-        return 1;
+        const SOCellPos targetCell = mUnit->GetFootprint().ToCellPos(moveTargetPosition);
+        NewMoveTask(SNavGoal(targetCell), this, 0, nullptr, 0);
       }
 
-      case TASKSTATE_Processing: {
-        if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr && rawDistance > 1.0f) {
-          if (!builder->BuilderGetOnTarget()) {
-            return 1;
-          }
-        }
+      mTaskState = NextTaskState(mTaskState);
+      return 0;
+    }
 
-        targetEntity = mTargetEntity.GetObjectPtr();
-        if (targetEntity == nullptr) {
-          return -1;
-        }
-
-        ReclaimCostInfo reclaimCosts{};
-        // 0x0061FBC9 / 0x0061FBED -> 0x0061FAA8: a failed cost query only
-        // warns and ends the task; `OnReclaimed` belongs to the
-        // invalid-costs path below.
-        if (!QueryReclaimCosts(mUnit, targetEntity, reclaimCosts)) {
-          gpg::Warnf(kFailedReclaimCostWarning);
-          return -1;
-        }
-
-        const float reclaimRate = 1.0f / reclaimCosts.reclaimTime;
-        mReclaimRate = -reclaimRate;
-        if (reclaimCosts.reclaimEnergy >= 0.0f && reclaimCosts.reclaimMass >= 0.0f) {
-          mReclaimPerSecond.energy = std::max(reclaimCosts.reclaimEnergy, 0.0f) * reclaimRate;
-          mReclaimPerSecond.mass = std::max(reclaimCosts.reclaimMass, 0.0f) * reclaimRate;
-
-          mTaskState = NextTaskState(mTaskState);
-          mUnit->mUnitVarDat.mUnitStates |= kUnitStateReclaimingMask;
-
-          const float previousFraction = targetEntity->mVarDat.mFractionComplete;
-          const float completionFromHealth = targetEntity->mVarDat.mHealth / targetEntity->mVarDat.mMaxHealth;
-          const float clampedCompletion = std::min(completionFromHealth, previousFraction);
-          (void)targetEntity->UpdateFractionComplete(clampedCompletion - previousFraction);
-          return 1;
-        }
-
-        gpg::Warnf(kInvalidReclaimCostWarning);
-        targetEntity->RunScriptUnit(kOnReclaimedScript, mUnit);
+    case TASKSTATE_Waiting: {
+      if (mTargetHasNoMotor) {
+        *mDispatchResult = kAiResultRetryOrRetarget;
         return -1;
       }
 
-      case TASKSTATE_Complete: {
-        targetEntity = mTargetEntity.GetObjectPtr();
-        targetUnit = (targetEntity != nullptr) ? targetEntity->IsUnit() : nullptr;
-        if (targetUnit != nullptr && contactDistance > mUnit->GetBlueprint()->Economy.MaxBuildDistance) {
-          if (mHasStarted) {
-            SetReclaimScriptActive(false);
-          }
-          *mDispatchResult = kAiResultRetryOrRetarget;
-          return -1;
+      const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
+      float maxReclaimDistance = blueprint->Economy.MaxBuildDistance;
+      if (mUnit->IsUnitState(UNITSTATE_Patrolling)) {
+        maxReclaimDistance = std::max(maxReclaimDistance, blueprint->AI.GuardScanRadius);
+      }
+
+      if (contactDistance > maxReclaimDistance) {
+        if (mHasStarted) {
+          SetReclaimScriptActive(false);
         }
+        *mDispatchResult = kAiResultRetryOrRetarget;
+        return -1;
+      }
 
-        SetReclaimScriptActive(true);
-
-        const float limitingRate = mConsumptionData->LimitingRate();
-        float appliedFractionDelta = 0.0f;
-        float reclaimWorkProgress = mUnit->mUnitVarDat.mWorkProgress;
-        PausedPropReclaimOverride pausedOverride{};
-        if (targetUnit != nullptr) {
-          appliedFractionDelta = targetEntity->Materialize(mReclaimRate * limitingRate);
-
-          const float completionFromHealth = targetEntity->mVarDat.mHealth / targetEntity->mVarDat.mMaxHealth;
-          const float clampedCompletion = std::min(targetEntity->mVarDat.mFractionComplete, completionFromHealth);
-          const float clampedHealth = targetEntity->mVarDat.mMaxHealth * clampedCompletion;
-          if (clampedHealth != targetEntity->mVarDat.mHealth) {
-            targetEntity->SetHealth(clampedHealth);
-          }
-
-          reclaimWorkProgress = 1.0f - targetEntity->mVarDat.mFractionComplete;
-        } else if (targetEntity != nullptr) {
-          if (Prop* const propTarget = targetEntity->IsProp(); propTarget != nullptr) {
-            // FAF hot-patch: 0x0061FF7B jumps to 0x01291836 in .exxt. With the
-            // reclaimer paused it saves +0x64/+0x68/+0x6C to .exxt globals and
-            // writes 0xB22BCC77 (-1e-8f) and two zeros; 0x00620071 jumps to
-            // 0x0129188F, which restores them on the only exit of this arm.
-            if (mUnit->mUnitVarDat.mIsPaused) {
-              pausedOverride.active = true;
-              pausedOverride.savedReclaimRate = mReclaimRate;
-              pausedOverride.savedReclaimPerSecond = mReclaimPerSecond;
-              mReclaimRate = -0.0000000099999999f;
-              mReclaimPerSecond.energy = 0.0f;
-              mReclaimPerSecond.mass = 0.0f;
-            }
-
-            appliedFractionDelta = propTarget->Materialize(mReclaimRate * limitingRate);
-            reclaimWorkProgress = 1.0f - targetEntity->mVarDat.mFractionComplete;
+      if (targetEntity != nullptr) {
+        if (ReconBlip* const reconBlip = targetEntity->IsReconBlip(); reconBlip != nullptr) {
+          Unit* const creator = reconBlip->GetCreator();
+          mTargetEntity.Set(static_cast<Entity*>(creator));
+          targetEntity = mTargetEntity.GetObjectPtr();
+          targetUnit = (targetEntity != nullptr) ? targetEntity->IsUnit() : nullptr;
+          if (targetEntity == nullptr) {
+            return -1;
           }
         }
+      }
 
-        mUnit->mUnitVarDat.mWorkProgress = reclaimWorkProgress;
-        AwardReclaimedResources(mUnit, appliedFractionDelta, mReclaimRate, mReclaimPerSecond);
+      if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr && targetEntity != nullptr) {
+        builder->BuilderSetAimTarget(targetEntity->GetPositionWm3());
+      }
 
-        if (pausedOverride.active) {
-          mReclaimRate = pausedOverride.savedReclaimRate;
-          mReclaimPerSecond = pausedOverride.savedReclaimPerSecond;
-          return 1;
-        }
+      SetReclaimScriptActive(true);
+      mTaskState = NextTaskState(mTaskState);
+      return 0;
+    }
 
+    case TASKSTATE_Starting: {
+      targetEntity = mTargetEntity.GetObjectPtr();
+      targetUnit = (targetEntity != nullptr) ? targetEntity->IsUnit() : nullptr;
+      if (targetEntity == nullptr || targetUnit == nullptr || targetEntity->IsBeingBuilt()) {
+        mTaskState = NextTaskState(mTaskState);
         return 1;
       }
 
-      default:
-        gpg::HandleAssertFailure(
-          "Reached the supposably unreachable.",
-          427,
-          "c:\\work\\rts\\main\\code\\src\\sim\\AiUnitReclaim.cpp"
-        );
+      if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr && rawDistance > 1.0f) {
+        if (!builder->BuilderGetOnTarget()) {
+          return 1;
+        }
+      }
+
+      if (contactDistance > mUnit->GetBlueprint()->Economy.MaxBuildDistance) {
+        return -1;
+      }
+
+      ReclaimCostInfo reclaimCosts{};
+      if (!QueryReclaimCosts(mUnit, targetEntity, reclaimCosts)) {
+        gpg::Warnf(kFailedReclaimCostWarning);
+        return -1;
+      }
+
+      mUnit->mUnitVarDat.mUnitStates |= kUnitStateReclaimingMask;
+      mUnit->SetFocusEntity(targetEntity);
+
+      float reclaimHealthDelta = targetEntity->mVarDat.mMaxHealth / reclaimCosts.reclaimTime;
+      if (targetUnit->GetAttributes().regenRate > 0.0f) {
+        reclaimHealthDelta += targetUnit->GetAttributes().regenRate * 0.1f;
+      }
+
+      if (targetEntity->mVarDat.mHealth <= reclaimHealthDelta) {
+        if (!mUnit->IsUnitState(UNITSTATE_Guarding) && !mUnit->IsUnitState(UNITSTATE_AssistingCommander)) {
+          targetEntity->RunScriptUnit(kOnReclaimedScript, mUnit);
+
+          LuaPlus::LuaObject newEntityObject = targetEntity->RunScriptCreateWreckageProp(0.0f);
+          targetEntity->Destroy();
+          if (newEntityObject.IsNil()) {
+            mTargetEntity.Set(nullptr);
+          } else {
+            mTargetEntity.Set(SCR_FromLua_EntityOpt(newEntityObject));
+            mUnit->SetFocusEntity(mTargetEntity.GetObjectPtr());
+          }
+
+          mTaskState = NextTaskState(mTaskState);
+        }
+      } else {
+        targetEntity->AdjustHealth(nullptr, -reclaimHealthDelta);
+        if (targetUnit != nullptr) {
+          targetUnit->mUnitVarDat.mUnitStates |= kUnitStateNoReclaimMask;
+        }
+      }
+
+      return 1;
+    }
+
+    case TASKSTATE_Processing: {
+      if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr && rawDistance > 1.0f) {
+        if (!builder->BuilderGetOnTarget()) {
+          return 1;
+        }
+      }
+
+      targetEntity = mTargetEntity.GetObjectPtr();
+      if (targetEntity == nullptr) {
+        return -1;
+      }
+
+      ReclaimCostInfo reclaimCosts{};
+      // 0x0061FBC9 / 0x0061FBED -> 0x0061FAA8: a failed cost query only
+      // warns and ends the task; `OnReclaimed` belongs to the
+      // invalid-costs path below.
+      if (!QueryReclaimCosts(mUnit, targetEntity, reclaimCosts)) {
+        gpg::Warnf(kFailedReclaimCostWarning);
+        return -1;
+      }
+
+      const float reclaimRate = 1.0f / reclaimCosts.reclaimTime;
+      mReclaimRate = -reclaimRate;
+      if (reclaimCosts.reclaimEnergy >= 0.0f && reclaimCosts.reclaimMass >= 0.0f) {
+        mReclaimPerSecond.energy = std::max(reclaimCosts.reclaimEnergy, 0.0f) * reclaimRate;
+        mReclaimPerSecond.mass = std::max(reclaimCosts.reclaimMass, 0.0f) * reclaimRate;
+
+        mTaskState = NextTaskState(mTaskState);
+        mUnit->mUnitVarDat.mUnitStates |= kUnitStateReclaimingMask;
+
+        const float previousFraction = targetEntity->mVarDat.mFractionComplete;
+        const float completionFromHealth = targetEntity->mVarDat.mHealth / targetEntity->mVarDat.mMaxHealth;
+        const float clampedCompletion = std::min(completionFromHealth, previousFraction);
+        (void)targetEntity->UpdateFractionComplete(clampedCompletion - previousFraction);
         return 1;
+      }
+
+      gpg::Warnf(kInvalidReclaimCostWarning);
+      targetEntity->RunScriptUnit(kOnReclaimedScript, mUnit);
+      return -1;
+    }
+
+    case TASKSTATE_Complete: {
+      targetEntity = mTargetEntity.GetObjectPtr();
+      targetUnit = (targetEntity != nullptr) ? targetEntity->IsUnit() : nullptr;
+      if (targetUnit != nullptr && contactDistance > mUnit->GetBlueprint()->Economy.MaxBuildDistance) {
+        if (mHasStarted) {
+          SetReclaimScriptActive(false);
+        }
+        *mDispatchResult = kAiResultRetryOrRetarget;
+        return -1;
+      }
+
+      SetReclaimScriptActive(true);
+
+      const float limitingRate = mConsumptionData->LimitingRate();
+      float appliedFractionDelta = 0.0f;
+      float reclaimWorkProgress = mUnit->mUnitVarDat.mWorkProgress;
+      PausedPropReclaimOverride pausedOverride{};
+      if (targetUnit != nullptr) {
+        appliedFractionDelta = targetEntity->Materialize(mReclaimRate * limitingRate);
+
+        const float completionFromHealth = targetEntity->mVarDat.mHealth / targetEntity->mVarDat.mMaxHealth;
+        const float clampedCompletion = std::min(targetEntity->mVarDat.mFractionComplete, completionFromHealth);
+        const float clampedHealth = targetEntity->mVarDat.mMaxHealth * clampedCompletion;
+        if (clampedHealth != targetEntity->mVarDat.mHealth) {
+          targetEntity->SetHealth(clampedHealth);
+        }
+
+        reclaimWorkProgress = 1.0f - targetEntity->mVarDat.mFractionComplete;
+      } else if (targetEntity != nullptr) {
+        if (Prop* const propTarget = targetEntity->IsProp(); propTarget != nullptr) {
+          // FAF hot-patch: 0x0061FF7B jumps to 0x01291836 in .exxt. With the
+          // reclaimer paused it saves +0x64/+0x68/+0x6C to .exxt globals and
+          // writes 0xB22BCC77 (-1e-8f) and two zeros; 0x00620071 jumps to
+          // 0x0129188F, which restores them on the only exit of this arm.
+          if (mUnit->mUnitVarDat.mIsPaused) {
+            pausedOverride.active = true;
+            pausedOverride.savedReclaimRate = mReclaimRate;
+            pausedOverride.savedReclaimPerSecond = mReclaimPerSecond;
+            mReclaimRate = -0.0000000099999999f;
+            mReclaimPerSecond.energy = 0.0f;
+            mReclaimPerSecond.mass = 0.0f;
+          }
+
+          appliedFractionDelta = propTarget->Materialize(mReclaimRate * limitingRate);
+          reclaimWorkProgress = 1.0f - targetEntity->mVarDat.mFractionComplete;
+        }
+      }
+
+      mUnit->mUnitVarDat.mWorkProgress = reclaimWorkProgress;
+      AwardReclaimedResources(mUnit, appliedFractionDelta, mReclaimRate, mReclaimPerSecond);
+
+      if (pausedOverride.active) {
+        mReclaimRate = pausedOverride.savedReclaimRate;
+        mReclaimPerSecond = pausedOverride.savedReclaimPerSecond;
+        return 1;
+      }
+
+      return 1;
+    }
+
+    default:
+      gpg::HandleAssertFailure(
+        "Reached the supposably unreachable.", 427, "c:\\work\\rts\\main\\code\\src\\sim\\AiUnitReclaim.cpp"
+      );
+      return 1;
     }
   }
 
@@ -666,7 +669,9 @@ namespace moho
    * Loads base command-task state and reclaim-task payload lanes, then
    * swaps owned economy request pointer ownership from archive state.
    */
-  void CUnitReclaimTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CUnitReclaimTask::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -698,7 +703,9 @@ namespace moho
    * Saves base command-task state and reclaim-task payload lanes including
    * tracked pointer ownership for command and economy request references.
    */
-  void CUnitReclaimTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CUnitReclaimTask::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;
@@ -727,7 +734,9 @@ namespace moho
    * Toggles reclaim-script active state and dispatches
    * `OnStartReclaim`/`OnStopReclaim` callbacks when state changes.
    */
-  void CUnitReclaimTask::SetReclaimScriptActive(const bool active)
+  void CUnitReclaimTask::SetReclaimScriptActive(
+    const bool active
+  )
   {
     if (mHasStarted == active) {
       return;
@@ -763,7 +772,10 @@ namespace moho
    * `0x0061EFB2` samples the gun position and `0x0061EFC0` constructs the
    * reclaim task under the parent.
    */
-  void IssueReclaimTask(CCommandTask* const parentTask, const CAiTarget& target)
+  void IssueReclaimTask(
+    CCommandTask* const parentTask,
+    const CAiTarget& target
+  )
   {
     // 0x0061EF7E reads the raw weak target (no recon-blip resolution); a
     // blip stays the target until the task's Waiting state resolves it.
@@ -789,7 +801,10 @@ namespace gpg
    * Builds one typed reflection reference for `moho::CUnitReclaimTask*`,
    * preserving dynamic-derived ownership and base-offset adjustment.
    */
-  gpg::RRef* RRef_CUnitReclaimTask(gpg::RRef* const outRef, moho::CUnitReclaimTask* const value)
+  gpg::RRef* RRef_CUnitReclaimTask(
+    gpg::RRef* const outRef,
+    moho::CUnitReclaimTask* const value
+  )
   {
     return gpg::WriteDerivedRef(outRef, value);
   }

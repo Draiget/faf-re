@@ -70,9 +70,18 @@ namespace faf::server
     /** On the sim's thread, with no view's work going on. `rules`, for blueprint ids: the same each time. */
     void Drain(moho::RRuleGameRules* rules, const MapOfArmy& maps, const ViewHolds& holds, const Answer& answer);
 
-    [[nodiscard]] std::uint64_t Applied() const noexcept { return mApplied; }
-    [[nodiscard]] std::uint64_t Refused() const noexcept { return mRefused; }
-    [[nodiscard]] std::uint64_t Dropped() const noexcept { return mDropped; }
+    [[nodiscard]] std::uint64_t Applied() const noexcept
+    {
+      return mApplied;
+    }
+    [[nodiscard]] std::uint64_t Refused() const noexcept
+    {
+      return mRefused;
+    }
+    [[nodiscard]] std::uint64_t Dropped() const noexcept
+    {
+      return mDropped;
+    }
     /** Ids that came in a view's numbers and went on in the sim's. */
     [[nodiscard]] std::uint64_t IdsTranslated() const noexcept;
     /** A line for the console; call once the sim has stopped. */

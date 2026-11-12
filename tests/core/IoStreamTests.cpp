@@ -24,7 +24,10 @@ namespace
   using faf_core_tests::PatternBytes;
 
   /** Reads until a read comes back short; with a blocking stream that is the end of a closed stream. */
-  std::string ReadUntilShort(gpg::Stream& stream, const std::size_t chunk)
+  std::string ReadUntilShort(
+    gpg::Stream& stream,
+    const std::size_t chunk
+  )
   {
     std::string out;
     std::string piece(chunk, '\0');
@@ -38,7 +41,11 @@ namespace
   }
 
   /** Writes `bytes` in pieces whose sizes cycle through `sizes`. */
-  void WriteInPieces(gpg::Stream& stream, const std::string& bytes, std::initializer_list<std::size_t> sizes)
+  void WriteInPieces(
+    gpg::Stream& stream,
+    const std::string& bytes,
+    std::initializer_list<std::size_t> sizes
+  )
   {
     std::size_t offset = 0;
     for (;;) {
@@ -54,7 +61,9 @@ namespace
   }
 
   /** Text that compresses: repeated words with a counter in it. */
-  std::string CompressibleText(const std::size_t size)
+  std::string CompressibleText(
+    const std::size_t size
+  )
   {
     std::string text;
     for (int line = 0; text.size() < size; ++line) {
@@ -65,7 +74,9 @@ namespace
   }
 
   /** Raw (headerless) inflate with zlib; returns the output and the last inflate result. */
-  std::pair<std::string, int> RawInflate(const std::string& compressed)
+  std::pair<std::string, int> RawInflate(
+    const std::string& compressed
+  )
   {
     z_stream stream{};
     EXPECT_EQ(inflateInit2(&stream, -15), Z_OK);
@@ -85,7 +96,9 @@ namespace
   }
 
   /** Raw (headerless) deflate with zlib, finished. */
-  std::string RawDeflate(const std::string& plain)
+  std::string RawDeflate(
+    const std::string& plain
+  )
   {
     z_stream stream{};
     EXPECT_EQ(deflateInit2(&stream, 6, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY), Z_OK);
@@ -106,7 +119,9 @@ namespace
   }
 
   /** Closes the pipe's sending side and reads everything it holds. */
-  std::string Drain(gpg::PipeStream& pipe)
+  std::string Drain(
+    gpg::PipeStream& pipe
+  )
   {
     pipe.VirtClose(gpg::Stream::ModeSend);
     return ReadUntilShort(pipe, 1000u);
@@ -116,7 +131,10 @@ namespace
   // PipeStream
   // ---------------------------------------------------------------------------------------------
 
-  TEST(GpgPipeStream, BytesShowAfterFlush)
+  TEST(
+    GpgPipeStream,
+    BytesShowAfterFlush
+  )
   {
     gpg::PipeStream pipe;
     char out[8] = {};
@@ -133,7 +151,10 @@ namespace
     EXPECT_FALSE(pipe.VirtAtEnd()); // still open
   }
 
-  TEST(GpgPipeStream, AcrossChunkBoundaries)
+  TEST(
+    GpgPipeStream,
+    AcrossChunkBoundaries
+  )
   {
     gpg::PipeStream pipe;
     const std::string bytes = PatternBytes(3u * gpg::PipeStreamBuffer::kSize + 1234u, 11u);
@@ -150,7 +171,10 @@ namespace
   // end, `cmp eax, [esi+10h]` (mWriteStart). A closed pipe whose bytes the reader has not scanned yet keeps
   // mReadEnd at mReadHead, so ours reports the end (and Empty() true) with the bytes still unread.
   // Minimal input: Write("ab"), VirtClose(ModeSend), then VirtAtEnd() / Empty() before any read.
-  TEST(GpgPipeStream, DISABLED_ClosedPipeWithUnreadBytesIsNotAtTheEnd)
+  TEST(
+    GpgPipeStream,
+    DISABLED_ClosedPipeWithUnreadBytesIsNotAtTheEnd
+  )
   {
     gpg::PipeStream pipe;
     pipe.Write("ab", 2u);
@@ -162,7 +186,10 @@ namespace
     EXPECT_TRUE(pipe.Empty());
   }
 
-  TEST(GpgPipeStream, OneLargeWriteSpansSeveralChunks)
+  TEST(
+    GpgPipeStream,
+    OneLargeWriteSpansSeveralChunks
+  )
   {
     gpg::PipeStream pipe;
     const std::string bytes = PatternBytes(5u * gpg::PipeStreamBuffer::kSize, 12u);
@@ -170,7 +197,10 @@ namespace
     EXPECT_EQ(Drain(pipe), bytes);
   }
 
-  TEST(GpgPipeStream, NoWritesAfterClose)
+  TEST(
+    GpgPipeStream,
+    NoWritesAfterClose
+  )
   {
     gpg::PipeStream pipe;
     pipe.Write("ab", 2u);
@@ -185,7 +215,10 @@ namespace
     EXPECT_EQ(ReadUntilShort(pipe, 8u), "ab");
   }
 
-  TEST(GpgPipeStream, BlockingReaderOnAnotherThread)
+  TEST(
+    GpgPipeStream,
+    BlockingReaderOnAnotherThread
+  )
   {
     gpg::PipeStream pipe;
     const std::string bytes = PatternBytes(300000u, 13u);
@@ -219,7 +252,10 @@ namespace
   constexpr unsigned int kCreateAlways = 0u;
   constexpr unsigned int kOpenExisting = 3u;
 
-  TEST(GpgFileStream, WriteThroughTheBufferAndDirect)
+  TEST(
+    GpgFileStream,
+    WriteThroughTheBufferAndDirect
+  )
   {
     const faf_core_tests::TempDir folder;
     const std::string path = folder.File("out.bin");
@@ -238,7 +274,10 @@ namespace
     EXPECT_EQ(faf_core_tests::ReadWholeFile(path), bytes);
   }
 
-  TEST(GpgFileStream, DestructorFlushesPendingBytes)
+  TEST(
+    GpgFileStream,
+    DestructorFlushesPendingBytes
+  )
   {
     const faf_core_tests::TempDir folder;
     const std::string path = folder.File("pending.txt");
@@ -249,7 +288,10 @@ namespace
     EXPECT_EQ(faf_core_tests::ReadWholeFile(path), "only in the buffer");
   }
 
-  TEST(GpgFileStream, ReadSeekAndTell)
+  TEST(
+    GpgFileStream,
+    ReadSeekAndTell
+  )
   {
     const faf_core_tests::TempDir folder;
     const std::string path = folder.File("in.bin");
@@ -281,7 +323,10 @@ namespace
     EXPECT_TRUE(file.VirtAtEnd());
   }
 
-  TEST(GpgFileStream, ReadAndWriteOneFile)
+  TEST(
+    GpgFileStream,
+    ReadAndWriteOneFile
+  )
   {
     const faf_core_tests::TempDir folder;
     const std::string path = folder.File("both.txt");
@@ -302,7 +347,10 @@ namespace
     EXPECT_EQ(faf_core_tests::ReadWholeFile(path), "hJllo world!");
   }
 
-  TEST(GpgFileStream, MissingFileThrowsIOErrorWithTheSystemCode)
+  TEST(
+    GpgFileStream,
+    MissingFileThrowsIOErrorWithTheSystemCode
+  )
   {
     const faf_core_tests::TempDir folder;
     const std::string path = folder.File("missing.bin");
@@ -315,7 +363,10 @@ namespace
     }
   }
 
-  TEST(GpgFileStream, WrongDirectionThrows)
+  TEST(
+    GpgFileStream,
+    WrongDirectionThrows
+  )
   {
     const faf_core_tests::TempDir folder;
     const std::string path = folder.File("dir.bin");
@@ -326,7 +377,9 @@ namespace
       EXPECT_THROW((void)out.VirtAtEnd(), std::runtime_error);
       EXPECT_THROW((void)out.VirtTell(gpg::Stream::ModeReceive), std::invalid_argument);
       EXPECT_THROW((void)out.Seek(gpg::Stream::OriginBegin, 0), std::invalid_argument);
-      EXPECT_THROW((void)out.VirtSeek(gpg::Stream::ModeSend, static_cast<gpg::Stream::SeekOrigin>(3), 0), std::invalid_argument);
+      EXPECT_THROW(
+        (void)out.VirtSeek(gpg::Stream::ModeSend, static_cast<gpg::Stream::SeekOrigin>(3), 0), std::invalid_argument
+      );
       out.Write("x", 1u);
     }
     gpg::FileStream in(path.c_str(), gpg::Stream::ModeReceive, kOpenExisting, 64);
@@ -340,7 +393,10 @@ namespace
   // ZLibOutputFilterStream
   // ---------------------------------------------------------------------------------------------
 
-  TEST(GpgZLibStream, DeflateInflatesBackWithZlib)
+  TEST(
+    GpgZLibStream,
+    DeflateInflatesBackWithZlib
+  )
   {
     const std::string text = CompressibleText(60000u);
     const std::string noise = PatternBytes(5000u, 31u);
@@ -361,7 +417,10 @@ namespace
     EXPECT_TRUE(inflated == plain);
   }
 
-  TEST(GpgZLibStream, EmptyDeflateIsAFinishedStream)
+  TEST(
+    GpgZLibStream,
+    EmptyDeflateIsAFinishedStream
+  )
   {
     gpg::PipeStream pipe;
     {
@@ -373,7 +432,10 @@ namespace
     EXPECT_TRUE(inflated.empty());
   }
 
-  TEST(GpgZLibStream, FlushEndsWithASyncMarker)
+  TEST(
+    GpgZLibStream,
+    FlushEndsWithASyncMarker
+  )
   {
     gpg::PipeStream pipe;
     gpg::ZLibOutputFilterStream deflater(&pipe, gpg::FLOP_Deflate);
@@ -392,7 +454,10 @@ namespace
     deflater.VirtClose(gpg::Stream::ModeSend);
   }
 
-  TEST(GpgZLibStream, InflateWhatZlibDeflated)
+  TEST(
+    GpgZLibStream,
+    InflateWhatZlibDeflated
+  )
   {
     const std::string plain = CompressibleText(40000u) + PatternBytes(3000u, 32u);
     const std::string compressed = RawDeflate(plain);
@@ -418,7 +483,10 @@ namespace
     EXPECT_TRUE(out == plain);
   }
 
-  TEST(GpgZLibStream, InflateClosedBeforeTheEndThrows)
+  TEST(
+    GpgZLibStream,
+    InflateClosedBeforeTheEndThrows
+  )
   {
     const std::string compressed = RawDeflate(PatternBytes(8000u, 33u));
     ASSERT_GT(compressed.size() / 2u, 1024u); // one write past the inline buffer, so nothing is left in it
@@ -428,7 +496,10 @@ namespace
     EXPECT_THROW(inflater.VirtClose(gpg::Stream::ModeSend), std::runtime_error);
   }
 
-  TEST(GpgZLibStream, InflateRefusesDataAfterTheEnd)
+  TEST(
+    GpgZLibStream,
+    InflateRefusesDataAfterTheEnd
+  )
   {
     const std::string compressed = RawDeflate("short") + "XYZ";
     gpg::PipeStream pipe;
@@ -437,7 +508,10 @@ namespace
     EXPECT_THROW(inflater.VirtClose(gpg::Stream::ModeSend), std::runtime_error);
   }
 
-  TEST(GpgZLibStream, ClosedStreamRefusesWritesAndFlushes)
+  TEST(
+    GpgZLibStream,
+    ClosedStreamRefusesWritesAndFlushes
+  )
   {
     gpg::PipeStream pipe;
     gpg::ZLibOutputFilterStream deflater(&pipe, gpg::FLOP_Deflate);
@@ -447,9 +521,14 @@ namespace
     EXPECT_NO_THROW(deflater.VirtClose(gpg::Stream::ModeSend)); // a second close does nothing
   }
 
-  TEST(GpgZLibStream, UnknownOperationThrows)
+  TEST(
+    GpgZLibStream,
+    UnknownOperationThrows
+  )
   {
     gpg::PipeStream pipe;
-    EXPECT_THROW((void)gpg::ZLibOutputFilterStream(&pipe, static_cast<gpg::EFilterOperation>(5)), std::invalid_argument);
+    EXPECT_THROW(
+      (void)gpg::ZLibOutputFilterStream(&pipe, static_cast<gpg::EFilterOperation>(5)), std::invalid_argument
+    );
   }
 } // namespace

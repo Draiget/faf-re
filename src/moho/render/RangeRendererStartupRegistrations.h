@@ -124,19 +124,4 @@ namespace moho
 
   extern bool ren_Ranges;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 } // namespace moho

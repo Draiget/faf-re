@@ -108,8 +108,8 @@ namespace moho
      */
     [[nodiscard]] double GetDeltaSeconds(const CTimeStamp& other) const noexcept;
 
-    std::int64_t time{0};  // +0x00
-    std::int64_t ftime{0}; // +0x08
+    std::int64_t time{0};    // +0x00
+    std::int64_t ftime{0};   // +0x08
     std::uint16_t millis{0}; // +0x10
   };
   static_assert(offsetof(CTimeStamp::SInfo, year) == 0x00, "CTimeStamp::SInfo::year offset must be 0x00");
@@ -131,7 +131,9 @@ namespace moho
     /**
      * Engine addition: atomic add on the primary lane, returning the value before it.
      */
-    std::int32_t AddPrimaryBits(const std::int32_t delta) noexcept
+    std::int32_t AddPrimaryBits(
+      const std::int32_t delta
+    ) noexcept
     {
       return platform::AtomicAdd(&mPrimaryValueBits, delta);
     }
@@ -139,7 +141,9 @@ namespace moho
     /**
      * Engine addition: atomic exchange on the primary lane, returning the value before it.
      */
-    std::int32_t ExchangePrimaryBits(const std::int32_t value) noexcept
+    std::int32_t ExchangePrimaryBits(
+      const std::int32_t value
+    ) noexcept
     {
       return platform::AtomicExchange(&mPrimaryValueBits, value);
     }
@@ -147,7 +151,9 @@ namespace moho
     /**
      * Engine addition: atomic store on the primary lane.
      */
-    void StorePrimaryBits(const std::int32_t value) noexcept
+    void StorePrimaryBits(
+      const std::int32_t value
+    ) noexcept
     {
       platform::AtomicField(&mPrimaryValueBits).store(value);
     }
@@ -306,7 +312,10 @@ namespace moho
     void VisitChildren(void (*visit)(StatItem* child, void* context), void* context);
 
     /** Engine addition: the item's name (the last part of its stat path). */
-    [[nodiscard]] const fa::string& Name() const noexcept { return mName; }
+    [[nodiscard]] const fa::string& Name() const noexcept
+    {
+      return mName;
+    }
 
     static gpg::RType* sType;
 
@@ -328,8 +337,8 @@ namespace moho
 
     fa::string mScratchValue; // +0x48
 
-    std::uint32_t mSampleTag{0};      // +0x64
-    StatSampleBuffer mSampleHistory;  // +0x68..+0x73
+    std::uint32_t mSampleTag{0};     // +0x64
+    StatSampleBuffer mSampleHistory; // +0x68..+0x73
 
     fa::string mName; // +0x74
 
@@ -373,8 +382,6 @@ namespace moho
    */
   struct StatItemSerializer : gpg::SerSaveLoadHelper<StatItem>
   {};
-
-
 
   /**
    * VFTABLE: 0x00E01104
@@ -523,9 +530,9 @@ namespace moho
   /**
    * Unit stat-tree lookup helpers used by Unit::GetStat* wrappers.
    *
-    * Alias of FUN_0040C200 (non-canonical helper lane).
-    * Alias of FUN_00417B60 (non-canonical helper lane).
-    * Alias of FUN_00417C50 (non-canonical helper lane).
+   * Alias of FUN_0040C200 (non-canonical helper lane).
+   * Alias of FUN_00417B60 (non-canonical helper lane).
+   * Alias of FUN_00417C50 (non-canonical helper lane).
    */
   [[nodiscard]] StatItem* ResolveStatByMode(void* statsRoot, gpg::StrArg name, int mode);
   [[nodiscard]] StatItem* ResolveStatFloat(void* statsRoot, gpg::StrArg name);

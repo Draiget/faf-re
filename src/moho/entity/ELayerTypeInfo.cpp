@@ -132,9 +132,14 @@ namespace
   [[maybe_unused]] ELayerTypeInfoBootstrap gELayerTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_ELayerTypeInfo_b64bda, moho::register_ELayerTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_ELayerTypeInfo_b64bda,
+  moho::register_ELayerTypeInfo
+)
 
-GPG_PREREGISTER_INIT(preregister_ELayerTypeInfo_b64bda, moho::preregister_ELayerTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_ELayerTypeInfo_b64bda,
+  moho::preregister_ELayerTypeInfo
+)

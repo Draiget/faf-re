@@ -5,14 +5,22 @@
 
 namespace
 {
-  [[nodiscard]] float SelectRejectCoordinate(const float planeAxis, const float minValue, const float maxValue) noexcept
+  [[nodiscard]] float SelectRejectCoordinate(
+    const float planeAxis,
+    const float minValue,
+    const float maxValue
+  ) noexcept
   {
     // Reject-test corner selection (sub_472380): choose the corner that yields
     // the smallest signed distance against the plane.
     return std::signbit(planeAxis) ? maxValue : minValue;
   }
 
-  [[nodiscard]] float SelectSupportCoordinate(const float planeAxis, const float minValue, const float maxValue) noexcept
+  [[nodiscard]] float SelectSupportCoordinate(
+    const float planeAxis,
+    const float minValue,
+    const float maxValue
+  ) noexcept
   {
     // Inside-test corner selection (sub_472430): choose the corner that yields
     // the largest signed distance against the plane.
@@ -33,7 +41,10 @@ namespace
    * sign bits into one word and shifts each out as an index - which is the
    * `signbit ? max : min` the helper above spells out.
    */
-  [[nodiscard]] bool IsAabbNotOutsidePlane(const Wm3::Plane3f& plane, const Wm3::AxisAlignedBox3f& bounds) noexcept
+  [[nodiscard]] bool IsAabbNotOutsidePlane(
+    const Wm3::Plane3f& plane,
+    const Wm3::AxisAlignedBox3f& bounds
+  ) noexcept
   {
     const float rejectX = SelectRejectCoordinate(plane.Normal.x, bounds.Min.x, bounds.Max.x);
     const float rejectY = SelectRejectCoordinate(plane.Normal.y, bounds.Min.y, bounds.Max.y);
@@ -53,7 +64,10 @@ namespace
    * Tests whether an AABB is fully on the negative (inside) side of a plane by
    * checking the support corner against the plane equation.
    */
-  [[nodiscard]] bool IsAabbFullyInsidePlane(const Wm3::Plane3f& plane, const Wm3::AxisAlignedBox3f& bounds) noexcept
+  [[nodiscard]] bool IsAabbFullyInsidePlane(
+    const Wm3::Plane3f& plane,
+    const Wm3::AxisAlignedBox3f& bounds
+  ) noexcept
   {
     const float supportX = SelectSupportCoordinate(plane.Normal.x, bounds.Min.x, bounds.Max.x);
     const float supportY = SelectSupportCoordinate(plane.Normal.y, bounds.Min.y, bounds.Max.y);
@@ -64,7 +78,10 @@ namespace
     return signedDistance <= 0.0f;
   }
 
-  [[nodiscard]] Wm3::Plane3f TransformPlaneToBoxBasis(const Wm3::Plane3f& plane, const Wm3::Box3f& box) noexcept
+  [[nodiscard]] Wm3::Plane3f TransformPlaneToBoxBasis(
+    const Wm3::Plane3f& plane,
+    const Wm3::Box3f& box
+  ) noexcept
   {
     Wm3::Plane3f transformedPlane{};
     transformedPlane.Normal.x =
@@ -77,7 +94,9 @@ namespace
     return transformedPlane;
   }
 
-  [[nodiscard]] Wm3::Vector3f ProjectBoxCenterToBasis(const Wm3::Box3f& box) noexcept
+  [[nodiscard]] Wm3::Vector3f ProjectBoxCenterToBasis(
+    const Wm3::Box3f& box
+  ) noexcept
   {
     const float centerX = box.Center[0];
     const float centerY = box.Center[1];
@@ -101,7 +120,9 @@ namespace moho
    * Builds six clipping planes from one oriented box center/axis/extent
    * representation.
    */
-  CGeomSolid3::CGeomSolid3(const Wm3::Box3f& box)
+  CGeomSolid3::CGeomSolid3(
+    const Wm3::Box3f& box
+  )
   {
     ResizePlanes(6u, Wm3::Plane3f{});
 
@@ -133,7 +154,9 @@ namespace moho
    * What it does:
    * Rebinds this solid to inline storage and deep-copies all clipping planes.
    */
-  CGeomSolid3::CGeomSolid3(const CGeomSolid3& rhs)
+  CGeomSolid3::CGeomSolid3(
+    const CGeomSolid3& rhs
+  )
   {
     *this = rhs;
   }
@@ -147,7 +170,9 @@ namespace moho
    * Replaces this solid's plane list with rhs while preserving existing
    * allocation when capacity is sufficient.
    */
-  CGeomSolid3& CGeomSolid3::operator=(const CGeomSolid3& rhs)
+  CGeomSolid3& CGeomSolid3::operator=(
+    const CGeomSolid3& rhs
+  )
   {
     if (this == &rhs) {
       return *this;
@@ -189,7 +214,10 @@ namespace moho
    * Resizes the clipping plane array and fills appended entries with
    * `fillPlane`.
    */
-  void CGeomSolid3::ResizePlanes(const std::uint32_t planeCount, const Wm3::Plane3f& fillPlane)
+  void CGeomSolid3::ResizePlanes(
+    const std::uint32_t planeCount,
+    const Wm3::Plane3f& fillPlane
+  )
   {
     planes_.Resize(planeCount, fillPlane);
   }
@@ -202,7 +230,9 @@ namespace moho
    * What it does:
    * Returns true when the AABB is not wholly outside any clipping plane.
    */
-  bool CGeomSolid3::Intersects(const Wm3::AxisAlignedBox3f& bounds) const
+  bool CGeomSolid3::Intersects(
+    const Wm3::AxisAlignedBox3f& bounds
+  ) const
   {
     for (const Wm3::Plane3f& plane : planes_) {
       if (!IsAabbNotOutsidePlane(plane, bounds)) {
@@ -221,7 +251,9 @@ namespace moho
    * Projects this solid into the oriented-box basis and tests against an
    * axis-aligned box in that local space.
    */
-  bool CGeomSolid3::Intersects(const Wm3::Box3f& box) const
+  bool CGeomSolid3::Intersects(
+    const Wm3::Box3f& box
+  ) const
   {
     CGeomSolid3 transformedSolid;
     transformedSolid.ResizePlanes(static_cast<std::uint32_t>(planes_.Size()), Wm3::Plane3f{});
@@ -248,11 +280,13 @@ namespace moho
    * What it does:
    * Returns true when the sphere is not fully outside any clipping plane.
    */
-  bool CGeomSolid3::Intersects(const Wm3::Sphere3f& sphere) const
+  bool CGeomSolid3::Intersects(
+    const Wm3::Sphere3f& sphere
+  ) const
   {
     for (const Wm3::Plane3f& plane : planes_) {
-      const float signedDistance = (plane.Normal.x * sphere.Center.x) + (plane.Normal.y * sphere.Center.y)
-        + (plane.Normal.z * sphere.Center.z) - plane.Constant;
+      const float signedDistance = (plane.Normal.x * sphere.Center.x) + (plane.Normal.y * sphere.Center.y) +
+        (plane.Normal.z * sphere.Center.z) - plane.Constant;
       if (signedDistance > sphere.Radius) {
         return false;
       }
@@ -269,7 +303,10 @@ namespace moho
    * Plane-mask variant of AABB intersection; clears mask bits for planes
    * where the box is fully inside and early-outs on first outside plane.
    */
-  bool CGeomSolid3::Intersects(const Wm3::AxisAlignedBox3f& bounds, std::uint32_t* const activePlaneMask) const
+  bool CGeomSolid3::Intersects(
+    const Wm3::AxisAlignedBox3f& bounds,
+    std::uint32_t* const activePlaneMask
+  ) const
   {
     const std::size_t planeCount = planes_.Size();
     if (planeCount == 0) {

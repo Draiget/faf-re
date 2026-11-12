@@ -22,7 +22,10 @@ namespace
 
   struct CMauiScrollbarTypeInfoBootstrap
   {
-    CMauiScrollbarTypeInfoBootstrap() { moho::register_CMauiScrollbarTypeInfoStartup(); }
+    CMauiScrollbarTypeInfoBootstrap()
+    {
+      moho::register_CMauiScrollbarTypeInfoStartup();
+    }
   };
   CMauiScrollbarTypeInfoBootstrap gCMauiScrollbarTypeInfoBootstrap;
 
@@ -37,7 +40,9 @@ namespace
    * `RType::IsDerivedFrom` cannot walk from it to CScriptObject and every
    * reflected reference built from a CMauiScrollbar fails its upcast.
    */
-  void AddCMauiControlBase(gpg::RType& typeInfo)
+  void AddCMauiControlBase(
+    gpg::RType& typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CMauiControl>(&typeInfo);
   }
@@ -98,4 +103,7 @@ void moho::register_CMauiScrollbarTypeInfoStartup()
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every
 // consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CMauiScrollbarTypeInfoStartup_7a0360, moho::register_CMauiScrollbarTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CMauiScrollbarTypeInfoStartup_7a0360,
+  moho::register_CMauiScrollbarTypeInfoStartup
+)

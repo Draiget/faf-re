@@ -2,8 +2,8 @@
 
 namespace gpg::gal
 {
-namespace
-{
+  namespace
+  {
 
     /**
      * FAF addition. Lays the engine's colour-write mask and fill mode over the
@@ -14,7 +14,9 @@ namespace
      * render state. D3D10 hands back the existing object for a description it
      * has seen, so nothing needs caching here.
      */
-    void ApplyStateOverrides(ID3D10Device* const device)
+    void ApplyStateOverrides(
+      ID3D10Device* const device
+    )
     {
       if (sColorWriteMask != D3D10_COLOR_WRITE_ENABLE_ALL) {
         ID3D10BlendState* bound = nullptr;
@@ -59,8 +61,7 @@ namespace
         SafeRelease(bound);
       }
     }
-}
-
+  } // namespace
 
   /**
    * Address: 0x00900FF0 (FUN_00900FF0)
@@ -72,7 +73,9 @@ namespace
    * effect interface through `AddRef`.
    */
   EffectTechniqueD3D10::EffectTechniqueD3D10(
-    const char* const name, ID3D10Effect* const dxEffect, ID3D10EffectTechnique* const techniqueHandle
+    const char* const name,
+    ID3D10Effect* const dxEffect,
+    ID3D10EffectTechnique* const techniqueHandle
   )
     : name_()
     , dxEffect_(dxEffect)
@@ -159,7 +162,9 @@ namespace
    * What it does:
    * Applies a pass from the active D3D10 technique handle.
    */
-  void EffectTechniqueD3D10::BeginPass(const int pass)
+  void EffectTechniqueD3D10::BeginPass(
+    const int pass
+  )
   {
     if (!beginEndActive_) {
       ThrowGalError("EffectTechniqueD3D10.cpp", 89, "effect technique begin/end mismatch");
@@ -193,7 +198,10 @@ namespace
    * What it does:
    * Fetches a boolean annotation by name from the current technique handle.
    */
-  bool EffectTechniqueD3D10::GetAnnotationBool(bool* const outValue, const fa::string& annotationName)
+  bool EffectTechniqueD3D10::GetAnnotationBool(
+    bool* const outValue,
+    const fa::string& annotationName
+  )
   {
     if (techniqueHandle_ == nullptr) {
       ThrowGalError("EffectTechniqueD3D10.cpp", 105, "invalid effect technique");
@@ -220,7 +228,10 @@ namespace
    * What it does:
    * Fetches an integer annotation by name from the current technique handle.
    */
-  bool EffectTechniqueD3D10::GetAnnotationInt(int* const outValue, const fa::string& annotationName)
+  bool EffectTechniqueD3D10::GetAnnotationInt(
+    int* const outValue,
+    const fa::string& annotationName
+  )
   {
     if (techniqueHandle_ == nullptr) {
       ThrowGalError("EffectTechniqueD3D10.cpp", 124, "invalid effect technique");
@@ -245,7 +256,10 @@ namespace
    * What it does:
    * Fetches a float annotation by name from the current technique handle.
    */
-  bool EffectTechniqueD3D10::GetAnnotationFloat(float* const outValue, const fa::string& annotationName)
+  bool EffectTechniqueD3D10::GetAnnotationFloat(
+    float* const outValue,
+    const fa::string& annotationName
+  )
   {
     if (techniqueHandle_ == nullptr) {
       ThrowGalError("EffectTechniqueD3D10.cpp", 140, "invalid effect technique");
@@ -270,7 +284,10 @@ namespace
    * What it does:
    * Fetches a string annotation by name from the current technique handle.
    */
-  bool EffectTechniqueD3D10::GetAnnotationString(fa::string* const outValue, const fa::string& annotationName)
+  bool EffectTechniqueD3D10::GetAnnotationString(
+    fa::string* const outValue,
+    const fa::string& annotationName
+  )
   {
     if (techniqueHandle_ == nullptr) {
       ThrowGalError("EffectTechniqueD3D10.cpp", 156, "invalid effect technique");
@@ -290,5 +307,4 @@ namespace
     outValue->assign_owned((text != nullptr) ? text : "");
     return true;
   }
-}
-
+} // namespace gpg::gal

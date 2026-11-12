@@ -13,8 +13,7 @@ namespace moho
   /**
    * Address: 0x007F6250 (FUN_007F6250, Moho::SimpleRenderWorldView::Func1)
    */
-  void IRenderWorldView::Func1()
-  {}
+  void IRenderWorldView::Func1() {}
 
   /**
    * Address: 0x007F6260 (FUN_007F6260, Moho::IRenderWorldView::Func2)

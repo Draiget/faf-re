@@ -68,7 +68,8 @@ namespace gpg::gal
     boost::shared_ptr<VertexBuffer> CreateVertexBuffer(const VertexBufferContext* context) override;
     boost::shared_ptr<IndexBuffer> CreateIndexBuffer(const IndexBufferContext* context) override;
     void GetRenderTargetData(
-      const boost::shared_ptr<RenderTarget>& source, const boost::shared_ptr<Texture>& destination
+      const boost::shared_ptr<RenderTarget>& source,
+      const boost::shared_ptr<Texture>& destination
     ) override;
     void StretchRect(
       const boost::shared_ptr<RenderTarget>& source,
@@ -82,9 +83,12 @@ namespace gpg::gal
       const RECT* sourceRect,
       const RECT* destinationRect
     ) override;
-    void SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) override;
+    void
+    SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) override;
     void SaveRenderTarget(
-      const boost::shared_ptr<RenderTarget>& renderTarget, const fa::string& filePath, int fileFormat
+      const boost::shared_ptr<RenderTarget>& renderTarget,
+      const fa::string& filePath,
+      int fileFormat
     ) override;
     void SaveTexture(
       const boost::shared_ptr<Texture>& texture,
@@ -99,7 +103,8 @@ namespace gpg::gal
       std::uint32_t* outWidth,
       int* outHeight
     ) override;
-    boost::weak_ptr<void>* Func7(boost::weak_ptr<void>* outWeakHandle, boost::shared_ptr<void> temporarySharedHandle) override;
+    boost::weak_ptr<void>*
+    Func7(boost::weak_ptr<void>* outWeakHandle, boost::shared_ptr<void> temporarySharedHandle) override;
     /** Resizes every head's swap chain to the context's head sizes and rebuilds the back-buffer targets. */
     void Reset(DeviceContext* context) override;
     void Reset() override;
@@ -113,11 +118,21 @@ namespace gpg::gal
     void SetViewport(const D3DVIEWPORT9* viewport) override;
     void GetViewport(D3DVIEWPORT9* outViewport) override;
     void ClearTarget(const OutputContext* context) override;
-    void Clear(bool clearColor, bool clearDepth, bool clearStencil, std::uint32_t packedColor, float depth, int stencil) override;
+    void Clear(
+      bool clearColor,
+      bool clearDepth,
+      bool clearStencil,
+      std::uint32_t packedColor,
+      float depth,
+      int stencil
+    ) override;
     void ClearTextures() override;
     void SetVertexDeclaration(boost::shared_ptr<VertexFormat> vertexFormat) override;
     void SetVertexBuffer(
-      std::uint32_t streamSlot, boost::shared_ptr<VertexBuffer> vertexBuffer, int streamFrequencyToken, int startVertex
+      std::uint32_t streamSlot,
+      boost::shared_ptr<VertexBuffer> vertexBuffer,
+      int streamFrequencyToken,
+      int startVertex
     ) override;
     void SetBufferIndices(boost::shared_ptr<IndexBuffer> indexBuffer) override;
     void SetFogState(bool enable, const Matrix* projection, float fogStart, float fogEnd, int fogColor) override;
@@ -154,7 +169,10 @@ namespace gpg::gal
      * Diagnostics: with FAF_GAL_TRACE_START / FAF_GAL_TRACE_FRAMES set, the
      * calls of that many frames from that frame on go to the log.
      */
-    [[nodiscard]] bool Tracing() const noexcept { return mTracing; }
+    [[nodiscard]] bool Tracing() const noexcept
+    {
+      return mTracing;
+    }
     void Trace(const char* format, ...);
     /** Diagnostics: writes the bound colour target to FAF_GAL_DUMP_DIR. */
     void DumpBoundTarget(const char* label);
@@ -165,9 +183,18 @@ namespace gpg::gal
     /** As DeviceD3D10::SupportsVertexTextureFormat: any 2D-sampleable format. */
     [[nodiscard]] bool SupportsVertexTextureFormat(std::uint32_t textureFormat);
 
-    [[nodiscard]] ID3D11Device* NativeDevice() const noexcept { return mDevice.Get(); }
-    [[nodiscard]] ID3D11DeviceContext* Immediate() const noexcept { return mImmediate.Get(); }
-    [[nodiscard]] PipelineStateD3D11& Pipeline() const noexcept { return *mPipelineState; }
+    [[nodiscard]] ID3D11Device* NativeDevice() const noexcept
+    {
+      return mDevice.Get();
+    }
+    [[nodiscard]] ID3D11DeviceContext* Immediate() const noexcept
+    {
+      return mImmediate.Get();
+    }
+    [[nodiscard]] PipelineStateD3D11& Pipeline() const noexcept
+    {
+      return *mPipelineState;
+    }
 
     /** Encodes `resource` as image file format `d3dxFormat` (D3DX11_IMAGE_FILE_FORMAT). */
     HRESULT EncodeTexture(ID3D11Resource* resource, int d3dxFormat, ID3D10Blob** outBlob);
@@ -186,16 +213,26 @@ namespace gpg::gal
     void DumpBackBufferIfDue();
     void CreateClearResources();
     [[nodiscard]] bool ViewportCoversTargets() const;
-    void ClearViewportWithDraw(bool clearColor, bool clearDepth, bool clearStencil, const float* rgba, float depth, int stencil);
+    void ClearViewportWithDraw(
+      bool clearColor,
+      bool clearDepth,
+      bool clearStencil,
+      const float* rgba,
+      float depth,
+      int stencil
+    );
     void DumpTexture(ID3D11Texture2D* texture, const char* path);
     void PrepareInputLayout();
-    Microsoft::WRL::ComPtr<ID3D11InputLayout> CreateShaderInputLayout(std::uint32_t format, const void* bytecode, SIZE_T length);
+    Microsoft::WRL::ComPtr<ID3D11InputLayout>
+    CreateShaderInputLayout(std::uint32_t format, const void* bytecode, SIZE_T length);
 
     struct ShaderLayoutKey
     {
       std::uint32_t format = 0;
       std::uint8_t checksum[16]{}; // the vertex shader's DXBC hash
-      bool operator<(const ShaderLayoutKey& other) const noexcept
+      bool operator<(
+        const ShaderLayoutKey& other
+      ) const noexcept
       {
         if (format != other.format) {
           return format < other.format;

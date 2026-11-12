@@ -82,7 +82,7 @@ float moho::con_TestVarFloat = 0.0f;
  */
 fa::string moho::con_TestVarStr("string");
 bool moho::snd_ExtraDoWorkCalls = true; // 0x00F58026
-int moho::recon_debug = -1; // 0x00F58AC8 is initialised .data: -1, no army selected
+int moho::recon_debug = -1;             // 0x00F58AC8 is initialised .data: -1, no army selected
 bool moho::sPathDebuggerEnabled = false;
 int moho::rule_Paranoid = 0;
 float moho::rule_BlueprintReloadDelay = 0.5f; // 0x00F58CC0
@@ -124,55 +124,70 @@ namespace
    */
   fa::vector<fa::string> gSavedConsoleCommands;
 
-  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
+  [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(
+    lua_State* const luaContext
+  ) noexcept
   {
     return luaContext ? luaContext->stateUserData : nullptr;
   }
 
   [[nodiscard]]
-  bool TokenEq(const fa::string* token, const std::string_view text) noexcept
+  bool TokenEq(
+    const fa::string* token,
+    const std::string_view text
+  ) noexcept
   {
     return token != nullptr && token->view() == text;
   }
 
   [[nodiscard]]
-  bool TokenEqNoCase(const fa::string* token, const char* text) noexcept
+  bool TokenEqNoCase(
+    const fa::string* token,
+    const char* text
+  ) noexcept
   {
     return token != nullptr && token->equals_no_case(text);
   }
 
   [[nodiscard]]
-  const char* TokenDataOrEmpty(const fa::string* token) noexcept
+  const char* TokenDataOrEmpty(
+    const fa::string* token
+  ) noexcept
   {
     return token != nullptr ? token->c_str() : "";
   }
 
   [[nodiscard]]
-  int ParseIntToken(const fa::string* token) noexcept
+  int ParseIntToken(
+    const fa::string* token
+  ) noexcept
   {
     return std::atoi(TokenDataOrEmpty(token));
   }
 
   [[nodiscard]]
-  std::uint32_t ParseUInt32Token(const fa::string* token) noexcept
+  std::uint32_t ParseUInt32Token(
+    const fa::string* token
+  ) noexcept
   {
     return static_cast<std::uint32_t>(gpg::STR_ParseUInt32(TokenDataOrEmpty(token)));
   }
 
   [[nodiscard]]
-  float ParseFloatToken(const fa::string* token) noexcept
+  float ParseFloatToken(
+    const fa::string* token
+  ) noexcept
   {
     return static_cast<float>(std::atof(TokenDataOrEmpty(token)));
   }
 
-
-
-
   static_assert(sizeof(Wm3::Vector2f) == 0x8, "Wm3::Vector2f size must be 0x8");
 
-
   [[nodiscard]]
-  fa::string JoinConCommandTokens(const fa::vector<fa::string>& args, const std::size_t firstTokenIndex)
+  fa::string JoinConCommandTokens(
+    const fa::vector<fa::string>& args,
+    const std::size_t firstTokenIndex
+  )
   {
     const std::size_t count = args.size();
     if (firstTokenIndex >= count) {
@@ -183,7 +198,11 @@ namespace
   }
 
   template <typename TValue, typename ParseFn>
-  void ApplyIntegralConVarCommand(const fa::vector<fa::string>& args, TValue* value, ParseFn parseFn)
+  void ApplyIntegralConVarCommand(
+    const fa::vector<fa::string>& args,
+    TValue* value,
+    ParseFn parseFn
+  )
   {
     if (value == nullptr) {
       return;
@@ -254,7 +273,11 @@ namespace
    * What it does:
    * Parses bool convar commands (`=`, on/off/true/false/show/tog, numeric fallback).
    */
-  void HandleBoolConVarCommand(const fa::vector<fa::string>& args, const char* name, bool* value)
+  void HandleBoolConVarCommand(
+    const fa::vector<fa::string>& args,
+    const char* name,
+    bool* value
+  )
   {
     if (value == nullptr) {
       return;
@@ -300,7 +323,10 @@ namespace
    * What it does:
    * Parses int convar commands with arithmetic/bitwise operators and aliases.
    */
-  void HandleIntConVarCommand(const fa::vector<fa::string>& args, int* value)
+  void HandleIntConVarCommand(
+    const fa::vector<fa::string>& args,
+    int* value
+  )
   {
     ApplyIntegralConVarCommand<int>(args, value, ParseIntToken);
   }
@@ -312,7 +338,10 @@ namespace
    * What it does:
    * Parses uint8 convar commands with arithmetic/bitwise operators and aliases.
    */
-  void HandleUInt8ConVarCommand(const fa::vector<fa::string>& args, std::uint8_t* value)
+  void HandleUInt8ConVarCommand(
+    const fa::vector<fa::string>& args,
+    std::uint8_t* value
+  )
   {
     ApplyIntegralConVarCommand<std::uint8_t>(args, value, ParseIntToken);
   }
@@ -324,7 +353,10 @@ namespace
    * What it does:
    * Parses uint32 convar commands; supports decimal and `0x` numeric formats.
    */
-  void HandleUInt32ConVarCommand(const fa::vector<fa::string>& args, std::uint32_t* value)
+  void HandleUInt32ConVarCommand(
+    const fa::vector<fa::string>& args,
+    std::uint32_t* value
+  )
   {
     ApplyIntegralConVarCommand<std::uint32_t>(args, value, ParseUInt32Token);
   }
@@ -336,7 +368,10 @@ namespace
    * What it does:
    * Parses float convar commands (`=`, `+=`, `-=`, `*=`, `/=`, direct numeric).
    */
-  void HandleFloatConVarCommand(const fa::vector<fa::string>& args, float* value)
+  void HandleFloatConVarCommand(
+    const fa::vector<fa::string>& args,
+    float* value
+  )
   {
     if (value == nullptr) {
       return;
@@ -376,7 +411,11 @@ namespace
    * What it does:
    * Parses string convar commands (`= value` or direct assignment); prints current value when no args.
    */
-  void HandleStringConVarCommand(const fa::vector<fa::string>& args, const char* name, fa::string* value)
+  void HandleStringConVarCommand(
+    const fa::vector<fa::string>& args,
+    const char* name,
+    fa::string* value
+  )
   {
     if (value == nullptr) {
       return;
@@ -400,7 +439,10 @@ namespace
   struct ConsoleCommandNameLess
   {
     [[nodiscard]]
-    bool operator()(const std::string& lhs, const std::string& rhs) const noexcept
+    bool operator()(
+      const std::string& lhs,
+      const std::string& rhs
+    ) const noexcept
     {
       return _stricmp(lhs.c_str(), rhs.c_str()) < 0;
     }
@@ -431,13 +473,17 @@ namespace
   }
 
   [[nodiscard]]
-  std::string ToStdName(const char* const name)
+  std::string ToStdName(
+    const char* const name
+  )
   {
     return (name == nullptr) ? std::string{} : std::string{name};
   }
 
   [[nodiscard]]
-  std::string ToStdName(const std::string_view name)
+  std::string ToStdName(
+    const std::string_view name
+  )
   {
     return std::string{name};
   }
@@ -451,26 +497,31 @@ namespace
    */
   [[nodiscard]]
   ConsoleCommandMap::const_iterator LowerBoundCommandByName(
-    const ConsoleCommandMap& commandsByName, const std::string_view commandName
+    const ConsoleCommandMap& commandsByName,
+    const std::string_view commandName
   )
   {
     return commandsByName.lower_bound(ToStdName(commandName));
   }
 
   /**
-    * Alias of FUN_004203D0 (non-canonical helper lane).
+   * Alias of FUN_004203D0 (non-canonical helper lane).
    *
    * What it does:
    * Moves one command-map iterator to the next in-order entry.
    */
   template <typename TIter>
-  void AdvanceCommandIterator(TIter& it)
+  void AdvanceCommandIterator(
+    TIter& it
+  )
   {
     ++it;
   }
 
   [[nodiscard]]
-  bool IsConsoleWhitespace(const char ch) noexcept
+  bool IsConsoleWhitespace(
+    const char ch
+  ) noexcept
   {
     return ch == ' ' || ch == '\t';
   }
@@ -491,7 +542,9 @@ namespace
   }
 
   void ParseCommandLine(
-    const char* const commandText, fa::vector<fa::string>& tokens, fa::string& remainder
+    const char* const commandText,
+    fa::vector<fa::string>& tokens,
+    fa::string& remainder
   )
   {
     tokens.clear();
@@ -579,7 +632,9 @@ namespace
    * Builds a quoted token and escapes embedded `"` and `\\`.
    */
   [[nodiscard]]
-  fa::string StringifyToken(const fa::string& token)
+  fa::string StringifyToken(
+    const fa::string& token
+  )
   {
     std::string out;
     out.reserve(token.size() + 2);
@@ -597,7 +652,9 @@ namespace
   }
 
   [[nodiscard]]
-  bool TokenNeedsStringify(const fa::string& token) noexcept
+  bool TokenNeedsStringify(
+    const fa::string& token
+  ) noexcept
   {
     const std::string_view text = token.view();
     if (text.empty()) {
@@ -615,7 +672,9 @@ namespace
    * What it does:
    * Decrements each character in-place by one.
    */
-  void DecStringChars(fa::string& text)
+  void DecStringChars(
+    fa::string& text
+  )
   {
     std::string decoded = text.to_std();
     for (char& ch : decoded) {
@@ -630,7 +689,9 @@ namespace
    * What it does:
    * Dispatches one formatted console line to each registered output handler.
    */
-  void OutputToConHandlers(const fa::string& line)
+  void OutputToConHandlers(
+    const fa::string& line
+  )
   {
     for (IConOutputHandler* handler : CON_GetOutputHandlers()) {
       if (handler != nullptr) {
@@ -647,7 +708,10 @@ namespace
    * Finds one command in the command map by case-insensitive key.
    */
   [[nodiscard]]
-  CConCommand* FindCommandInMap(const ConsoleCommandMap& commandsByName, const std::string_view commandName)
+  CConCommand* FindCommandInMap(
+    const ConsoleCommandMap& commandsByName,
+    const std::string_view commandName
+  )
   {
     const std::string key = ToStdName(commandName);
     const auto it = LowerBoundCommandByName(commandsByName, key);
@@ -669,7 +733,10 @@ namespace
    * What it does:
    * Inserts command by case-insensitive key when absent; reports duplicates.
    */
-  void InsertCommandByName(ConsoleCommandMap& commandsByName, CConCommand& command)
+  void InsertCommandByName(
+    ConsoleCommandMap& commandsByName,
+    CConCommand& command
+  )
   {
     const std::string key = ToStdName(command.mName);
     if (key.empty()) {
@@ -690,7 +757,9 @@ namespace
   }
 
   [[nodiscard]]
-  CConCommand* FindRegisteredConCommand(const std::string_view commandName)
+  CConCommand* FindRegisteredConCommand(
+    const std::string_view commandName
+  )
   {
     auto& registry = GetConsoleCommandRegistry();
     std::scoped_lock lock{registry.lock};
@@ -706,7 +775,10 @@ namespace
  * What it does:
  * Initializes base command metadata and auto-registers when name is present.
  */
-moho::CConCommand::CConCommand(const char* const name, const char* const description) noexcept
+moho::CConCommand::CConCommand(
+  const char* const name,
+  const char* const description
+) noexcept
   : mName(name)
   , mDescription(description)
 {
@@ -734,7 +806,9 @@ moho::CConCommand::~CConCommand()
  * What it does:
  * Registers one command by exact key and warns on duplicate definitions.
  */
-void moho::RegisterConCommand(CConCommand& command)
+void moho::RegisterConCommand(
+  CConCommand& command
+)
 {
   auto& registry = GetConsoleCommandRegistry();
   std::scoped_lock lock{registry.lock};
@@ -747,7 +821,9 @@ void moho::RegisterConCommand(CConCommand& command)
  * What it does:
  * Removes one command from the global map and warns when the key is unknown.
  */
-void moho::UnregisterConCommand(CConCommand& command)
+void moho::UnregisterConCommand(
+  CConCommand& command
+)
 {
   const std::string key = ToStdName(command.mName);
   if (key.empty()) {
@@ -767,26 +843,32 @@ void moho::UnregisterConCommand(CConCommand& command)
 }
 
 /**
- * Address: 0x0041BFF0 (FUN_0041BFF0, ?CON_ParseCommand@Moho@@YAXVStrArg@gpg@@AAV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@AAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@5@@Z)
+ * Address: 0x0041BFF0 (FUN_0041BFF0,
+ * ?CON_ParseCommand@Moho@@YAXVStrArg@gpg@@AAV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@AAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@5@@Z)
  * Address: 0x00420E30 (FUN_00420E30, sub_420E30 helper lane)
  *
  * What it does:
  * Parses one console command lane into tokens and remainder text.
  */
 void moho::CON_ParseCommand(
-  const char* const commandText, fa::vector<fa::string>& tokens, fa::string& remainder
+  const char* const commandText,
+  fa::vector<fa::string>& tokens,
+  fa::string& remainder
 )
 {
   ParseCommandLine(commandText, tokens, remainder);
 }
 
 /**
- * Address: 0x0041C4D0 (FUN_0041C4D0, ?CON_UnparseCommand@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@3@@Z)
+ * Address: 0x0041C4D0 (FUN_0041C4D0,
+ * ?CON_UnparseCommand@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@3@@Z)
  *
  * What it does:
  * Rebuilds one command string from parsed tokens with quote escaping.
  */
-fa::string moho::CON_UnparseCommand(const fa::vector<fa::string>& tokens)
+fa::string moho::CON_UnparseCommand(
+  const fa::vector<fa::string>& tokens
+)
 {
   std::string out;
   for (std::size_t index = 0; index < tokens.size(); ++index) {
@@ -807,18 +889,19 @@ fa::string moho::CON_UnparseCommand(const fa::vector<fa::string>& tokens)
 }
 
 /**
- * Address: 0x0041C600 (FUN_0041C600, ?CON_GetCommandList@Moho@@YAXAAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@_N@Z)
- * Address: 0x004203D0 (FUN_004203D0, std::map_string_CConCommand::Iterator::inc)
- * Address: 0x007E42F0 (FUN_007E42F0)
- * Address: 0x00592FE0 (FUN_00592FE0)
- * Address: 0x0052EEC0 (FUN_0052EEC0)
- * Address: 0x00531C90 (FUN_00531C90)
- * Address: 0x00531CE0 (FUN_00531CE0)
+ * Address: 0x0041C600 (FUN_0041C600,
+ * ?CON_GetCommandList@Moho@@YAXAAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@_N@Z) Address:
+ * 0x004203D0 (FUN_004203D0, std::map_string_CConCommand::Iterator::inc) Address: 0x007E42F0 (FUN_007E42F0) Address:
+ * 0x00592FE0 (FUN_00592FE0) Address: 0x0052EEC0 (FUN_0052EEC0) Address: 0x00531C90 (FUN_00531C90) Address: 0x00531CE0
+ * (FUN_00531CE0)
  *
  * What it does:
  * Appends command listing text into `outText`.
  */
-void moho::CON_GetCommandList(fa::string& outText, const bool includeDescriptions)
+void moho::CON_GetCommandList(
+  fa::string& outText,
+  const bool includeDescriptions
+)
 {
   std::string merged = outText.to_std();
 
@@ -831,9 +914,7 @@ void moho::CON_GetCommandList(fa::string& outText, const bool includeDescription
     );
   }
 
-  for (
-    auto it = registry.commandsByName.begin(); it != registry.commandsByName.end(); AdvanceCommandIterator(it)
-  ) {
+  for (auto it = registry.commandsByName.begin(); it != registry.commandsByName.end(); AdvanceCommandIterator(it)) {
     const auto& [name, command] = *it;
     (void)name;
     if (command == nullptr) {
@@ -842,7 +923,9 @@ void moho::CON_GetCommandList(fa::string& outText, const bool includeDescription
 
     if (includeDescriptions) {
       merged.append(
-        gpg::STR_Printf("  %s - %s\n", command->mName ? command->mName : "", command->mDescription ? command->mDescription : "")
+        gpg::STR_Printf(
+          "  %s - %s\n", command->mName ? command->mName : "", command->mDescription ? command->mDescription : ""
+        )
           .view()
       );
     } else {
@@ -854,14 +937,17 @@ void moho::CON_GetCommandList(fa::string& outText, const bool includeDescription
 }
 
 /**
- * Address: 0x0041C770 (FUN_0041C770, ?CON_GetFindTextMatches@Moho@@YA?BV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@PBD@Z)
-  * Alias of FUN_0041FF10 (non-canonical helper lane).
-  * Alias of FUN_004203D0 (non-canonical helper lane).
+ * Address: 0x0041C770 (FUN_0041C770,
+ * ?CON_GetFindTextMatches@Moho@@YA?BV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@PBD@Z)
+ * Alias of FUN_0041FF10 (non-canonical helper lane).
+ * Alias of FUN_004203D0 (non-canonical helper lane).
  *
  * What it does:
  * Returns command names starting with `prefix` (case-insensitive).
  */
-fa::vector<fa::string> moho::CON_GetFindTextMatches(const char* const prefix)
+fa::vector<fa::string> moho::CON_GetFindTextMatches(
+  const char* const prefix
+)
 {
   fa::vector<fa::string> matches;
   if (prefix == nullptr || prefix[0] == '\0') {
@@ -899,7 +985,10 @@ fa::vector<fa::string> moho::CON_GetFindTextMatches(const char* const prefix)
  * What it does:
  * Formats one output line and dispatches it to console handlers.
  */
-void moho::CON_Printf(const char* const format, ...)
+void moho::CON_Printf(
+  const char* const format,
+  ...
+)
 {
   if (format == nullptr) {
     return;
@@ -917,12 +1006,15 @@ void moho::CON_Printf(const char* const format, ...)
   }
 
   const fa::string captured(line);
-  boost::function<void(), std::allocator<void>> callback = [captured]() { OutputToConHandlers(captured); };
+  boost::function<void(), std::allocator<void>> callback = [captured]() {
+    OutputToConHandlers(captured);
+  };
   THREAD_InvokeAsync(callback, 0u);
 }
 
 /**
- * Address: 0x0041D3C0 (FUN_0041D3C0, ?CON_GetExecuteStack@Moho@@YAABV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@XZ)
+ * Address: 0x0041D3C0 (FUN_0041D3C0,
+ * ?CON_GetExecuteStack@Moho@@YAABV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@XZ)
  *
  * What it does:
  * Returns the global saved execute stack.
@@ -938,7 +1030,9 @@ const fa::vector<fa::string>& moho::CON_GetExecuteStack()
  * What it does:
  * Looks up command metadata by exact command key.
  */
-moho::CConCommand* moho::CON_FindCommand(const char* const commandName)
+moho::CConCommand* moho::CON_FindCommand(
+  const char* const commandName
+)
 {
   if (commandName == nullptr) {
     return nullptr;
@@ -952,7 +1046,9 @@ moho::CConCommand* moho::CON_FindCommand(const char* const commandName)
  * What it does:
  * Executes a semicolon-chain of console command text.
  */
-void moho::ExecuteConsoleCommandText(const char* commandText)
+void moho::ExecuteConsoleCommandText(
+  const char* commandText
+)
 {
   if (commandText == nullptr || commandText[0] == '\0') {
     return;
@@ -999,12 +1095,14 @@ void moho::ExecuteConsoleCommandText(const char* commandText)
 }
 
 /**
-  * Alias of FUN_0041CC90 (non-canonical helper lane).
+ * Alias of FUN_0041CC90 (non-canonical helper lane).
  *
  * What it does:
  * Public console execution entry point used by Lua and UI helpers.
  */
-void moho::CON_Execute(const char* commandText)
+void moho::CON_Execute(
+  const char* commandText
+)
 {
   ExecuteConsoleCommandText(commandText);
 }
@@ -1015,7 +1113,10 @@ void moho::CON_Execute(const char* commandText)
  * What it does:
  * Formats a command string with varargs and forwards to `CON_Execute`.
  */
-void moho::CON_Executef(const char* format, ...)
+void moho::CON_Executef(
+  const char* format,
+  ...
+)
 {
   if (format == nullptr) {
     return;
@@ -1035,7 +1136,9 @@ void moho::CON_Executef(const char* format, ...)
  * Pushes command text to history stack (front-insert, capped to 0x64 entries),
  * then executes the command.
  */
-void moho::CON_ExecuteSave(const char* commandText)
+void moho::CON_ExecuteSave(
+  const char* commandText
+)
 {
   if (commandText == nullptr || commandText[0] == '\0') {
     return;
@@ -1074,7 +1177,9 @@ void moho::CON_ExecuteLastCommand()
  * What it does:
  * Emits joined command arguments (`arg1..argN`) through console output.
  */
-void moho::CON_Echo(const fa::vector<fa::string>& args)
+void moho::CON_Echo(
+  const fa::vector<fa::string>& args
+)
 {
   if (args.size() < 2u) {
     return;
@@ -1095,12 +1200,14 @@ void moho::CON_Echo(const fa::vector<fa::string>& args)
 
 /**
  * Address: 0x0041EF40 (FUN_0041EF40, Moho::CON_ListCommands)
-  * Alias of FUN_004203D0 (non-canonical helper lane).
+ * Alias of FUN_004203D0 (non-canonical helper lane).
  *
  * What it does:
  * Emits one formatted line per registered command.
  */
-void moho::CON_ListCommands(const fa::vector<fa::string>& args)
+void moho::CON_ListCommands(
+  const fa::vector<fa::string>& args
+)
 {
   (void)args;
 
@@ -1108,16 +1215,16 @@ void moho::CON_ListCommands(const fa::vector<fa::string>& args)
   {
     auto& registry = GetConsoleCommandRegistry();
     std::scoped_lock lock{registry.lock};
-    for (
-      auto it = registry.commandsByName.begin(); it != registry.commandsByName.end(); AdvanceCommandIterator(it)
-    ) {
+    for (auto it = registry.commandsByName.begin(); it != registry.commandsByName.end(); AdvanceCommandIterator(it)) {
       const auto& [name, command] = *it;
       (void)name;
       if (command == nullptr) {
         continue;
       }
       lines.push_back(
-        gpg::STR_Printf("  %-25s %s", command->mName ? command->mName : "", command->mDescription ? command->mDescription : "")
+        gpg::STR_Printf(
+          "  %-25s %s", command->mName ? command->mName : "", command->mDescription ? command->mDescription : ""
+        )
       );
     }
   }
@@ -1133,7 +1240,9 @@ void moho::CON_ListCommands(const fa::vector<fa::string>& args)
  * What it does:
  * Prints the current engine-version string to console output.
  */
-void moho::CON_GetVersion(const fa::vector<fa::string>& args)
+void moho::CON_GetVersion(
+  const fa::vector<fa::string>& args
+)
 {
   (void)args;
   const fa::string engineVersion = moho::GetEngineVersion();
@@ -1146,7 +1255,9 @@ void moho::CON_GetVersion(const fa::vector<fa::string>& args)
  * What it does:
  * Iterates all registered Lua init-form sets and dumps their binder docs.
  */
-void moho::CON_LUADOC(const fa::vector<fa::string>& args)
+void moho::CON_LUADOC(
+  const fa::vector<fa::string>& args
+)
 {
   (void)args;
 
@@ -1155,7 +1266,6 @@ void moho::CON_LUADOC(const fa::vector<fa::string>& args)
   }
 }
 
-
 /**
  * Address: 0x0047A670 (FUN_0047A670, Moho::CON_Log)
  *
@@ -1163,7 +1273,9 @@ void moho::CON_LUADOC(const fa::vector<fa::string>& args)
  * Joins command tokens from index 1 with spaces and emits one info-severity
  * log line.
  */
-void moho::CON_Log(const fa::vector<fa::string>& args)
+void moho::CON_Log(
+  const fa::vector<fa::string>& args
+)
 {
   const fa::string message = JoinConCommandTokens(args, 1u);
   gpg::Logf("%s", message.c_str());
@@ -1176,7 +1288,9 @@ void moho::CON_Log(const fa::vector<fa::string>& args)
  * Joins command tokens from index 1 with spaces and emits one warn-severity
  * log line.
  */
-void moho::CON_Debug_Warn(const fa::vector<fa::string>& args)
+void moho::CON_Debug_Warn(
+  const fa::vector<fa::string>& args
+)
 {
   const fa::string message = JoinConCommandTokens(args, 1u);
   gpg::Warnf("%s", message.c_str());
@@ -1189,7 +1303,9 @@ void moho::CON_Debug_Warn(const fa::vector<fa::string>& args)
  * Joins command tokens from index 1 with spaces and terminates through
  * `gpg::Die("%s", ...)`.
  */
-void moho::CON_Debug_Error(const fa::vector<fa::string>& args)
+void moho::CON_Debug_Error(
+  const fa::vector<fa::string>& args
+)
 {
   const fa::string message = JoinConCommandTokens(args, 1u);
   gpg::Die("%s", message.c_str());
@@ -1201,7 +1317,9 @@ void moho::CON_Debug_Error(const fa::vector<fa::string>& args)
  * What it does:
  * Debug no-op callback slot.
  */
-void moho::CON_Debug_Assert(const fa::vector<fa::string>& args)
+void moho::CON_Debug_Assert(
+  const fa::vector<fa::string>& args
+)
 {
   (void)args;
 }
@@ -1212,7 +1330,9 @@ void moho::CON_Debug_Assert(const fa::vector<fa::string>& args)
  * What it does:
  * Intentionally crashes by writing zero to absolute address 0.
  */
-void moho::CON_Debug_Crash(const fa::vector<fa::string>& args)
+void moho::CON_Debug_Crash(
+  const fa::vector<fa::string>& args
+)
 {
   (void)args;
   *reinterpret_cast<volatile std::uint32_t*>(0) = 0u;
@@ -1224,7 +1344,9 @@ void moho::CON_Debug_Crash(const fa::vector<fa::string>& args)
  * What it does:
  * Throws `std::exception` with fixed debug text.
  */
-void moho::CON_Debug_Throw(const fa::vector<fa::string>& args)
+void moho::CON_Debug_Throw(
+  const fa::vector<fa::string>& args
+)
 {
   (void)args;
 #if defined(_WIN32)
@@ -1243,7 +1365,9 @@ void moho::CON_Debug_Throw(const fa::vector<fa::string>& args)
  * Emits one no-support line when called with a filespec argument; otherwise
  * prints command usage.
  */
-void moho::CON_p4_Edit(const fa::vector<fa::string>& args)
+void moho::CON_p4_Edit(
+  const fa::vector<fa::string>& args
+)
 {
   const fa::string* const commandToken = ConCommandArg(args, 0u);
   GPG_ASSERT(commandToken != nullptr);
@@ -1263,7 +1387,9 @@ void moho::CON_p4_Edit(const fa::vector<fa::string>& args)
  * Emits one no-support line when called with a filespec argument; otherwise
  * prints command usage.
  */
-void moho::CON_p4_IsOpenedForEdit(const fa::vector<fa::string>& args)
+void moho::CON_p4_IsOpenedForEdit(
+  const fa::vector<fa::string>& args
+)
 {
   const fa::string* const commandToken = ConCommandArg(args, 0u);
   GPG_ASSERT(commandToken != nullptr);
@@ -1276,13 +1402,10 @@ void moho::CON_p4_IsOpenedForEdit(const fa::vector<fa::string>& args)
   CON_Printf("usage: %s <filespec> [user]", commandToken->c_str());
 }
 
-
 namespace
 {
 
-
 } // namespace
-
 
 /**
  * Address: 0x008D3810 (FUN_008D3810, sub_8D3810)
@@ -1292,7 +1415,9 @@ namespace
  * two command tokens are present, forwards token `0` to
  * `d3d_AntiAliasingSamples`.
  */
-void moho::CON_d3d_AntiAliasingSamplesSeedFromFirstToken(const fa::vector<fa::string>& args)
+void moho::CON_d3d_AntiAliasingSamplesSeedFromFirstToken(
+  const fa::vector<fa::string>& args
+)
 {
   if (args.size() != 2u) {
     return;
@@ -1306,15 +1431,15 @@ void moho::CON_d3d_AntiAliasingSamplesSeedFromFirstToken(const fa::vector<fa::st
   CON_Executef("d3d_AntiAliasingSamples %s", sampleToken->c_str());
 }
 
-
 namespace
 {
 } // namespace
 
-
 namespace
 {
-  int RunConTextMatchesLuaCallback(LuaPlus::LuaState* const state)
+  int RunConTextMatchesLuaCallback(
+    LuaPlus::LuaState* const state
+  )
   {
     if (state == nullptr || state->m_state == nullptr) {
       return 0;
@@ -1344,7 +1469,10 @@ namespace
   }
 
   template <void (*TExecutor)(const char*)>
-  int RunConExecuteLuaCallback(LuaPlus::LuaState* const state, const char* const helpText)
+  int RunConExecuteLuaCallback(
+    LuaPlus::LuaState* const state,
+    const char* const helpText
+  )
   {
     if (state == nullptr || state->m_state == nullptr) {
       return 0;
@@ -1354,11 +1482,7 @@ namespace
     const int argumentCount = lua_gettop(rawState);
     if (argumentCount != 1) {
       LuaPlus::LuaState::Error(
-        state,
-        "%s\n  expected %d args, but got %d",
-        helpText != nullptr ? helpText : "",
-        1,
-        argumentCount
+        state, "%s\n  expected %d args, but got %d", helpText != nullptr ? helpText : "", 1, argumentCount
       );
     }
 
@@ -1374,7 +1498,9 @@ namespace
  * What it does:
  * Returns a Lua table of console-command text matches for one input prefix.
  */
-int moho::cfunc_ConTextMatchesL(LuaPlus::LuaState* const state)
+int moho::cfunc_ConTextMatchesL(
+  LuaPlus::LuaState* const state
+)
 {
   return RunConTextMatchesLuaCallback(state);
 }
@@ -1385,7 +1511,9 @@ int moho::cfunc_ConTextMatchesL(LuaPlus::LuaState* const state)
  * What it does:
  * Lua callback thunk from `lua_State*` context to `LuaPlus::LuaState*`.
  */
-int moho::cfunc_ConTextMatches(lua_State* const luaContext)
+int moho::cfunc_ConTextMatches(
+  lua_State* const luaContext
+)
 {
   return cfunc_ConTextMatchesL(ResolveBindingState(luaContext));
 }
@@ -1415,7 +1543,9 @@ moho::CScrLuaInitForm* moho::func_ConTextMatches_LuaFuncDef()
  * What it does:
  * Validates one string argument and executes it as a console command.
  */
-int moho::cfunc_ConExecuteL(LuaPlus::LuaState* const state)
+int moho::cfunc_ConExecuteL(
+  LuaPlus::LuaState* const state
+)
 {
   return RunConExecuteLuaCallback<&moho::CON_Execute>(state, kConExecuteHelpText);
 }
@@ -1426,7 +1556,9 @@ int moho::cfunc_ConExecuteL(LuaPlus::LuaState* const state)
  * What it does:
  * Lua callback thunk from `lua_State*` context to `LuaPlus::LuaState*`.
  */
-int moho::cfunc_ConExecute(lua_State* const luaContext)
+int moho::cfunc_ConExecute(
+  lua_State* const luaContext
+)
 {
   return cfunc_ConExecuteL(ResolveBindingState(luaContext));
 }
@@ -1437,7 +1569,9 @@ int moho::cfunc_ConExecute(lua_State* const luaContext)
  * What it does:
  * Validates one string argument and executes it through save+execute path.
  */
-int moho::cfunc_ConExecuteSaveL(LuaPlus::LuaState* const state)
+int moho::cfunc_ConExecuteSaveL(
+  LuaPlus::LuaState* const state
+)
 {
   return RunConExecuteLuaCallback<&moho::CON_ExecuteSave>(state, kConExecuteSaveHelpText);
 }
@@ -1448,7 +1582,9 @@ int moho::cfunc_ConExecuteSaveL(LuaPlus::LuaState* const state)
  * What it does:
  * Lua callback thunk from `lua_State*` context to `LuaPlus::LuaState*`.
  */
-int moho::cfunc_ConExecuteSave(lua_State* const luaContext)
+int moho::cfunc_ConExecuteSave(
+  lua_State* const luaContext
+)
 {
   return cfunc_ConExecuteSaveL(ResolveBindingState(luaContext));
 }
@@ -1462,12 +1598,7 @@ int moho::cfunc_ConExecuteSave(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_ConExecute_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    "ConExecute",
-    &moho::cfunc_ConExecute,
-    nullptr,
-    "<global>",
-    kConExecuteHelpText
+    moho::SCR_UserLuaInitSet(), "ConExecute", &moho::cfunc_ConExecute, nullptr, "<global>", kConExecuteHelpText
   );
   return &binder;
 }
@@ -1515,7 +1646,9 @@ moho::CScrLuaInitForm* moho::register_ConExecuteSave_LuaFuncDef()
  * Dispatches bool convar command parsing and mutation.
  */
 template <>
-void moho::TConVar<bool>::Handle(const fa::vector<fa::string>& args)
+void moho::TConVar<bool>::Handle(
+  const fa::vector<fa::string>& args
+)
 {
   HandleBoolConVarCommand(args, mName, mValue);
 }
@@ -1528,7 +1661,9 @@ void moho::TConVar<bool>::Handle(const fa::vector<fa::string>& args)
  * Handles int convar command; prints current value when no RHS command args are provided.
  */
 template <>
-void moho::TConVar<int>::Handle(const fa::vector<fa::string>& args)
+void moho::TConVar<int>::Handle(
+  const fa::vector<fa::string>& args
+)
 {
   int* const value = mValue;
   if (value == nullptr) {
@@ -1550,7 +1685,9 @@ void moho::TConVar<int>::Handle(const fa::vector<fa::string>& args)
  * Handles uint8 convar command; prints current value when no RHS command args are provided.
  */
 template <>
-void moho::TConVar<std::uint8_t>::Handle(const fa::vector<fa::string>& args)
+void moho::TConVar<std::uint8_t>::Handle(
+  const fa::vector<fa::string>& args
+)
 {
   std::uint8_t* const value = mValue;
   if (value == nullptr) {
@@ -1572,7 +1709,9 @@ void moho::TConVar<std::uint8_t>::Handle(const fa::vector<fa::string>& args)
  * Handles float convar command; prints current value when no RHS command args are provided.
  */
 template <>
-void moho::TConVar<float>::Handle(const fa::vector<fa::string>& args)
+void moho::TConVar<float>::Handle(
+  const fa::vector<fa::string>& args
+)
 {
   float* const value = mValue;
   if (value == nullptr) {
@@ -1588,13 +1727,15 @@ void moho::TConVar<float>::Handle(const fa::vector<fa::string>& args)
 
 /**
  * Address: 0x007FDE00 (FUN_007FDE00, Moho::TConVar_uint::Process)
-  * Alias of FUN_103C8880 (non-canonical helper lane).
+ * Alias of FUN_103C8880 (non-canonical helper lane).
  *
  * What it does:
  * Handles uint32 convar command; prints current value when no RHS command args are provided.
  */
 template <>
-void moho::TConVar<std::uint32_t>::Handle(const fa::vector<fa::string>& args)
+void moho::TConVar<std::uint32_t>::Handle(
+  const fa::vector<fa::string>& args
+)
 {
   std::uint32_t* const value = mValue;
   if (value == nullptr) {
@@ -1616,7 +1757,9 @@ void moho::TConVar<std::uint32_t>::Handle(const fa::vector<fa::string>& args)
  * Handles string convar command assignment and value display.
  */
 template <>
-void moho::TConVar<fa::string>::Handle(const fa::vector<fa::string>& args)
+void moho::TConVar<fa::string>::Handle(
+  const fa::vector<fa::string>& args
+)
 {
   HandleStringConVarCommand(args, mName, mValue);
 }
@@ -1641,8 +1784,7 @@ namespace
   constexpr const char* kConsoleStartupConDebugCrashDescription = "Cause a crash (for debugging purposes)";
   constexpr const char* kConsoleStartupConDebugThrowDescription = "Throw a std::exception.";
   constexpr const char* kConsoleStartupConP4EditDescription = "Check out file(s) from perfoce";
-  constexpr const char* kConsoleStartupConP4IsOpenedForEditDescription =
-    "Is the specified file opened for edit?";
+  constexpr const char* kConsoleStartupConP4IsOpenedForEditDescription = "Is the specified file opened for edit?";
   constexpr const char* kConsoleStartupReconDebugDescription = "Show debug recon info for specified army index";
   constexpr const char* kConsoleStartupRuleParanoidDescription =
     "Paranoid mode for RULE system, print all error messages.";
@@ -1659,7 +1801,8 @@ namespace
    * Address: 0x00BC3950 (FUN_00BC3950, dynamic initializer for `gCConFunc_CON_ListCommands`)
    * Address: 0x00BEEC40 (FUN_00BEEC40, dynamic atexit destructor for `gCConFunc_CON_ListCommands`)
    */
-  CConFunc gCConFunc_CON_ListCommands("CON_ListCommands", kConsoleStartupConListCommandsDescription, &moho::CON_ListCommands);
+  CConFunc
+    gCConFunc_CON_ListCommands("CON_ListCommands", kConsoleStartupConListCommandsDescription, &moho::CON_ListCommands);
 
   /**
    * Address: 0x00BC3440 (FUN_00BC3440, dynamic initializer for `gCConFunc_PrintStats`)
@@ -1677,20 +1820,27 @@ namespace
    * Address: 0x00BC34C0 (FUN_00BC34C0, dynamic initializer for `gCConFunc_BeginLoggingStats`)
    * Address: 0x00BEE850 (FUN_00BEE850, dynamic atexit destructor for `gCConFunc_BeginLoggingStats`)
    */
-  CConFunc gCConFunc_BeginLoggingStats("BeginLoggingStats", kConsoleStartupConBeginLoggingStatsDescription, &moho::CON_BeginLoggingStats);
+  CConFunc gCConFunc_BeginLoggingStats(
+    "BeginLoggingStats",
+    kConsoleStartupConBeginLoggingStatsDescription,
+    &moho::CON_BeginLoggingStats
+  );
 
   /**
    * Address: 0x00BC3500 (FUN_00BC3500, dynamic initializer for `gCConFunc_EndLoggingStats`)
    * Address: 0x00BEE880 (FUN_00BEE880, dynamic atexit destructor for `gCConFunc_EndLoggingStats`)
    */
-  CConFunc gCConFunc_EndLoggingStats("EndLoggingStats", kConsoleStartupConEndLoggingStatsDescription, &moho::CON_EndLoggingStats);
+  CConFunc gCConFunc_EndLoggingStats(
+    "EndLoggingStats",
+    kConsoleStartupConEndLoggingStatsDescription,
+    &moho::CON_EndLoggingStats
+  );
 
   /**
    * Address: 0x00BC6450 (FUN_00BC6450, dynamic initializer for `gCConFunc_LUADOC`)
    * Address: 0x00BF0C90 (FUN_00BF0C90, dynamic atexit destructor for `gCConFunc_LUADOC`)
    */
   CConFunc gCConFunc_LUADOC("LUADOC", kConsoleStartupConLuaDocDescription, &moho::CON_LUADOC);
-
 
   /**
    * Address: 0x00BC6630 (FUN_00BC6630, dynamic initializer for `gCConFunc_GetVersion`)
@@ -1702,8 +1852,11 @@ namespace
    * Address: 0x00BC3990 (FUN_00BC3990, dynamic initializer for `gCConFunc_CON_ExecuteLastCommand`)
    * Address: 0x00BEEC70 (FUN_00BEEC70, dynamic atexit destructor for `gCConFunc_CON_ExecuteLastCommand`)
    */
-  CConFunc gCConFunc_CON_ExecuteLastCommand("CON_ExecuteLastCommand", kConsoleStartupConExecuteLastCommandDescription, reinterpret_cast<CConFunc::Callback>(&moho::CON_ExecuteLastCommand));
-
+  CConFunc gCConFunc_CON_ExecuteLastCommand(
+    "CON_ExecuteLastCommand",
+    kConsoleStartupConExecuteLastCommandDescription,
+    reinterpret_cast<CConFunc::Callback>(&moho::CON_ExecuteLastCommand)
+  );
 
   /**
    * Address: 0x00BC4B70 (FUN_00BC4B70, dynamic initializer for `gCConFunc_Log`)
@@ -1741,7 +1894,6 @@ namespace
    */
   CConFunc gCConFunc_Debug_Throw("Debug_Throw", kConsoleStartupConDebugThrowDescription, &CON_Debug_Throw);
 
-
   /**
    * Address: 0x00BC76F0 (FUN_00BC76F0, dynamic initializer for `gCConFunc_p4_Edit`)
    * Address: 0x00BF1C20 (FUN_00BF1C20, dynamic atexit destructor for `gCConFunc_p4_Edit`)
@@ -1752,18 +1904,17 @@ namespace
    * Address: 0x00BC7730 (FUN_00BC7730, dynamic initializer for `gCConFunc_p4_IsOpenedForEdit`)
    * Address: 0x00BF1C50 (FUN_00BF1C50, dynamic atexit destructor for `gCConFunc_p4_IsOpenedForEdit`)
    */
-  CConFunc gCConFunc_p4_IsOpenedForEdit("p4_IsOpenedForEdit", kConsoleStartupConP4IsOpenedForEditDescription, &moho::CON_p4_IsOpenedForEdit);
-
+  CConFunc gCConFunc_p4_IsOpenedForEdit(
+    "p4_IsOpenedForEdit",
+    kConsoleStartupConP4IsOpenedForEditDescription,
+    &moho::CON_p4_IsOpenedForEdit
+  );
 
   /**
    * Address: 0x00BC39D0 (FUN_00BC39D0, dynamic initializer for `gTConVar_con_TestVarBool`)
    * Address: 0x00BEECA0 (FUN_00BEECA0, dynamic atexit destructor for `gTConVar_con_TestVarBool`)
    */
-  TConVar<bool> gTConVar_con_TestVarBool(
-    "con_TestVarBool",
-    kConsoleStartupTestVarDescription,
-    &moho::con_TestVarBool
-  );
+  TConVar<bool> gTConVar_con_TestVarBool("con_TestVarBool", kConsoleStartupTestVarDescription, &moho::con_TestVarBool);
 
   /**
    * Address: 0x00BC3A10 (FUN_00BC3A10, dynamic initializer for `gTConVar_con_TestVar`)
@@ -1775,21 +1926,15 @@ namespace
    * Address: 0x00BC3A70 (FUN_00BC3A70, dynamic initializer for `gTConVar_con_TestVarFloat`)
    * Address: 0x00BEED30 (FUN_00BEED30, dynamic atexit destructor for `gTConVar_con_TestVarFloat`)
    */
-  TConVar<float> gTConVar_con_TestVarFloat(
-    "con_TestVarFloat",
-    kConsoleStartupTestVarDescription,
-    &moho::con_TestVarFloat
-  );
+  TConVar<float>
+    gTConVar_con_TestVarFloat("con_TestVarFloat", kConsoleStartupTestVarDescription, &moho::con_TestVarFloat);
 
   /**
    * Address: 0x00BC3AD0 (FUN_00BC3AD0, dynamic initializer for `gTConVar_con_TestVarStr`)
    * Address: 0x00BEED90 (FUN_00BEED90, dynamic atexit destructor for `gTConVar_con_TestVarStr`)
    */
-  TConVar<fa::string> gTConVar_con_TestVarStr(
-    "con_TestVarStr",
-    kConsoleStartupTestVarDescription,
-    &moho::con_TestVarStr
-  );
+  TConVar<fa::string>
+    gTConVar_con_TestVarStr("con_TestVarStr", kConsoleStartupTestVarDescription, &moho::con_TestVarStr);
 
   /**
    * Address: 0x00BCDB70 (FUN_00BCDB70, dynamic initializer for `gTConVar_recon_debug`)
@@ -1801,11 +1946,7 @@ namespace
    * Address: 0x00BC8DC0 (FUN_00BC8DC0, dynamic initializer for `gTConVar_rule_Paranoid`)
    * Address: 0x00BF3950 (FUN_00BF3950, dynamic atexit destructor for `gTConVar_rule_Paranoid`)
    */
-  TConVar<int> gTConVar_rule_Paranoid(
-    "rule_Paranoid",
-    kConsoleStartupRuleParanoidDescription,
-    &moho::rule_Paranoid
-  );
+  TConVar<int> gTConVar_rule_Paranoid("rule_Paranoid", kConsoleStartupRuleParanoidDescription, &moho::rule_Paranoid);
 
   /**
    * Address: 0x00BC8E00 (FUN_00BC8E00, dynamic initializer for `gTConVar_rule_BlueprintReloadDelay`)
@@ -1816,7 +1957,6 @@ namespace
     kConsoleStartupRuleBlueprintReloadDelayDescription,
     &moho::rule_BlueprintReloadDelay
   );
-
 
   /**
    * Address: 0x00BC6780 (FUN_00BC6780, dynamic initializer for `gTConVar_snd_ExtraDoWorkCalls`)
@@ -1834,11 +1974,8 @@ namespace
    *   `TConVar<uint8_t>`'s constructor cloned with `this` bound to this global)
    * Address: 0x00BEED00 (FUN_00BEED00, dynamic atexit destructor for `gTConVar_con_TestVarUByte`)
    */
-  TConVar<std::uint8_t> gTConVar_con_TestVarUByte(
-    "con_TestVarUByte",
-    kConsoleStartupTestVarDescription,
-    &moho::con_TestVarUByte
-  );
+  TConVar<std::uint8_t>
+    gTConVar_con_TestVarUByte("con_TestVarUByte", kConsoleStartupTestVarDescription, &moho::con_TestVarUByte);
 } // namespace
 
 namespace
@@ -1927,7 +2064,6 @@ namespace moho
 
 } // namespace moho
 
-
 namespace
 {
   constexpr const char* kConsoleStartupNetLagDescription = "Lag, in milliseconds.";
@@ -1940,22 +2076,21 @@ namespace moho
    * Address: 0x00BDB8E0 (FUN_00BDB8E0, dynamic initializer for `gTConVar_net_Lag`)
    * Address: 0x00C00C00 (FUN_00C00C00, dynamic atexit destructor for `gTConVar_net_Lag`)
    */
-  TConVar<float> gTConVar_net_Lag(
-    "net_Lag",
-    kConsoleStartupNetLagDescription,
-    &moho::net_Lag
-  );
+  TConVar<float> gTConVar_net_Lag("net_Lag", kConsoleStartupNetLagDescription, &moho::net_Lag);
 
 } // namespace moho
-
 
 namespace
 {
   constexpr const char* kConsoleStartupSimDebugCheatsDescription = "Log a backtrace when we detect a cheat.";
-  constexpr const char* kConsoleStartupSimDebugDelayDescription = "Milliseconds to delay each sim tick to simulate a slow sim.";
-  constexpr const char* kConsoleStartupSimInterlockedDescription = "If true, force the sim and UI threads to run interlocked.";
-  constexpr const char* kConsoleStartupSimIssueThreadDebugLevelDescription = "How much debug spam to spew from the issue thread.";
-  constexpr const char* kConsoleStartupSimKeepAllLogFilesDescription = "If true, keep all long files instead of just the ones for beats that appear out-of-sync.";
+  constexpr const char* kConsoleStartupSimDebugDelayDescription =
+    "Milliseconds to delay each sim tick to simulate a slow sim.";
+  constexpr const char* kConsoleStartupSimInterlockedDescription =
+    "If true, force the sim and UI threads to run interlocked.";
+  constexpr const char* kConsoleStartupSimIssueThreadDebugLevelDescription =
+    "How much debug spam to spew from the issue thread.";
+  constexpr const char* kConsoleStartupSimKeepAllLogFilesDescription =
+    "If true, keep all long files instead of just the ones for beats that appear out-of-sync.";
   constexpr const char* kConsoleStartupSimLogSizeDescription = "How many ticks to log before flushing files.";
   constexpr const char* kConsoleStartupSimReportCheatsDescription = "Report cheating when cheats are enabled.";
   constexpr const char* kConsoleStartupSimShowDamageDescription = "Show debug damage info";
@@ -1978,31 +2113,22 @@ namespace moho
    * Address: 0x00BDBA50 (FUN_00BDBA50, dynamic initializer for `gTConVar_sim_DebugCheats`)
    * Address: 0x00C00CE0 (FUN_00C00CE0, dynamic atexit destructor for `gTConVar_sim_DebugCheats`)
    */
-  TConVar<bool> gTConVar_sim_DebugCheats(
-    "sim_DebugCheats",
-    kConsoleStartupSimDebugCheatsDescription,
-    &moho::sim_DebugCheats
-  );
+  TConVar<bool>
+    gTConVar_sim_DebugCheats("sim_DebugCheats", kConsoleStartupSimDebugCheatsDescription, &moho::sim_DebugCheats);
 
   /**
    * Address: 0x00BDB920 (FUN_00BDB920, dynamic initializer for `gTConVar_sim_DebugDelay`)
    * Address: 0x00C00C30 (FUN_00C00C30, dynamic atexit destructor for `gTConVar_sim_DebugDelay`)
    */
-  TConVar<int> gTConVar_sim_DebugDelay(
-    "sim_DebugDelay",
-    kConsoleStartupSimDebugDelayDescription,
-    &moho::sim_DebugDelay
-  );
+  TConVar<int>
+    gTConVar_sim_DebugDelay("sim_DebugDelay", kConsoleStartupSimDebugDelayDescription, &moho::sim_DebugDelay);
 
   /**
    * Address: 0x00BDB860 (FUN_00BDB860, dynamic initializer for `gTConVar_sim_Interlocked`)
    * Address: 0x00C00BA0 (FUN_00C00BA0, dynamic atexit destructor for `gTConVar_sim_Interlocked`)
    */
-  TConVar<bool> gTConVar_sim_Interlocked(
-    "sim_Interlocked",
-    kConsoleStartupSimInterlockedDescription,
-    &moho::sim_Interlocked
-  );
+  TConVar<bool>
+    gTConVar_sim_Interlocked("sim_Interlocked", kConsoleStartupSimInterlockedDescription, &moho::sim_Interlocked);
 
   /**
    * Address: 0x00BDB8A0 (FUN_00BDB8A0, dynamic initializer for `gTConVar_sim_IssueThreadDebugLevel`)
@@ -2028,51 +2154,46 @@ namespace moho
    * Address: 0x00BDB9D0 (FUN_00BDB9D0, dynamic initializer for `gTConVar_sim_LogSize`)
    * Address: 0x00C00C80 (FUN_00C00C80, dynamic atexit destructor for `gTConVar_sim_LogSize`)
    */
-  TConVar<int> gTConVar_sim_LogSize(
-    "sim_LogSize",
-    kConsoleStartupSimLogSizeDescription,
-    &moho::sim_LogSize
-  );
+  TConVar<int> gTConVar_sim_LogSize("sim_LogSize", kConsoleStartupSimLogSizeDescription, &moho::sim_LogSize);
 
   /**
    * Address: 0x00BDBA90 (FUN_00BDBA90, dynamic initializer for `gTConVar_sim_ReportCheats`)
    * Address: 0x00C00D10 (FUN_00C00D10, dynamic atexit destructor for `gTConVar_sim_ReportCheats`)
    */
-  TConVar<bool> gTConVar_sim_ReportCheats(
-    "sim_ReportCheats",
-    kConsoleStartupSimReportCheatsDescription,
-    &moho::sim_ReportCheats
-  );
+  TConVar<bool>
+    gTConVar_sim_ReportCheats("sim_ReportCheats", kConsoleStartupSimReportCheatsDescription, &moho::sim_ReportCheats);
 
   /**
    * Address: 0x00BDB6B0 (FUN_00BDB6B0, dynamic initializer for `gTConVar_sim_ShowDamage`)
    * Address: 0x00C00AE0 (FUN_00C00AE0, dynamic atexit destructor for `gTConVar_sim_ShowDamage`)
    */
-  TConVar<bool> gTConVar_sim_ShowDamage(
-    "sim_ShowDamage",
-    kConsoleStartupSimShowDamageDescription,
-    &moho::sim_ShowDamage
-  );
+  TConVar<bool>
+    gTConVar_sim_ShowDamage("sim_ShowDamage", kConsoleStartupSimShowDamageDescription, &moho::sim_ShowDamage);
 
 } // namespace moho
 
-
 namespace
 {
-  constexpr const char* kConsoleStartupCamEntityBoxExpandDescription = "How much to expand the entity box when targetting entity";
-  constexpr const char* kConsoleStartupCamFarFOVDescription = "FOV to use for perspective camera at farthest zoom, in degrees";
+  constexpr const char* kConsoleStartupCamEntityBoxExpandDescription =
+    "How much to expand the entity box when targetting entity";
+  constexpr const char* kConsoleStartupCamFarFOVDescription =
+    "FOV to use for perspective camera at farthest zoom, in degrees";
   constexpr const char* kConsoleStartupCamFarPitchDescription = "Pitch of camera at farthest zoom, in degrees";
   constexpr const char* kConsoleStartupCamMinSpinPitchDescription = "The min pitch resulting from a spin";
-  constexpr const char* kConsoleStartupCamNearFOVDescription = "FOV to use for perspective camera at nearest zoom, in degrees";
+  constexpr const char* kConsoleStartupCamNearFOVDescription =
+    "FOV to use for perspective camera at nearest zoom, in degrees";
   constexpr const char* kConsoleStartupCamNearPitchDescription = "Pitch of camera at nearest zoom, in degrees";
   constexpr const char* kConsoleStartupCamNearZoomDescription = "Closest mouse can zoom in to terrain";
   constexpr const char* kConsoleStartupCamPanSpeedDescription = "How fast the camera pans.";
   constexpr const char* kConsoleStartupCamShakeMultDescription = "How much camera shake to allow.";
-  constexpr const char* kConsoleStartupCamSpinSpeedDescription = "How fast mouse spins camera, in degrees across screen size";
+  constexpr const char* kConsoleStartupCamSpinSpeedDescription =
+    "How fast mouse spins camera, in degrees across screen size";
   constexpr const char* kConsoleStartupCamTrackProjectileTimeoutDescription = "Delay after tracking a projectile.";
   constexpr const char* kConsoleStartupCamZoomAmountDescription = "How far to zoom in response to the mouse wheel.";
-  constexpr const char* kConsoleStartupCamZoomSpeedLargeDescription = "How fast the camera actually moves in response to a large zoom.";
-  constexpr const char* kConsoleStartupCamZoomSpeedSmallDescription = "How fast the camera actually moves in response to a small zoom.";
+  constexpr const char* kConsoleStartupCamZoomSpeedLargeDescription =
+    "How fast the camera actually moves in response to a large zoom.";
+  constexpr const char* kConsoleStartupCamZoomSpeedSmallDescription =
+    "How fast the camera actually moves in response to a small zoom.";
 } // namespace
 
 // New console-tunable storage with no other subsystem owner (default read from the
@@ -2095,7 +2216,6 @@ namespace moho
   extern float cam_ZoomSpeedLarge;
   extern float cam_ZoomSpeedSmall;
 
-
   /**
    * Address: 0x00BDF540 (FUN_00BDF540, dynamic initializer for `gTConVar_cam_EntityBoxExpand`)
    * Address: 0x00C03550 (FUN_00C03550, dynamic atexit destructor for `gTConVar_cam_EntityBoxExpand`)
@@ -2110,92 +2230,56 @@ namespace moho
    * Address: 0x00BDF2C0 (FUN_00BDF2C0, dynamic initializer for `gTConVar_cam_FarFOV`)
    * Address: 0x00C03370 (FUN_00C03370, dynamic atexit destructor for `gTConVar_cam_FarFOV`)
    */
-  TConVar<float> gTConVar_cam_FarFOV(
-    "cam_FarFOV",
-    kConsoleStartupCamFarFOVDescription,
-    &moho::cam_FarFOV
-  );
+  TConVar<float> gTConVar_cam_FarFOV("cam_FarFOV", kConsoleStartupCamFarFOVDescription, &moho::cam_FarFOV);
 
   /**
    * Address: 0x00BDF340 (FUN_00BDF340, dynamic initializer for `gTConVar_cam_FarPitch`)
    * Address: 0x00C033D0 (FUN_00C033D0, dynamic atexit destructor for `gTConVar_cam_FarPitch`)
    */
-  TConVar<float> gTConVar_cam_FarPitch(
-    "cam_FarPitch",
-    kConsoleStartupCamFarPitchDescription,
-    &moho::cam_FarPitch
-  );
-
+  TConVar<float> gTConVar_cam_FarPitch("cam_FarPitch", kConsoleStartupCamFarPitchDescription, &moho::cam_FarPitch);
 
   /**
    * Address: 0x00BDF580 (FUN_00BDF580, dynamic initializer for `gTConVar_cam_MinSpinPitch`)
    * Address: 0x00C03580 (FUN_00C03580, dynamic atexit destructor for `gTConVar_cam_MinSpinPitch`)
    */
-  TConVar<float> gTConVar_cam_MinSpinPitch(
-    "cam_MinSpinPitch",
-    kConsoleStartupCamMinSpinPitchDescription,
-    &moho::cam_MinSpinPitch
-  );
+  TConVar<float>
+    gTConVar_cam_MinSpinPitch("cam_MinSpinPitch", kConsoleStartupCamMinSpinPitchDescription, &moho::cam_MinSpinPitch);
 
   /**
    * Address: 0x00BDF280 (FUN_00BDF280, dynamic initializer for `gTConVar_cam_NearFOV`)
    * Address: 0x00C03340 (FUN_00C03340, dynamic atexit destructor for `gTConVar_cam_NearFOV`)
    */
-  TConVar<float> gTConVar_cam_NearFOV(
-    "cam_NearFOV",
-    kConsoleStartupCamNearFOVDescription,
-    &moho::cam_NearFOV
-  );
+  TConVar<float> gTConVar_cam_NearFOV("cam_NearFOV", kConsoleStartupCamNearFOVDescription, &moho::cam_NearFOV);
 
   /**
    * Address: 0x00BDF300 (FUN_00BDF300, dynamic initializer for `gTConVar_cam_NearPitch`)
    * Address: 0x00C033A0 (FUN_00C033A0, dynamic atexit destructor for `gTConVar_cam_NearPitch`)
    */
-  TConVar<float> gTConVar_cam_NearPitch(
-    "cam_NearPitch",
-    kConsoleStartupCamNearPitchDescription,
-    &moho::cam_NearPitch
-  );
+  TConVar<float> gTConVar_cam_NearPitch("cam_NearPitch", kConsoleStartupCamNearPitchDescription, &moho::cam_NearPitch);
 
   /**
    * Address: 0x00BDF240 (FUN_00BDF240, dynamic initializer for `gTConVar_cam_NearZoom`)
    * Address: 0x00C03310 (FUN_00C03310, dynamic atexit destructor for `gTConVar_cam_NearZoom`)
    */
-  TConVar<float> gTConVar_cam_NearZoom(
-    "cam_NearZoom",
-    kConsoleStartupCamNearZoomDescription,
-    &moho::cam_NearZoom
-  );
+  TConVar<float> gTConVar_cam_NearZoom("cam_NearZoom", kConsoleStartupCamNearZoomDescription, &moho::cam_NearZoom);
 
   /**
    * Address: 0x00BDF4C0 (FUN_00BDF4C0, dynamic initializer for `gTConVar_cam_PanSpeed`)
    * Address: 0x00C034F0 (FUN_00C034F0, dynamic atexit destructor for `gTConVar_cam_PanSpeed`)
    */
-  TConVar<float> gTConVar_cam_PanSpeed(
-    "cam_PanSpeed",
-    kConsoleStartupCamPanSpeedDescription,
-    &moho::cam_PanSpeed
-  );
+  TConVar<float> gTConVar_cam_PanSpeed("cam_PanSpeed", kConsoleStartupCamPanSpeedDescription, &moho::cam_PanSpeed);
 
   /**
    * Address: 0x00BDF500 (FUN_00BDF500, dynamic initializer for `gTConVar_cam_ShakeMult`)
    * Address: 0x00C03520 (FUN_00C03520, dynamic atexit destructor for `gTConVar_cam_ShakeMult`)
    */
-  TConVar<float> gTConVar_cam_ShakeMult(
-    "cam_ShakeMult",
-    kConsoleStartupCamShakeMultDescription,
-    &moho::cam_ShakeMult
-  );
+  TConVar<float> gTConVar_cam_ShakeMult("cam_ShakeMult", kConsoleStartupCamShakeMultDescription, &moho::cam_ShakeMult);
 
   /**
    * Address: 0x00BDF480 (FUN_00BDF480, dynamic initializer for `gTConVar_cam_SpinSpeed`)
    * Address: 0x00C034C0 (FUN_00C034C0, dynamic atexit destructor for `gTConVar_cam_SpinSpeed`)
    */
-  TConVar<float> gTConVar_cam_SpinSpeed(
-    "cam_SpinSpeed",
-    kConsoleStartupCamSpinSpeedDescription,
-    &moho::cam_SpinSpeed
-  );
+  TConVar<float> gTConVar_cam_SpinSpeed("cam_SpinSpeed", kConsoleStartupCamSpinSpeedDescription, &moho::cam_SpinSpeed);
 
   /**
    * Address: 0x00BDF440 (FUN_00BDF440, dynamic initializer for `gTConVar_cam_TrackProjectileTimeout`)
@@ -2211,11 +2295,8 @@ namespace moho
    * Address: 0x00BDF380 (FUN_00BDF380, dynamic initializer for `gTConVar_cam_ZoomAmount`)
    * Address: 0x00C03400 (FUN_00C03400, dynamic atexit destructor for `gTConVar_cam_ZoomAmount`)
    */
-  TConVar<float> gTConVar_cam_ZoomAmount(
-    "cam_ZoomAmount",
-    kConsoleStartupCamZoomAmountDescription,
-    &moho::cam_ZoomAmount
-  );
+  TConVar<float>
+    gTConVar_cam_ZoomAmount("cam_ZoomAmount", kConsoleStartupCamZoomAmountDescription, &moho::cam_ZoomAmount);
 
   /**
    * Address: 0x00BDF400 (FUN_00BDF400, dynamic initializer for `gTConVar_cam_ZoomSpeedLarge`)
@@ -2239,7 +2320,6 @@ namespace moho
 
 } // namespace moho
 
-
 namespace
 {
   constexpr const char* kConsoleStartupDbgMetronomeDescription = "Tick a metronome every tick.";
@@ -2249,15 +2329,18 @@ namespace
   constexpr const char* kConsoleStartupEdEnableHookDescription = "";
   constexpr const char* kConsoleStartupEfxWaveCutoffDescription = "Shoreline LOD cutoff";
   constexpr const char* kConsoleStartupFogDistanceFogDescription = "Distance fog enabled?";
-  constexpr const char* kConsoleStartupFogOffsetMultiplierDescription = "amount to fudge offset by to make fog go away as we zoom out";
+  constexpr const char* kConsoleStartupFogOffsetMultiplierDescription =
+    "amount to fudge offset by to make fog go away as we zoom out";
   constexpr const char* kConsoleStartupScFrameTimeClampDescription = "Minimum time between frames, in milliseconds";
   constexpr const char* kConsoleStartupScSkipIntroDescription = "Skip intro movies";
   constexpr const char* kConsoleStartupSndCheckDistanceDescription = "Do distance checks for sound culling.";
   constexpr const char* kConsoleStartupSndCheckLOSDescription = "Do LOS checks for sound culling.";
   constexpr const char* kConsoleStartupSndSpewSoundDescription = "Spew debug sound info";
   constexpr const char* kConsoleStartupWldRunWithTheWindDescription = "If true, run beats as fast as we can.";
-  constexpr const char* kConsoleStartupWldSkewRateAdjustBaseDescription = "How much to adjust the sim rate based on one beat of skew.";
-  constexpr const char* kConsoleStartupWldSkewRateAdjustMaxDescription = "Max amount to adjust the sim rate due to skew.";
+  constexpr const char* kConsoleStartupWldSkewRateAdjustBaseDescription =
+    "How much to adjust the sim rate based on one beat of skew.";
+  constexpr const char* kConsoleStartupWldSkewRateAdjustMaxDescription =
+    "Max amount to adjust the sim rate due to skew.";
 } // namespace
 
 // New console-tunable storage with no other subsystem owner (default read from the
@@ -2286,11 +2369,7 @@ namespace moho
    * Address: 0x00BE76F0 (FUN_00BE76F0, dynamic initializer for `gTConVar_dbg_Metronome`)
    * Address: 0x00C08160 (FUN_00C08160, dynamic atexit destructor for `gTConVar_dbg_Metronome`)
    */
-  TConVar<bool> gTConVar_dbg_Metronome(
-    "dbg_Metronome",
-    kConsoleStartupDbgMetronomeDescription,
-    &moho::dbg_Metronome
-  );
+  TConVar<bool> gTConVar_dbg_Metronome("dbg_Metronome", kConsoleStartupDbgMetronomeDescription, &moho::dbg_Metronome);
 
   /**
    * Address: 0x00BE8F60 (FUN_00BE8F60, dynamic initializer for `gTConVar_dbg_MonitorAddressSpace`)
@@ -2306,52 +2385,33 @@ namespace moho
    * Address: 0x00BE6C40 (FUN_00BE6C40, dynamic initializer for `gTConVar_debug_movie`)
    * Address: 0x00C07B10 (FUN_00C07B10, dynamic atexit destructor for `gTConVar_debug_movie`)
    */
-  TConVar<bool> gTConVar_debug_movie(
-    "debug_movie",
-    kConsoleStartupDebugMovieDescription,
-    &moho::debug_movie
-  );
+  TConVar<bool> gTConVar_debug_movie("debug_movie", kConsoleStartupDebugMovieDescription, &moho::debug_movie);
 
   /**
    * Address: 0x00BE0F10 (FUN_00BE0F10, dynamic initializer for `gTConVar_dump_Rate`)
    * Address: 0x00C04210 (FUN_00C04210, dynamic atexit destructor for `gTConVar_dump_Rate`)
    */
-  TConVar<float> gTConVar_dump_Rate(
-    "dump_Rate",
-    kConsoleStartupDumpRateDescription,
-    &moho::dump_Rate
-  );
-
+  TConVar<float> gTConVar_dump_Rate("dump_Rate", kConsoleStartupDumpRateDescription, &moho::dump_Rate);
 
   /**
    * Address: 0x00BE1A10 (FUN_00BE1A10, dynamic initializer for `gTConVar_ed_EnableHook`)
    * Address: 0x00C04990 (FUN_00C04990, dynamic atexit destructor for `gTConVar_ed_EnableHook`)
    */
-  TConVar<bool> gTConVar_ed_EnableHook(
-    "ed_EnableHook",
-    kConsoleStartupEdEnableHookDescription,
-    &moho::ed_EnableHook
-  );
+  TConVar<bool> gTConVar_ed_EnableHook("ed_EnableHook", kConsoleStartupEdEnableHookDescription, &moho::ed_EnableHook);
 
   /**
    * Address: 0x00BE71B0 (FUN_00BE71B0, dynamic initializer for `gTConVar_efx_WaveCutoff`)
    * Address: 0x00C07E60 (FUN_00C07E60, dynamic atexit destructor for `gTConVar_efx_WaveCutoff`)
    */
-  TConVar<float> gTConVar_efx_WaveCutoff(
-    "efx_WaveCutoff",
-    kConsoleStartupEfxWaveCutoffDescription,
-    &moho::efx_WaveCutoff
-  );
+  TConVar<float>
+    gTConVar_efx_WaveCutoff("efx_WaveCutoff", kConsoleStartupEfxWaveCutoffDescription, &moho::efx_WaveCutoff);
 
   /**
    * Address: 0x00BE16D0 (FUN_00BE16D0, dynamic initializer for `gTConVar_fog_DistanceFog`)
    * Address: 0x00C04720 (FUN_00C04720, dynamic atexit destructor for `gTConVar_fog_DistanceFog`)
    */
-  TConVar<bool> gTConVar_fog_DistanceFog(
-    "fog_DistanceFog",
-    kConsoleStartupFogDistanceFogDescription,
-    &moho::fog_DistanceFog
-  );
+  TConVar<bool>
+    gTConVar_fog_DistanceFog("fog_DistanceFog", kConsoleStartupFogDistanceFogDescription, &moho::fog_DistanceFog);
 
   /**
    * Address: 0x00BE1C10 (FUN_00BE1C10, dynamic initializer for `gTConVar_fog_OffsetMultiplier`)
@@ -2377,11 +2437,7 @@ namespace moho
    * Address: 0x00BE8D60 (FUN_00BE8D60, dynamic initializer for `gTConVar_sc_SkipIntro`)
    * Address: 0x00C08A90 (FUN_00C08A90, dynamic atexit destructor for `gTConVar_sc_SkipIntro`)
    */
-  TConVar<bool> gTConVar_sc_SkipIntro(
-    "sc_SkipIntro",
-    kConsoleStartupScSkipIntroDescription,
-    &moho::sc_SkipIntro
-  );
+  TConVar<bool> gTConVar_sc_SkipIntro("sc_SkipIntro", kConsoleStartupScSkipIntroDescription, &moho::sc_SkipIntro);
 
   /**
    * Address: 0x00BE7E40 (FUN_00BE7E40, dynamic initializer for `gTConVar_snd_CheckDistance`)
@@ -2397,21 +2453,13 @@ namespace moho
    * Address: 0x00BE7E80 (FUN_00BE7E80, dynamic initializer for `gTConVar_snd_CheckLOS`)
    * Address: 0x00C08550 (FUN_00C08550, dynamic atexit destructor for `gTConVar_snd_CheckLOS`)
    */
-  TConVar<bool> gTConVar_snd_CheckLOS(
-    "snd_CheckLOS",
-    kConsoleStartupSndCheckLOSDescription,
-    &moho::snd_CheckLOS
-  );
+  TConVar<bool> gTConVar_snd_CheckLOS("snd_CheckLOS", kConsoleStartupSndCheckLOSDescription, &moho::snd_CheckLOS);
 
   /**
    * Address: 0x00BE7EC0 (FUN_00BE7EC0, dynamic initializer for `gTConVar_snd_SpewSound`)
    * Address: 0x00C08580 (FUN_00C08580, dynamic atexit destructor for `gTConVar_snd_SpewSound`)
    */
-  TConVar<bool> gTConVar_snd_SpewSound(
-    "snd_SpewSound",
-    kConsoleStartupSndSpewSoundDescription,
-    &moho::snd_SpewSound
-  );
+  TConVar<bool> gTConVar_snd_SpewSound("snd_SpewSound", kConsoleStartupSndSpewSoundDescription, &moho::snd_SpewSound);
 
   /**
    * Address: 0x00BE7730 (FUN_00BE7730, dynamic initializer for `gTConVar_wld_RunWithTheWind`)
@@ -2443,16 +2491,18 @@ namespace moho
     &moho::wld_SkewRateAdjustMax
   );
 
-
 } // namespace moho
-
 
 namespace
 {
-  constexpr const char* kConsoleStartupUIShowControlUnderMouseDescription = "Highlights the control currently under the mouse";
-  constexpr const char* kConsoleStartupUiBuildPlaceTarmacAlphaDescription = "Tarmac alpha for buildings that are about to be placed";
-  constexpr const char* kConsoleStartupUiCommandClickScaleDescription = "Scale applied to the click distance size of command waypoints";
-  constexpr const char* kConsoleStartupUiFuelbarHeightDescription = "size of the fuel bar as a fraction of the bar height";
+  constexpr const char* kConsoleStartupUIShowControlUnderMouseDescription =
+    "Highlights the control currently under the mouse";
+  constexpr const char* kConsoleStartupUiBuildPlaceTarmacAlphaDescription =
+    "Tarmac alpha for buildings that are about to be placed";
+  constexpr const char* kConsoleStartupUiCommandClickScaleDescription =
+    "Scale applied to the click distance size of command waypoints";
+  constexpr const char* kConsoleStartupUiFuelbarHeightDescription =
+    "size of the fuel bar as a fraction of the bar height";
 } // namespace
 
 // New console-tunable storage with no other subsystem owner (default read from the
@@ -2465,7 +2515,6 @@ namespace moho
 {
   extern bool UI_ShowControlUnderMouse;
 
-
   /**
    * Address: 0x00BE19D0 (FUN_00BE19D0, dynamic initializer for `gTConVar_UI_ShowControlUnderMouse`)
    * Address: 0x00C04960 (FUN_00C04960, dynamic atexit destructor for `gTConVar_UI_ShowControlUnderMouse`)
@@ -2475,7 +2524,6 @@ namespace moho
     kConsoleStartupUIShowControlUnderMouseDescription,
     &moho::UI_ShowControlUnderMouse
   );
-
 
   /**
    * Address: 0x00BE50E0 (FUN_00BE50E0, dynamic initializer for `gTConVar_ui_BuildPlaceTarmacAlpha`)
@@ -2497,44 +2545,44 @@ namespace moho
     &moho::ui_CommandClickScale
   );
 
-
   /**
    * Address: 0x00BE5420 (FUN_00BE5420, dynamic initializer for `gTConVar_ui_fuelbarHeight`)
    * Address: 0x00C06BA0 (FUN_00C06BA0, dynamic atexit destructor for `gTConVar_ui_fuelbarHeight`)
    */
-  TConVar<float> gTConVar_ui_fuelbarHeight(
-    "ui_fuelbarHeight",
-    kConsoleStartupUiFuelbarHeightDescription,
-    &moho::ui_fuelbarHeight
-  );
-
+  TConVar<float>
+    gTConVar_ui_fuelbarHeight("ui_fuelbarHeight", kConsoleStartupUiFuelbarHeightDescription, &moho::ui_fuelbarHeight);
 
   // Not in the binary: the attack-ground deviation switch's cleanup and
   // registrar, shaped like every retail convar pair around it.
 } // namespace moho
 
-
 namespace
 {
   constexpr const char* kConsoleStartupRenBandwidthDisplayKernelDescription = "Width of bandwidth filter (in seconds).";
-  constexpr const char* kConsoleStartupRenBandwidthDisplaySecondsDescription = "Number of seconds of bandwidth data to display.";
+  constexpr const char* kConsoleStartupRenBandwidthDisplaySecondsDescription =
+    "Number of seconds of bandwidth data to display.";
   constexpr const char* kConsoleStartupRenBloomDescription = "Render Blooms?";
   constexpr const char* kConsoleStartupRenBloomBlurCountDescription = "Bloom Blur Count";
   constexpr const char* kConsoleStartupRenBorderSizeDescription = "Size of edge border";
-  constexpr const char* kConsoleStartupRenClipDecalLevelDescription = "Level at which we clip decals for super quick reject";
+  constexpr const char* kConsoleStartupRenClipDecalLevelDescription =
+    "Level at which we clip decals for super quick reject";
   constexpr const char* kConsoleStartupRenClipDecalsDescription = "Clip Decals vertex count";
   constexpr const char* kConsoleStartupRenClutterDescription = "Render clutter";
-  constexpr const char* kConsoleStartupRenDecalAlbedoLodCutoffDescription = "Fudge factor for decal cutoff on zoom out for albedos";
-  constexpr const char* kConsoleStartupRenDecalFadeFractionDescription = "fraction (0..1) of their range that decals start to fade";
+  constexpr const char* kConsoleStartupRenDecalAlbedoLodCutoffDescription =
+    "Fudge factor for decal cutoff on zoom out for albedos";
+  constexpr const char* kConsoleStartupRenDecalFadeFractionDescription =
+    "fraction (0..1) of their range that decals start to fade";
   constexpr const char* kConsoleStartupRenDecalFidelityDescription = "";
   constexpr const char* kConsoleStartupRenDecalFlatTolDescription = "flatness tolerance";
-  constexpr const char* kConsoleStartupRenDecalNormalLodCutoffDescription = "Fudge factor for decal cutoff on zoom out for normals";
+  constexpr const char* kConsoleStartupRenDecalNormalLodCutoffDescription =
+    "Fudge factor for decal cutoff on zoom out for normals";
   constexpr const char* kConsoleStartupRenDecalOverDrawDescription = "Render overdraw display for decals";
   constexpr const char* kConsoleStartupRenDecalsDescription = "Render Terrain Decals.";
   constexpr const char* kConsoleStartupRenErrorCacheDescription = "use error threshold cache?";
   constexpr const char* kConsoleStartupRenFogIntensityDescription = "intensity of gray fog";
   constexpr const char* kConsoleStartupRenFogOfWarDescription = "Draw terrain with fog-of-war.";
-  constexpr const char* kConsoleStartupRenForceUpdateMinimapTerrainDescription = "Update the terrain tesselation/decals if it's a minimap";
+  constexpr const char* kConsoleStartupRenForceUpdateMinimapTerrainDescription =
+    "Update the terrain tesselation/decals if it's a minimap";
   constexpr const char* kConsoleStartupRenFrameTimeSecondsDescription = "Number of seconds to display.";
   constexpr const char* kConsoleStartupRenFxDescription = "Render FX?";
   constexpr const char* kConsoleStartupRenGenerateMeshDescription = "Generate a new mesh or use the old one?";
@@ -2557,7 +2605,8 @@ namespace
   constexpr const char* kConsoleStartupRenShadowSizeDescription = "Sizeof shadow texture";
   constexpr const char* kConsoleStartupRenShadowsDescription = "Render Shadows?";
   constexpr const char* kConsoleStartupRenShoreErrorCoeffDescription = "";
-  constexpr const char* kConsoleStartupRenShowBandwidthUsageDescription = "Show the amount of network bandwidth we are using.";
+  constexpr const char* kConsoleStartupRenShowBandwidthUsageDescription =
+    "Show the amount of network bandwidth we are using.";
   constexpr const char* kConsoleStartupRenShowBoneNamesDescription = "Show bone names";
   constexpr const char* kConsoleStartupRenShowDirtyTerrainDescription = "Show or hide the dirty terrain bits.";
   constexpr const char* kConsoleStartupRenShowFrameTimesDescription = "Graphically show the frame times.";
@@ -2567,9 +2616,11 @@ namespace
   constexpr const char* kConsoleStartupRenSkirtDescription = "Use new fog update code";
   constexpr const char* kConsoleStartupRenSkyDomeDescription = "Render sky";
   constexpr const char* kConsoleStartupRenSplatsDescription = "Render Terrain splats.";
-  constexpr const char* kConsoleStartupRenSyncTerrainLODDescription = "Distance at which to start display terrain sync changes";
+  constexpr const char* kConsoleStartupRenSyncTerrainLODDescription =
+    "Distance at which to start display terrain sync changes";
   constexpr const char* kConsoleStartupRenTTerrainGlowDescription = "Render the terrain using TTerrainGlow";
-  constexpr const char* kConsoleStartupRenTeamColorLookupCountDescription = "Number of 'channels' in team color lookup texture.";
+  constexpr const char* kConsoleStartupRenTeamColorLookupCountDescription =
+    "Number of 'channels' in team color lookup texture.";
   constexpr const char* kConsoleStartupRenTerrainDescription = "Show or hide the terrain.";
   constexpr const char* kConsoleStartupRenTreesDescription = "Show or hide the trees.";
   constexpr const char* kConsoleStartupRenUiDescription = "Render UI?";
@@ -2578,7 +2629,8 @@ namespace
   constexpr const char* kConsoleStartupRenWaterDescription = "Show or hide the water.";
   constexpr const char* kConsoleStartupRenWorldBorderDescription = "Render UI world border frame?";
   constexpr const char* kConsoleStartupRenBicubicnormalsDescription = "Sample normal map basis using bicubic filter";
-  constexpr const char* kConsoleStartupRenFogDescription = "Do we render fog of war, rendering only no effect on database.";
+  constexpr const char* kConsoleStartupRenFogDescription =
+    "Do we render fog of war, rendering only no effect on database.";
   constexpr const char* kConsoleStartupRenGlowingDecalsDescription = "Render glowing decals";
 } // namespace
 
@@ -2673,16 +2725,11 @@ namespace moho
     &moho::ren_BandwidthDisplaySeconds
   );
 
-
   /**
    * Address: 0x00BE1710 (FUN_00BE1710, dynamic initializer for `gTConVar_ren_Bloom`)
    * Address: 0x00C04750 (FUN_00C04750, dynamic atexit destructor for `gTConVar_ren_Bloom`)
    */
-  TConVar<bool> gTConVar_ren_Bloom(
-    "ren_Bloom",
-    kConsoleStartupRenBloomDescription,
-    &moho::ren_Bloom
-  );
+  TConVar<bool> gTConVar_ren_Bloom("ren_Bloom", kConsoleStartupRenBloomDescription, &moho::ren_Bloom);
 
   /**
    * Address: 0x00BE0E00 (FUN_00BE0E00, dynamic initializer for `gTConVar_ren_BloomBlurCount`)
@@ -2694,16 +2741,12 @@ namespace moho
     &moho::ren_BloomBlurCount
   );
 
-
   /**
    * Address: 0x00BE31D0 (FUN_00BE31D0, dynamic initializer for `gTConVar_ren_BorderSize`)
    * Address: 0x00C05A00 (FUN_00C05A00, dynamic atexit destructor for `gTConVar_ren_BorderSize`)
    */
-  TConVar<float> gTConVar_ren_BorderSize(
-    "ren_BorderSize",
-    kConsoleStartupRenBorderSizeDescription,
-    &moho::ren_BorderSize
-  );
+  TConVar<float>
+    gTConVar_ren_BorderSize("ren_BorderSize", kConsoleStartupRenBorderSizeDescription, &moho::ren_BorderSize);
 
   /**
    * Address: 0x00BE3190 (FUN_00BE3190, dynamic initializer for `gTConVar_ren_ClipDecalLevel`)
@@ -2719,22 +2762,14 @@ namespace moho
    * Address: 0x00BE3150 (FUN_00BE3150, dynamic initializer for `gTConVar_ren_ClipDecals`)
    * Address: 0x00C059A0 (FUN_00C059A0, dynamic atexit destructor for `gTConVar_ren_ClipDecals`)
    */
-  TConVar<bool> gTConVar_ren_ClipDecals(
-    "ren_ClipDecals",
-    kConsoleStartupRenClipDecalsDescription,
-    &moho::ren_ClipDecals
-  );
+  TConVar<bool>
+    gTConVar_ren_ClipDecals("ren_ClipDecals", kConsoleStartupRenClipDecalsDescription, &moho::ren_ClipDecals);
 
   /**
    * Address: 0x00BE1810 (FUN_00BE1810, dynamic initializer for `gTConVar_ren_Clutter`)
    * Address: 0x00C04810 (FUN_00C04810, dynamic atexit destructor for `gTConVar_ren_Clutter`)
    */
-  TConVar<bool> gTConVar_ren_Clutter(
-    "ren_Clutter",
-    kConsoleStartupRenClutterDescription,
-    &moho::ren_Clutter
-  );
-
+  TConVar<bool> gTConVar_ren_Clutter("ren_Clutter", kConsoleStartupRenClutterDescription, &moho::ren_Clutter);
 
   /**
    * Address: 0x00BE7A40 (FUN_00BE7A40, dynamic initializer for `gTConVar_ren_DecalAlbedoLodCutoff`)
@@ -2770,11 +2805,8 @@ namespace moho
    * Address: 0x00BE7AC0 (FUN_00BE7AC0, dynamic initializer for `gTConVar_ren_DecalFlatTol`)
    * Address: 0x00C08420 (FUN_00C08420, dynamic atexit destructor for `gTConVar_ren_DecalFlatTol`)
    */
-  TConVar<float> gTConVar_ren_DecalFlatTol(
-    "ren_DecalFlatTol",
-    kConsoleStartupRenDecalFlatTolDescription,
-    &moho::ren_DecalFlatTol
-  );
+  TConVar<float>
+    gTConVar_ren_DecalFlatTol("ren_DecalFlatTol", kConsoleStartupRenDecalFlatTolDescription, &moho::ren_DecalFlatTol);
 
   /**
    * Address: 0x00BE7A00 (FUN_00BE7A00, dynamic initializer for `gTConVar_ren_DecalNormalLodCutoff`)
@@ -2800,41 +2832,27 @@ namespace moho
    * Address: 0x00BE2290 (FUN_00BE2290, dynamic initializer for `gTConVar_ren_Decals`)
    * Address: 0x00C04F70 (FUN_00C04F70, dynamic atexit destructor for `gTConVar_ren_Decals`)
    */
-  TConVar<bool> gTConVar_ren_Decals(
-    "ren_Decals",
-    kConsoleStartupRenDecalsDescription,
-    &moho::ren_Decals
-  );
+  TConVar<bool> gTConVar_ren_Decals("ren_Decals", kConsoleStartupRenDecalsDescription, &moho::ren_Decals);
 
   /**
    * Address: 0x00BE3250 (FUN_00BE3250, dynamic initializer for `gTConVar_ren_ErrorCache`)
    * Address: 0x00C05A60 (FUN_00C05A60, dynamic atexit destructor for `gTConVar_ren_ErrorCache`)
    */
-  TConVar<bool> gTConVar_ren_ErrorCache(
-    "ren_ErrorCache",
-    kConsoleStartupRenErrorCacheDescription,
-    &moho::ren_ErrorCache
-  );
+  TConVar<bool>
+    gTConVar_ren_ErrorCache("ren_ErrorCache", kConsoleStartupRenErrorCacheDescription, &moho::ren_ErrorCache);
 
   /**
    * Address: 0x00BE8120 (FUN_00BE8120, dynamic initializer for `gTConVar_ren_FogIntensity`)
    * Address: 0x00C08640 (FUN_00C08640, dynamic atexit destructor for `gTConVar_ren_FogIntensity`)
    */
-  TConVar<int> gTConVar_ren_FogIntensity(
-    "ren_FogIntensity",
-    kConsoleStartupRenFogIntensityDescription,
-    &moho::ren_FogIntensity
-  );
+  TConVar<int>
+    gTConVar_ren_FogIntensity("ren_FogIntensity", kConsoleStartupRenFogIntensityDescription, &moho::ren_FogIntensity);
 
   /**
    * Address: 0x00BE2210 (FUN_00BE2210, dynamic initializer for `gTConVar_ren_FogOfWar`)
    * Address: 0x00C04F10 (FUN_00C04F10, dynamic atexit destructor for `gTConVar_ren_FogOfWar`)
    */
-  TConVar<bool> gTConVar_ren_FogOfWar(
-    "ren_FogOfWar",
-    kConsoleStartupRenFogOfWarDescription,
-    &moho::ren_FogOfWar
-  );
+  TConVar<bool> gTConVar_ren_FogOfWar("ren_FogOfWar", kConsoleStartupRenFogOfWarDescription, &moho::ren_FogOfWar);
 
   /**
    * Address: 0x00BE2450 (FUN_00BE2450, dynamic initializer for `gTConVar_ren_ForceUpdateMinimapTerrain`)
@@ -2860,21 +2878,14 @@ namespace moho
    * Address: 0x00BE14D0 (FUN_00BE14D0, dynamic initializer for `gTConVar_ren_Fx`)
    * Address: 0x00C045A0 (FUN_00C045A0, dynamic atexit destructor for `gTConVar_ren_Fx`)
    */
-  TConVar<bool> gTConVar_ren_Fx(
-    "ren_Fx",
-    kConsoleStartupRenFxDescription,
-    &moho::ren_Fx
-  );
+  TConVar<bool> gTConVar_ren_Fx("ren_Fx", kConsoleStartupRenFxDescription, &moho::ren_Fx);
 
   /**
    * Address: 0x00BE2350 (FUN_00BE2350, dynamic initializer for `gTConVar_ren_GenerateMesh`)
    * Address: 0x00C05000 (FUN_00C05000, dynamic atexit destructor for `gTConVar_ren_GenerateMesh`)
    */
-  TConVar<bool> gTConVar_ren_GenerateMesh(
-    "ren_GenerateMesh",
-    kConsoleStartupRenGenerateMeshDescription,
-    &moho::ren_GenerateMesh
-  );
+  TConVar<bool>
+    gTConVar_ren_GenerateMesh("ren_GenerateMesh", kConsoleStartupRenGenerateMeshDescription, &moho::ren_GenerateMesh);
 
   /**
    * Address: 0x00BE1950 (FUN_00BE1950, dynamic initializer for `gTConVar_ren_HideSecondary`)
@@ -2896,46 +2907,32 @@ namespace moho
     &moho::ren_IgnoreDecalLOD
   );
 
-
   /**
    * Address: 0x00BE24D0 (FUN_00BE24D0, dynamic initializer for `gTConVar_ren_NewFogUpdate`)
    * Address: 0x00C05120 (FUN_00C05120, dynamic atexit destructor for `gTConVar_ren_NewFogUpdate`)
    */
-  TConVar<bool> gTConVar_ren_NewFogUpdate(
-    "ren_NewFogUpdate",
-    kConsoleStartupRenNewFogUpdateDescription,
-    &moho::ren_NewFogUpdate
-  );
+  TConVar<bool>
+    gTConVar_ren_NewFogUpdate("ren_NewFogUpdate", kConsoleStartupRenNewFogUpdateDescription, &moho::ren_NewFogUpdate);
 
   /**
    * Address: 0x00BE1390 (FUN_00BE1390, dynamic initializer for `gTConVar_ren_NewPipeline`)
    * Address: 0x00C044B0 (FUN_00C044B0, dynamic atexit destructor for `gTConVar_ren_NewPipeline`)
    */
-  TConVar<bool> gTConVar_ren_NewPipeline(
-    "ren_NewPipeline",
-    kConsoleStartupRenNewPipelineDescription,
-    &moho::ren_NewPipeline
-  );
+  TConVar<bool>
+    gTConVar_ren_NewPipeline("ren_NewPipeline", kConsoleStartupRenNewPipelineDescription, &moho::ren_NewPipeline);
 
   /**
    * Address: 0x00BE22D0 (FUN_00BE22D0, dynamic initializer for `gTConVar_ren_NormalDecals`)
    * Address: 0x00C04FA0 (FUN_00C04FA0, dynamic atexit destructor for `gTConVar_ren_NormalDecals`)
    */
-  TConVar<bool> gTConVar_ren_NormalDecals(
-    "ren_NormalDecals",
-    kConsoleStartupRenNormalDecalsDescription,
-    &moho::ren_NormalDecals
-  );
+  TConVar<bool>
+    gTConVar_ren_NormalDecals("ren_NormalDecals", kConsoleStartupRenNormalDecalsDescription, &moho::ren_NormalDecals);
 
   /**
    * Address: 0x00BE1410 (FUN_00BE1410, dynamic initializer for `gTConVar_ren_Oblivion`)
    * Address: 0x00C04510 (FUN_00C04510, dynamic atexit destructor for `gTConVar_ren_Oblivion`)
    */
-  TConVar<bool> gTConVar_ren_Oblivion(
-    "ren_Oblivion",
-    kConsoleStartupRenOblivionDescription,
-    &moho::ren_Oblivion
-  );
+  TConVar<bool> gTConVar_ren_Oblivion("ren_Oblivion", kConsoleStartupRenOblivionDescription, &moho::ren_Oblivion);
 
   /**
    * Address: 0x00BE1750 (FUN_00BE1750, dynamic initializer for `gTConVar_ren_OnlyFirstView`)
@@ -2961,31 +2958,22 @@ namespace moho
    * Address: 0x00BE1510 (FUN_00BE1510, dynamic initializer for `gTConVar_ren_Reflection`)
    * Address: 0x00C045D0 (FUN_00C045D0, dynamic atexit destructor for `gTConVar_ren_Reflection`)
    */
-  TConVar<bool> gTConVar_ren_Reflection(
-    "ren_Reflection",
-    kConsoleStartupRenReflectionDescription,
-    &moho::ren_Reflection
-  );
+  TConVar<bool>
+    gTConVar_ren_Reflection("ren_Reflection", kConsoleStartupRenReflectionDescription, &moho::ren_Reflection);
 
   /**
    * Address: 0x00BE1550 (FUN_00BE1550, dynamic initializer for `gTConVar_ren_Refraction`)
    * Address: 0x00C04600 (FUN_00C04600, dynamic atexit destructor for `gTConVar_ren_Refraction`)
    */
-  TConVar<bool> gTConVar_ren_Refraction(
-    "ren_Refraction",
-    kConsoleStartupRenRefractionDescription,
-    &moho::ren_Refraction
-  );
+  TConVar<bool>
+    gTConVar_ren_Refraction("ren_Refraction", kConsoleStartupRenRefractionDescription, &moho::ren_Refraction);
 
   /**
    * Address: 0x00BE18D0 (FUN_00BE18D0, dynamic initializer for `gTConVar_ren_RegenShore`)
    * Address: 0x00C048A0 (FUN_00C048A0, dynamic atexit destructor for `gTConVar_ren_RegenShore`)
    */
-  TConVar<bool> gTConVar_ren_RegenShore(
-    "ren_RegenShore",
-    kConsoleStartupRenRegenShoreDescription,
-    &moho::ren_RegenShore
-  );
+  TConVar<bool>
+    gTConVar_ren_RegenShore("ren_RegenShore", kConsoleStartupRenRegenShoreDescription, &moho::ren_RegenShore);
 
   /**
    * Address: 0x00BE13D0 (FUN_00BE13D0, dynamic initializer for `gTConVar_ren_RenderNothing`)
@@ -3001,62 +2989,40 @@ namespace moho
    * Address: 0x00BE1590 (FUN_00BE1590, dynamic initializer for `gTConVar_ren_Select`)
    * Address: 0x00C04630 (FUN_00C04630, dynamic atexit destructor for `gTConVar_ren_Select`)
    */
-  TConVar<bool> gTConVar_ren_Select(
-    "ren_Select",
-    kConsoleStartupRenSelectDescription,
-    &moho::ren_Select
-  );
-
+  TConVar<bool> gTConVar_ren_Select("ren_Select", kConsoleStartupRenSelectDescription, &moho::ren_Select);
 
   /**
    * Address: 0x00BE1850 (FUN_00BE1850, dynamic initializer for `gTConVar_ren_ShadowBlur`)
    * Address: 0x00C04840 (FUN_00C04840, dynamic atexit destructor for `gTConVar_ren_ShadowBlur`)
    */
-  TConVar<bool> gTConVar_ren_ShadowBlur(
-    "ren_ShadowBlur",
-    kConsoleStartupRenShadowBlurDescription,
-    &moho::ren_ShadowBlur
-  );
+  TConVar<bool>
+    gTConVar_ren_ShadowBlur("ren_ShadowBlur", kConsoleStartupRenShadowBlurDescription, &moho::ren_ShadowBlur);
 
   /**
    * Address: 0x00BE1FA0 (FUN_00BE1FA0, dynamic initializer for `gTConVar_ren_ShadowCoeff`)
    * Address: 0x00C04D80 (FUN_00C04D80, dynamic atexit destructor for `gTConVar_ren_ShadowCoeff`)
    */
-  TConVar<float> gTConVar_ren_ShadowCoeff(
-    "ren_ShadowCoeff",
-    kConsoleStartupRenShadowCoeffDescription,
-    &moho::ren_ShadowCoeff
-  );
+  TConVar<float>
+    gTConVar_ren_ShadowCoeff("ren_ShadowCoeff", kConsoleStartupRenShadowCoeffDescription, &moho::ren_ShadowCoeff);
 
   /**
    * Address: 0x00BE1FE0 (FUN_00BE1FE0, dynamic initializer for `gTConVar_ren_ShadowLOD`)
    * Address: 0x00C04DB0 (FUN_00C04DB0, dynamic atexit destructor for `gTConVar_ren_ShadowLOD`)
    */
-  TConVar<float> gTConVar_ren_ShadowLOD(
-    "ren_ShadowLOD",
-    kConsoleStartupRenShadowLODDescription,
-    &moho::ren_ShadowLOD
-  );
+  TConVar<float> gTConVar_ren_ShadowLOD("ren_ShadowLOD", kConsoleStartupRenShadowLODDescription, &moho::ren_ShadowLOD);
 
   /**
    * Address: 0x00BE1890 (FUN_00BE1890, dynamic initializer for `gTConVar_ren_ShadowSize`)
    * Address: 0x00C04870 (FUN_00C04870, dynamic atexit destructor for `gTConVar_ren_ShadowSize`)
    */
-  TConVar<int> gTConVar_ren_ShadowSize(
-    "ren_ShadowSize",
-    kConsoleStartupRenShadowSizeDescription,
-    &moho::ren_ShadowSize
-  );
+  TConVar<int>
+    gTConVar_ren_ShadowSize("ren_ShadowSize", kConsoleStartupRenShadowSizeDescription, &moho::ren_ShadowSize);
 
   /**
    * Address: 0x00BE17D0 (FUN_00BE17D0, dynamic initializer for `gTConVar_ren_Shadows`)
    * Address: 0x00C047E0 (FUN_00C047E0, dynamic atexit destructor for `gTConVar_ren_Shadows`)
    */
-  TConVar<bool> gTConVar_ren_Shadows(
-    "ren_Shadows",
-    kConsoleStartupRenShadowsDescription,
-    &moho::ren_Shadows
-  );
+  TConVar<bool> gTConVar_ren_Shadows("ren_Shadows", kConsoleStartupRenShadowsDescription, &moho::ren_Shadows);
 
   /**
    * Address: 0x00BE3210 (FUN_00BE3210, dynamic initializer for `gTConVar_ren_ShoreErrorCoeff`)
@@ -3067,7 +3033,6 @@ namespace moho
     kConsoleStartupRenShoreErrorCoeffDescription,
     &moho::ren_ShoreErrorCoeff
   );
-
 
   /**
    * Address: 0x00BE1B10 (FUN_00BE1B10, dynamic initializer for `gTConVar_ren_ShowBandwidthUsage`)
@@ -3123,11 +3088,8 @@ namespace moho
    * Address: 0x00BE2110 (FUN_00BE2110, dynamic initializer for `gTConVar_ren_ShowNormals`)
    * Address: 0x00C04E50 (FUN_00C04E50, dynamic atexit destructor for `gTConVar_ren_ShowNormals`)
    */
-  TConVar<bool> gTConVar_ren_ShowNormals(
-    "ren_ShowNormals",
-    kConsoleStartupRenShowNormalsDescription,
-    &moho::ren_ShowNormals
-  );
+  TConVar<bool>
+    gTConVar_ren_ShowNormals("ren_ShowNormals", kConsoleStartupRenShowNormalsDescription, &moho::ren_ShowNormals);
 
   /**
    * Address: 0x00BE15D0 (FUN_00BE15D0, dynamic initializer for `gTConVar_ren_ShowWireframe`)
@@ -3143,31 +3105,19 @@ namespace moho
    * Address: 0x00BE2510 (FUN_00BE2510, dynamic initializer for `gTConVar_ren_Skirt`)
    * Address: 0x00C05150 (FUN_00C05150, dynamic atexit destructor for `gTConVar_ren_Skirt`)
    */
-  TConVar<bool> gTConVar_ren_Skirt(
-    "ren_Skirt",
-    kConsoleStartupRenSkirtDescription,
-    &moho::ren_Skirt
-  );
+  TConVar<bool> gTConVar_ren_Skirt("ren_Skirt", kConsoleStartupRenSkirtDescription, &moho::ren_Skirt);
 
   /**
    * Address: 0x00BE1790 (FUN_00BE1790, dynamic initializer for `gTConVar_ren_SkyDome`)
    * Address: 0x00C047B0 (FUN_00C047B0, dynamic atexit destructor for `gTConVar_ren_SkyDome`)
    */
-  TConVar<bool> gTConVar_ren_SkyDome(
-    "ren_SkyDome",
-    kConsoleStartupRenSkyDomeDescription,
-    &moho::ren_SkyDome
-  );
+  TConVar<bool> gTConVar_ren_SkyDome("ren_SkyDome", kConsoleStartupRenSkyDomeDescription, &moho::ren_SkyDome);
 
   /**
    * Address: 0x00BE2310 (FUN_00BE2310, dynamic initializer for `gTConVar_ren_Splats`)
    * Address: 0x00C04FD0 (FUN_00C04FD0, dynamic atexit destructor for `gTConVar_ren_Splats`)
    */
-  TConVar<bool> gTConVar_ren_Splats(
-    "ren_Splats",
-    kConsoleStartupRenSplatsDescription,
-    &moho::ren_Splats
-  );
+  TConVar<bool> gTConVar_ren_Splats("ren_Splats", kConsoleStartupRenSplatsDescription, &moho::ren_Splats);
 
   /**
    * Address: 0x00BE7D90 (FUN_00BE7D90, dynamic initializer for `gTConVar_ren_SyncTerrainLOD`)
@@ -3183,11 +3133,8 @@ namespace moho
    * Address: 0x00BE2490 (FUN_00BE2490, dynamic initializer for `gTConVar_ren_TTerrainGlow`)
    * Address: 0x00C050F0 (FUN_00C050F0, dynamic atexit destructor for `gTConVar_ren_TTerrainGlow`)
    */
-  TConVar<bool> gTConVar_ren_TTerrainGlow(
-    "ren_TTerrainGlow",
-    kConsoleStartupRenTTerrainGlowDescription,
-    &moho::ren_TTerrainGlow
-  );
+  TConVar<bool>
+    gTConVar_ren_TTerrainGlow("ren_TTerrainGlow", kConsoleStartupRenTTerrainGlowDescription, &moho::ren_TTerrainGlow);
 
   /**
    * Address: 0x00BE86E0 (FUN_00BE86E0, dynamic initializer for `gTConVar_ren_TeamColorLookupCount`)
@@ -3203,32 +3150,19 @@ namespace moho
    * Address: 0x00BE2150 (FUN_00BE2150, dynamic initializer for `gTConVar_ren_Terrain`)
    * Address: 0x00C04E80 (FUN_00C04E80, dynamic atexit destructor for `gTConVar_ren_Terrain`)
    */
-  TConVar<bool> gTConVar_ren_Terrain(
-    "ren_Terrain",
-    kConsoleStartupRenTerrainDescription,
-    &moho::ren_Terrain
-  );
+  TConVar<bool> gTConVar_ren_Terrain("ren_Terrain", kConsoleStartupRenTerrainDescription, &moho::ren_Terrain);
 
   /**
    * Address: 0x00BE21D0 (FUN_00BE21D0, dynamic initializer for `gTConVar_ren_Trees`)
    * Address: 0x00C04EE0 (FUN_00C04EE0, dynamic atexit destructor for `gTConVar_ren_Trees`)
    */
-  TConVar<bool> gTConVar_ren_Trees(
-    "ren_Trees",
-    kConsoleStartupRenTreesDescription,
-    &moho::ren_Trees
-  );
+  TConVar<bool> gTConVar_ren_Trees("ren_Trees", kConsoleStartupRenTreesDescription, &moho::ren_Trees);
 
   /**
    * Address: 0x00BE1450 (FUN_00BE1450, dynamic initializer for `gTConVar_ren_Ui`)
    * Address: 0x00C04540 (FUN_00C04540, dynamic atexit destructor for `gTConVar_ren_Ui`)
    */
-  TConVar<bool> gTConVar_ren_Ui(
-    "ren_Ui",
-    kConsoleStartupRenUiDescription,
-    &moho::ren_Ui
-  );
-
+  TConVar<bool> gTConVar_ren_Ui("ren_Ui", kConsoleStartupRenUiDescription, &moho::ren_Ui);
 
   /**
    * Address: 0x00BE1990 (FUN_00BE1990, dynamic initializer for `gTConVar_ren_UnitSilhouette`)
@@ -3244,31 +3178,20 @@ namespace moho
    * Address: 0x00BE3110 (FUN_00BE3110, dynamic initializer for `gTConVar_ren_ViewError`)
    * Address: 0x00C05970 (FUN_00C05970, dynamic atexit destructor for `gTConVar_ren_ViewError`)
    */
-  TConVar<float> gTConVar_ren_ViewError(
-    "ren_ViewError",
-    kConsoleStartupRenViewErrorDescription,
-    &moho::ren_ViewError
-  );
+  TConVar<float> gTConVar_ren_ViewError("ren_ViewError", kConsoleStartupRenViewErrorDescription, &moho::ren_ViewError);
 
   /**
    * Address: 0x00BE2250 (FUN_00BE2250, dynamic initializer for `gTConVar_ren_Water`)
    * Address: 0x00C04F40 (FUN_00C04F40, dynamic atexit destructor for `gTConVar_ren_Water`)
    */
-  TConVar<bool> gTConVar_ren_Water(
-    "ren_Water",
-    kConsoleStartupRenWaterDescription,
-    &moho::ren_Water
-  );
+  TConVar<bool> gTConVar_ren_Water("ren_Water", kConsoleStartupRenWaterDescription, &moho::ren_Water);
 
   /**
    * Address: 0x00BE1490 (FUN_00BE1490, dynamic initializer for `gTConVar_ren_WorldBorder`)
    * Address: 0x00C04570 (FUN_00C04570, dynamic atexit destructor for `gTConVar_ren_WorldBorder`)
    */
-  TConVar<bool> gTConVar_ren_WorldBorder(
-    "ren_WorldBorder",
-    kConsoleStartupRenWorldBorderDescription,
-    &moho::ren_WorldBorder
-  );
+  TConVar<bool>
+    gTConVar_ren_WorldBorder("ren_WorldBorder", kConsoleStartupRenWorldBorderDescription, &moho::ren_WorldBorder);
 
   /**
    * Address: 0x00BE20D0 (FUN_00BE20D0, dynamic initializer for `gTConVar_ren_bicubicnormals`)
@@ -3284,11 +3207,7 @@ namespace moho
    * Address: 0x00BE1610 (FUN_00BE1610, dynamic initializer for `gTConVar_ren_fog`)
    * Address: 0x00C04690 (FUN_00C04690, dynamic atexit destructor for `gTConVar_ren_fog`)
    */
-  TConVar<bool> gTConVar_ren_fog(
-    "ren_fog",
-    kConsoleStartupRenFogDescription,
-    &moho::ren_fog
-  );
+  TConVar<bool> gTConVar_ren_fog("ren_fog", kConsoleStartupRenFogDescription, &moho::ren_fog);
 
   /**
    * Address: 0x00BE23D0 (FUN_00BE23D0, dynamic initializer for `gTConVar_ren_glowingDecals`)
@@ -3302,7 +3221,6 @@ namespace moho
 
 } // namespace moho
 
-
 namespace
 {
 } // namespace
@@ -3310,9 +3228,7 @@ namespace
 namespace moho
 {
 
-
 } // namespace moho
-
 
 namespace
 {
@@ -3322,16 +3238,17 @@ namespace
 namespace moho
 {
 
-
   /**
    * Address: 0x00BE9500 (FUN_00BE9500, dynamic initializer for `gCConFunc_SC_AntiAliasingSamples`)
    * Address: 0x00C08D90 (FUN_00C08D90, dynamic atexit destructor for `gCConFunc_SC_AntiAliasingSamples`)
    */
-  CConFunc gCConFunc_SC_AntiAliasingSamples("SC_AntiAliasingSamples", kConsoleStartupSCAntiAliasingSamplesDescription, &moho::CON_d3d_AntiAliasingSamplesSeedFromFirstToken);
-
+  CConFunc gCConFunc_SC_AntiAliasingSamples(
+    "SC_AntiAliasingSamples",
+    kConsoleStartupSCAntiAliasingSamplesDescription,
+    &moho::CON_d3d_AntiAliasingSamplesSeedFromFirstToken
+  );
 
 } // namespace moho
-
 
 namespace
 {
@@ -3341,7 +3258,6 @@ namespace moho
 {
 
 } // namespace moho
-
 
 namespace
 {
@@ -3372,6 +3288,4 @@ namespace moho
     &moho::ai_InitialMassCurrencyMax
   );
 
-
 } // namespace moho
-

@@ -42,7 +42,18 @@ namespace faf::editor
   {
     std::vector<char> preview;
     std::vector<PropRecord> props;
+    /**
+     * The terrain's images as the file has them (the normal maps, the two stratum masks, the water map), each a whole
+     * chunk, length first; and which of them a save writes back as they were, because what they are made from didn't
+     * change (the engine would encode them again into other bytes: the normal map from the heights, the water map from
+     * the heights and levels, the masks with another header flag).
+     */
+    std::vector<std::string> images;
+    std::vector<bool> keepImages;
   };
+
+  /** The terrain's image chunks of a `.scmap` (after its preview, `previewBytes` long), as the file has them. */
+  std::vector<std::string> ReadImageRecords(const std::string& file, std::size_t previewBytes);
 
   /** The preview chunk's bytes from the start of a `.scmap` (after the 8-byte file header), or empty. */
   std::vector<char> ReadPreviewRecord(const std::string& file);
@@ -63,7 +74,12 @@ namespace faf::editor
    * lives in the game's archives, or anywhere new), the path is the caller's. Terrain is written as
    * version 60, which every game version reads. False with `error` set when it can't.
    */
-  bool WriteMapFile(moho::CWldMap& map, const MapFileRecords& records, const std::filesystem::path& path, std::string& error);
+  bool WriteMapFile(
+    moho::CWldMap& map,
+    const MapFileRecords& records,
+    const std::filesystem::path& path,
+    std::string& error
+  );
 
   /**
    * Reads a `.scmap` file from `path` on disk into a new map, through the same chunk loaders as
@@ -88,6 +104,7 @@ namespace faf::editor
    */
   PropRecord PropRecordFor(const std::string& path, const moho::VTransform& transform);
 
-  /** A whole game file (`/maps/...`, from a folder or an archive), resolved as MapLoad does; false if it can't be read. */
+  /** A whole game file (`/maps/...`, from a folder or an archive), resolved as MapLoad does; false if it can't be read.
+   */
   bool ReadGameFile(const std::string& virtualPath, std::string& out);
 } // namespace faf::editor

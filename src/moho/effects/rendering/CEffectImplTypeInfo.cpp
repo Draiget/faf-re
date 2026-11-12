@@ -58,7 +58,9 @@ namespace moho
   /**
    * Address: 0x0065A750 (FUN_0065A750, Moho::CEffectImplTypeInfo::AddBase_IEffect)
    */
-  void CEffectImplTypeInfo::AddBase_IEffect(gpg::RType* const typeInfo)
+  void CEffectImplTypeInfo::AddBase_IEffect(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBaseType(typeInfo, IEffect::StaticGetClass());
   }
@@ -90,4 +92,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CEffectImplTypeInfo_00_261522, moho::register_CEffectImplTypeInfo_00)
+GPG_PREREGISTER_INIT(
+  register_CEffectImplTypeInfo_00_261522,
+  moho::register_CEffectImplTypeInfo_00
+)

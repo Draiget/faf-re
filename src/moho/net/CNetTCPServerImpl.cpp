@@ -17,9 +17,9 @@ using namespace moho;
  */
 CNetTCPServerImpl::~CNetTCPServerImpl()
 {
-  if (mSocket != INVALID_SOCKET) {
-    closesocket(mSocket);
-    mSocket = INVALID_SOCKET;
+  if (mSocket != platform::net::kInvalidSocket) {
+    platform::net::CloseSocket(mSocket);
+    mSocket = platform::net::kInvalidSocket;
   }
 }
 
@@ -33,8 +33,7 @@ CNetTCPServerImpl::~CNetTCPServerImpl()
 u_short CNetTCPServerImpl::GetLocalPort()
 {
   sockaddr_in name{};
-  int nameLen = static_cast<int>(sizeof(name));
-  getsockname(mSocket, reinterpret_cast<sockaddr*>(&name), &nameLen);
+  platform::net::GetLocalAddress(mSocket, &name);
   return ntohs(name.sin_port);
 }
 
@@ -47,10 +46,9 @@ u_short CNetTCPServerImpl::GetLocalPort()
  */
 INetTCPSocket* CNetTCPServerImpl::Accept()
 {
-  sockaddr addr{};
-  int addrLen = static_cast<int>(sizeof(addr));
-  const SOCKET acceptedSocket = accept(mSocket, &addr, &addrLen);
-  if (acceptedSocket == INVALID_SOCKET) {
+  sockaddr_in addr{};
+  const platform::net::Socket acceptedSocket = platform::net::Accept(mSocket, &addr);
+  if (acceptedSocket == platform::net::kInvalidSocket) {
     gpg::Logf("CNetTCPServerImpl::Accept(): accept() failed: %s", NET_GetWinsockErrorString());
     return nullptr;
   }
@@ -72,9 +70,9 @@ INetTCPSocket* CNetTCPServerImpl::Accept()
  */
 void CNetTCPServerImpl::CloseSocket()
 {
-  if (mSocket != INVALID_SOCKET) {
-    closesocket(mSocket);
-    mSocket = INVALID_SOCKET;
+  if (mSocket != platform::net::kInvalidSocket) {
+    platform::net::CloseSocket(mSocket);
+    mSocket = platform::net::kInvalidSocket;
   }
 }
 
@@ -84,6 +82,8 @@ void CNetTCPServerImpl::CloseSocket()
  * What it does:
  * Initializes CNetTCPServerImpl around already-open listening socket.
  */
-CNetTCPServerImpl::CNetTCPServerImpl(const SOCKET socket) noexcept
+CNetTCPServerImpl::CNetTCPServerImpl(
+  const platform::net::Socket socket
+) noexcept
   : mSocket(socket)
 {}

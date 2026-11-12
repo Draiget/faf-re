@@ -59,7 +59,8 @@ namespace moho
     CScrLuaObjectFactory* mClassFactory; // +0x14
   };
   static_assert(
-    offsetof(CScrLuaClassBinder, mClassFactory) == 0x14, "CScrLuaClassBinder::mClassFactory offset must be 0x14"
+    offsetof(CScrLuaClassBinder, mClassFactory) == 0x14,
+    "CScrLuaClassBinder::mClassFactory offset must be 0x14"
   );
   static_assert(sizeof(CScrLuaClassBinder) == 0x18, "CScrLuaClassBinder size must be 0x18");
 } // namespace moho

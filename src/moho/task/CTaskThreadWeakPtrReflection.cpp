@@ -15,7 +15,9 @@
 namespace
 {
 
-  [[nodiscard]] gpg::RRef MakeCTaskThreadRef(moho::CTaskThread* thread)
+  [[nodiscard]] gpg::RRef MakeCTaskThreadRef(
+    moho::CTaskThread* thread
+  )
   {
     gpg::RRef out{};
     out.mObj = nullptr;
@@ -40,15 +42,19 @@ namespace
       return out;
     }
 
-    out.mObj = reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(thread) - static_cast<std::uintptr_t>(baseOffset));
+    out.mObj =
+      reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(thread) - static_cast<std::uintptr_t>(baseOffset));
     out.mType = dynamicType;
     return out;
   }
 
   /**
-    * Alias of FUN_0040C4A0 (non-canonical helper lane).
+   * Alias of FUN_0040C4A0 (non-canonical helper lane).
    */
-  [[nodiscard]] moho::CTaskThread* ReadPointerCTaskThread(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
+  [[nodiscard]] moho::CTaskThread* ReadPointerCTaskThread(
+    gpg::ReadArchive* archive,
+    const gpg::RRef& ownerRef
+  )
   {
     const gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
     if (!tracked.object) {
@@ -92,7 +98,8 @@ namespace
  * provided thread object.
  */
 moho::WeakPtr<moho::CTaskThread>* moho::RelinkWeakPtrCTaskThread(
-  moho::WeakPtr<moho::CTaskThread>* const weak, moho::CTaskThread* const thread
+  moho::WeakPtr<moho::CTaskThread>* const weak,
+  moho::CTaskThread* const thread
 )
 {
   if (!weak) {
@@ -124,8 +131,8 @@ moho::RWeakPtrType<moho::CTaskThread>::~RWeakPtrType() = default;
  */
 const char* moho::RWeakPtrType<moho::CTaskThread>::GetName() const
 {
-    static const fa::string sName = gpg::STR_Printf("WeakPtr<%s>", gpg::RTypeOf<moho::CTaskThread>()->GetName());
-    return sName.c_str();
+  static const fa::string sName = gpg::STR_Printf("WeakPtr<%s>", gpg::RTypeOf<moho::CTaskThread>()->GetName());
+  return sName.c_str();
 }
 
 /**
@@ -133,7 +140,9 @@ const char* moho::RWeakPtrType<moho::CTaskThread>::GetName() const
  */
 void moho::RWeakPtrType<moho::CTaskThread>::Init()
 {
-  static_assert(sizeof(moho::WeakPtr<moho::CTaskThread>) == 0x08, "moho::WeakPtr<moho::CTaskThread> is 0x08 bytes on x86");
+  static_assert(
+    sizeof(moho::WeakPtr<moho::CTaskThread>) == 0x08, "moho::WeakPtr<moho::CTaskThread> is 0x08 bytes on x86"
+  );
   size_ = sizeof(moho::WeakPtr<moho::CTaskThread>);
   version_ = 1;
   serLoadFunc_ = &moho::WeakPtr_CTaskThread::Deserialize;
@@ -143,7 +152,9 @@ void moho::RWeakPtrType<moho::CTaskThread>::Init()
 /**
  * Address: 0x0040A3C0 (FUN_0040A3C0, Moho::RWeakPtrType_CTaskThread::GetLexical)
  */
-fa::string moho::RWeakPtrType<moho::CTaskThread>::GetLexical(const gpg::RRef& ref) const
+fa::string moho::RWeakPtrType<moho::CTaskThread>::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   auto* const weak = static_cast<const moho::WeakPtr<moho::CTaskThread>*>(ref.mObj);
   if (!weak || !weak->HasValue()) {
@@ -178,7 +189,9 @@ const gpg::RIndexed* moho::RWeakPtrType<moho::CTaskThread>::IsPointer() const
 /**
  * Address: 0x0040A570 (FUN_0040A570, Moho::RWeakPtrType_CTaskThread::GetCount)
  */
-size_t moho::RWeakPtrType<moho::CTaskThread>::GetCount(void* obj) const
+size_t moho::RWeakPtrType<moho::CTaskThread>::GetCount(
+  void* obj
+) const
 {
   auto* const weak = static_cast<moho::WeakPtr<moho::CTaskThread>*>(obj);
   if (!weak) {
@@ -190,7 +203,10 @@ size_t moho::RWeakPtrType<moho::CTaskThread>::GetCount(void* obj) const
 /**
  * Address: 0x0040A5A0 (FUN_0040A5A0, Moho::RWeakPtrType_CTaskThread::SubscriptIndex)
  */
-gpg::RRef moho::RWeakPtrType<moho::CTaskThread>::SubscriptIndex(void* const obj, const int ind) const
+gpg::RRef moho::RWeakPtrType<moho::CTaskThread>::SubscriptIndex(
+  void* const obj,
+  const int ind
+) const
 {
   GPG_ASSERT(ind == 0);
   if (ind != 0) {
@@ -209,7 +225,10 @@ gpg::RRef moho::RWeakPtrType<moho::CTaskThread>::SubscriptIndex(void* const obj,
  * Address: 0x0040AD50 (FUN_0040AD50, Moho::WeakPtr_CTaskThread::Deserialize)
  */
 void moho::WeakPtr_CTaskThread::Deserialize(
-  gpg::ReadArchive* const archive, const std::intptr_t objectPtr, int /*version*/, gpg::RRef* ownerRef
+  gpg::ReadArchive* const archive,
+  const std::intptr_t objectPtr,
+  int /*version*/,
+  gpg::RRef* ownerRef
 )
 {
   auto* const weak = reinterpret_cast<moho::WeakPtr<moho::CTaskThread>*>(objectPtr);
@@ -223,7 +242,10 @@ void moho::WeakPtr_CTaskThread::Deserialize(
  * Address: 0x0040AD80 (FUN_0040AD80, Moho::WeakPtr_CTaskThread::Serialize)
  */
 void moho::WeakPtr_CTaskThread::Serialize(
-  gpg::WriteArchive* const archive, const std::intptr_t objectPtr, int /*version*/, gpg::RRef* ownerRef
+  gpg::WriteArchive* const archive,
+  const std::intptr_t objectPtr,
+  int /*version*/,
+  gpg::RRef* ownerRef
 )
 {
   auto* const weak = reinterpret_cast<moho::WeakPtr<moho::CTaskThread>*>(objectPtr);

@@ -94,7 +94,7 @@ namespace moho
   int cfunc_CameraImplEnableEaseInOutL(LuaPlus::LuaState* state);
   int cfunc_CameraImplDisableEaseInOut(lua_State* luaContext);
   int cfunc_CameraImplDisableEaseInOutL(LuaPlus::LuaState* state);
-}
+} // namespace moho
 
 namespace
 {
@@ -251,7 +251,6 @@ namespace
     return gpg::time::GetSystemTimer().ElapsedSeconds();
   }
 
-
   /**
    * Address: 0x007A6BF0 (FUN_007A6BF0, Moho::CameraImpl::TargetNothing)
    *
@@ -259,7 +258,10 @@ namespace
    * Stops entity tracking notifications when needed and resets camera target
    * mode/timing lanes back to untargeted location mode.
    */
-  [[nodiscard]] moho::UserEntity* FindSessionEntityById(moho::CWldSession* const session, const std::int32_t entityId)
+  [[nodiscard]] moho::UserEntity* FindSessionEntityById(
+    moho::CWldSession* const session,
+    const std::int32_t entityId
+  )
   {
     return session != nullptr ? session->LookupEntityId(static_cast<moho::EntId>(entityId)) : nullptr;
   }
@@ -293,7 +295,9 @@ namespace
     }
   }
 
-  [[nodiscard]] moho::UserEntity* ActiveCameraTargetEntity(const moho::CameraImpl& camera) noexcept
+  [[nodiscard]] moho::UserEntity* ActiveCameraTargetEntity(
+    const moho::CameraImpl& camera
+  ) noexcept
   {
     using TargetList = fa::list<moho::WeakPtr<moho::UserEntity>>;
     const TargetList::const_iterator active = camera.mActiveTarget;
@@ -303,14 +307,18 @@ namespace
     return active->GetObjectPtr();
   }
 
-  [[nodiscard]] float HeadingFromEntityOrientation(const Wm3::Quatf& orientation) noexcept
+  [[nodiscard]] float HeadingFromEntityOrientation(
+    const Wm3::Quatf& orientation
+  ) noexcept
   {
     const float headingNumerator = ((orientation.z * orientation.x) + (orientation.y * orientation.w)) * 2.0f;
     const float headingDenominator = 1.0f - ((orientation.y * orientation.y + orientation.x * orientation.x) * 2.0f);
     return static_cast<float>(std::atan2(headingNumerator, headingDenominator));
   }
 
-  [[nodiscard]] float PitchFromEntityOrientation(const Wm3::Quatf& orientation) noexcept
+  [[nodiscard]] float PitchFromEntityOrientation(
+    const Wm3::Quatf& orientation
+  ) noexcept
   {
     float pitchCarrier = ((orientation.w * orientation.z) - (orientation.y * orientation.x)) * -2.0f;
     if (pitchCarrier >= 1.0f) {
@@ -321,9 +329,7 @@ namespace
 
     const float sqrtTerm = std::sqrt(1.0f - pitchCarrier);
     const float poly =
-      pitchCarrier *
-        ((pitchCarrier * ((pitchCarrier * -0.018729299f) + 0.074261002f)) - 0.21211439f) +
-      1.5707288f;
+      pitchCarrier * ((pitchCarrier * ((pitchCarrier * -0.018729299f) + 0.074261002f)) - 0.21211439f) + 1.5707288f;
     return moho::kHalfPi - (sqrtTerm * poly);
   }
 
@@ -365,14 +371,15 @@ namespace
       distanceFactor = 1.0f;
     }
 
-    const float magnitude =
-      (1.0f - (shakeParams->mElapsed / shakeParams->mDuration)) *
-      (((shakeParams->mMagnitudeAtMaxRange - shakeParams->mMagnitudeAtCenter) * distanceFactor) + shakeParams->mMagnitudeAtCenter);
+    const float magnitude = (1.0f - (shakeParams->mElapsed / shakeParams->mDuration)) *
+      (((shakeParams->mMagnitudeAtMaxRange - shakeParams->mMagnitudeAtCenter) * distanceFactor) +
+       shakeParams->mMagnitudeAtCenter);
     const float radialAmount =
       static_cast<float>(moho::MathGlobalRandomUnitScaled(magnitude)) * shakeParams->mScale * 0.5f;
     const float tangentialAmount = static_cast<float>(moho::MathGlobalRandomRange(-magnitude, magnitude)) * 0.25f;
 
-    outShakeOffset->x = ((shakeDirection.x * radialAmount) + (shakeDirection.z * tangentialAmount)) * moho::cam_ShakeMult;
+    outShakeOffset->x =
+      ((shakeDirection.x * radialAmount) + (shakeDirection.z * tangentialAmount)) * moho::cam_ShakeMult;
     outShakeOffset->y = ((shakeDirection.y * radialAmount) + (tangentialAmount * 0.0f)) * moho::cam_ShakeMult;
     outShakeOffset->z =
       ((shakeDirection.z * radialAmount) + ((0.0f - shakeDirection.x) * tangentialAmount)) * moho::cam_ShakeMult;
@@ -390,7 +397,9 @@ namespace moho
     return sInstance;
   }
 
-  LuaPlus::LuaObject CScrLuaMetatableFactory<CameraImpl>::Create(LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject CScrLuaMetatableFactory<CameraImpl>::Create(
+    LuaPlus::LuaState* const state
+  )
   {
     return SCR_CreateSimpleMetatable(state);
   }
@@ -402,7 +411,10 @@ namespace moho
    * Returns cached `CameraImpl` metatable object from Lua object-factory
    * storage.
    */
-  LuaPlus::LuaObject* func_CreateLuaCameraImpl(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject* func_CreateLuaCameraImpl(
+    LuaPlus::LuaObject* const object,
+    LuaPlus::LuaState* const state
+  )
   {
     return SCR_WriteMetatable<CameraImpl>(object, state);
   }
@@ -478,7 +490,11 @@ gpg::RType* moho::CameraImpl::GetClass() const
   return StaticGetClass();
 }
 
-moho::CameraImpl::CameraImpl(const gpg::StrArg name, const STIMap& map, LuaPlus::LuaState* const state)
+moho::CameraImpl::CameraImpl(
+  const gpg::StrArg name,
+  const STIMap& map,
+  LuaPlus::LuaState* const state
+)
   : RCamCamera()
   , CScriptEvent()
   // `std::string::string(name, strlen(name))` and the embedded solid-frustum
@@ -504,7 +520,6 @@ moho::CameraImpl::CameraImpl(const gpg::StrArg name, const STIMap& map, LuaPlus:
   mZoom = 0.0f;
   mPivot.x = 0.0f;
   mPivot.y = 0.0f;
-
 
   // Default to the wall-clock (System) time source and null both slots before
   // installing them (mirrors the binary's 2-element eh-vector zero-fill).
@@ -572,8 +587,7 @@ moho::CameraImpl::CameraImpl(const gpg::StrArg name, const STIMap& map, LuaPlus:
     LuaPlus::LuaObject luaArg1{};
     LuaPlus::LuaObject luaMetatable{};
     func_CreateLuaCameraImpl(&luaMetatable, state);
-    static_cast<moho::CScriptObject*>(this)
-      ->CreateLuaObject(luaMetatable, luaArg1, luaArg2, luaArg3);
+    static_cast<moho::CScriptObject*>(this)->CreateLuaObject(luaMetatable, luaArg1, luaArg2, luaArg3);
   }
 
   // Default unit viewport (origin {0,0}, extent {1,1}) then snap the basis.
@@ -670,7 +684,9 @@ moho::CameraImpl::~CameraImpl()
  * What it does:
  * Applies one camera acceleration mode token to runtime lane `mAccType`.
  */
-void moho::CameraImpl::CameraSetAccType(const fa::string& accType)
+void moho::CameraImpl::CameraSetAccType(
+  const fa::string& accType
+)
 {
   if (_stricmp(accType.c_str(), kCameraAccTypeLinearName) == 0) {
     mAccType = kCameraAccTypeLinear;
@@ -695,7 +711,9 @@ void moho::CameraImpl::CameraSetAccType(const fa::string& accType)
  * Applies heading/pitch spin deltas from one 2D input vector using the current
  * zoom metric scale, then normalizes heading and clamps pitch.
  */
-void moho::CameraImpl::CameraSpin(const Wm3::Vector2f& spinDelta)
+void moho::CameraImpl::CameraSpin(
+  const Wm3::Vector2f& spinDelta
+)
 {
   // 0x007A6CFB divides `cam_SpinSpeed` by `[this+0x32C]`. `mCam` sits at +0x070 and
   // `GeomCamera3::viewport` at +0x284 within it, so +0x32C is `viewport.r[3].z` --
@@ -732,7 +750,9 @@ void moho::CameraImpl::CameraSpin(const Wm3::Vector2f& spinDelta)
  * Applies exponential zoom scaling from one input delta and clamps the
  * resulting near-zoom lane against min/max zoom bounds.
  */
-void moho::CameraImpl::CameraZoom(const float zoomDelta)
+void moho::CameraImpl::CameraZoom(
+  const float zoomDelta
+)
 {
   mNearZoom = std::exp2((-cam_ZoomAmount) * zoomDelta) * mNearZoom;
 
@@ -755,7 +775,9 @@ void moho::CameraImpl::CameraZoom(const float zoomDelta)
  * What it does:
  * Arms rotated mode, clears revert state, and stores current pitch lane.
  */
-void moho::CameraImpl::CameraSetPitch(const float pitchRadians)
+void moho::CameraImpl::CameraSetPitch(
+  const float pitchRadians
+)
 {
   mIsRotated = 1u;
   mRevertRotation = 0u;
@@ -769,7 +791,9 @@ void moho::CameraImpl::CameraSetPitch(const float pitchRadians)
  * What it does:
  * Arms rotated mode, clears revert state, and stores current heading lane.
  */
-void moho::CameraImpl::CameraSetHeading(const float headingRadians)
+void moho::CameraImpl::CameraSetHeading(
+  const float headingRadians
+)
 {
   mIsRotated = 1u;
   mRevertRotation = 0u;
@@ -824,7 +848,9 @@ void moho::CameraImpl::CameraRevertRotation()
  * is the incoming argument still sitting in `eax` at `retn 4`; no call site
  * reads it, so this is modelled as returning `void`.
  */
-void moho::CameraImpl::CameraSetPivot(const Wm3::Vector2f& pivot)
+void moho::CameraImpl::CameraSetPivot(
+  const Wm3::Vector2f& pivot
+)
 {
   mPivot.x = pivot.X();
   mPivot.y = pivot.Y();
@@ -888,10 +914,15 @@ void moho::CameraImpl::CameraReset()
  * Promotes one follow target into the active camera target list when the
  * current entity-id gate still matches.
  */
-void moho::CameraImpl::CameraFollow(const SCamFollowParams& followParams)
+void moho::CameraImpl::CameraFollow(
+  const SCamFollowParams& followParams
+)
 {
   UserEntity* const currentTarget = GetTargetEntity();
-  if (currentTarget == nullptr || currentTarget->mParams.mEntityId != static_cast<std::uint32_t>(followParams.mCurrentEntityId)) {
+  if (
+    currentTarget == nullptr ||
+    currentTarget->mParams.mEntityId != static_cast<std::uint32_t>(followParams.mCurrentEntityId)
+  ) {
     return;
   }
 
@@ -960,7 +991,10 @@ const moho::GeomCamera3& moho::CameraImpl::CameraGetView() const
  * row-2 viewport coefficients from row-1 using inverse width, and updates
  * camera zoom metric scale from viewport aspect ratio.
  */
-void moho::CameraImpl::CameraSetViewport(const Wm3::Vector2f& viewportOrigin, const Wm3::Vector2f& viewportSize)
+void moho::CameraImpl::CameraSetViewport(
+  const Wm3::Vector2f& viewportOrigin,
+  const Wm3::Vector2f& viewportSize
+)
 {
   VMatrix4& viewport = mCam.viewport;
 
@@ -985,7 +1019,9 @@ void moho::CameraImpl::CameraSetViewport(const Wm3::Vector2f& viewportOrigin, co
  * What it does:
  * Stores orthographic-camera mode flag lane.
  */
-void moho::CameraImpl::CameraSetOrtho(const bool enabled)
+void moho::CameraImpl::CameraSetOrtho(
+  const bool enabled
+)
 {
   mIsOrtho = static_cast<std::uint8_t>(enabled ? 1 : 0);
 }
@@ -997,7 +1033,9 @@ void moho::CameraImpl::CameraSetOrtho(const bool enabled)
  * What it does:
  * Stores the active runtime time-source selector in the camera runtime view.
  */
-void moho::CameraImpl::SetTimeSource(const ECamTimeSource timeSource)
+void moho::CameraImpl::SetTimeSource(
+  const ECamTimeSource timeSource
+)
 {
   mTimeSource = static_cast<std::int32_t>(timeSource);
 }
@@ -1019,7 +1057,10 @@ bool moho::CameraImpl::CameraIsOrtho()
  * What it does:
  * Returns current camera viewport origin and viewport size lanes.
  */
-void moho::CameraImpl::CameraGetViewport(Wm3::Vector2f& viewportOrigin, Wm3::Vector2f& viewportSize) const
+void moho::CameraImpl::CameraGetViewport(
+  Wm3::Vector2f& viewportOrigin,
+  Wm3::Vector2f& viewportSize
+) const
 {
   const VMatrix4& viewport = mCam.viewport;
   viewportOrigin.x = viewport.r[3].x;
@@ -1082,7 +1123,9 @@ bool moho::CameraImpl::CameraIsRotated() const
  * Projects one world-space point through the embedded camera view and
  * returns screen-space coordinates.
  */
-Wm3::Vector2f moho::CameraImpl::Project(const Wm3::Vector3f& worldPoint) const
+Wm3::Vector2f moho::CameraImpl::Project(
+  const Wm3::Vector3f& worldPoint
+) const
 {
   return mCam.Project(worldPoint);
 }
@@ -1094,19 +1137,24 @@ Wm3::Vector2f moho::CameraImpl::Project(const Wm3::Vector3f& worldPoint) const
  * Builds one world-space ray from a screen-space point using the embedded
  * camera view/projection/viewport lanes.
  */
-moho::GeomLine3 moho::CameraImpl::Unproject(const Wm3::Vector2f& screenPoint) const
+moho::GeomLine3 moho::CameraImpl::Unproject(
+  const Wm3::Vector2f& screenPoint
+) const
 {
   return mCam.Unproject(screenPoint);
 }
 
 /**
- * Address: 0x007A6BB0 (FUN_007A6BB0, ?CameraScreenToSurface@CameraImpl@Moho@@UBE?AV?$Vector3@M@Wm3@@ABV?$Vector2@M@4@@Z)
+ * Address: 0x007A6BB0 (FUN_007A6BB0,
+ * ?CameraScreenToSurface@CameraImpl@Moho@@UBE?AV?$Vector3@M@Wm3@@ABV?$Vector2@M@4@@Z)
  *
  * What it does:
  * Unprojects one screen-space point and resolves the terrain/water surface
  * intersection point on the active map.
  */
-Wm3::Vector3f moho::CameraImpl::CameraScreenToSurface(const Wm3::Vector2f& screenPoint) const
+Wm3::Vector3f moho::CameraImpl::CameraScreenToSurface(
+  const Wm3::Vector2f& screenPoint
+) const
 {
   const GeomLine3 worldRay = Unproject(screenPoint);
   return mTerrainMap->SurfaceIntersection(worldRay, nullptr);
@@ -1118,7 +1166,9 @@ Wm3::Vector3f moho::CameraImpl::CameraScreenToSurface(const Wm3::Vector2f& scree
  * What it does:
  * Updates embedded camera LOD scale used by projection/unprojection lanes.
  */
-void moho::CameraImpl::SetLODScale(const float scale)
+void moho::CameraImpl::SetLODScale(
+  const float scale
+)
 {
   mCam.SetLODScale(scale);
 }
@@ -1130,7 +1180,9 @@ void moho::CameraImpl::SetLODScale(const float scale)
  * What it does:
  * Enables or disables camera-shake application for this camera runtime.
  */
-void moho::CameraImpl::CanShake(const bool canShake)
+void moho::CameraImpl::CanShake(
+  const bool canShake
+)
 {
   mCanShake = canShake ? 1u : 0u;
 }
@@ -1143,7 +1195,9 @@ void moho::CameraImpl::CanShake(const bool canShake)
  * Arms camera shake params when shaking is enabled and either the previous
  * shake finished or incoming shake has stronger minimum magnitude.
  */
-void moho::CameraImpl::CameraShake(const SCamShakeParams& shakeParams)
+void moho::CameraImpl::CameraShake(
+  const SCamShakeParams& shakeParams
+)
 {
   if (mCanShake == 0u) {
     return;
@@ -1279,8 +1333,7 @@ float moho::CameraImpl::GetMaxZoom() const
   const float borderSize = moho::ren_BorderSize;
   const float maxZoomMult = mMaxZoomMult;
   const float horizontalExtent = (static_cast<float>(maxX - minX) + borderSize) * maxZoomMult;
-  const float verticalExtent =
-    (static_cast<float>(maxZ - minZ) + borderSize) * maxZoomMult * mVerticalZoomMetricScale;
+  const float verticalExtent = (static_cast<float>(maxZ - minZ) + borderSize) * maxZoomMult * mVerticalZoomMetricScale;
   return std::max(verticalExtent, horizontalExtent);
 }
 
@@ -1290,7 +1343,9 @@ float moho::CameraImpl::GetMaxZoom() const
  * What it does:
  * Projects one offset vector into the camera viewport LOD-metric row.
  */
-float moho::CameraImpl::LODMetric(const Wm3::Vec3f& offset) const
+float moho::CameraImpl::LODMetric(
+  const Wm3::Vec3f& offset
+) const
 {
   const Vector4f& row = CameraGetView().viewport.r[1];
   return offset.x * row.x + offset.y * row.y + offset.z * row.z + row.w;
@@ -1317,7 +1372,9 @@ gpg::core::FastVectorInline<moho::WeakPtr<moho::UserEntity>>& moho::CameraImpl::
  * What it does:
  * Updates one runtime multiplier lane used by max-zoom gating.
  */
-void moho::CameraImpl::SetMaxZoomMult(const float maxZoomMult)
+void moho::CameraImpl::SetMaxZoomMult(
+  const float maxZoomMult
+)
 {
   mMaxZoomMult = maxZoomMult;
 }
@@ -1351,7 +1408,10 @@ Wm3::AxisAlignedBox3f moho::CameraImpl::GetViewBox() const
  * What it does:
  * Seeds timed-move state lanes for position/zoom/pitch/heading transition.
  */
-void moho::CameraImpl::TimedMoveInit(const float seconds, const float transitionParam)
+void moho::CameraImpl::TimedMoveInit(
+  const float seconds,
+  const float transitionParam
+)
 {
   mTimedMoveOffset = {0.0f, 0.0f, 0.0f};
   mTimedMoveZoom = 0.0f;
@@ -1381,7 +1441,10 @@ void moho::CameraImpl::TimedMoveInit(const float seconds, const float transition
  * Normalizes one angle to [-pi, pi] and unwraps by +/-2pi so it remains
  * closest to a reference heading lane.
  */
-[[nodiscard]] static float NormalizeQuadrantRelative(const float angleRadians, const float referenceRadians) noexcept
+[[nodiscard]] static float NormalizeQuadrantRelative(
+  const float angleRadians,
+  const float referenceRadians
+) noexcept
 {
   // 0x007A88A9..0x007A88B2: the MSVC8 CRT `_CIfmod`.
   float normalized = static_cast<float>(fa::fmod(static_cast<double>(angleRadians), static_cast<double>(kTwoPi)));
@@ -1583,9 +1646,8 @@ void moho::CameraImpl::CalculateFOV()
     clampedLogZoom = logNearZoom;
   }
 
-  mFarFov =
-    ((((clampedLogZoom - logNearZoom) / (logMaxZoom - logNearZoom)) * (moho::cam_FarFOV - moho::cam_NearFOV)) +
-      moho::cam_NearFOV) *
+  mFarFov = ((((clampedLogZoom - logNearZoom) / (logMaxZoom - logNearZoom)) * (moho::cam_FarFOV - moho::cam_NearFOV)) +
+             moho::cam_NearFOV) *
     kDegreesToRadians;
 }
 
@@ -1598,7 +1660,10 @@ namespace
    * `UpdateBasis`. The blend lane reads `mTargetZoom` so callers must already
    * have applied the per-frame zoom slew before invoking.
    */
-  [[nodiscard]] float LogZoomInterpolatedPitchRadians(const moho::CameraImpl& camera, const float maxZoom) noexcept
+  [[nodiscard]] float LogZoomInterpolatedPitchRadians(
+    const moho::CameraImpl& camera,
+    const float maxZoom
+  ) noexcept
   {
     const float logMaxZoom = std::log(maxZoom);
     const float logTargetZoom = std::log(camera.mTargetZoom);
@@ -1609,12 +1674,11 @@ namespace
       clampedLogZoom = logNearZoom;
     }
 
-    return (((clampedLogZoom - logNearZoom) / (logMaxZoom - logNearZoom)) *
-              (moho::cam_FarPitch - moho::cam_NearPitch) +
-             moho::cam_NearPitch) *
-           kDegreesToRadians;
+    return (((clampedLogZoom - logNearZoom) / (logMaxZoom - logNearZoom)) * (moho::cam_FarPitch - moho::cam_NearPitch) +
+            moho::cam_NearPitch) *
+      kDegreesToRadians;
   }
-}
+} // namespace
 
 /**
  * Address: 0x007A95F0 (FUN_007A95F0, Moho::CameraImpl::UpdateBasis)
@@ -1629,7 +1693,10 @@ namespace
  * targeting, recomputes FOV, then resolves heading and pitch lanes from the
  * current target type and finally re-clamps focus onto the terrain surface.
  */
-void moho::CameraImpl::UpdateBasis(const float interpolationAlpha, const float frameSeconds)
+void moho::CameraImpl::UpdateBasis(
+  const float interpolationAlpha,
+  const float frameSeconds
+)
 {
   const float startTargetZoom = mTargetZoom;
 
@@ -1642,8 +1709,7 @@ void moho::CameraImpl::UpdateBasis(const float interpolationAlpha, const float f
   const float logDeltaMagnitude = std::fabs(logDelta);
 
   float clampedMagnitude = logDeltaMagnitude;
-  const float allowedStep =
-    ((clampedMagnitude * moho::cam_ZoomSpeedLarge) + moho::cam_ZoomSpeedSmall) * frameSeconds;
+  const float allowedStep = ((clampedMagnitude * moho::cam_ZoomSpeedLarge) + moho::cam_ZoomSpeedSmall) * frameSeconds;
   if (clampedMagnitude > allowedStep) {
     clampedMagnitude = allowedStep;
   }
@@ -1670,8 +1736,10 @@ void moho::CameraImpl::UpdateBasis(const float interpolationAlpha, const float f
   // focus point along the screen-space pivot ray so the pivot world point
   // stays under the screen pivot through the zoom transition.
   const std::int32_t shiftAnchorType = mTargetType;
-  if ((shiftAnchorType == kCameraTargetTypeLocation || shiftAnchorType == kCameraTargetTypeHermite) &&
-      startTargetZoom > mTargetZoom) {
+  if (
+    (shiftAnchorType == kCameraTargetTypeLocation || shiftAnchorType == kCameraTargetTypeHermite) &&
+    startTargetZoom > mTargetZoom
+  ) {
     moho::GeomLine3 pivotRay = mCam.Unproject(mPivot);
     pivotRay.closest = gpg::nInf;
 
@@ -1688,12 +1756,9 @@ void moho::CameraImpl::UpdateBasis(const float interpolationAlpha, const float f
         }
         const float scale = zoomScale / startTargetZoom;
 
-        mTargetLocation.x =
-          ((mTargetLocation.x - pivotSurfacePoint.x) * scale) + pivotSurfacePoint.x;
-        mTargetLocation.y =
-          ((mTargetLocation.y - pivotSurfacePoint.y) * scale) + pivotSurfacePoint.y;
-        mTargetLocation.z =
-          ((mTargetLocation.z - pivotSurfacePoint.z) * scale) + pivotSurfacePoint.z;
+        mTargetLocation.x = ((mTargetLocation.x - pivotSurfacePoint.x) * scale) + pivotSurfacePoint.x;
+        mTargetLocation.y = ((mTargetLocation.y - pivotSurfacePoint.y) * scale) + pivotSurfacePoint.y;
+        mTargetLocation.z = ((mTargetLocation.z - pivotSurfacePoint.z) * scale) + pivotSurfacePoint.z;
       }
     }
   }
@@ -1719,8 +1784,7 @@ void moho::CameraImpl::UpdateBasis(const float interpolationAlpha, const float f
     const float orientZ = orient.z;
     const float orientW = orient.w;
     mHeading = std::atan2(
-      ((orientW * orientY) + (orientX * orientZ)) * 2.0f,
-      1.0f - (((orientX * orientX) + (orientY * orientY)) * 2.0f)
+      ((orientW * orientY) + (orientX * orientZ)) * 2.0f, 1.0f - (((orientX * orientX) + (orientY * orientY)) * 2.0f)
     );
     mFarPitch = moho::COORDS_Pitch(orient) + mNoseCamPitchAdjust;
     ClampFocusPos();
@@ -1765,8 +1829,10 @@ void moho::CameraImpl::UpdateBasis(const float interpolationAlpha, const float f
     }
     mHeading = headingStep;
 
-    if (std::fabs(headingStep - headingTarget) >= kRotatedTolerance ||
-        std::fabs(pitchStep - interpolatedPitch) >= kRotatedTolerance) {
+    if (
+      std::fabs(headingStep - headingTarget) >= kRotatedTolerance ||
+      std::fabs(pitchStep - interpolatedPitch) >= kRotatedTolerance
+    ) {
       ClampFocusPos();
       return;
     }
@@ -1798,7 +1864,10 @@ void moho::CameraImpl::UpdateBasis(const float interpolationAlpha, const float f
  * target-type dispatch summary. Invoked from `CameraImpl::Frame` immediately
  * before `UpdateBasis`.
  */
-void moho::CameraImpl::UpdateTargets(const float interpolationAlpha, const float frameSeconds)
+void moho::CameraImpl::UpdateTargets(
+  const float interpolationAlpha,
+  const float frameSeconds
+)
 {
   // Tracked-target countdown: when armed, decay toward zero and dispatch
   // TargetNextEntity through the virtual lane when it hits zero so the next
@@ -1857,8 +1926,7 @@ void moho::CameraImpl::UpdateTargets(const float interpolationAlpha, const float
       const float orientZ = orient.z;
       const float orientW = orient.w;
       const float headingFromQuat = std::atan2(
-        ((orientW * orientY) + (orientX * orientZ)) * 2.0f,
-        1.0f - (((orientX * orientX) + (orientY * orientY)) * 2.0f)
+        ((orientW * orientY) + (orientX * orientZ)) * 2.0f, 1.0f - (((orientX * orientX) + (orientY * orientY)) * 2.0f)
       );
       mHeadingZoom = NormalizeQuadrantRelative(headingFromQuat, mTimedMoveHeading);
     }
@@ -1896,7 +1964,10 @@ void moho::CameraImpl::UpdateTargets(const float interpolationAlpha, const float
  *
  * Invoked from `RCamManager::Frame` (0x007AABB0) over the camera loop.
  */
-void moho::CameraImpl::Frame(const float interpolationAlpha, float frameSeconds)
+void moho::CameraImpl::Frame(
+  const float interpolationAlpha,
+  float frameSeconds
+)
 {
   CameraTimeSource* const gameTimeSource = mTimeSources[kCameraTimeSourceGame];
 
@@ -1946,7 +2017,9 @@ namespace
     float endValue;
   };
 
-  [[nodiscard]] CameraHermiteWeights MakeCameraHermiteWeights(const float t) noexcept
+  [[nodiscard]] CameraHermiteWeights MakeCameraHermiteWeights(
+    const float t
+  ) noexcept
   {
     const float tt = t * t;
     const float ttt = tt * t;
@@ -1961,14 +2034,17 @@ namespace
   // Signals the camera's embedded `CScriptEvent` (a `CTaskEvent`) sub-object at
   // +0x0C that a timed transition has completed. Matches the binary's
   // `CTaskEvent::EventSetSignaled((CTaskEvent*)&this->CScriptEvent, 1)`.
-  void EventSetSignaledCameraTransition(moho::CameraImpl& camera, const bool signaled) noexcept
+  void EventSetSignaledCameraTransition(
+    moho::CameraImpl& camera,
+    const bool signaled
+  ) noexcept
   {
     // +0x0C is where the compiler puts it: `CameraImpl : public RCamCamera,
     // public CScriptEvent` with `sizeof(RCamCamera) == 0x0C`, so CScriptEvent is
     // the second base. Take it by cast rather than by adding 0x0C.
     static_cast<moho::CScriptEvent&>(camera).EventSetSignaled(signaled);
   }
-}
+} // namespace
 
 /**
  * Address: 0x007A9BA0 (FUN_007A9BA0, Moho::CameraImpl::InterpolateBasis)
@@ -1994,7 +2070,10 @@ namespace
  * Invoked from the recovered `CameraImpl::Frame` (FUN_007A9030) on the
  * transition lane (`mTimedMoveDuration > 0`).
  */
-void moho::CameraImpl::InterpolateBasis(const float interpolationAlpha, const float /*frameSeconds*/)
+void moho::CameraImpl::InterpolateBasis(
+  const float interpolationAlpha,
+  const float /*frameSeconds*/
+)
 {
   // Linear transition progress = (now - startTime) / duration along the active
   // time source.
@@ -2032,8 +2111,7 @@ void moho::CameraImpl::InterpolateBasis(const float interpolationAlpha, const fl
       float noseProgress = 1.0f;
       if (mTimedMoveTransitionParam > 0.0f) {
         CameraTimeSource* const noseSource = mTimeSources[mTimeSource];
-        noseProgress =
-          (noseSource->Time() - mTimedMoveStartTime) / mTimedMoveTransitionParam;
+        noseProgress = (noseSource->Time() - mTimedMoveStartTime) / mTimedMoveTransitionParam;
         if (noseProgress > 1.0f) {
           noseProgress = 1.0f;
         }
@@ -2047,9 +2125,8 @@ void moho::CameraImpl::InterpolateBasis(const float interpolationAlpha, const fl
     if (mAccType == kCameraAccTypeFastInSlowOut) {
       shapedProgress = std::sin(curveInput * kHalfPi);
     } else if (mAccType == kCameraAccTypeSlowInOut) {
-      shapedProgress = (progress < 0.5f)
-        ? (1.0f - std::cos(curveInput * kPi)) * 0.5f
-        : (std::sin((curveInput - 0.5f) * kPi) * 0.5f) + 0.5f;
+      shapedProgress = (progress < 0.5f) ? (1.0f - std::cos(curveInput * kPi)) * 0.5f
+                                         : (std::sin((curveInput - 0.5f) * kPi) * 0.5f) + 0.5f;
     }
 
     const float t = shapedProgress;
@@ -2063,54 +2140,37 @@ void moho::CameraImpl::InterpolateBasis(const float interpolationAlpha, const fl
     //   heading   : mTimedMoveHeading / mHermiteHeadingStartDelta /
     //               mHermiteHeadingEndDelta / mHeadingZoom
     if (mTargetType == kCameraTargetTypeHermite || mTargetType == kCameraTargetTypeNoseCam) {
-      mFarPitch =
-        (mHermitePitchEndDelta * w.endTangent) +
-        (mHermitePitchStartDelta * w.startTangent) +
-        (mTimedMovePitch * w.startValue) +
-        (mCurrentPitch * w.endValue);
+      mFarPitch = (mHermitePitchEndDelta * w.endTangent) + (mHermitePitchStartDelta * w.startTangent) +
+        (mTimedMovePitch * w.startValue) + (mCurrentPitch * w.endValue);
 
-      mHeading =
-        (mTimedMoveHeading * w.startValue) +
-        (mHermiteHeadingStartDelta * w.startTangent) +
-        (mHermiteHeadingEndDelta * w.endTangent) +
-        (mHeadingZoom * w.endValue);
+      mHeading = (mTimedMoveHeading * w.startValue) + (mHermiteHeadingStartDelta * w.startTangent) +
+        (mHermiteHeadingEndDelta * w.endTangent) + (mHeadingZoom * w.endValue);
       mIsRotated = 1u;
     }
 
     // Target-zoom is always Hermite-blended between the cached zoom endpoints:
     //   startValue=mTimedMoveZoom, startTangent=mHermiteZoomStartDelta,
     //   endTangent=mHermiteZoomEndDelta, endValue=mNearZoom.
-    mTargetZoom =
-      (mHermiteZoomStartDelta * w.startTangent) +
-      (mTimedMoveZoom * w.startValue) +
-      (mHermiteZoomEndDelta * w.endTangent) +
-      (mNearZoom * w.endValue);
+    mTargetZoom = (mHermiteZoomStartDelta * w.startTangent) + (mTimedMoveZoom * w.startValue) +
+      (mHermiteZoomEndDelta * w.endTangent) + (mNearZoom * w.endValue);
 
     // Offset is Hermite-blended between the cached offset endpoints:
     //   startValue=mTimedMoveOffset, startTangent=mHermiteOffsetEndDelta,
     //   endTangent=mHermiteOffsetStartDelta, endValue=mTargetLocation.
-    mOffset.x =
-      (mTimedMoveOffset.x * w.startValue) +
-      (mTargetLocation.x * w.endValue) +
-      (mHermiteOffsetEndDelta.x * w.startTangent) +
-      (mHermiteOffsetStartDelta.x * w.endTangent);
-    mOffset.y =
-      (mTimedMoveOffset.y * w.startValue) +
-      (mTargetLocation.y * w.endValue) +
-      (mHermiteOffsetEndDelta.y * w.startTangent) +
-      (mHermiteOffsetStartDelta.y * w.endTangent);
-    mOffset.z =
-      (mTimedMoveOffset.z * w.startValue) +
-      (mTargetLocation.z * w.endValue) +
-      (mHermiteOffsetEndDelta.z * w.startTangent) +
-      (mHermiteOffsetStartDelta.z * w.endTangent);
+    mOffset.x = (mTimedMoveOffset.x * w.startValue) + (mTargetLocation.x * w.endValue) +
+      (mHermiteOffsetEndDelta.x * w.startTangent) + (mHermiteOffsetStartDelta.x * w.endTangent);
+    mOffset.y = (mTimedMoveOffset.y * w.startValue) + (mTargetLocation.y * w.endValue) +
+      (mHermiteOffsetEndDelta.y * w.startTangent) + (mHermiteOffsetStartDelta.y * w.endTangent);
+    mOffset.z = (mTimedMoveOffset.z * w.startValue) + (mTargetLocation.z * w.endValue) +
+      (mHermiteOffsetEndDelta.z * w.startTangent) + (mHermiteOffsetStartDelta.z * w.endTangent);
   }
 
   // Non-targeted transitions (Location/Box) derive the far-pitch from the
   // log-zoom interpolation lane (matches CalculateFOV's blend domain).
-  if (mTargetType != kCameraTargetTypeHermite &&
-      mTargetType != kCameraTargetTypeNoseCam &&
-      mTargetType != kCameraTargetTypeEntity) {
+  if (
+    mTargetType != kCameraTargetTypeHermite && mTargetType != kCameraTargetTypeNoseCam &&
+    mTargetType != kCameraTargetTypeEntity
+  ) {
     const float logMaxZoom = std::log(GetMaxZoom());
     const float logTargetZoom = std::log(mTargetZoom);
     const float logNearZoom = std::log(moho::cam_NearZoom);
@@ -2119,8 +2179,7 @@ void moho::CameraImpl::InterpolateBasis(const float interpolationAlpha, const fl
       clampedLogZoom = logNearZoom;
     }
     mFarPitch =
-      (((clampedLogZoom - logNearZoom) / (logMaxZoom - logNearZoom)) *
-         (moho::cam_FarPitch - moho::cam_NearPitch) +
+      (((clampedLogZoom - logNearZoom) / (logMaxZoom - logNearZoom)) * (moho::cam_FarPitch - moho::cam_NearPitch) +
        moho::cam_NearPitch) *
       kDegreesToRadians;
   }
@@ -2148,8 +2207,7 @@ void moho::CameraImpl::InterpolateBasis(const float interpolationAlpha, const fl
   // When the transition has finished, demote Hermite/Box transitions to
   // Location mode (Entity/NoseCam stay tracked).
   if (progress >= 1.0f) {
-    if (mTargetType != kCameraTargetTypeNoseCam &&
-        mTargetType != kCameraTargetTypeEntity) {
+    if (mTargetType != kCameraTargetTypeNoseCam && mTargetType != kCameraTargetTypeEntity) {
       mTargetType = kCameraTargetTypeLocation;
     }
   }
@@ -2177,7 +2235,9 @@ void moho::CameraImpl::InterpolateBasis(const float interpolationAlpha, const fl
  * Y zeroed and renormalized) by the Y delta. Both axes are scaled by the
  * current target zoom, the inverse viewport width, and `cam_PanSpeed`.
  */
-void moho::CameraImpl::CameraPan(const Wm3::Vector2f& panDelta)
+void moho::CameraImpl::CameraPan(
+  const Wm3::Vector2f& panDelta
+)
 {
   // Skip panning entirely while the UI is in NIS (non-interactive scripted)
   // mode, as reported by the gamemain UI module.
@@ -2245,7 +2305,9 @@ namespace
   );
 
   /// The binary's 0.5 s, or the M5 interval for a camera whose last rebuild held that many entities.
-  [[nodiscard]] float FrustumCacheRefreshInterval(const std::size_t cachedEntities)
+  [[nodiscard]] float FrustumCacheRefreshInterval(
+    const std::size_t cachedEntities
+  )
   {
     constexpr float kRefreshSeconds = 0.5f;
     if (ren_FrustumCacheLodUnits > 0 && cachedEntities >= static_cast<std::size_t>(ren_FrustumCacheLodUnits)) {
@@ -2289,7 +2351,9 @@ std::uint64_t moho::CAM_FrustumUnitsRebuildCount() noexcept
  * Invoked from the recovered `CameraImpl::Frame` (FUN_007A9030) as the final
  * per-frame step.
  */
-void moho::CameraImpl::CacheCameraFrustumUnits(const float deltaFrame)
+void moho::CameraImpl::CacheCameraFrustumUnits(
+  const float deltaFrame
+)
 {
   moho::CWldSession* const session = moho::WLD_GetActiveSession();
   if (session == nullptr) {
@@ -2321,9 +2385,7 @@ void moho::CameraImpl::CacheCameraFrustumUnits(const float deltaFrame)
   gpg::fastvector<UserEntity*> unitsInView;
   auto* const spatialDb = session->GetEntitySpatialDbStorage();
   auto* const cameraView = const_cast<moho::GeomCamera3*>(&CameraGetView());
-  spatialDb->CollectInView(
-    cameraView, unitsInView, static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Entity)
-  );
+  spatialDb->CollectInView(cameraView, unitsInView, static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Entity));
 
   for (UserEntity* const entity : unitsInView) {
     if (entity == nullptr) {
@@ -2364,7 +2426,9 @@ namespace
    * (lane 0 is the scalar; see `QuatToMatrix` at 0x00452FD0, whose diagonals
    * pair only lanes 1..3).
    */
-  [[nodiscard]] Wm3::Quaternionf ViewOrientFromLook(const Wm3::Quaternionf& look) noexcept
+  [[nodiscard]] Wm3::Quaternionf ViewOrientFromLook(
+    const Wm3::Quaternionf& look
+  ) noexcept
   {
     Wm3::Quaternionf orient{};
     orient.w = -look.y;
@@ -2400,7 +2464,10 @@ namespace
  * Invoked from the recovered `CameraImpl::Frame` (FUN_007A9030) after the
  * per-frame basis/zoom slew.
  */
-void moho::CameraImpl::UpdateCoords(const float /*interpolationAlpha*/, const float /*frameSeconds*/)
+void moho::CameraImpl::UpdateCoords(
+  const float /*interpolationAlpha*/,
+  const float /*frameSeconds*/
+)
 {
   const float targetZoom = mTargetZoom;
 
@@ -2443,12 +2510,10 @@ void moho::CameraImpl::UpdateCoords(const float /*interpolationAlpha*/, const fl
     projection.r[0].x = 2.0f / ((targetZoom * 0.5f) - (targetZoom * -0.5f));
     projection.r[1].y = 2.0f / ((verticalExtent * 0.5f) - (verticalExtent * -0.5f));
     projection.r[2].z = 1.0f / (farClip - nearClip);
-    projection.r[3].x =
-      (((targetZoom * -0.5f) + (targetZoom * 0.5f)) / ((targetZoom * -0.5f) - (targetZoom * 0.5f))) -
+    projection.r[3].x = (((targetZoom * -0.5f) + (targetZoom * 0.5f)) / ((targetZoom * -0.5f) - (targetZoom * 0.5f))) -
       (1.0f / static_cast<float>(static_cast<int>(targetZoom)));
     projection.r[3].y =
-      (((verticalExtent * -0.5f) + (verticalExtent * 0.5f)) /
-       ((verticalExtent * -0.5f) - (verticalExtent * 0.5f))) +
+      (((verticalExtent * -0.5f) + (verticalExtent * 0.5f)) / ((verticalExtent * -0.5f) - (verticalExtent * 0.5f))) +
       (1.0f / static_cast<float>(static_cast<int>(verticalExtent)));
     projection.r[3].z = nearClip / (nearClip - farClip);
     projection.r[3].w = 1.0f;
@@ -2466,17 +2531,14 @@ void moho::CameraImpl::UpdateCoords(const float /*interpolationAlpha*/, const fl
 
     // Apply per-frame camera shake to the eye position.
     Wm3::Vector3f shakeOffset{};
-    Wm3::Vector3f* const shake =
-      func_CameraImplUpdateShake(&mOffset, &shakeOffset, &mCamShakeParams);
+    Wm3::Vector3f* const shake = func_CameraImplUpdateShake(&mOffset, &shakeOffset, &mCamShakeParams);
     viewTransform.pos_.x = shake->x + eyeX;
     viewTransform.pos_.y = shake->y + eyeY;
     viewTransform.pos_.z = shake->z + eyeZ;
 
     // D3D-style perspective projection from the current FOV, clip planes, and
     // vertical metric scale (used as the aspect lane).
-    projection = moho::VEC_D3DProjectionMatrixFOV(
-      mFarFov, mFarFov, nearClip, farClip, mVerticalZoomMetricScale
-    );
+    projection = moho::VEC_D3DProjectionMatrixFOV(mFarFov, mFarFov, nearClip, farClip, mVerticalZoomMetricScale);
   }
 
   mCam.Init(viewTransform, projection);
@@ -2509,7 +2571,10 @@ void moho::CameraImpl::TargetNothing()
  * Targets one world-space location with optional timed transition and
  * immediate focus/FOV update when `seconds == 0`.
  */
-void moho::CameraImpl::TargetLocation(const Wm3::Vec3f& position, const float seconds)
+void moho::CameraImpl::TargetLocation(
+  const Wm3::Vec3f& position,
+  const float seconds
+)
 {
   if (mTargetType == kCameraTargetTypeEntity) {
     BroadcastEvent(SCameraTracking{mName, 0});
@@ -2539,7 +2604,10 @@ void moho::CameraImpl::TargetLocation(const Wm3::Vec3f& position, const float se
  * Targets one world-space AABB, derives focus/near-zoom lanes from box bounds,
  * and optionally applies immediate focus+FOV clamping.
  */
-void moho::CameraImpl::TargetBox(const Wm3::AxisAlignedBox3f& targetBox, const float seconds)
+void moho::CameraImpl::TargetBox(
+  const Wm3::AxisAlignedBox3f& targetBox,
+  const float seconds
+)
 {
   if (mTargetType == kCameraTargetTypeEntity) {
     BroadcastEvent(SCameraTracking{mName, 0});
@@ -2583,11 +2651,15 @@ void moho::CameraImpl::TargetBox(const Wm3::AxisAlignedBox3f& targetBox, const f
  * seconds)`, and additionally calls `TargetNothing` when `seconds == 0` so the
  * camera releases any active entity-tracking state after the framing snap.
  */
-void moho::CameraImpl::TargetEntityBox(UserEntity* const entity, const float seconds)
+void moho::CameraImpl::TargetEntityBox(
+  UserEntity* const entity,
+  const float seconds
+)
 {
   const Wm3::Box3f* sourceBox = nullptr;
-  if (MeshInstance* const meshInstance = (entity != nullptr) ? entity->mMeshInstance : nullptr;
-      meshInstance != nullptr) {
+  if (
+    MeshInstance* const meshInstance = (entity != nullptr) ? entity->mMeshInstance : nullptr; meshInstance != nullptr
+  ) {
     meshInstance->UpdateInterpolatedFields();
     sourceBox = &meshInstance->box;
   } else {
@@ -2752,8 +2824,7 @@ void moho::CameraImpl::TargetNoseCam(
 
   const VTransform& targetTransform = targetEntity->mVariableData.mCurTransform;
   mTargetLocation = targetTransform.pos_;
-  mHeadingZoom =
-    NormalizeQuadrantRelative(HeadingFromEntityOrientation(targetTransform.orient_), mTimedMoveHeading);
+  mHeadingZoom = NormalizeQuadrantRelative(HeadingFromEntityOrientation(targetTransform.orient_), mTimedMoveHeading);
   mCurrentPitch = PitchFromEntityOrientation(targetTransform.orient_) + pitchAdjust;
   mNearZoom = zoom;
   mNoseCamPitchAdjust = pitchAdjust;
@@ -2775,7 +2846,11 @@ void moho::CameraImpl::TargetNoseCam(
  * applies the result immediately or seeds Hermite transition state.
  */
 void moho::CameraImpl::TargetManual(
-  const Wm3::Vec3f& position, const float heading, const float pitch, const float zoom, const float seconds
+  const Wm3::Vec3f& position,
+  const float heading,
+  const float pitch,
+  const float zoom,
+  const float seconds
 )
 {
   if (mTargetType == kCameraTargetTypeEntity) {
@@ -2813,7 +2888,10 @@ void moho::CameraImpl::TargetManual(
  * the active heading and far-pitch lanes and substituting a new zoom/seconds
  * pair.
  */
-void moho::CameraImpl::SetZoom(const float zoom, const float seconds)
+void moho::CameraImpl::SetZoom(
+  const float zoom,
+  const float seconds
+)
 {
   TargetManual(mTargetLocation, mHeading, mFarPitch, zoom, seconds);
 }
@@ -2824,7 +2902,9 @@ void moho::CameraImpl::SetZoom(const float zoom, const float seconds)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_GetCameraL`.
  */
-int moho::cfunc_GetCamera(lua_State* const luaContext)
+int moho::cfunc_GetCamera(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetCameraL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2838,12 +2918,7 @@ int moho::cfunc_GetCamera(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_GetCamera_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    kGetCameraName,
-    &moho::cfunc_GetCamera,
-    nullptr,
-    kGlobalLuaClassName,
-    kGetCameraHelpText
+    moho::SCR_UserLuaInitSet(), kGetCameraName, &moho::cfunc_GetCamera, nullptr, kGlobalLuaClassName, kGetCameraHelpText
   );
   return &binder;
 }
@@ -2855,7 +2930,9 @@ moho::CScrLuaInitForm* moho::func_GetCamera_LuaFuncDef()
  * Resolves one camera name from Lua and pushes the camera script object or
  * nil when no camera matches.
  */
-int moho::cfunc_GetCameraL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetCameraL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kGetCameraHelpText);
@@ -2883,7 +2960,9 @@ int moho::cfunc_GetCameraL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_CameraImplSnapToL`.
  */
-int moho::cfunc_CameraImplSnapTo(lua_State* const luaContext)
+int moho::cfunc_CameraImplSnapTo(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplSnapToL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2914,7 +2993,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplSnapTo_LuaFuncDef()
  * Validates `Camera:SnapTo(position, orientationHPR, zoom)`, resolves Lua
  * camera/vector payloads, and applies an immediate manual camera target.
  */
-int moho::cfunc_CameraImplSnapToL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplSnapToL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 4, kCameraImplSnapToHelpText);
@@ -2944,7 +3025,9 @@ int moho::cfunc_CameraImplSnapToL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_CameraImplMoveToL`.
  */
-int moho::cfunc_CameraImplMoveTo(lua_State* const luaContext)
+int moho::cfunc_CameraImplMoveTo(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplMoveToL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2956,7 +3039,9 @@ int moho::cfunc_CameraImplMoveTo(lua_State* const luaContext)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CameraImplMoveToRegionL`.
  */
-int moho::cfunc_CameraImplMoveToRegion(lua_State* const luaContext)
+int moho::cfunc_CameraImplMoveToRegion(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplMoveToRegionL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2988,12 +3073,16 @@ moho::CScrLuaInitForm* moho::func_CameraImplMoveToRegion_LuaFuncDef()
  * terrain grid cell centers, samples corner elevations, and targets one world
  * box transition.
  */
-int moho::cfunc_CameraImplMoveToRegionL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplMoveToRegionL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   const int argumentCount = lua_gettop(rawState);
   if (argumentCount < 2 || argumentCount > 3) {
-    LuaPlus::LuaState::Error(state, kLuaExpectedBetweenArgsWarning, kCameraImplMoveToRegionHelpText, 2, 3, argumentCount);
+    LuaPlus::LuaState::Error(
+      state, kLuaExpectedBetweenArgsWarning, kCameraImplMoveToRegionHelpText, 2, 3, argumentCount
+    );
   }
 
   const LuaPlus::LuaObject cameraObject(LuaPlus::LuaStackObject(state, 1));
@@ -3044,7 +3133,9 @@ int moho::cfunc_CameraImplMoveToRegionL(LuaPlus::LuaState* const state)
  * resolves typed camera/vector payloads from Lua, and dispatches manual camera
  * targeting with heading/pitch plus zoom/time lanes.
  */
-int moho::cfunc_CameraImplMoveToL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplMoveToL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 5, kCameraImplMoveToHelpText);
 
@@ -3079,7 +3170,9 @@ int moho::cfunc_CameraImplMoveToL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_CameraImplSetZoomL`.
  */
-int moho::cfunc_CameraImplSetZoom(lua_State* const luaContext)
+int moho::cfunc_CameraImplSetZoom(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplSetZoomL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3111,7 +3204,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplSetZoom_LuaFuncDef()
  * heading/pitch lanes, and dispatches manual camera targeting with new zoom
  * and transition seconds.
  */
-int moho::cfunc_CameraImplSetZoomL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplSetZoomL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 3, kCameraImplSetZoomHelpText);
@@ -3142,7 +3237,9 @@ int moho::cfunc_CameraImplSetZoomL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CameraImplSetTargetZoomL`.
  */
-int moho::cfunc_CameraImplSetTargetZoom(lua_State* const luaContext)
+int moho::cfunc_CameraImplSetTargetZoom(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplSetTargetZoomL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3173,7 +3270,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplSetTargetZoom_LuaFuncDef()
  * Validates `Camera:SetTargetZoom(zoom)` and updates one runtime near-zoom
  * lane directly from Lua.
  */
-int moho::cfunc_CameraImplSetTargetZoomL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplSetTargetZoomL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kCameraImplSetTargetZoomHelpText);
@@ -3216,7 +3315,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplMoveTo_LuaFuncDef()
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CameraImplGetMinZoomL`.
  */
-int moho::cfunc_CameraImplGetMinZoom(lua_State* const luaContext)
+int moho::cfunc_CameraImplGetMinZoom(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplGetMinZoomL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3247,7 +3348,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplGetMinZoom_LuaFuncDef()
  * Validates `Camera:GetMinZoom()`, pushes the global near-zoom value, and
  * returns one Lua result.
  */
-int moho::cfunc_CameraImplGetMinZoomL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplGetMinZoomL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kCameraImplGetMinZoomHelpText);
@@ -3264,7 +3367,9 @@ int moho::cfunc_CameraImplGetMinZoomL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CameraImplSetMaxZoomMultL`.
  */
-int moho::cfunc_CameraImplSetMaxZoomMult(lua_State* const luaContext)
+int moho::cfunc_CameraImplSetMaxZoomMult(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplSetMaxZoomMultL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3295,7 +3400,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplSetMaxZoomMult_LuaFuncDef()
  * Validates `Camera:SetMaxZoomMult(mult)` and applies one max-zoom multiplier
  * through the camera virtual lane.
  */
-int moho::cfunc_CameraImplSetMaxZoomMultL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplSetMaxZoomMultL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kCameraImplSetMaxZoomMultHelpText);
@@ -3319,7 +3426,9 @@ int moho::cfunc_CameraImplSetMaxZoomMultL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CameraImplSetAccModeL`.
  */
-int moho::cfunc_CameraImplSetAccMode(lua_State* const luaContext)
+int moho::cfunc_CameraImplSetAccMode(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplSetAccModeL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3332,7 +3441,9 @@ int moho::cfunc_CameraImplSetAccMode(lua_State* const luaContext)
  * and one string acceleration token from Lua, then dispatches
  * `CameraImpl::CameraSetAccType`.
  */
-int moho::cfunc_CameraImplSetAccModeL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplSetAccModeL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kCameraImplSetAccModeHelpText);
 
@@ -3376,7 +3487,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplSetAccMode_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_CameraImplSpinL`.
  */
-int moho::cfunc_CameraImplSpin(lua_State* const luaContext)
+int moho::cfunc_CameraImplSpin(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplSpinL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3388,7 +3501,9 @@ int moho::cfunc_CameraImplSpin(lua_State* const luaContext)
  * Reads heading plus optional zoom spin rates from Lua and updates camera spin
  * control lanes.
  */
-int moho::cfunc_CameraImplSpinL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplSpinL(
+  LuaPlus::LuaState* const state
+)
 {
   const int argumentCount = lua_gettop(state->m_state);
   if (argumentCount < 2 || argumentCount > 3) {
@@ -3446,7 +3561,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplSpin_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_CameraImplResetL`.
  */
-int moho::cfunc_CameraImplReset(lua_State* const luaContext)
+int moho::cfunc_CameraImplReset(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplResetL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3458,7 +3575,9 @@ int moho::cfunc_CameraImplReset(lua_State* const luaContext)
  * Validates `Camera:Reset()`, resolves one camera payload, and invokes
  * `CameraImpl::CameraReset`.
  */
-int moho::cfunc_CameraImplResetL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplResetL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kCameraImplResetHelpText);
 
@@ -3513,7 +3632,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplTrackEntities_LuaFuncDef()
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CameraImplTrackEntitiesL`.
  */
-int moho::cfunc_CameraImplTrackEntities(lua_State* const luaContext)
+int moho::cfunc_CameraImplTrackEntities(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplTrackEntitiesL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3526,7 +3647,9 @@ int moho::cfunc_CameraImplTrackEntities(lua_State* const luaContext)
  * weak-set of session entities from Lua string IDs, and dispatches
  * tracked-entity targeting.
  */
-int moho::cfunc_CameraImplTrackEntitiesL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplTrackEntitiesL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 4, kCameraImplTrackEntitiesHelpText);
@@ -3560,7 +3683,9 @@ int moho::cfunc_CameraImplTrackEntitiesL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CameraImplTargetEntitiesL`.
  */
-int moho::cfunc_CameraImplTargetEntities(lua_State* const luaContext)
+int moho::cfunc_CameraImplTargetEntities(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplTargetEntitiesL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3573,7 +3698,9 @@ int moho::cfunc_CameraImplTargetEntities(lua_State* const luaContext)
  * plus weak-set of session entities from Lua string IDs, and dispatches
  * non-tracking multi-entity targeting.
  */
-int moho::cfunc_CameraImplTargetEntitiesL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplTargetEntitiesL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 4, kCameraImplTargetEntitiesHelpText);
@@ -3606,7 +3733,9 @@ int moho::cfunc_CameraImplTargetEntitiesL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_CameraImplNoseCamL`.
  */
-int moho::cfunc_CameraImplNoseCam(lua_State* const luaContext)
+int moho::cfunc_CameraImplNoseCam(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplNoseCamL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3619,7 +3748,9 @@ int moho::cfunc_CameraImplNoseCam(lua_State* const luaContext)
  * resolves one target entity by string ID, and dispatches nose-camera target
  * alignment.
  */
-int moho::cfunc_CameraImplNoseCamL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplNoseCamL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 6, kCameraImplNoseCamHelpText);
@@ -3712,7 +3843,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplNoseCam_LuaFuncDef()
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CameraImplHoldRotationL`.
  */
-int moho::cfunc_CameraImplHoldRotation(lua_State* const luaContext)
+int moho::cfunc_CameraImplHoldRotation(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplHoldRotationL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3724,7 +3857,9 @@ int moho::cfunc_CameraImplHoldRotation(lua_State* const luaContext)
  * Validates `Camera:HoldRotation()`, resolves one camera payload, and applies
  * hold-rotation runtime flags.
  */
-int moho::cfunc_CameraImplHoldRotationL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplHoldRotationL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kCameraImplHoldRotationHelpText);
 
@@ -3760,7 +3895,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplHoldRotation_LuaFuncDef()
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CameraImplRevertRotationL`.
  */
-int moho::cfunc_CameraImplRevertRotation(lua_State* const luaContext)
+int moho::cfunc_CameraImplRevertRotation(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplRevertRotationL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3772,7 +3909,9 @@ int moho::cfunc_CameraImplRevertRotation(lua_State* const luaContext)
  * Validates `Camera:RevertRotation()`, resolves one camera payload, and
  * invokes `CameraImpl::CameraRevertRotation`.
  */
-int moho::cfunc_CameraImplRevertRotationL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplRevertRotationL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kCameraImplRevertRotationHelpText);
 
@@ -3807,7 +3946,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplRevertRotation_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_CameraImplGetZoomL`.
  */
-int moho::cfunc_CameraImplGetZoom(lua_State* const luaContext)
+int moho::cfunc_CameraImplGetZoom(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplGetZoomL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3819,7 +3960,9 @@ int moho::cfunc_CameraImplGetZoom(lua_State* const luaContext)
  * Validates `Camera:GetZoom()`, resolves one camera payload, and pushes the
  * current target-zoom scalar.
  */
-int moho::cfunc_CameraImplGetZoomL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplGetZoomL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kCameraImplGetZoomHelpText);
@@ -3857,7 +4000,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplGetZoom_LuaFuncDef()
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CameraImplGetFocusPositionL`.
  */
-int moho::cfunc_CameraImplGetFocusPosition(lua_State* const luaContext)
+int moho::cfunc_CameraImplGetFocusPosition(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplGetFocusPositionL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3868,7 +4013,9 @@ int moho::cfunc_CameraImplGetFocusPosition(lua_State* const luaContext)
  * What it does:
  * Resolves one camera object and pushes its focus-position vector payload.
  */
-int moho::cfunc_CameraImplGetFocusPositionL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplGetFocusPositionL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kCameraImplGetFocusPositionHelpText);
 
@@ -3905,7 +4052,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplGetFocusPosition_LuaFuncDef()
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CameraImplSaveSettingsL`.
  */
-int moho::cfunc_CameraImplSaveSettings(lua_State* const luaContext)
+int moho::cfunc_CameraImplSaveSettings(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplSaveSettingsL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3917,7 +4066,9 @@ int moho::cfunc_CameraImplSaveSettings(lua_State* const luaContext)
  * Captures one camera snapshot table (`Focus`, `Zoom`, `Pitch`, `Heading`)
  * from the current camera runtime and returns it to Lua.
  */
-int moho::cfunc_CameraImplSaveSettingsL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplSaveSettingsL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kCameraImplSaveSettingsHelpText);
 
@@ -3962,7 +4113,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplSaveSettings_LuaFuncDef()
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CameraImplRestoreSettingsL`.
  */
-int moho::cfunc_CameraImplRestoreSettings(lua_State* const luaContext)
+int moho::cfunc_CameraImplRestoreSettings(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplRestoreSettingsL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -3975,7 +4128,9 @@ int moho::cfunc_CameraImplRestoreSettings(lua_State* const luaContext)
  * `Heading`), restores manual target state immediately, then clears timed
  * targeting and reapplies rotation-revert semantics.
  */
-int moho::cfunc_CameraImplRestoreSettingsL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplRestoreSettingsL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kCameraImplRestoreSettingsHelpText);
@@ -4047,7 +4202,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplRestoreSettings_LuaFuncDef()
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CameraImplGetTargetZoomL`.
  */
-int moho::cfunc_CameraImplGetTargetZoom(lua_State* const luaContext)
+int moho::cfunc_CameraImplGetTargetZoom(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplGetTargetZoomL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -4078,7 +4235,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplGetTargetZoom_LuaFuncDef()
  * Validates `Camera:GetTargetZoom()`, resolves typed camera payload, pushes
  * current near-zoom lane, and returns one Lua result.
  */
-int moho::cfunc_CameraImplGetTargetZoomL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplGetTargetZoomL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kCameraImplGetTargetZoomHelpText);
@@ -4098,7 +4257,9 @@ int moho::cfunc_CameraImplGetTargetZoomL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CameraImplGetMaxZoomL`.
  */
-int moho::cfunc_CameraImplGetMaxZoom(lua_State* const luaContext)
+int moho::cfunc_CameraImplGetMaxZoom(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplGetMaxZoomL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -4129,7 +4290,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplGetMaxZoom_LuaFuncDef()
  * Validates `Camera:GetMaxZoom()`, resolves typed camera payload, queries
  * runtime max zoom through virtual lane, and returns one Lua result.
  */
-int moho::cfunc_CameraImplGetMaxZoomL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplGetMaxZoomL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kCameraImplGetMaxZoomHelpText);
@@ -4149,7 +4312,9 @@ int moho::cfunc_CameraImplGetMaxZoomL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CameraImplUseGameClockL`.
  */
-int moho::cfunc_CameraImplUseGameClock(lua_State* const luaContext)
+int moho::cfunc_CameraImplUseGameClock(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplUseGameClockL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -4161,7 +4326,9 @@ int moho::cfunc_CameraImplUseGameClock(lua_State* const luaContext)
  * Validates `Camera:UseGameClock()`, resolves one camera payload, and switches
  * camera timing to game-clock mode.
  */
-int moho::cfunc_CameraImplUseGameClockL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplUseGameClockL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kCameraImplUseGameClockHelpText);
 
@@ -4197,7 +4364,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplUseGameClock_LuaFuncDef()
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CameraImplUseSystemClockL`.
  */
-int moho::cfunc_CameraImplUseSystemClock(lua_State* const luaContext)
+int moho::cfunc_CameraImplUseSystemClock(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplUseSystemClockL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -4209,7 +4378,9 @@ int moho::cfunc_CameraImplUseSystemClock(lua_State* const luaContext)
  * Validates `Camera:UseSystemClock()`, resolves one camera payload, and
  * switches camera timing to system-clock mode.
  */
-int moho::cfunc_CameraImplUseSystemClockL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplUseSystemClockL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kCameraImplUseSystemClockHelpText);
 
@@ -4245,7 +4416,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplUseSystemClock_LuaFuncDef()
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CameraImplEnableEaseInOutL`.
  */
-int moho::cfunc_CameraImplEnableEaseInOut(lua_State* const luaContext)
+int moho::cfunc_CameraImplEnableEaseInOut(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplEnableEaseInOutL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -4257,7 +4430,9 @@ int moho::cfunc_CameraImplEnableEaseInOut(lua_State* const luaContext)
  * Validates `Camera:EnableEaseInOut()`, resolves one camera payload, and
  * enables ease-in/out targeting behavior.
  */
-int moho::cfunc_CameraImplEnableEaseInOutL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplEnableEaseInOutL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kCameraImplEnableEaseInOutHelpText);
 
@@ -4293,7 +4468,9 @@ moho::CScrLuaInitForm* moho::func_CameraImplEnableEaseInOut_LuaFuncDef()
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CameraImplDisableEaseInOutL`.
  */
-int moho::cfunc_CameraImplDisableEaseInOut(lua_State* const luaContext)
+int moho::cfunc_CameraImplDisableEaseInOut(
+  lua_State* const luaContext
+)
 {
   return cfunc_CameraImplDisableEaseInOutL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -4305,7 +4482,9 @@ int moho::cfunc_CameraImplDisableEaseInOut(lua_State* const luaContext)
  * Validates `Camera:DisableEaseInOut()`, resolves one camera payload, and
  * disables ease-in/out targeting behavior.
  */
-int moho::cfunc_CameraImplDisableEaseInOutL(LuaPlus::LuaState* const state)
+int moho::cfunc_CameraImplDisableEaseInOutL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kCameraImplDisableEaseInOutHelpText);
 

@@ -21,7 +21,7 @@ namespace moho
   class CHeightField;
   class RRuleGameRules;
   struct SSyncData;
-}
+} // namespace moho
 
 namespace faf::remote::client
 {
@@ -90,7 +90,8 @@ namespace faf::remote::client
     /** `rules`: the client's own, from its own load of the match's map and mods; must outlive this. */
     CServerViewClient(moho::RRuleGameRules& rules, const SServerGameInfo& info);
 
-    /** One view into `packet`'s entity lanes (a fresh packet: nothing else to start from), and its army and grid lanes. */
+    /** One view into `packet`'s entity lanes (a fresh packet: nothing else to start from), and its army and grid lanes.
+     */
     bool Apply(const SViewMessage& view, moho::SSyncData& packet);
     /**
      * A `SessionTables` message (plan WP11 step 4): the sounds, names, deposits and terrain edits the views after it
@@ -101,17 +102,46 @@ namespace faf::remote::client
      * The heights this client's terrain starts from (its own load of the map): the server's terrain edits are applied
      * to a copy, which each beat's packet then carries as the sim's field would.
      */
-    void SeedTerrain(const moho::CHeightField& heights) { mRebuilder->SeedTerrain(heights); }
-    [[nodiscard]] const wire::CSessionTableReaders& Tables() const noexcept { return *mTables; }
+    void SeedTerrain(
+      const moho::CHeightField& heights
+    )
+    {
+      mRebuilder->SeedTerrain(heights);
+    }
+    [[nodiscard]] const wire::CSessionTableReaders& Tables() const noexcept
+    {
+      return *mTables;
+    }
 
-    [[nodiscard]] const SServerGameInfo& Info() const noexcept { return mInfo; }
-    [[nodiscard]] const std::vector<wire::SArmyRecord>& Armies() const noexcept { return mArmies; }
-    [[nodiscard]] const std::vector<wire::SGridSlot>& Grids() const noexcept { return mGrids; }
-    [[nodiscard]] const SServerViewStats& Stats() const noexcept { return mStats; }
-    [[nodiscard]] const SRebuildStats& RebuildStats() const noexcept { return mRebuilder->Stats(); }
+    [[nodiscard]] const SServerGameInfo& Info() const noexcept
+    {
+      return mInfo;
+    }
+    [[nodiscard]] const std::vector<wire::SArmyRecord>& Armies() const noexcept
+    {
+      return mArmies;
+    }
+    [[nodiscard]] const std::vector<wire::SGridSlot>& Grids() const noexcept
+    {
+      return mGrids;
+    }
+    [[nodiscard]] const SServerViewStats& Stats() const noexcept
+    {
+      return mStats;
+    }
+    [[nodiscard]] const SRebuildStats& RebuildStats() const noexcept
+    {
+      return mRebuilder->Stats();
+    }
     /** The last merged frame shown. */
-    [[nodiscard]] const wire::SViewFrame* Shown() const noexcept { return mRebuilder->Baseline(); }
-    [[nodiscard]] std::uint64_t BlipsLeftOut() const noexcept { return mMerger.BlipsLeftOut(); }
+    [[nodiscard]] const wire::SViewFrame* Shown() const noexcept
+    {
+      return mRebuilder->Baseline();
+    }
+    [[nodiscard]] std::uint64_t BlipsLeftOut() const noexcept
+    {
+      return mMerger.BlipsLeftOut();
+    }
 
   private:
     SServerGameInfo mInfo;

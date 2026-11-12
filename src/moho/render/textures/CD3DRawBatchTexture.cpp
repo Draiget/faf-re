@@ -10,11 +10,13 @@ namespace moho
   /**
    * Address: 0x00448120 (FUN_00448120, Moho::CD3DRawBatchTexture::CD3DRawBatchTexture)
    */
-  CD3DRawBatchTexture::CD3DRawBatchTexture(const DataHandle& data, const std::uint32_t border)
+  CD3DRawBatchTexture::CD3DRawBatchTexture(
+    const DataHandle& data,
+    const std::uint32_t border
+  )
     : CD3DBatchTexture(data->mWidth - (2u * border), data->mHeight - (2u * border), border)
     , mData(data)
-  {
-  }
+  {}
 
   /**
    * Address: 0x004481D0 (FUN_004481D0, Moho::CD3DRawBatchTexture::dtr)
@@ -28,7 +30,10 @@ namespace moho
   /**
    * Address: 0x00448180 (FUN_00448180, Moho::CD3DRawBatchTexture::Func1)
    */
-  void CD3DRawBatchTexture::BuildTextureData(void* const destination, const std::uint32_t destinationPitchBytes)
+  void CD3DRawBatchTexture::BuildTextureData(
+    void* const destination,
+    const std::uint32_t destinationPitchBytes
+  )
   {
     if (destination == nullptr || !mData) {
       return;
@@ -51,7 +56,10 @@ namespace moho
   /**
    * Address: 0x00448190 (FUN_00448190, Moho::CD3DRawBatchTexture::GetAlphaAt)
    */
-  std::uint8_t CD3DRawBatchTexture::GetAlphaAt(const std::uint32_t x, const std::uint32_t y) const
+  std::uint8_t CD3DRawBatchTexture::GetAlphaAt(
+    const std::uint32_t x,
+    const std::uint32_t y
+  ) const
   {
     if (!mData) {
       return 0;
@@ -65,4 +73,3 @@ namespace moho
     );
   }
 } // namespace moho
-

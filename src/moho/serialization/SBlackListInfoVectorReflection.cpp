@@ -32,7 +32,12 @@ namespace
    * staging vector is swapped into the destination and the old elements die
    * with it. Nothing is null-tested.
    */
-  void LoadSBlackListInfoVector(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef*)
+  void LoadSBlackListInfoVector(
+    gpg::ReadArchive* const archive,
+    const std::intptr_t objectPtr,
+    int,
+    gpg::RRef*
+  )
   {
     auto& storage = *reinterpret_cast<fa::vector<moho::SBlackListInfo>*>(objectPtr);
 
@@ -58,7 +63,12 @@ namespace
    * through the reflected `SBlackListInfo` type with the caller's owner.
    * Nothing is null-tested.
    */
-  void SaveSBlackListInfoVector(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* const ownerRef)
+  void SaveSBlackListInfoVector(
+    gpg::WriteArchive* const archive,
+    const std::intptr_t objectPtr,
+    int,
+    gpg::RRef* const ownerRef
+  )
   {
     const auto& storage = *reinterpret_cast<const fa::vector<moho::SBlackListInfo>*>(objectPtr);
     const unsigned int count = static_cast<unsigned int>(storage.size());
@@ -92,7 +102,10 @@ namespace moho
 /**
  * Address: 0x006DE830 (FUN_006DE830, gpg::RRef_SBlackListInfo)
  */
-gpg::RRef* gpg::RRef_SBlackListInfo(gpg::RRef* const outRef, moho::SBlackListInfo* const value)
+gpg::RRef* gpg::RRef_SBlackListInfo(
+  gpg::RRef* const outRef,
+  moho::SBlackListInfo* const value
+)
 {
   if (!outRef) {
     return nullptr;
@@ -109,7 +122,10 @@ gpg::RRef* gpg::RRef_SBlackListInfo(gpg::RRef* const outRef, moho::SBlackListInf
  * What it does:
  * Packs one `RRef_SBlackListInfo` lane into caller-owned output storage.
  */
-[[maybe_unused]] gpg::RRef* gpg::PackRRef_SBlackListInfo(gpg::RRef* const outRef, moho::SBlackListInfo* const value)
+[[maybe_unused]] gpg::RRef* gpg::PackRRef_SBlackListInfo(
+  gpg::RRef* const outRef,
+  moho::SBlackListInfo* const value
+)
 {
   if (!outRef) {
     return nullptr;
@@ -140,7 +156,9 @@ const char* gpg::RVectorType<moho::SBlackListInfo>::GetName() const
 /**
  * Address: 0x006DB690 (FUN_006DB690, gpg::RVectorType_SBlackListInfo::GetLexical)
  */
-fa::string gpg::RVectorType<moho::SBlackListInfo>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType<moho::SBlackListInfo>::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
@@ -159,7 +177,9 @@ const gpg::RIndexed* gpg::RVectorType<moho::SBlackListInfo>::IsIndexed() const
  */
 void gpg::RVectorType<moho::SBlackListInfo>::Init()
 {
-  static_assert(sizeof(fa::vector<moho::SBlackListInfo>) == 0x10, "fa::vector<moho::SBlackListInfo> is 0x10 bytes on x86");
+  static_assert(
+    sizeof(fa::vector<moho::SBlackListInfo>) == 0x10, "fa::vector<moho::SBlackListInfo> is 0x10 bytes on x86"
+  );
   size_ = sizeof(fa::vector<moho::SBlackListInfo>);
   version_ = 1;
   serLoadFunc_ = &LoadSBlackListInfoVector;
@@ -169,7 +189,10 @@ void gpg::RVectorType<moho::SBlackListInfo>::Init()
 /**
  * Address: 0x006DB790 (FUN_006DB790, gpg::RVectorType_SBlackListInfo::SubscriptIndex)
  */
-gpg::RRef gpg::RVectorType<moho::SBlackListInfo>::SubscriptIndex(void* const obj, const int ind) const
+gpg::RRef gpg::RVectorType<moho::SBlackListInfo>::SubscriptIndex(
+  void* const obj,
+  const int ind
+) const
 {
   auto* const storage = static_cast<fa::vector<moho::SBlackListInfo>*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -189,7 +212,9 @@ gpg::RRef gpg::RVectorType<moho::SBlackListInfo>::SubscriptIndex(void* const obj
 /**
  * Address: 0x006DB730 (FUN_006DB730, gpg::RVectorType_SBlackListInfo::GetCount)
  */
-size_t gpg::RVectorType<moho::SBlackListInfo>::GetCount(void* const obj) const
+size_t gpg::RVectorType<moho::SBlackListInfo>::GetCount(
+  void* const obj
+) const
 {
   if (!obj) {
     return 0u;
@@ -207,7 +232,10 @@ size_t gpg::RVectorType<moho::SBlackListInfo>::GetCount(void* const obj) const
  * pointer (MSVC8's `T()` left `mValue` as it found it); value-initialisation
  * here zeroes `mValue` too. Nothing is null-tested.
  */
-void gpg::RVectorType<moho::SBlackListInfo>::SetCount(void* const obj, const int count) const
+void gpg::RVectorType<moho::SBlackListInfo>::SetCount(
+  void* const obj,
+  const int count
+) const
 {
   static_cast<fa::vector<moho::SBlackListInfo>*>(obj)->resize(static_cast<std::size_t>(count), moho::SBlackListInfo());
 }
@@ -238,4 +266,7 @@ void moho::register_SBlackListInfoVectorType()
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_SBlackListInfoVectorType_00_ca9d53, moho::register_SBlackListInfoVectorType_00)
+GPG_PREREGISTER_INIT(
+  register_SBlackListInfoVectorType_00_ca9d53,
+  moho::register_SBlackListInfoVectorType_00
+)

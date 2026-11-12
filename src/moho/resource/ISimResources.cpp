@@ -3,7 +3,9 @@
 
 namespace
 {
-  void DeleteSimResourcesOwned(moho::CSimResources* resources) noexcept
+  void DeleteSimResourcesOwned(
+    moho::CSimResources* resources
+  ) noexcept
   {
     // Binary invokes the scalar deleting destructor through vtable slot 0,
     // which is exactly what `delete` compiles to for this virtual hierarchy.
@@ -13,7 +15,9 @@ namespace
   class SimResourcesSharedControl final : public boost::detail::sp_counted_base
   {
   public:
-    explicit SimResourcesSharedControl(moho::CSimResources* resources) noexcept
+    explicit SimResourcesSharedControl(
+      moho::CSimResources* resources
+    ) noexcept
       : resources_(resources)
     {}
 
@@ -23,7 +27,9 @@ namespace
       resources_ = nullptr;
     }
 
-    void* get_deleter(boost::detail::sp_typeinfo const&) noexcept override
+    void* get_deleter(
+      boost::detail::sp_typeinfo const&
+    ) noexcept override
     {
       return nullptr;
     }
@@ -34,7 +40,10 @@ namespace
 
   static_assert(sizeof(SimResourcesSharedControl) == 0x10, "SimResourcesSharedControl size must be 0x10");
 
-  void NoopSimResourcesSharedHook(moho::CSimResources*, boost::detail::sp_counted_base*) noexcept
+  void NoopSimResourcesSharedHook(
+    moho::CSimResources*,
+    boost::detail::sp_counted_base*
+  ) noexcept
   {
     // Address: 0x0042AC30 (FUN_0042AC30, nullsub_1)
   }
@@ -60,7 +69,9 @@ namespace moho::detail
    * exception-safety by deleting `resources` on control-block construction
    * failure.
    */
-  boost::detail::sp_counted_base* CreateSimResourcesSharedControl(CSimResources* resources)
+  boost::detail::sp_counted_base* CreateSimResourcesSharedControl(
+    CSimResources* resources
+  )
   {
     try {
       return new SimResourcesSharedControl(resources);
@@ -76,8 +87,10 @@ namespace moho::detail
    * What it does:
    * Initializes one raw shared handle from `resources` and a fresh control block.
    */
-  boost::SharedPtrRaw<ISimResources>&
-  InitSharedISimResources(boost::SharedPtrRaw<ISimResources>& outHandle, CSimResources* resources)
+  boost::SharedPtrRaw<ISimResources>& InitSharedISimResources(
+    boost::SharedPtrRaw<ISimResources>& outHandle,
+    CSimResources* resources
+  )
   {
     outHandle.px = resources;
     outHandle.pi = CreateSimResourcesSharedControl(resources);
@@ -92,7 +105,10 @@ namespace moho::detail
    * Rebinds an existing raw shared handle to `resources` and releases the
    * previous strong control-block reference.
    */
-  void AssignSharedISimResources(boost::SharedPtrRaw<ISimResources>& outHandle, CSimResources* resources)
+  void AssignSharedISimResources(
+    boost::SharedPtrRaw<ISimResources>& outHandle,
+    CSimResources* resources
+  )
   {
     boost::detail::sp_counted_base* const newControl = CreateSimResourcesSharedControl(resources);
     NoopSimResourcesSharedHook(resources, newControl);

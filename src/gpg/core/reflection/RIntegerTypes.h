@@ -74,15 +74,15 @@ using RIntType_ushort = RIntType<unsigned short>;
 using RIntType_uint = RIntType<unsigned int>;
 using RIntType_ulong = RIntType<unsigned long>;
 
-#define DECLARE_INT_TYPE_INFO(NAME, T)                                                       \
-  class NAME : public RIntType<T>                                                            \
-  {                                                                                          \
-  public:                                                                                    \
-    NAME();                                                                                  \
-    ~NAME() override;                                                                        \
-    [[nodiscard]] const char* GetName() const override;                                      \
-    void Init() override;                                                                    \
-  };                                                                                         \
+#define DECLARE_INT_TYPE_INFO(NAME, T)                                                                                 \
+  class NAME : public RIntType<T>                                                                                      \
+  {                                                                                                                    \
+  public:                                                                                                              \
+    NAME();                                                                                                            \
+    ~NAME() override;                                                                                                  \
+    [[nodiscard]] const char* GetName() const override;                                                                \
+    void Init() override;                                                                                              \
+  };                                                                                                                   \
   void register_##NAME##Startup();
 
 /**
@@ -92,7 +92,10 @@ using RIntType_ulong = RIntType<unsigned long>;
  * What it does:
  * Registers and initializes reflection metadata type for `char`.
  */
-DECLARE_INT_TYPE_INFO(charTypeInfo, char)
+DECLARE_INT_TYPE_INFO(
+  charTypeInfo,
+  char
+)
 /**
  * Address: 0x008DFE50 (FUN_008DFE50, signedcharTypeInfo::signedcharTypeInfo)
  * Address: 0x008E3240 (FUN_008E3240, signedcharTypeInfo::Init)
@@ -100,7 +103,10 @@ DECLARE_INT_TYPE_INFO(charTypeInfo, char)
  * What it does:
  * Registers and initializes reflection metadata type for `signed char`.
  */
-DECLARE_INT_TYPE_INFO(signedcharTypeInfo, signed char)
+DECLARE_INT_TYPE_INFO(
+  signedcharTypeInfo,
+  signed char
+)
 /**
  * Address: 0x008DFF30 (FUN_008DFF30, unsignedcharTypeInfo::unsignedcharTypeInfo)
  * Address: 0x008E3280 (FUN_008E3280, unsignedcharTypeInfo::Init)
@@ -108,7 +114,10 @@ DECLARE_INT_TYPE_INFO(signedcharTypeInfo, signed char)
  * What it does:
  * Registers and initializes reflection metadata type for `unsigned char`.
  */
-DECLARE_INT_TYPE_INFO(unsignedcharTypeInfo, unsigned char)
+DECLARE_INT_TYPE_INFO(
+  unsignedcharTypeInfo,
+  unsigned char
+)
 /**
  * Address: 0x008DFBB0 (FUN_008DFBB0, shortTypeInfo::shortTypeInfo)
  * Address: 0x008E3180 (FUN_008E3180, shortTypeInfo::Init)
@@ -116,7 +125,10 @@ DECLARE_INT_TYPE_INFO(unsignedcharTypeInfo, unsigned char)
  * What it does:
  * Registers and initializes reflection metadata type for `short`.
  */
-DECLARE_INT_TYPE_INFO(shortTypeInfo, short)
+DECLARE_INT_TYPE_INFO(
+  shortTypeInfo,
+  short
+)
 /**
  * Address: 0x008E0010 (FUN_008E0010, unsignedshortTypeInfo::unsignedshortTypeInfo)
  * Address: 0x008E32C0 (FUN_008E32C0, unsignedshortTypeInfo::Init)
@@ -124,7 +136,10 @@ DECLARE_INT_TYPE_INFO(shortTypeInfo, short)
  * What it does:
  * Registers and initializes reflection metadata type for `unsigned short`.
  */
-DECLARE_INT_TYPE_INFO(unsignedshortTypeInfo, unsigned short)
+DECLARE_INT_TYPE_INFO(
+  unsignedshortTypeInfo,
+  unsigned short
+)
 /**
  * Address: 0x008DFC90 (FUN_008DFC90, intTypeInfo::intTypeInfo)
  * Address: 0x008E31C0 (FUN_008E31C0, intTypeInfo::Init)
@@ -132,7 +147,10 @@ DECLARE_INT_TYPE_INFO(unsignedshortTypeInfo, unsigned short)
  * What it does:
  * Registers and initializes reflection metadata type for `int`.
  */
-DECLARE_INT_TYPE_INFO(intTypeInfo, int)
+DECLARE_INT_TYPE_INFO(
+  intTypeInfo,
+  int
+)
 /**
  * Address: 0x008E00F0 (FUN_008E00F0, unsignedintTypeInfo::unsignedintTypeInfo)
  * Address: 0x008E3300 (FUN_008E3300, unsignedintTypeInfo::Init)
@@ -140,7 +158,10 @@ DECLARE_INT_TYPE_INFO(intTypeInfo, int)
  * What it does:
  * Registers and initializes reflection metadata type for `unsigned int`.
  */
-DECLARE_INT_TYPE_INFO(unsignedintTypeInfo, unsigned int)
+DECLARE_INT_TYPE_INFO(
+  unsignedintTypeInfo,
+  unsigned int
+)
 /**
  * Address: 0x008DFD70 (FUN_008DFD70, longTypeInfo::longTypeInfo)
  * Address: 0x008E3200 (FUN_008E3200, longTypeInfo::Init)
@@ -148,7 +169,10 @@ DECLARE_INT_TYPE_INFO(unsignedintTypeInfo, unsigned int)
  * What it does:
  * Registers and initializes reflection metadata type for `long`.
  */
-DECLARE_INT_TYPE_INFO(longTypeInfo, long)
+DECLARE_INT_TYPE_INFO(
+  longTypeInfo,
+  long
+)
 /**
  * Address: 0x008E01D0 (FUN_008E01D0, unsignedlongTypeInfo::unsignedlongTypeInfo)
  * Address: 0x008E3340 (FUN_008E3340, unsignedlongTypeInfo::Init)
@@ -156,6 +180,9 @@ DECLARE_INT_TYPE_INFO(longTypeInfo, long)
  * What it does:
  * Registers and initializes reflection metadata type for `unsigned long`.
  */
-DECLARE_INT_TYPE_INFO(unsignedlongTypeInfo, unsigned long)
+DECLARE_INT_TYPE_INFO(
+  unsignedlongTypeInfo,
+  unsigned long
+)
 
 #undef DECLARE_INT_TYPE_INFO

@@ -1,0 +1,19 @@
+{
+  "name": "faf-server-dashboard",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A web dashboard for the dedicated server's REST API (plan WP17.4, WP17.11)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "check": "tsc --noEmit",
+    "smoke": "node scripts/smoke.ts",
+    "smoke-host": "node scripts/smoke-host.ts"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "typescript": "7.0.2",
+    "vite": "8.3.8"
+  }
+}

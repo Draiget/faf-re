@@ -17,7 +17,9 @@ namespace moho
    * Initializes one decal-group object with the provided group index, empty
    * display name string, and empty decal-index vector lanes.
    */
-  CDecalGroup::CDecalGroup(const std::int32_t index)
+  CDecalGroup::CDecalGroup(
+    const std::int32_t index
+  )
     : IDecalGroup()
     , mIndex(index)
     , mName()
@@ -114,7 +116,9 @@ namespace moho
    * Removes one matching decal-index lane from `mDecals` and compacts the
    * trailing entries.
    */
-  void CDecalGroup::RemoveFromGroup(const std::int32_t decalIndex)
+  void CDecalGroup::RemoveFromGroup(
+    const std::int32_t decalIndex
+  )
   {
     auto* const found = std::find(mDecals.begin(), mDecals.end(), decalIndex);
     if (found == mDecals.end()) {
@@ -132,7 +136,9 @@ namespace moho
    * Writes group index/name plus every tracked decal index to the binary
    * writer in save-stream order.
    */
-  void CDecalGroup::WriteToStream(gpg::BinaryWriter& writer)
+  void CDecalGroup::WriteToStream(
+    gpg::BinaryWriter& writer
+  )
   {
     writer.Write(mIndex);
     writer.WriteString(mName);
@@ -153,7 +159,9 @@ namespace moho
    * argument slot with it, and tail-jumps to slot 7 (`jmp [vtbl+0x1C]`).
    * `decal` is dereferenced unconditionally.
    */
-  bool CDecalGroup::Contains(CWldTerrainDecal* const decal)
+  bool CDecalGroup::Contains(
+    CWldTerrainDecal* const decal
+  )
   {
     return Contains(decal->mIndex);
   }
@@ -167,7 +175,9 @@ namespace moho
    * for `decalIndex`, then returns `end != cursor` -- true when the walk broke
    * early on a match, false when it ran to the end or the vector was empty.
    */
-  bool CDecalGroup::Contains(const std::int32_t decalIndex)
+  bool CDecalGroup::Contains(
+    const std::int32_t decalIndex
+  )
   {
     return std::find(mDecals.begin(), mDecals.end(), decalIndex) != mDecals.end();
   }
@@ -180,7 +190,9 @@ namespace moho
    * Reads `decal->mIndex` and tail-jumps to slot 9 (`jmp [vtbl+0x24]`).
    * `decal` is dereferenced unconditionally.
    */
-  void CDecalGroup::Add(CWldTerrainDecal* const decal)
+  void CDecalGroup::Add(
+    CWldTerrainDecal* const decal
+  )
   {
     Add(decal->mIndex);
   }
@@ -194,7 +206,9 @@ namespace moho
    * it reports the index is already tracked; otherwise appends it to `mDecals`
    * (`sub_686E80`, the `fa::vector<std::int32_t>` push_back emission).
    */
-  void CDecalGroup::Add(const std::int32_t decalIndex)
+  void CDecalGroup::Add(
+    const std::int32_t decalIndex
+  )
   {
     if (!Contains(decalIndex)) {
       mDecals.push_back(decalIndex);
@@ -209,7 +223,9 @@ namespace moho
    * Reads `decal->mIndex` and tail-jumps to slot 11 (`jmp [vtbl+0x2C]`).
    * `decal` is dereferenced unconditionally.
    */
-  void CDecalGroup::RemoveFromGroup(CWldTerrainDecal* const decal)
+  void CDecalGroup::RemoveFromGroup(
+    CWldTerrainDecal* const decal
+  )
   {
     RemoveFromGroup(decal->mIndex);
   }
@@ -222,7 +238,10 @@ namespace moho
    * reads the group index, name, decal count, and that many decal indices from
    * the binary reader in the same field order the save stream wrote.
    */
-  void CDecalGroup::ReadFromStream(gpg::BinaryReader& reader, const int version)
+  void CDecalGroup::ReadFromStream(
+    gpg::BinaryReader& reader,
+    const int version
+  )
   {
     (void)version;
 

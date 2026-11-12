@@ -31,7 +31,6 @@ namespace moho
     void Init() override;
   };
 
-
   /**
    * Address: 0x00BCE030 (FUN_00BCE030, register_ESiloBuildStageTypeInfo)
    *

@@ -11,7 +11,9 @@ namespace platform
    * and the x64 CRT rejects the precision mask (the debug CRT asserts in
    * ieee.c, the release CRT ignores it), so on x64 this does nothing.
    */
-  inline void SetX87PrecisionControl(const unsigned int precision) noexcept
+  inline void SetX87PrecisionControl(
+    const unsigned int precision
+  ) noexcept
   {
 #if defined(_M_IX86)
     (void)::_controlfp(precision, _MCW_PC);

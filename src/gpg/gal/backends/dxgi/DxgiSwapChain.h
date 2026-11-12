@@ -33,10 +33,10 @@ namespace gpg::gal::dxgi
     std::uint32_t height = 0;
     DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM;
     bool fullscreen = false;
-    std::uint32_t refreshHz = 0;    // full-screen only; 0 lets DXGI pick
+    std::uint32_t refreshHz = 0; // full-screen only; 0 lets DXGI pick
     DXGI_USAGE usage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     std::uint32_t bufferCount = 2;
-    bool allowFlipModel = true;     // false forces BltDiscard
+    bool allowFlipModel = true; // false forces BltDiscard
   };
 
   class SwapChain
@@ -66,20 +66,37 @@ namespace gpg::gal::dxgi
 
     void Release() noexcept;
 
-    [[nodiscard]] IDXGISwapChain* Get() const noexcept { return mSwapChain.Get(); }
-    [[nodiscard]] SwapModel Model() const noexcept { return mModel; }
-    [[nodiscard]] bool IsFlipModel() const noexcept { return mModel != SwapModel::BltDiscard; }
-    [[nodiscard]] bool AllowsTearing() const noexcept { return mAllowTearing; }
+    [[nodiscard]] IDXGISwapChain* Get() const noexcept
+    {
+      return mSwapChain.Get();
+    }
+    [[nodiscard]] SwapModel Model() const noexcept
+    {
+      return mModel;
+    }
+    [[nodiscard]] bool IsFlipModel() const noexcept
+    {
+      return mModel != SwapModel::BltDiscard;
+    }
+    [[nodiscard]] bool AllowsTearing() const noexcept
+    {
+      return mAllowTearing;
+    }
 
     template <class Buffer>
-    HRESULT GetBuffer(Buffer** outBuffer) const
+    HRESULT GetBuffer(
+      Buffer** outBuffer
+    ) const
     {
       return mSwapChain->GetBuffer(0U, IID_PPV_ARGS(outBuffer));
     }
 
     /** Buffer `index` (Direct3D 12 addresses each flip-model buffer itself). */
     template <class Buffer>
-    HRESULT GetBuffer(const std::uint32_t index, Buffer** outBuffer) const
+    HRESULT GetBuffer(
+      const std::uint32_t index,
+      Buffer** outBuffer
+    ) const
     {
       return mSwapChain->GetBuffer(index, IID_PPV_ARGS(outBuffer));
     }

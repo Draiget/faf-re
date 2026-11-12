@@ -51,7 +51,10 @@ uint32_t moho::THREAD_GetMainThreadId()
  * What it does:
  * Queues one callback as APC on the resolved target thread.
  */
-void moho::THREAD_InvokeAsync(boost::function<void(), std::allocator<void>> fn, const uint32_t threadId)
+void moho::THREAD_InvokeAsync(
+  boost::function<void(), std::allocator<void>> fn,
+  const uint32_t threadId
+)
 {
   const DWORD tid = ResolveTid(threadId);
   const HANDLE hThread = ::OpenThread(kThreadAccessFa, FALSE, tid);
@@ -91,7 +94,10 @@ void moho::THREAD_InvokeAsync(boost::function<void(), std::allocator<void>> fn, 
  * What it does:
  * Queues one callback as APC and blocks until completion is signaled.
  */
-void moho::THREAD_InvokeWait(boost::function<void(), std::allocator<void>> fn, const uint32_t threadId)
+void moho::THREAD_InvokeWait(
+  boost::function<void(), std::allocator<void>> fn,
+  const uint32_t threadId
+)
 {
   const DWORD tid = ResolveTid(threadId);
   const HANDLE hThread = ::OpenThread(kThreadAccessFa, FALSE, tid);
@@ -135,7 +141,9 @@ void moho::THREAD_InvokeWait(boost::function<void(), std::allocator<void>> fn, c
  * What it does:
  * Selects one cpu from the process affinity mask and pins the current thread.
  */
-void moho::THREAD_SetAffinity(const bool preferLowest) noexcept
+void moho::THREAD_SetAffinity(
+  const bool preferLowest
+) noexcept
 {
   DWORD_PTR procMask = 0;
   DWORD_PTR sysMask = 0;
@@ -184,7 +192,9 @@ void moho::THREAD_SetAffinity(const bool preferLowest) noexcept
  * What it does:
  * Runs one APC callback payload and frees transport storage.
  */
-void __stdcall moho::pfnAPC(const ULONG_PTR dwData)
+void __stdcall moho::pfnAPC(
+  const ULONG_PTR dwData
+)
 {
   // pair[0] = box (InvokePayload*), pair[1] = WaitCtx*
   const auto pair = reinterpret_cast<void**>(dwData);
@@ -211,7 +221,9 @@ void __stdcall moho::pfnAPC(const ULONG_PTR dwData)
   ::operator delete(pair);
 }
 
-DWORD moho::ResolveTid(const std::uint32_t threadId) noexcept
+DWORD moho::ResolveTid(
+  const std::uint32_t threadId
+) noexcept
 {
   if (threadId) {
     return threadId;

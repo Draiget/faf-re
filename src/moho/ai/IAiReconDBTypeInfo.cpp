@@ -87,4 +87,7 @@ void moho::register_IAiReconDBTypeInfo()
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_IAiReconDBTypeInfo_254042, moho::register_IAiReconDBTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_IAiReconDBTypeInfo_254042,
+  moho::register_IAiReconDBTypeInfo
+)

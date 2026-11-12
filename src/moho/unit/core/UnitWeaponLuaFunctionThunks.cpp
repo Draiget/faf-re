@@ -137,7 +137,8 @@ namespace moho
    * Address: 0x00BD89F0 (FUN_00BD89F0, register_UnitWeaponGetProjectileBlueprint_LuaFuncDef)
    *
    * What it does:
-   * Forwards `register_UnitWeaponGetProjectileBlueprint_LuaFuncDef` to `func_UnitWeaponGetProjectileBlueprint_LuaFuncDef`.
+   * Forwards `register_UnitWeaponGetProjectileBlueprint_LuaFuncDef` to
+   * `func_UnitWeaponGetProjectileBlueprint_LuaFuncDef`.
    */
   CScrLuaInitForm* register_UnitWeaponGetProjectileBlueprint_LuaFuncDef()
   {
@@ -225,7 +226,8 @@ namespace moho
    * Address: 0x00BD8A70 (FUN_00BD8A70, register_UnitWeaponChangeFiringTolerance_LuaFuncDef)
    *
    * What it does:
-   * Forwards `register_UnitWeaponChangeFiringTolerance_LuaFuncDef` to `func_UnitWeaponChangeFiringTolerance_LuaFuncDef`.
+   * Forwards `register_UnitWeaponChangeFiringTolerance_LuaFuncDef` to
+   * `func_UnitWeaponChangeFiringTolerance_LuaFuncDef`.
    */
   CScrLuaInitForm* register_UnitWeaponChangeFiringTolerance_LuaFuncDef()
   {
@@ -313,7 +315,8 @@ namespace moho
    * Address: 0x00BD8AF0 (FUN_00BD8AF0, j_func_UnitWeaponSetFireTargetLayerCaps_LuaFuncDef)
    *
    * What it does:
-   * Forwards `register_UnitWeaponSetFireTargetLayerCaps_LuaFuncDef` to `func_UnitWeaponSetFireTargetLayerCaps_LuaFuncDef`.
+   * Forwards `register_UnitWeaponSetFireTargetLayerCaps_LuaFuncDef` to
+   * `func_UnitWeaponSetFireTargetLayerCaps_LuaFuncDef`.
    */
   CScrLuaInitForm* register_UnitWeaponSetFireTargetLayerCaps_LuaFuncDef()
   {
@@ -324,7 +327,8 @@ namespace moho
    * Address: 0x00BD8B00 (FUN_00BD8B00, register_UnitWeaponSetTargetingPriorities_LuaFuncDef)
    *
    * What it does:
-   * Forwards `register_UnitWeaponSetTargetingPriorities_LuaFuncDef` to `func_UnitWeaponSetTargetingPriorities_LuaFuncDef`.
+   * Forwards `register_UnitWeaponSetTargetingPriorities_LuaFuncDef` to
+   * `func_UnitWeaponSetTargetingPriorities_LuaFuncDef`.
    */
   CScrLuaInitForm* register_UnitWeaponSetTargetingPriorities_LuaFuncDef()
   {
@@ -368,7 +372,8 @@ namespace moho
    * Address: 0x00BD8B40 (FUN_00BD8B40, register_UnitWeaponChangeProjectileBlueprint_LuaFuncDef)
    *
    * What it does:
-   * Forwards `register_UnitWeaponChangeProjectileBlueprint_LuaFuncDef` to `func_UnitWeaponChangeProjectileBlueprint_LuaFuncDef`.
+   * Forwards `register_UnitWeaponChangeProjectileBlueprint_LuaFuncDef` to
+   * `func_UnitWeaponChangeProjectileBlueprint_LuaFuncDef`.
    */
   CScrLuaInitForm* register_UnitWeaponChangeProjectileBlueprint_LuaFuncDef()
   {

@@ -130,9 +130,8 @@ namespace moho
      * own `RProjectileBlueprint` (owned by the rules, so the archive may not delete it).
      * Inlined into `SerConstructHelper<RProjectileBlueprint>::Construct` 0x0051CB20.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x0051CA40 (FUN_0051CA40)
@@ -142,10 +141,13 @@ namespace moho
      * `MemberConstruct` to look the blueprint up by.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
-    fa::string DevStatus;             // +0x017C
+    fa::string DevStatus;                // +0x017C
     RProjectileBlueprintDisplay Display; // +0x0198
     RProjectileBlueprintEconomy Economy; // +0x01D0
     RProjectileBlueprintPhysics Physics; // +0x01DC
@@ -281,7 +283,9 @@ namespace moho
    * axis even when its range is zero. Leaves the sampled vector unnormalized.
    */
   [[nodiscard]] Wm3::Vector3f* BuildRandomDirectionVector(
-    CRandomStream* randomStream, Wm3::Vector3f* destination, const RProjectileBlueprint* blueprint
+    CRandomStream* randomStream,
+    Wm3::Vector3f* destination,
+    const RProjectileBlueprint* blueprint
   );
 
   static_assert(sizeof(RProjectileBlueprintDisplay) == 0x38, "RProjectileBlueprintDisplay size must be 0x38");
@@ -375,14 +379,16 @@ namespace moho
     "RProjectileBlueprintPhysics::DetonateBelowHeight offset must be 0x0C"
   );
   static_assert(
-    offsetof(RProjectileBlueprintPhysics, TurnRate) == 0x10, "RProjectileBlueprintPhysics::TurnRate offset must be 0x10"
+    offsetof(RProjectileBlueprintPhysics, TurnRate) == 0x10,
+    "RProjectileBlueprintPhysics::TurnRate offset must be 0x10"
   );
   static_assert(
     offsetof(RProjectileBlueprintPhysics, TurnRateRange) == 0x14,
     "RProjectileBlueprintPhysics::TurnRateRange offset must be 0x14"
   );
   static_assert(
-    offsetof(RProjectileBlueprintPhysics, Lifetime) == 0x18, "RProjectileBlueprintPhysics::Lifetime offset must be 0x18"
+    offsetof(RProjectileBlueprintPhysics, Lifetime) == 0x18,
+    "RProjectileBlueprintPhysics::Lifetime offset must be 0x18"
   );
   static_assert(
     offsetof(RProjectileBlueprintPhysics, LifetimeRange) == 0x1C,
@@ -397,7 +403,8 @@ namespace moho
     "RProjectileBlueprintPhysics::InitialSpeedRange offset must be 0x24"
   );
   static_assert(
-    offsetof(RProjectileBlueprintPhysics, MaxSpeed) == 0x28, "RProjectileBlueprintPhysics::MaxSpeed offset must be 0x28"
+    offsetof(RProjectileBlueprintPhysics, MaxSpeed) == 0x28,
+    "RProjectileBlueprintPhysics::MaxSpeed offset must be 0x28"
   );
   static_assert(
     offsetof(RProjectileBlueprintPhysics, MaxSpeedRange) == 0x2C,
@@ -501,7 +508,8 @@ namespace moho
   );
 
   static_assert(
-    offsetof(RProjectileBlueprint, DevStatus) == 0x17C, "RProjectileBlueprint::DevStatus offset must be 0x17C"
+    offsetof(RProjectileBlueprint, DevStatus) == 0x17C,
+    "RProjectileBlueprint::DevStatus offset must be 0x17C"
   );
   static_assert(offsetof(RProjectileBlueprint, Display) == 0x198, "RProjectileBlueprint::Display offset must be 0x198");
   static_assert(offsetof(RProjectileBlueprint, Economy) == 0x1D0, "RProjectileBlueprint::Economy offset must be 0x1D0");

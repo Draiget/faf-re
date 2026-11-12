@@ -185,10 +185,8 @@
 #include "gpg/core/reflection/StaticInitPhase.h"
 #include "lua/LuaCrashDump.h"
 
-
 using namespace moho;
 namespace
 {
   constexpr const char* kNoSessionStartedText = "No session started.";
 }
-

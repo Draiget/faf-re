@@ -25,7 +25,12 @@ namespace Wm3
 
   // The library's portable body, which behaves as its MSVC 8 `memcpy_s` call
   // does for every valid copy.
-  void* System::Memcpy(void* const dst, const std::size_t dstSize, const void* const src, const std::size_t srcSize)
+  void* System::Memcpy(
+    void* const dst,
+    const std::size_t dstSize,
+    const void* const src,
+    const std::size_t srcSize
+  )
   {
     if (dst == nullptr || dstSize == 0 || src == nullptr || srcSize == 0) {
       return nullptr;

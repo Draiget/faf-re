@@ -76,4 +76,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_Sphere3fTypeInfo_96ea18, moho::register_Sphere3fTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_Sphere3fTypeInfo_96ea18,
+  moho::register_Sphere3fTypeInfo
+)

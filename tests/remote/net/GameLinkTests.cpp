@@ -27,7 +27,10 @@ using namespace faf::remote::net;
 
 namespace
 {
-  void Check(const bool ok, const char* const what)
+  void Check(
+    const bool ok,
+    const char* const what
+  )
   {
     EXPECT_TRUE(ok) << what;
   }
@@ -39,7 +42,8 @@ namespace
   struct SMemoryHandshake
   {
     SMemoryHandshake()
-      : token(MakeToken("secret")), client(kUid, token)
+      : token(MakeToken("secret"))
+      , client(kUid, token)
     {
       Check(jar.Init(), "a random secret");
       const auto hello = WriteHello();
@@ -84,7 +88,10 @@ namespace
     clientChannel.Poll(1000u, out);
     Check(!out.empty(), "the channel sends");
     for (const auto& datagram : out) {
-      Check(serverChannel.Receive(datagram.data(), datagram.size(), 2000u) == ReceiveResult::Accepted, "and the other end opens it");
+      Check(
+        serverChannel.Receive(datagram.data(), datagram.size(), 2000u) == ReceiveResult::Accepted,
+        "and the other end opens it"
+      );
     }
     std::vector<std::uint8_t> got;
     Check(serverChannel.TakeReliable(got) && got.size() == sizeof(text), "the message arrives");
@@ -128,7 +135,10 @@ namespace
     const auto challenge = AnswerHello(hello.data(), hello.size(), handshake.jar, kAddress, kNow);
     (void)stranger.OnChallenge(challenge.data(), challenge.size());
     if (session) {
-      Check(!stranger.OnAccept(session->accept.data(), session->accept.size()).has_value(), "someone in the middle without the token gets no keys");
+      Check(
+        !stranger.OnAccept(session->accept.data(), session->accept.size()).has_value(),
+        "someone in the middle without the token gets no keys"
+      );
     }
   }
 
@@ -152,15 +162,23 @@ namespace
     Check(AnswerHello(hello.data(), hello.size() - 1u, jar, kAddress, kNow).empty(), "a short one gets nothing");
     hello[2] = 0xFFu;
     const auto version = AnswerHello(hello.data(), hello.size(), jar, kAddress, kNow);
-    Check(version.size() == kRejectSize && version[2] == static_cast<std::uint8_t>(EHandshakeRefusal::Version), "another version is told so");
+    Check(
+      version.size() == kRejectSize && version[2] == static_cast<std::uint8_t>(EHandshakeRefusal::Version),
+      "another version is told so"
+    );
   }
 
   void Endpoints()
   {
     SEndpoint endpoint;
-    Check(ParseEndpoint("192.0.2.7:7777", endpoint) && endpoint.ip == 0xC0000207u && endpoint.port == 7777u, "an address reads");
+    Check(
+      ParseEndpoint("192.0.2.7:7777", endpoint) && endpoint.ip == 0xC0000207u && endpoint.port == 7777u,
+      "an address reads"
+    );
     Check(endpoint.Text() == "192.0.2.7:7777", "and writes back");
-    for (const char* const bad : {"", "1.2.3", "1.2.3.4", "1.2.3.4:", "1.2.3.4:0", "1.2.3.4:70000", "1.2.3.256:80", "a.b.c.d:80", "1.2.3.4:80x"}) {
+    for (const char* const bad : {
+           "", "1.2.3", "1.2.3.4", "1.2.3.4:", "1.2.3.4:0", "1.2.3.4:70000", "1.2.3.256:80", "a.b.c.d:80", "1.2.3.4:80x"
+         }) {
       SEndpoint ignored;
       Check(!ParseEndpoint(bad, ignored), "a bad address doesn't read");
     }
@@ -169,13 +187,28 @@ namespace
   class CEvents final : public CServerLinks::IEvents
   {
   public:
-    void OnJoined(const std::int32_t uid, const SEndpoint&, const bool returning) override
+    void OnJoined(
+      const std::int32_t uid,
+      const SEndpoint&,
+      const bool returning
+    ) override
     {
       ++joined[uid];
       returns += returning ? 1 : 0;
     }
-    void OnMessage(const std::int32_t uid, const std::vector<std::uint8_t>& message) override { messages[uid].push_back(message); }
-    void OnLost(const std::int32_t uid) override { ++lost[uid]; }
+    void OnMessage(
+      const std::int32_t uid,
+      const std::vector<std::uint8_t>& message
+    ) override
+    {
+      messages[uid].push_back(message);
+    }
+    void OnLost(
+      const std::int32_t uid
+    ) override
+    {
+      ++lost[uid];
+    }
 
     std::map<std::int32_t, int> joined;
     std::map<std::int32_t, int> lost;
@@ -187,7 +220,14 @@ namespace
 
   /** Runs both ends until `done` or `limitUs` of their shared clock has gone by; true when it's done. */
   template <class Done>
-  [[nodiscard]] bool RunUntil(CServerLinks& server, CEvents& events, std::vector<CClientLink*> clients, std::uint64_t& nowUs, const std::uint64_t limitUs, Done done)
+  [[nodiscard]] bool RunUntil(
+    CServerLinks& server,
+    CEvents& events,
+    std::vector<CClientLink*> clients,
+    std::uint64_t& nowUs,
+    const std::uint64_t limitUs,
+    Done done
+  )
   {
     const std::uint64_t end = nowUs + limitUs;
     while (nowUs < end) {
@@ -218,23 +258,72 @@ namespace
     CClientLink one(1, MakeToken("one"), server.Local());
     CClientLink two(2, MakeToken("two"), server.Local());
     Check(one.Open(error) && two.Open(error), "the clients open");
-    Check(RunUntil(server, events, {&one, &two}, nowUs, 2'000'000u, [&] { return one.State() == CClientLink::EState::Connected && two.State() == CClientLink::EState::Connected; }), "two players join");
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&one, &two},
+        nowUs,
+        2'000'000u,
+        [&] {
+      return one.State() == CClientLink::EState::Connected && two.State() == CClientLink::EState::Connected;
+    }
+      ),
+      "two players join"
+    );
     Check(events.joined[1] == 1 && events.joined[2] == 1 && events.returns == 0, "each once");
 
     const std::uint8_t text[] = {1, 2, 3};
     Check(one.SendReliable(text, sizeof(text)), "a player sends");
-    Check(RunUntil(server, events, {&one, &two}, nowUs, 2'000'000u, [&] { return events.messages[1].size() == 1u; }), "the server gets it");
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&one, &two},
+        nowUs,
+        2'000'000u,
+        [&] {
+      return events.messages[1].size() == 1u;
+    }
+      ),
+      "the server gets it"
+    );
     Check(events.messages[2].empty(), "from that player only");
 
     server.SendUnreliableToAll(text, sizeof(text));
     std::vector<std::uint8_t> got;
-    Check(RunUntil(server, events, {&one, &two}, nowUs, 2'000'000u, [&] { return two.TakeUnreliable(got); }) && got.size() == sizeof(text), "the server sends to everyone");
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&one, &two},
+        nowUs,
+        2'000'000u,
+        [&] {
+      return two.TakeUnreliable(got);
+    }
+      ) &&
+        got.size() == sizeof(text),
+      "the server sends to everyone"
+    );
 
     // The wrong token, an unknown uid.
     CClientLink wrong(1, MakeToken("guess"), server.Local());
     CClientLink stranger(99, MakeToken("one"), server.Local());
     Check(wrong.Open(error) && stranger.Open(error), "more clients open");
-    Check(RunUntil(server, events, {&one, &two, &wrong, &stranger}, nowUs, 2'000'000u, [&] { return wrong.State() == CClientLink::EState::Refused && stranger.State() == CClientLink::EState::Refused; }), "a wrong token and a stranger are refused");
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&one, &two, &wrong, &stranger},
+        nowUs,
+        2'000'000u,
+        [&] {
+      return wrong.State() == CClientLink::EState::Refused && stranger.State() == CClientLink::EState::Refused;
+    }
+      ),
+      "a wrong token and a stranger are refused"
+    );
     Check(wrong.Refusal() == EHandshakeRefusal::NotAdmitted, "as not admitted");
     Check(events.joined[1] == 1 && events.returns == 0, "and knock nobody out");
 
@@ -245,7 +334,9 @@ namespace
     std::array<std::uint8_t, 1400> junk{};
     const std::uint64_t strangersBefore = server.Stats().strangersDropped;
     for (int i = 0; i < 2000; ++i) {
-      std::generate(junk.begin(), junk.end(), [&] { return static_cast<std::uint8_t>(random()); });
+      std::generate(junk.begin(), junk.end(), [&] {
+        return static_cast<std::uint8_t>(random());
+      });
       const std::size_t size = random() % junk.size();
       if (i % 4 == 0 && size > 0u) {
         junk[0] = kDatagramTag;
@@ -258,9 +349,24 @@ namespace
         server.Pump(nowUs, events);
       }
     }
-    Check(RunUntil(server, events, {&one, &two}, nowUs, 200'000u, [] { return false; }) == false, "the game goes on through it");
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&one, &two},
+        nowUs,
+        200'000u,
+        [] {
+      return false;
+    }
+      ) == false,
+      "the game goes on through it"
+    );
     Check(server.Stats().strangersDropped > strangersBefore, "noise is dropped");
-    Check(one.State() == CClientLink::EState::Connected && two.State() == CClientLink::EState::Connected, "and both players stay");
+    Check(
+      one.State() == CClientLink::EState::Connected && two.State() == CClientLink::EState::Connected,
+      "and both players stay"
+    );
 
     // A Connect from an earlier session, sent again, can't take the channel over.
     CUdpSocket raw;
@@ -279,23 +385,83 @@ namespace
     Check(size == static_cast<int>(kChallengeSize), "the raw socket gets a challenge");
     const auto connect = earlier.OnChallenge(buffer.data(), static_cast<std::size_t>(size));
     (void)raw.SendTo(connect.data(), connect.size(), server.Local());
-    Check(RunUntil(server, events, {&two}, nowUs, 2'000'000u, [&] { return events.returns == 1; }), "a holder of the token takes the seat back");
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&two},
+        nowUs,
+        2'000'000u,
+        [&] {
+      return events.returns == 1;
+    }
+      ),
+      "a holder of the token takes the seat back"
+    );
     Check(events.joined[1] == 2, "as a return");
     const int joinsBefore = events.joined[1];
     one.Reconnect();
-    Check(RunUntil(server, events, {&one, &two}, nowUs, 2'000'000u, [&] { return one.State() == CClientLink::EState::Connected; }), "and the first client comes back with new keys");
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&one, &two},
+        nowUs,
+        2'000'000u,
+        [&] {
+      return one.State() == CClientLink::EState::Connected;
+    }
+      ),
+      "and the first client comes back with new keys"
+    );
     Check(events.joined[1] == joinsBefore + 1, "once");
     (void)raw.SendTo(connect.data(), connect.size(), server.Local());
-    Check(RunUntil(server, events, {&one, &two}, nowUs, 100'000u, [] { return false; }) == false, "an old Connect goes around");
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&one, &two},
+        nowUs,
+        100'000u,
+        [] {
+      return false;
+    }
+      ) == false,
+      "an old Connect goes around"
+    );
     Check(events.joined[1] == joinsBefore + 1, "and takes nothing");
     Check(one.SendReliable(text, sizeof(text)), "the live client still sends");
     const std::size_t oneMessages = events.messages[1].size();
-    Check(RunUntil(server, events, {&one, &two}, nowUs, 2'000'000u, [&] { return events.messages[1].size() == oneMessages + 1u; }), "and the server still hears it");
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&one, &two},
+        nowUs,
+        2'000'000u,
+        [&] {
+      return events.messages[1].size() == oneMessages + 1u;
+    }
+      ),
+      "and the server still hears it"
+    );
 
     // Removed: no way back in.
     server.RemovePlayer(2);
     two.Reconnect();
-    Check(RunUntil(server, events, {&one, &two}, nowUs, 2'000'000u, [&] { return two.State() == CClientLink::EState::Refused; }), "a removed player is refused");
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&one, &two},
+        nowUs,
+        2'000'000u,
+        [&] {
+      return two.State() == CClientLink::EState::Refused;
+    }
+      ),
+      "a removed player is refused"
+    );
   }
 
   void TimeoutAndRateLimit()
@@ -311,11 +477,60 @@ namespace
 
     CClientLink one(1, MakeToken("one"), server.Local());
     Check(one.Open(error), "a client opens");
-    Check(RunUntil(server, events, {&one}, nowUs, 2'000'000u, [&] { return one.State() == CClientLink::EState::Connected; }), "joins");
-    Check(RunUntil(server, events, {}, nowUs, 2'000'000u, [&] { return events.lost[1] == 1; }), "the server sees a silent player gone");
-    Check(RunUntil(server, events, {}, nowUs, 400'000u, [] { return false; }) == false && events.lost[1] == 1, "and says so once");
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&one},
+        nowUs,
+        2'000'000u,
+        [&] {
+      return one.State() == CClientLink::EState::Connected;
+    }
+      ),
+      "joins"
+    );
+    Check(
+      RunUntil(
+        server,
+        events,
+        {},
+        nowUs,
+        2'000'000u,
+        [&] {
+      return events.lost[1] == 1;
+    }
+      ),
+      "the server sees a silent player gone"
+    );
+    Check(
+      RunUntil(
+        server,
+        events,
+        {},
+        nowUs,
+        400'000u,
+        [] {
+      return false;
+    }
+      ) == false &&
+        events.lost[1] == 1,
+      "and says so once"
+    );
     one.Reconnect();
-    Check(RunUntil(server, events, {&one}, nowUs, 2'000'000u, [&] { return events.returns == 1; }), "the player can come back");
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&one},
+        nowUs,
+        2'000'000u,
+        [&] {
+      return events.returns == 1;
+    }
+      ),
+      "the player can come back"
+    );
 
     // A burst of Hellos in one instant: past the budget they get nothing.
     CUdpSocket flood;
@@ -338,7 +553,12 @@ namespace
   }
 
   /** A raw Hello from `socket`; whether a Challenge comes back. */
-  [[nodiscard]] bool GetsChallenge(CServerLinks& server, CEvents& events, CUdpSocket& socket, const std::uint64_t nowUs)
+  [[nodiscard]] bool GetsChallenge(
+    CServerLinks& server,
+    CEvents& events,
+    CUdpSocket& socket,
+    const std::uint64_t nowUs
+  )
   {
     const auto hello = WriteHello();
     (void)socket.SendTo(hello.data(), hello.size(), server.Local());
@@ -385,7 +605,10 @@ namespace
     while (flood.ReceiveFrom(buffer.data(), buffer.size(), from) >= 0) {
       ++answers;
     }
-    Check(answers <= static_cast<int>(CServerLinks::kUnlistedHandshakesPerSecond), "an unlisted flood gets at most the unlisted budget");
+    Check(
+      answers <= static_cast<int>(CServerLinks::kUnlistedHandshakesPerSecond),
+      "an unlisted flood gets at most the unlisted budget"
+    );
     Check(server.Stats().unlistedDropped > 0u, "and the rest is dropped");
     Check(server.Stats().handshakesLimited == 0u, "without touching the server's budget");
     Check(GetsChallenge(server, events, listed, nowUs), "the listed address still gets its challenge at once");
@@ -394,7 +617,19 @@ namespace
     nowUs += 2'000'000u;
     CClientLink vpn(1, MakeToken("one"), server.Local());
     Check(vpn.Open(error), "a client on 127.0.0.1, which isn't listed, opens");
-    Check(RunUntil(server, events, {&vpn}, nowUs, 2'000'000u, [&] { return vpn.State() == CClientLink::EState::Connected; }), "it gets in with its token");
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&vpn},
+        nowUs,
+        2'000'000u,
+        [&] {
+      return vpn.State() == CClientLink::EState::Connected;
+    }
+      ),
+      "it gets in with its token"
+    );
     // Its address is now listed: a flood from elsewhere doesn't keep it out when it comes back.
     for (int i = 0; i < 1000; ++i) {
       (void)other.SendTo(hello.data(), hello.size(), server.Local());
@@ -402,14 +637,68 @@ namespace
     server.Wait(20);
     server.Pump(nowUs, events);
     vpn.Reconnect();
-    Check(RunUntil(server, events, {&vpn}, nowUs, 2'000'000u, [&] { return vpn.State() == CClientLink::EState::Connected; }), "and comes back through an unlisted flood");
+    Check(
+      RunUntil(
+        server,
+        events,
+        {&vpn},
+        nowUs,
+        2'000'000u,
+        [&] {
+      return vpn.State() == CClientLink::EState::Connected;
+    }
+      ),
+      "and comes back through an unlisted flood"
+    );
   }
 } // namespace
 
-TEST(Existing_GameLink, HandshakeAgreesOnKeys) { HandshakeAgreesOnKeys(); }
-TEST(Existing_GameLink, HandshakeRefusals) { HandshakeRefusals(); }
-TEST(Existing_GameLink, CookiesAndHello) { CookiesAndHello(); }
-TEST(Existing_GameLink, Endpoints) { Endpoints(); }
-TEST(Existing_GameLink, OverRealSockets) { OverRealSockets(); }
-TEST(Existing_GameLink, TimeoutAndRateLimit) { TimeoutAndRateLimit(); }
-TEST(Existing_GameLink, AllowlistAndAddressLimits) { AllowlistAndAddressLimits(); }
+TEST(
+  Existing_GameLink,
+  HandshakeAgreesOnKeys
+)
+{
+  HandshakeAgreesOnKeys();
+}
+TEST(
+  Existing_GameLink,
+  HandshakeRefusals
+)
+{
+  HandshakeRefusals();
+}
+TEST(
+  Existing_GameLink,
+  CookiesAndHello
+)
+{
+  CookiesAndHello();
+}
+TEST(
+  Existing_GameLink,
+  Endpoints
+)
+{
+  Endpoints();
+}
+TEST(
+  Existing_GameLink,
+  OverRealSockets
+)
+{
+  OverRealSockets();
+}
+TEST(
+  Existing_GameLink,
+  TimeoutAndRateLimit
+)
+{
+  TimeoutAndRateLimit();
+}
+TEST(
+  Existing_GameLink,
+  AllowlistAndAddressLimits
+)
+{
+  AllowlistAndAddressLimits();
+}

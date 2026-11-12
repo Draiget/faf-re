@@ -19,17 +19,31 @@ namespace faf::remote::client
   class CLoopbackCommandIntake final : public moho::ICommandSink
   {
   public:
-    explicit CLoopbackCommandIntake(moho::ISTIDriver& server) noexcept
+    explicit CLoopbackCommandIntake(
+      moho::ISTIDriver& server
+    ) noexcept
       : mServer(server)
     {}
 
     /** Before each command: forget the last cookie, so a dropped command shows. */
-    void BeginCommand() noexcept { mHaveCookie = false; }
+    void BeginCommand() noexcept
+    {
+      mHaveCookie = false;
+    }
     /** Whether the command since `BeginCommand` reached the server, and the cookie it returned. */
-    [[nodiscard]] bool HaveCookie() const noexcept { return mHaveCookie; }
-    [[nodiscard]] std::int32_t Cookie() const noexcept { return mCookie; }
+    [[nodiscard]] bool HaveCookie() const noexcept
+    {
+      return mHaveCookie;
+    }
+    [[nodiscard]] std::int32_t Cookie() const noexcept
+    {
+      return mCookie;
+    }
     /** Messages a client's driver never sends (the client manager's own), received anyway. */
-    [[nodiscard]] std::uint64_t Unexpected() const noexcept { return mUnexpected; }
+    [[nodiscard]] std::uint64_t Unexpected() const noexcept
+    {
+      return mUnexpected;
+    }
 
     void SetCommandSource(moho::CommandSourceId sourceId) override;
     void OnCommandSourceTerminated() override;
@@ -43,32 +57,44 @@ namespace faf::remote::client
     void WarpEntity(moho::EntId entityId, const moho::VTransform& transform) override;
     void ProcessInfoPair(moho::EntId entityId, gpg::StrArg key, gpg::StrArg value) override;
     void IssueCommand(
-      const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities, const moho::SSTICommandIssueData& data, bool clear
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities,
+      const moho::SSTICommandIssueData& data,
+      bool clear
     ) override;
     void IssueFactoryCommand(
-      const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities, const moho::SSTICommandIssueData& data, bool clear
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities,
+      const moho::SSTICommandIssueData& data,
+      bool clear
     ) override;
     void IncreaseCommandCount(moho::CmdId id, int count) override;
     void DecreaseCommandCount(moho::CmdId id, int count) override;
     void SetCommandTarget(moho::CmdId id, const moho::SSTITarget& target) override;
     void SetCommandType(moho::CmdId id, moho::EUnitCommandType type) override;
     void SetCommandCells(
-      moho::CmdId id, const gpg::core::FastVector<moho::SOCellPos>& cells, const Wm3::Vector3<float>& target
+      moho::CmdId id,
+      const gpg::core::FastVector<moho::SOCellPos>& cells,
+      const Wm3::Vector3<float>& target
     ) override;
     void RemoveCommandFromUnitQueue(moho::CmdId id, moho::EntId unitId) override;
     void ExecuteLuaInSim(const char* lua, const LuaPlus::LuaObject& args) override;
     void LuaSimCallback(
-      const char* fnName, const LuaPlus::LuaObject& args, const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities
+      const char* fnName,
+      const LuaPlus::LuaObject& args,
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities
     ) override;
     void ExecuteDebugCommand(
-      const char* command, const Wm3::Vector3<float>& worldPos, uint32_t focusArmy,
+      const char* command,
+      const Wm3::Vector3<float>& worldPos,
+      uint32_t focusArmy,
       const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities
     ) override;
     void AdvanceBeat(int beats) override;
     void EndGame() override;
 
   private:
-    void Took(std::int32_t cookie) noexcept
+    void Took(
+      std::int32_t cookie
+    ) noexcept
     {
       mCookie = cookie;
       mHaveCookie = true;

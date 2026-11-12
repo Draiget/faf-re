@@ -77,10 +77,22 @@ namespace moho
     /** `reporter` acknowledged `sender`'s stream at `beat` with `digest`. */
     void NoteReport(int reporter, int sender, std::uint32_t beat, const AckDigest& digest);
 
-    [[nodiscard]] bool Diverged() const noexcept { return mDiverged; }
-    [[nodiscard]] bool StopsGame() const noexcept { return mDiverged && mStopOnDivergence; }
-    [[nodiscard]] bool StopsOnDivergence() const noexcept { return mStopOnDivergence; }
-    [[nodiscard]] const Divergence& FirstDivergence() const noexcept { return mFirst; }
+    [[nodiscard]] bool Diverged() const noexcept
+    {
+      return mDiverged;
+    }
+    [[nodiscard]] bool StopsGame() const noexcept
+    {
+      return mDiverged && mStopOnDivergence;
+    }
+    [[nodiscard]] bool StopsOnDivergence() const noexcept
+    {
+      return mStopOnDivergence;
+    }
+    [[nodiscard]] const Divergence& FirstDivergence() const noexcept
+    {
+      return mFirst;
+    }
 
     /**
      * Whether `sender`'s own acknowledgement has disagreed with what reached
@@ -91,7 +103,10 @@ namespace moho
     [[nodiscard]] bool ProvenAltered(int sender) const noexcept;
 
     /** Whether there are findings `TakeFindings` has not handed out yet. */
-    [[nodiscard]] bool HasFindings() const noexcept { return !mFindings.empty(); }
+    [[nodiscard]] bool HasFindings() const noexcept
+    {
+      return !mFindings.empty();
+    }
 
     /**
      * The findings to tell the user about, oldest first: each sender's first

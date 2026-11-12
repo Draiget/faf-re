@@ -17,7 +17,12 @@ namespace moho
     constexpr float kDefaultAbyssBelow = 15.0f;
 
     /// A number field of `table`, or `fallback` when it is missing or not a number.
-    [[nodiscard]] float NumberField(const LuaPlus::LuaObject& table, const char* const name, const float fallback, bool* const present = nullptr)
+    [[nodiscard]] float NumberField(
+      const LuaPlus::LuaObject& table,
+      const char* const name,
+      const float fallback,
+      bool* const present = nullptr
+    )
     {
       const LuaPlus::LuaObject value = table[name];
       const bool isNumber = value.IsNumber();
@@ -28,7 +33,11 @@ namespace moho
     }
 
     /// `{ a, b, ... }` with `count` numbers, into `out`; false when it is not that.
-    [[nodiscard]] bool NumberList(const LuaPlus::LuaObject& list, float* const out, const std::int32_t count)
+    [[nodiscard]] bool NumberList(
+      const LuaPlus::LuaObject& list,
+      float* const out,
+      const std::int32_t count
+    )
     {
       if (!list.IsTable()) {
         return false;
@@ -44,7 +53,9 @@ namespace moho
     }
   } // namespace
 
-  void STIMap::InstallWaterBodies(const LuaPlus::LuaObject& scenarioInfo)
+  void STIMap::InstallWaterBodies(
+    const LuaPlus::LuaObject& scenarioInfo
+  )
   {
     mWaterBodies.reset();
     if (!scenarioInfo.IsTable()) {
@@ -61,7 +72,8 @@ namespace moho
 
     // Shading depths default to the sea's distances below its level, or without a sea to the
     // original maps' usual ones (Seton's Clutch: 17.5, 15, 2.5).
-    const bool seaShading = mWaterEnabled != 0u && mWaterElevation > mWaterElevationDeep && mWaterElevation > mWaterElevationAbyss;
+    const bool seaShading =
+      mWaterEnabled != 0u && mWaterElevation > mWaterElevationDeep && mWaterElevation > mWaterElevationAbyss;
     const float deepBelow = seaShading ? mWaterElevation - mWaterElevationDeep : kDefaultDeepBelow;
     const float abyssBelow = seaShading ? mWaterElevation - mWaterElevationAbyss : kDefaultAbyssBelow;
 
@@ -84,7 +96,8 @@ namespace moho
       desc.fillTo = NumberField(entry, "FillTo", desc.elevation, &hasFillTo);
       if (desc.dry ? !hasFillTo : !hasElevation) {
         log.push_back(
-          "water body " + std::to_string(index) + (desc.dry ? " skipped: a dry body needs FillTo" : " skipped: no Elevation")
+          "water body " + std::to_string(index) +
+          (desc.dry ? " skipped: a dry body needs FillTo" : " skipped: no Elevation")
         );
         continue;
       }
@@ -92,7 +105,9 @@ namespace moho
       desc.abyss = NumberField(entry, "Abyss", desc.elevation - abyssBelow);
       // Shading only (drawing divides by Elevation - Abyss): keep both below the level.
       if (!desc.dry && (desc.deep >= desc.elevation || desc.abyss >= desc.elevation)) {
-        log.push_back("water body " + std::to_string(index) + ": Deep and Abyss must be below Elevation; using 2.5 and 15 below it");
+        log.push_back(
+          "water body " + std::to_string(index) + ": Deep and Abyss must be below Elevation; using 2.5 and 15 below it"
+        );
         desc.deep = desc.elevation - kDefaultDeepBelow;
         desc.abyss = desc.elevation - kDefaultAbyssBelow;
       }

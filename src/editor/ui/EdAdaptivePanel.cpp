@@ -1,0 +1,368 @@
+// The Adaptive tool's panel: an adaptive map's whole setup in one place (EdShell::DrawAdaptivePanel). Which resources
+// spawn with which army, the lobby options' groups, the crazyrush lists, and the lobby options in `_options.lua` that
+// the script reads them by; the Properties panel keeps the one-marker view of the same tables.
+
+#include <algorithm>
+#include <cstdio>
+#include <functional>
+#include <initializer_list>
+#include <string>
+#include <vector>
+
+#include "editor/EdShell.h"
+#include "editor/doc/EdAdaptiveTables.h"
+#include "editor/doc/EdDocument.h"
+#include "editor/doc/EdGroupOptions.h"
+#include "editor/doc/EdUnitFate.h"
+#include "editor/doc/EdUnitWrecks.h"
+#include "editor/doc/EdUnits.h"
+#include "editor/tools/EdMarkers.h"
+#include "editor/ui/EdHelp.h"
+#include "imgui.h"
+
+namespace faf::editor
+{
+  namespace
+  {
+    const ImVec4 kGood(0.45f, 0.80f, 0.45f, 1.0f);
+    const ImVec4 kWarn(0.95f, 0.75f, 0.30f, 1.0f);
+    const ImVec4 kBad(0.95f, 0.45f, 0.35f, 1.0f);
+
+    void Header(
+      const char* const text
+    )
+    {
+      ImGui::Spacing();
+      ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+      ImGui::TextUnformatted(text);
+      ImGui::PopStyleColor();
+    }
+
+    /** A status line: a coloured dot and the text, wrapped. */
+    void Status(
+      const ImVec4& colour,
+      const std::string& text
+    )
+    {
+      const float size = ImGui::GetTextLineHeight();
+      const ImVec2 at = ImGui::GetCursorScreenPos();
+      ImGui::GetWindowDrawList()->AddCircleFilled(
+        ImVec2(at.x + size * 0.4f, at.y + size * 0.5f), size * 0.22f, ImGui::GetColorU32(colour)
+      );
+      ImGui::Dummy(ImVec2(size * 0.8f, size));
+      ImGui::SameLine();
+      ImGui::TextWrapped("%s", text.c_str());
+    }
+
+    /** Small buttons at the right of a row, right to left; true when clicked. */
+    class RowButtons
+    {
+    public:
+      /** `rowRight`: the row's right edge, in the window's local x (as SameLine takes it). */
+      /**
+       * `rowRight`: the row's right edge, in the window's local x (as SameLine takes it); `labels`: every button the
+       * row will have, so a narrow panel puts them all under the row's text rather than over it.
+       */
+      RowButtons(
+        const float rowRight,
+        std::initializer_list<const char*> labels
+      )
+        : mRight(rowRight)
+      {
+        float total = 0.0f;
+        for (const char* const label : labels) {
+          total += Width(label) + ImGui::GetStyle().ItemInnerSpacing.x;
+        }
+        const float textEnd = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x + ImGui::GetScrollX();
+        mWrap = mRight - total < textEnd + ImGui::GetStyle().ItemSpacing.x;
+      }
+      bool Button(
+        const char* const label,
+        const bool enabled = true
+      )
+      {
+        mRight -= Width(label);
+        if (mWrap) {
+          mWrap = false; // the first one starts the line under the text; the rest follow it
+          ImGui::SetCursorPosX(mRight);
+        } else {
+          ImGui::SameLine(mRight);
+        }
+        mRight -= ImGui::GetStyle().ItemInnerSpacing.x;
+        ImGui::BeginDisabled(!enabled);
+        const bool clicked = ImGui::SmallButton(label);
+        ImGui::EndDisabled();
+        return clicked;
+      }
+
+    private:
+      static float Width(
+        const char* const label
+      )
+      {
+        return ImGui::CalcTextSize(label, nullptr, true).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+      }
+      float mRight;
+      bool mWrap = false;
+    };
+
+    /** Takes `names` out of every list in `lists`. */
+    void TakeOut(
+      std::vector<std::vector<std::string>>& lists,
+      const std::vector<std::string>& names
+    )
+    {
+      for (std::vector<std::string>& list : lists) {
+        list.erase(
+          std::remove_if(
+            list.begin(),
+            list.end(),
+            [&](const std::string& name) {
+          return std::find(names.begin(), names.end(), name) != names.end();
+        }
+          ),
+          list.end()
+        );
+      }
+    }
+  } // namespace
+
+  void EdShell::DrawAdaptivePanel()
+  {
+    if (mDocument.GetState() != EdDocument::State::Open) {
+      ImGui::TextDisabled("Open a map to set up its adaptive resources.");
+      return;
+    }
+    const std::vector<ScenarioTeam> teams = mDocument.Teams();
+    const int slots = teams.empty() ? 0 : static_cast<int>(teams.front().armies.size());
+
+    // The files the script needs, and what each one does.
+    Header("FILES");
+    if (!mDocument.Adaptive()) {
+      HelpNote(
+        "Adaptive maps (FAF's \"Ultimate maps\" script by CookieNoob and KeyBlue) spawn each player's resources only "
+        "when that player is in the game, and let the lobby's options add groups of resources. The editor writes the "
+        "_tables.lua and the lobby options; the _script.lua comes from an adaptive map (copy it into this map's "
+        "folder)."
+      );
+      if (ImGui::Button("Make this map adaptive", ImVec2(-1.0f, 0.0f))) {
+        AdaptiveTables fresh;
+        fresh.maxPlayers = std::max(slots, 1);
+        fresh.mexArmy.assign(static_cast<std::size_t>(fresh.maxPlayers), {});
+        fresh.hydroArmy.assign(static_cast<std::size_t>(fresh.maxPlayers), {});
+        mDocument.SetTablesText(WithAdaptiveTables("", fresh));
+      }
+      return;
+    }
+    AdaptiveTables tables;
+    std::string error;
+    if (!ParseAdaptiveTables(mDocument.TablesText(), tables, error)) {
+      Status(kBad, "_tables.lua doesn't read: " + error);
+      return;
+    }
+    HelpNote(
+      "Three files make an adaptive map. _tables.lua says which resources spawn with which army and which belong to "
+      "the lobby options' groups: this panel writes it (the tables it doesn't know are kept). _script.lua is the "
+      "\"Ultimate maps\" script that reads the tables when the game starts: it isn't made here, it comes from an "
+      "adaptive map. _options.lua holds the lobby's options: this panel writes the ones its tables need, the rest "
+      "(wreckage, reclaim...) are kept. They are written into the map's folder on Save; Edit shows a file's text."
+    );
+    const auto editLink = [&](const char* const id, const int file) {
+      ImGui::SameLine();
+      ImGui::PushID(id);
+      if (ImGui::SmallButton("Edit")) {
+        ShowLuaFile(file);
+      }
+      ImGui::PopID();
+      ImGui::SetItemTooltip("This file's text in the Script panel");
+    };
+    Status(kGood, "Tables: " + mDocument.Facts().tablesPath);
+    editLink("tables", 2);
+    if (AdaptiveTablesPath(mDocument.Script()).empty()) {
+      Status(
+        kWarn,
+        "The map's _script.lua doesn't read the tables yet: put an adaptive map's _script.lua in its folder, "
+        "importing " +
+          mDocument.Facts().tablesPath + ". Until then nothing here changes the game."
+      );
+    } else {
+      Status(kGood, "The script reads them.");
+    }
+    editLink("script", 0);
+    if (mDocument.OptionsText().empty()) {
+      Status(
+        kWarn,
+        "No _options.lua: the lobby shows no options, so no option group below spawns (the script reads 1, none)."
+      );
+    } else {
+      Status(kGood, "Lobby options: " + mDocument.Facts().optionsPath);
+    }
+    editLink("options", 1);
+
+    // The edit: a copy of the tables changed, written into the file's text as one undo step.
+    AdaptiveTables changed = tables;
+    bool edited = false;
+    std::string options = mDocument.OptionsText();
+    bool optionsEdited = false;
+
+    // The selection's resources, by kind: what the "Add selected" buttons take.
+    std::vector<std::string> selectedMass;
+    std::vector<std::string> selectedHydro;
+    for (const SaveEntry& marker : mTools.MarkerSelection()) {
+      const std::string type = MarkerTypeOf(marker);
+      if (type == "Mass" && !AdaptiveEntry(marker.name, false).empty()) {
+        selectedMass.push_back(marker.name);
+      } else if (type == "Hydrocarbon" && !AdaptiveEntry(marker.name, true).empty()) {
+        selectedHydro.push_back(marker.name);
+      }
+    }
+    std::vector<std::string> selected = selectedMass;
+    selected.insert(selected.end(), selectedHydro.begin(), selectedHydro.end());
+    ImGui::Spacing();
+    if (selected.empty()) {
+      ImGui::PushTextWrapPos(0.0f);
+      ImGui::TextDisabled("Select mass or hydrocarbon markers in the view (click, Ctrl+click, box) to add them below.");
+      ImGui::PopTextWrapPos();
+    } else {
+      ImGui::Text("Selected: %zu mass, %zu hydrocarbon", selectedMass.size(), selectedHydro.size());
+    }
+
+    // The rows' right edge, a frame padding short of the scrollbar so the buttons don't touch it.
+    const float right = ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - ImGui::GetStyle().FramePadding.x;
+    const auto selectNames = [&](const std::vector<std::string>& names) {
+      mTools.AskMarkerSelect(names, ImGui::GetIO().KeyCtrl);
+    };
+
+    // Players.
+    Header("PLAYERS");
+    {
+      int players = changed.maxPlayers;
+      ImGui::SetNextItemWidth(ImGui::GetFontSize() * 7.0f);
+      if (ImGui::InputInt("Max players on the map", &players) && players >= std::max(slots, 1) && players <= 16) {
+        changed.maxPlayers = players;
+        edited = true;
+      }
+      ImGui::SetItemTooltip(
+        "maxPlayerOnMap: the script reads the armies' lists up to it (never fewer than the %d slots)", slots
+      );
+    }
+
+    // By army: the resources that spawn only with that army's player.
+    Header("SPAWN WITH AN ARMY");
+    HelpNote(
+      "A resource in an army's list is there only when that army's player is in the game (with the lobby's "
+      "Dynamic Spawn option, also for the mirror slot). Resources in no list always spawn, unless an option group has "
+      "them."
+    );
+    {
+      std::vector<std::string> armyAll;
+      for (const auto* const lists : {&changed.mexArmy, &changed.hydroArmy}) {
+        for (const std::vector<std::string>& list : *lists) {
+          armyAll.insert(armyAll.end(), list.begin(), list.end());
+        }
+      }
+      const int armies = std::max(
+        {changed.maxPlayers,
+         slots,
+         static_cast<int>(changed.mexArmy.size()),
+         static_cast<int>(changed.hydroArmy.size())}
+      );
+      for (int a = 1; a <= armies; ++a) {
+        ImGui::PushID(a);
+        const std::size_t index = static_cast<std::size_t>(a - 1);
+        const std::size_t mass = index < changed.mexArmy.size() ? changed.mexArmy[index].size() : 0;
+        const std::size_t hydro = index < changed.hydroArmy.size() ? changed.hydroArmy[index].size() : 0;
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("ARMY_%d", a);
+        ImGui::SameLine(ImGui::GetFontSize() * 5.5f);
+        ImGui::TextDisabled("%zu mass, %zu hydro", mass, hydro);
+        RowButtons buttons(right, {"Add selected", "Select"});
+        if (buttons.Button("Add selected", !selected.empty())) {
+          TakeOut(changed.mexArmy, selected);
+          TakeOut(changed.hydroArmy, selected);
+          if (changed.mexArmy.size() < static_cast<std::size_t>(a)) {
+            changed.mexArmy.resize(static_cast<std::size_t>(a));
+          }
+          if (changed.hydroArmy.size() < static_cast<std::size_t>(a)) {
+            changed.hydroArmy.resize(static_cast<std::size_t>(a));
+          }
+          changed.mexArmy[index].insert(changed.mexArmy[index].end(), selectedMass.begin(), selectedMass.end());
+          changed.hydroArmy[index].insert(changed.hydroArmy[index].end(), selectedHydro.begin(), selectedHydro.end());
+          edited = true;
+        }
+        if (buttons.Button("Select", mass + hydro > 0)) {
+          std::vector<std::string> names;
+          if (index < changed.mexArmy.size()) {
+            names = changed.mexArmy[index];
+          }
+          if (index < changed.hydroArmy.size()) {
+            names.insert(names.end(), changed.hydroArmy[index].begin(), changed.hydroArmy[index].end());
+          }
+          selectNames(names);
+        }
+        ImGui::PopID();
+      }
+      if (ImGui::Button("Selected: spawn always", ImVec2(-1.0f, 0.0f)) && !selected.empty()) {
+        TakeOut(changed.mexArmy, selected);
+        TakeOut(changed.hydroArmy, selected);
+        edited = true;
+      }
+      ImGui::SetItemTooltip("Takes the selected resources out of every army's list");
+    }
+
+    // The lobby's options (mexes, hydrocarbons, wrecks, units): the Adaptive Map window, by what the player picks.
+    Header("LOBBY OPTIONS");
+    if (ImGui::Button("Edit the lobby options...", ImVec2(-1.0f, 0.0f))) {
+      OpenAdaptiveWindow(mAdaptivePick == "#players" ? std::string() : mAdaptivePick);
+      if (mAdaptivePick == "#players") {
+        mAdaptivePick.clear();
+      }
+    }
+    ImGui::SetItemTooltip("The Adaptive Map window: each lobby option with its choices and what each puts on the map");
+
+    // Crazyrush: the script's two flat lists.
+    Header("CRAZYRUSH");
+    {
+      const auto list = [&](const char* const label, const char* const help, std::vector<std::string>& names) {
+        ImGui::PushID(label);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(label);
+        ImGui::SetItemTooltip("%s", help);
+        ImGui::SameLine(ImGui::GetFontSize() * 9.0f);
+        ImGui::TextDisabled("%zu mass", names.size());
+        RowButtons buttons(right, {"Remove selected", "Add selected", "Select"});
+        if (buttons.Button("Remove selected", !selectedMass.empty())) {
+          std::vector<std::vector<std::string>> one{names};
+          TakeOut(one, selectedMass);
+          names = one.front();
+          edited = true;
+        }
+        if (buttons.Button("Add selected", !selectedMass.empty())) {
+          for (const std::string& name : selectedMass) {
+            if (std::find(names.begin(), names.end(), name) == names.end()) {
+              names.push_back(name);
+            }
+          }
+          edited = true;
+        }
+        if (buttons.Button("Select", !names.empty())) {
+          selectNames(names);
+        }
+        ImGui::PopID();
+      };
+      list("Forward", "forwardCrazyrushMexes: the mexes the crazyrush option spawns forward", changed.forwardCrazyrush);
+      list(
+        "The one core mex", "crazyrushOneMexes: the one mex per player the crazyrush option keeps", changed.crazyrushOne
+      );
+    }
+
+    if (edited && !(changed == tables)) {
+      // The script reads armies up to maxPlayerOnMap: never fewer than the lobby's slots.
+      changed.maxPlayers = std::max(changed.maxPlayers, slots);
+      mDocument.SetTablesText(WithAdaptiveTables(mDocument.TablesText(), changed));
+    }
+    if (optionsEdited && options != mDocument.OptionsText()) {
+      mDocument.SetOptionsText(options);
+    }
+  }
+} // namespace faf::editor

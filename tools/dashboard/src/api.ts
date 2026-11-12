@@ -1,0 +1,417 @@
+// The dedicated server's REST API (plan WP17.11, docs/SWITCHES.md `--rest`): status, the armies of a running game,
+// control ops, and the event stream, each with the admin token as a bearer token. No browser-only API here, so Node
+// runs it too (scripts/smoke.ts).
+
+export interface Seat {
+  uid: number;
+  name: string;
+  joined: boolean;
+  loaded?: boolean;
+  lost?: boolean;
+  gone?: boolean;
+  away?: boolean;
+  ping_ms?: number | null;
+  /** In the lobby: "yes", "no", or "" before the player's lobby set it. */
+  ready?: string;
+  /** The lobby slot the host's lobby gave it; 0 before. */
+  slot?: number;
+  speed_limit?: number | null;
+  camera_updates?: number;
+  backlog_kb?: number;
+  behind_beats?: number;
+  /** "" before the launch, then "loading", "rules", "loaded". */
+  load?: string;
+  /** "same", "differs", "missing", or "" before the verdict. */
+  content?: string;
+  /** "allowed", "outside", "missing", or "" before the verdict. */
+  mods?: string;
+  ui_mods?: string[];
+  [key: string]: unknown;
+}
+
+export interface Status {
+  id: number;
+  ok: true;
+  phase: "lobby" | "game" | string;
+  host?: number;
+  started?: boolean;
+  beat?: number;
+  paused?: boolean;
+  seats?: Seat[];
+  /** The configured start-when-ready countdown in seconds; 0 or absent when off. */
+  start_when_ready_seconds?: number;
+  /** Seconds left of a running countdown; present only while one runs. */
+  countdown_seconds?: number;
+  [key: string]: unknown;
+}
+
+export interface Resource {
+  stored?: number | null;
+  income?: number | null;
+  storage?: number | null;
+}
+
+export interface Army {
+  /** The army's number, from 1. */
+  army: number;
+  name?: string | null;
+  team?: number | null;
+  /** 1 UEF, 2 Aeon, 3 Cybran, 4 Seraphim. */
+  faction?: number | null;
+  human?: boolean | null;
+  /** Humans only. */
+  uid?: number | null;
+  score?: number | null;
+  mass?: Resource | null;
+  energy?: Resource | null;
+  units?: { count?: number | null; cap?: number | null } | null;
+  acu?: { alive?: boolean | null; health?: number | null; max_health?: number | null; enhancements?: string[] | null } | null;
+  /** The sim's result once known, e.g. "victory 10". */
+  result?: string | null;
+  [key: string]: unknown;
+}
+
+export interface Armies {
+  ok: true;
+  beat?: number;
+  armies: Army[];
+  [key: string]: unknown;
+}
+
+// ---------------------------------------------------------------- server-host (one per machine, many lobbies)
+
+export interface HostCpu {
+  id: number;
+  /** Hyperthread siblings share a core id. */
+  core?: number | null;
+  socket?: number | null;
+  /** Busy % over the last second, 0..100. */
+  load?: number | null;
+  /** Busy % over the last 10 s, 0..100. */
+  load10?: number | null;
+  /** Ids of the lobbies pinned to this CPU. */
+  lobbies?: string[] | null;
+}
+
+export interface HostInfo {
+  name?: string;
+  cpu_model?: string;
+  memory_mb?: { total?: number | null; available?: number | null } | null;
+  cpus: HostCpu[];
+  lobbies?: number;
+  /** AI personalities a seat may take. */
+  ai?: string[];
+  [key: string]: unknown;
+}
+
+export interface MapInfo {
+  id: string;
+  name?: string;
+  file?: string;
+  size?: number[] | null;
+  km?: number | null;
+  players?: number | null;
+  description?: string | null;
+  /** "fa" (the game's own maps) or "vault". */
+  source?: string | null;
+}
+
+export interface Hint {
+  players?: number;
+  km?: number;
+  mean_cores?: number | null;
+  worst_cores?: number | null;
+  suggested_cores?: number | null;
+  basis?: string | null;
+}
+
+export interface LobbySeat {
+  seat: number;
+  kind: "human" | "ai" | string;
+  name?: string | null;
+  uid?: number | null;
+  ai?: string | null;
+  faction?: number | null;
+  team?: number | null;
+  /** Humans: the switches their game starts with to join. */
+  join?: string | null;
+}
+
+/** Someone who watches a lobby's game as a live replay (plan WP13.1). */
+export interface LobbyObserver {
+  name?: string | null;
+  /** A referee watches with no delay. */
+  referee?: boolean | null;
+  /** The switches the game opens the live replay with: `/replay gpgnet://<host>:<port>/<token>`. */
+  watch?: string | null;
+}
+
+export interface Lobby {
+  id: string;
+  name?: string | null;
+  /** starting, lobby, game, ended, failed, stopped. */
+  state: string;
+  map?: { id?: string; name?: string | null; km?: number | null; players?: number | null } | null;
+  cpus?: number[] | null;
+  port?: number | null;
+  pid?: number | null;
+  created?: string | null;
+  control?: string | null;
+  start_when_ready?: number | null;
+  seats?: LobbySeat[] | null;
+  hint?: Hint | null;
+  phase?: string | null;
+  beat?: number | null;
+  /** How the process exited, for a failed lobby. */
+  exit?: string | null;
+  observers?: LobbyObserver[] | null;
+  /** How far behind the game non-referee observers watch. */
+  observer_delay_seconds?: number | null;
+  /** The second port observers watch from; only with observers. */
+  observe_port?: number | null;
+  [key: string]: unknown;
+}
+
+export interface NewObserver {
+  /** Up to 40 characters; empty gives "Observer N". */
+  name: string;
+  referee?: boolean;
+}
+
+export interface NewSeat {
+  kind: "human" | "ai";
+  name?: string;
+  uid?: number;
+  ai?: string;
+  /** 1 UEF, 2 Aeon, 3 Cybran, 4 Seraphim, 5 random. */
+  faction: number;
+  /** 1 = no team, 2.. = team 1.. (FAF's numbering). */
+  team: number;
+}
+
+export interface NewLobby {
+  name: string;
+  map: string;
+  options: Record<string, string>;
+  seats: NewSeat[];
+  control: "player" | "organiser";
+  start_when_ready: number;
+  lobby_minutes: number;
+  cpus: number[] | "auto";
+  cores?: number;
+  /** At most 32. */
+  observers?: NewObserver[];
+  /** 0..3600; referees watch without it. */
+  observer_delay_seconds?: number;
+}
+
+export interface Answer {
+  ok: boolean;
+  error?: string;
+  [key: string]: unknown;
+}
+
+export interface ServerEvent {
+  event: string;
+  [key: string]: unknown;
+}
+
+// Plain fields, not constructor parameter properties: Node runs this file by stripping types only.
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+/** The answer's JSON, or `ok: false` when its body isn't JSON (a proxy's error page, say). */
+async function readAnswer(response: Response): Promise<Answer> {
+  try {
+    return (await response.json()) as Answer;
+  } catch {
+    return { ok: false };
+  }
+}
+
+export class ServerApi {
+  readonly base: string;
+  private readonly token: string;
+
+  constructor(base: string, token: string) {
+    this.base = base.replace(/\/+$/, "");
+    this.token = token;
+  }
+
+  private headers(json: boolean): Record<string, string> {
+    const headers: Record<string, string> = { Authorization: `Bearer ${this.token}` };
+    if (json) {
+      headers["Content-Type"] = "application/json";
+    }
+    return headers;
+  }
+
+  /** `GET /api/v1/status`: the lobby or the game, with its seats. `signal` gives up on it (a time limit, say). */
+  async status(signal?: AbortSignal): Promise<Status> {
+    const response = await fetch(`${this.base}/api/v1/status`, { headers: this.headers(false), signal });
+    const body = await readAnswer(response);
+    if (!response.ok || !body.ok) {
+      throw new ApiError(body.error ?? `status: HTTP ${response.status}`, response.status);
+    }
+    return body as Status;
+  }
+
+  /**
+   * `GET /api/v1/armies`: each army of the running game (score, resources, units, ACU). Throws `ApiError` with 400
+   * ("no game yet") in the lobby, and 404 from a server without this endpoint.
+   */
+  async armies(signal?: AbortSignal): Promise<Armies> {
+    const response = await fetch(`${this.base}/api/v1/armies`, { headers: this.headers(false), signal });
+    const body = await readAnswer(response);
+    if (!response.ok || !body.ok) {
+      throw new ApiError(body.error ?? `armies: HTTP ${response.status}`, response.status);
+    }
+    const armies = body as Armies;
+    return { ...armies, armies: Array.isArray(armies.armies) ? armies.armies : [] };
+  }
+
+  /**
+   * `POST /api/v1/ops/<op>` with the op's fields: the server's answer, `ok` false with its `error` when it refused
+   * (HTTP 400). A missing or wrong token, or a server that isn't there, throws.
+   */
+  async op(name: string, fields: Record<string, unknown> = {}): Promise<Answer> {
+    const response = await fetch(`${this.base}/api/v1/ops/${encodeURIComponent(name)}`, {
+      method: "POST",
+      headers: this.headers(true),
+      body: JSON.stringify(fields),
+    });
+    const body = await readAnswer(response);
+    if (response.status === 401) {
+      throw new ApiError(body.error ?? "the admin token was refused", 401);
+    }
+    if (!body.ok && body.error === undefined && !response.ok) {
+      body.error = `HTTP ${response.status}`;
+    }
+    return body;
+  }
+
+  /**
+   * `GET /api/v1/events`, read until `signal` aborts or the server closes it: each Server-Sent Event's JSON to
+   * `onEvent`. Read with fetch, as the browser's EventSource can't send the token. `onOpen` runs once the stream is
+   * established.
+   */
+  async events(onEvent: (event: ServerEvent) => void, signal: AbortSignal, onOpen?: () => void): Promise<void> {
+    const response = await fetch(`${this.base}/api/v1/events`, { headers: this.headers(false), signal });
+    if (!response.ok || response.body === null) {
+      throw new ApiError(`events: HTTP ${response.status}`, response.status);
+    }
+    onOpen?.();
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffered = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) {
+        return;
+      }
+      buffered = (buffered + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
+      // An event ends at a blank line; its `data:` lines hold the JSON.
+      let end = buffered.indexOf("\n\n");
+      while (end >= 0) {
+        const block = buffered.slice(0, end);
+        buffered = buffered.slice(end + 2);
+        const data = block
+          .split("\n")
+          .filter((line) => line.startsWith("data:"))
+          .map((line) => line.slice(5).trimStart())
+          .join("\n");
+        if (data !== "") {
+          try {
+            onEvent(JSON.parse(data) as ServerEvent);
+          } catch {
+            // not JSON: ignored, as the stream's comments are
+          }
+        }
+        end = buffered.indexOf("\n\n");
+      }
+    }
+  }
+}
+
+/**
+ * A machine's `server-host` (plan WP17.13): the machine, its maps, the cost hint, and its lobbies, each lobby its own
+ * server reached through the host (`lobbyApi`). Errors throw `ApiError` with the HTTP status and the host's reason.
+ */
+export class HostApi {
+  readonly base: string;
+  private readonly token: string;
+
+  constructor(base: string, token: string) {
+    this.base = base.replace(/\/+$/, "");
+    this.token = token;
+  }
+
+  private async request(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<Answer> {
+    const headers: Record<string, string> = { Authorization: `Bearer ${this.token}` };
+    if (body !== undefined) {
+      headers["Content-Type"] = "application/json";
+    }
+    const response = await fetch(`${this.base}${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal,
+    });
+    const answer = await readAnswer(response);
+    if (!response.ok || !answer.ok) {
+      throw new ApiError(answer.error ?? `${method} ${path}: HTTP ${response.status}`, response.status);
+    }
+    return answer;
+  }
+
+  /** `GET /api/v1/host`. A plain server (no host) answers 404. */
+  async host(signal?: AbortSignal): Promise<HostInfo> {
+    const answer = await this.request("GET", "/api/v1/host", undefined, signal);
+    const host = (answer.host ?? {}) as HostInfo;
+    return { ...host, cpus: Array.isArray(host.cpus) ? host.cpus : [] };
+  }
+
+  /** `GET /api/v1/maps`, sorted by name. */
+  async maps(signal?: AbortSignal): Promise<MapInfo[]> {
+    const answer = await this.request("GET", "/api/v1/maps", undefined, signal);
+    return Array.isArray(answer.maps) ? (answer.maps as MapInfo[]) : [];
+  }
+
+  /** `GET /api/v1/hint`: how many cores a game of that many players on a map that big needs. */
+  async hint(players: number, km: number, signal?: AbortSignal): Promise<Hint> {
+    const query = `players=${encodeURIComponent(String(players))}&km=${encodeURIComponent(String(km))}`;
+    return (await this.request("GET", `/api/v1/hint?${query}`, undefined, signal)) as Hint;
+  }
+
+  /** `GET /api/v1/lobbies`. */
+  async lobbies(signal?: AbortSignal): Promise<Lobby[]> {
+    const answer = await this.request("GET", "/api/v1/lobbies", undefined, signal);
+    return Array.isArray(answer.lobbies) ? (answer.lobbies as Lobby[]) : [];
+  }
+
+  /** `POST /api/v1/lobbies`: starts a lobby's server. */
+  async createLobby(lobby: NewLobby): Promise<Lobby> {
+    return (await this.request("POST", "/api/v1/lobbies", lobby)).lobby as Lobby;
+  }
+
+  /** `DELETE /api/v1/lobbies/<id>`: stops its server; it stays listed as stopped. */
+  async stopLobby(id: string): Promise<Lobby> {
+    return (await this.request("DELETE", `/api/v1/lobbies/${encodeURIComponent(id)}`)).lobby as Lobby;
+  }
+
+  /** `DELETE /api/v1/lobbies/<id>?forget=1`: takes a stopped or failed lobby off the list. */
+  async forgetLobby(id: string): Promise<void> {
+    await this.request("DELETE", `/api/v1/lobbies/${encodeURIComponent(id)}?forget=1`);
+  }
+
+  /** The lobby's own server API, proxied by the host with the host's token. */
+  lobbyApi(id: string): ServerApi {
+    return new ServerApi(`${this.base}/api/v1/lobbies/${encodeURIComponent(id)}`, this.token);
+  }
+}

@@ -56,7 +56,7 @@ namespace moho
      * four-byte hole after the key. Every one of those numbers follows from
      * `alignof(SDiskFileInfo) == 8` and none of them from 4.
      */
-    alignas(8) FILETIME mLastWriteTime{};      // +0x08
+    alignas(8) FILETIME mLastWriteTime{}; // +0x08
   };
 
   static_assert(sizeof(SDiskFileInfo) == 0x10, "SDiskFileInfo size must be 0x10");
@@ -78,7 +78,7 @@ namespace moho
     ~SFileWaitHandle();
 
     volatile platform::InterlockedLong mLock = 0; // +0x08
-    CZipFile* mZipFile = nullptr;  // +0x0C
+    CZipFile* mZipFile = nullptr;                 // +0x0C
   };
 
   static_assert(sizeof(SFileWaitHandle) == 0x10, "SFileWaitHandle size must be 0x10");
@@ -87,8 +87,8 @@ namespace moho
 
   struct FWHSEntry
   {
-    SFileWaitHandle* mHandle = nullptr;    // +0x00
-    std::uint32_t mZipEntryIndex = 0;      // +0x04
+    SFileWaitHandle* mHandle = nullptr; // +0x00
+    std::uint32_t mZipEntryIndex = 0;   // +0x04
   };
 
   static_assert(sizeof(FWHSEntry) == 0x08, "FWHSEntry size must be 0x08");
@@ -183,11 +183,11 @@ namespace moho
      */
     void NotifyAll();
 
-    boost::mutex mLock;                  // +0x00
-    boost::condition mObjectSender;      // +0x08
-    std::int32_t mLockLevel = 0;         // +0x20
-    std::int32_t mWaitingLevel = 0;      // +0x24
-    std::uint8_t mIsLocked = 0;          // +0x28
+    boost::mutex mLock;             // +0x00
+    boost::condition mObjectSender; // +0x08
+    std::int32_t mLockLevel = 0;    // +0x20
+    std::int32_t mWaitingLevel = 0; // +0x24
+    std::uint8_t mIsLocked = 0;     // +0x28
   };
 
   static_assert(sizeof(boost::mutex) == 0x08, "boost::mutex size must be 0x08");
@@ -245,10 +245,10 @@ namespace moho
      */
     ~FWaitHandleSet();
 
-    TDatList<SFileWaitHandle, void> mZipFiles;       // +0x2C
-    FWHSZipEntryMap mZipEntries{};                    // +0x34
-    FWHSFileInfoMap mFileInfo{};                      // +0x40
-    CVirtualFileSystem* mHandle = nullptr;            // +0x4C
+    TDatList<SFileWaitHandle, void> mZipFiles; // +0x2C
+    FWHSZipEntryMap mZipEntries{};             // +0x34
+    FWHSFileInfoMap mFileInfo{};               // +0x40
+    CVirtualFileSystem* mHandle = nullptr;     // +0x4C
     FWHSThreadState mThreadStateInd{};         // +0x50
 
     /**
@@ -261,7 +261,7 @@ namespace moho
     void RemoveEntry(SFileWaitHandle* handle);
 
     /**
-       * Address: 0x00458D30 (FUN_00458D30)
+     * Address: 0x00458D30 (FUN_00458D30)
      *
      * What it does:
      * Resolves metadata for one canonical path through zip-entry records and the
@@ -323,7 +323,10 @@ namespace moho
   static_assert(offsetof(FWaitHandleSet, mZipEntries) == 0x34, "FWaitHandleSet::mZipEntries offset must be 0x34");
   static_assert(offsetof(FWaitHandleSet, mFileInfo) == 0x40, "FWaitHandleSet::mFileInfo offset must be 0x40");
   static_assert(offsetof(FWaitHandleSet, mHandle) == 0x4C, "FWaitHandleSet::mHandle offset must be 0x4C");
-  static_assert(offsetof(FWaitHandleSet, mThreadStateInd) == 0x50, "FWaitHandleSet::mThreadStateInd offset must be 0x50");
+  static_assert(
+    offsetof(FWaitHandleSet, mThreadStateInd) == 0x50,
+    "FWaitHandleSet::mThreadStateInd offset must be 0x50"
+  );
   static_assert(sizeof(FWaitHandleSet) == 0x54, "FWaitHandleSet size must be 0x54");
 
   /**
@@ -419,7 +422,8 @@ namespace moho
   [[nodiscard]] gpg::MemBuffer<const char> DISK_MemoryMapFile(gpg::StrArg sourcePath);
 
   /**
-   * Address: 0x00459D50 (FUN_00459D50, ?DISK_GetLastError@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ)
+   * Address: 0x00459D50 (FUN_00459D50,
+   * ?DISK_GetLastError@Moho@@YA?AV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ)
    *
    * What it does:
    * Returns a copy of the current thread-local disk error text.
@@ -661,7 +665,7 @@ namespace moho
   [[nodiscard]] CScrLuaInitForm* register_FileCollapsePath_LuaFuncDef();
 
   /**
-    * Alias of FUN_00458D30 (non-canonical helper lane).
+   * Alias of FUN_00458D30 (non-canonical helper lane).
    *
    * What it does:
    * Resolves file metadata through the wait-handle/VFS runtime when available.

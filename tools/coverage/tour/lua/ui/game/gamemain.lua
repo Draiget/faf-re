@@ -238,6 +238,60 @@ do
         Log('commands done: ' .. table.getn(Commands))
     end
 
+    -- Methods the fuzz leaves out (controls, the camera, user units): they end the object, take the input focus for
+    -- good, or are callbacks the engine calls itself.
+    local ControlFuzzSkip = {
+        Destroy = true, OnDestroy = true, AcquireKeyboardFocus = true, AbandonKeyboardFocus = true, AcquireFocus = true,
+        SetNeedsFrameUpdate = true, OnFrame = true, HandleEvent = true, OnKeyboardFocusChange = true,
+        -- ItemList:GetItem and the movie getters crash the original game the same way (see Skip above), and so does
+        -- camera:RestoreSettings on a value that isn't a table: 0x007AD150 reads its fields with lua_rawget
+        -- (0x0090D050) and checks nothing first.
+        GetItem = true, GetFrameRate = true, GetNumFrames = true, RestoreSettings = true,
+    }
+
+    -- Every method of a control (the engine's and FAF's Lua class's) with each argument pattern: nothing, 1, a
+    -- string, true, two numbers, the parent control, an empty table. The wrong patterns stop at the argument checks.
+    local function FuzzControl(label, control, parent)
+        if Skip[label] == 'all' then
+            return
+        end
+        local methods = getmetatable(control)
+        if type(methods) == 'table' and type(rawget(methods, '__index')) == 'table' then
+            methods = rawget(methods, '__index')
+        end
+        if type(methods) ~= 'table' then
+            return
+        end
+        local names = {}
+        for name, value in methods do
+            if type(name) == 'string' and (type(value) == 'cfunction' or type(value) == 'function')
+                and not ControlFuzzSkip[name] then
+                table.insert(names, name)
+            end
+        end
+        table.sort(names)
+        local calls = 0
+        local failed = 0
+        for i = 1, table.getn(names) do
+            local fn = methods[names[i]]
+            local patterns = { {}, { 1 }, { 'zoo' }, { true }, { 1, 1 }, { parent }, { {} } }
+            for p = 1, table.getn(patterns) do
+                local args = patterns[p]
+                local ok
+                if table.getn(args) == 0 then
+                    ok = pcall(fn, control)
+                elseif table.getn(args) == 1 then
+                    ok = pcall(fn, control, args[1])
+                else
+                    ok = pcall(fn, control, args[1], args[2])
+                end
+                calls = calls + 1
+                if not ok then failed = failed + 1 end
+            end
+        end
+        Log('fuzz ' .. label .. ': ' .. calls .. ' calls, ' .. failed .. ' errors')
+    end
+
     local function CameraTour()
         local camera = GetCamera('WorldCamera')
         if not camera then
@@ -245,6 +299,7 @@ do
             return
         end
         SweepObject('camera', camera)
+        FuzzControl('camera', camera, GetFrame(0))
         Try('zoom', camera.SetZoom, camera, 40, 0.5)
         WaitSeconds(1)
         Try('spin', camera.Spin, camera, 1, 0.3)
@@ -262,6 +317,48 @@ do
         Try('UseSystemClock', camera.UseSystemClock, camera)
     end
 
+    -- The user-side unit functions (UserLuaUnits.cpp), each with patterns built from the selection: nothing, the
+    -- units, a category and the units, a category name, the units and true, the units and a toggle name, one unit,
+    -- 1, a string. EntityCategoryFilterDown/FilterOut get only a category and the units: they count their second
+    -- argument with lua_getn, which reads any value as a table, unchecked in the original game too.
+    local UnitFunctionNames = {
+        'ParseEntityCategory', 'GetUnitCommandFromCommandCap', 'EntityCategoryContains', 'SetAutoMode',
+        'SetAutoSurfaceMode', 'ToggleScriptBit', 'SetPaused', 'GetAttachedUnitsList', 'ValidateUnitsList',
+        'GetAssistingUnitsList', 'GetIdleEngineers', 'GetIdleFactories', 'GetSelectedUnits', 'GetValidAttackingUnits',
+        'SelectUnits', 'AddSelectUnits', 'GetHighlightCommand', 'DeleteCommand', 'GenerateBuildTemplateFromSelection',
+        'ClearBuildTemplates', 'GetUnitById', 'SimCallback', 'ExecLuaInSim', 'CreateUnitAtMouse',
+    }
+
+    local function UnitFunctions(units)
+        local globals = getfenv(0)
+        local cat = rawget(globals, 'categories') and rawget(categories, 'ALLUNITS')
+        local one = units[1]
+        local patterns = { {}, { units }, { cat, units }, { 'ALLUNITS' }, { units, true }, { units, 'RULEUTC_ShieldToggle' },
+                           { one }, { 1 }, { 'zoo' }, { '1' }, { { Func = 'zoo', Args = {} } } }
+        local calls = 0
+        local failed = 0
+        for i = 1, table.getn(UnitFunctionNames) do
+            local fn = rawget(globals, UnitFunctionNames[i])
+            if fn then
+                for p = 1, table.getn(patterns) do
+                    local args = patterns[p]
+                    local ok
+                    if table.getn(args) == 0 then ok = pcall(fn)
+                    elseif table.getn(args) == 1 then ok = pcall(fn, args[1])
+                    else ok = pcall(fn, args[1], args[2]) end
+                    calls = calls + 1
+                    if not ok then failed = failed + 1 end
+                end
+            end
+        end
+        local filterDown = rawget(globals, 'EntityCategoryFilterDown')
+        local filterOut = rawget(globals, 'EntityCategoryFilterOut')
+        if cat and filterDown then pcall(filterDown, cat, units) end
+        if cat and filterOut then pcall(filterOut, cat, units) end
+        Try('select again', SelectUnits, units)
+        Log('unit functions: ' .. calls .. ' calls, ' .. failed .. ' errors')
+    end
+
     local function UnitTour()
         -- A replay starts as an observer, and category selection only takes the focus army's own units.
         Try('focus army', ConExecute, 'SetFocusArmy 0')
@@ -277,6 +374,10 @@ do
         for i = 1, math.min(6, table.getn(units)) do
             SweepObject('user unit ' .. i, units[i])
         end
+        for i = 1, math.min(3, table.getn(units)) do
+            FuzzControl('user unit ' .. i, units[i], units[table.getn(units)])
+        end
+        UnitFunctions(units)
         Try('select land', UISelectionByCategory, 'LAND', false, false, false, false)
         WaitSeconds(2)
         Try('select air', UISelectionByCategory, 'AIR', false, false, false, false)
@@ -299,6 +400,7 @@ do
             local control = Try('make ' .. label, module[class], parent, a)
             if control then
                 SweepObject(label, control)
+                FuzzControl(label, control, parent)
                 table.insert(made, control)
             end
         end
@@ -762,7 +864,87 @@ do
         Log('vars done: ' .. table.getn(Vars))
     end
 
+    -- The live tour (/tourlive, in a game rather than a replay): orders through the user-side command functions, queued
+    -- so the command graph has queues to draw, a factory build order, the dock command and the zoom calls.
+    local LiveCommands = {
+        'UNITCOMMAND_Move', 'UNITCOMMAND_Attack', 'UNITCOMMAND_AggressiveMove', 'UNITCOMMAND_Patrol',
+        'UNITCOMMAND_Guard', 'UNITCOMMAND_Reclaim', 'UNITCOMMAND_Repair', 'UNITCOMMAND_Capture', 'UNITCOMMAND_Stop',
+        'UNITCOMMAND_Dive', 'UNITCOMMAND_Pause', 'UNITCOMMAND_Upgrade', 'UNITCOMMAND_Script', 'UNITCOMMAND_Ferry',
+        'UNITCOMMAND_FormMove', 'UNITCOMMAND_Tactical', 'UNITCOMMAND_Nuke', 'UNITCOMMAND_TransportLoadUnits',
+        'UNITCOMMAND_TransportUnloadUnits', 'UNITCOMMAND_Sacrifice', 'UNITCOMMAND_Overcharge',
+        'Move', 'Stop', 'Attack', 'Patrol',
+    }
+
+    local function LiveTour()
+        Try('select all', UISelectionByCategory, 'ALLUNITS', false, false, false, false)
+        WaitSeconds(1)
+        local units = GetSelectedUnits() or {}
+        Log('live: ' .. table.getn(units) .. ' units')
+        for i = 1, table.getn(LiveCommands) do
+            local command = LiveCommands[i]
+            Try('IssueUnitCommand ' .. command, IssueUnitCommand, units, command, nil, false)
+            Try('IssueCommand ' .. command, IssueCommand, command, nil, false)
+            WaitSeconds(0.2)
+        end
+        -- A Lua dragger makes the session's command graph (CMauiLuaDragger takes GetCommandGraph(true)); held while
+        -- the queued orders above are pending, the graph builds and updates their nodes. (Drawing it needs a real
+        -- Shift key on a foreground window, which the tour leaves alone.)
+        local ok, draggerModule = pcall(import, '/lua/maui/dragger.lua')
+        local dragger = ok and draggerModule and rawget(draggerModule, 'Dragger') and Try('Dragger', draggerModule.Dragger)
+        WaitSeconds(10)
+        if dragger then
+            Try('dragger destroy', dragger.Destroy, dragger)
+        end
+        -- Command mode for each kind of order, a few seconds each: a driver posting mouse clicks to the window (if one
+        -- runs) issues them through the world view's command code.
+        local okMode, commandMode = pcall(import, '/lua/ui/game/commandmode.lua')
+        if okMode and commandMode and rawget(commandMode, 'StartCommandMode') then
+            local orders = { 'RULEUCC_Move', 'RULEUCC_Attack', 'RULEUCC_Patrol', 'RULEUCC_Guard', 'RULEUCC_Reclaim',
+                             'RULEUCC_Repair', 'RULEUCC_Capture', 'RULEUCC_Ferry', 'RULEUCC_Tactical', 'RULEUCC_Nuke' }
+            for i = 1, table.getn(orders) do
+                Try('select all for ' .. orders[i], UISelectionByCategory, 'ALLUNITS', false, false, false, false)
+                Try('StartCommandMode ' .. orders[i], commandMode.StartCommandMode, 'order', { name = orders[i] })
+                WaitSeconds(3)
+                Try('EndCommandMode', commandMode.EndCommandMode, true)
+            end
+            Try('select engineers', UISelectionByCategory, 'ENGINEER', false, false, false, false)
+            Try('StartCommandMode build', commandMode.StartCommandMode, 'build', { name = 'ueb1101' })
+            WaitSeconds(4)
+            Try('EndCommandMode', commandMode.EndCommandMode, true)
+        end
+        WaitSeconds(3)
+        Try('select factories', UISelectionByCategory, 'FACTORY', false, false, false, false)
+        Try('IssueBlueprintCommand', IssueBlueprintCommand, 'UNITCOMMAND_BuildFactory', 'uel0105', 2, false)
+        Try('IssueDockCommand', IssueDockCommand, false)
+        WaitSeconds(2)
+        Try('select all again', UISelectionByCategory, 'ALLUNITS', false, false, false, false)
+        local again = GetSelectedUnits() or {}
+        if again[1] then
+            Try('UIZoomTo', UIZoomTo, again, 1)
+            WaitSeconds(2)
+            Try('UISelectAndZoomTo', UISelectAndZoomTo, again[1], 1)
+        end
+        WaitSeconds(10)
+        Log('live done')
+    end
+
     local function Tour()
+        if HasCommandLineArg('/tourlive') then
+            -- The map's scripted AI builds the army for a minute and a half first: more units, more kinds of order.
+            WaitSeconds(90)
+            Log('start live')
+            LiveTour()
+            UnitTour()
+            CameraTour()
+            ControlTour()
+            SweepGlobals()
+            RunCommands()
+            Log('done')
+            if HasCommandLineArg('/tourexit') then
+                ExitApplication()
+            end
+            return
+        end
         if HasCommandLineArg('/tourvars') then
             WaitSeconds(5)
             Log('start vars')
@@ -787,9 +969,26 @@ do
         Log('done')
     end
 
+    -- `/tourquitafter <seconds>` quits the game that long after the session starts, so a multiplayer game run by a
+    -- test tool ends cleanly and writes its coverage counters; `/tournone` skips the tour itself.
+    local function QuitLater()
+        local args = GetCommandLineArg('/tourquitafter', 1)
+        local seconds = args and tonumber(args[1])
+        if seconds then
+            WaitSeconds(seconds)
+            Log('quitting after ' .. seconds .. ' s')
+            ExitApplication()
+        end
+    end
+
     local TourOnFirstUpdate = OnFirstUpdate
     OnFirstUpdate = function()
         TourOnFirstUpdate()
-        ForkThread(Tour)
+        if HasCommandLineArg('/tourquitafter') then
+            ForkThread(QuitLater)
+        end
+        if not HasCommandLineArg('/tournone') then
+            ForkThread(Tour)
+        end
     end
 end

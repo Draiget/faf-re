@@ -33,9 +33,8 @@ namespace moho
      * handed back unowned. Inlined into
      * `SerConstructHelper<CParticleTexture>::Construct` 0x0048F140.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * What it does:
@@ -43,7 +42,10 @@ namespace moho
      * `SerSaveConstructHelper<CParticleTexture>::SaveConstructArgs` 0x0048F010.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     using TextureResourceHandle = boost::shared_ptr<RD3DTextureResource>;
@@ -73,7 +75,7 @@ namespace moho
     TextureResourceHandle& GetTexture(TextureResourceHandle& outTexture);
 
   public:
-    fa::string mTexturePath;             // +0x08
+    fa::string mTexturePath;                // +0x08
     TextureResourceHandle mTextureResource; // +0x24
   };
 
@@ -83,7 +85,8 @@ namespace moho
   );
   static_assert(offsetof(CParticleTexture, mTexturePath) == 0x08, "CParticleTexture::mTexturePath offset must be 0x08");
   static_assert(
-    offsetof(CParticleTexture, mTextureResource) == 0x24, "CParticleTexture::mTextureResource offset must be 0x24"
+    offsetof(CParticleTexture, mTextureResource) == 0x24,
+    "CParticleTexture::mTextureResource offset must be 0x24"
   );
   static_assert(sizeof(CParticleTexture) == 0x2C, "CParticleTexture size must be 0x2C");
 } // namespace moho

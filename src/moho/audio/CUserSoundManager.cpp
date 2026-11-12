@@ -96,7 +96,9 @@ namespace
    * What it does:
    * Returns one resolved sound-variable state lane.
    */
-  [[nodiscard]] std::uint16_t ReadSndVarState(const moho::CSndVar& value) noexcept
+  [[nodiscard]] std::uint16_t ReadSndVarState(
+    const moho::CSndVar& value
+  ) noexcept
   {
     return value.mState;
   }
@@ -107,7 +109,9 @@ namespace
    * What it does:
    * Returns one resolved bank id from a sound-parameter descriptor.
    */
-  [[nodiscard]] std::uint16_t ReadSndParamsBankId(const moho::CSndParams& params) noexcept
+  [[nodiscard]] std::uint16_t ReadSndParamsBankId(
+    const moho::CSndParams& params
+  ) noexcept
   {
     return params.mBankId;
   }
@@ -118,7 +122,9 @@ namespace
    * What it does:
    * Returns one resolved cue id from a sound-parameter descriptor.
    */
-  [[nodiscard]] std::uint16_t ReadSndParamsCueId(const moho::CSndParams& params) noexcept
+  [[nodiscard]] std::uint16_t ReadSndParamsCueId(
+    const moho::CSndParams& params
+  ) noexcept
   {
     return params.mCueId;
   }
@@ -129,7 +135,9 @@ namespace
    * What it does:
    * Returns one script-loop owner context pointer from a script sound handle.
    */
-  [[nodiscard]] moho::CSndParams* ReadSoundLoopOwnerContext(moho::HSound& sound) noexcept
+  [[nodiscard]] moho::CSndParams* ReadSoundLoopOwnerContext(
+    moho::HSound& sound
+  ) noexcept
   {
     return sound.mLoopOwnerContext;
   }
@@ -141,7 +149,10 @@ namespace
    * Writes one loop-cue pointer into a script sound handle and returns the
    * same handle.
    */
-  [[nodiscard]] moho::HSound* WriteSoundLoopCue(moho::HSound* const sound, moho::IXACTCue* const cue) noexcept
+  [[nodiscard]] moho::HSound* WriteSoundLoopCue(
+    moho::HSound* const sound,
+    moho::IXACTCue* const cue
+  ) noexcept
   {
     sound->mLoopCue = cue;
     return sound;
@@ -153,7 +164,9 @@ namespace
    * What it does:
    * Returns one loop-cue pointer from a script sound handle.
    */
-  [[nodiscard]] moho::IXACTCue* ReadSoundLoopCue(moho::HSound& sound) noexcept
+  [[nodiscard]] moho::IXACTCue* ReadSoundLoopCue(
+    moho::HSound& sound
+  ) noexcept
   {
     return sound.mLoopCue;
   }
@@ -164,7 +177,9 @@ namespace
    * What it does:
    * Returns one ducking-flag byte from a script sound handle.
    */
-  [[nodiscard]] std::uint8_t ReadSoundAffectsDuckingFlag(const moho::HSound& sound) noexcept
+  [[nodiscard]] std::uint8_t ReadSoundAffectsDuckingFlag(
+    const moho::HSound& sound
+  ) noexcept
   {
     return sound.mAffectsDucking;
   }
@@ -175,7 +190,9 @@ namespace
    * What it does:
    * Returns one RPC-loop variable pointer from a sound-parameter descriptor.
    */
-  [[nodiscard]] moho::CSndVar* ReadSndParamsRpcLoopVariable(moho::CSndParams& params) noexcept
+  [[nodiscard]] moho::CSndVar* ReadSndParamsRpcLoopVariable(
+    moho::CSndParams& params
+  ) noexcept
   {
     return params.mRpcLoopVariable;
   }
@@ -186,7 +203,10 @@ namespace
    * What it does:
    * Packs one `(bankId, cueId)` pair into a 32-bit lookup key.
    */
-  [[nodiscard]] std::uint32_t PackSndBankCueKey(const std::uint16_t bankId, const std::uint16_t cueId) noexcept
+  [[nodiscard]] std::uint32_t PackSndBankCueKey(
+    const std::uint16_t bankId,
+    const std::uint16_t cueId
+  ) noexcept
   {
     return static_cast<std::uint32_t>(cueId) | (static_cast<std::uint32_t>(bankId) << 16u);
   }
@@ -198,7 +218,9 @@ namespace
    * Destroys one loop cue attached to a script sound handle when present and
    * returns that cue pointer.
    */
-  [[nodiscard]] moho::IXACTCue* DestroySoundLoopCueIfPresent(moho::HSound& sound)
+  [[nodiscard]] moho::IXACTCue* DestroySoundLoopCueIfPresent(
+    moho::HSound& sound
+  )
   {
     moho::IXACTCue* const cue = ReadSoundLoopCue(sound);
     if (cue != nullptr) {
@@ -228,7 +250,9 @@ namespace
    * when cue state does not carry the stopped bit; null cues are treated as
    * prepared.
    */
-  [[nodiscard]] bool SoundHandleCueIsPrepared(moho::HSound* const sound)
+  [[nodiscard]] bool SoundHandleCueIsPrepared(
+    moho::HSound* const sound
+  )
   {
     std::int32_t cueState = 0;
     moho::IXACTCue* const cue = (sound != nullptr) ? ReadSoundLoopCue(*sound) : nullptr;
@@ -246,13 +270,8 @@ namespace
 
   void EnsureSoundCounterStat(moho::StatItem*& slot, const char* statPath);
 
-
-
   // The record's three tracked-entity lanes *are* the set object; keep the
   // aliasing view pinned to them so a layout change fails loudly here.
-
-
-
 
   struct SelfLinkedDwordNode12
   {
@@ -286,7 +305,6 @@ namespace
    * Inserts one entity id into a loop-handle tracked-entity tree and returns
    * whether this was a new key.
    */
-
 
   /**
    * Address: 0x008AA3B0 (FUN_008AA3B0)
@@ -334,7 +352,9 @@ namespace
    * Returns one reusable loop-handle id from the free-id bitset, or allocates
    * the next monotonic id when the free-id set is empty.
    */
-  [[nodiscard]] std::uint32_t AcquireSoundHandleIndex(moho::SoundHandleIdPool* const idPool)
+  [[nodiscard]] std::uint32_t AcquireSoundHandleIndex(
+    moho::SoundHandleIdPool* const idPool
+  )
   {
     if (idPool == nullptr) {
       return 0u;
@@ -351,12 +371,16 @@ namespace
     return next;
   }
 
-  moho::HSound* LoopOwnerFromNode(LoopNode* node)
+  moho::HSound* LoopOwnerFromNode(
+    LoopNode* node
+  )
   {
     return LoopList::owner_from_member_node<moho::HSound, &moho::HSound::mSimLoopLink>(node);
   }
 
-  bool IsSndVarReady(const moho::CSndVar& value)
+  bool IsSndVarReady(
+    const moho::CSndVar& value
+  )
   {
     if (value.mResolved != 0u) {
       return ReadSndVarState(value) != 0xFFFFu;
@@ -364,20 +388,27 @@ namespace
     return value.DoResolve();
   }
 
-  bool ParamsHasResolvedEngine(const moho::CSndParams& params)
+  bool ParamsHasResolvedEngine(
+    const moho::CSndParams& params
+  )
   {
     boost::shared_ptr<moho::AudioEngine> resolvedEngine;
     return params.GetEngine(&resolvedEngine)->get() != nullptr;
   }
 
-  void StopAndDestroyCue(moho::IXACTCue* cue)
+  void StopAndDestroyCue(
+    moho::IXACTCue* cue
+  )
   {
     cue->Stop(1);
     cue->Destroy();
   }
 
   void WarnCuePlayFailure(
-    const int xactResult, const std::uint16_t cueId, const std::uint16_t bankId, const fa::string& bankName
+    const int xactResult,
+    const std::uint16_t cueId,
+    const std::uint16_t bankId,
+    const fa::string& bankName
   )
   {
     if (xactResult >= 0 || xactResult == kXactErrCuePreparedOnly) {
@@ -388,7 +419,10 @@ namespace
     gpg::Warnf("SND: Error playing cue %i on bank %i [%s]\nXACT: %s", cueId, bankId, bankName.c_str(), xactMessage);
   }
 
-  void EnsureSoundCounterStat(moho::StatItem*& slot, const char* const statPath)
+  void EnsureSoundCounterStat(
+    moho::StatItem*& slot,
+    const char* const statPath
+  )
   {
     if (slot != nullptr) {
       return;
@@ -405,7 +439,10 @@ namespace
     }
   }
 
-  void StoreSoundCounter(moho::StatItem* const slot, const std::int32_t value)
+  void StoreSoundCounter(
+    moho::StatItem* const slot,
+    const std::int32_t value
+  )
   {
     if (slot == nullptr) {
       return;
@@ -425,7 +462,10 @@ namespace
    * sounds south of the camera played as if right under it and on-screen
    * sounds as if on the horizon (issue #23).
    */
-  [[nodiscard]] float ComputeCueAngleDegrees(const Wm3::Vec3f& worldPos, const Wm3::Vec3f& listenerPos)
+  [[nodiscard]] float ComputeCueAngleDegrees(
+    const Wm3::Vec3f& worldPos,
+    const Wm3::Vec3f& listenerPos
+  )
   {
     const Wm3::Vec3f delta{
       worldPos.x - listenerPos.x,
@@ -435,8 +475,10 @@ namespace
     return (kHalfPi - moho::COORDS_Pitch(delta)) * kRadToDeg;
   }
 
-  [[nodiscard]] moho::UserEntity*
-  FindUserSessionEntityById(moho::CWldSession* const session, const std::int32_t entityId) noexcept
+  [[nodiscard]] moho::UserEntity* FindUserSessionEntityById(
+    moho::CWldSession* const session,
+    const std::int32_t entityId
+  ) noexcept
   {
     if (session == nullptr) {
       return nullptr;
@@ -454,7 +496,9 @@ namespace
    * writes optional angle variable when configured.
    */
   void UpdateEntityLoopSpatialization(
-    moho::SoundHandleRecord* const record, moho::AudioEngine* const engine, const float interpolationAlpha
+    moho::SoundHandleRecord* const record,
+    moho::AudioEngine* const engine,
+    const float interpolationAlpha
   )
   {
     if (record == nullptr || engine == nullptr || record->mTrackedEntities.empty()) {
@@ -545,7 +589,8 @@ namespace
    * name rather than dropping it through opaque STL internals.
    */
   void EnqueuePendingDestroyCue(
-    fa::set<moho::IXACTCue*>& pendingCues, moho::IXACTCue* const cue
+    fa::set<moho::IXACTCue*>& pendingCues,
+    moho::IXACTCue* const cue
   )
   {
     // Build the node-link triplet FUN_008AF8D0 would have written: the
@@ -559,7 +604,8 @@ namespace
   }
 
   [[nodiscard]] int DrainFinishedPendingCues(
-    fa::set<moho::IXACTCue*>& pendingCues, moho::AudioEngine* const voiceEngine
+    fa::set<moho::IXACTCue*>& pendingCues,
+    moho::AudioEngine* const voiceEngine
   )
   {
     const bool canQueryCueState =
@@ -605,8 +651,7 @@ namespace moho
   SoundHandleIdPool::SoundHandleIdPool()
     : mFreeIds()
     , mNextId(0u)
-  {
-  }
+  {}
 
   /**
    * Address: 0x008AA340 (FUN_008AA340)
@@ -764,7 +809,9 @@ namespace moho
     gEarlySoundPending = false;
   }
 
-  void USER_WithSound(std::function<void(IUserSoundManager*)> work)
+  void USER_WithSound(
+    std::function<void(IUserSoundManager*)> work
+  )
   {
     {
       SEarlySound& early = EarlySound();
@@ -846,7 +893,9 @@ namespace moho
    * Stops one active entity-loop cue when it is not currently in the playing
    * state, with optional debug spew.
    */
-  void SND_StopEntityLoop(SoundHandleRecord* const record)
+  void SND_StopEntityLoop(
+    SoundHandleRecord* const record
+  )
   {
     if (record == nullptr || record->mCue == nullptr) {
       return;
@@ -859,7 +908,9 @@ namespace moho
     }
 
     if (snd_SpewSound) {
-      gpg::Debugf("SND: StopEntityLoop[Cue: %s] [Bank: %s]", record->mParams->mCue.c_str(), record->mParams->mBank.c_str());
+      gpg::Debugf(
+        "SND: StopEntityLoop[Cue: %s] [Bank: %s]", record->mParams->mCue.c_str(), record->mParams->mBank.c_str()
+      );
     }
 
     record->mCue->Stop(0);
@@ -873,7 +924,9 @@ namespace moho
    * loop index to free-id pool, clears per-record entity-set tree lanes, and
    * decrements `Sound_ActiveEntityLoops` stat.
    */
-  void SND_DestroyEntityLoop(SoundHandleRecord* const record)
+  void SND_DestroyEntityLoop(
+    SoundHandleRecord* const record
+  )
   {
     if (record == nullptr) {
       return;
@@ -970,7 +1023,9 @@ namespace moho
    * entities through `EraseEntityLoopTreeNode` (and release the whole set once
    * the last one goes), ambient loops stop or destroy outright.
    */
-  void CUserSoundManager::UpdateSoundRequests(const gpg::fastvector<SAudioRequest>& requests)
+  void CUserSoundManager::UpdateSoundRequests(
+    const gpg::fastvector<SAudioRequest>& requests
+  )
   {
     EnsureSoundCounterStat(gEngineStatSoundLimitedLoop, "Sound_LimitedLoop");
     EnsureSoundCounterStat(gEngineStatSoundStartEntityLoop, "Sound_StartEntityLoop");
@@ -1032,8 +1087,8 @@ namespace moho
 
         IXACTCue* cue = nullptr;
         if (
-          AudioEngine::Play(ReadSndParamsBankId(*params), &cue, voiceEngine, ReadSndParamsCueId(*params), 0) >= 0
-          && cue != nullptr
+          AudioEngine::Play(ReadSndParamsBankId(*params), &cue, voiceEngine, ReadSndParamsCueId(*params), 0) >= 0 &&
+          cue != nullptr
         ) {
           (void)WriteSoundLoopCue(sound, cue);
           AudioEngine::Calculate3D(&request.position, voiceEngine, cue);
@@ -1088,8 +1143,8 @@ namespace moho
 
         IXACTCue* cue = nullptr;
         if (
-          AudioEngine::Play(ReadSndParamsBankId(*params), &cue, voiceEngine, ReadSndParamsCueId(*params), 0) < 0
-          || cue == nullptr
+          AudioEngine::Play(ReadSndParamsBankId(*params), &cue, voiceEngine, ReadSndParamsCueId(*params), 0) < 0 ||
+          cue == nullptr
         ) {
           break;
         }
@@ -1127,8 +1182,7 @@ namespace moho
       if (rpcLoopVariable == nullptr || rpcLoopVariable->mState == 0xFFFFu) {
         // Ambient (non-RPC) loop at 0x008AC8C1: the first tracked entity alone
         // decides whether the whole loop keeps playing.
-        UserEntity* const entity =
-          FindUserSessionEntityById(WLD_GetActiveSession(), *trackedSet.begin());
+        UserEntity* const entity = FindUserSessionEntityById(WLD_GetActiveSession(), *trackedSet.begin());
         const CSndParams* const ambientParams = entity != nullptr ? entity->mAmbientLoop.mParams : nullptr;
 
         EFilterType filterResult = EFilterType::Pass;
@@ -1162,14 +1216,12 @@ namespace moho
         UserEntity* const entity = FindUserSessionEntityById(WLD_GetActiveSession(), *node);
         const HSndEntityLoop* const entityLoop = entity != nullptr ? entity->mRumbleLoopHandle : nullptr;
 
-        const bool keepEntity =
-          entityLoop != nullptr
-          && record.mParams == entityLoop->mParams
-          && FilterSound(
-               record.mParams,
-               static_cast<ELayer>(entity->mVariableData.mLayerMask),
-               &entity->mVariableData.mCurTransform.pos_
-             ) == EFilterType::Pass;
+        const bool keepEntity = entityLoop != nullptr && record.mParams == entityLoop->mParams &&
+          FilterSound(
+            record.mParams,
+            static_cast<ELayer>(entity->mVariableData.mLayerMask),
+            &entity->mVariableData.mCurTransform.pos_
+          ) == EFilterType::Pass;
 
         if (keepEntity) {
           ++node;
@@ -1220,8 +1272,9 @@ namespace moho
       // Ambient loop: the entity's own inline HSndEntityLoop, started once and
       // then held down by its mLoopIndex leaving -1 (0x008ACA2F..0x008ACAE4).
       CSndParams* const ambientParams = entity->mAmbientLoop.mParams;
-      if (ambientParams != nullptr && ParamsHasResolvedEngine(*ambientParams)
-          && entity->mAmbientLoop.mLoopIndex == -1) {
+      if (
+        ambientParams != nullptr && ParamsHasResolvedEngine(*ambientParams) && entity->mAmbientLoop.mLoopIndex == -1
+      ) {
         if (FilterSound(ambientParams, layer, &position) == EFilterType::Pass) {
           const std::int32_t entityId = static_cast<std::int32_t>(entity->mParams.mEntityId);
           StartEntityLoop(entityId, &entity->mAmbientLoop);
@@ -1233,8 +1286,7 @@ namespace moho
       // call at 0x008ACBA6 and cleared by the cull pass above.
       HSndEntityLoop* const rumbleLoop = entity->mRumbleLoopHandle;
       CSndParams* const rumbleParams = rumbleLoop != nullptr ? rumbleLoop->mParams : nullptr;
-      if (rumbleParams != nullptr && ParamsHasResolvedEngine(*rumbleParams)
-          && entity->mHasInitialUpdate == 0u) {
+      if (rumbleParams != nullptr && ParamsHasResolvedEngine(*rumbleParams) && entity->mHasInitialUpdate == 0u) {
         if (FilterSound(rumbleParams, layer, &position) == EFilterType::Pass) {
           const std::int32_t entityId = static_cast<std::int32_t>(entity->mParams.mEntityId);
           StartRPCEntityLoop(entityId, rumbleLoop);
@@ -1251,9 +1303,12 @@ namespace moho
    * Writes `(tracked_count - 1)` into the record RPC loop global variable and
    * stops the cue when this call removes the final tracked entity.
    */
-  bool CUserSoundManager::StopRPCEntityLoop(SoundHandleRecord* const record)
+  bool CUserSoundManager::StopRPCEntityLoop(
+    SoundHandleRecord* const record
+  )
   {
-    const float trackedCountMinusOne = static_cast<float>(static_cast<std::int32_t>(record->mTrackedEntities.size()) - 1);
+    const float trackedCountMinusOne =
+      static_cast<float>(static_cast<std::int32_t>(record->mTrackedEntities.size()) - 1);
     SND_SetGlobalFloat(ReadSndParamsRpcLoopVariable(*record->mParams)->mState, trackedCountMinusOne);
     if (record->mTrackedEntities.size() != 1u) {
       return false;
@@ -1269,7 +1324,10 @@ namespace moho
    * What it does:
    * Routes one entity-loop stop request to destroy-or-stop behavior.
    */
-  void CUserSoundManager::StopEntityLoop(SoundHandleRecord* const record, const bool destroy)
+  void CUserSoundManager::StopEntityLoop(
+    SoundHandleRecord* const record,
+    const bool destroy
+  )
   {
     if (destroy) {
       SND_DestroyEntityLoop(record);
@@ -1286,7 +1344,10 @@ namespace moho
    * Starts one entity-loop cue, allocates/binds one sound-handle record, and
    * seeds initial 3D placement from the referenced entity.
    */
-  void CUserSoundManager::StartEntityLoop(const std::int32_t& entityId, HSndEntityLoop* const loopHandle)
+  void CUserSoundManager::StartEntityLoop(
+    const std::int32_t& entityId,
+    HSndEntityLoop* const loopHandle
+  )
   {
     if (loopHandle == nullptr || loopHandle->mParams == nullptr) {
       return;
@@ -1338,12 +1399,14 @@ namespace moho
    * Starts/reuses one RPC loop cue and writes tracked-entity count to the
    * RPC loop variable lane.
    */
-  void CUserSoundManager::StartRPCEntityLoop(const std::int32_t& entityId, HSndEntityLoop* const loopHandle)
+  void CUserSoundManager::StartRPCEntityLoop(
+    const std::int32_t& entityId,
+    HSndEntityLoop* const loopHandle
+  )
   {
     if (
-      loopHandle == nullptr
-      || loopHandle->mParams == nullptr
-      || ReadSndParamsRpcLoopVariable(*loopHandle->mParams) == nullptr
+      loopHandle == nullptr || loopHandle->mParams == nullptr ||
+      ReadSndParamsRpcLoopVariable(*loopHandle->mParams) == nullptr
     ) {
       return;
     }
@@ -1355,8 +1418,8 @@ namespace moho
       IXACTCue* cue = nullptr;
       AudioEngine* const voiceEngine = mVoiceEngine.get();
       if (
-        voiceEngine == nullptr
-        || AudioEngine::Play(ReadSndParamsBankId(*params), &cue, voiceEngine, ReadSndParamsCueId(*params), 0) < 0
+        voiceEngine == nullptr ||
+        AudioEngine::Play(ReadSndParamsBankId(*params), &cue, voiceEngine, ReadSndParamsCueId(*params), 0) < 0
       ) {
         return;
       }
@@ -1408,14 +1471,12 @@ namespace moho
       }
 
       const fa::string baseLine = gpg::STR_Printf(
-        "%4i: %s.%s",
-        static_cast<int>(handleIndex),
-        record.mParams->mBank.c_str(),
-        record.mParams->mCue.c_str()
+        "%4i: %s.%s", static_cast<int>(handleIndex), record.mParams->mBank.c_str(), record.mParams->mCue.c_str()
       );
 
       if (record.mPlayingSeconds > 0.0f) {
-        const fa::string stoppingLine = gpg::STR_Printf("%s (stopping %2.2f)", baseLine.c_str(), record.mPlayingSeconds);
+        const fa::string stoppingLine =
+          gpg::STR_Printf("%s (stopping %2.2f)", baseLine.c_str(), record.mPlayingSeconds);
         gpg::Logf("%s", stoppingLine.c_str());
         continue;
       }
@@ -1437,7 +1498,10 @@ namespace moho
    * Updates listener transform and active loop handles, runs duck interpolation,
    * and destroys transient cues that reached stopped state.
    */
-  void CUserSoundManager::Frame(const float simDeltaSeconds, const float frameSeconds)
+  void CUserSoundManager::Frame(
+    const float simDeltaSeconds,
+    const float frameSeconds
+  )
   {
     if (RCamManager* const camManager = CAM_GetManager(); camManager != nullptr) {
       if (CameraImpl* const camera = camManager->GetCamera(kWorldCameraName); camera != nullptr) {
@@ -1463,8 +1527,8 @@ namespace moho
         continue;
       }
 
-      const CSndVar* const rpcLoopVariable = record.mParams != nullptr ? ReadSndParamsRpcLoopVariable(*record.mParams)
-                                                                       : nullptr;
+      const CSndVar* const rpcLoopVariable =
+        record.mParams != nullptr ? ReadSndParamsRpcLoopVariable(*record.mParams) : nullptr;
       if (rpcLoopVariable == nullptr || rpcLoopVariable->mState == 0xFFFFu) {
         UpdateEntityLoopSpatialization(&record, mVoiceEngine.get(), simDeltaSeconds);
       }
@@ -1508,7 +1572,10 @@ namespace moho
    * Builds transient cue params from bank+cue names and plays a one-shot on
    * the voice engine.
    */
-  void CUserSoundManager::Play(const fa::string& bankName, const fa::string& cueName)
+  void CUserSoundManager::Play(
+    const fa::string& bankName,
+    const fa::string& cueName
+  )
   {
     CSndParams params(bankName, cueName, nullptr, nullptr, mVoiceEngine);
     if (!ParamsHasResolvedEngine(params)) {
@@ -1536,7 +1603,9 @@ namespace moho
    * What it does:
    * Plays a one-shot from resolved cue parameters.
    */
-  void CUserSoundManager::Play2D(const CSndParams& params)
+  void CUserSoundManager::Play2D(
+    const CSndParams& params
+  )
   {
     if (!ParamsHasResolvedEngine(params)) {
       return;
@@ -1563,7 +1632,9 @@ namespace moho
    * What it does:
    * Rebinds listener-army intrusive hook to the new army visibility anchor.
    */
-  void CUserSoundManager::SetListenerArmy(UserArmy* listenerArmy)
+  void CUserSoundManager::SetListenerArmy(
+    UserArmy* listenerArmy
+  )
   {
     mListenerArmy.Set(listenerArmy);
   }
@@ -1580,7 +1651,9 @@ namespace moho
    * What it does:
    * Forwards listener transform to the primary voice engine.
    */
-  void CUserSoundManager::SetListenerTransform(const VTransform& transform)
+  void CUserSoundManager::SetListenerTransform(
+    const VTransform& transform
+  )
   {
     if (AudioEngine* const voiceEngine = mVoiceEngine.get(); voiceEngine != nullptr) {
       voiceEngine->SetListenerTransform(transform);
@@ -1593,7 +1666,9 @@ namespace moho
    * What it does:
    * Writes world-sound enable lane used by `UpdateSoundRequests`.
    */
-  void CUserSoundManager::EnableWorldSounds(const bool enabled)
+  void CUserSoundManager::EnableWorldSounds(
+    const bool enabled
+  )
   {
     mWorldSoundsEnabled = enabled ? 1u : 0u;
   }
@@ -1624,7 +1699,9 @@ namespace moho
    * Removes one active ducking request (or all requests for immediate mode),
    * and transitions duck mode/values to stop ducking.
    */
-  void CUserSoundManager::PopDuck(const bool immediate)
+  void CUserSoundManager::PopDuck(
+    const bool immediate
+  )
   {
     if (immediate) {
       mActiveDuckingSounds = 0;
@@ -1657,7 +1734,11 @@ namespace moho
    * Plays one script-triggered cue and wraps it into one intrusive `HSound`
    * node owned by `mActiveLoops`.
    */
-  HSound* CUserSoundManager::ScriptPlaySound(AudioEngine* const engine, CSndParams* const params, const bool preloadOnly)
+  HSound* CUserSoundManager::ScriptPlaySound(
+    AudioEngine* const engine,
+    CSndParams* const params,
+    const bool preloadOnly
+  )
   {
     if (params == nullptr || !ParamsHasResolvedEngine(*params)) {
       return nullptr;
@@ -1669,9 +1750,9 @@ namespace moho
     }
 
     if (
-      AudioEngine::Play(ReadSndParamsBankId(*params), &cue, engine, ReadSndParamsCueId(*params), preloadOnly ? 1 : 0)
-        < 0
-      || cue == nullptr
+      AudioEngine::Play(ReadSndParamsBankId(*params), &cue, engine, ReadSndParamsCueId(*params), preloadOnly ? 1 : 0) <
+        0 ||
+      cue == nullptr
     ) {
       return nullptr;
     }
@@ -1689,7 +1770,10 @@ namespace moho
    * Stops one script-driven cue and destroys the sound handle immediately when
    * no deferred stop path remains.
    */
-  void CUserSoundManager::ScriptStopSound(HSound* const sound, const bool immediate)
+  void CUserSoundManager::ScriptStopSound(
+    HSound* const sound,
+    const bool immediate
+  )
   {
     if (sound == nullptr) {
       return;
@@ -1785,7 +1869,10 @@ namespace moho
    * Clears ducking state, resets "Duck" global variable, then pushes category
    * volume to active engines.
    */
-  void CUserSoundManager::SetVolume(const gpg::StrArg category, const float value)
+  void CUserSoundManager::SetVolume(
+    const gpg::StrArg category,
+    const float value
+  )
   {
     mActiveDuckingSounds = 0;
     mDuckMode = 0;
@@ -1817,7 +1904,9 @@ namespace moho
    * What it does:
    * Returns category volume from the primary voice engine.
    */
-  float CUserSoundManager::GetVolume(const gpg::StrArg category)
+  float CUserSoundManager::GetVolume(
+    const gpg::StrArg category
+  )
   {
     if (AudioEngine* const voiceEngine = mVoiceEngine.get(); voiceEngine != nullptr) {
       return voiceEngine->GetVolume(category);
@@ -1838,7 +1927,9 @@ namespace moho
    * What it does:
    * Integrates ducking progress and writes the resulting duck scalar.
    */
-  void CUserSoundManager::UpdateDuck(const float deltaSeconds)
+  void CUserSoundManager::UpdateDuck(
+    const float deltaSeconds
+  )
   {
     if (!IsSndVarReady(mDuckVar)) {
       return;
@@ -1883,7 +1974,9 @@ namespace moho
    * Applies distance and LOS filtering for candidate sounds.
    */
   CUserSoundManager::EFilterType CUserSoundManager::FilterSound(
-    const CSndParams* const params, const ELayer layer, const Wm3::Vec3f* const worldPos
+    const CSndParams* const params,
+    const ELayer layer,
+    const Wm3::Vec3f* const worldPos
   ) const
   {
     if (params == nullptr) {
@@ -1924,7 +2017,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_PlaySoundL`.
    */
-  int cfunc_PlaySound(lua_State* const luaContext)
+  int cfunc_PlaySound(
+    lua_State* const luaContext
+  )
   {
     return cfunc_PlaySoundL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1937,7 +2032,9 @@ namespace moho
    */
   CScrLuaInitForm* func_PlaySound_LuaFuncDef()
   {
-    static CScrLuaBinder binder(moho::SCR_UserLuaInitSet(), "PlaySound", &cfunc_PlaySound, nullptr, "<global>", kPlaySoundHelpText);
+    static CScrLuaBinder binder(
+      moho::SCR_UserLuaInitSet(), "PlaySound", &cfunc_PlaySound, nullptr, "<global>", kPlaySoundHelpText
+    );
     return &binder;
   }
 
@@ -1948,7 +2045,9 @@ namespace moho
    * Resolves one `CSndParams` Lua object, plays one voice-engine cue, and
    * returns an `HSound` Lua object or nil.
    */
-  int cfunc_PlaySoundL(LuaPlus::LuaState* const state)
+  int cfunc_PlaySoundL(
+    LuaPlus::LuaState* const state
+  )
   {
     lua_State* const rawState = state->m_state;
     const int argumentCount = lua_gettop(rawState);
@@ -1983,7 +2082,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_PauseSoundL`.
    */
-  int cfunc_PauseSound(lua_State* const luaContext)
+  int cfunc_PauseSound(
+    lua_State* const luaContext
+  )
   {
     return cfunc_PauseSoundL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1996,7 +2097,9 @@ namespace moho
    */
   CScrLuaInitForm* func_PauseSound_LuaFuncDef()
   {
-    static CScrLuaBinder binder(moho::SCR_UserLuaInitSet(), "PauseSound", &cfunc_PauseSound, nullptr, "<global>", kPauseSoundHelpText);
+    static CScrLuaBinder binder(
+      moho::SCR_UserLuaInitSet(), "PauseSound", &cfunc_PauseSound, nullptr, "<global>", kPauseSoundHelpText
+    );
     return &binder;
   }
 
@@ -2009,7 +2112,9 @@ namespace moho
    * present. The FA binder names this entry point `PauseSound` but
    * actually routes through `mVoiceEngine`, not the tutorial engine.
    */
-  int cfunc_PauseSoundL(LuaPlus::LuaState* const state)
+  int cfunc_PauseSoundL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -2044,7 +2149,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_PauseVoiceL`.
    */
-  int cfunc_PauseVoice(lua_State* const luaContext)
+  int cfunc_PauseVoice(
+    lua_State* const luaContext
+  )
   {
     return cfunc_PauseVoiceL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2057,7 +2164,9 @@ namespace moho
    */
   CScrLuaInitForm* func_PauseVoice_LuaFuncDef()
   {
-    static CScrLuaBinder binder(moho::SCR_UserLuaInitSet(), "PauseVoice", &cfunc_PauseVoice, nullptr, "<global>", kPauseVoiceHelpText);
+    static CScrLuaBinder binder(
+      moho::SCR_UserLuaInitSet(), "PauseVoice", &cfunc_PauseVoice, nullptr, "<global>", kPauseVoiceHelpText
+    );
     return &binder;
   }
 
@@ -2070,7 +2179,9 @@ namespace moho
    * present. The FA binder names this entry point `PauseVoice` but
    * routes through `mTutorialEngine`.
    */
-  int cfunc_PauseVoiceL(LuaPlus::LuaState* const state)
+  int cfunc_PauseVoiceL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -2105,7 +2216,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_SoundIsPreparedL`.
    */
-  int cfunc_SoundIsPrepared(lua_State* const luaContext)
+  int cfunc_SoundIsPrepared(
+    lua_State* const luaContext
+  )
   {
     return cfunc_SoundIsPreparedL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2136,7 +2249,9 @@ namespace moho
    * Returns whether an optional script `HSound` handle still has an active cue
    * state (`true` for nil/missing handles).
    */
-  int cfunc_SoundIsPreparedL(LuaPlus::LuaState* const state)
+  int cfunc_SoundIsPreparedL(
+    LuaPlus::LuaState* const state
+  )
   {
     lua_State* const rawState = state->m_state;
     moho::SCR_ExpectExactArgs(state, 1, kSoundIsPreparedHelpText);
@@ -2161,7 +2276,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_StartSoundL`.
    */
-  int cfunc_StartSound(lua_State* const luaContext)
+  int cfunc_StartSound(
+    lua_State* const luaContext
+  )
   {
     return cfunc_StartSoundL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2174,7 +2291,9 @@ namespace moho
    */
   CScrLuaInitForm* func_StartSound_LuaFuncDef()
   {
-    static CScrLuaBinder binder(moho::SCR_UserLuaInitSet(), "StartSound", &cfunc_StartSound, nullptr, "<global>", kStartSoundHelpText);
+    static CScrLuaBinder binder(
+      moho::SCR_UserLuaInitSet(), "StartSound", &cfunc_StartSound, nullptr, "<global>", kStartSoundHelpText
+    );
     return &binder;
   }
 
@@ -2185,7 +2304,9 @@ namespace moho
    * Resolves optional script `HSound` handle and triggers cue playback when a
    * loop cue instance exists.
    */
-  int cfunc_StartSoundL(LuaPlus::LuaState* const state)
+  int cfunc_StartSoundL(
+    LuaPlus::LuaState* const state
+  )
   {
     lua_State* const rawState = state->m_state;
     moho::SCR_ExpectExactArgs(state, 1, kStartSoundHelpText);
@@ -2223,7 +2344,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_SetVolumeL`.
    */
-  int cfunc_SetVolume(lua_State* const luaContext)
+  int cfunc_SetVolume(
+    lua_State* const luaContext
+  )
   {
     return cfunc_SetVolumeL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2236,8 +2359,9 @@ namespace moho
    */
   CScrLuaInitForm* func_SetVolume_LuaFuncDef()
   {
-    static CScrLuaBinder
-      binder(moho::SCR_UserLuaInitSet(), "SetVolume", &cfunc_SetVolume, nullptr, "<global>", kSetVolumeHelpText);
+    static CScrLuaBinder binder(
+      moho::SCR_UserLuaInitSet(), "SetVolume", &cfunc_SetVolume, nullptr, "<global>", kSetVolumeHelpText
+    );
     return &binder;
   }
 
@@ -2248,7 +2372,9 @@ namespace moho
    * Parses `(category, volume)` and applies category volume on user audio
    * manager.
    */
-  int cfunc_SetVolumeL(LuaPlus::LuaState* const state)
+  int cfunc_SetVolumeL(
+    LuaPlus::LuaState* const state
+  )
   {
     lua_State* const rawState = state->m_state;
     moho::SCR_ExpectExactArgs(state, 2, kSetVolumeHelpText);
@@ -2279,7 +2405,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_GetVolumeL`.
    */
-  int cfunc_GetVolume(lua_State* const luaContext)
+  int cfunc_GetVolume(
+    lua_State* const luaContext
+  )
   {
     return cfunc_GetVolumeL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2292,8 +2420,9 @@ namespace moho
    */
   CScrLuaInitForm* func_GetVolume_LuaFuncDef()
   {
-    static CScrLuaBinder
-      binder(moho::SCR_UserLuaInitSet(), "GetVolume", &cfunc_GetVolume, nullptr, "<global>", kGetVolumeHelpText);
+    static CScrLuaBinder binder(
+      moho::SCR_UserLuaInitSet(), "GetVolume", &cfunc_GetVolume, nullptr, "<global>", kGetVolumeHelpText
+    );
     return &binder;
   }
 
@@ -2304,7 +2433,9 @@ namespace moho
    * Parses one category string, queries user audio manager volume, and pushes
    * one Lua number result.
    */
-  int cfunc_GetVolumeL(LuaPlus::LuaState* const state)
+  int cfunc_GetVolumeL(
+    LuaPlus::LuaState* const state
+  )
   {
     lua_State* const rawState = state->m_state;
     moho::SCR_ExpectExactArgs(state, 1, kGetVolumeHelpText);
@@ -2330,7 +2461,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_StopSoundL`.
    */
-  int cfunc_StopSound(lua_State* const luaContext)
+  int cfunc_StopSound(
+    lua_State* const luaContext
+  )
   {
     return cfunc_StopSoundL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2343,8 +2476,9 @@ namespace moho
    */
   CScrLuaInitForm* func_StopSound_LuaFuncDef()
   {
-    static CScrLuaBinder
-      binder(moho::SCR_UserLuaInitSet(), "StopSound", &cfunc_StopSound, nullptr, "<global>", kStopSoundHelpText);
+    static CScrLuaBinder binder(
+      moho::SCR_UserLuaInitSet(), "StopSound", &cfunc_StopSound, nullptr, "<global>", kStopSoundHelpText
+    );
     return &binder;
   }
 
@@ -2355,7 +2489,9 @@ namespace moho
    * Resolves optional script `HSound` handle and stops one cue immediately or
    * deferred based on the second Lua argument.
    */
-  int cfunc_StopSoundL(LuaPlus::LuaState* const state)
+  int cfunc_StopSoundL(
+    LuaPlus::LuaState* const state
+  )
   {
     lua_State* const rawState = state->m_state;
     const int argumentCount = lua_gettop(rawState);
@@ -2372,7 +2508,9 @@ namespace moho
           immediate = LuaPlus::LuaStackObject(state, 2).GetBoolean();
         }
 
-        if (CUserSoundManager* const userSound = static_cast<CUserSoundManager*>(USER_GetSound()); userSound != nullptr) {
+        if (
+          CUserSoundManager* const userSound = static_cast<CUserSoundManager*>(USER_GetSound()); userSound != nullptr
+        ) {
           userSound->ScriptStopSound(sound, immediate);
         }
       }
@@ -2387,7 +2525,9 @@ namespace moho
    * What it does:
    * Validates no-arg Lua call and stops all currently active user sounds.
    */
-  int cfunc_StopAllSounds(lua_State* const luaContext)
+  int cfunc_StopAllSounds(
+    lua_State* const luaContext
+  )
   {
     LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     moho::SCR_ExpectExactArgs(state, 0, kStopAllSoundsHelpText);
@@ -2407,8 +2547,9 @@ namespace moho
    */
   CScrLuaInitForm* func_StopAllSounds_LuaFuncDef()
   {
-    static CScrLuaBinder
-      binder(moho::SCR_UserLuaInitSet(), "StopAllSounds", &cfunc_StopAllSounds, nullptr, "<global>", kStopAllSoundsHelpText);
+    static CScrLuaBinder binder(
+      moho::SCR_UserLuaInitSet(), "StopAllSounds", &cfunc_StopAllSounds, nullptr, "<global>", kStopAllSoundsHelpText
+    );
     return &binder;
   }
 
@@ -2418,7 +2559,9 @@ namespace moho
    * What it does:
    * Validates no-arg Lua call and disables world-sound playback requests.
    */
-  int cfunc_DisableWorldSounds(lua_State* const luaContext)
+  int cfunc_DisableWorldSounds(
+    lua_State* const luaContext
+  )
   {
     LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     moho::SCR_ExpectExactArgs(state, 0, kDisableWorldSoundsHelpText);
@@ -2455,7 +2598,9 @@ namespace moho
    * What it does:
    * Validates no-arg Lua call and enables world-sound playback requests.
    */
-  int cfunc_EnableWorldSounds(lua_State* const luaContext)
+  int cfunc_EnableWorldSounds(
+    lua_State* const luaContext
+  )
   {
     LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
     moho::SCR_ExpectExactArgs(state, 0, kEnableWorldSoundsHelpText);
@@ -2492,7 +2637,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_PlayTutorialVOL`.
    */
-  int cfunc_PlayTutorialVO(lua_State* const luaContext)
+  int cfunc_PlayTutorialVO(
+    lua_State* const luaContext
+  )
   {
     return cfunc_PlayTutorialVOL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2506,12 +2653,7 @@ namespace moho
   CScrLuaInitForm* func_PlayTutorialVO_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      moho::SCR_UserLuaInitSet(),
-      "PlayTutorialVO",
-      &cfunc_PlayTutorialVO,
-      nullptr,
-      "<global>",
-      kPlayTutorialVOHelpText
+      moho::SCR_UserLuaInitSet(), "PlayTutorialVO", &cfunc_PlayTutorialVO, nullptr, "<global>", kPlayTutorialVOHelpText
     );
     return &binder;
   }
@@ -2522,7 +2664,9 @@ namespace moho
    * What it does:
    * Plays one tutorial VO cue, returning an `HSound` Lua object or nil.
    */
-  int cfunc_PlayTutorialVOL(LuaPlus::LuaState* const state)
+  int cfunc_PlayTutorialVOL(
+    LuaPlus::LuaState* const state
+  )
   {
     lua_State* const rawState = state->m_state;
     moho::SCR_ExpectExactArgs(state, 1, kPlayTutorialVOHelpText);
@@ -2557,7 +2701,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_PlayVoiceL`.
    */
-  int cfunc_PlayVoice(lua_State* const luaContext)
+  int cfunc_PlayVoice(
+    lua_State* const luaContext
+  )
   {
     return cfunc_PlayVoiceL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2570,8 +2716,9 @@ namespace moho
    */
   CScrLuaInitForm* func_PlayVoice_LuaFuncDef()
   {
-    static CScrLuaBinder
-      binder(moho::SCR_UserLuaInitSet(), "PlayVoice", &cfunc_PlayVoice, nullptr, "<global>", kPlayVoiceHelpText);
+    static CScrLuaBinder binder(
+      moho::SCR_UserLuaInitSet(), "PlayVoice", &cfunc_PlayVoice, nullptr, "<global>", kPlayVoiceHelpText
+    );
     return &binder;
   }
 
@@ -2582,7 +2729,9 @@ namespace moho
    * Plays one voice cue, optionally flags ducking behavior, and returns an
    * `HSound` Lua object or nil.
    */
-  int cfunc_PlayVoiceL(LuaPlus::LuaState* const state)
+  int cfunc_PlayVoiceL(
+    LuaPlus::LuaState* const state
+  )
   {
     lua_State* const rawState = state->m_state;
     const int argumentCount = lua_gettop(rawState);

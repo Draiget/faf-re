@@ -8,7 +8,9 @@
 
 namespace faf::remote
 {
-  std::vector<std::uint8_t> EncodeRosterMessage(const wire::SRoster& roster)
+  std::vector<std::uint8_t> EncodeRosterMessage(
+    const wire::SRoster& roster
+  )
   {
     wire::BitWriter writer;
     roster.Encode(writer);
@@ -20,7 +22,9 @@ namespace faf::remote
     return message;
   }
 
-  std::optional<wire::SRoster> DecodeRosterMessage(const std::span<const std::uint8_t> message)
+  std::optional<wire::SRoster> DecodeRosterMessage(
+    const std::span<const std::uint8_t> message
+  )
   {
     if (message.empty() || message[0] != static_cast<std::uint8_t>(net::ESeatMessage::Roster)) {
       return std::nullopt;
@@ -29,7 +33,10 @@ namespace faf::remote
     return wire::SRoster::Decode(reader);
   }
 
-  bool SameBesidesTimes(const wire::SRoster& a, const wire::SRoster& b) noexcept
+  bool SameBesidesTimes(
+    const wire::SRoster& a,
+    const wire::SRoster& b
+  ) noexcept
   {
     if (a.localIndex != b.localIndex || a.entries.size() != b.entries.size()) {
       return false;
@@ -45,7 +52,10 @@ namespace faf::remote
     return true;
   }
 
-  std::vector<std::uint8_t> EncodeChatMessage(const int clientIndex, const std::span<const std::uint8_t> payload)
+  std::vector<std::uint8_t> EncodeChatMessage(
+    const int clientIndex,
+    const std::span<const std::uint8_t> payload
+  )
   {
     std::vector<std::uint8_t> message;
     message.reserve(3u + payload.size());
@@ -60,7 +70,11 @@ namespace faf::remote
     return message;
   }
 
-  bool DecodeChatMessage(const std::span<const std::uint8_t> message, int& clientIndex, std::span<const std::uint8_t>& payload)
+  bool DecodeChatMessage(
+    const std::span<const std::uint8_t> message,
+    int& clientIndex,
+    std::span<const std::uint8_t>& payload
+  )
   {
     if (message.empty() || message[0] != static_cast<std::uint8_t>(net::ESeatMessage::Chat)) {
       return false;
@@ -85,7 +99,9 @@ namespace faf::remote
     return true;
   }
 
-  bool CChatBudget::Take(const std::uint64_t nowUs) noexcept
+  bool CChatBudget::Take(
+    const std::uint64_t nowUs
+  ) noexcept
   {
     if (mStarted && nowUs > mLastUs) {
       mTokens = std::min(kBurst, mTokens + static_cast<double>(nowUs - mLastUs) * 1e-6 * kPerSecond);

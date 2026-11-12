@@ -29,12 +29,11 @@ namespace
     }
   };
 
-
   struct SSTICommandVariableDataSlot
   {
-    std::uint32_t mHeaderWord0 = 0;                  // +0x00
-    std::uint32_t mHeaderWord1 = 0;                  // +0x04
-    moho::SSTICommandVariableData mVariableData{};   // +0x08
+    std::uint32_t mHeaderWord0 = 0;                // +0x00
+    std::uint32_t mHeaderWord1 = 0;                // +0x04
+    moho::SSTICommandVariableData mVariableData{}; // +0x08
   };
 
   static_assert(
@@ -45,9 +44,6 @@ namespace
     sizeof(SSTICommandVariableDataSlot) >= (sizeof(moho::SSTICommandVariableData) + 0x08),
     "SSTICommandVariableDataSlot must include 8-byte slot header plus variable payload"
   );
-
-
-
 
 } // namespace
 
@@ -100,7 +96,6 @@ namespace moho
     mTarget2.mPos = Wm3::Vec3f::Zero();
   }
 
-
   /**
    * Address: 0x006ECAD0 (FUN_006ECAD0, Moho::SSTICommandVariableData::SSTICommandVariableData)
    *
@@ -108,7 +103,9 @@ namespace moho
    * Copy-constructs the full command-variable payload including target lanes
    * and variable cell vector storage.
    */
-  SSTICommandVariableData::SSTICommandVariableData(const SSTICommandVariableData& other)
+  SSTICommandVariableData::SSTICommandVariableData(
+    const SSTICommandVariableData& other
+  )
     : mEntIds(other.mEntIds)
     , mCmdType(other.mCmdType)
     , mTarget1(other.mTarget1)
@@ -118,8 +115,7 @@ namespace moho
     , mMaxCount(other.mMaxCount)
     , mCount(other.mCount)
     , v23(other.v23)
-  {
-  }
+  {}
 
   /**
    * Address: 0x00552A70 (FUN_00552A70, Moho::SSTICommandVariableData::SSTICommandVariableData)
@@ -127,7 +123,9 @@ namespace moho
    * What it does:
    * Initializes variable command payload lanes from one issue payload lane.
    */
-  SSTICommandVariableData::SSTICommandVariableData(const SSTICommandIssueData& issueData)
+  SSTICommandVariableData::SSTICommandVariableData(
+    const SSTICommandIssueData& issueData
+  )
     : mEntIds{}
     , mCmdType(issueData.mCommandType)
     , mTarget1(issueData.mTarget)
@@ -157,7 +155,9 @@ namespace moho
   /**
    * Address: 0x00554760 (FUN_00554760, Moho::SSTICommandVariableData::MemberDeserialize)
    */
-  void SSTICommandVariableData::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SSTICommandVariableData::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -190,7 +190,9 @@ namespace moho
   /**
    * Address: 0x005548A0 (FUN_005548A0, Moho::SSTICommandVariableData::MemberSerialize)
    */
-  void SSTICommandVariableData::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SSTICommandVariableData::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;
@@ -230,19 +232,21 @@ namespace moho
    * `Unit::MotionTick`, and inlined into `CAiFormationInstance::Update`
    * (0x0059AE80, the seven-way command-type compare at 0x0059B3xx).
    */
-  bool IsSpeedThroughBusyCommandType(const EUnitCommandType commandType) noexcept
+  bool IsSpeedThroughBusyCommandType(
+    const EUnitCommandType commandType
+  ) noexcept
   {
     switch (commandType) {
-      case EUnitCommandType::UNITCOMMAND_Move:
-      case EUnitCommandType::UNITCOMMAND_Attack:
-      case EUnitCommandType::UNITCOMMAND_Patrol:
-      case EUnitCommandType::UNITCOMMAND_FormMove:
-      case EUnitCommandType::UNITCOMMAND_FormAttack:
-      case EUnitCommandType::UNITCOMMAND_FormPatrol:
-      case EUnitCommandType::UNITCOMMAND_Guard:
-        return true;
-      default:
-        return false;
+    case EUnitCommandType::UNITCOMMAND_Move:
+    case EUnitCommandType::UNITCOMMAND_Attack:
+    case EUnitCommandType::UNITCOMMAND_Patrol:
+    case EUnitCommandType::UNITCOMMAND_FormMove:
+    case EUnitCommandType::UNITCOMMAND_FormAttack:
+    case EUnitCommandType::UNITCOMMAND_FormPatrol:
+    case EUnitCommandType::UNITCOMMAND_Guard:
+      return true;
+    default:
+      return false;
     }
   }
 } // namespace moho
@@ -253,7 +257,10 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_SSTICommandVariableDataTypeInfo_2a172c, moho::preregister_SSTICommandVariableDataTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_SSTICommandVariableDataTypeInfo_2a172c,
+  moho::preregister_SSTICommandVariableDataTypeInfo
+)
 
 namespace moho
 {

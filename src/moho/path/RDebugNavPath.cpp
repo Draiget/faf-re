@@ -17,7 +17,10 @@ namespace
   constexpr std::uint32_t kPathLineColor = 0x0FFF8000u;
 
   [[nodiscard]] float ResolvePathPointElevation(
-    const moho::STIMap& map, const moho::SFootprint& footprint, const float x, const float z
+    const moho::STIMap& map,
+    const moho::SFootprint& footprint,
+    const float x,
+    const float z
   )
   {
     const moho::CHeightField* const heightField = map.GetHeightField();
@@ -26,8 +29,8 @@ namespace
     }
 
     float elevation = heightField->GetElevation(x, z);
-    const bool seabedOnly =
-      (static_cast<std::uint8_t>(footprint.mOccupancyCaps) & static_cast<std::uint8_t>(moho::EOccupancyCaps::OC_SEABED)) != 0u;
+    const bool seabedOnly = (static_cast<std::uint8_t>(footprint.mOccupancyCaps) &
+                             static_cast<std::uint8_t>(moho::EOccupancyCaps::OC_SEABED)) != 0u;
     const float waterElevation = map.GetWaterElevationAt(x, z); // engine addition: per position
     if (!seabedOnly && waterElevation > elevation) {
       elevation = waterElevation;
@@ -47,10 +50,16 @@ namespace
    * SOCellPos center (footprint-offset, terrain/water elevation) plus a debug
    * line connecting consecutive circle centers.
    */
-  void DrawNavigatorPathOverlay(moho::Sim* const sim, const moho::SFootprint& footprint, const moho::SNavPath* const navPath)
+  void DrawNavigatorPathOverlay(
+    moho::Sim* const sim,
+    const moho::SFootprint& footprint,
+    const moho::SNavPath* const navPath
+  )
   {
-    if (sim == nullptr || sim->mMapData == nullptr || navPath == nullptr || navPath->start == nullptr ||
-        navPath->finish == nullptr || navPath->finish <= navPath->start) {
+    if (
+      sim == nullptr || sim->mMapData == nullptr || navPath == nullptr || navPath->start == nullptr ||
+      navPath->finish == nullptr || navPath->finish <= navPath->start
+    ) {
       return;
     }
 
@@ -73,9 +82,7 @@ namespace
       center.z = static_cast<float>(cell->z) + (static_cast<float>(footprint.mSizeZ) * 0.5f);
       center.y = ResolvePathPointElevation(*sim->mMapData, footprint, center.x, center.z);
 
-      debugCanvas->AddWireCircle(
-        circleNormal, center, 0.5f, kPathCircleDepth, 6u
-      );
+      debugCanvas->AddWireCircle(circleNormal, center, 0.5f, kPathCircleDepth, 6u);
 
       if (hasPrevious) {
         moho::SDebugLine line{};
@@ -134,7 +141,9 @@ namespace moho
   /**
    * Address: 0x00650690 (FUN_00650690, Moho::RDebugNavPath::OnTick)
    */
-  void RDebugNavPath::Tick(Sim* const sim)
+  void RDebugNavPath::Tick(
+    Sim* const sim
+  )
   {
     if (sim == nullptr || sim->mEntityDB == nullptr) {
       return;

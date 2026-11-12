@@ -18,7 +18,9 @@ namespace
    * Registers `CScriptEvent` as one reflected `CameraImpl` base lane at
    * offset `+0x0C`.
    */
-  void AddCScriptEventBaseToCameraImplType(gpg::RType* const typeInfo)
+  void AddCScriptEventBaseToCameraImplType(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<CScriptEvent>(typeInfo, gpg::BaseSubobjectOffset<CameraImpl, CScriptEvent>());
   }
@@ -34,7 +36,10 @@ namespace
 
   struct CameraImplTypeInfoBootstrap
   {
-    CameraImplTypeInfoBootstrap() { moho::register_CameraImplTypeInfoStartup(); }
+    CameraImplTypeInfoBootstrap()
+    {
+      moho::register_CameraImplTypeInfoStartup();
+    }
   };
   CameraImplTypeInfoBootstrap gCameraImplTypeInfoBootstrap;
 } // namespace
@@ -83,4 +88,7 @@ void moho::register_CameraImplTypeInfoStartup()
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CameraImplTypeInfoStartup_035071, moho::register_CameraImplTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CameraImplTypeInfoStartup_035071,
+  moho::register_CameraImplTypeInfoStartup
+)

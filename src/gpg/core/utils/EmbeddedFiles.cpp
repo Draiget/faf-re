@@ -30,7 +30,9 @@ namespace gpg
   namespace
   {
     /** A resource of type RCDATA in the executable, or an empty view. */
-    [[nodiscard]] std::string_view FindEmbedded(const wchar_t* const name)
+    [[nodiscard]] std::string_view FindEmbedded(
+      const wchar_t* const name
+    )
     {
       HMODULE const module = ::GetModuleHandleW(nullptr);
       HRSRC const found = ::FindResourceW(module, name, MAKEINTRESOURCEW(10)); // RT_RCDATA
@@ -39,10 +41,13 @@ namespace gpg
       }
       HGLOBAL const loaded = ::LoadResource(module, found);
       const void* const bytes = loaded != nullptr ? ::LockResource(loaded) : nullptr;
-      return bytes != nullptr ? std::string_view(static_cast<const char*>(bytes), ::SizeofResource(module, found)) : std::string_view{};
+      return bytes != nullptr ? std::string_view(static_cast<const char*>(bytes), ::SizeofResource(module, found))
+                              : std::string_view{};
     }
 
-    [[nodiscard]] std::uint64_t Fnv1a64(const std::string_view bytes) noexcept
+    [[nodiscard]] std::uint64_t Fnv1a64(
+      const std::string_view bytes
+    ) noexcept
     {
       std::uint64_t hash = 0xCBF29CE484222325ULL;
       for (const char byte : bytes) {
@@ -52,7 +57,10 @@ namespace gpg
     }
 
     /** %LOCALAPPDATA%\FAForever\faf-re\<name>-<hash of bytes>\, created; empty on failure. */
-    [[nodiscard]] std::wstring CopyFolder(const wchar_t* const name, const std::string_view bytes)
+    [[nodiscard]] std::wstring CopyFolder(
+      const wchar_t* const name,
+      const std::string_view bytes
+    )
     {
       wchar_t localAppData[MAX_PATH]{};
       const DWORD length = ::GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, MAX_PATH);
@@ -72,7 +80,9 @@ namespace gpg
       return folder + L'\\';
     }
 
-    [[nodiscard]] bool FileExists(const std::wstring& path)
+    [[nodiscard]] bool FileExists(
+      const std::wstring& path
+    )
     {
       const DWORD attributes = ::GetFileAttributesW(path.c_str());
       return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0U;
@@ -82,18 +92,23 @@ namespace gpg
      * Writes `bytes` to `path` through a file of this process's own, so a game starting at the
      * same time never sees half a file. A copy another game wrote first is kept.
      */
-    [[nodiscard]] bool WriteFileOnce(const std::wstring& path, const std::string_view bytes)
+    [[nodiscard]] bool WriteFileOnce(
+      const std::wstring& path,
+      const std::string_view bytes
+    )
     {
       if (FileExists(path)) {
         return true;
       }
       const std::wstring temporary = path + L"." + std::to_wstring(::GetCurrentProcessId()) + L".tmp";
-      HANDLE const file = ::CreateFileW(temporary.c_str(), GENERIC_WRITE, 0U, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+      HANDLE const file =
+        ::CreateFileW(temporary.c_str(), GENERIC_WRITE, 0U, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
       if (file == INVALID_HANDLE_VALUE) {
         return false;
       }
       DWORD written = 0U;
-      const bool ok = ::WriteFile(file, bytes.data(), static_cast<DWORD>(bytes.size()), &written, nullptr) && written == bytes.size();
+      const bool ok =
+        ::WriteFile(file, bytes.data(), static_cast<DWORD>(bytes.size()), &written, nullptr) && written == bytes.size();
       ::CloseHandle(file);
       if (ok && ::MoveFileExW(temporary.c_str(), path.c_str(), 0U)) {
         return true;
@@ -102,7 +117,10 @@ namespace gpg
       return FileExists(path); // another game wrote it first
     }
 
-    [[nodiscard]] bool Decompress(const std::string_view packed, std::vector<char>& outBytes)
+    [[nodiscard]] bool Decompress(
+      const std::string_view packed,
+      std::vector<char>& outBytes
+    )
     {
       ZSTD_DStream* const stream = ZSTD_createDStream();
       if (stream == nullptr) {
@@ -122,7 +140,11 @@ namespace gpg
     }
 
     /** Each regular file of a tar archive: its name and bytes. */
-    template <typename Visit> [[nodiscard]] bool ForEachTarFile(const std::vector<char>& tar, Visit&& visit)
+    template <typename Visit>
+    [[nodiscard]] bool ForEachTarFile(
+      const std::vector<char>& tar,
+      Visit&& visit
+    )
     {
       constexpr std::size_t kBlock = 512U;
       for (std::size_t at = 0U; at + kBlock <= tar.size();) {
@@ -153,7 +175,10 @@ namespace gpg
      * CopyFolder); the folder with a trailing backslash, or empty. A marker written last tells a
      * complete folder from one a crashed game left half done.
      */
-    [[nodiscard]] std::wstring UnpackOnce(const wchar_t* const resource, const wchar_t* const name)
+    [[nodiscard]] std::wstring UnpackOnce(
+      const wchar_t* const resource,
+      const wchar_t* const name
+    )
     {
       const std::string_view packed = FindEmbedded(resource);
       if (packed.empty()) {
@@ -169,7 +194,9 @@ namespace gpg
         return folder;
       }
       std::vector<char> tar;
-      const bool ok = Decompress(packed, tar) && ForEachTarFile(tar, [&folder](const std::string& path, const std::string_view bytes) {
+      const bool ok = Decompress(packed, tar) &&
+        ForEachTarFile(tar,
+                       [&folder](const std::string& path, const std::string_view bytes) {
         std::wstring target = folder;
         for (const char c : path) {
           if (c == '/') {
@@ -180,7 +207,8 @@ namespace gpg
           }
         }
         return WriteFileOnce(target, bytes);
-      }) && WriteFileOnce(marker, {});
+      }) &&
+        WriteFileOnce(marker, {});
       if (!ok) {
         gpg::Warnf("embedded files: could not unpack %ls into %%LOCALAPPDATA%%\\FAForever\\faf-re", name);
         return {};

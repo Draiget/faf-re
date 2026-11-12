@@ -13,7 +13,7 @@ namespace gpg
 {
   class BinaryReader;
   class BinaryWriter;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -58,9 +58,9 @@ namespace moho
      */
     struct SplatVertex
     {
-      Wm3::Vec3f mPosition;       // +0x00
-      Wm3::Vec2f mTexCoord;       // +0x0C
-      float mAlpha;               // +0x14
+      Wm3::Vec3f mPosition; // +0x00
+      Wm3::Vec2f mTexCoord; // +0x0C
+      float mAlpha;         // +0x14
       std::uint8_t mPad18_1B[0x4];
     };
 
@@ -128,7 +128,12 @@ namespace moho
      * the quad holds). Otherwise `Restart` when `mayRestart` and the atlas was
      * full, so the pass clears the atlas and starts over, else `Skip`.
      */
-    enum class AtlasMiss { Draw, Skip, Restart };
+    enum class AtlasMiss
+    {
+      Draw,
+      Skip,
+      Restart
+    };
     [[nodiscard]] AtlasMiss OnAtlasResult(bool placed, bool mayRestart) const noexcept;
 
     /**
@@ -141,12 +146,18 @@ namespace moho
     SplatVertex* GetSplatVertices() noexcept;
 
   public:
-    SplatVertex mSplatVertices[4];                  // +0x170
-    boost::shared_ptr<CD3DBatchTexture> mTex;       // +0x1E0
+    SplatVertex mSplatVertices[4];            // +0x170
+    boost::shared_ptr<CD3DBatchTexture> mTex; // +0x1E0
   };
 
-  static_assert(offsetof(CWldSplat::SplatVertex, mPosition) == 0x00, "CWldSplat::SplatVertex::mPosition offset must be 0x00");
-  static_assert(offsetof(CWldSplat::SplatVertex, mTexCoord) == 0x0C, "CWldSplat::SplatVertex::mTexCoord offset must be 0x0C");
+  static_assert(
+    offsetof(CWldSplat::SplatVertex, mPosition) == 0x00,
+    "CWldSplat::SplatVertex::mPosition offset must be 0x00"
+  );
+  static_assert(
+    offsetof(CWldSplat::SplatVertex, mTexCoord) == 0x0C,
+    "CWldSplat::SplatVertex::mTexCoord offset must be 0x0C"
+  );
   static_assert(offsetof(CWldSplat::SplatVertex, mAlpha) == 0x14, "CWldSplat::SplatVertex::mAlpha offset must be 0x14");
   static_assert(sizeof(CWldSplat::SplatVertex) == 0x1C, "CWldSplat::SplatVertex size must be 0x1C");
   static_assert(offsetof(CWldSplat, mSplatVertices) == 0x170, "CWldSplat::mSplatVertices offset must be 0x170");
@@ -268,10 +279,12 @@ namespace moho
     virtual void ProcessRemovals(std::int32_t tick) = 0;
 
     /// Slot 25.
-    virtual std::int32_t EntitiesInView(GeomCamera3* camera, gpg::fastvector<CWldTerrainDecal*>& entities, bool ignoreDecalLod) = 0;
+    virtual std::int32_t
+    EntitiesInView(GeomCamera3* camera, gpg::fastvector<CWldTerrainDecal*>& entities, bool ignoreDecalLod) = 0;
 
     /// Slot 26.
-    virtual std::int32_t PropsInView(GeomCamera3* camera, gpg::fastvector<CWldTerrainDecal*>& props, bool ignoreDecalLod) = 0;
+    virtual std::int32_t
+    PropsInView(GeomCamera3* camera, gpg::fastvector<CWldTerrainDecal*>& props, bool ignoreDecalLod) = 0;
 
     /// Slot 27.
     virtual void MarkPendingChanges() = 0;
@@ -292,7 +305,6 @@ namespace moho
   class CDecalManager : public IDecalManager
   {
   public:
-
     /**
      * Address: 0x00877B70 (FUN_00877B70, Moho::CDecalManager::~CDecalManager)
      *
@@ -374,7 +386,8 @@ namespace moho
      * Address: 0x00877FF0 (FUN_00877FF0, Moho::CDecalManager::Func5)
      *
      * IDA signature:
-     * Moho::CWldTerrainDecal *__thiscall Moho::CDecalManager::Func5(Moho::CDecalManager *this, unsigned int decalIndex);
+     * Moho::CWldTerrainDecal *__thiscall Moho::CDecalManager::Func5(Moho::CDecalManager *this, unsigned int
+     * decalIndex);
      *
      * What it does:
      * Looks up one decal-index key in `mDecalGroupLookupByDecalIndex` and
@@ -573,7 +586,8 @@ namespace moho
      * Collects one camera-visible entity lane from the manager spatial-db
      * registration and sorts the collected pointer range.
      */
-    std::int32_t EntitiesInView(GeomCamera3* camera, gpg::fastvector<CWldTerrainDecal*>& entities, bool ignoreDecalLod) override;
+    std::int32_t
+    EntitiesInView(GeomCamera3* camera, gpg::fastvector<CWldTerrainDecal*>& entities, bool ignoreDecalLod) override;
 
     /**
      * Address: 0x00878C40 (FUN_00878C40, Moho::CDecalManager::PropsInView)
@@ -582,7 +596,8 @@ namespace moho
      * Collects one camera-visible prop lane from the manager spatial-db
      * registration and sorts the collected pointer range.
      */
-    std::int32_t PropsInView(GeomCamera3* camera, gpg::fastvector<CWldTerrainDecal*>& props, bool ignoreDecalLod) override;
+    std::int32_t
+    PropsInView(GeomCamera3* camera, gpg::fastvector<CWldTerrainDecal*>& props, bool ignoreDecalLod) override;
 
     /**
      * Address: 0x00878CA0 (FUN_00878CA0, Moho::CDecalManager::Func25)
@@ -680,17 +695,18 @@ namespace moho
     void RebuildLodHistogram();
 
   public:
-    std::uint32_t mDecalCount; // +0x04
-    std::uint32_t mNumDecals; // +0x08
+    std::uint32_t mDecalCount;             // +0x04
+    std::uint32_t mNumDecals;              // +0x08
     fa::vector<CWldTerrainDecal*> mDecals; // +0x0C (4-word binary vector: proxy@0x0C,first@0x10,last@0x14,end@0x18)
-    fa::map<std::uint32_t, CWldTerrainDecal*> mDecalGroupLookupByDecalIndex; // +0x1C (3-word canonical rb_tree: proxy@0x1C,head@0x20,size@0x24)
+    fa::map<std::uint32_t, CWldTerrainDecal*>
+      mDecalGroupLookupByDecalIndex;       // +0x1C (3-word canonical rb_tree: proxy@0x1C,head@0x20,size@0x24)
     fa::vector<CDecalGroup*> mDecalGroups; // +0x28
     fa::map<std::uint32_t, CDecalGroup*> mDecalGroupLookupBySplatIndex; // +0x38
-    fa::vector<CWldSplat*> mSplats; // +0x44
+    fa::vector<CWldSplat*> mSplats;                                     // +0x44
     SpatialDB<CWldTerrainDecal> mSpatialDb; // +0x54 (built by 0x00501D80, the database ctor)
-    IWldTerrainRes* mWldTerrain; // +0xE4
-    float mLodThresholds[10]; // +0xE8 (decal-area decile LOD histogram)
-    std::uint8_t mDidSomething; // +0x110
+    IWldTerrainRes* mWldTerrain;            // +0xE4
+    float mLodThresholds[10];               // +0xE8 (decal-area decile LOD histogram)
+    std::uint8_t mDidSomething;             // +0x110
     std::uint8_t mPad111_113[0x03];
   };
 
@@ -718,18 +734,9 @@ namespace moho
     "CDecalManager::mDecalGroupLookupBySplatIndex offset must be 0x38"
   );
   static_assert(offsetof(CDecalManager, mSplats) == 0x44, "CDecalManager::mSplats offset must be 0x44");
-  static_assert(
-    offsetof(CDecalManager, mSpatialDb) == 0x54,
-    "CDecalManager::mSpatialDb offset must be 0x54"
-  );
+  static_assert(offsetof(CDecalManager, mSpatialDb) == 0x54, "CDecalManager::mSpatialDb offset must be 0x54");
   static_assert(offsetof(CDecalManager, mWldTerrain) == 0xE4, "CDecalManager::mWldTerrain offset must be 0xE4");
-  static_assert(
-    offsetof(CDecalManager, mLodThresholds) == 0xE8,
-    "CDecalManager::mLodThresholds offset must be 0xE8"
-  );
-  static_assert(
-    offsetof(CDecalManager, mDidSomething) == 0x110,
-    "CDecalManager::mDidSomething offset must be 0x110"
-  );
+  static_assert(offsetof(CDecalManager, mLodThresholds) == 0xE8, "CDecalManager::mLodThresholds offset must be 0xE8");
+  static_assert(offsetof(CDecalManager, mDidSomething) == 0x110, "CDecalManager::mDidSomething offset must be 0x110");
   static_assert(sizeof(CDecalManager) == 0x114, "CDecalManager size must be 0x114");
 } // namespace moho

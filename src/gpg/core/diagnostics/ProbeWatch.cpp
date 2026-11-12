@@ -26,39 +26,41 @@ namespace gpg::diag
 
     // The Watch section is always registered (it writes nothing when no
     // probe or watch was ever armed).
-    void WriteProbeWatchSectionAdapter(std::FILE* const sink, const CrashSectionInfo& info)
+    void WriteProbeWatchSectionAdapter(
+      std::FILE* const sink,
+      const CrashSectionInfo& info
+    )
     {
       WriteProbeWatchSection(sink, info);
     }
 
-    const bool sProbeWatchSectionRegistered =
-      (AddCrashSection("Watch", &WriteProbeWatchSectionAdapter), true);
+    const bool sProbeWatchSectionRegistered = (AddCrashSection("Watch", &WriteProbeWatchSectionAdapter), true);
 
   } // namespace
 
   namespace
   {
 
-    constexpr int kMaxWatches = 4;    // DR0-DR3
+    constexpr int kMaxWatches = 4; // DR0-DR3
     constexpr int kMaxProbes = 16;
     constexpr int kMaxLogLines = 512;
     constexpr int kMaxReportsPerWatch = 8;
 
     struct Watch
     {
-      std::uintptr_t address = 0;      // dword-rounded
-      std::uintptr_t baseAddress = 0;  // spec base before "+offset" (0 if none)
+      std::uintptr_t address = 0;     // dword-rounded
+      std::uintptr_t baseAddress = 0; // spec base before "+offset" (0 if none)
       bool armed = false;
       int reportCount = 0;
     };
 
     struct Probe
     {
-      std::uintptr_t address = 0;      // int3 site
+      std::uintptr_t address = 0; // int3 site
       unsigned char originalByte = 0;
-      char watchExpr[64] = {};         // optional "ecx+474", armed on next hit
+      char watchExpr[64] = {}; // optional "ecx+474", armed on next hit
       bool armed = false;
-      bool waitingStepOver = false;    // single-stepping over the probe
+      bool waitingStepOver = false; // single-stepping over the probe
       int hitCount = 0;
     };
 
@@ -84,7 +86,10 @@ namespace gpg::diag
       return state;
     }
 
-    void PwLog(const char* const format, ...)
+    void PwLog(
+      const char* const format,
+      ...
+    )
     {
       ProbeWatchState& s = PwState();
       va_list args;
@@ -101,20 +106,25 @@ namespace gpg::diag
 
     // ---- DR7 computation ----
 
-    std::uintptr_t ComputeDr7(const Watch watches[kMaxWatches])
+    std::uintptr_t ComputeDr7(
+      const Watch watches[kMaxWatches]
+    )
     {
       std::uintptr_t dr7 = 0;
       for (int i = 0; i < kMaxWatches; ++i) {
         if (watches[i].armed) {
-          dr7 |= (1ull << (2 * i));                          // local enable i
-          dr7 |= (0x1ull << (16 + 4 * i));                   // RW=01 (write)
-          dr7 |= (0x3ull << (18 + 4 * i));                   // LEN=11 (dword)
+          dr7 |= (1ull << (2 * i));        // local enable i
+          dr7 |= (0x1ull << (16 + 4 * i)); // RW=01 (write)
+          dr7 |= (0x3ull << (18 + 4 * i)); // LEN=11 (dword)
         }
       }
       return dr7;
     }
 
-    void ApplyDebugRegsToThread(HANDLE thread, const Watch watches[kMaxWatches])
+    void ApplyDebugRegsToThread(
+      HANDLE thread,
+      const Watch watches[kMaxWatches]
+    )
     {
       CONTEXT context{};
       context.ContextFlags = CONTEXT_DEBUG_REGISTERS;
@@ -131,7 +141,6 @@ namespace gpg::diag
       (void)::SetThreadContext(thread, &context);
     }
 
-
     // Arguments for the arming helper thread (namespace scope so the helper
     // function can reach them; single armer at a time - arming is a rare,
     // operator-driven event).
@@ -143,11 +152,12 @@ namespace gpg::diag
     };
     HelperArgs gArmingHelperArgs;
 
-    DWORD WINAPI ArmingHelperThread(LPVOID)
+    DWORD WINAPI ArmingHelperThread(
+      LPVOID
+    )
     {
       HelperArgs& a = gArmingHelperArgs;
-      HANDLE target =
-        ::OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, a.targetTid);
+      HANDLE target = ::OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_SET_CONTEXT, FALSE, a.targetTid);
       if (target == nullptr) {
         (void)::SetEvent(a.done);
         return 0;
@@ -161,7 +171,9 @@ namespace gpg::diag
       return 0;
     }
 
-    void WriteDebugRegsCurrent(const Watch watches[kMaxWatches])
+    void WriteDebugRegsCurrent(
+      const Watch watches[kMaxWatches]
+    )
     {
       // `mov drX` is privileged (ring 0); the only user-mode route is
       // SuspendThread + SetThreadContext, and a thread cannot suspend
@@ -220,7 +232,10 @@ namespace gpg::diag
 
     // ---- software breakpoints ----
 
-    bool InstallInt3(const std::uintptr_t address, unsigned char* const originalByte)
+    bool InstallInt3(
+      const std::uintptr_t address,
+      unsigned char* const originalByte
+    )
     {
       DWORD oldProtect = 0;
       if (::VirtualProtect(reinterpret_cast<void*>(address), 1, PAGE_EXECUTE_READWRITE, &oldProtect) == FALSE) {
@@ -233,7 +248,10 @@ namespace gpg::diag
       return true;
     }
 
-    void RestoreInt3(const std::uintptr_t address, const unsigned char originalByte)
+    void RestoreInt3(
+      const std::uintptr_t address,
+      const unsigned char originalByte
+    )
     {
       DWORD oldProtect = 0;
       if (::VirtualProtect(reinterpret_cast<void*>(address), 1, PAGE_EXECUTE_READWRITE, &oldProtect) == FALSE) {
@@ -244,7 +262,10 @@ namespace gpg::diag
       FlushInstructionCache(::GetCurrentProcess(), reinterpret_cast<void*>(address), 1);
     }
 
-    void StepOverProbe(Probe& probe, CONTEXT& context)
+    void StepOverProbe(
+      Probe& probe,
+      CONTEXT& context
+    )
     {
       // Restore the original byte, rewind to the instruction, trap after it.
       RestoreInt3(probe.address, probe.originalByte);
@@ -261,7 +282,11 @@ namespace gpg::diag
     // Grammar (FADeepProbe subset): reg | reg+hex | [reg+hex]+hex.
     // reg: eax..edi/esp/ebp (x86) or rax..r15 (x64).
 
-    bool EvalWatchExpr(const char* const expr, const CONTEXT& context, std::uintptr_t* const out)
+    bool EvalWatchExpr(
+      const char* const expr,
+      const CONTEXT& context,
+      std::uintptr_t* const out
+    )
     {
       if (expr == nullptr || out == nullptr || expr[0] == '\0') {
         return false;
@@ -284,8 +309,14 @@ namespace gpg::diag
           const char* name;
           std::uintptr_t value;
         } const regs[] = {
-          {"eax", context.Eax}, {"ebx", context.Ebx}, {"ecx", context.Ecx}, {"edx", context.Edx},
-          {"esi", context.Esi}, {"edi", context.Edi}, {"esp", context.Esp}, {"ebp", context.Ebp},
+          {"eax", context.Eax},
+          {"ebx", context.Ebx},
+          {"ecx", context.Ecx},
+          {"edx", context.Edx},
+          {"esi", context.Esi},
+          {"edi", context.Edi},
+          {"esp", context.Esp},
+          {"ebp", context.Ebp},
         };
 #elif defined(_M_X64)
         struct
@@ -293,10 +324,22 @@ namespace gpg::diag
           const char* name;
           std::uintptr_t value;
         } const regs[] = {
-          {"rax", context.Rax}, {"rbx", context.Rbx}, {"rcx", context.Rcx}, {"rdx", context.Rdx},
-          {"rsi", context.Rsi}, {"rdi", context.Rdi}, {"rsp", context.Rsp}, {"rbp", context.Rbp},
-          {"r8", context.R8},   {"r9", context.R9},   {"r10", context.R10}, {"r11", context.R11},
-          {"r12", context.R12}, {"r13", context.R13}, {"r14", context.R14}, {"r15", context.R15},
+          {"rax", context.Rax},
+          {"rbx", context.Rbx},
+          {"rcx", context.Rcx},
+          {"rdx", context.Rdx},
+          {"rsi", context.Rsi},
+          {"rdi", context.Rdi},
+          {"rsp", context.Rsp},
+          {"rbp", context.Rbp},
+          {"r8", context.R8},
+          {"r9", context.R9},
+          {"r10", context.R10},
+          {"r11", context.R11},
+          {"r12", context.R12},
+          {"r13", context.R13},
+          {"r14", context.R14},
+          {"r15", context.R15},
         };
 #else
         struct
@@ -376,19 +419,25 @@ namespace gpg::diag
 
     // ---- reports ----
 
-    void EmitWatchReport(const int watchIndex, CONTEXT& context)
+    void EmitWatchReport(
+      const int watchIndex,
+      CONTEXT& context
+    )
     {
       ProbeWatchState& s = PwState();
       const Watch& watch = s.watches[watchIndex];
 
       char addressText[40] = {};
       if (watch.baseAddress != 0 && watch.address != watch.baseAddress) {
-        (void)::sprintf_s(addressText, sizeof(addressText), "%llX+%llX",
-                         static_cast<unsigned long long>(watch.baseAddress),
-                         static_cast<unsigned long long>(watch.address - watch.baseAddress));
+        (void)::sprintf_s(
+          addressText,
+          sizeof(addressText),
+          "%llX+%llX",
+          static_cast<unsigned long long>(watch.baseAddress),
+          static_cast<unsigned long long>(watch.address - watch.baseAddress)
+        );
       } else {
-        (void)::sprintf_s(addressText, sizeof(addressText), "%llX",
-                         static_cast<unsigned long long>(watch.address));
+        (void)::sprintf_s(addressText, sizeof(addressText), "%llX", static_cast<unsigned long long>(watch.address));
       }
 
       std::uintptr_t writtenValue = 0;
@@ -404,9 +453,13 @@ namespace gpg::diag
       const std::uintptr_t pc = 0;
 #endif
 
-      PwLog("%s write by %llX, value %llX, report %d", addressText,
-            static_cast<unsigned long long>(pc), static_cast<unsigned long long>(writtenValue),
-            watch.reportCount);
+      PwLog(
+        "%s write by %llX, value %llX, report %d",
+        addressText,
+        static_cast<unsigned long long>(pc),
+        static_cast<unsigned long long>(writtenValue),
+        watch.reportCount
+      );
       DiagLogStack("watch-write");
     }
 
@@ -424,7 +477,9 @@ namespace gpg::diag
     //    evaluate any pending probe watch expression, step over.
     //  * anything else: continue search.
 
-    LONG CALLBACK ProbeWatchVectoredHandler(EXCEPTION_POINTERS* const info)
+    LONG CALLBACK ProbeWatchVectoredHandler(
+      EXCEPTION_POINTERS* const info
+    )
     {
       if (PwState().anythingArmed == 0) {
         return EXCEPTION_CONTINUE_SEARCH;
@@ -517,8 +572,12 @@ namespace gpg::diag
               s.watches[slot].address = watched;
               s.watches[slot].baseAddress = 0;
               BroadcastDebugRegs();
-              PwLog("%llX armed by probe %llX (%s)", static_cast<unsigned long long>(watched),
-                    static_cast<unsigned long long>(site), probe.watchExpr);
+              PwLog(
+                "%llX armed by probe %llX (%s)",
+                static_cast<unsigned long long>(watched),
+                static_cast<unsigned long long>(site),
+                probe.watchExpr
+              );
             }
             probe.watchExpr[0] = '\0';
           }
@@ -534,7 +593,9 @@ namespace gpg::diag
 
   } // namespace
 
-  bool ParseWatchSpec(const char* const spec)
+  bool ParseWatchSpec(
+    const char* const spec
+  )
   {
     if (spec == nullptr || spec[0] == '\0') {
       return false;
@@ -588,7 +649,9 @@ namespace gpg::diag
     return true;
   }
 
-  bool ParseProbeSpec(const char* const spec)
+  bool ParseProbeSpec(
+    const char* const spec
+  )
   {
     if (spec == nullptr || spec[0] == '\0') {
       return false;
@@ -597,8 +660,7 @@ namespace gpg::diag
 
     char addressText[32] = {};
     const char* const colon = std::strchr(spec, ':');
-    const std::size_t addressLength =
-      (colon != nullptr) ? static_cast<std::size_t>(colon - spec) : std::strlen(spec);
+    const std::size_t addressLength = (colon != nullptr) ? static_cast<std::size_t>(colon - spec) : std::strlen(spec);
     if (addressLength == 0 || addressLength >= sizeof(addressText)) {
       return false;
     }
@@ -619,8 +681,11 @@ namespace gpg::diag
       }
       if (InstallInt3(address, &s.probes[i].originalByte)) {
         ::InterlockedExchange(&s.anythingArmed, 1);
-        PwLog("probe %llX armed%s", static_cast<unsigned long long>(address),
-              (colon != nullptr) ? " with watch expression" : "");
+        PwLog(
+          "probe %llX armed%s",
+          static_cast<unsigned long long>(address),
+          (colon != nullptr) ? " with watch expression" : ""
+        );
         return true;
       }
       s.probes[i].armed = false;
@@ -629,7 +694,9 @@ namespace gpg::diag
     return false;
   }
 
-  bool ParseFadepProbeRequest(const char* const text)
+  bool ParseFadepProbeRequest(
+    const char* const text
+  )
   {
     if (text == nullptr) {
       return false;
@@ -648,7 +715,10 @@ namespace gpg::diag
     (void)::AddVectoredExceptionHandler(0, &ProbeWatchVectoredHandler); // behind the fault logger
   }
 
-  void WriteProbeWatchSection(std::FILE* const sink, const CrashSectionInfo& info)
+  void WriteProbeWatchSection(
+    std::FILE* const sink,
+    const CrashSectionInfo& info
+  )
   {
     (void)info;
     ProbeWatchState& s = PwState();
@@ -664,14 +734,19 @@ namespace gpg::diag
 
     for (int i = 0; i < kMaxProbes; ++i) {
       if (s.probes[i].armed) {
-        (void)std::fprintf(sink, "probe %llX: %d hit(s)\n", static_cast<unsigned long long>(s.probes[i].address),
-                          s.probes[i].hitCount);
+        (void)std::fprintf(
+          sink, "probe %llX: %d hit(s)\n", static_cast<unsigned long long>(s.probes[i].address), s.probes[i].hitCount
+        );
       }
     }
     for (int i = 0; i < kMaxWatches; ++i) {
       if (s.watches[i].armed) {
-        (void)std::fprintf(sink, "watch %llX: %d report(s)\n", static_cast<unsigned long long>(s.watches[i].address),
-                          s.watches[i].reportCount);
+        (void)std::fprintf(
+          sink,
+          "watch %llX: %d report(s)\n",
+          static_cast<unsigned long long>(s.watches[i].address),
+          s.watches[i].reportCount
+        );
       }
     }
     (void)std::fflush(sink);
@@ -683,7 +758,9 @@ namespace gpg::diag
     // /crashtest watch to verify the whole DR0-DR3 path end to end.
     volatile std::uint32_t scratch = 0;
     char spec[64] = {};
-    (void)::sprintf_s(spec, sizeof(spec), "%llX", static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(&scratch)));
+    (void)::sprintf_s(
+      spec, sizeof(spec), "%llX", static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(&scratch))
+    );
     PwLog("selftest: arming watch on %s", spec);
     if (!ParseWatchSpec(spec)) {
       PwLog("selftest: arm failed");

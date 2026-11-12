@@ -24,7 +24,9 @@ namespace moho
    * What it does:
    * Default UI callback lane for disconnect notifications (no-op in base interface).
    */
-  void IClientMgrUIInterface::NoteDisconnect(const CClientBase* const client)
+  void IClientMgrUIInterface::NoteDisconnect(
+    const CClientBase* const client
+  )
   {
     (void)client;
   }
@@ -35,7 +37,10 @@ namespace moho
    * What it does:
    * Default UI callback lane for eject-request notifications (no-op in base interface).
    */
-  void IClientMgrUIInterface::NoteEjectRequest(const CClientBase* const target, const CClientBase* const requester)
+  void IClientMgrUIInterface::NoteEjectRequest(
+    const CClientBase* const target,
+    const CClientBase* const requester
+  )
   {
     (void)target;
     (void)requester;
@@ -47,7 +52,10 @@ namespace moho
    * What it does:
    * Default UI callback lane for inbound chat payload notifications (no-op in base interface).
    */
-  void IClientMgrUIInterface::ReceiveChat(const CClientBase* const sender, const gpg::MemBuffer<const char>& data)
+  void IClientMgrUIInterface::ReceiveChat(
+    const CClientBase* const sender,
+    const gpg::MemBuffer<const char>& data
+  )
   {
     (void)sender;
     (void)data;
@@ -59,7 +67,10 @@ namespace moho
    * What it does:
    * Default UI callback lane for game-speed updates (no-op in base interface).
    */
-  void IClientMgrUIInterface::NoteGameSpeedChanged(const CClientBase* const client, const std::int32_t gameSpeed)
+  void IClientMgrUIInterface::NoteGameSpeedChanged(
+    const CClientBase* const client,
+    const std::int32_t gameSpeed
+  )
   {
     (void)client;
     (void)gameSpeed;
@@ -71,7 +82,9 @@ namespace moho
    * What it does:
    * Default UI callback lane for bottleneck notifications (no-op in base interface).
    */
-  void IClientMgrUIInterface::ReportBottleneck(const SClientBottleneckInfo& info)
+  void IClientMgrUIInterface::ReportBottleneck(
+    const SClientBottleneckInfo& info
+  )
   {
     (void)info;
   }
@@ -82,20 +95,25 @@ namespace moho
    * What it does:
    * Default UI callback lane for bottleneck-clear notifications (no-op in base interface).
    */
-  void IClientMgrUIInterface::ReportBottleneckCleared()
-  {}
+  void IClientMgrUIInterface::ReportBottleneckCleared() {}
 
   /**
    * Engine addition (issue #275), not in the binary: no-op default (see the header).
    */
-  void IClientMgrUIInterface::NoteRejoinOffer(const fa::string&, const fa::string&)
+  void IClientMgrUIInterface::NoteRejoinOffer(
+    const fa::string&,
+    const fa::string&
+  )
   {}
 
   /**
    * Engine addition, not in the binary: no-op default (see the header).
    */
   void IClientMgrUIInterface::NoteOrdersDiffer(
-    const fa::string& sender, const fa::string& reporter, const bool selfReport, const bool stopped
+    const fa::string& sender,
+    const fa::string& reporter,
+    const bool selfReport,
+    const bool stopped
   )
   {
     (void)sender;
@@ -103,6 +121,5 @@ namespace moho
     (void)selfReport;
     (void)stopped;
   }
-
 
 } // namespace moho

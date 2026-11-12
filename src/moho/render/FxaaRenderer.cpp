@@ -38,8 +38,9 @@ namespace moho
       *this = FxaaRenderer();
       mDevice = device;
       gpg::gal::DeviceContext* const context = device->GetDeviceContext();
-      const bool modern = context != nullptr
-        && (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 || context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
+      const bool modern = context != nullptr &&
+        (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 ||
+         context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
       if (modern && (device->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureVertexPulling) != 0U) {
         gpg::gal::GpuProgramDesc desc{};
         desc.name = "Fxaa";
@@ -63,13 +64,20 @@ namespace moho
     return mSupported;
   }
 
-  void FxaaRenderer::Render(gpg::gal::RenderTarget& copy, const int width, const int height)
+  void FxaaRenderer::Render(
+    gpg::gal::RenderTarget& copy,
+    const int width,
+    const int height
+  )
   {
     if (!mSupported || width <= 0 || height <= 0) {
       return;
     }
     const float constants[4] = {
-      1.0f / static_cast<float>(width), 1.0f / static_cast<float>(height), static_cast<float>(width), static_cast<float>(height),
+      1.0f / static_cast<float>(width),
+      1.0f / static_cast<float>(height),
+      static_cast<float>(width),
+      static_cast<float>(height),
     };
     gpg::gal::GpuDrawCall draw{};
     draw.program = mProgram.get();

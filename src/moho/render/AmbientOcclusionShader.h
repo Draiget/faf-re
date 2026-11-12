@@ -40,6 +40,8 @@ cbuffer AoConstants : register(b0)
     row_major float4x4 ShadowMatrix; // world to the sun's clip space, terrain.fx's ShadowMatrix
     float4 ShadowParams;  // 1 when ShadowMap holds this frame's sun shadow (contact shadows only where it is sunlit), then unused
     float4 ShadowCascades[9]; // the effects' faf_ShadowCascades (ren_ShadowCascades, gpg/gal/effects/ShadowCascades.h)
+    float4 RayParams;     // 1 when occlusion is traced (ren_RayAo), rays per point, ray lift per unit of camera distance,
+                          // how far under the traced ground a drawn ground point can lie (RayTracedShadows.h [7].y)
 };
 
 #define CONTACT_STEPS 8
@@ -58,6 +60,123 @@ StructuredBuffer<float> TerrainShadow : register(t2);
 Texture2D<float> SceneDepth : register(t6);
 // The sun's shadow texture the terrain samples: green is 1 in sunlight, 0 in shadow (terrain.fx).
 Texture2D<float4> ShadowMap : register(t4);
+
+#ifdef FAF_RAY_QUERY
+// Engine addition (ren_RayAo): the device's ray-traced scene (gpg/gal/RayTracing.h, moho/render/RayScene.h).
+#ifdef __spirv__
+[[vk::binding(0, 2)]]
+#endif
+RaytracingAccelerationStructure RayScene : register(t0, space1);
+// Alpha-tested pieces (trees): as ModernHlsl.cpp's faf_ray_solid.
+#ifdef __spirv__
+[[vk::binding(1, 2)]]
+#endif
+ByteAddressBuffer RayAttributes : register(t1, space1);
+#ifdef __spirv__
+[[vk::binding(2, 2)]]
+#endif
+StructuredBuffer<uint4> RayRecords : register(t2, space1);
+#ifdef __spirv__
+[[vk::binding(3, 2)]]
+#endif
+Texture2D RayTextures[64] : register(t0, space2);
+#ifdef __spirv__
+[[vk::binding(4, 2)]]
+#endif
+SamplerState RaySampler : register(s0, space1);
+bool TracedSolid(uint instance, uint primitive, float2 bary)
+{
+    const uint4 record = RayRecords[instance];
+    if (record.w == 0) {
+        return true;
+    }
+    const uint3 corner = RayAttributes.Load3(record.x + primitive * 12);
+    const float2 uv0 = asfloat(RayAttributes.Load2(record.y + corner.x * 8));
+    const float2 uv1 = asfloat(RayAttributes.Load2(record.y + corner.y * 8));
+    const float2 uv2 = asfloat(RayAttributes.Load2(record.y + corner.z * 8));
+    const float2 uv = uv0 + bary.x * (uv1 - uv0) + bary.y * (uv2 - uv0);
+    return RayTextures[NonUniformResourceIndex(record.z)].SampleLevel(RaySampler, uv, 1).a >= 0.5;
+}
+
+// Ambient light that reaches `center` by rays: RayParams.y rays spread over the hemisphere around `normal`
+// (cosine-weighted, turned per point by `spin`), each up to Radius long; a hit takes more of the light the
+// closer it is. Occluders off the screen and behind others count, which the depth samples miss.
+// The nearest hit along `direction` between tMin and Radius among the instances in `mask` (RayTracing.h:
+// 1 ground, 2 meshes), or -1.
+float TracedHit(float3 origin, float3 direction, float tMin, uint mask)
+{
+    if (tMin >= Radius) {
+        return -1.0;
+    }
+    RayDesc ray;
+    ray.Origin = origin;
+    ray.Direction = direction;
+    ray.TMin = tMin;
+    ray.TMax = Radius;
+    RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> query;
+    query.TraceRayInline(RayScene, RAY_FLAG_NONE, mask, ray);
+    while (query.Proceed()) {
+        if (query.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE &&
+            TracedSolid(query.CandidateInstanceIndex(), query.CandidatePrimitiveIndex(), query.CandidateTriangleBarycentrics())) {
+            query.CommitNonOpaqueTriangleHit();
+        }
+    }
+    return (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT) ? query.CommittedRayT() : -1.0;
+}
+
+// How far under the traced ground `p` lies, 0 when it doesn't (ModernHlsl.cpp's faf_ray_under_ground): the
+// drawn ground is coarser than the traced height field with camera distance, by more than any fixed lift.
+float TracedUnderGround(float3 p)
+{
+    RayDesc ray;
+    ray.Origin = p;
+    ray.Direction = float3(0, 1, 0);
+    ray.TMin = 0;
+    ray.TMax = 200;
+    RayQuery<RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES | RAY_FLAG_FORCE_OPAQUE> query;
+    query.TraceRayInline(RayScene, RAY_FLAG_NONE, 1, ray);
+    query.Proceed();
+    return (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT) ? query.CommittedRayT() : 0.0;
+}
+
+// `center` is rebuilt from the depth buffer, whose error grows with camera distance; the rays leave from
+// above the surface by more than that error (RayParams.z per unit of distance), or they would start under
+// the ground and hit it from below. A point under the traced ground moves up onto it first.
+float TracedOcclusion(float3 center, float3 normal, float spin, float distance)
+{
+    const float3 helper = (abs(normal.y) < 0.9) ? float3(0, 1, 0) : float3(1, 0, 0);
+    const float3 tangent = normalize(cross(helper, normal));
+    const float3 bitangent = cross(normal, tangent);
+    const int count = clamp((int)RayParams.y, 1, 16);
+    const float lift = 0.05 + RayParams.z * distance;
+    const float3 origin = center + float3(0, TracedUnderGround(center), 0) + normal * lift;
+    float blocked = 0.0;
+    const float under = RayParams.w;
+    for (int i = 0; i < count; ++i) {
+        // A spiral over the disc, lifted onto the hemisphere: cosine-weighted directions.
+        const float u = (i + 0.5) / count;
+        const float angle = i * 2.39996323 + spin;
+        const float r = sqrt(u);
+        const float3 direction = normalize(tangent * (r * cos(angle)) + bitangent * (r * sin(angle)) + normal * sqrt(max(1.0 - u, 0.0)));
+        float t = -1.0;
+        if (under > 0.0) {
+            // The traced ground can lie above the drawn one here (a coarse field, tessellation): meshes from the
+            // surface, the traced ground only past the depth a drawn point can lie under it.
+            t = TracedHit(origin, direction, 0.01, 2);
+            if (t < 0.0) {
+                t = TracedHit(origin, direction, under / max(direction.y, 0.2), 1);
+            }
+        } else {
+            t = TracedHit(origin, direction, 0.01, 0xFF);
+        }
+        if (t >= 0.0) {
+            const float near = 1.0 - t / Radius;
+            blocked += 0.35 + 0.65 * near;
+        }
+    }
+    return saturate(1.0 - Intensity * 1.5 * blocked / count);
+}
+#endif
 
 // How much sun the shadow map gives this point: 1 when there is no shadow map.
 float SunVisibility(float3 world)
@@ -92,7 +211,9 @@ float SunVisibility(float3 world)
     uint width;
     uint height;
     ShadowMap.GetDimensions(width, height);
-    return saturate(ShadowMap.Load(int3(int2(uv * float2(width, height)), 0)).g);
+    // uv may be exactly 1 (the test above and the cascade boxes are inclusive): the last texel, not the one past it.
+    const int2 texel = min(int2(uv * float2(width, height)), int2(width, height) - 1);
+    return saturate(ShadowMap.Load(int3(texel, 0)).g);
 }
 
 float3 WorldPosition(int2 pixel, float depth)
@@ -219,6 +340,13 @@ void AoCS(uint3 id : SV_DispatchThreadID)
 
     // Interleaved gradient noise turns the spiral per sample; the composite blur averages it out.
     const float spin = frac(52.9829189 * frac(dot(float2(id.xy), float2(0.06711056, 0.00583715)))) * 6.2831853;
+#ifdef FAF_RAY_QUERY
+    if (RayParams.x > 0.0) {
+        // Traced: the sun's shadows are traced in the lit passes too, so no contact shadow or terrain bake here.
+        AoTerms[index] = float2(lerp(1.0, TracedOcclusion(center, normal, spin, distance), fade) * terrain, distance);
+        return;
+    }
+#endif
     const float radius2 = Radius * Radius;
     const int2 low = int2(ViewRect.xy);
     const int2 high = low + int2(ViewRect.zw) - 1;

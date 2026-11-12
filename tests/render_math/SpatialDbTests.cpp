@@ -41,7 +41,9 @@ namespace
    * The one map an entry is kept in (SpatialShardData::Insert): the first of unit, projectile, prop that its
    * registration mask has, else entity.
    */
-  std::uint32_t MapOf(const std::uint32_t mask)
+  std::uint32_t MapOf(
+    const std::uint32_t mask
+  )
   {
     if ((mask & kUnit) != 0u) {
       return kUnit;
@@ -56,13 +58,20 @@ namespace
   }
 
   /** Wild Magic's AxisAlignedBox3::TestIntersection: inclusive on every axis. */
-  bool Touch(const Wm3::AxisAlignedBox3f& a, const Wm3::AxisAlignedBox3f& b)
+  bool Touch(
+    const Wm3::AxisAlignedBox3f& a,
+    const Wm3::AxisAlignedBox3f& b
+  )
   {
-    return !(a.Max.x < b.Min.x || a.Min.x > b.Max.x || a.Max.y < b.Min.y || a.Min.y > b.Max.y || a.Max.z < b.Min.z
-             || a.Min.z > b.Max.z);
+    return !(
+      a.Max.x < b.Min.x || a.Min.x > b.Max.x || a.Max.y < b.Min.y || a.Min.y > b.Max.y || a.Max.z < b.Min.z ||
+      a.Min.z > b.Max.z
+    );
   }
 
-  std::multiset<moho::MeshInstance*> Owners(const gpg::fastvector<moho::MeshInstance*>& found)
+  std::multiset<moho::MeshInstance*> Owners(
+    const gpg::fastvector<moho::MeshInstance*>& found
+  )
   {
     std::multiset<moho::MeshInstance*> owners;
     for (std::size_t i = 0; i < found.size(); ++i) {
@@ -83,12 +92,18 @@ namespace
       mEntries.resize(kCount); // no reallocation afterwards: an entry holds an iterator into the database
     }
 
-    moho::MeshInstance* OwnerOf(const std::size_t index)
+    moho::MeshInstance* OwnerOf(
+      const std::size_t index
+    )
     {
       return reinterpret_cast<moho::MeshInstance*>(&mStorage[index]);
     }
 
-    Wm3::AxisAlignedBox3f RandomBox(std::mt19937& rng, const float low, const float high)
+    Wm3::AxisAlignedBox3f RandomBox(
+      std::mt19937& rng,
+      const float low,
+      const float high
+    )
     {
       std::uniform_real_distribution<float> position(low, high);
       std::uniform_real_distribution<float> size(0.5f, 30.0f);
@@ -96,7 +111,9 @@ namespace
       return Wm3::AxisAlignedBox3f(min, {min.x + size(rng), min.y + size(rng), min.z + size(rng)});
     }
 
-    void RegisterAll(std::mt19937& rng)
+    void RegisterAll(
+      std::mt19937& rng
+    )
     {
       const std::uint32_t masks[] = {kUnit, kProp, kProjectile, kEntity, kUnit | kProp, kProp | kProjectile};
       for (std::size_t i = 0; i < kCount; ++i) {
@@ -111,7 +128,9 @@ namespace
       }
     }
 
-    std::multiset<moho::MeshInstance*> ExpectedOfType(const std::uint32_t type) const
+    std::multiset<moho::MeshInstance*> ExpectedOfType(
+      const std::uint32_t type
+    ) const
     {
       std::multiset<moho::MeshInstance*> owners;
       for (const SOracleEntry& entry : mOracle) {
@@ -122,7 +141,9 @@ namespace
       return owners;
     }
 
-    std::multiset<moho::MeshInstance*> ExpectedUnitsIn(const Wm3::AxisAlignedBox3f& box) const
+    std::multiset<moho::MeshInstance*> ExpectedUnitsIn(
+      const Wm3::AxisAlignedBox3f& box
+    ) const
     {
       std::multiset<moho::MeshInstance*> owners;
       for (const SOracleEntry& entry : mOracle) {
@@ -133,7 +154,9 @@ namespace
       return owners;
     }
 
-    std::multiset<moho::MeshInstance*> Collect(const std::uint32_t type)
+    std::multiset<moho::MeshInstance*> Collect(
+      const std::uint32_t type
+    )
     {
       gpg::fastvector<moho::MeshInstance*> found;
       const std::int32_t count = mDb.Collect(found, static_cast<moho::EEntityType>(type));
@@ -141,7 +164,9 @@ namespace
       return Owners(found);
     }
 
-    std::multiset<moho::MeshInstance*> CollectInBox(const Wm3::AxisAlignedBox3f& box)
+    std::multiset<moho::MeshInstance*> CollectInBox(
+      const Wm3::AxisAlignedBox3f& box
+    )
     {
       gpg::fastvector<moho::MeshInstance*> found;
       const std::int32_t count = mDb.CollectInBox(found, box);
@@ -158,12 +183,21 @@ namespace
 
 // Each entry is kept in one map, by the first of unit, projectile, prop its mask has (0x00502200), and a typed
 // collect returns the entries of the maps whose bits it asks for.
-TEST_F(SpatialDbFixture, TypedCollectFindsEachEntryInItsOneMap)
+TEST_F(
+  SpatialDbFixture,
+  TypedCollectFindsEachEntryInItsOneMap
+)
 {
   std::mt19937 rng(17);
   RegisterAll(rng);
-  for (const std::uint32_t type : {kUnit, kProp, kProjectile, kEntity, kUnit | kProp, kProp | kProjectile | kEntity,
-                                   kUnit | kProp | kProjectile | kEntity}) {
+  for (const std::uint32_t type :
+       {kUnit,
+        kProp,
+        kProjectile,
+        kEntity,
+        kUnit | kProp,
+        kProp | kProjectile | kEntity,
+        kUnit | kProp | kProjectile | kEntity}) {
     SCOPED_TRACE(testing::Message() << "type 0x" << std::hex << type);
     EXPECT_EQ(Collect(type), ExpectedOfType(type));
   }
@@ -171,7 +205,10 @@ TEST_F(SpatialDbFixture, TypedCollectFindsEachEntryInItsOneMap)
 
 // A box collect returns the units whose box touches the query box, edges included, inside the map grid and in
 // the overflow lane (0x00504040 collects units only).
-TEST_F(SpatialDbFixture, BoxCollectFindsTheTouchingUnits)
+TEST_F(
+  SpatialDbFixture,
+  BoxCollectFindsTheTouchingUnits
+)
 {
   std::mt19937 rng(23);
   RegisterAll(rng);
@@ -186,7 +223,10 @@ TEST_F(SpatialDbFixture, BoxCollectFindsTheTouchingUnits)
 }
 
 // Unregistering takes an entry out of every collect; moving it re-seats it where its new box lies.
-TEST_F(SpatialDbFixture, UnregisterAndMoveKeepTheCollectsExact)
+TEST_F(
+  SpatialDbFixture,
+  UnregisterAndMoveKeepTheCollectsExact
+)
 {
   std::mt19937 rng(31);
   RegisterAll(rng);
@@ -209,7 +249,10 @@ TEST_F(SpatialDbFixture, UnregisterAndMoveKeepTheCollectsExact)
 
 // A small move inside one cell only grows the cell's bounds (UpdateBounds, 0x00501C10): the entry stays found
 // at its new place, and at the old one only where the old box still touches the query.
-TEST_F(SpatialDbFixture, SmallMoveStaysFoundAtItsNewPlace)
+TEST_F(
+  SpatialDbFixture,
+  SmallMoveStaysFoundAtItsNewPlace
+)
 {
   const Wm3::AxisAlignedBox3f start({100.0f, 0.0f, 100.0f}, {104.0f, 4.0f, 104.0f});
   const Wm3::AxisAlignedBox3f moved({102.0f, 0.0f, 101.0f}, {106.0f, 4.0f, 105.0f});
@@ -223,7 +266,10 @@ TEST_F(SpatialDbFixture, SmallMoveStaysFoundAtItsNewPlace)
 
 // Entries registered without bounds wait in the database's own map; a collect hands them back whatever type it
 // asks for (0x00503F80 walks that map without a type test).
-TEST_F(SpatialDbFixture, EntriesWithoutBoundsAreCollectedForAnyType)
+TEST_F(
+  SpatialDbFixture,
+  EntriesWithoutBoundsAreCollectedForAnyType
+)
 {
   mEntries[0].Register(&mDb, OwnerOf(0), static_cast<std::int32_t>(kProp));
   mEntries[1].Register(&mDb, OwnerOf(1), static_cast<std::int32_t>(kUnit));
@@ -237,7 +283,10 @@ TEST_F(SpatialDbFixture, EntriesWithoutBoundsAreCollectedForAnyType)
 }
 
 // The map's order (0x00504990): entries that never fade first, ascending, then fading ones by descending cutoff.
-TEST(SpatialEntryOrder, NeverFadingFirstThenLongestFadeFirst)
+TEST(
+  SpatialEntryOrder,
+  NeverFadingFirstThenLongestFadeFirst
+)
 {
   moho::SpatialEntryLess<moho::MeshInstance> less;
   const auto entry = [](const float fade) {

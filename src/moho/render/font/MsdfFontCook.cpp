@@ -27,16 +27,16 @@ namespace moho
 {
   namespace
   {
-    constexpr double kCornerAngleThreshold = 3.0;       // radians; msdfgen's default for edge coloring
+    constexpr double kCornerAngleThreshold = 3.0;                       // radians; msdfgen's default for edge coloring
     constexpr std::uint64_t kColoringSeedStep = 6364136223846793005ull; // msdf-atlas-gen's per-glyph seed
-    constexpr std::uint32_t kAtlasMagic = 0x4D465346u;  // "FSFM"
+    constexpr std::uint32_t kAtlasMagic = 0x4D465346u;                  // "FSFM"
     constexpr std::uint32_t kAtlasVersion = 2u;
     constexpr std::uint32_t kMaxLoadedStrikes = 16u;
     constexpr std::int32_t kMaxLoadedStrikeBox = 64;
     constexpr float kMaxLoadedStrikeMetric = 1024.0f;
     constexpr std::int32_t kMaxLoadedAtlasSide = 8192;
     constexpr std::uint32_t kMaxLoadedGlyphs = 65536u;
-    constexpr double kMaxBoxTexels = 65536.0;           // far past any atlas; only to keep the casts below defined
+    constexpr double kMaxBoxTexels = 65536.0; // far past any atlas; only to keep the casts below defined
 
     /**
      * FreeType's memory with a ceiling: an allocation past it fails, and FreeType handles that as running out
@@ -51,7 +51,9 @@ namespace moho
       std::size_t mUsed = 0u;
       std::size_t mLimit = 0u;
 
-      explicit CappedMemory(const std::size_t limit)
+      explicit CappedMemory(
+        const std::size_t limit
+      )
         : mLimit(limit)
       {
         mRecord.user = this;
@@ -60,9 +62,17 @@ namespace moho
         mRecord.realloc = &Realloc;
       }
 
-      [[nodiscard]] static CappedMemory& Of(const FT_Memory memory) { return *static_cast<CappedMemory*>(memory->user); }
+      [[nodiscard]] static CappedMemory& Of(
+        const FT_Memory memory
+      )
+      {
+        return *static_cast<CappedMemory*>(memory->user);
+      }
 
-      [[nodiscard]] static void* Alloc(const FT_Memory memory, const long size)
+      [[nodiscard]] static void* Alloc(
+        const FT_Memory memory,
+        const long size
+      )
       {
         CappedMemory& self = Of(memory);
         const auto bytes = static_cast<std::size_t>(size);
@@ -78,7 +88,10 @@ namespace moho
         return block + kHeader;
       }
 
-      static void Free(const FT_Memory memory, void* const pointer)
+      static void Free(
+        const FT_Memory memory,
+        void* const pointer
+      )
       {
         if (pointer == nullptr) {
           return;
@@ -90,7 +103,12 @@ namespace moho
         std::free(block);
       }
 
-      [[nodiscard]] static void* Realloc(const FT_Memory memory, const long, const long newSize, void* const pointer)
+      [[nodiscard]] static void* Realloc(
+        const FT_Memory memory,
+        const long,
+        const long newSize,
+        void* const pointer
+      )
       {
         if (pointer == nullptr) {
           return Alloc(memory, newSize);
@@ -119,7 +137,9 @@ namespace moho
       std::unique_ptr<CappedMemory> mMemory;
       FT_Library mLibrary = nullptr;
 
-      explicit FreeTypeLibrary(const std::size_t memoryLimit = 0u)
+      explicit FreeTypeLibrary(
+        const std::size_t memoryLimit = 0u
+      )
       {
         if (memoryLimit == 0u) {
           (void)FT_Init_FreeType(&mLibrary);
@@ -152,10 +172,16 @@ namespace moho
     struct FreeTypeFace
     {
       FT_Face mFace = nullptr;
-      FreeTypeFace(const FT_Library library, const void* const bytes, const std::size_t byteCount)
+      FreeTypeFace(
+        const FT_Library library,
+        const void* const bytes,
+        const std::size_t byteCount
+      )
       {
         if (library != nullptr && byteCount > 0u && byteCount <= 0x7FFFFFFFu) {
-          (void)FT_New_Memory_Face(library, static_cast<const FT_Byte*>(bytes), static_cast<FT_Long>(byteCount), 0, &mFace);
+          (void)FT_New_Memory_Face(
+            library, static_cast<const FT_Byte*>(bytes), static_cast<FT_Long>(byteCount), 0, &mFace
+          );
         }
       }
       ~FreeTypeFace()
@@ -171,10 +197,15 @@ namespace moho
     struct FontHandleOwner
     {
       msdfgen::FontHandle* mFont;
-      explicit FontHandleOwner(const FT_Face face)
+      explicit FontHandleOwner(
+        const FT_Face face
+      )
         : mFont(msdfgen::adoptFreetypeFont(face))
       {}
-      ~FontHandleOwner() { msdfgen::destroyFont(mFont); }
+      ~FontHandleOwner()
+      {
+        msdfgen::destroyFont(mFont);
+      }
       FontHandleOwner(const FontHandleOwner&) = delete;
       FontHandleOwner& operator=(const FontHandleOwner&) = delete;
     };
@@ -192,7 +223,9 @@ namespace moho
       std::int32_t mAtlasY = 0; // of the box's top row
     };
 
-    [[nodiscard]] std::size_t CountEdges(const msdfgen::Shape& shape) noexcept
+    [[nodiscard]] std::size_t CountEdges(
+      const msdfgen::Shape& shape
+    ) noexcept
     {
       std::size_t edges = 0u;
       for (const msdfgen::Contour& contour : shape.contours) {
@@ -206,10 +239,14 @@ namespace moho
      * negative. False for a glyph that doesn't load or has an open contour.
      */
     [[nodiscard]] bool LoadGlyph(
-      SourceGlyph& glyph, msdfgen::FontHandle* const font, const unsigned glyphId
+      SourceGlyph& glyph,
+      msdfgen::FontHandle* const font,
+      const unsigned glyphId
     )
     {
-      if (!msdfgen::loadGlyph(glyph.mShape, font, msdfgen::GlyphIndex(glyphId), msdfgen::FONT_SCALING_NONE, &glyph.mAdvance)) {
+      if (!msdfgen::loadGlyph(
+            glyph.mShape, font, msdfgen::GlyphIndex(glyphId), msdfgen::FONT_SCALING_NONE, &glyph.mAdvance
+          )) {
         return false;
       }
       if (!glyph.mShape.validate()) {
@@ -233,7 +270,12 @@ namespace moho
      * up to whole texels with the shape centered, plus one texel so the quad can stop at texel centers.
      * False for a box too large to be real.
      */
-    [[nodiscard]] bool WrapBox(SourceGlyph& glyph, const double scale, const double rangeUnits, const double miterLimit)
+    [[nodiscard]] bool WrapBox(
+      SourceGlyph& glyph,
+      const double scale,
+      const double rangeUnits,
+      const double miterLimit
+    )
     {
       const msdfgen::Shape::Bounds bounds = glyph.mShape.getBounds();
       if (bounds.l >= bounds.r || bounds.b >= bounds.t) {
@@ -261,7 +303,9 @@ namespace moho
 
     /** Shelves, tallest first. Returns the rows used, or -1 when any box is wider than the atlas. */
     [[nodiscard]] std::int32_t PackShelves(
-      std::vector<SourceGlyph>& glyphs, const std::int32_t atlasWidth, const std::int32_t spacing
+      std::vector<SourceGlyph>& glyphs,
+      const std::int32_t atlasWidth,
+      const std::int32_t spacing
     )
     {
       std::vector<SourceGlyph*> order;
@@ -296,7 +340,9 @@ namespace moho
     }
 
     /** Scales a 2D vector to unit length; zero stays zero, as msdfgen's normalize(true) leaves it. */
-    void NormalizeOrZero(float* const v) noexcept
+    void NormalizeOrZero(
+      float* const v
+    ) noexcept
     {
       const float length = std::sqrt(v[0] * v[0] + v[1] * v[1]);
       if (length > 0.0f) {
@@ -309,7 +355,11 @@ namespace moho
     }
 
     /** msdfgen's EdgeSegment::direction at the start or the end of a GPU edge, unit length or zero. */
-    void GpuEdgeDirection(const SMsdfGpuEdge& edge, const bool atEnd, float* const out) noexcept
+    void GpuEdgeDirection(
+      const SMsdfGpuEdge& edge,
+      const bool atEnd,
+      float* const out
+    ) noexcept
     {
       if (edge.mKind == 1u) {
         out[0] = edge.mP1[0] - edge.mP0[0];
@@ -333,7 +383,13 @@ namespace moho
      * touching a curve's top was counted twice before, which drew a line beside the glyph. A split traces the same
      * curve, so no distance changes.
      */
-    void PushGpuQuadratic(std::vector<SMsdfGpuEdge>& edges, const float* const p0, const float* const p1, const float* const p2, const std::uint32_t color)
+    void PushGpuQuadratic(
+      std::vector<SMsdfGpuEdge>& edges,
+      const float* const p0,
+      const float* const p1,
+      const float* const p2,
+      const std::uint32_t color
+    )
     {
       const auto push = [&edges, color](const float* const a, const float* const b, const float* const c) {
         SMsdfGpuEdge edge;
@@ -365,7 +421,10 @@ namespace moho
      * between an edge and the one before it, wrapping around: the shader needs them to tell which side of a corner
      * a texel is on, as msdfgen's MultiDistanceSelector::addEdge does with the edges on either side.
      */
-    void FillContourCorners(std::vector<SMsdfGpuEdge>& edges, const std::size_t first)
+    void FillContourCorners(
+      std::vector<SMsdfGpuEdge>& edges,
+      const std::size_t first
+    )
     {
       const std::size_t count = edges.size() - first;
       for (std::size_t i = 0; i < count; ++i) {
@@ -388,8 +447,12 @@ namespace moho
 
     /** The last step of a field, wherever it came from: error correction, then the bytes into the atlas. */
     void StoreField(
-      const SourceGlyph& glyph, std::vector<float>& field, const double scale, const double rangeUnits,
-      const std::int32_t atlasWidth, std::uint8_t* const atlasPixels
+      const SourceGlyph& glyph,
+      std::vector<float>& field,
+      const double scale,
+      const double rangeUnits,
+      const std::int32_t atlasWidth,
+      std::uint8_t* const atlasPixels
     )
     {
       const msdfgen::BitmapSection<float, 4> section(field.data(), glyph.mWidth, glyph.mHeight, msdfgen::Y_UPWARD);
@@ -406,7 +469,8 @@ namespace moho
       // The field's rows go up; the atlas's go down from the top.
       for (std::int32_t y = 0; y < glyph.mHeight; ++y) {
         const std::size_t row = static_cast<std::size_t>(glyph.mAtlasY + glyph.mHeight - 1 - y);
-        std::uint8_t* out = atlasPixels + (row * static_cast<std::size_t>(atlasWidth) + static_cast<std::size_t>(glyph.mAtlasX)) * 4u;
+        std::uint8_t* out =
+          atlasPixels + (row * static_cast<std::size_t>(atlasWidth) + static_cast<std::size_t>(glyph.mAtlasX)) * 4u;
         const float* in = field.data() + static_cast<std::size_t>(y) * static_cast<std::size_t>(glyph.mWidth) * 4u;
         for (std::int32_t texel = 0; texel < glyph.mWidth * 4; ++texel) {
           out[texel] = msdfgen::pixelFloatToByte(in[texel]);
@@ -419,8 +483,12 @@ namespace moho
      * correction, fix signs against the exact fill, then correct errors without distance checks.
      */
     void GenerateGlyph(
-      const SourceGlyph& glyph, std::vector<float>& field, const double scale, const double rangeUnits,
-      const std::int32_t atlasWidth, std::uint8_t* const atlasPixels
+      const SourceGlyph& glyph,
+      std::vector<float>& field,
+      const double scale,
+      const double rangeUnits,
+      const std::int32_t atlasWidth,
+      std::uint8_t* const atlasPixels
     )
     {
       field.resize(static_cast<std::size_t>(glyph.mWidth) * static_cast<std::size_t>(glyph.mHeight) * 4u);
@@ -442,7 +510,12 @@ namespace moho
      * vertically and never runs the font's own hinting programs. Nothing here calls Win32, so a later
      * client on another system can use it. A glyph that won't rasterize, or is implausibly large, is left out.
      */
-    void RasterizeStrikes(const FT_Face face, const SMsdfCookOptions& options, const std::vector<std::uint32_t>& codepoints, SMsdfFontAtlas& atlas)
+    void RasterizeStrikes(
+      const FT_Face face,
+      const SMsdfCookOptions& options,
+      const std::vector<std::uint32_t>& codepoints,
+      SMsdfFontAtlas& atlas
+    )
     {
       constexpr int kMaxStrikeBox = 64;
       for (const std::int32_t size : options.mStrikeSizes) {
@@ -460,7 +533,9 @@ namespace moho
           const FT_Bitmap& bitmap = slot->bitmap;
           const int width = static_cast<int>(bitmap.width);
           const int rows = static_cast<int>(bitmap.rows);
-          if ((width != 0 && bitmap.pixel_mode != FT_PIXEL_MODE_GRAY) || width > kMaxStrikeBox || rows > kMaxStrikeBox) {
+          if (
+            (width != 0 && bitmap.pixel_mode != FT_PIXEL_MODE_GRAY) || width > kMaxStrikeBox || rows > kMaxStrikeBox
+          ) {
             continue;
           }
           SMsdfStrikeGlyph glyph;
@@ -481,7 +556,9 @@ namespace moho
       }
     }
 
-    [[nodiscard]] std::string DecodeName(const FT_SfntName& name)
+    [[nodiscard]] std::string DecodeName(
+      const FT_SfntName& name
+    )
     {
       std::string text;
       if (name.platform_id == TT_PLATFORM_MICROSOFT || name.platform_id == TT_PLATFORM_APPLE_UNICODE) {
@@ -501,14 +578,21 @@ namespace moho
     }
 
     template <class T>
-    void AppendValue(std::vector<std::uint8_t>& out, const T& value)
+    void AppendValue(
+      std::vector<std::uint8_t>& out,
+      const T& value
+    )
     {
       const auto* const bytes = reinterpret_cast<const std::uint8_t*>(&value);
       out.insert(out.end(), bytes, bytes + sizeof(T));
     }
 
     template <class T>
-    [[nodiscard]] bool ReadValue(const std::uint8_t*& at, const std::uint8_t* const end, T& value)
+    [[nodiscard]] bool ReadValue(
+      const std::uint8_t*& at,
+      const std::uint8_t* const end,
+      T& value
+    )
     {
       if (static_cast<std::size_t>(end - at) < sizeof(T)) {
         return false;
@@ -518,11 +602,21 @@ namespace moho
       return true;
     }
 
-    [[nodiscard]] bool IsGlyphRectValid(const SMsdfGlyph& glyph, const SMsdfFontAtlas& atlas) noexcept
+    [[nodiscard]] bool IsGlyphRectValid(
+      const SMsdfGlyph& glyph,
+      const SMsdfFontAtlas& atlas
+    ) noexcept
     {
       const float values[] = {
-        glyph.mAdvance,     glyph.mPlaneLeft,  glyph.mPlaneBottom, glyph.mPlaneRight, glyph.mPlaneTop,
-        glyph.mAtlasLeft,   glyph.mAtlasBottom, glyph.mAtlasRight, glyph.mAtlasTop,
+        glyph.mAdvance,
+        glyph.mPlaneLeft,
+        glyph.mPlaneBottom,
+        glyph.mPlaneRight,
+        glyph.mPlaneTop,
+        glyph.mAtlasLeft,
+        glyph.mAtlasBottom,
+        glyph.mAtlasRight,
+        glyph.mAtlasTop,
       };
       for (const float value : values) {
         if (!std::isfinite(value)) {
@@ -531,8 +625,8 @@ namespace moho
       }
       const auto width = static_cast<float>(atlas.mWidth);
       const auto height = static_cast<float>(atlas.mHeight);
-      return glyph.mAtlasLeft >= 0.0f && glyph.mAtlasLeft <= glyph.mAtlasRight && glyph.mAtlasRight <= width
-        && glyph.mAtlasTop >= 0.0f && glyph.mAtlasTop <= glyph.mAtlasBottom && glyph.mAtlasBottom <= height;
+      return glyph.mAtlasLeft >= 0.0f && glyph.mAtlasLeft <= glyph.mAtlasRight && glyph.mAtlasRight <= width &&
+        glyph.mAtlasTop >= 0.0f && glyph.mAtlasTop <= glyph.mAtlasBottom && glyph.mAtlasBottom <= height;
     }
   } // namespace
 
@@ -555,7 +649,9 @@ namespace moho
     return codepoints;
   }
 
-  SMsdfCookOptions MSDF_MakeCookOptions(const std::int32_t threads)
+  SMsdfCookOptions MSDF_MakeCookOptions(
+    const std::int32_t threads
+  )
   {
     SMsdfCookOptions options;
     options.mThreads = threads;
@@ -563,7 +659,9 @@ namespace moho
     return options;
   }
 
-  SMsdfCookOptions MSDF_MakeModCookOptions(const std::int32_t threads)
+  SMsdfCookOptions MSDF_MakeModCookOptions(
+    const std::int32_t threads
+  )
   {
     SMsdfCookOptions options = MSDF_MakeCookOptions(threads);
     options.mStrikeSizes = {8, 9, 10, 11, 12, 13, 14};
@@ -599,13 +697,17 @@ namespace moho
     bool mTimedOut = false;
 
     /** Whether to give up now, for time or a cancel; sets `error` when it does. */
-    [[nodiscard]] bool ShouldStop(std::string& error)
+    [[nodiscard]] bool ShouldStop(
+      std::string& error
+    )
     {
       if (mOptions.mCancel != nullptr && mOptions.mCancel->load(std::memory_order_relaxed)) {
         error = "cancelled";
         mTimedOut = true;
-      } else if (mOptions.mMaxSeconds > 0.0
-                 && std::chrono::duration<double>(std::chrono::steady_clock::now() - mStart).count() > mOptions.mMaxSeconds) {
+      } else if (
+        mOptions.mMaxSeconds > 0.0 &&
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - mStart).count() > mOptions.mMaxSeconds
+      ) {
         error = "it took too long";
         mTimedOut = true;
       }
@@ -624,7 +726,12 @@ namespace moho
     return mImpl->mTimedOut;
   }
 
-  bool MsdfCookPlan::Prepare(const void* const fontBytes, const std::size_t byteCount, const SMsdfCookOptions& options, std::string& error)
+  bool MsdfCookPlan::Prepare(
+    const void* const fontBytes,
+    const std::size_t byteCount,
+    const SMsdfCookOptions& options,
+    std::string& error
+  )
   {
     Impl& plan = *mImpl;
     plan.mOptions = options;
@@ -701,8 +808,8 @@ namespace moho
         error = "a glyph is far too large";
         return false;
       }
-      const std::uint64_t work = static_cast<std::uint64_t>(glyph.mWidth) * static_cast<std::uint64_t>(glyph.mHeight)
-        * static_cast<std::uint64_t>(CountEdges(glyph.mShape));
+      const std::uint64_t work = static_cast<std::uint64_t>(glyph.mWidth) * static_cast<std::uint64_t>(glyph.mHeight) *
+        static_cast<std::uint64_t>(CountEdges(glyph.mShape));
       fontWork += work;
       if (options.mMaxGlyphWork != 0u && work > options.mMaxGlyphWork) {
         error = "a glyph would take too much work";
@@ -714,7 +821,8 @@ namespace moho
       }
     }
 
-    // Any box wider than the atlas refuses the font, wherever it sorts: one left unplaced would be written past the atlas.
+    // Any box wider than the atlas refuses the font, wherever it sorts: one left unplaced would be written past the
+    // atlas.
     const std::int32_t rowsUsed = PackShelves(plan.mGlyphs, options.mAtlasWidth, options.mGlyphSpacing);
     const std::int32_t step = (std::max)(options.mHeightStep, 1);
     const std::int32_t rows = (std::max)((rowsUsed + step - 1) / step, 1) * step;
@@ -735,7 +843,9 @@ namespace moho
     return true;
   }
 
-  bool MsdfCookPlan::GenerateOnCpu(std::string& error)
+  bool MsdfCookPlan::GenerateOnCpu(
+    std::string& error
+  )
   {
     Impl& plan = *mImpl;
     // Boxes don't overlap, so threads write disjoint texels.
@@ -745,7 +855,9 @@ namespace moho
       std::vector<float> field;
       for (std::size_t i = next++; i < plan.mGlyphs.size() && !stopped.load(std::memory_order_relaxed); i = next++) {
         if (plan.mGlyphs[i].mWidth > 0) {
-          GenerateGlyph(plan.mGlyphs[i], field, plan.mScale, plan.mRangeUnits, plan.mAtlas.mWidth, plan.mAtlas.mPixels.data());
+          GenerateGlyph(
+            plan.mGlyphs[i], field, plan.mScale, plan.mRangeUnits, plan.mAtlas.mWidth, plan.mAtlas.mPixels.data()
+          );
         }
       }
     };
@@ -853,13 +965,20 @@ namespace moho
     return static_cast<float>(mImpl->mOptions.mDistanceRange);
   }
 
-  void MsdfCookPlan::StoreGlyphField(const std::size_t glyphIndex, std::vector<float>& field)
+  void MsdfCookPlan::StoreGlyphField(
+    const std::size_t glyphIndex,
+    std::vector<float>& field
+  )
   {
     Impl& plan = *mImpl;
-    StoreField(plan.mGlyphs[glyphIndex], field, plan.mScale, plan.mRangeUnits, plan.mAtlas.mWidth, plan.mAtlas.mPixels.data());
+    StoreField(
+      plan.mGlyphs[glyphIndex], field, plan.mScale, plan.mRangeUnits, plan.mAtlas.mWidth, plan.mAtlas.mPixels.data()
+    );
   }
 
-  void MsdfCookPlan::Finish(SMsdfFontAtlas& out)
+  void MsdfCookPlan::Finish(
+    SMsdfFontAtlas& out
+  )
   {
     Impl& plan = *mImpl;
     SMsdfFontAtlas& atlas = plan.mAtlas;
@@ -875,8 +994,10 @@ namespace moho
       const double inverseScale = 1.0 / plan.mScale;
       result.mPlaneLeft = static_cast<float>((-glyph.mTranslateX + 0.5 * inverseScale) / plan.mUnitsPerEm);
       result.mPlaneBottom = static_cast<float>((-glyph.mTranslateY + 0.5 * inverseScale) / plan.mUnitsPerEm);
-      result.mPlaneRight = static_cast<float>((-glyph.mTranslateX + (glyph.mWidth - 0.5) * inverseScale) / plan.mUnitsPerEm);
-      result.mPlaneTop = static_cast<float>((-glyph.mTranslateY + (glyph.mHeight - 0.5) * inverseScale) / plan.mUnitsPerEm);
+      result.mPlaneRight =
+        static_cast<float>((-glyph.mTranslateX + (glyph.mWidth - 0.5) * inverseScale) / plan.mUnitsPerEm);
+      result.mPlaneTop =
+        static_cast<float>((-glyph.mTranslateY + (glyph.mHeight - 0.5) * inverseScale) / plan.mUnitsPerEm);
       result.mAtlasLeft = static_cast<float>(glyph.mAtlasX) + 0.5f;
       result.mAtlasRight = static_cast<float>(glyph.mAtlasX + glyph.mWidth) - 0.5f;
       result.mAtlasTop = static_cast<float>(glyph.mAtlasY) + 0.5f;
@@ -887,7 +1008,10 @@ namespace moho
   }
 
   bool MSDF_CookFont(
-    const void* const fontBytes, const std::size_t byteCount, const SMsdfCookOptions& options, SMsdfFontAtlas& out,
+    const void* const fontBytes,
+    const std::size_t byteCount,
+    const SMsdfCookOptions& options,
+    SMsdfFontAtlas& out,
     std::string& error
   )
   {
@@ -900,7 +1024,10 @@ namespace moho
     return true;
   }
 
-  std::vector<std::string> MSDF_ReadFontNames(const void* const fontBytes, const std::size_t byteCount)
+  std::vector<std::string> MSDF_ReadFontNames(
+    const void* const fontBytes,
+    const std::size_t byteCount
+  )
   {
     std::vector<std::string> names;
     const FreeTypeLibrary library{};
@@ -927,7 +1054,9 @@ namespace moho
     return names;
   }
 
-  std::vector<std::uint8_t> MSDF_SaveAtlas(const SMsdfFontAtlas& atlas)
+  std::vector<std::uint8_t> MSDF_SaveAtlas(
+    const SMsdfFontAtlas& atlas
+  )
   {
     std::vector<std::uint8_t> plain;
     plain.reserve(atlas.mGlyphs.size() * sizeof(SMsdfGlyph) + atlas.mPixels.size() + 64u);
@@ -959,7 +1088,8 @@ namespace moho
     std::memcpy(packed.data(), &kAtlasMagic, sizeof(kAtlasMagic));
     std::memcpy(packed.data() + sizeof(kAtlasMagic), &kAtlasVersion, sizeof(kAtlasVersion));
     const std::size_t header = sizeof(kAtlasMagic) + sizeof(kAtlasVersion);
-    const std::size_t written = ZSTD_compress(packed.data() + header, packed.size() - header, plain.data(), plain.size(), 3);
+    const std::size_t written =
+      ZSTD_compress(packed.data() + header, packed.size() - header, plain.data(), plain.size(), 3);
     if (ZSTD_isError(written) != 0u) {
       return {};
     }
@@ -967,7 +1097,11 @@ namespace moho
     return packed;
   }
 
-  bool MSDF_LoadAtlas(const void* const bytes, const std::size_t byteCount, SMsdfFontAtlas& out)
+  bool MSDF_LoadAtlas(
+    const void* const bytes,
+    const std::size_t byteCount,
+    SMsdfFontAtlas& out
+  )
   {
     out = SMsdfFontAtlas{};
     const std::size_t header = sizeof(kAtlasMagic) + sizeof(kAtlasVersion);
@@ -984,8 +1118,9 @@ namespace moho
 
     const void* const packed = static_cast<const std::uint8_t*>(bytes) + header;
     const unsigned long long plainSize = ZSTD_getFrameContentSize(packed, byteCount - header);
-    const unsigned long long largest = static_cast<unsigned long long>(kMaxLoadedAtlasSide) * kMaxLoadedAtlasSide * 4ull
-      + kMaxLoadedGlyphs * sizeof(SMsdfGlyph) + 64ull;
+    const unsigned long long largest =
+      static_cast<unsigned long long>(kMaxLoadedAtlasSide) * kMaxLoadedAtlasSide * 4ull +
+      kMaxLoadedGlyphs * sizeof(SMsdfGlyph) + 64ull;
     if (plainSize == ZSTD_CONTENTSIZE_UNKNOWN || plainSize == ZSTD_CONTENTSIZE_ERROR || plainSize > largest) {
       return false;
     }
@@ -999,16 +1134,20 @@ namespace moho
     const std::uint8_t* const end = plain.data() + plain.size();
     std::uint32_t glyphCount = 0u;
     SMsdfFontAtlas atlas;
-    if (!ReadValue(at, end, atlas.mWidth) || !ReadValue(at, end, atlas.mHeight) || !ReadValue(at, end, atlas.mEmPixels)
-        || !ReadValue(at, end, atlas.mDistanceRange) || !ReadValue(at, end, atlas.mMissing)
-        || !ReadValue(at, end, atlas.mAscent) || !ReadValue(at, end, atlas.mDescent) || !ReadValue(at, end, atlas.mLineGap)
-        || !ReadValue(at, end, glyphCount)) {
+    if (
+      !ReadValue(at, end, atlas.mWidth) || !ReadValue(at, end, atlas.mHeight) || !ReadValue(at, end, atlas.mEmPixels) ||
+      !ReadValue(at, end, atlas.mDistanceRange) || !ReadValue(at, end, atlas.mMissing) ||
+      !ReadValue(at, end, atlas.mAscent) || !ReadValue(at, end, atlas.mDescent) ||
+      !ReadValue(at, end, atlas.mLineGap) || !ReadValue(at, end, glyphCount)
+    ) {
       return false;
     }
-    if (atlas.mWidth <= 0 || atlas.mHeight <= 0 || atlas.mWidth > kMaxLoadedAtlasSide || atlas.mHeight > kMaxLoadedAtlasSide
-        || glyphCount > kMaxLoadedGlyphs || !std::isfinite(atlas.mEmPixels) || atlas.mEmPixels <= 0.0f
-        || !std::isfinite(atlas.mDistanceRange) || atlas.mDistanceRange <= 0.0f || !std::isfinite(atlas.mAscent)
-        || !std::isfinite(atlas.mDescent) || !std::isfinite(atlas.mLineGap)) {
+    if (
+      atlas.mWidth <= 0 || atlas.mHeight <= 0 || atlas.mWidth > kMaxLoadedAtlasSide ||
+      atlas.mHeight > kMaxLoadedAtlasSide || glyphCount > kMaxLoadedGlyphs || !std::isfinite(atlas.mEmPixels) ||
+      atlas.mEmPixels <= 0.0f || !std::isfinite(atlas.mDistanceRange) || atlas.mDistanceRange <= 0.0f ||
+      !std::isfinite(atlas.mAscent) || !std::isfinite(atlas.mDescent) || !std::isfinite(atlas.mLineGap)
+    ) {
       return false;
     }
     atlas.mGlyphs.resize(glyphCount);
@@ -1028,19 +1167,27 @@ namespace moho
     for (SMsdfStrike& strike : atlas.mStrikes) {
       std::uint32_t strikeGlyphs = 0u;
       std::uint32_t coverageBytes = 0u;
-      if (!ReadValue(at, end, strike.mPixelSize) || !ReadValue(at, end, strikeGlyphs) || !ReadValue(at, end, coverageBytes)
-          || strike.mPixelSize <= 0 || strike.mPixelSize > kMaxLoadedStrikeBox || strikeGlyphs > kMaxLoadedGlyphs) {
+      if (
+        !ReadValue(at, end, strike.mPixelSize) || !ReadValue(at, end, strikeGlyphs) ||
+        !ReadValue(at, end, coverageBytes) || strike.mPixelSize <= 0 || strike.mPixelSize > kMaxLoadedStrikeBox ||
+        strikeGlyphs > kMaxLoadedGlyphs
+      ) {
         return false;
       }
       strike.mGlyphs.resize(strikeGlyphs);
       std::uint32_t previousStrike = 0u;
       for (std::uint32_t i = 0; i < strikeGlyphs; ++i) {
         SMsdfStrikeGlyph& glyph = strike.mGlyphs[i];
-        if (!ReadValue(at, end, glyph) || (i != 0u && glyph.mCodepoint <= previousStrike) || glyph.mWidth < 0
-            || glyph.mHeight < 0 || glyph.mWidth > kMaxLoadedStrikeBox || glyph.mHeight > kMaxLoadedStrikeBox
-            || !std::isfinite(glyph.mAdvance) || std::fabs(glyph.mAdvance) > kMaxLoadedStrikeMetric
-            || std::abs(glyph.mLeft) > static_cast<int>(kMaxLoadedStrikeMetric) || std::abs(glyph.mTop) > static_cast<int>(kMaxLoadedStrikeMetric)
-            || static_cast<std::uint64_t>(glyph.mOffset) + static_cast<std::uint64_t>(glyph.mWidth) * static_cast<std::uint64_t>(glyph.mHeight) > coverageBytes) {
+        if (
+          !ReadValue(at, end, glyph) || (i != 0u && glyph.mCodepoint <= previousStrike) || glyph.mWidth < 0 ||
+          glyph.mHeight < 0 || glyph.mWidth > kMaxLoadedStrikeBox || glyph.mHeight > kMaxLoadedStrikeBox ||
+          !std::isfinite(glyph.mAdvance) || std::fabs(glyph.mAdvance) > kMaxLoadedStrikeMetric ||
+          std::abs(glyph.mLeft) > static_cast<int>(kMaxLoadedStrikeMetric) ||
+          std::abs(glyph.mTop) > static_cast<int>(kMaxLoadedStrikeMetric) ||
+          static_cast<std::uint64_t>(glyph.mOffset) +
+              static_cast<std::uint64_t>(glyph.mWidth) * static_cast<std::uint64_t>(glyph.mHeight) >
+            coverageBytes
+        ) {
           return false;
         }
         previousStrike = glyph.mCodepoint;
@@ -1051,7 +1198,8 @@ namespace moho
       strike.mCoverage.assign(at, at + coverageBytes);
       at += coverageBytes;
     }
-    const std::size_t pixelBytes = static_cast<std::size_t>(atlas.mWidth) * static_cast<std::size_t>(atlas.mHeight) * 4u;
+    const std::size_t pixelBytes =
+      static_cast<std::size_t>(atlas.mWidth) * static_cast<std::size_t>(atlas.mHeight) * 4u;
     if (static_cast<std::size_t>(end - at) != pixelBytes) {
       return false;
     }

@@ -44,7 +44,8 @@ namespace moho
 
   TConVar<bool> gTConVar_res_PrecompileScripts(
     "res_PrecompileScripts",
-    "With res_ScriptChunkCache, compile the blueprints and scripts the rules' scripts list with DiskFindFiles on helper "
+    "With res_ScriptChunkCache, compile the blueprints and scripts the rules' scripts list with DiskFindFiles on "
+    "helper "
     "threads ahead of their doscript (1, the default), or each when it is run (0). The same functions either way.",
     &res_PrecompileScripts
   );
@@ -86,10 +87,18 @@ namespace
 
   struct SChunkKeyHash
   {
-    std::size_t operator()(const SChunkKey& key) const noexcept { return static_cast<std::size_t>(key.first); }
+    std::size_t operator()(
+      const SChunkKey& key
+    ) const noexcept
+    {
+      return static_cast<std::size_t>(key.first);
+    }
   };
 
-  [[nodiscard]] std::uint64_t Rotate(const std::uint64_t value, const int bits) noexcept
+  [[nodiscard]] std::uint64_t Rotate(
+    const std::uint64_t value,
+    const int bits
+  ) noexcept
   {
     return (value << bits) | (value >> (64 - bits));
   }
@@ -99,7 +108,9 @@ namespace
   class ChunkHasher
   {
   public:
-    void Add(const std::string_view text) noexcept
+    void Add(
+      const std::string_view text
+    ) noexcept
     {
       std::size_t index = 0;
       for (; index + 8U <= text.size(); index += 8U) {
@@ -119,13 +130,17 @@ namespace
     }
 
   private:
-    void Mix(const std::uint64_t word) noexcept
+    void Mix(
+      const std::uint64_t word
+    ) noexcept
     {
       mFirst = Rotate((mFirst ^ word) * 0x9E3779B97F4A7C15ULL, 29);
       mSecond = Rotate((mSecond + Rotate(word, 31)) * 0xC2B2AE3D27D4EB4FULL, 33);
     }
 
-    [[nodiscard]] static std::uint64_t Finish(std::uint64_t value) noexcept
+    [[nodiscard]] static std::uint64_t Finish(
+      std::uint64_t value
+    ) noexcept
     {
       value ^= value >> 33U;
       value *= 0xFF51AFD7ED558CCDULL;
@@ -143,12 +158,16 @@ namespace
 
   /// The file after its header.
   template <class Bytes>
-  [[nodiscard]] std::string_view Payload(const Bytes& file)
+  [[nodiscard]] std::string_view Payload(
+    const Bytes& file
+  )
   {
     return std::string_view(file.data() + kHeaderBytes, file.size() - kHeaderBytes);
   }
 
-  [[nodiscard]] SChunkKey Checksum(const std::string_view payload)
+  [[nodiscard]] SChunkKey Checksum(
+    const std::string_view payload
+  )
   {
     ChunkHasher hasher;
     hasher.Add(payload);
@@ -179,7 +198,9 @@ namespace
   class ScriptChunks
   {
   public:
-    explicit ScriptChunks(const char* const fileName)
+    explicit ScriptChunks(
+      const char* const fileName
+    )
       : mFileName(fileName)
     {}
 
@@ -213,7 +234,9 @@ namespace
      * with `now`. For the batch the main thread keeps open for as long as the user interface runs,
      * which never ends: the chunks the helper writes stay where they are (mFile, mCompiled).
      */
-    void Flush(const bool now)
+    void Flush(
+      const bool now
+    )
     {
       if (now && mWriter.joinable()) {
         mWriter.join();
@@ -233,11 +256,16 @@ namespace
       if (now) {
         Write(Path(), kept);
       } else {
-        mWriter = std::thread([path = Path(), kept = std::move(kept)] { Write(path, kept); });
+        mWriter = std::thread([path = Path(), kept = std::move(kept)] {
+          Write(path, kept);
+        });
       }
     }
 
-    [[nodiscard]] bool Find(const SChunkKey& key, std::string& outCode)
+    [[nodiscard]] bool Find(
+      const SChunkKey& key,
+      std::string& outCode
+    )
     {
       const std::lock_guard<std::mutex> lock(mMutex);
       const auto found = mChunks.find(key);
@@ -249,7 +277,9 @@ namespace
       return true;
     }
 
-    [[nodiscard]] bool Contains(const SChunkKey& key)
+    [[nodiscard]] bool Contains(
+      const SChunkKey& key
+    )
     {
       const std::lock_guard<std::mutex> lock(mMutex);
       return mChunks.find(key) != mChunks.end();
@@ -257,7 +287,11 @@ namespace
 
     /// `used`: kept by the batch's loader, not ahead of it by a helper (which may compile a chunk the
     /// loader then asks for with other text, such as a hooked script).
-    void Keep(const SChunkKey& key, std::string code, const bool used)
+    void Keep(
+      const SChunkKey& key,
+      std::string code,
+      const bool used
+    )
     {
       const std::lock_guard<std::mutex> lock(mMutex);
       if (mBatches == 0) {
@@ -291,12 +325,15 @@ namespace
       if (path.empty()) {
         return;
       }
-      HANDLE const file = ::CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, nullptr);
+      HANDLE const file = ::CreateFileA(
+        path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, nullptr
+      );
       if (file == INVALID_HANDLE_VALUE) {
         return;
       }
       LARGE_INTEGER size{};
-      bool ok = ::GetFileSizeEx(file, &size) && size.QuadPart >= static_cast<LONGLONG>(kHeaderBytes) && static_cast<std::uint64_t>(size.QuadPart) < kMaxFileBytes;
+      bool ok = ::GetFileSizeEx(file, &size) && size.QuadPart >= static_cast<LONGLONG>(kHeaderBytes) &&
+        static_cast<std::uint64_t>(size.QuadPart) < kMaxFileBytes;
       if (ok) {
         mFile.resize(static_cast<std::size_t>(size.QuadPart));
         DWORD read = 0;
@@ -305,13 +342,17 @@ namespace
       ::CloseHandle(file);
 
       const std::uint64_t identity = gpg::ExecutableIdentity();
-      if (!ok || std::memcmp(mFile.data(), kMagic, sizeof(kMagic)) != 0 ||
-          std::memcmp(mFile.data() + sizeof(kMagic), &identity, sizeof(identity)) != 0) {
+      if (
+        !ok || std::memcmp(mFile.data(), kMagic, sizeof(kMagic)) != 0 ||
+        std::memcmp(mFile.data() + sizeof(kMagic), &identity, sizeof(identity)) != 0
+      ) {
         mFile.clear();
         return;
       }
-      if (const SChunkKey checksum = Checksum(Payload(mFile));
-          std::memcmp(mFile.data() + sizeof(kMagic) + sizeof(identity), &checksum, sizeof(checksum)) != 0) {
+      if (
+        const SChunkKey checksum = Checksum(Payload(mFile));
+        std::memcmp(mFile.data() + sizeof(kMagic) + sizeof(identity), &checksum, sizeof(checksum)) != 0
+      ) {
         mFile.clear();
         return;
       }
@@ -350,7 +391,10 @@ namespace
       return kept;
     }
 
-    static void Write(const std::string& path, const std::vector<SKeptChunk>& kept)
+    static void Write(
+      const std::string& path,
+      const std::vector<SKeptChunk>& kept
+    )
     {
       if (path.empty()) {
         return;
@@ -377,7 +421,8 @@ namespace
         return;
       }
       DWORD written = 0;
-      const bool ok = ::WriteFile(file, out.data(), static_cast<DWORD>(out.size()), &written, nullptr) && written == out.size();
+      const bool ok =
+        ::WriteFile(file, out.data(), static_cast<DWORD>(out.size()), &written, nullptr) && written == out.size();
       ::CloseHandle(file);
       std::error_code renamed;
       if (ok) {
@@ -424,7 +469,11 @@ namespace
     bool done = false;
   };
 
-  const char* ReadWholeBuffer(lua_State* /*state*/, void* const userData, std::size_t* const outSize)
+  const char* ReadWholeBuffer(
+    lua_State* /*state*/,
+    void* const userData,
+    std::size_t* const outSize
+  )
   {
     auto* const buffer = static_cast<SWholeBuffer*>(userData);
     if (buffer->done || buffer->text.empty()) {
@@ -435,7 +484,12 @@ namespace
     return buffer->text.data();
   }
 
-  int AppendDump(lua_State* /*state*/, const void* const bytes, const std::size_t size, void* const userData)
+  int AppendDump(
+    lua_State* /*state*/,
+    const void* const bytes,
+    const std::size_t size,
+    void* const userData
+  )
   {
     static_cast<std::string*>(userData)->append(static_cast<const char*>(bytes), size);
     return 0;
@@ -446,18 +500,27 @@ namespace
    * byte, as lua_load tells them apart. Such a chunk is never kept: each load goes to the parser,
    * which logs it and refuses it when lua_AllowPrecompiledChunks is off.
    */
-  [[nodiscard]] bool IsCompiledChunk(const std::string_view text) noexcept
+  [[nodiscard]] bool IsCompiledChunk(
+    const std::string_view text
+  ) noexcept
   {
     return !text.empty() && text.front() == '\033';
   }
 
-  [[nodiscard]] int LoadBuffer(lua_State* const state, const std::string_view text, const char* const chunkName)
+  [[nodiscard]] int LoadBuffer(
+    lua_State* const state,
+    const std::string_view text,
+    const char* const chunkName
+  )
   {
     SWholeBuffer buffer{text};
     return lua_load(state, reinterpret_cast<lua_Chunkreader>(ReadWholeBuffer), &buffer, chunkName);
   }
 
-  [[nodiscard]] SChunkKey KeyOf(const char* const chunkName, const std::string_view source)
+  [[nodiscard]] SChunkKey KeyOf(
+    const char* const chunkName,
+    const std::string_view source
+  )
   {
     ChunkHasher hasher;
     hasher.Add(chunkName != nullptr ? std::string_view(chunkName) : std::string_view("?"));
@@ -476,7 +539,9 @@ namespace
   class Precompiler
   {
   public:
-    void Add(const fa::vector<fa::string>& mountedPaths)
+    void Add(
+      const fa::vector<fa::string>& mountedPaths
+    )
     {
       {
         const std::lock_guard<std::mutex> lock(mMutex);
@@ -490,7 +555,9 @@ namespace
           mStopping = false;
           const unsigned count = std::clamp(std::thread::hardware_concurrency() / 2U, 1U, 4U);
           for (unsigned index = 0; index < count; ++index) {
-            mHelpers.emplace_back([this] { Run(); });
+            mHelpers.emplace_back([this] {
+              Run();
+            });
           }
         }
       }
@@ -523,7 +590,9 @@ namespace
         std::string mountedPath;
         {
           std::unique_lock<std::mutex> lock(mMutex);
-          mWake.wait(lock, [this] { return mStopping || !mQueue.empty(); });
+          mWake.wait(lock, [this] {
+            return mStopping || !mQueue.empty();
+          });
           if (mStopping) {
             return;
           }
@@ -538,7 +607,10 @@ namespace
       }
     }
 
-    static void Compile(lua_State* const state, const std::string& mountedPath)
+    static void Compile(
+      lua_State* const state,
+      const std::string& mountedPath
+    )
     {
       moho::FWaitHandleSet* const waitHandleSet = moho::FILE_GetWaitHandleSet();
       if (waitHandleSet == nullptr || waitHandleSet->mHandle == nullptr) {
@@ -567,8 +639,10 @@ namespace
       }
       const int top = lua_gettop(state);
       std::string code;
-      if (LoadBuffer(state, source, chunkName.c_str()) == 0 &&
-          lua_dump(state, reinterpret_cast<lua_Chunkwriter>(AppendDump), &code) != 0) {
+      if (
+        LoadBuffer(state, source, chunkName.c_str()) == 0 &&
+        lua_dump(state, reinterpret_cast<lua_Chunkwriter>(AppendDump), &code) != 0
+      ) {
         Chunks().Keep(key, std::move(code), false);
       }
       lua_settop(state, top);
@@ -619,12 +693,16 @@ void moho::SCR_BeginUiScriptChunkCache()
   UiChunks().Begin();
 }
 
-void moho::SCR_FlushUiScriptChunkCache(const bool now)
+void moho::SCR_FlushUiScriptChunkCache(
+  const bool now
+)
 {
   UiChunks().Flush(now);
 }
 
-void moho::SCR_PrecompileScripts(const fa::vector<fa::string>& mountedPaths)
+void moho::SCR_PrecompileScripts(
+  const fa::vector<fa::string>& mountedPaths
+)
 {
   if (SCR_ScriptChunkCacheActive() && res_PrecompileScripts && tBatchChunks == &Chunks()) {
     Precompile().Add(mountedPaths);
@@ -636,7 +714,11 @@ bool moho::SCR_ScriptChunkCacheActive()
   return tBatchDepth > 0 && res_ScriptChunkCache && tBatchChunks != nullptr;
 }
 
-int moho::SCR_LoadScriptChunk(lua_State* const state, const std::string_view source, const char* const chunkName)
+int moho::SCR_LoadScriptChunk(
+  lua_State* const state,
+  const std::string_view source,
+  const char* const chunkName
+)
 {
   if (IsCompiledChunk(source)) {
     return LoadBuffer(state, source, chunkName); // never cached, so the parser checks it each time

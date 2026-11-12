@@ -36,7 +36,11 @@ CMessageDispatcher::~CMessageDispatcher()
 /**
  * Address: 0x0047C360 (FUN_0047C360)
  */
-void CMessageDispatcher::PushReceiver(const unsigned int lower, const unsigned int upper, IMessageReceiver* rec)
+void CMessageDispatcher::PushReceiver(
+  const unsigned int lower,
+  const unsigned int upper,
+  IMessageReceiver* rec
+)
 {
   auto* const linkage = new SMsgReceiverLinkage{lower, upper, rec, this};
 
@@ -56,7 +60,11 @@ void CMessageDispatcher::PushReceiver(const unsigned int lower, const unsigned i
  * `CLobby::LaunchGame` inlines it twice (0x007C4B36, 0x007C4B68); both copies
  * share this body's Message.cpp line-241 assert at 0x007C4E4D.
  */
-void CMessageDispatcher::RemoveReceiver(const unsigned int lower, const unsigned int upper, IMessageReceiver* rec)
+void CMessageDispatcher::RemoveReceiver(
+  const unsigned int lower,
+  const unsigned int upper,
+  IMessageReceiver* rec
+)
 {
   for (SMsgReceiverLinkage* const linkage : mLinkages) {
     if (linkage->mLower == lower && linkage->mUpper == upper && linkage->mReceiver == rec) {
@@ -65,7 +73,9 @@ void CMessageDispatcher::RemoveReceiver(const unsigned int lower, const unsigned
     }
   }
 
-  gpg::HandleAssertFailure("Reached the supposably unreachable.", 241, "c:\\work\\rts\\main\\code\\src\\core\\Message.cpp");
+  gpg::HandleAssertFailure(
+    "Reached the supposably unreachable.", 241, "c:\\work\\rts\\main\\code\\src\\core\\Message.cpp"
+  );
 }
 
 /**
@@ -77,7 +87,9 @@ void CMessageDispatcher::RemoveReceiver(const unsigned int lower, const unsigned
  * starts at the linkage's own successor (0x0047C457), so older linkages never
  * win a slot back.
  */
-void CMessageDispatcher::RemoveLinkage(SMsgReceiverLinkage* linkage)
+void CMessageDispatcher::RemoveLinkage(
+  SMsgReceiverLinkage* linkage
+)
 {
   using LinkageList = decltype(mLinkages);
   const LinkageList::iterator later{static_cast<SMsgReceiverLinkage::DispatcherLink*>(linkage)->mNext, &mLinkages};
@@ -102,7 +114,9 @@ void CMessageDispatcher::RemoveLinkage(SMsgReceiverLinkage* linkage)
 /**
  * Address: 0x0047C4D0 (FUN_0047C4D0)
  */
-bool CMessageDispatcher::Dispatch(CMessage* msg)
+bool CMessageDispatcher::Dispatch(
+  CMessage* msg
+)
 {
   const uint8_t idx = *msg->mBuff.start_;
 
@@ -144,7 +158,10 @@ IMessageReceiver::~IMessageReceiver()
  * Address: 0x0047C37A (inlined in FUN_0047C360)
  */
 SMsgReceiverLinkage::SMsgReceiverLinkage(
-  const unsigned int lower, const unsigned int upper, IMessageReceiver* rec, CMessageDispatcher* dispatcher
+  const unsigned int lower,
+  const unsigned int upper,
+  IMessageReceiver* rec,
+  CMessageDispatcher* dispatcher
 )
   : mLower(lower)
   , mUpper(upper)

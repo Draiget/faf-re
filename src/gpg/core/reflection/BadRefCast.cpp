@@ -26,7 +26,9 @@ namespace
   }
 
   [[nodiscard]] std::string BuildBadRefCastMessage(
-    const char* const prefix, const char* const fromType, const char* const toType
+    const char* const prefix,
+    const char* const fromType,
+    const char* const toType
   )
   {
     const char* const resolvedPrefix = prefix ? prefix : "type error: can't convert ";
@@ -46,10 +48,11 @@ namespace
  * What it does:
  * Builds the bad-reference-cast exception payload from a C-string message.
  */
-BadRefCast::BadRefCast(const char* const message)
-    : std::runtime_error(message)
-{
-}
+BadRefCast::BadRefCast(
+  const char* const message
+)
+  : std::runtime_error(message)
+{}
 
 /**
  * Address: 0x008DD300 (FUN_008DD300, ??0BadRefCast@gpg@@QAE@@Z)
@@ -58,10 +61,13 @@ BadRefCast::BadRefCast(const char* const message)
  * Builds one formatted cast failure payload:
  * `prefix_or_default + fromType + " to " + toType`.
  */
-BadRefCast::BadRefCast(const char* const prefix, const char* const fromType, const char* const toType)
-    : std::runtime_error(BuildBadRefCastMessage(prefix, fromType, toType))
-{
-}
+BadRefCast::BadRefCast(
+  const char* const prefix,
+  const char* const fromType,
+  const char* const toType
+)
+  : std::runtime_error(BuildBadRefCastMessage(prefix, fromType, toType))
+{}
 
 /**
  * Address: 0x0040CC30 (FUN_0040CC30)
@@ -70,10 +76,11 @@ BadRefCast::BadRefCast(const char* const prefix, const char* const fromType, con
  * What it does:
  * Clones a runtime_error payload into BadRefCast and restores BadRefCast vftable.
  */
-BadRefCast::BadRefCast(const std::runtime_error& error)
-    : std::runtime_error(error)
-{
-}
+BadRefCast::BadRefCast(
+  const std::runtime_error& error
+)
+  : std::runtime_error(error)
+{}
 
 /**
  * Address: 0x00408A70 (FUN_00408A70)

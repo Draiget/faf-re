@@ -79,8 +79,8 @@ namespace moho
     // behind this word until the compiler's rule is pinned down.
     std::uint32_t mOverlayClassPad0064;                       // +0x64
     TDatListItem<RDebugOverlayClass, void> mOverlayClassLink; // +0x68
-    fa::string mOverlayToken;                              // +0x70
-    fa::string mOverlayDescription;                        // +0x8C
+    fa::string mOverlayToken;                                 // +0x70
+    fa::string mOverlayDescription;                           // +0x8C
   };
 
   /**
@@ -99,10 +99,12 @@ namespace moho
     "RDebugOverlayClass::mOverlayClassPad0064 offset must be 0x64"
   );
   static_assert(
-    offsetof(RDebugOverlayClass, mOverlayClassLink) == 0x68, "RDebugOverlayClass::mOverlayClassLink offset must be 0x68"
+    offsetof(RDebugOverlayClass, mOverlayClassLink) == 0x68,
+    "RDebugOverlayClass::mOverlayClassLink offset must be 0x68"
   );
   static_assert(
-    offsetof(RDebugOverlayClass, mOverlayToken) == 0x70, "RDebugOverlayClass::mOverlayToken offset must be 0x70"
+    offsetof(RDebugOverlayClass, mOverlayToken) == 0x70,
+    "RDebugOverlayClass::mOverlayToken offset must be 0x70"
   );
   static_assert(
     offsetof(RDebugOverlayClass, mOverlayDescription) == 0x8C,

@@ -46,34 +46,37 @@ namespace
   constexpr float kTwoPi = 6.2831855f;
 
   constexpr std::array<float, 8> kDecalBillboardQuadVertices = {
-    -1.0f, 1.0f,
-    -1.0f, -1.0f,
-    1.0f, 1.0f,
-    1.0f, -1.0f,
+    -1.0f,
+    1.0f,
+    -1.0f,
+    -1.0f,
+    1.0f,
+    1.0f,
+    1.0f,
+    -1.0f,
   };
 
   constexpr std::array<std::int16_t, 6> kDecalQuadIndices = {
-    0, 1, 2,
-    2, 1, 3,
+    0,
+    1,
+    2,
+    2,
+    1,
+    3,
   };
 
-  
-  
   // ---------------------------------------------------------------------------
   // Static cirrus runtime table (byte_F5AE00, 0x50 bytes / 20 float lanes)
   // copied verbatim into SkyDome::mCirrusData by SetupHorizonAndCirrus.
   // Extracted byte-for-byte from ForgedAlliance.exe .data @0xF5AE00.
   // ---------------------------------------------------------------------------
   constexpr std::array<float, 20> kSkyDomeCirrusRuntimeTable = {
-    0.00428f, 0.0030100001f, 0.55000001f, 0.53288001f,
-    -0.84618998f, 0.00191f, 0.00164f, 0.090000004f,
-    0.96638f, 0.25713f, 0.00119f, 0.0060000001f,
-    0.15000001f, 0.15816f, 0.98741001f, 0.0026400001f,
-    0.0011f, 0.30000001f, -0.59482002f, -0.80386001f,
+    0.00428f,     0.0030100001f, 0.55000001f, 0.53288001f, -0.84618998f,  0.00191f,     0.00164f,
+    0.090000004f, 0.96638f,      0.25713f,    0.00119f,    0.0060000001f, 0.15000001f,  0.15816f,
+    0.98741001f,  0.0026400001f, 0.0011f,     0.30000001f, -0.59482002f,  -0.80386001f,
   };
 
-  static_assert(sizeof(kSkyDomeCirrusRuntimeTable) == 0x50,
-    "SkyDome cirrus runtime table must be 0x50 bytes");
+  static_assert(sizeof(kSkyDomeCirrusRuntimeTable) == 0x50, "SkyDome cirrus runtime table must be 0x50 bytes");
 
 } // namespace
 
@@ -94,7 +97,8 @@ namespace moho
   {}
 
   /**
-   * Address: 0x008158D0 (FUN_008158D0, ?SetCirrusContext@SkyDome@Moho@@QAEXMABV?$Vector3@M@Wm3@@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
+   * Address: 0x008158D0 (FUN_008158D0,
+   * ?SetCirrusContext@SkyDome@Moho@@QAEXMABV?$Vector3@M@Wm3@@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@Z)
    *
    * What it does:
    * Restores the cirrus multiplier lane to `1.8f`, copies direction
@@ -116,7 +120,7 @@ namespace moho
     mCirrusTexPath.reset_and_assign(texturePath);
   }
 
-/**
+  /**
    * Address: 0x008153C0 (FUN_008153C0)
    *
    * What it does:
@@ -139,7 +143,7 @@ namespace moho
     mHeight = 6;
   }
 
-/**
+  /**
    * Address: 0x008154A0 (FUN_008154A0)
    *
    * IDA signature:
@@ -199,19 +203,21 @@ namespace moho
     {
       const fa::string horizonLookupPath("/textures/environment/horizonLookup.dds");
       ResetHorizonContext(
-        Wm3::Vector3f{0.25999999f, 0.46000001f, 0.58999997f},   // sky colour
-        domeRadius * 0.15360001f,                               // horizon size
-        Wm3::Vector3f{0.81000000f, 0.74000001f, 0.63999999f},   // horizon colour
-        horizonLookupPath);
+        Wm3::Vector3f{0.25999999f, 0.46000001f, 0.58999997f}, // sky colour
+        domeRadius * 0.15360001f,                             // horizon size
+        Wm3::Vector3f{0.81000000f, 0.74000001f, 0.63999999f}, // horizon colour
+        horizonLookupPath
+      );
     }
 
     // Cirrus context: fixed colour vector + cirrus texture path.
     {
       const fa::string cirrusTexturePath("/textures/environment/cirrus001_512.dds");
       SetCirrusContext(
-        0.0f,                                                   // speed lane (ignored)
-        Wm3::Vector3f{1.39000000f, 0.75999999f, 0.49000001f},   // cirrus colour
-        cirrusTexturePath);
+        0.0f,                                                 // speed lane (ignored)
+        Wm3::Vector3f{1.39000000f, 0.75999999f, 0.49000001f}, // cirrus colour
+        cirrusTexturePath
+      );
     }
 
     // qmemcpy(this+0x140, byte_F5AE00, 0x50): install the static cirrus table.
@@ -307,7 +313,10 @@ namespace moho
    * version-gated fields before the format froze, and the caller only reaches
    * this at map version 0x3A and above.
    */
-  void SkyDome::Load(unsigned int, gpg::BinaryReader& reader)
+  void SkyDome::Load(
+    unsigned int,
+    gpg::BinaryReader& reader
+  )
   {
     Reset();
 
@@ -383,7 +392,9 @@ namespace moho
    * the block is fixed size, which is why the reader consumes that count and
    * ignores it.
    */
-  void SkyDome::Save(gpg::BinaryWriter& writer)
+  void SkyDome::Save(
+    gpg::BinaryWriter& writer
+  )
   {
     writer.Write(reinterpret_cast<const char*>(&mDomeOrigin), sizeof(mDomeOrigin));
     writer.Write(mDomeShapeParams.x);
@@ -422,9 +433,7 @@ namespace moho
     constexpr std::size_t kCirrusLayerCount = sizeof(mCirrusData) / kCirrusLayerRecordSize;
     writer.Write(static_cast<std::int32_t>(kCirrusLayerCount));
     for (std::size_t layer = 0; layer < kCirrusLayerCount; ++layer) {
-      writer.Write(
-        reinterpret_cast<const char*>(mCirrusData) + layer * kCirrusLayerRecordSize, kCirrusLayerRecordSize
-      );
+      writer.Write(reinterpret_cast<const char*>(mCirrusData) + layer * kCirrusLayerRecordSize, kCirrusLayerRecordSize);
     }
   }
 
@@ -434,8 +443,10 @@ namespace moho
    * What it does:
    * Releases sky texture resource handles used by runtime sky layers.
    */
-void SkyDome::OnResourceChanged(const gpg::StrArg)
-{
+  void SkyDome::OnResourceChanged(
+    const gpg::StrArg
+  )
+  {
     mDecalUploads.clear();
     mHorizonLookupTex = {};
     mCirrusTex = {};
@@ -444,7 +455,7 @@ void SkyDome::OnResourceChanged(const gpg::StrArg)
     mDecalTex2 = {};
     mAtmosphereTex = {};
     mAtmosphereTex2 = {};
-}
+  }
 
   /**
    * Address: 0x00817810 (FUN_00817810, ?GetEffect@SkyDome@Moho@@AAE?AV?$shared_ptr@VEffect@gal@gpg@@@boost@@XZ)
@@ -503,12 +514,11 @@ void SkyDome::OnResourceChanged(const gpg::StrArg)
     // Each texture: resolve the resource by path (with fallback), then extract
     // its base GAL texture into the destination lane. Path -> lane mapping is
     // taken verbatim from the store offsets in FUN_00817850.
-    const auto loadTexture =
-      [&](const fa::string& path, boost::shared_ptr<gpg::gal::Texture>& lane) {
-        ID3DDeviceResources::TextureResourceHandle textureResource;
-        resources->GetTexture(textureResource, path.c_str(), watcher, true);
-        textureResource->GetTexture(lane);
-      };
+    const auto loadTexture = [&](const fa::string& path, boost::shared_ptr<gpg::gal::Texture>& lane) {
+      ID3DDeviceResources::TextureResourceHandle textureResource;
+      resources->GetTexture(textureResource, path.c_str(), watcher, true);
+      textureResource->GetTexture(lane);
+    };
 
     loadTexture(mAtmosphereTexPath, mAtmosphereTex);    // 0x7C  -> 0x1CC
     loadTexture(mHorizonLookupPath, mHorizonLookupTex); // 0x5C  -> 0x1B0
@@ -583,9 +593,8 @@ void SkyDome::OnResourceChanged(const gpg::StrArg)
     context.usage_ = 1u;
     mDomeVertBuf = device->CreateVertexBuffer(&context);
 
-    auto* const vertices = static_cast<SkyDomeVertex*>(
-      mDomeVertBuf->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0))
-    );
+    auto* const vertices =
+      static_cast<SkyDomeVertex*>(mDomeVertBuf->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0)));
 
     int vertexWriteIndex = 0;
     for (int row = 0; row < heightSegments; ++row) {
@@ -620,7 +629,10 @@ void SkyDome::OnResourceChanged(const gpg::StrArg)
    * What it does:
    * Creates one 16-bit index buffer for dome strips and one apex fan.
    */
-  void SkyDome::CreateDomeIndexBuffer(const int widthSegments, const int heightSegments)
+  void SkyDome::CreateDomeIndexBuffer(
+    const int widthSegments,
+    const int heightSegments
+  )
   {
     if (mDomeIndexBuf) {
       return;
@@ -692,7 +704,9 @@ void SkyDome::OnResourceChanged(const gpg::StrArg)
 
     void* const quadVertices = mDecalVertBuf1->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0));
     // Raw GPU upload: static billboard quad vertex blob into the locked buffer.
-    std::copy(kDecalBillboardQuadVertices.begin(), kDecalBillboardQuadVertices.end(), static_cast<float*>(quadVertices));
+    std::copy(
+      kDecalBillboardQuadVertices.begin(), kDecalBillboardQuadVertices.end(), static_cast<float*>(quadVertices)
+    );
     mDecalVertBuf1->Unlock();
 
     gpg::gal::VertexBufferContext cumulusContext{};
@@ -784,7 +798,8 @@ void SkyDome::OnResourceChanged(const gpg::StrArg)
   } // namespace
 
   /**
-   * Address: 0x00819AF0 (FUN_00819AF0, ?RenderDomeUsing@SkyDome@Moho@@AAEXV?$shared_ptr@VEffectTechnique@gal@gpg@@@boost@@@Z)
+   * Address: 0x00819AF0 (FUN_00819AF0,
+   * ?RenderDomeUsing@SkyDome@Moho@@AAEXV?$shared_ptr@VEffectTechnique@gal@gpg@@@boost@@@Z)
    *
    * IDA signature:
    * void __stdcall Moho::SkyDome::RenderDomeUsing(boost::shared_ptr<gpg::gal::EffectTechnique> technique);
@@ -798,7 +813,9 @@ void SkyDome::OnResourceChanged(const gpg::StrArg)
    * object), because the base `gpg::gal::EffectTechnique` is the pure-virtual
    * skeleton whose inheritance from `EffectTechniqueD3D9` is not yet recovered.
    */
-  void SkyDome::RenderDomeUsing(boost::shared_ptr<gpg::gal::EffectTechnique> technique)
+  void SkyDome::RenderDomeUsing(
+    boost::shared_ptr<gpg::gal::EffectTechnique> technique
+  )
   {
     auto* const device = gpg::gal::Device::GetInstance();
     gpg::gal::EffectTechnique* const techniqueImpl = technique.get();
@@ -830,7 +847,9 @@ void SkyDome::OnResourceChanged(const gpg::StrArg)
    * view position/projection plus the horizon begin/end, horizon/sky colors,
    * and horizon lookup texture, then renders the dome with that technique.
    */
-  void SkyDome::RenderAtmosphere(const GeomCamera3& cam)
+  void SkyDome::RenderAtmosphere(
+    const GeomCamera3& cam
+  )
   {
     boost::shared_ptr<gpg::gal::Effect> effect = ResolveSkyEffect();
     boost::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique("Atmosphere");
@@ -860,7 +879,11 @@ void SkyDome::OnResourceChanged(const gpg::StrArg)
    * and the packed cirrus parameter block, then renders the dome with that
    * technique.
    */
-  void SkyDome::RenderCirrus(const int tick, const float interpolant, const GeomCamera3& cam)
+  void SkyDome::RenderCirrus(
+    const int tick,
+    const float interpolant,
+    const GeomCamera3& cam
+  )
   {
     boost::shared_ptr<gpg::gal::Effect> effect = ResolveSkyEffect();
     boost::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique("Cirrus");
@@ -884,7 +907,8 @@ void SkyDome::OnResourceChanged(const gpg::StrArg)
   }
 
   /**
-   * Address: 0x00818FB0 (FUN_00818FB0, ?RenderCumulus@SkyDome@Moho@@AAEXHMABVGeomCamera3@2@ABV?$vector@UCumulusVertex@SkyDome@Moho@@V?$allocator@UCumulusVertex@SkyDome@Moho@@@std@@@std@@@Z)
+   * Address: 0x00818FB0 (FUN_00818FB0,
+   * ?RenderCumulus@SkyDome@Moho@@AAEXHMABVGeomCamera3@2@ABV?$vector@UCumulusVertex@SkyDome@Moho@@V?$allocator@UCumulusVertex@SkyDome@Moho@@@std@@@std@@@Z)
    *
    * IDA signature:
    * void __thiscall Moho::SkyDome::RenderCumulus(int head, float deltaFrame,
@@ -967,7 +991,9 @@ void SkyDome::OnResourceChanged(const gpg::StrArg)
    * index streams plus albedo/glow textures and the glow multiplier, then
    * issues one indexed quad draw per technique pass.
    */
-  void SkyDome::RenderDecals(const GeomCamera3& cam)
+  void SkyDome::RenderDecals(
+    const GeomCamera3& cam
+  )
   {
     if (mDecalUploads.empty() || !mAtmosphereTex || !mAtmosphereTex2) {
       return;

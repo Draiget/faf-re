@@ -148,7 +148,7 @@ namespace moho
 
   struct UICommandModeData
   {
-    fa::string mMode;          // +0x00
+    fa::string mMode;              // +0x00
     LuaPlus::LuaObject mPayload{}; // +0x1C
 
     /**
@@ -178,9 +178,7 @@ namespace moho
   };
 
   static_assert(sizeof(UICommandModeData) == 0x30, "moho::UICommandModeData size must be 0x30");
-  static_assert(
-    offsetof(UICommandModeData, mPayload) == 0x1C, "moho::UICommandModeData::mPayload offset must be 0x1C"
-  );
+  static_assert(offsetof(UICommandModeData, mPayload) == 0x1C, "moho::UICommandModeData::mPayload offset must be 0x1C");
 
   /**
    * Address: 0x0084C5E0 (FUN_0084C5E0)
@@ -253,7 +251,11 @@ namespace moho
    */
   [[nodiscard]]
   bool UI_StartHostLobbyUI(
-    const char* protocol, int port, const char* playerName, const char* gameName, const char* mapName
+    const char* protocol,
+    int port,
+    const char* playerName,
+    const char* gameName,
+    const char* mapName
   );
 
   /**
@@ -349,7 +351,8 @@ namespace moho
   );
 
   /**
-   * Address: 0x0083D500 (FUN_0083D500, ?UI_ShowDesyncDialog@Moho@@YAXHABV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@@Z)
+   * Address: 0x0083D500 (FUN_0083D500,
+   * ?UI_ShowDesyncDialog@Moho@@YAXHABV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@@Z)
    *
    * What it does:
    * Builds one Lua table from desync payload strings and invokes

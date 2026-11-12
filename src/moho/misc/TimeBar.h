@@ -22,16 +22,20 @@ namespace moho
   };
 
   static_assert(
-    offsetof(STimeBarEventRecord, mStartCycleLo) == 0x00, "STimeBarEventRecord::mStartCycleLo offset must be 0x00"
+    offsetof(STimeBarEventRecord, mStartCycleLo) == 0x00,
+    "STimeBarEventRecord::mStartCycleLo offset must be 0x00"
   );
   static_assert(
-    offsetof(STimeBarEventRecord, mStartCycleHi) == 0x04, "STimeBarEventRecord::mStartCycleHi offset must be 0x04"
+    offsetof(STimeBarEventRecord, mStartCycleHi) == 0x04,
+    "STimeBarEventRecord::mStartCycleHi offset must be 0x04"
   );
   static_assert(
-    offsetof(STimeBarEventRecord, mEndCycleLo) == 0x08, "STimeBarEventRecord::mEndCycleLo offset must be 0x08"
+    offsetof(STimeBarEventRecord, mEndCycleLo) == 0x08,
+    "STimeBarEventRecord::mEndCycleLo offset must be 0x08"
   );
   static_assert(
-    offsetof(STimeBarEventRecord, mEndCycleHi) == 0x0C, "STimeBarEventRecord::mEndCycleHi offset must be 0x0C"
+    offsetof(STimeBarEventRecord, mEndCycleHi) == 0x0C,
+    "STimeBarEventRecord::mEndCycleHi offset must be 0x0C"
   );
   static_assert(offsetof(STimeBarEventRecord, mName) == 0x10, "STimeBarEventRecord::mName offset must be 0x10");
   static_assert(offsetof(STimeBarEventRecord, mColorTag) == 0x14, "STimeBarEventRecord::mColorTag offset must be 0x14");
@@ -51,7 +55,8 @@ namespace moho
   };
 
   static_assert(
-    offsetof(STimeBarThreadInfo, mCurrentSection) == 0x08, "STimeBarThreadInfo::mCurrentSection offset must be 0x08"
+    offsetof(STimeBarThreadInfo, mCurrentSection) == 0x08,
+    "STimeBarThreadInfo::mCurrentSection offset must be 0x08"
   );
   static_assert(offsetof(STimeBarThreadInfo, mColorTag) == 0x0C, "STimeBarThreadInfo::mColorTag offset must be 0x0C");
   static_assert(sizeof(STimeBarThreadInfo) == 0x10, "STimeBarThreadInfo size must be 0x10");
@@ -93,10 +98,12 @@ namespace moho
   };
 
   static_assert(
-    offsetof(CTimeBarSection, mPreviousSection) == 0x00, "CTimeBarSection::mPreviousSection offset must be 0x00"
+    offsetof(CTimeBarSection, mPreviousSection) == 0x00,
+    "CTimeBarSection::mPreviousSection offset must be 0x00"
   );
   static_assert(
-    offsetof(CTimeBarSection, mStartCycleAlignPad) == 0x04, "CTimeBarSection::mStartCycleAlignPad offset must be 0x04"
+    offsetof(CTimeBarSection, mStartCycleAlignPad) == 0x04,
+    "CTimeBarSection::mStartCycleAlignPad offset must be 0x04"
   );
   static_assert(offsetof(CTimeBarSection, mStartCycleLo) == 0x08, "CTimeBarSection::mStartCycleLo offset must be 0x08");
   static_assert(offsetof(CTimeBarSection, mStartCycleHi) == 0x0C, "CTimeBarSection::mStartCycleHi offset must be 0x0C");

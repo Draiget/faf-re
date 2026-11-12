@@ -63,7 +63,10 @@ namespace difffuzz
     // A comma-separated substring filter, as difffuzz's --filter: a token
     // matches when the row name contains it (compared at the token's length,
     // so the token needs no terminator of its own).
-    [[nodiscard]] bool Matches(const char* name, const char* filter)
+    [[nodiscard]] bool Matches(
+      const char* name,
+      const char* filter
+    )
     {
       if (filter == nullptr) {
         return true;
@@ -92,7 +95,11 @@ namespace difffuzz
       return false;
     }
 
-    DWORD CallGuarded(const spec::StubFn fn, const u32* in, u32* out) noexcept
+    DWORD CallGuarded(
+      const spec::StubFn fn,
+      const u32* in,
+      u32* out
+    ) noexcept
     {
       __try {
         fn(in, out);
@@ -106,8 +113,12 @@ namespace difffuzz
     /// write its dump/values lines to already-open files. Returns 0 when every
     /// call survived.
     int RunRow(
-      const spec::Row& r, const unsigned long long iters, const unsigned long long seed, const std::size_t rowIndex,
-      std::FILE* dumpFile, std::FILE* valuesFile
+      const spec::Row& r,
+      const unsigned long long iters,
+      const unsigned long long seed,
+      const std::size_t rowIndex,
+      std::FILE* dumpFile,
+      std::FILE* valuesFile
     )
     {
       constexpr int kStubSpacing = 128;
@@ -163,7 +174,12 @@ namespace difffuzz
 
     /// The child's own dump/values path for one row, next to the parent's
     /// files: "<parent>.row<N>.tmp".
-    void RowFilePath(const char* parent, const std::size_t row, char* out, const std::size_t outBytes)
+    void RowFilePath(
+      const char* parent,
+      const std::size_t row,
+      char* out,
+      const std::size_t outBytes
+    )
     {
       std::snprintf(out, outBytes, "%s.row%zu.tmp", parent != nullptr ? parent : "difffuzz_spec", row);
     }
@@ -171,14 +187,25 @@ namespace difffuzz
     /// Spawns this exe with `--spec-row row` and waits up to the timeout.
     /// Returns the child's exit code, or -1 when it could not start, -2 on
     /// timeout (the child is killed).
-    int RunRowChild(const Options& opt, const std::size_t row, const char* dumpTmp, const char* valuesTmp)
+    int RunRowChild(
+      const Options& opt,
+      const std::size_t row,
+      const char* dumpTmp,
+      const char* valuesTmp
+    )
     {
       char exe[MAX_PATH];
       GetModuleFileNameA(nullptr, exe, MAX_PATH);
       char cmd[2048];
       std::snprintf(
-        cmd, sizeof(cmd), "\"%s\" --spec \"%s\" --spec-row %zu --spec-iters %llu --seed %llu", exe, opt.specPath, row,
-        opt.iters, opt.seed
+        cmd,
+        sizeof(cmd),
+        "\"%s\" --spec \"%s\" --spec-row %zu --spec-iters %llu --seed %llu",
+        exe,
+        opt.specPath,
+        row,
+        opt.iters,
+        opt.seed
       );
       if (dumpTmp != nullptr) {
         char tail[512];
@@ -212,7 +239,10 @@ namespace difffuzz
     }
 
     /// Appends one file's contents to another (both binary).
-    bool AppendFile(const char* from, std::FILE* to)
+    bool AppendFile(
+      const char* from,
+      std::FILE* to
+    )
     {
       std::FILE* f = std::fopen(from, "rb");
       if (f == nullptr) {
@@ -227,7 +257,10 @@ namespace difffuzz
       return true;
     }
 
-    int Run(const Options& opt, RetailImage& image)
+    int Run(
+      const Options& opt,
+      RetailImage& image
+    )
     {
       spec::File file;
       std::string error;
@@ -305,8 +338,12 @@ namespace difffuzz
           ++failed;
           if (printed++ < opt.maxPrint) {
             std::printf(
-              "[FAIL ] %-16s 0x%08X  %s\n", r.name, r.va,
-              rc == -1 ? "could not start the child" : rc == -2 ? "timed out (killed)" : "crashed"
+              "[FAIL ] %-16s 0x%08X  %s\n",
+              r.name,
+              r.va,
+              rc == -1     ? "could not start the child"
+                : rc == -2 ? "timed out (killed)"
+                           : "crashed"
             );
           }
         }
@@ -329,8 +366,15 @@ namespace difffuzz
   namespace specrun
   {
     int RunSpecMain(
-      const char* specPath, const unsigned long long iters, const unsigned long long seed, const char* filter,
-      const char* dump, const char* values, const long rowIndex, const unsigned rowTimeoutSeconds, RetailImage& image
+      const char* specPath,
+      const unsigned long long iters,
+      const unsigned long long seed,
+      const char* filter,
+      const char* dump,
+      const char* values,
+      const long rowIndex,
+      const unsigned rowTimeoutSeconds,
+      RetailImage& image
     )
     {
       Options opt;

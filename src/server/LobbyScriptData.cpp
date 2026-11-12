@@ -12,7 +12,12 @@ namespace faf::server
   {
     constexpr std::uint8_t kTableEnd = 5;
 
-    [[nodiscard]] bool Parse(const std::span<const std::uint8_t> bytes, std::size_t& at, SLuaBytesValue& out, const int depth)
+    [[nodiscard]] bool Parse(
+      const std::span<const std::uint8_t> bytes,
+      std::size_t& at,
+      SLuaBytesValue& out,
+      const int depth
+    )
     {
       if (at >= bytes.size() || depth > kLuaBytesMaxDepth) {
         return false;
@@ -70,7 +75,9 @@ namespace faf::server
     }
   } // namespace
 
-  SLuaBytesValue* SLuaBytesValue::Field(const std::string_view key) noexcept
+  SLuaBytesValue* SLuaBytesValue::Field(
+    const std::string_view key
+  ) noexcept
   {
     if (kind != EKind::Table) {
       return nullptr;
@@ -83,7 +90,12 @@ namespace faf::server
     return nullptr;
   }
 
-  bool SetTableNumber(const std::span<const std::uint8_t> bytes, const std::string_view key, const float value, std::vector<std::uint8_t>& out)
+  bool SetTableNumber(
+    const std::span<const std::uint8_t> bytes,
+    const std::string_view key,
+    const float value,
+    std::vector<std::uint8_t>& out
+  )
   {
     SLuaBytesValue table;
     if (!ParseLuaBytes(bytes, table)) {
@@ -100,14 +112,20 @@ namespace faf::server
     return true;
   }
 
-  bool ParseLuaBytes(const std::span<const std::uint8_t> bytes, SLuaBytesValue& out)
+  bool ParseLuaBytes(
+    const std::span<const std::uint8_t> bytes,
+    SLuaBytesValue& out
+  )
   {
     std::size_t at = 0;
     out = SLuaBytesValue{};
     return Parse(bytes, at, out, 0) && at == bytes.size();
   }
 
-  void WriteLuaBytes(const SLuaBytesValue& value, std::vector<std::uint8_t>& out)
+  void WriteLuaBytes(
+    const SLuaBytesValue& value,
+    std::vector<std::uint8_t>& out
+  )
   {
     out.push_back(static_cast<std::uint8_t>(value.kind));
     switch (value.kind) {
@@ -136,7 +154,9 @@ namespace faf::server
   namespace
   {
     /** A number's value (the float `ToByteStream` wrote) as a whole number; nothing for anything else. */
-    [[nodiscard]] std::optional<int> WholeNumber(const SLuaBytesValue* const value)
+    [[nodiscard]] std::optional<int> WholeNumber(
+      const SLuaBytesValue* const value
+    )
     {
       if (value == nullptr || value->kind != SLuaBytesValue::EKind::Number) {
         return std::nullopt;
@@ -150,18 +170,24 @@ namespace faf::server
     }
 
     /** A player's `OwnerID` (lobby.lua keeps peer ids as strings); nothing when it isn't a uid. */
-    [[nodiscard]] std::optional<std::int32_t> OwnerOf(SLuaBytesValue* const options)
+    [[nodiscard]] std::optional<std::int32_t> OwnerOf(
+      SLuaBytesValue* const options
+    )
     {
       if (options == nullptr || options->kind != SLuaBytesValue::EKind::Table) {
         return std::nullopt;
       }
       SLuaBytesValue* const owner = options->Field("OwnerID");
       if (owner != nullptr && owner->kind == SLuaBytesValue::EKind::String) {
-        if (owner->text.empty() || owner->text.size() > 10u || owner->text.find_first_not_of("0123456789") != std::string::npos) {
+        if (
+          owner->text.empty() || owner->text.size() > 10u ||
+          owner->text.find_first_not_of("0123456789") != std::string::npos
+        ) {
           return std::nullopt;
         }
         const long long uid = std::stoll(owner->text);
-        return uid > 0 && uid <= 0x7fffffffLL ? std::optional<std::int32_t>(static_cast<std::int32_t>(uid)) : std::nullopt;
+        return uid > 0 && uid <= 0x7fffffffLL ? std::optional<std::int32_t>(static_cast<std::int32_t>(uid))
+                                              : std::nullopt;
       }
       if (const std::optional<int> uid = WholeNumber(owner); uid && *uid > 0) {
         return *uid;
@@ -170,7 +196,9 @@ namespace faf::server
     }
   } // namespace
 
-  SLobbyFacts ReadLobbyFacts(const std::span<const std::uint8_t> payload)
+  SLobbyFacts ReadLobbyFacts(
+    const std::span<const std::uint8_t> payload
+  )
   {
     SLobbyFacts facts;
     SLuaBytesValue root;
@@ -183,7 +211,8 @@ namespace faf::server
     }
     if (type->IsString("PlayerOptions")) {
       SLuaBytesValue* const options = root.Field("Options");
-      const SLuaBytesValue* const ready = options != nullptr && options->kind == SLuaBytesValue::EKind::Table ? options->Field("Ready") : nullptr;
+      const SLuaBytesValue* const ready =
+        options != nullptr && options->kind == SLuaBytesValue::EKind::Table ? options->Field("Ready") : nullptr;
       if (ready != nullptr && ready->kind == SLuaBytesValue::EKind::Boolean) {
         facts.ready = ready->raw[0] != 0u;
       }
@@ -195,7 +224,8 @@ namespace faf::server
       }
     } else if (type->IsString("GameInfo")) {
       SLuaBytesValue* const info = root.Field("GameInfo");
-      SLuaBytesValue* const players = info != nullptr && info->kind == SLuaBytesValue::EKind::Table ? info->Field("PlayerOptions") : nullptr;
+      SLuaBytesValue* const players =
+        info != nullptr && info->kind == SLuaBytesValue::EKind::Table ? info->Field("PlayerOptions") : nullptr;
       if (players != nullptr && players->kind == SLuaBytesValue::EKind::Table) {
         for (std::size_t i = 0; i < players->keys.size(); ++i) {
           const std::optional<int> slot = WholeNumber(&players->keys[i]);
@@ -208,7 +238,9 @@ namespace faf::server
     return facts;
   }
 
-  EPlayerScript LimitPlayerScript(std::vector<std::uint8_t>& payload)
+  EPlayerScript LimitPlayerScript(
+    std::vector<std::uint8_t>& payload
+  )
   {
     SLuaBytesValue root;
     if (!ParseLuaBytes(payload, root) || root.kind != SLuaBytesValue::EKind::Table) {
@@ -218,7 +250,8 @@ namespace faf::server
     if (type == nullptr || type->kind != SLuaBytesValue::EKind::String) {
       return EPlayerScript::Unchanged;
     }
-    for (const char* const request : {"MovePlayer", "RequestColor", "RequestConvertToObserver", "RequestConvertToPlayer"}) {
+    for (const char* const request :
+         {"MovePlayer", "RequestColor", "RequestConvertToObserver", "RequestConvertToPlayer"}) {
       if (type->IsString(request)) {
         return EPlayerScript::Refused;
       }
@@ -249,7 +282,10 @@ namespace faf::server
     return EPlayerScript::Rewritten;
   }
 
-  bool PinGameOptions(std::vector<std::uint8_t>& payload, const SPinnedOptions& pinned)
+  bool PinGameOptions(
+    std::vector<std::uint8_t>& payload,
+    const SPinnedOptions& pinned
+  )
   {
     if (pinned.empty()) {
       return false;

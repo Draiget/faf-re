@@ -14,9 +14,8 @@ using namespace gpg;
  * Constructs PrematureEOF runtime_error payload ("Premature EOF").
  */
 BinaryReader::PrematureEOF::PrematureEOF()
-    : std::runtime_error("Premature EOF")
-{
-}
+  : std::runtime_error("Premature EOF")
+{}
 
 /**
  * Address: 0x0043D270 (FUN_0043D270)
@@ -33,22 +32,25 @@ BinaryReader::PrematureEOF::~PrematureEOF() noexcept = default;
  * What it does:
  * Reads exactly `size` bytes or throws PrematureEOF on underrun.
  */
-void BinaryReader::Read(char* buf, const size_t size) const
+void BinaryReader::Read(
+  char* buf,
+  const size_t size
+) const
 {
-    Stream* const stream = mStream;
-    const char* const readHead = stream->mReadHead;
-    const auto available = static_cast<size_t>(stream->mReadEnd - readHead);
+  Stream* const stream = mStream;
+  const char* const readHead = stream->mReadHead;
+  const auto available = static_cast<size_t>(stream->mReadEnd - readHead);
 
-    if (size > available) {
-        const size_t got = stream->VirtRead(buf, size);
-        if (got != size) {
-            throw PrematureEOF();
-        }
-    } else if (size != 0) {
-        // Raw byte-stream read from the buffered read head.
-        std::copy_n(readHead, size, buf);
-        stream->mReadHead += size;
+  if (size > available) {
+    const size_t got = stream->VirtRead(buf, size);
+    if (got != size) {
+      throw PrematureEOF();
     }
+  } else if (size != 0) {
+    // Raw byte-stream read from the buffered read head.
+    std::copy_n(readHead, size, buf);
+    stream->mReadHead += size;
+  }
 }
 
 /**
@@ -57,10 +59,13 @@ void BinaryReader::Read(char* buf, const size_t size) const
  * What it does:
  * Reads one fixed 12-byte payload lane and returns the destination pointer.
  */
-[[maybe_unused]] void* ReadThreeDwordLaneFromBinaryReader(BinaryReader* const reader, void* const out)
+[[maybe_unused]] void* ReadThreeDwordLaneFromBinaryReader(
+  BinaryReader* const reader,
+  void* const out
+)
 {
-    reader->Read(static_cast<char*>(out), 12u);
-    return out;
+  reader->Read(static_cast<char*>(out), 12u);
+  return out;
 }
 
 /**
@@ -70,12 +75,12 @@ void BinaryReader::Read(char* buf, const size_t size) const
  * Reads `wordCount` dwords (`wordCount * 4` bytes) into caller storage.
  */
 [[maybe_unused]] void ReadDwordArrayLanePrimary(
-    BinaryReader* const reader,
-    const int wordCount,
-    void* const out
+  BinaryReader* const reader,
+  const int wordCount,
+  void* const out
 )
 {
-    reader->Read(static_cast<char*>(out), static_cast<std::size_t>(wordCount) * sizeof(std::uint32_t));
+  reader->Read(static_cast<char*>(out), static_cast<std::size_t>(wordCount) * sizeof(std::uint32_t));
 }
 
 /**
@@ -84,10 +89,13 @@ void BinaryReader::Read(char* buf, const size_t size) const
  * What it does:
  * Reads one fixed 16-byte payload lane and returns the destination pointer.
  */
-[[maybe_unused]] void* ReadFourDwordLaneFromBinaryReader(BinaryReader* const reader, void* const out)
+[[maybe_unused]] void* ReadFourDwordLaneFromBinaryReader(
+  BinaryReader* const reader,
+  void* const out
+)
 {
-    reader->Read(static_cast<char*>(out), 16u);
-    return out;
+  reader->Read(static_cast<char*>(out), 16u);
+  return out;
 }
 
 /**
@@ -98,12 +106,12 @@ void BinaryReader::Read(char* buf, const size_t size) const
  * into caller storage.
  */
 [[maybe_unused]] void ReadDwordArrayLaneSecondary(
-    BinaryReader* const reader,
-    const int wordCount,
-    void* const out
+  BinaryReader* const reader,
+  const int wordCount,
+  void* const out
 )
 {
-    reader->Read(static_cast<char*>(out), static_cast<std::size_t>(wordCount) * sizeof(std::uint32_t));
+  reader->Read(static_cast<char*>(out), static_cast<std::size_t>(wordCount) * sizeof(std::uint32_t));
 }
 
 /**
@@ -118,28 +126,30 @@ void BinaryReader::Read(char* buf, const size_t size) const
  * Reads one 32-bit integer into `outValue`, preferring the stream's resident
  * read window and throwing `PrematureEOF` on short reads.
  */
-int* BinaryReader::ReadInt(int* const outValue) const
+int* BinaryReader::ReadInt(
+  int* const outValue
+) const
 {
-    if (outValue == nullptr) {
-        throw PrematureEOF();
+  if (outValue == nullptr) {
+    throw PrematureEOF();
+  }
+
+  *outValue = 0;
+
+  Stream* const stream = mStream;
+  const auto available = static_cast<std::size_t>(stream->mReadEnd - stream->mReadHead);
+  if (available < sizeof(*outValue)) {
+    const std::size_t readCount = stream->VirtRead(reinterpret_cast<char*>(outValue), sizeof(*outValue));
+    if (readCount != sizeof(*outValue)) {
+      throw PrematureEOF();
     }
-
-    *outValue = 0;
-
-    Stream* const stream = mStream;
-    const auto available = static_cast<std::size_t>(stream->mReadEnd - stream->mReadHead);
-    if (available < sizeof(*outValue)) {
-        const std::size_t readCount = stream->VirtRead(reinterpret_cast<char*>(outValue), sizeof(*outValue));
-        if (readCount != sizeof(*outValue)) {
-            throw PrematureEOF();
-        }
-        return outValue;
-    }
-
-    // Raw byte-stream read from the buffered read head.
-    std::memcpy(outValue, stream->mReadHead, sizeof(*outValue));
-    stream->mReadHead += sizeof(*outValue);
     return outValue;
+  }
+
+  // Raw byte-stream read from the buffered read head.
+  std::memcpy(outValue, stream->mReadHead, sizeof(*outValue));
+  stream->mReadHead += sizeof(*outValue);
+  return outValue;
 }
 
 /**
@@ -150,9 +160,9 @@ int* BinaryReader::ReadInt(int* const outValue) const
  */
 int BinaryReader::ReadInt32() const
 {
-    int value = 0;
-    (void)ReadInt(&value);
-    return value;
+  int value = 0;
+  (void)ReadInt(&value);
+  return value;
 }
 
 /**
@@ -163,9 +173,9 @@ int BinaryReader::ReadInt32() const
  */
 std::uint8_t BinaryReader::ReadChar() const
 {
-    std::uint8_t value = 0;
-    Read(reinterpret_cast<char*>(&value), 1U);
-    return value;
+  std::uint8_t value = 0;
+  Read(reinterpret_cast<char*>(&value), 1U);
+  return value;
 }
 
 /**
@@ -174,30 +184,32 @@ std::uint8_t BinaryReader::ReadChar() const
  * What it does:
  * Reads one NUL-terminated string from stream bytes.
  */
-void BinaryReader::ReadString(fa::string* out) const
+void BinaryReader::ReadString(
+  fa::string* out
+) const
 {
-    std::string ownedValue{};
-    Stream* const stream = mStream;
+  std::string ownedValue{};
+  Stream* const stream = mStream;
 
-    std::uint8_t nextByte = 0;
-    while (true) {
-        if (stream->mReadHead == stream->mReadEnd) {
-            if (stream->VirtRead(reinterpret_cast<char*>(&nextByte), 1U) < 1U) {
-                out->assign_owned(ownedValue);
-                return;
-            }
-        } else {
-            nextByte = static_cast<std::uint8_t>(*stream->mReadHead);
-            ++stream->mReadHead;
-        }
-
-        if (nextByte == 0U) {
-            out->assign_owned(ownedValue);
-            break;
-        }
-
-        ownedValue.push_back(static_cast<char>(nextByte));
+  std::uint8_t nextByte = 0;
+  while (true) {
+    if (stream->mReadHead == stream->mReadEnd) {
+      if (stream->VirtRead(reinterpret_cast<char*>(&nextByte), 1U) < 1U) {
+        out->assign_owned(ownedValue);
+        return;
+      }
+    } else {
+      nextByte = static_cast<std::uint8_t>(*stream->mReadHead);
+      ++stream->mReadHead;
     }
+
+    if (nextByte == 0U) {
+      out->assign_owned(ownedValue);
+      break;
+    }
+
+    ownedValue.push_back(static_cast<char>(nextByte));
+  }
 }
 
 /**
@@ -206,22 +218,24 @@ void BinaryReader::ReadString(fa::string* out) const
  * What it does:
  * Reads one 32-bit length-prefixed byte string into legacy string storage.
  */
-void BinaryReader::ReadLengthPrefixedString(fa::string* out) const
+void BinaryReader::ReadLengthPrefixedString(
+  fa::string* out
+) const
 {
-    if (out == nullptr) {
-        return;
-    }
+  if (out == nullptr) {
+    return;
+  }
 
-    std::int32_t byteCount = 0;
-    ReadExact(byteCount);
-    if (byteCount < 0) {
-        throw std::runtime_error("InvalidFormat");
-    }
+  std::int32_t byteCount = 0;
+  ReadExact(byteCount);
+  if (byteCount < 0) {
+    throw std::runtime_error("InvalidFormat");
+  }
 
-    std::string ownedValue(static_cast<std::size_t>(byteCount), '\0');
-    if (byteCount > 0) {
-        Read(ownedValue.data(), static_cast<std::size_t>(byteCount));
-    }
+  std::string ownedValue(static_cast<std::size_t>(byteCount), '\0');
+  if (byteCount > 0) {
+    Read(ownedValue.data(), static_cast<std::size_t>(byteCount));
+  }
 
-    out->assign_owned(ownedValue);
+  out->assign_owned(ownedValue);
 }

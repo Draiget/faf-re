@@ -10,7 +10,7 @@ namespace moho
 {
   class RRuleGameRules;
   struct SSTIArmyVariableData;
-}
+} // namespace moho
 
 namespace faf::remote
 {

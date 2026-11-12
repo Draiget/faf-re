@@ -23,18 +23,40 @@ namespace
     std::int32_t height;
     std::vector<std::uint16_t> samples;
 
-    Field(const std::int32_t w, const std::int32_t h, const float level)
-      : width(w), height(h), samples(static_cast<std::size_t>(w) * static_cast<std::size_t>(h), Word(level))
+    Field(
+      const std::int32_t w,
+      const std::int32_t h,
+      const float level
+    )
+      : width(w)
+      , height(h)
+      , samples(static_cast<std::size_t>(w) * static_cast<std::size_t>(h), Word(level))
     {}
 
-    static std::uint16_t Word(const float level) { return static_cast<std::uint16_t>(level * 128.0f); }
-
-    void Set(const std::int32_t x, const std::int32_t z, const float level)
+    static std::uint16_t Word(
+      const float level
+    )
     {
-      samples[static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)] = Word(level);
+      return static_cast<std::uint16_t>(level * 128.0f);
     }
 
-    void Fill(const std::int32_t x0, const std::int32_t z0, const std::int32_t x1, const std::int32_t z1, const float level)
+    void Set(
+      const std::int32_t x,
+      const std::int32_t z,
+      const float level
+    )
+    {
+      samples[static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)] =
+        Word(level);
+    }
+
+    void Fill(
+      const std::int32_t x0,
+      const std::int32_t z0,
+      const std::int32_t x1,
+      const std::int32_t z1,
+      const float level
+    )
     {
       for (std::int32_t z = z0; z <= z1; ++z) {
         for (std::int32_t x = x0; x <= x1; ++x) {
@@ -43,13 +65,20 @@ namespace
       }
     }
 
-    std::unique_ptr<CWaterBodies> Build(const std::vector<SWaterBodyDesc>& descs, std::vector<std::string>* log = nullptr) const
+    std::unique_ptr<CWaterBodies> Build(
+      const std::vector<SWaterBodyDesc>& descs,
+      std::vector<std::string>* log = nullptr
+    ) const
     {
       return CWaterBodies::Build(samples.data(), width, height, kScale, descs, log);
     }
   };
 
-  SWaterBodyDesc Lake(const float level, const float seedX, const float seedZ)
+  SWaterBodyDesc Lake(
+    const float level,
+    const float seedX,
+    const float seedZ
+  )
   {
     SWaterBodyDesc desc;
     desc.elevation = level;
@@ -62,13 +91,19 @@ namespace
   }
 } // namespace
 
-TEST(WaterBodies, NoBodiesBuildsNothing)
+TEST(
+  WaterBodies,
+  NoBodiesBuildsNothing
+)
 {
   const Field field(17, 17, 50.0f);
   EXPECT_EQ(field.Build({}), nullptr);
 }
 
-TEST(WaterBodies, BasinFillsOnlyBelowItsLevel)
+TEST(
+  WaterBodies,
+  BasinFillsOnlyBelowItsLevel
+)
 {
   // A plateau at 60 with a basin at 40 over vertices [4, 8] x [4, 8].
   Field field(17, 17, 60.0f);
@@ -96,7 +131,10 @@ TEST(WaterBodies, BasinFillsOnlyBelowItsLevel)
   EXPECT_FLOAT_EQ(bodies->LevelAt(12.0f, 6.5f, moho::kWaterBodyNoWater), moho::kWaterBodyNoWater);
 }
 
-TEST(WaterBodies, TwoBasinsAreSeparate)
+TEST(
+  WaterBodies,
+  TwoBasinsAreSeparate
+)
 {
   Field field(33, 17, 60.0f);
   field.Fill(2, 2, 6, 6, 40.0f);
@@ -109,7 +147,10 @@ TEST(WaterBodies, TwoBasinsAreSeparate)
   EXPECT_FLOAT_EQ(bodies->LevelAt(14.0f, 5.0f, 0.0f), 0.0f);
 }
 
-TEST(WaterBodies, FillFollowsConnectionNotHeightAlone)
+TEST(
+  WaterBodies,
+  FillFollowsConnectionNotHeightAlone
+)
 {
   // Two basins at 40 joined by a channel at 45, and a third one apart.
   Field field(33, 9, 60.0f);
@@ -124,7 +165,10 @@ TEST(WaterBodies, FillFollowsConnectionNotHeightAlone)
   EXPECT_EQ(bodies->BodyOfVertex(27, 3), 0u);
 }
 
-TEST(WaterBodies, BoundsStopTheFill)
+TEST(
+  WaterBodies,
+  BoundsStopTheFill
+)
 {
   Field field(33, 9, 10.0f);
   SWaterBodyDesc desc = Lake(50.0f, 4.0f, 4.0f);
@@ -139,7 +183,10 @@ TEST(WaterBodies, BoundsStopTheFill)
   EXPECT_EQ(bodies->BodyOfVertex(9, 4), 0u);
 }
 
-TEST(WaterBodies, EarlierBodyKeepsItsVertices)
+TEST(
+  WaterBodies,
+  EarlierBodyKeepsItsVertices
+)
 {
   Field field(17, 9, 40.0f);
   const auto bodies = field.Build({Lake(50.0f, 2.0f, 2.0f), Lake(55.0f, 12.0f, 4.0f)});
@@ -148,7 +195,10 @@ TEST(WaterBodies, EarlierBodyKeepsItsVertices)
   EXPECT_EQ(bodies->BodyCount(), 1u);
 }
 
-TEST(WaterBodies, SeedAboveItsLevelIsSkipped)
+TEST(
+  WaterBodies,
+  SeedAboveItsLevelIsSkipped
+)
 {
   Field field(17, 17, 60.0f);
   field.Fill(4, 4, 8, 8, 40.0f);
@@ -160,7 +210,10 @@ TEST(WaterBodies, SeedAboveItsLevelIsSkipped)
   EXPECT_NE(log[0].find("water body 1 skipped"), std::string::npos);
 }
 
-TEST(WaterBodies, SeedOffTheMapIsSkipped)
+TEST(
+  WaterBodies,
+  SeedOffTheMapIsSkipped
+)
 {
   const Field field(17, 17, 10.0f);
   std::vector<std::string> log;
@@ -168,7 +221,10 @@ TEST(WaterBodies, SeedOffTheMapIsSkipped)
   EXPECT_EQ(log.size(), 1u);
 }
 
-TEST(WaterBodies, DryBodyHasNoWater)
+TEST(
+  WaterBodies,
+  DryBodyHasNoWater
+)
 {
   // A polder at 5 below a sea at 20, closed by a dike at 25.
   Field field(17, 17, 0.0f);
@@ -186,7 +242,10 @@ TEST(WaterBodies, DryBodyHasNoWater)
   EXPECT_FLOAT_EQ(bodies->LevelOfVertex(8, 8, 20.0f), moho::kWaterBodyNoWater);
 }
 
-TEST(WaterBodies, LookupClampsAndToleratesNaN)
+TEST(
+  WaterBodies,
+  LookupClampsAndToleratesNaN
+)
 {
   Field field(9, 9, 0.0f);
   const auto bodies = field.Build({Lake(5.0f, 4.0f, 4.0f)});
@@ -197,7 +256,10 @@ TEST(WaterBodies, LookupClampsAndToleratesNaN)
   EXPECT_FLOAT_EQ(bodies->HighestLevel(), 5.0f);
 }
 
-TEST(WaterBodies, OutlinePolygonPassesThroughItsControlPoints)
+TEST(
+  WaterBodies,
+  OutlinePolygonPassesThroughItsControlPoints
+)
 {
   // A uniform Catmull-Rom spline passes through every control point at t = 0.
   const std::vector<float> points = {10.0f, 10.0f, 30.0f, 12.0f, 28.0f, 30.0f, 8.0f, 26.0f};
@@ -213,7 +275,10 @@ TEST(WaterBodies, OutlinePolygonPassesThroughItsControlPoints)
   EXPECT_TRUE(moho::WaterBodyOutlinePolygon({1.0f, 2.0f, 3.0f, 4.0f}).empty());
 }
 
-TEST(WaterBodies, OutlinesSplitOneBasinIntoTwoLevels)
+TEST(
+  WaterBodies,
+  OutlinesSplitOneBasinIntoTwoLevels
+)
 {
   // One flat basin at 10; two outlines side by side make a pool at 20 and one at 15.
   Field field(41, 21, 10.0f);
@@ -234,7 +299,10 @@ TEST(WaterBodies, OutlinesSplitOneBasinIntoTwoLevels)
   EXPECT_EQ(bodies->BodyOfVertex(0, 0), 0u);
 }
 
-TEST(WaterBodies, OutlineWithSeedFillsOnlyItsConnectedPart)
+TEST(
+  WaterBodies,
+  OutlineWithSeedFillsOnlyItsConnectedPart
+)
 {
   // Two basins inside one outline; the seed picks the western one.
   Field field(41, 21, 30.0f);
@@ -248,7 +316,10 @@ TEST(WaterBodies, OutlineWithSeedFillsOnlyItsConnectedPart)
   EXPECT_EQ(bodies->BodyOfVertex(31, 10), 0u);
 }
 
-TEST(WaterBodies, OutlineWithNothingLowEnoughIsSkipped)
+TEST(
+  WaterBodies,
+  OutlineWithNothingLowEnoughIsSkipped
+)
 {
   Field field(21, 21, 30.0f);
   SWaterBodyDesc lake = Lake(20.0f, 0.0f, 0.0f);

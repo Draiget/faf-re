@@ -134,8 +134,7 @@ namespace moho
     , mTickCounter(0)
     , mPadC4{}
     , mMembership()
-  {
-  }
+  {}
 
   /**
    * Address: 0x0061AE50 (FUN_0061AE50, Moho::CUnitPatrolTask::CUnitPatrolTask)
@@ -227,8 +226,9 @@ namespace moho
     // Immobile need-unpack attackers get their desired target cleared so the
     // pack/unpack transition is not held by a stale attack target.
     if (unit->IsUnitState(UNITSTATE_Immobile)) {
-      if (const RUnitBlueprint* const blueprint = unit->GetBlueprint();
-          blueprint != nullptr && blueprint->AI.NeedUnpack) {
+      if (
+        const RUnitBlueprint* const blueprint = unit->GetBlueprint(); blueprint != nullptr && blueprint->AI.NeedUnpack
+      ) {
         if (CAiAttackerImpl* const attacker = unit->AiAttacker; attacker != nullptr) {
           CAiTarget clearTarget{};
           clearTarget.targetType = EAiTargetType::AITARGET_None;
@@ -310,7 +310,9 @@ namespace moho
    * What it does:
    * See the header declaration for the full behavior summary.
    */
-  void CUnitPatrolTask::OnEvent(const ECommandEvent /*event*/)
+  void CUnitPatrolTask::OnEvent(
+    const ECommandEvent /*event*/
+  )
   {
     SOCellPos cell{};
     (void)CUnitCommand::GetPosition(mBoundCommand, mUnit, &cell);
@@ -338,7 +340,9 @@ namespace moho
    * What it does:
    * See the header declaration for the full behavior summary.
    */
-  void CUnitPatrolTask::OnEvent(const EFormationdStatus event)
+  void CUnitPatrolTask::OnEvent(
+    const EFormationdStatus event
+  )
   {
     if (event == FORMATIONSTATUS_FormationAtGoal) {
       mNavStalled = true;
@@ -360,7 +364,9 @@ namespace moho
      * inflated by ceil(mInfoCache.mFormationTopSpeed) cells before the
      * containment test.
      */
-    [[nodiscard]] bool PatrolGoalCoversUnitOrigin(const CUnitPatrolTask& task)
+    [[nodiscard]] bool PatrolGoalCoversUnitOrigin(
+      const CUnitPatrolTask& task
+    )
     {
       Unit* const unit = task.mUnit;
 
@@ -505,10 +511,8 @@ namespace moho
     // are, i.e. when there is surplus to spend.
     const CSimArmyEconomyInfo* const economy = army->GetEconomy();
     const SEconTotals& totals = economy->economy;
-    const bool energyStorageNearFull =
-      totals.mStored.ENERGY > static_cast<float>(totals.mMaxStorage.ENERGY) * 0.75f;
-    const bool massStorageNearFull =
-      totals.mStored.MASS > static_cast<float>(totals.mMaxStorage.MASS) * 0.75f;
+    const bool energyStorageNearFull = totals.mStored.ENERGY > static_cast<float>(totals.mMaxStorage.ENERGY) * 0.75f;
+    const bool massStorageNearFull = totals.mStored.MASS > static_cast<float>(totals.mMaxStorage.MASS) * 0.75f;
 
     // No-rush zone centre: start position offset by the per-army no-rush offset.
     // X pairs with the candidate's X and Z with its Z -- 0x0061C00A subtracts
@@ -521,9 +525,7 @@ namespace moho
     gpg::core::FastVectorN<CollisionResult, 10> collisions;
     Sim* const sim = unit->SimulationRef;
     sim->mOGrid->CollectEntitiesInBox(
-      collisions,
-      static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Prop),
-      mSearchBox
+      collisions, static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Prop), mSearchBox
     );
 
     Entity* bestCandidate = nullptr;
@@ -562,8 +564,7 @@ namespace moho
           continue;
         }
         if (energyStorageNearFull || massStorageNearFull) {
-          const auto* const propBlueprint =
-            reinterpret_cast<const RPropBlueprint*>(candidateProp->BluePrint);
+          const auto* const propBlueprint = reinterpret_cast<const RPropBlueprint*>(candidateProp->BluePrint);
           bool hasReclaimValue = false;
           if (!energyStorageNearFull) {
             hasReclaimValue = propBlueprint->Economy.ReclaimEnergyMax > 0.0f;
@@ -604,9 +605,11 @@ namespace moho
           weight = 0.5f;
         } else {
           // Allied damaged unit, but only while both stores are near full.
-          if (!energyStorageNearFull || !massStorageNearFull
-              || candidate->mVarDat.mHealth >= (candidate->mVarDat.mMaxHealth * 0.9f)
-              || candidateUnit->IsUnitState(UNITSTATE_BeingReclaimed)) {
+          if (
+            !energyStorageNearFull || !massStorageNearFull ||
+            candidate->mVarDat.mHealth >= (candidate->mVarDat.mMaxHealth * 0.9f) ||
+            candidateUnit->IsUnitState(UNITSTATE_BeingReclaimed)
+          ) {
             continue;
           }
           weight = 2.0f;
@@ -689,9 +692,11 @@ namespace moho
     // owner unit's own current position. The type is read via the named
     // `mVarDat.mCmdType` field, consistent with every other recovered task.
     Wm3::Vector3f endPos;
-    if (queueTailCommand != nullptr && queueTailCommand != queueHeadCommand
-        && (queueTailCommand->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_Patrol
-            || queueTailCommand->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_FormPatrol)) {
+    if (
+      queueTailCommand != nullptr && queueTailCommand != queueHeadCommand &&
+      (queueTailCommand->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_Patrol ||
+       queueTailCommand->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_FormPatrol)
+    ) {
       const SFootprint& tailFootprint = unit->GetFootprint();
       SOCellPos tailCell{};
       const SOCellPos* const tailPosCell = CUnitCommand::GetPosition(queueTailCommand, unit, &tailCell);
@@ -866,7 +871,9 @@ namespace moho
    *   8. `mTickCounter` via the virtual `ReadInt` archive slot (vtbl +0x24).
    *   9. `mMembership` (`EntitySetTemplate<Entity>`) by reflected type.
    */
-  void CUnitPatrolTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CUnitPatrolTask::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -909,7 +916,9 @@ namespace moho
    * search box via reflected `Write`, the tick counter via the virtual
    * `WriteInt` slot, and the membership node via reflected `Write`.
    */
-  void CUnitPatrolTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CUnitPatrolTask::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;
@@ -996,7 +1005,6 @@ namespace moho
 
 } // namespace moho
 
-
 namespace
 {
 
@@ -1007,7 +1015,12 @@ namespace moho
   /**
    * Address: 0x0061AD10 (FUN_0061AD10)
    */
-  void CUnitPatrolTask::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CUnitPatrolTask::MemberConstruct(
+    gpg::ReadArchive&,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     result.SetUnowned(gpg::MakeRRef(new CUnitPatrolTask()), 0u);
   }

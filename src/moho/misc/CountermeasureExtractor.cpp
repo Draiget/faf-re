@@ -14,7 +14,7 @@ namespace
 
   /// 0x00E4F724, the multiplier applied to `Defense.Shield.ShieldSize`.
   constexpr float kShieldDiameterToRadius = 0.5f;
-}
+} // namespace
 
 namespace moho
 {
@@ -27,7 +27,9 @@ namespace moho
    * Address: 0x007EC980 (FUN_007EC980, Moho::CountermeasureExtractor::Range)
    */
   bool CountermeasureExtractor::Range(
-    SRangeExtractionPayload* const outRange, const RUnitBlueprint* const unitBlueprint, const Wm3::Vec3f& center
+    SRangeExtractionPayload* const outRange,
+    const RUnitBlueprint* const unitBlueprint,
+    const Wm3::Vec3f& center
   ) const
   {
     if (!outRange || !unitBlueprint) {
@@ -54,7 +56,9 @@ namespace moho
    * Address: 0x007EC880 (FUN_007EC880, Moho::CountermeasureExtractor::Extract)
    */
   bool CountermeasureExtractor::Extract(
-    SRangeExtractionPayload* const outRange, const UserEntity* const userEntity, const float interpolationAlpha
+    SRangeExtractionPayload* const outRange,
+    const UserEntity* const userEntity,
+    const float interpolationAlpha
   ) const
   {
     if (!outRange || !userEntity) {
@@ -69,8 +73,10 @@ namespace moho
     // An earlier pass had this branch reading a factory command queue through
     // a layout stand-in instead.
     if (const UserUnit* const userUnit = userEntity->IsUserUnit(); userUnit != nullptr) {
-      if (const RUnitBlueprint* const unitBlueprint = static_cast<const IUnit*>(userUnit)->GetBlueprint();
-          unitBlueprint != nullptr) {
+      if (
+        const RUnitBlueprint* const unitBlueprint = static_cast<const IUnit*>(userUnit)->GetBlueprint();
+        unitBlueprint != nullptr
+      ) {
         const float shieldRadius = unitBlueprint->Defense.Shield.ShieldSize * kShieldDiameterToRadius;
         if (shieldRadius > 0.0f) {
           return StoreRangeAtEntity(outRange, *userEntity, interpolationAlpha, shieldRadius);

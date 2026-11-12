@@ -2,8 +2,8 @@
 
 namespace gpg::gal
 {
-namespace
-{
+  namespace
+  {
 
     // Address: 0x00D43078 (DAT_00D43078)
     constexpr std::uint32_t kPrimitiveTopologyByToken[15] = {
@@ -121,7 +121,10 @@ namespace
     constexpr std::size_t kDeviceCreateEffectInjectedMacroCount =
       sizeof(kDeviceCreateEffectInjectedMacros) / sizeof(kDeviceCreateEffectInjectedMacros[0]);
 
-    [[noreturn]] void ThrowDeviceD3D10Hresult(const int line, const HRESULT code)
+    [[noreturn]] void ThrowDeviceD3D10Hresult(
+      const int line,
+      const HRESULT code
+    )
     {
       throw Error(MakeShortString("DeviceD3D10.cpp"), line, MakeD3DErrorString(code));
     }
@@ -134,7 +137,10 @@ namespace
      * head capability list.
      */
     void AppendHeadSampleOption(
-      Head& head, const unsigned int sampleType, const unsigned int sampleQuality, const char* const label
+      Head& head,
+      const unsigned int sampleType,
+      const unsigned int sampleQuality,
+      const char* const label
     )
     {
       HeadSampleOption option{};
@@ -144,17 +150,23 @@ namespace
       head.mStrs.push_back(option);
     }
 
-    [[noreturn]] void ThrowInvalidTopologyError(const int line)
+    [[noreturn]] void ThrowInvalidTopologyError(
+      const int line
+    )
     {
       ThrowGalError("DeviceD3D10.cpp", line, "invalid topology specified");
     }
 
-    std::uint32_t ResolvePrimitiveTopology(const std::uint32_t topologyToken) noexcept
+    std::uint32_t ResolvePrimitiveTopology(
+      const std::uint32_t topologyToken
+    ) noexcept
     {
       return kPrimitiveTopologyByToken[topologyToken];
     }
 
-    int ResolveImageFileFormatToken(const int token) noexcept
+    int ResolveImageFileFormatToken(
+      const int token
+    ) noexcept
     {
       if ((token < 0) || (token >= 5)) {
         return 0;
@@ -172,8 +184,10 @@ namespace
      * Clears one swap-chain descriptor and populates presentation lanes from
      * one `Head` runtime view when a native window handle is present.
      */
-    DXGI_SWAP_CHAIN_DESC*
-    BuildSwapChainDescFromHead(DXGI_SWAP_CHAIN_DESC* const outDesc, const Head* const head)
+    DXGI_SWAP_CHAIN_DESC* BuildSwapChainDescFromHead(
+      DXGI_SWAP_CHAIN_DESC* const outDesc,
+      const Head* const head
+    )
     {
       std::memset(outDesc, 0, sizeof(DXGI_SWAP_CHAIN_DESC));
       if (head->mWindow == nullptr) {
@@ -209,7 +223,9 @@ namespace
      * Converts GAL render-target format token to DXGI format token through the
      * recovered 10-entry render-target mapping table.
      */
-    int MapGalRenderTargetFormatToDxgi(const int galFormat)
+    int MapGalRenderTargetFormatToDxgi(
+      const int galFormat
+    )
     {
       for (const DXGIFormatPair& pair : kRenderTargetDxgiGalPairs) {
         if (pair.gal == galFormat) {
@@ -227,7 +243,9 @@ namespace
      * Maps depth-stencil format token to DXGI format through the recovered
      * `DAT_00D487AC` lookup lane.
      */
-    int ResolveDepthStencilFormatToDxgi(const int formatToken) noexcept
+    int ResolveDepthStencilFormatToDxgi(
+      const int formatToken
+    ) noexcept
     {
       return static_cast<int>(kDepthStencilDxgiByToken[formatToken]);
     }
@@ -240,7 +258,9 @@ namespace
      * writes pass-desc IA signature lanes for input-layout creation.
      */
     void GetVertexInputSignatureOrThrow(
-      DeviceD3D10* const device, const int formatToken, D3D10_PASS_DESC* const outPassDesc
+      DeviceD3D10* const device,
+      const int formatToken,
+      D3D10_PASS_DESC* const outPassDesc
     )
     {
       ID3D10Effect* const signatureEffect = device->mSignatureEffect;
@@ -255,18 +275,17 @@ namespace
 
       static_cast<void>(technique->GetPassByIndex(0U)->GetDesc(outPassDesc));
     }
-}
+  } // namespace
 
-
-    // FAF addition, not in the shipped binary. GPG's D3D10 SetColorWriteState
-    // and SetWireframeState (0x008FE6F0, 0x008FE6E0) are empty, so the engine's
-    // colour-write masks (13 call sites) and wireframe toggle did nothing under
-    // /D3D10. These hold what the engine last asked for; one device exists at a
-    // time, and the binary-sized PipelineStateD3D10 has no room for them.
-    UINT8 sColorWriteMask = D3D10_COLOR_WRITE_ENABLE_ALL;
-    bool sWireframe = false;
-namespace
-{
+  // FAF addition, not in the shipped binary. GPG's D3D10 SetColorWriteState
+  // and SetWireframeState (0x008FE6F0, 0x008FE6E0) are empty, so the engine's
+  // colour-write masks (13 call sites) and wireframe toggle did nothing under
+  // /D3D10. These hold what the engine last asked for; one device exists at a
+  // time, and the binary-sized PipelineStateD3D10 has no room for them.
+  UINT8 sColorWriteMask = D3D10_COLOR_WRITE_ENABLE_ALL;
+  bool sWireframe = false;
+  namespace
+  {
 
     /**
      * FAF addition. The D3D9 backend's mask for the two flags
@@ -274,7 +293,10 @@ namespace
      * write everything, colour alone RGB, alpha alone A. D3D10's write-enable
      * bits are D3D9's.
      */
-    [[nodiscard]] UINT8 ColorWriteMask(const bool writeColor, const bool writeAlpha) noexcept
+    [[nodiscard]] UINT8 ColorWriteMask(
+      const bool writeColor,
+      const bool writeAlpha
+    ) noexcept
     {
       constexpr UINT8 kRgb =
         D3D10_COLOR_WRITE_ENABLE_RED | D3D10_COLOR_WRITE_ENABLE_GREEN | D3D10_COLOR_WRITE_ENABLE_BLUE;
@@ -284,8 +306,7 @@ namespace
       return writeAlpha ? static_cast<UINT8>(D3D10_COLOR_WRITE_ENABLE_ALPHA)
                         : static_cast<UINT8>(D3D10_COLOR_WRITE_ENABLE_ALL);
     }
-}
-
+  } // namespace
 
   /**
    * Address: 0x00900450 (FUN_00900450)
@@ -351,7 +372,10 @@ namespace
    * What it does:
    * Forwards to the linked `D3D10CreateBlob`.
    */
-  HRESULT DeviceD3D10::CreateBlob(const SIZE_T size, ID3D10Blob** const outBlob)
+  HRESULT DeviceD3D10::CreateBlob(
+    const SIZE_T size,
+    ID3D10Blob** const outBlob
+  )
   {
     return mD3D10CreateBlob(size, outBlob);
   }
@@ -363,7 +387,9 @@ namespace
    * Forwards to the linked `D3DX10SaveTextureToMemory`.
    */
   HRESULT DeviceD3D10::SaveTextureToMemory(
-    ID3D10Resource* const texture, const D3DX10_IMAGE_FILE_FORMAT format, ID3D10Blob** const outBlob
+    ID3D10Resource* const texture,
+    const D3DX10_IMAGE_FILE_FORMAT format,
+    ID3D10Blob** const outBlob
   )
   {
     return mD3DX10SaveTextureToMemory(texture, format, outBlob);
@@ -437,7 +463,10 @@ namespace
    * them all would repeat each resolution. An index past the adapter list
    * leaves the list empty, as on D3D9.
    */
-  void DeviceD3D10::GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, const int adapterIndex)
+  void DeviceD3D10::GetModesForAdapter(
+    fa::vector<HeadAdapterMode>& outModes,
+    const int adapterIndex
+  )
   {
     outModes.clear();
     if (adapterIndex < 0 || adapterIndex >= static_cast<int>(mAdapters.size())) {
@@ -474,27 +503,22 @@ namespace
     }
 
     mD3D10CreateDevice = reinterpret_cast<D3D10CreateDeviceFn>(::GetProcAddress(mD3D10Module, "D3D10CreateDevice"));
-    mD3D10CreateBlob = reinterpret_cast<D3D10CreateBlobFn>(
-      ::GetProcAddress(mD3D10Module, "D3D10CreateBlob")
-    );
+    mD3D10CreateBlob = reinterpret_cast<D3D10CreateBlobFn>(::GetProcAddress(mD3D10Module, "D3D10CreateBlob"));
 
     mD3DX10Module = ::LoadLibraryA("d3dx10.dll");
     if (mD3DX10Module == nullptr) {
       ThrowGalError("DeviceD3D10.cpp", 1650, "unable to explicitly link to d3dx10.dll");
     }
 
-    mD3DX10CreateEffectFromMemory = reinterpret_cast<D3DX10CreateEffectFromMemoryFn>(
-      ::GetProcAddress(mD3DX10Module, "D3DX10CreateEffectFromMemory")
-    );
+    mD3DX10CreateEffectFromMemory =
+      reinterpret_cast<D3DX10CreateEffectFromMemoryFn>(::GetProcAddress(mD3DX10Module, "D3DX10CreateEffectFromMemory"));
     mD3DX10CreateTextureFromMemory = reinterpret_cast<D3DX10CreateTextureFromMemoryFn>(
       ::GetProcAddress(mD3DX10Module, "D3DX10CreateTextureFromMemory")
     );
-    mD3DX10SaveTextureToFileA = reinterpret_cast<D3DX10SaveTextureToFileFn>(
-      ::GetProcAddress(mD3DX10Module, "D3DX10SaveTextureToFileA")
-    );
-    mD3DX10SaveTextureToMemory = reinterpret_cast<D3DX10SaveTextureToMemoryFn>(
-      ::GetProcAddress(mD3DX10Module, "D3DX10SaveTextureToMemory")
-    );
+    mD3DX10SaveTextureToFileA =
+      reinterpret_cast<D3DX10SaveTextureToFileFn>(::GetProcAddress(mD3DX10Module, "D3DX10SaveTextureToFileA"));
+    mD3DX10SaveTextureToMemory =
+      reinterpret_cast<D3DX10SaveTextureToMemoryFn>(::GetProcAddress(mD3DX10Module, "D3DX10SaveTextureToMemory"));
 
     mDXGIModule = ::LoadLibraryA("dxgi.dll");
     if (mDXGIModule == nullptr) {
@@ -608,11 +632,7 @@ namespace
 
     ID3D10InputLayout* inputLayout = nullptr;
     const HRESULT createInputLayoutResult = device->CreateInputLayout(
-      inputElements,
-      2U,
-      passDesc.pIAInputSignature,
-      passDesc.IAInputSignatureSize,
-      &inputLayout
+      inputElements, 2U, passDesc.pIAInputSignature, passDesc.IAInputSignatureSize, &inputLayout
     );
     if (createInputLayoutResult < 0) {
       ThrowDeviceD3D10Hresult(1970, createInputLayoutResult);
@@ -629,7 +649,9 @@ namespace
    * Copies the requested device context into runtime, validates requested
    * head count, and populates per-head format/sample capability lanes.
    */
-  std::uint32_t DeviceD3D10::CheckAvailableFormats(DeviceContext* const context)
+  std::uint32_t DeviceD3D10::CheckAvailableFormats(
+    DeviceContext* const context
+  )
   {
     mDeviceContext = *context;
 
@@ -668,8 +690,10 @@ namespace
       for (int formatToken = 1; formatToken < 8; ++formatToken) {
         UINT supportFlags = 0U;
         const DXGI_FORMAT dxgiFormat = static_cast<DXGI_FORMAT>(MapGalRenderTargetFormatToDxgi(formatToken));
-        if ((device->CheckFormatSupport(dxgiFormat, &supportFlags) >= 0) &&
-            ((supportFlags & kD3D10FormatSupportRenderTarget) != 0U)) {
+        if (
+          (device->CheckFormatSupport(dxgiFormat, &supportFlags) >= 0) &&
+          ((supportFlags & kD3D10FormatSupportRenderTarget) != 0U)
+        ) {
           head.validFormats1.push_back(formatToken);
         }
       }
@@ -678,8 +702,10 @@ namespace
       for (int formatToken = 1; formatToken < 20; ++formatToken) {
         UINT supportFlags = 0U;
         const DXGI_FORMAT dxgiFormat = static_cast<DXGI_FORMAT>(MapGalTextureFormatToDxgi(formatToken));
-        if ((device->CheckFormatSupport(dxgiFormat, &supportFlags) >= 0) &&
-            ((supportFlags & kD3D10FormatSupportTexture2D) != 0U)) {
+        if (
+          (device->CheckFormatSupport(dxgiFormat, &supportFlags) >= 0) &&
+          ((supportFlags & kD3D10FormatSupportTexture2D) != 0U)
+        ) {
           head.validFormats2.push_back(formatToken);
         }
       }
@@ -688,8 +714,10 @@ namespace
       if (adapter.description_.VendorId != kVendorIdNvidia) {
         for (unsigned int sampleCount = 2U; sampleCount <= 16U; ++sampleCount) {
           UINT qualityLevels = 0U;
-          if ((device->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, sampleCount, &qualityLevels) >= 0) &&
-              (qualityLevels != 0U)) {
+          if (
+            (device->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, sampleCount, &qualityLevels) >= 0) &&
+            (qualityLevels != 0U)
+          ) {
             char label[16]{};
             std::snprintf(label, sizeof(label), "%u", sampleCount);
             AppendHeadSampleOption(head, sampleCount, qualityLevels - 1U, label);
@@ -730,7 +758,9 @@ namespace
    * Asks the device whether the format's DXGI equivalent can be a 2D texture
    * that shaders sample.
    */
-  bool DeviceD3D10::SupportsVertexTextureFormat(const std::uint32_t textureFormat)
+  bool DeviceD3D10::SupportsVertexTextureFormat(
+    const std::uint32_t textureFormat
+  )
   {
     const auto dxgiFormat = static_cast<DXGI_FORMAT>(MapGalTextureFormatToDxgi(static_cast<int>(textureFormat)));
     if (mDevice == nullptr || dxgiFormat == DXGI_FORMAT_UNKNOWN) {
@@ -739,7 +769,7 @@ namespace
 
     UINT support = 0U;
     return SUCCEEDED(mDevice->CheckFormatSupport(dxgiFormat, &support)) &&
-           (support & D3D10_FORMAT_SUPPORT_TEXTURE2D) != 0U && (support & D3D10_FORMAT_SUPPORT_SHADER_SAMPLE) != 0U;
+      (support & D3D10_FORMAT_SUPPORT_TEXTURE2D) != 0U && (support & D3D10_FORMAT_SUPPORT_SHADER_SAMPLE) != 0U;
   }
 
   /**
@@ -815,7 +845,9 @@ namespace
    * context (dynamic link, DXGI/device/swapchain/effects/state/capability
    * initialization).
    */
-  void DeviceD3D10::Setup(DeviceContext* const context)
+  void DeviceD3D10::Setup(
+    DeviceContext* const context
+  )
   {
 
     DynamicLink();
@@ -832,12 +864,7 @@ namespace
     }
 
     const HRESULT createDeviceResult = mD3D10CreateDevice(
-      mAdapters.front().dxgiAdapter_,
-      D3D10_DRIVER_TYPE_HARDWARE,
-      nullptr,
-      0U,
-      D3D10_SDK_VERSION,
-      &mDevice
+      mAdapters.front().dxgiAdapter_, D3D10_DRIVER_TYPE_HARDWARE, nullptr, 0U, D3D10_SDK_VERSION, &mDevice
     );
     if (createDeviceResult < 0) {
       ThrowDeviceD3D10Hresult(622, createDeviceResult);
@@ -894,7 +921,9 @@ namespace
    * (`sizeof(Head)` is 0x80, the `>> 7` of `size()`) and returns that head's
    * output context from `mHeadOutputContexts`.
    */
-  OutputContext* DeviceD3D10::GetHeadOutputContext(const unsigned int headIndex)
+  OutputContext* DeviceD3D10::GetHeadOutputContext(
+    const unsigned int headIndex
+  )
   {
     if (headIndex >= mDeviceContext.mHeads.size()) {
       ThrowGalError("DeviceD3D10.cpp", 727, "invalid head index specified");
@@ -909,7 +938,9 @@ namespace
    * What it does:
    * The const overload of `GetHeadOutputContext`; same body.
    */
-  const OutputContext* DeviceD3D10::GetHeadOutputContext(const unsigned int headIndex) const
+  const OutputContext* DeviceD3D10::GetHeadOutputContext(
+    const unsigned int headIndex
+  ) const
   {
     if (headIndex >= mDeviceContext.mHeads.size()) {
       ThrowGalError("DeviceD3D10.cpp", 733, "invalid head index specified");
@@ -941,16 +972,15 @@ namespace
    * `new` at 0x008FEF5A), and the define array is never freed -- the binary
    * has no `delete[]` for it on any path, the same as the D3D9 builder's.
    */
-  boost::shared_ptr<Effect> DeviceD3D10::CreateEffect(const EffectContext& context)
+  boost::shared_ptr<Effect> DeviceD3D10::CreateEffect(
+    const EffectContext& context
+  )
   {
     ID3D10Effect* dxEffect = nullptr;
     {
       EffectContext localContext(context);
       for (std::size_t i = 0U; i < kDeviceCreateEffectInjectedMacroCount; ++i) {
-        localContext.DefineMacro(
-          kDeviceCreateEffectInjectedMacros[i].key,
-          kDeviceCreateEffectInjectedMacros[i].value
-        );
+        localContext.DefineMacro(kDeviceCreateEffectInjectedMacros[i].key, kDeviceCreateEffectInjectedMacros[i].value);
       }
 
       const std::size_t macroCount = localContext.mMacros.size();
@@ -1018,7 +1048,9 @@ namespace
    * size and format) with its shader-resource view and wraps both in a
    * `TextureD3D10`.
    */
-  boost::shared_ptr<Texture> DeviceD3D10::CreateTexture(const TextureContext* const context)
+  boost::shared_ptr<Texture> DeviceD3D10::CreateTexture(
+    const TextureContext* const context
+  )
   {
     ID3D10Texture2D* nativeTexture = nullptr;
     ID3D10ShaderResourceView* shaderResourceView = nullptr;
@@ -1108,7 +1140,9 @@ namespace
    * SRV, sets a viewport covering it, and wraps all three in a
    * `RenderTargetD3D10`.
    */
-  boost::shared_ptr<RenderTarget> DeviceD3D10::CreateRenderTarget(const RenderTargetContext* const context)
+  boost::shared_ptr<RenderTarget> DeviceD3D10::CreateRenderTarget(
+    const RenderTargetContext* const context
+  )
   {
     D3D10_TEXTURE2D_DESC textureDesc{};
     textureDesc.Width = context->width_;
@@ -1168,7 +1202,9 @@ namespace
    * takes the context but only default-constructs its own copy, and the
    * D3D10 backend never creates a native cube texture.
    */
-  boost::shared_ptr<CubeRenderTarget> DeviceD3D10::CreateCubeRenderTarget(const CubeRenderTargetContext* const context)
+  boost::shared_ptr<CubeRenderTarget> DeviceD3D10::CreateCubeRenderTarget(
+    const CubeRenderTargetContext* const context
+  )
   {
     return boost::shared_ptr<CubeRenderTarget>(new CubeRenderTargetD3D10(context));
   }
@@ -1180,7 +1216,9 @@ namespace
    * Creates one depth texture with its DSV (plus an SRV when the context asks
    * for a sampleable target) and wraps them in a `DepthStencilTargetD3D10`.
    */
-  boost::shared_ptr<DepthStencilTarget> DeviceD3D10::CreateDepthStencilTarget(const DepthStencilTargetContext* const context)
+  boost::shared_ptr<DepthStencilTarget> DeviceD3D10::CreateDepthStencilTarget(
+    const DepthStencilTargetContext* const context
+  )
   {
     const DXGI_FORMAT depthFormat =
       static_cast<DXGI_FORMAT>(ResolveDepthStencilFormatToDxgi(static_cast<int>(context->format_)));
@@ -1244,7 +1282,9 @@ namespace
    * signature effect's pass for that format and wraps it in a
    * `VertexFormatD3D10`.
    */
-  boost::shared_ptr<VertexFormat> DeviceD3D10::CreateVertexFormat(const std::uint32_t formatToken)
+  boost::shared_ptr<VertexFormat> DeviceD3D10::CreateVertexFormat(
+    const std::uint32_t formatToken
+  )
   {
     const D3D10_INPUT_ELEMENT_DESC* const elements = GetVertexLayoutElementsOrThrow(formatToken);
     const std::uint32_t elementCount = GetVertexLayoutElementCountOrThrow(formatToken);
@@ -1270,7 +1310,9 @@ namespace
    * Creates one GPU vertex buffer and the staging buffer `Lock` maps, and
    * wraps both in a `VertexBufferD3D10`.
    */
-  boost::shared_ptr<VertexBuffer> DeviceD3D10::CreateVertexBuffer(const VertexBufferContext* const context)
+  boost::shared_ptr<VertexBuffer> DeviceD3D10::CreateVertexBuffer(
+    const VertexBufferContext* const context
+  )
   {
     const std::uint32_t byteWidth = context->vertexCount_ * context->stride_;
 
@@ -1300,9 +1342,7 @@ namespace
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 1056, createStagingBufferResult);
     }
 
-    return boost::shared_ptr<VertexBuffer>(
-      new VertexBufferD3D10(context, mDevice, gpuBuffer, stagingBuffer)
-    );
+    return boost::shared_ptr<VertexBuffer>(new VertexBufferD3D10(context, mDevice, gpuBuffer, stagingBuffer));
   }
 
   /**
@@ -1312,7 +1352,9 @@ namespace
    * Creates one GPU index buffer and the staging buffer `Lock` maps, and
    * wraps both in an `IndexBufferD3D10`.
    */
-  boost::shared_ptr<IndexBuffer> DeviceD3D10::CreateIndexBuffer(const IndexBufferContext* const context)
+  boost::shared_ptr<IndexBuffer> DeviceD3D10::CreateIndexBuffer(
+    const IndexBufferContext* const context
+  )
   {
     const std::uint32_t bytesPerIndex = (context->format_ == 1U) ? 2U : 4U;
     const std::uint32_t byteWidth = context->size_ * bytesPerIndex;
@@ -1343,9 +1385,7 @@ namespace
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 1083, createStagingBufferResult);
     }
 
-    return boost::shared_ptr<IndexBuffer>(
-      new IndexBufferD3D10(context, mDevice, gpuBuffer, stagingBuffer)
-    );
+    return boost::shared_ptr<IndexBuffer>(new IndexBufferD3D10(context, mDevice, gpuBuffer, stagingBuffer));
   }
 
   /**
@@ -1356,7 +1396,8 @@ namespace
    * `CopyResource` from the target's texture into the destination's.
    */
   void DeviceD3D10::GetRenderTargetData(
-    const boost::shared_ptr<RenderTarget>& source, const boost::shared_ptr<Texture>& destination
+    const boost::shared_ptr<RenderTarget>& source,
+    const boost::shared_ptr<Texture>& destination
   )
   {
     if (source.get() == nullptr) {
@@ -1401,9 +1442,10 @@ namespace
     const RenderTargetContext* const sourceContext = sourceTarget->GetContext();
     const RenderTargetContext* const destinationContext = destinationTarget->GetContext();
 
-    if ((sourceContext->width_ == destinationContext->width_) &&
-        (sourceContext->height_ == destinationContext->height_) &&
-        (sourceContext->format_ == destinationContext->format_)) {
+    if (
+      (sourceContext->width_ == destinationContext->width_) &&
+      (sourceContext->height_ == destinationContext->height_) && (sourceContext->format_ == destinationContext->format_)
+    ) {
       unsigned int destinationX = 0U;
       unsigned int destinationY = 0U;
       if (destinationRect != nullptr) {
@@ -1450,7 +1492,10 @@ namespace
    * `g_txSource` set to `source`, and restores the viewport and targets.
    */
   void DeviceD3D10::StretchRectBlit(
-    const UINT width, const UINT height, ID3D10RenderTargetView* const destination, ID3D10ShaderResourceView* const source
+    const UINT width,
+    const UINT height,
+    ID3D10RenderTargetView* const destination,
+    ID3D10ShaderResourceView* const source
   )
   {
     D3D10_VIEWPORT savedViewport{};
@@ -1519,9 +1564,10 @@ namespace
     auto* const destinationTexture = static_cast<TextureD3D10*>(destination.get());
     const TextureContext* const sourceContext = sourceTexture->GetContext();
     const TextureContext* const destinationContext = destinationTexture->GetContext();
-    if ((sourceContext->width_ == destinationContext->width_) &&
-        (sourceContext->height_ == destinationContext->height_) &&
-        (sourceContext->format_ == destinationContext->format_)) {
+    if (
+      (sourceContext->width_ == destinationContext->width_) &&
+      (sourceContext->height_ == destinationContext->height_) && (sourceContext->format_ == destinationContext->format_)
+    ) {
       unsigned int destinationX = 0U;
       unsigned int destinationY = 0U;
       if (destinationRect != nullptr) {
@@ -1607,7 +1653,9 @@ namespace
    * through the image-format table at `DAT_00D430A0`.
    */
   void DeviceD3D10::SaveRenderTarget(
-    const boost::shared_ptr<RenderTarget>& renderTarget, const fa::string& filePath, const int fileFormat
+    const boost::shared_ptr<RenderTarget>& renderTarget,
+    const fa::string& filePath,
+    const int fileFormat
   )
   {
     const int imageFileFormat = ResolveImageFileFormatToken(fileFormat);
@@ -1708,7 +1756,8 @@ namespace
     loadInfo.Format = DXGI_FORMAT_BC3_UNORM;
 
     ID3D10Resource* decodedResource = nullptr;
-    HRESULT result = mD3DX10CreateTextureFromMemory(mDevice, sourceData, sourceBytes, &loadInfo, nullptr, &decodedResource);
+    HRESULT result =
+      mD3DX10CreateTextureFromMemory(mDevice, sourceData, sourceBytes, &loadInfo, nullptr, &decodedResource);
     if (result < 0) {
       ThrowDeviceD3D10Hresult(1317, result);
     }
@@ -1791,8 +1840,10 @@ namespace
    * Clears caller weak-handle output lane and consumes one temporary shared
    * handle by value.
    */
-  boost::weak_ptr<void>*
-  DeviceD3D10::Func7(boost::weak_ptr<void>* const outWeakHandle, boost::shared_ptr<void> temporarySharedHandle)
+  boost::weak_ptr<void>* DeviceD3D10::Func7(
+    boost::weak_ptr<void>* const outWeakHandle,
+    boost::shared_ptr<void> temporarySharedHandle
+  )
   {
     static_cast<void>(temporarySharedHandle);
     outWeakHandle->reset();
@@ -1806,7 +1857,8 @@ namespace
    * D3D10 cannot save a cube target: the body is a bare `ret 8`.
    */
   void DeviceD3D10::SaveCubeRenderTarget(
-    const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath
+    const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
+    const fa::string& filePath
   )
   {
     static_cast<void>(cubeTarget);
@@ -1829,9 +1881,10 @@ namespace
    * What it does:
    * Preserves the binary no-op virtual slot (`retn 4` shape).
    */
-  void DeviceD3D10::Reset(DeviceContext* const /*context*/)
-  {
-  }
+  void DeviceD3D10::Reset(
+    DeviceContext* const /*context*/
+  )
+  {}
 
   /**
    * Address: 0x008F8730 (FUN_008F8730)
@@ -1869,7 +1922,9 @@ namespace
    * Tail-delegates to the retained `CursorD3D10` lane at `this+0x11C` and
    * rebuilds/applies cursor icon state from caller context.
    */
-  void DeviceD3D10::SetCursor(const CursorContext* const context)
+  void DeviceD3D10::SetCursor(
+    const CursorContext* const context
+  )
   {
     static_cast<void>(mCursor.SetCursor(context));
   }
@@ -1894,7 +1949,9 @@ namespace
    * Tail-delegates to retained cursor show/hide loop control
    * (`CursorD3D10::ShowCursor`).
    */
-  int DeviceD3D10::ShowCursor(const bool show)
+  int DeviceD3D10::ShowCursor(
+    const bool show
+  )
   {
     return mCursor.ShowCursor(show);
   }
@@ -1907,7 +1964,9 @@ namespace
    * What it does:
    * Copies one caller viewport payload and binds it as the single native D3D10 viewport.
    */
-  void DeviceD3D10::SetViewport(const D3DVIEWPORT9* const viewport)
+  void DeviceD3D10::SetViewport(
+    const D3DVIEWPORT9* const viewport
+  )
   {
     D3D10_VIEWPORT viewportCopy{};
     viewportCopy.TopLeftX = static_cast<INT>(viewport->X);
@@ -1927,7 +1986,9 @@ namespace
    * What it does:
    * Fetches one native viewport payload and copies it back into caller memory.
    */
-  void DeviceD3D10::GetViewport(D3DVIEWPORT9* const outViewport)
+  void DeviceD3D10::GetViewport(
+    D3DVIEWPORT9* const outViewport
+  )
   {
     UINT viewportCount = 1U;
     D3D10_VIEWPORT viewport{};
@@ -1965,7 +2026,9 @@ namespace
    * Validates the topology, binds the native primitive topology, then dispatches
    * `Draw` vs `DrawInstanced` using the instance count at `this+0xD8`.
    */
-  void DeviceD3D10::DrawPrimitive(const DrawContext* const context)
+  void DeviceD3D10::DrawPrimitive(
+    const DrawContext* const context
+  )
   {
     // D3D10's Draw takes the vertex count as is (`mov edx,[edi+8]` at
     // 0x008FD05D); only the D3D9 backend converts it to primitives.
@@ -1973,7 +2036,9 @@ namespace
       ThrowInvalidTopologyError(1561);
     }
 
-    mDevice->IASetPrimitiveTopology(static_cast<D3D10_PRIMITIVE_TOPOLOGY>(ResolvePrimitiveTopology(context->topology_)));
+    mDevice->IASetPrimitiveTopology(
+      static_cast<D3D10_PRIMITIVE_TOPOLOGY>(ResolvePrimitiveTopology(context->topology_))
+    );
 
     // Slot 0's frequency is the instance count (0x008FD049 reads this+0xD8).
     const UINT instanceCount = static_cast<UINT>(mStreamFrequencies[0]);
@@ -1994,7 +2059,9 @@ namespace
    * Validates the topology, binds the native primitive topology, then
    * dispatches `DrawIndexed` vs `DrawIndexedInstanced`.
    */
-  void DeviceD3D10::DrawIndexedPrimitive(const DrawIndexedContext* const context)
+  void DeviceD3D10::DrawIndexedPrimitive(
+    const DrawIndexedContext* const context
+  )
   {
     // As above: DrawIndexed takes the index count as is (`mov edx,[edi+0x10]`
     // at 0x008FD16E).
@@ -2002,7 +2069,9 @@ namespace
       ThrowInvalidTopologyError(1580);
     }
 
-    mDevice->IASetPrimitiveTopology(static_cast<D3D10_PRIMITIVE_TOPOLOGY>(ResolvePrimitiveTopology(context->topology_)));
+    mDevice->IASetPrimitiveTopology(
+      static_cast<D3D10_PRIMITIVE_TOPOLOGY>(ResolvePrimitiveTopology(context->topology_))
+    );
 
     // Slot 0's frequency is the instance count (0x008FD159 reads this+0xD8).
     const UINT instanceCount = static_cast<UINT>(mStreamFrequencies[0]);
@@ -2025,7 +2094,9 @@ namespace
    * Copies one output-context snapshot into retained device state, resolves
    * active render/depth view handles, and dispatches native target clear.
    */
-  void DeviceD3D10::ClearTarget(const OutputContext* const context)
+  void DeviceD3D10::ClearTarget(
+    const OutputContext* const context
+  )
   {
     Device::ClearTarget(context);
 
@@ -2118,8 +2189,7 @@ namespace
     const float /*fogEnd*/,
     const int /*fogColor*/
   )
-  {
-  }
+  {}
 
   /**
    * Address: 0x008FE6E0 (FUN_008FE6E0)
@@ -2129,7 +2199,9 @@ namespace
    * pass applied afterwards draws wireframe unless it sets its own fill mode
    * (`ApplyStateOverrides`).
    */
-  void DeviceD3D10::SetWireframeState(const bool enabled)
+  void DeviceD3D10::SetWireframeState(
+    const bool enabled
+  )
   {
     sWireframe = enabled;
   }
@@ -2142,7 +2214,10 @@ namespace
    * would use; every effect pass applied afterwards writes only those
    * channels unless it restricts its own (`ApplyStateOverrides`).
    */
-  void DeviceD3D10::SetColorWriteState(const bool writeColor, const bool writeAlpha)
+  void DeviceD3D10::SetColorWriteState(
+    const bool writeColor,
+    const bool writeAlpha
+  )
   {
     sColorWriteMask = ColorWriteMask(writeColor, writeAlpha);
   }
@@ -2166,7 +2241,9 @@ namespace
    * Binds `vertexFormat`'s input layout (through
    * `VertexFormatD3D10::ValidateLayoutOrThrow`, 0x008F962B).
    */
-  void DeviceD3D10::SetVertexDeclaration(const boost::shared_ptr<VertexFormat> vertexFormat)
+  void DeviceD3D10::SetVertexDeclaration(
+    const boost::shared_ptr<VertexFormat> vertexFormat
+  )
   {
     mDevice->IASetInputLayout(static_cast<VertexFormatD3D10*>(vertexFormat.get())->ValidateLayoutOrThrow());
   }
@@ -2188,7 +2265,8 @@ namespace
   )
   {
     const VertexBufferContext* const context = vertexBuffer->GetContext();
-    ID3D10Buffer* const nativeVertexBuffer = static_cast<VertexBufferD3D10*>(vertexBuffer.get())->GetNativeBufferOrThrow();
+    ID3D10Buffer* const nativeVertexBuffer =
+      static_cast<VertexBufferD3D10*>(vertexBuffer.get())->GetNativeBufferOrThrow();
     const UINT stride = context->stride_;
     const UINT offset = static_cast<UINT>(startVertex * static_cast<int>(stride));
     mDevice->IASetVertexBuffers(streamSlot, 1U, &nativeVertexBuffer, &stride, &offset);
@@ -2203,7 +2281,9 @@ namespace
    * Binds `indexBuffer` as the index source at offset 0, 32-bit for index
    * format 2 and 16-bit otherwise.
    */
-  void DeviceD3D10::SetBufferIndices(const boost::shared_ptr<IndexBuffer> indexBuffer)
+  void DeviceD3D10::SetBufferIndices(
+    const boost::shared_ptr<IndexBuffer> indexBuffer
+  )
   {
     const IndexBufferContext* const context = indexBuffer->GetContext();
     const DXGI_FORMAT indexFormat = (context->format_ == 2U) ? DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT;
@@ -2232,5 +2312,4 @@ namespace
   {
     mPipelineState->EndTechnique();
   }
-}
-
+} // namespace gpg::gal

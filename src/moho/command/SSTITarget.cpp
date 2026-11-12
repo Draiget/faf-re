@@ -48,8 +48,18 @@ namespace
   // Forward declarations: SSTITargetSerializer's constructor below binds
   // these as its load/save callback pointers; their bodies are defined
   // further down in this same anonymous namespace.
-  void DeserializeSSTITargetSerializerCallback(gpg::ReadArchive* archive, std::intptr_t objectPtr, int unusedTag, gpg::RRef* ownerRef);
-  void SerializeSSTITargetSerializerCallback(gpg::WriteArchive* archive, std::intptr_t objectPtr, int unusedTag, gpg::RRef* ownerRef);
+  void DeserializeSSTITargetSerializerCallback(
+    gpg::ReadArchive* archive,
+    std::intptr_t objectPtr,
+    int unusedTag,
+    gpg::RRef* ownerRef
+  );
+  void SerializeSSTITargetSerializerCallback(
+    gpg::WriteArchive* archive,
+    std::intptr_t objectPtr,
+    int unusedTag,
+    gpg::RRef* ownerRef
+  );
 
   /**
    * Address: 0x0055B120 (FUN_0055B120, Moho::SSTITargetSerializer::Deserialize)
@@ -101,9 +111,8 @@ namespace
   {
     static gpg::RType* sType = nullptr;
     if (sType == nullptr) {
-      sType = gpg::REF_FindFirstTypeNamed(
-        {"ESTITargetType", "Moho::ESTITargetType", "EAiTargetType", "Moho::EAiTargetType"}
-      );
+      sType =
+        gpg::REF_FindFirstTypeNamed({"ESTITargetType", "Moho::ESTITargetType", "EAiTargetType", "Moho::EAiTargetType"});
       if (sType == nullptr) {
         sType = gpg::LookupRType(typeid(moho::EAiTargetType));
       }
@@ -165,7 +174,9 @@ namespace moho
    * Reads target-kind enum, then conditionally deserializes either entity-id
    * payload or ground-position payload.
    */
-  void SSTITarget::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SSTITarget::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -198,7 +209,9 @@ namespace moho
    * Writes target-kind enum, then conditionally serializes either entity-id
    * payload or ground-position payload.
    */
-  void SSTITarget::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SSTITarget::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;
@@ -241,8 +254,14 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_EntIdTypeInfo_dd3051, moho::preregister_EntIdTypeInfo)
-GPG_PREREGISTER_INIT(preregister_SSTITargetTypeInfo_dd3051, moho::preregister_SSTITargetTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_EntIdTypeInfo_dd3051,
+  moho::preregister_EntIdTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  preregister_SSTITargetTypeInfo_dd3051,
+  moho::preregister_SSTITargetTypeInfo
+)
 
 namespace moho
 {

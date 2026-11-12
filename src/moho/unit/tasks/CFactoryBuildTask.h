@@ -11,7 +11,7 @@ namespace gpg
 {
   class ReadArchive;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -55,8 +55,12 @@ namespace moho
      * Initializes one dispatch-bound factory build task, linking blueprint,
      * rally point unit weak pointer, and originating command weak pointer.
      */
-    CFactoryBuildTask(CCommandTask* dispatchTask, const RUnitBlueprint* blueprint,
-                      CUnitCommand* command, Unit* rallyPointUnit);
+    CFactoryBuildTask(
+      CCommandTask* dispatchTask,
+      const RUnitBlueprint* blueprint,
+      CUnitCommand* command,
+      Unit* rallyPointUnit
+    );
 
     /**
      * Address: 0x005FA010 (FUN_005FA010, non-deleting destructor body)
@@ -103,9 +107,8 @@ namespace moho
      * What it does:
      * Allocates one `CFactoryBuildTask` and runs dispatch-bound construction.
      */
-    [[nodiscard]] static CFactoryBuildTask* Create(
-      CCommandTask* dispatchTask, const RUnitBlueprint* blueprint,
-      CUnitCommand* command, Unit* rallyPointUnit);
+    [[nodiscard]] static CFactoryBuildTask*
+    Create(CCommandTask* dispatchTask, const RUnitBlueprint* blueprint, CUnitCommand* command, Unit* rallyPointUnit);
 
     /**
      * Address: 0x005FA550 (FUN_005FA550, Moho::CFactoryBuildTask::InheritCommandsTo)
@@ -126,37 +129,28 @@ namespace moho
     void InheritQueuedCommandsTo(Entity* builtUnit);
 
   public:
-    IAiCommandDispatchImpl* mDispatch;   // 0x30
-    const RUnitBlueprint* mBlueprint;    // 0x34
-    CBuildTaskHelper mBuildHelper;        // 0x38  (0x44 bytes, ends at 0x7C)
-    WeakPtr<Unit> mRallyPointUnit;       // 0x7C  (0x08 bytes)
-    std::int32_t mBuildCount;            // 0x84
-    bool mHasCommand;                    // 0x88
-    std::uint8_t mPad89[3];              // 0x89
-    WeakPtr<CUnitCommand> mCommand;      // 0x8C  (0x08 bytes)
+    IAiCommandDispatchImpl* mDispatch; // 0x30
+    const RUnitBlueprint* mBlueprint;  // 0x34
+    CBuildTaskHelper mBuildHelper;     // 0x38  (0x44 bytes, ends at 0x7C)
+    WeakPtr<Unit> mRallyPointUnit;     // 0x7C  (0x08 bytes)
+    std::int32_t mBuildCount;          // 0x84
+    bool mHasCommand;                  // 0x88
+    std::uint8_t mPad89[3];            // 0x89
+    WeakPtr<CUnitCommand> mCommand;    // 0x8C  (0x08 bytes)
   };
 
   static_assert(sizeof(CFactoryBuildTask) == 0x94, "CFactoryBuildTask size must be 0x94");
+  static_assert(offsetof(CFactoryBuildTask, mDispatch) == 0x30, "CFactoryBuildTask::mDispatch offset must be 0x30");
+  static_assert(offsetof(CFactoryBuildTask, mBlueprint) == 0x34, "CFactoryBuildTask::mBlueprint offset must be 0x34");
   static_assert(
-    offsetof(CFactoryBuildTask, mDispatch) == 0x30, "CFactoryBuildTask::mDispatch offset must be 0x30"
-  );
-  static_assert(
-    offsetof(CFactoryBuildTask, mBlueprint) == 0x34, "CFactoryBuildTask::mBlueprint offset must be 0x34"
-  );
-  static_assert(
-    offsetof(CFactoryBuildTask, mBuildHelper) == 0x38, "CFactoryBuildTask::mBuildHelper offset must be 0x38"
+    offsetof(CFactoryBuildTask, mBuildHelper) == 0x38,
+    "CFactoryBuildTask::mBuildHelper offset must be 0x38"
   );
   static_assert(
     offsetof(CFactoryBuildTask, mRallyPointUnit) == 0x7C,
     "CFactoryBuildTask::mRallyPointUnit offset must be 0x7C"
   );
-  static_assert(
-    offsetof(CFactoryBuildTask, mBuildCount) == 0x84, "CFactoryBuildTask::mBuildCount offset must be 0x84"
-  );
-  static_assert(
-    offsetof(CFactoryBuildTask, mHasCommand) == 0x88, "CFactoryBuildTask::mHasCommand offset must be 0x88"
-  );
-  static_assert(
-    offsetof(CFactoryBuildTask, mCommand) == 0x8C, "CFactoryBuildTask::mCommand offset must be 0x8C"
-  );
+  static_assert(offsetof(CFactoryBuildTask, mBuildCount) == 0x84, "CFactoryBuildTask::mBuildCount offset must be 0x84");
+  static_assert(offsetof(CFactoryBuildTask, mHasCommand) == 0x88, "CFactoryBuildTask::mHasCommand offset must be 0x88");
+  static_assert(offsetof(CFactoryBuildTask, mCommand) == 0x8C, "CFactoryBuildTask::mCommand offset must be 0x8C");
 } // namespace moho

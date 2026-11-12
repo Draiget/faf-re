@@ -16,7 +16,10 @@
 
 struct lua_State;
 
-namespace LuaPlus { class LuaState; }
+namespace LuaPlus
+{
+  class LuaState;
+}
 
 namespace moho
 {
@@ -48,4 +51,3 @@ namespace moho
   // func_CreateUnitHPR_LuaFuncDef recovered in Unit.cpp (FUN_006CFB10).
   // func_CreateUnit_LuaFuncDef recovered in Unit.cpp (FUN_006CF500).
 }
-

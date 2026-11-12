@@ -26,10 +26,12 @@ moho::CTaskStage* moho::sUserStage = nullptr;
 namespace
 {
 
-
-
   template <class T>
-  T* ReadTypedPointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef, gpg::RType* expectedType)
+  T* ReadTypedPointer(
+    gpg::ReadArchive* archive,
+    const gpg::RRef& ownerRef,
+    gpg::RType* expectedType
+  )
   {
     const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, ownerRef);
     if (!tracked.object) {
@@ -56,12 +58,15 @@ namespace
   }
 
   /**
-    * Alias of FUN_0040B530 (non-canonical helper lane).
+   * Alias of FUN_0040B530 (non-canonical helper lane).
    *
    * What it does:
    * Loads an owned CTask pointer record used by task-stack payloads.
    */
-  CTask* DeserializeOwnedTaskPointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
+  CTask* DeserializeOwnedTaskPointer(
+    gpg::ReadArchive* archive,
+    const gpg::RRef& ownerRef
+  )
   {
     CTask* task = nullptr;
     (void)archive->ReadPointerOwned(&task, &ownerRef); // 0x0040B564: UNOWNED or a conflict, then 0x0040B611: OWNED
@@ -69,12 +74,15 @@ namespace
   }
 
   /**
-    * Alias of FUN_0040B640 (non-canonical helper lane).
+   * Alias of FUN_0040B640 (non-canonical helper lane).
    *
    * What it does:
    * Loads an unowned CTask pointer record used by task-stack payloads.
    */
-  CTask* DeserializeWeakTaskPointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
+  CTask* DeserializeWeakTaskPointer(
+    gpg::ReadArchive* archive,
+    const gpg::RRef& ownerRef
+  )
   {
     return ReadTypedPointer<CTask>(archive, ownerRef, gpg::RTypeOf<CTask>());
   }
@@ -86,7 +94,11 @@ namespace
    * Writes task stack chain: [owns-flag,bool] + [task pointer] pairs, then
    * appends terminating null pointer record.
    */
-  void SerializeTaskStack(gpg::WriteArchive* archive, CTaskThread* thread, const gpg::RRef& ownerRef)
+  void SerializeTaskStack(
+    gpg::WriteArchive* archive,
+    CTaskThread* thread,
+    const gpg::RRef& ownerRef
+  )
   {
     for (CTask* task = thread->mTaskTop; task != nullptr; task = task->mSubtask) {
       archive->WriteBool(task->mAutoDelete);
@@ -108,7 +120,11 @@ namespace
    * Rebuilds task stack chain by reading [owns-flag,bool] + [task pointer]
    * records until null pointer terminator.
    */
-  void DeserializeTaskStack(gpg::ReadArchive* archive, CTaskThread* thread, const gpg::RRef& ownerRef)
+  void DeserializeTaskStack(
+    gpg::ReadArchive* archive,
+    CTaskThread* thread,
+    const gpg::RRef& ownerRef
+  )
   {
     CTask** slot = &thread->mTaskTop;
     while (true) {
@@ -135,16 +151,21 @@ namespace
    * Upcasts one reflected reference lane to `CTaskStage` and returns the
    * resulting object pointer (or null on mismatch).
    */
-  [[nodiscard]] CTaskStage* UpcastCTaskStageRef(const gpg::RRef& source)
+  [[nodiscard]] CTaskStage* UpcastCTaskStageRef(
+    const gpg::RRef& source
+  )
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<CTaskStage>());
     return static_cast<CTaskStage*>(upcast.mObj);
   }
 
   /**
-    * Alias of FUN_0040D650 (non-canonical helper lane).
+   * Alias of FUN_0040D650 (non-canonical helper lane).
    */
-  CTaskStage* DeserializeTaskStagePointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
+  CTaskStage* DeserializeTaskStagePointer(
+    gpg::ReadArchive* archive,
+    const gpg::RRef& ownerRef
+  )
   {
     const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, ownerRef);
     if (!tracked.object) {
@@ -177,20 +198,25 @@ namespace
    * Upcasts one reflected reference lane to `CTaskThread` and returns the
    * resulting object pointer (or null on mismatch).
    */
-  [[nodiscard]] CTaskThread* UpcastCTaskThreadRef(const gpg::RRef& source)
+  [[nodiscard]] CTaskThread* UpcastCTaskThreadRef(
+    const gpg::RRef& source
+  )
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<CTaskThread>());
     return static_cast<CTaskThread*>(upcast.mObj);
   }
 
   /**
-    * Alias of FUN_0040B800 (non-canonical helper lane).
+   * Alias of FUN_0040B800 (non-canonical helper lane).
    *
    * What it does:
    * Reads one tracked pointer lane, enforces owned-pointer transition
    * (`Unowned -> Owned`), and upcasts to `CTaskThread`.
    */
-  CTaskThread* ReadOwnedTaskThreadPointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
+  CTaskThread* ReadOwnedTaskThreadPointer(
+    gpg::ReadArchive* archive,
+    const gpg::RRef& ownerRef
+  )
   {
     gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
     if (!tracked.object) {
@@ -224,12 +250,16 @@ namespace
   /**
    * Address: 0x0040BC20 (FUN_0040BC20, func_RRefCTaskThread)
    */
-  gpg::RRef SerializeTaskThreadPointer(const CTaskThread* thread)
+  gpg::RRef SerializeTaskThreadPointer(
+    const CTaskThread* thread
+  )
   {
     return gpg::MakeTypedRef(const_cast<CTaskThread*>(thread), gpg::RTypeOf<CTaskThread>());
   }
 
-  void InitializeTaskStage(CTaskStage* const stage)
+  void InitializeTaskStage(
+    CTaskStage* const stage
+  )
   {
     if (!stage) {
       return;
@@ -237,7 +267,9 @@ namespace
     new (stage) CTaskStage();
   }
 
-  gpg::RRef MakeTaskStageRef(CTaskStage* const stage)
+  gpg::RRef MakeTaskStageRef(
+    CTaskStage* const stage
+  )
   {
     gpg::RRef out{};
     out.mObj = stage;
@@ -258,7 +290,9 @@ namespace
   /**
    * Address: 0x0040B190 (FUN_0040B190, sub_40B190)
    */
-  void DeleteTaskStage(void* const object)
+  void DeleteTaskStage(
+    void* const object
+  )
   {
     delete static_cast<CTaskStage*>(object);
   }
@@ -266,7 +300,9 @@ namespace
   /**
    * Address: 0x0040B1B0 (FUN_0040B1B0, sub_40B1B0)
    */
-  gpg::RRef ConstructTaskStageRef(void* const object)
+  gpg::RRef ConstructTaskStageRef(
+    void* const object
+  )
   {
     auto* const stage = static_cast<CTaskStage*>(object);
     InitializeTaskStage(stage);
@@ -276,12 +312,16 @@ namespace
   /**
    * Address: 0x0040B1F0 (FUN_0040B1F0, sub_40B1F0)
    */
-  void DestroyTaskStageOnly(void* const object)
+  void DestroyTaskStageOnly(
+    void* const object
+  )
   {
     static_cast<CTaskStage*>(object)->~CTaskStage();
   }
 
-  void PopTaskStack(CTaskThread* const thread)
+  void PopTaskStack(
+    CTaskThread* const thread
+  )
   {
     while (thread->mTaskTop != nullptr) {
       CTask* const task = thread->mTaskTop;
@@ -302,7 +342,9 @@ namespace
    * Per-thread task scheduler step. Executes top task, handles completion/
    * staging return codes, exception fallback, and pending-frame throttling.
    */
-  int RunThreadUserFrameStep(CTaskThread* const thread)
+  int RunThreadUserFrameStep(
+    CTaskThread* const thread
+  )
   {
     if (!thread) {
       return -1;
@@ -392,7 +434,11 @@ namespace
  * What it does:
  * Loads stage pointer, pending-frame counter, staged flag, and task stack.
  */
-void CTaskThread::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
+void CTaskThread::MemberDeserialize(
+  gpg::ReadArchive* const archive,
+  const int,
+  const gpg::RRef& ownerRef
+)
 {
   mStage = DeserializeTaskStagePointer(archive, ownerRef);
   archive->ReadInt(&mPendingFrames);
@@ -406,7 +452,11 @@ void CTaskThread::MemberDeserialize(gpg::ReadArchive* const archive, const int, 
  * What it does:
  * Saves stage pointer, pending-frame counter, staged flag, and task stack.
  */
-void CTaskThread::MemberSerialize(gpg::WriteArchive* const archive, const int, const gpg::RRef& ownerRef)
+void CTaskThread::MemberSerialize(
+  gpg::WriteArchive* const archive,
+  const int,
+  const gpg::RRef& ownerRef
+)
 {
   archive->WritePointer<moho::CTaskStage>(mStage, gpg::TrackedPointerState::Unowned, ownerRef);
   archive->WriteInt(mPendingFrames);
@@ -433,7 +483,9 @@ gpg::RType* CTaskThread::GetPointerType()
  * What it does:
  * Initializes thread state and links it into stage main thread list.
  */
-CTaskThread::CTaskThread(CTaskStage* const stage)
+CTaskThread::CTaskThread(
+  CTaskStage* const stage
+)
   : WeakObject()
   , mStage(stage)
   , mTaskTop(nullptr)
@@ -624,7 +676,9 @@ void CTaskStage::UserFrame()
  * Writes owned thread-pointer lanes for main list and staged list, each
  * terminated by a null pointer lane.
  */
-void CTaskStage::SerializeThreads(gpg::WriteArchive* const archive) const
+void CTaskStage::SerializeThreads(
+  gpg::WriteArchive* const archive
+) const
 {
   const gpg::RRef nullOwner{};
   auto* const mainEnd = reinterpret_cast<const CTaskThread*>(&mThreads);
@@ -655,7 +709,9 @@ void CTaskStage::SerializeThreads(gpg::WriteArchive* const archive) const
  * Reads owned thread-pointer lanes and relinks decoded nodes into stage main
  * list followed by stage staged-list.
  */
-void CTaskStage::DeserializeThreads(gpg::ReadArchive* const archive)
+void CTaskStage::DeserializeThreads(
+  gpg::ReadArchive* const archive
+)
 {
   const gpg::RRef nullOwner{};
 
@@ -735,7 +791,12 @@ namespace moho
   /**
    * Address: 0x004094F0 (FUN_004094F0)
    */
-  void CTaskThread::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CTaskThread::MemberConstruct(
+    gpg::ReadArchive&,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     result.SetUnowned(gpg::MakeRRef(new CTaskThread()), 0u);
   }
@@ -786,7 +847,9 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<CTaskStage>::Deserialize` 0x00409BF0.
    */
-  void CTaskStage::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CTaskStage::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
 
     archive->ReadBool(&mActive);
@@ -796,7 +859,9 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<CTaskStage>::Serialize` 0x00409C20.
    */
-  void CTaskStage::MemberSerialize(gpg::WriteArchive* const archive)
+  void CTaskStage::MemberSerialize(
+    gpg::WriteArchive* const archive
+  )
   {
 
     archive->WriteBool(mActive);

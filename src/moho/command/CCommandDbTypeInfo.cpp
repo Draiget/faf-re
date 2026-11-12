@@ -55,7 +55,9 @@ namespace moho
    * Clears reflected base/field vector lanes for one `CCommandDBTypeInfo`
    * instance while preserving outer storage ownership.
    */
-  [[maybe_unused]] void DestroyCCommandDbTypeInfoBody(CCommandDBTypeInfo* const typeInfo) noexcept
+  [[maybe_unused]] void DestroyCCommandDbTypeInfoBody(
+    CCommandDBTypeInfo* const typeInfo
+  ) noexcept
   {
     gpg::ClearTypeLists(typeInfo);
   }
@@ -108,7 +110,9 @@ namespace
   CCommandDBTypeInfoBootstrap gCCommandDBTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CCommandDBTypeInfo_4c172b, moho::register_CCommandDBTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CCommandDBTypeInfo_4c172b,
+  moho::register_CCommandDBTypeInfo
+)

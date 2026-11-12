@@ -1,7 +1,10 @@
 #include "moho/render/CRenFrame.h"
 
 #include <algorithm>
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
 #include <d3d9.h>
+#endif
 
 #include <cstdint>
 #include <cstring>
@@ -10,9 +13,15 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Device.hpp"
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#endif
 #include "gpg/gal/EffectVariable.hpp"
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
+#endif
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/ID3DRenderTarget.h"
 #include "moho/render/ID3DVertexSheet.h"
@@ -77,24 +86,51 @@ namespace moho
     // Mirrors the DEFINE_WATER2_SHADER_VAR_GETTER lazy-register idiom
     // (see moho/terrain/water/WaterShaderVars.cpp).
     // -------------------------------------------------------------------------
-#define DEFINE_FRAME_SHADER_VAR_GETTER(FUNC_NAME, VARIABLE_NAME) \
-    [[nodiscard]] ShaderVar& FUNC_NAME() \
-    { \
-      static ShaderVar shaderVar{}; \
-      static const bool registered = (RegisterShaderVar(VARIABLE_NAME, &shaderVar, "frame"), true); \
-      (void)registered; \
-      return shaderVar; \
-    }
+#define DEFINE_FRAME_SHADER_VAR_GETTER(FUNC_NAME, VARIABLE_NAME)                                                       \
+  [[nodiscard]] ShaderVar& FUNC_NAME()                                                                                 \
+  {                                                                                                                    \
+    static ShaderVar shaderVar{};                                                                                      \
+    static const bool registered = (RegisterShaderVar(VARIABLE_NAME, &shaderVar, "frame"), true);                      \
+    (void)registered;                                                                                                  \
+    return shaderVar;                                                                                                  \
+  }
 
-    DEFINE_FRAME_SHADER_VAR_GETTER(GetFrameFrameTexture1ShaderVar, "FrameTexture1")
-    DEFINE_FRAME_SHADER_VAR_GETTER(GetFrameFrameTexture2ShaderVar, "FrameTexture2")
-    DEFINE_FRAME_SHADER_VAR_GETTER(GetFrameFrameTexture3ShaderVar, "FrameTexture3")
-    DEFINE_FRAME_SHADER_VAR_GETTER(GetFrameFrameTexture4ShaderVar, "FrameTexture4")
-    DEFINE_FRAME_SHADER_VAR_GETTER(GetFrameBlurScaleShaderVar, "BlurScale")
-    DEFINE_FRAME_SHADER_VAR_GETTER(GetFrameGlowCopyScaleShaderVar, "GlowCopyScale")
-    DEFINE_FRAME_SHADER_VAR_GETTER(GetFrameFrameWidthShaderVar, "framewidth")
-    DEFINE_FRAME_SHADER_VAR_GETTER(GetFrameFrameHeightShaderVar, "frameheight")
-    DEFINE_FRAME_SHADER_VAR_GETTER(GetFrameViewPortShaderVar, "viewport")
+    DEFINE_FRAME_SHADER_VAR_GETTER(
+      GetFrameFrameTexture1ShaderVar,
+      "FrameTexture1"
+    )
+    DEFINE_FRAME_SHADER_VAR_GETTER(
+      GetFrameFrameTexture2ShaderVar,
+      "FrameTexture2"
+    )
+    DEFINE_FRAME_SHADER_VAR_GETTER(
+      GetFrameFrameTexture3ShaderVar,
+      "FrameTexture3"
+    )
+    DEFINE_FRAME_SHADER_VAR_GETTER(
+      GetFrameFrameTexture4ShaderVar,
+      "FrameTexture4"
+    )
+    DEFINE_FRAME_SHADER_VAR_GETTER(
+      GetFrameBlurScaleShaderVar,
+      "BlurScale"
+    )
+    DEFINE_FRAME_SHADER_VAR_GETTER(
+      GetFrameGlowCopyScaleShaderVar,
+      "GlowCopyScale"
+    )
+    DEFINE_FRAME_SHADER_VAR_GETTER(
+      GetFrameFrameWidthShaderVar,
+      "framewidth"
+    )
+    DEFINE_FRAME_SHADER_VAR_GETTER(
+      GetFrameFrameHeightShaderVar,
+      "frameheight"
+    )
+    DEFINE_FRAME_SHADER_VAR_GETTER(
+      GetFrameViewPortShaderVar,
+      "viewport"
+    )
 
 #undef DEFINE_FRAME_SHADER_VAR_GETTER
 
@@ -110,19 +146,58 @@ namespace moho
     // registration-only globals -- no accessor is added, since inventing one
     // nothing calls would itself be unreferenced source.
     // -------------------------------------------------------------------------
-#define DEFINE_FRAME_SHADER_VAR_REGISTRAR(GLOBAL_NAME, FUNC_NAME, VARIABLE_NAME) \
-    ShaderVar GLOBAL_NAME{}; \
-    void FUNC_NAME() { RegisterShaderVar(VARIABLE_NAME, &GLOBAL_NAME, "frame"); }
+#define DEFINE_FRAME_SHADER_VAR_REGISTRAR(GLOBAL_NAME, FUNC_NAME, VARIABLE_NAME)                                       \
+  ShaderVar GLOBAL_NAME{};                                                                                             \
+  void FUNC_NAME()                                                                                                     \
+  {                                                                                                                    \
+    RegisterShaderVar(VARIABLE_NAME, &GLOBAL_NAME, "frame");                                                           \
+  }
 
-    DEFINE_FRAME_SHADER_VAR_REGISTRAR(shaderVarFrameObjectToWorld, register_ShaderVarFrameObjectToWorld, "ObjectToWorld")
-    DEFINE_FRAME_SHADER_VAR_REGISTRAR(shaderVarFrameWorldToView, register_ShaderVarFrameWorldToView, "WorldToView")
-    DEFINE_FRAME_SHADER_VAR_REGISTRAR(shaderVarFrameProjection, register_ShaderVarFrameProjection, "Projection")
-    DEFINE_FRAME_SHADER_VAR_REGISTRAR(shaderVarFrameTexture1Amount, register_ShaderVarFrameTexture1Amount, "Texture1Amount")
-    DEFINE_FRAME_SHADER_VAR_REGISTRAR(shaderVarFrameTexture2Amount, register_ShaderVarFrameTexture2Amount, "Texture2Amount")
-    DEFINE_FRAME_SHADER_VAR_REGISTRAR(shaderVarFrameTexture3Amount, register_ShaderVarFrameTexture3Amount, "Texture3Amount")
-    DEFINE_FRAME_SHADER_VAR_REGISTRAR(shaderVarFrameTexture4Amount, register_ShaderVarFrameTexture4Amount, "Texture4Amount")
-    DEFINE_FRAME_SHADER_VAR_REGISTRAR(shaderVarFrameFrameScreenLoc, register_ShaderVarFrameFrameScreenLoc, "FrameScreenLoc")
-    DEFINE_FRAME_SHADER_VAR_REGISTRAR(shaderVarFrameWorldSize, register_ShaderVarFrameWorldSize, "WorldSize")
+    DEFINE_FRAME_SHADER_VAR_REGISTRAR(
+      shaderVarFrameObjectToWorld,
+      register_ShaderVarFrameObjectToWorld,
+      "ObjectToWorld"
+    )
+    DEFINE_FRAME_SHADER_VAR_REGISTRAR(
+      shaderVarFrameWorldToView,
+      register_ShaderVarFrameWorldToView,
+      "WorldToView"
+    )
+    DEFINE_FRAME_SHADER_VAR_REGISTRAR(
+      shaderVarFrameProjection,
+      register_ShaderVarFrameProjection,
+      "Projection"
+    )
+    DEFINE_FRAME_SHADER_VAR_REGISTRAR(
+      shaderVarFrameTexture1Amount,
+      register_ShaderVarFrameTexture1Amount,
+      "Texture1Amount"
+    )
+    DEFINE_FRAME_SHADER_VAR_REGISTRAR(
+      shaderVarFrameTexture2Amount,
+      register_ShaderVarFrameTexture2Amount,
+      "Texture2Amount"
+    )
+    DEFINE_FRAME_SHADER_VAR_REGISTRAR(
+      shaderVarFrameTexture3Amount,
+      register_ShaderVarFrameTexture3Amount,
+      "Texture3Amount"
+    )
+    DEFINE_FRAME_SHADER_VAR_REGISTRAR(
+      shaderVarFrameTexture4Amount,
+      register_ShaderVarFrameTexture4Amount,
+      "Texture4Amount"
+    )
+    DEFINE_FRAME_SHADER_VAR_REGISTRAR(
+      shaderVarFrameFrameScreenLoc,
+      register_ShaderVarFrameFrameScreenLoc,
+      "FrameScreenLoc"
+    )
+    DEFINE_FRAME_SHADER_VAR_REGISTRAR(
+      shaderVarFrameWorldSize,
+      register_ShaderVarFrameWorldSize,
+      "WorldSize"
+    )
 
 #undef DEFINE_FRAME_SHADER_VAR_REGISTRAR
 
@@ -148,7 +223,10 @@ namespace moho
     // FUN_00491280, which is what the binary calls here (0x007F6076, 0x007F6084,
     // 0x007F6092 and 0x007F60A0 all pass a &mFrameTextureN handle). It takes the
     // shared_ptr<ID3DRenderTarget> as-is - no cast, and nothing to lock.
-    void BindFrameTexture(ShaderVar& shaderVar, const boost::shared_ptr<ID3DRenderTarget>& renderTarget)
+    void BindFrameTexture(
+      ShaderVar& shaderVar,
+      const boost::shared_ptr<ID3DRenderTarget>& renderTarget
+    )
     {
       shaderVar.SetRenderTargetTexture(renderTarget);
     }
@@ -179,7 +257,10 @@ namespace moho
   /**
    * Address: 0x007F5D00 (FUN_007F5D00, Moho::CRenFrame::SetTexture)
    */
-  void CRenFrame::SetTexture(const unsigned int textureSlot, boost::shared_ptr<ID3DRenderTarget> texture)
+  void CRenFrame::SetTexture(
+    const unsigned int textureSlot,
+    boost::shared_ptr<ID3DRenderTarget> texture
+  )
   {
     (void)textureSlot;
     mFrameTexture1 = texture;
@@ -194,7 +275,10 @@ namespace moho
    * Rebuilds the cached transformed fullscreen-quad vertices used by
    * CRenFrame pass rendering, with a half-pixel screen-space offset.
    */
-  void CRenFrame::InitTransformedVerts(const float width, const float height)
+  void CRenFrame::InitTransformedVerts(
+    const float width,
+    const float height
+  )
   {
     CD3DDevice* const device = D3D_GetDevice();
     ID3DDeviceResources* const resources = device->GetResources();
@@ -231,7 +315,9 @@ namespace moho
     const int vertexCount = mVertexSheet->Func5();
     void* const lockedVertices = vertexStream->Lock(0, vertexCount, false, false);
     // Raw GPU upload: frame quad vertex blob into the locked stream.
-    std::copy(std::begin(quadVertices), std::end(quadVertices), static_cast<RenFrameTransformedVertex*>(lockedVertices));
+    std::copy(
+      std::begin(quadVertices), std::end(quadVertices), static_cast<RenFrameTransformedVertex*>(lockedVertices)
+    );
     mVertexSheet->GetVertStream(0U)->Unlock();
   }
 
@@ -269,7 +355,10 @@ namespace moho
    * shader variable, and issues a non-indexed triangle-strip fullscreen-quad
    * draw over the cached vertex sheet.
    */
-  void CRenFrame::Render(const int width, const int height)
+  void CRenFrame::Render(
+    const int width,
+    const int height
+  )
   {
     auto* const galDevice = gpg::gal::Device::GetInstance();
 

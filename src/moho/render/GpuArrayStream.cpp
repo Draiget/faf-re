@@ -10,7 +10,11 @@
 
 namespace moho
 {
-  GpuArrayStream::GpuArrayStream(const char* const name, const std::uint32_t stride, const std::uint32_t blockBytes) noexcept
+  GpuArrayStream::GpuArrayStream(
+    const char* const name,
+    const std::uint32_t stride,
+    const std::uint32_t blockBytes
+  ) noexcept
     : mName(name)
     , mStride(stride)
     , mBlockBytes(std::max(stride, blockBytes - (blockBytes % stride)))
@@ -22,7 +26,10 @@ namespace moho
     mUploaded.clear();
   }
 
-  gpg::gal::GpuBuffer* GpuArrayStream::Update(const void* const data, const std::size_t count)
+  gpg::gal::GpuBuffer* GpuArrayStream::Update(
+    const void* const data,
+    const std::size_t count
+  )
   {
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     if (device == nullptr) {
@@ -51,7 +58,9 @@ namespace moho
     const auto flush = [&](const std::size_t end) {
       if (inRange) {
         device->UpdateGpuBuffer(
-          *mBuffer, static_cast<std::uint32_t>(rangeStart / mStride), static_cast<std::uint32_t>((end - rangeStart) / mStride),
+          *mBuffer,
+          static_cast<std::uint32_t>(rangeStart / mStride),
+          static_cast<std::uint32_t>((end - rangeStart) / mStride),
           bytes + rangeStart
         );
         std::memcpy(mUploaded.data() + rangeStart, bytes + rangeStart, end - rangeStart);

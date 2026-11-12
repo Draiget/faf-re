@@ -23,7 +23,10 @@ namespace
  * Builds one typed reflection reference for a `CParticleTexture*` lane,
  * resolving derived runtime type + base adjustment when needed.
  */
-gpg::RRef* gpg::RRef_CParticleTexture(gpg::RRef* const outRef, moho::CParticleTexture* const value)
+gpg::RRef* gpg::RRef_CParticleTexture(
+  gpg::RRef* const outRef,
+  moho::CParticleTexture* const value
+)
 {
   if (outRef == nullptr) {
     return nullptr;
@@ -65,7 +68,10 @@ gpg::RRef* gpg::RRef_CParticleTexture(gpg::RRef* const outRef, moho::CParticleTe
  * Wrapper that forwards to `RRef_CParticleTexture` and returns the output
  * lane pointer.
  */
-gpg::RRef* gpg::AssignCParticleTextureRef(gpg::RRef* const outRef, moho::CParticleTexture* const value)
+gpg::RRef* gpg::AssignCParticleTextureRef(
+  gpg::RRef* const outRef,
+  moho::CParticleTexture* const value
+)
 {
   return gpg::RRef_CParticleTexture(outRef, value);
 }

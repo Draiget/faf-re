@@ -42,14 +42,20 @@ namespace gpg::gal::d3d11
       Fields fields;
     };
 
-    [[nodiscard]] std::string Lower(std::string_view text)
+    [[nodiscard]] std::string Lower(
+      std::string_view text
+    )
     {
       std::string out(text);
-      std::transform(out.begin(), out.end(), out.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+      std::transform(out.begin(), out.end(), out.begin(), [](const unsigned char c) {
+        return static_cast<char>(std::tolower(c));
+      });
       return out;
     }
 
-    [[nodiscard]] std::string Trim(std::string_view text)
+    [[nodiscard]] std::string Trim(
+      std::string_view text
+    )
     {
       std::size_t begin = 0U;
       std::size_t end = text.size();
@@ -63,7 +69,9 @@ namespace gpg::gal::d3d11
     }
 
     /** Field key for merging: lower case, no spaces ("BlendEnable[ 0 ]" -> "blendenable[0]"). */
-    [[nodiscard]] std::string FieldKey(std::string_view field)
+    [[nodiscard]] std::string FieldKey(
+      std::string_view field
+    )
     {
       std::string key;
       for (const char c : field) {
@@ -74,13 +82,18 @@ namespace gpg::gal::d3d11
       return key;
     }
 
-    [[nodiscard]] bool IsIdentifierChar(const char c) noexcept
+    [[nodiscard]] bool IsIdentifierChar(
+      const char c
+    ) noexcept
     {
       return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_';
     }
 
     /** Index of the brace closing the one at `open`, or npos. */
-    [[nodiscard]] std::size_t MatchingBrace(const std::string& text, const std::size_t open)
+    [[nodiscard]] std::size_t MatchingBrace(
+      const std::string& text,
+      const std::size_t open
+    )
     {
       int depth = 0;
       for (std::size_t index = open; index < text.size(); ++index) {
@@ -96,7 +109,10 @@ namespace gpg::gal::d3d11
     }
 
     /** Splits on `separator` outside parentheses and braces. */
-    [[nodiscard]] std::vector<std::string> SplitTopLevel(std::string_view text, const char separator)
+    [[nodiscard]] std::vector<std::string> SplitTopLevel(
+      std::string_view text,
+      const char separator
+    )
     {
       std::vector<std::string> parts;
       int depth = 0;
@@ -117,7 +133,11 @@ namespace gpg::gal::d3d11
     }
 
     /** Replaces whole identifiers `from` with `to`. Returns the count. */
-    std::size_t ReplaceIdentifier(std::string& text, const std::string_view from, const std::string_view to)
+    std::size_t ReplaceIdentifier(
+      std::string& text,
+      const std::string_view from,
+      const std::string_view to
+    )
     {
       std::size_t count = 0U;
       std::size_t position = 0U;
@@ -137,7 +157,9 @@ namespace gpg::gal::d3d11
     }
 
     /** Drops `#line` (and any other directive) lines the preprocessor left. */
-    [[nodiscard]] std::string StripDirectives(std::string_view text)
+    [[nodiscard]] std::string StripDirectives(
+      std::string_view text
+    )
     {
       std::string out;
       out.reserve(text.size());
@@ -161,7 +183,11 @@ namespace gpg::gal::d3d11
       return out;
     }
 
-    void SetField(Fields& fields, const std::string& name, const std::string& value)
+    void SetField(
+      Fields& fields,
+      const std::string& name,
+      const std::string& value
+    )
     {
       const std::string key = FieldKey(name);
       for (auto& [field, existing] : fields) {
@@ -173,26 +199,42 @@ namespace gpg::gal::d3d11
       fields.emplace_back(name, value);
     }
 
-    [[nodiscard]] Fields DefaultFields(const StateKind kind)
+    [[nodiscard]] Fields DefaultFields(
+      const StateKind kind
+    )
     {
       // The pack `BeginTechnique` binds before every pass (PipelineStateD3D11).
       switch (kind) {
       case StateKind::Blend:
-        return {{"BlendEnable[0]", "FALSE"}, {"SrcBlend", "ONE"}, {"DestBlend", "ZERO"}, {"BlendOp", "ADD"},
-                {"SrcBlendAlpha", "ONE"}, {"DestBlendAlpha", "ZERO"}, {"BlendOpAlpha", "ADD"},
-                {"RenderTargetWriteMask[0]", "0x0F"}};
+        return {
+          {"BlendEnable[0]", "FALSE"},
+          {"SrcBlend", "ONE"},
+          {"DestBlend", "ZERO"},
+          {"BlendOp", "ADD"},
+          {"SrcBlendAlpha", "ONE"},
+          {"DestBlendAlpha", "ZERO"},
+          {"BlendOpAlpha", "ADD"},
+          {"RenderTargetWriteMask[0]", "0x0F"}
+        };
       case StateKind::DepthStencil:
         return {{"DepthEnable", "TRUE"}, {"DepthWriteMask", "ALL"}, {"DepthFunc", "LESS_EQUAL"}};
       case StateKind::Rasterizer:
       default:
         // A pass that sets some rasterizer state but no cull mode keeps the
         // begin state's, which culls nothing as in Direct3D 9.
-        return {{"FillMode", "SOLID"}, {"CullMode", backend::Direct3D10TechniqueCull() ? "BACK" : "NONE"},
-                {"DepthClipEnable", "FALSE"}, {"MultisampleEnable", "TRUE"}};
+        return {
+          {"FillMode", "SOLID"},
+          {"CullMode", backend::Direct3D10TechniqueCull() ? "BACK" : "NONE"},
+          {"DepthClipEnable", "FALSE"},
+          {"MultisampleEnable", "TRUE"}
+        };
       }
     }
 
-    [[nodiscard]] std::optional<std::string> Translate(const std::map<std::string, std::string>& table, const std::string& value)
+    [[nodiscard]] std::optional<std::string> Translate(
+      const std::map<std::string, std::string>& table,
+      const std::string& value
+    )
     {
       const auto found = table.find(Lower(Trim(value)));
       if (found == table.end()) {
@@ -201,31 +243,60 @@ namespace gpg::gal::d3d11
       return found->second;
     }
 
-    const std::map<std::string, std::string> kBools = {{"true", "TRUE"}, {"false", "FALSE"}, {"1", "TRUE"}, {"0", "FALSE"}};
+    const std::map<std::string, std::string> kBools =
+      {{"true", "TRUE"}, {"false", "FALSE"}, {"1", "TRUE"}, {"0", "FALSE"}};
     const std::map<std::string, std::string> kCompare = {
-      {"never", "NEVER"}, {"less", "LESS"}, {"equal", "EQUAL"}, {"lessequal", "LESS_EQUAL"},
-      {"greater", "GREATER"}, {"notequal", "NOT_EQUAL"}, {"greaterequal", "GREATER_EQUAL"}, {"always", "ALWAYS"},
+      {"never", "NEVER"},
+      {"less", "LESS"},
+      {"equal", "EQUAL"},
+      {"lessequal", "LESS_EQUAL"},
+      {"greater", "GREATER"},
+      {"notequal", "NOT_EQUAL"},
+      {"greaterequal", "GREATER_EQUAL"},
+      {"always", "ALWAYS"},
     };
     const std::map<std::string, std::string> kStencilOps = {
-      {"keep", "KEEP"}, {"zero", "ZERO"}, {"replace", "REPLACE"}, {"incrsat", "INCR_SAT"},
-      {"decrsat", "DECR_SAT"}, {"invert", "INVERT"}, {"incr", "INCR"}, {"decr", "DECR"},
+      {"keep", "KEEP"},
+      {"zero", "ZERO"},
+      {"replace", "REPLACE"},
+      {"incrsat", "INCR_SAT"},
+      {"decrsat", "DECR_SAT"},
+      {"invert", "INVERT"},
+      {"incr", "INCR"},
+      {"decr", "DECR"},
     };
     const std::map<std::string, std::string> kBlends = {
-      {"zero", "ZERO"}, {"one", "ONE"}, {"srccolor", "SRC_COLOR"}, {"invsrccolor", "INV_SRC_COLOR"},
-      {"srcalpha", "SRC_ALPHA"}, {"invsrcalpha", "INV_SRC_ALPHA"}, {"destalpha", "DEST_ALPHA"},
-      {"invdestalpha", "INV_DEST_ALPHA"}, {"destcolor", "DEST_COLOR"}, {"invdestcolor", "INV_DEST_COLOR"},
-      {"srcalphasat", "SRC_ALPHA_SAT"}, {"blendfactor", "BLEND_FACTOR"}, {"invblendfactor", "INV_BLEND_FACTOR"},
+      {"zero", "ZERO"},
+      {"one", "ONE"},
+      {"srccolor", "SRC_COLOR"},
+      {"invsrccolor", "INV_SRC_COLOR"},
+      {"srcalpha", "SRC_ALPHA"},
+      {"invsrcalpha", "INV_SRC_ALPHA"},
+      {"destalpha", "DEST_ALPHA"},
+      {"invdestalpha", "INV_DEST_ALPHA"},
+      {"destcolor", "DEST_COLOR"},
+      {"invdestcolor", "INV_DEST_COLOR"},
+      {"srcalphasat", "SRC_ALPHA_SAT"},
+      {"blendfactor", "BLEND_FACTOR"},
+      {"invblendfactor", "INV_BLEND_FACTOR"},
     };
     const std::map<std::string, std::string> kBlendOps = {
-      {"add", "ADD"}, {"subtract", "SUBTRACT"}, {"revsubtract", "REV_SUBTRACT"}, {"min", "MIN"}, {"max", "MAX"},
+      {"add", "ADD"},
+      {"subtract", "SUBTRACT"},
+      {"revsubtract", "REV_SUBTRACT"},
+      {"min", "MIN"},
+      {"max", "MAX"},
     };
     // D3D9 culls the named winding; with FrontCounterClockwise = FALSE the
     // clockwise faces are the front ones.
     const std::map<std::string, std::string> kCullModes = {{"none", "NONE"}, {"cw", "FRONT"}, {"ccw", "BACK"}};
-    const std::map<std::string, std::string> kFillModes = {{"solid", "SOLID"}, {"wireframe", "WIREFRAME"}, {"point", "SOLID"}};
+    const std::map<std::string, std::string> kFillModes =
+      {{"solid", "SOLID"}, {"wireframe", "WIREFRAME"}, {"point", "SOLID"}};
 
     /** The alpha factor D3D9 uses for a colour factor when blending alpha with the same factors. */
-    [[nodiscard]] std::string AlphaFactor(const std::string& factor)
+    [[nodiscard]] std::string AlphaFactor(
+      const std::string& factor
+    )
     {
       if (factor == "SRC_COLOR") {
         return "SRC_ALPHA";
@@ -243,7 +314,9 @@ namespace gpg::gal::d3d11
     }
 
     /** "- 0.00001f" -> -0.00001 */
-    [[nodiscard]] std::optional<double> ParseNumber(std::string_view text)
+    [[nodiscard]] std::optional<double> ParseNumber(
+      std::string_view text
+    )
     {
       std::string compact;
       for (const char c : text) {
@@ -262,7 +335,9 @@ namespace gpg::gal::d3d11
       return value;
     }
 
-    [[nodiscard]] bool IsShaderAssignment(const std::string& lowerName)
+    [[nodiscard]] bool IsShaderAssignment(
+      const std::string& lowerName
+    )
     {
       return lowerName == "vertexshader" || lowerName == "pixelshader" || lowerName == "geometryshader" ||
         lowerName == "computeshader" || lowerName == "hullshader" || lowerName == "domainshader";
@@ -271,7 +346,11 @@ namespace gpg::gal::d3d11
     class Translator
     {
     public:
-      Translator(std::string text, const bool shaderModel41, const std::string_view original)
+      Translator(
+        std::string text,
+        const bool shaderModel41,
+        const std::string_view original
+      )
         : mText(std::move(text))
         , mShaderModel41(shaderModel41)
       {
@@ -283,6 +362,7 @@ namespace gpg::gal::d3d11
         RaiseShaderModel();
         RewriteOneDimensionalSamplers();
         RenameTypesShadowingTechniques();
+        RenameLocalsShadowingParameters();
         CollectStateObjects();
         DropUndefinedFixedFunctionTechniques();
         CollectStructsAndFunctions();
@@ -295,7 +375,9 @@ namespace gpg::gal::d3d11
           mNotes.push_back("pixel shader inputs re-linked through " + std::to_string(mWrappers) + " wrapper(s)");
         }
         if (mAlphaTestedPasses != 0U) {
-          mNotes.push_back("D3D9 alpha test applied in the pixel shader of " + std::to_string(mAlphaTestedPasses) + " pass(es)");
+          mNotes.push_back(
+            "D3D9 alpha test applied in the pixel shader of " + std::to_string(mAlphaTestedPasses) + " pass(es)"
+          );
         }
         return TranslatedEffectSource{std::move(mText), std::move(mNotes)};
       }
@@ -335,7 +417,9 @@ namespace gpg::gal::d3d11
       };
 
       /** POSITION0 -> POSITION, COLOR -> COLOR0, TEXCOORD -> TEXCOORD0, SV_Position -> POSITION. */
-      static std::string NormaliseSemantic(std::string semantic)
+      static std::string NormaliseSemantic(
+        std::string semantic
+      )
       {
         semantic = Trim(semantic);
         std::transform(semantic.begin(), semantic.end(), semantic.begin(), [](const unsigned char c) {
@@ -344,14 +428,18 @@ namespace gpg::gal::d3d11
         if (semantic == "SV_POSITION" || semantic == "POSITION0") {
           return "POSITION";
         }
-        if (!semantic.empty() && std::isdigit(static_cast<unsigned char>(semantic.back())) == 0 && semantic != "POSITION" &&
-            semantic != "VPOS" && semantic != "VFACE") {
+        if (
+          !semantic.empty() && std::isdigit(static_cast<unsigned char>(semantic.back())) == 0 &&
+          semantic != "POSITION" && semantic != "VPOS" && semantic != "VFACE"
+        ) {
           semantic += "0";
         }
         return semantic;
       }
 
-      static Variable ParseVariable(const std::string& declaration)
+      static Variable ParseVariable(
+        const std::string& declaration
+      )
       {
         Variable variable{};
         std::string text = Trim(declaration);
@@ -407,17 +495,21 @@ namespace gpg::gal::d3d11
         std::vector<std::string> techniques;
         std::vector<std::string> clashes;
         if (gEffectFastScan) {
-          scan::ForEachTechniqueName(mText, [&](const std::string_view name) { techniques.emplace_back(name); });
+          scan::ForEachTechniqueName(mText, [&](const std::string_view name) {
+            techniques.emplace_back(name);
+          });
           scan::ForEachStructName(mText, [&](const std::string_view name) {
             if (std::find(techniques.begin(), techniques.end(), name) != techniques.end()) {
               clashes.emplace_back(name);
             }
           });
         } else {
-          for (auto it = std::sregex_iterator(mText.begin(), mText.end(), techniqueName); it != std::sregex_iterator(); ++it) {
+          for (auto it = std::sregex_iterator(mText.begin(), mText.end(), techniqueName); it != std::sregex_iterator();
+               ++it) {
             techniques.push_back((*it)[1].str());
           }
-          for (auto it = std::sregex_iterator(mText.begin(), mText.end(), structName); it != std::sregex_iterator(); ++it) {
+          for (auto it = std::sregex_iterator(mText.begin(), mText.end(), structName); it != std::sregex_iterator();
+               ++it) {
             if (std::find(techniques.begin(), techniques.end(), (*it)[1].str()) != techniques.end()) {
               clashes.push_back((*it)[1].str());
             }
@@ -435,14 +527,195 @@ namespace gpg::gal::d3d11
         }
       }
 
-      void AddStruct(const std::string& name, const std::size_t open)
+      /** float, half, int, uint, bool, double, with an optional N or NxM (N, M 1-4). */
+      [[nodiscard]] static bool IsNumericTypeName(
+        const std::string_view word
+      )
+      {
+        for (const std::string_view base : {"float", "half", "int", "uint", "bool", "double"}) {
+          if (word.substr(0U, base.size()) != base) {
+            continue;
+          }
+          const std::string_view rest = word.substr(base.size());
+          const auto dimension = [](const char c) {
+            return c >= '1' && c <= '4';
+          };
+          return rest.empty() || (rest.size() == 1U && dimension(rest[0])) ||
+            (rest.size() == 3U && dimension(rest[0]) && rest[1] == 'x' && dimension(rest[2]));
+        }
+        return false;
+      }
+
+      /** A local declared like an effect parameter that reads the parameter in its own initializer. */
+      struct ShadowingLocal
+      {
+        std::string name;
+        std::size_t namePosition = 0U;   // the local's name in its declaration
+        std::size_t declarationEnd = 0U; // its ';'
+        std::size_t blockEnd = 0U;       // the '}' closing its block
+      };
+
+      [[nodiscard]] std::optional<ShadowingLocal> FindLocalShadowingParameter() const
+      {
+        struct Declaration
+        {
+          std::string name;
+          std::size_t namePosition;
+          std::size_t equals;
+        };
+        std::vector<std::string> parameters;
+        std::vector<Declaration> locals;
+        const std::string& text = mText;
+        const auto skipSpace = [&](std::size_t at) {
+          while (at < text.size() && std::isspace(static_cast<unsigned char>(text[at])) != 0) {
+            ++at;
+          }
+          return at;
+        };
+        int depth = 0;
+        for (std::size_t at = 0U; at < text.size();) {
+          const char c = text[at];
+          if (c == '/' && at + 1U < text.size() && text[at + 1U] == '/') {
+            at = text.find('\n', at);
+            continue;
+          }
+          if (c == '/' && at + 1U < text.size() && text[at + 1U] == '*') {
+            const std::size_t close = text.find("*/", at + 2U);
+            at = close == std::string::npos ? text.size() : close + 2U;
+            continue;
+          }
+          if (c == '"') {
+            const std::size_t close = text.find('"', at + 1U);
+            at = close == std::string::npos ? text.size() : close + 1U;
+            continue;
+          }
+          if (c == '{' || c == '}') {
+            depth += c == '{' ? 1 : -1;
+            ++at;
+            continue;
+          }
+          if (!IsIdentifierChar(c) || (at > 0U && IsIdentifierChar(text[at - 1U]))) {
+            ++at;
+            continue;
+          }
+          std::size_t end = at;
+          while (end < text.size() && IsIdentifierChar(text[end])) {
+            ++end;
+          }
+          const std::string_view word(text.data() + at, end - at);
+          if (IsNumericTypeName(word) && (at == 0U || text[at - 1U] != '.')) {
+            const std::size_t nameStart = skipSpace(end);
+            std::size_t nameEnd = nameStart;
+            while (nameEnd < text.size() && IsIdentifierChar(text[nameEnd])) {
+              ++nameEnd;
+            }
+            if (nameEnd > nameStart && std::isdigit(static_cast<unsigned char>(text[nameStart])) == 0) {
+              const std::size_t next = skipSpace(nameEnd);
+              const char follow = next < text.size() ? text[next] : '\0';
+              std::string name = text.substr(nameStart, nameEnd - nameStart);
+              if (depth == 0 && (follow == '=' || follow == ';' || follow == ':' || follow == '[' || follow == '<')) {
+                parameters.push_back(std::move(name));
+              } else if (depth > 0 && follow == '=' && (next + 1U >= text.size() || text[next + 1U] != '=')) {
+                locals.push_back(Declaration{std::move(name), nameStart, next});
+              }
+            }
+          }
+          at = end;
+        }
+
+        for (const Declaration& local : locals) {
+          if (std::find(parameters.begin(), parameters.end(), local.name) == parameters.end()) {
+            continue;
+          }
+          // The initializer runs to the ';' outside parentheses.
+          int parens = 0;
+          std::size_t semicolon = std::string::npos;
+          for (std::size_t at = local.equals + 1U; at < text.size(); ++at) {
+            if (text[at] == '(') {
+              ++parens;
+            } else if (text[at] == ')') {
+              --parens;
+            } else if (text[at] == ';' && parens == 0) {
+              semicolon = at;
+              break;
+            } else if (text[at] == '{' || text[at] == '}') {
+              break;
+            }
+          }
+          if (semicolon == std::string::npos) {
+            continue;
+          }
+          std::string initializer = text.substr(local.equals + 1U, semicolon - local.equals - 1U);
+          if (ReplaceIdentifier(initializer, local.name, local.name) == 0U) {
+            continue;
+          }
+          int blockDepth = 0;
+          for (std::size_t at = semicolon; at < text.size(); ++at) {
+            if (text[at] == '{') {
+              ++blockDepth;
+            } else if (text[at] == '}' && --blockDepth < 0) {
+              return ShadowingLocal{local.name, local.namePosition, semicolon, at};
+            }
+          }
+        }
+        return std::nullopt;
+      }
+
+      /**
+       * D3D9's compiler lets a local take an effect parameter's name and still read the parameter in its own
+       * initializer: the original water2.fx has `float2 waterLerp` and, in a pixel shader,
+       * `float waterLerp = clamp(waterDepth, waterLerp.x, waterLerp.y);`. Shader model 4 and later already see the
+       * local there and reject `.y` on a float. The local is renamed for the rest of its block, so the initializer
+       * reads the parameter and the later uses read the local, as in D3D9. FAF's own copy of water2.fx renamed the
+       * local in 2024 (fa #6452); the original game's and older FAF copies still have it.
+       */
+      void RenameLocalsShadowingParameters()
+      {
+        for (std::size_t guard = 0U; guard < 64U; ++guard) {
+          const std::optional<ShadowingLocal> shadow = FindLocalShadowingParameter();
+          if (!shadow) {
+            return;
+          }
+          const std::string renamed = "faf_local_" + shadow->name;
+          std::string rest = mText.substr(shadow->declarationEnd, shadow->blockEnd - shadow->declarationEnd);
+          // Whole identifiers only, and not a member of the same name (`v.waterLerp`).
+          std::string replaced;
+          std::size_t from = 0U;
+          for (std::size_t at = rest.find(shadow->name); at != std::string::npos;
+               at = rest.find(shadow->name, at + 1U)) {
+            const std::size_t end = at + shadow->name.size();
+            const bool whole =
+              (at == 0U || !IsIdentifierChar(rest[at - 1U])) && (end >= rest.size() || !IsIdentifierChar(rest[end]));
+            std::size_t before = at;
+            while (before > 0U && std::isspace(static_cast<unsigned char>(rest[before - 1U])) != 0) {
+              --before;
+            }
+            const bool member = before > 0U && rest[before - 1U] == '.';
+            if (whole && !member) {
+              replaced += rest.substr(from, at - from) + renamed;
+              from = end;
+            }
+          }
+          replaced += rest.substr(from);
+          const std::size_t nameEnd = shadow->namePosition + shadow->name.size();
+          mText = mText.substr(0U, shadow->namePosition) + renamed +
+            mText.substr(nameEnd, shadow->declarationEnd - nameEnd) + replaced + mText.substr(shadow->blockEnd);
+          mNotes.push_back("local " + shadow->name + " renamed: it reads the effect parameter of the same name");
+        }
+      }
+
+      void AddStruct(
+        const std::string& name,
+        const std::size_t open
+      )
       {
         const std::size_t close = MatchingBrace(mText, open);
         if (close == std::string::npos) {
           return;
         }
         std::vector<Variable> members;
-        for (const std::string& member : SplitTopLevel(std::string_view(mText).substr(open + 1U, close - open - 1U), ';')) {
+        for (const std::string& member :
+             SplitTopLevel(std::string_view(mText).substr(open + 1U, close - open - 1U), ';')) {
           if (!Trim(member).empty()) {
             members.push_back(ParseVariable(member));
           }
@@ -451,7 +724,10 @@ namespace gpg::gal::d3d11
       }
 
       void AddFunction(
-        const std::string& returnType, const std::string& name, const std::string& parameters, const std::string& returnSemantic
+        const std::string& returnType,
+        const std::string& name,
+        const std::string& parameters,
+        const std::string& returnSemantic
       )
       {
         if (mFunctions.count(name) != 0U || name == "if" || name == "while" || name == "for" || name == "switch") {
@@ -471,29 +747,45 @@ namespace gpg::gal::d3d11
       void CollectStructsAndFunctions()
       {
         if (gEffectFastScan) {
-          scan::ForEachStructHead(mText, [&](const std::string_view name, const std::size_t open) { AddStruct(std::string(name), open); });
+          scan::ForEachStructHead(mText, [&](const std::string_view name, const std::size_t open) {
+            AddStruct(std::string(name), open);
+          });
           scan::ForEachFunctionHead(
             mText,
-            [&](const std::string_view type, const std::string_view name, const std::string_view parameters, const std::string_view semantic, bool) {
-              AddFunction(std::string(type), std::string(name), std::string(parameters), std::string(semantic));
-            }
+            [&](
+              const std::string_view type,
+              const std::string_view name,
+              const std::string_view parameters,
+              const std::string_view semantic,
+              bool
+            ) {
+            AddFunction(std::string(type), std::string(name), std::string(parameters), std::string(semantic));
+          }
           );
           return;
         }
 
         static const std::regex structHead(R"(\bstruct\s+(\w+)\s*\{)");
-        for (auto it = std::sregex_iterator(mText.begin(), mText.end(), structHead); it != std::sregex_iterator(); ++it) {
+        for (auto it = std::sregex_iterator(mText.begin(), mText.end(), structHead); it != std::sregex_iterator();
+             ++it) {
           AddStruct((*it)[1].str(), static_cast<std::size_t>(it->position(0) + it->length(0) - 1));
         }
 
         static const std::regex functionHead(R"((\w+)\s+(\w+)\s*\(([^(){};]*)\)\s*(:\s*(\w+)\s*)?\{)");
-        for (auto it = std::sregex_iterator(mText.begin(), mText.end(), functionHead); it != std::sregex_iterator(); ++it) {
-          AddFunction((*it)[1].str(), (*it)[2].str(), (*it)[3].str(), (*it)[5].matched ? (*it)[5].str() : std::string());
+        for (auto it = std::sregex_iterator(mText.begin(), mText.end(), functionHead); it != std::sregex_iterator();
+             ++it) {
+          AddFunction(
+            (*it)[1].str(), (*it)[2].str(), (*it)[3].str(), (*it)[5].matched ? (*it)[5].str() : std::string()
+          );
         }
       }
 
       /** The shader function a `VertexShader = compile vs_4_0 F ( args )` statement names, and its args. */
-      static bool ParseCompile(const std::string& value, std::string& function, std::string& arguments)
+      static bool ParseCompile(
+        const std::string& value,
+        std::string& function,
+        std::string& arguments
+      )
       {
         static const std::regex compile(R"(^\s*compile\s+\w+\s+(\w+)\s*\((.*)\)\s*$)");
         std::smatch match;
@@ -512,13 +804,20 @@ namespace gpg::gal::d3d11
        * (or a prefix of it), route it through a wrapper that does and
        * forwards each input by semantic.
        */
-      std::string RelinkPixelShader(const std::string& vertexValue, const std::string& pixelValue, std::string& declarations)
+      std::string RelinkPixelShader(
+        const std::string& vertexValue,
+        const std::string& pixelValue,
+        std::string& declarations
+      )
       {
         std::string vertexName;
         std::string vertexArguments;
         std::string pixelName;
         std::string pixelArguments;
-        if (!ParseCompile(vertexValue, vertexName, vertexArguments) || !ParseCompile(pixelValue, pixelName, pixelArguments)) {
+        if (
+          !ParseCompile(vertexValue, vertexName, vertexArguments) ||
+          !ParseCompile(pixelValue, pixelName, pixelArguments)
+        ) {
           return pixelValue;
         }
         const auto vertex = mFunctions.find(vertexName);
@@ -606,7 +905,9 @@ namespace gpg::gal::d3d11
         }
 
         static const std::regex compileHead(R"(^(\s*compile\s+\w+\s+)\w+)");
-        return std::regex_replace(pixelValue, compileHead, "$1" + wrapper->second, std::regex_constants::format_first_only);
+        return std::regex_replace(
+          pixelValue, compileHead, "$1" + wrapper->second, std::regex_constants::format_first_only
+        );
       }
 
       void RewriteOneDimensionalSamplers()
@@ -617,11 +918,17 @@ namespace gpg::gal::d3d11
           mText.insert(0U, "float4 faf_tex1D(sampler2D s, float u) { return tex2D(s, float2(u, 0.5)); }\n");
         }
         if (samplers != 0U || reads != 0U) {
-          mNotes.push_back("1D samplers read as 2D: " + std::to_string(samplers) + " sampler(s), " + std::to_string(reads) + " read(s)");
+          mNotes.push_back(
+            "1D samplers read as 2D: " + std::to_string(samplers) + " sampler(s), " + std::to_string(reads) + " read(s)"
+          );
         }
       }
 
-      void AddStateObject(const std::string_view kind, const std::string& name, const std::size_t open)
+      void AddStateObject(
+        const std::string_view kind,
+        const std::string& name,
+        const std::size_t open
+      )
       {
         const std::size_t close = MatchingBrace(mText, open);
         if (close == std::string::npos) {
@@ -631,7 +938,8 @@ namespace gpg::gal::d3d11
         object.kind = (kind == "BlendState") ? StateKind::Blend
           : (kind == "DepthStencilState")    ? StateKind::DepthStencil
                                              : StateKind::Rasterizer;
-        for (const std::string& statement : SplitTopLevel(std::string_view(mText).substr(open + 1U, close - open - 1U), ';')) {
+        for (const std::string& statement :
+             SplitTopLevel(std::string_view(mText).substr(open + 1U, close - open - 1U), ';')) {
           const std::size_t equals = statement.find('=');
           if (equals == std::string::npos) {
             continue;
@@ -644,16 +952,21 @@ namespace gpg::gal::d3d11
       void CollectStateObjects()
       {
         if (gEffectFastScan) {
-          scan::ForEachStateDeclaration(mText, [&](const std::string_view kind, const std::string_view name, const std::size_t open) {
+          scan::ForEachStateDeclaration(
+            mText, [&](const std::string_view kind, const std::string_view name, const std::size_t open) {
             AddStateObject(kind, std::string(name), open);
-          });
+          }
+          );
           return;
         }
 
         static const std::regex declaration(R"(\b(BlendState|DepthStencilState|RasterizerState)\s+(\w+)\s*\{)");
-        for (auto it = std::sregex_iterator(mText.begin(), mText.end(), declaration); it != std::sregex_iterator(); ++it) {
+        for (auto it = std::sregex_iterator(mText.begin(), mText.end(), declaration); it != std::sregex_iterator();
+             ++it) {
           const std::smatch& match = *it;
-          AddStateObject(match[1].str(), match[2].str(), static_cast<std::size_t>(match.position(0) + match.length(0) - 1));
+          AddStateObject(
+            match[1].str(), match[2].str(), static_cast<std::size_t>(match.position(0) + match.length(0) - 1)
+          );
         }
       }
 
@@ -684,7 +997,8 @@ namespace gpg::gal::d3d11
           }
           std::string body = "\n";
           bool hasDepthClip = false;
-          for (const std::string& statement : SplitTopLevel(std::string_view(mText).substr(open + 1U, close - open - 1U), ';')) {
+          for (const std::string& statement :
+               SplitTopLevel(std::string_view(mText).substr(open + 1U, close - open - 1U), ';')) {
             const std::size_t equals = statement.find('=');
             if (equals == std::string::npos) {
               if (!Trim(statement).empty()) {
@@ -699,7 +1013,10 @@ namespace gpg::gal::d3d11
               value = "TRUE";
               hasDepthClip = true;
             } else if (key == "depthbias") {
-              if (const std::optional<double> number = ParseNumber(value); number && *number != 0.0 && std::fabs(*number) < 1.0) {
+              if (
+                const std::optional<double> number = ParseNumber(value);
+                number && *number != 0.0 && std::fabs(*number) < 1.0
+              ) {
                 value = std::to_string(static_cast<long>(std::lround(*number * 16777216.0)));
               }
             }
@@ -713,7 +1030,9 @@ namespace gpg::gal::d3d11
           ++rewritten;
         }
         if (rewritten != 0U) {
-          mNotes.push_back(std::to_string(rewritten) + " rasterizer state(s) clip depth and use D3D9-scaled depth biases");
+          mNotes.push_back(
+            std::to_string(rewritten) + " rasterizer state(s) clip depth and use D3D9-scaled depth biases"
+          );
         }
       }
 
@@ -746,7 +1065,8 @@ namespace gpg::gal::d3d11
           std::string destBlend = "ZERO";
           std::string blendOp = "ADD";
           Fields fields;
-          for (const std::string& statement : SplitTopLevel(std::string_view(mText).substr(open + 1U, close - open - 1U), ';')) {
+          for (const std::string& statement :
+               SplitTopLevel(std::string_view(mText).substr(open + 1U, close - open - 1U), ';')) {
             const std::size_t equals = statement.find('=');
             if (equals == std::string::npos) {
               continue;
@@ -778,7 +1098,9 @@ namespace gpg::gal::d3d11
           ++rewritten;
         }
         if (rewritten != 0U) {
-          mNotes.push_back(std::to_string(rewritten) + " blend state(s) blend alpha with their colour factors, as D3D9");
+          mNotes.push_back(
+            std::to_string(rewritten) + " blend state(s) blend alpha with their colour factors, as D3D9"
+          );
         }
       }
 
@@ -825,7 +1147,8 @@ namespace gpg::gal::d3d11
             // viewport origin already carries that half pixel (DeviceD3D11::
             // SetViewport) and faf_ViewportSize reports it, so the two cancel
             // here and the vertex lands at pixel + 0.5 either way.
-            mText.insert(0U,
+            mText.insert(
+              0U,
               "float4 faf_ViewportSize; // (left, top, 1/width, 1/height), set by the D3D11 backend\n"
               "struct faf_FixedFuncVertex { float4 position : POSITION0; float2 texcoord : TEXCOORD0; };\n"
               "faf_FixedFuncVertex FixedFuncVS(float4 position : POSITION0, float2 texcoord : TEXCOORD0)\n"
@@ -836,7 +1159,8 @@ namespace gpg::gal::d3d11
               "                        saturate(position.z), 1.0);\n"
               "    o.texcoord = texcoord;\n"
               "    return o;\n"
-              "}\n");
+              "}\n"
+            );
             mNotes.push_back("D3D9 fixed-function FixedFuncVS emulated for pre-transformed vertices");
             continue;
           }
@@ -868,7 +1192,9 @@ namespace gpg::gal::d3d11
             }
             const std::string_view body = std::string_view(mText).substr(open, close - open);
             if (body.find(function) != std::string_view::npos) {
-              mNotes.push_back("technique " + droppedName + " dropped: it uses the undefined D3D9 fixed-function " + function);
+              mNotes.push_back(
+                "technique " + droppedName + " dropped: it uses the undefined D3D9 fixed-function " + function
+              );
               mText.erase(start, close + 1U - start);
               searchFrom = start;
             } else {
@@ -896,11 +1222,20 @@ namespace gpg::gal::d3d11
        * name and pass index, and applied in the pixel shader (see
        * WrapAlphaTest).
        */
-      void CollectAlphaTests(const std::string_view original)
+      void CollectAlphaTests(
+        const std::string_view original
+      )
       {
         const std::string text = StripCommentsAndDirectives(original);
         static const std::map<std::string, int> kFunctions = {
-          {"never", 1}, {"less", 2}, {"equal", 3}, {"lessequal", 4}, {"greater", 5}, {"notequal", 6}, {"greaterequal", 7}, {"always", 8},
+          {"never", 1},
+          {"less", 2},
+          {"equal", 3},
+          {"lessequal", 4},
+          {"greater", 5},
+          {"notequal", 6},
+          {"greaterequal", 7},
+          {"always", 8},
         };
 
         std::size_t from = 0U;
@@ -930,7 +1265,8 @@ namespace gpg::gal::d3d11
             }
             bool enabled = false;
             AlphaTest test{};
-            for (const auto& [field, value] : ParseAssignments(std::string_view(text).substr(passOpen + 1U, passClose - passOpen - 1U))) {
+            for (const auto& [field, value] :
+                 ParseAssignments(std::string_view(text).substr(passOpen + 1U, passClose - passOpen - 1U))) {
               const std::string key = Lower(field);
               if (key == "alphatestenable") {
                 enabled = Translate(kBools, value) == std::optional<std::string>("TRUE");
@@ -952,13 +1288,17 @@ namespace gpg::gal::d3d11
         }
       }
 
-      [[nodiscard]] static bool IsIdentifierChar(const char c) noexcept
+      [[nodiscard]] static bool IsIdentifierChar(
+        const char c
+      ) noexcept
       {
         return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_';
       }
 
       /** `text` without comments and without `#` lines (line breaks kept). */
-      [[nodiscard]] static std::string StripCommentsAndDirectives(const std::string_view original)
+      [[nodiscard]] static std::string StripCommentsAndDirectives(
+        const std::string_view original
+      )
       {
         std::string text;
         text.reserve(original.size());
@@ -1068,7 +1408,9 @@ namespace gpg::gal::d3d11
       }
 
       /** Every `... field = value;` of a block body: the last word before `=` and the trimmed value. */
-      [[nodiscard]] static std::vector<std::pair<std::string, std::string>> ParseAssignments(const std::string_view body)
+      [[nodiscard]] static std::vector<std::pair<std::string, std::string>> ParseAssignments(
+        const std::string_view body
+      )
       {
         std::vector<std::pair<std::string, std::string>> assignments;
         for (const std::string& statement : SplitTopLevel(body, ';')) {
@@ -1102,7 +1444,8 @@ namespace gpg::gal::d3d11
       void DisableAlphaTestD3D10()
       {
         // The definition `void AlphaTestD3D10( ... ) { ... }`, not one of its calls.
-        for (std::size_t at = mText.find("AlphaTestD3D10"); at != std::string::npos; at = mText.find("AlphaTestD3D10", at + 1U)) {
+        for (std::size_t at = mText.find("AlphaTestD3D10"); at != std::string::npos;
+             at = mText.find("AlphaTestD3D10", at + 1U)) {
           std::size_t before = at;
           while (before > 0U && std::isspace(static_cast<unsigned char>(mText[before - 1U])) != 0) {
             --before;
@@ -1137,7 +1480,11 @@ namespace gpg::gal::d3d11
        * Returns the new PixelShader value, or `pixelValue` when the shader
        * cannot be wrapped.
        */
-      std::string WrapAlphaTest(const std::string& pixelValue, const AlphaTest& test, std::string& declarations)
+      std::string WrapAlphaTest(
+        const std::string& pixelValue,
+        const AlphaTest& test,
+        std::string& declarations
+      )
       {
         std::string pixelName;
         std::string pixelArguments;
@@ -1172,8 +1519,9 @@ namespace gpg::gal::d3d11
           std::string call = pixelName + "(";
           for (std::size_t index = 0U; index < original.parameters.size(); ++index) {
             const Variable& parameter = original.parameters[index];
-            signature += std::string(index == 0U ? " " : ", ") + (parameter.uniform ? "uniform " : "") + (parameter.out ? "out " : "") +
-              parameter.type + " " + parameter.name + (parameter.semantic.empty() ? "" : " : " + parameter.semantic);
+            signature += std::string(index == 0U ? " " : ", ") + (parameter.uniform ? "uniform " : "") +
+              (parameter.out ? "out " : "") + parameter.type + " " + parameter.name +
+              (parameter.semantic.empty() ? "" : " : " + parameter.semantic);
             call += std::string(index == 0U ? " " : ", ") + parameter.name;
           }
           signature += " )";
@@ -1186,16 +1534,19 @@ namespace gpg::gal::d3d11
           if (test.function == 1 || test.function == 8) {
             condition = kComparisons[test.function];
           } else {
-            condition = "faf_alpha " + std::string(kComparisons[test.function]) + " " + std::to_string(test.reference) + "u";
+            condition =
+              "faf_alpha " + std::string(kComparisons[test.function]) + " " + std::to_string(test.reference) + "u";
           }
           declarations += signature + "\n{\n    " + original.returnType + " faf_result = " + call + ";\n" +
-            "    uint faf_alpha = (uint)round(saturate(" + alphaSource + ".a) * 255.0);\n" +
-            "    if (!(" + condition + "))\n        discard;\n    return faf_result;\n}\n";
+            "    uint faf_alpha = (uint)round(saturate(" + alphaSource + ".a) * 255.0);\n" + "    if (!(" + condition +
+            "))\n        discard;\n    return faf_result;\n}\n";
           mFunctions[name] = original;
           wrapper = mAlphaTestWrappers.emplace(key, name).first;
         }
         static const std::regex compileHead(R"(^(\s*compile\s+\w+\s+)\w+)");
-        return std::regex_replace(pixelValue, compileHead, "$1" + wrapper->second, std::regex_constants::format_first_only);
+        return std::regex_replace(
+          pixelValue, compileHead, "$1" + wrapper->second, std::regex_constants::format_first_only
+        );
       }
 
       void RewritePasses()
@@ -1204,7 +1555,8 @@ namespace gpg::gal::d3d11
         while (true) {
           std::string techniqueName;
           std::size_t techniqueOpen = std::string::npos;
-          const std::size_t techniqueStart = FindBlock(mText, {"technique10", "technique11"}, searchFrom, techniqueName, techniqueOpen);
+          const std::size_t techniqueStart =
+            FindBlock(mText, {"technique10", "technique11"}, searchFrom, techniqueName, techniqueOpen);
           if (techniqueStart == std::string::npos) {
             break;
           }
@@ -1219,7 +1571,9 @@ namespace gpg::gal::d3d11
           while (passFrom < techniqueClose) {
             std::string passName;
             std::size_t passOpen = std::string::npos;
-            if (FindBlock(mText, {"pass"}, passFrom, passName, passOpen) == std::string::npos || passOpen > techniqueClose) {
+            if (
+              FindBlock(mText, {"pass"}, passFrom, passName, passOpen) == std::string::npos || passOpen > techniqueClose
+            ) {
               break;
             }
             const std::size_t passClose = MatchingBrace(mText, passOpen);
@@ -1227,12 +1581,14 @@ namespace gpg::gal::d3d11
               break;
             }
             const std::string body = mText.substr(passOpen + 1U, passClose - passOpen - 1U);
-            const auto alphaTest = mAlphaTests.find(techniqueName + "#" + (!passName.empty() ? passName : std::to_string(passIndex)));
+            const auto alphaTest =
+              mAlphaTests.find(techniqueName + "#" + (!passName.empty() ? passName : std::to_string(passIndex)));
             ++passIndex;
             const std::string rewritten =
               RewritePassBody(body, declarations, alphaTest != mAlphaTests.end() ? &alphaTest->second : nullptr);
             mText.replace(passOpen + 1U, passClose - passOpen - 1U, rewritten);
-            const std::ptrdiff_t delta = static_cast<std::ptrdiff_t>(rewritten.size()) - static_cast<std::ptrdiff_t>(body.size());
+            const std::ptrdiff_t delta =
+              static_cast<std::ptrdiff_t>(rewritten.size()) - static_cast<std::ptrdiff_t>(body.size());
             techniqueClose = static_cast<std::size_t>(static_cast<std::ptrdiff_t>(techniqueClose) + delta);
             passFrom = passOpen + 1U + rewritten.size() + 1U;
           }
@@ -1245,7 +1601,11 @@ namespace gpg::gal::d3d11
         }
       }
 
-      std::string RewritePassBody(const std::string& body, std::string& declarations, const AlphaTest* const alphaTest)
+      std::string RewritePassBody(
+        const std::string& body,
+        std::string& declarations,
+        const AlphaTest* const alphaTest
+      )
       {
         std::map<std::string, std::string> legacy; // lower-case D3D9 state -> value
         std::vector<std::string> kept;
@@ -1258,8 +1618,10 @@ namespace gpg::gal::d3d11
           }
           const std::size_t paren = statement.find('(');
           const std::string head = Trim(statement.substr(0U, paren));
-          if (paren != std::string::npos && statement.back() == ')' &&
-              (head == "SetBlendState" || head == "SetDepthStencilState" || head == "SetRasterizerState")) {
+          if (
+            paren != std::string::npos && statement.back() == ')' &&
+            (head == "SetBlendState" || head == "SetDepthStencilState" || head == "SetRasterizerState")
+          ) {
             const StateKind kind = (head == "SetBlendState") ? StateKind::Blend
               : (head == "SetDepthStencilState")             ? StateKind::DepthStencil
                                                              : StateKind::Rasterizer;
@@ -1375,7 +1737,10 @@ namespace gpg::gal::d3d11
         {
           Fields fields = baseFields(StateKind::DepthStencil);
           bool touched = false;
-          const auto apply = [&](const char* const d3d9, const char* const field, const std::map<std::string, std::string>* const table) {
+          const auto apply =
+            [&](
+              const char* const d3d9, const char* const field, const std::map<std::string, std::string>* const table
+            ) {
             if (const std::optional<std::string> value = take(d3d9)) {
               const std::optional<std::string> translated = (table != nullptr) ? Translate(*table, *value) : value;
               if (translated) {
@@ -1407,7 +1772,11 @@ namespace gpg::gal::d3d11
           const std::optional<std::string> backFail = take("ccw_stencilfail");
           const std::optional<std::string> backDepthFail = take("ccw_stencilzfail");
           const std::optional<std::string> backPass = take("ccw_stencilpass");
-          const auto stencil = [&](const char* const field, const std::optional<std::string>& value, const std::map<std::string, std::string>& table) {
+          const auto stencil = [&](
+                                 const char* const field,
+                                 const std::optional<std::string>& value,
+                                 const std::map<std::string, std::string>& table
+                               ) {
             if (value) {
               if (const std::optional<std::string> translated = Translate(table, *value)) {
                 SetField(fields, field, *translated);
@@ -1558,9 +1927,13 @@ namespace gpg::gal::d3d11
         }
 
         std::string out = "\n";
-        const auto emit = [&out](const std::string& statement) { out += "        " + statement + ";\n"; };
+        const auto emit = [&out](const std::string& statement) {
+          out += "        " + statement + ";\n";
+        };
         for (const auto& [kind, arguments] : setCalls) {
-          std::string call = (kind == StateKind::Blend) ? "SetBlendState(" : (kind == StateKind::DepthStencil) ? "SetDepthStencilState(" : "SetRasterizerState(";
+          std::string call = (kind == StateKind::Blend) ? "SetBlendState("
+            : (kind == StateKind::DepthStencil)         ? "SetDepthStencilState("
+                                                        : "SetRasterizerState(";
           for (std::size_t index = 0U; index < arguments.size(); ++index) {
             call += (index != 0U ? ", " : " ") + arguments[index];
           }
@@ -1574,12 +1947,18 @@ namespace gpg::gal::d3d11
         return out;
       }
 
-      std::string NewName(const char* const kind)
+      std::string NewName(
+        const char* const kind
+      )
       {
         return "faf_d3d11_" + std::string(kind) + "_" + std::to_string(mGenerated++);
       }
 
-      static std::string Declare(const char* const type, const std::string& name, const Fields& fields)
+      static std::string Declare(
+        const char* const type,
+        const std::string& name,
+        const Fields& fields
+      )
       {
         std::string text = std::string(type) + " " + name + "\n{\n";
         for (const auto& [field, value] : fields) {
@@ -1599,8 +1978,8 @@ namespace gpg::gal::d3d11
       std::map<std::string, Function> mFunctions;
       std::map<std::string, std::string> mWrapperNames; // pixel shader | input struct -> wrapper
       std::size_t mWrappers = 0U;
-      std::map<std::string, AlphaTest> mAlphaTests;           // technique name # pass index -> D3D9 alpha test
-      std::map<std::string, std::string> mAlphaTestWrappers;  // pixel shader | function | reference -> wrapper
+      std::map<std::string, AlphaTest> mAlphaTests;          // technique name # pass index -> D3D9 alpha test
+      std::map<std::string, std::string> mAlphaTestWrappers; // pixel shader | function | reference -> wrapper
       std::size_t mAlphaTestedPasses = 0U;
       bool mShaderModel41 = false;
     };
@@ -1609,7 +1988,9 @@ namespace gpg::gal::d3d11
   bool gEffectFastScan = true;
 
   TranslatedEffectSource TranslateEffectSource(
-    const std::string_view preprocessed, const bool shaderModel41, const std::string_view original
+    const std::string_view preprocessed,
+    const bool shaderModel41,
+    const std::string_view original
   )
   {
     static const bool sStartupFlagRead = [] {
@@ -1633,7 +2014,8 @@ namespace gpg::gal::d3d11
       const TranslatedEffectSource other = Translator(StripDirectives(preprocessed), shaderModel41, original).Run();
       gEffectFastScan = wasFast;
       gpg::Logf(
-        "effect scan verify: %zu bytes, %s", result.source.size(),
+        "effect scan verify: %zu bytes, %s",
+        result.source.size(),
         result.source == other.source && result.notes == other.notes ? "same" : "DIFFERENT"
       );
     }

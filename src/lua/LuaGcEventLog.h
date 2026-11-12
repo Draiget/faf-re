@@ -73,16 +73,22 @@ namespace lua
     [[nodiscard]] static long long Now() noexcept;
 
     /** Parallel sweep detail: its classify, mark-reset and serial replay times, live and dead objects. */
-    void NoteSweep(long long classifyTicks, long long clearTicks, long long replayTicks, std::size_t live, std::size_t dead) noexcept;
+    void NoteSweep(
+      long long classifyTicks,
+      long long clearTicks,
+      long long replayTicks,
+      std::size_t live,
+      std::size_t dead
+    ) noexcept;
 
     /** Adds `ticks` to the named sub-phase (a string literal) of this collection. */
     void Detail(const char* name, long long ticks) noexcept;
 
   private:
     std::size_t mBlocks = 0;
-    long long mLast = 0;                   // QueryPerformanceCounter ticks; 0: not timing
+    long long mLast = 0; // QueryPerformanceCounter ticks; 0: not timing
     long long mPhaseTicks[kPhaseCount]{};
-    long long mSweepTicks[3]{};            // NoteSweep: classify, clear, replay
+    long long mSweepTicks[3]{}; // NoteSweep: classify, clear, replay
     std::size_t mLive = 0;
     std::size_t mDead = 0;
     bool mSweepNoted = false;

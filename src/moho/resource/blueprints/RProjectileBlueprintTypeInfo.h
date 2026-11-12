@@ -58,7 +58,6 @@ namespace moho
      * Registers projectile-blueprint field descriptors and descriptions.
      */
     static void AddFields(gpg::RType* typeInfo);
-
   };
 
   /**

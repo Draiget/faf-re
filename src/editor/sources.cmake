@@ -13,11 +13,71 @@ set(FAF_EDITOR_SOURCES
   doc/EdMapFile.cpp
   doc/EdNewMap.cpp
   doc/EdSaveFile.cpp
+  doc/EdUnits.cpp
+  doc/EdUnitFate.cpp
+  doc/EdGroupOptions.cpp
+  doc/EdUnitWrecks.cpp
+  doc/EdPackage.cpp
+  doc/EdWaterPreset.cpp
+  doc/EdJson.cpp
+  doc/EdLighting.cpp
+  doc/EdMarkerPreset.cpp
+  doc/EdUnitPreset.cpp
+  doc/EdLayerPreset.cpp
+  doc/EdPropPaint.cpp
+  doc/EdSkybox.cpp
+  doc/EdImageChunks.cpp
+  tools/EdWaves.cpp
+  tools/EdTerrainTypes.cpp
+  tools/EdViewAids.cpp
+  tools/EdArmySlots.cpp
+  doc/EdAdaptiveTables.cpp
+  doc/EdLuaText.cpp
+  doc/EdRecentMaps.cpp
+  doc/EdVault.cpp
+  doc/EdHttp.cpp
+  doc/EdFafApi.cpp
+  ui/EdMapBrowser.cpp
+  doc/EdWaterBodies.cpp
+  view/EdWaterBodyView.cpp
+  ui/EdHelp.cpp
+  ui/EdIcons.cpp
+  view/EdPropThumbnails.cpp
+  ui/EdArmiesPanel.cpp
+  ui/EdPropertiesPanel.cpp
+  ui/EdAdaptivePanel.cpp
+  ui/EdUnitFatePanel.cpp
   doc/EdRoundTrip.cpp
   tools/EdHeightBrush.cpp
   tools/EdHeightFile.cpp
   tools/EdMaskBrush.cpp
   tools/EdMarkers.cpp
+  tools/EdDecalShape.cpp
+  tools/EdDecals.cpp
+  tools/EdChecks.cpp
+  tools/EdShaderSlots.cpp
+  graph/EdNodeGraph.cpp
+  graph/EdTextureGraph.cpp
+  graph/EdTextureBake.cpp
+  doc/EdEmitter.cpp
+  graph/EdEffectGraph.cpp
+  view/EdParticlePreview.cpp
+  view/EdParticleViewport.cpp
+  ui/EdParticleEditor.cpp
+  ui/EdParticleBrowser.cpp
+  ui/EdParticleGraph.cpp
+  ui/EdTexturePicker.cpp
+  ui/EdCodeEditor.cpp
+  ui/EdAdaptiveWindow.cpp
+  ui/EdLiveUnitPanel.cpp
+  view/EdLiveUnits.cpp
+  view/EdLiveTerrain.cpp
+  doc/EdAdaptiveModel.cpp
+  doc/EdLuaSyntax.cpp
+  doc/EdViewState.cpp
+  ui/EdNodeCanvas.cpp
+  ui/EdMaterialEditor.cpp
+  tools/EdPathing.cpp
   tools/EdTextureLibrary.cpp
   tools/EdSymmetryCheck.cpp
   undo/EdHeightHistory.cpp

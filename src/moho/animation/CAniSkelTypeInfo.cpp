@@ -78,4 +78,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_CAniSkelTypeInfo_9b39e1, moho::preregister_CAniSkelTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_CAniSkelTypeInfo_9b39e1,
+  moho::preregister_CAniSkelTypeInfo
+)

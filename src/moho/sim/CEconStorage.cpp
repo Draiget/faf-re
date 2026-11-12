@@ -24,7 +24,10 @@ namespace moho
    * Binds one economy owner pointer, copies amount lanes, and applies this
    * storage lane into economy max-storage totals.
    */
-  CEconStorage::CEconStorage(const SEconValue& amount, CEconomy* const economy)
+  CEconStorage::CEconStorage(
+    const SEconValue& amount,
+    CEconomy* const economy
+  )
   {
     mEconomy = economy;
     mAmt = amount;
@@ -38,7 +41,9 @@ namespace moho
    * Removes previous amount contribution, copies new amount lanes, then
    * reapplies contribution to economy max-storage totals.
    */
-  void CEconStorage::ChangeAmt(const SEconValue& amount)
+  void CEconStorage::ChangeAmt(
+    const SEconValue& amount
+  )
   {
     Chng(-1);
     mAmt = amount;
@@ -62,7 +67,12 @@ namespace moho
    * Allocates one `CEconStorage`, zero-initializes owner/value lanes, and
    * publishes the object as an unowned construct result.
    */
-  void CEconStorage::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CEconStorage::MemberConstruct(
+    gpg::ReadArchive&,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     result.SetUnowned(gpg::MakeRRef(new CEconStorage()), 0u);
   }
@@ -74,7 +84,9 @@ namespace moho
    * Applies this storage lane as a signed delta (`direction` is typically
    * `+1` or `-1`) into owning economy max-storage counters.
    */
-  void CEconStorage::Chng(const std::int32_t direction)
+  void CEconStorage::Chng(
+    const std::int32_t direction
+  )
   {
     SEconStoragePair& maxStorage = mEconomy->mTotals.mMaxStorage;
     maxStorage.ENERGY += static_cast<std::int64_t>(mAmt.energy) * direction;
@@ -88,7 +100,9 @@ namespace moho
    * Deserializes referenced economy owner pointer, then reads one reflected
    * `SEconValue` payload lane.
    */
-  void CEconStorage::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CEconStorage::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -110,7 +124,9 @@ namespace moho
    * Serializes referenced economy owner as an unowned pointer, then writes
    * one reflected `SEconValue` payload lane.
    */
-  void CEconStorage::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CEconStorage::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;

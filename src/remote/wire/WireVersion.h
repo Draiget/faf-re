@@ -19,12 +19,12 @@ namespace faf::remote::wire
 
   enum class ELane : std::uint8_t
   {
-    Entities,   // view frames: entity creation, change and removal (EntityFrame.h)
-    Armies,     // army constant and variable data (§6)
-    Grids,      // the view's intel grids
-    Events,     // effects, sounds, decals, camera events
-    LuaSync,    // routed Lua `Sync` payloads (§8)
-    Commands,   // client commands and their acknowledgements
+    Entities, // view frames: entity creation, change and removal (EntityFrame.h)
+    Armies,   // army constant and variable data (§6)
+    Grids,    // the view's intel grids
+    Events,   // effects, sounds, decals, camera events
+    LuaSync,  // routed Lua `Sync` payloads (§8)
+    Commands, // client commands and their acknowledgements
     Count,
   };
 

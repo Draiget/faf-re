@@ -61,7 +61,9 @@ namespace moho
   /**
    * Address: 0x00762390 (FUN_00762390, Moho::CSimSoundManagerTypeInfo::AddBase_ISoundManager)
    */
-  void CSimSoundManagerTypeInfo::AddBase_ISoundManager(gpg::RType* const typeInfo)
+  void CSimSoundManagerTypeInfo::AddBase_ISoundManager(
+    gpg::RType* const typeInfo
+  )
   {
     audio_reflection::AddBase(typeInfo, audio_reflection::ResolveISoundManagerType());
   }
@@ -94,4 +96,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CSimSoundManagerTypeInfo_5f9bc5, moho::register_CSimSoundManagerTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CSimSoundManagerTypeInfo_5f9bc5,
+  moho::register_CSimSoundManagerTypeInfo
+)

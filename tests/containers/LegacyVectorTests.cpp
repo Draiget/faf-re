@@ -34,7 +34,9 @@ namespace
   using ElemOf = std::remove_pointer_t<typename Vec::iterator>;
 
   template <class E>
-  [[nodiscard]] E Make(const int v)
+  [[nodiscard]] E Make(
+    const int v
+  )
   {
     if constexpr (std::is_same_v<E, int>) {
       return v;
@@ -79,7 +81,10 @@ namespace
     return requires { E::live; };
   }
 
-  [[nodiscard]] std::size_t Pick(std::mt19937& rng, const std::size_t maxInclusive)
+  [[nodiscard]] std::size_t Pick(
+    std::mt19937& rng,
+    const std::size_t maxInclusive
+  )
   {
     return std::uniform_int_distribution<std::size_t>(0, maxInclusive)(rng);
   }
@@ -89,7 +94,10 @@ namespace
    * and compares them after every step. A second vector takes part through copy, move and swap.
    */
   template <class Vec>
-  void RunRandomOps(const unsigned seed, const int steps)
+  void RunRandomOps(
+    const unsigned seed,
+    const int steps
+  )
   {
     using E = ElemOf<Vec>;
     ResetCounters<E>();
@@ -286,7 +294,10 @@ namespace
   }
 
   template <class Vec>
-  [[nodiscard]] std::vector<std::size_t> CapacitiesWhilePushing(const int count, const bool emplace)
+  [[nodiscard]] std::vector<std::size_t> CapacitiesWhilePushing(
+    const int count,
+    const bool emplace
+  )
   {
     Vec v;
     std::vector<std::size_t> capacities;
@@ -305,7 +316,10 @@ namespace
   }
 } // namespace
 
-TEST(FaVector, EmptyVectorHasNoStorage)
+TEST(
+  FaVector,
+  EmptyVectorHasNoStorage
+)
 {
   const fa::vector<int> v;
   EXPECT_TRUE(v.empty());
@@ -315,13 +329,19 @@ TEST(FaVector, EmptyVectorHasNoStorage)
   EXPECT_EQ(v.begin(), v.end());
 }
 
-TEST(FaVector, LayoutWithAndWithoutTheDebugProxy)
+TEST(
+  FaVector,
+  LayoutWithAndWithoutTheDebugProxy
+)
 {
   EXPECT_EQ(sizeof(fa::vector<int, false>), 3 * sizeof(void*));
   EXPECT_EQ(sizeof(fa::vector<int, true>), 4 * sizeof(void*));
 }
 
-TEST(FaVector, GrowthAddsHalfTheCapacity)
+TEST(
+  FaVector,
+  GrowthAddsHalfTheCapacity
+)
 {
   // MSVC8's growth: the new capacity is cap + cap / 2, or the size needed when that is more.
   const std::vector<std::size_t> expected{1, 2, 3, 4, 6, 9, 13, 19, 28, 42};
@@ -330,7 +350,10 @@ TEST(FaVector, GrowthAddsHalfTheCapacity)
   EXPECT_EQ((CapacitiesWhilePushing<fa::vector<int, false>>(30, false)), expected);
 }
 
-TEST(FaVector, InsertGrowsToTheLargerOfHalfAndNeed)
+TEST(
+  FaVector,
+  InsertGrowsToTheLargerOfHalfAndNeed
+)
 {
   fa::vector<int> v;
   v.insert(v.end(), 10u, 1);
@@ -342,7 +365,10 @@ TEST(FaVector, InsertGrowsToTheLargerOfHalfAndNeed)
   EXPECT_EQ(v.size(), 31u);
 }
 
-TEST(FaVector, Constructors)
+TEST(
+  FaVector,
+  Constructors
+)
 {
   const fa::vector<int> sized(3);
   EXPECT_EQ(Values(sized), (std::vector<int>{0, 0, 0}));
@@ -376,31 +402,37 @@ TEST(FaVector, Constructors)
   EXPECT_EQ(Values(moved), (std::vector<int>{7, 7, 7, 7}));
 }
 
-TEST(FaVector, CopyAssignmentCoversEveryCapacityCase)
+TEST(
+  FaVector,
+  CopyAssignmentCoversEveryCapacityCase
+)
 {
   fa::vector<int> target;
   const fa::vector<int> small(2, 1);
   const fa::vector<int> big(9, 2);
   const fa::vector<int> none;
 
-  target = big;  // grows from nothing
+  target = big; // grows from nothing
   EXPECT_EQ(Values(target), Values(big));
   const std::size_t capacity = target.capacity();
 
-  target = small;  // shrinks in place
+  target = small; // shrinks in place
   EXPECT_EQ(Values(target), Values(small));
   EXPECT_EQ(target.capacity(), capacity);
 
-  target = big;  // grows within the capacity
+  target = big; // grows within the capacity
   EXPECT_EQ(Values(target), Values(big));
   EXPECT_EQ(target.capacity(), capacity);
 
-  target = none;  // empties and keeps the capacity
+  target = none; // empties and keeps the capacity
   EXPECT_TRUE(target.empty());
   EXPECT_EQ(target.capacity(), capacity);
 }
 
-TEST(FaVector, SelfAssignmentKeepsTheContents)
+TEST(
+  FaVector,
+  SelfAssignmentKeepsTheContents
+)
 {
   fa::vector<Tracked> v;
   for (int i = 0; i < 5; ++i) {
@@ -415,7 +447,10 @@ TEST(FaVector, SelfAssignmentKeepsTheContents)
   EXPECT_EQ(Tracked::badAccesses, 0);
 }
 
-TEST(FaVector, EraseReturnsTheNextPosition)
+TEST(
+  FaVector,
+  EraseReturnsTheNextPosition
+)
 {
   fa::vector<int> v;
   for (int i = 0; i < 8; ++i) {
@@ -439,7 +474,10 @@ TEST(FaVector, EraseReturnsTheNextPosition)
   EXPECT_TRUE(v.empty());
 }
 
-TEST(FaVector, InsertWithinAndPastTheCapacity)
+TEST(
+  FaVector,
+  InsertWithinAndPastTheCapacity
+)
 {
   fa::vector<int> v;
   v.reserve(10);
@@ -463,7 +501,10 @@ TEST(FaVector, InsertWithinAndPastTheCapacity)
   EXPECT_EQ(v.size(), 12u);
 }
 
-TEST(FaVector, DestroysEachElementOnce)
+TEST(
+  FaVector,
+  DestroysEachElementOnce
+)
 {
   Tracked::ResetCounters();
   {
@@ -491,7 +532,10 @@ TEST(FaVector, DestroysEachElementOnce)
   EXPECT_EQ(Tracked::badAccesses, 0);
 }
 
-TEST(FaVector, TidyFreesAndReleaseHandsTheStorageOver)
+TEST(
+  FaVector,
+  TidyFreesAndReleaseHandsTheStorageOver
+)
 {
   fa::vector<int> v(5, 3);
   v.tidy();
@@ -507,7 +551,10 @@ TEST(FaVector, TidyFreesAndReleaseHandsTheStorageOver)
   ::operator delete(storage);
 }
 
-TEST(FaVector, UncheckedPushAndPopMoveOnlyTheEnd)
+TEST(
+  FaVector,
+  UncheckedPushAndPopMoveOnlyTheEnd
+)
 {
   fa::vector<int> v;
   v.reserve(4);
@@ -522,7 +569,10 @@ TEST(FaVector, UncheckedPushAndPopMoveOnlyTheEnd)
   EXPECT_EQ(v.ptr_at(1), v.data() + 1);
 }
 
-TEST(FaVector, TooLongRequestsThrow)
+TEST(
+  FaVector,
+  TooLongRequestsThrow
+)
 {
   fa::vector<int> v(2, 1);
   EXPECT_THROW(v.reserve(fa::vector<int>::max_size() + 1), std::length_error);
@@ -532,7 +582,10 @@ TEST(FaVector, TooLongRequestsThrow)
   EXPECT_EQ(fa::vector<int>::max_size(), 0xFFFFFFFFu / sizeof(int));
 }
 
-TEST(FaVector, ConversionsToAndFromStd)
+TEST(
+  FaVector,
+  ConversionsToAndFromStd
+)
 {
   fa::vector<int> v;
   v.from_std(std::vector<int>{3, 1, 4, 1, 5});
@@ -541,7 +594,10 @@ TEST(FaVector, ConversionsToAndFromStd)
   EXPECT_EQ(v.to_std(), (std::vector<int>{9}));
 }
 
-TEST(FaVector, PushBackOfAnOwnElementAtCapacity)
+TEST(
+  FaVector,
+  PushBackOfAnOwnElementAtCapacity
+)
 {
   Tracked::ResetCounters();
   {
@@ -560,7 +616,10 @@ TEST(FaVector, PushBackOfAnOwnElementAtCapacity)
 // the new element, so an argument that refers into the vector is read after it was destroyed
 // and freed. std::vector supports this. Minimal input: a full vector<Tracked> {10, 11, 12, 13}
 // and emplace_back(v[1]); the copy reads a destroyed Tracked.
-TEST(FaVector, DISABLED_EmplaceBackOfAnOwnElementAtCapacity)
+TEST(
+  FaVector,
+  DISABLED_EmplaceBackOfAnOwnElementAtCapacity
+)
 {
   Tracked::ResetCounters();
   {
@@ -575,34 +634,49 @@ TEST(FaVector, DISABLED_EmplaceBackOfAnOwnElementAtCapacity)
   EXPECT_EQ(Tracked::badAccesses, 0);
 }
 
-TEST(FaVector, RandomOpsMatchStdVectorInt)
+TEST(
+  FaVector,
+  RandomOpsMatchStdVectorInt
+)
 {
   for (unsigned seed = 1; seed <= 4; ++seed) {
     RunRandomOps<fa::vector<int>>(seed, 2500);
   }
 }
 
-TEST(FaVector, RandomOpsMatchStdVectorWithoutProxy)
+TEST(
+  FaVector,
+  RandomOpsMatchStdVectorWithoutProxy
+)
 {
   RunRandomOps<fa::vector<int, false>>(11, 2500);
   RunRandomOps<fa::vector<Tracked, false>>(12, 2500);
 }
 
-TEST(FaVector, RandomOpsMatchStdVectorWideTrivialElement)
+TEST(
+  FaVector,
+  RandomOpsMatchStdVectorWideTrivialElement
+)
 {
   for (unsigned seed = 21; seed <= 23; ++seed) {
     RunRandomOps<fa::vector<Pod12>>(seed, 2500);
   }
 }
 
-TEST(FaVector, RandomOpsMatchStdVectorTrackedElement)
+TEST(
+  FaVector,
+  RandomOpsMatchStdVectorTrackedElement
+)
 {
   for (unsigned seed = 31; seed <= 34; ++seed) {
     RunRandomOps<fa::vector<Tracked>>(seed, 2500);
   }
 }
 
-TEST(FaVector, RandomOpsMatchStdVectorCopyRelocatedElement)
+TEST(
+  FaVector,
+  RandomOpsMatchStdVectorCopyRelocatedElement
+)
 {
   for (unsigned seed = 41; seed <= 43; ++seed) {
     RunRandomOps<fa::vector<TrackedCopyRelocated>>(seed, 2500);
@@ -616,22 +690,33 @@ namespace
   using Cursor = fa::detail::vector_bool_word_cursor;
   using WordStorage = fa::detail::vector_bool_storage;
 
-  [[nodiscard]] long GlobalBit(const std::uint32_t* const base, const Cursor& c)
+  [[nodiscard]] long GlobalBit(
+    const std::uint32_t* const base,
+    const Cursor& c
+  )
   {
     return static_cast<long>(c.word - base) * 32 + static_cast<long>(c.bit);
   }
 
-  [[nodiscard]] Cursor CursorAt(std::uint32_t* const base, const long bit)
+  [[nodiscard]] Cursor CursorAt(
+    std::uint32_t* const base,
+    const long bit
+  )
   {
     return Cursor{base + bit / 32, static_cast<std::uint32_t>(bit % 32)};
   }
 
-  [[nodiscard]] bool BitAt(const std::uint32_t* const base, const long bit)
+  [[nodiscard]] bool BitAt(
+    const std::uint32_t* const base,
+    const long bit
+  )
   {
     return ((base[bit / 32] >> (bit % 32)) & 1u) != 0u;
   }
 
-  [[nodiscard]] std::vector<bool> Bits(const std::vector<std::uint32_t>& words)
+  [[nodiscard]] std::vector<bool> Bits(
+    const std::vector<std::uint32_t>& words
+  )
   {
     std::vector<bool> bits;
     for (std::size_t i = 0; i < words.size() * 32; ++i) {
@@ -640,17 +725,25 @@ namespace
     return bits;
   }
 
-  [[nodiscard]] void* AllocateWords(const unsigned int count)
+  [[nodiscard]] void* AllocateWords(
+    const unsigned int count
+  )
   {
     return ::operator new(static_cast<std::size_t>(count) * sizeof(std::uint32_t));
   }
 
-  [[nodiscard]] std::vector<std::uint32_t> WordsOf(const WordStorage& storage)
+  [[nodiscard]] std::vector<std::uint32_t> WordsOf(
+    const WordStorage& storage
+  )
   {
     return std::vector<std::uint32_t>(storage.begin, storage.end);
   }
 
-  void EraseWords(WordStorage* const storage, std::uint32_t* const first, std::uint32_t* const last)
+  void EraseWords(
+    WordStorage* const storage,
+    std::uint32_t* const first,
+    std::uint32_t* const last
+  )
   {
     std::uint32_t* end = storage->end;
     std::uint32_t* out = nullptr;
@@ -659,7 +752,10 @@ namespace
   }
 } // namespace
 
-TEST(FaVectorBool, CursorStepsCarryAcrossWords)
+TEST(
+  FaVectorBool,
+  CursorStepsCarryAcrossWords
+)
 {
   std::uint32_t words[4]{};
   Cursor c{words, 0};
@@ -677,7 +773,10 @@ TEST(FaVectorBool, CursorStepsCarryAcrossWords)
   EXPECT_EQ(c.word, words + 1);
 }
 
-TEST(FaVectorBool, AdvanceAndDistanceMatchBitIndices)
+TEST(
+  FaVectorBool,
+  AdvanceAndDistanceMatchBitIndices
+)
 {
   std::uint32_t words[8]{};
   std::mt19937 rng(7);
@@ -704,7 +803,10 @@ TEST(FaVectorBool, AdvanceAndDistanceMatchBitIndices)
   EXPECT_TRUE(fa::detail::CursorNotEqual(CursorAt(words, 40), CursorAt(words, 41)));
 }
 
-TEST(FaVectorBool, ForwardCopyMatchesStdCopy)
+TEST(
+  FaVectorBool,
+  ForwardCopyMatchesStdCopy
+)
 {
   std::mt19937 rng(9);
   for (int step = 0; step < 2000; ++step) {
@@ -727,13 +829,17 @@ TEST(FaVectorBool, ForwardCopyMatchesStdCopy)
 
     Cursor end{};
     (void)fa::detail::CopyBitCursorRangeForward(
-      &end, CursorAt(source.data(), first), CursorAt(source.data(), last), CursorAt(dest.data(), out));
+      &end, CursorAt(source.data(), first), CursorAt(source.data(), last), CursorAt(dest.data(), out)
+    );
     ASSERT_EQ(Bits(dest), expected);
     ASSERT_EQ(GlobalBit(dest.data(), end), out + (last - first));
   }
 }
 
-TEST(FaVectorBool, BackwardCopyShiftsAnOverlappingRangeRight)
+TEST(
+  FaVectorBool,
+  BackwardCopyShiftsAnOverlappingRangeRight
+)
 {
   std::mt19937 rng(10);
   for (int step = 0; step < 2000; ++step) {
@@ -751,13 +857,17 @@ TEST(FaVectorBool, BackwardCopyShiftsAnOverlappingRangeRight)
 
     Cursor begin{};
     (void)fa::detail::CopyBitCursorRangeBackward(
-      &begin, CursorAt(words.data(), first), CursorAt(words.data(), last), CursorAt(words.data(), last + shift));
+      &begin, CursorAt(words.data(), first), CursorAt(words.data(), last), CursorAt(words.data(), last + shift)
+    );
     ASSERT_EQ(Bits(words), expected);
     ASSERT_EQ(GlobalBit(words.data(), begin), first + shift);
   }
 }
 
-TEST(FaVectorBool, FillSetsOrClearsARange)
+TEST(
+  FaVectorBool,
+  FillSetsOrClearsARange
+)
 {
   std::mt19937 rng(11);
   for (int step = 0; step < 2000; ++step) {
@@ -771,12 +881,16 @@ TEST(FaVectorBool, FillSetsOrClearsARange)
     std::vector<bool> expected = Bits(words);
     std::fill(expected.begin() + first, expected.begin() + last, value);
     (void)fa::detail::FillBitCursorRangeFromBooleanSlot(
-      &value, CursorAt(words.data(), first), CursorAt(words.data(), last));
+      &value, CursorAt(words.data(), first), CursorAt(words.data(), last)
+    );
     ASSERT_EQ(Bits(words), expected) << "step " << step;
   }
 }
 
-TEST(FaVectorBool, CopyBitAtCursor)
+TEST(
+  FaVectorBool,
+  CopyBitAtCursor
+)
 {
   std::uint32_t source = 0x00000004u;
   std::uint32_t dest = 0xFFFFFFFFu;
@@ -787,9 +901,14 @@ TEST(FaVectorBool, CopyBitAtCursor)
   EXPECT_EQ(dest, 0xFFFFFFFFu);
 }
 
-TEST(FaVectorBool, InsertFillWordsMatchesStdInsert)
+TEST(
+  FaVectorBool,
+  InsertFillWordsMatchesStdInsert
+)
 {
-  const auto throwTooLong = [] { fa::detail::ThrowVectorBoolTooLong(); };
+  const auto throwTooLong = [] {
+    fa::detail::ThrowVectorBoolTooLong();
+  };
   std::mt19937 rng(12);
   WordStorage storage{};
   ASSERT_TRUE(fa::detail::InitializeWordStorage(&storage, 0u, throwTooLong, AllocateWords));
@@ -800,8 +919,8 @@ TEST(FaVectorBool, InsertFillWordsMatchesStdInsert)
     const std::uint32_t fill = static_cast<std::uint32_t>(rng());
     SCOPED_TRACE(::testing::Message() << "step " << step << " pos " << pos << " count " << count);
     const std::size_t capacityBefore = static_cast<std::size_t>(storage.capacityEnd - storage.begin);
-    std::uint32_t* const at = fa::detail::InsertFillWords(
-      &storage, storage.begin + pos, count, fill, throwTooLong, AllocateWords);
+    std::uint32_t* const at =
+      fa::detail::InsertFillWords(&storage, storage.begin + pos, count, fill, throwTooLong, AllocateWords);
     ref.insert(ref.begin() + static_cast<std::ptrdiff_t>(pos), count, fill);
     ASSERT_EQ(at, storage.begin + pos);
     ASSERT_EQ(WordsOf(storage), ref);
@@ -821,11 +940,16 @@ TEST(FaVectorBool, InsertFillWordsMatchesStdInsert)
   ::operator delete(storage.begin);
 }
 
-TEST(FaVectorBool, ResizeWordStorageGrowsWithFillAndErasesTheTail)
+TEST(
+  FaVectorBool,
+  ResizeWordStorageGrowsWithFillAndErasesTheTail
+)
 {
-  const auto throwTooLong = [] { fa::detail::ThrowVectorBoolTooLong(); };
-  const auto growWords = [&throwTooLong](
-                           WordStorage* const s, std::uint32_t* const at, const std::size_t count, const std::uint32_t fill) {
+  const auto throwTooLong = [] {
+    fa::detail::ThrowVectorBoolTooLong();
+  };
+  const auto growWords =
+    [&throwTooLong](WordStorage* const s, std::uint32_t* const at, const std::size_t count, const std::uint32_t fill) {
     (void)fa::detail::InsertFillWords(s, at, count, fill, throwTooLong, AllocateWords);
   };
   WordStorage storage{};
@@ -844,17 +968,29 @@ TEST(FaVectorBool, ResizeWordStorageGrowsWithFillAndErasesTheTail)
   ::operator delete(storage.begin);
 }
 
-TEST(FaVectorBool, InitializeRejectsTooManyWords)
+TEST(
+  FaVectorBool,
+  InitializeRejectsTooManyWords
+)
 {
-  const auto throwTooLong = [] { fa::detail::ThrowVectorBoolTooLong(); };
+  const auto throwTooLong = [] {
+    fa::detail::ThrowVectorBoolTooLong();
+  };
   WordStorage storage{};
-  EXPECT_THROW((void)fa::detail::InitializeWordStorage(&storage, 0x40000000u, throwTooLong, AllocateWords), std::length_error);
+  EXPECT_THROW(
+    (void)fa::detail::InitializeWordStorage(&storage, 0x40000000u, throwTooLong, AllocateWords), std::length_error
+  );
   EXPECT_EQ(storage.begin, nullptr);
 }
 
-TEST(FaVectorBool, NormalizeTrimsWordsAndMasksTheLastOne)
+TEST(
+  FaVectorBool,
+  NormalizeTrimsWordsAndMasksTheLastOne
+)
 {
-  const auto throwTooLong = [] { fa::detail::ThrowVectorBoolTooLong(); };
+  const auto throwTooLong = [] {
+    fa::detail::ThrowVectorBoolTooLong();
+  };
   WordStorage storage{};
   ASSERT_TRUE(fa::detail::InitializeWordStorage(&storage, 4u, throwTooLong, AllocateWords));
   (void)fa::detail::InsertFillWords(&storage, storage.end, 4u, 0xFFFFFFFFu, throwTooLong, AllocateWords);
@@ -871,7 +1007,10 @@ TEST(FaVectorBool, NormalizeTrimsWordsAndMasksTheLastOne)
   ::operator delete(storage.begin);
 }
 
-TEST(FaVectorBool, SmallWordHelpers)
+TEST(
+  FaVectorBool,
+  SmallWordHelpers
+)
 {
   EXPECT_EQ(fa::detail::BitCountToWordCount(0u), 0u);
   EXPECT_EQ(fa::detail::BitCountToWordCount(1u), 1u);

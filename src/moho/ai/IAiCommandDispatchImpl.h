@@ -34,7 +34,10 @@ namespace moho
    * - base `IAiCommandDispatch` at +0x30 (FUN_00599910).
    * - base `Listener<EUnitCommandQueueStatus>` at +0x34 (FUN_00599970).
    */
-  class IAiCommandDispatchImpl : public CCommandTask, public IAiCommandDispatch, public Listener<EUnitCommandQueueStatus>
+  class IAiCommandDispatchImpl :
+    public CCommandTask,
+    public IAiCommandDispatch,
+    public Listener<EUnitCommandQueueStatus>
   {
   public:
     /**
@@ -47,7 +50,8 @@ namespace moho
     IAiCommandDispatchImpl();
 
     /**
-     * Address: 0x00598D00 (FUN_00598D00, ??0IAiCommandDispatchImpl@Moho@@QAE@PAVUnit@1@PAVCTaskThread@1@PAW4EAiResult@1@@Z)
+     * Address: 0x00598D00 (FUN_00598D00,
+     * ??0IAiCommandDispatchImpl@Moho@@QAE@PAVUnit@1@PAVCTaskThread@1@PAW4EAiResult@1@@Z)
      *
      * What it does:
      * Binds this dispatch task to one unit, creates one task-thread lane on
@@ -176,9 +180,8 @@ namespace moho
      * Allocates one recovered command-dispatch object and stores it as an
      * unowned construct result payload.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x00599C80 (FUN_00599C80, Moho::IAiCommandDispatchImpl::MemberDeserialize)
@@ -209,7 +212,8 @@ namespace moho
   static_assert(sizeof(IAiCommandDispatchImpl) == 0x48, "IAiCommandDispatchImpl size must be 0x48");
   static_assert(offsetof(IAiCommandDispatchImpl, mState) == 0x40, "IAiCommandDispatchImpl::mState offset must be 0x40");
   static_assert(
-    offsetof(IAiCommandDispatchImpl, mCommandQueue) == 0x44, "IAiCommandDispatchImpl::mCommandQueue offset must be 0x44"
+    offsetof(IAiCommandDispatchImpl, mCommandQueue) == 0x44,
+    "IAiCommandDispatchImpl::mCommandQueue offset must be 0x44"
   );
 
   /**

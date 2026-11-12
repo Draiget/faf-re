@@ -54,7 +54,9 @@ namespace moho
   /**
    * Address: 0x00581730 (FUN_00581730, Moho::SBuildReserveInfo::MemberDeserialize)
    */
-  void SBuildReserveInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SBuildReserveInfo::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -70,7 +72,9 @@ namespace moho
   /**
    * Address: 0x005817B0 (FUN_005817B0, Moho::SBuildReserveInfo::MemberSerialize)
    */
-  void SBuildReserveInfo::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SBuildReserveInfo::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;

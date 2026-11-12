@@ -70,10 +70,11 @@ namespace
   constexpr std::int32_t kSkirtMaxIndexCount = 199998;
   constexpr float kMinDecalAlpha = 0.0039215689f;
 
-
   constexpr int kNoiseFillTextureFormat = 2;
 
-  [[nodiscard]] std::int32_t FloorToInt(const float value) noexcept
+  [[nodiscard]] std::int32_t FloorToInt(
+    const float value
+  ) noexcept
   {
     return static_cast<std::int32_t>(std::floor(value));
   }
@@ -84,7 +85,9 @@ namespace
     "1)/2.0f + .5f) * (vTexelSize.x * 128.0f);};";
 
   template <typename T>
-  void DeleteOwned(T*& lane) noexcept
+  void DeleteOwned(
+    T*& lane
+  ) noexcept
   {
     if (lane == nullptr) {
       return;
@@ -95,7 +98,10 @@ namespace
   }
 
   template <typename T>
-  void ReplaceOwned(T*& lane, T* const nextLane) noexcept
+  void ReplaceOwned(
+    T*& lane,
+    T* const nextLane
+  ) noexcept
   {
     if (lane == nextLane) {
       return;
@@ -105,7 +111,9 @@ namespace
     lane = nextLane;
   }
 
-  void FillDynamicQuadIndices(moho::CD3DIndexSheet* const indexSheet)
+  void FillDynamicQuadIndices(
+    moho::CD3DIndexSheet* const indexSheet
+  )
   {
     std::int16_t* const indices = indexSheet->Lock(0U, kDynamicIndexCount, true, false);
     if (indices == nullptr) {
@@ -113,7 +121,8 @@ namespace
     }
 
     std::int16_t* write = indices;
-    for (std::uint16_t indexToken = 2; indexToken < kDynamicVertexLoopStop; indexToken = static_cast<std::uint16_t>(indexToken + 4)) {
+    for (std::uint16_t indexToken = 2; indexToken < kDynamicVertexLoopStop;
+         indexToken = static_cast<std::uint16_t>(indexToken + 4)) {
       *(write + 0) = static_cast<std::int16_t>(indexToken - 2);
       *(write + 1) = static_cast<std::int16_t>(indexToken - 1);
       *(write + 2) = static_cast<std::int16_t>(indexToken + 0);
@@ -191,10 +200,8 @@ namespace
       return true;
     }
 
-    return dirtyRect.x0 >= cameraFootprint.x0
-      && cameraFootprint.x1 >= dirtyRect.x1
-      && dirtyRect.z0 >= cameraFootprint.z0
-      && cameraFootprint.z1 >= dirtyRect.z1;
+    return dirtyRect.x0 >= cameraFootprint.x0 && cameraFootprint.x1 >= dirtyRect.x1 &&
+      dirtyRect.z0 >= cameraFootprint.z0 && cameraFootprint.z1 >= dirtyRect.z1;
   }
 } // namespace
 
@@ -286,7 +293,9 @@ namespace moho
    * class when `graphics_Fidelity` is 2, and the binary compares against that
    * same constant here.
    */
-  bool HighFidelityTerrain::IsFidelity(const std::int32_t fidelity) const
+  bool HighFidelityTerrain::IsFidelity(
+    const std::int32_t fidelity
+  ) const
   {
     return fidelity == kHighTerrainFidelity;
   }
@@ -298,7 +307,9 @@ namespace moho
    * Binds the terrain resource, resets shared high-fidelity helper ownership
    * lanes, then dispatches initialization.
    */
-  bool HighFidelityTerrain::Create(IWldTerrainRes* const terrainResource)
+  bool HighFidelityTerrain::Create(
+    IWldTerrainRes* const terrainResource
+  )
   {
     mTerrainResource = terrainResource;
 
@@ -340,7 +351,8 @@ namespace moho
   {
     TConVar<bool> gTConVar_ren_TerrainGpuBuffers(
       "ren_TerrainGpuBuffers",
-      "Direct3D 12 / Vulkan: the terrain's vertices and indices stay in GPU memory and upload only after a rebuild (1, the "
+      "Direct3D 12 / Vulkan: the terrain's vertices and indices stay in GPU memory and upload only after a rebuild (1, "
+      "the "
       "default), or are copied each frame (0). Read when a terrain is created.",
       &ren_TerrainGpuBuffers
     );
@@ -363,7 +375,8 @@ namespace moho
     // Engine change (ren_TerrainGpuBuffers): upload memory is recycled, so a dynamic sheet is copied again
     // each frame though the mesh rarely changes. In GPU memory it uploads only after a rebuild.
     const gpg::gal::DeviceApi deviceApi = gpg::gal::Device::GetInstance()->GetDeviceContext()->mDeviceType;
-    const bool gpuSheets = ren_TerrainGpuBuffers && (deviceApi == gpg::gal::DeviceApi::Direct3D12 || deviceApi == gpg::gal::DeviceApi::Vulkan);
+    const bool gpuSheets = ren_TerrainGpuBuffers &&
+      (deviceApi == gpg::gal::DeviceApi::Direct3D12 || deviceApi == gpg::gal::DeviceApi::Vulkan);
     mTerrainSheetState = gpuSheets ? 3u : 0u;
     ReplaceOwned(mTerrainVertexSheet, resources->NewVertexSheet(gpuSheets ? 0U : 1U, 0xFFFF, terrainVertexFormat));
     ReplaceOwned(mTerrainIndexSheet, resources->CreateIndexSheet(!gpuSheets, 199998));
@@ -397,10 +410,7 @@ namespace moho
 
     if (!sHighFidelityNoiseFillTexture) {
       (void)resources->NewDynamicTextureSheet(
-        sHighFidelityNoiseFillTexture,
-        quarterWidth,
-        quarterHeight,
-        kNoiseFillTextureFormat
+        sHighFidelityNoiseFillTexture, quarterWidth, quarterHeight, kNoiseFillTextureFormat
       );
 
       (void)resources->FillDynamicTexture(kNoiseFillName, kNoiseFillShaderSource, sHighFidelityNoiseFillTexture);
@@ -429,7 +439,9 @@ namespace moho
    * updates terrain-scale and viewport normalization constants, and forwards
    * the optional terrain-normal map texture handle for terrain normal passes.
    */
-  void HighFidelityTerrain::LoadShaderVars(const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture)
+  void HighFidelityTerrain::LoadShaderVars(
+    const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture
+  )
   {
     auto& shaderVars = GetTerrainShaderVars();
 
@@ -437,8 +449,9 @@ namespace moho
     StratumMaterial& strata = terrainRes->GetStratumMaterial();
     strata.SetSizeTo(terrainRes);
 
-
-    BindTextureShaderVar(shaderVars.skirtTexture, boost::static_pointer_cast<ID3DTextureSheet>(sHighFidelityGridTexture));
+    BindTextureShaderVar(
+      shaderVars.skirtTexture, boost::static_pointer_cast<ID3DTextureSheet>(sHighFidelityGridTexture)
+    );
     BindTextureShaderVar(shaderVars.utilityTextureA, strata.mStratumMask0);
     BindTextureShaderVar(shaderVars.utilityTextureB, strata.mStratumMask1);
     BindTextureShaderVar(shaderVars.utilityTextureC, terrainRes->GetWaterMap());
@@ -492,10 +505,7 @@ namespace moho
     const CHeightField* const heightField = REN_GetTerrainRes()->mMap->mHeightField.get();
 
     const float terrainScale[4] = {
-      1.0f / static_cast<float>(heightField->width - 1),
-      1.0f / static_cast<float>(heightField->height - 1),
-      0.0f,
-      1.0f
+      1.0f / static_cast<float>(heightField->width - 1), 1.0f / static_cast<float>(heightField->height - 1), 0.0f, 1.0f
     };
     SetShaderVarMem(shaderVars.terrainScale, 4U, terrainScale);
 
@@ -508,15 +518,13 @@ namespace moho
     const float viewportWidthNdc = static_cast<float>(mViewportWidth) * inverseViewportWidth;
     const float viewportHeightNdc = static_cast<float>(mViewportHeight) * inverseViewportHeight;
 
-    const float viewportScale[2] = {
-      viewportWidthNdc * 0.5f,
-      viewportHeightNdc * -0.5f
-    };
+    const float viewportScale[2] = {viewportWidthNdc * 0.5f, viewportHeightNdc * -0.5f};
 
     const float viewportOffset[2] = {
-      (viewportWidthNdc * 0.5f) + (static_cast<float>(mViewportOriginX) * inverseViewportWidth) + (inverseViewportWidth * 0.5f),
-      (inverseViewportHeight * 0.5f)
-        + ((static_cast<float>(mViewportOriginY) * inverseViewportHeight) + (viewportHeightNdc * 0.5f))
+      (viewportWidthNdc * 0.5f) + (static_cast<float>(mViewportOriginX) * inverseViewportWidth) +
+        (inverseViewportWidth * 0.5f),
+      (inverseViewportHeight * 0.5f) +
+        ((static_cast<float>(mViewportOriginY) * inverseViewportHeight) + (viewportHeightNdc * 0.5f))
     };
 
     SetShaderVarMem(shaderVars.viewportScale, 2U, viewportScale);
@@ -545,7 +553,9 @@ namespace moho
    * LoadTerrainLighting (0x00805600); the two differ only in which
    * per-fidelity noise / bi-cubic sheet globals they bind.
    */
-  void HighFidelityTerrain::LoadTerrainLighting(Shadow* const shadowContext)
+  void HighFidelityTerrain::LoadTerrainLighting(
+    Shadow* const shadowContext
+  )
   {
     auto& shaderVars = GetTerrainShaderVars();
 
@@ -576,15 +586,12 @@ namespace moho
     const Wm3::Vector3f sunColor = terrainRes->GetSunColor();
     SetShaderVarMem(shaderVars.sunColor, 3U, &sunColor.x);
 
-
     // Half-angle vector: normalize(sunDirection + inverseView.r[2]). The binary
     // spells each component `sunDir - (-0.0 - invView.r[2].c)`, which is an
     // addition because the constant is -0.0.
     const Vector4f& cameraBasisZ = camera.inverseView.r[2];
     float halfAngle[3] = {
-      sunDirection.x + cameraBasisZ.x,
-      sunDirection.y + cameraBasisZ.y,
-      sunDirection.z + cameraBasisZ.z
+      sunDirection.x + cameraBasisZ.x, sunDirection.y + cameraBasisZ.y, sunDirection.z + cameraBasisZ.z
     };
     const float halfAngleLength =
       std::sqrt((halfAngle[0] * halfAngle[0]) + (halfAngle[1] * halfAngle[1]) + (halfAngle[2] * halfAngle[2]));
@@ -601,20 +608,12 @@ namespace moho
     SetShaderVarMem(shaderVars.halfAngle, 3U, halfAngle);
 
     // Camera forward direction: -inverseView.r[2].
-    const float cameraDirection[3] = {
-      -cameraBasisZ.x,
-      -cameraBasisZ.y,
-      -cameraBasisZ.z
-    };
+    const float cameraDirection[3] = {-cameraBasisZ.x, -cameraBasisZ.y, -cameraBasisZ.z};
     SetShaderVarMem(shaderVars.cameraDirection, 3U, cameraDirection);
 
     // Camera world position: inverseView.r[3] (translation row).
     const Vector4f& cameraTranslation = camera.inverseView.r[3];
-    const float cameraPosition[3] = {
-      cameraTranslation.x,
-      cameraTranslation.y,
-      cameraTranslation.z
-    };
+    const float cameraPosition[3] = {cameraTranslation.x, cameraTranslation.y, cameraTranslation.z};
     SetShaderVarMem(shaderVars.cameraPosition, 3U, cameraPosition);
 
     const Vector4f specularColor = terrainRes->GetSpecularColor();
@@ -622,7 +621,6 @@ namespace moho
 
     const Wm3::Vector3f shadowFillColor = terrainRes->GetShadowFillColor();
     SetShaderVarMem(shaderVars.shadowFillColor, 3U, &shadowFillColor.x);
-
 
     if (shadowContext != nullptr) {
       // The binary zero-extends the raw shadow-enabled byte into a 4-byte blob.
@@ -663,7 +661,8 @@ namespace moho
     GeomCamera3* const camera,
     const std::int32_t* const viewportBlock,
     const bool minimapPass,
-    const std::int32_t forceRegenerate)
+    const std::int32_t forceRegenerate
+  )
   {
     if (mTerrainResource == nullptr) {
       return;
@@ -742,8 +741,10 @@ namespace moho
 
           for (CWldTerrainDecal* const decal : visibleDecals) {
 
-            if (!ren_NormalDecals
-                && (decal->mType == WldTerrainDecalType_NormalsAlpha || decal->mType == WldTerrainDecalType_Normals)) {
+            if (
+              !ren_NormalDecals &&
+              (decal->mType == WldTerrainDecalType_NormalsAlpha || decal->mType == WldTerrainDecalType_Normals)
+            ) {
               continue;
             }
             // Fidelity 0 always passes: the LOD-area threshold only gates
@@ -781,8 +782,12 @@ namespace moho
             if (isFlat) {
               std::uint32_t addedIndexCount = 0;
               (void)mTesselator->EmitCollisionQuad(
-                reinterpret_cast<const Wm3::Vector3f*>(&flatnessQuad.mCorner0), &command.startIndex, &addedIndexCount,
-                &command.startVertex, reinterpret_cast<std::uint32_t*>(&command.endVertex));
+                reinterpret_cast<const Wm3::Vector3f*>(&flatnessQuad.mCorner0),
+                &command.startIndex,
+                &addedIndexCount,
+                &command.startVertex,
+                reinterpret_cast<std::uint32_t*>(&command.endVertex)
+              );
               command.indexCount = static_cast<std::int32_t>(addedIndexCount);
 
               if (command.indexCount > 0 && (command.startIndex + command.indexCount) < kSkirtMaxIndexCount) {
@@ -801,11 +806,20 @@ namespace moho
               std::int32_t minRectIndex = 0;
               std::int32_t maxRectIndex = 0;
               (void)mTesselator->CollectClippedCollisionIndicesInRect(
-                FloorToInt(decal->mBoundsMinX), FloorToInt(decal->mBoundsMinZ), FloorToInt(decal->mBoundsMaxX),
-                FloorToInt(decal->mBoundsMaxZ), &baselineIndexCount, &addedIndexCount, &minRectIndex, &maxRectIndex);
+                FloorToInt(decal->mBoundsMinX),
+                FloorToInt(decal->mBoundsMinZ),
+                FloorToInt(decal->mBoundsMaxX),
+                FloorToInt(decal->mBoundsMaxZ),
+                &baselineIndexCount,
+                &addedIndexCount,
+                &minRectIndex,
+                &maxRectIndex
+              );
 
-              if (addedIndexCount > 0
-                  && (baselineIndexCount + static_cast<std::int32_t>(addedIndexCount)) < kSkirtMaxIndexCount) {
+              if (
+                addedIndexCount > 0 &&
+                (baselineIndexCount + static_cast<std::int32_t>(addedIndexCount)) < kSkirtMaxIndexCount
+              ) {
                 command.startIndex = baselineIndexCount;
                 command.indexCount = static_cast<std::int32_t>(addedIndexCount);
                 command.startVertex = minRectIndex;
@@ -844,14 +858,15 @@ namespace moho
 
             const CWldSplat::SplatVertex& firstVertex = splat->mSplatVertices[0];
             const Vector4f& row1 = mCamera->viewport.r[1];
-            const float worldDistance = (firstVertex.mPosition.z * row1.z) + (firstVertex.mPosition.y * row1.y)
-              + (firstVertex.mPosition.x * row1.x) + row1.w;
+            const float worldDistance = (firstVertex.mPosition.z * row1.z) + (firstVertex.mPosition.y * row1.y) +
+              (firstVertex.mPosition.x * row1.x) + row1.w;
 
             if (worldDistance > splat->mCutoffLOD) {
               continue;
             }
-            if (splatBudget++ >= splatOutputBudget.available
-              && !TryGrowSplatOutput(mSplatVertices, splatOutputBudget)) {
+            if (
+              splatBudget++ >= splatOutputBudget.available && !TryGrowSplatOutput(mSplatVertices, splatOutputBudget)
+            ) {
               break;
             }
 
@@ -946,7 +961,10 @@ namespace moho
    * the alpha command is drawn and the walk continues; the binary tracks the
    * active technique in a flag rather than terminating.
    */
-  void HighFidelityTerrain::OverDrawDecals(const std::int32_t gameTick, const float deltaSeconds)
+  void HighFidelityTerrain::OverDrawDecals(
+    const std::int32_t gameTick,
+    const float deltaSeconds
+  )
   {
     if (!ren_Decals) {
       return;
@@ -984,8 +1002,7 @@ namespace moho
       // and the int seed is the game tick, which is the only type-consistent
       // reading of the two values the caller threads through.
       const boost::shared_ptr<ID3DTextureSheet> texture = decal.GetTexture(0, deltaSeconds, gameTick);
-      shaderVars.decalNormalTexture.GetTexture(
-        boost::static_pointer_cast<CD3DDynamicTextureSheet>(texture));
+      shaderVars.decalNormalTexture.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(texture));
 
       std::int32_t primitiveType = kTriangleListPrimitiveToken;
 
@@ -1053,7 +1070,10 @@ namespace moho
    * This is the high-fidelity twin of MediumFidelityTerrain::DrawTerrainNormal
    * (0x00806F50); the two differ only in which lighting helper they call.
    */
-  void HighFidelityTerrain::DrawTerrainNormal(const std::int32_t gameTick, const float deltaSeconds)
+  void HighFidelityTerrain::DrawTerrainNormal(
+    const std::int32_t gameTick,
+    const float deltaSeconds
+  )
   {
     if (!ren_Terrain) {
       return;
@@ -1069,9 +1089,8 @@ namespace moho
     // rather than a literal, so a map can override the normal pass.
     CD3DEffect* const effect = device->GetCurEffect();
     const fa::string technique = effect->GetStringAnnotation(
-      terrainRes->GetStratumMaterial().mShaderName,
-      fa::string{"normals"},
-      fa::string{"TTerrainNormals"});
+      terrainRes->GetStratumMaterial().mShaderName, fa::string{"normals"}, fa::string{"TTerrainNormals"}
+    );
     device->SelectTechnique(technique.c_str());
 
     LoadTerrainLighting(nullptr);
@@ -1092,7 +1111,6 @@ namespace moho
     // Render dispatches that on the first frame after a map load.
     const std::int32_t normalMapCount = terrainRes->GetNormalMapCount();
 
-
     for (std::int32_t tile = 0; tile < normalMapCount; ++tile) {
       const SNormalMapInfo info = terrainRes->GetNormalMapInfo(tile);
 
@@ -1108,8 +1126,8 @@ namespace moho
       SetShaderVarMem(shaderVars.normalBasisSizeSource, 2U, &info.mWidth);
 
       const std::int32_t querySize = (static_cast<std::int32_t>(info.mWidth) < static_cast<std::int32_t>(info.mHeight))
-                                       ? static_cast<std::int32_t>(info.mHeight)
-                                       : static_cast<std::int32_t>(info.mWidth);
+        ? static_cast<std::int32_t>(info.mHeight)
+        : static_cast<std::int32_t>(info.mWidth);
 
       std::int32_t rangeStart = 0;
       std::uint32_t rangeCount = 0;
@@ -1122,7 +1140,8 @@ namespace moho
         &rangeStart,
         &rangeCount,
         &minValue,
-        &maxValue);
+        &maxValue
+      );
 
       if (rangeStart + static_cast<std::int32_t>(rangeCount) >= kSkirtMaxIndexCount) {
         continue;
@@ -1157,8 +1176,11 @@ namespace moho
    * binding each decal's texture matrix, albedo + specular sheets and alpha.
    */
   void HighFidelityTerrain::DrawDecalPass(
-    const std::int32_t gameTick, const float deltaSeconds,
-    const std::int32_t decalType, const char* const techniqueName)
+    const std::int32_t gameTick,
+    const float deltaSeconds,
+    const std::int32_t decalType,
+    const char* const techniqueName
+  )
   {
     if (!ren_Decals) {
       return;
@@ -1226,9 +1248,11 @@ namespace moho
     if (splatVertexCount > 10000U) {
       D3D_GetDevice()->SelectTechnique("TSplats");
       GetTerrainShaderVars().decalAlbedoTexture.GetTexture(
-        boost::static_pointer_cast<CD3DDynamicTextureSheet>(sHighFidelityTextureBatcher->GetCompositeTexture()));
+        boost::static_pointer_cast<CD3DDynamicTextureSheet>(sHighFidelityTextureBatcher->GetCompositeTexture())
+      );
       DrawSplatChunksPassMajor(
-        D3D_GetDevice(), mDynamicVertexSheet, mDynamicIndexSheet, mSplatVertices.data(), splatVertexCount, 2500);
+        D3D_GetDevice(), mDynamicVertexSheet, mDynamicIndexSheet, mSplatVertices.data(), splatVertexCount, 2500
+      );
       return;
     }
 
@@ -1268,7 +1292,10 @@ namespace moho
    * with the `TDecalsGlow` technique. Gated on `ren_Decals` and
    * `ren_glowingDecals` together.
    */
-  void HighFidelityTerrain::DrawGlowingDecals(const std::int32_t gameTick, const float deltaSeconds)
+  void HighFidelityTerrain::DrawGlowingDecals(
+    const std::int32_t gameTick,
+    const float deltaSeconds
+  )
   {
     if (!ren_Decals || !ren_glowingDecals) {
       return;
@@ -1290,7 +1317,8 @@ namespace moho
       }
 
       shaderVars.decalAlbedoTexture.GetTexture(
-        boost::static_pointer_cast<CD3DDynamicTextureSheet>(decal.GetTexture(0, deltaSeconds, gameTick)));
+        boost::static_pointer_cast<CD3DDynamicTextureSheet>(decal.GetTexture(0, deltaSeconds, gameTick))
+      );
 
       if (shaderVars.decalAlpha.Exists()) {
         shaderVars.decalAlpha.SetFloat(command.alpha);
@@ -1340,7 +1368,8 @@ namespace moho
     const std::int32_t gameTick,
     const float deltaSeconds,
     const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
-    Shadow* const shadowContext)
+    Shadow* const shadowContext
+  )
   {
     if (!ren_Terrain) {
       return false;
@@ -1362,7 +1391,6 @@ namespace moho
 
     StratumMaterial& strata = terrainRes->GetStratumMaterial();
 
-
     D3D_GetDevice()->SelectTechnique(strata.mShaderName.c_str());
 
     // Absent water puts every elevation below the terrain so the shader's
@@ -1375,15 +1403,14 @@ namespace moho
     if (shaderVars.waterElevation.Exists()) {
       shaderVars.waterElevation.SetFloat(
         map.HasWaterBodies() ? WaterBodyTerrainShaderLevel(map)
-                             : (map.mWaterEnabled ? map.mWaterElevation : kNoWaterElevation));
+                             : (map.mWaterEnabled ? map.mWaterElevation : kNoWaterElevation)
+      );
     }
     if (shaderVars.waterElevationDeep.Exists()) {
-      shaderVars.waterElevationDeep.SetFloat(
-        map.mWaterEnabled ? map.mWaterElevationDeep : kNoWaterElevation);
+      shaderVars.waterElevationDeep.SetFloat(map.mWaterEnabled ? map.mWaterElevationDeep : kNoWaterElevation);
     }
     if (shaderVars.waterElevationAbyss.Exists()) {
-      shaderVars.waterElevationAbyss.SetFloat(
-        map.mWaterEnabled ? map.mWaterElevationAbyss : kNoWaterElevation);
+      shaderVars.waterElevationAbyss.SetFloat(map.mWaterEnabled ? map.mWaterElevationAbyss : kNoWaterElevation);
     }
 
     (void)terrainRes->IsInEditMode();
@@ -1417,7 +1444,10 @@ namespace moho
    * medium and high paths defer it to the water pass so it composites over the
    * water surface.
    */
-  void HighFidelityTerrain::DrawWaterAlbedoDecals(const std::int32_t gameTick, const float deltaSeconds)
+  void HighFidelityTerrain::DrawWaterAlbedoDecals(
+    const std::int32_t gameTick,
+    const float deltaSeconds
+  )
   {
     if (!ren_Decals) {
       return;
@@ -1459,7 +1489,8 @@ namespace moho
       }
 
       shaderVars.decalAlbedoTexture.GetTexture(
-        boost::static_pointer_cast<CD3DDynamicTextureSheet>(decal.GetTexture(0, deltaSeconds, gameTick)));
+        boost::static_pointer_cast<CD3DDynamicTextureSheet>(decal.GetTexture(0, deltaSeconds, gameTick))
+      );
 
       if (shaderVars.decalAlpha.Exists()) {
         shaderVars.decalAlpha.SetFloat(command.alpha);
@@ -1500,7 +1531,8 @@ namespace moho
     const std::int32_t tick,
     const float tickLerp,
     const boost::shared_ptr<ID3DRenderTarget> refractionTexture,
-    const boost::shared_ptr<ID3DRenderTarget> reflectionTexture)
+    const boost::shared_ptr<ID3DRenderTarget> reflectionTexture
+  )
   {
     const float inverseRenderWidth = 1.0F / static_cast<float>(mViewportRenderWidth);
     const float inverseRenderHeight = 1.0F / static_cast<float>(mViewportRenderHeight);
@@ -1511,21 +1543,16 @@ namespace moho
     const float viewportScaleOffset[4] = {
       halfWidthScale,
       heightScale * -0.5F,
-      (halfWidthScale + (inverseRenderWidth * static_cast<float>(mViewportOriginX)))
-        + (inverseRenderWidth * 0.5F),
-      (inverseRenderHeight * 0.5F)
-        + ((inverseRenderHeight * static_cast<float>(mViewportOriginY)) + (heightScale * 0.5F))
+      (halfWidthScale + (inverseRenderWidth * static_cast<float>(mViewportOriginX))) + (inverseRenderWidth * 0.5F),
+      (inverseRenderHeight * 0.5F) +
+        ((inverseRenderHeight * static_cast<float>(mViewportOriginY)) + (heightScale * 0.5F))
     };
     SetShaderVarMem(GetWater2ViewportScaleOffsetShaderVar(), 4U, viewportScaleOffset);
 
     auto* const terrainRes = mTerrainResource;
     (void)sHighFidelityWaterSurface->RenderWaterSurface(
-      tick,
-      tickLerp,
-      mCamera,
-      terrainRes->GetWaterShaderProperties(),
-      refractionTexture,
-      reflectionTexture);
+      tick, tickLerp, mCamera, terrainRes->GetWaterShaderProperties(), refractionTexture, reflectionTexture
+    );
 
     DrawWaterAlbedoDecals(tick, tickLerp);
   }
@@ -1537,7 +1564,10 @@ namespace moho
    * Dispatches high-fidelity water utility-mask rendering and then draws the
    * current shoreline sheet using the active camera.
    */
-  void HighFidelityTerrain::DrawWaterLine(const std::int32_t /*gameTick*/, const float /*deltaSeconds*/)
+  void HighFidelityTerrain::DrawWaterLine(
+    const std::int32_t /*gameTick*/,
+    const float /*deltaSeconds*/
+  )
   {
     (void)sHighFidelityWaterSurface->RenderWaterLayerAlphaMask(mCamera);
     DrawShoreline(&mShoreline, mCamera);
@@ -1555,7 +1585,9 @@ namespace moho
    * Each shader-var write is guarded by Exists() as in the binary - the
    * technique does not necessarily declare all three.
    */
-  void HighFidelityTerrain::DrawTerrainDepth(const GeomCamera3& camera)
+  void HighFidelityTerrain::DrawTerrainDepth(
+    const GeomCamera3& camera
+  )
   {
     if (!ren_Terrain) {
       return;
@@ -1639,7 +1671,6 @@ namespace moho
   {
     std::int32_t indexCount = static_cast<std::int32_t>(mSkirtStartIndex);
 
-
     if (indexCount <= 0 || (indexCount % 3) != 0) {
       return;
     }
@@ -1687,7 +1718,9 @@ namespace moho
    * This is the exact twin of `MediumFidelityTerrain::CondDrawTerrainTechnique`
    * (0x00805B50) down to the instruction shape.
    */
-  void HighFidelityTerrain::CondDrawTerrainTechnique(const STerrainTechniqueDrawParams& params)
+  void HighFidelityTerrain::CondDrawTerrainTechnique(
+    const STerrainTechniqueDrawParams& params
+  )
   {
     if (!ren_Terrain) {
       return;
@@ -1784,7 +1817,9 @@ namespace moho
    * for the height field, once for the dirty-rect list - exactly as
    * `HighFidelityTerrain::DrawShoreline` (0x008131D0) reads it in this file.
    */
-  void HighFidelityTerrain::DrawDirtyTerrain(CD3DPrimBatcher* const batcher)
+  void HighFidelityTerrain::DrawDirtyTerrain(
+    CD3DPrimBatcher* const batcher
+  )
   {
     if (!ren_ShowDirtyTerrain) {
       return;
@@ -1844,7 +1879,10 @@ namespace moho
    * Binds shoreline shader state, writes camera + water elevation uniforms,
    * and submits the shoreline vertex-sheet primitive list.
    */
-  void HighFidelityTerrain::DrawShoreline(const Shoreline* const shoreline, const GeomCamera3* const camera)
+  void HighFidelityTerrain::DrawShoreline(
+    const Shoreline* const shoreline,
+    const GeomCamera3* const camera
+  )
   {
     if (!ren_Shoreline || shoreline->mShorelineTris == 0) {
       return;

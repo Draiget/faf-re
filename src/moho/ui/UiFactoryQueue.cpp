@@ -1,6 +1,5 @@
 #include "moho/ui/UiPrivate.h"
 
-
 /**
  * What it does:
  * Language-level default construction of one empty queue row. The binary never
@@ -414,8 +413,7 @@ namespace
     }
     return moho::sCurrentBuildQueue;
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x00837070 (FUN_00837070, sub_837070)

@@ -59,8 +59,8 @@ namespace moho
   struct EntityCategoryIterator
   {
     RRuleGameRules* mRules; // +0x00
-    BVIntSet* mSet;                    // +0x04
-    std::int32_t mCurBit;              // +0x08
+    BVIntSet* mSet;         // +0x04
+    std::int32_t mCurBit;   // +0x08
   };
   static_assert(sizeof(EntityCategoryIterator) == 0x0C, "EntityCategoryIterator size must be 0x0C");
 
@@ -72,7 +72,7 @@ namespace moho
    * universe handle, bitset pointer, and `Max()`-equivalent cursor (`wordEnd * 32`).
    */
   [[nodiscard]] EntityCategoryIterator*
-    BuildEntityCategoryEndIterator(EntityCategoryIterator* out, EntityCategorySet* categorySet) noexcept;
+  BuildEntityCategoryEndIterator(EntityCategoryIterator* out, EntityCategorySet* categorySet) noexcept;
 
   /**
    * Address family:
@@ -203,7 +203,7 @@ namespace moho
    * Wraps one `EntityCategorySet*` in Lua userdata and applies the category metatable.
    */
   LuaPlus::LuaObject*
-    func_NewEntityCategory(LuaPlus::LuaState* state, LuaPlus::LuaObject* out, EntityCategorySet* value);
+  func_NewEntityCategory(LuaPlus::LuaState* state, LuaPlus::LuaObject* out, EntityCategorySet* value);
 
   /**
    * Address: 0x00BC9E60 (FUN_00BC9E60, register_EntityCategory)
@@ -220,11 +220,8 @@ namespace moho
    * What it does:
    * Computes `lhs | rhs` into `out`.
    */
-  EntityCategorySet* func_EntityCategoryAdd(
-    const EntityCategorySet* lhs,
-    EntityCategorySet* out,
-    const EntityCategorySet* rhs
-  );
+  EntityCategorySet*
+  func_EntityCategoryAdd(const EntityCategorySet* lhs, EntityCategorySet* out, const EntityCategorySet* rhs);
 
   /**
    * Address: 0x005556B0 (FUN_005556B0, cfunc_EntityCategory__add)

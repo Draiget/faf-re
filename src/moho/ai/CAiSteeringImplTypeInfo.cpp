@@ -35,12 +35,16 @@ namespace
     return gpg::MakeTypedRef(new CAiSteeringImpl(), gpg::CachedLookup<CAiSteeringImpl>(CAiSteeringImpl::sType));
   }
 
-  void DeleteAiSteeringImplOwned(void* object)
+  void DeleteAiSteeringImplOwned(
+    void* object
+  )
   {
     delete static_cast<CAiSteeringImpl*>(object);
   }
 
-  void DestroyAiSteeringImplInPlace(void* object)
+  void DestroyAiSteeringImplInPlace(
+    void* object
+  )
   {
     auto* const steering = static_cast<CAiSteeringImpl*>(object);
     if (steering) {
@@ -105,7 +109,9 @@ const char* CAiSteeringImplTypeInfo::GetName() const
 /**
  * Address: 0x005D44D0 (FUN_005D44D0, Moho::CAiSteeringImplTypeInfo::AddBase_IAiSteering)
  */
-void CAiSteeringImplTypeInfo::AddBase_IAiSteering(gpg::RType* const typeInfo)
+void CAiSteeringImplTypeInfo::AddBase_IAiSteering(
+  gpg::RType* const typeInfo
+)
 {
   gpg::AddBaseIfPresent(typeInfo, gpg::RTypeOf<IAiSteering>(), 0);
 }
@@ -115,7 +121,9 @@ void CAiSteeringImplTypeInfo::AddBase_IAiSteering(gpg::RType* const typeInfo)
  *
  * Offset 4: CTask is the second base, after IAiSteering at 0.
  */
-void CAiSteeringImplTypeInfo::AddBase_CTask(gpg::RType* const typeInfo)
+void CAiSteeringImplTypeInfo::AddBase_CTask(
+  gpg::RType* const typeInfo
+)
 {
   gpg::AddBaseIfPresent(typeInfo, gpg::RTypeOf<CTask>(), gpg::BaseSubobjectOffset<CAiSteeringImpl, CTask>());
 }
@@ -140,7 +148,9 @@ void CAiSteeringImplTypeInfo::Init()
  * Placement-constructs one `CAiSteeringImpl` in caller storage and returns a
  * typed reflection reference.
  */
-gpg::RRef CAiSteeringImplTypeInfo::CtrRef(void* const objectStorage)
+gpg::RRef CAiSteeringImplTypeInfo::CtrRef(
+  void* const objectStorage
+)
 {
   auto* const steering = gpg::ConstructInStorage<CAiSteeringImpl>(objectStorage);
   return gpg::MakeTypedRef(steering, gpg::CachedLookup<CAiSteeringImpl>(CAiSteeringImpl::sType));
@@ -161,4 +171,7 @@ void moho::register_CAiSteeringImplTypeInfo()
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CAiSteeringImplTypeInfo_8b6b3f, moho::register_CAiSteeringImplTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CAiSteeringImplTypeInfo_8b6b3f,
+  moho::register_CAiSteeringImplTypeInfo
+)

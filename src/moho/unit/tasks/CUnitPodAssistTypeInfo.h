@@ -68,4 +68,3 @@ namespace moho
 
   static_assert(sizeof(CUnitPodAssistTypeInfo) == 0x64, "CUnitPodAssistTypeInfo size must be 0x64");
 } // namespace moho
-

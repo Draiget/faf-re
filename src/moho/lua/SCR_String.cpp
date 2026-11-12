@@ -14,7 +14,8 @@ namespace
 {
   constexpr const char* kXtoiHelpText = "int STR_xtoi(string) - converts a hexidecimal string to an integer";
   constexpr const char* kItoxHelpText = "string STR_itox(int) - converts an integer into a hexidecimal string";
-  constexpr const char* kUtf8LenHelpText = "int STR_Utf8Len(string) - return the number of characters in a UTF-8 string";
+  constexpr const char* kUtf8LenHelpText =
+    "int STR_Utf8Len(string) - return the number of characters in a UTF-8 string";
   constexpr const char* kUtf8SubStringHelpText =
     "string STR_Utf8SubString(string, start, count) - return a substring from start to count";
   constexpr const char* kGetTokensHelpText = "table STR_GetTokens(string,delimiter)";
@@ -24,10 +25,12 @@ namespace
 } // namespace
 
 /**
- * Address: 0x004D3110 (FUN_004D3110, ?SCR_FromString@Moho@@YA?AVLuaObject@LuaPlus@@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@PAVLuaState@3@@Z)
+ * Address: 0x004D3110 (FUN_004D3110,
+ * ?SCR_FromString@Moho@@YA?AVLuaObject@LuaPlus@@ABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@PAVLuaState@3@@Z)
  *
  * IDA signature:
- * LuaPlus::LuaObject *__cdecl Moho::SCR_FromString(LuaPlus::LuaObject *out, std::string const& src, LuaPlus::LuaState *state);
+ * LuaPlus::LuaObject *__cdecl Moho::SCR_FromString(LuaPlus::LuaObject *out, std::string const& src, LuaPlus::LuaState
+ * *state);
  *
  * What it does:
  * Drops the source string into a 256-byte initial MemBufferStream, wraps that
@@ -35,7 +38,10 @@ namespace
  * receives a fully populated LuaObject. Lifetime is managed by RAII.
  */
 LuaPlus::LuaObject* moho::SCR_FromString(
-    LuaPlus::LuaObject* const outObject, const fa::string& source, LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject* const outObject,
+  const fa::string& source,
+  LuaPlus::LuaState* const state
+)
 {
   gpg::MemBufferStream stream{0x100u};
   stream.Write(source.c_str(), source.size());
@@ -51,7 +57,9 @@ LuaPlus::LuaObject* moho::SCR_FromString(
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_STR_xtoiL`.
  */
-int moho::cfunc_STR_xtoi(lua_State* const luaContext)
+int moho::cfunc_STR_xtoi(
+  lua_State* const luaContext
+)
 {
   return cfunc_STR_xtoiL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -62,7 +70,9 @@ int moho::cfunc_STR_xtoi(lua_State* const luaContext)
  * What it does:
  * Converts one hexadecimal string argument to a numeric value.
  */
-int moho::cfunc_STR_xtoiL(LuaPlus::LuaState* const state)
+int moho::cfunc_STR_xtoiL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kXtoiHelpText);
 
@@ -85,7 +95,9 @@ int moho::cfunc_STR_xtoiL(LuaPlus::LuaState* const state)
  */
 moho::CScrLuaInitForm* moho::func_STR_xtoi_LuaFuncDef()
 {
-  static CScrLuaBinder binder(moho::SCR_CoreLuaInitSet(), "STR_xtoi", &moho::cfunc_STR_xtoi, nullptr, "<global>", kXtoiHelpText);
+  static CScrLuaBinder binder(
+    moho::SCR_CoreLuaInitSet(), "STR_xtoi", &moho::cfunc_STR_xtoi, nullptr, "<global>", kXtoiHelpText
+  );
   return &binder;
 }
 
@@ -106,7 +118,9 @@ moho::CScrLuaInitForm* moho::register_STR_xtoi_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_STR_itoxL`.
  */
-int moho::cfunc_STR_itox(lua_State* const luaContext)
+int moho::cfunc_STR_itox(
+  lua_State* const luaContext
+)
 {
   return cfunc_STR_itoxL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -118,7 +132,9 @@ int moho::cfunc_STR_itox(lua_State* const luaContext)
  * Validates one integer-like Lua arg and pushes its uppercase hexadecimal
  * string representation.
  */
-int moho::cfunc_STR_itoxL(LuaPlus::LuaState* const state)
+int moho::cfunc_STR_itoxL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kItoxHelpText);
 
@@ -141,7 +157,9 @@ int moho::cfunc_STR_itoxL(LuaPlus::LuaState* const state)
  */
 moho::CScrLuaInitForm* moho::func_STR_itox_LuaFuncDef()
 {
-  static CScrLuaBinder binder(moho::SCR_CoreLuaInitSet(), "STR_itox", &moho::cfunc_STR_itox, nullptr, "<global>", kItoxHelpText);
+  static CScrLuaBinder binder(
+    moho::SCR_CoreLuaInitSet(), "STR_itox", &moho::cfunc_STR_itox, nullptr, "<global>", kItoxHelpText
+  );
   return &binder;
 }
 
@@ -162,7 +180,9 @@ moho::CScrLuaInitForm* moho::register_STR_itox_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_STR_Utf8LenL`.
  */
-int moho::cfunc_STR_Utf8Len(lua_State* const luaContext)
+int moho::cfunc_STR_Utf8Len(
+  lua_State* const luaContext
+)
 {
   return cfunc_STR_Utf8LenL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -173,7 +193,9 @@ int moho::cfunc_STR_Utf8Len(lua_State* const luaContext)
  * What it does:
  * Returns UTF-8 codepoint count for one input string.
  */
-int moho::cfunc_STR_Utf8LenL(LuaPlus::LuaState* const state)
+int moho::cfunc_STR_Utf8LenL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kUtf8LenHelpText);
 
@@ -196,8 +218,9 @@ int moho::cfunc_STR_Utf8LenL(LuaPlus::LuaState* const state)
  */
 moho::CScrLuaInitForm* moho::func_STR_Utf8Len_LuaFuncDef()
 {
-  static CScrLuaBinder
-    binder(moho::SCR_CoreLuaInitSet(), "STR_Utf8Len", &moho::cfunc_STR_Utf8Len, nullptr, "<global>", kUtf8LenHelpText);
+  static CScrLuaBinder binder(
+    moho::SCR_CoreLuaInitSet(), "STR_Utf8Len", &moho::cfunc_STR_Utf8Len, nullptr, "<global>", kUtf8LenHelpText
+  );
   return &binder;
 }
 
@@ -218,7 +241,9 @@ moho::CScrLuaInitForm* moho::register_STR_Utf8Len_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_STR_Utf8SubStringL`.
  */
-int moho::cfunc_STR_Utf8SubString(lua_State* const luaContext)
+int moho::cfunc_STR_Utf8SubString(
+  lua_State* const luaContext
+)
 {
   return cfunc_STR_Utf8SubStringL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -230,7 +255,9 @@ int moho::cfunc_STR_Utf8SubString(lua_State* const luaContext)
  * Validates `(string, start, count)` Lua args, returns the UTF-8 substring
  * at one-based `start` for `count` codepoints.
  */
-int moho::cfunc_STR_Utf8SubStringL(LuaPlus::LuaState* const state)
+int moho::cfunc_STR_Utf8SubStringL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 3, kUtf8SubStringHelpText);
 
@@ -284,7 +311,9 @@ moho::CScrLuaInitForm* moho::register_STR_Utf8SubString_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_STR_GetTokensL`.
  */
-int moho::cfunc_STR_GetTokens(lua_State* const luaContext)
+int moho::cfunc_STR_GetTokens(
+  lua_State* const luaContext
+)
 {
   return cfunc_STR_GetTokensL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -295,7 +324,9 @@ int moho::cfunc_STR_GetTokens(lua_State* const luaContext)
  * What it does:
  * Splits one input string by delimiter and returns a Lua table of tokens.
  */
-int moho::cfunc_STR_GetTokensL(LuaPlus::LuaState* const state)
+int moho::cfunc_STR_GetTokensL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kGetTokensHelpText);
 
@@ -334,8 +365,9 @@ int moho::cfunc_STR_GetTokensL(LuaPlus::LuaState* const state)
  */
 moho::CScrLuaInitForm* moho::func_STR_GetTokens_LuaFuncDef()
 {
-  static CScrLuaBinder
-    binder(moho::SCR_CoreLuaInitSet(), "STR_GetTokens", &moho::cfunc_STR_GetTokens, nullptr, "<global>", kGetTokensHelpText);
+  static CScrLuaBinder binder(
+    moho::SCR_CoreLuaInitSet(), "STR_GetTokens", &moho::cfunc_STR_GetTokens, nullptr, "<global>", kGetTokensHelpText
+  );
   return &binder;
 }
 
@@ -371,7 +403,9 @@ fa::string moho::GetEngineVersion()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_existsL`.
  */
-int moho::cfunc_exists(lua_State* const luaContext)
+int moho::cfunc_exists(
+  lua_State* const luaContext
+)
 {
   return cfunc_existsL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -382,7 +416,9 @@ int moho::cfunc_exists(lua_State* const luaContext)
  * What it does:
  * Returns Lua boolean indicating whether a resource path exists.
  */
-int moho::cfunc_existsL(LuaPlus::LuaState* const state)
+int moho::cfunc_existsL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kExistsHelpText);
 
@@ -393,8 +429,8 @@ int moho::cfunc_existsL(LuaPlus::LuaState* const state)
   }
 
   const moho::FWaitHandleSet* const waitHandleSet = moho::FILE_GetWaitHandleSet();
-  const bool exists = waitHandleSet != nullptr && waitHandleSet->mHandle != nullptr
-    && waitHandleSet->mHandle->GetFileInfo(sourcePath, nullptr);
+  const bool exists = waitHandleSet != nullptr && waitHandleSet->mHandle != nullptr &&
+    waitHandleSet->mHandle->GetFileInfo(sourcePath, nullptr);
   lua_pushboolean(state->m_state, exists ? 1 : 0);
   (void)lua_gettop(state->m_state);
   return 1;
@@ -408,7 +444,9 @@ int moho::cfunc_existsL(LuaPlus::LuaState* const state)
  */
 moho::CScrLuaInitForm* moho::func_exists_LuaFuncDef()
 {
-  static CScrLuaBinder binder(moho::SCR_CoreLuaInitSet(), "exists", &moho::cfunc_exists, nullptr, "<global>", kExistsHelpText);
+  static CScrLuaBinder binder(
+    moho::SCR_CoreLuaInitSet(), "exists", &moho::cfunc_exists, nullptr, "<global>", kExistsHelpText
+  );
   return &binder;
 }
 
@@ -429,7 +467,9 @@ moho::CScrLuaInitForm* moho::register_exists_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_GetVersionL`.
  */
-int moho::cfunc_GetVersion(lua_State* const luaContext)
+int moho::cfunc_GetVersion(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetVersionL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -440,7 +480,9 @@ int moho::cfunc_GetVersion(lua_State* const luaContext)
  * What it does:
  * Pushes one engine-version string and returns it.
  */
-int moho::cfunc_GetVersionL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetVersionL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 0, kGetVersionHelpText);
 
@@ -458,8 +500,9 @@ int moho::cfunc_GetVersionL(LuaPlus::LuaState* const state)
  */
 moho::CScrLuaInitForm* moho::func_GetVersion_LuaFuncDef()
 {
-  static CScrLuaBinder
-    binder(moho::SCR_CoreLuaInitSet(), "GetVersion", &moho::cfunc_GetVersion, nullptr, "<global>", kGetVersionHelpText);
+  static CScrLuaBinder binder(
+    moho::SCR_CoreLuaInitSet(), "GetVersion", &moho::cfunc_GetVersion, nullptr, "<global>", kGetVersionHelpText
+  );
   return &binder;
 }
 

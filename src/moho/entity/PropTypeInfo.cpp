@@ -77,7 +77,9 @@ namespace moho
   /**
    * Address: 0x006FAD70 (FUN_006FAD70, Moho::PropTypeInfo::AddBase_Entity)
    */
-  void PropTypeInfo::AddBase_Entity(gpg::RType* const typeInfo)
+  void PropTypeInfo::AddBase_Entity(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<Entity>(typeInfo);
   }
@@ -117,8 +119,13 @@ namespace
   PropTypeInfoBootstrap gPropTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_SPropPriorityInfoTypeInfo_e6e11f, moho::register_SPropPriorityInfoTypeInfo)
-GPG_PREREGISTER_INIT(register_PropTypeInfo_e6e11f, moho::register_PropTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_SPropPriorityInfoTypeInfo_e6e11f,
+  moho::register_SPropPriorityInfoTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_PropTypeInfo_e6e11f,
+  moho::register_PropTypeInfo
+)

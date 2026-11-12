@@ -26,7 +26,9 @@ namespace moho
    * `SonarStealth`, `Cloak`) then emits `{center.x, center.z, 0, radius}`.
    */
   bool CounterIntelExtractor::Range(
-    SRangeExtractionPayload* const outRange, const RUnitBlueprint* const unitBlueprint, const Wm3::Vec3f& center
+    SRangeExtractionPayload* const outRange,
+    const RUnitBlueprint* const unitBlueprint,
+    const Wm3::Vec3f& center
   ) const
   {
     const float jammerRange = static_cast<float>(unitBlueprint->Intel.JamRadius.max);
@@ -49,7 +51,9 @@ namespace moho
    * `{interp.x, interp.z, 0, radius}`.
    */
   bool CounterIntelExtractor::Extract(
-    SRangeExtractionPayload* const outRange, const UserEntity* const userEntity, const float interpolationAlpha
+    SRangeExtractionPayload* const outRange,
+    const UserEntity* const userEntity,
+    const float interpolationAlpha
   ) const
   {
     float maxCounterIntelRange = 0.0f;

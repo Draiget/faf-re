@@ -7,8 +7,38 @@
 
 extern "C" int FafRunAllocatorBoundsCase(const char* mode);
 
-TEST(AllocatorBounds, Normal) { EXPECT_EQ(FafRunAllocatorBoundsCase("normal"), 0); }
-TEST(AllocatorBounds, Low) { EXPECT_EQ(FafRunAllocatorBoundsCase("low"), 0); }
-TEST(AllocatorBounds, High) { EXPECT_EQ(FafRunAllocatorBoundsCase("high"), 0); }
-TEST(AllocatorBounds, Map) { EXPECT_EQ(FafRunAllocatorBoundsCase("map"), 0); }
-TEST(AllocatorBounds, Separate) { EXPECT_EQ(FafRunAllocatorBoundsCase("separate"), 0); }
+TEST(
+  AllocatorBounds,
+  Normal
+)
+{
+  EXPECT_EQ(FafRunAllocatorBoundsCase("normal"), 0);
+}
+TEST(
+  AllocatorBounds,
+  Low
+)
+{
+  EXPECT_EQ(FafRunAllocatorBoundsCase("low"), 0);
+}
+TEST(
+  AllocatorBounds,
+  High
+)
+{
+  EXPECT_EQ(FafRunAllocatorBoundsCase("high"), 0);
+}
+TEST(
+  AllocatorBounds,
+  Map
+)
+{
+  EXPECT_EQ(FafRunAllocatorBoundsCase("map"), 0);
+}
+TEST(
+  AllocatorBounds,
+  Separate
+)
+{
+  EXPECT_EQ(FafRunAllocatorBoundsCase("separate"), 0);
+}

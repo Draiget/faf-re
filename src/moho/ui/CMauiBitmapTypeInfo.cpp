@@ -22,7 +22,10 @@ namespace
 
   struct CMauiBitmapTypeInfoBootstrap
   {
-    CMauiBitmapTypeInfoBootstrap() { moho::register_CMauiBitmapTypeInfoStartup(); }
+    CMauiBitmapTypeInfoBootstrap()
+    {
+      moho::register_CMauiBitmapTypeInfoStartup();
+    }
   };
   CMauiBitmapTypeInfoBootstrap gCMauiBitmapTypeInfoBootstrap;
 
@@ -37,7 +40,9 @@ namespace
    * `RType::IsDerivedFrom` cannot walk from it to CScriptObject and every
    * reflected reference built from a CMauiBitmap fails its upcast.
    */
-  void AddCMauiControlBase(gpg::RType& typeInfo)
+  void AddCMauiControlBase(
+    gpg::RType& typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CMauiControl>(&typeInfo);
   }
@@ -98,4 +103,7 @@ void moho::register_CMauiBitmapTypeInfoStartup()
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every
 // consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(CMauiBitmapTypeInfoStartupPreregister, moho::register_CMauiBitmapTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  CMauiBitmapTypeInfoStartupPreregister,
+  moho::register_CMauiBitmapTypeInfoStartup
+)

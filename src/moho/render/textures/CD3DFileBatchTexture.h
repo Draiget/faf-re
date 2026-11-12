@@ -78,7 +78,7 @@ namespace moho
     static void OnClose(CD3DFileBatchTexture* texture);
 
   public:
-    fa::string mFilename; // +0x28
+    fa::string mFilename;    // +0x28
     bool mCanDelete = false; // +0x44
   };
 
@@ -98,7 +98,13 @@ namespace moho
    */
   void register_sFileTextures();
 
-  static_assert(offsetof(CD3DFileBatchTexture, mFilename) == 0x28, "CD3DFileBatchTexture::mFilename offset must be 0x28");
-  static_assert(offsetof(CD3DFileBatchTexture, mCanDelete) == 0x44, "CD3DFileBatchTexture::mCanDelete offset must be 0x44");
+  static_assert(
+    offsetof(CD3DFileBatchTexture, mFilename) == 0x28,
+    "CD3DFileBatchTexture::mFilename offset must be 0x28"
+  );
+  static_assert(
+    offsetof(CD3DFileBatchTexture, mCanDelete) == 0x44,
+    "CD3DFileBatchTexture::mCanDelete offset must be 0x44"
+  );
   static_assert(sizeof(CD3DFileBatchTexture) == 0x48, "CD3DFileBatchTexture size must be 0x48");
 } // namespace moho

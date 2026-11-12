@@ -29,7 +29,6 @@ namespace moho
 
   static_assert(sizeof(ESiloTypeTypeInfo) == 0x78, "ESiloTypeTypeInfo size must be 0x78");
 
-
   /**
    * Address: 0x0050A270 (FUN_0050A270, preregister_ESiloTypeTypeInfo)
    *

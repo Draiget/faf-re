@@ -214,7 +214,7 @@ namespace moho
   Unit* SCR_FromLua_Unit(const LuaPlus::LuaObject& object);
 
   /**
-    * Alias of FUN_00593970 (non-canonical helper lane).
+   * Alias of FUN_00593970 (non-canonical helper lane).
    *
    * What it does:
    * Converts one Lua object to `Unit*` without throwing conversion errors:
@@ -273,7 +273,8 @@ namespace moho
    * runtime type.
    */
   [[nodiscard]]
-  CBoneEntityManipulator* SCR_FromLua_CBoneEntityManipulator(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state);
+  CBoneEntityManipulator*
+  SCR_FromLua_CBoneEntityManipulator(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state);
 
   /**
    * Address: 0x006371D0 (FUN_006371D0, Moho::SCR_FromLua_CBuilderArmManipulator)
@@ -284,7 +285,8 @@ namespace moho
    * runtime type.
    */
   [[nodiscard]]
-  CBuilderArmManipulator* SCR_FromLua_CBuilderArmManipulator(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state);
+  CBuilderArmManipulator*
+  SCR_FromLua_CBuilderArmManipulator(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state);
 
   /**
    * Address: 0x00638AF0 (FUN_00638AF0, Moho::SCR_FromLua_CCollisionManipulator)
@@ -852,7 +854,7 @@ namespace moho
   Prop* SCR_FromLua_Prop(const LuaPlus::LuaObject& object, LuaPlus::LuaState* state);
 
   /**
-    * Alias of FUN_004C9030 (non-canonical helper lane).
+   * Alias of FUN_004C9030 (non-canonical helper lane).
    *
    * What it does:
    * Builds an RTTI-aware `gpg::RRef` for a CScriptObject pointer.

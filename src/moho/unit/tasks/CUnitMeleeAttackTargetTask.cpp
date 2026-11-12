@@ -47,9 +47,9 @@ namespace moho
 namespace
 {
 
-
-
-  [[nodiscard]] std::int16_t RoundToCellCoord(const float value) noexcept
+  [[nodiscard]] std::int16_t RoundToCellCoord(
+    const float value
+  ) noexcept
   {
     return static_cast<std::int16_t>(std::lrintf(value));
   }
@@ -81,10 +81,13 @@ namespace
     return probe;
   }
 
-  [[nodiscard]] bool HasPositionChanged(const moho::Entity& entity) noexcept
+  [[nodiscard]] bool HasPositionChanged(
+    const moho::Entity& entity
+  ) noexcept
   {
-    return entity.mVarDat.mCurTransform.pos_.x != entity.mVarDat.mLastTransform.pos_.x || entity.mVarDat.mCurTransform.pos_.y != entity.mVarDat.mLastTransform.pos_.y
-      || entity.mVarDat.mCurTransform.pos_.z != entity.mVarDat.mLastTransform.pos_.z;
+    return entity.mVarDat.mCurTransform.pos_.x != entity.mVarDat.mLastTransform.pos_.x ||
+      entity.mVarDat.mCurTransform.pos_.y != entity.mVarDat.mLastTransform.pos_.y ||
+      entity.mVarDat.mCurTransform.pos_.z != entity.mVarDat.mLastTransform.pos_.z;
   }
 
   constexpr const char* kOnAssignedFocusEntityScript = "OnAssignedFocusEntity";
@@ -92,7 +95,9 @@ namespace
   constexpr const char* kMeleeTaskSourcePath = "c:\\work\\rts\\main\\code\\src\\sim\\AiUnitMeleeAttack.cpp";
   constexpr int kMeleeTaskAssertLine = 747;
 
-  [[nodiscard]] moho::SOCellPos ComputeDestinationCellFromUnitGoalOrPosition(const moho::Unit& targetUnit) noexcept
+  [[nodiscard]] moho::SOCellPos ComputeDestinationCellFromUnitGoalOrPosition(
+    const moho::Unit& targetUnit
+  ) noexcept
   {
     const moho::SFootprint& footprint = targetUnit.GetFootprint();
 
@@ -102,31 +107,31 @@ namespace
     }
 
     moho::SOCellPos destination{};
-    destination.x =
-      static_cast<std::int16_t>(static_cast<int>(std::lrintf(center.x - (static_cast<float>(footprint.mSizeX) * 0.5f))));
-    destination.z =
-      static_cast<std::int16_t>(static_cast<int>(std::lrintf(center.z - (static_cast<float>(footprint.mSizeZ) * 0.5f))));
+    destination.x = static_cast<std::int16_t>(
+      static_cast<int>(std::lrintf(center.x - (static_cast<float>(footprint.mSizeX) * 0.5f)))
+    );
+    destination.z = static_cast<std::int16_t>(
+      static_cast<int>(std::lrintf(center.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)))
+    );
     return destination;
   }
 
-  [[nodiscard]] moho::SOCellPos
-  ComputeMeleeMidpointDestinationCell(const moho::Unit& ownerUnit, const moho::Unit& targetUnit) noexcept
+  [[nodiscard]] moho::SOCellPos ComputeMeleeMidpointDestinationCell(
+    const moho::Unit& ownerUnit,
+    const moho::Unit& targetUnit
+  ) noexcept
   {
     const Wm3::Vector3f ownerPos = ownerUnit.GetPosition();
     const Wm3::Vector3f targetPos = targetUnit.GetPosition();
     const moho::SFootprint& ownerFootprint = ownerUnit.GetFootprint();
 
     moho::SOCellPos destination{};
-    destination.x = static_cast<std::int16_t>(
-      static_cast<int>(std::lrintf(
-        ((targetPos.x + ownerPos.x) * 0.5f) - (static_cast<float>(ownerFootprint.mSizeX) * 0.5f)
-      ))
-    );
-    destination.z = static_cast<std::int16_t>(
-      static_cast<int>(std::lrintf(
-        ((targetPos.z + ownerPos.z) * 0.5f) - (static_cast<float>(ownerFootprint.mSizeZ) * 0.5f)
-      ))
-    );
+    destination.x = static_cast<std::int16_t>(static_cast<int>(
+      std::lrintf(((targetPos.x + ownerPos.x) * 0.5f) - (static_cast<float>(ownerFootprint.mSizeX) * 0.5f))
+    ));
+    destination.z = static_cast<std::int16_t>(static_cast<int>(
+      std::lrintf(((targetPos.z + ownerPos.z) * 0.5f) - (static_cast<float>(ownerFootprint.mSizeZ) * 0.5f))
+    ));
     return destination;
   }
 
@@ -142,9 +147,8 @@ namespace
 
     if (targetUnit.IsMobile()) {
       const moho::SFootprint& targetFootprint = targetUnit.GetFootprint();
-      const std::uint8_t maxSide = (targetFootprint.mSizeX > targetFootprint.mSizeZ)
-        ? targetFootprint.mSizeX
-        : targetFootprint.mSizeZ;
+      const std::uint8_t maxSide =
+        (targetFootprint.mSizeX > targetFootprint.mSizeZ) ? targetFootprint.mSizeX : targetFootprint.mSizeZ;
       if (maxSide > 1u) {
         return ownerUnit.HasMeleeSpaceAroundLargeTarget(&targetUnit, inOutDestination, 1);
       }
@@ -153,7 +157,10 @@ namespace
     return ownerUnit.HasMeleeSpaceAroundSmallTarget(&targetUnit, inOutDestination);
   }
 
-  [[nodiscard]] bool IsAtFootprintOriginCell(const moho::Unit& unit, const Wm3::Vector3f& worldPos) noexcept
+  [[nodiscard]] bool IsAtFootprintOriginCell(
+    const moho::Unit& unit,
+    const Wm3::Vector3f& worldPos
+  ) noexcept
   {
     const moho::SFootprint& footprint = unit.GetFootprint();
     const Wm3::Vector3f unitPos = unit.GetPosition();
@@ -163,11 +170,14 @@ namespace
     const int targetCellX = static_cast<int>(std::lrintf(worldPos.x - (static_cast<float>(footprint.mSizeX) * 0.5f)));
     const int targetCellZ = static_cast<int>(std::lrintf(worldPos.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)));
 
-    return static_cast<std::uint16_t>(unitCellX) == static_cast<std::uint16_t>(targetCellX)
-      && static_cast<std::uint16_t>(unitCellZ) == static_cast<std::uint16_t>(targetCellZ);
+    return static_cast<std::uint16_t>(unitCellX) == static_cast<std::uint16_t>(targetCellX) &&
+      static_cast<std::uint16_t>(unitCellZ) == static_cast<std::uint16_t>(targetCellZ);
   }
 
-  void SetUnitFocusEntity(moho::Unit& unit, moho::Entity* const focusEntity)
+  void SetUnitFocusEntity(
+    moho::Unit& unit,
+    moho::Entity* const focusEntity
+  )
   {
     unit.FocusEntityRef.ResetFromObject(focusEntity);
     if (unit.FocusEntityRef.GetObjectPtr() != nullptr) {
@@ -176,7 +186,9 @@ namespace
     unit.NeedSyncGameData = true;
   }
 
-  [[nodiscard]] moho::CUnitCommand* GetCurrentCommand(moho::Unit* const unit) noexcept
+  [[nodiscard]] moho::CUnitCommand* GetCurrentCommand(
+    moho::Unit* const unit
+  ) noexcept
   {
     if (unit == nullptr || unit->CommandQueue == nullptr) {
       return nullptr;
@@ -221,7 +233,6 @@ namespace moho
     : CAttackTargetTask()
   {
 
-
     mDispatchTask = nullptr;
     mCommand = nullptr;
     mFormation = nullptr;
@@ -256,7 +267,6 @@ namespace moho
   )
     : CAttackTargetTask(dispatchTask)
   {
-
 
     mDispatchTask = dispatchTask;
     mCommand = nullptr;
@@ -309,14 +319,11 @@ namespace moho
         Listener<EAiAttackerEvent>::ListUnlink();
       }
 
-      mHasMobileTarget =
-        mTarget.targetEntity.GetObjectPtr() != nullptr && mTarget.targetIsMobile;
+      mHasMobileTarget = mTarget.targetEntity.GetObjectPtr() != nullptr && mTarget.targetIsMobile;
 
       UpdatePosition();
 
-      if (
-        unit->IsUnitState(UNITSTATE_Immobile) && unit->GetBlueprint()->AI.NeedUnpack && attacker != nullptr
-      ) {
+      if (unit->IsUnitState(UNITSTATE_Immobile) && unit->GetBlueprint()->AI.NeedUnpack && attacker != nullptr) {
         CAiTarget desiredTarget{};
         desiredTarget.targetType = EAiTargetType::AITARGET_None;
         desiredTarget.targetEntity.ClearLinkState();
@@ -431,7 +438,9 @@ namespace moho
    * Builds one-cell navigator goal bounds from `destinationCell`, pushes the
    * goal to the owner navigator, and caches the destination cell lane.
    */
-  void CUnitMeleeAttackTargetTask::SetDestinationCellGoal(const SOCellPos& destinationCell)
+  void CUnitMeleeAttackTargetTask::SetDestinationCellGoal(
+    const SOCellPos& destinationCell
+  )
   {
     IAiNavigator* const navigator = static_cast<moho::CCommandTask*>(this)->mUnit->AiNavigator;
     if (navigator == nullptr) {
@@ -482,7 +491,9 @@ namespace moho
    * Converts one world-space destination to footprint-origin cell
    * coordinates, then routes through `SetDestinationCellGoal`.
    */
-  void CUnitMeleeAttackTargetTask::SetDestinationGoalFromWorldPosition(const Wm3::Vector3f& worldPosition)
+  void CUnitMeleeAttackTargetTask::SetDestinationGoalFromWorldPosition(
+    const Wm3::Vector3f& worldPosition
+  )
   {
     const SFootprint& footprint = static_cast<moho::CCommandTask*>(this)->mUnit->GetFootprint();
 
@@ -499,7 +510,9 @@ namespace moho
    * Sets navigator destination-unit follow lane and refreshes the cached
    * destination cell from target footprint-centered world position.
    */
-  void CUnitMeleeAttackTargetTask::SetDestUnit(Entity* const destinationEntity)
+  void CUnitMeleeAttackTargetTask::SetDestUnit(
+    Entity* const destinationEntity
+  )
   {
     IAiNavigator* const navigator = static_cast<moho::CCommandTask*>(this)->mUnit->AiNavigator;
     if (navigator == nullptr) {
@@ -537,7 +550,9 @@ namespace moho
       mFormation->SetCoords(formationCenter);
 
       SOCellPos adjustedPosition{};
-      mFormation->GetAdjustedFormationPosition(&adjustedPosition, static_cast<moho::CCommandTask*>(this)->mUnit, nullptr);
+      mFormation->GetAdjustedFormationPosition(
+        &adjustedPosition, static_cast<moho::CCommandTask*>(this)->mUnit, nullptr
+      );
       SetDestinationCellGoal(adjustedPosition);
       return;
     }
@@ -611,7 +626,8 @@ namespace moho
       return false;
     }
 
-    Unit* const formationLead = static_cast<moho::CCommandTask*>(this)->mUnit->mInfoCache.mFormationLeadRef.GetObjectPtr();
+    Unit* const formationLead =
+      static_cast<moho::CCommandTask*>(this)->mUnit->mInfoCache.mFormationLeadRef.GetObjectPtr();
     if (formationLead == nullptr) {
       return false;
     }
@@ -667,9 +683,8 @@ namespace moho
     const SFootprint& ownerFootprint = ownerUnit->GetFootprint();
     const SFootprint& targetFootprint = targetEntity->GetFootprint();
 
-    const std::uint8_t targetMaxSide = (targetFootprint.mSizeX > targetFootprint.mSizeZ)
-      ? targetFootprint.mSizeX
-      : targetFootprint.mSizeZ;
+    const std::uint8_t targetMaxSide =
+      (targetFootprint.mSizeX > targetFootprint.mSizeZ) ? targetFootprint.mSizeX : targetFootprint.mSizeZ;
     if (targetUnit->IsMobile() && targetMaxSide > 1u) {
       if (targetEntity->CollisionExtents == nullptr) {
         return false;
@@ -687,8 +702,8 @@ namespace moho
       const Wm3::Box3f innerProbe = BuildAxisAlignedCollisionProbe(destinationCenter, halfSizeX, halfSizeZ);
 
       CollisionResult collisionResult{};
-      return targetEntity->CollisionExtents->CollideBox(&outerProbe, &collisionResult)
-        && !targetEntity->CollisionExtents->CollideBox(&innerProbe, &collisionResult);
+      return targetEntity->CollisionExtents->CollideBox(&outerProbe, &collisionResult) &&
+        !targetEntity->CollisionExtents->CollideBox(&innerProbe, &collisionResult);
     }
 
     SCoordsVec2 targetCenterXZ{};
@@ -706,10 +721,8 @@ namespace moho
     COORDS_ToGridRect(&targetRect, targetCenterXZ, targetFootprint);
 
     SCoordsVec2 destinationCenterXZ{};
-    destinationCenterXZ.x =
-      static_cast<float>(mDestination.x) + (static_cast<float>(ownerFootprint.mSizeX) * 0.5f);
-    destinationCenterXZ.z =
-      static_cast<float>(mDestination.z) + (static_cast<float>(ownerFootprint.mSizeZ) * 0.5f);
+    destinationCenterXZ.x = static_cast<float>(mDestination.x) + (static_cast<float>(ownerFootprint.mSizeX) * 0.5f);
+    destinationCenterXZ.z = static_cast<float>(mDestination.z) + (static_cast<float>(ownerFootprint.mSizeZ) * 0.5f);
 
     gpg::Rect2i destinationRect{};
     COORDS_ToGridRect(&destinationRect, destinationCenterXZ, ownerFootprint);
@@ -723,7 +736,9 @@ namespace moho
    * Applies a new desired attacker target when it differs by entity;
    * otherwise resets attacker reporting state.
    */
-  bool CUnitMeleeAttackTargetTask::UpdateDesiredTarget(CAiTarget* const desiredTarget)
+  bool CUnitMeleeAttackTargetTask::UpdateDesiredTarget(
+    CAiTarget* const desiredTarget
+  )
   {
     CAiAttackerImpl* const attacker = static_cast<moho::CCommandTask*>(this)->mUnit->AiAttacker;
     if (attacker == nullptr) {
@@ -736,8 +751,8 @@ namespace moho
     // attack-ground order, say -- look identical, so the attacker never
     // receives the new target and nothing ever fires.
     CAiTarget* const currentDesiredTarget = attacker->GetDesiredTarget();
-    const bool sameEntityTarget = desiredTarget != nullptr && currentDesiredTarget != nullptr
-                               && desiredTarget->HasSameTargetEntity(*currentDesiredTarget);
+    const bool sameEntityTarget = desiredTarget != nullptr && currentDesiredTarget != nullptr &&
+      desiredTarget->HasSameTargetEntity(*currentDesiredTarget);
     if (!sameEntityTarget) {
       attacker->SetDesiredTarget(desiredTarget);
       return true;
@@ -828,7 +843,9 @@ namespace moho
    * Syncs command-target payload on event `0` and advances task state from
    * waiting to starting.
    */
-  void CUnitMeleeAttackTargetTask::HandleCommandEvent(const ECommandEvent event)
+  void CUnitMeleeAttackTargetTask::HandleCommandEvent(
+    const ECommandEvent event
+  )
   {
     if (static_cast<std::int32_t>(event) != 0) {
       return;
@@ -848,7 +865,9 @@ namespace moho
    * target refresh/replant when new melee contact room opens around focus
    * target.
    */
-  void CUnitMeleeAttackTargetTask::HandleAiAttackerEvent(const EAiAttackerEvent event)
+  void CUnitMeleeAttackTargetTask::HandleAiAttackerEvent(
+    const EAiAttackerEvent event
+  )
   {
     CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     Unit* const unit = commandTask->mUnit;
@@ -860,56 +879,56 @@ namespace moho
     }
 
     switch (static_cast<int>(event)) {
-      case 0:
-      case 2:
-        return;
+    case 0:
+    case 2:
+      return;
 
-      case 1:
-        commandTask->mTaskState = TASKSTATE_5;
-        break;
+    case 1:
+      commandTask->mTaskState = TASKSTATE_5;
+      break;
 
-      case 8:
-        *commandTask->mDispatchResult = static_cast<EAiResult>(1);
-        commandTask->mTaskState = TASKSTATE_6;
-        break;
+    case 8:
+      *commandTask->mDispatchResult = static_cast<EAiResult>(1);
+      commandTask->mTaskState = TASKSTATE_6;
+      break;
 
-      case 9: {
-        const WeakPtr<Entity>& focusWeak = unit->FocusEntityRef;
-        if (focusWeak.GetObjectPtr() != nullptr) {
-          Entity* const focusEntity = unit->GetFocusEntity();
-          Unit* const targetUnit = focusEntity != nullptr ? focusEntity->IsUnit() : nullptr;
-          if (targetUnit != nullptr) {
-            const SFootprint& targetFootprint = focusEntity->GetFootprint();
-            SOCellPos candidateDestination = targetFootprint.ToCellPos(targetUnit->AiNavigator->GetGoalPos());
+    case 9: {
+      const WeakPtr<Entity>& focusWeak = unit->FocusEntityRef;
+      if (focusWeak.GetObjectPtr() != nullptr) {
+        Entity* const focusEntity = unit->GetFocusEntity();
+        Unit* const targetUnit = focusEntity != nullptr ? focusEntity->IsUnit() : nullptr;
+        if (targetUnit != nullptr) {
+          const SFootprint& targetFootprint = focusEntity->GetFootprint();
+          SOCellPos candidateDestination = targetFootprint.ToCellPos(targetUnit->AiNavigator->GetGoalPos());
 
-            if (QueryMeleeSpaceForTarget(*unit, *targetUnit, &candidateDestination)) {
-              mDestination = candidateDestination;
-              FreeSpot();
+          if (QueryMeleeSpaceForTarget(*unit, *targetUnit, &candidateDestination)) {
+            mDestination = candidateDestination;
+            FreeSpot();
 
-              CAiTarget updatedTarget{};
-              (void)updatedTarget.UpdateTarget(unit->GetFocusEntity());
-              mTarget = updatedTarget;
+            CAiTarget updatedTarget{};
+            (void)updatedTarget.UpdateTarget(unit->GetFocusEntity());
+            mTarget = updatedTarget;
 
-              const Wm3::Vector3f reserveCenter =
-                COORDS_ToWorldPos(unit->SimulationRef->mMapData, mDestination, unit->GetFootprint());
-              const SCoordsVec2 reserveCenterXZ{reserveCenter.x, reserveCenter.z};
-              gpg::Rect2i reserveRect{};
-              COORDS_ToGridRect(&reserveRect, reserveCenterXZ, unit->GetFootprint());
-              unit->ReserveOgridRect(reserveRect);
-              mPlanted = true;
+            const Wm3::Vector3f reserveCenter =
+              COORDS_ToWorldPos(unit->SimulationRef->mMapData, mDestination, unit->GetFootprint());
+            const SCoordsVec2 reserveCenterXZ{reserveCenter.x, reserveCenter.z};
+            gpg::Rect2i reserveRect{};
+            COORDS_ToGridRect(&reserveRect, reserveCenterXZ, unit->GetFootprint());
+            unit->ReserveOgridRect(reserveRect);
+            mPlanted = true;
 
-              RefreshMeleeNavigationGoal();
-              commandTask->mTaskState = TASKSTATE_Complete;
-              commandTask->TaskResume(false, 0);
-            }
+            RefreshMeleeNavigationGoal();
+            commandTask->mTaskState = TASKSTATE_Complete;
+            commandTask->TaskResume(false, 0);
           }
         }
-        break;
       }
+      break;
+    }
 
-      default:
-        commandTask->mTaskState = TASKSTATE_Waiting;
-        break;
+    default:
+      commandTask->mTaskState = TASKSTATE_Waiting;
+      break;
     }
 
     WakeOwnerThreadForImmediateTick(commandTask);
@@ -922,7 +941,9 @@ namespace moho
    * Scans nearby enemy units, scores melee candidates, and selects one target
    * plus destination cell for waiting-state engagement logic.
    */
-  Unit* CUnitMeleeAttackTargetTask::SelectWaitingMeleeTarget(bool* const outHasImmediateMeleeSpace)
+  Unit* CUnitMeleeAttackTargetTask::SelectWaitingMeleeTarget(
+    bool* const outHasImmediateMeleeSpace
+  )
   {
     if (outHasImmediateMeleeSpace != nullptr) {
       *outHasImmediateMeleeSpace = false;
@@ -946,7 +967,9 @@ namespace moho
 
     // 0x00616437: `func_EntitiesAroundPoint`, whose own range test is `r*r > d*d` (0x007224B5).
     gpg::core::FastVectorN<CollisionResult, 10> nearbyEntities{};
-    EntitiesAroundPoint(nearbyEntities, guardScanRadius, *ownerUnit->SimulationRef->mOGrid, EEntityType::ENTITYTYPE_Unit, ownerPosition);
+    EntitiesAroundPoint(
+      nearbyEntities, guardScanRadius, *ownerUnit->SimulationRef->mOGrid, EEntityType::ENTITYTYPE_Unit, ownerPosition
+    );
 
     EntitySetTemplate<Entity> candidateSet{};
     for (const CollisionResult& nearby : nearbyEntities) {
@@ -1009,8 +1032,8 @@ namespace moho
       if (weightedScore < bestReachableScore) {
         SOCellPos candidateDestination{};
         if (
-          candidateUnit->mIsMelee && candidateUnit->IsUnitState(UNITSTATE_Attacking)
-          && candidateUnit->GetFocusEntity() == nullptr
+          candidateUnit->mIsMelee && candidateUnit->IsUnitState(UNITSTATE_Attacking) &&
+          candidateUnit->GetFocusEntity() == nullptr
         ) {
           candidateDestination = ComputeMeleeMidpointDestinationCell(*ownerUnit, *candidateUnit);
         } else {
@@ -1083,168 +1106,168 @@ namespace moho
     }
 
     switch (commandTask->mTaskState) {
-      case TASKSTATE_Preparing: {
-        CUnitCommand* const command = mCommand;
-        if (command == nullptr) {
-          return -1;
-        }
-        if (command->IsCoordinating() && !command->IsDone()) {
-          return 10;
-        }
-
-        commandTask->mTaskState = TASKSTATE_Starting;
-        return 0;
+    case TASKSTATE_Preparing: {
+      CUnitCommand* const command = mCommand;
+      if (command == nullptr) {
+        return -1;
+      }
+      if (command->IsCoordinating() && !command->IsDone()) {
+        return 10;
       }
 
-      case TASKSTATE_Waiting: {
-        if (mPlanted) {
-          unit->FreeOgridRect();
-          mPlanted = false;
-        }
+      commandTask->mTaskState = TASKSTATE_Starting;
+      return 0;
+    }
 
-        bool hasImmediateMeleeSpace = false;
-        Unit* const selectedTarget = SelectWaitingMeleeTarget(&hasImmediateMeleeSpace);
-        if (selectedTarget == nullptr) {
-          commandTask->mTaskState = TASKSTATE_6;
-          return 1;
-        }
+    case TASKSTATE_Waiting: {
+      if (mPlanted) {
+        unit->FreeOgridRect();
+        mPlanted = false;
+      }
 
-        (void)mTarget.UpdateTarget(static_cast<Entity*>(selectedTarget));
-        if (!hasImmediateMeleeSpace) {
-          RefreshMeleeNavigationGoal();
-          SetUnitFocusEntity(*unit, nullptr);
-          commandTask->mTaskState = TASKSTATE_Processing;
-          return 5;
-        }
-
-        const Wm3::Vector3f reserveCenter =
-          COORDS_ToWorldPos(unit->SimulationRef->mMapData, mDestination, unit->GetFootprint());
-        const SCoordsVec2 reserveCenterXZ{reserveCenter.x, reserveCenter.z};
-        gpg::Rect2i reserveRect{};
-        COORDS_ToGridRect(&reserveRect, reserveCenterXZ, unit->GetFootprint());
-        unit->ReserveOgridRect(reserveRect);
-        mPlanted = true;
-
-        RefreshMeleeNavigationGoal();
-        SetUnitFocusEntity(*unit, static_cast<Entity*>(selectedTarget));
-        commandTask->mTaskState = TASKSTATE_Complete;
-
-        if (selectedTarget->IsUnitState(UNITSTATE_Attacking) && selectedTarget->GetFocusEntity() == nullptr) {
-          if (CAiAttackerImpl* const targetAttacker = selectedTarget->AiAttacker; targetAttacker != nullptr) {
-            targetAttacker->ForceEngage(static_cast<Entity*>(unit));
-          }
-        }
-
+      bool hasImmediateMeleeSpace = false;
+      Unit* const selectedTarget = SelectWaitingMeleeTarget(&hasImmediateMeleeSpace);
+      if (selectedTarget == nullptr) {
+        commandTask->mTaskState = TASKSTATE_6;
         return 1;
       }
 
-      case TASKSTATE_Starting:
-        if (CAiAttackerImpl* const attacker = unit->AiAttacker; attacker != nullptr) {
-          attacker->AddListener(this);
-        }
+      (void)mTarget.UpdateTarget(static_cast<Entity*>(selectedTarget));
+      if (!hasImmediateMeleeSpace) {
         RefreshMeleeNavigationGoal();
+        SetUnitFocusEntity(*unit, nullptr);
         commandTask->mTaskState = TASKSTATE_Processing;
-        return 1;
+        return 5;
+      }
 
-      case TASKSTATE_Processing: {
-        if (mFormation != nullptr) {
-          Unit* const formationLead = unit->mInfoCache.mFormationLeadRef.GetObjectPtr();
-          if (formationLead != unit && mIgnoreFormationUpdates) {
-            if (HasFormationLeadDesiredTarget()) {
-              mFormation = nullptr;
-              mIgnoreFormationUpdates = false;
-              if (navigator != nullptr) {
-                navigator->IgnoreFormation(true);
-              }
-              commandTask->mTaskState = TASKSTATE_Waiting;
-              return 1;
+      const Wm3::Vector3f reserveCenter =
+        COORDS_ToWorldPos(unit->SimulationRef->mMapData, mDestination, unit->GetFootprint());
+      const SCoordsVec2 reserveCenterXZ{reserveCenter.x, reserveCenter.z};
+      gpg::Rect2i reserveRect{};
+      COORDS_ToGridRect(&reserveRect, reserveCenterXZ, unit->GetFootprint());
+      unit->ReserveOgridRect(reserveRect);
+      mPlanted = true;
+
+      RefreshMeleeNavigationGoal();
+      SetUnitFocusEntity(*unit, static_cast<Entity*>(selectedTarget));
+      commandTask->mTaskState = TASKSTATE_Complete;
+
+      if (selectedTarget->IsUnitState(UNITSTATE_Attacking) && selectedTarget->GetFocusEntity() == nullptr) {
+        if (CAiAttackerImpl* const targetAttacker = selectedTarget->AiAttacker; targetAttacker != nullptr) {
+          targetAttacker->ForceEngage(static_cast<Entity*>(unit));
+        }
+      }
+
+      return 1;
+    }
+
+    case TASKSTATE_Starting:
+      if (CAiAttackerImpl* const attacker = unit->AiAttacker; attacker != nullptr) {
+        attacker->AddListener(this);
+      }
+      RefreshMeleeNavigationGoal();
+      commandTask->mTaskState = TASKSTATE_Processing;
+      return 1;
+
+    case TASKSTATE_Processing: {
+      if (mFormation != nullptr) {
+        Unit* const formationLead = unit->mInfoCache.mFormationLeadRef.GetObjectPtr();
+        if (formationLead != unit && mIgnoreFormationUpdates) {
+          if (HasFormationLeadDesiredTarget()) {
+            mFormation = nullptr;
+            mIgnoreFormationUpdates = false;
+            if (navigator != nullptr) {
+              navigator->IgnoreFormation(true);
             }
+            commandTask->mTaskState = TASKSTATE_Waiting;
             return 1;
           }
-        }
-
-        if (!InRange()) {
-          if (navigator == nullptr || navigator->GetStatus() != AINAVSTATUS_Idle) {
-            if (mHasMobileTarget && mTarget.HasTarget()) {
-              const Wm3::Vector3f targetPos = mTarget.GetTargetPosGun(false);
-              const float dx = mTargetPosition.x - targetPos.x;
-              const float dy = mTargetPosition.y - targetPos.y;
-              const float dz = mTargetPosition.z - targetPos.z;
-              // 0x00616E8E-0x00616ECB: summed `(dz*dz + dy*dy) + dx*dx`.
-              if (std::sqrt(((dz * dz) + (dy * dy)) + (dx * dx)) > 10.0f) {
-                UpdateTarget();
-                UpdatePosition();
-              }
-            }
-          } else {
-            commandTask->mTaskState = TASKSTATE_Starting;
-          }
-
           return 1;
         }
-
-        mFormation = nullptr;
-        mIgnoreFormationUpdates = false;
-        if (navigator != nullptr) {
-          navigator->IgnoreFormation(true);
-        }
-        commandTask->mTaskState = TASKSTATE_Waiting;
-        return 1;
       }
 
-      case TASKSTATE_Complete: {
-        const SFootprint& ownerFootprint = unit->GetFootprint();
-        const Wm3::Vector3f destinationCenter{
-          static_cast<float>(mDestination.x) + (static_cast<float>(ownerFootprint.mSizeX) * 0.5f),
-          0.0f,
-          static_cast<float>(mDestination.z) + (static_cast<float>(ownerFootprint.mSizeZ) * 0.5f),
-        };
-
-        if (IsDestinationCellInMeleeContactRange()) {
-          if (IsAtFootprintOriginCell(*unit, destinationCenter)) {
-            (void)UpdateDesiredTarget(&mTarget);
-            commandTask->mTaskState = TASKSTATE_5;
+      if (!InRange()) {
+        if (navigator == nullptr || navigator->GetStatus() != AINAVSTATUS_Idle) {
+          if (mHasMobileTarget && mTarget.HasTarget()) {
+            const Wm3::Vector3f targetPos = mTarget.GetTargetPosGun(false);
+            const float dx = mTargetPosition.x - targetPos.x;
+            const float dy = mTargetPosition.y - targetPos.y;
+            const float dz = mTargetPosition.z - targetPos.z;
+            // 0x00616E8E-0x00616ECB: summed `(dz*dz + dy*dy) + dx*dx`.
+            if (std::sqrt(((dz * dz) + (dy * dy)) + (dx * dx)) > 10.0f) {
+              UpdateTarget();
+              UpdatePosition();
+            }
           }
         } else {
-          CAiTarget clearTarget{};
-          clearTarget.targetType = EAiTargetType::AITARGET_Entity;
-          clearTarget.targetEntity.ClearLinkState();
-          clearTarget.position = Wm3::Vector3f::Zero();
-          clearTarget.targetPoint = -1;
-          clearTarget.targetIsMobile = false;
-          clearTarget.PickTargetPoint();
-
-          (void)UpdateDesiredTarget(&clearTarget);
-          commandTask->mTaskState = TASKSTATE_Waiting;
+          commandTask->mTaskState = TASKSTATE_Starting;
         }
 
         return 1;
       }
 
-      case TASKSTATE_5:
-        FreeSpot();
-        return -2;
+      mFormation = nullptr;
+      mIgnoreFormationUpdates = false;
+      if (navigator != nullptr) {
+        navigator->IgnoreFormation(true);
+      }
+      commandTask->mTaskState = TASKSTATE_Waiting;
+      return 1;
+    }
 
-      case TASKSTATE_6: {
-        const Wm3::Vector3f currentPosition = unit->GetPosition();
-        const SCoordsVec2 centerXZ{currentPosition.x, currentPosition.z};
-        gpg::Rect2i reserveRect{};
-        COORDS_ToGridRect(&reserveRect, centerXZ, unit->GetFootprint());
-        unit->ReserveOgridRect(reserveRect);
-        mPlanted = true;
+    case TASKSTATE_Complete: {
+      const SFootprint& ownerFootprint = unit->GetFootprint();
+      const Wm3::Vector3f destinationCenter{
+        static_cast<float>(mDestination.x) + (static_cast<float>(ownerFootprint.mSizeX) * 0.5f),
+        0.0f,
+        static_cast<float>(mDestination.z) + (static_cast<float>(ownerFootprint.mSizeZ) * 0.5f),
+      };
 
-        SetDestinationGoalFromWorldPosition(currentPosition);
-        commandTask->mTaskState = TASKSTATE_7;
-        return 20;
+      if (IsDestinationCellInMeleeContactRange()) {
+        if (IsAtFootprintOriginCell(*unit, destinationCenter)) {
+          (void)UpdateDesiredTarget(&mTarget);
+          commandTask->mTaskState = TASKSTATE_5;
+        }
+      } else {
+        CAiTarget clearTarget{};
+        clearTarget.targetType = EAiTargetType::AITARGET_Entity;
+        clearTarget.targetEntity.ClearLinkState();
+        clearTarget.position = Wm3::Vector3f::Zero();
+        clearTarget.targetPoint = -1;
+        clearTarget.targetIsMobile = false;
+        clearTarget.PickTargetPoint();
+
+        (void)UpdateDesiredTarget(&clearTarget);
+        commandTask->mTaskState = TASKSTATE_Waiting;
       }
 
-      case TASKSTATE_7:
-        FreeSpot();
-        return -1;
+      return 1;
+    }
 
-      default:
-        gpg::HandleAssertFailure(kMeleeTaskAssertText, kMeleeTaskAssertLine, kMeleeTaskSourcePath);
-        return -1;
+    case TASKSTATE_5:
+      FreeSpot();
+      return -2;
+
+    case TASKSTATE_6: {
+      const Wm3::Vector3f currentPosition = unit->GetPosition();
+      const SCoordsVec2 centerXZ{currentPosition.x, currentPosition.z};
+      gpg::Rect2i reserveRect{};
+      COORDS_ToGridRect(&reserveRect, centerXZ, unit->GetFootprint());
+      unit->ReserveOgridRect(reserveRect);
+      mPlanted = true;
+
+      SetDestinationGoalFromWorldPosition(currentPosition);
+      commandTask->mTaskState = TASKSTATE_7;
+      return 20;
+    }
+
+    case TASKSTATE_7:
+      FreeSpot();
+      return -1;
+
+    default:
+      gpg::HandleAssertFailure(kMeleeTaskAssertText, kMeleeTaskAssertLine, kMeleeTaskSourcePath);
+      return -1;
     }
   }
 
@@ -1255,7 +1278,9 @@ namespace moho
    * Deserializes base command-task state, melee-task pointer lanes, target
    * payload, navigation flags, destination cell, and planted-state lane.
    */
-  void CUnitMeleeAttackTargetTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CUnitMeleeAttackTargetTask::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -1301,7 +1326,9 @@ namespace moho
    * Serializes base command-task state, melee-task pointer lanes, target
    * payload, navigation flags, destination cell, and planted-state lane.
    */
-  void CUnitMeleeAttackTargetTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CUnitMeleeAttackTargetTask::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;

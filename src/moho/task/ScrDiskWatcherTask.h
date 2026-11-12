@@ -55,9 +55,8 @@ namespace moho
      * handed back unowned. Inlined into
      * `SerConstructHelper<ScrDiskWatcherTask>::Construct` 0x004C0AB0.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * What it does:
@@ -65,7 +64,10 @@ namespace moho
      * `SerSaveConstructHelper<ScrDiskWatcherTask>::SaveConstructArgs` 0x004C0940.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     /**
@@ -120,7 +122,8 @@ namespace moho
 
   static_assert(sizeof(ScrDiskWatcherTask) == 0x50, "ScrDiskWatcherTask size must be 0x50");
   static_assert(
-    offsetof(ScrDiskWatcherTask, mReserved18) == 0x18, "ScrDiskWatcherTask::mReserved18 offset must be 0x18"
+    offsetof(ScrDiskWatcherTask, mReserved18) == 0x18,
+    "ScrDiskWatcherTask::mReserved18 offset must be 0x18"
   );
   static_assert(offsetof(ScrDiskWatcherTask, mLuaState) == 0x1C, "ScrDiskWatcherTask::mLuaState offset must be 0x1C");
   static_assert(offsetof(ScrDiskWatcherTask, mListener) == 0x20, "ScrDiskWatcherTask::mListener offset must be 0x20");

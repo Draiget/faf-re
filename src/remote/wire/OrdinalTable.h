@@ -29,9 +29,15 @@ namespace faf::remote::wire
     [[nodiscard]] std::uint32_t Ordinal(std::string_view name) const;
     /** Empty for an ordinal out of range. */
     [[nodiscard]] std::string_view Name(std::uint32_t ordinal) const noexcept;
-    [[nodiscard]] std::uint32_t Size() const noexcept { return static_cast<std::uint32_t>(mNames.size()); }
+    [[nodiscard]] std::uint32_t Size() const noexcept
+    {
+      return static_cast<std::uint32_t>(mNames.size());
+    }
     /** 64-bit FNV-1a over the count and every name with its terminator, in ordinal order. */
-    [[nodiscard]] std::uint64_t Hash() const noexcept { return mHash; }
+    [[nodiscard]] std::uint64_t Hash() const noexcept
+    {
+      return mHash;
+    }
 
   private:
     std::vector<std::string> mNames;

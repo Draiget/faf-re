@@ -66,17 +66,18 @@ namespace moho
    */
   struct SFormationScriptSlot
   {
-    SCoordsVec2 mOffset{};            // +0x00
-    EntityCategorySet mCategory{};    // +0x08
-    float mWeight{0.0f};              // +0x30
+    SCoordsVec2 mOffset{};         // +0x00
+    EntityCategorySet mCategory{}; // +0x08
+    float mWeight{0.0f};           // +0x30
     /// Tail word the binary neither writes nor reads; present only because the
     /// element stride is provably 0x38 and the fields above end at 0x34.
-    std::uint32_t mReserved34{0};     // +0x34
+    std::uint32_t mReserved34{0}; // +0x34
   };
   static_assert(sizeof(SFormationScriptSlot) == 0x38, "SFormationScriptSlot size must be 0x38");
   static_assert(offsetof(SFormationScriptSlot, mOffset) == 0x00, "SFormationScriptSlot::mOffset offset must be 0x00");
   static_assert(
-    offsetof(SFormationScriptSlot, mCategory) == 0x08, "SFormationScriptSlot::mCategory offset must be 0x08"
+    offsetof(SFormationScriptSlot, mCategory) == 0x08,
+    "SFormationScriptSlot::mCategory offset must be 0x08"
   );
   static_assert(offsetof(SFormationScriptSlot, mWeight) == 0x30, "SFormationScriptSlot::mWeight offset must be 0x30");
 
@@ -116,10 +117,10 @@ namespace moho
    */
   struct SFormationScriptResult
   {
-    bool mSuccess{false};                                 // +0x00
-    std::uint8_t mPad01[3]{};                             // +0x01
-    std::uint32_t mReserved04{0};                         // +0x04
-    gpg::fastvector_n<SFormationScriptSlot, 20> mObjs{};  // +0x08
+    bool mSuccess{false};                                // +0x00
+    std::uint8_t mPad01[3]{};                            // +0x01
+    std::uint32_t mReserved04{0};                        // +0x04
+    gpg::fastvector_n<SFormationScriptSlot, 20> mObjs{}; // +0x08
 
     SFormationScriptResult() = default;
     SFormationScriptResult(const SFormationScriptResult&) = default;
@@ -139,7 +140,8 @@ namespace moho
   };
   static_assert(sizeof(SFormationScriptResult) == 0x478, "SFormationScriptResult size must be 0x478");
   static_assert(
-    offsetof(SFormationScriptResult, mSuccess) == 0x00, "SFormationScriptResult::mSuccess offset must be 0x00"
+    offsetof(SFormationScriptResult, mSuccess) == 0x00,
+    "SFormationScriptResult::mSuccess offset must be 0x00"
   );
   static_assert(offsetof(SFormationScriptResult, mObjs) == 0x08, "SFormationScriptResult::mObjs offset must be 0x08");
 
@@ -162,7 +164,8 @@ namespace moho
   const char* FORMATION_GetScriptName(LuaPlus::LuaState* state, int scriptIndex, EFormationType formationType);
 
   /**
-   * Address: 0x00575DB0 (FUN_00575DB0, ?FORMATION_GetScriptIndex@Moho@@YAHPAVLuaState@LuaPlus@@VStrArg@gpg@@W4EFormationType@1@@Z)
+   * Address: 0x00575DB0 (FUN_00575DB0,
+   * ?FORMATION_GetScriptIndex@Moho@@YAHPAVLuaState@LuaPlus@@VStrArg@gpg@@W4EFormationType@1@@Z)
    *
    * What it does:
    * Loads `/lua/formations.lua`, resolves a formation bucket table, and returns
@@ -171,7 +174,8 @@ namespace moho
   int FORMATION_GetScriptIndex(LuaPlus::LuaState* state, gpg::StrArg scriptName, EFormationType formationType);
 
   /**
-   * Address: 0x00576010 (FUN_00576010, ?FORMATION_PickTravelFormation@Moho@@YAHPAVLuaState@LuaPlus@@W4EFormationType@1@M@Z)
+   * Address: 0x00576010 (FUN_00576010,
+   * ?FORMATION_PickTravelFormation@Moho@@YAHPAVLuaState@LuaPlus@@W4EFormationType@1@M@Z)
    *
    * What it does:
    * Calls `/lua/formations.lua`::`PickBestTravelFormationIndex(formationTypeName, dist)`
@@ -182,7 +186,8 @@ namespace moho
   int FORMATION_PickTravelFormation(LuaPlus::LuaState* state, EFormationType formationType, float dist);
 
   /**
-   * Address: 0x00576350 (FUN_00576350, ?FORMATION_PickBestFormation@Moho@@YAHPAVLuaState@LuaPlus@@W4EFormationType@1@M@Z)
+   * Address: 0x00576350 (FUN_00576350,
+   * ?FORMATION_PickBestFormation@Moho@@YAHPAVLuaState@LuaPlus@@W4EFormationType@1@M@Z)
    *
    * What it does:
    * Calls `/lua/formations.lua` helper `PickBestFinalFormationIndex` and returns

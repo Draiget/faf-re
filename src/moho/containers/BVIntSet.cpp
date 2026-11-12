@@ -54,9 +54,7 @@ namespace
     out->mWords.Resize(outWordCount, 0u);
 
     if (lhsRange.mStartWord < lhsRange.mEndWord) {
-      std::copy(
-        lhs.mWords.start_, lhs.mWords.end_, out->mWords.start_ + (lhsRange.mStartWord - outStartWord)
-      );
+      std::copy(lhs.mWords.start_, lhs.mWords.end_, out->mWords.start_ + (lhsRange.mStartWord - outStartWord));
     }
 
     // rhs is folded over every word the output spans, not just the words
@@ -76,7 +74,10 @@ namespace
 
   template <typename CombineFn>
   BVIntSet* BuildTrimmedOverlap(
-    const BVIntSet& lhs, const BVIntSet& rhs, BVIntSet* const out, CombineFn&& combine
+    const BVIntSet& lhs,
+    const BVIntSet& rhs,
+    BVIntSet* const out,
+    CombineFn&& combine
   )
   {
     const BVIntSetWordRange lhsRange = lhs.WordRange();
@@ -92,7 +93,9 @@ namespace
 
     unsigned int firstNonZero = overlapStart;
     while (firstNonZero < overlapEnd) {
-      if (combine(lhs.mWords[firstNonZero - lhsRange.mStartWord], rhs.mWords[firstNonZero - rhsRange.mStartWord]) != 0u) {
+      if (
+        combine(lhs.mWords[firstNonZero - lhsRange.mStartWord], rhs.mWords[firstNonZero - rhsRange.mStartWord]) != 0u
+      ) {
         break;
       }
       ++firstNonZero;
@@ -132,7 +135,10 @@ gpg::RType* BVIntSet::sType = nullptr;
  * What it does:
  * Packs `{owner, value}` into a BVIntSet index pair.
  */
-BVIntSetIndex moho::MakeBVIntSetIndex(BVIntSet* const owner, const unsigned int value) noexcept
+BVIntSetIndex moho::MakeBVIntSetIndex(
+  BVIntSet* const owner,
+  const unsigned int value
+) noexcept
 {
   return BVIntSetIndex{owner, value};
 }
@@ -143,7 +149,10 @@ BVIntSetIndex moho::MakeBVIntSetIndex(BVIntSet* const owner, const unsigned int 
  * What it does:
  * Compares BVIntSet index pairs by value lane only.
  */
-bool moho::BVIntSetIndexValueNotEqual(const BVIntSetIndex& lhs, const BVIntSetIndex& rhs) noexcept
+bool moho::BVIntSetIndexValueNotEqual(
+  const BVIntSetIndex& lhs,
+  const BVIntSetIndex& rhs
+) noexcept
 {
   return lhs.mValue != rhs.mValue;
 }
@@ -155,13 +164,17 @@ bool moho::BVIntSetIndexValueNotEqual(const BVIntSetIndex& lhs, const BVIntSetIn
  * Copies the first-word index and the word storage; the binary never writes
  * +0x04 here (0x00401E17..0x00401E22), so it keeps its default.
  */
-BVIntSet::BVIntSet(const BVIntSet& set)
+BVIntSet::BVIntSet(
+  const BVIntSet& set
+)
 {
   mFirstWordIndex = set.mFirstWordIndex;
   mWords.ResetFrom(set.mWords);
 }
 
-BVIntSet& BVIntSet::operator=(const BVIntSet& set)
+BVIntSet& BVIntSet::operator=(
+  const BVIntSet& set
+)
 {
   if (this == &set) {
     return *this;
@@ -183,12 +196,16 @@ BVIntSetWordRange BVIntSet::WordRange() const noexcept
   return {mFirstWordIndex, mFirstWordIndex + static_cast<unsigned int>(WordCount())};
 }
 
-size_t BVIntSet::WordIndexFor(const size_t val) const
+size_t BVIntSet::WordIndexFor(
+  const size_t val
+) const
 {
   return (val >> kWordShift) - mFirstWordIndex;
 }
 
-size_t BVIntSet::FirstValueInWord(const size_t wordIndex) const
+size_t BVIntSet::FirstValueInWord(
+  const size_t wordIndex
+) const
 {
   return (mFirstWordIndex + wordIndex) << kWordShift;
 }
@@ -233,7 +250,11 @@ BVIntSetIndex BVIntSet::EndIndex()
  * What it does:
  * ORs a half-open value range [lower, upper) from `from` into this set.
  */
-void BVIntSet::AddFrom(const BVIntSet* from, const unsigned int lower, const unsigned int upper)
+void BVIntSet::AddFrom(
+  const BVIntSet* from,
+  const unsigned int lower,
+  const unsigned int upper
+)
 {
   if (from == nullptr || from == this || lower == upper) {
     return;
@@ -275,7 +296,10 @@ void BVIntSet::AddFrom(const BVIntSet* from, const unsigned int lower, const uns
  * What it does:
  * Clears bits in [lower.mValue, upper.mValue), compacts, and returns `{this, min(upper, Max())}`.
  */
-BVIntSetIndex BVIntSet::ClearRange(const BVIntSetIndex lower, const BVIntSetIndex upper)
+BVIntSetIndex BVIntSet::ClearRange(
+  const BVIntSetIndex lower,
+  const BVIntSetIndex upper
+)
 {
   const unsigned int lowerValue = lower.mValue;
   const unsigned int upperValue = upper.mValue;
@@ -329,7 +353,9 @@ unsigned int BVIntSet::Count() const
  * What it does:
  * Returns whether `val` bit is set in this set.
  */
-bool BVIntSet::Contains(const unsigned int val) const
+bool BVIntSet::Contains(
+  const unsigned int val
+) const
 {
   const unsigned int relativeWord = (val >> kWordShift) - mFirstWordIndex;
   const std::size_t wordCount = static_cast<std::size_t>(mWords.end_ - mWords.start_);
@@ -347,7 +373,9 @@ bool BVIntSet::Contains(const unsigned int val) const
  * What it does:
  * Returns `{this, val}` when the bit exists; otherwise returns `{this, Max()}`.
  */
-BVIntSetIndex BVIntSet::Get(const unsigned int val) const
+BVIntSetIndex BVIntSet::Get(
+  const unsigned int val
+) const
 {
   const unsigned int relativeWord = (val >> kWordShift) - mFirstWordIndex;
   const std::size_t wordCount = static_cast<std::size_t>(mWords.end_ - mWords.start_);
@@ -363,7 +391,9 @@ BVIntSetIndex BVIntSet::Get(const unsigned int val) const
  * What it does:
  * Returns the next set value strictly greater than `val`, or Max() when exhausted.
  */
-unsigned int BVIntSet::GetNext(const unsigned int val) const
+unsigned int BVIntSet::GetNext(
+  const unsigned int val
+) const
 {
   unsigned int current = val + 1u;
   const unsigned int startValue = Min();
@@ -400,7 +430,9 @@ unsigned int BVIntSet::GetNext(const unsigned int val) const
  * What it does:
  * Finds the previous set bit before `val` by walking backward across wordIndex storage.
  */
-unsigned int BVIntSet::GetPrev(const unsigned int val) const
+unsigned int BVIntSet::GetPrev(
+  const unsigned int val
+) const
 {
   unsigned int result = val - 1u;
   const unsigned int startWord = mFirstWordIndex;
@@ -474,7 +506,10 @@ void BVIntSet::Finalize()
  * What it does:
  * Ensures wordIndex coverage for [lower, upper) by prepending/appending zero words as needed.
  */
-void BVIntSet::EnsureBounds(const unsigned int lower, const unsigned int upper)
+void BVIntSet::EnsureBounds(
+  const unsigned int lower,
+  const unsigned int upper
+)
 {
   constexpr unsigned int fillWord = 0u;
   const unsigned int requiredStart = (lower >> kWordShift);
@@ -520,7 +555,9 @@ void BVIntSet::EnsureBounds(const unsigned int lower, const unsigned int upper)
  * What it does:
  * Unions all bits from `from` into this set.
  */
-void BVIntSet::AddAllFrom(const BVIntSet* from)
+void BVIntSet::AddAllFrom(
+  const BVIntSet* from
+)
 {
   if (from == nullptr) {
     return;
@@ -538,7 +575,9 @@ void BVIntSet::AddAllFrom(const BVIntSet* from)
  * What it does:
  * Clears all bits from this set that are present in `from`, then compacts.
  */
-void BVIntSet::RemoveAllFrom(const BVIntSet* from)
+void BVIntSet::RemoveAllFrom(
+  const BVIntSet* from
+)
 {
   if (from == nullptr) {
     return;
@@ -564,7 +603,9 @@ void BVIntSet::RemoveAllFrom(const BVIntSet* from)
  * What it does:
  * Intersects this set with `other` and trims to the non-zero overlap span.
  */
-void BVIntSet::IntersectWith(const BVIntSet* other)
+void BVIntSet::IntersectWith(
+  const BVIntSet* other
+)
 {
   if (other == nullptr) {
     mWords.ResetStorageToInline();
@@ -625,7 +666,9 @@ void BVIntSet::IntersectWith(const BVIntSet* other)
  * What it does:
  * Compares set base index and all payload words for exact equality.
  */
-bool BVIntSet::Equals(const BVIntSet* other) const
+bool BVIntSet::Equals(
+  const BVIntSet* other
+) const
 {
   if (other == nullptr) {
     return false;
@@ -655,7 +698,10 @@ bool BVIntSet::Equals(const BVIntSet* other) const
  * What it does:
  * Returns whether two sets differ.
  */
-bool moho::operator!=(const BVIntSet& lhs, const BVIntSet& rhs) noexcept
+bool moho::operator!=(
+  const BVIntSet& lhs,
+  const BVIntSet& rhs
+) noexcept
 {
   return !lhs.Equals(&rhs);
 }
@@ -666,7 +712,10 @@ bool moho::operator!=(const BVIntSet& lhs, const BVIntSet& rhs) noexcept
  * What it does:
  * Builds the union of `*this` and `rhs` into `out`.
  */
-BVIntSet* BVIntSet::Union(BVIntSet* const out, const BVIntSet* const rhs) const
+BVIntSet* BVIntSet::Union(
+  BVIntSet* const out,
+  const BVIntSet* const rhs
+) const
 {
   const BVIntSetWordRange lhsRange = WordRange();
   const BVIntSetWordRange rhsRange = rhs->WordRange();
@@ -674,14 +723,9 @@ BVIntSet* BVIntSet::Union(BVIntSet* const out, const BVIntSet* const rhs) const
   const unsigned int outWordCount = std::max(lhsRange.mEndWord, rhsRange.mEndWord) - outStartWord;
 
   return CopyAndApplyOverlap(
-    *this,
-    *rhs,
-    out,
-    outStartWord,
-    outWordCount,
-    [](unsigned int& dstWord, const unsigned int rhsWord) {
-      dstWord |= rhsWord;
-    }
+    *this, *rhs, out, outStartWord, outWordCount, [](unsigned int& dstWord, const unsigned int rhsWord) {
+    dstWord |= rhsWord;
+  }
   );
 }
 
@@ -691,7 +735,10 @@ BVIntSet* BVIntSet::Union(BVIntSet* const out, const BVIntSet* const rhs) const
  * What it does:
  * Builds the symmetric difference of `*this` and `rhs` into `out`.
  */
-BVIntSet* BVIntSet::ExclusiveOr(BVIntSet* const out, const BVIntSet* const rhs) const
+BVIntSet* BVIntSet::ExclusiveOr(
+  BVIntSet* const out,
+  const BVIntSet* const rhs
+) const
 {
   const BVIntSetWordRange lhsRange = WordRange();
   const BVIntSetWordRange rhsRange = rhs->WordRange();
@@ -699,14 +746,9 @@ BVIntSet* BVIntSet::ExclusiveOr(BVIntSet* const out, const BVIntSet* const rhs) 
   const unsigned int outWordCount = std::max(lhsRange.mEndWord, rhsRange.mEndWord) - outStartWord;
 
   CopyAndApplyOverlap(
-    *this,
-    *rhs,
-    out,
-    outStartWord,
-    outWordCount,
-    [](unsigned int& dstWord, const unsigned int rhsWord) {
-      dstWord ^= rhsWord;
-    }
+    *this, *rhs, out, outStartWord, outWordCount, [](unsigned int& dstWord, const unsigned int rhsWord) {
+    dstWord ^= rhsWord;
+  }
   );
   out->Finalize();
   return out;
@@ -718,16 +760,14 @@ BVIntSet* BVIntSet::ExclusiveOr(BVIntSet* const out, const BVIntSet* const rhs) 
  * What it does:
  * Builds the trimmed intersection of `*this` and `rhs` into `out`.
  */
-BVIntSet* BVIntSet::Intersect(BVIntSet* const out, const BVIntSet* const rhs) const
+BVIntSet* BVIntSet::Intersect(
+  BVIntSet* const out,
+  const BVIntSet* const rhs
+) const
 {
-  return BuildTrimmedOverlap(
-    *this,
-    *rhs,
-    out,
-    [](const unsigned int lhsWord, const unsigned int rhsWord) {
-      return lhsWord & rhsWord;
-    }
-  );
+  return BuildTrimmedOverlap(*this, *rhs, out, [](const unsigned int lhsWord, const unsigned int rhsWord) {
+    return lhsWord & rhsWord;
+  });
 }
 
 /**
@@ -736,7 +776,10 @@ BVIntSet* BVIntSet::Intersect(BVIntSet* const out, const BVIntSet* const rhs) co
  * What it does:
  * Builds `*this & ~rhs` into `out` and compacts the result.
  */
-BVIntSet* BVIntSet::Subtract(BVIntSet* const out, const BVIntSet* const rhs) const
+BVIntSet* BVIntSet::Subtract(
+  BVIntSet* const out,
+  const BVIntSet* const rhs
+) const
 {
   const BVIntSetWordRange lhsRange = WordRange();
   CopyAndApplyOverlap(
@@ -746,8 +789,8 @@ BVIntSet* BVIntSet::Subtract(BVIntSet* const out, const BVIntSet* const rhs) con
     lhsRange.mStartWord,
     lhsRange.mEndWord - lhsRange.mStartWord,
     [](unsigned int& dstWord, const unsigned int rhsWord) {
-      dstWord &= ~rhsWord;
-    }
+    dstWord &= ~rhsWord;
+  }
   )->Finalize();
   return out;
 }
@@ -766,7 +809,9 @@ BVIntSet* BVIntSet::Subtract(BVIntSet* const out, const BVIntSet* const rhs) con
  * What it does:
  * Sets one bit and returns `{this, value, wasInserted}`.
  */
-BVIntSetAddResult BVIntSet::Add(const unsigned int val)
+BVIntSetAddResult BVIntSet::Add(
+  const unsigned int val
+)
 {
   EnsureBounds(val, val + 1u);
 
@@ -785,7 +830,9 @@ BVIntSetAddResult BVIntSet::Add(const unsigned int val)
  * What it does:
  * Clears one bit, finalizes storage, and reports whether that bit was previously set.
  */
-bool BVIntSet::Remove(const unsigned int val)
+bool BVIntSet::Remove(
+  const unsigned int val
+)
 {
   const size_t wordIndex = WordIndexFor(val);
   if (wordIndex >= WordCount()) {
@@ -809,7 +856,9 @@ bool BVIntSet::Remove(const unsigned int val)
  * What it does:
  * Reads the base word index and packed word-vector payload from archive.
  */
-void BVIntSet::MemberDeserialize(gpg::ReadArchive* const archive)
+void BVIntSet::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   GPG_ASSERT(archive != nullptr);
   if (!archive) {
@@ -836,7 +885,9 @@ void BVIntSet::MemberDeserialize(gpg::ReadArchive* const archive)
  * What it does:
  * Writes the base word index and packed word-vector payload to archive.
  */
-void BVIntSet::MemberSerialize(gpg::WriteArchive* const archive) const
+void BVIntSet::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   GPG_ASSERT(archive != nullptr);
   if (!archive) {
@@ -854,7 +905,10 @@ void BVIntSet::MemberSerialize(gpg::WriteArchive* const archive) const
   archive->Write(vectorType, &mWords, NullOwnerRef());
 }
 
-unsigned int BVIntSet::MaskRange(const unsigned loBit, const unsigned hiBit) noexcept
+unsigned int BVIntSet::MaskRange(
+  const unsigned loBit,
+  const unsigned hiBit
+) noexcept
 {
   const unsigned int upperMask = (hiBit >= kBitsPerWord) ? 0xFFFFFFFFu : ((1u << hiBit) - 1u);
   const unsigned int lowerMask = (loBit == 0u) ? 0u : ((1u << loBit) - 1u);

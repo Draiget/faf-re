@@ -18,7 +18,9 @@
 namespace
 {
 
-  [[nodiscard]] gpg::RRef MakePosHandleRef(moho::CIntelPosHandle* const handle)
+  [[nodiscard]] gpg::RRef MakePosHandleRef(
+    moho::CIntelPosHandle* const handle
+  )
   {
     gpg::RRef out{};
     gpg::RType* const baseType = gpg::RTypeOf<moho::CIntelPosHandle>();
@@ -40,9 +42,8 @@ namespace
         return out;
       }
 
-      out.mObj = reinterpret_cast<void*>(
-        reinterpret_cast<std::uintptr_t>(handle) - static_cast<std::uintptr_t>(baseOffset)
-      );
+      out.mObj =
+        reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(handle) - static_cast<std::uintptr_t>(baseOffset));
       out.mType = dynamicType;
       return out;
     } catch (...) {
@@ -56,7 +57,10 @@ namespace
   // difference re-rasters. `CIntelPosHandle::Update` makes the same call at
   // 0x0076D8DC. (A 2026-09-14 change read that call as a 1e-5 epsilon compare;
   // the epsilon only ever existed in a recovery-era patch to Wm3Vector3.h.)
-  [[nodiscard]] bool PositionChanged(const moho::CIntelPosHandle& handle, const Wm3::Vec3f& position) noexcept
+  [[nodiscard]] bool PositionChanged(
+    const moho::CIntelPosHandle& handle,
+    const Wm3::Vec3f& position
+  ) noexcept
   {
     return position != handle.mLastPos;
   }
@@ -66,13 +70,14 @@ namespace moho
 {
   gpg::RType* CIntel::sType = nullptr;
 
-  void IntelHandleDeleter::operator()(CIntelPosHandle* const handle) const noexcept
+  void IntelHandleDeleter::operator()(
+    CIntelPosHandle* const handle
+  ) const noexcept
   {
     handle->Destroy(1);
   }
 
   CIntel::~CIntel() = default;
-
 
   /**
    * Address: 0x00683170 (FUN_00683170)
@@ -111,7 +116,11 @@ namespace moho
    * Initializes intel handles and toggle presence flags from
    * `RUnitBlueprintIntel` radii/booleans and owning recon/sim pointers.
    */
-  CIntel::CIntel(const RUnitBlueprintIntel* const blueprintIntel, Sim* const sim, CAiReconDBImpl* const reconDB)
+  CIntel::CIntel(
+    const RUnitBlueprintIntel* const blueprintIntel,
+    Sim* const sim,
+    CAiReconDBImpl* const reconDB
+  )
     : CIntel()
   {
     if (blueprintIntel->VisionRadius != 0u) {
@@ -139,9 +148,8 @@ namespace moho
       InitIntel(8, blueprintIntel->CloakFieldRadius, reconDB, sim);
     }
 
-    mJamming.present = static_cast<std::uint8_t>(
-      (blueprintIntel->JammerBlips != 0u && blueprintIntel->JamRadius.max != 0u) ? 1u : 0u
-    );
+    mJamming.present =
+      static_cast<std::uint8_t>((blueprintIntel->JammerBlips != 0u && blueprintIntel->JamRadius.max != 0u) ? 1u : 0u);
     mCloak.present = static_cast<std::uint8_t>(blueprintIntel->Cloak != 0u ? 1u : 0u);
     mSpoof.present = static_cast<std::uint8_t>(blueprintIntel->SpoofRadius.max != 0u ? 1u : 0u);
     mSonarStealth.present = static_cast<std::uint8_t>(blueprintIntel->SonarStealth != 0u ? 1u : 0u);
@@ -154,7 +162,9 @@ namespace moho
    * What it does:
    * Clears one `{present,enabled}` toggle pair.
    */
-  void CIntel::BoolFieldInit(CIntelToggleState* const toggleState)
+  void CIntel::BoolFieldInit(
+    CIntelToggleState* const toggleState
+  )
   {
     toggleState->present = 0u;
     toggleState->enabled = 0u;
@@ -168,7 +178,10 @@ namespace moho
    * What it does:
    * Forces position refresh pass across all active intel handles.
    */
-  void CIntel::ForceUpdate(const Wm3::Vec3f& position, const std::int32_t tick)
+  void CIntel::ForceUpdate(
+    const Wm3::Vec3f& position,
+    const std::int32_t tick
+  )
   {
     for (std::size_t i = 0; i < kHandleCount; ++i) {
       CIntelPosHandle* const handle = mIntelHandles[i].get();
@@ -189,7 +202,10 @@ namespace moho
    * Updates armed intel handles against new position and updates
    * per-handle tick stamps.
    */
-  void CIntel::Update(const Wm3::Vec3f& position, const std::int32_t tick)
+  void CIntel::Update(
+    const Wm3::Vec3f& position,
+    const std::int32_t tick
+  )
   {
 
     for (std::size_t i = 0; i < kHandleCount; ++i) {
@@ -221,7 +237,9 @@ namespace moho
    * Reads all 9 intel-handle pointers and 5 toggle-state pairs from archive,
    * replacing any existing handle instances.
    */
-  void CIntel::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CIntel::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     const gpg::RRef ownerRef{};
     for (std::size_t i = 0; i < kHandleCount; ++i) {
@@ -247,10 +265,14 @@ namespace moho
    * Writes all 9 intel-handle pointers as owned tracked pointers and then
    * serializes 5 toggle-state `{present,enabled}` pairs.
    */
-  void CIntel::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CIntel::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     for (std::size_t i = 0; i < kHandleCount; ++i) {
-      gpg::WriteRawPointer(archive, MakePosHandleRef(mIntelHandles[i].get()), gpg::TrackedPointerState::Owned, gpg::RRef{});
+      gpg::WriteRawPointer(
+        archive, MakePosHandleRef(mIntelHandles[i].get()), gpg::TrackedPointerState::Owned, gpg::RRef{}
+      );
     }
 
     for (const CIntelToggleState& toggle : mToggleStates) {
@@ -267,12 +289,16 @@ namespace moho
    * fields/toggle lanes) against recon grids.
    */
   void CIntel::InitIntel(
-    const std::int32_t intelType, const std::uint32_t radius, CAiReconDBImpl* const reconDB, Sim* const sim
+    const std::int32_t intelType,
+    const std::uint32_t radius,
+    CAiReconDBImpl* const reconDB,
+    Sim* const sim
   )
   {
     switch (intelType) {
     case 1: {
-      boost::SharedPtrRaw<CIntelGrid> grid = reconDB ? reconDB->ReconGetVisionGrid() : boost::SharedPtrRaw<CIntelGrid>{};
+      boost::SharedPtrRaw<CIntelGrid> grid =
+        reconDB ? reconDB->ReconGetVisionGrid() : boost::SharedPtrRaw<CIntelGrid>{};
       mIntelHandles[INTEL_Vision].reset(new (std::nothrow) CIntelPosHandle(radius, grid));
       grid.release();
       return;
@@ -312,7 +338,8 @@ namespace moho
       );
       return;
     case 8:
-      mIntelHandles[INTEL_CloakField].reset(new (std::nothrow) CIntelCounterHandle(radius, sim, INTELCOUNTER_CloakField, reconDB));
+      mIntelHandles[INTEL_CloakField].reset(new (std::nothrow)
+                                              CIntelCounterHandle(radius, sim, INTELCOUNTER_CloakField, reconDB));
       return;
     // 0x0076E3F4 folds every toggle lane into one indexed store,
     // `mov [ebp+ecx*2+12h], 1` for `intelType >= INTEL_Jammer` -- so the lane

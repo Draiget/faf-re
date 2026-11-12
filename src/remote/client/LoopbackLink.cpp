@@ -21,7 +21,11 @@
 
 namespace faf::remote::client
 {
-  wire::SFrameCodec MakeLoopbackCodec(const float mapSizeX, const float mapSizeZ, const SLoopbackOptions& options)
+  wire::SFrameCodec MakeLoopbackCodec(
+    const float mapSizeX,
+    const float mapSizeZ,
+    const SLoopbackOptions& options
+  )
   {
     wire::SFrameCodec codec{};
     codec.position = wire::SPositionQuantizer::ForMap(mapSizeX, mapSizeZ);
@@ -33,7 +37,9 @@ namespace faf::remote::client
   }
 
   CLoopbackLink::CLoopbackLink(
-    moho::RRuleGameRules& rules, const wire::SFrameCodec& codec, const SLoopbackOptions& options
+    moho::RRuleGameRules& rules,
+    const wire::SFrameCodec& codec,
+    const SLoopbackOptions& options
   )
     : mTables(BuildContentTables(rules))
     , mClientContent(BuildContentTables(rules))
@@ -76,7 +82,9 @@ namespace faf::remote::client
     mGridSnapshots.Uninstall();
   }
 
-  void CLoopbackLink::PassArmiesAndGrids(moho::SSyncData& packet)
+  void CLoopbackLink::PassArmiesAndGrids(
+    moho::SSyncData& packet
+  )
   {
     // Army lane: every army's record as the view gets it, through the wire; the client's records
     // then stand in the packet in place of the sim's.
@@ -152,8 +160,11 @@ namespace faf::remote::client
         }
         ++mUserGridsInstalled;
         gpg::Logf(
-          "loopback: army %u's %s grid is now the client's own (%ux%u cells)", static_cast<unsigned>(slot.army),
-          slot.kind == 0 ? "vision" : "water", slot.bits.width, slot.bits.height
+          "loopback: army %u's %s grid is now the client's own (%ux%u cells)",
+          static_cast<unsigned>(slot.army),
+          slot.kind == 0 ? "vision" : "water",
+          slot.bits.width,
+          slot.bits.height
         );
       }
       for (std::size_t cell = 0; cell < slot.bits.cells.size(); ++cell) {
@@ -163,7 +174,9 @@ namespace faf::remote::client
     }
   }
 
-  void CLoopbackLink::Pass(moho::SSyncData& packet)
+  void CLoopbackLink::Pass(
+    moho::SSyncData& packet
+  )
   {
     if (!mRefusal.empty()) {
       return; // refused at connect: the packet stays the sim's own
@@ -223,7 +236,10 @@ namespace faf::remote::client
     mMaxBeatSeconds = std::max(mMaxBeatSeconds, std::chrono::duration<double>(rebuilt - start).count());
   }
 
-  void CLoopbackLink::PassRoster(moho::IClientManager& standIn, CRemoteClientManager& facade)
+  void CLoopbackLink::PassRoster(
+    moho::IClientManager& standIn,
+    CRemoteClientManager& facade
+  )
   {
     if (!mRefusal.empty()) {
       return;
@@ -266,19 +282,20 @@ namespace faf::remote::client
     mRosterBeat = 0;
 
     // Check: the facade answers the roster questions as the stand-in does.
-    bool same = facade.NumberOfClients() == standIn.NumberOfClients()
-             && (facade.GetLocalClient() == nullptr) == (standIn.GetLocalClient() == nullptr);
+    bool same = facade.NumberOfClients() == standIn.NumberOfClients() &&
+      (facade.GetLocalClient() == nullptr) == (standIn.GetLocalClient() == nullptr);
     for (std::size_t i = 0; same && i < standIn.NumberOfClients(); ++i) {
       auto* const a = static_cast<moho::CClientBase*>(standIn.GetClient(static_cast<int>(i)));
       auto* const b = static_cast<moho::CClientBase*>(facade.GetClient(static_cast<int>(i)));
       same = (a == nullptr) == (b == nullptr);
       if (same && a != nullptr) {
-        same = a->GetNickname().view() == b->GetNickname().view() && a->GetOwnerId() == b->GetOwnerId()
-            && a->mSimRate == b->mSimRate && a->NoEjectionPending() == b->NoEjectionPending()
-            && (a == standIn.GetLocalClient()) == (b == facade.GetLocalClient());
+        same = a->GetNickname().view() == b->GetNickname().view() && a->GetOwnerId() == b->GetOwnerId() &&
+          a->mSimRate == b->mSimRate && a->NoEjectionPending() == b->NoEjectionPending() &&
+          (a == standIn.GetLocalClient()) == (b == facade.GetLocalClient());
         const moho::BVIntSet* const sa = a->GetValidCommandSources();
         const moho::BVIntSet* const sb = b->GetValidCommandSources();
-        for (unsigned int va = sa->GetNext(~0u), vb = sb->GetNext(~0u); same; va = sa->GetNext(va), vb = sb->GetNext(vb)) {
+        for (unsigned int va = sa->GetNext(~0u), vb = sb->GetNext(~0u); same;
+             va = sa->GetNext(va), vb = sb->GetNext(vb)) {
           same = (va == sa->Max()) == (vb == sb->Max()) && (va == sa->Max() || va == vb);
           if (va == sa->Max()) {
             break;
@@ -292,66 +309,128 @@ namespace faf::remote::client
   std::uint64_t CLoopbackLink::CheckFailures() const noexcept
   {
     const SRebuildStats& s = mRebuilder.Stats();
-    return (mRefusal.empty() ? 0u : 1u) + mEncodeFailures + mRebuildFailures + mTableFailures + s.decodeFailures + s.soundMismatches
-         + s.underlayMismatches + s.unknownTableIds + mBuilder.UnknownUnderlays() + s.createdNotInPacket + s.packetCreatedNotRebuilt
-         + s.blueprintMismatches + s.eraseMismatches + s.deleteMismatches + s.packetUpdatesDropped
-         + s.unitChangesWithoutUpdate + s.unitConstantsMissing + s.meshMismatches + s.meshResourceMismatches
-         + s.positionsOutOfRange + s.tickMismatches + s.unitDataMismatches + s.depositMismatches
-         + mBuilder.DepositOverflows() + s.terrainRectMismatches + mRebuilder.TerrainCellsDiffering()
-         + mBuilder.TerrainEditOverflows() + mRosterFailures + mRosterMismatches + mArmyFailures + mArmyMismatches
-         + mGridFailures + mGridMismatches;
+    return (mRefusal.empty() ? 0u : 1u) + mEncodeFailures + mRebuildFailures + mTableFailures + s.decodeFailures +
+      s.soundMismatches + s.underlayMismatches + s.unknownTableIds + mBuilder.UnknownUnderlays() +
+      s.createdNotInPacket + s.packetCreatedNotRebuilt + s.blueprintMismatches + s.eraseMismatches +
+      s.deleteMismatches + s.packetUpdatesDropped + s.unitChangesWithoutUpdate + s.unitConstantsMissing +
+      s.meshMismatches + s.meshResourceMismatches + s.positionsOutOfRange + s.tickMismatches + s.unitDataMismatches +
+      s.depositMismatches + mBuilder.DepositOverflows() + s.terrainRectMismatches + mRebuilder.TerrainCellsDiffering() +
+      mBuilder.TerrainEditOverflows() + mRosterFailures + mRosterMismatches + mArmyFailures + mArmyMismatches +
+      mGridFailures + mGridMismatches;
   }
 
-  std::string CLoopbackLink::Summary(const char* const when) const
+  std::string CLoopbackLink::Summary(
+    const char* const when
+  ) const
   {
     const SRebuildStats& s = mRebuilder.Stats();
     const double frames = s.frames != 0u ? static_cast<double>(s.frames) : 1.0;
-    const auto u = [](const std::uint64_t value) { return static_cast<unsigned long long>(value); };
+    const auto u = [](const std::uint64_t value) {
+      return static_cast<unsigned long long>(value);
+    };
     std::string text = mRefusal.empty() ? std::string() : "loopback REFUSED at connect: " + mRefusal + "; ";
     text += gpg::STR_Printf(
-      "loopback %s: frames %llu, %.1f KB/s, encode failures %llu, decode failures %llu, rebuild failures %llu, "
-      "created %llu, erased %llu, deleted %llu, entity updates %llu (settle %llu, packet data %llu), "
-      "max position error %.5f, max orientation error %.3f deg, time per beat %.2f ms server + %.2f ms client (decode %.2f, delta %.2f, rebuild "
-      "%.2f; max %.1f ms)",
-      when, u(s.frames), static_cast<double>(s.frameBytes) / frames * 10.0 / 1024.0, u(mEncodeFailures),
-      u(s.decodeFailures), u(mRebuildFailures), u(s.created), u(s.erased), u(s.deleted), u(s.entityUpdates),
-      u(s.settleUpdates), u(s.entityDataBorrowed), s.maxPositionError, s.maxOrientationError, mServerSeconds * 1000.0 / frames,
-      mClientSeconds * 1000.0 / frames, s.decodeSeconds * 1000.0 / frames, s.deltaSeconds * 1000.0 / frames,
-      s.rebuildSeconds * 1000.0 / frames, mMaxBeatSeconds * 1000.0
-    ).c_str();
+              "loopback %s: frames %llu, %.1f KB/s, encode failures %llu, decode failures %llu, rebuild failures %llu, "
+              "created %llu, erased %llu, deleted %llu, entity updates %llu (settle %llu, packet data %llu), "
+              "max position error %.5f, max orientation error %.3f deg, time per beat %.2f ms server + %.2f ms client "
+              "(decode %.2f, delta %.2f, rebuild "
+              "%.2f; max %.1f ms)",
+              when,
+              u(s.frames),
+              static_cast<double>(s.frameBytes) / frames * 10.0 / 1024.0,
+              u(mEncodeFailures),
+              u(s.decodeFailures),
+              u(mRebuildFailures),
+              u(s.created),
+              u(s.erased),
+              u(s.deleted),
+              u(s.entityUpdates),
+              u(s.settleUpdates),
+              u(s.entityDataBorrowed),
+              s.maxPositionError,
+              s.maxOrientationError,
+              mServerSeconds * 1000.0 / frames,
+              mClientSeconds * 1000.0 / frames,
+              s.decodeSeconds * 1000.0 / frames,
+              s.deltaSeconds * 1000.0 / frames,
+              s.rebuildSeconds * 1000.0 / frames,
+              mMaxBeatSeconds * 1000.0
+    )
+              .c_str();
     text += "\n";
-    text += gpg::STR_Printf(
-      "loopback %s checks: created not in packet %llu, packet creations not rebuilt %llu, blueprint mismatches %llu, "
-      "creations without blueprint %llu, erase mismatches %llu, delete mismatches %llu, packet updates dropped %llu, "
-      "unit changes without update %llu, unit constants differing %llu, mesh mismatches %llu, mesh resource "
-      "mismatches %llu, positions out of range %llu, sound mismatches %llu, underlay mismatches %llu, unknown "
-      "underlays %llu, unknown table ids %llu, table failures %llu (table records %.2f KB in all), creation tick "
-      "mismatches %llu, unit stat items applied %llu, unit updates %llu (with the packet's poses %llu), unit data "
-      "mismatches %llu, resource deposits %zu (mismatches %llu, overflows %llu), terrain edits %llu (rectangle "
-      "mismatches %llu, height cells differing from the sim's now %llu, overflows %llu), rosters %llu (%.2f KB, "
-      "failures %llu, mismatches %llu); clock: sim rate %d, beats/s expected %.2f, on the server's clock %.2f, "
-      "arriving %.2f, backlog %lld, skew %.2f",
-      when, u(s.createdNotInPacket), u(s.packetCreatedNotRebuilt), u(s.blueprintMismatches), u(s.noBlueprint),
-      u(s.eraseMismatches), u(s.deleteMismatches), u(s.packetUpdatesDropped), u(s.unitChangesWithoutUpdate),
-      u(s.unitConstantsMissing), u(s.meshMismatches), u(s.meshResourceMismatches), u(s.positionsOutOfRange),
-      u(s.soundMismatches), u(s.underlayMismatches), u(mBuilder.UnknownUnderlays()), u(s.unknownTableIds),
-      u(mTableFailures), static_cast<double>(mTableBytes) / 1024.0, u(s.tickMismatches), u(s.statsApplied),
-      u(s.unitUpdates), u(s.unitPosesBorrowed), u(s.unitDataMismatches), mClientTables.Deposits().size(),
-      u(s.depositMismatches), u(mBuilder.DepositOverflows()), u(s.terrainEdits), u(s.terrainRectMismatches),
-      u(mRebuilder.TerrainCellsDiffering()), u(mBuilder.TerrainEditOverflows()), u(mRostersSent),
-      static_cast<double>(mRosterBytes) / 1024.0, u(mRosterFailures), u(mRosterMismatches), mClock.ServerSimRate(),
-      mClock.ExpectedBeatsPerSecond(), mClock.ServerBeatsPerSecond(), mClock.ArrivalBeatsPerSecond(),
-      static_cast<long long>(mClock.Backlog()), mClock.Skew()
-    ).c_str();
+    text +=
+      gpg::STR_Printf(
+        "loopback %s checks: created not in packet %llu, packet creations not rebuilt %llu, blueprint mismatches %llu, "
+        "creations without blueprint %llu, erase mismatches %llu, delete mismatches %llu, packet updates dropped %llu, "
+        "unit changes without update %llu, unit constants differing %llu, mesh mismatches %llu, mesh resource "
+        "mismatches %llu, positions out of range %llu, sound mismatches %llu, underlay mismatches %llu, unknown "
+        "underlays %llu, unknown table ids %llu, table failures %llu (table records %.2f KB in all), creation tick "
+        "mismatches %llu, unit stat items applied %llu, unit updates %llu (with the packet's poses %llu), unit data "
+        "mismatches %llu, resource deposits %zu (mismatches %llu, overflows %llu), terrain edits %llu (rectangle "
+        "mismatches %llu, height cells differing from the sim's now %llu, overflows %llu), rosters %llu (%.2f KB, "
+        "failures %llu, mismatches %llu); clock: sim rate %d, beats/s expected %.2f, on the server's clock %.2f, "
+        "arriving %.2f, backlog %lld, skew %.2f",
+        when,
+        u(s.createdNotInPacket),
+        u(s.packetCreatedNotRebuilt),
+        u(s.blueprintMismatches),
+        u(s.noBlueprint),
+        u(s.eraseMismatches),
+        u(s.deleteMismatches),
+        u(s.packetUpdatesDropped),
+        u(s.unitChangesWithoutUpdate),
+        u(s.unitConstantsMissing),
+        u(s.meshMismatches),
+        u(s.meshResourceMismatches),
+        u(s.positionsOutOfRange),
+        u(s.soundMismatches),
+        u(s.underlayMismatches),
+        u(mBuilder.UnknownUnderlays()),
+        u(s.unknownTableIds),
+        u(mTableFailures),
+        static_cast<double>(mTableBytes) / 1024.0,
+        u(s.tickMismatches),
+        u(s.statsApplied),
+        u(s.unitUpdates),
+        u(s.unitPosesBorrowed),
+        u(s.unitDataMismatches),
+        mClientTables.Deposits().size(),
+        u(s.depositMismatches),
+        u(mBuilder.DepositOverflows()),
+        u(s.terrainEdits),
+        u(s.terrainRectMismatches),
+        u(mRebuilder.TerrainCellsDiffering()),
+        u(mBuilder.TerrainEditOverflows()),
+        u(mRostersSent),
+        static_cast<double>(mRosterBytes) / 1024.0,
+        u(mRosterFailures),
+        u(mRosterMismatches),
+        mClock.ServerSimRate(),
+        mClock.ExpectedBeatsPerSecond(),
+        mClock.ServerBeatsPerSecond(),
+        mClock.ArrivalBeatsPerSecond(),
+        static_cast<long long>(mClock.Backlog()),
+        mClock.Skew()
+      )
+        .c_str();
     text += "\n";
-    text += gpg::STR_Printf(
-      "loopback %s armies and grids: army lane %.2f KB/s (failures %llu, records other than sent %llu); grid lane %.2f "
-      "KB/s (failures %llu, grids other than the sim's %llu, beats without a copy %llu); client grids installed in "
-      "the session %llu",
-      when, static_cast<double>(mArmyBytes) / frames * 10.0 / 1024.0, u(mArmyFailures), u(mArmyMismatches),
-      static_cast<double>(mGridBytes) / frames * 10.0 / 1024.0, u(mGridFailures), u(mGridMismatches),
-      u(mGridBeatsMissing), u(mUserGridsInstalled)
-    ).c_str();
+    text +=
+      gpg::STR_Printf(
+        "loopback %s armies and grids: army lane %.2f KB/s (failures %llu, records other than sent %llu); grid lane "
+        "%.2f "
+        "KB/s (failures %llu, grids other than the sim's %llu, beats without a copy %llu); client grids installed in "
+        "the session %llu",
+        when,
+        static_cast<double>(mArmyBytes) / frames * 10.0 / 1024.0,
+        u(mArmyFailures),
+        u(mArmyMismatches),
+        static_cast<double>(mGridBytes) / frames * 10.0 / 1024.0,
+        u(mGridFailures),
+        u(mGridMismatches),
+        u(mGridBeatsMissing),
+        u(mUserGridsInstalled)
+      )
+        .c_str();
     return text;
   }
 } // namespace faf::remote::client

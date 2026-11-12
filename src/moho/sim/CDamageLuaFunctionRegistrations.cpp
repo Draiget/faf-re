@@ -28,7 +28,9 @@ namespace
     "MetaImpact(instigator,location,fMaxRadius,iAmount,affectsCategory,[damageFriendly])";
 
   void RequireLuaArgCount(
-    LuaPlus::LuaState* const state, const char* const helpText, const int expectedCount
+    LuaPlus::LuaState* const state,
+    const char* const helpText,
+    const int expectedCount
   )
   {
     if (!state || !state->m_state) {
@@ -41,7 +43,10 @@ namespace
     }
   }
 
-  void PushEntityOrNil(LuaPlus::LuaState* const state, moho::Entity* const entity)
+  void PushEntityOrNil(
+    LuaPlus::LuaState* const state,
+    moho::Entity* const entity
+  )
   {
     if (!state || !state->m_state) {
       return;
@@ -62,7 +67,7 @@ namespace moho
   CScrLuaMetatableFactory<CDamage> CScrLuaMetatableFactory<CDamage>::sInstance{};
 
   /**
-    * Alias of FUN_10015880 (non-canonical helper lane).
+   * Alias of FUN_10015880 (non-canonical helper lane).
    *
    * What it does:
    * Stores one metatable-factory index used by `CScrLuaObjectFactory::Get`.
@@ -96,7 +101,9 @@ namespace moho
    * What it does:
    * Creates the default metatable used by `CDamage` Lua userdata.
    */
-  LuaPlus::LuaObject CScrLuaMetatableFactory<CDamage>::Create(LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject CScrLuaMetatableFactory<CDamage>::Create(
+    LuaPlus::LuaState* const state
+  )
   {
     return SCR_CreateSimpleMetatable(state);
   }
@@ -107,7 +114,10 @@ namespace moho
    * What it does:
    * Resolves one cached Lua metatable object for CDamage userdata creation.
    */
-  LuaPlus::LuaObject* func_CreateLuaCDamage(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  LuaPlus::LuaObject* func_CreateLuaCDamage(
+    LuaPlus::LuaObject* const object,
+    LuaPlus::LuaState* const state
+  )
   {
     *object = CScrLuaMetatableFactory<CDamage>::Instance().Get(state);
     return object;
@@ -119,7 +129,9 @@ namespace moho
    * What it does:
    * Unwraps raw Lua callback context and forwards to `cfunc_DamageL`.
    */
-  int cfunc_Damage(lua_State* const luaContext)
+  int cfunc_Damage(
+    lua_State* const luaContext
+  )
   {
     return cfunc_DamageL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -133,12 +145,7 @@ namespace moho
   CScrLuaInitForm* func_Damage_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      moho::SCR_SimLuaInitSet(),
-      "Damage",
-      &cfunc_Damage,
-      nullptr,
-      "<global>",
-      kDamageHelpText
+      moho::SCR_SimLuaInitSet(), "Damage", &cfunc_Damage, nullptr, "<global>", kDamageHelpText
     );
     return &binder;
   }
@@ -150,7 +157,9 @@ namespace moho
    * Builds one transient `CDamage` payload from Lua args and dispatches it to
    * `SIM_Damage`.
    */
-  int cfunc_DamageL(LuaPlus::LuaState* const state)
+  int cfunc_DamageL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -222,7 +231,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_DamageAreaL`.
    */
-  int cfunc_DamageArea(lua_State* const luaContext)
+  int cfunc_DamageArea(
+    lua_State* const luaContext
+  )
   {
     return cfunc_DamageAreaL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -236,12 +247,7 @@ namespace moho
   CScrLuaInitForm* func_DamageArea_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      moho::SCR_SimLuaInitSet(),
-      "DamageArea",
-      &cfunc_DamageArea,
-      nullptr,
-      "<global>",
-      kDamageAreaHelpText
+      moho::SCR_SimLuaInitSet(), "DamageArea", &cfunc_DamageArea, nullptr, "<global>", kDamageAreaHelpText
     );
     return &binder;
   }
@@ -253,7 +259,9 @@ namespace moho
    * Builds one transient area-effect `CDamage` payload from Lua args and
    * dispatches it to `SIM_Damage`.
    */
-  int cfunc_DamageAreaL(LuaPlus::LuaState* const state)
+  int cfunc_DamageAreaL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -262,12 +270,7 @@ namespace moho
     const int argumentCount = lua_gettop(state->m_state);
     if (argumentCount < 6 || argumentCount > 7) {
       LuaPlus::LuaState::Error(
-        state,
-        "%s\n  expected between %d and %d args, but got %d",
-        kDamageAreaHelpText,
-        6,
-        7,
-        argumentCount
+        state, "%s\n  expected between %d and %d args, but got %d", kDamageAreaHelpText, 6, 7, argumentCount
       );
     }
 
@@ -339,7 +342,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_DamageRingL`.
    */
-  int cfunc_DamageRing(lua_State* const luaContext)
+  int cfunc_DamageRing(
+    lua_State* const luaContext
+  )
   {
     return cfunc_DamageRingL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -353,12 +358,7 @@ namespace moho
   CScrLuaInitForm* func_DamageRing_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      moho::SCR_SimLuaInitSet(),
-      "DamageRing",
-      &cfunc_DamageRing,
-      nullptr,
-      "<global>",
-      kDamageRingHelpText
+      moho::SCR_SimLuaInitSet(), "DamageRing", &cfunc_DamageRing, nullptr, "<global>", kDamageRingHelpText
     );
     return &binder;
   }
@@ -370,7 +370,9 @@ namespace moho
    * Builds one transient ring-effect `CDamage` payload from Lua args and
    * dispatches it to `SIM_Damage`.
    */
-  int cfunc_DamageRingL(LuaPlus::LuaState* const state)
+  int cfunc_DamageRingL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -379,12 +381,7 @@ namespace moho
     const int argumentCount = lua_gettop(state->m_state);
     if (argumentCount < 7 || argumentCount > 8) {
       LuaPlus::LuaState::Error(
-        state,
-        "%s\n  expected between %d and %d args, but got %d",
-        kDamageRingHelpText,
-        7,
-        8,
-        argumentCount
+        state, "%s\n  expected between %d and %d args, but got %d", kDamageRingHelpText, 7, 8, argumentCount
       );
     }
 
@@ -468,7 +465,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CDamageGetInstigatorL`.
    */
-  int cfunc_CDamageGetInstigator(lua_State* const luaContext)
+  int cfunc_CDamageGetInstigator(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CDamageGetInstigatorL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -480,7 +479,9 @@ namespace moho
    * Resolves one `CDamage` object and pushes its live instigator entity Lua
    * object, or `nil` when missing/dead.
    */
-  int cfunc_CDamageGetInstigatorL(LuaPlus::LuaState* const state)
+  int cfunc_CDamageGetInstigatorL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -524,7 +525,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CDamageSetInstigatorL`.
    */
-  int cfunc_CDamageSetInstigator(lua_State* const luaContext)
+  int cfunc_CDamageSetInstigator(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CDamageSetInstigatorL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -535,7 +538,9 @@ namespace moho
    * What it does:
    * Resolves `CDamage` + `Entity` Lua args and stores the instigator weak link.
    */
-  int cfunc_CDamageSetInstigatorL(LuaPlus::LuaState* const state)
+  int cfunc_CDamageSetInstigatorL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -581,7 +586,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CDamageGetTargetL`.
    */
-  int cfunc_CDamageGetTarget(lua_State* const luaContext)
+  int cfunc_CDamageGetTarget(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CDamageGetTargetL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -593,7 +600,9 @@ namespace moho
    * Resolves one `CDamage` object and pushes its live target entity Lua object,
    * or `nil` when missing/dead.
    */
-  int cfunc_CDamageGetTargetL(LuaPlus::LuaState* const state)
+  int cfunc_CDamageGetTargetL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -638,7 +647,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CDamageSetTargetL`.
    */
-  int cfunc_CDamageSetTarget(lua_State* const luaContext)
+  int cfunc_CDamageSetTarget(
+    lua_State* const luaContext
+  )
   {
     return cfunc_CDamageSetTargetL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -649,7 +660,9 @@ namespace moho
    * What it does:
    * Resolves `CDamage` + `Entity` Lua args and stores the target weak link.
    */
-  int cfunc_CDamageSetTargetL(LuaPlus::LuaState* const state)
+  int cfunc_CDamageSetTargetL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -696,7 +709,9 @@ namespace moho
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_MetaImpactL`.
    */
-  int cfunc_MetaImpact(lua_State* const luaContext)
+  int cfunc_MetaImpact(
+    lua_State* const luaContext
+  )
   {
     return cfunc_MetaImpactL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -710,12 +725,7 @@ namespace moho
   CScrLuaInitForm* func_MetaImpact_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      moho::SCR_SimLuaInitSet(),
-      "MetaImpact",
-      &cfunc_MetaImpact,
-      nullptr,
-      "<global>",
-      kMetaImpactHelpText
+      moho::SCR_SimLuaInitSet(), "MetaImpact", &cfunc_MetaImpact, nullptr, "<global>", kMetaImpactHelpText
     );
     return &binder;
   }
@@ -739,7 +749,9 @@ namespace moho
    * (instigator, location, radius, amount, damageType, [damageFriendly]) and
    * dispatches it to `SIM_MetaImpactArea` after validating radius > 0 and amount > 0.
    */
-  int cfunc_MetaImpactL(LuaPlus::LuaState* const state)
+  int cfunc_MetaImpactL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state || !state->m_state) {
       return 0;
@@ -748,7 +760,8 @@ namespace moho
     const int argumentCount = lua_gettop(state->m_state);
     if (argumentCount < 5 || argumentCount > 6) {
       LuaPlus::LuaState::Error(
-        state, "%s\n  expected between %d and %d args, but got %d", kMetaImpactHelpText, 5, 6, argumentCount);
+        state, "%s\n  expected between %d and %d args, but got %d", kMetaImpactHelpText, 5, 6, argumentCount
+      );
     }
 
     Sim* const sim = lua_getglobaluserdata(state->m_state);

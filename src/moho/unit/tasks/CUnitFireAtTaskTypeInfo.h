@@ -71,4 +71,3 @@ namespace moho
 
   static_assert(sizeof(CUnitFireAtTaskTypeInfo) == 0x64, "CUnitFireAtTaskTypeInfo size must be 0x64");
 } // namespace moho
-

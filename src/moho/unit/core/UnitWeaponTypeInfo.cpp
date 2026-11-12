@@ -73,7 +73,9 @@ namespace moho
   /**
    * Address: 0x006DD3D0 (FUN_006DD3D0, Moho::UnitWeaponTypeInfo::AddBase_CScriptEvent)
    */
-  void UnitWeaponTypeInfo::AddBase_CScriptEvent(gpg::RType* const typeInfo)
+  void UnitWeaponTypeInfo::AddBase_CScriptEvent(
+    gpg::RType* const typeInfo
+  )
   {
     if (!typeInfo) {
       return;
@@ -99,4 +101,7 @@ namespace moho
 // Phase-1 pre-registration: this descriptor was previously built by an
 // ordinary namespace-scope bootstrap object, which the CRT runs in .CRT$XCU
 // alongside the consumers that look it up. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_UnitWeaponTypeInfo_bd88d0, moho::preregister_UnitWeaponTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_UnitWeaponTypeInfo_bd88d0,
+  moho::preregister_UnitWeaponTypeInfo
+)

@@ -32,4 +32,3 @@ namespace moho
   );
   static_assert(sizeof(ThreadSafeCountedObject) == 0x08, "ThreadSafeCountedObject size must be 0x08");
 } // namespace moho
-

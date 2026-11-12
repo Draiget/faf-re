@@ -15,7 +15,7 @@ namespace gpg
 {
   class RRef;
   class RType;
-}
+} // namespace gpg
 
 namespace gpg
 {
@@ -46,10 +46,7 @@ namespace moho
    *
    * VFTABLE: `CUnitPatrolTask` primary vtable (TaskTick == CTask::Execute slot 1).
    */
-  class CUnitPatrolTask
-    : public CCommandTask
-    , public Listener<ECommandEvent>
-    , public Listener<EFormationdStatus>
+  class CUnitPatrolTask : public CCommandTask, public Listener<ECommandEvent>, public Listener<EFormationdStatus>
   {
   public:
     static gpg::RType* sType;
@@ -116,11 +113,7 @@ namespace moho
      * Allocates one patrol-task object and forwards constructor arguments into
      * in-place construction.
      */
-    [[nodiscard]] static CUnitPatrolTask* Create(
-      CCommandTask* dispatchTask,
-      const void* goalPayload,
-      bool inFormation
-    );
+    [[nodiscard]] static CUnitPatrolTask* Create(CCommandTask* dispatchTask, const void* goalPayload, bool inFormation);
 
     /**
      * Address: 0x0061C4E0 (FUN_0061C4E0, Moho::CUnitPatrolTask::operator new `_0` overload)
@@ -133,11 +126,8 @@ namespace moho
      * "in-formation" flag. Allocates 0xF0 bytes and in-place constructs with
      * the formation-instance lane set and `inFormation=false`.
      */
-    [[nodiscard]] static CUnitPatrolTask* CreateWithFormation(
-      CCommandTask* dispatchTask,
-      const void* goalPayload,
-      IFormationInstance* formationInstance
-    );
+    [[nodiscard]] static CUnitPatrolTask*
+    CreateWithFormation(CCommandTask* dispatchTask, const void* goalPayload, IFormationInstance* formationInstance);
 
     /**
      * Address: 0x0061C130 (FUN_0061C130, Moho::CUnitPatrolTask::TaskTick)
@@ -189,9 +179,8 @@ namespace moho
      * Builds a new `CUnitPatrolTask` for an archive load and hands it back unowned; its
      * members are loaded over it afterwards.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x0061CF50 (FUN_0061CF50, Moho::CUnitPatrolTask::MemberDeserialize)
@@ -313,11 +302,10 @@ namespace moho
 
   static_assert(sizeof(CUnitPatrolTask) == 0xF0, "CUnitPatrolTask size must be 0xF0");
   static_assert(offsetof(CUnitPatrolTask, mDispatch) == 0x50, "CUnitPatrolTask::mDispatch offset must be 0x50");
+  static_assert(offsetof(CUnitPatrolTask, mBoundCommand) == 0x54, "CUnitPatrolTask::mBoundCommand offset must be 0x54");
   static_assert(
-    offsetof(CUnitPatrolTask, mBoundCommand) == 0x54, "CUnitPatrolTask::mBoundCommand offset must be 0x54"
-  );
-  static_assert(
-    offsetof(CUnitPatrolTask, mFormationInstance) == 0x58, "CUnitPatrolTask::mFormationInstance offset must be 0x58"
+    offsetof(CUnitPatrolTask, mFormationInstance) == 0x58,
+    "CUnitPatrolTask::mFormationInstance offset must be 0x58"
   );
   static_assert(offsetof(CUnitPatrolTask, mGoal) == 0x5C, "CUnitPatrolTask::mGoal offset must be 0x5C");
   static_assert(offsetof(CUnitPatrolTask, mMoving) == 0x80, "CUnitPatrolTask::mMoving offset must be 0x80");
@@ -327,4 +315,3 @@ namespace moho
   static_assert(offsetof(CUnitPatrolTask, mTickCounter) == 0xC0, "CUnitPatrolTask::mTickCounter offset must be 0xC0");
   static_assert(offsetof(CUnitPatrolTask, mMembership) == 0xC8, "CUnitPatrolTask::mMembership offset must be 0xC8");
 } // namespace moho
-

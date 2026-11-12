@@ -20,7 +20,11 @@
 
 namespace faf::headless
 {
-  bool LoadSessionScenario(moho::SWldSessionInfo& sessionInfo, moho::SWldGameData& gameData, std::string& error)
+  bool LoadSessionScenario(
+    moho::SWldSessionInfo& sessionInfo,
+    moho::SWldGameData& gameData,
+    std::string& error
+  )
   {
     moho::CWldSessionLoaderImpl* const loader = moho::GetWldSessionLoader();
     moho::LaunchInfoBase* const launchInfo = sessionInfo.mLaunchInfo.get();
@@ -50,7 +54,12 @@ namespace faf::headless
     return true;
   }
 
-  moho::STIMap* CompleteSessionLaunchInfo(moho::SWldSessionInfo& sessionInfo, moho::RRuleGameRules& rules, moho::CWldMap& map, LuaPlus::LuaState& sessionState)
+  moho::STIMap* CompleteSessionLaunchInfo(
+    moho::SWldSessionInfo& sessionInfo,
+    moho::RRuleGameRules& rules,
+    moho::CWldMap& map,
+    LuaPlus::LuaState& sessionState
+  )
   {
     moho::LaunchInfoBase* const launchInfo = sessionInfo.mLaunchInfo.get();
     moho::STIMap* const launchMap = new moho::STIMap(map.mTerrainRes->mMap);
@@ -68,7 +77,9 @@ namespace faf::headless
 
   namespace
   {
-    [[nodiscard]] std::string ReadSyncBytes(moho::SSyncData& packet)
+    [[nodiscard]] std::string ReadSyncBytes(
+      moho::SSyncData& packet
+    )
     {
       std::string bytes;
       char buffer[4096];
@@ -84,18 +95,28 @@ namespace faf::headless
     }
   } // namespace
 
-  bool SyncBytesContain(moho::SSyncData& packet, const std::string_view text)
+  bool SyncBytesContain(
+    moho::SSyncData& packet,
+    const std::string_view text
+  )
   {
     return ReadSyncBytes(packet).find(text) != std::string::npos;
   }
 
-  bool ReadSyncNaming(moho::SSyncData& packet, LuaPlus::LuaState* const state, const std::initializer_list<std::string_view> names, LuaPlus::LuaObject& sync)
+  bool ReadSyncNaming(
+    moho::SSyncData& packet,
+    LuaPlus::LuaState* const state,
+    const std::initializer_list<std::string_view> names,
+    LuaPlus::LuaObject& sync
+  )
   {
     if (packet.mStream == nullptr || state == nullptr) {
       return false;
     }
     const std::string bytes = ReadSyncBytes(packet);
-    const bool named = std::any_of(names.begin(), names.end(), [&](const std::string_view name) { return bytes.find(name) != std::string::npos; });
+    const bool named = std::any_of(names.begin(), names.end(), [&](const std::string_view name) {
+      return bytes.find(name) != std::string::npos;
+    });
     if (!named) {
       return false;
     }
@@ -104,7 +125,10 @@ namespace faf::headless
     return !sync.IsNil();
   }
 
-  bool SyncSaysGameEnded(moho::SSyncData& packet, LuaPlus::LuaState* const state)
+  bool SyncSaysGameEnded(
+    moho::SSyncData& packet,
+    LuaPlus::LuaState* const state
+  )
   {
     LuaPlus::LuaObject currentSync;
     if (!ReadSyncNaming(packet, state, {"GameEnded"}, currentSync)) {

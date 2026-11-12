@@ -7,151 +7,167 @@
 
 namespace gpg
 {
-	class Stream;
+  class Stream;
 
-	class BinaryReader
-	{
-	public:
-        struct PrematureEOF : std::runtime_error
-        {
-            /**
-             * Address: 0x0043D180 (FUN_0043D180)
-             *
-             * What it does:
-             * Constructs PrematureEOF runtime_error payload ("Premature EOF").
-             */
-            PrematureEOF();
-            /**
-             * Address: 0x0043D270 (FUN_0043D270)
-             * Demangled: gpg::BinaryReader::PrematureEOF::dtr
-             *
-             * What it does:
-             * Destroys PrematureEOF exception payload.
-             */
-            ~PrematureEOF() noexcept override;
-        };
+  class BinaryReader
+  {
+  public:
+    struct PrematureEOF : std::runtime_error
+    {
+      /**
+       * Address: 0x0043D180 (FUN_0043D180)
+       *
+       * What it does:
+       * Constructs PrematureEOF runtime_error payload ("Premature EOF").
+       */
+      PrematureEOF();
+      /**
+       * Address: 0x0043D270 (FUN_0043D270)
+       * Demangled: gpg::BinaryReader::PrematureEOF::dtr
+       *
+       * What it does:
+       * Destroys PrematureEOF exception payload.
+       */
+      ~PrematureEOF() noexcept override;
+    };
 
-        BinaryReader() = default;
-        explicit BinaryReader(Stream* s, const std::uint32_t port = 0)
-            : mStream(s), mPort(port), mReserved0(0), mReserved1(0) {
-        }
+    BinaryReader() = default;
+    explicit BinaryReader(
+      Stream* s,
+      const std::uint32_t port = 0
+    )
+      : mStream(s)
+      , mPort(port)
+      , mReserved0(0)
+      , mReserved1(0)
+    {}
 
-        /**
-         * Address: 0x0043D210 (FUN_0043D210)
-         *
-         * What it does:
-         * Reads exactly `size` bytes or throws `PrematureEOF` when source underruns.
-         */
-        void Read(char* buf, size_t size) const;
+    /**
+     * Address: 0x0043D210 (FUN_0043D210)
+     *
+     * What it does:
+     * Reads exactly `size` bytes or throws `PrematureEOF` when source underruns.
+     */
+    void Read(char* buf, size_t size) const;
 
-        /**
-         * Address: 0x00540A10 (FUN_00540A10, gpg::BinaryReader::ReadInt)
-         *
-         * int *
-         *
-         * IDA signature:
-         * int * __usercall gpg::BinaryReader::ReadInt@<eax>(gpg::BinaryReader *this@<eax>, int *outValue@<ecx>);
-         *
-         * What it does:
-         * Reads one 32-bit integer into `outValue`, using stream fast-path bytes
-         * when available and throwing `PrematureEOF` on short reads.
-         */
-        int* ReadInt(int* outValue) const;
+    /**
+     * Address: 0x00540A10 (FUN_00540A10, gpg::BinaryReader::ReadInt)
+     *
+     * int *
+     *
+     * IDA signature:
+     * int * __usercall gpg::BinaryReader::ReadInt@<eax>(gpg::BinaryReader *this@<eax>, int *outValue@<ecx>);
+     *
+     * What it does:
+     * Reads one 32-bit integer into `outValue`, using stream fast-path bytes
+     * when available and throwing `PrematureEOF` on short reads.
+     */
+    int* ReadInt(int* outValue) const;
 
-        /**
-         * Address: 0x00445590 (FUN_00445590)
-         *
-         * What it does:
-         * Reads one 32-bit integer and returns it by value via `ReadInt`.
-         */
-        [[nodiscard]] int ReadInt32() const;
+    /**
+     * Address: 0x00445590 (FUN_00445590)
+     *
+     * What it does:
+     * Reads one 32-bit integer and returns it by value via `ReadInt`.
+     */
+    [[nodiscard]] int ReadInt32() const;
 
-        /**
-         * Address: 0x004D4DC0 (FUN_004D4DC0, gpg::BinaryReader::ReadChar)
-         *
-         * What it does:
-         * Reads one byte from stream input and returns it as unsigned char.
-         */
-        [[nodiscard]] std::uint8_t ReadChar() const;
+    /**
+     * Address: 0x004D4DC0 (FUN_004D4DC0, gpg::BinaryReader::ReadChar)
+     *
+     * What it does:
+     * Reads one byte from stream input and returns it as unsigned char.
+     */
+    [[nodiscard]] std::uint8_t ReadChar() const;
 
-        /**
-         * Address: 0x004CCDD0 (FUN_004CCDD0)
-         *
-         * What it does:
-         * Reads one NUL-terminated string from stream bytes.
-         */
-        void ReadString(fa::string* out) const;
+    /**
+     * Address: 0x004CCDD0 (FUN_004CCDD0)
+     *
+     * What it does:
+     * Reads one NUL-terminated string from stream bytes.
+     */
+    void ReadString(fa::string* out) const;
 
-        /**
-         * Address: <synthetic host-build helper>
-         *
-         * What it does:
-         * Reads one 32-bit length-prefixed byte string into legacy string storage.
-         */
-        void ReadLengthPrefixedString(fa::string* out) const;
+    /**
+     * Address: <synthetic host-build helper>
+     *
+     * What it does:
+     * Reads one 32-bit length-prefixed byte string into legacy string storage.
+     */
+    void ReadLengthPrefixedString(fa::string* out) const;
 
-        /**
-         * Read exactly sizeof(T) bytes into T's object storage.
-         */
-        template<class T>
-        void ReadExact(T& out) const {
-            Read(reinterpret_cast<char*>(std::addressof(out)), sizeof(T));
-        }
+    /**
+     * Read exactly sizeof(T) bytes into T's object storage.
+     */
+    template <class T>
+    void ReadExact(
+      T& out
+    ) const
+    {
+      Read(reinterpret_cast<char*>(std::addressof(out)), sizeof(T));
+    }
 
-        /**
-         * Read exactly count * sizeof(T) bytes into a contiguous array.
-         */
-        template <class T>
-        void ReadExactArray(T* out, std::size_t count) const
-        {
-            Read(reinterpret_cast<char*>(out), sizeof(T) * count);
-        }
+    /**
+     * Read exactly count * sizeof(T) bytes into a contiguous array.
+     */
+    template <class T>
+    void ReadExactArray(
+      T* out,
+      std::size_t count
+    ) const
+    {
+      Read(reinterpret_cast<char*>(out), sizeof(T) * count);
+    }
 
-        /**
-         * Read into std::array<T, N>.
-         */
-        template <class T, std::size_t N>
-        void ReadExact(std::array<T, N>& arr) const
-        {
-            ReadExactArray(arr.data(), N);
-        }
+    /**
+     * Read into std::array<T, N>.
+     */
+    template <class T, std::size_t N>
+    void ReadExact(
+      std::array<T, N>& arr
+    ) const
+    {
+      ReadExactArray(arr.data(), N);
+    }
 
-        /**
-         * Address: 0x006E57C0 (FUN_006E57C0, ReadExact<gpg::MD5Digest>() - result in the
-         *   hidden return slot (ecx), reader in eax: four dwords from the read window
-         *   when 16 bytes are buffered, otherwise `VirtRead` + `PrematureEOF`.
-         *   `CDecoder::DecodeVerifyChecksum`. Formerly `BinaryReader::ReadBytes16`.)
-         * Address: 0x006E5830 (FUN_006E5830, ReadExact<moho::SCoordsVec2>() - the same
-         *   for 8 bytes. The original seeds the result with NaN first (the value
-         *   type's construction); a read that fails throws, so the seed is never
-         *   observed. `CDecoder::DecodeCreateUnit`. Formerly `ReadCoordsVec2OrThrow`
-         *   in CDecoder.cpp.)
-         *
-         * What it does:
-         * Reads one `T` by value.
-         */
-        template <class T>
-        T ReadExact() const
-        {
-            T v{};
-            ReadExact(v);
-            return v;
-        }
+    /**
+     * Address: 0x006E57C0 (FUN_006E57C0, ReadExact<gpg::MD5Digest>() - result in the
+     *   hidden return slot (ecx), reader in eax: four dwords from the read window
+     *   when 16 bytes are buffered, otherwise `VirtRead` + `PrematureEOF`.
+     *   `CDecoder::DecodeVerifyChecksum`. Formerly `BinaryReader::ReadBytes16`.)
+     * Address: 0x006E5830 (FUN_006E5830, ReadExact<moho::SCoordsVec2>() - the same
+     *   for 8 bytes. The original seeds the result with NaN first (the value
+     *   type's construction); a read that fails throws, so the seed is never
+     *   observed. `CDecoder::DecodeCreateUnit`. Formerly `ReadCoordsVec2OrThrow`
+     *   in CDecoder.cpp.)
+     *
+     * What it does:
+     * Reads one `T` by value.
+     */
+    template <class T>
+    T ReadExact() const
+    {
+      T v{};
+      ReadExact(v);
+      return v;
+    }
 
-        [[nodiscard]]
-		const Stream* stream() const noexcept {
-	        return mStream;
-        }
-        Stream* stream() noexcept {
-	        return mStream;
-        }
+    [[nodiscard]]
+    const Stream* stream() const noexcept
+    {
+      return mStream;
+    }
+    Stream* stream() noexcept
+    {
+      return mStream;
+    }
 
-    private:
-        Stream* mStream = nullptr; // +0
-        [[maybe_unused]] uint32_t mPort = 0;        // +4
-        [[maybe_unused]] uint32_t mReserved0 = 0;   // +8
-        [[maybe_unused]] uint32_t mReserved1 = 0;   // +12
-	};
+  private:
+    Stream* mStream = nullptr;                // +0
+    [[maybe_unused]] uint32_t mPort = 0;      // +4
+    [[maybe_unused]] uint32_t mReserved0 = 0; // +8
+    [[maybe_unused]] uint32_t mReserved1 = 0; // +12
+  };
 
-    static_assert(sizeof(BinaryReader) == 16, "BinaryReader size must be 16");
-}
+  static_assert(sizeof(BinaryReader) == 16, "BinaryReader size must be 16");
+} // namespace gpg

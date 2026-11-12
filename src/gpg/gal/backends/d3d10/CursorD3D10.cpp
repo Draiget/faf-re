@@ -2,10 +2,12 @@
 
 namespace gpg::gal
 {
-namespace
-{
+  namespace
+  {
 
-    std::uint32_t ConvertCursorPixelRgbaToBgra(const std::uint32_t rgba) noexcept
+    std::uint32_t ConvertCursorPixelRgbaToBgra(
+      const std::uint32_t rgba
+    ) noexcept
     {
       return (rgba & 0xFF000000U) | ((rgba & 0x000000FFU) << 16U) | (rgba & 0x0000FF00U) |
         ((rgba & 0x00FF0000U) >> 16U);
@@ -21,7 +23,11 @@ namespace
      * handle arrives by value; its release on the way out is the parameter's
      * destruction.
      */
-    HICON BuildCursorIcon(const int hotspotX, const int hotspotY, const boost::shared_ptr<Texture> texture)
+    HICON BuildCursorIcon(
+      const int hotspotX,
+      const int hotspotY,
+      const boost::shared_ptr<Texture> texture
+    )
     {
       BITMAPV5HEADER bitmapInfo{};
       bitmapInfo.bV5Size = sizeof(BITMAPV5HEADER);
@@ -74,8 +80,7 @@ namespace
       ::DeleteObject(maskBitmap);
       return iconHandle;
     }
-}
-
+  } // namespace
 
   /**
    * Address: 0x008F8100 (FUN_008F8100)
@@ -83,7 +88,9 @@ namespace
    * What it does:
    * Applies the non-deleting destructor body lanes for `CursorD3D10`.
    */
-  void DestroyCursorD3D10Body(CursorD3D10* const cursor) noexcept
+  void DestroyCursorD3D10Body(
+    CursorD3D10* const cursor
+  ) noexcept
   {
     cursor->Destroy();
   }
@@ -162,7 +169,9 @@ namespace
    * Resets prior cursor/icon state, builds one icon from caller cursor context,
    * applies it as the active native cursor, and stores the returned prior cursor.
    */
-  HCURSOR CursorD3D10::SetCursor(const CursorContext* const context)
+  HCURSOR CursorD3D10::SetCursor(
+    const CursorContext* const context
+  )
   {
     Destroy();
 
@@ -196,7 +205,9 @@ namespace
    * Validates icon initialization state and drives native show/hide cursor
    * count loops until the binary stop conditions are reached.
    */
-  int CursorD3D10::ShowCursor(const bool show)
+  int CursorD3D10::ShowCursor(
+    const bool show
+  )
   {
     if (cursorIcon_ == nullptr) {
       ThrowGalError("CursorD3D10.cpp", 76, "attempt to use uninitialized cursor");
@@ -215,5 +226,4 @@ namespace
 
     return result;
   }
-}
-
+} // namespace gpg::gal

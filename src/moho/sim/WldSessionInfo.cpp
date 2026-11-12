@@ -24,7 +24,9 @@ namespace moho
 
     struct ScopedLoadControlLock
     {
-      explicit ScopedLoadControlLock(gpg::core::Mutex& lock)
+      explicit ScopedLoadControlLock(
+        gpg::core::Mutex& lock
+      )
         : mLock(lock)
       {
         mLock.lock();
@@ -42,7 +44,9 @@ namespace moho
       gpg::core::Mutex& mLock;
     };
 
-    void CloseHandleIfValid(void*& handle)
+    void CloseHandleIfValid(
+      void*& handle
+    )
     {
       if (!handle) {
         return;
@@ -75,7 +79,9 @@ namespace moho
    * Loads one `SWldSessionInfo*` from the caller-provided slot and, when the
    * pointer is non-null, invokes its destructor then calls `operator delete`.
    */
-  void DestroyAndDeleteSessionInfo(SWldSessionInfo** const sessionInfoSlot)
+  void DestroyAndDeleteSessionInfo(
+    SWldSessionInfo** const sessionInfoSlot
+  )
   {
     SWldSessionInfo* const sessionInfo = *sessionInfoSlot;
     if (sessionInfo == nullptr) {
@@ -93,7 +99,9 @@ namespace moho
    * Runs `SWldSessionInfo` destruction for one heap object and then frees
    * the same storage via global `operator delete`.
    */
-  SWldSessionInfo* DestroyAndDeleteSessionInfoScalar(SWldSessionInfo* const sessionInfo)
+  SWldSessionInfo* DestroyAndDeleteSessionInfoScalar(
+    SWldSessionInfo* const sessionInfo
+  )
   {
     sessionInfo->~SWldSessionInfo();
     ::operator delete(sessionInfo);
@@ -120,7 +128,9 @@ namespace moho
    * Both call sites (LoadGameData SEH unwind and func_DoLoading cleanup) rely
    * on this exact ordering for crash-safe destruction.
    */
-  void ReleaseWldGameDataHandles(SWldGameData* const gameData)
+  void ReleaseWldGameDataHandles(
+    SWldGameData* const gameData
+  )
   {
     if (gameData == nullptr) {
       return;
@@ -148,7 +158,9 @@ namespace moho
    * What it does:
    * Copy-constructs background-task-aborted exception state.
    */
-  XBackgroundTaskAborted::XBackgroundTaskAborted(const XBackgroundTaskAborted& other) noexcept
+  XBackgroundTaskAborted::XBackgroundTaskAborted(
+    const XBackgroundTaskAborted& other
+  ) noexcept
     : std::exception(other)
   {}
 
@@ -194,7 +206,10 @@ namespace moho
     WaitForSingleObject(static_cast<HANDLE>(mWakeEvent), INFINITE);
   }
 
-  void SWldScenarioLoadCallbackStorage::Bind(const WldScenarioLoadEntryFn entryPoint, SWldScenarioInfo* const scenario)
+  void SWldScenarioLoadCallbackStorage::Bind(
+    const WldScenarioLoadEntryFn entryPoint,
+    SWldScenarioInfo* const scenario
+  )
   {
     mDispatchOwner = nullptr;
     mReserved04 = 0;
@@ -207,7 +222,9 @@ namespace moho
     }
   }
 
-  void SWldScenarioLoadCallbackStorage::Invoke(CBackgroundTaskControl* const loadControl) const
+  void SWldScenarioLoadCallbackStorage::Invoke(
+    CBackgroundTaskControl* const loadControl
+  ) const
   {
     if (!mEntryPoint || !mScenario) {
       return;
@@ -220,7 +237,9 @@ namespace moho
    * Address: 0x00412B90 (FUN_00412b90)
    */
   SWldScenarioLoadControl::SWldScenarioLoadControl(
-    const char* const workerName, SWldScenarioInfo* const owner, const WldScenarioLoadEntryFn entryPoint
+    const char* const workerName,
+    SWldScenarioInfo* const owner,
+    const WldScenarioLoadEntryFn entryPoint
   )
     : mMutex()
     , mThreadName(workerName ? workerName : "")
@@ -271,8 +290,9 @@ namespace moho
     mStopRequested = true;
     if (mState == EWldScenarioLoadControlState::kPaused) {
       mWakeSet.SignalOne();
-    } else if (mState == EWldScenarioLoadControlState::kNotStarted ||
-               mState == EWldScenarioLoadControlState::kCompleted) {
+    } else if (
+      mState == EWldScenarioLoadControlState::kNotStarted || mState == EWldScenarioLoadControlState::kCompleted
+    ) {
       mState = EWldScenarioLoadControlState::kReadyForDestroy;
     }
   }
@@ -280,7 +300,9 @@ namespace moho
   /**
    * Address: 0x00412FA0 (FUN_00412fa0)
    */
-  void SWldScenarioLoadControl::StartOrResume(SWldScenarioLoadTask& ownerTask)
+  void SWldScenarioLoadControl::StartOrResume(
+    SWldScenarioLoadTask& ownerTask
+  )
   {
     ScopedLoadControlLock lock(mMutex);
     if (mPauseRequested) {
@@ -406,7 +428,9 @@ namespace moho
    * Address: 0x00885460 (FUN_00885460)
    */
   SWldScenarioLoadTask* SWldScenarioLoadTask::Create(
-    const char* const workerName, SWldScenarioInfo* const owner, const WldScenarioLoadEntryFn entryPoint
+    const char* const workerName,
+    SWldScenarioInfo* const owner,
+    const WldScenarioLoadEntryFn entryPoint
   )
   {
     auto* const task = new (std::nothrow) SWldScenarioLoadTask{};
@@ -422,7 +446,10 @@ namespace moho
   /**
    * Address: 0x008866A0 (FUN_008866a0)
    */
-  void SWldScenarioLoadTask::AssignWithRelease(SWldScenarioLoadTask*& slot, SWldScenarioLoadTask* const replacement)
+  void SWldScenarioLoadTask::AssignWithRelease(
+    SWldScenarioLoadTask*& slot,
+    SWldScenarioLoadTask* const replacement
+  )
   {
     SWldScenarioLoadTask* const previous = slot;
     slot = replacement;
@@ -499,7 +526,10 @@ namespace moho
   /**
    * Address: 0x00885530 (FUN_00885530, ??0struct_ScenarioInfo@@QAE@@Z)
    */
-  SWldScenarioInfo::SWldScenarioInfo(const char* const mapName, const fa::string& gameMods)
+  SWldScenarioInfo::SWldScenarioInfo(
+    const char* const mapName,
+    const fa::string& gameMods
+  )
   {
     mMapName = gpg::STR_ToLower(mapName ? mapName : "");
     mGameMods = gameMods;

@@ -1,0 +1,5 @@
+# Commits that only change layout; git blame skips them (GitHub reads this file by itself;
+# locally: git config blame.ignoreRevsFile .git-blame-ignore-revs).
+
+# chore: every C/C++ file under src, tests and tools is formatted with .clang-format (clang-format 22.1.8)
+107e6ad79576b124ffe99da9960bc0d2e0acba5b

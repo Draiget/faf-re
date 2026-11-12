@@ -510,7 +510,10 @@ namespace moho
      * appends pending fake-blip creation requests when needed.
      */
     void UpdateBlips(
-      ReconBlipMap::iterator first, ReconBlipMap::iterator last, Unit* sourceUnit, EReconFlags detectedFlags,
+      ReconBlipMap::iterator first,
+      ReconBlipMap::iterator last,
+      Unit* sourceUnit,
+      EReconFlags detectedFlags,
       fa::vector<SNewBlip>& pending
     );
 
@@ -627,13 +630,13 @@ namespace moho
     static constexpr std::uint32_t kVisionGridCellSize = 2u;
     static constexpr std::uint32_t kIntelGridCellSize = 4u;
 
-    ReconBlipMap mBlipMap;      // +0x04
-    fa::vector<ReconBlip*> mBblips;  // +0x10
-    fa::vector<ReconBlip*> mTempBlips; // +0x20
-    SimArmy* mArmy;                     // +0x30
-    STIMap* mMapData;                   // +0x34
-    Sim* mSim;                          // +0x38
-    CInfluenceMap* mIMap;               // +0x3C
+    ReconBlipMap mBlipMap;                       // +0x04
+    fa::vector<ReconBlip*> mBblips;              // +0x10
+    fa::vector<ReconBlip*> mTempBlips;           // +0x20
+    SimArmy* mArmy;                              // +0x30
+    STIMap* mMapData;                            // +0x34
+    Sim* mSim;                                   // +0x38
+    CInfluenceMap* mIMap;                        // +0x3C
     boost::SharedPtrRaw<CIntelGrid> mVisionGrid; // +0x40
     boost::SharedPtrRaw<CIntelGrid> mWaterGrid;  // +0x48
     boost::SharedPtrRaw<CIntelGrid> mRadarGrid;  // +0x50
@@ -642,9 +645,9 @@ namespace moho
     boost::SharedPtrRaw<CIntelGrid> mRCIGrid;    // +0x68
     boost::SharedPtrRaw<CIntelGrid> mSCIGrid;    // +0x70
     boost::SharedPtrRaw<CIntelGrid> mVCIGrid;    // +0x78
-    EntityCategorySet mVisibleToReconCategory; // +0x80
-    std::uint8_t mFogOfWar;              // +0xA8
-    std::uint8_t mPadA9[0x07];           // +0xA9
+    EntityCategorySet mVisibleToReconCategory;   // +0x80
+    std::uint8_t mFogOfWar;                      // +0xA8
+    std::uint8_t mPadA9[0x07];                   // +0xA9
   };
 
   static_assert(sizeof(CAiReconDBImpl) == 0xB0, "CAiReconDBImpl size must be 0xB0");

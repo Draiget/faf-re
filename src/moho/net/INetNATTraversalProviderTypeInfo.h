@@ -47,9 +47,7 @@ namespace moho
     void Init() override;
   };
 
-  static_assert(
-    sizeof(INetNATTraversalProviderTypeInfo) == 0x64, "INetNATTraversalProviderTypeInfo size must be 0x64"
-  );
+  static_assert(sizeof(INetNATTraversalProviderTypeInfo) == 0x64, "INetNATTraversalProviderTypeInfo size must be 0x64");
 
   /**
    * Address: 0x00BC4D70 (FUN_00BC4D70, register_INetNATTraversalProviderTypeInfo)

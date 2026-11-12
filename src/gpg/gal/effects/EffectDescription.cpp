@@ -16,7 +16,9 @@ namespace gpg::gal::effects
 
   namespace
   {
-    [[nodiscard]] Annotations ParseAnnotations(std::string_view body)
+    [[nodiscard]] Annotations ParseAnnotations(
+      std::string_view body
+    )
     {
       Annotations annotations;
       for (const std::string& rawStatement : SplitTopLevel(body, ';')) {
@@ -38,7 +40,8 @@ namespace gpg::gal::effects
           annotation.kind = Annotation::Kind::String;
           const std::size_t first = value.find('"');
           const std::size_t last = value.rfind('"');
-          annotation.text = (first != std::string::npos && last > first) ? value.substr(first + 1U, last - first - 1U) : value;
+          annotation.text =
+            (first != std::string::npos && last > first) ? value.substr(first + 1U, last - first - 1U) : value;
         } else {
           double folded = 0.0;
           if (EvaluateConstant(value, folded)) {
@@ -47,7 +50,7 @@ namespace gpg::gal::effects
             const std::vector<float> numbers = ParseNumbers(value);
             annotation.number = numbers.empty() ? 0.0 : numbers.front();
           }
-          annotation.kind = (type == "bool") ? Annotation::Kind::Bool
+          annotation.kind = (type == "bool")                       ? Annotation::Kind::Bool
             : (type == "int" || type == "uint" || type == "dword") ? Annotation::Kind::Int
                                                                    : Annotation::Kind::Float;
           annotation.text = value;
@@ -60,11 +63,20 @@ namespace gpg::gal::effects
     // ---------------------------------------------------------------------
     // Enumerators of the FX state assignments
 
-    [[nodiscard]] std::string EnumKey(std::string_view value)
+    [[nodiscard]] std::string EnumKey(
+      std::string_view value
+    )
     {
       std::string key = Lower(Trim(value));
-      for (const char* const prefix : {"d3d10_blend_op_", "d3d10_blend_", "d3d10_comparison_", "d3d10_stencil_op_", "d3d11_blend_op_",
-                                       "d3d11_blend_", "d3d11_comparison_", "d3d11_stencil_op_"}) {
+      for (const char* const prefix :
+           {"d3d10_blend_op_",
+            "d3d10_blend_",
+            "d3d10_comparison_",
+            "d3d10_stencil_op_",
+            "d3d11_blend_op_",
+            "d3d11_blend_",
+            "d3d11_comparison_",
+            "d3d11_stencil_op_"}) {
         if (key.rfind(prefix, 0U) == 0U) {
           key.erase(0U, std::char_traits<char>::length(prefix));
         }
@@ -73,7 +85,10 @@ namespace gpg::gal::effects
       return key;
     }
 
-    [[nodiscard]] bool ParseBool(std::string_view value, const bool fallback)
+    [[nodiscard]] bool ParseBool(
+      std::string_view value,
+      const bool fallback
+    )
     {
       const std::string key = EnumKey(value);
       if (key == "true" || key == "1") {
@@ -85,7 +100,10 @@ namespace gpg::gal::effects
       return fallback;
     }
 
-    [[nodiscard]] std::uint32_t ParseUnsigned(std::string_view value, const std::uint32_t fallback)
+    [[nodiscard]] std::uint32_t ParseUnsigned(
+      std::string_view value,
+      const std::uint32_t fallback
+    )
     {
       // Integers directly: a float cannot hold 0xFFFFFFFF (the sample masks).
       const std::string text = Trim(value);
@@ -100,67 +118,127 @@ namespace gpg::gal::effects
       return numbers.empty() ? fallback : static_cast<std::uint32_t>(numbers.front());
     }
 
-    [[nodiscard]] std::uint8_t ParseBlend(std::string_view value, const std::uint8_t fallback)
+    [[nodiscard]] std::uint8_t ParseBlend(
+      std::string_view value,
+      const std::uint8_t fallback
+    )
     {
       static const std::map<std::string, std::uint8_t> kValues = {
-        {"zero", 1}, {"one", 2}, {"srccolor", 3}, {"invsrccolor", 4}, {"srcalpha", 5}, {"invsrcalpha", 6},
-        {"destalpha", 7}, {"invdestalpha", 8}, {"destcolor", 9}, {"invdestcolor", 10}, {"srcalphasat", 11},
-        {"blendfactor", 14}, {"invblendfactor", 15},
+        {"zero", 1},
+        {"one", 2},
+        {"srccolor", 3},
+        {"invsrccolor", 4},
+        {"srcalpha", 5},
+        {"invsrcalpha", 6},
+        {"destalpha", 7},
+        {"invdestalpha", 8},
+        {"destcolor", 9},
+        {"invdestcolor", 10},
+        {"srcalphasat", 11},
+        {"blendfactor", 14},
+        {"invblendfactor", 15},
       };
       const auto found = kValues.find(EnumKey(value));
       return (found != kValues.end()) ? found->second : fallback;
     }
 
-    [[nodiscard]] std::uint8_t ParseBlendOp(std::string_view value, const std::uint8_t fallback)
+    [[nodiscard]] std::uint8_t ParseBlendOp(
+      std::string_view value,
+      const std::uint8_t fallback
+    )
     {
       static const std::map<std::string, std::uint8_t> kValues = {
-        {"add", 1}, {"subtract", 2}, {"revsubtract", 3}, {"min", 4}, {"max", 5},
+        {"add", 1},
+        {"subtract", 2},
+        {"revsubtract", 3},
+        {"min", 4},
+        {"max", 5},
       };
       const auto found = kValues.find(EnumKey(value));
       return (found != kValues.end()) ? found->second : fallback;
     }
 
-    [[nodiscard]] std::uint8_t ParseComparison(std::string_view value, const std::uint8_t fallback)
+    [[nodiscard]] std::uint8_t ParseComparison(
+      std::string_view value,
+      const std::uint8_t fallback
+    )
     {
       static const std::map<std::string, std::uint8_t> kValues = {
-        {"never", 1}, {"less", 2}, {"equal", 3}, {"lessequal", 4}, {"greater", 5}, {"notequal", 6}, {"greaterequal", 7}, {"always", 8},
+        {"never", 1},
+        {"less", 2},
+        {"equal", 3},
+        {"lessequal", 4},
+        {"greater", 5},
+        {"notequal", 6},
+        {"greaterequal", 7},
+        {"always", 8},
       };
       const auto found = kValues.find(EnumKey(value));
       return (found != kValues.end()) ? found->second : fallback;
     }
 
-    [[nodiscard]] std::uint8_t ParseStencilOp(std::string_view value, const std::uint8_t fallback)
+    [[nodiscard]] std::uint8_t ParseStencilOp(
+      std::string_view value,
+      const std::uint8_t fallback
+    )
     {
       static const std::map<std::string, std::uint8_t> kValues = {
-        {"keep", 1}, {"zero", 2}, {"replace", 3}, {"incrsat", 4}, {"decrsat", 5}, {"invert", 6}, {"incr", 7}, {"decr", 8},
+        {"keep", 1},
+        {"zero", 2},
+        {"replace", 3},
+        {"incrsat", 4},
+        {"decrsat", 5},
+        {"invert", 6},
+        {"incr", 7},
+        {"decr", 8},
       };
       const auto found = kValues.find(EnumKey(value));
       return (found != kValues.end()) ? found->second : fallback;
     }
 
-    [[nodiscard]] std::uint8_t ParseAddress(std::string_view value, const std::uint8_t fallback)
+    [[nodiscard]] std::uint8_t ParseAddress(
+      std::string_view value,
+      const std::uint8_t fallback
+    )
     {
       static const std::map<std::string, std::uint8_t> kValues = {
-        {"wrap", 1}, {"mirror", 2}, {"clamp", 3}, {"border", 4}, {"mirroronce", 5},
+        {"wrap", 1},
+        {"mirror", 2},
+        {"clamp", 3},
+        {"border", 4},
+        {"mirroronce", 5},
       };
       const auto found = kValues.find(EnumKey(value));
       return (found != kValues.end()) ? found->second : fallback;
     }
 
-    [[nodiscard]] std::uint32_t ParseFilter(std::string_view value, const std::uint32_t fallback)
+    [[nodiscard]] std::uint32_t ParseFilter(
+      std::string_view value,
+      const std::uint32_t fallback
+    )
     {
       static const std::map<std::string, std::uint32_t> kValues = {
-        {"minmagmippoint", 0x00}, {"minmagpointmiplinear", 0x01}, {"minpointmaglinearmippoint", 0x04},
-        {"minpointmagmiplinear", 0x05}, {"minlinearmagmippoint", 0x10}, {"minlinearmagpointmiplinear", 0x11},
-        {"minmaglinearmippoint", 0x14}, {"minmagmiplinear", 0x15}, {"anisotropic", 0x55},
-        {"comparisonminmagmippoint", 0x80}, {"comparisonminmagmiplinear", 0x95}, {"comparisonanisotropic", 0xD5},
+        {"minmagmippoint", 0x00},
+        {"minmagpointmiplinear", 0x01},
+        {"minpointmaglinearmippoint", 0x04},
+        {"minpointmagmiplinear", 0x05},
+        {"minlinearmagmippoint", 0x10},
+        {"minlinearmagpointmiplinear", 0x11},
+        {"minmaglinearmippoint", 0x14},
+        {"minmagmiplinear", 0x15},
+        {"anisotropic", 0x55},
+        {"comparisonminmagmippoint", 0x80},
+        {"comparisonminmagmiplinear", 0x95},
+        {"comparisonanisotropic", 0xD5},
       };
       const auto found = kValues.find(EnumKey(value));
       return (found != kValues.end()) ? found->second : fallback;
     }
 
     /** "BlendEnable [ 0 ]" -> ("blendenable", 0). */
-    [[nodiscard]] std::pair<std::string, int> FieldName(std::string_view field)
+    [[nodiscard]] std::pair<std::string, int> FieldName(
+      std::string_view field
+    )
     {
       std::string compact;
       for (const char c : field) {
@@ -178,7 +256,10 @@ namespace gpg::gal::effects
     }
 
     template <class Apply>
-    void ForEachAssignment(std::string_view body, Apply&& apply)
+    void ForEachAssignment(
+      std::string_view body,
+      Apply&& apply
+    )
     {
       for (const std::string& rawStatement : SplitTopLevel(body, ';')) {
         const std::string statement = Trim(rawStatement);
@@ -202,20 +283,22 @@ namespace gpg::gal::effects
     }
 
     /** The alpha-channel form of a colour blend factor (D3D11/12 enumerators). */
-    [[nodiscard]] std::uint8_t AlphaFactor(const std::uint8_t factor) noexcept
+    [[nodiscard]] std::uint8_t AlphaFactor(
+      const std::uint8_t factor
+    ) noexcept
     {
       switch (factor) {
-      case 3: // SRC_COLOR
-        return 5; // SRC_ALPHA
-      case 4: // INV_SRC_COLOR
-        return 6; // INV_SRC_ALPHA
-      case 9: // DEST_COLOR
-        return 7; // DEST_ALPHA
-      case 10: // INV_DEST_COLOR
-        return 8; // INV_DEST_ALPHA
-      case 16: // SRC1_COLOR
+      case 3:      // SRC_COLOR
+        return 5;  // SRC_ALPHA
+      case 4:      // INV_SRC_COLOR
+        return 6;  // INV_SRC_ALPHA
+      case 9:      // DEST_COLOR
+        return 7;  // DEST_ALPHA
+      case 10:     // INV_DEST_COLOR
+        return 8;  // INV_DEST_ALPHA
+      case 16:     // SRC1_COLOR
         return 18; // SRC1_ALPHA
-      case 17: // INV_SRC1_COLOR
+      case 17:     // INV_SRC1_COLOR
         return 19; // INV_SRC1_ALPHA
       default:
         return factor;
@@ -223,7 +306,9 @@ namespace gpg::gal::effects
     }
 
     // Unset fields of an FX state object take the Direct3D 10 defaults.
-    [[nodiscard]] BlendDesc ParseBlendState(std::string_view body)
+    [[nodiscard]] BlendDesc ParseBlendState(
+      std::string_view body
+    )
     {
       BlendDesc desc{};
       ForEachAssignment(body, [&](const std::string& field, const int index, const std::string& value) {
@@ -260,7 +345,9 @@ namespace gpg::gal::effects
       return desc;
     }
 
-    [[nodiscard]] DepthStencilDesc ParseDepthStencilState(std::string_view body)
+    [[nodiscard]] DepthStencilDesc ParseDepthStencilState(
+      std::string_view body
+    )
     {
       DepthStencilDesc desc{};
       desc.depthFunc = 2; // LESS
@@ -299,7 +386,9 @@ namespace gpg::gal::effects
       return desc;
     }
 
-    [[nodiscard]] RasterizerDesc ParseRasterizerState(std::string_view body)
+    [[nodiscard]] RasterizerDesc ParseRasterizerState(
+      std::string_view body
+    )
     {
       RasterizerDesc desc{};
       desc.depthClipEnable = true;
@@ -346,7 +435,10 @@ namespace gpg::gal::effects
       return desc;
     }
 
-    void ParseSamplerState(std::string_view body, SamplerDesc& desc)
+    void ParseSamplerState(
+      std::string_view body,
+      SamplerDesc& desc
+    )
     {
       ForEachAssignment(body, [&](const std::string& field, int, const std::string& value) {
         if (field == "texture") {
@@ -398,18 +490,24 @@ namespace gpg::gal::effects
       std::uint32_t columns = 1;
     };
 
-    [[nodiscard]] TypeInfo ParseType(const std::string& typeName, const std::vector<std::string>& structs)
+    [[nodiscard]] TypeInfo ParseType(
+      const std::string& typeName,
+      const std::vector<std::string>& structs
+    )
     {
       TypeInfo info{};
       std::string base = Lower(typeName);
-      for (const char* const modifier : {"row_major ", "column_major ", "uniform ", "shared ", "volatile ", "extern ", "const ", "static "}) {
+      for (const char* const modifier :
+           {"row_major ", "column_major ", "uniform ", "shared ", "volatile ", "extern ", "const ", "static "}) {
         std::size_t position;
         while ((position = base.find(modifier)) != std::string::npos) {
           base.erase(position, std::char_traits<char>::length(modifier));
         }
       }
       base = Trim(base);
-      if (base == "texture" || base == "texture1d" || base == "texture2d" || base == "texture3d" || base == "texturecube") {
+      if (
+        base == "texture" || base == "texture1d" || base == "texture2d" || base == "texture3d" || base == "texturecube"
+      ) {
         info.parameterClass = ParameterClass::Texture;
         return info;
       }
@@ -418,8 +516,13 @@ namespace gpg::gal::effects
         return info;
       }
       const std::pair<const char*, ScalarType> scalars[] = {
-        {"float", ScalarType::Float}, {"half", ScalarType::Float}, {"double", ScalarType::Float}, {"int", ScalarType::Int},
-        {"uint", ScalarType::Uint}, {"dword", ScalarType::Uint}, {"bool", ScalarType::Bool},
+        {"float", ScalarType::Float},
+        {"half", ScalarType::Float},
+        {"double", ScalarType::Float},
+        {"int", ScalarType::Int},
+        {"uint", ScalarType::Uint},
+        {"dword", ScalarType::Uint},
+        {"bool", ScalarType::Bool},
       };
       for (const auto& [name, scalar] : scalars) {
         const std::size_t length = std::char_traits<char>::length(name);
@@ -453,27 +556,33 @@ namespace gpg::gal::effects
       return info;
     }
 
-    [[nodiscard]] std::pair<std::string, Annotations> NameAndAnnotations(const std::string& text)
+    [[nodiscard]] std::pair<std::string, Annotations> NameAndAnnotations(
+      const std::string& text
+    )
     {
       const std::size_t open = text.find('<');
       if (open == std::string::npos) {
         return {Trim(text), {}};
       }
       const std::size_t close = Matching(text, open);
-      Annotations annotations =
-        (close != std::string::npos) ? ParseAnnotations(std::string_view(text).substr(open + 1U, close - open - 1U)) : Annotations{};
+      Annotations annotations = (close != std::string::npos)
+        ? ParseAnnotations(std::string_view(text).substr(open + 1U, close - open - 1U))
+        : Annotations{};
       return {Trim(text.substr(0U, open)), std::move(annotations)};
     }
 
     /** "compile vs_4_1 Function ( a , b )" or "CompileShader ( vs_4_0 , Function ( ) )". */
-    [[nodiscard]] ShaderReference ParseShaderReference(const std::string& value)
+    [[nodiscard]] ShaderReference ParseShaderReference(
+      const std::string& value
+    )
     {
       ShaderReference reference;
       std::string text = Trim(value);
       if (StartsWithWord(text, "CompileShader")) {
         const std::size_t open = text.find('(');
         const std::size_t close = Matching(text, open);
-        const std::vector<std::string> parts = SplitTopLevel(std::string_view(text).substr(open + 1U, close - open - 1U), ',');
+        const std::vector<std::string> parts =
+          SplitTopLevel(std::string_view(text).substr(open + 1U, close - open - 1U), ',');
         text = (parts.size() >= 2U) ? "compile " + Trim(parts[0]) + " " + Trim(parts[1]) : std::string();
       }
       if (!StartsWithWord(text, "compile")) {
@@ -491,12 +600,16 @@ namespace gpg::gal::effects
       }
       reference.function = Trim(call.substr(0U, open));
       const std::size_t close = Matching(call, open);
-      reference.arguments = Trim(call.substr(open + 1U, (close == std::string::npos ? call.size() : close) - open - 1U));
+      reference.arguments =
+        Trim(call.substr(open + 1U, (close == std::string::npos ? call.size() : close) - open - 1U));
       return reference;
     }
   } // namespace
 
-  const Annotation* FindAnnotation(const Annotations& annotations, const std::string_view name) noexcept
+  const Annotation* FindAnnotation(
+    const Annotations& annotations,
+    const std::string_view name
+  ) noexcept
   {
     for (const Annotation& annotation : annotations) {
       if (annotation.name == name) {
@@ -506,7 +619,9 @@ namespace gpg::gal::effects
     return nullptr;
   }
 
-  const Parameter* EffectDescription::FindParameter(const std::string_view name) const noexcept
+  const Parameter* EffectDescription::FindParameter(
+    const std::string_view name
+  ) const noexcept
   {
     for (const Parameter& parameter : parameters) {
       if (parameter.name == name) {
@@ -516,7 +631,9 @@ namespace gpg::gal::effects
     return nullptr;
   }
 
-  const StructType* EffectDescription::FindStruct(const std::string_view name) const noexcept
+  const StructType* EffectDescription::FindStruct(
+    const std::string_view name
+  ) const noexcept
   {
     for (const StructType& structType : structs) {
       if (structType.name == name) {
@@ -526,7 +643,9 @@ namespace gpg::gal::effects
     return nullptr;
   }
 
-  const Technique* EffectDescription::FindTechnique(const std::string_view name) const noexcept
+  const Technique* EffectDescription::FindTechnique(
+    const std::string_view name
+  ) const noexcept
   {
     for (const Technique& technique : techniques) {
       if (technique.name == name) {
@@ -539,7 +658,10 @@ namespace gpg::gal::effects
   namespace
   {
     /** A `struct` item: its members with their types. The name joins `structs`, which ParseType reads. */
-    [[nodiscard]] StructType ParseStruct(const Item& item, std::vector<std::string>& structs)
+    [[nodiscard]] StructType ParseStruct(
+      const Item& item,
+      std::vector<std::string>& structs
+    )
     {
       const std::string& head = item.head;
       StructType structType;
@@ -578,7 +700,9 @@ namespace gpg::gal::effects
     }
 
     /** A sampler declaration with a body: its name, type, source range and states. */
-    [[nodiscard]] SamplerDesc ParseSampler(const Item& item)
+    [[nodiscard]] SamplerDesc ParseSampler(
+      const Item& item
+    )
     {
       const std::string& head = item.head;
       SamplerDesc sampler;
@@ -622,9 +746,12 @@ namespace gpg::gal::effects
         }
         const std::size_t open = statement.find('(');
         const std::string call = Trim(statement.substr(0U, open));
-        if (open != std::string::npos && (call == "SetBlendState" || call == "SetDepthStencilState" || call == "SetRasterizerState" ||
-                                          call == "SetVertexShader" || call == "SetPixelShader" || call == "SetGeometryShader" ||
-                                          call == "SetHullShader" || call == "SetDomainShader")) {
+        if (
+          open != std::string::npos &&
+          (call == "SetBlendState" || call == "SetDepthStencilState" || call == "SetRasterizerState" ||
+           call == "SetVertexShader" || call == "SetPixelShader" || call == "SetGeometryShader" ||
+           call == "SetHullShader" || call == "SetDomainShader")
+        ) {
           const std::size_t close = Matching(statement, open);
           const std::vector<std::string> arguments =
             SplitTopLevel(std::string_view(statement).substr(open + 1U, close - open - 1U), ',');
@@ -694,7 +821,9 @@ namespace gpg::gal::effects
     }
   } // namespace
 
-  EffectDescription ParseEffect(const std::string_view source)
+  EffectDescription ParseEffect(
+    const std::string_view source
+  )
   {
     EffectDescription effect;
     const std::vector<Item> items = SplitItems(source);
@@ -727,7 +856,9 @@ namespace gpg::gal::effects
         }
         continue;
       }
-      if (StartsWithWord(head, "technique10") || StartsWithWord(head, "technique11") || StartsWithWord(head, "technique")) {
+      if (
+        StartsWithWord(head, "technique10") || StartsWithWord(head, "technique11") || StartsWithWord(head, "technique")
+      ) {
         techniques.push_back(&item);
         continue;
       }
@@ -743,13 +874,17 @@ namespace gpg::gal::effects
         rasterizerStates[NameAndAnnotations(head.substr(15U)).first] = ParseRasterizerState(item.body);
         continue;
       }
-      if (item.braced && (head.find("sampler_state") != std::string::npos || StartsWithWord(head, "SamplerState") ||
-                          StartsWithWord(head, "sampler2D") || StartsWithWord(head, "sampler") || StartsWithWord(head, "samplerCUBE") ||
-                          StartsWithWord(head, "sampler3D") || StartsWithWord(head, "sampler1D"))) {
+      if (
+        item.braced &&
+        (head.find("sampler_state") != std::string::npos || StartsWithWord(head, "SamplerState") ||
+         StartsWithWord(head, "sampler2D") || StartsWithWord(head, "sampler") || StartsWithWord(head, "samplerCUBE") ||
+         StartsWithWord(head, "sampler3D") || StartsWithWord(head, "sampler1D"))
+      ) {
         effect.samplers.push_back(ParseSampler(item));
         continue;
       }
-      const bool initializerList = item.braced && HasTopLevelAssignment(head) && head.find("sampler_state") == std::string::npos;
+      const bool initializerList =
+        item.braced && HasTopLevelAssignment(head) && head.find("sampler_state") == std::string::npos;
       if (item.braced && !initializerList) {
         continue; // a function, cbuffer or anything else with a body
       }
@@ -848,7 +983,9 @@ namespace gpg::gal::effects
     constexpr std::string_view kWhitespace = " \t\r\n";
 
     /** The source with comments and preprocessor lines (and their continuations) blanked out. */
-    [[nodiscard]] std::string WithoutCommentsAndDirectives(const std::string_view source)
+    [[nodiscard]] std::string WithoutCommentsAndDirectives(
+      const std::string_view source
+    )
     {
       std::string text(source);
       for (std::size_t index = 0U; index < text.size(); ++index) {
@@ -878,7 +1015,9 @@ namespace gpg::gal::effects
         if (continued || (first < next && text[first] == '#')) {
           const std::size_t last = (next == line) ? std::string::npos : text.find_last_not_of(" \t\r", next - 1U);
           continued = last != std::string::npos && last >= line && text[last] == '\\';
-          std::fill(text.begin() + static_cast<std::ptrdiff_t>(line), text.begin() + static_cast<std::ptrdiff_t>(next), ' ');
+          std::fill(
+            text.begin() + static_cast<std::ptrdiff_t>(line), text.begin() + static_cast<std::ptrdiff_t>(next), ' '
+          );
         }
         line = next + 1U;
       }
@@ -887,7 +1026,8 @@ namespace gpg::gal::effects
 
     /** Each `<keyword> Name [< annotations >] { body }` block in `text`, in order. */
     [[nodiscard]] std::vector<std::pair<std::string, std::string_view>> NamedBlocks(
-      const std::string_view text, const std::string_view keyword
+      const std::string_view text,
+      const std::string_view keyword
     )
     {
       std::vector<std::pair<std::string, std::string_view>> blocks;
@@ -903,7 +1043,8 @@ namespace gpg::gal::effects
         while (nameEnd < text.size() && IsIdentifierChar(text[nameEnd])) {
           ++nameEnd;
         }
-        std::string name = (index == std::string_view::npos) ? std::string() : std::string(text.substr(index, nameEnd - index));
+        std::string name =
+          (index == std::string_view::npos) ? std::string() : std::string(text.substr(index, nameEnd - index));
         index = text.find_first_not_of(kWhitespace, nameEnd);
         if (index != std::string_view::npos && text[index] == '<') {
           const std::size_t close = Matching(text, index);
@@ -923,10 +1064,20 @@ namespace gpg::gal::effects
       return blocks;
     }
 
-    [[nodiscard]] std::uint8_t ParseDirect3D9Comparison(const std::string& value, const std::uint8_t fallback)
+    [[nodiscard]] std::uint8_t ParseDirect3D9Comparison(
+      const std::string& value,
+      const std::uint8_t fallback
+    )
     {
       static constexpr std::pair<const char*, std::uint8_t> kNames[] = {
-        {"never", 1}, {"less", 2}, {"equal", 3}, {"lessequal", 4}, {"greater", 5}, {"notequal", 6}, {"greaterequal", 7}, {"always", 8},
+        {"never", 1},
+        {"less", 2},
+        {"equal", 3},
+        {"lessequal", 4},
+        {"greater", 5},
+        {"notequal", 6},
+        {"greaterequal", 7},
+        {"always", 8},
       };
       const std::string key = Lower(Trim(value));
       for (const auto& [name, func] : kNames) {
@@ -939,13 +1090,17 @@ namespace gpg::gal::effects
     }
   } // namespace
 
-  void ApplyDirect3D9PassStates(const std::string_view originalSource, EffectDescription& description)
+  void ApplyDirect3D9PassStates(
+    const std::string_view originalSource,
+    EffectDescription& description
+  )
   {
     const std::string text = WithoutCommentsAndDirectives(originalSource);
     description.direct3D9PassStates = true;
     std::size_t alphaTested = 0U;
     for (const auto& [techniqueName, techniqueBody] : NamedBlocks(text, "technique")) {
-      const auto technique = std::find_if(description.techniques.begin(), description.techniques.end(), [&](const Technique& candidate) {
+      const auto technique =
+        std::find_if(description.techniques.begin(), description.techniques.end(), [&](const Technique& candidate) {
         return candidate.name == techniqueName;
       });
       if (technique == description.techniques.end()) {

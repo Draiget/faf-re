@@ -101,7 +101,10 @@ namespace
 
   struct EMauiEventTypeTypeInfoBootstrap
   {
-    EMauiEventTypeTypeInfoBootstrap() { register_EMauiEventTypeTypeInfo(); }
+    EMauiEventTypeTypeInfoBootstrap()
+    {
+      register_EMauiEventTypeTypeInfo();
+    }
   };
 
   EMauiEventTypeTypeInfoBootstrap gEMauiEventTypeTypeInfoBootstrap;
@@ -109,4 +112,7 @@ namespace
 
 // Phase-1 pre-registration: the descriptor has to exist before anything calls
 // gpg::LookupRType on it. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_EMauiEventTypeTypeInfo_00795a, register_EMauiEventTypeTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_EMauiEventTypeTypeInfo_00795a,
+  register_EMauiEventTypeTypeInfo
+)

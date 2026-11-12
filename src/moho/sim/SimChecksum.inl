@@ -90,7 +90,9 @@ bool Sim::CheatsEnabled()
  * Validates whether current command source may issue actions on one army, with
  * cheat fallback when source authorization fails.
  */
-bool Sim::OkayToMessWith(SimArmy* army)
+bool Sim::OkayToMessWith(
+  SimArmy* army
+)
 {
   auto* armyImpl = static_cast<CArmyImpl*>(army);
   if (!armyImpl) {
@@ -115,7 +117,9 @@ bool Sim::OkayToMessWith(SimArmy* army)
  * What it does:
  * Resolves entity owner army and delegates permission checks to army-level policy.
  */
-bool Sim::OkayToMessWith(Entity* entity)
+bool Sim::OkayToMessWith(
+  Entity* entity
+)
 {
   return OkayToMessWith(entity ? static_cast<SimArmy*>(entity->ArmyRef) : nullptr);
 }
@@ -127,7 +131,9 @@ bool Sim::OkayToMessWith(Entity* entity)
  * Checks each command unit-set entry against command-source permissions and
  * requires cheats for unusable or unauthorized entries.
  */
-bool Sim::OkayToMessWith(CUnitCommand* cmd)
+bool Sim::OkayToMessWith(
+  CUnitCommand* cmd
+)
 {
   if (!cmd) {
     return false;
@@ -167,7 +173,12 @@ bool Sim::OkayToMessWith(CUnitCommand* cmd)
  * Initializes one desync entry from beat/army metadata and both checksum
  * digest payloads.
  */
-SDesyncInfo::SDesyncInfo(const std::int32_t beatValue, const std::int32_t armyValue, const gpg::MD5Digest& expectedHash, const gpg::MD5Digest& remoteHash)
+SDesyncInfo::SDesyncInfo(
+  const std::int32_t beatValue,
+  const std::int32_t armyValue,
+  const gpg::MD5Digest& expectedHash,
+  const gpg::MD5Digest& remoteHash
+)
   : beat(beatValue)
   , army(armyValue)
   , hash1(expectedHash)
@@ -181,7 +192,10 @@ SDesyncInfo::SDesyncInfo(const std::int32_t beatValue, const std::int32_t armyVa
  * Validates one remote beat checksum against the local rolling hash ring,
  * records a desync entry on mismatch, and clears the cached desync log list.
  */
-void Sim::VerifyChecksum(const gpg::MD5Digest& checksum, const CSeqNo beat)
+void Sim::VerifyChecksum(
+  const gpg::MD5Digest& checksum,
+  const CSeqNo beat
+)
 {
   if (mCurCommandSource == kInvalidCommandSource) {
     return;
@@ -242,8 +256,9 @@ void Sim::RequestPause()
     return;
   }
 
-  if (mCurCommandSource == kInvalidCommandSource ||
-      static_cast<std::size_t>(mCurCommandSource) >= mCommandSources.size()) {
+  if (
+    mCurCommandSource == kInvalidCommandSource || static_cast<std::size_t>(mCurCommandSource) >= mCommandSources.size()
+  ) {
     return;
   }
 

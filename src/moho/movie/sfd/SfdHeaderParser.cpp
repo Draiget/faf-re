@@ -62,11 +62,13 @@ namespace moho::sfd
       h.audioStreams = static_cast<std::uint8_t>(Byte(s, 0xb1));
       h.videoStreams = static_cast<std::uint8_t>(Byte(s, 0xb2));
       h.privateStreams = static_cast<std::uint8_t>(Byte(s, 0xb3));
-      if (!h.elementCount || h.elementCount > 26 || h.videoStreams != 1 ||
-          h.elementCount != h.audioStreams + h.videoStreams + h.privateStreams ||
-          table + h.elementCount * stride > s.size() || h.metadataSize < table + h.elementCount * stride ||
-          h.metadataSize > 65536 || h.packSize < h.metadataSize || h.packSize > 65536 || h.packetSizeFieldLength != 2 ||
-          h.packType != 0)
+      if (
+        !h.elementCount || h.elementCount > 26 || h.videoStreams != 1 ||
+        h.elementCount != h.audioStreams + h.videoStreams + h.privateStreams ||
+        table + h.elementCount * stride > s.size() || h.metadataSize < table + h.elementCount * stride ||
+        h.metadataSize > 65536 || h.packSize < h.metadataSize || h.packSize > 65536 || h.packetSizeFieldLength != 2 ||
+        h.packType != 0
+      )
         continue;
       h.byteRate = Le32(s, 0xb4);
       h.audioLength = Le32(s, 0xb8);

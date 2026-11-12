@@ -37,9 +37,9 @@ namespace moho
 
     WeakPtr<Entity> mAttachTargetWeak; // +0x00
 
-    std::int32_t mParentBoneIndex;  // +0x08
-    std::int32_t mChildBoneIndex;   // +0x0C
-    VTransform mRelativeTransform;  // +0x10
+    std::int32_t mParentBoneIndex; // +0x08
+    std::int32_t mChildBoneIndex;  // +0x0C
+    VTransform mRelativeTransform; // +0x10
 
     /**
      * What it does:
@@ -64,7 +64,10 @@ namespace moho
      * (0x0068C1E6), each with a default-constructed (identity) transform.
      */
     SEntAttachInfo(
-      Entity* parent, std::int32_t childBoneIndex, std::int32_t parentBoneIndex, const VTransform& relativeTransform
+      Entity* parent,
+      std::int32_t childBoneIndex,
+      std::int32_t parentBoneIndex,
+      const VTransform& relativeTransform
     ) noexcept;
 
     [[nodiscard]] WeakPtr<Entity>& TargetWeakLink() noexcept
@@ -105,15 +108,19 @@ namespace moho
 
   static_assert(sizeof(SEntAttachInfo) == 0x2C, "SEntAttachInfo size must be 0x2C");
   static_assert(
-    offsetof(SEntAttachInfo, mAttachTargetWeak) == 0x00, "SEntAttachInfo::mAttachTargetWeak offset must be 0x00"
+    offsetof(SEntAttachInfo, mAttachTargetWeak) == 0x00,
+    "SEntAttachInfo::mAttachTargetWeak offset must be 0x00"
   );
   static_assert(
-    offsetof(SEntAttachInfo, mParentBoneIndex) == 0x08, "SEntAttachInfo::mParentBoneIndex offset must be 0x08"
+    offsetof(SEntAttachInfo, mParentBoneIndex) == 0x08,
+    "SEntAttachInfo::mParentBoneIndex offset must be 0x08"
   );
   static_assert(
-    offsetof(SEntAttachInfo, mChildBoneIndex) == 0x0C, "SEntAttachInfo::mChildBoneIndex offset must be 0x0C"
+    offsetof(SEntAttachInfo, mChildBoneIndex) == 0x0C,
+    "SEntAttachInfo::mChildBoneIndex offset must be 0x0C"
   );
   static_assert(
-    offsetof(SEntAttachInfo, mRelativeTransform) == 0x10, "SEntAttachInfo::mRelativeTransform offset must be 0x10"
+    offsetof(SEntAttachInfo, mRelativeTransform) == 0x10,
+    "SEntAttachInfo::mRelativeTransform offset must be 0x10"
   );
 } // namespace moho

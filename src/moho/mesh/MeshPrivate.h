@@ -23,7 +23,10 @@
 
 #include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
+#endif
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
 #include "moho/app/UserWorkerPool.h"
@@ -59,9 +62,8 @@
 #include "gpg/core/utils/Logging.h"
 #include "moho/render/d3d/CD3DRenderTarget.h"
 
-
 namespace moho
 {
   extern float ren_MeshDissolve;
   extern float ren_MeshDissolveCutoff;
-}
+} // namespace moho

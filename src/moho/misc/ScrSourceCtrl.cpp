@@ -16,12 +16,15 @@ namespace
    */
   struct ScrFileCtrlHasPath
   {
-    explicit ScrFileCtrlHasPath(const fa::string& sourcePath)
+    explicit ScrFileCtrlHasPath(
+      const fa::string& sourcePath
+    )
       : mSourcePath(sourcePath)
-    {
-    }
+    {}
 
-    bool operator()(const moho::ScrFileCtrl* const page) const
+    bool operator()(
+      const moho::ScrFileCtrl* const page
+    ) const
     {
       return mSourcePath == page->mSourcePath;
     }
@@ -33,11 +36,12 @@ namespace
 /**
  * Address: 0x004C3500 (FUN_004C3500)
  */
-moho::ScrSourceCtrl::ScrSourceCtrl(wxWindow* const parent)
+moho::ScrSourceCtrl::ScrSourceCtrl(
+  wxWindow* const parent
+)
   : wxNotebook(parent, kSourceNotebookId, wxDefaultPosition, wxDefaultSize, 0, wxT("ScrSourceCtrl"))
   , mPages()
-{
-}
+{}
 
 /**
  * Address: 0x004C3620 (FUN_004C3620)
@@ -48,7 +52,9 @@ moho::ScrSourceCtrl::~ScrSourceCtrl() = default;
 /**
  * Address: 0x004C3670 (FUN_004C3670)
  */
-bool moho::ScrSourceCtrl::Open(const fa::string& fileName)
+bool moho::ScrSourceCtrl::Open(
+  const fa::string& fileName
+)
 {
   const fa::vector<ScrFileCtrl*>::iterator existing =
     std::find_if(mPages.begin(), mPages.end(), ScrFileCtrlHasPath(fileName));
@@ -71,7 +77,9 @@ bool moho::ScrSourceCtrl::Open(const fa::string& fileName)
 /**
  * Address: 0x004C38A0 (FUN_004C38A0)
  */
-void moho::ScrSourceCtrl::Close(const fa::string& fileName)
+void moho::ScrSourceCtrl::Close(
+  const fa::string& fileName
+)
 {
   const fa::vector<ScrFileCtrl*>::iterator page =
     std::find_if(mPages.begin(), mPages.end(), ScrFileCtrlHasPath(fileName));
@@ -118,7 +126,9 @@ fa::string moho::ScrSourceCtrl::GetCurrentFileName() const
 /**
  * Address: 0x004C3A40 (FUN_004C3A40)
  */
-void moho::ScrSourceCtrl::FindFirst(const fa::string& text)
+void moho::ScrSourceCtrl::FindFirst(
+  const fa::string& text
+)
 {
   const int selection = GetSelection();
   if (selection > -1) {
@@ -129,7 +139,9 @@ void moho::ScrSourceCtrl::FindFirst(const fa::string& text)
 /**
  * Address: 0x004C3A70 (FUN_004C3A70)
  */
-void moho::ScrSourceCtrl::FindNext(const fa::string& text)
+void moho::ScrSourceCtrl::FindNext(
+  const fa::string& text
+)
 {
   const int selection = GetSelection();
   if (selection > -1) {
@@ -140,7 +152,9 @@ void moho::ScrSourceCtrl::FindNext(const fa::string& text)
 /**
  * Address: 0x004C3AA0 (FUN_004C3AA0)
  */
-void moho::ScrSourceCtrl::FindPrevious(const fa::string& text)
+void moho::ScrSourceCtrl::FindPrevious(
+  const fa::string& text
+)
 {
   const int selection = GetSelection();
   if (selection > -1) {
@@ -151,7 +165,9 @@ void moho::ScrSourceCtrl::FindPrevious(const fa::string& text)
 /**
  * Address: 0x004C3AD0 (FUN_004C3AD0)
  */
-void moho::ScrSourceCtrl::GotoLine(const int line)
+void moho::ScrSourceCtrl::GotoLine(
+  const int line
+)
 {
   const int selection = GetSelection();
   if (selection > -1) {
@@ -162,7 +178,9 @@ void moho::ScrSourceCtrl::GotoLine(const int line)
 /**
  * Address: 0x004C3B00 (FUN_004C3B00)
  */
-void moho::ScrSourceCtrl::EnableBreakpoints(const bool enable)
+void moho::ScrSourceCtrl::EnableBreakpoints(
+  const bool enable
+)
 {
   for (fa::vector<ScrFileCtrl*>::iterator page = mPages.begin(); page != mPages.end(); ++page) {
     (*page)->EnableBreakpoints(enable);
@@ -172,7 +190,10 @@ void moho::ScrSourceCtrl::EnableBreakpoints(const bool enable)
 /**
  * Address: 0x004C3B30 (FUN_004C3B30)
  */
-void moho::ScrSourceCtrl::RemoveBreakpoint(const fa::string& fileName, const int line)
+void moho::ScrSourceCtrl::RemoveBreakpoint(
+  const fa::string& fileName,
+  const int line
+)
 {
   const fa::vector<ScrFileCtrl*>::iterator page =
     std::find_if(mPages.begin(), mPages.end(), ScrFileCtrlHasPath(fileName));
@@ -194,7 +215,10 @@ void moho::ScrSourceCtrl::RemoveAllBreakpoints()
 /**
  * Address: 0x004C3C00 (FUN_004C3C00)
  */
-bool moho::ScrSourceCtrl::SetCursorLine(const fa::string& fileName, const int line)
+bool moho::ScrSourceCtrl::SetCursorLine(
+  const fa::string& fileName,
+  const int line
+)
 {
   ClearCursor();
 

@@ -43,7 +43,9 @@ namespace moho
    *   because the engine retains ownership through the broadcaster lane,
    *   so no explicit free is needed in the recovered form.
    */
-  void CameraTrackingListener::OnEvent(SCameraTracking event)
+  void CameraTrackingListener::OnEvent(
+    SCameraTracking event
+  )
   {
     CWldSession* const activeSession = WLD_GetSession();
     if (activeSession == nullptr) {
@@ -134,7 +136,9 @@ namespace moho
    * the self-link reset, then the four-store insert ahead of the camera's
    * ring at `camera+0x04`. The camera is not null-checked.
    */
-  void func_SetWorldCamera(CameraImpl* const camera)
+  void func_SetWorldCamera(
+    CameraImpl* const camera
+  )
   {
     camera->AddListener(&GlobalCameraTrackingListener());
   }

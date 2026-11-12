@@ -56,4 +56,3 @@ namespace moho
    */
   void register_CAiNavigatorAirTypeInfo();
 } // namespace moho
-

@@ -105,11 +105,11 @@ namespace moho
 
     // 0x18: reserved/unknown dword (all observed constructors clear it to zero).
     std::uint32_t mReserved18;
-    Unit* mUnit;                  // 0x1C
-    Sim* mSim;                    // 0x20
-    ETaskState mTaskState;        // 0x24
-    EAiResult* mDispatchResult;   // 0x28
-    EAiResult mLinkResult;        // 0x2C
+    Unit* mUnit;                // 0x1C
+    Sim* mSim;                  // 0x20
+    ETaskState mTaskState;      // 0x24
+    EAiResult* mDispatchResult; // 0x28
+    EAiResult mLinkResult;      // 0x2C
   };
 
   class CCommandTaskTypeInfo : public gpg::RType
@@ -148,9 +148,7 @@ namespace moho
   static_assert(offsetof(CCommandTask, mUnit) == 0x1C, "CCommandTask::mUnit offset must be 0x1C");
   static_assert(offsetof(CCommandTask, mSim) == 0x20, "CCommandTask::mSim offset must be 0x20");
   static_assert(offsetof(CCommandTask, mTaskState) == 0x24, "CCommandTask::mTaskState offset must be 0x24");
-  static_assert(
-    offsetof(CCommandTask, mDispatchResult) == 0x28, "CCommandTask::mDispatchResult offset must be 0x28"
-  );
+  static_assert(offsetof(CCommandTask, mDispatchResult) == 0x28, "CCommandTask::mDispatchResult offset must be 0x28");
   static_assert(offsetof(CCommandTask, mLinkResult) == 0x2C, "CCommandTask::mLinkResult offset must be 0x2C");
   static_assert(sizeof(CCommandTaskTypeInfo) == 0x64, "CCommandTaskTypeInfo size must be 0x64");
 

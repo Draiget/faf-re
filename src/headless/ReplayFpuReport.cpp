@@ -37,7 +37,11 @@ namespace faf::headless
     unsigned gSampledControlWord = 0;
     unsigned gSampledMxcsr = 0;
 
-    void OnSampleSignal(int, siginfo_t*, void* const rawContext)
+    void OnSampleSignal(
+      int,
+      siginfo_t*,
+      void* const rawContext
+    )
     {
       const auto* const context = static_cast<const ucontext_t*>(rawContext);
       if (context != nullptr && context->uc_mcontext.fpregs != nullptr) {
@@ -72,7 +76,9 @@ namespace faf::headless
       return ids;
     }
 
-    [[nodiscard]] double ThreadUserSeconds(const long id)
+    [[nodiscard]] double ThreadUserSeconds(
+      const long id
+    )
     {
       char path[64];
       std::snprintf(path, sizeof(path), "/proc/self/task/%ld/stat", id);
@@ -93,7 +99,10 @@ namespace faf::headless
     }
   } // namespace
 
-  std::string ReportThreadFloatingPointState(const int samples, const int intervalMs)
+  std::string ReportThreadFloatingPointState(
+    const int samples,
+    const int intervalMs
+  )
   {
     const int signalNumber = SIGRTMIN + 3;
     struct sigaction action{};
@@ -181,7 +190,11 @@ namespace faf::headless
     }
 
     /** Suspends, reads the floating-point context, resumes; nothing allocates in between. */
-    [[nodiscard]] bool SampleThread(const HANDLE thread, unsigned& controlWord, unsigned& mxcsr)
+    [[nodiscard]] bool SampleThread(
+      const HANDLE thread,
+      unsigned& controlWord,
+      unsigned& mxcsr
+    )
     {
       if (::SuspendThread(thread) == static_cast<DWORD>(-1)) {
         return false;
@@ -204,7 +217,10 @@ namespace faf::headless
     }
   } // namespace
 
-  std::string ReportThreadFloatingPointState(const int samples, const int intervalMs)
+  std::string ReportThreadFloatingPointState(
+    const int samples,
+    const int intervalMs
+  )
   {
     std::map<DWORD, SThreadSamples> threads;
     for (int round = 0; round < samples; ++round) {

@@ -39,17 +39,23 @@ namespace moho
 
 namespace
 {
-  constexpr std::uint64_t kUnitStateMaskTransportLoading = (1ull << static_cast<std::uint32_t>(moho::UNITSTATE_TransportLoading));
-  constexpr std::uint64_t kUnitStateMaskHoldingPattern = (1ull << static_cast<std::uint32_t>(moho::UNITSTATE_HoldingPattern));
+  constexpr std::uint64_t kUnitStateMaskTransportLoading =
+    (1ull << static_cast<std::uint32_t>(moho::UNITSTATE_TransportLoading));
+  constexpr std::uint64_t kUnitStateMaskHoldingPattern =
+    (1ull << static_cast<std::uint32_t>(moho::UNITSTATE_HoldingPattern));
   constexpr int kPickupTimeoutTicks = 300;
   constexpr std::uintptr_t kInvalidEntitySlot = 0x8u;
 
-  [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept
+  [[nodiscard]] moho::ETaskState NextTaskState(
+    const moho::ETaskState state
+  ) noexcept
   {
     return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
   }
 
-  [[nodiscard]] bool IsUsableUnitSlot(const moho::Unit* const unit) noexcept
+  [[nodiscard]] bool IsUsableUnitSlot(
+    const moho::Unit* const unit
+  ) noexcept
   {
     const std::uintptr_t raw = reinterpret_cast<std::uintptr_t>(unit);
     return raw != 0u && raw != kInvalidEntitySlot;
@@ -65,7 +71,9 @@ namespace
    * `movss/mulss` chain the comparator body applies to each operand's blueprint
    * before the metric compare.
    */
-  [[nodiscard]] float ComputePickUpInfoLoadMetric(const moho::SPickUpInfo& entry) noexcept
+  [[nodiscard]] float ComputePickUpInfoLoadMetric(
+    const moho::SPickUpInfo& entry
+  ) noexcept
   {
     const moho::Unit* const unit = entry.GetUnit();
     GPG_ASSERT(unit != nullptr);
@@ -118,7 +126,10 @@ namespace
     return lhsMetric > rhsMetric;
   }
 
-  void RunUnitScript(moho::Unit* const unit, const char* const scriptName)
+  void RunUnitScript(
+    moho::Unit* const unit,
+    const char* const scriptName
+  )
   {
     if (unit == nullptr || scriptName == nullptr) {
       return;
@@ -148,7 +159,9 @@ namespace
    * last test is about units already committed to a ferry, and reading the
    * neighbouring slot let an unrelated transport claim them.
    */
-  [[nodiscard]] bool IsEligiblePickupCandidate(const moho::Unit* const unit) noexcept
+  [[nodiscard]] bool IsEligiblePickupCandidate(
+    const moho::Unit* const unit
+  ) noexcept
   {
     if (!IsUsableUnitSlot(unit)) {
       return false;
@@ -200,7 +213,10 @@ namespace moho
    * binds transport mode flags, links unit-set ownership in EntityDB, and
    * starts transport-loading script/state.
    */
-  CUnitLoadUnits::CUnitLoadUnits(CCommandTask* const parentTask, const EntitySetTemplate<Unit>& requestedUnits)
+  CUnitLoadUnits::CUnitLoadUnits(
+    CCommandTask* const parentTask,
+    const EntitySetTemplate<Unit>& requestedUnits
+  )
     : CCommandTask(parentTask)
     , mPickupQueue()
     , mRequestedUnits(requestedUnits)
@@ -289,7 +305,10 @@ namespace moho
    * Allocates one load-units task and forwards constructor arguments into
    * in-place construction.
    */
-  CUnitLoadUnits* CUnitLoadUnits::Create(CCommandTask* const parentTask, const EntitySetTemplate<Unit>* const requestedUnits)
+  CUnitLoadUnits* CUnitLoadUnits::Create(
+    CCommandTask* const parentTask,
+    const EntitySetTemplate<Unit>* const requestedUnits
+  )
   {
     if (requestedUnits == nullptr) {
       return nullptr;
@@ -392,12 +411,8 @@ namespace moho
     }
 
     if (
-      rejectedByCapacity
-      && !mIsTeleporter
-      && !mIsStagingPlatform
-      && !mUnit->IsUnitState(UNITSTATE_AssistMoving)
-      && !mUnit->IsUnitState(UNITSTATE_Ferrying)
-      && !mUnit->IsUnitState(UNITSTATE_Guarding)
+      rejectedByCapacity && !mIsTeleporter && !mIsStagingPlatform && !mUnit->IsUnitState(UNITSTATE_AssistMoving) &&
+      !mUnit->IsUnitState(UNITSTATE_Ferrying) && !mUnit->IsUnitState(UNITSTATE_Guarding)
     ) {
       // 0x0062555B-0x0062556F: `[unit+0x154]` ArmyRef, vtable +0x1C
       // GetArmyBrain, then CScriptObject::RunScript (0x00581AA0) on the brain,
@@ -440,9 +455,8 @@ namespace moho
           }
 
           if (
-            mUnit->IsUnitState(UNITSTATE_Ferrying)
-            && pickupUnit->IsUnitState(UNITSTATE_WaitForFerry)
-            && !pickupUnit->IsUnitState(UNITSTATE_TransportLoading)
+            mUnit->IsUnitState(UNITSTATE_Ferrying) && pickupUnit->IsUnitState(UNITSTATE_WaitForFerry) &&
+            !pickupUnit->IsUnitState(UNITSTATE_TransportLoading)
           ) {
             navigator->AbortMove();
           } else {
@@ -455,7 +469,10 @@ namespace moho
       }
     }
 
-    if (!mRequestedUnits.Empty() && transport->TransportGetWaitingFormation() == nullptr && (mIsStagingPlatform || mIsTeleporter)) {
+    if (
+      !mRequestedUnits.Empty() && transport->TransportGetWaitingFormation() == nullptr &&
+      (mIsStagingPlatform || mIsTeleporter)
+    ) {
       transport->TransportGenerateWaitingFormationForUnits(mRequestedUnits);
     }
   }
@@ -489,170 +506,173 @@ namespace moho
     }
 
     switch (mTaskState) {
-      case TASKSTATE_Preparing: {
-        if (!mUnit->IsUnitState(UNITSTATE_AssistMoving) && !mUnit->IsUnitState(UNITSTATE_Ferrying)) {
-          mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskHoldingPattern;
+    case TASKSTATE_Preparing: {
+      if (!mUnit->IsUnitState(UNITSTATE_AssistMoving) && !mUnit->IsUnitState(UNITSTATE_Ferrying)) {
+        mUnit->mUnitVarDat.mUnitStates |= kUnitStateMaskHoldingPattern;
 
-          CUnitCommand* const ownerHeadCommand = mUnit->CommandQueue != nullptr ? mUnit->CommandQueue->GetCurrentCommand() : nullptr;
-          for (Entity* const unitSlot : mRequestedUnits.mVec) {
-            Unit* const candidate = static_cast<Unit*>(unitSlot);
-            if (!IsUsableUnitSlot(candidate)) {
-              continue;
-            }
-
-            if (candidate->IsDead() || candidate->IsBeingBuilt() || candidate->IsUnitState(UNITSTATE_Attached)
-                || candidate->DestroyQueued()) {
-              continue;
-            }
-
-            CUnitCommand* const candidateHeadCommand =
-              candidate->CommandQueue != nullptr ? candidate->CommandQueue->GetCurrentCommand() : nullptr;
-            if (candidateHeadCommand != ownerHeadCommand) {
-              return 1;
-            }
+        CUnitCommand* const ownerHeadCommand =
+          mUnit->CommandQueue != nullptr ? mUnit->CommandQueue->GetCurrentCommand() : nullptr;
+        for (Entity* const unitSlot : mRequestedUnits.mVec) {
+          Unit* const candidate = static_cast<Unit*>(unitSlot);
+          if (!IsUsableUnitSlot(candidate)) {
+            continue;
           }
 
-          mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskHoldingPattern;
+          if (
+            candidate->IsDead() || candidate->IsBeingBuilt() || candidate->IsUnitState(UNITSTATE_Attached) ||
+            candidate->DestroyQueued()
+          ) {
+            continue;
+          }
+
+          CUnitCommand* const candidateHeadCommand =
+            candidate->CommandQueue != nullptr ? candidate->CommandQueue->GetCurrentCommand() : nullptr;
+          if (candidateHeadCommand != ownerHeadCommand) {
+            return 1;
+          }
         }
 
-        DoTask();
-        mTaskState = NextTaskState(mTaskState);
-        return 0;
+        mUnit->mUnitVarDat.mUnitStates &= ~kUnitStateMaskHoldingPattern;
       }
 
-      case TASKSTATE_Waiting: {
-        if (!mUnit->IsMobile()) {
-          mTaskState = NextTaskState(mTaskState);
-          return 1;
-        }
+      DoTask();
+      mTaskState = NextTaskState(mTaskState);
+      return 0;
+    }
 
-        // 0x00625AF1: `cmp [ebp+74h], esi` guards the storage probe, and
-        // `+0x74` is `mReadyUnitCount` -- `DoTask` zeroes it at 0x006251F4
-        // beside `mProcessingTicks` (+0x7C) and bumps it with
-        // `add dword ptr [ebp+74h], 1` (0x00625414) for every unit
-        // `TransportAssignSlot` accepts. A non-zero count jumps straight past
-        // the probe (`jnz` to 0x00625B0E); only a transport that assigned
-        // nothing has to justify itself by having internal storage.
-        //
-        // `mLoadedUnitCount` (+0x78) is the wrong lane: it counts units
-        // already physically attached, so it is zero on every fresh load. That
-        // made the guard always reach `TransportHasAvailableStorage`, which is
-        // `(stored + reserved) < Transport.StorageSlots` -- and every stock air
-        // transport blueprint omits `StorageSlots`, leaving the ctor default of
-        // 0 (ours and the binary's alike, 0x0051E5F7). `(0 + 0) < 0` is false,
-        // so the task returned -1 on its first Waiting tick, every time. Its
-        // destructor then cleared `kUnitStateMaskTransportLoading`, and the
-        // cargo's `CUnitCallTransport` sat in TASKSTATE_Preparing forever
-        // waiting for a flag that was already gone -- the order stayed queued
-        // and nothing moved.
-        if (mReadyUnitCount == 0 && !transport->TransportHasAvailableStorage()) {
-          return -1;
-        }
-
-        if (mIsStagingPlatform || mIsTeleporter || !mUnit->mIsAir) {
-          // 0x00625A9E: the abort is guarded by
-          // `Wm3::Vector3::Compare(mCurTransform.pos, mLastTransform.pos)`,
-          // which reports a *difference* -- so the move is only aborted while
-          // the unit is still travelling. A stationary transport advances
-          // straight to the next state with its navigator untouched.
-          IAiNavigator* const navigator = mUnit->AiNavigator;
-          if (navigator != nullptr && mUnit->mVarDat.mCurTransform.pos_ != mUnit->mVarDat.mLastTransform.pos_) {
-            navigator->AbortMove();
-          }
-
-          mTaskState = NextTaskState(mTaskState);
-          return 1;
-        }
-
-        RunUnitScript(mUnit, "OnTransportOrdered");
-
-        if (mUnit->mVarDat.mLayerMask != LAYER_Air && !mUnit->IsUnitState(UNITSTATE_AssistMoving)) {
-          const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
-          if (blueprint != nullptr) {
-            const Wm3::Vector3f& ownerPos = mUnit->GetPosition();
-            const float dx = ownerPos.x - mPickupCenter.x;
-            const float dz = ownerPos.z - mPickupCenter.z;
-            const float distance = std::sqrt((dx * dx) + (dz * dz));
-            // 0x00625BB5 `fcompi` + `jbe`: a NaN distance counts as in range.
-            if (!(distance > blueprint->AI.GuardScanRadius)) {
-              mTaskState = NextTaskState(mTaskState);
-              return 1;
-            }
-          }
-        }
-
-        const SOCellPos pickupCell = mUnit->GetFootprint().ToCellPos(mPickupCenter);
-        SNavGoal pickupGoal(pickupCell);
-        pickupGoal.mLayer = LAYER_Land;
-        NewMoveTask(pickupGoal, this, 0, nullptr, 1);
-
-        if (CUnitMotion* const motion = mUnit->UnitMotion; motion != nullptr) {
-          motion->SetFacing(transport->TransportGetPickupFacing());
-        }
-
+    case TASKSTATE_Waiting: {
+      if (!mUnit->IsMobile()) {
         mTaskState = NextTaskState(mTaskState);
         return 1;
       }
 
-      case TASKSTATE_Starting:
-        transport->TransportAtPickupPosition();
-        mTaskState = NextTaskState(mTaskState);
-        return 1;
-
-      case TASKSTATE_Processing: {
-        if (mIsStagingPlatform) {
-          if (transport->TransportGetPickupUnitCount() != 0u) {
-            return 10;
-          }
-
-          mTaskState = NextTaskState(mTaskState);
-          return 1;
-        }
-
-        ++mProcessingTicks;
-        if (transport->TransportGetPickupUnitCount() != 0u && mProcessingTicks <= kPickupTimeoutTicks) {
-          return 1;
-        }
-
-        // 0x00625D4F/0x00625D5A: `fastvector::AddAll` (0x0057EB00) onto
-        // `[ebp+0x48]` replaces the requested set's contents -- assignment.
-        mRequestedUnits = transport->TransportGetUnitsWaitingForPickup();
-
-        if (!mRequestedUnits.Empty() && mIsTeleporter) {
-          mTaskState = TASKSTATE_Preparing;
-          return 1;
-        }
-
-        mCompletedSuccessfully = (mProcessingTicks <= kPickupTimeoutTicks);
+      // 0x00625AF1: `cmp [ebp+74h], esi` guards the storage probe, and
+      // `+0x74` is `mReadyUnitCount` -- `DoTask` zeroes it at 0x006251F4
+      // beside `mProcessingTicks` (+0x7C) and bumps it with
+      // `add dword ptr [ebp+74h], 1` (0x00625414) for every unit
+      // `TransportAssignSlot` accepts. A non-zero count jumps straight past
+      // the probe (`jnz` to 0x00625B0E); only a transport that assigned
+      // nothing has to justify itself by having internal storage.
+      //
+      // `mLoadedUnitCount` (+0x78) is the wrong lane: it counts units
+      // already physically attached, so it is zero on every fresh load. That
+      // made the guard always reach `TransportHasAvailableStorage`, which is
+      // `(stored + reserved) < Transport.StorageSlots` -- and every stock air
+      // transport blueprint omits `StorageSlots`, leaving the ctor default of
+      // 0 (ours and the binary's alike, 0x0051E5F7). `(0 + 0) < 0` is false,
+      // so the task returned -1 on its first Waiting tick, every time. Its
+      // destructor then cleared `kUnitStateMaskTransportLoading`, and the
+      // cargo's `CUnitCallTransport` sat in TASKSTATE_Preparing forever
+      // waiting for a flag that was already gone -- the order stayed queued
+      // and nothing moved.
+      if (mReadyUnitCount == 0 && !transport->TransportHasAvailableStorage()) {
         return -1;
       }
 
-      case TASKSTATE_Complete: {
-        bool loadedUnitsEmpty = false;
-        if (transport != nullptr) {
-          const EntitySetTemplate<Unit> loaded = transport->TransportGetLoadedUnits(true);
-          loadedUnitsEmpty = loaded.Empty();
+      if (mIsStagingPlatform || mIsTeleporter || !mUnit->mIsAir) {
+        // 0x00625A9E: the abort is guarded by
+        // `Wm3::Vector3::Compare(mCurTransform.pos, mLastTransform.pos)`,
+        // which reports a *difference* -- so the move is only aborted while
+        // the unit is still travelling. A stationary transport advances
+        // straight to the next state with its navigator untouched.
+        IAiNavigator* const navigator = mUnit->AiNavigator;
+        if (navigator != nullptr && mUnit->mVarDat.mCurTransform.pos_ != mUnit->mVarDat.mLastTransform.pos_) {
+          navigator->AbortMove();
         }
 
-        if (!loadedUnitsEmpty) {
+        mTaskState = NextTaskState(mTaskState);
+        return 1;
+      }
+
+      RunUnitScript(mUnit, "OnTransportOrdered");
+
+      if (mUnit->mVarDat.mLayerMask != LAYER_Air && !mUnit->IsUnitState(UNITSTATE_AssistMoving)) {
+        const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
+        if (blueprint != nullptr) {
+          const Wm3::Vector3f& ownerPos = mUnit->GetPosition();
+          const float dx = ownerPos.x - mPickupCenter.x;
+          const float dz = ownerPos.z - mPickupCenter.z;
+          const float distance = std::sqrt((dx * dx) + (dz * dz));
+          // 0x00625BB5 `fcompi` + `jbe`: a NaN distance counts as in range.
+          if (!(distance > blueprint->AI.GuardScanRadius)) {
+            mTaskState = NextTaskState(mTaskState);
+            return 1;
+          }
+        }
+      }
+
+      const SOCellPos pickupCell = mUnit->GetFootprint().ToCellPos(mPickupCenter);
+      SNavGoal pickupGoal(pickupCell);
+      pickupGoal.mLayer = LAYER_Land;
+      NewMoveTask(pickupGoal, this, 0, nullptr, 1);
+
+      if (CUnitMotion* const motion = mUnit->UnitMotion; motion != nullptr) {
+        motion->SetFacing(transport->TransportGetPickupFacing());
+      }
+
+      mTaskState = NextTaskState(mTaskState);
+      return 1;
+    }
+
+    case TASKSTATE_Starting:
+      transport->TransportAtPickupPosition();
+      mTaskState = NextTaskState(mTaskState);
+      return 1;
+
+    case TASKSTATE_Processing: {
+      if (mIsStagingPlatform) {
+        if (transport->TransportGetPickupUnitCount() != 0u) {
           return 10;
         }
 
-        // 0x00625E13/0x00625E22: `fastvector::AddAll` (0x0057EB00) --
-        // assignment, as in TASKSTATE_Processing.
-        mRequestedUnits = transport->TransportGetUnitsWaitingForPickup();
-
-        if (!mRequestedUnits.Empty()) {
-          mTaskState = TASKSTATE_Preparing;
-          return 1;
-        }
-
-        mCompletedSuccessfully = true;
-        return -1;
+        mTaskState = NextTaskState(mTaskState);
+        return 1;
       }
 
-      default:
+      ++mProcessingTicks;
+      if (transport->TransportGetPickupUnitCount() != 0u && mProcessingTicks <= kPickupTimeoutTicks) {
         return 1;
+      }
+
+      // 0x00625D4F/0x00625D5A: `fastvector::AddAll` (0x0057EB00) onto
+      // `[ebp+0x48]` replaces the requested set's contents -- assignment.
+      mRequestedUnits = transport->TransportGetUnitsWaitingForPickup();
+
+      if (!mRequestedUnits.Empty() && mIsTeleporter) {
+        mTaskState = TASKSTATE_Preparing;
+        return 1;
+      }
+
+      mCompletedSuccessfully = (mProcessingTicks <= kPickupTimeoutTicks);
+      return -1;
+    }
+
+    case TASKSTATE_Complete: {
+      bool loadedUnitsEmpty = false;
+      if (transport != nullptr) {
+        const EntitySetTemplate<Unit> loaded = transport->TransportGetLoadedUnits(true);
+        loadedUnitsEmpty = loaded.Empty();
+      }
+
+      if (!loadedUnitsEmpty) {
+        return 10;
+      }
+
+      // 0x00625E13/0x00625E22: `fastvector::AddAll` (0x0057EB00) --
+      // assignment, as in TASKSTATE_Processing.
+      mRequestedUnits = transport->TransportGetUnitsWaitingForPickup();
+
+      if (!mRequestedUnits.Empty()) {
+        mTaskState = TASKSTATE_Preparing;
+        return 1;
+      }
+
+      mCompletedSuccessfully = true;
+      return -1;
+    }
+
+    default:
+      return 1;
     }
   }
 
@@ -663,7 +683,9 @@ namespace moho
    * Loads base task state, pickup queue lanes, requested-unit set, pickup
    * center, counters, and transport mode flags from archive storage.
    */
-  void CUnitLoadUnits::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CUnitLoadUnits::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -689,7 +711,9 @@ namespace moho
    * Saves base task state, pickup queue lanes, requested-unit set, pickup
    * center, counters, and transport mode flags into archive storage.
    */
-  void CUnitLoadUnits::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CUnitLoadUnits::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;

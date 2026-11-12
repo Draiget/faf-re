@@ -85,7 +85,7 @@ namespace moho
     // `WeakObject`, which needs `Unit` complete.
     [[nodiscard]] Unit* GetUnit() const noexcept;
 
-    WeakPtr<Unit> mUnit;     // +0x00
+    WeakPtr<Unit> mUnit;      // +0x00
     float mDistanceSq = 0.0f; // +0x08
   };
 

@@ -68,4 +68,3 @@ namespace moho
 
   static_assert(sizeof(CUnitUpgradeTaskTypeInfo) == 0x64, "CUnitUpgradeTaskTypeInfo size must be 0x64");
 } // namespace moho
-

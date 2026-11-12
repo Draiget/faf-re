@@ -8,7 +8,8 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
-#include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/RRuleGameRules.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -49,7 +50,9 @@ namespace
    * What it does:
    * Restores unit spawn-elevation lane from blueprint physics elevation.
    */
-  [[maybe_unused]] moho::UnitAttributes* RestoreSpawnElevationFromBlueprint(moho::UnitAttributes* const attributes) noexcept
+  [[maybe_unused]] moho::UnitAttributes* RestoreSpawnElevationFromBlueprint(
+    moho::UnitAttributes* const attributes
+  ) noexcept
   {
     attributes->spawnElevationOffset = attributes->blueprint->Physics.Elevation;
     return attributes;
@@ -61,7 +64,9 @@ namespace
    * What it does:
    * Restores unit regen-rate lane from blueprint defense data.
    */
-  [[maybe_unused]] moho::UnitAttributes* RestoreRegenRateFromBlueprint(moho::UnitAttributes* const attributes) noexcept
+  [[maybe_unused]] moho::UnitAttributes* RestoreRegenRateFromBlueprint(
+    moho::UnitAttributes* const attributes
+  ) noexcept
   {
     attributes->regenRate = attributes->blueprint->Defense.RegenRate;
     return attributes;
@@ -73,7 +78,9 @@ namespace
    * What it does:
    * Restores unit build-rate lane from blueprint economy data.
    */
-  [[maybe_unused]] moho::UnitAttributes* RestoreBuildRateFromBlueprint(moho::UnitAttributes* const attributes) noexcept
+  [[maybe_unused]] moho::UnitAttributes* RestoreBuildRateFromBlueprint(
+    moho::UnitAttributes* const attributes
+  ) noexcept
   {
     attributes->buildRate = attributes->blueprint->Economy.BuildRate;
     return attributes;
@@ -85,7 +92,9 @@ namespace
    * What it does:
    * Restores unit command-capability mask from blueprint general data.
    */
-  [[maybe_unused]] moho::UnitAttributes* RestoreCommandCapsFromBlueprint(moho::UnitAttributes* const attributes) noexcept
+  [[maybe_unused]] moho::UnitAttributes* RestoreCommandCapsFromBlueprint(
+    moho::UnitAttributes* const attributes
+  ) noexcept
   {
     attributes->commandCapsMask = static_cast<std::uint32_t>(attributes->blueprint->General.CommandCaps);
     return attributes;
@@ -97,7 +106,9 @@ namespace
    * What it does:
    * Restores unit toggle-capability mask from blueprint general data.
    */
-  [[maybe_unused]] moho::UnitAttributes* RestoreToggleCapsFromBlueprint(moho::UnitAttributes* const attributes) noexcept
+  [[maybe_unused]] moho::UnitAttributes* RestoreToggleCapsFromBlueprint(
+    moho::UnitAttributes* const attributes
+  ) noexcept
   {
     attributes->toggleCapsMask = static_cast<std::uint32_t>(attributes->blueprint->General.ToggleCaps);
     return attributes;
@@ -115,7 +126,10 @@ namespace moho
    * Copies rule-empty category universe lanes, clears category bit words back
    * to inline-empty storage, then restores blueprint-driven elevation/rates/caps.
    */
-  UnitAttributes::UnitAttributes(const RUnitBlueprint* const unitBlueprint, const RRuleGameRulesImpl* const rules)
+  UnitAttributes::UnitAttributes(
+    const RUnitBlueprint* const unitBlueprint,
+    const RRuleGameRulesImpl* const rules
+  )
   {
     blueprint = unitBlueprint;
 
@@ -176,7 +190,9 @@ namespace moho
    * Deserializes pointer/category/float/caps/bool lanes into one
    * `UnitAttributes` object.
    */
-  void UnitAttributes::MemberDeserialize(gpg::ReadArchive* const archive)
+  void UnitAttributes::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     const gpg::RRef ownerRef{};
 
@@ -217,11 +233,15 @@ namespace moho
    * Serializes pointer/category/float/caps/bool lanes from one
    * `UnitAttributes` object.
    */
-  void UnitAttributes::MemberSerialize(gpg::WriteArchive* const archive) const
+  void UnitAttributes::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     const gpg::RRef ownerRef{};
 
-    archive->WritePointer<moho::RUnitBlueprint>(const_cast<RUnitBlueprint*>(blueprint), gpg::TrackedPointerState::Unowned, ownerRef);
+    archive->WritePointer<moho::RUnitBlueprint>(
+      const_cast<RUnitBlueprint*>(blueprint), gpg::TrackedPointerState::Unowned, ownerRef
+    );
 
     archive->Write(gpg::RTypeOf<moho::EntityCategorySet>(), &restrictionCategory, ownerRef);
     archive->WriteFloat(spawnElevationOffset);
@@ -263,7 +283,10 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_UnitAttributesTypeInfo_ff51a9, moho::preregister_UnitAttributesTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_UnitAttributesTypeInfo_ff51a9,
+  moho::preregister_UnitAttributesTypeInfo
+)
 
 namespace moho
 {

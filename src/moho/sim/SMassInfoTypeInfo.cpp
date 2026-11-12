@@ -77,7 +77,9 @@ void moho::register_SMassInfoTypeInfoStartup()
   (void)AcquireSMassInfoTypeInfo();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_SMassInfoTypeInfoStartup_53a161, moho::register_SMassInfoTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_SMassInfoTypeInfoStartup_53a161,
+  moho::register_SMassInfoTypeInfoStartup
+)

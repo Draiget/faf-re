@@ -16,7 +16,11 @@ namespace gpg::gal
    * mirror that exact loop structure to preserve identical behavior on
    * misaligned reads and short tails.
    */
-  int STR_Compare(const char* lhs, const char* rhs, const std::size_t length) noexcept
+  int STR_Compare(
+    const char* lhs,
+    const char* rhs,
+    const std::size_t length
+  ) noexcept
   {
     std::size_t remaining = length;
 
@@ -60,7 +64,8 @@ namespace gpg::gal
           if (remaining == 1u) {
             return 0;
           }
-          diff = static_cast<int>(static_cast<unsigned char>(*lhs)) - static_cast<int>(static_cast<unsigned char>(*rhs));
+          diff =
+            static_cast<int>(static_cast<unsigned char>(*lhs)) - static_cast<int>(static_cast<unsigned char>(*rhs));
           if (diff == 0) {
             return 0;
           }
@@ -82,7 +87,9 @@ namespace gpg::gal
    * `*search`; returns `end` when no exact match is present.
    */
   fa::string* STR_FindInRange(
-    fa::string* start, fa::string* end, const char* const* search
+    fa::string* start,
+    fa::string* end,
+    const char* const* search
   ) noexcept
   {
     fa::string* iter = start;

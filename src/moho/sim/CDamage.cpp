@@ -49,7 +49,9 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] LuaPlus::LuaObject CreateDamageLuaFactoryObject(moho::Sim* const sim)
+  [[nodiscard]] LuaPlus::LuaObject CreateDamageLuaFactoryObject(
+    moho::Sim* const sim
+  )
   {
     LuaPlus::LuaObject scriptFactory{};
     moho::func_CreateLuaCDamage(&scriptFactory, sim->mLuaState);
@@ -63,7 +65,10 @@ namespace
    * Returns true when one shield owns a collision primitive and that
    * primitive contains the target entity world-position lane.
    */
-  [[maybe_unused]] bool ShieldContainsEntityPosition(moho::Shield* const shield, moho::Entity* const entity)
+  [[maybe_unused]] bool ShieldContainsEntityPosition(
+    moho::Shield* const shield,
+    moho::Entity* const entity
+  )
   {
     if (shield != nullptr) {
       moho::CColPrimitiveBase* const collisionShape = shield->CollisionExtents;
@@ -98,7 +103,9 @@ namespace
    * Clears the temporary shield-iteration list used by the damage path and
    * releases its owned entries.
    */
-  [[maybe_unused]] void ResetDamageShieldIterationList(fa::list<moho::Shield*>& shields)
+  [[maybe_unused]] void ResetDamageShieldIterationList(
+    fa::list<moho::Shield*>& shields
+  )
   {
     shields.clear();
   }
@@ -109,10 +116,7 @@ namespace
     DamageShieldListSentinelNode* prev;
     std::uint32_t valueLane;
   };
-  static_assert(
-    sizeof(DamageShieldListSentinelNode) == 0x0C,
-    "DamageShieldListSentinelNode size must be 0x0C"
-  );
+  static_assert(sizeof(DamageShieldListSentinelNode) == 0x0C, "DamageShieldListSentinelNode size must be 0x0C");
 
   /**
    * Address: 0x00739DB0 (FUN_00739DB0, SIM shield-list sentinel allocator)
@@ -123,8 +127,7 @@ namespace
    */
   [[maybe_unused]] [[nodiscard]] DamageShieldListSentinelNode* AllocateSelfLinkedDamageShieldSentinel()
   {
-    auto* const node =
-      fa::detail::allocate_checked<DamageShieldListSentinelNode>(1u);
+    auto* const node = fa::detail::allocate_checked<DamageShieldListSentinelNode>(1u);
     node->next = node;
     node->prev = node;
     return node;
@@ -179,7 +182,9 @@ namespace moho
    * Copy-constructs one detached damage payload and re-links copied
    * instigator/target weak lanes into owner intrusive weak chains.
    */
-  CDamage::CDamage(const CDamage& other)
+  CDamage::CDamage(
+    const CDamage& other
+  )
     : CScriptObject()
     , mMethod(other.mMethod)
     , mInstigator(other.mInstigator) // 0x00736C85: `WeakPtr`'s copy constructor, linked at the head
@@ -203,7 +208,9 @@ namespace moho
    * Creates script-backed CDamage object state and initializes runtime fields
    * used by damage apply helpers.
    */
-  CDamage::CDamage(Sim* const sim)
+  CDamage::CDamage(
+    Sim* const sim
+  )
     : CScriptObject(CreateDamageLuaFactoryObject(sim), LuaPlus::LuaObject{}, LuaPlus::LuaObject{}, LuaPlus::LuaObject{})
   {
 
@@ -271,7 +278,9 @@ namespace moho
    * What it does:
    * Adds reflected `CScriptObject` base lane at zero offset.
    */
-  void CDamageTypeInfo::AddBaseScriptObject(gpg::RType* const typeInfo)
+  void CDamageTypeInfo::AddBaseScriptObject(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CScriptObject>(typeInfo);
   }
@@ -282,7 +291,9 @@ namespace moho
    * What it does:
    * Publishes `CDamage` reflected lanes in binary call order.
    */
-  void CDamageTypeInfo::AddFields(gpg::RType* const typeInfo)
+  void CDamageTypeInfo::AddFields(
+    gpg::RType* const typeInfo
+  )
   {
     (void)typeInfo->AddField<moho::CDamageMethod>("Method", offsetof(CDamage, mMethod));
     (void)typeInfo->AddField<moho::SMinMax<float>>("MinMaxRadius", offsetof(CDamage, mRadius));
@@ -360,7 +371,10 @@ namespace moho
    *     `"DealDamage(target=0x%08x, amt=%.1f)"`, packs `mVector` into a
    *     Lua vec3, and invokes the target's `OnDamage` script callback.
    */
-  void SIM_DoDamagePoint(Sim* const sim, const CDamage& damage)
+  void SIM_DoDamagePoint(
+    Sim* const sim,
+    const CDamage& damage
+  )
   {
     Entity* const targetEntity = damage.mTarget.GetObjectPtr();
 
@@ -432,9 +446,10 @@ namespace moho
       const float relativeDamage = postArmorAmount / damage.mAmount;
 
       if (postArmorAmount > 0.0f) {
-        if (Entity* const scriptInstigator = damage.mInstigator.GetObjectPtr();
-            scriptInstigator != nullptr && scriptInstigator->ArmyRef != nullptr)
-        {
+        if (
+          Entity* const scriptInstigator = damage.mInstigator.GetObjectPtr();
+          scriptInstigator != nullptr && scriptInstigator->ArmyRef != nullptr
+        ) {
           const int instigatorArmyIndex = scriptInstigator->ArmyRef->mConstDat.mArmyIndex + 1;
           targetUnit->RunScriptInt("OnDamageBy", instigatorArmyIndex);
         }
@@ -448,9 +463,10 @@ namespace moho
 
     // Instigator-side army-wide and per-platoon damage-dealt stats.
     if (damage.mInstigator.HasValue()) {
-      if (Entity* const instigatorEntity = damage.mInstigator.GetObjectPtr();
-          instigatorEntity != nullptr && instigatorEntity->ArmyRef != nullptr)
-      {
+      if (
+        Entity* const instigatorEntity = damage.mInstigator.GetObjectPtr();
+        instigatorEntity != nullptr && instigatorEntity->ArmyRef != nullptr
+      ) {
         CArmyImpl* const instigatorArmy = instigatorEntity->ArmyRef;
         CArmyStats* const armyStats = instigatorArmy->GetArmyStats();
         if (armyStats != nullptr) {
@@ -462,17 +478,10 @@ namespace moho
 
           if (Unit* const instigatorUnit = instigatorEntity->IsUnit(); instigatorUnit != nullptr) {
             const RUnitBlueprint* const blueprint = instigatorUnit->GetBlueprint();
-            (void)armyStats->AddBlueprintStatDelta(
-              "Units_TotalDamageDealt",
-              blueprint,
-              postArmorAmount
-            );
+            (void)armyStats->AddBlueprintStatDelta("Units_TotalDamageDealt", blueprint, postArmorAmount);
 
             ESquadClass squadClass{};
-            CPlatoon* const platoon = instigatorArmy->GetPlatoonFor(
-              instigatorUnit,
-              &squadClass
-            );
+            CPlatoon* const platoon = instigatorArmy->GetPlatoonFor(instigatorUnit, &squadClass);
             if (platoon != nullptr) {
               platoon->mDamageDealt += postArmorAmount;
             }
@@ -487,13 +496,15 @@ namespace moho
     // behavior is preserved here (an unbound instigator skips target
     // stats too).
     if (damage.mInstigator.HasValue()) {
-      if (Entity* const targetForStats = damage.mTarget.GetObjectPtr();
-          targetForStats != nullptr && targetForStats->ArmyRef != nullptr)
-      {
+      if (
+        Entity* const targetForStats = damage.mTarget.GetObjectPtr();
+        targetForStats != nullptr && targetForStats->ArmyRef != nullptr
+      ) {
         CArmyImpl* const targetArmy = targetForStats->ArmyRef;
         CArmyStats* const armyStats = targetArmy->GetArmyStats();
         if (armyStats != nullptr) {
-          CArmyStatItem* const receivedItem = ResolveArmyStatItemCachedCreate(armyStats, "DamageStats_TotalDamageReceived");
+          CArmyStatItem* const receivedItem =
+            ResolveArmyStatItemCachedCreate(armyStats, "DamageStats_TotalDamageReceived");
           if (receivedItem != nullptr) {
             receivedItem->SynchronizeAsFloat();
             (void)receivedItem->AddFloat(&postArmorAmount);
@@ -501,17 +512,10 @@ namespace moho
 
           if (Unit* const targetUnitForStats = targetForStats->IsUnit(); targetUnitForStats != nullptr) {
             const RUnitBlueprint* const targetBlueprint = targetUnitForStats->GetBlueprint();
-            (void)armyStats->AddBlueprintStatDelta(
-              "Units_TotalDamageReceive",
-              targetBlueprint,
-              postArmorAmount
-            );
+            (void)armyStats->AddBlueprintStatDelta("Units_TotalDamageReceive", targetBlueprint, postArmorAmount);
 
             ESquadClass squadClass{};
-            CPlatoon* const platoon = targetArmy->GetPlatoonFor(
-              targetUnitForStats,
-              &squadClass
-            );
+            CPlatoon* const platoon = targetArmy->GetPlatoonFor(targetUnitForStats, &squadClass);
             if (platoon != nullptr) {
               platoon->mDamageReceived += postArmorAmount;
             }
@@ -531,10 +535,7 @@ namespace moho
       if (finalTarget != nullptr) {
         const std::string_view typeView = damage.mType.view();
         finalTarget->RunScriptEntityOnDamage(
-          damage.mInstigator,
-          postArmorAmount,
-          damagePayload,
-          std::string(typeView.data(), typeView.size())
+          damage.mInstigator, postArmorAmount, damagePayload, std::string(typeView.data(), typeView.size())
         );
       }
     }
@@ -542,7 +543,10 @@ namespace moho
 
   // Moho::IArmy::IsAlly (0x005BD630) is shadowed on CArmyImpl by the same-named
   // cached-flag data member (+0x128), so replicate the ally-bitset membership test.
-  [[nodiscard]] bool ArmyIsAlly(const CArmyImpl* const army, const std::uint32_t armyIndex) noexcept
+  [[nodiscard]] bool ArmyIsAlly(
+    const CArmyImpl* const army,
+    const std::uint32_t armyIndex
+  ) noexcept
   {
     if (army == nullptr || armyIndex == 0xFFFFFFFFu) {
       return false;
@@ -550,7 +554,10 @@ namespace moho
     return army->mVarDat.mAllies.Contains(armyIndex);
   }
 
-  [[nodiscard]] bool PointInsideSphere(const Wm3::Vec3f& point, const Wm3::Sphere3f& sphere) noexcept
+  [[nodiscard]] bool PointInsideSphere(
+    const Wm3::Vec3f& point,
+    const Wm3::Sphere3f& sphere
+  ) noexcept
   {
     // 0x00A49DB0: the deltas are rounded to float, their squares summed
     // (x + y) + z on the x87 stack and stored as a float, the square root is
@@ -588,7 +595,11 @@ namespace moho
    * unless friendly fire is enabled -- the shield's script-driven absorption is
    * queried and, when positive, the shield is appended to `absorbingShields`.
    */
-  void SIM_DoDamage(Sim* const sim, fa::list<SShieldDamageEntry>& absorbingShields, const CDamage& damage)
+  void SIM_DoDamage(
+    Sim* const sim,
+    fa::list<SShieldDamageEntry>& absorbingShields,
+    const CDamage& damage
+  )
   {
     fa::list<Shield*> shieldSnapshot = sim->mShields;
     for (Shield* const shield : shieldSnapshot) {
@@ -606,8 +617,9 @@ namespace moho
           CArmyImpl* const shieldArmy = shield->ArmyRef;
           if (shieldArmy != nullptr) {
             CArmyImpl* const instigatorArmy = instigator->ArmyRef;
-            const std::uint32_t instigatorIndex =
-              instigatorArmy != nullptr ? static_cast<std::uint32_t>(instigatorArmy->mConstDat.mArmyIndex) : 0xFFFFFFFFu;
+            const std::uint32_t instigatorIndex = instigatorArmy != nullptr
+              ? static_cast<std::uint32_t>(instigatorArmy->mConstDat.mArmyIndex)
+              : 0xFFFFFFFFu;
             if (ArmyIsAlly(shieldArmy, instigatorIndex)) {
               continue;
             }
@@ -664,7 +676,10 @@ namespace moho
    * damage that reaches the entity.
    */
   [[nodiscard]] float ComputeShieldedDamageForEntity(
-    Entity* const entity, const fa::list<SShieldDamageEntry>& absorbingShields, float amount)
+    Entity* const entity,
+    const fa::list<SShieldDamageEntry>& absorbingShields,
+    float amount
+  )
   {
     for (const SShieldDamageEntry& entry : absorbingShields) {
       Shield* const shield = entry.shield;
@@ -690,7 +705,10 @@ namespace moho
    * (radius mRadius) -- the ring band a ring-effect damage payload strikes.
    */
   void GatherEntitiesInDamageRing(
-    const CDamage& damage, COGrid* const oGrid, gpg::core::FastVectorN<CollisionResult, 10>& outResults)
+    const CDamage& damage,
+    COGrid* const oGrid,
+    gpg::core::FastVectorN<CollisionResult, 10>& outResults
+  )
   {
     Wm3::Sphere3f innerSphere{};
     innerSphere.Center = damage.mOrigin;
@@ -721,7 +739,8 @@ namespace moho
     (void)oGrid->GatherUnmarkedEntities(
       outerBounds,
       static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Prop | ENTITYTYPE_Projectile | ENTITYTYPE_Entity),
-      gatheredEntities);
+      gatheredEntities
+    );
 
     outResults.ResetStorageToInline();
 
@@ -749,7 +768,10 @@ namespace moho
    * (non-ally, non-"NOSPLASHDAMAGE") target, applies the origin damage reduced by
    * the shields covering that entity via a single-target SIM_DoDamagePoint.
    */
-  void func_DoDamageRing(Sim* const sim, const CDamage& damage)
+  void func_DoDamageRing(
+    Sim* const sim,
+    const CDamage& damage
+  )
   {
     fa::list<SShieldDamageEntry> absorbingShields;
     SIM_DoDamage(sim, absorbingShields, damage);
@@ -811,7 +833,10 @@ namespace moho
    * SIM_DoDamagePoint. Unlike the ring lane, it then also damages each absorbing
    * shield itself by the amount that shield absorbed.
    */
-  void SIM_DoDamageArea(Sim* const sim, const CDamage& damage)
+  void SIM_DoDamageArea(
+    Sim* const sim,
+    const CDamage& damage
+  )
   {
     fa::list<SShieldDamageEntry> absorbingShields;
     SIM_DoDamage(sim, absorbingShields, damage);
@@ -824,7 +849,8 @@ namespace moho
     sim->mOGrid->ForAllEntitiesIterator(
       areaResults,
       static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Prop | ENTITYTYPE_Projectile | ENTITYTYPE_Entity),
-      querySphere);
+      querySphere
+    );
 
     Entity* const instigator = damage.mInstigator.GetObjectPtr();
 
@@ -887,7 +913,9 @@ namespace moho
    * in the damage's absorbing-shield list.
    */
   [[nodiscard]] bool EntityInsideAnyAbsorbingShield(
-    const fa::list<SShieldDamageEntry>& absorbingShields, Entity* const entity)
+    const fa::list<SShieldDamageEntry>& absorbingShields,
+    Entity* const entity
+  )
   {
     if (entity == nullptr) {
       return false;
@@ -913,7 +941,10 @@ namespace moho
    * fire is enabled. Shields covering the origin still absorb (SIM_DoDamage), and a
    * unit already inside one of those shields receives no impulse.
    */
-  void SIM_MetaImpactArea(Sim* const sim, const CDamage& damage)
+  void SIM_MetaImpactArea(
+    Sim* const sim,
+    const CDamage& damage
+  )
   {
     fa::list<SShieldDamageEntry> absorbingShields;
     SIM_DoDamage(sim, absorbingShields, damage);
@@ -941,8 +972,10 @@ namespace moho
         continue;
       }
 
-      if (!damage.mDamageFriendly && instigatorArmy != nullptr &&
-          ArmyIsAlly(instigatorArmy, static_cast<std::uint32_t>(static_cast<Entity*>(unit)->GetArmyIndex()))) {
+      if (
+        !damage.mDamageFriendly && instigatorArmy != nullptr &&
+        ArmyIsAlly(instigatorArmy, static_cast<std::uint32_t>(static_cast<Entity*>(unit)->GetArmyIndex()))
+      ) {
         continue;
       }
 
@@ -982,7 +1015,10 @@ namespace moho
    * applier free function. The single-target lane additionally skips the
    * call when the target entity is already dead.
    */
-  void SIM_Damage(Sim* const sim, const CDamage& damage)
+  void SIM_Damage(
+    Sim* const sim,
+    const CDamage& damage
+  )
   {
     switch (damage.mMethod) {
     case CDamage_AREA_EFFECT:
@@ -1019,9 +1055,14 @@ namespace
   [[maybe_unused]] CDamageTypeInfoBootstrap gCDamageTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CDamageTypeInfo_13c59b, moho::register_CDamageTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CDamageTypeInfo_13c59b,
+  moho::register_CDamageTypeInfo
+)
 
-GPG_PREREGISTER_INIT(preregister_CDamageTypeInfo_13c59b, moho::preregister_CDamageTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_CDamageTypeInfo_13c59b,
+  moho::preregister_CDamageTypeInfo
+)

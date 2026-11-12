@@ -23,17 +23,24 @@ using namespace gpg::gal::effects;
 
 namespace
 {
-  constexpr std::uint8_t U8(const int value)
+  constexpr std::uint8_t U8(
+    const int value
+  )
   {
     return static_cast<std::uint8_t>(value);
   }
 
-  constexpr std::uint32_t U32(const int value)
+  constexpr std::uint32_t U32(
+    const int value
+  )
   {
     return static_cast<std::uint32_t>(value);
   }
 
-  bool HasNote(const EffectDescription& description, const std::string& note)
+  bool HasNote(
+    const EffectDescription& description,
+    const std::string& note
+  )
   {
     for (const std::string& line : description.notes) {
       if (line == note) {
@@ -70,7 +77,10 @@ CirrusAlias bCirrus;
 )fx";
 } // namespace
 
-TEST(GalEffectDescription, ParametersTakeTheirTypeShapeAndDefaults)
+TEST(
+  GalEffectDescription,
+  ParametersTakeTheirTypeShapeAndDefaults
+)
 {
   const EffectDescription effect = ParseEffect(kParameters);
 
@@ -176,7 +186,10 @@ TEST(GalEffectDescription, ParametersTakeTheirTypeShapeAndDefaults)
   EXPECT_EQ(effect.FindParameter("missing"), nullptr);
 }
 
-TEST(GalEffectDescription, ParameterSpansCoverTheirDeclaration)
+TEST(
+  GalEffectDescription,
+  ParameterSpansCoverTheirDeclaration
+)
 {
   const std::string source = kParameters;
   const EffectDescription effect = ParseEffect(source);
@@ -188,7 +201,10 @@ TEST(GalEffectDescription, ParameterSpansCoverTheirDeclaration)
   EXPECT_EQ(source.substr(weights->begin, weights->end - weights->begin), "float Weights[] = { 1, 2, 3 };");
 }
 
-TEST(GalEffectDescription, AnnotationsKeepKindTextAndFoldedNumbers)
+TEST(
+  GalEffectDescription,
+  AnnotationsKeepKindTextAndFoldedNumbers
+)
 {
   const EffectDescription effect = ParseEffect(kParameters);
   const Parameter* const time = effect.FindParameter("Time");
@@ -225,7 +241,10 @@ TEST(GalEffectDescription, AnnotationsKeepKindTextAndFoldedNumbers)
   EXPECT_EQ(FindAnnotation({}, "UIName"), nullptr);
 }
 
-TEST(GalEffectDescription, StructsAndTypedefsAreRecordedAndNotNumeric)
+TEST(
+  GalEffectDescription,
+  StructsAndTypedefsAreRecordedAndNotNumeric
+)
 {
   const EffectDescription effect = ParseEffect(kParameters);
 
@@ -257,7 +276,10 @@ TEST(GalEffectDescription, StructsAndTypedefsAreRecordedAndNotNumeric)
   EXPECT_EQ(b->parameterClass, ParameterClass::Struct);
 }
 
-TEST(GalEffectDescription, SamplerStatesTakeTheirFieldsAndEffects11Defaults)
+TEST(
+  GalEffectDescription,
+  SamplerStatesTakeTheirFieldsAndEffects11Defaults
+)
 {
   const EffectDescription effect = ParseEffect(R"fx(
 texture BaseTexture;
@@ -334,7 +356,10 @@ sampler2D LinearSampler = sampler_state { Filter = MIN_LINEAR_MAG_MIP_POINT; };
   EXPECT_EQ(effect.FindParameter("BaseSampler"), nullptr) << "samplers are not parameters";
 }
 
-TEST(GalEffectDescription, BlendStatesBlendAlphaWithTheColourFactorsAsDirect3D9)
+TEST(
+  GalEffectDescription,
+  BlendStatesBlendAlphaWithTheColourFactorsAsDirect3D9
+)
 {
   const EffectDescription effect = ParseEffect(R"fx(
 BlendState Additive
@@ -376,7 +401,10 @@ technique10 T
   EXPECT_EQ(additive.blend->srcBlendAlpha, U8(D3D11_BLEND_SRC_ALPHA));
   EXPECT_EQ(additive.blend->destBlendAlpha, U8(D3D11_BLEND_INV_DEST_ALPHA));
   EXPECT_EQ(additive.blend->blendOpAlpha, U8(D3D11_BLEND_OP_REV_SUBTRACT));
-  EXPECT_EQ(additive.blend->writeMask, U8(D3D11_COLOR_WRITE_ENABLE_RED | D3D11_COLOR_WRITE_ENABLE_GREEN | D3D11_COLOR_WRITE_ENABLE_BLUE));
+  EXPECT_EQ(
+    additive.blend->writeMask,
+    U8(D3D11_COLOR_WRITE_ENABLE_RED | D3D11_COLOR_WRITE_ENABLE_GREEN | D3D11_COLOR_WRITE_ENABLE_BLUE)
+  );
   EXPECT_FLOAT_EQ(additive.blendFactor[0], 0.25f);
   EXPECT_FLOAT_EQ(additive.blendFactor[1], 0.5f);
   EXPECT_FLOAT_EQ(additive.blendFactor[2], 0.75f);
@@ -408,7 +436,10 @@ technique10 T
   EXPECT_EQ(empty.blend->writeMask, U8(D3D11_COLOR_WRITE_ENABLE_ALL));
 }
 
-TEST(GalEffectDescription, DepthStencilStatesTakeEveryField)
+TEST(
+  GalEffectDescription,
+  DepthStencilStatesTakeEveryField
+)
 {
   const EffectDescription effect = ParseEffect(R"fx(
 DepthStencilState Stencilled
@@ -485,7 +516,10 @@ technique10 T
   EXPECT_EQ(inverted.stencilRef, 255U);
 }
 
-TEST(GalEffectDescription, DepthStencilPackedKeyFollowsItsBitLayout)
+TEST(
+  GalEffectDescription,
+  DepthStencilPackedKeyFollowsItsBitLayout
+)
 {
   // The header's layout: depth enable bit 0, depth write bit 1, depth func bits 2-5, stencil
   // enable bit 6, read mask bits 8-15, write mask bits 16-23, the front face from bit 24 and
@@ -504,7 +538,10 @@ TEST(GalEffectDescription, DepthStencilPackedKeyFollowsItsBitLayout)
   EXPECT_EQ(changed.PackedKey() ^ defaults.PackedKey(), static_cast<std::uint64_t>(0xFFU ^ 0x0FU) << 16U);
 }
 
-TEST(GalEffectDescription, RasterizerStatesConvertDirect3D9DepthBiases)
+TEST(
+  GalEffectDescription,
+  RasterizerStatesConvertDirect3D9DepthBiases
+)
 {
   const EffectDescription effect = ParseEffect(R"fx(
 RasterizerState Wire
@@ -569,7 +606,10 @@ technique10 T
   EXPECT_FALSE(defaults.antialiasedLineEnable);
 }
 
-TEST(GalEffectDescription, TechniquesPassesAndShaderReferences)
+TEST(
+  GalEffectDescription,
+  TechniquesPassesAndShaderReferences
+)
 {
   const EffectDescription effect = ParseEffect(R"fx(
 BlendState Opaque { BlendEnable[0] = FALSE; };
@@ -651,9 +691,13 @@ technique11 Eleven { }
   EXPECT_TRUE(eleven->passes.empty());
 }
 
-TEST(GalEffectDescription, DirectivesAreSkippedAndMalformedInputIsHandled)
+TEST(
+  GalEffectDescription,
+  DirectivesAreSkippedAndMalformedInputIsHandled
+)
 {
-  const EffectDescription withDirectives = ParseEffect("#define sqrt(x) sqrt(abs(x))\n#line 4 \"a.fx\"\nfloat a = 1;\n");
+  const EffectDescription withDirectives =
+    ParseEffect("#define sqrt(x) sqrt(abs(x))\n#line 4 \"a.fx\"\nfloat a = 1;\n");
   ASSERT_EQ(withDirectives.parameters.size(), 1U);
   EXPECT_EQ(withDirectives.parameters[0].name, "a");
 
@@ -671,7 +715,10 @@ TEST(GalEffectDescription, DirectivesAreSkippedAndMalformedInputIsHandled)
   EXPECT_TRUE(ParseEffect("").parameters.empty());
 }
 
-TEST(GalDirect3D9PassStates, AlphaTestsAreReadFromTheOriginalSource)
+TEST(
+  GalDirect3D9PassStates,
+  AlphaTestsAreReadFromTheOriginalSource
+)
 {
   // The translated source the parser saw: the D3D10 dialect has no alpha test.
   EffectDescription description = ParseEffect(R"fx(
@@ -685,7 +732,8 @@ technique10 Water < string Note = "a // b"; >
 )fx");
   // The effect as the game ships it: the alpha test sits in `#ifndef DIRECT3D10` sections and
   // after the state macros, which end without a ';'.
-  ApplyDirect3D9PassStates(R"fx(
+  ApplyDirect3D9PassStates(
+    R"fx(
 // technique Water { pass P0 { AlphaTestEnable = true; AlphaFunc = Less; } }
 /* technique Water { pass P0 { AlphaTestEnable = true; AlphaFunc = Less; } } */
 technique Water < string Note = "a // b"; >
@@ -720,7 +768,8 @@ technique Water < string Note = "a // b"; >
 }
 technique Unknown { pass P0 { AlphaTestEnable = true; AlphaFunc = Less; } }
 )fx",
-                           description);
+    description
+  );
   EXPECT_TRUE(description.direct3D9PassStates);
   const Technique* const water = description.FindTechnique("Water");
   ASSERT_NE(water, nullptr);
@@ -738,7 +787,10 @@ technique Unknown { pass P0 { AlphaTestEnable = true; AlphaFunc = Less; } }
   EXPECT_TRUE(HasNote(description, "2 passes take Direct3D 9's alpha test"));
 }
 
-TEST(GalDirect3D9PassStates, NothingToReadLeavesThePassesAlone)
+TEST(
+  GalDirect3D9PassStates,
+  NothingToReadLeavesThePassesAlone
+)
 {
   EffectDescription description = ParseEffect("technique10 T { pass P0 { } }");
   ApplyDirect3D9PassStates("", description);
@@ -747,8 +799,10 @@ TEST(GalDirect3D9PassStates, NothingToReadLeavesThePassesAlone)
   EXPECT_TRUE(description.notes.empty());
 
   // A pass name the original lacks, and more passes in the original than were parsed.
-  ApplyDirect3D9PassStates("technique T { pass { AlphaTestEnable = 1; AlphaFunc = 9; } pass { AlphaTestEnable = 1; AlphaFunc = less; } }",
-                           description);
+  ApplyDirect3D9PassStates(
+    "technique T { pass { AlphaTestEnable = 1; AlphaFunc = 9; } pass { AlphaTestEnable = 1; AlphaFunc = less; } }",
+    description
+  );
   EXPECT_FALSE(description.techniques[0].passes[0].alphaTest.has_value()) << "an out-of-range function keeps ALWAYS";
   ASSERT_EQ(description.techniques[0].passes.size(), 1U);
 }

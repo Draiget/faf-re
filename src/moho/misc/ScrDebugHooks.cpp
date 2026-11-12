@@ -128,7 +128,9 @@ namespace
    * Rebuilds the cached "has enabled breakpoints" flag from global breakpoint
    * entries.
    */
-  void RefreshAnyEnabledBreakpointsFlag(ScrDebugState& runtime)
+  void RefreshAnyEnabledBreakpointsFlag(
+    ScrDebugState& runtime
+  )
   {
     runtime.hasEnabledBreakpoints = false;
     for (const moho::ScrBreakpoint& breakpoint : runtime.breakpoints) {
@@ -139,7 +141,9 @@ namespace
     }
   }
 
-  void SaveBreakpointsUnlocked(ScrDebugState& runtime)
+  void SaveBreakpointsUnlocked(
+    ScrDebugState& runtime
+  )
   {
     moho::IUserPrefs* const preferences = moho::USER_GetPreferences();
     if (preferences == nullptr) {
@@ -154,7 +158,9 @@ namespace
     preferences->SetStringArr(fa::string(kBreakpointPreferenceKey), serializedBreakpoints);
   }
 
-  [[nodiscard]] fa::string ToMountedSourcePath(const char* sourcePath)
+  [[nodiscard]] fa::string ToMountedSourcePath(
+    const char* sourcePath
+  )
   {
     fa::string mountedPath;
     if (sourcePath == nullptr) {
@@ -170,7 +176,9 @@ namespace
     return mountedPath;
   }
 
-  [[nodiscard]] moho::PausedThread* PopPausedThreadUnlocked(ScrDebugState& runtime)
+  [[nodiscard]] moho::PausedThread* PopPausedThreadUnlocked(
+    ScrDebugState& runtime
+  )
   {
     if (runtime.pausedThreads.empty()) {
       return nullptr;
@@ -182,7 +190,9 @@ namespace
     return pausedThread;
   }
 
-  [[nodiscard]] LuaPlus::LuaState* GetFrontPausedLuaStateUnlocked(ScrDebugState& runtime)
+  [[nodiscard]] LuaPlus::LuaState* GetFrontPausedLuaStateUnlocked(
+    ScrDebugState& runtime
+  )
   {
     if (runtime.pausedThreads.empty()) {
       return nullptr;
@@ -196,7 +206,10 @@ namespace
     return pausedThread->GetLuaState();
   }
 
-  void BindLuaStateForHook(ScrDebugState& runtime, LuaPlus::LuaState* const state)
+  void BindLuaStateForHook(
+    ScrDebugState& runtime,
+    LuaPlus::LuaState* const state
+  )
   {
     if (state == nullptr || state->m_state == nullptr) {
       return;
@@ -212,7 +225,10 @@ namespace
     runtime.hookBindings.push_back(LuaHookBinding{state->m_state, state});
   }
 
-  void UnbindLuaStateForHook(ScrDebugState& runtime, LuaPlus::LuaState* const state)
+  void UnbindLuaStateForHook(
+    ScrDebugState& runtime,
+    LuaPlus::LuaState* const state
+  )
   {
     if (state == nullptr || state->m_state == nullptr) {
       return;
@@ -239,7 +255,10 @@ namespace
     return nullptr;
   }
 
-  bool ConsumeSingleStepRootState(ScrDebugState& runtime, LuaPlus::LuaState* const rootState)
+  bool ConsumeSingleStepRootState(
+    ScrDebugState& runtime,
+    LuaPlus::LuaState* const rootState
+  )
   {
     std::lock_guard<std::mutex> lock(runtime.singleStepMutex);
 
@@ -260,7 +279,10 @@ namespace
     return false;
   }
 
-  void QueueSingleStepRootState(ScrDebugState& runtime, LuaPlus::LuaState* const rootState)
+  void QueueSingleStepRootState(
+    ScrDebugState& runtime,
+    LuaPlus::LuaState* const rootState
+  )
   {
     if (rootState == nullptr) {
       return;
@@ -342,7 +364,9 @@ moho::ScrDebugWindowPostPauseHook moho::sScrDebugWindowPostPause = nullptr;
  * Binds one Lua state to the script debug hook callback when a debug window
  * runtime is active.
  */
-void moho::SCR_HookState(LuaPlus::LuaState* const state)
+void moho::SCR_HookState(
+  LuaPlus::LuaState* const state
+)
 {
   if (state == nullptr || state->m_state == nullptr) {
     return;
@@ -368,7 +392,9 @@ void moho::SCR_HookState(LuaPlus::LuaState* const state)
  * Removes one Lua state from script debug hook dispatch and clears the Lua
  * hook callback.
  */
-void moho::SCR_UnhookState(LuaPlus::LuaState* const state)
+void moho::SCR_UnhookState(
+  LuaPlus::LuaState* const state
+)
 {
   if (state == nullptr || state->m_state == nullptr) {
     return;
@@ -392,7 +418,9 @@ void moho::SCR_UnhookState(LuaPlus::LuaState* const state)
  * Inserts one breakpoint in sorted unique order and persists preferences
  * after successful insertion.
  */
-void moho::SCR_AddBreakpoint(const ScrBreakpoint& breakpoint)
+void moho::SCR_AddBreakpoint(
+  const ScrBreakpoint& breakpoint
+)
 {
   ScrDebugState& runtime = GetScrDebugState();
   std::lock_guard<std::recursive_mutex> lock(runtime.breakpointMutex);
@@ -411,7 +439,10 @@ void moho::SCR_AddBreakpoint(const ScrBreakpoint& breakpoint)
  * What it does:
  * Updates one existing breakpoint enabled lane and persists preferences.
  */
-void moho::SCR_EnableBreakpoint(const ScrBreakpoint& breakpoint, const bool enabled)
+void moho::SCR_EnableBreakpoint(
+  const ScrBreakpoint& breakpoint,
+  const bool enabled
+)
 {
   ScrDebugState& runtime = GetScrDebugState();
   std::lock_guard<std::recursive_mutex> lock(runtime.breakpointMutex);
@@ -433,7 +464,9 @@ void moho::SCR_EnableBreakpoint(const ScrBreakpoint& breakpoint, const bool enab
  * Applies one enabled lane to every global breakpoint and persists
  * preferences.
  */
-void moho::SCR_EnableAllBreakpoints(const bool enabled)
+void moho::SCR_EnableAllBreakpoints(
+  const bool enabled
+)
 {
   ScrDebugState& runtime = GetScrDebugState();
   std::lock_guard<std::recursive_mutex> lock(runtime.breakpointMutex);
@@ -453,7 +486,9 @@ void moho::SCR_EnableAllBreakpoints(const bool enabled)
  * What it does:
  * Removes one matching global breakpoint and persists preferences.
  */
-void moho::SCR_RemoveBreakpoint(const ScrBreakpoint& breakpoint)
+void moho::SCR_RemoveBreakpoint(
+  const ScrBreakpoint& breakpoint
+)
 {
   ScrDebugState& runtime = GetScrDebugState();
   std::lock_guard<std::recursive_mutex> lock(runtime.breakpointMutex);
@@ -520,7 +555,9 @@ void moho::SCR_EnumerateBreakpoints(
  * What it does:
  * Enumerates call-stack activation frames for the currently paused script state.
  */
-void moho::SCR_EnumerateCallStack(fa::vector<ScrActivation>& outActivations)
+void moho::SCR_EnumerateCallStack(
+  fa::vector<ScrActivation>& outActivations
+)
 {
   outActivations.clear();
 
@@ -555,7 +592,10 @@ void moho::SCR_EnumerateCallStack(fa::vector<ScrActivation>& outActivations)
  * What it does:
  * Enumerates locals and closure upvalues from one Lua stack level.
  */
-void moho::SCR_EnumerateLocals(const int level, fa::vector<ScrWatch>& outWatches)
+void moho::SCR_EnumerateLocals(
+  const int level,
+  fa::vector<ScrWatch>& outWatches
+)
 {
   outWatches.clear();
 
@@ -573,8 +613,7 @@ void moho::SCR_EnumerateLocals(const int level, fa::vector<ScrWatch>& outWatches
   }
 
   int index = 1;
-  for (const char* localName = lua_getlocal(pausedLuaState->m_state, &debugFrame, index);
-       localName != nullptr;
+  for (const char* localName = lua_getlocal(pausedLuaState->m_state, &debugFrame, index); localName != nullptr;
        localName = lua_getlocal(pausedLuaState->m_state, &debugFrame, index)) {
     ++index;
 
@@ -586,8 +625,7 @@ void moho::SCR_EnumerateLocals(const int level, fa::vector<ScrWatch>& outWatches
   lua_getinfo(pausedLuaState->m_state, kFunctionInfoMask, &debugFrame);
 
   index = 1;
-  for (const char* upvalueName = lua_getupvalue(pausedLuaState->m_state, -1, index);
-       upvalueName != nullptr;
+  for (const char* upvalueName = lua_getupvalue(pausedLuaState->m_state, -1, index); upvalueName != nullptr;
        upvalueName = lua_getupvalue(pausedLuaState->m_state, -1, index)) {
     ++index;
 
@@ -609,7 +647,9 @@ void moho::SCR_EnumerateLocals(const int level, fa::vector<ScrWatch>& outWatches
  * What it does:
  * Enumerates global Lua table entries for the currently paused script state.
  */
-void moho::SCR_EnumerateGlobals(fa::vector<ScrWatch>& outWatches)
+void moho::SCR_EnumerateGlobals(
+  fa::vector<ScrWatch>& outWatches
+)
 {
   outWatches.clear();
 
@@ -737,7 +777,10 @@ void moho::SCR_SaveBreakpoints()
  * Handles Lua line-hook notifications, checking queued single-step roots and
  * explicit file/line breakpoints before pausing the current script thread.
  */
-void moho::DebugLuaHook(lua_State* const state, lua_Debug* const debugFrame)
+void moho::DebugLuaHook(
+  lua_State* const state,
+  lua_Debug* const debugFrame
+)
 {
   ScrDebugState& runtime = GetScrDebugState();
 

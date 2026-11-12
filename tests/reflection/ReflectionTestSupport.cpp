@@ -18,7 +18,9 @@ namespace faf_reflection_tests
   {
     // `HandleAssertFailure` hands its message to the die handler and returns when none is set, so an engine
     // assertion inside a test would pass unseen. This handler turns it into a test failure.
-    void FailOnEngineAssertion(const char* const message)
+    void FailOnEngineAssertion(
+      const char* const message
+    )
     {
       ADD_FAILURE() << "engine assertion: " << (message != nullptr ? message : "(null)");
     }
@@ -26,8 +28,14 @@ namespace faf_reflection_tests
     class EngineAssertEnvironment final : public ::testing::Environment
     {
     public:
-      void SetUp() override { mPrevious = gpg::SetDieHandler(&FailOnEngineAssertion); }
-      void TearDown() override { (void)gpg::SetDieHandler(mPrevious); }
+      void SetUp() override
+      {
+        mPrevious = gpg::SetDieHandler(&FailOnEngineAssertion);
+      }
+      void TearDown() override
+      {
+        (void)gpg::SetDieHandler(mPrevious);
+      }
 
     private:
       gpg::die_handler_t mPrevious = nullptr;
@@ -38,21 +46,28 @@ namespace faf_reflection_tests
 
     std::atomic<unsigned int> gFolderCounter{0u};
 
-    void CloseFile(std::FILE* const file)
+    void CloseFile(
+      std::FILE* const file
+    )
     {
       if (file != nullptr) {
         std::fclose(file);
       }
     }
 
-    boost::shared_ptr<std::FILE> OpenFile(const std::string& path, const char* const mode)
+    boost::shared_ptr<std::FILE> OpenFile(
+      const std::string& path,
+      const char* const mode
+    )
     {
       std::FILE* file = nullptr;
       EXPECT_EQ(fopen_s(&file, path.c_str(), mode), 0) << path;
       return boost::shared_ptr<std::FILE>(file, &CloseFile);
     }
 
-    std::string ReadWholeFile(const std::string& path)
+    std::string ReadWholeFile(
+      const std::string& path
+    )
     {
       std::string bytes;
       std::FILE* file = nullptr;
@@ -72,7 +87,10 @@ namespace faf_reflection_tests
       return bytes;
     }
 
-    void WriteWholeFile(const std::string& path, const std::string& bytes)
+    void WriteWholeFile(
+      const std::string& path,
+      const std::string& bytes
+    )
     {
       std::FILE* file = nullptr;
       if (fopen_s(&file, path.c_str(), "wb") != 0 || file == nullptr) {
@@ -88,7 +106,10 @@ namespace faf_reflection_tests
     class StringSink final : public gpg::WriteArchiveSink
     {
     public:
-      [[nodiscard]] bool Write(const void* const bytes, const std::size_t byteCount) override
+      [[nodiscard]] bool Write(
+        const void* const bytes,
+        const std::size_t byteCount
+      ) override
       {
         mBytes.append(static_cast<const char*>(bytes), byteCount);
         return true;
@@ -97,7 +118,9 @@ namespace faf_reflection_tests
     };
   } // namespace
 
-  std::string ToHex(const std::string& bytes)
+  std::string ToHex(
+    const std::string& bytes
+  )
   {
     static constexpr char kDigits[] = "0123456789abcdef";
     std::string out;
@@ -113,7 +136,7 @@ namespace faf_reflection_tests
   ArchiveFixture::ArchiveFixture()
   {
     const std::string name = "faf_reflection_tests_" + std::to_string(::GetCurrentProcessId()) + "_" +
-                             std::to_string(gFolderCounter.fetch_add(1u));
+      std::to_string(gFolderCounter.fetch_add(1u));
     mFolder = std::filesystem::temp_directory_path() / name;
     std::error_code error;
     std::filesystem::remove_all(mFolder, error);
@@ -127,12 +150,17 @@ namespace faf_reflection_tests
     std::filesystem::remove_all(mFolder, error);
   }
 
-  std::string ArchiveFixture::NextFile(const char* const prefix)
+  std::string ArchiveFixture::NextFile(
+    const char* const prefix
+  )
   {
     return (mFolder / (std::string(prefix) + std::to_string(mCount++) + ".bin")).string();
   }
 
-  std::string ArchiveFixture::Write(const std::function<void(gpg::WriteArchive&)>& body, const WriterKind kind)
+  std::string ArchiveFixture::Write(
+    const std::function<void(gpg::WriteArchive&)>& body,
+    const WriterKind kind
+  )
   {
     if (kind == WriterKind::FastSink) {
       StringSink sink;
@@ -154,7 +182,10 @@ namespace faf_reflection_tests
     return ReadWholeFile(path);
   }
 
-  void ArchiveFixture::Read(const std::string& bytes, const std::function<void(gpg::ReadArchive&)>& body)
+  void ArchiveFixture::Read(
+    const std::string& bytes,
+    const std::function<void(gpg::ReadArchive&)>& body
+  )
   {
     const std::string path = NextFile("read");
     WriteWholeFile(path, bytes);
@@ -163,7 +194,9 @@ namespace faf_reflection_tests
     body(*archive);
   }
 
-  std::string ArchiveFixture::WriteText(const std::function<void(gpg::WriteArchive&)>& body)
+  std::string ArchiveFixture::WriteText(
+    const std::function<void(gpg::WriteArchive&)>& body
+  )
   {
     auto* const text = new std::ostringstream;
     const boost::shared_ptr<std::ostream> stream(text);
@@ -175,7 +208,10 @@ namespace faf_reflection_tests
     return text->str();
   }
 
-  void ArchiveFixture::ReadText(const std::string& text, const std::function<void(gpg::ReadArchive&)>& body)
+  void ArchiveFixture::ReadText(
+    const std::string& text,
+    const std::function<void(gpg::ReadArchive&)>& body
+  )
   {
     const boost::shared_ptr<std::istream> stream(new std::istringstream(text));
     std::unique_ptr<gpg::ReadArchive> archive(gpg::CreateTextReadArchive(stream));

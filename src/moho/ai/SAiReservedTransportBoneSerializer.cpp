@@ -25,7 +25,9 @@ namespace
  * assignment expression, which resolves to that same canonical template
  * method.
  */
-SAiReservedTransportBone& SAiReservedTransportBone::operator=(const SAiReservedTransportBone& other)
+SAiReservedTransportBone& SAiReservedTransportBone::operator=(
+  const SAiReservedTransportBone& other
+)
 {
   transportBoneIndex = other.transportBoneIndex;
   attachBoneIndex = other.attachBoneIndex;
@@ -46,13 +48,14 @@ SAiReservedTransportBone& SAiReservedTransportBone::operator=(const SAiReservedT
  * vector. Reached per element from `fa::vector<SAiReservedTransportBone>`'s
  * `_Uninit_copy` (0x005EFF70) and `resize` (0x005EA590).
  */
-SAiReservedTransportBone::SAiReservedTransportBone(const SAiReservedTransportBone& other)
+SAiReservedTransportBone::SAiReservedTransportBone(
+  const SAiReservedTransportBone& other
+)
   : transportBoneIndex(other.transportBoneIndex)
   , attachBoneIndex(other.attachBoneIndex)
   , reservedUnit(other.reservedUnit)
   , reservedBones(other.reservedBones)
-{
-}
+{}
 
 /**
  * Address: 0x005EB860 (FUN_005EB860, Moho::SAiReservedTransportBone::MemberDeserialize)
@@ -61,7 +64,9 @@ SAiReservedTransportBone::SAiReservedTransportBone(const SAiReservedTransportBon
  * Loads transport/attach indices, reserved-unit weak link, and reserved
  * attach-bone list from one archive payload.
  */
-void SAiReservedTransportBone::MemberDeserialize(gpg::ReadArchive* const archive)
+void SAiReservedTransportBone::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -88,7 +93,9 @@ void SAiReservedTransportBone::MemberDeserialize(gpg::ReadArchive* const archive
  * Stores transport/attach indices, reserved-unit weak link, and reserved
  * attach-bone list into one archive payload.
  */
-void SAiReservedTransportBone::MemberSerialize(gpg::WriteArchive* const archive) const
+void SAiReservedTransportBone::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (!archive) {
     return;

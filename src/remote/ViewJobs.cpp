@@ -8,11 +8,15 @@
 
 namespace faf::remote
 {
-  CViewJobs::CViewJobs(const unsigned int threads)
+  CViewJobs::CViewJobs(
+    const unsigned int threads
+  )
   {
     mThreads.reserve(threads);
     for (unsigned int index = 0; index < threads; ++index) {
-      mThreads.emplace_back([this] { ThreadMain(); });
+      mThreads.emplace_back([this] {
+        ThreadMain();
+      });
     }
   }
 
@@ -28,7 +32,10 @@ namespace faf::remote
     }
   }
 
-  void CViewJobs::Start(const std::size_t count, std::function<void(std::size_t)> job)
+  void CViewJobs::Start(
+    const std::size_t count,
+    std::function<void(std::size_t)> job
+  )
   {
     {
       const std::lock_guard<std::mutex> lock(mMutex);
@@ -44,7 +51,9 @@ namespace faf::remote
   void CViewJobs::Wait()
   {
     std::unique_lock<std::mutex> lock(mMutex);
-    mDone.wait(lock, [this] { return mFinished == mCount; });
+    mDone.wait(lock, [this] {
+      return mFinished == mCount;
+    });
   }
 
   void CViewJobs::ThreadMain()
@@ -52,7 +61,9 @@ namespace faf::remote
     moho::tIsSimWorkerThread = true; // the same rules as the sim's workers: no Lua, no nested batches
     std::unique_lock<std::mutex> lock(mMutex);
     for (;;) {
-      mWake.wait(lock, [this] { return mStopping || mNext < mCount; });
+      mWake.wait(lock, [this] {
+        return mStopping || mNext < mCount;
+      });
       if (mStopping) {
         return;
       }

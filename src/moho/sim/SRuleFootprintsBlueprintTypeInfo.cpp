@@ -71,7 +71,9 @@ namespace
    */
   void SRuleFootprintsBlueprintTypeInfo::Init()
   {
-    static_assert(sizeof(moho::SRuleFootprintsBlueprint) == 0x0C, "moho::SRuleFootprintsBlueprint is 0x0C bytes on x86");
+    static_assert(
+      sizeof(moho::SRuleFootprintsBlueprint) == 0x0C, "moho::SRuleFootprintsBlueprint is 0x0C bytes on x86"
+    );
     size_ = sizeof(moho::SRuleFootprintsBlueprint);
     gpg::RType::Init();
     (void)AddFields(this);
@@ -85,7 +87,9 @@ namespace
    * Reflects the `Footprints` list: a tail jump into its `AddField`
    * 0x005146E0.
    */
-  gpg::RField* SRuleFootprintsBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
+  gpg::RField* SRuleFootprintsBlueprintTypeInfo::AddFields(
+    gpg::RType* const typeInfo
+  )
   {
     return typeInfo->AddField<fa::list<moho::SNamedFootprint>>(
       "Footprints", offsetof(moho::SRuleFootprintsBlueprint, mFootprints)
@@ -157,9 +161,14 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_SRuleFootprintsBlueprintTypeInfoStartup_6adcb7, moho::register_SRuleFootprintsBlueprintTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_SRuleFootprintsBlueprintTypeInfoStartup_6adcb7,
+  moho::register_SRuleFootprintsBlueprintTypeInfoStartup
+)
 
-GPG_PREREGISTER_INIT(preregister_SRuleFootprintsBlueprintTypeInfo_6adcb7, moho::preregister_SRuleFootprintsBlueprintTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_SRuleFootprintsBlueprintTypeInfo_6adcb7,
+  moho::preregister_SRuleFootprintsBlueprintTypeInfo
+)

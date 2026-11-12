@@ -17,7 +17,9 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<RResId>::Deserialize` 0x004A9690.
    */
-  void RResId::MemberDeserialize(gpg::ReadArchive* const archive)
+  void RResId::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -30,7 +32,9 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<RResId>::Serialize` 0x004A96B0.
    */
-  void RResId::MemberSerialize(gpg::WriteArchive* const archive)
+  void RResId::MemberSerialize(
+    gpg::WriteArchive* const archive
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {

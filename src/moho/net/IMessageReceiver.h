@@ -71,7 +71,7 @@ namespace moho
     /// Every linkage pushed onto this dispatcher, oldest first.
     gpg::DList<SMsgReceiverLinkage, CMessageDispatcher> mLinkages; // +0x00
     /// The receiver currently answering each message type.
-    IMessageReceiver* mReceivers[256];                             // +0x08
+    IMessageReceiver* mReceivers[256]; // +0x08
   };
   static_assert(offsetof(CMessageDispatcher, mReceivers) == 0x08, "CMessageDispatcher::mReceivers offset must be 0x08");
   static_assert(sizeof(CMessageDispatcher) == 0x408, "CMessageDispatcher size must be 0x408");
@@ -118,9 +118,9 @@ namespace moho
    * in `PushReceiver` stores a vptr. The second base sits at +0x0C, not +0x08,
    * because both bases are `gpg::DListItem`s and each carries a `noncopyable`.
    */
-  struct SMsgReceiverLinkage
-    : gpg::DListItem<SMsgReceiverLinkage, CMessageDispatcher>
-    , gpg::DListItem<SMsgReceiverLinkage, IMessageReceiver>
+  struct SMsgReceiverLinkage :
+    gpg::DListItem<SMsgReceiverLinkage, CMessageDispatcher>,
+    gpg::DListItem<SMsgReceiverLinkage, IMessageReceiver>
   {
     using DispatcherLink = gpg::DListItem<SMsgReceiverLinkage, CMessageDispatcher>;
     using ReceiverLink = gpg::DListItem<SMsgReceiverLinkage, IMessageReceiver>;
@@ -154,7 +154,8 @@ namespace moho
   };
   static_assert(offsetof(SMsgReceiverLinkage, mLower) == 0x14, "SMsgReceiverLinkage::mLower offset must be 0x14");
   static_assert(
-    offsetof(SMsgReceiverLinkage, mDispatcher) == 0x20, "SMsgReceiverLinkage::mDispatcher offset must be 0x20"
+    offsetof(SMsgReceiverLinkage, mDispatcher) == 0x20,
+    "SMsgReceiverLinkage::mDispatcher offset must be 0x20"
   );
   static_assert(sizeof(SMsgReceiverLinkage) == 0x24, "SMsgReceiverLinkage size must be 0x24");
 } // namespace moho

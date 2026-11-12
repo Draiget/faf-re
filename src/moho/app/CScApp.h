@@ -26,6 +26,14 @@ namespace moho
   extern bool gAppWindowed;
 
   /**
+   * Engine addition (the map editor's particle preview): when set, a frame without a session gives the renderer a clock
+   * of its own, 10 ticks a second from the first such frame, never going back, so particles the editor hands to the
+   * world particle renderer age and expire (without a session the game's clock is tick 0 every frame). False in the
+   * game.
+   */
+  extern bool gAppIdleClock;
+
+  /**
    * Engine addition (the map editor): called by `CScApp::CreateAppFrame` just before the device is created,
    * with the context and the top-level frame's window. The editor adds a head there for its own panels (a
    * child window of the frame); the game's viewport was made for the heads before it, so it draws only those.
@@ -105,7 +113,7 @@ public:
   bool Init() override;
 
   /**
-     * Address: 0x008D1470 (FUN_008D1470)
+   * Address: 0x008D1470 (FUN_008D1470)
    * Mangled: ?Main@CScApp@@UAEXXZ
    *
    * What it does:
@@ -141,12 +149,8 @@ public:
    * Creates primary/secondary frame windows, viewport bindings, and D3D
    * bootstrap handoff for the startup render path.
    */
-  bool CreateAppFrame(
-    const fa::string& title,
-    bool maximized,
-    const wxPoint& position,
-    gpg::gal::DeviceContext& context
-  );
+  bool
+  CreateAppFrame(const fa::string& title, bool maximized, const wxPoint& position, gpg::gal::DeviceContext& context);
 
   /**
    * Address: 0x008CE1D0 (FUN_008CE1D0, CScApp::HasFrame)

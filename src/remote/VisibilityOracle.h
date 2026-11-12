@@ -40,7 +40,7 @@ namespace moho
   class Entity;
   class ReconBlip;
   class Sim;
-}
+} // namespace moho
 
 namespace faf::remote
 {
@@ -87,18 +87,19 @@ namespace faf::remote
    * Stage 1: the publication and visibility mode `Sim::Sync` would give `entity` with
    * `viewArmy` (0-based, or -1 for an observer) as its focus. Reads only.
    */
-  [[nodiscard]] SViewVisibility ResolveViewVisibility(const moho::Sim& sim, std::int32_t viewArmy, moho::Entity& entity);
+  [[nodiscard]] SViewVisibility
+  ResolveViewVisibility(const moho::Sim& sim, std::int32_t viewArmy, moho::Entity& entity);
   /** Stage 1 from facts read this beat. */
-  [[nodiscard]] SViewVisibility ResolveViewVisibility(const moho::Sim& sim, std::int32_t viewArmy, const SEntityFacts& facts);
+  [[nodiscard]] SViewVisibility
+  ResolveViewVisibility(const moho::Sim& sim, std::int32_t viewArmy, const SEntityFacts& facts);
 
   /**
    * `UserArmy::CanSeeCell` (0x008B17F0) on the sim's grids: whether `view` sees the cell through
    * its own vision (or, `underwater`, water) grid or the grid of an army that counts it as an
    * ally. `ViewCanSeePoint` maps the point to the cell; the spatial oracle tests cells directly.
    */
-  [[nodiscard]] bool ViewCanSeeCell(
-    const moho::Sim& sim, const moho::CArmyImpl& view, std::int32_t x, std::int32_t z, bool underwater
-  );
+  [[nodiscard]] bool
+  ViewCanSeeCell(const moho::Sim& sim, const moho::CArmyImpl& view, std::int32_t x, std::int32_t z, bool underwater);
 
   /**
    * Stage 2 (WP4.2): whether `viewArmy`'s client sees the world point `pos` through its own
@@ -106,7 +107,8 @@ namespace faf::remote
    * underwater entity is tested against the water grids, everything else against the vision
    * grids. An observer (-1) sees everything.
    */
-  [[nodiscard]] bool ViewCanSeePoint(const moho::Sim& sim, std::int32_t viewArmy, const Wm3::Vec3f& pos, bool underwater);
+  [[nodiscard]] bool
+  ViewCanSeePoint(const moho::Sim& sim, std::int32_t viewArmy, const Wm3::Vec3f& pos, bool underwater);
 
   /**
    * Whether the entity belongs in `viewArmy`'s view this beat: published, and for a plain

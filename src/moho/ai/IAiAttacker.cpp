@@ -200,7 +200,9 @@ namespace
   using CAcquireTargetTaskPtrVector = fa::vector<moho::CAcquireTargetTask*>;
 
   template <class TObject>
-  [[nodiscard]] TObject* PointerFromArchiveInt(const std::intptr_t objectPtr)
+  [[nodiscard]] TObject* PointerFromArchiveInt(
+    const std::intptr_t objectPtr
+  )
   {
     return reinterpret_cast<TObject*>(objectPtr);
   }
@@ -266,7 +268,11 @@ namespace
   }
 
   template <class TVector>
-  [[nodiscard]] fa::string MakeVectorLexical(const gpg::RType* const ownerType, const gpg::RRef& ref, const TVector* vec)
+  [[nodiscard]] fa::string MakeVectorLexical(
+    const gpg::RType* const ownerType,
+    const gpg::RRef& ref,
+    const TVector* vec
+  )
   {
     const fa::string base = ownerType != nullptr ? ownerType->gpg::RType::GetLexical(ref) : fa::string("vector");
     const int size = vec ? static_cast<int>(vec->size()) : 0;
@@ -369,7 +375,9 @@ void moho::RBroadcasterRType_EAiAttackerEvent::SerSave(
   const gpg::RRef nullOwner{};
 
   for (moho::Listener<moho::EAiAttackerEvent>* const listener : broadcaster->mListeners.owners()) {
-    archive->WritePointer<moho::Listener<moho::EAiAttackerEvent>>(listener, gpg::TrackedPointerState::Unowned, nullOwner);
+    archive->WritePointer<moho::Listener<moho::EAiAttackerEvent>>(
+      listener, gpg::TrackedPointerState::Unowned, nullOwner
+    );
   }
 
   archive->WritePointer<moho::Listener<moho::EAiAttackerEvent>>(nullptr, gpg::TrackedPointerState::Unowned, nullOwner);
@@ -396,7 +404,9 @@ const char* gpg::RVectorType_UnitWeaponPtr::GetName() const
  * Appends `size=<count>` suffix to the base lexical representation for one
  * `vector<UnitWeapon*>` payload.
  */
-fa::string gpg::RVectorType_UnitWeaponPtr::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_UnitWeaponPtr::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   return MakeVectorLexical(this, ref, static_cast<const UnitWeaponPtrVector*>(ref.mObj));
 }
@@ -487,7 +497,10 @@ void gpg::RVectorType_UnitWeaponPtr::SerSave(
   }
 }
 
-gpg::RRef gpg::RVectorType_UnitWeaponPtr::SubscriptIndex(void* const obj, const int ind) const
+gpg::RRef gpg::RVectorType_UnitWeaponPtr::SubscriptIndex(
+  void* const obj,
+  const int ind
+) const
 {
   auto* const storage = static_cast<UnitWeaponPtrVector*>(obj);
   gpg::RRef out{};
@@ -501,13 +514,18 @@ gpg::RRef gpg::RVectorType_UnitWeaponPtr::SubscriptIndex(void* const obj, const 
   return out;
 }
 
-size_t gpg::RVectorType_UnitWeaponPtr::GetCount(void* const obj) const
+size_t gpg::RVectorType_UnitWeaponPtr::GetCount(
+  void* const obj
+) const
 {
   const auto* const storage = static_cast<const UnitWeaponPtrVector*>(obj);
   return storage ? storage->size() : 0u;
 }
 
-void gpg::RVectorType_UnitWeaponPtr::SetCount(void* const obj, const int count) const
+void gpg::RVectorType_UnitWeaponPtr::SetCount(
+  void* const obj,
+  const int count
+) const
 {
   auto* const storage = static_cast<UnitWeaponPtrVector*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -529,8 +547,7 @@ void gpg::RVectorType_UnitWeaponPtr::SetCount(void* const obj, const int count) 
  */
 const char* gpg::RVectorType_CAcquireTargetTaskPtr::GetName() const
 {
-  static const fa::string sName =
-    gpg::STR_Printf("vector<%s>", moho::CAcquireTargetTask::GetPointerType()->GetName());
+  static const fa::string sName = gpg::STR_Printf("vector<%s>", moho::CAcquireTargetTask::GetPointerType()->GetName());
   return sName.c_str();
 }
 
@@ -541,7 +558,9 @@ const char* gpg::RVectorType_CAcquireTargetTaskPtr::GetName() const
  * Appends `size=<count>` suffix to the base lexical representation for one
  * `vector<CAcquireTargetTask*>` payload.
  */
-fa::string gpg::RVectorType_CAcquireTargetTaskPtr::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType_CAcquireTargetTaskPtr::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   return MakeVectorLexical(this, ref, static_cast<const CAcquireTargetTaskPtrVector*>(ref.mObj));
 }
@@ -620,11 +639,16 @@ void gpg::RVectorType_CAcquireTargetTaskPtr::SerSave(
 
   const gpg::RRef nullOwner{};
   for (unsigned int i = 0; i < count; ++i) {
-    archive->WritePointer<moho::CAcquireTargetTask>((*storage)[static_cast<std::size_t>(i)], gpg::TrackedPointerState::Unowned, nullOwner);
+    archive->WritePointer<moho::CAcquireTargetTask>(
+      (*storage)[static_cast<std::size_t>(i)], gpg::TrackedPointerState::Unowned, nullOwner
+    );
   }
 }
 
-gpg::RRef gpg::RVectorType_CAcquireTargetTaskPtr::SubscriptIndex(void* const obj, const int ind) const
+gpg::RRef gpg::RVectorType_CAcquireTargetTaskPtr::SubscriptIndex(
+  void* const obj,
+  const int ind
+) const
 {
   auto* const storage = static_cast<CAcquireTargetTaskPtrVector*>(obj);
   gpg::RRef out{};
@@ -638,13 +662,18 @@ gpg::RRef gpg::RVectorType_CAcquireTargetTaskPtr::SubscriptIndex(void* const obj
   return out;
 }
 
-size_t gpg::RVectorType_CAcquireTargetTaskPtr::GetCount(void* const obj) const
+size_t gpg::RVectorType_CAcquireTargetTaskPtr::GetCount(
+  void* const obj
+) const
 {
   const auto* const storage = static_cast<const CAcquireTargetTaskPtrVector*>(obj);
   return storage ? storage->size() : 0u;
 }
 
-void gpg::RVectorType_CAcquireTargetTaskPtr::SetCount(void* const obj, const int count) const
+void gpg::RVectorType_CAcquireTargetTaskPtr::SetCount(
+  void* const obj,
+  const int count
+) const
 {
   auto* const storage = static_cast<CAcquireTargetTaskPtrVector*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -784,6 +813,15 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_RBroadcasterRType_EAiAttackerEvent_1874e7, moho::preregister_RBroadcasterRType_EAiAttackerEvent)
-GPG_PREREGISTER_INIT(preregister_RVectorType_UnitWeaponPtr_1874e7, moho::preregister_RVectorType_UnitWeaponPtr)
-GPG_PREREGISTER_INIT(preregister_RVectorType_CAcquireTargetTaskPtr_1874e7, moho::preregister_RVectorType_CAcquireTargetTaskPtr)
+GPG_PREREGISTER_INIT(
+  preregister_RBroadcasterRType_EAiAttackerEvent_1874e7,
+  moho::preregister_RBroadcasterRType_EAiAttackerEvent
+)
+GPG_PREREGISTER_INIT(
+  preregister_RVectorType_UnitWeaponPtr_1874e7,
+  moho::preregister_RVectorType_UnitWeaponPtr
+)
+GPG_PREREGISTER_INIT(
+  preregister_RVectorType_CAcquireTargetTaskPtr_1874e7,
+  moho::preregister_RVectorType_CAcquireTargetTaskPtr
+)

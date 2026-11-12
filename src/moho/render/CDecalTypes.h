@@ -12,7 +12,7 @@ namespace gpg
   class ReadArchive;
   class RType;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -86,16 +86,16 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
-    Wm3::Vec3f mPos;         // +0x00
-    Wm3::Vec3f mSize;        // +0x0C
-    Wm3::Vec3f mRot;         // +0x18
-    fa::string mTexName1; // +0x24
-    fa::string mTexName2; // +0x40
-    std::uint8_t mIsSplat;   // +0x5C
+    Wm3::Vec3f mPos;       // +0x00
+    Wm3::Vec3f mSize;      // +0x0C
+    Wm3::Vec3f mRot;       // +0x18
+    fa::string mTexName1;  // +0x24
+    fa::string mTexName2;  // +0x40
+    std::uint8_t mIsSplat; // +0x5C
     std::uint8_t mPad5D[0x03];
     float mLODParam;          // +0x60
     std::uint32_t mStartTick; // +0x64
-    fa::string mType;      // +0x68
+    fa::string mType;         // +0x68
     std::uint32_t mObj;       // +0x84
     std::uint32_t mArmy;      // +0x88
     std::uint32_t mFidelity;  // +0x8C

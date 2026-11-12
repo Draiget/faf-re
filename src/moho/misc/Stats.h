@@ -18,7 +18,7 @@ namespace LuaPlus
 {
   class LuaState;
   class LuaObject;
-}
+} // namespace LuaPlus
 
 namespace moho
 {
@@ -65,27 +65,26 @@ namespace moho
     virtual void Delete(const char* statPath);
 
     /**
-       * Address: 0x0040C200 (FUN_0040C200)
+     * Address: 0x0040C200 (FUN_0040C200)
      */
     [[nodiscard]] StatItem* GetItem(gpg::StrArg statPath, bool allowCreate);
 
     /**
-       * Address: 0x00417B60 (FUN_00417B60)
+     * Address: 0x00417B60 (FUN_00417B60)
      */
     [[nodiscard]] StatItem* GetFloatItem(gpg::StrArg statPath);
 
     /**
-       * Address: 0x00417C50 (FUN_00417C50)
+     * Address: 0x00417C50 (FUN_00417C50)
      */
     [[nodiscard]] StatItem* GetStringItem(gpg::StrArg statPath);
 
     /**
-       * Address: 0x00436290 (FUN_00436290)
+     * Address: 0x00436290 (FUN_00436290)
      */
     [[nodiscard]] StatItem* GetIntItem(gpg::StrArg statPath);
 
     static gpg::RType* sType;
-
 
   public:
     // The root item, owned: the destructor 0x00406600 tears down `mLock` and then
@@ -108,7 +107,8 @@ namespace moho
    * with its path as `GetItem` takes it ("Parent_Child"), holding the tree's lock throughout
    * (the sim adds items under it). A game server reads a unit's stats this way to send them.
    */
-  void STAT_VisitItems(Stats<StatItem>& stats, const std::function<void(const fa::string& path, StatItem& item)>& visit);
+  void
+  STAT_VisitItems(Stats<StatItem>& stats, const std::function<void(const fa::string& path, StatItem& item)>& visit);
   /**
    * Engine addition, server mode: the items `STAT_VisitItems` visits, in its order, without their paths: a server
    * that read a tree once checks each beat whether its items are still the same ones before reading only values.
@@ -136,17 +136,17 @@ namespace moho
     ~EngineStats();
 
     /**
-      * Alias of FUN_00417B60 (non-canonical helper lane).
+     * Alias of FUN_00417B60 (non-canonical helper lane).
      */
     [[nodiscard]] StatItem* GetItem3(gpg::StrArg statPath);
 
     /**
-      * Alias of FUN_00417C50 (non-canonical helper lane).
+     * Alias of FUN_00417C50 (non-canonical helper lane).
      */
     [[nodiscard]] StatItem* GetItem_0(gpg::StrArg statPath);
 
     /**
-      * Alias of FUN_00436290 (non-canonical helper lane).
+     * Alias of FUN_00436290 (non-canonical helper lane).
      */
     [[nodiscard]] StatItem* GetItem2(gpg::StrArg statPath);
 
@@ -169,11 +169,11 @@ namespace moho
     [[nodiscard]] float EndLogging();
 
   public:
-    fa::string mLogFileName;   // +0x10
+    fa::string mLogFileName;         // +0x10
     fa::string mResolvedLogFilePath; // +0x2C
-    std::int32_t mLogFrameCount;  // +0x48
-    std::uint8_t mIsLogging;      // +0x4C
-    std::uint8_t mPad4D[3];       // +0x4D
+    std::int32_t mLogFrameCount;     // +0x48
+    std::uint8_t mIsLogging;         // +0x4C
+    std::uint8_t mPad4D[3];          // +0x4D
   };
 
   static_assert(offsetof(EngineStats, mLogFileName) == 0x10, "EngineStats::mLogFileName offset must be 0x10");
@@ -1019,7 +1019,6 @@ namespace moho
      */
     [[nodiscard]] static CArmyStatItem*
     WalkTokenPath(CArmyStatItem* root, const fa::vector<fa::string>& tokens, bool allowCreate, bool* didCreate);
-
 
   public:
     // The root item, owned: the destructor 0x006FD850 tears down `mLock` and then

@@ -32,7 +32,10 @@ namespace faf::editor::memmap
     using NtQueryInformationThreadFn = LONG(NTAPI*)(HANDLE, ULONG, void*, ULONG, ULONG*);
 
     /** The allocation base of every Win32 heap's pieces (segments and large blocks), to its heap. */
-    void MapHeaps(std::map<std::uintptr_t, std::uintptr_t>& owner, Snapshot& snapshot)
+    void MapHeaps(
+      std::map<std::uintptr_t, std::uintptr_t>& owner,
+      Snapshot& snapshot
+    )
     {
       const DWORD count = ::GetProcessHeaps(0, nullptr);
       std::vector<HANDLE> heaps(count + 16);
@@ -66,7 +69,9 @@ namespace faf::editor::memmap
     }
 
     /** The allocation base of every thread's stack. */
-    std::set<std::uintptr_t> StackBases(unsigned long& threads)
+    std::set<std::uintptr_t> StackBases(
+      unsigned long& threads
+    )
     {
       std::set<std::uintptr_t> bases;
       threads = 0;
@@ -106,11 +111,19 @@ namespace faf::editor::memmap
       return bases;
     }
 
-    std::string HeapName(const Snapshot& snapshot, const std::uintptr_t heap)
+    std::string HeapName(
+      const Snapshot& snapshot,
+      const std::uintptr_t heap
+    )
     {
       char text[64];
-      std::snprintf(text, sizeof(text), "heap %llx%s", static_cast<unsigned long long>(heap),
-                    heap == snapshot.processHeap ? " (the process heap)" : "");
+      std::snprintf(
+        text,
+        sizeof(text),
+        "heap %llx%s",
+        static_cast<unsigned long long>(heap),
+        heap == snapshot.processHeap ? " (the process heap)" : ""
+      );
       return text;
     }
   } // namespace
@@ -169,7 +182,10 @@ namespace faf::editor::memmap
     return snapshot;
   }
 
-  void LogChanges(const Snapshot& before, const Snapshot& after)
+  void LogChanges(
+    const Snapshot& before,
+    const Snapshot& after
+  )
   {
     std::size_t heapTotal = 0;
     for (const auto& [heap, size] : after.heaps) {
@@ -179,10 +195,21 @@ namespace faf::editor::memmap
     for (const auto& [base, size] : after.loose) {
       looseTotal += size;
     }
-    gpg::Logf("editor: memory map: %.1f MB private = heaps %.1f (%zu heaps) + stacks %.1f (%lu threads) + other %.1f; "
-              "mapped %.1f MB, images %.1f MB; %lu handles, %lu GDI, %lu USER objects",
-              after.privateTotal / kMB, heapTotal / kMB, after.heaps.size(), after.stacks / kMB, after.threads,
-              looseTotal / kMB, after.mapped / kMB, after.image / kMB, after.handles, after.gdiObjects, after.userObjects);
+    gpg::Logf(
+      "editor: memory map: %.1f MB private = heaps %.1f (%zu heaps) + stacks %.1f (%lu threads) + other %.1f; "
+      "mapped %.1f MB, images %.1f MB; %lu handles, %lu GDI, %lu USER objects",
+      after.privateTotal / kMB,
+      heapTotal / kMB,
+      after.heaps.size(),
+      after.stacks / kMB,
+      after.threads,
+      looseTotal / kMB,
+      after.mapped / kMB,
+      after.image / kMB,
+      after.handles,
+      after.gdiObjects,
+      after.userObjects
+    );
     if (before.privateTotal == 0) {
       return;
     }
@@ -190,20 +217,29 @@ namespace faf::editor::memmap
     auto delta = [](const std::size_t now, const std::size_t was) {
       return (static_cast<double>(now) - static_cast<double>(was)) / kMB;
     };
-    gpg::Logf("editor: memory map since the last play: private %+.2f MB, stacks %+.2f MB, threads %+ld, mapped %+.2f MB, "
-              "handles %+ld, GDI %+ld, USER %+ld",
-              delta(after.privateTotal, before.privateTotal), delta(after.stacks, before.stacks),
-              static_cast<long>(after.threads) - static_cast<long>(before.threads), delta(after.mapped, before.mapped),
-              static_cast<long>(after.handles) - static_cast<long>(before.handles),
-              static_cast<long>(after.gdiObjects) - static_cast<long>(before.gdiObjects),
-              static_cast<long>(after.userObjects) - static_cast<long>(before.userObjects));
+    gpg::Logf(
+      "editor: memory map since the last play: private %+.2f MB, stacks %+.2f MB, threads %+ld, mapped %+.2f MB, "
+      "handles %+ld, GDI %+ld, USER %+ld",
+      delta(after.privateTotal, before.privateTotal),
+      delta(after.stacks, before.stacks),
+      static_cast<long>(after.threads) - static_cast<long>(before.threads),
+      delta(after.mapped, before.mapped),
+      static_cast<long>(after.handles) - static_cast<long>(before.handles),
+      static_cast<long>(after.gdiObjects) - static_cast<long>(before.gdiObjects),
+      static_cast<long>(after.userObjects) - static_cast<long>(before.userObjects)
+    );
 
     for (const auto& [heap, size] : after.heaps) {
       const auto was = before.heaps.find(heap);
       const std::size_t previous = was != before.heaps.end() ? was->second : 0;
       if (size > previous + 65536 || previous > size + 65536 || was == before.heaps.end()) {
-        gpg::Logf("editor:   %s%s: %+.2f MB, now %.2f MB", HeapName(after, heap).c_str(),
-                  was == before.heaps.end() ? " (new)" : "", delta(size, previous), size / kMB);
+        gpg::Logf(
+          "editor:   %s%s: %+.2f MB, now %.2f MB",
+          HeapName(after, heap).c_str(),
+          was == before.heaps.end() ? " (new)" : "",
+          delta(size, previous),
+          size / kMB
+        );
       }
     }
     for (const auto& [heap, size] : before.heaps) {
@@ -234,17 +270,28 @@ namespace faf::editor::memmap
         goneBytes += static_cast<double>(size);
       }
     }
-    gpg::Logf("editor:   direct allocations: %.2f MB new, %.2f MB gone, %+.2f MB in ones that changed size", addedBytes / kMB,
-              goneBytes / kMB, grownBytes / kMB);
+    gpg::Logf(
+      "editor:   direct allocations: %.2f MB new, %.2f MB gone, %+.2f MB in ones that changed size",
+      addedBytes / kMB,
+      goneBytes / kMB,
+      grownBytes / kMB
+    );
     int lines = 0;
     for (auto it = changed.rbegin(); it != changed.rend() && lines < 6; ++it, ++lines) {
       const std::uintptr_t base = it->second;
-      gpg::Logf("editor:     at %llx (reserves %.1f MB): %.2f -> %.2f MB committed", static_cast<unsigned long long>(base),
-                after.looseReserved.at(base) / kMB, before.loose.at(base) / kMB, after.loose.at(base) / kMB);
+      gpg::Logf(
+        "editor:     at %llx (reserves %.1f MB): %.2f -> %.2f MB committed",
+        static_cast<unsigned long long>(base),
+        after.looseReserved.at(base) / kMB,
+        before.loose.at(base) / kMB,
+        after.loose.at(base) / kMB
+      );
     }
     lines = 0;
     for (auto it = added.rbegin(); it != added.rend() && lines < 16; ++it, ++lines) {
-      gpg::Logf("editor:     %d new of %zu KB (protection 0x%lx)", it->second, it->first.first / 1024, it->first.second);
+      gpg::Logf(
+        "editor:     %d new of %zu KB (protection 0x%lx)", it->second, it->first.first / 1024, it->first.second
+      );
     }
   }
 } // namespace faf::editor::memmap

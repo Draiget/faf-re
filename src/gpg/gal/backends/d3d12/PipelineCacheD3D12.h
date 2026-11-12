@@ -25,7 +25,10 @@ namespace gpg::gal::d3d12
     void Open(ID3D12Device* device, const std::string& directory);
     void Close() noexcept;
 
-    [[nodiscard]] bool IsOpen() const noexcept { return mLibrary != nullptr; }
+    [[nodiscard]] bool IsOpen() const noexcept
+    {
+      return mLibrary != nullptr;
+    }
 
     /** A stored pipeline for `key` whose description is `desc`, or null. */
     [[nodiscard]] Microsoft::WRL::ComPtr<ID3D12PipelineState>

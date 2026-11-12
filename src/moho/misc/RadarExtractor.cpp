@@ -14,7 +14,9 @@ namespace moho
    * Address: 0x007ED000 (FUN_007ED000, Moho::RadarExtractor::Range)
    */
   bool RadarExtractor::Range(
-    SRangeExtractionPayload* const outRange, const RUnitBlueprint* const unitBlueprint, const Wm3::Vec3f& center
+    SRangeExtractionPayload* const outRange,
+    const RUnitBlueprint* const unitBlueprint,
+    const Wm3::Vec3f& center
   ) const
   {
     if (!outRange || !unitBlueprint) {
@@ -29,7 +31,9 @@ namespace moho
    * Address: 0x007ECF40 (FUN_007ECF40, Moho::RadarExtractor::Extract)
    */
   bool RadarExtractor::Extract(
-    SRangeExtractionPayload* const outRange, const UserEntity* const userEntity, const float interpolationAlpha
+    SRangeExtractionPayload* const outRange,
+    const UserEntity* const userEntity,
+    const float interpolationAlpha
   ) const
   {
     if (!outRange || !userEntity) {

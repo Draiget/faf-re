@@ -6,7 +6,8 @@
 #include "moho/misc/Listener.h"
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/ECommandEvent.h"
-#include "moho/unit/tasks/CUnitGuardTask.h"
+#include "moho/unit/tasks/CUnitGuardTask.h"
+
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -67,7 +68,9 @@ namespace moho
    * What it does:
    * Registers `CCommandTask` as the primary reflection base.
    */
-  void __stdcall CUnitGuardTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void __stdcall CUnitGuardTaskTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CCommandTask>(typeInfo);
   }
@@ -79,9 +82,13 @@ namespace moho
    * Registers `Listener<ECommandEvent>` as the secondary reflection base at
    * offset `0x34`.
    */
-  void __stdcall CUnitGuardTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const typeInfo)
+  void __stdcall CUnitGuardTaskTypeInfo::AddBase_Listener_ECommandEvent(
+    gpg::RType* const typeInfo
+  )
   {
-    gpg::AddReflectedBase<moho::Listener<moho::ECommandEvent>>(typeInfo, gpg::BaseSubobjectOffset<CUnitGuardTask, Listener<ECommandEvent>>());
+    gpg::AddReflectedBase<moho::Listener<moho::ECommandEvent>>(
+      typeInfo, gpg::BaseSubobjectOffset<CUnitGuardTask, Listener<ECommandEvent>>()
+    );
   }
 
   /**
@@ -105,7 +112,9 @@ namespace moho
    * Constructs one `CUnitGuardTask` in caller-provided storage and returns a
    * typed reflection ref.
    */
-  gpg::RRef CUnitGuardTaskTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitGuardTaskTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     CUnitGuardTask* task = nullptr;
     if (objectStorage != nullptr) {
@@ -123,7 +132,9 @@ namespace moho
    * What it does:
    * Deletes one heap-owned `CUnitGuardTask`.
    */
-  void CUnitGuardTaskTypeInfo::Delete(void* const objectStorage)
+  void CUnitGuardTaskTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CUnitGuardTask*>(objectStorage);
   }
@@ -134,7 +145,9 @@ namespace moho
    * What it does:
    * Runs the in-place `CUnitGuardTask` destructor body.
    */
-  void CUnitGuardTaskTypeInfo::Destruct(void* const objectStorage)
+  void CUnitGuardTaskTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     auto* const task = static_cast<CUnitGuardTask*>(objectStorage);
     if (!task) {
@@ -147,4 +160,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_CUnitGuardTaskTypeInfo_15e799, moho::preregister_CUnitGuardTaskTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_CUnitGuardTaskTypeInfo_15e799,
+  moho::preregister_CUnitGuardTaskTypeInfo
+)

@@ -41,7 +41,9 @@ namespace faf::remote::client
     constexpr std::uint32_t kSummaryEveryViews = 600; // one minute of game time
 
     /** The bytes `LuaObject::ToByteStream` writes for an empty table: a beat whose Lua lane carries nothing. */
-    [[nodiscard]] std::vector<std::uint8_t> EmptyTableBytes(LuaPlus::LuaState& state)
+    [[nodiscard]] std::vector<std::uint8_t> EmptyTableBytes(
+      LuaPlus::LuaState& state
+    )
     {
       LuaPlus::LuaObject table;
       table.AssignNewTable(&state, 0, 0u);
@@ -54,16 +56,27 @@ namespace faf::remote::client
       constexpr std::size_t kHeaderBytes = 3u;
       const auto* const bytes = reinterpret_cast<const std::uint8_t*>(message.mBuff.start_);
       const std::size_t size = message.mBuff.Size();
-      return size > kHeaderBytes ? std::vector<std::uint8_t>(bytes + kHeaderBytes, bytes + size) : std::vector<std::uint8_t>{};
+      return size > kHeaderBytes ? std::vector<std::uint8_t>(bytes + kHeaderBytes, bytes + size)
+                                 : std::vector<std::uint8_t>{};
     }
   } // namespace
 
   CNetworkSimDriver::CNetworkSimDriver(
-    moho::RRuleGameRules& rules, const moho::LaunchInfoBase& launch, const char* const playerName, const int clientIndex,
-    const std::int32_t uid, const unsigned int sourceId, const moho::CHeightField* const heights
+    moho::RRuleGameRules& rules,
+    const moho::LaunchInfoBase& launch,
+    const char* const playerName,
+    const int clientIndex,
+    const std::int32_t uid,
+    const unsigned int sourceId,
+    const moho::CHeightField* const heights
   )
     : mRules(rules)
-    , mClientManager([this](moho::CMessage& message) { SendCommandFrame(message); }, nullptr)
+    , mClientManager(
+        [this](moho::CMessage& message) {
+          SendCommandFrame(message);
+        },
+        nullptr
+      )
     , mMarshaller(&mClientManager)
     , mEmptySyncLua(new LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE))
   {
@@ -101,7 +114,11 @@ namespace faf::remote::client
       gpg::Logf("server driver: loaded; told the server");
     });
     gpg::Logf(
-      "server driver: on, as client %d (uid %d, source %u), %zu armies", clientIndex, static_cast<int>(uid), sourceId, mArmyConstants.size()
+      "server driver: on, as client %d (uid %d, source %u), %zu armies",
+      clientIndex,
+      static_cast<int>(uid),
+      sourceId,
+      mArmyConstants.size()
     );
   }
 
@@ -113,55 +130,91 @@ namespace faf::remote::client
     }
   }
 
-  void CNetworkSimDriver::LogSummary(const char* const when) const
+  void CNetworkSimDriver::LogSummary(
+    const char* const when
+  ) const
   {
     const SServerViewStats noStats{};
     const SServerViewStats& views = mViews ? mViews->Stats() : noStats;
     gpg::Logf(
-      "server driver %s: %llu views (%llu applied, %llu bad, %llu frame failures), beat %d, %llu commands sent, answers %llu applied / "
-      "%llu refused / %llu dropped (issue lead %d beats, largest %d, %llu applied past their beat), %llu Lua lanes bad, "
+      "server driver %s: %llu views (%llu applied, %llu bad, %llu frame failures), beat %d, %llu commands sent, "
+      "answers %llu applied / "
+      "%llu refused / %llu dropped (issue lead %d beats, largest %d, %llu applied past their beat), %llu Lua lanes "
+      "bad, "
       "%llu without their LuaSync; session tables: %llu records (%llu bad, %llu resets), "
-      "%zu deposits, %llu terrain edits, %llu unknown ids; clock: server rate %+d, %.1f beats/s on its clock, %.1f arriving, "
+      "%zu deposits, %llu terrain edits, %llu unknown ids; clock: server rate %+d, %.1f beats/s on its clock, %.1f "
+      "arriving, "
       "backlog %lld, skew %.2f; roster: %llu (%llu bad), %zu clients; chat: %llu sent, %llu received, %llu bad; "
       "KB by lane: entities %.0f, armies %.0f, grids %.0f, Lua %.0f, poses %.0f",
-      when, static_cast<unsigned long long>(mViewsTaken), static_cast<unsigned long long>(views.applied), static_cast<unsigned long long>(mViewsBad),
-      static_cast<unsigned long long>(views.frameFailures), static_cast<int>(mLastBeat), static_cast<unsigned long long>(mCommandsSent),
-      static_cast<unsigned long long>(mAnswers[0]), static_cast<unsigned long long>(mAnswers[1]), static_cast<unsigned long long>(mAnswers[2]),
-      static_cast<int>(mIssueLead), static_cast<int>(mLargestLead), static_cast<unsigned long long>(mAnswersPastEstimate),
-      static_cast<unsigned long long>(mLuaLanesBad), static_cast<unsigned long long>(mLuaMissing),
-      static_cast<unsigned long long>(views.tableRecords), static_cast<unsigned long long>(views.tableFailures + mTablesBad),
-      static_cast<unsigned long long>(views.tableResets), mViews ? mViews->Tables().Deposits().size() : std::size_t{0},
+      when,
+      static_cast<unsigned long long>(mViewsTaken),
+      static_cast<unsigned long long>(views.applied),
+      static_cast<unsigned long long>(mViewsBad),
+      static_cast<unsigned long long>(views.frameFailures),
+      static_cast<int>(mLastBeat),
+      static_cast<unsigned long long>(mCommandsSent),
+      static_cast<unsigned long long>(mAnswers[0]),
+      static_cast<unsigned long long>(mAnswers[1]),
+      static_cast<unsigned long long>(mAnswers[2]),
+      static_cast<int>(mIssueLead),
+      static_cast<int>(mLargestLead),
+      static_cast<unsigned long long>(mAnswersPastEstimate),
+      static_cast<unsigned long long>(mLuaLanesBad),
+      static_cast<unsigned long long>(mLuaMissing),
+      static_cast<unsigned long long>(views.tableRecords),
+      static_cast<unsigned long long>(views.tableFailures + mTablesBad),
+      static_cast<unsigned long long>(views.tableResets),
+      mViews ? mViews->Tables().Deposits().size() : std::size_t{0},
       static_cast<unsigned long long>(mViews ? mViews->RebuildStats().terrainEdits : 0u),
       static_cast<unsigned long long>(mViews ? mViews->RebuildStats().unknownTableIds : 0u),
-      static_cast<int>(mClock.ServerSimRate()), mClock.ServerBeatsPerSecond(), mClock.ArrivalBeatsPerSecond(),
-      static_cast<long long>(mClock.Backlog()), mClock.Skew(), static_cast<unsigned long long>(mRosters),
-      static_cast<unsigned long long>(mRostersBad), mClientManager.RosterCount(),
-      static_cast<unsigned long long>(mChatSent), static_cast<unsigned long long>(mChatReceived), static_cast<unsigned long long>(mChatBad),
-      static_cast<double>(mLaneBytes[0]) / 1024.0, static_cast<double>(mLaneBytes[1]) / 1024.0, static_cast<double>(mLaneBytes[2]) / 1024.0,
-      static_cast<double>(mLaneBytes[3]) / 1024.0, static_cast<double>(mLaneBytes[4]) / 1024.0
+      static_cast<int>(mClock.ServerSimRate()),
+      mClock.ServerBeatsPerSecond(),
+      mClock.ArrivalBeatsPerSecond(),
+      static_cast<long long>(mClock.Backlog()),
+      mClock.Skew(),
+      static_cast<unsigned long long>(mRosters),
+      static_cast<unsigned long long>(mRostersBad),
+      mClientManager.RosterCount(),
+      static_cast<unsigned long long>(mChatSent),
+      static_cast<unsigned long long>(mChatReceived),
+      static_cast<unsigned long long>(mChatBad),
+      static_cast<double>(mLaneBytes[0]) / 1024.0,
+      static_cast<double>(mLaneBytes[1]) / 1024.0,
+      static_cast<double>(mLaneBytes[2]) / 1024.0,
+      static_cast<double>(mLaneBytes[3]) / 1024.0,
+      static_cast<double>(mLaneBytes[4]) / 1024.0
     );
   }
 
-  void CNetworkSimDriver::SendChat(const int clientIndex, const gpg::MemBuffer<const char>& data)
+  void CNetworkSimDriver::SendChat(
+    const int clientIndex,
+    const gpg::MemBuffer<const char>& data
+  )
   {
     const moho::IClient* const local = mClientManager.GetLocalClient();
     if (local != nullptr && local->GetIndex() == clientIndex) {
       // To itself (a line to everyone includes the sender): as a lockstep game's local client shows it.
-      DeliverChat(clientIndex, std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(data.mBegin), data.Size()));
+      DeliverChat(
+        clientIndex, std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(data.mBegin), data.Size())
+      );
       return;
     }
     if (data.Size() > kMaxChatBytes) {
       ++mChatBad;
       return;
     }
-    const std::vector<std::uint8_t> message =
-      EncodeChatMessage(clientIndex, std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(data.mBegin), data.Size()));
+    const std::vector<std::uint8_t> message = EncodeChatMessage(
+      clientIndex, std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(data.mBegin), data.Size())
+    );
     if (SendServerGameMessage(message)) {
       ++mChatSent;
     }
   }
 
-  void CNetworkSimDriver::DeliverChat(const int senderIndex, const std::span<const std::uint8_t> payload)
+  void CNetworkSimDriver::DeliverChat(
+    const int senderIndex,
+    const std::span<const std::uint8_t> payload
+  )
   {
     const CRosterClient* const sender = mClientManager.RosterClient(senderIndex);
     if (sender == nullptr || mClientManager.mInterface == nullptr) {
@@ -172,7 +225,9 @@ namespace faf::remote::client
     mClientManager.mInterface->ReceiveChat(sender, gpg::CopyMemBuffer(payload.data(), payload.size()));
   }
 
-  void CNetworkSimDriver::Take(const std::vector<std::uint8_t>& message)
+  void CNetworkSimDriver::Take(
+    const std::vector<std::uint8_t>& message
+  )
   {
     if (message.empty()) {
       return;
@@ -188,11 +243,17 @@ namespace faf::remote::client
       if (!mViews) {
         mViews = std::make_unique<CServerViewClient>(mRules, info);
         if (mSeedHeights != nullptr) {
-          mViews->SeedTerrain(*mSeedHeights); // no edit has reached the session's field yet: none is applied before a view
+          mViews->SeedTerrain(
+            *mSeedHeights
+          ); // no edit has reached the session's field yet: none is applied before a view
         }
         gpg::Logf(
-          "server driver: map %.0f x %.0f, army %d, source %u, %llu blueprints known", info.mapSizeX, info.mapSizeZ, static_cast<int>(info.army),
-          info.source, static_cast<unsigned long long>(mViews->Stats().blueprintsKnown)
+          "server driver: map %.0f x %.0f, army %d, source %u, %llu blueprints known",
+          info.mapSizeX,
+          info.mapSizeZ,
+          static_cast<int>(info.army),
+          info.source,
+          static_cast<unsigned long long>(mViews->Stats().blueprintsKnown)
         );
       }
       return;
@@ -226,7 +287,9 @@ namespace faf::remote::client
         return;
       }
       std::vector<std::uint8_t> lane(bytes, bytes + size);
-      const auto pending = std::find_if(mPendingViews.begin(), mPendingViews.end(), [beat](const SPendingView& view) { return view.beat == beat; });
+      const auto pending = std::find_if(mPendingViews.begin(), mPendingViews.end(), [beat](const SPendingView& view) {
+        return view.beat == beat;
+      });
       if (pending != mPendingViews.end()) {
         pending->lua = std::move(lane);
         pending->haveLua = true;
@@ -288,9 +351,15 @@ namespace faf::remote::client
         return;
       }
       ++mRosters;
-      mClientManager.ApplyRoster(*roster, [this](const int index, const gpg::MemBuffer<const char> data) { SendChat(index, data); });
+      mClientManager.ApplyRoster(*roster, [this](const int index, const gpg::MemBuffer<const char> data) {
+        SendChat(index, data);
+      });
       if (mRosters == 1u) {
-        gpg::Logf("server driver: roster from the server, %zu clients, this one %d", roster->entries.size(), static_cast<int>(roster->localIndex));
+        gpg::Logf(
+          "server driver: roster from the server, %zu clients, this one %d",
+          roster->entries.size(),
+          static_cast<int>(roster->localIndex)
+        );
       }
       return;
     }
@@ -335,7 +404,10 @@ namespace faf::remote::client
     }
   }
 
-  void CNetworkSimDriver::QueueView(const SViewMessage& view, const std::span<const std::uint8_t> lua)
+  void CNetworkSimDriver::QueueView(
+    const SViewMessage& view,
+    const std::span<const std::uint8_t> lua
+  )
   {
     ++mViewsTaken;
     // Plan WP10.10: this view's bytes by lane, for the network panel and the summary.
@@ -356,7 +428,9 @@ namespace faf::remote::client
     packet->mCurBeat = static_cast<std::int32_t>(view.beat);
     packet->mCurTick = static_cast<std::int32_t>(view.beat);
     packet->mAdvanced = true;
-    packet->mFocusArmy = mFocusGranted.load(std::memory_order_relaxed) == kNoFocusGranted ? mViews->Info().army : mFocusGranted.load(std::memory_order_relaxed);
+    packet->mFocusArmy = mFocusGranted.load(std::memory_order_relaxed) == kNoFocusGranted
+      ? mViews->Info().army
+      : mFocusGranted.load(std::memory_order_relaxed);
     if (!mArmiesGiven) {
       mArmiesGiven = true;
       for (const moho::SSTIArmyConstantData& army : mArmyConstants) {
@@ -373,7 +447,9 @@ namespace faf::remote::client
     mSpeedMeter.Add(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - applyStart).count());
     if (const std::optional<int> limit = mSpeedMeter.Settled(); limit) {
       const bool sent = SendServerGameMessage(EncodeSpeedLimit(*limit));
-      gpg::Logf("server driver: this game keeps up with speed %+d%s", *limit, sent ? "" : " (not sent: no server link)");
+      gpg::Logf(
+        "server driver: this game keeps up with speed %+d%s", *limit, sent ? "" : " (not sent: no server link)"
+      );
     }
     // #178: the frame's header carries the server's sim rate and clock; the session paces by them.
     if (const wire::SViewFrame* const shown = mViews->Shown(); shown != nullptr) {
@@ -408,8 +484,12 @@ namespace faf::remote::client
         std::search(table.begin(), table.end(), std::begin(kPlayableArea), std::end(kPlayableArea) - 1) != table.end();
       mLuaTablesLogged += table.empty() ? 0u : 1u;
       gpg::Logf(
-        "server driver: beat %u Lua lane %zu bytes, Sync table %zu bytes%s, %zu prints", view.beat, lua.size(), table.size(),
-        playableArea ? " (NewPlayableArea)" : "", prints.size()
+        "server driver: beat %u Lua lane %zu bytes, Sync table %zu bytes%s, %zu prints",
+        view.beat,
+        lua.size(),
+        table.size(),
+        playableArea ? " (NewPlayableArea)" : "",
+        prints.size()
       );
     }
     auto* const stream = new gpg::MemBufferStream(static_cast<unsigned int>(sync.size() + 16u));
@@ -423,7 +503,9 @@ namespace faf::remote::client
     }
   }
 
-  void CNetworkSimDriver::SendCommandFrame(moho::CMessage& message)
+  void CNetworkSimDriver::SendCommandFrame(
+    moho::CMessage& message
+  )
   {
     // As the probe sends one: the kind, then the whole message (type, 16-bit size, payload).
     std::vector<std::uint8_t> frame;
@@ -477,7 +559,9 @@ namespace faf::remote::client
     return !mPackets.empty();
   }
 
-  void CNetworkSimDriver::GetSyncData(moho::SSyncData*& outSyncData)
+  void CNetworkSimDriver::GetSyncData(
+    moho::SSyncData*& outSyncData
+  )
   {
     // Never blocks: the session asks only after `HasSyncData`.
     outSyncData = nullptr;
@@ -502,7 +586,9 @@ namespace faf::remote::client
     return mClock.HasFrames() ? mClock.Skew() : 0.0;
   }
 
-  void CNetworkSimDriver::SetArmyIndex(const int army)
+  void CNetworkSimDriver::SetArmyIndex(
+    const int army
+  )
   {
     // Plan WP11.1: a request; the server answers with the army it grants (`FocusArmy`), which the views then carry.
     const int shown = mFocusGranted.load(std::memory_order_relaxed);
@@ -513,7 +599,9 @@ namespace faf::remote::client
     gpg::Logf("server driver: focus on army %d asked of the server%s", army, sent ? "" : " (not sent: no server link)");
   }
 
-  void CNetworkSimDriver::SetGeomCams(const fa::vector<moho::GeomCamera3>& cameras)
+  void CNetworkSimDriver::SetGeomCams(
+    const fa::vector<moho::GeomCamera3>& cameras
+  )
   {
     // Plan WP11.1: what the cameras see goes to the server at most every kCameraPeriodMs (for WP8.2's camera order).
     const auto now = std::chrono::steady_clock::now();
@@ -539,11 +627,22 @@ namespace faf::remote::client
 
   // The sync filters choose what a local sim passes to the UI; a server game's views are the server's (plan WP4), so
   // nothing here changes what it sends.
-  void CNetworkSimDriver::SetSyncFilterMaskA(const moho::SSyncFilterMaskBlock&) {}
-  void CNetworkSimDriver::SetSyncFilterMaskB(const moho::SSyncFilterMaskBlock&) {}
-  void CNetworkSimDriver::SetSyncFilterOptionFlag(const bool) {}
+  void CNetworkSimDriver::SetSyncFilterMaskA(
+    const moho::SSyncFilterMaskBlock&
+  )
+  {}
+  void CNetworkSimDriver::SetSyncFilterMaskB(
+    const moho::SSyncFilterMaskBlock&
+  )
+  {}
+  void CNetworkSimDriver::SetSyncFilterOptionFlag(
+    const bool
+  )
+  {}
 
-  void CNetworkSimDriver::RequestPause(std::int32_t* const outCommandCookie)
+  void CNetworkSimDriver::RequestPause(
+    std::int32_t* const outCommandCookie
+  )
   {
     mMarshaller.RequestPause();
     if (outCommandCookie != nullptr) {
@@ -551,7 +650,9 @@ namespace faf::remote::client
     }
   }
 
-  void CNetworkSimDriver::Resume(std::int32_t* const outCommandCookie)
+  void CNetworkSimDriver::Resume(
+    std::int32_t* const outCommandCookie
+  )
   {
     mMarshaller.Resume();
     if (outCommandCookie != nullptr) {
@@ -567,38 +668,57 @@ namespace faf::remote::client
     return IssueBeat();
   }
 
-  moho::CmdId CNetworkSimDriver::CreateUnit(const uint32_t armyIndex, const moho::RResId& id, const moho::SCoordsVec2& pos, const float heading)
+  moho::CmdId CNetworkSimDriver::CreateUnit(
+    const uint32_t armyIndex,
+    const moho::RResId& id,
+    const moho::SCoordsVec2& pos,
+    const float heading
+  )
   {
     mMarshaller.CreateUnit(armyIndex, id, pos, heading);
     return IssueBeat();
   }
 
-  moho::CmdId CNetworkSimDriver::CreateProp(const char* const id, const Wm3::Vec3f& loc)
+  moho::CmdId CNetworkSimDriver::CreateProp(
+    const char* const id,
+    const Wm3::Vec3f& loc
+  )
   {
     mMarshaller.CreateProp(id, loc);
     return IssueBeat();
   }
 
-  moho::CmdId CNetworkSimDriver::DestroyEntity(const moho::EntId entityId)
+  moho::CmdId CNetworkSimDriver::DestroyEntity(
+    const moho::EntId entityId
+  )
   {
     mMarshaller.DestroyEntity(entityId);
     return IssueBeat();
   }
 
-  moho::CmdId CNetworkSimDriver::WarpEntity(const moho::EntId entityId, const moho::VTransform& transform)
+  moho::CmdId CNetworkSimDriver::WarpEntity(
+    const moho::EntId entityId,
+    const moho::VTransform& transform
+  )
   {
     mMarshaller.WarpEntity(entityId, transform);
     return IssueBeat();
   }
 
-  moho::CmdId CNetworkSimDriver::ProcessInfoPair(const moho::EntId entityId, const gpg::StrArg key, const gpg::StrArg val)
+  moho::CmdId CNetworkSimDriver::ProcessInfoPair(
+    const moho::EntId entityId,
+    const gpg::StrArg key,
+    const gpg::StrArg val
+  )
   {
     mMarshaller.ProcessInfoPair(entityId, key, val);
     return IssueBeat();
   }
 
   moho::CmdId CNetworkSimDriver::IssueCommand(
-    const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities, const moho::SSTICommandIssueData& data, const bool clear
+    const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities,
+    const moho::SSTICommandIssueData& data,
+    const bool clear
   )
   {
     mMarshaller.IssueCommand(entities, data, clear);
@@ -606,59 +726,83 @@ namespace faf::remote::client
   }
 
   moho::CmdId CNetworkSimDriver::IssueFactoryCommand(
-    const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities, const moho::SSTICommandIssueData& data, const bool clear
+    const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities,
+    const moho::SSTICommandIssueData& data,
+    const bool clear
   )
   {
     mMarshaller.IssueFactoryCommand(entities, data, clear);
     return IssueBeat();
   }
 
-  moho::CmdId CNetworkSimDriver::IncreaseCommandCount(const moho::CmdId id, const int count)
+  moho::CmdId CNetworkSimDriver::IncreaseCommandCount(
+    const moho::CmdId id,
+    const int count
+  )
   {
     mMarshaller.IncreaseCommandCount(id, count);
     return IssueBeat();
   }
 
-  moho::CmdId CNetworkSimDriver::DecreaseCommandCount(const moho::CmdId id, const int count)
+  moho::CmdId CNetworkSimDriver::DecreaseCommandCount(
+    const moho::CmdId id,
+    const int count
+  )
   {
     mMarshaller.DecreaseCommandCount(id, count);
     return IssueBeat();
   }
 
-  moho::CmdId CNetworkSimDriver::SetCommandTarget(const moho::CmdId id, const moho::SSTITarget& target)
+  moho::CmdId CNetworkSimDriver::SetCommandTarget(
+    const moho::CmdId id,
+    const moho::SSTITarget& target
+  )
   {
     mMarshaller.SetCommandTarget(id, target);
     return IssueBeat();
   }
 
-  moho::CmdId CNetworkSimDriver::SetCommandType(const moho::CmdId id, const moho::EUnitCommandType type)
+  moho::CmdId CNetworkSimDriver::SetCommandType(
+    const moho::CmdId id,
+    const moho::EUnitCommandType type
+  )
   {
     mMarshaller.SetCommandType(id, type);
     return IssueBeat();
   }
 
   moho::CmdId CNetworkSimDriver::SetCommandCells(
-    const moho::CmdId id, const gpg::core::FastVector<moho::SOCellPos>& cells, const Wm3::Vector3<float>& target
+    const moho::CmdId id,
+    const gpg::core::FastVector<moho::SOCellPos>& cells,
+    const Wm3::Vector3<float>& target
   )
   {
     mMarshaller.SetCommandCells(id, cells, target);
     return IssueBeat();
   }
 
-  moho::CmdId CNetworkSimDriver::RemoveCommandFromUnitQueue(const moho::CmdId id, const moho::EntId unitId)
+  moho::CmdId CNetworkSimDriver::RemoveCommandFromUnitQueue(
+    const moho::CmdId id,
+    const moho::EntId unitId
+  )
   {
     mMarshaller.RemoveCommandFromUnitQueue(id, unitId);
     return IssueBeat();
   }
 
-  moho::CmdId CNetworkSimDriver::ExecuteLuaInSim(const char* const lua, const LuaPlus::LuaObject& args)
+  moho::CmdId CNetworkSimDriver::ExecuteLuaInSim(
+    const char* const lua,
+    const LuaPlus::LuaObject& args
+  )
   {
     mMarshaller.ExecuteLuaInSim(lua, args);
     return IssueBeat();
   }
 
   moho::CmdId CNetworkSimDriver::LuaSimCallback(
-    const char* const fnName, const LuaPlus::LuaObject& args, const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities
+    const char* const fnName,
+    const LuaPlus::LuaObject& args,
+    const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities
   )
   {
     mMarshaller.LuaSimCallback(fnName, args, entities);
@@ -666,7 +810,9 @@ namespace faf::remote::client
   }
 
   moho::CmdId CNetworkSimDriver::ExecuteDebugCommand(
-    const char* const command, const Wm3::Vector3<float>& worldPos, const uint32_t focusArmy,
+    const char* const command,
+    const Wm3::Vector3<float>& worldPos,
+    const uint32_t focusArmy,
     const moho::BVSet<moho::EntId, moho::EntIdUniverse>& entities
   )
   {
@@ -681,14 +827,23 @@ namespace faf::remote::client
 
   void CNetworkSimDriver::ReleaseInterlockRef() {}
 
-  void CNetworkSimDriver::RequestSaveGame(moho::ISaveRequest* const request)
+  void CNetworkSimDriver::RequestSaveGame(
+    moho::ISaveRequest* const request
+  )
   {
     // A client with no sim has nothing to save; the server keeps the game (and its replay).
     (void)request;
     gpg::Warnf("server driver: a save was asked for; a server game can't be saved by a player");
   }
 
-  void CNetworkSimDriver::DrawNetworkStats(moho::CD3DPrimBatcher*, float, float, float, float) {}
+  void CNetworkSimDriver::DrawNetworkStats(
+    moho::CD3DPrimBatcher*,
+    float,
+    float,
+    float,
+    float
+  )
+  {}
 
   namespace
   {
@@ -696,7 +851,9 @@ namespace faf::remote::client
     bool sHaveLaunch = false;
   } // namespace
 
-  void SetServerLaunch(const SServerLaunch& launch)
+  void SetServerLaunch(
+    const SServerLaunch& launch
+  )
   {
     sLaunch = launch;
     sHaveLaunch = true;
@@ -708,9 +865,13 @@ namespace faf::remote::client
   }
 
   moho::ISTIDriver* CreateServerSessionDriver(
-    moho::RRuleGameRules& rules, const moho::LaunchInfoBase& launch, const moho::CHeightField* const heights
+    moho::RRuleGameRules& rules,
+    const moho::LaunchInfoBase& launch,
+    const moho::CHeightField* const heights
   )
   {
-    return new CNetworkSimDriver(rules, launch, sLaunch.playerName.c_str(), sLaunch.clientIndex, sLaunch.uid, sLaunch.source, heights);
+    return new CNetworkSimDriver(
+      rules, launch, sLaunch.playerName.c_str(), sLaunch.clientIndex, sLaunch.uid, sLaunch.source, heights
+    );
   }
 } // namespace faf::remote::client

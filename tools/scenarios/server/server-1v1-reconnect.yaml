@@ -1,0 +1,26 @@
+kind: server
+name: server-1v1-reconnect
+description: >
+  Plan WP16.4: a 1v1 where Seat 1002's process is killed at 60 s (a crash, no leave message) and started again at
+  75 s with the same token, inside the server's reconnect window. The game goes on for Seat 1001 throughout, the
+  second run of 1002 gets its view again and decodes it, and the replay plays back.
+map: /maps/scmp_009/scmp_009_scenario.lua
+seats:
+  - uid: 1001
+    team: 2
+    args: ["--order-at", "30"]
+  - uid: 1002
+    team: 3
+server:
+  stopBeat: 2400
+  args: ["--reconnect-seconds", "60"]
+steps:
+  - at: 60s
+    kill: 1002
+  - at: 75s
+    start: 1002
+timeout: 10m
+expect:
+  clean: true
+  playback: true
+  present: ["Seat 1002 has their view again"]

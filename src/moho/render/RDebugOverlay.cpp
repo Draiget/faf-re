@@ -26,7 +26,10 @@ namespace moho
   /**
    * Address: 0x00651AF0 (FUN_00651AF0, nullsub_1684)
    */
-  void RDebugOverlay::Tick(Sim* /*sim*/) {}
+  void RDebugOverlay::Tick(
+    Sim* /*sim*/
+  )
+  {}
 
   /**
    * Address: 0x006527B0 (FUN_006527B0, Moho::RDebugOverlay::NewPtr)
@@ -35,7 +38,9 @@ namespace moho
    * Creates one reflected object through `typeInfo`, upcasts it to
    * `RDebugOverlay`, and returns the typed object pointer.
    */
-  RDebugOverlay* RDebugOverlay::NewPtr(gpg::RType& typeInfo)
+  RDebugOverlay* RDebugOverlay::NewPtr(
+    gpg::RType& typeInfo
+  )
   {
     if (typeInfo.newRefFunc_ == nullptr) {
       return nullptr;
@@ -51,11 +56,7 @@ namespace moho
 
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, overlayType);
     if (upcast.mObj == nullptr) {
-      gpg::HandleAssertFailure(
-        "result",
-        540,
-        "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/reflection.h"
-      );
+      gpg::HandleAssertFailure("result", 540, "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore/reflection/reflection.h");
       return nullptr;
     }
 

@@ -22,7 +22,10 @@ namespace
 
   struct CMauiMovieTypeInfoBootstrap
   {
-    CMauiMovieTypeInfoBootstrap() { moho::register_CMauiMovieTypeInfoStartup(); }
+    CMauiMovieTypeInfoBootstrap()
+    {
+      moho::register_CMauiMovieTypeInfoStartup();
+    }
   };
   CMauiMovieTypeInfoBootstrap gCMauiMovieTypeInfoBootstrap;
 
@@ -37,7 +40,9 @@ namespace
    * `RType::IsDerivedFrom` cannot walk from it to CScriptObject and every
    * reflected reference built from a CMauiMovie fails its upcast.
    */
-  void AddCMauiControlBase(gpg::RType& typeInfo)
+  void AddCMauiControlBase(
+    gpg::RType& typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CMauiControl>(&typeInfo);
   }
@@ -98,4 +103,7 @@ void moho::register_CMauiMovieTypeInfoStartup()
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every
 // consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CMauiMovieTypeInfoStartup_79ecd0, moho::register_CMauiMovieTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CMauiMovieTypeInfoStartup_79ecd0,
+  moho::register_CMauiMovieTypeInfoStartup
+)

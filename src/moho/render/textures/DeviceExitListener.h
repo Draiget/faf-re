@@ -13,9 +13,9 @@ namespace moho
 
   struct SD3DDeviceEvent
   {
-    std::uint32_t mEventType;       // +0x00
-    bool mShouldReleaseTextures;    // +0x04
-    std::uint8_t mPad05[0x03];      // +0x05
+    std::uint32_t mEventType;    // +0x00
+    bool mShouldReleaseTextures; // +0x04
+    std::uint8_t mPad05[0x03];   // +0x05
   };
 
   static_assert(sizeof(SD3DDeviceEvent) == 0x08, "SD3DDeviceEvent size must be 0x08");

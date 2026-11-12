@@ -59,7 +59,9 @@ namespace gpg
    * What it does:
    * Formats inherited lexical text and appends current map element count.
    */
-  fa::string RMapStringFloatTypeInfo::GetLexical(const gpg::RRef& ref) const
+  fa::string RMapStringFloatTypeInfo::GetLexical(
+    const gpg::RRef& ref
+  ) const
   {
     const fa::string base = gpg::RType::GetLexical(ref);
     const auto* const map = static_cast<const fa::map<fa::string, float>*>(ref.mObj);
@@ -74,7 +76,12 @@ namespace gpg
    * Clears destination storage, then reads `count` serialized
    * `string -> float` pairs from the archive.
    */
-  void RMapStringFloatTypeInfo::SerLoad(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef* const)
+  void RMapStringFloatTypeInfo::SerLoad(
+    gpg::ReadArchive* const archive,
+    const std::intptr_t objectPtr,
+    const int,
+    gpg::RRef* const
+  )
   {
     if (archive == nullptr || objectPtr == 0) {
       return;
@@ -100,7 +107,12 @@ namespace gpg
    * What it does:
    * Writes map size followed by each key/value pair in map-order.
    */
-  void RMapStringFloatTypeInfo::SerSave(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef*)
+  void RMapStringFloatTypeInfo::SerSave(
+    gpg::WriteArchive* const archive,
+    const std::intptr_t objectPtr,
+    const int,
+    gpg::RRef*
+  )
   {
     if (archive == nullptr) {
       return;
@@ -157,4 +169,7 @@ namespace gpg
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_MapStringFloat_Type_00_7b60b7, gpg::register_MapStringFloat_Type_00)
+GPG_PREREGISTER_INIT(
+  register_MapStringFloat_Type_00_7b60b7,
+  gpg::register_MapStringFloat_Type_00
+)

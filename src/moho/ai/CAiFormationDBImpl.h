@@ -98,7 +98,8 @@ namespace moho
 
   static_assert(offsetof(CAiFormationDBImpl, mSim) == 0x04, "CAiFormationDBImpl::mSim offset must be 0x04");
   static_assert(
-    offsetof(CAiFormationDBImpl, mFormInstances) == 0x08, "CAiFormationDBImpl::mFormInstances offset must be 0x08"
+    offsetof(CAiFormationDBImpl, mFormInstances) == 0x08,
+    "CAiFormationDBImpl::mFormInstances offset must be 0x08"
   );
   static_assert(sizeof(CAiFormationDBImpl) == 0x40, "CAiFormationDBImpl size must be 0x40");
 } // namespace moho

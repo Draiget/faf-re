@@ -28,7 +28,9 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RRef MakeCAiFormationDBImplRef(CAiFormationDBImpl* const object) noexcept
+  [[nodiscard]] gpg::RRef MakeCAiFormationDBImplRef(
+    CAiFormationDBImpl* const object
+  ) noexcept
   {
     gpg::RRef out{};
     out = gpg::MakeRRef<moho::CAiFormationDBImpl>(object);
@@ -71,7 +73,9 @@ const char* CAiFormationDBImplTypeInfo::GetName() const
  * The null guard on the looked-up type is ours; the binary dereferences
  * unconditionally. Kept because a failed lookup would otherwise crash here.
  */
-void CAiFormationDBImplTypeInfo::AddBase_IAiFormationDB(gpg::RType* const typeInfo)
+void CAiFormationDBImplTypeInfo::AddBase_IAiFormationDB(
+  gpg::RType* const typeInfo
+)
 {
   static gpg::RType* sCachedIAiFormationDBType = nullptr;
   if (!sCachedIAiFormationDBType) {
@@ -107,7 +111,9 @@ void CAiFormationDBImplTypeInfo::Init()
  * Wires `newRef/ctorRef/delete/dtr` callback lanes for
  * `CAiFormationDBImpl` reflection ownership.
  */
-gpg::RType* CAiFormationDBImplTypeInfo::InitializeAllocationCallbacks(gpg::RType* const typeInfo)
+gpg::RType* CAiFormationDBImplTypeInfo::InitializeAllocationCallbacks(
+  gpg::RType* const typeInfo
+)
 {
   typeInfo->newRefFunc_ = &CAiFormationDBImplTypeInfo::NewRef;
   typeInfo->ctorRefFunc_ = &CAiFormationDBImplTypeInfo::CtrRef;
@@ -136,7 +142,9 @@ gpg::RRef CAiFormationDBImplTypeInfo::NewRef()
  * Placement-constructs one `CAiFormationDBImpl` in caller storage and returns
  * a typed `gpg::RRef`.
  */
-gpg::RRef CAiFormationDBImplTypeInfo::CtrRef(void* const objectStorage)
+gpg::RRef CAiFormationDBImplTypeInfo::CtrRef(
+  void* const objectStorage
+)
 {
   auto* const object = gpg::ConstructInStorage<CAiFormationDBImpl>(objectStorage);
 
@@ -150,7 +158,9 @@ gpg::RRef CAiFormationDBImplTypeInfo::CtrRef(void* const objectStorage)
  * Runs deleting-dtor behavior for one reflected `CAiFormationDBImpl`
  * storage lane.
  */
-void CAiFormationDBImplTypeInfo::Delete(void* const objectStorage)
+void CAiFormationDBImplTypeInfo::Delete(
+  void* const objectStorage
+)
 {
   auto* const object = static_cast<CAiFormationDBImpl*>(objectStorage);
   if (!object) {
@@ -168,7 +178,9 @@ void CAiFormationDBImplTypeInfo::Delete(void* const objectStorage)
  * Runs in-place teardown for one reflected `CAiFormationDBImpl` storage lane
  * without freeing the backing allocation.
  */
-void CAiFormationDBImplTypeInfo::Destruct(void* const objectStorage)
+void CAiFormationDBImplTypeInfo::Destruct(
+  void* const objectStorage
+)
 {
   auto* const object = static_cast<CAiFormationDBImpl*>(objectStorage);
   if (!object) {
@@ -205,4 +217,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CAiFormationDBImplTypeInfo_700dc3, moho::register_CAiFormationDBImplTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CAiFormationDBImplTypeInfo_700dc3,
+  moho::register_CAiFormationDBImplTypeInfo
+)

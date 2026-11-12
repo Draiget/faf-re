@@ -89,7 +89,9 @@ namespace
    * Uses the active blueprint TLS lane and forwards one mesh-blueprint
    * registration callback into the canonical state registration routine.
    */
-  [[maybe_unused]] int RegisterMeshBlueprintFromTlsLane(LuaPlus::LuaState* const state)
+  [[maybe_unused]] int RegisterMeshBlueprintFromTlsLane(
+    LuaPlus::LuaState* const state
+  )
   {
     (void)&moho::BlueprintLoaderContext().mRules->mMeshBlueprints;
     (void)RegisterMeshBlueprintFromState(state);
@@ -103,7 +105,9 @@ namespace
    * Uses the active blueprint TLS lane and forwards one trail-emitter
    * registration callback into the canonical state registration routine.
    */
-  [[maybe_unused]] int RegisterTrailEmitterBlueprintFromTlsLane(LuaPlus::LuaState* const state)
+  [[maybe_unused]] int RegisterTrailEmitterBlueprintFromTlsLane(
+    LuaPlus::LuaState* const state
+  )
   {
     (void)&moho::BlueprintLoaderContext().mRules->mTrailBlueprints;
     return RegisterTrailEmitterBlueprintFromState(state);
@@ -116,7 +120,9 @@ namespace
    * Uses the active blueprint TLS lane and forwards one emitter-blueprint
    * registration callback into the canonical state registration routine.
    */
-  [[maybe_unused]] int RegisterEmitterBlueprintFromTlsLane(LuaPlus::LuaState* const state)
+  [[maybe_unused]] int RegisterEmitterBlueprintFromTlsLane(
+    LuaPlus::LuaState* const state
+  )
   {
     (void)&moho::BlueprintLoaderContext().mRules->mEmitterBlueprints;
     return RegisterEmitterBlueprintFromState(state);
@@ -129,7 +135,9 @@ namespace
    * Uses the active blueprint TLS lane and forwards one beam-blueprint
    * registration callback into the canonical state registration routine.
    */
-  [[maybe_unused]] int RegisterBeamBlueprintFromTlsLane(LuaPlus::LuaState* const state)
+  [[maybe_unused]] int RegisterBeamBlueprintFromTlsLane(
+    LuaPlus::LuaState* const state
+  )
   {
     (void)&moho::BlueprintLoaderContext().mRules->mBeamBlueprints;
     return RegisterBeamBlueprintFromState(state);
@@ -147,9 +155,7 @@ namespace
     TickBlueprintLoaderProgressFromLoaderContext();
     return 0;
   }
-}
-
-
+} // namespace
 
 /**
  * Address: 0x00BC8E50 (FUN_00BC8E50, register_RegisterUnitBlueprint_LuaFuncDef)

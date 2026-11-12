@@ -15,7 +15,9 @@
 
 namespace
 {
-  [[noreturn]] void NoEngineDefinition(const char* const name)
+  [[noreturn]] void NoEngineDefinition(
+    const char* const name
+  )
   {
     std::fprintf(stderr, "difffuzz: %s called, but this build does not compile its engine TU\n", name);
     std::abort();
@@ -24,11 +26,29 @@ namespace
 
 namespace gpg
 {
-  void HandleAssertFailure(const char*, int, const char*) { NoEngineDefinition("gpg::HandleAssertFailure"); }
-  fa::string STR_Printf(const char*, ...) { NoEngineDefinition("gpg::STR_Printf"); }
+  void HandleAssertFailure(
+    const char*,
+    int,
+    const char*
+  )
+  {
+    NoEngineDefinition("gpg::HandleAssertFailure");
+  }
+  fa::string STR_Printf(
+    const char*,
+    ...
+  )
+  {
+    NoEngineDefinition("gpg::STR_Printf");
+  }
 } // namespace gpg
 
 namespace moho
 {
-  VAxes3::VAxes3(const Wm3::Quaternionf&) { NoEngineDefinition("moho::VAxes3::VAxes3(quat) (MathReflection.cpp)"); }
+  VAxes3::VAxes3(
+    const Wm3::Quaternionf&
+  )
+  {
+    NoEngineDefinition("moho::VAxes3::VAxes3(quat) (MathReflection.cpp)");
+  }
 } // namespace moho

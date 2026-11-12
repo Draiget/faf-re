@@ -86,7 +86,8 @@ namespace moho
      * having drawn nothing, when the atlas cannot hold the icon textures or a
      * texture is too large for it; the caller then draws through the CPU path.
      */
-    [[nodiscard]] bool Draw(CD3DPrimBatcher& batcher, const void* viewKey, std::span<const StrategicIconInstance> instances);
+    [[nodiscard]] bool
+    Draw(CD3DPrimBatcher& batcher, const void* viewKey, std::span<const StrategicIconInstance> instances);
 
     /**
      * `IsActive()`, `ren_GpuIconClassify` is on and the backend has compute
@@ -170,9 +171,9 @@ namespace moho
     boost::shared_ptr<gpg::gal::GpuProgram> mClassifyProgram;
     boost::shared_ptr<gpg::gal::GpuProgram> mCompactProgram;
     std::uint32_t mClassifyCapacity = 0U;
-    boost::shared_ptr<gpg::gal::GpuBuffer> mStaged;  // one record per source
-    boost::shared_ptr<gpg::gal::GpuBuffer> mRunOf;   // one run per source
-    boost::shared_ptr<gpg::gal::GpuBuffer> mOutput;  // the records in draw order
+    boost::shared_ptr<gpg::gal::GpuBuffer> mStaged; // one record per source
+    boost::shared_ptr<gpg::gal::GpuBuffer> mRunOf;  // one run per source
+    boost::shared_ptr<gpg::gal::GpuBuffer> mOutput; // the records in draw order
     boost::shared_ptr<gpg::gal::GpuBuffer> mDrawArgs;
     std::uint32_t mLastClassifiedSources = 0U;
   };

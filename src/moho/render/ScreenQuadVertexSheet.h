@@ -41,11 +41,5 @@ namespace moho
    * here. Shadow passes 1.0f for the texture scales, which is the identity the
    * binary gets by simply not emitting those multiplies.
    */
-  void FillScreenQuadVertexSheet(
-    ID3DVertexSheet& vertexSheet,
-    float scaleX,
-    float scaleY,
-    float scaleU,
-    float scaleV
-  );
+  void FillScreenQuadVertexSheet(ID3DVertexSheet& vertexSheet, float scaleX, float scaleY, float scaleU, float scaleV);
 } // namespace moho

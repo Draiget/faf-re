@@ -43,9 +43,7 @@ namespace moho
      * Initializes receiver links, steals optional stream ownership, and stores
      * sink/rules/lua decode dependencies.
      */
-    CDecoder(
-      ICommandSink* sink, fa::auto_ptr<gpg::Stream>& stream, RRuleGameRules* rules, LuaPlus::LuaState* luaState
-    );
+    CDecoder(ICommandSink* sink, fa::auto_ptr<gpg::Stream>& stream, RRuleGameRules* rules, LuaPlus::LuaState* luaState);
 
     /**
      * Address: 0x006E40A0 (FUN_006E40A0)
@@ -67,15 +65,13 @@ namespace moho
      */
     void ReceiveMessage(CMessage* message, CMessageDispatcher* dispatcher) override;
 
-#if FAF_SERVER_MODE
     /**
-     * Engine addition, server mode (plan WP11.1): a function every decoder calls with each
-     * message it receives, before decoding it, on the thread that decodes it. headless's
-     * command round trip uses it; null (the default) is none.
+     * Engine addition (plan WP11.1): a function every decoder calls with each message it
+     * receives, before decoding it, on the thread that decodes it. headless's command round
+     * trip (server mode) and `--bot-obs` (every build) use it; null (the default) is none.
      */
     using MessageObserver = void (*)(const CMessage& message, void* context);
     static void SetMessageObserver(MessageObserver observer, void* context) noexcept;
-#endif
 
   private:
     /**
@@ -236,7 +232,7 @@ namespace moho
     void DecodeLuaObject(gpg::BinaryReader& reader, LuaPlus::LuaObject& out);
 
   public:
-    ICommandSink* mSink = nullptr;          // +0x0C  the sim
+    ICommandSink* mSink = nullptr; // +0x0C  the sim
     // +0x10  the replay recording: every received message is appended to it,
     // flushed at each `CMDST_Advance` and closed at `CMDST_EndGame`. Null when
     // the session does not record.

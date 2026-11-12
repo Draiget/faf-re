@@ -23,7 +23,10 @@ namespace
 
   struct CMauiCursorTypeInfoBootstrap
   {
-    CMauiCursorTypeInfoBootstrap() { moho::register_CMauiCursorTypeInfoStartup(); }
+    CMauiCursorTypeInfoBootstrap()
+    {
+      moho::register_CMauiCursorTypeInfoStartup();
+    }
   };
   CMauiCursorTypeInfoBootstrap gCMauiCursorTypeInfoBootstrap;
 
@@ -41,7 +44,9 @@ namespace
    * `Cursor.__init`, then `UIUtil.CreateCursor()`, so `SetCursor` never ran and
    * the UI manager kept a null cursor.
    */
-  void AddCScriptObjectBase(gpg::RType& typeInfo)
+  void AddCScriptObjectBase(
+    gpg::RType& typeInfo
+  )
   {
     gpg::AddReflectedBaseViaSlot<moho::CScriptObject>(&typeInfo);
   }
@@ -102,4 +107,7 @@ void moho::register_CMauiCursorTypeInfoStartup()
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every
 // consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CMauiCursorTypeInfoStartup_078ca00, moho::register_CMauiCursorTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CMauiCursorTypeInfoStartup_078ca00,
+  moho::register_CMauiCursorTypeInfoStartup
+)

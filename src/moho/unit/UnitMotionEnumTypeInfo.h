@@ -55,9 +55,7 @@ namespace moho
      */
     void Init() override;
   };
-  static_assert(
-    sizeof(EUnitMotionCarrierEventTypeInfo) == 0x78, "EUnitMotionCarrierEventTypeInfo size must be 0x78"
-  );
+  static_assert(sizeof(EUnitMotionCarrierEventTypeInfo) == 0x78, "EUnitMotionCarrierEventTypeInfo size must be 0x78");
 
   /**
    * Address: 0x006B7360 (FUN_006B7360, EUnitMotionHorzEventTypeInfo::GetName)
@@ -232,4 +230,3 @@ namespace moho
    */
   int register_EUnitMotionTurnEventPrimitiveSerializer();
 } // namespace moho
-

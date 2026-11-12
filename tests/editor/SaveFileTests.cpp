@@ -85,7 +85,10 @@ Scenario = {
 }
 )";
 
-  TEST(SaveFile, ParsesMarkersAndAreasAndWritesBackUnchanged)
+  TEST(
+    SaveFile,
+    ParsesMarkersAndAreasAndWritesBackUnchanged
+  )
   {
     SaveFile save;
     std::string error;
@@ -102,7 +105,10 @@ Scenario = {
     EXPECT_EQ(save.Text(), kSave);
   }
 
-  TEST(SaveFile, AChangedBlockIsRewrittenAndReadsBack)
+  TEST(
+    SaveFile,
+    AChangedBlockIsRewrittenAndReadsBack
+  )
   {
     SaveFile save;
     std::string error;
@@ -127,7 +133,10 @@ Scenario = {
     EXPECT_EQ(again.Areas(), save.Areas());
   }
 
-  TEST(SaveFile, AreasAreChangedAlone)
+  TEST(
+    SaveFile,
+    AreasAreChangedAlone
+  )
   {
     SaveFile save;
     std::string error;
@@ -141,7 +150,10 @@ Scenario = {
     EXPECT_EQ(again.Markers(), save.Markers());
   }
 
-  TEST(SaveFile, ArmiesAreParsedAndAdded)
+  TEST(
+    SaveFile,
+    ArmiesAreParsedAndAdded
+  )
   {
     SaveFile save;
     std::string error;
@@ -158,10 +170,14 @@ Scenario = {
     EXPECT_EQ(again.Markers(), save.Markers());
   }
 
-  TEST(SaveFile, ScenarioArmiesAreReadAndWritten)
+  TEST(
+    SaveFile,
+    ScenarioArmiesAreReadAndWritten
+  )
   {
-    const std::string scenario = "Configurations = {\n ['standard'] = {\n teams = {\n { name = 'FFA', armies = {'ARMY_1','ARMY_2',} },\n },\n"
-                                 " customprops = {\n ['ExtraArmies'] = STRING( 'ARMY_9 NEUTRAL_CIVILIAN' ),\n },\n },\n}\n";
+    const std::string scenario =
+      "Configurations = {\n ['standard'] = {\n teams = {\n { name = 'FFA', armies = {'ARMY_1','ARMY_2',} },\n },\n"
+      " customprops = {\n ['ExtraArmies'] = STRING( 'ARMY_9 NEUTRAL_CIVILIAN' ),\n },\n },\n}\n";
     const std::vector<std::string> armies = faf::editor::ScenarioArmies(scenario);
     ASSERT_EQ(armies.size(), 2u);
     EXPECT_EQ(armies[1], "ARMY_2");
@@ -176,10 +192,89 @@ Scenario = {
     EXPECT_EQ(faf::editor::ScenarioArmies(fewer).size(), 3u);
   }
 
-  TEST(SaveFile, ScriptPlayableAreaIsSetAndRemoved)
+  TEST(
+    SaveFile,
+    AChangedEntryKeepsTheRestAsItWas
+  )
   {
-    const std::string script = "local ScenarioUtils = import('/lua/sim/ScenarioUtilities.lua')\n\nfunction OnPopulate()\n"
-                               "\tScenarioUtils.InitializeArmies()\nend\n\nfunction OnStart(self)\nend\n";
+    // CR LF line ends, a banner between the entries, bare keys: what the game's saves look like.
+    const std::string text =
+      "Scenario = {\r\n    MasterChain = {\r\n        ['_MASTERCHAIN_'] = {\r\n            Markers = {\r\n"
+      "                --[[ the first ]]--\r\n"
+      "                ['A'] = {\r\n                    ['type'] = STRING( 'Mass' ),\r\n"
+      "                    ['position'] = VECTOR3( 1, 2, 3 ),\r\n                },\r\n"
+      "                --[[ the second ]]--\r\n"
+      "                ['B'] = {\r\n                    ['type'] = STRING( 'Mass' ),\r\n"
+      "                    ['position'] = VECTOR3( 4, 5, 6 ),\r\n                },\r\n"
+      "            },\r\n        },\r\n    },\r\n}\r\n";
+    SaveFile save;
+    std::string error;
+    ASSERT_TRUE(save.Parse(text, error)) << error;
+    ASSERT_EQ(save.Markers().size(), 2u);
+    // B moves: only its position's text changes.
+    save.Markers()[1].Set("position", "VECTOR3( 7, 8, 9 )");
+    std::string expected = text;
+    expected.replace(
+      expected.find("VECTOR3( 4, 5, 6 )"), std::string("VECTOR3( 4, 5, 6 )").size(), "VECTOR3( 7, 8, 9 )"
+    );
+    EXPECT_EQ(save.Text(), expected);
+    // A new marker comes at the end in the file's line ends; A and the banners stay.
+    faf::editor::SaveEntry c{"C", {{"type", "STRING( 'Mass' )"}, {"position", "VECTOR3( 0, 0, 0 )"}}};
+    save.Markers().push_back(c);
+    const std::string more = save.Text();
+    EXPECT_NE(more.find("--[[ the second ]]--"), std::string::npos);
+    EXPECT_NE(more.find("['C'] = {\r\n"), std::string::npos);
+    EXPECT_EQ(more.find("\n"), more.find("\r\n") + 1);
+    std::size_t bare = 0;
+    for (std::size_t i = 0; i < more.size(); ++i) {
+      bare += more[i] == '\n' && (i == 0 || more[i - 1] != '\r') ? 1 : 0;
+    }
+    EXPECT_EQ(bare, 0u);
+    // A deleted marker takes its banner with it.
+    save.Markers().erase(save.Markers().begin());
+    const std::string fewer = save.Text();
+    EXPECT_EQ(fewer.find("--[[ the first ]]--"), std::string::npos);
+    EXPECT_NE(fewer.find("['B']"), std::string::npos);
+  }
+
+  TEST(
+    SaveFile,
+    ScenarioTeamsAreReadAndWritten
+  )
+  {
+    // As the game's scenarios write them (SCMP_009): one team on one line.
+    const std::string scenario =
+      "version = 3\nScenarioInfo = {\n    Configurations = {\n        ['standard'] = {\n            teams = {\n"
+      "                { name = 'FFA', armies = {'ARMY_1','ARMY_2','ARMY_3',} },\n            },\n"
+      "            customprops = {\n                ['ExtraArmies'] = STRING( 'ARMY_9 NEUTRAL_CIVILIAN' ),\n"
+      "            },\n        },\n    },\n}\n";
+    std::vector<faf::editor::ScenarioTeam> teams = faf::editor::ScenarioTeams(scenario);
+    ASSERT_EQ(teams.size(), 1u);
+    EXPECT_EQ(teams[0].name, "FFA");
+    ASSERT_EQ(teams[0].armies.size(), 3u);
+    // Unchanged teams write the same text back.
+    EXPECT_EQ(faf::editor::WithScenarioTeams(scenario, teams), scenario);
+    // Two teams: ARMY_3 moves to a new one.
+    teams[0].armies.pop_back();
+    teams.push_back({"Bottom", {"ARMY_3"}});
+    const std::string two = faf::editor::WithScenarioTeams(scenario, teams);
+    const std::vector<faf::editor::ScenarioTeam> back = faf::editor::ScenarioTeams(two);
+    ASSERT_EQ(back.size(), 2u);
+    EXPECT_EQ(back[1].name, "Bottom");
+    EXPECT_EQ(back[1].armies, std::vector<std::string>{"ARMY_3"});
+    // Every team's armies, in order; the text after the block is kept.
+    EXPECT_EQ(faf::editor::ScenarioArmies(two), (std::vector<std::string>{"ARMY_1", "ARMY_2", "ARMY_3"}));
+    EXPECT_EQ(faf::editor::ScenarioExtraArmies(two).size(), 2u);
+  }
+
+  TEST(
+    SaveFile,
+    ScriptPlayableAreaIsSetAndRemoved
+  )
+  {
+    const std::string script =
+      "local ScenarioUtils = import('/lua/sim/ScenarioUtilities.lua')\n\nfunction OnPopulate()\n"
+      "\tScenarioUtils.InitializeArmies()\nend\n\nfunction OnStart(self)\nend\n";
     EXPECT_FALSE(faf::editor::ScriptPlayableArea(script).has_value());
     const std::string with = faf::editor::WithScriptPlayableArea(script, "AREA_1");
     ASSERT_TRUE(faf::editor::ScriptPlayableArea(with).has_value());
@@ -191,5 +286,144 @@ Scenario = {
     EXPECT_EQ(renamed.find("AREA_1"), std::string::npos);
     const std::string without = faf::editor::WithScriptPlayableArea(renamed, "");
     EXPECT_FALSE(faf::editor::ScriptPlayableArea(without).has_value());
+  }
+  TEST(
+    SaveFile,
+    ReclaimTotalsReplaceTheScenariosOwn
+  )
+  {
+    const std::string scenario =
+      "version = 3\r\nScenarioInfo = {\r\n    reclaim = {1234.500000, 99.000000},\r\n    size = {512, 512},\r\n}\r\n";
+    EXPECT_EQ(
+      faf::editor::WithScenarioReclaim(scenario, 8001.25, 42.0),
+      "version = 3\r\nScenarioInfo = {\r\n    reclaim = {8001.250000, 42.000000},\r\n    size = {512, 512},\r\n}\r\n"
+    );
+    // FAFME's spacing kept; no entry, none added.
+    EXPECT_EQ(faf::editor::WithScenarioReclaim("reclaim = { 1, 2 },", 3.0, 4.0), "reclaim = { 3.000000, 4.000000 },");
+    const std::string none = "ScenarioInfo = {\n    size = {512, 512},\n}\n";
+    EXPECT_EQ(faf::editor::WithScenarioReclaim(none, 1.0, 2.0), none);
+  }
+  TEST(
+    SaveFile,
+    ChainsReadAndWriteAsTheGamesSaves
+  )
+  {
+    // SCMP_009's Chains block, as the retail save has it (CR LF).
+    const std::string chains = "    Chains = {\r\n"
+                               "        ['Naval_Chain_Left'] = {\r\n"
+                               "            Markers = {\r\n"
+                               "                \"Naval Link 00\",\r\n"
+                               "                \"Naval Link 01\",\r\n"
+                               "            },\r\n"
+                               "        },\r\n"
+                               "        ['Naval_Chain_Right'] = {\r\n"
+                               "            Markers = {\r\n"
+                               "                \"Naval Link 05\",\r\n"
+                               "            },\r\n"
+                               "        },\r\n"
+                               "    },\r\n";
+    const std::string text = "Scenario = {\r\n" + chains + "    next_queue_id = '1',\r\n}\r\n";
+    faf::editor::SaveFile save;
+    std::string error;
+    ASSERT_TRUE(save.Parse(text, error)) << error;
+    ASSERT_EQ(save.Chains().size(), 2u);
+    EXPECT_EQ(save.Chains()[0].name, "Naval_Chain_Left");
+    EXPECT_EQ(save.Chains()[0].markers, (std::vector<std::string>{"Naval Link 00", "Naval Link 01"}));
+    EXPECT_EQ(save.Text(), text);
+    // Written anew, the same chains give the same text: the game's layout.
+    const std::string body = faf::editor::SaveFile::ChainsText(save.Chains(), 8, "\r\n");
+    EXPECT_EQ("    Chains = {" + body + "},\r\n", chains);
+    // A change: only the Chains block is new, and it reads back.
+    save.Chains()[1].markers.push_back("Naval Link 06");
+    save.Chains().push_back({"Patrol", {}});
+    EXPECT_TRUE(save.Changed());
+    faf::editor::SaveFile again;
+    ASSERT_TRUE(again.Parse(save.Text(), error)) << error;
+    ASSERT_EQ(again.Chains().size(), 3u);
+    EXPECT_EQ(again.Chains()[1].markers.back(), "Naval Link 06");
+    EXPECT_TRUE(again.Chains()[2].markers.empty());
+    EXPECT_NE(save.Text().find("    next_queue_id = '1',\r\n}"), std::string::npos);
+  }
+  TEST(
+    SaveFile,
+    ArmySettingsChangeOnlyWhatDiffers
+  )
+  {
+    // An army as SCMP_009's save writes it (CR LF), with SCMP_023's alliance shape.
+    const std::string text = "Scenario = {\r\n"
+                             "    Armies = {\r\n"
+                             "        ['ARMY_1'] =  \r\n"
+                             "        {\r\n"
+                             "            personality = '',\r\n"
+                             "            plans = '',\r\n"
+                             "            color = 0,\r\n"
+                             "            faction = 0,\r\n"
+                             "            Economy = {\r\n"
+                             "                mass = 0,\r\n"
+                             "                energy = 0,\r\n"
+                             "            },\r\n"
+                             "            Alliances = {\r\n"
+                             "                ['ARMY_2'] = 'Enemy',\r\n"
+                             "            },\r\n"
+                             "        },\r\n"
+                             "    },\r\n"
+                             "}\r\n";
+    faf::editor::SaveFile save;
+    std::string error;
+    ASSERT_TRUE(save.Parse(text, error)) << error;
+    ASSERT_EQ(save.Armies().size(), 1u);
+    faf::editor::ArmySettings settings = faf::editor::ReadArmySettings(save.Armies()[0]);
+    EXPECT_EQ(settings.alliances, (std::vector<std::pair<std::string, std::string>>{{"ARMY_2", "Enemy"}}));
+    // Unchanged: the text as it was.
+    faf::editor::WriteArmySettings(save.Armies()[0], settings);
+    EXPECT_EQ(save.Text(), text);
+    // Starting resources and a faction: only those numbers change, in place.
+    settings.mass = 650;
+    settings.energy = 2500.5;
+    settings.faction = 2;
+    settings.plans = "/maps/x/plan.lua";
+    faf::editor::WriteArmySettings(save.Armies()[0], settings);
+    std::string expected = text;
+    expected.replace(expected.find("plans = ''"), 10, "plans = '/maps/x/plan.lua'");
+    expected.replace(expected.find("faction = 0"), 11, "faction = 2");
+    expected.replace(expected.find("mass = 0"), 8, "mass = 650");
+    expected.replace(expected.find("energy = 0"), 10, "energy = 2500.5");
+    EXPECT_EQ(save.Text(), expected);
+    // Alliances written anew in the saves' layout.
+    settings.alliances.emplace_back("ARMY_3", "Ally");
+    faf::editor::WriteArmySettings(save.Armies()[0], settings);
+    EXPECT_NE(
+      save.Text().find(
+        "            Alliances = {\r\n                ['ARMY_2'] = 'Enemy',\r\n                ['ARMY_3'] = "
+        "'Ally',\r\n            },"
+      ),
+      std::string::npos
+    ) << save.Text();
+    faf::editor::SaveFile again;
+    ASSERT_TRUE(again.Parse(save.Text(), error)) << error;
+    EXPECT_TRUE(faf::editor::ReadArmySettings(again.Armies()[0]) == settings);
+  }
+  TEST(
+    SaveFile,
+    TheEffectDecorationsBlockGoesInAndOut
+  )
+  {
+    const std::string script =
+      "local ScenarioUtils = import('/lua/sim/ScenarioUtilities.lua')\n\nfunction OnPopulate()\n"
+      "    ScenarioUtils.InitializeArmies()\nend\n\nfunction OnStart(self)\nend\n";
+    const std::string on = faf::editor::WithScriptEffects(script, true);
+    // The call right after InitializeArmies, the function at the end.
+    EXPECT_NE(on.find("    ScenarioUtils.InitializeArmies()\n    MapEditorEffects()"), std::string::npos);
+    EXPECT_NE(on.find("function MapEditorEffects()"), std::string::npos);
+    EXPECT_NE(on.find("for path in string.gfind(marker.effect, '[^;]+') do"), std::string::npos);
+    EXPECT_NE(on.find("CreateEmitterAtEntity(entity, -1, path)"), std::string::npos);
+    // On again: the same text (one block, one call).
+    EXPECT_EQ(faf::editor::WithScriptEffects(on, true), on);
+    // Off: the script as it was.
+    EXPECT_EQ(faf::editor::WithScriptEffects(on, false), script);
+    EXPECT_EQ(faf::editor::WithScriptEffects(script, false), script);
+    // No OnPopulate: one is added.
+    const std::string bare = faf::editor::WithScriptEffects("function OnStart(self)\nend\n", true);
+    EXPECT_NE(bare.find("function OnPopulate()\n    MapEditorEffects()"), std::string::npos);
   }
 } // namespace

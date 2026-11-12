@@ -37,7 +37,9 @@ namespace moho
       &ren_TextureAtlasCache
     );
 
-    [[nodiscard]] AtlasCacheSlot& AtlasCacheSlotFor(const CD3DBatchTexture* const texture) noexcept
+    [[nodiscard]] AtlasCacheSlot& AtlasCacheSlotFor(
+      const CD3DBatchTexture* const texture
+    ) noexcept
     {
       const std::uintptr_t address = reinterpret_cast<std::uintptr_t>(texture);
       return sAtlasCache[((address >> 4U) ^ (address >> 14U)) & (kAtlasCacheSlots - 1U)];
@@ -62,14 +64,15 @@ namespace moho
       return destination;
     }
 
-
     /**
      * Address: 0x00448E10 (FUN_00448E10)
      *
      * What it does:
      * Releases one batch-texture shared handle scratch lane.
      */
-    void ReleaseBatchTextureHandle(BatchTextureHandle* const scratchHandle)
+    void ReleaseBatchTextureHandle(
+      BatchTextureHandle* const scratchHandle
+    )
     {
       if (scratchHandle != nullptr) {
         scratchHandle->reset();
@@ -82,7 +85,9 @@ namespace moho
      * What it does:
      * Returns whether one 32-bit value lane is zero.
      */
-    [[nodiscard]] bool IsZero(const std::uint32_t* const valueLane)
+    [[nodiscard]] bool IsZero(
+      const std::uint32_t* const valueLane
+    )
     {
       return valueLane != nullptr && *valueLane == 0u;
     }
@@ -135,10 +140,12 @@ namespace moho
    */
   CD3DTextureBatcher::CD3DTextureBatcher()
     : CD3DTextureBatcher(kCompositeWidth, kCompositeHeight)
-  {
-  }
+  {}
 
-  CD3DTextureBatcher::CD3DTextureBatcher(const std::int32_t width, const std::int32_t height)
+  CD3DTextureBatcher::CD3DTextureBatcher(
+    const std::int32_t width,
+    const std::int32_t height
+  )
     : mWidth(width)
     , mHeight(height)
     , mRects()
@@ -179,7 +186,9 @@ namespace moho
    * Returns cached UVs for one batch texture or allocates new atlas space,
    * uploads the texture payload, and stores one new UV mapping.
    */
-  const gpg::Rect2f* CD3DTextureBatcher::AddTexture(const boost::shared_ptr<CD3DBatchTexture>& texture)
+  const gpg::Rect2f* CD3DTextureBatcher::AddTexture(
+    const boost::shared_ptr<CD3DBatchTexture>& texture
+  )
   {
     if (!texture) {
       return nullptr;
@@ -307,7 +316,11 @@ namespace moho
    * Selects the best-fit free rectangle (top-most, then left-most) that can
    * fit the requested dimensions.
    */
-  bool CD3DTextureBatcher::FindRect(gpg::Rect2i& outRect, const int width, const int height) const
+  bool CD3DTextureBatcher::FindRect(
+    gpg::Rect2i& outRect,
+    const int width,
+    const int height
+  ) const
   {
     bool found = false;
     for (gpg::Rect2i* it = mRects.begin(); it != mRects.end(); ++it) {
@@ -319,9 +332,7 @@ namespace moho
         continue;
       }
 
-      if (!found ||
-          candidate.z0 < outRect.z0 ||
-          (candidate.z0 == outRect.z0 && candidate.x0 < outRect.x0)) {
+      if (!found || candidate.z0 < outRect.z0 || (candidate.z0 == outRect.z0 && candidate.x0 < outRect.x0)) {
         outRect.x0 = candidate.x0;
         outRect.z0 = candidate.z0;
         outRect.x1 = candidate.x0 + width;
@@ -340,7 +351,9 @@ namespace moho
    * Removes one allocated rectangle from the free list and re-inserts
    * remaining split fragments.
    */
-  void CD3DTextureBatcher::AllocateRect(const gpg::Rect2i& allocatedRect)
+  void CD3DTextureBatcher::AllocateRect(
+    const gpg::Rect2i& allocatedRect
+  )
   {
     AvailableRectVector currentRects(mRects);
     mRects.clear();
@@ -348,15 +361,9 @@ namespace moho
     for (gpg::Rect2i* it = currentRects.begin(); it != currentRects.end(); ++it) {
       const gpg::Rect2i freeRect = *it;
 
-      const bool noStrictOverlap =
-        allocatedRect.x0 >= freeRect.x1 ||
-        freeRect.x0 >= allocatedRect.x1 ||
-        allocatedRect.z0 >= freeRect.z1 ||
-        freeRect.z0 >= allocatedRect.z1 ||
-        allocatedRect.x0 >= allocatedRect.x1 ||
-        allocatedRect.z0 >= allocatedRect.z1 ||
-        freeRect.x0 >= freeRect.x1 ||
-        freeRect.z0 >= freeRect.z1;
+      const bool noStrictOverlap = allocatedRect.x0 >= freeRect.x1 || freeRect.x0 >= allocatedRect.x1 ||
+        allocatedRect.z0 >= freeRect.z1 || freeRect.z0 >= allocatedRect.z1 || allocatedRect.x0 >= allocatedRect.x1 ||
+        allocatedRect.z0 >= allocatedRect.z1 || freeRect.x0 >= freeRect.x1 || freeRect.z0 >= freeRect.z1;
 
       if (noStrictOverlap) {
         AddAvailableRect(freeRect);
@@ -385,7 +392,9 @@ namespace moho
    * Inserts one free rectangle while removing dominated fragments and skipping
    * insertion when fully covered by an existing entry.
    */
-  void CD3DTextureBatcher::AddAvailableRect(const gpg::Rect2i& rect)
+  void CD3DTextureBatcher::AddAvailableRect(
+    const gpg::Rect2i& rect
+  )
   {
     gpg::Rect2i* writeIt = mRects.begin();
 
@@ -393,9 +402,7 @@ namespace moho
       const gpg::Rect2i& current = *readIt;
 
       if (current.x0 <= rect.x0) {
-        if (current.x1 >= rect.x1 &&
-            rect.z0 >= current.z0 &&
-            current.z1 >= rect.z1) {
+        if (current.x1 >= rect.x1 && rect.z0 >= current.z0 && current.z1 >= rect.z1) {
           return;
         }
         if (current.x0 < rect.x0) {

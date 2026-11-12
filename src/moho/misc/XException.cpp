@@ -6,24 +6,24 @@
 
 namespace moho
 {
-    std::uint32_t PLAT_GetCallStack(void* contextRecord, std::uint32_t maxFrames, std::uintptr_t* outFrames);
-    fa::string PLAT_FormatCallstack(std::int32_t firstFrame, std::int32_t endFrame, const std::uintptr_t* frames);
+  std::uint32_t PLAT_GetCallStack(void* contextRecord, std::uint32_t maxFrames, std::uintptr_t* outFrames);
+  fa::string PLAT_FormatCallstack(std::int32_t firstFrame, std::int32_t endFrame, const std::uintptr_t* frames);
 } // namespace moho
 
 using namespace moho;
 
-XException::XException(const char* const message, const bool captureCallstack)
-    : std::runtime_error(message),
-      mCallstack{},
-      mTopStack(0),
-      mMsg()
+XException::XException(
+  const char* const message,
+  const bool captureCallstack
+)
+  : std::runtime_error(message)
+  , mCallstack{}
+  , mTopStack(0)
+  , mMsg()
 {
-    if (captureCallstack) {
-        mTopStack = moho::PLAT_GetCallStack(
-            nullptr,
-            static_cast<std::uint32_t>(mCallstack.size()),
-            mCallstack.data());
-    }
+  if (captureCallstack) {
+    mTopStack = moho::PLAT_GetCallStack(nullptr, static_cast<std::uint32_t>(mCallstack.size()), mCallstack.data());
+  }
 }
 
 /**
@@ -33,10 +33,11 @@ XException::XException(const char* const message, const bool captureCallstack)
  * What it does:
  * Builds runtime_error payload and captures current callstack snapshot.
  */
-XException::XException(const char* const message)
-    : XException(message, true)
-{
-}
+XException::XException(
+  const char* const message
+)
+  : XException(message, true)
+{}
 
 /**
  * Address: 0x0040FCD0 (FUN_0040FCD0, sub_40FCD0)
@@ -44,13 +45,14 @@ XException::XException(const char* const message)
  * What it does:
  * Copies runtime_error payload plus callstack/message lanes.
  */
-XException::XException(const XException& other)
-    : std::runtime_error(other)
-    , mCallstack(other.mCallstack)
-    , mTopStack(other.mTopStack)
-    , mMsg(other.mMsg)
-{
-}
+XException::XException(
+  const XException& other
+)
+  : std::runtime_error(other)
+  , mCallstack(other.mCallstack)
+  , mTopStack(other.mTopStack)
+  , mMsg(other.mMsg)
+{}
 
 /**
  * Address: 0x00405240 (FUN_00405240)
@@ -70,15 +72,15 @@ XException::~XException() noexcept = default;
  */
 const char* XException::what() const noexcept
 {
-    if (mMsg.empty()) {
-        mMsg = std::runtime_error::what();
-        if (mTopStack != 0) {
-            mMsg.append("\n\nOriginal callstack:\n\n");
-            const fa::string formatted =
-                moho::PLAT_FormatCallstack(0, static_cast<std::int32_t>(mTopStack), mCallstack.data());
-            mMsg.append(formatted.c_str());
-        }
+  if (mMsg.empty()) {
+    mMsg = std::runtime_error::what();
+    if (mTopStack != 0) {
+      mMsg.append("\n\nOriginal callstack:\n\n");
+      const fa::string formatted =
+        moho::PLAT_FormatCallstack(0, static_cast<std::int32_t>(mTopStack), mCallstack.data());
+      mMsg.append(formatted.c_str());
     }
+  }
 
-    return mMsg.c_str();
+  return mMsg.c_str();
 }

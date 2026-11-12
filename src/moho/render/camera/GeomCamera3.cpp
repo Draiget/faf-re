@@ -25,7 +25,7 @@ namespace moho
   // moho/render/RCamManager.cpp, which registers its console variable; the
   // simulation links this file without the client's render code.
   float cam_DefaultLOD = 1.0f;
-}
+} // namespace moho
 
 namespace
 {
@@ -59,14 +59,19 @@ namespace
    * root-tile frustum test rejecting the entire terrain every frame, since
    * the camera's view/viewProjection matrices never tilted with pitch.
    */
-  [[nodiscard]] moho::VMatrix4 BuildMatrixFromTransform(const moho::VTransform& transform) noexcept
+  [[nodiscard]] moho::VMatrix4 BuildMatrixFromTransform(
+    const moho::VTransform& transform
+  ) noexcept
   {
     moho::VMatrix4 matrix{};
     matrix.Set(transform.orient_, transform.pos_);
     return matrix;
   }
 
-  [[nodiscard]] bool InvertMatrixGeneral(const moho::VMatrix4& matrix, moho::VMatrix4* const outInverse) noexcept
+  [[nodiscard]] bool InvertMatrixGeneral(
+    const moho::VMatrix4& matrix,
+    moho::VMatrix4* const outInverse
+  ) noexcept
   {
     if (!outInverse) {
       return false;
@@ -165,21 +170,27 @@ namespace
    * each output row K, i.e. `view`'s Z/W COLUMN dotted per-row, not `view`'s
    * own row 2/row 3 blended by the point-transform operator).
    */
-  [[nodiscard]] moho::Vector4f DotMatrixRows(const moho::VMatrix4& matrix, const moho::Vector4f& columnVector) noexcept
+  [[nodiscard]] moho::Vector4f DotMatrixRows(
+    const moho::VMatrix4& matrix,
+    const moho::Vector4f& columnVector
+  ) noexcept
   {
     return {
-      (matrix.r[0].x * columnVector.x) + (matrix.r[0].y * columnVector.y) + (matrix.r[0].z * columnVector.z)
-        + (matrix.r[0].w * columnVector.w),
-      (matrix.r[1].x * columnVector.x) + (matrix.r[1].y * columnVector.y) + (matrix.r[1].z * columnVector.z)
-        + (matrix.r[1].w * columnVector.w),
-      (matrix.r[2].x * columnVector.x) + (matrix.r[2].y * columnVector.y) + (matrix.r[2].z * columnVector.z)
-        + (matrix.r[2].w * columnVector.w),
-      (matrix.r[3].x * columnVector.x) + (matrix.r[3].y * columnVector.y) + (matrix.r[3].z * columnVector.z)
-        + (matrix.r[3].w * columnVector.w),
+      (matrix.r[0].x * columnVector.x) + (matrix.r[0].y * columnVector.y) + (matrix.r[0].z * columnVector.z) +
+        (matrix.r[0].w * columnVector.w),
+      (matrix.r[1].x * columnVector.x) + (matrix.r[1].y * columnVector.y) + (matrix.r[1].z * columnVector.z) +
+        (matrix.r[1].w * columnVector.w),
+      (matrix.r[2].x * columnVector.x) + (matrix.r[2].y * columnVector.y) + (matrix.r[2].z * columnVector.z) +
+        (matrix.r[2].w * columnVector.w),
+      (matrix.r[3].x * columnVector.x) + (matrix.r[3].y * columnVector.y) + (matrix.r[3].z * columnVector.z) +
+        (matrix.r[3].w * columnVector.w),
     };
   }
 
-  [[nodiscard]] Wm3::Plane3f BuildNormalizedPlane(const moho::Vector4f& clipPlane, const moho::VMatrix4& matrix) noexcept
+  [[nodiscard]] Wm3::Plane3f BuildNormalizedPlane(
+    const moho::Vector4f& clipPlane,
+    const moho::VMatrix4& matrix
+  ) noexcept
   {
     // Extracts one world-space clipping plane from a combined view/projection
     // matrix (the standard Gribb/Hartmann technique). Plane extraction needs
@@ -194,8 +205,8 @@ namespace
     // tesselator's root-tile frustum test reject the whole terrain every
     // frame.
     const moho::Vector4f transformed = DotMatrixRows(matrix, clipPlane);
-    const float reciprocalLength =
-      1.0f / std::sqrt((transformed.x * transformed.x) + (transformed.y * transformed.y) + (transformed.z * transformed.z));
+    const float reciprocalLength = 1.0f /
+      std::sqrt((transformed.x * transformed.x) + (transformed.y * transformed.y) + (transformed.z * transformed.z));
     return {
       {transformed.x * reciprocalLength, transformed.y * reciprocalLength, transformed.z * reciprocalLength},
       -transformed.w * reciprocalLength,
@@ -209,12 +220,16 @@ namespace
     float z{};
   };
 
-  [[nodiscard]] ProjectionPoint
-  ProjectFromInverseProjection(const moho::VMatrix4& inverseProjection, const float x, const float y, const float z) noexcept
+  [[nodiscard]] ProjectionPoint ProjectFromInverseProjection(
+    const moho::VMatrix4& inverseProjection,
+    const float x,
+    const float y,
+    const float z
+  ) noexcept
   {
-    const float reciprocalW = 1.0f
-                            / ((inverseProjection.r[0].w * x) + (inverseProjection.r[1].w * y) +
-                               (inverseProjection.r[2].w * z) + inverseProjection.r[3].w);
+    const float reciprocalW = 1.0f /
+      ((inverseProjection.r[0].w * x) + (inverseProjection.r[1].w * y) + (inverseProjection.r[2].w * z) +
+       inverseProjection.r[3].w);
     return {
       ((inverseProjection.r[0].x * x) + (inverseProjection.r[1].x * y) + (inverseProjection.r[2].x * z) +
        inverseProjection.r[3].x) *
@@ -228,11 +243,14 @@ namespace
     };
   }
 
-  [[nodiscard]] ProjectionPoint
-  ProjectFromMatrix(const moho::VMatrix4& matrix, const float x, const float y, const float z) noexcept
+  [[nodiscard]] ProjectionPoint ProjectFromMatrix(
+    const moho::VMatrix4& matrix,
+    const float x,
+    const float y,
+    const float z
+  ) noexcept
   {
-    const float reciprocalW = 1.0f
-                            / ((matrix.r[0].w * x) + (matrix.r[1].w * y) + (matrix.r[2].w * z) + matrix.r[3].w);
+    const float reciprocalW = 1.0f / ((matrix.r[0].w * x) + (matrix.r[1].w * y) + (matrix.r[2].w * z) + matrix.r[3].w);
     return {
       ((matrix.r[0].x * x) + (matrix.r[1].x * y) + (matrix.r[2].x * z) + matrix.r[3].x) * reciprocalW,
       ((matrix.r[0].y * x) + (matrix.r[1].y * y) + (matrix.r[2].y * z) + matrix.r[3].y) * reciprocalW,
@@ -240,7 +258,10 @@ namespace
     };
   }
 
-  [[nodiscard]] float Distance3(const ProjectionPoint& lhs, const ProjectionPoint& rhs) noexcept
+  [[nodiscard]] float Distance3(
+    const ProjectionPoint& lhs,
+    const ProjectionPoint& rhs
+  ) noexcept
   {
     const float dx = lhs.x - rhs.x;
     const float dy = lhs.y - rhs.y;
@@ -248,7 +269,9 @@ namespace
     return std::sqrt((dx * dx) + (dy * dy) + (dz * dz));
   }
 
-  void InitializeFrustumStorage(moho::GeomCamera3* const camera)
+  void InitializeFrustumStorage(
+    moho::GeomCamera3* const camera
+  )
   {
     const Wm3::Plane3f defaultPlane{};
     camera->solid1.ResizePlanes(kFrustumPlaneCount, defaultPlane);
@@ -256,10 +279,15 @@ namespace
   }
 
   [[nodiscard]] moho::VMatrix4 BuildLookAtMatrix(
-    const Wm3::Vector3f& eye, const Wm3::Vector3f& target, const Wm3::Vector3f& up
+    const Wm3::Vector3f& eye,
+    const Wm3::Vector3f& target,
+    const Wm3::Vector3f& up
   ) noexcept
   {
-    Wm3::Vector3f forward{target.x - eye.x, target.y - eye.y, target.z - eye.z};
+    // 0x004EF6E3..0x004EF71D: `[ecx] - [eax]`, and GeomCamera3::LookAt (0x00471540) hands the eye in ECX and the
+    // target in EAX (MeshThumbnailRenderer's call at 0x007EB31C..0x007EB34B): the axis points from the target back to
+    // the eye, so what the camera looks at lies along its -Z, as ViewInitOrtho's depth lane expects.
+    Wm3::Vector3f forward{eye.x - target.x, eye.y - target.y, eye.z - target.z};
     if (Wm3::Vector3f::Normalize(&forward) == 0.0f) {
       forward = {0.0f, 0.0f, 1.0f};
     }
@@ -371,7 +399,10 @@ namespace moho
    * Initializes camera state and immediately derives view/projection frusta
    * from caller-provided transform and projection.
    */
-  GeomCamera3::GeomCamera3(const VTransform& viewTransform, const gpg::gal::Matrix& projectionMatrix)
+  GeomCamera3::GeomCamera3(
+    const VTransform& viewTransform,
+    const gpg::gal::Matrix& projectionMatrix
+  )
     : lodScale(1.0f)
   {
     tranform.orient_ = Wm3::Quatf::Identity();
@@ -392,7 +423,10 @@ namespace moho
    * Recomputes all derived camera matrices, clipping solids, and viewport
    * scaling coefficients.
    */
-  void GeomCamera3::Init(const VTransform& viewTransform, const gpg::gal::Matrix& projectionMatrix)
+  void GeomCamera3::Init(
+    const VTransform& viewTransform,
+    const gpg::gal::Matrix& projectionMatrix
+  )
   {
     tranform = viewTransform;
 
@@ -464,7 +498,9 @@ namespace moho
    * Updates LOD scale and rebuilds viewport rows used for distance/LOD
    * conversions.
    */
-  void GeomCamera3::SetLODScale(const float value)
+  void GeomCamera3::SetLODScale(
+    const float value
+  )
   {
     lodScale = value;
 
@@ -488,7 +524,9 @@ namespace moho
    * What it does:
    * Applies a new camera transform while preserving current projection.
    */
-  void GeomCamera3::Move(const VTransform& viewTransform)
+  void GeomCamera3::Move(
+    const VTransform& viewTransform
+  )
   {
     Init(viewTransform, projection);
   }
@@ -501,7 +539,9 @@ namespace moho
    * What it does:
    * Applies a new projection while preserving current camera transform.
    */
-  void GeomCamera3::SetProjection(const gpg::gal::Matrix& projectionMatrix)
+  void GeomCamera3::SetProjection(
+    const gpg::gal::Matrix& projectionMatrix
+  )
   {
     Init(tranform, projectionMatrix);
   }
@@ -549,7 +589,9 @@ namespace moho
    * What it does:
    * Unprojects one point expressed in this camera's own viewport pixels.
    */
-  GeomLine3 GeomCamera3::Unproject(const Wm3::Vector2f& screenPoint) const
+  GeomLine3 GeomCamera3::Unproject(
+    const Wm3::Vector2f& screenPoint
+  ) const
   {
     return Unproject(
       screenPoint,
@@ -577,16 +619,16 @@ namespace moho
     const float viewportY1
   ) const
   {
-    const float reciprocalW = 1.0f
-                            / ((viewProjection.r[0].w * worldPoint.x) + (viewProjection.r[1].w * worldPoint.y) +
-                               (viewProjection.r[2].w * worldPoint.z) + viewProjection.r[3].w);
+    const float reciprocalW = 1.0f /
+      ((viewProjection.r[0].w * worldPoint.x) + (viewProjection.r[1].w * worldPoint.y) +
+       (viewProjection.r[2].w * worldPoint.z) + viewProjection.r[3].w);
 
     const float projectedX = ((viewProjection.r[0].x * worldPoint.x) + (viewProjection.r[1].x * worldPoint.y) +
-                              (viewProjection.r[2].x * worldPoint.z) + viewProjection.r[3].x)
-                           * reciprocalW;
+                              (viewProjection.r[2].x * worldPoint.z) + viewProjection.r[3].x) *
+      reciprocalW;
     const float projectedY = ((viewProjection.r[0].y * worldPoint.x) + (viewProjection.r[1].y * worldPoint.y) +
-                              (viewProjection.r[2].y * worldPoint.z) + viewProjection.r[3].y)
-                           * reciprocalW;
+                              (viewProjection.r[2].y * worldPoint.z) + viewProjection.r[3].y) *
+      reciprocalW;
 
     return {
       (((viewportX1 - viewportX0) * (projectedX - -1.0f)) * 0.5f) + viewportX0,
@@ -602,14 +644,12 @@ namespace moho
    * What it does:
    * Projects one world point into current camera viewport coordinates.
    */
-  Wm3::Vector2f GeomCamera3::Project(const Wm3::Vector3f& worldPoint) const
+  Wm3::Vector2f GeomCamera3::Project(
+    const Wm3::Vector3f& worldPoint
+  ) const
   {
     return Project(
-      worldPoint,
-      viewport.r[3].x,
-      viewport.r[3].x + viewport.r[3].z,
-      viewport.r[3].y + viewport.r[3].w,
-      viewport.r[3].y
+      worldPoint, viewport.r[3].x, viewport.r[3].x + viewport.r[3].z, viewport.r[3].y + viewport.r[3].w, viewport.r[3].y
     );
   }
 
@@ -621,7 +661,9 @@ namespace moho
    * What it does:
    * Converts one screen-space rectangle into a world-space frustum solid.
    */
-  CGeomSolid3 GeomCamera3::Unproject(const gpg::Rect2f& screenRect) const
+  CGeomSolid3 GeomCamera3::Unproject(
+    const gpg::Rect2f& screenRect
+  ) const
   {
     const float viewportX = viewport.r[3].x;
     const float viewportY = viewport.r[3].y;
@@ -658,8 +700,7 @@ namespace moho
    * Builds one D3D-style perspective projection matrix from caller FOV/depth
    * lanes and returns it by value.
    */
-  VMatrix4
-  VEC_D3DProjectionMatrixFOV(
+  VMatrix4 VEC_D3DProjectionMatrixFOV(
     const float fovXRadians,
     const float fovYRadians,
     const float nearDepth,
@@ -752,7 +793,11 @@ namespace moho
    * Reorients the camera transform from eye/target/up and re-initializes all
    * derived camera state using current projection.
    */
-  void GeomCamera3::LookAt(const Wm3::Vector3f& eye, const Wm3::Vector3f& target, const Wm3::Vector3f& up)
+  void GeomCamera3::LookAt(
+    const Wm3::Vector3f& eye,
+    const Wm3::Vector3f& target,
+    const Wm3::Vector3f& up
+  )
   {
     const VMatrix4 lookAtMatrix = BuildLookAtMatrix(eye, target, up);
 
@@ -813,7 +858,12 @@ namespace moho
    * Rebuilds perspective projection through the original fixed-constant lane
    * and reinitializes camera state.
    */
-  void GeomCamera3::ViewInitPerspective(float fovXRadians, float fovYRadians, float nearDepth, float farDepth)
+  void GeomCamera3::ViewInitPerspective(
+    float fovXRadians,
+    float fovYRadians,
+    float nearDepth,
+    float farDepth
+  )
   {
     (void)fovXRadians;
     (void)fovYRadians;

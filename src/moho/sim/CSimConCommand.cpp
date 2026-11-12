@@ -16,7 +16,10 @@ namespace
   struct SimConCommandNameLess
   {
     [[nodiscard]]
-    bool operator()(const fa::string& lhs, const fa::string& rhs) const noexcept
+    bool operator()(
+      const fa::string& lhs,
+      const fa::string& rhs
+    ) const noexcept
     {
       return gpg::STR_CompareNoCase(lhs.c_str(), rhs.c_str()) < 0;
     }
@@ -44,8 +47,10 @@ namespace
    * Returns the case-insensitive lower-bound node for one command name in the
    * sim-command registry tree.
    */
-  [[nodiscard]] SimConCommandRegistry::iterator
-  FindSimConLowerBound(SimConCommandRegistry& registry, const fa::string& commandName)
+  [[nodiscard]] SimConCommandRegistry::iterator FindSimConLowerBound(
+    SimConCommandRegistry& registry,
+    const fa::string& commandName
+  )
   {
     return registry.lower_bound(commandName);
   }
@@ -57,20 +62,18 @@ namespace
    * Returns the lower-bound iterator only when the candidate compares as an
    * exact case-insensitive match for `commandName`; otherwise returns `end()`.
    */
-  [[nodiscard]] SimConCommandRegistry::iterator
-  FindSimConExactOrEnd(SimConCommandRegistry& registry, const fa::string& commandName)
+  [[nodiscard]] SimConCommandRegistry::iterator FindSimConExactOrEnd(
+    SimConCommandRegistry& registry,
+    const fa::string& commandName
+  )
   {
     const auto candidate = FindSimConLowerBound(registry, commandName);
     if (candidate == registry.end()) {
       return registry.end();
     }
 
-    return gpg::STR_CompareNoCase(commandName.c_str(), candidate->first.c_str()) < 0
-      ? registry.end()
-      : candidate;
+    return gpg::STR_CompareNoCase(commandName.c_str(), candidate->first.c_str()) < 0 ? registry.end() : candidate;
   }
-
-
 
   /**
    * Address: 0x00735290 (FUN_00735290, sub_735290)
@@ -120,7 +123,8 @@ namespace
     int removedCount = 0;
     auto upperBound = lowerBound;
     SimConCommandNameLess less{};
-    while (upperBound != registry.end() && !less(commandName, upperBound->first) && !less(upperBound->first, commandName)) {
+    while (upperBound != registry.end() && !less(commandName, upperBound->first) &&
+           !less(upperBound->first, commandName)) {
       ++removedCount;
       ++upperBound;
     }
@@ -140,7 +144,6 @@ namespace
   {
     (void)GetSimConCommandRegistry();
   }
-
 
 } // namespace
 
@@ -180,7 +183,10 @@ namespace moho
    * from FUN_007355F0 per the callgraph -- same "no separate source
    * line" rationale as the entries above.
    */
-  CSimConCommand::CSimConCommand(const bool allowWithoutCheats, const char* const name)
+  CSimConCommand::CSimConCommand(
+    const bool allowWithoutCheats,
+    const char* const name
+  )
     : mName(name)
     , mAllowWithoutCheats(allowWithoutCheats ? 1u : 0u)
     , mPad09{0u, 0u, 0u}
@@ -214,7 +220,9 @@ namespace moho
     return this;
   }
 
-  CSimConCommand* FindRegisteredSimConCommand(const std::string& commandName)
+  CSimConCommand* FindRegisteredSimConCommand(
+    const std::string& commandName
+  )
   {
     InitSimConList();
 

@@ -12,7 +12,7 @@ namespace gpg
   class RType;
   class ReadArchive;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -236,7 +236,9 @@ namespace moho
      * reached (e.g. `Sim::AdvanceBeat` at 0x0074A261).
      */
     template <class F>
-    void ForEachValue(F&& fn) const
+    void ForEachValue(
+      F&& fn
+    ) const
     {
       const unsigned int sentinel = Max();
       for (unsigned int value = GetNext(std::numeric_limits<unsigned int>::max()); value != sentinel;

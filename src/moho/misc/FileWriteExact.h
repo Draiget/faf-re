@@ -7,7 +7,11 @@
 
 namespace moho
 {
-  [[nodiscard]] inline bool WriteExact(std::FILE* const file, const void* const data, const std::size_t byteCount)
+  [[nodiscard]] inline bool WriteExact(
+    std::FILE* const file,
+    const void* const data,
+    const std::size_t byteCount
+  )
   {
     if (!file) {
       return false;

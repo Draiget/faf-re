@@ -27,24 +27,33 @@ namespace
   };
   static_assert(sizeof(Packed) == 8u);
 
-  std::string ContentOf(const gpg::MemBufferStream& stream)
+  std::string ContentOf(
+    const gpg::MemBufferStream& stream
+  )
   {
     return std::string(stream.GetConstBuffer().begin(), stream.GetLength());
   }
 
   /** A read-only stream over `bytes`: every byte is in the read window, so reads take the inline path. */
-  gpg::MemBufferStream WindowedReader(const std::string& bytes)
+  gpg::MemBufferStream WindowedReader(
+    const std::string& bytes
+  )
   {
     return gpg::MemBufferStream(gpg::CopyMemBuffer(bytes.data(), bytes.size()));
   }
 
   /** A writable stream holding `bytes`, whose read window starts empty: reads go through VirtRead. */
-  void FillWritable(gpg::MemBufferStream& stream, const std::string& bytes)
+  void FillWritable(
+    gpg::MemBufferStream& stream,
+    const std::string& bytes
+  )
   {
     stream.Write(bytes.data(), bytes.size());
   }
 
-  void WriteEveryPrimitive(const gpg::BinaryWriter& writer)
+  void WriteEveryPrimitive(
+    const gpg::BinaryWriter& writer
+  )
   {
     writer.Write(std::int8_t{-2});
     writer.Write(std::uint8_t{0xFE});
@@ -77,7 +86,9 @@ namespace
     0x01, 0x00, 0x02, 0x00, 0xFF, 0xFF,             // array<uint16_t, 3>
   };
 
-  void ExpectEveryPrimitive(const gpg::BinaryReader& reader)
+  void ExpectEveryPrimitive(
+    const gpg::BinaryReader& reader
+  )
   {
     EXPECT_EQ(reader.ReadExact<std::int8_t>(), -2);
     EXPECT_EQ(reader.ReadChar(), 0xFEu);
@@ -104,7 +115,10 @@ namespace
     EXPECT_EQ(values, (std::array<std::uint16_t, 3>{1u, 2u, 0xFFFFu}));
   }
 
-  TEST(GpgBinaryIo, WriterLaysOutEveryPrimitiveLittleEndian)
+  TEST(
+    GpgBinaryIo,
+    WriterLaysOutEveryPrimitiveLittleEndian
+  )
   {
     gpg::MemBufferStream stream(4u); // small, so most writes go through VirtWrite
     WriteEveryPrimitive(gpg::BinaryWriter(&stream));
@@ -113,15 +127,22 @@ namespace
     EXPECT_EQ(std::memcmp(bytes.data(), kEveryPrimitive, sizeof(kEveryPrimitive)), 0);
   }
 
-  TEST(GpgBinaryIo, ReaderReadsEveryPrimitiveFromTheWindow)
+  TEST(
+    GpgBinaryIo,
+    ReaderReadsEveryPrimitiveFromTheWindow
+  )
   {
-    gpg::MemBufferStream stream = WindowedReader(std::string(reinterpret_cast<const char*>(kEveryPrimitive), sizeof(kEveryPrimitive)));
+    gpg::MemBufferStream stream =
+      WindowedReader(std::string(reinterpret_cast<const char*>(kEveryPrimitive), sizeof(kEveryPrimitive)));
     const gpg::BinaryReader reader(&stream);
     ExpectEveryPrimitive(reader);
     EXPECT_THROW((void)reader.ReadChar(), gpg::BinaryReader::PrematureEOF);
   }
 
-  TEST(GpgBinaryIo, ReaderReadsEveryPrimitiveFromAGrowingStream)
+  TEST(
+    GpgBinaryIo,
+    ReaderReadsEveryPrimitiveFromAGrowingStream
+  )
   {
     gpg::MemBufferStream stream(4u);
     WriteEveryPrimitive(gpg::BinaryWriter(&stream));
@@ -130,7 +151,10 @@ namespace
     EXPECT_THROW((void)reader.ReadInt32(), gpg::BinaryReader::PrematureEOF);
   }
 
-  TEST(GpgBinaryIo, ArraysAndRawSpans)
+  TEST(
+    GpgBinaryIo,
+    ArraysAndRawSpans
+  )
   {
     gpg::MemBufferStream stream(64u);
     const gpg::BinaryWriter writer(&stream);
@@ -149,7 +173,10 @@ namespace
     reader.Read(tail, 0u); // a zero-length read at the end is not an EOF
   }
 
-  TEST(GpgBinaryIo, TerminatedStringsRoundTrip)
+  TEST(
+    GpgBinaryIo,
+    TerminatedStringsRoundTrip
+  )
   {
     gpg::MemBufferStream stream(8u);
     const gpg::BinaryWriter writer(&stream);
@@ -172,7 +199,10 @@ namespace
     EXPECT_EQ(out.view(), ""sv);
   }
 
-  TEST(GpgBinaryIo, TerminatedStringEndsAtEndOfInputWithoutThrowing)
+  TEST(
+    GpgBinaryIo,
+    TerminatedStringEndsAtEndOfInputWithoutThrowing
+  )
   {
     gpg::MemBufferStream stream = WindowedReader("no terminator");
     const gpg::BinaryReader reader(&stream);
@@ -183,7 +213,10 @@ namespace
     EXPECT_EQ(out.view(), ""sv);
   }
 
-  TEST(GpgBinaryIo, LengthPrefixedStrings)
+  TEST(
+    GpgBinaryIo,
+    LengthPrefixedStrings
+  )
   {
     const auto prefixed = [](const std::int32_t length, const std::string_view body) {
       std::string bytes(reinterpret_cast<const char*>(&length), 4u);
@@ -214,7 +247,10 @@ namespace
     }
   }
 
-  TEST(GpgBinaryIo, ShortReadsThrowPrematureEOF)
+  TEST(
+    GpgBinaryIo,
+    ShortReadsThrowPrematureEOF
+  )
   {
     for (std::size_t available = 0; available < 8u; ++available) {
       gpg::MemBufferStream windowed = WindowedReader(std::string(available, 'z'));
@@ -233,7 +269,10 @@ namespace
     EXPECT_THROW((void)reader.ReadInt(nullptr), gpg::BinaryReader::PrematureEOF);
   }
 
-  TEST(GpgBinaryIo, PrematureEOFCarriesItsMessage)
+  TEST(
+    GpgBinaryIo,
+    PrematureEOFCarriesItsMessage
+  )
   {
     const gpg::BinaryReader::PrematureEOF error;
     EXPECT_STREQ(error.what(), "Premature EOF");
@@ -241,7 +280,10 @@ namespace
     EXPECT_STREQ(base.what(), "Premature EOF");
   }
 
-  TEST(GpgBinaryIo, ReaderAndWriterKeepTheirStream)
+  TEST(
+    GpgBinaryIo,
+    ReaderAndWriterKeepTheirStream
+  )
   {
     gpg::MemBufferStream stream(4u);
     const gpg::BinaryWriter writer(&stream, 7u);

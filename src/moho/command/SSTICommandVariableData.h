@@ -129,27 +129,36 @@ namespace moho
 
   // Offsets below are read straight out of FUN_00552A00 (the ctor asm quoted
   // above); every one of them is a literal displacement in that body.
-  static_assert(offsetof(SSTICommandVariableData, mEntIds) == 0x00, "SSTICommandVariableData::mEntIds offset must be 0x00");
+  static_assert(
+    offsetof(SSTICommandVariableData, mEntIds) == 0x00,
+    "SSTICommandVariableData::mEntIds offset must be 0x00"
+  );
   static_assert(sizeof(gpg::fastvector_n<EntId, 2>) == 0x18, "SSTICommandVariableData::mEntIds size must be 0x18");
   static_assert(
-    offsetof(SSTICommandVariableData, mCmdType) == 0x18, "SSTICommandVariableData::mCmdType offset must be 0x18"
+    offsetof(SSTICommandVariableData, mCmdType) == 0x18,
+    "SSTICommandVariableData::mCmdType offset must be 0x18"
   );
   static_assert(
-    offsetof(SSTICommandVariableData, mTarget1) == 0x1C, "SSTICommandVariableData::mTarget1 offset must be 0x1C"
+    offsetof(SSTICommandVariableData, mTarget1) == 0x1C,
+    "SSTICommandVariableData::mTarget1 offset must be 0x1C"
   );
   static_assert(
-    offsetof(SSTICommandVariableData, mTarget2) == 0x30, "SSTICommandVariableData::mTarget2 offset must be 0x30"
+    offsetof(SSTICommandVariableData, mTarget2) == 0x30,
+    "SSTICommandVariableData::mTarget2 offset must be 0x30"
   );
   static_assert(offsetof(SSTICommandVariableData, v14) == 0x44, "SSTICommandVariableData::v14 offset must be 0x44");
   static_assert(
-    offsetof(SSTICommandVariableData, mCells) == 0x48, "SSTICommandVariableData::mCells offset must be 0x48"
+    offsetof(SSTICommandVariableData, mCells) == 0x48,
+    "SSTICommandVariableData::mCells offset must be 0x48"
   );
   static_assert(sizeof(gpg::fastvector_n<SOCellPos, 2>) == 0x18, "SSTICommandVariableData::mCells size must be 0x18");
   static_assert(
-    offsetof(SSTICommandVariableData, mMaxCount) == 0x60, "SSTICommandVariableData::mMaxCount offset must be 0x60"
+    offsetof(SSTICommandVariableData, mMaxCount) == 0x60,
+    "SSTICommandVariableData::mMaxCount offset must be 0x60"
   );
   static_assert(
-    offsetof(SSTICommandVariableData, mCount) == 0x64, "SSTICommandVariableData::mCount offset must be 0x64"
+    offsetof(SSTICommandVariableData, mCount) == 0x64,
+    "SSTICommandVariableData::mCount offset must be 0x64"
   );
   static_assert(offsetof(SSTICommandVariableData, v23) == 0x68, "SSTICommandVariableData::v23 offset must be 0x68");
   // 8-aligned through its two `fastvector_n`s, so 0x70: `CUnitCommand`'s
@@ -164,7 +173,8 @@ namespace moho
     "SSTICommandVariableDataSerializer::mSerSaveFunc offset must be 0x10"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    sizeof(SSTICommandVariableDataSerializer) == 0x14, "SSTICommandVariableDataSerializer size must be 0x14"
+    sizeof(SSTICommandVariableDataSerializer) == 0x14,
+    "SSTICommandVariableDataSerializer size must be 0x14"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SSTICommandVariableData) == 0x70, "SSTICommandVariableData size must be 0x70");
 

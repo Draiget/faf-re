@@ -27,7 +27,9 @@ namespace
     return key;
   }
 
-  ControlNonce Nonce(const std::uint8_t first)
+  ControlNonce Nonce(
+    const std::uint8_t first
+  )
   {
     ControlNonce nonce{};
     for (std::size_t i = 0; i < nonce.size(); ++i) {
@@ -36,7 +38,10 @@ namespace
     return nonce;
   }
 
-  std::string Hex(const std::uint8_t* const data, const std::size_t size)
+  std::string Hex(
+    const std::uint8_t* const data,
+    const std::size_t size
+  )
   {
     static constexpr char kDigits[] = "0123456789abcdef";
     std::string text;
@@ -47,7 +52,9 @@ namespace
     return text;
   }
 
-  std::span<const std::uint8_t> Bytes(const std::string_view text)
+  std::span<const std::uint8_t> Bytes(
+    const std::string_view text
+  )
   {
     return {reinterpret_cast<const std::uint8_t*>(text.data()), text.size()};
   }
@@ -68,24 +75,35 @@ namespace
   };
 } // namespace
 
-TEST(ControlChannel, MatchesTheGoVector)
+TEST(
+  ControlChannel,
+  MatchesTheGoVector
+)
 {
   SPair pair;
   ASSERT_TRUE(pair.ok);
   const ControlProof serverProof = CControlChannel(VectorKey(), EControlRole::Server, Nonce(0x10)).Proof(Nonce(0x40));
   const ControlProof serviceProof = CControlChannel(VectorKey(), EControlRole::Service, Nonce(0x40)).Proof(Nonce(0x10));
-  EXPECT_EQ(Hex(serverProof.data(), serverProof.size()), "87a57dc7e495714a626877771e9e4280f7da5df3b42a0f63bdc731ec79663c8c");
-  EXPECT_EQ(Hex(serviceProof.data(), serviceProof.size()), "f5402e1690ed49e47fb64c8cf3af73ec96de449ff0f2bf135ad3a7d6e787b45c");
+  EXPECT_EQ(
+    Hex(serverProof.data(), serverProof.size()), "87a57dc7e495714a626877771e9e4280f7da5df3b42a0f63bdc731ec79663c8c"
+  );
+  EXPECT_EQ(
+    Hex(serviceProof.data(), serviceProof.size()), "f5402e1690ed49e47fb64c8cf3af73ec96de449ff0f2bf135ad3a7d6e787b45c"
+  );
   const std::vector<std::uint8_t> frame = pair.server.Seal(Bytes(R"({"op":"status"})"));
   EXPECT_EQ(Hex(frame.data(), frame.size()), "1f0000006b5e9bea6e449d70872477d977c6535a31b1534d510121194724dcb2035660");
 }
 
-TEST(ControlChannel, MessagesGoBothWaysInOrderWhateverTheReads)
+TEST(
+  ControlChannel,
+  MessagesGoBothWaysInOrderWhateverTheReads
+)
 {
   SPair pair;
   ASSERT_TRUE(pair.ok);
   std::vector<std::uint8_t> stream;
-  for (const std::string_view text : {std::string_view("one"), std::string_view(""), std::string_view(R"({"op":"force_start"})")}) {
+  for (const std::string_view text :
+       {std::string_view("one"), std::string_view(""), std::string_view(R"({"op":"force_start"})")}) {
     const std::vector<std::uint8_t> frame = pair.service.Seal(Bytes(text));
     stream.insert(stream.end(), frame.begin(), frame.end());
   }
@@ -108,7 +126,10 @@ TEST(ControlChannel, MessagesGoBothWaysInOrderWhateverTheReads)
   EXPECT_EQ(std::string(message.begin(), message.end()), "ok");
 }
 
-TEST(ControlChannel, AWrongKeyIsRefusedBothWays)
+TEST(
+  ControlChannel,
+  AWrongKeyIsRefusedBothWays
+)
 {
   ControlKey other = VectorKey();
   other[0] ^= 1u;
@@ -126,7 +147,10 @@ TEST(ControlChannel, AWrongKeyIsRefusedBothWays)
   EXPECT_FALSE(again.CheckPeerProof(mine));
 }
 
-TEST(ControlChannel, ChangedReplayedOrHugeFramesEndTheConnection)
+TEST(
+  ControlChannel,
+  ChangedReplayedOrHugeFramesEndTheConnection
+)
 {
   {
     SPair pair;
@@ -156,9 +180,14 @@ TEST(ControlChannel, ChangedReplayedOrHugeFramesEndTheConnection)
 }
 
 // Plan WP17.2: what the listener reads of a request (server/ControlListener.h).
-TEST(ControlListener, ParsesFlatRequests)
+TEST(
+  ControlListener,
+  ParsesFlatRequests
+)
 {
-  const auto eject = faf::server::ParseControlRequest(R"( {"id": 7, "op": "eject", "uid": 1002, "reason": "no \"show\"\n", "extra": true, "n": null} )");
+  const auto eject = faf::server::ParseControlRequest(
+    R"( {"id": 7, "op": "eject", "uid": 1002, "reason": "no \"show\"\n", "extra": true, "n": null} )"
+  );
   ASSERT_TRUE(eject.has_value());
   EXPECT_EQ(eject->id, 7);
   EXPECT_EQ(eject->op, "eject");
@@ -169,16 +198,26 @@ TEST(ControlListener, ParsesFlatRequests)
   EXPECT_EQ(status->id, 0);
   EXPECT_EQ(faf::server::ParseControlRequest(R"({"op":"café"})")->op, "caf\xC3\xA9");
   // Not a request: no op, nested values, fractions, trailing text, truncation, other JSON.
-  for (const std::string_view bad : {std::string_view(R"({"id":1})"), std::string_view(R"({"op":"x","args":{"a":1}})"),
-                                     std::string_view(R"({"op":"x","list":[1]})"), std::string_view(R"({"op":"x","id":1.5})"),
-                                     std::string_view(R"({"op":"x"} tail)"), std::string_view(R"({"op":"x")"), std::string_view("[1]"),
-                                     std::string_view(""), std::string_view(R"({"op":"x",})"), std::string_view(R"({"op":"\q"})")}) {
+  for (const std::string_view bad :
+       {std::string_view(R"({"id":1})"),
+        std::string_view(R"({"op":"x","args":{"a":1}})"),
+        std::string_view(R"({"op":"x","list":[1]})"),
+        std::string_view(R"({"op":"x","id":1.5})"),
+        std::string_view(R"({"op":"x"} tail)"),
+        std::string_view(R"({"op":"x")"),
+        std::string_view("[1]"),
+        std::string_view(""),
+        std::string_view(R"({"op":"x",})"),
+        std::string_view(R"({"op":"\q"})")}) {
     EXPECT_FALSE(faf::server::ParseControlRequest(bad).has_value()) << bad;
   }
   EXPECT_EQ(faf::server::JsonString("a\"b\\c\n\x01"), "\"a\\\"b\\\\c\\n\\u0001\"");
 }
 
-TEST(ControlChannel, ReadsTheKeyFile)
+TEST(
+  ControlChannel,
+  ReadsTheKeyFile
+)
 {
   ControlKey key{};
   EXPECT_TRUE(faf::server::ReadControlKey(" 000102030405060708090a0b0c0d0e0f101112131415161718191A1B1C1D1E1F\n", key));

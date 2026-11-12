@@ -44,7 +44,9 @@ namespace
    * What it does:
    * Upcasts a reflected object lane to `STaskEventLinkage` when compatible.
    */
-  [[nodiscard]] STaskEventLinkage* UpcastSTaskEventLinkage(const gpg::RRef& source)
+  [[nodiscard]] STaskEventLinkage* UpcastSTaskEventLinkage(
+    const gpg::RRef& source
+  )
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::RTypeOf<STaskEventLinkage>());
     return static_cast<STaskEventLinkage*>(upcast.mObj);
@@ -57,7 +59,9 @@ namespace
    * Builds reflected object reference for `STaskEventLinkage` and preserves
    * most-derived complete-object pointer semantics.
    */
-  gpg::RRef MakeSTaskEventLinkageRef(STaskEventLinkage* linkage)
+  gpg::RRef MakeSTaskEventLinkageRef(
+    STaskEventLinkage* linkage
+  )
   {
     gpg::RRef out{};
     out.mObj = nullptr;
@@ -89,13 +93,16 @@ namespace
   }
 
   /**
-    * Alias of FUN_004081E0 (non-canonical helper lane).
+   * Alias of FUN_004081E0 (non-canonical helper lane).
    *
    * What it does:
    * Reads one tracked pointer lane and upcasts it to `STaskEventLinkage`
    * without changing ownership state.
    */
-  [[nodiscard]] STaskEventLinkage* ReadPointerSTaskEventLinkage(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
+  [[nodiscard]] STaskEventLinkage* ReadPointerSTaskEventLinkage(
+    gpg::ReadArchive* archive,
+    const gpg::RRef& ownerRef
+  )
   {
     const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, ownerRef);
     if (!tracked.object) {
@@ -121,13 +128,16 @@ namespace
   }
 
   /**
-    * Alias of FUN_00407A50 (non-canonical helper lane).
+   * Alias of FUN_00407A50 (non-canonical helper lane).
    *
    * What it does:
    * Reads one pointer lane, enforces owned-pointer transition
    * (`Unowned -> Owned`), and upcasts to `STaskEventLinkage`.
    */
-  STaskEventLinkage* ReadOwnedSTaskEventLinkagePointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
+  STaskEventLinkage* ReadOwnedSTaskEventLinkagePointer(
+    gpg::ReadArchive* archive,
+    const gpg::RRef& ownerRef
+  )
   {
     gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
     if (!tracked.object) {
@@ -164,7 +174,12 @@ namespace
    * Loads one weak pointer lane targeting `STaskEventLinkage` and binds this
    * weak-link node to the decoded owner object.
    */
-  void LoadWeakPtrSTaskEventLinkage(gpg::ReadArchive* archive, std::intptr_t objectPtr, int /*version*/, gpg::RRef* ownerRef)
+  void LoadWeakPtrSTaskEventLinkage(
+    gpg::ReadArchive* archive,
+    std::intptr_t objectPtr,
+    int /*version*/,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const weak = reinterpret_cast<WeakPtr<STaskEventLinkage>*>(objectPtr);
     GPG_ASSERT(weak != nullptr);
@@ -180,7 +195,12 @@ namespace
    * Saves one weak pointer lane targeting `STaskEventLinkage` as an unowned
    * tracked pointer entry.
    */
-  void SaveWeakPtrSTaskEventLinkage(gpg::WriteArchive* archive, std::intptr_t objectPtr, int /*version*/, gpg::RRef* ownerRef)
+  void SaveWeakPtrSTaskEventLinkage(
+    gpg::WriteArchive* archive,
+    std::intptr_t objectPtr,
+    int /*version*/,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const weak = reinterpret_cast<WeakPtr<STaskEventLinkage>*>(objectPtr);
     GPG_ASSERT(weak != nullptr);
@@ -256,7 +276,9 @@ gpg::RRef STaskEventLinkageTypeInfo::NewRef()
 /**
  * Address: 0x00407860 (FUN_00407860)
  */
-gpg::RRef STaskEventLinkageTypeInfo::CtrRef(void* const objectStorage)
+gpg::RRef STaskEventLinkageTypeInfo::CtrRef(
+  void* const objectStorage
+)
 {
   auto* const linkage = static_cast<STaskEventLinkage*>(objectStorage);
   if (linkage) {
@@ -268,7 +290,9 @@ gpg::RRef STaskEventLinkageTypeInfo::CtrRef(void* const objectStorage)
 /**
  * Address: 0x00407840 (FUN_00407840)
  */
-void STaskEventLinkageTypeInfo::Delete(void* const objectStorage)
+void STaskEventLinkageTypeInfo::Delete(
+  void* const objectStorage
+)
 {
   auto* const linkage = static_cast<STaskEventLinkage*>(objectStorage);
   if (!linkage) {
@@ -282,7 +306,9 @@ void STaskEventLinkageTypeInfo::Delete(void* const objectStorage)
 /**
  * Address: 0x004078A0 (FUN_004078A0)
  */
-void STaskEventLinkageTypeInfo::Destruct(void* const objectStorage)
+void STaskEventLinkageTypeInfo::Destruct(
+  void* const objectStorage
+)
 {
   auto* const linkage = static_cast<STaskEventLinkage*>(objectStorage);
   if (!linkage) {
@@ -331,14 +357,16 @@ RWeakPtrType<STaskEventLinkage>::~RWeakPtrType() = default;
  */
 const char* RWeakPtrType<STaskEventLinkage>::GetName() const
 {
-    static const fa::string sName = gpg::STR_Printf("WeakPtr<%s>", gpg::RTypeOf<STaskEventLinkage>()->GetName());
-    return sName.c_str();
+  static const fa::string sName = gpg::STR_Printf("WeakPtr<%s>", gpg::RTypeOf<STaskEventLinkage>()->GetName());
+  return sName.c_str();
 }
 
 /**
  * Address: 0x00407370 (FUN_00407370, Moho::RWeakPtrType_STaskEventLinkage::GetLexical)
  */
-fa::string RWeakPtrType<STaskEventLinkage>::GetLexical(const gpg::RRef& ref) const
+fa::string RWeakPtrType<STaskEventLinkage>::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   auto* const weak = static_cast<const WeakPtr<STaskEventLinkage>*>(ref.mObj);
   if (!weak || !weak->HasValue()) {
@@ -375,7 +403,10 @@ const gpg::RIndexed* RWeakPtrType<STaskEventLinkage>::IsPointer() const
  */
 void RWeakPtrType<STaskEventLinkage>::Init()
 {
-  static_assert(sizeof(moho::WeakPtr<moho::STaskEventLinkage>) == 0x08, "moho::WeakPtr<moho::STaskEventLinkage> is 0x08 bytes on x86");
+  static_assert(
+    sizeof(moho::WeakPtr<moho::STaskEventLinkage>) == 0x08,
+    "moho::WeakPtr<moho::STaskEventLinkage> is 0x08 bytes on x86"
+  );
   size_ = sizeof(moho::WeakPtr<moho::STaskEventLinkage>);
   version_ = 1;
   serLoadFunc_ = &LoadWeakPtrSTaskEventLinkage;
@@ -385,7 +416,10 @@ void RWeakPtrType<STaskEventLinkage>::Init()
 /**
  * Address: 0x00407550 (FUN_00407550, Moho::RWeakPtrType_STaskEventLinkage::SubscriptIndex)
  */
-gpg::RRef RWeakPtrType<STaskEventLinkage>::SubscriptIndex(void* const obj, const int ind) const
+gpg::RRef RWeakPtrType<STaskEventLinkage>::SubscriptIndex(
+  void* const obj,
+  const int ind
+) const
 {
   GPG_ASSERT(ind == 0);
   if (ind != 0) {
@@ -403,7 +437,9 @@ gpg::RRef RWeakPtrType<STaskEventLinkage>::SubscriptIndex(void* const obj, const
 /**
  * Address: 0x00407520 (FUN_00407520, Moho::RWeakPtrType_STaskEventLinkage::GetCount)
  */
-size_t RWeakPtrType<STaskEventLinkage>::GetCount(void* const obj) const
+size_t RWeakPtrType<STaskEventLinkage>::GetCount(
+  void* const obj
+) const
 {
   auto* const weak = static_cast<WeakPtr<STaskEventLinkage>*>(obj);
   if (!weak) {
@@ -458,7 +494,11 @@ gpg::RType* WeakPtr_STaskEventLinkage::ResolveType()
  * What it does:
  * Loads one `WeakPtr<STaskEventLinkage>` lane through reflected type metadata.
  */
-void WeakPtr_STaskEventLinkage::Read(gpg::ReadArchive* const archive, void* const object, const gpg::RRef& ownerRef)
+void WeakPtr_STaskEventLinkage::Read(
+  gpg::ReadArchive* const archive,
+  void* const object,
+  const gpg::RRef& ownerRef
+)
 {
   archive->Read(ResolveType(), object, ownerRef);
 }
@@ -470,7 +510,9 @@ void WeakPtr_STaskEventLinkage::Read(gpg::ReadArchive* const archive, void* cons
  * Saves one `WeakPtr<STaskEventLinkage>` lane through reflected type metadata.
  */
 void WeakPtr_STaskEventLinkage::Write(
-  gpg::WriteArchive* const archive, const void* const object, const gpg::RRef& ownerRef
+  gpg::WriteArchive* const archive,
+  const void* const object,
+  const gpg::RRef& ownerRef
 )
 {
   archive->Write(ResolveType(), object, ownerRef);
@@ -488,7 +530,8 @@ void WeakPtr_STaskEventLinkage::Write(
  */
 WeakPtr<STaskEventLinkage>* WeakPtr_STaskEventLinkage::SetObject(
   WeakPtr<STaskEventLinkage>* const slot,
-  STaskEventLinkage* const linkage) noexcept
+  STaskEventLinkage* const linkage
+) noexcept
 {
   if (slot != nullptr) {
     slot->ResetFromObject(linkage);
@@ -522,7 +565,9 @@ CTaskEvent::~CTaskEvent()
  * Stages the provided thread when needed, allocates a new wait-link node,
  * binds its thread weak-link, then appends it to this event wait-list.
  */
-STaskEventLinkage* CTaskEvent::EventWait(CTaskThread* const thread)
+STaskEventLinkage* CTaskEvent::EventWait(
+  CTaskThread* const thread
+)
 {
   if (mTriggered) {
     return nullptr;
@@ -545,7 +590,9 @@ STaskEventLinkage* CTaskEvent::EventWait(CTaskThread* const thread)
  * Applies signaled state; when set to true, drains all wait links, clears
  * pending-frame throttles, and unstages waiting threads.
  */
-void CTaskEvent::EventSetSignaled(const bool signaled)
+void CTaskEvent::EventSetSignaled(
+  const bool signaled
+)
 {
   if (signaled) {
     while (mWaitLinks.mNext != &mWaitLinks) {
@@ -569,7 +616,9 @@ void CTaskEvent::EventSetSignaled(const bool signaled)
 /**
  * Address: 0x00407020 (FUN_00407020, ?SerThreads@CTaskEvent@Moho@@AAEXAAVReadArchive@gpg@@H@Z)
  */
-void CTaskEvent::DeserializeWaitLinks(gpg::ReadArchive* const archive)
+void CTaskEvent::DeserializeWaitLinks(
+  gpg::ReadArchive* const archive
+)
 {
   const gpg::RRef owner{};
   while (true) {
@@ -584,7 +633,9 @@ void CTaskEvent::DeserializeWaitLinks(gpg::ReadArchive* const archive)
 /**
  * Address: 0x00406FB0 (FUN_00406FB0, ?SerThreads@CTaskEvent@Moho@@ABEXAAVWriteArchive@gpg@@H@Z)
  */
-void CTaskEvent::SerializeWaitLinks(gpg::WriteArchive* const archive) const
+void CTaskEvent::SerializeWaitLinks(
+  gpg::WriteArchive* const archive
+) const
 {
   const gpg::RRef owner{};
   auto* const listEnd = reinterpret_cast<const STaskEventLinkage*>(&mWaitLinks);
@@ -670,18 +721,25 @@ namespace
   [[maybe_unused]] CTaskEventReflectionBootstrap gCTaskEventReflectionBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_STaskEventLinkageTypeInfo_7aa7c0, moho::register_STaskEventLinkageTypeInfo)
-GPG_PREREGISTER_INIT(register_CTaskEventTypeInfo_7aa7c0, moho::register_CTaskEventTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_STaskEventLinkageTypeInfo_7aa7c0,
+  moho::register_STaskEventLinkageTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_CTaskEventTypeInfo_7aa7c0,
+  moho::register_CTaskEventTypeInfo
+)
 
 namespace moho
 {
   /**
    * Inlined into `gpg::SerSaveLoadHelper<CTaskEvent>::Deserialize` 0x00406EC0.
    */
-  void CTaskEvent::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CTaskEvent::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     archive->ReadBool(&mTriggered);
     DeserializeWaitLinks(archive);
@@ -690,7 +748,9 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<CTaskEvent>::Serialize` 0x00406EF0.
    */
-  void CTaskEvent::MemberSerialize(gpg::WriteArchive* const archive)
+  void CTaskEvent::MemberSerialize(
+    gpg::WriteArchive* const archive
+  )
   {
     archive->WriteBool(mTriggered);
     SerializeWaitLinks(archive);
@@ -725,7 +785,9 @@ namespace moho
    * Loads the weak thread reference. Inlined into
    * `gpg::SerSaveLoadHelper<STaskEventLinkage>::Deserialize` 0x004069A0.
    */
-  void STaskEventLinkage::MemberDeserialize(gpg::ReadArchive* const archive)
+  void STaskEventLinkage::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     archive->Read(gpg::RTypeOf<WeakPtr<CTaskThread>>(), &mThreadRef, gpg::RRef{});
   }
@@ -735,7 +797,9 @@ namespace moho
    * Saves the weak thread reference. Inlined into
    * `gpg::SerSaveLoadHelper<STaskEventLinkage>::Serialize` 0x004069F0.
    */
-  void STaskEventLinkage::MemberSerialize(gpg::WriteArchive* const archive) const
+  void STaskEventLinkage::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     archive->Write(gpg::RTypeOf<WeakPtr<CTaskThread>>(), &mThreadRef, gpg::RRef{});
   }

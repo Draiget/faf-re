@@ -34,13 +34,18 @@ namespace
     std::size_t mLength;
   };
 
-  std::uint32_t GetU32(const Bytes& bytes, const std::size_t at)
+  std::uint32_t GetU32(
+    const Bytes& bytes,
+    const std::size_t at
+  )
   {
-    return (static_cast<std::uint32_t>(bytes[at]) << 24u) | (static_cast<std::uint32_t>(bytes[at + 1u]) << 16u)
-      | (static_cast<std::uint32_t>(bytes[at + 2u]) << 8u) | bytes[at + 3u];
+    return (static_cast<std::uint32_t>(bytes[at]) << 24u) | (static_cast<std::uint32_t>(bytes[at + 1u]) << 16u) |
+      (static_cast<std::uint32_t>(bytes[at + 2u]) << 8u) | bytes[at + 3u];
   }
 
-  std::vector<TableSpan> ReadTables(const Bytes& font)
+  std::vector<TableSpan> ReadTables(
+    const Bytes& font
+  )
   {
     std::vector<TableSpan> tables;
     const std::size_t count = (static_cast<std::size_t>(font[4]) << 8u) | font[5];
@@ -54,14 +59,19 @@ namespace
     return tables;
   }
 
-  std::uint8_t InterestingByte(Random& random)
+  std::uint8_t InterestingByte(
+    Random& random
+  )
   {
     static constexpr std::uint8_t values[] = {0x00u, 0x01u, 0x7Fu, 0x80u, 0xFEu, 0xFFu};
     return random() % 3u == 0u ? values[random() % std::size(values)] : static_cast<std::uint8_t>(random());
   }
 
   /** Bytes inside tables only: the structure check still passes, and the parsers get to see them. */
-  void MutateTables(Bytes& font, Random& random)
+  void MutateTables(
+    Bytes& font,
+    Random& random
+  )
   {
     const std::vector<TableSpan> tables = ReadTables(font);
     if (tables.empty()) {
@@ -77,27 +87,30 @@ namespace
   }
 
   /** The file's shape: what the structure check is there to catch. */
-  void MutateStructure(Bytes& font, Random& random)
+  void MutateStructure(
+    Bytes& font,
+    Random& random
+  )
   {
     const std::size_t count = (static_cast<std::size_t>(font[4]) << 8u) | font[5];
     switch (random() % 5u) {
-      case 0u:
-        font[12u + random() % (count * 16u)] = InterestingByte(random);
-        break;
-      case 1u:
-        font.resize(random() % font.size());
-        break;
-      case 2u:
-        font.resize(font.size() + 1u + random() % 64u, InterestingByte(random));
-        break;
-      case 3u:
-        font[random() % 12u] = InterestingByte(random);
-        break;
-      default:
-        for (int i = 0; i < 8 && !font.empty(); ++i) {
-          font[random() % font.size()] = InterestingByte(random);
-        }
-        break;
+    case 0u:
+      font[12u + random() % (count * 16u)] = InterestingByte(random);
+      break;
+    case 1u:
+      font.resize(random() % font.size());
+      break;
+    case 2u:
+      font.resize(font.size() + 1u + random() % 64u, InterestingByte(random));
+      break;
+    case 3u:
+      font[random() % 12u] = InterestingByte(random);
+      break;
+    default:
+      for (int i = 0; i < 8 && !font.empty(); ++i) {
+        font[random() % font.size()] = InterestingByte(random);
+      }
+      break;
     }
   }
 
@@ -111,7 +124,12 @@ namespace
     int mSlowestMs = 0;
   };
 
-  void RunOne(const Bytes& input, const moho::SMsdfCookOptions& options, Counts& counts, Random& random)
+  void RunOne(
+    const Bytes& input,
+    const moho::SMsdfCookOptions& options,
+    Counts& counts,
+    Random& random
+  )
   {
     ++counts.mInputs;
     std::string reason;
@@ -125,9 +143,12 @@ namespace
     moho::SMsdfFontAtlas atlas;
     const auto start = std::chrono::steady_clock::now();
     const bool cooked = moho::MSDF_CookFont(input.data(), input.size(), options, atlas, reason);
-    counts.mSlowestMs = (std::max)(
-      counts.mSlowestMs, static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count())
-    );
+    counts.mSlowestMs =
+      (std::max)(counts.mSlowestMs,
+                 static_cast<int>(
+                   std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start)
+                     .count()
+                 ));
     if (!cooked) {
       ++counts.mCookRefused;
       return;
@@ -144,13 +165,19 @@ namespace
       packed[random() % packed.size()] = InterestingByte(random);
     }
     moho::SMsdfFontAtlas loaded;
-    if (!moho::MSDF_LoadAtlas(packed.data(), packed.size(), loaded) || !moho::MSDF_CheckCookedAtlas(loaded, options, reason)) {
+    if (
+      !moho::MSDF_LoadAtlas(packed.data(), packed.size(), loaded) ||
+      !moho::MSDF_CheckCookedAtlas(loaded, options, reason)
+    ) {
       ++counts.mAtlasRefused;
     }
   }
 } // namespace
 
-int main(const int argc, char** const argv)
+int main(
+  const int argc,
+  char** const argv
+)
 {
   if (argc < 2) {
     std::printf("usage: faf_fontfuzz <folder of fonts> [--seed N] [--seconds N] [--iterations N] [--save <folder>]\n");
@@ -203,8 +230,10 @@ int main(const int argc, char** const argv)
   Counts counts;
   const auto start = std::chrono::steady_clock::now();
   for (;;) {
-    if (iterations != 0u ? counts.mInputs >= iterations
-                         : std::chrono::steady_clock::now() - start >= std::chrono::seconds(seconds)) {
+    if (
+      iterations != 0u ? counts.mInputs >= iterations
+                       : std::chrono::steady_clock::now() - start >= std::chrono::seconds(seconds)
+    ) {
       break;
     }
     Bytes input = fonts[random() % fonts.size()];
@@ -221,10 +250,15 @@ int main(const int argc, char** const argv)
   }
 
   std::printf(
-    "seed %llu: %llu inputs, %llu refused by structure, %llu refused by the cook, %llu cooked, %llu atlases refused, slowest cook %d ms\n",
-    static_cast<unsigned long long>(seed), static_cast<unsigned long long>(counts.mInputs),
-    static_cast<unsigned long long>(counts.mStructureRefused), static_cast<unsigned long long>(counts.mCookRefused),
-    static_cast<unsigned long long>(counts.mCooked), static_cast<unsigned long long>(counts.mAtlasRefused), counts.mSlowestMs
+    "seed %llu: %llu inputs, %llu refused by structure, %llu refused by the cook, %llu cooked, %llu atlases refused, "
+    "slowest cook %d ms\n",
+    static_cast<unsigned long long>(seed),
+    static_cast<unsigned long long>(counts.mInputs),
+    static_cast<unsigned long long>(counts.mStructureRefused),
+    static_cast<unsigned long long>(counts.mCookRefused),
+    static_cast<unsigned long long>(counts.mCooked),
+    static_cast<unsigned long long>(counts.mAtlasRefused),
+    counts.mSlowestMs
   );
   return 0;
 }

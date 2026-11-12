@@ -10,7 +10,7 @@ namespace gpg
 {
   class ReadArchive;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -20,7 +20,6 @@ namespace moho
   class CUnitCarrierRetrieve : public CCommandTask
   {
   public:
-
     /**
      * Address: 0x00607A1E-0x00607A27, inlined into
      * `CUnitCarrierRetrieveTypeInfo::NewRef` (0x006079E0) and its `CtrRef`
@@ -85,10 +84,7 @@ namespace moho
      * `nullptr`; on constructor throw the allocation is released before
      * the exception propagates.
      */
-    static CUnitCarrierRetrieve* Create(
-      CCommandTask* parentTask,
-      const EntitySetTemplate<Unit>& trackedUnits
-    );
+    static CUnitCarrierRetrieve* Create(CCommandTask* parentTask, const EntitySetTemplate<Unit>& trackedUnits);
 
     /**
      * Address: 0x00605EF0 (FUN_00605EF0, Moho::CUnitCarrierRetrieve::TaskTick)
@@ -130,8 +126,8 @@ namespace moho
     void MemberDeserialize(gpg::ReadArchive* archive);
 
   public:
-    bool mRetrievalComplete;             // 0x30
-    std::uint8_t mPad31_37[0x07];        // 0x31
+    bool mRetrievalComplete;               // 0x30
+    std::uint8_t mPad31_37[0x07];          // 0x31
     EntitySetTemplate<Unit> mTrackedUnits; // 0x38
   };
 

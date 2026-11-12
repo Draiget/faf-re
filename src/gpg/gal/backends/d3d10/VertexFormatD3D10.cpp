@@ -12,7 +12,10 @@ namespace gpg::gal
    * Initializes one D3D10 vertex-format wrapper from caller format/declaration
    * inputs and rebuilds per-stream stride lanes.
    */
-  VertexFormatD3D10::VertexFormatD3D10(const std::uint32_t format, ID3D10InputLayout* const vertexDeclaration)
+  VertexFormatD3D10::VertexFormatD3D10(
+    const std::uint32_t format,
+    ID3D10InputLayout* const vertexDeclaration
+  )
     : vertexDeclaration_(nullptr)
   {
     formatCode_ = 0x17U;
@@ -69,7 +72,10 @@ namespace gpg::gal
    * Rebinds declaration state, validates static table ownership for the format
    * token, and rebuilds per-stream stride lanes from recovered element records.
    */
-  std::uint32_t VertexFormatD3D10::Initialize(const std::uint32_t format, ID3D10InputLayout* const vertexDeclaration)
+  std::uint32_t VertexFormatD3D10::Initialize(
+    const std::uint32_t format,
+    ID3D10InputLayout* const vertexDeclaration
+  )
   {
     ResetDeclaration();
     vertexDeclaration_ = vertexDeclaration;
@@ -95,5 +101,4 @@ namespace gpg::gal
 
     return result;
   }
-}
-
+} // namespace gpg::gal

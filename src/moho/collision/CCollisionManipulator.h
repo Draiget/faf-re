@@ -24,8 +24,8 @@ namespace moho
   {
   public:
     /**
-       * Address: 0x00638770 (FUN_00638770)
-       * Address: 0x00638830 (FUN_00638830)
+     * Address: 0x00638770 (FUN_00638770)
+     * Address: 0x00638830 (FUN_00638830)
      *
      * What it does:
      * Constructs default collision-manipulator state used by RTTI allocation paths.
@@ -141,7 +141,7 @@ namespace moho
   public:
     static gpg::RType* sType;
 
-    Unit* mOwnerUnit;                   // +0x80
+    Unit* mOwnerUnit; // +0x80
     /**
      * Address: 0x006378B0 (FUN_006378B0 -- clears this flag and then walks
      *   `IAniManipulator::mWatchBones` masking `mFlags & 0xFFFEFFFF`, i.e.
@@ -151,7 +151,7 @@ namespace moho
      *   a deleted overlay in
      *   moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-22.)
      */
-    bool mCollisionCallbacksEnabled;    // +0x84
+    bool mCollisionCallbacksEnabled; // +0x84
     /**
      * Address: 0x006378E0 (FUN_006378E0 -- the one-line store behind
      *   `SetTerrainCollisionCheckEnabled` above; formerly `SetRuntimeFlag85`.
@@ -285,7 +285,8 @@ namespace moho
   };
 
   static_assert(
-    offsetof(CCollisionManipulator, mOwnerUnit) == 0x80, "CCollisionManipulator::mOwnerUnit offset must be 0x80"
+    offsetof(CCollisionManipulator, mOwnerUnit) == 0x80,
+    "CCollisionManipulator::mOwnerUnit offset must be 0x80"
   );
   static_assert(
     offsetof(CCollisionManipulator, mCollisionCallbacksEnabled) == 0x84,

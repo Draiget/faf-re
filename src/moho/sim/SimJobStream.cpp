@@ -50,14 +50,18 @@ namespace moho
     };
 
     // One cache line per slot: the sim thread writes the next slot while a worker runs this one.
-    struct alignas(kCacheLine) Slot
+    struct alignas(
+      kCacheLine
+    ) Slot
     {
       CSimJobStream::JobFunction fn = nullptr;
       void* context = nullptr;
       std::atomic<std::uint8_t> state{kDone};
     };
 
-    void SpinFor(const std::int64_t ticks)
+    void SpinFor(
+      const std::int64_t ticks
+    )
     {
       LARGE_INTEGER start{};
       LARGE_INTEGER now{};
@@ -75,12 +79,12 @@ namespace moho
 
     // Written by the sim thread only.
     bool open = false;
-    std::uint32_t epoch = 0; // bumped by every Open; a ticket is (epoch << 16) | index
-    std::uint32_t finishedPrefix = 0; // every job below this index is done
+    std::uint32_t epoch = 0;           // bumped by every Open; a ticket is (epoch << 16) | index
+    std::uint32_t finishedPrefix = 0;  // every job below this index is done
     std::int64_t workerDelayTicks = 0; // sim_WorkerJobDelayUs, read when the stream opens
-    std::uint32_t written = 0; // slots filled; `published` trails it by less than `publishBatch`
-    std::uint32_t publishBatch = 1; // sim_JobStreamPublishBatch, read when the stream opens
-    bool prefetchSlots = false; // sim_JobStreamPrefetch, read when the stream opens
+    std::uint32_t written = 0;         // slots filled; `published` trails it by less than `publishBatch`
+    std::uint32_t publishBatch = 1;    // sim_JobStreamPublishBatch, read when the stream opens
+    bool prefetchSlots = false;        // sim_JobStreamPrefetch, read when the stream opens
 
     // Separate lines: the sim thread writes `published`, the workers fight over `next`.
     alignas(kCacheLine) std::atomic<std::uint32_t> published{0}; // jobs the workers may take
@@ -104,7 +108,9 @@ namespace moho
     }();
 
     /// Runs job `index` unless another thread took it first; true when this call ran it.
-    bool RunSlot(const std::uint32_t index)
+    bool RunSlot(
+      const std::uint32_t index
+    )
     {
       Slot& slot = slots[index];
       std::uint8_t expected = kQueued;
@@ -149,8 +155,10 @@ namespace moho
         idleRounds = 0;
         const std::uint32_t seenSignal = signal.load(std::memory_order_seq_cst);
         sleepers.fetch_add(1u, std::memory_order_seq_cst);
-        if (next.load(std::memory_order_seq_cst) < published.load(std::memory_order_seq_cst) ||
-            closing.load(std::memory_order_seq_cst)) {
+        if (
+          next.load(std::memory_order_seq_cst) < published.load(std::memory_order_seq_cst) ||
+          closing.load(std::memory_order_seq_cst)
+        ) {
           sleepers.fetch_sub(1u, std::memory_order_seq_cst);
           continue;
         }
@@ -159,7 +167,11 @@ namespace moho
       }
     }
 
-    static void DrainEntry(void* const context, std::size_t, std::size_t)
+    static void DrainEntry(
+      void* const context,
+      std::size_t,
+      std::size_t
+    )
     {
       // CSimWorkerPool's dispatcher also runs chunks (at StartAsync's serial fallback and at
       // FinishAsync); only workers wait for jobs here.
@@ -179,7 +191,9 @@ namespace moho
     }
 
     /// After a store to `published` or `closing`: wakes sleeping workers, if there are any.
-    void WakeSleepers(const bool all)
+    void WakeSleepers(
+      const bool all
+    )
     {
       if (sleepers.load(std::memory_order_seq_cst) == 0u) {
         return;
@@ -220,7 +234,9 @@ namespace moho
       return true;
     }
 
-    void Finish(const std::uint32_t index)
+    void Finish(
+      const std::uint32_t index
+    )
     {
       Slot& slot = slots[index];
       if (slot.state.load(std::memory_order_acquire) == kDone) {
@@ -279,8 +295,7 @@ namespace moho
 
   CSimJobStream::CSimJobStream()
     : mImpl(std::make_unique<Impl>())
-  {
-  }
+  {}
 
   CSimJobStream::~CSimJobStream() = default;
 
@@ -290,7 +305,10 @@ namespace moho
     return sStream;
   }
 
-  std::int32_t CSimJobStream::Enqueue(const JobFunction fn, void* const context)
+  std::int32_t CSimJobStream::Enqueue(
+    const JobFunction fn,
+    void* const context
+  )
   {
     Impl& impl = *mImpl;
     if (IsSimWorkerThread() || !CSimWorkerPool::ParallelEnabled()) {
@@ -323,7 +341,9 @@ namespace moho
     return static_cast<std::int32_t>((impl.epoch << 16) | index);
   }
 
-  void CSimJobStream::Finish(const std::int32_t ticket)
+  void CSimJobStream::Finish(
+    const std::int32_t ticket
+  )
   {
     Impl& impl = *mImpl;
     // A ticket from before the last Close is done: Close finished every job.

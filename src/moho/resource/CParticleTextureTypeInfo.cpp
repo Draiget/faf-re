@@ -72,7 +72,9 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CParticleTextureTypeInfo_88240b, moho::register_CParticleTextureTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CParticleTextureTypeInfo_88240b,
+  moho::register_CParticleTextureTypeInfo
+)

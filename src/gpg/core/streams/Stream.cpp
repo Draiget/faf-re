@@ -9,29 +9,31 @@ using namespace gpg;
 
 namespace
 {
-constexpr int kCarriageReturnByte = 13;
-constexpr int kLineFeedByte = 10;
-constexpr int kEndOfFileByte = -1;
+  constexpr int kCarriageReturnByte = 13;
+  constexpr int kLineFeedByte = 10;
+  constexpr int kEndOfFileByte = -1;
 
-// The read-buffer fast path `TextReader`'s two read members both open with:
-// take the next byte from the window when one is there, otherwise go through
-// the virtual `VirtRead` slot for a single byte. The binary inlines it at
-// each of its three use sites rather than calling it.
-[[nodiscard]] int ReadRawByte(Stream& stream)
-{
-  if (stream.mReadHead != stream.mReadEnd) {
-    const unsigned char value = static_cast<unsigned char>(*stream.mReadHead);
-    ++stream.mReadHead;
-    return static_cast<int>(value);
+  // The read-buffer fast path `TextReader`'s two read members both open with:
+  // take the next byte from the window when one is there, otherwise go through
+  // the virtual `VirtRead` slot for a single byte. The binary inlines it at
+  // each of its three use sites rather than calling it.
+  [[nodiscard]] int ReadRawByte(
+    Stream& stream
+  )
+  {
+    if (stream.mReadHead != stream.mReadEnd) {
+      const unsigned char value = static_cast<unsigned char>(*stream.mReadHead);
+      ++stream.mReadHead;
+      return static_cast<int>(value);
+    }
+
+    unsigned char value = 0;
+    if (stream.VirtRead(reinterpret_cast<char*>(&value), 1U) == 1U) {
+      return static_cast<int>(value);
+    }
+
+    return kEndOfFileByte;
   }
-
-  unsigned char value = 0;
-  if (stream.VirtRead(reinterpret_cast<char*>(&value), 1U) == 1U) {
-    return static_cast<int>(value);
-  }
-
-  return kEndOfFileByte;
-}
 
 } // namespace
 
@@ -41,7 +43,10 @@ constexpr int kEndOfFileByte = -1;
  * What it does:
  * Binds the reader to one stream and records the CR normalization mode.
  */
-TextReader::TextReader(Stream* const stream, const bool normalizeCrAsLf)
+TextReader::TextReader(
+  Stream* const stream,
+  const bool normalizeCrAsLf
+)
   : mStream(stream)
   , mNormalizeCrAsLf(normalizeCrAsLf)
 {}
@@ -156,7 +161,9 @@ Stream::UnsupportedOperation::UnsupportedOperation()
  * What it does:
  * Copy-constructs one unsupported-operation exception payload.
  */
-Stream::UnsupportedOperation::UnsupportedOperation(const UnsupportedOperation& other)
+Stream::UnsupportedOperation::UnsupportedOperation(
+  const UnsupportedOperation& other
+)
   : std::logic_error{other}
 {}
 
@@ -176,7 +183,9 @@ Stream::UnsupportedOperation::~UnsupportedOperation() = default;
  * What it does:
  * Default seek-position query lane throws UnsupportedOperation.
  */
-std::uint64_t Stream::VirtTell(Mode)
+std::uint64_t Stream::VirtTell(
+  Mode
+)
 {
   throw UnsupportedOperation{};
 }
@@ -187,7 +196,11 @@ std::uint64_t Stream::VirtTell(Mode)
  * What it does:
  * Default seek lane throws UnsupportedOperation.
  */
-std::uint64_t Stream::VirtSeek(Mode, SeekOrigin, std::int64_t)
+std::uint64_t Stream::VirtSeek(
+  Mode,
+  SeekOrigin,
+  std::int64_t
+)
 {
   throw UnsupportedOperation{};
 }
@@ -198,7 +211,10 @@ std::uint64_t Stream::VirtSeek(Mode, SeekOrigin, std::int64_t)
  * What it does:
  * Default read lane throws UnsupportedOperation.
  */
-size_t Stream::VirtRead(char*, size_t)
+size_t Stream::VirtRead(
+  char*,
+  size_t
+)
 {
   throw UnsupportedOperation{};
 }
@@ -209,7 +225,10 @@ size_t Stream::VirtRead(char*, size_t)
  * What it does:
  * Default non-blocking read forwards to VirtRead.
  */
-size_t Stream::VirtReadNonBlocking(char* buf, size_t len)
+size_t Stream::VirtReadNonBlocking(
+  char* buf,
+  size_t len
+)
 {
   return VirtRead(buf, len);
 }
@@ -220,7 +239,9 @@ size_t Stream::VirtReadNonBlocking(char* buf, size_t len)
  * What it does:
  * Default unget lane throws UnsupportedOperation.
  */
-void Stream::VirtUnGetByte(int /*unknown*/)
+void Stream::VirtUnGetByte(
+  int /*unknown*/
+)
 {
   throw UnsupportedOperation{};
 }
@@ -242,7 +263,10 @@ bool Stream::VirtAtEnd()
  * What it does:
  * Default write lane throws UnsupportedOperation.
  */
-void Stream::VirtWrite(const char* /*data*/, size_t /*size*/)
+void Stream::VirtWrite(
+  const char* /*data*/,
+  size_t /*size*/
+)
 {
   throw UnsupportedOperation{};
 }
@@ -261,7 +285,10 @@ void Stream::VirtFlush() {}
  * What it does:
  * Default close lane is a no-op.
  */
-void Stream::VirtClose(Mode) {}
+void Stream::VirtClose(
+  Mode
+)
+{}
 
 /**
  * Address: 0x0046BED0 (FUN_0046BED0, __imp_?Seek@Stream@gpg@@QAE_KW4Mode@12@W4SeekOrigin@12@_J@Z)
@@ -270,7 +297,10 @@ void Stream::VirtClose(Mode) {}
  * Non-virtual receive-lane seek wrapper that forwards to `VirtSeek` with
  * `ModeReceive`.
  */
-std::uint64_t Stream::Seek(const SeekOrigin origin, const std::int64_t pos)
+std::uint64_t Stream::Seek(
+  const SeekOrigin origin,
+  const std::int64_t pos
+)
 {
   return VirtSeek(ModeReceive, origin, pos);
 }
@@ -281,7 +311,9 @@ std::uint64_t Stream::Seek(const SeekOrigin origin, const std::int64_t pos)
  * What it does:
  * Writes string bytes including trailing NUL via inline buffer or virtual write fallback.
  */
-void Stream::Write(const fa::string& str)
+void Stream::Write(
+  const fa::string& str
+)
 {
   Write(str.c_str(), str.size() + 1);
 }
@@ -294,7 +326,10 @@ void Stream::Write(const fa::string& str)
  * What it does:
  * Writes one byte span via inline buffer fast path or virtual write fallback.
  */
-void Stream::Write(const char* buf, const size_t size)
+void Stream::Write(
+  const char* buf,
+  const size_t size
+)
 {
   if (size > LeftToWrite()) {
     VirtWrite(buf, size);
@@ -312,7 +347,9 @@ void Stream::Write(const char* buf, const size_t size)
  * What it does:
  * Writes one NUL-terminated C-string including terminator.
  */
-void Stream::Write(const char* buf)
+void Stream::Write(
+  const char* buf
+)
 {
   const auto len = strlen(buf) + 1;
   Write(buf, len);
@@ -324,7 +361,9 @@ void Stream::Write(const char* buf)
  * What it does:
  * Writes one 32-bit integer through inline-buffer fast path or virtual write fallback.
  */
-void Stream::WriteInt32(const std::int32_t value)
+void Stream::WriteInt32(
+  const std::int32_t value
+)
 {
   if (static_cast<unsigned int>(mWriteEnd - mWriteHead) < sizeof(value)) {
     VirtWrite(reinterpret_cast<const char*>(&value), sizeof(value));
@@ -341,7 +380,9 @@ void Stream::WriteInt32(const std::int32_t value)
  * What it does:
  * Calls `VirtClose(mode)` and converts any exception into a `false` return.
  */
-bool Stream::CloseNoThrow(const Mode access)
+bool Stream::CloseNoThrow(
+  const Mode access
+)
 {
   try {
     VirtClose(access);
@@ -351,7 +392,9 @@ bool Stream::CloseNoThrow(const Mode access)
   }
 }
 
-bool Stream::Close(const Mode access)
+bool Stream::Close(
+  const Mode access
+)
 {
   VirtClose(access);
   return true;
@@ -363,7 +406,10 @@ bool Stream::Close(const Mode access)
  * What it does:
  * Reads one byte span from inline read window or virtual read fallback.
  */
-size_t Stream::Read(char* buf, size_t size)
+size_t Stream::Read(
+  char* buf,
+  size_t size
+)
 {
   if (size > BytesRead()) {
     size = VirtRead(buf, size);
@@ -381,7 +427,9 @@ size_t Stream::Read(char* buf, size_t size)
  * What it does:
  * Rewinds one byte with value validation or delegates to virtual unget at read window boundary.
  */
-void Stream::UnGetByte(const int value)
+void Stream::UnGetByte(
+  const int value
+)
 {
   char* const readHead = mReadHead;
   if (readHead == mReadStart) {
@@ -420,12 +468,18 @@ int Stream::CheckByte()
   return static_cast<int>(value);
 }
 
-void gpg::UnGetByteChecked(Stream& stream, const int value)
+void gpg::UnGetByteChecked(
+  Stream& stream,
+  const int value
+)
 {
   stream.UnGetByte(value);
 }
 
-size_t Stream::ReadNonBlocking(char* buf, size_t size)
+size_t Stream::ReadNonBlocking(
+  char* buf,
+  size_t size
+)
 {
   if (size > BytesRead()) {
     size = VirtReadNonBlocking(buf, size);
@@ -466,7 +520,10 @@ int Stream::GetByte()
  * What it does:
  * Initializes writer state around a target stream and configured line-ending mode.
  */
-TextWriter::TextWriter(Stream* const stream, const int mode)
+TextWriter::TextWriter(
+  Stream* const stream,
+  const int mode
+)
   : mStream(stream)
   , mMode(mode)
   , mSawCarriageReturn(false)
@@ -479,7 +536,9 @@ TextWriter::TextWriter(Stream* const stream, const int mode)
  * Writes one byte to the stream write lane using inline-buffer fast path and
  * virtual write fallback when the inline window is full.
  */
-char* TextWriter::WriteByte(const char value)
+char* TextWriter::WriteByte(
+  const char value
+)
 {
   if (mStream->mWriteHead == mStream->mWriteEnd) {
     mStream->VirtWrite(&value, 1);
@@ -528,7 +587,9 @@ void TextWriter::WriteNewline()
  * What it does:
  * Writes one character with optional CR/LF normalization depending on writer mode.
  */
-void TextWriter::WriteChar(const char value)
+void TextWriter::WriteChar(
+  const char value
+)
 {
   if (mMode == 0) {
     WriteByte(value);
@@ -561,7 +622,10 @@ void TextWriter::WriteChar(const char value)
  * Writes `length` bytes from `value` by forwarding each byte through
  * `WriteChar` normalization semantics.
  */
-void TextWriter::WriteChars(const char* const value, const int length)
+void TextWriter::WriteChars(
+  const char* const value,
+  const int length
+)
 {
   for (int index = 0; index < length; ++index) {
     WriteChar(value[index]);
@@ -574,7 +638,9 @@ void TextWriter::WriteChars(const char* const value, const int length)
  * What it does:
  * Writes one NUL-terminated C-string through WriteChar normalization.
  */
-void TextWriter::WriteCString(const char* value)
+void TextWriter::WriteCString(
+  const char* value
+)
 {
   if (!value) {
     return;
@@ -591,7 +657,9 @@ void TextWriter::WriteCString(const char* value)
  * What it does:
  * Writes one fa::string payload through WriteChar normalization.
  */
-void TextWriter::WriteString(const fa::string& value)
+void TextWriter::WriteString(
+  const fa::string& value
+)
 {
   const char* const raw = value.data();
   const std::size_t length = value.size();
@@ -606,7 +674,10 @@ void TextWriter::WriteString(const fa::string& value)
  * What it does:
  * Formats one vararg message with STR_Va and writes it through this TextWriter.
  */
-void TextWriter::Printf(const char* const format, ...)
+void TextWriter::Printf(
+  const char* const format,
+  ...
+)
 {
   va_list va;
   va_start(va, format);

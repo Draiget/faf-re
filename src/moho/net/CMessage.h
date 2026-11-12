@@ -63,7 +63,10 @@ namespace moho
      * Allows direct enum usage (for example `ECmdStreamOp`) without explicit cast wrappers.
      */
     template <U8Enum E>
-    explicit CMessage(E type, size_t size = 0)
+    explicit CMessage(
+      E type,
+      size_t size = 0
+    )
       : CMessage(MessageType(type), size)
     {}
 
@@ -97,7 +100,9 @@ namespace moho
      * What it does:
      * Stores message wire-size (header + payload) into bytes 1..2.
      */
-    void SetSize(const size_t size)
+    void SetSize(
+      const size_t size
+    )
     {
       mBuff[1] = LOBYTE(size);
       mBuff[2] = HIBYTE(size);
@@ -158,7 +163,9 @@ namespace moho
      * What it does:
      * Writes message type to header byte 0.
      */
-    void SetType(const MessageType type)
+    void SetType(
+      const MessageType type
+    )
     {
       mBuff[0] = type.raw();
     }
@@ -180,7 +187,9 @@ namespace moho
     void InitializeHeaderForPayloadSizeAndType(size_t payloadSize, MessageType type);
 
     template <U8Enum E>
-    void SetType(E e)
+    void SetType(
+      E e
+    )
     {
       this->mBuff[0] = static_cast<std::uint8_t>(e);
     }

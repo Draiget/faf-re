@@ -53,7 +53,6 @@ namespace moho
      */
     void GetFrameAt(FrameRef& outFrame, float frameIndex) const;
 
-
     [[nodiscard]] const fa::string& GetBaseTextureName() const noexcept;
 
     CAnimTexture(const CAnimTexture&) = delete;

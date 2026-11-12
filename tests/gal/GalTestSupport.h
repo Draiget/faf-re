@@ -26,18 +26,47 @@ namespace faf_gal_tests
   class FakeTexture final : public gpg::gal::Texture
   {
   public:
-    gpg::gal::TextureContext* GetContext() override { return nullptr; }
-    gpg::gal::TextureLockRect Lock(int, const RECT&, int) override { return {}; }
-    int Unlock(gpg::gal::TextureLockRect) override { return 0; }
-    int Unlock(int) override { return 0; }
-    void SaveToBuffer(gpg::MemBuffer<char>*) override {}
+    gpg::gal::TextureContext* GetContext() override
+    {
+      return nullptr;
+    }
+    gpg::gal::TextureLockRect Lock(
+      int,
+      const RECT&,
+      int
+    ) override
+    {
+      return {};
+    }
+    int Unlock(
+      gpg::gal::TextureLockRect
+    ) override
+    {
+      return 0;
+    }
+    int Unlock(
+      int
+    ) override
+    {
+      return 0;
+    }
+    void SaveToBuffer(
+      gpg::MemBuffer<char>*
+    ) override
+    {}
   };
 
   class FakeRenderTarget final : public gpg::gal::RenderTarget
   {
   public:
-    gpg::gal::RenderTargetContext* GetContext() override { return nullptr; }
-    HDC GetDC() override { return nullptr; }
+    gpg::gal::RenderTargetContext* GetContext() override
+    {
+      return nullptr;
+    }
+    HDC GetDC() override
+    {
+      return nullptr;
+    }
   };
 
   /**

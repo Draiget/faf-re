@@ -37,7 +37,12 @@ namespace gpg::gal
     void EndTechnique();
 
     void SetColorWriteMask(bool writeColor, bool writeAlpha) noexcept;
-    void SetWireframe(bool enabled) noexcept { mWireframe = enabled; }
+    void SetWireframe(
+      bool enabled
+    ) noexcept
+    {
+      mWireframe = enabled;
+    }
 
     /**
      * Lays the colour-write mask and wireframe fill over the state an effect

@@ -16,13 +16,19 @@ namespace
   // "a", "é" (2 bytes), "€" (3 bytes), U+1F600 (4 bytes).
   constexpr const char kMixed[] = "a\xC3\xA9\xE2\x82\xAC\xF0\x9F\x98\x80";
 
-  [[nodiscard]] char Fold(const char c)
+  [[nodiscard]] char Fold(
+    const char c
+  )
   {
     return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
   }
 
   /** '*' matches any run, '?' one character. */
-  [[nodiscard]] bool ReferenceMatch(const char* const t, const char* const p, const bool fold)
+  [[nodiscard]] bool ReferenceMatch(
+    const char* const t,
+    const char* const p,
+    const bool fold
+  )
   {
     if (*p == '*') {
       return ReferenceMatch(t, p + 1, fold) || (*t != '\0' && ReferenceMatch(t + 1, p, fold));
@@ -41,7 +47,10 @@ namespace
    * except that a star that ends the pattern matches only an empty rest (CScrLuaObjectFactory
    * relies on it: "STR_MatchWildcard never matches a pattern that ends in `*`").
    */
-  [[nodiscard]] bool ReferenceMatchCaseSensitive(const char* t, const char* p)
+  [[nodiscard]] bool ReferenceMatchCaseSensitive(
+    const char* t,
+    const char* p
+  )
   {
     const char* starPattern = nullptr;
     const char* starText = nullptr;
@@ -72,7 +81,11 @@ namespace
   }
 
   /** Some continuation of `t` matches `p`. */
-  [[nodiscard]] bool ReferenceValidPrefix(const char* const t, const char* const p, const bool fold)
+  [[nodiscard]] bool ReferenceValidPrefix(
+    const char* const t,
+    const char* const p,
+    const bool fold
+  )
   {
     if (*t == '\0') {
       return true;
@@ -89,7 +102,12 @@ namespace
     return false;
   }
 
-  [[nodiscard]] std::string RandomOf(std::mt19937& rng, const char* const alphabet, const std::size_t alphabetSize, const std::size_t maxLength)
+  [[nodiscard]] std::string RandomOf(
+    std::mt19937& rng,
+    const char* const alphabet,
+    const std::size_t alphabetSize,
+    const std::size_t maxLength
+  )
   {
     std::string out;
     for (std::size_t n = rng() % (maxLength + 1); n > 0; --n) {
@@ -99,7 +117,10 @@ namespace
   }
 } // namespace
 
-TEST(GpgString, Utf8LengthsAndOffsets)
+TEST(
+  GpgString,
+  Utf8LengthsAndOffsets
+)
 {
   EXPECT_EQ(gpg::STR_Utf8Len(kMixed), 4);
   EXPECT_EQ(gpg::STR_Utf8Len(""), 0);
@@ -128,7 +149,10 @@ TEST(GpgString, Utf8LengthsAndOffsets)
   EXPECT_EQ(gpg::STR_PreviousUtf8Char(kMixed, kMixed), kMixed);
 }
 
-TEST(GpgString, Utf8SubString)
+TEST(
+  GpgString,
+  Utf8SubString
+)
 {
   EXPECT_EQ(gpg::STR_Utf8SubString(kMixed, 1, 2).view(), "\xC3\xA9\xE2\x82\xAC");
   EXPECT_EQ(gpg::STR_Utf8SubString("abc", 1, 5).view(), "bc");
@@ -137,7 +161,10 @@ TEST(GpgString, Utf8SubString)
   EXPECT_THROW((void)gpg::STR_Utf8SubString("abc", 4, 1), std::out_of_range);
 }
 
-TEST(GpgString, EncodeDecodeRoundTripsEveryBmpUnit)
+TEST(
+  GpgString,
+  EncodeDecodeRoundTripsEveryBmpUnit
+)
 {
   for (unsigned int code = 1; code <= 0xFFFFu; ++code) {
     const wchar_t c = static_cast<wchar_t>(code);
@@ -152,7 +179,10 @@ TEST(GpgString, EncodeDecodeRoundTripsEveryBmpUnit)
   }
 }
 
-TEST(GpgString, EncodeStopsAtTheLimit)
+TEST(
+  GpgString,
+  EncodeStopsAtTheLimit
+)
 {
   char buffer[3]{};
   EXPECT_EQ(gpg::STR_EncodeUtf8Char(buffer, L'\x20AC', buffer + 2), buffer);
@@ -161,7 +191,10 @@ TEST(GpgString, EncodeStopsAtTheLimit)
   EXPECT_EQ(gpg::STR_EncodeUtf8Char(buffer, L'a', nullptr), buffer + 1);
 }
 
-TEST(GpgString, DecodeStopsAtATruncatedSequence)
+TEST(
+  GpgString,
+  DecodeStopsAtATruncatedSequence
+)
 {
   wchar_t c = 0;
   const char truncated[] = "\xC3";
@@ -173,7 +206,10 @@ TEST(GpgString, DecodeStopsAtATruncatedSequence)
   EXPECT_EQ(c, L'z');
 }
 
-TEST(GpgString, WideAndUtf8Conversions)
+TEST(
+  GpgString,
+  WideAndUtf8Conversions
+)
 {
   const std::wstring wide = L"abc \x00E9\x20AC\x0416\xFFFD";
   const fa::string utf8 = gpg::STR_WideToUtf8(wide.c_str());
@@ -183,7 +219,10 @@ TEST(GpgString, WideAndUtf8Conversions)
   EXPECT_TRUE(gpg::STR_Utf8ToWide(nullptr).empty());
 }
 
-TEST(GpgString, Tokens)
+TEST(
+  GpgString,
+  Tokens
+)
 {
   const char* find = "  a,b,,c ";
   fa::string token;
@@ -208,7 +247,10 @@ TEST(GpgString, Tokens)
   EXPECT_TRUE(none.empty());
 }
 
-TEST(GpgString, WordStarts)
+TEST(
+  GpgString,
+  WordStarts
+)
 {
   fa::string text("hello brave world");
   EXPECT_EQ(gpg::STR_GetNextWordStartIndex(text, 0), 6);
@@ -225,7 +267,10 @@ TEST(GpgString, WordStarts)
   EXPECT_EQ(gpg::STR_GetNextWordStartIndex(empty, 0), 0);
 }
 
-TEST(GpgString, PrefixesAndSuffixes)
+TEST(
+  GpgString,
+  PrefixesAndSuffixes
+)
 {
   EXPECT_TRUE(gpg::STR_EndsWith("abc", "bc"));
   // A string never ends with itself (retail 0x00938190: strlen(str) > strlen(end)).
@@ -243,7 +288,10 @@ TEST(GpgString, PrefixesAndSuffixes)
   EXPECT_FALSE(gpg::STR_StartsWithNoCase("/lux", "/lua"));
 }
 
-TEST(GpgString, CaseInsensitiveComparisons)
+TEST(
+  GpgString,
+  CaseInsensitiveComparisons
+)
 {
   EXPECT_TRUE(gpg::STR_EqualsNoCaseN("ABCdef", "abcXYZ", 3));
   EXPECT_FALSE(gpg::STR_EqualsNoCaseN("ABCdef", "abcXYZ", 4));
@@ -271,7 +319,10 @@ TEST(GpgString, CaseInsensitiveComparisons)
   EXPECT_FALSE(gpg::STR_ContainsNoCase(nullptr, "a"));
 }
 
-TEST(GpgString, FileNameOrderIsCaseInsensitiveWithACaseTieBreak)
+TEST(
+  GpgString,
+  FileNameOrderIsCaseInsensitiveWithACaseTieBreak
+)
 {
   EXPECT_TRUE(gpg::STR_FileNameOrderLess("abc", "ABD"));
   EXPECT_FALSE(gpg::STR_FileNameOrderLess("ABD", "abc"));
@@ -294,7 +345,10 @@ TEST(GpgString, FileNameOrderIsCaseInsensitiveWithACaseTieBreak)
   }
 }
 
-TEST(GpgString, IdentifiersAndNumbers)
+TEST(
+  GpgString,
+  IdentifiersAndNumbers
+)
 {
   EXPECT_TRUE(gpg::STR_IsIdent("_a1"));
   EXPECT_TRUE(gpg::STR_IsIdent("Z"));
@@ -323,7 +377,10 @@ TEST(GpgString, IdentifiersAndNumbers)
   EXPECT_EQ(gpg::STR_GetWhitespaceCharacters().view(), " \n\t\r");
 }
 
-TEST(GpgString, WildcardTargetedCases)
+TEST(
+  GpgString,
+  WildcardTargetedCases
+)
 {
   EXPECT_TRUE(gpg::STR_MatchWildcard("abc", "abc"));
   EXPECT_FALSE(gpg::STR_MatchWildcard("abc", "abd"));
@@ -356,7 +413,10 @@ TEST(GpgString, WildcardTargetedCases)
   EXPECT_FALSE(gpg::STR_WildcardValidPrefix(nullptr, "a"));
 }
 
-TEST(GpgString, CaseSensitiveWildcardMatchesItsReference)
+TEST(
+  GpgString,
+  CaseSensitiveWildcardMatchesItsReference
+)
 {
   std::mt19937 rng(10);
   const char textAlphabet[] = {'a', 'b', 'A'};
@@ -364,16 +424,23 @@ TEST(GpgString, CaseSensitiveWildcardMatchesItsReference)
   for (int i = 0; i < 30000; ++i) {
     const std::string text = RandomOf(rng, textAlphabet, sizeof(textAlphabet), 6);
     const std::string pattern = RandomOf(rng, patternAlphabet, sizeof(patternAlphabet), 5);
-    ASSERT_EQ(gpg::STR_MatchWildcard(text.c_str(), pattern.c_str()), ReferenceMatchCaseSensitive(text.c_str(), pattern.c_str()))
-      << "'" << text << "' against '" << pattern << "'";
+    ASSERT_EQ(
+      gpg::STR_MatchWildcard(text.c_str(), pattern.c_str()), ReferenceMatchCaseSensitive(text.c_str(), pattern.c_str())
+    ) << "'"
+      << text << "' against '" << pattern << "'";
     if (pattern.empty() || pattern.back() != '*') {
-      ASSERT_EQ(gpg::STR_MatchWildcard(text.c_str(), pattern.c_str()), ReferenceMatch(text.c_str(), pattern.c_str(), false))
-        << "'" << text << "' against '" << pattern << "'";
+      ASSERT_EQ(
+        gpg::STR_MatchWildcard(text.c_str(), pattern.c_str()), ReferenceMatch(text.c_str(), pattern.c_str(), false)
+      ) << "'"
+        << text << "' against '" << pattern << "'";
     }
   }
 }
 
-TEST(GpgString, CaseInsensitiveWildcardMatchesItsReference)
+TEST(
+  GpgString,
+  CaseInsensitiveWildcardMatchesItsReference
+)
 {
   std::mt19937 rng(11);
   const char textAlphabet[] = {'a', 'b', 'A'};
@@ -381,14 +448,22 @@ TEST(GpgString, CaseInsensitiveWildcardMatchesItsReference)
   for (int i = 0; i < 30000; ++i) {
     const std::string text = RandomOf(rng, textAlphabet, sizeof(textAlphabet), 6);
     const std::string pattern = RandomOf(rng, patternAlphabet, sizeof(patternAlphabet), 5);
-    ASSERT_EQ(gpg::STR_MatchWildcard(text.c_str(), pattern.c_str(), false), ReferenceMatch(text.c_str(), pattern.c_str(), true))
-      << "'" << text << "' against '" << pattern << "'";
-    ASSERT_EQ(gpg::STR_WildcardValidPrefix(text.c_str(), pattern.c_str(), false), ReferenceValidPrefix(text.c_str(), pattern.c_str(), true))
-      << "prefix '" << text << "' of '" << pattern << "'";
+    ASSERT_EQ(
+      gpg::STR_MatchWildcard(text.c_str(), pattern.c_str(), false), ReferenceMatch(text.c_str(), pattern.c_str(), true)
+    ) << "'"
+      << text << "' against '" << pattern << "'";
+    ASSERT_EQ(
+      gpg::STR_WildcardValidPrefix(text.c_str(), pattern.c_str(), false),
+      ReferenceValidPrefix(text.c_str(), pattern.c_str(), true)
+    ) << "prefix '"
+      << text << "' of '" << pattern << "'";
   }
 }
 
-TEST(GpgString, ReplaceWithinTheCapacity)
+TEST(
+  GpgString,
+  ReplaceWithinTheCapacity
+)
 {
   fa::string path("a\\b\\c");
   EXPECT_EQ(gpg::STR_Replace(path, "\\", "/", 1u), 2);
@@ -410,14 +485,20 @@ TEST(GpgString, ReplaceWithinTheCapacity)
 // through _Grow 0x00405C20). fa::string::replace returns false instead when the result does not
 // fit the current capacity, and STR_Replace ignores that: the text stays and the count still
 // goes up. Minimal input: "xx" with "x" -> "yyyyyyyyyy" gives "yyyyyyyyyyx" and 2.
-TEST(GpgString, DISABLED_ReplaceGrowsPastTheCapacity)
+TEST(
+  GpgString,
+  DISABLED_ReplaceGrowsPastTheCapacity
+)
 {
   fa::string s("xx");
   EXPECT_EQ(gpg::STR_Replace(s, "x", "yyyyyyyyyy", 1u), 2);
   EXPECT_EQ(s.view(), std::string(20, 'y'));
 }
 
-TEST(GpgString, ChopTrimAndCase)
+TEST(
+  GpgString,
+  ChopTrimAndCase
+)
 {
   EXPECT_EQ(gpg::STR_Chop("abc", 'c').view(), "ab");
   EXPECT_EQ(gpg::STR_Chop("abc", 'x').view(), "abc");
@@ -440,7 +521,10 @@ TEST(GpgString, ChopTrimAndCase)
   EXPECT_EQ(gpg::STR_ToUpper("MiXeD case 123").view(), "MIXED CASE 123");
 }
 
-TEST(GpgString, FilenameHelpers)
+TEST(
+  GpgString,
+  FilenameHelpers
+)
 {
   fa::string mixed("Maps\\Foo/BAR.Scmap");
   gpg::STR_NormalizeFilenameLowerSlash(mixed);
@@ -480,7 +564,10 @@ TEST(GpgString, FilenameHelpers)
   EXPECT_EQ(gpg::STR_InitFilename(nullptr, "x"), nullptr);
 }
 
-TEST(GpgString, PrintfAtAndPastTheStackBuffer)
+TEST(
+  GpgString,
+  PrintfAtAndPastTheStackBuffer
+)
 {
   EXPECT_EQ(gpg::STR_Printf("%d-%s", 42, "x").view(), "42-x");
   EXPECT_EQ(gpg::STR_Printf("").view(), "");

@@ -3,7 +3,6 @@
 #include <unordered_map>
 #include <unordered_set>
 
-
 // Defined at file scope (global namespace, external linkage) in
 // CrtRuntimeExportedHelpers.cpp - shared by every legacy VC8 "<container> too
 // long" throw lane. Forward-declared here rather than duplicated so
@@ -18,25 +17,28 @@
 // near the end of this file - but `DrawPathPreview` (namespace moho, below)
 // needs to call it ahead of that point.
 moho::CommandModeData* func_GetRightMouseButtonAction(
-  moho::CommandModeData* out, moho::MouseInfo* mouseInfo, int modifiers, moho::CWldSession* wldSession);
+  moho::CommandModeData* out,
+  moho::MouseInfo* mouseInfo,
+  int modifiers,
+  moho::CWldSession* wldSession
+);
 namespace moho
 {
 
   // Command-waypoint drawing parameters; see the declarations in CWldSession.h
   // for the per-symbol addresses. All seven are zero at image load and stay so
   // until `UICommandGraph::LoadWaypointParams` imports them.
-  std::int32_t ui_CurveSegments = 20;          // 0x00F57CC0
+  std::int32_t ui_CurveSegments = 20; // 0x00F57CC0
   // 0x010A6443 lies past ForgedAlliance.exe's raw .data (zero-filled BSS tail),
   // so the path-preview overlay ships off.
-  bool ui_DrawPathPreview = false;          // 0x010A6443
-  bool ui_PathPreview = false;              // 0x010A6448
-
+  bool ui_DrawPathPreview = false; // 0x010A6443
+  bool ui_PathPreview = false;     // 0x010A6448
 
   // Initial values from the shipped .data; commandwaypoint.lua may override the
   // waypoint/path ones (UICommandGraph::LoadPathParams), missing keys keep these.
-  float ui_CurveSmoothness = 50.0f;            // 0x00F57CC4
-  float ui_PathSmoothness = 2.0f;              // 0x00F57CC8
-  float ui_MaxTextLOD = 80.0f;                 // 0x00F57CCC
+  float ui_CurveSmoothness = 50.0f;             // 0x00F57CC4
+  float ui_PathSmoothness = 2.0f;               // 0x00F57CC8
+  float ui_MaxTextLOD = 80.0f;                  // 0x00F57CCC
   std::int32_t ui_CommandGraphMaxNodeUnits = 1; // 0x00F57CD0
 
   /**
@@ -46,9 +48,9 @@ namespace moho
    * normalizing noise into an arbitrary direction.
    */
   constexpr float kCommandGraphOrientationEpsilon = 1.0e-6f;
-  float ui_MinWaypointSize = 7.0f;             // 0x00F57CD4
-  float ui_MaxWaypointSize = 100.0f;           // 0x00F57CD8
-  float ui_WaypointLineScale = 1.0f;           // 0x00F57CDC
+  float ui_MinWaypointSize = 7.0f;   // 0x00F57CD4
+  float ui_MaxWaypointSize = 100.0f; // 0x00F57CD8
+  float ui_WaypointLineScale = 1.0f; // 0x00F57CDC
 
   /**
    * Address: 0x008243F0 (FUN_008243F0, ??0UICommandGraphNode@Moho@@QAE@@Z)
@@ -112,7 +114,9 @@ namespace moho
    * Copies one command-graph style node payload, including shared-texture
    * control lanes for orderline/waypoint/arrowhead textures.
    */
-  UICommandGraphNode* UICommandGraphNode::CopyFrom(const UICommandGraphNode& other)
+  UICommandGraphNode* UICommandGraphNode::CopyFrom(
+    const UICommandGraphNode& other
+  )
   {
     mOrderlineTexture.px = other.mOrderlineTexture.px;
     boost::detail::sp_counted_base* incomingControl = other.mOrderlineTexture.pi;
@@ -187,7 +191,11 @@ namespace moho
    * `inherit_from` recursion before overriding local orderline/waypoint/
    * arrowhead keys.
    */
-  void UICommandGraphNode::LoadTextures(LuaPlus::LuaObject rootTable, const char* const key, LuaPlus::LuaState* const state)
+  void UICommandGraphNode::LoadTextures(
+    LuaPlus::LuaObject rootTable,
+    const char* const key,
+    LuaPlus::LuaState* const state
+  )
   {
     LuaPlus::LuaObject nodeTable = rootTable[key];
     if (nodeTable.IsNil()) {
@@ -268,7 +276,8 @@ namespace moho
 
     if (hasKey("waypoint_texture")) {
       LuaPlus::LuaObject textureValue = nodeTable["waypoint_texture"];
-      const boost::shared_ptr<CD3DBatchTexture> loadedTexture = CD3DBatchTexture::FromFile(textureValue.GetString(), 1u);
+      const boost::shared_ptr<CD3DBatchTexture> loadedTexture =
+        CD3DBatchTexture::FromFile(textureValue.GetString(), 1u);
       const boost::SharedPtrRaw<CD3DBatchTexture> loadedRaw = boost::SharedPtrRawFromSharedBorrow(loadedTexture);
       assignSharedLane(mWaypointTexture, loadedRaw.px, loadedRaw.pi);
     }
@@ -303,7 +312,8 @@ namespace moho
 
     if (hasKey("arrowhead_texture")) {
       LuaPlus::LuaObject textureValue = nodeTable["arrowhead_texture"];
-      const boost::shared_ptr<CD3DBatchTexture> loadedTexture = CD3DBatchTexture::FromFile(textureValue.GetString(), 1u);
+      const boost::shared_ptr<CD3DBatchTexture> loadedTexture =
+        CD3DBatchTexture::FromFile(textureValue.GetString(), 1u);
       const boost::SharedPtrRaw<CD3DBatchTexture> loadedRaw = boost::SharedPtrRawFromSharedBorrow(loadedTexture);
       assignSharedLane(mArrowheadTexture, loadedRaw.px, loadedRaw.pi);
     }
@@ -349,18 +359,22 @@ namespace moho
    */
   UICommandGraph::UICommandGraphDrawNode::~UICommandGraphDrawNode() = default;
 
-  std::size_t UICommandGraph::EdgeKeyHashCompare::operator()(const DrawNodePair& key) const noexcept
+  std::size_t UICommandGraph::EdgeKeyHashCompare::operator()(
+    const DrawNodePair& key
+  ) const noexcept
   {
     const auto fromAddress = reinterpret_cast<std::uintptr_t>(key.first);
     const auto toAddress = reinterpret_cast<std::uintptr_t>(key.second);
     // Hash only: retain the binary's 32-bit combine; equality uses full pointers.
-    const auto combined = static_cast<std::uint32_t>(
-      3863u * fromAddress + 7919u * toAddress + 53849u * (fromAddress ^ toAddress)
-    );
+    const auto combined =
+      static_cast<std::uint32_t>(3863u * fromAddress + 7919u * toAddress + 53849u * (fromAddress ^ toAddress));
     return fa::hash_value(static_cast<long>(combined));
   }
 
-  bool UICommandGraph::EdgeKeyHashCompare::operator()(const DrawNodePair& lhs, const DrawNodePair& rhs) const noexcept
+  bool UICommandGraph::EdgeKeyHashCompare::operator()(
+    const DrawNodePair& lhs,
+    const DrawNodePair& rhs
+  ) const noexcept
   {
     const std::less<UICommandGraphDrawNode*> less;
     return less(lhs.first, rhs.first) || (!less(rhs.first, lhs.first) && less(lhs.second, rhs.second));
@@ -378,7 +392,9 @@ namespace moho
     return node;
   }
 
-  void UICommandGraph::InitTree(CommandGraphTree& tree)
+  void UICommandGraph::InitTree(
+    CommandGraphTree& tree
+  )
   {
     tree.mAllocProxy = nullptr;
     tree.mHead = AllocateTreeSentinelNode();
@@ -392,7 +408,9 @@ namespace moho
   /**
    * Address: 0x0082BEE0 (FUN_0082BEE0, sub_82BEE0)
    */
-  void UICommandGraph::ReleaseCommandGraphTreeBucket(CommandGraphTreeBucket& bucket) noexcept
+  void UICommandGraph::ReleaseCommandGraphTreeBucket(
+    CommandGraphTreeBucket& bucket
+  ) noexcept
   {
     if (bucket.mEdges.data() != nullptr) {
       ::operator delete(bucket.mEdges.data());
@@ -404,7 +422,10 @@ namespace moho
   /**
    * Address: 0x0082CDE0 (FUN_0082CDE0, sub_82CDE0, `DestroyTree`'s copy of this walk)
    */
-  void UICommandGraph::DestroyCommandGraphTreeSubtree(CommandGraphTreeNode* const sentinelHead, CommandGraphTreeNode* node)
+  void UICommandGraph::DestroyCommandGraphTreeSubtree(
+    CommandGraphTreeNode* const sentinelHead,
+    CommandGraphTreeNode* node
+  )
   {
     if (node == nullptr || node == sentinelHead || node->mIsSentinel != 0u) {
       return;
@@ -425,7 +446,9 @@ namespace moho
    * releasing each node's bucket resources first, then releases the head
    * sentinel and clears head/size lanes.
    */
-  void UICommandGraph::DestroyTree(CommandGraphTree& tree)
+  void UICommandGraph::DestroyTree(
+    CommandGraphTree& tree
+  )
   {
     if (tree.mHead) {
       DestroyCommandGraphTreeSubtree(tree.mHead, tree.mHead->mParent);
@@ -436,30 +459,30 @@ namespace moho
     tree.mSize = 0u;
     tree.mAllocProxy = nullptr;
   }
-namespace
-{
+  namespace
+  {
 
-  // Forward declarations: reopens the same file-scope anonymous namespace
-  // that defines these two sentinel-headed RB-tree walkers further below,
-  // so `AttachCommandGraphNodeUnique`/`AttachCommandGraphNodeHinted`
-  // below - the first command-graph callers that need them - can call them
-  // here, ahead of their point of definition (mirrors the later reopening
-  // for `DrawCommandGraphMesh`'s own needs).
-      template <typename TNode>
+    // Forward declarations: reopens the same file-scope anonymous namespace
+    // that defines these two sentinel-headed RB-tree walkers further below,
+    // so `AttachCommandGraphNodeUnique`/`AttachCommandGraphNodeHinted`
+    // below - the first command-graph callers that need them - can call them
+    // here, ahead of their point of definition (mirrors the later reopening
+    // for `DrawCommandGraphMesh`'s own needs).
+    template <typename TNode>
     [[nodiscard]] bool IsSentinelNode(const TNode* node);
     template <typename TNode>
     [[nodiscard]] TNode* NextTreeNode(TNode* node);
     template <typename TNode>
     [[nodiscard]] TNode* PrevTreeNode(TNode* node);
-}
-
+  } // namespace
 
   /**
    * Address: 0x0082D330 (FUN_0082D330, sub_82D330) - see the declaration's
    * doc comment.
    */
   UICommandGraph::CommandGraphTreeBucket* UICommandGraph::InitCommandGraphTreeBucketValue(
-    CommandGraphTreeBucket* const destination, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
+    CommandGraphTreeBucket* const destination,
+    const boost::SharedPtrRaw<ID3DTextureSheet>& texture
   )
   {
     ::new (static_cast<void*>(destination)) CommandGraphTreeBucket();
@@ -470,7 +493,10 @@ namespace
   /**
    * Address: 0x00830010 (FUN_00830010) - see the declaration's doc comment.
    */
-  void UICommandGraph::PivotCommandGraphTreeLeft(CommandGraphTree& tree, CommandGraphTreeNode* const n) noexcept
+  void UICommandGraph::PivotCommandGraphTreeLeft(
+    CommandGraphTree& tree,
+    CommandGraphTreeNode* const n
+  ) noexcept
   {
     CommandGraphTreeNode* const pivot = n->mRight;
     n->mRight = pivot->mLeft;
@@ -494,7 +520,10 @@ namespace
   /**
    * Address: 0x00830080 (FUN_00830080) - see the declaration's doc comment.
    */
-  void UICommandGraph::PivotCommandGraphTreeRight(CommandGraphTree& tree, CommandGraphTreeNode* const n) noexcept
+  void UICommandGraph::PivotCommandGraphTreeRight(
+    CommandGraphTree& tree,
+    CommandGraphTreeNode* const n
+  ) noexcept
   {
     CommandGraphTreeNode* const pivot = n->mLeft;
     n->mLeft = pivot->mRight;
@@ -524,7 +553,9 @@ namespace
    * `insert_at` citation.
    */
   UICommandGraph::CommandGraphTreeNode* UICommandGraph::AttachCommandGraphNodeAt(
-    CommandGraphTree& tree, const bool addLeft, CommandGraphTreeNode* const where,
+    CommandGraphTree& tree,
+    const bool addLeft,
+    CommandGraphTreeNode* const where,
     const boost::SharedPtrRaw<ID3DTextureSheet>& texture
   )
   {
@@ -611,7 +642,8 @@ namespace
    * doc comment.
    */
   UICommandGraph::CommandGraphTreeNode* UICommandGraph::AttachCommandGraphNodeUnique(
-    CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
+    CommandGraphTree& tree,
+    const boost::SharedPtrRaw<ID3DTextureSheet>& texture
   )
   {
     CommandGraphTreeNode* where = tree.mHead;
@@ -641,7 +673,9 @@ namespace
    * doc comment.
    */
   UICommandGraph::CommandGraphTreeNode* UICommandGraph::AttachCommandGraphNodeHinted(
-    CommandGraphTree& tree, CommandGraphTreeNode* const hint, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
+    CommandGraphTree& tree,
+    CommandGraphTreeNode* const hint,
+    const boost::SharedPtrRaw<ID3DTextureSheet>& texture
   )
   {
     if (tree.mSize == 0u) {
@@ -661,13 +695,13 @@ namespace
       CommandGraphTreeNode* const before = PrevTreeNode(hint);
       if (before->mBucket.mTexture.pi < texture.pi) {
         return (before->mRight->mIsSentinel != 0u) ? AttachCommandGraphNodeAt(tree, false, before, texture)
-                                                     : AttachCommandGraphNodeAt(tree, true, hint, texture);
+                                                   : AttachCommandGraphNodeAt(tree, true, hint, texture);
       }
     } else if (hint->mBucket.mTexture.pi < texture.pi) {
       CommandGraphTreeNode* const after = NextTreeNode(hint);
       if (after->mIsSentinel != 0u || texture.pi < after->mBucket.mTexture.pi) {
         return (hint->mRight->mIsSentinel != 0u) ? AttachCommandGraphNodeAt(tree, false, hint, texture)
-                                                  : AttachCommandGraphNodeAt(tree, true, after, texture);
+                                                 : AttachCommandGraphNodeAt(tree, true, after, texture);
       }
     }
 
@@ -679,7 +713,8 @@ namespace
    * doc comment.
    */
   fa::vector<UICommandGraph::CommandGraphEdge*>& UICommandGraph::FindOrInsertCommandGraphBucket(
-    CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture
+    CommandGraphTree& tree,
+    const boost::SharedPtrRaw<ID3DTextureSheet>& texture
   )
   {
     CommandGraphTreeNode* candidate = tree.mHead;
@@ -703,7 +738,10 @@ namespace
   /**
    * Address: 0x00824740 (FUN_00824740, func_OnCommandGraphShow)
    */
-  void UICommandGraph::OnCommandGraphShow(LuaPlus::LuaState* const state, const bool visible)
+  void UICommandGraph::OnCommandGraphShow(
+    LuaPlus::LuaState* const state,
+    const bool visible
+  )
   {
     try {
       const LuaPlus::LuaObject commandGraph = SCR_Import(state, "/lua/ui/game/commandgraph.lua");
@@ -799,8 +837,7 @@ namespace
       ui_PathSmoothness = static_cast<float>(params["ui_PathSmoothness"].GetNumber());
     }
     if (!params["ui_CommandGraphMaxNodeUnits"].IsNil()) {
-      ui_CommandGraphMaxNodeUnits =
-        static_cast<std::int32_t>(params["ui_CommandGraphMaxNodeUnits"].GetNumber());
+      ui_CommandGraphMaxNodeUnits = static_cast<std::int32_t>(params["ui_CommandGraphMaxNodeUnits"].GetNumber());
     }
     if (!params["ui_MinWaypointSize"].IsNil()) {
       ui_MinWaypointSize = static_cast<float>(params["ui_MinWaypointSize"].GetNumber());
@@ -825,7 +862,10 @@ namespace
   /**
    * What it does: see the header.
    */
-  void UICommandGraph::CreateBuildPreviewMesh(UICommandGraphDrawNode& drawNode, UICommandGraph& graph)
+  void UICommandGraph::CreateBuildPreviewMesh(
+    UICommandGraphDrawNode& drawNode,
+    UICommandGraph& graph
+  )
   {
     // 0x008274D7 hands CreateMeshInstance an opaque green, then 0x008274FB
     // immediately overwrites the instance's own colour lane with the
@@ -882,13 +922,7 @@ namespace
     const fa::string emptyLookupName;
     const fa::string emptySecondaryName;
     const boost::shared_ptr<MeshMaterial> material = MeshMaterial::Create(
-      shaderName,
-      lod->mAlbedoName,
-      lod->mNormalsName,
-      lod->mSpecularName,
-      emptyLookupName,
-      emptySecondaryName,
-      nullptr
+      shaderName, lod->mAlbedoName, lod->mNormalsName, lod->mSpecularName, emptyLookupName, emptySecondaryName, nullptr
     );
 
     MeshInstance* const meshInstance = MeshRenderer::GetInstance()->CreateMeshInstance(
@@ -1017,8 +1051,7 @@ namespace
     // the Shift command graph rebuilt its nodes. The inline lane can come back
     // once the binary's per-vector-type collect template is restored.
     gpg::fastvector<UserEntity*> entities;
-    (void)mSession->GetEntitySpatialDbStorage()
-      ->Collect(entities, ENTITYTYPE_Unit);
+    (void)mSession->GetEntitySpatialDbStorage()->Collect(entities, ENTITYTYPE_Unit);
 
     for (UserEntity* const entity : entities) {
       if (entity == nullptr) {
@@ -1047,7 +1080,9 @@ namespace
   /**
    * What it does: see the header.
    */
-  void UICommandGraph::ResolveDrawNodeCompletionTick(UICommandGraphDrawNode& drawNode)
+  void UICommandGraph::ResolveDrawNodeCompletionTick(
+    UICommandGraphDrawNode& drawNode
+  )
   {
     // Non-zero means "already solved this pass". Seeding it with the current
     // tick before recursing is what makes a cyclic order graph terminate: a
@@ -1073,8 +1108,7 @@ namespace
       }
     }
 
-    const std::uint32_t finishTick =
-      startTick + static_cast<std::uint32_t>(EstimateDrawNodeWorkTicks(*this, drawNode));
+    const std::uint32_t finishTick = startTick + static_cast<std::uint32_t>(EstimateDrawNodeWorkTicks(*this, drawNode));
 
     // The already-stored tick winning means this order costs nothing and has no
     // unfinished predecessor; the binary still steps it back by one so the node
@@ -1133,8 +1167,8 @@ namespace
       RecomputeDrawNodeOrientation(entry.second);
     }
   }
-namespace
-{
+  namespace
+  {
     /**
      * One lane's contribution to a draw node's orderline tangent.
      *
@@ -1172,18 +1206,22 @@ namespace
      * A lane of one edge yields -0.5 rather than 0 because the binary clamps
      * the divisor, not the result.
      */
-    [[nodiscard]] float LaneBundleDistribution(const std::int32_t index, const float laneSpan) noexcept
+    [[nodiscard]] float LaneBundleDistribution(
+      const std::int32_t index,
+      const float laneSpan
+    ) noexcept
     {
       const float divisor = (laneSpan < 1.0f) ? 1.0f : laneSpan;
       return (static_cast<float>(index) / divisor) - 0.5f;
     }
-}
-
+  } // namespace
 
   /**
    * What it does: see the header.
    */
-  void UICommandGraph::RecomputeDrawNodeOrientation(UICommandGraphDrawNode& drawNode)
+  void UICommandGraph::RecomputeDrawNodeOrientation(
+    UICommandGraphDrawNode& drawNode
+  )
   {
     const std::int32_t maxNodeUnits = ui_CommandGraphMaxNodeUnits;
     const Wm3::Vector3f centroid = DrawNodeCentroid(drawNode);
@@ -1202,10 +1240,9 @@ namespace
         float dy = centroid.y - farCentroid.y;
         float dz = centroid.z - farCentroid.z;
 
-        const std::int32_t edgeUnits =
-          (static_cast<std::int32_t>(edge->mTouchCount) >= maxNodeUnits)
-            ? maxNodeUnits
-            : static_cast<std::int32_t>(edge->mTouchCount);
+        const std::int32_t edgeUnits = (static_cast<std::int32_t>(edge->mTouchCount) >= maxNodeUnits)
+          ? maxNodeUnits
+          : static_cast<std::int32_t>(edge->mTouchCount);
 
         const float lengthSquared = ((dx * dx) + (dy * dy)) + (dz * dz);
         if (lengthSquared > 0.0f) {
@@ -1238,10 +1275,9 @@ namespace
         float dy = farCentroid.y - centroid.y;
         float dz = farCentroid.z - centroid.z;
 
-        const std::int32_t edgeUnits =
-          (static_cast<std::int32_t>(edge->mTouchCount) >= maxNodeUnits)
-            ? maxNodeUnits
-            : static_cast<std::int32_t>(edge->mTouchCount);
+        const std::int32_t edgeUnits = (static_cast<std::int32_t>(edge->mTouchCount) >= maxNodeUnits)
+          ? maxNodeUnits
+          : static_cast<std::int32_t>(edge->mTouchCount);
 
         // Component order differs from lane A's sum above; preserved because
         // float addition is not associative and this is the binary's order.
@@ -1271,12 +1307,10 @@ namespace
       drawNode.mOrientationHint = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
     } else {
       const float inverseLength = 1.0f / length;
-      drawNode.mOrientationHint =
-        Wm3::Vector3f{totalX * inverseLength, totalY * inverseLength, totalZ * inverseLength};
+      drawNode.mOrientationHint = Wm3::Vector3f{totalX * inverseLength, totalY * inverseLength, totalZ * inverseLength};
     }
 
-    const std::int32_t busierLaneUnits =
-      (laneA.mUnitTotal < laneB.mUnitTotal) ? laneB.mUnitTotal : laneA.mUnitTotal;
+    const std::int32_t busierLaneUnits = (laneA.mUnitTotal < laneB.mUnitTotal) ? laneB.mUnitTotal : laneA.mUnitTotal;
     drawNode.mUnitCountScale = std::sqrt(static_cast<float>(busierLaneUnits));
   }
 
@@ -1311,8 +1345,8 @@ namespace
 
     return ECommandNodeHighlightState::Normal;
   }
-namespace
-{
+  namespace
+  {
     /**
      * Address: 0x00831110 (FUN_00831110)
      *
@@ -1328,7 +1362,10 @@ namespace
      * Callers `DrawNodeSharesLiveEntityWithSelection` (0x00828280) and
      * `ResolveCursorHighlightCommandId` (0x00829800).
      */
-    [[nodiscard]] bool SharesALiveEntity(const WeakSet<UserEntity>& entities, const WeakSet<UserUnit>& units)
+    [[nodiscard]] bool SharesALiveEntity(
+      const WeakSet<UserEntity>& entities,
+      const WeakSet<UserUnit>& units
+    )
     {
       auto entity = entities.begin();
       if (entity == entities.end()) {
@@ -1355,8 +1392,7 @@ namespace
         }
       }
     }
-}
-
+  } // namespace
 
   /**
    * Address: 0x00828280 (FUN_00828280, sub_828280)
@@ -1398,7 +1434,9 @@ namespace
    * `[ui_MinWaypointSize, ui_MaxWaypointSize]`.
    */
   void UICommandGraph::DrawWaypointMarker(
-    const GeomCamera3& camera, CD3DPrimBatcher& batcher, UICommandGraphDrawNode& drawNode
+    const GeomCamera3& camera,
+    CD3DPrimBatcher& batcher,
+    UICommandGraphDrawNode& drawNode
   ) const
   {
     auto* const helper = drawNode.mHelperLink.GetObjectPtr();
@@ -1472,7 +1510,8 @@ namespace
    * What it does: see the declaration.
    */
   CmdId UICommandGraph::ResolveCursorHighlightCommandId(
-    const GeomCamera3& camera, const Wm3::Vector2f& cursorScreenPos
+    const GeomCamera3& camera,
+    const Wm3::Vector2f& cursorScreenPos
   ) const
   {
     float bestScaledDistance = gpg::pInf;
@@ -1524,7 +1563,8 @@ namespace
 
       bool preemptsByLiveSelection = false;
       if (helper != nullptr) {
-        preemptsByLiveSelection = SharesALiveEntity(mSession->GetSelection(), *ResolveCommandIssueCursorEntities(*helper));
+        preemptsByLiveSelection =
+          SharesALiveEntity(mSession->GetSelection(), *ResolveCommandIssueCursorEntities(*helper));
       }
 
       if (bestScaledDistance > scaledDistance || preemptsByLiveSelection) {
@@ -1624,7 +1664,10 @@ namespace
    * (position = averaged anchor, orientation = identity,
    * `SetStance(anchor, anchor)`) matches for both branches regardless.
    */
-  void UICommandGraph::DrawPositionNodeMesh(UICommandGraphDrawNode& drawNode, CD3DPrimBatcher& batcher) const
+  void UICommandGraph::DrawPositionNodeMesh(
+    UICommandGraphDrawNode& drawNode,
+    CD3DPrimBatcher& batcher
+  ) const
   {
     if (!drawNode.mMeshInstance) {
       return;
@@ -1701,7 +1744,9 @@ namespace
    * by `mDebugFont.tex->mDescent + 1` pixels vertically.
    */
   void UICommandGraph::DisplayCommandNode(
-    const GeomCamera3& camera, const UICommandGraphDrawNode& drawNode, CD3DPrimBatcher& batcher
+    const GeomCamera3& camera,
+    const UICommandGraphDrawNode& drawNode,
+    CD3DPrimBatcher& batcher
   ) const
   {
     if (!drawNode.mHelperLink.HasValue()) {
@@ -1760,7 +1805,9 @@ namespace
     // value the raw decompile states literally, preserved as-is (an
     // unclipped label). Color/scale use this file's other text-draw
     // defaults (opaque white, unscaled) pending a dedicated re-verification.
-    mDebugFont.tex->Render2D(gpg::StrArg(label.c_str()), &batcher, screenPos, 0xFFFFFFFFu, 1.0f, std::numeric_limits<float>::quiet_NaN());
+    mDebugFont.tex->Render2D(
+      gpg::StrArg(label.c_str()), &batcher, screenPos, 0xFFFFFFFFu, 1.0f, std::numeric_limits<float>::quiet_NaN()
+    );
   }
 
   /**
@@ -1794,8 +1841,12 @@ namespace
    * glow scalar.
    */
   void UICommandGraph::DrawCommandOrderline(
-    const GeomCamera3& camera, CD3DPrimBatcher& batcher, const std::int32_t tick, const float tickFraction,
-    const CommandGraphEdge& edge, const bool isGlow
+    const GeomCamera3& camera,
+    CD3DPrimBatcher& batcher,
+    const std::int32_t tick,
+    const float tickFraction,
+    const CommandGraphEdge& edge,
+    const bool isGlow
   ) const
   {
     UICommandGraphDrawNode* const fromNode = edge.mFromNode;
@@ -1813,7 +1864,8 @@ namespace
 
     const float fromInvWeight = 1.0f / fromNode->mWeight;
     const Wm3::Vector3f fromPos{
-      fromNode->mPositionSum.x * fromInvWeight, fromNode->mPositionSum.y * fromInvWeight,
+      fromNode->mPositionSum.x * fromInvWeight,
+      fromNode->mPositionSum.y * fromInvWeight,
       fromNode->mPositionSum.z * fromInvWeight
     };
     const float toInvWeight = 1.0f / toNode->mWeight;
@@ -1829,19 +1881,22 @@ namespace
     direction.Normalize();
 
     Wm3::Vector3f fromTangent = direction;
-    if (fromNode->mOrientationHint.x != 0.0f || fromNode->mOrientationHint.y != 0.0f
-        || fromNode->mOrientationHint.z != 0.0f) {
+    if (
+      fromNode->mOrientationHint.x != 0.0f || fromNode->mOrientationHint.y != 0.0f ||
+      fromNode->mOrientationHint.z != 0.0f
+    ) {
       fromTangent = fromNode->mOrientationHint;
     }
     Wm3::Vector3f toTangent = direction;
-    if (toNode->mOrientationHint.x != 0.0f || toNode->mOrientationHint.y != 0.0f
-        || toNode->mOrientationHint.z != 0.0f) {
+    if (
+      toNode->mOrientationHint.x != 0.0f || toNode->mOrientationHint.y != 0.0f || toNode->mOrientationHint.z != 0.0f
+    ) {
       toTangent = toNode->mOrientationHint;
     }
 
     const float segmentLength = std::sqrt(
-      ((toPos.x - fromPos.x) * (toPos.x - fromPos.x) + (toPos.y - fromPos.y) * (toPos.y - fromPos.y))
-      + (toPos.z - fromPos.z) * (toPos.z - fromPos.z)
+      ((toPos.x - fromPos.x) * (toPos.x - fromPos.x) + (toPos.y - fromPos.y) * (toPos.y - fromPos.y)) +
+      (toPos.z - fromPos.z) * (toPos.z - fromPos.z)
     );
     const float smoothRadius = std::min(segmentLength * 0.25f, ui_CurveSmoothness * width);
 
@@ -1877,27 +1932,32 @@ namespace
     const float uStart = 1.0f - fa::fmod((static_cast<double>(tick) + tickFraction) * node.mOrderlineAnimRate, 1.0);
 
     EmitHermiteRibbonSegments(
-      batcher, fromPos, toPos, Wm3::Vector3f{fromTangent.x * smoothRadius, fromTangent.y * smoothRadius, fromTangent.z * smoothRadius},
-      Wm3::Vector3f{toTangent.x * smoothRadius, toTangent.y * smoothRadius, toTangent.z * smoothRadius}, width, color,
-      uStart, node.mOrderlineAspectRatio
+      batcher,
+      fromPos,
+      toPos,
+      Wm3::Vector3f{fromTangent.x * smoothRadius, fromTangent.y * smoothRadius, fromTangent.z * smoothRadius},
+      Wm3::Vector3f{toTangent.x * smoothRadius, toTangent.y * smoothRadius, toTangent.z * smoothRadius},
+      width,
+      color,
+      uStart,
+      node.mOrderlineAspectRatio
     );
   }
-namespace
-{
+  namespace
+  {
 
-  // Forward declarations: reopens the same file-scope anonymous namespace
-  // that defines these two sentinel-headed RB-tree walkers further below (by
-  // the selection/save-tree helpers), so `DrawCommandGraphMesh` below - the
-  // only command-graph draw method that needs them - can call them here,
-  // ahead of their point of definition.
-      template <typename TNode>
+    // Forward declarations: reopens the same file-scope anonymous namespace
+    // that defines these two sentinel-headed RB-tree walkers further below (by
+    // the selection/save-tree helpers), so `DrawCommandGraphMesh` below - the
+    // only command-graph draw method that needs them - can call them here,
+    // ahead of their point of definition.
+    template <typename TNode>
     [[nodiscard]] bool IsSentinelNode(const TNode* node);
     template <typename TNode>
     [[nodiscard]] TNode* NextTreeNode(TNode* node);
     template <typename TNode>
     [[nodiscard]] TNode* PrevTreeNode(TNode* node);
-}
-
+  } // namespace
 
   /**
    * Address: 0x00829190 (FUN_00829190, sub_829190)
@@ -1934,7 +1994,10 @@ namespace
    * either.
    */
   void UICommandGraph::DrawCommandGraphMesh(
-    const GeomCamera3& camera, CD3DPrimBatcher& batcher, const std::int32_t tick, const float tickFraction
+    const GeomCamera3& camera,
+    CD3DPrimBatcher& batcher,
+    const std::int32_t tick,
+    const float tickFraction
   )
   {
     batcher.Flush();
@@ -1943,7 +2006,8 @@ namespace
     (void)batcher.Setup("TCommand");
     batcher.SetViewProjMatrix(camera);
     for (CommandGraphTreeNode* node = mCommandGraphTree.mHead->mLeft;
-         node != nullptr && node != mCommandGraphTree.mHead; node = NextTreeNode(node)) {
+         node != nullptr && node != mCommandGraphTree.mHead;
+         node = NextTreeNode(node)) {
       CommandGraphTreeBucket& bucket = node->mBucket;
       batcher.SetTexture(boost::SharedPtrFromRawRetained(bucket.mTexture));
       for (CommandGraphEdge* const edge : bucket.mEdges) {
@@ -1957,7 +2021,8 @@ namespace
     (void)batcher.Setup("TCommandGlow");
     batcher.SetViewProjMatrix(camera);
     for (CommandGraphTreeNode* node = mCommandGraphTree.mHead->mLeft;
-         node != nullptr && node != mCommandGraphTree.mHead; node = NextTreeNode(node)) {
+         node != nullptr && node != mCommandGraphTree.mHead;
+         node = NextTreeNode(node)) {
       CommandGraphTreeBucket& bucket = node->mBucket;
       batcher.SetTexture(boost::SharedPtrFromRawRetained(bucket.mTexture));
       for (CommandGraphEdge* const edge : bucket.mEdges) {
@@ -2009,7 +2074,9 @@ namespace
    * Returns -1 (no highlighted command) when `graph` is null.
    */
   CmdId ResolveCommandGraphCursorHighlightIfPresent(
-    UICommandGraph* const graph, const GeomCamera3& camera, const Wm3::Vector2f& cursorScreenPos
+    UICommandGraph* const graph,
+    const GeomCamera3& camera,
+    const Wm3::Vector2f& cursorScreenPos
   )
   {
     if (graph == nullptr) {
@@ -2053,7 +2120,10 @@ namespace
    * field's canonical type.
    */
   void DrawPathPreview(
-    UICommandGraph& graph, const GeomCamera3& camera, CD3DPrimBatcher& batcher, const std::int32_t tick,
+    UICommandGraph& graph,
+    const GeomCamera3& camera,
+    CD3DPrimBatcher& batcher,
+    const std::int32_t tick,
     const float tickFraction
   )
   {
@@ -2098,7 +2168,10 @@ namespace
       fa::vector<Wm3::Vector3f> worldPts(cellCount);
       for (std::size_t i = 0; i < cellCount; ++i) {
         worldPts[i] = COORDS_ToWorldPos(
-          stiMap, cellPositions[i], static_cast<ELayer>(footprintDescriptor[2]), footprintDescriptor[0],
+          stiMap,
+          cellPositions[i],
+          static_cast<ELayer>(footprintDescriptor[2]),
+          footprintDescriptor[0],
           footprintDescriptor[1]
         );
       }
@@ -2106,8 +2179,7 @@ namespace
       simplifiedPath.push_back(worldPts.front());
       simplifiedPath.push_back(worldPts.back());
       SimplifyPathSpan(
-        worldPts, 0, static_cast<std::int32_t>(cellCount) - 1, simplifiedPath, --simplifiedPath.end(),
-        ui_PathSmoothness
+        worldPts, 0, static_cast<std::int32_t>(cellCount) - 1, simplifiedPath, --simplifiedPath.end(), ui_PathSmoothness
       );
     } else {
       if (!session->CursorInfo().mHitValid) {
@@ -2183,14 +2255,15 @@ namespace
       (void)session->GetLeftMouseButtonAction(&scratch, &session->CursorInfo(), 0);
     }
 
-    const ERuleBPUnitCommandCaps caps =
-      (commandData.mMode == COMMOD_Order) ? commandData.mCommandCaps : RULEUCC_Move;
+    const ERuleBPUnitCommandCaps caps = (commandData.mMode == COMMOD_Order) ? commandData.mCommandCaps : RULEUCC_Move;
     UICommandGraph::CommandGraphNode& node = graph.mNodes[static_cast<std::size_t>(UnitCommandCapToCommandType(caps))];
 
     if (node.mOrderlineTexture.px != nullptr) {
-      batcher.SetTexture(boost::SharedPtrFromRawRetained(reinterpret_cast<const boost::SharedPtrRaw<CD3DBatchTexture>&>(
-        node.mOrderlineTexture
-      )));
+      batcher.SetTexture(
+        boost::SharedPtrFromRawRetained(
+          reinterpret_cast<const boost::SharedPtrRaw<CD3DBatchTexture>&>(node.mOrderlineTexture)
+        )
+      );
     } else {
       batcher.SetTexture(CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu));
     }
@@ -2216,7 +2289,9 @@ namespace
       if (isLastSegment && hasArrowhead) {
         Wm3::Vector3f direction{p1.x - p0.x, p1.y - p0.y, p1.z - p0.z};
         direction.Normalize();
-        p1 = Wm3::Vector3f{p1.x + direction.x * finalWidth, p1.y + direction.y * finalWidth, p1.z + direction.z * finalWidth};
+        p1 = Wm3::Vector3f{
+          p1.x + direction.x * finalWidth, p1.y + direction.y * finalWidth, p1.z + direction.z * finalWidth
+        };
       }
 
       auto prevOfIt = it;
@@ -2255,19 +2330,25 @@ namespace
       if (isLastSegment && hasArrowhead) {
         const float capOffset = (finalWidth / capDivisor) * node.mArrowheadCapOffset;
         batcher.Flush();
-        batcher.SetTexture(boost::SharedPtrFromRawRetained(reinterpret_cast<const boost::SharedPtrRaw<CD3DBatchTexture>&>(
-          node.mArrowheadTexture
-        )));
+        batcher.SetTexture(
+          boost::SharedPtrFromRawRetained(
+            reinterpret_cast<const boost::SharedPtrRaw<CD3DBatchTexture>&>(node.mArrowheadTexture)
+          )
+        );
 
         Wm3::Vector3f direction{p1.x - p0.x, p1.y - p0.y, p1.z - p0.z};
         direction.Normalize();
         const Wm3::Vector3f capCenter{
-          p1.x + direction.x * capOffset, p1.y + direction.y * capOffset, p1.z + direction.z * capOffset};
+          p1.x + direction.x * capOffset, p1.y + direction.y * capOffset, p1.z + direction.z * capOffset
+        };
         const Wm3::Quaternionf orient = COORDS_Orient(direction);
 
         Wm3::Vector3f corners[4] = {
-          {-finalWidth, 0.0f, -finalWidth}, {-finalWidth, 0.0f, finalWidth}, {finalWidth, 0.0f, finalWidth},
-          {finalWidth, 0.0f, -finalWidth}};
+          {-finalWidth, 0.0f, -finalWidth},
+          {-finalWidth, 0.0f, finalWidth},
+          {finalWidth, 0.0f, finalWidth},
+          {finalWidth, 0.0f, -finalWidth}
+        };
         for (Wm3::Vector3f& corner : corners) {
           Wm3::Vector3f rotated{};
           (void)MultQuadVec(&rotated, &corner, &orient);
@@ -2287,7 +2368,9 @@ namespace
   /**
    * Address: 0x00824810 (FUN_00824810, ??0UICommandGraph@Moho@@QAE@@Z)
    */
-  UICommandGraph::UICommandGraph(CWldSession* const session)
+  UICommandGraph::UICommandGraph(
+    CWldSession* const session
+  )
     : mNeedsRebuild(1u)
     , pad_0001{0, 0, 0}
     , mNodes{}
@@ -2329,8 +2412,8 @@ namespace
     OnCommandGraphShow(mSession ? mSession->mState : nullptr, false);
     DestroyTree(mCommandGraphTree);
   }
-namespace
-{
+  namespace
+  {
     // The orphan and visibility sets are `CWldSession::mOrphans` (+0x42C) and
     // `CWldSession::mVizUpdates` (+0x438), two bare 12-byte `WeakSet<UserEntity>`
     // headers; they were reached through two padded overlays here that laid a
@@ -2338,13 +2421,17 @@ namespace
     // +0x4B0 is `CWldSession::CursorInfo()`, not a third padded overlay.
 
     template <typename TNode>
-    [[nodiscard]] bool IsSentinelNode(const TNode* const node)
+    [[nodiscard]] bool IsSentinelNode(
+      const TNode* const node
+    )
     {
       return !node || node->mIsSentinel != 0u;
     }
 
     template <typename TNode>
-    [[nodiscard]] TNode* NextTreeNode(TNode* node)
+    [[nodiscard]] TNode* NextTreeNode(
+      TNode* node
+    )
     {
       if (!node || IsSentinelNode(node)) {
         return node;
@@ -2379,7 +2466,9 @@ namespace
      * "`--end()` yields rightmost" header case does not apply here.
      */
     template <typename TNode>
-    [[nodiscard]] TNode* PrevTreeNode(TNode* node)
+    [[nodiscard]] TNode* PrevTreeNode(
+      TNode* node
+    )
     {
       if (!node || IsSentinelNode(node)) {
         return node;
@@ -2400,8 +2489,7 @@ namespace
       }
       return parent;
     }
-}
-
+  } // namespace
 
   /**
    * Ten sim ticks a second - the rate both order-graph estimators below convert
@@ -2429,7 +2517,9 @@ namespace
    * shape, which is the same body over the same node type and matches the
    * binary's `_Node**` out-parameter call at 0x00826DE8.
    */
-  std::int32_t EstimateEdgeTravelTicks(const UICommandGraph::CommandGraphEdge& edge)
+  std::int32_t EstimateEdgeTravelTicks(
+    const UICommandGraph::CommandGraphEdge& edge
+  )
   {
     // Both endpoints accumulate a position *sum* plus a weight so several units
     // sharing one queue average into a single anchor; each side divides by its
@@ -2448,21 +2538,21 @@ namespace
     auto* const helper = edge.mToNode->mHelperLink.GetObjectPtr();
 
     switch (ResolveCommandIssueHelperCommandType(*helper)) {
-      case EUnitCommandType::UNITCOMMAND_Move:
-      case EUnitCommandType::UNITCOMMAND_FormMove:
-      case EUnitCommandType::UNITCOMMAND_BuildMobile:
-      case EUnitCommandType::UNITCOMMAND_Attack:
-      case EUnitCommandType::UNITCOMMAND_FormAttack:
-      case EUnitCommandType::UNITCOMMAND_Patrol:
-      case EUnitCommandType::UNITCOMMAND_FormPatrol:
-      case EUnitCommandType::UNITCOMMAND_AggressiveMove:
-      case EUnitCommandType::UNITCOMMAND_FormAggressiveMove:
-        break;
+    case EUnitCommandType::UNITCOMMAND_Move:
+    case EUnitCommandType::UNITCOMMAND_FormMove:
+    case EUnitCommandType::UNITCOMMAND_BuildMobile:
+    case EUnitCommandType::UNITCOMMAND_Attack:
+    case EUnitCommandType::UNITCOMMAND_FormAttack:
+    case EUnitCommandType::UNITCOMMAND_Patrol:
+    case EUnitCommandType::UNITCOMMAND_FormPatrol:
+    case EUnitCommandType::UNITCOMMAND_AggressiveMove:
+    case EUnitCommandType::UNITCOMMAND_FormAggressiveMove:
+      break;
 
-      default:
-        // Nothing else walks a unit across the map, so it costs no travel time.
-        // This is the binary's jump-table default at 0x00826D1A.
-        return 0;
+    default:
+      // Nothing else walks a unit across the map, so it costs no travel time.
+      // This is the binary's jump-table default at 0x00826D1A.
+      return 0;
     }
 
     // The walk runs over a copy of the helper's units rather than the live
@@ -2478,8 +2568,7 @@ namespace
       // speed. A unit with no positive speed of either kind is skipped rather
       // than making the whole orderline infinitely slow.
       const RUnitBlueprint* const blueprint = GetIUnitBridge(unit)->GetBlueprint();
-      const float unitSpeed =
-        (blueprint->Air.CanFly != 0u) ? blueprint->Air.MaxAirspeed : blueprint->Physics.MaxSpeed;
+      const float unitSpeed = (blueprint->Air.CanFly != 0u) ? blueprint->Air.MaxAirspeed : blueprint->Physics.MaxSpeed;
       if (unitSpeed > 0.0f && slowestSpeed > unitSpeed) {
         slowestSpeed = unitSpeed;
       }
@@ -2494,12 +2583,10 @@ namespace
     // Rounded up: the binary spells the ceiling as `(int)rint(t) + (t > rint(t))`
     // (0x00826E4C..0x00826E5F), which agrees with `ceil` on every finite value
     // because the correction only fires when round-to-nearest went down.
-    return static_cast<std::int32_t>(
-      std::ceil((distance * kCommandGraphTicksPerSecond) / slowestSpeed)
-    );
+    return static_cast<std::int32_t>(std::ceil((distance * kCommandGraphTicksPerSecond) / slowestSpeed));
   }
-namespace
-{
+  namespace
+  {
 
     /**
      * Address: 0x00824500 (FUN_00824500, sub_824500)
@@ -2516,7 +2603,9 @@ namespace
      * unit in `eax`; it was typed here as an anonymous "command owner" with a
      * padded overlay over the +0x210 dword.
      */
-    [[nodiscard]] UserEntity* ResolveUnitFocusEntity(const UserUnit* const unit)
+    [[nodiscard]] UserEntity* ResolveUnitFocusEntity(
+      const UserUnit* const unit
+    )
     {
       CWldSession* const session = moho::WLD_GetSession();
       if (unit == nullptr || session == nullptr) {
@@ -2525,8 +2614,7 @@ namespace
 
       return session->LookupEntityId(unit->mUnitVarDat.mFocusUnit);
     }
-}
-
+  } // namespace
 
   /**
    * Address: 0x00826F10 (FUN_00826F10, sub_826F10)
@@ -2554,7 +2642,8 @@ namespace
    *   throws is skipped rather than abandoning the whole estimate.
    */
   std::int32_t EstimateDrawNodeWorkTicks(
-    UICommandGraph& graph, UICommandGraph::UICommandGraphDrawNode& drawNode
+    UICommandGraph& graph,
+    UICommandGraph::UICommandGraphDrawNode& drawNode
   )
   {
     LuaPlus::LuaState* const state = GetUiManagerGlobalLaneA()->mLuaState;
@@ -2583,8 +2672,10 @@ namespace
     // Only the two build orders carry work; the order graph treats everything
     // else as costing no time. The binary re-resolves the type for the second
     // test rather than reusing the first result.
-    if (ResolveCommandIssueHelperCommandType(*helper) != EUnitCommandType::UNITCOMMAND_BuildMobile
-      && ResolveCommandIssueHelperCommandType(*helper) != EUnitCommandType::UNITCOMMAND_BuildFactory) {
+    if (
+      ResolveCommandIssueHelperCommandType(*helper) != EUnitCommandType::UNITCOMMAND_BuildMobile &&
+      ResolveCommandIssueHelperCommandType(*helper) != EUnitCommandType::UNITCOMMAND_BuildFactory
+    ) {
       return 0;
     }
 
@@ -2594,10 +2685,8 @@ namespace
 
     // Engineers and factories are the two things that can pour build power into
     // an order, so the walk below tests membership of their union once per unit.
-    const EntityCategorySet* const factoryCategory =
-      graph.mSession->mRules->GetEntityCategory("FACTORY");
-    const EntityCategorySet* const engineerCategory =
-      graph.mSession->mRules->GetEntityCategory("ENGINEER");
+    const EntityCategorySet* const factoryCategory = graph.mSession->mRules->GetEntityCategory("FACTORY");
+    const EntityCategorySet* const engineerCategory = graph.mSession->mRules->GetEntityCategory("ENGINEER");
     EntityCategorySet assistingCategory{};
     (void)func_EntityCategoryAdd(engineerCategory, &assistingCategory, factoryCategory);
 
@@ -2608,8 +2697,7 @@ namespace
         // How much of the job is left is read off whatever this unit is
         // currently working on, and only while it is working on *this* order -
         // an engineer queued to help later must not shorten the estimate.
-        if (UserEntity* const workTarget = ResolveUnitFocusEntity(unit);
-            workTarget != nullptr) {
+        if (UserEntity* const workTarget = ResolveUnitFocusEntity(unit); workTarget != nullptr) {
           if (ResolveUserUnitFrontCommandIssueHelper(unit->GetCommandQueue()) == helper) {
             const float maxHealth = workTarget->mVariableData.mMaxHealth;
             if (maxHealth > 0.0f) {
@@ -2643,9 +2731,7 @@ namespace
 
     // Truncated, not rounded: 0x0082725F ORs 0xC00 into the x87 control word
     // (round toward zero) for the one `fistp` and restores it straight after.
-    return static_cast<std::int32_t>(
-      (remainingWorkFraction * kCommandGraphTicksPerSecond) / combinedBuildRate
-    );
+    return static_cast<std::int32_t>((remainingWorkFraction * kCommandGraphTicksPerSecond) / combinedBuildRate);
   }
 
   /**
@@ -2654,7 +2740,9 @@ namespace
    * FUN_0081CFD0's resolve-target / target-to-position / release trio straight
    * into the skirt loop (asm 0x0085AE88..0x0085AEB7).
    */
-  Wm3::Vector3f ResolveCommandIssueHelperAnchorPosition(UserCommandIssueHelper& helper)
+  Wm3::Vector3f ResolveCommandIssueHelperAnchorPosition(
+    UserCommandIssueHelper& helper
+  )
   {
     Wm3::Vector3f out{};
     (void)ResolveCommandIssueTargetPosition(&out, helper);
@@ -2686,7 +2774,10 @@ namespace
    * only thing `OnCurrentDraggerReplaced` (0x00824290) does before
    * `delete this`.
    */
-  void ReanchorCommandGraphDrawNode(UICommandGraph& graph, const CmdId cmdId)
+  void ReanchorCommandGraphDrawNode(
+    UICommandGraph& graph,
+    const CmdId cmdId
+  )
   {
     CommandManager* const commandManager = graph.mSession->mCommandManager;
 
@@ -2702,8 +2793,7 @@ namespace
     // draw-node hash is keyed by the helper's own pointer identity.
 
     if (graph.mMapAB0.count(helper) != 0) {
-      UICommandGraph::UICommandGraphDrawNode* const drawNode =
-        &graph.mMapAB0[helper];
+      UICommandGraph::UICommandGraphDrawNode* const drawNode = &graph.mMapAB0[helper];
 
       drawNode->mPositionSum = ResolveCommandIssueHelperAnchorPosition(*helper);
       drawNode->mWeight = 1.0f;
@@ -2717,7 +2807,9 @@ namespace
    * `UICommandGraph::DrawPositionNodeMesh` (a different TU) can resolve a
    * command's world-space anchor.
    */
-  Wm3::Vector3f ResolveCommandGraphAnchorWorldPosition(UserCommandIssueHelper& helper) noexcept
+  Wm3::Vector3f ResolveCommandGraphAnchorWorldPosition(
+    UserCommandIssueHelper& helper
+  ) noexcept
   {
     Wm3::Vector3f position{};
     (void)ResolveCommandIssueTargetPosition(&position, helper);
@@ -2748,12 +2840,13 @@ namespace
    * original legacy hash-table find/insert behavior.
    */
   void LinkCommandGraphEdge(
-    UICommandGraph::UICommandGraphDrawNode& toNode, UICommandGraph::UICommandGraphDrawNode& fromNode,
-    UICommandGraph& graph, const bool forceHighlight
+    UICommandGraph::UICommandGraphDrawNode& toNode,
+    UICommandGraph::UICommandGraphDrawNode& fromNode,
+    UICommandGraph& graph,
+    const bool forceHighlight
   )
   {
-    UICommandGraph::CommandGraphEdge* const edge =
-      &graph.mMapC[UICommandGraph::DrawNodePair{&fromNode, &toNode}];
+    UICommandGraph::CommandGraphEdge* const edge = &graph.mMapC[UICommandGraph::DrawNodePair{&fromNode, &toNode}];
 
     if (edge->mToNode == nullptr) {
       edge->mFromNode = &fromNode;
@@ -2830,7 +2923,11 @@ namespace
    * `UserTarget` (`ResolveCommandIssueTarget`, 0x008B4080) and releases that
    * transient target (`~UserTarget`, 0x0081D010) before testing it.
    */
-  void AddCommandQueueToCommandGraph(UserEntity& entity, UICommandGraph& graph, UserCommandQueue* const queue)
+  void AddCommandQueueToCommandGraph(
+    UserEntity& entity,
+    UICommandGraph& graph,
+    UserCommandQueue* const queue
+  )
   {
     if (queue == nullptr) {
       return;
@@ -2857,8 +2954,7 @@ namespace
 
     // Queue-head node: keyed by the first resolved link's helper pointer,
     // accumulates every unit sharing this queue's centroid.
-    UICommandGraph::UICommandGraphDrawNode* queueHeadNode =
-      &graph.mMapAB1[queueLinks->front().GetObjectPtr()];
+    UICommandGraph::UICommandGraphDrawNode* queueHeadNode = &graph.mMapAB1[queueLinks->front().GetObjectPtr()];
     queueHeadNode->mPositionSum.x += entity.mVariableData.mCurTransform.pos_.x;
     queueHeadNode->mPositionSum.y += entity.mVariableData.mCurTransform.pos_.y;
     queueHeadNode->mPositionSum.z += entity.mVariableData.mCurTransform.pos_.z;
@@ -2910,8 +3006,7 @@ namespace
         continue;
       }
 
-      UICommandGraph::UICommandGraphDrawNode* const currentNode =
-        &graph.mMapAB0[helper];
+      UICommandGraph::UICommandGraphDrawNode* const currentNode = &graph.mMapAB0[helper];
 
       if (!currentNode->mHelperLink.HasValue()) {
         // 0x00826374/0x00826386: reset an expired node before binding a new helper.
@@ -3337,12 +3432,14 @@ namespace
   }
 
   void CWldSession::RenderCommandGraph(
-    const GeomCamera3& camera, CD3DPrimBatcher* const batcher, const std::int32_t gameTick, const float tickFraction
+    const GeomCamera3& camera,
+    CD3DPrimBatcher* const batcher,
+    const std::int32_t gameTick,
+    const float tickFraction
   )
   {
     if (const boost::shared_ptr<UICommandGraph> graph = GetCommandGraph(false)) {
       graph->DrawCommandGraphMesh(camera, *batcher, gameTick, tickFraction);
     }
   }
-}
-
+} // namespace moho

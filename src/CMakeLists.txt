@@ -133,6 +133,8 @@ set(_faf_main_options
 # Switches off the Win32 layout static_asserts where they don't apply (see the
 # header).
 list(APPEND _faf_main_options /FIplatform/LayoutAsserts.h)
+# FAFRE_PLATFORM_WINDOWS and the other platform macros (see the header).
+list(APPEND _faf_main_options /FIplatform/PlatformDefines.h)
 if(NOT FAF_TARGET_ARCH STREQUAL "x64")
   # Keeps sqrt a CRT call under the sim's _PC_24 x87 control word (see the
   # header and cmake/FafCodegen.cmake).
@@ -173,6 +175,7 @@ set_property(SOURCE
     gpg/gal/backends/vulkan/ResourcesVulkan.cpp
     gpg/gal/backends/vulkan/DeviceVulkan.cpp
     gpg/gal/backends/vulkan/GpuDrivenVulkan.cpp
+    gpg/gal/backends/vulkan/RayTracingVulkan.cpp
   APPEND PROPERTY INCLUDE_DIRECTORIES "${FAF_DEPENDENCIES_DIR}/vulkan/include")
 
 # FX11 (Effects 11) compiles into the engine as its own project would build it:

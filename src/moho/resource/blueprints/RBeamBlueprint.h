@@ -42,9 +42,8 @@ namespace moho
      * own `RBeamBlueprint` (owned by the rules, so the archive may not delete it).
      * Inlined into `SerConstructHelper<RBeamBlueprint>::Construct` 0x00510340.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x00510260 (FUN_00510260)
@@ -54,7 +53,10 @@ namespace moho
      * `MemberConstruct` to look the blueprint up by.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     /**
@@ -79,7 +81,7 @@ namespace moho
     float Thickness{1.0f};                       // +0x30
     float UShift{0.0f};                          // +0x34
     float VShift{0.0f};                          // +0x38
-    fa::string TextureName;                   // +0x3C
+    fa::string TextureName;                      // +0x3C
     Vector4f StartColor{1.0f, 1.0f, 1.0f, 0.0f}; // +0x58
     Vector4f EndColor{1.0f, 1.0f, 1.0f, 0.0f};   // +0x68
     float LODCutoff{200.0f};                     // +0x78

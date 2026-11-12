@@ -21,7 +21,11 @@ namespace
    * What it does:
    * Draws one wire-circle marker for each waypoint in the contiguous batch.
    */
-  void DrawSteeringWaypoints(moho::Sim* const sim, const Wm3::Vector3f* const waypoints, const int waypointCount)
+  void DrawSteeringWaypoints(
+    moho::Sim* const sim,
+    const Wm3::Vector3f* const waypoints,
+    const int waypointCount
+  )
   {
     if (waypointCount <= 0) {
       return;
@@ -81,7 +85,9 @@ namespace moho
   /**
    * Address: 0x006508A0 (FUN_006508A0, Moho::RDebugNavWaypoints::OnTick)
    */
-  void RDebugNavWaypoints::Tick(Sim* const sim)
+  void RDebugNavWaypoints::Tick(
+    Sim* const sim
+  )
   {
     if (sim == nullptr || sim->mEntityDB == nullptr) {
       return;

@@ -20,12 +20,14 @@ namespace faf::server
 {
   namespace
   {
-    constexpr int kAttempts = 10;                    // connections made before giving up
+    constexpr int kAttempts = 10; // connections made before giving up
     constexpr int kRetrySeconds = 5;
     constexpr std::size_t kChunkBytes = 64u * 1024u;
 
     /** A connected TCP socket to `host:port`, or -1. */
-    [[nodiscard]] int Connect(const SGpgNetAddress& to)
+    [[nodiscard]] int Connect(
+      const SGpgNetAddress& to
+    )
     {
       addrinfo hints{};
       hints.ai_family = AF_INET;
@@ -48,7 +50,12 @@ namespace faf::server
     }
 
     /** All of `data` or false (a closed connection, an error). Waits up to a second at a time so `stop` is heard. */
-    [[nodiscard]] bool SendAll(const int socket, const std::uint8_t* data, std::size_t size, const std::atomic<bool>& stop)
+    [[nodiscard]] bool SendAll(
+      const int socket,
+      const std::uint8_t* data,
+      std::size_t size,
+      const std::atomic<bool>& stop
+    )
     {
       while (size > 0u && !stop.load(std::memory_order_relaxed)) {
         pollfd ready{socket, POLLOUT, 0};
@@ -69,7 +76,9 @@ namespace faf::server
     }
   } // namespace
 
-  std::optional<SGpgNetAddress> ParseGpgNetAddress(const std::string& uri)
+  std::optional<SGpgNetAddress> ParseGpgNetAddress(
+    const std::string& uri
+  )
   {
     static constexpr std::string_view kScheme = "gpgnet://";
     if (uri.size() <= kScheme.size() || uri.compare(0, kScheme.size(), kScheme) != 0) {
@@ -84,7 +93,9 @@ namespace faf::server
     address.host = authority.substr(0, colon);
     if (colon != std::string::npos) {
       const std::string port = authority.substr(colon + 1);
-      if (port.empty() || port.size() > 5 || !std::all_of(port.begin(), port.end(), [](const char c) { return c >= '0' && c <= '9'; })) {
+      if (port.empty() || port.size() > 5 || !std::all_of(port.begin(), port.end(), [](const char c) {
+        return c >= '0' && c <= '9';
+      })) {
         return std::nullopt;
       }
       const long value = std::strtol(port.c_str(), nullptr, 10);
@@ -99,7 +110,12 @@ namespace faf::server
     return address;
   }
 
-  CLiveReplaySender::CLiveReplaySender(std::shared_ptr<const CReplayLog> log, Clock clock, const double delaySeconds, SGpgNetAddress to)
+  CLiveReplaySender::CLiveReplaySender(
+    std::shared_ptr<const CReplayLog> log,
+    Clock clock,
+    const double delaySeconds,
+    SGpgNetAddress to
+  )
     : mLog(std::move(log))
     , mClock(std::move(clock))
     , mDelayUs(static_cast<std::uint64_t>(std::max(0.0, delaySeconds) * 1e6))
@@ -113,7 +129,9 @@ namespace faf::server
 
   void CLiveReplaySender::Start()
   {
-    mThread = std::thread([this] { Run(); });
+    mThread = std::thread([this] {
+      Run();
+    });
   }
 
   void CLiveReplaySender::Stop()
@@ -130,7 +148,9 @@ namespace faf::server
     return std::exchange(mNews, {});
   }
 
-  void CLiveReplaySender::Say(std::string line)
+  void CLiveReplaySender::Say(
+    std::string line
+  )
   {
     const std::scoped_lock lock(mLock);
     mNews.push_back(std::move(line));
@@ -143,7 +163,10 @@ namespace faf::server
     for (int attempt = 1; attempt <= kAttempts && !mStop.load(std::memory_order_relaxed); ++attempt) {
       const int socket = Connect(mTo);
       if (socket < 0) {
-        Say("live replay: no connection to " + where + " (try " + std::to_string(attempt) + " of " + std::to_string(kAttempts) + ")");
+        Say(
+          "live replay: no connection to " + where + " (try " + std::to_string(attempt) + " of " +
+          std::to_string(kAttempts) + ")"
+        );
         for (int i = 0; i < kRetrySeconds * 10 && !mStop.load(std::memory_order_relaxed); ++i) {
           std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }

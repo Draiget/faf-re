@@ -11,7 +11,7 @@ namespace gpg
   class ReadArchive;
   class RType;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -63,12 +63,7 @@ namespace moho
      * the repeat and ramp textures. `armyIndex` is forwarded to the base effect
      * as its owning-army/script token.
      */
-    CEfxTrailEmitter(
-      CEffectManagerImpl* manager,
-      const float* position,
-      RTrailBlueprint* blueprint,
-      int armyIndex
-    );
+    CEfxTrailEmitter(CEffectManagerImpl* manager, const float* position, RTrailBlueprint* blueprint, int armyIndex);
 
     /**
      * Address: 0x00671420 (FUN_00671420, Moho::CEfxTrailEmitter::Invalidate1)
@@ -158,16 +153,16 @@ namespace moho
     void Tick(std::int32_t tick);
 
   public:
-    RTrailBlueprint* mTrailBlueprint;      // +0x190
-    std::int32_t mTrailLength;             // +0x194
-    float mTotalTicks;                     // +0x198
-    float mLife;                           // +0x19C
-    float mLength;                         // +0x1A0
+    RTrailBlueprint* mTrailBlueprint;       // +0x190
+    std::int32_t mTrailLength;              // +0x194
+    float mTotalTicks;                      // +0x198
+    float mLife;                            // +0x19C
+    float mLength;                          // +0x1A0
     Wm3::Vector3f mSerializedTrailPosition; // +0x1A4
-    bool mCreated;                         // +0x1B0
-    bool mVisible;                         // +0x1B1
-    std::uint8_t mPad1B2[0x02];            // +0x1B2
-    std::uint32_t mLastUpdate;             // +0x1B4
+    bool mCreated;                          // +0x1B0
+    bool mVisible;                          // +0x1B1
+    std::uint8_t mPad1B2[0x02];             // +0x1B2
+    std::uint32_t mLastUpdate;              // +0x1B4
   };
 
   static_assert(
@@ -178,33 +173,15 @@ namespace moho
     offsetof(CEfxTrailEmitter, mTrailLength) == 0x194,
     "CEfxTrailEmitter::mTrailLength offset must be 0x194"
   );
-  static_assert(
-    offsetof(CEfxTrailEmitter, mTotalTicks) == 0x198,
-    "CEfxTrailEmitter::mTotalTicks offset must be 0x198"
-  );
-  static_assert(
-    offsetof(CEfxTrailEmitter, mLife) == 0x19C,
-    "CEfxTrailEmitter::mLife offset must be 0x19C"
-  );
-  static_assert(
-    offsetof(CEfxTrailEmitter, mLength) == 0x1A0,
-    "CEfxTrailEmitter::mLength offset must be 0x1A0"
-  );
+  static_assert(offsetof(CEfxTrailEmitter, mTotalTicks) == 0x198, "CEfxTrailEmitter::mTotalTicks offset must be 0x198");
+  static_assert(offsetof(CEfxTrailEmitter, mLife) == 0x19C, "CEfxTrailEmitter::mLife offset must be 0x19C");
+  static_assert(offsetof(CEfxTrailEmitter, mLength) == 0x1A0, "CEfxTrailEmitter::mLength offset must be 0x1A0");
   static_assert(
     offsetof(CEfxTrailEmitter, mSerializedTrailPosition) == 0x1A4,
     "CEfxTrailEmitter::mSerializedTrailPosition offset must be 0x1A4"
   );
-  static_assert(
-    offsetof(CEfxTrailEmitter, mCreated) == 0x1B0,
-    "CEfxTrailEmitter::mCreated offset must be 0x1B0"
-  );
-  static_assert(
-    offsetof(CEfxTrailEmitter, mVisible) == 0x1B1,
-    "CEfxTrailEmitter::mVisible offset must be 0x1B1"
-  );
-  static_assert(
-    offsetof(CEfxTrailEmitter, mLastUpdate) == 0x1B4,
-    "CEfxTrailEmitter::mLastUpdate offset must be 0x1B4"
-  );
+  static_assert(offsetof(CEfxTrailEmitter, mCreated) == 0x1B0, "CEfxTrailEmitter::mCreated offset must be 0x1B0");
+  static_assert(offsetof(CEfxTrailEmitter, mVisible) == 0x1B1, "CEfxTrailEmitter::mVisible offset must be 0x1B1");
+  static_assert(offsetof(CEfxTrailEmitter, mLastUpdate) == 0x1B4, "CEfxTrailEmitter::mLastUpdate offset must be 0x1B4");
   static_assert(sizeof(CEfxTrailEmitter) == 0x1B8, "CEfxTrailEmitter size must be 0x1B8");
 } // namespace moho

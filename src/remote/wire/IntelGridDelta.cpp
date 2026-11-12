@@ -10,14 +10,21 @@ namespace faf::remote::wire
 {
   namespace
   {
-    [[nodiscard]] bool SameShape(const SGridBits& grid, const SGridBits* const baseline) noexcept
+    [[nodiscard]] bool SameShape(
+      const SGridBits& grid,
+      const SGridBits* const baseline
+    ) noexcept
     {
-      return baseline != nullptr && baseline->width == grid.width && baseline->height == grid.height
-          && baseline->cells.size() == grid.cells.size();
+      return baseline != nullptr && baseline->width == grid.width && baseline->height == grid.height &&
+        baseline->cells.size() == grid.cells.size();
     }
   } // namespace
 
-  bool EncodeGridDelta(const SGridBits& current, const SGridBits* const baseline, BitWriter& writer)
+  bool EncodeGridDelta(
+    const SGridBits& current,
+    const SGridBits* const baseline,
+    BitWriter& writer
+  )
   {
     const std::uint64_t cellCount = static_cast<std::uint64_t>(current.width) * current.height;
     if (cellCount != current.cells.size()) {
@@ -66,15 +73,25 @@ namespace faf::remote::wire
   }
 
   void EncodeGridDeltaInPlace(
-    const std::uint32_t width, const std::uint32_t height, const std::int8_t* const now, std::uint64_t* const seen, BitWriter& writer
+    const std::uint32_t width,
+    const std::uint32_t height,
+    const std::int8_t* const now,
+    std::uint64_t* const seen,
+    BitWriter& writer
   )
   {
     EncodeGridDeltaInPlace(width, height, now, seen, writer, nullptr, 0u, true);
   }
 
   void EncodeGridDeltaInPlace(
-    const std::uint32_t width, const std::uint32_t height, const std::int8_t* const now, std::uint64_t* const seen, BitWriter& writer,
-    std::uint8_t* const changed, const std::uint32_t chunkCells, const bool readAll
+    const std::uint32_t width,
+    const std::uint32_t height,
+    const std::int8_t* const now,
+    std::uint64_t* const seen,
+    BitWriter& writer,
+    std::uint8_t* const changed,
+    const std::uint32_t chunkCells,
+    const bool readAll
   )
   {
     writer.WriteVarUint(width);
@@ -150,7 +167,12 @@ namespace faf::remote::wire
     }
   }
 
-  bool DecodeGridDelta(BitReader& reader, const SGridBits* const baseline, const std::uint32_t maxCells, SGridBits& out)
+  bool DecodeGridDelta(
+    BitReader& reader,
+    const SGridBits* const baseline,
+    const std::uint32_t maxCells,
+    SGridBits& out
+  )
   {
     const std::uint32_t width = reader.ReadVarUint();
     const std::uint32_t height = reader.ReadVarUint();
@@ -167,8 +189,8 @@ namespace faf::remote::wire
     grid.width = width;
     grid.height = height;
     grid.cells.assign(static_cast<std::size_t>(cellCount), 0u);
-    const bool sameShape = baseline != nullptr && baseline->width == width && baseline->height == height
-                        && baseline->cells.size() == cellCount;
+    const bool sameShape = baseline != nullptr && baseline->width == width && baseline->height == height &&
+      baseline->cells.size() == cellCount;
     if (sameShape) {
       for (std::size_t i = 0; i < grid.cells.size(); ++i) {
         grid.cells[i] = baseline->cells[i] != 0u ? 1u : 0u;

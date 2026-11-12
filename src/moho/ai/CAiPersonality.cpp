@@ -118,7 +118,8 @@ namespace
   constexpr const char* kAiPersonalityGetSeaUnitsEmphasisName = "GetSeaUnitsEmphasis";
   constexpr const char* kAiPersonalityGetSeaUnitsEmphasisHelpText = "CAiPersonality:GetSeaUnitsEmphasis()";
   constexpr const char* kAiPersonalityGetSpecialtyForcesEmphasisName = "GetSpecialtyForcesEmphasis";
-  constexpr const char* kAiPersonalityGetSpecialtyForcesEmphasisHelpText = "CAiPersonality:GetSpecialtyForcesEmphasis()";
+  constexpr const char* kAiPersonalityGetSpecialtyForcesEmphasisHelpText =
+    "CAiPersonality:GetSpecialtyForcesEmphasis()";
   constexpr const char* kAiPersonalityGetSupportUnitsEmphasisName = "GetSupportUnitsEmphasis";
   constexpr const char* kAiPersonalityGetSupportUnitsEmphasisHelpText = "CAiPersonality:GetSupportUnitsEmphasis()";
   constexpr const char* kAiPersonalityGetDirectDamageEmphasisName = "GetDirectDamageEmphasis";
@@ -161,7 +162,6 @@ namespace
     return Sim::sType;
   }
 
-
   template <typename TObject>
   void WritePointerWithType(
     gpg::WriteArchive* const archive,
@@ -175,7 +175,9 @@ namespace
     gpg::WriteRawPointer(archive, objectRef, state, owner);
   }
 
-  [[nodiscard]] const char* SafeCString(const char* value)
+  [[nodiscard]] const char* SafeCString(
+    const char* value
+  )
   {
     return value ? value : "";
   }
@@ -188,7 +190,9 @@ namespace
    * Loads `/lua/aipersonality.lua` and returns `AIPersonality` metatable,
    * falling back to `CScrLuaMetatableFactory<CAiPersonality>::sInstance`.
    */
-  [[nodiscard]] LuaPlus::LuaObject LoadAiPersonalityMetatable(LuaPlus::LuaState* const state)
+  [[nodiscard]] LuaPlus::LuaObject LoadAiPersonalityMetatable(
+    LuaPlus::LuaState* const state
+  )
   {
     LuaPlus::LuaObject metatable;
 
@@ -204,7 +208,10 @@ namespace
     return metatable;
   }
 
-  [[nodiscard]] LuaPlus::LuaObject FindTemplateRow(const LuaPlus::LuaObject& templateTable, const char* rowName)
+  [[nodiscard]] LuaPlus::LuaObject FindTemplateRow(
+    const LuaPlus::LuaObject& templateTable,
+    const char* rowName
+  )
   {
     const std::int32_t rowCount = templateTable.GetN();
     for (std::int32_t rowIndex = 1; rowIndex <= rowCount; ++rowIndex) {
@@ -221,7 +228,11 @@ namespace
     return {};
   }
 
-  void LoadRangeField(const LuaPlus::LuaObject& row, const std::int32_t fieldIndex, SAiPersonalityRange& outRange)
+  void LoadRangeField(
+    const LuaPlus::LuaObject& row,
+    const std::int32_t fieldIndex,
+    SAiPersonalityRange& outRange
+  )
   {
     LuaPlus::LuaObject rangeObj = row.GetByIndex(fieldIndex);
     if (!rangeObj.IsTable()) {
@@ -234,7 +245,9 @@ namespace
   }
 
   void LoadStringListField(
-    const LuaPlus::LuaObject& row, const std::int32_t fieldIndex, fa::vector<fa::string>& outList
+    const LuaPlus::LuaObject& row,
+    const std::int32_t fieldIndex,
+    fa::vector<fa::string>& outList
   )
   {
     outList.clear();
@@ -266,7 +279,9 @@ CScrLuaMetatableFactory<CAiPersonality> CScrLuaMetatableFactory<CAiPersonality>:
  * Reads one personality and two integer delay parameters, applies
  * difficulty-scaled adjustment, and returns one integer delay result.
  */
-int moho::cfunc_CAiPersonalityAdjustDelayL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityAdjustDelayL(
+  LuaPlus::LuaState* const state
+)
 {
   const LuaPlus::LuaObject personalityObject(LuaPlus::LuaStackObject(state, 1));
   CAiPersonality* const personality = SCR_FromLua_CAiPersonality(personalityObject, state);
@@ -298,7 +313,9 @@ int moho::cfunc_CAiPersonalityAdjustDelayL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiPersonalityAdjustDelayL`.
  */
-int moho::cfunc_CAiPersonalityAdjustDelay(lua_State* const luaContext)
+int moho::cfunc_CAiPersonalityAdjustDelay(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiPersonalityAdjustDelayL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -325,7 +342,8 @@ CScrLuaInitForm* moho::func_CAiPersonalityAdjustDelay_LuaFuncDef()
 namespace
 {
   [[nodiscard]] CAiPersonality* ResolveAiPersonalityLuaSelf(
-    lua_State* const luaContext, const char* const helpText
+    lua_State* const luaContext,
+    const char* const helpText
   )
   {
     LuaPlus::LuaState* const state = moho::SCR_ResolveBindingState(luaContext);
@@ -340,14 +358,17 @@ namespace
   }
 
   [[nodiscard]] float ComputeDifficultyScaledRange(
-    const CAiPersonality* const personality, const SAiPersonalityRange& range
+    const CAiPersonality* const personality,
+    const SAiPersonalityRange& range
   ) noexcept
   {
-    return ((1.0f - personality->mDifficulty) * range.mMinValue)
-         + (range.mMaxValue * personality->mDifficulty);
+    return ((1.0f - personality->mDifficulty) * range.mMinValue) + (range.mMaxValue * personality->mDifficulty);
   }
 
-  int PushStringVectorTable(LuaPlus::LuaState* const state, const fa::vector<fa::string>& values)
+  int PushStringVectorTable(
+    LuaPlus::LuaState* const state,
+    const fa::vector<fa::string>& values
+  )
   {
     LuaPlus::LuaObject resultTable;
     resultTable.AssignNewTable(state, static_cast<int>(values.size()), 0);
@@ -368,8 +389,10 @@ namespace
     return 1;
   }
 
-  template <SAiPersonalityRange CAiPersonality::*RangeMember>
-  [[nodiscard]] int PushDifficultyScaledPersonalityRange(LuaPlus::LuaState* const state)
+  template <SAiPersonalityRange CAiPersonality::* RangeMember>
+  [[nodiscard]] int PushDifficultyScaledPersonalityRange(
+    LuaPlus::LuaState* const state
+  )
   {
     const LuaPlus::LuaObject personalityObject(LuaPlus::LuaStackObject(state, 1));
     CAiPersonality* const personality = SCR_FromLua_CAiPersonality(personalityObject, state);
@@ -380,132 +403,184 @@ namespace
     return 1;
   }
 
-  int LuaCallback_CAiPersonalityGetPersonalityName(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetPersonalityName(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetPersonalityNameL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetChatPersonality(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetChatPersonality(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetChatPersonalityL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetDifficulty(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetDifficulty(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetDifficultyL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetRepeatAttackFrequency(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetRepeatAttackFrequency(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetRepeatAttackFrequencyL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetCounterForces(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetCounterForces(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetCounterForcesL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetIntelGathering(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetIntelGathering(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetIntelGatheringL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetCoordinatedAttacks(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetCoordinatedAttacks(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetCoordinatedAttacksL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetExpansionDriven(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetExpansionDriven(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetExpansionDrivenL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetTechAdvancement(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetTechAdvancement(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetTechAdvancementL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetUpgradesDriven(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetUpgradesDriven(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetUpgradesDrivenL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetDefenseDriven(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetDefenseDriven(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetDefenseDrivenL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetEconomyDriven(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetEconomyDriven(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetEconomyDrivenL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetFactoryTycoon(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetFactoryTycoon(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetFactoryTycoonL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetIntelBuildingTycoon(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetIntelBuildingTycoon(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetIntelBuildingTycoonL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetSuperWeaponTendency(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetSuperWeaponTendency(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetSuperWeaponTendencyL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetAirUnitsEmphasis(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetAirUnitsEmphasis(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetAirUnitsEmphasisL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetTankUnitsEmphasis(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetTankUnitsEmphasis(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetTankUnitsEmphasisL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetBotUnitsEmphasis(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetBotUnitsEmphasis(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetBotUnitsEmphasisL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetSeaUnitsEmphasis(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetSeaUnitsEmphasis(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetSeaUnitsEmphasisL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetSpecialtyForcesEmphasis(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetSpecialtyForcesEmphasis(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetSpecialtyForcesEmphasisL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetSupportUnitsEmphasis(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetSupportUnitsEmphasis(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetSupportUnitsEmphasisL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetDirectDamageEmphasis(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetDirectDamageEmphasis(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetDirectDamageEmphasisL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetInDirectDamageEmphasis(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetInDirectDamageEmphasis(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetInDirectDamageEmphasisL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetSurvivalEmphasis(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetSurvivalEmphasis(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetSurvivalEmphasisL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetTeamSupport(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetTeamSupport(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetTeamSupportL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int LuaCallback_CAiPersonalityGetFormationUse(lua_State* const luaContext)
+  int LuaCallback_CAiPersonalityGetFormationUse(
+    lua_State* const luaContext
+  )
   {
     return moho::cfunc_CAiPersonalityGetFormationUseL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -518,7 +593,9 @@ namespace
  * What it does:
  * Reads one `CAiPersonality` from Lua and pushes the personality-name string.
  */
-int moho::cfunc_CAiPersonalityGetPersonalityNameL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetPersonalityNameL(
+  LuaPlus::LuaState* const state
+)
 {
   const LuaPlus::LuaObject personalityObject(LuaPlus::LuaStackObject(state, 1));
   CAiPersonality* const personality = SCR_FromLua_CAiPersonality(personalityObject, state);
@@ -535,7 +612,9 @@ int moho::cfunc_CAiPersonalityGetPersonalityNameL(LuaPlus::LuaState* const state
  * What it does:
  * Reads one `CAiPersonality` from Lua and pushes the chat-personality string.
  */
-int moho::cfunc_CAiPersonalityGetChatPersonalityL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetChatPersonalityL(
+  LuaPlus::LuaState* const state
+)
 {
   const LuaPlus::LuaObject personalityObject(LuaPlus::LuaStackObject(state, 1));
   CAiPersonality* const personality = SCR_FromLua_CAiPersonality(personalityObject, state);
@@ -552,7 +631,9 @@ int moho::cfunc_CAiPersonalityGetChatPersonalityL(LuaPlus::LuaState* const state
  * What it does:
  * Reads one `CAiPersonality` from Lua and pushes the current difficulty value.
  */
-int moho::cfunc_CAiPersonalityGetDifficultyL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetDifficultyL(
+  LuaPlus::LuaState* const state
+)
 {
   const LuaPlus::LuaObject personalityObject(LuaPlus::LuaStackObject(state, 1));
   CAiPersonality* const personality = SCR_FromLua_CAiPersonality(personalityObject, state);
@@ -570,7 +651,9 @@ int moho::cfunc_CAiPersonalityGetDifficultyL(LuaPlus::LuaState* const state)
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * army-size value.
  */
-int moho::cfunc_CAiPersonalityGetArmySizeL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetArmySizeL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mArmySize>(state);
 }
@@ -582,7 +665,9 @@ int moho::cfunc_CAiPersonalityGetArmySizeL(LuaPlus::LuaState* const state)
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * platoon-size value.
  */
-int moho::cfunc_CAiPersonalityGetPlatoonSizeL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetPlatoonSizeL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mPlatoonSize>(state);
 }
@@ -594,7 +679,9 @@ int moho::cfunc_CAiPersonalityGetPlatoonSizeL(LuaPlus::LuaState* const state)
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * attack-frequency value.
  */
-int moho::cfunc_CAiPersonalityGetAttackFrequencyL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetAttackFrequencyL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mAttackFrequency>(state);
 }
@@ -606,7 +693,9 @@ int moho::cfunc_CAiPersonalityGetAttackFrequencyL(LuaPlus::LuaState* const state
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiPersonalityGetArmySizeL`.
  */
-int moho::cfunc_CAiPersonalityGetArmySize(lua_State* const luaContext)
+int moho::cfunc_CAiPersonalityGetArmySize(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiPersonalityGetArmySizeL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -618,7 +707,9 @@ int moho::cfunc_CAiPersonalityGetArmySize(lua_State* const luaContext)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiPersonalityGetPlatoonSizeL`.
  */
-int moho::cfunc_CAiPersonalityGetPlatoonSize(lua_State* const luaContext)
+int moho::cfunc_CAiPersonalityGetPlatoonSize(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiPersonalityGetPlatoonSizeL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -630,7 +721,9 @@ int moho::cfunc_CAiPersonalityGetPlatoonSize(lua_State* const luaContext)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiPersonalityGetAttackFrequencyL`.
  */
-int moho::cfunc_CAiPersonalityGetAttackFrequency(lua_State* const luaContext)
+int moho::cfunc_CAiPersonalityGetAttackFrequency(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiPersonalityGetAttackFrequencyL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -642,7 +735,9 @@ int moho::cfunc_CAiPersonalityGetAttackFrequency(lua_State* const luaContext)
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * repeat-attack frequency.
  */
-int moho::cfunc_CAiPersonalityGetRepeatAttackFrequencyL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetRepeatAttackFrequencyL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mRepeatAttackFrequency>(state);
 }
@@ -654,7 +749,9 @@ int moho::cfunc_CAiPersonalityGetRepeatAttackFrequencyL(LuaPlus::LuaState* const
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * counter-forces value.
  */
-int moho::cfunc_CAiPersonalityGetCounterForcesL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetCounterForcesL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mCounterForces>(state);
 }
@@ -666,7 +763,9 @@ int moho::cfunc_CAiPersonalityGetCounterForcesL(LuaPlus::LuaState* const state)
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * intel-gathering value.
  */
-int moho::cfunc_CAiPersonalityGetIntelGatheringL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetIntelGatheringL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mIntelGathering>(state);
 }
@@ -678,7 +777,9 @@ int moho::cfunc_CAiPersonalityGetIntelGatheringL(LuaPlus::LuaState* const state)
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * coordinated-attacks value.
  */
-int moho::cfunc_CAiPersonalityGetCoordinatedAttacksL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetCoordinatedAttacksL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mCoordinatedAttacks>(state);
 }
@@ -690,7 +791,9 @@ int moho::cfunc_CAiPersonalityGetCoordinatedAttacksL(LuaPlus::LuaState* const st
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * expansion-driven value.
  */
-int moho::cfunc_CAiPersonalityGetExpansionDrivenL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetExpansionDrivenL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mExpansionDriven>(state);
 }
@@ -702,7 +805,9 @@ int moho::cfunc_CAiPersonalityGetExpansionDrivenL(LuaPlus::LuaState* const state
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * tech-advancement value.
  */
-int moho::cfunc_CAiPersonalityGetTechAdvancementL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetTechAdvancementL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mTechAdvancement>(state);
 }
@@ -714,7 +819,9 @@ int moho::cfunc_CAiPersonalityGetTechAdvancementL(LuaPlus::LuaState* const state
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * upgrades-driven value.
  */
-int moho::cfunc_CAiPersonalityGetUpgradesDrivenL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetUpgradesDrivenL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mUpgradesDriven>(state);
 }
@@ -726,7 +833,9 @@ int moho::cfunc_CAiPersonalityGetUpgradesDrivenL(LuaPlus::LuaState* const state)
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * defense-driven value.
  */
-int moho::cfunc_CAiPersonalityGetDefenseDrivenL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetDefenseDrivenL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mDefenseDriven>(state);
 }
@@ -738,7 +847,9 @@ int moho::cfunc_CAiPersonalityGetDefenseDrivenL(LuaPlus::LuaState* const state)
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * economy-driven value.
  */
-int moho::cfunc_CAiPersonalityGetEconomyDrivenL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetEconomyDrivenL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mEconomyDriven>(state);
 }
@@ -750,7 +861,9 @@ int moho::cfunc_CAiPersonalityGetEconomyDrivenL(LuaPlus::LuaState* const state)
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * factory-tycoon value.
  */
-int moho::cfunc_CAiPersonalityGetFactoryTycoonL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetFactoryTycoonL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mFactoryTycoon>(state);
 }
@@ -762,7 +875,9 @@ int moho::cfunc_CAiPersonalityGetFactoryTycoonL(LuaPlus::LuaState* const state)
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * intel-building-tycoon value.
  */
-int moho::cfunc_CAiPersonalityGetIntelBuildingTycoonL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetIntelBuildingTycoonL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mIntelBuildingTycoon>(state);
 }
@@ -774,7 +889,9 @@ int moho::cfunc_CAiPersonalityGetIntelBuildingTycoonL(LuaPlus::LuaState* const s
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * super-weapon-tendency value.
  */
-int moho::cfunc_CAiPersonalityGetSuperWeaponTendencyL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetSuperWeaponTendencyL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mSuperWeaponTendency>(state);
 }
@@ -786,7 +903,9 @@ int moho::cfunc_CAiPersonalityGetSuperWeaponTendencyL(LuaPlus::LuaState* const s
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * air-units-emphasis value.
  */
-int moho::cfunc_CAiPersonalityGetAirUnitsEmphasisL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetAirUnitsEmphasisL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mAirUnitsEmphasis>(state);
 }
@@ -798,7 +917,9 @@ int moho::cfunc_CAiPersonalityGetAirUnitsEmphasisL(LuaPlus::LuaState* const stat
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * tank-units-emphasis value.
  */
-int moho::cfunc_CAiPersonalityGetTankUnitsEmphasisL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetTankUnitsEmphasisL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mTankUnitsEmphasis>(state);
 }
@@ -810,7 +931,9 @@ int moho::cfunc_CAiPersonalityGetTankUnitsEmphasisL(LuaPlus::LuaState* const sta
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * bot-units-emphasis value.
  */
-int moho::cfunc_CAiPersonalityGetBotUnitsEmphasisL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetBotUnitsEmphasisL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mBotUnitsEmphasis>(state);
 }
@@ -822,7 +945,9 @@ int moho::cfunc_CAiPersonalityGetBotUnitsEmphasisL(LuaPlus::LuaState* const stat
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted sea
  * units emphasis value.
  */
-int moho::cfunc_CAiPersonalityGetSeaUnitsEmphasisL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetSeaUnitsEmphasisL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mSeaUnitsEmphasis>(state);
 }
@@ -834,7 +959,9 @@ int moho::cfunc_CAiPersonalityGetSeaUnitsEmphasisL(LuaPlus::LuaState* const stat
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * specialty-forces emphasis value.
  */
-int moho::cfunc_CAiPersonalityGetSpecialtyForcesEmphasisL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetSpecialtyForcesEmphasisL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mSpecialtyForcesEmphasis>(state);
 }
@@ -846,7 +973,9 @@ int moho::cfunc_CAiPersonalityGetSpecialtyForcesEmphasisL(LuaPlus::LuaState* con
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * support-units emphasis value.
  */
-int moho::cfunc_CAiPersonalityGetSupportUnitsEmphasisL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetSupportUnitsEmphasisL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mSupportUnitsEmphasis>(state);
 }
@@ -858,7 +987,9 @@ int moho::cfunc_CAiPersonalityGetSupportUnitsEmphasisL(LuaPlus::LuaState* const 
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * direct-damage-emphasis value.
  */
-int moho::cfunc_CAiPersonalityGetDirectDamageEmphasisL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetDirectDamageEmphasisL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mDirectDamageEmphasis>(state);
 }
@@ -870,7 +1001,9 @@ int moho::cfunc_CAiPersonalityGetDirectDamageEmphasisL(LuaPlus::LuaState* const 
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * indirect-damage-emphasis value.
  */
-int moho::cfunc_CAiPersonalityGetInDirectDamageEmphasisL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetInDirectDamageEmphasisL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mIndirectDamageEmphasis>(state);
 }
@@ -882,7 +1015,9 @@ int moho::cfunc_CAiPersonalityGetInDirectDamageEmphasisL(LuaPlus::LuaState* cons
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * survival-emphasis value.
  */
-int moho::cfunc_CAiPersonalityGetSurvivalEmphasisL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetSurvivalEmphasisL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mSurvivalEmphasis>(state);
 }
@@ -894,7 +1029,9 @@ int moho::cfunc_CAiPersonalityGetSurvivalEmphasisL(LuaPlus::LuaState* const stat
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * team-support value.
  */
-int moho::cfunc_CAiPersonalityGetTeamSupportL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetTeamSupportL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mTeamSupport>(state);
 }
@@ -906,7 +1043,9 @@ int moho::cfunc_CAiPersonalityGetTeamSupportL(LuaPlus::LuaState* const state)
  * Reads one `CAiPersonality` from Lua and pushes the difficulty-weighted
  * formation-use value.
  */
-int moho::cfunc_CAiPersonalityGetFormationUseL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetFormationUseL(
+  LuaPlus::LuaState* const state
+)
 {
   return PushDifficultyScaledPersonalityRange<&CAiPersonality::mFormationUse>(state);
 }
@@ -1507,7 +1646,9 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetFormationUse_LuaFuncDef()
  * Reads one `CAiPersonality` and pushes `mFavouriteStructures` as Lua array
  * elements.
  */
-int moho::cfunc_CAiPersonalityGetFavouriteStructuresL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetFavouriteStructuresL(
+  LuaPlus::LuaState* const state
+)
 {
   if (state == nullptr || state->m_state == nullptr) {
     return 0;
@@ -1529,7 +1670,9 @@ int moho::cfunc_CAiPersonalityGetFavouriteStructuresL(LuaPlus::LuaState* const s
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiPersonalityGetFavouriteStructuresL`.
  */
-int moho::cfunc_CAiPersonalityGetFavouriteStructures(lua_State* const luaContext)
+int moho::cfunc_CAiPersonalityGetFavouriteStructures(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiPersonalityGetFavouriteStructuresL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1541,13 +1684,16 @@ int moho::cfunc_CAiPersonalityGetFavouriteStructures(lua_State* const luaContext
  * Reads one `CAiPersonality` and pushes `mFavouriteUnits` as Lua array
  * elements.
  */
-int moho::cfunc_CAiPersonalityGetFavouriteUnitsL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetFavouriteUnitsL(
+  LuaPlus::LuaState* const state
+)
 {
   if (state == nullptr || state->m_state == nullptr) {
     return 0;
   }
 
-  CAiPersonality* const personality = ResolveAiPersonalityLuaSelf(state->m_state, kAiPersonalityGetFavouriteUnitsHelpText);
+  CAiPersonality* const personality =
+    ResolveAiPersonalityLuaSelf(state->m_state, kAiPersonalityGetFavouriteUnitsHelpText);
   if (personality == nullptr) {
     return 0;
   }
@@ -1562,7 +1708,9 @@ int moho::cfunc_CAiPersonalityGetFavouriteUnitsL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiPersonalityGetFavouriteUnitsL`.
  */
-int moho::cfunc_CAiPersonalityGetFavouriteUnits(lua_State* const luaContext)
+int moho::cfunc_CAiPersonalityGetFavouriteUnits(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiPersonalityGetFavouriteUnitsL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1573,7 +1721,9 @@ int moho::cfunc_CAiPersonalityGetFavouriteUnits(lua_State* const luaContext)
  * What it does:
  * Reads one `CAiPersonality` and pushes difficulty-scaled target spread.
  */
-int moho::cfunc_CAiPersonalityGetTargetSpreadL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetTargetSpreadL(
+  LuaPlus::LuaState* const state
+)
 {
   const LuaPlus::LuaObject personalityObject(LuaPlus::LuaStackObject(state, 1));
   CAiPersonality* const personality = SCR_FromLua_CAiPersonality(personalityObject, state);
@@ -1591,7 +1741,9 @@ int moho::cfunc_CAiPersonalityGetTargetSpreadL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiPersonalityGetTargetSpreadL`.
  */
-int moho::cfunc_CAiPersonalityGetTargetSpread(lua_State* const luaContext)
+int moho::cfunc_CAiPersonalityGetTargetSpread(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiPersonalityGetTargetSpreadL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1621,7 +1773,9 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetTargetSpread_LuaFuncDef()
  * What it does:
  * Reads one `CAiPersonality` and pushes difficulty-scaled quitting tendency.
  */
-int moho::cfunc_CAiPersonalityGetQuittingTendencyL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetQuittingTendencyL(
+  LuaPlus::LuaState* const state
+)
 {
   const LuaPlus::LuaObject personalityObject(LuaPlus::LuaStackObject(state, 1));
   CAiPersonality* const personality = SCR_FromLua_CAiPersonality(personalityObject, state);
@@ -1639,7 +1793,9 @@ int moho::cfunc_CAiPersonalityGetQuittingTendencyL(LuaPlus::LuaState* const stat
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiPersonalityGetQuittingTendencyL`.
  */
-int moho::cfunc_CAiPersonalityGetQuittingTendency(lua_State* const luaContext)
+int moho::cfunc_CAiPersonalityGetQuittingTendency(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiPersonalityGetQuittingTendencyL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1669,7 +1825,9 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetQuittingTendency_LuaFuncDef()
  * What it does:
  * Reads one `CAiPersonality` and pushes difficulty-scaled chat frequency.
  */
-int moho::cfunc_CAiPersonalityGetChatFrequencyL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiPersonalityGetChatFrequencyL(
+  LuaPlus::LuaState* const state
+)
 {
   const LuaPlus::LuaObject personalityObject(LuaPlus::LuaStackObject(state, 1));
   CAiPersonality* const personality = SCR_FromLua_CAiPersonality(personalityObject, state);
@@ -1687,7 +1845,9 @@ int moho::cfunc_CAiPersonalityGetChatFrequencyL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiPersonalityGetChatFrequencyL`.
  */
-int moho::cfunc_CAiPersonalityGetChatFrequency(lua_State* const luaContext)
+int moho::cfunc_CAiPersonalityGetChatFrequency(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiPersonalityGetChatFrequencyL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1745,9 +1905,12 @@ namespace
 } // namespace
 
 /**
- * Address: 0x005B9620 (FUN_005B9620, ?Create@?$CScrLuaMetatableFactory@VCAiPersonality@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
+ * Address: 0x005B9620 (FUN_005B9620,
+ * ?Create@?$CScrLuaMetatableFactory@VCAiPersonality@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
  */
-LuaPlus::LuaObject CScrLuaMetatableFactory<CAiPersonality>::Create(LuaPlus::LuaState* const state)
+LuaPlus::LuaObject CScrLuaMetatableFactory<CAiPersonality>::Create(
+  LuaPlus::LuaState* const state
+)
 {
   return SCR_CreateSimpleMetatable(state);
 }
@@ -1805,7 +1968,9 @@ CAiPersonality::CAiPersonality()
 /**
  * Address: 0x005B6DC0 (FUN_005B6DC0, ctor body)
  */
-CAiPersonality::CAiPersonality(Sim* const sim)
+CAiPersonality::CAiPersonality(
+  Sim* const sim
+)
   : mSim(sim)
   , mPersonalityName()
   , mChatPersonality()
@@ -1945,7 +2110,9 @@ void CAiPersonality::ReadData()
 /**
  * Address: 0x005B96A0 (FUN_005B96A0, Moho::CAiPersonality::MemberDeserialize)
  */
-void CAiPersonality::MemberDeserialize(gpg::ReadArchive* const archive)
+void CAiPersonality::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -1999,7 +2166,9 @@ void CAiPersonality::MemberDeserialize(gpg::ReadArchive* const archive)
 /**
  * Address: 0x005B9DD0 (FUN_005B9DD0, Moho::CAiPersonality::MemberSerialize)
  */
-void CAiPersonality::MemberSerialize(gpg::WriteArchive* const archive) const
+void CAiPersonality::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (!archive) {
     return;
@@ -2117,7 +2286,12 @@ namespace moho
   /**
    * Address: 0x005B69F0 (FUN_005B69F0)
    */
-  void CAiPersonality::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CAiPersonality::MemberConstruct(
+    gpg::ReadArchive&,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     result.SetUnowned(gpg::MakeRRef(new CAiPersonality()), 0u);
   }

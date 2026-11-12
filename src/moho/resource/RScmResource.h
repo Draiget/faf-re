@@ -35,9 +35,8 @@ namespace moho
      * Reads the model path and hands back the shared model for it (`GetModel`).
      * Inlined into `SerConstructHelper<RScmResource>::Construct` 0x005390C0.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x00538F70 (FUN_00538F70)
@@ -46,7 +45,10 @@ namespace moho
      * Saves the model's name as a mounted path.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     static gpg::RType* sType;
@@ -90,11 +92,11 @@ namespace moho
     void DropGeometry();
 
   public:
-    fa::string mName;                   // +0x08
+    fa::string mName;                        // +0x08
     boost::shared_ptr<const SScmFile> mFile; // +0x24
-    CAniSkel* mSkeleton;                   // +0x2C
-    Wm3::AxisAlignedBox3f mBounds;         // +0x30
-    float mSize;                           // +0x48
+    CAniSkel* mSkeleton;                     // +0x2C
+    Wm3::AxisAlignedBox3f mBounds;           // +0x30
+    float mSize;                             // +0x48
   };
 
   static_assert(offsetof(RScmResource, mName) == 0x08, "RScmResource::mName offset must be 0x08");
@@ -137,8 +139,6 @@ namespace moho
    * Constructs one `shared_ptr<RScmResource>` from one raw resource lane,
    * including `enable_shared_from_this` ownership binding.
    */
-  boost::shared_ptr<RScmResource>* ConstructSharedRScmResourceFromRaw(
-    boost::shared_ptr<RScmResource>* outResource,
-    RScmResource* resource
-  );
+  boost::shared_ptr<RScmResource>*
+  ConstructSharedRScmResourceFromRaw(boost::shared_ptr<RScmResource>* outResource, RScmResource* resource);
 } // namespace moho

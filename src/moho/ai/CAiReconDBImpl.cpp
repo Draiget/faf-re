@@ -40,27 +40,33 @@ using namespace moho;
 namespace
 {
 
-
-
-  [[nodiscard]] std::uint32_t GetSourceEntityId(const Unit* const source) noexcept
+  [[nodiscard]] std::uint32_t GetSourceEntityId(
+    const Unit* const source
+  ) noexcept
   {
     return source ? static_cast<std::uint32_t>(source->id_) : 0u;
   }
 
-  [[nodiscard]] SReconKey MakeReconProbeKey(const std::uint32_t sourceEntityId) noexcept
+  [[nodiscard]] SReconKey MakeReconProbeKey(
+    const std::uint32_t sourceEntityId
+  ) noexcept
   {
     SReconKey probe{};
     probe.sourceEntityId = sourceEntityId;
     return probe;
   }
 
-  [[nodiscard]] SReconKey MakeReconMapKey(Unit* const sourceUnit) noexcept
+  [[nodiscard]] SReconKey MakeReconMapKey(
+    Unit* const sourceUnit
+  ) noexcept
   {
     return SReconKey{WeakPtr<Entity>(sourceUnit), GetSourceEntityId(sourceUnit)};
   }
 
-  [[nodiscard]] std::pair<ReconBlipMap::iterator, ReconBlipMap::iterator>
-  FindReconBlipRange(CAiReconDBImpl* const owner, Unit* const sourceUnit)
+  [[nodiscard]] std::pair<ReconBlipMap::iterator, ReconBlipMap::iterator> FindReconBlipRange(
+    CAiReconDBImpl* const owner,
+    Unit* const sourceUnit
+  )
   {
     return owner->mBlipMap.equal_range(MakeReconProbeKey(GetSourceEntityId(sourceUnit)));
   }
@@ -78,7 +84,10 @@ namespace
   };
   std::unordered_map<const CAiReconDBImpl*, ReconBlipIndex> gReconBlipIndexes;
 
-  void RefreshReconBlipIndex(CAiReconDBImpl* const owner, const std::uint32_t sourceEntityId)
+  void RefreshReconBlipIndex(
+    CAiReconDBImpl* const owner,
+    const std::uint32_t sourceEntityId
+  )
   {
     const auto index = gReconBlipIndexes.find(owner);
     if (index == gReconBlipIndexes.end()) {
@@ -93,7 +102,10 @@ namespace
   }
 
   /// `mBlipMap.erase(node)`, keeping the blip index current.
-  void EraseReconBlipNode(CAiReconDBImpl* const owner, const ReconBlipMap::iterator node)
+  void EraseReconBlipNode(
+    CAiReconDBImpl* const owner,
+    const ReconBlipMap::iterator node
+  )
   {
     const std::uint32_t sourceEntityId = node->first.sourceEntityId;
     (void)owner->mBlipMap.erase(node);
@@ -102,50 +114,70 @@ namespace
 
   // 0x005C05D5..0x005C0602: four `comiss`/`ja` rejections, so a coordinate
   // that compares unordered (NaN) counts as inside.
-  [[nodiscard]] bool IsInsideRectXZ(const moho::Rect2<int>& rect, const Wm3::Vec3f& pos) noexcept
+  [[nodiscard]] bool IsInsideRectXZ(
+    const moho::Rect2<int>& rect,
+    const Wm3::Vec3f& pos
+  ) noexcept
   {
     return !(static_cast<float>(rect.x0) > pos.x) && !(pos.x > static_cast<float>(rect.x1)) &&
       !(static_cast<float>(rect.z0) > pos.z) && !(pos.z > static_cast<float>(rect.z1));
   }
 
-  [[nodiscard]] EReconFlags MergeFlags(const EReconFlags lhs, const EReconFlags rhs) noexcept
+  [[nodiscard]] EReconFlags MergeFlags(
+    const EReconFlags lhs,
+    const EReconFlags rhs
+  ) noexcept
   {
     return static_cast<EReconFlags>(static_cast<std::int32_t>(lhs) | static_cast<std::int32_t>(rhs));
   }
 
-  [[nodiscard]] EReconFlags ClearFlag(const EReconFlags value, const EReconFlags bit) noexcept
+  [[nodiscard]] EReconFlags ClearFlag(
+    const EReconFlags value,
+    const EReconFlags bit
+  ) noexcept
   {
     return static_cast<EReconFlags>(static_cast<std::int32_t>(value) & ~static_cast<std::int32_t>(bit));
   }
 
-  [[nodiscard]] bool HasFlag(const EReconFlags value, const EReconFlags bit) noexcept
+  [[nodiscard]] bool HasFlag(
+    const EReconFlags value,
+    const EReconFlags bit
+  ) noexcept
   {
     return (static_cast<std::int32_t>(value) & static_cast<std::int32_t>(bit)) != 0;
   }
 
-  [[nodiscard]] bool UsesWaterSenseLane(const ELayer layer) noexcept
+  [[nodiscard]] bool UsesWaterSenseLane(
+    const ELayer layer
+  ) noexcept
   {
-    constexpr std::int32_t kWaterSenseMask = static_cast<std::int32_t>(LAYER_Sub) | static_cast<std::int32_t>(LAYER_Water);
+    constexpr std::int32_t kWaterSenseMask =
+      static_cast<std::int32_t>(LAYER_Sub) | static_cast<std::int32_t>(LAYER_Water);
     return (static_cast<std::int32_t>(layer) & kWaterSenseMask) != 0;
   }
 
-  [[nodiscard]] const char* ReconSenseLexical(const EReconFlags sense) noexcept
+  [[nodiscard]] const char* ReconSenseLexical(
+    const EReconFlags sense
+  ) noexcept
   {
     switch (sense) {
-      case RECON_LOSNow:
-        return "LOSNow";
-      case RECON_Radar:
-        return "Radar";
-      case RECON_Sonar:
-        return "Sonar";
-      case RECON_Omni:
-        return "Omni";
-      default:
-        return "Unknown";
+    case RECON_LOSNow:
+      return "LOSNow";
+    case RECON_Radar:
+      return "Radar";
+    case RECON_Sonar:
+      return "Sonar";
+    case RECON_Omni:
+      return "Omni";
+    default:
+      return "Unknown";
     }
   }
 
-  [[nodiscard]] bool IsAlliedOrSameArmy(const SimArmy* const viewer, const SimArmy* const owner) noexcept
+  [[nodiscard]] bool IsAlliedOrSameArmy(
+    const SimArmy* const viewer,
+    const SimArmy* const owner
+  ) noexcept
   {
     if (!viewer || !owner) {
       return false;
@@ -162,24 +194,31 @@ namespace
     return viewer->mVarDat.mAllies.Contains(static_cast<std::uint32_t>(owner->mConstDat.mArmyIndex));
   }
 
-  [[nodiscard]] Unit* DecodeBlipSourceUnit(ReconBlip* const blip) noexcept
+  [[nodiscard]] Unit* DecodeBlipSourceUnit(
+    ReconBlip* const blip
+  ) noexcept
   {
     return blip ? blip->GetSourceUnit() : nullptr;
   }
 
-  [[nodiscard]] bool IsFakeBlip(ReconBlip* const blip) noexcept
+  [[nodiscard]] bool IsFakeBlip(
+    ReconBlip* const blip
+  ) noexcept
   {
     return blip && blip->IsFake();
   }
 
   [[nodiscard]] SPerArmyReconInfo* GetPerArmyReconSlot(
-    ReconBlip* const blip, const std::int32_t armyIndex
+    ReconBlip* const blip,
+    const std::int32_t armyIndex
   ) noexcept
   {
     return blip ? blip->GetPerArmyReconInfo(armyIndex) : nullptr;
   }
 
-  [[nodiscard]] std::int32_t GetActiveJammerBlipCount(const Unit* const unit) noexcept
+  [[nodiscard]] std::int32_t GetActiveJammerBlipCount(
+    const Unit* const unit
+  ) noexcept
   {
     if (!unit) {
       return 0;
@@ -213,7 +252,10 @@ namespace
    * An unfocused viewer (index -1) short-circuits to false at 0x005C0CC6
    * `cmp eax,-1`, leaving the decision to the LOS probe beside this call.
    */
-  [[nodiscard]] bool BlipArmyTreatsViewerAsAlly(CAiReconDBImpl* const owner, ReconBlip* const blip) noexcept
+  [[nodiscard]] bool BlipArmyTreatsViewerAsAlly(
+    CAiReconDBImpl* const owner,
+    ReconBlip* const blip
+  ) noexcept
   {
     if (!owner || !blip || !owner->mArmy) {
       return false;
@@ -232,7 +274,9 @@ namespace
     return blipArmy->mVarDat.mAllies.Contains(static_cast<std::uint32_t>(viewerArmyId));
   }
 
-  [[nodiscard]] Wm3::Vec3f BlipProbePosition(ReconBlip* const blip) noexcept
+  [[nodiscard]] Wm3::Vec3f BlipProbePosition(
+    ReconBlip* const blip
+  ) noexcept
   {
     if (!blip) {
       return {};
@@ -258,7 +302,10 @@ namespace
     influenceMap->UpdateBlipPosition(blipId, blipEntity->mVarDat.mCurTransform.pos_, blueprint);
   }
 
-  [[nodiscard]] bool DoesBlipSourceCollideBox(ReconBlip* const blip, const Wm3::Box3f& box) noexcept
+  [[nodiscard]] bool DoesBlipSourceCollideBox(
+    ReconBlip* const blip,
+    const Wm3::Box3f& box
+  ) noexcept
   {
     Unit* const sourceUnit = DecodeBlipSourceUnit(blip);
     if (!sourceUnit) {
@@ -274,8 +321,9 @@ namespace
     return collision->CollideBox(&box, &overlap);
   }
 
-
-  void RebuildBlipListFromMapAndOrphans(CAiReconDBImpl* const owner)
+  void RebuildBlipListFromMapAndOrphans(
+    CAiReconDBImpl* const owner
+  )
   {
     if (!owner) {
       return;
@@ -303,7 +351,9 @@ namespace
   }
 
   void ClearPerArmyRecon(
-    CAiReconDBImpl* const owner, ReconBlip* const blip, const bool emitIntelEvents
+    CAiReconDBImpl* const owner,
+    ReconBlip* const blip,
+    const bool emitIntelEvents
   )
   {
     if (!owner || !owner->mArmy || !blip) {
@@ -348,16 +398,21 @@ namespace
     const EReconFlags detectedFlags
   )
   {
-    pending.push_back(CAiReconDBImpl::SNewBlip{
-      .sourceUnit = sourceUnit,
-      .fake = fake,
-      .pad_09_0B = {},
-      .detectedFlags = detectedFlags,
-    });
+    pending.push_back(
+      CAiReconDBImpl::SNewBlip{
+        .sourceUnit = sourceUnit,
+        .fake = fake,
+        .pad_09_0B = {},
+        .detectedFlags = detectedFlags,
+      }
+    );
   }
 
   [[nodiscard]] EReconFlags ReconCanDetectEntity(
-    const CAiReconDBImpl* const owner, Entity* const entity, const Wm3::Vec3f& pos, const EReconFlags oldFlags
+    const CAiReconDBImpl* const owner,
+    Entity* const entity,
+    const Wm3::Vec3f& pos,
+    const EReconFlags oldFlags
   )
   {
     return owner ? owner->ReconCanDetect(entity, pos, oldFlags) : RECON_None;
@@ -366,7 +421,10 @@ namespace
   [[nodiscard]] EReconFlags ReconTickQuery(const CAiReconDBImpl* db, Unit* unit, std::size_t index);
   void EndReconTickQueries(const CAiReconDBImpl* db);
 
-  void TickAllReconGrids(CAiReconDBImpl* const owner, const int dTicks)
+  void TickAllReconGrids(
+    CAiReconDBImpl* const owner,
+    const int dTicks
+  )
   {
     if (!owner) {
       return;
@@ -438,7 +496,6 @@ namespace moho
     &sim_ReconBlipIndex
   );
 
-
   /**
    * One `GetReconFlags` point probe: the probed entity and position, plus the
    * values the binary re-derives from them alone in every per-army
@@ -452,7 +509,10 @@ namespace moho
    */
   struct SReconPointProbe
   {
-    SReconPointProbe(Entity* const entity, const Wm3::Vec3f& pos) noexcept
+    SReconPointProbe(
+      Entity* const entity,
+      const Wm3::Vec3f& pos
+    ) noexcept
       : mPos(pos)
       , mUnit(entity ? entity->IsUnit() : nullptr)
     {
@@ -482,7 +542,9 @@ namespace moho
      * the cell is built once per size with the same `GridPos` constructor and
      * reused; the bounds test stays per grid.
      */
-    [[nodiscard]] bool IsVisibleIn(const CIntelGrid* const grid) const
+    [[nodiscard]] bool IsVisibleIn(
+      const CIntelGrid* const grid
+    ) const
     {
       if (grid == nullptr) {
         return false;
@@ -534,8 +596,7 @@ gpg::RType* CAiReconDBImpl::sType = nullptr;
  */
 CAiReconDBImpl::CAiReconDBImpl()
   : CAiReconDBImpl(nullptr, false)
-{
-}
+{}
 
 /**
  * Address: 0x005BFF90 (FUN_005BFF90, ??0CAiReconDBImpl@Moho@@QAE@PAVSimArmy@1@_N1@Z)
@@ -545,27 +606,29 @@ CAiReconDBImpl::CAiReconDBImpl()
  * boost::ResetSharedPtrRawOwning at all 8 grid-assignment call sites below
  * (e.g. 0x005C00D7).
  */
-CAiReconDBImpl::CAiReconDBImpl(SimArmy* const army, const bool fogOfWar) :
-    mBlipMap{},
-    mBblips{},
-    mTempBlips{},
-    mArmy(army),
-    mMapData(nullptr),
-    mSim(nullptr),
-    mIMap(nullptr),
-    mVisionGrid{},
-    mWaterGrid{},
-    mRadarGrid{},
-    mSonarGrid{},
-    mOmniGrid{},
-    mRCIGrid{},
-    mSCIGrid{},
-    mVCIGrid{},
-    mVisibleToReconCategory{},
-    mFogOfWar(static_cast<std::uint8_t>(fogOfWar ? 1u : 0u)),
-    mPadA9{0, 0, 0, 0, 0, 0, 0}
+CAiReconDBImpl::CAiReconDBImpl(
+  SimArmy* const army,
+  const bool fogOfWar
+)
+  : mBlipMap{}
+  , mBblips{}
+  , mTempBlips{}
+  , mArmy(army)
+  , mMapData(nullptr)
+  , mSim(nullptr)
+  , mIMap(nullptr)
+  , mVisionGrid{}
+  , mWaterGrid{}
+  , mRadarGrid{}
+  , mSonarGrid{}
+  , mOmniGrid{}
+  , mRCIGrid{}
+  , mSCIGrid{}
+  , mVCIGrid{}
+  , mVisibleToReconCategory{}
+  , mFogOfWar(static_cast<std::uint8_t>(fogOfWar ? 1u : 0u))
+  , mPadA9{0, 0, 0, 0, 0, 0, 0}
 {
-
 
   if (!mArmy) {
     return;
@@ -581,7 +644,6 @@ CAiReconDBImpl::CAiReconDBImpl(SimArmy* const army, const bool fogOfWar) :
     if (category) {
       mVisibleToReconCategory = *category;
     }
-
   }
 
   boost::ResetSharedPtrRawOwning(mRadarGrid, MakeGrid(mMapData, kIntelGridCellSize));
@@ -658,7 +720,9 @@ void CAiReconDBImpl::Flush()
 /**
  * Address: 0x005C0C40 (FUN_005C0C40)
  */
-void CAiReconDBImpl::ReconTick(const int dTicks)
+void CAiReconDBImpl::ReconTick(
+  const int dTicks
+)
 {
   if (!mArmy || !mSim) {
     TickAllReconGrids(this, dTicks);
@@ -668,12 +732,18 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
   // 0x005C0C40 opens on the Logf and goes straight into the orphan loop at
   // 0x005C0CA5. There is no map re-seed here; seeding belongs to the two entry
   // points that can be reached with an empty map, not to the per-tick path.
-  mSim->Logf("ReconTick for army %d: %s [%s]\n", mArmy->mConstDat.mArmyIndex, mArmy->mConstDat.mPlayerName.raw_data_unsafe(), mArmy->mConstDat.mArmyName.raw_data_unsafe());
+  mSim->Logf(
+    "ReconTick for army %d: %s [%s]\n",
+    mArmy->mConstDat.mArmyIndex,
+    mArmy->mConstDat.mPlayerName.raw_data_unsafe(),
+    mArmy->mConstDat.mArmyName.raw_data_unsafe()
+  );
 
   for (auto it = mTempBlips.begin(); it != mTempBlips.end();) {
     ReconBlip* const blip = *it;
     const bool shouldDelete = BlipArmyTreatsViewerAsAlly(this, blip) ||
-      (ReconCanDetectEntity(this, reinterpret_cast<Entity*>(blip), BlipProbePosition(blip), RECON_LOSNow) != RECON_None);
+      (ReconCanDetectEntity(this, reinterpret_cast<Entity*>(blip), BlipProbePosition(blip), RECON_LOSNow) !=
+       RECON_None);
     if (shouldDelete) {
       // 0x005C0D39-0x005C0D74: the orphan teardown logs the confirmation and
       // feeds the sim checksum -- tag 2, then the blip id, four bytes each, the
@@ -741,10 +811,11 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
       // decoy ghosts that nothing would ever clear.
       if (blip->mDeleteWhenStale != 0u) {
         ClearPerArmyRecon(this, blip, true);
-        blip->DestroyIfUnused();  // 0x005C0F14
+        blip->DestroyIfUnused(); // 0x005C0F14
       } else {
         const bool shouldDeleteFake = BlipArmyTreatsViewerAsAlly(this, blip) ||
-          (ReconCanDetectEntity(this, reinterpret_cast<Entity*>(blip), BlipProbePosition(blip), RECON_LOSNow) != RECON_None);
+          (ReconCanDetectEntity(this, reinterpret_cast<Entity*>(blip), BlipProbePosition(blip), RECON_LOSNow) !=
+           RECON_None);
         if (shouldDeleteFake) {
           // 0x005C0F8A. Same influence-map release as the orphan arm. The
           // stale-mobile arm below deliberately has none -- the binary does not
@@ -753,7 +824,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
             mIMap->RemoveEntry(static_cast<std::uint32_t>(blip->id_));
           }
           ClearPerArmyRecon(this, blip, true);
-          blip->DestroyIfUnused();  // 0x005C0FBA
+          blip->DestroyIfUnused(); // 0x005C0FBA
         } else {
           SPerArmyReconInfo* const recon = GetPerArmyReconSlot(blip, mArmy->mConstDat.mArmyIndex);
           if (recon) {
@@ -853,7 +924,10 @@ namespace
   constexpr std::size_t kBlipPrefetchNear = 6u;
 
   void PrefetchBlipsAhead(
-    ReconBlip* const* const blips, const std::size_t index, const std::size_t count, const std::int32_t armyIndex
+    ReconBlip* const* const blips,
+    const std::size_t index,
+    const std::size_t count,
+    const std::int32_t armyIndex
   ) noexcept
   {
     if (index + kBlipPrefetchFar < count) {
@@ -880,7 +954,11 @@ namespace
    * a blip in the map or among the orphans is null the sizes differ, and the walk stays on the tree.
    */
   template <class TVisit>
-  void ForEachMappedBlipWithSource(CAiReconDBImpl& db, const std::int32_t armyIndex, TVisit&& visit)
+  void ForEachMappedBlipWithSource(
+    CAiReconDBImpl& db,
+    const std::int32_t armyIndex,
+    TVisit&& visit
+  )
   {
     const std::size_t count = db.mBlipMap.size();
     if (sim_ReconFlatWalk && db.mBblips.size() == count + db.mTempBlips.size()) {
@@ -944,7 +1022,11 @@ void CAiReconDBImpl::ReconRefresh()
  * What it does:
  * Emits one `OnIntelChange` script event for a single changed recon lane.
  */
-void CAiReconDBImpl::CheckEvent(ReconBlip* const blip, const int newFlags, const EReconFlags changedFlag)
+void CAiReconDBImpl::CheckEvent(
+  ReconBlip* const blip,
+  const int newFlags,
+  const EReconFlags changedFlag
+)
 {
   if (!mArmy || !blip) {
     return;
@@ -974,7 +1056,11 @@ void CAiReconDBImpl::CheckEvent(ReconBlip* const blip, const int newFlags, const
  * What it does:
  * Diffs old/new recon masks and emits lane-specific intel-change callbacks.
  */
-void CAiReconDBImpl::CheckIntelEvents(ReconBlip* const blip, const int oldFlags, const int newFlags)
+void CAiReconDBImpl::CheckIntelEvents(
+  ReconBlip* const blip,
+  const int oldFlags,
+  const int newFlags
+)
 {
   if (oldFlags == newFlags) {
     return;
@@ -1005,7 +1091,9 @@ void CAiReconDBImpl::CheckIntelEvents(ReconBlip* const blip, const int oldFlags,
  * the recon blip map and the influence map, and fires `OnDetectedBy` on each
  * detected unit.
  */
-void CAiReconDBImpl::GenerateNewBlips(const fa::vector<SNewBlip>& pending)
+void CAiReconDBImpl::GenerateNewBlips(
+  const fa::vector<SNewBlip>& pending
+)
 {
   for (const SNewBlip& candidate : pending) {
     ReconBlip* const blip = FindOrCreateBlip(candidate);
@@ -1034,7 +1122,9 @@ void CAiReconDBImpl::GenerateNewBlips(const fa::vector<SNewBlip>& pending)
 /**
  * Address: 0x005C0930 (FUN_005C0930)
  */
-ReconBlip* CAiReconDBImpl::FindOrCreateBlip(const SNewBlip& candidate)
+ReconBlip* CAiReconDBImpl::FindOrCreateBlip(
+  const SNewBlip& candidate
+)
 {
   Unit* const sourceUnit = candidate.sourceUnit;
   if (!mArmy || !sourceUnit) {
@@ -1082,13 +1172,19 @@ namespace
 {
   /// Whether this army's record of the unit holds its poses (`POSE_HoldClientHandles`). One it holds
   /// from before the unit's skeleton changed is still replaced, as an 11-bone pose must be freed.
-  [[nodiscard]] bool BlipHoldsPoses(const SPerArmyReconInfo& perArmy, const CAniActor& actor) noexcept
+  [[nodiscard]] bool BlipHoldsPoses(
+    const SPerArmyReconInfo& perArmy,
+    const CAniActor& actor
+  ) noexcept
   {
     return POSE_HoldClientHandles(actor) || perArmy.mPose.get() != nullptr || perArmy.mPriorPose.get() != nullptr;
   }
 } // namespace
 
-void CAiReconDBImpl::RefreshBlip(ReconBlip* const blip, Unit* const sourceUnit)
+void CAiReconDBImpl::RefreshBlip(
+  ReconBlip* const blip,
+  Unit* const sourceUnit
+)
 {
   if (!mArmy || !blip || !sourceUnit || blip->IsFake()) {
     return;
@@ -1174,13 +1270,19 @@ namespace
   /// True when `target = source` would leave `target` unchanged: the same pointer and the same
   /// control block (boost 1.34 orders shared_ptrs by owner).
   template <class T>
-  [[nodiscard]] bool SameHandle(const boost::shared_ptr<T>& target, const boost::shared_ptr<T>& source) noexcept
+  [[nodiscard]] bool SameHandle(
+    const boost::shared_ptr<T>& target,
+    const boost::shared_ptr<T>& source
+  ) noexcept
   {
     return target.get() == source.get() && !(target < source) && !(source < target);
   }
 
   /// True when RefreshBlip's LOS branch would change any of the three handles.
-  [[nodiscard]] bool BlipHandlesDiffer(const SPerArmyReconInfo& perArmy, const Unit& sourceUnit) noexcept
+  [[nodiscard]] bool BlipHandlesDiffer(
+    const SPerArmyReconInfo& perArmy,
+    const Unit& sourceUnit
+  ) noexcept
   {
     if (POSE_KeepClientHandles() && !SameHandle(perArmy.mMesh, sourceUnit.mVarDat.mScmResource)) {
       return true;
@@ -1232,15 +1334,16 @@ namespace
     const boost::shared_ptr<CAniPose>& priorPose = actor != nullptr ? actor->mPriorPose : noPose;
     const boost::shared_ptr<CAniPose>& pose = actor != nullptr ? actor->mPose : noPose;
     const auto sourceHolds = [&](const boost::shared_ptr<CAniPose>& handle) {
-      return actor != nullptr && handle.get() != nullptr &&
-             (SameHandle(handle, priorPose) || SameHandle(handle, pose));
+      return actor != nullptr && handle.get() != nullptr && (SameHandle(handle, priorPose) || SameHandle(handle, pose));
     };
     ExchangeHandle(perArmy.mPriorPose, priorPose, released.mPriorPose, sourceHolds(perArmy.mPriorPose));
     ExchangeHandle(perArmy.mPose, pose, released.mPose, sourceHolds(perArmy.mPose));
   }
 } // namespace
 
-void CAiReconDBImpl::RefreshDeferringHandles(SRefreshFixups& fixups)
+void CAiReconDBImpl::RefreshDeferringHandles(
+  SRefreshFixups& fixups
+)
 {
   fixups.mCount = 0u;
   fixups.mOverflow = false;
@@ -1264,7 +1367,9 @@ void CAiReconDBImpl::RefreshDeferringHandles(SRefreshFixups& fixups)
     if ((perArmy->mReconFlags & static_cast<std::uint32_t>(RECON_LOSNow)) != 0u) {
       perArmy->mMeshTypeClassId = sourceUnit->mVarDat.mMeshBlueprint;
       const CAniActor* const sourceActor = sourceUnit->AniActor;
-      if ((sourceActor == nullptr || BlipHoldsPoses(*perArmy, *sourceActor)) && BlipHandlesDiffer(*perArmy, *sourceUnit)) {
+      if (
+        (sourceActor == nullptr || BlipHoldsPoses(*perArmy, *sourceActor)) && BlipHandlesDiffer(*perArmy, *sourceUnit)
+      ) {
         if (fixups.mCount < SRefreshFixups::kCapacity) {
           ExchangeBlipHandles(*perArmy, *sourceUnit, fixups.mReleased[fixups.mCount++]);
         } else {
@@ -1282,7 +1387,9 @@ void CAiReconDBImpl::RefreshDeferringHandles(SRefreshFixups& fixups)
   });
 }
 
-void CAiReconDBImpl::ApplyRefreshFixups(SRefreshFixups& fixups)
+void CAiReconDBImpl::ApplyRefreshFixups(
+  SRefreshFixups& fixups
+)
 {
   // The releases RefreshBlip would have made, in its order: blip by blip in map order, and mesh,
   // prior pose, pose within a blip.
@@ -1306,7 +1413,11 @@ void CAiReconDBImpl::ApplyRefreshFixups(SRefreshFixups& fixups)
 /**
  * Address: 0x005C1CF0 (FUN_005C1CF0)
  */
-void CAiReconDBImpl::UpdateBlip(ReconBlip* const blip, Unit* const sourceUnit, std::uint32_t newFlags)
+void CAiReconDBImpl::UpdateBlip(
+  ReconBlip* const blip,
+  Unit* const sourceUnit,
+  std::uint32_t newFlags
+)
 {
   if (!mArmy || !blip) {
     return;
@@ -1332,7 +1443,9 @@ void CAiReconDBImpl::UpdateBlip(ReconBlip* const blip, Unit* const sourceUnit, s
   const std::uint32_t oldFlags = perArmy->mReconFlags;
   if (blip->IsFake()) {
     Entity* const sourceEntity = sourceUnit ? static_cast<Entity*>(sourceUnit) : nullptr;
-    newFlags = static_cast<std::uint32_t>(ReconCanDetectEntity(this, sourceEntity, blip->mVarDat.mCurTransform.pos_, RECON_AnySense));
+    newFlags = static_cast<std::uint32_t>(
+      ReconCanDetectEntity(this, sourceEntity, blip->mVarDat.mCurTransform.pos_, RECON_AnySense)
+    );
   }
 
   newFlags |= (oldFlags & 0x30u);
@@ -1387,7 +1500,9 @@ void CAiReconDBImpl::UpdateBlip(ReconBlip* const blip, Unit* const sourceUnit, s
 
   if (mIMap) {
     mIMap->UpdateBlipPosition(
-      static_cast<std::uint32_t>(blip->id_), blip->mVarDat.mCurTransform.pos_, static_cast<const RUnitBlueprint*>(blip->GetBlueprint())
+      static_cast<std::uint32_t>(blip->id_),
+      blip->mVarDat.mCurTransform.pos_,
+      static_cast<const RUnitBlueprint*>(blip->GetBlueprint())
     );
   }
   CheckIntelEvents(blip, static_cast<int>(oldFlags), static_cast<int>(refreshedFlags));
@@ -1462,7 +1577,9 @@ void CAiReconDBImpl::UpdateBlips(
 /**
  * Address: 0x005C21F0 (FUN_005C21F0)
  */
-void CAiReconDBImpl::DeleteBlip(ReconBlip* const blip)
+void CAiReconDBImpl::DeleteBlip(
+  ReconBlip* const blip
+)
 {
   if (!mArmy || !blip) {
     return;
@@ -1495,7 +1612,10 @@ void CAiReconDBImpl::DeleteBlip(ReconBlip* const blip)
  * Clears this army's recon state for all map blips from one source unit and
  * removes that source's range from the typed recon map.
  */
-void CAiReconDBImpl::DeleteBlips(const ReconBlipMap::iterator first, const ReconBlipMap::iterator last)
+void CAiReconDBImpl::DeleteBlips(
+  const ReconBlipMap::iterator first,
+  const ReconBlipMap::iterator last
+)
 {
   // The range comes from ReconTick's lookup (0x005C2230 reads `[ecx]` and
   // `[ecx+4]`). 0x005C2250..0x005C22D7 tears every blip in it down while the
@@ -1531,7 +1651,9 @@ void CAiReconDBImpl::DeleteBlips(const ReconBlipMap::iterator first, const Recon
  * counter-intel suppression.
  */
 EReconFlags CAiReconDBImpl::GetNewReconFor(
-  const SReconPointProbe& probe, const EReconFlags oldFlags, const bool belowWater
+  const SReconPointProbe& probe,
+  const EReconFlags oldFlags,
+  const bool belowWater
 ) const
 {
   EReconFlags detected = RECON_None;
@@ -1579,7 +1701,10 @@ EReconFlags CAiReconDBImpl::GetNewReconFor(
  * Applies point counter-intel and stealth/counter-stealth suppression to
  * raw recon flags.
  */
-EReconFlags CAiReconDBImpl::ApplyReconCounters(const SReconPointProbe& probe, EReconFlags flags) const
+EReconFlags CAiReconDBImpl::ApplyReconCounters(
+  const SReconPointProbe& probe,
+  EReconFlags flags
+) const
 {
   Unit* const unit = probe.mUnit;
 
@@ -1631,7 +1756,10 @@ EReconFlags CAiReconDBImpl::ApplyReconCounters(const SReconPointProbe& probe, ER
  * applies point counter-intel filtering.
  */
 EReconFlags CAiReconDBImpl::GetReconFlags(
-  Entity* const entity, const Wm3::Vec3f& pos, const EReconFlags oldFlags, const bool belowWater
+  Entity* const entity,
+  const Wm3::Vec3f& pos,
+  const EReconFlags oldFlags,
+  const bool belowWater
 ) const
 {
   const SReconPointProbe probe(entity, pos);
@@ -1683,7 +1811,9 @@ EReconFlags CAiReconDBImpl::GetReconFlags(
  * applies rectangle counter-intel filtering.
  */
 EReconFlags CAiReconDBImpl::GetReconFlagsForRect(
-  const moho::Rect2<int>& rect, const EReconFlags oldFlags, const bool isUnderwater
+  const moho::Rect2<int>& rect,
+  const EReconFlags oldFlags,
+  const bool isUnderwater
 ) const
 {
   EReconFlags combined = GetDetection(rect, oldFlags, isUnderwater);
@@ -1732,7 +1862,9 @@ EReconFlags CAiReconDBImpl::GetReconFlagsForRect(
  * world-space rectangle.
  */
 EReconFlags CAiReconDBImpl::GetDetection(
-  const moho::Rect2<int>& rect, const EReconFlags oldFlags, const bool isUnderwater
+  const moho::Rect2<int>& rect,
+  const EReconFlags oldFlags,
+  const bool isUnderwater
 ) const
 {
   EReconFlags detected = RECON_None;
@@ -1776,7 +1908,10 @@ EReconFlags CAiReconDBImpl::GetDetection(
  * What it does:
  * Clears recon senses suppressed by active counter-intel grids.
  */
-EReconFlags CAiReconDBImpl::DoCounterDetection(const moho::Rect2<int>& rect, EReconFlags flags) const
+EReconFlags CAiReconDBImpl::DoCounterDetection(
+  const moho::Rect2<int>& rect,
+  EReconFlags flags
+) const
 {
   if (HasFlag(flags, RECON_Omni)) {
     return flags;
@@ -1797,13 +1932,19 @@ EReconFlags CAiReconDBImpl::DoCounterDetection(const moho::Rect2<int>& rect, ERe
 /**
  * Address: 0x005C18A0 (FUN_005C18A0, Moho::CAiReconDBImpl::ReconCanDetect)
  */
-EReconFlags CAiReconDBImpl::ReconCanDetect(const moho::Rect2<int>& rect, const float y, const int oldFlags) const
+EReconFlags CAiReconDBImpl::ReconCanDetect(
+  const moho::Rect2<int>& rect,
+  const float y,
+  const int oldFlags
+) const
 {
   const EReconFlags senseMask = static_cast<EReconFlags>(oldFlags);
   // Engine addition (water bodies): the level at the rectangle's centre.
-  const float waterElevation = mMapData ? mMapData->GetWaterElevationAt(
-    static_cast<float>(rect.x0 + rect.x1) * 0.5f, static_cast<float>(rect.z0 + rect.z1) * 0.5f
-  ) : -10000.0f;
+  const float waterElevation = mMapData
+    ? mMapData->GetWaterElevationAt(
+        static_cast<float>(rect.x0 + rect.x1) * 0.5f, static_cast<float>(rect.z0 + rect.z1) * 0.5f
+      )
+    : -10000.0f;
   const bool isUnderwater = waterElevation > y;
   return GetReconFlagsForRect(rect, senseMask, isUnderwater);
 }
@@ -1827,9 +1968,11 @@ EReconFlags CAiReconDBImpl::ReconCanDetect(const moho::Rect2<int>& rect, const f
   }
 
   // Engine addition (water bodies): the level at the rectangle's centre.
-  const float waterElevation = reconDb->mMapData ? reconDb->mMapData->GetWaterElevationAt(
-    static_cast<float>(rect.x0 + rect.x1) * 0.5f, static_cast<float>(rect.z0 + rect.z1) * 0.5f
-  ) : -10000.0f;
+  const float waterElevation = reconDb->mMapData
+    ? reconDb->mMapData->GetWaterElevationAt(
+        static_cast<float>(rect.x0 + rect.x1) * 0.5f, static_cast<float>(rect.z0 + rect.z1) * 0.5f
+      )
+    : -10000.0f;
   return reconDb->GetReconFlagsForRect(rect, oldFlags, waterElevation > y);
 }
 
@@ -1850,7 +1993,9 @@ EReconFlags CAiReconDBImpl::ReconCanDetect(const moho::Rect2<int>& rect, const f
  * point recon flags through `GetReconFlags`.
  */
 EReconFlags CAiReconDBImpl::ReconCanDetect(
-  Entity* const ent, const Wm3::Vec3f& pos, const EReconFlags oldFlags
+  Entity* const ent,
+  const Wm3::Vec3f& pos,
+  const EReconFlags oldFlags
 ) const
 {
   if (!ent) {
@@ -1880,7 +2025,9 @@ EReconFlags CAiReconDBImpl::ReconCanDetect(
  * What it does:
  * Probes LOS at the far beam endpoint selected by `mFromStart`.
  */
-bool CAiReconDBImpl::BeamIsVisible(const SWorldBeam& beam) const
+bool CAiReconDBImpl::BeamIsVisible(
+  const SWorldBeam& beam
+) const
 {
   if (beam.mFromStart) {
     return ReconCanDetect(beam.mCurEnd.pos_, RECON_LOSNow) != RECON_None;
@@ -1907,7 +2054,9 @@ bool CAiReconDBImpl::BeamIsVisible(const SWorldBeam& beam) const
  * Confirms dead-state visibility when the blip is allied or currently
  * detectable via LOS at its probe position.
  */
-bool CAiReconDBImpl::IntelConfirmDead(ReconBlip* const blip)
+bool CAiReconDBImpl::IntelConfirmDead(
+  ReconBlip* const blip
+)
 {
   if (!blip) {
     return false;
@@ -1934,7 +2083,10 @@ bool CAiReconDBImpl::IntelConfirmDead(ReconBlip* const blip)
  *   Wm3::Vector3f *pos,
  *   Moho::EReconFlags oldFlags)
  */
-EReconFlags CAiReconDBImpl::ReconCanDetect(const Wm3::Vec3f& pos, const int oldFlags) const
+EReconFlags CAiReconDBImpl::ReconCanDetect(
+  const Wm3::Vec3f& pos,
+  const int oldFlags
+) const
 {
   const float waterElevation = mMapData ? mMapData->GetWaterElevationAt(pos.x, pos.z) : -10000.0f; // engine addition
   const bool belowWater = waterElevation > pos.y;
@@ -1947,7 +2099,10 @@ EReconFlags CAiReconDBImpl::ReconCanDetect(const Wm3::Vec3f& pos, const int oldF
  * What it does:
  * Appends blips whose source-unit collision primitive overlaps `box`.
  */
-void CAiReconDBImpl::ReconGetBlips(const Wm3::Box3<float>& box, gpg::core::FastVector<Entity*>* const outBlips) const
+void CAiReconDBImpl::ReconGetBlips(
+  const Wm3::Box3<float>& box,
+  gpg::core::FastVector<Entity*>* const outBlips
+) const
 {
   for (ReconBlip* const blip : mBblips) {
     if (!blip) {
@@ -1967,7 +2122,9 @@ void CAiReconDBImpl::ReconGetBlips(const Wm3::Box3<float>& box, gpg::core::FastV
  * with radius `radius` (3D distance check, no output clear).
  */
 void CAiReconDBImpl::ReconGetBlips(
-  const Wm3::Vec3f& center, const float radius, gpg::core::FastVector<Entity*>* const outBlips
+  const Wm3::Vec3f& center,
+  const float radius,
+  gpg::core::FastVector<Entity*>* const outBlips
 ) const
 {
   const float radiusSquared = radius * radius;
@@ -2068,7 +2225,9 @@ boost::SharedPtrRaw<CIntelGrid> CAiReconDBImpl::ReconGetVCIGrid() const
  * What it does:
  * Updates `mFogOfWar` only when a vision grid exists.
  */
-void CAiReconDBImpl::ReconSetFogOfWar(const bool enabled)
+void CAiReconDBImpl::ReconSetFogOfWar(
+  const bool enabled
+)
 {
   if (mVisionGrid.px) {
     mFogOfWar = static_cast<std::uint8_t>(enabled ? 1u : 0u);
@@ -2102,7 +2261,9 @@ void CAiReconDBImpl::UpdateSimChecksum() {}
  * (`find`, 0x005C4950: lower-bound descent plus the equality test), or
  * `nullptr` when the unit has none.
  */
-ReconBlip* CAiReconDBImpl::ReconGetBlip(Unit* const unit) const
+ReconBlip* CAiReconDBImpl::ReconGetBlip(
+  Unit* const unit
+) const
 {
   if (!unit) {
     return nullptr;
@@ -2139,7 +2300,9 @@ ReconBlip* CAiReconDBImpl::ReconGetBlip(Unit* const unit) const
  * binary tests nothing else: no null or `DestroyQueued` check on the unit, no
  * null blip, and no re-seeding of the map.
  */
-EntitySetTemplate<Entity> CAiReconDBImpl::ReconGetJamingBlips(Unit* const unit)
+EntitySetTemplate<Entity> CAiReconDBImpl::ReconGetJamingBlips(
+  Unit* const unit
+)
 {
   EntitySetTemplate<Entity> out{};
   const SReconKey probe = MakeReconMapKey(unit);
@@ -2156,7 +2319,9 @@ EntitySetTemplate<Entity> CAiReconDBImpl::ReconGetJamingBlips(Unit* const unit)
 /**
  * Address: 0x005C05A0 (FUN_005C05A0)
  */
-void CAiReconDBImpl::ReconFlushBlipsInRect(const moho::Rect2<int>& rect)
+void CAiReconDBImpl::ReconFlushBlipsInRect(
+  const moho::Rect2<int>& rect
+)
 {
   // No map re-seed: 0x005C05A0 walks the orphan list straight away.
   //
@@ -2194,7 +2359,10 @@ void CAiReconDBImpl::ReconFlushBlipsInRect(const moho::Rect2<int>& rect)
 /**
  * Address: 0x005C36A0 (FUN_005C36A0, ??2CAiReconDBImpl@Moho@@QAE@@Z)
  */
-CAiReconDBImpl* CAiReconDBImpl::Create(SimArmy* const army, const bool fogOfWar)
+CAiReconDBImpl* CAiReconDBImpl::Create(
+  SimArmy* const army,
+  const bool fogOfWar
+)
 {
   return new CAiReconDBImpl(army, fogOfWar);
 }
@@ -2208,7 +2376,10 @@ CAiReconDBImpl* CAiReconDBImpl::Create(SimArmy* const army, const bool fogOfWar)
  * to match the binary's separate `shared_ptr_CIntelGrid::operator=` call
  * (e.g. 0x005C00D7) rather than binding a custom deleter.
  */
-CIntelGrid* CAiReconDBImpl::MakeGrid(STIMap* const map, const std::uint32_t gridSize)
+CIntelGrid* CAiReconDBImpl::MakeGrid(
+  STIMap* const map,
+  const std::uint32_t gridSize
+)
 {
   if (!map) {
     return nullptr;
@@ -2217,16 +2388,20 @@ CIntelGrid* CAiReconDBImpl::MakeGrid(STIMap* const map, const std::uint32_t grid
   return new CIntelGrid(map, gridSize);
 }
 
-
 namespace moho
 {
-  bool SReconKeyLess::operator()(const SReconKey& lhs, const SReconKey& rhs) const noexcept
+  bool SReconKeyLess::operator()(
+    const SReconKey& lhs,
+    const SReconKey& rhs
+  ) const noexcept
   {
     return lhs.sourceEntityId < rhs.sourceEntityId;
   }
 } // namespace moho
 
-void moho::RECON_DropBlipIndex(const CAiReconDBImpl* const db)
+void moho::RECON_DropBlipIndex(
+  const CAiReconDBImpl* const db
+)
 {
   gReconBlipIndexes.erase(db);
 }
@@ -2257,21 +2432,30 @@ namespace
   } sReconQueryCache;
 
   /// The units ReconTick's main loop queries, by its own filters.
-  [[nodiscard]] bool IsReconTickQueryUnit(const CAiReconDBImpl& db, const Unit* const unit)
+  [[nodiscard]] bool IsReconTickQueryUnit(
+    const CAiReconDBImpl& db,
+    const Unit* const unit
+  )
   {
     return !unit->DestroyQueued() && unit->BluePrint != nullptr && unit->ArmyRef != db.mArmy &&
-           db.mVisibleToReconCategory.ContainsBit(unit->BluePrint->mCategoryBitIndex);
+      db.mVisibleToReconCategory.ContainsBit(unit->BluePrint->mCategoryBitIndex);
   }
 
   /// ReconTick's query of `unit`, the `index`th unit its main loop queries: the cached result when
   /// the cache serves this DB, lists that unit there and its chunk is done; else computed here.
-  [[nodiscard]] EReconFlags ReconTickQuery(const CAiReconDBImpl* const db, Unit* const unit, const std::size_t index)
+  [[nodiscard]] EReconFlags ReconTickQuery(
+    const CAiReconDBImpl* const db,
+    Unit* const unit,
+    const std::size_t index
+  )
   {
     SReconQueryCache& cache = sReconQueryCache;
     if (cache.mDb == db) {
       ++cache.mQueried;
-      if (index < cache.mEntries.size() && cache.mEntries[index].mUnit == unit &&
-          cache.mChunkDone[index / SReconQueryCache::kChunkUnits].load(std::memory_order_acquire)) {
+      if (
+        index < cache.mEntries.size() && cache.mEntries[index].mUnit == unit &&
+        cache.mChunkDone[index / SReconQueryCache::kChunkUnits].load(std::memory_order_acquire)
+      ) {
         ++cache.mServed;
         return cache.mEntries[index].mFlags;
       }
@@ -2281,7 +2465,9 @@ namespace
 
   /// After ReconTick's main loop nothing takes a cached query, and what follows (blip creation,
   /// the grid advance) writes what fills read: stop the fills and wait for those in progress.
-  void EndReconTickQueries(const CAiReconDBImpl* const db)
+  void EndReconTickQueries(
+    const CAiReconDBImpl* const db
+  )
   {
     SReconQueryCache& cache = sReconQueryCache;
     if (cache.mDb != db) {
@@ -2299,18 +2485,23 @@ namespace moho
   bool sim_ReconQueryCache = true;
   TConVar<bool> gTConVar_sim_ReconQueryCache(
     "sim_ReconQueryCache",
-    "With sim_ReconOverlap, the ReconTick army's per-unit detection queries are computed ahead on sim workers (same recon).",
+    "With sim_ReconOverlap, the ReconTick army's per-unit detection queries are computed ahead on sim workers (same "
+    "recon).",
     &sim_ReconQueryCache
   );
 } // namespace moho
 
-std::size_t moho::RECON_StartQueryCache(const CAiReconDBImpl* const db)
+std::size_t moho::RECON_StartQueryCache(
+  const CAiReconDBImpl* const db
+)
 {
   SReconQueryCache& cache = sReconQueryCache;
   cache.mDb = nullptr;
   cache.mEntries.clear();
-  if (!sim_ReconQueryCache || db == nullptr || db->mArmy == nullptr || db->mSim == nullptr ||
-      db->mSim->mEntityDB == nullptr) {
+  if (
+    !sim_ReconQueryCache || db == nullptr || db->mArmy == nullptr || db->mSim == nullptr ||
+    db->mSim->mEntityDB == nullptr
+  ) {
     return 0u;
   }
 
@@ -2346,7 +2537,10 @@ std::size_t moho::RECON_StartQueryCache(const CAiReconDBImpl* const db)
   return chunks;
 }
 
-void moho::RECON_FillQueryCache(const std::size_t firstChunk, const std::size_t lastChunk)
+void moho::RECON_FillQueryCache(
+  const std::size_t firstChunk,
+  const std::size_t lastChunk
+)
 {
   SReconQueryCache& cache = sReconQueryCache;
   const CAiReconDBImpl* const db = cache.mFillDb;

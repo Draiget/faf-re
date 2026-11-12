@@ -14,12 +14,30 @@
 #include <cstdio>
 #include <cstring>
 
-static inline float AsFloat(std::uint32_t u) { float f; std::memcpy(&f, &u, 4); return f; }
-static inline std::uint32_t AsBits(float f) { std::uint32_t u; std::memcpy(&u, &f, 4); return u; }
-
-int main(int argc, char** argv)
+static inline float AsFloat(
+  std::uint32_t u
+)
 {
-  if (argc < 2) return 2;
+  float f;
+  std::memcpy(&f, &u, 4);
+  return f;
+}
+static inline std::uint32_t AsBits(
+  float f
+)
+{
+  std::uint32_t u;
+  std::memcpy(&u, &f, 4);
+  return u;
+}
+
+int main(
+  int argc,
+  char** argv
+)
+{
+  if (argc < 2)
+    return 2;
   const char* fn = argv[1];
   const bool bounded = std::strcmp(fn, "asin") == 0 || std::strcmp(fn, "acos") == 0;
   for (std::uint64_t block = 0; block < (1ull << 12); ++block) {
@@ -28,20 +46,29 @@ int main(int argc, char** argv)
     for (std::uint64_t i = 0; i < (1ull << 20); ++i) {
       const std::uint32_t bits = static_cast<std::uint32_t>((block << 20) | i);
       const float x = AsFloat(bits);
-      if (bounded && !(x >= -1.0f && x <= 1.0f)) continue;
-      if (std::isnan(x)) continue;
+      if (bounded && !(x >= -1.0f && x <= 1.0f))
+        continue;
+      if (std::isnan(x))
+        continue;
       const double d = static_cast<double>(x);
       double r;
-      if (fn[0] == 'a' && fn[1] == 's') r = std::asin(d);
-      else if (fn[0] == 'a') r = std::acos(d);
-      else if (fn[0] == 'e') r = std::exp(d);
-      else r = std::log(d);
+      if (fn[0] == 'a' && fn[1] == 's')
+        r = std::asin(d);
+      else if (fn[0] == 'a')
+        r = std::acos(d);
+      else if (fn[0] == 'e')
+        r = std::exp(d);
+      else
+        r = std::log(d);
       const std::uint32_t out = AsBits(static_cast<float>(r));
       hash = (hash ^ bits) * 1099511628211ull;
       hash = (hash ^ out) * 1099511628211ull;
       any = true;
     }
-    if (any) std::printf("%s %llu %016llx\n", fn, static_cast<unsigned long long>(block), static_cast<unsigned long long>(hash));
+    if (any)
+      std::printf(
+        "%s %llu %016llx\n", fn, static_cast<unsigned long long>(block), static_cast<unsigned long long>(hash)
+      );
   }
   return 0;
 }

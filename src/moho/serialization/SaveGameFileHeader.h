@@ -21,16 +21,16 @@ namespace moho
    */
   struct SSaveGameFileHeader
   {
-    std::uint32_t mMagic = kSaveGameFileHeaderMagic;      // +0x0000
-    std::uint32_t mVersion = kSaveGameFileHeaderVersion;  // +0x0004
-    std::uint32_t mByteSize = kSaveGameFileHeaderSize;    // +0x0008
-    std::int32_t mPreviewOffsetLow = 0;                   // +0x000C
-    std::int32_t mPreviewOffsetHigh = 0;                  // +0x0010
-    std::uint32_t mPreviewByteSize = 0;                   // +0x0014
-    std::uint32_t mGameIdPart1 = 0;                       // +0x0018
-    std::uint32_t mGameIdPart3 = 0;                       // +0x001C
-    std::uint32_t mGameIdPart4 = 0;                       // +0x0020
-    std::uint32_t mGameIdPart2 = 0;                       // +0x0024
+    std::uint32_t mMagic = kSaveGameFileHeaderMagic;     // +0x0000
+    std::uint32_t mVersion = kSaveGameFileHeaderVersion; // +0x0004
+    std::uint32_t mByteSize = kSaveGameFileHeaderSize;   // +0x0008
+    std::int32_t mPreviewOffsetLow = 0;                  // +0x000C
+    std::int32_t mPreviewOffsetHigh = 0;                 // +0x0010
+    std::uint32_t mPreviewByteSize = 0;                  // +0x0014
+    std::uint32_t mGameIdPart1 = 0;                      // +0x0018
+    std::uint32_t mGameIdPart3 = 0;                      // +0x001C
+    std::uint32_t mGameIdPart4 = 0;                      // +0x0020
+    std::uint32_t mGameIdPart2 = 0;                      // +0x0024
     // UTF-16 text: char16_t, Windows' wchar_t, also where wchar_t is 32 bits (plan WPL.6, C4).
     char16_t mAppNameUtf16[kSaveGameFileHeaderTextCapacity]{};     // +0x0028
     char16_t mSessionNameUtf16[kSaveGameFileHeaderTextCapacity]{}; // +0x0828
@@ -39,11 +39,11 @@ namespace moho
 
   static_assert(sizeof(SSaveGameFileHeader) == 0x2028, "SSaveGameFileHeader size must be 0x2028");
   static_assert(
-    offsetof(SSaveGameFileHeader, mAppNameUtf16) == 0x28, "SSaveGameFileHeader::mAppNameUtf16 offset must be 0x28"
+    offsetof(SSaveGameFileHeader, mAppNameUtf16) == 0x28,
+    "SSaveGameFileHeader::mAppNameUtf16 offset must be 0x28"
   );
   static_assert(
     offsetof(SSaveGameFileHeader, mSessionNameUtf16) == 0x828,
     "SSaveGameFileHeader::mSessionNameUtf16 offset must be 0x828"
   );
 } // namespace moho
-

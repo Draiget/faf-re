@@ -35,7 +35,9 @@
 namespace
 {
 
-  [[nodiscard]] moho::IAiCommandDispatchImpl* AsDispatchImpl(moho::CCommandTask* const dispatchTask) noexcept
+  [[nodiscard]] moho::IAiCommandDispatchImpl* AsDispatchImpl(
+    moho::CCommandTask* const dispatchTask
+  ) noexcept
   {
     return static_cast<moho::IAiCommandDispatchImpl*>(dispatchTask);
   }
@@ -46,12 +48,17 @@ namespace
   // Distance at which the pod counts as having reached the bone.
   constexpr float kAttachContactDistance = 0.5f;
 
-  [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept
+  [[nodiscard]] moho::ETaskState NextTaskState(
+    const moho::ETaskState state
+  ) noexcept
   {
     return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
   }
 
-  [[nodiscard]] float DistanceSquared(const Wm3::Vec3f& a, const Wm3::Vec3f& b) noexcept
+  [[nodiscard]] float DistanceSquared(
+    const Wm3::Vec3f& a,
+    const Wm3::Vec3f& b
+  ) noexcept
   {
     const float dx = a.x - b.x;
     const float dy = a.y - b.y;
@@ -68,14 +75,19 @@ namespace
     (void)moho::CUnitRepairTask::Allocate(AsDispatchImpl(task->mDispatchTask), targetUnit, isSiloBuild);
   }
 
-  void DispatchReclaimTask(moho::CUnitPodAssist* const task, moho::Entity* const targetEntity)
+  void DispatchReclaimTask(
+    moho::CUnitPodAssist* const task,
+    moho::Entity* const targetEntity
+  )
   {
     moho::CAiTarget target{};
     (void)target.UpdateTarget(targetEntity);
     IssueReclaimTask(task->mDispatchTask, target);
   }
 
-  [[nodiscard]] moho::Unit* ResolveFocusUnit(moho::Unit* const unit) noexcept
+  [[nodiscard]] moho::Unit* ResolveFocusUnit(
+    moho::Unit* const unit
+  ) noexcept
   {
     if (unit == nullptr) {
       return nullptr;
@@ -106,11 +118,16 @@ namespace
       return false;
     }
 
-    if (ownerUnit->ArmyRef == nullptr || candidateUnit->SimulationRef == nullptr || candidateUnit->SimulationRef->mMapData == nullptr) {
+    if (
+      ownerUnit->ArmyRef == nullptr || candidateUnit->SimulationRef == nullptr ||
+      candidateUnit->SimulationRef->mMapData == nullptr
+    ) {
       return false;
     }
 
-    if (!candidateUnit->SimulationRef->mMapData->IsWithin(candidateUnit->mVarDat.mCurTransform.pos_, 1.0f, ownerUnit->ArmyRef->UseWholeMap())) {
+    if (!candidateUnit->SimulationRef->mMapData->IsWithin(
+          candidateUnit->mVarDat.mCurTransform.pos_, 1.0f, ownerUnit->ArmyRef->UseWholeMap()
+        )) {
       return false;
     }
 
@@ -123,7 +140,9 @@ namespace
     return candidateArmy == ownerArmy || ownerArmy->GetAllianceWith(candidateArmy) == moho::ALLIANCE_Ally;
   }
 
-  [[nodiscard]] moho::Unit* ResolveAssistDistanceTarget(moho::Unit* const candidateUnit) noexcept
+  [[nodiscard]] moho::Unit* ResolveAssistDistanceTarget(
+    moho::Unit* const candidateUnit
+  ) noexcept
   {
     if (candidateUnit == nullptr) {
       return nullptr;
@@ -135,8 +154,10 @@ namespace
           return focusUnit;
         }
 
-        if (!candidateUnit->IsUnitState(moho::UNITSTATE_Enhancing)
-            && !candidateUnit->IsUnitState(moho::UNITSTATE_SiloBuildingAmmo)) {
+        if (
+          !candidateUnit->IsUnitState(moho::UNITSTATE_Enhancing) &&
+          !candidateUnit->IsUnitState(moho::UNITSTATE_SiloBuildingAmmo)
+        ) {
           return nullptr;
         }
       }
@@ -150,7 +171,10 @@ namespace
    * `COGrid::ForAllEntitiesIterator` call rather than an axis-aligned
    * approximation of it.
    */
-  void GatherNearbyAssistUnits(moho::Unit* const ownerUnit, gpg::core::FastVectorN<moho::CollisionResult, 10>& outHits)
+  void GatherNearbyAssistUnits(
+    moho::Unit* const ownerUnit,
+    gpg::core::FastVectorN<moho::CollisionResult, 10>& outHits
+  )
   {
     if (ownerUnit == nullptr || ownerUnit->SimulationRef == nullptr || ownerUnit->SimulationRef->mOGrid == nullptr) {
       return;
@@ -167,7 +191,6 @@ namespace
 
     ownerUnit->SimulationRef->mOGrid->ForAllEntitiesIterator(outHits, moho::ENTITYTYPE_Unit, scanSphere);
   }
-
 
 } // namespace
 
@@ -514,7 +537,9 @@ namespace moho
     }
 
     Unit* const focusUnit = focusEntity->IsUnit();
-    if (focusUnit != nullptr && focusUnit->AiSiloBuild != nullptr && focusUnit->IsUnitState(UNITSTATE_SiloBuildingAmmo)) {
+    if (
+      focusUnit != nullptr && focusUnit->AiSiloBuild != nullptr && focusUnit->IsUnitState(UNITSTATE_SiloBuildingAmmo)
+    ) {
       Kill();
       DispatchRepairTask(this, focusUnit, true);
       return true;
@@ -523,8 +548,10 @@ namespace moho
     // 0x0061DEFF: a focus that is not a unit jumps straight to the Building test
     // at 0x0061DF5E, past the Repairing test, so a host reclaiming a wreck while
     // its Repairing bit is still set sends its pods to the reclaim below.
-    if ((focusUnit != nullptr && assistTargetUnit->IsUnitState(UNITSTATE_Repairing)) ||
-        assistTargetUnit->IsUnitState(UNITSTATE_Building)) {
+    if (
+      (focusUnit != nullptr && assistTargetUnit->IsUnitState(UNITSTATE_Repairing)) ||
+      assistTargetUnit->IsUnitState(UNITSTATE_Building)
+    ) {
       Kill();
       DispatchRepairTask(this, focusUnit, false);
       return true;
@@ -601,7 +628,10 @@ namespace gpg
    * Builds one typed reflection reference for `moho::CUnitPodAssist*`,
    * preserving dynamic-derived ownership and base-offset adjustment.
    */
-  gpg::RRef* RRef_CUnitPodAssist(gpg::RRef* const outRef, moho::CUnitPodAssist* const value)
+  gpg::RRef* RRef_CUnitPodAssist(
+    gpg::RRef* const outRef,
+    moho::CUnitPodAssist* const value
+  )
   {
     return gpg::WriteDerivedRef(outRef, value);
   }

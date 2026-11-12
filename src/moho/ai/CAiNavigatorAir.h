@@ -47,9 +47,8 @@ namespace moho
      * Builds a new `CAiNavigatorAir` for an archive load and hands it back unowned; its
      * members are loaded over it afterwards.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x005A9100 (FUN_005A9100, Moho::CAiNavigatorAir::MemberDeserialize)
@@ -212,11 +211,11 @@ namespace moho
      * by both serializers - an attack order on something seen only on radar
      * puts a `ReconBlip` in here, not a `Unit`.
      */
-    WeakPtr<Entity> mDestinationEntity;  // +0x68
-    Wm3::Vector3f mCurrentTargetPos;     // +0x70
-    Wm3::Vector3f mGoalPos;              // +0x7C
-    std::uint8_t mTrackFormationTarget;  // +0x88
-    std::uint8_t mPad89[3];              // +0x89
+    WeakPtr<Entity> mDestinationEntity; // +0x68
+    Wm3::Vector3f mCurrentTargetPos;    // +0x70
+    Wm3::Vector3f mGoalPos;             // +0x7C
+    std::uint8_t mTrackFormationTarget; // +0x88
+    std::uint8_t mPad89[3];             // +0x89
   };
 
   static_assert(sizeof(CAiNavigatorAir) == 0x8C, "CAiNavigatorAir size must be 0x8C");
@@ -225,7 +224,8 @@ namespace moho
     "CAiNavigatorAir::mDestinationEntity offset must be 0x68"
   );
   static_assert(
-    offsetof(CAiNavigatorAir, mCurrentTargetPos) == 0x70, "CAiNavigatorAir::mCurrentTargetPos offset must be 0x70"
+    offsetof(CAiNavigatorAir, mCurrentTargetPos) == 0x70,
+    "CAiNavigatorAir::mCurrentTargetPos offset must be 0x70"
   );
   static_assert(offsetof(CAiNavigatorAir, mGoalPos) == 0x7C, "CAiNavigatorAir::mGoalPos offset must be 0x7C");
   static_assert(
@@ -233,4 +233,3 @@ namespace moho
     "CAiNavigatorAir::mTrackFormationTarget offset must be 0x88"
   );
 } // namespace moho
-

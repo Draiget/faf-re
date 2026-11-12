@@ -20,40 +20,60 @@ namespace
   using Wm3::Vector3f;
 
   /// `fstp dword`.
-  [[nodiscard]] float Store(const X87Float value) noexcept
+  [[nodiscard]] float Store(
+    const X87Float value
+  ) noexcept
   {
     return static_cast<float>(value);
   }
 
   /// Vector3::Dot inlined: ((x*x' + y*y') + z*z') on the stack, the result
   /// stored.
-  [[nodiscard]] float Dot(const Vector3f& lhs, const Vector3f& rhs) noexcept
+  [[nodiscard]] float Dot(
+    const Vector3f& lhs,
+    const Vector3f& rhs
+  ) noexcept
   {
     return Store((X87Float(lhs.x) * rhs.x + X87Float(lhs.y) * rhs.y) + X87Float(lhs.z) * rhs.z);
   }
 
-  [[nodiscard]] float Dot(const Vector2f& lhs, const Vector2f& rhs) noexcept
+  [[nodiscard]] float Dot(
+    const Vector2f& lhs,
+    const Vector2f& rhs
+  ) noexcept
   {
     return Store(X87Float(lhs.x) * rhs.x + X87Float(lhs.y) * rhs.y);
   }
 
   /// The inlined Vector3 operators: each lane formed on the stack and stored.
-  [[nodiscard]] Vector3f Sub(const Vector3f& lhs, const Vector3f& rhs) noexcept
+  [[nodiscard]] Vector3f Sub(
+    const Vector3f& lhs,
+    const Vector3f& rhs
+  ) noexcept
   {
     return {Store(X87Float(lhs.x) - rhs.x), Store(X87Float(lhs.y) - rhs.y), Store(X87Float(lhs.z) - rhs.z)};
   }
 
-  [[nodiscard]] Vector3f Add(const Vector3f& lhs, const Vector3f& rhs) noexcept
+  [[nodiscard]] Vector3f Add(
+    const Vector3f& lhs,
+    const Vector3f& rhs
+  ) noexcept
   {
     return {Store(X87Float(lhs.x) + rhs.x), Store(X87Float(lhs.y) + rhs.y), Store(X87Float(lhs.z) + rhs.z)};
   }
 
-  [[nodiscard]] Vector3f Scale(const float scalar, const Vector3f& vector) noexcept
+  [[nodiscard]] Vector3f Scale(
+    const float scalar,
+    const Vector3f& vector
+  ) noexcept
   {
     return {Store(X87Float(scalar) * vector.x), Store(X87Float(scalar) * vector.y), Store(X87Float(scalar) * vector.z)};
   }
 
-  [[nodiscard]] Vector3f Cross(const Vector3f& lhs, const Vector3f& rhs) noexcept
+  [[nodiscard]] Vector3f Cross(
+    const Vector3f& lhs,
+    const Vector3f& rhs
+  ) noexcept
   {
     return {
       Store(X87Float(lhs.y) * rhs.z - X87Float(lhs.z) * rhs.y),
@@ -62,26 +82,35 @@ namespace
     };
   }
 
-  [[nodiscard]] Vector2f Sub(const Vector2f& lhs, const Vector2f& rhs) noexcept
+  [[nodiscard]] Vector2f Sub(
+    const Vector2f& lhs,
+    const Vector2f& rhs
+  ) noexcept
   {
     return {Store(X87Float(lhs.x) - rhs.x), Store(X87Float(lhs.y) - rhs.y)};
   }
 
   /// Math<float>::FAbs inlined: `fabs` of the stored argument, stored.
-  [[nodiscard]] float FAbs(const float value) noexcept
+  [[nodiscard]] float FAbs(
+    const float value
+  ) noexcept
   {
     return std::fabs(value);
   }
 
   /// Math<float>::Sqrt: `_CIsqrt` (0x00A91000) runs `fsqrt` under 24-bit
   /// precision control, one rounding of the root to a float.
-  [[nodiscard]] float Sqrt(const float value) noexcept
+  [[nodiscard]] float Sqrt(
+    const float value
+  ) noexcept
   {
     return std::sqrt(value);
   }
 
   /// Math<float>::InvSqrt: `fld1; fdivr` of the root on the stack, stored.
-  [[nodiscard]] float InvSqrt(const float value) noexcept
+  [[nodiscard]] float InvSqrt(
+    const float value
+  ) noexcept
   {
     return Store(X87Float(1.0f) / Sqrt(value));
   }
@@ -89,7 +118,12 @@ namespace
   /// IntrLine3Box3<float>::Clip (0x00A4FCC0): the products stay on the stack
   /// for the comparisons, the quotient is stored. A NaN denominator takes
   /// the last branch (`test ah, 41h` / `test ah, 5` at 0x00A4FCCA, 0x00A4FD10).
-  [[nodiscard]] bool Clip(const float denom, const float numer, float& t0, float& t1) noexcept
+  [[nodiscard]] bool Clip(
+    const float denom,
+    const float numer,
+    float& t0,
+    float& t1
+  ) noexcept
   {
     if (denom > 0.0f) {
       if (X87Float(numer) > X87Float(denom) * t1) {
@@ -130,8 +164,7 @@ namespace
 
     const float saveT0 = t0;
     const float saveT1 = t1;
-    const bool notAllClipped =
-      Clip(+boxDirection.x, Store(-X87Float(boxOrigin.x) - box.Extent[0]), t0, t1) &&
+    const bool notAllClipped = Clip(+boxDirection.x, Store(-X87Float(boxOrigin.x) - box.Extent[0]), t0, t1) &&
       Clip(-boxDirection.x, Store(X87Float(boxOrigin.x) - box.Extent[0]), t0, t1) &&
       Clip(+boxDirection.y, Store(-X87Float(boxOrigin.y) - box.Extent[1]), t0, t1) &&
       Clip(-boxDirection.y, Store(X87Float(boxOrigin.y) - box.Extent[1]), t0, t1) &&
@@ -151,7 +184,10 @@ namespace
   }
 
   /// DistVector2Box2<float>::GetSquared (the closest point is not kept).
-  [[nodiscard]] float SquaredDistanceVector2Box2(const Vector2f& point, const Wm3::Box2f& box) noexcept
+  [[nodiscard]] float SquaredDistanceVector2Box2(
+    const Vector2f& point,
+    const Wm3::Box2f& box
+  ) noexcept
   {
     const Vector2f diff = Sub(point, box.Center);
     float sqrDistance = 0.0f;
@@ -171,12 +207,21 @@ namespace
 
 namespace Wm3
 {
-  int FindSegment3Box3(const Segment3f& segment, const Box3f& box, const bool solid, Vector3f points[2]) noexcept
+  int FindSegment3Box3(
+    const Segment3f& segment,
+    const Box3f& box,
+    const bool solid,
+    Vector3f points[2]
+  ) noexcept
   {
     return DoClipping(-segment.Extent, segment.Extent, segment.Origin, segment.Direction, box, solid, points);
   }
 
-  int FindSegment3Sphere3(const Segment3f& segment, const Sphere3f& sphere, Vector3f points[2]) noexcept
+  int FindSegment3Sphere3(
+    const Segment3f& segment,
+    const Sphere3f& sphere,
+    Vector3f points[2]
+  ) noexcept
   {
     constexpr float kZeroThreshold = 1e-06f; // Math<float>::ZERO_TOLERANCE, set by the ctor 0x00A46A10
 
@@ -219,7 +264,10 @@ namespace Wm3
     return 0;
   }
 
-  bool TestBox3Sphere3(const Box3f& box, const Sphere3f& sphere) noexcept
+  bool TestBox3Sphere3(
+    const Box3f& box,
+    const Sphere3f& sphere
+  ) noexcept
   {
     const Vector3f centerDiff = Sub(sphere.Center, box.Center);
     const float ax = FAbs(Dot(centerDiff, box.Axis[0]));
@@ -257,7 +305,11 @@ namespace Wm3
     return (X87Float(dx) * dx + X87Float(dy) * dy) + X87Float(dz) * dz <= X87Float(rSqr);
   }
 
-  float SquaredDistanceVector3Box3(const Vector3f& point, const Box3f& box, Vector3f& closestOnBox) noexcept
+  float SquaredDistanceVector3Box3(
+    const Vector3f& point,
+    const Box3f& box,
+    Vector3f& closestOnBox
+  ) noexcept
   {
     const Vector3f diff = Sub(point, box.Center);
     float sqrDistance = 0.0f;
@@ -282,7 +334,11 @@ namespace Wm3
     return sqrDistance;
   }
 
-  float SquaredDistanceVector3Segment3(const Vector3f& point, const Segment3f& segment, Vector3f& closestOnSegment) noexcept
+  float SquaredDistanceVector3Segment3(
+    const Vector3f& point,
+    const Segment3f& segment,
+    Vector3f& closestOnSegment
+  ) noexcept
   {
     const Vector3f diff = Sub(point, segment.Origin);
     const float param = Dot(segment.Direction, diff);
@@ -299,13 +355,19 @@ namespace Wm3
     return Dot(toClosest, toClosest);
   }
 
-  float DistanceVector3Segment3(const Vector3f& point, const Segment3f& segment) noexcept
+  float DistanceVector3Segment3(
+    const Vector3f& point,
+    const Segment3f& segment
+  ) noexcept
   {
     Vector3f closest;
     return Sqrt(SquaredDistanceVector3Segment3(point, segment, closest));
   }
 
-  bool TestBox2Box2(const Box2f& box0, const Box2f& box1) noexcept
+  bool TestBox2Box2(
+    const Box2f& box0,
+    const Box2f& box1
+  ) noexcept
   {
     const Vector2f* const a = box0.Axis;
     const Vector2f* const b = box1.Axis;
@@ -341,12 +403,18 @@ namespace Wm3
     return !(absAdD > rSum);
   }
 
-  bool TestBox2Circle2(const Box2f& box, const Circle2f& circle) noexcept
+  bool TestBox2Circle2(
+    const Box2f& box,
+    const Circle2f& circle
+  ) noexcept
   {
     return Sqrt(SquaredDistanceVector2Box2(circle.Center, box)) <= circle.Radius;
   }
 
-  bool TestLine3Box3(const Line3f& line, const Box3f& box) noexcept
+  bool TestLine3Box3(
+    const Line3f& line,
+    const Box3f& box
+  ) noexcept
   {
     const Vector3f diff = Sub(line.Origin, box.Center);
     const Vector3f wxd = Cross(line.Direction, diff);
@@ -373,7 +441,10 @@ namespace Wm3
     return !(awxddu[2] > rhs);
   }
 
-  bool PointInBox3(const Vector3f& point, const Box3f& box) noexcept
+  bool PointInBox3(
+    const Vector3f& point,
+    const Box3f& box
+  ) noexcept
   {
     const Vector3f diff = Sub(point, box.Center);
     for (int i = 0; i < 3; ++i) {
@@ -384,7 +455,10 @@ namespace Wm3
     return true;
   }
 
-  Box3f ContAlignedBox3(const int quantity, const Vector3f* const points) noexcept
+  Box3f ContAlignedBox3(
+    const int quantity,
+    const Vector3f* const points
+  ) noexcept
   {
     Vector3f minimum = points[0];
     Vector3f maximum = minimum;
@@ -420,27 +494,76 @@ namespace Wm3
 
       [[nodiscard]] static float
       GetVertexIntersection(float dx, float dy, float dz, float vx, float vy, float vz, float rSqr) noexcept;
-      [[nodiscard]] static float GetEdgeIntersection(float dx, float dz, float vx, float vz, float vSqr, float rSqr) noexcept;
+      [[nodiscard]] static float
+      GetEdgeIntersection(float dx, float dz, float vx, float vz, float vSqr, float rSqr) noexcept;
       [[nodiscard]] int FindFaceRegionIntersection(
-        float ex, float ey, float ez, float cx, float cy, float cz, float vx, float vy, float vz,
-        float& ix, float& iy, float& iz, bool aboveFace
+        float ex,
+        float ey,
+        float ez,
+        float cx,
+        float cy,
+        float cz,
+        float vx,
+        float vy,
+        float vz,
+        float& ix,
+        float& iy,
+        float& iz,
+        bool aboveFace
       ) noexcept;
       [[nodiscard]] int FindJustEdgeIntersection(
-        float cy, float ex, float ey, float ez, float dx, float dz, float vx, float vy, float vz,
-        float& ix, float& iy, float& iz
+        float cy,
+        float ex,
+        float ey,
+        float ez,
+        float dx,
+        float dz,
+        float vx,
+        float vy,
+        float vz,
+        float& ix,
+        float& iy,
+        float& iz
       ) noexcept;
       [[nodiscard]] int FindEdgeRegionIntersection(
-        float ex, float ey, float ez, float cx, float cy, float cz, float vx, float vy, float vz,
-        float& ix, float& iy, float& iz, bool aboveEdge
+        float ex,
+        float ey,
+        float ez,
+        float cx,
+        float cy,
+        float cz,
+        float vx,
+        float vy,
+        float vz,
+        float& ix,
+        float& iy,
+        float& iz,
+        bool aboveEdge
       ) noexcept;
       [[nodiscard]] int FindVertexRegionIntersection(
-        float ex, float ey, float ez, float cx, float cy, float cz, float vx, float vy, float vz,
-        float& ix, float& iy, float& iz
+        float ex,
+        float ey,
+        float ez,
+        float cx,
+        float cy,
+        float cz,
+        float vx,
+        float vy,
+        float vz,
+        float& ix,
+        float& iy,
+        float& iz
       ) noexcept;
     };
 
     float BoxSphereSweep::GetVertexIntersection(
-      const float dx, const float dy, const float dz, const float vx, const float vy, const float vz, const float rSqr
+      const float dx,
+      const float dy,
+      const float dz,
+      const float vx,
+      const float vy,
+      const float vz,
+      const float rSqr
     ) noexcept
     {
       const float vSqr = Store((X87Float(vx) * vx + X87Float(vy) * vy) + X87Float(vz) * vz);
@@ -451,7 +574,12 @@ namespace Wm3
     }
 
     float BoxSphereSweep::GetEdgeIntersection(
-      const float dx, const float dz, const float vx, const float vz, const float vSqr, const float rSqr
+      const float dx,
+      const float dz,
+      const float vx,
+      const float vz,
+      const float vSqr,
+      const float rSqr
     ) noexcept
     {
       const float dot = Store(X87Float(vx) * dx + X87Float(vz) * dz);
@@ -461,8 +589,19 @@ namespace Wm3
     }
 
     int BoxSphereSweep::FindFaceRegionIntersection(
-      const float ex, const float ey, const float ez, const float cx, const float cy, const float cz,
-      const float vx, const float vy, const float vz, float& ix, float& iy, float& iz, const bool aboveFace
+      const float ex,
+      const float ey,
+      const float ez,
+      const float cx,
+      const float cy,
+      const float cz,
+      const float vx,
+      const float vy,
+      const float vz,
+      float& ix,
+      float& iy,
+      float& iz,
+      const bool aboveFace
     ) noexcept
     {
       if (X87Float(cz) <= X87Float(ez) + sphere.Radius && aboveFace) {
@@ -543,8 +682,18 @@ namespace Wm3
     }
 
     int BoxSphereSweep::FindJustEdgeIntersection(
-      const float cy, const float ex, const float ey, const float ez, const float dx, const float dz,
-      const float vx, const float vy, const float vz, float& ix, float& iy, float& iz
+      const float cy,
+      const float ex,
+      const float ey,
+      const float ez,
+      const float dx,
+      const float dz,
+      const float vx,
+      const float vy,
+      const float vz,
+      float& ix,
+      float& iy,
+      float& iz
     ) noexcept
     {
       const float rSqr = Store(X87Float(sphere.Radius) * sphere.Radius);
@@ -564,9 +713,10 @@ namespace Wm3
         crossX = Store(X87Float(dy) * vz - X87Float(dz) * vy);
       }
 
-      if (crossZ >= 0.0f && crossX >= 0.0f &&
-          X87Float(crossX) * crossX + X87Float(crossZ) * crossZ >
-            X87Float(vy) * vy * sphere.Radius * sphere.Radius) {
+      if (
+        crossZ >= 0.0f && crossX >= 0.0f &&
+        X87Float(crossX) * crossX + X87Float(crossZ) * crossZ > X87Float(vy) * vy * sphere.Radius * sphere.Radius
+      ) {
         const Vector3f velocity(vx, vy, vz);
         const Vector3f d(dx, dy, dz);
         const Vector3f cross = Cross(d, velocity);
@@ -588,8 +738,19 @@ namespace Wm3
     }
 
     int BoxSphereSweep::FindEdgeRegionIntersection(
-      const float ex, const float ey, const float ez, const float cx, const float cy, const float cz,
-      const float vx, const float vy, const float vz, float& ix, float& iy, float& iz, const bool aboveEdge
+      const float ex,
+      const float ey,
+      const float ez,
+      const float cx,
+      const float cy,
+      const float cz,
+      const float vx,
+      const float vy,
+      const float vz,
+      float& ix,
+      float& iy,
+      float& iz,
+      const bool aboveEdge
     ) noexcept
     {
       const float dx = Store(X87Float(cx) - ex);
@@ -628,8 +789,18 @@ namespace Wm3
     }
 
     int BoxSphereSweep::FindVertexRegionIntersection(
-      const float ex, const float ey, const float ez, const float cx, const float cy, const float cz,
-      const float vx, const float vy, const float vz, float& ix, float& iy, float& iz
+      const float ex,
+      const float ey,
+      const float ez,
+      const float cx,
+      const float cy,
+      const float cz,
+      const float vx,
+      const float vy,
+      const float vz,
+      float& ix,
+      float& iy,
+      float& iz
     ) noexcept
     {
       const float dx = Store(X87Float(cx) - ex);
@@ -655,9 +826,11 @@ namespace Wm3
       const float vy2 = Store(X87Float(vy) * vy);
       const float vz2 = Store(X87Float(vz) * vz);
 
-      if ((crossY < 0.0f && crossZ >= 0.0f && X87Float(crY2) + crZ2 <= X87Float(rSqr) * vx2) ||
-          (crossZ < 0.0f && crossX < 0.0f && X87Float(crX2) + crZ2 <= X87Float(rSqr) * vy2) ||
-          (crossY >= 0.0f && crossX >= 0.0f && X87Float(crX2) + crY2 <= X87Float(rSqr) * vz2)) {
+      if (
+        (crossY < 0.0f && crossZ >= 0.0f && X87Float(crY2) + crZ2 <= X87Float(rSqr) * vx2) ||
+        (crossZ < 0.0f && crossX < 0.0f && X87Float(crX2) + crZ2 <= X87Float(rSqr) * vy2) ||
+        (crossY >= 0.0f && crossX >= 0.0f && X87Float(crX2) + crY2 <= X87Float(rSqr) * vz2)
+      ) {
         contactTime = GetVertexIntersection(dx, dy, dz, vx, vy, vz, Store(X87Float(sphere.Radius) * sphere.Radius));
         ix = Store(X87Float(contactTime) * vx + cx);
         iy = Store(X87Float(contactTime) * vy + cy);

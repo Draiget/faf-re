@@ -70,7 +70,10 @@ namespace
   constexpr const char* kGetCurrentAngleHelpText = "RotateManipulator:GetCurrentAngle()";
   constexpr const char* kSetCurrentAngleHelpText = "RotateManipulator:SetCurrentAngle(angle)";
 
-  [[nodiscard]] bool ParseAxisText(const char* axisText, Wm3::Vector3f* const outAxis) noexcept
+  [[nodiscard]] bool ParseAxisText(
+    const char* axisText,
+    Wm3::Vector3f* const outAxis
+  ) noexcept
   {
     if (axisText == nullptr || outAxis == nullptr) {
       return false;
@@ -172,7 +175,9 @@ namespace
    * What it does:
    * Upcasts one reflected reference lane to `moho::CRotateManipulator*`.
    */
-  [[maybe_unused]] [[nodiscard]] void* TryUpcastCRotateManipulatorRefObject(gpg::RRef* const sourceRef)
+  [[maybe_unused]] [[nodiscard]] void* TryUpcastCRotateManipulatorRefObject(
+    gpg::RRef* const sourceRef
+  )
   {
     if (!sourceRef) {
       return nullptr;
@@ -217,8 +222,10 @@ namespace
 
   [[maybe_unused]] CRotateManipulatorSerializerStartupBootstrap gCRotateManipulatorSerializerStartupBootstrap;
 
-  [[nodiscard]] moho::CRotateManipulator*
-  GetCRotateManipulatorOptional(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+  [[nodiscard]] moho::CRotateManipulator* GetCRotateManipulatorOptional(
+    const LuaPlus::LuaObject& object,
+    LuaPlus::LuaState* const state
+  )
   {
     moho::CScriptObject** const scriptObjectSlot = moho::SCR_FromLua_CScriptObject(object);
     if (scriptObjectSlot == nullptr) {
@@ -272,7 +279,9 @@ namespace moho
  * Loads `IAniManipulator` base payload, then rotate-state flags, axis,
  * angular lanes, and follow-bone index.
  */
-void moho::CRotateManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
+void moho::CRotateManipulator::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -305,7 +314,9 @@ void moho::CRotateManipulator::MemberDeserialize(gpg::ReadArchive* const archive
  * Saves `IAniManipulator` base payload, then rotate-state flags, axis,
  * angular lanes, and follow-bone index.
  */
-void moho::CRotateManipulator::MemberSerialize(gpg::WriteArchive* const archive) const
+void moho::CRotateManipulator::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (!archive) {
     return;
@@ -387,7 +398,9 @@ moho::CRotateManipulator::CRotateManipulator(
  * Applies one immediate angle to the watched bone and marks that pose lane
  * to skip interpolation on the next frame.
  */
-bool moho::CRotateManipulator::SetCurrentAngle(const float angleRadians)
+bool moho::CRotateManipulator::SetCurrentAngle(
+  const float angleRadians
+)
 {
   if (mOwnerActor == nullptr || mOwnerActor->mPose.get() == nullptr || mWatchBones.begin() == nullptr) {
     return false;
@@ -413,7 +426,9 @@ bool moho::CRotateManipulator::SetCurrentAngle(const float angleRadians)
  * What it does:
  * Sets spin-down mode flag lane.
  */
-void moho::CRotateManipulator::SetSpinDownEnabled(const bool enabled) noexcept
+void moho::CRotateManipulator::SetSpinDownEnabled(
+  const bool enabled
+) noexcept
 {
   mSpinDown = enabled ? 1u : 0u;
 }
@@ -424,7 +439,9 @@ void moho::CRotateManipulator::SetSpinDownEnabled(const bool enabled) noexcept
  * What it does:
  * Updates follow-bone index and marks goal state dirty for next tick.
  */
-void moho::CRotateManipulator::SetFollowBoneTarget(const int followBoneIndex) noexcept
+void moho::CRotateManipulator::SetFollowBoneTarget(
+  const int followBoneIndex
+) noexcept
 {
   mFollowBone = followBoneIndex;
   mHasGoal = 1u;
@@ -521,7 +538,9 @@ bool moho::CRotateManipulator::ManipulatorUpdate()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_CreateRotatorL`.
  */
-int moho::cfunc_CreateRotator(lua_State* const luaContext)
+int moho::cfunc_CreateRotator(
+  lua_State* const luaContext
+)
 {
   return cfunc_CreateRotatorL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -552,7 +571,9 @@ moho::CScrLuaInitForm* moho::func_CreateRotator_LuaFuncDef()
  * Builds one `CRotateManipulator` from
  * `(unit, bone, axis, [goal], [speed], [accel], [goalspeed])`.
  */
-int moho::cfunc_CreateRotatorL(LuaPlus::LuaState* const state)
+int moho::cfunc_CreateRotatorL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   const int argumentCount = lua_gettop(rawState);
@@ -618,7 +639,9 @@ int moho::cfunc_CreateRotatorL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CRotateManipulatorSetSpinDownL`.
  */
-int moho::cfunc_CRotateManipulatorSetSpinDown(lua_State* const luaContext)
+int moho::cfunc_CRotateManipulatorSetSpinDown(
+  lua_State* const luaContext
+)
 {
   return cfunc_CRotateManipulatorSetSpinDownL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -630,7 +653,9 @@ int moho::cfunc_CRotateManipulatorSetSpinDown(lua_State* const luaContext)
  * Reads `(rotator, enabled)`, validates the rotator object, sets spin-down
  * mode, and returns the rotator Lua object.
  */
-int moho::cfunc_CRotateManipulatorSetSpinDownL(LuaPlus::LuaState* const state)
+int moho::cfunc_CRotateManipulatorSetSpinDownL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kSetSpinDownHelpText);
@@ -650,7 +675,9 @@ int moho::cfunc_CRotateManipulatorSetSpinDownL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CRotateManipulatorSetGoalL`.
  */
-int moho::cfunc_CRotateManipulatorSetGoal(lua_State* const luaContext)
+int moho::cfunc_CRotateManipulatorSetGoal(
+  lua_State* const luaContext
+)
 {
   return cfunc_CRotateManipulatorSetGoalL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -662,7 +689,9 @@ int moho::cfunc_CRotateManipulatorSetGoal(lua_State* const luaContext)
  * Reads `(rotator, goalDegrees)`, validates numeric input, converts to
  * radians, stores goal angle, and updates triggered state.
  */
-int moho::cfunc_CRotateManipulatorSetGoalL(LuaPlus::LuaState* const state)
+int moho::cfunc_CRotateManipulatorSetGoalL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kSetGoalHelpText);
@@ -691,7 +720,9 @@ int moho::cfunc_CRotateManipulatorSetGoalL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CRotateManipulatorSetSpeedL`.
  */
-int moho::cfunc_CRotateManipulatorSetSpeed(lua_State* const luaContext)
+int moho::cfunc_CRotateManipulatorSetSpeed(
+  lua_State* const luaContext
+)
 {
   return cfunc_CRotateManipulatorSetSpeedL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -703,7 +734,9 @@ int moho::cfunc_CRotateManipulatorSetSpeed(lua_State* const luaContext)
  * Reads `(rotator, speedDegPerSec)`, validates numeric input, converts to
  * radians/sec, and stores runtime speed lane.
  */
-int moho::cfunc_CRotateManipulatorSetSpeedL(LuaPlus::LuaState* const state)
+int moho::cfunc_CRotateManipulatorSetSpeedL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kSetSpeedHelpText);
@@ -721,7 +754,9 @@ int moho::cfunc_CRotateManipulatorSetSpeedL(LuaPlus::LuaState* const state)
   return 1;
 }
 
-int moho::cfunc_CRotateManipulatorSetTargetSpeed(lua_State* const luaContext)
+int moho::cfunc_CRotateManipulatorSetTargetSpeed(
+  lua_State* const luaContext
+)
 {
   return cfunc_CRotateManipulatorSetTargetSpeedL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -733,7 +768,9 @@ int moho::cfunc_CRotateManipulatorSetTargetSpeed(lua_State* const luaContext)
  * Reads `(rotator, targetSpeedDegPerSec)`, validates numeric input, converts
  * to radians/sec, stores target speed, and updates triggered state.
  */
-int moho::cfunc_CRotateManipulatorSetTargetSpeedL(LuaPlus::LuaState* const state)
+int moho::cfunc_CRotateManipulatorSetTargetSpeedL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kSetTargetSpeedHelpText);
@@ -761,7 +798,9 @@ int moho::cfunc_CRotateManipulatorSetTargetSpeedL(LuaPlus::LuaState* const state
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CRotateManipulatorSetAccelL`.
  */
-int moho::cfunc_CRotateManipulatorSetAccel(lua_State* const luaContext)
+int moho::cfunc_CRotateManipulatorSetAccel(
+  lua_State* const luaContext
+)
 {
   return cfunc_CRotateManipulatorSetAccelL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -773,7 +812,9 @@ int moho::cfunc_CRotateManipulatorSetAccel(lua_State* const luaContext)
  * Reads `(rotator, accelDegPerSecSq)`, validates numeric input, converts to
  * radians/sec^2, and stores runtime acceleration lane.
  */
-int moho::cfunc_CRotateManipulatorSetAccelL(LuaPlus::LuaState* const state)
+int moho::cfunc_CRotateManipulatorSetAccelL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kSetAccelHelpText);
@@ -798,7 +839,9 @@ int moho::cfunc_CRotateManipulatorSetAccelL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CRotateManipulatorClearFollowBoneL`.
  */
-int moho::cfunc_CRotateManipulatorClearFollowBone(lua_State* const luaContext)
+int moho::cfunc_CRotateManipulatorClearFollowBone(
+  lua_State* const luaContext
+)
 {
   return cfunc_CRotateManipulatorClearFollowBoneL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -810,7 +853,9 @@ int moho::cfunc_CRotateManipulatorClearFollowBone(lua_State* const luaContext)
  * Reads `(rotator)`, clears follow-bone target (`-1`) and marks goal state
  * dirty, then returns the rotator Lua object.
  */
-int moho::cfunc_CRotateManipulatorClearFollowBoneL(LuaPlus::LuaState* const state)
+int moho::cfunc_CRotateManipulatorClearFollowBoneL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kClearFollowBoneHelpText);
@@ -830,7 +875,9 @@ int moho::cfunc_CRotateManipulatorClearFollowBoneL(LuaPlus::LuaState* const stat
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CRotateManipulatorSetFollowBoneL`.
  */
-int moho::cfunc_CRotateManipulatorSetFollowBone(lua_State* const luaContext)
+int moho::cfunc_CRotateManipulatorSetFollowBone(
+  lua_State* const luaContext
+)
 {
   return cfunc_CRotateManipulatorSetFollowBoneL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -842,7 +889,9 @@ int moho::cfunc_CRotateManipulatorSetFollowBone(lua_State* const luaContext)
  * Reads `(rotator, bone)`, resolves bone index through owner actor, assigns
  * follow-bone target, and returns the rotator Lua object.
  */
-int moho::cfunc_CRotateManipulatorSetFollowBoneL(LuaPlus::LuaState* const state)
+int moho::cfunc_CRotateManipulatorSetFollowBoneL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kSetFollowBoneHelpText);
@@ -868,7 +917,9 @@ int moho::cfunc_CRotateManipulatorSetFollowBoneL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CRotateManipulatorGetCurrentAngleL`.
  */
-int moho::cfunc_CRotateManipulatorGetCurrentAngle(lua_State* const luaContext)
+int moho::cfunc_CRotateManipulatorGetCurrentAngle(
+  lua_State* const luaContext
+)
 {
   return cfunc_CRotateManipulatorGetCurrentAngleL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -880,7 +931,9 @@ int moho::cfunc_CRotateManipulatorGetCurrentAngle(lua_State* const luaContext)
  * Reads `(rotator)`, pushes current angle in degrees, and returns one Lua
  * number.
  */
-int moho::cfunc_CRotateManipulatorGetCurrentAngleL(LuaPlus::LuaState* const state)
+int moho::cfunc_CRotateManipulatorGetCurrentAngleL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kGetCurrentAngleHelpText);
@@ -893,7 +946,9 @@ int moho::cfunc_CRotateManipulatorGetCurrentAngleL(LuaPlus::LuaState* const stat
   return 1;
 }
 
-int moho::cfunc_CRotateManipulatorSetCurrentAngle(lua_State* const luaContext)
+int moho::cfunc_CRotateManipulatorSetCurrentAngle(
+  lua_State* const luaContext
+)
 {
   return cfunc_CRotateManipulatorSetCurrentAngleL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -905,7 +960,9 @@ int moho::cfunc_CRotateManipulatorSetCurrentAngle(lua_State* const luaContext)
  * Reads `(rotator, angleDegrees)`, validates numeric input, converts to
  * radians, applies current-angle lane, and raises Lua error on failure.
  */
-int moho::cfunc_CRotateManipulatorSetCurrentAngleL(LuaPlus::LuaState* const state)
+int moho::cfunc_CRotateManipulatorSetCurrentAngleL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kSetCurrentAngleHelpText);
@@ -1005,7 +1062,8 @@ void moho::CRotateManipulatorTypeInfo::Init()
 
 gpg::RRef moho::CRotateManipulatorTypeInfo::NewRef()
 {
-  auto* const storage = static_cast<moho::CRotateManipulator*>(::operator new(sizeof(moho::CRotateManipulator), std::nothrow));
+  auto* const storage =
+    static_cast<moho::CRotateManipulator*>(::operator new(sizeof(moho::CRotateManipulator), std::nothrow));
   moho::CRotateManipulator* object = nullptr;
   if (storage) {
     object = new (storage) moho::CRotateManipulator();
@@ -1023,7 +1081,9 @@ gpg::RRef moho::CRotateManipulatorTypeInfo::NewRef()
  * Constructs one detached `CRotateManipulator` in caller-owned storage and
  * returns its typed reflection reference.
  */
-gpg::RRef moho::CRotateManipulatorTypeInfo::CtrRef(void* const objectStorage)
+gpg::RRef moho::CRotateManipulatorTypeInfo::CtrRef(
+  void* const objectStorage
+)
 {
   moho::CRotateManipulator* object = nullptr;
   if (objectStorage != nullptr) {
@@ -1035,19 +1095,25 @@ gpg::RRef moho::CRotateManipulatorTypeInfo::CtrRef(void* const objectStorage)
   return out;
 }
 
-void moho::CRotateManipulatorTypeInfo::Delete(void* const objectStorage)
+void moho::CRotateManipulatorTypeInfo::Delete(
+  void* const objectStorage
+)
 {
   delete static_cast<moho::CRotateManipulator*>(objectStorage);
 }
 
-void moho::CRotateManipulatorTypeInfo::Destruct(void* const objectStorage)
+void moho::CRotateManipulatorTypeInfo::Destruct(
+  void* const objectStorage
+)
 {
   if (objectStorage != nullptr) {
     static_cast<moho::CRotateManipulator*>(objectStorage)->~CRotateManipulator();
   }
 }
 
-void moho::CRotateManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const typeInfo)
+void moho::CRotateManipulatorTypeInfo::AddBase_IAniManipulator(
+  gpg::RType* const typeInfo
+)
 {
   gpg::AddReflectedBaseViaSlot<moho::IAniManipulator>(typeInfo);
 }
@@ -1059,7 +1125,10 @@ void moho::CRotateManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const
  * Builds one typed reflection reference for `moho::CRotateManipulator*`,
  * preserving dynamic-derived ownership and base-offset adjustment.
  */
-gpg::RRef* gpg::RRef_CRotateManipulator(gpg::RRef* const outRef, moho::CRotateManipulator* const value)
+gpg::RRef* gpg::RRef_CRotateManipulator(
+  gpg::RRef* const outRef,
+  moho::CRotateManipulator* const value
+)
 {
   const gpg::RRef typed = gpg::MakeDerivedRef(value, CachedCRotateManipulatorType());
   outRef->mObj = typed.mObj;
@@ -1067,12 +1136,17 @@ gpg::RRef* gpg::RRef_CRotateManipulator(gpg::RRef* const outRef, moho::CRotateMa
   return outRef;
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CRotateManipulatorTypeInfoStartup_072343, register_CRotateManipulatorTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CRotateManipulatorTypeInfoStartup_072343,
+  register_CRotateManipulatorTypeInfoStartup
+)
 
-GPG_PREREGISTER_INIT(preregister_CRotateManipulatorTypeInfo_072343, preregister_CRotateManipulatorTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_CRotateManipulatorTypeInfo_072343,
+  preregister_CRotateManipulatorTypeInfo
+)
 
 namespace
 {

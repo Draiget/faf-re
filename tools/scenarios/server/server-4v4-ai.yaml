@@ -1,0 +1,25 @@
+kind: server
+name: server-4v4-ai
+description: >
+  Plan WP16.4: a 4v4 on Seton's Clutch: two remote players on team 2 with two AIs, against four AIs; one of the
+  players orders a unit. Every view decodes, every frame check matches, and the replay plays back.
+map: /maps/scmp_009/scmp_009_scenario.lua
+seats:
+  - uid: 1001
+    team: 2
+    args: ["--order-at", "30"]
+  - uid: 1002
+    team: 2
+ais:
+  - team: 2
+  - team: 2
+  - team: 3
+  - team: 3
+  - team: 3
+  - team: 3
+server:
+  stopBeat: 1800
+timeout: 12m
+expect:
+  clean: true
+  playback: true

@@ -105,7 +105,9 @@ namespace
    * Packs one `CTask` pointer into `RRef` lanes using reflected dynamic type
    * ownership when available.
    */
-  gpg::RRef MakeCTaskRef(CTask* task)
+  gpg::RRef MakeCTaskRef(
+    CTask* task
+  )
   {
     gpg::RRef out{};
     out.mObj = nullptr;
@@ -143,13 +145,18 @@ namespace
    * Upcasts one reflected reference lane to `CTask` and returns the resulting
    * object pointer (or null on mismatch).
    */
-  [[nodiscard]] CTask* UpcastCTaskRef(const gpg::RRef& source)
+  [[nodiscard]] CTask* UpcastCTaskRef(
+    const gpg::RRef& source
+  )
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, gpg::CachedLookup<CTask>(CTask::sType));
     return static_cast<CTask*>(upcast.mObj);
   }
 
-  CTask* ReadCTaskPointer(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
+  CTask* ReadCTaskPointer(
+    gpg::ReadArchive* archive,
+    const gpg::RRef& ownerRef
+  )
   {
     const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, ownerRef);
     if (!tracked.object) {
@@ -214,7 +221,11 @@ gpg::RType* CTask::StaticGetClass()
  * What it does:
  * Loads one `CTask` base lane through reflected type metadata.
  */
-void moho::ReadCTaskBase(gpg::ReadArchive* const archive, void* const object, const gpg::RRef& ownerRef)
+void moho::ReadCTaskBase(
+  gpg::ReadArchive* const archive,
+  void* const object,
+  const gpg::RRef& ownerRef
+)
 {
   gpg::RType* taskType = CTask::sType;
   if (!taskType) {
@@ -231,7 +242,11 @@ void moho::ReadCTaskBase(gpg::ReadArchive* const archive, void* const object, co
  * What it does:
  * Saves one `CTask` base lane through reflected type metadata.
  */
-void moho::WriteCTaskBase(gpg::WriteArchive* const archive, const void* const object, const gpg::RRef& ownerRef)
+void moho::WriteCTaskBase(
+  gpg::WriteArchive* const archive,
+  const void* const object,
+  const gpg::RRef& ownerRef
+)
 {
   gpg::RType* taskType = CTask::sType;
   if (!taskType) {
@@ -270,7 +285,6 @@ CTask::~CTask()
   if (mDestroyFlag != nullptr) {
     *mDestroyFlag = true;
   }
-
 }
 
 /**
@@ -280,7 +294,10 @@ CTask::~CTask()
  * Initializes task state and pushes this task to the owning thread stack when
  * a thread is provided.
  */
-CTask::CTask(CTaskThread* const thread, const bool owning)
+CTask::CTask(
+  CTaskThread* const thread,
+  const bool owning
+)
 {
 
   if (thread != nullptr) {
@@ -326,7 +343,10 @@ void CTask::TaskInterruptSubtasks()
  * Updates thread pending frame count, unstages thread, and optionally interrupts
  * subtask stack above this task.
  */
-void CTask::TaskResume(const bool recursiveInterrupt, const int pendingFrames)
+void CTask::TaskResume(
+  const bool recursiveInterrupt,
+  const int pendingFrames
+)
 {
   CTaskThread* const thread = mOwnerThread;
   if (thread == nullptr) {
@@ -351,7 +371,11 @@ void CTask::TaskResume(const bool recursiveInterrupt, const int pendingFrames)
  * Allocates one `CTaskThread` on `stage` and pushes `dispatch` onto that
  * thread's task stack, keeping the previous top as `dispatch->mSubtask`.
  */
-CTaskThread* CTask::CreateTaskThread(CTask* const dispatch, CTaskStage* const stage, const bool own)
+CTaskThread* CTask::CreateTaskThread(
+  CTask* const dispatch,
+  CTaskStage* const stage,
+  const bool own
+)
 {
   if (dispatch == nullptr) {
     return nullptr;
@@ -388,19 +412,26 @@ void CTaskTypeInfo::Init()
   Finish();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CTaskTypeInfo_e70b77, moho::register_CTaskTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CTaskTypeInfo_e70b77,
+  moho::register_CTaskTypeInfo
+)
 
-GPG_PREREGISTER_INIT(InitializeCTaskTypeInfoStorage_e70b77, InitializeCTaskTypeInfoStorage)
+GPG_PREREGISTER_INIT(
+  InitializeCTaskTypeInfoStorage_e70b77,
+  InitializeCTaskTypeInfoStorage
+)
 
 namespace moho
 {
   /**
    * Inlined into `gpg::SerSaveLoadHelper<CTask>::Deserialize` 0x00408E00.
    */
-  void CTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CTask::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     CTask* subtask = mSubtask;
     subtask = ReadCTaskPointer(archive, gpg::RRef{});
@@ -410,7 +441,9 @@ namespace moho
   /**
    * Inlined into `gpg::SerSaveLoadHelper<CTask>::Serialize` 0x00408E40.
    */
-  void CTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CTask::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     const gpg::RRef subtaskRef = MakeCTaskRef(mSubtask);
     gpg::WriteRawPointer(archive, subtaskRef, gpg::TrackedPointerState::Unowned, gpg::RRef{});

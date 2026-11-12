@@ -66,7 +66,9 @@ namespace moho
   /**
    * Address: 0x007125A0 (FUN_007125A0)
    */
-  void CArmyStatsTypeInfo::AddBase_StatsCArmyStatItem(gpg::RType* const typeInfo)
+  void CArmyStatsTypeInfo::AddBase_StatsCArmyStatItem(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBaseViaSlot<Stats<CArmyStatItem>>(typeInfo);
   }
@@ -85,7 +87,9 @@ namespace
   CArmyStatsTypeInfoBootstrap gCArmyStatsTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CArmyStatsTypeInfo_a19502, moho::register_CArmyStatsTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CArmyStatsTypeInfo_a19502,
+  moho::register_CArmyStatsTypeInfo
+)

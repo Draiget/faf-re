@@ -23,7 +23,9 @@ namespace
     return sInstance;
   }
 
-  [[nodiscard]] gpg::RRef MakeCUnitRefuelRef(moho::CUnitRefuel* const object)
+  [[nodiscard]] gpg::RRef MakeCUnitRefuelRef(
+    moho::CUnitRefuel* const object
+  )
   {
     return gpg::RRef{object, gpg::RTypeOf<moho::CUnitRefuel>()};
   }
@@ -74,7 +76,9 @@ namespace moho
   /**
    * Address: 0x00622400 (FUN_00622400, Moho::CUnitRefuelTypeInfo::AddBase_CCommandTask)
    */
-  void __stdcall CUnitRefuelTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void __stdcall CUnitRefuelTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CCommandTask>(typeInfo);
   }
@@ -91,7 +95,9 @@ namespace moho
   /**
    * Address: 0x00622370 (FUN_00622370, Moho::CUnitRefuelTypeInfo::CtrRef)
    */
-  gpg::RRef CUnitRefuelTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitRefuelTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const object = gpg::ConstructInStorage<CUnitRefuel>(objectStorage);
 
@@ -101,7 +107,9 @@ namespace moho
   /**
    * Address: 0x00622350 (FUN_00622350, Moho::CUnitRefuelTypeInfo::Delete)
    */
-  void CUnitRefuelTypeInfo::Delete(void* const objectStorage)
+  void CUnitRefuelTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CUnitRefuel*>(objectStorage);
   }
@@ -109,7 +117,9 @@ namespace moho
   /**
    * Address: 0x006223F0 (FUN_006223F0, Moho::CUnitRefuelTypeInfo::Destruct)
    */
-  void CUnitRefuelTypeInfo::Destruct(void* const objectStorage)
+  void CUnitRefuelTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     auto* const object = static_cast<CUnitRefuel*>(objectStorage);
     if (!object) {
@@ -128,7 +138,9 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CUnitRefuelTypeInfo_cb70ca, moho::register_CUnitRefuelTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CUnitRefuelTypeInfo_cb70ca,
+  moho::register_CUnitRefuelTypeInfo
+)

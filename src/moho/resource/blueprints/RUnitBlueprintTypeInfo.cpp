@@ -74,7 +74,9 @@ namespace moho
    * What it does:
    * Adds `REntityBlueprint` as the reflected base class lane.
    */
-  void RUnitBlueprintTypeInfo::AddBaseREntityBlueprint(gpg::RType* const typeInfo)
+  void RUnitBlueprintTypeInfo::AddBaseREntityBlueprint(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::REntityBlueprint>(typeInfo);
   }
@@ -85,17 +87,22 @@ namespace moho
    * What it does:
    * Registers unit-blueprint section field descriptors and descriptions.
    */
-  void RUnitBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
+  void RUnitBlueprintTypeInfo::AddFields(
+    gpg::RType* const typeInfo
+  )
   {
-    gpg::RField* const generalField = typeInfo->AddField<moho::RUnitBlueprintGeneral>("General", offsetof(RUnitBlueprint, General));
+    gpg::RField* const generalField =
+      typeInfo->AddField<moho::RUnitBlueprintGeneral>("General", offsetof(RUnitBlueprint, General));
     generalField->mFlags = 3;
     generalField->mDesc = "General information for the unit";
 
-    gpg::RField* const displayField = typeInfo->AddField<moho::RUnitBlueprintDisplay>("Display", offsetof(RUnitBlueprint, Display));
+    gpg::RField* const displayField =
+      typeInfo->AddField<moho::RUnitBlueprintDisplay>("Display", offsetof(RUnitBlueprint, Display));
     displayField->mFlags = 3;
     displayField->mDesc = "Display information for the unit";
 
-    gpg::RField* const physicsField = typeInfo->AddField<moho::RUnitBlueprintPhysics>("Physics", offsetof(RUnitBlueprint, Physics));
+    gpg::RField* const physicsField =
+      typeInfo->AddField<moho::RUnitBlueprintPhysics>("Physics", offsetof(RUnitBlueprint, Physics));
     physicsField->mFlags = 3;
     physicsField->mDesc = "Physics information for the unit";
 
@@ -103,11 +110,13 @@ namespace moho
     airField->mFlags = 3;
     airField->mDesc = "Air control information for the unit";
 
-    gpg::RField* const transportField = typeInfo->AddField<moho::RUnitBlueprintTransport>("Transport", offsetof(RUnitBlueprint, Transport));
+    gpg::RField* const transportField =
+      typeInfo->AddField<moho::RUnitBlueprintTransport>("Transport", offsetof(RUnitBlueprint, Transport));
     transportField->mFlags = 3;
     transportField->mDesc = "Transport related information for the unit";
 
-    gpg::RField* const defenseField = typeInfo->AddField<moho::RUnitBlueprintDefense>("Defense", offsetof(RUnitBlueprint, Defense));
+    gpg::RField* const defenseField =
+      typeInfo->AddField<moho::RUnitBlueprintDefense>("Defense", offsetof(RUnitBlueprint, Defense));
     defenseField->mFlags = 3;
     defenseField->mDesc = "Defense information for the unit";
 
@@ -115,16 +124,19 @@ namespace moho
     aiField->mFlags = 3;
     aiField->mDesc = "AI information for the unit";
 
-    gpg::RField* const intelField = typeInfo->AddField<moho::RUnitBlueprintIntel>("Intel", offsetof(RUnitBlueprint, Intel));
+    gpg::RField* const intelField =
+      typeInfo->AddField<moho::RUnitBlueprintIntel>("Intel", offsetof(RUnitBlueprint, Intel));
     intelField->mFlags = 3;
     intelField->mDesc = "Intel information for the unit";
 
-    gpg::RField* const weaponField = typeInfo->AddField<fa::vector<moho::RUnitBlueprintWeapon>>("Weapons", offsetof(RUnitBlueprint, Weapons));
+    gpg::RField* const weaponField =
+      typeInfo->AddField<fa::vector<moho::RUnitBlueprintWeapon>>("Weapons", offsetof(RUnitBlueprint, Weapons));
     weaponField->mName = "Weapon";
     weaponField->mFlags = 3;
     weaponField->mDesc = "Weapon information for the unit";
 
-    gpg::RField* const economyField = typeInfo->AddField<moho::RUnitBlueprintEconomy>("Economy", offsetof(RUnitBlueprint, Economy));
+    gpg::RField* const economyField =
+      typeInfo->AddField<moho::RUnitBlueprintEconomy>("Economy", offsetof(RUnitBlueprint, Economy));
     economyField->mFlags = 3;
     economyField->mDesc = "Economy information for the unit";
   }
@@ -156,4 +168,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_RUnitBlueprintTypeInfo_79d1ea, moho::register_RUnitBlueprintTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_RUnitBlueprintTypeInfo_79d1ea,
+  moho::register_RUnitBlueprintTypeInfo
+)

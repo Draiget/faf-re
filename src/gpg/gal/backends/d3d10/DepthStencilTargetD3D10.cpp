@@ -2,8 +2,8 @@
 
 namespace gpg::gal
 {
-namespace
-{
+  namespace
+  {
 
     /**
      * Address: 0x0094B210 (FUN_0094B210)
@@ -11,12 +11,13 @@ namespace
      * What it does:
      * Executes the recovered non-deleting destructor body lanes for `DepthStencilTargetD3D10`.
      */
-    void DestroyDepthStencilTargetD3D10Body(DepthStencilTargetD3D10* const depthStencilTarget)
+    void DestroyDepthStencilTargetD3D10Body(
+      DepthStencilTargetD3D10* const depthStencilTarget
+    )
     {
       depthStencilTarget->DestroyState();
     }
-}
-
+  } // namespace
 
   /**
    * Address: 0x0094B100 (FUN_0094B100, DepthStencilTargetD3D10 default-state init lane)
@@ -150,5 +151,4 @@ namespace
 
     return shaderResourceView_;
   }
-}
-
+} // namespace gpg::gal

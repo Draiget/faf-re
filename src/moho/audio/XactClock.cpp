@@ -13,6 +13,10 @@
 #include "moho/audio/AudioEngine.h"
 #include "moho/misc/StartupHelpers.h"
 
+#if FAFRE_PLATFORM_WINDOWS
+// XACT's clock is patched through the KERNEL32 imports of its DLL. The Linux client's XACT is
+// FAudio, linked in, with no import table to patch (issue #258); SND_InstallXactClock does nothing
+// there.
 namespace
 {
   /// The process clock starts here, not at 0: XACT treats a zero timestamp as
@@ -21,10 +25,10 @@ namespace
 
   struct XactClockOrigin
   {
-    LONGLONG mFrequency = 1;       // QueryPerformanceFrequency
-    LONGLONG mCounterAtStart = 0;  // system counter when the first engine was created
-    DWORD mTicksAtStart = 0;       // system GetTickCount at the same moment
-    double mTestOffsetDays = 0.0;  // FAF_TEST_TICK_OFFSET_DAYS
+    LONGLONG mFrequency = 1;      // QueryPerformanceFrequency
+    LONGLONG mCounterAtStart = 0; // system counter when the first engine was created
+    DWORD mTicksAtStart = 0;      // system GetTickCount at the same moment
+    double mTestOffsetDays = 0.0; // FAF_TEST_TICK_OFFSET_DAYS
     LONGLONG mTestCounterOffset = 0;
     DWORD mTestTickOffset = 0;
   };
@@ -45,7 +49,9 @@ namespace
     return ::GetTickCount() + sOrigin.mTestTickOffset;
   }
 
-  BOOL WINAPI QueryProcessCounter(LARGE_INTEGER* const counter)
+  BOOL WINAPI QueryProcessCounter(
+    LARGE_INTEGER* const counter
+  )
   {
     counter->QuadPart = ReadSystemCounter() - sOrigin.mCounterAtStart + sOrigin.mFrequency * kClockBaseSeconds;
     return TRUE;
@@ -58,7 +64,9 @@ namespace
 
   /// Test only (`/realtickcount` with FAF_TEST_TICK_OFFSET_DAYS): the system
   /// clock as a machine up that many days longer would report it.
-  BOOL WINAPI QueryShiftedSystemCounter(LARGE_INTEGER* const counter)
+  BOOL WINAPI QueryShiftedSystemCounter(
+    LARGE_INTEGER* const counter
+  )
   {
     counter->QuadPart = ReadSystemCounter();
     return TRUE;
@@ -95,18 +103,23 @@ namespace
   };
 
   template <class T>
-  [[nodiscard]] T* ImageData(const HMODULE module, const DWORD rva)
+  [[nodiscard]] T* ImageData(
+    const HMODULE module,
+    const DWORD rva
+  )
   {
     return reinterpret_cast<T*>(reinterpret_cast<char*>(module) + rva);
   }
 
   /// Rewrites the module's KERNEL32 import slots named in `replacements`.
-  int PatchKernel32Imports(const HMODULE module, const std::span<ImportReplacement> replacements)
+  int PatchKernel32Imports(
+    const HMODULE module,
+    const std::span<ImportReplacement> replacements
+  )
   {
     const auto* const dosHeader = ImageData<const IMAGE_DOS_HEADER>(module, 0);
     const auto* const ntHeaders = ImageData<const IMAGE_NT_HEADERS>(module, static_cast<DWORD>(dosHeader->e_lfanew));
-    const IMAGE_DATA_DIRECTORY& importDirectory =
-      ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+    const IMAGE_DATA_DIRECTORY& importDirectory = ntHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
     if (importDirectory.VirtualAddress == 0) {
       return 0;
     }
@@ -115,8 +128,10 @@ namespace
     for (const auto* descriptor = ImageData<const IMAGE_IMPORT_DESCRIPTOR>(module, importDirectory.VirtualAddress);
          descriptor->Name != 0;
          ++descriptor) {
-      if (::_stricmp(ImageData<const char>(module, descriptor->Name), "kernel32.dll") != 0 ||
-          descriptor->OriginalFirstThunk == 0) {
+      if (
+        ::_stricmp(ImageData<const char>(module, descriptor->Name), "kernel32.dll") != 0 ||
+        descriptor->OriginalFirstThunk == 0
+      ) {
         continue;
       }
 
@@ -135,11 +150,17 @@ namespace
           }
 
           DWORD oldProtection = 0;
-          if (::VirtualProtect(&addressThunk->u1.Function, sizeof(addressThunk->u1.Function), PAGE_EXECUTE_READWRITE, &oldProtection)) {
+          if (
+            ::VirtualProtect(
+              &addressThunk->u1.Function, sizeof(addressThunk->u1.Function), PAGE_EXECUTE_READWRITE, &oldProtection
+            )
+          ) {
             ::InterlockedExchangePointer(
               reinterpret_cast<PVOID volatile*>(&addressThunk->u1.Function), const_cast<void*>(replacement.mFunction)
             );
-            ::VirtualProtect(&addressThunk->u1.Function, sizeof(addressThunk->u1.Function), oldProtection, &oldProtection);
+            ::VirtualProtect(
+              &addressThunk->u1.Function, sizeof(addressThunk->u1.Function), oldProtection, &oldProtection
+            );
             replacement.mPatched = true;
             ++patched;
           }
@@ -149,11 +170,18 @@ namespace
     return patched;
   }
 } // namespace
+#endif // FAFRE_PLATFORM_WINDOWS
 
 namespace moho
 {
-  void SND_InstallXactClock(const IXACTEngine& engine)
+  void SND_InstallXactClock(
+    const IXACTEngine& engine
+  )
   {
+#if !FAFRE_PLATFORM_WINDOWS
+    (void)engine;
+    gpg::Logf("SND: FAudio keeps its own clock; nothing to patch");
+#else
     // A COM object's first word is its interface table, which sits in the
     // image of the DLL that implements it.
     const void* const interfaceTable = *reinterpret_cast<const void* const*>(&engine);
@@ -181,16 +209,21 @@ namespace moho
     }
 
     std::array<ImportReplacement, 2> replacements{{
-      {"QueryPerformanceCounter", systemClock ? reinterpret_cast<const void*>(&QueryShiftedSystemCounter)
-                                              : reinterpret_cast<const void*>(&QueryProcessCounter), false},
-      {"GetTickCount", systemClock ? reinterpret_cast<const void*>(&GetShiftedSystemTickCount)
-                                   : reinterpret_cast<const void*>(&GetProcessTickCount), false},
+      {"QueryPerformanceCounter",
+       systemClock ? reinterpret_cast<const void*>(&QueryShiftedSystemCounter)
+                   : reinterpret_cast<const void*>(&QueryProcessCounter),
+       false},
+      {"GetTickCount",
+       systemClock ? reinterpret_cast<const void*>(&GetShiftedSystemTickCount)
+                   : reinterpret_cast<const void*>(&GetProcessTickCount),
+       false},
     }};
     const int patched = PatchKernel32Imports(module, replacements);
 
     if (systemClock) {
       gpg::Logf(
-        "SND: /realtickcount: %s times itself with the system uptime clock, shifted %.2f days by FAF_TEST_TICK_OFFSET_DAYS (%d imports)",
+        "SND: /realtickcount: %s times itself with the system uptime clock, shifted %.2f days by "
+        "FAF_TEST_TICK_OFFSET_DAYS (%d imports)",
         moduleName,
         sOrigin.mTestOffsetDays,
         patched
@@ -199,11 +232,13 @@ namespace moho
     }
 
     gpg::Logf(
-      "SND: %s clock imports patched to count from process start (QueryPerformanceCounter %s, GetTickCount %s%s); /realtickcount disables",
+      "SND: %s clock imports patched to count from process start (QueryPerformanceCounter %s, GetTickCount %s%s); "
+      "/realtickcount disables",
       moduleName,
       replacements[0].mPatched ? "yes" : "no",
       replacements[1].mPatched ? "yes" : "no",
       sOrigin.mTestOffsetDays != 0.0 ? ", system clock shifted by FAF_TEST_TICK_OFFSET_DAYS" : ""
     );
+#endif
   }
 } // namespace moho

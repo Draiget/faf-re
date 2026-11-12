@@ -59,7 +59,9 @@ namespace gpg
      * The inherited lexical text followed by the list's size. The binary reads
      * `_Mysize` straight off `ref.mObj` with no null test.
      */
-    [[nodiscard]] fa::string GetLexical(const RRef& ref) const override
+    [[nodiscard]] fa::string GetLexical(
+      const RRef& ref
+    ) const override
     {
       const fa::string base = RType::GetLexical(ref);
       return STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(static_cast<const list_type*>(ref.mObj)->size()));
@@ -83,7 +85,12 @@ namespace gpg
      * a fresh `T` (`ReadElement`: a value through its reflected type, a raw
      * pointer or a `boost::shared_ptr` as a tracked pointer) and appends it.
      */
-    static void SerLoad(ReadArchive* const archive, const std::intptr_t objectPtr, const int, RRef* const ownerRef)
+    static void SerLoad(
+      ReadArchive* const archive,
+      const std::intptr_t objectPtr,
+      const int,
+      RRef* const ownerRef
+    )
     {
       list_type& list = *reinterpret_cast<list_type*>(objectPtr);
 
@@ -101,7 +108,12 @@ namespace gpg
      * What it does:
      * Writes the element count, then each element (`WriteElement`).
      */
-    static void SerSave(WriteArchive* const archive, const std::intptr_t objectPtr, const int, RRef* const ownerRef)
+    static void SerSave(
+      WriteArchive* const archive,
+      const std::intptr_t objectPtr,
+      const int,
+      RRef* const ownerRef
+    )
     {
       const list_type& list = *reinterpret_cast<const list_type*>(objectPtr);
 

@@ -11,7 +11,10 @@ namespace moho
   {
     constexpr std::size_t kMaxWaterBodies = 255u;
 
-    void AddLog(std::vector<std::string>* const log, const char* const text)
+    void AddLog(
+      std::vector<std::string>* const log,
+      const char* const text
+    )
     {
       if (log != nullptr) {
         log->emplace_back(text);
@@ -19,7 +22,10 @@ namespace moho
     }
 
     /// `value` truncated toward the cell below it and clamped to `[0, count - 1]`; NaN gives 0.
-    [[nodiscard]] std::int32_t ClampedCell(const float value, const std::int32_t count) noexcept
+    [[nodiscard]] std::int32_t ClampedCell(
+      const float value,
+      const std::int32_t count
+    ) noexcept
     {
       if (!(value >= 0.0f)) {
         return 0;
@@ -31,7 +37,9 @@ namespace moho
     }
   } // namespace
 
-  std::vector<float> WaterBodyOutlinePolygon(const std::vector<float>& points)
+  std::vector<float> WaterBodyOutlinePolygon(
+    const std::vector<float>& points
+  )
   {
     std::vector<float> polygon;
     const std::size_t count = points.size() / 2u;
@@ -39,7 +47,9 @@ namespace moho
       return polygon;
     }
     polygon.reserve(count * static_cast<std::size_t>(kWaterBodyOutlineSteps) * 2u);
-    const auto at = [&](const std::size_t index, const std::size_t axis) { return points[(index % count) * 2u + axis]; };
+    const auto at = [&](const std::size_t index, const std::size_t axis) {
+      return points[(index % count) * 2u + axis];
+    };
     for (std::size_t span = 0; span < count; ++span) {
       for (std::int32_t step = 0; step < kWaterBodyOutlineSteps; ++step) {
         // Steps are a power of two, so t, t^2 and t^3 are exact.
@@ -62,7 +72,11 @@ namespace moho
     return polygon;
   }
 
-  bool WaterBodyPolygonContains(const std::vector<float>& polygon, const float x, const float z) noexcept
+  bool WaterBodyPolygonContains(
+    const std::vector<float>& polygon,
+    const float x,
+    const float z
+  ) noexcept
   {
     const std::size_t count = polygon.size() / 2u;
     bool inside = false;
@@ -125,7 +139,9 @@ namespace moho
       if (!desc.outline.empty()) {
         polygon = WaterBodyOutlinePolygon(desc.outline);
         if (polygon.empty()) {
-          std::snprintf(line, sizeof(line), "water body %zu skipped: an outline needs at least 3 points", descIndex + 1u);
+          std::snprintf(
+            line, sizeof(line), "water body %zu skipped: an outline needs at least 3 points", descIndex + 1u
+          );
           AddLog(log, line);
           continue;
         }
@@ -160,17 +176,25 @@ namespace moho
         std::uint32_t taken = 0;
         for (std::int32_t z = z0; z <= z1; ++z) {
           for (std::int32_t x = x0; x <= x1; ++x) {
-            const std::size_t index = static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x);
-            if (result->mVertexBody[index] == 0u && static_cast<float>(heights[index]) * heightScale < desc.fillTo &&
-                inside(x, z)) {
+            const std::size_t index =
+              static_cast<std::size_t>(z) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x);
+            if (
+              result->mVertexBody[index] == 0u && static_cast<float>(heights[index]) * heightScale < desc.fillTo &&
+              inside(x, z)
+            ) {
               result->mVertexBody[index] = number;
               ++taken;
             }
           }
         }
         if (taken == 0u) {
-          std::snprintf(line, sizeof(line), "water body %zu skipped: no terrain inside its outline is below %g",
-                        descIndex + 1u, static_cast<double>(desc.fillTo));
+          std::snprintf(
+            line,
+            sizeof(line),
+            "water body %zu skipped: no terrain inside its outline is below %g",
+            descIndex + 1u,
+            static_cast<double>(desc.fillTo)
+          );
           AddLog(log, line);
           continue;
         }
@@ -184,11 +208,15 @@ namespace moho
 
       const float seedX = std::floor(desc.seedX + 0.5f);
       const float seedZ = std::floor(desc.seedZ + 0.5f);
-      if (!(seedX >= static_cast<float>(x0) && seedX <= static_cast<float>(x1) &&
-            seedZ >= static_cast<float>(z0) && seedZ <= static_cast<float>(z1))) {
+      if (!(seedX >= static_cast<float>(x0) && seedX <= static_cast<float>(x1) && seedZ >= static_cast<float>(z0) &&
+            seedZ <= static_cast<float>(z1))) {
         std::snprintf(
-          line, sizeof(line), "water body %zu skipped: seed (%g, %g) is off the map or outside its bounds",
-          descIndex + 1u, static_cast<double>(desc.seedX), static_cast<double>(desc.seedZ)
+          line,
+          sizeof(line),
+          "water body %zu skipped: seed (%g, %g) is off the map or outside its bounds",
+          descIndex + 1u,
+          static_cast<double>(desc.seedX),
+          static_cast<double>(desc.seedZ)
         );
         AddLog(log, line);
         continue;
@@ -196,14 +224,20 @@ namespace moho
 
       const std::int32_t sx = static_cast<std::int32_t>(seedX);
       const std::int32_t sz = static_cast<std::int32_t>(seedZ);
-      const std::size_t seedIndex = static_cast<std::size_t>(sz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(sx);
+      const std::size_t seedIndex =
+        static_cast<std::size_t>(sz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(sx);
       const auto below = [&](const std::size_t index) {
         return static_cast<float>(heights[index]) * heightScale < desc.fillTo;
       };
       if (result->mVertexBody[seedIndex] != 0u || !below(seedIndex) || !inside(sx, sz)) {
         std::snprintf(
-          line, sizeof(line), "water body %zu skipped: terrain at its seed (%g, %g) is not below %g or is another body's",
-          descIndex + 1u, static_cast<double>(desc.seedX), static_cast<double>(desc.seedZ), static_cast<double>(desc.fillTo)
+          line,
+          sizeof(line),
+          "water body %zu skipped: terrain at its seed (%g, %g) is not below %g or is another body's",
+          descIndex + 1u,
+          static_cast<double>(desc.seedX),
+          static_cast<double>(desc.seedZ),
+          static_cast<double>(desc.fillTo)
         );
         AddLog(log, line);
         continue;
@@ -232,7 +266,8 @@ namespace moho
           if (nx < x0 || nx > x1 || nz < z0 || nz > z1) {
             continue;
           }
-          const std::size_t next = static_cast<std::size_t>(nz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(nx);
+          const std::size_t next =
+            static_cast<std::size_t>(nz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(nx);
           if (result->mVertexBody[next] != 0u || !below(next) || !inside(nx, nz)) {
             continue;
           }
@@ -262,7 +297,9 @@ namespace moho
         std::uint8_t owner = 0u;
         for (std::int32_t dz = 0; dz < 2; ++dz) {
           for (std::int32_t dx = 0; dx < 2; ++dx) {
-            const std::uint8_t corner = result->mVertexBody[static_cast<std::size_t>(z + dz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x + dx)];
+            const std::uint8_t corner =
+              result->mVertexBody
+                [static_cast<std::size_t>(z + dz) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x + dx)];
             if (corner != 0u && (owner == 0u || corner < owner)) {
               owner = corner;
             }
@@ -271,7 +308,9 @@ namespace moho
         if (owner == 0u) {
           continue;
         }
-        result->mCellBody[static_cast<std::size_t>(z) * static_cast<std::size_t>(cellWidth) + static_cast<std::size_t>(x)] = owner;
+        result
+          ->mCellBody[static_cast<std::size_t>(z) * static_cast<std::size_t>(cellWidth) + static_cast<std::size_t>(x)] =
+          owner;
         SWaterBody& body = result->mBodies[owner - 1u];
         ++body.cellCount;
         body.x0 = std::min(body.x0, x);
@@ -295,7 +334,10 @@ namespace moho
     return result;
   }
 
-  std::uint8_t CWaterBodies::BodyOfBlock(const std::int32_t x, const std::int32_t z) const noexcept
+  std::uint8_t CWaterBodies::BodyOfBlock(
+    const std::int32_t x,
+    const std::int32_t z
+  ) const noexcept
   {
     std::uint8_t owner = 0u;
     for (std::int32_t dz = 0; dz < 2; ++dz) {
@@ -309,7 +351,10 @@ namespace moho
     return owner;
   }
 
-  std::uint8_t CWaterBodies::BodyOfCell(const std::int32_t x, const std::int32_t z) const noexcept
+  std::uint8_t CWaterBodies::BodyOfCell(
+    const std::int32_t x,
+    const std::int32_t z
+  ) const noexcept
   {
     const std::int32_t cellWidth = CellWidth();
     const std::int32_t cx = std::clamp(x, 0, cellWidth - 1);
@@ -317,20 +362,32 @@ namespace moho
     return mCellBody[static_cast<std::size_t>(cz) * static_cast<std::size_t>(cellWidth) + static_cast<std::size_t>(cx)];
   }
 
-  std::uint8_t CWaterBodies::BodyOfVertex(const std::int32_t x, const std::int32_t z) const noexcept
+  std::uint8_t CWaterBodies::BodyOfVertex(
+    const std::int32_t x,
+    const std::int32_t z
+  ) const noexcept
   {
     const std::int32_t vx = std::clamp(x, 0, mVertexWidth - 1);
     const std::int32_t vz = std::clamp(z, 0, mVertexHeight - 1);
-    return mVertexBody[static_cast<std::size_t>(vz) * static_cast<std::size_t>(mVertexWidth) + static_cast<std::size_t>(vx)];
+    return mVertexBody
+      [static_cast<std::size_t>(vz) * static_cast<std::size_t>(mVertexWidth) + static_cast<std::size_t>(vx)];
   }
 
-  float CWaterBodies::LevelAt(const float x, const float z, const float seaLevel) const noexcept
+  float CWaterBodies::LevelAt(
+    const float x,
+    const float z,
+    const float seaLevel
+  ) const noexcept
   {
     const std::uint8_t body = BodyOfCell(ClampedCell(x, CellWidth()), ClampedCell(z, CellHeight()));
     return body != 0u ? mBodies[body - 1u].elevation : seaLevel;
   }
 
-  float CWaterBodies::LevelOfVertex(const std::int32_t x, const std::int32_t z, const float seaLevel) const noexcept
+  float CWaterBodies::LevelOfVertex(
+    const std::int32_t x,
+    const std::int32_t z,
+    const float seaLevel
+  ) const noexcept
   {
     const std::uint8_t body = BodyOfVertex(x, z);
     return body != 0u ? mBodies[body - 1u].elevation : seaLevel;

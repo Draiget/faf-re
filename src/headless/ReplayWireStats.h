@@ -22,7 +22,7 @@ namespace moho
 {
   class CHeightField;
   struct SSyncData;
-}
+} // namespace moho
 
 namespace faf::headless
 {
@@ -31,14 +31,20 @@ namespace faf::headless
   public:
     /** `path`: one CSV line per beat; `mapSizeX/Z` fix the position quantiser. */
     CReplayWireStats(
-      const std::string& path, const faf::remote::wire::SContentTables& tables, float mapSizeX, float mapSizeZ
+      const std::string& path,
+      const faf::remote::wire::SContentTables& tables,
+      float mapSizeX,
+      float mapSizeZ
     );
     ~CReplayWireStats();
 
     CReplayWireStats(const CReplayWireStats&) = delete;
     CReplayWireStats& operator=(const CReplayWireStats&) = delete;
 
-    [[nodiscard]] bool IsOpen() const noexcept { return mFile != nullptr; }
+    [[nodiscard]] bool IsOpen() const noexcept
+    {
+      return mFile != nullptr;
+    }
 
     /** Applies one packet's entity lanes and measures the resulting frame. */
     void OnPacket(const moho::SSyncData& packet);
@@ -82,22 +88,22 @@ namespace faf::headless
     /** Bits of changed records by field class, summed over the run (creations and ids apart). */
     struct SFieldBits
     {
-      std::uint64_t transform = 0;  // position, orientation
+      std::uint64_t transform = 0;   // position, orientation
       std::uint64_t orientation = 0; // the orientation part of `transform`
-      std::uint64_t scalars = 0;    // health, max health, build progress
-      std::uint64_t flags = 0;      // entity flags, kind, blueprint, army
-      std::uint64_t unit = 0;       // unit block
+      std::uint64_t scalars = 0;     // health, max health, build progress
+      std::uint64_t flags = 0;       // entity flags, kind, blueprint, army
+      std::uint64_t unit = 0;        // unit block
       /** Appearance block: mesh, scale, attachments, visual flags, impact, scroll, intel radii. */
       std::array<std::uint64_t, 7> appearance{};
       /** Unit block beyond the basics: stats tree, constants, detail ids, economy, queues, weapons, attributes. */
       std::array<std::uint64_t, 7> unitParts{};
-      std::uint64_t overhead = 0;   // id gaps and masks of changed records
-      std::uint64_t creations = 0;  // whole created records with their ids
-      std::uint64_t removals = 0;   // removed ids
+      std::uint64_t overhead = 0;  // id gaps and masks of changed records
+      std::uint64_t creations = 0; // whole created records with their ids
+      std::uint64_t removals = 0;  // removed ids
     } mFieldBits;
     std::array<std::uint64_t, 7> mCreationAppearanceBits{}; // the appearance part of `creations`
-    std::uint64_t mEconomyChanges = 0;       // changed records with an economy change
-    std::uint64_t mEconomyFloatsChanged = 0; // of their six floats, how many changed in all
+    std::uint64_t mEconomyChanges = 0;                      // changed records with an economy change
+    std::uint64_t mEconomyFloatsChanged = 0;                // of their six floats, how many changed in all
     bool mHavePrevious = false;
 
     std::uint64_t mBeats = 0;

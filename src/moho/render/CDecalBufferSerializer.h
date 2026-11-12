@@ -15,8 +15,6 @@ namespace moho
 {
   class CDecalBuffer;
 
-
-
   /**
    * Address: 0x00779CE0 (FUN_00779CE0)
    *

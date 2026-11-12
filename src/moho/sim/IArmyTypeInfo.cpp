@@ -90,10 +90,14 @@ namespace
   [[maybe_unused]] IArmyTypeInfoBootstrap gIArmyTypeInfoBootstrap;
 } // namespace
 
-
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_IArmyTypeInfo_0717a0, moho::register_IArmyTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_IArmyTypeInfo_0717a0,
+  moho::register_IArmyTypeInfo
+)
 
-GPG_PREREGISTER_INIT(preregister_IArmyTypeInfo_0717a0, moho::preregister_IArmyTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_IArmyTypeInfo_0717a0,
+  moho::preregister_IArmyTypeInfo
+)

@@ -102,7 +102,5 @@ namespace moho
    * template emission symbol when callers (`UnitWeapon::Set...Priorities`,
    * `CPlatoon::SetPrioritizedTargetList`) push category-set entries.
    */
-  void PushBackEntityCategorySetVector(
-    fa::vector<EntityCategorySet>& destination,
-    const EntityCategorySet& value);
+  void PushBackEntityCategorySetVector(fa::vector<EntityCategorySet>& destination, const EntityCategorySet& value);
 } // namespace moho

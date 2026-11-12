@@ -2,11 +2,16 @@
 #include "DeviceContext.hpp"
 #include "Error.hpp"
 // d3d11.h pulls in d3d10_1.h, which refuses to follow d3d10.h: D3D11 first.
+// The Linux client renders with Vulkan only (issue #255).
+#if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d11/DeviceD3D11.h"
 #include "gpg/gal/backends/d3d12/DeviceD3D12.h"
+#endif
 #include "gpg/gal/backends/vulkan/DeviceVulkan.h"
+#if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d10/DeviceD3D10.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#endif
 #include "legacy/containers/AutoPtr.h"
 
 #include <Windows.h>
@@ -14,453 +19,534 @@
 
 namespace gpg::gal
 {
-    namespace
+  namespace
+  {
+    /**
+     * The active device (0x00F8E284). An `auto_ptr`: `Create` and
+     * `DestroyInstance` replace it with its delete-then-assign `reset`,
+     * and its exit-time destructor (0x00C095F0) deletes whatever device is
+     * still live.
+     */
+    fa::auto_ptr<Device> sDeviceD3D;
+
+    [[noreturn]] void ThrowDeviceContextError(
+      const int line,
+      const char* const message
+    )
     {
-        /**
-         * The active device (0x00F8E284). An `auto_ptr`: `Create` and
-         * `DestroyInstance` replace it with its delete-then-assign `reset`,
-         * and its exit-time destructor (0x00C095F0) deletes whatever device is
-         * still live.
-         */
-        fa::auto_ptr<Device> sDeviceD3D;
-
-        [[noreturn]] void ThrowDeviceContextError(const int line, const char* const message)
-        {
-            throw Error(
-                fa::string("c:\\work\\rts\\main\\code\\src\\libs\\gpggal\\Device.cpp"),
-                line,
-                fa::string(message)
-            );
-        }
-
-        /**
-         * Address: 0x00432310 (FUN_00432310)
-         *
-         * What it does:
-         * Returns the number of `Head` elements currently stored in one vector lane.
-         */
-        [[nodiscard]] int CountHeadVectorEntries(const fa::vector<Head>& heads) noexcept
-        {
-            const Head* const start = heads.begin();
-            if (start == nullptr)
-            {
-                return 0;
-            }
-
-            return static_cast<int>(heads.end() - start);
-        }
-
+      throw Error(fa::string("c:\\work\\rts\\main\\code\\src\\libs\\gpggal\\Device.cpp"), line, fa::string(message));
     }
 
     /**
-     * Address: 0x004369B0 (FUN_004369B0)
+     * Address: 0x00432310 (FUN_00432310)
      *
      * What it does:
-     * Copy-constructs one head-sample option lane including its owned label
-     * string payload.
+     * Returns the number of `Head` elements currently stored in one vector lane.
      */
-    HeadSampleOption::HeadSampleOption(const HeadSampleOption& other)
-        : sampleType(other.sampleType),
-          sampleQuality(other.sampleQuality),
-          label(other.label)
+    [[nodiscard]] int CountHeadVectorEntries(
+      const fa::vector<Head>& heads
+    ) noexcept
     {
+      const Head* const start = heads.begin();
+      if (start == nullptr) {
+        return 0;
+      }
+
+      return static_cast<int>(heads.end() - start);
     }
 
-    /**
-     * Address: 0x008E6D40 (FUN_008E6D40)
-     *
-     * What it does:
-     * Initializes one device-context record and records requested backend type.
-     */
-    DeviceContext::DeviceContext(const DeviceApi deviceType)
-        : mDeviceType(deviceType)
-    {
-    }
+  } // namespace
 
-    /**
-     * Address: 0x00430480 (FUN_00430480)
-     *
-     * DeviceContext const &
-     *
-     * What it does:
-     * Copies one device-context payload, including all configured heads.
-     */
-    DeviceContext::DeviceContext(const DeviceContext& other)
-        : mDeviceType(other.mDeviceType),
-          mValidate(other.mValidate),
-          mAdapter(other.mAdapter),
-          mVSync(other.mVSync),
-          mHWBasedInstancing(other.mHWBasedInstancing),
-          mSupportsFloat16(other.mSupportsFloat16),
-          mVertexShaderProfile(other.mVertexShaderProfile),
-          mPixelShaderProfile(other.mPixelShaderProfile),
-          mMaxPrimitiveCount(other.mMaxPrimitiveCount),
-          mMaxVertexCount(other.mMaxVertexCount),
-          mHeads(other.mHeads)
-    {
-    }
+  /**
+   * Address: 0x004369B0 (FUN_004369B0)
+   *
+   * What it does:
+   * Copy-constructs one head-sample option lane including its owned label
+   * string payload.
+   */
+  HeadSampleOption::HeadSampleOption(
+    const HeadSampleOption& other
+  )
+    : sampleType(other.sampleType)
+    , sampleQuality(other.sampleQuality)
+    , label(other.label)
+  {}
 
-    /**
-     * Address: 0x008D1D00 (FUN_008D1D00, func_CpyDeviceContext)
-     *
-     * What it does:
-     * Copies one device-context payload and returns the destination context.
-     */
-    DeviceContext& DeviceContext::operator=(const DeviceContext& other)
-    {
-        mDeviceType = other.mDeviceType;
-        mValidate = other.mValidate;
-        mAdapter = other.mAdapter;
-        mVSync = other.mVSync;
-        mHWBasedInstancing = other.mHWBasedInstancing;
-        mSupportsFloat16 = other.mSupportsFloat16;
-        mVertexShaderProfile = other.mVertexShaderProfile;
-        mPixelShaderProfile = other.mPixelShaderProfile;
-        mMaxPrimitiveCount = other.mMaxPrimitiveCount;
-        mMaxVertexCount = other.mMaxVertexCount;
-        mHeads = other.mHeads;
-        return *this;
-    }
+  /**
+   * Address: 0x008E6D40 (FUN_008E6D40)
+   *
+   * What it does:
+   * Initializes one device-context record and records requested backend type.
+   */
+  DeviceContext::DeviceContext(
+    const DeviceApi deviceType
+  )
+    : mDeviceType(deviceType)
+  {}
 
-    /**
-     * Address: 0x008E6730 (FUN_008E6730)
-     *
-     * What it does:
-     * Returns the active device singleton pointer.
-     */
-    Device* Device::GetInstance()
-    {
-        return sDeviceD3D.get();
-    }
+  /**
+   * Address: 0x00430480 (FUN_00430480)
+   *
+   * DeviceContext const &
+   *
+   * What it does:
+   * Copies one device-context payload, including all configured heads.
+   */
+  DeviceContext::DeviceContext(
+    const DeviceContext& other
+  )
+    : mDeviceType(other.mDeviceType)
+    , mValidate(other.mValidate)
+    , mAdapter(other.mAdapter)
+    , mVSync(other.mVSync)
+    , mHWBasedInstancing(other.mHWBasedInstancing)
+    , mSupportsFloat16(other.mSupportsFloat16)
+    , mVertexShaderProfile(other.mVertexShaderProfile)
+    , mPixelShaderProfile(other.mPixelShaderProfile)
+    , mMaxPrimitiveCount(other.mMaxPrimitiveCount)
+    , mMaxVertexCount(other.mMaxVertexCount)
+    , mHeads(other.mHeads)
+  {}
 
-    /**
-     * Address: 0x008E6720 (FUN_008E6720, gpg::gal::Device::IsReady)
-     *
-     * What it does:
-     * Returns true when the global active device singleton is available.
-     */
-    bool Device::IsReady()
-    {
-        return sDeviceD3D.get() != nullptr;
-    }
+  /**
+   * Address: 0x008D1D00 (FUN_008D1D00, func_CpyDeviceContext)
+   *
+   * What it does:
+   * Copies one device-context payload and returns the destination context.
+   */
+  DeviceContext& DeviceContext::operator=(
+    const DeviceContext& other
+  )
+  {
+    mDeviceType = other.mDeviceType;
+    mValidate = other.mValidate;
+    mAdapter = other.mAdapter;
+    mVSync = other.mVSync;
+    mHWBasedInstancing = other.mHWBasedInstancing;
+    mSupportsFloat16 = other.mSupportsFloat16;
+    mVertexShaderProfile = other.mVertexShaderProfile;
+    mPixelShaderProfile = other.mPixelShaderProfile;
+    mMaxPrimitiveCount = other.mMaxPrimitiveCount;
+    mMaxVertexCount = other.mMaxVertexCount;
+    mHeads = other.mHeads;
+    return *this;
+  }
 
-    /**
-     * Address: 0x008E6700 (FUN_008E6700, func_DeivceD3DDtr)
-     *
-     * What it does:
-     * Deletes the active device (through its virtual destructor, slot 0) and
-     * clears the singleton.
-     */
-    void Device::DestroyInstance()
-    {
-        sDeviceD3D.reset();
-    }
+  /**
+   * Address: 0x008E6730 (FUN_008E6730)
+   *
+   * What it does:
+   * Returns the active device singleton pointer.
+   */
+  Device* Device::GetInstance()
+  {
+    return sDeviceD3D.get();
+  }
 
-    /**
-     * Address: 0x008E6B60 (FUN_008E6B60, func_CreateDeviceD3D)
-     *
-     * What it does:
-     * Deletes the active device, then builds the backend `context` asks for
-     * (`new DeviceD3D9`, 0x84 bytes, or `new DeviceD3D10`, 0x128), installs
-     * it as the active device before bringing it up, and returns it. Any other
-     * device type throws "unknown API requested" (Device.cpp line 135).
-     * `CScApp::CreateDevice` is the caller (0x008CFC09).
-     */
-    Device* Device::Create(DeviceContext* const context)
-    {
+  /**
+   * Address: 0x008E6720 (FUN_008E6720, gpg::gal::Device::IsReady)
+   *
+   * What it does:
+   * Returns true when the global active device singleton is available.
+   */
+  bool Device::IsReady()
+  {
+    return sDeviceD3D.get() != nullptr;
+  }
+
+  /**
+   * Address: 0x008E6700 (FUN_008E6700, func_DeivceD3DDtr)
+   *
+   * What it does:
+   * Deletes the active device (through its virtual destructor, slot 0) and
+   * clears the singleton.
+   */
+  void Device::DestroyInstance()
+  {
+    sDeviceD3D.reset();
+  }
+
+  /**
+   * Address: 0x008E6B60 (FUN_008E6B60, func_CreateDeviceD3D)
+   *
+   * What it does:
+   * Deletes the active device, then builds the backend `context` asks for
+   * (`new DeviceD3D9`, 0x84 bytes, or `new DeviceD3D10`, 0x128), installs
+   * it as the active device before bringing it up, and returns it. Any other
+   * device type throws "unknown API requested" (Device.cpp line 135).
+   * `CScApp::CreateDevice` is the caller (0x008CFC09).
+   */
+  Device* Device::Create(
+    DeviceContext* const context
+  )
+  {
+    DestroyInstance();
+
+    switch (context->mDeviceType) {
+#if FAFRE_PLATFORM_WINDOWS
+    case DeviceApi::Direct3D9: {
+      DeviceD3D9* const device = new DeviceD3D9();
+      sDeviceD3D.reset(device);
+      device->Setup(context);
+      break;
+    }
+    case DeviceApi::Direct3D10: {
+      DeviceD3D10* const device = new DeviceD3D10();
+      sDeviceD3D.reset(device);
+      device->Setup(context);
+      break;
+    }
+    case DeviceApi::Direct3D11: {
+      // FAF addition, not in the shipped binary. A Setup that throws
+      // leaves no half-built device installed: the caller falls back to
+      // Direct3D 9 (CScApp::CreateDevice), and nothing may reach this
+      // one through GetInstance in between.
+      DeviceD3D11* const device = new DeviceD3D11();
+      sDeviceD3D.reset(device);
+      try {
+        device->Setup(context);
+      } catch (...) {
         DestroyInstance();
-
-        switch (context->mDeviceType)
-        {
-        case DeviceApi::Direct3D9:
-        {
-            DeviceD3D9* const device = new DeviceD3D9();
-            sDeviceD3D.reset(device);
-            device->Setup(context);
-            break;
-        }
-        case DeviceApi::Direct3D10:
-        {
-            DeviceD3D10* const device = new DeviceD3D10();
-            sDeviceD3D.reset(device);
-            device->Setup(context);
-            break;
-        }
-        case DeviceApi::Direct3D11:
-        {
-            // FAF addition, not in the shipped binary. A Setup that throws
-            // leaves no half-built device installed: the caller falls back to
-            // Direct3D 9 (CScApp::CreateDevice), and nothing may reach this
-            // one through GetInstance in between.
-            DeviceD3D11* const device = new DeviceD3D11();
-            sDeviceD3D.reset(device);
-            try
-            {
-                device->Setup(context);
-            }
-            catch (...)
-            {
-                DestroyInstance();
-                throw;
-            }
-            break;
-        }
-        case DeviceApi::Vulkan:
-        {
-            // FAF addition, not in the shipped binary: as Direct3D 11 above.
-            DeviceVulkan* const device = new DeviceVulkan();
-            sDeviceD3D.reset(device);
-            try
-            {
-                device->Setup(context);
-            }
-            catch (...)
-            {
-                DestroyInstance();
-                throw;
-            }
-            break;
-        }
-        case DeviceApi::Direct3D12:
-        {
-            // FAF addition, not in the shipped binary: as Direct3D 11 above.
-            DeviceD3D12* const device = new DeviceD3D12();
-            sDeviceD3D.reset(device);
-            try
-            {
-                device->Setup(context);
-            }
-            catch (...)
-            {
-                DestroyInstance();
-                throw;
-            }
-            break;
-        }
-        default:
-            ThrowDeviceContextError(135, "unknown API requested");
-        }
-
-        return sDeviceD3D.get();
+        throw;
+      }
+      break;
+    }
+#endif
+    case DeviceApi::Vulkan: {
+      // FAF addition, not in the shipped binary: as Direct3D 11 above.
+      DeviceVulkan* const device = new DeviceVulkan();
+      sDeviceD3D.reset(device);
+      try {
+        device->Setup(context);
+      } catch (...) {
+        DestroyInstance();
+        throw;
+      }
+      break;
+    }
+#if FAFRE_PLATFORM_WINDOWS
+    case DeviceApi::Direct3D12: {
+      // FAF addition, not in the shipped binary: as Direct3D 11 above.
+      DeviceD3D12* const device = new DeviceD3D12();
+      sDeviceD3D.reset(device);
+      try {
+        device->Setup(context);
+      } catch (...) {
+        DestroyInstance();
+        throw;
+      }
+      break;
+    }
+#endif
+    default:
+      ThrowDeviceContextError(135, "unknown API requested");
     }
 
-    /**
-     * FAF addition, not in the shipped binary.
-     *
-     * What it does:
-     * Dispatches on the active device's API to its backend's own query.
-     */
-    bool SupportsVertexTextureFormat(const std::uint32_t textureFormat)
-    {
-        Device* const device = Device::GetInstance();
-        if (device == nullptr)
-        {
-            return false;
-        }
+    return sDeviceD3D.get();
+  }
 
-        switch (device->GetDeviceContext()->mDeviceType)
-        {
-        case DeviceApi::Direct3D9:
-            return static_cast<DeviceD3D9*>(device)->SupportsVertexTextureFormat(textureFormat);
-        case DeviceApi::Direct3D10:
-            return static_cast<DeviceD3D10*>(device)->SupportsVertexTextureFormat(textureFormat);
-        case DeviceApi::Direct3D11:
-            return static_cast<DeviceD3D11*>(device)->SupportsVertexTextureFormat(textureFormat);
-        case DeviceApi::Direct3D12:
-            return static_cast<DeviceD3D12*>(device)->SupportsVertexTextureFormat(textureFormat);
-        case DeviceApi::Vulkan:
-            return static_cast<DeviceVulkan*>(device)->SupportsVertexTextureFormat(textureFormat);
-        default:
-            return false;
-        }
+  /**
+   * FAF addition, not in the shipped binary.
+   *
+   * What it does:
+   * Dispatches on the active device's API to its backend's own query.
+   */
+  bool SupportsVertexTextureFormat(
+    const std::uint32_t textureFormat
+  )
+  {
+    Device* const device = Device::GetInstance();
+    if (device == nullptr) {
+      return false;
     }
 
-    /**
-     * Address: 0x008E81B0 (FUN_008E81B0)
-     *
-     * What it does:
-     * Installs the base vtable and builds the empty output context.
-     */
-    Device::Device() = default;
+    switch (device->GetDeviceContext()->mDeviceType) {
+#if FAFRE_PLATFORM_WINDOWS
+    case DeviceApi::Direct3D9:
+      return static_cast<DeviceD3D9*>(device)->SupportsVertexTextureFormat(textureFormat);
+    case DeviceApi::Direct3D10:
+      return static_cast<DeviceD3D10*>(device)->SupportsVertexTextureFormat(textureFormat);
+    case DeviceApi::Direct3D11:
+      return static_cast<DeviceD3D11*>(device)->SupportsVertexTextureFormat(textureFormat);
+    case DeviceApi::Direct3D12:
+      return static_cast<DeviceD3D12*>(device)->SupportsVertexTextureFormat(textureFormat);
+#endif
+    case DeviceApi::Vulkan:
+      return static_cast<DeviceVulkan*>(device)->SupportsVertexTextureFormat(textureFormat);
+    default:
+      return false;
+    }
+  }
 
-    /**
-     * Address: 0x008E81A0 (FUN_008E81A0)
-     *
-     * What it does:
-     * Reinstalls the base vtable and destroys the output context (a tail
-     * jump to `~OutputContext`, 0x008E76D0).
-     */
-    Device::~Device() = default;
+  /**
+   * Address: 0x008E81B0 (FUN_008E81B0)
+   *
+   * What it does:
+   * Installs the base vtable and builds the empty output context.
+   */
+  Device::Device() = default;
 
-    /**
-     * Address: 0x0079CB10 (FUN_0079CB10, gpg::gal::WindowIsForeground)
-     *
-     * What it does:
-     * Returns true when the foreground HWND matches any configured head window
-     * handle in the active device context.
-     */
-    bool WindowIsForeground()
-    {
-        const HWND foregroundWindow = ::GetForegroundWindow();
-        Device* const instance = Device::GetInstance();
-        if (instance == nullptr)
-        {
-            return false;
-        }
+  /**
+   * Address: 0x008E81A0 (FUN_008E81A0)
+   *
+   * What it does:
+   * Reinstalls the base vtable and destroys the output context (a tail
+   * jump to `~OutputContext`, 0x008E76D0).
+   */
+  Device::~Device() = default;
 
-        DeviceContext* const context = instance->GetDeviceContext();
-        const int headCount = context->GetHeadCount();
-        if (headCount <= 0)
-        {
-            return false;
-        }
-
-        for (int headIndex = 0; headIndex < headCount; ++headIndex)
-        {
-            const Head& head = context->GetHead(static_cast<std::uint32_t>(headIndex));
-            if (foregroundWindow == head.mWindow || foregroundWindow == head.mHandle)
-            {
-                return true;
-            }
-        }
-
-        return false;
+  /**
+   * Address: 0x0079CB10 (FUN_0079CB10, gpg::gal::WindowIsForeground)
+   *
+   * What it does:
+   * Returns true when the foreground HWND matches any configured head window
+   * handle in the active device context.
+   */
+  bool WindowIsForeground()
+  {
+    const HWND foregroundWindow = ::GetForegroundWindow();
+    Device* const instance = Device::GetInstance();
+    if (instance == nullptr) {
+      return false;
     }
 
-    /**
-     * Address: 0x008E66E0 (FUN_008E66E0)
-     *
-     * What it does:
-     * Returns the number of configured head descriptors in `mHeads`.
-     */
-    int DeviceContext::GetHeadCount() const
-    {
-        return CountHeadVectorEntries(mHeads);
+    DeviceContext* const context = instance->GetDeviceContext();
+    const int headCount = context->GetHeadCount();
+    if (headCount <= 0) {
+      return false;
     }
 
-    /**
-     * Address: 0x008E69C0 (FUN_008E69C0)
-     *
-     * What it does:
-     * Validates one head index and returns the matching head descriptor.
-     */
-    const Head& DeviceContext::GetHead(const std::uint32_t index) const
-    {
-        const Head* const start = mHeads.begin();
-        const Head* const finish = mHeads.end();
-        const std::uint32_t count = (start == nullptr) ? 0U : static_cast<std::uint32_t>(finish - start);
-        if ((start == nullptr) || (index >= count))
-        {
-            ThrowDeviceContextError(91, "invalid head index");
-        }
-
-        return start[index];
+    for (int headIndex = 0; headIndex < headCount; ++headIndex) {
+      const Head& head = context->GetHead(static_cast<std::uint32_t>(headIndex));
+      if (foregroundWindow == head.mWindow || foregroundWindow == head.mHandle) {
+        return true;
+      }
     }
 
-    /**
-     * Address: 0x008E6A90 (FUN_008E6A90)
-     *
-     * What it does:
-     * Validates one mutable head index and returns the matching head descriptor.
-     */
-    Head& DeviceContext::GetHead(const std::uint32_t index)
-    {
-        Head* const start = mHeads.begin();
-        const Head* const finish = mHeads.end();
-        const std::uint32_t count = (start == nullptr) ? 0U : static_cast<std::uint32_t>(finish - start);
-        if ((start == nullptr) || (index >= count))
-        {
-            ThrowDeviceContextError(97, "invalid head index");
-        }
+    return false;
+  }
 
-        return start[index];
+  /**
+   * Address: 0x008E66E0 (FUN_008E66E0)
+   *
+   * What it does:
+   * Returns the number of configured head descriptors in `mHeads`.
+   */
+  int DeviceContext::GetHeadCount() const
+  {
+    return CountHeadVectorEntries(mHeads);
+  }
+
+  /**
+   * Address: 0x008E69C0 (FUN_008E69C0)
+   *
+   * What it does:
+   * Validates one head index and returns the matching head descriptor.
+   */
+  const Head& DeviceContext::GetHead(
+    const std::uint32_t index
+  ) const
+  {
+    const Head* const start = mHeads.begin();
+    const Head* const finish = mHeads.end();
+    const std::uint32_t count = (start == nullptr) ? 0U : static_cast<std::uint32_t>(finish - start);
+    if ((start == nullptr) || (index >= count)) {
+      ThrowDeviceContextError(91, "invalid head index");
     }
 
-    /**
-     * Address: 0x008E7530 (FUN_008E7530)
-     *
-     * IDA signature:
-     * void __thiscall gpg::gal::DeviceContext::AddHead(DeviceContext *this, Head *head);
-     *
-     * What it does:
-     * Appends one head descriptor to the retained head vector — a single
-     * `mHeads.insert(end, 1, head)`. The release binary outlines this one
-     * `insert(end(), 1, value)` into a conditional fast-path uninitialized fill
-     * (`FUN_008E6F90`, taken when `size < capacity`) plus the `_Insert_n` grow
-     * body (`FUN_008E71D0`); together they add exactly one element. Both cite
-     * `fa::vector<T>::insert` in Vector.h, along with the copy-construct
-     * range (`FUN_008D7C20`) and its four calling-convention trampolines.
-     * `Head` copies route through the recovered `Head` copy-ctor
-     * (`FUN_004368B0`), never a raw byte copy.
-     */
-    void DeviceContext::AddHead(const Head& head)
-    {
-        mHeads.insert(mHeads.end(), 1U, head);
+    return start[index];
+  }
+
+  /**
+   * Address: 0x008E6A90 (FUN_008E6A90)
+   *
+   * What it does:
+   * Validates one mutable head index and returns the matching head descriptor.
+   */
+  Head& DeviceContext::GetHead(
+    const std::uint32_t index
+  )
+  {
+    Head* const start = mHeads.begin();
+    const Head* const finish = mHeads.end();
+    const std::uint32_t count = (start == nullptr) ? 0U : static_cast<std::uint32_t>(finish - start);
+    if ((start == nullptr) || (index >= count)) {
+      ThrowDeviceContextError(97, "invalid head index");
     }
 
-    /**
-     * Address: 0x008E6940 (FUN_008E6940)
-     *
-     * OutputContext const *
-     *
-     * What it does:
-     * Copies caller output-target context state into the device's active output context.
-     */
-    void Device::ClearTarget(const OutputContext* const context)
-    {
-        outputContext_ = *context;
-    }
+    return start[index];
+  }
 
-    /**
-     * Address: 0x008E6810 (FUN_008E6810)
-     *
-     * OutputContext *
-     *
-     * What it does:
-     * Copies the device's active output-target context into the caller-provided context object.
-     */
-    void Device::GetContext(OutputContext* const outContext)
-    {
-        *outContext = outputContext_;
-    }
+  /**
+   * Address: 0x008E7530 (FUN_008E7530)
+   *
+   * IDA signature:
+   * void __thiscall gpg::gal::DeviceContext::AddHead(DeviceContext *this, Head *head);
+   *
+   * What it does:
+   * Appends one head descriptor to the retained head vector — a single
+   * `mHeads.insert(end, 1, head)`. The release binary outlines this one
+   * `insert(end(), 1, value)` into a conditional fast-path uninitialized fill
+   * (`FUN_008E6F90`, taken when `size < capacity`) plus the `_Insert_n` grow
+   * body (`FUN_008E71D0`); together they add exactly one element. Both cite
+   * `fa::vector<T>::insert` in Vector.h, along with the copy-construct
+   * range (`FUN_008D7C20`) and its four calling-convention trampolines.
+   * `Head` copies route through the recovered `Head` copy-ctor
+   * (`FUN_004368B0`), never a raw byte copy.
+   */
+  void DeviceContext::AddHead(
+    const Head& head
+  )
+  {
+    mHeads.insert(mHeads.end(), 1U, head);
+  }
 
-    // FAF additions, not in the shipped binary: the "not supported" bodies of
-    // the GPU-driven slots appended after slot 49 (Device.hpp, GpuDriven.h).
+  /**
+   * Address: 0x008E6940 (FUN_008E6940)
+   *
+   * OutputContext const *
+   *
+   * What it does:
+   * Copies caller output-target context state into the device's active output context.
+   */
+  void Device::ClearTarget(
+    const OutputContext* const context
+  )
+  {
+    outputContext_ = *context;
+  }
 
-    std::uint32_t Device::GetGpuDrivenVerified() const
-    {
-      return 0U;
-    }
+  /**
+   * Address: 0x008E6810 (FUN_008E6810)
+   *
+   * OutputContext *
+   *
+   * What it does:
+   * Copies the device's active output-target context into the caller-provided context object.
+   */
+  void Device::GetContext(
+    OutputContext* const outContext
+  )
+  {
+    *outContext = outputContext_;
+  }
 
-    std::uint32_t Device::GetGpuDrivenFeatures() const
-    {
-        return 0U;
-    }
+  // FAF additions, not in the shipped binary: the "not supported" bodies of
+  // the GPU-driven slots appended after slot 49 (Device.hpp, GpuDriven.h).
 
-    boost::shared_ptr<GpuBuffer> Device::CreateGpuBuffer(const GpuBufferDesc&)
-    {
-        return {};
-    }
+  std::uint32_t Device::GetGpuDrivenVerified() const
+  {
+    return 0U;
+  }
 
-    void Device::UpdateGpuBuffer(GpuBuffer&, std::uint32_t, std::uint32_t, const void*) {}
+  std::uint32_t Device::GetGpuDrivenFeatures() const
+  {
+    return 0U;
+  }
 
-    boost::shared_ptr<GpuProgram> Device::CreateGpuProgram(const GpuProgramDesc&)
-    {
-        return {};
-    }
+  boost::shared_ptr<GpuBuffer> Device::CreateGpuBuffer(
+    const GpuBufferDesc&
+  )
+  {
+    return {};
+  }
 
-    void Device::DrawGpuProgram(const GpuDrawCall&) {}
+  void Device::UpdateGpuBuffer(
+    GpuBuffer&,
+    std::uint32_t,
+    std::uint32_t,
+    const void*
+  )
+  {}
 
-    void Device::DispatchGpuProgram(const GpuDispatch&) {}
+  boost::shared_ptr<GpuProgram> Device::CreateGpuProgram(
+    const GpuProgramDesc&
+  )
+  {
+    return {};
+  }
 
-    void Device::BeginProfileRegion(std::uint32_t) {}
+  void Device::DrawGpuProgram(
+    const GpuDrawCall&
+  )
+  {}
 
-    void Device::EndProfileRegion(std::uint32_t) {}
-    bool Device::GetRuntimeInfo(DeviceRuntimeInfo&) { return false; }
-    bool Device::ReadGpuBuffer(GpuBuffer&, std::uint32_t, std::uint32_t, void*) { return false; }
-    void Device::ReleaseBufferCopy(VertexBuffer&) {}
-    void Device::ReleaseBufferCopy(IndexBuffer&) {}
-    void Device::CopyLockedRangeOnly(VertexBuffer&) {}
-    void Device::CopyLockedRangeOnly(IndexBuffer&) {}
-    bool Device::CopyVertexBufferRegion(VertexBuffer&, std::uint32_t, VertexBuffer&, std::uint32_t, std::uint32_t) { return false; }
-}
+  void Device::DispatchGpuProgram(
+    const GpuDispatch&
+  )
+  {}
+
+  void Device::BeginProfileRegion(
+    std::uint32_t
+  )
+  {}
+
+  void Device::EndProfileRegion(
+    std::uint32_t
+  )
+  {}
+  bool Device::GetRuntimeInfo(
+    DeviceRuntimeInfo&
+  )
+  {
+    return false;
+  }
+  bool Device::ReadGpuBuffer(
+    GpuBuffer&,
+    std::uint32_t,
+    std::uint32_t,
+    void*
+  )
+  {
+    return false;
+  }
+  void Device::ReleaseBufferCopy(
+    VertexBuffer&
+  )
+  {}
+  void Device::ReleaseBufferCopy(
+    IndexBuffer&
+  )
+  {}
+  void Device::CopyLockedRangeOnly(
+    VertexBuffer&
+  )
+  {}
+  void Device::CopyLockedRangeOnly(
+    IndexBuffer&
+  )
+  {}
+  void Device::CopyWrittenOnly(
+    VertexBuffer&
+  )
+  {}
+  bool Device::CopyVertexBufferRegion(
+    VertexBuffer&,
+    std::uint32_t,
+    VertexBuffer&,
+    std::uint32_t,
+    std::uint32_t
+  )
+  {
+    return false;
+  }
+  RayGeometryId Device::CreateRayGeometry(
+    const RayGeometryDesc&
+  )
+  {
+    return 0U;
+  }
+  void Device::DestroyRayGeometry(
+    RayGeometryId
+  )
+  {}
+  bool Device::SetRayInstances(
+    const RayInstance*,
+    std::uint32_t,
+    const boost::shared_ptr<Texture>*,
+    std::uint32_t
+  )
+  {
+    return false;
+  }
+} // namespace gpg::gal

@@ -38,8 +38,8 @@ namespace faf::remote::wire
     std::uint32_t name = 0;
     std::uint8_t type = kNone;
     bool realtime = false;
-    std::uint32_t bits = 0;                       // int, or float bits (kInt / kFloat)
-    std::uint32_t text = 0xFFFFFFFFu;             // name table id of the string value (kString)
+    std::uint32_t bits = 0;           // int, or float bits (kInt / kFloat)
+    std::uint32_t text = 0xFFFFFFFFu; // name table id of the string value (kString)
 
     [[nodiscard]] bool operator==(const SUnitStat& other) const noexcept = default;
   };
@@ -105,14 +105,14 @@ namespace faf::remote::wire
     std::int32_t fireState = 0;
     std::array<std::int32_t, 2> siloMaxStorage{}; // tactical, nuke
     std::uint32_t selectionInheritor = 0;
-    std::uint32_t customName = 0xFFFFFFFFu;       // name table id
+    std::uint32_t customName = 0xFFFFFFFFu; // name table id
     std::uint32_t focusUnit = 0;
     std::uint32_t guardedUnit = 0;
     std::uint32_t targetBlip = 0;
     std::uint8_t didRefresh = 0;
     std::int32_t reconFlags = 0;
-    std::array<float, 6> economy{};               // produced, spent, maintenance: energy, mass each
-    std::vector<std::int32_t> commands;           // command ids
+    std::array<float, 6> economy{};     // produced, spent, maintenance: energy, mass each
+    std::vector<std::int32_t> commands; // command ids
     std::vector<std::int32_t> buildQueue;
     std::vector<SUnitWeapon> weapons;
     SUnitAttributes attributes;
@@ -128,12 +128,12 @@ namespace faf::remote::wire
     float fuelRatio = 0.0f;
     float shieldRatio = 0.0f;
     float workProgress = 0.0f;
-    std::uint64_t unitStates = 0;   // EUnitState bits
-    std::uint32_t scriptBits = 0;   // the toggle buttons' bits
-    std::array<std::uint16_t, 4> siloCounts{}; // tactical build, nuke build, tactical stored, nuke stored
-    std::uint8_t unitFlags = 0;     // paused, auto mode, auto surface, busy, repeat queue, ...
+    std::uint64_t unitStates = 0;               // EUnitState bits
+    std::uint32_t scriptBits = 0;               // the toggle buttons' bits
+    std::array<std::uint16_t, 4> siloCounts{};  // tactical build, nuke build, tactical stored, nuke stored
+    std::uint8_t unitFlags = 0;                 // paused, auto mode, auto surface, busy, repeat queue, ...
     TSharedValue<std::vector<SUnitStat>> stats; // ascending names; sent whole when any item changes
-    std::uint8_t buildStateTag = 0; // creation constants (SCreateUnitConstantData)
+    std::uint8_t buildStateTag = 0;             // creation constants (SCreateUnitConstantData)
     std::uint8_t fake = 0;
     TSharedValue<SUnitDetail> detail; // shared with the frames before until it changes
   };
@@ -148,17 +148,17 @@ namespace faf::remote::wire
     static constexpr std::uint32_t kNoAttachParent = 0xF0000000u; // the sim's invalid entity id
     static constexpr std::size_t kMaxAttachments = 64;
 
-    std::uint32_t mesh = COrdinalTable::kNone;      // ordinal into SContentTables::meshes
+    std::uint32_t mesh = COrdinalTable::kNone; // ordinal into SContentTables::meshes
     std::array<float, 3> scale{1.0f, 1.0f, 1.0f};
     std::uint32_t attachParent = kNoAttachParent;
-    std::vector<std::uint32_t> attachments;          // the entities attached to this one
+    std::vector<std::uint32_t> attachments; // the entities attached to this one
     float impact = 1.0f;
-    std::array<float, 4> scroll{};                   // texture scroll: beat start x, y, beat end x, y
-    std::uint8_t visualFlags = 0;                    // hidden, alt footprint, alt footprint 2, killed, refresh UI
-    std::array<std::uint32_t, 8> intel{};            // vision, water vision, radar, sonar, omni, radar/sonar stealth, cloak
+    std::array<float, 4> scroll{};        // texture scroll: beat start x, y, beat end x, y
+    std::uint8_t visualFlags = 0;         // hidden, alt footprint, alt footprint 2, killed, refresh UI
+    std::array<std::uint32_t, 8> intel{}; // vision, water vision, radar, sonar, omni, radar/sonar stealth, cloak
     std::uint32_t ambientSound = COrdinalTable::kNone; // id in the session's sound table
     std::uint32_t rumbleSound = COrdinalTable::kNone;
-    std::uint32_t underlay = COrdinalTable::kNone;     // strategic underlay texture: id in the session's name table
+    std::uint32_t underlay = COrdinalTable::kNone; // strategic underlay texture: id in the session's name table
 
     [[nodiscard]] bool operator==(const SAppearance& other) const noexcept;
   };
@@ -175,7 +175,7 @@ namespace faf::remote::wire
     std::uint32_t tickCreated = 0;
     std::uint32_t blueprint = COrdinalTable::kNone; // ordinal into SContentTables::blueprints
     std::uint8_t army = 0xFFu;                      // 0xFF: no army
-    QuantizedPosition position{};                    // with dead reckoning: the anchor position
+    QuantizedPosition position{};                   // with dead reckoning: the anchor position
     /**
      * A position outside the quantiser's range (an effect projectile drifting off the map, say)
      * goes as exact floats instead: `position`, `velocity` and `anchorBeat` are then zero.
@@ -192,8 +192,8 @@ namespace faf::remote::wire
     std::uint32_t anchorBeat = 0;
     /** Ground following (WP7.8): the height is the terrain's under the predicted x and z. */
     bool followsGround = false;
-    std::uint32_t orientation = 0;                  // yawOnly ? QuantizeYaw : PackQuaternion
-    bool yawOnly = false;                           // a rotation about the vertical axis only
+    std::uint32_t orientation = 0; // yawOnly ? QuantizeYaw : PackQuaternion
+    bool yawOnly = false;          // a rotation about the vertical axis only
     /**
      * Orientation reckoning (WP7.8), a yaw-only record alone: the turn since `orientationBeat`
      * in 2^-velocityFractionBits yaw units (1/65536 turn) per beat; zero without it.
@@ -204,7 +204,7 @@ namespace faf::remote::wire
     float maxHealth = 0.0f;
     float fractionComplete = 0.0f;
     std::uint16_t flags = 0;
-    bool isUnit = false;                            // `unit` is meaningful
+    bool isUnit = false; // `unit` is meaningful
     SUnitFields unit{};
     SAppearance appearance{};
 
@@ -261,17 +261,16 @@ namespace faf::remote::wire
     kFieldUnderlay = 1u << 24,
     kFieldUnitStats = 1u << 25,
     kFieldUnitConstants = 1u << 26,
-    kFieldUnitDetail = 1u << 27,     // the scalars and ids of SUnitDetail
-    kFieldUnitQueues = 1u << 28,     // commands and build queue
+    kFieldUnitDetail = 1u << 27, // the scalars and ids of SUnitDetail
+    kFieldUnitQueues = 1u << 28, // commands and build queue
     kFieldUnitWeapons = 1u << 29,
     kFieldUnitAttributes = 1u << 30,
-    kFieldUnitEconomy = 1u << 31,    // produced, spent, maintenance (change often)
+    kFieldUnitEconomy = 1u << 31, // produced, spent, maintenance (change often)
   };
 
   inline constexpr std::uint32_t kEntityFields = 0x00FFu;
-  inline constexpr std::uint32_t kUnitFields = 0x7F00u | kFieldUnitStats | kFieldUnitConstants | kFieldUnitDetail
-                                             | kFieldUnitQueues | kFieldUnitWeapons | kFieldUnitAttributes
-                                             | kFieldUnitEconomy;
+  inline constexpr std::uint32_t kUnitFields = 0x7F00u | kFieldUnitStats | kFieldUnitConstants | kFieldUnitDetail |
+    kFieldUnitQueues | kFieldUnitWeapons | kFieldUnitAttributes | kFieldUnitEconomy;
   inline constexpr std::uint32_t kAppearanceFields = 0x1FF0000u;
   inline constexpr std::uint32_t kAllFields = kEntityFields | kUnitFields | kFieldKind | kAppearanceFields;
 
@@ -306,14 +305,14 @@ namespace faf::remote::wire
   /** What turns one frame into the next: what the encoder sends and the client applies. */
   struct SFrameDelta
   {
-    std::vector<std::uint32_t> removed;      // ascending
-    std::vector<SEntityRecord> created;      // ascending ids
+    std::vector<std::uint32_t> removed; // ascending
+    std::vector<SEntityRecord> created; // ascending ids
     struct SChange
     {
       std::uint32_t fields = 0;
-      SEntityRecord record;                   // the new state (only `fields` differ)
+      SEntityRecord record; // the new state (only `fields` differ)
     };
-    std::vector<SChange> changed;            // ascending ids
+    std::vector<SChange> changed; // ascending ids
   };
 
   /** `baseline` null: everything in `frame` is created. Both frames must be well formed. */
@@ -376,9 +375,8 @@ namespace faf::remote::wire
   inline constexpr std::size_t kReckoningHistory = 9;
 
   /** Where the client shows a dead-reckoned record at `beat`: whole steps, rounded, clamped to the axes. */
-  [[nodiscard]] QuantizedPosition PredictPosition(
-    const SEntityRecord& record, std::uint32_t beat, const SFrameCodec& codec
-  ) noexcept;
+  [[nodiscard]] QuantizedPosition
+  PredictPosition(const SEntityRecord& record, std::uint32_t beat, const SFrameCodec& codec) noexcept;
 
   /**
    * The server side of dead reckoning for one view and entity: `sent` is the record the view
@@ -389,12 +387,16 @@ namespace faf::remote::wire
    * by its builder); otherwise leaves the position fields alone. Returns whether it re-anchored.
    */
   bool ApplyDeadReckoning(
-    SEntityRecord& sent, std::span<const QuantizedPosition> history, std::uint32_t beat,
-    const SReckoningScheme& scheme, const SFrameCodec& codec
+    SEntityRecord& sent,
+    std::span<const QuantizedPosition> history,
+    std::uint32_t beat,
+    const SReckoningScheme& scheme,
+    const SFrameCodec& codec
   ) noexcept;
 
   /** The yaw the client shows for a reckoned yaw-only record at `beat` (1/65536 turns). */
-  [[nodiscard]] std::uint32_t PredictYaw(const SEntityRecord& record, std::uint32_t beat, const SFrameCodec& codec) noexcept;
+  [[nodiscard]] std::uint32_t
+  PredictYaw(const SEntityRecord& record, std::uint32_t beat, const SFrameCodec& codec) noexcept;
 
   /**
    * The server side of orientation reckoning for one view and entity: `sent` is the record the
@@ -405,17 +407,20 @@ namespace faf::remote::wire
    * Returns whether it re-anchored.
    */
   bool ApplyOrientationReckoning(
-    SEntityRecord& sent, const SEntityRecord& actual, std::span<const std::uint32_t> yawHistory, std::uint32_t beat,
-    const SReckoningScheme& scheme, const SFrameCodec& codec
+    SEntityRecord& sent,
+    const SEntityRecord& actual,
+    std::span<const std::uint32_t> yawHistory,
+    std::uint32_t beat,
+    const SReckoningScheme& scheme,
+    const SFrameCodec& codec
   ) noexcept;
 
   /**
    * Writes `frame` relative to `baseline` (null: a full frame). False, with nothing useful
    * written, when a frame is not well formed or a value does not fit the codec.
    */
-  [[nodiscard]] bool EncodeFrame(
-    const SViewFrame& frame, const SViewFrame* baseline, const SFrameCodec& codec, BitWriter& writer
-  );
+  [[nodiscard]] bool
+  EncodeFrame(const SViewFrame& frame, const SViewFrame* baseline, const SFrameCodec& codec, BitWriter& writer);
 
   /** One changed record for `EncodeFrameChanges`: which fields, and the record before and after. */
   struct SFrameChange
@@ -453,7 +458,8 @@ namespace faf::remote::wire
    * for its orientation (the yaw bit included, orientation reckoning's not). `before`: the baseline's record,
    * null for a creation. For `--wire-stats`, so its classes add up to what is sent.
    */
-  [[nodiscard]] int PositionFieldBits(const SEntityRecord& record, const SEntityRecord* before, const SFrameCodec& codec) noexcept;
+  [[nodiscard]] int
+  PositionFieldBits(const SEntityRecord& record, const SEntityRecord* before, const SFrameCodec& codec) noexcept;
   [[nodiscard]] int OrientationFieldBits(const SEntityRecord& record, const SEntityRecord* before) noexcept;
 
   /**
@@ -492,7 +498,6 @@ namespace faf::remote::wire
    * full frame. False for anything malformed or inconsistent with the baseline; never reads
    * out of bounds and never allocates more than the codec's entity limit allows.
    */
-  [[nodiscard]] bool DecodeFrame(
-    BitReader& reader, const SViewFrame* baseline, const SFrameCodec& codec, SViewFrame& out
-  );
+  [[nodiscard]] bool
+  DecodeFrame(BitReader& reader, const SViewFrame* baseline, const SFrameCodec& codec, SViewFrame& out);
 } // namespace faf::remote::wire

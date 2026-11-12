@@ -58,8 +58,8 @@ namespace moho
      */
     void OnMove(wxMoveEvent& event);
 
-    bool mInitializing;      // +0x170
-    wxTextCtrl* mLineText;   // +0x174
+    bool mInitializing;    // +0x170
+    wxTextCtrl* mLineText; // +0x174
 
     DECLARE_EVENT_TABLE()
   };

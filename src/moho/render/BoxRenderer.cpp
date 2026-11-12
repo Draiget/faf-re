@@ -44,14 +44,9 @@ namespace
   // far faces through the leaked CCW stencil ops, so the Boundary pass blacked
   // out the whole playable area once fog of war had drawn a frame.
   constexpr std::array<std::uint16_t, 36> kUnitBoxIndices = {{
-    4, 1, 0, 1, 4, 5,
-    5, 2, 1, 2, 5, 6,
-    6, 3, 2, 3, 6, 7,
-    0, 3, 7, 7, 4, 0,
-    7, 5, 4, 7, 6, 5,
-    0, 2, 3, 0, 1, 2,
+    4, 1, 0, 1, 4, 5, 5, 2, 1, 2, 5, 6, 6, 3, 2, 3, 6, 7, 0, 3, 7, 7, 4, 0, 7, 5, 4, 7, 6, 5, 0, 2, 3, 0, 1, 2,
   }};
-}
+} // namespace
 
 namespace moho
 {
@@ -97,11 +92,14 @@ namespace moho
     mGeometry.mIndexBuffer = device->CreateIndexBuffer(&indexBufferContext);
 
     if (mGeometry.mVertexBuffer) {
-      void* const vertexStorage =
-        mGeometry.mVertexBuffer->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0));
+      void* const vertexStorage = mGeometry.mVertexBuffer->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0));
       if (vertexStorage) {
         // Raw GPU upload: static unit-box vertex blob into the locked buffer.
-        std::copy(kUnitBoxVertices.begin(), kUnitBoxVertices.end(), static_cast<decltype(kUnitBoxVertices)::value_type*>(vertexStorage));
+        std::copy(
+          kUnitBoxVertices.begin(),
+          kUnitBoxVertices.end(),
+          static_cast<decltype(kUnitBoxVertices)::value_type*>(vertexStorage)
+        );
       }
       mGeometry.mVertexBuffer->Unlock();
     }

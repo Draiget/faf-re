@@ -82,4 +82,3 @@ namespace moho
   [[nodiscard]] gpg::RType* preregister_VectorResourceDepositType();
   void register_VectorResourceDepositType();
 } // namespace moho
-

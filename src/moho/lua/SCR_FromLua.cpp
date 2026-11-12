@@ -8,7 +8,9 @@
  * (`y*` lanes map onto `z*` rectangle fields).
  */
 template <>
-gpg::Rect2<float> moho::SCR_FromLuaCopy<gpg::Rect2<float>>(const LuaPlus::LuaObject& object)
+gpg::Rect2<float> moho::SCR_FromLuaCopy<gpg::Rect2<float>>(
+  const LuaPlus::LuaObject& object
+)
 {
   gpg::Rect2<float> out{};
 
@@ -35,7 +37,9 @@ gpg::Rect2<float> moho::SCR_FromLuaCopy<gpg::Rect2<float>>(const LuaPlus::LuaObj
  * (`y*` lanes map onto `z*` rectangle fields).
  */
 template <>
-gpg::Rect2<int> moho::SCR_FromLuaCopy<gpg::Rect2<int>>(const LuaPlus::LuaObject& object)
+gpg::Rect2<int> moho::SCR_FromLuaCopy<gpg::Rect2<int>>(
+  const LuaPlus::LuaObject& object
+)
 {
   gpg::Rect2<int> out{};
 
@@ -62,7 +66,9 @@ gpg::Rect2<int> moho::SCR_FromLuaCopy<gpg::Rect2<int>>(const LuaPlus::LuaObject&
  * copied quaternion where slots map to `(x,y,z,w)`.
  */
 template <>
-Wm3::Quaternion<float> moho::SCR_FromLuaCopy<Wm3::Quaternion<float>>(const LuaPlus::LuaObject& object)
+Wm3::Quaternion<float> moho::SCR_FromLuaCopy<Wm3::Quaternion<float>>(
+  const LuaPlus::LuaObject& object
+)
 {
   Wm3::Quaternion<float> out{};
 
@@ -89,7 +95,9 @@ Wm3::Quaternion<float> moho::SCR_FromLuaCopy<Wm3::Quaternion<float>>(const LuaPl
  * copied `Wm3::Vector2f`.
  */
 template <>
-Wm3::Vector2<float> moho::SCR_FromLuaCopy<Wm3::Vector2<float>>(const LuaPlus::LuaObject& object)
+Wm3::Vector2<float> moho::SCR_FromLuaCopy<Wm3::Vector2<float>>(
+  const LuaPlus::LuaObject& object
+)
 {
   Wm3::Vector2<float> out{};
 
@@ -110,7 +118,9 @@ Wm3::Vector2<float> moho::SCR_FromLuaCopy<Wm3::Vector2<float>>(const LuaPlus::Lu
  * returns one copied `Wm3::Vector3f`.
  */
 template <>
-Wm3::Vector3<float> moho::SCR_FromLuaCopy<Wm3::Vector3<float>>(const LuaPlus::LuaObject& object)
+Wm3::Vector3<float> moho::SCR_FromLuaCopy<Wm3::Vector3<float>>(
+  const LuaPlus::LuaObject& object
+)
 {
   Wm3::Vector3<float> out{};
 
@@ -134,7 +144,9 @@ Wm3::Vector3<float> moho::SCR_FromLuaCopy<Wm3::Vector3<float>>(const LuaPlus::Lu
  * `SPointVector` payload.
  */
 template <>
-moho::SPointVector moho::SCR_FromLuaCopy<moho::SPointVector>(const LuaPlus::LuaObject& object)
+moho::SPointVector moho::SCR_FromLuaCopy<moho::SPointVector>(
+  const LuaPlus::LuaObject& object
+)
 {
   moho::SPointVector out{};
 

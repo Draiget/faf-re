@@ -29,11 +29,11 @@
  */
 struct ZIO
 {
-	std::size_t remainingBytes; // +0x00  ZIO::n      bytes left in this block
-	const char* cursor;         // +0x04  ZIO::p      read position within it
-	lua_Chunkreader reader;     // +0x08  ZIO::reader block source
-	void* readerData;           // +0x0C  ZIO::data   reader's own context
-	const char* chunkName;      // +0x10  ZIO::name   for error messages
+  std::size_t remainingBytes; // +0x00  ZIO::n      bytes left in this block
+  const char* cursor;         // +0x04  ZIO::p      read position within it
+  lua_Chunkreader reader;     // +0x08  ZIO::reader block source
+  void* readerData;           // +0x0C  ZIO::data   reader's own context
+  const char* chunkName;      // +0x10  ZIO::name   for error messages
 };
 
 static_assert(offsetof(ZIO, remainingBytes) == 0x00, "ZIO::remainingBytes offset must be 0x00");
@@ -57,11 +57,11 @@ constexpr int kLuaEndOfStream = -1;
  */
 struct LoadState
 {
-	lua_State* state;       // +0x00  LoadState::L
-	ZIO* stream;            // +0x04  LoadState::Z
-	Mbuffer* scratchBuffer; // +0x08  LoadState::b
-	int swapBytes;          // +0x0C  LoadState::swap
-	const char* chunkName;  // +0x10  LoadState::name
+  lua_State* state;       // +0x00  LoadState::L
+  ZIO* stream;            // +0x04  LoadState::Z
+  Mbuffer* scratchBuffer; // +0x08  LoadState::b
+  int swapBytes;          // +0x0C  LoadState::swap
+  const char* chunkName;  // +0x10  LoadState::name
 };
 
 static_assert(offsetof(LoadState, state) == 0x00, "LoadState::state offset must be 0x00");
@@ -73,28 +73,28 @@ static_assert(sizeof(LoadState) == 0x14, "LoadState size must be 0x14");
 
 namespace LuaPlus
 {
-	// Binary-chunk loader entry points, recovered in LuaObject.cpp alongside
-	// the file-private sub-loaders they drive. External linkage so
-	// `luaU_undump` in LuaParser.cpp can invoke them by name.
-	void LuaLoadChunkHeader(LoadState* loadState);
-	Proto* LuaLoadProtoObject(LoadState* loadState, TString* fallbackSource);
+  // Binary-chunk loader entry points, recovered in LuaObject.cpp alongside
+  // the file-private sub-loaders they drive. External linkage so
+  // `luaU_undump` in LuaParser.cpp can invoke them by name.
+  void LuaLoadChunkHeader(LoadState* loadState);
+  Proto* LuaLoadProtoObject(LoadState* loadState, TString* fallbackSource);
 
-	/**
-	 * Native byte order, as the chunk header records it: 1 for little-endian,
-	 * 0 for big. Upstream writes a local `int x = 1` and reads its first byte;
-	 * this is a 32-bit x86 build, so the whole function folded to `mov eax, 1`.
-	 *
-	 * Recovered in LuaObject.cpp with the rest of the loader, immediately
-	 * before `LuaLoadChunkHeader` - which is where upstream's `lundump.c`
-	 * defines it, and where the binary puts it too.
-	 */
-	int luaU_endianness();
+  /**
+   * Native byte order, as the chunk header records it: 1 for little-endian,
+   * 0 for big. Upstream writes a local `int x = 1` and reads its first byte;
+   * this is a 32-bit x86 build, so the whole function folded to `mov eax, 1`.
+   *
+   * Recovered in LuaObject.cpp with the rest of the loader, immediately
+   * before `LuaLoadChunkHeader` - which is where upstream's `lundump.c`
+   * defines it, and where the binary puts it too.
+   */
+  int luaU_endianness();
 
-	/**
-	 * Writes one compiled chunk to `writer` - the dump half of the format
-	 * `LuaLoadChunkHeader` / `LuaLoadProtoObject` read. Recovered in
-	 * LuaDump.cpp, which owns the file-private sub-dumpers it drives, and
-	 * declared here because `lua_dump` in LuaObject.cpp is its only caller.
-	 */
-	void luaU_dump(lua_State* state, const Proto* mainPrototype, lua_Chunkwriter writer, void* writerData);
-}
+  /**
+   * Writes one compiled chunk to `writer` - the dump half of the format
+   * `LuaLoadChunkHeader` / `LuaLoadProtoObject` read. Recovered in
+   * LuaDump.cpp, which owns the file-private sub-dumpers it drives, and
+   * declared here because `lua_dump` in LuaObject.cpp is its only caller.
+   */
+  void luaU_dump(lua_State* state, const Proto* mainPrototype, lua_Chunkwriter writer, void* writerData);
+} // namespace LuaPlus

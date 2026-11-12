@@ -10,7 +10,8 @@
 namespace
 {
   /**
-   * Address: 0x00BFA2B0 (FUN_00BFA2B0, atexit destructor of the CUnitReclaimTaskTypeInfo object; registered by 0x00BD17C0)
+   * Address: 0x00BFA2B0 (FUN_00BFA2B0, atexit destructor of the CUnitReclaimTaskTypeInfo object; registered by
+   * 0x00BD17C0)
    */
   [[nodiscard]] moho::CUnitReclaimTaskTypeInfo* AcquireCUnitReclaimTaskTypeInfo()
   {
@@ -31,7 +32,9 @@ namespace
     return AcquireCUnitReclaimTaskTypeInfo();
   }
 
-  [[nodiscard]] gpg::RRef MakeCUnitReclaimTaskRef(moho::CUnitReclaimTask* const object)
+  [[nodiscard]] gpg::RRef MakeCUnitReclaimTaskRef(
+    moho::CUnitReclaimTask* const object
+  )
   {
     gpg::RRef out{};
     out.mObj = object;
@@ -72,7 +75,9 @@ namespace moho
    * Assigns all lifecycle callbacks (`NewRef`, `CtrRef`, delete, destruct)
    * to one reclaim-task type descriptor.
    */
-  gpg::RType* CUnitReclaimTaskTypeInfo::AssignAllLifecycleCallbacks(gpg::RType* const typeInfo)
+  gpg::RType* CUnitReclaimTaskTypeInfo::AssignAllLifecycleCallbacks(
+    gpg::RType* const typeInfo
+  )
   {
     AssignCtorCallbacks(typeInfo);
     AssignDtorCallbacks(typeInfo);
@@ -86,7 +91,9 @@ namespace moho
    * Assigns constructor-lane callbacks (`NewRef`, `CtrRef`) to one reclaim-task
    * type descriptor.
    */
-  gpg::RType* CUnitReclaimTaskTypeInfo::AssignCtorCallbacks(gpg::RType* const typeInfo)
+  gpg::RType* CUnitReclaimTaskTypeInfo::AssignCtorCallbacks(
+    gpg::RType* const typeInfo
+  )
   {
     typeInfo->newRefFunc_ = &CUnitReclaimTaskTypeInfo::NewRef;
     typeInfo->ctorRefFunc_ = &CUnitReclaimTaskTypeInfo::CtrRef;
@@ -100,7 +107,9 @@ namespace moho
    * Assigns destructor-lane callbacks (delete + in-place destruct) to one
    * reclaim-task type descriptor.
    */
-  gpg::RType* CUnitReclaimTaskTypeInfo::AssignDtorCallbacks(gpg::RType* const typeInfo)
+  gpg::RType* CUnitReclaimTaskTypeInfo::AssignDtorCallbacks(
+    gpg::RType* const typeInfo
+  )
   {
     typeInfo->deleteFunc_ = &CUnitReclaimTaskTypeInfo::Delete;
     typeInfo->dtrFunc_ = &CUnitReclaimTaskTypeInfo::Destruct;
@@ -110,7 +119,9 @@ namespace moho
   /**
    * Address: 0x00620680 (FUN_00620680, Moho::CUnitReclaimTaskTypeInfo::AddBase_CCommandTask)
    */
-  void __stdcall CUnitReclaimTaskTypeInfo::AddBase_CCommandTask(gpg::RType* const typeInfo)
+  void __stdcall CUnitReclaimTaskTypeInfo::AddBase_CCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CCommandTask>(typeInfo);
   }
@@ -118,9 +129,13 @@ namespace moho
   /**
    * Address: 0x006206E0 (FUN_006206E0, Moho::CUnitReclaimTaskTypeInfo::AddBase_Listener_ECommandEvent)
    */
-  void __stdcall CUnitReclaimTaskTypeInfo::AddBase_Listener_ECommandEvent(gpg::RType* const typeInfo)
+  void __stdcall CUnitReclaimTaskTypeInfo::AddBase_Listener_ECommandEvent(
+    gpg::RType* const typeInfo
+  )
   {
-    gpg::AddReflectedBase<moho::Listener<moho::ECommandEvent>>(typeInfo, gpg::BaseSubobjectOffset<CUnitReclaimTask, Listener<ECommandEvent>>());
+    gpg::AddReflectedBase<moho::Listener<moho::ECommandEvent>>(
+      typeInfo, gpg::BaseSubobjectOffset<CUnitReclaimTask, Listener<ECommandEvent>>()
+    );
   }
 
   /**
@@ -135,7 +150,9 @@ namespace moho
   /**
    * Address: 0x00620600 (FUN_00620600, Moho::CUnitReclaimTaskTypeInfo::CtrRef)
    */
-  gpg::RRef CUnitReclaimTaskTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CUnitReclaimTaskTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const object = gpg::ConstructInStorage<moho::CUnitReclaimTask>(objectStorage);
 
@@ -145,7 +162,9 @@ namespace moho
   /**
    * Address: 0x006205E0 (FUN_006205E0, Moho::CUnitReclaimTaskTypeInfo::Delete)
    */
-  void CUnitReclaimTaskTypeInfo::Delete(void* const objectStorage)
+  void CUnitReclaimTaskTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<moho::CUnitReclaimTask*>(objectStorage);
   }
@@ -153,7 +172,9 @@ namespace moho
   /**
    * Address: 0x00620670 (FUN_00620670, Moho::CUnitReclaimTaskTypeInfo::Destruct)
    */
-  void CUnitReclaimTaskTypeInfo::Destruct(void* const objectStorage)
+  void CUnitReclaimTaskTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     auto* const object = static_cast<moho::CUnitReclaimTask*>(objectStorage);
     if (!object) {
@@ -166,4 +187,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(AcquireCUnitReclaimTaskTypeInfo_13dd41, AcquireCUnitReclaimTaskTypeInfo)
+GPG_PREREGISTER_INIT(
+  AcquireCUnitReclaimTaskTypeInfo_13dd41,
+  AcquireCUnitReclaimTaskTypeInfo
+)

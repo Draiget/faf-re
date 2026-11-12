@@ -21,39 +21,57 @@ namespace
   constexpr float kPi = 3.14159265f;
   constexpr float kTolerance = 1.0e-4f;
 
-  float Dot(const Wm3::Vector3f& a, const Wm3::Vector3f& b)
+  float Dot(
+    const Wm3::Vector3f& a,
+    const Wm3::Vector3f& b
+  )
   {
     return (a.x * b.x) + (a.y * b.y) + (a.z * b.z);
   }
 
-  float Length(const Wm3::Vector3f& v)
+  float Length(
+    const Wm3::Vector3f& v
+  )
   {
     return std::sqrt(Dot(v, v));
   }
 
-  Wm3::Vector3f Cross(const Wm3::Vector3f& a, const Wm3::Vector3f& b)
+  Wm3::Vector3f Cross(
+    const Wm3::Vector3f& a,
+    const Wm3::Vector3f& b
+  )
   {
     return {(a.y * b.z) - (a.z * b.y), (a.z * b.x) - (a.x * b.z), (a.x * b.y) - (a.y * b.x)};
   }
 
   // Rodrigues' rotation of `v` by `angle` about the unit `axis` (right-handed).
-  Wm3::Vector3f Rotate(const Wm3::Vector3f& v, const Wm3::Vector3f& axis, const float angle)
+  Wm3::Vector3f Rotate(
+    const Wm3::Vector3f& v,
+    const Wm3::Vector3f& axis,
+    const float angle
+  )
   {
     const float c = std::cos(angle);
     const float s = std::sin(angle);
     const Wm3::Vector3f k = Cross(axis, v);
     const float d = Dot(axis, v) * (1.0f - c);
-    return {(v.x * c) + (k.x * s) + (axis.x * d), (v.y * c) + (k.y * s) + (axis.y * d),
-            (v.z * c) + (k.z * s) + (axis.z * d)};
+    return {
+      (v.x * c) + (k.x * s) + (axis.x * d), (v.y * c) + (k.y * s) + (axis.y * d), (v.z * c) + (k.z * s) + (axis.z * d)
+    };
   }
 
-  Wm3::Quaternionf AxisAngle(const Wm3::Vector3f& axis, const float angle)
+  Wm3::Quaternionf AxisAngle(
+    const Wm3::Vector3f& axis,
+    const float angle
+  )
   {
     const float s = std::sin(angle * 0.5f);
     return Wm3::Quaternionf{std::cos(angle * 0.5f), axis.x * s, axis.y * s, axis.z * s};
   }
 
-  Wm3::Vector3f RandomUnit(std::mt19937& rng)
+  Wm3::Vector3f RandomUnit(
+    std::mt19937& rng
+  )
   {
     std::uniform_real_distribution<float> lane(-1.0f, 1.0f);
     for (;;) {
@@ -65,7 +83,11 @@ namespace
     }
   }
 
-  void ExpectNear3(const Wm3::Vector3f& actual, const Wm3::Vector3f& expected, const float tolerance)
+  void ExpectNear3(
+    const Wm3::Vector3f& actual,
+    const Wm3::Vector3f& expected,
+    const float tolerance
+  )
   {
     EXPECT_NEAR(actual.x, expected.x, tolerance);
     EXPECT_NEAR(actual.y, expected.y, tolerance);
@@ -73,7 +95,11 @@ namespace
   }
 
   // q and -q are the same rotation.
-  void ExpectSameRotation(const Wm3::Quaternionf& a, const Wm3::Quaternionf& b, const float tolerance)
+  void ExpectSameRotation(
+    const Wm3::Quaternionf& a,
+    const Wm3::Quaternionf& b,
+    const float tolerance
+  )
   {
     const float sign = ((a.w * b.w) + (a.x * b.x) + (a.y * b.y) + (a.z * b.z)) < 0.0f ? -1.0f : 1.0f;
     EXPECT_NEAR(a.w, sign * b.w, tolerance);
@@ -83,7 +109,10 @@ namespace
   }
 } // namespace
 
-TEST(MathVector, ValidityRejectsNaNButAcceptsInfinity)
+TEST(
+  MathVector,
+  ValidityRejectsNaNButAcceptsInfinity
+)
 {
   const float nan = std::numeric_limits<float>::quiet_NaN();
   const float inf = std::numeric_limits<float>::infinity();
@@ -103,7 +132,10 @@ TEST(MathVector, ValidityRejectsNaNButAcceptsInfinity)
   EXPECT_EQ(zeroQuat.x, 0.0f);
 }
 
-TEST(MathVector, LengthHelpers)
+TEST(
+  MathVector,
+  LengthHelpers
+)
 {
   Wm3::Vector3f dest{};
   moho::NormalizeVectorInto(&dest, {3.0f, 0.0f, 4.0f});
@@ -150,7 +182,10 @@ TEST(MathVector, LengthHelpers)
   ExpectNear3(out, target, 0.0f);
 }
 
-TEST(MathVector, ReflectionAxisAndHeading)
+TEST(
+  MathVector,
+  ReflectionAxisAndHeading
+)
 {
   const Wm3::Vector3f incident{1.0f, -1.0f, 0.0f};
   const Wm3::Vector3f normal{0.0f, 1.0f, 0.0f};
@@ -171,7 +206,10 @@ TEST(MathVector, ReflectionAxisAndHeading)
   EXPECT_NEAR(std::fabs(moho::VEC_HeadingFromXZ(&south)), kPi, 1.0e-6f);
 }
 
-TEST(MathVector, EulerRollAndAxisAngleVectorBuildUnitQuaternions)
+TEST(
+  MathVector,
+  EulerRollAndAxisAngleVectorBuildUnitQuaternions
+)
 {
   const Wm3::Vector3f axis{0.0f, 1.0f, 0.0f};
   Wm3::Quatf quat{};
@@ -183,7 +221,10 @@ TEST(MathVector, EulerRollAndAxisAngleVectorBuildUnitQuaternions)
   ExpectSameRotation(fromVector, AxisAngle({0.0f, 0.0f, 1.0f}, 2.0f), 1.0e-6f);
 }
 
-TEST(MathGrid, GridPosFloorsWorldCoordinates)
+TEST(
+  MathGrid,
+  GridPosFloorsWorldCoordinates
+)
 {
   Wm3::Vec3f position{17.9f, 0.0f, -0.5f};
   const moho::GridPos cell(&position, 4);
@@ -198,7 +239,10 @@ TEST(MathGrid, GridPosFloorsWorldCoordinates)
   EXPECT_EQ(moho::FloorSecondsToTicks(3.0f), 30);
 }
 
-TEST(MathQuaternion, NormalizeAngleWrapsIntoSignedPi)
+TEST(
+  MathQuaternion,
+  NormalizeAngleWrapsIntoSignedPi
+)
 {
   const float inputs[] = {0.0f, 1.0f, -1.0f, 3.0f, 4.0f, -4.0f, 7.0f, -7.0f, 100.0f, -100.0f, 6.2f};
   for (const float input : inputs) {
@@ -212,7 +256,10 @@ TEST(MathQuaternion, NormalizeAngleWrapsIntoSignedPi)
   EXPECT_NEAR(moho::NormalizeAngleSignedRadiansX87(7.0), 7.0f - (2.0f * kPi), 1.0e-5f);
 }
 
-TEST(MathQuaternion, MatrixAndVectorRotationAgreeWithRodrigues)
+TEST(
+  MathQuaternion,
+  MatrixAndVectorRotationAgreeWithRodrigues
+)
 {
   std::mt19937 rng(42);
   std::uniform_real_distribution<float> angles(-3.0f, 3.0f);
@@ -258,7 +305,10 @@ TEST(MathQuaternion, MatrixAndVectorRotationAgreeWithRodrigues)
   }
 }
 
-TEST(MathQuaternion, ProductComposesRotations)
+TEST(
+  MathQuaternion,
+  ProductComposesRotations
+)
 {
   std::mt19937 rng(7);
   std::uniform_real_distribution<float> angles(-3.0f, 3.0f);
@@ -282,7 +332,10 @@ TEST(MathQuaternion, ProductComposesRotations)
   }
 }
 
-TEST(MathQuaternion, NormalizeAndNearEqual)
+TEST(
+  MathQuaternion,
+  NormalizeAndNearEqual
+)
 {
   Wm3::Quaternionf q{2.0f, 0.0f, 0.0f, 0.0f};
   moho::NormalizeQuatInPlace(&q);
@@ -299,7 +352,10 @@ TEST(MathQuaternion, NormalizeAndNearEqual)
   EXPECT_FALSE(moho::QuatsNearEqual(a, c));
 }
 
-TEST(MathQuaternion, InterpolationEndpointsAndMidpoint)
+TEST(
+  MathQuaternion,
+  InterpolationEndpointsAndMidpoint
+)
 {
   const Wm3::Vector3f up{0.0f, 1.0f, 0.0f};
   const Wm3::Quaternionf from = AxisAngle(up, 0.0f);
@@ -332,7 +388,10 @@ TEST(MathQuaternion, InterpolationEndpointsAndMidpoint)
   ExpectSameRotation(out, AxisAngle(up, 0.6f), 1.0e-5f);
 }
 
-TEST(MathQuaternion, AxisAngleRoundTrip)
+TEST(
+  MathQuaternion,
+  AxisAngleRoundTrip
+)
 {
   Wm3::Vector3f axis{};
   float angle = 0.0f;
@@ -345,7 +404,10 @@ TEST(MathQuaternion, AxisAngleRoundTrip)
   ExpectNear3(axis, {1.0f, 0.0f, 0.0f}, 0.0f); // 0x006C1070: no axis -> +x, angle 0
 }
 
-TEST(MathQuaternion, RotateByAngleAndBlendClampTheStep)
+TEST(
+  MathQuaternion,
+  RotateByAngleAndBlendClampTheStep
+)
 {
   const Wm3::Vector3f up{0.0f, 1.0f, 0.0f};
   Wm3::Quaternionf q = AxisAngle(up, 2.0f);
@@ -370,7 +432,10 @@ TEST(MathQuaternion, RotateByAngleAndBlendClampTheStep)
   ExpectSameRotation(out, goal, 0.0f);
 }
 
-TEST(MathQuaternion, EulerMatrixAndShortestArc)
+TEST(
+  MathQuaternion,
+  EulerMatrixAndShortestArc
+)
 {
   // Heading only: a rotation about +y.
   Wm3::Vector3f matrix[3]{};
@@ -408,7 +473,10 @@ TEST(MathQuaternion, EulerMatrixAndShortestArc)
   }
 }
 
-TEST(MathQuaternion, VecRotTurnsForwardTowardTheReference)
+TEST(
+  MathQuaternion,
+  VecRotTurnsForwardTowardTheReference
+)
 {
   // Identity faces +z; a full step towards +x turns the forward axis onto +x.
   Wm3::Quaternionf q{1.0f, 0.0f, 0.0f, 0.0f};
@@ -430,12 +498,13 @@ TEST(MathQuaternion, VecRotTurnsForwardTowardTheReference)
   ExpectNear3(moved, east, 1.0e-4f);
 }
 
-TEST(MathBox, AxisAlignedBoundsAndEmpty)
+TEST(
+  MathBox,
+  AxisAlignedBoundsAndEmpty
+)
 {
   const float c = std::cos(kPi / 4.0f);
-  const Wm3::Box3f box(
-    {10.0f, 0.0f, -5.0f}, {c, 0.0f, c}, {0.0f, 1.0f, 0.0f}, {-c, 0.0f, c}, 2.0f, 1.0f, 2.0f
-  );
+  const Wm3::Box3f box({10.0f, 0.0f, -5.0f}, {c, 0.0f, c}, {0.0f, 1.0f, 0.0f}, {-c, 0.0f, c}, 2.0f, 1.0f, 2.0f);
   const Wm3::AxisAlignedBox3f bounds = moho::AxisAlignedBoundsFromBox(box);
   const float half = 2.0f * std::sqrt(2.0f);
   EXPECT_NEAR(bounds.Min.x, 10.0f - half, 1.0e-4f);
@@ -451,7 +520,10 @@ TEST(MathBox, AxisAlignedBoundsAndEmpty)
   EXPECT_GT(empty.Min.z, empty.Max.z);
 }
 
-TEST(MathBox, RaySlabClip)
+TEST(
+  MathBox,
+  RaySlabClip
+)
 {
   const Wm3::AxisAlignedBox3f box({0.0f, 0.0f, 0.0f}, {10.0f, 10.0f, 10.0f});
   moho::RaySlabState hit{};
@@ -485,7 +557,10 @@ TEST(MathBox, RaySlabClip)
   EXPECT_FALSE(moho::RayBoxSlabClip(shortRay, box));
 }
 
-TEST(MathQueries, SegmentsAndDistances)
+TEST(
+  MathQueries,
+  SegmentsAndDistances
+)
 {
   const Wm3::Segment3f segment = Wm3::MakeSegment3fFromEndpoints({0.0f, 0.0f, 0.0f}, {10.0f, 0.0f, 0.0f});
   ExpectNear3(segment.Origin, {5.0f, 0.0f, 0.0f}, 1.0e-6f);
@@ -511,7 +586,10 @@ TEST(MathQueries, SegmentsAndDistances)
   EXPECT_FALSE(Wm3::PointInBox3({0.5f, -2.5f, 2.0f}, box));
 }
 
-TEST(MathQueries, SegmentBoxAndSphereIntersections)
+TEST(
+  MathQueries,
+  SegmentBoxAndSphereIntersections
+)
 {
   const Wm3::Box3f box(
     {0.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, 1.0f, 1.0f, 1.0f
@@ -540,32 +618,56 @@ TEST(MathQueries, SegmentBoxAndSphereIntersections)
   // -1 along x from x = 5 into the face x = 1 reports no contact. The sim calls Find only after Test passed.
   float contactTime = 0.0f;
   Wm3::Vector3f contactPoint{};
-  EXPECT_FALSE(Wm3::FindBox3Sphere3(
-    box, Wm3::Sphere3f({5.0f, 0.0f, 0.0f}, 1.0f), 10.0f, {0.0f, 0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}, contactTime,
-    contactPoint
-  ));
+  EXPECT_FALSE(
+    Wm3::FindBox3Sphere3(
+      box,
+      Wm3::Sphere3f({5.0f, 0.0f, 0.0f}, 1.0f),
+      10.0f,
+      {0.0f, 0.0f, 0.0f},
+      {-1.0f, 0.0f, 0.0f},
+      contactTime,
+      contactPoint
+    )
+  );
   // A centre inside the box is a contact at time 0, at the centre.
-  ASSERT_TRUE(Wm3::FindBox3Sphere3(
-    box, Wm3::Sphere3f({0.5f, 0.0f, 0.0f}, 1.0f), 10.0f, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, contactTime,
-    contactPoint
-  ));
+  ASSERT_TRUE(
+    Wm3::FindBox3Sphere3(
+      box,
+      Wm3::Sphere3f({0.5f, 0.0f, 0.0f}, 1.0f),
+      10.0f,
+      {0.0f, 0.0f, 0.0f},
+      {0.0f, 0.0f, 0.0f},
+      contactTime,
+      contactPoint
+    )
+  );
   EXPECT_EQ(contactTime, 0.0f);
   EXPECT_EQ(contactPoint.x, 0.5f);
-  EXPECT_FALSE(Wm3::FindBox3Sphere3(
-    box, Wm3::Sphere3f({5.0f, 0.0f, 0.0f}, 1.0f), 2.0f, {0.0f, 0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f}, contactTime,
-    contactPoint
-  ));
+  EXPECT_FALSE(
+    Wm3::FindBox3Sphere3(
+      box,
+      Wm3::Sphere3f({5.0f, 0.0f, 0.0f}, 1.0f),
+      2.0f,
+      {0.0f, 0.0f, 0.0f},
+      {-1.0f, 0.0f, 0.0f},
+      contactTime,
+      contactPoint
+    )
+  );
 
   EXPECT_TRUE(Wm3::TestLine3Box3(Wm3::Line3f({0.0f, 5.0f, 0.0f}, {0.0f, 1.0f, 0.0f}), box));
   EXPECT_FALSE(Wm3::TestLine3Box3(Wm3::Line3f({3.0f, 5.0f, 0.0f}, {0.0f, 1.0f, 0.0f}), box));
 }
 
-TEST(MathQueries, TwoDimensionalTestsAndContainment)
+TEST(
+  MathQueries,
+  TwoDimensionalTestsAndContainment
+)
 {
   const float c = std::cos(kPi / 4.0f);
   const Wm3::Box2f square({0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f}, 1.0f, 1.0f);
-  const Wm3::Box2f diamond({2.3f, 0.0f}, {c, c}, {-c, c}, 1.0f, 1.0f);     // reaches x = 2.3 - sqrt(2) < 1
-  const Wm3::Box2f justApart({2.5f, 0.0f}, {c, c}, {-c, c}, 1.0f, 1.0f);  // reaches x = 2.5 - sqrt(2) > 1
+  const Wm3::Box2f diamond({2.3f, 0.0f}, {c, c}, {-c, c}, 1.0f, 1.0f);   // reaches x = 2.3 - sqrt(2) < 1
+  const Wm3::Box2f justApart({2.5f, 0.0f}, {c, c}, {-c, c}, 1.0f, 1.0f); // reaches x = 2.5 - sqrt(2) > 1
   const Wm3::Box2f far({5.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f}, 1.0f, 1.0f);
   EXPECT_TRUE(Wm3::TestBox2Box2(square, diamond));
   EXPECT_FALSE(Wm3::TestBox2Box2(square, justApart));

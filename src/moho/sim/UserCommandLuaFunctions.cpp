@@ -82,193 +82,204 @@ using namespace moho;
 // Engine addition: helpers shared with the file these functions came from.
 namespace
 {
-    // Per-tick economy value → per-second UI rate (ds:dword_DFF31C == 10.0f).
-    constexpr float kRolloverEconomyPerSecondToUiRate = 10.0f;
-    // The rollover builders read the UI unit's own members (x86 offsets as
-    // FUN_008421F0 reads them): `mParams.mEntityId` (+0x44),
-    // `mVariableData.mHealth/mMaxHealth` (+0x68/+0x6C), `mArmy` (+0x120), the
-    // replicated `mUnitVarDat` block at +0x198 (fuel +0x1A4, shield +0x1A8, work
-    // +0x1BC, silo counters +0x1C0..+0x1D4, custom name +0x1DC, produced /
-    // spent / maintenance pairs +0x1F8..+0x20C, focus / guarded / target-blip
-    // ids +0x210..+0x218), and `mIntelStateFlags` (+0x3E0; 0x10 = has unit
-    // data, 0x08 = health valid).
-    constexpr std::uint32_t kRolloverHasUnitDataFlag = 0x10u;
-    constexpr std::uint32_t kRolloverHealthValidFlag = 0x08u;
+  // Per-tick economy value → per-second UI rate (ds:dword_DFF31C == 10.0f).
+  constexpr float kRolloverEconomyPerSecondToUiRate = 10.0f;
+  // The rollover builders read the UI unit's own members (x86 offsets as
+  // FUN_008421F0 reads them): `mParams.mEntityId` (+0x44),
+  // `mVariableData.mHealth/mMaxHealth` (+0x68/+0x6C), `mArmy` (+0x120), the
+  // replicated `mUnitVarDat` block at +0x198 (fuel +0x1A4, shield +0x1A8, work
+  // +0x1BC, silo counters +0x1C0..+0x1D4, custom name +0x1DC, produced /
+  // spent / maintenance pairs +0x1F8..+0x20C, focus / guarded / target-blip
+  // ids +0x210..+0x218), and `mIntelStateFlags` (+0x3E0; 0x10 = has unit
+  // data, 0x08 = health valid).
+  constexpr std::uint32_t kRolloverHasUnitDataFlag = 0x10u;
+  constexpr std::uint32_t kRolloverHealthValidFlag = 0x08u;
 
-    /**
-     * Address: 0x00842770 (FUN_00842770, sub_842770)
-     *
-     * IDA signature:
-     * void __usercall sub_842770(LuaPlus::LuaObject *out@<esi>,
-     *                            Moho::UserEntity *prop@<edi>,
-     *                            LuaPlus::LuaState *state);
-     *
-     * What it does:
-     * Fills one rollover sub-table for a focused prop entity: blueprintId +
-     * fractionComplete, or "unknown"/0.0 when the prop has no blueprint.
-     */
-    void BuildFocusPropRolloverInfo(LuaPlus::LuaObject& out, UserEntity* const prop, LuaPlus::LuaState* const state)
-    {
-      out.AssignNewTable(state, 0, 0);
+  /**
+   * Address: 0x00842770 (FUN_00842770, sub_842770)
+   *
+   * IDA signature:
+   * void __usercall sub_842770(LuaPlus::LuaObject *out@<esi>,
+   *                            Moho::UserEntity *prop@<edi>,
+   *                            LuaPlus::LuaState *state);
+   *
+   * What it does:
+   * Fills one rollover sub-table for a focused prop entity: blueprintId +
+   * fractionComplete, or "unknown"/0.0 when the prop has no blueprint.
+   */
+  void BuildFocusPropRolloverInfo(
+    LuaPlus::LuaObject& out,
+    UserEntity* const prop,
+    LuaPlus::LuaState* const state
+  )
+  {
+    out.AssignNewTable(state, 0, 0);
 
-      const REntityBlueprint* const blueprint = prop->mParams.mBlueprint;
-      if (blueprint != nullptr) {
-        out.SetString("blueprintId", blueprint->mBlueprintId.c_str());
-        out.SetNumber("fractionComplete", prop->mVariableData.mFractionComplete);
-      } else {
-        out.SetString("blueprintId", "unknown");
-        out.SetNumber("fractionComplete", 0.0f);
-      }
-    }
-    /**
-     * Address: 0x008427E0 (FUN_008427E0, sub_8427E0)
-     *
-     * IDA signature:
-     * void __usercall sub_8427E0(LuaPlus::LuaState *state@<eax>,
-     *                            Moho::UserUnit *unit@<edi>,
-     *                            LuaPlus::LuaObject *out);
-     *
-     * What it does:
-     * Fills one compact rollover sub-table for a focus / upgrade target unit:
-     * blueprintId + health/max when the target blueprint is present and the unit
-     * data flags gate (mobile → 0x08, otherwise 0x10) is satisfied; otherwise a
-     * stubbed "unknown" blueprintId.
-     */
-    void BuildFocusUnitRolloverInfo(LuaPlus::LuaObject& out, UserUnit* const unit, LuaPlus::LuaState* const state)
-    {
-      out.AssignNewTable(state, 0, 0);
-
-      IUnit* const bridge = GetIUnitBridge(unit);
-      const RUnitBlueprint* const blueprint = bridge->GetBlueprint();
-
-      bool hasBlueprintId = false;
-      if (blueprint != nullptr) {
-        const std::uint32_t requiredFlag =
-          blueprint->IsMobile() ? kRolloverHealthValidFlag : kRolloverHasUnitDataFlag;
-        hasBlueprintId = (unit->mIntelStateFlags & requiredFlag) != 0u;
-      }
-
-      if (!hasBlueprintId) {
-        out.SetString("blueprintId", "unknown");
-        return;
-      }
-
+    const REntityBlueprint* const blueprint = prop->mParams.mBlueprint;
+    if (blueprint != nullptr) {
       out.SetString("blueprintId", blueprint->mBlueprintId.c_str());
-      out.SetNumber("health", unit->mVariableData.mHealth);
-      out.SetNumber("maxHealth", unit->mVariableData.mMaxHealth);
+      out.SetNumber("fractionComplete", prop->mVariableData.mFractionComplete);
+    } else {
+      out.SetString("blueprintId", "unknown");
+      out.SetNumber("fractionComplete", 0.0f);
     }
-    /**
-     * Address: 0x008421F0 (FUN_008421F0, sub_8421F0)
-     *
-     * IDA signature:
-     * void __usercall sub_8421F0(LuaPlus::LuaObject *out@<edi>,
-     *                            Moho::UserUnit *unit@<esi>,
-     *                            LuaPlus::LuaState *state);
-     *
-     * What it does:
-     * Fills one rollover-info Lua table with full stats for a live user unit:
-     * blueprint id, health/max, KILLS stat, per-second economy, silo counters,
-     * fuel/shield/work ratios, the unit's own Lua object, entity id, army index
-     * and encoded team color. When the +0x3E0 flag word lacks the has-unit-data
-     * bit only a stubbed blueprintId / armyIndex / teamColor is written; when the
-     * entity id nibble marks a being-placed entity the stat block is sentinel-filled.
-     */
-    void BuildUserUnitRolloverInfo(LuaPlus::LuaObject& out, UserUnit* const unit, LuaPlus::LuaState* const state)
-    {
-      out.AssignNewTable(state, 0, 0);
+  }
+  /**
+   * Address: 0x008427E0 (FUN_008427E0, sub_8427E0)
+   *
+   * IDA signature:
+   * void __usercall sub_8427E0(LuaPlus::LuaState *state@<eax>,
+   *                            Moho::UserUnit *unit@<edi>,
+   *                            LuaPlus::LuaObject *out);
+   *
+   * What it does:
+   * Fills one compact rollover sub-table for a focus / upgrade target unit:
+   * blueprintId + health/max when the target blueprint is present and the unit
+   * data flags gate (mobile → 0x08, otherwise 0x10) is satisfied; otherwise a
+   * stubbed "unknown" blueprintId.
+   */
+  void BuildFocusUnitRolloverInfo(
+    LuaPlus::LuaObject& out,
+    UserUnit* const unit,
+    LuaPlus::LuaState* const state
+  )
+  {
+    out.AssignNewTable(state, 0, 0);
 
-      const SSTIUnitVariableData& unitData = unit->mUnitVarDat;
-      if ((unit->mIntelStateFlags & kRolloverHasUnitDataFlag) != 0u) {
-        IUnit* const bridge = GetIUnitBridge(unit);
-        out.SetString("blueprintId", bridge->GetBlueprint()->mBlueprintId.c_str());
+    IUnit* const bridge = GetIUnitBridge(unit);
+    const RUnitBlueprint* const blueprint = bridge->GetBlueprint();
 
-        if ((unit->mIntelStateFlags & kRolloverHealthValidFlag) != 0u) {
-          out.SetNumber("health", unit->mVariableData.mHealth);
-          out.SetNumber("maxHealth", unit->mVariableData.mMaxHealth);
-        }
+    bool hasBlueprintId = false;
+    if (blueprint != nullptr) {
+      const std::uint32_t requiredFlag = blueprint->IsMobile() ? kRolloverHealthValidFlag : kRolloverHasUnitDataFlag;
+      hasBlueprintId = (unit->mIntelStateFlags & requiredFlag) != 0u;
+    }
 
-        if ((unit->mParams.mEntityId & 0xF0000000u) == 0x30000000u) {
-          // Placeholder / being-placed entity: sentinel values.
-          out.SetNumber("kills", 0.0f);
-          out.SetInteger("energyConsumed", -1);
-          out.SetInteger("massConsumed", -1);
-          out.SetInteger("energyRequested", 0);
-          out.SetInteger("massRequested", 0);
-          out.SetInteger("energyProduced", -1);
-          out.SetInteger("massProduced", -1);
-          out.SetInteger("tacticalSiloBuildCount", 0);
-          out.SetInteger("tacticalSiloStorageCount", 0);
-          out.SetInteger("tacticalSiloMaxStorageCount", 0);
-          out.SetInteger("nukeSiloBuildCount", 0);
-          out.SetInteger("nukeSiloStorageCount", 0);
-          out.SetInteger("nukeSiloMaxStorageCount", 0);
-          out.SetInteger("fuelRatio", -1);
-          out.SetInteger("shieldRatio", -1);
-          out.SetInteger("workProgress", -1);
-        } else {
-          int killsDefault = 0;
-          StatItem* const killsStat = bridge->GetStat("KILLS", killsDefault);
-          out.SetNumber("kills", static_cast<float>(killsStat->GetInt(false)));
+    if (!hasBlueprintId) {
+      out.SetString("blueprintId", "unknown");
+      return;
+    }
 
-          // FAF hot-patch (FA-Binary-Patches GetRolloverInfoFix): 0x008422FD..0x0084240C keep
-          // the six rates as floats (`movd eax, xmm0` + LuaObject::SetNumber at 0x00908320)
-          // instead of truncating them to integers for SetInteger.
-          out.SetNumber("energyConsumed", unitData.mResourcesSpent.ENERGY * kRolloverEconomyPerSecondToUiRate);
-          out.SetNumber("massConsumed", unitData.mResourcesSpent.MASS * kRolloverEconomyPerSecondToUiRate);
-          out.SetNumber("energyRequested", unitData.mMaintainenceCost.ENERGY * kRolloverEconomyPerSecondToUiRate);
-          out.SetNumber("massRequested", unitData.mMaintainenceCost.MASS * kRolloverEconomyPerSecondToUiRate);
-          out.SetNumber("energyProduced", unitData.mProduced.ENERGY * kRolloverEconomyPerSecondToUiRate);
-          out.SetNumber("massProduced", unitData.mProduced.MASS * kRolloverEconomyPerSecondToUiRate);
-          out.SetInteger("tacticalSiloBuildCount", unitData.mTacticalSiloBuildCount);
-          out.SetInteger("tacticalSiloStorageCount", unitData.mTacticalSiloStorageCount);
-          out.SetInteger("tacticalSiloMaxStorageCount", unitData.mTacticalSiloMaxStorageCount);
-          out.SetInteger("nukeSiloBuildCount", unitData.mNukeSiloBuildCount);
-          out.SetInteger("nukeSiloStorageCount", unitData.mNukeSiloStorageCount);
-          out.SetInteger("nukeSiloMaxStorageCount", unitData.mNukeSiloMaxStorageCount);
-          out.SetNumber("fuelRatio", unitData.mFuelRatio);
-          out.SetNumber("shieldRatio", unitData.mShieldRatio);
-          out.SetNumber("workProgress", unitData.mWorkProgress);
+    out.SetString("blueprintId", blueprint->mBlueprintId.c_str());
+    out.SetNumber("health", unit->mVariableData.mHealth);
+    out.SetNumber("maxHealth", unit->mVariableData.mMaxHealth);
+  }
+  /**
+   * Address: 0x008421F0 (FUN_008421F0, sub_8421F0)
+   *
+   * IDA signature:
+   * void __usercall sub_8421F0(LuaPlus::LuaObject *out@<edi>,
+   *                            Moho::UserUnit *unit@<esi>,
+   *                            LuaPlus::LuaState *state);
+   *
+   * What it does:
+   * Fills one rollover-info Lua table with full stats for a live user unit:
+   * blueprint id, health/max, KILLS stat, per-second economy, silo counters,
+   * fuel/shield/work ratios, the unit's own Lua object, entity id, army index
+   * and encoded team color. When the +0x3E0 flag word lacks the has-unit-data
+   * bit only a stubbed blueprintId / armyIndex / teamColor is written; when the
+   * entity id nibble marks a being-placed entity the stat block is sentinel-filled.
+   */
+  void BuildUserUnitRolloverInfo(
+    LuaPlus::LuaObject& out,
+    UserUnit* const unit,
+    LuaPlus::LuaState* const state
+  )
+  {
+    out.AssignNewTable(state, 0, 0);
 
-          const LuaPlus::LuaObject unitObject = bridge->GetLuaObject();
-          out.SetObject("userUnit", unitObject);
+    const SSTIUnitVariableData& unitData = unit->mUnitVarDat;
+    if ((unit->mIntelStateFlags & kRolloverHasUnitDataFlag) != 0u) {
+      IUnit* const bridge = GetIUnitBridge(unit);
+      out.SetString("blueprintId", bridge->GetBlueprint()->mBlueprintId.c_str());
 
-          const fa::string entityIdText = gpg::STR_Printf("%d", unit->mParams.mEntityId);
-          out.SetString("entityId", entityIdText.c_str());
-        }
-
-        out.SetInteger("armyIndex", static_cast<int>(unit->mArmy->mArmyIndex));
-        const LuaPlus::LuaObject teamColor = SCR_EncodeColor(state, unit->mArmy->mVarDat.mPlayerColorBgra);
-        out.SetObject("teamColor", teamColor);
-
-        if (!unitData.mCustomName.empty()) {
-          out.SetString("customName", unitData.mCustomName.c_str());
-        }
-      } else {
-        out.SetString("blueprintId", "unknown");
-        const LuaPlus::LuaObject teamColor = SCR_EncodeColor(state, unit->mArmy->mVarDat.mPlayerColorBgra);
-        out.SetObject("teamColor", teamColor);
-        out.SetInteger("armyIndex", static_cast<int>(unit->mArmy->mArmyIndex));
+      if ((unit->mIntelStateFlags & kRolloverHealthValidFlag) != 0u) {
+        out.SetNumber("health", unit->mVariableData.mHealth);
+        out.SetNumber("maxHealth", unit->mVariableData.mMaxHealth);
       }
+
+      if ((unit->mParams.mEntityId & 0xF0000000u) == 0x30000000u) {
+        // Placeholder / being-placed entity: sentinel values.
+        out.SetNumber("kills", 0.0f);
+        out.SetInteger("energyConsumed", -1);
+        out.SetInteger("massConsumed", -1);
+        out.SetInteger("energyRequested", 0);
+        out.SetInteger("massRequested", 0);
+        out.SetInteger("energyProduced", -1);
+        out.SetInteger("massProduced", -1);
+        out.SetInteger("tacticalSiloBuildCount", 0);
+        out.SetInteger("tacticalSiloStorageCount", 0);
+        out.SetInteger("tacticalSiloMaxStorageCount", 0);
+        out.SetInteger("nukeSiloBuildCount", 0);
+        out.SetInteger("nukeSiloStorageCount", 0);
+        out.SetInteger("nukeSiloMaxStorageCount", 0);
+        out.SetInteger("fuelRatio", -1);
+        out.SetInteger("shieldRatio", -1);
+        out.SetInteger("workProgress", -1);
+      } else {
+        int killsDefault = 0;
+        StatItem* const killsStat = bridge->GetStat("KILLS", killsDefault);
+        out.SetNumber("kills", static_cast<float>(killsStat->GetInt(false)));
+
+        // FAF hot-patch (FA-Binary-Patches GetRolloverInfoFix): 0x008422FD..0x0084240C keep
+        // the six rates as floats (`movd eax, xmm0` + LuaObject::SetNumber at 0x00908320)
+        // instead of truncating them to integers for SetInteger.
+        out.SetNumber("energyConsumed", unitData.mResourcesSpent.ENERGY * kRolloverEconomyPerSecondToUiRate);
+        out.SetNumber("massConsumed", unitData.mResourcesSpent.MASS * kRolloverEconomyPerSecondToUiRate);
+        out.SetNumber("energyRequested", unitData.mMaintainenceCost.ENERGY * kRolloverEconomyPerSecondToUiRate);
+        out.SetNumber("massRequested", unitData.mMaintainenceCost.MASS * kRolloverEconomyPerSecondToUiRate);
+        out.SetNumber("energyProduced", unitData.mProduced.ENERGY * kRolloverEconomyPerSecondToUiRate);
+        out.SetNumber("massProduced", unitData.mProduced.MASS * kRolloverEconomyPerSecondToUiRate);
+        out.SetInteger("tacticalSiloBuildCount", unitData.mTacticalSiloBuildCount);
+        out.SetInteger("tacticalSiloStorageCount", unitData.mTacticalSiloStorageCount);
+        out.SetInteger("tacticalSiloMaxStorageCount", unitData.mTacticalSiloMaxStorageCount);
+        out.SetInteger("nukeSiloBuildCount", unitData.mNukeSiloBuildCount);
+        out.SetInteger("nukeSiloStorageCount", unitData.mNukeSiloStorageCount);
+        out.SetInteger("nukeSiloMaxStorageCount", unitData.mNukeSiloMaxStorageCount);
+        out.SetNumber("fuelRatio", unitData.mFuelRatio);
+        out.SetNumber("shieldRatio", unitData.mShieldRatio);
+        out.SetNumber("workProgress", unitData.mWorkProgress);
+
+        const LuaPlus::LuaObject unitObject = bridge->GetLuaObject();
+        out.SetObject("userUnit", unitObject);
+
+        const fa::string entityIdText = gpg::STR_Printf("%d", unit->mParams.mEntityId);
+        out.SetString("entityId", entityIdText.c_str());
+      }
+
+      out.SetInteger("armyIndex", static_cast<int>(unit->mArmy->mArmyIndex));
+      const LuaPlus::LuaObject teamColor = SCR_EncodeColor(state, unit->mArmy->mVarDat.mPlayerColorBgra);
+      out.SetObject("teamColor", teamColor);
+
+      if (!unitData.mCustomName.empty()) {
+        out.SetString("customName", unitData.mCustomName.c_str());
+      }
+    } else {
+      out.SetString("blueprintId", "unknown");
+      const LuaPlus::LuaObject teamColor = SCR_EncodeColor(state, unit->mArmy->mVarDat.mPlayerColorBgra);
+      out.SetObject("teamColor", teamColor);
+      out.SetInteger("armyIndex", static_cast<int>(unit->mArmy->mArmyIndex));
     }
-    // One candidate air-staging platform: the ordering keys the binary computes for
-    // each viable platform. Layout matches the 12-byte record the binary pushes
-    // (platform @ +0x00, distSq @ +0x04, freeCapacity @ +0x08).
-    struct DockCandidate
-    {
-      UserUnit* platform;      // +0x00
-      float distSq;            // +0x04 (squared XZ distance to selection centroid)
-      std::int32_t freeCapacity; // +0x08 (available docking slots)
-    };
-    constexpr std::uint32_t kDockRejectLayerSeabed = 2u; // LAYER_Seabed
-    // Current-layer values that disqualify a platform from being a dock target:
-    // an underwater platform (Sub or Seabed layer) cannot stage docked units.
-    // (the binary gates `layer != LAYER_Sub(4) && layer != LAYER_Seabed(2)`.)
-    constexpr std::uint32_t kDockRejectLayerSub = 4u;    // LAYER_Sub
-    // Radius padding (world units) added to the nearest-platform distance when the
-    // whole selection cannot dock at a single platform (binary literal 100.0f).
-    constexpr float kMultiDockRadiusPadding = 100.0f;
-    // RULEUCC_Dock command capability bit tested against UnitAttributes::commandCapsMask.
-    constexpr std::uint32_t kRuleUccDock = 0x400000u;
+  }
+  // One candidate air-staging platform: the ordering keys the binary computes for
+  // each viable platform. Layout matches the 12-byte record the binary pushes
+  // (platform @ +0x00, distSq @ +0x04, freeCapacity @ +0x08).
+  struct DockCandidate
+  {
+    UserUnit* platform;        // +0x00
+    float distSq;              // +0x04 (squared XZ distance to selection centroid)
+    std::int32_t freeCapacity; // +0x08 (available docking slots)
+  };
+  constexpr std::uint32_t kDockRejectLayerSeabed = 2u; // LAYER_Seabed
+  // Current-layer values that disqualify a platform from being a dock target:
+  // an underwater platform (Sub or Seabed layer) cannot stage docked units.
+  // (the binary gates `layer != LAYER_Sub(4) && layer != LAYER_Seabed(2)`.)
+  constexpr std::uint32_t kDockRejectLayerSub = 4u; // LAYER_Sub
+  // Radius padding (world units) added to the nearest-platform distance when the
+  // whole selection cannot dock at a single platform (binary literal 100.0f).
+  constexpr float kMultiDockRadiusPadding = 100.0f;
+  // RULEUCC_Dock command capability bit tested against UnitAttributes::commandCapsMask.
+  constexpr std::uint32_t kRuleUccDock = 0x400000u;
 
   /**
    * Address: 0x00866020 (FUN_00866020, sub_866020)
@@ -295,7 +306,10 @@ namespace
    * binary's caller (`UI_ExpandCurrentSelection` below) always resolves and
    * passes a real `CameraImpl*` for this exact null-check gate.
    */
-  void ExpandCurrentSelection(moho::CWldSession* const session, const moho::CameraImpl* const camera)
+  void ExpandCurrentSelection(
+    moho::CWldSession* const session,
+    const moho::CameraImpl* const camera
+  )
   {
     if (camera == nullptr) {
       return;
@@ -370,8 +384,7 @@ namespace
 constexpr const char* kIsTransportPreOrdersEnabledName = "IsTransportPreOrdersEnabled";
   constexpr const char* kIsTransportPreOrdersEnabledHelpText =
     "IsTransportPreOrdersEnabled() -> bool - returns whether transport cargo pre-orders and drop ghosts are enabled";
-  constexpr const char* kOpenURLHelpText =
-    "OpenURL(string) - open the default browser window to the specified URL";
+    constexpr const char* kOpenURLHelpText = "OpenURL(string) - open the default browser window to the specified URL";
   constexpr const char* kOpenURLName = "OpenURL";
   constexpr const char* kSetActiveBuildTemplateHelpText = "set this as an active build template.";
   constexpr const char* kSetActiveBuildTemplateName = "SetActiveBuildTemplate";
@@ -512,12 +525,24 @@ constexpr const char* kIsTransportPreOrdersEnabledName = "IsTransportPreOrdersEn
           Wm3::AxisAlignedBox3f entityBox{};
           entityBox = moho::AxisAlignedBoundsFromBox(orientedBox);
 
-          if (entityBox.Min.x <= combined.Min.x) { combined.Min.x = entityBox.Min.x; }
-          if (entityBox.Min.y <= combined.Min.y) { combined.Min.y = entityBox.Min.y; }
-          if (entityBox.Min.z <= combined.Min.z) { combined.Min.z = entityBox.Min.z; }
-          if (entityBox.Max.x >  combined.Max.x) { combined.Max.x = entityBox.Max.x; }
-          if (entityBox.Max.y >  combined.Max.y) { combined.Max.y = entityBox.Max.y; }
-          if (entityBox.Max.z >  combined.Max.z) { combined.Max.z = entityBox.Max.z; }
+          if (entityBox.Min.x <= combined.Min.x) {
+            combined.Min.x = entityBox.Min.x;
+          }
+          if (entityBox.Min.y <= combined.Min.y) {
+            combined.Min.y = entityBox.Min.y;
+          }
+          if (entityBox.Min.z <= combined.Min.z) {
+            combined.Min.z = entityBox.Min.z;
+          }
+          if (entityBox.Max.x > combined.Max.x) {
+            combined.Max.x = entityBox.Max.x;
+          }
+          if (entityBox.Max.y > combined.Max.y) {
+            combined.Max.y = entityBox.Max.y;
+          }
+          if (entityBox.Max.z > combined.Max.z) {
+            combined.Max.z = entityBox.Max.z;
+          }
         }
 
         camera->TargetBox(combined, 0.0f);
@@ -566,7 +591,9 @@ constexpr const char* kIsTransportPreOrdersEnabledName = "IsTransportPreOrdersEn
    * read from the PE `.data` initializer of `stru_F5B518`
    * ("UI_ExpandCurrentSelection").
    */
-  void UI_ExpandCurrentSelection(const fa::vector<fa::string>& args)
+  void UI_ExpandCurrentSelection(
+    const fa::vector<fa::string>& args
+  )
   {
     (void)args;
 
@@ -601,7 +628,9 @@ constexpr const char* kIsTransportPreOrdersEnabledName = "IsTransportPreOrdersEn
    * read from the PE `.data` initializer of `stru_F5B528`
    * ("UI_SelectByCategory").
    */
-  void UI_SelectByCategory(const fa::vector<fa::string>& args)
+  void UI_SelectByCategory(
+    const fa::vector<fa::string>& args
+  )
   {
     moho::CWldSession* const session = moho::WLD_GetActiveSession();
     if (session == nullptr) {
@@ -619,7 +648,8 @@ constexpr const char* kIsTransportPreOrdersEnabledName = "IsTransportPreOrdersEn
         "+idle : select only idle units\n"
         "+inview: select only units in the current view\n"
         "+goto: goto the unit if it's already selected\n"
-        "categoryExpression uses the format CAT1 CAT2, CAT3 CAT4 where a space means intersection and a comma means union\n"
+        "categoryExpression uses the format CAT1 CAT2, CAT3 CAT4 where a space means intersection and a comma means "
+        "union\n"
       );
       return;
     }
@@ -689,7 +719,6 @@ constexpr const char* kIsTransportPreOrdersEnabledName = "IsTransportPreOrdersEn
   }
 } // namespace
 
-
 namespace moho
 {
   // Recovered child wrappers call these deeper callback lanes.
@@ -707,13 +736,21 @@ namespace
    * Address: 0x00BE61C0 (FUN_00BE61C0, dynamic initializer for `gCConFunc_UI_ExpandCurrentSelection`)
    * Address: 0x00C07550 (FUN_00C07550, dynamic atexit destructor for `gCConFunc_UI_ExpandCurrentSelection`)
    */
-  moho::CConFunc gCConFunc_UI_ExpandCurrentSelection("UI_ExpandCurrentSelection", kConsoleStartupUIExpandCurrentSelectionDescription, &UI_ExpandCurrentSelection);
+  moho::CConFunc gCConFunc_UI_ExpandCurrentSelection(
+    "UI_ExpandCurrentSelection",
+    kConsoleStartupUIExpandCurrentSelectionDescription,
+    &UI_ExpandCurrentSelection
+  );
 
   /**
    * Address: 0x00BE6200 (FUN_00BE6200, dynamic initializer for `gCConFunc_UI_SelectByCategory`)
    * Address: 0x00C07580 (FUN_00C07580, dynamic atexit destructor for `gCConFunc_UI_SelectByCategory`)
    */
-  moho::CConFunc gCConFunc_UI_SelectByCategory("UI_SelectByCategory", kConsoleStartupUISelectByCategoryDescription, &UI_SelectByCategory);
+  moho::CConFunc gCConFunc_UI_SelectByCategory(
+    "UI_SelectByCategory",
+    kConsoleStartupUISelectByCategoryDescription,
+    &UI_SelectByCategory
+  );
 
 } // namespace
 
@@ -1001,12 +1038,7 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
   CScrLuaInitForm* func_UIZoomTo_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      moho::SCR_UserLuaInitSet(),
-      kUIZoomToName,
-      &moho::cfunc_UIZoomTo,
-      nullptr,
-      "<global>",
-      kUIZoomToHelpText
+      moho::SCR_UserLuaInitSet(), kUIZoomToName, &moho::cfunc_UIZoomTo, nullptr, "<global>", kUIZoomToHelpText
     );
     return &binder;
   }
@@ -1077,12 +1109,7 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
   CScrLuaInitForm* func_OpenURL_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      moho::SCR_UserLuaInitSet(),
-      kOpenURLName,
-      &moho::cfunc_OpenURL,
-      nullptr,
-      "<global>",
-      kOpenURLHelpText
+      moho::SCR_UserLuaInitSet(), kOpenURLName, &moho::cfunc_OpenURL, nullptr, "<global>", kOpenURLHelpText
     );
     return &binder;
   }
@@ -1096,12 +1123,7 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
   CScrLuaInitForm* func_SetCursor_LuaFuncDef()
   {
     static CScrLuaBinder binder(
-      moho::SCR_UserLuaInitSet(),
-      kSetCursorName,
-      &moho::cfunc_SetCursor,
-      nullptr,
-      "<global>",
-      kSetCursorHelpText
+      moho::SCR_UserLuaInitSet(), kSetCursorName, &moho::cfunc_SetCursor, nullptr, "<global>", kSetCursorHelpText
     );
     return &binder;
   }
@@ -1113,7 +1135,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * Parses one command lexical plus optional payload/clear flag and issues the
    * command to the current world-session selection.
    */
-  int cfunc_IssueCommandL(LuaPlus::LuaState* const state)
+  int cfunc_IssueCommandL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (state == nullptr || state->m_state == nullptr) {
       return 0;
@@ -1122,7 +1146,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
     lua_State* const rawState = state->m_state;
     const int argumentCount = lua_gettop(rawState);
     if (argumentCount < 1 || argumentCount > 3) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected between %d and %d args, but got %d", kIssueCommandHelpText, 1, 3, argumentCount);
+      LuaPlus::LuaState::Error(
+        state, "%s\n  expected between %d and %d args, but got %d", kIssueCommandHelpText, 1, 3, argumentCount
+      );
     }
 
     CWldSession* const session = WLD_GetActiveSession();
@@ -1132,8 +1158,10 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
     }
 
     const int focusArmy = session->FocusArmy;
-    if (focusArmy < 0 || static_cast<std::size_t>(focusArmy) >= session->userArmies.size()
-        || session->userArmies[focusArmy] == nullptr) {
+    if (
+      focusArmy < 0 || static_cast<std::size_t>(focusArmy) >= session->userArmies.size() ||
+      session->userArmies[focusArmy] == nullptr
+    ) {
       return 0;
     }
 
@@ -1145,7 +1173,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
     }
 
     EUnitCommandType commandType = EUnitCommandType::UNITCOMMAND_None;
-    if (!TryParseUnitCommandTypeLexical(commandLexical, commandType) || commandType == EUnitCommandType::UNITCOMMAND_None) {
+    if (
+      !TryParseUnitCommandTypeLexical(commandLexical, commandType) || commandType == EUnitCommandType::UNITCOMMAND_None
+    ) {
       return 0;
     }
 
@@ -1153,11 +1183,12 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
     // through the command-issue pipeline. The binary iterates the live world
     // selection weak-set directly and forwards each selected entity id to the
     // sync-driver as an "add" info-pair (asm 0x84177C-0x8417F6).
-    if (commandType == EUnitCommandType::UNITCOMMAND_BuildSiloTactical
-        || commandType == EUnitCommandType::UNITCOMMAND_BuildSiloNuke) {
-      const char* const commandKey = (commandType == EUnitCommandType::UNITCOMMAND_BuildSiloTactical)
-        ? "SiloBuildTactical"
-        : "SiloBuildNuke";
+    if (
+      commandType == EUnitCommandType::UNITCOMMAND_BuildSiloTactical ||
+      commandType == EUnitCommandType::UNITCOMMAND_BuildSiloNuke
+    ) {
+      const char* const commandKey =
+        (commandType == EUnitCommandType::UNITCOMMAND_BuildSiloTactical) ? "SiloBuildTactical" : "SiloBuildNuke";
 
       for (UserEntity* const selectedEntity : session->mSelection) {
         // sSimDriver global read fresh each iteration (asm reloads it in-loop).
@@ -1196,7 +1227,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * per selected live FACTORY-category unit; every other command type issues to
    * the whole selection.
    */
-  int cfunc_IssueBlueprintCommandL(LuaPlus::LuaState* const state)
+  int cfunc_IssueBlueprintCommandL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (state == nullptr || state->m_state == nullptr) {
       return 0;
@@ -1205,7 +1238,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
     lua_State* const rawState = state->m_state;
     const int argumentCount = lua_gettop(rawState);
     if (argumentCount < 3 || argumentCount > 4) {
-      LuaPlus::LuaState::Error(state, "%s\n  expected between %d and %d args, but got %d", kIssueBlueprintCommandHelpText, 3, 4, argumentCount);
+      LuaPlus::LuaState::Error(
+        state, "%s\n  expected between %d and %d args, but got %d", kIssueBlueprintCommandHelpText, 3, 4, argumentCount
+      );
     }
 
     CWldSession* const session = WLD_GetActiveSession();
@@ -1257,11 +1292,12 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
 
     // Silo builds bypass the command-issue pipeline (mirrors cfunc_IssueCommandL):
     // forward each selected entity id to the sync-driver as an "add" info-pair.
-    if (commandType == EUnitCommandType::UNITCOMMAND_BuildSiloTactical
-        || commandType == EUnitCommandType::UNITCOMMAND_BuildSiloNuke) {
-      const char* const commandKey = (commandType == EUnitCommandType::UNITCOMMAND_BuildSiloTactical)
-        ? "SiloBuildTactical"
-        : "SiloBuildNuke";
+    if (
+      commandType == EUnitCommandType::UNITCOMMAND_BuildSiloTactical ||
+      commandType == EUnitCommandType::UNITCOMMAND_BuildSiloNuke
+    ) {
+      const char* const commandKey =
+        (commandType == EUnitCommandType::UNITCOMMAND_BuildSiloTactical) ? "SiloBuildTactical" : "SiloBuildNuke";
 
       for (UserEntity* const selectedEntity : session->mSelection) {
         if (ISTIDriver* const driver = WLD_GetDriver(); driver != nullptr) {
@@ -1289,8 +1325,10 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
       for (UserEntity* const selectedEntity : session->mSelection) {
         UserUnit* const selectedUnit = selectedEntity->IsUserUnit();
         const moho::IUnit* const factoryUnit = moho::GetIUnitBridge(selectedUnit);
-        if (selectedUnit != nullptr && factoryUnit != nullptr && !factoryUnit->IsDead()
-            && selectedEntity->IsInCategory(factoryCategory)) {
+        if (
+          selectedUnit != nullptr && factoryUnit != nullptr && !factoryUnit->IsDead() &&
+          selectedEntity->IsInCategory(factoryCategory)
+        ) {
           WeakSet<UserEntity> oneUnit;
           (void)oneUnit.Add(selectedEntity);
           for (int remaining = repeatCount; remaining > 0; --remaining) {
@@ -1317,7 +1355,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * Parses explicit user-unit list + command lexical with optional payload/clear
    * flag and issues the command to that explicit list.
    */
-  int cfunc_IssueUnitCommandL(LuaPlus::LuaState* const state)
+  int cfunc_IssueUnitCommandL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (state == nullptr || state->m_state == nullptr) {
       return 0;
@@ -1327,12 +1367,7 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
     const int argumentCount = lua_gettop(rawState);
     if (argumentCount < 1 || argumentCount > 4) {
       LuaPlus::LuaState::Error(
-        state,
-        "%s\n  expected between %d and %d args, but got %d",
-        kIssueUnitCommandHelpText,
-        1,
-        4,
-        argumentCount
+        state, "%s\n  expected between %d and %d args, but got %d", kIssueUnitCommandHelpText, 1, 4, argumentCount
       );
     }
 
@@ -1343,8 +1378,10 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
     }
 
     const int focusArmy = session->FocusArmy;
-    if (focusArmy < 0 || static_cast<std::size_t>(focusArmy) >= session->userArmies.size()
-        || session->userArmies[focusArmy] == nullptr) {
+    if (
+      focusArmy < 0 || static_cast<std::size_t>(focusArmy) >= session->userArmies.size() ||
+      session->userArmies[focusArmy] == nullptr
+    ) {
       return 0;
     }
 
@@ -1370,8 +1407,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
     }
 
     EUnitCommandType commandType = EUnitCommandType::UNITCOMMAND_None;
-    if (!TryParseUnitCommandTypeLexical(commandLexical, commandType)
-        || commandType == EUnitCommandType::UNITCOMMAND_None) {
+    if (
+      !TryParseUnitCommandTypeLexical(commandLexical, commandType) || commandType == EUnitCommandType::UNITCOMMAND_None
+    ) {
       return 0;
     }
 
@@ -1424,7 +1462,7 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
     return static_cast<UserUnit*>(upcast.mObj);
   }
 
-/**
+  /**
    * Address: Unmapped (FA-Binary-Patches addition)
    *
    * What it does:
@@ -1451,7 +1489,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
     return cfunc_IsTransportPreOrdersEnabledL(moho::SCR_ResolveBindingState(luaContext));
   }
 
-  int cfunc_DecreaseBuildCountInQueue(lua_State* const luaContext)
+  int cfunc_DecreaseBuildCountInQueue(
+    lua_State* const luaContext
+  )
   {
     return cfunc_DecreaseBuildCountInQueueL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1463,7 +1503,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_IncreaseBuildCountInQueueL`.
    */
-  int cfunc_IncreaseBuildCountInQueue(lua_State* const luaContext)
+  int cfunc_IncreaseBuildCountInQueue(
+    lua_State* const luaContext
+  )
   {
     return cfunc_IncreaseBuildCountInQueueL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1482,7 +1524,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * - restrictionCategory`, plus the same for every pending Upgrade command's
    * target blueprint (with the target's own blueprint-id category removed).
    */
-  int cfunc_GetUnitCommandDataL(LuaPlus::LuaState* const state)
+  int cfunc_GetUnitCommandDataL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kGetUnitCommandDataHelpText);
 
@@ -1534,7 +1578,6 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
           (void)EntityCategory::Sub(&buildable, &intersect, restrictionCat);
 
           (void)EntityCategory::Add(&perUnit, &buildable);
-
 
           fa::list<const RUnitBlueprint*> upgradeTargets;
           CollectUpgradeCommandTargetBlueprints(unit, upgradeTargets);
@@ -1622,7 +1665,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_GetUnitCommandDataL`.
    */
-  int cfunc_GetUnitCommandData(lua_State* const luaContext)
+  int cfunc_GetUnitCommandData(
+    lua_State* const luaContext
+  )
   {
     return cfunc_GetUnitCommandDataL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1648,7 +1693,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * found, or all had no capacity, it plays the corresponding "no staging platforms"
    * / "busy staging platforms" voice-over on one representative selected entity.
    */
-  int cfunc_IssueDockCommandL(LuaPlus::LuaState* const state)
+  int cfunc_IssueDockCommandL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kIssueDockCommandHelpText);
 
@@ -1756,8 +1803,7 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
         const std::int32_t storageSlots = blueprint->Transport.StorageSlots;
         std::int32_t freeCapacity = blueprint->Transport.DockingSlots;
         if (storageSlots != 0) {
-          const std::int32_t dockedCount =
-            static_cast<std::int32_t>(platform->mVariableData.mAuxValueVector.Size());
+          const std::int32_t dockedCount = static_cast<std::int32_t>(platform->mVariableData.mAuxValueVector.Size());
           freeCapacity = storageSlots - dockedCount;
         }
         if (freeCapacity <= 0) {
@@ -1781,9 +1827,11 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
     // into every body. The instantiation is catalogued on
     // legacy/algorithms/Sort.h; platforms at equal distance only come out in
     // the original's order through that algorithm, not the modern `std::sort`.
-    fa::sort(candidates.data(), candidates.data() + candidates.size(), [](const DockCandidate& a, const DockCandidate& b) {
+    fa::sort(
+      candidates.data(), candidates.data() + candidates.size(), [](const DockCandidate& a, const DockCandidate& b) {
       return a.distSq < b.distSq;
-    });
+    }
+    );
 
     if (!candidates.empty()) {
       const std::int32_t dockCapableSize = static_cast<std::int32_t>(dockTargets.Size());
@@ -1820,16 +1868,15 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
           nearbyPlatforms.data(),
           nearbyPlatforms.data() + nearbyPlatforms.size(),
           [](const DockCandidate& a, const DockCandidate& b) {
-            if (a.freeCapacity != b.freeCapacity) {
-              return a.freeCapacity > b.freeCapacity;
-            }
-            return a.distSq < b.distSq;
+          if (a.freeCapacity != b.freeCapacity) {
+            return a.freeCapacity > b.freeCapacity;
           }
+          return a.distSq < b.distSq;
+        }
         );
 
         // Per-platform quota scale = max(1, ceil(selectionSize / totalCapacity)).
-        const float capacityRatio =
-          static_cast<float>(dockCapableSize) / static_cast<float>(totalFreeCapacity);
+        const float capacityRatio = static_cast<float>(dockCapableSize) / static_cast<float>(totalFreeCapacity);
         const float quotaScale = (capacityRatio > 1.0f) ? capacityRatio : 1.0f;
 
         // Walk the dock-capable set, filling each platform up to its scaled quota.
@@ -1905,7 +1952,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * What it does:
    * Unwraps raw Lua callback context and forwards to `cfunc_IssueDockCommandL`.
    */
-  int cfunc_IssueDockCommand(lua_State* const luaContext)
+  int cfunc_IssueDockCommand(
+    lua_State* const luaContext
+  )
   {
     return cfunc_IssueDockCommandL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1916,7 +1965,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * What it does:
    * Unwraps raw Lua callback context and forwards to `cfunc_IssueCommandL`.
    */
-  int cfunc_IssueCommand(lua_State* const luaContext)
+  int cfunc_IssueCommand(
+    lua_State* const luaContext
+  )
   {
     return cfunc_IssueCommandL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1928,7 +1979,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_IssueUnitCommandL`.
    */
-  int cfunc_IssueUnitCommand(lua_State* const luaContext)
+  int cfunc_IssueUnitCommand(
+    lua_State* const luaContext
+  )
   {
     return cfunc_IssueUnitCommandL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1940,7 +1993,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_IssueBlueprintCommandL`.
    */
-  int cfunc_IssueBlueprintCommand(lua_State* const luaContext)
+  int cfunc_IssueBlueprintCommand(
+    lua_State* const luaContext
+  )
   {
     return cfunc_IssueBlueprintCommandL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -1958,7 +2013,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * in-world hovered unit. Holds a transient weak-link guard on the hovered unit
    * for the duration of the build.
    */
-  int cfunc_GetRolloverInfoL(LuaPlus::LuaState* const state)
+  int cfunc_GetRolloverInfoL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 0, kGetRolloverInfoHelpText);
 
@@ -2000,7 +2057,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
           BuildFocusUnitRolloverInfo(focusTable, targetUnit, state);
           result.SetObject("focus", focusTable);
         }
-      } else if (UserEntity* const focusEntity = session->LookupEntityId(hoveredData.mFocusUnit); focusEntity != nullptr) {
+      } else if (
+        UserEntity* const focusEntity = session->LookupEntityId(hoveredData.mFocusUnit); focusEntity != nullptr
+      ) {
         if (UserUnit* const focusUnit = focusEntity->IsUserUnit(); focusUnit != nullptr) {
           LuaPlus::LuaObject focusTable;
           BuildUserUnitRolloverInfo(focusTable, focusUnit, state);
@@ -2016,8 +2075,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
           BuildFocusPropRolloverInfo(propTable, focusEntity, state);
           result.SetObject("focusProp", propTable);
         }
-      } else if (UserEntity* const guardedEntity = session->LookupEntityId(hoveredData.mGuardedUnit);
-                 guardedEntity != nullptr) {
+      } else if (
+        UserEntity* const guardedEntity = session->LookupEntityId(hoveredData.mGuardedUnit); guardedEntity != nullptr
+      ) {
         if (UserUnit* const guardedUnit = guardedEntity->IsUserUnit(); guardedUnit != nullptr) {
           LuaPlus::LuaObject guardedTable;
           BuildUserUnitRolloverInfo(guardedTable, guardedUnit, state);
@@ -2036,7 +2096,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * What it does:
    * Unwraps raw Lua callback context and forwards to `cfunc_GetRolloverInfoL`.
    */
-  int cfunc_GetRolloverInfo(lua_State* const luaContext)
+  int cfunc_GetRolloverInfo(
+    lua_State* const luaContext
+  )
   {
     return cfunc_GetRolloverInfoL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2050,7 +2112,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * dispatches SelectUnitsByCategory (camera-target / engineer-exclusion are
    * always off from Lua). Emits a localized error when there is no active session.
    */
-  int cfunc_UISelectionByCategoryL(LuaPlus::LuaState* const state)
+  int cfunc_UISelectionByCategoryL(
+    LuaPlus::LuaState* const state
+  )
   {
     lua_State* const rawState = state->m_state;
     moho::SCR_ExpectExactArgs(state, 5, kUISelectionByCategoryHelpText);
@@ -2085,12 +2149,12 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
       session,
       camera,
       categoryExpr,
-      addToSelection,  // a4
-      inViewFrustum,   // a5
-      nearestToMouse,  // a6
-      mustBeIdle,      // a7
-      false,           // a8 doCameraTarget (no Lua arg)
-      false            // a9 excludeEngineerCommand (no Lua arg)
+      addToSelection, // a4
+      inViewFrustum,  // a5
+      nearestToMouse, // a6
+      mustBeIdle,     // a7
+      false,          // a8 doCameraTarget (no Lua arg)
+      false           // a9 excludeEngineerCommand (no Lua arg)
     );
     return 0;
   }
@@ -2102,7 +2166,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_UISelectionByCategoryL`.
    */
-  int cfunc_UISelectionByCategory(lua_State* const luaContext)
+  int cfunc_UISelectionByCategory(
+    lua_State* const luaContext
+  )
   {
     return cfunc_UISelectionByCategoryL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2113,7 +2179,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * What it does:
    * Unwraps raw Lua callback context and forwards to `cfunc_UISelectAndZoomToL`.
    */
-  int cfunc_UISelectAndZoomTo(lua_State* const luaContext)
+  int cfunc_UISelectAndZoomTo(
+    lua_State* const luaContext
+  )
   {
     return cfunc_UISelectAndZoomToL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2129,7 +2197,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * entity. Reports localized "No session" or the literal "No world camera
    * found." line via `CON_Printf` for the missing-prerequisite paths.
    */
-  int cfunc_UISelectAndZoomToL(LuaPlus::LuaState* const state)
+  int cfunc_UISelectAndZoomToL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (state == nullptr || state->m_state == nullptr) {
       return 0;
@@ -2139,9 +2209,7 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
     const int argumentCount = lua_gettop(rawState);
     if (argumentCount < 1 || argumentCount > 2) {
       LuaPlus::LuaState::Error(
-        state,
-        "%s\n  expected between %d and %d args, but got %d",
-        kUISelectAndZoomToHelpText, 1, 2, argumentCount
+        state, "%s\n  expected between %d and %d args, but got %d", kUISelectAndZoomToHelpText, 1, 2, argumentCount
       );
     }
 
@@ -2159,8 +2227,7 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
     }
 
     RCamManager* const cameraManager = CAM_GetManager();
-    CameraImpl* const camera =
-      (cameraManager != nullptr) ? cameraManager->GetCamera("WorldCamera") : nullptr;
+    CameraImpl* const camera = (cameraManager != nullptr) ? cameraManager->GetCamera("WorldCamera") : nullptr;
     if (camera == nullptr) {
       CON_Printf("UISelectAndZoomTo: No world camera found.");
       return 0;
@@ -2187,7 +2254,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * What it does:
    * Unwraps raw Lua callback context and forwards to `cfunc_UIZoomToL`.
    */
-  int cfunc_UIZoomTo(lua_State* const luaContext)
+  int cfunc_UIZoomTo(
+    lua_State* const luaContext
+  )
   {
     return cfunc_UIZoomToL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2211,7 +2280,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * localized "<LOC _No_session>" line when no session is active and
    * "UISelectAndZoomTo: No world camera found." when the world camera is missing.
    */
-  int cfunc_UIZoomToL(LuaPlus::LuaState* const state)
+  int cfunc_UIZoomToL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (state == nullptr || state->m_state == nullptr) {
       return 0;
@@ -2221,9 +2292,7 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
     const int argumentCount = lua_gettop(rawState);
     if (argumentCount < 1 || argumentCount > 2) {
       LuaPlus::LuaState::Error(
-        state,
-        "%s\n  expected between %d and %d args, but got %d",
-        kUIZoomToHelpText, 1, 2, argumentCount
+        state, "%s\n  expected between %d and %d args, but got %d", kUIZoomToHelpText, 1, 2, argumentCount
       );
     }
 
@@ -2310,7 +2379,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * innerRadius, innerThickness, outerRadius, outerThickness)` and applies it
    * to the active viewport range-render profile map.
    */
-  int cfunc_SetOverlayFilterL(LuaPlus::LuaState* const state)
+  int cfunc_SetOverlayFilterL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (state == nullptr || state->m_state == nullptr) {
       return 0;
@@ -2380,7 +2451,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * What it does:
    * Unwraps raw Lua callback context and forwards to `cfunc_SetOverlayFilterL`.
    */
-  int cfunc_SetOverlayFilter(lua_State* const luaContext)
+  int cfunc_SetOverlayFilter(
+    lua_State* const luaContext
+  )
   {
     return cfunc_SetOverlayFilterL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2392,7 +2465,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * Publishes the active world-session build-template payload as one Lua array
    * `{xSpan, zSpan, {bpId, buildOrder, x, z}...}`.
    */
-  int cfunc_GetActiveBuildTemplateL(LuaPlus::LuaState* const state)
+  int cfunc_GetActiveBuildTemplateL(
+    LuaPlus::LuaState* const state
+  )
   {
     CWldSession* const session = moho::WLD_GetActiveSession();
     if (session == nullptr) {
@@ -2440,7 +2515,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_GetActiveBuildTemplateL`.
    */
-  int cfunc_GetActiveBuildTemplate(lua_State* const luaContext)
+  int cfunc_GetActiveBuildTemplate(
+    lua_State* const luaContext
+  )
   {
     return cfunc_GetActiveBuildTemplateL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2455,7 +2532,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * least one valid entry was parsed). Malformed template/entry tables are reported
    * via gpg::Warnf and skipped.
    */
-  int cfunc_SetActiveBuildTemplateL(LuaPlus::LuaState* const state)
+  int cfunc_SetActiveBuildTemplateL(
+    LuaPlus::LuaState* const state
+  )
   {
     moho::SCR_ExpectExactArgs(state, 1, kSetActiveBuildTemplateHelpText);
 
@@ -2509,7 +2588,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_SetActiveBuildTemplateL`.
    */
-  int cfunc_SetActiveBuildTemplate(lua_State* const luaContext)
+  int cfunc_SetActiveBuildTemplate(
+    lua_State* const luaContext
+  )
   {
     return cfunc_SetActiveBuildTemplateL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2521,7 +2602,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * Validates a requested URL through wxURL, permits only configured protocol
    * names, and opens an allowed URL through the Windows shell.
    */
-  int cfunc_OpenURLL(LuaPlus::LuaState* const state)
+  int cfunc_OpenURLL(
+    LuaPlus::LuaState* const state
+  )
   {
     lua_State* const rawState = state->m_state;
     moho::SCR_ExpectExactArgs(state, 1, kOpenURLHelpText);
@@ -2543,7 +2626,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * What it does:
    * Unwraps raw Lua callback context and forwards to `cfunc_OpenURLL`.
    */
-  int cfunc_OpenURL(lua_State* const luaContext)
+  int cfunc_OpenURL(
+    lua_State* const luaContext
+  )
   {
     return cfunc_OpenURLL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2554,7 +2639,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * What it does:
    * Unwraps raw Lua callback context and forwards to `cfunc_SetCursorL`.
    */
-  int cfunc_SetCursor(lua_State* const luaContext)
+  int cfunc_SetCursor(
+    lua_State* const luaContext
+  )
   {
     return cfunc_SetCursorL(moho::SCR_ResolveBindingState(luaContext));
   }
@@ -2566,7 +2653,9 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * Decodes one optional cursor userdata (or nil) and updates the global UI
    * manager cursor binding.
    */
-  int cfunc_SetCursorL(LuaPlus::LuaState* const state)
+  int cfunc_SetCursorL(
+    LuaPlus::LuaState* const state
+  )
   {
     if (state == nullptr || state->m_state == nullptr) {
       return 0;
@@ -2588,7 +2677,6 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
   }
 
 } // namespace moho
-
 
 namespace
 {

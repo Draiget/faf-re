@@ -29,11 +29,17 @@ namespace moho
   struct SCreateBeamTransform
   {
     std::array<float, 4> mOrientation; // +0x00
-    Wm3::Vector3<float> mPosition; // +0x10
+    Wm3::Vector3<float> mPosition;     // +0x10
   };
 
-  static_assert(offsetof(SCreateBeamTransform, mOrientation) == 0x00, "SCreateBeamTransform::mOrientation offset must be 0x00");
-  static_assert(offsetof(SCreateBeamTransform, mPosition) == 0x10, "SCreateBeamTransform::mPosition offset must be 0x10");
+  static_assert(
+    offsetof(SCreateBeamTransform, mOrientation) == 0x00,
+    "SCreateBeamTransform::mOrientation offset must be 0x00"
+  );
+  static_assert(
+    offsetof(SCreateBeamTransform, mPosition) == 0x10,
+    "SCreateBeamTransform::mPosition offset must be 0x10"
+  );
   static_assert(sizeof(SCreateBeamTransform) == 0x1C, "SCreateBeamTransform size must be 0x1C");
 
   /**
@@ -56,20 +62,23 @@ namespace moho
      */
     SCreateBeamParams();
 
-    Entity* mAttachEntity;                 // +0x00
-    std::int32_t mAttachBoneIndex;         // +0x04
-    std::int32_t mAttachArmyIndex;         // +0x08
-    Wm3::Vector3<float> mStart;            // +0x0C
-    Wm3::Vector3<float> mEnd;              // +0x18
-    float mLifetime;                       // +0x24
-    float mWidth;                          // +0x28
-    float mTextureScale;                   // +0x2C
-    fa::string mTexture;                // +0x30
-    SCreateBeamTransform mSpawnTransform;  // +0x4C
-    std::int32_t mBlendMode;               // +0x68
+    Entity* mAttachEntity;                // +0x00
+    std::int32_t mAttachBoneIndex;        // +0x04
+    std::int32_t mAttachArmyIndex;        // +0x08
+    Wm3::Vector3<float> mStart;           // +0x0C
+    Wm3::Vector3<float> mEnd;             // +0x18
+    float mLifetime;                      // +0x24
+    float mWidth;                         // +0x28
+    float mTextureScale;                  // +0x2C
+    fa::string mTexture;                  // +0x30
+    SCreateBeamTransform mSpawnTransform; // +0x4C
+    std::int32_t mBlendMode;              // +0x68
   };
 
-  static_assert(offsetof(SCreateBeamParams, mAttachEntity) == 0x00, "SCreateBeamParams::mAttachEntity offset must be 0x00");
+  static_assert(
+    offsetof(SCreateBeamParams, mAttachEntity) == 0x00,
+    "SCreateBeamParams::mAttachEntity offset must be 0x00"
+  );
   static_assert(
     offsetof(SCreateBeamParams, mAttachBoneIndex) == 0x04,
     "SCreateBeamParams::mAttachBoneIndex offset must be 0x04"
@@ -135,8 +144,7 @@ namespace moho
     /**
      * Address: 0x0065E390 (FUN_0065E390, Moho::CEffectManagerImpl::CreateAttachedEmitter)
      */
-    virtual IEffect*
-    CreateAttachedEmitter(Entity* entity, int boneIndex, const char* blueprintName, int armyIndex) = 0;
+    virtual IEffect* CreateAttachedEmitter(Entity* entity, int boneIndex, const char* blueprintName, int armyIndex) = 0;
 
     /**
      * Address: 0x0065E520 (FUN_0065E520, Moho::CEffectManagerImpl::CreateEmitterAtBone)

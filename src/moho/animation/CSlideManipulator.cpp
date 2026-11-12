@@ -108,7 +108,9 @@ namespace
    * remaining distance, meaning the slide should start decelerating now.
    * Called once per `ManipulatorUpdate` step at 0x00647300.
    */
-  [[nodiscard]] bool ShouldDecelerateBeforeGoal(const moho::CSlideManipulator& manipulator)
+  [[nodiscard]] bool ShouldDecelerateBeforeGoal(
+    const moho::CSlideManipulator& manipulator
+  )
   {
     const Wm3::Vector3f delta{
       manipulator.mGoal.x - manipulator.mCurrentPosition.x,
@@ -197,7 +199,9 @@ namespace
    * What it does:
    * Upcasts one reflected reference lane to `moho::CSlideManipulator*`.
    */
-  [[maybe_unused]] [[nodiscard]] void* TryUpcastCSlideManipulatorRefObject(gpg::RRef* const sourceRef)
+  [[maybe_unused]] [[nodiscard]] void* TryUpcastCSlideManipulatorRefObject(
+    gpg::RRef* const sourceRef
+  )
   {
     if (!sourceRef) {
       return nullptr;
@@ -214,8 +218,10 @@ namespace
    * Converts one Lua object to `CSlideManipulator*` with type errors for invalid
    * game-object payloads and `nullptr` return for destroyed objects.
    */
-  [[nodiscard]] moho::CSlideManipulator*
-  GetCSlideManipulatorOptional(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+  [[nodiscard]] moho::CSlideManipulator* GetCSlideManipulatorOptional(
+    const LuaPlus::LuaObject& object,
+    LuaPlus::LuaState* const state
+  )
   {
     moho::CScriptObject** const scriptObjectSlot = moho::SCR_FromLua_CScriptObject(object);
     if (scriptObjectSlot == nullptr) {
@@ -247,7 +253,10 @@ namespace
    * units, and updates the task-event signaled lane when goal equals current
    * slide position.
    */
-  void SetSlideManipulatorGoal(moho::CSlideManipulator* const manipulator, const Wm3::Vector3f& goal)
+  void SetSlideManipulatorGoal(
+    moho::CSlideManipulator* const manipulator,
+    const Wm3::Vector3f& goal
+  )
   {
     manipulator->mGoal = goal;
 
@@ -284,7 +293,10 @@ namespace
 
     const float scaledSpeed = requestedSpeed * kSlideRateScale;
     manipulator->mSpeed = scaledSpeed;
-    if (manipulator->mWorldUnits == 0u && manipulator->mOwnerActor != nullptr && manipulator->mOwnerActor->mPose.get() != nullptr) {
+    if (
+      manipulator->mWorldUnits == 0u && manipulator->mOwnerActor != nullptr &&
+      manipulator->mOwnerActor->mPose.get() != nullptr
+    ) {
       manipulator->mSpeed = manipulator->mOwnerActor->mPose.get()->mScale * scaledSpeed;
     }
 
@@ -298,8 +310,10 @@ namespace
    * Fills one LuaObject with the cached `CSlideManipulator` metatable factory
    * result and returns the destination slot.
    */
-  [[nodiscard]] LuaPlus::LuaObject*
-  func_CreateCSlideManipulatorObject(LuaPlus::LuaObject* const object, LuaPlus::LuaState* const state)
+  [[nodiscard]] LuaPlus::LuaObject* func_CreateCSlideManipulatorObject(
+    LuaPlus::LuaObject* const object,
+    LuaPlus::LuaState* const state
+  )
   {
     *object = moho::CScrLuaMetatableFactory<moho::CSlideManipulator>::Instance().Get(state);
     return object;
@@ -319,7 +333,9 @@ namespace moho
  * Loads `IAniManipulator` base state, current/goal vectors, scalar motion
  * parameters, and the world-units flag.
  */
-void moho::CSlideManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
+void moho::CSlideManipulator::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -349,7 +365,9 @@ void moho::CSlideManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
  * Saves `IAniManipulator` base state, current/goal vectors, scalar motion
  * parameters, and the world-units flag.
  */
-void moho::CSlideManipulator::MemberSerialize(gpg::WriteArchive* const archive) const
+void moho::CSlideManipulator::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (!archive) {
     return;
@@ -357,7 +375,9 @@ void moho::CSlideManipulator::MemberSerialize(gpg::WriteArchive* const archive) 
 
   const gpg::RRef owner{};
   archive->Write(
-    gpg::RTypeOf<moho::IAniManipulator>(), const_cast<moho::IAniManipulator*>(static_cast<const moho::IAniManipulator*>(this)), owner
+    gpg::RTypeOf<moho::IAniManipulator>(),
+    const_cast<moho::IAniManipulator*>(static_cast<const moho::IAniManipulator*>(this)),
+    owner
   );
 
   gpg::RType* const vectorType = gpg::RTypeOf<Wm3::Vector3f>();
@@ -372,7 +392,7 @@ void moho::CSlideManipulator::MemberSerialize(gpg::WriteArchive* const archive) 
 }
 
 /**
-  * Alias of FUN_10015880 (non-canonical helper lane).
+ * Alias of FUN_10015880 (non-canonical helper lane).
  *
  * What it does:
  * Stores one metatable-factory index used by `CScrLuaObjectFactory::Get`.
@@ -388,12 +408,15 @@ moho::CScrLuaMetatableFactory<moho::CSlideManipulator>::Instance()
 }
 
 /**
- * Address: 0x00648420 (FUN_00648420, ?Create@?$CScrLuaMetatableFactory@VCSlideManipulator@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
+ * Address: 0x00648420 (FUN_00648420,
+ * ?Create@?$CScrLuaMetatableFactory@VCSlideManipulator@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
  *
  * What it does:
  * Creates the default metatable used by `CSlideManipulator` Lua userdata.
  */
-LuaPlus::LuaObject moho::CScrLuaMetatableFactory<moho::CSlideManipulator>::Create(LuaPlus::LuaState* const state)
+LuaPlus::LuaObject moho::CScrLuaMetatableFactory<moho::CSlideManipulator>::Create(
+  LuaPlus::LuaState* const state
+)
 {
   return SCR_CreateSimpleMetatable(state);
 }
@@ -424,7 +447,11 @@ moho::CSlideManipulator::CSlideManipulator()
  * Builds the slide manipulator, creates its Lua userdata, and arms the watched
  * bone/signaled state.
  */
-moho::CSlideManipulator::CSlideManipulator(moho::Sim* const sim, moho::CAniActor* const ownerActor, const int boneIndex)
+moho::CSlideManipulator::CSlideManipulator(
+  moho::Sim* const sim,
+  moho::CAniActor* const ownerActor,
+  const int boneIndex
+)
   : IAniManipulator(sim, ownerActor, 0)
 {
   mCurrentPosition = {};
@@ -483,11 +510,7 @@ bool moho::CSlideManipulator::ManipulatorUpdate()
     }
   }
 
-  Wm3::Vector3f delta{
-    mGoal.x - mCurrentPosition.x,
-    mGoal.y - mCurrentPosition.y,
-    mGoal.z - mCurrentPosition.z
-  };
+  Wm3::Vector3f delta{mGoal.x - mCurrentPosition.x, mGoal.y - mCurrentPosition.y, mGoal.z - mCurrentPosition.z};
 
   if (maxSpeed > 0.0f && VecLimitLengthTo(&delta, mCurrentSpeed)) {
     mCurrentPosition.x += delta.x;
@@ -526,7 +549,9 @@ bool moho::CSlideManipulator::ManipulatorUpdate()
  * What it does:
  * Stores clamped acceleration scalar as runtime rate (`max(0,value) * 0.1`).
  */
-moho::CSlideManipulator* moho::CSlideManipulator::SetAccelerationRateFromScript(const float value) noexcept
+moho::CSlideManipulator* moho::CSlideManipulator::SetAccelerationRateFromScript(
+  const float value
+) noexcept
 {
   const float clampedValue = value > 0.0f ? value : 0.0f;
   mAcceleration = clampedValue * kSlideRateScale;
@@ -539,7 +564,9 @@ moho::CSlideManipulator* moho::CSlideManipulator::SetAccelerationRateFromScript(
  * What it does:
  * Stores clamped deceleration scalar as runtime rate (`max(0,value) * 0.1`).
  */
-moho::CSlideManipulator* moho::CSlideManipulator::SetDecelerationRateFromScript(const float value) noexcept
+moho::CSlideManipulator* moho::CSlideManipulator::SetDecelerationRateFromScript(
+  const float value
+) noexcept
 {
   const float clampedValue = value > 0.0f ? value : 0.0f;
   mDeceleration = clampedValue * kSlideRateScale;
@@ -552,7 +579,9 @@ moho::CSlideManipulator* moho::CSlideManipulator::SetDecelerationRateFromScript(
  * What it does:
  * Sets world-units flag lane used by goal/move conversion logic.
  */
-void moho::CSlideManipulator::SetWorldUnits(const bool enabled) noexcept
+void moho::CSlideManipulator::SetWorldUnits(
+  const bool enabled
+) noexcept
 {
   mWorldUnits = enabled ? 1u : 0u;
 }
@@ -563,7 +592,9 @@ void moho::CSlideManipulator::SetWorldUnits(const bool enabled) noexcept
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_CreateSliderL`.
  */
-int moho::cfunc_CreateSlider(lua_State* const luaContext)
+int moho::cfunc_CreateSlider(
+  lua_State* const luaContext
+)
 {
   return cfunc_CreateSliderL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -575,18 +606,15 @@ int moho::cfunc_CreateSlider(lua_State* const luaContext)
  * Reads `(unit, bone, [goal_x, goal_y, goal_z, [speed, [world_space]]])`,
  * constructs one slide manipulator, and returns it to Lua.
  */
-int moho::cfunc_CreateSliderL(LuaPlus::LuaState* const state)
+int moho::cfunc_CreateSliderL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   const int argumentCount = lua_gettop(rawState);
   if (argumentCount < 2 || argumentCount > 7) {
     LuaPlus::LuaState::Error(
-      state,
-      "%s\n  expected between %d and %d args, but got %d",
-      kCreateSliderHelpText,
-      2,
-      7,
-      argumentCount
+      state, "%s\n  expected between %d and %d args, but got %d", kCreateSliderHelpText, 2, 7, argumentCount
     );
   }
 
@@ -600,7 +628,8 @@ int moho::cfunc_CreateSliderL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(boneArg.m_state, "A valid bone is required");
   }
 
-  moho::CSlideManipulator* const manipulator = new moho::CSlideManipulator(unit->SimulationRef, unit->AniActor, boneIndex);
+  moho::CSlideManipulator* const manipulator =
+    new moho::CSlideManipulator(unit->SimulationRef, unit->AniActor, boneIndex);
 
   if (argumentCount >= 7) {
     manipulator->SetWorldUnits(LuaPlus::LuaStackObject(state, 7).GetBoolean());
@@ -669,7 +698,9 @@ moho::CScrLuaInitForm* moho::func_CreateSlider_LuaFuncDef()
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CSlideManipulatorSetWorldUnitsL`.
  */
-int moho::cfunc_CSlideManipulatorSetWorldUnits(lua_State* const luaContext)
+int moho::cfunc_CSlideManipulatorSetWorldUnits(
+  lua_State* const luaContext
+)
 {
   return cfunc_CSlideManipulatorSetWorldUnitsL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -699,7 +730,9 @@ moho::CScrLuaInitForm* moho::func_CSlideManipulatorSetWorldUnits_LuaFuncDef()
  * What it does:
  * Resolves one `CSlideManipulator*` and updates world-unit mode from Lua arg #2.
  */
-int moho::cfunc_CSlideManipulatorSetWorldUnitsL(LuaPlus::LuaState* const state)
+int moho::cfunc_CSlideManipulatorSetWorldUnitsL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kSetWorldUnitsHelpText);
@@ -718,7 +751,9 @@ int moho::cfunc_CSlideManipulatorSetWorldUnitsL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_CSlideManipulatorSetSpeedL`.
  */
-int moho::cfunc_CSlideManipulatorSetSpeed(lua_State* const luaContext)
+int moho::cfunc_CSlideManipulatorSetSpeed(
+  lua_State* const luaContext
+)
 {
   return cfunc_CSlideManipulatorSetSpeedL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -748,7 +783,9 @@ moho::CScrLuaInitForm* moho::func_CSlideManipulatorSetSpeed_LuaFuncDef()
  * What it does:
  * Applies one speed scalar and optional pose-space scale conversion.
  */
-int moho::cfunc_CSlideManipulatorSetSpeedL(LuaPlus::LuaState* const state)
+int moho::cfunc_CSlideManipulatorSetSpeedL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kSetSpeedHelpText);
@@ -779,7 +816,9 @@ int moho::cfunc_CSlideManipulatorSetSpeedL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CSlideManipulatorSetAccelerationL`.
  */
-int moho::cfunc_CSlideManipulatorSetAcceleration(lua_State* const luaContext)
+int moho::cfunc_CSlideManipulatorSetAcceleration(
+  lua_State* const luaContext
+)
 {
   return cfunc_CSlideManipulatorSetAccelerationL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -809,7 +848,9 @@ moho::CScrLuaInitForm* moho::func_CSlideManipulatorSetAcceleration_LuaFuncDef()
  * What it does:
  * Stores clamped acceleration (`max(0,arg) * 0.1`) into the manipulator lane.
  */
-int moho::cfunc_CSlideManipulatorSetAccelerationL(LuaPlus::LuaState* const state)
+int moho::cfunc_CSlideManipulatorSetAccelerationL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kSetAccelerationHelpText);
@@ -836,7 +877,9 @@ int moho::cfunc_CSlideManipulatorSetAccelerationL(LuaPlus::LuaState* const state
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CSlideManipulatorSetDecelerationL`.
  */
-int moho::cfunc_CSlideManipulatorSetDeceleration(lua_State* const luaContext)
+int moho::cfunc_CSlideManipulatorSetDeceleration(
+  lua_State* const luaContext
+)
 {
   return cfunc_CSlideManipulatorSetDecelerationL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -866,7 +909,9 @@ moho::CScrLuaInitForm* moho::func_CSlideManipulatorSetDeceleration_LuaFuncDef()
  * What it does:
  * Stores clamped deceleration (`max(0,arg) * 0.1`) into the manipulator lane.
  */
-int moho::cfunc_CSlideManipulatorSetDecelerationL(LuaPlus::LuaState* const state)
+int moho::cfunc_CSlideManipulatorSetDecelerationL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 2, kSetDecelerationHelpText);
@@ -892,7 +937,9 @@ int moho::cfunc_CSlideManipulatorSetDecelerationL(LuaPlus::LuaState* const state
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_CSlideManipulatorSetGoalL`.
  */
-int moho::cfunc_CSlideManipulatorSetGoal(lua_State* const luaContext)
+int moho::cfunc_CSlideManipulatorSetGoal(
+  lua_State* const luaContext
+)
 {
   return cfunc_CSlideManipulatorSetGoalL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -923,7 +970,9 @@ moho::CScrLuaInitForm* moho::func_CSlideManipulatorSetGoal_LuaFuncDef()
  * Reads `(self, x, y, z)` and applies goal update semantics to the slide
  * manipulator runtime lane.
  */
-int moho::cfunc_CSlideManipulatorSetGoalL(LuaPlus::LuaState* const state)
+int moho::cfunc_CSlideManipulatorSetGoalL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 4, kSetGoalHelpText);
@@ -963,7 +1012,9 @@ int moho::cfunc_CSlideManipulatorSetGoalL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CSlideManipulatorBeenDestroyedL`.
  */
-int moho::cfunc_CSlideManipulatorBeenDestroyed(lua_State* const luaContext)
+int moho::cfunc_CSlideManipulatorBeenDestroyed(
+  lua_State* const luaContext
+)
 {
   return cfunc_CSlideManipulatorBeenDestroyedL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -993,7 +1044,9 @@ moho::CScrLuaInitForm* moho::func_CSlideManipulatorBeenDestroyed_LuaFuncDef()
  * What it does:
  * Returns whether the optional slide-manipulator object reference is null.
  */
-int moho::cfunc_CSlideManipulatorBeenDestroyedL(LuaPlus::LuaState* const state)
+int moho::cfunc_CSlideManipulatorBeenDestroyedL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kBeenDestroyedHelpText);
@@ -1033,7 +1086,9 @@ gpg::RRef moho::CSlideManipulatorTypeInfo::NewRef()
  * Constructs one detached `CSlideManipulator` in caller-owned storage and
  * returns its typed reflection reference.
  */
-gpg::RRef moho::CSlideManipulatorTypeInfo::CtrRef(void* const objectStorage)
+gpg::RRef moho::CSlideManipulatorTypeInfo::CtrRef(
+  void* const objectStorage
+)
 {
   CSlideManipulator* object = nullptr;
   if (objectStorage) {
@@ -1051,7 +1106,9 @@ gpg::RRef moho::CSlideManipulatorTypeInfo::CtrRef(void* const objectStorage)
  * What it does:
  * Deletes one heap-owned `CSlideManipulator`.
  */
-void moho::CSlideManipulatorTypeInfo::Delete(void* const objectStorage)
+void moho::CSlideManipulatorTypeInfo::Delete(
+  void* const objectStorage
+)
 {
   delete static_cast<CSlideManipulator*>(objectStorage);
 }
@@ -1062,7 +1119,9 @@ void moho::CSlideManipulatorTypeInfo::Delete(void* const objectStorage)
  * What it does:
  * Runs non-deleting in-place destructor logic for `CSlideManipulator`.
  */
-void moho::CSlideManipulatorTypeInfo::Destruct(void* const objectStorage)
+void moho::CSlideManipulatorTypeInfo::Destruct(
+  void* const objectStorage
+)
 {
   if (!objectStorage) {
     return;
@@ -1077,7 +1136,9 @@ void moho::CSlideManipulatorTypeInfo::Destruct(void* const objectStorage)
  * What it does:
  * Registers `IAniManipulator` as reflected base at offset `0`.
  */
-void moho::CSlideManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const typeInfo)
+void moho::CSlideManipulatorTypeInfo::AddBase_IAniManipulator(
+  gpg::RType* const typeInfo
+)
 {
   if (!typeInfo) {
     return;
@@ -1101,8 +1162,9 @@ void moho::CSlideManipulatorTypeInfo::AddBase_IAniManipulator(gpg::RType* const 
  * What it does:
  * Installs allocation and placement-construction callback lanes.
  */
-moho::CSlideManipulatorTypeInfo*
-moho::CSlideManipulatorTypeInfo::ConfigureCtorCallbacks(CSlideManipulatorTypeInfo* const typeInfo)
+moho::CSlideManipulatorTypeInfo* moho::CSlideManipulatorTypeInfo::ConfigureCtorCallbacks(
+  CSlideManipulatorTypeInfo* const typeInfo
+)
 {
   typeInfo->newRefFunc_ = &CSlideManipulatorTypeInfo::NewRef;
   typeInfo->ctorRefFunc_ = &CSlideManipulatorTypeInfo::CtrRef;
@@ -1115,8 +1177,9 @@ moho::CSlideManipulatorTypeInfo::ConfigureCtorCallbacks(CSlideManipulatorTypeInf
  * What it does:
  * Installs deletion and in-place destruction callback lanes.
  */
-moho::CSlideManipulatorTypeInfo*
-moho::CSlideManipulatorTypeInfo::ConfigureDtorCallbacks(CSlideManipulatorTypeInfo* const typeInfo)
+moho::CSlideManipulatorTypeInfo* moho::CSlideManipulatorTypeInfo::ConfigureDtorCallbacks(
+  CSlideManipulatorTypeInfo* const typeInfo
+)
 {
   typeInfo->deleteFunc_ = &CSlideManipulatorTypeInfo::Delete;
   typeInfo->dtrFunc_ = &CSlideManipulatorTypeInfo::Destruct;
@@ -1129,8 +1192,9 @@ moho::CSlideManipulatorTypeInfo::ConfigureDtorCallbacks(CSlideManipulatorTypeInf
  * What it does:
  * Installs all reflection lifecycle callbacks on one type-info instance.
  */
-moho::CSlideManipulatorTypeInfo*
-moho::CSlideManipulatorTypeInfo::ConfigureLifecycleCallbacks(CSlideManipulatorTypeInfo* const typeInfo)
+moho::CSlideManipulatorTypeInfo* moho::CSlideManipulatorTypeInfo::ConfigureLifecycleCallbacks(
+  CSlideManipulatorTypeInfo* const typeInfo
+)
 {
   ConfigureCtorCallbacks(typeInfo);
   ConfigureDtorCallbacks(typeInfo);
@@ -1173,18 +1237,26 @@ namespace gpg
    * Builds one typed reflection reference for `moho::CSlideManipulator*`,
    * preserving dynamic-derived ownership and base-offset adjustment.
    */
-  gpg::RRef* RRef_CSlideManipulator(gpg::RRef* const outRef, moho::CSlideManipulator* const value)
+  gpg::RRef* RRef_CSlideManipulator(
+    gpg::RRef* const outRef,
+    moho::CSlideManipulator* const value
+  )
   {
     return gpg::WriteDerivedRef(outRef, value, &CachedCSlideManipulatorType);
   }
 } // namespace gpg
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CSlideManipulatorTypeInfoStartup_aadc13, register_CSlideManipulatorTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_CSlideManipulatorTypeInfoStartup_aadc13,
+  register_CSlideManipulatorTypeInfoStartup
+)
 
-GPG_PREREGISTER_INIT(preregister_CSlideManipulatorTypeInfo_aadc13, preregister_CSlideManipulatorTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_CSlideManipulatorTypeInfo_aadc13,
+  preregister_CSlideManipulatorTypeInfo
+)
 
 namespace
 {

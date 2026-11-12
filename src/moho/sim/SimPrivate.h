@@ -171,7 +171,6 @@
 #include "remote/client/LockstepDriver.h"
 #endif
 
-
 using namespace moho;
 using EntId = std::int32_t;
 namespace moho
@@ -183,9 +182,9 @@ namespace
 {
   constexpr CommandSourceId kInvalidCommandSource = 0xFF;
 
-
-
-  [[nodiscard]] Sim* ResolveGlobalSim(lua_State* const luaContext) noexcept
+  [[nodiscard]] Sim* ResolveGlobalSim(
+    lua_State* const luaContext
+  ) noexcept
   {
     if (!luaContext || !luaContext->l_G) {
       return nullptr;
@@ -193,7 +192,9 @@ namespace
     return luaContext->l_G->globalUserData;
   }
 
-  [[nodiscard]] RRuleGameRulesImpl* ResolveRulesImpl(LuaPlus::LuaState* const state) noexcept
+  [[nodiscard]] RRuleGameRulesImpl* ResolveRulesImpl(
+    LuaPlus::LuaState* const state
+  ) noexcept
   {
     if (!state || !state->m_state) {
       return nullptr;
@@ -207,13 +208,19 @@ namespace
     return static_cast<RRuleGameRulesImpl*>(sim->mRules);
   }
 
-  [[nodiscard]] const BVIntSet& CategoryWordRangeAsBVIntSet(const EntityCategorySet& range) noexcept
+  [[nodiscard]] const BVIntSet& CategoryWordRangeAsBVIntSet(
+    const EntityCategorySet& range
+  ) noexcept
   {
     return range.mBits;
   }
 
   template <typename TInt>
-  [[nodiscard]] std::uint32_t PackOpaqueArmyColor(const TInt red, const TInt green, const TInt blue) noexcept
+  [[nodiscard]] std::uint32_t PackOpaqueArmyColor(
+    const TInt red,
+    const TInt green,
+    const TInt blue
+  ) noexcept
   {
     const std::int32_t redLane = (static_cast<std::int32_t>(red) | 0xFFFFFF00) << 16;
     const std::int32_t greenLane = (static_cast<std::int32_t>(green) & 0xFF) << 8;
@@ -224,7 +231,11 @@ namespace
   using ArmyListCursor = CArmyImpl* const*;
 
   template <typename TIterator>
-  [[nodiscard]] TIterator FindArmyByNameCursor(TIterator begin, const TIterator end, const std::string_view armyName)
+  [[nodiscard]] TIterator FindArmyByNameCursor(
+    TIterator begin,
+    const TIterator end,
+    const std::string_view armyName
+  )
   {
     return std::find_if(begin, end, [armyName](const CArmyImpl* const army) -> bool {
       return army != nullptr && army->mConstDat.mArmyName.view() == armyName;
@@ -238,8 +249,11 @@ namespace
    * Scans the army pointer range and returns the first entry whose `ArmyName`
    * matches `armyName` exactly, or `end` when no match exists.
    */
-  [[nodiscard]] ArmyListCursor
-  func_FindArmyWithName(ArmyListCursor begin, const ArmyListCursor end, const std::string_view armyName)
+  [[nodiscard]] ArmyListCursor func_FindArmyWithName(
+    ArmyListCursor begin,
+    const ArmyListCursor end,
+    const std::string_view armyName
+  )
   {
     return FindArmyByNameCursor(begin, end, armyName);
   }
@@ -251,23 +265,24 @@ namespace
    * Thin wrapper around `func_FindArmyWithName` used by army-Lua argument
    * decoding helpers.
    */
-  [[maybe_unused]] [[nodiscard]] ArmyListCursor
-  func_GetArmyWithName(ArmyListCursor begin, const ArmyListCursor end, const std::string_view armyName)
+  [[maybe_unused]] [[nodiscard]] ArmyListCursor func_GetArmyWithName(
+    ArmyListCursor begin,
+    const ArmyListCursor end,
+    const std::string_view armyName
+  )
   {
     return func_FindArmyWithName(begin, end, armyName);
   }
 
-
-
-
-
   static_assert(sizeof(CommandManager) == 0xCC0, "CommandManager size must be 0xCC0");
 
   static_assert(
-    offsetof(SimSubRes3, mValue) == offsetof(BVIntSet, mFirstWordIndex), "SimSubRes3/BVIntSet offset mismatch"
+    offsetof(SimSubRes3, mValue) == offsetof(BVIntSet, mFirstWordIndex),
+    "SimSubRes3/BVIntSet offset mismatch"
   );
   static_assert(
-    offsetof(SimSubRes3, mReserved04) == offsetof(BVIntSet, mReservedMetaWord), "SimSubRes3/BVIntSet offset mismatch"
+    offsetof(SimSubRes3, mReserved04) == offsetof(BVIntSet, mReservedMetaWord),
+    "SimSubRes3/BVIntSet offset mismatch"
   );
   static_assert(offsetof(SimSubRes3, mValues) == offsetof(BVIntSet, mWords), "SimSubRes3/BVIntSet offset mismatch");
   static_assert(sizeof(SimSubRes3) == sizeof(BVIntSet), "SimSubRes3/BVIntSet size mismatch");
@@ -280,7 +295,10 @@ namespace
    * consumer in the sim (IssueCommand, DestroyEntity, WarpEntity, AdvanceBeat,
    * ProcessInfoPair, ...) open-codes around that one map lookup.
    */
-  Entity* FindEntityById(EntityDB* entityDb, const EntId id)
+  Entity* FindEntityById(
+    EntityDB* entityDb,
+    const EntId id
+  )
   {
     if (!entityDb) {
       return nullptr;
@@ -295,9 +313,7 @@ namespace
   }
 
   static_assert(sizeof(EntitySetTemplate<Unit>) == 0x28, "EntitySetTemplate<Unit> size must be 0x28");
-  static_assert(
-    sizeof(TDatList<EntitySetBase, void>) == 0x08, "EntitySetTemplate<Unit> link-node size must be 0x08"
-  );
+  static_assert(sizeof(TDatList<EntitySetBase, void>) == 0x08, "EntitySetTemplate<Unit> link-node size must be 0x08");
 
   /**
    * The guarded shape of `CCommandDB::RemoveCmd` (0x006E0EC0, CCommandDb.cpp)
@@ -311,7 +327,10 @@ namespace
    * still the unresolved `0xFF......` sentinel, and one Sim.cpp path
    * deliberately passes a possibly-null `mCommandDB`.
    */
-  [[maybe_unused]] void ReleaseCommandIdIfUnconsumed(CCommandDB* commandDb, const CmdId cmdId)
+  [[maybe_unused]] void ReleaseCommandIdIfUnconsumed(
+    CCommandDB* commandDb,
+    const CmdId cmdId
+  )
   {
     if (!commandDb) {
       return;
@@ -324,12 +343,16 @@ namespace
     commandDb->RemoveCmd(cmdId);
   }
 
-  [[nodiscard]] Unit* GetTransportedBy(const Unit* const unit) noexcept
+  [[nodiscard]] Unit* GetTransportedBy(
+    const Unit* const unit
+  ) noexcept
   {
     return (unit != nullptr) ? unit->TransportedByRef.GetObjectPtr() : nullptr;
   }
 
-  [[nodiscard]] Unit* GetTransportFerryBeacon(Unit* const unit) noexcept
+  [[nodiscard]] Unit* GetTransportFerryBeacon(
+    Unit* const unit
+  ) noexcept
   {
     if (unit == nullptr || unit->CommandQueue == nullptr) {
       return nullptr;
@@ -343,49 +366,60 @@ namespace
     return currentCommand->mUnit.GetObjectPtr();
   }
 
-  [[nodiscard]] bool HasCommandCap(const Unit* const unit, const ERuleBPUnitCommandCaps commandCap) noexcept
+  [[nodiscard]] bool HasCommandCap(
+    const Unit* const unit,
+    const ERuleBPUnitCommandCaps commandCap
+  ) noexcept
   {
     return unit != nullptr && (unit->GetAttributes().commandCapsMask & static_cast<std::uint32_t>(commandCap)) != 0u;
   }
 
-  [[nodiscard]] bool IsValidTargetPosition(const Wm3::Vec3f& targetPosition) noexcept
+  [[nodiscard]] bool IsValidTargetPosition(
+    const Wm3::Vec3f& targetPosition
+  ) noexcept
   {
     return Wm3::Vector3fIsntNaN(&targetPosition);
   }
 
-  [[nodiscard]] bool IsDuplicateSuppressionCommand(const EUnitCommandType commandType) noexcept
+  [[nodiscard]] bool IsDuplicateSuppressionCommand(
+    const EUnitCommandType commandType
+  ) noexcept
   {
     switch (commandType) {
-      case EUnitCommandType::UNITCOMMAND_Move:
-      case EUnitCommandType::UNITCOMMAND_FormMove:
-      case EUnitCommandType::UNITCOMMAND_Attack:
-      case EUnitCommandType::UNITCOMMAND_FormAttack:
-      case EUnitCommandType::UNITCOMMAND_Patrol:
-      case EUnitCommandType::UNITCOMMAND_FormPatrol:
-      case EUnitCommandType::UNITCOMMAND_Reclaim:
-      case EUnitCommandType::UNITCOMMAND_Repair:
-      case EUnitCommandType::UNITCOMMAND_Capture:
-      case EUnitCommandType::UNITCOMMAND_TransportLoadUnits:
-      case EUnitCommandType::UNITCOMMAND_TransportReverseLoadUnits:
-      case EUnitCommandType::UNITCOMMAND_Upgrade:
-      case EUnitCommandType::UNITCOMMAND_Sacrifice:
-      case EUnitCommandType::UNITCOMMAND_AggressiveMove:
-      case EUnitCommandType::UNITCOMMAND_FormAggressiveMove:
-      case EUnitCommandType::UNITCOMMAND_Dock:
-        return true;
-      default:
-        break;
+    case EUnitCommandType::UNITCOMMAND_Move:
+    case EUnitCommandType::UNITCOMMAND_FormMove:
+    case EUnitCommandType::UNITCOMMAND_Attack:
+    case EUnitCommandType::UNITCOMMAND_FormAttack:
+    case EUnitCommandType::UNITCOMMAND_Patrol:
+    case EUnitCommandType::UNITCOMMAND_FormPatrol:
+    case EUnitCommandType::UNITCOMMAND_Reclaim:
+    case EUnitCommandType::UNITCOMMAND_Repair:
+    case EUnitCommandType::UNITCOMMAND_Capture:
+    case EUnitCommandType::UNITCOMMAND_TransportLoadUnits:
+    case EUnitCommandType::UNITCOMMAND_TransportReverseLoadUnits:
+    case EUnitCommandType::UNITCOMMAND_Upgrade:
+    case EUnitCommandType::UNITCOMMAND_Sacrifice:
+    case EUnitCommandType::UNITCOMMAND_AggressiveMove:
+    case EUnitCommandType::UNITCOMMAND_FormAggressiveMove:
+    case EUnitCommandType::UNITCOMMAND_Dock:
+      return true;
+    default:
+      break;
     }
 
     return false;
   }
 
-  [[nodiscard]] Unit* ResolveTargetUnit(Entity* const entity) noexcept
+  [[nodiscard]] Unit* ResolveTargetUnit(
+    Entity* const entity
+  ) noexcept
   {
     return entity != nullptr ? entity->IsUnit() : nullptr;
   }
 
-  [[nodiscard]] Unit* ResolveTargetUnitOrReconCreator(Entity* const entity) noexcept
+  [[nodiscard]] Unit* ResolveTargetUnitOrReconCreator(
+    Entity* const entity
+  ) noexcept
   {
     if (entity == nullptr) {
       return nullptr;
@@ -433,14 +467,20 @@ namespace
     return categorySet != nullptr && EntityCategory::HasBlueprint(blueprint, categorySet);
   }
 
-  [[nodiscard]] bool EqualsNoCase(const char* const lhs, const char* const rhs) noexcept
+  [[nodiscard]] bool EqualsNoCase(
+    const char* const lhs,
+    const char* const rhs
+  ) noexcept
   {
     const char* const safeLhs = lhs != nullptr ? lhs : "";
     const char* const safeRhs = rhs != nullptr ? rhs : "";
     return _stricmp(safeLhs, safeRhs) == 0;
   }
 
-  [[nodiscard]] bool IsOutsideArmyNoRushRadius(const CArmyImpl* const army, const CAiTarget& target) noexcept
+  [[nodiscard]] bool IsOutsideArmyNoRushRadius(
+    const CArmyImpl* const army,
+    const CAiTarget& target
+  ) noexcept
   {
     if (army == nullptr || army->mVarDat.mNoRushTimer <= 0 || target.targetType == EAiTargetType::AITARGET_None) {
       return false;
@@ -497,23 +537,25 @@ namespace
 
     if (queue != nullptr && IsDuplicateSuppressionCommand(commandIssueData.mCommandType)) {
       CUnitCommand* const currentCommand = queue->GetCurrentCommand();
-      if (clearQueue && currentCommand != nullptr && currentCommand->mVarDat.mCmdType == commandIssueData.mCommandType
-          && queue->GetNextCommand() == nullptr) {
+      if (
+        clearQueue && currentCommand != nullptr && currentCommand->mVarDat.mCmdType == commandIssueData.mCommandType &&
+        queue->GetNextCommand() == nullptr
+      ) {
         bool sameTarget = false;
         switch (commandIssueData.mTarget.mType) {
-          case EAiTargetType::AITARGET_Entity:
-            sameTarget = commandIssueData.mTarget.mEntityId == currentCommand->mVarDat.mTarget1.mEntityId;
-            break;
-          case EAiTargetType::AITARGET_Ground: {
-            const Wm3::Vec3f& currentTargetPos = currentCommand->mVarDat.mTarget1.mPos;
-            const float dx = commandIssueData.mTarget.mPos.x - currentTargetPos.x;
-            const float dy = commandIssueData.mTarget.mPos.y - currentTargetPos.y;
-            const float dz = commandIssueData.mTarget.mPos.z - currentTargetPos.z;
-            sameTarget = std::sqrt((dx * dx) + (dy * dy) + (dz * dz)) < 0.001f;
-            break;
-          }
-          default:
-            break;
+        case EAiTargetType::AITARGET_Entity:
+          sameTarget = commandIssueData.mTarget.mEntityId == currentCommand->mVarDat.mTarget1.mEntityId;
+          break;
+        case EAiTargetType::AITARGET_Ground: {
+          const Wm3::Vec3f& currentTargetPos = currentCommand->mVarDat.mTarget1.mPos;
+          const float dx = commandIssueData.mTarget.mPos.x - currentTargetPos.x;
+          const float dy = commandIssueData.mTarget.mPos.y - currentTargetPos.y;
+          const float dz = commandIssueData.mTarget.mPos.z - currentTargetPos.z;
+          sameTarget = std::sqrt((dx * dx) + (dy * dy) + (dz * dz)) < 0.001f;
+          break;
+        }
+        default:
+          break;
         }
 
         // 0x006EFE2A..0x006EFE3E: `EntitySetTemplate<Unit>::Same` (0x006EEC40)
@@ -526,10 +568,14 @@ namespace
     }
 
     if (commandIssueData.mTarget.mType != EAiTargetType::AITARGET_None) {
-      const Wm3::Vec3f targetPosition = targetEntity != nullptr ? targetEntity->mVarDat.mCurTransform.pos_ : commandIssueData.mTarget.mPos;
+      const Wm3::Vec3f targetPosition =
+        targetEntity != nullptr ? targetEntity->mVarDat.mCurTransform.pos_ : commandIssueData.mTarget.mPos;
       CArmyImpl* const army = unit->ArmyRef;
 
-      if (sim->mMapData != nullptr && army != nullptr && !sim->mMapData->IsWithin(targetPosition, 0.0f, army->UseWholeMap())) {
+      if (
+        sim->mMapData != nullptr && army != nullptr &&
+        !sim->mMapData->IsWithin(targetPosition, 0.0f, army->UseWholeMap())
+      ) {
         return false;
       }
 
@@ -541,311 +587,341 @@ namespace
       }
     }
 
-    if (unit->IsUnitState(UNITSTATE_Enhancing) && clearQueue
-        && commandIssueData.mCommandType != EUnitCommandType::UNITCOMMAND_Stop) {
+    if (
+      unit->IsUnitState(UNITSTATE_Enhancing) && clearQueue &&
+      commandIssueData.mCommandType != EUnitCommandType::UNITCOMMAND_Stop
+    ) {
       return false;
     }
 
     switch (commandIssueData.mCommandType) {
-      case EUnitCommandType::UNITCOMMAND_Move:
-      case EUnitCommandType::UNITCOMMAND_FormMove:
-      case EUnitCommandType::UNITCOMMAND_Patrol:
-      case EUnitCommandType::UNITCOMMAND_FormPatrol:
-      case EUnitCommandType::UNITCOMMAND_AggressiveMove:
-      case EUnitCommandType::UNITCOMMAND_FormAggressiveMove: {
-        // 0x006EFED4..0x006EFF87: a carried unit may only take a move order
-        // when it is a POD or its carrier is a CARRIER; anything riding in an
-        // ordinary transport is refused (replay 26898759 beat 1890).
-        Unit* const transportedBy = GetTransportedBy(unit);
-        const bool invalidTransportState =
-          transportedBy != nullptr && !unit->IsInCategory("POD") && !transportedBy->IsInCategory("CARRIER");
-        if (invalidTransportState || !unit->IsMobile() || !IsValidTargetPosition(commandIssueData.mTarget.mPos)
-            || commandIssueData.mTarget.mType == EAiTargetType::AITARGET_None) {
-          return false;
-        }
-        return true;
-      }
-      case EUnitCommandType::UNITCOMMAND_Dive: {
-        const RUnitBlueprint* const blueprint = unit->GetBlueprint();
-        return blueprint != nullptr && blueprint->Physics.MotionType == RULEUMT_SurfacingSub;
-      }
-      case EUnitCommandType::UNITCOMMAND_BuildFactory:
-      case EUnitCommandType::UNITCOMMAND_BuildMobile:
-        return unit->IsInCategory("FACTORY") || unit->IsInCategory("ENGINEER") || unit->IsInCategory("NEEDMOBILEBUILD")
-          || unit->IsInCategory("POD");
-      case EUnitCommandType::UNITCOMMAND_Attack:
-      case EUnitCommandType::UNITCOMMAND_FormAttack:
-        if (!unit->IsMobile() && unit->AiAttacker == nullptr) {
-          return false;
-        }
-        // 0x006F003E..0x006F0067: the attacker's army is asked (IArmy::IsAlly,
-        // 0x005BD630, on `unit->ArmyRef + 8`) whether the target's army index
-        // is in its ally set -- not the target army about the attacker.
-        if (targetEntity != nullptr && targetEntity->ArmyRef != nullptr && unit->ArmyRef != nullptr) {
-          const std::uint32_t targetArmyIndex = static_cast<std::uint32_t>(targetEntity->ArmyRef->mConstDat.mArmyIndex);
-          if (targetArmyIndex != 0xFFFFFFFFu && unit->ArmyRef->mVarDat.mAllies.Contains(targetArmyIndex)) {
-            return false;
-          }
-        }
-        return true;
-      case EUnitCommandType::UNITCOMMAND_Teleport:
-        return HasCommandCap(unit, RULEUCC_Teleport);
-      case EUnitCommandType::UNITCOMMAND_Guard: {
-        // 0x006F08A7..0x006F097C: as for Move, a carried unit is refused unless
-        // its carrier is a CARRIER (tested first) or it is itself a POD.
-        Unit* const transportedBy = GetTransportedBy(unit);
-        if ((transportedBy != nullptr && !transportedBy->IsInCategory("CARRIER") && !unit->IsInCategory("POD"))
-            || !HasCommandCap(unit, RULEUCC_Guard)) {
-          return false;
-        }
-
-        Unit* const targetUnit = ResolveTargetUnit(targetEntity);
-        if (targetUnit == nullptr) {
-          return unit->IsMobile();
-        }
-
-        if (unit == targetUnit) {
-          return false;
-        }
-
-        if (!targetUnit->IsMobile() && !unit->IsMobile() && targetUnit->IsInCategory("FACTORY") && unit->IsInCategory("FACTORY")
-            && !CategoryCachesIntersect(unit->GetBlueprint(), targetUnit->GetBlueprint())) {
-          return false;
-        }
-
-        if (targetUnit->IsInCategory("FERRYBEACON") && GetTransportFerryBeacon(unit) == targetUnit) {
-          return false;
-        }
-
-        const bool unitIsFactory = HasBlueprintInCategory(sim, unit->GetBlueprint(), "FACTORY");
-        const bool targetIsFactory = HasBlueprintInCategory(sim, targetUnit->GetBlueprint(), "FACTORY");
-        if (unitIsFactory && !targetIsFactory) {
-          return false;
-        }
-
-        return targetUnit->GetGuardedUnit() != unit;
-      }
-      case EUnitCommandType::UNITCOMMAND_Ferry:
-        return GetTransportedBy(unit) == nullptr && unit->IsInCategory("TRANSPORTATION") && unit->AiTransport != nullptr;
-      case EUnitCommandType::UNITCOMMAND_Reclaim: {
-        // 0x006F059C..0x006F060F: a carried unit is refused unless it is a POD.
-        if ((GetTransportedBy(unit) != nullptr && !unit->IsInCategory("POD")) || !unit->IsInCategory("RECLAIM")) {
-          return false;
-        }
-
-        if (targetEntity != nullptr && !targetEntity->IsBeingBuilt()) {
-          if (targetEntity->BluePrint == nullptr || !targetEntity->IsInCategory("RECLAIMABLE")
-              || targetEntity->mVarDat.mLayerMask == LAYER_Air) {
-            return false;
-          }
-
-          Unit* const sourceUnit = ResolveTargetUnitOrReconCreator(targetEntity);
-          if (sourceUnit != nullptr && !sourceUnit->GetAttributes().mReclaimable) {
-            return false;
-          }
-        }
-
-        return true;
-      }
-      case EUnitCommandType::UNITCOMMAND_Capture: {
-        // 0x006F043C..0x006F04A7: a carried unit is refused unless it is a POD.
-        if ((GetTransportedBy(unit) != nullptr && !unit->IsInCategory("POD")) || !unit->IsInCategory("CAPTURE")) {
-          return false;
-        }
-
-        if (targetEntity != nullptr) {
-          Unit* const targetUnit = ResolveTargetUnitOrReconCreator(targetEntity);
-          if (targetUnit == nullptr || !targetUnit->GetAttributes().mCapturable) {
-            return false;
-          }
-
-          // 0x006F053F..0x006F0561: the target's army is asked about the
-          // capturer's (`GetAllianceWith(this = target army + 8, unit army + 8
-          // or null)` == Ally); a null capturer army reads as Neutral.
-          if ((targetUnit->ArmyRef != nullptr && targetUnit->ArmyRef->GetAllianceWith(unit->ArmyRef) == ALLIANCE_Ally)
-              || targetUnit->IsDead() || targetUnit->IsBeingBuilt()) {
-            return false;
-          }
-        }
-
-        return true;
-      }
-      case EUnitCommandType::UNITCOMMAND_Repair:
-      case EUnitCommandType::UNITCOMMAND_Sacrifice: {
-        if (commandIssueData.mCommandType == EUnitCommandType::UNITCOMMAND_Sacrifice
-            && !HasCommandCap(unit, RULEUCC_Sacrifice)) {
-          return false;
-        }
-
-        if (targetEntity == nullptr) {
-          return false;
-        }
-
-        // 0x006F0766..0x006F07D5: a carried unit is refused unless it is a POD.
-        if ((GetTransportedBy(unit) != nullptr && !unit->IsInCategory("POD")) || !unit->IsInCategory("REPAIR")) {
-          return false;
-        }
-
-        if (unit->ArmyRef != nullptr && targetEntity->ArmyRef != nullptr
-            && unit->ArmyRef->GetAllianceWith(targetEntity->ArmyRef) == ALLIANCE_Enemy) {
-          return false;
-        }
-
-        if (Unit* const targetUnit = ResolveTargetUnit(targetEntity); targetUnit != nullptr && targetUnit == unit) {
-          return false;
-        }
-
-        return HasBlueprintInCategory(sim, unit->GetBlueprint(), "REPAIR");
-      }
-      case EUnitCommandType::UNITCOMMAND_TransportLoadUnits:
-      case EUnitCommandType::UNITCOMMAND_Dock: {
-        if (GetTransportedBy(unit) != nullptr || unit->IsInCategory("PODS")) {
-          return false;
-        }
-
-        Unit* const targetUnit = ResolveTargetUnit(targetEntity);
-        if (targetUnit == nullptr) {
-          return true;
-        }
-
-        if ((targetUnit != unit && !HasCommandCap(unit, RULEUCC_CallTransport)) || targetUnit->mVarDat.mLayerMask == LAYER_Seabed) {
-          return false;
-        }
-
-        const bool usesSpecialFerryFactoryLane =
-          targetUnit->IsInCategory("FERRYBEACON")
-          || (targetUnit->IsInCategory("FACTORY") && !targetUnit->IsInCategory("AIRSTAGINGPLATFORM")
-              && !targetUnit->IsInCategory("TELEPORTATION"));
-        if (!usesSpecialFerryFactoryLane) {
-          IAiTransport* const targetTransport = targetUnit->AiTransport;
-          if (targetUnit->IsDead() || targetUnit->IsBeingBuilt() || targetTransport == nullptr) {
-            return false;
-          }
-
-          if (targetUnit == unit || targetTransport->TransportCanCarryUnit(unit)) {
-            return true;
-          }
-
-          (void)targetUnit->RunScript("OnTransportReject");
-          return false;
-        }
-
-        if (targetUnit->IsInCategory("FERRYBEACON") && GetTransportFerryBeacon(unit) == targetUnit) {
-          return false;
-        }
-
-        if (unit->IsMobile() && !HasBlueprintInCategory(sim, unit->GetBlueprint(), "TRANSPORTATION")) {
-          return true;
-        }
-
+    case EUnitCommandType::UNITCOMMAND_Move:
+    case EUnitCommandType::UNITCOMMAND_FormMove:
+    case EUnitCommandType::UNITCOMMAND_Patrol:
+    case EUnitCommandType::UNITCOMMAND_FormPatrol:
+    case EUnitCommandType::UNITCOMMAND_AggressiveMove:
+    case EUnitCommandType::UNITCOMMAND_FormAggressiveMove: {
+      // 0x006EFED4..0x006EFF87: a carried unit may only take a move order
+      // when it is a POD or its carrier is a CARRIER; anything riding in an
+      // ordinary transport is refused (replay 26898759 beat 1890).
+      Unit* const transportedBy = GetTransportedBy(unit);
+      const bool invalidTransportState =
+        transportedBy != nullptr && !unit->IsInCategory("POD") && !transportedBy->IsInCategory("CARRIER");
+      if (
+        invalidTransportState || !unit->IsMobile() || !IsValidTargetPosition(commandIssueData.mTarget.mPos) ||
+        commandIssueData.mTarget.mType == EAiTargetType::AITARGET_None
+      ) {
         return false;
       }
-      case EUnitCommandType::UNITCOMMAND_TransportReverseLoadUnits: {
-        if ((!unit->IsMobile() && !unit->IsInCategory("AIRSTAGINGPLATFORM")) || GetTransportedBy(unit) != nullptr
-            || unit->IsInCategory("PODS")) {
+      return true;
+    }
+    case EUnitCommandType::UNITCOMMAND_Dive: {
+      const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+      return blueprint != nullptr && blueprint->Physics.MotionType == RULEUMT_SurfacingSub;
+    }
+    case EUnitCommandType::UNITCOMMAND_BuildFactory:
+    case EUnitCommandType::UNITCOMMAND_BuildMobile:
+      return unit->IsInCategory("FACTORY") || unit->IsInCategory("ENGINEER") || unit->IsInCategory("NEEDMOBILEBUILD") ||
+        unit->IsInCategory("POD");
+    case EUnitCommandType::UNITCOMMAND_Attack:
+    case EUnitCommandType::UNITCOMMAND_FormAttack:
+      if (!unit->IsMobile() && unit->AiAttacker == nullptr) {
+        return false;
+      }
+      // 0x006F003E..0x006F0067: the attacker's army is asked (IArmy::IsAlly,
+      // 0x005BD630, on `unit->ArmyRef + 8`) whether the target's army index
+      // is in its ally set -- not the target army about the attacker.
+      if (targetEntity != nullptr && targetEntity->ArmyRef != nullptr && unit->ArmyRef != nullptr) {
+        const std::uint32_t targetArmyIndex = static_cast<std::uint32_t>(targetEntity->ArmyRef->mConstDat.mArmyIndex);
+        if (targetArmyIndex != 0xFFFFFFFFu && unit->ArmyRef->mVarDat.mAllies.Contains(targetArmyIndex)) {
+          return false;
+        }
+      }
+      return true;
+    case EUnitCommandType::UNITCOMMAND_Teleport:
+      return HasCommandCap(unit, RULEUCC_Teleport);
+    case EUnitCommandType::UNITCOMMAND_Guard: {
+      // 0x006F08A7..0x006F097C: as for Move, a carried unit is refused unless
+      // its carrier is a CARRIER (tested first) or it is itself a POD.
+      Unit* const transportedBy = GetTransportedBy(unit);
+      if (
+        (transportedBy != nullptr && !transportedBy->IsInCategory("CARRIER") && !unit->IsInCategory("POD")) ||
+        !HasCommandCap(unit, RULEUCC_Guard)
+      ) {
+        return false;
+      }
+
+      Unit* const targetUnit = ResolveTargetUnit(targetEntity);
+      if (targetUnit == nullptr) {
+        return unit->IsMobile();
+      }
+
+      if (unit == targetUnit) {
+        return false;
+      }
+
+      if (
+        !targetUnit->IsMobile() && !unit->IsMobile() && targetUnit->IsInCategory("FACTORY") &&
+        unit->IsInCategory("FACTORY") && !CategoryCachesIntersect(unit->GetBlueprint(), targetUnit->GetBlueprint())
+      ) {
+        return false;
+      }
+
+      if (targetUnit->IsInCategory("FERRYBEACON") && GetTransportFerryBeacon(unit) == targetUnit) {
+        return false;
+      }
+
+      const bool unitIsFactory = HasBlueprintInCategory(sim, unit->GetBlueprint(), "FACTORY");
+      const bool targetIsFactory = HasBlueprintInCategory(sim, targetUnit->GetBlueprint(), "FACTORY");
+      if (unitIsFactory && !targetIsFactory) {
+        return false;
+      }
+
+      return targetUnit->GetGuardedUnit() != unit;
+    }
+    case EUnitCommandType::UNITCOMMAND_Ferry:
+      return GetTransportedBy(unit) == nullptr && unit->IsInCategory("TRANSPORTATION") && unit->AiTransport != nullptr;
+    case EUnitCommandType::UNITCOMMAND_Reclaim: {
+      // 0x006F059C..0x006F060F: a carried unit is refused unless it is a POD.
+      if ((GetTransportedBy(unit) != nullptr && !unit->IsInCategory("POD")) || !unit->IsInCategory("RECLAIM")) {
+        return false;
+      }
+
+      if (targetEntity != nullptr && !targetEntity->IsBeingBuilt()) {
+        if (
+          targetEntity->BluePrint == nullptr || !targetEntity->IsInCategory("RECLAIMABLE") ||
+          targetEntity->mVarDat.mLayerMask == LAYER_Air
+        ) {
           return false;
         }
 
-        if (selectedUnits.Empty()) {
+        Unit* const sourceUnit = ResolveTargetUnitOrReconCreator(targetEntity);
+        if (sourceUnit != nullptr && !sourceUnit->GetAttributes().mReclaimable) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+    case EUnitCommandType::UNITCOMMAND_Capture: {
+      // 0x006F043C..0x006F04A7: a carried unit is refused unless it is a POD.
+      if ((GetTransportedBy(unit) != nullptr && !unit->IsInCategory("POD")) || !unit->IsInCategory("CAPTURE")) {
+        return false;
+      }
+
+      if (targetEntity != nullptr) {
+        Unit* const targetUnit = ResolveTargetUnitOrReconCreator(targetEntity);
+        if (targetUnit == nullptr || !targetUnit->GetAttributes().mCapturable) {
           return false;
         }
 
-        Unit* candidateTransport = nullptr;
-        for (Entity* const* it = selectedUnits.mVec.begin(); it != selectedUnits.mVec.end(); ++it) {
-          Unit* const candidate = static_cast<Unit*>(*it);
-          if (candidate == nullptr || candidate->IsDead() || candidate->IsBeingBuilt() || candidate->AiTransport == nullptr) {
-            continue;
-          }
+        // 0x006F053F..0x006F0561: the target's army is asked about the
+        // capturer's (`GetAllianceWith(this = target army + 8, unit army + 8
+        // or null)` == Ally); a null capturer army reads as Neutral.
+        if (
+          (targetUnit->ArmyRef != nullptr && targetUnit->ArmyRef->GetAllianceWith(unit->ArmyRef) == ALLIANCE_Ally) ||
+          targetUnit->IsDead() || targetUnit->IsBeingBuilt()
+        ) {
+          return false;
+        }
+      }
 
-          candidateTransport = candidate;
-          Unit* const targetUnit = ResolveTargetUnit(targetEntity);
-          if (targetUnit == nullptr) {
-            if (candidateTransport != unit) {
-              (void)candidateTransport->RunScript("OnTransportReject");
-            }
-            return false;
-          }
+      return true;
+    }
+    case EUnitCommandType::UNITCOMMAND_Repair:
+    case EUnitCommandType::UNITCOMMAND_Sacrifice: {
+      if (
+        commandIssueData.mCommandType == EUnitCommandType::UNITCOMMAND_Sacrifice &&
+        !HasCommandCap(unit, RULEUCC_Sacrifice)
+      ) {
+        return false;
+      }
 
-          if (!candidate->AiTransport->TransportCanCarryUnit(targetUnit)) {
-            continue;
-          }
+      if (targetEntity == nullptr) {
+        return false;
+      }
 
-          if (candidate->mVarDat.mLayerMask == LAYER_Seabed) {
-            return false;
-          }
+      // 0x006F0766..0x006F07D5: a carried unit is refused unless it is a POD.
+      if ((GetTransportedBy(unit) != nullptr && !unit->IsInCategory("POD")) || !unit->IsInCategory("REPAIR")) {
+        return false;
+      }
 
+      if (
+        unit->ArmyRef != nullptr && targetEntity->ArmyRef != nullptr &&
+        unit->ArmyRef->GetAllianceWith(targetEntity->ArmyRef) == ALLIANCE_Enemy
+      ) {
+        return false;
+      }
+
+      if (Unit* const targetUnit = ResolveTargetUnit(targetEntity); targetUnit != nullptr && targetUnit == unit) {
+        return false;
+      }
+
+      return HasBlueprintInCategory(sim, unit->GetBlueprint(), "REPAIR");
+    }
+    case EUnitCommandType::UNITCOMMAND_TransportLoadUnits:
+    case EUnitCommandType::UNITCOMMAND_Dock: {
+      if (GetTransportedBy(unit) != nullptr || unit->IsInCategory("PODS")) {
+        return false;
+      }
+
+      Unit* const targetUnit = ResolveTargetUnit(targetEntity);
+      if (targetUnit == nullptr) {
+        return true;
+      }
+
+      if (
+        (targetUnit != unit && !HasCommandCap(unit, RULEUCC_CallTransport)) ||
+        targetUnit->mVarDat.mLayerMask == LAYER_Seabed
+      ) {
+        return false;
+      }
+
+      const bool usesSpecialFerryFactoryLane = targetUnit->IsInCategory("FERRYBEACON") ||
+        (targetUnit->IsInCategory("FACTORY") && !targetUnit->IsInCategory("AIRSTAGINGPLATFORM") &&
+         !targetUnit->IsInCategory("TELEPORTATION"));
+      if (!usesSpecialFerryFactoryLane) {
+        IAiTransport* const targetTransport = targetUnit->AiTransport;
+        if (targetUnit->IsDead() || targetUnit->IsBeingBuilt() || targetTransport == nullptr) {
+          return false;
+        }
+
+        if (targetUnit == unit || targetTransport->TransportCanCarryUnit(unit)) {
           return true;
         }
 
-        if (candidateTransport != nullptr && candidateTransport != unit) {
-          (void)candidateTransport->RunScript("OnTransportReject");
-        }
+        (void)targetUnit->RunScript("OnTransportReject");
         return false;
       }
-      case EUnitCommandType::UNITCOMMAND_TransportUnloadUnits:
-      case EUnitCommandType::UNITCOMMAND_TransportUnloadSpecificUnits:
-        return unit->mVarDat.mLayerMask != LAYER_Seabed && (unit->AiTransport != nullptr || GetTransportedBy(unit) != nullptr);
-      case EUnitCommandType::UNITCOMMAND_Upgrade: {
-        // Engine addition: a checked downcast. `mBlueprint` holds whatever
-        // `CDecoder::DecodeCommandData` resolved through `GetEntityBlueprint`,
-        // which also finds prop and projectile blueprints; the tests below read
-        // `General`, i.e. past the end of such a blueprint. A non-unit blueprint
-        // is no upgrade target, the same answer as no blueprint at all.
-        const RUnitBlueprint* const upgradeBlueprint =
-          dynamic_cast<const RUnitBlueprint*>(static_cast<const REntityBlueprint*>(commandIssueData.mBlueprint));
-        const RUnitBlueprint* const unitBlueprint = unit->GetBlueprint();
-        if (upgradeBlueprint == nullptr || unitBlueprint == nullptr) {
+
+      if (targetUnit->IsInCategory("FERRYBEACON") && GetTransportFerryBeacon(unit) == targetUnit) {
+        return false;
+      }
+
+      if (unit->IsMobile() && !HasBlueprintInCategory(sim, unit->GetBlueprint(), "TRANSPORTATION")) {
+        return true;
+      }
+
+      return false;
+    }
+    case EUnitCommandType::UNITCOMMAND_TransportReverseLoadUnits: {
+      if (
+        (!unit->IsMobile() && !unit->IsInCategory("AIRSTAGINGPLATFORM")) || GetTransportedBy(unit) != nullptr ||
+        unit->IsInCategory("PODS")
+      ) {
+        return false;
+      }
+
+      if (selectedUnits.Empty()) {
+        return false;
+      }
+
+      Unit* candidateTransport = nullptr;
+      for (Entity* const* it = selectedUnits.mVec.begin(); it != selectedUnits.mVec.end(); ++it) {
+        Unit* const candidate = static_cast<Unit*>(*it);
+        if (
+          candidate == nullptr || candidate->IsDead() || candidate->IsBeingBuilt() || candidate->AiTransport == nullptr
+        ) {
+          continue;
+        }
+
+        candidateTransport = candidate;
+        Unit* const targetUnit = ResolveTargetUnit(targetEntity);
+        if (targetUnit == nullptr) {
+          if (candidateTransport != unit) {
+            (void)candidateTransport->RunScript("OnTransportReject");
+          }
           return false;
         }
 
-        // 0x006F00A9: the arm goes straight from the blueprint lookup to the
-        // SeedUnit / UpgradesTo / UpgradesFromBase tests. There is no buildable-
-        // category gate here, so a later tier (T1 mex -> T3 mex, issued after a
-        // queued T2 by FAF's IssueUpgradeOrders) is accepted through
-        // UpgradesFromBase.
-        const char* const seedUnitId = upgradeBlueprint->General.SeedUnit.name.c_str();
-        if (seedUnitId != nullptr && seedUnitId[0] != '\0') {
-          // 0x006F00DD..0x006F0102: one compare, the unit's own blueprint id.
-          if (!EqualsNoCase(unitBlueprint->mBlueprintId.c_str(), seedUnitId)) {
-            return false;
-          }
-        } else {
-          const char* const unitUpgradesTo = unitBlueprint->General.UpgradesTo.name.c_str();
-          if (unitUpgradesTo == nullptr || unitUpgradesTo[0] == '\0') {
-            return false;
-          }
-
-          const char* const requiredSourceId = upgradeBlueprint->General.UpgradesFromBase.name.c_str();
-          if (!EqualsNoCase(requiredSourceId, "none")) {
-            if (!EqualsNoCase(unitBlueprint->mBlueprintId.c_str(), requiredSourceId)
-                && !EqualsNoCase(unitBlueprint->General.UpgradesFromBase.name.c_str(), requiredSourceId)) {
-              return false;
-            }
-          } else if (!EqualsNoCase(unitUpgradesTo, upgradeBlueprint->mBlueprintId.c_str())
-                     && !EqualsNoCase(unitUpgradesTo, upgradeBlueprint->General.UpgradesFrom.name.c_str())) {
-            return false;
-          }
+        if (!candidate->AiTransport->TransportCanCarryUnit(targetUnit)) {
+          continue;
         }
 
-        unit->mVarDat.mRequestRefreshUI = 1;
-        CUnitCommand* const lastCommand = queue != nullptr ? queue->GetLastCommand() : nullptr;
-        if (lastCommand != nullptr && lastCommand->mVarDat.mCmdType == commandIssueData.mCommandType) {
-          const REntityBlueprint* const lastBlueprint = lastCommand->mConstDat.blueprint;
-          if (lastBlueprint != nullptr && EqualsNoCase(lastBlueprint->mBlueprintId.c_str(), upgradeBlueprint->mBlueprintId.c_str())) {
-            return false;
-          }
+        if (candidate->mVarDat.mLayerMask == LAYER_Seabed) {
+          return false;
         }
 
         return true;
       }
-      case EUnitCommandType::UNITCOMMAND_KillSelf:
-        return !unit->IsBeingBuilt() && unit->RunScriptUnitBool("CheckCanBeKilled", unit);
-      case EUnitCommandType::UNITCOMMAND_OverCharge:
-        return HasCommandCap(unit, RULEUCC_Overcharge);
-      case EUnitCommandType::UNITCOMMAND_SpecialAction:
-        return HasCommandCap(unit, RULEUCC_SpecialAction);
-      default:
-        return true;
+
+      if (candidateTransport != nullptr && candidateTransport != unit) {
+        (void)candidateTransport->RunScript("OnTransportReject");
+      }
+      return false;
+    }
+    case EUnitCommandType::UNITCOMMAND_TransportUnloadUnits:
+    case EUnitCommandType::UNITCOMMAND_TransportUnloadSpecificUnits:
+      return unit->mVarDat.mLayerMask != LAYER_Seabed &&
+        (unit->AiTransport != nullptr || GetTransportedBy(unit) != nullptr);
+    case EUnitCommandType::UNITCOMMAND_Upgrade: {
+      // Engine addition: a checked downcast. `mBlueprint` holds whatever
+      // `CDecoder::DecodeCommandData` resolved through `GetEntityBlueprint`,
+      // which also finds prop and projectile blueprints; the tests below read
+      // `General`, i.e. past the end of such a blueprint. A non-unit blueprint
+      // is no upgrade target, the same answer as no blueprint at all.
+      const RUnitBlueprint* const upgradeBlueprint =
+        dynamic_cast<const RUnitBlueprint*>(static_cast<const REntityBlueprint*>(commandIssueData.mBlueprint));
+      const RUnitBlueprint* const unitBlueprint = unit->GetBlueprint();
+      if (upgradeBlueprint == nullptr || unitBlueprint == nullptr) {
+        return false;
+      }
+
+      // 0x006F00A9: the arm goes straight from the blueprint lookup to the
+      // SeedUnit / UpgradesTo / UpgradesFromBase tests. There is no buildable-
+      // category gate here, so a later tier (T1 mex -> T3 mex, issued after a
+      // queued T2 by FAF's IssueUpgradeOrders) is accepted through
+      // UpgradesFromBase.
+      const char* const seedUnitId = upgradeBlueprint->General.SeedUnit.name.c_str();
+      if (seedUnitId != nullptr && seedUnitId[0] != '\0') {
+        // 0x006F00DD..0x006F0102: one compare, the unit's own blueprint id.
+        if (!EqualsNoCase(unitBlueprint->mBlueprintId.c_str(), seedUnitId)) {
+          return false;
+        }
+      } else {
+        const char* const unitUpgradesTo = unitBlueprint->General.UpgradesTo.name.c_str();
+        if (unitUpgradesTo == nullptr || unitUpgradesTo[0] == '\0') {
+          return false;
+        }
+
+        const char* const requiredSourceId = upgradeBlueprint->General.UpgradesFromBase.name.c_str();
+        if (!EqualsNoCase(requiredSourceId, "none")) {
+          if (
+            !EqualsNoCase(unitBlueprint->mBlueprintId.c_str(), requiredSourceId) &&
+            !EqualsNoCase(unitBlueprint->General.UpgradesFromBase.name.c_str(), requiredSourceId)
+          ) {
+            return false;
+          }
+        } else if (
+          !EqualsNoCase(unitUpgradesTo, upgradeBlueprint->mBlueprintId.c_str()) &&
+          !EqualsNoCase(unitUpgradesTo, upgradeBlueprint->General.UpgradesFrom.name.c_str())
+        ) {
+          return false;
+        }
+      }
+
+      unit->mVarDat.mRequestRefreshUI = 1;
+      CUnitCommand* const lastCommand = queue != nullptr ? queue->GetLastCommand() : nullptr;
+      if (lastCommand != nullptr && lastCommand->mVarDat.mCmdType == commandIssueData.mCommandType) {
+        const REntityBlueprint* const lastBlueprint = lastCommand->mConstDat.blueprint;
+        if (
+          lastBlueprint != nullptr &&
+          EqualsNoCase(lastBlueprint->mBlueprintId.c_str(), upgradeBlueprint->mBlueprintId.c_str())
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    }
+    case EUnitCommandType::UNITCOMMAND_KillSelf:
+      return !unit->IsBeingBuilt() && unit->RunScriptUnitBool("CheckCanBeKilled", unit);
+    case EUnitCommandType::UNITCOMMAND_OverCharge:
+      return HasCommandCap(unit, RULEUCC_Overcharge);
+    case EUnitCommandType::UNITCOMMAND_SpecialAction:
+      return HasCommandCap(unit, RULEUCC_SpecialAction);
+    default:
+      return true;
     }
   }
 
@@ -853,7 +929,9 @@ namespace
    * `REntityBlueprint::mBlueprintId` (+0x08) of the entity's blueprint:
    * `[bp+0x20]` capacity test, `[bp+0x0C]` buffer (0x0074A9FE, 0x0068BF9A).
    */
-  [[maybe_unused]] const char* ResolveBlueprintIdCString(const Entity* entity)
+  [[maybe_unused]] const char* ResolveBlueprintIdCString(
+    const Entity* entity
+  )
   {
     if (!entity || !entity->BluePrint) {
       return "";
@@ -862,7 +940,6 @@ namespace
     return entity->BluePrint->mBlueprintId.raw_data_unsafe();
   }
 
-
   /**
    * Address: 0x00744C90 (FUN_00744C90, func_ArchiveWriteLuaObj)
    *
@@ -870,7 +947,10 @@ namespace
    * Writes all key/value lanes from one Lua table iterator into archive object
    * stream as `LuaObject` entries, then writes one trailing nil marker object.
    */
-  [[maybe_unused]] LuaPlus::LuaObject* func_ArchiveWriteLuaObj(gpg::WriteArchive* const archive, LuaPlus::LuaObject* const tableObject)
+  [[maybe_unused]] LuaPlus::LuaObject* func_ArchiveWriteLuaObj(
+    gpg::WriteArchive* const archive,
+    LuaPlus::LuaObject* const tableObject
+  )
   {
     if (!archive || !tableObject) {
       return tableObject;
@@ -893,7 +973,7 @@ namespace
     archive->Write(luaObjectType, &nilObject, nullOwner);
     return tableObject;
   }
-}
+} // namespace
 
 namespace
 {
@@ -905,7 +985,9 @@ namespace
   );
   static_assert(offsetof(CUnitCommand, mTarget) == 0x11C, "CUnitCommand::mTarget offset must be 0x11C (0x00764CCE)");
 
-  [[maybe_unused]] void AdvanceCoords(Entity* entity)
+  [[maybe_unused]] void AdvanceCoords(
+    Entity* entity
+  )
   {
     if (!entity) {
       return;
@@ -913,9 +995,7 @@ namespace
 
     entity->AdvanceCoords();
   }
-}
-
-
+} // namespace
 
 namespace
 {
@@ -926,10 +1006,14 @@ namespace
   };
 
   static_assert(sizeof(DumpUnitsCountEntry) == 8, "DumpUnitsCountEntry size must be 8");
-  static_assert(std::is_trivially_copyable_v<DumpUnitsCountEntry>,
-                "DumpUnitsCountEntry must be trivially copyable for the msvc8 _Insert_n memmove lane");
+  static_assert(
+    std::is_trivially_copyable_v<DumpUnitsCountEntry>,
+    "DumpUnitsCountEntry must be trivially copyable for the msvc8 _Insert_n memmove lane"
+  );
   [[nodiscard]] moho::RRuleGameRulesImpl* ResolveLuaBlueprintRules(LuaPlus::LuaState* state) noexcept;
-  [[nodiscard]] moho::RRuleGameRulesImpl* ResolveLuaBlueprintRules(LuaPlus::LuaState* const state) noexcept
+  [[nodiscard]] moho::RRuleGameRulesImpl* ResolveLuaBlueprintRules(
+    LuaPlus::LuaState* const state
+  ) noexcept
   {
     if (moho::RRuleGameRulesImpl* const rules = moho::BlueprintLoaderContext().mRules; rules != nullptr) {
       return rules;
@@ -994,7 +1078,10 @@ namespace
    * conversion to the registry's element type yet. The binary stores the raw
    * pointer value either way.
    */
-  void AppendBlueprintOrdinal(RRuleGameRulesImpl& rules, void* const blueprintObject)
+  void AppendBlueprintOrdinal(
+    RRuleGameRulesImpl& rules,
+    void* const blueprintObject
+  )
   {
     if (blueprintObject == nullptr) {
       return;
@@ -1030,7 +1117,10 @@ namespace
    * the hand-rolled `mBegin`/`mEnd` pointer fields the now-removed
    * `RRuleGameRulesLuaExportBindingArray` used to expose.
    */
-  void RegisterBlueprintInCategoryMaps(RRuleGameRulesImpl& rules, void* const blueprintObject)
+  void RegisterBlueprintInCategoryMaps(
+    RRuleGameRulesImpl& rules,
+    void* const blueprintObject
+  )
   {
     if (blueprintObject == nullptr) {
       return;
@@ -1044,7 +1134,10 @@ namespace
     }
   }
 
-  void InitMeshBlueprintFromLua(LuaPlus::LuaObject& luaBlueprint, RMeshBlueprint* const blueprint)
+  void InitMeshBlueprintFromLua(
+    LuaPlus::LuaObject& luaBlueprint,
+    RMeshBlueprint* const blueprint
+  )
   {
     gpg::RRef destination{};
     destination = gpg::MakeRRef<moho::RMeshBlueprint>(blueprint);
@@ -1059,7 +1152,9 @@ namespace
     SCR_RObjectToLuaMerge(resolved, luaBlueprint);
   }
 
-  [[nodiscard]] LuaPlus::LuaObject EnsureLuaBlueprintTable(LuaPlus::LuaState* const state)
+  [[nodiscard]] LuaPlus::LuaObject EnsureLuaBlueprintTable(
+    LuaPlus::LuaState* const state
+  )
   {
     if (!state) {
       return {};
@@ -1112,7 +1207,9 @@ namespace
     allBlueprints.SetObject(blueprint->mBlueprintId.c_str(), luaBlueprint);
   }
 
-  [[nodiscard]] fa::string ResolveNormalizedBlueprintId(const LuaPlus::LuaObject& blueprintSpec)
+  [[nodiscard]] fa::string ResolveNormalizedBlueprintId(
+    const LuaPlus::LuaObject& blueprintSpec
+  )
   {
     LuaPlus::LuaObject idObject = blueprintSpec.GetByName("BlueprintId");
     const char* const rawId = idObject.GetString();
@@ -1259,12 +1356,14 @@ namespace
       rules->mMeshBlueprints,
       "mesh",
       [](LuaPlus::LuaObject& blueprintSpec, RMeshBlueprint* const meshBlueprint) {
-        InitMeshBlueprintFromLua(blueprintSpec, meshBlueprint);
-      }
+      InitMeshBlueprintFromLua(blueprintSpec, meshBlueprint);
+    }
     );
   }
 
-  [[maybe_unused]] int RegisterMeshBlueprintFromState(LuaPlus::LuaState* const state)
+  [[maybe_unused]] int RegisterMeshBlueprintFromState(
+    LuaPlus::LuaState* const state
+  )
   {
     RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
     if (!rules) {
@@ -1284,7 +1383,9 @@ namespace
    * then applies reflected field values from the Lua object into that
    * blueprint instance.
    */
-  [[maybe_unused]] int RegisterTrailEmitterBlueprintFromState(LuaPlus::LuaState* const state)
+  [[maybe_unused]] int RegisterTrailEmitterBlueprintFromState(
+    LuaPlus::LuaState* const state
+  )
   {
     RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
     if (!rules) {
@@ -1297,9 +1398,9 @@ namespace
       rules->mTrailBlueprints,
       "trail emitter",
       [](gpg::RRef* const out, RTrailBlueprint* const trailBlueprint) {
-        *out = gpg::MakeRRef<moho::RTrailBlueprint>(trailBlueprint);
-        return out;
-      }
+      *out = gpg::MakeRRef<moho::RTrailBlueprint>(trailBlueprint);
+      return out;
+    }
     );
     return 0;
   }
@@ -1312,7 +1413,9 @@ namespace
    * then applies reflected field values from the Lua object into that
    * blueprint instance.
    */
-  [[maybe_unused]] int RegisterEmitterBlueprintFromState(LuaPlus::LuaState* const state)
+  [[maybe_unused]] int RegisterEmitterBlueprintFromState(
+    LuaPlus::LuaState* const state
+  )
   {
     RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
     if (!rules) {
@@ -1325,9 +1428,9 @@ namespace
       rules->mEmitterBlueprints,
       "particle emitter",
       [](gpg::RRef* const out, REmitterBlueprint* const emitterBlueprint) {
-        *out = gpg::MakeRRef<moho::REmitterBlueprint>(emitterBlueprint);
-        return out;
-      }
+      *out = gpg::MakeRRef<moho::REmitterBlueprint>(emitterBlueprint);
+      return out;
+    }
     );
     return 0;
   }
@@ -1339,7 +1442,9 @@ namespace
    * Creates or resolves one beam blueprint from Lua stack lane 1, then applies
    * reflected field values from the Lua object into that blueprint instance.
    */
-  [[maybe_unused]] int RegisterBeamBlueprintFromState(LuaPlus::LuaState* const state)
+  [[maybe_unused]] int RegisterBeamBlueprintFromState(
+    LuaPlus::LuaState* const state
+  )
   {
     RRuleGameRulesImpl* const rules = ResolveLuaBlueprintRules(state);
     if (!rules) {
@@ -1352,9 +1457,9 @@ namespace
       rules->mBeamBlueprints,
       "beam effect",
       [](gpg::RRef* const out, RBeamBlueprint* const beamBlueprint) {
-        *out = gpg::MakeRRef<moho::RBeamBlueprint>(beamBlueprint);
-        return out;
-      }
+      *out = gpg::MakeRRef<moho::RBeamBlueprint>(beamBlueprint);
+      return out;
+    }
     );
     return 0;
   }
@@ -1365,8 +1470,7 @@ namespace
       initHandler->mHandle->UpdateLoadingProgress();
     }
   }
-}
-
+} // namespace
 
 namespace moho
 {
@@ -1380,4 +1484,4 @@ namespace moho
   extern std::mutex sSyncObserverLock;
   extern ISyncRouting* sSyncRouting;
 #endif
-}
+} // namespace moho

@@ -12,9 +12,17 @@
 
 // Table 0x00DFF658 = {&wxDialog::sm_eventTable (0x00D540E8), rows 0x00F59448};
 // GetEventTable (0x004BC0F0) comes with it.
-BEGIN_EVENT_TABLE(moho::ScrGotoDialog, wxDialog)
-  EVT_BUTTON(wxID_OK, moho::ScrGotoDialog::OnOK)
-  EVT_MOVE(moho::ScrGotoDialog::OnMove)
+BEGIN_EVENT_TABLE(
+  moho::ScrGotoDialog,
+  wxDialog
+)
+EVT_BUTTON(
+  wxID_OK,
+  moho::ScrGotoDialog::OnOK
+)
+EVT_MOVE(
+  moho::ScrGotoDialog::OnMove
+)
 END_EVENT_TABLE()
 
 /**
@@ -22,12 +30,16 @@ END_EVENT_TABLE()
  */
 moho::ScrGotoDialog::ScrGotoDialog()
   : wxDialog(
-      nullptr, -1, wxT("Goto"),
+      nullptr,
+      -1,
+      wxT("Goto"),
       wxPoint(
         USER_GetPreferences()->GetInteger("Windows.Debug.Goto.x", -1),
         USER_GetPreferences()->GetInteger("Windows.Debug.Goto.y", -1)
       ),
-      wxDefaultSize, wxDEFAULT_DIALOG_STYLE, wxT("ScrGotoDialog")
+      wxDefaultSize,
+      wxDEFAULT_DIALOG_STYLE,
+      wxT("ScrGotoDialog")
     )
 {
   mInitializing = true;
@@ -66,7 +78,9 @@ int moho::ScrGotoDialog::GetLine() const
 /**
  * Address: 0x004BBFD0 (FUN_004BBFD0)
  */
-void moho::ScrGotoDialog::OnOK(wxCommandEvent& event)
+void moho::ScrGotoDialog::OnOK(
+  wxCommandEvent& event
+)
 {
   EndModal(wxID_OK);
 }
@@ -74,7 +88,9 @@ void moho::ScrGotoDialog::OnOK(wxCommandEvent& event)
 /**
  * Address: 0x004BBEB0 (FUN_004BBEB0)
  */
-void moho::ScrGotoDialog::OnMove(wxMoveEvent& event)
+void moho::ScrGotoDialog::OnMove(
+  wxMoveEvent& event
+)
 {
   if (mInitializing) {
     return;

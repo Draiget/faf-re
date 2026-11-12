@@ -7,7 +7,9 @@ namespace faf::remote::net
 {
   namespace
   {
-    std::array<std::uint8_t, 24> NonceFor(const std::uint32_t sequence) noexcept
+    std::array<std::uint8_t, 24> NonceFor(
+      const std::uint32_t sequence
+    ) noexcept
     {
       std::array<std::uint8_t, 24> nonce{};
       nonce[0] = static_cast<std::uint8_t>(sequence);
@@ -19,7 +21,10 @@ namespace faf::remote::net
   } // namespace
 
   void SealDatagram(
-    const ChannelKey& key, const std::uint32_t sequence, std::uint8_t* const datagram, const std::size_t payloadSize
+    const ChannelKey& key,
+    const std::uint32_t sequence,
+    std::uint8_t* const datagram,
+    const std::size_t payloadSize
   ) noexcept
   {
     const auto nonce = NonceFor(sequence);
@@ -48,7 +53,9 @@ namespace faf::remote::net
            ) == 0;
   }
 
-  void WipeKey(ChannelKey& key) noexcept
+  void WipeKey(
+    ChannelKey& key
+  ) noexcept
   {
     crypto_wipe(key.data(), key.size());
   }

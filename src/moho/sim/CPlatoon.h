@@ -90,9 +90,8 @@ namespace moho
      * Allocates one default platoon and hands it to the serializer as an
      * unowned reference.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x00724EB0 (FUN_00724EB0, Moho::CPlatoon::~CPlatoon)
@@ -215,7 +214,8 @@ namespace moho
       ESquadClass squadClass,
       EAlliance alliance,
       bool canAttack,
-      const Wm3::Vector3f& pos);
+      const Wm3::Vector3f& pos
+    );
 
     /**
      * Address: 0x00726120 (FUN_00726120, Moho::CPlatoon::FindClosestUnit)
@@ -230,7 +230,8 @@ namespace moho
       ECompareType cmpType,
       ESquadClass squadClass,
       EAlliance alliance,
-      bool canAttack);
+      bool canAttack
+    );
 
     /**
      * Address: 0x007259D0 (FUN_007259D0, Moho::CPlatoon::FindPrioritizedUnit)
@@ -246,7 +247,8 @@ namespace moho
       EAlliance alliance,
       bool canAttack,
       const Wm3::Vector3f& center,
-      float radius);
+      float radius
+    );
 
     /**
      * Address: 0x00725990 (FUN_00725990, sub_725990)
@@ -302,7 +304,8 @@ namespace moho
      * Adds up to `maxCount` live units in `categorySet` from the unassigned
      * squad to `outUnits`. No-op when there is no unassigned squad.
      */
-    void GetUnassignedUnitsInCategory(const EntityCategorySet* categorySet, int maxCount, EntitySetTemplate<Unit>& outUnits);
+    void
+    GetUnassignedUnitsInCategory(const EntityCategorySet* categorySet, int maxCount, EntitySetTemplate<Unit>& outUnits);
 
     /**
      * Address: 0x007261B0 (FUN_007261B0, Moho::CPlatoon::Stop)
@@ -395,7 +398,8 @@ namespace moho
      * independently. Uses FormMove/Move by the usual threshold. Returns the
      * issued command weak-links.
      */
-    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>> MoveToTarget(Entity* target, bool useTransports, ESquadClass squadClass);
+    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>>
+    MoveToTarget(Entity* target, bool useTransports, ESquadClass squadClass);
 
     /**
      * Address: 0x00726DE0 (FUN_00726DE0, Moho::CPlatoon::MoveToLocation)
@@ -406,7 +410,8 @@ namespace moho
      * alive transports as one set; otherwise the whole platoon (formation) or each
      * requested squad class independently. Returns the issued command weak-links.
      */
-    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>> MoveToLocation(Wm3::Vector3f& pos, bool useTransports, ESquadClass squadClass);
+    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>>
+    MoveToLocation(Wm3::Vector3f& pos, bool useTransports, ESquadClass squadClass);
 
     /**
      * Address: 0x00729A70 (FUN_00729A70, Moho::CPlatoon::UseFerryBeacon)
@@ -436,7 +441,8 @@ namespace moho
      * AggressiveMove) either to the whole platoon (named formation) or to each
      * requested squad class (1..5) independently.
      */
-    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>> AggressiveMoveToLocation(Wm3::Vector3f& pos, ESquadClass squadClass);
+    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>>
+    AggressiveMoveToLocation(Wm3::Vector3f& pos, ESquadClass squadClass);
 
     /**
      * Address: 0x007291C0 (FUN_007291C0, Moho::CPlatoon::UnloadUnitsAtLocation)
@@ -447,7 +453,8 @@ namespace moho
      * member of `category` (plus the carrier itself) via one
      * UNITCOMMAND_TransportUnloadSpecificUnits at that point.
      */
-    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>> UnloadUnitsAtLocation(const EntityCategorySet* category, Wm3::Vector3f& pos);
+    [[nodiscard]] fa::vector<WeakPtr<CUnitCommand>>
+    UnloadUnitsAtLocation(const EntityCategorySet* category, Wm3::Vector3f& pos);
 
     /**
      * Address: 0x00729690 (FUN_00729690, Moho::CPlatoon::UnloadAllAtLocation)
@@ -582,23 +589,23 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
-    Sim* mSim;                                  // +0x34
-    SimArmy* mArmy;                             // +0x38
-    std::uint32_t mUnknown_0x03C;               // +0x3C
-    gpg::fastvector_n<CSquad*, 8> mSquadList;   // +0x40
-    fa::string mName;                        // +0x70
-    fa::string mPlan;                        // +0x8C
-    fa::string mUniqueName;                  // +0xA8
-    fa::string mFormation;                   // +0xC4
-    bool mDisbandOnIdle;                        // +0xE0
-    std::uint8_t mPad_0x0E1[3];                 // +0xE1
-    std::int32_t mKills;                        // +0xE4 enemy units killed (Unit.cpp death path)
-    std::int32_t mLosses;                       // +0xE8 own units killed
-    float mDamageDealt;                         // +0xEC (CDamage, `Units_TotalDamageDealt`)
-    float mDamageReceived;                      // +0xF0 (CDamage, `Units_TotalDamageReceive`)
-    LuaPlus::LuaObject mLuaUnitList;            // +0xF4 cached `GetPlatoonUnits` table
-    bool mHasLuaList;                           // +0x108 whether mLuaUnitList is current
-    std::uint8_t mPad_0x109[7];                 // +0x109
+    Sim* mSim;                                // +0x34
+    SimArmy* mArmy;                           // +0x38
+    std::uint32_t mUnknown_0x03C;             // +0x3C
+    gpg::fastvector_n<CSquad*, 8> mSquadList; // +0x40
+    fa::string mName;                         // +0x70
+    fa::string mPlan;                         // +0x8C
+    fa::string mUniqueName;                   // +0xA8
+    fa::string mFormation;                    // +0xC4
+    bool mDisbandOnIdle;                      // +0xE0
+    std::uint8_t mPad_0x0E1[3];               // +0xE1
+    std::int32_t mKills;                      // +0xE4 enemy units killed (Unit.cpp death path)
+    std::int32_t mLosses;                     // +0xE8 own units killed
+    float mDamageDealt;                       // +0xEC (CDamage, `Units_TotalDamageDealt`)
+    float mDamageReceived;                    // +0xF0 (CDamage, `Units_TotalDamageReceive`)
+    LuaPlus::LuaObject mLuaUnitList;          // +0xF4 cached `GetPlatoonUnits` table
+    bool mHasLuaList;                         // +0x108 whether mLuaUnitList is current
+    std::uint8_t mPad_0x109[7];               // +0x109
   };
   static_assert(offsetof(CPlatoon, mSim) == 0x34, "CPlatoon::mSim offset must be 0x34");
   static_assert(offsetof(CPlatoon, mArmy) == 0x38, "CPlatoon::mArmy offset must be 0x38");
@@ -1138,7 +1145,7 @@ namespace moho
    *
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_CPlatoonFindClosestUnitToBaseL`.
-  */
+   */
   int cfunc_CPlatoonFindClosestUnitToBase(lua_State* luaContext);
 
   /**
@@ -1146,7 +1153,7 @@ namespace moho
    *
    * What it does:
    * Publishes the `CPlatoon:FindClosestUnitToBase()` Lua binder form.
-  */
+   */
   CScrLuaInitForm* func_CPlatoonFindClosestUnitToBase_LuaFuncDef();
 
   /**
@@ -1411,7 +1418,7 @@ namespace moho
    *
    * What it does:
    * Publishes the `CPlatoon:GuardTarget()` Lua binder form.
-  */
+   */
   CScrLuaInitForm* func_CPlatoonGuardTarget_LuaFuncDef();
 
   /**
@@ -1427,7 +1434,7 @@ namespace moho
    *
    * What it does:
    * Publishes the `CPlatoon:Destroy()` Lua binder form.
-  */
+   */
   CScrLuaInitForm* func_CPlatoonDestroy_LuaFuncDef();
 
   /**
@@ -1443,7 +1450,7 @@ namespace moho
    *
    * What it does:
    * Publishes the `CPlatoon:GetFerryBeacons()` Lua binder form.
-  */
+   */
   CScrLuaInitForm* func_CPlatoonGetFerryBeacons_LuaFuncDef();
 
   /**
@@ -1459,7 +1466,7 @@ namespace moho
    *
    * What it does:
    * Publishes the `CPlatoon:UseFerryBeacon()` Lua binder form.
-  */
+   */
   CScrLuaInitForm* func_CPlatoonUseFerryBeacon_LuaFuncDef();
 
   /**
@@ -1475,7 +1482,7 @@ namespace moho
    *
    * What it does:
    * Publishes the `CPlatoon:UseTeleporter()` Lua binder form.
-  */
+   */
   CScrLuaInitForm* func_CPlatoonUseTeleporter_LuaFuncDef();
 
   /**
@@ -1501,7 +1508,7 @@ namespace moho
    *
    * What it does:
    * Publishes the `CPlatoon:SetPlatoonFormationOverride()` Lua binder form.
-  */
+   */
   CScrLuaInitForm* func_CPlatoonSetPlatoonFormationOverride_LuaFuncDef();
 
   /**
@@ -1525,7 +1532,7 @@ namespace moho
    *
    * What it does:
    * Publishes the `CPlatoon:GetPlatoonLifetimeStats()` Lua binder form.
-  */
+   */
   CScrLuaInitForm* func_CPlatoonGetPlatoonLifetimeStats_LuaFuncDef();
 
   /**

@@ -66,7 +66,10 @@ table.insert = function(t, ...)
 end
 )lua";
 
-    [[nodiscard]] std::string ValueText(lua_State* const state, const int index)
+    [[nodiscard]] std::string ValueText(
+      lua_State* const state,
+      const int index
+    )
     {
       switch (lua_type(state, index)) {
       case LUA_TSTRING:
@@ -79,7 +82,9 @@ end
     }
 
     /** A script's path inside its archive ("lua/sim/score.lua"), or Lua's short name. */
-    [[nodiscard]] std::string SourceName(const lua_Debug& frame)
+    [[nodiscard]] std::string SourceName(
+      const lua_Debug& frame
+    )
     {
       std::string path = frame.source != nullptr ? frame.source : "";
       for (char& c : path) {
@@ -97,7 +102,9 @@ end
       return frame.short_src;
     }
 
-    int RecordSyncWrite(lua_State* const state)
+    int RecordSyncWrite(
+      lua_State* const state
+    )
     {
       // The writer's level comes as argument 2; no frame there means the metamethod was called
       // from C++.
@@ -114,7 +121,10 @@ end
       return 0;
     }
 
-    void InstallHook(lua_State* const state, lua_Debug* const)
+    void InstallHook(
+      lua_State* const state,
+      lua_Debug* const
+    )
     {
       // The hook fires on every call until `Sync` exists. Raw access only: the sim's globals
       // table has an `__index` (lua/system/config.lua), whose call would re-enter this hook.
@@ -125,7 +135,10 @@ end
       inside = true;
       struct SLeave
       {
-        ~SLeave() { inside = false; }
+        ~SLeave()
+        {
+          inside = false;
+        }
       } leave;
       lua_pushstring(state, "Sync");
       lua_rawget(state, LUA_GLOBALSINDEX);
@@ -149,11 +162,15 @@ end
     class CSyncWritersInitForm final : public moho::CScrLuaInitForm
     {
     public:
-      explicit CSyncWritersInitForm(moho::CScrLuaInitFormSet& set)
+      explicit CSyncWritersInitForm(
+        moho::CScrLuaInitFormSet& set
+      )
         : CScrLuaInitForm(set, "__faf_sync_record", "headless", "headless --sync-writers")
       {}
 
-      void Run(LuaPlus::LuaState* const state) override
+      void Run(
+        LuaPlus::LuaState* const state
+      ) override
       {
         gSimState = state;
         lua_register(state->m_state, "__faf_sync_record", &RecordSyncWrite);
@@ -179,7 +196,9 @@ end
     return gInstalled.load();
   }
 
-  std::string CSyncWriters::Write(const std::string& path) const
+  std::string CSyncWriters::Write(
+    const std::string& path
+  ) const
   {
     std::lock_guard<std::mutex> lock(gLock);
     std::FILE* file = nullptr;
@@ -198,9 +217,13 @@ end
     }
     std::fclose(file);
     return gpg::STR_Printf(
-      "sync writers: %zu keys, %zu call sites, %llu writes%s%s", gWrites.size(), sites,
-      static_cast<unsigned long long>(writes), gInstalled.load() ? "" : " (hook never installed)",
-      gInstallError.empty() ? "" : (std::string(", install error: ") + gInstallError).c_str()
-    ).c_str();
+             "sync writers: %zu keys, %zu call sites, %llu writes%s%s",
+             gWrites.size(),
+             sites,
+             static_cast<unsigned long long>(writes),
+             gInstalled.load() ? "" : " (hook never installed)",
+             gInstallError.empty() ? "" : (std::string(", install error: ") + gInstallError).c_str()
+    )
+      .c_str();
   }
 } // namespace faf::headless

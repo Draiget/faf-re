@@ -50,4 +50,3 @@ namespace moho
 
   static_assert(sizeof(EMauiScrollAxisTypeInfo) == 0x78, "EMauiScrollAxisTypeInfo size must be 0x78");
 } // namespace moho
-

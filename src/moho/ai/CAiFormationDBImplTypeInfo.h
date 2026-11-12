@@ -100,5 +100,4 @@ namespace moho
    */
   void register_CAiFormationDBImplTypeInfo();
 
-
 } // namespace moho

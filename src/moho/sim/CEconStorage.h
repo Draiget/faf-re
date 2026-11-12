@@ -59,9 +59,8 @@ namespace moho
      * Allocates one `CEconStorage`, zero-initializes owner/value lanes, and
      * publishes the object as an unowned construct result.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x007732C0 (FUN_007732C0, Moho::CEconStorage::Chng)

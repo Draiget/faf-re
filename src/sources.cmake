@@ -96,6 +96,7 @@ set(FAF_ENGINE_SOURCES
   gpg/gal/backends/d3d12/ResourcesD3D12.cpp
   gpg/gal/backends/d3d12/DeviceD3D12.cpp
   gpg/gal/backends/d3d12/GpuDrivenD3D12.cpp
+  gpg/gal/backends/d3d12/RayTracingD3D12.cpp
   gpg/gal/backends/d3d12/PipelineCacheD3D12.cpp
   gpg/gal/effects/SpirvReflect.cpp
   gpg/gal/backends/vulkan/VulkanLoader.cpp
@@ -105,6 +106,7 @@ set(FAF_ENGINE_SOURCES
   gpg/gal/backends/vulkan/ResourcesVulkan.cpp
   gpg/gal/backends/vulkan/DeviceVulkan.cpp
   gpg/gal/backends/vulkan/GpuDrivenVulkan.cpp
+  gpg/gal/backends/vulkan/RayTracingVulkan.cpp
   gpg/gal/backends/dxgi/DxgiFactory.cpp
   gpg/gal/backends/dxgi/DxgiSwapChain.cpp
   ${FAF_DEPENDENCIES_DIR}/FX11/d3dxGlobal.cpp
@@ -234,6 +236,7 @@ set(FAF_ENGINE_SOURCES
   moho/render/textures/SBatchTextureDataFactory.cpp
   moho/misc/FileWaitHandleSet.cpp
   moho/net/Common.cpp
+  platform/windows/NetWindows.cpp
   moho/net/NetConVars.cpp
   moho/net/NetPeerTransport.cpp
   moho/net/NetlinkPeers.cpp
@@ -922,6 +925,7 @@ set(FAF_ENGINE_SOURCES
   moho/render/CWldTerrainDecal.cpp
   moho/render/CDecalHandleTypeInfo.cpp
   moho/render/AmbientOcclusionRenderer.cpp
+  moho/render/DynamicLights.cpp
   moho/render/BoundaryRenderer.cpp
   moho/render/FxaaRenderer.cpp
   moho/render/PostRenderer.cpp
@@ -1023,6 +1027,7 @@ set(FAF_ENGINE_SOURCES
   moho/render/ProjectileIconRenderer.cpp
   moho/render/GpuPathSettings.cpp
   moho/render/RenderInfo.cpp
+  moho/render/RayScene.cpp
   moho/render/Shadow.cpp
   moho/render/SelectionBracketParams.cpp
   moho/render/SelectionBracketRenderer.cpp

@@ -3,7 +3,8 @@
 #include <new>
 #include <typeinfo>
 
-#include "moho/unit/tasks/CFactoryBuildTask.h"
+#include "moho/unit/tasks/CFactoryBuildTask.h"
+
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -15,7 +16,9 @@ namespace
    * What it does:
    * Deletes one heap-owned `CFactoryBuildTask` instance.
    */
-  void DeleteCFactoryBuildTaskOwned(void* const objectStorage)
+  void DeleteCFactoryBuildTaskOwned(
+    void* const objectStorage
+  )
   {
     delete static_cast<moho::CFactoryBuildTask*>(objectStorage);
   }
@@ -26,7 +29,9 @@ namespace
    * What it does:
    * Executes one in-place `CFactoryBuildTask` destructor lane.
    */
-  void DestroyCFactoryBuildTaskInPlace(void* const objectStorage)
+  void DestroyCFactoryBuildTaskInPlace(
+    void* const objectStorage
+  )
   {
     gpg::DestructInStorage<moho::CFactoryBuildTask>(objectStorage);
   }
@@ -38,7 +43,9 @@ namespace
    * Registers `CCommandTask` as the zero-offset reflected base, looking its type up once into
    * `CCommandTask::sType` (0x010C6FF4). `Init` (0x005FA190) is its only caller.
    */
-  void AddBaseCCommandTask(gpg::RType* const typeInfo)
+  void AddBaseCCommandTask(
+    gpg::RType* const typeInfo
+  )
   {
     if (moho::CCommandTask::sType == nullptr) {
       moho::CCommandTask::sType = gpg::LookupRType(typeid(moho::CCommandTask));
@@ -115,7 +122,9 @@ namespace moho
    * Placement-constructs one `CFactoryBuildTask` in caller storage and
    * returns a typed reflection ref.
    */
-  gpg::RRef CFactoryBuildTaskTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CFactoryBuildTaskTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     auto* const task = gpg::ConstructInStorage<CFactoryBuildTask>(objectStorage);
 
@@ -127,4 +136,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_CFactoryBuildTaskTypeInfo_c07ac7, moho::preregister_CFactoryBuildTaskTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_CFactoryBuildTaskTypeInfo_c07ac7,
+  moho::preregister_CFactoryBuildTaskTypeInfo
+)

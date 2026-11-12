@@ -86,13 +86,26 @@ namespace moho
      * (`mRequestRefreshUI`, 0x0067A10B) after copying it; an observer that rebuilds another
      * view's packet reads it here.
      */
-    virtual void OnEntityWillSync(Entity& entity) { (void)entity; }
+    virtual void OnEntityWillSync(
+      Entity& entity
+    )
+    {
+      (void)entity;
+    }
 
     /** An entity the walk just synced (its `Sync` has run): the beat's dirty run, or every entity on a focus change. */
-    virtual void OnEntitySynced(Entity& entity) { (void)entity; }
+    virtual void OnEntitySynced(
+      Entity& entity
+    )
+    {
+      (void)entity;
+    }
 
     /** The walk is done and the beat's packet holds every entity record it will carry. */
-    virtual void OnSyncWalkDone(Sim& sim, const SSyncData& packet)
+    virtual void OnSyncWalkDone(
+      Sim& sim,
+      const SSyncData& packet
+    )
     {
       (void)sim;
       (void)packet;
@@ -152,10 +165,8 @@ namespace moho
    * Constructs one `shared_ptr<SParticleBuffer>` from one raw particle-buffer
    * pointer lane.
    */
-  boost::shared_ptr<SParticleBuffer>* ConstructSharedParticleBufferFromRaw(
-    boost::shared_ptr<SParticleBuffer>* outBuffer,
-    SParticleBuffer* buffer
-  );
+  boost::shared_ptr<SParticleBuffer>*
+  ConstructSharedParticleBufferFromRaw(boost::shared_ptr<SParticleBuffer>* outBuffer, SParticleBuffer* buffer);
 
   /**
    * Address: 0x006F14D0 (FUN_006F14D0, Moho::UNIT_IssueFactoryCommand)
@@ -412,7 +423,9 @@ namespace moho
      * emits one shared command through the factory-dispatch lane.
      */
     void IssueFactoryCommand(
-      const BVSet<EntId, EntIdUniverse>&, const SSTICommandIssueData& commandIssueData, bool
+      const BVSet<EntId, EntIdUniverse>&,
+      const SSTICommandIssueData& commandIssueData,
+      bool
     ) override;
 
     /**
@@ -451,7 +464,8 @@ namespace moho
     void ExecuteLuaInSim(const char*, const LuaPlus::LuaObject&) override;
 
     /**
-     * Address: 0x00749B60 (FUN_00749B60, ?LuaSimCallback@Sim@Moho@@UAEXPBDABVLuaObject@LuaPlus@@ABV?$BVSet@HUEntIdUniverse@Moho@@@2@@Z)
+     * Address: 0x00749B60 (FUN_00749B60,
+     * ?LuaSimCallback@Sim@Moho@@UAEXPBDABVLuaObject@LuaPlus@@ABV?$BVSet@HUEntIdUniverse@Moho@@@2@@Z)
      *
      * What it does:
      * Imports `/lua/SimCallbacks.lua` and invokes `DoCallback(name,args,units)`
@@ -1363,7 +1377,7 @@ namespace moho
     void UpdateChecksum();
 
     /**
-      * Alias of FUN_00754C60 (non-canonical helper lane).
+     * Alias of FUN_00754C60 (non-canonical helper lane).
      *
      * What it does:
      * Core Sim load-serialization routine used by Sim serializer callback.
@@ -1563,24 +1577,24 @@ namespace moho
     // +0x08FC in binary: set in AdvanceBeat, cleared in Sync.
     // Acts as a "processed this beat" latch rather than beat counter state.
     bool mDidProcess;
-    uint32_t mCurTick;                                // 0x0900
-    CRandomStream* mRngState;                         // 0x0904
-    COGrid* mOGrid;                                   // 0x0908
+    uint32_t mCurTick;                             // 0x0900
+    CRandomStream* mRngState;                      // 0x0904
+    COGrid* mOGrid;                                // 0x0908
     fa::vector<CArmyImpl*> mArmiesList;            // 0x090C
     fa::vector<SSTICommandSource> mCommandSources; // 0x091C
-    int32_t mCurCommandSource;                        // 0x092C
+    int32_t mCurCommandSource;                     // 0x092C
     CTaskStage mTaskStageA;
     CTaskStage mDiskWatcherTaskStage;
     CTaskStage mTaskStageB;
     /// The canvas sim script draws into. `GetDebugCanvas` (FUN_00746720) is
     /// `add edi, 96Ch` plus a lazy `new CDebugCanvas`, which pins this offset
     /// exactly; `AdvanceBeat` then rolls it into the slot below and clears it.
-    boost::shared_ptr<CDebugCanvas> mDebugCanvas1;  // 0x096C
+    boost::shared_ptr<CDebugCanvas> mDebugCanvas1; // 0x096C
     /// The finished canvas from the previous beat roll.
-    boost::shared_ptr<CDebugCanvas> mDebugCanvas2;  // 0x0974
+    boost::shared_ptr<CDebugCanvas> mDebugCanvas2; // 0x0974
     PathTables* mPathTables;
     CAiFormationDBImpl* mFormationDB; // 0x0980
-    EntityDB* mEntityDB;             // 0x0984
+    EntityDB* mEntityDB;              // 0x0984
     CCommandDB* mCommandDB;           // 0x0988
     uint32_t mReserved98C;
     uint32_t mReserved990;
@@ -1611,9 +1625,9 @@ namespace moho
     /// all, while `Entity.cpp` reached the same storage through a
     /// `reinterpret_cast<the deleted owner-overlay*>(sim)` whose
     /// `pad_0000[0x09C8]` pinned this exact offset.
-    fa::vector<SCamShakeParams> mSyncCamShake; // 0x09C8
+    fa::vector<SCamShakeParams> mSyncCamShake;                // 0x09C8
     fa::vector<SUpgradeNotifyPair> mAllyUpgradeNotifications; // 0x9D8 (was mSyncSerializeGroup3)
-    fa::vector<SPendingPoseCopy> mPendingPoseCopies; // 0x9E8 (was mSyncSerializeGroup4)
+    fa::vector<SPendingPoseCopy> mPendingPoseCopies;          // 0x9E8 (was mSyncSerializeGroup4)
     // 0x09F8 / 0x0A08: accumulated map-rect lists (each an fa::vector<gpg::Rect2i>,
     // 0x10 bytes: proxy/first/last/end). FlattenMapRect (FUN_0074B120) push_back's the
     // clamped flatten rect into both; the Sim map-data serializer (FUN_00745120) streams
@@ -1650,9 +1664,9 @@ namespace moho
     // 0x0A6D..0x0A6F: padding (int32 alignment)
     // Sync packing reservation counters captured from the previous frame.
     // Used by helper calls from Sim::Sync (0x00560A00 / 0x00560940).
-    SSyncSizes mSyncSizes; // 0x0A70: the last packet's lane sizes, reserved on the next one
-    int32_t mSyncReserveUnused;    // 0x0A84 (observed initialized, not yet referenced)
-    SSyncFilter mSyncFilter;       // 0x0A88..0x0AF7
+    SSyncSizes mSyncSizes;      // 0x0A70: the last packet's lane sizes, reserved on the next one
+    int32_t mSyncReserveUnused; // 0x0A84 (observed initialized, not yet referenced)
+    SSyncFilter mSyncFilter;    // 0x0A88..0x0AF7
   };
 
   /**
@@ -2648,7 +2662,7 @@ namespace moho
    *
    * What it does:
    * Publishes the global Lua binder definition for `EntityCategoryCount`.
-  */
+   */
   CScrLuaInitForm* func_EntityCategoryCount_LuaFuncDef();
 
   /**
@@ -7441,7 +7455,8 @@ CScrLuaInitForm* func_SelectCargoUnits_LuaFuncDef();
   static_assert(offsetof(Sim, mIsDesyncFree) == 0x4C, "Sim::mIsDesyncFree offset must be 0x4C");
   static_assert(offsetof(Sim, mCoordEntities) == 0x0A5C, "Sim::mCoordEntities offset must be 0x0A5C");
   static_assert(
-    offsetof(Sim, mRequestXMLArmyStatsSubmit) == 0x0A64, "Sim::mRequestXMLArmyStatsSubmit offset must be 0x0A64"
+    offsetof(Sim, mRequestXMLArmyStatsSubmit) == 0x0A64,
+    "Sim::mRequestXMLArmyStatsSubmit offset must be 0x0A64"
   );
   static_assert(offsetof(Sim, mSyncArmy) == 0x0A68, "Sim::mSyncArmy offset must be 0x0A68");
   static_assert(offsetof(Sim, mDidSync) == 0x0A6C, "Sim::mDidSync offset must be 0x0A6C");

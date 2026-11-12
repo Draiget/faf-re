@@ -39,13 +39,13 @@ namespace moho
      */
     virtual ~ShoreCell();
 
-    std::uint16_t mType;                    // +0x04
-    std::uint16_t mPad06;                   // +0x06
-    float mCenterX;                         // +0x08
-    float mCenterZ;                         // +0x0C
-    ShoreCellPoint2 mPoints[5];            // +0x10
+    std::uint16_t mType;                       // +0x04
+    std::uint16_t mPad06;                      // +0x06
+    float mCenterX;                            // +0x08
+    float mCenterZ;                            // +0x0C
+    ShoreCellPoint2 mPoints[5];                // +0x10
     SpatialDBEntry<ShoreCell> mSpatialDbEntry; // +0x38
-    Wm3::AxisAlignedBox3f mBounds;         // +0x40
+    Wm3::AxisAlignedBox3f mBounds;             // +0x40
   };
 
   static_assert(offsetof(ShoreCell, mType) == 0x04, "ShoreCell::mType offset must be 0x04");

@@ -44,7 +44,10 @@ namespace
   // (mirrors the binary's sEngineStat_Render_ActiveEmitters_1 global).
   moho::StatItem* sEngineStatRenderActiveEmitters = nullptr;
 
-  [[nodiscard]] float ProjectViewportDepthRow1(const moho::VMatrix4& viewport, const Wm3::Vec3f& point) noexcept
+  [[nodiscard]] float ProjectViewportDepthRow1(
+    const moho::VMatrix4& viewport,
+    const Wm3::Vec3f& point
+  ) noexcept
   {
     return (point.x * viewport.r[1].x) + (point.y * viewport.r[1].y) + (point.z * viewport.r[1].z) + viewport.r[1].w;
   }
@@ -71,18 +74,15 @@ namespace
 
     const float* const start = emitter->mParams.start_;
     Wm3::Vec3f trailPosition{};
-    trailPosition.x = ((interpolatedMatrix.r[0].x * start[0])
-                     + (interpolatedMatrix.r[1].x * start[1])
-                     + (interpolatedMatrix.r[2].x * start[2]))
-                    + interpolatedMatrix.r[3].x;
-    trailPosition.y = ((interpolatedMatrix.r[0].y * start[0])
-                     + (interpolatedMatrix.r[1].y * start[1])
-                     + (interpolatedMatrix.r[2].y * start[2]))
-                    + interpolatedMatrix.r[3].y;
-    trailPosition.z = ((interpolatedMatrix.r[0].z * start[0])
-                     + (interpolatedMatrix.r[1].z * start[1])
-                     + (interpolatedMatrix.r[2].z * start[2]))
-                    + interpolatedMatrix.r[3].z;
+    trailPosition.x = ((interpolatedMatrix.r[0].x * start[0]) + (interpolatedMatrix.r[1].x * start[1]) +
+                       (interpolatedMatrix.r[2].x * start[2])) +
+      interpolatedMatrix.r[3].x;
+    trailPosition.y = ((interpolatedMatrix.r[0].y * start[0]) + (interpolatedMatrix.r[1].y * start[1]) +
+                       (interpolatedMatrix.r[2].y * start[2])) +
+      interpolatedMatrix.r[3].y;
+    trailPosition.z = ((interpolatedMatrix.r[0].z * start[0]) + (interpolatedMatrix.r[1].z * start[1]) +
+                       (interpolatedMatrix.r[2].z * start[2])) +
+      interpolatedMatrix.r[3].z;
 
     return ProjectViewportDepthRow1(camera->viewport, trailPosition) <= lodCutoff;
   }
@@ -190,7 +190,10 @@ namespace moho
    * What it does:
    * No-op invalidation lane used by the trail-emitter vtable.
    */
-  void CEfxTrailEmitter::Invalidate(const std::int32_t, const std::int32_t)
+  void CEfxTrailEmitter::Invalidate(
+    const std::int32_t,
+    const std::int32_t
+  )
   {}
 
   /**
@@ -200,7 +203,9 @@ namespace moho
    * Applies trail LOD/frustum checks and focused-army recon visibility probe
    * for one camera.
    */
-  bool CEfxTrailEmitter::CanSeeCam(const GeomCamera3* const camera)
+  bool CEfxTrailEmitter::CanSeeCam(
+    const GeomCamera3* const camera
+  )
   {
     VMatrix4 interpolatedMatrix{};
     (void)CEfxEmitter::InterpolatePosition(this, &interpolatedMatrix, 0, 0.0f);
@@ -211,25 +216,24 @@ namespace moho
     const float startZ = start[2];
 
     Wm3::Vec3f trailPosition{};
-    trailPosition.x = ((interpolatedMatrix.r[0].x * startX)
-                     + (interpolatedMatrix.r[1].x * startY)
-                     + (interpolatedMatrix.r[2].x * startZ))
-                    + interpolatedMatrix.r[3].x;
-    trailPosition.y = ((interpolatedMatrix.r[0].y * startX)
-                     + (interpolatedMatrix.r[1].y * startY)
-                     + (interpolatedMatrix.r[2].y * startZ))
-                    + interpolatedMatrix.r[3].y;
-    trailPosition.z = ((interpolatedMatrix.r[0].z * startX)
-                     + (interpolatedMatrix.r[1].z * startY)
-                     + (interpolatedMatrix.r[2].z * startZ))
-                    + interpolatedMatrix.r[3].z;
+    trailPosition.x = ((interpolatedMatrix.r[0].x * startX) + (interpolatedMatrix.r[1].x * startY) +
+                       (interpolatedMatrix.r[2].x * startZ)) +
+      interpolatedMatrix.r[3].x;
+    trailPosition.y = ((interpolatedMatrix.r[0].y * startX) + (interpolatedMatrix.r[1].y * startY) +
+                       (interpolatedMatrix.r[2].y * startZ)) +
+      interpolatedMatrix.r[3].y;
+    trailPosition.z = ((interpolatedMatrix.r[0].z * startX) + (interpolatedMatrix.r[1].z * startY) +
+                       (interpolatedMatrix.r[2].z * startZ)) +
+      interpolatedMatrix.r[3].z;
 
     const float lodCutoff = mTrailBlueprint->LODCutoff;
     Wm3::Sphere3f trailSphere{};
     trailSphere.Center = trailPosition;
     trailSphere.Radius = 5.0f;
-    if ((lodCutoff > 0.0f && ProjectViewportDepthRow1(camera->viewport, trailPosition) > lodCutoff)
-        || !camera->solid2.Intersects(trailSphere)) {
+    if (
+      (lodCutoff > 0.0f && ProjectViewportDepthRow1(camera->viewport, trailPosition) > lodCutoff) ||
+      !camera->solid2.Intersects(trailSphere)
+    ) {
       mLastUpdate = 0u;
       return false;
     }
@@ -306,7 +310,9 @@ namespace moho
    * (0x190, 0x194, 0x198, 0x19C, 0x1A0, 0x1A4, 0x1B0, 0x1B1, 0x1B4), not
    * just pattern-matched from the write side.
    */
-  void CEfxTrailEmitter::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CEfxTrailEmitter::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -333,7 +339,9 @@ namespace moho
    * Serializes trail-emitter payload after base `CEffectImpl` state:
    * blueprint pointer, timing lanes, one Vector3 lane, and live flags.
    */
-  void CEfxTrailEmitter::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CEfxTrailEmitter::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;
@@ -378,8 +386,7 @@ namespace moho
     const fa::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
 
     for (const GeomCamera3& camera : cameras) {
-      if (CanSeeCam(&camera)
-          && !(mNewAttachment && !TrailEmitterPassesLodCutoffForCamera(&camera, this))) {
+      if (CanSeeCam(&camera) && !(mNewAttachment && !TrailEmitterPassesLodCutoffForCamera(&camera, this))) {
         return true;
       }
     }
@@ -403,7 +410,9 @@ namespace moho
    * segment direction, updates the running trail length/position, retains the
    * repeat and ramp textures, and (when dbg_Trail is set) draws a debug line.
    */
-  void CEfxTrailEmitter::Tick(const std::int32_t tick)
+  void CEfxTrailEmitter::Tick(
+    const std::int32_t tick
+  )
   {
     // interpScale: 1.0, or 1 / (attached entity pending-velocity scale) on the
     // final (tick == 0) sub-frame when an entity is attached.
@@ -427,12 +436,18 @@ namespace moho
 
     // Trail-start point transformed through each interpolated matrix. Keep the
     // exact parenthesized add ordering the binary emits.
-    const float curX = (((curMatrix.r[1].x * sy) + (curMatrix.r[2].x * sz)) + (curMatrix.r[0].x * sx)) + curMatrix.r[3].x;
-    const float prevX = (((prevMatrix.r[1].x * sy) + (prevMatrix.r[2].x * sz)) + (prevMatrix.r[0].x * sx)) + prevMatrix.r[3].x;
-    const float prevY = (((prevMatrix.r[0].y * sx) + (prevMatrix.r[2].y * sz)) + (prevMatrix.r[1].y * sy)) + prevMatrix.r[3].y;
-    const float prevZ = (((prevMatrix.r[0].z * sx) + (prevMatrix.r[1].z * sy)) + (prevMatrix.r[2].z * sz)) + prevMatrix.r[3].z;
-    const float curY = (((curMatrix.r[0].y * sx) + (curMatrix.r[1].y * sy)) + (curMatrix.r[2].y * sz)) + curMatrix.r[3].y;
-    const float curZ = (((curMatrix.r[0].z * sx) + (curMatrix.r[1].z * sy)) + (curMatrix.r[2].z * sz)) + curMatrix.r[3].z;
+    const float curX =
+      (((curMatrix.r[1].x * sy) + (curMatrix.r[2].x * sz)) + (curMatrix.r[0].x * sx)) + curMatrix.r[3].x;
+    const float prevX =
+      (((prevMatrix.r[1].x * sy) + (prevMatrix.r[2].x * sz)) + (prevMatrix.r[0].x * sx)) + prevMatrix.r[3].x;
+    const float prevY =
+      (((prevMatrix.r[0].y * sx) + (prevMatrix.r[2].y * sz)) + (prevMatrix.r[1].y * sy)) + prevMatrix.r[3].y;
+    const float prevZ =
+      (((prevMatrix.r[0].z * sx) + (prevMatrix.r[1].z * sy)) + (prevMatrix.r[2].z * sz)) + prevMatrix.r[3].z;
+    const float curY =
+      (((curMatrix.r[0].y * sx) + (curMatrix.r[1].y * sy)) + (curMatrix.r[2].y * sz)) + curMatrix.r[3].y;
+    const float curZ =
+      (((curMatrix.r[0].z * sx) + (curMatrix.r[1].z * sy)) + (curMatrix.r[2].z * sz)) + curMatrix.r[3].z;
 
     Wm3::Vector3f direction{};
     direction.x = curX - prevX;
@@ -605,11 +620,8 @@ namespace moho
    *    `CEfxTrailEmitter::MemberSerialize` at 0x00672820.
    */
   class CEfxTrailEmitterSerializer : public gpg::SerSaveLoadHelper<CEfxTrailEmitter>
-  {
-  };
-  static_assert(
-    sizeof(CEfxTrailEmitterSerializer) == 0x14, "CEfxTrailEmitterSerializer size must be 0x14"
-  );
+  {};
+  static_assert(sizeof(CEfxTrailEmitterSerializer) == 0x14, "CEfxTrailEmitterSerializer size must be 0x14");
 } // namespace moho
 
 namespace

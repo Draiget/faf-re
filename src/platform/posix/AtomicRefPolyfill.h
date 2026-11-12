@@ -22,19 +22,26 @@ namespace std
   public:
     using value_type = T;
 
-    explicit atomic_ref(T& object) noexcept
+    explicit atomic_ref(
+      T& object
+    ) noexcept
       : mObject(&object)
     {}
 
     atomic_ref(const atomic_ref&) noexcept = default;
     atomic_ref& operator=(const atomic_ref&) = delete;
 
-    [[nodiscard]] T load(const memory_order order = memory_order_seq_cst) const noexcept
+    [[nodiscard]] T load(
+      const memory_order order = memory_order_seq_cst
+    ) const noexcept
     {
       return __atomic_load_n(mObject, ToBuiltin(order));
     }
 
-    void store(const T value, const memory_order order = memory_order_seq_cst) const noexcept
+    void store(
+      const T value,
+      const memory_order order = memory_order_seq_cst
+    ) const noexcept
     {
       __atomic_store_n(mObject, value, ToBuiltin(order));
     }
@@ -44,64 +51,96 @@ namespace std
       return load();
     }
 
-    T exchange(const T value, const memory_order order = memory_order_seq_cst) const noexcept
+    T exchange(
+      const T value,
+      const memory_order order = memory_order_seq_cst
+    ) const noexcept
     {
       return __atomic_exchange_n(mObject, value, ToBuiltin(order));
     }
 
     bool compare_exchange_weak(
-      T& expected, const T desired, const memory_order success, const memory_order failure
+      T& expected,
+      const T desired,
+      const memory_order success,
+      const memory_order failure
     ) const noexcept
     {
       return __atomic_compare_exchange_n(mObject, &expected, desired, true, ToBuiltin(success), ToBuiltin(failure));
     }
 
-    bool compare_exchange_weak(T& expected, const T desired, const memory_order order = memory_order_seq_cst)
-      const noexcept
+    bool compare_exchange_weak(
+      T& expected,
+      const T desired,
+      const memory_order order = memory_order_seq_cst
+    ) const noexcept
     {
       return compare_exchange_weak(expected, desired, order, FailureOrder(order));
     }
 
     bool compare_exchange_strong(
-      T& expected, const T desired, const memory_order success, const memory_order failure
+      T& expected,
+      const T desired,
+      const memory_order success,
+      const memory_order failure
     ) const noexcept
     {
       return __atomic_compare_exchange_n(mObject, &expected, desired, false, ToBuiltin(success), ToBuiltin(failure));
     }
 
-    bool compare_exchange_strong(T& expected, const T desired, const memory_order order = memory_order_seq_cst)
-      const noexcept
+    bool compare_exchange_strong(
+      T& expected,
+      const T desired,
+      const memory_order order = memory_order_seq_cst
+    ) const noexcept
     {
       return compare_exchange_strong(expected, desired, order, FailureOrder(order));
     }
 
-    T fetch_add(const T value, const memory_order order = memory_order_seq_cst) const noexcept
+    T fetch_add(
+      const T value,
+      const memory_order order = memory_order_seq_cst
+    ) const noexcept
     {
       return __atomic_fetch_add(mObject, value, ToBuiltin(order));
     }
 
-    T fetch_sub(const T value, const memory_order order = memory_order_seq_cst) const noexcept
+    T fetch_sub(
+      const T value,
+      const memory_order order = memory_order_seq_cst
+    ) const noexcept
     {
       return __atomic_fetch_sub(mObject, value, ToBuiltin(order));
     }
 
-    T fetch_and(const T value, const memory_order order = memory_order_seq_cst) const noexcept
+    T fetch_and(
+      const T value,
+      const memory_order order = memory_order_seq_cst
+    ) const noexcept
     {
       return __atomic_fetch_and(mObject, value, ToBuiltin(order));
     }
 
-    T fetch_or(const T value, const memory_order order = memory_order_seq_cst) const noexcept
+    T fetch_or(
+      const T value,
+      const memory_order order = memory_order_seq_cst
+    ) const noexcept
     {
       return __atomic_fetch_or(mObject, value, ToBuiltin(order));
     }
 
-    T fetch_xor(const T value, const memory_order order = memory_order_seq_cst) const noexcept
+    T fetch_xor(
+      const T value,
+      const memory_order order = memory_order_seq_cst
+    ) const noexcept
     {
       return __atomic_fetch_xor(mObject, value, ToBuiltin(order));
     }
 
   private:
-    [[nodiscard]] static constexpr int ToBuiltin(const memory_order order) noexcept
+    [[nodiscard]] static constexpr int ToBuiltin(
+      const memory_order order
+    ) noexcept
     {
       switch (order) {
       case memory_order_relaxed:
@@ -119,10 +158,12 @@ namespace std
       }
     }
 
-    [[nodiscard]] static constexpr memory_order FailureOrder(const memory_order order) noexcept
+    [[nodiscard]] static constexpr memory_order FailureOrder(
+      const memory_order order
+    ) noexcept
     {
       return order == memory_order_acq_rel ? memory_order_acquire
-           : order == memory_order_release ? memory_order_relaxed
+        : order == memory_order_release    ? memory_order_relaxed
                                            : order;
     }
 

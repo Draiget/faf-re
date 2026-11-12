@@ -31,7 +31,7 @@ namespace
   };
 
   ThreadSafeCountedObjectTypeInfoRegistration gThreadSafeCountedObjectTypeInfoRegistration;
-}
+} // namespace
 
 namespace moho
 {
@@ -83,7 +83,9 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_ThreadSafeCountedObjectTypeInfo_c782a3, moho::register_ThreadSafeCountedObjectTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_ThreadSafeCountedObjectTypeInfo_c782a3,
+  moho::register_ThreadSafeCountedObjectTypeInfo
+)

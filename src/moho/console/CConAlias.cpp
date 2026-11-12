@@ -8,7 +8,9 @@
 namespace
 {
   [[nodiscard]]
-  bool AliasArgNeedsQuotes(const std::string_view token) noexcept
+  bool AliasArgNeedsQuotes(
+    const std::string_view token
+  ) noexcept
   {
     if (token.empty()) {
       return true;
@@ -26,7 +28,10 @@ namespace
     return false;
   }
 
-  void AppendQuotedAliasArg(std::string& out, const std::string_view token)
+  void AppendQuotedAliasArg(
+    std::string& out,
+    const std::string_view token
+  )
   {
     out.push_back('"');
     for (const char ch : token) {
@@ -39,7 +44,9 @@ namespace
   }
 
   [[nodiscard]]
-  std::string BuildAliasArgumentSuffix(const fa::vector<fa::string>& args)
+  std::string BuildAliasArgumentSuffix(
+    const fa::vector<fa::string>& args
+  )
   {
     std::string suffix;
     const std::size_t count = args.size();
@@ -74,7 +81,11 @@ namespace
  * What it does:
  * Initializes/registers the base command, then copies the expansion text.
  */
-moho::CConAlias::CConAlias(const char* const name, const char* const description, const char* const aliasText)
+moho::CConAlias::CConAlias(
+  const char* const name,
+  const char* const description,
+  const char* const aliasText
+)
   : CConCommand(name, description)
   , mAliasText(aliasText)
 {}
@@ -85,7 +96,9 @@ moho::CConAlias::CConAlias(const char* const name, const char* const description
  * What it does:
  * Builds expanded alias command text and forwards it into console command execution.
  */
-void moho::CConAlias::Handle(const fa::vector<fa::string>& args)
+void moho::CConAlias::Handle(
+  const fa::vector<fa::string>& args
+)
 {
   std::string expandedCommand{mAliasText.view()};
   if (args.size() > 1) {

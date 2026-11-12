@@ -7,4 +7,3 @@ namespace moho
    */
   XAudioError::~XAudioError() = default;
 } // namespace moho
-

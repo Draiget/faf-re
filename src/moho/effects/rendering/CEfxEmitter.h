@@ -115,7 +115,8 @@ namespace moho
      * orientation/position at `tick` + `interp`, and writes the resulting
      * world matrix (optionally composed with one parent-bone local transform).
      */
-    [[nodiscard]] static bool InterpolatePosition(const CEffectImpl* effect, VMatrix4* outMatrix, int tick, float interp);
+    [[nodiscard]] static bool
+    InterpolatePosition(const CEffectImpl* effect, VMatrix4* outMatrix, int tick, float interp);
 
     /**
      * Address: 0x0065C1A0 (FUN_0065C1A0, Moho::CEfxEmitter::Interpolate)
@@ -227,8 +228,8 @@ namespace moho
   private:
     friend struct CEfxEmitterLayoutVerifier;
 
-    EmitterType mEmitterType;               // +0x190
-    [[maybe_unused]] std::uint8_t mPad194[0x04];             // +0x194
+    EmitterType mEmitterType;                    // +0x190
+    [[maybe_unused]] std::uint8_t mPad194[0x04]; // +0x194
     /**
      * A `0x10` `{start_, end_, capacity_, originalVec_}`
      * head at `+0x198` followed immediately by its own `21 * 0x38` inline window
@@ -249,18 +250,18 @@ namespace moho
      * capacity-end of the window happens to be the address of the next member.
      */
     gpg::fastvector_n<SEfxCurve, kEmitterCurveCount> mCurves; // +0x198
-    REmitterBlueprint* mBlueprint;          // +0x640
-    float mTotalEmissions;                  // +0x644
-    std::uint32_t mLife;                    // +0x648
-    SWorldParticle mParticle;               // +0x64C
-    bool mValid;                            // +0x6D8
-    [[maybe_unused]] std::uint8_t mPad6D9[0x03];             // +0x6D9
-    std::uint32_t mZCurveMask;              // +0x6DC
-    std::int32_t mMaxLifetime;              // +0x6E0
-    bool mVisible;                          // +0x6E4
-    [[maybe_unused]] std::uint8_t mPad6E5[0x03];             // +0x6E5
-    std::uint32_t mLastUpdate;              // +0x6E8
-    Wm3::Vec3f mPos;                        // +0x6EC
+    REmitterBlueprint* mBlueprint;                            // +0x640
+    float mTotalEmissions;                                    // +0x644
+    std::uint32_t mLife;                                      // +0x648
+    SWorldParticle mParticle;                                 // +0x64C
+    bool mValid;                                              // +0x6D8
+    [[maybe_unused]] std::uint8_t mPad6D9[0x03];              // +0x6D9
+    std::uint32_t mZCurveMask;                                // +0x6DC
+    std::int32_t mMaxLifetime;                                // +0x6E0
+    bool mVisible;                                            // +0x6E4
+    [[maybe_unused]] std::uint8_t mPad6E5[0x03];              // +0x6E5
+    std::uint32_t mLastUpdate;                                // +0x6E8
+    Wm3::Vec3f mPos;                                          // +0x6EC
   };
 
   struct CEfxEmitterLayoutVerifier
@@ -269,7 +270,8 @@ namespace moho
     static_assert(offsetof(CEfxEmitter, mCurves) == 0x198, "CEfxEmitter::mCurves offset must be 0x198");
     static_assert(sizeof(CEfxEmitter::mCurves) == 0x4A8, "CEfxEmitter::mCurves size must be 0x4A8");
     static_assert(
-      offsetof(CEfxEmitter, mCurves.inlineVec_) == 0x1A8, "CEfxEmitter::mCurves inline window offset must be 0x1A8"
+      offsetof(CEfxEmitter, mCurves.inlineVec_) == 0x1A8,
+      "CEfxEmitter::mCurves inline window offset must be 0x1A8"
     );
     static_assert(offsetof(CEfxEmitter, mBlueprint) == 0x640, "CEfxEmitter::mBlueprint offset must be 0x640");
     static_assert(offsetof(CEfxEmitter, mTotalEmissions) == 0x644, "CEfxEmitter::mTotalEmissions offset must be 0x644");

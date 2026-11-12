@@ -86,17 +86,17 @@ namespace gpg::gal
     void ClearDataBuffer() noexcept;
     [[nodiscard]] std::size_t DataSizeBytes() const noexcept;
 
-    std::uint32_t source_ = 0;                            // +0x04
-    fa::string location_{};                            // +0x08
-    gpg::MemBuffer<const char> dataBuffer_{};             // +0x24, shared owner and native pointer bounds
-    std::uint32_t type_ = 0;                              // +0x34
-    std::uint32_t usage_ = 0;                             // +0x38
-    std::uint32_t format_ = 0;                            // +0x3C
-    std::uint32_t mipmapLevels_ = 0;                      // +0x40
-    std::uint32_t reserved0x44_ = 0;                      // +0x44
-    std::uint32_t width_ = 0;                             // +0x48
-    std::uint32_t height_ = 0;                            // +0x4C
-    std::uint32_t reserved0x50_ = 0;                      // +0x50
+    std::uint32_t source_ = 0;                // +0x04
+    fa::string location_{};                   // +0x08
+    gpg::MemBuffer<const char> dataBuffer_{}; // +0x24, shared owner and native pointer bounds
+    std::uint32_t type_ = 0;                  // +0x34
+    std::uint32_t usage_ = 0;                 // +0x38
+    std::uint32_t format_ = 0;                // +0x3C
+    std::uint32_t mipmapLevels_ = 0;          // +0x40
+    std::uint32_t reserved0x44_ = 0;          // +0x44
+    std::uint32_t width_ = 0;                 // +0x48
+    std::uint32_t height_ = 0;                // +0x4C
+    std::uint32_t reserved0x50_ = 0;          // +0x50
   };
 
   static_assert(offsetof(TextureContext, source_) == 0x04, "TextureContext::source_ offset must be 0x04");

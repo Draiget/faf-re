@@ -51,12 +51,15 @@ namespace moho
    * Binds the SCM file and resource path, then caches the mesh's bounding
    * box (over every vertex position) and its size.
    */
-  RScmResource::RScmResource(const gpg::StrArg resourcePath, const boost::shared_ptr<const SScmFile>& scmFile) :
-    mName(resourcePath),
-    mFile(scmFile),
-    mSkeleton(nullptr),
-    mBounds(Empty<Wm3::AxisAlignedBox3f>()),
-    mSize(0.0f)
+  RScmResource::RScmResource(
+    const gpg::StrArg resourcePath,
+    const boost::shared_ptr<const SScmFile>& scmFile
+  )
+    : mName(resourcePath)
+    , mFile(scmFile)
+    , mSkeleton(nullptr)
+    , mBounds(Empty<Wm3::AxisAlignedBox3f>())
+    , mSize(0.0f)
   {
     const std::int32_t vertexCount = static_cast<std::int32_t>(mFile->mVertexCount);
     const SScmVertex* const vertices = scm_file::GetVertices(*mFile);
@@ -99,13 +102,17 @@ namespace moho
   {
     bool gKeepGeometry = true;
 
-    void DeleteTrimmedScmFile(const SScmFile* const file) noexcept
+    void DeleteTrimmedScmFile(
+      const SScmFile* const file
+    ) noexcept
     {
       delete[] reinterpret_cast<const char*>(file);
     }
   } // namespace
 
-  void RScmResource::SetKeepGeometry(const bool keep) noexcept
+  void RScmResource::SetKeepGeometry(
+    const bool keep
+  ) noexcept
   {
     gKeepGeometry = keep;
   }
@@ -154,7 +161,8 @@ namespace moho
   }
 
   /**
-   * Address: 0x00538DB0 (FUN_00538DB0, ?GetSkeleton@RScmResource@Moho@@QAE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)
+   * Address: 0x00538DB0 (FUN_00538DB0,
+   * ?GetSkeleton@RScmResource@Moho@@QAE?AV?$shared_ptr@$$CBVCAniSkel@Moho@@@boost@@XZ)
    *
    * What it does:
    * Lazily constructs the owned skeleton on first request by parsing this
@@ -177,7 +185,10 @@ namespace moho
     struct KeepOwnerAlive
     {
       boost::shared_ptr<RScmResource> owner;
-      void operator()(const CAniSkel*) const {}
+      void operator()(
+        const CAniSkel*
+      ) const
+      {}
     };
 
     KeepOwnerAlive keepOwner{shared_from_this()};
@@ -229,7 +240,12 @@ namespace moho
 
 namespace moho
 {
-  void RScmResource::MemberConstruct(gpg::ReadArchive& archive, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void RScmResource::MemberConstruct(
+    gpg::ReadArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     fa::string path;
     archive.ReadString(&path);
@@ -240,7 +256,10 @@ namespace moho
    * Address: 0x00538F70 (FUN_00538F70)
    */
   void RScmResource::MemberSaveConstructArgs(
-    gpg::WriteArchive& archive, const int, const gpg::RRef&, gpg::SerSaveConstructArgsResult& result
+    gpg::WriteArchive& archive,
+    const int,
+    const gpg::RRef&,
+    gpg::SerSaveConstructArgsResult& result
   )
   {
     fa::string mountedPath;
@@ -300,7 +319,10 @@ namespace moho
    * empty-path case lands there too, via the manager's own
    * `GetResource: Invalid name` rejection.
    */
-  boost::shared_ptr<RScmResource> GetModel(const gpg::StrArg path, CResourceWatcher* const resourceWatcher)
+  boost::shared_ptr<RScmResource> GetModel(
+    const gpg::StrArg path,
+    CResourceWatcher* const resourceWatcher
+  )
   {
     gpg::RType* resourceType = RScmResource::sType;
     if (resourceType == nullptr) {

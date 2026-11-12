@@ -123,12 +123,7 @@ namespace moho
   ) noexcept
   {
     const wchar_t* const safeRhs = (rhs != nullptr) ? rhs : L"";
-    return CompareWideStringPrefixRange(
-      (lhs != nullptr) ? lhs->size() : 0U,
-      lhs,
-      std::wcslen(safeRhs),
-      safeRhs
-    );
+    return CompareWideStringPrefixRange((lhs != nullptr) ? lhs->size() : 0U, lhs, std::wcslen(safeRhs), safeRhs);
   }
 
   /**

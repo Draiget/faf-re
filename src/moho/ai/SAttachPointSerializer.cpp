@@ -22,7 +22,9 @@ namespace moho
    * Deserializes one `SAttachPoint` payload lane (`index`, `localPos`,
    * `distSq`) from the archive.
    */
-  void SAttachPoint::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SAttachPoint::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     archive->ReadUInt(&index);
 
@@ -41,7 +43,9 @@ namespace moho
    * Serializes one `SAttachPoint` payload lane (`index`, `localPos`,
    * `distSq`) into the archive.
    */
-  void SAttachPoint::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SAttachPoint::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     archive->WriteUInt(index);
 

@@ -26,10 +26,13 @@ namespace faf::remote
   /** The same clients, names, sources, rates, connection and votes; ping and quiet time may differ. */
   [[nodiscard]] bool SameBesidesTimes(const wire::SRoster& a, const wire::SRoster& b) noexcept;
 
-  /** The `Chat` message: its kind, a varint client index (the addressee from a player, the sender from the server), the payload. */
+  /** The `Chat` message: its kind, a varint client index (the addressee from a player, the sender from the server), the
+   * payload. */
   [[nodiscard]] std::vector<std::uint8_t> EncodeChatMessage(int clientIndex, std::span<const std::uint8_t> payload);
-  /** False unless `message` is a whole `Chat` with an index under `wire::SRoster::kMaxEntries` and at most `kMaxChatBytes`. */
-  [[nodiscard]] bool DecodeChatMessage(std::span<const std::uint8_t> message, int& clientIndex, std::span<const std::uint8_t>& payload);
+  /** False unless `message` is a whole `Chat` with an index under `wire::SRoster::kMaxEntries` and at most
+   * `kMaxChatBytes`. */
+  [[nodiscard]] bool
+  DecodeChatMessage(std::span<const std::uint8_t> message, int& clientIndex, std::span<const std::uint8_t>& payload);
 
   /**
    * How much chat one player may send through the server: `kBurst` at once, then `kPerSecond`. A player's game sends a

@@ -11,7 +11,7 @@ namespace gpg
 {
   class ReadArchive;
   class WriteArchive;
-}
+} // namespace gpg
 
 namespace moho
 {
@@ -177,12 +177,8 @@ namespace moho
      * Address: 0x005D2480 (FUN_005D2480, func_TrySnapPosToWaypoint)
      */
     [[nodiscard]]
-    static Wm3::Vector3f TrySnapPosToWaypoint(
-      const CAiSteeringImpl& steering,
-      int index,
-      const Wm3::Vector3f& currentPos,
-      float tolerance
-    );
+    static Wm3::Vector3f
+    TrySnapPosToWaypoint(const CAiSteeringImpl& steering, int index, const Wm3::Vector3f& currentPos, float tolerance);
 
   public:
     static gpg::RType* sType;
@@ -192,49 +188,50 @@ namespace moho
     MOHO_EBO_PADDING_FIELD(1);
 #endif
 
-    Unit* mOwnerUnit;                 // +0x20
-    Wm3::Vector3f mWaypoints[4];      // +0x24
-    std::int32_t mWaypointCount;      // +0x54
-    std::int32_t mCurrentWaypointIndex; // +0x58
-    ELayer mMovementLayer;            // +0x5C
-    CUnitMotion* mUnitMotion;         // +0x60
-    SCollisionInfo mCollisionInfo;    // +0x64
-    CAiPathSpline* mPath;             // +0x80
-    Wm3::Vector3f mCollisionAvoidTarget; // +0x84
-    Wm3::Vector3f mDestination;       // +0x90
-    std::uint8_t mNeedsWaypointRefresh; // +0x9C
-    std::uint8_t mTopSpeedFromCalc1;  // +0x9D
-    std::uint8_t mTopSpeedFromCalc2;  // +0x9E
-    std::uint8_t mForceTopSpeed;      // +0x9F
+    Unit* mOwnerUnit;                       // +0x20
+    Wm3::Vector3f mWaypoints[4];            // +0x24
+    std::int32_t mWaypointCount;            // +0x54
+    std::int32_t mCurrentWaypointIndex;     // +0x58
+    ELayer mMovementLayer;                  // +0x5C
+    CUnitMotion* mUnitMotion;               // +0x60
+    SCollisionInfo mCollisionInfo;          // +0x64
+    CAiPathSpline* mPath;                   // +0x80
+    Wm3::Vector3f mCollisionAvoidTarget;    // +0x84
+    Wm3::Vector3f mDestination;             // +0x90
+    std::uint8_t mNeedsWaypointRefresh;     // +0x9C
+    std::uint8_t mTopSpeedFromCalc1;        // +0x9D
+    std::uint8_t mTopSpeedFromCalc2;        // +0x9E
+    std::uint8_t mForceTopSpeed;            // +0x9F
     std::uint8_t mPausedForStateTransition; // +0xA0
-    std::uint8_t mPadA1[3];           // +0xA1
+    std::uint8_t mPadA1[3];                 // +0xA1
   };
 
   static_assert(sizeof(CAiSteeringImpl) == 0xA4, "CAiSteeringImpl size must be 0xA4");
   static_assert(offsetof(CAiSteeringImpl, mOwnerUnit) == 0x20, "CAiSteeringImpl::mOwnerUnit offset must be 0x20");
   static_assert(offsetof(CAiSteeringImpl, mWaypoints) == 0x24, "CAiSteeringImpl::mWaypoints offset must be 0x24");
   static_assert(
-    offsetof(CAiSteeringImpl, mWaypointCount) == 0x54, "CAiSteeringImpl::mWaypointCount offset must be 0x54"
+    offsetof(CAiSteeringImpl, mWaypointCount) == 0x54,
+    "CAiSteeringImpl::mWaypointCount offset must be 0x54"
   );
   static_assert(
     offsetof(CAiSteeringImpl, mCurrentWaypointIndex) == 0x58,
     "CAiSteeringImpl::mCurrentWaypointIndex offset must be 0x58"
   );
   static_assert(
-    offsetof(CAiSteeringImpl, mMovementLayer) == 0x5C, "CAiSteeringImpl::mMovementLayer offset must be 0x5C"
+    offsetof(CAiSteeringImpl, mMovementLayer) == 0x5C,
+    "CAiSteeringImpl::mMovementLayer offset must be 0x5C"
   );
   static_assert(offsetof(CAiSteeringImpl, mUnitMotion) == 0x60, "CAiSteeringImpl::mUnitMotion offset must be 0x60");
   static_assert(
-    offsetof(CAiSteeringImpl, mCollisionInfo) == 0x64, "CAiSteeringImpl::mCollisionInfo offset must be 0x64"
+    offsetof(CAiSteeringImpl, mCollisionInfo) == 0x64,
+    "CAiSteeringImpl::mCollisionInfo offset must be 0x64"
   );
   static_assert(offsetof(CAiSteeringImpl, mPath) == 0x80, "CAiSteeringImpl::mPath offset must be 0x80");
   static_assert(
     offsetof(CAiSteeringImpl, mCollisionAvoidTarget) == 0x84,
     "CAiSteeringImpl::mCollisionAvoidTarget offset must be 0x84"
   );
-  static_assert(
-    offsetof(CAiSteeringImpl, mDestination) == 0x90, "CAiSteeringImpl::mDestination offset must be 0x90"
-  );
+  static_assert(offsetof(CAiSteeringImpl, mDestination) == 0x90, "CAiSteeringImpl::mDestination offset must be 0x90");
   static_assert(
     offsetof(CAiSteeringImpl, mNeedsWaypointRefresh) == 0x9C,
     "CAiSteeringImpl::mNeedsWaypointRefresh offset must be 0x9C"
@@ -248,7 +245,8 @@ namespace moho
     "CAiSteeringImpl::mTopSpeedFromCalc2 offset must be 0x9E"
   );
   static_assert(
-    offsetof(CAiSteeringImpl, mForceTopSpeed) == 0x9F, "CAiSteeringImpl::mForceTopSpeed offset must be 0x9F"
+    offsetof(CAiSteeringImpl, mForceTopSpeed) == 0x9F,
+    "CAiSteeringImpl::mForceTopSpeed offset must be 0x9F"
   );
   static_assert(
     offsetof(CAiSteeringImpl, mPausedForStateTransition) == 0xA0,
@@ -256,7 +254,8 @@ namespace moho
   );
 
   /**
-   * Address: 0x005D3C30 (FUN_005D3C30, ?AI_CreateSteering@Moho@@YAPAVIAiSteering@1@PAVUnit@1@PAVCUnitMotion@1@W4ELayer@1@@Z)
+   * Address: 0x005D3C30 (FUN_005D3C30,
+   * ?AI_CreateSteering@Moho@@YAPAVIAiSteering@1@PAVUnit@1@PAVCUnitMotion@1@W4ELayer@1@@Z)
    *
    * What it does:
    * Allocates and constructs CAiSteeringImpl.

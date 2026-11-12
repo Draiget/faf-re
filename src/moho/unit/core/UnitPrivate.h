@@ -118,7 +118,6 @@
 
 #include "gpg/core/reflection/StaticInitPhase.h"
 
-
 using namespace moho;
 namespace moho
 {
@@ -616,7 +615,7 @@ namespace moho
    * Resolves one unit stat path and returns the stat node as a Lua table.
    */
   int cfunc_UnitGetStatL(LuaPlus::LuaState* state);
-}
+} // namespace moho
 
 namespace
 {
@@ -631,8 +630,7 @@ namespace
     const STIMap& mapData,
     const SOCellPos& candidateCell
   );
-}
-
+} // namespace
 
 [[noreturn]] void EngineThrowContainerTooLong(const char* message);
 namespace moho
@@ -640,5 +638,4 @@ namespace moho
   extern bool sim_DeferBlipUnlinks;
   extern bool sim_ParallelBlipFlush;
   extern int sim_DeferBlipUnlinksTicks;
-}
-
+} // namespace moho

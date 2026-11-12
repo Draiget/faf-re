@@ -51,7 +51,8 @@ namespace
   // MemberDeserialize`/`MemberSerialize` directly.
 
   [[nodiscard]] moho::CAniPoseBone* ResolveWatchBone(
-    moho::CBuilderArmManipulator* const manipulator, const std::size_t watchSlot
+    moho::CBuilderArmManipulator* const manipulator,
+    const std::size_t watchSlot
   ) noexcept
   {
     if (manipulator->mWatchBones.begin() == nullptr) {
@@ -61,7 +62,9 @@ namespace
     // 0x00635FE9..0x00635FEE: watch bones live in the pose being built this
     // frame (`[actor+0]`, CAniActor::mPose).
     moho::CAniActor* const actor = manipulator->mOwnerActor;
-    return moho::ResolvePoseBone(actor != nullptr ? actor->mPose.get() : nullptr, manipulator->mWatchBones[watchSlot].mBoneIndex);
+    return moho::ResolvePoseBone(
+      actor != nullptr ? actor->mPose.get() : nullptr, manipulator->mWatchBones[watchSlot].mBoneIndex
+    );
   }
 
   /**
@@ -118,7 +121,9 @@ namespace moho
    * `IAniManipulator` base state, goal weak-pointer lane, and all builder-arm
    * tracking parameters.
    */
-  void CBuilderArmManipulator::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CBuilderArmManipulator::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -152,7 +157,9 @@ namespace moho
    * Serializes one `CBuilderArmManipulator` lane by saving IAniManipulator
    * base state, goal weak-pointer lane, and all builder-arm tracking fields.
    */
-  void CBuilderArmManipulator::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CBuilderArmManipulator::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (!archive) {
       return;
@@ -243,7 +250,9 @@ namespace moho
       LuaPlus::LuaObject scriptContext1{};
       LuaPlus::LuaObject metatableObject{};
       (void)func_CreateLuaBuilderArmObject(&metatableObject, sim != nullptr ? sim->mLuaState : nullptr);
-      static_cast<CScriptObject*>(this)->CreateLuaObject(metatableObject, scriptContext1, scriptContext2, scriptContext3);
+      static_cast<CScriptObject*>(this)->CreateLuaObject(
+        metatableObject, scriptContext1, scriptContext2, scriptContext3
+      );
     }
 
     // Read the goal unit's actor skeleton (RAII shared_ptr; released at scope end).
@@ -274,16 +283,13 @@ namespace moho
         // atan2(m02, m22) - the same heading extraction the disassembly of
         // CRotateManipulator::MoveManipulator (0x00643860) spells out at
         // 0x006438CD..0x00643925.
-        mHeadingCenter = fa::atan2(
-          ((ori.w * ori.y) + (ori.x * ori.z)) * 2.0f,
-          1.0f - (((ori.x * ori.x) + (ori.y * ori.y)) * 2.0f)
-        );
+        mHeadingCenter =
+          fa::atan2(((ori.w * ori.y) + (ori.x * ori.z)) * 2.0f, 1.0f - (((ori.x * ori.x) + (ori.y * ori.y)) * 2.0f));
       }
     }
 
     // Clear the unit builder's on-target latch (IAiBuilder vtable slot 17).
-    if (Unit* const targetUnit = mGoalUnit.GetObjectPtr();
-        targetUnit != nullptr && targetUnit->AiBuilder != nullptr) {
+    if (Unit* const targetUnit = mGoalUnit.GetObjectPtr(); targetUnit != nullptr && targetUnit->AiBuilder != nullptr) {
       targetUnit->AiBuilder->BuilderSetOnTarget(false);
     }
   }
@@ -345,7 +351,8 @@ namespace moho
    * builder aim target.
    */
   Wm3::Vector3f* CBuilderArmManipulator::ComputeDirectionToReferenceBone(
-    Wm3::Vector3f* const outDirection, const Wm3::Vector3f& targetPoint
+    Wm3::Vector3f* const outDirection,
+    const Wm3::Vector3f& targetPoint
   ) const
   {
     // 0x006366F0..0x006366F7 reads the reference bone from `[actor+8]`,
@@ -577,8 +584,7 @@ namespace moho
       return false;
     }
 
-    const Wm3::Vector3f aimTarget =
-      jobInputs != nullptr ? Wm3::Vector3f::ZERO : unit->AiBuilder->BuilderGetAimTarget();
+    const Wm3::Vector3f aimTarget = jobInputs != nullptr ? Wm3::Vector3f::ZERO : unit->AiBuilder->BuilderGetAimTarget();
     // 0x00636616..0x00636626: a 12-byte memcmp against `Vector3<float>::ZERO`
     // (0x00F3D21C) -- Wm3 `operator==` -- so a `-0` lane counts as a target.
     if (!(aimTarget == Wm3::Vector3f::ZERO)) {
@@ -612,7 +618,9 @@ namespace moho
    * slew, where the heading step needs no pose: `ComputeTrackingStep`, as `UpdateTrackingAxis`
    * computes it.
    */
-  bool CBuilderArmManipulator::IsPoseJobQuiet(const Unit& owner) const
+  bool CBuilderArmManipulator::IsPoseJobQuiet(
+    const Unit& owner
+  ) const
   {
     const Unit* const unit = mGoalUnit.GetObjectPtr();
     if (unit != &owner) {

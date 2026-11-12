@@ -64,7 +64,7 @@ namespace
       MakeBorderVertex(left, bottom, color, uvs.mBottomLeftU, uvs.mBottomLeftV);
     primBatcher->DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
   }
-}
+} // namespace
 
 gpg::RType* moho::CMauiScrollbar::sType = nullptr;
 
@@ -317,12 +317,8 @@ void moho::CMauiScrollbar::DoRender(
   }
 
   if (vertical) {
-    DrawScrollbarQuad(
-      primBatcher, mThumbTop, left, thumbStart, right, thumbStart + topCapLength, color, uvs
-    );
-    DrawScrollbarQuad(
-      primBatcher, mThumbBottom, left, thumbEnd - bottomCapLength, right, thumbEnd, color, uvs
-    );
+    DrawScrollbarQuad(primBatcher, mThumbTop, left, thumbStart, right, thumbStart + topCapLength, color, uvs);
+    DrawScrollbarQuad(primBatcher, mThumbBottom, left, thumbEnd - bottomCapLength, right, thumbEnd, color, uvs);
 
     if (std::fabs(thumbEnd - thumbStart) > capLength) {
       DrawScrollbarQuad(
@@ -339,23 +335,12 @@ void moho::CMauiScrollbar::DoRender(
     return;
   }
 
-  DrawScrollbarQuad(
-    primBatcher, mThumbTop, thumbStart - topCapLength, top, thumbStart, bottom, color, uvs
-  );
-  DrawScrollbarQuad(
-    primBatcher, mThumbBottom, thumbEnd, top, thumbEnd + bottomCapLength, bottom, color, uvs
-  );
+  DrawScrollbarQuad(primBatcher, mThumbTop, thumbStart - topCapLength, top, thumbStart, bottom, color, uvs);
+  DrawScrollbarQuad(primBatcher, mThumbBottom, thumbEnd, top, thumbEnd + bottomCapLength, bottom, color, uvs);
 
   if (std::fabs(thumbEnd - thumbStart) > capLength) {
     DrawScrollbarQuad(
-      primBatcher,
-      mThumbMiddle,
-      thumbStart - topCapLength,
-      top,
-      thumbEnd + bottomCapLength,
-      bottom,
-      color,
-      uvs
+      primBatcher, mThumbMiddle, thumbStart - topCapLength, top, thumbEnd + bottomCapLength, bottom, color, uvs
     );
   }
 }

@@ -10,8 +10,10 @@
  * `SPointVector` payload.
  */
 template <>
-LuaPlus::LuaObject
-moho::SCR_ToLua<moho::SPointVector>(LuaPlus::LuaState* const state, const moho::SPointVector& value)
+LuaPlus::LuaObject moho::SCR_ToLua<moho::SPointVector>(
+  LuaPlus::LuaState* const state,
+  const moho::SPointVector& value
+)
 {
   LuaPlus::LuaObject result;
   result.AssignNewTable(state, 0, 6);
@@ -31,8 +33,10 @@ moho::SCR_ToLua<moho::SPointVector>(LuaPlus::LuaState* const state, const moho::
  * Builds a 4-key Lua hash table (`x0`,`y0`,`x1`,`y1`) from one `Rect2f`.
  */
 template <>
-LuaPlus::LuaObject
-moho::SCR_ToLua<gpg::Rect2<float>>(LuaPlus::LuaState* const state, const gpg::Rect2<float>& value)
+LuaPlus::LuaObject moho::SCR_ToLua<gpg::Rect2<float>>(
+  LuaPlus::LuaState* const state,
+  const gpg::Rect2<float>& value
+)
 {
   LuaPlus::LuaObject result;
   result.AssignNewTable(state, 0, 4);
@@ -50,8 +54,10 @@ moho::SCR_ToLua<gpg::Rect2<float>>(LuaPlus::LuaState* const state, const gpg::Re
  * Builds a 4-key Lua hash table (`x0`,`y0`,`x1`,`y1`) from one `Rect2i`.
  */
 template <>
-LuaPlus::LuaObject
-moho::SCR_ToLua<gpg::Rect2<int>>(LuaPlus::LuaState* const state, const gpg::Rect2<int>& value)
+LuaPlus::LuaObject moho::SCR_ToLua<gpg::Rect2<int>>(
+  LuaPlus::LuaState* const state,
+  const gpg::Rect2<int>& value
+)
 {
   LuaPlus::LuaObject result;
   result.AssignNewTable(state, 0, 4);
@@ -70,8 +76,10 @@ moho::SCR_ToLua<gpg::Rect2<int>>(LuaPlus::LuaState* const state, const gpg::Rect
  * and attaches the shared vector metatable.
  */
 template <>
-LuaPlus::LuaObject
-moho::SCR_ToLua<Wm3::Quaternion<float>>(LuaPlus::LuaState* const state, const Wm3::Quaternion<float>& value)
+LuaPlus::LuaObject moho::SCR_ToLua<Wm3::Quaternion<float>>(
+  LuaPlus::LuaState* const state,
+  const Wm3::Quaternion<float>& value
+)
 {
   LuaPlus::LuaObject result;
   result.AssignNewTable(state, 4, 0);
@@ -93,8 +101,10 @@ moho::SCR_ToLua<Wm3::Quaternion<float>>(LuaPlus::LuaState* const state, const Wm
  * the shared vector metatable.
  */
 template <>
-LuaPlus::LuaObject
-moho::SCR_ToLua<Wm3::Vector2<float>>(LuaPlus::LuaState* const state, const Wm3::Vector2<float>& value)
+LuaPlus::LuaObject moho::SCR_ToLua<Wm3::Vector2<float>>(
+  LuaPlus::LuaState* const state,
+  const Wm3::Vector2<float>& value
+)
 {
   LuaPlus::LuaObject result;
   result.AssignNewTable(state, 2, 0);
@@ -114,8 +124,10 @@ moho::SCR_ToLua<Wm3::Vector2<float>>(LuaPlus::LuaState* const state, const Wm3::
  * the shared vector metatable.
  */
 template <>
-LuaPlus::LuaObject
-moho::SCR_ToLua<Wm3::Vector3<float>>(LuaPlus::LuaState* const state, const Wm3::Vector3<float>& value)
+LuaPlus::LuaObject moho::SCR_ToLua<Wm3::Vector3<float>>(
+  LuaPlus::LuaState* const state,
+  const Wm3::Vector3<float>& value
+)
 {
   LuaPlus::LuaObject result;
   result.AssignNewTable(state, 3, 0);

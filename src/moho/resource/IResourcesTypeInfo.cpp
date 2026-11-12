@@ -23,7 +23,9 @@ namespace
    * Executes one non-deleting `gpg::RType` base-teardown lane for
    * `IResourcesTypeInfo`.
    */
-  [[maybe_unused]] void cleanup_IResourcesTypeInfoRTypeBase(moho::IResourcesTypeInfo* const typeInfo) noexcept
+  [[maybe_unused]] void cleanup_IResourcesTypeInfoRTypeBase(
+    moho::IResourcesTypeInfo* const typeInfo
+  ) noexcept
   {
     gpg::ClearTypeLists(typeInfo);
   }
@@ -84,4 +86,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_IResourcesTypeInfo_80c926, moho::register_IResourcesTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_IResourcesTypeInfo_80c926,
+  moho::register_IResourcesTypeInfo
+)

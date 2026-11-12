@@ -39,7 +39,12 @@ namespace
    * releasing the destination's old storage. Bound as `serLoadFunc_`;
    * `version`/`ownerRef` are unused by the binary body.
    */
-  void LoadHPathCellVector(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef*)
+  void LoadHPathCellVector(
+    gpg::ReadArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef*
+  )
   {
     auto* const storage = reinterpret_cast<HPathCellVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -73,7 +78,12 @@ namespace
    * (via `WriteArchive::Write`, forwarding the caller's owner reference). Bound
    * as `serSaveFunc_`.
    */
-  void SaveHPathCellVector(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void SaveHPathCellVector(
+    gpg::WriteArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const storage = reinterpret_cast<const HPathCellVector*>(objectPtr);
     GPG_ASSERT(archive != nullptr);
@@ -127,7 +137,9 @@ const char* gpg::RVectorType<moho::HPathCell>::GetName() const
  * What it does:
  * Renders `"<base RType lexical>, size=<count>"`.
  */
-fa::string gpg::RVectorType<moho::HPathCell>::GetLexical(const gpg::RRef& ref) const
+fa::string gpg::RVectorType<moho::HPathCell>::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   const fa::string base = gpg::RType::GetLexical(ref);
   return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
@@ -168,7 +180,10 @@ void gpg::RVectorType<moho::HPathCell>::Init()
  * Wraps `&vec[ind]` (a `moho::HPathCell*` slot inside the vector storage) as one
  * `gpg::RRef_HPathCell` reference.
  */
-gpg::RRef gpg::RVectorType<moho::HPathCell>::SubscriptIndex(void* const obj, const int ind) const
+gpg::RRef gpg::RVectorType<moho::HPathCell>::SubscriptIndex(
+  void* const obj,
+  const int ind
+) const
 {
   auto* const storage = static_cast<HPathCellVector*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -190,7 +205,9 @@ gpg::RRef gpg::RVectorType<moho::HPathCell>::SubscriptIndex(void* const obj, con
  * What it does:
  * Returns the element count (`(_Mylast - _Myfirst) / 4`), or 0 when unallocated.
  */
-size_t gpg::RVectorType<moho::HPathCell>::GetCount(void* const obj) const
+size_t gpg::RVectorType<moho::HPathCell>::GetCount(
+  void* const obj
+) const
 {
   if (!obj) {
     return 0u;
@@ -206,7 +223,10 @@ size_t gpg::RVectorType<moho::HPathCell>::GetCount(void* const obj) const
  * Resizes the underlying `vector<HPathCell>` storage to `count`, zero-filling
  * any growth.
  */
-void gpg::RVectorType<moho::HPathCell>::SetCount(void* const obj, const int count) const
+void gpg::RVectorType<moho::HPathCell>::SetCount(
+  void* const obj,
+  const int count
+) const
 {
   auto* const storage = static_cast<HPathCellVector*>(obj);
   GPG_ASSERT(storage != nullptr);
@@ -249,4 +269,7 @@ void moho::register_HPathCellVectorType()
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_HPathCellVectorType_00_63aed0, moho::register_HPathCellVectorType_00)
+GPG_PREREGISTER_INIT(
+  register_HPathCellVectorType_00_63aed0,
+  moho::register_HPathCellVectorType_00
+)

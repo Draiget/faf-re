@@ -28,12 +28,19 @@ namespace faf::headless
 
     constexpr std::uint32_t kSmallestNumberId = 1u << 20;
 
-    [[nodiscard]] bool ParseDigits(const std::string_view text, std::uint32_t& id) noexcept
+    [[nodiscard]] bool ParseDigits(
+      const std::string_view text,
+      std::uint32_t& id
+    ) noexcept
     {
-      return !text.empty() && std::from_chars(text.data(), text.data() + text.size(), id).ptr == text.data() + text.size();
+      return !text.empty() &&
+        std::from_chars(text.data(), text.data() + text.size(), id).ptr == text.data() + text.size();
     }
 
-    [[nodiscard]] bool WholeNumberId(const float value, std::uint32_t& id) noexcept
+    [[nodiscard]] bool WholeNumberId(
+      const float value,
+      std::uint32_t& id
+    ) noexcept
     {
       if (!(value >= static_cast<float>(kSmallestNumberId)) || value >= 4294967040.0f || std::floor(value) != value) {
         return false;
@@ -51,11 +58,18 @@ namespace faf::headless
     const remote::CViewIdMap idMap;
     const std::vector<std::uint8_t>& table;
     std::size_t pos = 0;
-    std::string_view topKey;
+    std::string_view topKey{};
     bool endsLabel = false; // the id's value is a boolean: a reclaim label's end, not a new one
 
-    [[nodiscard]] bool Left(const std::size_t count) const noexcept { return pos + count <= table.size(); }
-    [[nodiscard]] bool ReadString(std::string_view& text) noexcept
+    [[nodiscard]] bool Left(
+      const std::size_t count
+    ) const noexcept
+    {
+      return pos + count <= table.size();
+    }
+    [[nodiscard]] bool ReadString(
+      std::string_view& text
+    ) noexcept
     {
       const auto* const start = table.data() + pos;
       const void* const end = std::memchr(start, 0, table.size() - pos);
@@ -75,20 +89,40 @@ namespace faf::headless
     }
   };
 
-  void CReplaySyncSpy::Example(const SWalk& walk, const char* const what, const std::uint32_t id, const std::string_view field)
+  void CReplaySyncSpy::Example(
+    const SWalk& walk,
+    const char* const what,
+    const std::uint32_t id,
+    const std::string_view field
+  )
   {
     if (mExamples.size() >= 12u) {
       return;
     }
     char text[192];
     std::snprintf(
-      text, sizeof(text), "%s: id 0x%08x in %.*s.%.*s, view of army %d, beat %d", what, id, static_cast<int>(walk.topKey.size()),
-      walk.topKey.data(), static_cast<int>(field.size()), field.data(), walk.army, static_cast<int>(walk.sim.mCurBeat)
+      text,
+      sizeof(text),
+      "%s: id 0x%08x in %.*s.%.*s, view of army %d, beat %d",
+      what,
+      id,
+      static_cast<int>(walk.topKey.size()),
+      walk.topKey.data(),
+      static_cast<int>(field.size()),
+      field.data(),
+      walk.army,
+      static_cast<int>(walk.sim.mCurBeat)
     );
     mExamples.emplace_back(text);
   }
 
-  void CReplaySyncSpy::CheckId(SWalk& walk, const std::uint32_t id, const std::string_view field, const bool isKey, const int depth)
+  void CReplaySyncSpy::CheckId(
+    SWalk& walk,
+    const std::uint32_t id,
+    const std::string_view field,
+    const bool isKey,
+    const int depth
+  )
   {
     const moho::Entity* const entity = walk.sim.mEntityDB != nullptr ? walk.sim.mEntityDB->FindEntityById(id) : nullptr;
     ++mIds;
@@ -99,14 +133,16 @@ namespace faf::headless
 
     const remote::SSyncIdField* mark = nullptr;
     for (const remote::SSyncIdField& candidate : remote::SyncIdFields()) {
-      if (candidate.key == walk.topKey && (isKey ? (depth == 1 && candidate.field.empty()) : candidate.field == field)) {
+      if (
+        candidate.key == walk.topKey && (isKey ? (depth == 1 && candidate.field.empty()) : candidate.field == field)
+      ) {
         mark = &candidate;
         break;
       }
     }
-    const std::int32_t owner = entity != nullptr                                                      ? entity->GetArmyIndex()
-                               : moho::ClassifyEntityIdFamily(id) == moho::EEntityIdFamily::Unit ? moho::ExtractEntityIdSourceIndex(id)
-                                                                                                    : -1;
+    const std::int32_t owner = entity != nullptr                        ? entity->GetArmyIndex()
+      : moho::ClassifyEntityIdFamily(id) == moho::EEntityIdFamily::Unit ? moho::ExtractEntityIdSourceIndex(id)
+                                                                        : -1;
     if (mark != nullptr) {
       ++mMarkedIds;
       // Lua decides for itself under a focus: `NoteFocusArmyChanged` releases the old army's units.
@@ -118,12 +154,13 @@ namespace faf::headless
           return true;
         }
         const Wm3::Vec3f position = entity->GetPositionWm3();
-        return remote::ViewCanSeePoint(walk.sim, walk.army, position, false) || remote::ViewCanSeePoint(walk.sim, walk.army, position, true);
+        return remote::ViewCanSeePoint(walk.sim, walk.army, position, false) ||
+          remote::ViewCanSeePoint(walk.sim, walk.army, position, true);
       };
-      const bool allowed = (mark->audience == remote::ESyncIdAudience::Seen && seen())
-                           || (mark->audience == remote::ESyncIdAudience::Owner
-                               && (owner == walk.army || mRouter.WroteUnderFocus(walk.view, key.c_str())))
-                           || (mark->audience == remote::ESyncIdAudience::Allies && mRouter.Allied(walk.sim, walk.view, owner));
+      const bool allowed = (mark->audience == remote::ESyncIdAudience::Seen && seen()) ||
+        (mark->audience == remote::ESyncIdAudience::Owner &&
+         (owner == walk.army || mRouter.WroteUnderFocus(walk.view, key.c_str()))) ||
+        (mark->audience == remote::ESyncIdAudience::Allies && mRouter.Allied(walk.sim, walk.view, owner));
       if (!allowed) {
         ++mOutsideAudience;
         Example(walk, "outside its audience", id, field);
@@ -132,13 +169,20 @@ namespace faf::headless
     }
     // A score's totals and a chat line's text only look like ids now and then: an energy total of
     // 2097210, a message saying "1".
-    if (entity != nullptr && owner != walk.army && walk.topKey != "Score" && walk.topKey != "ScoreAccum" && field != "text") {
+    if (
+      entity != nullptr && owner != walk.army && walk.topKey != "Score" && walk.topKey != "ScoreAccum" &&
+      field != "text"
+    ) {
       ++mUnmarked;
       Example(walk, "unmarked", id, field);
     }
   }
 
-  bool CReplaySyncSpy::WalkValue(SWalk& walk, const std::string_view field, const int depth)
+  bool CReplaySyncSpy::WalkValue(
+    SWalk& walk,
+    const std::string_view field,
+    const int depth
+  )
   {
     if (!walk.Left(1u)) {
       return false;
@@ -146,34 +190,34 @@ namespace faf::headless
     const std::uint8_t tag = walk.table[walk.pos++];
     std::uint32_t id = 0;
     switch (tag) {
-      case kTagNumber: {
-        if (!walk.Left(sizeof(float))) {
-          return false;
-        }
-        if (WholeNumberId(walk.ReadFloat(), id)) {
-          CheckId(walk, id, field, false, depth);
-        }
-        return true;
-      }
-      case kTagString: {
-        std::string_view text;
-        if (!walk.ReadString(text)) {
-          return false;
-        }
-        if (ParseDigits(text, id)) {
-          CheckId(walk, id, field, false, depth);
-        }
-        return true;
-      }
-      case kTagNil:
-        return true;
-      case kTagBool:
-        ++walk.pos;
-        return walk.Left(0u);
-      case kTagTableBegin:
-        break;
-      default:
+    case kTagNumber: {
+      if (!walk.Left(sizeof(float))) {
         return false;
+      }
+      if (WholeNumberId(walk.ReadFloat(), id)) {
+        CheckId(walk, id, field, false, depth);
+      }
+      return true;
+    }
+    case kTagString: {
+      std::string_view text;
+      if (!walk.ReadString(text)) {
+        return false;
+      }
+      if (ParseDigits(text, id)) {
+        CheckId(walk, id, field, false, depth);
+      }
+      return true;
+    }
+    case kTagNil:
+      return true;
+    case kTagBool:
+      ++walk.pos;
+      return walk.Left(0u);
+    case kTagTableBegin:
+      break;
+    default:
+      return false;
     }
 
     while (walk.Left(1u) && walk.table[walk.pos] != kTagTableEnd) {
@@ -225,7 +269,9 @@ namespace faf::headless
     return true;
   }
 
-  void CReplaySyncSpy::Check(const moho::Sim& sim)
+  void CReplaySyncSpy::Check(
+    const moho::Sim& sim
+  )
   {
     std::vector<std::uint8_t> table;
     std::vector<std::string> prints;
@@ -256,13 +302,20 @@ namespace faf::headless
   {
     char text[320];
     std::snprintf(
-      text, sizeof(text),
-      "lua spy: %zu keys over %llu view beats, %llu ids (%llu in marked fields); %llu keys with no route, %llu outside their audience, "
+      text,
+      sizeof(text),
+      "lua spy: %zu keys over %llu view beats, %llu ids (%llu in marked fields); %llu keys with no route, %llu outside "
+      "their audience, "
       "%llu renumbered ids sent raw, %llu that did not decode; %llu unmarked ids of other armies",
-      mKeys.size(), static_cast<unsigned long long>(mViewBeats), static_cast<unsigned long long>(mIds),
-      static_cast<unsigned long long>(mMarkedIds), static_cast<unsigned long long>(mUnknownKeys),
-      static_cast<unsigned long long>(mOutsideAudience), static_cast<unsigned long long>(mRawRenumbered),
-      static_cast<unsigned long long>(mDecodeFailures), static_cast<unsigned long long>(mUnmarked)
+      mKeys.size(),
+      static_cast<unsigned long long>(mViewBeats),
+      static_cast<unsigned long long>(mIds),
+      static_cast<unsigned long long>(mMarkedIds),
+      static_cast<unsigned long long>(mUnknownKeys),
+      static_cast<unsigned long long>(mOutsideAudience),
+      static_cast<unsigned long long>(mRawRenumbered),
+      static_cast<unsigned long long>(mDecodeFailures),
+      static_cast<unsigned long long>(mUnmarked)
     );
     std::string summary = text;
     for (const std::string& example : mExamples) {

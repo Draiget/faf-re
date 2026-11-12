@@ -53,7 +53,10 @@ namespace moho
    * Called from the hinted insert at 0x007E3340 (six code xrefs, one per
    * comparison branch); `_Lbound` and `operator[]` inline it instead.
    */
-  bool MeshBatchKeyLess::operator()(const MeshBatchKey& lhs, const MeshBatchKey& rhs) const noexcept
+  bool MeshBatchKeyLess::operator()(
+    const MeshBatchKey& lhs,
+    const MeshBatchKey& rhs
+  ) const noexcept
   {
     if (lhs.mSortKey != rhs.mSortKey) {
       return lhs.mSortKey < rhs.mSortKey;
@@ -86,7 +89,10 @@ namespace moho
    * computed the lower bound and then discarded it, taking the unhinted
    * `insert` path instead.
    */
-  MeshBatchInstanceVector* MeshBatchBucketTreeFindOrCreateInstances(const MeshBatchKey& key, MeshBatchBucketTree& tree)
+  MeshBatchInstanceVector* MeshBatchBucketTreeFindOrCreateInstances(
+    const MeshBatchKey& key,
+    MeshBatchBucketTree& tree
+  )
   {
     return &tree[key];
   }

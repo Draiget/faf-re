@@ -11,6 +11,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/GpuDriven.h"
+#include "gpg/gal/effects/RayTracedShadows.h"
 #include "gpg/gal/effects/ShadowCascades.h"
 #include "moho/console/CConCommand.h"
 #include "moho/math/VMatrix4.h"
@@ -47,9 +48,12 @@ namespace moho
     &ren_AoBias
   );
   TConVar<float> gTConVar_ren_AoFadeStart(
-    "ren_AoFadeStart", "Camera distance where ambient occlusion starts to fade out.", &ren_AoFadeStart
+    "ren_AoFadeStart",
+    "Camera distance where ambient occlusion starts to fade out.",
+    &ren_AoFadeStart
   );
-  TConVar<float> gTConVar_ren_AoFadeEnd("ren_AoFadeEnd", "Camera distance where ambient occlusion is gone.", &ren_AoFadeEnd);
+  TConVar<float>
+    gTConVar_ren_AoFadeEnd("ren_AoFadeEnd", "Camera distance where ambient occlusion is gone.", &ren_AoFadeEnd);
 
   float ren_AoContact = 0.35f;
   float ren_AoContactLength = 1.5f;
@@ -60,7 +64,31 @@ namespace moho
     &ren_AoContact
   );
   TConVar<float> gTConVar_ren_AoContactLength(
-    "ren_AoContactLength", "Contact shadow ray length in world units.", &ren_AoContactLength
+    "ren_AoContactLength",
+    "Contact shadow ray length in world units.",
+    &ren_AoContactLength
+  );
+
+  // Engine addition (ren_RayAo): ambient occlusion by rays against the ray-traced scene (RayScene.h) while
+  // ray-traced shadows are on.
+  int ren_RayAo = 1;
+  int ren_RayAoRays = 6;
+  TConVar<int> gTConVar_ren_RayAo(
+    "ren_RayAo",
+    "Direct3D 12 and Vulkan with ray tracing, while ren_RayTracedShadows is on: ambient occlusion by short rays over "
+    "the half-sphere above each point (ren_RayAoRays of them, ren_AoRadius long) instead of from the screen's depth, "
+    "so units, buildings and ground off the screen or behind others shade too. 1 on (default; nothing while "
+    "ren_RayTracedShadows is off), 0 off.",
+    &ren_RayAo
+  );
+  TConVar<int> gTConVar_ren_RayAoRays("ren_RayAoRays", "Rays per point for ren_RayAo (1-16).", &ren_RayAoRays);
+  // The point a ray leaves from is rebuilt from the depth buffer, whose error grows with camera distance.
+  float ren_RayAoLift = 0.006f;
+  TConVar<float> gTConVar_ren_RayAoLift(
+    "ren_RayAoLift",
+    "ren_RayAo: how far above the surface the rays start, per world unit of camera distance (plus 0.05), so they "
+    "don't start under the ground the depth buffer rebuilds.",
+    &ren_RayAoLift
   );
 
   float ren_TerrainShadows = 0.45f;
@@ -98,17 +126,21 @@ namespace moho
       VMatrix4 shadowMatrix;
       float shadowParams[4];
       float shadowCascades[gpg::gal::effects::kShadowCascadeVectors][4];
+      float rayParams[4];
     };
-    static_assert(sizeof(AoConstants) == 496, "AoConstants matches the shader's cbuffer");
+    static_assert(sizeof(AoConstants) == 512, "AoConstants matches the shader's cbuffer");
 
     /** Terrain-shadow cells across the larger side of the map at most. */
     constexpr std::int32_t kTerrainShadowCells = 1024;
 
-    [[nodiscard]] bool BackendReadsBoundDepth(gpg::gal::Device& device)
+    [[nodiscard]] bool BackendReadsBoundDepth(
+      gpg::gal::Device& device
+    )
     {
       const gpg::gal::DeviceContext* const context = device.GetDeviceContext();
-      return context != nullptr
-        && (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 || context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
+      return context != nullptr &&
+        (context->mDeviceType == gpg::gal::DeviceApi::Direct3D12 ||
+         context->mDeviceType == gpg::gal::DeviceApi::Vulkan);
     }
   } // namespace
 
@@ -134,8 +166,12 @@ namespace moho
       if (BackendReadsBoundDepth(*device) && (device->GetGpuDrivenFeatures() & kNeeded) == kNeeded) {
         gpg::gal::GpuProgramDesc compute{};
         compute.name = "AmbientOcclusion";
-        compute.source = kAmbientOcclusionShaderSource;
-        compute.sourceBytes = sizeof(kAmbientOcclusionShaderSource) - 1U;
+        // Engine addition (ren_RayAo): with ray queries the source also traces (FAF_RAY_QUERY).
+        mRaySource =
+          ((device->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureRayQuery) != 0U) ? "#define FAF_RAY_QUERY 1\n" : "";
+        mRaySource += kAmbientOcclusionShaderSource;
+        compute.source = mRaySource.c_str();
+        compute.sourceBytes = mRaySource.size();
         compute.computeEntry = "AoCS";
         mCompute = device->CreateGpuProgram(compute);
 
@@ -165,7 +201,9 @@ namespace moho
     return mSupported;
   }
 
-  bool AmbientOcclusionRenderer::PrepareTerrainShadows(const float sun[3])
+  bool AmbientOcclusionRenderer::PrepareTerrainShadows(
+    const float sun[3]
+  )
   {
     IWldTerrainRes* const terrain = REN_GetTerrainRes();
     if (terrain == nullptr || mBake == nullptr || terrain->mMap == nullptr) {
@@ -180,8 +218,10 @@ namespace moho
     if (field == nullptr || field->Width() < 2 || field->Height() < 2) {
       return false;
     }
-    if (field == mBakedField && field->Width() == mFieldWidth && field->Height() == mFieldHeight
-        && sun[0] == mBakedSun[0] && sun[1] == mBakedSun[1] && sun[2] == mBakedSun[2]) {
+    if (
+      field == mBakedField && field->Width() == mFieldWidth && field->Height() == mFieldHeight &&
+      sun[0] == mBakedSun[0] && sun[1] == mBakedSun[1] && sun[2] == mBakedSun[2]
+    ) {
       return mTerrainShadow != nullptr;
     }
 
@@ -239,8 +279,16 @@ namespace moho
     bake.groupsX = (mShadowAcross + 7U) / 8U;
     bake.groupsY = (mShadowDown + 7U) / 8U;
     mDevice->DispatchGpuProgram(bake);
-    gpg::Logf("Terrain shadows: baked %ux%u cells over a %dx%d heightfield, sun (%.3f, %.3f, %.3f) (ren_TerrainShadows)",
-              mShadowAcross, mShadowDown, mFieldWidth, mFieldHeight, sun[0], sun[1], sun[2]);
+    gpg::Logf(
+      "Terrain shadows: baked %ux%u cells over a %dx%d heightfield, sun (%.3f, %.3f, %.3f) (ren_TerrainShadows)",
+      mShadowAcross,
+      mShadowDown,
+      mFieldWidth,
+      mFieldHeight,
+      sun[0],
+      sun[1],
+      sun[2]
+    );
 
     // Diagnostics: FAF_TERRAIN_SHADOW_DUMP=<folder> writes the heightfield, the baked visibility and the sun
     // there, so a CPU march can check the bake cell by cell.
@@ -248,7 +296,9 @@ namespace moho
     char folder[512] = {};
     if (::getenv_s(&length, folder, sizeof(folder), "FAF_TERRAIN_SHADOW_DUMP") == 0 && length > 1U) {
       std::vector<float> visibility(static_cast<std::size_t>(mShadowAcross) * mShadowDown);
-      if (mDevice->ReadGpuBuffer(*mTerrainShadow, 0U, static_cast<std::uint32_t>(visibility.size()), visibility.data())) {
+      if (
+        mDevice->ReadGpuBuffer(*mTerrainShadow, 0U, static_cast<std::uint32_t>(visibility.size()), visibility.data())
+      ) {
         const std::string base(folder);
         if (std::FILE* const out = std::fopen((base + "/terrain_shadow.bin").c_str(), "wb")) {
           std::fwrite(visibility.data(), sizeof(float), visibility.size(), out);
@@ -259,8 +309,18 @@ namespace moho
           std::fclose(out);
         }
         if (std::FILE* const out = std::fopen((base + "/terrain_meta.txt").c_str(), "w")) {
-          std::fprintf(out, "%d %d %u %u %u %.9g %.9g %.9g\n", mFieldWidth, mFieldHeight, mShadowCellSize, mShadowAcross,
-                       mShadowDown, sun[0], sun[1], sun[2]);
+          std::fprintf(
+            out,
+            "%d %d %u %u %u %.9g %.9g %.9g\n",
+            mFieldWidth,
+            mFieldHeight,
+            mShadowCellSize,
+            mShadowAcross,
+            mShadowDown,
+            sun[0],
+            sun[1],
+            sun[2]
+          );
           std::fclose(out);
         }
         gpg::Logf("Terrain shadows: dumped to %s", folder);
@@ -270,7 +330,12 @@ namespace moho
   }
 
   void AmbientOcclusionRenderer::Render(
-    const GeomCamera3& camera, const int x, const int y, const int width, const int height, const float shadowReach,
+    const GeomCamera3& camera,
+    const int x,
+    const int y,
+    const int width,
+    const int height,
+    const float shadowReach,
     const Shadow* const shadow
   )
   {
@@ -345,7 +410,26 @@ namespace moho
       if (shadowSurface) {
         constants.shadowMatrix = shadow->mCamera.viewProjection;
         constants.shadowParams[0] = 1.0f;
-        std::memcpy(constants.shadowCascades, gpg::gal::effects::gShadowCascades.vectors, sizeof(constants.shadowCascades));
+        std::memcpy(
+          constants.shadowCascades, gpg::gal::effects::gShadowCascades.vectors, sizeof(constants.shadowCascades)
+        );
+      }
+    }
+
+    // Engine addition (ren_RayTracedShadows / ren_RayAo): while the frame's shadows are traced (RayScene published
+    // its constants this frame), the sun's terms are the lit passes' own: no contact shadows (they read a shadow map
+    // that no longer holds the ground and opaque meshes) and no terrain-shadow bake (the rays shade hills), with or
+    // without ren_RayAo. With it, occlusion is traced too.
+    if (gpg::gal::effects::gRayShadows.vectors[4][0] > 0.0f) {
+      constants.sun[3] = 0.0f;
+      constants.terrainGrid[3] = 0.0f;
+      constants.shadowParams[0] = 0.0f;
+      shadowSurface = {};
+      if (ren_RayAo > 0 && (mDevice->GetGpuDrivenFeatures() & gpg::gal::kGpuFeatureRayQuery) != 0U) {
+        constants.rayParams[0] = 1.0f;
+        constants.rayParams[1] = static_cast<float>(std::clamp(ren_RayAoRays, 1, 16));
+        constants.rayParams[2] = std::max(ren_RayAoLift, 0.0f);
+        constants.rayParams[3] = gpg::gal::effects::gRayShadows.vectors[7][1];
       }
     }
 

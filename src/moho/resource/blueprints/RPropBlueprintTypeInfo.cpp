@@ -62,7 +62,9 @@ namespace moho
   /**
    * Address: 0x0051DEA0 (FUN_0051DEA0, Moho::RPropBlueprintTypeInfo::AddBase_REntityBlueprint)
    */
-  void RPropBlueprintTypeInfo::AddBaseREntityBlueprint(gpg::RType* const typeInfo)
+  void RPropBlueprintTypeInfo::AddBaseREntityBlueprint(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::REntityBlueprint>(typeInfo);
   }
@@ -76,15 +78,18 @@ namespace moho
     AddBaseREntityBlueprint(this);
     gpg::RType::Init();
 
-    gpg::RField* const displayField = AddField<moho::RPropBlueprintDisplay>("Display", offsetof(RPropBlueprint, Display));
+    gpg::RField* const displayField =
+      AddField<moho::RPropBlueprintDisplay>("Display", offsetof(RPropBlueprint, Display));
     displayField->mFlags = 3;
     displayField->mDesc = "Display information for the unit";
 
-    gpg::RField* const defenseField = AddField<moho::RPropBlueprintDefense>("Defense", offsetof(RPropBlueprint, Defense));
+    gpg::RField* const defenseField =
+      AddField<moho::RPropBlueprintDefense>("Defense", offsetof(RPropBlueprint, Defense));
     defenseField->mFlags = 3;
     defenseField->mDesc = "Defense information for the unit";
 
-    gpg::RField* const economyField = AddField<moho::RPropBlueprintEconomy>("Economy", offsetof(RPropBlueprint, Economy));
+    gpg::RField* const economyField =
+      AddField<moho::RPropBlueprintEconomy>("Economy", offsetof(RPropBlueprint, Economy));
     economyField->mFlags = 3;
     economyField->mDesc = "Economy information for the unit";
 
@@ -104,4 +109,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_RPropBlueprintTypeInfo_460a53, moho::register_RPropBlueprintTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_RPropBlueprintTypeInfo_460a53,
+  moho::register_RPropBlueprintTypeInfo
+)

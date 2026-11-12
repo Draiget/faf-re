@@ -26,7 +26,9 @@ namespace
   class XDecoderMessageError final : public std::runtime_error
   {
   public:
-    explicit XDecoderMessageError(const char* message)
+    explicit XDecoderMessageError(
+      const char* message
+    )
       : std::runtime_error(message ? message : "Decoder message error")
     {}
 
@@ -69,7 +71,9 @@ namespace
    * Copy-constructs one decoder-message exception payload while preserving
    * the `std::runtime_error` base message state.
    */
-  XDecoderMessageError::XDecoderMessageError(const XDecoderMessageError& other)
+  XDecoderMessageError::XDecoderMessageError(
+    const XDecoderMessageError& other
+  )
     : std::runtime_error(other)
   {}
 
@@ -79,13 +83,17 @@ namespace
    * What it does:
    * Constructs one decoder-message exception from one prebuilt message string.
    */
-  XDecoderMessageError::XDecoderMessageError(const fa::string& message)
+  XDecoderMessageError::XDecoderMessageError(
+    const fa::string& message
+  )
     : std::runtime_error(message.c_str())
   {}
 
   constexpr std::uint32_t kNoTargetEntityId = 0xF0000000u;
 
-  [[noreturn]] void ThrowDecoderError(const fa::string& message)
+  [[noreturn]] void ThrowDecoderError(
+    const fa::string& message
+  )
   {
     throw XDecoderMessageError(message);
   }
@@ -95,7 +103,9 @@ namespace
    * message being decoded. The decoder reads straight out of one in-memory
    * `CMessageStream`, so this is everything a count field may still describe.
    */
-  [[nodiscard]] std::size_t UnreadPayloadBytes(gpg::BinaryReader& reader)
+  [[nodiscard]] std::size_t UnreadPayloadBytes(
+    gpg::BinaryReader& reader
+  )
   {
     return reader.stream()->BytesRead();
   }
@@ -138,19 +148,20 @@ namespace moho
    */
   CDecoder::~CDecoder() = default;
 
-#if FAF_SERVER_MODE
   namespace
   {
     CDecoder::MessageObserver sMessageObserver = nullptr;
     void* sMessageObserverContext = nullptr;
   } // namespace
 
-  void CDecoder::SetMessageObserver(const MessageObserver observer, void* const context) noexcept
+  void CDecoder::SetMessageObserver(
+    const MessageObserver observer,
+    void* const context
+  ) noexcept
   {
     sMessageObserverContext = context;
     sMessageObserver = observer;
   }
-#endif
 
   /**
    * Address: 0x006E40F0 (FUN_006E40F0)
@@ -160,7 +171,10 @@ namespace moho
    * Appends incoming wire bytes into owned stream (if present) and dispatches
    * decode by opcode.
    */
-  void CDecoder::ReceiveMessage(CMessage* message, CMessageDispatcher* dispatcher)
+  void CDecoder::ReceiveMessage(
+    CMessage* message,
+    CMessageDispatcher* dispatcher
+  )
   {
     (void)dispatcher;
 
@@ -168,11 +182,9 @@ namespace moho
     if (mStream.get() != nullptr) {
       mStream->Write(message->mBuff.start_, message->mBuff.Size());
     }
-#if FAF_SERVER_MODE
     if (sMessageObserver != nullptr) {
       sMessageObserver(*message, sMessageObserverContext);
     }
-#endif
 
     DecodeMessage(*message);
   }
@@ -196,7 +208,9 @@ namespace moho
    * message bytes and the shared rules, so every client drops the same
    * commands and the sims stay in step. Well-formed commands are untouched.
    */
-  void CDecoder::DecodeMessage(const CMessage& message)
+  void CDecoder::DecodeMessage(
+    const CMessage& message
+  )
   {
     CMessageStream stream(const_cast<CMessage*>(&message), CMessageStream::Access::kReadOnly);
     gpg::BinaryReader reader(&stream);
@@ -204,8 +218,10 @@ namespace moho
     const auto opcode = static_cast<ECmdStreamOp>(static_cast<std::uint8_t>(message.mBuff[0]));
 
     // Engine addition (issue #216): the desync recorder counts each beat's player commands.
-    if (opcode != ECmdStreamOp::CMDST_Advance && opcode != ECmdStreamOp::CMDST_SetCommandSource
-        && opcode != ECmdStreamOp::CMDST_VerifyChecksum) {
+    if (
+      opcode != ECmdStreamOp::CMDST_Advance && opcode != ECmdStreamOp::CMDST_SetCommandSource &&
+      opcode != ECmdStreamOp::CMDST_VerifyChecksum
+    ) {
       CDesyncRecorder::NoteCommandFor(mSink);
     }
 
@@ -226,7 +242,10 @@ namespace moho
    * Engine addition, not in the binary: the opcode switch of `DecodeMessage`
    * (0x006E4150), split out so the drop handling there wraps the whole decode.
    */
-  void CDecoder::DecodeOpcode(const ECmdStreamOp opcode, gpg::BinaryReader& reader)
+  void CDecoder::DecodeOpcode(
+    const ECmdStreamOp opcode,
+    gpg::BinaryReader& reader
+  )
   {
     switch (opcode) {
     case ECmdStreamOp::CMDST_Advance:
@@ -313,7 +332,9 @@ namespace moho
   /**
    * Address: 0x006E4400 (FUN_006E4400)
    */
-  void CDecoder::DecodeAdvance(gpg::BinaryReader& reader)
+  void CDecoder::DecodeAdvance(
+    gpg::BinaryReader& reader
+  )
   {
     if (mStream) {
       mStream->VirtFlush();
@@ -327,7 +348,9 @@ namespace moho
   /**
    * Address: 0x006E4440 (FUN_006E4440)
    */
-  void CDecoder::DecodeSetCommandSource(gpg::BinaryReader& reader)
+  void CDecoder::DecodeSetCommandSource(
+    gpg::BinaryReader& reader
+  )
   {
     std::uint8_t source = 0;
     reader.ReadExact(source);
@@ -341,7 +364,9 @@ namespace moho
    * Forwards `CMDST_CommandSourceTerminated` to the sink without consuming
    * any payload bytes.
    */
-  void CDecoder::DecodeCommandSourceTerminated(gpg::BinaryReader& reader)
+  void CDecoder::DecodeCommandSourceTerminated(
+    gpg::BinaryReader& reader
+  )
   {
     (void)reader;
     mSink->OnCommandSourceTerminated();
@@ -350,7 +375,9 @@ namespace moho
   /**
    * Address: 0x006E4480 (FUN_006E4480)
    */
-  void CDecoder::DecodeVerifyChecksum(gpg::BinaryReader& reader)
+  void CDecoder::DecodeVerifyChecksum(
+    gpg::BinaryReader& reader
+  )
   {
     const gpg::MD5Digest digest = reader.ReadExact<gpg::MD5Digest>();
     CSeqNo beat = 0;
@@ -365,7 +392,9 @@ namespace moho
    * Forwards `CMDST_RequestPause` to the sink without consuming any payload
    * bytes.
    */
-  void CDecoder::DecodeRequestPause(gpg::BinaryReader& reader)
+  void CDecoder::DecodeRequestPause(
+    gpg::BinaryReader& reader
+  )
   {
     (void)reader;
     mSink->RequestPause();
@@ -377,7 +406,9 @@ namespace moho
    * What it does:
    * Forwards `CMDST_Resume` to the sink without consuming any payload bytes.
    */
-  void CDecoder::DecodeResume(gpg::BinaryReader& reader)
+  void CDecoder::DecodeResume(
+    gpg::BinaryReader& reader
+  )
   {
     (void)reader;
     mSink->Resume();
@@ -390,7 +421,9 @@ namespace moho
    * Forwards `CMDST_SingleStep` to the sink without consuming any payload
    * bytes.
    */
-  void CDecoder::DecodeSingleStep(gpg::BinaryReader& reader)
+  void CDecoder::DecodeSingleStep(
+    gpg::BinaryReader& reader
+  )
   {
     (void)reader;
     mSink->SingleStep();
@@ -399,7 +432,9 @@ namespace moho
   /**
    * Address: 0x006E44F0 (FUN_006E44F0)
    */
-  void CDecoder::DecodeCreateUnit(gpg::BinaryReader& reader)
+  void CDecoder::DecodeCreateUnit(
+    gpg::BinaryReader& reader
+  )
   {
     std::uint8_t armyIndex = 0;
     fa::string blueprintId;
@@ -420,7 +455,9 @@ namespace moho
   /**
    * Address: 0x006E45D0 (FUN_006E45D0)
    */
-  void CDecoder::DecodeCreateProp(gpg::BinaryReader& reader)
+  void CDecoder::DecodeCreateProp(
+    gpg::BinaryReader& reader
+  )
   {
     fa::string blueprintPath;
     Wm3::Vec3f location{};
@@ -432,7 +469,9 @@ namespace moho
   /**
    * Address: 0x006E4670 (FUN_006E4670)
    */
-  void CDecoder::DecodeDestroyEntity(gpg::BinaryReader& reader)
+  void CDecoder::DecodeDestroyEntity(
+    gpg::BinaryReader& reader
+  )
   {
     EntId entityId = 0;
     reader.ReadExact(entityId);
@@ -442,7 +481,9 @@ namespace moho
   /**
    * Address: 0x006E46A0 (FUN_006E46A0)
    */
-  void CDecoder::DecodeWarpEntity(gpg::BinaryReader& reader)
+  void CDecoder::DecodeWarpEntity(
+    gpg::BinaryReader& reader
+  )
   {
     EntId entityId = 0;
     VTransform transform{};
@@ -454,7 +495,9 @@ namespace moho
   /**
    * Address: 0x006E46E0 (FUN_006E46E0)
    */
-  void CDecoder::DecodeProcessInfoPair(gpg::BinaryReader& reader)
+  void CDecoder::DecodeProcessInfoPair(
+    gpg::BinaryReader& reader
+  )
   {
     EntId entityId = 0;
     fa::string key;
@@ -470,7 +513,9 @@ namespace moho
   /**
    * Address: 0x006E47D0 (FUN_006E47D0)
    */
-  void CDecoder::DecodeIssueCommand(gpg::BinaryReader& reader)
+  void CDecoder::DecodeIssueCommand(
+    gpg::BinaryReader& reader
+  )
   {
     const BVSet<EntId, EntIdUniverse> entities = DecodeEntIdSet(reader);
     SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_None);
@@ -492,7 +537,9 @@ namespace moho
   /**
    * Address: 0x006E48E0 (FUN_006E48E0)
    */
-  void CDecoder::DecodeIssueFactoryCommand(gpg::BinaryReader& reader)
+  void CDecoder::DecodeIssueFactoryCommand(
+    gpg::BinaryReader& reader
+  )
   {
     const BVSet<EntId, EntIdUniverse> entities = DecodeEntIdSet(reader);
     SSTICommandIssueData commandData(EUnitCommandType::UNITCOMMAND_None);
@@ -514,7 +561,9 @@ namespace moho
   /**
    * Address: 0x006E49F0 (FUN_006E49F0)
    */
-  void CDecoder::DecodeIncreaseCommandCount(gpg::BinaryReader& reader)
+  void CDecoder::DecodeIncreaseCommandCount(
+    gpg::BinaryReader& reader
+  )
   {
     CmdId commandId = 0;
     int count = 0;
@@ -526,7 +575,9 @@ namespace moho
   /**
    * Address: 0x006E4A30 (FUN_006E4A30)
    */
-  void CDecoder::DecodeDecreaseCommandCount(gpg::BinaryReader& reader)
+  void CDecoder::DecodeDecreaseCommandCount(
+    gpg::BinaryReader& reader
+  )
   {
     CmdId commandId = 0;
     int count = 0;
@@ -538,7 +589,9 @@ namespace moho
   /**
    * Address: 0x006E4A70 (FUN_006E4A70)
    */
-  void CDecoder::DecodeSetCommandTarget(gpg::BinaryReader& reader)
+  void CDecoder::DecodeSetCommandTarget(
+    gpg::BinaryReader& reader
+  )
   {
     CmdId commandId = 0;
     reader.ReadExact(commandId);
@@ -550,7 +603,9 @@ namespace moho
   /**
    * Address: 0x006E4AC0 (FUN_006E4AC0)
    */
-  void CDecoder::DecodeSetCommandType(gpg::BinaryReader& reader)
+  void CDecoder::DecodeSetCommandType(
+    gpg::BinaryReader& reader
+  )
   {
     CmdId commandId = 0;
     std::int32_t commandType = 0;
@@ -562,7 +617,9 @@ namespace moho
   /**
    * Address: 0x006E4B00 (FUN_006E4B00)
    */
-  void CDecoder::DecodeSetCommandCells(gpg::BinaryReader& reader)
+  void CDecoder::DecodeSetCommandCells(
+    gpg::BinaryReader& reader
+  )
   {
     CmdId commandId = 0;
     gpg::core::FastVectorN<SOCellPos, 2> cells{};
@@ -578,7 +635,9 @@ namespace moho
   /**
    * Address: 0x006E4BB0 (FUN_006E4BB0)
    */
-  void CDecoder::DecodeRemoveCommandFromQueue(gpg::BinaryReader& reader)
+  void CDecoder::DecodeRemoveCommandFromQueue(
+    gpg::BinaryReader& reader
+  )
   {
     CmdId commandId = 0;
     EntId unitId = 0;
@@ -590,7 +649,9 @@ namespace moho
   /**
    * Address: 0x006E4BF0 (FUN_006E4BF0)
    */
-  void CDecoder::DecodeExecuteLuaInSim(gpg::BinaryReader& reader)
+  void CDecoder::DecodeExecuteLuaInSim(
+    gpg::BinaryReader& reader
+  )
   {
     fa::string functionName;
     LuaPlus::LuaObject args;
@@ -602,7 +663,9 @@ namespace moho
   /**
    * Address: 0x006E4CA0 (FUN_006E4CA0)
    */
-  void CDecoder::DecodeLuaSimCallback(gpg::BinaryReader& reader)
+  void CDecoder::DecodeLuaSimCallback(
+    gpg::BinaryReader& reader
+  )
   {
     fa::string callbackName;
     LuaPlus::LuaObject args;
@@ -615,7 +678,9 @@ namespace moho
   /**
    * Address: 0x006E4D80 (FUN_006E4D80)
    */
-  void CDecoder::DecodeDebugCommand(gpg::BinaryReader& reader)
+  void CDecoder::DecodeDebugCommand(
+    gpg::BinaryReader& reader
+  )
   {
     fa::string command;
     Wm3::Vec3f worldPos{};
@@ -641,7 +706,9 @@ namespace moho
   /**
    * Address: 0x006E4E90 (FUN_006E4E90 / FUN_006E4F30 / FUN_006E4FC0)
    */
-  BVSet<EntId, EntIdUniverse> CDecoder::DecodeEntIdSet(gpg::BinaryReader& reader)
+  BVSet<EntId, EntIdUniverse> CDecoder::DecodeEntIdSet(
+    gpg::BinaryReader& reader
+  )
   {
     BVSet<EntId, EntIdUniverse> entities{};
     std::uint32_t count = 0;
@@ -713,8 +780,11 @@ namespace moho
   /**
    * Address: 0x006E5010 (FUN_006E5010)
    */
-  void
-  CDecoder::DecodeCommandData(gpg::BinaryReader& reader, const char* decodeContext, SSTICommandIssueData& commandData)
+  void CDecoder::DecodeCommandData(
+    gpg::BinaryReader& reader,
+    const char* decodeContext,
+    SSTICommandIssueData& commandData
+  )
   {
     commandData.mCommandType = EUnitCommandType::UNITCOMMAND_None;
     commandData.mLuaState = mLuaState ? mLuaState->GetCState() : nullptr;
@@ -767,7 +837,10 @@ namespace moho
   /**
    * Address: 0x006E54B0 (FUN_006E54B0)
    */
-  SSTITarget CDecoder::DecodeTarget(gpg::BinaryReader& reader, const char* decodeContext)
+  SSTITarget CDecoder::DecodeTarget(
+    gpg::BinaryReader& reader,
+    const char* decodeContext
+  )
   {
     std::uint8_t targetType = 0;
     reader.ReadExact(targetType);
@@ -813,7 +886,10 @@ namespace moho
    * same inline-vs-heap distinction faithfully (`FastVector.h`'s
    * `Resize`/`GrowToCapacity`/`ResetInline_` family).
    */
-  void CDecoder::DecodeCells(gpg::BinaryReader& reader, gpg::core::FastVectorN<SOCellPos, 2>& cells)
+  void CDecoder::DecodeCells(
+    gpg::BinaryReader& reader,
+    gpg::core::FastVectorN<SOCellPos, 2>& cells
+  )
   {
     std::int32_t count = 0;
     reader.ReadExact(count);
@@ -836,7 +912,9 @@ namespace moho
    * What it does:
    * Lowercases and slash-normalizes blueprint/resource identifiers.
    */
-  void CDecoder::NormalizeFilenameLowerSlash(fa::string& inOut)
+  void CDecoder::NormalizeFilenameLowerSlash(
+    fa::string& inOut
+  )
   {
     gpg::STR_NormalizeFilenameLowerSlash(inOut);
   }
@@ -847,7 +925,10 @@ namespace moho
    * What it does:
    * Decodes one LuaObject payload from stream using decoder-owned Lua state.
    */
-  void CDecoder::DecodeLuaObject(gpg::BinaryReader& reader, LuaPlus::LuaObject& out)
+  void CDecoder::DecodeLuaObject(
+    gpg::BinaryReader& reader,
+    LuaPlus::LuaObject& out
+  )
   {
     // Engine addition: an error raised while the payload is rebuilt (a short
     // payload, or Lua refusing a key such as NaN) is a malformed command like

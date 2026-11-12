@@ -32,7 +32,9 @@ namespace
 
   // The colour each category's lines are written in; the replayed context
   // lines use the Info colour.
-  [[nodiscard]] wxTextAttr DefaultTextStyleForCategory(const std::uint32_t category)
+  [[nodiscard]] wxTextAttr DefaultTextStyleForCategory(
+    const std::uint32_t category
+  )
   {
     switch (category) {
     case 0u:
@@ -45,8 +47,7 @@ namespace
       return wxTextAttr(wxColour(0x00, 0x00, 0x00));
     }
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x004F73B0 (FUN_004F73B0)
@@ -207,7 +208,9 @@ const wchar_t* moho::CWinLogLine::SeverityPrefix() const noexcept
  * What it does:
  * Numbers the log-addition event type from wxNewEventType (0x00978FD0).
  */
-DEFINE_EVENT_TYPE(moho::EVT_LOG_ADDITION)
+DEFINE_EVENT_TYPE(
+  moho::EVT_LOG_ADDITION
+)
 
 /**
  * Address: 0x004F37F0 (FUN_004F37F0)
@@ -389,17 +392,47 @@ void moho::CWinLogTarget::OnMessage(
   }
 }
 
-BEGIN_EVENT_TABLE(moho::WWinLogWindow, wxDialog)
-  EVT_LOG_ADDITION_EVENT(moho::WWinLogWindow::OnTargetPendingLinesChanged)
-  EVT_CHECKBOX(900, moho::WWinLogWindow::OnFilterOrCategoryControlsChanged)
-  EVT_CHECKBOX(901, moho::WWinLogWindow::OnFilterOrCategoryControlsChanged)
-  EVT_CHECKBOX(902, moho::WWinLogWindow::OnFilterOrCategoryControlsChanged)
-  EVT_CHECKBOX(903, moho::WWinLogWindow::OnFilterOrCategoryControlsChanged)
-  EVT_CHECKBOX(904, moho::WWinLogWindow::OnFilterOrCategoryControlsChanged)
-  EVT_TEXT(905, moho::WWinLogWindow::OnFilterOrCategoryControlsChanged)
-  EVT_BUTTON(906, moho::WWinLogWindow::OnClear)
-  EVT_SIZE(moho::WWinLogWindow::OnSize)
-  EVT_MOVE(moho::WWinLogWindow::OnMove)
+BEGIN_EVENT_TABLE(
+  moho::WWinLogWindow,
+  wxDialog
+)
+EVT_LOG_ADDITION_EVENT(
+  moho::WWinLogWindow::OnTargetPendingLinesChanged
+)
+EVT_CHECKBOX(
+  900,
+  moho::WWinLogWindow::OnFilterOrCategoryControlsChanged
+)
+EVT_CHECKBOX(
+  901,
+  moho::WWinLogWindow::OnFilterOrCategoryControlsChanged
+)
+EVT_CHECKBOX(
+  902,
+  moho::WWinLogWindow::OnFilterOrCategoryControlsChanged
+)
+EVT_CHECKBOX(
+  903,
+  moho::WWinLogWindow::OnFilterOrCategoryControlsChanged
+)
+EVT_CHECKBOX(
+  904,
+  moho::WWinLogWindow::OnFilterOrCategoryControlsChanged
+)
+EVT_TEXT(
+  905,
+  moho::WWinLogWindow::OnFilterOrCategoryControlsChanged
+)
+EVT_BUTTON(
+  906,
+  moho::WWinLogWindow::OnClear
+)
+EVT_SIZE(
+  moho::WWinLogWindow::OnSize
+)
+EVT_MOVE(
+  moho::WWinLogWindow::OnMove
+)
 END_EVENT_TABLE()
 
 /**
@@ -458,12 +491,7 @@ moho::WWinLogWindow::WWinLogWindow()
   showSizer->Add(mFilterTextControl, 1, wxALIGN_CENTER_VERTICAL);
 
   mOutputTextControl = new wxTextCtrl(
-    this,
-    -1,
-    wxEmptyString,
-    wxDefaultPosition,
-    wxSize(384, 512),
-    wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH | wxHSCROLL
+    this, -1, wxEmptyString, wxDefaultPosition, wxSize(384, 512), wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH | wxHSCROLL
   );
 
   topSizer->Add(showSizer, 0, wxEXPAND);
@@ -540,7 +568,9 @@ std::array<const wxCheckBox*, 5> moho::WWinLogWindow::CategoryCheckBoxes() const
  * Once the controls are built, rebuilds the visible lines and stores each
  * category check box and the filter text back into the preferences.
  */
-void moho::WWinLogWindow::OnFilterOrCategoryControlsChanged(wxCommandEvent& event)
+void moho::WWinLogWindow::OnFilterOrCategoryControlsChanged(
+  wxCommandEvent& event
+)
 {
   (void)event;
   if (mIsInitializingControls) {
@@ -565,7 +595,9 @@ void moho::WWinLogWindow::OnFilterOrCategoryControlsChanged(wxCommandEvent& even
  * once the controls are built, the window's size is stored in
  * `Windows.Log.width` / `Windows.Log.height`.
  */
-void moho::WWinLogWindow::OnSize(wxSizeEvent& event)
+void moho::WWinLogWindow::OnSize(
+  wxSizeEvent& event
+)
 {
   wxDialog::OnSize(event);
   if (mIsInitializingControls) {
@@ -584,7 +616,9 @@ void moho::WWinLogWindow::OnSize(wxSizeEvent& event)
  * Once the controls are built, stores the window's position in
  * `Windows.Log.x` / `Windows.Log.y`.
  */
-void moho::WWinLogWindow::OnMove(wxMoveEvent& event)
+void moho::WWinLogWindow::OnMove(
+  wxMoveEvent& event
+)
 {
   (void)event;
   if (mIsInitializingControls) {
@@ -603,7 +637,9 @@ void moho::WWinLogWindow::OnMove(wxMoveEvent& event)
  * Clears the output and resets the target's committed lines to the buffered
  * replay context.
  */
-void moho::WWinLogWindow::OnClear(wxCommandEvent& event)
+void moho::WWinLogWindow::OnClear(
+  wxCommandEvent& event
+)
 {
   (void)event;
   mOutputTextControl->Clear();
@@ -612,7 +648,9 @@ void moho::WWinLogWindow::OnClear(wxCommandEvent& event)
   mOwnerTarget->ResetCommittedLinesFromReplayBuffer(mBufferedLines);
 }
 
-bool moho::WWinLogWindow::Show(const bool show)
+bool moho::WWinLogWindow::Show(
+  const bool show
+)
 {
   if (show) {
     FlushPendingOutput();
@@ -620,7 +658,10 @@ bool moho::WWinLogWindow::Show(const bool show)
   return WWinManagedDialog::Show(show);
 }
 
-void moho::WWinLogWindow::AppendOutput(const std::uint32_t styleCategory, const std::wstring& text)
+void moho::WWinLogWindow::AppendOutput(
+  const std::uint32_t styleCategory,
+  const std::wstring& text
+)
 {
   if (!mPendingOutput.empty() && mPendingOutput.back().styleCategory == styleCategory) {
     mPendingOutput.back().text += text;

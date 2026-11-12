@@ -45,9 +45,7 @@ namespace moho
     void Init() override;
   };
 
-  static_assert(
-    sizeof(ThreadSafeCountedObjectTypeInfo) == 0x64, "ThreadSafeCountedObjectTypeInfo size must be 0x64"
-  );
+  static_assert(sizeof(ThreadSafeCountedObjectTypeInfo) == 0x64, "ThreadSafeCountedObjectTypeInfo size must be 0x64");
 
   /**
    * Address: 0x00BC2D60 (FUN_00BC2D60, register_ThreadSafeCountedObjectTypeInfo)

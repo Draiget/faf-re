@@ -58,8 +58,9 @@ namespace
 {
   // --- Harness (as tests/net) ------------------------------------------------------------
 
-
-  [[nodiscard]] std::vector<std::uint8_t> Bytes(const BitWriter& writer)
+  [[nodiscard]] std::vector<std::uint8_t> Bytes(
+    const BitWriter& writer
+  )
   {
     const auto bytes = writer.Bytes();
     return {bytes.begin(), bytes.end()};
@@ -78,8 +79,9 @@ namespace
     for (const std::uint32_t v : varints) {
       writer.WriteVarUint(v);
     }
-    const float floats[] = {0.0f, -0.0f, 1.5f, -3.25e-20f, std::numeric_limits<float>::infinity(),
-                            std::bit_cast<float>(0x7FC12345u)};
+    const float floats[] = {
+      0.0f, -0.0f, 1.5f, -3.25e-20f, std::numeric_limits<float>::infinity(), std::bit_cast<float>(0x7FC12345u)
+    };
     for (const float f : floats) {
       writer.WriteFloatExact(f);
     }
@@ -118,7 +120,9 @@ namespace
   }
 
   /** The bit-at-a-time writer the wire format was defined with: the byte-wise one must match it. */
-  [[nodiscard]] std::vector<std::uint8_t> ReferenceWrite(const std::vector<std::pair<std::uint32_t, int>>& writes)
+  [[nodiscard]] std::vector<std::uint8_t> ReferenceWrite(
+    const std::vector<std::pair<std::uint32_t, int>>& writes
+  )
   {
     std::vector<std::uint8_t> bytes;
     std::size_t bitCount = 0;
@@ -239,7 +243,9 @@ namespace
     // Yaw-only rotations: detected, quantised to 1/65536 turn, and back within half a step.
     for (int i = 0; i < 4096; ++i) {
       const double yaw = 6.283185307179586 * (i + 0.37) / 4096.0;
-      const std::array<float, 4> q{0.0f, static_cast<float>(std::sin(yaw / 2)), 0.0f, static_cast<float>(std::cos(yaw / 2))};
+      const std::array<float, 4> q{
+        0.0f, static_cast<float>(std::sin(yaw / 2)), 0.0f, static_cast<float>(std::cos(yaw / 2))
+      };
       EXPECT_TRUE(IsYawOnly(q));
       const std::array<float, 4> back = YawToQuaternion(QuantizeYaw(q));
       const float dot = std::fabs(q[1] * back[1] + q[3] * back[3]);
@@ -358,7 +364,10 @@ namespace
   class CFrameGenerator
   {
   public:
-    explicit CFrameGenerator(const std::uint32_t seed, const bool deadReckoning = false)
+    explicit CFrameGenerator(
+      const std::uint32_t seed,
+      const bool deadReckoning = false
+    )
       : mRng(seed)
       , mDeadReckoning(deadReckoning)
     {}
@@ -392,9 +401,19 @@ namespace
     }
 
   private:
-    bool Chance(const double p) { return std::uniform_real_distribution<double>(0.0, 1.0)(mRng) < p; }
+    bool Chance(
+      const double p
+    )
+    {
+      return std::uniform_real_distribution<double>(0.0, 1.0)(mRng) < p;
+    }
 
-    std::uint32_t Axis(const SAxisQuantizer& axis) { return mRng() % (axis.MaxQuantized() + 1u); }
+    std::uint32_t Axis(
+      const SAxisQuantizer& axis
+    )
+    {
+      return mRng() % (axis.MaxQuantized() + 1u);
+    }
 
     float RandomFloat()
     {
@@ -410,7 +429,9 @@ namespace
       }
     }
 
-    SEntityRecord RandomRecord(const std::uint32_t id)
+    SEntityRecord RandomRecord(
+      const std::uint32_t id
+    )
     {
       SEntityRecord record{};
       record.id = id;
@@ -473,10 +494,15 @@ namespace
       return record;
     }
 
-    void RandomAppearance(SAppearance& look, const std::uint32_t fields)
+    void RandomAppearance(
+      SAppearance& look,
+      const std::uint32_t fields
+    )
     {
-      if ((fields & 1u) != 0u) look.mesh = mRng() % 4u == 0u ? COrdinalTable::kNone : mRng() % 3000u;
-      if ((fields & 2u) != 0u) look.scale = {RandomFloat(), RandomFloat(), RandomFloat()};
+      if ((fields & 1u) != 0u)
+        look.mesh = mRng() % 4u == 0u ? COrdinalTable::kNone : mRng() % 3000u;
+      if ((fields & 2u) != 0u)
+        look.scale = {RandomFloat(), RandomFloat(), RandomFloat()};
       if ((fields & 4u) != 0u) {
         look.attachParent = mRng() % 2u == 0u ? SAppearance::kNoAttachParent : static_cast<std::uint32_t>(mRng());
         look.attachments.resize(mRng() % 4u == 0u ? mRng() % (SAppearance::kMaxAttachments + 1u) : 0u);
@@ -484,9 +510,12 @@ namespace
           id = static_cast<std::uint32_t>(mRng());
         }
       }
-      if ((fields & 8u) != 0u) look.visualFlags = static_cast<std::uint8_t>(mRng() & 0x1Fu);
-      if ((fields & 16u) != 0u) look.impact = RandomFloat();
-      if ((fields & 32u) != 0u) look.scroll = {RandomFloat(), RandomFloat(), RandomFloat(), RandomFloat()};
+      if ((fields & 8u) != 0u)
+        look.visualFlags = static_cast<std::uint8_t>(mRng() & 0x1Fu);
+      if ((fields & 16u) != 0u)
+        look.impact = RandomFloat();
+      if ((fields & 32u) != 0u)
+        look.scroll = {RandomFloat(), RandomFloat(), RandomFloat(), RandomFloat()};
       if ((fields & 64u) != 0u) {
         for (std::uint32_t& radius : look.intel) {
           radius = mRng() % 2u == 0u ? 0u : static_cast<std::uint32_t>(mRng());
@@ -496,15 +525,20 @@ namespace
         look.ambientSound = mRng() % 3u == 0u ? COrdinalTable::kNone : mRng() % 500u;
         look.rumbleSound = mRng() % 3u == 0u ? COrdinalTable::kNone : mRng() % 500u;
       }
-      if ((fields & 256u) != 0u) look.underlay = mRng() % 3u == 0u ? COrdinalTable::kNone : mRng() % 50u;
+      if ((fields & 256u) != 0u)
+        look.underlay = mRng() % 3u == 0u ? COrdinalTable::kNone : mRng() % 50u;
     }
 
-    void Mutate(SEntityRecord& record)
+    void Mutate(
+      SEntityRecord& record
+    )
     {
       const SEntityRecord fresh = RandomRecord(record.id);
       const std::uint32_t fields = mRng() & 0xFFFFu;
-      if ((fields & kFieldBlueprint) != 0u) record.blueprint = fresh.blueprint;
-      if ((fields & kFieldArmy) != 0u) record.army = fresh.army;
+      if ((fields & kFieldBlueprint) != 0u)
+        record.blueprint = fresh.blueprint;
+      if ((fields & kFieldArmy) != 0u)
+        record.army = fresh.army;
       if ((fields & kFieldPosition) != 0u) {
         record.position = fresh.position;
         record.velocity = fresh.velocity;
@@ -530,10 +564,14 @@ namespace
         record.yawRate = fresh.yawRate;
         record.orientationBeat = fresh.orientationBeat;
       }
-      if ((fields & kFieldHealth) != 0u) record.health = fresh.health;
-      if ((fields & kFieldMaxHealth) != 0u) record.maxHealth = fresh.maxHealth;
-      if ((fields & kFieldFraction) != 0u) record.fractionComplete = fresh.fractionComplete;
-      if ((fields & kFieldFlags) != 0u) record.flags = fresh.flags;
+      if ((fields & kFieldHealth) != 0u)
+        record.health = fresh.health;
+      if ((fields & kFieldMaxHealth) != 0u)
+        record.maxHealth = fresh.maxHealth;
+      if ((fields & kFieldFraction) != 0u)
+        record.fractionComplete = fresh.fractionComplete;
+      if ((fields & kFieldFlags) != 0u)
+        record.flags = fresh.flags;
       if (mRng() % 4u == 0u) {
         RandomAppearance(record.appearance, mRng());
       }
@@ -545,21 +583,38 @@ namespace
       if (record.isUnit) {
         SUnitFields& unit = record.unit;
         const SUnitFields source = fresh.isUnit ? fresh.unit : RandomRecordUnit();
-        if ((fields & kFieldUnitFuel) != 0u) unit.fuelRatio = source.fuelRatio;
-        if ((fields & kFieldUnitShield) != 0u) unit.shieldRatio = source.shieldRatio;
-        if ((fields & kFieldUnitWork) != 0u) unit.workProgress = source.workProgress;
-        if ((fields & kFieldUnitStates) != 0u) unit.unitStates = source.unitStates;
-        if ((fields & kFieldUnitScriptBits) != 0u) unit.scriptBits = source.scriptBits;
-        if ((fields & kFieldUnitSilos) != 0u) unit.siloCounts = source.siloCounts;
-        if ((fields & kFieldUnitFlags) != 0u) unit.unitFlags = source.unitFlags;
-        if (mRng() % 5u == 0u) unit.stats = source.stats;
+        if ((fields & kFieldUnitFuel) != 0u)
+          unit.fuelRatio = source.fuelRatio;
+        if ((fields & kFieldUnitShield) != 0u)
+          unit.shieldRatio = source.shieldRatio;
+        if ((fields & kFieldUnitWork) != 0u)
+          unit.workProgress = source.workProgress;
+        if ((fields & kFieldUnitStates) != 0u)
+          unit.unitStates = source.unitStates;
+        if ((fields & kFieldUnitScriptBits) != 0u)
+          unit.scriptBits = source.scriptBits;
+        if ((fields & kFieldUnitSilos) != 0u)
+          unit.siloCounts = source.siloCounts;
+        if ((fields & kFieldUnitFlags) != 0u)
+          unit.unitFlags = source.unitFlags;
+        if (mRng() % 5u == 0u)
+          unit.stats = source.stats;
         if (mRng() % 4u == 0u) {
           const SUnitDetail fresh = RandomDetail();
           switch (mRng() % 4u) {
-          case 0: unit.detail.Edit().commands = fresh.commands; break;
-          case 1: unit.detail.Edit().weapons = fresh.weapons; break;
-          case 2: unit.detail.Edit().attributes = fresh.attributes; break;
-          default: unit.detail.Edit().focusUnit = fresh.focusUnit; unit.detail.Edit().economy = fresh.economy; break;
+          case 0:
+            unit.detail.Edit().commands = fresh.commands;
+            break;
+          case 1:
+            unit.detail.Edit().weapons = fresh.weapons;
+            break;
+          case 2:
+            unit.detail.Edit().attributes = fresh.attributes;
+            break;
+          default:
+            unit.detail.Edit().focusUnit = fresh.focusUnit;
+            unit.detail.Edit().economy = fresh.economy;
+            break;
           }
         }
       }
@@ -668,7 +723,9 @@ namespace
   const SFrameCodec kDeadReckoningCodec{SPositionQuantizer::ForMap(1024.0f, 1024.0f), 1u << 12, true, 0, true, true};
 
   [[nodiscard]] std::vector<std::uint8_t> Encode(
-    const SViewFrame& frame, const SViewFrame* baseline, const SFrameCodec& codec = kCodec
+    const SViewFrame& frame,
+    const SViewFrame* baseline,
+    const SFrameCodec& codec = kCodec
   )
   {
     BitWriter writer;
@@ -678,7 +735,9 @@ namespace
   }
 
   [[nodiscard]] bool Decode(
-    const std::vector<std::uint8_t>& bytes, const SViewFrame* baseline, SViewFrame& out,
+    const std::vector<std::uint8_t>& bytes,
+    const SViewFrame* baseline,
+    SViewFrame& out,
     const SFrameCodec& codec = kCodec
   )
   {
@@ -687,7 +746,11 @@ namespace
   }
 
   /** What the client does with consecutive decoded frames (WPR.38). */
-  [[nodiscard]] SViewFrame ApplyDelta(const SViewFrame& before, const SFrameDelta& delta, const SViewFrame& header)
+  [[nodiscard]] SViewFrame ApplyDelta(
+    const SViewFrame& before,
+    const SFrameDelta& delta,
+    const SViewFrame& header
+  )
   {
     std::vector<SEntityRecord> world = before.entities;
     std::erase_if(world, [&](const SEntityRecord& r) {
@@ -701,7 +764,9 @@ namespace
       }
     }
     world.insert(world.end(), delta.created.begin(), delta.created.end());
-    std::sort(world.begin(), world.end(), [](const SEntityRecord& x, const SEntityRecord& y) { return x.id < y.id; });
+    std::sort(world.begin(), world.end(), [](const SEntityRecord& x, const SEntityRecord& y) {
+      return x.id < y.id;
+    });
     SViewFrame frame = header;
     frame.entities = std::move(world);
     return frame;
@@ -744,13 +809,15 @@ namespace
       for (int step = 0; step < 120; ++step) {
         const SViewFrame frame = generator.Next();
         SViewFrame full{};
-        EXPECT_TRUE(Decode(Encode(frame, nullptr, kDeadReckoningCodec), nullptr, full, kDeadReckoningCodec) && full == frame);
+        EXPECT_TRUE(
+          Decode(Encode(frame, nullptr, kDeadReckoningCodec), nullptr, full, kDeadReckoningCodec) && full == frame
+        );
         for (std::size_t back = 1; back <= 5 && back <= history.size(); back += 2) {
           const SViewFrame& baseline = history[history.size() - back];
           SViewFrame decoded{};
           EXPECT_TRUE(
-            Decode(Encode(frame, &baseline, kDeadReckoningCodec), &baseline, decoded, kDeadReckoningCodec)
-            && decoded == frame
+            Decode(Encode(frame, &baseline, kDeadReckoningCodec), &baseline, decoded, kDeadReckoningCodec) &&
+            decoded == frame
           );
         }
         history.push_back(frame);
@@ -805,8 +872,10 @@ namespace
     sent.position = {1000, 500, 1000};
     sent.anchorBeat = 0;
     QuantizedPosition previous = sent.position;
-    const auto apply = [&](SEntityRecord& record, const QuantizedPosition& last, const QuantizedPosition& now,
-                           const std::uint32_t beat) {
+    const auto apply =
+      [&](
+        SEntityRecord& record, const QuantizedPosition& last, const QuantizedPosition& now, const std::uint32_t beat
+      ) {
       const QuantizedPosition pair[2] = {last, now};
       return ApplyDeadReckoning(record, pair, beat, scheme, codec);
     };
@@ -838,7 +907,8 @@ namespace
     fine.velocityFractionBits = 4;
     const auto quantised = [](const double x, const double y, const double z) {
       return QuantizedPosition{
-        static_cast<std::uint32_t>(std::lround(x)), static_cast<std::uint32_t>(std::lround(y)),
+        static_cast<std::uint32_t>(std::lround(x)),
+        static_cast<std::uint32_t>(std::lround(y)),
         static_cast<std::uint32_t>(std::lround(z))
       };
     };
@@ -851,20 +921,26 @@ namespace
         history.push_back(path(beat));
         const std::size_t keep = std::min<std::size_t>(history.size(), kReckoningHistory);
         count += ApplyDeadReckoning(
-                   record, std::span<const QuantizedPosition>(history.data() + history.size() - keep, keep), beat, use,
+                   record,
+                   std::span<const QuantizedPosition>(history.data() + history.size() - keep, keep),
+                   beat,
+                   use,
                    useCodec
                  )
-                 ? 1
-                 : 0;
+          ? 1
+          : 0;
         const QuantizedPosition shown = PredictPosition(record, beat, useCodec);
         for (int axis = 0; axis < 3; ++axis) {
-          const std::int64_t error = static_cast<std::int64_t>(shown[axis]) - static_cast<std::int64_t>(history.back()[axis]);
+          const std::int64_t error =
+            static_cast<std::int64_t>(shown[axis]) - static_cast<std::int64_t>(history.back()[axis]);
           EXPECT_TRUE(error <= use.tolerance && -error <= use.tolerance);
         }
       }
       return count;
     };
-    const auto cruise = [&](const std::uint32_t beat) { return quantised(1000.0 + 19.2 * beat, 500.0, 2000.0 - 7.7 * beat); };
+    const auto cruise = [&](const std::uint32_t beat) {
+      return quantised(1000.0 + 19.2 * beat, 500.0, 2000.0 - 7.7 * beat);
+    };
     SReckoningScheme fitted = scheme;
     fitted.window = 8;
     const int wholeSteps = anchorsOver(scheme, codec, cruise);
@@ -879,8 +955,12 @@ namespace
     };
     SReckoningScheme bent = fitted;
     bent.verticalAcceleration = true;
-    const int straightArc = anchorsOver(fitted, fine, [&](const std::uint32_t beat) { return arc(beat % 90u); });
-    const int bentArc = anchorsOver(bent, fine, [&](const std::uint32_t beat) { return arc(beat % 90u); });
+    const int straightArc = anchorsOver(fitted, fine, [&](const std::uint32_t beat) {
+      return arc(beat % 90u);
+    });
+    const int bentArc = anchorsOver(bent, fine, [&](const std::uint32_t beat) {
+      return arc(beat % 90u);
+    });
     std::printf("  ballistic arc anchors: straight %d, bent %d\n", straightArc, bentArc);
     EXPECT_TRUE(bentArc * 4 < straightArc);
 
@@ -905,7 +985,10 @@ namespace
     // terrain it re-anchors about as often as on flat ground.
     struct SHill final : IGroundHeight
     {
-      [[nodiscard]] float HeightAt(const float x, const float) const noexcept override
+      [[nodiscard]] float HeightAt(
+        const float x,
+        const float
+      ) const noexcept override
       {
         return 20.0f + 8.0f * std::sin(x / 20.0f);
       }
@@ -943,13 +1026,14 @@ namespace
       actual.orientation = static_cast<std::uint32_t>(std::lround(65000.0 + 100.3 * beat)) & 0xFFFFu;
       yaws.push_back(actual.orientation);
       const std::size_t keep = std::min<std::size_t>(yaws.size(), kReckoningHistory);
-      turnAnchors += ApplyOrientationReckoning(
-                       turner, actual, std::span<const std::uint32_t>(yaws.data() + yaws.size() - keep, keep), beat, turns,
-                       fine
-                     )
-                     ? 1
-                     : 0;
-      const auto error = static_cast<std::int16_t>(static_cast<std::uint16_t>(actual.orientation - PredictYaw(turner, beat, fine)));
+      turnAnchors +=
+        ApplyOrientationReckoning(
+          turner, actual, std::span<const std::uint32_t>(yaws.data() + yaws.size() - keep, keep), beat, turns, fine
+        )
+        ? 1
+        : 0;
+      const auto error =
+        static_cast<std::int16_t>(static_cast<std::uint16_t>(actual.orientation - PredictYaw(turner, beat, fine)));
       EXPECT_TRUE(error <= 64 && error >= -64);
     }
     std::printf("  turn anchors over 200 beats: %d\n", turnAnchors);
@@ -970,8 +1054,10 @@ namespace
     flat.yawOnly = true;
     flat.orientation = 1000;
     const std::uint32_t flatYaw[1] = {1000};
-    EXPECT_TRUE(ApplyOrientationReckoning(held, flat, flatYaw, 7, turns, fine) && held.yawOnly && held.yawRate == 0
-          && held.orientationBeat == 7u);
+    EXPECT_TRUE(
+      ApplyOrientationReckoning(held, flat, flatYaw, 7, turns, fine) && held.yawOnly && held.yawRate == 0 &&
+      held.orientationBeat == 7u
+    );
   }
 
   void TestGridDeltaInPlace()
@@ -1000,7 +1086,10 @@ namespace
         const std::size_t to = std::min(count, from + rng() % 300u);
         const bool seen = rng() % 2u == 0u;
         for (std::size_t at = from; at < to; ++at) {
-          now[at] = seen ? static_cast<std::int8_t>(rng() % 2u == 0u ? -1 - static_cast<int>(rng() % 120u) : 1 + static_cast<int>(rng() % 120u)) : std::int8_t{0};
+          now[at] = seen ? static_cast<std::int8_t>(
+                             rng() % 2u == 0u ? -1 - static_cast<int>(rng() % 120u) : 1 + static_cast<int>(rng() % 120u)
+                           )
+                         : std::int8_t{0};
         }
       }
       SGridBits current = before;
@@ -1024,7 +1113,9 @@ namespace
       BitWriter actual;
       EncodeGridDeltaInPlace(before.width, before.height, now.data(), seen.data(), actual);
       EXPECT_EQ(actual.BitCount(), expected.BitCount());
-      EXPECT_TRUE(std::equal(actual.Bytes().begin(), actual.Bytes().end(), expected.Bytes().begin(), expected.Bytes().end()));
+      EXPECT_TRUE(
+        std::equal(actual.Bytes().begin(), actual.Bytes().end(), expected.Bytes().begin(), expected.Bytes().end())
+      );
       EXPECT_EQ(seen, bitsOf(now));
 
       // Reading only the chunks flagged as changed (128 cells each here): every chunk with a changed
@@ -1039,11 +1130,17 @@ namespace
       }
       std::vector<std::uint64_t> chunkSeen = bitsOf(held);
       BitWriter chunked;
-      EncodeGridDeltaInPlace(before.width, before.height, now.data(), chunkSeen.data(), chunked, flags.data(), kChunk, false);
+      EncodeGridDeltaInPlace(
+        before.width, before.height, now.data(), chunkSeen.data(), chunked, flags.data(), kChunk, false
+      );
       EXPECT_EQ(chunked.BitCount(), expected.BitCount());
-      EXPECT_TRUE(std::equal(chunked.Bytes().begin(), chunked.Bytes().end(), expected.Bytes().begin(), expected.Bytes().end()));
+      EXPECT_TRUE(
+        std::equal(chunked.Bytes().begin(), chunked.Bytes().end(), expected.Bytes().begin(), expected.Bytes().end())
+      );
       EXPECT_EQ(chunkSeen, bitsOf(now));
-      EXPECT_TRUE(std::all_of(flags.begin(), flags.end(), [](const std::uint8_t flag) { return flag == 0u; }));
+      EXPECT_TRUE(std::all_of(flags.begin(), flags.end(), [](const std::uint8_t flag) {
+        return flag == 0u;
+      }));
       SGridBits empty = current;
       std::fill(empty.cells.begin(), empty.cells.end(), std::uint8_t{0});
       BitWriter wholeExpected;
@@ -1052,7 +1149,11 @@ namespace
       BitWriter whole;
       EncodeGridDeltaInPlace(before.width, before.height, now.data(), fresh.data(), whole, flags.data(), kChunk, true);
       EXPECT_EQ(whole.BitCount(), wholeExpected.BitCount());
-      EXPECT_TRUE(std::equal(whole.Bytes().begin(), whole.Bytes().end(), wholeExpected.Bytes().begin(), wholeExpected.Bytes().end()));
+      EXPECT_TRUE(
+        std::equal(
+          whole.Bytes().begin(), whole.Bytes().end(), wholeExpected.Bytes().begin(), wholeExpected.Bytes().end()
+        )
+      );
       EXPECT_EQ(fresh, bitsOf(now));
     }
   }
@@ -1169,72 +1270,203 @@ namespace
         EXPECT_TRUE(false);
       }
     };
-    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.mesh = 7; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.scale[2] = 7.0f; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.attachParent = 7; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.attachments[0] = 7; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.attachments.push_back(0); });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.impact = 7.0f; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.scroll[3] = 7.0f; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.visualFlags = 7; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.intel[7] = 7; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.ambientSound = 7; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.rumbleSound = 7; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.appearance.underlay = 7; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.position[2] = 7; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.farPosition = true; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.farValue[2] = 7.0f; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.yawOnly = true; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.orientation = 7; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.health = 7.0f; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.health = -0.0f; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.maxHealth = 7.0f; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.fractionComplete = 7.0f; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.flags = 7; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.fuelRatio = 7.0f; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.shieldRatio = 7.0f; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.workProgress = 7.0f; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.unitStates = std::uint64_t{1} << 40u; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.scriptBits = 7; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.siloCounts[3] = 7; });
-    changes([](SEntityRecord& r, SUnitDetail&) { r.unit.unitFlags = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.creator = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.creationTick = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.stunTicks = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.jobType = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.fireState = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.siloMaxStorage[0] = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.siloMaxStorage[1] = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.selectionInheritor = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.customName = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.focusUnit = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.guardedUnit = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.targetBlip = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.didRefresh = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.reconFlags = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.economy[5] = 7.0f; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.commands[0] = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.buildQueue[0] = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].targets.firstWord = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].targets.words[0] = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].secondary.words[0] = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].layer = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].minRadius = 7.0f; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].maxRadius = 7.0f; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].effectiveRadius = 7.0f; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].minRangeVisual = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons[0].maxRangeVisual = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.weapons.push_back(SUnitWeapon{}); });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.blueprint = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.reserved04 = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.restriction.words[0] = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.scalars[11] = 7.0f; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.commandCaps = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.toggleCaps = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.flags[3] = 7; });
-    changes([](SEntityRecord&, SUnitDetail& d) { d.attributes.reserved6C = 7; });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.appearance.mesh = 7;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.appearance.scale[2] = 7.0f;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.appearance.attachParent = 7;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.appearance.attachments[0] = 7;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.appearance.attachments.push_back(0);
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.appearance.impact = 7.0f;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.appearance.scroll[3] = 7.0f;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.appearance.visualFlags = 7;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.appearance.intel[7] = 7;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.appearance.ambientSound = 7;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.appearance.rumbleSound = 7;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.appearance.underlay = 7;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.position[2] = 7;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.farPosition = true;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.farValue[2] = 7.0f;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.yawOnly = true;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.orientation = 7;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.health = 7.0f;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.health = -0.0f;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.maxHealth = 7.0f;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.fractionComplete = 7.0f;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.flags = 7;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.unit.fuelRatio = 7.0f;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.unit.shieldRatio = 7.0f;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.unit.workProgress = 7.0f;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.unit.unitStates = std::uint64_t{1} << 40u;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.unit.scriptBits = 7;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.unit.siloCounts[3] = 7;
+    });
+    changes([](SEntityRecord& r, SUnitDetail&) {
+      r.unit.unitFlags = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.creator = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.creationTick = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.stunTicks = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.jobType = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.fireState = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.siloMaxStorage[0] = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.siloMaxStorage[1] = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.selectionInheritor = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.customName = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.focusUnit = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.guardedUnit = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.targetBlip = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.didRefresh = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.reconFlags = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.economy[5] = 7.0f;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.commands[0] = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.buildQueue[0] = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.weapons[0].targets.firstWord = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.weapons[0].targets.words[0] = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.weapons[0].secondary.words[0] = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.weapons[0].layer = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.weapons[0].minRadius = 7.0f;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.weapons[0].maxRadius = 7.0f;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.weapons[0].effectiveRadius = 7.0f;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.weapons[0].minRangeVisual = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.weapons[0].maxRangeVisual = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.weapons.push_back(SUnitWeapon{});
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.attributes.blueprint = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.attributes.reserved04 = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.attributes.restriction.words[0] = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.attributes.scalars[11] = 7.0f;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.attributes.commandCaps = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.attributes.toggleCaps = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.attributes.flags[3] = 7;
+    });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.attributes.reserved6C = 7;
+    });
     // A value moved between two neighbours is another update.
-    changes([](SEntityRecord&, SUnitDetail& d) { d.commands = {}; d.buildQueue = {1, 2}; });
+    changes([](SEntityRecord&, SUnitDetail& d) {
+      d.commands = {};
+      d.buildQueue = {1, 2};
+    });
   }
 
   void TestFrameAppearance()
@@ -1279,7 +1511,9 @@ namespace
     // change of the scroll sends all four floats.
     SViewFrame shifted = moved;
     shifted.frameId = 3;
-    shifted.entities[0].appearance.scroll = {moved.entities[0].appearance.scroll[2], moved.entities[0].appearance.scroll[3], 5.0f, 6.0f};
+    shifted.entities[0].appearance.scroll = {
+      moved.entities[0].appearance.scroll[2], moved.entities[0].appearance.scroll[3], 5.0f, 6.0f
+    };
     SViewFrame jumped = moved;
     jumped.frameId = 3;
     jumped.entities[0].appearance.scroll = {7.0f, 8.0f, 5.0f, 6.0f};
@@ -1318,13 +1552,17 @@ namespace
     nearZero.entities[0].orientation = 3u;
     EXPECT_TRUE(Decode(Encode(nearZero, &stepped), &stepped, decoded) && decoded == nearZero);
     EXPECT_TRUE(Decode(Encode(wrapped, &nearZero), &nearZero, decoded) && decoded == wrapped);
-    EXPECT_TRUE(PositionFieldBits(stepped.entities[0], &placed.entities[0], kCodec) < PositionFieldBits(stepped.entities[0], nullptr, kCodec));
+    EXPECT_TRUE(
+      PositionFieldBits(stepped.entities[0], &placed.entities[0], kCodec) <
+      PositionFieldBits(stepped.entities[0], nullptr, kCodec)
+    );
 
     // Entities 13 (#312): a full rotation goes as its packed components' steps from the baseline's when both are
     // full, share their largest component and the steps are shorter; a change of largest component, or a step to a
     // component's ends, still reads back exactly.
     {
-      const auto pack = [](const std::uint32_t largest, const std::uint32_t a, const std::uint32_t b, const std::uint32_t c) {
+      const auto pack =
+        [](const std::uint32_t largest, const std::uint32_t a, const std::uint32_t b, const std::uint32_t c) {
         return largest | (a << 2u) | (b << 12u) | (c << 22u);
       };
       SViewFrame tilted = wrapped;
@@ -1347,7 +1585,10 @@ namespace
       EXPECT_TRUE(Decode(rockedBytes, &tilted, decoded) && decoded == rocked);
       EXPECT_TRUE(Decode(flippedBytes, &tilted, decoded) && decoded == flipped);
       EXPECT_TRUE(Decode(Encode(ends, &tilted), &tilted, decoded) && decoded == ends);
-      EXPECT_TRUE(OrientationFieldBits(rocked.entities[0], &tilted.entities[0]) < OrientationFieldBits(flipped.entities[0], &tilted.entities[0]));
+      EXPECT_TRUE(
+        OrientationFieldBits(rocked.entities[0], &tilted.entities[0]) <
+        OrientationFieldBits(flipped.entities[0], &tilted.entities[0])
+      );
       EXPECT_EQ(OrientationFieldBits(flipped.entities[0], &tilted.entities[0]), 2 + 32);
       EXPECT_EQ(OrientationFieldBits(tilted.entities[0], &wrapped.entities[0]), 1 + 32);
     }
@@ -1423,12 +1664,18 @@ namespace
         for (std::size_t i = 0; i < next.entities.size(); ++i) {
           const std::uint32_t combination = (static_cast<std::uint32_t>(i) * 5u + round * 11u) % 63u + 1u;
           SEntityRecord& record = next.entities[i];
-          if ((combination & 1u) != 0u) record.position[0] += 3u;
-          if ((combination & 2u) != 0u) record.orientation += 7u;
-          if ((combination & 4u) != 0u) record.health += 1.0f;
-          if ((combination & 8u) != 0u) record.maxHealth += 2.0f;
-          if ((combination & 16u) != 0u) record.fractionComplete = record.fractionComplete > 0.5f ? 0.25f : 0.75f;
-          if ((combination & 32u) != 0u) record.flags ^= 1u;
+          if ((combination & 1u) != 0u)
+            record.position[0] += 3u;
+          if ((combination & 2u) != 0u)
+            record.orientation += 7u;
+          if ((combination & 4u) != 0u)
+            record.health += 1.0f;
+          if ((combination & 8u) != 0u)
+            record.maxHealth += 2.0f;
+          if ((combination & 16u) != 0u)
+            record.fractionComplete = record.fractionComplete > 0.5f ? 0.25f : 0.75f;
+          if ((combination & 32u) != 0u)
+            record.flags ^= 1u;
         }
         EXPECT_TRUE(Decode(Encode(next, &previous), &previous, decoded) && decoded == next);
         previous = next;
@@ -1436,13 +1683,14 @@ namespace
     }
 
     // A creation mask without the basic fields, or with unit fields for a non-unit, is refused.
-    for (const std::uint32_t mask : {std::uint32_t{kFieldKind}, kEntityFields | kFieldKind | kFieldUnitFuel, kAllFields + 1u}) {
+    for (const std::uint32_t mask :
+         {std::uint32_t{kFieldKind}, kEntityFields | kFieldKind | kFieldUnitFuel, kAllFields + 1u}) {
       BitWriter writer;
       writer.WriteBits(kLaneVersions[static_cast<std::size_t>(ELane::Entities)], 16);
       writer.WriteBits(1u, 32);
       writer.WriteBits(kNoBaseline, 32);
       writer.WriteBits(0u, 32);
-      writer.WriteVarUint(0u); // sim rate
+      writer.WriteVarUint(0u);  // sim rate
       writer.WriteBits(0u, 32); // server clock
       writer.WriteVarUint(0u);
       writer.WriteVarUint(1u);
@@ -1498,9 +1746,9 @@ namespace
     EXPECT_EQ(PeekFrameBaseline(full), kNoBaseline);
 
     SViewFrame out{};
-    EXPECT_FALSE(Decode(delta, nullptr, out));  // needs its baseline
-    EXPECT_FALSE(Decode(delta, &first, out));   // another baseline
-    EXPECT_FALSE(Decode(full, &second, out));   // a full frame takes none
+    EXPECT_FALSE(Decode(delta, nullptr, out)); // needs its baseline
+    EXPECT_FALSE(Decode(delta, &first, out));  // another baseline
+    EXPECT_FALSE(Decode(full, &second, out));  // a full frame takes none
     EXPECT_TRUE(Decode(delta, &second, out) && out == third);
 
     // A baseline with the right id but other content is caught when the removals or changes
@@ -1601,8 +1849,8 @@ namespace
       writer.WriteBits(1u, 32);
       writer.WriteBits(kNoBaseline, 32);
       writer.WriteBits(0u, 32);
-      writer.WriteVarUint(0u); // sim rate
-      writer.WriteBits(0u, 32); // server clock
+      writer.WriteVarUint(0u);    // sim rate
+      writer.WriteBits(0u, 32);   // server clock
       writer.WriteVarUint(0u);    // removed
       writer.WriteVarUint(count); // created
       const std::vector<std::uint8_t> bytes = Bytes(writer);
@@ -1620,7 +1868,7 @@ namespace
     writer.WriteBits(10u, 32);
     writer.WriteBits(9u, 32);
     writer.WriteBits(0u, 32);
-    writer.WriteVarUint(0u); // sim rate
+    writer.WriteVarUint(0u);  // sim rate
     writer.WriteBits(0u, 32); // server clock
     writer.WriteVarUint(1u);
     writer.WriteVarUint(11u); // id 11: not in the baseline
@@ -1635,7 +1883,7 @@ namespace
     dup.WriteBits(10u, 32);
     dup.WriteBits(9u, 32);
     dup.WriteBits(0u, 32);
-    dup.WriteVarUint(0u); // sim rate
+    dup.WriteVarUint(0u);  // sim rate
     dup.WriteBits(0u, 32); // server clock
     dup.WriteVarUint(0u);
     dup.WriteVarUint(1u);
@@ -1670,7 +1918,7 @@ namespace
     empty.WriteBits(10u, 32);
     empty.WriteBits(9u, 32);
     empty.WriteBits(0u, 32);
-    empty.WriteVarUint(0u); // sim rate
+    empty.WriteVarUint(0u);  // sim rate
     empty.WriteBits(0u, 32); // server clock
     empty.WriteVarUint(0u);
     empty.WriteVarUint(0u);
@@ -1700,7 +1948,10 @@ namespace
     BitReader firstIn(firstBytes);
     EXPECT_TRUE(client.Read(firstIn));
     EXPECT_TRUE(client.Sounds().Size() == 2u && client.Sounds().Find(0) != nullptr && *client.Sounds().Find(0) == loop);
-    EXPECT_TRUE(client.Names().Size() == 1u && *client.Names().Find(0) == "/textures/ui/common/game/strategicicons/icon_land_rest.dds");
+    EXPECT_TRUE(
+      client.Names().Size() == 1u &&
+      *client.Names().Find(0) == "/textures/ui/common/game/strategicicons/icon_land_rest.dds"
+    );
 
     // A second batch adds only what is new; an empty batch is four zero counts.
     EXPECT_EQ(server.Name("/textures/ui/common/game/strategicicons/icon_land_rest.dds"), 0u);
@@ -1910,12 +2161,19 @@ namespace
     EXPECT_TRUE(faf::remote::DecodeChatMessage(chat, index, payload) && index == 63 && payload.size() == line.size());
     EXPECT_TRUE(std::equal(payload.begin(), payload.end(), text.begin()));
     EXPECT_FALSE(faf::remote::DecodeChatMessage(std::span<const std::uint8_t>(chat.data(), 1u), index, payload));
-    EXPECT_FALSE(faf::remote::DecodeChatMessage(faf::remote::EncodeChatMessage(64, text), index, payload)); // past the roster's entries
+    EXPECT_FALSE(
+      faf::remote::DecodeChatMessage(faf::remote::EncodeChatMessage(64, text), index, payload)
+    ); // past the roster's entries
     const std::vector<std::uint8_t> big(faf::remote::kMaxChatBytes + 1u, std::uint8_t{'x'});
     EXPECT_FALSE(faf::remote::DecodeChatMessage(faf::remote::EncodeChatMessage(1, big), index, payload));
-    const std::uint8_t endless[] = {static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::Chat), 0x80u, 0x80u, 0x80u, 0x80u};
+    const std::uint8_t endless[] = {
+      static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::Chat), 0x80u, 0x80u, 0x80u, 0x80u
+    };
     EXPECT_FALSE(faf::remote::DecodeChatMessage(endless, index, payload));
-    EXPECT_TRUE(faf::remote::DecodeChatMessage(faf::remote::EncodeChatMessage(0, {}), index, payload) && index == 0 && payload.empty());
+    EXPECT_TRUE(
+      faf::remote::DecodeChatMessage(faf::remote::EncodeChatMessage(0, {}), index, payload) && index == 0 &&
+      payload.empty()
+    );
 
     faf::remote::CChatBudget budget;
     std::size_t taken = 0;
@@ -1930,9 +2188,9 @@ namespace
   void TestSoundTable()
   {
     CSoundTableWriter writer;
-    const SSoundEntry a{"UEL_Weapon", "UEL0101_MachineGun", ""};
-    const SSoundEntry b{"UEL_Weapon", "UEL0101_MachineGun", "Weapon_LodCutoff"};
-    const SSoundEntry c{"Explosions", "Explosion_Large", ""};
+    const SSoundEntry a{"UEL_Weapon", "UEL0101_MachineGun", "", ""};
+    const SSoundEntry b{"UEL_Weapon", "UEL0101_MachineGun", "Weapon_LodCutoff", ""};
+    const SSoundEntry c{"Explosions", "Explosion_Large", "", ""};
     const auto ia = writer.Intern(a);
     const auto ib = writer.Intern(b);
     const auto ia2 = writer.Intern(a);
@@ -2007,7 +2265,7 @@ namespace
     CSoundTableWriter many;
     BitWriter all;
     for (std::uint32_t i = 0; i <= CSoundTableReader::kMaxEntries; ++i) {
-      const auto interned = many.Intern({"b", std::to_string(i), ""});
+      const auto interned = many.Intern({"b", std::to_string(i), "", ""});
       many.WriteEntry(interned.id, all);
     }
     const std::vector<std::uint8_t> allBytes = Bytes(all);
@@ -2021,7 +2279,12 @@ namespace
 
   // --- Intel grid deltas (plan WP5.4) -------------------------------------------------------
 
-  [[nodiscard]] SGridBits RandomGrid(std::mt19937& rng, const std::uint32_t width, const std::uint32_t height, const int percent)
+  [[nodiscard]] SGridBits RandomGrid(
+    std::mt19937& rng,
+    const std::uint32_t width,
+    const std::uint32_t height,
+    const int percent
+  )
   {
     SGridBits grid;
     grid.width = width;
@@ -2075,10 +2338,13 @@ namespace
   }
 
   /** The cell-at-a-time encoder the grid delta was defined with: the word-skipping one must match it. */
-  [[nodiscard]] std::vector<std::uint8_t> ReferenceGridDelta(const SGridBits& current, const SGridBits* baseline)
+  [[nodiscard]] std::vector<std::uint8_t> ReferenceGridDelta(
+    const SGridBits& current,
+    const SGridBits* baseline
+  )
   {
-    const bool sameShape = baseline != nullptr && baseline->width == current.width && baseline->height == current.height
-                        && baseline->cells.size() == current.cells.size();
+    const bool sameShape = baseline != nullptr && baseline->width == current.width &&
+      baseline->height == current.height && baseline->cells.size() == current.cells.size();
     BitWriter writer;
     writer.WriteVarUint(current.width);
     writer.WriteVarUint(current.height);
@@ -2229,7 +2495,9 @@ namespace
   void TestViewIdMap()
   {
     using faf::remote::CViewIdMap;
-    const auto ownSource = [](const std::uint32_t commandId) { return (commandId >> 24u) == 2u; };
+    const auto ownSource = [](const std::uint32_t commandId) {
+      return (commandId >> 24u) == 2u;
+    };
     const auto record = [](const std::uint32_t id) {
       SEntityRecord r{};
       r.id = id;
@@ -2261,15 +2529,16 @@ namespace
       ids.push_back(r.id);
     }
     // Family nibble and source byte kept; serials by first appearance; records sorted again.
-    const std::vector<std::uint32_t> expected = {0x00200001u, 0x00200009u, 0x00500003u, 0x10200010u,
-                                                 0x10500001u, 0x2FF00005u, 0x30500001u, 0x30500002u};
+    const std::vector<std::uint32_t> expected = {
+      0x00200001u, 0x00200009u, 0x00500003u, 0x10200010u, 0x10500001u, 0x2FF00005u, 0x30500001u, 0x30500002u
+    };
     EXPECT_EQ(ids, expected);
     const SUnitDetail& mapped = *frame.entities[1].unit.detail;
     EXPECT_EQ(mapped.targetBlip, 0x30500001u); // the same view id as the blip's own record
     EXPECT_EQ(mapped.creator, 0x00200001u);
     EXPECT_TRUE(mapped.commands.size() == 3u && mapped.commands[0] == 0x02000005); // own command kept
-    EXPECT_TRUE(static_cast<std::uint32_t>(mapped.commands[1]) == 0x80000001u);  // the sim's own: renumbered
-    EXPECT_TRUE(static_cast<std::uint32_t>(mapped.commands[2]) == 0x80000002u);  // another client's: renumbered
+    EXPECT_TRUE(static_cast<std::uint32_t>(mapped.commands[1]) == 0x80000001u);    // the sim's own: renumbered
+    EXPECT_TRUE(static_cast<std::uint32_t>(mapped.commands[2]) == 0x80000002u);    // another client's: renumbered
     EXPECT_TRUE(mapped.buildQueue.size() == 1u && static_cast<std::uint32_t>(mapped.buildQueue[0]) == 0x80000001u);
     EXPECT_TRUE(map.EntitiesMapped() == 3u && map.CommandsMapped() == 2u && map.Overflows() == 0u);
 
@@ -2292,7 +2561,9 @@ namespace
     // A retired id still translates inbound for the grace beats (a late command), then no more.
     EXPECT_TRUE(map.EntityToSim(0x30500001u, sim) && sim == 0x30500007u);
     EXPECT_TRUE(map.CommandToSim(0x80000001u, sim) && sim == 0x80000123u);
-    map.RetireNewCommandsUnless([](const std::uint32_t simId) { return simId != 0x05000009u; });
+    map.RetireNewCommandsUnless([](const std::uint32_t simId) {
+      return simId != 0x05000009u;
+    });
     map.AdvanceTo(CViewIdMap::kInboundGraceBeats);
     EXPECT_FALSE(map.EntityToSim(0x30500001u, sim));
     EXPECT_FALSE(map.CommandToSim(0x80000001u, sim));
@@ -2308,8 +2579,12 @@ namespace
     EXPECT_EQ(again.entities[1].id, 0x30500003u);
     EXPECT_TRUE(static_cast<std::uint32_t>((*again.entities[0].unit.detail).commands[0]) == 0x80000003u);
     // A command found alive once is not asked about again; it retires when the sim releases it.
-    map.RetireNewCommandsUnless([](std::uint32_t) { return true; });
-    map.RetireNewCommandsUnless([](std::uint32_t) { return false; });
+    map.RetireNewCommandsUnless([](std::uint32_t) {
+      return true;
+    });
+    map.RetireNewCommandsUnless([](std::uint32_t) {
+      return false;
+    });
     EXPECT_EQ(map.LiveCommands(), 1u);
     const std::uint32_t released[] = {0x80000123u};
     map.RetireCommands(released);
@@ -2320,7 +2595,9 @@ namespace
     SViewFrame theirs{};
     theirs.entities.push_back(record(0x30500002u));
     theirs.entities.push_back(record(0x10500044u));
-    other.Translate(theirs, [](std::uint32_t) { return false; });
+    other.Translate(theirs, [](std::uint32_t) {
+      return false;
+    });
     EXPECT_EQ(theirs.entities[0].id, 0x10500044u);
     EXPECT_EQ(theirs.entities[1].id, 0x30500001u);
   }
@@ -2337,53 +2614,128 @@ namespace
     std::vector<std::uint32_t> removed; // command, unit
     int issued = 0;
 
-    void SetCommandSource(moho::CommandSourceId) override {}
+    void SetCommandSource(
+      moho::CommandSourceId
+    ) override
+    {}
     void OnCommandSourceTerminated() override {}
-    void VerifyChecksum(const gpg::MD5Digest&, moho::CSeqNo) override {}
+    void VerifyChecksum(
+      const gpg::MD5Digest&,
+      moho::CSeqNo
+    ) override
+    {}
     void RequestPause() override {}
     void Resume() override {}
     void SingleStep() override {}
-    void CreateUnit(uint32_t, const moho::RResId&, const moho::SCoordsVec2&, float) override {}
-    void CreateProp(const char*, const Wm3::Vec3f&) override {}
-    void DestroyEntity(const moho::EntId id) override { destroyed.push_back(static_cast<std::uint32_t>(id)); }
-    void WarpEntity(moho::EntId, const moho::VTransform&) override {}
-    void ProcessInfoPair(moho::EntId, gpg::StrArg, gpg::StrArg) override {}
+    void CreateUnit(
+      uint32_t,
+      const moho::RResId&,
+      const moho::SCoordsVec2&,
+      float
+    ) override
+    {}
+    void CreateProp(
+      const char*,
+      const Wm3::Vec3f&
+    ) override
+    {}
+    void DestroyEntity(
+      const moho::EntId id
+    ) override
+    {
+      destroyed.push_back(static_cast<std::uint32_t>(id));
+    }
+    void WarpEntity(
+      moho::EntId,
+      const moho::VTransform&
+    ) override
+    {}
+    void ProcessInfoPair(
+      moho::EntId,
+      gpg::StrArg,
+      gpg::StrArg
+    ) override
+    {}
     void IssueCommand(
-      const moho::BVSet<moho::EntId, moho::EntIdUniverse>& units, const moho::SSTICommandIssueData& data, bool
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>& units,
+      const moho::SSTICommandIssueData& data,
+      bool
     ) override
     {
       ++issued;
       issuedUnits.clear();
-      units.ForEachValue([this](const unsigned int id) { issuedUnits.push_back(id); });
+      units.ForEachValue([this](const unsigned int id) {
+        issuedUnits.push_back(id);
+      });
       partner = data.unk04;
       insertBefore = data.mIndex;
       target = data.mTarget.mEntityId;
     }
     void IssueFactoryCommand(
-      const moho::BVSet<moho::EntId, moho::EntIdUniverse>&, const moho::SSTICommandIssueData&, bool
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>&,
+      const moho::SSTICommandIssueData&,
+      bool
     ) override
     {}
-    void IncreaseCommandCount(moho::CmdId, int) override {}
-    void DecreaseCommandCount(moho::CmdId, int) override {}
-    void SetCommandTarget(moho::CmdId, const moho::SSTITarget&) override {}
-    void SetCommandType(moho::CmdId, moho::EUnitCommandType) override {}
-    void SetCommandCells(moho::CmdId, const gpg::core::FastVector<moho::SOCellPos>&, const Wm3::Vector3<float>&) override {}
-    void RemoveCommandFromUnitQueue(const moho::CmdId command, const moho::EntId unit) override
+    void IncreaseCommandCount(
+      moho::CmdId,
+      int
+    ) override
+    {}
+    void DecreaseCommandCount(
+      moho::CmdId,
+      int
+    ) override
+    {}
+    void SetCommandTarget(
+      moho::CmdId,
+      const moho::SSTITarget&
+    ) override
+    {}
+    void SetCommandType(
+      moho::CmdId,
+      moho::EUnitCommandType
+    ) override
+    {}
+    void SetCommandCells(
+      moho::CmdId,
+      const gpg::core::FastVector<moho::SOCellPos>&,
+      const Wm3::Vector3<float>&
+    ) override
+    {}
+    void RemoveCommandFromUnitQueue(
+      const moho::CmdId command,
+      const moho::EntId unit
+    ) override
     {
       removed = {static_cast<std::uint32_t>(command), static_cast<std::uint32_t>(unit)};
     }
-    void ExecuteLuaInSim(const char*, const LuaPlus::LuaObject&) override {}
+    void ExecuteLuaInSim(
+      const char*,
+      const LuaPlus::LuaObject&
+    ) override
+    {}
     std::string callbackEntity;
-    void LuaSimCallback(const char*, const LuaPlus::LuaObject& args, const moho::BVSet<moho::EntId, moho::EntIdUniverse>&) override
+    void LuaSimCallback(
+      const char*,
+      const LuaPlus::LuaObject& args,
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>&
+    ) override
     {
       const LuaPlus::LuaObject entity = args["entity"];
       callbackEntity = entity.IsString() ? entity.GetString() : "";
     }
     void ExecuteDebugCommand(
-      const char*, const Wm3::Vector3<float>&, uint32_t, const moho::BVSet<moho::EntId, moho::EntIdUniverse>&
+      const char*,
+      const Wm3::Vector3<float>&,
+      uint32_t,
+      const moho::BVSet<moho::EntId, moho::EntIdUniverse>&
     ) override
     {}
-    void AdvanceBeat(int) override {}
+    void AdvanceBeat(
+      int
+    ) override
+    {}
     void EndGame() override {}
   };
 
@@ -2391,7 +2743,9 @@ namespace
   void TestInboundIds()
   {
     using faf::remote::CViewIdMap;
-    const auto ownSource = [](const std::uint32_t commandId) { return (commandId >> 24u) == 2u; };
+    const auto ownSource = [](const std::uint32_t commandId) {
+      return (commandId >> 24u) == 2u;
+    };
     CViewIdMap map(2);
     SViewFrame frame{};
     SEntityRecord blip{};
@@ -2411,11 +2765,11 @@ namespace
     moho::BVSet<moho::EntId, moho::EntIdUniverse> units{};
     (void)units.Add(static_cast<moho::EntId>(0x00200009u));
     moho::SSTICommandIssueData data(moho::EUnitCommandType::UNITCOMMAND_Attack);
-    data.nextCommandId = 0x02000010;                           // the client's own new id
-    data.unk04 = static_cast<std::int32_t>(0x80000002u);        // partner: another client's command
-    data.mIndex = static_cast<std::int32_t>(0x80000001u);       // insert before the sim's command
+    data.nextCommandId = 0x02000010;                      // the client's own new id
+    data.unk04 = static_cast<std::int32_t>(0x80000002u);  // partner: another client's command
+    data.mIndex = static_cast<std::int32_t>(0x80000001u); // insert before the sim's command
     data.mTarget.mType = moho::EAiTargetType::AITARGET_Entity;
-    data.mTarget.mEntityId = 0x30500001u;                       // the blip, in view ids
+    data.mTarget.mEntityId = 0x30500001u; // the blip, in view ids
     intake.IssueCommand(units, data, false);
     EXPECT_EQ(sim.issued, 1);
     EXPECT_TRUE(sim.issuedUnits == std::vector<std::uint32_t>{0x00200009u});
@@ -2444,7 +2798,9 @@ namespace
     (void)mask.Add(0x30500003u); // a view blip id never given
     (void)mask.Add(0x00500001u); // a unit id the view holds no record of
     moho::SSyncFilterMaskBlock simMask{};
-    const auto held = [](const std::uint32_t simId) { return simId == 0x00200009u || simId == 0x30500007u; };
+    const auto held = [](const std::uint32_t simId) {
+      return simId == 0x00200009u || simId == 0x30500007u;
+    };
     EXPECT_EQ(faf::remote::TranslateSelectionMask(map, mask, simMask, held), 2u);
     EXPECT_TRUE(simMask.Contains(0x00200009u) && simMask.Contains(0x30500007u) && !simMask.Contains(0x30500001u));
 
@@ -2456,11 +2812,11 @@ namespace
     moho::BVSet<moho::EntId, moho::EntIdUniverse> none{};
     intake.LuaSimCallback("Rebuild", args, none);
     EXPECT_EQ(sim.callbackEntity, "810549255"); // 0x30500007, the sim's
-    args.SetString("entity", "810549252");   // 0x30500004, never given
+    args.SetString("entity", "810549252");      // 0x30500004, never given
     sim.callbackEntity.clear();
     intake.LuaSimCallback("Rebuild", args, none);
     EXPECT_TRUE(sim.callbackEntity.empty() && intake.Dropped() == 3u);
-    args.SetString("entity", "810549252");   // an unmarked callback passes as it is
+    args.SetString("entity", "810549252"); // an unmarked callback passes as it is
     intake.LuaSimCallback("SomethingElse", args, none);
     EXPECT_EQ(sim.callbackEntity, "810549252");
 
@@ -2523,14 +2879,14 @@ namespace
     };
 
     EXPECT_EQ(server.Baseline(), nullptr);
-    EXPECT_TRUE(send(frameAt(1), false));           // full
-    server.Ack(client.Newest());              // 1
+    EXPECT_TRUE(send(frameAt(1), false)); // full
+    server.Ack(client.Newest());          // 1
     EXPECT_TRUE(server.Baseline() != nullptr && server.Baseline()->frameId == 1u);
-    EXPECT_TRUE(send(frameAt(2), true));            // lost
-    EXPECT_TRUE(send(frameAt(3), false));           // against 1 still: decodes without 2
-    server.Ack(client.Newest());              // 3
+    EXPECT_TRUE(send(frameAt(2), true));  // lost
+    EXPECT_TRUE(send(frameAt(3), false)); // against 1 still: decodes without 2
+    server.Ack(client.Newest());          // 3
     EXPECT_TRUE(server.Baseline()->frameId == 3u && server.Kept() == 1u);
-    server.Ack(1u);                           // a late acknowledgement changes nothing
+    server.Ack(1u); // a late acknowledgement changes nothing
     EXPECT_TRUE(server.Baseline()->frameId == 3u);
     EXPECT_EQ(server.FullFrames(), 0u);
 
@@ -2650,7 +3006,9 @@ namespace
     BitWriter same;
     EXPECT_TRUE(EncodeArmyLane(second, &second, same) && same.Bytes().size() <= 2u); // the count, then a bit per army
 
-    std::vector<std::uint8_t> cut(full.Bytes().begin(), full.Bytes().begin() + static_cast<std::ptrdiff_t>(full.Bytes().size() / 2));
+    std::vector<std::uint8_t> cut(
+      full.Bytes().begin(), full.Bytes().begin() + static_cast<std::ptrdiff_t>(full.Bytes().size() / 2)
+    );
     BitReader cutReader(cut);
     std::vector<SArmyRecord> none;
     EXPECT_FALSE(DecodeArmyLane(cutReader, nullptr, none));
@@ -2762,7 +3120,8 @@ namespace
       threads.emplace_back([&server, &ids, t] {
         for (int i = 0; i < kNames; ++i) {
           const int name = (i * 7 + t * 13) % kNames;
-          ids[static_cast<std::size_t>(t)][static_cast<std::size_t>(name)] = server.Name("/stat/" + std::to_string(name));
+          ids[static_cast<std::size_t>(t)][static_cast<std::size_t>(name)] =
+            server.Name("/stat/" + std::to_string(name));
           if (i % 10 == 0) {
             (void)server.Sound(SSoundEntry{"Bank", "Cue" + std::to_string(name % 5), "", ""});
           }
@@ -2780,7 +3139,9 @@ namespace
     const std::vector<std::uint8_t> bytes = Bytes(record);
     BitReader in(bytes);
     CSessionTableReaders client;
-    EXPECT_TRUE(client.Read(in) && client.Names().Size() == static_cast<std::uint32_t>(kNames) && client.Sounds().Size() <= 5u);
+    EXPECT_TRUE(
+      client.Read(in) && client.Names().Size() == static_cast<std::uint32_t>(kNames) && client.Sounds().Size() <= 5u
+    );
     for (int name = 0; name < kNames; ++name) {
       const std::string* const text = client.Names().Find(ids[0][static_cast<std::size_t>(name)]);
       EXPECT_TRUE(text != nullptr && *text == "/stat/" + std::to_string(name));
@@ -2789,50 +3150,293 @@ namespace
 
 } // namespace
 
-TEST(Existing_Wire, ArmyAndGridLanes) { TestArmyAndGridLanes(); }
-TEST(Existing_Wire, FrameWindow) { TestFrameWindow(); }
-TEST(Existing_Wire, FrameWindowLateAcks) { TestFrameWindowLateAcks(); }
-TEST(Existing_Wire, ViewIdMap) { TestViewIdMap(); }
-TEST(Existing_Wire, InboundIds) { TestInboundIds(); }
-TEST(Existing_Wire, GridDeltaRoundTrip) { TestGridDeltaRoundTrip(); }
-TEST(Existing_Wire, GridDeltaUnchangedIsSmall) { TestGridDeltaUnchangedIsSmall(); }
-TEST(Existing_Wire, FlatMapEraseMatchesMap) { TestFlatMapEraseMatchesMap(); }
-TEST(Existing_Wire, GridDeltaMatchesCellAtATime) { TestGridDeltaMatchesCellAtATime(); }
-TEST(Existing_Wire, GridDeltaHostile) { TestGridDeltaHostile(); }
-TEST(Existing_Wire, SoundTable) { TestSoundTable(); }
-TEST(Existing_Wire, Roster) { TestRoster(); }
-TEST(Existing_Wire, SeatRosterMessages) { TestSeatRosterMessages(); }
-TEST(Existing_Wire, SessionTables) { TestSessionTables(); }
-TEST(Existing_Wire, SessionTablesFromThreads) { TestSessionTablesFromThreads(); }
-TEST(Existing_Wire, SharedValueShare) { TestSharedValueShare(); }
-TEST(Existing_Wire, PoseLane) { TestPoseLane(); }
-TEST(Existing_Wire, BitStreamRoundTrip) { TestBitStreamRoundTrip(); }
-TEST(Existing_Wire, BitStreamOverrun) { TestBitStreamOverrun(); }
-TEST(Existing_Wire, BitStreamMatchesBitAtATime) { TestBitStreamMatchesBitAtATime(); }
-TEST(Existing_Wire, BitStreamMalformedVarUint) { TestBitStreamMalformedVarUint(); }
-TEST(Existing_Wire, AxisQuantizer) { TestAxisQuantizer(); }
-TEST(Existing_Wire, PositionQuantizerForMap) { TestPositionQuantizerForMap(); }
-TEST(Existing_Wire, QuaternionPacking) { TestQuaternionPacking(); }
-TEST(Existing_Wire, OrdinalTable) { TestOrdinalTable(); }
-TEST(Existing_Wire, Hello) { TestHello(); }
-TEST(Existing_Wire, FrameRoundTripProperty) { TestFrameRoundTripProperty(); }
-TEST(Existing_Wire, FrameRoundTripDeadReckoning) { TestFrameRoundTripDeadReckoning(); }
-TEST(Existing_Wire, DeadReckoningRules) { TestDeadReckoningRules(); }
-TEST(Existing_Wire, FrameUnchangedIsSmall) { TestFrameUnchangedIsSmall(); }
-TEST(Existing_Wire, FrameBaselineChecks) { TestFrameBaselineChecks(); }
-TEST(Existing_Wire, EncodeRejects) { TestEncodeRejects(); }
-TEST(Existing_Wire, DecoderTruncation) { TestDecoderTruncation(); }
-TEST(Existing_Wire, DecoderCorruptionAndGarbage) { TestDecoderCorruptionAndGarbage(); }
-TEST(Existing_Wire, DecoderHostileCounts) { TestDecoderHostileCounts(); }
-TEST(Existing_Wire, FrameAppearance) { TestFrameAppearance(); }
-TEST(Existing_Wire, BlipUpdateHash) { TestBlipUpdateHash(); }
-TEST(Existing_Wire, BitWriterAppend) { TestBitWriterAppend(); }
-TEST(Existing_Wire, LuaSyncLane) { TestLuaSyncLane(); }
-TEST(Existing_Wire, GridDeltaInPlace) { TestGridDeltaInPlace(); }
+TEST(
+  Existing_Wire,
+  ArmyAndGridLanes
+)
+{
+  TestArmyAndGridLanes();
+}
+TEST(
+  Existing_Wire,
+  FrameWindow
+)
+{
+  TestFrameWindow();
+}
+TEST(
+  Existing_Wire,
+  FrameWindowLateAcks
+)
+{
+  TestFrameWindowLateAcks();
+}
+TEST(
+  Existing_Wire,
+  ViewIdMap
+)
+{
+  TestViewIdMap();
+}
+TEST(
+  Existing_Wire,
+  InboundIds
+)
+{
+  TestInboundIds();
+}
+TEST(
+  Existing_Wire,
+  GridDeltaRoundTrip
+)
+{
+  TestGridDeltaRoundTrip();
+}
+TEST(
+  Existing_Wire,
+  GridDeltaUnchangedIsSmall
+)
+{
+  TestGridDeltaUnchangedIsSmall();
+}
+TEST(
+  Existing_Wire,
+  FlatMapEraseMatchesMap
+)
+{
+  TestFlatMapEraseMatchesMap();
+}
+TEST(
+  Existing_Wire,
+  GridDeltaMatchesCellAtATime
+)
+{
+  TestGridDeltaMatchesCellAtATime();
+}
+TEST(
+  Existing_Wire,
+  GridDeltaHostile
+)
+{
+  TestGridDeltaHostile();
+}
+TEST(
+  Existing_Wire,
+  SoundTable
+)
+{
+  TestSoundTable();
+}
+TEST(
+  Existing_Wire,
+  Roster
+)
+{
+  TestRoster();
+}
+TEST(
+  Existing_Wire,
+  SeatRosterMessages
+)
+{
+  TestSeatRosterMessages();
+}
+TEST(
+  Existing_Wire,
+  SessionTables
+)
+{
+  TestSessionTables();
+}
+TEST(
+  Existing_Wire,
+  SessionTablesFromThreads
+)
+{
+  TestSessionTablesFromThreads();
+}
+TEST(
+  Existing_Wire,
+  SharedValueShare
+)
+{
+  TestSharedValueShare();
+}
+TEST(
+  Existing_Wire,
+  PoseLane
+)
+{
+  TestPoseLane();
+}
+TEST(
+  Existing_Wire,
+  BitStreamRoundTrip
+)
+{
+  TestBitStreamRoundTrip();
+}
+TEST(
+  Existing_Wire,
+  BitStreamOverrun
+)
+{
+  TestBitStreamOverrun();
+}
+TEST(
+  Existing_Wire,
+  BitStreamMatchesBitAtATime
+)
+{
+  TestBitStreamMatchesBitAtATime();
+}
+TEST(
+  Existing_Wire,
+  BitStreamMalformedVarUint
+)
+{
+  TestBitStreamMalformedVarUint();
+}
+TEST(
+  Existing_Wire,
+  AxisQuantizer
+)
+{
+  TestAxisQuantizer();
+}
+TEST(
+  Existing_Wire,
+  PositionQuantizerForMap
+)
+{
+  TestPositionQuantizerForMap();
+}
+TEST(
+  Existing_Wire,
+  QuaternionPacking
+)
+{
+  TestQuaternionPacking();
+}
+TEST(
+  Existing_Wire,
+  OrdinalTable
+)
+{
+  TestOrdinalTable();
+}
+TEST(
+  Existing_Wire,
+  Hello
+)
+{
+  TestHello();
+}
+TEST(
+  Existing_Wire,
+  FrameRoundTripProperty
+)
+{
+  TestFrameRoundTripProperty();
+}
+TEST(
+  Existing_Wire,
+  FrameRoundTripDeadReckoning
+)
+{
+  TestFrameRoundTripDeadReckoning();
+}
+TEST(
+  Existing_Wire,
+  DeadReckoningRules
+)
+{
+  TestDeadReckoningRules();
+}
+TEST(
+  Existing_Wire,
+  FrameUnchangedIsSmall
+)
+{
+  TestFrameUnchangedIsSmall();
+}
+TEST(
+  Existing_Wire,
+  FrameBaselineChecks
+)
+{
+  TestFrameBaselineChecks();
+}
+TEST(
+  Existing_Wire,
+  EncodeRejects
+)
+{
+  TestEncodeRejects();
+}
+TEST(
+  Existing_Wire,
+  DecoderTruncation
+)
+{
+  TestDecoderTruncation();
+}
+TEST(
+  Existing_Wire,
+  DecoderCorruptionAndGarbage
+)
+{
+  TestDecoderCorruptionAndGarbage();
+}
+TEST(
+  Existing_Wire,
+  DecoderHostileCounts
+)
+{
+  TestDecoderHostileCounts();
+}
+TEST(
+  Existing_Wire,
+  FrameAppearance
+)
+{
+  TestFrameAppearance();
+}
+TEST(
+  Existing_Wire,
+  BlipUpdateHash
+)
+{
+  TestBlipUpdateHash();
+}
+TEST(
+  Existing_Wire,
+  BitWriterAppend
+)
+{
+  TestBitWriterAppend();
+}
+TEST(
+  Existing_Wire,
+  LuaSyncLane
+)
+{
+  TestLuaSyncLane();
+}
+TEST(
+  Existing_Wire,
+  GridDeltaInPlace
+)
+{
+  TestGridDeltaInPlace();
+}
 
 // Plan WP10.10: the network panel's bytes by lane: totals since the game started, the rate over the last whole
 // seconds (the second under way left out, at most five), and a new game from zero.
-TEST(ServerLaneMeter, RatesOverWholeSecondsAndTotals)
+TEST(
+  ServerLaneMeter,
+  RatesOverWholeSecondsAndTotals
+)
 {
   using faf::remote::client::CServerLaneMeter;
   using faf::remote::client::kServerLaneCount;
@@ -2841,7 +3445,8 @@ TEST(ServerLaneMeter, RatesOverWholeSecondsAndTotals)
   EXPECT_FALSE(meter.Snapshot().active);
   const CServerLaneMeter::Clock::time_point start{std::chrono::seconds(1000)};
   const auto at = [&start](const double seconds) {
-    return start + std::chrono::duration_cast<CServerLaneMeter::Clock::duration>(std::chrono::duration<double>(seconds));
+    return start +
+      std::chrono::duration_cast<CServerLaneMeter::Clock::duration>(std::chrono::duration<double>(seconds));
   };
   const std::array<std::uint64_t, kServerLaneCount> view{1000u, 100u, 50u, 20u, 0u};
   for (int beat = 0; beat < 80; ++beat) { // 10 views a second for 8 s

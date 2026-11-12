@@ -18,17 +18,17 @@ using namespace LuaPlus;
  */
 gpg::RType* LuaPlus::register_LuaObjectTypeInfo()
 {
-	static LuaObjectTypeInfo sInstance;
-	return &sInstance;
+  static LuaObjectTypeInfo sInstance;
+  return &sInstance;
 }
 
 /**
  * Address: 0x0090BB80 (FUN_0090BB80, LuaPlus::LuaObjectTypeInfo::LuaObjectTypeInfo)
  */
 LuaObjectTypeInfo::LuaObjectTypeInfo()
-	: gpg::RType()
+  : gpg::RType()
 {
-	gpg::PreRegisterRType(typeid(LuaObject), this);
+  gpg::PreRegisterRType(typeid(LuaObject), this);
 }
 
 /**
@@ -41,7 +41,7 @@ LuaObjectTypeInfo::~LuaObjectTypeInfo() = default;
  */
 const char* LuaObjectTypeInfo::GetName() const
 {
-	return "LuaObject";
+  return "LuaObject";
 }
 
 /**
@@ -49,11 +49,14 @@ const char* LuaObjectTypeInfo::GetName() const
  */
 void LuaObjectTypeInfo::Init()
 {
-	size_ = sizeof(LuaObject);
-	gpg::RType::Init();
-	Finish();
+  size_ = sizeof(LuaObject);
+  gpg::RType::Init();
+  Finish();
 }
 
 // Phase-1 pre-registration: publish the descriptor before any consumer calls
 // gpg::LookupRType(typeid(LuaObject)). See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_LuaObjectTypeInfo_be9ef0, LuaPlus::register_LuaObjectTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_LuaObjectTypeInfo_be9ef0,
+  LuaPlus::register_LuaObjectTypeInfo
+)

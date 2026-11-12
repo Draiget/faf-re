@@ -53,7 +53,6 @@ namespace moho
   }
 } // namespace moho
 
-
 namespace
 {
   /**
@@ -93,7 +92,10 @@ namespace
 
   struct EMauiScrollAxisTypeInfoBootstrap
   {
-    EMauiScrollAxisTypeInfoBootstrap() { register_EMauiScrollAxisTypeInfo(); }
+    EMauiScrollAxisTypeInfoBootstrap()
+    {
+      register_EMauiScrollAxisTypeInfo();
+    }
   };
 
   EMauiScrollAxisTypeInfoBootstrap gEMauiScrollAxisTypeInfoBootstrap;
@@ -101,4 +103,7 @@ namespace
 
 // Phase-1 pre-registration: the descriptor has to exist before anything calls
 // gpg::LookupRType on it. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_EMauiScrollAxisTypeInfo_007865, register_EMauiScrollAxisTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_EMauiScrollAxisTypeInfo_007865,
+  register_EMauiScrollAxisTypeInfo
+)

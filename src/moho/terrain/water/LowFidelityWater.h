@@ -71,10 +71,10 @@ namespace moho
       const boost::shared_ptr<ID3DRenderTarget>& reflectionTexture
     ) override;
 
-    IWldTerrainRes* mTerrainRes = nullptr; // +0x04
-    float mWaterElevation = 0.0F;                    // +0x08
-    CD3DVertexSheet* mVertexSheet = nullptr;         // +0x0C
-    CD3DIndexSheet* mIndexSheet = nullptr;           // +0x10
+    IWldTerrainRes* mTerrainRes = nullptr;   // +0x04
+    float mWaterElevation = 0.0F;            // +0x08
+    CD3DVertexSheet* mVertexSheet = nullptr; // +0x0C
+    CD3DIndexSheet* mIndexSheet = nullptr;   // +0x10
   };
 
   static_assert(offsetof(LowFidelityWater, mTerrainRes) == 0x04, "LowFidelityWater::mTerrainRes offset must be 0x04");
@@ -82,10 +82,7 @@ namespace moho
     offsetof(LowFidelityWater, mWaterElevation) == 0x08,
     "LowFidelityWater::mWaterElevation offset must be 0x08"
   );
-  static_assert(
-    offsetof(LowFidelityWater, mVertexSheet) == 0x0C,
-    "LowFidelityWater::mVertexSheet offset must be 0x0C"
-  );
+  static_assert(offsetof(LowFidelityWater, mVertexSheet) == 0x0C, "LowFidelityWater::mVertexSheet offset must be 0x0C");
   static_assert(offsetof(LowFidelityWater, mIndexSheet) == 0x10, "LowFidelityWater::mIndexSheet offset must be 0x10");
   static_assert(sizeof(LowFidelityWater) == 0x14, "LowFidelityWater size must be 0x14");
 } // namespace moho

@@ -28,7 +28,11 @@ namespace
     return sInstance;
   }
 
-  void AddEnumEntry(gpg::REnumType* const typeInfo, const char* const token, const int value)
+  void AddEnumEntry(
+    gpg::REnumType* const typeInfo,
+    const char* const token,
+    const int value
+  )
   {
     typeInfo->AddEnum(typeInfo->StripPrefix(token), value);
   }
@@ -176,7 +180,9 @@ namespace
     return sName.c_str();
   }
 
-  fa::string RStringVectorTypeInfo::GetLexical(const gpg::RRef& ref) const
+  fa::string RStringVectorTypeInfo::GetLexical(
+    const gpg::RRef& ref
+  ) const
   {
     const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
@@ -195,7 +201,6 @@ namespace
     serSaveFunc_ = &RStringVectorTypeInfo::SerSave;
   }
 
-
   /**
    * Address: 0x00512FC0 (FUN_00512FC0, gpg::RVectorType_string::Reserve)
    *
@@ -206,7 +211,10 @@ namespace
    * own growth step (FUN_00513980, cited on `reserve` in
    * legacy/containers/Vector.h), so the canonical template call covers it.
    */
-  [[nodiscard]] std::size_t EnsureStringVectorCapacity(StringVector& value, const std::size_t requestedCount)
+  [[nodiscard]] std::size_t EnsureStringVectorCapacity(
+    StringVector& value,
+    const std::size_t requestedCount
+  )
   {
     if (requestedCount > kStringVectorMaxElements) {
       throw std::length_error("vector<T> too long");
@@ -278,7 +286,10 @@ namespace
     }
   }
 
-  gpg::RRef RStringVectorTypeInfo::SubscriptIndex(void* const obj, const int ind) const
+  gpg::RRef RStringVectorTypeInfo::SubscriptIndex(
+    void* const obj,
+    const int ind
+  ) const
   {
     gpg::RRef out{};
     out.mType = gpg::RTypeOf<fa::string>();
@@ -292,7 +303,9 @@ namespace
     return out;
   }
 
-  size_t RStringVectorTypeInfo::GetCount(void* const obj) const
+  size_t RStringVectorTypeInfo::GetCount(
+    void* const obj
+  ) const
   {
     const auto* const storage = static_cast<const StringVector*>(obj);
     return storage ? storage->size() : 0u;
@@ -307,7 +320,10 @@ namespace
    * Resizes one reflected string-vector lane to a requested count using a
    * default-constructed fill string.
    */
-  void RStringVectorTypeInfo::SetCount(void* const obj, const int count) const
+  void RStringVectorTypeInfo::SetCount(
+    void* const obj,
+    const int count
+  ) const
   {
     auto* const storage = static_cast<StringVector*>(obj);
     if (!storage || count < 0) {
@@ -503,7 +519,9 @@ namespace moho
    * What it does:
    * Adds `RBlueprint` as the reflected base lane at offset 0.
    */
-  void REntityBlueprintTypeInfo::AddBaseRBlueprint(gpg::RType* const typeInfo)
+  void REntityBlueprintTypeInfo::AddBaseRBlueprint(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::RBlueprint>(typeInfo);
   }
@@ -515,52 +533,163 @@ namespace moho
    * Registers entity-blueprint reflection fields, version tags, and editor
    * help text in the same order as the binary.
    */
-  void REntityBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
+  void REntityBlueprintTypeInfo::AddFields(
+    gpg::RType* const typeInfo
+  )
   {
-    gpg::RField* const categoriesField = typeInfo->AddField<fa::vector<fa::string>>("Categories", offsetof(REntityBlueprint, mCategories));
+    gpg::RField* const categoriesField =
+      typeInfo->AddField<fa::vector<fa::string>>("Categories", offsetof(REntityBlueprint, mCategories));
     categoriesField->mFlags = 3;
     categoriesField->mDesc = "Named categories that this entity belongs to";
-    typeInfo->AddField<fa::string>("ScriptModule", offsetof(REntityBlueprint, mScriptModule), 3, "Module defining entity's class.");
-    typeInfo->AddField<fa::string>("ScriptClass", offsetof(REntityBlueprint, mScriptClass), 3, "Name of entity's class.");
-    gpg::RField* const collisionShapeField = typeInfo->AddField<moho::ECollisionShape>("CollisionShape", offsetof(REntityBlueprint, mCollisionShape));
+    typeInfo->AddField<fa::string>(
+      "ScriptModule", offsetof(REntityBlueprint, mScriptModule), 3, "Module defining entity's class."
+    );
+    typeInfo->AddField<fa::string>(
+      "ScriptClass", offsetof(REntityBlueprint, mScriptClass), 3, "Name of entity's class."
+    );
+    gpg::RField* const collisionShapeField =
+      typeInfo->AddField<moho::ECollisionShape>("CollisionShape", offsetof(REntityBlueprint, mCollisionShape));
     collisionShapeField->mFlags = 3;
     collisionShapeField->mDesc = "Shape to use for collision db, 'None' for no collision.";
     typeInfo->AddField<float>("SizeX", offsetof(REntityBlueprint, mSizeX), 3, "Unit size X");
     typeInfo->AddField<float>("SizeY", offsetof(REntityBlueprint, mSizeY), 3, "Unit size Y");
     typeInfo->AddField<float>("SizeZ", offsetof(REntityBlueprint, mSizeZ), 3, "Unit size Z");
-    typeInfo->AddField<float>("AverageDensity", offsetof(REntityBlueprint, mAverageDensity), 3, "Unit average density in tons / m^3. (Default is 0.49)");
-    typeInfo->AddField<float>("InertiaTensorX", offsetof(REntityBlueprint, mInertiaTensorX), 3, "Component X,X of inertia tensor");
-    typeInfo->AddField<float>("InertiaTensorY", offsetof(REntityBlueprint, mInertiaTensorY), 3, "Component Y,Y of inertia tensor");
-    typeInfo->AddField<float>("InertiaTensorZ", offsetof(REntityBlueprint, mInertiaTensorZ), 3, "Component Z,Z of inertia tensor");
-    typeInfo->AddField<float>("CollisionOffsetX", offsetof(REntityBlueprint, mCollisionOffsetX), 3, "Offset collision by this much on the X Axis");
-    typeInfo->AddField<float>("CollisionOffsetY", offsetof(REntityBlueprint, mCollisionOffsetY), 3, "Offset collision by this much on the Y Axis");
-    typeInfo->AddField<float>("CollisionOffsetZ", offsetof(REntityBlueprint, mCollisionOffsetZ), 3, "Offset collision by this much on the Z Axis");
-    gpg::RField* const footprintField = typeInfo->AddField<moho::SFootprint>("Footprint", offsetof(REntityBlueprint, mFootprint));
+    typeInfo->AddField<float>(
+      "AverageDensity",
+      offsetof(REntityBlueprint, mAverageDensity),
+      3,
+      "Unit average density in tons / m^3. (Default is 0.49)"
+    );
+    typeInfo->AddField<float>(
+      "InertiaTensorX", offsetof(REntityBlueprint, mInertiaTensorX), 3, "Component X,X of inertia tensor"
+    );
+    typeInfo->AddField<float>(
+      "InertiaTensorY", offsetof(REntityBlueprint, mInertiaTensorY), 3, "Component Y,Y of inertia tensor"
+    );
+    typeInfo->AddField<float>(
+      "InertiaTensorZ", offsetof(REntityBlueprint, mInertiaTensorZ), 3, "Component Z,Z of inertia tensor"
+    );
+    typeInfo->AddField<float>(
+      "CollisionOffsetX",
+      offsetof(REntityBlueprint, mCollisionOffsetX),
+      3,
+      "Offset collision by this much on the X Axis"
+    );
+    typeInfo->AddField<float>(
+      "CollisionOffsetY",
+      offsetof(REntityBlueprint, mCollisionOffsetY),
+      3,
+      "Offset collision by this much on the Y Axis"
+    );
+    typeInfo->AddField<float>(
+      "CollisionOffsetZ",
+      offsetof(REntityBlueprint, mCollisionOffsetZ),
+      3,
+      "Offset collision by this much on the Z Axis"
+    );
+    gpg::RField* const footprintField =
+      typeInfo->AddField<moho::SFootprint>("Footprint", offsetof(REntityBlueprint, mFootprint));
     footprintField->mFlags = 3;
     footprintField->mDesc = "Unit footprint";
-    gpg::RField* const altFootprintField = typeInfo->AddField<moho::SFootprint>("AltFootprint", offsetof(REntityBlueprint, mAltFootprint));
+    gpg::RField* const altFootprintField =
+      typeInfo->AddField<moho::SFootprint>("AltFootprint", offsetof(REntityBlueprint, mAltFootprint));
     altFootprintField->mFlags = 3;
     altFootprintField->mDesc = "Alternate Unit footprint";
-    typeInfo->AddField<int>("DesiredShooterCap", offsetof(REntityBlueprint, mDesiredShooterCap), 3, "Set the desired maximum number of shooters taking shots at me");
-    typeInfo->AddField<moho::RResId>("StrategicIconName", offsetof(REntityBlueprint, mStrategicIconName), 3, "Name of strategic icon to use for this unit");
-    typeInfo->AddField<bool>("LifeBarRender", offsetof(REntityBlueprint, mLifeBarRender), 3, "Should render life bar or not.");
-    typeInfo->AddField<float>("LifeBarOffset", offsetof(REntityBlueprint, mLifeBarOffset), 3, "Vertical offset from unit for lifebar.");
+    typeInfo->AddField<int>(
+      "DesiredShooterCap",
+      offsetof(REntityBlueprint, mDesiredShooterCap),
+      3,
+      "Set the desired maximum number of shooters taking shots at me"
+    );
+    typeInfo->AddField<moho::RResId>(
+      "StrategicIconName",
+      offsetof(REntityBlueprint, mStrategicIconName),
+      3,
+      "Name of strategic icon to use for this unit"
+    );
+    typeInfo->AddField<bool>(
+      "LifeBarRender", offsetof(REntityBlueprint, mLifeBarRender), 3, "Should render life bar or not."
+    );
+    typeInfo->AddField<float>(
+      "LifeBarOffset", offsetof(REntityBlueprint, mLifeBarOffset), 3, "Vertical offset from unit for lifebar."
+    );
     typeInfo->AddField<float>("LifeBarSize", offsetof(REntityBlueprint, mLifeBarSize), 3, "size of lifebar in OGrids.");
-    typeInfo->AddField<float>("LifeBarHeight", offsetof(REntityBlueprint, mLifeBarHeight), 3, "height of lifebar in OGrids.");
-    typeInfo->AddField<float>("SelectionSizeX", offsetof(REntityBlueprint, mSelectionSizeX), 3, "X Size of selection box");
-    typeInfo->AddField<float>("SelectionSizeY", offsetof(REntityBlueprint, mSelectionSizeY), 3, "Y Size of selection box");
-    typeInfo->AddField<float>("SelectionSizeZ", offsetof(REntityBlueprint, mSelectionSizeZ), 3, "Z Size of selection box");
-    typeInfo->AddField<float>("SelectionCenterOffsetX", offsetof(REntityBlueprint, mSelectionCenterOffsetX), 3, "X center offset of selection box");
-    typeInfo->AddField<float>("SelectionCenterOffsetY", offsetof(REntityBlueprint, mSelectionCenterOffsetY), 3, "Y center offset of selection box");
-    typeInfo->AddField<float>("SelectionCenterOffsetZ", offsetof(REntityBlueprint, mSelectionCenterOffsetZ), 3, "Z center offset of selection box");
-    typeInfo->AddField<float>("SelectionYOffset", offsetof(REntityBlueprint, mSelectionYOffset), 3, "How far to reduce top of collision box for selection (default 0.5 (half))");
-    typeInfo->AddField<float>("SelectionMeshScaleX", offsetof(REntityBlueprint, mSelectionMeshScaleX), 3, "Scale the mesh on the X axis by this much when we perform our mouse over entity test");
-    typeInfo->AddField<float>("SelectionMeshScaleY", offsetof(REntityBlueprint, mSelectionMeshScaleY), 3, "Scale the mesh on the Y axis by this much when we perform our mouse over entity test");
-    typeInfo->AddField<float>("SelectionMeshScaleZ", offsetof(REntityBlueprint, mSelectionMeshScaleZ), 3, "Scale the mesh on the Z axis by this much when we perform our mouse over entity test");
-    typeInfo->AddField<float>("SelectionMeshUseTopAmount", offsetof(REntityBlueprint, mSelectionMeshUseTopAmount), 3, "Use this much of the top portion of our mesh for intersection test. Useful for naval stuctures that go deep into water");
-    typeInfo->AddField<float>("SelectionThickness", offsetof(REntityBlueprint, mSelectionThickness), 3, "Use this to modify the thickness of the rendered selection indicator for the unit");
-    typeInfo->AddField<float>("UseOOBTestZoom", offsetof(REntityBlueprint, mUseOOBTestZoom), 3, "Use OOB hit test for this unit when camera is below this zoom level");
-    gpg::RField* const strategicIconSortPriorityField = typeInfo->AddField<unsigned char>("StrategicIconSortPriority", offsetof(REntityBlueprint, mStrategicIconSortPriority));
+    typeInfo->AddField<float>(
+      "LifeBarHeight", offsetof(REntityBlueprint, mLifeBarHeight), 3, "height of lifebar in OGrids."
+    );
+    typeInfo->AddField<float>(
+      "SelectionSizeX", offsetof(REntityBlueprint, mSelectionSizeX), 3, "X Size of selection box"
+    );
+    typeInfo->AddField<float>(
+      "SelectionSizeY", offsetof(REntityBlueprint, mSelectionSizeY), 3, "Y Size of selection box"
+    );
+    typeInfo->AddField<float>(
+      "SelectionSizeZ", offsetof(REntityBlueprint, mSelectionSizeZ), 3, "Z Size of selection box"
+    );
+    typeInfo->AddField<float>(
+      "SelectionCenterOffsetX",
+      offsetof(REntityBlueprint, mSelectionCenterOffsetX),
+      3,
+      "X center offset of selection box"
+    );
+    typeInfo->AddField<float>(
+      "SelectionCenterOffsetY",
+      offsetof(REntityBlueprint, mSelectionCenterOffsetY),
+      3,
+      "Y center offset of selection box"
+    );
+    typeInfo->AddField<float>(
+      "SelectionCenterOffsetZ",
+      offsetof(REntityBlueprint, mSelectionCenterOffsetZ),
+      3,
+      "Z center offset of selection box"
+    );
+    typeInfo->AddField<float>(
+      "SelectionYOffset",
+      offsetof(REntityBlueprint, mSelectionYOffset),
+      3,
+      "How far to reduce top of collision box for selection (default 0.5 (half))"
+    );
+    typeInfo->AddField<float>(
+      "SelectionMeshScaleX",
+      offsetof(REntityBlueprint, mSelectionMeshScaleX),
+      3,
+      "Scale the mesh on the X axis by this much when we perform our mouse over entity test"
+    );
+    typeInfo->AddField<float>(
+      "SelectionMeshScaleY",
+      offsetof(REntityBlueprint, mSelectionMeshScaleY),
+      3,
+      "Scale the mesh on the Y axis by this much when we perform our mouse over entity test"
+    );
+    typeInfo->AddField<float>(
+      "SelectionMeshScaleZ",
+      offsetof(REntityBlueprint, mSelectionMeshScaleZ),
+      3,
+      "Scale the mesh on the Z axis by this much when we perform our mouse over entity test"
+    );
+    typeInfo->AddField<float>(
+      "SelectionMeshUseTopAmount",
+      offsetof(REntityBlueprint, mSelectionMeshUseTopAmount),
+      3,
+      "Use this much of the top portion of our mesh for intersection test. Useful for naval stuctures that go deep "
+      "into water"
+    );
+    typeInfo->AddField<float>(
+      "SelectionThickness",
+      offsetof(REntityBlueprint, mSelectionThickness),
+      3,
+      "Use this to modify the thickness of the rendered selection indicator for the unit"
+    );
+    typeInfo->AddField<float>(
+      "UseOOBTestZoom",
+      offsetof(REntityBlueprint, mUseOOBTestZoom),
+      3,
+      "Use OOB hit test for this unit when camera is below this zoom level"
+    );
+    gpg::RField* const strategicIconSortPriorityField = typeInfo->AddField<unsigned char>(
+      "StrategicIconSortPriority", offsetof(REntityBlueprint, mStrategicIconSortPriority)
+    );
     strategicIconSortPriorityField->mFlags = 3;
     strategicIconSortPriorityField->mDesc = "0 renders on top, 255 on bottom";
   }
@@ -597,7 +726,10 @@ namespace moho
  * Builds one temporary `RRef_REntityBlueprint` and copies `(mObj,mType)` into
  * caller-owned output storage.
  */
-gpg::RRef* gpg::PackRRef_REntityBlueprint(gpg::RRef* const outRef, moho::REntityBlueprint* const value)
+gpg::RRef* gpg::PackRRef_REntityBlueprint(
+  gpg::RRef* const outRef,
+  moho::REntityBlueprint* const value
+)
 {
   gpg::RRef temp{};
   temp = gpg::MakeRRef<moho::REntityBlueprint>(value);
@@ -608,9 +740,24 @@ gpg::RRef* gpg::PackRRef_REntityBlueprint(gpg::RRef* const outRef, moho::REntity
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_EFootprintFlagsTypeInfo_4663ab, moho::register_EFootprintFlagsTypeInfo)
-GPG_PREREGISTER_INIT(register_RStringVectorTypeInfo_4663ab, moho::register_RStringVectorTypeInfo)
-GPG_PREREGISTER_INIT(register_REntityBlueprintTypeInfo_4663ab, moho::register_REntityBlueprintTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_EFootprintFlagsTypeInfo_4663ab,
+  moho::register_EFootprintFlagsTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_RStringVectorTypeInfo_4663ab,
+  moho::register_RStringVectorTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  register_REntityBlueprintTypeInfo_4663ab,
+  moho::register_REntityBlueprintTypeInfo
+)
 
-GPG_PREREGISTER_INIT(AcquireEFootprintFlagsTypeInfo_4663ab, AcquireEFootprintFlagsTypeInfo)
-GPG_PREREGISTER_INIT(AcquireRStringVectorTypeInfo_4663ab, AcquireRStringVectorTypeInfo)
+GPG_PREREGISTER_INIT(
+  AcquireEFootprintFlagsTypeInfo_4663ab,
+  AcquireEFootprintFlagsTypeInfo
+)
+GPG_PREREGISTER_INIT(
+  AcquireRStringVectorTypeInfo_4663ab,
+  AcquireRStringVectorTypeInfo
+)

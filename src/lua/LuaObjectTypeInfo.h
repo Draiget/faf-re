@@ -4,58 +4,58 @@
 
 namespace LuaPlus
 {
-	/**
-	 * VFTABLE: 0x00D44F10
-	 * COL: 0x00E5184C
-	 *
-	 * Source hints:
-	 * - c:\work\rts\main\code\src\libs\gpgcore\reflection\reflection.cpp
-	 */
-	class LuaObjectTypeInfo : public gpg::RType
-	{
-	public:
-		/**
-		 * Address: 0x0090BB80 (FUN_0090BB80, LuaPlus::LuaObjectTypeInfo::LuaObjectTypeInfo)
-		 *
-		 * What it does:
-		 * Constructs the LuaObject runtime type descriptor and preregisters it
-		 * with reflection registry using `typeid(LuaObject)`.
-		 */
-		LuaObjectTypeInfo();
+  /**
+   * VFTABLE: 0x00D44F10
+   * COL: 0x00E5184C
+   *
+   * Source hints:
+   * - c:\work\rts\main\code\src\libs\gpgcore\reflection\reflection.cpp
+   */
+  class LuaObjectTypeInfo : public gpg::RType
+  {
+  public:
+    /**
+     * Address: 0x0090BB80 (FUN_0090BB80, LuaPlus::LuaObjectTypeInfo::LuaObjectTypeInfo)
+     *
+     * What it does:
+     * Constructs the LuaObject runtime type descriptor and preregisters it
+     * with reflection registry using `typeid(LuaObject)`.
+     */
+    LuaObjectTypeInfo();
 
-		/**
-		 * Address: 0x0090BCE0
-		 * Slot: 2
-		 * Demangled: LuaPlus::LuaObjectTypeInfo scalar deleting destructor
-		 */
-		~LuaObjectTypeInfo() override;
+    /**
+     * Address: 0x0090BCE0
+     * Slot: 2
+     * Demangled: LuaPlus::LuaObjectTypeInfo scalar deleting destructor
+     */
+    ~LuaObjectTypeInfo() override;
 
-		/**
-		 * Address: 0x0090BBD0
-		 * Slot: 3
-		 * Demangled: LuaPlus::LuaObjectTypeInfo::GetName
-		 */
-		[[nodiscard]]
-		const char* GetName() const override;
+    /**
+     * Address: 0x0090BBD0
+     * Slot: 3
+     * Demangled: LuaPlus::LuaObjectTypeInfo::GetName
+     */
+    [[nodiscard]]
+    const char* GetName() const override;
 
-		/**
-		 * Address: 0x0090BBE0
-		 * Slot: 9
-		 * Demangled: LuaPlus::LuaObjectTypeInfo::Init
-		 */
-		void Init() override;
-	};
-	static_assert(sizeof(LuaObjectTypeInfo) == 0x64, "LuaObjectTypeInfo must be 0x64");
+    /**
+     * Address: 0x0090BBE0
+     * Slot: 9
+     * Demangled: LuaPlus::LuaObjectTypeInfo::Init
+     */
+    void Init() override;
+  };
+  static_assert(sizeof(LuaObjectTypeInfo) == 0x64, "LuaObjectTypeInfo must be 0x64");
 
-	/**
-	 * Address: 0x00BE9EF0 (FUN_00BE9EF0, register_LuaObjectTypeInfo)
-	 *
-	 * IDA signature:
-	 * void __cdecl register_LuaObjectTypeInfo();
-	 *
-	 * What it does:
-	 * Constructs the static `LuaObjectTypeInfo` descriptor in place, which
-	 * preregisters `LuaObject`, and hands its destructor to `atexit`.
-	 */
-	gpg::RType* register_LuaObjectTypeInfo();
-}
+  /**
+   * Address: 0x00BE9EF0 (FUN_00BE9EF0, register_LuaObjectTypeInfo)
+   *
+   * IDA signature:
+   * void __cdecl register_LuaObjectTypeInfo();
+   *
+   * What it does:
+   * Constructs the static `LuaObjectTypeInfo` descriptor in place, which
+   * preregisters `LuaObject`, and hands its destructor to `atexit`.
+   */
+  gpg::RType* register_LuaObjectTypeInfo();
+} // namespace LuaPlus

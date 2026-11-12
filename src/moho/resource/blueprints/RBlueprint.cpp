@@ -57,7 +57,10 @@ namespace moho
    * default-initializes `mDescription` and `mSource`, and assigns the next
    * blueprint ordinal from the rules' virtual `AssignNextOrdinal` slot.
    */
-  RBlueprint::RBlueprint(RRuleGameRules* const owner, const RResId& resId)
+  RBlueprint::RBlueprint(
+    RRuleGameRules* const owner,
+    const RResId& resId
+  )
     : mOwner(owner)
     , mBlueprintId()
     , mDescription()
@@ -111,7 +114,9 @@ namespace moho
    * Builds reflected fields from one Lua blueprint table, runs polymorphic
    * post-init, then merges resolved fields back into the same table.
    */
-  void RBlueprint::InitBlueprint(LuaPlus::LuaObject& luaBlueprint)
+  void RBlueprint::InitBlueprint(
+    LuaPlus::LuaObject& luaBlueprint
+  )
   {
     gpg::RRef destination{};
     destination = gpg::MakeRRef<moho::RBlueprint>(this);
@@ -213,18 +218,20 @@ namespace moho
   }
 
   /**
- * Address: 0x0050E190 (FUN_0050E190, Moho::RBlueprintTypeInfo::AddBase_RObject)
- *
- * What it does:
- * Registers `gpg::RObject` as this type's reflected base at offset 0 -
- * RBlueprint derives from it singly.
-*/
-void RBlueprintTypeInfo::AddBase_RObject(gpg::RType* const typeInfo)
-{
-  gpg::AddReflectedBase<gpg::RObject>(typeInfo);
-}
+   * Address: 0x0050E190 (FUN_0050E190, Moho::RBlueprintTypeInfo::AddBase_RObject)
+   *
+   * What it does:
+   * Registers `gpg::RObject` as this type's reflected base at offset 0 -
+   * RBlueprint derives from it singly.
+   */
+  void RBlueprintTypeInfo::AddBase_RObject(
+    gpg::RType* const typeInfo
+  )
+  {
+    gpg::AddReflectedBase<gpg::RObject>(typeInfo);
+  }
 
-/**
+  /**
    * Address: 0x0050DC10 (FUN_0050DC10, Moho::RBlueprintTypeInfo::Init)
    *
    * What it does:
@@ -246,7 +253,9 @@ void RBlueprintTypeInfo::AddBase_RObject(gpg::RType* const typeInfo)
    * What it does:
    * Returns `__blueprints[BlueprintOrdinal]` from the active Lua globals.
    */
-  LuaPlus::LuaObject RBlueprint::GetLuaBlueprint(LuaPlus::LuaState* const state) const
+  LuaPlus::LuaObject RBlueprint::GetLuaBlueprint(
+    LuaPlus::LuaState* const state
+  ) const
   {
     if (!state) {
       return LuaPlus::LuaObject{};
@@ -263,7 +272,9 @@ void RBlueprintTypeInfo::AddBase_RObject(gpg::RType* const typeInfo)
    * Registers the base blueprint reflection fields and writes version/description
    * metadata for editor/runtime inspection lanes.
    */
-  gpg::RField* RBlueprintTypeInfo::AddFields(gpg::RType* const typeInfo)
+  gpg::RField* RBlueprintTypeInfo::AddFields(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RField* field = typeInfo->AddField<fa::string>("BlueprintId", offsetof(RBlueprint, mBlueprintId));
     field->mFlags = 1;
@@ -294,10 +305,14 @@ void RBlueprintTypeInfo::AddBase_RObject(gpg::RType* const typeInfo)
   }
 } // namespace moho
 
-
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_RBlueprintTypeInfo_c294bc, moho::register_RBlueprintTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_RBlueprintTypeInfo_c294bc,
+  moho::register_RBlueprintTypeInfo
+)
 
-GPG_PREREGISTER_INIT(PreregisterRBlueprintPointerType_c294bc, moho::PreregisterRBlueprintPointerType)
+GPG_PREREGISTER_INIT(
+  PreregisterRBlueprintPointerType_c294bc,
+  moho::PreregisterRBlueprintPointerType
+)

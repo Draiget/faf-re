@@ -14,7 +14,10 @@
 
 #include <cstdlib>
 
-int main(int argc, char** argv)
+int main(
+  int argc,
+  char** argv
+)
 {
   using namespace faf::netbridge;
   BridgeOptions options = ParseBridgeArgs(argc, argv);

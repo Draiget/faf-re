@@ -20,12 +20,17 @@ namespace
   constexpr float kAxisLengthSqEpsilon = 1.0e-6f;
   constexpr float kSupportSelectionEpsilon = 1.0e-3f;
 
-  [[nodiscard]] Wm3::Vec3f BuildBoxCenter(const Wm3::Box3f& box) noexcept
+  [[nodiscard]] Wm3::Vec3f BuildBoxCenter(
+    const Wm3::Box3f& box
+  ) noexcept
   {
     return {box.Center[0], box.Center[1], box.Center[2]};
   }
 
-  [[nodiscard]] Wm3::Vec3f BoxAxis(const Wm3::Box3f& box, const int axisIndex) noexcept
+  [[nodiscard]] Wm3::Vec3f BoxAxis(
+    const Wm3::Box3f& box,
+    const int axisIndex
+  ) noexcept
   {
     return {box.Axis[axisIndex][0], box.Axis[axisIndex][1], box.Axis[axisIndex][2]};
   }
@@ -48,7 +53,12 @@ namespace
    * distance divide by its length afterwards, which is what the manifold's
    * overlap normalisation does.
    */
-  void ProjectBoxOntoAxis(const Wm3::Box3f& box, const Wm3::Vec3f& axis, float* outMin, float* outMax) noexcept
+  void ProjectBoxOntoAxis(
+    const Wm3::Box3f& box,
+    const Wm3::Vec3f& axis,
+    float* outMin,
+    float* outMax
+  ) noexcept
   {
     const Wm3::Vec3f center = BuildBoxCenter(box);
 
@@ -79,8 +89,10 @@ namespace
    * inside the dead band contributes nothing, so a direction parallel to a
    * face yields a point on that face rather than an arbitrary corner.
    */
-  [[nodiscard]] Wm3::Vec3f
-  ComputeSupportPointAgainstDirection(const Wm3::Box3f& box, const Wm3::Vec3f& direction) noexcept
+  [[nodiscard]] Wm3::Vec3f ComputeSupportPointAgainstDirection(
+    const Wm3::Box3f& box,
+    const Wm3::Vec3f& direction
+  ) noexcept
   {
     Wm3::Vec3f support = BuildBoxCenter(box);
     for (int axisIndex = 0; axisIndex < 3; ++axisIndex) {
@@ -114,7 +126,9 @@ namespace
    * those lanes at zero, as in the original.
    */
   [[nodiscard]] bool ComputeBoxBoxContactManifold(
-    const Wm3::Box3f& lhs, const Wm3::Box3f& rhs, BoxBoxContactManifold* outManifold
+    const Wm3::Box3f& lhs,
+    const Wm3::Box3f& rhs,
+    BoxBoxContactManifold* outManifold
   ) noexcept
   {
     outManifold->penetrationNormal = Wm3::Vector3f::ZERO;
@@ -220,16 +234,16 @@ namespace
     const Wm3::Vec3f lineAxisLhs = lhsAxes[lhsEdgeIndex];
     const Wm3::Vec3f lineAxisRhs = rhsAxes[rhsEdgeIndex];
     const Wm3::Vec3f crossNormalAndRhs = Wm3::Vector3f::Cross(bestAxis, lineAxisRhs);
-    const float denominator = (lineAxisLhs.z * crossNormalAndRhs.z + lineAxisLhs.y * crossNormalAndRhs.y) +
-      lineAxisLhs.x * crossNormalAndRhs.x;
+    const float denominator =
+      (lineAxisLhs.z * crossNormalAndRhs.z + lineAxisLhs.y * crossNormalAndRhs.y) + lineAxisLhs.x * crossNormalAndRhs.x;
     if (std::fabs(denominator) < kAxisLengthSqEpsilon) {
       return false;
     }
 
-    const float projectionB = (supportOnB.z * crossNormalAndRhs.z + supportOnB.y * crossNormalAndRhs.y) +
-      crossNormalAndRhs.x * supportOnB.x;
-    const float projectionA = (crossNormalAndRhs.x * supportOnA.x + crossNormalAndRhs.z * supportOnA.z) +
-      supportOnA.y * crossNormalAndRhs.y;
+    const float projectionB =
+      (supportOnB.z * crossNormalAndRhs.z + supportOnB.y * crossNormalAndRhs.y) + crossNormalAndRhs.x * supportOnB.x;
+    const float projectionA =
+      (crossNormalAndRhs.x * supportOnA.x + crossNormalAndRhs.z * supportOnA.z) + supportOnA.y * crossNormalAndRhs.y;
     const float t = (projectionB - projectionA) / denominator;
     outManifold->pointOnA = supportOnA + lineAxisLhs * t;
     outManifold->pointOnB = outManifold->pointOnA + bestAxis * bestDepth;
@@ -254,7 +268,9 @@ namespace moho
    * What it does:
    * Initializes box primitive state from local box and stores local-center copy.
    */
-  CColPrimitive<Wm3::Box3f>::CColPrimitive(const Wm3::Box3f& localBox)
+  CColPrimitive<Wm3::Box3f>::CColPrimitive(
+    const Wm3::Box3f& localBox
+  )
     : mShape(localBox)
     , mLocalCenter(localBox.Center[0], localBox.Center[1], localBox.Center[2])
   {}
@@ -307,7 +323,9 @@ namespace moho
    * `VAxes3::VAxes3(orient)` (0x004EC590), exactly the two calls the binary
    * makes; they used to be open-coded here as a private basis build.
    */
-  void CColPrimitive<Wm3::Box3f>::SetTransform(const VTransform& transform)
+  void CColPrimitive<Wm3::Box3f>::SetTransform(
+    const VTransform& transform
+  )
   {
     Wm3::Vec3f rotatedCenter{};
     MultQuadVec(&rotatedCenter, &mLocalCenter, &transform.orient_);
@@ -344,7 +362,9 @@ namespace moho
    * and the angular impulse it accumulated grew by four orders of magnitude in
    * a single contact instead of damping.
    */
-  Wm3::Vec3f* CColPrimitive<Wm3::Box3f>::GetCenter(Wm3::Vec3f* outCenter) const
+  Wm3::Vec3f* CColPrimitive<Wm3::Box3f>::GetCenter(
+    Wm3::Vec3f* outCenter
+  ) const
   {
     *outCenter = mLocalCenter;
     return outCenter;
@@ -360,7 +380,9 @@ namespace moho
    * `mLocalCenter`, the same lane `GetCenter` reads. The world-space
    * `mShape.Center` is derived from it by `SetTransform`, never written here.
    */
-  const Wm3::Vec3f* CColPrimitive<Wm3::Box3f>::SetCenter(const Wm3::Vec3f* center)
+  const Wm3::Vec3f* CColPrimitive<Wm3::Box3f>::SetCenter(
+    const Wm3::Vec3f* center
+  )
   {
     mLocalCenter = *center;
     return center;
@@ -379,7 +401,9 @@ namespace moho
    * position, in that order.
    */
   bool CColPrimitive<Wm3::Box3f>::CollideLine(
-    const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionSegmentResult* outResult
+    const Wm3::Vec3f* lineStart,
+    const Wm3::Vec3f* lineEnd,
+    CollisionSegmentResult* outResult
   ) const
   {
     const Wm3::Segment3f segment = Wm3::MakeSegment3fFromEndpoints(*lineStart, *lineEnd);
@@ -405,7 +429,10 @@ namespace moho
    * Runs OBB-vs-OBB SAT and copies its contact normal/depth, including the
    * original zero-valued edge-axis contact result.
    */
-  bool CColPrimitive<Wm3::Box3f>::CollideBox(const Wm3::Box3f* box, CollisionResult* outResult) const
+  bool CColPrimitive<Wm3::Box3f>::CollideBox(
+    const Wm3::Box3f* box,
+    CollisionResult* outResult
+  ) const
   {
     BoxBoxContactManifold manifold{};
     if (!ComputeBoxBoxContactManifold(mShape, *box, &manifold)) {
@@ -426,7 +453,10 @@ namespace moho
    * Wild Magic's `DistVector3Box3f` on the stack: ctor 0x00A45730,
    * `GetSquared` 0x00A45C00, `~Distance` 0x00A38C40 (Wm3::SquaredDistanceVector3Box3).
    */
-  bool CColPrimitive<Wm3::Box3f>::CollideSphere(const Wm3::Sphere3f* sphere, CollisionResult* outResult) const
+  bool CColPrimitive<Wm3::Box3f>::CollideSphere(
+    const Wm3::Sphere3f* sphere,
+    CollisionResult* outResult
+  ) const
   {
     Wm3::Vector3f closestOnBox;
     const float squaredDistance = Wm3::SquaredDistanceVector3Box3(sphere->Center, mShape, closestOnBox);
@@ -454,7 +484,9 @@ namespace moho
    * Calls Wild Magic's `InBox<float>` (0x00A3BC10, Wm3ContBox3.cpp) with the
    * point and `mShape` (Wm3::PointInBox3).
    */
-  bool CColPrimitive<Wm3::Box3f>::PointInShape(const Wm3::Vec3f* point) const
+  bool CColPrimitive<Wm3::Box3f>::PointInShape(
+    const Wm3::Vec3f* point
+  ) const
   {
     return Wm3::PointInBox3(*point, mShape);
   }
@@ -465,7 +497,10 @@ namespace moho
    * What it does:
    * Initializes sphere primitive state from local center/radius.
    */
-  CColPrimitive<Wm3::Sphere3f>::CColPrimitive(const Wm3::Vec3f& localCenter, const float radius)
+  CColPrimitive<Wm3::Sphere3f>::CColPrimitive(
+    const Wm3::Vec3f& localCenter,
+    const float radius
+  )
     : mShape(localCenter, radius)
     , mLocalCenter(localCenter)
   {}
@@ -520,7 +555,9 @@ namespace moho
    * Rotates the local center by the orientation (`MultQuadVec`, 0x00452D40)
    * and adds the world position.
    */
-  void CColPrimitive<Wm3::Sphere3f>::SetTransform(const VTransform& transform)
+  void CColPrimitive<Wm3::Sphere3f>::SetTransform(
+    const VTransform& transform
+  )
   {
     Wm3::Vec3f rotatedCenter{};
     MultQuadVec(&rotatedCenter, &mLocalCenter, &transform.orient_);
@@ -540,7 +577,9 @@ namespace moho
    * written by `SetTransform`; see the box primitive's `GetCenter` for the
    * full evidence and for what reading the world lane here costs.
    */
-  Wm3::Vec3f* CColPrimitive<Wm3::Sphere3f>::GetCenter(Wm3::Vec3f* outCenter) const
+  Wm3::Vec3f* CColPrimitive<Wm3::Sphere3f>::GetCenter(
+    Wm3::Vec3f* outCenter
+  ) const
   {
     *outCenter = mLocalCenter;
     return outCenter;
@@ -555,7 +594,9 @@ namespace moho
    * 0x004FF986/8C/92 store to `[ecx+14h]`, `[ecx+18h]`, `[ecx+1Ch]` --
    * `mLocalCenter`, the same lane `GetCenter` reads.
    */
-  const Wm3::Vec3f* CColPrimitive<Wm3::Sphere3f>::SetCenter(const Wm3::Vec3f* center)
+  const Wm3::Vec3f* CColPrimitive<Wm3::Sphere3f>::SetCenter(
+    const Wm3::Vec3f* center
+  )
   {
     mLocalCenter = *center;
     return center;
@@ -572,7 +613,9 @@ namespace moho
    * Wm3::FindSegment3Sphere3; the same shape as the box primitive's line test.
    */
   bool CColPrimitive<Wm3::Sphere3f>::CollideLine(
-    const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionSegmentResult* outResult
+    const Wm3::Vec3f* lineStart,
+    const Wm3::Vec3f* lineEnd,
+    CollisionSegmentResult* outResult
   ) const
   {
     const Wm3::Segment3f segment = Wm3::MakeSegment3fFromEndpoints(*lineStart, *lineEnd);
@@ -605,7 +648,10 @@ namespace moho
    * `Vector3<float>::ZERO` (0x00F3D21C). Here Wm3::TestBox3Sphere3 and
    * Wm3::FindBox3Sphere3.
    */
-  bool CColPrimitive<Wm3::Sphere3f>::CollideBox(const Wm3::Box3f* box, CollisionResult* outResult) const
+  bool CColPrimitive<Wm3::Sphere3f>::CollideBox(
+    const Wm3::Box3f* box,
+    CollisionResult* outResult
+  ) const
   {
     if (!Wm3::TestBox3Sphere3(*box, mShape)) {
       return false;
@@ -619,7 +665,9 @@ namespace moho
 
     float contactTime = 0.0f;
     Wm3::Vector3f contactPoint;
-    if (Wm3::FindBox3Sphere3(*box, mShape, gpg::pInf, Wm3::Vector3f::ZERO, Wm3::Vector3f::ZERO, contactTime, contactPoint)) {
+    if (
+      Wm3::FindBox3Sphere3(*box, mShape, gpg::pInf, Wm3::Vector3f::ZERO, Wm3::Vector3f::ZERO, contactTime, contactPoint)
+    ) {
       const Wm3::Vec3f sphereToContact = contactPoint - mShape.Center;
       outResult->penetrationDepth = mShape.Radius - Wm3::SqrtfBinary(Wm3::Vector3f::LengthSq(sphereToContact));
     }
@@ -632,7 +680,10 @@ namespace moho
    * What it does:
    * Tests sphere-vs-sphere overlap and fills penetration direction/depth.
    */
-  bool CColPrimitive<Wm3::Sphere3f>::CollideSphere(const Wm3::Sphere3f* sphere, CollisionResult* outResult) const
+  bool CColPrimitive<Wm3::Sphere3f>::CollideSphere(
+    const Wm3::Sphere3f* sphere,
+    CollisionResult* outResult
+  ) const
   {
     const Wm3::Vec3f delta = sphere->Center - mShape.Center;
     const float combinedRadius = sphere->Radius + mShape.Radius;
@@ -656,7 +707,9 @@ namespace moho
    * What it does:
    * Returns true when point lies strictly inside sphere.
    */
-  bool CColPrimitive<Wm3::Sphere3f>::PointInShape(const Wm3::Vec3f* point) const
+  bool CColPrimitive<Wm3::Sphere3f>::PointInShape(
+    const Wm3::Vec3f* point
+  ) const
   {
     const Wm3::Vec3f delta = *point - mShape.Center;
     // 0x004FEB86..0x004FEB9F: summed `x*x + z*z`, then `+ y*y`.
@@ -684,9 +737,7 @@ namespace moho
     const Wm3::Sphere3f* sphere = with->GetSphere();
     if (!sphere) {
       gpg::HandleAssertFailure(
-        "Reached the supposably unreachable.",
-        94,
-        "c:\\work\\rts\\main\\code\\src\\core/ColMain.h"
+        "Reached the supposably unreachable.", 94, "c:\\work\\rts\\main\\code\\src\\core/ColMain.h"
       );
     }
     return CollideSphere(sphere, outResult);

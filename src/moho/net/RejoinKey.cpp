@@ -33,7 +33,10 @@ namespace moho
       return (std::filesystem::temp_directory_path(ignored) / "faf_rejoin_seat.key").string();
     }
 
-    void FillRandom(std::uint8_t* const out, const std::size_t size)
+    void FillRandom(
+      std::uint8_t* const out,
+      const std::size_t size
+    )
     {
       std::random_device source;
       for (std::size_t index = 0; index < size;) {
@@ -44,7 +47,9 @@ namespace moho
       }
     }
 
-    void UseSeed(std::array<std::uint8_t, kSeedBytes>& seed)
+    void UseSeed(
+      std::array<std::uint8_t, kSeedBytes>& seed
+    )
     {
       crypto_eddsa_key_pair(sSecretKey.data(), sPublicKey.data(), seed.data());
       crypto_wipe(seed.data(), seed.size());
@@ -53,7 +58,9 @@ namespace moho
 
     /// What a signature covers: the challenge, the seat and the peer, so it answers nothing else.
     [[nodiscard]] std::array<std::uint8_t, sizeof(kProofLabel) + sizeof(SRejoinNonce) + 8u> ProofMessage(
-      const SRejoinNonce& nonce, const int source, const int peerIndex
+      const SRejoinNonce& nonce,
+      const int source,
+      const int peerIndex
     )
     {
       std::array<std::uint8_t, sizeof(kProofLabel) + sizeof(SRejoinNonce) + 8u> message{};
@@ -129,7 +136,11 @@ namespace moho
     return nonce;
   }
 
-  SRejoinSignature REJOIN_SignChallenge(const SRejoinNonce& nonce, const int source, const int peerIndex)
+  SRejoinSignature REJOIN_SignChallenge(
+    const SRejoinNonce& nonce,
+    const int source,
+    const int peerIndex
+  )
   {
     const auto message = ProofMessage(nonce, source, peerIndex);
     SRejoinSignature signature{};
@@ -138,7 +149,10 @@ namespace moho
   }
 
   bool REJOIN_CheckProof(
-    const SRejoinPublicKey& key, const SRejoinNonce& nonce, const int source, const int peerIndex,
+    const SRejoinPublicKey& key,
+    const SRejoinNonce& nonce,
+    const int source,
+    const int peerIndex,
     const SRejoinSignature& signature
   )
   {

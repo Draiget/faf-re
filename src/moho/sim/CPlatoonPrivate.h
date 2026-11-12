@@ -82,9 +82,10 @@ namespace moho
   };
 
   static_assert(
-    sizeof(CScrLuaMetatableFactory<CPlatoon>) == 0x08, "CScrLuaMetatableFactory<CPlatoon> size must be 0x08"
+    sizeof(CScrLuaMetatableFactory<CPlatoon>) == 0x08,
+    "CScrLuaMetatableFactory<CPlatoon> size must be 0x08"
   );
-}
+} // namespace moho
 
 namespace
 {
@@ -100,7 +101,7 @@ namespace
   struct PlatoonUnitSearchEntry
   {
     moho::Unit* unit = nullptr; // +0x00
-    float distanceSq = 0.0f; // +0x04
+    float distanceSq = 0.0f;    // +0x04
   };
   static_assert(sizeof(PlatoonUnitSearchEntry) == 0x8, "PlatoonUnitSearchEntry size must be 0x8");
 
@@ -113,7 +114,7 @@ namespace
     static moho::CScrLuaInitFormSet fallbackSet("Sim");
     return fallbackSet;
   }
-}
+} // namespace
 
 namespace moho
 {
@@ -180,7 +181,7 @@ namespace moho
   int cfunc_CPlatoonCalculatePlatoonThreatAroundPositionL(LuaPlus::LuaState* state);
   int cfunc_CPlatoonPlatoonCategoryCountAroundPositionL(LuaPlus::LuaState* state);
   int cfunc_CPlatoonPlatoonCategoryCountL(LuaPlus::LuaState* state);
-}
+} // namespace moho
 
 namespace moho
 {

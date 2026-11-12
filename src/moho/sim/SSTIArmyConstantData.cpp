@@ -61,10 +61,14 @@ namespace moho
    * What it does:
    * Clones fixed identity/string lanes and all eight tracked shared
    * `CIntelGrid` pointer lanes from one source payload.
-   * Address: 0x00754B00 (FUN_00754B00 -- a second emission of this copy constructor, guarded on a null source; zero callers, unreachable; formerly `CopyConstructSSTIArmyConstantDataIfPresentPrimary`, removed 2026-09-11.)
-   * Address: 0x00755E30 (FUN_00755E30 -- a third emission of it; zero callers, unreachable; formerly `CopyConstructSSTIArmyConstantDataIfPresentSecondary`, removed 2026-09-11.)
+   * Address: 0x00754B00 (FUN_00754B00 -- a second emission of this copy constructor, guarded on a null source; zero
+   * callers, unreachable; formerly `CopyConstructSSTIArmyConstantDataIfPresentPrimary`, removed 2026-09-11.) Address:
+   * 0x00755E30 (FUN_00755E30 -- a third emission of it; zero callers, unreachable; formerly
+   * `CopyConstructSSTIArmyConstantDataIfPresentSecondary`, removed 2026-09-11.)
    */
-  SSTIArmyConstantData::SSTIArmyConstantData(const SSTIArmyConstantData& other)
+  SSTIArmyConstantData::SSTIArmyConstantData(
+    const SSTIArmyConstantData& other
+  )
     : mArmyIndex(other.mArmyIndex)
     , mArmyName(other.mArmyName)
     , mPlayerName(other.mPlayerName)
@@ -96,7 +100,9 @@ namespace moho
    * Serializes fixed army identity lanes and all eight tracked shared
    * `CIntelGrid` pointer lanes to a write archive.
    */
-  void SSTIArmyConstantData::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SSTIArmyConstantData::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;
@@ -132,7 +138,9 @@ namespace moho
    * `mIsCivilian` as bool) followed by eight tracked-shared `CIntelGrid`
    * pointers in declaration order via `ReadPointerShared<CIntelGrid>`.
    */
-  void SSTIArmyConstantData::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SSTIArmyConstantData::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -171,7 +179,8 @@ namespace moho
    * intel-grid shared lanes — and returns the destination pointer.
    */
   SSTIArmyConstantData* AssignArmyConstantData(
-    const SSTIArmyConstantData& source, SSTIArmyConstantData* const destination
+    const SSTIArmyConstantData& source,
+    SSTIArmyConstantData* const destination
   )
   {
     if (destination == nullptr) {
@@ -205,7 +214,12 @@ namespace moho
    * directly through the archive (matches the binary's `ReadUInt` call on
    * the raw 4-byte id storage).
    */
-  void EntIdSerializer::Deserialize(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef*)
+  void EntIdSerializer::Deserialize(
+    gpg::ReadArchive* const archive,
+    const std::intptr_t objectPtr,
+    const int,
+    gpg::RRef*
+  )
   {
     auto* const object = reinterpret_cast<std::uint32_t*>(objectPtr);
     archive->ReadUInt(object);
@@ -219,7 +233,12 @@ namespace moho
    * directly through the archive (matches the binary's `WriteUInt` call on
    * the raw 4-byte id storage).
    */
-  void EntIdSerializer::Serialize(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, const int, gpg::RRef*)
+  void EntIdSerializer::Serialize(
+    gpg::WriteArchive* const archive,
+    const std::intptr_t objectPtr,
+    const int,
+    gpg::RRef*
+  )
   {
     const auto* const object = reinterpret_cast<const std::uint32_t*>(objectPtr);
     archive->WriteUInt(*object);

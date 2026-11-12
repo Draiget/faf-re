@@ -19,8 +19,16 @@ namespace faf_core_tests
     TempDir(const TempDir&) = delete;
     TempDir& operator=(const TempDir&) = delete;
 
-    [[nodiscard]] const std::filesystem::path& Path() const noexcept { return mPath; }
-    [[nodiscard]] std::string File(const char* name) const { return (mPath / name).string(); }
+    [[nodiscard]] const std::filesystem::path& Path() const noexcept
+    {
+      return mPath;
+    }
+    [[nodiscard]] std::string File(
+      const char* name
+    ) const
+    {
+      return (mPath / name).string();
+    }
 
   private:
     std::filesystem::path mPath;

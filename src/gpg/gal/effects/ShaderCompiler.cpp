@@ -8,16 +8,25 @@
 #include <cstdio>
 #include <cstdlib>
 #include <mutex>
+#if FAFRE_PLATFORM_WINDOWS
 #include <wrl/client.h>
+#endif
 
 #include <algorithm>
 #include <cctype>
+#if FAFRE_PLATFORM_WINDOWS
 #include <d3d12shader.h>
 
 #include "dxcapi.h"
+#else
+// The Linux client (issue #255): DXC through platform/posix/dxc/DxcGlue, which alone includes
+// DXC's headers; libdxcompiler.so from the executable's directory or FAF_DXC_DIR.
+#include "platform/posix/dxc/DxcGlue.h"
+#endif
 
 namespace gpg::gal::effects
 {
+#if FAFRE_PLATFORM_WINDOWS
   using Microsoft::WRL::ComPtr;
 
   struct ShaderCompiler::Library
@@ -28,9 +37,15 @@ namespace gpg::gal::effects
     ComPtr<IDxcUtils> utils;
     ComPtr<IDxcCompiler3> dxc;
   };
+#else
+  // DxcGlue holds the library; this only marks that it loaded.
+  struct ShaderCompiler::Library
+  {};
+#endif
 
   namespace
   {
+#if FAFRE_PLATFORM_WINDOWS
     /**
      * Engine addition: a DXC compiler and utils object per thread. One object must not be used
      * by two threads at once, but separate objects compile in parallel, so the background
@@ -43,20 +58,25 @@ namespace gpg::gal::effects
       ComPtr<IDxcCompiler3> dxc;
     };
 
-    [[nodiscard]] ThreadDxc* ThisThreadDxc(const DxcCreateInstanceProc create)
+    [[nodiscard]] ThreadDxc* ThisThreadDxc(
+      const DxcCreateInstanceProc create
+    )
     {
       thread_local ThreadDxc instance;
       thread_local bool tried = false;
       if (!tried) {
         tried = true;
-        if (create == nullptr || FAILED(create(CLSID_DxcUtils, IID_PPV_ARGS(&instance.utils))) ||
-            FAILED(create(CLSID_DxcCompiler, IID_PPV_ARGS(&instance.dxc)))) {
+        if (
+          create == nullptr || FAILED(create(CLSID_DxcUtils, IID_PPV_ARGS(&instance.utils))) ||
+          FAILED(create(CLSID_DxcCompiler, IID_PPV_ARGS(&instance.dxc)))
+        ) {
           instance.utils.Reset();
           instance.dxc.Reset();
         }
       }
       return instance.dxc != nullptr ? &instance : nullptr;
     }
+#endif
 
     [[nodiscard]] std::wstring ExecutableDirectory()
     {
@@ -67,7 +87,9 @@ namespace gpg::gal::effects
       return (slash == std::wstring::npos) ? std::wstring() : directory.substr(0U, slash + 1U);
     }
 
-    [[nodiscard]] std::wstring Widen(const std::string_view text)
+    [[nodiscard]] std::wstring Widen(
+      const std::string_view text
+    )
     {
       if (text.empty()) {
         return {};
@@ -85,6 +107,30 @@ namespace gpg::gal::effects
     return compiler;
   }
 
+#if !FAFRE_PLATFORM_WINDOWS
+  ShaderCompiler::ShaderCompiler()
+  {
+    std::vector<std::string> directories;
+    {
+      // The POSIX GetModuleFileNameW gives the executable's path from /proc/self/exe.
+      const std::wstring executable = ExecutableDirectory();
+      std::string narrow;
+      for (const wchar_t c : executable) {
+        narrow.push_back(static_cast<char>(c)); // the install path is ASCII
+      }
+      directories.push_back(narrow);
+    }
+    if (const char* const configured = std::getenv("FAF_DXC_DIR"); configured != nullptr && configured[0] != '\0') {
+      directories.emplace_back(configured);
+    }
+    mLoadError = platform::posix::dxc::Load(directories, mVersion);
+    if (mLoadError.empty()) {
+      mLibrary = new Library();
+    }
+  }
+
+  ShaderCompiler::~ShaderCompiler() = default;
+#else
   ShaderCompiler::ShaderCompiler()
   {
     std::vector<std::wstring> directories{ExecutableDirectory()};
@@ -120,9 +166,12 @@ namespace gpg::gal::effects
       return;
     }
 
-    const auto create = reinterpret_cast<DxcCreateInstanceProc>(::GetProcAddress(library->compiler, "DxcCreateInstance"));
-    if (create == nullptr || FAILED(create(CLSID_DxcUtils, IID_PPV_ARGS(&library->utils))) ||
-        FAILED(create(CLSID_DxcCompiler, IID_PPV_ARGS(&library->dxc)))) {
+    const auto create =
+      reinterpret_cast<DxcCreateInstanceProc>(::GetProcAddress(library->compiler, "DxcCreateInstance"));
+    if (
+      create == nullptr || FAILED(create(CLSID_DxcUtils, IID_PPV_ARGS(&library->utils))) ||
+      FAILED(create(CLSID_DxcCompiler, IID_PPV_ARGS(&library->dxc)))
+    ) {
       mLoadError = "dxcompiler.dll does not provide IDxcCompiler3";
       library->utils.Reset();
       library->dxc.Reset();
@@ -139,7 +188,9 @@ namespace gpg::gal::effects
     UINT32 minor = 0U;
     if (SUCCEEDED(library->dxc.As(&versionInfo)) && SUCCEEDED(versionInfo->GetVersion(&major, &minor))) {
       char version[64]{};
-      std::snprintf(version, sizeof(version), "dxc %u.%u%s", major, minor, library->signer != nullptr ? " signed" : " unsigned");
+      std::snprintf(
+        version, sizeof(version), "dxc %u.%u%s", major, minor, library->signer != nullptr ? " signed" : " unsigned"
+      );
       mVersion = version;
     } else {
       mVersion = "dxc";
@@ -156,6 +207,7 @@ namespace gpg::gal::effects
       mLibrary->dxc.Reset();
     }
   }
+#endif
 
   bool ShaderCompiler::Available() const noexcept
   {
@@ -173,7 +225,10 @@ namespace gpg::gal::effects
   }
 
   CompiledShader ShaderCompiler::Compile(
-    const std::string_view hlsl, const ShaderEntry& entry, const ShaderTarget target, const std::vector<std::wstring>& extraArguments
+    const std::string_view hlsl,
+    const ShaderEntry& entry,
+    const ShaderTarget target,
+    const std::vector<std::wstring>& extraArguments
   ) const
   {
     CompiledShader result;
@@ -201,15 +256,28 @@ namespace gpg::gal::effects
     case ShaderStage::Pixel:
       break;
     }
+    // Engine addition (ren_RayTracedShadows): an effect with inline ray queries needs shader model 6.5 (DXR 1.1)
+    // and, for SPIR-V, Vulkan 1.2's ray query extension. Every stage of it, since they share the declarations.
+    const bool rayQueries = hlsl.find("RayQuery<") != std::string_view::npos;
+    std::wstring rayProfile;
+    if (rayQueries) {
+      rayProfile = profile;
+      rayProfile.replace(rayProfile.size() - 1U, 1U, L"5");
+      profile = rayProfile.c_str();
+    }
     std::vector<std::wstring> arguments{
-      L"-E", entryName,
-      L"-T", profile,
+      L"-E",
+      entryName,
+      L"-T",
+      profile,
       // HLSL 2018: the effects predate 2021's stricter vector logic.
-      L"-HV", L"2018",
+      L"-HV",
+      L"2018",
       // Row-major matrices: the parameter store keeps the engine's layout.
       L"-Zpr",
       L"-O3",
-      L"-D", stageDefine,
+      L"-D",
+      stageDefine,
       // FXC accepted these silently.
       L"-Wno-conversion",
     };
@@ -217,9 +285,25 @@ namespace gpg::gal::effects
       // The Vulkan backend's descriptor model: textures t<n> and samplers
       // s<n> in set 0 at bindings n and 64+n, $Globals alone in set 1.
       // D3D's clip-space y points the other way.
-      arguments.insert(arguments.end(), {L"-spirv", L"-fvk-use-dx-layout", L"-fspv-reflect", L"-fspv-target-env=vulkan1.1",
-                                         L"-fvk-t-shift", L"0", L"0", L"-fvk-s-shift", L"64", L"0", L"-fvk-b-shift", L"0", L"0",
-                                         L"-fvk-bind-globals", L"0", L"1"});
+      arguments.insert(
+        arguments.end(),
+        {L"-spirv",
+         L"-fvk-use-dx-layout",
+         L"-fspv-reflect",
+         rayQueries ? L"-fspv-target-env=vulkan1.2" : L"-fspv-target-env=vulkan1.1",
+         L"-fvk-t-shift",
+         L"0",
+         L"0",
+         L"-fvk-s-shift",
+         L"64",
+         L"0",
+         L"-fvk-b-shift",
+         L"0",
+         L"0",
+         L"-fvk-bind-globals",
+         L"0",
+         L"1"}
+      );
       // SV_Position leaves the vertex shader, or in a tessellated pass the domain
       // shader (its vertex shader writes control points, which have none).
       if (entry.stage == ShaderStage::Vertex || entry.stage == ShaderStage::Domain) {
@@ -231,7 +315,10 @@ namespace gpg::gal::effects
   }
 
   CompiledShader ShaderCompiler::CompileRaw(
-    const std::string_view hlsl, const std::string_view entryName, const wchar_t* const profile, const std::vector<std::wstring>& extraArguments
+    const std::string_view hlsl,
+    const std::string_view entryName,
+    const wchar_t* const profile,
+    const std::vector<std::wstring>& extraArguments
   ) const
   {
     if (mLibrary == nullptr) {
@@ -244,7 +331,42 @@ namespace gpg::gal::effects
     return Run(hlsl, arguments);
   }
 
-  CompiledShader ShaderCompiler::Run(const std::string_view hlsl, const std::vector<std::wstring>& arguments) const
+#if !FAFRE_PLATFORM_WINDOWS
+  CompiledShader ShaderCompiler::Run(
+    const std::string_view hlsl,
+    const std::vector<std::wstring>& arguments
+  ) const
+  {
+    platform::posix::dxc::Output output = platform::posix::dxc::Compile(hlsl, arguments);
+    CompiledShader result;
+    result.succeeded = output.succeeded;
+    result.code.assign(output.object.begin(), output.object.end());
+    result.messages = std::move(output.messages);
+    return result;
+  }
+
+  // DXIL reflection is the Direct3D 12 backend's; the Linux client compiles SPIR-V, whose
+  // reflection is SpirvReflect. The answers are the ones for an unreadable reflection.
+  std::uint64_t ShaderCompiler::ReflectTextureSlots(
+    const std::vector<std::uint8_t>& dxil
+  ) const
+  {
+    (void)dxil;
+    return ~std::uint64_t{0};
+  }
+
+  std::vector<ShaderInput> ShaderCompiler::ReflectInputs(
+    const std::vector<std::uint8_t>& dxil
+  ) const
+  {
+    (void)dxil;
+    return {};
+  }
+#else
+  CompiledShader ShaderCompiler::Run(
+    const std::string_view hlsl,
+    const std::vector<std::wstring>& arguments
+  ) const
   {
     CompiledShader result;
     std::vector<LPCWSTR> argumentPointers;
@@ -269,14 +391,18 @@ namespace gpg::gal::effects
     );
     if (FAILED(hr) || compiled == nullptr) {
       char message[64]{};
-      std::snprintf(message, sizeof(message), "IDxcCompiler3::Compile failed (0x%08lX)", static_cast<unsigned long>(hr));
+      std::snprintf(
+        message, sizeof(message), "IDxcCompiler3::Compile failed (0x%08lX)", static_cast<unsigned long>(hr)
+      );
       result.messages = message;
       return result;
     }
 
     ComPtr<IDxcBlobUtf8> errors;
-    if (SUCCEEDED(compiled->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&errors), nullptr)) && errors != nullptr &&
-        errors->GetStringLength() != 0U) {
+    if (
+      SUCCEEDED(compiled->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&errors), nullptr)) && errors != nullptr &&
+      errors->GetStringLength() != 0U
+    ) {
       result.messages.assign(errors->GetStringPointer(), errors->GetStringLength());
     }
     HRESULT status = E_FAIL;
@@ -295,7 +421,9 @@ namespace gpg::gal::effects
     return result;
   }
 
-  std::uint64_t ShaderCompiler::ReflectTextureSlots(const std::vector<std::uint8_t>& dxil) const
+  std::uint64_t ShaderCompiler::ReflectTextureSlots(
+    const std::vector<std::uint8_t>& dxil
+  ) const
   {
     constexpr std::uint64_t kAll = ~std::uint64_t{0};
     if (mLibrary == nullptr || dxil.empty()) {
@@ -310,7 +438,9 @@ namespace gpg::gal::effects
     }
     ComPtr<ID3D12ShaderReflection> reflection;
     D3D12_SHADER_DESC desc{};
-    if (FAILED(dxc->utils->CreateReflection(&buffer, IID_PPV_ARGS(&reflection))) || FAILED(reflection->GetDesc(&desc))) {
+    if (
+      FAILED(dxc->utils->CreateReflection(&buffer, IID_PPV_ARGS(&reflection))) || FAILED(reflection->GetDesc(&desc))
+    ) {
       return kAll;
     }
     std::uint64_t slots = 0U;
@@ -330,7 +460,9 @@ namespace gpg::gal::effects
     return slots;
   }
 
-  std::vector<ShaderInput> ShaderCompiler::ReflectInputs(const std::vector<std::uint8_t>& dxil) const
+  std::vector<ShaderInput> ShaderCompiler::ReflectInputs(
+    const std::vector<std::uint8_t>& dxil
+  ) const
   {
     std::vector<ShaderInput> inputs;
     if (mLibrary == nullptr || dxil.empty()) {
@@ -363,12 +495,13 @@ namespace gpg::gal::effects
       });
       input.index = parameter.SemanticIndex;
       input.component = (parameter.ComponentType == D3D_REGISTER_COMPONENT_UINT32) ? ShaderInput::Component::Uint
-        : (parameter.ComponentType == D3D_REGISTER_COMPONENT_SINT32)                ? ShaderInput::Component::Sint
-                                                                                    : ShaderInput::Component::Float;
+        : (parameter.ComponentType == D3D_REGISTER_COMPONENT_SINT32)               ? ShaderInput::Component::Sint
+                                                                                   : ShaderInput::Component::Float;
       input.mask = parameter.Mask;
       input.systemValue = parameter.SystemValueType != D3D_NAME_UNDEFINED;
       inputs.push_back(std::move(input));
     }
     return inputs;
   }
+#endif
 } // namespace gpg::gal::effects

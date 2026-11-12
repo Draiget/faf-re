@@ -78,7 +78,10 @@ namespace moho
      * that start would leave the UI without it. Only reads: raw table slots under keys the sim's Lua already
      * interned, so the restored sim is not changed.
      */
-    void CaptureEnhancing(Sim& sim, std::vector<SRestoredEnhancement>& enhancing)
+    void CaptureEnhancing(
+      Sim& sim,
+      std::vector<SRestoredEnhancement>& enhancing
+    )
     {
       for (const auto& [entityId, entity] : sim.mEntityDB->mAllUnits) {
         Unit* const unit = entity->IsUnit();
@@ -109,9 +112,11 @@ namespace moho
             entry.army = unit->GetArmyIndex();
             entry.source = key.GetString();
             entry.category = faction.GetString();
-            std::transform(entry.category.begin(), entry.category.end(), entry.category.begin(), [](const unsigned char c) {
+            std::transform(
+              entry.category.begin(), entry.category.end(), entry.category.begin(), [](const unsigned char c) {
               return static_cast<char>(std::tolower(c));
-            });
+            }
+            );
             enhancing.push_back(std::move(entry));
             break;
           }
@@ -119,7 +124,9 @@ namespace moho
       }
     }
 
-    void CaptureRestoredUiData(Sim& sim)
+    void CaptureRestoredUiData(
+      Sim& sim
+    )
     {
       auto data = std::make_unique<SRestoredUiData>();
       const gpg::Rect2i& playable = sim.mMapData->mPlayableRect;
@@ -151,7 +158,9 @@ namespace moho
     constexpr std::int64_t kImageReach = std::int64_t{1} << 30;
     constexpr std::uint64_t kImageRelative = std::uint64_t{0xFAF0} << 48;
 
-    [[nodiscard]] std::uint64_t PackFirstWord(const std::uint64_t word) noexcept
+    [[nodiscard]] std::uint64_t PackFirstWord(
+      const std::uint64_t word
+    ) noexcept
     {
       const std::int64_t offset = static_cast<std::int64_t>(word - reinterpret_cast<std::uintptr_t>(&kImageAnchor));
       if (offset <= -kImageReach || offset >= kImageReach) {
@@ -160,7 +169,9 @@ namespace moho
       return kImageRelative | (static_cast<std::uint64_t>(offset + kImageReach));
     }
 
-    [[nodiscard]] std::uint64_t UnpackFirstWord(const std::uint64_t word) noexcept
+    [[nodiscard]] std::uint64_t UnpackFirstWord(
+      const std::uint64_t word
+    ) noexcept
     {
       if ((word & (std::uint64_t{0xFFFF} << 48)) != kImageRelative) {
         return word;
@@ -171,26 +182,39 @@ namespace moho
 #endif
 
     template <typename T>
-    [[nodiscard]] bool WriteValue(std::FILE* const file, const T& value)
+    [[nodiscard]] bool WriteValue(
+      std::FILE* const file,
+      const T& value
+    )
     {
       return std::fwrite(&value, sizeof(T), 1u, file) == 1u;
     }
 
     template <typename T>
-    [[nodiscard]] bool ReadValue(std::FILE* const file, T& value)
+    [[nodiscard]] bool ReadValue(
+      std::FILE* const file,
+      T& value
+    )
     {
       return std::fread(&value, sizeof(T), 1u, file) == 1u;
     }
 
     template <typename T>
-    [[nodiscard]] bool WriteList(std::FILE* const file, const std::vector<T>& list)
+    [[nodiscard]] bool WriteList(
+      std::FILE* const file,
+      const std::vector<T>& list
+    )
     {
       const auto count = static_cast<std::uint32_t>(list.size());
-      return WriteValue(file, count) && (list.empty() || std::fwrite(list.data(), sizeof(T), list.size(), file) == list.size());
+      return WriteValue(file, count) &&
+        (list.empty() || std::fwrite(list.data(), sizeof(T), list.size(), file) == list.size());
     }
 
     template <typename T>
-    [[nodiscard]] bool ReadList(std::FILE* const file, std::vector<T>& list)
+    [[nodiscard]] bool ReadList(
+      std::FILE* const file,
+      std::vector<T>& list
+    )
     {
       std::uint32_t count = 0;
       if (!ReadValue(file, count) || count > kMaxListLength) {
@@ -206,12 +230,17 @@ namespace moho
     sFlattenLog.clear();
   }
 
-  void SIM_NoteFlatten(const SSimFlatten& flatten)
+  void SIM_NoteFlatten(
+    const SSimFlatten& flatten
+  )
   {
     sFlattenLog.push_back(flatten);
   }
 
-  void SIM_CaptureKeyframeHeader(const Sim& sim, SSimKeyframeHeader& header)
+  void SIM_CaptureKeyframeHeader(
+    const Sim& sim,
+    SSimKeyframeHeader& header
+  )
   {
     header.beat = sim.mCurBeat;
     header.tick = sim.mCurTick;
@@ -266,34 +295,42 @@ namespace moho
 #endif
   }
 
-  bool SIM_WriteKeyframeHeader(std::FILE* const file, const SSimKeyframeHeader& header)
+  bool SIM_WriteKeyframeHeader(
+    std::FILE* const file,
+    const SSimKeyframeHeader& header
+  )
   {
     const std::uint8_t flags[3] = {
       static_cast<std::uint8_t>(header.singleStep),
       static_cast<std::uint8_t>(header.gameEnded),
       static_cast<std::uint8_t>(header.gameOver),
     };
-    return WriteValue(file, kHeaderMagic) && WriteValue(file, kHeaderVersion) && WriteValue(file, header.beat)
-      && WriteValue(file, header.tick) && WriteValue(file, header.pausedBy) && WriteValue(file, header.commandSource)
-      && WriteValue(file, flags) && WriteValue(file, header.context) && WriteValue(file, header.hashes)
-      && WriteList(file, header.timeouts) && WriteList(file, header.flattens) && WriteValue(file, header.luaBlocks)
-      && WriteValue(file, header.luaThreshold) && WriteList(file, header.laneBlocks)
-      && WriteList(file, header.laneBytes) && WriteList(file, header.heldBlocks) && WriteList(file, header.heldSizes)
-      && WriteList(file, header.heldBytes);
+    return WriteValue(file, kHeaderMagic) && WriteValue(file, kHeaderVersion) && WriteValue(file, header.beat) &&
+      WriteValue(file, header.tick) && WriteValue(file, header.pausedBy) && WriteValue(file, header.commandSource) &&
+      WriteValue(file, flags) && WriteValue(file, header.context) && WriteValue(file, header.hashes) &&
+      WriteList(file, header.timeouts) && WriteList(file, header.flattens) && WriteValue(file, header.luaBlocks) &&
+      WriteValue(file, header.luaThreshold) && WriteList(file, header.laneBlocks) &&
+      WriteList(file, header.laneBytes) && WriteList(file, header.heldBlocks) && WriteList(file, header.heldSizes) &&
+      WriteList(file, header.heldBytes);
   }
 
-  bool SIM_ReadKeyframeHeader(std::FILE* const file, SSimKeyframeHeader& header)
+  bool SIM_ReadKeyframeHeader(
+    std::FILE* const file,
+    SSimKeyframeHeader& header
+  )
   {
     std::uint32_t magic = 0;
     std::uint32_t version = 0;
     std::uint8_t flags[3]{};
-    if (!ReadValue(file, magic) || magic != kHeaderMagic || !ReadValue(file, version) || version != kHeaderVersion
-        || !ReadValue(file, header.beat) || !ReadValue(file, header.tick) || !ReadValue(file, header.pausedBy)
-        || !ReadValue(file, header.commandSource) || !ReadValue(file, flags) || !ReadValue(file, header.context)
-        || !ReadValue(file, header.hashes) || !ReadList(file, header.timeouts) || !ReadList(file, header.flattens)
-        || !ReadValue(file, header.luaBlocks) || !ReadValue(file, header.luaThreshold)
-        || !ReadList(file, header.laneBlocks) || !ReadList(file, header.laneBytes) || !ReadList(file, header.heldBlocks)
-        || !ReadList(file, header.heldSizes) || !ReadList(file, header.heldBytes)) {
+    if (
+      !ReadValue(file, magic) || magic != kHeaderMagic || !ReadValue(file, version) || version != kHeaderVersion ||
+      !ReadValue(file, header.beat) || !ReadValue(file, header.tick) || !ReadValue(file, header.pausedBy) ||
+      !ReadValue(file, header.commandSource) || !ReadValue(file, flags) || !ReadValue(file, header.context) ||
+      !ReadValue(file, header.hashes) || !ReadList(file, header.timeouts) || !ReadList(file, header.flattens) ||
+      !ReadValue(file, header.luaBlocks) || !ReadValue(file, header.luaThreshold) ||
+      !ReadList(file, header.laneBlocks) || !ReadList(file, header.laneBytes) || !ReadList(file, header.heldBlocks) ||
+      !ReadList(file, header.heldSizes) || !ReadList(file, header.heldBytes)
+    ) {
       return false;
     }
     header.singleStep = flags[0] != 0u;
@@ -302,7 +339,9 @@ namespace moho
     return header.beat > 0u;
   }
 
-  void SIM_BeginKeyframeRestore(SSimKeyframeHeader header)
+  void SIM_BeginKeyframeRestore(
+    SSimKeyframeHeader header
+  )
   {
     gSimBeatOrigin.store(static_cast<std::int32_t>(header.beat) - 1);
 
@@ -331,11 +370,15 @@ namespace moho
     SimBlockLane::SetFreeBlocks(std::move(freeBlocks));
     sRestoredHeld.clear();
     in = header.heldBytes.data();
-    if (header.heldBytes.size() == header.heldBlocks.size() * SimBlockLane::kBlockBytes
-        && header.heldSizes.size() == header.heldBlocks.size()) {
+    if (
+      header.heldBytes.size() == header.heldBlocks.size() * SimBlockLane::kBlockBytes &&
+      header.heldSizes.size() == header.heldBlocks.size()
+    ) {
       for (std::size_t i = 0; i < header.heldBlocks.size(); ++i) {
         sRestoredHeld.push_back(
-          SimBlockLane::HeldBlock{nullptr, static_cast<std::size_t>(header.heldSizes[i]), unpackBlock(header.heldBlocks[i], in)}
+          SimBlockLane::HeldBlock{
+            nullptr, static_cast<std::size_t>(header.heldSizes[i]), unpackBlock(header.heldBlocks[i], in)
+          }
         );
         in += SimBlockLane::kBlockBytes;
       }
@@ -352,12 +395,18 @@ namespace moho
     gSimKeyframeRestoring.store(true);
   }
 
-  void SIM_NoteKeyframeBlock(const std::uint64_t saved, void* const block)
+  void SIM_NoteKeyframeBlock(
+    const std::uint64_t saved,
+    void* const block
+  )
   {
     sRestoredBlocks[saved] = block;
   }
 
-  void SIM_NoteKeyframeFormationPointer(void** const slot, const std::uint64_t saved)
+  void SIM_NoteKeyframeFormationPointer(
+    void** const slot,
+    const std::uint64_t saved
+  )
   {
     sRestoredFormationPointers.push_back(SFormationPointer{slot, saved});
   }
@@ -391,7 +440,9 @@ namespace moho
     return sRestore.get();
   }
 
-  void SIM_FinishKeyframeRestore(Sim& sim)
+  void SIM_FinishKeyframeRestore(
+    Sim& sim
+  )
   {
     gSimExactArchive.store(false);
     gSimKeyframeRestoring.store(false);
@@ -421,7 +472,11 @@ namespace moho
     sRestore.reset();
   }
 
-  void SIM_AddRestoredUiData(LuaPlus::LuaObject& sync, LuaPlus::LuaState* const state, const bool replay)
+  void SIM_AddRestoredUiData(
+    LuaPlus::LuaObject& sync,
+    LuaPlus::LuaState* const state,
+    const bool replay
+  )
   {
     std::unique_ptr<SRestoredUiData> data(sRestoredUiData.exchange(nullptr));
     if (!data) {
@@ -454,8 +509,10 @@ namespace moho
             continue;
           }
           const LuaPlus::LuaObject messageId = message["id"];
-          if ((messageId.IsString() && id == messageId.GetString()) ||
-              (messageId.IsNumber() && id == std::to_string(static_cast<long long>(messageId.GetNumber())))) {
+          if (
+            (messageId.IsString() && id == messageId.GetString()) ||
+            (messageId.IsNumber() && id == std::to_string(static_cast<long long>(messageId.GetNumber())))
+          ) {
             return true;
           }
         }

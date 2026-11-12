@@ -44,22 +44,22 @@ namespace moho
    */
   struct SPerArmyReconInfo
   {
-    std::uint8_t mNeedsFlush;                   // +0x00
-    std::uint8_t pad_01_03[0x03];               // +0x01
-    std::uint32_t mReconFlags;                  // +0x04
+    std::uint8_t mNeedsFlush;     // +0x00
+    std::uint8_t pad_01_03[0x03]; // +0x01
+    std::uint32_t mReconFlags;    // +0x04
     union
     {
-      const RMeshBlueprint* mMeshTypeClassId;   // +0x08
-      RMeshBlueprint* mStiMesh;                 // +0x08
+      const RMeshBlueprint* mMeshTypeClassId; // +0x08
+      RMeshBlueprint* mStiMesh;               // +0x08
     };
-    boost::shared_ptr<RScmResource> mMesh;      // +0x0C
-    boost::shared_ptr<CAniPose> mPriorPose;     // +0x14
-    boost::shared_ptr<CAniPose> mPose;          // +0x1C
-    float mHealth;                              // +0x24
-    float mMaxHealth;                           // +0x28
-    float mFractionComplete;                    // +0x2C
-    std::uint8_t mMaybeDead;                    // +0x30
-    std::uint8_t pad_31_33[0x03];               // +0x31
+    boost::shared_ptr<RScmResource> mMesh;  // +0x0C
+    boost::shared_ptr<CAniPose> mPriorPose; // +0x14
+    boost::shared_ptr<CAniPose> mPose;      // +0x1C
+    float mHealth;                          // +0x24
+    float mMaxHealth;                       // +0x28
+    float mFractionComplete;                // +0x2C
+    std::uint8_t mMaybeDead;                // +0x30
+    std::uint8_t pad_31_33[0x03];           // +0x31
 
     /**
      * Address: 0x005C4F50 (FUN_005C4F50, Moho::SPerArmyReconInfo::~SPerArmyReconInfo)
@@ -111,7 +111,8 @@ namespace moho
   static_assert(offsetof(SPerArmyReconInfo, mNeedsFlush) == 0x00, "SPerArmyReconInfo::mNeedsFlush offset must be 0x00");
   static_assert(offsetof(SPerArmyReconInfo, mReconFlags) == 0x04, "SPerArmyReconInfo::mReconFlags offset must be 0x04");
   static_assert(
-    offsetof(SPerArmyReconInfo, mMeshTypeClassId) == 0x08, "SPerArmyReconInfo::mMeshTypeClassId offset must be 0x08"
+    offsetof(SPerArmyReconInfo, mMeshTypeClassId) == 0x08,
+    "SPerArmyReconInfo::mMeshTypeClassId offset must be 0x08"
   );
   static_assert(offsetof(SPerArmyReconInfo, mStiMesh) == 0x08, "SPerArmyReconInfo::mStiMesh offset must be 0x08");
   static_assert(offsetof(SPerArmyReconInfo, mMesh) == 0x0C, "SPerArmyReconInfo::mMesh offset must be 0x0C");
@@ -137,11 +138,11 @@ namespace moho
    */
   struct SReconBlipUnitConstData
   {
-    std::uint8_t mBuildStateTag = 0;                    // +0x00
-    std::uint8_t mPad01[3] = {};                        // +0x01
-    boost::shared_ptr<Stats<StatItem>> mStatsRoot{};    // +0x04
-    std::uint8_t mFake = 0;                             // +0x0C
-    std::uint8_t mPad0D[3] = {};                        // +0x0D
+    std::uint8_t mBuildStateTag = 0;                 // +0x00
+    std::uint8_t mPad01[3] = {};                     // +0x01
+    boost::shared_ptr<Stats<StatItem>> mStatsRoot{}; // +0x04
+    std::uint8_t mFake = 0;                          // +0x0C
+    std::uint8_t mPad0D[3] = {};                     // +0x0D
   };
 
   static_assert(sizeof(SReconBlipUnitConstData) == 0x10, "SReconBlipUnitConstData size must be 0x10");
@@ -149,9 +150,7 @@ namespace moho
     offsetof(SReconBlipUnitConstData, mStatsRoot) == 0x04,
     "SReconBlipUnitConstData::mStatsRoot offset must be 0x04"
   );
-  static_assert(
-    offsetof(SReconBlipUnitConstData, mFake) == 0x0C, "SReconBlipUnitConstData::mFake offset must be 0x0C"
-  );
+  static_assert(offsetof(SReconBlipUnitConstData, mFake) == 0x0C, "SReconBlipUnitConstData::mFake offset must be 0x0C");
 
   /**
    * VFTABLE: 0x00E1D824
@@ -236,9 +235,8 @@ namespace moho
      * Reads serializer construct args (`Sim*`), allocates one `ReconBlip`, and
      * returns it as an unowned construct result.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x005BEE90 (FUN_005BEE90)
@@ -483,11 +481,15 @@ namespace moho
 
     [[nodiscard]] Unit* GetSourceUnit() const noexcept;
     [[nodiscard]] bool IsFake() const noexcept;
-    [[nodiscard]] SPerArmyReconInfo* GetPerArmyReconInfo(const std::int32_t armyIndex) noexcept
+    [[nodiscard]] SPerArmyReconInfo* GetPerArmyReconInfo(
+      const std::int32_t armyIndex
+    ) noexcept
     {
       return const_cast<SPerArmyReconInfo*>(static_cast<const ReconBlip*>(this)->GetPerArmyReconInfo(armyIndex));
     }
-    [[nodiscard]] const SPerArmyReconInfo* GetPerArmyReconInfo(const std::int32_t armyIndex) const noexcept
+    [[nodiscard]] const SPerArmyReconInfo* GetPerArmyReconInfo(
+      const std::int32_t armyIndex
+    ) const noexcept
     {
       if (armyIndex < 0 || mReconDat.begin() == nullptr || mReconDat.end() == nullptr) {
         return nullptr;
@@ -497,12 +499,12 @@ namespace moho
     }
 
   public:
-    WeakPtr<Unit> mCreator;                   // +0x270
-    std::uint8_t mDeleteWhenStale;            // +0x278
-    std::uint8_t mPad279[0x03];               // +0x279
-    Wm3::Vec3f mJamOffset;                    // +0x27C
-    SReconBlipUnitConstData mUnitConstDat;    // +0x288
-    SSTIUnitVariableData mUnitVarDat;         // +0x298
+    WeakPtr<Unit> mCreator;                  // +0x270
+    std::uint8_t mDeleteWhenStale;           // +0x278
+    std::uint8_t mPad279[0x03];              // +0x279
+    Wm3::Vec3f mJamOffset;                   // +0x27C
+    SReconBlipUnitConstData mUnitConstDat;   // +0x288
+    SSTIUnitVariableData mUnitVarDat;        // +0x298
     fa::vector<SPerArmyReconInfo> mReconDat; // +0x4C0
   };
 

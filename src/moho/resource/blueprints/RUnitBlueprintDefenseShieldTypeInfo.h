@@ -12,7 +12,8 @@ namespace moho
   {
   public:
     /**
-     * Address: 0x005217D0 (FUN_005217D0, Moho::RUnitBlueprintDefenseShieldTypeInfo::RUnitBlueprintDefenseShieldTypeInfo)
+     * Address: 0x005217D0 (FUN_005217D0,
+     * Moho::RUnitBlueprintDefenseShieldTypeInfo::RUnitBlueprintDefenseShieldTypeInfo)
      *
      * What it does:
      * Constructs and preregisters the reflection descriptor for
@@ -52,7 +53,7 @@ namespace moho
   void register_RUnitBlueprintDefenseShieldTypeInfo();
 
   static_assert(
-    sizeof(RUnitBlueprintDefenseShieldTypeInfo) == 0x64, "RUnitBlueprintDefenseShieldTypeInfo size must be 0x64"
+    sizeof(RUnitBlueprintDefenseShieldTypeInfo) == 0x64,
+    "RUnitBlueprintDefenseShieldTypeInfo size must be 0x64"
   );
 } // namespace moho
-

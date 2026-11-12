@@ -125,9 +125,8 @@ namespace moho
    * Tries prefixed command-line options formed as:
    * `prefix + alias`.
    */
-  bool CFG_GetArgOptionAliases(
-    const CfgAliasSet& aliases, std::uint32_t requiredArgCount, fa::vector<fa::string>* outArgs
-  );
+  bool
+  CFG_GetArgOptionAliases(const CfgAliasSet& aliases, std::uint32_t requiredArgCount, fa::vector<fa::string>* outArgs);
 
   /**
    * Address: 0x008D00E0 (FUN_008D00E0)
@@ -246,10 +245,7 @@ namespace moho
     virtual float GetNumber(const fa::string& key, float fallback) = 0;
     virtual std::uint32_t GetHex(const fa::string& key, std::uint32_t fallback) = 0;
     virtual fa::string GetString(const fa::string& key, const fa::string& fallback) = 0;
-    virtual fa::list<fa::string> GetStringArr(
-      const fa::string& key,
-      const fa::list<fa::string>& fallback
-    ) = 0;
+    virtual fa::list<fa::string> GetStringArr(const fa::string& key, const fa::list<fa::string>& fallback) = 0;
     virtual void SetBoolean(const fa::string& key, bool value) = 0;
     virtual void SetInteger(const fa::string& key, std::int32_t value) = 0;
     virtual void SetNumber(const fa::string& key, float value) = 0;
@@ -375,11 +371,8 @@ namespace moho
    * Invokes `/lua/options/optionslogic.lua:SetCustomData` for one option key
    * using `(customData, defaultValue)` Lua object lanes.
    */
-  void OPTIONS_SetCustomData(
-    gpg::StrArg key,
-    const LuaPlus::LuaObject& customData,
-    const LuaPlus::LuaObject& defaultValue
-  );
+  void
+  OPTIONS_SetCustomData(gpg::StrArg key, const LuaPlus::LuaObject& customData, const LuaPlus::LuaObject& defaultValue);
 
   /**
    * Address: 0x008C6EC0 (FUN_008C6EC0)
@@ -1205,9 +1198,7 @@ namespace moho
    * Resolves one path token against one base path and stores the resolved text
    * in `outPath`.
    */
-  fa::string* PATH_ResolveAgainstBase(
-    const fa::string& path, const fa::string& basePath, fa::string* outPath
-  );
+  fa::string* PATH_ResolveAgainstBase(const fa::string& path, const fa::string& basePath, fa::string* outPath);
 
   /**
    * Address: 0x0040FAF0 (FUN_0040FAF0)
@@ -1492,7 +1483,20 @@ namespace moho
   bool DISK_SetupDataAndSearchPaths(fa::string dataPathScriptName, const std::filesystem::path& launchDir);
 
   /**
-   * Address: 0x00459DA0 (FUN_00459DA0, ?DISK_GetAllowedProtocols@Moho@@YA?AV?$vector@V?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@V?$allocator@V?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@@2@@std@@XZ)
+   * Engine addition, not in the binary (the map editor's downloads): mounts `directory` at `mountpoint`
+   * (`/maps/<folder>`) while the game runs. The file system is built again from the startup mount table
+   * plus every folder mounted this way, and installed in place of the current one, which is kept (not
+   * destroyed) because loader threads may still be reading through it. The new folder ranks after
+   * everything mounted before it. False when no file system was set up yet.
+   */
+  bool DISK_MountDirectoryNow(const std::filesystem::path& directory, const char* mountpoint);
+
+  /** DISK_MountDirectoryNow for several folders (folder, mount point) with one rebuild of the file system. */
+  bool DISK_MountDirectoriesNow(const std::vector<std::pair<std::filesystem::path, std::string>>& folders);
+
+  /**
+   * Address: 0x00459DA0 (FUN_00459DA0,
+   * ?DISK_GetAllowedProtocols@Moho@@YA?AV?$vector@V?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@V?$allocator@V?$basic_string@_WU?$char_traits@_W@std@@V?$allocator@_W@2@@std@@@2@@std@@XZ)
    *
    * What it does:
    * Returns a copy of startup-configured URL protocols allowed by the disk layer.

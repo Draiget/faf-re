@@ -29,8 +29,24 @@ namespace faf::netbridge
     std::int32_t number = 0;
     std::string text;
 
-    static GpgArg Int(const std::int32_t v) { GpgArg a; a.kind = Kind::Int; a.number = v; return a; }
-    static GpgArg Str(std::string s) { GpgArg a; a.kind = Kind::String; a.text = std::move(s); return a; }
+    static GpgArg Int(
+      const std::int32_t v
+    )
+    {
+      GpgArg a;
+      a.kind = Kind::Int;
+      a.number = v;
+      return a;
+    }
+    static GpgArg Str(
+      std::string s
+    )
+    {
+      GpgArg a;
+      a.kind = Kind::String;
+      a.text = std::move(s);
+      return a;
+    }
   };
 
   struct GpgMessage
@@ -45,7 +61,13 @@ namespace faf::netbridge
   class GpgDecoder
   {
   public:
-    void Feed(const char* data, std::size_t size) { mBuffer.append(data, size); }
+    void Feed(
+      const char* data,
+      std::size_t size
+    )
+    {
+      mBuffer.append(data, size);
+    }
     // The next complete message, nullopt when more bytes are needed. Sets
     // *bad on a malformed stream.
     std::optional<GpgMessage> Next(bool* bad);

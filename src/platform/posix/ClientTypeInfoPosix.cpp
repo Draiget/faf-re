@@ -13,19 +13,21 @@
 #if !defined(_WIN32)
 
 // FAF_CLIENT_TYPEINFO(mangled name): typeinfo `_ZTI<name>` and its name string `_ZTS<name>`.
-#define FAF_CLIENT_TYPEINFO(NAME)                                         \
-  asm(".section .rodata._ZTS" NAME ",\"aG\",@progbits,_ZTS" NAME ",comdat\n" \
-      ".weak _ZTS" NAME "\n"                                              \
-      "_ZTS" NAME ":\n"                                                   \
-      ".asciz \"" NAME "\"\n"                                             \
-      ".section .data.rel.ro._ZTI" NAME ",\"awG\",@progbits,_ZTI" NAME ",comdat\n" \
-      ".weak _ZTI" NAME "\n"                                              \
-      ".p2align 3\n"                                                      \
-      "_ZTI" NAME ":\n"                                                   \
-      ".quad _ZTVN10__cxxabiv117__class_type_infoE+16\n"                  \
-      ".quad _ZTS" NAME "\n"                                              \
+#define FAF_CLIENT_TYPEINFO(NAME)                                                                                      \
+  asm(".section .rodata._ZTS" NAME ",\"aG\",@progbits,_ZTS" NAME ",comdat\n"                                           \
+      ".weak _ZTS" NAME "\n"                                                                                           \
+      "_ZTS" NAME ":\n"                                                                                                \
+      ".asciz \"" NAME "\"\n"                                                                                          \
+      ".section .data.rel.ro._ZTI" NAME ",\"awG\",@progbits,_ZTI" NAME ",comdat\n"                                     \
+      ".weak _ZTI" NAME "\n"                                                                                           \
+      ".p2align 3\n"                                                                                                   \
+      "_ZTI" NAME ":\n"                                                                                                \
+      ".quad _ZTVN10__cxxabiv117__class_type_infoE+16\n"                                                               \
+      ".quad _ZTS" NAME "\n"                                                                                           \
       ".text\n");
 
-FAF_CLIENT_TYPEINFO("N4moho8UserUnitE")
+FAF_CLIENT_TYPEINFO(
+  "N4moho8UserUnitE"
+)
 
 #endif // !defined(_WIN32)

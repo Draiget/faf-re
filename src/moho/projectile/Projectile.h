@@ -81,7 +81,8 @@ namespace moho
 
     /**
      * Address: 0x0069AFE0 (FUN_0069AFE0, Moho::Projectile::Projectile)
-     * Mangled: ??0Projectile@Moho@@QAE@PBVRProjectileBlueprint@1@PAVSim@1@PAVSimArmy@1@PAVEntity@1@VVTransform@1@MMV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVCAiTarget@1@_N@Z
+     * Mangled:
+     * ??0Projectile@Moho@@QAE@PBVRProjectileBlueprint@1@PAVSim@1@PAVSimArmy@1@PAVEntity@1@VVTransform@1@MMV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@ABVCAiTarget@1@_N@Z
      *
      * What it does:
      * Constructs one live projectile from runtime launch parameters: reserves a
@@ -116,9 +117,19 @@ namespace moho
     // them from SimBlockLane; x86 from the engine allocator's 896-byte class, as the binary does. Either way they
     // stay out of Entity's own operator new, so no entity pool can take them.
     [[nodiscard]] static void* operator new(std::size_t size);
-    [[nodiscard]] static void* operator new(std::size_t, void* const place) noexcept { return place; }
+    [[nodiscard]] static void* operator new(
+      std::size_t,
+      void* const place
+    ) noexcept
+    {
+      return place;
+    }
     static void operator delete(void* block, std::size_t size) noexcept;
-    static void operator delete(void*, void*) noexcept {}
+    static void operator delete(
+      void*,
+      void*
+    ) noexcept
+    {}
 
     /**
      * Address: 0x0069A610 (FUN_0069A610, Moho::Projectile::IsProjectile)
@@ -184,9 +195,8 @@ namespace moho
     /**
      * Address: 0x0069E520 (FUN_0069E520, Moho::Projectile::MemberConstruct)
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x006A0370 (FUN_006A0370, Moho::Projectile::MemberDeserialize)
@@ -229,24 +239,24 @@ namespace moho
     float mImpactInterpolation; // +0x2A4
 
     // The eight blueprint physics flags, one byte each, in blueprint order.
-    bool mCollideSurface;   // +0x2A8
-    bool mDoCollision;      // +0x2A9
-    bool mTrackTarget;      // +0x2AA
-    bool mVelocityAlign;    // +0x2AB
-    bool mStayUpright;      // +0x2AC
-    bool mLeadTarget;       // +0x2AD
-    bool mStayUnderwater;   // +0x2AE
-    bool mDestroyOnWater;   // +0x2AF
+    bool mCollideSurface; // +0x2A8
+    bool mDoCollision;    // +0x2A9
+    bool mTrackTarget;    // +0x2AA
+    bool mVelocityAlign;  // +0x2AB
+    bool mStayUpright;    // +0x2AC
+    bool mLeadTarget;     // +0x2AD
+    bool mStayUnderwater; // +0x2AE
+    bool mDestroyOnWater; // +0x2AF
 
-    float mTurnRateDegrees;                 // +0x2B0
-    float mMaxSpeed;                        // +0x2B4
-    float mAcceleration;                    // +0x2B8
-    Wm3::Vector3f mBallisticAcceleration;   // +0x2BC
+    float mTurnRateDegrees;               // +0x2B0
+    float mMaxSpeed;                      // +0x2B4
+    float mAcceleration;                  // +0x2B8
+    Wm3::Vector3f mBallisticAcceleration; // +0x2BC
 
-    float mDamage;                 // +0x2C8
-    float mDamageRadius;           // +0x2CC
+    float mDamage;              // +0x2C8
+    float mDamageRadius;        // +0x2CC
     fa::string mDamageTypeName; // +0x2D0
-    CAiTarget mTargetPosData;      // +0x2EC
+    CAiTarget mTargetPosData;   // +0x2EC
 
     /**
      * Cached homing aim point, written by `GetTargetPosGun` while a live target
@@ -255,49 +265,61 @@ namespace moho
      * steering toward this point after the live target is lost rather than
      * giving up.
      */
-    Wm3::Vector3f mCachedAimPoint;          // +0x30C
-    bool mKeepLastAimLatch;                 // +0x318
-    std::uint8_t pad_0319_031B[0x03];       // +0x319
+    Wm3::Vector3f mCachedAimPoint;    // +0x30C
+    bool mKeepLastAimLatch;           // +0x318
+    std::uint8_t pad_0319_031B[0x03]; // +0x319
 
     /** Earliest hit found this tick, and what it hit; both reset by `Impact()`. */
-    Wm3::Vector3f mImpactPosition;          // +0x31C
-    WeakPtr<Entity> mCollidedEntityWeak;    // +0x328
+    Wm3::Vector3f mImpactPosition;       // +0x31C
+    WeakPtr<Entity> mCollidedEntityWeak; // +0x328
 
-    std::uint32_t mLifetimeEnd;             // +0x330
-    bool mBelowWater;                       // +0x334
-    std::uint8_t pad_0335_0337[0x03];       // +0x335
-    std::int32_t mBounceLimit;              // +0x338
+    std::uint32_t mLifetimeEnd;       // +0x330
+    bool mBelowWater;                 // +0x334
+    std::uint8_t pad_0335_0337[0x03]; // +0x335
+    std::int32_t mBounceLimit;        // +0x338
 
     /** Terrain-bounce state: the tick the projectile met the ground, and the bounce normal. */
-    std::int32_t mGroundTick;               // +0x33C
-    bool mDirectAwayFromGround;             // +0x340
-    std::uint8_t pad_0341_0343[0x03];       // +0x341
-    Wm3::Vector3f mGroundDirection;         // +0x344
-    float mBounceVelocityDamping;           // +0x350
+    std::int32_t mGroundTick;         // +0x33C
+    bool mDirectAwayFromGround;       // +0x340
+    std::uint8_t pad_0341_0343[0x03]; // +0x341
+    Wm3::Vector3f mGroundDirection;   // +0x344
+    float mBounceVelocityDamping;     // +0x350
 
     /** Zig-zag jitter applied by `UpdateTracking`, re-rolled when the tick is reached. */
-    std::int32_t mZigZagNextTick;           // +0x354
-    Wm3::Vector3f mZigZagRandomOffset;      // +0x358
+    std::int32_t mZigZagNextTick;      // +0x354
+    Wm3::Vector3f mZigZagRandomOffset; // +0x358
 
-    EImpactType mImpactType;                // +0x364
-    CProjectileAttributes mAttributes;      // +0x368
-    bool mIsChildProjectile;                // +0x37C
-    std::uint8_t pad_037D_037F[0x03];       // +0x37D
+    EImpactType mImpactType;           // +0x364
+    CProjectileAttributes mAttributes; // +0x368
+    bool mIsChildProjectile;           // +0x37C
+    std::uint8_t pad_037D_037F[0x03];  // +0x37D
   };
 
   // Offsets read directly by `Projectile::Impact` (0x0069DEC0): [edi+270h],
   // [edi+278h], [edi+2A4h], [edi+2ECh], [edi+2F0h], [edi+31Ch], [edi+320h],
   // [edi+324h], [edi+328h] and [edi+364h].
-  static_assert(offsetof(Projectile, mImpactEventBroadcaster) == 0x270, "Projectile::mImpactEventBroadcaster offset must be 0x270");
+  static_assert(
+    offsetof(Projectile, mImpactEventBroadcaster) == 0x270,
+    "Projectile::mImpactEventBroadcaster offset must be 0x270"
+  );
   static_assert(offsetof(Projectile, mLauncherWeak) == 0x278, "Projectile::mLauncherWeak offset must be 0x278");
   static_assert(offsetof(Projectile, mVelocity) == 0x280, "Projectile::mVelocity offset must be 0x280");
-  static_assert(offsetof(Projectile, mLocalAngularVelocity) == 0x28C, "Projectile::mLocalAngularVelocity offset must be 0x28C");
+  static_assert(
+    offsetof(Projectile, mLocalAngularVelocity) == 0x28C,
+    "Projectile::mLocalAngularVelocity offset must be 0x28C"
+  );
   static_assert(offsetof(Projectile, mScaleVelocity) == 0x298, "Projectile::mScaleVelocity offset must be 0x298");
-  static_assert(offsetof(Projectile, mImpactInterpolation) == 0x2A4, "Projectile::mImpactInterpolation offset must be 0x2A4");
+  static_assert(
+    offsetof(Projectile, mImpactInterpolation) == 0x2A4,
+    "Projectile::mImpactInterpolation offset must be 0x2A4"
+  );
   static_assert(offsetof(Projectile, mDestroyOnWater) == 0x2AF, "Projectile::mDestroyOnWater offset must be 0x2AF");
   static_assert(offsetof(Projectile, mTurnRateDegrees) == 0x2B0, "Projectile::mTurnRateDegrees offset must be 0x2B0");
   static_assert(offsetof(Projectile, mAcceleration) == 0x2B8, "Projectile::mAcceleration offset must be 0x2B8");
-  static_assert(offsetof(Projectile, mBallisticAcceleration) == 0x2BC, "Projectile::mBallisticAcceleration offset must be 0x2BC");
+  static_assert(
+    offsetof(Projectile, mBallisticAcceleration) == 0x2BC,
+    "Projectile::mBallisticAcceleration offset must be 0x2BC"
+  );
   static_assert(offsetof(Projectile, mDamage) == 0x2C8, "Projectile::mDamage offset must be 0x2C8");
   static_assert(offsetof(Projectile, mDamageRadius) == 0x2CC, "Projectile::mDamageRadius offset must be 0x2CC");
   static_assert(offsetof(Projectile, mDamageTypeName) == 0x2D0, "Projectile::mDamageTypeName offset must be 0x2D0");
@@ -305,19 +327,34 @@ namespace moho
   static_assert(offsetof(Projectile, mCachedAimPoint) == 0x30C, "Projectile::mCachedAimPoint offset must be 0x30C");
   static_assert(offsetof(Projectile, mKeepLastAimLatch) == 0x318, "Projectile::mKeepLastAimLatch offset must be 0x318");
   static_assert(offsetof(Projectile, mImpactPosition) == 0x31C, "Projectile::mImpactPosition offset must be 0x31C");
-  static_assert(offsetof(Projectile, mCollidedEntityWeak) == 0x328, "Projectile::mCollidedEntityWeak offset must be 0x328");
+  static_assert(
+    offsetof(Projectile, mCollidedEntityWeak) == 0x328,
+    "Projectile::mCollidedEntityWeak offset must be 0x328"
+  );
   static_assert(offsetof(Projectile, mLifetimeEnd) == 0x330, "Projectile::mLifetimeEnd offset must be 0x330");
   static_assert(offsetof(Projectile, mBelowWater) == 0x334, "Projectile::mBelowWater offset must be 0x334");
   static_assert(offsetof(Projectile, mBounceLimit) == 0x338, "Projectile::mBounceLimit offset must be 0x338");
   static_assert(offsetof(Projectile, mGroundTick) == 0x33C, "Projectile::mGroundTick offset must be 0x33C");
-  static_assert(offsetof(Projectile, mDirectAwayFromGround) == 0x340, "Projectile::mDirectAwayFromGround offset must be 0x340");
+  static_assert(
+    offsetof(Projectile, mDirectAwayFromGround) == 0x340,
+    "Projectile::mDirectAwayFromGround offset must be 0x340"
+  );
   static_assert(offsetof(Projectile, mGroundDirection) == 0x344, "Projectile::mGroundDirection offset must be 0x344");
-  static_assert(offsetof(Projectile, mBounceVelocityDamping) == 0x350, "Projectile::mBounceVelocityDamping offset must be 0x350");
+  static_assert(
+    offsetof(Projectile, mBounceVelocityDamping) == 0x350,
+    "Projectile::mBounceVelocityDamping offset must be 0x350"
+  );
   static_assert(offsetof(Projectile, mZigZagNextTick) == 0x354, "Projectile::mZigZagNextTick offset must be 0x354");
-  static_assert(offsetof(Projectile, mZigZagRandomOffset) == 0x358, "Projectile::mZigZagRandomOffset offset must be 0x358");
+  static_assert(
+    offsetof(Projectile, mZigZagRandomOffset) == 0x358,
+    "Projectile::mZigZagRandomOffset offset must be 0x358"
+  );
   static_assert(offsetof(Projectile, mImpactType) == 0x364, "Projectile::mImpactType offset must be 0x364");
   static_assert(offsetof(Projectile, mAttributes) == 0x368, "Projectile::mAttributes offset must be 0x368");
-  static_assert(offsetof(Projectile, mIsChildProjectile) == 0x37C, "Projectile::mIsChildProjectile offset must be 0x37C");
+  static_assert(
+    offsetof(Projectile, mIsChildProjectile) == 0x37C,
+    "Projectile::mIsChildProjectile offset must be 0x37C"
+  );
   static_assert(sizeof(Projectile) == 0x380, "Projectile size must be 0x380");
 
   /**

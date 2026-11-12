@@ -74,4 +74,3 @@ namespace moho
 
   static_assert(sizeof(CUnitCallTransportTypeInfo) == 0x64, "CUnitCallTransportTypeInfo size must be 0x64");
 } // namespace moho
-

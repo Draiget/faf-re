@@ -23,7 +23,11 @@ namespace
 
   constexpr int kSize = 65;
 
-  std::vector<std::uint16_t> Painted(const Symmetry symmetry, const int turns, const unsigned seed)
+  std::vector<std::uint16_t> Painted(
+    const Symmetry symmetry,
+    const int turns,
+    const unsigned seed
+  )
   {
     std::vector<std::uint16_t> words(static_cast<std::size_t>(kSize) * kSize, 8000);
     std::mt19937 random(seed);
@@ -47,7 +51,10 @@ namespace
   class ExactSymmetry : public ::testing::TestWithParam<Symmetry>
   {};
 
-  TEST_P(ExactSymmetry, FindsAPlantedVertexAndRepairsIt)
+  TEST_P(
+    ExactSymmetry,
+    FindsAPlantedVertexAndRepairsIt
+  )
   {
     std::vector<std::uint16_t> words = Painted(GetParam(), 3, 99u);
     EXPECT_EQ(CheckSymmetry(words.data(), kSize, kSize, GetParam(), 3).differing, 0);
@@ -68,12 +75,24 @@ namespace
   }
 
   INSTANTIATE_TEST_SUITE_P(
-    SymmetryCheck, ExactSymmetry,
-    ::testing::Values(Symmetry::LeftRight, Symmetry::TopBottom, Symmetry::DiagonalBack, Symmetry::DiagonalForward, Symmetry::HalfTurn,
-                      Symmetry::BothAxes, Symmetry::BothDiagonals, Symmetry::QuarterTurns)
+    SymmetryCheck,
+    ExactSymmetry,
+    ::testing::Values(
+      Symmetry::LeftRight,
+      Symmetry::TopBottom,
+      Symmetry::DiagonalBack,
+      Symmetry::DiagonalForward,
+      Symmetry::HalfTurn,
+      Symmetry::BothAxes,
+      Symmetry::BothDiagonals,
+      Symmetry::QuarterTurns
+    )
   );
 
-  TEST(SymmetryCheck, ThreeWayTurnPaintedByTheBrushPasses)
+  TEST(
+    SymmetryCheck,
+    ThreeWayTurnPaintedByTheBrushPasses
+  )
   {
     std::vector<std::uint16_t> words = Painted(Symmetry::NWay, 3, 5u);
     const SymmetryReport report = CheckSymmetry(words.data(), kSize, kSize, Symmetry::NWay, 3);
@@ -81,7 +100,10 @@ namespace
     EXPECT_EQ(report.differing, 0) << "largest " << report.largest;
   }
 
-  TEST(SymmetryCheck, ThreeWayTurnFindsAPlantedBump)
+  TEST(
+    SymmetryCheck,
+    ThreeWayTurnFindsAPlantedBump
+  )
   {
     std::vector<std::uint16_t> words(static_cast<std::size_t>(kSize) * kSize, 8000);
     // A bump in the second sector (above the centre on the -x side) that the others don't have.
@@ -96,19 +118,26 @@ namespace
 
   // A field from a function of (x, z), with a little noise below the tolerance.
   template <typename F>
-  std::vector<std::uint16_t> FieldOf(const int size, F f)
+  std::vector<std::uint16_t> FieldOf(
+    const int size,
+    F f
+  )
   {
     std::vector<std::uint16_t> field(static_cast<std::size_t>(size) * size);
     std::mt19937 random(7);
     for (int z = 0; z < size; ++z) {
       for (int x = 0; x < size; ++x) {
-        field[static_cast<std::size_t>(z) * size + x] = static_cast<std::uint16_t>(f(x, z) + static_cast<int>(random() % 8));
+        field[static_cast<std::size_t>(z) * size + x] =
+          static_cast<std::uint16_t>(f(x, z) + static_cast<int>(random() % 8));
       }
     }
     return field;
   }
 
-  TEST(SymmetryDetect, FindsTheModeWithTheMostCopies)
+  TEST(
+    SymmetryDetect,
+    FindsTheModeWithTheMostCopies
+  )
   {
     constexpr int kSize = 257;
     const int last = kSize - 1;
@@ -121,7 +150,9 @@ namespace
     EXPECT_EQ(found.symmetry, Symmetry::LeftRight);
     EXPECT_GE(found.matched, 0.97f);
     // Mirrored on both axes (also left-right, top-bottom and a half turn): both axes, the most copies.
-    const auto both = FieldOf(kSize, [&](int x, int z) { return 4000 + 20 * std::min(x, last - x) + 35 * std::min(z, last - z); });
+    const auto both = FieldOf(kSize, [&](int x, int z) {
+      return 4000 + 20 * std::min(x, last - x) + 35 * std::min(z, last - z);
+    });
     EXPECT_EQ(faf::editor::DetectSymmetry(both.data(), kSize, kSize).symmetry, Symmetry::BothAxes);
     // A half turn only.
     const auto half = FieldOf(kSize, [&](int x, int z) {
@@ -133,17 +164,27 @@ namespace
     EXPECT_EQ(faf::editor::DetectSymmetry(half.data(), kSize, kSize).symmetry, Symmetry::HalfTurn);
   }
 
-  TEST(SymmetryDetect, FlatAndRandomFieldsHaveNone)
+  TEST(
+    SymmetryDetect,
+    FlatAndRandomFieldsHaveNone
+  )
   {
     constexpr int kSize = 129;
-    const auto flat = FieldOf(kSize, [](int, int) { return 6400; });
+    const auto flat = FieldOf(kSize, [](int, int) {
+      return 6400;
+    });
     EXPECT_EQ(faf::editor::DetectSymmetry(flat.data(), kSize, kSize).symmetry, Symmetry::None);
     std::mt19937 random(3);
-    const auto rough = FieldOf(kSize, [&](int, int) { return 4000 + static_cast<int>(random() % 4000); });
+    const auto rough = FieldOf(kSize, [&](int, int) {
+      return 4000 + static_cast<int>(random() % 4000);
+    });
     EXPECT_EQ(faf::editor::DetectSymmetry(rough.data(), kSize, kSize).symmetry, Symmetry::None);
   }
 
-  TEST(SymmetryCheck, NoSymmetryChecksNothing)
+  TEST(
+    SymmetryCheck,
+    NoSymmetryChecksNothing
+  )
   {
     std::vector<std::uint16_t> words = Painted(Symmetry::None, 3, 7u);
     EXPECT_EQ(CheckSymmetry(words.data(), kSize, kSize, Symmetry::None, 3).checked, 0);

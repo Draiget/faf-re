@@ -31,1042 +31,1050 @@
 
 namespace gpg::gal
 {
-    namespace
+  namespace
+  {
+    /**
+     * Address: 0x0093F650 (FUN_0093F650, effect-macro key-range search lane)
+     *
+     * What it does:
+     * Scans one contiguous `[first,last)` effect-macro range and returns
+     * the first entry whose key text exactly matches `needleKey`; returns
+     * `last` when no exact key match exists. The needle is a free
+     * `fa::string`, matching the binary shape used by
+     * `EffectContext::DefineMacro` where a temporary key string sits on
+     * the caller stack before any `EffectMacro` is constructed.
+     */
+    EffectMacro** FindEffectMacroByKeyInRange(
+      EffectMacro** const outPosition,
+      EffectMacro* first,
+      EffectMacro* last,
+      const fa::string& needleKey
+    ) noexcept
     {
-        /**
-         * Address: 0x0093F650 (FUN_0093F650, effect-macro key-range search lane)
-         *
-         * What it does:
-         * Scans one contiguous `[first,last)` effect-macro range and returns
-         * the first entry whose key text exactly matches `needleKey`; returns
-         * `last` when no exact key match exists. The needle is a free
-         * `fa::string`, matching the binary shape used by
-         * `EffectContext::DefineMacro` where a temporary key string sits on
-         * the caller stack before any `EffectMacro` is constructed.
-         */
-        EffectMacro** FindEffectMacroByKeyInRange(
-            EffectMacro** const outPosition,
-            EffectMacro* first,
-            EffectMacro* last,
-            const fa::string& needleKey
-        ) noexcept
-        {
-            EffectMacro* cursor = first;
-            if (first != last)
-            {
-                const char* const needleText = needleKey.raw_data_unsafe();
-                const std::size_t needleLength = needleKey.size();
+      EffectMacro* cursor = first;
+      if (first != last) {
+        const char* const needleText = needleKey.raw_data_unsafe();
+        const std::size_t needleLength = needleKey.size();
 
-                while (cursor != last)
-                {
-                    const char* const candidateText = cursor->keyText_.raw_data_unsafe();
-                    const std::size_t candidateLength = cursor->keyText_.size();
-                    const std::size_t compareLength = candidateLength < needleLength ? candidateLength : needleLength;
-                    const int compareResult = STR_Compare(candidateText, needleText, compareLength);
-                    if (compareResult == 0 && candidateLength == needleLength)
-                    {
-                        break;
-                    }
+        while (cursor != last) {
+          const char* const candidateText = cursor->keyText_.raw_data_unsafe();
+          const std::size_t candidateLength = cursor->keyText_.size();
+          const std::size_t compareLength = candidateLength < needleLength ? candidateLength : needleLength;
+          const int compareResult = STR_Compare(candidateText, needleText, compareLength);
+          if (compareResult == 0 && candidateLength == needleLength) {
+            break;
+          }
 
-                    ++cursor;
-                }
-            }
-
-            if (outPosition != nullptr)
-            {
-                *outPosition = cursor;
-            }
-            return outPosition;
+          ++cursor;
         }
+      }
 
-        /**
-         * Throws `gpg::gal::Error(file, line, message)`. Used by
-         * `EffectContext::DefineMacro` to preserve the binary's
-         * `Effect.cpp:76 "duplicate effect macro definition"` throw site.
-         */
-        [[noreturn]] void ThrowEffectContextError(const char* const file, const int line, const char* const message)
-        {
-            const std::size_t fileLength = (file != nullptr) ? std::strlen(file) : 0U;
-            const std::size_t messageLength = (message != nullptr) ? std::strlen(message) : 0U;
-            throw Error(
-                fa::string((file != nullptr) ? file : "", static_cast<unsigned int>(fileLength)),
-                line,
-                fa::string((message != nullptr) ? message : "", static_cast<unsigned int>(messageLength))
-            );
-        }
-
-        /**
-         * Address: 0x008E7B00 (FUN_008E7B00)
-         *
-         * What it does:
-         * Initializes one texture-context payload from a render-target context
-         * and remaps legacy render-target format tokens to texture-format lanes.
-         */
-        [[maybe_unused]] TextureContext* InitializeTextureContextFromRenderTargetContext(
-            TextureContext* const outContext,
-            const RenderTargetContext* const sourceContext
-        ) noexcept
-        {
-            if (outContext == nullptr || sourceContext == nullptr) {
-                return outContext;
-            }
-
-            ::new (static_cast<void*>(outContext)) TextureContext();
-            outContext->width_ = sourceContext->width_;
-            outContext->height_ = sourceContext->height_;
-
-            switch (sourceContext->format_)
-            {
-            case 0:
-                outContext->format_ = 0;
-                break;
-            case 2:
-                outContext->format_ = 2;
-                break;
-            case 3:
-                outContext->format_ = 3;
-                break;
-            case 6:
-                outContext->format_ = 4;
-                break;
-            case 7:
-                outContext->format_ = 14;
-                break;
-            default:
-                outContext->format_ = 20;
-                break;
-            }
-
-            return outContext;
-        }
+      if (outPosition != nullptr) {
+        *outPosition = cursor;
+      }
+      return outPosition;
     }
 
     /**
-     * Address: 0x008F56A0 (FUN_008F56A0, gpg::gal::VertexBuffer::VertexBuffer)
-     *
-     * What it does:
-     * Installs the abstract vertex-buffer vtable.
+     * Throws `gpg::gal::Error(file, line, message)`. Used by
+     * `EffectContext::DefineMacro` to preserve the binary's
+     * `Effect.cpp:76 "duplicate effect macro definition"` throw site.
      */
-    VertexBuffer::VertexBuffer() = default;
-
-    /**
-     * Address: 0x008F5690
-     *
-     * What it does:
-     * Reinstalls the abstract vertex-buffer vtable (`mov [ecx], 0x00D42F08;
-     * ret`). Both backend destructors inline it; this out-of-line copy is for
-     * their unwind paths, and IDA never boxed it as a function.
-     */
-    VertexBuffer::~VertexBuffer() = default;
-
-    /**
-     * Address: 0x009405F0 (FUN_009405F0)
-     *
-     * What it does:
-     * Initializes index-buffer context metadata lanes to zero.
-     */
-    IndexBufferContext::IndexBufferContext()
-        : format_(0),
-          size_(0),
-          type_(0)
-    {
-    }
-
-    /**
-     * Address: 0x00940610 (FUN_00940610)
-     *
-     * What it does:
-     * Initializes index-buffer size/format/type lanes from explicit payload values.
-     */
-    IndexBufferContext::IndexBufferContext(
-        const std::uint32_t size,
-        const std::uint32_t format,
-        const std::uint32_t type
+    [[noreturn]] void ThrowEffectContextError(
+      const char* const file,
+      const int line,
+      const char* const message
     )
-        : format_(format),
-          size_(size),
-          type_(type)
     {
+      const std::size_t fileLength = (file != nullptr) ? std::strlen(file) : 0U;
+      const std::size_t messageLength = (message != nullptr) ? std::strlen(message) : 0U;
+      throw Error(
+        fa::string((file != nullptr) ? file : "", static_cast<unsigned int>(fileLength)),
+        line,
+        fa::string((message != nullptr) ? message : "", static_cast<unsigned int>(messageLength))
+      );
     }
 
     /**
-     * Address: 0x008F4BF0 (FUN_008F4BF0)
+     * Address: 0x008E7B00 (FUN_008E7B00)
      *
      * What it does:
-     * Copies index-buffer metadata payload lanes from another context.
+     * Initializes one texture-context payload from a render-target context
+     * and remaps legacy render-target format tokens to texture-format lanes.
      */
-    IndexBufferContext& IndexBufferContext::AssignFrom(const IndexBufferContext& other)
+    [[maybe_unused]] TextureContext* InitializeTextureContextFromRenderTargetContext(
+      TextureContext* const outContext,
+      const RenderTargetContext* const sourceContext
+    ) noexcept
     {
-        format_ = other.format_;
-        size_ = other.size_;
-        type_ = other.type_;
-        return *this;
+      if (outContext == nullptr || sourceContext == nullptr) {
+        return outContext;
+      }
+
+      ::new (static_cast<void*>(outContext)) TextureContext();
+      outContext->width_ = sourceContext->width_;
+      outContext->height_ = sourceContext->height_;
+
+      switch (sourceContext->format_) {
+      case 0:
+        outContext->format_ = 0;
+        break;
+      case 2:
+        outContext->format_ = 2;
+        break;
+      case 3:
+        outContext->format_ = 3;
+        break;
+      case 6:
+        outContext->format_ = 4;
+        break;
+      case 7:
+        outContext->format_ = 14;
+        break;
+      default:
+        outContext->format_ = 20;
+        break;
+      }
+
+      return outContext;
+    }
+  } // namespace
+
+  /**
+   * Address: 0x008F56A0 (FUN_008F56A0, gpg::gal::VertexBuffer::VertexBuffer)
+   *
+   * What it does:
+   * Installs the abstract vertex-buffer vtable.
+   */
+  VertexBuffer::VertexBuffer() = default;
+
+  /**
+   * Address: 0x008F5690
+   *
+   * What it does:
+   * Reinstalls the abstract vertex-buffer vtable (`mov [ecx], 0x00D42F08;
+   * ret`). Both backend destructors inline it; this out-of-line copy is for
+   * their unwind paths, and IDA never boxed it as a function.
+   */
+  VertexBuffer::~VertexBuffer() = default;
+
+  /**
+   * Address: 0x009405F0 (FUN_009405F0)
+   *
+   * What it does:
+   * Initializes index-buffer context metadata lanes to zero.
+   */
+  IndexBufferContext::IndexBufferContext()
+    : format_(0)
+    , size_(0)
+    , type_(0)
+  {}
+
+  /**
+   * Address: 0x00940610 (FUN_00940610)
+   *
+   * What it does:
+   * Initializes index-buffer size/format/type lanes from explicit payload values.
+   */
+  IndexBufferContext::IndexBufferContext(
+    const std::uint32_t size,
+    const std::uint32_t format,
+    const std::uint32_t type
+  )
+    : format_(format)
+    , size_(size)
+    , type_(type)
+  {}
+
+  /**
+   * Address: 0x008F4BF0 (FUN_008F4BF0)
+   *
+   * What it does:
+   * Copies index-buffer metadata payload lanes from another context.
+   */
+  IndexBufferContext& IndexBufferContext::AssignFrom(
+    const IndexBufferContext& other
+  )
+  {
+    format_ = other.format_;
+    size_ = other.size_;
+    type_ = other.type_;
+    return *this;
+  }
+
+  /**
+   * Address: 0x00940850 (FUN_00940850)
+   *
+   * What it does:
+   * Initializes vertex-buffer context metadata lanes to zero.
+   */
+  VertexBufferContext::VertexBufferContext()
+    : type_(0)
+    , usage_(0)
+    , vertexCount_(0)
+    , stride_(0)
+  {}
+
+  /**
+   * Address: 0x00940870 (FUN_00940870)
+   *
+   * What it does:
+   * Initializes vertex-buffer count/stride/type/usage lanes from explicit payload values.
+   */
+  VertexBufferContext::VertexBufferContext(
+    const std::uint32_t vertexCount,
+    const std::uint32_t stride,
+    const std::uint32_t type,
+    const std::uint32_t usage
+  )
+    : type_(type)
+    , usage_(usage)
+    , vertexCount_(vertexCount)
+    , stride_(stride)
+  {}
+
+  /**
+   * Address: 0x008F5710 (FUN_008F5710)
+   *
+   * What it does:
+   * Copies vertex-buffer metadata payload lanes from another context.
+   */
+  VertexBufferContext& VertexBufferContext::AssignFrom(
+    const VertexBufferContext& other
+  )
+  {
+    type_ = other.type_;
+    usage_ = other.usage_;
+    vertexCount_ = other.vertexCount_;
+    stride_ = other.stride_;
+    return *this;
+  }
+
+  /**
+   * Address: 0x008E7C50 (FUN_008E7C50, func_CreateTexture)
+   *
+   * What it does:
+   * Creates one texture on the active device through its slot 10
+   * (`[vtbl+0x28]`). Callers: `RD3DTextureResource` (0x0043DAA0) and
+   * `CD3DDynamicTextureSheet` (0x0043E8E0, 0x00442940).
+   */
+  boost::shared_ptr<Texture> Texture::Create(
+    const TextureContext& context
+  )
+  {
+    return Device::GetInstance()->CreateTexture(&context);
+  }
+
+  /**
+   * Address: 0x008E7C80 (FUN_008E7C80)
+   *
+   * What it does:
+   * Initializes texture-context metadata and string/control lanes to zero.
+   */
+  TextureContext::TextureContext()
+    : source_(0)
+    , location_()
+    , dataBuffer_()
+    , type_(0)
+    , usage_(0)
+    , format_(0)
+    , mipmapLevels_(0)
+    , reserved0x44_(0)
+    , width_(0)
+    , height_(0)
+    , reserved0x50_(0)
+  {}
+
+  /**
+   * Address: 0x008E7D60 (FUN_008E7D60, ??0TextureContext@gal@gpg@@QAE@PBDIHH@Z)
+   *
+   * What it does:
+   * Initializes archive-backed texture source metadata from one location
+   * string plus explicit format and dimensions.
+   */
+  TextureContext::TextureContext(
+    const char* const location,
+    const std::uint32_t format,
+    const std::uint32_t width,
+    const std::uint32_t height
+  )
+    : source_(1U)
+    , location_(
+        (location != nullptr) ? location : "",
+        static_cast<unsigned int>(std::strlen((location != nullptr) ? location : ""))
+      )
+    , dataBuffer_()
+    , type_(0U)
+    , usage_(1U)
+    , format_(format)
+    , mipmapLevels_(0U)
+    , reserved0x44_(0U)
+    , width_(width)
+    , height_(height)
+    , reserved0x50_(0U)
+  {}
+
+  /**
+   * Address: 0x008E7DF0 (FUN_008E7DF0)
+   *
+   * What it does:
+   * Initializes archive-backed texture source metadata from one location
+   * string, one retained shared data buffer view, and explicit
+   * format/dimension payload lanes.
+   */
+  TextureContext::TextureContext(
+    const char* const location,
+    const gpg::MemBuffer<const char>& data,
+    const std::uint32_t format,
+    const std::uint32_t width,
+    const std::uint32_t height
+  )
+    : source_(1U)
+    , location_(
+        (location != nullptr) ? location : "",
+        static_cast<unsigned int>(std::strlen((location != nullptr) ? location : ""))
+      )
+    , dataBuffer_(data)
+    , type_(0U)
+    , usage_(1U)
+    , format_(format)
+    , mipmapLevels_(0U)
+    , reserved0x44_(0U)
+    , width_(width)
+    , height_(height)
+    , reserved0x50_(0U)
+  {}
+
+  /**
+   * Address: 0x008E7A40 (FUN_008E7A40, gpg::gal::TextureContext::Copy)
+   *
+   * What it does:
+   * Copy-constructs one texture-context payload, including location string
+   * data and shared-data ownership lanes.
+   */
+  TextureContext::TextureContext(
+    const TextureContext& other
+  )
+    : source_(other.source_)
+    , location_()
+    , dataBuffer_()
+    , type_(other.type_)
+    , usage_(other.usage_)
+    , format_(other.format_)
+    , mipmapLevels_(other.mipmapLevels_)
+    , reserved0x44_(other.reserved0x44_)
+    , width_(other.width_)
+    , height_(other.height_)
+    , reserved0x50_(other.reserved0x50_)
+  {
+    location_.assign(other.location_, 0U, fa::string::npos);
+    dataBuffer_ = other.dataBuffer_;
+  }
+
+  /**
+   * Address: 0x008E7EA0 (FUN_008E7EA0)
+   *
+   * What it does:
+   * Installs the abstract depth-stencil-target vtable.
+   */
+  DepthStencilTarget::DepthStencilTarget() = default;
+
+  /**
+   * Address: 0x008E7E90 (FUN_008E7E90)
+   *
+   * What it does:
+   * Reinstalls the abstract depth-stencil-target vtable; the body the
+   * derived constructors' unwind funclets call.
+   */
+  DepthStencilTarget::~DepthStencilTarget() = default;
+
+  /**
+   * Address: 0x00903B60 (FUN_00903B60)
+   *
+   * What it does:
+   * Copies texture-context payload fields and shared-count ownership lanes.
+   */
+  void TextureContext::AssignFrom(
+    const TextureContext& other
+  )
+  {
+    source_ = other.source_;
+    location_.assign(other.location_, 0U, fa::string::npos);
+    dataBuffer_ = other.dataBuffer_;
+    type_ = other.type_;
+    usage_ = other.usage_;
+    format_ = other.format_;
+    mipmapLevels_ = other.mipmapLevels_;
+    reserved0x44_ = other.reserved0x44_;
+    width_ = other.width_;
+    height_ = other.height_;
+    reserved0x50_ = other.reserved0x50_;
+  }
+
+  /**
+   * Address: 0x008E6550 (FUN_008E6550)
+   *
+   * What it does:
+   * Initializes cube render-target context dimensions/format lanes to zero.
+   */
+  CubeRenderTargetContext::CubeRenderTargetContext()
+    : dimension_(0)
+    , format_(0)
+  {}
+
+  /**
+   * Address: 0x008E6570 (FUN_008E6570)
+   *
+   * What it does:
+   * Initializes cube render-target context with explicit dimension and format.
+   */
+  CubeRenderTargetContext::CubeRenderTargetContext(
+    const std::uint32_t dimension,
+    const std::uint32_t format
+  )
+    : dimension_(dimension)
+    , format_(format)
+  {}
+
+  /**
+   * Address: 0x00941250 (FUN_00941250)
+   *
+   * What it does:
+   * Copies cube render-target dimension/format lanes from another context.
+   */
+  CubeRenderTargetContext& CubeRenderTargetContext::AssignFrom(
+    const CubeRenderTargetContext& other
+  )
+  {
+    dimension_ = other.dimension_;
+    format_ = other.format_;
+    return *this;
+  }
+
+  /**
+   * Address: 0x0093EF90 (FUN_0093EF90)
+   *
+   * What it does:
+   * Initializes depth-stencil context dimensions/format/flag lanes to zero.
+   */
+  DepthStencilTargetContext::DepthStencilTargetContext()
+    : width_(0)
+    , height_(0)
+    , format_(0)
+    , field0x10_(false)
+  {}
+
+  /**
+   * Address: 0x0093EFB0 (FUN_0093EFB0)
+   *
+   * What it does:
+   * Initializes depth-stencil context with explicit dimensions, format, and flag.
+   */
+  DepthStencilTargetContext::DepthStencilTargetContext(
+    const std::uint32_t width,
+    const std::uint32_t height,
+    const std::uint32_t format,
+    const bool field0x10
+  )
+    : width_(width)
+    , height_(height)
+    , format_(format)
+    , field0x10_(field0x10)
+  {}
+
+  /**
+   * Address: 0x008E79C0 (FUN_008E79C0)
+   *
+   * What it does:
+   * Initializes render-target context dimensions/format lanes to zero.
+   */
+  RenderTargetContext::RenderTargetContext()
+    : width_(0)
+    , height_(0)
+    , format_(0)
+  {}
+
+  /**
+   * Address: 0x008E79E0 (FUN_008E79E0)
+   *
+   * What it does:
+   * Initializes render-target context with explicit width, height, and
+   * format lanes.
+   */
+  RenderTargetContext::RenderTargetContext(
+    const std::uint32_t width,
+    const std::uint32_t height,
+    const std::uint32_t format
+  )
+    : width_(width)
+    , height_(height)
+    , format_(format)
+  {}
+
+  /**
+   * Address: 0x00442050 (FUN_00442050, sub_442050)
+   *
+   * What it does:
+   * Copies render-target width/height/format lanes from another context.
+   */
+  RenderTargetContext::RenderTargetContext(
+    const RenderTargetContext& other
+  )
+    : width_(other.width_)
+    , height_(other.height_)
+    , format_(other.format_)
+  {}
+
+  /**
+   * Address: 0x008E6590 (FUN_008E6590)
+   * Address: 0x008E65A0 (FUN_008E65A0, scalar deleting destructor thunk)
+   *
+   * What it does:
+   * Non-deleting destructor body resets vtable ownership for the
+   * cube-render-target context base lane. Scalar-delete thunk reuses this
+   * body then releases storage when requested.
+   */
+  CubeRenderTargetContext::~CubeRenderTargetContext() = default;
+
+  /**
+   * Address: 0x0093EFE0 (FUN_0093EFE0, ??1DepthStencilTargetContext@gal@gpg@@QAE@@Z)
+   * Address: 0x0093EFF0 (FUN_0093EFF0, scalar deleting destructor thunk)
+   *
+   * What it does:
+   * Destructor body: sets vtable to `gpg::gal::DepthStencilTargetContext::`vftable``
+   * before member subobject teardown. Defaulted because this class owns no
+   * non-trivial member resources directly.
+   */
+  DepthStencilTargetContext::~DepthStencilTargetContext() = default;
+
+  /**
+   * Address: 0x0093F010 (FUN_0093F010)
+   *
+   * What it does:
+   * Creates one depth/stencil target on the active device through its
+   * slot 13 (`[vtbl+0x34]`).
+   */
+  boost::shared_ptr<DepthStencilTarget> DepthStencilTarget::Create(
+    const DepthStencilTargetContext& context
+  )
+  {
+    return Device::GetInstance()->CreateDepthStencilTarget(&context);
+  }
+
+  /**
+   * Address: 0x008E69B0 (FUN_008E69B0, gpg::gal::DeviceContext::~DeviceContext)
+   * Address: 0x00430570 (FUN_00430570, scalar deleting destructor thunk)
+   *
+   * What it does:
+   * Tears down one device-context base lane; deleting-thunk dispatch uses
+   * the same canonical destructor body.
+   */
+  DeviceContext::~DeviceContext() = default;
+
+  /**
+   * Address: 0x0093F060 (FUN_0093F060)
+   *
+   * What it does:
+   * Stores the topology, the vertex count and the first vertex.
+   */
+  DrawContext::DrawContext(
+    const TOPOLOGY topology,
+    const std::uint32_t vertexCount,
+    const std::uint32_t startVertex
+  )
+    : topology_(topology)
+    , vertexCount_(vertexCount)
+    , startVertex_(startVertex)
+  {}
+
+  /**
+   * Address: 0x0093F080 (FUN_0093F080, gpg::gal::DrawContext::~DrawContext)
+   * Address: 0x0093F140 (FUN_0093F140, scalar deleting destructor)
+   *
+   * What it does:
+   * Restores the DrawContext vtable.
+   */
+  DrawContext::~DrawContext() = default;
+
+  /**
+   * Address: 0x0093F090 (FUN_0093F090)
+   *
+   * What it does:
+   * Zeroes every field.
+   */
+  DrawIndexedContext::DrawIndexedContext()
+    : topology_(static_cast<DrawContext::TOPOLOGY>(0))
+    , minVertexIndex_(0)
+    , vertexCount_(0)
+    , indexCount_(0)
+    , startIndex_(0)
+    , baseVertexIndex_(0)
+  {}
+
+  /**
+   * Address: 0x0093F0B0 (FUN_0093F0B0)
+   *
+   * What it does:
+   * A draw whose minimum vertex index is zero.
+   */
+  DrawIndexedContext::DrawIndexedContext(
+    const DrawContext::TOPOLOGY topology,
+    const std::uint32_t vertexCount,
+    const std::uint32_t indexCount,
+    const std::uint32_t startIndex,
+    const std::uint32_t baseVertexIndex
+  )
+    : topology_(topology)
+    , minVertexIndex_(0)
+    , vertexCount_(vertexCount)
+    , indexCount_(indexCount)
+    , startIndex_(startIndex)
+    , baseVertexIndex_(static_cast<std::int32_t>(baseVertexIndex))
+  {}
+
+  /**
+   * Address: 0x0093F0F0 (FUN_0093F0F0)
+   *
+   * What it does:
+   * A draw with an explicit minimum vertex index.
+   */
+  DrawIndexedContext::DrawIndexedContext(
+    const DrawContext::TOPOLOGY topology,
+    const std::uint32_t minVertexIndex,
+    const std::uint32_t vertexCount,
+    const std::uint32_t indexCount,
+    const std::uint32_t startIndex,
+    const std::int32_t baseVertexIndex
+  )
+    : topology_(topology)
+    , minVertexIndex_(minVertexIndex)
+    , vertexCount_(vertexCount)
+    , indexCount_(indexCount)
+    , startIndex_(startIndex)
+    , baseVertexIndex_(baseVertexIndex)
+  {}
+
+  /**
+   * Address: 0x0093F130 (FUN_0093F130, gpg::gal::DrawIndexedContext::~DrawIndexedContext)
+   * Address: 0x0093F160 (FUN_0093F160, scalar deleting destructor)
+   *
+   * What it does:
+   * Restores the DrawIndexedContext vtable.
+   */
+  DrawIndexedContext::~DrawIndexedContext() = default;
+
+  /**
+   * Address: 0x0093F180 (FUN_0093F180)
+   *
+   * What it does:
+   * Converts `count` vertices (or indices) into a primitive count for
+   * `topology`, throwing when the count cannot form whole primitives.
+   */
+  std::uint32_t DrawContext::CountPrimitives(
+    const TOPOLOGY topology,
+    const std::uint32_t count
+  )
+  {
+    switch (topology) {
+    case TOPOLOGY_POINTLIST:
+      return count;
+    case TOPOLOGY_LINELIST:
+      if ((count & 1U) != 0U) {
+        throw Error("DrawContext.cpp", 35, "invalid number of vertices in line list");
+      }
+      return count >> 1U;
+    case TOPOLOGY_LINESTRIP:
+      if (count <= 1U) {
+        throw Error("DrawContext.cpp", 39, "invalid number of vertices in line strip");
+      }
+      return count - 1U;
+    case TOPOLOGY_TRIANGLELIST:
+      if ((count % 3U) != 0U) {
+        throw Error("DrawContext.cpp", 43, "invalid number of vertices in triangle list");
+      }
+      return count / 3U;
+    case TOPOLOGY_TRIANGLESTRIP:
+      if (count <= 2U) {
+        throw Error("DrawContext.cpp", 47, "invalid number of vertices in triangle list");
+      }
+      return count - 2U;
+    default:
+      throw Error("DrawContext.cpp", 51, "unknown topology specified");
+    }
+  }
+
+  /**
+   * Address: 0x0093F470 (FUN_0093F470)
+   *
+   * What it does:
+   * The number of primitives `vertexCount_` vertices make in this topology.
+   */
+  std::uint32_t DrawContext::GetPrimitiveCount() const
+  {
+    return CountPrimitives(topology_, vertexCount_);
+  }
+
+  /**
+   * Address: 0x0093F490 (FUN_0093F490)
+   *
+   * What it does:
+   * The number of primitives `indexCount_` indices make in this topology.
+   */
+  std::uint32_t DrawIndexedContext::GetPrimitiveCount() const
+  {
+    return DrawContext::CountPrimitives(topology_, indexCount_);
+  }
+
+  /**
+   * Address: 0x0093FBE0 (FUN_0093FBE0, gpg::gal::EffectContext::EffectContext)
+   *
+   * What it does:
+   * Initializes effect source/cache string lanes, source-buffer ownership
+   * metadata, and macro vector storage to their default empty state.
+   */
+  EffectContext::EffectContext()
+    : mSourceType(0U)
+    , mUseCache(false)
+  {}
+
+  /**
+   * Address: 0x008FE7E0 (FUN_008FE7E0, gpg::gal::EffectContext::EffectContext)
+   *
+   * What it does:
+   * Copies effect-context source/cache paths, source-buffer ownership lanes,
+   * and effect-macro vector storage from one source context.
+   */
+  EffectContext::EffectContext(
+    const EffectContext& other
+  )
+    : mSourceType(other.mSourceType)
+    , mUseCache(other.mUseCache)
+    , mSourcePath(other.mSourcePath)
+    , mCachePath(other.mCachePath)
+    , mSourceBuffer(other.mSourceBuffer)
+    , mMacros(other.mMacros)
+  {}
+
+  /**
+   * Address: 0x00942CF0 (FUN_00942CF0, gpg::gal::EffectContext::operator=)
+   *
+   * What it does:
+   * Assigns every lane from `other` behind a self-check. The paths are
+   * whole-string assigns and the source buffer is a shared-owner copy, so the
+   * two contexts end up sharing one buffer.
+   */
+  EffectContext& EffectContext::operator=(
+    const EffectContext& other
+  )
+  {
+    if (this == &other) {
+      return *this;
     }
 
-    /**
-     * Address: 0x00940850 (FUN_00940850)
-     *
-     * What it does:
-     * Initializes vertex-buffer context metadata lanes to zero.
-     */
-    VertexBufferContext::VertexBufferContext()
-        : type_(0),
-          usage_(0),
-          vertexCount_(0),
-          stride_(0)
+    mSourceType = other.mSourceType;
+    mUseCache = other.mUseCache;
+    mSourcePath.assign(other.mSourcePath, 0U, fa::string::npos);
+    mCachePath.assign(other.mCachePath, 0U, fa::string::npos);
+    mSourceBuffer = other.mSourceBuffer;
+    mMacros = other.mMacros;
+    return *this;
+  }
+
+  /**
+   * Address: 0x0093FD90 (FUN_0093FD90, gpg::gal::EffectContext::EffectContext)
+   *
+   * What it does:
+   * Initializes one effect context from explicit cache/path/source-buffer
+   * payload and copies the effect-macro vector lane.
+   */
+  EffectContext::EffectContext(
+    const bool useCachePayload,
+    const gpg::StrArg sourcePath,
+    const gpg::StrArg cachePath,
+    const gpg::MemBuffer<char>& sourceBuffer,
+    const fa::vector<EffectMacro>& macros
+  )
+    : mSourceType(2U)
+    , mUseCache(useCachePayload)
+    , mSourcePath((sourcePath != nullptr) ? sourcePath : "")
+    , mCachePath((cachePath != nullptr) ? cachePath : "")
+    , mSourceBuffer(sourceBuffer)
+    , mMacros(macros)
+  {}
+
+  /**
+   * Address: 0x0093F950 (FUN_0093F950, gpg::gal::EffectContext::~EffectContext)
+   * Address: 0x008FE8B0 (FUN_008FE8B0, scalar deleting destructor thunk owner)
+   *
+   * What it does:
+   * Releases effect-macro vector storage, decrements source-buffer shared
+   * count ownership, and resets both path string lanes to empty state.
+   */
+  EffectContext::~EffectContext() = default;
+
+  /**
+   * Address: 0x009402D0 (FUN_009402D0, gpg::gal::EffectContext::DefineMacro)
+   * Mangled: ?DefineMacro@EffectContext@gal@gpg@@QAEXPBD0@Z
+   *
+   * IDA signature:
+   * int __thiscall gpg::gal::EffectContext::DefineMacro(
+   *     gpg::gal::EffectContext *this, char *name, char *value);
+   *
+   * What it does:
+   * Looks up `name` in this context's effect-macro vector lane; throws
+   * `gpg::gal::Error("duplicate effect macro definition")` from
+   * `Effect.cpp:76` when a macro with the same key already exists, and
+   * otherwise appends a freshly-constructed `EffectMacro{name, value}` to
+   * the back of the macro vector.
+   */
+  void EffectContext::DefineMacro(
+    const char* const name,
+    const char* const value
+  )
+  {
+    const char* const nameText = (name != nullptr) ? name : "";
+    const char* const valueText = (value != nullptr) ? value : "";
+
+    // The binary constructs a scratch `std::string` from `name`, uses
+    // it as the lookup needle, then drops it before either throwing
+    // the duplicate error or appending the new macro. Mirror that
+    // lifetime so the heap/SSO behavior matches the original
+    // function exactly.
+    bool isDuplicate = false;
     {
+      const fa::string needleKey(nameText, static_cast<unsigned int>(std::strlen(nameText)));
+
+      EffectMacro* foundPosition = mMacros.end();
+      (void)FindEffectMacroByKeyInRange(&foundPosition, mMacros.begin(), mMacros.end(), needleKey);
+      isDuplicate = (foundPosition != mMacros.end());
     }
 
-    /**
-     * Address: 0x00940870 (FUN_00940870)
-     *
-     * What it does:
-     * Initializes vertex-buffer count/stride/type/usage lanes from explicit payload values.
-     */
-    VertexBufferContext::VertexBufferContext(
-        const std::uint32_t vertexCount,
-        const std::uint32_t stride,
-        const std::uint32_t type,
-        const std::uint32_t usage
-    )
-        : type_(type),
-          usage_(usage),
-          vertexCount_(vertexCount),
-          stride_(stride)
-    {
+    if (isDuplicate) {
+      ThrowEffectContextError(
+        "c:\\work\\rts\\main\\code\\src\\libs\\gpggal\\Effect.cpp", 76, "duplicate effect macro definition"
+      );
     }
 
-    /**
-     * Address: 0x008F5710 (FUN_008F5710)
-     *
-     * What it does:
-     * Copies vertex-buffer metadata payload lanes from another context.
-     */
-    VertexBufferContext& VertexBufferContext::AssignFrom(const VertexBufferContext& other)
-    {
-        type_ = other.type_;
-        usage_ = other.usage_;
-        vertexCount_ = other.vertexCount_;
-        stride_ = other.stride_;
-        return *this;
+    const EffectMacro newMacro(nameText, valueText);
+    // `fa::vector<EffectMacro>::push_back` (0x00940230, cited on Vector.h);
+    // its capacity-full path is the single-value `insert` 0x009401C0.
+    mMacros.push_back(newMacro);
+  }
+
+  /**
+   * Address: 0x00940630 (FUN_00940630)
+   * Address: 0x00940640 (FUN_00940640, scalar deleting destructor thunk)
+   *
+   * What it does:
+   * Restores index-buffer context vftable ownership and services deleting-destructor teardown.
+   */
+  IndexBufferContext::~IndexBufferContext() = default;
+
+  /**
+   * Address: 0x00940660 (FUN_00940660, func_DeviceCreateIndexBuffer)
+   *
+   * What it does:
+   * Creates one index buffer on the active device through its slot 16
+   * (`[vtbl+0x40]`). Caller: `CD3DIndexSheet::CreateBuffer` (0x0043F737).
+   */
+  boost::shared_ptr<IndexBuffer> IndexBuffer::Create(
+    const IndexBufferContext& context
+  )
+  {
+    return Device::GetInstance()->CreateIndexBuffer(&context);
+  }
+
+  /**
+   * Address: 0x008E77B0 (FUN_008E77B0, gpg::gal::OutputContextInit)
+   *
+   * What it does:
+   * Initializes one output context with empty target handles; `face` is
+   * left uninitialized, as the binary leaves it.
+   */
+  OutputContext::OutputContext()
+    : cubeTarget()
+    , surface()
+    , depthStencil()
+  {}
+
+  /**
+   * Address: 0x008E77D0 (FUN_008E77D0, gpg::gal::OutputContext::OutputContext)
+   *
+   * What it does:
+   * Binds a 2D colour target and its depth/stencil target: copies the two
+   * by-value handles into +0x10 and +0x18, retaining each, and leaves the
+   * cube handle at +0x04 empty.
+   */
+  OutputContext::OutputContext(
+    const boost::shared_ptr<RenderTarget> surface,
+    const boost::shared_ptr<DepthStencilTarget> depthStencil
+  )
+    : cubeTarget()
+    , surface(surface)
+    , depthStencil(depthStencil)
+  {}
+
+  /**
+   * Address: 0x008E78C0 (FUN_008E78C0)
+   *
+   * What it does:
+   * Binds face `face` of a cube target plus its depth/stencil target,
+   * leaving the 2D surface handle empty.
+   */
+  OutputContext::OutputContext(
+    const boost::shared_ptr<CubeRenderTarget> cubeTarget,
+    const std::int32_t face,
+    const boost::shared_ptr<DepthStencilTarget> depthStencil
+  )
+    : cubeTarget(cubeTarget)
+    , face(face)
+    , surface()
+    , depthStencil(depthStencil)
+  {}
+
+  /**
+   * Address: 0x00430160 (FUN_00430160)
+   *
+   * What it does:
+   * Copies one output context, retaining every target handle.
+   */
+  OutputContext::OutputContext(
+    const OutputContext& other
+  )
+    : cubeTarget(other.cubeTarget)
+    , face(other.face)
+    , surface(other.surface)
+    , depthStencil(other.depthStencil)
+  {}
+
+  /**
+   * Address: 0x008E76D0 (FUN_008E76D0, gpg::gal::OutputContext::~OutputContext)
+   * Address: 0x008E8250 (FUN_008E8250, scalar/vector deleting-destructor thunk owner)
+   *
+   * What it does:
+   * Releases the depth/stencil, surface and cube-target handles in reverse
+   * declaration order.
+   */
+  OutputContext::~OutputContext() = default;
+
+  OutputContext* NewOutputContexts(
+    const std::uint32_t count
+  )
+  {
+    if (count == 0U) {
+      return nullptr;
     }
-
-    /**
-     * Address: 0x008E7C50 (FUN_008E7C50, func_CreateTexture)
-     *
-     * What it does:
-     * Creates one texture on the active device through its slot 10
-     * (`[vtbl+0x28]`). Callers: `RD3DTextureResource` (0x0043DAA0) and
-     * `CD3DDynamicTextureSheet` (0x0043E8E0, 0x00442940).
-     */
-    boost::shared_ptr<Texture> Texture::Create(const TextureContext& context)
-    {
-        return Device::GetInstance()->CreateTexture(&context);
+    std::allocator<OutputContext> allocator;
+    OutputContext* const contexts = allocator.allocate(count);
+    for (std::uint32_t index = 0U; index < count; ++index) {
+      ::new (static_cast<void*>(contexts + index)) OutputContext();
     }
+    return contexts;
+  }
 
-    /**
-     * Address: 0x008E7C80 (FUN_008E7C80)
-     *
-     * What it does:
-     * Initializes texture-context metadata and string/control lanes to zero.
-     */
-    TextureContext::TextureContext()
-        : source_(0),
-          location_(),
-          dataBuffer_(),
-          type_(0),
-          usage_(0),
-          format_(0),
-          mipmapLevels_(0),
-          reserved0x44_(0),
-          width_(0),
-          height_(0),
-          reserved0x50_(0)
-    {
+  void DeleteOutputContexts(
+    OutputContext* const contexts,
+    const std::uint32_t count
+  ) noexcept
+  {
+    if (contexts == nullptr) {
+      return;
     }
-
-    /**
-     * Address: 0x008E7D60 (FUN_008E7D60, ??0TextureContext@gal@gpg@@QAE@PBDIHH@Z)
-     *
-     * What it does:
-     * Initializes archive-backed texture source metadata from one location
-     * string plus explicit format and dimensions.
-     */
-    TextureContext::TextureContext(
-        const char* const location,
-        const std::uint32_t format,
-        const std::uint32_t width,
-        const std::uint32_t height
-    )
-        : source_(1U),
-          location_(
-            (location != nullptr) ? location : "",
-            static_cast<unsigned int>(std::strlen((location != nullptr) ? location : ""))
-          ),
-          dataBuffer_(),
-          type_(0U),
-          usage_(1U),
-          format_(format),
-          mipmapLevels_(0U),
-          reserved0x44_(0U),
-          width_(width),
-          height_(height),
-          reserved0x50_(0U)
-    {
+    for (std::uint32_t index = count; index > 0U; --index) {
+      contexts[index - 1U].~OutputContext();
     }
+    std::allocator<OutputContext>().deallocate(contexts, count);
+  }
 
-    /**
-     * Address: 0x008E7DF0 (FUN_008E7DF0)
-     *
-     * What it does:
-     * Initializes archive-backed texture source metadata from one location
-     * string, one retained shared data buffer view, and explicit
-     * format/dimension payload lanes.
-     */
-    TextureContext::TextureContext(
-        const char* const location,
-        const gpg::MemBuffer<const char>& data,
-        const std::uint32_t format,
-        const std::uint32_t width,
-        const std::uint32_t height
-    )
-        : source_(1U),
-          location_(
-            (location != nullptr) ? location : "",
-            static_cast<unsigned int>(std::strlen((location != nullptr) ? location : ""))
-          ),
-          dataBuffer_(data),
-          type_(0U),
-          usage_(1U),
-          format_(format),
-          mipmapLevels_(0U),
-          reserved0x44_(0U),
-          width_(width),
-          height_(height),
-          reserved0x50_(0U)
-    {
+  /**
+   * Address: 0x008E7A00 (FUN_008E7A00, ??1RenderTargetContext@gal@gpg@@QAE@@Z)
+   * Address: 0x00442080 (FUN_00442080, scalar deleting destructor thunk)
+   *
+   * What it does:
+   * Destructor body: sets vtable to `gpg::gal::RenderTargetContext::`vftable``
+   * before member subobject teardown. Defaulted because this class owns no
+   * non-trivial member resources directly.
+   */
+  RenderTargetContext::~RenderTargetContext() = default;
+
+  /**
+   * Address: 0x008E7A10 (FUN_008E7A10)
+   *
+   * What it does:
+   * Creates one render target on the active device through its slot 11
+   * (`[vtbl+0x2C]`).
+   */
+  boost::shared_ptr<RenderTarget> RenderTarget::Create(
+    const RenderTargetContext& context
+  )
+  {
+    return Device::GetInstance()->CreateRenderTarget(&context);
+  }
+
+  /**
+   * Address: 0x008E7CC0 (FUN_008E7CC0, __imp_??1TextureContext@gal@gpg@@UAE@XZ)
+   * Address: 0x008E7AE0 (FUN_008E7AE0, scalar deleting destructor thunk)
+   *
+   * What it does:
+   * Releases texture payload shared-count ownership before string/member teardown.
+   */
+  TextureContext::~TextureContext() = default;
+
+  void TextureContext::SetDataBuffer(
+    const gpg::MemBuffer<const char>& data
+  )
+  {
+    dataBuffer_ = data;
+  }
+
+  void TextureContext::ClearDataBuffer() noexcept
+  {
+    dataBuffer_.Reset();
+  }
+
+  std::size_t TextureContext::DataSizeBytes() const noexcept
+  {
+    if (dataBuffer_.mBegin == dataBuffer_.mEnd || dataBuffer_.mEnd < dataBuffer_.mBegin) {
+      return 0;
     }
+    return dataBuffer_.Size();
+  }
 
-    /**
-     * Address: 0x008E7A40 (FUN_008E7A40, gpg::gal::TextureContext::Copy)
-     *
-     * What it does:
-     * Copy-constructs one texture-context payload, including location string
-     * data and shared-data ownership lanes.
-     */
-    TextureContext::TextureContext(const TextureContext& other)
-        : source_(other.source_),
-          location_(),
-          dataBuffer_(),
-          type_(other.type_),
-          usage_(other.usage_),
-          format_(other.format_),
-          mipmapLevels_(other.mipmapLevels_),
-          reserved0x44_(other.reserved0x44_),
-          width_(other.width_),
-          height_(other.height_),
-          reserved0x50_(other.reserved0x50_)
-    {
-        location_.assign(other.location_, 0U, fa::string::npos);
-        dataBuffer_ = other.dataBuffer_;
-    }
+  /**
+   * Address: 0x009408A0 (FUN_009408A0)
+   * Address: 0x009408B0 (FUN_009408B0, scalar deleting destructor thunk)
+   *
+   * What it does:
+   * Restores vertex-buffer context vftable ownership and services deleting-destructor teardown.
+   */
+  VertexBufferContext::~VertexBufferContext() = default;
 
-    /**
-     * Address: 0x008E7EA0 (FUN_008E7EA0)
-     *
-     * What it does:
-     * Installs the abstract depth-stencil-target vtable.
-     */
-    DepthStencilTarget::DepthStencilTarget() = default;
+  /**
+   * Address: 0x009408D0 (FUN_009408D0, func_CreateVertexBuffer)
+   *
+   * What it does:
+   * Creates one vertex buffer on the active device through its slot 15
+   * (`[vtbl+0x3C]`). Caller: `CD3DVertexStream::CreateBuffer` (0x0043FC20).
+   */
+  boost::shared_ptr<VertexBuffer> VertexBuffer::Create(
+    const VertexBufferContext& context
+  )
+  {
+    return Device::GetInstance()->CreateVertexBuffer(&context);
+  }
 
-    /**
-     * Address: 0x008E7E90 (FUN_008E7E90)
-     *
-     * What it does:
-     * Reinstalls the abstract depth-stencil-target vtable; the body the
-     * derived constructors' unwind funclets call.
-     */
-    DepthStencilTarget::~DepthStencilTarget() = default;
-
-    /**
-     * Address: 0x00903B60 (FUN_00903B60)
-     *
-     * What it does:
-     * Copies texture-context payload fields and shared-count ownership lanes.
-     */
-    void TextureContext::AssignFrom(const TextureContext& other)
-    {
-        source_ = other.source_;
-        location_.assign(other.location_, 0U, fa::string::npos);
-        dataBuffer_ = other.dataBuffer_;
-        type_ = other.type_;
-        usage_ = other.usage_;
-        format_ = other.format_;
-        mipmapLevels_ = other.mipmapLevels_;
-        reserved0x44_ = other.reserved0x44_;
-        width_ = other.width_;
-        height_ = other.height_;
-        reserved0x50_ = other.reserved0x50_;
-    }
-
-    /**
-     * Address: 0x008E6550 (FUN_008E6550)
-     *
-     * What it does:
-     * Initializes cube render-target context dimensions/format lanes to zero.
-     */
-    CubeRenderTargetContext::CubeRenderTargetContext()
-        : dimension_(0),
-          format_(0)
-    {
-    }
-
-    /**
-     * Address: 0x008E6570 (FUN_008E6570)
-     *
-     * What it does:
-     * Initializes cube render-target context with explicit dimension and format.
-     */
-    CubeRenderTargetContext::CubeRenderTargetContext(const std::uint32_t dimension, const std::uint32_t format)
-        : dimension_(dimension),
-          format_(format)
-    {
-    }
-
-    /**
-     * Address: 0x00941250 (FUN_00941250)
-     *
-     * What it does:
-     * Copies cube render-target dimension/format lanes from another context.
-     */
-    CubeRenderTargetContext& CubeRenderTargetContext::AssignFrom(const CubeRenderTargetContext& other)
-    {
-        dimension_ = other.dimension_;
-        format_ = other.format_;
-        return *this;
-    }
-
-    /**
-     * Address: 0x0093EF90 (FUN_0093EF90)
-     *
-     * What it does:
-     * Initializes depth-stencil context dimensions/format/flag lanes to zero.
-     */
-    DepthStencilTargetContext::DepthStencilTargetContext()
-        : width_(0),
-          height_(0),
-          format_(0),
-          field0x10_(false)
-    {
-    }
-
-    /**
-     * Address: 0x0093EFB0 (FUN_0093EFB0)
-     *
-     * What it does:
-     * Initializes depth-stencil context with explicit dimensions, format, and flag.
-     */
-    DepthStencilTargetContext::DepthStencilTargetContext(
-        const std::uint32_t width,
-        const std::uint32_t height,
-        const std::uint32_t format,
-        const bool field0x10
-    )
-        : width_(width),
-          height_(height),
-          format_(format),
-          field0x10_(field0x10)
-    {
-    }
-
-    /**
-     * Address: 0x008E79C0 (FUN_008E79C0)
-     *
-     * What it does:
-     * Initializes render-target context dimensions/format lanes to zero.
-     */
-    RenderTargetContext::RenderTargetContext()
-        : width_(0),
-          height_(0),
-          format_(0)
-    {
-    }
-
-    /**
-     * Address: 0x008E79E0 (FUN_008E79E0)
-     *
-     * What it does:
-     * Initializes render-target context with explicit width, height, and
-     * format lanes.
-     */
-    RenderTargetContext::RenderTargetContext(
-        const std::uint32_t width,
-        const std::uint32_t height,
-        const std::uint32_t format
-    )
-        : width_(width),
-          height_(height),
-          format_(format)
-    {
-    }
-
-    /**
-     * Address: 0x00442050 (FUN_00442050, sub_442050)
-     *
-     * What it does:
-     * Copies render-target width/height/format lanes from another context.
-     */
-    RenderTargetContext::RenderTargetContext(const RenderTargetContext& other)
-        : width_(other.width_),
-          height_(other.height_),
-          format_(other.format_)
-    {
-    }
-
-    /**
-     * Address: 0x008E6590 (FUN_008E6590)
-     * Address: 0x008E65A0 (FUN_008E65A0, scalar deleting destructor thunk)
-     *
-     * What it does:
-     * Non-deleting destructor body resets vtable ownership for the
-     * cube-render-target context base lane. Scalar-delete thunk reuses this
-     * body then releases storage when requested.
-     */
-    CubeRenderTargetContext::~CubeRenderTargetContext() = default;
-
-    /**
-     * Address: 0x0093EFE0 (FUN_0093EFE0, ??1DepthStencilTargetContext@gal@gpg@@QAE@@Z)
-     * Address: 0x0093EFF0 (FUN_0093EFF0, scalar deleting destructor thunk)
-     *
-     * What it does:
-     * Destructor body: sets vtable to `gpg::gal::DepthStencilTargetContext::`vftable``
-     * before member subobject teardown. Defaulted because this class owns no
-     * non-trivial member resources directly.
-     */
-    DepthStencilTargetContext::~DepthStencilTargetContext() = default;
-
-    /**
-     * Address: 0x0093F010 (FUN_0093F010)
-     *
-     * What it does:
-     * Creates one depth/stencil target on the active device through its
-     * slot 13 (`[vtbl+0x34]`).
-     */
-    boost::shared_ptr<DepthStencilTarget> DepthStencilTarget::Create(const DepthStencilTargetContext& context)
-    {
-        return Device::GetInstance()->CreateDepthStencilTarget(&context);
-    }
-
-    /**
-     * Address: 0x008E69B0 (FUN_008E69B0, gpg::gal::DeviceContext::~DeviceContext)
-     * Address: 0x00430570 (FUN_00430570, scalar deleting destructor thunk)
-     *
-     * What it does:
-     * Tears down one device-context base lane; deleting-thunk dispatch uses
-     * the same canonical destructor body.
-     */
-    DeviceContext::~DeviceContext() = default;
-
-    /**
-     * Address: 0x0093F060 (FUN_0093F060)
-     *
-     * What it does:
-     * Stores the topology, the vertex count and the first vertex.
-     */
-    DrawContext::DrawContext(const TOPOLOGY topology, const std::uint32_t vertexCount, const std::uint32_t startVertex)
-        : topology_(topology),
-          vertexCount_(vertexCount),
-          startVertex_(startVertex)
-    {
-    }
-
-    /**
-     * Address: 0x0093F080 (FUN_0093F080, gpg::gal::DrawContext::~DrawContext)
-     * Address: 0x0093F140 (FUN_0093F140, scalar deleting destructor)
-     *
-     * What it does:
-     * Restores the DrawContext vtable.
-     */
-    DrawContext::~DrawContext() = default;
-
-    /**
-     * Address: 0x0093F090 (FUN_0093F090)
-     *
-     * What it does:
-     * Zeroes every field.
-     */
-    DrawIndexedContext::DrawIndexedContext()
-        : topology_(static_cast<DrawContext::TOPOLOGY>(0)),
-          minVertexIndex_(0),
-          vertexCount_(0),
-          indexCount_(0),
-          startIndex_(0),
-          baseVertexIndex_(0)
-    {
-    }
-
-    /**
-     * Address: 0x0093F0B0 (FUN_0093F0B0)
-     *
-     * What it does:
-     * A draw whose minimum vertex index is zero.
-     */
-    DrawIndexedContext::DrawIndexedContext(
-        const DrawContext::TOPOLOGY topology,
-        const std::uint32_t vertexCount,
-        const std::uint32_t indexCount,
-        const std::uint32_t startIndex,
-        const std::uint32_t baseVertexIndex
-    )
-        : topology_(topology),
-          minVertexIndex_(0),
-          vertexCount_(vertexCount),
-          indexCount_(indexCount),
-          startIndex_(startIndex),
-          baseVertexIndex_(static_cast<std::int32_t>(baseVertexIndex))
-    {
-    }
-
-    /**
-     * Address: 0x0093F0F0 (FUN_0093F0F0)
-     *
-     * What it does:
-     * A draw with an explicit minimum vertex index.
-     */
-    DrawIndexedContext::DrawIndexedContext(
-        const DrawContext::TOPOLOGY topology,
-        const std::uint32_t minVertexIndex,
-        const std::uint32_t vertexCount,
-        const std::uint32_t indexCount,
-        const std::uint32_t startIndex,
-        const std::int32_t baseVertexIndex
-    )
-        : topology_(topology),
-          minVertexIndex_(minVertexIndex),
-          vertexCount_(vertexCount),
-          indexCount_(indexCount),
-          startIndex_(startIndex),
-          baseVertexIndex_(baseVertexIndex)
-    {
-    }
-
-    /**
-     * Address: 0x0093F130 (FUN_0093F130, gpg::gal::DrawIndexedContext::~DrawIndexedContext)
-     * Address: 0x0093F160 (FUN_0093F160, scalar deleting destructor)
-     *
-     * What it does:
-     * Restores the DrawIndexedContext vtable.
-     */
-    DrawIndexedContext::~DrawIndexedContext() = default;
-
-    /**
-     * Address: 0x0093F180 (FUN_0093F180)
-     *
-     * What it does:
-     * Converts `count` vertices (or indices) into a primitive count for
-     * `topology`, throwing when the count cannot form whole primitives.
-     */
-    std::uint32_t DrawContext::CountPrimitives(const TOPOLOGY topology, const std::uint32_t count)
-    {
-        switch (topology)
-        {
-        case TOPOLOGY_POINTLIST:
-            return count;
-        case TOPOLOGY_LINELIST:
-            if ((count & 1U) != 0U)
-            {
-                throw Error("DrawContext.cpp", 35, "invalid number of vertices in line list");
-            }
-            return count >> 1U;
-        case TOPOLOGY_LINESTRIP:
-            if (count <= 1U)
-            {
-                throw Error("DrawContext.cpp", 39, "invalid number of vertices in line strip");
-            }
-            return count - 1U;
-        case TOPOLOGY_TRIANGLELIST:
-            if ((count % 3U) != 0U)
-            {
-                throw Error("DrawContext.cpp", 43, "invalid number of vertices in triangle list");
-            }
-            return count / 3U;
-        case TOPOLOGY_TRIANGLESTRIP:
-            if (count <= 2U)
-            {
-                throw Error("DrawContext.cpp", 47, "invalid number of vertices in triangle list");
-            }
-            return count - 2U;
-        default:
-            throw Error("DrawContext.cpp", 51, "unknown topology specified");
-        }
-    }
-
-    /**
-     * Address: 0x0093F470 (FUN_0093F470)
-     *
-     * What it does:
-     * The number of primitives `vertexCount_` vertices make in this topology.
-     */
-    std::uint32_t DrawContext::GetPrimitiveCount() const
-    {
-        return CountPrimitives(topology_, vertexCount_);
-    }
-
-    /**
-     * Address: 0x0093F490 (FUN_0093F490)
-     *
-     * What it does:
-     * The number of primitives `indexCount_` indices make in this topology.
-     */
-    std::uint32_t DrawIndexedContext::GetPrimitiveCount() const
-    {
-        return DrawContext::CountPrimitives(topology_, indexCount_);
-    }
-
-    /**
-     * Address: 0x0093FBE0 (FUN_0093FBE0, gpg::gal::EffectContext::EffectContext)
-     *
-     * What it does:
-     * Initializes effect source/cache string lanes, source-buffer ownership
-     * metadata, and macro vector storage to their default empty state.
-     */
-    EffectContext::EffectContext()
-        : mSourceType(0U)
-        , mUseCache(false)
-    {}
-
-    /**
-     * Address: 0x008FE7E0 (FUN_008FE7E0, gpg::gal::EffectContext::EffectContext)
-     *
-     * What it does:
-     * Copies effect-context source/cache paths, source-buffer ownership lanes,
-     * and effect-macro vector storage from one source context.
-     */
-    EffectContext::EffectContext(const EffectContext& other)
-        : mSourceType(other.mSourceType)
-        , mUseCache(other.mUseCache)
-        , mSourcePath(other.mSourcePath)
-        , mCachePath(other.mCachePath)
-        , mSourceBuffer(other.mSourceBuffer)
-        , mMacros(other.mMacros)
-    {}
-
-    /**
-     * Address: 0x00942CF0 (FUN_00942CF0, gpg::gal::EffectContext::operator=)
-     *
-     * What it does:
-     * Assigns every lane from `other` behind a self-check. The paths are
-     * whole-string assigns and the source buffer is a shared-owner copy, so the
-     * two contexts end up sharing one buffer.
-     */
-    EffectContext& EffectContext::operator=(const EffectContext& other)
-    {
-        if (this == &other) {
-            return *this;
-        }
-
-        mSourceType = other.mSourceType;
-        mUseCache = other.mUseCache;
-        mSourcePath.assign(other.mSourcePath, 0U, fa::string::npos);
-        mCachePath.assign(other.mCachePath, 0U, fa::string::npos);
-        mSourceBuffer = other.mSourceBuffer;
-        mMacros = other.mMacros;
-        return *this;
-    }
-
-    /**
-     * Address: 0x0093FD90 (FUN_0093FD90, gpg::gal::EffectContext::EffectContext)
-     *
-     * What it does:
-     * Initializes one effect context from explicit cache/path/source-buffer
-     * payload and copies the effect-macro vector lane.
-     */
-    EffectContext::EffectContext(
-        const bool useCachePayload,
-        const gpg::StrArg sourcePath,
-        const gpg::StrArg cachePath,
-        const gpg::MemBuffer<char>& sourceBuffer,
-        const fa::vector<EffectMacro>& macros
-    )
-        : mSourceType(2U)
-        , mUseCache(useCachePayload)
-        , mSourcePath((sourcePath != nullptr) ? sourcePath : "")
-        , mCachePath((cachePath != nullptr) ? cachePath : "")
-        , mSourceBuffer(sourceBuffer)
-        , mMacros(macros)
-    {}
-
-    /**
-     * Address: 0x0093F950 (FUN_0093F950, gpg::gal::EffectContext::~EffectContext)
-     * Address: 0x008FE8B0 (FUN_008FE8B0, scalar deleting destructor thunk owner)
-     *
-     * What it does:
-     * Releases effect-macro vector storage, decrements source-buffer shared
-     * count ownership, and resets both path string lanes to empty state.
-     */
-    EffectContext::~EffectContext() = default;
-
-    /**
-     * Address: 0x009402D0 (FUN_009402D0, gpg::gal::EffectContext::DefineMacro)
-     * Mangled: ?DefineMacro@EffectContext@gal@gpg@@QAEXPBD0@Z
-     *
-     * IDA signature:
-     * int __thiscall gpg::gal::EffectContext::DefineMacro(
-     *     gpg::gal::EffectContext *this, char *name, char *value);
-     *
-     * What it does:
-     * Looks up `name` in this context's effect-macro vector lane; throws
-     * `gpg::gal::Error("duplicate effect macro definition")` from
-     * `Effect.cpp:76` when a macro with the same key already exists, and
-     * otherwise appends a freshly-constructed `EffectMacro{name, value}` to
-     * the back of the macro vector.
-     */
-    void EffectContext::DefineMacro(const char* const name, const char* const value)
-    {
-        const char* const nameText = (name != nullptr) ? name : "";
-        const char* const valueText = (value != nullptr) ? value : "";
-
-        // The binary constructs a scratch `std::string` from `name`, uses
-        // it as the lookup needle, then drops it before either throwing
-        // the duplicate error or appending the new macro. Mirror that
-        // lifetime so the heap/SSO behavior matches the original
-        // function exactly.
-        bool isDuplicate = false;
-        {
-            const fa::string needleKey(
-                nameText, static_cast<unsigned int>(std::strlen(nameText))
-            );
-
-            EffectMacro* foundPosition = mMacros.end();
-            (void)FindEffectMacroByKeyInRange(
-                &foundPosition,
-                mMacros.begin(),
-                mMacros.end(),
-                needleKey
-            );
-            isDuplicate = (foundPosition != mMacros.end());
-        }
-
-        if (isDuplicate)
-        {
-            ThrowEffectContextError(
-                "c:\\work\\rts\\main\\code\\src\\libs\\gpggal\\Effect.cpp",
-                76,
-                "duplicate effect macro definition"
-            );
-        }
-
-        const EffectMacro newMacro(nameText, valueText);
-        // `fa::vector<EffectMacro>::push_back` (0x00940230, cited on Vector.h);
-        // its capacity-full path is the single-value `insert` 0x009401C0.
-        mMacros.push_back(newMacro);
-    }
-
-    /**
-     * Address: 0x00940630 (FUN_00940630)
-     * Address: 0x00940640 (FUN_00940640, scalar deleting destructor thunk)
-     *
-     * What it does:
-     * Restores index-buffer context vftable ownership and services deleting-destructor teardown.
-     */
-    IndexBufferContext::~IndexBufferContext() = default;
-
-    /**
-     * Address: 0x00940660 (FUN_00940660, func_DeviceCreateIndexBuffer)
-     *
-     * What it does:
-     * Creates one index buffer on the active device through its slot 16
-     * (`[vtbl+0x40]`). Caller: `CD3DIndexSheet::CreateBuffer` (0x0043F737).
-     */
-    boost::shared_ptr<IndexBuffer> IndexBuffer::Create(const IndexBufferContext& context)
-    {
-        return Device::GetInstance()->CreateIndexBuffer(&context);
-    }
-
-    /**
-     * Address: 0x008E77B0 (FUN_008E77B0, gpg::gal::OutputContextInit)
-     *
-     * What it does:
-     * Initializes one output context with empty target handles; `face` is
-     * left uninitialized, as the binary leaves it.
-     */
-    OutputContext::OutputContext()
-        : cubeTarget(),
-          surface(),
-          depthStencil()
-    {
-    }
-
-    /**
-     * Address: 0x008E77D0 (FUN_008E77D0, gpg::gal::OutputContext::OutputContext)
-     *
-     * What it does:
-     * Binds a 2D colour target and its depth/stencil target: copies the two
-     * by-value handles into +0x10 and +0x18, retaining each, and leaves the
-     * cube handle at +0x04 empty.
-     */
-    OutputContext::OutputContext(
-        const boost::shared_ptr<RenderTarget> surface,
-        const boost::shared_ptr<DepthStencilTarget> depthStencil
-    )
-        : cubeTarget(),
-          surface(surface),
-          depthStencil(depthStencil)
-    {
-    }
-
-    /**
-     * Address: 0x008E78C0 (FUN_008E78C0)
-     *
-     * What it does:
-     * Binds face `face` of a cube target plus its depth/stencil target,
-     * leaving the 2D surface handle empty.
-     */
-    OutputContext::OutputContext(
-        const boost::shared_ptr<CubeRenderTarget> cubeTarget,
-        const std::int32_t face,
-        const boost::shared_ptr<DepthStencilTarget> depthStencil
-    )
-        : cubeTarget(cubeTarget),
-          face(face),
-          surface(),
-          depthStencil(depthStencil)
-    {
-    }
-
-    /**
-     * Address: 0x00430160 (FUN_00430160)
-     *
-     * What it does:
-     * Copies one output context, retaining every target handle.
-     */
-    OutputContext::OutputContext(const OutputContext& other)
-        : cubeTarget(other.cubeTarget),
-          face(other.face),
-          surface(other.surface),
-          depthStencil(other.depthStencil)
-    {
-    }
-
-    /**
-     * Address: 0x008E76D0 (FUN_008E76D0, gpg::gal::OutputContext::~OutputContext)
-     * Address: 0x008E8250 (FUN_008E8250, scalar/vector deleting-destructor thunk owner)
-     *
-     * What it does:
-     * Releases the depth/stencil, surface and cube-target handles in reverse
-     * declaration order.
-     */
-    OutputContext::~OutputContext() = default;
-
-    OutputContext* NewOutputContexts(const std::uint32_t count)
-    {
-        if (count == 0U)
-        {
-            return nullptr;
-        }
-        std::allocator<OutputContext> allocator;
-        OutputContext* const contexts = allocator.allocate(count);
-        for (std::uint32_t index = 0U; index < count; ++index)
-        {
-            ::new (static_cast<void*>(contexts + index)) OutputContext();
-        }
-        return contexts;
-    }
-
-    void DeleteOutputContexts(OutputContext* const contexts, const std::uint32_t count) noexcept
-    {
-        if (contexts == nullptr)
-        {
-            return;
-        }
-        for (std::uint32_t index = count; index > 0U; --index)
-        {
-            contexts[index - 1U].~OutputContext();
-        }
-        std::allocator<OutputContext>().deallocate(contexts, count);
-    }
-
-    /**
-     * Address: 0x008E7A00 (FUN_008E7A00, ??1RenderTargetContext@gal@gpg@@QAE@@Z)
-     * Address: 0x00442080 (FUN_00442080, scalar deleting destructor thunk)
-     *
-     * What it does:
-     * Destructor body: sets vtable to `gpg::gal::RenderTargetContext::`vftable``
-     * before member subobject teardown. Defaulted because this class owns no
-     * non-trivial member resources directly.
-     */
-    RenderTargetContext::~RenderTargetContext() = default;
-
-    /**
-     * Address: 0x008E7A10 (FUN_008E7A10)
-     *
-     * What it does:
-     * Creates one render target on the active device through its slot 11
-     * (`[vtbl+0x2C]`).
-     */
-    boost::shared_ptr<RenderTarget> RenderTarget::Create(const RenderTargetContext& context)
-    {
-        return Device::GetInstance()->CreateRenderTarget(&context);
-    }
-
-    /**
-     * Address: 0x008E7CC0 (FUN_008E7CC0, __imp_??1TextureContext@gal@gpg@@UAE@XZ)
-     * Address: 0x008E7AE0 (FUN_008E7AE0, scalar deleting destructor thunk)
-     *
-     * What it does:
-     * Releases texture payload shared-count ownership before string/member teardown.
-     */
-    TextureContext::~TextureContext() = default;
-
-    void TextureContext::SetDataBuffer(const gpg::MemBuffer<const char>& data)
-    {
-        dataBuffer_ = data;
-    }
-
-    void TextureContext::ClearDataBuffer() noexcept
-    {
-        dataBuffer_.Reset();
-    }
-
-    std::size_t TextureContext::DataSizeBytes() const noexcept
-    {
-        if (dataBuffer_.mBegin == dataBuffer_.mEnd || dataBuffer_.mEnd < dataBuffer_.mBegin) {
-            return 0;
-        }
-        return dataBuffer_.Size();
-    }
-
-    /**
-     * Address: 0x009408A0 (FUN_009408A0)
-     * Address: 0x009408B0 (FUN_009408B0, scalar deleting destructor thunk)
-     *
-     * What it does:
-     * Restores vertex-buffer context vftable ownership and services deleting-destructor teardown.
-     */
-    VertexBufferContext::~VertexBufferContext() = default;
-
-    /**
-     * Address: 0x009408D0 (FUN_009408D0, func_CreateVertexBuffer)
-     *
-     * What it does:
-     * Creates one vertex buffer on the active device through its slot 15
-     * (`[vtbl+0x3C]`). Caller: `CD3DVertexStream::CreateBuffer` (0x0043FC20).
-     */
-    boost::shared_ptr<VertexBuffer> VertexBuffer::Create(const VertexBufferContext& context)
-    {
-        return Device::GetInstance()->CreateVertexBuffer(&context);
-    }
-
-    /**
-     * Address: 0x00940900 (FUN_00940900)
-     *
-     * What it does:
-     * Creates gal vertex format `formatCode` on the active device through its
-     * slot 14 (`[vtbl+0x38]`). Caller: `CD3DVertexFormat`'s constructor
-     * (0x0043CFE6).
-     */
-    boost::shared_ptr<VertexFormat> VertexFormat::Create(const std::uint32_t formatCode)
-    {
-        return Device::GetInstance()->CreateVertexFormat(formatCode);
-    }
-}
+  /**
+   * Address: 0x00940900 (FUN_00940900)
+   *
+   * What it does:
+   * Creates gal vertex format `formatCode` on the active device through its
+   * slot 14 (`[vtbl+0x38]`). Caller: `CD3DVertexFormat`'s constructor
+   * (0x0043CFE6).
+   */
+  boost::shared_ptr<VertexFormat> VertexFormat::Create(
+    const std::uint32_t formatCode
+  )
+  {
+    return Device::GetInstance()->CreateVertexFormat(formatCode);
+  }
+} // namespace gpg::gal

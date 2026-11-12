@@ -8,17 +8,24 @@ namespace faf::remote::wire
 {
   namespace
   {
-    [[nodiscard]] std::uint32_t ZigZag(const std::int32_t value) noexcept
+    [[nodiscard]] std::uint32_t ZigZag(
+      const std::int32_t value
+    ) noexcept
     {
       return (static_cast<std::uint32_t>(value) << 1) ^ static_cast<std::uint32_t>(value >> 31);
     }
 
-    [[nodiscard]] std::int32_t UnZigZag(const std::uint32_t value) noexcept
+    [[nodiscard]] std::int32_t UnZigZag(
+      const std::uint32_t value
+    ) noexcept
     {
       return static_cast<std::int32_t>(value >> 1) ^ -static_cast<std::int32_t>(value & 1u);
     }
 
-    void WriteSmallList(BitWriter& writer, const std::vector<std::uint8_t>& values)
+    void WriteSmallList(
+      BitWriter& writer,
+      const std::vector<std::uint8_t>& values
+    )
     {
       writer.WriteVarUint(static_cast<std::uint32_t>(values.size()));
       for (const std::uint8_t value : values) {
@@ -26,7 +33,11 @@ namespace faf::remote::wire
       }
     }
 
-    [[nodiscard]] bool ReadSmallList(BitReader& reader, std::vector<std::uint8_t>& values, const std::size_t limit)
+    [[nodiscard]] bool ReadSmallList(
+      BitReader& reader,
+      std::vector<std::uint8_t>& values,
+      const std::size_t limit
+    )
     {
       const std::uint32_t count = reader.ReadVarUint();
       if (!reader.Ok() || count > limit || static_cast<std::uint64_t>(count) * 8u > reader.BitsLeft()) {
@@ -41,20 +52,26 @@ namespace faf::remote::wire
     }
   } // namespace
 
-  bool SRosterEntry::operator==(const SRosterEntry& other) const noexcept
+  bool SRosterEntry::operator==(
+    const SRosterEntry& other
+  ) const noexcept
   {
-    return index == other.index && name == other.name && ownerId == other.ownerId && sources == other.sources
-        && simRate == other.simRate && std::bit_cast<std::uint32_t>(ping) == std::bit_cast<std::uint32_t>(other.ping)
-        && std::bit_cast<std::uint32_t>(quiet) == std::bit_cast<std::uint32_t>(other.quiet)
-        && connected == other.connected && ejectedBy == other.ejectedBy;
+    return index == other.index && name == other.name && ownerId == other.ownerId && sources == other.sources &&
+      simRate == other.simRate && std::bit_cast<std::uint32_t>(ping) == std::bit_cast<std::uint32_t>(other.ping) &&
+      std::bit_cast<std::uint32_t>(quiet) == std::bit_cast<std::uint32_t>(other.quiet) &&
+      connected == other.connected && ejectedBy == other.ejectedBy;
   }
 
-  bool SRoster::operator==(const SRoster& other) const noexcept
+  bool SRoster::operator==(
+    const SRoster& other
+  ) const noexcept
   {
     return localIndex == other.localIndex && entries == other.entries;
   }
 
-  void SRoster::Encode(BitWriter& writer) const
+  void SRoster::Encode(
+    BitWriter& writer
+  ) const
   {
     writer.WriteVarUint(ZigZag(localIndex));
     writer.WriteVarUint(static_cast<std::uint32_t>(entries.size()));
@@ -74,7 +91,9 @@ namespace faf::remote::wire
     }
   }
 
-  std::optional<SRoster> SRoster::Decode(BitReader& reader)
+  std::optional<SRoster> SRoster::Decode(
+    BitReader& reader
+  )
   {
     SRoster roster{};
     roster.localIndex = UnZigZag(reader.ReadVarUint());
@@ -86,7 +105,9 @@ namespace faf::remote::wire
     for (SRosterEntry& entry : roster.entries) {
       entry.index = static_cast<std::uint8_t>(reader.ReadBits(8));
       const std::uint32_t size = reader.ReadVarUint();
-      if (!reader.Ok() || size > SRosterEntry::kMaxNameBytes || static_cast<std::uint64_t>(size) * 8u > reader.BitsLeft()) {
+      if (
+        !reader.Ok() || size > SRosterEntry::kMaxNameBytes || static_cast<std::uint64_t>(size) * 8u > reader.BitsLeft()
+      ) {
         return std::nullopt;
       }
       entry.name.reserve(size);

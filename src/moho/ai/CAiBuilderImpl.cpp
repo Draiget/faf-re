@@ -65,7 +65,9 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::RRef MakeUnitRef(Unit* unit)
+  [[nodiscard]] gpg::RRef MakeUnitRef(
+    Unit* unit
+  )
   {
     gpg::RRef out{};
     gpg::RType* const staticType = gpg::RTypeOf<Unit>();
@@ -97,7 +99,10 @@ namespace
     return out;
   }
 
-  [[nodiscard]] Unit* ReadPointerUnit(gpg::ReadArchive* const archive, const gpg::RRef& ownerRef)
+  [[nodiscard]] Unit* ReadPointerUnit(
+    gpg::ReadArchive* const archive,
+    const gpg::RRef& ownerRef
+  )
   {
     if (!archive) {
       return nullptr;
@@ -133,7 +138,11 @@ namespace
     throw gpg::SerializationError(message.c_str());
   }
 
-  void WritePointerUnit(gpg::WriteArchive* const archive, Unit* const unit, const gpg::RRef& ownerRef)
+  void WritePointerUnit(
+    gpg::WriteArchive* const archive,
+    Unit* const unit,
+    const gpg::RRef& ownerRef
+  )
   {
     if (!archive) {
       return;
@@ -143,14 +152,18 @@ namespace
     gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, ownerRef);
   }
 
-  [[nodiscard]] std::uint32_t EncodeRebuildKey(const SOCellPos& cellPos) noexcept
+  [[nodiscard]] std::uint32_t EncodeRebuildKey(
+    const SOCellPos& cellPos
+  ) noexcept
   {
     const int x = static_cast<int>(cellPos.x);
     const int z = static_cast<int>(cellPos.z);
     return static_cast<std::uint32_t>(x * 10000 + z);
   }
 
-  [[nodiscard]] SOCellPos DecodeRebuildKey(const std::uint32_t key) noexcept
+  [[nodiscard]] SOCellPos DecodeRebuildKey(
+    const std::uint32_t key
+  ) noexcept
   {
     const int signedKey = static_cast<std::int32_t>(key);
     SOCellPos cellPos{};
@@ -159,22 +172,24 @@ namespace
     return cellPos;
   }
 
-
-
-  [[nodiscard]] bool HasSeabedOccupancy(const SFootprint& footprint) noexcept
+  [[nodiscard]] bool HasSeabedOccupancy(
+    const SFootprint& footprint
+  ) noexcept
   {
     const auto mask = static_cast<std::uint8_t>(footprint.mOccupancyCaps);
     return (mask & static_cast<std::uint8_t>(EOccupancyCaps::OC_SEABED)) != 0u;
   }
 
-  [[nodiscard]] bool IsTransportTargetEntityAllowed(const Entity* entity)
+  [[nodiscard]] bool IsTransportTargetEntityAllowed(
+    const Entity* entity
+  )
   {
     if (!entity) {
       return false;
     }
 
     return entity->IsInCategory("FERRYBEACON") || entity->IsInCategory("TRANSPORTATION") ||
-           entity->IsInCategory("AIRSTAGINGPLATFORM");
+      entity->IsInCategory("AIRSTAGINGPLATFORM");
   }
 
 } // namespace
@@ -193,14 +208,14 @@ CAiBuilderImpl::CAiBuilderImpl()
   , mAimTarget(Wm3::Vector3f::Zero())
   , mRebuildStructures{}
   , mFactoryCommands()
-{
-
-}
+{}
 
 /**
  * Address: 0x0059F920 (FUN_0059F920, unit ctor)
  */
-CAiBuilderImpl::CAiBuilderImpl(Unit* const unit)
+CAiBuilderImpl::CAiBuilderImpl(
+  Unit* const unit
+)
   : mOwnerUnit(unit)
   , mIsFactory(0)
   , mIsOnTarget(1)
@@ -209,9 +224,7 @@ CAiBuilderImpl::CAiBuilderImpl(Unit* const unit)
   , mAimTarget(Wm3::Vector3f::Zero())
   , mRebuildStructures{}
   , mFactoryCommands()
-{
-
-}
+{}
 
 /**
  * Address: 0x0059FB50 (FUN_0059FB50, scalar deleting thunk)
@@ -230,7 +243,9 @@ CAiBuilderImpl::~CAiBuilderImpl()
  * Reads builder runtime state from archive lanes and marks the command queue
  * dirty for post-load revalidation.
  */
-void CAiBuilderImpl::MemberDeserialize(gpg::ReadArchive* const archive)
+void CAiBuilderImpl::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   if (!archive) {
     return;
@@ -273,7 +288,9 @@ void CAiBuilderImpl::MemberDeserialize(gpg::ReadArchive* const archive)
  * What it does:
  * Writes builder runtime state to archive lanes.
  */
-void CAiBuilderImpl::MemberSerialize(gpg::WriteArchive* const archive) const
+void CAiBuilderImpl::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   if (!archive) {
     return;
@@ -308,7 +325,9 @@ bool CAiBuilderImpl::BuilderIsFactory() const
 /**
  * Address: 0x0059FA90 (FUN_0059FA90)
  */
-void CAiBuilderImpl::BuilderSetIsFactory(const bool isFactory)
+void CAiBuilderImpl::BuilderSetIsFactory(
+  const bool isFactory
+)
 {
   mIsFactory = static_cast<std::uint8_t>(isFactory);
 }
@@ -395,8 +414,10 @@ void CAiBuilderImpl::BuilderValidateFactoryCommandQueue()
       continue;
     }
 
-    if (command->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_TransportLoadUnits &&
-        !IsTransportTargetEntityAllowed(command->mTarget.targetEntity.GetObjectPtr())) {
+    if (
+      command->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_TransportLoadUnits &&
+      !IsTransportTargetEntityAllowed(command->mTarget.targetEntity.GetObjectPtr())
+    ) {
       command->RemoveUnit(mOwnerUnit);
       it = mFactoryCommands.erase(it);
       mFactoryQueueDirty = 1;
@@ -430,7 +451,9 @@ bool CAiBuilderImpl::BuilderIsFactoryQueueDirty() const
 /**
  * Address: 0x0059EEE0 (FUN_0059EEE0)
  */
-void CAiBuilderImpl::BuilderSetFactoryQueueDirty(const bool dirty)
+void CAiBuilderImpl::BuilderSetFactoryQueueDirty(
+  const bool dirty
+)
 {
   mFactoryQueueDirty = static_cast<std::uint8_t>(dirty);
 }
@@ -476,7 +499,10 @@ bool CAiBuilderImpl::BuilderIsBusy() const
 /**
  * Address: 0x0059F4D0 (FUN_0059F4D0)
  */
-void CAiBuilderImpl::BuilderAddFactoryCommand(CUnitCommand* const command, const int index)
+void CAiBuilderImpl::BuilderAddFactoryCommand(
+  CUnitCommand* const command,
+  const int index
+)
 {
   if (!command) {
     return;
@@ -489,7 +515,9 @@ void CAiBuilderImpl::BuilderAddFactoryCommand(CUnitCommand* const command, const
 /**
  * Address: 0x0059F500 (FUN_0059F500)
  */
-bool CAiBuilderImpl::BuilderContainsCommand(CUnitCommand* const command)
+bool CAiBuilderImpl::BuilderContainsCommand(
+  CUnitCommand* const command
+)
 {
   if (!command) {
     return false;
@@ -506,7 +534,9 @@ bool CAiBuilderImpl::BuilderContainsCommand(CUnitCommand* const command)
 /**
  * Address: 0x0059F540 (FUN_0059F540)
  */
-CUnitCommand* CAiBuilderImpl::BuilderGetFactoryCommand(const int index)
+CUnitCommand* CAiBuilderImpl::BuilderGetFactoryCommand(
+  const int index
+)
 {
   if (index < 0) {
     return nullptr;
@@ -523,7 +553,9 @@ CUnitCommand* CAiBuilderImpl::BuilderGetFactoryCommand(const int index)
 /**
  * Address: 0x0059F580 (FUN_0059F580)
  */
-void CAiBuilderImpl::BuilderRemoveFactoryCommand(CUnitCommand* const command)
+void CAiBuilderImpl::BuilderRemoveFactoryCommand(
+  CUnitCommand* const command
+)
 {
   if (!command) {
     return;
@@ -554,7 +586,9 @@ void CAiBuilderImpl::BuilderClearFactoryCommandQueue()
 /**
  * Address: 0x0059F600 (FUN_0059F600)
  */
-void CAiBuilderImpl::BuilderSetAimTarget(const Wm3::Vector3f target)
+void CAiBuilderImpl::BuilderSetAimTarget(
+  const Wm3::Vector3f target
+)
 {
   mAimTarget = target;
   // 0x0059F62D: `Vector3::CompareArrays` (0x004F0A50, a memcmp) against the
@@ -575,7 +609,9 @@ Wm3::Vector3f CAiBuilderImpl::BuilderGetAimTarget() const
 /**
  * Address: 0x0059F670 (FUN_0059F670)
  */
-void CAiBuilderImpl::BuilderSetOnTarget(const bool onTarget)
+void CAiBuilderImpl::BuilderSetOnTarget(
+  const bool onTarget
+)
 {
   mIsOnTarget = static_cast<std::uint8_t>(onTarget);
 }
@@ -591,7 +627,10 @@ bool CAiBuilderImpl::BuilderGetOnTarget() const
 /**
  * Address: 0x0059F690 (FUN_0059F690)
  */
-void CAiBuilderImpl::BuilderAddRebuildStructure(const SOCellPos& cellPos, const RUnitBlueprint* const blueprint)
+void CAiBuilderImpl::BuilderAddRebuildStructure(
+  const SOCellPos& cellPos,
+  const RUnitBlueprint* const blueprint
+)
 {
   mRebuildStructures[EncodeRebuildKey(cellPos)] = blueprint;
 }
@@ -599,7 +638,9 @@ void CAiBuilderImpl::BuilderAddRebuildStructure(const SOCellPos& cellPos, const 
 /**
  * Address: 0x0059F6C0 (FUN_0059F6C0)
  */
-void CAiBuilderImpl::BuilderRemoveRebuildStructure(const SOCellPos& cellPos)
+void CAiBuilderImpl::BuilderRemoveRebuildStructure(
+  const SOCellPos& cellPos
+)
 {
   (void)mRebuildStructures.erase(EncodeRebuildKey(cellPos));
 }
@@ -615,7 +656,9 @@ void CAiBuilderImpl::BuilderClearRebuildStructure()
 /**
  * Address: 0x0059F740 (FUN_0059F740)
  */
-const RUnitBlueprint* CAiBuilderImpl::BuilderGetNextRebuildStructure(SOCellPos& outCellPos)
+const RUnitBlueprint* CAiBuilderImpl::BuilderGetNextRebuildStructure(
+  SOCellPos& outCellPos
+)
 {
   outCellPos = {0, 0};
 
@@ -666,8 +709,10 @@ const RUnitBlueprint* CAiBuilderImpl::BuilderGetNextRebuildStructure(SOCellPos& 
       continue;
     }
 
-    if (OCCUPY_FootprintFits(*sim->mOGrid, cellPos, blueprint->mFootprint, EOccupancyCaps::OC_ANY) ==
-        static_cast<EOccupancyCaps>(0u)) {
+    if (
+      OCCUPY_FootprintFits(*sim->mOGrid, cellPos, blueprint->mFootprint, EOccupancyCaps::OC_ANY) ==
+      static_cast<EOccupancyCaps>(0u)
+    ) {
       continue;
     }
 
@@ -685,7 +730,12 @@ namespace moho
   /**
    * Address: 0x0059FD90 (FUN_0059FD90)
    */
-  void CAiBuilderImpl::MemberConstruct(gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result)
+  void CAiBuilderImpl::MemberConstruct(
+    gpg::ReadArchive&,
+    const int,
+    const gpg::RRef&,
+    gpg::SerConstructResult& result
+  )
   {
     result.SetUnowned(gpg::MakeRRef(new CAiBuilderImpl()), 0u);
   }

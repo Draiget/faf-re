@@ -133,7 +133,9 @@ namespace moho
     virtual int GetNumPlatoonWithPlan(const char* planName) = 0;
     // Address: 0x00700A00 (FUN_00700A00)
     virtual int CountUnitsInBoundsXZ(
-      const Wm3::Vector3f& minBounds, const Wm3::Vector3f& maxBounds, const EntitySetTemplate<Unit>& unitSet
+      const Wm3::Vector3f& minBounds,
+      const Wm3::Vector3f& maxBounds,
+      const EntitySetTemplate<Unit>& unitSet
     ) = 0;
     // Address: 0x00700A70 (FUN_00700A70)
     virtual void UpdateAIDebugPlatoonStats(Unit* unit) = 0;

@@ -12,7 +12,7 @@ namespace moho
   struct WeakPtr_Entity
   {
     /**
-      * Alias of FUN_0067CD30 (non-canonical helper lane).
+     * Alias of FUN_0067CD30 (non-canonical helper lane).
      *
      * What it does:
      * Deserializes one `WeakPtr<Entity>` payload from tracked pointer lanes.
@@ -20,7 +20,7 @@ namespace moho
     static void Deserialize(gpg::ReadArchive* archive, std::intptr_t objectPtr, int version, gpg::RRef* ownerRef);
 
     /**
-      * Alias of FUN_0067CD60 (non-canonical helper lane).
+     * Alias of FUN_0067CD60 (non-canonical helper lane).
      *
      * What it does:
      * Serializes one `WeakPtr<Entity>` payload as an unowned tracked pointer.
@@ -72,7 +72,7 @@ namespace moho
   };
 
   static_assert(sizeof(RWeakPtrType<Entity>) == 0x68, "RWeakPtrType<Entity> size must be 0x68");
-}
+} // namespace moho
 
 namespace gpg
 {
@@ -152,32 +152,32 @@ namespace gpg
     [[nodiscard]] const char* GetName() const override;
 
     /**
-      * Alias of FUN_00694380 (non-canonical helper lane).
+     * Alias of FUN_00694380 (non-canonical helper lane).
      */
     [[nodiscard]] fa::string GetLexical(const gpg::RRef& ref) const override;
 
     /**
-      * Alias of FUN_00694380 (non-canonical helper lane).
+     * Alias of FUN_00694380 (non-canonical helper lane).
      */
     [[nodiscard]] const gpg::RIndexed* IsIndexed() const override;
 
     /**
-      * Alias of FUN_00694380 (non-canonical helper lane).
+     * Alias of FUN_00694380 (non-canonical helper lane).
      */
     void Init() override;
 
     /**
-      * Alias of FUN_00694380 (non-canonical helper lane).
+     * Alias of FUN_00694380 (non-canonical helper lane).
      */
     gpg::RRef SubscriptIndex(void* obj, int ind) const override;
 
     /**
-      * Alias of FUN_00694380 (non-canonical helper lane).
+     * Alias of FUN_00694380 (non-canonical helper lane).
      */
     size_t GetCount(void* obj) const override;
 
     /**
-      * Alias of FUN_00694380 (non-canonical helper lane).
+     * Alias of FUN_00694380 (non-canonical helper lane).
      */
     void SetCount(void* obj, int count) const override;
   };
@@ -220,7 +220,7 @@ namespace moho
   void register_VectorEntityPtr_Type();
 
   /**
-    * Alias of FUN_00694380 (non-canonical helper lane).
+   * Alias of FUN_00694380 (non-canonical helper lane).
    *
    * What it does:
    * Constructs and preregisters RTTI for `fastvector<Entity*>`.

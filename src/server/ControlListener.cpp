@@ -1,4 +1,5 @@
 #include "server/ControlListener.h"
+#include "server/RestListener.h"
 
 #include <algorithm>
 #include <arpa/inet.h>
@@ -24,14 +25,21 @@ namespace faf::server
     constexpr std::uint64_t kHandshakeUs = 5'000'000u;
     constexpr std::size_t kMaxPendingOutBytes = 4u * 1024u * 1024u; // a service that stops reading is dropped
 
-    void SkipSpace(std::string_view text, std::size_t& at) noexcept
+    void SkipSpace(
+      std::string_view text,
+      std::size_t& at
+    ) noexcept
     {
       while (at < text.size() && (text[at] == ' ' || text[at] == '\t' || text[at] == '\r' || text[at] == '\n')) {
         ++at;
       }
     }
 
-    [[nodiscard]] bool ReadString(std::string_view text, std::size_t& at, std::string& out)
+    [[nodiscard]] bool ReadString(
+      std::string_view text,
+      std::size_t& at,
+      std::string& out
+    )
     {
       if (at >= text.size() || text[at] != '"') {
         return false;
@@ -52,14 +60,30 @@ namespace faf::server
         }
         const char e = text[at++];
         switch (e) {
-        case '"': out += '"'; break;
-        case '\\': out += '\\'; break;
-        case '/': out += '/'; break;
-        case 'n': out += '\n'; break;
-        case 't': out += '\t'; break;
-        case 'r': out += '\r'; break;
-        case 'b': out += '\b'; break;
-        case 'f': out += '\f'; break;
+        case '"':
+          out += '"';
+          break;
+        case '\\':
+          out += '\\';
+          break;
+        case '/':
+          out += '/';
+          break;
+        case 'n':
+          out += '\n';
+          break;
+        case 't':
+          out += '\t';
+          break;
+        case 'r':
+          out += '\r';
+          break;
+        case 'b':
+          out += '\b';
+          break;
+        case 'f':
+          out += '\f';
+          break;
         case 'u': {
           if (at + 4 > text.size()) {
             return false;
@@ -99,10 +123,16 @@ namespace faf::server
     }
 
     /** A number, true, false or null; numbers as whole values (ids and uids). */
-    [[nodiscard]] bool ReadScalar(std::string_view text, std::size_t& at, std::int64_t& number, bool& isNumber)
+    [[nodiscard]] bool ReadScalar(
+      std::string_view text,
+      std::size_t& at,
+      std::int64_t& number,
+      bool& isNumber
+    )
     {
       isNumber = false;
-      for (const std::string_view word : {std::string_view("true"), std::string_view("false"), std::string_view("null")}) {
+      for (const std::string_view word :
+           {std::string_view("true"), std::string_view("false"), std::string_view("null")}) {
         if (text.substr(at, word.size()) == word) {
           at += word.size();
           return true;
@@ -141,14 +171,18 @@ namespace faf::server
       return errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR;
     }
 
-    void SetNonBlocking(const int socket) noexcept
+    void SetNonBlocking(
+      const int socket
+    ) noexcept
     {
       const int flags = ::fcntl(socket, F_GETFL, 0);
       (void)::fcntl(socket, F_SETFL, flags | O_NONBLOCK);
     }
   } // namespace
 
-  std::optional<SControlRequest> ParseControlRequest(const std::string_view text)
+  std::optional<SControlRequest> ParseControlRequest(
+    const std::string_view text
+  )
   {
     SControlRequest request;
     std::size_t at = 0;
@@ -228,16 +262,28 @@ namespace faf::server
     return request;
   }
 
-  std::string JsonString(const std::string_view text)
+  std::string JsonString(
+    const std::string_view text
+  )
   {
     std::string out = "\"";
     for (const char c : text) {
       switch (c) {
-      case '"': out += "\\\""; break;
-      case '\\': out += "\\\\"; break;
-      case '\n': out += "\\n"; break;
-      case '\r': out += "\\r"; break;
-      case '\t': out += "\\t"; break;
+      case '"':
+        out += "\\\"";
+        break;
+      case '\\':
+        out += "\\\\";
+        break;
+      case '\n':
+        out += "\\n";
+        break;
+      case '\r':
+        out += "\\r";
+        break;
+      case '\t':
+        out += "\\t";
+        break;
       default:
         if (static_cast<unsigned char>(c) < 0x20u) {
           char escaped[8];
@@ -277,7 +323,11 @@ namespace faf::server
     crypto_wipe(mKey.data(), mKey.size());
   }
 
-  bool CControlListener::Open(const remote::net::SEndpoint& at, const ControlKey& key, std::string& error)
+  bool CControlListener::Open(
+    const remote::net::SEndpoint& at,
+    const ControlKey& key,
+    std::string& error
+  )
   {
     mKey = key;
     mListenSocket = ::socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
@@ -291,7 +341,10 @@ namespace faf::server
     address.sin_family = AF_INET;
     address.sin_port = htons(at.port);
     address.sin_addr.s_addr = htonl(at.ip);
-    if (::bind(mListenSocket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0 || ::listen(mListenSocket, 4) != 0) {
+    if (
+      ::bind(mListenSocket, reinterpret_cast<const sockaddr*>(&address), sizeof(address)) != 0 ||
+      ::listen(mListenSocket, 4) != 0
+    ) {
       error = "control: can't listen on " + at.Text();
       ::close(mListenSocket);
       mListenSocket = -1;
@@ -303,7 +356,8 @@ namespace faf::server
 
   bool CControlListener::Connected() const noexcept
   {
-    return std::any_of(mConnections.begin(), mConnections.end(), [](const std::unique_ptr<SConnection>& connection) {
+    return (mRest && mRest->Connected()) ||
+      std::any_of(mConnections.begin(), mConnections.end(), [](const std::unique_ptr<SConnection>& connection) {
       return connection->socket >= 0 && connection->channel && connection->channel->Ready();
     });
   }
@@ -313,7 +367,10 @@ namespace faf::server
     return std::exchange(mNews, {});
   }
 
-  void CControlListener::Close(SConnection& connection, const char* const why)
+  void CControlListener::Close(
+    SConnection& connection,
+    const char* const why
+  )
   {
     if (connection.socket < 0) {
       return;
@@ -327,13 +384,18 @@ namespace faf::server
 
   void CControlListener::DropClosed()
   {
-    std::erase_if(mConnections, [](const std::unique_ptr<SConnection>& connection) { return connection->socket < 0; });
+    std::erase_if(mConnections, [](const std::unique_ptr<SConnection>& connection) {
+      return connection->socket < 0;
+    });
   }
 
-  void CControlListener::Flush(SConnection& connection)
+  void CControlListener::Flush(
+    SConnection& connection
+  )
   {
     while (connection.socket >= 0 && !connection.outgoing.empty()) {
-      const ssize_t sent = ::send(connection.socket, connection.outgoing.data(), connection.outgoing.size(), MSG_NOSIGNAL);
+      const ssize_t sent =
+        ::send(connection.socket, connection.outgoing.data(), connection.outgoing.size(), MSG_NOSIGNAL);
       if (sent < 0) {
         if (!WouldBlock()) {
           Close(connection, errno == EPIPE || errno == ECONNRESET ? "disconnected" : "closed (send failed)");
@@ -344,13 +406,17 @@ namespace faf::server
     }
   }
 
-  void CControlListener::Send(SConnection& connection, const std::string_view json)
+  void CControlListener::Send(
+    SConnection& connection,
+    const std::string_view json
+  )
   {
     if (connection.socket < 0 || !connection.channel || !connection.channel->Ready()) {
       return;
     }
-    const std::vector<std::uint8_t> frame =
-      connection.channel->Seal(std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(json.data()), json.size()));
+    const std::vector<std::uint8_t> frame = connection.channel->Seal(
+      std::span<const std::uint8_t>(reinterpret_cast<const std::uint8_t*>(json.data()), json.size())
+    );
     if (frame.empty()) {
       return; // too large for one message
     }
@@ -362,9 +428,15 @@ namespace faf::server
     Flush(connection);
   }
 
-  void CControlListener::Answer(const std::int64_t id, const std::string_view json)
+  void CControlListener::Answer(
+    const std::int64_t id,
+    const std::string_view json
+  )
   {
-    const auto waiting = std::find_if(mWaiting.begin(), mWaiting.end(), [id](const std::pair<std::int64_t, std::uint64_t>& entry) { return entry.first == id; });
+    const auto waiting =
+      std::find_if(mWaiting.begin(), mWaiting.end(), [id](const std::pair<std::int64_t, std::uint64_t>& entry) {
+      return entry.first == id;
+    });
     if (waiting == mWaiting.end()) {
       return; // no request with this id is waiting: nobody asked
     }
@@ -378,26 +450,74 @@ namespace faf::server
     }
   }
 
-  void CControlListener::Reply(const std::int64_t id, const std::string_view fields)
+  bool CControlListener::OpenRest(
+    const remote::net::SEndpoint& at,
+    std::string token,
+    std::string corsOrigin,
+    std::string& error
+  )
   {
-    Answer(id, "{\"id\":" + std::to_string(id) + ",\"ok\":true" + (fields.empty() ? std::string() : "," + std::string(fields)) + "}");
+    auto rest = std::make_unique<CRestListener>();
+    if (!rest->Open(at, std::move(token), std::move(corsOrigin), error)) {
+      return false;
+    }
+    mRest = std::move(rest);
+    return true;
   }
 
-  void CControlListener::Refuse(const std::int64_t id, const std::string_view error)
+  void CControlListener::Reply(
+    const std::int64_t id,
+    const std::string_view fields
+  )
   {
-    Answer(id, "{\"id\":" + std::to_string(id) + ",\"ok\":false,\"error\":" + JsonString(error) + "}");
+    const std::string json = "{\"id\":" + std::to_string(id) + ",\"ok\":true" +
+      (fields.empty() ? std::string() : "," + std::string(fields)) + "}";
+    if (id < 0 && mRest) {
+      mRest->Answer(id, true, json); // plan WP17.11: a REST request's
+      return;
+    }
+    Answer(id, json);
   }
 
-  void CControlListener::Event(const std::string_view name, const std::string_view fields)
+  void CControlListener::Refuse(
+    const std::int64_t id,
+    const std::string_view error
+  )
   {
-    const std::string json = "{\"event\":" + JsonString(name) + (fields.empty() ? std::string() : "," + std::string(fields)) + "}";
+    const std::string json = "{\"id\":" + std::to_string(id) + ",\"ok\":false,\"error\":" + JsonString(error) + "}";
+    if (id < 0 && mRest) {
+      mRest->Answer(id, false, json);
+      return;
+    }
+    Answer(id, json);
+  }
+
+  void CControlListener::Event(
+    const std::string_view name,
+    const std::string_view fields
+  )
+  {
+    const std::string json =
+      "{\"event\":" + JsonString(name) + (fields.empty() ? std::string() : "," + std::string(fields)) + "}";
     for (const std::unique_ptr<SConnection>& connection : mConnections) {
       Send(*connection, json);
     }
+    if (mRest) {
+      mRest->Event(name, json);
+    }
   }
 
-  void CControlListener::Poll(std::vector<SControlRequest>& requests, const std::uint64_t nowUs)
+  void CControlListener::Poll(
+    std::vector<SControlRequest>& requests,
+    const std::uint64_t nowUs
+  )
   {
+    if (mRest) {
+      mRest->Poll(requests, nowUs); // plan WP17.11
+      for (std::string& line : mRest->TakeNews()) {
+        mNews.push_back(std::move(line));
+      }
+    }
     if (mListenSocket < 0) {
       return;
     }
@@ -410,7 +530,8 @@ namespace faf::server
     for (;;) {
       sockaddr_in from{};
       socklen_t size = sizeof(from);
-      const int socket = ::accept4(mListenSocket, reinterpret_cast<sockaddr*>(&from), &size, SOCK_NONBLOCK | SOCK_CLOEXEC);
+      const int socket =
+        ::accept4(mListenSocket, reinterpret_cast<sockaddr*>(&from), &size, SOCK_NONBLOCK | SOCK_CLOEXEC);
       if (socket < 0) {
         break;
       }
@@ -424,7 +545,10 @@ namespace faf::server
       }
       DropClosed();
       if (mConnections.size() >= kMaxControlConnections) {
-        mNews.push_back("control: " + peer.Text() + " refused: " + std::to_string(kMaxControlConnections) + " control connections are open");
+        mNews.push_back(
+          "control: " + peer.Text() + " refused: " + std::to_string(kMaxControlConnections) +
+          " control connections are open"
+        );
         ::close(socket);
         continue;
       }
@@ -451,7 +575,9 @@ namespace faf::server
     DropClosed();
   }
 
-  bool CControlListener::PeerClosed(const SConnection& connection)
+  bool CControlListener::PeerClosed(
+    const SConnection& connection
+  )
   {
     if (connection.socket < 0) {
       return false;
@@ -461,7 +587,11 @@ namespace faf::server
     return got == 0 || (got < 0 && !WouldBlock());
   }
 
-  void CControlListener::ReadConnection(SConnection& connection, std::vector<SControlRequest>& requests, const std::uint64_t nowUs)
+  void CControlListener::ReadConnection(
+    SConnection& connection,
+    std::vector<SControlRequest>& requests,
+    const std::uint64_t nowUs
+  )
   {
     if (connection.socket < 0) {
       return;
@@ -480,7 +610,11 @@ namespace faf::server
       if (got < 0) {
         if (!WouldBlock()) {
           // A peer that closes with our events unread resets the connection: that's a disconnect too.
-          Close(connection, errno == ECONNRESET ? (connection.channel->Ready() ? "disconnected" : "disconnected during the handshake") : "closed (receive failed)");
+          Close(
+            connection,
+            errno == ECONNRESET ? (connection.channel->Ready() ? "disconnected" : "disconnected during the handshake")
+                                : "closed (receive failed)"
+          );
         }
         break;
       }
@@ -533,7 +667,10 @@ namespace faf::server
       const std::string_view text(reinterpret_cast<const char*>(message.data()), message.size());
       std::optional<SControlRequest> request = ParseControlRequest(text);
       if (!request) {
-        Send(connection, "{\"id\":0,\"ok\":false,\"error\":" + JsonString("not a request: a flat JSON object with an \"op\"") + "}");
+        Send(
+          connection,
+          "{\"id\":0,\"ok\":false,\"error\":" + JsonString("not a request: a flat JSON object with an \"op\"") + "}"
+        );
         continue;
       }
       if (mWaiting.size() >= 1024u) {

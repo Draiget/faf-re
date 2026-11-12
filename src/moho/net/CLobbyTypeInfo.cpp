@@ -25,7 +25,9 @@ namespace
    * Registers `CScriptObject` as one reflected `CLobby` base lane at
    * offset `+0x00`.
    */
-  void AddCScriptObjectBaseToCLobbyType(gpg::RType* const typeInfo)
+  void AddCScriptObjectBaseToCLobbyType(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<moho::CScriptObject>(typeInfo);
   }
@@ -94,7 +96,9 @@ namespace moho
   }
 } // namespace moho
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CLobbyTypeInfo_2c77e3, register_CLobbyTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CLobbyTypeInfo_2c77e3,
+  register_CLobbyTypeInfo
+)

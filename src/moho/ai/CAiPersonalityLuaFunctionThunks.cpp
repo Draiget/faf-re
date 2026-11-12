@@ -75,7 +75,11 @@ namespace moho
   CScrLuaInitForm* register_sim_SimInits_mForms_aiPersonalityStartupAnchor()
   {
     static CScrLuaClassBinder binder(
-      moho::SCR_SimLuaInitSet(), "moho.aipersonality_methods", &CScrLuaMetatableFactory<CAiPersonality>::Instance(), "CAiPersonality", ""
+      moho::SCR_SimLuaInitSet(),
+      "moho.aipersonality_methods",
+      &CScrLuaMetatableFactory<CAiPersonality>::Instance(),
+      "CAiPersonality",
+      ""
     );
     return &binder;
   }

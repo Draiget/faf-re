@@ -48,7 +48,10 @@ namespace
    * Register-shape adapter that forwards archive load to
    * `moho::CAniPose::MemberDeserialize`.
    */
-  [[maybe_unused]] void DeserializeCAniPoseRegisterAdapter(moho::CAniPose* const pose, gpg::ReadArchive* const archive)
+  [[maybe_unused]] void DeserializeCAniPoseRegisterAdapter(
+    moho::CAniPose* const pose,
+    gpg::ReadArchive* const archive
+  )
   {
     if (!pose) {
       return;
@@ -165,7 +168,6 @@ namespace
 
   [[maybe_unused]] CAniPoseSerializerStartupBootstrap gCAniPoseSerializerStartupBootstrap;
 
-
   [[nodiscard]] moho::VTransform MakeIdentityPoseTransform() noexcept
   {
     moho::VTransform transform{};
@@ -251,26 +253,17 @@ namespace
     return storage;
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-  void InitializePoseBonesInlineStorage(moho::CAniPose& pose)
+  void InitializePoseBonesInlineStorage(
+    moho::CAniPose& pose
+  )
   {
     (void)InitializePoseBoneArrayInlineLanes(&pose.mBones);
   }
 
-
-
-  [[nodiscard]] bool PoseTransformDiffers(const moho::VTransform& lhs, const moho::VTransform& rhs) noexcept
+  [[nodiscard]] bool PoseTransformDiffers(
+    const moho::VTransform& lhs,
+    const moho::VTransform& rhs
+  ) noexcept
   {
     return lhs.pos_ != rhs.pos_ || lhs.orient_ != rhs.orient_;
   }
@@ -284,7 +277,9 @@ namespace
 
   /// Reads a source bone's flag for copying. A bone that another thread is recomputing right now is
   /// copied as dirty, so the copy never waits on a recompute nobody will publish to it.
-  [[nodiscard]] std::uint8_t LoadCopyableCompositeState(const moho::CAniPoseBone& source) noexcept
+  [[nodiscard]] std::uint8_t LoadCopyableCompositeState(
+    const moho::CAniPoseBone& source
+  ) noexcept
   {
     const std::uint8_t state =
       std::atomic_ref<std::uint8_t>(const_cast<std::uint8_t&>(source.mCompositeDirty)).load(std::memory_order_acquire);
@@ -326,7 +321,9 @@ namespace moho
    * Copy-constructs one pose-bone lane including transform payload, owning pose
    * link, parent link, and visibility flags.
    */
-  CAniPoseBone::CAniPoseBone(const CAniPoseBone& copy)
+  CAniPoseBone::CAniPoseBone(
+    const CAniPoseBone& copy
+  )
     : mCompositeDirty(LoadCopyableCompositeState(copy))
     , mCompositeIsLocal(copy.mCompositeIsLocal)
     , mLocalTransform(copy.mLocalTransform)
@@ -353,7 +350,9 @@ namespace moho
    * release binary uses. Drives the per-element copy in
    * CAniPoseBoneTypeInfo's range copy-assign helper.
    */
-  CAniPoseBone& CAniPoseBone::operator=(const CAniPoseBone& copy) noexcept
+  CAniPoseBone& CAniPoseBone::operator=(
+    const CAniPoseBone& copy
+  ) noexcept
   {
     // Flag before transform, as in the copy constructor.
     mCompositeDirty = LoadCopyableCompositeState(copy);
@@ -393,7 +392,9 @@ namespace moho
    * `orient_ * rotation`, with the existing orientation as the LEFT operand.
    * The previous body had both the convention and the operand order wrong.
    */
-  void CAniPoseBone::Rotate(const Wm3::Quaternionf& rotation)
+  void CAniPoseBone::Rotate(
+    const Wm3::Quaternionf& rotation
+  )
   {
     mLocalTransform.orient_ = MultiplyQuat(mLocalTransform.orient_, rotation);
     if (mPose != nullptr) {
@@ -407,7 +408,9 @@ namespace moho
    * What it does:
    * Replaces this bone local transform and marks the owning pose lane dirty.
    */
-  void CAniPoseBone::SetLocalTransform(const VTransform& transform)
+  void CAniPoseBone::SetLocalTransform(
+    const VTransform& transform
+  )
   {
     mLocalTransform = transform;
     if (mPose != nullptr) {
@@ -486,8 +489,7 @@ namespace moho
     const CAniSkel* const skeleton = skeletonHandle.get();
     const SAniSkelBone* const bonesBegin = skeleton->mBones.begin();
     const std::uint32_t boneIndex = static_cast<std::uint32_t>(mIdx);
-    if (bonesBegin
-        && boneIndex < static_cast<std::uint32_t>(skeleton->mBones.end() - bonesBegin)) {
+    if (bonesBegin && boneIndex < static_cast<std::uint32_t>(skeleton->mBones.end() - bonesBegin)) {
       return bonesBegin + boneIndex;
     }
     return nullptr;
@@ -512,8 +514,7 @@ namespace moho
     const std::uint32_t boneIndex = static_cast<std::uint32_t>(mIdx);
 
     const SAniSkelBone* targetBone = nullptr;
-    if (bonesBegin
-        && boneIndex < static_cast<std::uint32_t>(skeleton->mBones.end() - bonesBegin)) {
+    if (bonesBegin && boneIndex < static_cast<std::uint32_t>(skeleton->mBones.end() - bonesBegin)) {
       targetBone = bonesBegin + boneIndex;
     }
 
@@ -523,7 +524,9 @@ namespace moho
   /**
    * Address: 0x0054BE30 (FUN_0054BE30, Moho::CAniPoseBone::SetVisibleRecur)
    */
-  std::uint32_t CAniPoseBone::SetVisibleRecur(const bool visible)
+  std::uint32_t CAniPoseBone::SetVisibleRecur(
+    const bool visible
+  )
   {
     std::uint32_t boneCount = 0;
     if (mPose != nullptr) {
@@ -551,7 +554,9 @@ namespace moho
    * Writes one bone's local-space flag, local transform lane, visibility, and
    * skip-interpolation flag in archive order.
    */
-  void CAniPoseBone::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CAniPoseBone::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     archive->WriteBool(mCompositeIsLocal);
 
@@ -565,7 +570,9 @@ namespace moho
   /**
    * Address: 0x0054F5C0 (FUN_0054F5C0, Moho::CAniPoseBone::MemberDeserialize)
    */
-  void CAniPoseBone::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CAniPoseBone::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     mCompositeDirty = 1u;
 
@@ -597,7 +604,10 @@ namespace moho
    * A null skeleton falls back to `CAniSkel::GetDefaultSkeleton()`
    * (0x0054AF4C..0x0054AFE9), so a pose always has a skeleton to size against.
    */
-  CAniPose::CAniPose(const boost::shared_ptr<const CAniSkel> skeleton, const float scale)
+  CAniPose::CAniPose(
+    const boost::shared_ptr<const CAniSkel> skeleton,
+    const float scale
+  )
     : mSkeleton(skeleton)
     , mScale(scale)
     , mLocalTransform(MakeIdentityPoseTransform())
@@ -612,8 +622,7 @@ namespace moho
 
     // Bone count comes straight off the skeleton's own array (0x0054AFEC:
     // `mBones._Mylast - mBones._Myfirst`, zero when the array is unallocated).
-    const std::uint32_t boneCount =
-      mSkeleton ? static_cast<std::uint32_t>(mSkeleton->mBones.size()) : 0u;
+    const std::uint32_t boneCount = mSkeleton ? static_cast<std::uint32_t>(mSkeleton->mBones.size()) : 0u;
 
     CAniPoseBone fillBone{};
     fillBone.mCompositeTransform = MakeIdentityPoseTransform();
@@ -645,10 +654,9 @@ namespace moho
       poseBone.mSkipNextInterp = 0u;
 
       const std::int32_t parentIndex = skeletonBone->mParentBoneIndex;
-      poseBone.mParent =
-        (parentIndex >= 0 && static_cast<std::uint32_t>(parentIndex) < boneCount)
-          ? &bonesBegin[static_cast<std::uint32_t>(parentIndex)]
-          : nullptr;
+      poseBone.mParent = (parentIndex >= 0 && static_cast<std::uint32_t>(parentIndex) < boneCount)
+        ? &bonesBegin[static_cast<std::uint32_t>(parentIndex)]
+        : nullptr;
 
       // 0x0054B155..0x0054B17A: rest position from the skeleton bone at +0x18 scaled by
       // `scale`, rest orientation at +0x08 verbatim -- the same +0x08 transform
@@ -671,7 +679,9 @@ namespace moho
    * Initializes one pose to default storage/layout lanes and then overwrites
    * that state from `copy`.
    */
-  CAniPose::CAniPose(const CAniPose& copy)
+  CAniPose::CAniPose(
+    const CAniPose& copy
+  )
     : mSkeleton()
     , mScale(0.0f)
     , mLocalTransform(MakeIdentityPoseTransform())
@@ -722,7 +732,9 @@ namespace moho
    * Copies pose-level state and rebuilds destination per-bone parent pointers
    * from the destination skeleton bone hierarchy.
    */
-  void CAniPose::OverwritePose(const CAniPose& copy)
+  void CAniPose::OverwritePose(
+    const CAniPose& copy
+  )
   {
     mSkeleton = copy.mSkeleton;
     mScale = copy.mScale;
@@ -742,9 +754,8 @@ namespace moho
 
     const CAniPoseBone* const sourceBegin = copy.mBones.begin();
     const CAniPoseBone* const sourceEnd = copy.mBones.end();
-    const std::uint32_t boneCount = (sourceBegin && sourceEnd && sourceEnd >= sourceBegin)
-      ? static_cast<std::uint32_t>(sourceEnd - sourceBegin)
-      : 0u;
+    const std::uint32_t boneCount =
+      (sourceBegin && sourceEnd && sourceEnd >= sourceBegin) ? static_cast<std::uint32_t>(sourceEnd - sourceBegin) : 0u;
 
     if (boneCount == 0u || sourceBegin == nullptr) {
       mBones.resize(0, fillBone);
@@ -892,7 +903,10 @@ namespace moho
    * Copies one source pose's local transform and bone-local lanes into this
    * pose and marks copied destination lanes composite-dirty.
    */
-  void CAniPose::CopyPose(const CAniPose* const sourcePose, const bool preserveSourceLane)
+  void CAniPose::CopyPose(
+    const CAniPose* const sourcePose,
+    const bool preserveSourceLane
+  )
   {
     (void)preserveSourceLane;
     if (sourcePose == nullptr) {
@@ -951,7 +965,9 @@ namespace moho
    * Applies one new pose-world transform and invalidates composite caches for
    * non-local bones whose parent lane is root or already dirty.
    */
-  void CAniPose::SetWorldTransform(const VTransform& transform)
+  void CAniPose::SetWorldTransform(
+    const VTransform& transform
+  )
   {
     if (!PoseTransformDiffers(mLocalTransform, transform)) {
       return;
@@ -1084,7 +1100,9 @@ namespace moho
   /**
    * Address: 0x0054B990 (FUN_0054B990, ?MarkBoneDirty@CAniPose@Moho@@AAEXH@Z)
    */
-  void CAniPose::MarkBoneDirty(const int idx)
+  void CAniPose::MarkBoneDirty(
+    const int idx
+  )
   {
     CAniPoseBone* const bonesBegin = mBones.begin();
     CAniPoseBone* const bonesEnd = mBones.end();
@@ -1118,10 +1136,14 @@ namespace moho
    * Rotates one local-space position delta by the bone local orientation,
    * accumulates it into local position, and marks the bone dirty.
    */
-  [[maybe_unused]] void ApplyBoneLocalPositionDelta(CAniPoseBone* const bone, const Wm3::Vector3f& localDelta)
+  [[maybe_unused]] void ApplyBoneLocalPositionDelta(
+    CAniPoseBone* const bone,
+    const Wm3::Vector3f& localDelta
+  )
   {
     Wm3::Vector3f rotatedDelta{};
-    const Wm3::Vector3f* const deltaInPoseSpace = MultQuadVec(&rotatedDelta, &localDelta, &bone->mLocalTransform.orient_);
+    const Wm3::Vector3f* const deltaInPoseSpace =
+      MultQuadVec(&rotatedDelta, &localDelta, &bone->mLocalTransform.orient_);
 
     bone->mLocalTransform.pos_.x += deltaInPoseSpace->x;
     bone->mLocalTransform.pos_.y += deltaInPoseSpace->y;
@@ -1163,7 +1185,10 @@ namespace moho
    * Composes one pose-bone local transform with an incoming transform and then
    * marks that bone dirty through its owning pose/index lanes.
    */
-  void CAniPose::ApplyBoneLocalTransform(CAniPoseBone* const bone, const VTransform& transform)
+  void CAniPose::ApplyBoneLocalTransform(
+    CAniPoseBone* const bone,
+    const VTransform& transform
+  )
   {
     bone->mLocalTransform = VTransform::Compose(transform, bone->mLocalTransform);
     bone->mPose->MarkBoneDirty(bone->mIdx);
@@ -1176,7 +1201,9 @@ namespace moho
    * Loads skeleton/shared-pointer state, scalar/local transform lanes, and the
    * pose-bone array, then rebuilds each bone's owning-pose/index/parent links.
    */
-  void CAniPose::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CAniPose::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (!archive) {
       return;
@@ -1190,8 +1217,7 @@ namespace moho
 
     CAniPoseBone* const bonesBegin = mBones.begin();
     CAniPoseBone* const bonesEnd = mBones.end();
-    const std::uint32_t boneCount =
-      (bonesBegin && bonesEnd) ? static_cast<std::uint32_t>(bonesEnd - bonesBegin) : 0u;
+    const std::uint32_t boneCount = (bonesBegin && bonesEnd) ? static_cast<std::uint32_t>(bonesEnd - bonesBegin) : 0u;
 
     for (std::uint32_t boneIndex = 0; boneIndex < boneCount; ++boneIndex) {
       CAniPoseBone& bone = bonesBegin[boneIndex];
@@ -1225,7 +1251,9 @@ namespace moho
   /**
    * Address: 0x0054F4F0 (FUN_0054F4F0, Moho::CAniPose::MemberSerialize)
    */
-  void CAniPose::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CAniPose::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     const gpg::RRef nullOwner{};
     const gpg::RRef skeletonRef =

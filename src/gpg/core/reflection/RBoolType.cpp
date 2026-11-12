@@ -15,9 +15,15 @@ namespace
     return sInstance;
   }
 
-  struct Bootstrap { Bootstrap() { register_boolTypeInfoStartup(); } };
+  struct Bootstrap
+  {
+    Bootstrap()
+    {
+      register_boolTypeInfoStartup();
+    }
+  };
   Bootstrap gBootstrap;
-}
+} // namespace
 
 /**
  * Address: 0x008DEEF0 (FUN_008DEEF0, ?SetLexical@RBoolType@@UBE_N...)
@@ -26,7 +32,10 @@ namespace
  * Parses "0"/"false"/"no" as false and "1"/"true"/"yes" as true
  * (case-insensitive). Returns true on success.
  */
-bool RBoolType::SetLexical(const gpg::RRef& ref, const char* const str) const
+bool RBoolType::SetLexical(
+  const gpg::RRef& ref,
+  const char* const str
+) const
 {
   auto* const out = static_cast<bool*>(ref.mObj);
   if (_stricmp(str, "0") == 0 || _stricmp(str, "false") == 0 || _stricmp(str, "no") == 0) {
@@ -46,7 +55,9 @@ bool RBoolType::SetLexical(const gpg::RRef& ref, const char* const str) const
  * What it does:
  * Returns "true" or "false" based on the bool value referenced by ref.mObj.
  */
-fa::string RBoolType::GetLexical(const gpg::RRef& ref) const
+fa::string RBoolType::GetLexical(
+  const gpg::RRef& ref
+) const
 {
   const auto* const value = static_cast<const bool*>(ref.mObj);
   return *value ? fa::string{"true"} : fa::string{"false"};
@@ -66,7 +77,10 @@ boolTypeInfo::boolTypeInfo()
 boolTypeInfo::~boolTypeInfo() = default;
 
 /** Address: 0x008E0320 */
-const char* boolTypeInfo::GetName() const { return "bool"; }
+const char* boolTypeInfo::GetName() const
+{
+  return "bool";
+}
 
 /**
  * Address: 0x008E0330
@@ -89,7 +103,9 @@ void register_boolTypeInfoStartup()
   (void)Acquire();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_boolTypeInfoStartup_ca8f89, register_boolTypeInfoStartup)
+GPG_PREREGISTER_INIT(
+  register_boolTypeInfoStartup_ca8f89,
+  register_boolTypeInfoStartup
+)

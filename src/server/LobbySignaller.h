@@ -59,7 +59,8 @@ namespace faf::server
     void OnJoined(std::int32_t uid, std::vector<SOutgoing>& out);
     /** `uid` has left (out of the game, or its connection gone for good). */
     void OnLeft(std::int32_t uid, std::vector<SOutgoing>& out);
-    /** Plan WPR.50: nothing has come from `uid` for a while; it may come back. A logical host that does is succeeded. */
+    /** Plan WPR.50: nothing has come from `uid` for a while; it may come back. A logical host that does is succeeded.
+     */
     void OnAway(std::int32_t uid, std::vector<SOutgoing>& out);
     /** `uid` is heard again after `OnAway`: a role given out while it was away is given to it now. */
     void OnBack(std::int32_t uid, std::vector<SOutgoing>& out);
@@ -70,9 +71,15 @@ namespace faf::server
     [[nodiscard]] std::size_t InLobby() const noexcept;
     [[nodiscard]] std::vector<std::int32_t> InLobbyUids() const;
     /** The logical host left before launch and nobody is left to take over: the lobby can't go on. */
-    [[nodiscard]] bool HostLeft() const noexcept { return mHostLeft; }
+    [[nodiscard]] bool HostLeft() const noexcept
+    {
+      return mHostLeft;
+    }
     /** Times the logical host has been succeeded. */
-    [[nodiscard]] unsigned Successions() const noexcept { return mSuccessions; }
+    [[nodiscard]] unsigned Successions() const noexcept
+    {
+      return mSuccessions;
+    }
 
   private:
     struct SParticipant
@@ -82,7 +89,7 @@ namespace faf::server
       bool in = false;      // channel up
       bool lobbied = false; // has its role, from the current logical host
       bool left = false;
-      bool away = false;    // quiet for a while (`OnAway`), not left
+      bool away = false; // quiet for a while (`OnAway`), not left
     };
 
     void GiveRole(SParticipant& participant, std::vector<SOutgoing>& out);
@@ -92,7 +99,12 @@ namespace faf::server
     void Succeed(std::vector<SOutgoing>& out);
     static void Push(std::vector<SOutgoing>& out, std::int32_t to, const remote::net::SLobbySignal& signal);
     [[nodiscard]] SParticipant* Find(std::int32_t uid) noexcept;
-    [[nodiscard]] bool IsHost(const SParticipant& participant) const noexcept { return &participant == &mParticipants[mHost]; }
+    [[nodiscard]] bool IsHost(
+      const SParticipant& participant
+    ) const noexcept
+    {
+      return &participant == &mParticipants[mHost];
+    }
 
     std::string mScenario;
     std::uint8_t mFlags = 0;

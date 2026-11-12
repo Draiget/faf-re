@@ -58,17 +58,20 @@ namespace moho
 #if defined(_M_IX86)
   static_assert(sizeof(EntityPositionWatchEntry) == 0x1C, "EntityPositionWatchEntry size must be 0x1C");
   static_assert(
-    offsetof(EntityPositionWatchEntry, mLastPos) == 0x04, "EntityPositionWatchEntry::mLastPos offset must be 0x04"
+    offsetof(EntityPositionWatchEntry, mLastPos) == 0x04,
+    "EntityPositionWatchEntry::mLastPos offset must be 0x04"
   );
   static_assert(
-    offsetof(EntityPositionWatchEntry, mRadius) == 0x10, "EntityPositionWatchEntry::mRadius offset must be 0x10"
+    offsetof(EntityPositionWatchEntry, mRadius) == 0x10,
+    "EntityPositionWatchEntry::mRadius offset must be 0x10"
   );
   static_assert(
     offsetof(EntityPositionWatchEntry, mLastTickUpdated) == 0x14,
     "EntityPositionWatchEntry::mLastTickUpdated offset must be 0x14"
   );
   static_assert(
-    offsetof(EntityPositionWatchEntry, mEnabled) == 0x18, "EntityPositionWatchEntry::mEnabled offset must be 0x18"
+    offsetof(EntityPositionWatchEntry, mEnabled) == 0x18,
+    "EntityPositionWatchEntry::mEnabled offset must be 0x18"
   );
 #endif
 } // namespace moho

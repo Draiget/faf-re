@@ -39,7 +39,6 @@ namespace moho
 
   static_assert(sizeof(ECommandEventTypeInfo) == 0x78, "ECommandEventTypeInfo size must be 0x78");
 
-
   /**
    * Address: 0x006E7D60 (FUN_006E7D60, sub_6E7D60)
    *

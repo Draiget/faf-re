@@ -3,8 +3,11 @@
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
+#endif
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/d3d/CD3DDevice.h"
@@ -29,12 +32,13 @@ namespace moho
    * What it does:
    * Initializes intrusive resource links and seeds texture context from location.
    */
-  RD3DTextureResource::RD3DTextureResource(const char* const location)
+  RD3DTextureResource::RD3DTextureResource(
+    const char* const location
+  )
     : mResources()
     , mContext(location != nullptr ? location : "", 0U, 0U, 0U)
     , mBaseTex()
-  {
-  }
+  {}
 
   /**
    * Address: 0x0043D7A0 (FUN_0043D7A0)
@@ -44,7 +48,11 @@ namespace moho
    * What it does:
    * Initializes one archive-backed texture context from in-memory bytes.
    */
-  RD3DTextureResource::RD3DTextureResource(const char* const location, void* const data, const std::size_t size)
+  RD3DTextureResource::RD3DTextureResource(
+    const char* const location,
+    void* const data,
+    const std::size_t size
+  )
     : mResources()
     , mContext()
     , mBaseTex()
@@ -75,7 +83,9 @@ namespace moho
    * What it does:
    * Copies caller-provided texture-bytes payload into retained context data lane.
    */
-  bool RD3DTextureResource::Init(gpg::MemBuffer<const char> data)
+  bool RD3DTextureResource::Init(
+    gpg::MemBuffer<const char> data
+  )
   {
     mContext.SetDataBuffer(data);
     return true;
@@ -152,7 +162,9 @@ namespace moho
    * What it does:
    * Loads base texture on demand and returns current width/height as float vector.
    */
-  Wm3::Vector3f* RD3DTextureResource::GetDimensions(Wm3::Vector3f* const outDimensions)
+  Wm3::Vector3f* RD3DTextureResource::GetDimensions(
+    Wm3::Vector3f* const outDimensions
+  )
   {
     if (outDimensions == nullptr) {
       return nullptr;
@@ -180,7 +192,9 @@ namespace moho
    * What it does:
    * Loads base texture on demand and returns original integer width/height.
    */
-  Wm3::Vector2i* RD3DTextureResource::GetOriginalDimensions(Wm3::Vector2i* const outDimensions)
+  Wm3::Vector2i* RD3DTextureResource::GetOriginalDimensions(
+    Wm3::Vector2i* const outDimensions
+  )
   {
     if (outDimensions == nullptr) {
       return nullptr;
@@ -221,7 +235,9 @@ namespace moho
    * What it does:
    * Loads base texture on demand and copies retained texture ownership.
    */
-  RD3DTextureResource::TextureHandle& RD3DTextureResource::GetTexture(TextureHandle& outTexture)
+  RD3DTextureResource::TextureHandle& RD3DTextureResource::GetTexture(
+    TextureHandle& outTexture
+  )
   {
     LoadTexture();
     outTexture = mBaseTex;
@@ -236,7 +252,10 @@ namespace moho
    * What it does:
    * Preserves unreachable lock lane after forcing lazy texture load.
    */
-  bool RD3DTextureResource::Lock(std::uint32_t* const, void** const)
+  bool RD3DTextureResource::Lock(
+    std::uint32_t* const,
+    void** const
+  )
   {
     LoadTexture();
     gpg::HandleAssertFailure(kUnreachableExpr, 189, kTextureSourcePath);
@@ -251,7 +270,11 @@ namespace moho
    * What it does:
    * Preserves unreachable rect-lock lane after forcing lazy texture load.
    */
-  bool RD3DTextureResource::LockRect(const RECT* const, std::uint32_t* const, void** const)
+  bool RD3DTextureResource::LockRect(
+    const RECT* const,
+    std::uint32_t* const,
+    void** const
+  )
   {
     LoadTexture();
     gpg::HandleAssertFailure(kUnreachableExpr, 195, kTextureSourcePath);
@@ -279,7 +302,9 @@ namespace moho
    * What it does:
    * Preserves unreachable archive-load lane after forcing lazy texture load.
    */
-  bool RD3DTextureResource::ReadFromArchive(gpg::BinaryReader* const)
+  bool RD3DTextureResource::ReadFromArchive(
+    gpg::BinaryReader* const
+  )
   {
     LoadTexture();
     gpg::HandleAssertFailure(kUnreachableExpr, 208, kTextureSourcePath);
@@ -294,7 +319,10 @@ namespace moho
    * What it does:
    * Preserves unreachable archive-save lane after forcing lazy texture load.
    */
-  bool RD3DTextureResource::SaveToArchive(gpg::Stream* const, const bool)
+  bool RD3DTextureResource::SaveToArchive(
+    gpg::Stream* const,
+    const bool
+  )
   {
     LoadTexture();
     gpg::HandleAssertFailure(kUnreachableExpr, 214, kTextureSourcePath);

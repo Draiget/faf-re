@@ -13,12 +13,18 @@
 
 namespace
 {
-  void Put(std::uint8_t* const data, const std::size_t offset, const std::uint32_t value)
+  void Put(
+    std::uint8_t* const data,
+    const std::size_t offset,
+    const std::uint32_t value
+  )
   {
     std::memcpy(data + offset, &value, sizeof(value));
   }
 
-  void TestTopology(const std::uint32_t skip)
+  void TestTopology(
+    const std::uint32_t skip
+  )
   {
     // Deliberately unaligned: DDS files need no word alignment.
     std::array<std::uint8_t, 150U> storage{};
@@ -53,7 +59,8 @@ namespace
           Put(data, 132U, dimension);
           Put(data, 136U, misc);
           Put(data, 140U, 3U); // arrays do not themselves suppress 2D quality
-          EXPECT_TRUE(effective() == (dimension == 4U || misc == 4U ? 0U : chained)) << "DX10 topology supersedes legacy caps";
+          EXPECT_TRUE(effective() == (dimension == 4U || misc == 4U ? 0U : chained))
+            << "DX10 topology supersedes legacy caps";
         }
       }
     }
@@ -83,7 +90,10 @@ namespace
   }
 } // namespace
 
-TEST(Existing_TextureQuality, MipLevelsTopology)
+TEST(
+  Existing_TextureQuality,
+  MipLevelsTopology
+)
 {
   for (std::uint32_t skip = 0U; skip < 32U; ++skip) {
     SCOPED_TRACE(testing::Message() << "skip " << skip);

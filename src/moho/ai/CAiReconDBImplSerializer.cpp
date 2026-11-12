@@ -92,7 +92,9 @@ void SReconKeyTypeInfo::Init()
 /**
  * Address: 0x005C90F0 (FUN_005C90F0, Moho::SReconKey::MemberDeserialize)
  */
-void SReconKey::MemberDeserialize(gpg::ReadArchive* const archive)
+void SReconKey::MemberDeserialize(
+  gpg::ReadArchive* const archive
+)
 {
   const gpg::RRef ownerRef{};
   archive->Read(gpg::RTypeOf<WeakPtr<Entity>>(), &sourceEntity, ownerRef);
@@ -102,7 +104,9 @@ void SReconKey::MemberDeserialize(gpg::ReadArchive* const archive)
 /**
  * Address: 0x005C9170 (FUN_005C9170, Moho::SReconKey::MemberSerialize)
  */
-void SReconKey::MemberSerialize(gpg::WriteArchive* const archive) const
+void SReconKey::MemberSerialize(
+  gpg::WriteArchive* const archive
+) const
 {
   const gpg::RRef ownerRef{};
   archive->Write(gpg::RTypeOf<WeakPtr<Entity>>(), &sourceEntity, ownerRef);
@@ -117,12 +121,17 @@ void moho::register_SReconKeyTypeInfo()
   (void)PreregisterSReconKeyTypeInfo();
 }
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_SReconKeyTypeInfo_e639f8, moho::register_SReconKeyTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_SReconKeyTypeInfo_e639f8,
+  moho::register_SReconKeyTypeInfo
+)
 
-GPG_PREREGISTER_INIT(PreregisterSReconKeyTypeInfo_e639f8, PreregisterSReconKeyTypeInfo)
+GPG_PREREGISTER_INIT(
+  PreregisterSReconKeyTypeInfo_e639f8,
+  PreregisterSReconKeyTypeInfo
+)
 
 namespace moho
 {
@@ -153,7 +162,9 @@ namespace moho
    * What it does:
    * Deserializes CAiReconDBImpl reflected member lanes in binary order.
    */
-  void CAiReconDBImpl::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CAiReconDBImpl::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     const gpg::RRef ownerRef{};
     archive->Read(gpg::RTypeOf<ReconBlipMap>(), &mBlipMap, ownerRef);
@@ -182,7 +193,9 @@ namespace moho
    * What it does:
    * Serializes CAiReconDBImpl reflected member lanes in binary order.
    */
-  void CAiReconDBImpl::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CAiReconDBImpl::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     const gpg::RRef ownerRef{};
     archive->Write(gpg::RTypeOf<ReconBlipMap>(), &mBlipMap, ownerRef);

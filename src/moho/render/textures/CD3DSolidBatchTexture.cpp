@@ -50,7 +50,9 @@ namespace moho
      * Returns the map sentinel/end iterator lane.
      */
     template <class Map>
-    [[nodiscard]] typename Map::iterator GetMapEnd(Map& map)
+    [[nodiscard]] typename Map::iterator GetMapEnd(
+      Map& map
+    )
     {
       return map.end();
     }
@@ -67,7 +69,10 @@ namespace moho
      * Returns the first map entry whose key is not less than `color`.
      */
     template <class Map>
-    [[nodiscard]] typename Map::iterator GetMapLowerBound(Map& map, const typename Map::key_type& key)
+    [[nodiscard]] typename Map::iterator GetMapLowerBound(
+      Map& map,
+      const typename Map::key_type& key
+    )
     {
       return map.lower_bound(key);
     }
@@ -80,7 +85,9 @@ namespace moho
      * Returns an iterator/cursor result unchanged.
      */
     template <class Iterator>
-    [[nodiscard]] Iterator CopyIteratorResult(Iterator iterator)
+    [[nodiscard]] Iterator CopyIteratorResult(
+      Iterator iterator
+    )
     {
       return iterator;
     }
@@ -94,7 +101,10 @@ namespace moho
      * iterators stay at end.
      */
     template <class Map>
-    void AdvanceMapIterator(Map& map, typename Map::iterator& iterator)
+    void AdvanceMapIterator(
+      Map& map,
+      typename Map::iterator& iterator
+    )
     {
       if (iterator != map.end()) {
         ++iterator;
@@ -109,7 +119,10 @@ namespace moho
      * `end()` maps to the rightmost entry and `begin()` wraps to `end()`.
      */
     template <class Map>
-    void RetreatMapIterator(Map& map, typename Map::iterator& iterator)
+    void RetreatMapIterator(
+      Map& map,
+      typename Map::iterator& iterator
+    )
     {
       if (map.empty()) {
         iterator = map.end();
@@ -137,7 +150,9 @@ namespace moho
      * Returns the rightmost (maximum-key) solid-texture cache entry.
      */
     template <class Map>
-    [[nodiscard]] typename Map::iterator GetMapRightmost(Map& map)
+    [[nodiscard]] typename Map::iterator GetMapRightmost(
+      Map& map
+    )
     {
       if (map.empty()) {
         return map.end();
@@ -155,7 +170,9 @@ namespace moho
      * Returns the leftmost (minimum-key) solid-texture cache entry.
      */
     template <class Map>
-    [[nodiscard]] typename Map::iterator GetMapLeftmost(Map& map)
+    [[nodiscard]] typename Map::iterator GetMapLeftmost(
+      Map& map
+    )
     {
       if (map.empty()) {
         return map.end();
@@ -198,17 +215,23 @@ namespace moho
       return GetMapLeftmost(GetSolidTextureMap());
     }
 
-    [[maybe_unused]] void AdvanceSolidTextureIterator(SolidTextureMap::iterator& iterator)
+    [[maybe_unused]] void AdvanceSolidTextureIterator(
+      SolidTextureMap::iterator& iterator
+    )
     {
       AdvanceMapIterator(GetSolidTextureMap(), iterator);
     }
 
-    [[maybe_unused]] void RetreatSolidTextureIterator(SolidTextureMap::iterator& iterator)
+    [[maybe_unused]] void RetreatSolidTextureIterator(
+      SolidTextureMap::iterator& iterator
+    )
     {
       RetreatMapIterator(GetSolidTextureMap(), iterator);
     }
 
-    [[nodiscard]] SolidTextureMap::iterator FindSolidTextureEntry(const std::uint32_t color)
+    [[nodiscard]] SolidTextureMap::iterator FindSolidTextureEntry(
+      const std::uint32_t color
+    )
     {
       SolidTextureMap& solidTextureMap = GetSolidTextureMap();
       SolidTextureMap::iterator it = GetMapLowerBound(solidTextureMap, color);
@@ -226,8 +249,9 @@ namespace moho
      * Locks one weak cached solid-texture handle into a shared handle only when
      * the control block still has live owners.
      */
-    [[nodiscard]] boost::shared_ptr<CD3DBatchTexture>
-      LockSolidTextureWeakHandle(const SolidTextureWeakHandle& weakTexture)
+    [[nodiscard]] boost::shared_ptr<CD3DBatchTexture> LockSolidTextureWeakHandle(
+      const SolidTextureWeakHandle& weakTexture
+    )
     {
       const SolidTextureHandle lockedTexture = weakTexture.lock();
       boost::shared_ptr<CD3DBatchTexture> outTexture = lockedTexture;
@@ -242,7 +266,9 @@ namespace moho
      * What it does:
      * Builds one owning shared handle from a raw solid-texture pointer.
      */
-    [[nodiscard]] SolidTextureHandle BuildSolidTextureSharedHandle(CD3DSolidBatchTexture* const rawTexture)
+    [[nodiscard]] SolidTextureHandle BuildSolidTextureSharedHandle(
+      CD3DSolidBatchTexture* const rawTexture
+    )
     {
       return SolidTextureHandle(rawTexture);
     }
@@ -280,7 +306,9 @@ namespace moho
    * What it does:
    * Initializes one 2x2 border-1 batch texture that stores one solid RGBA color.
    */
-  CD3DSolidBatchTexture::CD3DSolidBatchTexture(const std::uint32_t rgba)
+  CD3DSolidBatchTexture::CD3DSolidBatchTexture(
+    const std::uint32_t rgba
+  )
     : CD3DBatchTexture(kSolidTextureWidth, kSolidTextureHeight, kSolidTextureBorder)
     , mColor(rgba)
   {}
@@ -312,7 +340,10 @@ namespace moho
    * What it does:
    * Writes one constant-color DXT-compatible 4x4 block into destination memory.
    */
-  void CD3DSolidBatchTexture::BuildTextureData(void* const destination, const std::uint32_t pitch)
+  void CD3DSolidBatchTexture::BuildTextureData(
+    void* const destination,
+    const std::uint32_t pitch
+  )
   {
     (void)pitch;
     if (destination == nullptr) {
@@ -329,8 +360,7 @@ namespace moho
     const std::uint8_t red = static_cast<std::uint8_t>((mColor >> 16u) & 0xFFu);
 
     const std::uint16_t rgb565 = static_cast<std::uint16_t>(
-      ((static_cast<std::uint16_t>(red) & 0xF8u) << 8u) |
-      ((static_cast<std::uint16_t>(green) & 0xFCu) << 3u) |
+      ((static_cast<std::uint16_t>(red) & 0xF8u) << 8u) | ((static_cast<std::uint16_t>(green) & 0xFCu) << 3u) |
       ((static_cast<std::uint16_t>(blue) >> 3u) & 0x1Fu)
     );
 
@@ -352,7 +382,10 @@ namespace moho
    * What it does:
    * Returns the alpha byte from this solid RGBA color.
    */
-  std::uint8_t CD3DSolidBatchTexture::GetAlphaAt(const std::uint32_t x, const std::uint32_t y) const
+  std::uint8_t CD3DSolidBatchTexture::GetAlphaAt(
+    const std::uint32_t x,
+    const std::uint32_t y
+  ) const
   {
     (void)x;
     (void)y;
@@ -366,7 +399,9 @@ namespace moho
    * Returns one cached shared batch-texture handle for a solid RGBA color,
    * creating/inserting a `CD3DSolidBatchTexture` instance on cache miss.
    */
-  boost::shared_ptr<CD3DBatchTexture> CD3DBatchTexture::FromSolidColor(const std::uint32_t rgba)
+  boost::shared_ptr<CD3DBatchTexture> CD3DBatchTexture::FromSolidColor(
+    const std::uint32_t rgba
+  )
   {
     std::lock_guard<std::recursive_mutex> scopedLock(sResourceLock);
     (void)InitializeSolidTextureMapStorage();

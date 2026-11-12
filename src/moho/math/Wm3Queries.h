@@ -34,7 +34,8 @@ namespace Wm3
    * Returns the number of intersection points (0, 1 or 2) and writes them to
    * `points`.
    */
-  [[nodiscard]] int FindSegment3Box3(const Segment3f& segment, const Box3f& box, bool solid, Vector3f points[2]) noexcept;
+  [[nodiscard]] int
+  FindSegment3Box3(const Segment3f& segment, const Box3f& box, bool solid, Vector3f points[2]) noexcept;
 
   /**
    * Address: 0x00A471C0 (IntrSegment3Sphere3<float>::Find)
@@ -72,7 +73,8 @@ namespace Wm3
    * Squared distance from `point` to `box`; `closestOnBox` is the query's
    * closest point on the box (m_kClosestPoint1).
    */
-  [[nodiscard]] float SquaredDistanceVector3Box3(const Vector3f& point, const Box3f& box, Vector3f& closestOnBox) noexcept;
+  [[nodiscard]] float
+  SquaredDistanceVector3Box3(const Vector3f& point, const Box3f& box, Vector3f& closestOnBox) noexcept;
 
   /**
    * Address: 0x00A484F0 (DistVector3Segment3<float>::GetSquared)

@@ -20,7 +20,9 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RRef MakeFormationInstanceRef(CAiFormationInstance* const object)
+  [[nodiscard]] gpg::RRef MakeFormationInstanceRef(
+    CAiFormationInstance* const object
+  )
   {
     gpg::RRef out{};
     out = gpg::MakeRRef<moho::CAiFormationInstance>(object);
@@ -34,7 +36,9 @@ namespace
    * Registers `CFormationInstance` as one reflected base lane for
    * `CAiFormationInstance` at offset `+0x00`.
    */
-  void AddCFormationInstanceBaseToCAiFormationInstanceType(gpg::RType* const typeInfo)
+  void AddCFormationInstanceBaseToCAiFormationInstanceType(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBase<CFormationInstance>(typeInfo);
   }
@@ -86,7 +90,9 @@ void CAiFormationInstanceTypeInfo::Init()
  * Wires `newRef/ctorRef/delete/dtr` callback lanes for
  * `CAiFormationInstance` reflection ownership.
  */
-gpg::RType* CAiFormationInstanceTypeInfo::InitializeAllocationCallbacks(gpg::RType* const typeInfo)
+gpg::RType* CAiFormationInstanceTypeInfo::InitializeAllocationCallbacks(
+  gpg::RType* const typeInfo
+)
 {
   typeInfo->newRefFunc_ = &CAiFormationInstanceTypeInfo::NewRef;
   typeInfo->ctorRefFunc_ = &CAiFormationInstanceTypeInfo::CtrRef;
@@ -116,7 +122,9 @@ gpg::RRef CAiFormationInstanceTypeInfo::NewRef()
  * The placement form of `NewRef`: runs the same default constructor on
  * caller-provided storage.
  */
-gpg::RRef CAiFormationInstanceTypeInfo::CtrRef(void* const objectStorage)
+gpg::RRef CAiFormationInstanceTypeInfo::CtrRef(
+  void* const objectStorage
+)
 {
   auto* const object = gpg::ConstructInStorage<CAiFormationInstance>(objectStorage);
   return MakeFormationInstanceRef(object);
@@ -125,7 +133,9 @@ gpg::RRef CAiFormationInstanceTypeInfo::CtrRef(void* const objectStorage)
 /**
  * Address: 0x0059D180 (FUN_0059D180)
  */
-void CAiFormationInstanceTypeInfo::Delete(void* const objectStorage)
+void CAiFormationInstanceTypeInfo::Delete(
+  void* const objectStorage
+)
 {
   delete static_cast<CAiFormationInstance*>(objectStorage);
 }
@@ -133,7 +143,9 @@ void CAiFormationInstanceTypeInfo::Delete(void* const objectStorage)
 /**
  * Address: 0x0059D220 (FUN_0059D220)
  */
-void CAiFormationInstanceTypeInfo::Destruct(void* const objectStorage)
+void CAiFormationInstanceTypeInfo::Destruct(
+  void* const objectStorage
+)
 {
   // `p->~T()` on a virtual destructor is a slot-0 dispatch with the free bit
   // clear -- `mov eax,[ecx]; mov edx,[eax]; push 0; call edx`, which is this
@@ -168,4 +180,7 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CAiFormationInstanceTypeInfo_0197ce, moho::register_CAiFormationInstanceTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CAiFormationInstanceTypeInfo_0197ce,
+  moho::register_CAiFormationInstanceTypeInfo
+)

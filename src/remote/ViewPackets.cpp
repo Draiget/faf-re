@@ -24,7 +24,8 @@ namespace faf::remote
   namespace
   {
     constexpr std::int32_t kUnitReconFlags = 28; // `Unit::SyncInterface`, 0x006AC4DC..0x006AC500
-    constexpr std::size_t kMaxViews = wire::kMaxArmyRecords; // no frame names more armies; `SEntityViews` has a bit per view
+    constexpr std::size_t kMaxViews =
+      wire::kMaxArmyRecords; // no frame names more armies; `SEntityViews` has a bit per view
     static_assert(kMaxViews <= 32u);
     constexpr std::size_t kChangedGrain = 64; // blips, the costly part, sit together by id: small chunks spread them
     constexpr std::size_t kBlipGrain = 8;
@@ -47,7 +48,9 @@ namespace faf::remote
 
     /** The block `Entity::SyncInterface` (0x0067A290) copies, for one view. */
     [[nodiscard]] moho::SSTIEntityVariableData EntityBlockForView(
-      moho::Entity& entity, const SViewVisibility& visibility, const bool requestRefreshUI
+      moho::Entity& entity,
+      const SViewVisibility& visibility,
+      const bool requestRefreshUI
     )
     {
       moho::SSTIEntityVariableData data = entity.mVarDat;
@@ -60,14 +63,16 @@ namespace faf::remote
    * Plan WP5.4: army `index`'s record as view `viewArmy` gets it. Every army's public fields go to
    * every view; the fields the client reads for the focus army alone go to their own view only,
    * zeroed for the others: economy totals (`GetEconomyTotals`, UserLuaFunctions.cpp:3954),
-   * resource sharing (:4093), use-whole-map (the focus army's camera bounds and command checks, CameraImpl.cpp:1286/1487, UserCommandIssue.cpp:418/746), the path-preview
-   * scratch (CWldSession.cpp:4734), start position and no-rush ring (RangeRenderer.cpp:1934-1954,
-   * CWldSession.cpp:9164, UserCommandIssue.cpp:422/750). `mIsAlly` is the one focus-dependent field
-   * the sim writes (`CArmyImpl::SetCanSee` 0x006FDEE0): 1 with no focus, else whether the army lists
-   * the view's army among its allies.
+   * resource sharing (:4093), use-whole-map (the focus army's camera bounds and command checks,
+   * CameraImpl.cpp:1286/1487, UserCommandIssue.cpp:418/746), the path-preview scratch (CWldSession.cpp:4734), start
+   * position and no-rush ring (RangeRenderer.cpp:1934-1954, CWldSession.cpp:9164, UserCommandIssue.cpp:422/750).
+   * `mIsAlly` is the one focus-dependent field the sim writes (`CArmyImpl::SetCanSee` 0x006FDEE0): 1 with no focus,
+   * else whether the army lists the view's army among its allies.
    */
   moho::SSTIArmyVariableData ArmyRecordForView(
-    const moho::SSTIArmyVariableData& source, const std::size_t index, const std::int32_t viewArmy,
+    const moho::SSTIArmyVariableData& source,
+    const std::size_t index,
+    const std::int32_t viewArmy,
     const bool beforeFirstTick
   )
   {
@@ -95,7 +100,10 @@ namespace faf::remote
   CViewPackets::CViewPackets() = default;
   CViewPackets::~CViewPackets() = default;
 
-  void CViewPackets::OnBeatChanges(moho::Sim& sim, const moho::SSyncData& packet)
+  void CViewPackets::OnBeatChanges(
+    moho::Sim& sim,
+    const moho::SSyncData& packet
+  )
   {
     OnBeatStarting();
     mSyncPacket = &packet;
@@ -118,7 +126,8 @@ namespace faf::remote
           continue;
         }
         if (const std::int32_t team = mTeamOfArmy[army]; team >= 0) {
-          mTeams[static_cast<std::size_t>(team)].mask &= ~bit; // it stays a member: the team's id map is still the one it had
+          mTeams[static_cast<std::size_t>(team)].mask &=
+            ~bit; // it stays a member: the team's id map is still the one it had
         }
         mTeamOfArmy[army] = mObserverTeam;
         observer.members.push_back(static_cast<std::int32_t>(army));
@@ -160,7 +169,10 @@ namespace faf::remote
         continue;
       }
       const moho::CArmyImpl* const owner = sim.mArmiesList[army];
-      mHasView[army] = army >= kMaxViews || (mSkipCivilians && owner != nullptr && owner->IsCivilian()) || (mViewArmies & (std::uint32_t{1} << army)) == 0u ? 0u : 1u;
+      mHasView[army] = army >= kMaxViews || (mSkipCivilians && owner != nullptr && owner->IsCivilian()) ||
+          (mViewArmies & (std::uint32_t{1} << army)) == 0u
+        ? 0u
+        : 1u;
     }
 
     if (mSharedRecords != nullptr) {
@@ -188,23 +200,32 @@ namespace faf::remote
       }
       // Plan WP5.4: the army lane, positionally as `Sim::Sync` fills it.
       for (std::size_t index = 0; index < packet.mArmyUpdates.size(); ++index) {
-        out.mArmyUpdates.push_back(
-          ArmyRecordForView(packet.mArmyUpdates[index], index, WatchesEverything(army) ? -1 : static_cast<std::int32_t>(army), packet.mCurBeat == 0)
-        );
+        out.mArmyUpdates.push_back(ArmyRecordForView(
+          packet.mArmyUpdates[index],
+          index,
+          WatchesEverything(army) ? -1 : static_cast<std::int32_t>(army),
+          packet.mCurBeat == 0
+        ));
       }
     };
     if (mParallel && slots > 1u) {
       // The team views first: each holds what its whole team sees, the longest jobs.
       const std::size_t teams = slots - armyCount;
-      moho::CSimWorkerPool::Get().ParallelFor(slots, 1u, [this, &build, teams, armyCount](const std::size_t begin, const std::size_t end) {
+      moho::CSimWorkerPool::Get().ParallelFor(
+        slots, 1u, [this, &build, teams, armyCount](const std::size_t begin, const std::size_t end) {
         for (std::size_t job = begin; job < end; ++job) {
           const std::size_t army = job < teams ? armyCount + job : job - teams;
-          this->TimeView(army, [&] { build(army); });
+          this->TimeView(army, [&] {
+            build(army);
+          });
         }
-      });
+      }
+      );
     } else {
       for (std::size_t army = 0; army < slots; ++army) {
-        TimeView(army, [&] { build(army); });
+        TimeView(army, [&] {
+          build(army);
+        });
       }
     }
     MarkPhase(EViewPhase::Build);
@@ -217,7 +238,9 @@ namespace faf::remote
     OnViewPackets(sim);
   }
 
-  void CViewPackets::MarkPhase(const EViewPhase phase) noexcept
+  void CViewPackets::MarkPhase(
+    const EViewPhase phase
+  ) noexcept
   {
     if (!mPhaseTimesOn) {
       return;
@@ -236,17 +259,21 @@ namespace faf::remote
     time.viewMax += slowest;
   }
 
-  void CViewPackets::BuildTeams(const moho::Sim& sim)
+  void CViewPackets::BuildTeams(
+    const moho::Sim& sim
+  )
   {
     const std::size_t armies = sim.mArmiesList.size();
     mTeams.clear();
     mTeamOfArmy.assign(armies, -1);
     const auto hasView = [&](const std::size_t army) {
       const moho::CArmyImpl* const owner = sim.mArmiesList[army];
-      return owner != nullptr && army < kMaxViews && !(mSkipCivilians && owner->IsCivilian()) && (mViewArmies & (std::uint32_t{1} << army)) != 0u;
+      return owner != nullptr && army < kMaxViews && !(mSkipCivilians && owner->IsCivilian()) &&
+        (mViewArmies & (std::uint32_t{1} << army)) != 0u;
     };
     const auto mutual = [&](const std::size_t a, const std::size_t b) {
-      return sim.mArmiesList[a]->mVarDat.mAllies.Contains(static_cast<unsigned int>(b)) && sim.mArmiesList[b]->mVarDat.mAllies.Contains(static_cast<unsigned int>(a));
+      return sim.mArmiesList[a]->mVarDat.mAllies.Contains(static_cast<unsigned int>(b)) &&
+        sim.mArmiesList[b]->mVarDat.mAllies.Contains(static_cast<unsigned int>(a));
     };
     for (std::size_t army = 0; army < armies; ++army) {
       if (!hasView(army) || mTeamOfArmy[army] >= 0) {
@@ -279,12 +306,21 @@ namespace faf::remote
         mObserverTeam = static_cast<std::int32_t>(mTeams.size());
         mTeams.push_back(std::move(observer));
       } else {
-        gpg::Warnf("views: %zu armies and %zu teams leave no room for an observer view; a defeated player keeps their team's", armies, mTeams.size());
+        gpg::Warnf(
+          "views: %zu armies and %zu teams leave no room for an observer view; a defeated player keeps their team's",
+          armies,
+          mTeams.size()
+        );
       }
     }
     if (armies + mTeams.size() > kMaxViews) {
       mObserverTeam = -1;
-      gpg::Warnf("views: %zu armies and %zu teams don't fit %zu views; each player gets a view of their own", armies, mTeams.size(), kMaxViews);
+      gpg::Warnf(
+        "views: %zu armies and %zu teams don't fit %zu views; each player gets a view of their own",
+        armies,
+        mTeams.size(),
+        kMaxViews
+      );
       mTeams.clear();
       mTeamOfArmy.clear();
       return;
@@ -298,11 +334,14 @@ namespace faf::remote
     mTeamsOn = true;
   }
 
-  void CViewPackets::CheckTeams(const moho::Sim& sim)
+  void CViewPackets::CheckTeams(
+    const moho::Sim& sim
+  )
   {
     const auto mutual = [&sim](const std::size_t a, const std::size_t b) {
-      return sim.mArmiesList[a] != nullptr && sim.mArmiesList[b] != nullptr && sim.mArmiesList[a]->mVarDat.mAllies.Contains(static_cast<unsigned int>(b))
-        && sim.mArmiesList[b]->mVarDat.mAllies.Contains(static_cast<unsigned int>(a));
+      return sim.mArmiesList[a] != nullptr && sim.mArmiesList[b] != nullptr &&
+        sim.mArmiesList[a]->mVarDat.mAllies.Contains(static_cast<unsigned int>(b)) &&
+        sim.mArmiesList[b]->mVarDat.mAllies.Contains(static_cast<unsigned int>(a));
     };
     for (STeam& team : mTeams) {
       // While two of those still in the team aren't mutual allies, the one with fewer allies left in it goes.
@@ -332,7 +371,11 @@ namespace faf::remote
         }
         team.mask &= ~(std::uint32_t{1} << leaving);
         mCutArmies |= std::uint32_t{1} << leaving;
-        gpg::Warnf("views: army index %d is no longer allied with the rest of its team; from now on its player gets only a view of their own units", leaving);
+        gpg::Warnf(
+          "views: army index %d is no longer allied with the rest of its team; from now on its player gets only a view "
+          "of their own units",
+          leaving
+        );
       }
     }
     if (mTeamsJoined) {
@@ -340,17 +383,26 @@ namespace faf::remote
     }
     for (std::size_t a = 0; a < mTeamOfArmy.size(); ++a) {
       for (std::size_t b = a + 1u; b < mTeamOfArmy.size(); ++b) {
-        if (mTeamOfArmy[a] >= 0 && mTeamOfArmy[b] >= 0 && mTeamOfArmy[a] != mTeamOfArmy[b] && !CutFromTeam(a) && !CutFromTeam(b) && !WatchesEverything(a) &&
-            !WatchesEverything(b) && mutual(a, b)) {
+        if (
+          mTeamOfArmy[a] >= 0 && mTeamOfArmy[b] >= 0 && mTeamOfArmy[a] != mTeamOfArmy[b] && !CutFromTeam(a) &&
+          !CutFromTeam(b) && !WatchesEverything(a) && !WatchesEverything(b) && mutual(a, b)
+        ) {
           mTeamsJoined = true;
-          gpg::Warnf("views: army indices %zu and %zu became allies across teams; their teams' views stay apart, so neither sees what the other does", a, b);
+          gpg::Warnf(
+            "views: army indices %zu and %zu became allies across teams; their teams' views stay apart, so neither "
+            "sees what the other does",
+            a,
+            b
+          );
           return;
         }
       }
     }
   }
 
-  bool CViewPackets::WatchEverything(const std::size_t army)
+  bool CViewPackets::WatchEverything(
+    const std::size_t army
+  )
   {
     // The teams are made at the first beat; until then nobody can have been defeated.
     if (mObserverTeam < 0 || army >= 32u || army >= mTeamOfArmy.size()) {
@@ -364,7 +416,9 @@ namespace faf::remote
     return true;
   }
 
-  std::int32_t CViewPackets::TeamLead(const STeam& team) const noexcept
+  std::int32_t CViewPackets::TeamLead(
+    const STeam& team
+  ) const noexcept
   {
     if (team.observer) {
       return -1; // sees everything
@@ -372,7 +426,10 @@ namespace faf::remote
     return team.mask != 0u ? std::countr_zero(team.mask) : team.members.front();
   }
 
-  std::int32_t CViewPackets::ReconArmyFor(const std::int32_t view, const SEntityFacts& facts) const noexcept
+  std::int32_t CViewPackets::ReconArmyFor(
+    const std::int32_t view,
+    const SEntityFacts& facts
+  ) const noexcept
   {
     if (!mTeamsOn || view < mArmySlots) {
       return view;
@@ -382,15 +439,20 @@ namespace faf::remote
     return holders != 0u ? std::countr_zero(holders) : TeamLead(team);
   }
 
-  SViewVisibility CViewPackets::VisibilityFor(const moho::Sim& sim, const std::int32_t view, const SEntityFacts& facts) const
+  SViewVisibility CViewPackets::VisibilityFor(
+    const moho::Sim& sim,
+    const std::int32_t view,
+    const SEntityFacts& facts
+  ) const
   {
     if (!mTeamsOn) {
       return ResolveViewVisibility(sim, view, facts);
     }
     if (view < mArmySlots) {
       // An army's own view: its real units; nothing once its player watches everything (they come in that view).
-      return facts.kind == SEntityFacts::EKind::Unit && !WatchesEverything(static_cast<std::size_t>(view)) ? ResolveViewVisibility(sim, view, facts)
-                                                                                                          : SViewVisibility{};
+      return facts.kind == SEntityFacts::EKind::Unit && !WatchesEverything(static_cast<std::size_t>(view))
+        ? ResolveViewVisibility(sim, view, facts)
+        : SViewVisibility{};
     }
     const STeam& team = mTeams[static_cast<std::size_t>(view - mArmySlots)];
     if (team.observer) {
@@ -408,7 +470,10 @@ namespace faf::remote
     return ResolveViewVisibility(sim, owned ? facts.armyIndex : TeamLead(team), facts);
   }
 
-  std::uint32_t CViewPackets::ViewsKeeping(const moho::Sim& sim, const SEntityFacts& facts) const
+  std::uint32_t CViewPackets::ViewsKeeping(
+    const moho::Sim& sim,
+    const SEntityFacts& facts
+  ) const
   {
     if (!mTeamsOn) {
       return ViewsThatSee(sim, mPackets.size(), facts);
@@ -416,9 +481,11 @@ namespace faf::remote
     if (facts.destroyed) {
       return 0u;
     }
-    const std::uint32_t observer = ObserverBit() != 0u && facts.kind != SEntityFacts::EKind::Blip && CanViewSee(sim, -1, facts) ? ObserverBit() : 0u;
+    const std::uint32_t observer =
+      ObserverBit() != 0u && facts.kind != SEntityFacts::EKind::Blip && CanViewSee(sim, -1, facts) ? ObserverBit() : 0u;
     if (facts.kind == SEntityFacts::EKind::Unit) {
-      const bool own = facts.armyIndex >= 0 && facts.armyIndex < mArmySlots && !WatchesEverything(static_cast<std::size_t>(facts.armyIndex));
+      const bool own = facts.armyIndex >= 0 && facts.armyIndex < mArmySlots &&
+        !WatchesEverything(static_cast<std::size_t>(facts.armyIndex));
       return (own ? std::uint32_t{1} << facts.armyIndex : 0u) | observer;
     }
     std::uint32_t views = observer;
@@ -438,7 +505,11 @@ namespace faf::remote
     return views;
   }
 
-  bool CViewPackets::ViewVision(const SChangedView& changed, const std::size_t army, std::uint32_t& vision) const
+  bool CViewPackets::ViewVision(
+    const SChangedView& changed,
+    const std::size_t army,
+    std::uint32_t& vision
+  ) const
   {
     if (changed.hasCreator) {
       vision = changed.creatorVision;
@@ -452,7 +523,10 @@ namespace faf::remote
     return false;
   }
 
-  void CViewPackets::MatchBlipViews(moho::Sim& sim, SChangedView& changed)
+  void CViewPackets::MatchBlipViews(
+    moho::Sim& sim,
+    SChangedView& changed
+  )
   {
     SBlipKey keys[kBlipViews];
     int count = 0;
@@ -465,13 +539,21 @@ namespace faf::remote
       if (!visibility.published) {
         continue;
       }
-      const moho::SPerArmyReconInfo& recon = changed.target.blip->mReconDat[static_cast<std::size_t>(ReconArmyFor(static_cast<std::int32_t>(army), changed.facts))];
+      const moho::SPerArmyReconInfo& recon =
+        changed.target.blip
+          ->mReconDat[static_cast<std::size_t>(ReconArmyFor(static_cast<std::int32_t>(army), changed.facts))];
       std::uint32_t vision = 0;
       const bool hasVision = ViewVision(changed, army, vision);
       const SBlipKey key{
-        static_cast<std::int32_t>(visibility.mode), static_cast<std::uint32_t>(recon.mReconFlags), recon.mStiMesh,
-        std::bit_cast<std::uint32_t>(recon.mHealth), std::bit_cast<std::uint32_t>(recon.mMaxHealth),
-        std::bit_cast<std::uint32_t>(recon.mFractionComplete), static_cast<std::uint32_t>(recon.mMaybeDead), vision, hasVision
+        static_cast<std::int32_t>(visibility.mode),
+        static_cast<std::uint32_t>(recon.mReconFlags),
+        recon.mStiMesh,
+        std::bit_cast<std::uint32_t>(recon.mHealth),
+        std::bit_cast<std::uint32_t>(recon.mMaxHealth),
+        std::bit_cast<std::uint32_t>(recon.mFractionComplete),
+        static_cast<std::uint32_t>(recon.mMaybeDead),
+        vision,
+        hasVision
       };
       int match = 0;
       while (match < count && !(keys[match] == key)) {
@@ -487,7 +569,9 @@ namespace faf::remote
     changed.blipRecordCount = static_cast<std::uint8_t>(count);
   }
 
-  void CViewPackets::ReadChangedEntities(moho::Sim& sim)
+  void CViewPackets::ReadChangedEntities(
+    moho::Sim& sim
+  )
   {
     static_assert(kBlipViews == kMaxViews);
     const std::vector<SChangedEntity>& entities = Entities();
@@ -513,13 +597,17 @@ namespace faf::remote
         changed.hasVision.store(changed.before.hasVision, std::memory_order_relaxed);
         changed.hasCreator = false;
         // Plan WPR.35: the creation goes with the update, as the record both make is shared.
-        if (mSharedRecords != nullptr && target.unit == nullptr && target.blip == nullptr && CSharedEntityRecords::Shareable(entity)) {
+        if (
+          mSharedRecords != nullptr && target.unit == nullptr && target.blip == nullptr &&
+          CSharedEntityRecords::Shareable(entity)
+        ) {
           target.shared = &mSharedRecords->Update(i);
         }
         if (target.unit != nullptr) {
           // `ResolveViewVisibility`: a unit is published to its own army alone.
           const std::int32_t own = changed.facts.armyIndex;
-          changed.mayAct = changed.before.created | (own >= 0 && static_cast<std::size_t>(own) < kMaxViews ? std::uint32_t{1} << own : 0u) | ObserverBit();
+          changed.mayAct = changed.before.created |
+            (own >= 0 && static_cast<std::size_t>(own) < kMaxViews ? std::uint32_t{1} << own : 0u) | ObserverBit();
         } else if (target.blip != nullptr) {
           // A blip: to the armies whose recon record needs a flush.
           changed.mayAct = changed.before.created;
@@ -534,7 +622,8 @@ namespace faf::remote
           }
           if (moho::Unit* const creator = target.blip->mCreator.GetObjectPtr(); creator != nullptr) {
             // 0x005BF00A..0x005BF027: the creator's vision range, written into the blip itself.
-            changed.creatorVision = static_cast<moho::Entity*>(creator)->mVarDat.mIntelAttributes.GetRange(moho::ENTATTR_Vision);
+            changed.creatorVision =
+              static_cast<moho::Entity*>(creator)->mVarDat.mIntelAttributes.GetRange(moho::ENTATTR_Vision);
             changed.hasCreator = true;
           }
           changed.blipRecordCount = 0;
@@ -557,7 +646,8 @@ namespace faf::remote
     for (std::size_t i = 0; i < entities.size(); ++i) {
       SChangedView& changed = mChanged[i];
       const bool needsVisions = changed.hasCreator && changed.before.visions == kNoVisions;
-      const bool needsHashes = changed.target.blip != nullptr && changed.blipRecordCount != 0u && changed.before.blipHashes == kNoVisions;
+      const bool needsHashes =
+        changed.target.blip != nullptr && changed.blipRecordCount != 0u && changed.before.blipHashes == kNoVisions;
       if (!needsVisions && !needsHashes) {
         continue;
       }
@@ -618,8 +708,14 @@ namespace faf::remote
             std::uint32_t vision = 0;
             const bool hasVision = ViewVision(changed, view, vision);
             mSharedRecords->FillBlipRecord(
-              mSharedRecords->BlipRecord(changed.firstBlipRecord + k), block, *changed.target.blip, changed.target.requestRefreshUI,
-              static_cast<std::size_t>(ReconArmyFor(static_cast<std::int32_t>(view), changed.facts)), VisibilityFor(sim, static_cast<std::int32_t>(view), changed.facts).mode, vision, hasVision
+              mSharedRecords->BlipRecord(changed.firstBlipRecord + k),
+              block,
+              *changed.target.blip,
+              changed.target.requestRefreshUI,
+              static_cast<std::size_t>(ReconArmyFor(static_cast<std::int32_t>(view), changed.facts)),
+              VisibilityFor(sim, static_cast<std::int32_t>(view), changed.facts).mode,
+              vision,
+              hasVision
             );
           }
         }
@@ -660,7 +756,12 @@ namespace faf::remote
     }
   }
 
-  void CViewPackets::SyncForView(moho::Sim& sim, const std::int32_t army, SChangedView& changed, moho::SSyncData& out)
+  void CViewPackets::SyncForView(
+    moho::Sim& sim,
+    const std::int32_t army,
+    SChangedView& changed,
+    moho::SSyncData& out
+  )
   {
     moho::Entity& entity = *changed.target.entity;
     const SViewVisibility visibility = VisibilityFor(sim, army, changed.facts);
@@ -736,7 +837,8 @@ namespace faf::remote
       // An update the view takes the long way (a blip with a sound, say) leaves no hash to match.
       const SBlipRecord* blipRecord = nullptr;
       if (blip != nullptr && changed.blipRecordCount != 0u) {
-        blipRecord = &mSharedRecords->BlipRecord(changed.firstBlipRecord + changed.blipRecordOf[static_cast<std::size_t>(army)]);
+        blipRecord =
+          &mSharedRecords->BlipRecord(changed.firstBlipRecord + changed.blipRecordOf[static_cast<std::size_t>(army)]);
         std::uint64_t& held = mBlipHashes[changed.before.blipHashes + static_cast<std::size_t>(army)];
         if (wasCreated && held == blipRecord->hash) {
           return;
@@ -794,8 +896,10 @@ namespace faf::remote
 
       // `ReconBlip::SyncInterface`: only an active real contact in current line of sight
       // publishes its creator's scroll.
-      if (!blip->IsFake() && creator != nullptr && recon.mNeedsFlush != 0u && recon.mMaybeDead == 0u &&
-          (recon.mReconFlags & static_cast<std::uint32_t>(moho::RECON_LOSNow)) != 0u) {
+      if (
+        !blip->IsFake() && creator != nullptr && recon.mNeedsFlush != 0u && recon.mMaybeDead == 0u &&
+        (recon.mReconFlags & static_cast<std::uint32_t>(moho::RECON_LOSNow)) != 0u
+      ) {
         const moho::SSTIEntityVariableData& creatorData = static_cast<moho::Entity*>(creator)->mVarDat;
         block.mScrollBeatStart = creatorData.mScrollBeatStart;
         block.mScrollBeatEnd = creatorData.mScrollBeatEnd;

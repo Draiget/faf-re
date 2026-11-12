@@ -12,7 +12,9 @@
 
 namespace
 {
-  void ReleaseParticleTextureRef(moho::CParticleTexture*& texture) noexcept
+  void ReleaseParticleTextureRef(
+    moho::CParticleTexture*& texture
+  ) noexcept
   {
     if (texture == nullptr) {
       return;
@@ -23,7 +25,9 @@ namespace
     texture = nullptr;
   }
 
-  void RetainParticleTextureRef(moho::CParticleTexture* const texture) noexcept
+  void RetainParticleTextureRef(
+    moho::CParticleTexture* const texture
+  ) noexcept
   {
     if (texture == nullptr) {
       return;
@@ -33,7 +37,10 @@ namespace
     counted->AddReferenceAtomic();
   }
 
-  void AssignParticleTextureRef(moho::CParticleTexture*& slot, moho::CParticleTexture* const newTexture) noexcept
+  void AssignParticleTextureRef(
+    moho::CParticleTexture*& slot,
+    moho::CParticleTexture* const newTexture
+  ) noexcept
   {
     if (newTexture != nullptr) {
       RetainParticleTextureRef(newTexture);
@@ -94,7 +101,10 @@ namespace moho
    * Initializes one manager-bound effect lane while preserving the same member
    * default state used by the no-arg constructor.
    */
-  CEffectImpl::CEffectImpl(CEffectManagerImpl* const manager, const int scriptObjectToken)
+  CEffectImpl::CEffectImpl(
+    CEffectManagerImpl* const manager,
+    const int scriptObjectToken
+  )
     : IEffect(manager, scriptObjectToken)
     , mUnknown44(0)
     , mParams()
@@ -125,7 +135,10 @@ namespace moho
   /**
    * Address: 0x00654460 (FUN_00654460, Moho::CEffectImpl::OnInit)
    */
-  void CEffectImpl::OnInit(const std::int32_t paramIndex, const char* const paramName)
+  void CEffectImpl::OnInit(
+    const std::int32_t paramIndex,
+    const char* const paramName
+  )
   {
     if (paramName != nullptr && *paramName != '\0') {
       mStrings.start_[paramIndex].assign_owned(paramName);
@@ -155,7 +168,9 @@ namespace moho
   /**
    * Address: 0x00654550 (FUN_00654550, Moho::CEffectImpl::GetStringParam)
    */
-  fa::string* CEffectImpl::GetStringParam(const std::int32_t paramIndex)
+  fa::string* CEffectImpl::GetStringParam(
+    const std::int32_t paramIndex
+  )
   {
     return &mStrings.start_[paramIndex];
   }
@@ -163,7 +178,10 @@ namespace moho
   /**
    * Address: 0x00654570 (FUN_00654570, Moho::CEffectImpl::GetTextureParam)
    */
-  CParticleTexture** CEffectImpl::GetTextureParam(CParticleTexture** const outTexture, const std::int32_t paramIndex)
+  CParticleTexture** CEffectImpl::GetTextureParam(
+    CParticleTexture** const outTexture,
+    const std::int32_t paramIndex
+  )
   {
     CParticleTexture* const texture = mParticleTextures.start_[paramIndex];
     *outTexture = texture;
@@ -174,7 +192,9 @@ namespace moho
   /**
    * Address: 0x006545A0 (FUN_006545A0, Moho::CEffectImpl::GetFloatParam)
    */
-  float CEffectImpl::GetFloatParam(const std::int32_t paramIndex)
+  float CEffectImpl::GetFloatParam(
+    const std::int32_t paramIndex
+  )
   {
     return mParams.start_[paramIndex];
   }
@@ -182,7 +202,10 @@ namespace moho
   /**
    * Address: 0x006545B0 (FUN_006545B0, Moho::CEffectImpl::GetVectorParam)
    */
-  Wm3::Vector3f* CEffectImpl::GetVectorParam(Wm3::Vector3f* const outValue, const std::int32_t paramIndex)
+  Wm3::Vector3f* CEffectImpl::GetVectorParam(
+    Wm3::Vector3f* const outValue,
+    const std::int32_t paramIndex
+  )
   {
     outValue->x = mParams.start_[paramIndex + 0];
     outValue->y = mParams.start_[paramIndex + 1];
@@ -193,7 +216,10 @@ namespace moho
   /**
    * Address: 0x006545E0 (FUN_006545E0, Moho::CEffectImpl::GetQuatParam)
    */
-  Vector4f* CEffectImpl::GetQuatParam(Vector4f* const outValue, const std::int32_t paramIndex)
+  Vector4f* CEffectImpl::GetQuatParam(
+    Vector4f* const outValue,
+    const std::int32_t paramIndex
+  )
   {
     outValue->x = mParams.start_[paramIndex + 0];
     outValue->y = mParams.start_[paramIndex + 1];
@@ -205,7 +231,9 @@ namespace moho
   /**
    * Address: 0x006546E0 (FUN_006546E0, Moho::CEffectImpl::GetCurveParam)
    */
-  SEfxCurve* CEffectImpl::GetCurveParam(const std::int32_t)
+  SEfxCurve* CEffectImpl::GetCurveParam(
+    const std::int32_t
+  )
   {
     return nullptr;
   }
@@ -213,7 +241,10 @@ namespace moho
   /**
    * Address: 0x00654610 (FUN_00654610, Moho::CEffectImpl::SetFloatParam)
    */
-  void CEffectImpl::SetFloatParam(const std::int32_t paramIndex, const float value)
+  void CEffectImpl::SetFloatParam(
+    const std::int32_t paramIndex,
+    const float value
+  )
   {
     mParams.start_[paramIndex] = value;
     Invalidate(paramIndex, 1);
@@ -222,7 +253,10 @@ namespace moho
   /**
    * Address: 0x00654640 (FUN_00654640, Moho::CEffectImpl::SetVectorParam)
    */
-  void CEffectImpl::SetVectorParam(const std::int32_t paramIndex, const Wm3::Vector3f* const value)
+  void CEffectImpl::SetVectorParam(
+    const std::int32_t paramIndex,
+    const Wm3::Vector3f* const value
+  )
   {
     mParams.start_[paramIndex + 0] = value->x;
     mParams.start_[paramIndex + 1] = value->y;
@@ -233,7 +267,11 @@ namespace moho
   /**
    * Address: 0x00654690 (FUN_00654690, Moho::CEffectImpl::SetNParam)
    */
-  void CEffectImpl::SetNParam(const std::int32_t paramIndex, const float* const values, const std::int32_t valueCount)
+  void CEffectImpl::SetNParam(
+    const std::int32_t paramIndex,
+    const float* const values,
+    const std::int32_t valueCount
+  )
   {
     // Raw float-lane blob write into the effect parameter array slice.
     std::copy_n(values, static_cast<std::size_t>(valueCount), &mParams.start_[paramIndex]);
@@ -243,13 +281,18 @@ namespace moho
   /**
    * Address: 0x006546D0 (FUN_006546D0, Moho::CEffectImpl::SetCurveParam)
    */
-  void CEffectImpl::SetCurveParam(const std::int32_t, const SEfxCurve*)
+  void CEffectImpl::SetCurveParam(
+    const std::int32_t,
+    const SEfxCurve*
+  )
   {}
 
   /**
    * Address: 0x006592D0 (FUN_006592D0, Moho::CEffectImpl::SetEntity)
    */
-  void CEffectImpl::SetEntity(Entity* const entity)
+  void CEffectImpl::SetEntity(
+    Entity* const entity
+  )
   {
     mNewAttachment = 1;
     mEntityInfo.mAttachTargetWeak.ResetFromObject(entity);
@@ -262,7 +305,10 @@ namespace moho
   /**
    * Address: 0x00659280 (FUN_00659280, Moho::CEffectImpl::SetBone)
    */
-  void CEffectImpl::SetBone(Entity* const entity, const std::int32_t boneIndex)
+  void CEffectImpl::SetBone(
+    Entity* const entity,
+    const std::int32_t boneIndex
+  )
   {
     mNewAttachment = 1;
     mEntityInfo.mParentBoneIndex = boneIndex < 0 ? 0 : boneIndex;
@@ -276,20 +322,24 @@ namespace moho
   /**
    * Address: 0x00654430 (FUN_00654430, Moho::CEffectImpl::Invalidate)
    */
-  void CEffectImpl::Invalidate(const std::int32_t, const std::int32_t)
+  void CEffectImpl::Invalidate(
+    const std::int32_t,
+    const std::int32_t
+  )
   {}
 
   /**
    * Address: 0x00654440 (FUN_00654440, Moho::CEffectImpl::Invalidate2)
    */
-  void CEffectImpl::Invalidate2(const std::int32_t)
+  void CEffectImpl::Invalidate2(
+    const std::int32_t
+  )
   {}
 
   /**
    * Address: 0x00654450 (FUN_00654450, Moho::CEffectImpl::Interpolate)
    */
-  void CEffectImpl::Interpolate()
-  {}
+  void CEffectImpl::Interpolate() {}
 
   gpg::RType* CEffectImpl::StaticGetClass()
   {

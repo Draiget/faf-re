@@ -106,9 +106,7 @@ namespace
     offsetof(CUnitGuardTaskSerializerHelper, mSaveCallback) == 0x10,
     "CUnitGuardTaskSerializerHelper::mSaveCallback offset must be 0x10"
   );
-  static_assert(
-    sizeof(CUnitGuardTaskSerializerHelper) == 0x14, "CUnitGuardTaskSerializerHelper size must be 0x14"
-  );
+  static_assert(sizeof(CUnitGuardTaskSerializerHelper) == 0x14, "CUnitGuardTaskSerializerHelper size must be 0x14");
 
   CUnitGuardTaskSerializerHelper gCUnitGuardTaskSerializer;
 
@@ -171,11 +169,14 @@ namespace
       return outWord;
     }
 
-    *outWord = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(guardTask->mPrimaryCommandRef.ownerLinkSlot));
+    *outWord =
+      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(guardTask->mPrimaryCommandRef.ownerLinkSlot));
     return outWord;
   }
 
-  [[nodiscard]] const moho::RUnitBlueprint* ResolveUnitBlueprintFromCommand(const moho::CUnitCommand* const command)
+  [[nodiscard]] const moho::RUnitBlueprint* ResolveUnitBlueprintFromCommand(
+    const moho::CUnitCommand* const command
+  )
   {
     if (command == nullptr || command->mConstDat.blueprint == nullptr) {
       return nullptr;
@@ -189,7 +190,9 @@ namespace
    * SHIELD-category unit whose focus entity is below max health
    * (0x006132FD..0x00613391 and 0x00613708..0x0061376A, inlined).
    */
-  [[nodiscard]] bool IsShieldWithDamagedFocus(moho::Unit* const unit)
+  [[nodiscard]] bool IsShieldWithDamagedFocus(
+    moho::Unit* const unit
+  )
   {
     if (!unit->IsInCategory("SHIELD")) {
       return false;
@@ -199,7 +202,10 @@ namespace
     return shieldEntity != nullptr && shieldEntity->mVarDat.mHealth < shieldEntity->mVarDat.mMaxHealth;
   }
 
-  [[nodiscard]] float DistanceSquared(const Wm3::Vector3f& lhs, const Wm3::Vector3f& rhs)
+  [[nodiscard]] float DistanceSquared(
+    const Wm3::Vector3f& lhs,
+    const Wm3::Vector3f& rhs
+  )
   {
     const float deltaX = lhs.x - rhs.x;
     const float deltaY = lhs.y - rhs.y;
@@ -234,7 +240,9 @@ namespace moho
    * task payload, dispatch pointer, weak links, target payload, guard-state
    * flags, secondary weak-link/direction lanes, and guard navigation goal.
    */
-  void CUnitGuardTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CUnitGuardTask::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -284,7 +292,9 @@ namespace moho
    * task payload, dispatch pointer, weak links, target payload, guard-state
    * flags, secondary weak-link/direction lanes, and guard navigation goal.
    */
-  void CUnitGuardTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CUnitGuardTask::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;
@@ -386,7 +396,10 @@ namespace moho
    * (factory/shield/silo/engineer/no-formation) to seed the guard-behavior flags
    * and initial task state.
    */
-  CUnitGuardTask::CUnitGuardTask(IAiCommandDispatchImpl* const dispatch, CAiTarget* const target)
+  CUnitGuardTask::CUnitGuardTask(
+    IAiCommandDispatchImpl* const dispatch,
+    CAiTarget* const target
+  )
     : CCommandTask(dispatch)
     , Listener<ECommandEvent>()
     , mCommandTask(dispatch)
@@ -432,8 +445,10 @@ namespace moho
     // command, then register this task's embedded command-event listener on that
     // command's broadcaster chain.
     CUnitCommand* headCommand = nullptr;
-    if (CUnitCommandQueue* const commandQueue = unit->CommandQueue;
-        commandQueue != nullptr && commandQueue->mCommandVec.size() > 0u) {
+    if (
+      CUnitCommandQueue* const commandQueue = unit->CommandQueue;
+      commandQueue != nullptr && commandQueue->mCommandVec.size() > 0u
+    ) {
       headCommand = commandQueue->mCommandVec[0].GetObjectPtr();
     }
     mCommandRef.ResetFromObject(headCommand);
@@ -449,8 +464,7 @@ namespace moho
     if (Unit* const guardedUnit = mSecondaryUnit.GetObjectPtr(); guardedUnit != nullptr) {
       if (guardedUnit->IsBeingBuilt() || guardedUnit->IsUnitState(UNITSTATE_Upgrading)) {
         const bool guardedIsStructureType = guardedUnit->IsInCategory("FACTORY") ||
-          guardedUnit->IsInCategory("SHIELD") || guardedUnit->IsInCategory("SILO") ||
-          guardedUnit->IsMobile();
+          guardedUnit->IsInCategory("SHIELD") || guardedUnit->IsInCategory("SILO") || guardedUnit->IsMobile();
         if (!guardedIsStructureType) {
           mUnknown7A = true;
         }
@@ -490,16 +504,20 @@ namespace moho
     }
 
     // An engineer guarding an engineer suppresses the reaction state.
-    if (Unit* const guardedUnit = mSecondaryUnit.GetObjectPtr();
-        guardedUnit != nullptr && guardedUnit->IsInCategory("ENGINEER")) {
+    if (
+      Unit* const guardedUnit = mSecondaryUnit.GetObjectPtr();
+      guardedUnit != nullptr && guardedUnit->IsInCategory("ENGINEER")
+    ) {
       mDisableReactionState = true;
       return;
     }
 
     // An engineer guarding a factory prepares before acting and suppresses the
     // best-enemy search.
-    if (Unit* const guardedUnit = mSecondaryUnit.GetObjectPtr();
-        guardedUnit != nullptr && guardedUnit->IsInCategory("FACTORY")) {
+    if (
+      Unit* const guardedUnit = mSecondaryUnit.GetObjectPtr();
+      guardedUnit != nullptr && guardedUnit->IsInCategory("FACTORY")
+    ) {
       mTaskState = TASKSTATE_Preparing;
       mDisableBestEnemySearch = true;
     }
@@ -516,7 +534,10 @@ namespace moho
    * Allocates one guard-task object (0xC0 bytes) and, on success, forwards the
    * dispatch/target arguments into in-place construction.
    */
-  CUnitGuardTask* CUnitGuardTask::Create(IAiCommandDispatchImpl* const dispatch, CAiTarget* const target)
+  CUnitGuardTask* CUnitGuardTask::Create(
+    IAiCommandDispatchImpl* const dispatch,
+    CAiTarget* const target
+  )
   {
     void* const storage = ::operator new(sizeof(CUnitGuardTask));
     if (storage == nullptr) {
@@ -631,9 +652,7 @@ namespace moho
 
           if (mUnit != nullptr && mUnit->IsInCategory("TRANSPORTATION")) {
             const bool isStationaryFactoryBuilder =
-              targetUnit->IsInCategory("FACTORY")
-              && targetUnit->AiBuilder != nullptr
-              && !targetUnit->IsMobile();
+              targetUnit->IsInCategory("FACTORY") && targetUnit->AiBuilder != nullptr && !targetUnit->IsMobile();
 
             if (isStationaryFactoryBuilder) {
               mPreferTransportRefuel = true;
@@ -662,7 +681,9 @@ namespace moho
    * What it does:
    * See the header declaration for the full behavior summary.
    */
-  void CUnitGuardTask::OnEvent(const ECommandEvent /*event*/)
+  void CUnitGuardTask::OnEvent(
+    const ECommandEvent /*event*/
+  )
   {
     CUnitCommand* const linkedCommand = mCommandRef.GetObjectPtr();
     if (linkedCommand == nullptr) {
@@ -705,11 +726,8 @@ namespace moho
       // their summed remaining build counts -- not by its total length.
       int queuedBuildCount = 0;
       const int factoryBuildCommands = commandQueue->CountFactoryBuildCommands(queuedBuildCount);
-      const bool useCandidate =
-        (candidate == mUnit && factoryBuildCommands > 0)
-        || (factoryBuildCommands > 1)
-        || (factoryBuildCommands > 0 && candidate->mUnitVarDat.mRepeatQueue)
-        || (queuedBuildCount > 1);
+      const bool useCandidate = (candidate == mUnit && factoryBuildCommands > 0) || (factoryBuildCommands > 1) ||
+        (factoryBuildCommands > 0 && candidate->mUnitVarDat.mRepeatQueue) || (queuedBuildCount > 1);
       if (useCandidate) {
         return candidate;
       }
@@ -740,7 +758,8 @@ namespace moho
 
         const SCoordsVec2 guardedPos2d{mGuardMoveAnchorPosition.x, mGuardMoveAnchorPosition.z};
         gpg::Rect2f guardedSkirt = guardedUnit->GetBlueprint()->GetSkirtRect(guardedPos2d);
-        const bool useWholeMap = (mUnit != nullptr && mUnit->ArmyRef != nullptr) ? mUnit->ArmyRef->UseWholeMap() : false;
+        const bool useWholeMap =
+          (mUnit != nullptr && mUnit->ArmyRef != nullptr) ? mUnit->ArmyRef->UseWholeMap() : false;
         if (mUnit != nullptr) {
           (void)PrepareMove(0, mUnit, &mGuardMoveAnchorPosition, &guardedSkirt, useWholeMap);
         }
@@ -860,13 +879,19 @@ namespace moho
       return ResolveRebuilderGuardQueueAnchorPosition();
     }
 
-    if (CUnitCommandQueue* const commandQueue = mUnit->CommandQueue;
-        commandQueue != nullptr && commandQueue->mCommandVec.size() > 0u) {
-      if (CUnitCommand* const headCommand = commandQueue->mCommandVec[0].GetObjectPtr();
-          headCommand != nullptr && mUnit->SimulationRef != nullptr && mUnit->SimulationRef->mMapData != nullptr) {
+    if (
+      CUnitCommandQueue* const commandQueue = mUnit->CommandQueue;
+      commandQueue != nullptr && commandQueue->mCommandVec.size() > 0u
+    ) {
+      if (
+        CUnitCommand* const headCommand = commandQueue->mCommandVec[0].GetObjectPtr();
+        headCommand != nullptr && mUnit->SimulationRef != nullptr && mUnit->SimulationRef->mMapData != nullptr
+      ) {
         SOCellPos commandCell{};
-        if (const SOCellPos* const headCell = CUnitCommand::GetPosition(headCommand, mUnit, &commandCell);
-            headCell != nullptr) {
+        if (
+          const SOCellPos* const headCell = CUnitCommand::GetPosition(headCommand, mUnit, &commandCell);
+          headCell != nullptr
+        ) {
           const SFootprint& footprint = mUnit->GetFootprint();
           return COORDS_ToWorldPos(
             mUnit->SimulationRef->mMapData,
@@ -889,7 +914,9 @@ namespace moho
    * Returns whether owner distance to the current guard reference position
    * exceeds guarded-footprint threshold plus `extraRange`.
    */
-  bool CUnitGuardTask::IsOutsideGuardReferenceRange(const float extraRange)
+  bool CUnitGuardTask::IsOutsideGuardReferenceRange(
+    const float extraRange
+  )
   {
     if (mUnit == nullptr) {
       return false;
@@ -899,8 +926,9 @@ namespace moho
     if (mTrackGuardedUnit) {
       if (Unit* const guardedUnit = mSecondaryUnit.GetObjectPtr(); guardedUnit != nullptr) {
         const SFootprint& guardedFootprint = guardedUnit->GetFootprint();
-        guardedExtentThreshold =
-          static_cast<float>(std::max(static_cast<int>(guardedFootprint.mSizeX), static_cast<int>(guardedFootprint.mSizeZ)));
+        guardedExtentThreshold = static_cast<float>(
+          std::max(static_cast<int>(guardedFootprint.mSizeX), static_cast<int>(guardedFootprint.mSizeZ))
+        );
       }
     }
 
@@ -921,7 +949,9 @@ namespace moho
    * Returns whether owner footprint-min cell lies inside one goal rectangle
    * bounds.
    */
-  bool CUnitGuardTask::IsOwnerCellInsideGoalBounds(const SNavGoal& goal) const
+  bool CUnitGuardTask::IsOwnerCellInsideGoalBounds(
+    const SNavGoal& goal
+  ) const
   {
     if (mUnit == nullptr) {
       return false;
@@ -934,8 +964,8 @@ namespace moho
 
     const std::int16_t ownerCellMinX = static_cast<std::int16_t>(ownerMinX);
     const std::int16_t ownerCellMinZ = static_cast<std::int16_t>(ownerMinZ);
-    return goal.minX <= ownerCellMinX && goal.maxX >= ownerCellMinX && goal.minZ <= ownerCellMinZ
-      && goal.maxZ >= ownerCellMinZ;
+    return goal.minX <= ownerCellMinX && goal.maxX >= ownerCellMinX && goal.minZ <= ownerCellMinZ &&
+      goal.maxZ >= ownerCellMinZ;
   }
 
   /**
@@ -945,7 +975,10 @@ namespace moho
    * Compares the primary goal rectangle bounds lanes (`min/max X/Z`) for
    * exact equality.
    */
-  bool CUnitGuardTask::IsSameGoalBounds(const SNavGoal& lhs, const SNavGoal& rhs)
+  bool CUnitGuardTask::IsSameGoalBounds(
+    const SNavGoal& lhs,
+    const SNavGoal& rhs
+  )
   {
     return rhs.minX == lhs.minX && rhs.maxX == lhs.maxX && rhs.minZ == lhs.minZ && rhs.maxZ == lhs.maxZ;
   }
@@ -967,7 +1000,8 @@ namespace moho
     const bool engineerWithGuardedUnit = mUnit->IsInCategory("ENGINEER") && guardedUnit != nullptr;
     if (engineerWithGuardedUnit) {
       const Wm3::Vector3f zero = Wm3::Vector3f::Zero();
-      const bool guardedUnitMoving = guardedUnit->mVarDat.mCurTransform.pos_ != guardedUnit->mVarDat.mLastTransform.pos_;
+      const bool guardedUnitMoving =
+        guardedUnit->mVarDat.mCurTransform.pos_ != guardedUnit->mVarDat.mLastTransform.pos_;
       const bool hasReservedAnchor = mGuardMoveAnchorPosition != zero;
       const Wm3::Vector3f guardedPosition = guardedUnit->GetPosition();
 
@@ -1015,8 +1049,10 @@ namespace moho
           const float floored = value > low ? value : low;
           return high > floored ? floored : high;
         };
-        desiredPosition.x = clampToBounds(desiredPosition.x, static_cast<float>(playableRect.x0), static_cast<float>(playableRect.x1));
-        desiredPosition.z = clampToBounds(desiredPosition.z, static_cast<float>(playableRect.z0), static_cast<float>(playableRect.z1));
+        desiredPosition.x =
+          clampToBounds(desiredPosition.x, static_cast<float>(playableRect.x0), static_cast<float>(playableRect.x1));
+        desiredPosition.z =
+          clampToBounds(desiredPosition.z, static_cast<float>(playableRect.z0), static_cast<float>(playableRect.z1));
         clampedToPlayableRect = true;
       }
     }
@@ -1055,7 +1091,9 @@ namespace moho
       return;
     }
 
-    if (!IsSameGoalBounds(mGuardGoal, proposedGoal) || clampedToPlayableRect || navigatorStatus != AINAVSTATUS_Steering) {
+    if (
+      !IsSameGoalBounds(mGuardGoal, proposedGoal) || clampedToPlayableRect || navigatorStatus != AINAVSTATUS_Steering
+    ) {
       navigator->SetGoal(proposedGoal);
       mGuardGoal = proposedGoal;
       mUnit->UpdateSpeedThroughStatus();
@@ -1118,7 +1156,10 @@ namespace moho
       }
 
       const EUnitCommandType commandType = command->mVarDat.mCmdType;
-      if (commandType != EUnitCommandType::UNITCOMMAND_BuildFactory && commandType != EUnitCommandType::UNITCOMMAND_Upgrade) {
+      if (
+        commandType != EUnitCommandType::UNITCOMMAND_BuildFactory &&
+        commandType != EUnitCommandType::UNITCOMMAND_Upgrade
+      ) {
         return false;
       }
 
@@ -1159,9 +1200,8 @@ namespace moho
 
       // 0x006129C6..0x006129D8 and 0x00612A76..0x00612A88: the repeat-queue
       // flag is the guarded factory's (mSecondaryUnit, +0x2A2), not this unit's.
-      const bool canDispatchSlot =
-        index > 0u || command->mVarDat.mCount > 1
-        || (guardedCommandCount <= 1u && guardedUnit->mUnitVarDat.mRepeatQueue);
+      const bool canDispatchSlot = index > 0u || command->mVarDat.mCount > 1 ||
+        (guardedCommandCount <= 1u && guardedUnit->mUnitVarDat.mRepeatQueue);
       if (!canDispatchSlot) {
         continue;
       }
@@ -1193,7 +1233,9 @@ namespace moho
    * Resolves one guard-context structure blueprint and build-cell target from
    * rebuilder queues or guarded-unit build-mobile command lanes.
    */
-  const RUnitBlueprint* CUnitGuardTask::TryResolveGuardBuildBlueprint(SOCellPos& outBuildCellPos)
+  const RUnitBlueprint* CUnitGuardTask::TryResolveGuardBuildBlueprint(
+    SOCellPos& outBuildCellPos
+  )
   {
     if (mUnit == nullptr || mUnit->AiBuilder == nullptr) {
       return nullptr;
@@ -1252,8 +1294,10 @@ namespace moho
     const SOCellPos& buildCellPos
   )
   {
-    if (buildBlueprint == nullptr || mUnit == nullptr || mUnit->SimulationRef == nullptr
-        || mUnit->SimulationRef->mMapData == nullptr) {
+    if (
+      buildBlueprint == nullptr || mUnit == nullptr || mUnit->SimulationRef == nullptr ||
+      mUnit->SimulationRef->mMapData == nullptr
+    ) {
       return;
     }
 
@@ -1277,7 +1321,9 @@ namespace moho
    * Returns whether owner builder queue already contains a guard command that
    * targets the candidate unit's current world position.
    */
-  bool CUnitGuardTask::HasGuardCommandAtUnitPosition(const Unit* const candidateUnit) const
+  bool CUnitGuardTask::HasGuardCommandAtUnitPosition(
+    const Unit* const candidateUnit
+  ) const
   {
     if (candidateUnit == nullptr || mUnit == nullptr || mUnit->AiBuilder == nullptr) {
       return false;
@@ -1336,7 +1382,10 @@ namespace moho
       }
 
       const RUnitBlueprint* const guardedBlueprint = guardedUnit->GetBlueprint();
-      if (guardedBlueprint != nullptr && guardedBlueprint->Physics.FuelUseTime > 1.0f && guardedUnit->mUnitVarDat.mFuelRatio < 1.0f) {
+      if (
+        guardedBlueprint != nullptr && guardedBlueprint->Physics.FuelUseTime > 1.0f &&
+        guardedUnit->mUnitVarDat.mFuelRatio < 1.0f
+      ) {
         return guardedUnit;
       }
 
@@ -1351,8 +1400,10 @@ namespace moho
       // 0x006133FC..0x006134B8: assist whatever the guarded unit is working on
       // (unless it is reclaiming); a non-unit focus ends the search.
       Unit* siloAssistUnit = guardedUnit;
-      if (Entity* const focusEntity = guardedUnit->GetFocusEntity();
-          focusEntity != nullptr && !guardedUnit->IsUnitState(UNITSTATE_Reclaiming)) {
+      if (
+        Entity* const focusEntity = guardedUnit->GetFocusEntity();
+        focusEntity != nullptr && !guardedUnit->IsUnitState(UNITSTATE_Reclaiming)
+      ) {
         Unit* const focusUnit = focusEntity->IsUnit();
         if (focusUnit == nullptr) {
           return nullptr;
@@ -1374,8 +1425,10 @@ namespace moho
       }
 
       // 0x0061348C / 0x006134CD: unpaused silo-ammo build.
-      if (!siloAssistUnit->mUnitVarDat.mIsPaused && siloAssistUnit->AiSiloBuild != nullptr
-          && siloAssistUnit->IsUnitState(UNITSTATE_SiloBuildingAmmo)) {
+      if (
+        !siloAssistUnit->mUnitVarDat.mIsPaused && siloAssistUnit->AiSiloBuild != nullptr &&
+        siloAssistUnit->IsUnitState(UNITSTATE_SiloBuildingAmmo)
+      ) {
         return siloAssistUnit;
       }
 
@@ -1414,7 +1467,9 @@ namespace moho
         continue;
       }
 
-      if (!candidate->SimulationRef->mMapData->IsWithin(candidate->mVarDat.mCurTransform.pos_, 1.0f, mUnit->ArmyRef->UseWholeMap())) {
+      if (!candidate->SimulationRef->mMapData->IsWithin(
+            candidate->mVarDat.mCurTransform.pos_, 1.0f, mUnit->ArmyRef->UseWholeMap()
+          )) {
         continue;
       }
 
@@ -1435,8 +1490,7 @@ namespace moho
           continue;
         }
         const bool isAllied =
-          candidate->ArmyRef == mUnit->ArmyRef
-          || mUnit->ArmyRef->GetAllianceWith(candidate->ArmyRef) == ALLIANCE_Ally;
+          candidate->ArmyRef == mUnit->ArmyRef || mUnit->ArmyRef->GetAllianceWith(candidate->ArmyRef) == ALLIANCE_Ally;
         if (!isAllied) {
           continue;
         }
@@ -1446,17 +1500,18 @@ namespace moho
       // damaged candidate (or, for rebuilders, a SHIELD whose focus is
       // damaged) is itself the target -- no pause/silo gates, no Lua query.
       Unit* distanceTarget = candidate;
-      const bool candidateNeedsWork =
-        candidate->IsBeingBuilt()
-        || candidate->mVarDat.mHealth < candidate->mVarDat.mMaxHealth
-        || (isRebuilder && IsShieldWithDamagedFocus(candidate));
+      const bool candidateNeedsWork = candidate->IsBeingBuilt() ||
+        candidate->mVarDat.mHealth < candidate->mVarDat.mMaxHealth ||
+        (isRebuilder && IsShieldWithDamagedFocus(candidate));
       if (!candidateNeedsWork) {
         // 0x006137E9..0x00613838: otherwise the unit it is working on, then
         // its own enhancement or silo-ammo build.
         Entity* const focusEntity = candidate->GetFocusEntity();
         if (Unit* const focusUnit = (focusEntity != nullptr) ? focusEntity->IsUnit() : nullptr; focusUnit != nullptr) {
           distanceTarget = focusUnit;
-        } else if (!candidate->IsUnitState(UNITSTATE_Enhancing) && !candidate->IsUnitState(UNITSTATE_SiloBuildingAmmo)) {
+        } else if (
+          !candidate->IsUnitState(UNITSTATE_Enhancing) && !candidate->IsUnitState(UNITSTATE_SiloBuildingAmmo)
+        ) {
           continue;
         }
       }
@@ -1478,7 +1533,9 @@ namespace moho
    * Dispatches allied repair/silo-assist or enemy capture follow-up work for
    * one guard candidate unit.
    */
-  void CUnitGuardTask::DispatchAssistOrCaptureTask(Unit* const targetUnit)
+  void CUnitGuardTask::DispatchAssistOrCaptureTask(
+    Unit* const targetUnit
+  )
   {
     if (targetUnit == nullptr || mUnit == nullptr) {
       return;
@@ -1487,14 +1544,14 @@ namespace moho
     // 0x00613AA0: the Lua query runs first, for capture targets too.
     const bool shieldIsOn = targetUnit->RunScriptBool("ShieldIsOn");
 
-    const bool isAlliedTarget =
-      mUnit->ArmyRef != nullptr
-      && targetUnit->ArmyRef != nullptr
-      && mUnit->ArmyRef->GetAllianceWith(targetUnit->ArmyRef) == ALLIANCE_Ally;
+    const bool isAlliedTarget = mUnit->ArmyRef != nullptr && targetUnit->ArmyRef != nullptr &&
+      mUnit->ArmyRef->GetAllianceWith(targetUnit->ArmyRef) == ALLIANCE_Ally;
 
     if (isAlliedTarget) {
       bool shouldIssueRepairTask = true;
-      if (targetUnit->mVarDat.mMaxHealth <= targetUnit->mVarDat.mHealth && !targetUnit->IsUnitState(UNITSTATE_Enhancing)) {
+      if (
+        targetUnit->mVarDat.mMaxHealth <= targetUnit->mVarDat.mHealth && !targetUnit->IsUnitState(UNITSTATE_Enhancing)
+      ) {
         shouldIssueRepairTask = shieldIsOn && IsShieldWithDamagedFocus(targetUnit);
       }
 
@@ -1523,7 +1580,9 @@ namespace moho
    * Builds one target payload for `enemy` and dispatches an attack-target task
    * bound to this guard task's command-dispatch lane.
    */
-  void CUnitGuardTask::SetEnemy(Entity* const enemy)
+  void CUnitGuardTask::SetEnemy(
+    Entity* const enemy
+  )
   {
     if (enemy == nullptr) {
       return;
@@ -1542,7 +1601,9 @@ namespace moho
    * Builds one target payload for `targetEntity` and dispatches a reclaim task
    * through this guard task's command-dispatch lane.
    */
-  void CUnitGuardTask::IssueReclaimTaskForEntity(Entity* const targetEntity)
+  void CUnitGuardTask::IssueReclaimTaskForEntity(
+    Entity* const targetEntity
+  )
   {
     if (targetEntity == nullptr) {
       return;
@@ -1649,7 +1710,10 @@ namespace moho
     if (CUnitCommand* const primaryCommand = mPrimaryCommandRef.GetObjectPtr(); primaryCommand != nullptr) {
       if (mLinkResult == static_cast<EAiResult>(1)) {
         if (primaryCommand->mVarDat.mCount <= 1) {
-          if (mUnit->mUnitVarDat.mRepeatQueue && primaryCommand->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_BuildFactory) {
+          if (
+            mUnit->mUnitVarDat.mRepeatQueue &&
+            primaryCommand->mVarDat.mCmdType == EUnitCommandType::UNITCOMMAND_BuildFactory
+          ) {
             primaryCommand->mVarDat.mCount = primaryCommand->mVarDat.mMaxCount;
             primaryCommand->mNeedsUpdate = true;
             if (mUnit->CommandQueue != nullptr) {
@@ -1711,98 +1775,100 @@ namespace moho
     const float guardScanRadius = (ownerBlueprint != nullptr) ? ownerBlueprint->AI.GuardScanRadius : 0.0f;
 
     switch (mTaskState) {
-      case TASKSTATE_Preparing: {
-        const SFootprint& footprint = mUnit->GetFootprint();
-        const Wm3::Vector3f moveAnchorPosition = EnsureReservedGuardMoveAnchorPosition();
-        const SOCellPos moveTargetCell = footprint.ToCellPos(moveAnchorPosition);
-        NewMoveTask(SNavGoal(moveTargetCell), mCommandTask, 0, nullptr, 0);
-        mTaskState = TASKSTATE_Waiting;
-        break;
-      }
+    case TASKSTATE_Preparing: {
+      const SFootprint& footprint = mUnit->GetFootprint();
+      const Wm3::Vector3f moveAnchorPosition = EnsureReservedGuardMoveAnchorPosition();
+      const SOCellPos moveTargetCell = footprint.ToCellPos(moveAnchorPosition);
+      NewMoveTask(SNavGoal(moveTargetCell), mCommandTask, 0, nullptr, 0);
+      mTaskState = TASKSTATE_Waiting;
+      break;
+    }
 
-      case TASKSTATE_Waiting:
-        mUnit->FreeOgridRect();
-        mTaskState = TASKSTATE_Processing;
-        break;
+    case TASKSTATE_Waiting:
+      mUnit->FreeOgridRect();
+      mTaskState = TASKSTATE_Processing;
+      break;
 
-      case TASKSTATE_Starting:
-        if (IsOutsideGuardReferenceRange(guardScanRadius * 0.5f)) {
-          UpdateGuardFollowMoveGoal();
-        } else {
-          mTaskState = TASKSTATE_Processing;
-        }
-        break;
-
-      case TASKSTATE_Processing: {
-        // 0x006145A1: the same refuel/repair platform search the patrol task
-        // runs (`Unit::FindPlatform`), not just an already-assigned platform.
-        if (Unit* const platform = mUnit->FindPlatform(); platform != nullptr) {
-          if (IAiTransport* const transport = platform->AiTransport; transport != nullptr) {
-            transport->TransportResetReservation();
-          }
-          AbortMove();
-          if (mCommandTask != nullptr) {
-            static_cast<IAiCommandDispatchImpl*>(mCommandTask)->IssueRefuelTask(platform);
-          }
-          break;
-        }
-
-        const Unit* const activeGuardedUnit = mSecondaryUnit.GetObjectPtr();
-        bool shouldDispatchFerryTask = mPreferTransportRefuel;
-        if (!shouldDispatchFerryTask && mAllowFerryBeaconRedirect && activeGuardedUnit != nullptr) {
-          shouldDispatchFerryTask = activeGuardedUnit->IsInCategory("FERRYBEACON");
-        }
-
-        if (shouldDispatchFerryTask) {
-          AbortMove();
-          (void)CUnitFerryTask::Create(mCommandTask, mSecondaryUnit.GetObjectPtr());
-          break;
-        }
-
-        if (mRefreshGuardedUnitFromNearby) {
-          AbortMove();
-          TryDispatchFactoryOrUpgradeFromGuardQueues();
-          break;
-        }
-
-        if (Entity* const bestEnemy = GetBestEnemy(); bestEnemy != nullptr) {
-          AbortMove();
-          SetEnemy(bestEnemy);
-          mTaskState = TASKSTATE_Starting;
-          break;
-        }
-
-        SOCellPos buildCellPos{};
-        if (const RUnitBlueprint* const buildBlueprint = TryResolveGuardBuildBlueprint(buildCellPos);
-            buildBlueprint != nullptr) {
-          mGuardMoveAnchorPosition = Wm3::Vector3f::Zero();
-          AbortMove();
-          DispatchMobileBuildTask(buildBlueprint, buildCellPos);
-          break;
-        }
-
-        if (Entity* const reclaimEntity = ResolveGuardedReclaimFocusEntity(); reclaimEntity != nullptr) {
-          AbortMove();
-          IssueReclaimTaskForEntity(reclaimEntity);
-          break;
-        }
-
-        if (Unit* const assistCandidate = SelectAssistOrCaptureCandidateUnit(); assistCandidate != nullptr) {
-          AbortMove();
-          DispatchAssistOrCaptureTask(assistCandidate);
-          break;
-        }
-
-        if (ShouldAbortGuardForBuilderContext()) {
-          return -1;
-        }
-
+    case TASKSTATE_Starting:
+      if (IsOutsideGuardReferenceRange(guardScanRadius * 0.5f)) {
         UpdateGuardFollowMoveGoal();
+      } else {
+        mTaskState = TASKSTATE_Processing;
+      }
+      break;
+
+    case TASKSTATE_Processing: {
+      // 0x006145A1: the same refuel/repair platform search the patrol task
+      // runs (`Unit::FindPlatform`), not just an already-assigned platform.
+      if (Unit* const platform = mUnit->FindPlatform(); platform != nullptr) {
+        if (IAiTransport* const transport = platform->AiTransport; transport != nullptr) {
+          transport->TransportResetReservation();
+        }
+        AbortMove();
+        if (mCommandTask != nullptr) {
+          static_cast<IAiCommandDispatchImpl*>(mCommandTask)->IssueRefuelTask(platform);
+        }
         break;
       }
 
-      default:
+      const Unit* const activeGuardedUnit = mSecondaryUnit.GetObjectPtr();
+      bool shouldDispatchFerryTask = mPreferTransportRefuel;
+      if (!shouldDispatchFerryTask && mAllowFerryBeaconRedirect && activeGuardedUnit != nullptr) {
+        shouldDispatchFerryTask = activeGuardedUnit->IsInCategory("FERRYBEACON");
+      }
+
+      if (shouldDispatchFerryTask) {
+        AbortMove();
+        (void)CUnitFerryTask::Create(mCommandTask, mSecondaryUnit.GetObjectPtr());
         break;
+      }
+
+      if (mRefreshGuardedUnitFromNearby) {
+        AbortMove();
+        TryDispatchFactoryOrUpgradeFromGuardQueues();
+        break;
+      }
+
+      if (Entity* const bestEnemy = GetBestEnemy(); bestEnemy != nullptr) {
+        AbortMove();
+        SetEnemy(bestEnemy);
+        mTaskState = TASKSTATE_Starting;
+        break;
+      }
+
+      SOCellPos buildCellPos{};
+      if (
+        const RUnitBlueprint* const buildBlueprint = TryResolveGuardBuildBlueprint(buildCellPos);
+        buildBlueprint != nullptr
+      ) {
+        mGuardMoveAnchorPosition = Wm3::Vector3f::Zero();
+        AbortMove();
+        DispatchMobileBuildTask(buildBlueprint, buildCellPos);
+        break;
+      }
+
+      if (Entity* const reclaimEntity = ResolveGuardedReclaimFocusEntity(); reclaimEntity != nullptr) {
+        AbortMove();
+        IssueReclaimTaskForEntity(reclaimEntity);
+        break;
+      }
+
+      if (Unit* const assistCandidate = SelectAssistOrCaptureCandidateUnit(); assistCandidate != nullptr) {
+        AbortMove();
+        DispatchAssistOrCaptureTask(assistCandidate);
+        break;
+      }
+
+      if (ShouldAbortGuardForBuilderContext()) {
+        return -1;
+      }
+
+      UpdateGuardFollowMoveGoal();
+      break;
+    }
+
+    default:
+      break;
     }
 
     if ((!mDisableReactionState && !mDisableBestEnemySearch) || mSecondaryUnit.GetObjectPtr() == nullptr) {

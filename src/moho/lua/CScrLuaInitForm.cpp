@@ -18,12 +18,18 @@ namespace
     fa::string mName;
   };
 
-  [[nodiscard]] bool LessText(const fa::string& lhs, const fa::string& rhs)
+  [[nodiscard]] bool LessText(
+    const fa::string& lhs,
+    const fa::string& rhs
+  )
   {
     return std::string_view(lhs.c_str()) < std::string_view(rhs.c_str());
   }
 
-  [[nodiscard]] bool LessEntry(const LuaDocEntry& lhs, const LuaDocEntry& rhs)
+  [[nodiscard]] bool LessEntry(
+    const LuaDocEntry& lhs,
+    const LuaDocEntry& rhs
+  )
   {
     if (lhs.mGroupName == rhs.mGroupName) {
       if (lhs.mDocString == rhs.mDocString) {
@@ -44,7 +50,9 @@ namespace moho
    * What it does:
    * Resolves LuaPlus wrapper state pointer from raw `lua_State` callback lane.
    */
-  LuaPlus::LuaState* SCR_ResolveBindingState(lua_State* const luaContext) noexcept
+  LuaPlus::LuaState* SCR_ResolveBindingState(
+    lua_State* const luaContext
+  ) noexcept
   {
     return luaContext ? luaContext->stateUserData : nullptr;
   }
@@ -56,7 +64,9 @@ namespace moho
    * What it does:
    * Returns first init-form set whose name exactly matches `setName`.
    */
-  CScrLuaInitFormSet* SCR_FindLuaInitFormSet(const char* const setName) noexcept
+  CScrLuaInitFormSet* SCR_FindLuaInitFormSet(
+    const char* const setName
+  ) noexcept
   {
     if (setName == nullptr) {
       return nullptr;
@@ -79,7 +89,9 @@ namespace moho
    * What it does:
    * Initializes the set name and inserts this set into the global set list.
    */
-  CScrLuaInitFormSet::CScrLuaInitFormSet(const char* const setName)
+  CScrLuaInitFormSet::CScrLuaInitFormSet(
+    const char* const setName
+  )
     : mSetName(setName)
     , mNextSet(sSets)
   {
@@ -114,7 +126,9 @@ namespace moho
    * What it does:
    * Performs a direct field copy of the 4-word set record.
    */
-  CScrLuaInitFormSet& CScrLuaInitFormSet::operator=(const CScrLuaInitFormSet& other)
+  CScrLuaInitFormSet& CScrLuaInitFormSet::operator=(
+    const CScrLuaInitFormSet& other
+  )
   {
     mSetName = other.mSetName;
     mForms = other.mForms;
@@ -132,7 +146,9 @@ namespace moho
    * What it does:
    * Inserts an init form at the head of this set.
    */
-  void CScrLuaInitFormSet::AddInit(CScrLuaInitForm* const form)
+  void CScrLuaInitFormSet::AddInit(
+    CScrLuaInitForm* const form
+  )
   {
     form->mNextInSet = mForms;
     mForms = form;
@@ -144,7 +160,9 @@ namespace moho
    * What it does:
    * Marks this set as registered and runs every linked init form.
    */
-  void CScrLuaInitFormSet::RunInits(LuaPlus::LuaState* const state)
+  void CScrLuaInitFormSet::RunInits(
+    LuaPlus::LuaState* const state
+  )
   {
     mRegistered = 1;
     for (CScrLuaInitForm* form = mForms; form; form = form->mNextInSet) {
@@ -202,7 +220,10 @@ namespace moho
    * Initializes metadata and links this form into the set head.
    */
   CScrLuaInitForm::CScrLuaInitForm(
-    CScrLuaInitFormSet& set, const char* name, const char* groupName, const char* docString
+    CScrLuaInitFormSet& set,
+    const char* name,
+    const char* groupName,
+    const char* docString
   )
     : mName(name)
     , mGroupName(groupName)
@@ -217,7 +238,9 @@ namespace moho
    * What it does:
    * Copy-constructs the init-form metadata and chain link.
    */
-  CScrLuaInitForm::CScrLuaInitForm(const CScrLuaInitForm& other)
+  CScrLuaInitForm::CScrLuaInitForm(
+    const CScrLuaInitForm& other
+  )
     : mName(other.mName)
     , mGroupName(other.mGroupName)
     , mDocString(other.mDocString)

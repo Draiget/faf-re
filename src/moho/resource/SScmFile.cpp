@@ -13,7 +13,10 @@ namespace moho::scm_file
    * null-terminated strings, so each entry starts one past the previous
    * terminator.
    */
-  void FillBoneNamePointers(const SScmFile& file, fa::vector<const char*>& outNamePointers)
+  void FillBoneNamePointers(
+    const SScmFile& file,
+    fa::vector<const char*>& outNamePointers
+  )
   {
     const std::uint32_t boneCount = file.mBoneTotalCount;
     outNamePointers.resize(boneCount);

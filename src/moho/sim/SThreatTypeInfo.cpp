@@ -64,4 +64,7 @@ namespace moho
 // Phase-1 pre-registration: CInfluenceMap caches SThreat::sType through
 // gpg::LookupRType, so the descriptor must exist before that consumer runs.
 // See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(preregister_SThreatTypeInfo_7179b0, moho::preregister_SThreatTypeInfo)
+GPG_PREREGISTER_INIT(
+  preregister_SThreatTypeInfo_7179b0,
+  moho::preregister_SThreatTypeInfo
+)

@@ -55,7 +55,10 @@ namespace faf::remote
     [[nodiscard]] bool TakeLobbyFrame(std::vector<std::uint8_t>& frame);
     /** The next signal, if it comes first; a malformed one is dropped. */
     [[nodiscard]] bool TakeSignal(net::SLobbySignal& signal);
-    [[nodiscard]] std::uint64_t DroppedSignals() const noexcept { return mDropped; }
+    [[nodiscard]] std::uint64_t DroppedSignals() const noexcept
+    {
+      return mDropped;
+    }
 
   private:
     [[nodiscard]] static bool IsSignal(const std::vector<std::uint8_t>& frame) noexcept;
@@ -82,11 +85,15 @@ namespace faf::remote
     void SelectEvent(HANDLE ev) override;
     moho::SSendStampWindow SnapshotSendStamps(std::int32_t since) override;
 
-    /** The uid a connection to this address reaches: the engine address's, or 0 (nobody: the server signals) for any other. */
+    /** The uid a connection to this address reaches: the engine address's, or 0 (nobody: the server signals) for any
+     * other. */
     [[nodiscard]] static std::int32_t UidForAddress(u_long address, u_short port) noexcept;
 
     /** Frames that came with no use: malformed, or from a uid this side has rejected. */
-    [[nodiscard]] std::uint64_t DroppedFrames() const noexcept { return mDropped; }
+    [[nodiscard]] std::uint64_t DroppedFrames() const noexcept
+    {
+      return mDropped;
+    }
 
   private:
     class CRelayConnection;

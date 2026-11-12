@@ -29,13 +29,25 @@ namespace gpg::gal
     constexpr UINT kFirstTextureRegister = kGpuMaxReadBuffers; // t4
 
     [[nodiscard]] ComPtr<ID3DBlob> CompileStage(
-      const GpuProgramDesc& desc, const char* const entry, const char* const profile
+      const GpuProgramDesc& desc,
+      const char* const entry,
+      const char* const profile
     )
     {
       ComPtr<ID3DBlob> code;
       ComPtr<ID3DBlob> errors;
       const HRESULT result = ::D3DCompile(
-        desc.source, desc.sourceBytes, desc.name, nullptr, nullptr, entry, profile, kShaderCompileFlags, 0U, &code, &errors
+        desc.source,
+        desc.sourceBytes,
+        desc.name,
+        nullptr,
+        nullptr,
+        entry,
+        profile,
+        kShaderCompileFlags,
+        0U,
+        &code,
+        &errors
       );
       if (FAILED(result)) {
         std::string message = errors != nullptr
@@ -47,13 +59,17 @@ namespace gpg::gal
       return code;
     }
 
-    [[nodiscard]] D3D11_COMPARISON_FUNC ToD3D11(const GpuCompare compare) noexcept
+    [[nodiscard]] D3D11_COMPARISON_FUNC ToD3D11(
+      const GpuCompare compare
+    ) noexcept
     {
       // GpuCompare follows D3D11_COMPARISON_FUNC's order, one below it.
       return static_cast<D3D11_COMPARISON_FUNC>(static_cast<int>(compare) + 1);
     }
 
-    [[nodiscard]] D3D11_STENCIL_OP ToD3D11(const GpuStencilOp op) noexcept
+    [[nodiscard]] D3D11_STENCIL_OP ToD3D11(
+      const GpuStencilOp op
+    ) noexcept
     {
       switch (op) {
       case GpuStencilOp::Zero:
@@ -76,23 +92,30 @@ namespace gpg::gal
       }
     }
 
-    [[nodiscard]] D3D11_DEPTH_STENCILOP_DESC ToD3D11(const GpuStencilFace& face) noexcept
+    [[nodiscard]] D3D11_DEPTH_STENCILOP_DESC ToD3D11(
+      const GpuStencilFace& face
+    ) noexcept
     {
-      return D3D11_DEPTH_STENCILOP_DESC{ToD3D11(face.fail), ToD3D11(face.depthFail), ToD3D11(face.pass), ToD3D11(face.func)};
+      return D3D11_DEPTH_STENCILOP_DESC{
+        ToD3D11(face.fail), ToD3D11(face.depthFail), ToD3D11(face.pass), ToD3D11(face.func)
+      };
     }
 
-    [[nodiscard]] D3D11_BLEND_DESC BlendDesc(const GpuProgramDesc& desc) noexcept
+    [[nodiscard]] D3D11_BLEND_DESC BlendDesc(
+      const GpuProgramDesc& desc
+    ) noexcept
     {
       D3D11_BLEND_DESC blend{};
       D3D11_RENDER_TARGET_BLEND_DESC& target = blend.RenderTarget[0];
       target.BlendEnable = desc.blend != GpuBlend::Opaque ? TRUE : FALSE;
       target.SrcBlend = desc.blend == GpuBlend::Opaque ? D3D11_BLEND_ONE
         : desc.blend == GpuBlend::Multiply             ? D3D11_BLEND_ZERO
+        : desc.blend == GpuBlend::Brighten             ? D3D11_BLEND_DEST_COLOR
                                                        : D3D11_BLEND_SRC_ALPHA;
-      target.DestBlend = desc.blend == GpuBlend::AlphaBlend ? D3D11_BLEND_INV_SRC_ALPHA
-        : desc.blend == GpuBlend::Additive                  ? D3D11_BLEND_ONE
-        : desc.blend == GpuBlend::Multiply                  ? D3D11_BLEND_SRC_COLOR
-                                                             : D3D11_BLEND_ZERO;
+      target.DestBlend = desc.blend == GpuBlend::AlphaBlend                    ? D3D11_BLEND_INV_SRC_ALPHA
+        : desc.blend == GpuBlend::Additive || desc.blend == GpuBlend::Brighten ? D3D11_BLEND_ONE
+        : desc.blend == GpuBlend::Multiply                                     ? D3D11_BLEND_SRC_COLOR
+                                                                               : D3D11_BLEND_ZERO;
       target.BlendOp = D3D11_BLEND_OP_ADD;
       target.SrcBlendAlpha = D3D11_BLEND_ONE;
       target.DestBlendAlpha = D3D11_BLEND_ZERO;
@@ -105,7 +128,9 @@ namespace gpg::gal
     class SavedDrawState
     {
     public:
-      explicit SavedDrawState(ID3D11DeviceContext* const context)
+      explicit SavedDrawState(
+        ID3D11DeviceContext* const context
+      )
         : mContext(context)
       {
         mContext->IAGetInputLayout(&mInputLayout);
@@ -180,7 +205,10 @@ namespace gpg::gal
     };
 
     /** The t0..t5 views of `bindings`, in register order. */
-    void GatherShaderViews(const GpuBindings& bindings, ID3D11ShaderResourceView* (&views)[kGpuMaxReadBuffers + kGpuMaxTextures])
+    void GatherShaderViews(
+      const GpuBindings& bindings,
+      ID3D11ShaderResourceView* (&views)[kGpuMaxReadBuffers + kGpuMaxTextures]
+    )
     {
       for (std::uint32_t index = 0U; index < kGpuMaxReadBuffers; ++index) {
         views[index] = bindings.readBuffers[index] != nullptr
@@ -198,7 +226,10 @@ namespace gpg::gal
   // ---------------------------------------------------------------------------
   // GpuBufferD3D11
 
-  GpuBufferD3D11::GpuBufferD3D11(ID3D11Device* const device, const GpuBufferDesc& desc)
+  GpuBufferD3D11::GpuBufferD3D11(
+    ID3D11Device* const device,
+    const GpuBufferDesc& desc
+  )
     : GpuBuffer(desc)
   {
     const bool indirect = desc.kind == GpuBufferKind::IndirectArgs;
@@ -211,8 +242,9 @@ namespace gpg::gal
     bufferDesc.ByteWidth = stride * capacity;
     bufferDesc.Usage = D3D11_USAGE_DEFAULT;
     bufferDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE | (desc.shaderWrite ? D3D11_BIND_UNORDERED_ACCESS : 0U);
-    bufferDesc.MiscFlags = indirect ? (D3D11_RESOURCE_MISC_DRAWINDIRECT_ARGS | D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS)
-                                    : D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+    bufferDesc.MiscFlags = indirect
+      ? (D3D11_RESOURCE_MISC_DRAWINDIRECT_ARGS | D3D11_RESOURCE_MISC_BUFFER_ALLOW_RAW_VIEWS)
+      : D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
     bufferDesc.StructureByteStride = indirect ? 0U : stride;
     CheckHresult("GpuDrivenD3D11.cpp", __LINE__, device->CreateBuffer(&bufferDesc, nullptr, &mBuffer));
 
@@ -229,7 +261,9 @@ namespace gpg::gal
       viewDesc.Buffer.FirstElement = 0U;
       viewDesc.Buffer.NumElements = capacity;
     }
-    CheckHresult("GpuDrivenD3D11.cpp", __LINE__, device->CreateShaderResourceView(mBuffer.Get(), &viewDesc, &mShaderView));
+    CheckHresult(
+      "GpuDrivenD3D11.cpp", __LINE__, device->CreateShaderResourceView(mBuffer.Get(), &viewDesc, &mShaderView)
+    );
 
     if (desc.shaderWrite) {
       D3D11_UNORDERED_ACCESS_VIEW_DESC writeDesc{};
@@ -243,7 +277,9 @@ namespace gpg::gal
         writeDesc.Format = DXGI_FORMAT_UNKNOWN;
         writeDesc.Buffer.NumElements = capacity;
       }
-      CheckHresult("GpuDrivenD3D11.cpp", __LINE__, device->CreateUnorderedAccessView(mBuffer.Get(), &writeDesc, &mWriteView));
+      CheckHresult(
+        "GpuDrivenD3D11.cpp", __LINE__, device->CreateUnorderedAccessView(mBuffer.Get(), &writeDesc, &mWriteView)
+      );
     }
   }
 
@@ -255,7 +291,9 @@ namespace gpg::gal
   // GpuDrivenD3D11
 
   GpuDrivenD3D11::GpuDrivenD3D11(
-    ID3D11Device* const device, ID3D11DeviceContext* const immediate, const D3D_FEATURE_LEVEL featureLevel
+    ID3D11Device* const device,
+    ID3D11DeviceContext* const immediate,
+    const D3D_FEATURE_LEVEL featureLevel
   )
     : mDevice(device)
     , mImmediate(immediate)
@@ -278,7 +316,9 @@ namespace gpg::gal
 
   GpuDrivenD3D11::~GpuDrivenD3D11() = default;
 
-  boost::shared_ptr<GpuBuffer> GpuDrivenD3D11::CreateBuffer(const GpuBufferDesc& desc)
+  boost::shared_ptr<GpuBuffer> GpuDrivenD3D11::CreateBuffer(
+    const GpuBufferDesc& desc
+  )
   {
     if ((mFeatures & kGpuFeatureVertexPulling) == 0U) {
       return {};
@@ -286,7 +326,12 @@ namespace gpg::gal
     return boost::shared_ptr<GpuBuffer>(new GpuBufferD3D11(mDevice.Get(), desc));
   }
 
-  void GpuDrivenD3D11::UpdateBuffer(GpuBuffer& buffer, const std::uint32_t firstElement, const std::uint32_t count, const void* const data)
+  void GpuDrivenD3D11::UpdateBuffer(
+    GpuBuffer& buffer,
+    const std::uint32_t firstElement,
+    const std::uint32_t count,
+    const void* const data
+  )
   {
     const GpuBufferDesc& desc = buffer.Desc();
     if (count == 0U || firstElement >= desc.capacity) {
@@ -304,7 +349,12 @@ namespace gpg::gal
     RecordUpload(box.right - box.left);
   }
 
-  bool GpuDrivenD3D11::ReadBuffer(GpuBuffer& buffer, const std::uint32_t firstElement, const std::uint32_t count, void* const out)
+  bool GpuDrivenD3D11::ReadBuffer(
+    GpuBuffer& buffer,
+    const std::uint32_t firstElement,
+    const std::uint32_t count,
+    void* const out
+  )
   {
     const GpuBufferDesc& desc = buffer.Desc();
     if (count == 0U || out == nullptr || firstElement >= desc.capacity || count > desc.capacity - firstElement) {
@@ -324,7 +374,9 @@ namespace gpg::gal
     box.right = box.left + bytes;
     box.bottom = 1U;
     box.back = 1U;
-    mImmediate->CopySubresourceRegion(staging.Get(), 0U, 0U, 0U, 0U, static_cast<GpuBufferD3D11&>(buffer).Buffer(), 0U, &box);
+    mImmediate->CopySubresourceRegion(
+      staging.Get(), 0U, 0U, 0U, 0U, static_cast<GpuBufferD3D11&>(buffer).Buffer(), 0U, &box
+    );
     D3D11_MAPPED_SUBRESOURCE mapped{};
     if (FAILED(mImmediate->Map(staging.Get(), 0U, D3D11_MAP_READ, 0U, &mapped))) {
       return false;
@@ -334,7 +386,9 @@ namespace gpg::gal
     return true;
   }
 
-  boost::shared_ptr<GpuProgram> GpuDrivenD3D11::CreateProgram(const GpuProgramDesc& desc)
+  boost::shared_ptr<GpuProgram> GpuDrivenD3D11::CreateProgram(
+    const GpuProgramDesc& desc
+  )
   {
     if ((mFeatures & kGpuFeatureVertexPulling) == 0U || desc.source == nullptr) {
       return {};
@@ -343,8 +397,12 @@ namespace gpg::gal
     boost::shared_ptr<GpuProgramD3D11> program(new GpuProgramD3D11());
     if (desc.computeEntry != nullptr) {
       const ComPtr<ID3DBlob> code = CompileStage(desc, desc.computeEntry, "cs_5_0");
-      if (code == nullptr ||
-          FAILED(mDevice->CreateComputeShader(code->GetBufferPointer(), code->GetBufferSize(), nullptr, &program->mComputeShader))) {
+      if (
+        code == nullptr ||
+        FAILED(mDevice->CreateComputeShader(
+          code->GetBufferPointer(), code->GetBufferSize(), nullptr, &program->mComputeShader
+        ))
+      ) {
         return {};
       }
       return program;
@@ -355,9 +413,15 @@ namespace gpg::gal
     }
     const ComPtr<ID3DBlob> vertexCode = CompileStage(desc, desc.vertexEntry, "vs_5_0");
     const ComPtr<ID3DBlob> pixelCode = CompileStage(desc, desc.pixelEntry, "ps_5_0");
-    if (vertexCode == nullptr || pixelCode == nullptr ||
-        FAILED(mDevice->CreateVertexShader(vertexCode->GetBufferPointer(), vertexCode->GetBufferSize(), nullptr, &program->mVertexShader)) ||
-        FAILED(mDevice->CreatePixelShader(pixelCode->GetBufferPointer(), pixelCode->GetBufferSize(), nullptr, &program->mPixelShader))) {
+    if (
+      vertexCode == nullptr || pixelCode == nullptr ||
+      FAILED(mDevice->CreateVertexShader(
+        vertexCode->GetBufferPointer(), vertexCode->GetBufferSize(), nullptr, &program->mVertexShader
+      )) ||
+      FAILED(mDevice->CreatePixelShader(
+        pixelCode->GetBufferPointer(), pixelCode->GetBufferSize(), nullptr, &program->mPixelShader
+      ))
+    ) {
       return {};
     }
 
@@ -388,7 +452,8 @@ namespace gpg::gal
     CheckHresult("GpuDrivenD3D11.cpp", __LINE__, mDevice->CreateRasterizerState(&rasterizer, &program->mRasterizer));
 
     D3D11_SAMPLER_DESC sampler{};
-    sampler.Filter = desc.sampler == GpuSampler::PointClamp ? D3D11_FILTER_MIN_MAG_MIP_POINT : D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+    sampler.Filter =
+      desc.sampler == GpuSampler::PointClamp ? D3D11_FILTER_MIN_MAG_MIP_POINT : D3D11_FILTER_MIN_MAG_MIP_LINEAR;
     const D3D11_TEXTURE_ADDRESS_MODE address =
       desc.sampler == GpuSampler::LinearWrap ? D3D11_TEXTURE_ADDRESS_WRAP : D3D11_TEXTURE_ADDRESS_CLAMP;
     sampler.AddressU = address;
@@ -402,19 +467,25 @@ namespace gpg::gal
     return program;
   }
 
-  void GpuDrivenD3D11::UploadConstants(const GpuBindings& bindings)
+  void GpuDrivenD3D11::UploadConstants(
+    const GpuBindings& bindings
+  )
   {
     if (bindings.constants == nullptr || bindings.constantBytes == 0U) {
       return;
     }
     D3D11_MAPPED_SUBRESOURCE mapped{};
-    CheckHresult("GpuDrivenD3D11.cpp", __LINE__, mImmediate->Map(mConstants.Get(), 0U, D3D11_MAP_WRITE_DISCARD, 0U, &mapped));
+    CheckHresult(
+      "GpuDrivenD3D11.cpp", __LINE__, mImmediate->Map(mConstants.Get(), 0U, D3D11_MAP_WRITE_DISCARD, 0U, &mapped)
+    );
     std::memcpy(mapped.pData, bindings.constants, std::min(bindings.constantBytes, kGpuMaxConstantBytes));
     mImmediate->Unmap(mConstants.Get(), 0U);
     RecordUpload(bindings.constantBytes);
   }
 
-  void GpuDrivenD3D11::Draw(const GpuDrawCall& call)
+  void GpuDrivenD3D11::Draw(
+    const GpuDrawCall& call
+  )
   {
     auto* const program = static_cast<GpuProgramD3D11*>(call.program);
     if (program == nullptr || program->mVertexShader == nullptr) {
@@ -452,17 +523,25 @@ namespace gpg::gal
       auto* const indices = static_cast<IndexBufferD3D11*>(call.indexBuffer);
       mImmediate->IASetIndexBuffer(indices->GetBuffer(), indices->GetIndexFormat(), 0U);
       mImmediate->DrawIndexedInstanced(call.vertexCountPerInstance, call.instanceCount, 0U, 0, call.firstInstance);
-      RecordDraw((call.vertexCountPerInstance / 3U) * call.instanceCount, call.vertexCountPerInstance * call.instanceCount);
+      RecordDraw(
+        (call.vertexCountPerInstance / 3U) * call.instanceCount, call.vertexCountPerInstance * call.instanceCount
+      );
     } else if (call.indirectArgs != nullptr) {
-      mImmediate->DrawInstancedIndirect(static_cast<GpuBufferD3D11*>(call.indirectArgs)->Buffer(), call.indirectArgsOffset);
+      mImmediate->DrawInstancedIndirect(
+        static_cast<GpuBufferD3D11*>(call.indirectArgs)->Buffer(), call.indirectArgsOffset
+      );
       RecordDraw(0U, 0U);
     } else {
       mImmediate->DrawInstanced(call.vertexCountPerInstance, call.instanceCount, 0U, call.firstInstance);
-      RecordDraw((call.vertexCountPerInstance / 3U) * call.instanceCount, call.vertexCountPerInstance * call.instanceCount);
+      RecordDraw(
+        (call.vertexCountPerInstance / 3U) * call.instanceCount, call.vertexCountPerInstance * call.instanceCount
+      );
     }
   }
 
-  void GpuDrivenD3D11::Dispatch(const GpuDispatch& dispatch)
+  void GpuDrivenD3D11::Dispatch(
+    const GpuDispatch& dispatch
+  )
   {
     auto* const program = static_cast<GpuProgramD3D11*>(dispatch.program);
     if (program == nullptr || program->mComputeShader == nullptr) {
@@ -498,7 +577,9 @@ namespace gpg::gal
   // ---------------------------------------------------------------------------
   // Timestamps
 
-  void GpuDrivenD3D11::BeginProfileRegion(const std::uint32_t region)
+  void GpuDrivenD3D11::BeginProfileRegion(
+    const std::uint32_t region
+  )
   {
     ProfileFrame& frame = mProfileFrames[mProfileFrame];
     if (frame.pending) {
@@ -551,7 +632,9 @@ namespace gpg::gal
     frame.regions.push_back(TimedRegion{region, pair});
   }
 
-  void GpuDrivenD3D11::EndProfileRegion(const std::uint32_t region)
+  void GpuDrivenD3D11::EndProfileRegion(
+    const std::uint32_t region
+  )
   {
     static_cast<void>(region);
     ProfileFrame& frame = mProfileFrames[mProfileFrame];
@@ -583,7 +666,9 @@ namespace gpg::gal
     CollectProfileFrames(false);
   }
 
-  void GpuDrivenD3D11::CollectProfileFrames(const bool wait)
+  void GpuDrivenD3D11::CollectProfileFrames(
+    const bool wait
+  )
   {
     RenderProfiler& profiler = RenderProfiler::Get();
     for (std::uint32_t age = 0U; age < kProfileFrames; ++age) {
@@ -606,19 +691,26 @@ namespace gpg::gal
       };
       UINT64 frameBegin = 0U;
       UINT64 frameEnd = 0U;
-      if (read(frame.timestamps[0].Get(), frameBegin) && read(frame.timestamps[1].Get(), frameEnd) && frameEnd >= frameBegin) {
+      if (
+        read(frame.timestamps[0].Get(), frameBegin) && read(frame.timestamps[1].Get(), frameEnd) &&
+        frameEnd >= frameBegin
+      ) {
         profiler.AddGpuFrameTime(static_cast<double>(frameEnd - frameBegin) * toMilliseconds);
       }
       for (const TimedRegion& timed : frame.regions) {
         UINT64 begin = 0U;
         UINT64 end = 0U;
-        if (read(frame.timestamps[2U * timed.queryPair].Get(), begin) &&
-            read(frame.timestamps[2U * timed.queryPair + 1U].Get(), end) && end >= begin) {
+        if (
+          read(frame.timestamps[2U * timed.queryPair].Get(), begin) &&
+          read(frame.timestamps[2U * timed.queryPair + 1U].Get(), end) && end >= begin
+        ) {
           profiler.AddGpuTime(timed.region, static_cast<double>(end - begin) * toMilliseconds);
         }
         D3D11_QUERY_DATA_PIPELINE_STATISTICS statistics{};
-        if (timed.queryPair < frame.statistics.size() &&
-            mImmediate->GetData(frame.statistics[timed.queryPair].Get(), &statistics, sizeof(statistics), flags) == S_OK) {
+        if (
+          timed.queryPair < frame.statistics.size() &&
+          mImmediate->GetData(frame.statistics[timed.queryPair].Get(), &statistics, sizeof(statistics), flags) == S_OK
+        ) {
           profiler.AddGpuPipelineStatistics(timed.region, statistics.PSInvocations, statistics.CPrimitives);
         }
       }

@@ -43,10 +43,18 @@ namespace faf::headless
   class CReplayViewFrameStats final : public remote::CViewFrames
   {
   public:
-    CReplayViewFrameStats(const std::string& path, const remote::wire::SContentTables& tables, float mapSizeX, float mapSizeZ);
+    CReplayViewFrameStats(
+      const std::string& path,
+      const remote::wire::SContentTables& tables,
+      float mapSizeX,
+      float mapSizeZ
+    );
     ~CReplayViewFrameStats() override;
 
-    [[nodiscard]] bool IsOpen() const noexcept { return mFile != nullptr; }
+    [[nodiscard]] bool IsOpen() const noexcept
+    {
+      return mFile != nullptr;
+    }
 
     void Install();
     void Uninstall();
@@ -59,14 +67,21 @@ namespace faf::headless
       for (const std::uint64_t count : mSpyUnheld) {
         unheld += count;
       }
-      return mEncodeFailures + mRoundTripFailures + mGridFailures + mIdFailures + mChannelFailures + mSpyOutside + unheld;
+      return mEncodeFailures + mRoundTripFailures + mGridFailures + mIdFailures + mChannelFailures + mSpyOutside +
+        unheld;
     }
 
     /** The spy client's checks (`--spy`). */
-    void EnableSpy() noexcept { mSpyOn = true; }
+    void EnableSpy() noexcept
+    {
+      mSpyOn = true;
+    }
 
     /** The simulated channel (`--view-loss`, `--view-ack-delay`); off at 0 % loss and 0 beats. */
-    void SetChannel(std::uint32_t lossPercent, std::uint32_t ackDelayBeats) noexcept
+    void SetChannel(
+      std::uint32_t lossPercent,
+      std::uint32_t ackDelayBeats
+    ) noexcept
     {
       mLossPercent = lossPercent;
       mAckDelay = ackDelayBeats;
@@ -96,7 +111,7 @@ namespace faf::headless
     std::FILE* mFile = nullptr;
     remote::wire::SFrameCodec mCodec;
     remote::wire::SFrameCodec mReckonedCodec;
-    std::vector<remote::CDeadReckoner> mReckoners;          // per army
+    std::vector<remote::CDeadReckoner> mReckoners;           // per army
     std::vector<remote::wire::SViewFrame> mPreviousReckoned; // per army
     std::vector<std::uint64_t> mReckonedBytes;               // per army, all beats
     // Records the reckoner anchored on the beat they were sent (new or re-anchored), per army: by
@@ -106,9 +121,9 @@ namespace faf::headless
     const remote::wire::SContentTables* mTables = nullptr;
     std::vector<remote::wire::SViewFrame> mPrevious;
     std::vector<bool> mHavePrevious;
-    std::vector<std::uint64_t> mBytes;    // per army, all beats
-    std::vector<std::uint64_t> mEntities; // per army, all beats
-    std::vector<std::uint64_t> mGridBytes; // per army, all beats
+    std::vector<std::uint64_t> mBytes;                                                       // per army, all beats
+    std::vector<std::uint64_t> mEntities;                                                    // per army, all beats
+    std::vector<std::uint64_t> mGridBytes;                                                   // per army, all beats
     std::map<std::tuple<std::size_t, std::size_t, int>, remote::wire::SGridBits> mSentGrids; // (view, army, kind)
     std::uint64_t mGridFailures = 0;
     std::uint64_t mBeats = 0;
@@ -117,12 +132,12 @@ namespace faf::headless
     bool mChannelOn = false;
     std::uint32_t mLossPercent = 0;
     std::uint32_t mAckDelay = 0;
-    std::vector<SChannel> mChannels; // per army
+    std::vector<SChannel> mChannels;    // per army
     std::uint64_t mChannelFailures = 0; // frames that arrived and did not decode to the frame sent
     bool mSpyOn = false;
     std::uint64_t mSpyRecords = 0;
-    std::uint64_t mSpyOutside = 0;  // records the oracle does not let the view have
-    std::uint64_t mSpyOrphans = 0;  // records the sim no longer has
+    std::uint64_t mSpyOutside = 0; // records the oracle does not let the view have
+    std::uint64_t mSpyOrphans = 0; // records the sim no longer has
     std::uint64_t mSpyReferences = 0;
     std::array<std::uint64_t, 7> mSpyUnheld{}; // by field: names an entity the client does not hold
     std::vector<std::string> mSpyExamples;

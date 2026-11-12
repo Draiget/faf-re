@@ -39,8 +39,8 @@ namespace gpg::gal
    * body is for their unwind paths.
    */
   Texture::~Texture() = default;
-namespace
-{
+  namespace
+  {
     /**
      * Address: 0x00940940 (FUN_00940940)
      *
@@ -48,7 +48,9 @@ namespace
      * Re-runs `Class` constructor side effects for ABI adapter lanes that
      * ignore constructor return values.
      */
-    [[maybe_unused]] void ResetClassVtableVoidAdapter(Class* const instance) noexcept
+    [[maybe_unused]] void ResetClassVtableVoidAdapter(
+      Class* const instance
+    ) noexcept
     {
       static_cast<void>(::new (instance) Class());
     }
@@ -60,7 +62,9 @@ namespace
      * What it does:
      * Applies legacy MSVC8 `_Tidy` semantics to both `EffectMacro` string lanes.
      */
-    void DestroyEffectMacroBody(EffectMacro* const effectMacro) noexcept
+    void DestroyEffectMacroBody(
+      EffectMacro* const effectMacro
+    ) noexcept
     {
       effectMacro->valueText_.tidy(true, 0U);
       effectMacro->keyText_.tidy(true, 0U);
@@ -73,13 +77,14 @@ namespace
      * What it does:
      * Applies legacy MSVC8 `_Tidy` semantics to both `Error` string lanes.
      */
-    void DestroyErrorBody(Error* const error) noexcept
+    void DestroyErrorBody(
+      Error* const error
+    ) noexcept
     {
       error->message_.tidy(true, 0U);
       error->file_.tidy(true, 0U);
     }
-}
-
+  } // namespace
 
   /**
    * Address: 0x0093EEA0 (FUN_0093EEA0, __imp_??0CursorContext@gal@gpg@@QAE@XZ)
@@ -91,8 +96,7 @@ namespace
     : hotspotX_(0)
     , hotspotY_(0)
     , texture_()
-  {
-  }
+  {}
 
   /**
    * Address: 0x0093EF20 (FUN_0093EF20)
@@ -102,12 +106,14 @@ namespace
    * pair the body shows (0x0093EF55, 0x0093EF5C) is the by-value parameter
    * being copied into the member and then destroyed.
    */
-  CursorContext::CursorContext(const POINT& hotspot, const boost::shared_ptr<Texture> texture)
+  CursorContext::CursorContext(
+    const POINT& hotspot,
+    const boost::shared_ptr<Texture> texture
+  )
     : hotspotX_(hotspot.x)
     , hotspotY_(hotspot.y)
     , texture_(texture)
-  {
-  }
+  {}
 
   /**
    * Address: 0x0093EE60 (FUN_0093EE60, __imp_??1CursorContext@gal@gpg@@UAE@XZ)
@@ -142,7 +148,9 @@ namespace
    * Copy-constructs effect-macro text lanes through legacy string assign
    * semantics for key/value payloads.
    */
-  EffectMacro::EffectMacro(const EffectMacro& other)
+  EffectMacro::EffectMacro(
+    const EffectMacro& other
+  )
     : keyText_()
     , valueText_()
   {
@@ -156,7 +164,10 @@ namespace
    * What it does:
    * Constructs one effect-macro entry from raw C-string key/value payloads.
    */
-  EffectMacro::EffectMacro(const char* const keyText, const char* const valueText)
+  EffectMacro::EffectMacro(
+    const char* const keyText,
+    const char* const valueText
+  )
     : keyText_()
     , valueText_()
   {
@@ -193,8 +204,7 @@ namespace
     , file_("<unknown>")
     , line_(0)
     , message_("<undefined>")
-  {
-  }
+  {}
 
   /**
    * Address: 0x009404D0 (FUN_009404D0)
@@ -203,7 +213,11 @@ namespace
    * What it does:
    * Initializes file/line/message payload lanes for gal error exceptions.
    */
-  Error::Error(const fa::string& file, const int line, const fa::string& message)
+  Error::Error(
+    const fa::string& file,
+    const int line,
+    const fa::string& message
+  )
     : std::exception()
   {
     file_.assign(file, 0U, fa::string::npos);
@@ -287,7 +301,8 @@ namespace
     const bool windowed,
     const std::uint32_t width,
     const std::uint32_t height,
-    const std::uint32_t framesPerSecondValue)
+    const std::uint32_t framesPerSecondValue
+  )
   {
     mHandle = handle;
     mWindow = window;
@@ -306,7 +321,9 @@ namespace
    * Copy-constructs one GAL head descriptor by default-initializing this lane
    * and applying `operator=` to copy owned payloads.
    */
-  Head::Head(const Head& other)
+  Head::Head(
+    const Head& other
+  )
     : Head()
   {
     *this = other;
@@ -319,7 +336,9 @@ namespace
    * Copies one GAL head descriptor lane in-place, including owned text and
    * nested vector payloads, without altering the vftable.
    */
-  Head& Head::operator=(const Head& other)
+  Head& Head::operator=(
+    const Head& other
+  )
   {
     mHandle = other.mHandle;
     mWindow = other.mWindow;
@@ -346,7 +365,9 @@ namespace
    * What it does:
    * Linear scan of the first valid-format list for `format`.
    */
-  bool Head::HasCapability1(const std::int32_t format) const
+  bool Head::HasCapability1(
+    const std::int32_t format
+  ) const
   {
     return std::ranges::find(validFormats1, format) != validFormats1.end();
   }
@@ -360,7 +381,9 @@ namespace
    * What it does:
    * Linear scan of the second valid-format list for `format`.
    */
-  bool Head::HasCapability2(const std::int32_t format) const
+  bool Head::HasCapability2(
+    const std::int32_t format
+  ) const
   {
     return std::ranges::find(validFormats2, format) != validFormats2.end();
   }
@@ -379,5 +402,4 @@ namespace
    * dispatches here and conditionally frees `this`.
    */
   Head::~Head() = default;
-}
-
+} // namespace gpg::gal

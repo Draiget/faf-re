@@ -30,7 +30,12 @@ namespace gpg::gal
       return *static_cast<DeviceD3D11*>(Device::GetInstance());
     }
 
-    [[noreturn]] void ThrowMissing(const char* const file, const int line, const char* const what, const char* const name)
+    [[noreturn]] void ThrowMissing(
+      const char* const file,
+      const int line,
+      const char* const what,
+      const char* const name
+    )
     {
       char message[512]{};
       std::snprintf(message, sizeof(message), "invalid effect %s requested: %s", what, (name != nullptr) ? name : "");
@@ -39,7 +44,11 @@ namespace gpg::gal
 
     /** Reads one annotation of `owner` (a technique or a variable). */
     template <class Owner, class Read>
-    bool ReadAnnotation(Owner* const owner, const fa::string& annotationName, Read&& read)
+    bool ReadAnnotation(
+      Owner* const owner,
+      const fa::string& annotationName,
+      Read&& read
+    )
     {
       ID3DX11EffectVariable* const annotation = owner->GetAnnotationByName(annotationName.c_str());
       if (annotation == nullptr || !annotation->IsValid()) {
@@ -53,7 +62,10 @@ namespace gpg::gal
   // ---------------------------------------------------------------------------
   // EffectD3D11
 
-  EffectD3D11::EffectD3D11(const EffectContext& context, ID3DX11Effect* const effect)
+  EffectD3D11::EffectD3D11(
+    const EffectContext& context,
+    ID3DX11Effect* const effect
+  )
     : mContext(context)
     , mEffect(effect)
   {
@@ -69,7 +81,9 @@ namespace gpg::gal
     return &mContext;
   }
 
-  void EffectD3D11::GetTechniques(fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques)
+  void EffectD3D11::GetTechniques(
+    fa::vector<boost::shared_ptr<EffectTechnique>>& outTechniques
+  )
   {
     if (mEffect == nullptr) {
       ThrowError("EffectD3D11.cpp", __LINE__, "invalid effect");
@@ -90,7 +104,9 @@ namespace gpg::gal
     }
   }
 
-  boost::shared_ptr<EffectVariable> EffectD3D11::GetVariable(const char* const name)
+  boost::shared_ptr<EffectVariable> EffectD3D11::GetVariable(
+    const char* const name
+  )
   {
     if (mEffect == nullptr) {
       ThrowError("EffectD3D11.cpp", __LINE__, "invalid effect");
@@ -102,7 +118,9 @@ namespace gpg::gal
     return boost::shared_ptr<EffectVariable>(new EffectVariableD3D11(name, mEffect.Get(), variable));
   }
 
-  boost::shared_ptr<EffectTechnique> EffectD3D11::GetTechnique(const char* const name)
+  boost::shared_ptr<EffectTechnique> EffectD3D11::GetTechnique(
+    const char* const name
+  )
   {
     if (mEffect == nullptr) {
       ThrowError("EffectD3D11.cpp", __LINE__, "invalid effect");
@@ -122,7 +140,9 @@ namespace gpg::gal
   // EffectTechniqueD3D11
 
   EffectTechniqueD3D11::EffectTechniqueD3D11(
-    const char* const name, ID3DX11Effect* const effect, ID3DX11EffectTechnique* const technique
+    const char* const name,
+    ID3DX11Effect* const effect,
+    ID3DX11EffectTechnique* const technique
   )
     : mName((name != nullptr) ? name : "")
     , mEffect(effect)
@@ -181,7 +201,9 @@ namespace gpg::gal
     }
   }
 
-  void EffectTechniqueD3D11::BeginPass(const int pass)
+  void EffectTechniqueD3D11::BeginPass(
+    const int pass
+  )
   {
     if (!mBegun) {
       ThrowError("EffectTechniqueD3D11.cpp", __LINE__, "effect technique begin/end mismatch");
@@ -208,9 +230,11 @@ namespace gpg::gal
     RecordStateChange();
     D3DX11_PASS_SHADER_DESC vertexShader{};
     D3DX11_EFFECT_SHADER_DESC shaderDesc{};
-    if (SUCCEEDED(mTechnique->GetPassByIndex(static_cast<UINT>(pass))->GetVertexShaderDesc(&vertexShader)) &&
-        vertexShader.pShaderVariable != nullptr &&
-        SUCCEEDED(vertexShader.pShaderVariable->GetShaderDesc(vertexShader.ShaderIndex, &shaderDesc))) {
+    if (
+      SUCCEEDED(mTechnique->GetPassByIndex(static_cast<UINT>(pass))->GetVertexShaderDesc(&vertexShader)) &&
+      vertexShader.pShaderVariable != nullptr &&
+      SUCCEEDED(vertexShader.pShaderVariable->GetShaderDesc(vertexShader.ShaderIndex, &shaderDesc))
+    ) {
       device.SetPassVertexShader(shaderDesc.pBytecode, shaderDesc.BytecodeLength);
     }
     D3DX11_STATE_BLOCK_MASK stateMask{};
@@ -225,7 +249,10 @@ namespace gpg::gal
     }
   }
 
-  bool EffectTechniqueD3D11::GetAnnotationBool(bool* const outValue, const fa::string& annotationName)
+  bool EffectTechniqueD3D11::GetAnnotationBool(
+    bool* const outValue,
+    const fa::string& annotationName
+  )
   {
     return ReadAnnotation(mTechnique, annotationName, [&](ID3DX11EffectVariable* const annotation) {
       bool value = false;
@@ -234,21 +261,30 @@ namespace gpg::gal
     });
   }
 
-  bool EffectTechniqueD3D11::GetAnnotationInt(int* const outValue, const fa::string& annotationName)
+  bool EffectTechniqueD3D11::GetAnnotationInt(
+    int* const outValue,
+    const fa::string& annotationName
+  )
   {
     return ReadAnnotation(mTechnique, annotationName, [&](ID3DX11EffectVariable* const annotation) {
       CheckHresult("EffectTechniqueD3D11.cpp", __LINE__, annotation->AsScalar()->GetInt(outValue));
     });
   }
 
-  bool EffectTechniqueD3D11::GetAnnotationFloat(float* const outValue, const fa::string& annotationName)
+  bool EffectTechniqueD3D11::GetAnnotationFloat(
+    float* const outValue,
+    const fa::string& annotationName
+  )
   {
     return ReadAnnotation(mTechnique, annotationName, [&](ID3DX11EffectVariable* const annotation) {
       CheckHresult("EffectTechniqueD3D11.cpp", __LINE__, annotation->AsScalar()->GetFloat(outValue));
     });
   }
 
-  bool EffectTechniqueD3D11::GetAnnotationString(fa::string* const outValue, const fa::string& annotationName)
+  bool EffectTechniqueD3D11::GetAnnotationString(
+    fa::string* const outValue,
+    const fa::string& annotationName
+  )
   {
     return ReadAnnotation(mTechnique, annotationName, [&](ID3DX11EffectVariable* const annotation) {
       LPCSTR text = nullptr;
@@ -261,7 +297,9 @@ namespace gpg::gal
   // EffectVariableD3D11
 
   EffectVariableD3D11::EffectVariableD3D11(
-    const char* const name, ID3DX11Effect* const effect, ID3DX11EffectVariable* const variable
+    const char* const name,
+    ID3DX11Effect* const effect,
+    ID3DX11EffectVariable* const variable
   )
     : mName((name != nullptr) ? name : "")
     , mEffect(effect)
@@ -282,23 +320,30 @@ namespace gpg::gal
     return &mName;
   }
 
-  void EffectVariableD3D11::SetCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget> cubeTarget)
+  void EffectVariableD3D11::SetCubeRenderTarget(
+    const boost::shared_ptr<CubeRenderTarget> cubeTarget
+  )
   {
     static_cast<void>(cubeTarget);
   }
 
-  void EffectVariableD3D11::SetRenderTarget(const boost::shared_ptr<RenderTarget> renderTarget)
+  void EffectVariableD3D11::SetRenderTarget(
+    const boost::shared_ptr<RenderTarget> renderTarget
+  )
   {
     if (ActiveDevice().Tracing()) {
       ActiveDevice().Trace("var %s SetRenderTarget %p", mName.c_str(), renderTarget.get());
     }
-    ID3D11ShaderResourceView* const view =
-      (renderTarget != nullptr) ? static_cast<RenderTargetD3D11*>(renderTarget.get())->GetShaderResourceView() : nullptr;
+    ID3D11ShaderResourceView* const view = (renderTarget != nullptr)
+      ? static_cast<RenderTargetD3D11*>(renderTarget.get())->GetShaderResourceView()
+      : nullptr;
     CheckHresult("EffectVariableD3D11.cpp", __LINE__, mVariable->AsShaderResource()->SetResource(view));
     RecordStateChange();
   }
 
-  void EffectVariableD3D11::SetTexture(const boost::shared_ptr<Texture> texture)
+  void EffectVariableD3D11::SetTexture(
+    const boost::shared_ptr<Texture> texture
+  )
   {
     if (ActiveDevice().Tracing()) {
       ActiveDevice().Trace("var %s SetTexture %p", mName.c_str(), texture.get());
@@ -309,20 +354,52 @@ namespace gpg::gal
     RecordStateChange();
   }
 
-  void EffectVariableD3D11::SetMatrix4x4(const Matrix* const matrix)
+  void EffectVariableD3D11::SetMatrix4x4(
+    const Matrix* const matrix
+  )
   {
     if (ActiveDevice().Tracing()) {
-      ActiveDevice().Trace("var %s SetMatrix4x4 class %d rows %u cols %u [%g %g %g %g / %g %g %g %g / %g %g %g %g / %g %g %g %g]", mName.c_str(), static_cast<int>(mType.Class), mType.Rows, mType.Columns, matrix->r[0].x, matrix->r[0].y, matrix->r[0].z, matrix->r[0].w, matrix->r[1].x, matrix->r[1].y, matrix->r[1].z, matrix->r[1].w, matrix->r[2].x, matrix->r[2].y, matrix->r[2].z, matrix->r[2].w, matrix->r[3].x, matrix->r[3].y, matrix->r[3].z, matrix->r[3].w);
+      ActiveDevice().Trace(
+        "var %s SetMatrix4x4 class %d rows %u cols %u [%g %g %g %g / %g %g %g %g / %g %g %g %g / %g %g %g %g]",
+        mName.c_str(),
+        static_cast<int>(mType.Class),
+        mType.Rows,
+        mType.Columns,
+        matrix->r[0].x,
+        matrix->r[0].y,
+        matrix->r[0].z,
+        matrix->r[0].w,
+        matrix->r[1].x,
+        matrix->r[1].y,
+        matrix->r[1].z,
+        matrix->r[1].w,
+        matrix->r[2].x,
+        matrix->r[2].y,
+        matrix->r[2].z,
+        matrix->r[2].w,
+        matrix->r[3].x,
+        matrix->r[3].y,
+        matrix->r[3].z,
+        matrix->r[3].w
+      );
     }
     CheckHresult("EffectVariableD3D11.cpp", __LINE__, mVariable->AsMatrix()->SetMatrix(&matrix->r[0].x));
   }
 
-  void EffectVariableD3D11::SetPackedFloats(const float* const values, const std::uint32_t count, const int line)
+  void EffectVariableD3D11::SetPackedFloats(
+    const float* const values,
+    const std::uint32_t count,
+    const int line
+  )
   {
     const UINT elements = std::max<UINT>(mType.Elements, 1U);
     switch (mType.Class) {
     case D3D_SVC_SCALAR:
-      CheckHresult("EffectVariableD3D11.cpp", line, mVariable->AsScalar()->SetFloatArray(values, 0U, std::min<UINT>(count, elements)));
+      CheckHresult(
+        "EffectVariableD3D11.cpp",
+        line,
+        mVariable->AsScalar()->SetFloatArray(values, 0U, std::min<UINT>(count, elements))
+      );
       return;
 
     case D3D_SVC_VECTOR: {
@@ -339,7 +416,9 @@ namespace gpg::gal
       if (mType.Elements == 0U) {
         CheckHresult("EffectVariableD3D11.cpp", line, mVariable->AsVector()->SetFloatVector(padded.data()));
       } else {
-        CheckHresult("EffectVariableD3D11.cpp", line, mVariable->AsVector()->SetFloatVectorArray(padded.data(), 0U, vectors));
+        CheckHresult(
+          "EffectVariableD3D11.cpp", line, mVariable->AsVector()->SetFloatVectorArray(padded.data(), 0U, vectors)
+        );
       }
       return;
     }
@@ -366,26 +445,52 @@ namespace gpg::gal
     CheckHresult("EffectVariableD3D11.cpp", line, mVariable->SetRawValue(values, 0U, count * 4U));
   }
 
-  void EffectVariableD3D11::SetFloatArray(const std::uint32_t count, const float* const values)
+  void EffectVariableD3D11::SetFloatArray(
+    const std::uint32_t count,
+    const float* const values
+  )
   {
     if (ActiveDevice().Tracing()) {
-      ActiveDevice().Trace("var %s SetFloatArray %u class %d el %u", mName.c_str(), count, static_cast<int>(mType.Class), mType.Elements);
+      ActiveDevice().Trace(
+        "var %s SetFloatArray %u class %d el %u", mName.c_str(), count, static_cast<int>(mType.Class), mType.Elements
+      );
     }
     SetPackedFloats(values, count, __LINE__);
   }
 
-  void EffectVariableD3D11::SetVector(const float* const vector4)
+  void EffectVariableD3D11::SetVector(
+    const float* const vector4
+  )
   {
     if (ActiveDevice().Tracing()) {
-      ActiveDevice().Trace("var %s SetVector %g %g %g %g class %d", mName.c_str(), vector4[0], vector4[1], vector4[2], vector4[3], static_cast<int>(mType.Class));
+      ActiveDevice().Trace(
+        "var %s SetVector %g %g %g %g class %d",
+        mName.c_str(),
+        vector4[0],
+        vector4[1],
+        vector4[2],
+        vector4[3],
+        static_cast<int>(mType.Class)
+      );
     }
     CheckHresult("EffectVariableD3D11.cpp", __LINE__, mVariable->AsVector()->SetFloatVector(vector4));
   }
 
-  void EffectVariableD3D11::SetValue(const void* const data, const std::uint32_t byteCount)
+  void EffectVariableD3D11::SetValue(
+    const void* const data,
+    const std::uint32_t byteCount
+  )
   {
     if (ActiveDevice().Tracing()) {
-      ActiveDevice().Trace("var %s SetValue %u bytes class %d rows %u cols %u el %u", mName.c_str(), byteCount, static_cast<int>(mType.Class), mType.Rows, mType.Columns, mType.Elements);
+      ActiveDevice().Trace(
+        "var %s SetValue %u bytes class %d rows %u cols %u el %u",
+        mName.c_str(),
+        byteCount,
+        static_cast<int>(mType.Class),
+        mType.Rows,
+        mType.Columns,
+        mType.Elements
+      );
     }
     // D3D9's SetValue on a numeric float variable converts like SetFloatArray;
     // structs and other types are raw bytes.
@@ -401,7 +506,9 @@ namespace gpg::gal
 
   // D3D9's scalar setters also fill a one-component vector (`float1`, which
   // the effects use for many parameters); Effects 11's AsScalar() refuses one.
-  void EffectVariableD3D11::SetFloat(const float value)
+  void EffectVariableD3D11::SetFloat(
+    const float value
+  )
   {
     if (ActiveDevice().Tracing()) {
       ActiveDevice().Trace("var %s SetFloat %g class %d", mName.c_str(), value, static_cast<int>(mType.Class));
@@ -414,7 +521,9 @@ namespace gpg::gal
     CheckHresult("EffectVariableD3D11.cpp", __LINE__, mVariable->AsScalar()->SetFloat(value));
   }
 
-  void EffectVariableD3D11::SetInt(const int value)
+  void EffectVariableD3D11::SetInt(
+    const int value
+  )
   {
     if (ActiveDevice().Tracing()) {
       ActiveDevice().Trace("var %s SetInt %d", mName.c_str(), value);
@@ -427,7 +536,9 @@ namespace gpg::gal
     CheckHresult("EffectVariableD3D11.cpp", __LINE__, mVariable->AsScalar()->SetInt(value));
   }
 
-  void EffectVariableD3D11::SetBool(const bool value)
+  void EffectVariableD3D11::SetBool(
+    const bool value
+  )
   {
     if (ActiveDevice().Tracing()) {
       ActiveDevice().Trace("var %s SetBool %d", mName.c_str(), value ? 1 : 0);
@@ -440,10 +551,21 @@ namespace gpg::gal
     CheckHresult("EffectVariableD3D11.cpp", __LINE__, mVariable->AsScalar()->SetBool(value));
   }
 
-  void EffectVariableD3D11::SetMatrixArray(const std::uint32_t count, const Matrix* const matrices)
+  void EffectVariableD3D11::SetMatrixArray(
+    const std::uint32_t count,
+    const Matrix* const matrices
+  )
   {
     if (ActiveDevice().Tracing()) {
-      ActiveDevice().Trace("var %s SetMatrixArray %u class %d rows %u cols %u el %u", mName.c_str(), count, static_cast<int>(mType.Class), mType.Rows, mType.Columns, mType.Elements);
+      ActiveDevice().Trace(
+        "var %s SetMatrixArray %u class %d rows %u cols %u el %u",
+        mName.c_str(),
+        count,
+        static_cast<int>(mType.Class),
+        mType.Rows,
+        mType.Columns,
+        mType.Elements
+      );
     }
     // The D3D10 backend passes the address of its `matrices` parameter here
     // (0x0094CAD8); the D3D9 one passes the pointer, which is what is meant.
@@ -452,7 +574,10 @@ namespace gpg::gal
     );
   }
 
-  void EffectVariableD3D11::SetVectorArray(const std::uint32_t count, const float* const vectors4)
+  void EffectVariableD3D11::SetVectorArray(
+    const std::uint32_t count,
+    const float* const vectors4
+  )
   {
     if (ActiveDevice().Tracing()) {
       ActiveDevice().Trace("var %s SetVectorArray %u", mName.c_str(), count);
@@ -460,7 +585,10 @@ namespace gpg::gal
     CheckHresult("EffectVariableD3D11.cpp", __LINE__, mVariable->AsVector()->SetFloatVectorArray(vectors4, 0U, count));
   }
 
-  bool EffectVariableD3D11::GetAnnotationBool(bool* const outValue, const fa::string& annotationName)
+  bool EffectVariableD3D11::GetAnnotationBool(
+    bool* const outValue,
+    const fa::string& annotationName
+  )
   {
     return ReadAnnotation(mVariable, annotationName, [&](ID3DX11EffectVariable* const annotation) {
       bool value = false;
@@ -469,21 +597,30 @@ namespace gpg::gal
     });
   }
 
-  bool EffectVariableD3D11::GetAnnotationInt(int* const outValue, const fa::string& annotationName)
+  bool EffectVariableD3D11::GetAnnotationInt(
+    int* const outValue,
+    const fa::string& annotationName
+  )
   {
     return ReadAnnotation(mVariable, annotationName, [&](ID3DX11EffectVariable* const annotation) {
       CheckHresult("EffectVariableD3D11.cpp", __LINE__, annotation->AsScalar()->GetInt(outValue));
     });
   }
 
-  bool EffectVariableD3D11::GetAnnotationFloat(float* const outValue, const fa::string& annotationName)
+  bool EffectVariableD3D11::GetAnnotationFloat(
+    float* const outValue,
+    const fa::string& annotationName
+  )
   {
     return ReadAnnotation(mVariable, annotationName, [&](ID3DX11EffectVariable* const annotation) {
       CheckHresult("EffectVariableD3D11.cpp", __LINE__, annotation->AsScalar()->GetFloat(outValue));
     });
   }
 
-  bool EffectVariableD3D11::GetAnnotationString(fa::string* const outValue, const fa::string& annotationName)
+  bool EffectVariableD3D11::GetAnnotationString(
+    fa::string* const outValue,
+    const fa::string& annotationName
+  )
   {
     return ReadAnnotation(mVariable, annotationName, [&](ID3DX11EffectVariable* const annotation) {
       LPCSTR text = nullptr;

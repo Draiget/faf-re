@@ -43,8 +43,7 @@ namespace
 
     return IsMeleeCandidateCellNavigable(unit, nullptr, footprint, moveLayer, *sim->mOGrid, *sim->mMapData, cell);
   }
-}
-
+} // namespace
 
 /**
  * Address: 0x006A9010 (FUN_006A9010, Moho::Unit::MotionTick)
@@ -162,7 +161,9 @@ VTransform const& Unit::GetTransform() const
  * Compares this unit's footprint-aligned grid anchor against one candidate
  * world position using the same half-footprint cell projection.
  */
-bool Unit::IsAtPosition(const Wm3::Vec3f& position) const
+bool Unit::IsAtPosition(
+  const Wm3::Vec3f& position
+) const
 {
   const SFootprint& unitFootprint = GetFootprint();
   const Wm3::Vec3f& currentPosition = GetPosition();
@@ -193,7 +194,9 @@ bool Unit::IsAtPosition(const Wm3::Vec3f& position) const
  * bone index is valid, otherwise composes unit world transform with the
  * fallback local anchor (`+SizeY*0.5` for root `-1`).
  */
-VTransform Unit::GetBoneWorldTransform(const int boneIndex) const
+VTransform Unit::GetBoneWorldTransform(
+  const int boneIndex
+) const
 {
   if (boneIndex >= 0) {
     POSE_WaitFor(AniActor); // engine addition (sim_ParallelPose): this tick's pose first
@@ -238,7 +241,9 @@ VTransform Unit::GetBoneWorldTransform(const int boneIndex) const
  * Resolves one unit bone local transform from animation pose composite lanes,
  * with `-1` fallback to blueprint center-height anchor.
  */
-VTransform Unit::GetBoneLocalTransform(const int boneIndex) const
+VTransform Unit::GetBoneLocalTransform(
+  const int boneIndex
+) const
 {
   VTransform localTransform{};
   localTransform.orient_.w = 1.0f;
@@ -279,7 +284,9 @@ VTransform Unit::GetBoneLocalTransform(const int boneIndex) const
  * Returns true when both units are not attacking and share the same non-null
  * formation-layer pointer.
  */
-bool Unit::IsSameFormationLayerWith(const Unit* const other) const
+bool Unit::IsSameFormationLayerWith(
+  const Unit* const other
+) const
 {
   if (other == nullptr) {
     return false;
@@ -334,8 +341,10 @@ bool Unit::PrepareMove(
 
     if (IsInCategory("CANLANDONWATER")) {
       const STIMap* const mapData = sim->mMapData;
-      const CHeightField* const heightField = (mapData != nullptr && mapData->mHeightField) ? mapData->mHeightField.get() : nullptr;
-      const float terrainElevation = (heightField != nullptr) ? heightField->GetElevation(inOutPos->x, inOutPos->z) : inOutPos->y;
+      const CHeightField* const heightField =
+        (mapData != nullptr && mapData->mHeightField) ? mapData->mHeightField.get() : nullptr;
+      const float terrainElevation =
+        (heightField != nullptr) ? heightField->GetElevation(inOutPos->x, inOutPos->z) : inOutPos->y;
       const float waterElevation =
         mapData != nullptr ? mapData->GetWaterElevationAt(inOutPos->x, inOutPos->z) : -10000.0f; // engine addition
       if (waterElevation > terrainElevation) {
@@ -394,15 +403,8 @@ bool Unit::PrepareMove(
         };
 
         if (!IsPrepareMoveCandidateValid(
-              *this,
-              footprint,
-              moveLayer,
-              candidateCell,
-              candidateWorldPos,
-              *skirtRect,
-              useWholeMap
-            ))
-        {
+              *this, footprint, moveLayer, candidateCell, candidateWorldPos, *skirtRect, useWholeMap
+            )) {
           continue;
         }
 

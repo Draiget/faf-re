@@ -80,9 +80,8 @@ namespace moho
      * Builds a new `CAnimationManipulator` for an archive load and hands it back unowned; its
      * members are loaded over it afterwards.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x0063F440 (FUN_0063F440, scalar deleting destructor thunk)
@@ -183,19 +182,19 @@ namespace moho
   public:
     static gpg::RType* sType;
 
-    WeakPtr<Unit> mGoal;                // +0x80 (intrusive weak link into goalMotionScaleUnit chain)
-    SAniManipBitStorage mBoneMask;      // +0x88
+    WeakPtr<Unit> mGoal;                           // +0x80 (intrusive weak link into goalMotionScaleUnit chain)
+    SAniManipBitStorage mBoneMask;                 // +0x88
     boost::shared_ptr<RScaResource> mAnimationRef; // +0x9C
-    float mRate;                        // +0xA4
-    float mAnimationTime;               // +0xA8
-    float mLastFramePosition;           // +0xAC
-    bool mLooping;                      // +0xB0
-    bool mFrameChanged;                 // +0xB1
-    bool mIgnoreMotionScaling;          // +0xB2
-    bool mOverwriteMode;                // +0xB3
-    bool mDisableOnSignal;              // +0xB4
-    bool mDirectionalAnim;              // +0xB5
-    std::uint8_t mReservedB6[2]{};      // +0xB6
+    float mRate;                                   // +0xA4
+    float mAnimationTime;                          // +0xA8
+    float mLastFramePosition;                      // +0xAC
+    bool mLooping;                                 // +0xB0
+    bool mFrameChanged;                            // +0xB1
+    bool mIgnoreMotionScaling;                     // +0xB2
+    bool mOverwriteMode;                           // +0xB3
+    bool mDisableOnSignal;                         // +0xB4
+    bool mDirectionalAnim;                         // +0xB5
+    std::uint8_t mReservedB6[2]{};                 // +0xB6
   };
 
   using CAnimationManipulatorPlayAnim_LuaFuncDef = ::moho::CScrLuaBinder;
@@ -223,7 +222,8 @@ namespace moho
 
   protected:
     /**
-     * Address: 0x00641E10 (FUN_00641E10, ?Create@?$CScrLuaMetatableFactory@VCAnimationManipulator@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
+     * Address: 0x00641E10 (FUN_00641E10,
+     * ?Create@?$CScrLuaMetatableFactory@VCAnimationManipulator@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
      *
      * What it does:
      * Builds the metatable object used for `CAnimationManipulator` Lua userdata.
@@ -597,28 +597,31 @@ namespace moho
     void Init() override;
   };
 
+  static_assert(offsetof(CAnimationManipulator, mGoal) == 0x80, "CAnimationManipulator::mGoal offset must be 0x80");
   static_assert(
-    offsetof(CAnimationManipulator, mGoal) == 0x80, "CAnimationManipulator::mGoal offset must be 0x80"
+    offsetof(CAnimationManipulator, mBoneMask) == 0x88,
+    "CAnimationManipulator::mBoneMask offset must be 0x88"
   );
   static_assert(
-    offsetof(CAnimationManipulator, mBoneMask) == 0x88, "CAnimationManipulator::mBoneMask offset must be 0x88"
-  );
-  static_assert(
-    offsetof(CAnimationManipulator, mAnimationRef) == 0x9C, "CAnimationManipulator::mAnimationRef offset must be 0x9C"
+    offsetof(CAnimationManipulator, mAnimationRef) == 0x9C,
+    "CAnimationManipulator::mAnimationRef offset must be 0x9C"
   );
   static_assert(offsetof(CAnimationManipulator, mRate) == 0xA4, "CAnimationManipulator::mRate offset must be 0xA4");
   static_assert(
-    offsetof(CAnimationManipulator, mAnimationTime) == 0xA8, "CAnimationManipulator::mAnimationTime offset must be 0xA8"
+    offsetof(CAnimationManipulator, mAnimationTime) == 0xA8,
+    "CAnimationManipulator::mAnimationTime offset must be 0xA8"
   );
   static_assert(
     offsetof(CAnimationManipulator, mLastFramePosition) == 0xAC,
     "CAnimationManipulator::mLastFramePosition offset must be 0xAC"
   );
   static_assert(
-    offsetof(CAnimationManipulator, mLooping) == 0xB0, "CAnimationManipulator::mLooping offset must be 0xB0"
+    offsetof(CAnimationManipulator, mLooping) == 0xB0,
+    "CAnimationManipulator::mLooping offset must be 0xB0"
   );
   static_assert(
-    offsetof(CAnimationManipulator, mOverwriteMode) == 0xB3, "CAnimationManipulator::mOverwriteMode offset must be 0xB3"
+    offsetof(CAnimationManipulator, mOverwriteMode) == 0xB3,
+    "CAnimationManipulator::mOverwriteMode offset must be 0xB3"
   );
   static_assert(
     offsetof(CAnimationManipulator, mDisableOnSignal) == 0xB4,

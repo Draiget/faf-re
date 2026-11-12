@@ -71,7 +71,10 @@ namespace moho
    * Runs the IRenTerrain destructor lane and conditionally frees the object
    * storage when the delete flag requests heap release.
    */
-  IRenTerrain* IRenTerrain::DeleteWithFlag(IRenTerrain* const object, const std::uint8_t deleteFlags) noexcept
+  IRenTerrain* IRenTerrain::DeleteWithFlag(
+    IRenTerrain* const object,
+    const std::uint8_t deleteFlags
+  ) noexcept
   {
     object->~IRenTerrain();
     if ((deleteFlags & 0x1u) != 0u) {

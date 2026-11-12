@@ -23,7 +23,9 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RRef MakeUnitWeaponRef(moho::UnitWeapon* weapon)
+  [[nodiscard]] gpg::RRef MakeUnitWeaponRef(
+    moho::UnitWeapon* weapon
+  )
   {
     gpg::RRef out{};
     out.mObj = nullptr;
@@ -40,7 +42,8 @@ namespace
     }
 
     std::int32_t baseOffset = 0;
-    const bool isDerived = dynamicType != nullptr && gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType) != nullptr &&
+    const bool isDerived = dynamicType != nullptr &&
+      gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType) != nullptr &&
       dynamicType->IsDerivedFrom(gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType), &baseOffset);
 
     out.mObj = isDerived
@@ -50,7 +53,10 @@ namespace
     return out;
   }
 
-  [[nodiscard]] moho::UnitWeapon* ReadPointerUnitWeapon(gpg::ReadArchive* const archive, const gpg::RRef& ownerRef)
+  [[nodiscard]] moho::UnitWeapon* ReadPointerUnitWeapon(
+    gpg::ReadArchive* const archive,
+    const gpg::RRef& ownerRef
+  )
   {
     const gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
     if (!tracked.object) {
@@ -66,10 +72,13 @@ namespace
       return static_cast<moho::UnitWeapon*>(upcast.mObj);
     }
 
-    const char* const expected = gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType) ? gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType)->GetName() : "UnitWeapon";
+    const char* const expected = gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType)
+      ? gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType)->GetName()
+      : "UnitWeapon";
     const char* const actual = source.GetTypeName();
     const fa::string msg = gpg::STR_Printf(
-      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
+      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+      "instead",
       expected ? expected : "UnitWeapon",
       actual ? actual : "null"
     );
@@ -92,7 +101,12 @@ namespace moho
   /**
    * Address: 0x00675220 (FUN_00675220, Moho::WeakPtr_UnitWeapon::Deserialize)
    */
-  void WeakPtr_UnitWeapon::Deserialize(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void WeakPtr_UnitWeapon::Deserialize(
+    gpg::ReadArchive* const archive,
+    const std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const weak = reinterpret_cast<WeakPtr<UnitWeapon>*>(objectPtr);
     if (!archive || !weak) {
@@ -106,7 +120,12 @@ namespace moho
   /**
    * Address: 0x00675250 (FUN_00675250, Moho::WeakPtr_UnitWeapon::Serialize)
    */
-  void WeakPtr_UnitWeapon::Serialize(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void WeakPtr_UnitWeapon::Serialize(
+    gpg::WriteArchive* const archive,
+    const std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const weak = reinterpret_cast<WeakPtr<UnitWeapon>*>(objectPtr);
     if (!archive || !weak) {
@@ -124,14 +143,17 @@ namespace moho
    */
   const char* RWeakPtrType<UnitWeapon>::GetName() const
   {
-    static const fa::string sName = gpg::STR_Printf("WeakPtr<%s>", gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType)->GetName());
+    static const fa::string sName =
+      gpg::STR_Printf("WeakPtr<%s>", gpg::CachedLookup<moho::UnitWeapon>(moho::UnitWeapon::sType)->GetName());
     return sName.c_str();
   }
 
   /**
    * Address: 0x00674C70 (FUN_00674C70, Moho::RWeakPtrType_UnitWeapon::GetLexical)
    */
-  fa::string RWeakPtrType<UnitWeapon>::GetLexical(const gpg::RRef& ref) const
+  fa::string RWeakPtrType<UnitWeapon>::GetLexical(
+    const gpg::RRef& ref
+  ) const
   {
     auto* const weak = static_cast<const WeakPtr<UnitWeapon>*>(ref.mObj);
     if (!weak || !weak->HasValue()) {
@@ -177,7 +199,10 @@ namespace moho
   /**
    * Address: 0x00674E50 (FUN_00674E50, Moho::RWeakPtrType_UnitWeapon::SubscriptIndex)
    */
-  gpg::RRef RWeakPtrType<UnitWeapon>::SubscriptIndex(void* const obj, const int ind) const
+  gpg::RRef RWeakPtrType<UnitWeapon>::SubscriptIndex(
+    void* const obj,
+    const int ind
+  ) const
   {
     GPG_ASSERT(ind == 0);
 
@@ -188,7 +213,9 @@ namespace moho
   /**
    * Address: 0x00674E20 (FUN_00674E20, Moho::RWeakPtrType_UnitWeapon::GetCount)
    */
-  size_t RWeakPtrType<UnitWeapon>::GetCount(void* const obj) const
+  size_t RWeakPtrType<UnitWeapon>::GetCount(
+    void* const obj
+  ) const
   {
     auto* const weak = static_cast<WeakPtr<UnitWeapon>*>(obj);
     return (weak && weak->HasValue()) ? 1u : 0u;
@@ -215,4 +242,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_WeakPtr_UnitWeapon_Type_00_c604f3, moho::register_WeakPtr_UnitWeapon_Type_00)
+GPG_PREREGISTER_INIT(
+  register_WeakPtr_UnitWeapon_Type_00_c604f3,
+  moho::register_WeakPtr_UnitWeapon_Type_00
+)

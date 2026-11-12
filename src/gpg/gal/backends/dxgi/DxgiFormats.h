@@ -47,7 +47,10 @@ namespace gpg::gal::dxgi
   {
     std::uint32_t rowPitch = 0;
     std::uint32_t rowCount = 0;
-    [[nodiscard]] std::uint32_t ByteSize() const noexcept { return rowPitch * rowCount; }
+    [[nodiscard]] std::uint32_t ByteSize() const noexcept
+    {
+      return rowPitch * rowCount;
+    }
   };
 
   [[nodiscard]] LevelLayout ComputeLevelLayout(DXGI_FORMAT format, std::uint32_t width, std::uint32_t height) noexcept;

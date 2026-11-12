@@ -38,21 +38,21 @@ namespace moho
 
   struct SScaHeader
   {
-    std::uint32_t magic;           // +0x00
-    std::uint32_t version;         // +0x04
-    std::uint32_t boneCount;       // +0x08
-    std::uint32_t field_0C;        // +0x0C
-    std::uint32_t keysPerBone;     // +0x10
-    std::uint32_t field_14;        // +0x14
-    std::uint32_t field_18;        // +0x18
-    std::uint32_t animDataOffset;  // +0x1C
+    std::uint32_t magic;          // +0x00
+    std::uint32_t version;        // +0x04
+    std::uint32_t boneCount;      // +0x08
+    std::uint32_t field_0C;       // +0x0C
+    std::uint32_t keysPerBone;    // +0x10
+    std::uint32_t field_14;       // +0x14
+    std::uint32_t field_18;       // +0x18
+    std::uint32_t animDataOffset; // +0x1C
   };
 
-  static_assert(offsetof(SScaHeader, version)        == 0x04);
-  static_assert(offsetof(SScaHeader, boneCount)      == 0x08);
-  static_assert(offsetof(SScaHeader, keysPerBone)    == 0x10);
+  static_assert(offsetof(SScaHeader, version) == 0x04);
+  static_assert(offsetof(SScaHeader, boneCount) == 0x08);
+  static_assert(offsetof(SScaHeader, keysPerBone) == 0x10);
   static_assert(offsetof(SScaHeader, animDataOffset) == 0x1C);
-  static_assert(sizeof(SScaHeader)                   == 0x20);
+  static_assert(sizeof(SScaHeader) == 0x20);
 
   // ============================================================================
   // SCA animation key record (28 bytes per key)
@@ -64,8 +64,8 @@ namespace moho
 
   struct SScaAnimKey
   {
-    float position[3];    // +0x00: x, y, z
-    float rotation[4];    // +0x0C: quaternion components
+    float position[3]; // +0x00: x, y, z
+    float rotation[4]; // +0x0C: quaternion components
   };
 
   static_assert(sizeof(SScaAnimKey) == 0x1C);
@@ -78,8 +78,8 @@ namespace moho
 
   struct SScaAnimDataHeader
   {
-    float field_00[3];     // +0x00
-    float rotation[4];     // +0x0C: quaternion subject to same fixup as keys
+    float field_00[3]; // +0x00
+    float rotation[4]; // +0x0C: quaternion subject to same fixup as keys
   };
 
   static_assert(sizeof(SScaAnimDataHeader) == 0x1C);
@@ -106,9 +106,8 @@ namespace moho
      * (`GetScaResource`). Inlined into `SerConstructHelper<RScaResource>::Construct`
      * 0x0053A8C0.
      */
-    static void MemberConstruct(
-      gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result
-    );
+    static void
+    MemberConstruct(gpg::ReadArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerConstructResult& result);
 
     /**
      * Address: 0x0053A770 (FUN_0053A770)
@@ -117,7 +116,10 @@ namespace moho
      * Saves the resource's file name as a mounted path.
      */
     void MemberSaveConstructArgs(
-      gpg::WriteArchive& archive, int version, const gpg::RRef& ownerRef, gpg::SerSaveConstructArgsResult& result
+      gpg::WriteArchive& archive,
+      int version,
+      const gpg::RRef& ownerRef,
+      gpg::SerSaveConstructArgsResult& result
     );
 
     static gpg::RType* sType;
@@ -163,17 +165,17 @@ namespace moho
     ~RScaResource() noexcept = default;
 
   public:
-    fa::string mFilename{};          // +0x00
-    gpg::MemBuffer<char> mMem{};        // +0x1C
-    char* mStart = nullptr;             // +0x2C
-    char* mEnd = nullptr;               // +0x30
+    fa::string mFilename{};      // +0x00
+    gpg::MemBuffer<char> mMem{}; // +0x1C
+    char* mStart = nullptr;      // +0x2C
+    char* mEnd = nullptr;        // +0x30
   };
 
   static_assert(offsetof(RScaResource, mFilename) == 0x00);
-  static_assert(offsetof(RScaResource, mMem)      == 0x1C);
-  static_assert(offsetof(RScaResource, mStart)    == 0x2C);
-  static_assert(offsetof(RScaResource, mEnd)      == 0x30);
-  static_assert(sizeof(RScaResource)              == 0x34);
+  static_assert(offsetof(RScaResource, mMem) == 0x1C);
+  static_assert(offsetof(RScaResource, mStart) == 0x2C);
+  static_assert(offsetof(RScaResource, mEnd) == 0x30);
+  static_assert(sizeof(RScaResource) == 0x34);
 
   /**
    * Resource-factory singleton that materializes one `RScaResource` per SCA path.
@@ -182,7 +184,6 @@ namespace moho
   class CScaResourceFactory final : public ResourceFactory<RScaResource>
   {
   public:
-
     /**
      * Address: 0x0053A9E0 (FUN_0053A9E0, Moho::CScaResourceFactory::CScaResourceFactory)
      *

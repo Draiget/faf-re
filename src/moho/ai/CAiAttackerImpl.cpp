@@ -134,16 +134,14 @@ namespace
   constexpr const char* kAiAttackerImplGetTargetWeaponHelpText =
     "Loop through the weapons to find one that we can use to attack target";
   constexpr const char* kAiAttackerImplGetPrimaryWeaponName = "GetPrimaryWeapon";
-  constexpr const char* kAiAttackerImplGetPrimaryWeaponHelpText =
-    "Loop through the weapons to find our primary weapon";
+  constexpr const char* kAiAttackerImplGetPrimaryWeaponHelpText = "Loop through the weapons to find our primary weapon";
   constexpr const char* kAiAttackerImplGetMaxWeaponRangeName = "GetMaxWeaponRange";
   constexpr const char* kAiAttackerImplGetMaxWeaponRangeHelpText =
     "Loop through the weapons to find the weapon with the longest range that is not manual fire";
   constexpr const char* kAiAttackerImplIsTooCloseName = "IsTooClose";
   constexpr const char* kAiAttackerImplIsTooCloseHelpText = "Check if the target is too close to our weapons";
   constexpr const char* kAiAttackerImplIsWithinAttackRangeName = "IsWithinAttackRange";
-  constexpr const char* kAiAttackerImplIsWithinAttackRangeHelpText =
-    "Check if the target is within any weapon range";
+  constexpr const char* kAiAttackerImplIsWithinAttackRangeHelpText = "Check if the target is within any weapon range";
   constexpr const char* kAiAttackerImplIsTargetExemptName = "IsTargetExempt";
   constexpr const char* kAiAttackerImplIsTargetExemptHelpText = "Check if the target is exempt from being attacked";
   constexpr const char* kAiAttackerImplHasSlavedTargetName = "HasSlavedTarget";
@@ -213,8 +211,8 @@ namespace
     }
 
     const Wm3::Vector3f span{start.x - end.x, start.y - end.y, start.z - end.z};
-    return IsValidVector3f(hitPoint)
-        && std::sqrt(((span.z * span.z) + (span.y * span.y)) + (span.x * span.x)) >= hit.distance;
+    return IsValidVector3f(hitPoint) &&
+      std::sqrt(((span.z * span.z) + (span.y * span.y)) + (span.x * span.x)) >= hit.distance;
   }
 
   /**
@@ -224,15 +222,16 @@ namespace
    * Updates acquire-target task pending-frame countdown and unstages its thread
    * when schedule changes require immediate processing.
    */
-  void RefreshAcquireTargetTaskScheduling(CAcquireTargetTask* const task)
+  void RefreshAcquireTargetTaskScheduling(
+    CAcquireTargetTask* const task
+  )
   {
     if (task == nullptr || task->mWeapon == nullptr) {
       return;
     }
 
     int pendingFrames = 0;
-    CAiTarget* const desiredTarget =
-      (task->mAttacker != nullptr) ? task->mAttacker->GetDesiredTarget() : nullptr;
+    CAiTarget* const desiredTarget = (task->mAttacker != nullptr) ? task->mAttacker->GetDesiredTarget() : nullptr;
 
     if (desiredTarget != nullptr && desiredTarget->targetType == EAiTargetType::AITARGET_None) {
       // 0x005D9542 reads `*(BYTE*)(blueprint + 76)`, i.e. +0x4C. The reflection
@@ -240,8 +239,9 @@ namespace
       // (line 101) and `NeedPrep` at 0x123 (line 198), so the prep flag was the
       // wrong field: it made every auto-initiating weapon reschedule on the
       // slow TargetCheckInterval path instead of the 2-tick one.
-      if (task->mWeapon->mWeaponBlueprint != nullptr
-          && task->mWeapon->mWeaponBlueprint->AutoInitiateAttackCommand != 0u) {
+      if (
+        task->mWeapon->mWeaponBlueprint != nullptr && task->mWeapon->mWeaponBlueprint->AutoInitiateAttackCommand != 0u
+      ) {
         pendingFrames = 2;
       } else {
         const float checkInterval =
@@ -262,8 +262,10 @@ namespace
     }
   }
 
-  [[nodiscard]] CAcquireTargetTask*
-  FindAcquireTaskForWeapon(fa::vector<CAcquireTargetTask*>& tasks, UnitWeapon* const weapon) noexcept
+  [[nodiscard]] CAcquireTargetTask* FindAcquireTaskForWeapon(
+    fa::vector<CAcquireTargetTask*>& tasks,
+    UnitWeapon* const weapon
+  ) noexcept
   {
     for (CAcquireTargetTask* const task : tasks) {
       if (task != nullptr && task->mWeapon == weapon) {
@@ -287,7 +289,11 @@ namespace
     return index;
   }
 
-  void RequireLuaArgCount(LuaPlus::LuaState* const state, const char* const helpText, const int expectedArgs)
+  void RequireLuaArgCount(
+    LuaPlus::LuaState* const state,
+    const char* const helpText,
+    const int expectedArgs
+  )
   {
     if (!state || !state->m_state) {
       return;
@@ -299,7 +305,10 @@ namespace
     }
   }
 
-  [[nodiscard]] CAiAttackerImpl* ResolveAiAttackerLuaSelf(LuaPlus::LuaState* const state, const char* const helpText)
+  [[nodiscard]] CAiAttackerImpl* ResolveAiAttackerLuaSelf(
+    LuaPlus::LuaState* const state,
+    const char* const helpText
+  )
   {
     if (!state || !state->m_state) {
       return nullptr;
@@ -310,8 +319,11 @@ namespace
     return SCR_FromLua_CAiAttackerImpl(selfObject, state);
   }
 
-  [[nodiscard]] CAiAttackerImpl*
-  ResolveAiAttackerLuaSelfWithTargetArg(LuaPlus::LuaState* const state, const char* const helpText, CAiTarget& outTarget)
+  [[nodiscard]] CAiAttackerImpl* ResolveAiAttackerLuaSelfWithTargetArg(
+    LuaPlus::LuaState* const state,
+    const char* const helpText,
+    CAiTarget& outTarget
+  )
   {
     if (!state || !state->m_state) {
       return nullptr;
@@ -423,7 +435,10 @@ CAiAttackerImpl::CAiAttackerImpl() noexcept
  * Address: 0x005D83A0 (FUN_005D83A0)
  */
 void CAiAttackerImpl::MemberConstruct(
-  gpg::ReadArchive&, const int, const gpg::RRef&, gpg::SerConstructResult& result
+  gpg::ReadArchive&,
+  const int,
+  const gpg::RRef&,
+  gpg::SerConstructResult& result
 )
 {
   result.SetUnowned(gpg::MakeRRef(new CAiAttackerImpl()), 0u);
@@ -457,7 +472,9 @@ namespace
  * Gameplay constructor: same lane initialization as the deserialization ctor,
  * then binds the owning unit and starts the attacker's task thread.
  */
-CAiAttackerImpl::CAiAttackerImpl(Unit* const unit)
+CAiAttackerImpl::CAiAttackerImpl(
+  Unit* const unit
+)
   : CAiAttackerImpl()
 {
   auto* const view = this;
@@ -480,7 +497,9 @@ CAiAttackerImpl::CAiAttackerImpl(Unit* const unit)
  * Allocates one `CAiAttackerImpl` (0xA4 bytes) bound to `unit`, or returns
  * null when the allocation fails.
  */
-moho::CAiAttackerImpl* moho::AI_CreateAttacker(Unit* const unit)
+moho::CAiAttackerImpl* moho::AI_CreateAttacker(
+  Unit* const unit
+)
 {
   return new CAiAttackerImpl(unit);
 }
@@ -547,7 +566,9 @@ CTaskStage* CAiAttackerImpl::GetTaskStage()
  * Allocates one weapon for this attacker, binds task threads for fire/target
  * control, and stores the weapon/task lanes into attacker-owned vectors.
  */
-UnitWeapon* CAiAttackerImpl::CreateWeapon(RUnitBlueprintWeapon* const weaponBlueprint)
+UnitWeapon* CAiAttackerImpl::CreateWeapon(
+  RUnitBlueprintWeapon* const weaponBlueprint
+)
 {
   auto* const view = this;
   const int weaponIndex = static_cast<int>(view->mWeapons.size());
@@ -588,7 +609,9 @@ int CAiAttackerImpl::GetWeaponCount()
  * Returns one attacker weapon by index and raises fatal error for invalid
  * index lanes.
  */
-UnitWeapon* CAiAttackerImpl::GetWeapon(const int index)
+UnitWeapon* CAiAttackerImpl::GetWeapon(
+  const int index
+)
 {
   const auto* const view = this;
   const unsigned int weaponCount = static_cast<unsigned int>(view->mWeapons.size());
@@ -608,7 +631,9 @@ UnitWeapon* CAiAttackerImpl::GetWeapon(const int index)
  * Stores desired-target state, clears per-weapon active targets, refreshes
  * acquire-task scheduling, and emits `CannotTarget` when state was previously set.
  */
-void CAiAttackerImpl::SetDesiredTarget(CAiTarget* const target)
+void CAiAttackerImpl::SetDesiredTarget(
+  CAiTarget* const target
+)
 {
   auto* const view = this;
   view->mDesiredTarget = (target != nullptr) ? *target : BuildClearedTarget();
@@ -675,7 +700,9 @@ void CAiAttackerImpl::OnWeaponHaltFire()
  * What it does:
  * Returns true when any owned weapon can attack the provided target payload.
  */
-bool CAiAttackerImpl::CanAttackTarget(CAiTarget* const target)
+bool CAiAttackerImpl::CanAttackTarget(
+  CAiTarget* const target
+)
 {
   const auto* const view = this;
   if (!view->mUnit || view->mUnit->IsBeingBuilt()) {
@@ -698,7 +725,9 @@ bool CAiAttackerImpl::CanAttackTarget(CAiTarget* const target)
  * Tests one entity against each owned weapon's target-point eligibility and
  * returns true when any weapon can pick that target.
  */
-bool CAiAttackerImpl::PickTarget(Entity* const targetEntity)
+bool CAiAttackerImpl::PickTarget(
+  Entity* const targetEntity
+)
 {
   const auto* const view = this;
   if (targetEntity == nullptr || !view->mUnit || view->mUnit->IsBeingBuilt()) {
@@ -805,7 +834,10 @@ Entity* CAiAttackerImpl::FindBestEnemy(
 
   const auto* const view = this;
   Unit* const unit = view->mUnit;
-  if (unit == nullptr || unit->ArmyRef == nullptr || unit->SimulationRef == nullptr || unit->SimulationRef->mRules == nullptr) {
+  if (
+    unit == nullptr || unit->ArmyRef == nullptr || unit->SimulationRef == nullptr ||
+    unit->SimulationRef->mRules == nullptr
+  ) {
     return nullptr;
   }
 
@@ -856,8 +888,8 @@ Entity* CAiAttackerImpl::FindBestEnemy(
     }
 
     const std::uint32_t candidateArmyId = (candidate->ArmyRef != nullptr)
-                                            ? static_cast<std::uint32_t>(candidate->ArmyRef->mConstDat.mArmyIndex)
-                                            : static_cast<std::uint32_t>(-1);
+      ? static_cast<std::uint32_t>(candidate->ArmyRef->mConstDat.mArmyIndex)
+      : static_cast<std::uint32_t>(-1);
     if (!army->IsEnemy(candidateArmyId)) {
       continue;
     }
@@ -873,8 +905,10 @@ Entity* CAiAttackerImpl::FindBestEnemy(
 
     const bool isAirLayer = candidate->mVarDat.mLayerMask == LAYER_Air;
     const bool isBeingBuilt = candidate->IsBeingBuilt();
-    if ((candidate->mAttachInfo.GetAttachTargetEntity() != nullptr && (isAirLayer || isBeingBuilt))
-        || (isAirLayer && isBeingBuilt)) {
+    if (
+      (candidate->mAttachInfo.GetAttachTargetEntity() != nullptr && (isAirLayer || isBeingBuilt)) ||
+      (isAirLayer && isBeingBuilt)
+    ) {
       continue;
     }
 
@@ -882,22 +916,27 @@ Entity* CAiAttackerImpl::FindBestEnemy(
       continue;
     }
 
-    if (Unit* const candidateUnit = candidate->IsUnit();
-        candidateUnit != nullptr && candidateUnit->IsUnitState(UNITSTATE_DoNotTarget)) {
+    if (
+      Unit* const candidateUnit = candidate->IsUnit();
+      candidateUnit != nullptr && candidateUnit->IsUnitState(UNITSTATE_DoNotTarget)
+    ) {
       continue;
     }
 
     if (!isAirLayer) {
-      const STIMap* const candidateMap = (candidate->SimulationRef != nullptr) ? candidate->SimulationRef->mMapData : nullptr;
+      const STIMap* const candidateMap =
+        (candidate->SimulationRef != nullptr) ? candidate->SimulationRef->mMapData : nullptr;
       if (candidateMap == nullptr) {
         continue;
       }
 
       const gpg::Rect2i& playableRect = candidateMap->mPlayableRect;
-      if (candidatePosition.x < static_cast<float>(playableRect.x0)
-          || candidatePosition.z < static_cast<float>(playableRect.z0)
-          || candidatePosition.x > static_cast<float>(playableRect.x1)
-          || candidatePosition.z > static_cast<float>(playableRect.z1)) {
+      if (
+        candidatePosition.x < static_cast<float>(playableRect.x0) ||
+        candidatePosition.z < static_cast<float>(playableRect.z0) ||
+        candidatePosition.x > static_cast<float>(playableRect.x1) ||
+        candidatePosition.z > static_cast<float>(playableRect.z1)
+      ) {
         continue;
       }
     }
@@ -911,22 +950,25 @@ Entity* CAiAttackerImpl::FindBestEnemy(
 
     // 0x005D7D71: `UnitWeapon::TargetSolutionStatusGun` (0x006D5B40).
     const ESolutionStatus solutionStatus = weapon->TargetSolutionStatusGun(&candidatePosition, &distanceSq);
-    if ((solutionStatus == ESolutionStatus::TRS_InsideMinRange || solutionStatus == ESolutionStatus::TRS_NoSolution)
-        && (!unit->IsMobile()
-            || weapon->mWeaponBlueprint == nullptr
-            || (weapon->mWeaponBlueprint->AutoInitiateAttackCommand == 0u
-                && weapon->mWeaponBlueprint->SlavedToBody == 0u))) {
+    if (
+      (solutionStatus == ESolutionStatus::TRS_InsideMinRange || solutionStatus == ESolutionStatus::TRS_NoSolution) &&
+      (!unit->IsMobile() || weapon->mWeaponBlueprint == nullptr ||
+       (weapon->mWeaponBlueprint->AutoInitiateAttackCommand == 0u && weapon->mWeaponBlueprint->SlavedToBody == 0u))
+    ) {
       continue;
     }
 
-    if (tryTerrainBlockage && weapon->mWeaponBlueprint != nullptr
-        && moho::AI_TestForTerrainBlockage(unit, candidatePosition, weapon->mWeaponBlueprint->BallisticArc)) {
+    if (
+      tryTerrainBlockage && weapon->mWeaponBlueprint != nullptr &&
+      moho::AI_TestForTerrainBlockage(unit, candidatePosition, weapon->mWeaponBlueprint->BallisticArc)
+    ) {
       continue;
     }
 
-    if (const RUnitBlueprint* const unitBlueprint = unit->GetBlueprint();
-        unitBlueprint != nullptr && unitBlueprint->AI.NeedUnpack != 0u
-        && solutionStatus != ESolutionStatus::TRS_Available) {
+    if (
+      const RUnitBlueprint* const unitBlueprint = unit->GetBlueprint();
+      unitBlueprint != nullptr && unitBlueprint->AI.NeedUnpack != 0u && solutionStatus != ESolutionStatus::TRS_Available
+    ) {
       continue;
     }
 
@@ -941,13 +983,14 @@ Entity* CAiAttackerImpl::FindBestEnemy(
       // <= 0), then the dot summed as (y*y' + z*z') + x*x'.
       Wm3::Vector3f toTargetDir{};
       (void)NormalizeVectorInto(&toTargetDir, toTarget);
-      usedDistance = ((toTargetDir.y * weaponForward.y) + (toTargetDir.z * weaponForward.z))
-        + (toTargetDir.x * weaponForward.x);
+      usedDistance =
+        ((toTargetDir.y * weaponForward.y) + (toTargetDir.z * weaponForward.z)) + (toTargetDir.x * weaponForward.x);
     }
 
-    if (solutionStatus != ESolutionStatus::TRS_Available
-        && weapon->mWeaponBlueprint != nullptr
-        && weapon->mWeaponBlueprint->AutoInitiateAttackCommand == 0u) {
+    if (
+      solutionStatus != ESolutionStatus::TRS_Available && weapon->mWeaponBlueprint != nullptr &&
+      weapon->mWeaponBlueprint->AutoInitiateAttackCommand == 0u
+    ) {
       if (use3DDistance) {
         usedDistance += 4.0f;
       } else {
@@ -963,8 +1006,7 @@ Entity* CAiAttackerImpl::FindBestEnemy(
     for (std::size_t categoryIndex = 0; categoryIndex < priorityCount; ++categoryIndex) {
       const std::uint32_t categoryLane = static_cast<std::uint32_t>(categoryIndex);
 
-      if (categoryLane > bestCategory
-          || (solutionStatus > bestSolution && bestEntity != nullptr)) {
+      if (categoryLane > bestCategory || (solutionStatus > bestSolution && bestEntity != nullptr)) {
         break;
       }
 
@@ -1008,7 +1050,9 @@ Entity* CAiAttackerImpl::FindBestEnemy(
  * What it does:
  * Returns the first weapon that can attack the provided target payload.
  */
-UnitWeapon* CAiAttackerImpl::GetTargetWeapon(CAiTarget* const target)
+UnitWeapon* CAiAttackerImpl::GetTargetWeapon(
+  CAiTarget* const target
+)
 {
   const auto* const view = this;
   if (!view->mUnit || view->mUnit->IsBeingBuilt()) {
@@ -1094,7 +1138,10 @@ float CAiAttackerImpl::GetMaxWeaponRange()
  * What it does:
  * Checks XZ-plane range against one weapon's cached max-radius-squared lane.
  */
-bool CAiAttackerImpl::VectorIsWithinWeaponAttackRange(UnitWeapon* const weapon, const Wm3::Vector3f* const targetPos)
+bool CAiAttackerImpl::VectorIsWithinWeaponAttackRange(
+  UnitWeapon* const weapon,
+  const Wm3::Vector3f* const targetPos
+)
 {
   const auto* const view = this;
   if (!view->mUnit || view->mUnit->IsBeingBuilt() || !weapon || !targetPos) {
@@ -1107,7 +1154,8 @@ bool CAiAttackerImpl::VectorIsWithinWeaponAttackRange(UnitWeapon* const weapon, 
   const float distSq = (dz * dz) + (dx * dx);
 
   if (weapon->mAttributes.mBlueprint && weapon->mAttributes.mMaxRadiusSq < 0.0f) {
-    weapon->mAttributes.mMaxRadiusSq = weapon->mAttributes.mBlueprint->MaxRadius * weapon->mAttributes.mBlueprint->MaxRadius;
+    weapon->mAttributes.mMaxRadiusSq =
+      weapon->mAttributes.mBlueprint->MaxRadius * weapon->mAttributes.mBlueprint->MaxRadius;
   }
 
   // 0x005D71FA `comiss distSq, maxSq; ja -> false`: unordered compares report in range.
@@ -1120,7 +1168,9 @@ bool CAiAttackerImpl::VectorIsWithinWeaponAttackRange(UnitWeapon* const weapon, 
  * What it does:
  * Checks whether any enabled weapon covers the provided XZ-plane position.
  */
-bool CAiAttackerImpl::VectorIsWithinAttackRange(const Wm3::Vector3f* const targetPos)
+bool CAiAttackerImpl::VectorIsWithinAttackRange(
+  const Wm3::Vector3f* const targetPos
+)
 {
   const auto* const view = this;
   if (!view->mUnit || view->mUnit->IsBeingBuilt() || !targetPos) {
@@ -1138,7 +1188,8 @@ bool CAiAttackerImpl::VectorIsWithinAttackRange(const Wm3::Vector3f* const targe
     }
 
     if (weapon->mAttributes.mBlueprint && weapon->mAttributes.mMaxRadiusSq < 0.0f) {
-      weapon->mAttributes.mMaxRadiusSq = weapon->mAttributes.mBlueprint->MaxRadius * weapon->mAttributes.mBlueprint->MaxRadius;
+      weapon->mAttributes.mMaxRadiusSq =
+        weapon->mAttributes.mBlueprint->MaxRadius * weapon->mAttributes.mBlueprint->MaxRadius;
     }
 
     if (weapon->mAttributes.mMaxRadiusSq > distSq) {
@@ -1156,7 +1207,10 @@ bool CAiAttackerImpl::VectorIsWithinAttackRange(const Wm3::Vector3f* const targe
  * Validates one target against one weapon and returns true only when the
  * weapon can attack and target solution status is `Available`.
  */
-bool CAiAttackerImpl::TargetIsWithinWeaponAttackRange(UnitWeapon* const weapon, CAiTarget* const target)
+bool CAiAttackerImpl::TargetIsWithinWeaponAttackRange(
+  UnitWeapon* const weapon,
+  CAiTarget* const target
+)
 {
   const auto* const view = this;
   if (!view->mUnit || view->mUnit->IsBeingBuilt() || weapon == nullptr || target == nullptr || weapon->mEnabled == 0u) {
@@ -1184,7 +1238,9 @@ bool CAiAttackerImpl::TargetIsWithinWeaponAttackRange(UnitWeapon* const weapon, 
  * Returns true when any enabled weapon can attack the target and reports an
  * available firing solution.
  */
-bool CAiAttackerImpl::TargetIsWithinAttackRange(CAiTarget* const target)
+bool CAiAttackerImpl::TargetIsWithinAttackRange(
+  CAiTarget* const target
+)
 {
   const auto* const view = this;
   if (!view->mUnit || view->mUnit->IsBeingBuilt() || target == nullptr) {
@@ -1196,8 +1252,9 @@ bool CAiAttackerImpl::TargetIsWithinAttackRange(CAiTarget* const target)
       continue;
     }
 
-    if (UnitWeapon::CanAttackTarget(target, weapon)
-        && weapon->TargetIsTooClose(target) == ESolutionStatus::TRS_Available) {
+    if (
+      UnitWeapon::CanAttackTarget(target, weapon) && weapon->TargetIsTooClose(target) == ESolutionStatus::TRS_Available
+    ) {
       return true;
     }
   }
@@ -1212,7 +1269,9 @@ bool CAiAttackerImpl::TargetIsWithinAttackRange(CAiTarget* const target)
  * Reports whether the target is in the min-range-only lane for all eligible
  * weapons while no enabled eligible weapon has an available solution.
  */
-bool CAiAttackerImpl::IsTooClose(CAiTarget* const target)
+bool CAiAttackerImpl::IsTooClose(
+  CAiTarget* const target
+)
 {
   const auto* const view = this;
   if (!view->mUnit || view->mUnit->IsBeingBuilt() || target == nullptr) {
@@ -1245,7 +1304,8 @@ namespace moho
 
   TConVar<bool> gTConVar_sim_ExemptCheckInPlace(
     "sim_ExemptCheckInPlace",
-    "Check a unit's reclaim/capture commands for target exemption without copying its command queue (same results, less work).",
+    "Check a unit's reclaim/capture commands for target exemption without copying its command queue (same results, "
+    "less work).",
     &sim_ExemptCheckInPlace
   );
 } // namespace moho
@@ -1254,7 +1314,8 @@ namespace
 {
   /// Whether a reclaim or capture command in `commands` targets `target` (or, through a blip, its source).
   [[nodiscard]] bool QueuedCommandExemptsTarget(
-    const fa::vector<WeakPtr<CUnitCommand>>& commands, const Entity* const target
+    const fa::vector<WeakPtr<CUnitCommand>>& commands,
+    const Entity* const target
   )
   {
     for (const WeakPtr<CUnitCommand>& weakCommand : commands) {
@@ -1264,8 +1325,9 @@ namespace
       }
 
       const EUnitCommandType commandType = command->mVarDat.mCmdType;
-      if (commandType != EUnitCommandType::UNITCOMMAND_Reclaim
-          && commandType != EUnitCommandType::UNITCOMMAND_Capture) {
+      if (
+        commandType != EUnitCommandType::UNITCOMMAND_Reclaim && commandType != EUnitCommandType::UNITCOMMAND_Capture
+      ) {
         continue;
       }
 
@@ -1287,7 +1349,9 @@ namespace
  * Exempts targets currently used by reclaim/capture commands or targets in
  * `UNITSTATE_BeingCaptured` that are focused by live engineer units.
  */
-bool CAiAttackerImpl::IsTargetExempt(Entity* const target)
+bool CAiAttackerImpl::IsTargetExempt(
+  Entity* const target
+)
 {
   if (target == nullptr) {
     return false;
@@ -1314,8 +1378,10 @@ bool CAiAttackerImpl::IsTargetExempt(Entity* const target)
   if (targetUnit == nullptr || !targetUnit->IsUnitState(UNITSTATE_BeingCaptured)) {
     return false;
   }
-  if (ownerUnit == nullptr || ownerUnit->ArmyRef == nullptr || ownerUnit->SimulationRef == nullptr
-      || ownerUnit->SimulationRef->mRules == nullptr) {
+  if (
+    ownerUnit == nullptr || ownerUnit->ArmyRef == nullptr || ownerUnit->SimulationRef == nullptr ||
+    ownerUnit->SimulationRef->mRules == nullptr
+  ) {
     return false;
   }
 
@@ -1346,7 +1412,9 @@ bool CAiAttackerImpl::IsTargetExempt(Entity* const target)
  * What it does:
  * Returns the first slaved-weapon target and optionally outputs that weapon.
  */
-CAiTarget* CAiAttackerImpl::HasSlavedTarget(UnitWeapon** const outWeapon)
+CAiTarget* CAiAttackerImpl::HasSlavedTarget(
+  UnitWeapon** const outWeapon
+)
 {
   const auto* const view = this;
   if (outWeapon) {
@@ -1398,7 +1466,10 @@ void CAiAttackerImpl::ResetReportingState()
  * template that `reinterpret_cast`ed the broadcaster to `WeakPtr<void>&` and
  * open-coded the `listener + kOwnerLinkOffset` encoding.
  */
-void CAiAttackerImpl::TransmitProjectileImpactEvent(UnitWeapon* const weapon, Projectile* const projectile)
+void CAiAttackerImpl::TransmitProjectileImpactEvent(
+  UnitWeapon* const weapon,
+  Projectile* const projectile
+)
 {
   CAcquireTargetTask* const task = FindAcquireTaskForWeapon(this->mTasks, weapon);
   // 0x005D781E: no task drives this weapon -> the broadcaster is left alone.
@@ -1418,7 +1489,10 @@ void CAiAttackerImpl::TransmitProjectileImpactEvent(UnitWeapon* const weapon, Pr
  * alone when there is none. The task's `ManyToOneListener<ECollisionBeamEvent>` base
  * sits at mdisp=32, its second listener subobject.
  */
-void CAiAttackerImpl::TransmitBeamImpactEvent(UnitWeapon* const weapon, CollisionBeamEntity* const beam)
+void CAiAttackerImpl::TransmitBeamImpactEvent(
+  UnitWeapon* const weapon,
+  CollisionBeamEntity* const beam
+)
 {
   CAcquireTargetTask* const task = FindAcquireTaskForWeapon(this->mTasks, weapon);
   // 0x005D781E: no task drives this weapon -> the broadcaster is left alone.
@@ -1436,7 +1510,9 @@ void CAiAttackerImpl::TransmitBeamImpactEvent(UnitWeapon* const weapon, Collisio
  * Sets unit focus entity, dispatches script callback for resolved focus,
  * marks sync-dirty focus state, and notifies attacker listeners of can-target.
  */
-void CAiAttackerImpl::ForceEngage(Entity* const target)
+void CAiAttackerImpl::ForceEngage(
+  Entity* const target
+)
 {
   auto* const view = this;
   if (view->mUnit == nullptr) {
@@ -1488,7 +1564,9 @@ gpg::RRef CAiAttackerImpl::GetDerivedObjectRef()
  * What it does:
  * Pushes this attacker's Lua object wrapper onto the provided Lua stack.
  */
-void CAiAttackerImpl::PushStack(LuaPlus::LuaState* const luaState)
+void CAiAttackerImpl::PushStack(
+  LuaPlus::LuaState* const luaState
+)
 {
   mLuaObj.PushStack(luaState);
 }
@@ -1522,7 +1600,9 @@ void CAiAttackerImpl::Stop()
  * reporting-state lane is a raw dword shared with `EAiAttackerEvent`; the
  * comparison and store operate on that dword.
  */
-void CAiAttackerImpl::SetState(const State state)
+void CAiAttackerImpl::SetState(
+  const State state
+)
 {
   auto* const view = this;
   const auto stateValue = static_cast<std::int32_t>(state);
@@ -1544,7 +1624,9 @@ void CAiAttackerImpl::SetState(const State state)
  * unit is stunned/busy; otherwise gathers projectiles within the weapon tracking
  * radius and returns the closest eligible one by squared horizontal distance.
  */
-Entity* CAiAttackerImpl::TrackToTarget(UnitWeapon* const weapon)
+Entity* CAiAttackerImpl::TrackToTarget(
+  UnitWeapon* const weapon
+)
 {
   const auto* const view = this;
   Unit* const unit = view->mUnit;
@@ -1563,7 +1645,6 @@ Entity* CAiAttackerImpl::TrackToTarget(UnitWeapon* const weapon)
   CArmyImpl* const army = unit->ArmyRef;
   STIMap* const mapData = sim->mMapData;
   RUnitBlueprintWeapon* const weaponBlueprint = weapon->mWeaponBlueprint;
-
 
   const Wm3::Vector3f unitPosition = unit->GetPosition();
 
@@ -1646,7 +1727,9 @@ Entity* CAiAttackerImpl::TrackToTarget(UnitWeapon* const weapon)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiAttackerImplGetUnitL`.
  */
-int moho::cfunc_CAiAttackerImplGetUnit(lua_State* const luaContext)
+int moho::cfunc_CAiAttackerImplGetUnit(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiAttackerImplGetUnitL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1657,7 +1740,9 @@ int moho::cfunc_CAiAttackerImplGetUnit(lua_State* const luaContext)
  * What it does:
  * Resolves attacker self and pushes the bound `Unit` Lua object.
  */
-int moho::cfunc_CAiAttackerImplGetUnitL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiAttackerImplGetUnitL(
+  LuaPlus::LuaState* const state
+)
 {
   CAiAttackerImpl* const attacker = ResolveAiAttackerLuaSelf(state, kAiAttackerImplGetUnitHelpText);
   if (!attacker) {
@@ -1675,7 +1760,9 @@ int moho::cfunc_CAiAttackerImplGetUnitL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiAttackerImplAttackerWeaponsBusyL`.
  */
-int moho::cfunc_CAiAttackerImplAttackerWeaponsBusy(lua_State* const luaContext)
+int moho::cfunc_CAiAttackerImplAttackerWeaponsBusy(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiAttackerImplAttackerWeaponsBusyL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1686,7 +1773,9 @@ int moho::cfunc_CAiAttackerImplAttackerWeaponsBusy(lua_State* const luaContext)
  * What it does:
  * Resolves attacker self and returns whether any attacker weapon is busy.
  */
-int moho::cfunc_CAiAttackerImplAttackerWeaponsBusyL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiAttackerImplAttackerWeaponsBusyL(
+  LuaPlus::LuaState* const state
+)
 {
   CAiAttackerImpl* const attacker = ResolveAiAttackerLuaSelf(state, kAiAttackerImplAttackerWeaponsBusyHelpText);
   if (!attacker || !state || !state->m_state) {
@@ -1704,7 +1793,9 @@ int moho::cfunc_CAiAttackerImplAttackerWeaponsBusyL(LuaPlus::LuaState* const sta
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiAttackerImplGetWeaponCountL`.
  */
-int moho::cfunc_CAiAttackerImplGetWeaponCount(lua_State* const luaContext)
+int moho::cfunc_CAiAttackerImplGetWeaponCount(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiAttackerImplGetWeaponCountL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1715,7 +1806,9 @@ int moho::cfunc_CAiAttackerImplGetWeaponCount(lua_State* const luaContext)
  * What it does:
  * Resolves attacker self and pushes weapon-count as Lua number.
  */
-int moho::cfunc_CAiAttackerImplGetWeaponCountL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiAttackerImplGetWeaponCountL(
+  LuaPlus::LuaState* const state
+)
 {
   CAiAttackerImpl* const attacker = ResolveAiAttackerLuaSelf(state, kAiAttackerImplGetWeaponCountHelpText);
   if (!attacker || !state || !state->m_state) {
@@ -1733,7 +1826,9 @@ int moho::cfunc_CAiAttackerImplGetWeaponCountL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiAttackerImplSetDesiredTargetL`.
  */
-int moho::cfunc_CAiAttackerImplSetDesiredTarget(lua_State* const luaContext)
+int moho::cfunc_CAiAttackerImplSetDesiredTarget(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiAttackerImplSetDesiredTargetL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1744,7 +1839,9 @@ int moho::cfunc_CAiAttackerImplSetDesiredTarget(lua_State* const luaContext)
  * What it does:
  * Resolves `(attacker, target)` and applies desired-target state.
  */
-int moho::cfunc_CAiAttackerImplSetDesiredTargetL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiAttackerImplSetDesiredTargetL(
+  LuaPlus::LuaState* const state
+)
 {
   CAiTarget target{};
   CAiAttackerImpl* const attacker =
@@ -1764,7 +1861,9 @@ int moho::cfunc_CAiAttackerImplSetDesiredTargetL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiAttackerImplGetDesiredTargetL`.
  */
-int moho::cfunc_CAiAttackerImplGetDesiredTarget(lua_State* const luaContext)
+int moho::cfunc_CAiAttackerImplGetDesiredTarget(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiAttackerImplGetDesiredTargetL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1775,7 +1874,9 @@ int moho::cfunc_CAiAttackerImplGetDesiredTarget(lua_State* const luaContext)
  * What it does:
  * Resolves attacker self and pushes current desired target as Lua object.
  */
-int moho::cfunc_CAiAttackerImplGetDesiredTargetL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiAttackerImplGetDesiredTargetL(
+  LuaPlus::LuaState* const state
+)
 {
   CAiAttackerImpl* const attacker = ResolveAiAttackerLuaSelf(state, kAiAttackerImplGetDesiredTargetHelpText);
   if (!attacker) {
@@ -1794,7 +1895,9 @@ int moho::cfunc_CAiAttackerImplGetDesiredTargetL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiAttackerImplStopL`.
  */
-int moho::cfunc_CAiAttackerImplStop(lua_State* const luaContext)
+int moho::cfunc_CAiAttackerImplStop(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiAttackerImplStopL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1805,7 +1908,9 @@ int moho::cfunc_CAiAttackerImplStop(lua_State* const luaContext)
  * What it does:
  * Resolves attacker self and applies `CAiAttackerImpl::Stop()`.
  */
-int moho::cfunc_CAiAttackerImplStopL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiAttackerImplStopL(
+  LuaPlus::LuaState* const state
+)
 {
   CAiAttackerImpl* const attacker = ResolveAiAttackerLuaSelf(state, kAiAttackerImplStopHelpText);
   if (!attacker) {
@@ -1822,7 +1927,9 @@ int moho::cfunc_CAiAttackerImplStopL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiAttackerImplCanAttackTargetL`.
  */
-int moho::cfunc_CAiAttackerImplCanAttackTarget(lua_State* const luaContext)
+int moho::cfunc_CAiAttackerImplCanAttackTarget(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiAttackerImplCanAttackTargetL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1833,7 +1940,9 @@ int moho::cfunc_CAiAttackerImplCanAttackTarget(lua_State* const luaContext)
  * What it does:
  * Resolves `(attacker, target)` and returns attack-eligibility as Lua bool.
  */
-int moho::cfunc_CAiAttackerImplCanAttackTargetL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiAttackerImplCanAttackTargetL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -1858,7 +1967,9 @@ int moho::cfunc_CAiAttackerImplCanAttackTargetL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiAttackerImplFindBestEnemyL`.
  */
-int moho::cfunc_CAiAttackerImplFindBestEnemy(lua_State* const luaContext)
+int moho::cfunc_CAiAttackerImplFindBestEnemy(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiAttackerImplFindBestEnemyL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1870,7 +1981,9 @@ int moho::cfunc_CAiAttackerImplFindBestEnemy(lua_State* const luaContext)
  * Resolves `(attacker, maxRange)`, queries best enemy from primary weapon,
  * and pushes resulting entity Lua object when found.
  */
-int moho::cfunc_CAiAttackerImplFindBestEnemyL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiAttackerImplFindBestEnemyL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -1910,7 +2023,9 @@ int moho::cfunc_CAiAttackerImplFindBestEnemyL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiAttackerImplGetTargetWeaponL`.
  */
-int moho::cfunc_CAiAttackerImplGetTargetWeapon(lua_State* const luaContext)
+int moho::cfunc_CAiAttackerImplGetTargetWeapon(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiAttackerImplGetTargetWeaponL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1921,7 +2036,9 @@ int moho::cfunc_CAiAttackerImplGetTargetWeapon(lua_State* const luaContext)
  * What it does:
  * Resolves `(attacker, target)` and pushes target-weapon index when available.
  */
-int moho::cfunc_CAiAttackerImplGetTargetWeaponL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiAttackerImplGetTargetWeaponL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -1949,7 +2066,9 @@ int moho::cfunc_CAiAttackerImplGetTargetWeaponL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiAttackerImplGetPrimaryWeaponL`.
  */
-int moho::cfunc_CAiAttackerImplGetPrimaryWeapon(lua_State* const luaContext)
+int moho::cfunc_CAiAttackerImplGetPrimaryWeapon(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiAttackerImplGetPrimaryWeaponL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1960,7 +2079,9 @@ int moho::cfunc_CAiAttackerImplGetPrimaryWeapon(lua_State* const luaContext)
  * What it does:
  * Resolves attacker self and pushes primary-weapon index when available.
  */
-int moho::cfunc_CAiAttackerImplGetPrimaryWeaponL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiAttackerImplGetPrimaryWeaponL(
+  LuaPlus::LuaState* const state
+)
 {
   CAiAttackerImpl* const attacker = ResolveAiAttackerLuaSelf(state, kAiAttackerImplGetPrimaryWeaponHelpText);
   if (!attacker || !state || !state->m_state) {
@@ -1981,7 +2102,9 @@ int moho::cfunc_CAiAttackerImplGetPrimaryWeaponL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiAttackerImplGetMaxWeaponRangeL`.
  */
-int moho::cfunc_CAiAttackerImplGetMaxWeaponRange(lua_State* const luaContext)
+int moho::cfunc_CAiAttackerImplGetMaxWeaponRange(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiAttackerImplGetMaxWeaponRangeL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1992,7 +2115,9 @@ int moho::cfunc_CAiAttackerImplGetMaxWeaponRange(lua_State* const luaContext)
  * What it does:
  * Resolves attacker self and pushes max weapon range as Lua number.
  */
-int moho::cfunc_CAiAttackerImplGetMaxWeaponRangeL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiAttackerImplGetMaxWeaponRangeL(
+  LuaPlus::LuaState* const state
+)
 {
   CAiAttackerImpl* const attacker = ResolveAiAttackerLuaSelf(state, kAiAttackerImplGetMaxWeaponRangeHelpText);
   if (!attacker || !state || !state->m_state) {
@@ -2010,7 +2135,9 @@ int moho::cfunc_CAiAttackerImplGetMaxWeaponRangeL(LuaPlus::LuaState* const state
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiAttackerImplIsWithinAttackRangeL`.
  */
-int moho::cfunc_CAiAttackerImplIsWithinAttackRange(lua_State* const luaContext)
+int moho::cfunc_CAiAttackerImplIsWithinAttackRange(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiAttackerImplIsWithinAttackRangeL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2024,7 +2151,9 @@ int moho::cfunc_CAiAttackerImplIsWithinAttackRange(lua_State* const luaContext)
  * attacker's weapon range. When `weaponIndex` is supplied the check is
  * performed against that specific weapon; otherwise against any weapon.
  */
-int moho::cfunc_CAiAttackerImplIsWithinAttackRangeL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiAttackerImplIsWithinAttackRangeL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -2122,7 +2251,9 @@ CScrLuaInitForm* moho::func_CAiAttackerImplIsWithinAttackRange_LuaFuncDef()
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CAiAttackerImplIsTooCloseL`.
  */
-int moho::cfunc_CAiAttackerImplIsTooClose(lua_State* const luaContext)
+int moho::cfunc_CAiAttackerImplIsTooClose(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiAttackerImplIsTooCloseL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2133,14 +2264,17 @@ int moho::cfunc_CAiAttackerImplIsTooClose(lua_State* const luaContext)
  * What it does:
  * Resolves `(attacker, target)` and returns close-range bool status.
  */
-int moho::cfunc_CAiAttackerImplIsTooCloseL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiAttackerImplIsTooCloseL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
   }
 
   CAiTarget target{};
-  CAiAttackerImpl* const attacker = ResolveAiAttackerLuaSelfWithTargetArg(state, kAiAttackerImplIsTooCloseHelpText, target);
+  CAiAttackerImpl* const attacker =
+    ResolveAiAttackerLuaSelfWithTargetArg(state, kAiAttackerImplIsTooCloseHelpText, target);
   if (!attacker) {
     return 0;
   }
@@ -2386,7 +2520,9 @@ CScrLuaInitForm* moho::func_CAiAttackerImplIsTooClose_LuaFuncDef()
  * Reads attacker + target entity from Lua and returns attacker
  * `IsTargetExempt(...)` predicate result.
  */
-int moho::cfunc_CAiAttackerImplIsTargetExemptL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiAttackerImplIsTargetExemptL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kAiAttackerImplIsTargetExemptHelpText);
 
@@ -2408,7 +2544,9 @@ int moho::cfunc_CAiAttackerImplIsTargetExemptL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiAttackerImplIsTargetExemptL`.
  */
-int moho::cfunc_CAiAttackerImplIsTargetExempt(lua_State* const luaContext)
+int moho::cfunc_CAiAttackerImplIsTargetExempt(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiAttackerImplIsTargetExemptL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2439,7 +2577,9 @@ CScrLuaInitForm* moho::func_CAiAttackerImplIsTargetExempt_LuaFuncDef()
  * Resolves an attacker slaved-target pointer and pushes a serialized
  * `CAiTarget` Lua object or `nil` when no slaved target exists.
  */
-int moho::cfunc_CAiAttackerImplHasSlavedTargetL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiAttackerImplHasSlavedTargetL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kAiAttackerImplHasSlavedTargetHelpText);
 
@@ -2467,7 +2607,9 @@ int moho::cfunc_CAiAttackerImplHasSlavedTargetL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiAttackerImplHasSlavedTargetL`.
  */
-int moho::cfunc_CAiAttackerImplHasSlavedTarget(lua_State* const luaContext)
+int moho::cfunc_CAiAttackerImplHasSlavedTarget(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiAttackerImplHasSlavedTargetL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2497,7 +2639,9 @@ CScrLuaInitForm* moho::func_CAiAttackerImplHasSlavedTarget_LuaFuncDef()
  * What it does:
  * Resolves attacker from Lua and dispatches `ResetReportingState()`.
  */
-int moho::cfunc_CAiAttackerImplResetReportingStateL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiAttackerImplResetReportingStateL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kAiAttackerImplResetReportingStateHelpText);
 
@@ -2514,7 +2658,9 @@ int moho::cfunc_CAiAttackerImplResetReportingStateL(LuaPlus::LuaState* const sta
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiAttackerImplResetReportingStateL`.
  */
-int moho::cfunc_CAiAttackerImplResetReportingState(lua_State* const luaContext)
+int moho::cfunc_CAiAttackerImplResetReportingState(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiAttackerImplResetReportingStateL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2549,7 +2695,9 @@ CScrLuaInitForm* moho::func_CAiAttackerImplResetReportingState_LuaFuncDef()
  * The original binary compares against expected arg count `1` while still
  * reading stack slot `2`; this recovery preserves that behavior.
  */
-int moho::cfunc_CAiAttackerImplForceEngageL(LuaPlus::LuaState* const state)
+int moho::cfunc_CAiAttackerImplForceEngageL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 1, kAiAttackerImplForceEngageHelpText);
 
@@ -2568,7 +2716,9 @@ int moho::cfunc_CAiAttackerImplForceEngageL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and forwards to
  * `cfunc_CAiAttackerImplForceEngageL`.
  */
-int moho::cfunc_CAiAttackerImplForceEngage(lua_State* const luaContext)
+int moho::cfunc_CAiAttackerImplForceEngage(
+  lua_State* const luaContext
+)
 {
   return cfunc_CAiAttackerImplForceEngageL(moho::SCR_ResolveBindingState(luaContext));
 }

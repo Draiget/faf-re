@@ -42,7 +42,7 @@ namespace moho
    */
   struct SSyncFilter
   {
-    int32_t focusArmy = -1;             // +0x00
+    int32_t focusArmy = -1;          // +0x00
     fa::vector<GeomCamera3> geoCams; // +0x04
     // +0x14..+0x1F are not copied by FUN_0073DD10 / sub_1030E200.
     uint32_t geoCamVectorAuxWords[3]{}; // +0x14

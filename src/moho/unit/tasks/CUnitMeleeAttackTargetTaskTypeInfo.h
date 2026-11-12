@@ -107,7 +107,10 @@ namespace moho
     static void Destruct(void* objectStorage);
   };
 
-  static_assert(sizeof(CUnitMeleeAttackTargetTaskTypeInfo) == 0x64, "CUnitMeleeAttackTargetTaskTypeInfo size must be 0x64");
+  static_assert(
+    sizeof(CUnitMeleeAttackTargetTaskTypeInfo) == 0x64,
+    "CUnitMeleeAttackTargetTaskTypeInfo size must be 0x64"
+  );
 
   /**
    * Address: 0x00615270 (FUN_00615270, sub_615270)

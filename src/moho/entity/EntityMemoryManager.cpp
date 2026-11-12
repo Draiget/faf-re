@@ -17,7 +17,8 @@ namespace moho
 
   TConVar<bool> gTConVar_sim_EntityPools(
     "sim_EntityPools",
-    "Use 64-KB slab memory pools for Unit and all other Entity-derived instances (projectiles keep their own allocator).",
+    "Use 64-KB slab memory pools for Unit and all other Entity-derived instances (projectiles keep their own "
+    "allocator).",
     &sim_EntityPools
   );
 
@@ -37,7 +38,9 @@ namespace moho
     Clear();
   }
 
-  void EntityMemoryManager::RegisterSize(const std::size_t size)
+  void EntityMemoryManager::RegisterSize(
+    const std::size_t size
+  )
   {
     for (const auto& pool : mPools) {
       if (pool->GetBlockSize() == size) {
@@ -60,7 +63,9 @@ namespace moho
     }
   }
 
-  FixedSlabPool* EntityMemoryManager::FindPoolForSize(const std::size_t size) noexcept
+  FixedSlabPool* EntityMemoryManager::FindPoolForSize(
+    const std::size_t size
+  ) noexcept
   {
     for (const auto& pool : mPools) {
       if (pool->GetBlockSize() == size) {
@@ -70,7 +75,9 @@ namespace moho
     return nullptr;
   }
 
-  void* EntityMemoryManager::TryAllocateSlab(const std::size_t size)
+  void* EntityMemoryManager::TryAllocateSlab(
+    const std::size_t size
+  )
   {
     if (sim_EntityPools) {
       FixedSlabPool* const pool = FindPoolForSize(size);
@@ -85,12 +92,16 @@ namespace moho
     return nullptr;
   }
 
-  bool EntityMemoryManager::OwnsBlock(const void* const ptr) noexcept
+  bool EntityMemoryManager::OwnsBlock(
+    const void* const ptr
+  ) noexcept
   {
     return ptr != nullptr && slab_region::Owns(ptr);
   }
 
-  void* EntityMemoryManager::Allocate(const std::size_t size)
+  void* EntityMemoryManager::Allocate(
+    const std::size_t size
+  )
   {
     if (void* const block = TryAllocateSlab(size)) {
       return block;
@@ -98,7 +109,10 @@ namespace moho
     return ::operator new(size);
   }
 
-  void EntityMemoryManager::Deallocate(void* const ptr, const std::size_t /*size*/) noexcept
+  void EntityMemoryManager::Deallocate(
+    void* const ptr,
+    const std::size_t /*size*/
+  ) noexcept
   {
     if (ptr == nullptr) {
       return;

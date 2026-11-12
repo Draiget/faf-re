@@ -21,7 +21,7 @@ namespace
   {
     return gSimConVarIndexCounter;
   }
-}
+} // namespace
 
 /**
  * Address: 0x00743210 (FUN_00743210, sub_743210)
@@ -41,11 +41,13 @@ std::uint32_t moho::GetSimConVarIndexCounter() noexcept
  * Initializes one convar definition lane, assigns a unique global convar
  * index, and binds the `CSimConVarBase` vftable.
  */
-CSimConVarBase::CSimConVarBase(const bool allowWithoutCheats, const char* const name)
+CSimConVarBase::CSimConVarBase(
+  const bool allowWithoutCheats,
+  const char* const name
+)
   : CSimConCommand(allowWithoutCheats, name)
   , mIndex(AllocateSimConVarIndex())
-{
-}
+{}
 
 /**
  * Address: 0x00734820 (FUN_00734820, sub_734820)
@@ -108,11 +110,14 @@ CSimConVarInstanceBase* moho::TSimConVar<bool>::CreateInstance()
  * bool payload lane.
  */
 template <>
-moho::TSimConVar<bool>::TSimConVar(const bool allowWithoutCheats, const char* const name, const bool& defaultValue)
+moho::TSimConVar<bool>::TSimConVar(
+  const bool allowWithoutCheats,
+  const char* const name,
+  const bool& defaultValue
+)
   : CSimConVarBase(allowWithoutCheats, name)
   , mDefaultValue(defaultValue)
-{
-}
+{}
 
 /**
  * Address: 0x005D3CE0 (FUN_005D3CE0, Moho::TSimConVar_float::NewInstance)

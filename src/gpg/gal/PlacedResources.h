@@ -43,6 +43,15 @@ namespace gpg::gal
   extern bool gLockedRangeOnly;
 
   /**
+   * Engine change: a dynamic buffer marked by Device::CopyWrittenOnly is drawn reading only bytes
+   * written since its last discard lock. When a draw in a new recording needs a fresh copy of it,
+   * only those bytes are copied instead of the whole buffer: the particle instance buffer holds each
+   * particle from its birth and is drawn every frame, mostly without new writes, so each frame copied
+   * its full capacity. Console variable `ren_CopyWrittenOnly` (moho).
+   */
+  extern bool gCopyWrittenOnly;
+
+  /**
    * Engine addition: each Vulkan head draws into an image of its own and Present copies it into the
    * swap chain's image, scaled to the window, so the swap chain can be made again when the window
    * changes size. Without it a resized window left every acquire out of date and the picture froze

@@ -27,7 +27,9 @@ namespace faf::remote
   public:
     void Refresh();
     /** The entity's underlay path as of the last `Refresh`, or null. */
-    [[nodiscard]] const std::string* Find(const std::uint32_t entityId) const
+    [[nodiscard]] const std::string* Find(
+      const std::uint32_t entityId
+    ) const
     {
       if (mPaths.empty()) {
         return nullptr;

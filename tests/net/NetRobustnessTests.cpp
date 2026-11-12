@@ -59,7 +59,6 @@ namespace
 {
   // --- Harness ---------------------------------------------------------------------------
 
-
   // --- Byte building -----------------------------------------------------------------------
 
   struct Bytes
@@ -67,21 +66,47 @@ namespace
     std::string data;
 
     template <class T>
-    Bytes& Put(const T& value)
+    Bytes& Put(
+      const T& value
+    )
     {
       data.append(reinterpret_cast<const char*>(&value), sizeof(value));
       return *this;
     }
-    Bytes& U8(std::uint8_t v) { return Put(v); }
-    Bytes& I32(std::int32_t v) { return Put(v); }
-    Bytes& U32(std::uint32_t v) { return Put(v); }
-    Bytes& F32(float v) { return Put(v); }
-    Bytes& Str(const char* s)
+    Bytes& U8(
+      std::uint8_t v
+    )
+    {
+      return Put(v);
+    }
+    Bytes& I32(
+      std::int32_t v
+    )
+    {
+      return Put(v);
+    }
+    Bytes& U32(
+      std::uint32_t v
+    )
+    {
+      return Put(v);
+    }
+    Bytes& F32(
+      float v
+    )
+    {
+      return Put(v);
+    }
+    Bytes& Str(
+      const char* s
+    )
     {
       data.append(s, std::strlen(s) + 1);
       return *this;
     }
-    Bytes& Raw(const std::string& s)
+    Bytes& Raw(
+      const std::string& s
+    )
     {
       data += s;
       return *this;
@@ -89,13 +114,33 @@ namespace
   };
 
   // SCR byte-stream values (LuaObject::ToByteStream's tags).
-  std::string LuaNumber(const float v) { return Bytes{}.U8(0).F32(v).data; }
-  std::string LuaString(const char* s) { return Bytes{}.U8(1).Str(s).data; }
-  std::string LuaNil() { return std::string(1, '\x02'); }
-  std::string LuaTable(const std::string& entries) { return "\x04" + entries + "\x05"; }
+  std::string LuaNumber(
+    const float v
+  )
+  {
+    return Bytes{}.U8(0).F32(v).data;
+  }
+  std::string LuaString(
+    const char* s
+  )
+  {
+    return Bytes{}.U8(1).Str(s).data;
+  }
+  std::string LuaNil()
+  {
+    return std::string(1, '\x02');
+  }
+  std::string LuaTable(
+    const std::string& entries
+  )
+  {
+    return "\x04" + entries + "\x05";
+  }
 
   // `depth` tables, each the value of key "k" in the one around it.
-  std::string LuaNested(const int depth)
+  std::string LuaNested(
+    const int depth
+  )
   {
     std::string out;
     for (int i = 1; i < depth; ++i) {
@@ -107,7 +152,10 @@ namespace
   }
 
   template <class E>
-  CMessage MakeMessage(const E type, const std::string& payload)
+  CMessage MakeMessage(
+    const E type,
+    const std::string& payload
+  )
   {
     CMessage msg(type);
     if (!payload.empty()) {
@@ -132,7 +180,11 @@ namespace
 
   // Decodes `bytes`; returns whether it succeeded. Checks the Lua stack is left
   // as it was either way.
-  bool Decode(const std::string& bytes, LuaPlus::LuaObject& out, const DecodeMode mode = DecodeMode::Network)
+  bool Decode(
+    const std::string& bytes,
+    LuaPlus::LuaObject& out,
+    const DecodeMode mode = DecodeMode::Network
+  )
   {
     LuaPlus::LuaState& state = TestLuaState();
     const int top = lua_gettop(state.GetCState());
@@ -156,7 +208,9 @@ namespace
     return decoded;
   }
 
-  bool DecodeFails(const std::string& bytes)
+  bool DecodeFails(
+    const std::string& bytes
+  )
   {
     LuaPlus::LuaObject out;
     return !Decode(bytes, out);
@@ -180,7 +234,10 @@ namespace
   }
 
   // Follows key "k" `steps` times.
-  LuaPlus::LuaObject Descend(LuaPlus::LuaObject table, const int steps)
+  LuaPlus::LuaObject Descend(
+    LuaPlus::LuaObject table,
+    const int steps
+  )
   {
     for (int i = 0; i < steps && table.IsTable(); ++i) {
       table = table["k"];
@@ -207,8 +264,9 @@ namespace
   void TestLuaDeepFieldKeepsSiblings()
   {
     LuaPlus::LuaObject out;
-    const std::string table = LuaTable(LuaString("a") + LuaNumber(1.0f) + LuaString("deep") + LuaNested(300) +
-                                       LuaString("b") + LuaString("kept"));
+    const std::string table = LuaTable(
+      LuaString("a") + LuaNumber(1.0f) + LuaString("deep") + LuaNested(300) + LuaString("b") + LuaString("kept")
+    );
     EXPECT_TRUE(Decode(table, out) && out.IsTable());
     EXPECT_TRUE(out["a"].IsNumber() && out["a"].GetNumber() == 1.0);
     EXPECT_TRUE(out["b"].IsString() && std::strcmp(out["b"].GetString(), "kept") == 0);
@@ -226,7 +284,10 @@ namespace
       LuaTable(LuaString("Type") + LuaString("AddPlayer") + LuaString("PlayerOptions") + LuaTable(field));
     const std::string launch = LuaTable(
       LuaString("Type") + LuaString("Launch") + LuaString("GameInfo") +
-      LuaTable(LuaString("PlayerOptions") + LuaTable(LuaNumber(1.0f) + LuaTable(LuaString("PlayerName") + LuaString("p") + field)))
+      LuaTable(
+        LuaString("PlayerOptions") +
+        LuaTable(LuaNumber(1.0f) + LuaTable(LuaString("PlayerName") + LuaString("p") + field))
+      )
     );
 
     LuaPlus::LuaObject out;
@@ -246,11 +307,11 @@ namespace
   void TestLuaMalformedTables()
   {
     const float nan = std::numeric_limits<float>::quiet_NaN();
-    EXPECT_TRUE(DecodeFails(LuaTable(LuaNil() + LuaString("v"))));                   // nil key
-    EXPECT_TRUE(DecodeFails(LuaTable(LuaString("k") + LuaNil())));                   // nil value
-    EXPECT_TRUE(DecodeFails(LuaTable(LuaNumber(nan) + LuaString("v"))));             // NaN key
-    EXPECT_TRUE(DecodeFails(LuaTable(LuaString("k") + std::string(1, '\x09'))));     // unknown tag as value
-    EXPECT_TRUE(DecodeFails(LuaTable(std::string(1, '\x09') + LuaString("v"))));     // unknown tag as key
+    EXPECT_TRUE(DecodeFails(LuaTable(LuaNil() + LuaString("v"))));               // nil key
+    EXPECT_TRUE(DecodeFails(LuaTable(LuaString("k") + LuaNil())));               // nil value
+    EXPECT_TRUE(DecodeFails(LuaTable(LuaNumber(nan) + LuaString("v"))));         // NaN key
+    EXPECT_TRUE(DecodeFails(LuaTable(LuaString("k") + std::string(1, '\x09')))); // unknown tag as value
+    EXPECT_TRUE(DecodeFails(LuaTable(std::string(1, '\x09') + LuaString("v")))); // unknown tag as key
 
     // Truncated anywhere inside a table.
     const std::string table = LuaTable(LuaString("key") + LuaNumber(3.0f));
@@ -262,14 +323,20 @@ namespace
   // --- Lua encoding ------------------------------------------------------------------------
 
   // Runs `script` in the test state and returns global `name`.
-  LuaPlus::LuaObject LuaGlobal(const char* const script, const char* const name)
+  LuaPlus::LuaObject LuaGlobal(
+    const char* const script,
+    const char* const name
+  )
   {
     LuaPlus::LuaState& state = TestLuaState();
     (void)lua_dostring(state.GetCState(), script);
     return state.GetGlobal(name);
   }
 
-  std::string Encode(LuaPlus::LuaObject value, bool& encoded)
+  std::string Encode(
+    LuaPlus::LuaObject value,
+    bool& encoded
+  )
   {
     gpg::MemBufferStream stream(256u);
     encoded = value.ToByteStream(stream);
@@ -295,7 +362,9 @@ namespace
   {
     bool encoded = true;
     const std::string bytes = Encode(
-      LuaGlobal("faf_test_c = { n = 1 } faf_test_c.self = faf_test_c faf_test_c.sub = { up = faf_test_c, v = 2 }", "faf_test_c"),
+      LuaGlobal(
+        "faf_test_c = { n = 1 } faf_test_c.self = faf_test_c faf_test_c.sub = { up = faf_test_c, v = 2 }", "faf_test_c"
+      ),
       encoded
     );
     EXPECT_FALSE(encoded);
@@ -368,55 +437,174 @@ namespace
     int total = 0;
     EntId lastEntity = 0;
 
-    void Note(const ECmdStreamOp op)
+    void Note(
+      const ECmdStreamOp op
+    )
     {
       ++calls[static_cast<int>(op)];
       ++total;
     }
 
-    void SetCommandSource(CommandSourceId) override { Note(ECmdStreamOp::CMDST_SetCommandSource); }
-    void OnCommandSourceTerminated() override { Note(ECmdStreamOp::CMDST_CommandSourceTerminated); }
-    void VerifyChecksum(gpg::MD5Digest const&, CSeqNo) override { Note(ECmdStreamOp::CMDST_VerifyChecksum); }
-    void RequestPause() override { Note(ECmdStreamOp::CMDST_RequestPause); }
-    void Resume() override { Note(ECmdStreamOp::CMDST_Resume); }
-    void SingleStep() override { Note(ECmdStreamOp::CMDST_SingleStep); }
-    void CreateUnit(uint32_t, RResId const&, SCoordsVec2 const&, float) override { Note(ECmdStreamOp::CMDST_CreateUnit); }
-    void CreateProp(const char*, Wm3::Vec3f const&) override { Note(ECmdStreamOp::CMDST_CreateProp); }
-    void DestroyEntity(const EntId id) override
+    void SetCommandSource(
+      CommandSourceId
+    ) override
+    {
+      Note(ECmdStreamOp::CMDST_SetCommandSource);
+    }
+    void OnCommandSourceTerminated() override
+    {
+      Note(ECmdStreamOp::CMDST_CommandSourceTerminated);
+    }
+    void VerifyChecksum(
+      gpg::MD5Digest const&,
+      CSeqNo
+    ) override
+    {
+      Note(ECmdStreamOp::CMDST_VerifyChecksum);
+    }
+    void RequestPause() override
+    {
+      Note(ECmdStreamOp::CMDST_RequestPause);
+    }
+    void Resume() override
+    {
+      Note(ECmdStreamOp::CMDST_Resume);
+    }
+    void SingleStep() override
+    {
+      Note(ECmdStreamOp::CMDST_SingleStep);
+    }
+    void CreateUnit(
+      uint32_t,
+      RResId const&,
+      SCoordsVec2 const&,
+      float
+    ) override
+    {
+      Note(ECmdStreamOp::CMDST_CreateUnit);
+    }
+    void CreateProp(
+      const char*,
+      Wm3::Vec3f const&
+    ) override
+    {
+      Note(ECmdStreamOp::CMDST_CreateProp);
+    }
+    void DestroyEntity(
+      const EntId id
+    ) override
     {
       lastEntity = id;
       Note(ECmdStreamOp::CMDST_DestroyEntity);
     }
-    void WarpEntity(EntId, VTransform const&) override { Note(ECmdStreamOp::CMDST_WarpEntity); }
-    void ProcessInfoPair(EntId, gpg::StrArg, gpg::StrArg) override { Note(ECmdStreamOp::CMDST_ProcessInfoPair); }
-    void IssueCommand(BVSet<EntId, EntIdUniverse> const&, SSTICommandIssueData const&, bool) override
+    void WarpEntity(
+      EntId,
+      VTransform const&
+    ) override
+    {
+      Note(ECmdStreamOp::CMDST_WarpEntity);
+    }
+    void ProcessInfoPair(
+      EntId,
+      gpg::StrArg,
+      gpg::StrArg
+    ) override
+    {
+      Note(ECmdStreamOp::CMDST_ProcessInfoPair);
+    }
+    void IssueCommand(
+      BVSet<EntId, EntIdUniverse> const&,
+      SSTICommandIssueData const&,
+      bool
+    ) override
     {
       Note(ECmdStreamOp::CMDST_IssueCommand);
     }
-    void IssueFactoryCommand(BVSet<EntId, EntIdUniverse> const&, SSTICommandIssueData const&, bool) override
+    void IssueFactoryCommand(
+      BVSet<EntId, EntIdUniverse> const&,
+      SSTICommandIssueData const&,
+      bool
+    ) override
     {
       Note(ECmdStreamOp::CMDST_IssueFactoryCommand);
     }
-    void IncreaseCommandCount(CmdId, int) override { Note(ECmdStreamOp::CMDST_IncreaseCommandCount); }
-    void DecreaseCommandCount(CmdId, int) override { Note(ECmdStreamOp::CMDST_DecreaseCommandCount); }
-    void SetCommandTarget(CmdId, SSTITarget const&) override { Note(ECmdStreamOp::CMDST_SetCommandTarget); }
-    void SetCommandType(CmdId, EUnitCommandType) override { Note(ECmdStreamOp::CMDST_SetCommandType); }
-    void SetCommandCells(CmdId, gpg::core::FastVector<SOCellPos> const&, Wm3::Vector3<float> const&) override
+    void IncreaseCommandCount(
+      CmdId,
+      int
+    ) override
+    {
+      Note(ECmdStreamOp::CMDST_IncreaseCommandCount);
+    }
+    void DecreaseCommandCount(
+      CmdId,
+      int
+    ) override
+    {
+      Note(ECmdStreamOp::CMDST_DecreaseCommandCount);
+    }
+    void SetCommandTarget(
+      CmdId,
+      SSTITarget const&
+    ) override
+    {
+      Note(ECmdStreamOp::CMDST_SetCommandTarget);
+    }
+    void SetCommandType(
+      CmdId,
+      EUnitCommandType
+    ) override
+    {
+      Note(ECmdStreamOp::CMDST_SetCommandType);
+    }
+    void SetCommandCells(
+      CmdId,
+      gpg::core::FastVector<SOCellPos> const&,
+      Wm3::Vector3<float> const&
+    ) override
     {
       Note(ECmdStreamOp::CMDST_SetCommandCells);
     }
-    void RemoveCommandFromUnitQueue(CmdId, EntId) override { Note(ECmdStreamOp::CMDST_RemoveCommandFromQueue); }
-    void ExecuteLuaInSim(const char*, LuaPlus::LuaObject const&) override { Note(ECmdStreamOp::CMDST_ExecuteLuaInSim); }
-    void LuaSimCallback(const char*, LuaPlus::LuaObject const&, BVSet<EntId, EntIdUniverse> const&) override
+    void RemoveCommandFromUnitQueue(
+      CmdId,
+      EntId
+    ) override
+    {
+      Note(ECmdStreamOp::CMDST_RemoveCommandFromQueue);
+    }
+    void ExecuteLuaInSim(
+      const char*,
+      LuaPlus::LuaObject const&
+    ) override
+    {
+      Note(ECmdStreamOp::CMDST_ExecuteLuaInSim);
+    }
+    void LuaSimCallback(
+      const char*,
+      LuaPlus::LuaObject const&,
+      BVSet<EntId, EntIdUniverse> const&
+    ) override
     {
       Note(ECmdStreamOp::CMDST_LuaSimCallback);
     }
-    void ExecuteDebugCommand(const char*, Wm3::Vector3<float> const&, uint32_t, BVSet<EntId, EntIdUniverse> const&) override
+    void ExecuteDebugCommand(
+      const char*,
+      Wm3::Vector3<float> const&,
+      uint32_t,
+      BVSet<EntId, EntIdUniverse> const&
+    ) override
     {
       Note(ECmdStreamOp::CMDST_DebugCommand);
     }
-    void AdvanceBeat(int) override { Note(ECmdStreamOp::CMDST_Advance); }
-    void EndGame() override { Note(ECmdStreamOp::CMDST_EndGame); }
+    void AdvanceBeat(
+      int
+    ) override
+    {
+      Note(ECmdStreamOp::CMDST_Advance);
+    }
+    void EndGame() override
+    {
+      Note(ECmdStreamOp::CMDST_EndGame);
+    }
   };
 
   struct DecoderFixture
@@ -425,7 +613,10 @@ namespace
     fa::auto_ptr<gpg::Stream> recording;
     CDecoder decoder{&sink, recording, nullptr, &TestLuaState()};
 
-    void Feed(const ECmdStreamOp op, const std::string& payload)
+    void Feed(
+      const ECmdStreamOp op,
+      const std::string& payload
+    )
     {
       CMessage msg = MakeMessage(op, payload);
       decoder.ReceiveMessage(&msg, nullptr);
@@ -456,8 +647,10 @@ namespace
     } commands[] = {
       {ECmdStreamOp::CMDST_DestroyEntity, Bytes{}.I32(42).data},
       {ECmdStreamOp::CMDST_VerifyChecksum, Bytes{}.Raw(std::string(16, '\x11')).I32(50).data},
-      {ECmdStreamOp::CMDST_SetCommandCells, Bytes{}.I32(7).I32(1).Raw(std::string(sizeof(SOCellPos), '\x01')).F32(1).F32(2).F32(3).data},
-      {ECmdStreamOp::CMDST_LuaSimCallback, Bytes{}.Str("Ping").Raw(LuaTable(LuaString("k") + LuaNumber(1))).Raw(entities).data},
+      {ECmdStreamOp::CMDST_SetCommandCells,
+       Bytes{}.I32(7).I32(1).Raw(std::string(sizeof(SOCellPos), '\x01')).F32(1).F32(2).F32(3).data},
+      {ECmdStreamOp::CMDST_LuaSimCallback,
+       Bytes{}.Str("Ping").Raw(LuaTable(LuaString("k") + LuaNumber(1))).Raw(entities).data},
       {ECmdStreamOp::CMDST_DebugCommand, Bytes{}.Str("dbg").F32(0).F32(0).F32(0).U8(1).Raw(entities).data},
     };
 
@@ -481,7 +674,9 @@ namespace
     f.Feed(ECmdStreamOp::CMDST_LuaSimCallback, Bytes{}.Str("cb").Raw(args).U32(0xFFFFFFFFu).data);
     f.Feed(ECmdStreamOp::CMDST_LuaSimCallback, Bytes{}.Str("cb").Raw(args).U32(1000).I32(1).data);
     // Ids of two types (the last one is the one the binary never checks).
-    f.Feed(ECmdStreamOp::CMDST_LuaSimCallback, Bytes{}.Str("cb").Raw(args).U32(2).U32(0x00000001u).U32(0xF0000001u).data);
+    f.Feed(
+      ECmdStreamOp::CMDST_LuaSimCallback, Bytes{}.Str("cb").Raw(args).U32(2).U32(0x00000001u).U32(0xF0000001u).data
+    );
     f.Feed(ECmdStreamOp::CMDST_LuaSimCallback, Bytes{}.Str("cb").Raw(args).U32(3).U32(1).U32(0x10000001u).U32(2).data);
     // Cell counts that are negative or larger than the message.
     f.Feed(ECmdStreamOp::CMDST_SetCommandCells, Bytes{}.I32(7).I32(-1).F32(0).F32(0).F32(0).data);
@@ -502,7 +697,9 @@ namespace
     const float nan = std::numeric_limits<float>::quiet_NaN();
 
     f.Feed(ECmdStreamOp::CMDST_LuaSimCallback, Bytes{}.Str("cb").Raw(LuaTable(LuaNil() + LuaNumber(1))).Raw(none).data);
-    f.Feed(ECmdStreamOp::CMDST_LuaSimCallback, Bytes{}.Str("cb").Raw(LuaTable(LuaNumber(nan) + LuaNumber(1))).Raw(none).data);
+    f.Feed(
+      ECmdStreamOp::CMDST_LuaSimCallback, Bytes{}.Str("cb").Raw(LuaTable(LuaNumber(nan) + LuaNumber(1))).Raw(none).data
+    );
     f.Feed(ECmdStreamOp::CMDST_ExecuteLuaInSim, Bytes{}.Str("fn").Raw(std::string(60000, '\x04')).data);
     EXPECT_EQ(f.sink.total, 0);
 
@@ -530,19 +727,45 @@ namespace
     int writes = 0;
     int destroyRequests = 0;
 
-    FakeConnection(const u_long addr, const u_short p)
+    FakeConnection(
+      const u_long addr,
+      const u_short p
+    )
       : address(addr)
       , port(p)
     {}
 
-    u_long GetAddr() override { return address; }
-    u_short GetPort() override { return port; }
-    float GetPing() override { return 0.0f; }
-    float GetTime() override { return 0.0f; }
-    void Write(NetDataSpan*) override { ++writes; }
+    u_long GetAddr() override
+    {
+      return address;
+    }
+    u_short GetPort() override
+    {
+      return port;
+    }
+    float GetPing() override
+    {
+      return 0.0f;
+    }
+    float GetTime() override
+    {
+      return 0.0f;
+    }
+    void Write(
+      NetDataSpan*
+    ) override
+    {
+      ++writes;
+    }
     void Close() override {}
-    fa::string ToString() override { return gpg::STR_Printf("fake:%u", static_cast<unsigned>(port)); }
-    void ScheduleDestroy() override { ++destroyRequests; }
+    fa::string ToString() override
+    {
+      return gpg::STR_Printf("fake:%u", static_cast<unsigned>(port));
+    }
+    void ScheduleDestroy() override
+    {
+      ++destroyRequests;
+    }
   };
 
   class FakeConnector final : public INetConnector
@@ -551,28 +774,61 @@ namespace
     std::vector<FakeConnection*> connections;
     int connects = 0;
 
-    FakeConnection* Last() const { return connections.empty() ? nullptr : connections.back(); }
+    FakeConnection* Last() const
+    {
+      return connections.empty() ? nullptr : connections.back();
+    }
 
     void Destroy() override {}
-    ENetProtocolType GetProtocol() override { return ENetProtocolType::kUdp; }
-    u_short GetLocalPort() override { return 6000; }
-    INetConnection* Connect(const u_long address, const u_short port) override
+    ENetProtocolType GetProtocol() override
+    {
+      return ENetProtocolType::kUdp;
+    }
+    u_short GetLocalPort() override
+    {
+      return 6000;
+    }
+    INetConnection* Connect(
+      const u_long address,
+      const u_short port
+    ) override
     {
       ++connects;
       connections.push_back(new FakeConnection(address, port));
       return connections.back();
     }
-    bool FindNextAddress(u_long&, u_short&) override { return false; }
-    INetConnection* Accept(const u_long address, const u_short port) override
+    bool FindNextAddress(
+      u_long&,
+      u_short&
+    ) override
+    {
+      return false;
+    }
+    INetConnection* Accept(
+      const u_long address,
+      const u_short port
+    ) override
     {
       connections.push_back(new FakeConnection(address, port));
       return connections.back();
     }
-    void Reject(u_long, u_short) override {}
+    void Reject(
+      u_long,
+      u_short
+    ) override
+    {}
     void Pull() override {}
     void Push() override {}
-    void SelectEvent(HANDLE) override {}
-    SSendStampWindow SnapshotSendStamps(int32_t) override { return SSendStampWindow{0, 0}; }
+    void SelectEvent(
+      HANDLE
+    ) override
+    {}
+    SSendStampWindow SnapshotSendStamps(
+      int32_t
+    ) override
+    {
+      return SSendStampWindow{0, 0};
+    }
   };
 
   // --- Client control messages --------------------------------------------------------------
@@ -596,7 +852,10 @@ namespace
     }
 
     template <class E>
-    void Receive(const E type, const std::string& payload)
+    void Receive(
+      const E type,
+      const std::string& payload
+    )
     {
       CMessage msg = MakeMessage(type, payload);
       remote->ReceiveMessage(&msg, &connection);
@@ -668,13 +927,19 @@ namespace
     }
 
     template <class E>
-    void Deliver(FakeConnection* const from, const E type, const std::string& payload)
+    void Deliver(
+      FakeConnection* const from,
+      const E type,
+      const std::string& payload
+    )
     {
       CMessage msg = MakeMessage(type, payload);
       lobby->ReceiveMessage(&msg, from);
     }
 
-    SPeer* Peer(const int32_t uid)
+    SPeer* Peer(
+      const int32_t uid
+    )
     {
       for (SPeer* const peer : lobby->peers.owners()) {
         if (peer->uid == uid) {
@@ -689,7 +954,12 @@ namespace
       return Bytes{}.Str("host").I32(kHostUid).I32(kLocalUid).Str("local").I32(0).data;
     }
 
-    std::string NewPeer(const char* name, const u_long address, const u_short port, const int32_t uid) const
+    std::string NewPeer(
+      const char* name,
+      const u_long address,
+      const u_short port,
+      const int32_t uid
+    ) const
     {
       return Bytes{}.Str(name).Put(address).Put(port).I32(uid).data;
     }
@@ -806,7 +1076,9 @@ namespace
 
   // --- Order stream check ------------------------------------------------------------------
 
-  std::string HexOf(const gpg::SHA256::Digest& digest)
+  std::string HexOf(
+    const gpg::SHA256::Digest& digest
+  )
   {
     static const char* const kHex = "0123456789abcdef";
     std::string out;
@@ -838,7 +1110,10 @@ namespace
     EXPECT_EQ(HexOf(pieces.Snapshot()), hashOf(twoBlocks));
   }
 
-  CMessage CommandMessage(const ECmdStreamOp op, const std::string& payload)
+  CMessage CommandMessage(
+    const ECmdStreamOp op,
+    const std::string& payload
+  )
   {
     return MakeMessage(op, payload);
   }
@@ -896,16 +1171,35 @@ namespace
     int toManager = 0;
     int fromIndex = 0;
 
-    u_long GetAddr() override { return 0x7F000001u; }
-    u_short GetPort() override { return static_cast<u_short>(7000 + toManager); }
-    float GetPing() override { return 0.0f; }
-    float GetTime() override { return 0.0f; }
-    void Write(NetDataSpan* const data) override
+    u_long GetAddr() override
     {
-      wire->queue.push_back({toManager, fromIndex, std::string(reinterpret_cast<const char*>(data->start), data->size())});
+      return 0x7F000001u;
+    }
+    u_short GetPort() override
+    {
+      return static_cast<u_short>(7000 + toManager);
+    }
+    float GetPing() override
+    {
+      return 0.0f;
+    }
+    float GetTime() override
+    {
+      return 0.0f;
+    }
+    void Write(
+      NetDataSpan* const data
+    ) override
+    {
+      wire->queue.push_back(
+        {toManager, fromIndex, std::string(reinterpret_cast<const char*>(data->start), data->size())}
+      );
     }
     void Close() override {}
-    fa::string ToString() override { return "wire"; }
+    fa::string ToString() override
+    {
+      return "wire";
+    }
     void ScheduleDestroy() override {}
   };
 
@@ -931,18 +1225,26 @@ namespace
           connection.wire = &wire;
           connection.toManager = p;
           connection.fromIndex = m;
-          managers[m]->CreateNetClient(gpg::STR_Printf("p%d", p).c_str(), p, p + 1, static_cast<unsigned>(p), &connection);
+          managers[m]->CreateNetClient(
+            gpg::STR_Printf("p%d", p).c_str(), p, p + 1, static_cast<unsigned>(p), &connection
+          );
         }
       }
     }
 
-    void Deliver(const int toManager, const int fromIndex, CMessage& msg)
+    void Deliver(
+      const int toManager,
+      const int fromIndex,
+      CMessage& msg
+    )
     {
       auto* const receiver = static_cast<CNetClient*>(managers[toManager]->mClients[fromIndex]);
       receiver->ReceiveMessage(&msg, &connections[toManager][fromIndex]);
     }
 
-    void Deliver(const Wire::Packet& packet)
+    void Deliver(
+      const Wire::Packet& packet
+    )
     {
       CMessage msg(static_cast<ECmdStreamOp>(static_cast<std::uint8_t>(packet.bytes[0])));
       if (packet.bytes.size() > 3) {
@@ -963,7 +1265,10 @@ namespace
 
     // Delivers up to `limit` packets as a laggy network would: connections in
     // a random order, each connection's packets still in order.
-    void PumpShuffled(std::mt19937& random, std::size_t limit)
+    void PumpShuffled(
+      std::mt19937& random,
+      std::size_t limit
+    )
     {
       for (; limit > 0 && !wire.queue.empty(); --limit) {
         const std::size_t pick = std::uniform_int_distribution<std::size_t>(0, wire.queue.size() - 1)(random);
@@ -979,7 +1284,10 @@ namespace
     }
 
     // Player m sends one beat: a checksum report, then an advance.
-    void SendBeat(const int m, const int beat)
+    void SendBeat(
+      const int m,
+      const int beat
+    )
     {
       const std::string hash(16, static_cast<char>(0x40 + (m * 7 + beat) % 64));
       CMessage checksum = CommandMessage(ECmdStreamOp::CMDST_VerifyChecksum, Bytes{}.Raw(hash).I32(beat).data);
@@ -1068,7 +1376,9 @@ namespace
     }
   }
 
-  void RunDifferentOrdersGame(const int checkMode)
+  void RunDifferentOrdersGame(
+    const int checkMode
+  )
   {
     net_CheckOrderStreams = checkMode;
     ThreePlayerGame* const game = new ThreePlayerGame();
@@ -1109,15 +1419,24 @@ namespace
     }
   }
 
-  void TestStreamCheckReportsDifferentOrders() { RunDifferentOrdersGame(1); }
+  void TestStreamCheckReportsDifferentOrders()
+  {
+    RunDifferentOrdersGame(1);
+  }
 
-  void TestStreamCheckStopsOnDifferentOrders() { RunDifferentOrdersGame(2); }
+  void TestStreamCheckStopsOnDifferentOrders()
+  {
+    RunDifferentOrdersGame(2);
+  }
 
   // --- Lua file access (what a lobby's map or mod can reach) -----------------------------
 
   // Runs `source` in `state` and returns its first result as a string, or
   // "error: ..." when it fails to load or run.
-  std::string RunLua(LuaPlus::LuaState& state, const std::string& source)
+  std::string RunLua(
+    LuaPlus::LuaState& state,
+    const std::string& source
+  )
   {
     lua_State* const L = state.GetCState();
     const int top = lua_gettop(L);
@@ -1166,7 +1485,10 @@ namespace
       std::filesystem::remove_all(root, ignored);
     }
 
-    static void WriteText(const std::filesystem::path& path, const std::string& text)
+    static void WriteText(
+      const std::filesystem::path& path,
+      const std::string& text
+    )
     {
       std::FILE* const file = std::fopen(path.string().c_str(), "wb");
       if (file != nullptr) {
@@ -1175,7 +1497,9 @@ namespace
       }
     }
 
-    bool Finds(const char* const path)
+    bool Finds(
+      const char* const path
+    )
     {
       fa::string found;
       (void)vfs->FindFile(&found, path, nullptr);
@@ -1219,10 +1543,9 @@ namespace
   void TestGameDataVersion()
   {
     // FAF's lua/version.lua as deployed (double quotes) and as in the source tree.
-    const std::string deployed =
-      "local GameType = \"FAF\"  -- The use of `'` instead of `\"` is **intentional**\n"
-      "local Commit = \"2ae081b063aba82df3c679780f0ba8460e06a63e\"\n\n"
-      "local Version = \"3835\"\n---@alias PATCH \"3835\"\n---@alias VERSION \"1.5.3835\"\n";
+    const std::string deployed = "local GameType = \"FAF\"  -- The use of `'` instead of `\"` is **intentional**\n"
+                                 "local Commit = \"2ae081b063aba82df3c679780f0ba8460e06a63e\"\n\n"
+                                 "local Version = \"3835\"\n---@alias PATCH \"3835\"\n---@alias VERSION \"1.5.3835\"\n";
     EXPECT_EQ(FAF_ParseLuaVersionFile(deployed), 3835);
     EXPECT_EQ(FAF_ParseLuaVersionFile("local Version='3839'"), 3839);
     EXPECT_EQ(FAF_ParseLuaVersionFile("local Version = \"38x9\""), 0);
@@ -1261,17 +1584,29 @@ namespace
   void TestReplayDamagedHeaderRefused()
   {
     // A replay header as VCR_CreateReplay writes it, up to the init seed.
-    const auto lengthPrefixed = [](const std::string& s) { return Bytes{}.U32(static_cast<std::uint32_t>(s.size())).Raw(s).data; };
-    const std::string preamble =
-      Bytes{}.Str("Supreme Commander v1.50.3835").Str("\r\n").Raw("Replay v1.9\r\n").Str("/maps/x/x.scmap").Str("\r\n\x1a").data;
+    const auto lengthPrefixed = [](const std::string& s) {
+      return Bytes{}.U32(static_cast<std::uint32_t>(s.size())).Raw(s).data;
+    };
+    const std::string preamble = Bytes{}
+                                   .Str("Supreme Commander v1.50.3835")
+                                   .Str("\r\n")
+                                   .Raw("Replay v1.9\r\n")
+                                   .Str("/maps/x/x.scmap")
+                                   .Str("\r\n\x1a")
+                                   .data;
     const auto makeHeader = [&](const std::string& mods, const std::string& scenario, const std::string& army) {
       return Bytes{}
         .Raw(preamble)
         .Raw(lengthPrefixed(mods))
         .Raw(lengthPrefixed(scenario))
-        .U8(1).Str("player").I32(0)
+        .U8(1)
+        .Str("player")
+        .I32(0)
         .U8(0)
-        .U8(1).Raw(lengthPrefixed(army)).U8(0).U8(0xFF)
+        .U8(1)
+        .Raw(lengthPrefixed(army))
+        .U8(0)
+        .U8(0xFF)
         .data;
     };
     const std::string goodMods = LuaTable(std::string{});
@@ -1319,39 +1654,255 @@ namespace
 
 } // namespace
 
-TEST(Existing_NetRobustness, LuaValidValues) { TestLuaValidValues(); }
-TEST(Existing_NetRobustness, VfsStaysInsideMounts) { TestVfsStaysInsideMounts(); }
-TEST(Existing_NetRobustness, LuaFilesComeFromTheGame) { TestLuaFilesComeFromTheGame(); }
-TEST(Existing_NetRobustness, LuaCompiledChunksRefused) { TestLuaCompiledChunksRefused(); }
-TEST(Existing_NetRobustness, GameDataVersion) { TestGameDataVersion(); }
-TEST(Existing_NetRobustness, LuaNestingLimit) { TestLuaNestingLimit(); }
-TEST(Existing_NetRobustness, LuaDeepFieldKeepsSiblings) { TestLuaDeepFieldKeepsSiblings(); }
-TEST(Existing_NetRobustness, LuaLobbyRelayDepth) { TestLuaLobbyRelayDepth(); }
-TEST(Existing_NetRobustness, LuaLocalDecodeHasNoNestingLimit) { TestLuaLocalDecodeHasNoNestingLimit(); }
-TEST(Existing_NetRobustness, LuaMalformedTables) { TestLuaMalformedTables(); }
-TEST(Existing_NetRobustness, LuaEncoderLeavesOutWhatItCannotCarry) { TestLuaEncoderLeavesOutWhatItCannotCarry(); }
-TEST(Existing_NetRobustness, LuaEncoderStopsAtCycles) { TestLuaEncoderStopsAtCycles(); }
-TEST(Existing_NetRobustness, LuaEncoderDepthLimit) { TestLuaEncoderDepthLimit(); }
-TEST(Existing_NetRobustness, LuaEncoderValidDataUnchanged) { TestLuaEncoderValidDataUnchanged(); }
-TEST(Existing_NetRobustness, MessageFraming) { TestMessageFraming(); }
-TEST(Existing_NetRobustness, DecoderEmptyPayloads) { TestDecoderEmptyPayloads(); }
-TEST(Existing_NetRobustness, DecoderTruncation) { TestDecoderTruncation(); }
-TEST(Existing_NetRobustness, DecoderCounts) { TestDecoderCounts(); }
-TEST(Existing_NetRobustness, DecoderLuaPayloads) { TestDecoderLuaPayloads(); }
-TEST(Existing_NetRobustness, DecoderValidCommand) { TestDecoderValidCommand(); }
-TEST(Existing_NetRobustness, ClientShortMessages) { TestClientShortMessages(); }
-TEST(Existing_NetRobustness, ClientSpeedRequests) { TestClientSpeedRequests(); }
-TEST(Existing_NetRobustness, ClientEndGameFromPeerIgnored) { TestClientEndGameFromPeerIgnored(); }
-TEST(Existing_NetRobustness, LobbyJoinHandshake) { TestLobbyJoinHandshake(); }
-TEST(Existing_NetRobustness, LobbyTruncatedMessages) { TestLobbyTruncatedMessages(); }
-TEST(Existing_NetRobustness, LobbyHostMessages) { TestLobbyHostMessages(); }
-TEST(Existing_NetRobustness, LobbyScriptData) { TestLobbyScriptData(); }
-TEST(Existing_NetRobustness, LobbyPeerEvents) { TestLobbyPeerEvents(); }
-TEST(Existing_NetRobustness, ReplayDamagedHeaderRefused) { TestReplayDamagedHeaderRefused(); }
-TEST(Existing_NetRobustness, Sha256Vectors) { TestSha256Vectors(); }
-TEST(Existing_NetRobustness, StreamCheckReports) { TestStreamCheckReports(); }
-TEST(Existing_NetRobustness, StreamCheckHonestGame) { TestStreamCheckHonestGame(); }
-TEST(Existing_NetRobustness, StreamCheckLagAndReordering) { TestStreamCheckLagAndReordering(); }
-TEST(Existing_NetRobustness, StreamCheckFalseReportProvesNothing) { TestStreamCheckFalseReportProvesNothing(); }
-TEST(Existing_NetRobustness, StreamCheckReportsDifferentOrders) { TestStreamCheckReportsDifferentOrders(); }
-TEST(Existing_NetRobustness, StreamCheckStopsOnDifferentOrders) { TestStreamCheckStopsOnDifferentOrders(); }
+TEST(
+  Existing_NetRobustness,
+  LuaValidValues
+)
+{
+  TestLuaValidValues();
+}
+TEST(
+  Existing_NetRobustness,
+  VfsStaysInsideMounts
+)
+{
+  TestVfsStaysInsideMounts();
+}
+TEST(
+  Existing_NetRobustness,
+  LuaFilesComeFromTheGame
+)
+{
+  TestLuaFilesComeFromTheGame();
+}
+TEST(
+  Existing_NetRobustness,
+  LuaCompiledChunksRefused
+)
+{
+  TestLuaCompiledChunksRefused();
+}
+TEST(
+  Existing_NetRobustness,
+  GameDataVersion
+)
+{
+  TestGameDataVersion();
+}
+TEST(
+  Existing_NetRobustness,
+  LuaNestingLimit
+)
+{
+  TestLuaNestingLimit();
+}
+TEST(
+  Existing_NetRobustness,
+  LuaDeepFieldKeepsSiblings
+)
+{
+  TestLuaDeepFieldKeepsSiblings();
+}
+TEST(
+  Existing_NetRobustness,
+  LuaLobbyRelayDepth
+)
+{
+  TestLuaLobbyRelayDepth();
+}
+TEST(
+  Existing_NetRobustness,
+  LuaLocalDecodeHasNoNestingLimit
+)
+{
+  TestLuaLocalDecodeHasNoNestingLimit();
+}
+TEST(
+  Existing_NetRobustness,
+  LuaMalformedTables
+)
+{
+  TestLuaMalformedTables();
+}
+TEST(
+  Existing_NetRobustness,
+  LuaEncoderLeavesOutWhatItCannotCarry
+)
+{
+  TestLuaEncoderLeavesOutWhatItCannotCarry();
+}
+TEST(
+  Existing_NetRobustness,
+  LuaEncoderStopsAtCycles
+)
+{
+  TestLuaEncoderStopsAtCycles();
+}
+TEST(
+  Existing_NetRobustness,
+  LuaEncoderDepthLimit
+)
+{
+  TestLuaEncoderDepthLimit();
+}
+TEST(
+  Existing_NetRobustness,
+  LuaEncoderValidDataUnchanged
+)
+{
+  TestLuaEncoderValidDataUnchanged();
+}
+TEST(
+  Existing_NetRobustness,
+  MessageFraming
+)
+{
+  TestMessageFraming();
+}
+TEST(
+  Existing_NetRobustness,
+  DecoderEmptyPayloads
+)
+{
+  TestDecoderEmptyPayloads();
+}
+TEST(
+  Existing_NetRobustness,
+  DecoderTruncation
+)
+{
+  TestDecoderTruncation();
+}
+TEST(
+  Existing_NetRobustness,
+  DecoderCounts
+)
+{
+  TestDecoderCounts();
+}
+TEST(
+  Existing_NetRobustness,
+  DecoderLuaPayloads
+)
+{
+  TestDecoderLuaPayloads();
+}
+TEST(
+  Existing_NetRobustness,
+  DecoderValidCommand
+)
+{
+  TestDecoderValidCommand();
+}
+TEST(
+  Existing_NetRobustness,
+  ClientShortMessages
+)
+{
+  TestClientShortMessages();
+}
+TEST(
+  Existing_NetRobustness,
+  ClientSpeedRequests
+)
+{
+  TestClientSpeedRequests();
+}
+TEST(
+  Existing_NetRobustness,
+  ClientEndGameFromPeerIgnored
+)
+{
+  TestClientEndGameFromPeerIgnored();
+}
+TEST(
+  Existing_NetRobustness,
+  LobbyJoinHandshake
+)
+{
+  TestLobbyJoinHandshake();
+}
+TEST(
+  Existing_NetRobustness,
+  LobbyTruncatedMessages
+)
+{
+  TestLobbyTruncatedMessages();
+}
+TEST(
+  Existing_NetRobustness,
+  LobbyHostMessages
+)
+{
+  TestLobbyHostMessages();
+}
+TEST(
+  Existing_NetRobustness,
+  LobbyScriptData
+)
+{
+  TestLobbyScriptData();
+}
+TEST(
+  Existing_NetRobustness,
+  LobbyPeerEvents
+)
+{
+  TestLobbyPeerEvents();
+}
+TEST(
+  Existing_NetRobustness,
+  ReplayDamagedHeaderRefused
+)
+{
+  TestReplayDamagedHeaderRefused();
+}
+TEST(
+  Existing_NetRobustness,
+  Sha256Vectors
+)
+{
+  TestSha256Vectors();
+}
+TEST(
+  Existing_NetRobustness,
+  StreamCheckReports
+)
+{
+  TestStreamCheckReports();
+}
+TEST(
+  Existing_NetRobustness,
+  StreamCheckHonestGame
+)
+{
+  TestStreamCheckHonestGame();
+}
+TEST(
+  Existing_NetRobustness,
+  StreamCheckLagAndReordering
+)
+{
+  TestStreamCheckLagAndReordering();
+}
+TEST(
+  Existing_NetRobustness,
+  StreamCheckFalseReportProvesNothing
+)
+{
+  TestStreamCheckFalseReportProvesNothing();
+}
+TEST(
+  Existing_NetRobustness,
+  StreamCheckReportsDifferentOrders
+)
+{
+  TestStreamCheckReportsDifferentOrders();
+}
+TEST(
+  Existing_NetRobustness,
+  StreamCheckStopsOnDifferentOrders
+)
+{
+  TestStreamCheckStopsOnDifferentOrders();
+}

@@ -2,23 +2,23 @@
 
 LuaState* LuaState::GetActiveState()
 {
-	if (!m_state || !m_state->l_G || !m_state->l_G->lstate) {
-		return nullptr;
-	}
-	return m_state->l_G->lstate->stateUserData;
+  if (!m_state || !m_state->l_G || !m_state->l_G->lstate) {
+    return nullptr;
+  }
+  return m_state->l_G->lstate->stateUserData;
 }
 
 lua_State* LuaState::GetActiveCState()
 {
-	if (!m_state || !m_state->l_G) {
-		return nullptr;
-	}
-	return m_state->l_G->lstate;
+  if (!m_state || !m_state->l_G) {
+    return nullptr;
+  }
+  return m_state->l_G->lstate;
 }
 
 lua_State* LuaState::GetCState() const
 {
-	return m_state;
+  return m_state;
 }
 
 /**
@@ -26,19 +26,19 @@ lua_State* LuaState::GetCState() const
  */
 LuaObject LuaState::GetGlobals()
 {
-	if (!m_state) {
-		return {};
-	}
+  if (!m_state) {
+    return {};
+  }
 
-	return LuaObject(this, LUA_GLOBALSINDEX);
+  return LuaObject(this, LUA_GLOBALSINDEX);
 }
 
 LuaObject LuaState::GetTableSizes()
 {
-	getsizes(m_state);
-	LuaObject sizes(this, -1);
-	lua_settop(m_state, -2);
-	return sizes;
+  getsizes(m_state);
+  LuaObject sizes(this, -1);
+  lua_settop(m_state, -2);
+  return sizes;
 }
 
 /**
@@ -47,33 +47,37 @@ LuaObject LuaState::GetTableSizes()
  * What it does:
  * Returns the C++ wrapper pointer stored in `lua_State::stateUserData`.
  */
-LuaState* LuaState::CastState(lua_State* const state)
+LuaState* LuaState::CastState(
+  lua_State* const state
+)
 {
-	return state->stateUserData;
+  return state->stateUserData;
 }
 
 /**
  * Address: 0x10008F20 (?GetGlobal@LuaState@LuaPlus@@QAE?AVLuaObject@2@PBD@Z)
  */
-LuaObject LuaState::GetGlobal(const char* name)
+LuaObject LuaState::GetGlobal(
+  const char* name
+)
 {
-	LuaObject globals = GetGlobals();
-	return globals[name ? name : ""];
+  LuaObject globals = GetGlobals();
+  return globals[name ? name : ""];
 }
 
 LuaState* LuaState::GetRootState()
 {
-	return m_rootState;
+  return m_rootState;
 }
 
 const LuaState* LuaState::GetRootState() const
 {
-	return m_rootState;
+  return m_rootState;
 }
 
 const LuaObject* LuaState::GetThreadObject() const
 {
-	return &m_threadObj;
+  return &m_threadObj;
 }
 
 // The two bridges below are x86 register/stack adapters written in inline
@@ -87,12 +91,12 @@ const LuaObject* LuaState::GetThreadObject() const
  * preserving the original thiscall adapter stack shape.
  */
 __declspec(naked) void __stdcall LuaStateSlotCallBridge(
-	const int /*nargs*/,
-	const int /*nresults*/
+  const int /*nargs*/,
+  const int /*nresults*/
 )
 {
-	__asm
-	{
+  __asm
+    {
 		mov     eax, [esp+8]
 		mov     edx, [esp+4]
 		push    eax
@@ -102,7 +106,7 @@ __declspec(naked) void __stdcall LuaStateSlotCallBridge(
 		call    lua_call
 		add     esp, 0Ch
 		retn    8
-	}
+    }
 }
 
 /**
@@ -112,10 +116,12 @@ __declspec(naked) void __stdcall LuaStateSlotCallBridge(
  * Bridges register/stack lanes into `luaL_loadbuffer(*slot, buff, size, name)`
  * using the original stdcall adapter sequence.
  */
-__declspec(naked) void __stdcall LuaStateSlotLoadBufferBridge(lua_State** /*stateSlot*/)
+__declspec(naked) void __stdcall LuaStateSlotLoadBufferBridge(
+  lua_State** /*stateSlot*/
+)
 {
-	__asm
-	{
+  __asm
+    {
 		push    eax
 		mov     eax, [esp+8]
 		push    ecx
@@ -125,7 +131,7 @@ __declspec(naked) void __stdcall LuaStateSlotLoadBufferBridge(lua_State** /*stat
 		call    luaL_loadbuffer
 		add     esp, 10h
 		retn    4
-	}
+    }
 }
 #endif // _M_IX86
 
@@ -135,9 +141,11 @@ __declspec(naked) void __stdcall LuaStateSlotLoadBufferBridge(lua_State** /*stat
  * What it does:
  * Pops one value from a Lua stack slot by rebasing top to `-2`.
  */
-[[maybe_unused]] static void LuaStateSlotPopOne(lua_State** const stateSlot)
+[[maybe_unused]] static void LuaStateSlotPopOne(
+  lua_State** const stateSlot
+)
 {
-	lua_settop(*stateSlot, -2);
+  lua_settop(*stateSlot, -2);
 }
 
 /**
@@ -149,8 +157,8 @@ __declspec(naked) void __stdcall LuaStateSlotLoadBufferBridge(lua_State** /*stat
  */
 LuaStackObject LuaState::PushNil()
 {
-	lua_pushnil(m_state);
-	return LuaStackObject(this, lua_gettop(m_state));
+  lua_pushnil(m_state);
+  return LuaStackObject(this, lua_gettop(m_state));
 }
 
 /**
@@ -160,15 +168,19 @@ LuaStackObject LuaState::PushNil()
  * Pushes one numeric value to this state's Lua stack and returns a stack view
  * for the pushed value.
  */
-LuaStackObject LuaState::PushNumber(const float n)
+LuaStackObject LuaState::PushNumber(
+  const float n
+)
 {
-	lua_pushnumber(m_state, n);
-	return LuaStackObject(this, lua_gettop(m_state));
+  lua_pushnumber(m_state, n);
+  return LuaStackObject(this, lua_gettop(m_state));
 }
 
-LuaStackObject LuaState::Stack(const int32_t index)
+LuaStackObject LuaState::Stack(
+  const int32_t index
+)
 {
-	return LuaStackObject(this, index);
+  return LuaStackObject(this, index);
 }
 
 /**
@@ -178,9 +190,12 @@ LuaStackObject LuaState::Stack(const int32_t index)
  * Validates stack slot `index` as string/coercible and returns Lua's internal
  * string pointer + optional byte length.
  */
-const char* LuaState::CheckString(const int32_t index, size_t* const lengthOut)
+const char* LuaState::CheckString(
+  const int32_t index,
+  size_t* const lengthOut
+)
 {
-	return luaL_checklstring(m_state, index, lengthOut);
+  return luaL_checklstring(m_state, index, lengthOut);
 }
 
 /**
@@ -189,9 +204,11 @@ const char* LuaState::CheckString(const int32_t index, size_t* const lengthOut)
  * What it does:
  * Raises a Lua argument error when stack slot `index` is missing.
  */
-void LuaState::CheckAny(const int32_t index)
+void LuaState::CheckAny(
+  const int32_t index
+)
 {
-	luaL_checkany(m_state, index);
+  luaL_checkany(m_state, index);
 }
 
 /**
@@ -200,9 +217,12 @@ void LuaState::CheckAny(const int32_t index)
  * What it does:
  * Raises one Lua argument error for argument lane `narg`.
  */
-int LuaState::ArgError(const int narg, char* const extraMessage)
+int LuaState::ArgError(
+  const int narg,
+  char* const extraMessage
+)
 {
-	return luaL_argerror(m_state, narg, extraMessage);
+  return luaL_argerror(m_state, narg, extraMessage);
 }
 
 /**
@@ -212,9 +232,13 @@ int LuaState::ArgError(const int narg, char* const extraMessage)
  * Returns optional string argument `narg` or `defaultValue`, and writes string
  * byte length when `lengthOut` is non-null.
  */
-const char* LuaState::OptString(const int narg, char* const defaultValue, size_t* const lengthOut)
+const char* LuaState::OptString(
+  const int narg,
+  char* const defaultValue,
+  size_t* const lengthOut
+)
 {
-	return luaL_optlstring(m_state, narg, defaultValue, lengthOut);
+  return luaL_optlstring(m_state, narg, defaultValue, lengthOut);
 }
 
 /**
@@ -223,9 +247,11 @@ const char* LuaState::OptString(const int narg, char* const defaultValue, size_t
  * What it does:
  * Validates numeric argument `index` and returns its number lane.
  */
-lua_Number LuaState::CheckNumber(const int index)
+lua_Number LuaState::CheckNumber(
+  const int index
+)
 {
-	return luaL_checknumber(m_state, index);
+  return luaL_checknumber(m_state, index);
 }
 
 /**
@@ -234,25 +260,28 @@ lua_Number LuaState::CheckNumber(const int index)
  * What it does:
  * Returns optional numeric argument `index` or `defaultValue`.
  */
-lua_Number LuaState::OptNumber(const int index, const lua_Number defaultValue)
+lua_Number LuaState::OptNumber(
+  const int index,
+  const lua_Number defaultValue
+)
 {
-	return luaL_optnumber(m_state, index, defaultValue);
+  return luaL_optnumber(m_state, index, defaultValue);
 }
 
 int32_t LuaState::GetTop() const
 {
-	return m_state ? lua_gettop(m_state) : 0;
+  return m_state ? lua_gettop(m_state) : 0;
 }
 
 bool LuaState::IsRootState() const
 {
-	return m_rootState == this;
+  return m_rootState == this;
 }
 
 bool LuaState::IsSuspended() const
 {
-	// lua_suspended() is not surfaced in this SDK build yet.
-	return false;
+  // lua_suspended() is not surfaced in this SDK build yet.
+  return false;
 }
 
 /**
@@ -261,23 +290,29 @@ bool LuaState::IsSuspended() const
  * What it does:
  * Formats one varargs error string on the Lua stack and raises `lua_error`.
  */
-void LuaState::Error(LuaState* const state, const char* const format, ...)
+void LuaState::Error(
+  LuaState* const state,
+  const char* const format,
+  ...
+)
 {
-	va_list args;
-	va_start(args, format);
-	lua_pushvfstring(state->m_state, format, args);
-	va_end(args);
-	lua_error(state->m_state);
+  va_list args;
+  va_start(args, format);
+  lua_pushvfstring(state->m_state, format, args);
+  va_end(args);
+  lua_error(state->m_state);
 }
 
 /**
  * Address: 0x00415490 (FUN_00415490, LuaPlus::LuaStackObject::LuaStackObject)
  */
-LuaStackObject::LuaStackObject(LuaState* state, const int32_t stackIndex)
-	: m_state(state),
-	  m_stackIndex(stackIndex)
-{
-}
+LuaStackObject::LuaStackObject(
+  LuaState* state,
+  const int32_t stackIndex
+)
+  : m_state(state)
+  , m_stackIndex(stackIndex)
+{}
 
 /**
  * Address: 0x00456AE0 (FUN_00456AE0, sub_456AE0)
@@ -288,15 +323,18 @@ LuaStackObject::LuaStackObject(LuaState* state, const int32_t stackIndex)
  * Pushes one C-string onto the Lua state stack and returns a stack-object
  * view for the pushed slot.
  */
-LuaStackObject LuaPlus::PushStringAndCaptureStackObject(LuaState* const state, const char* const value)
+LuaStackObject LuaPlus::PushStringAndCaptureStackObject(
+  LuaState* const state,
+  const char* const value
+)
 {
-	lua_pushstring(state->m_state, value);
-	return LuaStackObject(state, lua_gettop(state->m_state));
+  lua_pushstring(state->m_state, value);
+  return LuaStackObject(state, lua_gettop(state->m_state));
 }
 
 bool LuaStackObject::IsNil() const
 {
-	return !m_state || !m_state->GetCState() || lua_type(m_state->GetCState(), m_stackIndex) == LUA_TNIL;
+  return !m_state || !m_state->GetCState() || lua_type(m_state->GetCState(), m_stackIndex) == LUA_TNIL;
 }
 
 /**
@@ -306,22 +344,30 @@ bool LuaStackObject::IsNil() const
  * Copies the stack slot into a LuaObject (0x00908A70) and raises its type error
  * (LuaObject::TypeError, 0x009072D0), e.g. "integer expected but got nil".
  */
-void LuaStackObject::TypeError(const char* const expectedType) const
+void LuaStackObject::TypeError(
+  const char* const expectedType
+) const
 {
-	const LuaObject value(*this);
-	value.TypeError(expectedType);
+  const LuaObject value(*this);
+  value.TypeError(expectedType);
 }
 
-void LuaStackObject::TypeError(const char* const expectedType, const int32_t) const
+void LuaStackObject::TypeError(
+  const char* const expectedType,
+  const int32_t
+) const
 {
-	TypeError(expectedType);
+  TypeError(expectedType);
 }
 
-void LuaStackObject::TypeError(LuaStackObject* const self, const char* const expectedType)
+void LuaStackObject::TypeError(
+  LuaStackObject* const self,
+  const char* const expectedType
+)
 {
-	if (self != nullptr) {
-		self->TypeError(expectedType);
-	}
+  if (self != nullptr) {
+    self->TypeError(expectedType);
+  }
 }
 
 /**
@@ -333,11 +379,11 @@ void LuaStackObject::TypeError(LuaStackObject* const self, const char* const exp
  */
 const char* LuaStackObject::GetString() const
 {
-	const char* const str = lua_tostring(m_state->GetCState(), m_stackIndex);
-	if (!str) {
-		TypeError("string");
-	}
-	return str;
+  const char* const str = lua_tostring(m_state->GetCState(), m_stackIndex);
+  if (!str) {
+    TypeError("string");
+  }
+  return str;
 }
 
 /**
@@ -349,13 +395,13 @@ const char* LuaStackObject::GetString() const
  */
 int32_t LuaStackObject::GetInteger() const
 {
-	lua_State* const cState = m_state->GetCState();
-	if (lua_type(cState, m_stackIndex) != LUA_TNUMBER) {
-		TypeError("integer");
-	}
-	// 0x0041B553: tail call to `__ftol2_sse`, so NaN reads as 0x80000000 --
-	// `WaitTicks(NaN)` is then a negative tick count and ends the thread.
-	return fa::TruncateToInt(lua_tonumber(cState, m_stackIndex));
+  lua_State* const cState = m_state->GetCState();
+  if (lua_type(cState, m_stackIndex) != LUA_TNUMBER) {
+    TypeError("integer");
+  }
+  // 0x0041B553: tail call to `__ftol2_sse`, so NaN reads as 0x80000000 --
+  // `WaitTicks(NaN)` is then a negative tick count and ends the thread.
+  return fa::TruncateToInt(lua_tonumber(cState, m_stackIndex));
 }
 
 /**
@@ -367,11 +413,11 @@ int32_t LuaStackObject::GetInteger() const
  */
 double LuaStackObject::ToNumber() const
 {
-	lua_State* const cState = m_state->GetCState();
-	if (lua_type(cState, m_stackIndex) != LUA_TNUMBER) {
-		TypeError("number");
-	}
-	return lua_tonumber(cState, m_stackIndex);
+  lua_State* const cState = m_state->GetCState();
+  if (lua_type(cState, m_stackIndex) != LUA_TNUMBER) {
+    TypeError("number");
+  }
+  return lua_tonumber(cState, m_stackIndex);
 }
 
 /**
@@ -383,11 +429,11 @@ double LuaStackObject::ToNumber() const
  */
 bool LuaStackObject::GetBoolean() const
 {
-	const int type = lua_type(m_state->GetCState(), m_stackIndex);
-	if (type != LUA_TBOOLEAN && type != LUA_TNIL) {
-		TypeError("boolean");
-	}
-	return lua_toboolean(m_state->GetCState(), m_stackIndex) != 0;
+  const int type = lua_type(m_state->GetCState(), m_stackIndex);
+  if (type != LUA_TBOOLEAN && type != LUA_TNIL) {
+    TypeError("boolean");
+  }
+  return lua_toboolean(m_state->GetCState(), m_stackIndex) != 0;
 }
 
 /**
@@ -397,14 +443,15 @@ bool LuaStackObject::GetBoolean() const
  * Pushes `name`, performs one raw lookup against this stack slot, and returns
  * a stack-object view of the lookup result.
  */
-LuaStackObject LuaStackObject::GetByName(const char* const name) const
+LuaStackObject LuaStackObject::GetByName(
+  const char* const name
+) const
 {
-	lua_State* const cState = m_state->GetCState();
-	lua_pushstring(cState, name);
-	lua_rawget(cState, m_stackIndex);
-	return LuaStackObject(m_state, lua_gettop(cState));
+  lua_State* const cState = m_state->GetCState();
+  lua_pushstring(cState, name);
+  lua_rawget(cState, m_stackIndex);
+  return LuaStackObject(m_state, lua_gettop(cState));
 }
-
 
 /**
  * Address: 0x009072B0 (FUN_009072B0, LuaPlus::LuaObject::GetActiveState)
@@ -415,17 +462,17 @@ LuaStackObject LuaStackObject::GetByName(const char* const name) const
  */
 LuaState* LuaObject::GetActiveState() const
 {
-	// An unbound LuaObject answers null rather than faulting. Every caller in
-	// this tree already treats null as "no script state": CScriptObject::
-	// FindScript reads this straight into `state` and returns early on null,
-	// which only means anything if null is reachable. Unit::Unit reaches it that
-	// way -- SetAutoMode -> CallbackStr -> FindScript runs at Unit.cpp:13518,
-	// before the unit's own Lua object exists -- and without this the read of
-	// `m_state->m_state` faulted on address 0.
-	if (m_state == nullptr || m_state->m_state == nullptr) {
-		return nullptr;
-	}
-	return m_state->m_state->l_G->lstate->stateUserData;
+  // An unbound LuaObject answers null rather than faulting. Every caller in
+  // this tree already treats null as "no script state": CScriptObject::
+  // FindScript reads this straight into `state` and returns early on null,
+  // which only means anything if null is reachable. Unit::Unit reaches it that
+  // way -- SetAutoMode -> CallbackStr -> FindScript runs at Unit.cpp:13518,
+  // before the unit's own Lua object exists -- and without this the read of
+  // `m_state->m_state` faulted on address 0.
+  if (m_state == nullptr || m_state->m_state == nullptr) {
+    return nullptr;
+  }
+  return m_state->m_state->l_G->lstate->stateUserData;
 }
 
 /**
@@ -437,7 +484,7 @@ LuaState* LuaObject::GetActiveState() const
  */
 lua_State* LuaObject::GetActiveCState() const
 {
-	return m_state->m_state->l_G->lstate;
+  return m_state->m_state->l_G->lstate;
 }
 
 /**
@@ -449,15 +496,18 @@ lua_State* LuaObject::GetActiveCState() const
  * `key`, or Lua's canonical nil object lane when the globals slot is not a
  * table.
  */
-[[maybe_unused, nodiscard]] const TObject* ResolveSerializedObjectNameEntry(lua_State* const state, TString* const key)
+[[maybe_unused, nodiscard]] const TObject* ResolveSerializedObjectNameEntry(
+  lua_State* const state,
+  TString* const key
+)
 {
-	TString* const serializeMapName = luaS_newlstr(state, "__serialize_object_for_name", 0x1Bu);
-	const TObject* const serializeMapObject = luaH_getstr(static_cast<Table*>(state->_gt.value.p), serializeMapName);
-	if (serializeMapObject->tt == LUA_TTABLE) {
-		return luaH_getstr(static_cast<Table*>(serializeMapObject->value.p), key);
-	}
+  TString* const serializeMapName = luaS_newlstr(state, "__serialize_object_for_name", 0x1Bu);
+  const TObject* const serializeMapObject = luaH_getstr(static_cast<Table*>(state->_gt.value.p), serializeMapName);
+  if (serializeMapObject->tt == LUA_TTABLE) {
+    return luaH_getstr(static_cast<Table*>(serializeMapObject->value.p), key);
+  }
 
-	return &luaO_nilobject;
+  return &luaO_nilobject;
 }
 
 /**
@@ -466,17 +516,19 @@ lua_State* LuaObject::GetActiveCState() const
  * What it does:
  * Serializes LuaObject state ownership lane and TObject payload.
  */
-void LuaObject::MemberSerialize(gpg::WriteArchive* const archive)
+void LuaObject::MemberSerialize(
+  gpg::WriteArchive* const archive
+)
 {
-	Ensure(archive != nullptr, "archive");
+  Ensure(archive != nullptr, "archive");
 
-	archive->WritePointer<LuaPlus::LuaState>(m_state, gpg::TrackedPointerState::Unowned, gpg::RRef{});
+  archive->WritePointer<LuaPlus::LuaState>(m_state, gpg::TrackedPointerState::Unowned, gpg::RRef{});
 
-	if (m_state != nullptr) {
-		gpg::RRef ownerRef{};
-		ownerRef = gpg::MakeRRef<lua_State>(m_state->m_state);
-		archive->Write(CachedType<TObject>(gLuaTObjectType), &m_object, ownerRef);
-	}
+  if (m_state != nullptr) {
+    gpg::RRef ownerRef{};
+    ownerRef = gpg::MakeRRef<lua_State>(m_state->m_state);
+    archive->Write(CachedType<TObject>(gLuaTObjectType), &m_object, ownerRef);
+  }
 }
 
 /**
@@ -485,22 +537,26 @@ void LuaObject::MemberSerialize(gpg::WriteArchive* const archive)
  * What it does:
  * Deserializes LuaObject state ownership lane and TObject payload.
  */
-void LuaObject::MemberDeserialize(gpg::ReadArchive* const archive, const int, const gpg::RRef& ownerRef)
+void LuaObject::MemberDeserialize(
+  gpg::ReadArchive* const archive,
+  const int,
+  const gpg::RRef& ownerRef
+)
 {
-	Ensure(archive != nullptr, "archive");
+  Ensure(archive != nullptr, "archive");
 
-	LuaState* state = nullptr;
-	(void)archive->ReadPointer(&state, &ownerRef);
-	if (state != nullptr) {
-		AssignNil(state);
+  LuaState* state = nullptr;
+  (void)archive->ReadPointer(&state, &ownerRef);
+  if (state != nullptr) {
+    AssignNil(state);
 
-		gpg::RRef stateOwner{};
-		stateOwner = gpg::MakeRRef<lua_State>(m_state->m_state);
-		archive->Read(CachedType<TObject>(gLuaTObjectType), &m_object, stateOwner);
-		return;
-	}
+    gpg::RRef stateOwner{};
+    stateOwner = gpg::MakeRRef<lua_State>(m_state->m_state);
+    archive->Read(CachedType<TObject>(gLuaTObjectType), &m_object, stateOwner);
+    return;
+  }
 
-	*this = LuaObject{};
+  *this = LuaObject{};
 }
 
 /**
@@ -510,20 +566,23 @@ void LuaObject::MemberDeserialize(gpg::ReadArchive* const archive, const int, co
  * Binds this object to the root used-object intrusive list from `state` and
  * copies the caller-provided raw payload into `m_object`.
  */
-void LuaObject::AddToUsedObjectList(LuaState* state, TObject* object)
+void LuaObject::AddToUsedObjectList(
+  LuaState* state,
+  TObject* object
+)
 {
-	MOHO_ASSERT_NOT_SIM_WORKER("LuaObject used-object list");
-	Ensure(state != nullptr, "state");
-	Ensure(state->m_rootState != nullptr, "state->m_rootState");
-	Ensure(object != nullptr, "obj");
+  MOHO_ASSERT_NOT_SIM_WORKER("LuaObject used-object list");
+  Ensure(state != nullptr, "state");
+  Ensure(state->m_rootState != nullptr, "state->m_rootState");
+  Ensure(object != nullptr, "obj");
 
-	LuaState* const root = state->m_rootState;
-	m_state = root;
-	m_next = root->m_headObject.m_next;
-	root->m_headObject.m_next = this;
-	m_next->m_prev = reinterpret_cast<LuaObject**>(this);
-	m_prev = reinterpret_cast<LuaObject**>(&root->m_headObject.m_next);
-	m_object = *object;
+  LuaState* const root = state->m_rootState;
+  m_state = root;
+  m_next = root->m_headObject.m_next;
+  root->m_headObject.m_next = this;
+  m_next->m_prev = reinterpret_cast<LuaObject**>(this);
+  m_prev = reinterpret_cast<LuaObject**>(&root->m_headObject.m_next);
+  m_object = *object;
 }
 
 /**
@@ -533,21 +592,24 @@ void LuaObject::AddToUsedObjectList(LuaState* state, TObject* object)
  * Rebinds this object to the target root list only when the owner root
  * changes, then copies one caller-provided raw `TObject` payload.
  */
-void LuaObject::AssignTObject(LuaState* state, TObject* object)
+void LuaObject::AssignTObject(
+  LuaState* state,
+  TObject* object
+)
 {
-	Ensure(state != nullptr, "state");
-	Ensure(object != nullptr, "obj");
+  Ensure(state != nullptr, "state");
+  Ensure(object != nullptr, "obj");
 
-	if (state->m_rootState != m_state) {
-		if (m_state != nullptr) {
-			*m_prev = m_next;
-			m_next->m_prev = m_prev;
-			*reinterpret_cast<std::uint32_t*>(&m_object.tt) = 0u;
-		}
-		AddToUsedList(state);
-	}
+  if (state->m_rootState != m_state) {
+    if (m_state != nullptr) {
+      *m_prev = m_next;
+      m_next->m_prev = m_prev;
+      *reinterpret_cast<std::uint32_t*>(&m_object.tt) = 0u;
+    }
+    AddToUsedList(state);
+  }
 
-	m_object = *object;
+  m_object = *object;
 }
 
 /**
@@ -557,18 +619,20 @@ void LuaObject::AssignTObject(LuaState* state, TObject* object)
  * Binds this object to the root used-object intrusive list from `state`,
  * preserving the current payload lane.
  */
-void LuaObject::AddToUsedList(LuaState* state)
+void LuaObject::AddToUsedList(
+  LuaState* state
+)
 {
-	MOHO_ASSERT_NOT_SIM_WORKER("LuaObject used-object list");
-	Ensure(state != nullptr, "state");
-	Ensure(state->m_rootState != nullptr, "state->m_rootState");
+  MOHO_ASSERT_NOT_SIM_WORKER("LuaObject used-object list");
+  Ensure(state != nullptr, "state");
+  Ensure(state->m_rootState != nullptr, "state->m_rootState");
 
-	LuaState* const root = state->m_rootState;
-	m_state = root;
-	m_next = root->m_headObject.m_next;
-	root->m_headObject.m_next = this;
-	m_next->m_prev = reinterpret_cast<LuaObject**>(this);
-	m_prev = reinterpret_cast<LuaObject**>(&root->m_headObject.m_next);
+  LuaState* const root = state->m_rootState;
+  m_state = root;
+  m_next = root->m_headObject.m_next;
+  root->m_headObject.m_next = this;
+  m_next->m_prev = reinterpret_cast<LuaObject**>(this);
+  m_prev = reinterpret_cast<LuaObject**>(&root->m_headObject.m_next);
 }
 
 /**
@@ -578,24 +642,26 @@ void LuaObject::AddToUsedList(LuaState* state)
  * Rebinds this object to one thread `lua_State` payload and enforces root
  * ownership transition semantics for the intrusive used-object list.
  */
-void LuaObject::AssignThread(LuaState* const state)
+void LuaObject::AssignThread(
+  LuaState* const state
+)
 {
-	if (state->m_rootState == state) {
-		LuaState* const activeState = state->GetActiveState();
-		luaG_runerror(activeState->m_state, "attempt to use main lua state as a thread");
-	}
+  if (state->m_rootState == state) {
+    LuaState* const activeState = state->GetActiveState();
+    luaG_runerror(activeState->m_state, "attempt to use main lua state as a thread");
+  }
 
-	if (state->m_rootState != m_state) {
-		if (m_state != nullptr) {
-			*m_prev = m_next;
-			m_next->m_prev = m_prev;
-			m_object.tt = LUA_TNIL;
-		}
-		AddToUsedList(state);
-	}
+  if (state->m_rootState != m_state) {
+    if (m_state != nullptr) {
+      *m_prev = m_next;
+      m_next->m_prev = m_prev;
+      m_object.tt = LUA_TNIL;
+    }
+    AddToUsedList(state);
+  }
 
-	m_object.value.p = state->m_state;
-	m_object.tt = state->m_state->tt;
+  m_object.value.p = state->m_state;
+  m_object.tt = state->m_state->tt;
 }
 
 /**
@@ -607,19 +673,19 @@ void LuaObject::AssignThread(LuaState* const state)
  */
 void LuaObject::Reset()
 {
-	if (!m_state) {
-		return;
-	}
+  if (!m_state) {
+    return;
+  }
 
-	MOHO_ASSERT_NOT_SIM_WORKER("LuaObject used-object list");
-	if (m_prev && m_next) {
-		*m_prev = m_next;
-		m_next->m_prev = m_prev;
-	}
-	m_object.tt = LUA_TNIL;
-	m_state = nullptr;
-	m_next = nullptr;
-	m_prev = nullptr;
+  MOHO_ASSERT_NOT_SIM_WORKER("LuaObject used-object list");
+  if (m_prev && m_next) {
+    *m_prev = m_next;
+    m_next->m_prev = m_prev;
+  }
+  m_object.tt = LUA_TNIL;
+  m_state = nullptr;
+  m_next = nullptr;
+  m_prev = nullptr;
 }
 
 /**
@@ -631,19 +697,19 @@ void LuaObject::Reset()
  */
 LuaObject::operator bool() const noexcept
 {
-	if (!m_state) {
-		return false;
-	}
+  if (!m_state) {
+    return false;
+  }
 
-	if (m_object.tt == LUA_TNIL) {
-		return false;
-	}
+  if (m_object.tt == LUA_TNIL) {
+    return false;
+  }
 
-	if (m_object.tt == LUA_TBOOLEAN) {
-		return m_object.value.b != 0;
-	}
+  if (m_object.tt == LUA_TBOOLEAN) {
+    return m_object.value.b != 0;
+  }
 
-	return true;
+  return true;
 }
 
 /**
@@ -653,13 +719,15 @@ LuaObject::operator bool() const noexcept
  * Performs Lua semantic equality on this value and `other` after matching
  * type tags.
  */
-bool LuaObject::operator==(const LuaObject& other) const
+bool LuaObject::operator==(
+  const LuaObject& other
+) const
 {
-	if (m_object.tt != other.m_object.tt) {
-		return false;
-	}
+  if (m_object.tt != other.m_object.tt) {
+    return false;
+  }
 
-	return luaV_equalval(m_state->m_state, &m_object, &other.m_object) != 0;
+  return luaV_equalval(m_state->m_state, &m_object, &other.m_object) != 0;
 }
 
 /**
@@ -668,9 +736,11 @@ bool LuaObject::operator==(const LuaObject& other) const
  * What it does:
  * Performs Lua semantic less-than comparison between this value and `other`.
  */
-bool LuaObject::operator<(const LuaObject& other) const
+bool LuaObject::operator<(
+  const LuaObject& other
+) const
 {
-	return luaV_lessthan(m_state->m_state, &m_object, &other.m_object) != 0;
+  return luaV_lessthan(m_state->m_state, &m_object, &other.m_object) != 0;
 }
 
 /**
@@ -681,7 +751,7 @@ bool LuaObject::operator<(const LuaObject& other) const
  */
 bool LuaObject::IsNil() const noexcept
 {
-	return m_state != nullptr && m_object.tt == LUA_TNIL;
+  return m_state != nullptr && m_object.tt == LUA_TNIL;
 }
 
 /**
@@ -693,8 +763,8 @@ bool LuaObject::IsNil() const noexcept
  */
 bool LuaObject::IsNone() const
 {
-	Ensure(m_state != nullptr, "m_state");
-	return m_object.tt == LUA_TNONE;
+  Ensure(m_state != nullptr, "m_state");
+  return m_object.tt == LUA_TNONE;
 }
 
 /**
@@ -705,8 +775,8 @@ bool LuaObject::IsNone() const
  */
 bool LuaObject::IsBoolean() const
 {
-	Ensure(m_state != nullptr, "m_state");
-	return m_object.tt == LUA_TBOOLEAN;
+  Ensure(m_state != nullptr, "m_state");
+  return m_object.tt == LUA_TBOOLEAN;
 }
 
 /**
@@ -717,7 +787,7 @@ bool LuaObject::IsBoolean() const
  */
 bool LuaObject::IsNumber() const noexcept
 {
-	return m_object.tt == LUA_TNUMBER;
+  return m_object.tt == LUA_TNUMBER;
 }
 
 /**
@@ -726,9 +796,11 @@ bool LuaObject::IsNumber() const noexcept
  * What it does:
  * Forwards one import-thunk lane to `LuaObject::IsNumber`.
  */
-bool LuaObjectIsNumberThunk2(const LuaObject* const object)
+bool LuaObjectIsNumberThunk2(
+  const LuaObject* const object
+)
 {
-	return object->IsNumber();
+  return object->IsNumber();
 }
 
 /**
@@ -739,7 +811,7 @@ bool LuaObjectIsNumberThunk2(const LuaObject* const object)
  */
 bool LuaObject::IsString() const noexcept
 {
-	return m_object.tt == LUA_TSTRING;
+  return m_object.tt == LUA_TSTRING;
 }
 
 /**
@@ -751,8 +823,8 @@ bool LuaObject::IsString() const noexcept
  */
 bool LuaObject::IsLightUserData() const
 {
-	Ensure(m_state != nullptr, "m_state");
-	return m_object.tt == LUA_TLIGHTUSERDATA;
+  Ensure(m_state != nullptr, "m_state");
+  return m_object.tt == LUA_TLIGHTUSERDATA;
 }
 
 /**
@@ -763,7 +835,7 @@ bool LuaObject::IsLightUserData() const
  */
 bool LuaObject::IsUserData() const noexcept
 {
-	return m_object.tt == LUA_TUSERDATA || m_object.tt == LUA_TLIGHTUSERDATA;
+  return m_object.tt == LUA_TUSERDATA || m_object.tt == LUA_TLIGHTUSERDATA;
 }
 
 /**
@@ -794,18 +866,18 @@ bool LuaObject::IsUserData() const noexcept
  */
 gpg::RRef LuaObject::GetUserData() const
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	if (m_object.tt != LUA_TUSERDATA) {
-		luaG_typeerror(m_state->m_state->l_G->lstate, &m_object, "get as UserData");
-	}
+  if (m_object.tt != LUA_TUSERDATA) {
+    luaG_typeerror(m_state->m_state->l_G->lstate, &m_object, "get as UserData");
+  }
 
-	auto* const userdata = static_cast<Udata*>(m_object.value.p);
+  auto* const userdata = static_cast<Udata*>(m_object.value.p);
 
-	gpg::RRef out{};
-	out.mObj = reinterpret_cast<std::uint8_t*>(userdata) + sizeof(Udata);
-	out.mType = reinterpret_cast<gpg::RType*>(userdata->len);
-	return out;
+  gpg::RRef out{};
+  out.mObj = reinterpret_cast<std::uint8_t*>(userdata) + sizeof(Udata);
+  out.mType = reinterpret_cast<gpg::RType*>(userdata->len);
+  return out;
 }
 
 /**
@@ -817,11 +889,11 @@ gpg::RRef LuaObject::GetUserData() const
  */
 bool LuaObject::IsFunction() const
 {
-	if (m_state == nullptr) {
-		throw LuaAssertion("m_state");
-	}
+  if (m_state == nullptr) {
+    throw LuaAssertion("m_state");
+  }
 
-	return (m_object.tt | 1) == LUA_TFUNCTION;
+  return (m_object.tt | 1) == LUA_TFUNCTION;
 }
 
 /**
@@ -833,14 +905,14 @@ bool LuaObject::IsFunction() const
  */
 bool LuaObject::IsConvertibleToInteger() const
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	TObject numericValue{};
-	if (m_object.tt == LUA_TNUMBER) {
-		return true;
-	}
+  TObject numericValue{};
+  if (m_object.tt == LUA_TNUMBER) {
+    return true;
+  }
 
-	return luaV_tonumber(&m_object, &numericValue) != 0;
+  return luaV_tonumber(&m_object, &numericValue) != 0;
 }
 
 /**
@@ -852,14 +924,14 @@ bool LuaObject::IsConvertibleToInteger() const
  */
 bool LuaObject::IsConvertibleToNumber() const
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	TObject numericValue{};
-	if (m_object.tt == LUA_TNUMBER) {
-		return true;
-	}
+  TObject numericValue{};
+  if (m_object.tt == LUA_TNUMBER) {
+    return true;
+  }
 
-	return luaV_tonumber(&m_object, &numericValue) != 0;
+  return luaV_tonumber(&m_object, &numericValue) != 0;
 }
 
 /**
@@ -870,8 +942,8 @@ bool LuaObject::IsConvertibleToNumber() const
  */
 bool LuaObject::IsConvertibleToString() const
 {
-	Ensure(m_state != nullptr, "m_state");
-	return m_object.tt == LUA_TSTRING || m_object.tt == LUA_TNUMBER;
+  Ensure(m_state != nullptr, "m_state");
+  return m_object.tt == LUA_TSTRING || m_object.tt == LUA_TNUMBER;
 }
 
 /**
@@ -883,9 +955,11 @@ bool LuaObject::IsConvertibleToString() const
  * object is never on that thread's stack, so the message is always the plain
  * "<operation> expected but got <type>" (FA-Binary-Patches LuaMessages wording).
  */
-void LuaObject::TypeError(const char* const operation) const
+void LuaObject::TypeError(
+  const char* const operation
+) const
 {
-	luaG_typeerror(GetActiveCState(), &m_object, operation != nullptr ? operation : "value");
+  luaG_typeerror(GetActiveCState(), &m_object, operation != nullptr ? operation : "value");
 }
 
 /**
@@ -896,8 +970,8 @@ void LuaObject::TypeError(const char* const operation) const
  */
 int LuaObject::Type() const
 {
-	Ensure(m_state != nullptr, "m_state");
-	return m_object.tt;
+  Ensure(m_state != nullptr, "m_state");
+  return m_object.tt;
 }
 
 /**
@@ -909,13 +983,13 @@ int LuaObject::Type() const
  */
 const char* LuaObject::TypeName() const
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	const int type = m_object.tt;
-	if (type == LUA_TNONE) {
-		return "no value";
-	}
-	return luaT_typenames[type];
+  const int type = m_object.tt;
+  if (type == LUA_TNONE) {
+    return "no value";
+  }
+  return luaT_typenames[type];
 }
 
 /**
@@ -926,20 +1000,23 @@ const char* LuaObject::TypeName() const
  * stack, so no collection can start here: a string value made by `SetString` is on no stack yet, and
  * a collection would free it.
  */
-void LuaObject::SetTableHelper(const char* key, TObject* object)
+void LuaObject::SetTableHelper(
+  const char* key,
+  TObject* object
+)
 {
-	Ensure(m_state != nullptr, "m_state");
-	Ensure(key != nullptr, "key");
-	Ensure(object != nullptr, "obj");
+  Ensure(m_state != nullptr, "m_state");
+  Ensure(key != nullptr, "key");
+  Ensure(object != nullptr, "obj");
 
-	lua_State* lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
+  lua_State* lstate = GetActiveCState();
+  Ensure(lstate != nullptr, "active lua state");
 
-	TString* const interned = luaS_newlstr(lstate, key, std::strlen(key));
-	TObject keyObject{};
-	keyObject.tt = interned->tt;
-	keyObject.value.p = interned;
-	luaV_settable(lstate, &m_object, &keyObject, object);
+  TString* const interned = luaS_newlstr(lstate, key, std::strlen(key));
+  TObject keyObject{};
+  keyObject.tt = interned->tt;
+  keyObject.value.p = interned;
+  luaV_settable(lstate, &m_object, &keyObject, object);
 }
 
 /**
@@ -949,18 +1026,21 @@ void LuaObject::SetTableHelper(const char* key, TObject* object)
  * Builds one numeric-key TValue and writes `valueSlot` into this object's
  * table lane using `luaV_settable`.
  */
-void LuaObject::SetTableHelperRaw(const int32_t index, const StkId valueSlot)
+void LuaObject::SetTableHelperRaw(
+  const int32_t index,
+  const StkId valueSlot
+)
 {
-	Ensure(m_state != nullptr, "m_state");
-	Ensure(valueSlot != nullptr, "valueSlot");
+  Ensure(m_state != nullptr, "m_state");
+  Ensure(valueSlot != nullptr, "valueSlot");
 
-	lua_State* const lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
+  lua_State* const lstate = GetActiveCState();
+  Ensure(lstate != nullptr, "active lua state");
 
-	TObject key{};
-	key.tt = LUA_TNUMBER;
-	key.value.n = static_cast<float>(index);
-	luaV_settable(lstate, &m_object, &key, valueSlot);
+  TObject key{};
+  key.tt = LUA_TNUMBER;
+  key.value.n = static_cast<float>(index);
+  luaV_settable(lstate, &m_object, &key, valueSlot);
 }
 
 /**
@@ -970,15 +1050,21 @@ void LuaObject::SetTableHelperRaw(const int32_t index, const StkId valueSlot)
  * Writes one table entry by Lua-object key through `luaV_settable` using one
  * caller-provided value slot.
  */
-void LuaObject::SetTableHelperRaw(const LuaObject& key, const StkId valueSlot)
+void LuaObject::SetTableHelperRaw(
+  const LuaObject& key,
+  const StkId valueSlot
+)
 {
-	lua_State* const lstate = GetActiveCState();
-	luaV_settable(lstate, &m_object, const_cast<TObject*>(&key.m_object), valueSlot);
+  lua_State* const lstate = GetActiveCState();
+  luaV_settable(lstate, &m_object, const_cast<TObject*>(&key.m_object), valueSlot);
 }
 
-void LuaObject::SetTableHelper(const int32_t index, TObject* object)
+void LuaObject::SetTableHelper(
+  const int32_t index,
+  TObject* object
+)
 {
-	SetTableHelperRaw(index, object);
+  SetTableHelperRaw(index, object);
 }
 
 /**
@@ -987,17 +1073,19 @@ void LuaObject::SetTableHelper(const int32_t index, TObject* object)
  * What it does:
  * Writes Lua array-length metadata (`n`) for this table object.
  */
-void LuaObject::SetN(const int32_t n)
+void LuaObject::SetN(
+  const int32_t n
+)
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	lua_State* const lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
+  lua_State* const lstate = GetActiveCState();
+  Ensure(lstate != nullptr, "active lua state");
 
-	const int oldTop = lua_gettop(lstate);
-	PushStack(lstate);
-	luaL_setn(lstate, -1, n);
-	lua_settop(lstate, oldTop);
+  const int oldTop = lua_gettop(lstate);
+  PushStack(lstate);
+  luaL_setn(lstate, -1, n);
+  lua_settop(lstate, oldTop);
 }
 
 /**
@@ -1009,16 +1097,18 @@ void LuaObject::SetN(const int32_t n)
  * object's raw `TObject` payload onto `state->top`, extends stack space when
  * needed, then advances the stack top by one slot.
  */
-StkId LuaObject::PushStack(lua_State* state) const
+StkId LuaObject::PushStack(
+  lua_State* state
+) const
 {
-	if (state == nullptr || m_state == nullptr || m_state->m_state == nullptr) {
-		throw LuaAssertion("state->l_G == m_state->m_state->l_G");
-	}
-	if (state->l_G != m_state->m_state->l_G) {
-		throw LuaAssertion("state->l_G == m_state->m_state->l_G");
-	}
+  if (state == nullptr || m_state == nullptr || m_state->m_state == nullptr) {
+    throw LuaAssertion("state->l_G == m_state->m_state->l_G");
+  }
+  if (state->l_G != m_state->m_state->l_G) {
+    throw LuaAssertion("state->l_G == m_state->m_state->l_G");
+  }
 
-	return PushRawLuaObjectToStack(&m_object, state);
+  return PushRawLuaObjectToStack(&m_object, state);
 }
 
 // Convenience overload with no counterpart in the binary, which exports only
@@ -1028,26 +1118,32 @@ StkId LuaObject::PushStack(lua_State* state) const
 // rejects pushes between the sim and UI roots, which are distinct roots over
 // one global_State, and that rejection is what was failing every
 // cfunc_GetPreference call at startup.
-StkId LuaObject::PushStack(LuaState* state) const
+StkId LuaObject::PushStack(
+  LuaState* state
+) const
 {
-	Ensure(state != nullptr, "state");
-	return PushStack(state->GetCState());
+  Ensure(state != nullptr, "state");
+  return PushStack(state->GetCState());
 }
 
-void LuaObject::AssignNewTable(LuaState* state, const int32_t nArray, const uint32_t lnHash)
+void LuaObject::AssignNewTable(
+  LuaState* state,
+  const int32_t nArray,
+  const uint32_t lnHash
+)
 {
-	RebindToState(*this, state);
+  RebindToState(*this, state);
 
-	lua_State* lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
+  lua_State* lstate = GetActiveCState();
+  Ensure(lstate != nullptr, "active lua state");
 
-	// Address: 0x00909940 (FUN_00909940)
-	// Binary path creates a table directly via luaH_new using requested array/hash sizing.
-	const int hashBits = luaO_log2(lnHash);
-	Table* const table = luaH_new(lstate, nArray, hashBits + 1);
-	Ensure(table != nullptr, "luaH_new returned null");
-	m_object.tt = table->tt;
-	m_object.value.p = table;
+  // Address: 0x00909940 (FUN_00909940)
+  // Binary path creates a table directly via luaH_new using requested array/hash sizing.
+  const int hashBits = luaO_log2(lnHash);
+  Table* const table = luaH_new(lstate, nArray, hashBits + 1);
+  Ensure(table != nullptr, "luaH_new returned null");
+  m_object.tt = table->tt;
+  m_object.value.p = table;
 }
 
 /**
@@ -1058,14 +1154,14 @@ void LuaObject::AssignNewTable(LuaState* state, const int32_t nArray, const uint
  * shared-state ownership.
  */
 void LuaObject::AssignObject(
-	LuaState* const state,
-	const LuaObject& value
+  LuaState* const state,
+  const LuaObject& value
 )
 {
-	(void)state;
-	Ensure(m_state == value.m_state, "m_state == value.m_state");
-	m_object.tt = value.m_object.tt;
-	m_object.value = value.m_object.value;
+  (void)state;
+  Ensure(m_state == value.m_state, "m_state == value.m_state");
+  m_object.tt = value.m_object.tt;
+  m_object.value = value.m_object.value;
 }
 
 /**
@@ -1075,19 +1171,22 @@ void LuaObject::AssignObject(
  * Rebinds this object to `state` root ownership lane when needed, then stores
  * one integer payload converted to Lua number format.
  */
-void LuaObject::AssignInteger(LuaState* state, const int32_t value)
+void LuaObject::AssignInteger(
+  LuaState* state,
+  const int32_t value
+)
 {
-	if (state->m_rootState != m_state) {
-		if (m_state != nullptr) {
-			*m_prev = m_next;
-			m_next->m_prev = m_prev;
-			m_object.tt = LUA_TNIL;
-		}
-		AddToUsedList(state);
-	}
+  if (state->m_rootState != m_state) {
+    if (m_state != nullptr) {
+      *m_prev = m_next;
+      m_next->m_prev = m_prev;
+      m_object.tt = LUA_TNIL;
+    }
+    AddToUsedList(state);
+  }
 
-	m_object.value.n = static_cast<float>(value);
-	m_object.tt = LUA_TNUMBER;
+  m_object.value.n = static_cast<float>(value);
+  m_object.tt = LUA_TNUMBER;
 }
 
 /**
@@ -1097,11 +1196,14 @@ void LuaObject::AssignInteger(LuaState* state, const int32_t value)
  * Rebinds this object to `state` root ownership (when needed) and stores one
  * numeric payload lane.
  */
-void LuaObject::AssignNumber(LuaState* state, const double number)
+void LuaObject::AssignNumber(
+  LuaState* state,
+  const double number
+)
 {
-	RebindToState(*this, state);
-	m_object.value.n = static_cast<float>(number);
-	m_object.tt = LUA_TNUMBER;
+  RebindToState(*this, state);
+  m_object.value.n = static_cast<float>(number);
+  m_object.tt = LUA_TNUMBER;
 }
 
 /**
@@ -1116,11 +1218,13 @@ void LuaObject::AssignNumber(LuaState* state, const double number)
  * the previous state's used-object chain lives in RebindToState, which is what
  * the binary open-codes here before writing the tag.
  */
-void LuaObject::AssignNil(LuaState* state)
+void LuaObject::AssignNil(
+  LuaState* state
+)
 {
-	RebindToState(*this, state);
-	m_object.tt = LUA_TNIL;
-	m_object.value.p = nullptr;
+  RebindToState(*this, state);
+  m_object.tt = LUA_TNIL;
+  m_object.value.p = nullptr;
 }
 
 /**
@@ -1130,19 +1234,22 @@ void LuaObject::AssignNil(LuaState* state)
  * Rebinds this object to one state-root lane when needed, then stores one
  * boolean payload lane (`LUA_TBOOLEAN`).
  */
-void LuaObject::AssignBoolean(LuaState* state, const bool value)
+void LuaObject::AssignBoolean(
+  LuaState* state,
+  const bool value
+)
 {
-	if (state->m_rootState != m_state) {
-		if (m_state != nullptr) {
-			*m_prev = m_next;
-			m_next->m_prev = m_prev;
-			*reinterpret_cast<std::uint32_t*>(&m_object.tt) = 0u;
-		}
-		AddToUsedList(state);
-	}
+  if (state->m_rootState != m_state) {
+    if (m_state != nullptr) {
+      *m_prev = m_next;
+      m_next->m_prev = m_prev;
+      *reinterpret_cast<std::uint32_t*>(&m_object.tt) = 0u;
+    }
+    AddToUsedList(state);
+  }
 
-	m_object.value.b = value ? 1u : 0u;
-	*reinterpret_cast<std::uint32_t*>(&m_object.tt) = LUA_TBOOLEAN;
+  m_object.value.b = value ? 1u : 0u;
+  *reinterpret_cast<std::uint32_t*>(&m_object.tt) = LUA_TBOOLEAN;
 }
 
 /**
@@ -1152,28 +1259,34 @@ void LuaObject::AssignBoolean(LuaState* state, const bool value)
  * Rebinds this object to one state-root lane when needed, then stores one
  * interned string payload or marks this object as `LUA_TNIL` for null input.
  */
-void LuaObject::AssignString(LuaState* state, const char* value)
+void LuaObject::AssignString(
+  LuaState* state,
+  const char* value
+)
 {
-	RebindToState(*this, state);
-	if (value == nullptr) {
-		m_object.tt = LUA_TNIL;
-		return;
-	}
+  RebindToState(*this, state);
+  if (value == nullptr) {
+    m_object.tt = LUA_TNIL;
+    return;
+  }
 
-	Ensure(state != nullptr, "state");
-	lua_State* const lstate = state->m_state;
-	Ensure(lstate != nullptr, "state->m_state");
+  Ensure(state != nullptr, "state");
+  lua_State* const lstate = state->m_state;
+  Ensure(lstate != nullptr, "state->m_state");
 
-	TString* const interned = luaS_newlstr(lstate, value, std::strlen(value));
-	m_object.tt = interned->tt;
-	m_object.value.p = interned;
+  TString* const interned = luaS_newlstr(lstate, value, std::strlen(value));
+  m_object.tt = interned->tt;
+  m_object.value.p = interned;
 }
 
-void LuaObject::AssignLightUserData(LuaState* state, void* value)
+void LuaObject::AssignLightUserData(
+  LuaState* state,
+  void* value
+)
 {
-	RebindToState(*this, state);
-	m_object.tt = LUA_TLIGHTUSERDATA;
-	SetLightPointer(m_object.value, value);
+  RebindToState(*this, state);
+  m_object.tt = LUA_TLIGHTUSERDATA;
+  SetLightPointer(m_object.value, value);
 }
 
 /**
@@ -1183,19 +1296,22 @@ void LuaObject::AssignLightUserData(LuaState* state, void* value)
  * Rebinds this object to `state` root ownership, allocates one default-
  * constructed userdata payload for `type`, and stores it as object payload.
  */
-gpg::RRef LuaObject::AssignNewUserData(LuaState* state, const gpg::RType* type)
+gpg::RRef LuaObject::AssignNewUserData(
+  LuaState* state,
+  const gpg::RType* type
+)
 {
-	RebindToState(*this, state);
-	Ensure(state != nullptr, "state");
-	Ensure(type != nullptr, "type");
+  RebindToState(*this, state);
+  Ensure(state != nullptr, "state");
+  Ensure(type != nullptr, "type");
 
-	lua_State* const lstate = state->m_state;
-	Ensure(lstate != nullptr, "state->m_state");
+  lua_State* const lstate = state->m_state;
+  Ensure(lstate != nullptr, "state->m_state");
 
-	Udata* const userdata = luaS_newudata(lstate, const_cast<gpg::RType*>(type));
-	m_object.tt = static_cast<int>(userdata->tt);
-	m_object.value.p = userdata;
-	return BuildRefFromUserdata(userdata);
+  Udata* const userdata = luaS_newudata(lstate, const_cast<gpg::RType*>(type));
+  m_object.tt = static_cast<int>(userdata->tt);
+  m_object.value.p = userdata;
+  return BuildRefFromUserdata(userdata);
 }
 
 /**
@@ -1205,17 +1321,20 @@ gpg::RRef LuaObject::AssignNewUserData(LuaState* state, const gpg::RType* type)
  * Rebinds this object to `state` root ownership, then materializes one
  * reflected userdata lane from `value` and stores it as object payload.
  */
-gpg::RRef LuaObject::AssignNewUserData(LuaState* state, const gpg::RRef& value)
+gpg::RRef LuaObject::AssignNewUserData(
+  LuaState* state,
+  const gpg::RRef& value
+)
 {
-	RebindToState(*this, state);
-	Ensure(state != nullptr, "state");
-	lua_State* const lstate = state->m_state;
-	Ensure(lstate != nullptr, "state->m_state");
+  RebindToState(*this, state);
+  Ensure(state != nullptr, "state");
+  lua_State* const lstate = state->m_state;
+  Ensure(lstate != nullptr, "state->m_state");
 
-	Udata* const userdata = CreateRefUserdata(lstate, const_cast<gpg::RRef*>(&value));
-	m_object.tt = static_cast<int>(userdata->tt);
-	m_object.value.p = userdata;
-	return BuildRefFromUserdata(userdata);
+  Udata* const userdata = CreateRefUserdata(lstate, const_cast<gpg::RRef*>(&value));
+  m_object.tt = static_cast<int>(userdata->tt);
+  m_object.value.p = userdata;
+  return BuildRefFromUserdata(userdata);
 }
 
 /**
@@ -1224,27 +1343,30 @@ gpg::RRef LuaObject::AssignNewUserData(LuaState* state, const gpg::RRef& value)
  * What it does:
  * Writes one table entry by integer index using a string-or-nil payload.
  */
-void LuaObject::SetString(const int32_t index, const char* value)
+void LuaObject::SetString(
+  const int32_t index,
+  const char* value
+)
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	lua_State* const lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
+  lua_State* const lstate = GetActiveCState();
+  Ensure(lstate != nullptr, "active lua state");
 
-	TObject valueObject{};
-	if (value != nullptr) {
-		TString* const interned = luaS_newlstr(lstate, value, std::strlen(value));
-		valueObject.tt = interned->tt;
-		valueObject.value.p = interned;
-	} else {
-		valueObject.tt = LUA_TNIL;
-		valueObject.value.p = nullptr;
-	}
+  TObject valueObject{};
+  if (value != nullptr) {
+    TString* const interned = luaS_newlstr(lstate, value, std::strlen(value));
+    valueObject.tt = interned->tt;
+    valueObject.value.p = interned;
+  } else {
+    valueObject.tt = LUA_TNIL;
+    valueObject.value.p = nullptr;
+  }
 
-	TObject keyObject{};
-	keyObject.value.n = static_cast<float>(index);
-	keyObject.tt = LUA_TNUMBER;
-	luaV_settable(lstate, &m_object, &keyObject, &valueObject);
+  TObject keyObject{};
+  keyObject.value.n = static_cast<float>(index);
+  keyObject.tt = LUA_TNUMBER;
+  luaV_settable(lstate, &m_object, &keyObject, &valueObject);
 }
 
 /**
@@ -1253,24 +1375,27 @@ void LuaObject::SetString(const int32_t index, const char* value)
  * What it does:
  * Writes one table entry by string key using a string-or-nil payload.
  */
-void LuaObject::SetString(const char* key, const char* value)
+void LuaObject::SetString(
+  const char* key,
+  const char* value
+)
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	lua_State* const lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
+  lua_State* const lstate = GetActiveCState();
+  Ensure(lstate != nullptr, "active lua state");
 
-	TObject valueObject{};
-	if (value != nullptr) {
-		TString* const interned = luaS_newlstr(lstate, value, std::strlen(value));
-		valueObject.tt = interned->tt;
-		valueObject.value.p = interned;
-	} else {
-		valueObject.tt = LUA_TNIL;
-		valueObject.value.p = nullptr;
-	}
+  TObject valueObject{};
+  if (value != nullptr) {
+    TString* const interned = luaS_newlstr(lstate, value, std::strlen(value));
+    valueObject.tt = interned->tt;
+    valueObject.value.p = interned;
+  } else {
+    valueObject.tt = LUA_TNIL;
+    valueObject.value.p = nullptr;
+  }
 
-	SetTableHelper(key, &valueObject);
+  SetTableHelper(key, &valueObject);
 }
 
 /**
@@ -1280,22 +1405,25 @@ void LuaObject::SetString(const char* key, const char* value)
  * Writes one table entry by LuaObject key using a string-or-nil payload after
  * enforcing shared-state ownership with `key`.
  */
-void LuaObject::SetString(const LuaObject& key, const char* value)
+void LuaObject::SetString(
+  const LuaObject& key,
+  const char* value
+)
 {
-	Ensure(m_state == key.m_state, "m_state == key.m_state");
+  Ensure(m_state == key.m_state, "m_state == key.m_state");
 
-	lua_State* const lstate = GetActiveCState();
+  lua_State* const lstate = GetActiveCState();
 
-	TObject valueObject{};
-	if (value != nullptr) {
-		TString* const interned = luaS_newlstr(lstate, value, std::strlen(value));
-		valueObject.tt = interned->tt;
-		valueObject.value.p = interned;
-	} else {
-		valueObject.tt = LUA_TNIL;
-	}
+  TObject valueObject{};
+  if (value != nullptr) {
+    TString* const interned = luaS_newlstr(lstate, value, std::strlen(value));
+    valueObject.tt = interned->tt;
+    valueObject.value.p = interned;
+  } else {
+    valueObject.tt = LUA_TNIL;
+  }
 
-	SetTableHelperRaw(key, &valueObject);
+  SetTableHelperRaw(key, &valueObject);
 }
 
 /**
@@ -1304,14 +1432,17 @@ void LuaObject::SetString(const LuaObject& key, const char* value)
  * What it does:
  * Writes one light-userdata payload into this table by string key.
  */
-void LuaObject::SetLightUserData(const char* const key, void* const value)
+void LuaObject::SetLightUserData(
+  const char* const key,
+  void* const value
+)
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	TObject object{};
-	object.tt = LUA_TLIGHTUSERDATA;
-	SetLightPointer(object.value, value);
-	SetTableHelper(key, &object);
+  TObject object{};
+  object.tt = LUA_TLIGHTUSERDATA;
+  SetLightPointer(object.value, value);
+  SetTableHelper(key, &object);
 }
 
 /**
@@ -1320,21 +1451,24 @@ void LuaObject::SetLightUserData(const char* const key, void* const value)
  * What it does:
  * Writes one light-userdata payload into this table by integer key.
  */
-void LuaObject::SetLightUserData(const int32_t index, void* const value)
+void LuaObject::SetLightUserData(
+  const int32_t index,
+  void* const value
+)
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	lua_State* const lstate = GetActiveCState();
+  lua_State* const lstate = GetActiveCState();
 
-	TObject val{};
-	SetLightPointer(val.value, value);
-	val.tt = LUA_TLIGHTUSERDATA;
+  TObject val{};
+  SetLightPointer(val.value, value);
+  val.tt = LUA_TLIGHTUSERDATA;
 
-	TObject key{};
-	key.value.n = static_cast<float>(index);
-	key.tt = LUA_TNUMBER;
+  TObject key{};
+  key.value.n = static_cast<float>(index);
+  key.tt = LUA_TNUMBER;
 
-	luaV_settable(lstate, &m_object, &key, &val);
+  luaV_settable(lstate, &m_object, &key, &val);
 }
 
 /**
@@ -1344,15 +1478,18 @@ void LuaObject::SetLightUserData(const int32_t index, void* const value)
  * Writes one light-userdata payload into this table by LuaObject key after
  * validating shared-state ownership with `key`.
  */
-void LuaObject::SetLightUserData(const LuaObject& key, void* const value)
+void LuaObject::SetLightUserData(
+  const LuaObject& key,
+  void* const value
+)
 {
-	Ensure(m_state == key.m_state, "m_state == key.m_state");
+  Ensure(m_state == key.m_state, "m_state == key.m_state");
 
-	TObject val{};
-	SetLightPointer(val.value, value);
-	val.tt = LUA_TLIGHTUSERDATA;
+  TObject val{};
+  SetLightPointer(val.value, value);
+  val.tt = LUA_TLIGHTUSERDATA;
 
-	SetTableHelperRaw(key, &val);
+  SetTableHelperRaw(key, &val);
 }
 
 /**
@@ -1361,14 +1498,16 @@ void LuaObject::SetLightUserData(const LuaObject& key, void* const value)
  * What it does:
  * Writes a nil payload to one table entry addressed by string key.
  */
-void LuaObject::SetNil(const char* const key)
+void LuaObject::SetNil(
+  const char* const key
+)
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	TObject nilObject{};
-	nilObject.tt = LUA_TNIL;
-	nilObject.value.p = nullptr;
-	SetTableHelper(key, &nilObject);
+  TObject nilObject{};
+  nilObject.tt = LUA_TNIL;
+  nilObject.value.p = nullptr;
+  SetTableHelper(key, &nilObject);
 }
 
 /**
@@ -1377,22 +1516,24 @@ void LuaObject::SetNil(const char* const key)
  * What it does:
  * Writes a nil payload to one table entry addressed by integer key.
  */
-void LuaObject::SetNil(const int32_t index)
+void LuaObject::SetNil(
+  const int32_t index
+)
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	lua_State* const lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
+  lua_State* const lstate = GetActiveCState();
+  Ensure(lstate != nullptr, "active lua state");
 
-	TObject keyObject{};
-	keyObject.tt = LUA_TNUMBER;
-	keyObject.value.n = static_cast<float>(index);
+  TObject keyObject{};
+  keyObject.tt = LUA_TNUMBER;
+  keyObject.value.n = static_cast<float>(index);
 
-	TObject nilObject{};
-	nilObject.tt = LUA_TNIL;
-	nilObject.value.p = nullptr;
+  TObject nilObject{};
+  nilObject.tt = LUA_TNIL;
+  nilObject.value.p = nullptr;
 
-	luaV_settable(lstate, &m_object, &keyObject, &nilObject);
+  luaV_settable(lstate, &m_object, &keyObject, &nilObject);
 }
 
 /**
@@ -1402,15 +1543,17 @@ void LuaObject::SetNil(const int32_t index)
  * Writes one nil payload to this table by LuaObject key after validating
  * shared-state ownership with `key`.
  */
-void LuaObject::SetNil(const LuaObject& key)
+void LuaObject::SetNil(
+  const LuaObject& key
+)
 {
-	Ensure(m_state == key.m_state, "m_state == key.m_state");
+  Ensure(m_state == key.m_state, "m_state == key.m_state");
 
-	TObject nilObject{};
-	nilObject.tt = LUA_TNIL;
-	nilObject.value.p = nullptr;
+  TObject nilObject{};
+  nilObject.tt = LUA_TNIL;
+  nilObject.value.p = nullptr;
 
-	SetTableHelperRaw(key, &nilObject);
+  SetTableHelperRaw(key, &nilObject);
 }
 
 /**
@@ -1419,14 +1562,17 @@ void LuaObject::SetNil(const LuaObject& key)
  * What it does:
  * Writes one table entry by string key using a numeric payload.
  */
-void LuaObject::SetNumber(const char* key, const float value)
+void LuaObject::SetNumber(
+  const char* key,
+  const float value
+)
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	TObject object;
-	object.tt = LUA_TNUMBER;
-	object.value.n = value;
-	SetTableHelper(key, &object);
+  TObject object;
+  object.tt = LUA_TNUMBER;
+  object.value.n = value;
+  SetTableHelper(key, &object);
 }
 
 /**
@@ -1435,22 +1581,25 @@ void LuaObject::SetNumber(const char* key, const float value)
  * What it does:
  * Writes one table entry by integer key using a numeric payload.
  */
-void LuaObject::SetNumber(const int32_t index, const float value)
+void LuaObject::SetNumber(
+  const int32_t index,
+  const float value
+)
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	lua_State* const lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
+  lua_State* const lstate = GetActiveCState();
+  Ensure(lstate != nullptr, "active lua state");
 
-	TObject val{};
-	val.tt = LUA_TNUMBER;
-	val.value.n = value;
+  TObject val{};
+  val.tt = LUA_TNUMBER;
+  val.value.n = value;
 
-	TObject key{};
-	key.tt = LUA_TNUMBER;
-	key.value.n = static_cast<float>(index);
+  TObject key{};
+  key.tt = LUA_TNUMBER;
+  key.value.n = static_cast<float>(index);
 
-	luaV_settable(lstate, &m_object, &key, &val);
+  luaV_settable(lstate, &m_object, &key, &val);
 }
 
 /**
@@ -1460,15 +1609,18 @@ void LuaObject::SetNumber(const int32_t index, const float value)
  * Writes one table entry by LuaObject key using a numeric payload after
  * validating shared-state ownership with `key`.
  */
-void LuaObject::SetNumber(const LuaObject& key, const float value)
+void LuaObject::SetNumber(
+  const LuaObject& key,
+  const float value
+)
 {
-	Ensure(m_state == key.m_state, "m_state == key.m_state");
+  Ensure(m_state == key.m_state, "m_state == key.m_state");
 
-	TObject val{};
-	val.tt = LUA_TNUMBER;
-	val.value.n = value;
+  TObject val{};
+  val.tt = LUA_TNUMBER;
+  val.value.n = value;
 
-	SetTableHelperRaw(key, &val);
+  SetTableHelperRaw(key, &val);
 }
 
 /**
@@ -1477,22 +1629,25 @@ void LuaObject::SetNumber(const LuaObject& key, const float value)
  * What it does:
  * Writes one table entry by integer key using an integer payload.
  */
-void LuaObject::SetInteger(const int32_t index, const int32_t value)
+void LuaObject::SetInteger(
+  const int32_t index,
+  const int32_t value
+)
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	lua_State* const lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
+  lua_State* const lstate = GetActiveCState();
+  Ensure(lstate != nullptr, "active lua state");
 
-	TObject val{};
-	val.tt = LUA_TNUMBER;
-	val.value.n = static_cast<float>(value);
+  TObject val{};
+  val.tt = LUA_TNUMBER;
+  val.value.n = static_cast<float>(value);
 
-	TObject key{};
-	key.tt = LUA_TNUMBER;
-	key.value.n = static_cast<float>(index);
+  TObject key{};
+  key.tt = LUA_TNUMBER;
+  key.value.n = static_cast<float>(index);
 
-	luaV_settable(lstate, &m_object, &key, &val);
+  luaV_settable(lstate, &m_object, &key, &val);
 }
 
 /**
@@ -1501,14 +1656,17 @@ void LuaObject::SetInteger(const int32_t index, const int32_t value)
  * What it does:
  * Writes one table entry by string key using an integer payload lane.
  */
-void LuaObject::SetInteger(const char* key, const int32_t value)
+void LuaObject::SetInteger(
+  const char* key,
+  const int32_t value
+)
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	TObject object{};
-	object.tt = LUA_TNUMBER;
-	object.value.n = static_cast<float>(value);
-	SetTableHelper(key, &object);
+  TObject object{};
+  object.tt = LUA_TNUMBER;
+  object.value.n = static_cast<float>(value);
+  SetTableHelper(key, &object);
 }
 
 /**
@@ -1518,15 +1676,18 @@ void LuaObject::SetInteger(const char* key, const int32_t value)
  * Writes one table entry by LuaObject key using an integer payload lane after
  * validating shared-state ownership with `key`.
  */
-void LuaObject::SetInteger(const LuaObject& key, const int32_t value)
+void LuaObject::SetInteger(
+  const LuaObject& key,
+  const int32_t value
+)
 {
-	Ensure(m_state == key.m_state, "m_state == key.m_state");
+  Ensure(m_state == key.m_state, "m_state == key.m_state");
 
-	TObject val{};
-	val.tt = LUA_TNUMBER;
-	val.value.n = static_cast<float>(value);
+  TObject val{};
+  val.tt = LUA_TNUMBER;
+  val.value.n = static_cast<float>(value);
 
-	SetTableHelperRaw(key, &val);
+  SetTableHelperRaw(key, &val);
 }
 
 /**
@@ -1535,14 +1696,17 @@ void LuaObject::SetInteger(const LuaObject& key, const int32_t value)
  * What it does:
  * Writes one boolean payload into this table by string key.
  */
-void LuaObject::SetBoolean(const char* key, const bool value)
+void LuaObject::SetBoolean(
+  const char* key,
+  const bool value
+)
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	TObject object{};
-	object.tt = LUA_TBOOLEAN;
-	object.value.b = value ? 1 : 0;
-	SetTableHelper(key, &object);
+  TObject object{};
+  object.tt = LUA_TBOOLEAN;
+  object.value.b = value ? 1 : 0;
+  SetTableHelper(key, &object);
 }
 
 /**
@@ -1551,21 +1715,24 @@ void LuaObject::SetBoolean(const char* key, const bool value)
  * What it does:
  * Writes one boolean payload into this table by integer key.
  */
-void LuaObject::SetBoolean(const int32_t index, const bool value)
+void LuaObject::SetBoolean(
+  const int32_t index,
+  const bool value
+)
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	lua_State* const lstate = GetActiveCState();
+  lua_State* const lstate = GetActiveCState();
 
-	TObject val{};
-	val.value.b = value ? 1 : 0;
-	val.tt = LUA_TBOOLEAN;
+  TObject val{};
+  val.value.b = value ? 1 : 0;
+  val.tt = LUA_TBOOLEAN;
 
-	TObject key{};
-	key.value.n = static_cast<float>(index);
-	key.tt = LUA_TNUMBER;
+  TObject key{};
+  key.value.n = static_cast<float>(index);
+  key.tt = LUA_TNUMBER;
 
-	luaV_settable(lstate, &m_object, &key, &val);
+  luaV_settable(lstate, &m_object, &key, &val);
 }
 
 /**
@@ -1575,15 +1742,18 @@ void LuaObject::SetBoolean(const int32_t index, const bool value)
  * Writes one boolean payload into this table by LuaObject key after
  * validating shared-state ownership with `key`.
  */
-void LuaObject::SetBoolean(const LuaObject& key, const bool value)
+void LuaObject::SetBoolean(
+  const LuaObject& key,
+  const bool value
+)
 {
-	Ensure(m_state == key.m_state, "m_state == key.m_state");
+  Ensure(m_state == key.m_state, "m_state == key.m_state");
 
-	TObject val{};
-	val.value.b = value ? 1 : 0;
-	val.tt = LUA_TBOOLEAN;
+  TObject val{};
+  val.value.b = value ? 1 : 0;
+  val.tt = LUA_TBOOLEAN;
 
-	SetTableHelperRaw(key, &val);
+  SetTableHelperRaw(key, &val);
 }
 
 /**
@@ -1593,21 +1763,27 @@ void LuaObject::SetBoolean(const LuaObject& key, const bool value)
  * Writes one table field by string key after enforcing shared-state ownership
  * with the source Lua object value.
  */
-void LuaObject::SetObject(const char* key, const LuaObject& value)
+void LuaObject::SetObject(
+  const char* key,
+  const LuaObject& value
+)
 {
-	Ensure(m_state == value.m_state, "m_state == value.m_state");
-	SetTableHelper(key, const_cast<TObject*>(&value.m_object));
+  Ensure(m_state == value.m_state, "m_state == value.m_state");
+  SetTableHelper(key, const_cast<TObject*>(&value.m_object));
 }
 
-void LuaObject::SetObject(const char* key, LuaObject* value)
+void LuaObject::SetObject(
+  const char* key,
+  LuaObject* value
+)
 {
-	if (value) {
-		SetObject(key, *value);
-		return;
-	}
+  if (value) {
+    SetObject(key, *value);
+    return;
+  }
 
-	TObject nilValue;
-	SetTableHelper(key, &nilValue);
+  TObject nilValue;
+  SetTableHelper(key, &nilValue);
 }
 
 /**
@@ -1617,15 +1793,18 @@ void LuaObject::SetObject(const char* key, LuaObject* value)
  * Writes one table entry by LuaObject key/value lanes after validating shared
  * state ownership.
  */
-void LuaObject::SetObject(const LuaObject& key, const LuaObject& value)
+void LuaObject::SetObject(
+  const LuaObject& key,
+  const LuaObject& value
+)
 {
-	Ensure(m_state == key.m_state, "m_state == key.m_state");
-	Ensure(m_state == value.m_state, "m_state == value.m_state");
+  Ensure(m_state == key.m_state, "m_state == key.m_state");
+  Ensure(m_state == value.m_state, "m_state == value.m_state");
 
-	lua_State* const lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
+  lua_State* const lstate = GetActiveCState();
+  Ensure(lstate != nullptr, "active lua state");
 
-	SetTableHelperRaw(key, const_cast<TObject*>(&value.m_object));
+  SetTableHelperRaw(key, const_cast<TObject*>(&value.m_object));
 }
 
 /**
@@ -1635,94 +1814,104 @@ void LuaObject::SetObject(const LuaObject& key, const LuaObject& value)
  * Writes one object value into this table by integer key after enforcing
  * shared Lua-state ownership with `value`.
  */
-void LuaObject::SetObject(const int32_t index, const LuaObject& value)
+void LuaObject::SetObject(
+  const int32_t index,
+  const LuaObject& value
+)
 {
-	Ensure(m_state == value.m_state, "m_state == value.m_state");
-	SetTableHelper(index, const_cast<TObject*>(&value.m_object));
+  Ensure(m_state == value.m_state, "m_state == value.m_state");
+  SetTableHelper(index, const_cast<TObject*>(&value.m_object));
 }
 
-void LuaObject::SetObject(const int32_t index, LuaObject* value)
+void LuaObject::SetObject(
+  const int32_t index,
+  LuaObject* value
+)
 {
-	if (value) {
-		SetObject(index, *value);
-		return;
-	}
+  if (value) {
+    SetObject(index, *value);
+    return;
+  }
 
-	TObject nilValue;
-	SetTableHelper(index, &nilValue);
+  TObject nilValue;
+  SetTableHelper(index, &nilValue);
 }
 
 namespace
 {
-	struct OwnerWordLaneAt68
-	{
-		std::byte pad00[68];
-		std::uint32_t lane44;
-	};
-	static_assert(offsetof(OwnerWordLaneAt68, lane44) == 68, "OwnerWordLaneAt68::lane44 offset must be 68");
+  struct OwnerWordLaneAt68
+  {
+    std::byte pad00[68];
+    std::uint32_t lane44;
+  };
+  static_assert(offsetof(OwnerWordLaneAt68, lane44) == 68, "OwnerWordLaneAt68::lane44 offset must be 68");
 
-	struct OwnerWordWritePair
-	{
-		OwnerWordLaneAt68* owner;
-		std::uint32_t value;
-	};
-	static_assert(sizeof(OwnerWordWritePair) == 0x08, "OwnerWordWritePair size must be 0x08");
+  struct OwnerWordWritePair
+  {
+    OwnerWordLaneAt68* owner;
+    std::uint32_t value;
+  };
+  static_assert(sizeof(OwnerWordWritePair) == 0x08, "OwnerWordWritePair size must be 0x08");
 
-	/**
-	 * Address: 0x00929BE0 (FUN_00929BE0)
-	 *
-	 * What it does:
-	 * Stores one 32-bit value into owner field `+0x44` (`+0x68` bytes) and
-	 * returns the owner pointer lane.
-	 */
-	[[maybe_unused]] OwnerWordLaneAt68* StoreOwnerWordLaneAt68(
-		OwnerWordWritePair* const writePair
-	)
-	{
-		if (writePair == nullptr || writePair->owner == nullptr) {
-			return nullptr;
-		}
+  /**
+   * Address: 0x00929BE0 (FUN_00929BE0)
+   *
+   * What it does:
+   * Stores one 32-bit value into owner field `+0x44` (`+0x68` bytes) and
+   * returns the owner pointer lane.
+   */
+  [[maybe_unused]] OwnerWordLaneAt68* StoreOwnerWordLaneAt68(
+    OwnerWordWritePair* const writePair
+  )
+  {
+    if (writePair == nullptr || writePair->owner == nullptr) {
+      return nullptr;
+    }
 
-		writePair->owner->lane44 = writePair->value;
-		return writePair->owner;
-	}
+    writePair->owner->lane44 = writePair->value;
+    return writePair->owner;
+  }
 
-	/**
-	 * Address: 0x009284D0 (FUN_009284D0)
-	 *
-	 * IDA signature:
-	 * void __cdecl sub_9284D0(lua_State *L, TObject *o, GCObject *mt);
-	 *
-	 * What it does:
-	 * Assigns one metatable object to a tagged Lua value:
-	 * table/userdata instances store direct metatable pointers while all other
-	 * tag lanes update `global_State::_defaultmetatypes[tt]`. The binary
-	 * dispatches on the tag alone - it validates neither the pointers nor the
-	 * tag range, so neither does this.
-	 */
-	void AssignMetatableByTaggedValueType(
-		lua_State* const state,
-		LuaPlus::TObject* const object,
-		GCObject* const metatableObject
-	)
-	{
-		if (object->tt == LUA_TTABLE) {
-			static_cast<Table*>(object->value.p)->metatable = reinterpret_cast<Table*>(metatableObject);
-			faf_lua51_gc_barrier_f(state, static_cast<GCObject*>(object->value.p), metatableObject); // Lua 5.1.5 lapi.c: setmetatable barrier
-			return;
-		}
+  /**
+   * Address: 0x009284D0 (FUN_009284D0)
+   *
+   * IDA signature:
+   * void __cdecl sub_9284D0(lua_State *L, TObject *o, GCObject *mt);
+   *
+   * What it does:
+   * Assigns one metatable object to a tagged Lua value:
+   * table/userdata instances store direct metatable pointers while all other
+   * tag lanes update `global_State::_defaultmetatypes[tt]`. The binary
+   * dispatches on the tag alone - it validates neither the pointers nor the
+   * tag range, so neither does this.
+   */
+  void AssignMetatableByTaggedValueType(
+    lua_State* const state,
+    LuaPlus::TObject* const object,
+    GCObject* const metatableObject
+  )
+  {
+    if (object->tt == LUA_TTABLE) {
+      static_cast<Table*>(object->value.p)->metatable = reinterpret_cast<Table*>(metatableObject);
+      faf_lua51_gc_barrier_f(
+        state, static_cast<GCObject*>(object->value.p), metatableObject
+      ); // Lua 5.1.5 lapi.c: setmetatable barrier
+      return;
+    }
 
-		if (object->tt == LUA_TUSERDATA) {
-			static_cast<Udata*>(object->value.p)->metatable = reinterpret_cast<Table*>(metatableObject);
-			faf_lua51_gc_barrier_f(state, static_cast<GCObject*>(object->value.p), metatableObject); // Lua 5.1.5 lapi.c: setmetatable barrier
-			return;
-		}
+    if (object->tt == LUA_TUSERDATA) {
+      static_cast<Udata*>(object->value.p)->metatable = reinterpret_cast<Table*>(metatableObject);
+      faf_lua51_gc_barrier_f(
+        state, static_cast<GCObject*>(object->value.p), metatableObject
+      ); // Lua 5.1.5 lapi.c: setmetatable barrier
+      return;
+    }
 
-		TObject& slot = state->l_G->_defaultmetatypes[object->tt];
-		slot.tt = static_cast<int>(metatableObject->gch.tt);
-		slot.value.p = metatableObject;
-	}
-}
+    TObject& slot = state->l_G->_defaultmetatypes[object->tt];
+    slot.tt = static_cast<int>(metatableObject->gch.tt);
+    slot.value.p = metatableObject;
+  }
+} // namespace
 
 /**
  * Address: 0x00907E00 (FUN_00907E00, LuaPlus::LuaObject::SetMetaTable)
@@ -1731,15 +1920,13 @@ namespace
  * Validates that both objects share one Lua state and applies `valueObj` as
  * this object's runtime metatable.
  */
-void LuaObject::SetMetaTable(const LuaObject& valueObj)
+void LuaObject::SetMetaTable(
+  const LuaObject& valueObj
+)
 {
-	Ensure(m_state && m_state == valueObj.m_state, "m_state && m_state == valueObj.m_state");
+  Ensure(m_state && m_state == valueObj.m_state, "m_state && m_state == valueObj.m_state");
 
-	AssignMetatableByTaggedValueType(
-		m_state->GetCState(),
-		&m_object,
-		static_cast<GCObject*>(valueObj.m_object.value.p)
-	);
+  AssignMetatableByTaggedValueType(m_state->GetCState(), &m_object, static_cast<GCObject*>(valueObj.m_object.value.p));
 }
 
 /**
@@ -1750,14 +1937,14 @@ void LuaObject::SetMetaTable(const LuaObject& valueObj)
  */
 LuaObject LuaObject::GetMetaTable() const
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	Table* const metatable = luaT_getmetatable(m_state->m_state, &m_object);
+  Table* const metatable = luaT_getmetatable(m_state->m_state, &m_object);
 
-	LuaObject out(m_state);
-	out.m_object.value.p = metatable;
-	out.m_object.tt = metatable->tt;
-	return out;
+  LuaObject out(m_state);
+  out.m_object.value.p = metatable;
+  out.m_object.tt = metatable->tt;
+  return out;
 }
 
 /**
@@ -1766,20 +1953,24 @@ LuaObject LuaObject::GetMetaTable() const
  * What it does:
  * Creates one new Lua table and stores it in this table at string key `key`.
  */
-LuaObject LuaObject::CreateTable(const char* const key, const int32_t narray, const int32_t lnhash)
+LuaObject LuaObject::CreateTable(
+  const char* const key,
+  const int32_t narray,
+  const int32_t lnhash
+)
 {
-	Ensure(m_state != nullptr, "m_state");
-	Ensure(key != nullptr, "key");
+  Ensure(m_state != nullptr, "m_state");
+  Ensure(key != nullptr, "key");
 
-	lua_State* const lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
+  lua_State* const lstate = GetActiveCState();
+  Ensure(lstate != nullptr, "active lua state");
 
-	LuaObject out(m_state);
-	Table* const table = luaH_new(lstate, narray, lnhash);
-	out.m_object.value.p = table;
-	out.m_object.tt = table->tt;
-	SetTableHelper(key, &out.m_object);
-	return out;
+  LuaObject out(m_state);
+  Table* const table = luaH_new(lstate, narray, lnhash);
+  out.m_object.value.p = table;
+  out.m_object.tt = table->tt;
+  SetTableHelper(key, &out.m_object);
+  return out;
 }
 
 /**
@@ -1789,23 +1980,27 @@ LuaObject LuaObject::CreateTable(const char* const key, const int32_t narray, co
  * Creates one new Lua table and stores it in this table at integer key
  * `index`.
  */
-LuaObject LuaObject::CreateTable(const int32_t index, const int32_t narray, const int32_t lnhash)
+LuaObject LuaObject::CreateTable(
+  const int32_t index,
+  const int32_t narray,
+  const int32_t lnhash
+)
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	lua_State* const lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
+  lua_State* const lstate = GetActiveCState();
+  Ensure(lstate != nullptr, "active lua state");
 
-	LuaObject out(m_state);
-	Table* const table = luaH_new(lstate, narray, lnhash);
-	out.m_object.value.p = table;
-	out.m_object.tt = table->tt;
+  LuaObject out(m_state);
+  Table* const table = luaH_new(lstate, narray, lnhash);
+  out.m_object.value.p = table;
+  out.m_object.tt = table->tt;
 
-	TObject keyObject{};
-	keyObject.tt = LUA_TNUMBER;
-	keyObject.value.n = static_cast<float>(index);
-	luaV_settable(lstate, &m_object, &keyObject, &out.m_object);
-	return out;
+  TObject keyObject{};
+  keyObject.tt = LUA_TNUMBER;
+  keyObject.value.n = static_cast<float>(index);
+  luaV_settable(lstate, &m_object, &keyObject, &out.m_object);
+  return out;
 }
 
 /**
@@ -1816,24 +2011,24 @@ LuaObject LuaObject::CreateTable(const int32_t index, const int32_t narray, cons
  * `key`.
  */
 LuaObject LuaObject::CreateTable(
-	const LuaObject& key,
-	const int32_t narray,
-	const int32_t lnhash
+  const LuaObject& key,
+  const int32_t narray,
+  const int32_t lnhash
 )
 {
-	Ensure(m_state != nullptr, "m_state");
-	Ensure(m_state == key.m_state, "m_state == key.m_state");
+  Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state == key.m_state, "m_state == key.m_state");
 
-	lua_State* const lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
+  lua_State* const lstate = GetActiveCState();
+  Ensure(lstate != nullptr, "active lua state");
 
-	LuaObject out(m_state);
-	Table* const table = luaH_new(lstate, narray, lnhash);
-	out.m_object.tt = table->tt;
-	out.m_object.value.p = table;
+  LuaObject out(m_state);
+  Table* const table = luaH_new(lstate, narray, lnhash);
+  out.m_object.tt = table->tt;
+  out.m_object.value.p = table;
 
-	SetTableHelperRaw(key, &out.m_object);
-	return out;
+  SetTableHelperRaw(key, &out.m_object);
+  return out;
 }
 
 // Reopen the same unnamed namespace that houses LuaCall and the
@@ -1841,45 +2036,45 @@ LuaObject LuaObject::CreateTable(
 // driver on top of them without duplicating their layout.
 namespace
 {
-	// Intent-first typed frame wrapper used by LuaObject::Insert / Remove / Sort.
-	// Delegates to the recovered 2007 primitives from earlier in this TU:
-	//   ConstructLuaCallFrame            (0x00909A00, FUN_00909A00)
-	//   InvokeLuaCallFrame               (0x00907270, FUN_00907270)
-	//   PushLuaObjectArgumentToCallFrame (0x00908940, FUN_00908940)
-	void RunLuaTableMethodCallFrame(
-		LuaState* const activeState,
-		LuaObject& methodFunction,
-		LuaObject* const arg0 = nullptr,
-		const bool pushNumericArg = false,
-		const lua_Number numericArg = 0.0,
-		LuaObject* const arg2 = nullptr
-	)
-	{
-		(void)activeState;
+  // Intent-first typed frame wrapper used by LuaObject::Insert / Remove / Sort.
+  // Delegates to the recovered 2007 primitives from earlier in this TU:
+  //   ConstructLuaCallFrame            (0x00909A00, FUN_00909A00)
+  //   InvokeLuaCallFrame               (0x00907270, FUN_00907270)
+  //   PushLuaObjectArgumentToCallFrame (0x00908940, FUN_00908940)
+  void RunLuaTableMethodCallFrame(
+    LuaState* const activeState,
+    LuaObject& methodFunction,
+    LuaObject* const arg0 = nullptr,
+    const bool pushNumericArg = false,
+    const lua_Number numericArg = 0.0,
+    LuaObject* const arg2 = nullptr
+  )
+  {
+    (void)activeState;
 
-		LuaCall frame{};
-		(void)ConstructLuaCallFrame(&frame, &methodFunction);
+    LuaCall frame{};
+    (void)ConstructLuaCallFrame(&frame, &methodFunction);
 
-		if (arg0 != nullptr) {
-			(void)PushLuaObjectArgumentToCallFrame(&frame, arg0);
-		}
+    if (arg0 != nullptr) {
+      (void)PushLuaObjectArgumentToCallFrame(&frame, arg0);
+    }
 
-		if (pushNumericArg) {
-			// 0x00909D9E: `lua_pushnumber(state->m_state, (float)key)` -- the
-			// number goes on the FRAME's thread, the same one every other
-			// argument and `lua_call` use, never on the caller's wrapper.
-			lua_pushnumber(frame.m_state->m_state, numericArg);
-			++frame.m_numArgs;
-		}
+    if (pushNumericArg) {
+      // 0x00909D9E: `lua_pushnumber(state->m_state, (float)key)` -- the
+      // number goes on the FRAME's thread, the same one every other
+      // argument and `lua_call` use, never on the caller's wrapper.
+      lua_pushnumber(frame.m_state->m_state, numericArg);
+      ++frame.m_numArgs;
+    }
 
-		if (arg2 != nullptr) {
-			(void)PushLuaObjectArgumentToCallFrame(&frame, arg2);
-		}
+    if (arg2 != nullptr) {
+      (void)PushLuaObjectArgumentToCallFrame(&frame, arg2);
+    }
 
-		LuaStackObject result(activeState, 0);
-		const int multret = LUA_MULTRET;
-		(void)InvokeLuaCallFrame(&frame, &result, &multret);
-	}
+    LuaStackObject result(activeState, 0);
+    const int multret = LUA_MULTRET;
+    (void)InvokeLuaCallFrame(&frame, &result, &multret);
+  }
 } // namespace
 
 /**
@@ -1891,33 +2086,29 @@ namespace
  * `this`, the numeric key, and the value `obj` as arguments onto it,
  * invoking the frame, and restoring the original Lua stack top.
  */
-void LuaObject::Insert(const int32_t key, const LuaObject& obj) const
+void LuaObject::Insert(
+  const int32_t key,
+  const LuaObject& obj
+) const
 {
-	if (m_state != obj.m_state) {
-		throw LuaAssertion("m_state == obj.m_state");
-	}
+  if (m_state != obj.m_state) {
+    throw LuaAssertion("m_state == obj.m_state");
+  }
 
-	LuaState* const activeState = m_state->GetActiveState();
-	lua_State* const lstate = activeState->m_state;
-	const int oldTop = lua_gettop(lstate);
+  LuaState* const activeState = m_state->GetActiveState();
+  lua_State* const lstate = activeState->m_state;
+  const int oldTop = lua_gettop(lstate);
 
-	{
-		LuaObject tableObject = activeState->GetGlobal("table");
-		LuaObject insertFunction = tableObject["insert"];
+  {
+    LuaObject tableObject = activeState->GetGlobal("table");
+    LuaObject insertFunction = tableObject["insert"];
 
-		LuaObject thisCopy(*this);
-		LuaObject objCopy(obj);
-		RunLuaTableMethodCallFrame(
-			activeState,
-			insertFunction,
-			&thisCopy,
-			true,
-			static_cast<lua_Number>(key),
-			&objCopy
-		);
-	}
+    LuaObject thisCopy(*this);
+    LuaObject objCopy(obj);
+    RunLuaTableMethodCallFrame(activeState, insertFunction, &thisCopy, true, static_cast<lua_Number>(key), &objCopy);
+  }
 
-	lua_settop(lstate, oldTop);
+  lua_settop(lstate, oldTop);
 }
 
 /**
@@ -1931,33 +2122,28 @@ void LuaObject::Insert(const int32_t key, const LuaObject& obj) const
  * Same shape as the two-argument overload above with the numeric-key push
  * omitted.
  */
-void LuaObject::Insert(const LuaObject& obj) const
+void LuaObject::Insert(
+  const LuaObject& obj
+) const
 {
-	if (m_state != obj.m_state) {
-		throw LuaAssertion("m_state == obj.m_state");
-	}
+  if (m_state != obj.m_state) {
+    throw LuaAssertion("m_state == obj.m_state");
+  }
 
-	LuaState* const activeState = m_state->GetActiveState();
-	lua_State* const lstate = activeState->m_state;
-	const int oldTop = lua_gettop(lstate);
+  LuaState* const activeState = m_state->GetActiveState();
+  lua_State* const lstate = activeState->m_state;
+  const int oldTop = lua_gettop(lstate);
 
-	{
-		LuaObject tableObject = activeState->GetGlobal("table");
-		LuaObject insertFunction = tableObject["insert"];
+  {
+    LuaObject tableObject = activeState->GetGlobal("table");
+    LuaObject insertFunction = tableObject["insert"];
 
-		LuaObject thisCopy(*this);
-		LuaObject objCopy(obj);
-		RunLuaTableMethodCallFrame(
-			activeState,
-			insertFunction,
-			&thisCopy,
-			false,
-			0.0,
-			&objCopy
-		);
-	}
+    LuaObject thisCopy(*this);
+    LuaObject objCopy(obj);
+    RunLuaTableMethodCallFrame(activeState, insertFunction, &thisCopy, false, 0.0, &objCopy);
+  }
 
-	lua_settop(lstate, oldTop);
+  lua_settop(lstate, oldTop);
 }
 
 /**
@@ -1969,28 +2155,23 @@ void LuaObject::Insert(const LuaObject& obj) const
  * as arguments, invoking the frame, and restoring the original Lua stack
  * top.
  */
-void LuaObject::Remove(const int32_t index) const
+void LuaObject::Remove(
+  const int32_t index
+) const
 {
-	LuaState* const activeState = m_state->GetActiveState();
-	lua_State* const lstate = activeState->m_state;
-	const int oldTop = lua_gettop(lstate);
+  LuaState* const activeState = m_state->GetActiveState();
+  lua_State* const lstate = activeState->m_state;
+  const int oldTop = lua_gettop(lstate);
 
-	{
-		LuaObject tableObject = activeState->GetGlobal("table");
-		LuaObject removeFunction = tableObject["remove"];
+  {
+    LuaObject tableObject = activeState->GetGlobal("table");
+    LuaObject removeFunction = tableObject["remove"];
 
-		LuaObject thisCopy(*this);
-		RunLuaTableMethodCallFrame(
-			activeState,
-			removeFunction,
-			&thisCopy,
-			true,
-			static_cast<lua_Number>(index),
-			nullptr
-		);
-	}
+    LuaObject thisCopy(*this);
+    RunLuaTableMethodCallFrame(activeState, removeFunction, &thisCopy, true, static_cast<lua_Number>(index), nullptr);
+  }
 
-	lua_settop(lstate, oldTop);
+  lua_settop(lstate, oldTop);
 }
 
 /**
@@ -2003,26 +2184,19 @@ void LuaObject::Remove(const int32_t index) const
  */
 void LuaObject::Sort() const
 {
-	LuaState* const activeState = m_state->GetActiveState();
-	lua_State* const lstate = activeState->m_state;
-	const int oldTop = lua_gettop(lstate);
+  LuaState* const activeState = m_state->GetActiveState();
+  lua_State* const lstate = activeState->m_state;
+  const int oldTop = lua_gettop(lstate);
 
-	{
-		LuaObject tableObject = activeState->GetGlobal("table");
-		LuaObject sortFunction = tableObject["sort"];
+  {
+    LuaObject tableObject = activeState->GetGlobal("table");
+    LuaObject sortFunction = tableObject["sort"];
 
-		LuaObject thisCopy(*this);
-		RunLuaTableMethodCallFrame(
-			activeState,
-			sortFunction,
-			&thisCopy,
-			false,
-			0.0,
-			nullptr
-		);
-	}
+    LuaObject thisCopy(*this);
+    RunLuaTableMethodCallFrame(activeState, sortFunction, &thisCopy, false, 0.0, nullptr);
+  }
 
-	lua_settop(lstate, oldTop);
+  lua_settop(lstate, oldTop);
 }
 
 /**
@@ -2047,18 +2221,20 @@ void LuaObject::Sort() const
  * have on top - typically a stale error string. That is how class metatables
  * fetched out of `__factory_objects` turned into `TString`s.
  */
-LuaObject LuaObject::GetByIndex(const int32_t index) const
+LuaObject LuaObject::GetByIndex(
+  const int32_t index
+) const
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	lua_State* const lstate = GetActiveCState();
+  lua_State* const lstate = GetActiveCState();
 
-	TObject key{};
-	key.value.n = static_cast<lua_Number>(index);
-	key.tt = LUA_TNUMBER;
+  TObject key{};
+  key.value.n = static_cast<lua_Number>(index);
+  key.tt = LUA_TNUMBER;
 
-	const TObject* const rawValue = luaV_gettable(lstate, &m_object, &key, 0);
-	return LuaObject(m_state, const_cast<TObject*>(rawValue));
+  const TObject* const rawValue = luaV_gettable(lstate, &m_object, &key, 0);
+  return LuaObject(m_state, const_cast<TObject*>(rawValue));
 }
 
 /**
@@ -2067,17 +2243,19 @@ LuaObject LuaObject::GetByIndex(const int32_t index) const
  * What it does:
  * Looks up this table using a LuaObject key and returns the raw slot value.
  */
-LuaObject LuaObject::GetByObject(const LuaObject& key) const
+LuaObject LuaObject::GetByObject(
+  const LuaObject& key
+) const
 {
-	Ensure(m_state == key.m_state, "m_state == key.m_state");
+  Ensure(m_state == key.m_state, "m_state == key.m_state");
 
-	lua_State* const lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
+  lua_State* const lstate = GetActiveCState();
+  Ensure(lstate != nullptr, "active lua state");
 
-	const TObject* const rawValue = luaV_gettable(lstate, &m_object, &key.m_object, 0);
-	LuaObject out;
-	out.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
-	return out;
+  const TObject* const rawValue = luaV_gettable(lstate, &m_object, &key.m_object, 0);
+  LuaObject out;
+  out.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
+  return out;
 }
 
 /**
@@ -2087,14 +2265,16 @@ LuaObject LuaObject::GetByObject(const LuaObject& key) const
  * Looks up this table using one `LuaStackObject` key lane and returns the
  * resolved raw slot value as a bound LuaObject.
  */
-LuaObject LuaObject::GetByObject(const LuaStackObject& obj) const
+LuaObject LuaObject::GetByObject(
+  const LuaStackObject& obj
+) const
 {
-	Ensure(m_state == obj.m_state->m_rootState, "m_state == obj.m_state->m_rootState");
+  Ensure(m_state == obj.m_state->m_rootState, "m_state == obj.m_state->m_rootState");
 
-	lua_State* const lstate = GetActiveCState();
-	TObject* const keyObject = luaA_index(lstate, obj.m_stackIndex);
-	const TObject* const rawValue = luaV_gettable(lstate, &m_object, keyObject, 0);
-	return LuaObject(m_state, const_cast<TObject*>(rawValue));
+  lua_State* const lstate = GetActiveCState();
+  TObject* const keyObject = luaA_index(lstate, obj.m_stackIndex);
+  const TObject* const rawValue = luaV_gettable(lstate, &m_object, keyObject, 0);
+  return LuaObject(m_state, const_cast<TObject*>(rawValue));
 }
 
 /**
@@ -2111,9 +2291,11 @@ LuaObject LuaObject::GetByObject(const LuaStackObject& obj) const
  * a key the table does not hold itself comes back nil rather than escalating
  * to whatever the module's environment chain would do with it.
  */
-LuaObject LuaObject::GetByName(const char* name) const
+LuaObject LuaObject::GetByName(
+  const char* name
+) const
 {
-	return (*this)[name];
+  return (*this)[name];
 }
 
 /**
@@ -2123,36 +2305,38 @@ LuaObject LuaObject::GetByName(const char* name) const
  * Validates table indexing, resolves an already-interned string key from the
  * VM string table, and returns the raw table slot value.
  */
-LuaObject LuaObject::operator[](const char* const name) const
+LuaObject LuaObject::operator[](
+  const char* const name
+) const
 {
-	Ensure(m_state != nullptr, "m_state");
-	Ensure(name != nullptr, "name");
+  Ensure(m_state != nullptr, "m_state");
+  Ensure(name != nullptr, "name");
 
-	lua_State* const lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
+  lua_State* const lstate = GetActiveCState();
+  Ensure(lstate != nullptr, "active lua state");
 
-	if (m_object.tt != LUA_TTABLE) {
-		luaG_typeerror(lstate, &m_object, "index");
-	}
+  if (m_object.tt != LUA_TTABLE) {
+    luaG_typeerror(lstate, &m_object, "index");
+  }
 
-	const TString* const internedKey = FindInternedString(lstate, name);
-	if (internedKey == nullptr) {
-		LuaObject nilValue;
-		nilValue.AddToUsedList(m_state);
-		nilValue.m_object.tt = LUA_TNIL;
-		return nilValue;
-	}
+  const TString* const internedKey = FindInternedString(lstate, name);
+  if (internedKey == nullptr) {
+    LuaObject nilValue;
+    nilValue.AddToUsedList(m_state);
+    nilValue.m_object.tt = LUA_TNIL;
+    return nilValue;
+  }
 
-	TObject keyObject;
-	keyObject.tt = internedKey->tt;
-	keyObject.value.p = const_cast<TString*>(internedKey);
+  TObject keyObject;
+  keyObject.tt = internedKey->tt;
+  keyObject.value.p = const_cast<TString*>(internedKey);
 
-	const TObject* const rawValue = luaH_get(static_cast<Table*>(m_object.value.p), &keyObject);
-	Ensure(rawValue != nullptr, "obj");
+  const TObject* const rawValue = luaH_get(static_cast<Table*>(m_object.value.p), &keyObject);
+  Ensure(rawValue != nullptr, "obj");
 
-	LuaObject result;
-	result.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
-	return result;
+  LuaObject result;
+  result.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
+  return result;
 }
 
 /**
@@ -2162,21 +2346,23 @@ LuaObject LuaObject::operator[](const char* const name) const
  * Validates state + table type for LuaObject-key indexing, then fetches the
  * raw keyed slot directly from Lua's table storage.
  */
-LuaObject LuaObject::operator[](const LuaObject& key) const
+LuaObject LuaObject::operator[](
+  const LuaObject& key
+) const
 {
-	if (m_state != key.m_state) {
-		throw LuaAssertion("m_state == obj.m_state");
-	}
+  if (m_state != key.m_state) {
+    throw LuaAssertion("m_state == obj.m_state");
+  }
 
-	lua_State* const lstate = GetActiveCState();
-	if (m_object.tt != LUA_TTABLE) {
-		luaG_typeerror(lstate, &m_object, "index");
-	}
+  lua_State* const lstate = GetActiveCState();
+  if (m_object.tt != LUA_TTABLE) {
+    luaG_typeerror(lstate, &m_object, "index");
+  }
 
-	const TObject* const rawValue = luaH_get(static_cast<Table*>(m_object.value.p), &key.m_object);
-	LuaObject result;
-	result.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
-	return result;
+  const TObject* const rawValue = luaH_get(static_cast<Table*>(m_object.value.p), &key.m_object);
+  LuaObject result;
+  result.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
+  return result;
 }
 
 /**
@@ -2186,24 +2372,26 @@ LuaObject LuaObject::operator[](const LuaObject& key) const
  * Validates state + table type for integer indexing, then fetches the raw
  * numeric-key slot directly from Lua's table storage.
  */
-LuaObject LuaObject::operator[](const int32_t index) const
+LuaObject LuaObject::operator[](
+  const int32_t index
+) const
 {
-	if (!m_state) {
-		throw LuaAssertion("m_state");
-	}
+  if (!m_state) {
+    throw LuaAssertion("m_state");
+  }
 
-	lua_State* const lstate = GetActiveCState();
-	if (m_object.tt != LUA_TTABLE) {
-		luaG_typeerror(lstate, &m_object, "index");
-		if (m_object.tt != LUA_TTABLE) {
-			throw LuaAssertion("(((o)->tt) == LUA_TTABLE)");
-		}
-	}
+  lua_State* const lstate = GetActiveCState();
+  if (m_object.tt != LUA_TTABLE) {
+    luaG_typeerror(lstate, &m_object, "index");
+    if (m_object.tt != LUA_TTABLE) {
+      throw LuaAssertion("(((o)->tt) == LUA_TTABLE)");
+    }
+  }
 
-	const TObject* const rawValue = luaH_getnum(static_cast<Table*>(m_object.value.p), index);
-	LuaObject result;
-	result.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
-	return result;
+  const TObject* const rawValue = luaH_getnum(static_cast<Table*>(m_object.value.p), index);
+  LuaObject result;
+  result.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
+  return result;
 }
 
 /**
@@ -2213,24 +2401,26 @@ LuaObject LuaObject::operator[](const int32_t index) const
  * Validates root-state compatibility for LuaStackObject-key indexing, then
  * resolves the stack key and fetches the raw keyed table slot.
  */
-LuaObject LuaObject::operator[](const LuaStackObject& key) const
+LuaObject LuaObject::operator[](
+  const LuaStackObject& key
+) const
 {
-	const LuaState* const rootState = m_state;
-	const LuaState* const keyRootState = (key.m_state != nullptr) ? key.m_state->m_rootState : nullptr;
-	if (rootState != keyRootState) {
-		throw LuaAssertion("m_state == obj.m_state->m_rootState");
-	}
+  const LuaState* const rootState = m_state;
+  const LuaState* const keyRootState = (key.m_state != nullptr) ? key.m_state->m_rootState : nullptr;
+  if (rootState != keyRootState) {
+    throw LuaAssertion("m_state == obj.m_state->m_rootState");
+  }
 
-	lua_State* const lstate = GetActiveCState();
-	if (m_object.tt != LUA_TTABLE) {
-		luaG_typeerror(lstate, &m_object, "index");
-	}
+  lua_State* const lstate = GetActiveCState();
+  if (m_object.tt != LUA_TTABLE) {
+    luaG_typeerror(lstate, &m_object, "index");
+  }
 
-	TObject* const stackKey = luaA_index(lstate, key.m_stackIndex);
-	const TObject* const rawValue = luaH_get(static_cast<Table*>(m_object.value.p), stackKey);
-	LuaObject result;
-	result.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
-	return result;
+  TObject* const stackKey = luaA_index(lstate, key.m_stackIndex);
+  const TObject* const rawValue = luaH_get(static_cast<Table*>(m_object.value.p), stackKey);
+  LuaObject result;
+  result.AddToUsedObjectList(m_state, const_cast<TObject*>(rawValue));
+  return result;
 }
 
 /**
@@ -2240,81 +2430,82 @@ LuaObject LuaObject::operator[](const LuaStackObject& key) const
  * Traverses a dotted path and alternates string-key vs numeric-index lookup
  * based on each segment's parse result.
  */
-LuaObject LuaObject::Lookup(const char* const path) const
+LuaObject LuaObject::Lookup(
+  const char* const path
+) const
 {
-	if (path == nullptr || *path == '\0') {
-		return *this;
-	}
+  if (path == nullptr || *path == '\0') {
+    return *this;
+  }
 
-	auto tryParseIndex = [](const char* const text, int32_t* const outIndex) -> bool
-	{
-		if (text == nullptr || *text == '\0' || outIndex == nullptr) {
-			return false;
-		}
+  auto tryParseIndex = [](const char* const text, int32_t* const outIndex) -> bool {
+    if (text == nullptr || *text == '\0' || outIndex == nullptr) {
+      return false;
+    }
 
-		char* parseEnd = nullptr;
-		const double parsedValue = std::strtod(text, &parseEnd);
-		if (parseEnd == text || parseEnd == nullptr || *parseEnd != '\0') {
-			return false;
-		}
+    char* parseEnd = nullptr;
+    const double parsedValue = std::strtod(text, &parseEnd);
+    if (parseEnd == text || parseEnd == nullptr || *parseEnd != '\0') {
+      return false;
+    }
 
-		const double minValue = static_cast<double>(std::numeric_limits<int32_t>::min());
-		const double maxValue = static_cast<double>(std::numeric_limits<int32_t>::max());
-		if (parsedValue < minValue || parsedValue > maxValue) {
-			return false;
-		}
+    const double minValue = static_cast<double>(std::numeric_limits<int32_t>::min());
+    const double maxValue = static_cast<double>(std::numeric_limits<int32_t>::max());
+    if (parsedValue < minValue || parsedValue > maxValue) {
+      return false;
+    }
 
-		*outIndex = static_cast<int32_t>(parsedValue);
-		return true;
-	};
+    *outIndex = static_cast<int32_t>(parsedValue);
+    return true;
+  };
 
-	LuaObject current = *this;
-	std::string mutablePath(path);
-	char* segment = mutablePath.data();
-	char* dot = std::strchr(segment, '.');
+  LuaObject current = *this;
+  std::string mutablePath(path);
+  char* segment = mutablePath.data();
+  char* dot = std::strchr(segment, '.');
 
-	while (dot != nullptr) {
-		*dot = '\0';
-		if (*segment == '\0') {
-			return {};
-		}
+  while (dot != nullptr) {
+    *dot = '\0';
+    if (*segment == '\0') {
+      return {};
+    }
 
-		int32_t numericIndex = 0;
-		current = tryParseIndex(segment, &numericIndex) ? current[numericIndex] : current[segment];
-		if (current.IsNil()) {
-			return current;
-		}
+    int32_t numericIndex = 0;
+    current = tryParseIndex(segment, &numericIndex) ? current[numericIndex] : current[segment];
+    if (current.IsNil()) {
+      return current;
+    }
 
-		segment = dot + 1;
-		dot = std::strchr(segment, '.');
-	}
+    segment = dot + 1;
+    dot = std::strchr(segment, '.');
+  }
 
-	if (*segment == '\0') {
-		return {};
-	}
+  if (*segment == '\0') {
+    return {};
+  }
 
-	int32_t numericIndex = 0;
-	return tryParseIndex(segment, &numericIndex) ? current[numericIndex] : current[segment];
+  int32_t numericIndex = 0;
+  return tryParseIndex(segment, &numericIndex) ? current[numericIndex] : current[segment];
 }
 
 int32_t LuaObject::GetN() const
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	lua_State* lstate = GetActiveCState();
-	Ensure(lstate != nullptr, "active lua state");
+  lua_State* lstate = GetActiveCState();
+  Ensure(lstate != nullptr, "active lua state");
 
-	const int oldTop = lua_gettop(lstate);
-	const_cast<LuaObject*>(this)->PushStack(lstate);
+  const int oldTop = lua_gettop(lstate);
+  const_cast<LuaObject*>(this)->PushStack(lstate);
 #if defined(lua_rawlen)
-	const int32_t count = static_cast<int32_t>(lua_rawlen(lstate, -1));
+  const int32_t count = static_cast<int32_t>(lua_rawlen(lstate, -1));
 #elif defined(lua_objlen)
-	const int32_t count = static_cast<int32_t>(lua_objlen(lstate, -1));
+  const int32_t count = static_cast<int32_t>(lua_objlen(lstate, -1));
 #else
-	const int32_t count = luaL_getn(lstate, -1);
+  const int32_t count = luaL_getn(lstate, -1);
 #endif
-	lua_settop(lstate, oldTop);
-	return count;
+  lua_settop(lstate, oldTop);
+  return count;
 }
 
 /**
@@ -2326,18 +2517,18 @@ int32_t LuaObject::GetN() const
  */
 int32_t LuaObject::GetCount() const
 {
-	Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state != nullptr, "m_state");
 
-	LuaState* const activeState = GetActiveState();
-	Ensure(activeState != nullptr, "active state");
-	Ensure(activeState->m_state != nullptr, "active lua state");
+  LuaState* const activeState = GetActiveState();
+  Ensure(activeState != nullptr, "active state");
+  Ensure(activeState->m_state != nullptr, "active lua state");
 
-	const int oldTop = lua_gettop(activeState->m_state);
-	const_cast<LuaObject*>(this)->PushStack(activeState);
-	const int stackIndex = lua_gettop(activeState->m_state);
-	const int32_t count = static_cast<int32_t>(lua_getn(activeState->m_state, stackIndex));
-	lua_settop(activeState->m_state, oldTop);
-	return count;
+  const int oldTop = lua_gettop(activeState->m_state);
+  const_cast<LuaObject*>(this)->PushStack(activeState);
+  const int stackIndex = lua_gettop(activeState->m_state);
+  const int32_t count = static_cast<int32_t>(lua_getn(activeState->m_state, stackIndex));
+  lua_settop(activeState->m_state, oldTop);
+  return count;
 }
 
 /**
@@ -2348,13 +2539,13 @@ int32_t LuaObject::GetCount() const
  */
 int32_t LuaObject::GetTableCount() const
 {
-	int32_t count = 0;
-	LuaTableIterator iter(*this, 1);
-	while (!iter.m_isDone) {
-		++count;
-		iter.Next();
-	}
-	return count;
+  int32_t count = 0;
+  LuaTableIterator iter(*this, 1);
+  while (!iter.m_isDone) {
+    ++count;
+    iter.Next();
+  }
+  return count;
 }
 
 /**
@@ -2364,66 +2555,72 @@ int32_t LuaObject::GetTableCount() const
  * Creates one C closure with `tagMethod` upvalues from the Lua root-state
  * stack, then assigns it into this table object under `key`.
  */
-void LuaObject::Register(const char* const key, CFunction const value, const int32_t tagMethod)
+void LuaObject::Register(
+  const char* const key,
+  CFunction const value,
+  const int32_t tagMethod
+)
 {
-	Ensure(m_state != nullptr, "m_state");
-	Ensure(m_state->m_state != nullptr, "lua state");
-	Ensure(m_state->m_state->l_G != nullptr, "lua global state");
-	Ensure(key != nullptr, "key");
-	Ensure(value != nullptr, "value");
+  Ensure(m_state != nullptr, "m_state");
+  Ensure(m_state->m_state != nullptr, "lua state");
+  Ensure(m_state->m_state->l_G != nullptr, "lua global state");
+  Ensure(key != nullptr, "key");
+  Ensure(value != nullptr, "value");
 
-	lua_State* const closureState = m_state->m_state->l_G->lstate;
-	Ensure(closureState != nullptr, "closure state");
+  lua_State* const closureState = m_state->m_state->l_G->lstate;
+  Ensure(closureState != nullptr, "closure state");
 
-	Closure* const closure = luaF_newCclosure(closureState, tagMethod);
-	closure->c.f = value;
-	closureState->top -= tagMethod;
+  Closure* const closure = luaF_newCclosure(closureState, tagMethod);
+  closure->c.f = value;
+  closureState->top -= tagMethod;
 
-	for (int upvalueIndex = tagMethod - 1; upvalueIndex >= 0; --upvalueIndex) {
-		closure->c.upvalue[upvalueIndex] = closureState->top[upvalueIndex];
-		faf_lua51_gc_barrier_value(
-			closureState,
-			reinterpret_cast<GCObject*>(closure),
-			&closure->c.upvalue[upvalueIndex]
-		); // Lua 5.1.5 lapi.c: lua_pushcclosure()
-		closureState->top[upvalueIndex].tt = 0;
-	}
+  for (int upvalueIndex = tagMethod - 1; upvalueIndex >= 0; --upvalueIndex) {
+    closure->c.upvalue[upvalueIndex] = closureState->top[upvalueIndex];
+    faf_lua51_gc_barrier_value(
+      closureState,
+      reinterpret_cast<GCObject*>(closure),
+      &closure->c.upvalue[upvalueIndex]
+    ); // Lua 5.1.5 lapi.c: lua_pushcclosure()
+    closureState->top[upvalueIndex].tt = 0;
+  }
 
-	TObject closureObject{};
-	closureObject.value.p = closure;
-	closureObject.tt = static_cast<int>(closure->c.tt);
-	SetTableHelper(key, &closureObject);
+  TObject closureObject{};
+  closureObject.value.p = closure;
+  closureObject.tt = static_cast<int>(closure->c.tt);
+  SetTableHelper(key, &closureObject);
 }
 
 namespace
 {
-	// Wire tags of the SCR byte-stream format, written by LuaObject::ToByteStream.
-	constexpr int8_t kScrTagNumber = 0;
-	constexpr int8_t kScrTagString = 1;
-	constexpr int8_t kScrTagNil = 2;
-	constexpr int8_t kScrTagBoolean = 3;
-	constexpr int8_t kScrTagTableBegin = 4;
-	constexpr int8_t kScrTagTableEnd = 5;
+  // Wire tags of the SCR byte-stream format, written by LuaObject::ToByteStream.
+  constexpr int8_t kScrTagNumber = 0;
+  constexpr int8_t kScrTagString = 1;
+  constexpr int8_t kScrTagNil = 2;
+  constexpr int8_t kScrTagBoolean = 3;
+  constexpr int8_t kScrTagTableBegin = 4;
+  constexpr int8_t kScrTagTableEnd = 5;
 
-	// Deepest table nesting the decoder rebuilds. Each nested table is one
-	// recursion, and a 64 KB lobby message or sim callback holds 65535
-	// table-begin tags, enough to overflow any thread's stack. Nothing the
-	// engine or the game's Lua sends nests within an order of magnitude of it.
-	// Tables below this depth are skipped, not refused: FAF's lobby relays what
-	// a player sent a few levels deeper (a joiner's player options end up in
-	// the host's Launch message), so refusing would let one player's deep table
-	// stop everyone else's launch.
-	constexpr int kScrMaxTableDepth = 256;
+  // Deepest table nesting the decoder rebuilds. Each nested table is one
+  // recursion, and a 64 KB lobby message or sim callback holds 65535
+  // table-begin tags, enough to overflow any thread's stack. Nothing the
+  // engine or the game's Lua sends nests within an order of magnitude of it.
+  // Tables below this depth are skipped, not refused: FAF's lobby relays what
+  // a player sent a few levels deeper (a joiner's player options end up in
+  // the host's Launch message), so refusing would let one player's deep table
+  // stop everyone else's launch.
+  constexpr int kScrMaxTableDepth = 256;
 
-	// The stream comes off the network (lobby data, sim callbacks, chat), so a
-	// malformed one is the sender's fault: it fails the decode like a short
-	// read (BinaryReader::PrematureEOF) does, and the caller drops it.
-	[[noreturn]] void ThrowMalformedScrStream(const char* const reason)
-	{
-		throw std::runtime_error(std::string("Malformed lua byte stream: ") + reason);
-	}
+  // The stream comes off the network (lobby data, sim callbacks, chat), so a
+  // malformed one is the sender's fault: it fails the decode like a short
+  // read (BinaryReader::PrematureEOF) does, and the caller drops it.
+  [[noreturn]] void ThrowMalformedScrStream(
+    const char* const reason
+  )
+  {
+    throw std::runtime_error(std::string("Malformed lua byte stream: ") + reason);
+  }
 
-	bool ReadScrValue(LuaObject& out, LuaState* state, const gpg::BinaryReader* reader, int tablesLeft);
+  bool ReadScrValue(LuaObject& out, LuaState* state, const gpg::BinaryReader* reader, int tablesLeft);
 } // namespace
 
 /**
@@ -2439,12 +2636,16 @@ namespace
  * could end the process. A table entry whose key or value nests deeper than
  * kScrMaxTableDepth is skipped without recursion and left out.
  */
-void LuaObject::SCR_FromByteStream(LuaObject& out, LuaState* state, const gpg::BinaryReader* reader)
+void LuaObject::SCR_FromByteStream(
+  LuaObject& out,
+  LuaState* state,
+  const gpg::BinaryReader* reader
+)
 {
-	Ensure(state != nullptr, "state");
-	Ensure(reader != nullptr, "reader");
+  Ensure(state != nullptr, "state");
+  Ensure(reader != nullptr, "reader");
 
-	ReadScrValue(out, state, reader, kScrMaxTableDepth);
+  ReadScrValue(out, state, reader, kScrMaxTableDepth);
 }
 
 /**
@@ -2452,142 +2653,153 @@ void LuaObject::SCR_FromByteStream(LuaObject& out, LuaState* state, const gpg::B
  * written by ToByteStream in this process, which recursed as deep as this
  * decode will, so the nesting cap guards nothing here.
  */
-void LuaObject::SCR_FromLocalByteStream(LuaObject& out, LuaState* state, const gpg::BinaryReader* reader)
+void LuaObject::SCR_FromLocalByteStream(
+  LuaObject& out,
+  LuaState* state,
+  const gpg::BinaryReader* reader
+)
 {
-	Ensure(state != nullptr, "state");
-	Ensure(reader != nullptr, "reader");
+  Ensure(state != nullptr, "state");
+  Ensure(reader != nullptr, "reader");
 
-	ReadScrValue(out, state, reader, std::numeric_limits<int>::max());
+  ReadScrValue(out, state, reader, std::numeric_limits<int>::max());
 }
 
 namespace
 {
-	/**
-	 * What it does:
-	 * Consumes the rest of a table whose begin tag has been read, nested
-	 * tables included, with a counter instead of recursion.
-	 */
-	void SkipScrTable(const gpg::BinaryReader* const reader)
-	{
-		std::size_t openTables = 1;
-		while (openTables != 0) {
-			int8_t luaType = 0;
-			reader->ReadExact(luaType);
-			switch (luaType) {
-				case kScrTagNumber: {
-					float number = 0.0f;
-					reader->ReadExact(number);
-					break;
-				}
-				case kScrTagString: {
-					fa::string string;
-					reader->ReadString(&string);
-					break;
-				}
-				case kScrTagBoolean: {
-					int8_t byteValue = 0;
-					reader->ReadExact(byteValue);
-					break;
-				}
-				case kScrTagTableBegin:
-					++openTables;
-					break;
-				case kScrTagTableEnd:
-					--openTables;
-					break;
-				default:
-					break;
-			}
-		}
-	}
+  /**
+   * What it does:
+   * Consumes the rest of a table whose begin tag has been read, nested
+   * tables included, with a counter instead of recursion.
+   */
+  void SkipScrTable(
+    const gpg::BinaryReader* const reader
+  )
+  {
+    std::size_t openTables = 1;
+    while (openTables != 0) {
+      int8_t luaType = 0;
+      reader->ReadExact(luaType);
+      switch (luaType) {
+      case kScrTagNumber: {
+        float number = 0.0f;
+        reader->ReadExact(number);
+        break;
+      }
+      case kScrTagString: {
+        fa::string string;
+        reader->ReadString(&string);
+        break;
+      }
+      case kScrTagBoolean: {
+        int8_t byteValue = 0;
+        reader->ReadExact(byteValue);
+        break;
+      }
+      case kScrTagTableBegin:
+        ++openTables;
+        break;
+      case kScrTagTableEnd:
+        --openTables;
+        break;
+      default:
+        break;
+      }
+    }
+  }
 
-	/**
-	 * What it does:
-	 * The body of SCR_FromByteStream, one tagged value at a time;
-	 * `tablesLeft` is how many more levels of table nesting may be opened.
-	 * Returns false for a table past that depth, which is skipped instead.
-	 */
-	bool ReadScrValue(LuaObject& out, LuaState* const state, const gpg::BinaryReader* const reader, const int tablesLeft)
-	{
-		LuaObject result;
-		int8_t luaType = 0;
-		reader->ReadExact(luaType);
+  /**
+   * What it does:
+   * The body of SCR_FromByteStream, one tagged value at a time;
+   * `tablesLeft` is how many more levels of table nesting may be opened.
+   * Returns false for a table past that depth, which is skipped instead.
+   */
+  bool ReadScrValue(
+    LuaObject& out,
+    LuaState* const state,
+    const gpg::BinaryReader* const reader,
+    const int tablesLeft
+  )
+  {
+    LuaObject result;
+    int8_t luaType = 0;
+    reader->ReadExact(luaType);
 
-		switch (luaType) {
-			case kScrTagNumber: {
-				float number = 0.0f;
-				reader->ReadExact(number);
-				result.AssignNumber(state, number);
-				break;
-			}
-			case kScrTagString: {
-				fa::string string;
-				reader->ReadString(&string);
-				result.AssignString(state, string.c_str());
-				break;
-			}
-			case kScrTagNil:
-				result.AssignNil(state);
-				break;
-			case kScrTagBoolean: {
-				int8_t byteValue = 0;
-				reader->ReadExact(byteValue);
-				result.AssignBoolean(state, byteValue != 0);
-				break;
-			}
-			case kScrTagTableBegin: {
-				if (tablesLeft <= 0) {
-					SkipScrTable(reader);
-					return false;
-				}
-				result.AssignNewTable(state, 0, 0);
+    switch (luaType) {
+    case kScrTagNumber: {
+      float number = 0.0f;
+      reader->ReadExact(number);
+      result.AssignNumber(state, number);
+      break;
+    }
+    case kScrTagString: {
+      fa::string string;
+      reader->ReadString(&string);
+      result.AssignString(state, string.c_str());
+      break;
+    }
+    case kScrTagNil:
+      result.AssignNil(state);
+      break;
+    case kScrTagBoolean: {
+      int8_t byteValue = 0;
+      reader->ReadExact(byteValue);
+      result.AssignBoolean(state, byteValue != 0);
+      break;
+    }
+    case kScrTagTableBegin: {
+      if (tablesLeft <= 0) {
+        SkipScrTable(reader);
+        return false;
+      }
+      result.AssignNewTable(state, 0, 0);
 
-				// Peek the next tag through Stream::CheckByte: it reads one byte and
-				// rewinds the read window by one. Reaching for the virtual unget
-				// directly instead skips that rewind, and MemBufferStream's override
-				// throws unconditionally - which made every table fail to load.
-				gpg::Stream& stream = *const_cast<gpg::Stream*>(reader->stream());
-				while (stream.CheckByte() != kScrTagTableEnd) {
-					LuaObject key;
-					const bool haveKey = ReadScrValue(key, state, reader, tablesLeft - 1);
-					if (haveKey && key.IsNil()) {
-						ThrowMalformedScrStream("nil table key");
-					}
-					// A NaN key makes luaH_set raise a Lua error, which unwinds with
-					// the error message still pushed on the Lua stack.
-					if (haveKey && key.IsNumber() && key.GetNumber() != key.GetNumber()) {
-						ThrowMalformedScrStream("NaN table key");
-					}
+      // Peek the next tag through Stream::CheckByte: it reads one byte and
+      // rewinds the read window by one. Reaching for the virtual unget
+      // directly instead skips that rewind, and MemBufferStream's override
+      // throws unconditionally - which made every table fail to load.
+      gpg::Stream& stream = *const_cast<gpg::Stream*>(reader->stream());
+      while (stream.CheckByte() != kScrTagTableEnd) {
+        LuaObject key;
+        const bool haveKey = ReadScrValue(key, state, reader, tablesLeft - 1);
+        if (haveKey && key.IsNil()) {
+          ThrowMalformedScrStream("nil table key");
+        }
+        // A NaN key makes luaH_set raise a Lua error, which unwinds with
+        // the error message still pushed on the Lua stack.
+        if (haveKey && key.IsNumber() && key.GetNumber() != key.GetNumber()) {
+          ThrowMalformedScrStream("NaN table key");
+        }
 
-					LuaObject value;
-					const bool haveValue = ReadScrValue(value, state, reader, tablesLeft - 1);
-					if (haveValue && value.IsNil()) {
-						ThrowMalformedScrStream("nil table value");
-					}
+        LuaObject value;
+        const bool haveValue = ReadScrValue(value, state, reader, tablesLeft - 1);
+        if (haveValue && value.IsNil()) {
+          ThrowMalformedScrStream("nil table value");
+        }
 
-					// An entry with a key or value nested too deeply is left out.
-					if (haveKey && haveValue) {
-						result.SetObject(key, value);
-					}
-				}
+        // An entry with a key or value nested too deeply is left out.
+        if (haveKey && haveValue) {
+          result.SetObject(key, value);
+        }
+      }
 
-				// Consume the end-of-table tag the peek left in place.
-				(void)reader->ReadChar();
-				break;
-			}
-			case kScrTagTableEnd:
-				gpg::Warnf("Error deseralizing lua object: unexpected end-of-table marker encountered.");
-				result.AssignNil(state);
-				break;
-			default:
-				gpg::Warnf("Attempt to deserialize unknown lua data.");
-				result.AssignNil(state);
-				break;
-		}
+      // Consume the end-of-table tag the peek left in place.
+      (void)reader->ReadChar();
+      break;
+    }
+    case kScrTagTableEnd:
+      gpg::Warnf("Error deseralizing lua object: unexpected end-of-table marker encountered.");
+      result.AssignNil(state);
+      break;
+    default:
+      gpg::Warnf("Attempt to deserialize unknown lua data.");
+      result.AssignNil(state);
+      break;
+    }
 
-		out = result;
-		return true;
-	}
+    out = result;
+    return true;
+  }
 } // namespace
 
 /**
@@ -2599,16 +2811,16 @@ namespace
  */
 bool LuaObject::GetBoolean() const
 {
-	if (!m_state) {
-		throw LuaAssertion("m_state");
-	}
+  if (!m_state) {
+    throw LuaAssertion("m_state");
+  }
 
-	lua_State* const lstate = GetActiveCState();
-	if (m_object.tt != LUA_TNIL && m_object.tt != LUA_TBOOLEAN) {
-		luaG_typeerror(lstate, &m_object, "get as boolean");
-	}
+  lua_State* const lstate = GetActiveCState();
+  if (m_object.tt != LUA_TNIL && m_object.tt != LUA_TBOOLEAN) {
+    luaG_typeerror(lstate, &m_object, "get as boolean");
+  }
 
-	return m_object.tt != LUA_TNIL && (m_object.tt != LUA_TBOOLEAN || m_object.value.b != 0);
+  return m_object.tt != LUA_TNIL && (m_object.tt != LUA_TBOOLEAN || m_object.value.b != 0);
 }
 
 /**
@@ -2620,17 +2832,17 @@ bool LuaObject::GetBoolean() const
  */
 const char* LuaObject::GetString() const
 {
-	if (!m_state) {
-		throw LuaAssertion("m_state");
-	}
+  if (!m_state) {
+    throw LuaAssertion("m_state");
+  }
 
-	lua_State* const lstate = GetActiveCState();
-	if (m_object.tt != LUA_TSTRING) {
-		luaG_typeerror(lstate, &m_object, "get as string");
-	}
+  lua_State* const lstate = GetActiveCState();
+  if (m_object.tt != LUA_TSTRING) {
+    luaG_typeerror(lstate, &m_object, "get as string");
+  }
 
-	const auto* ts = static_cast<const TString*>(m_object.value.p);
-	return ts->str;
+  const auto* ts = static_cast<const TString*>(m_object.value.p);
+  return ts->str;
 }
 
 /**
@@ -2642,17 +2854,17 @@ const char* LuaObject::GetString() const
  */
 int32_t LuaObject::ToStrLen()
 {
-	if (m_object.tt == LUA_TSTRING) {
-		const auto* const text = static_cast<const TString*>(m_object.value.p);
-		return static_cast<int32_t>(text->len);
-	}
+  if (m_object.tt == LUA_TSTRING) {
+    const auto* const text = static_cast<const TString*>(m_object.value.p);
+    return static_cast<int32_t>(text->len);
+  }
 
-	if (luaV_tostring(m_state->m_state, &m_object) != 0) {
-		const auto* const text = static_cast<const TString*>(m_object.value.p);
-		return static_cast<int32_t>(text->len);
-	}
+  if (luaV_tostring(m_state->m_state, &m_object) != 0) {
+    const auto* const text = static_cast<const TString*>(m_object.value.p);
+    return static_cast<int32_t>(text->len);
+  }
 
-	return 0;
+  return 0;
 }
 
 /**
@@ -2664,11 +2876,11 @@ int32_t LuaObject::ToStrLen()
  */
 int32_t LuaObject::ToInteger() const
 {
-	TObject numericValue{};
-	if (m_object.tt == LUA_TNUMBER || luaV_tonumber(&m_object, &numericValue) != 0) {
-		return static_cast<int32_t>(m_object.value.n);
-	}
-	return 0;
+  TObject numericValue{};
+  if (m_object.tt == LUA_TNUMBER || luaV_tonumber(&m_object, &numericValue) != 0) {
+    return static_cast<int32_t>(m_object.value.n);
+  }
+  return 0;
 }
 
 /**
@@ -2680,11 +2892,11 @@ int32_t LuaObject::ToInteger() const
  */
 double LuaObject::ToNumber() const
 {
-	TObject numericValue{};
-	if (m_object.tt == LUA_TNUMBER || luaV_tonumber(&m_object, &numericValue) != 0) {
-		return static_cast<double>(m_object.value.n);
-	}
-	return 0.0;
+  TObject numericValue{};
+  if (m_object.tt == LUA_TNUMBER || luaV_tonumber(&m_object, &numericValue) != 0) {
+    return static_cast<double>(m_object.value.n);
+  }
+  return 0.0;
 }
 
 /**
@@ -2697,16 +2909,16 @@ double LuaObject::ToNumber() const
  */
 const char* LuaObject::ToString() const
 {
-	if (m_object.tt == LUA_TSTRING) {
-		return static_cast<const GCObject*>(m_object.value.p)->ts.str;
-	}
+  if (m_object.tt == LUA_TSTRING) {
+    return static_cast<const GCObject*>(m_object.value.p)->ts.str;
+  }
 
-	TObject* const object = const_cast<TObject*>(&m_object);
-	if (luaV_tostring(m_state->m_state, object) != 0) {
-		return static_cast<const GCObject*>(object->value.p)->ts.str;
-	}
+  TObject* const object = const_cast<TObject*>(&m_object);
+  if (luaV_tostring(m_state->m_state, object) != 0) {
+    return static_cast<const GCObject*>(object->value.p)->ts.str;
+  }
 
-	return nullptr;
+  return nullptr;
 }
 
 /**
@@ -2717,11 +2929,11 @@ const char* LuaObject::ToString() const
  */
 double LuaObject::GetNumber() const
 {
-	Ensure(m_state != nullptr, "m_state");
-	if (m_object.tt != LUA_TNUMBER) {
-		luaG_typeerror(m_state->m_state->l_G->lstate, &m_object, "get as number");
-	}
-	return static_cast<double>(m_object.value.n);
+  Ensure(m_state != nullptr, "m_state");
+  if (m_object.tt != LUA_TNUMBER) {
+    luaG_typeerror(m_state->m_state->l_G->lstate, &m_object, "get as number");
+  }
+  return static_cast<double>(m_object.value.n);
 }
 
 /**
@@ -2731,14 +2943,16 @@ double LuaObject::GetNumber() const
  * Validates LuaObject state/type and returns the numeric payload as one float
  * lane (`Value::n`), raising Lua's type-error lane for non-numeric values.
  */
-float LuaObjectGetNumberAsFloat(const LuaObject* const object)
+float LuaObjectGetNumberAsFloat(
+  const LuaObject* const object
+)
 {
-	Ensure(object != nullptr, "object");
-	Ensure(object->m_state != nullptr, "m_state");
-	if (object->m_object.tt != LUA_TNUMBER) {
-		luaG_typeerror(object->m_state->m_state->l_G->lstate, &object->m_object, "get as number");
-	}
-	return object->m_object.value.n;
+  Ensure(object != nullptr, "object");
+  Ensure(object->m_state != nullptr, "m_state");
+  if (object->m_object.tt != LUA_TNUMBER) {
+    luaG_typeerror(object->m_state->m_state->l_G->lstate, &object->m_object, "get as number");
+  }
+  return object->m_object.value.n;
 }
 
 /**
@@ -2748,16 +2962,18 @@ float LuaObjectGetNumberAsFloat(const LuaObject* const object)
  * Validates LuaObject state/type and returns one interned Lua string buffer,
  * raising Lua's typed-operation error lane on non-string values.
  */
-const char* LuaObjectGetStringChecked(const LuaObject* const object)
+const char* LuaObjectGetStringChecked(
+  const LuaObject* const object
+)
 {
-	Ensure(object != nullptr, "object");
-	Ensure(object->m_state != nullptr, "m_state");
-	if (object->m_object.tt != LUA_TSTRING) {
-		luaG_typeerror(object->m_state->m_state->l_G->lstate, &object->m_object, "string");
-	}
+  Ensure(object != nullptr, "object");
+  Ensure(object->m_state != nullptr, "m_state");
+  if (object->m_object.tt != LUA_TSTRING) {
+    luaG_typeerror(object->m_state->m_state->l_G->lstate, &object->m_object, "string");
+  }
 
-	const auto* const text = static_cast<const TString*>(object->m_object.value.p);
-	return text->str;
+  const auto* const text = static_cast<const TString*>(object->m_object.value.p);
+  return text->str;
 }
 
 /**
@@ -2767,23 +2983,25 @@ const char* LuaObjectGetStringChecked(const LuaObject* const object)
  * Validates LuaObject state/type for function access and returns one C closure
  * entrypoint pointer, or `nullptr` if Lua still reports a non-function lane.
  */
-CFunction LuaObjectGetCFunctionChecked(const LuaObject* const object)
+CFunction LuaObjectGetCFunctionChecked(
+  const LuaObject* const object
+)
 {
-	Ensure(object != nullptr, "object");
-	Ensure(object->m_state != nullptr, "m_state");
+  Ensure(object != nullptr, "object");
+  Ensure(object->m_state != nullptr, "m_state");
 
-	bool isFunctionType = object->m_object.tt == LUA_TFUNCTION;
-	if (!isFunctionType) {
-		luaG_typeerror(object->m_state->m_state->l_G->lstate, &object->m_object, "get as C function");
-		isFunctionType = object->m_object.tt == LUA_TFUNCTION;
-	}
+  bool isFunctionType = object->m_object.tt == LUA_TFUNCTION;
+  if (!isFunctionType) {
+    luaG_typeerror(object->m_state->m_state->l_G->lstate, &object->m_object, "get as C function");
+    isFunctionType = object->m_object.tt == LUA_TFUNCTION;
+  }
 
-	if (!isFunctionType) {
-		return nullptr;
-	}
+  if (!isFunctionType) {
+    return nullptr;
+  }
 
-	const auto* const closure = static_cast<const CClosure*>(object->m_object.value.p);
-	return closure != nullptr ? closure->f : nullptr;
+  const auto* const closure = static_cast<const CClosure*>(object->m_object.value.p);
+  return closure != nullptr ? closure->f : nullptr;
 }
 
 /**
@@ -2793,15 +3011,17 @@ CFunction LuaObjectGetCFunctionChecked(const LuaObject* const object)
  * Validates LuaObject state/type and returns the raw light-userdata pointer
  * payload (`Value::p`) from this tagged object.
  */
-void* LuaObjectGetLightUserDataChecked(const LuaObject* const object)
+void* LuaObjectGetLightUserDataChecked(
+  const LuaObject* const object
+)
 {
-	Ensure(object != nullptr, "object");
-	Ensure(object->m_state != nullptr, "m_state");
-	if (object->m_object.tt != LUA_TLIGHTUSERDATA) {
-		luaG_typeerror(object->m_state->m_state->l_G->lstate, &object->m_object, "get as light userdata");
-	}
+  Ensure(object != nullptr, "object");
+  Ensure(object->m_state != nullptr, "m_state");
+  if (object->m_object.tt != LUA_TLIGHTUSERDATA) {
+    luaG_typeerror(object->m_state->m_state->l_G->lstate, &object->m_object, "get as light userdata");
+  }
 
-	return LightPointer(object->m_object.value);
+  return LightPointer(object->m_object.value);
 }
 
 /**
@@ -2812,18 +3032,18 @@ void* LuaObjectGetLightUserDataChecked(const LuaObject* const object)
  * returns the converted truth-value while restoring the original stack top.
  */
 bool LuaDateGetBooleanField(
-	const char* const fieldName,
-	lua_State* const  state
+  const char* const fieldName,
+  lua_State* const state
 )
 {
-	Ensure(state != nullptr, "state");
-	Ensure(fieldName != nullptr, "fieldName");
+  Ensure(state != nullptr, "state");
+  Ensure(fieldName != nullptr, "fieldName");
 
-	lua_pushstring(state, fieldName);
-	lua_gettable(state, -2);
-	const bool value = lua_toboolean(state, -1) != 0;
-	lua_settop(state, -2);
-	return value;
+  lua_pushstring(state, fieldName);
+  lua_gettable(state, -2);
+  const bool value = lua_toboolean(state, -1) != 0;
+  lua_settop(state, -2);
+  return value;
 }
 
 /**
@@ -2834,25 +3054,25 @@ bool LuaDateGetBooleanField(
  * returns `defaultValue` on non-number fields and raises when required.
  */
 int LuaDateGetNumericFieldOrDefault(
-	int               defaultValue,
-	const char* const fieldName,
-	lua_State* const  state
+  int defaultValue,
+  const char* const fieldName,
+  lua_State* const state
 )
 {
-	Ensure(state != nullptr, "state");
-	Ensure(fieldName != nullptr, "fieldName");
+  Ensure(state != nullptr, "state");
+  Ensure(fieldName != nullptr, "fieldName");
 
-	lua_pushstring(state, fieldName);
-	lua_gettable(state, -2);
+  lua_pushstring(state, fieldName);
+  lua_gettable(state, -2);
 
-	if (lua_isnumber(state, -1)) {
-		defaultValue = static_cast<int>(lua_tonumber(state, -1));
-	} else if (defaultValue == -2) {
-		luaL_error(state, "field `%s' missing in date table", fieldName);
-	}
+  if (lua_isnumber(state, -1)) {
+    defaultValue = static_cast<int>(lua_tonumber(state, -1));
+  } else if (defaultValue == -2) {
+    luaL_error(state, "field `%s' missing in date table", fieldName);
+  }
 
-	lua_settop(state, -2);
-	return defaultValue;
+  lua_settop(state, -2);
+  return defaultValue;
 }
 
 /**
@@ -2861,9 +3081,11 @@ int LuaDateGetNumericFieldOrDefault(
  * What it does:
  * Forwards one import-thunk lane to `LuaObject::GetNumber`.
  */
-double LuaObjectGetNumberThunk2(const LuaObject* const object)
+double LuaObjectGetNumberThunk2(
+  const LuaObject* const object
+)
 {
-	return object->GetNumber();
+  return object->GetNumber();
 }
 
 /**
@@ -2874,29 +3096,31 @@ double LuaObjectGetNumberThunk2(const LuaObject* const object)
  */
 int32_t LuaObject::GetInteger() const
 {
-	Ensure(m_state != nullptr, "m_state");
-	if (m_object.tt != LUA_TNUMBER) {
-		luaG_typeerror(m_state->m_state->l_G->lstate, &m_object, "get as int");
-	}
-	return static_cast<int32_t>(m_object.value.n);
+  Ensure(m_state != nullptr, "m_state");
+  if (m_object.tt != LUA_TNUMBER) {
+    luaG_typeerror(m_state->m_state->l_G->lstate, &m_object, "get as int");
+  }
+  return static_cast<int32_t>(m_object.value.n);
 }
 
 namespace
 {
-	// Deepest table nesting the encoder writes; past it an entry is left out.
-	// Each level is one recursion on the calling thread (the sim's for Sync),
-	// and a table that contains itself would otherwise recurse until the stack
-	// ran out. Well above anything real: remote data arrives capped at 256
-	// levels (kScrMaxTableDepth) and the sim adds a few on top.
-	constexpr std::size_t kScrMaxEncodeDepth = 1024;
+  // Deepest table nesting the encoder writes; past it an entry is left out.
+  // Each level is one recursion on the calling thread (the sim's for Sync),
+  // and a table that contains itself would otherwise recurse until the stack
+  // ran out. Well above anything real: remote data arrives capped at 256
+  // levels (kScrMaxTableDepth) and the sim adds a few on top.
+  constexpr std::size_t kScrMaxEncodeDepth = 1024;
 
-	// Values the SCR format carries inside a table.
-	[[nodiscard]] bool IsScrEncodable(const LuaObject& value) noexcept
-	{
-		return value.IsBoolean() || value.IsNumber() || value.IsString() || value.IsTable();
-	}
+  // Values the SCR format carries inside a table.
+  [[nodiscard]] bool IsScrEncodable(
+    const LuaObject& value
+  ) noexcept
+  {
+    return value.IsBoolean() || value.IsNumber() || value.IsString() || value.IsTable();
+  }
 
-	bool WriteScrValue(LuaObject& value, gpg::Stream& stream, std::vector<const void*>& openTables);
+  bool WriteScrValue(LuaObject& value, gpg::Stream& stream, std::vector<const void*>& openTables);
 } // namespace
 
 /**
@@ -2914,157 +3138,168 @@ namespace
  * whole stream became unreadable; and it recursed into cycles until the stack
  * overflowed.
  */
-bool LuaObject::ToByteStream(gpg::Stream& stream)
+bool LuaObject::ToByteStream(
+  gpg::Stream& stream
+)
 {
-	std::vector<const void*> openTables;
-	return WriteScrValue(*this, stream, openTables);
+  std::vector<const void*> openTables;
+  return WriteScrValue(*this, stream, openTables);
 }
 
 namespace
 {
-	/**
-	 * What it does:
-	 * The body of LuaObject::ToByteStream; `openTables` holds the tables
-	 * enclosing `value`, outermost first.
-	 */
-	bool WriteScrValue(LuaObject& value, gpg::Stream& stream, std::vector<const void*>& openTables)
-	{
-		char typeTag;
-		bool success = true;
+  /**
+   * What it does:
+   * The body of LuaObject::ToByteStream; `openTables` holds the tables
+   * enclosing `value`, outermost first.
+   */
+  bool WriteScrValue(
+    LuaObject& value,
+    gpg::Stream& stream,
+    std::vector<const void*>& openTables
+  )
+  {
+    char typeTag;
+    bool success = true;
 
-		const auto skipEntry = [&openTables](const LuaObject& entry) {
-			if (!IsScrEncodable(entry)) {
-				gpg::Warnf(
-					entry.IsUserData() ? "Attempt to serialize lua user data." : "Attempt to serialize unsupported lua value."
-				);
-				return true;
-			}
-			if (entry.IsTable()) {
-				const void* const table = entry.m_object.value.p;
-				if (std::find(openTables.begin(), openTables.end(), table) != openTables.end()) {
-					gpg::Warnf("Attempt to serialize a lua table that contains itself.");
-					return true;
-				}
-				if (openTables.size() >= kScrMaxEncodeDepth) {
-					gpg::Warnf("Attempt to serialize lua tables nested more than %u deep.", static_cast<unsigned>(kScrMaxEncodeDepth));
-					return true;
-				}
-			}
-			return false;
-		};
+    const auto skipEntry = [&openTables](const LuaObject& entry) {
+      if (!IsScrEncodable(entry)) {
+        gpg::Warnf(
+          entry.IsUserData() ? "Attempt to serialize lua user data." : "Attempt to serialize unsupported lua value."
+        );
+        return true;
+      }
+      if (entry.IsTable()) {
+        const void* const table = entry.m_object.value.p;
+        if (std::find(openTables.begin(), openTables.end(), table) != openTables.end()) {
+          gpg::Warnf("Attempt to serialize a lua table that contains itself.");
+          return true;
+        }
+        if (openTables.size() >= kScrMaxEncodeDepth) {
+          gpg::Warnf(
+            "Attempt to serialize lua tables nested more than %u deep.", static_cast<unsigned>(kScrMaxEncodeDepth)
+          );
+          return true;
+        }
+      }
+      return false;
+    };
 
-		if (!value.m_state || value.IsNil()) {
-			typeTag = 2;
-			if (stream.mWriteEnd != stream.mWriteHead) {
-				*stream.mWriteHead = typeTag;
-				++stream.mWriteHead;
-			} else {
-				stream.VirtWrite(&typeTag, 1);
-			}
-			return true;
-		}
+    if (!value.m_state || value.IsNil()) {
+      typeTag = 2;
+      if (stream.mWriteEnd != stream.mWriteHead) {
+        *stream.mWriteHead = typeTag;
+        ++stream.mWriteHead;
+      } else {
+        stream.VirtWrite(&typeTag, 1);
+      }
+      return true;
+    }
 
-		if (value.IsBoolean()) {
-			typeTag = 3;
-			if (stream.mWriteEnd != stream.mWriteHead) {
-				*stream.mWriteHead = typeTag;
-				++stream.mWriteHead;
-			} else {
-				stream.VirtWrite(&typeTag, 1);
-			}
+    if (value.IsBoolean()) {
+      typeTag = 3;
+      if (stream.mWriteEnd != stream.mWriteHead) {
+        *stream.mWriteHead = typeTag;
+        ++stream.mWriteHead;
+      } else {
+        stream.VirtWrite(&typeTag, 1);
+      }
 
-			const bool boolValue = value.GetBoolean();
-			typeTag = boolValue ? 1 : 0;
-			if (stream.mWriteEnd != stream.mWriteHead) {
-				*stream.mWriteHead = typeTag;
-				++stream.mWriteHead;
-			} else {
-				stream.VirtWrite(&typeTag, 1);
-			}
-			return true;
-		}
+      const bool boolValue = value.GetBoolean();
+      typeTag = boolValue ? 1 : 0;
+      if (stream.mWriteEnd != stream.mWriteHead) {
+        *stream.mWriteHead = typeTag;
+        ++stream.mWriteHead;
+      } else {
+        stream.VirtWrite(&typeTag, 1);
+      }
+      return true;
+    }
 
-		if (value.IsNumber()) {
-			typeTag = 0;
-			stream.Write(typeTag);
-			const float number = static_cast<float>(value.GetNumber());
-			stream.Write(number);
-			return true;
-		}
+    if (value.IsNumber()) {
+      typeTag = 0;
+      stream.Write(typeTag);
+      const float number = static_cast<float>(value.GetNumber());
+      stream.Write(number);
+      return true;
+    }
 
-		if (value.IsString()) {
-			typeTag = 1;
-			stream.Write(typeTag);
-			const char* str = value.GetString();
-			stream.Write(str ? str : "");
-			return true;
-		}
+    if (value.IsString()) {
+      typeTag = 1;
+      stream.Write(typeTag);
+      const char* str = value.GetString();
+      stream.Write(str ? str : "");
+      return true;
+    }
 
-		if (value.IsTable()) {
-			typeTag = 4;
-			stream.Write(typeTag);
+    if (value.IsTable()) {
+      typeTag = 4;
+      stream.Write(typeTag);
 
-			openTables.push_back(value.m_object.value.p);
-			LuaTableIterator iter(value, 1);
-			while (!iter.m_isDone) {
-				LuaObject entryKey = iter.GetKey();
-				LuaObject entryValue = iter.GetValue();
-				if (skipEntry(entryKey) || skipEntry(entryValue)) {
-					success = false;
-				} else {
-					if (!WriteScrValue(entryKey, stream, openTables)) {
-						success = false;
-					}
-					if (!WriteScrValue(entryValue, stream, openTables)) {
-						success = false;
-					}
-				}
+      openTables.push_back(value.m_object.value.p);
+      LuaTableIterator iter(value, 1);
+      while (!iter.m_isDone) {
+        LuaObject entryKey = iter.GetKey();
+        LuaObject entryValue = iter.GetValue();
+        if (skipEntry(entryKey) || skipEntry(entryValue)) {
+          success = false;
+        } else {
+          if (!WriteScrValue(entryKey, stream, openTables)) {
+            success = false;
+          }
+          if (!WriteScrValue(entryValue, stream, openTables)) {
+            success = false;
+          }
+        }
 
-				iter.Next();
-			}
-			openTables.pop_back();
+        iter.Next();
+      }
+      openTables.pop_back();
 
-			typeTag = 5;
-			stream.Write(typeTag);
-			return success;
-		}
+      typeTag = 5;
+      stream.Write(typeTag);
+      return success;
+    }
 
-		if (value.IsUserData()) {
-			gpg::Warnf("Attempt to serialize lua user data.");
-			typeTag = 2;
-			stream.Write(typeTag);
-			return false;
-		}
+    if (value.IsUserData()) {
+      gpg::Warnf("Attempt to serialize lua user data.");
+      typeTag = 2;
+      stream.Write(typeTag);
+      return false;
+    }
 
-		gpg::Warnf("Attempt to serialize unsupported lua value.");
-		typeTag = 2;
-		stream.Write(typeTag);
-		return false;
-	}
+    gpg::Warnf("Attempt to serialize unsupported lua value.");
+    typeTag = 2;
+    stream.Write(typeTag);
+    return false;
+  }
 } // namespace
 
 namespace gpg
 {
-	/**
-	 * Address: 0x00916E60 (FUN_00916E60, gpg::RRef_WrapFile)
-	 *
-	 * IDA signature:
-	 * gpg::RRef *__cdecl gpg::RRef_WrapFile(gpg::RRef *out, char *object);
-	 *
-	 * What it does:
-	 * Builds a reflected reference for one `WrapFile` payload (internal
-	 * LuaObject.cpp userdata type) using the cached RTTI lookup and the
-	 * 3-slot TLS derived-type normalization helper. `WrapFile` is a
-	 * non-polymorphic struct so the runtime-type compare-equal fast path
-	 * always fires and the derived-type TLS-cache lanes are dead code in
-	 * this instantiation; the effective behavior is
-	 * `(out->mObj = object; out->mType = CachedType<WrapFile>())`.
-	 */
-	gpg::RRef* RRef_WrapFile(gpg::RRef* const out, void* const object)
-	{
-		return RRefWrapFileImpl(out, static_cast<WrapFile*>(object));
-	}
-}
+  /**
+   * Address: 0x00916E60 (FUN_00916E60, gpg::RRef_WrapFile)
+   *
+   * IDA signature:
+   * gpg::RRef *__cdecl gpg::RRef_WrapFile(gpg::RRef *out, char *object);
+   *
+   * What it does:
+   * Builds a reflected reference for one `WrapFile` payload (internal
+   * LuaObject.cpp userdata type) using the cached RTTI lookup and the
+   * 3-slot TLS derived-type normalization helper. `WrapFile` is a
+   * non-polymorphic struct so the runtime-type compare-equal fast path
+   * always fires and the derived-type TLS-cache lanes are dead code in
+   * this instantiation; the effective behavior is
+   * `(out->mObj = object; out->mType = CachedType<WrapFile>())`.
+   */
+  gpg::RRef* RRef_WrapFile(
+    gpg::RRef* const out,
+    void* const object
+  )
+  {
+    return RRefWrapFileImpl(out, static_cast<WrapFile*>(object));
+  }
+} // namespace gpg
 
 /**
  * `gpg::SerSaveLoadHelper<Table>`, vtable 0x00D47030.
@@ -3080,8 +3315,8 @@ struct TableSerializer : gpg::SerSaveLoadHelper<Table>
 
 namespace
 {
-	// Address: 0x00F8E72C -- process-global `TableSerializer` singleton.
-	TableSerializer gTableSerializer;
+  // Address: 0x00F8E72C -- process-global `TableSerializer` singleton.
+  TableSerializer gTableSerializer;
 } // namespace
 
 /**
@@ -3098,8 +3333,8 @@ struct LClosureSerializer : gpg::SerSaveLoadHelper<LClosure>
 
 namespace
 {
-	// Address: 0x00F8E768 -- process-global `LClosureSerializer` singleton.
-	LClosureSerializer gLClosureSerializer;
+  // Address: 0x00F8E768 -- process-global `LClosureSerializer` singleton.
+  LClosureSerializer gLClosureSerializer;
 } // namespace
 
 /**
@@ -3116,8 +3351,8 @@ struct ProtoSerializer : gpg::SerSaveLoadHelper<Proto>
 
 namespace
 {
-	// Address: 0x00F8E77C -- process-global `ProtoSerializer` singleton.
-	ProtoSerializer gProtoSerializer;
+  // Address: 0x00F8E77C -- process-global `ProtoSerializer` singleton.
+  ProtoSerializer gProtoSerializer;
 } // namespace
 
 /**
@@ -3134,8 +3369,8 @@ struct lua_StateSerializer : gpg::SerSaveLoadHelper<lua_State>
 
 namespace
 {
-	// Address: 0x00F8EAAC -- process-global `lua_StateSerializer` singleton.
-	lua_StateSerializer glua_StateSerializer;
+  // Address: 0x00F8EAAC -- process-global `lua_StateSerializer` singleton.
+  lua_StateSerializer glua_StateSerializer;
 } // namespace
 
 /**
@@ -3152,8 +3387,8 @@ struct TObjectSerializer : gpg::SerSaveLoadHelper<TObject>
 
 namespace
 {
-	// Address: 0x00F8E8AC -- process-global `TObjectSerializer` singleton.
-	TObjectSerializer gTObjectSerializer;
+  // Address: 0x00F8E8AC -- process-global `TObjectSerializer` singleton.
+  TObjectSerializer gTObjectSerializer;
 } // namespace
 
 /**
@@ -3170,29 +3405,29 @@ struct UdataSerializer : gpg::SerSaveLoadHelper<Udata>
 
 namespace
 {
-	// Address: 0x00F8E6F0 -- process-global `UdataSerializer` singleton.
-	UdataSerializer gUdataSerializer;
+  // Address: 0x00F8E6F0 -- process-global `UdataSerializer` singleton.
+  UdataSerializer gUdataSerializer;
 } // namespace
 
 namespace LuaPlus
 {
-	/**
-	 * `gpg::SerSaveLoadHelper<LuaObject>`, vtable 0x00D44F5C.
-	 *
-	 * Address: 0x00BE9F50 (FUN_00BE9F50 -- constructs the global and registers its destructor.)
-	 * Address: 0x00C098B0 (FUN_00C098B0 -- the global's destructor.)
-	 * Address: 0x0090B560 (FUN_0090B560 -- `Init`.)
-	 * Address: 0x0090BE70 (FUN_0090BE70 -- `Deserialize`, a forward to `MemberDeserialize`.)
-	 * Address: 0x0090BA10 (FUN_0090BA10 -- `Serialize`, a forward to `MemberSerialize`.)
-	 */
-	struct LuaObjectSerializer : gpg::SerSaveLoadHelper<LuaObject>
-	{};
+  /**
+   * `gpg::SerSaveLoadHelper<LuaObject>`, vtable 0x00D44F5C.
+   *
+   * Address: 0x00BE9F50 (FUN_00BE9F50 -- constructs the global and registers its destructor.)
+   * Address: 0x00C098B0 (FUN_00C098B0 -- the global's destructor.)
+   * Address: 0x0090B560 (FUN_0090B560 -- `Init`.)
+   * Address: 0x0090BE70 (FUN_0090BE70 -- `Deserialize`, a forward to `MemberDeserialize`.)
+   * Address: 0x0090BA10 (FUN_0090BA10 -- `Serialize`, a forward to `MemberSerialize`.)
+   */
+  struct LuaObjectSerializer : gpg::SerSaveLoadHelper<LuaObject>
+  {};
 
 #include "LuaIncrementalGcCore.inc"
 } // namespace LuaPlus
 
 namespace
 {
-	// Address: 0x00F8E5AC -- process-global `LuaObjectSerializer` singleton.
-	LuaPlus::LuaObjectSerializer gLuaObjectSerializer;
+  // Address: 0x00F8E5AC -- process-global `LuaObjectSerializer` singleton.
+  LuaPlus::LuaObjectSerializer gLuaObjectSerializer;
 } // namespace

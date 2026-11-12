@@ -63,8 +63,10 @@ AlignTrailingComments: true
 PointerAlignment: Left
 ReferenceAlignment: Left
 
-# Include sorting
-SortIncludes: CaseInsensitive
+# Include sorting: off. The Windows SDK (dsound.h, mmreg.h, winhttp.h, dpapi.h) and wxWidgets 2.4 headers the engine
+# uses depend on the order they are included in; sorting them broke 22 files on Windows (2026-11-11).
+# The categories below only apply if sorting is turned back on.
+SortIncludes: Never
 IncludeBlocks: Preserve
 # Ensure windows.h always precedes other Windows SDK headers that depend on it
 IncludeCategories:
@@ -94,5 +96,6 @@ DerivePointerAlignment: false
 FixNamespaceComments: true
 MaxEmptyLinesToKeep: 1
 ReflowComments: true
-SortUsingDeclarations: true
+# Off like SortIncludes: formatting changes layout only, never the order of declarations.
+SortUsingDeclarations: Never
 ...

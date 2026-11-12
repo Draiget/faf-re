@@ -14,7 +14,9 @@ namespace moho
    * Address: 0x007ED150 (FUN_007ED150, Moho::SonarExtractor::Range)
    */
   bool SonarExtractor::Range(
-    SRangeExtractionPayload* const outRange, const RUnitBlueprint* const unitBlueprint, const Wm3::Vec3f& center
+    SRangeExtractionPayload* const outRange,
+    const RUnitBlueprint* const unitBlueprint,
+    const Wm3::Vec3f& center
   ) const
   {
     if (!outRange || !unitBlueprint) {
@@ -29,7 +31,9 @@ namespace moho
    * Address: 0x007ED090 (FUN_007ED090, Moho::SonarExtractor::Extract)
    */
   bool SonarExtractor::Extract(
-    SRangeExtractionPayload* const outRange, const UserEntity* const userEntity, const float interpolationAlpha
+    SRangeExtractionPayload* const outRange,
+    const UserEntity* const userEntity,
+    const float interpolationAlpha
   ) const
   {
     if (!outRange || !userEntity) {

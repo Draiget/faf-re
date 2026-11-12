@@ -5,12 +5,15 @@
 #include <typeinfo>
 
 #include "moho/sim/CArmyImpl.h"
-#include "moho/sim/SimArmy.h"
+#include "moho/sim/SimArmy.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
-  [[nodiscard]] gpg::RRef MakeCArmyImplRef(moho::CArmyImpl* const object)
+  [[nodiscard]] gpg::RRef MakeCArmyImplRef(
+    moho::CArmyImpl* const object
+  )
   {
     return gpg::MakeRRef(object);
   }
@@ -63,7 +66,9 @@ namespace moho
   /**
    * Address: 0x00701D00 (FUN_00701D00, sub_701D00)
    */
-  CArmyImplTypeInfo* CArmyImplTypeInfo::AssignFactoryCallbacks(CArmyImplTypeInfo* const typeInfo)
+  CArmyImplTypeInfo* CArmyImplTypeInfo::AssignFactoryCallbacks(
+    CArmyImplTypeInfo* const typeInfo
+  )
   {
     typeInfo->newRefFunc_ = &CArmyImplTypeInfo::NewRef;
     typeInfo->ctorRefFunc_ = &CArmyImplTypeInfo::CtrRef;
@@ -89,7 +94,9 @@ namespace moho
    * What it does:
    * Default-constructs an army in caller-owned storage when present.
    */
-  gpg::RRef CArmyImplTypeInfo::CtrRef(void* const objectStorage)
+  gpg::RRef CArmyImplTypeInfo::CtrRef(
+    void* const objectStorage
+  )
   {
     return MakeCArmyImplRef(objectStorage ? new (objectStorage) CArmyImpl() : nullptr);
   }
@@ -100,7 +107,9 @@ namespace moho
    * What it does:
    * Deletes a reflected army through its virtual destructor.
    */
-  void CArmyImplTypeInfo::Delete(void* const objectStorage)
+  void CArmyImplTypeInfo::Delete(
+    void* const objectStorage
+  )
   {
     delete static_cast<CArmyImpl*>(objectStorage);
   }
@@ -111,7 +120,9 @@ namespace moho
    * What it does:
    * Runs the virtual army destructor without freeing its storage.
    */
-  void CArmyImplTypeInfo::Destruct(void* const objectStorage)
+  void CArmyImplTypeInfo::Destruct(
+    void* const objectStorage
+  )
   {
     static_cast<CArmyImpl*>(objectStorage)->~CArmyImpl();
   }
@@ -119,7 +130,9 @@ namespace moho
   /**
    * Address: 0x00703F40 (FUN_00703F40, Moho::CArmyImplTypeInfo::AddBase_SimArmy)
    */
-  void CArmyImplTypeInfo::AddBase_SimArmy(gpg::RType* const typeInfo)
+  void CArmyImplTypeInfo::AddBase_SimArmy(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBaseViaSlot<SimArmy>(typeInfo);
   }
@@ -149,7 +162,9 @@ namespace
   CArmyImplTypeInfoBootstrap gCArmyImplTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CArmyImplTypeInfo_02f242, moho::register_CArmyImplTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CArmyImplTypeInfo_02f242,
+  moho::register_CArmyImplTypeInfo
+)

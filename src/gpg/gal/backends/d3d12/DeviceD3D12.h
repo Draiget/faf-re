@@ -89,7 +89,10 @@ namespace gpg::gal
     boost::shared_ptr<VertexFormat> CreateVertexFormat(std::uint32_t formatCode) override;
     boost::shared_ptr<VertexBuffer> CreateVertexBuffer(const VertexBufferContext* context) override;
     boost::shared_ptr<IndexBuffer> CreateIndexBuffer(const IndexBufferContext* context) override;
-    void GetRenderTargetData(const boost::shared_ptr<RenderTarget>& source, const boost::shared_ptr<Texture>& destination) override;
+    void GetRenderTargetData(
+      const boost::shared_ptr<RenderTarget>& source,
+      const boost::shared_ptr<Texture>& destination
+    ) override;
     void StretchRect(
       const boost::shared_ptr<RenderTarget>& source,
       const boost::shared_ptr<RenderTarget>& destination,
@@ -102,15 +105,28 @@ namespace gpg::gal
       const RECT* sourceRect,
       const RECT* destinationRect
     ) override;
-    void SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) override;
-    void SaveRenderTarget(const boost::shared_ptr<RenderTarget>& renderTarget, const fa::string& filePath, int fileFormat) override;
+    void
+    SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath) override;
+    void SaveRenderTarget(
+      const boost::shared_ptr<RenderTarget>& renderTarget,
+      const fa::string& filePath,
+      int fileFormat
+    ) override;
     void SaveTexture(
-      const boost::shared_ptr<Texture>& texture, const fa::string& filePath, int fileFormat, gpg::MemBuffer<char>* outBuffer
+      const boost::shared_ptr<Texture>& texture,
+      const fa::string& filePath,
+      int fileFormat,
+      gpg::MemBuffer<char>* outBuffer
     ) override;
     void GetTexture2D(
-      const void* sourceData, std::uint32_t sourceBytes, gpg::MemBuffer<char>* outTextureData, std::uint32_t* outWidth, int* outHeight
+      const void* sourceData,
+      std::uint32_t sourceBytes,
+      gpg::MemBuffer<char>* outTextureData,
+      std::uint32_t* outWidth,
+      int* outHeight
     ) override;
-    boost::weak_ptr<void>* Func7(boost::weak_ptr<void>* outWeakHandle, boost::shared_ptr<void> temporarySharedHandle) override;
+    boost::weak_ptr<void>*
+    Func7(boost::weak_ptr<void>* outWeakHandle, boost::shared_ptr<void> temporarySharedHandle) override;
     void Reset(DeviceContext* context) override;
     void Reset() override;
     int TestCooperativeLevel() override;
@@ -123,11 +139,21 @@ namespace gpg::gal
     void SetViewport(const D3DVIEWPORT9* viewport) override;
     void GetViewport(D3DVIEWPORT9* outViewport) override;
     void ClearTarget(const OutputContext* context) override;
-    void Clear(bool clearColor, bool clearDepth, bool clearStencil, std::uint32_t packedColor, float depth, int stencil) override;
+    void Clear(
+      bool clearColor,
+      bool clearDepth,
+      bool clearStencil,
+      std::uint32_t packedColor,
+      float depth,
+      int stencil
+    ) override;
     void ClearTextures() override;
     void SetVertexDeclaration(boost::shared_ptr<VertexFormat> vertexFormat) override;
     void SetVertexBuffer(
-      std::uint32_t streamSlot, boost::shared_ptr<VertexBuffer> vertexBuffer, int streamFrequencyToken, int startVertex
+      std::uint32_t streamSlot,
+      boost::shared_ptr<VertexBuffer> vertexBuffer,
+      int streamFrequencyToken,
+      int startVertex
     ) override;
     void SetBufferIndices(boost::shared_ptr<IndexBuffer> indexBuffer) override;
     void SetFogState(bool enable, const Matrix* projection, float fogStart, float fogEnd, int fogColor) override;
@@ -154,10 +180,24 @@ namespace gpg::gal
     bool ReadGpuBuffer(GpuBuffer& buffer, std::uint32_t firstElement, std::uint32_t count, void* out) override;
     void ReleaseBufferCopy(VertexBuffer& buffer) override;
     void ReleaseBufferCopy(IndexBuffer& buffer) override;
+    void CopyWrittenOnly(VertexBuffer& buffer) override;
     void CopyLockedRangeOnly(VertexBuffer& buffer) override;
     void CopyLockedRangeOnly(IndexBuffer& buffer) override;
     bool CopyVertexBufferRegion(
-      VertexBuffer& destination, std::uint32_t destinationOffset, VertexBuffer& source, std::uint32_t sourceOffset, std::uint32_t byteCount
+      VertexBuffer& destination,
+      std::uint32_t destinationOffset,
+      VertexBuffer& source,
+      std::uint32_t sourceOffset,
+      std::uint32_t byteCount
+    ) override;
+    // Ray tracing (RayTracingD3D12.cpp)
+    RayGeometryId CreateRayGeometry(const RayGeometryDesc& desc) override;
+    void DestroyRayGeometry(RayGeometryId geometry) override;
+    bool SetRayInstances(
+      const RayInstance* instances,
+      std::uint32_t count,
+      const boost::shared_ptr<Texture>* textures,
+      std::uint32_t textureCount
     ) override;
 
     // effects::PassBinder
@@ -167,13 +207,28 @@ namespace gpg::gal
     [[nodiscard]] bool SupportsVertexTextureFormat(std::uint32_t textureFormat);
 
     // ---- services for the resources ----------------------------------------
-    [[nodiscard]] ID3D12Device* Native() const noexcept { return mDevice.Get(); }
+    [[nodiscard]] ID3D12Device* Native() const noexcept
+    {
+      return mDevice.Get();
+    }
     /** Engine addition (gal::gPlacedResources): where static buffers are placed. */
-    [[nodiscard]] d3d12::PlacedHeapAllocator& PlacedBuffers() noexcept { return mPlacedBuffers; }
-    [[nodiscard]] d3d12::SharedBufferAllocator& SharedBuffers() noexcept { return mSharedBuffers; }
-    [[nodiscard]] std::recursive_mutex& Mutex() noexcept { return mMutex; }
+    [[nodiscard]] d3d12::PlacedHeapAllocator& PlacedBuffers() noexcept
+    {
+      return mPlacedBuffers;
+    }
+    [[nodiscard]] d3d12::SharedBufferAllocator& SharedBuffers() noexcept
+    {
+      return mSharedBuffers;
+    }
+    [[nodiscard]] std::recursive_mutex& Mutex() noexcept
+    {
+      return mMutex;
+    }
     /** The submission the commands being recorded belong to. */
-    [[nodiscard]] std::uint64_t RecordingSerial() const noexcept { return mSubmittedSerial + 1U; }
+    [[nodiscard]] std::uint64_t RecordingSerial() const noexcept
+    {
+      return mSubmittedSerial + 1U;
+    }
 
     [[nodiscard]] d3d12::UploadAllocation AllocateUpload(std::uint64_t bytes, std::uint64_t alignment);
     void Transition(d3d12::TrackedResource& resource, D3D12_RESOURCE_STATES state);
@@ -181,9 +236,19 @@ namespace gpg::gal
     /** Copies `bytes` of `data` into `destination` at `offset` (a default-heap buffer). */
     void UploadBuffer(d3d12::TrackedResource& destination, std::uint64_t offset, const void* data, std::uint64_t bytes);
     /** Uploads one subresource of a texture, rows `rowPitch` bytes apart in `data`. */
-    void UploadSubresource(d3d12::TrackedResource& destination, std::uint32_t subresource, const void* data, std::uint32_t rowPitch);
+    void UploadSubresource(
+      d3d12::TrackedResource& destination,
+      std::uint32_t subresource,
+      const void* data,
+      std::uint32_t rowPitch
+    );
     /** Reads one subresource back (submits and waits for the GPU). */
-    void ReadSubresource(d3d12::TrackedResource& source, std::uint32_t subresource, std::vector<std::uint8_t>& bytes, std::uint32_t& rowPitch);
+    void ReadSubresource(
+      d3d12::TrackedResource& source,
+      std::uint32_t subresource,
+      std::vector<std::uint8_t>& bytes,
+      std::uint32_t& rowPitch
+    );
     /** Reads a whole 2D texture (every level of every slice) into `image`. */
     void ReadTexture(d3d12::TrackedResource& source, imaging::Image& image);
     /** Keeps `resource` and frees `descriptors` once the GPU is done with the commands recorded so far. */
@@ -210,18 +275,19 @@ namespace gpg::gal
       effects::EffectProgram* program = nullptr;
       const effects::CompiledEntry* vertexShader = nullptr;
       const effects::CompiledEntry* pixelShader = nullptr;
-      const effects::CompiledEntry* hullShader = nullptr;   // engine addition: a tessellated pass (both set)
+      const effects::CompiledEntry* hullShader = nullptr; // engine addition: a tessellated pass (both set)
       const effects::CompiledEntry* domainShader = nullptr;
       BlendState state;
       D3D12_GPU_VIRTUAL_ADDRESS constants = 0;
       const std::uint8_t* constantsCpu = nullptr; // the same snapshot, CPU side (upload memory)
       std::uint32_t constantsBytes = 0;
-      std::uint64_t constantsSerial = 0;          // the submission whose upload memory holds it
+      std::uint64_t constantsSerial = 0; // the submission whose upload memory holds it
       D3D12_GPU_DESCRIPTOR_HANDLE textures{};
-      std::uint64_t tableFrame = 0;               // the frame's view arena the table is in
+      std::uint64_t tableFrame = 0; // the frame's view arena the table is in
       std::uint64_t tableEpoch = 0;
       D3D12_GPU_DESCRIPTOR_HANDLE samplers{};
-      const std::vector<effects::TextureBinding>* sampled = nullptr; // what the texture table holds, in the effect's state
+      const std::vector<effects::TextureBinding>* sampled =
+        nullptr; // what the texture table holds, in the effect's state
       std::uint32_t techniqueIndex = 0;
       std::uint32_t passIndex = 0;
       const char* technique = ""; // diagnostics
@@ -281,12 +347,24 @@ namespace gpg::gal
     void DumpBackBufferIfDue();
     void LogMemoryIfDue();
 
+    // ---- ray tracing (RayTracingD3D12.cpp) -------------------------------------
+    /** Checks for DXR 1.1 and shader model 6.5 (before the root signature, which then gains the scene). */
+    void CreateRayTracing();
+    void ReleaseRayTracing() noexcept;
+    [[nodiscard]] bool EnsureRayScratch(std::uint64_t bytes);
+    void RayBuildBarrier(ID3D12Resource* resource);
+    void CollectRayFrees();
+    bool BuildRayScene();
+
     // ---- GPU-driven programs (GpuDrivenD3D12.cpp) ------------------------------
     void CreateGpuDrivenObjects();
     void ReleaseGpuDrivenObjects() noexcept;
     /** Uploads b0 and fills the SRV and UAV tables of one GPU-driven call. */
     void PrepareGpuBindings(
-      const GpuBindings& bindings, bool compute, D3D12_GPU_VIRTUAL_ADDRESS& constants, D3D12_GPU_DESCRIPTOR_HANDLE& readTable,
+      const GpuBindings& bindings,
+      bool compute,
+      D3D12_GPU_VIRTUAL_ADDRESS& constants,
+      D3D12_GPU_DESCRIPTOR_HANDLE& readTable,
       D3D12_GPU_DESCRIPTOR_HANDLE& writeTable
     );
     [[nodiscard]] ID3D12PipelineState* GpuPipelineFor(GpuProgramD3D12& program);
@@ -352,7 +430,7 @@ namespace gpg::gal
     d3d12::DescriptorPool mRtvPool;
     d3d12::DescriptorPool mDsvPool;
     d3d12::DescriptorPool mSrvPool;
-    d3d12::DescriptorArena mSamplerHeap; // shader visible, filled once per effect
+    d3d12::DescriptorArena mSamplerHeap;         // shader visible, filled once per effect
     D3D12_CPU_DESCRIPTOR_HANDLE mNullViews[3]{}; // Texture2D, TextureCube, Texture3D
     D3D12_CPU_DESCRIPTOR_HANDLE mNullViewRun{};  // kMaxTextureSlots null 2D views in a row
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mNullViewHeap;
@@ -372,7 +450,7 @@ namespace gpg::gal
     {
       std::uint64_t vertexKey;
       std::uint64_t pixelKey;
-      std::uint64_t hullKey;   // 0 when the pass is not tessellated
+      std::uint64_t hullKey; // 0 when the pass is not tessellated
       std::uint64_t domainKey;
       std::uint32_t format;
       std::uint32_t sampleMask;
@@ -387,7 +465,7 @@ namespace gpg::gal
     d3d12::PipelineCache mPipelineCache; // engine addition: mPipelines' entries kept on disk across sessions
     std::map<std::string, D3D12_GPU_DESCRIPTOR_HANDLE> mSamplerTables; // by content
     std::uint64_t mArenaEpoch = 0; // bumped when a frame's view arena is emptied mid-frame
-    BlendState mCurrent;      // what passes leave behind (D3D9's persistent render states)
+    BlendState mCurrent;           // what passes leave behind (D3D9's persistent render states)
     BoundPass mPass;
     std::uint8_t mColorWriteMask = 0x0F;
     bool mWireframe = false;
@@ -416,6 +494,90 @@ namespace gpg::gal
     D3D12_CPU_DESCRIPTOR_HANDLE mBoundRenderTarget{};
     D3D12_CPU_DESCRIPTOR_HANDLE mBoundDepthStencil{};
     bool mTargetsDirty = true;
+
+    // ---- ray tracing ------------------------------------------------------------
+    /** Where one bottom-level structure lives inside the arena's buffers. */
+    struct RayRange
+    {
+      std::uint32_t chunk = 0U;
+      std::uint64_t offset = 0U;
+      std::uint64_t bytes = 0U;
+      D3D12_GPU_VIRTUAL_ADDRESS address = 0U;
+    };
+    /** Large buffers holding the bottom-level structures, with first-fit holes. */
+    struct RayArena
+    {
+      struct Chunk
+      {
+        Microsoft::WRL::ComPtr<ID3D12Resource> buffer;
+        std::uint64_t bytes = 0U;
+        std::map<std::uint64_t, std::uint64_t> holes; // offset -> bytes
+      };
+      std::vector<Chunk> chunks;
+      [[nodiscard]] bool Allocate(ID3D12Device* device, std::uint64_t bytes, RayRange& out);
+      void Free(const RayRange& range);
+    };
+    struct RayGeometryD3D12
+    {
+      RayRange range;
+      std::uint32_t triangles = 0U;
+      // Engine addition (ren_RayAlphaShadows): where its triangle indices and texture coordinates sit in
+      // mRayAttributes (indices first, three per triangle, then two floats per vertex); ~0 for an opaque piece.
+      std::uint64_t indexOffset = ~0ULL;
+      std::uint64_t uvOffset = ~0ULL;
+    };
+    struct RayFree
+    {
+      std::uint64_t serial = 0U;
+      RayRange range;
+    };
+    bool mRayQuery = false;
+    Microsoft::WRL::ComPtr<ID3D12Device5> mDevice5;
+    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> mList4;
+    RayArena mRayArena;
+    std::unordered_map<RayGeometryId, RayGeometryD3D12> mRayGeometries;
+    std::vector<RayFree> mRayFrees;
+    RayGeometryId mNextRayGeometry = 1U;
+    std::uint64_t mRayGeometryBytes = 0U;
+    d3d12::TrackedResource mRayScratch;
+    std::uint64_t mRayScratchBytes = 0U;
+    d3d12::TrackedResource mTlas;
+    std::uint64_t mTlasBytes = 0U;
+    D3D12_GPU_VIRTUAL_ADDRESS mTlasAddress = 0U;
+    std::uint32_t mRayInstanceCount = 0U;
+    // Engine addition (ren_RayAlphaShadows): alpha-tested pieces. Their indices and texture coordinates (t1,
+    // space1, ByteAddressBuffer), one record per scene instance (t2, space1: index offset, uv offset, texture
+    // slot, 1 when alpha-tested) and a table of their textures (t0..63, space2), rebuilt in the frame's heap
+    // whenever the frame or the heap changes.
+    d3d12::TrackedResource mRayAttributes;
+    std::uint64_t mRayAttributesBytes = 0U;
+    std::uint64_t mRayAttributesUsed = 0U;
+    std::vector<std::uint32_t> mRayRecords; // four per instance
+    std::vector<boost::shared_ptr<Texture>> mRayTextures;
+    d3d12::TrackedResource mRayRecordsBuffer; // default heap, rewritten by each SetRayInstances
+    std::uint64_t mRayRecordsBytes = 0U;
+    D3D12_GPU_VIRTUAL_ADDRESS mRayRecordsAddress = 0U;
+    D3D12_GPU_DESCRIPTOR_HANDLE mRayTextureTable{};
+    std::uint64_t mRayTablesFrame = ~0ULL;
+    std::uint64_t mRayTablesEpoch = ~0ULL;
+    bool AppendRayAttributes(const void* data, std::uint64_t bytes, std::uint64_t& offset);
+    /** Writes the scene's records into mRayRecordsBuffer (in queue order after the draws that read the old ones). */
+    void WriteRayRecords();
+    /**
+     * The frame's texture table (rebuilt when the frame or the view heap changed) and the textures in the read
+     * state; after the caller's own tables and before any root binding (it can start the view heap over: the caller
+     * then allocates its tables again, see DrawIndexedPrimitive).
+     */
+    void EnsureRayTables();
+    void BindRayRoot(bool compute);
+    /** Fills the alpha-test root parameters from `first` and the sampler; returns how many parameters. */
+    std::uint32_t AppendRayRootParameters(
+      D3D12_ROOT_PARAMETER* parameters,
+      std::uint32_t first,
+      D3D12_DESCRIPTOR_RANGE& textures,
+      D3D12_STATIC_SAMPLER_DESC& sampler
+    );
+    std::vector<D3D12_RAYTRACING_INSTANCE_DESC> mRayInstanceDescs;
 
     // ---- GPU-driven programs -------------------------------------------------
     std::uint32_t mGpuFeatures = 0U;

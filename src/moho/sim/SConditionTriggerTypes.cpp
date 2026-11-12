@@ -18,7 +18,9 @@ namespace
   gpg::RType* gSConditionCategorySetType = nullptr;
   gpg::RType* gFastVectorSConditionType = nullptr;
 
-  void DestroySTriggerState(moho::STrigger* const trigger)
+  void DestroySTriggerState(
+    moho::STrigger* const trigger
+  )
   {
     // Alias of FUN_00711A90 (non-canonical helper lane).
     if (!trigger) {
@@ -39,7 +41,9 @@ namespace
    * Deleting-dtor thunk lane for `STrigger`: runs the canonical destructor
    * body and frees object storage when the pointer is non-null.
    */
-  [[maybe_unused]] void DestroySTriggerAndFreeThunk(moho::STrigger* const trigger)
+  [[maybe_unused]] void DestroySTriggerAndFreeThunk(
+    moho::STrigger* const trigger
+  )
   {
     if (trigger == nullptr) {
       return;
@@ -74,7 +78,9 @@ namespace moho
   /**
    * Address: 0x00712300 (FUN_00712300, Moho::SCondition::MemberDeserialize)
    */
-  void SCondition::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SCondition::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -93,14 +99,18 @@ namespace moho
     }
 
     archive->Read(gpg::CachedLookup<ETriggerOperator>(gETriggerOperatorType), &mOp, gpg::RRef{});
-    archive->Read(gpg::CachedLookup<BVSet<const RBlueprint*, EntityCategoryHelper>>(gSConditionCategorySetType), &mCat, gpg::RRef{});
+    archive->Read(
+      gpg::CachedLookup<BVSet<const RBlueprint*, EntityCategoryHelper>>(gSConditionCategorySetType), &mCat, gpg::RRef{}
+    );
     archive->ReadFloat(&mVal);
   }
 
   /**
    * Address: 0x007123B0 (FUN_007123B0, Moho::SCondition::MemberSerialize)
    */
-  void SCondition::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SCondition::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -142,7 +152,9 @@ namespace moho
   /**
    * Address: 0x00712460 (FUN_00712460, Moho::STrigger::MemberDeserialize)
    */
-  void STrigger::MemberDeserialize(gpg::ReadArchive* const archive)
+  void STrigger::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -156,7 +168,9 @@ namespace moho
   /**
    * Address: 0x007124B0 (FUN_007124B0, Moho::STrigger::MemberSerialize)
    */
-  void STrigger::MemberSerialize(gpg::WriteArchive* const archive) const
+  void STrigger::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     GPG_ASSERT(archive != nullptr);
     if (!archive) {
@@ -164,7 +178,9 @@ namespace moho
     }
 
     archive->WriteString(const_cast<fa::string*>(&mName));
-    archive->Write(gpg::CachedLookup<gpg::fastvector<SCondition>>(gFastVectorSConditionType), &mConditions, gpg::RRef{});
+    archive->Write(
+      gpg::CachedLookup<gpg::fastvector<SCondition>>(gFastVectorSConditionType), &mConditions, gpg::RRef{}
+    );
   }
 } // namespace moho
 

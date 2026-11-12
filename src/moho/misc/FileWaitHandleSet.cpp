@@ -447,9 +447,7 @@ namespace
     }
 
     moho::DISK_TraceAccess("open", canonicalPath.c_str());
-    return fa::auto_ptr<gpg::Stream>(
-      new gpg::FileStream(canonicalPath.c_str(), gpg::Stream::ModeReceive, 0x0Bu, 4096)
-    );
+    return fa::auto_ptr<gpg::Stream>(new gpg::FileStream(canonicalPath.c_str(), gpg::Stream::ModeReceive, 0x0Bu, 4096));
   }
 
   /**
@@ -880,7 +878,9 @@ moho::CVirtualFileSystem* moho::DISK_GetVFS()
  * See the header for why this exists: the binary performs this store inline in
  * DISK_SetupDataAndSearchPaths, where the wait-handle set is in reach.
  */
-moho::CVirtualFileSystem* moho::DISK_ExchangeVFS(CVirtualFileSystem* const virtualFileSystem)
+moho::CVirtualFileSystem* moho::DISK_ExchangeVFS(
+  CVirtualFileSystem* const virtualFileSystem
+)
 {
   FILE_EnsureWaitHandleSet();
   if (sPFWaitHandleSet == nullptr) {
@@ -918,7 +918,9 @@ void moho::DISK_InvalidateFileInfoCache(
 /**
  * Engine addition (headless `--disk-trace`): installs or clears the access trace file.
  */
-void moho::DISK_SetAccessTrace(std::FILE* const file)
+void moho::DISK_SetAccessTrace(
+  std::FILE* const file
+)
 {
   std::lock_guard<std::mutex> guard(sAccessTraceLock);
   std::FILE* const previous = sAccessTrace.exchange(file);
@@ -938,7 +940,10 @@ bool moho::DISK_AccessTraceOn()
 /**
  * Engine addition: one `kind path` line in the access trace, when one is set.
  */
-void moho::DISK_TraceAccess(const char* const kind, const gpg::StrArg path)
+void moho::DISK_TraceAccess(
+  const char* const kind,
+  const gpg::StrArg path
+)
 {
   if (!DISK_AccessTraceOn()) {
     return;
@@ -1109,7 +1114,12 @@ int moho::cfunc_DiskGetFileInfoL(
 moho::CScrLuaInitForm* moho::func_DiskGetFileInfo_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_CoreLuaInitSet(), "DiskGetFileInfo", &moho::cfunc_DiskGetFileInfo, nullptr, "<global>", kDiskGetFileInfoHelpText
+    moho::SCR_CoreLuaInitSet(),
+    "DiskGetFileInfo",
+    &moho::cfunc_DiskGetFileInfo,
+    nullptr,
+    "<global>",
+    kDiskGetFileInfoHelpText
   );
   return &binder;
 }
@@ -1271,7 +1281,9 @@ int moho::cfunc_DirnameL(
  */
 moho::CScrLuaInitForm* moho::func_Dirname_LuaFuncDef()
 {
-  static CScrLuaBinder binder(moho::SCR_CoreLuaInitSet(), "Dirname", &moho::cfunc_Dirname, nullptr, "<global>", kDirnameHelpText);
+  static CScrLuaBinder binder(
+    moho::SCR_CoreLuaInitSet(), "Dirname", &moho::cfunc_Dirname, nullptr, "<global>", kDirnameHelpText
+  );
   return &binder;
 }
 
@@ -1325,7 +1337,12 @@ int moho::cfunc_FileCollapsePathL(
 moho::CScrLuaInitForm* moho::func_FileCollapsePath_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_CoreLuaInitSet(), "FileCollapsePath", &moho::cfunc_FileCollapsePath, nullptr, "<global>", kFileCollapsePathHelpText
+    moho::SCR_CoreLuaInitSet(),
+    "FileCollapsePath",
+    &moho::cfunc_FileCollapsePath,
+    nullptr,
+    "<global>",
+    kFileCollapsePathHelpText
   );
   return &binder;
 }
@@ -1407,7 +1424,6 @@ namespace
 
   const FileWaitHandleSetLuaFunctionBootstrap gFileWaitHandleSetLuaFunctionBootstrap{};
 } // namespace
-
 
 /**
  * Address: 0x00413F90 (FUN_00413F90, Moho::FWaitHandleSet::Wait)
@@ -1821,7 +1837,7 @@ void moho::FWaitHandleSet::InvalidateFileInfoCache(
 }
 
 /**
-  * Alias of FUN_00458D30 (non-canonical helper lane).
+ * Alias of FUN_00458D30 (non-canonical helper lane).
  *
  * What it does:
  * Resolves file metadata through the wait-handle/VFS runtime when available.

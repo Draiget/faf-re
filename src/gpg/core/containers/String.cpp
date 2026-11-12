@@ -521,7 +521,10 @@ int gpg::STR_CompareNoCase(
   return _stricmp(lhs, rhs);
 }
 
-bool gpg::STR_FileNameOrderLess(const StrArg lhs, const StrArg rhs) noexcept
+bool gpg::STR_FileNameOrderLess(
+  const StrArg lhs,
+  const StrArg rhs
+) noexcept
 {
   const auto upper = [](const char c) noexcept {
     const auto byte = static_cast<unsigned char>(c);
@@ -891,8 +894,8 @@ bool gpg::STR_WildcardValidPrefix(
 
   if (caseSensitive) {
     const int result = MatchWildcardPatternLane(prefix, pattern);
-    return result == static_cast<int>(WildcardMatchStepResult::Match)
-      || result == static_cast<int>(WildcardMatchStepResult::PrefixExhausted);
+    return result == static_cast<int>(WildcardMatchStepResult::Match) ||
+      result == static_cast<int>(WildcardMatchStepResult::PrefixExhausted);
   }
 
   const char* starPattern = nullptr;
@@ -1256,8 +1259,7 @@ fa::string gpg::STR_Va(
       }
     } while (didNotFit(formattedLength, capacity));
 
-    return fa::string{} +
-           std::string_view(dynamicBuffer.data(), static_cast<std::size_t>(formattedLength));
+    return fa::string{} + std::string_view(dynamicBuffer.data(), static_cast<std::size_t>(formattedLength));
   }
 
   return fa::string{} + std::string_view(stackBuffer, static_cast<std::size_t>(formattedLength));

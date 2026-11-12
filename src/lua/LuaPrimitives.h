@@ -1,8 +1,7 @@
 #pragma once
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
 // The Lua 5.0 C API headers of LuaPlus build 1081, as FAF patched them. The
@@ -51,8 +50,7 @@ extern "C"
 #undef lua_getn
 #endif
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 int lua_getn(lua_State* L, int index);
 #ifdef __cplusplus
@@ -120,15 +118,15 @@ int lua_getn(lua_State* L, int index);
 
 namespace gpg
 {
-	class Stream;
-	class BinaryReader;
-	class RType;
-	class RRef;
-	class WriteArchive;
-	class ReadArchive;
-	class SerConstructResult;
-	class SerSaveConstructArgsResult;
-}
+  class Stream;
+  class BinaryReader;
+  class RType;
+  class RRef;
+  class WriteArchive;
+  class ReadArchive;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
+} // namespace gpg
 
 struct global_State;
 union GCObject;
@@ -136,11 +134,11 @@ struct lua_State;
 
 namespace moho
 {
-	class CMessageStream;
-	class Sim;
-	class CLuaTask;
-	class CTaskStage;
-}
+  class CMessageStream;
+  class Sim;
+  class CLuaTask;
+  class CTaskStage;
+} // namespace moho
 
 void* lua_getglobaluserdata(lua_State* state);
 
@@ -161,17 +159,18 @@ int luaL_getmetafield(lua_State* L, int obj, const char* event);
  * returns the pushed string pointer from that worker.
  */
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 const char* luaO_pushfstring(lua_State* L, const char* format, ...);
 #ifdef __cplusplus
 }
 #endif
 
-inline moho::Sim* lua_getglobaluserdata_typed(lua_State* state)
+inline moho::Sim* lua_getglobaluserdata_typed(
+  lua_State* state
+)
 {
-	return static_cast<moho::Sim*>(::lua_getglobaluserdata(state));
+  return static_cast<moho::Sim*>(::lua_getglobaluserdata(state));
 }
 
 // Preserve typed SDK call sites while matching LuaPlus API signature.
@@ -211,8 +210,7 @@ inline moho::Sim* lua_getglobaluserdata_typed(lua_State* state)
  * on the first error in a script task's TaskTick.
  */
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 int LuaCallProtected(lua_State* L, int nargs, int nresults);
 void LuaCallUnprotected(lua_State* L, int nargs, int nresults);
@@ -223,148 +221,225 @@ void LuaCallUnprotected(lua_State* L, int nargs, int nresults);
 
 namespace LuaPlus
 {
-	class LuaState;
-	class LuaStackObject;
-	class LuaObject;
+  class LuaState;
+  class LuaStackObject;
+  class LuaObject;
 
-	// Keep 4-byte alignment to mirror MSVC x86-era binary layout.
+  // Keep 4-byte alignment to mirror MSVC x86-era binary layout.
 #pragma pack(push, 4)
 #if INTPTR_MAX == INT32_MAX
-	using ValuePointer = void*;
+  using ValuePointer = void*;
 #else
-	// Engine change on x64: a Lua object's pointer in the 4 bytes the binary gives it, as every Lua
-	// object lives below 4 GB (LuaArena.h). It reads and assigns as the pointer it holds.
-	class ValuePointer
-	{
-	public:
-		ValuePointer() = default;
-		ValuePointer(std::nullptr_t) noexcept : mBits(0u) {}
+  // Engine change on x64: a Lua object's pointer in the 4 bytes the binary gives it, as every Lua
+  // object lives below 4 GB (LuaArena.h). It reads and assigns as the pointer it holds.
+  class ValuePointer
+  {
+  public:
+    ValuePointer() = default;
+    ValuePointer(
+      std::nullptr_t
+    ) noexcept
+      : mBits(0u)
+    {}
 
-		template <class T>
-		ValuePointer& operator=(T* const pointer) noexcept
-		{
-			mBits = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(pointer));
-			return *this;
-		}
-		ValuePointer& operator=(std::nullptr_t) noexcept
-		{
-			mBits = 0u;
-			return *this;
-		}
+    template <class T>
+    ValuePointer& operator=(
+      T* const pointer
+    ) noexcept
+    {
+      mBits = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(pointer));
+      return *this;
+    }
+    ValuePointer& operator=(
+      std::nullptr_t
+    ) noexcept
+    {
+      mBits = 0u;
+      return *this;
+    }
 
-		template <class T>
-		[[nodiscard]] operator T*() const noexcept
-		{
-			return reinterpret_cast<T*>(static_cast<std::uintptr_t>(mBits));
-		}
+    template <class T>
+    [[nodiscard]] operator T*() const noexcept
+    {
+      return reinterpret_cast<T*>(static_cast<std::uintptr_t>(mBits));
+    }
 
-		[[nodiscard]] std::uint32_t Bits() const noexcept { return mBits; }
+    [[nodiscard]] std::uint32_t Bits() const noexcept
+    {
+      return mBits;
+    }
 
-		[[nodiscard]] friend bool operator==(const ValuePointer lhs, const ValuePointer rhs) noexcept { return lhs.mBits == rhs.mBits; }
-		[[nodiscard]] friend bool operator!=(const ValuePointer lhs, const ValuePointer rhs) noexcept { return lhs.mBits != rhs.mBits; }
-		[[nodiscard]] friend bool operator==(const ValuePointer lhs, std::nullptr_t) noexcept { return lhs.mBits == 0u; }
-		[[nodiscard]] friend bool operator!=(const ValuePointer lhs, std::nullptr_t) noexcept { return lhs.mBits != 0u; }
+    [[nodiscard]] friend bool operator==(
+      const ValuePointer lhs,
+      const ValuePointer rhs
+    ) noexcept
+    {
+      return lhs.mBits == rhs.mBits;
+    }
+    [[nodiscard]] friend bool operator!=(
+      const ValuePointer lhs,
+      const ValuePointer rhs
+    ) noexcept
+    {
+      return lhs.mBits != rhs.mBits;
+    }
+    [[nodiscard]] friend bool operator==(
+      const ValuePointer lhs,
+      std::nullptr_t
+    ) noexcept
+    {
+      return lhs.mBits == 0u;
+    }
+    [[nodiscard]] friend bool operator!=(
+      const ValuePointer lhs,
+      std::nullptr_t
+    ) noexcept
+    {
+      return lhs.mBits != 0u;
+    }
 
-	private:
-		std::uint32_t mBits;
-	};
+  private:
+    std::uint32_t mBits;
+  };
 #endif
 
 #if INTPTR_MAX == INT32_MAX
-	template <class T>
-	using ObjectPointer = T*;
+  template <class T>
+  using ObjectPointer = T*;
 #else
-	// A field naming a Lua object or a block a Lua object owns, in 4 bytes on x64 (LuaArena.h).
-	template <class T>
-	class ObjectPointer
-	{
-	public:
-		ObjectPointer() = default;
-		ObjectPointer(T* const pointer) noexcept : mBits(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(pointer))) {}
+  // A field naming a Lua object or a block a Lua object owns, in 4 bytes on x64 (LuaArena.h).
+  template <class T>
+  class ObjectPointer
+  {
+  public:
+    ObjectPointer() = default;
+    ObjectPointer(
+      T* const pointer
+    ) noexcept
+      : mBits(static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(pointer)))
+    {}
 
-		[[nodiscard]] operator T*() const noexcept { return Get(); }
-		[[nodiscard]] T* operator->() const noexcept { return Get(); }
+    [[nodiscard]] operator T*() const noexcept
+    {
+      return Get();
+    }
+    [[nodiscard]] T* operator->() const noexcept
+    {
+      return Get();
+    }
 
-	private:
-		[[nodiscard]] T* Get() const noexcept { return reinterpret_cast<T*>(static_cast<std::uintptr_t>(mBits)); }
+  private:
+    [[nodiscard]] T* Get() const noexcept
+    {
+      return reinterpret_cast<T*>(static_cast<std::uintptr_t>(mBits));
+    }
 
-		std::uint32_t mBits;
-	};
+    std::uint32_t mBits;
+  };
 #endif
 
-	union Value
-	{
-		ValuePointer p;
-		float n;
-		int b;
-	};
+  union Value
+  {
+    ValuePointer p;
+    float n;
+    int b;
+  };
 
-	// lua.org/source/5.0/lobject.h.html#TObject
-	struct TObject
-	{
-		int tt;
-		Value value;
+  // lua.org/source/5.0/lobject.h.html#TObject
+  struct TObject
+  {
+    int tt;
+    Value value;
 
-		TObject(int number) : tt{ LUA_TNUMBER } { value.n = static_cast<float>(number); }
-		TObject(float number) : tt{ LUA_TNUMBER } { value.n = number; }
-		TObject(bool boolean) : tt{ LUA_TBOOLEAN } { value.b = boolean ? 1 : 0; }
-		TObject() : tt{ LUA_TNIL } { value.p = nullptr; }
+    TObject(
+      int number
+    )
+      : tt{LUA_TNUMBER}
+    {
+      value.n = static_cast<float>(number);
+    }
+    TObject(
+      float number
+    )
+      : tt{LUA_TNUMBER}
+    {
+      value.n = number;
+    }
+    TObject(
+      bool boolean
+    )
+      : tt{LUA_TBOOLEAN}
+    {
+      value.b = boolean ? 1 : 0;
+    }
+    TObject()
+      : tt{LUA_TNIL}
+    {
+      value.p = nullptr;
+    }
 
-		/**
-		 * Address: 0x009216D0 (FUN_009216D0, TObject::MemberSerialize)
-		 *
-		 * What it does:
-		 * Serializes one tagged Lua value lane into write-archive format,
-		 * including named-object indirection and type-specific payload dispatch.
-		 */
-		void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
+    /**
+     * Address: 0x009216D0 (FUN_009216D0, TObject::MemberSerialize)
+     *
+     * What it does:
+     * Serializes one tagged Lua value lane into write-archive format,
+     * including named-object indirection and type-specific payload dispatch.
+     */
+    void MemberSerialize(gpg::WriteArchive* archive, int version, const gpg::RRef& ownerRef);
 
-		/**
-		 * Address: 0x009226F0 (FUN_009226F0, TObject::MemberDeserialize)
-		 *
-		 * What it does:
-		 * Deserializes one tagged Lua value lane from read-archive format,
-		 * including named-object lookup and type-specific payload dispatch.
-		 */
-		void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
-	};
+    /**
+     * Address: 0x009226F0 (FUN_009226F0, TObject::MemberDeserialize)
+     *
+     * What it does:
+     * Deserializes one tagged Lua value lane from read-archive format,
+     * including named-object lookup and type-specific payload dispatch.
+     */
+    void MemberDeserialize(gpg::ReadArchive* archive, int version, const gpg::RRef& ownerRef);
+  };
 
-	/// The 32 bits `luaH_mainposition` hashes for a pointer key.
-	[[nodiscard]] inline std::uint32_t ValuePointerBits(const Value& value) noexcept
-	{
+  /// The 32 bits `luaH_mainposition` hashes for a pointer key.
+  [[nodiscard]] inline std::uint32_t ValuePointerBits(
+    const Value& value
+  ) noexcept
+  {
 #if INTPTR_MAX == INT32_MAX
-		return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(value.p));
+    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(value.p));
 #else
-		return value.p.Bits();
+    return value.p.Bits();
 #endif
-	}
+  }
 
-	/// A light userdata's pointer goes in and out of a value through these: on x64 it can lie above 4 GB.
-	inline void SetLightPointer(Value& value, void* const pointer) noexcept
-	{
+  /// A light userdata's pointer goes in and out of a value through these: on x64 it can lie above 4 GB.
+  inline void SetLightPointer(
+    Value& value,
+    void* const pointer
+  ) noexcept
+  {
 #if INTPTR_MAX == INT32_MAX
-		value.p = pointer;
+    value.p = pointer;
 #else
-		value.p = const_cast<void**>(lua::ArenaLightCell(pointer));
+    value.p = const_cast<void**>(lua::ArenaLightCell(pointer));
 #endif
-	}
-	[[nodiscard]] inline void* LightPointer(const Value& value) noexcept
-	{
+  }
+  [[nodiscard]] inline void* LightPointer(
+    const Value& value
+  ) noexcept
+  {
 #if INTPTR_MAX == INT32_MAX
-		return value.p;
+    return value.p;
 #else
-		return *static_cast<void**>(value.p);
+    return *static_cast<void**>(value.p);
 #endif
-	}
+  }
 
-	// `traverseproto` (0x009154A0) walks a Proto's constant array as
-	// `[ecx+eax*8]`, so a TObject is 8 bytes; `newkey` (0x00927970) reads the
-	// tag as `*(_DWORD *)&mp->i_val.tt` at the start of the object, so `tt`
-	// leads. Both are load-bearing for Node's 20-byte stride.
-	static_assert(offsetof(TObject, tt) == 0x00, "TObject::tt must be at +0x00");
-	static_assert(offsetof(TObject, value) == 0x04, "TObject::value must be at +0x04");
-	static_assert(sizeof(TObject) == 0x08, "TObject size must be 0x08");
+  // `traverseproto` (0x009154A0) walks a Proto's constant array as
+  // `[ecx+eax*8]`, so a TObject is 8 bytes; `newkey` (0x00927970) reads the
+  // tag as `*(_DWORD *)&mp->i_val.tt` at the start of the object, so `tt`
+  // leads. Both are load-bearing for Node's 20-byte stride.
+  static_assert(offsetof(TObject, tt) == 0x00, "TObject::tt must be at +0x00");
+  static_assert(offsetof(TObject, value) == 0x04, "TObject::value must be at +0x04");
+  static_assert(sizeof(TObject) == 0x08, "TObject size must be 0x08");
 
-	using StkId = TObject*;
+  using StkId = TObject*;
 #pragma pack(pop)
-}
+} // namespace LuaPlus

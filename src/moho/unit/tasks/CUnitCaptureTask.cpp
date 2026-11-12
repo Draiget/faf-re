@@ -52,7 +52,9 @@ namespace
   constexpr const char* kGetCaptureCostsScript = "GetCaptureCosts";
   constexpr const char* kCaptureCostsError = "Failed to get valid capture costs from the target";
 
-  [[nodiscard]] moho::Entity* ResolveCaptureTargetEntity(const moho::CAiTarget* const commandTarget) noexcept
+  [[nodiscard]] moho::Entity* ResolveCaptureTargetEntity(
+    const moho::CAiTarget* const commandTarget
+  ) noexcept
   {
     if (commandTarget == nullptr) {
       return nullptr;
@@ -61,12 +63,17 @@ namespace
     return commandTarget->targetEntity.GetObjectPtr();
   }
 
-  [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState current) noexcept
+  [[nodiscard]] moho::ETaskState NextTaskState(
+    const moho::ETaskState current
+  ) noexcept
   {
     return static_cast<moho::ETaskState>(static_cast<int>(current) + 1);
   }
 
-  void ReplaceEconomyRequestPointer(moho::CEconRequest*& request, moho::CEconRequest* const replacement)
+  void ReplaceEconomyRequestPointer(
+    moho::CEconRequest*& request,
+    moho::CEconRequest* const replacement
+  )
   {
     DestroyEconomyRequestPointer(request);
     request = replacement;
@@ -88,12 +95,17 @@ namespace
     return request;
   }
 
-  [[nodiscard]] int MaxFootprintExtent(const moho::SFootprint& footprint) noexcept
+  [[nodiscard]] int MaxFootprintExtent(
+    const moho::SFootprint& footprint
+  ) noexcept
   {
     return std::max(static_cast<int>(footprint.mSizeX), static_cast<int>(footprint.mSizeZ));
   }
 
-  [[nodiscard]] float HorizontalDistanceToCaptureContact(const moho::Unit& unit, const moho::Entity& targetEntity)
+  [[nodiscard]] float HorizontalDistanceToCaptureContact(
+    const moho::Unit& unit,
+    const moho::Entity& targetEntity
+  )
   {
     const auto& unitPosition = unit.GetPosition();
     const auto& targetPosition = targetEntity.GetPositionWm3();
@@ -107,7 +119,10 @@ namespace
     return rawDistance - static_cast<float>(unitExtent) - static_cast<float>(targetExtent);
   }
 
-  [[nodiscard]] bool IsTargetCaptureCapable(const moho::Entity* const targetEntity, const moho::Unit* const targetUnit)
+  [[nodiscard]] bool IsTargetCaptureCapable(
+    const moho::Entity* const targetEntity,
+    const moho::Unit* const targetUnit
+  )
   {
     if (targetEntity == nullptr) {
       return false;
@@ -151,7 +166,10 @@ namespace moho
    * Initializes one capture-task lane from parent dispatch context, binds
    * target/listener ownership links, and seeds owner focus/target blip state.
    */
-  CUnitCaptureTask::CUnitCaptureTask(CCommandTask* const parentTask, Entity* const targetEntity)
+  CUnitCaptureTask::CUnitCaptureTask(
+    CCommandTask* const parentTask,
+    Entity* const targetEntity
+  )
     : CCommandTask(parentTask)
     , Listener<ECommandEvent>()
     , mCommand(nullptr)
@@ -194,7 +212,10 @@ namespace moho
    * Resolves one capture target from command payload, writes dispatch failure
    * result when absent, and allocates/constructs one capture-task object.
    */
-  CUnitCaptureTask* CUnitCaptureTask::Create(CCommandTask* const parentTask, CAiTarget* const commandTarget)
+  CUnitCaptureTask* CUnitCaptureTask::Create(
+    CCommandTask* const parentTask,
+    CAiTarget* const commandTarget
+  )
   {
     Entity* const targetEntity = ResolveCaptureTargetEntity(commandTarget);
     if (targetEntity == nullptr) {
@@ -235,8 +256,8 @@ namespace moho
     }
 
     if (
-      targetEntity->ArmyRef == nullptr || targetEntity->mVarDat.mLayerMask == LAYER_Air
-      || targetEntity->ArmyRef->GetAllianceWith(mUnit->ArmyRef) == ALLIANCE_Ally
+      targetEntity->ArmyRef == nullptr || targetEntity->mVarDat.mLayerMask == LAYER_Air ||
+      targetEntity->ArmyRef->GetAllianceWith(mUnit->ArmyRef) == ALLIANCE_Ally
     ) {
       *mDispatchResult = static_cast<EAiResult>(2);
       return -1;
@@ -251,200 +272,193 @@ namespace moho
     }
 
     switch (mTaskState) {
-      case TASKSTATE_Preparing: {
-        if (distance > 5.0f) {
-          Wm3::Vec3f targetPosition = targetEntity->GetTransformWm3().pos_;
-          if (!mUnit->mIsAir) {
-            gpg::Rect2f moveSkirt{0.0f, 0.0f, 0.0f, 0.0f};
-            if (Unit* const unitTarget = targetEntity->IsUnit(); unitTarget != nullptr) {
-              moveSkirt = unitTarget->GetSkirtRect();
-            }
-
-            const bool useWholeMap = (mUnit->ArmyRef != nullptr) ? mUnit->ArmyRef->UseWholeMap() : false;
-            (void)PrepareMove(1, mUnit, &targetPosition, &moveSkirt, useWholeMap);
-
-            const SCoordsVec2 targetPos2d{targetPosition.x, targetPosition.z};
-            gpg::Rect2i reserveRect{};
-            (void)COORDS_ToGridRect(&reserveRect, targetPos2d, mUnit->GetFootprint());
-            mUnit->ReserveOgridRect(reserveRect);
+    case TASKSTATE_Preparing: {
+      if (distance > 5.0f) {
+        Wm3::Vec3f targetPosition = targetEntity->GetTransformWm3().pos_;
+        if (!mUnit->mIsAir) {
+          gpg::Rect2f moveSkirt{0.0f, 0.0f, 0.0f, 0.0f};
+          if (Unit* const unitTarget = targetEntity->IsUnit(); unitTarget != nullptr) {
+            moveSkirt = unitTarget->GetSkirtRect();
           }
 
-          const SOCellPos targetCell = mUnit->GetFootprint().ToCellPos(targetPosition);
-          NewMoveTask(SNavGoal(targetCell), this, 0, nullptr, 0);
+          const bool useWholeMap = (mUnit->ArmyRef != nullptr) ? mUnit->ArmyRef->UseWholeMap() : false;
+          (void)PrepareMove(1, mUnit, &targetPosition, &moveSkirt, useWholeMap);
+
+          const SCoordsVec2 targetPos2d{targetPosition.x, targetPosition.z};
+          gpg::Rect2i reserveRect{};
+          (void)COORDS_ToGridRect(&reserveRect, targetPos2d, mUnit->GetFootprint());
+          mUnit->ReserveOgridRect(reserveRect);
         }
 
-        mTaskState = NextTaskState(mTaskState);
-        return 0;
+        const SOCellPos targetCell = mUnit->GetFootprint().ToCellPos(targetPosition);
+        NewMoveTask(SNavGoal(targetCell), this, 0, nullptr, 0);
       }
 
-      case TASKSTATE_Waiting: {
-        if (distance > 10.0f) {
-          *mDispatchResult = static_cast<EAiResult>(2);
-          return -1;
-        }
+      mTaskState = NextTaskState(mTaskState);
+      return 0;
+    }
 
-        if (ReconBlip* const reconBlip = targetEntity->IsReconBlip(); reconBlip != nullptr) {
-          Unit* const creator = reconBlip->GetCreator();
-          mTargetEntity.Set(static_cast<Entity*>(creator));
-          targetEntity = mTargetEntity.GetObjectPtr();
-          targetUnit = (targetEntity != nullptr) ? targetEntity->IsUnit() : nullptr;
-        }
-
-        if (targetEntity == nullptr || targetUnit == nullptr || targetUnit->IsDead() || targetUnit->DestroyQueued()) {
-          return -1;
-        }
-
-        if (mUnit->AiBuilder != nullptr) {
-          const VTransform targetTransform = targetEntity->GetBoneWorldTransform(-1);
-          mUnit->AiBuilder->BuilderSetAimTarget(targetTransform.pos_);
-        }
-
-        mUnit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_Capturing);
-        mTaskState = NextTaskState(mTaskState);
-        return 0;
-      }
-
-      case TASKSTATE_Starting: {
-        if (targetEntity == nullptr) {
-          return -1;
-        }
-
-        gpg::core::FastVector<LuaPlus::LuaObject> captureCostResults;
-        LuaPlus::LuaObject arg2{};
-        LuaPlus::LuaObject arg3{};
-        LuaPlus::LuaObject arg4{};
-        LuaPlus::LuaObject arg5{};
-        if (
-          !mUnit->RunScriptMultiRet(
-            kGetCaptureCostsScript,
-            captureCostResults,
-            targetEntity->mLuaObj,
-            arg2,
-            arg3,
-            arg4,
-            arg5
-          )
-          || captureCostResults.size() != 3
-        ) {
-          gpg::Warnf(kCaptureCostsError);
-          return -1;
-        }
-
-        // 0x006049FF..0x00604A0C: `cvttss2si((float)mCaptureTime + max(1, t))`.
-        mCaptureTime = static_cast<int>(
-          static_cast<float>(mCaptureTime)
-          + std::max(1.0f, static_cast<float>(captureCostResults[0].ToNumber() * 10.0))
-        );
-        float energyCost = captureCostResults[1].ToNumber();
-        float massCost = captureCostResults[2].ToNumber();
-
-        // 0x00604A45..0x00604B96: the cursor comes from `[ebp+4]` once, but the
-        // bound is re-read out of `[ebp+8]` (`_Mylast`) both for the entry test
-        // at 0x00604A48 and for the loop-back test at 0x00604B93. The body runs
-        // the `GetCaptureCosts` script on each attached unit, so the compiler
-        // cannot hoist that load and neither may we: a script that destroys an
-        // attached unit erases it from this very list, and a cached `end()`
-        // would then read the slot the erase vacated.
-        const fa::vector<Entity*>& attachedEntities = targetEntity->GetAttachedEntities();
-        for (Entity* const* cursor = attachedEntities.begin(); cursor != attachedEntities.end(); ++cursor) {
-          Entity* const attachedEntity = *cursor;
-          Unit* const attachedUnit = (attachedEntity != nullptr) ? attachedEntity->IsUnit() : nullptr;
-          if (attachedUnit == nullptr || attachedUnit->IsDead()) {
-            continue;
-          }
-
-          gpg::core::FastVector<LuaPlus::LuaObject> attachedCaptureCosts;
-          LuaPlus::LuaObject attachedArg2{};
-          LuaPlus::LuaObject attachedArg3{};
-          LuaPlus::LuaObject attachedArg4{};
-          LuaPlus::LuaObject attachedArg5{};
-          if (
-            !mUnit->RunScriptMultiRet(
-              kGetCaptureCostsScript,
-              attachedCaptureCosts,
-              attachedUnit->mLuaObj,
-              attachedArg2,
-              attachedArg3,
-              attachedArg4,
-              attachedArg5
-            )
-            || attachedCaptureCosts.size() != 3
-          ) {
-            continue;
-          }
-
-          mCaptureTime = static_cast<int>(
-            static_cast<float>(mCaptureTime)
-            + std::max(1.0f, static_cast<float>(attachedCaptureCosts[0].ToNumber() * 10.0))
-          );
-          energyCost += attachedCaptureCosts[1].ToNumber();
-          massCost += attachedCaptureCosts[2].ToNumber();
-        }
-
-        if (energyCost < 0.0f) {
-          energyCost = 0.0f;
-        }
-        if (massCost < 0.0f) {
-          massCost = 0.0f;
-        }
-
-        const float captureTimeAsFloat = static_cast<float>(mCaptureTime);
-        mCaptureRate.energy = energyCost / captureTimeAsFloat;
-        mCaptureRate.mass = massCost / captureTimeAsFloat;
-
-        CSimArmyEconomyInfo* const economyInfo = mUnit->ArmyRef->GetEconomy();
-        ReplaceEconomyRequestPointer(mConsumptionData, CreateEconomyRequest(mCaptureRate, economyInfo));
-
-        DoCallback(true);
-        mTaskState = NextTaskState(mTaskState);
-        return 0;
-      }
-
-      case TASKSTATE_Processing: {
-        if (mConsumptionData->mGranted.energy >= mCaptureRate.energy && mConsumptionData->mGranted.mass >= mCaptureRate.mass) {
-          const SEconValue granted = TakeGrantedResourcesAndReset(mConsumptionData);
-          mUnit->mUnitVarDat.mResourcesSpent.ENERGY += granted.energy;
-          mUnit->mUnitVarDat.mResourcesSpent.MASS += granted.mass;
-
-          targetEntity = mTargetEntity.GetObjectPtr();
-          targetUnit = (targetEntity != nullptr) ? targetEntity->IsUnit() : nullptr;
-          if (targetUnit != nullptr) {
-            int captureProgress = mCaptureProgress + targetUnit->CaptorCount;
-            if (captureProgress > mCaptureTime) {
-              captureProgress = mCaptureTime;
-            }
-            mCaptureProgress = captureProgress;
-            mUnit->mUnitVarDat.mWorkProgress = static_cast<float>(mCaptureProgress) / static_cast<float>(mCaptureTime);
-          }
-        }
-
-        if (mCaptureProgress < mCaptureTime) {
-          return 1;
-        }
-
-        mTaskState = NextTaskState(mTaskState);
-        return 0;
-      }
-
-      case TASKSTATE_Complete: {
-        mUnit->RunScriptWeakEntity(kOnStopCaptureScript, mTargetEntity);
-
-        targetEntity = mTargetEntity.GetObjectPtr();
-        if (targetEntity != nullptr) {
-          targetEntity->RunScriptUnit(kOnStopBeingCapturedScript, mUnit);
-          targetEntity->RunScriptUnit(kOnCapturedScript, mUnit);
-        }
-
+    case TASKSTATE_Waiting: {
+      if (distance > 10.0f) {
+        *mDispatchResult = static_cast<EAiResult>(2);
         return -1;
       }
 
-      default:
-        gpg::HandleAssertFailure(
-          "Reached the supposably unreachable.",
-          276,
-          "c:\\work\\rts\\main\\code\\src\\sim\\AiUnitCapture.cpp"
+      if (ReconBlip* const reconBlip = targetEntity->IsReconBlip(); reconBlip != nullptr) {
+        Unit* const creator = reconBlip->GetCreator();
+        mTargetEntity.Set(static_cast<Entity*>(creator));
+        targetEntity = mTargetEntity.GetObjectPtr();
+        targetUnit = (targetEntity != nullptr) ? targetEntity->IsUnit() : nullptr;
+      }
+
+      if (targetEntity == nullptr || targetUnit == nullptr || targetUnit->IsDead() || targetUnit->DestroyQueued()) {
+        return -1;
+      }
+
+      if (mUnit->AiBuilder != nullptr) {
+        const VTransform targetTransform = targetEntity->GetBoneWorldTransform(-1);
+        mUnit->AiBuilder->BuilderSetAimTarget(targetTransform.pos_);
+      }
+
+      mUnit->mUnitVarDat.mUnitStates |= (1ull << UNITSTATE_Capturing);
+      mTaskState = NextTaskState(mTaskState);
+      return 0;
+    }
+
+    case TASKSTATE_Starting: {
+      if (targetEntity == nullptr) {
+        return -1;
+      }
+
+      gpg::core::FastVector<LuaPlus::LuaObject> captureCostResults;
+      LuaPlus::LuaObject arg2{};
+      LuaPlus::LuaObject arg3{};
+      LuaPlus::LuaObject arg4{};
+      LuaPlus::LuaObject arg5{};
+      if (
+        !mUnit->RunScriptMultiRet(
+          kGetCaptureCostsScript, captureCostResults, targetEntity->mLuaObj, arg2, arg3, arg4, arg5
+        ) ||
+        captureCostResults.size() != 3
+      ) {
+        gpg::Warnf(kCaptureCostsError);
+        return -1;
+      }
+
+      // 0x006049FF..0x00604A0C: `cvttss2si((float)mCaptureTime + max(1, t))`.
+      mCaptureTime = static_cast<int>(
+        static_cast<float>(mCaptureTime) + std::max(1.0f, static_cast<float>(captureCostResults[0].ToNumber() * 10.0))
+      );
+      float energyCost = captureCostResults[1].ToNumber();
+      float massCost = captureCostResults[2].ToNumber();
+
+      // 0x00604A45..0x00604B96: the cursor comes from `[ebp+4]` once, but the
+      // bound is re-read out of `[ebp+8]` (`_Mylast`) both for the entry test
+      // at 0x00604A48 and for the loop-back test at 0x00604B93. The body runs
+      // the `GetCaptureCosts` script on each attached unit, so the compiler
+      // cannot hoist that load and neither may we: a script that destroys an
+      // attached unit erases it from this very list, and a cached `end()`
+      // would then read the slot the erase vacated.
+      const fa::vector<Entity*>& attachedEntities = targetEntity->GetAttachedEntities();
+      for (Entity* const* cursor = attachedEntities.begin(); cursor != attachedEntities.end(); ++cursor) {
+        Entity* const attachedEntity = *cursor;
+        Unit* const attachedUnit = (attachedEntity != nullptr) ? attachedEntity->IsUnit() : nullptr;
+        if (attachedUnit == nullptr || attachedUnit->IsDead()) {
+          continue;
+        }
+
+        gpg::core::FastVector<LuaPlus::LuaObject> attachedCaptureCosts;
+        LuaPlus::LuaObject attachedArg2{};
+        LuaPlus::LuaObject attachedArg3{};
+        LuaPlus::LuaObject attachedArg4{};
+        LuaPlus::LuaObject attachedArg5{};
+        if (
+          !mUnit->RunScriptMultiRet(
+            kGetCaptureCostsScript,
+            attachedCaptureCosts,
+            attachedUnit->mLuaObj,
+            attachedArg2,
+            attachedArg3,
+            attachedArg4,
+            attachedArg5
+          ) ||
+          attachedCaptureCosts.size() != 3
+        ) {
+          continue;
+        }
+
+        mCaptureTime = static_cast<int>(
+          static_cast<float>(mCaptureTime) +
+          std::max(1.0f, static_cast<float>(attachedCaptureCosts[0].ToNumber() * 10.0))
         );
+        energyCost += attachedCaptureCosts[1].ToNumber();
+        massCost += attachedCaptureCosts[2].ToNumber();
+      }
+
+      if (energyCost < 0.0f) {
+        energyCost = 0.0f;
+      }
+      if (massCost < 0.0f) {
+        massCost = 0.0f;
+      }
+
+      const float captureTimeAsFloat = static_cast<float>(mCaptureTime);
+      mCaptureRate.energy = energyCost / captureTimeAsFloat;
+      mCaptureRate.mass = massCost / captureTimeAsFloat;
+
+      CSimArmyEconomyInfo* const economyInfo = mUnit->ArmyRef->GetEconomy();
+      ReplaceEconomyRequestPointer(mConsumptionData, CreateEconomyRequest(mCaptureRate, economyInfo));
+
+      DoCallback(true);
+      mTaskState = NextTaskState(mTaskState);
+      return 0;
+    }
+
+    case TASKSTATE_Processing: {
+      if (
+        mConsumptionData->mGranted.energy >= mCaptureRate.energy && mConsumptionData->mGranted.mass >= mCaptureRate.mass
+      ) {
+        const SEconValue granted = TakeGrantedResourcesAndReset(mConsumptionData);
+        mUnit->mUnitVarDat.mResourcesSpent.ENERGY += granted.energy;
+        mUnit->mUnitVarDat.mResourcesSpent.MASS += granted.mass;
+
+        targetEntity = mTargetEntity.GetObjectPtr();
+        targetUnit = (targetEntity != nullptr) ? targetEntity->IsUnit() : nullptr;
+        if (targetUnit != nullptr) {
+          int captureProgress = mCaptureProgress + targetUnit->CaptorCount;
+          if (captureProgress > mCaptureTime) {
+            captureProgress = mCaptureTime;
+          }
+          mCaptureProgress = captureProgress;
+          mUnit->mUnitVarDat.mWorkProgress = static_cast<float>(mCaptureProgress) / static_cast<float>(mCaptureTime);
+        }
+      }
+
+      if (mCaptureProgress < mCaptureTime) {
         return 1;
+      }
+
+      mTaskState = NextTaskState(mTaskState);
+      return 0;
+    }
+
+    case TASKSTATE_Complete: {
+      mUnit->RunScriptWeakEntity(kOnStopCaptureScript, mTargetEntity);
+
+      targetEntity = mTargetEntity.GetObjectPtr();
+      if (targetEntity != nullptr) {
+        targetEntity->RunScriptUnit(kOnStopBeingCapturedScript, mUnit);
+        targetEntity->RunScriptUnit(kOnCapturedScript, mUnit);
+      }
+
+      return -1;
+    }
+
+    default:
+      gpg::HandleAssertFailure(
+        "Reached the supposably unreachable.", 276, "c:\\work\\rts\\main\\code\\src\\sim\\AiUnitCapture.cpp"
+      );
+      return 1;
     }
   }
 
@@ -460,7 +474,9 @@ namespace moho
    * Saves base command-task state plus capture-task command/target/economy
    * ownership lanes and capture progress/rate values.
    */
-  void CUnitCaptureTask::MemberSerialize(gpg::WriteArchive* const archive) const
+  void CUnitCaptureTask::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     if (archive == nullptr) {
       return;
@@ -489,7 +505,9 @@ namespace moho
    * ownership lanes, capture progress/rate values, and replaces the owned
    * economy request, unlinking the prior pointer from its intrusive lane.
    */
-  void CUnitCaptureTask::MemberDeserialize(gpg::ReadArchive* const archive)
+  void CUnitCaptureTask::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     if (archive == nullptr) {
       return;
@@ -563,7 +581,9 @@ namespace moho
    * Toggles target capture-state/captor-count bookkeeping and dispatches
    * start/failed capture script callbacks on owner and target lanes.
    */
-  void CUnitCaptureTask::DoCallback(const bool start)
+  void CUnitCaptureTask::DoCallback(
+    const bool start
+  )
   {
     if (start == mHasStarted) {
       return;
@@ -611,7 +631,9 @@ namespace moho
    * Refreshes target/focus links from current command payload, resets capture
    * progress/economy lanes, and wakes owner task thread for immediate retick.
    */
-  void CUnitCaptureTask::OnEvent(ECommandEvent)
+  void CUnitCaptureTask::OnEvent(
+    ECommandEvent
+  )
   {
     DoCallback(false);
 

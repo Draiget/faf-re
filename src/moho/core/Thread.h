@@ -97,7 +97,9 @@ namespace moho
     /**
      * Initialize context (asm passes '2'; ignored here, kept for parity).
      */
-    void begin(int /*mode*/) noexcept
+    void begin(
+      int /*mode*/
+    ) noexcept
     {
       // Auto-reset, initially non-signaled
       evt = ::CreateEventW(nullptr, FALSE, FALSE, nullptr);

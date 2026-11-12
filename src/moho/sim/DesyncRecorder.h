@@ -20,9 +20,8 @@ namespace moho
   /**
    * Engine addition (issue #216): `sim_DesyncRecorder`, a user-side switch for the full sync-log
    * recording, which costs sim time. 0, the default, never records; 1 always does; -1 records live
-   * multiplayer games only. Seeded by `/desyncrecorder` (1) and `/nodesyncrecorder` (0). Read when a sim is created, so a
-   * change takes effect at the next game. It never reaches the sim: the recorder only reads state
-   * and writes text.
+   * multiplayer games only. Seeded by `/desyncrecorder` (1) and `/nodesyncrecorder` (0). Read when a sim is created, so
+   * a change takes effect at the next game. It never reaches the sim: the recorder only reads state and writes text.
    */
   extern int sim_DesyncRecorder;
 
@@ -83,7 +82,9 @@ namespace moho
     [[nodiscard]] std::string* StateTap() noexcept;
 
     /// The recorder recording `sim`, or null.
-    [[nodiscard]] static CDesyncRecorder* For(const Sim* const sim) noexcept
+    [[nodiscard]] static CDesyncRecorder* For(
+      const Sim* const sim
+    ) noexcept
     {
       return sim != nullptr && sim == sSim ? sInstance : nullptr;
     }

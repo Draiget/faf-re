@@ -24,7 +24,9 @@
  * symbols even though they are the same C++ overload. Unit.cpp,
  * CWldSession.cpp and PathTables.cpp all forward-declare the plain form.
  */
-[[noreturn]] void EngineThrowContainerTooLong(const char* message)
+[[noreturn]] void EngineThrowContainerTooLong(
+  const char* message
+)
 {
   throw std::length_error(message);
 }
@@ -36,7 +38,9 @@
  * Lowercases one wide character under the current CRT locale lane. Called per
  * character by the typed wxString lowercase loop in `WxRuntimeTypes.cpp`.
  */
-int EngineToLowerWideWithCurrentLocale(const wchar_t character)
+int EngineToLowerWideWithCurrentLocale(
+  const wchar_t character
+)
 {
   return static_cast<int>(_towlower_l(static_cast<wint_t>(character), nullptr));
 }
@@ -47,7 +51,9 @@ int EngineToLowerWideWithCurrentLocale(const wchar_t character)
  * What it does:
  * Parses one base-10 signed wide integer by forwarding to `wcstol`.
  */
-extern "C" int __cdecl EngineWtoiFromWide(const wchar_t* const text)
+extern "C" int __cdecl EngineWtoiFromWide(
+  const wchar_t* const text
+)
 {
   return static_cast<int>(::wcstol(text, nullptr, 10));
 }
@@ -58,7 +64,9 @@ extern "C" int __cdecl EngineWtoiFromWide(const wchar_t* const text)
  * What it does:
  * Tail-forwards one `_wtoi` thunk lane into `EngineWtoiFromWide`.
  */
-extern "C" int __cdecl EngineWtoiFromWideThunk(const wchar_t* const text)
+extern "C" int __cdecl EngineWtoiFromWideThunk(
+  const wchar_t* const text
+)
 {
   return EngineWtoiFromWide(text);
 }
@@ -74,11 +82,13 @@ extern "C" int __cdecl EngineWtoiFromWideThunk(const wchar_t* const text)
  * that position, or null when absent. Searching for the terminator itself
  * finds it, because the backward scan starts there.
  */
-extern "C" wchar_t* __cdecl EngineWideStringFindLast(wchar_t* const text, const wchar_t needle)
+extern "C" wchar_t* __cdecl EngineWideStringFindLast(
+  wchar_t* const text,
+  const wchar_t needle
+)
 {
   wchar_t* cursor = text;
-  while (*cursor++ != L'\0') {
-  }
+  while (*cursor++ != L'\0') {}
 
   do {
     --cursor;

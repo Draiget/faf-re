@@ -23,7 +23,9 @@ namespace
     return &sInstance;
   }
 
-  [[nodiscard]] gpg::RRef MakeUnitRef(moho::Unit* unit)
+  [[nodiscard]] gpg::RRef MakeUnitRef(
+    moho::Unit* unit
+  )
   {
     gpg::RRef out{};
     out.mObj = nullptr;
@@ -40,8 +42,11 @@ namespace
     }
 
     std::int32_t baseOffset = 0;
-    if (dynamicType && gpg::RTypeOf<moho::Unit>() && dynamicType->IsDerivedFrom(gpg::RTypeOf<moho::Unit>(), &baseOffset)) {
-      out.mObj = reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(unit) - static_cast<std::uintptr_t>(baseOffset));
+    if (
+      dynamicType && gpg::RTypeOf<moho::Unit>() && dynamicType->IsDerivedFrom(gpg::RTypeOf<moho::Unit>(), &baseOffset)
+    ) {
+      out.mObj =
+        reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(unit) - static_cast<std::uintptr_t>(baseOffset));
       out.mType = dynamicType;
       return out;
     }
@@ -51,7 +56,10 @@ namespace
     return out;
   }
 
-  [[nodiscard]] moho::Unit* ReadPointerUnit(gpg::ReadArchive* const archive, const gpg::RRef& ownerRef)
+  [[nodiscard]] moho::Unit* ReadPointerUnit(
+    gpg::ReadArchive* const archive,
+    const gpg::RRef& ownerRef
+  )
   {
     const gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
     if (!tracked.object) {
@@ -70,7 +78,8 @@ namespace
     const char* const expected = gpg::RTypeOf<moho::Unit>() ? gpg::RTypeOf<moho::Unit>()->GetName() : "Unit";
     const char* const actual = source.GetTypeName();
     const fa::string message = gpg::STR_Printf(
-      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
+      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+      "instead",
       expected ? expected : "Unit",
       actual ? actual : "null"
     );
@@ -93,7 +102,12 @@ namespace moho
   /**
    * Address: 0x006AF1E0 (FUN_006AF1E0, Moho::RWeakPtrType_Unit::SerLoad)
    */
-  void WeakPtr_Unit::Deserialize(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void WeakPtr_Unit::Deserialize(
+    gpg::ReadArchive* const archive,
+    const std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const weak = reinterpret_cast<WeakPtr<Unit>*>(objectPtr);
     if (!archive || !weak) {
@@ -107,7 +121,12 @@ namespace moho
   /**
    * Address: 0x006AF210 (FUN_006AF210, Moho::RWeakPtrType_Unit::SerSave)
    */
-  void WeakPtr_Unit::Serialize(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void WeakPtr_Unit::Serialize(
+    gpg::WriteArchive* const archive,
+    const std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const weak = reinterpret_cast<WeakPtr<Unit>*>(objectPtr);
     if (!archive || !weak) {
@@ -131,7 +150,9 @@ namespace moho
   /**
    * Address: 0x006AE050 (FUN_006AE050, Moho::RWeakPtrType_Unit::GetLexical)
    */
-  fa::string RWeakPtrType<Unit>::GetLexical(const gpg::RRef& ref) const
+  fa::string RWeakPtrType<Unit>::GetLexical(
+    const gpg::RRef& ref
+  ) const
   {
     auto* const weak = static_cast<const WeakPtr<Unit>*>(ref.mObj);
     if (!weak || !weak->HasValue()) {
@@ -177,7 +198,10 @@ namespace moho
   /**
    * Address: 0x006AE230 (FUN_006AE230, Moho::RWeakPtrType_Unit::SubscriptIndex)
    */
-  gpg::RRef RWeakPtrType<Unit>::SubscriptIndex(void* const obj, const int ind) const
+  gpg::RRef RWeakPtrType<Unit>::SubscriptIndex(
+    void* const obj,
+    const int ind
+  ) const
   {
     GPG_ASSERT(ind == 0);
     auto* const weak = static_cast<WeakPtr<Unit>*>(obj);
@@ -187,7 +211,9 @@ namespace moho
   /**
    * Address: 0x006AE200 (FUN_006AE200, Moho::RWeakPtrType_Unit::GetCount)
    */
-  size_t RWeakPtrType<Unit>::GetCount(void* const obj) const
+  size_t RWeakPtrType<Unit>::GetCount(
+    void* const obj
+  ) const
   {
     auto* const weak = static_cast<WeakPtr<Unit>*>(obj);
     return (weak && weak->HasValue()) ? 1u : 0u;
@@ -220,4 +246,7 @@ namespace moho
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_WeakPtr_Unit_Type_00_6d7fb4, moho::register_WeakPtr_Unit_Type_00)
+GPG_PREREGISTER_INIT(
+  register_WeakPtr_Unit_Type_00_6d7fb4,
+  moho::register_WeakPtr_Unit_Type_00
+)

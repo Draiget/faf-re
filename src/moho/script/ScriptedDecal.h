@@ -146,9 +146,7 @@ namespace moho
   // 0x64 in the binary, plus the engine's mHeading.
   static_assert(sizeof(ScriptedDecal) == 0x68, "ScriptedDecal size must be 0x68");
   static_assert(offsetof(ScriptedDecal, mDecal) == 0x34, "ScriptedDecal::mDecal offset must be 0x34");
-  static_assert(
-    offsetof(ScriptedDecal, mDynamicTexture) == 0x3C, "ScriptedDecal::mDynamicTexture offset must be 0x3C"
-  );
+  static_assert(offsetof(ScriptedDecal, mDynamicTexture) == 0x3C, "ScriptedDecal::mDynamicTexture offset must be 0x3C");
   static_assert(offsetof(ScriptedDecal, mDecalManager) == 0x44, "ScriptedDecal::mDecalManager offset must be 0x44");
   static_assert(offsetof(ScriptedDecal, mWorldCamera) == 0x48, "ScriptedDecal::mWorldCamera offset must be 0x48");
   static_assert(offsetof(ScriptedDecal, mScale) == 0x4C, "ScriptedDecal::mScale offset must be 0x4C");

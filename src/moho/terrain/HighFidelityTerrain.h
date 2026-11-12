@@ -35,7 +35,6 @@ namespace moho
   class HighFidelityTerrain : public TerrainCommon
   {
   public:
-
     /**
      * Address: 0x007FF940 (??0HighFidelityTerrain@Moho@@QAE@@Z)
      * Mangled: ??0HighFidelityTerrain@Moho@@QAE@@Z
@@ -226,7 +225,8 @@ namespace moho
       std::int32_t tick,
       float tickLerp,
       boost::shared_ptr<ID3DRenderTarget> refractionTexture,
-      boost::shared_ptr<ID3DRenderTarget> reflectionTexture) override;
+      boost::shared_ptr<ID3DRenderTarget> reflectionTexture
+    ) override;
 
     /**
      * Address: 0x00801BE0 (FUN_00801BE0, Moho::HighFidelityTerrain::DrawNormals)
@@ -239,7 +239,8 @@ namespace moho
       std::int32_t gameTick,
       float deltaSeconds,
       const boost::shared_ptr<ID3DRenderTarget>& terrainNormalTexture,
-      Shadow* shadowContext) override;
+      Shadow* shadowContext
+    ) override;
 
     /**
      * Address: 0x00802F20 (FUN_00802F20, Moho::HighFidelityTerrain::DrawTerrainNormal)
@@ -322,10 +323,8 @@ namespace moho
      * terrain triangle list. The retained overlay handle is released as the
      * by-value `shared_ptr` parameter goes out of scope.
      */
-    void DrawTerrain(
-      boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
-      const fa::string* techniqueName
-    ) override;
+    void
+    DrawTerrain(boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture, const fa::string* techniqueName) override;
 
     /**
      * Address: 0x00801EE0 (FUN_00801EE0, Moho::HighFidelityTerrain::DrawDirtyTerrain)
@@ -356,33 +355,33 @@ namespace moho
     static void DrawShoreline(const Shoreline* shoreline, const GeomCamera3* camera);
 
     IWldTerrainRes* mTerrainResource = nullptr; // +0x0C
-    std::int32_t mViewportOriginX = 0;                    // +0x10
-    std::int32_t mViewportOriginY = 0;                    // +0x14
-    std::int32_t mViewportWidth = 0;                      // +0x18
-    std::int32_t mViewportHeight = 0;                     // +0x1C
-    std::int32_t mViewportRenderWidth = 0;                // +0x20
-    std::int32_t mViewportRenderHeight = 0;               // +0x24
-    GeomCamera3* mCamera = nullptr;                       // +0x28
-    std::uint32_t mSkirtStartIndex = 0u;                  // +0x2C
-    std::uint32_t mUnknown30 = 0u;                        // +0x30
-    std::uint32_t mSkirtEndIndex = 0u;                    // +0x34
-    std::int32_t mSkirtEndVertex = 0;                     // +0x38
-    std::int32_t mSkirtBaseVertex = 0;                    // +0x3C
+    std::int32_t mViewportOriginX = 0;          // +0x10
+    std::int32_t mViewportOriginY = 0;          // +0x14
+    std::int32_t mViewportWidth = 0;            // +0x18
+    std::int32_t mViewportHeight = 0;           // +0x1C
+    std::int32_t mViewportRenderWidth = 0;      // +0x20
+    std::int32_t mViewportRenderHeight = 0;     // +0x24
+    GeomCamera3* mCamera = nullptr;             // +0x28
+    std::uint32_t mSkirtStartIndex = 0u;        // +0x2C
+    std::uint32_t mUnknown30 = 0u;              // +0x30
+    std::uint32_t mSkirtEndIndex = 0u;          // +0x34
+    std::int32_t mSkirtEndVertex = 0;           // +0x38
+    std::int32_t mSkirtBaseVertex = 0;          // +0x3C
 
     gpg::core::FastVectorN<TerrainDecalDrawCommand, 500> mDecalDrawCommands; // +0x40
-    CTesselator* mTesselator = nullptr;                   // +0x2F30
-    Shoreline mShoreline;                                 // +0x2F34
-    CD3DVertexSheet* mTerrainVertexSheet = nullptr;       // +0x2FE4
-    CD3DIndexSheet* mTerrainIndexSheet = nullptr;         // +0x2FE8
+    CTesselator* mTesselator = nullptr;                                      // +0x2F30
+    Shoreline mShoreline;                                                    // +0x2F34
+    CD3DVertexSheet* mTerrainVertexSheet = nullptr;                          // +0x2FE4
+    CD3DIndexSheet* mTerrainIndexSheet = nullptr;                            // +0x2FE8
     // Engine addition in the padding (ren_TerrainGpuBuffers): 1 while the two sheets above live in GPU
     // memory, 2 added until their first upload.
-    std::uint32_t mTerrainSheetState = 0u;                // +0x2FEC
+    std::uint32_t mTerrainSheetState = 0u; // +0x2FEC
 
     gpg::core::FastVectorN<CWldSplat::SplatVertex, 10000> mSplatVertices; // +0x2FF0
-    CD3DVertexSheet* mDynamicVertexSheet = nullptr;       // +0x475C0
-    CD3DIndexSheet* mDynamicIndexSheet = nullptr;         // +0x475C4
-    VTransform mTerrainTransform;                         // +0x475C8
-    std::uint32_t mUnknown475E4;                          // +0x475E4
+    CD3DVertexSheet* mDynamicVertexSheet = nullptr;                       // +0x475C0
+    CD3DIndexSheet* mDynamicIndexSheet = nullptr;                         // +0x475C4
+    VTransform mTerrainTransform;                                         // +0x475C8
+    std::uint32_t mUnknown475E4;                                          // +0x475E4
   };
 
   static_assert(

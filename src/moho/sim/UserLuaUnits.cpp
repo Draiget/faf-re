@@ -6,7 +6,7 @@ using EntId = std::int32_t;
 namespace
 {
 
-// Engine addition: helpers shared with the file these functions came from.
+  // Engine addition: helpers shared with the file these functions came from.
   /**
    * Address: 0x008B5BB0 (FUN_008B5BB0, sub_8B5BB0)
    *
@@ -41,12 +41,17 @@ namespace
   constexpr const char* kExpectedGameObjectError = "Expected a game object. (Did you call with '.' instead of ':'?)";
   constexpr const char* kIncorrectGameObjectTypeError =
     "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
-  [[nodiscard]] IUnit* ResolveIUnitBridge(UserUnit* const unit) noexcept
+  [[nodiscard]] IUnit* ResolveIUnitBridge(
+    UserUnit* const unit
+  ) noexcept
   {
     return unit ? static_cast<IUnit*>(unit) : nullptr;
   }
 
-  void AppendSelectionUnitUnique(fa::vector<UserUnit*>& selectionUnits, UserUnit* const unit)
+  void AppendSelectionUnitUnique(
+    fa::vector<UserUnit*>& selectionUnits,
+    UserUnit* const unit
+  )
   {
     if (unit == nullptr) {
       return;
@@ -56,12 +61,17 @@ namespace
       selectionUnits.push_back(unit);
     }
   }
-  [[nodiscard]] std::int64_t BuildScriptBitMask(const int bitIndex) noexcept
+  [[nodiscard]] std::int64_t BuildScriptBitMask(
+    const int bitIndex
+  ) noexcept
   {
     const std::uint32_t bitShift = static_cast<std::uint32_t>(bitIndex);
     return bitShift < 64u ? static_cast<std::int64_t>(1ull << bitShift) : 0;
   }
-  [[nodiscard]] UserCommandIssueHelper* FindCommandIssueHelper(CWldSession* const session, const CmdId cmdId)
+  [[nodiscard]] UserCommandIssueHelper* FindCommandIssueHelper(
+    CWldSession* const session,
+    const CmdId cmdId
+  )
   {
     if (!session || !session->mCommandManager) {
       return nullptr;
@@ -70,8 +80,10 @@ namespace
     CommandManager* const commandManager = session->mCommandManager;
     return FindCommandIssueHelperInManager(commandManager, cmdId);
   }
-  [[nodiscard]] UserEntity*
-  FindUserSessionEntityById(CWldSession* const session, const std::int32_t entityId) noexcept
+  [[nodiscard]] UserEntity* FindUserSessionEntityById(
+    CWldSession* const session,
+    const std::int32_t entityId
+  ) noexcept
   {
     if (session == nullptr) {
       return nullptr;
@@ -104,11 +116,13 @@ namespace
     "table GetIdleEngineers() - return a table of idle engineer units for the army";
   constexpr const char* kGetIdleFactoriesHelpText =
     "table GetIdleFactories() - return a table of idle factory units for the army";
-  constexpr const char* kGetSelectedUnitsHelpText = "table GetSelectedUnits() - return a table of the currently selected units";
+  constexpr const char* kGetSelectedUnitsHelpText =
+    "table GetSelectedUnits() - return a table of the currently selected units";
   constexpr const char* kGetUnitByIdUserHelpText = "GetUnitById(id)";
   constexpr const char* kGetUnitCommandFromCommandCapErrorHelpText = "string GetUnitCommandFromCommandCap(string)";
   constexpr const char* kGetUnitCommandFromCommandCapHelpText =
-    "string GetUnitCommandFromCommandCap(string) - given a RULEUCC type command, return the equivalent UNITCOMMAND command";
+    "string GetUnitCommandFromCommandCap(string) - given a RULEUCC type command, return the equivalent UNITCOMMAND "
+    "command";
   constexpr const char* kGetValidAttackingUnitsHelpText =
     "table GetValidAttackingUnits() - return a table of the currently selected units";
   constexpr const char* kParseEntityCategoryUserHelpText = "parse a string to generate a new entity category";
@@ -137,13 +151,20 @@ namespace
    * body with kind 1; zero callers and no references in the image, a
    * linker-retained copy nothing runs.)
    */
-  void QueueCommandIssueDecreaseCountEvent(UserCommandIssueHelper& helper, const CmdId cmdId, const std::int32_t deltaCount)
+  void QueueCommandIssueDecreaseCountEvent(
+    UserCommandIssueHelper& helper,
+    const CmdId cmdId,
+    const std::int32_t deltaCount
+  )
   {
     UserCommandIssueLocalEvent event(cmdId, ECommandIssueEvent::DecreaseCount);
     event.mCount = deltaCount;
     helper.mLocalQueue.push_back(event);
   }
-  [[nodiscard]] CmdId ReadLuaCommandIdArg(LuaPlus::LuaState* const state, const int stackIndex)
+  [[nodiscard]] CmdId ReadLuaCommandIdArg(
+    LuaPlus::LuaState* const state,
+    const int stackIndex
+  )
   {
     LuaPlus::LuaStackObject arg(state, stackIndex);
     if (lua_type(state->m_state, stackIndex) != LUA_TNUMBER) {
@@ -179,14 +200,18 @@ namespace
     const IUnit* const iunitBridge = ResolveIUnitBridge(userUnit);
     return iunitBridge ? iunitBridge->GetBlueprint() : nullptr;
   }
-  [[nodiscard]] Sim* ResolveGlobalSim(lua_State* const luaContext) noexcept
+  [[nodiscard]] Sim* ResolveGlobalSim(
+    lua_State* const luaContext
+  ) noexcept
   {
     if (!luaContext || !luaContext->l_G) {
       return nullptr;
     }
     return luaContext->l_G->globalUserData;
   }
-  [[nodiscard]] UserUnit* ResolveSelectableTransportAttachmentParent(UserUnit* const unit) noexcept
+  [[nodiscard]] UserUnit* ResolveSelectableTransportAttachmentParent(
+    UserUnit* const unit
+  ) noexcept
   {
     if (unit == nullptr) {
       return nullptr;
@@ -198,10 +223,8 @@ namespace
       return nullptr;
     }
 
-    UserEntity* const attachmentParentEntity = FindUserSessionEntityById(
-      entity->mSession,
-      static_cast<std::int32_t>(attachmentParentRef)
-    );
+    UserEntity* const attachmentParentEntity =
+      FindUserSessionEntityById(entity->mSession, static_cast<std::int32_t>(attachmentParentRef));
     if (attachmentParentEntity == nullptr || !attachmentParentEntity->IsSelectable()) {
       return nullptr;
     }
@@ -214,7 +237,10 @@ namespace
     static const fa::string kTransportationCategory("TRANSPORTATION");
     return attachmentParentEntity->IsInCategory(kTransportationCategory) ? attachmentParentUnit : nullptr;
   }
-  [[nodiscard]] UserUnit* ResolveUserUnitOptional(const LuaPlus::LuaObject& object, LuaPlus::LuaState* const state)
+  [[nodiscard]] UserUnit* ResolveUserUnitOptional(
+    const LuaPlus::LuaObject& object,
+    LuaPlus::LuaState* const state
+  )
   {
     CScriptObject** const scriptObjectSlot = moho::SCR_ScriptObjectSlot(object);
     if (scriptObjectSlot == nullptr) {
@@ -236,9 +262,7 @@ namespace
 
     return static_cast<UserUnit*>(upcast.mObj);
   }
-}
-
-
+} // namespace
 
 /**
  * Address: 0x008B9B80 (FUN_008B9B80, cfunc_ParseEntityCategoryUserL)
@@ -247,7 +271,9 @@ namespace
  * Parses one category expression string and returns a new entity-category
  * userdata object.
  */
-int moho::cfunc_ParseEntityCategoryUserL(LuaPlus::LuaState* const state)
+int moho::cfunc_ParseEntityCategoryUserL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kParseEntityCategoryUserHelpText);
@@ -279,7 +305,9 @@ int moho::cfunc_ParseEntityCategoryUserL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback state and forwards to `cfunc_ParseEntityCategoryUserL`.
  */
-int moho::cfunc_ParseEntityCategoryUser(lua_State* const luaContext)
+int moho::cfunc_ParseEntityCategoryUser(
+  lua_State* const luaContext
+)
 {
   return cfunc_ParseEntityCategoryUserL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -310,7 +338,9 @@ moho::CScrLuaInitForm* moho::func_ParseEntityCategoryUser_LuaFuncDef()
  * Unwraps Lua callback state and forwards to
  * `cfunc_GetUnitCommandFromCommandCapL`.
  */
-int moho::cfunc_GetUnitCommandFromCommandCap(lua_State* const luaContext)
+int moho::cfunc_GetUnitCommandFromCommandCap(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetUnitCommandFromCommandCapL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -341,7 +371,9 @@ moho::CScrLuaInitForm* moho::func_GetUnitCommandFromCommandCap_LuaFuncDef()
  * What it does:
  * Converts one command-capability enum into the matching unit command enum.
  */
-moho::EUnitCommandType moho::UnitCommandCapToCommandType(const ERuleBPUnitCommandCaps commandCap)
+moho::EUnitCommandType moho::UnitCommandCapToCommandType(
+  const ERuleBPUnitCommandCaps commandCap
+)
 {
   if (commandCap > RULEUCC_Tactical) {
     if (commandCap > RULEUCC_Pause) {
@@ -442,7 +474,9 @@ moho::EUnitCommandType moho::UnitCommandCapToCommandType(const ERuleBPUnitComman
  * Converts one `RULEUCC` lexical token to its corresponding `UNITCOMMAND`
  * lexical token and returns it as a Lua string.
  */
-int moho::cfunc_GetUnitCommandFromCommandCapL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetUnitCommandFromCommandCapL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 1, kGetUnitCommandFromCommandCapErrorHelpText);
@@ -472,7 +506,9 @@ int moho::cfunc_GetUnitCommandFromCommandCapL(LuaPlus::LuaState* const state)
  * What it does:
  * Tests whether arg#1 category set contains arg#2 unit/blueprint category.
  */
-int moho::cfunc_EntityCategoryContainsUserL(LuaPlus::LuaState* const state)
+int moho::cfunc_EntityCategoryContainsUserL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -487,7 +523,8 @@ int moho::cfunc_EntityCategoryContainsUserL(LuaPlus::LuaState* const state)
   }
 
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 1));
-  EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject); // 0x005575E0: raises on a non-category
+  EntityCategorySet* const categorySet =
+    func_GetCObj_EntityCategory(categoryObject); // 0x005575E0: raises on a non-category
 
   const LuaPlus::LuaObject valueObject(LuaPlus::LuaStackObject(state, 2));
   const RUnitBlueprint* const blueprint = ResolveEntityCategoryFilterBlueprint(valueObject, session, state);
@@ -504,7 +541,9 @@ int moho::cfunc_EntityCategoryContainsUserL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback state and forwards to `cfunc_EntityCategoryContainsUserL`.
  */
-int moho::cfunc_EntityCategoryContainsUser(lua_State* const luaContext)
+int moho::cfunc_EntityCategoryContainsUser(
+  lua_State* const luaContext
+)
 {
   return cfunc_EntityCategoryContainsUserL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -535,7 +574,9 @@ moho::CScrLuaInitForm* moho::func_EntityCategoryContainsUser_LuaFuncDef()
  * Filters arg#2 values into a result table by keeping entries whose resolved
  * unit blueprint category bit is present in arg#1 category set.
  */
-int moho::cfunc_EntityCategoryFilterDownUserL(LuaPlus::LuaState* const state)
+int moho::cfunc_EntityCategoryFilterDownUserL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -554,7 +595,8 @@ int moho::cfunc_EntityCategoryFilterDownUserL(LuaPlus::LuaState* const state)
   }
 
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 1));
-  EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject); // 0x005575E0: raises on a non-category
+  EntityCategorySet* const categorySet =
+    func_GetCObj_EntityCategory(categoryObject); // 0x005575E0: raises on a non-category
   if (!categorySet) {
     LuaPlus::LuaState::Error(state, kEntityCategoryFilterDownUserInvalidCategoryText);
   }
@@ -588,7 +630,9 @@ int moho::cfunc_EntityCategoryFilterDownUserL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback state and forwards to `cfunc_EntityCategoryFilterDownUserL`.
  */
-int moho::cfunc_EntityCategoryFilterDownUser(lua_State* const luaContext)
+int moho::cfunc_EntityCategoryFilterDownUser(
+  lua_State* const luaContext
+)
 {
   return cfunc_EntityCategoryFilterDownUserL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -619,7 +663,9 @@ moho::CScrLuaInitForm* moho::func_EntityCategoryFilterDownUser_LuaFuncDef()
  * Filters arg#2 values into a result table by excluding entries whose resolved
  * unit blueprint category bit is present in arg#1 category set.
  */
-int moho::cfunc_EntityCategoryFilterOutL(LuaPlus::LuaState* const state)
+int moho::cfunc_EntityCategoryFilterOutL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -633,7 +679,8 @@ int moho::cfunc_EntityCategoryFilterOutL(LuaPlus::LuaState* const state)
   }
 
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 1));
-  EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject); // 0x005575E0: raises on a non-category
+  EntityCategorySet* const categorySet =
+    func_GetCObj_EntityCategory(categoryObject); // 0x005575E0: raises on a non-category
   if (!categorySet) {
     LuaPlus::LuaState::Error(state, kEntityCategoryFilterOutInvalidCategoryText);
   }
@@ -668,7 +715,9 @@ int moho::cfunc_EntityCategoryFilterOutL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback state and forwards to `cfunc_EntityCategoryFilterOutL`.
  */
-int moho::cfunc_EntityCategoryFilterOut(lua_State* const luaContext)
+int moho::cfunc_EntityCategoryFilterOut(
+  lua_State* const luaContext
+)
 {
   return cfunc_EntityCategoryFilterOutL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -701,7 +750,9 @@ moho::CScrLuaInitForm* moho::func_EntityCategoryFilterOut_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and dispatches to `cfunc_ExecLuaInSimL`.
  */
-int moho::cfunc_ExecLuaInSim(lua_State* const luaContext)
+int moho::cfunc_ExecLuaInSim(
+  lua_State* const luaContext
+)
 {
   return cfunc_ExecLuaInSimL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -715,12 +766,7 @@ int moho::cfunc_ExecLuaInSim(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_ExecLuaInSim_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    "ExecLuaInSim",
-    &moho::cfunc_ExecLuaInSim,
-    nullptr,
-    "<global>",
-    kExecLuaInSimHelpText
+    moho::SCR_UserLuaInitSet(), "ExecLuaInSim", &moho::cfunc_ExecLuaInSim, nullptr, "<global>", kExecLuaInSimHelpText
   );
   return &binder;
 }
@@ -732,7 +778,9 @@ moho::CScrLuaInitForm* moho::func_ExecLuaInSim_LuaFuncDef()
  * Reads `(functionName,args)` from Lua and forwards one
  * `ExecuteLuaInSim(functionName,args)` request through the active sim driver.
  */
-int moho::cfunc_ExecLuaInSimL(LuaPlus::LuaState* const state)
+int moho::cfunc_ExecLuaInSimL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kExecLuaInSimHelpText);
 
@@ -758,7 +806,9 @@ int moho::cfunc_ExecLuaInSimL(LuaPlus::LuaState* const state)
  * Reads callback payload (`Func`,`Args`) and optional selection forwarding
  * flag, then marshals `CMDST_LuaSimCallback` through the active sim driver.
  */
-int moho::cfunc_SimCallbackL(LuaPlus::LuaState* const state)
+int moho::cfunc_SimCallbackL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -768,12 +818,7 @@ int moho::cfunc_SimCallbackL(LuaPlus::LuaState* const state)
   const int argumentCount = lua_gettop(rawState);
   if (argumentCount < 1 || argumentCount > 2) {
     LuaPlus::LuaState::Error(
-      state,
-      "%s\n  expected between %d and %d args, but got %d",
-      kSimCallbackHelpText,
-      1,
-      2,
-      argumentCount
+      state, "%s\n  expected between %d and %d args, but got %d", kSimCallbackHelpText, 1, 2, argumentCount
     );
   }
 
@@ -825,7 +870,9 @@ int moho::cfunc_SimCallbackL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and dispatches to `cfunc_SimCallbackL`.
  */
-int moho::cfunc_SimCallback(lua_State* const luaContext)
+int moho::cfunc_SimCallback(
+  lua_State* const luaContext
+)
 {
   return cfunc_SimCallbackL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -839,12 +886,7 @@ int moho::cfunc_SimCallback(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SimCallback_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    "SimCallback",
-    &moho::cfunc_SimCallback,
-    nullptr,
-    "<global>",
-    kSimCallbackHelpText
+    moho::SCR_UserLuaInitSet(), "SimCallback", &moho::cfunc_SimCallback, nullptr, "<global>", kSimCallbackHelpText
   );
   return &binder;
 }
@@ -856,7 +898,9 @@ moho::CScrLuaInitForm* moho::func_SimCallback_LuaFuncDef()
  * Reads `(unitTable, enabled)` and emits one `SetAutoMode` info-pair per
  * live user-unit entry.
  */
-int moho::cfunc_SetAutoModeL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetAutoModeL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -882,11 +926,7 @@ int moho::cfunc_SetAutoModeL(LuaPlus::LuaState* const state)
     }
 
     if (ISTIDriver* const activeDriver = WLD_GetDriver(); activeDriver != nullptr) {
-      activeDriver->ProcessInfoPair(
-        iunitBridge->GetEntityId(),
-        "SetAutoMode",
-        enabled ? "true" : "false"
-      );
+      activeDriver->ProcessInfoPair(iunitBridge->GetEntityId(), "SetAutoMode", enabled ? "true" : "false");
     }
   }
 
@@ -899,7 +939,9 @@ int moho::cfunc_SetAutoModeL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and dispatches to `cfunc_SetAutoModeL`.
  */
-int moho::cfunc_SetAutoMode(lua_State* const luaContext)
+int moho::cfunc_SetAutoMode(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetAutoModeL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -913,12 +955,7 @@ int moho::cfunc_SetAutoMode(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SetAutoMode_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    "SetAutoMode",
-    &moho::cfunc_SetAutoMode,
-    nullptr,
-    "<global>",
-    kSetAutoModeHelpText
+    moho::SCR_UserLuaInitSet(), "SetAutoMode", &moho::cfunc_SetAutoMode, nullptr, "<global>", kSetAutoModeHelpText
   );
   return &binder;
 }
@@ -930,7 +967,9 @@ moho::CScrLuaInitForm* moho::func_SetAutoMode_LuaFuncDef()
  * Reads `(unitTable, enabled)` and emits one `SetAutoSurfaceMode` info-pair
  * per live user-unit entry.
  */
-int moho::cfunc_SetAutoSurfaceModeL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetAutoSurfaceModeL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -956,11 +995,7 @@ int moho::cfunc_SetAutoSurfaceModeL(LuaPlus::LuaState* const state)
     }
 
     if (ISTIDriver* const activeDriver = WLD_GetDriver(); activeDriver != nullptr) {
-      activeDriver->ProcessInfoPair(
-        iunitBridge->GetEntityId(),
-        "SetAutoSurfaceMode",
-        enabled ? "true" : "false"
-      );
+      activeDriver->ProcessInfoPair(iunitBridge->GetEntityId(), "SetAutoSurfaceMode", enabled ? "true" : "false");
     }
   }
 
@@ -973,7 +1008,9 @@ int moho::cfunc_SetAutoSurfaceModeL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and dispatches to `cfunc_SetAutoSurfaceModeL`.
  */
-int moho::cfunc_SetAutoSurfaceMode(lua_State* const luaContext)
+int moho::cfunc_SetAutoSurfaceMode(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetAutoSurfaceModeL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1005,7 +1042,9 @@ moho::CScrLuaInitForm* moho::func_SetAutoSurfaceMode_LuaFuncDef()
  * info-pairs for live units whose toggle-cap lane exposes that bit and whose
  * current script-bit value matches `currentState`.
  */
-int moho::cfunc_ToggleScriptBitL(LuaPlus::LuaState* const state)
+int moho::cfunc_ToggleScriptBitL(
+  LuaPlus::LuaState* const state
+)
 {
   lua_State* const rawState = state->m_state;
   moho::SCR_ExpectExactArgs(state, 3, kToggleScriptBitExpectedArgsText);
@@ -1061,7 +1100,9 @@ int moho::cfunc_ToggleScriptBitL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and dispatches to `cfunc_ToggleScriptBitL`.
  */
-int moho::cfunc_ToggleScriptBit(lua_State* const luaContext)
+int moho::cfunc_ToggleScriptBit(
+  lua_State* const luaContext
+)
 {
   return cfunc_ToggleScriptBitL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1092,7 +1133,9 @@ moho::CScrLuaInitForm* moho::func_ToggleScriptBit_LuaFuncDef()
  * Reads `(unitTable, paused)` and emits one `SetPaused` info-pair per live
  * user-unit entry while callback dispatch remains enabled.
  */
-int moho::cfunc_SetPausedL(LuaPlus::LuaState* const state)
+int moho::cfunc_SetPausedL(
+  LuaPlus::LuaState* const state
+)
 {
   moho::SCR_ExpectExactArgs(state, 2, kSetPausedHelpText);
 
@@ -1111,11 +1154,7 @@ int moho::cfunc_SetPausedL(LuaPlus::LuaState* const state)
       }
 
       if (ISTIDriver* const activeDriver = WLD_GetDriver(); activeDriver != nullptr) {
-        activeDriver->ProcessInfoPair(
-          iunitBridge->GetEntityId(),
-          "SetPaused",
-          paused ? "true" : "false"
-        );
+        activeDriver->ProcessInfoPair(iunitBridge->GetEntityId(), "SetPaused", paused ? "true" : "false");
       }
     }
   }
@@ -1129,7 +1168,9 @@ int moho::cfunc_SetPausedL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps raw Lua callback context and dispatches to `cfunc_SetPausedL`.
  */
-int moho::cfunc_SetPaused(lua_State* const luaContext)
+int moho::cfunc_SetPaused(
+  lua_State* const luaContext
+)
 {
   return cfunc_SetPausedL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1143,12 +1184,7 @@ int moho::cfunc_SetPaused(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SetPaused_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    "SetPaused",
-    &moho::cfunc_SetPaused,
-    nullptr,
-    "<global>",
-    kSetPausedHelpText
+    moho::SCR_UserLuaInitSet(), "SetPaused", &moho::cfunc_SetPaused, nullptr, "<global>", kSetPausedHelpText
   );
   return &binder;
 }
@@ -1159,7 +1195,9 @@ moho::CScrLuaInitForm* moho::func_SetPaused_LuaFuncDef()
  * What it does:
  * Unwraps Lua callback state and dispatches to `cfunc_GetAttachedUnitsListL`.
  */
-int moho::cfunc_GetAttachedUnitsList(lua_State* const luaContext)
+int moho::cfunc_GetAttachedUnitsList(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetAttachedUnitsListL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1190,7 +1228,9 @@ moho::CScrLuaInitForm* moho::func_GetAttachedUnitsList_LuaFuncDef()
  * Builds one Lua table containing alive attached user-unit script objects for
  * each source unit in the input table.
  */
-int moho::cfunc_GetAttachedUnitsListL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetAttachedUnitsListL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!WLD_GetActiveSession() || state == nullptr || state->m_state == nullptr) {
     return 0;
@@ -1250,7 +1290,9 @@ int moho::cfunc_GetAttachedUnitsListL(LuaPlus::LuaState* const state)
  * Filters one input unit table down to alive, non-destroy-queued unit Lua
  * objects and returns the filtered table.
  */
-int moho::cfunc_ValidateUnitsListL(LuaPlus::LuaState* const state)
+int moho::cfunc_ValidateUnitsListL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -1293,7 +1335,9 @@ int moho::cfunc_ValidateUnitsListL(LuaPlus::LuaState* const state)
  * Unwraps raw Lua callback context and dispatches to
  * `cfunc_ValidateUnitsListL`.
  */
-int moho::cfunc_ValidateUnitsList(lua_State* const luaContext)
+int moho::cfunc_ValidateUnitsList(
+  lua_State* const luaContext
+)
 {
   return cfunc_ValidateUnitsListL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1324,7 +1368,9 @@ moho::CScrLuaInitForm* moho::func_ValidateUnitsList_LuaFuncDef()
  * Unwraps Lua callback context and dispatches to
  * `cfunc_GetAssistingUnitsListL`.
  */
-int moho::cfunc_GetAssistingUnitsList(lua_State* const luaContext)
+int moho::cfunc_GetAssistingUnitsList(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetAssistingUnitsListL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1355,7 +1401,9 @@ moho::CScrLuaInitForm* moho::func_GetAssistingUnitsList_LuaFuncDef()
  * Returns one Lua array of focused-army pod units that are assisting one of
  * the input units (or the unit itself when matching POD filters).
  */
-int moho::cfunc_GetAssistingUnitsListL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetAssistingUnitsListL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -1396,11 +1444,9 @@ int moho::cfunc_GetAssistingUnitsListL(LuaPlus::LuaState* const state)
     }
 
     const REntityBlueprint* const sourceBlueprint = sourceBridge->GetBlueprint();
-    const bool sourceIsPodStaging =
-      (podStagingCategory != nullptr) && (sourceBlueprint != nullptr)
-      && EntityCategory::HasBlueprint(sourceBlueprint, podStagingCategory);
-    const bool sourceIsPod =
-      (sourceBlueprint != nullptr) && EntityCategory::HasBlueprint(sourceBlueprint, podCategory);
+    const bool sourceIsPodStaging = (podStagingCategory != nullptr) && (sourceBlueprint != nullptr) &&
+      EntityCategory::HasBlueprint(sourceBlueprint, podStagingCategory);
+    const bool sourceIsPod = (sourceBlueprint != nullptr) && EntityCategory::HasBlueprint(sourceBlueprint, podCategory);
     if (!sourceIsPodStaging && !sourceIsPod) {
       continue;
     }
@@ -1455,7 +1501,9 @@ int moho::cfunc_GetAssistingUnitsListL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_GetIdleEngineersL`.
  */
-int moho::cfunc_GetIdleEngineers(lua_State* const luaContext)
+int moho::cfunc_GetIdleEngineers(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetIdleEngineersL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1485,7 +1533,9 @@ moho::CScrLuaInitForm* moho::func_GetIdleEngineers_LuaFuncDef()
  * What it does:
  * Returns one Lua array of focus-army idle engineer unit script objects.
  */
-int moho::cfunc_GetIdleEngineersL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetIdleEngineersL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -1528,7 +1578,9 @@ int moho::cfunc_GetIdleEngineersL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_GetIdleFactoriesL`.
  */
-int moho::cfunc_GetIdleFactories(lua_State* const luaContext)
+int moho::cfunc_GetIdleFactories(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetIdleFactoriesL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1558,7 +1610,9 @@ moho::CScrLuaInitForm* moho::func_GetIdleFactories_LuaFuncDef()
  * What it does:
  * Returns one Lua array of focus-army idle factory unit script objects.
  */
-int moho::cfunc_GetIdleFactoriesL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetIdleFactoriesL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -1601,7 +1655,9 @@ int moho::cfunc_GetIdleFactoriesL(LuaPlus::LuaState* const state)
  * What it does:
  * Builds and returns a Lua array containing currently selected unit script objects.
  */
-int moho::cfunc_GetSelectedUnitsL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetSelectedUnitsL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -1648,7 +1704,9 @@ int moho::cfunc_GetSelectedUnitsL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_GetSelectedUnitsL`.
  */
-int moho::cfunc_GetSelectedUnits(lua_State* const luaContext)
+int moho::cfunc_GetSelectedUnits(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetSelectedUnitsL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1683,7 +1741,9 @@ moho::CScrLuaInitForm* moho::func_GetSelectedUnits_LuaFuncDef()
  * the hovered target (via `CWldSession::GetValidAttackingUnits`), each as its
  * script object. Returns nil when the set is empty.
  */
-int moho::cfunc_GetValidAttackingUnitsL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetValidAttackingUnitsL(
+  LuaPlus::LuaState* const state
+)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (!session) {
@@ -1726,7 +1786,9 @@ int moho::cfunc_GetValidAttackingUnitsL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_GetValidAttackingUnitsL`.
  */
-int moho::cfunc_GetValidAttackingUnits(lua_State* const luaContext)
+int moho::cfunc_GetValidAttackingUnits(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetValidAttackingUnitsL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1756,7 +1818,9 @@ moho::CScrLuaInitForm* moho::func_GetValidAttackingUnits_LuaFuncDef()
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_SelectUnitsL`.
  */
-int moho::cfunc_SelectUnits(lua_State* const luaContext)
+int moho::cfunc_SelectUnits(
+  lua_State* const luaContext
+)
 {
   return cfunc_SelectUnitsL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1770,12 +1834,7 @@ int moho::cfunc_SelectUnits(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_SelectUnits_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    "SelectUnits",
-    &moho::cfunc_SelectUnits,
-    nullptr,
-    "<global>",
-    kSelectUnitsHelpText
+    moho::SCR_UserLuaInitSet(), "SelectUnits", &moho::cfunc_SelectUnits, nullptr, "<global>", kSelectUnitsHelpText
   );
   return &binder;
 }
@@ -1789,7 +1848,9 @@ moho::CScrLuaInitForm* moho::func_SelectUnits_LuaFuncDef()
  * result table's AssignNewTable (0x008BD9BF) and PushStack (0x008BDBA6) are
  * NOPed and 0x008BDC18 returns 0, so nothing is returned.
  */
-int moho::cfunc_SelectUnitsL(LuaPlus::LuaState* const state)
+int moho::cfunc_SelectUnitsL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -1816,13 +1877,15 @@ int moho::cfunc_SelectUnitsL(LuaPlus::LuaState* const state)
         continue;
       }
 
-      UserEntity* const userEntity = userUnit;  // base conversion, not a reinterpretation
+      UserEntity* const userEntity = userUnit; // base conversion, not a reinterpretation
       if (allowCargo && userEntity != nullptr && userEntity->mArmy == session->GetFocusUserArmy()) {
         AppendSelectionUnitUnique(selectionUnits, userUnit);
       } else if (userEntity != nullptr && userEntity->IsSelectable()) {
         AppendSelectionUnitUnique(selectionUnits, userUnit);
-      } else if (UserUnit* const attachmentParent = ResolveSelectableTransportAttachmentParent(userUnit);
-                 attachmentParent != nullptr) {
+      } else if (
+        UserUnit* const attachmentParent = ResolveSelectableTransportAttachmentParent(userUnit);
+        attachmentParent != nullptr
+      ) {
         AppendSelectionUnitUnique(selectionUnits, attachmentParent);
       }
     }
@@ -1909,7 +1972,9 @@ moho::CScrLuaInitForm* moho::func_SelectCargoUnits_LuaFuncDef()
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_AddSelectUnitsL`.
  */
-int moho::cfunc_AddSelectUnits(lua_State* const luaContext)
+int moho::cfunc_AddSelectUnits(
+  lua_State* const luaContext
+)
 {
   return cfunc_AddSelectUnitsL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -1940,7 +2005,9 @@ moho::CScrLuaInitForm* moho::func_AddSelectUnits_LuaFuncDef()
  * Adds validated selectable units from Lua input to current selection and
  * applies the merged set back into the world session.
  */
-int moho::cfunc_AddSelectUnitsL(LuaPlus::LuaState* const state)
+int moho::cfunc_AddSelectUnitsL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -1962,7 +2029,7 @@ int moho::cfunc_AddSelectUnitsL(LuaPlus::LuaState* const state)
     for (int unitIndex = 1; unitIndex <= unitCount; ++unitIndex) {
       const LuaPlus::LuaObject unitObject = sourceUnitsObject[unitIndex];
       UserUnit* const userUnit = ResolveUserUnitOptional(unitObject, state);
-      UserEntity* const userEntity = userUnit;  // base conversion, not a reinterpretation
+      UserEntity* const userEntity = userUnit; // base conversion, not a reinterpretation
       if (userEntity == nullptr || !userEntity->IsSelectable()) {
         continue;
       }
@@ -1987,7 +2054,9 @@ int moho::cfunc_AddSelectUnitsL(LuaPlus::LuaState* const state)
  * unless it is the empty id 0xF0000000, and the build blueprint id when there
  * is one. Returns nothing otherwise.
  */
-int moho::cfunc_GetHighlightCommand(lua_State* const luaContext)
+int moho::cfunc_GetHighlightCommand(
+  lua_State* const luaContext
+)
 {
   // The patch reads the session global without a check; without a session
   // there is nothing to highlight.
@@ -2054,7 +2123,9 @@ moho::CScrLuaInitForm* moho::func_GetHighlightCommand_LuaFuncDef()
  * What it does:
  * Unwraps Lua callback context and dispatches to `cfunc_DeleteCommandL`.
  */
-int moho::cfunc_DeleteCommand(lua_State* const luaContext)
+int moho::cfunc_DeleteCommand(
+  lua_State* const luaContext
+)
 {
   return cfunc_DeleteCommandL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2068,12 +2139,7 @@ int moho::cfunc_DeleteCommand(lua_State* const luaContext)
 moho::CScrLuaInitForm* moho::func_DeleteCommand_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    "DeleteCommand",
-    &moho::cfunc_DeleteCommand,
-    nullptr,
-    "<global>",
-    kDeleteCommandHelpText
+    moho::SCR_UserLuaInitSet(), "DeleteCommand", &moho::cfunc_DeleteCommand, nullptr, "<global>", kDeleteCommandHelpText
   );
   return &binder;
 }
@@ -2086,7 +2152,9 @@ moho::CScrLuaInitForm* moho::func_DeleteCommand_LuaFuncDef()
  * `DecreaseCommandCount` request through the active sim driver, then records
  * one local helper queue update for the same command id/count delta.
  */
-int moho::cfunc_DeleteCommandL(LuaPlus::LuaState* const state)
+int moho::cfunc_DeleteCommandL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -2136,7 +2204,9 @@ int moho::cfunc_DeleteCommandL(LuaPlus::LuaState* const state)
  * remaining effective build count) and records the matching local decrease-count
  * update event, stopping once the requested count has been fully consumed.
  */
-int moho::cfunc_DecreaseBuildCountInQueueL(LuaPlus::LuaState* const state)
+int moho::cfunc_DecreaseBuildCountInQueueL(
+  LuaPlus::LuaState* const state
+)
 {
   constexpr const char* kDecreaseBuildCountInQueueHelpText = "DecreaseBuildCountInQueue(queueIndex, count)";
 
@@ -2215,7 +2285,9 @@ int moho::cfunc_DecreaseBuildCountInQueueL(LuaPlus::LuaState* const state)
  * live factory-build command found (helper present, resolved type == BuildFactory,
  * count > 0) via `ISSUE_IncreaseCommandCount(helper, count)` and stops.
  */
-int moho::cfunc_IncreaseBuildCountInQueueL(LuaPlus::LuaState* const state)
+int moho::cfunc_IncreaseBuildCountInQueueL(
+  LuaPlus::LuaState* const state
+)
 {
   // Binary reuses the Decrease help string verbatim here (copy-paste in the
   // original 2007 source: luadef_IncreaseBuildCountInQueue.mHelp -> the Decrease
@@ -2256,9 +2328,7 @@ int moho::cfunc_IncreaseBuildCountInQueueL(LuaPlus::LuaState* const state)
       continue;
     }
 
-    if (ResolveCommandIssueHelperCommandType(*helper)
-          == EUnitCommandType::UNITCOMMAND_BuildFactory
-        && count > 0) {
+    if (ResolveCommandIssueHelperCommandType(*helper) == EUnitCommandType::UNITCOMMAND_BuildFactory && count > 0) {
       ISSUE_IncreaseCommandCount(helper, count);
       break;
     }
@@ -2279,7 +2349,9 @@ int moho::cfunc_IncreaseBuildCountInQueueL(LuaPlus::LuaState* const state)
  * is active, regenerates its build templates from the current selection.
  * Pushes no return values.
  */
-int moho::cfunc_GenerateBuildTemplateFromSelection(lua_State* const luaContext)
+int moho::cfunc_GenerateBuildTemplateFromSelection(
+  lua_State* const luaContext
+)
 {
   (void)LuaPlus::LuaState::CastState(luaContext);
 
@@ -2315,7 +2387,9 @@ moho::CScrLuaInitForm* moho::func_GenerateBuildTemplateFromSelection_LuaFuncDef(
  * What it does:
  * Clears user-session build-template state when a world session is active.
  */
-int moho::cfunc_ClearBuildTemplates(lua_State* const luaContext)
+int moho::cfunc_ClearBuildTemplates(
+  lua_State* const luaContext
+)
 {
   (void)LuaPlus::LuaState::CastState(luaContext);
   if (CWldSession* const session = WLD_GetActiveSession()) {
@@ -2349,7 +2423,9 @@ moho::CScrLuaInitForm* moho::func_ClearBuildTemplates_LuaFuncDef()
  * What it does:
  * Unwraps raw Lua callback context and forwards to `cfunc_GetUnitByIdUserL`.
  */
-int moho::cfunc_GetUnitByIdUser(lua_State* const luaContext)
+int moho::cfunc_GetUnitByIdUser(
+  lua_State* const luaContext
+)
 {
   return cfunc_GetUnitByIdUserL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2380,7 +2456,9 @@ moho::CScrLuaInitForm* moho::func_GetUnitByIdUser_LuaFuncDef()
  * Resolves one entity id through user-session map lanes and returns the
  * matching user-unit Lua object, or `nil` when no unit is found.
  */
-int moho::cfunc_GetUnitByIdUserL(LuaPlus::LuaState* const state)
+int moho::cfunc_GetUnitByIdUserL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -2422,7 +2500,9 @@ int moho::cfunc_GetUnitByIdUserL(LuaPlus::LuaState* const state)
  * What it does:
  * Unwraps Lua callback context and forwards to `cfunc_CreateUnitAtMouseL`.
  */
-int moho::cfunc_CreateUnitAtMouse(lua_State* const luaContext)
+int moho::cfunc_CreateUnitAtMouse(
+  lua_State* const luaContext
+)
 {
   return cfunc_CreateUnitAtMouseL(moho::SCR_ResolveBindingState(luaContext));
 }
@@ -2454,7 +2534,9 @@ moho::CScrLuaInitForm* moho::func_CreateUnitAtMouse_LuaFuncDef()
  * unit blueprint, snaps non-mobile units to footprint-aligned map cells, and
  * submits one create-unit command through the active sim driver.
  */
-int moho::cfunc_CreateUnitAtMouseL(LuaPlus::LuaState* const state)
+int moho::cfunc_CreateUnitAtMouseL(
+  LuaPlus::LuaState* const state
+)
 {
   if (!state || !state->m_state) {
     return 0;
@@ -2492,12 +2574,7 @@ int moho::cfunc_CreateUnitAtMouseL(LuaPlus::LuaState* const state)
 
   const int armyCount = static_cast<int>(session->userArmies.size());
   if (armyIndex < 0 || armyIndex >= armyCount) {
-    LuaPlus::LuaState::Error(
-      state,
-      "Invalid army index, must be >= 0 and < %d but got %d.",
-      armyCount,
-      armyIndex
-    );
+    LuaPlus::LuaState::Error(state, "Invalid army index, must be >= 0 and < %d but got %d.", armyCount, armyIndex);
     return 0;
   }
 

@@ -42,7 +42,6 @@ namespace moho
 
   static_assert(sizeof(ESearchTypeTypeInfo) == 0x78, "ESearchTypeTypeInfo size must be 0x78");
 
-
   /**
    * Address: 0x00BCCCF0 (FUN_00BCCCF0, register_ESearchTypeTypeInfo)
    *

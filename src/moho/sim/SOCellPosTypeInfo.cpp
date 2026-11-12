@@ -27,7 +27,9 @@ namespace
    * Executes one non-deleting `gpg::RType` base-teardown lane for
    * `SOCellPosTypeInfo`.
    */
-  [[maybe_unused]] void cleanup_SOCellPosTypeInfoRTypeBase(moho::SOCellPosTypeInfo* const typeInfo) noexcept
+  [[maybe_unused]] void cleanup_SOCellPosTypeInfoRTypeBase(
+    moho::SOCellPosTypeInfo* const typeInfo
+  ) noexcept
   {
     gpg::ClearTypeLists(typeInfo);
   }
@@ -44,7 +46,9 @@ namespace moho
    * What it does:
    * Writes the canonical invalid cell-position sentinel (`x = z = 0x8000`).
    */
-  [[maybe_unused]] [[nodiscard]] SOCellPos* InitializeInvalidSOCellPos(SOCellPos* const result) noexcept
+  [[maybe_unused]] [[nodiscard]] SOCellPos* InitializeInvalidSOCellPos(
+    SOCellPos* const result
+  ) noexcept
   {
     result->x = static_cast<std::int16_t>(0x8000);
     result->z = static_cast<std::int16_t>(0x8000);
@@ -74,7 +78,9 @@ namespace moho
    * What it does:
    * Returns the `x` lane of one `SOCellPos`.
    */
-  [[maybe_unused]] [[nodiscard]] std::int16_t ReadSOCellPosX(const SOCellPos* const value) noexcept
+  [[maybe_unused]] [[nodiscard]] std::int16_t ReadSOCellPosX(
+    const SOCellPos* const value
+  ) noexcept
   {
     return value->x;
   }
@@ -85,7 +91,9 @@ namespace moho
    * What it does:
    * Returns the `z` lane of one `SOCellPos`.
    */
-  [[maybe_unused]] [[nodiscard]] std::int16_t ReadSOCellPosZ(const SOCellPos* const value) noexcept
+  [[maybe_unused]] [[nodiscard]] std::int16_t ReadSOCellPosZ(
+    const SOCellPos* const value
+  ) noexcept
   {
     return value->z;
   }
@@ -96,7 +104,10 @@ namespace moho
    * What it does:
    * Returns whether two cell-position lanes carry identical `(x, z)` values.
    */
-  bool operator==(const SOCellPos& lhs, const SOCellPos& rhs) noexcept
+  bool operator==(
+    const SOCellPos& lhs,
+    const SOCellPos& rhs
+  ) noexcept
   {
     return lhs.x == rhs.x && lhs.z == rhs.z;
   }
@@ -145,13 +156,17 @@ namespace moho
     Finish();
   }
 
-  void SOCellPos::MemberDeserialize(gpg::ReadArchive* const archive)
+  void SOCellPos::MemberDeserialize(
+    gpg::ReadArchive* const archive
+  )
   {
     archive->ReadShort(&x);
     archive->ReadShort(&z);
   }
 
-  void SOCellPos::MemberSerialize(gpg::WriteArchive* const archive) const
+  void SOCellPos::MemberSerialize(
+    gpg::WriteArchive* const archive
+  ) const
   {
     archive->WriteShort(x);
     archive->WriteShort(z);
@@ -203,10 +218,12 @@ namespace
   [[maybe_unused]] SOCellPosTypeInfoBootstrap gSOCellPosTypeInfoBootstrap;
 } // namespace
 
-
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_SOCellPosTypeInfo_9a89ee, moho::register_SOCellPosTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_SOCellPosTypeInfo_9a89ee,
+  moho::register_SOCellPosTypeInfo
+)
 
 namespace moho
 {
@@ -216,10 +233,9 @@ namespace moho
    * Address: 0x00BC7D40 (FUN_00BC7D40 -- constructs the global and registers its destructor.)
    * Address: 0x00BF21A0 (FUN_00BF21A0 -- the global's destructor.)
    * Address: 0x0050BFA0 (FUN_0050BFA0 -- an unreferenced out-of-line copy of the constructor.)
-   * Address: 0x0050C7A0 (FUN_0050C7A0 -- an unreferenced copy of the `gpg::SerSaveLoadHelper<SOCellPos>` constructor on the same global.)
-   * Address: 0x0050C7D0 (FUN_0050C7D0 -- `Init`.)
-   * Address: 0x0050BF40 (FUN_0050BF40 -- `Deserialize`, `MemberDeserialize` inlined.)
-   * Address: 0x0050BF70 (FUN_0050BF70 -- `Serialize`, `MemberSerialize` inlined.)
+   * Address: 0x0050C7A0 (FUN_0050C7A0 -- an unreferenced copy of the `gpg::SerSaveLoadHelper<SOCellPos>` constructor on
+   * the same global.) Address: 0x0050C7D0 (FUN_0050C7D0 -- `Init`.) Address: 0x0050BF40 (FUN_0050BF40 -- `Deserialize`,
+   * `MemberDeserialize` inlined.) Address: 0x0050BF70 (FUN_0050BF70 -- `Serialize`, `MemberSerialize` inlined.)
    */
   struct SOCellPosSerializer : gpg::SerSaveLoadHelper<SOCellPos>
   {};

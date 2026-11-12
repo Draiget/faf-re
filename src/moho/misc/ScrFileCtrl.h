@@ -201,10 +201,10 @@ namespace moho
     void LoadBreakpoints();
 
   public:
-    int mCursorLine;                    // +0x150 one-based, 0 when none
-    wxImageList* mImageList;            // +0x154
-    fa::string mSourcePath;          // +0x158
-    fa::vector<ScrFileLine> mLines;  // +0x174
+    int mCursorLine;                // +0x150 one-based, 0 when none
+    wxImageList* mImageList;        // +0x154
+    fa::string mSourcePath;         // +0x158
+    fa::vector<ScrFileLine> mLines; // +0x174
 
     DECLARE_EVENT_TABLE()
   };

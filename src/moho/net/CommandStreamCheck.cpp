@@ -19,18 +19,27 @@ namespace moho
     constexpr std::size_t kMaxPendingReports = 1024;
 
     // Beat order with wrap, as the client code compares beats.
-    [[nodiscard]] bool BeatBefore(const std::uint32_t lhs, const std::uint32_t rhs) noexcept
+    [[nodiscard]] bool BeatBefore(
+      const std::uint32_t lhs,
+      const std::uint32_t rhs
+    ) noexcept
     {
       return static_cast<std::int32_t>(lhs - rhs) < 0;
     }
   } // namespace
 
-  CommandStreamCheck::CommandStreamCheck(const std::size_t clientCount, const bool stopOnDivergence)
+  CommandStreamCheck::CommandStreamCheck(
+    const std::size_t clientCount,
+    const bool stopOnDivergence
+  )
     : mStreams(clientCount)
     , mStopOnDivergence(stopOnDivergence)
   {}
 
-  void CommandStreamCheck::Append(const int sender, const CMessage& message)
+  void CommandStreamCheck::Append(
+    const int sender,
+    const CMessage& message
+  )
   {
     if (sender < 0 || static_cast<std::size_t>(sender) >= mStreams.size()) {
       return;
@@ -38,7 +47,10 @@ namespace moho
     mStreams[static_cast<std::size_t>(sender)].hash.Update(message.mBuff.start_, message.mBuff.Size());
   }
 
-  CommandStreamCheck::AckDigest CommandStreamCheck::NoteBoundary(const int sender, const std::uint32_t queuedBeat)
+  CommandStreamCheck::AckDigest CommandStreamCheck::NoteBoundary(
+    const int sender,
+    const std::uint32_t queuedBeat
+  )
   {
     AckDigest digest{};
     if (sender < 0 || static_cast<std::size_t>(sender) >= mStreams.size()) {
@@ -69,7 +81,10 @@ namespace moho
   }
 
   void CommandStreamCheck::NoteReport(
-    const int reporter, const int sender, const std::uint32_t beat, const AckDigest& digest
+    const int reporter,
+    const int sender,
+    const std::uint32_t beat,
+    const AckDigest& digest
   )
   {
     if (sender < 0 || static_cast<std::size_t>(sender) >= mStreams.size()) {
@@ -85,15 +100,20 @@ namespace moho
     }
   }
 
-  bool CommandStreamCheck::Reached(const Stream& stream, const std::uint32_t beat) const noexcept
+  bool CommandStreamCheck::Reached(
+    const Stream& stream,
+    const std::uint32_t beat
+  ) const noexcept
   {
     return !stream.boundaries.empty() && !BeatBefore(stream.boundaries.back().beat, beat);
   }
 
-  bool CommandStreamCheck::ProvenAltered(const int sender) const noexcept
+  bool CommandStreamCheck::ProvenAltered(
+    const int sender
+  ) const noexcept
   {
     return sender >= 0 && static_cast<std::size_t>(sender) < mStreams.size() &&
-           mStreams[static_cast<std::size_t>(sender)].provenAltered;
+      mStreams[static_cast<std::size_t>(sender)].provenAltered;
   }
 
   std::vector<CommandStreamCheck::Divergence> CommandStreamCheck::TakeFindings()
@@ -101,7 +121,10 @@ namespace moho
     return std::exchange(mFindings, {});
   }
 
-  void CommandStreamCheck::Check(const int sender, const Report& report)
+  void CommandStreamCheck::Check(
+    const int sender,
+    const Report& report
+  )
   {
     // Checking goes on after a difference: a later report from the sender
     // itself can still prove which side it was.
@@ -127,7 +150,11 @@ namespace moho
     Fail(sender, report.reporter, report.beat);
   }
 
-  void CommandStreamCheck::Fail(const int sender, const int reporter, const std::uint32_t beat)
+  void CommandStreamCheck::Fail(
+    const int sender,
+    const int reporter,
+    const std::uint32_t beat
+  )
   {
     const Divergence divergence{sender, reporter, beat};
     if (!mDiverged) {

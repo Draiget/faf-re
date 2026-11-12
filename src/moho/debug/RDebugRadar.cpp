@@ -68,7 +68,10 @@ namespace
      * `CIntelGrid::IsVisible(const Wm3::Vector2i&)` (0x005BE180) spells them.
      * Zero callers: every use site inlined it and the linker kept the COMDAT.
      */
-    [[nodiscard]] std::int8_t CoverageAt(const std::uint32_t cellX, const std::uint32_t cellZ) const noexcept
+    [[nodiscard]] std::int8_t CoverageAt(
+      const std::uint32_t cellX,
+      const std::uint32_t cellZ
+    ) const noexcept
     {
       const moho::CIntelGrid* const intelGrid = grid.px;
       if (cellX >= intelGrid->mWidth || cellZ >= intelGrid->mHeight) {
@@ -87,7 +90,10 @@ namespace
      * `[pass+8]` color load -- which is how the color's offset in the stack
      * block is known.
      */
-    [[nodiscard]] std::uint32_t ColorAt(const std::uint32_t cellX, const std::uint32_t cellZ) const noexcept
+    [[nodiscard]] std::uint32_t ColorAt(
+      const std::uint32_t cellX,
+      const std::uint32_t cellZ
+    ) const noexcept
     {
       return CoverageAt(cellX, cellZ) != 0 ? color : 0u;
     }
@@ -133,8 +139,7 @@ namespace
       for (int cellZ = cellZ0; cellZ < cellZ1; ++cellZ) {
         const int worldZ = cellSize * cellZ;
 
-        const std::uint32_t color =
-          pass.ColorAt(static_cast<std::uint32_t>(cellX), static_cast<std::uint32_t>(cellZ));
+        const std::uint32_t color = pass.ColorAt(static_cast<std::uint32_t>(cellX), static_cast<std::uint32_t>(cellZ));
         if ((color & 0xFF000000u) == 0u) {
           continue;
         }
@@ -322,7 +327,9 @@ namespace moho
    * dimensions), rasterizing each block's recon-coverage grids that survive
    * frustum culling.
    */
-  void RDebugRadar::Tick(Sim* const sim)
+  void RDebugRadar::Tick(
+    Sim* const sim
+  )
   {
     if (sim == nullptr || sim->mMapData == nullptr) {
       return;

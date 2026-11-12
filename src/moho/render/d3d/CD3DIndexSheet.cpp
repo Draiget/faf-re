@@ -4,7 +4,10 @@
 #include "gpg/gal/D3D9Utils.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/Error.hpp"
+// The Direct3D 9 backend is Windows-only (the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#endif
 #include "moho/render/d3d/CD3DDevice.h"
 
 namespace moho
@@ -110,7 +113,9 @@ namespace moho
    * What it does:
    * Copies retained index-buffer ownership into caller storage.
    */
-  CD3DIndexSheet::BufferHandle& CD3DIndexSheet::GetBuffer(BufferHandle& outBuffer)
+  CD3DIndexSheet::BufferHandle& CD3DIndexSheet::GetBuffer(
+    BufferHandle& outBuffer
+  )
   {
     outBuffer = mBuffer;
     return outBuffer;
@@ -135,7 +140,9 @@ namespace moho
    * What it does:
    * Recreates the backing index buffer when the requested size differs.
    */
-  bool CD3DIndexSheet::SetSize(const std::uint32_t size)
+  bool CD3DIndexSheet::SetSize(
+    const std::uint32_t size
+  )
   {
     if (size == mBuffer.get()->GetContext()->size_) {
       return true;

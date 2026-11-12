@@ -26,7 +26,8 @@ namespace gpg
   {
   public:
     /**
-     * Address: 0x0059DED0 (FUN_0059DED0, gpg::RFastVectorType_IFormationInstance_P::RFastVectorType_IFormationInstance_P)
+     * Address: 0x0059DED0 (FUN_0059DED0,
+     * gpg::RFastVectorType_IFormationInstance_P::RFastVectorType_IFormationInstance_P)
      *
      * What it does:
      * Constructs and preregisters the reflection descriptor for

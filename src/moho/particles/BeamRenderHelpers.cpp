@@ -49,7 +49,8 @@ namespace
 
   template <typename TType>
   [[nodiscard]] bool IsSharedHandleLessForBucket(
-    const boost::shared_ptr<TType>& lhs, const boost::shared_ptr<TType>& rhs
+    const boost::shared_ptr<TType>& lhs,
+    const boost::shared_ptr<TType>& rhs
   ) noexcept
   {
     using SharedHandleRaw = boost::SharedPtrLayout<TType>;
@@ -63,26 +64,27 @@ namespace
 
   template <typename TType>
   [[nodiscard]] bool AreSharedHandlesEquivalentForBucket(
-    const boost::shared_ptr<TType>& lhs, const boost::shared_ptr<TType>& rhs
+    const boost::shared_ptr<TType>& lhs,
+    const boost::shared_ptr<TType>& rhs
   ) noexcept
   {
     return lhs.get() == rhs.get();
   }
 
-  [[nodiscard]] bool IsMsvc8StringLess(const fa::string& lhs, const fa::string& rhs) noexcept
+  [[nodiscard]] bool IsMsvc8StringLess(
+    const fa::string& lhs,
+    const fa::string& rhs
+  ) noexcept
   {
     const char* const lhsData = lhs.data();
     const char* const rhsData = rhs.data();
-    return std::lexicographical_compare(
-      lhsData,
-      lhsData + lhs.size(),
-      rhsData,
-      rhsData + rhs.size()
-    );
+    return std::lexicographical_compare(lhsData, lhsData + lhs.size(), rhsData, rhsData + rhs.size());
   }
 
   [[nodiscard]] Wm3::Vector3<float> LerpVector3(
-    const Wm3::Vector3<float>& from, const Wm3::Vector3<float>& to, const float alpha
+    const Wm3::Vector3<float>& from,
+    const Wm3::Vector3<float>& to,
+    const float alpha
   ) noexcept
   {
     return Wm3::Vector3<float>{
@@ -93,7 +95,8 @@ namespace
   }
 
   [[nodiscard]] Wm3::Vector3<float> RotateVectorByOrientation(
-    const Wm3::Vector3<float>& vector, const Wm3::Quaternion<float>& orientation
+    const Wm3::Vector3<float>& vector,
+    const Wm3::Quaternion<float>& orientation
   ) noexcept
   {
     Wm3::Vector3<float> out{};
@@ -193,41 +196,49 @@ namespace
   }
 
   [[nodiscard]] const char* ResolveParticleTechniqueSuffix(
-    const std::int32_t blendMode, const bool allowRefractSuffix, const int unreachableLine
+    const std::int32_t blendMode,
+    const bool allowRefractSuffix,
+    const int unreachableLine
   )
   {
     switch (blendMode) {
-      case 0:
-        return "_ALPHABLEND";
-      case 1:
-        return "_MODULATEINVERSE";
-      case 2:
-        return "_MODULATE2XINVERSE";
-      case 3:
-        return "_ADD";
-      case 4:
-        return "_PREMODALPHA";
-      case 5:
-        if (allowRefractSuffix) {
-          return "_REFRACT";
-        }
-        break;
-      default:
-        break;
+    case 0:
+      return "_ALPHABLEND";
+    case 1:
+      return "_MODULATEINVERSE";
+    case 2:
+      return "_MODULATE2XINVERSE";
+    case 3:
+      return "_ADD";
+    case 4:
+      return "_PREMODALPHA";
+    case 5:
+      if (allowRefractSuffix) {
+        return "_REFRACT";
+      }
+      break;
+    default:
+      break;
     }
 
     gpg::HandleAssertFailure(kUnreachableAssertText, unreachableLine, kParticleRendererSourcePath);
     return "_ALPHABLEND";
   }
 
-  [[nodiscard]] std::string BuildBeamTechniqueName(const std::int32_t blendMode, const bool hasTwoTextures)
+  [[nodiscard]] std::string BuildBeamTechniqueName(
+    const std::int32_t blendMode,
+    const bool hasTwoTextures
+  )
   {
     std::string techniqueName = hasTwoTextures ? "TBeam_TwoTexture" : "TBeam_OneTexture";
     techniqueName += ResolveParticleTechniqueSuffix(blendMode, false, 301);
     return techniqueName;
   }
 
-  void BindBeamTextureShaderVar(moho::ShaderVar& shaderVar, const moho::TextureSheetHandle& textureSheet)
+  void BindBeamTextureShaderVar(
+    moho::ShaderVar& shaderVar,
+    const moho::TextureSheetHandle& textureSheet
+  )
   {
     shaderVar.GetTexture(textureSheet);
   }
@@ -248,7 +259,8 @@ namespace moho
   bool ren_Beams = true;
 
   bool BeamBucketKeyLess::operator()(
-    const SBeamBucketKey& lhs, const SBeamBucketKey& rhs
+    const SBeamBucketKey& lhs,
+    const SBeamBucketKey& rhs
   ) const noexcept
   {
     if (lhs.blendMode != rhs.blendMode) {
@@ -268,7 +280,10 @@ namespace moho
    * Allocates one beam-particle vertex sheet from device resources and swaps it
    * into the caller slot, deleting the old sheet when replaced.
    */
-  void RecreateBeamParticleVertexSheet(CD3DVertexSheet*& vertexSheet, CD3DVertexFormat* const vertexFormat)
+  void RecreateBeamParticleVertexSheet(
+    CD3DVertexSheet*& vertexSheet,
+    CD3DVertexFormat* const vertexFormat
+  )
   {
     CD3DDevice* const device = D3D_GetDevice();
     ID3DDeviceResources* const resources = device->GetResources();
@@ -289,7 +304,10 @@ namespace moho
    * Resolves beam textures into one bucket key and appends the beam payload
    * into the matching texture/blend bucket.
    */
-  void AddBeamToTextureBuckets(BeamBucketMap& buckets, const SWorldBeam& beam)
+  void AddBeamToTextureBuckets(
+    BeamBucketMap& buckets,
+    const SWorldBeam& beam
+  )
   {
     if (!ren_Beams) {
       return;
@@ -370,7 +388,9 @@ namespace moho
    * form one billboarded beam quad.
    */
   void EmitInterpolatedBeamQuadVertices(
-    const SWorldBeam& beam, const float frameAlpha, BeamVertexArray& outVertices
+    const SWorldBeam& beam,
+    const float frameAlpha,
+    BeamVertexArray& outVertices
   )
   {
     const float interpolation = std::min(beam.mLastInterpolation * frameAlpha, 1.0f);
@@ -380,9 +400,8 @@ namespace moho
     Wm3::Quaternion<float> startOrientation{};
     (void)QuatLERP(&beam.mLastStart.orient_, &beam.mCurStart.orient_, &startOrientation, interpolation);
     const Wm3::Vector3<float> startBasePosition = LerpVector3(beam.mCurStart.pos_, beam.mLastStart.pos_, interpolation);
-    const Wm3::Vector3<float> startWorldPosition = Wm3::Vector3<float>::Add(
-      startBasePosition, RotateVectorByOrientation(beam.mStart, startOrientation)
-    );
+    const Wm3::Vector3<float> startWorldPosition =
+      Wm3::Vector3<float>::Add(startBasePosition, RotateVectorByOrientation(beam.mStart, startOrientation));
 
     Wm3::Quaternion<float> endOrientation = startOrientation;
     Wm3::Vector3<float> endBasePosition = startBasePosition;
@@ -402,36 +421,18 @@ namespace moho
     Wm3::Vector3<float>::Normalize(axis);
     const Wm3::Vector3<float> oppositeAxis = Wm3::Vector3<float>::Scale(axis, -1.0f);
 
-    outVertices.push_back(
-      BuildBeamRenderVertex(startWorldPosition, axis, beam.mWidth, beam.mStartColor, 1.0f, 0.0f, beam.mUShift, beam.mVShift)
-    );
-    outVertices.push_back(
-      BuildBeamRenderVertex(endWorldPosition, axis, beam.mWidth, beam.mEndColor, 1.0f, repeatCoord, beam.mUShift, beam.mVShift)
-    );
-    outVertices.push_back(
-      BuildBeamRenderVertex(
-        endWorldPosition,
-        oppositeAxis,
-        beam.mWidth,
-        beam.mEndColor,
-        0.0f,
-        repeatCoord,
-        beam.mUShift,
-        beam.mVShift
-      )
-    );
-    outVertices.push_back(
-      BuildBeamRenderVertex(
-        startWorldPosition,
-        oppositeAxis,
-        beam.mWidth,
-        beam.mStartColor,
-        0.0f,
-        0.0f,
-        beam.mUShift,
-        beam.mVShift
-      )
-    );
+    outVertices.push_back(BuildBeamRenderVertex(
+      startWorldPosition, axis, beam.mWidth, beam.mStartColor, 1.0f, 0.0f, beam.mUShift, beam.mVShift
+    ));
+    outVertices.push_back(BuildBeamRenderVertex(
+      endWorldPosition, axis, beam.mWidth, beam.mEndColor, 1.0f, repeatCoord, beam.mUShift, beam.mVShift
+    ));
+    outVertices.push_back(BuildBeamRenderVertex(
+      endWorldPosition, oppositeAxis, beam.mWidth, beam.mEndColor, 0.0f, repeatCoord, beam.mUShift, beam.mVShift
+    ));
+    outVertices.push_back(BuildBeamRenderVertex(
+      startWorldPosition, oppositeAxis, beam.mWidth, beam.mStartColor, 0.0f, 0.0f, beam.mUShift, beam.mVShift
+    ));
   }
 
   /**
@@ -441,7 +442,11 @@ namespace moho
    * Renders the active beam buckets into the shared vertex/index sheets using
    * beam-technique selection and 1000-vertex batching.
    */
-  [[nodiscard]] bool DrawBeamParticle(SBeamBucketContainer& beams, const float frameAlpha, const bool disable)
+  [[nodiscard]] bool DrawBeamParticle(
+    SBeamBucketContainer& beams,
+    const float frameAlpha,
+    const bool disable
+  )
   {
     if (!ren_Beams || disable) {
       return false;
@@ -515,10 +520,8 @@ namespace moho
         continue;
       }
 
-      const std::string techniqueName = BuildBeamTechniqueName(
-        bucketKey.blendMode,
-        bucketKey.texture1.get() != nullptr
-      );
+      const std::string techniqueName =
+        BuildBeamTechniqueName(bucketKey.blendMode, bucketKey.texture1.get() != nullptr);
       device->SelectTechnique(techniqueName.c_str());
 
       const SBeamVertex* const sourceVertices = vertices.empty() ? nullptr : &vertices[0];
@@ -543,7 +546,11 @@ namespace moho
         }
 
         // Raw GPU upload: beam vertex blob into the locked stream.
-        std::copy_n(sourceVertices + vertexOffset, static_cast<std::size_t>(batchVertices), static_cast<SBeamVertex*>(mappedVertices));
+        std::copy_n(
+          sourceVertices + vertexOffset,
+          static_cast<std::size_t>(batchVertices),
+          static_cast<SBeamVertex*>(mappedVertices)
+        );
         vertexStream->Unlock();
 
         SD3DVertexRange vertexSheetView{};
@@ -576,7 +583,8 @@ namespace moho
    * Strict-weak ordering comparator for world-particle bucket keys.
    */
   bool IsParticleBucketKeyRhsLessThanLhs(
-    const SParticleBucketKey& lhs, const SParticleBucketKey& rhs
+    const SParticleBucketKey& lhs,
+    const SParticleBucketKey& rhs
   ) noexcept
   {
     if (lhs.sortScalar != rhs.sortScalar) {
@@ -611,15 +619,14 @@ namespace moho
    * What it does:
    * Equality comparator for world-particle bucket keys.
    */
-  bool AreParticleBucketKeysEquivalent(const SParticleBucketKey& lhs, const SParticleBucketKey& rhs) noexcept
+  bool AreParticleBucketKeysEquivalent(
+    const SParticleBucketKey& lhs,
+    const SParticleBucketKey& rhs
+  ) noexcept
   {
-    return lhs.sortScalar == rhs.sortScalar &&
-           lhs.dragEnabled == rhs.dragEnabled &&
-           lhs.blendMode == rhs.blendMode &&
-           lhs.zMode == rhs.zMode &&
-           AreSharedHandlesEquivalentForBucket(lhs.texture0, rhs.texture0) &&
-           AreSharedHandlesEquivalentForBucket(lhs.texture1, rhs.texture1) &&
-           lhs.tag == rhs.tag;
+    return lhs.sortScalar == rhs.sortScalar && lhs.dragEnabled == rhs.dragEnabled && lhs.blendMode == rhs.blendMode &&
+      lhs.zMode == rhs.zMode && AreSharedHandlesEquivalentForBucket(lhs.texture0, rhs.texture0) &&
+      AreSharedHandlesEquivalentForBucket(lhs.texture1, rhs.texture1) && lhs.tag == rhs.tag;
   }
 
   /**
@@ -656,7 +663,10 @@ namespace moho
    * What it does:
    * Builds one trail bucket key from one `STrail` runtime payload.
    */
-  STrailBucketKey* InitializeTrailBucketKeyFromTrail(STrailBucketKey* const key, const SWorldTrail& trail)
+  STrailBucketKey* InitializeTrailBucketKeyFromTrail(
+    STrailBucketKey* const key,
+    const SWorldTrail& trail
+  )
   {
     if (key == nullptr) {
       return nullptr;
@@ -692,7 +702,8 @@ namespace moho
    * Strict-weak ordering comparator for trail bucket keys.
    */
   bool IsTrailBucketKeyRhsLessThanLhs(
-    const STrailBucketKey& lhs, const STrailBucketKey& rhs
+    const STrailBucketKey& lhs,
+    const STrailBucketKey& rhs
   ) noexcept
   {
     if (lhs.sortScalar != rhs.sortScalar) {
@@ -721,13 +732,14 @@ namespace moho
    * What it does:
    * Equality comparator for trail bucket keys.
    */
-  bool AreTrailBucketKeysEquivalent(const STrailBucketKey& lhs, const STrailBucketKey& rhs) noexcept
+  bool AreTrailBucketKeysEquivalent(
+    const STrailBucketKey& lhs,
+    const STrailBucketKey& rhs
+  ) noexcept
   {
-    return lhs.sortScalar == rhs.sortScalar &&
-           lhs.blendMode == rhs.blendMode &&
-           AreSharedHandlesEquivalentForBucket(lhs.texture0, rhs.texture0) &&
-           AreSharedHandlesEquivalentForBucket(lhs.texture1, rhs.texture1) &&
-           lhs.tag == rhs.tag;
+    return lhs.sortScalar == rhs.sortScalar && lhs.blendMode == rhs.blendMode &&
+      AreSharedHandlesEquivalentForBucket(lhs.texture0, rhs.texture0) &&
+      AreSharedHandlesEquivalentForBucket(lhs.texture1, rhs.texture1) && lhs.tag == rhs.tag;
   }
 
   /**
@@ -760,7 +772,9 @@ namespace moho
    * What it does:
    * Releases one world-particle bucket key resource lane.
    */
-  void ResetParticleBucketKeyResources(SParticleBucketKey& key)
+  void ResetParticleBucketKeyResources(
+    SParticleBucketKey& key
+  )
   {
     key.tag.tidy(true, 0U);
     key.texture1.reset();
@@ -773,7 +787,9 @@ namespace moho
    * What it does:
    * Releases one world-trail bucket key resource lane.
    */
-  void ResetTrailBucketKeyResources(STrailBucketKey& key)
+  void ResetTrailBucketKeyResources(
+    STrailBucketKey& key
+  )
   {
     key.tag.tidy(true, 0U);
     key.texture1.reset();
@@ -781,14 +797,15 @@ namespace moho
   }
 } // namespace moho
 
-
 namespace moho
 {
   namespace
   {
     /// Fetches the first stream of `sheet` through its typed virtual
     /// `GetVertStream(0)` slot, matching the binary's slot-8 dispatch.
-    [[nodiscard]] ID3DVertexStream* FetchPrimaryVertexStream(CD3DVertexSheet* const sheet)
+    [[nodiscard]] ID3DVertexStream* FetchPrimaryVertexStream(
+      CD3DVertexSheet* const sheet
+    )
     {
       return sheet->GetVertStream(0u);
     }
@@ -876,7 +893,8 @@ namespace moho
     const float* const boxCorners,
     const float dx,
     const float dy,
-    const float dz)
+    const float dz
+  )
   {
     const float boxX0 = boxCorners[0];
     const float boxY0 = boxCorners[1];
@@ -921,7 +939,9 @@ namespace moho
    * `packedQuad` into the active write cursor, advances the cursor
    * by 48 bytes, and bumps the running quad count.
    */
-  const float* BeamDrawContext::WritePackedQuad(const float* const packedQuad)
+  const float* BeamDrawContext::WritePackedQuad(
+    const float* const packedQuad
+  )
   {
     for (std::size_t i = 0; i < 12; ++i) {
       writeCursor[i] = packedQuad[i];
@@ -933,7 +953,10 @@ namespace moho
 
   namespace
   {
-    [[nodiscard]] bool FlushBeamQuadDrawImpl(moho::BeamDrawContext& context, const int quadCount)
+    [[nodiscard]] bool FlushBeamQuadDrawImpl(
+      moho::BeamDrawContext& context,
+      const int quadCount
+    )
     {
       if (context.writeCursor != nullptr) {
         ID3DVertexStream* const stream = FetchPrimaryVertexStream(context.sheet);
@@ -988,7 +1011,9 @@ namespace moho
    * `quadCount` for the view bounds instead of the context's own
    * running count.
    */
-  bool BeamDrawContext::FlushQuadDraw(const int quadCountOverride)
+  bool BeamDrawContext::FlushQuadDraw(
+    const int quadCountOverride
+  )
   {
     return FlushBeamQuadDrawImpl(*this, quadCountOverride);
   }
@@ -1021,11 +1046,7 @@ namespace moho
     CD3DVertexStream* streamArray[2]{nullptr, sVertexStream.get()};
     CD3DDevice* const device2 = D3D_GetDevice();
     ID3DDeviceResources* const resources2 = device2->GetResources();
-    CD3DVertexSheet* const newSheet = resources2->Func6(
-      1u,
-      maxVertexCount,
-      vertexFormat,
-      streamArray);
+    CD3DVertexSheet* const newSheet = resources2->Func6(1u, maxVertexCount, vertexFormat, streamArray);
 
     CD3DVertexSheet* const oldSheet = sheet;
     if (newSheet != oldSheet && oldSheet != nullptr) {
@@ -1046,7 +1067,9 @@ namespace moho
    * the quad-count / vertex-count / cursor lanes, builds the shared
    * vertex sheet, and primes the shared index sheet.
    */
-  void BeamDrawContext::Initialize(const int quadCapacity)
+  void BeamDrawContext::Initialize(
+    const int quadCapacity
+  )
   {
     if (sheet != nullptr) {
       return;

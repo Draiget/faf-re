@@ -233,7 +233,6 @@ namespace
     );
   }
 
-
   /**
    * Address: 0x007A4540 (FUN_007A4540, sub_7A4540)
    *
@@ -326,7 +325,7 @@ namespace
     const char* const message = exception.what() != nullptr ? exception.what() : "";
     scriptObject->LogScriptWarning(scriptObject, "IsScrollable", message);
   }
-}
+} // namespace
 
 gpg::RType* moho::CMauiControl::sType = nullptr;
 
@@ -1895,7 +1894,12 @@ int moho::cfunc_GetFrontEndData(
 moho::CScrLuaInitForm* moho::func_GetFrontEndData_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(), "GetFrontEndData", &moho::cfunc_GetFrontEndData, nullptr, "<global>", kGetFrontEndDataHelpText
+    moho::SCR_UserLuaInitSet(),
+    "GetFrontEndData",
+    &moho::cfunc_GetFrontEndData,
+    nullptr,
+    "<global>",
+    kGetFrontEndDataHelpText
   );
   return &binder;
 }
@@ -2240,8 +2244,7 @@ namespace
     static std::map<const moho::CMauiControl*, bool> map;
     return map;
   }
-}
-
+} // namespace
 
 void moho::CMauiControl::SetCustomRender(
   const bool enabled
@@ -2444,8 +2447,7 @@ void moho::CMauiControl::SetHidden(
   mIsHidden = hidden;
 
   CMauiControlListNode* const sentinel = static_cast<CMauiControlListNode*>(&mChildrenList);
-  for (CMauiControlListNode* childNode = mChildrenList.mNext; childNode != sentinel;
-       childNode = childNode->mNext) {
+  for (CMauiControlListNode* childNode = mChildrenList.mNext; childNode != sentinel; childNode = childNode->mNext) {
     if (CMauiControl* const childControl = ControlFromParentListNode(childNode); childControl != nullptr) {
       childControl->SetHidden(hidden);
     }
@@ -2519,9 +2521,7 @@ bool moho::CMauiControl::GetIsScrollable(
 
   try {
     LuaPlus::LuaFunction<bool> callback(callbackObject);
-    return callback(
-      mLuaObj, axisLexical != nullptr ? axisLexical : ""
-    );
+    return callback(mLuaObj, axisLexical != nullptr ? axisLexical : "");
   } catch (const std::exception& exception) {
     LogIsScrollableCallbackException(scriptObject, exception);
   } catch (...) {
@@ -2568,8 +2568,7 @@ void moho::CMauiControl::OnMinimized(
 )
 {
   CMauiControlListNode* const sentinel = static_cast<CMauiControlListNode*>(&mChildrenList);
-  for (CMauiControlListNode* childNode = mChildrenList.mNext; childNode != sentinel;
-       childNode = childNode->mNext) {
+  for (CMauiControlListNode* childNode = mChildrenList.mNext; childNode != sentinel; childNode = childNode->mNext) {
     CMauiControl* const childControl = ControlFromParentListNode(childNode);
     if (childControl != nullptr) {
       childControl->OnMinimized(minimized);
@@ -2596,8 +2595,7 @@ void moho::CMauiControl::DisableHitTest(
   }
 
   CMauiControlListNode* const sentinel = static_cast<CMauiControlListNode*>(&mChildrenList);
-  for (CMauiControlListNode* childNode = mChildrenList.mNext; childNode != sentinel;
-       childNode = childNode->mNext) {
+  for (CMauiControlListNode* childNode = mChildrenList.mNext; childNode != sentinel; childNode = childNode->mNext) {
     CMauiControl* const childControl = ControlFromParentListNode(childNode);
     if (childControl != nullptr) {
       childControl->DisableHitTest(disableHitTest, true);
@@ -2682,10 +2680,8 @@ bool moho::CMauiControl::HitTest(
   const float y
 )
 {
-  return x >= CScriptLazyVar_float::GetValue(&mLeftLV) &&
-    CScriptLazyVar_float::GetValue(&mRightLV) > x &&
-    y >= CScriptLazyVar_float::GetValue(&mTopLV) &&
-    CScriptLazyVar_float::GetValue(&mBottomLV) > y;
+  return x >= CScriptLazyVar_float::GetValue(&mLeftLV) && CScriptLazyVar_float::GetValue(&mRightLV) > x &&
+    y >= CScriptLazyVar_float::GetValue(&mTopLV) && CScriptLazyVar_float::GetValue(&mBottomLV) > y;
 }
 
 /**
@@ -2759,8 +2755,7 @@ bool moho::CMauiControl::HandleEvent(
   const SMauiEventData& eventData
 )
 {
-  LuaPlus::LuaState* const activeState =
-    mLuaObj.GetActiveState();
+  LuaPlus::LuaState* const activeState = mLuaObj.GetActiveState();
   LuaPlus::LuaObject eventObject{};
   (void)CreateLuaEventObject(const_cast<SMauiEventData*>(&eventData), &eventObject, activeState);
   return RunScriptBool("HandleEvent", eventObject);
@@ -2841,8 +2836,7 @@ moho::SMauiScrollValues moho::CMauiControl::GetScrollValues(
 {
   SMauiScrollValues values{};
   CScriptObject* const scriptObject = this;
-  LuaPlus::LuaState* const activeState =
-    mLuaObj.GetActiveState();
+  LuaPlus::LuaState* const activeState = mLuaObj.GetActiveState();
   if (scriptObject == nullptr || activeState == nullptr || activeState->m_state == nullptr) {
     return values;
   }
@@ -2889,8 +2883,7 @@ void moho::CMauiControl::ApplyFunction(
   callback(mLuaObj);
 
   CMauiControlListNode* const sentinel = static_cast<CMauiControlListNode*>(&mChildrenList);
-  for (CMauiControlListNode* childNode = mChildrenList.mNext; childNode != sentinel;
-       childNode = childNode->mNext) {
+  for (CMauiControlListNode* childNode = mChildrenList.mNext; childNode != sentinel; childNode = childNode->mNext) {
     CMauiControl* const childControl = ControlFromParentListNode(childNode);
     if (childControl != nullptr) {
       callback(childControl->mLuaObj);
@@ -2996,7 +2989,12 @@ int moho::cfunc_GetInputCapture(
 moho::CScrLuaInitForm* moho::func_GetInputCapture_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(), "GetInputCapture", &moho::cfunc_GetInputCapture, nullptr, "<global>", kGetInputCaptureHelpText
+    moho::SCR_UserLuaInitSet(),
+    "GetInputCapture",
+    &moho::cfunc_GetInputCapture,
+    nullptr,
+    "<global>",
+    kGetInputCaptureHelpText
   );
   return &binder;
 }
@@ -3045,7 +3043,12 @@ int moho::func_AddInputCapture(
 moho::CScrLuaInitForm* moho::func_AddInputCapture_LuaFuncDef()
 {
   static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(), "AddInputCapture", &moho::func_AddInputCapture, nullptr, "<global>", kAddInputCaptureHelpText
+    moho::SCR_UserLuaInitSet(),
+    "AddInputCapture",
+    &moho::func_AddInputCapture,
+    nullptr,
+    "<global>",
+    kAddInputCaptureHelpText
   );
   return &binder;
 }

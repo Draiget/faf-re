@@ -40,7 +40,11 @@ namespace gpg::gal
   public:
     /** `contentsFromEngine`: an engine-filled texture, whose CPU copy starts as zeros. */
     TextureD3D12(
-      const TextureContext& context, d3d12::TrackedResource resource, D3D12_CPU_DESCRIPTOR_HANDLE view, bool cube, bool contentsFromEngine
+      const TextureContext& context,
+      d3d12::TrackedResource resource,
+      D3D12_CPU_DESCRIPTOR_HANDLE view,
+      bool cube,
+      bool contentsFromEngine
     );
     ~TextureD3D12() override;
 
@@ -53,11 +57,26 @@ namespace gpg::gal
     /** After the GPU wrote the texture: the CPU copy is stale. */
     void DiscardCpuCopy() noexcept;
 
-    [[nodiscard]] d3d12::TrackedResource& Resource() noexcept { return mResource; }
-    [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE View() const noexcept { return mView; }
-    [[nodiscard]] const D3D12_RESOURCE_DESC& Desc() const noexcept { return mDesc; }
-    [[nodiscard]] bool IsCube() const noexcept { return mContext.type_ == 2U; }
-    [[nodiscard]] bool IsVolume() const noexcept { return mContext.type_ == 3U; }
+    [[nodiscard]] d3d12::TrackedResource& Resource() noexcept
+    {
+      return mResource;
+    }
+    [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE View() const noexcept
+    {
+      return mView;
+    }
+    [[nodiscard]] const D3D12_RESOURCE_DESC& Desc() const noexcept
+    {
+      return mDesc;
+    }
+    [[nodiscard]] bool IsCube() const noexcept
+    {
+      return mContext.type_ == 2U;
+    }
+    [[nodiscard]] bool IsVolume() const noexcept
+    {
+      return mContext.type_ == 3U;
+    }
 
     /** Bytes held by every texture's CPU copies (memory diagnostics). */
     [[nodiscard]] static std::uint64_t CpuCopyBytes() noexcept;
@@ -98,9 +117,18 @@ namespace gpg::gal
     HDC GetDC() override;
 
     [[nodiscard]] Buffer& Current();
-    [[nodiscard]] bool IsBackBuffer() const noexcept { return mSwapChain != nullptr; }
-    [[nodiscard]] std::vector<Buffer>& Buffers() noexcept { return mBuffers; }
-    [[nodiscard]] DXGI_FORMAT Format() const noexcept { return mFormat; }
+    [[nodiscard]] bool IsBackBuffer() const noexcept
+    {
+      return mSwapChain != nullptr;
+    }
+    [[nodiscard]] std::vector<Buffer>& Buffers() noexcept
+    {
+      return mBuffers;
+    }
+    [[nodiscard]] DXGI_FORMAT Format() const noexcept
+    {
+      return mFormat;
+    }
 
   private:
     RenderTargetContext mContext;
@@ -123,10 +151,22 @@ namespace gpg::gal
 
     DepthStencilTargetContext* GetContext() override;
 
-    [[nodiscard]] d3d12::TrackedResource& Resource() noexcept { return mResource; }
-    [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE DepthView() const noexcept { return mDepthView; }
-    [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE ShaderView() const noexcept { return mShaderView; }
-    [[nodiscard]] DXGI_FORMAT DepthFormat() const noexcept { return mDepthFormat; }
+    [[nodiscard]] d3d12::TrackedResource& Resource() noexcept
+    {
+      return mResource;
+    }
+    [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE DepthView() const noexcept
+    {
+      return mDepthView;
+    }
+    [[nodiscard]] D3D12_CPU_DESCRIPTOR_HANDLE ShaderView() const noexcept
+    {
+      return mShaderView;
+    }
+    [[nodiscard]] DXGI_FORMAT DepthFormat() const noexcept
+    {
+      return mDepthFormat;
+    }
 
   private:
     DepthStencilTargetContext mContext;
@@ -169,12 +209,29 @@ namespace gpg::gal
     /** Device::ReleaseBufferCopy: frees the CPU copy of a static buffer, once it's on the GPU. */
     void ReleaseCopy() noexcept;
     /** Device::CopyLockedRangeOnly. */
-    void CopyLockedRangeOnly() noexcept { mLockedRangeOnly = true; }
+    void CopyLockedRangeOnly() noexcept
+    {
+      mLockedRangeOnly = true;
+    }
 
     /** The address draws read from, ready for reading. */
     [[nodiscard]] D3D12_GPU_VIRTUAL_ADDRESS PrepareForDraw(DeviceD3D12& device);
-    [[nodiscard]] std::uint32_t ByteWidth() const noexcept { return mByteWidth; }
-    [[nodiscard]] bool IsDynamic() const noexcept { return mDynamic; }
+    [[nodiscard]] std::uint32_t ByteWidth() const noexcept
+    {
+      return mByteWidth;
+    }
+    [[nodiscard]] bool IsDynamic() const noexcept
+    {
+      return mDynamic;
+    }
+    /** Device::CopyWrittenOnly (ren_CopyWrittenOnly). */
+    void MarkWrittenOnly() noexcept
+    {
+      mCopyWrittenOnly = true;
+    }
+    /** How many leading bytes a fresh copy needs: those written since the last discard for a marked buffer, else all.
+     */
+    [[nodiscard]] std::uint32_t WrittenCopyBytes() const noexcept;
 
     /**
      * Where a GPU copy reads this buffer: the default-heap resource, moved to
@@ -184,7 +241,10 @@ namespace gpg::gal
     /** A static buffer's resource, for a GPU copy into it; nullptr for a dynamic buffer. */
     [[nodiscard]] d3d12::TrackedResource* CopyDestination();
     /** Where this static buffer starts in that resource. */
-    [[nodiscard]] std::uint64_t ResourceOffset() const noexcept { return mResourceOffset; }
+    [[nodiscard]] std::uint64_t ResourceOffset() const noexcept
+    {
+      return mResourceOffset;
+    }
 
   private:
     void TakeChunk(DeviceD3D12& device, const d3d12::UploadAllocation& chunk);
@@ -197,11 +257,11 @@ namespace gpg::gal
     D3D12_RESOURCE_STATES mReadState = D3D12_RESOURCE_STATE_GENERIC_READ;
     backend::LockShadow mShadow;
     bool mLockedRangeOnly = false;
-    d3d12::TrackedResource mResource;    // static buffers with a resource of their own
+    d3d12::TrackedResource mResource;              // static buffers with a resource of their own
     d3d12::TrackedResource* mTracked = &mResource; // or the large buffer this one shares (gal::gSharedBuffers)
     std::uint64_t mResourceOffset = 0;
     Microsoft::WRL::ComPtr<IUnknown> mSharedRange;
-    bool mUnwritten = false;             // placed, and not yet uploaded whole
+    bool mUnwritten = false;              // placed, and not yet uploaded whole
     D3D12_GPU_VIRTUAL_ADDRESS mChunk = 0; // dynamic buffers: the current copy in upload memory
     std::uint8_t* mChunkCpu = nullptr;
     ID3D12Resource* mChunkResource = nullptr; // the upload page holding that copy, and where in it
@@ -211,6 +271,8 @@ namespace gpg::gal
     std::uint32_t mLockOffset = 0;
     std::uint32_t mLockSize = 0;
     std::uint32_t mLockFlags = 0;
+    bool mCopyWrittenOnly = false; // Device::CopyWrittenOnly
+    std::uint32_t mWrittenEnd = 0; // end of the bytes written since the last discard lock
   };
 
   class VertexBufferD3D12 final : public VertexBuffer
@@ -223,7 +285,10 @@ namespace gpg::gal
     void* Lock(unsigned int offset, unsigned int size, MohoD3DLockFlags lockFlags) override;
     void Unlock() override;
 
-    [[nodiscard]] BufferStorageD3D12& Storage() noexcept { return mStorage; }
+    [[nodiscard]] BufferStorageD3D12& Storage() noexcept
+    {
+      return mStorage;
+    }
 
   private:
     VertexBufferContext mContext;
@@ -240,7 +305,10 @@ namespace gpg::gal
     std::int16_t* Lock(unsigned int offset, unsigned int size, MohoD3DLockFlags lockFlags) override;
     void Unlock() override;
 
-    [[nodiscard]] BufferStorageD3D12& Storage() noexcept { return mStorage; }
+    [[nodiscard]] BufferStorageD3D12& Storage() noexcept
+    {
+      return mStorage;
+    }
     [[nodiscard]] DXGI_FORMAT IndexFormat() const noexcept;
 
   private:

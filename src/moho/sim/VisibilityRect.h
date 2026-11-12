@@ -27,7 +27,9 @@ namespace moho
       return *reinterpret_cast<gpg::Rect2i*>(this);
     }
 
-    [[nodiscard]] static const VisibilityRect& FromRect2i(const gpg::Rect2i& rect) noexcept
+    [[nodiscard]] static const VisibilityRect& FromRect2i(
+      const gpg::Rect2i& rect
+    ) noexcept
     {
       return *reinterpret_cast<const VisibilityRect*>(&rect);
     }

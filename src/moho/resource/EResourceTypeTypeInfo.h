@@ -53,7 +53,6 @@ namespace moho
 
   static_assert(sizeof(EResourceTypeTypeInfo) == 0x78, "EResourceTypeTypeInfo size must be 0x78");
 
-
   /**
    * Address: 0x00BC95F0 (FUN_00BC95F0, register_EResourceTypeTypeInfo)
    *

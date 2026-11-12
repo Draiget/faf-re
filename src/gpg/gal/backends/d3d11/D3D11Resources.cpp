@@ -29,7 +29,10 @@ namespace gpg::gal
       return *static_cast<DeviceD3D11*>(Device::GetInstance());
     }
 
-    [[nodiscard]] bool HasFlag(const int flags, const MohoD3DLockFlags flag) noexcept
+    [[nodiscard]] bool HasFlag(
+      const int flags,
+      const MohoD3DLockFlags flag
+    ) noexcept
     {
       return (static_cast<std::uint32_t>(flags) & static_cast<std::uint32_t>(flag)) != 0U;
     }
@@ -79,7 +82,9 @@ namespace gpg::gal
     return &mContext;
   }
 
-  void TextureD3D11::ReadBackLevel(const std::uint32_t level)
+  void TextureD3D11::ReadBackLevel(
+    const std::uint32_t level
+  )
   {
     D3D11_TEXTURE2D_DESC stagingDesc = mDesc;
     stagingDesc.Usage = D3D11_USAGE_STAGING;
@@ -95,23 +100,30 @@ namespace gpg::gal
     mImmediate->CopySubresourceRegion(staging.Get(), subresource, 0U, 0U, 0U, mTexture2D.Get(), subresource, nullptr);
 
     D3D11_MAPPED_SUBRESOURCE mapped{};
-    CheckHresult("TextureD3D11.cpp", __LINE__, mImmediate->Map(staging.Get(), subresource, D3D11_MAP_READ, 0U, &mapped));
-
-    const d3d11::LevelLayout layout = d3d11::ComputeLevelLayout(
-      mDesc.Format, std::max(1U, mDesc.Width >> level), std::max(1U, mDesc.Height >> level)
+    CheckHresult(
+      "TextureD3D11.cpp", __LINE__, mImmediate->Map(staging.Get(), subresource, D3D11_MAP_READ, 0U, &mapped)
     );
+
+    const d3d11::LevelLayout layout =
+      d3d11::ComputeLevelLayout(mDesc.Format, std::max(1U, mDesc.Width >> level), std::max(1U, mDesc.Height >> level));
     std::vector<std::uint8_t>& bytes = mLevels[level];
     bytes.resize(layout.ByteSize());
     const auto* const source = static_cast<const std::uint8_t*>(mapped.pData);
     for (std::uint32_t row = 0U; row < layout.rowCount; ++row) {
-      std::memcpy(bytes.data() + static_cast<std::size_t>(row) * layout.rowPitch,
-                  source + static_cast<std::size_t>(row) * mapped.RowPitch,
-                  layout.rowPitch);
+      std::memcpy(
+        bytes.data() + static_cast<std::size_t>(row) * layout.rowPitch,
+        source + static_cast<std::size_t>(row) * mapped.RowPitch,
+        layout.rowPitch
+      );
     }
     mImmediate->Unmap(staging.Get(), subresource);
   }
 
-  TextureLockRect TextureD3D11::Lock(const int level, const RECT& rect, const int flags)
+  TextureLockRect TextureD3D11::Lock(
+    const int level,
+    const RECT& rect,
+    const int flags
+  )
   {
     if (mTexture2D == nullptr) {
       ThrowError("TextureD3D11.cpp", __LINE__, "attempt to map invalid texture");
@@ -142,9 +154,11 @@ namespace gpg::gal
     if (rect.left != rect.right) {
       const std::uint32_t elementBytes = d3d11::FormatElementBytes(mDesc.Format);
       if (d3d11::IsBlockCompressed(mDesc.Format)) {
-        offset = static_cast<std::size_t>(rect.top / 4) * layout.rowPitch + static_cast<std::size_t>(rect.left / 4) * elementBytes;
+        offset = static_cast<std::size_t>(rect.top / 4) * layout.rowPitch +
+          static_cast<std::size_t>(rect.left / 4) * elementBytes;
       } else {
-        offset = static_cast<std::size_t>(rect.top) * layout.rowPitch + static_cast<std::size_t>(rect.left) * elementBytes;
+        offset =
+          static_cast<std::size_t>(rect.top) * layout.rowPitch + static_cast<std::size_t>(rect.left) * elementBytes;
       }
     }
 
@@ -160,12 +174,16 @@ namespace gpg::gal
     return lock;
   }
 
-  int TextureD3D11::Unlock(const TextureLockRect lock)
+  int TextureD3D11::Unlock(
+    const TextureLockRect lock
+  )
   {
     return Unlock(lock.level);
   }
 
-  int TextureD3D11::Unlock(const int level)
+  int TextureD3D11::Unlock(
+    const int level
+  )
   {
     if (!mLocked || level != mLockedLevel) {
       ThrowError("TextureD3D11.cpp", __LINE__, "texture lock/unlock mismatch");
@@ -178,7 +196,12 @@ namespace gpg::gal
         mDesc.Format, std::max(1U, mDesc.Width >> levelIndex), std::max(1U, mDesc.Height >> levelIndex)
       );
       mImmediate->UpdateSubresource(
-        mTexture2D.Get(), D3D11CalcSubresource(levelIndex, 0U, mDesc.MipLevels), nullptr, bytes.data(), layout.rowPitch, 0U
+        mTexture2D.Get(),
+        D3D11CalcSubresource(levelIndex, 0U, mDesc.MipLevels),
+        nullptr,
+        bytes.data(),
+        layout.rowPitch,
+        0U
       );
       RecordUpload(bytes.size());
     } else if (!mContentsFromEngine) {
@@ -193,7 +216,9 @@ namespace gpg::gal
     return 0;
   }
 
-  void TextureD3D11::SaveToBuffer(gpg::MemBuffer<char>* const outBuffer)
+  void TextureD3D11::SaveToBuffer(
+    gpg::MemBuffer<char>* const outBuffer
+  )
   {
     if (mResource == nullptr) {
       ThrowError("TextureD3D11.cpp", __LINE__, "attempt to save invalid texture");
@@ -324,7 +349,9 @@ namespace gpg::gal
     return mShaderResourceView.Get();
   }
 
-  CubeRenderTargetD3D11::CubeRenderTargetD3D11(const CubeRenderTargetContext& context)
+  CubeRenderTargetD3D11::CubeRenderTargetD3D11(
+    const CubeRenderTargetContext& context
+  )
     : mContext(context)
   {}
 
@@ -363,7 +390,11 @@ namespace gpg::gal
     }
   }
 
-  std::uint8_t* BufferStorageD3D11::Lock(const std::uint32_t offset, const std::uint32_t size, const MohoD3DLockFlags flags)
+  std::uint8_t* BufferStorageD3D11::Lock(
+    const std::uint32_t offset,
+    const std::uint32_t size,
+    const MohoD3DLockFlags flags
+  )
   {
     if (mLocked) {
       ThrowError(mKind, __LINE__, "buffer lock/unlock mismatch");
@@ -428,7 +459,9 @@ namespace gpg::gal
   }
 
   VertexBufferD3D11::VertexBufferD3D11(
-    const VertexBufferContext& context, ID3D11Device* const device, ID3D11DeviceContext* const immediate
+    const VertexBufferContext& context,
+    ID3D11Device* const device,
+    ID3D11DeviceContext* const immediate
   )
     : mContext(context)
     , mStorage(
@@ -448,7 +481,11 @@ namespace gpg::gal
     return &mContext;
   }
 
-  void* VertexBufferD3D11::Lock(const unsigned int offset, const unsigned int size, const MohoD3DLockFlags lockFlags)
+  void* VertexBufferD3D11::Lock(
+    const unsigned int offset,
+    const unsigned int size,
+    const MohoD3DLockFlags lockFlags
+  )
   {
     return mStorage.Lock(offset, size, lockFlags);
   }
@@ -459,7 +496,9 @@ namespace gpg::gal
   }
 
   IndexBufferD3D11::IndexBufferD3D11(
-    const IndexBufferContext& context, ID3D11Device* const device, ID3D11DeviceContext* const immediate
+    const IndexBufferContext& context,
+    ID3D11Device* const device,
+    ID3D11DeviceContext* const immediate
   )
     : mContext(context)
     , mStorage(
@@ -479,7 +518,11 @@ namespace gpg::gal
     return &mContext;
   }
 
-  std::int16_t* IndexBufferD3D11::Lock(const unsigned int offset, const unsigned int size, const MohoD3DLockFlags lockFlags)
+  std::int16_t* IndexBufferD3D11::Lock(
+    const unsigned int offset,
+    const unsigned int size,
+    const MohoD3DLockFlags lockFlags
+  )
   {
     return reinterpret_cast<std::int16_t*>(mStorage.Lock(offset, size, lockFlags));
   }
@@ -494,7 +537,10 @@ namespace gpg::gal
     return (mContext.format_ == 1U) ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT;
   }
 
-  VertexFormatD3D11::VertexFormatD3D11(const std::uint32_t formatCode, ID3D11InputLayout* const inputLayout)
+  VertexFormatD3D11::VertexFormatD3D11(
+    const std::uint32_t formatCode,
+    ID3D11InputLayout* const inputLayout
+  )
     : mInputLayout(inputLayout)
   {
     formatCode_ = formatCode;
@@ -539,7 +585,9 @@ namespace gpg::gal
       return desc;
     }
 
-    [[nodiscard]] D3D11_DEPTH_STENCIL_DESC DepthWriteDesc(const D3D11_COMPARISON_FUNC depthFunc) noexcept
+    [[nodiscard]] D3D11_DEPTH_STENCIL_DESC DepthWriteDesc(
+      const D3D11_COMPARISON_FUNC depthFunc
+    ) noexcept
     {
       D3D11_DEPTH_STENCIL_DESC desc{};
       desc.DepthEnable = TRUE;
@@ -554,7 +602,10 @@ namespace gpg::gal
       return desc;
     }
 
-    [[nodiscard]] D3D11_RASTERIZER_DESC SolidRasterizerDesc(const D3D11_CULL_MODE cull, const BOOL frontCounterClockwise) noexcept
+    [[nodiscard]] D3D11_RASTERIZER_DESC SolidRasterizerDesc(
+      const D3D11_CULL_MODE cull,
+      const BOOL frontCounterClockwise
+    ) noexcept
     {
       D3D11_RASTERIZER_DESC desc{};
       desc.FillMode = D3D11_FILL_SOLID;
@@ -569,15 +620,22 @@ namespace gpg::gal
     }
   } // namespace
 
-  PipelineStateD3D11::PipelineStateD3D11(ID3D11Device* const device, ID3D11DeviceContext* const immediate)
+  PipelineStateD3D11::PipelineStateD3D11(
+    ID3D11Device* const device,
+    ID3D11DeviceContext* const immediate
+  )
     : mDevice(device)
     , mImmediate(immediate)
   {
     // Pack 1 (D3D10 `CreateState1`).
     const D3D11_RASTERIZER_DESC startupRasterizer = SolidRasterizerDesc(D3D11_CULL_NONE, TRUE);
-    CheckHresult("PipelineStateD3D11.cpp", __LINE__, mDevice->CreateRasterizerState(&startupRasterizer, &mStartupRasterizer));
+    CheckHresult(
+      "PipelineStateD3D11.cpp", __LINE__, mDevice->CreateRasterizerState(&startupRasterizer, &mStartupRasterizer)
+    );
     const D3D11_DEPTH_STENCIL_DESC startupDepth = DepthWriteDesc(D3D11_COMPARISON_ALWAYS);
-    CheckHresult("PipelineStateD3D11.cpp", __LINE__, mDevice->CreateDepthStencilState(&startupDepth, &mStartupDepthStencil));
+    CheckHresult(
+      "PipelineStateD3D11.cpp", __LINE__, mDevice->CreateDepthStencilState(&startupDepth, &mStartupDepthStencil)
+    );
     const D3D11_BLEND_DESC blend = OpaqueBlendDesc();
     CheckHresult("PipelineStateD3D11.cpp", __LINE__, mDevice->CreateBlendState(&blend, &mStartupBlend));
 
@@ -596,9 +654,13 @@ namespace gpg::gal
     // does (see backend::Direct3D10TechniqueCull).
     const D3D11_RASTERIZER_DESC techniqueRasterizer =
       SolidRasterizerDesc(backend::Direct3D10TechniqueCull() ? D3D11_CULL_BACK : D3D11_CULL_NONE, FALSE);
-    CheckHresult("PipelineStateD3D11.cpp", __LINE__, mDevice->CreateRasterizerState(&techniqueRasterizer, &mTechniqueRasterizer));
+    CheckHresult(
+      "PipelineStateD3D11.cpp", __LINE__, mDevice->CreateRasterizerState(&techniqueRasterizer, &mTechniqueRasterizer)
+    );
     const D3D11_DEPTH_STENCIL_DESC techniqueDepth = DepthWriteDesc(D3D11_COMPARISON_LESS_EQUAL);
-    CheckHresult("PipelineStateD3D11.cpp", __LINE__, mDevice->CreateDepthStencilState(&techniqueDepth, &mTechniqueDepthStencil));
+    CheckHresult(
+      "PipelineStateD3D11.cpp", __LINE__, mDevice->CreateDepthStencilState(&techniqueDepth, &mTechniqueDepthStencil)
+    );
     CheckHresult("PipelineStateD3D11.cpp", __LINE__, mDevice->CreateBlendState(&blend, &mTechniqueBlend));
   }
 
@@ -630,11 +692,15 @@ namespace gpg::gal
 
   void PipelineStateD3D11::EndTechnique() {}
 
-  void PipelineStateD3D11::SetColorWriteMask(const bool writeColor, const bool writeAlpha) noexcept
+  void PipelineStateD3D11::SetColorWriteMask(
+    const bool writeColor,
+    const bool writeAlpha
+  ) noexcept
   {
     // The D3D9 backend's mask (`PipelineStateD3D9::SetColorWriteState`):
     // both or neither write everything, colour alone RGB, alpha alone A.
-    constexpr UINT8 kRgb = D3D11_COLOR_WRITE_ENABLE_RED | D3D11_COLOR_WRITE_ENABLE_GREEN | D3D11_COLOR_WRITE_ENABLE_BLUE;
+    constexpr UINT8 kRgb =
+      D3D11_COLOR_WRITE_ENABLE_RED | D3D11_COLOR_WRITE_ENABLE_GREEN | D3D11_COLOR_WRITE_ENABLE_BLUE;
     if (writeColor) {
       mColorWriteMask = writeAlpha ? static_cast<UINT8>(D3D11_COLOR_WRITE_ENABLE_ALL) : kRgb;
     } else {
@@ -643,7 +709,10 @@ namespace gpg::gal
     }
   }
 
-  void PipelineStateD3D11::ApplyOverrides(const bool passSetsBlend, const bool passSetsRasterizer)
+  void PipelineStateD3D11::ApplyOverrides(
+    const bool passSetsBlend,
+    const bool passSetsRasterizer
+  )
   {
     if (mColorWriteMask != D3D11_COLOR_WRITE_ENABLE_ALL && !passSetsBlend) {
       ComPtr<ID3D11BlendState> bound;
@@ -698,7 +767,11 @@ namespace gpg::gal
      * swapped. Our textures keep D3D9's byte order (B8G8R8A8), so the swap of
      * the D3D10 (R8G8B8A8) path is not wanted here.
      */
-    HICON BuildCursorIcon(const int hotspotX, const int hotspotY, Texture& texture)
+    HICON BuildCursorIcon(
+      const int hotspotX,
+      const int hotspotY,
+      Texture& texture
+    )
     {
       BITMAPV5HEADER bitmapInfo{};
       bitmapInfo.bV5Size = sizeof(BITMAPV5HEADER);
@@ -714,8 +787,9 @@ namespace gpg::gal
 
       HDC const dc = ::GetDC(nullptr);
       void* dibPixels = nullptr;
-      HBITMAP const colorBitmap =
-        ::CreateDIBSection(dc, reinterpret_cast<const BITMAPINFO*>(&bitmapInfo), DIB_RGB_COLORS, &dibPixels, nullptr, 0U);
+      HBITMAP const colorBitmap = ::CreateDIBSection(
+        dc, reinterpret_cast<const BITMAPINFO*>(&bitmapInfo), DIB_RGB_COLORS, &dibPixels, nullptr, 0U
+      );
       ::ReleaseDC(nullptr, dc);
       if (colorBitmap == nullptr || dibPixels == nullptr) {
         return nullptr;
@@ -767,10 +841,13 @@ namespace gpg::gal
     mCursorIcon = nullptr;
   }
 
-  HCURSOR CursorD3D11::SetCursor(const CursorContext& context)
+  HCURSOR CursorD3D11::SetCursor(
+    const CursorContext& context
+  )
   {
-    HICON const icon =
-      (context.texture_ != nullptr) ? BuildCursorIcon(context.hotspotX_, context.hotspotY_, *context.texture_) : nullptr;
+    HICON const icon = (context.texture_ != nullptr)
+      ? BuildCursorIcon(context.hotspotX_, context.hotspotY_, *context.texture_)
+      : nullptr;
     HICON const previousIcon = mCursorIcon;
     mCursorIcon = icon;
     HCURSOR const previous = ::SetCursor(mCursorIcon);
@@ -790,7 +867,9 @@ namespace gpg::gal
     return ::SetCursor(mCursorIcon);
   }
 
-  int CursorD3D11::ShowCursor(const bool show)
+  int CursorD3D11::ShowCursor(
+    const bool show
+  )
   {
     if (mCursorIcon == nullptr) {
       ThrowError("CursorD3D11.cpp", __LINE__, "attempt to use uninitialized cursor");

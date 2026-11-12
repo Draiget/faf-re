@@ -8,7 +8,11 @@
  * What it does:
  * Initializes base command metadata/registration, then stores the handler.
  */
-moho::CConFunc::CConFunc(const char* const name, const char* const description, const Callback callback) noexcept
+moho::CConFunc::CConFunc(
+  const char* const name,
+  const char* const description,
+  const Callback callback
+) noexcept
   : CConCommand(name, description)
   , mFunc(callback)
 {}
@@ -20,7 +24,9 @@ moho::CConFunc::CConFunc(const char* const name, const char* const description, 
  * What it does:
  * Invokes the stored handler with the command args.
  */
-void moho::CConFunc::Handle(const fa::vector<fa::string>& args)
+void moho::CConFunc::Handle(
+  const fa::vector<fa::string>& args
+)
 {
   mFunc(args);
 }

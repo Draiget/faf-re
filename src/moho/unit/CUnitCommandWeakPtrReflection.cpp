@@ -61,7 +61,9 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RRef MakeCUnitCommandRef(moho::CUnitCommand* command)
+  [[nodiscard]] gpg::RRef MakeCUnitCommandRef(
+    moho::CUnitCommand* command
+  )
   {
     gpg::RRef out{};
     out.mObj = nullptr;
@@ -88,7 +90,9 @@ namespace
     return out;
   }
 
-  [[nodiscard]] gpg::RRef MakeWeakPtrCUnitCommandRef(moho::WeakPtr<moho::CUnitCommand>* value)
+  [[nodiscard]] gpg::RRef MakeWeakPtrCUnitCommandRef(
+    moho::WeakPtr<moho::CUnitCommand>* value
+  )
   {
     gpg::RRef out{};
     out.mObj = value;
@@ -97,9 +101,12 @@ namespace
   }
 
   /**
-    * Alias of FUN_005F5100 (non-canonical helper lane).
+   * Alias of FUN_005F5100 (non-canonical helper lane).
    */
-  [[nodiscard]] moho::CUnitCommand* ReadPointerCUnitCommand(gpg::ReadArchive* archive, const gpg::RRef& ownerRef)
+  [[nodiscard]] moho::CUnitCommand* ReadPointerCUnitCommand(
+    gpg::ReadArchive* archive,
+    const gpg::RRef& ownerRef
+  )
   {
     const gpg::TrackedPointerInfo& tracked = gpg::ReadRawPointer(archive, ownerRef);
     if (!tracked.object) {
@@ -118,7 +125,8 @@ namespace
     const char* const expected = CachedCUnitCommandType() ? CachedCUnitCommandType()->GetName() : "CUnitCommand";
     const char* const actual = source.GetTypeName();
     const fa::string msg = gpg::STR_Printf(
-      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" instead",
+      "Error detected in archive: expected a pointer to an object of type \"%s\" but got an object of type \"%s\" "
+      "instead",
       expected ? expected : "CUnitCommand",
       actual ? actual : "null"
     );
@@ -128,7 +136,12 @@ namespace
   /**
    * Address: 0x006EA8F0 (FUN_006EA8F0, sub_6EA8F0)
    */
-  void LoadWeakPtrCUnitCommandVector(gpg::ReadArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void LoadWeakPtrCUnitCommandVector(
+    gpg::ReadArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const storage = reinterpret_cast<WeakPtrVector*>(objectPtr);
     if (!archive || !storage) {
@@ -163,7 +176,12 @@ namespace
   /**
    * Address: 0x006EAA40 (FUN_006EAA40, sub_6EAA40)
    */
-  void SaveWeakPtrCUnitCommandVector(gpg::WriteArchive* archive, std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void SaveWeakPtrCUnitCommandVector(
+    gpg::WriteArchive* archive,
+    std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const storage = reinterpret_cast<const WeakPtrVector*>(objectPtr);
     if (!archive || !storage) {
@@ -207,7 +225,9 @@ namespace moho
   /**
    * Address: 0x006E9950 (FUN_006E9950, Moho::RWeakPtrType_CUnitCommand::GetLexical)
    */
-  fa::string RWeakPtrType<CUnitCommand>::GetLexical(const gpg::RRef& ref) const
+  fa::string RWeakPtrType<CUnitCommand>::GetLexical(
+    const gpg::RRef& ref
+  ) const
   {
     auto* const weak = static_cast<const WeakPtr<CUnitCommand>*>(ref.mObj);
     if (!weak || !weak->HasValue()) {
@@ -242,7 +262,9 @@ namespace moho
   /**
    * Address: 0x006E9B00 (FUN_006E9B00, Moho::RWeakPtrType_CUnitCommand::GetCount)
    */
-  size_t RWeakPtrType<CUnitCommand>::GetCount(void* obj) const
+  size_t RWeakPtrType<CUnitCommand>::GetCount(
+    void* obj
+  ) const
   {
     auto* const weak = static_cast<WeakPtr<CUnitCommand>*>(obj);
     return (weak && weak->HasValue()) ? 1u : 0u;
@@ -251,7 +273,10 @@ namespace moho
   /**
    * Address: 0x006E9B30 (FUN_006E9B30, Moho::RWeakPtrType_CUnitCommand::SubscriptIndex)
    */
-  gpg::RRef RWeakPtrType<CUnitCommand>::SubscriptIndex(void* obj, int ind) const
+  gpg::RRef RWeakPtrType<CUnitCommand>::SubscriptIndex(
+    void* obj,
+    int ind
+  ) const
   {
     GPG_ASSERT(ind == 0);
 
@@ -262,7 +287,12 @@ namespace moho
   /**
    * Address: 0x006EA880 (FUN_006EA880, Moho::RWeakPtrType_CUnitCommand::SerLoad)
    */
-  void WeakPtr_CUnitCommand::Deserialize(gpg::ReadArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void WeakPtr_CUnitCommand::Deserialize(
+    gpg::ReadArchive* const archive,
+    const std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const weak = reinterpret_cast<WeakPtr<CUnitCommand>*>(objectPtr);
     if (!archive || !weak) {
@@ -276,7 +306,12 @@ namespace moho
   /**
    * Address: 0x006EA8B0 (FUN_006EA8B0, Moho::RWeakPtrType_CUnitCommand::SerSave)
    */
-  void WeakPtr_CUnitCommand::Serialize(gpg::WriteArchive* const archive, const std::intptr_t objectPtr, int, gpg::RRef* ownerRef)
+  void WeakPtr_CUnitCommand::Serialize(
+    gpg::WriteArchive* const archive,
+    const std::intptr_t objectPtr,
+    int,
+    gpg::RRef* ownerRef
+  )
   {
     auto* const weak = reinterpret_cast<WeakPtr<CUnitCommand>*>(objectPtr);
     if (!archive || !weak) {
@@ -353,7 +388,9 @@ namespace gpg
   /**
    * Address: 0x006E9C50 (FUN_006E9C50, gpg::RVectorType_WeakPtr_CUnitCommand::GetLexical)
    */
-  fa::string RVectorType<moho::WeakPtr<moho::CUnitCommand>>::GetLexical(const gpg::RRef& ref) const
+  fa::string RVectorType<moho::WeakPtr<moho::CUnitCommand>>::GetLexical(
+    const gpg::RRef& ref
+  ) const
   {
     const fa::string base = gpg::RType::GetLexical(ref);
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(GetCount(ref.mObj)));
@@ -370,7 +407,9 @@ namespace gpg
   /**
    * Address: 0x006E9CF0 (FUN_006E9CF0, gpg::RVectorType_WeakPtr_CUnitCommand::GetCount)
    */
-  size_t RVectorType<moho::WeakPtr<moho::CUnitCommand>>::GetCount(void* obj) const
+  size_t RVectorType<moho::WeakPtr<moho::CUnitCommand>>::GetCount(
+    void* obj
+  ) const
   {
     const auto* const storage = static_cast<const WeakPtrVector*>(obj);
     return storage ? storage->size() : 0u;
@@ -379,7 +418,10 @@ namespace gpg
   /**
    * Address: 0x006E9D10 (FUN_006E9D10, gpg::RVectorType_WeakPtr_CUnitCommand::SetCount)
    */
-  void RVectorType<moho::WeakPtr<moho::CUnitCommand>>::SetCount(void* obj, int count) const
+  void RVectorType<moho::WeakPtr<moho::CUnitCommand>>::SetCount(
+    void* obj,
+    int count
+  ) const
   {
     auto* const storage = static_cast<WeakPtrVector*>(obj);
     GPG_ASSERT(storage != nullptr);
@@ -397,7 +439,10 @@ namespace gpg
   /**
    * Address: 0x006E9D40 (FUN_006E9D40, gpg::RVectorType_WeakPtr_CUnitCommand::SubscriptIndex)
    */
-  gpg::RRef RVectorType<moho::WeakPtr<moho::CUnitCommand>>::SubscriptIndex(void* obj, int ind) const
+  gpg::RRef RVectorType<moho::WeakPtr<moho::CUnitCommand>>::SubscriptIndex(
+    void* obj,
+    int ind
+  ) const
   {
     auto* const storage = static_cast<WeakPtrVector*>(obj);
     GPG_ASSERT(storage != nullptr);
@@ -429,5 +474,11 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_WeakPtr_CUnitCommand_Type_00_c8c64f, moho::register_WeakPtr_CUnitCommand_Type_00)
-GPG_PREREGISTER_INIT(register_WeakPtr_CUnitCommand_VectorType_00_c8c64f, moho::register_WeakPtr_CUnitCommand_VectorType_00)
+GPG_PREREGISTER_INIT(
+  register_WeakPtr_CUnitCommand_Type_00_c8c64f,
+  moho::register_WeakPtr_CUnitCommand_Type_00
+)
+GPG_PREREGISTER_INIT(
+  register_WeakPtr_CUnitCommand_VectorType_00_c8c64f,
+  moho::register_WeakPtr_CUnitCommand_VectorType_00
+)

@@ -10,8 +10,13 @@
 #include <string>
 #include <vector>
 
+#if FAFRE_PLATFORM_WINDOWS
 #include <d3dcompiler.h>
 #include <wrl/client.h>
+#else
+// The Linux client (issue #255): effects are preprocessed by DXC's preprocessor, not D3DPreprocess.
+#include "platform/posix/dxc/DxcGlue.h"
+#endif
 
 #include "VulkanAttachmentBarrier.h"
 #include "VulkanSurface.h"
@@ -36,6 +41,7 @@
 #include "gpg/gal/backends/d3d11/D3D11VertexLayouts.h"
 #include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
 #include "gpg/gal/backends/dxgi/DxgiFormats.h"
+#include "gpg/gal/effects/RayTracedShadows.h"
 #include "gpg/gal/effects/ShadowCascades.h"
 #include "gpg/gal/effects/TextureFiltering.h"
 
@@ -56,12 +62,27 @@ namespace gpg::gal
 
     // The Direct3D 10 effect dialect (see DeviceD3D12), plus one naming this backend.
     constexpr MacroPair kInjectedMacros[] = {
-      {"technique", "technique10"}, {"VERSION", "DIRECT3D10"}, {"vs_1_1", "vs_4_0"},   {"vs_1_3", "vs_4_0"},
-      {"vs_1_4", "vs_4_0"},         {"vs_2_0", "vs_4_0"},      {"vs_3_0", "vs_4_0"},   {"ps_1_1", "ps_4_0"},
-      {"ps_1_3", "ps_4_0"},         {"ps_1_4", "ps_4_0"},      {"ps_2_0", "ps_4_0"},   {"ps_2_a", "ps_4_0"},
-      {"ps_2_b", "ps_4_0"},         {"ps_3_0", "ps_4_0"},      {"MipFilter", "Filter"}, {"MinFilter", "Filter"},
-      {"MagFilter", "Filter"},      {"NONE", "MIN_MAG_MIP_POINT"}, {"LINEAR", "MIN_MAG_MIP_LINEAR"},
-      {"POINT", "MIN_MAG_MIP_POINT"}, {"VULKAN", "1"},
+      {"technique", "technique10"},
+      {"VERSION", "DIRECT3D10"},
+      {"vs_1_1", "vs_4_0"},
+      {"vs_1_3", "vs_4_0"},
+      {"vs_1_4", "vs_4_0"},
+      {"vs_2_0", "vs_4_0"},
+      {"vs_3_0", "vs_4_0"},
+      {"ps_1_1", "ps_4_0"},
+      {"ps_1_3", "ps_4_0"},
+      {"ps_1_4", "ps_4_0"},
+      {"ps_2_0", "ps_4_0"},
+      {"ps_2_a", "ps_4_0"},
+      {"ps_2_b", "ps_4_0"},
+      {"ps_3_0", "ps_4_0"},
+      {"MipFilter", "Filter"},
+      {"MinFilter", "Filter"},
+      {"MagFilter", "Filter"},
+      {"NONE", "MIN_MAG_MIP_POINT"},
+      {"LINEAR", "MIN_MAG_MIP_LINEAR"},
+      {"POINT", "MIN_MAG_MIP_POINT"},
+      {"VULKAN", "1"},
     };
 
     // D3D10's primitive topology per gal token (0x00D43078).
@@ -83,30 +104,38 @@ namespace gpg::gal
       VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
     };
 
-    constexpr std::uint32_t kTextureBindings = effects::kMaxTextureSlots;  // set 0, bindings 0..63
-    constexpr std::uint32_t kSamplerBindings = effects::kMaxSamplerSlots;  // set 0, bindings 64..127
-    constexpr std::uint32_t kZeroBinding = 15U;                            // vertex binding of missing inputs
+    constexpr std::uint32_t kTextureBindings = effects::kMaxTextureSlots; // set 0, bindings 0..63
+    constexpr std::uint32_t kSamplerBindings = effects::kMaxSamplerSlots; // set 0, bindings 64..127
+    constexpr std::uint32_t kZeroBinding = 15U;                           // vertex binding of missing inputs
 
-    [[nodiscard]] bool CommandLineHas(const char* const option)
+    [[nodiscard]] bool CommandLineHas(
+      const char* const option
+    )
     {
       std::string commandLine = ::GetCommandLineA();
       std::string needle = option;
       const auto lower = [](std::string& text) {
-        std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        std::transform(text.begin(), text.end(), text.begin(), [](const unsigned char c) {
+          return static_cast<char>(std::tolower(c));
+        });
       };
       lower(commandLine);
       lower(needle);
       return commandLine.find(needle) != std::string::npos;
     }
 
-    [[nodiscard]] bool IsRgbaTexture(Texture& texture)
+    [[nodiscard]] bool IsRgbaTexture(
+      Texture& texture
+    )
     {
       const DXGI_FORMAT format = static_cast<TextureVulkan&>(texture).DxgiFormat();
       return format == DXGI_FORMAT_R8G8B8A8_UNORM || format == DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
     }
 
     /** See DeviceD3D12: plain counts, D3DSTREAMSOURCE_INDEXEDDATA | count, or an instance-data stream. */
-    [[nodiscard]] std::uint32_t InstanceCount(const std::int32_t token) noexcept
+    [[nodiscard]] std::uint32_t InstanceCount(
+      const std::int32_t token
+    ) noexcept
     {
       const auto bits = static_cast<std::uint32_t>(token);
       if ((bits & 0x80000000U) != 0U) {
@@ -116,55 +145,89 @@ namespace gpg::gal
     }
 
     // D3D11/12 enumerators (as the effect description keeps them) -> Vulkan.
-    [[nodiscard]] VkBlendFactor BlendFactor(const std::uint8_t blend) noexcept
+    [[nodiscard]] VkBlendFactor BlendFactor(
+      const std::uint8_t blend
+    ) noexcept
     {
       switch (blend) {
-      case 1: return VK_BLEND_FACTOR_ZERO;
-      case 2: return VK_BLEND_FACTOR_ONE;
-      case 3: return VK_BLEND_FACTOR_SRC_COLOR;
-      case 4: return VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
-      case 5: return VK_BLEND_FACTOR_SRC_ALPHA;
-      case 6: return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-      case 7: return VK_BLEND_FACTOR_DST_ALPHA;
-      case 8: return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
-      case 9: return VK_BLEND_FACTOR_DST_COLOR;
-      case 10: return VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
-      case 11: return VK_BLEND_FACTOR_SRC_ALPHA_SATURATE;
-      case 14: return VK_BLEND_FACTOR_CONSTANT_COLOR;
-      case 15: return VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
-      default: return VK_BLEND_FACTOR_ONE;
+      case 1:
+        return VK_BLEND_FACTOR_ZERO;
+      case 2:
+        return VK_BLEND_FACTOR_ONE;
+      case 3:
+        return VK_BLEND_FACTOR_SRC_COLOR;
+      case 4:
+        return VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+      case 5:
+        return VK_BLEND_FACTOR_SRC_ALPHA;
+      case 6:
+        return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+      case 7:
+        return VK_BLEND_FACTOR_DST_ALPHA;
+      case 8:
+        return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+      case 9:
+        return VK_BLEND_FACTOR_DST_COLOR;
+      case 10:
+        return VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
+      case 11:
+        return VK_BLEND_FACTOR_SRC_ALPHA_SATURATE;
+      case 14:
+        return VK_BLEND_FACTOR_CONSTANT_COLOR;
+      case 15:
+        return VK_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR;
+      default:
+        return VK_BLEND_FACTOR_ONE;
       }
     }
 
-    [[nodiscard]] VkBlendOp BlendOp(const std::uint8_t op) noexcept
+    [[nodiscard]] VkBlendOp BlendOp(
+      const std::uint8_t op
+    ) noexcept
     {
       switch (op) {
-      case 2: return VK_BLEND_OP_SUBTRACT;
-      case 3: return VK_BLEND_OP_REVERSE_SUBTRACT;
-      case 4: return VK_BLEND_OP_MIN;
-      case 5: return VK_BLEND_OP_MAX;
-      default: return VK_BLEND_OP_ADD;
+      case 2:
+        return VK_BLEND_OP_SUBTRACT;
+      case 3:
+        return VK_BLEND_OP_REVERSE_SUBTRACT;
+      case 4:
+        return VK_BLEND_OP_MIN;
+      case 5:
+        return VK_BLEND_OP_MAX;
+      default:
+        return VK_BLEND_OP_ADD;
       }
     }
 
-    [[nodiscard]] VkCompareOp CompareOp(const std::uint8_t func) noexcept
+    [[nodiscard]] VkCompareOp CompareOp(
+      const std::uint8_t func
+    ) noexcept
     {
       return (func >= 1U && func <= 8U) ? static_cast<VkCompareOp>(func - 1U) : VK_COMPARE_OP_ALWAYS;
     }
 
-    [[nodiscard]] VkStencilOp StencilOp(const std::uint8_t op) noexcept
+    [[nodiscard]] VkStencilOp StencilOp(
+      const std::uint8_t op
+    ) noexcept
     {
       return (op >= 1U && op <= 8U) ? static_cast<VkStencilOp>(op - 1U) : VK_STENCIL_OP_KEEP;
     }
 
-    [[nodiscard]] VkSamplerAddressMode AddressMode(const std::uint8_t mode) noexcept
+    [[nodiscard]] VkSamplerAddressMode AddressMode(
+      const std::uint8_t mode
+    ) noexcept
     {
       switch (mode) {
-      case 1: return VK_SAMPLER_ADDRESS_MODE_REPEAT;
-      case 2: return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-      case 4: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
-      case 5: return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
-      default: return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+      case 1:
+        return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+      case 2:
+        return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+      case 4:
+        return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+      case 5:
+        return VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
+      default:
+        return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
       }
     }
 
@@ -172,17 +235,24 @@ namespace gpg::gal
     {
     public:
       template <class T>
-      void Add(const T& value)
+      void Add(
+        const T& value
+      )
       {
         mKey.append(reinterpret_cast<const char*>(&value), sizeof(T));
       }
-      [[nodiscard]] std::string& Key() noexcept { return mKey; }
+      [[nodiscard]] std::string& Key() noexcept
+      {
+        return mKey;
+      }
 
     private:
       std::string mKey;
     };
 
-    [[nodiscard]] VkImageAspectFlags AspectOf(const VkFormat format) noexcept
+    [[nodiscard]] VkImageAspectFlags AspectOf(
+      const VkFormat format
+    ) noexcept
     {
       if (vulkan::IsDepthFormat(format)) {
         return VK_IMAGE_ASPECT_DEPTH_BIT | (vulkan::HasStencil(format) ? VK_IMAGE_ASPECT_STENCIL_BIT : 0U);
@@ -190,9 +260,15 @@ namespace gpg::gal
       return VK_IMAGE_ASPECT_COLOR_BIT;
     }
 
-    void WriteBmp(const char* const path, const imaging::Image& image)
+    void WriteBmp(
+      const char* const path,
+      const imaging::Image& image
+    )
     {
-      if (image.subresources.empty() || dxgi::FormatElementBytes(image.format) != 4U || dxgi::IsBlockCompressed(image.format)) {
+      if (
+        image.subresources.empty() || dxgi::FormatElementBytes(image.format) != 4U ||
+        dxgi::IsBlockCompressed(image.format)
+      ) {
         return;
       }
       const imaging::Image::Subresource& top = image.subresources.front();
@@ -211,7 +287,9 @@ namespace gpg::gal
         std::fwrite(&fileHeader, sizeof(fileHeader), 1U, file);
         std::fwrite(&infoHeader, sizeof(infoHeader), 1U, file);
         for (std::uint32_t row = 0U; row < top.height; ++row) {
-          std::fwrite(image.bytes.data() + top.offset + static_cast<std::size_t>(row) * top.rowPitch, 4U, top.width, file);
+          std::fwrite(
+            image.bytes.data() + top.offset + static_cast<std::size_t>(row) * top.rowPitch, 4U, top.width, file
+          );
         }
         std::fclose(file);
         gpg::Logf("Vulkan: dump %s", path);
@@ -228,8 +306,10 @@ namespace gpg::gal
       static std::set<std::int32_t> seen;
       static std::mutex mutex;
       const std::lock_guard<std::mutex> lock(mutex);
-      if (severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT && data != nullptr && seen.size() < 300U &&
-          seen.insert(data->messageIdNumber).second) {
+      if (
+        severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT && data != nullptr && seen.size() < 300U &&
+        seen.insert(data->messageIdNumber).second
+      ) {
         gpg::Warnf("Vulkan validation: %s", (data->pMessage != nullptr) ? data->pMessage : "");
       }
       return VK_FALSE;
@@ -242,7 +322,10 @@ namespace gpg::gal
 
     // A slot's handles are copied only when they changed: each copy is an atomic increment, and a
     // decal draw keeps all but a few of its effect's textures.
-    void KeepBinding(effects::TextureBinding& slot, const effects::TextureBinding& binding)
+    void KeepBinding(
+      effects::TextureBinding& slot,
+      const effects::TextureBinding& binding
+    )
     {
       if (slot.texture.get() != binding.texture.get()) {
         slot.texture = binding.texture;
@@ -261,6 +344,8 @@ namespace gpg::gal
     float lastViewport[4]{-1.0f, -1.0f, -1.0f, -1.0f};
     std::int32_t shadowCascadeParameter = -1; // faf_ShadowCascades (ren_ShadowCascades)
     std::uint64_t shadowCascadeVersion = 0;
+    std::int32_t rayShadowParameter = -1; // faf_RayShadows (ren_RayTracedShadows)
+    std::uint64_t rayShadowVersion = 0;
 
     std::uint64_t constantsVersion = 0;
     std::uint64_t constantsSerial = 0;
@@ -294,6 +379,7 @@ namespace gpg::gal
       Vk().vkDeviceWaitIdle(mDevice);
     }
     ReleaseGpuDrivenObjects();
+    ReleaseRayTracingObjects();
     outputContext_ = OutputContext();
     mHeadOutputContexts.clear();
     mPass = BoundPass{};
@@ -450,15 +536,18 @@ namespace gpg::gal
     if (!layers.empty() && Vk().vkCreateDebugUtilsMessengerEXT != nullptr) {
       VkDebugUtilsMessengerCreateInfoEXT messenger{};
       messenger.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-      messenger.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-      messenger.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+      messenger.messageSeverity =
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+      messenger.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
       messenger.pfnUserCallback = &DebugMessage;
       Vk().vkCreateDebugUtilsMessengerEXT(mInstance, &messenger, nullptr, &mMessenger);
     }
   }
 
-  void DeviceVulkan::PickPhysicalDevice(const std::int32_t adapter)
+  void DeviceVulkan::PickPhysicalDevice(
+    const std::int32_t adapter
+  )
   {
     std::uint32_t count = 0U;
     Vk().vkEnumeratePhysicalDevices(mInstance, &count, nullptr);
@@ -493,7 +582,10 @@ namespace gpg::gal
     };
 
     std::uint32_t family = 0U;
-    if (adapter >= 0 && static_cast<std::uint32_t>(adapter) < count && usable(mPhysicalDevices[static_cast<std::size_t>(adapter)], family)) {
+    if (
+      adapter >= 0 && static_cast<std::uint32_t>(adapter) < count &&
+      usable(mPhysicalDevices[static_cast<std::size_t>(adapter)], family)
+    ) {
       mPhysical = mPhysicalDevices[static_cast<std::size_t>(adapter)];
       mQueueFamily = family;
     } else {
@@ -533,6 +625,13 @@ namespace gpg::gal
   {
     VkPhysicalDeviceVulkan13Features available13{};
     available13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+    // Engine addition (ren_RayTracedShadows): inline ray queries need these two, and buffer device addresses.
+    VkPhysicalDeviceRayQueryFeaturesKHR availableRayQuery{};
+    availableRayQuery.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR availableAcceleration{};
+    availableAcceleration.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+    availableAcceleration.pNext = &availableRayQuery;
+    available13.pNext = &availableAcceleration;
     VkPhysicalDeviceVulkan12Features available12{};
     available12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
     available12.pNext = &available13;
@@ -542,10 +641,14 @@ namespace gpg::gal
     Vk().vkGetPhysicalDeviceFeatures2(mPhysical, &available);
     // scalarBlockLayout: $Globals keeps Direct3D's constant-buffer packing
     // (-fvk-use-dx-layout), which std140 rules do not allow.
-    if (available13.dynamicRendering != VK_TRUE || available13.synchronization2 != VK_TRUE || available12.timelineSemaphore != VK_TRUE ||
-        available12.scalarBlockLayout != VK_TRUE) {
+    if (
+      available13.dynamicRendering != VK_TRUE || available13.synchronization2 != VK_TRUE ||
+      available12.timelineSemaphore != VK_TRUE || available12.scalarBlockLayout != VK_TRUE
+    ) {
       ThrowError(
-        "DeviceVulkan.cpp", __LINE__, "the Vulkan device lacks dynamic rendering, synchronization2, timeline semaphores or scalar block layout"
+        "DeviceVulkan.cpp",
+        __LINE__,
+        "the Vulkan device lacks dynamic rendering, synchronization2, timeline semaphores or scalar block layout"
       );
     }
 
@@ -572,6 +675,9 @@ namespace gpg::gal
     if (available.features.textureCompressionBC != VK_TRUE) {
       ThrowError("DeviceVulkan.cpp", __LINE__, "the Vulkan device has no BC texture compression");
     }
+    // A software rasterizer (llvmpipe, as in a virtual machine without 3D, issue #256) gets no ray
+    // queries below: ray-traced shadows would trace on the CPU that already rasterizes every pixel.
+    const bool softwareDevice = mProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU;
 
     const float priority = 1.0f;
     VkDeviceQueueCreateInfo queue{};
@@ -585,21 +691,63 @@ namespace gpg::gal
     Vk().vkEnumerateDeviceExtensionProperties(mPhysical, nullptr, &extensionCount, nullptr);
     std::vector<VkExtensionProperties> available_extensions(extensionCount);
     Vk().vkEnumerateDeviceExtensionProperties(mPhysical, nullptr, &extensionCount, available_extensions.data());
-    mMemoryBudget = std::any_of(available_extensions.begin(), available_extensions.end(), [](const VkExtensionProperties& extension) {
+    mMemoryBudget =
+      std::any_of(available_extensions.begin(), available_extensions.end(), [](const VkExtensionProperties& extension) {
       return std::strcmp(extension.extensionName, VK_EXT_MEMORY_BUDGET_EXTENSION_NAME) == 0;
     });
-    const char* const extensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_EXT_MEMORY_BUDGET_EXTENSION_NAME};
+    std::vector<const char*> extensions{VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+    if (mMemoryBudget) {
+      extensions.push_back(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
+    }
+    const auto hasExtension = [&](const char* const name) {
+      return std::any_of(
+        available_extensions.begin(), available_extensions.end(), [name](const VkExtensionProperties& extension) {
+        return std::strcmp(extension.extensionName, name) == 0;
+      }
+      );
+    };
+    VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeatures{};
+    rayQueryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+    rayQueryFeatures.rayQuery = VK_TRUE;
+    VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationFeatures{};
+    accelerationFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+    accelerationFeatures.accelerationStructure = VK_TRUE;
+    accelerationFeatures.pNext = &rayQueryFeatures;
+    mRayQuery = effects::RayTracedShadowsWanted() && !softwareDevice &&
+      hasExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME) && hasExtension(VK_KHR_RAY_QUERY_EXTENSION_NAME) &&
+      hasExtension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME) &&
+      availableAcceleration.accelerationStructure == VK_TRUE && availableRayQuery.rayQuery == VK_TRUE &&
+      available12.bufferDeviceAddress == VK_TRUE &&
+      // ren_RayAlphaShadows: the lookups index the alpha textures per hit (NonUniformResourceIndex).
+      available12.shaderSampledImageArrayNonUniformIndexing == VK_TRUE;
+    if (mRayQuery) {
+      extensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+      extensions.push_back(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+      extensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+      features12.bufferDeviceAddress = VK_TRUE;
+      features12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+      features13.pNext = &accelerationFeatures;
+    }
     VkDeviceCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     info.pNext = &features;
     info.queueCreateInfoCount = 1U;
     info.pQueueCreateInfos = &queue;
-    info.enabledExtensionCount = mMemoryBudget ? 2U : 1U;
-    info.ppEnabledExtensionNames = extensions;
+    info.enabledExtensionCount = static_cast<std::uint32_t>(extensions.size());
+    info.ppEnabledExtensionNames = extensions.data();
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateDevice(mPhysical, &info, nullptr, &mDevice));
     if (!Vk().LoadDevice(mDevice)) {
       ThrowError("DeviceVulkan.cpp", __LINE__, "the Vulkan device lacks required functions");
     }
+    if (mRayQuery && !Vk().LoadRay(mDevice)) {
+      mRayQuery = false;
+    }
+    effects::gRayQueryShaders = mRayQuery;
+    gpg::Logf(
+      mRayQuery                              ? "Vulkan: inline ray queries available"
+        : !effects::RayTracedShadowsWanted() ? "Vulkan: ray tracing off (ren_RayTracedShadows -1 at device creation)"
+                                             : "Vulkan: no inline ray queries; ray-traced shadows off"
+    );
     Vk().vkGetDeviceQueue(mDevice, mQueueFamily, 0U, &mQueue);
 
     VkSemaphoreTypeCreateInfo timelineType{};
@@ -623,8 +771,13 @@ namespace gpg::gal
 
     gpg::Logf(
       "Vulkan: device created on '%s' (vendor 0x%04X device 0x%04X, API %u.%u.%u, driver 0x%08X), depth-stencil %s",
-      mProperties.deviceName, mProperties.vendorID, mProperties.deviceID, VK_API_VERSION_MAJOR(mProperties.apiVersion),
-      VK_API_VERSION_MINOR(mProperties.apiVersion), VK_API_VERSION_PATCH(mProperties.apiVersion), mProperties.driverVersion,
+      mProperties.deviceName,
+      mProperties.vendorID,
+      mProperties.deviceID,
+      VK_API_VERSION_MAJOR(mProperties.apiVersion),
+      VK_API_VERSION_MINOR(mProperties.apiVersion),
+      VK_API_VERSION_PATCH(mProperties.apiVersion),
+      mProperties.driverVersion,
       (mDepthStencilFormat == VK_FORMAT_D24_UNORM_S8_UINT) ? "D24S8" : "D32S8"
     );
   }
@@ -644,12 +797,14 @@ namespace gpg::gal
   {
     // Tessellated passes (engine addition) read textures and constants in their hull and domain shaders too.
     const VkShaderStageFlags stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT |
-      (mTessellationSupported ? VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT : 0U);
+      (mTessellationSupported ? VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT | VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT
+                              : 0U);
     std::vector<VkDescriptorSetLayoutBinding> bindings;
     for (std::uint32_t index = 0U; index < kTextureBindings + kSamplerBindings; ++index) {
       VkDescriptorSetLayoutBinding binding{};
       binding.binding = index;
-      binding.descriptorType = (index < kTextureBindings) ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE : VK_DESCRIPTOR_TYPE_SAMPLER;
+      binding.descriptorType =
+        (index < kTextureBindings) ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE : VK_DESCRIPTOR_TYPE_SAMPLER;
       binding.descriptorCount = 1U;
       binding.stageFlags = stages;
       bindings.push_back(binding);
@@ -667,22 +822,56 @@ namespace gpg::gal
     constants.stageFlags = stages;
     layout.bindingCount = 1U;
     layout.pBindings = &constants;
-    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateDescriptorSetLayout(mDevice, &layout, nullptr, &mConstantLayout));
+    CheckVk(
+      "DeviceVulkan.cpp", __LINE__, Vk().vkCreateDescriptorSetLayout(mDevice, &layout, nullptr, &mConstantLayout)
+    );
 
-    const VkDescriptorSetLayout sets[2] = {mTextureLayout, mConstantLayout};
+    // Engine addition (ren_RayTracedShadows): the ray-traced scene is set 2 (RayTracingVulkan.cpp).
+    if (mRayQuery) {
+      // Engine addition (ren_RayAlphaShadows): the alpha-tested pieces' resources (RayTracingVulkan.cpp WriteRaySet).
+      VkSamplerCreateInfo sampler{};
+      sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+      sampler.magFilter = VK_FILTER_LINEAR;
+      sampler.minFilter = VK_FILTER_LINEAR;
+      sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+      sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+      sampler.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+      sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+      sampler.maxLod = VK_LOD_CLAMP_NONE;
+      CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateSampler(mDevice, &sampler, nullptr, &mRaySampler));
+      // Compute too: ren_RayAo's dispatch reads the scene (GpuDrivenVulkan.cpp's layouts share this set layout).
+      const VkShaderStageFlags rayStages = stages | VK_SHADER_STAGE_COMPUTE_BIT;
+      VkDescriptorSetLayoutBinding scene[5]{};
+      scene[0] = {0U, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, 1U, rayStages, nullptr};
+      scene[1] = {1U, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1U, rayStages, nullptr};
+      scene[2] = {2U, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1U, rayStages, nullptr};
+      scene[3] = {3U, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, kRayTextureSlots, rayStages, nullptr};
+      scene[4] = {4U, VK_DESCRIPTOR_TYPE_SAMPLER, 1U, rayStages, &mRaySampler};
+      layout.bindingCount = 5U;
+      layout.pBindings = scene;
+      CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateDescriptorSetLayout(mDevice, &layout, nullptr, &mRayLayout));
+      layout.bindingCount = 1U;
+      layout.pBindings = &constants;
+    }
+    const std::uint32_t setCount = mRayQuery ? 3U : 2U;
+    const VkDescriptorSetLayout sets[3] = {mTextureLayout, mConstantLayout, mRayLayout};
     VkPipelineLayoutCreateInfo pipeline{};
     pipeline.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipeline.setLayoutCount = 2U;
+    pipeline.setLayoutCount = setCount;
     pipeline.pSetLayouts = sets;
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreatePipelineLayout(mDevice, &pipeline, nullptr, &mPipelineLayout));
 
     // Engine addition (ren_VulkanDynamicConstants): the same with $Globals as a dynamic uniform buffer, so a draw
     // whose constants changed binds the page's one set with an offset instead of allocating and writing a set.
     constants.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateDescriptorSetLayout(mDevice, &layout, nullptr, &mDynamicConstantLayout));
-    const VkDescriptorSetLayout dynamicSets[2] = {mTextureLayout, mDynamicConstantLayout};
+    CheckVk(
+      "DeviceVulkan.cpp", __LINE__, Vk().vkCreateDescriptorSetLayout(mDevice, &layout, nullptr, &mDynamicConstantLayout)
+    );
+    const VkDescriptorSetLayout dynamicSets[3] = {mTextureLayout, mDynamicConstantLayout, mRayLayout};
     pipeline.pSetLayouts = dynamicSets;
-    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreatePipelineLayout(mDevice, &pipeline, nullptr, &mDynamicPipelineLayout));
+    CheckVk(
+      "DeviceVulkan.cpp", __LINE__, Vk().vkCreatePipelineLayout(mDevice, &pipeline, nullptr, &mDynamicPipelineLayout)
+    );
     mDynamicConstants = gVulkanDynamicConstants;
 
     VkPipelineCacheCreateInfo cache{};
@@ -712,7 +901,11 @@ namespace gpg::gal
       VkMemoryRequirements requirements{};
       Vk().vkGetImageMemoryRequirements(mDevice, image.image, &requirements);
       image.memory = mMemory.Allocate(requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, false);
-      CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkBindImageMemory(mDevice, image.image, image.memory.memory, image.memory.offset));
+      CheckVk(
+        "DeviceVulkan.cpp",
+        __LINE__,
+        Vk().vkBindImageMemory(mDevice, image.image, image.memory.memory, image.memory.offset)
+      );
       image.format = info.format;
       image.width = image.height = image.depth = 1U;
       image.layers = info.arrayLayers;
@@ -724,7 +917,9 @@ namespace gpg::gal
       VkImageViewCreateInfo view{};
       view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
       view.image = image.image;
-      view.viewType = (kind == 0) ? VK_IMAGE_VIEW_TYPE_2D : (kind == 1) ? VK_IMAGE_VIEW_TYPE_CUBE : VK_IMAGE_VIEW_TYPE_3D;
+      view.viewType = (kind == 0) ? VK_IMAGE_VIEW_TYPE_2D
+        : (kind == 1)             ? VK_IMAGE_VIEW_TYPE_CUBE
+                                  : VK_IMAGE_VIEW_TYPE_3D;
       view.format = info.format;
       view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0U, 1U, 0U, info.arrayLayers};
       CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateImageView(mDevice, &view, nullptr, &mNullViews[kind]));
@@ -734,15 +929,25 @@ namespace gpg::gal
     UploadBuffer(mZeroBuffer, 0U, zeros, sizeof(zeros));
   }
 
-  void DeviceVulkan::CreateSwapChain(SwapChain& swapChain, std::uint32_t width, std::uint32_t height)
+  void DeviceVulkan::CreateSwapChain(
+    SwapChain& swapChain,
+    std::uint32_t width,
+    std::uint32_t height
+  )
   {
     VkSurfaceCapabilitiesKHR capabilities{};
-    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysical, swapChain.surface, &capabilities));
+    CheckVk(
+      "DeviceVulkan.cpp",
+      __LINE__,
+      Vk().vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysical, swapChain.surface, &capabilities)
+    );
     std::uint32_t count = 0U;
     Vk().vkGetPhysicalDeviceSurfaceFormatsKHR(mPhysical, swapChain.surface, &count, nullptr);
     std::vector<VkSurfaceFormatKHR> formats(count);
     Vk().vkGetPhysicalDeviceSurfaceFormatsKHR(mPhysical, swapChain.surface, &count, formats.data());
-    VkSurfaceFormatKHR chosen = formats.empty() ? VkSurfaceFormatKHR{VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR} : formats.front();
+    VkSurfaceFormatKHR chosen = formats.empty()
+      ? VkSurfaceFormatKHR{VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR}
+      : formats.front();
     for (const VkSurfaceFormatKHR& format : formats) {
       if (format.format == VK_FORMAT_B8G8R8A8_UNORM && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
         chosen = format;
@@ -765,15 +970,19 @@ namespace gpg::gal
     }
     tryModes.push_back(VK_PRESENT_MODE_FIFO_KHR);
     const auto modeName = [](const VkPresentModeKHR presentMode) {
-      return (presentMode == VK_PRESENT_MODE_FIFO_KHR) ? "FIFO (vsync)" : (presentMode == VK_PRESENT_MODE_MAILBOX_KHR) ? "mailbox" : "immediate";
+      return (presentMode == VK_PRESENT_MODE_FIFO_KHR) ? "FIFO (vsync)"
+        : (presentMode == VK_PRESENT_MODE_MAILBOX_KHR) ? "mailbox"
+                                                       : "immediate";
     };
 
     VkExtent2D extent{width, height};
     if (capabilities.currentExtent.width != 0xFFFFFFFFU) {
       extent = capabilities.currentExtent;
     }
-    extent.width = std::clamp(extent.width, capabilities.minImageExtent.width, std::max(capabilities.maxImageExtent.width, 1U));
-    extent.height = std::clamp(extent.height, capabilities.minImageExtent.height, std::max(capabilities.maxImageExtent.height, 1U));
+    extent.width =
+      std::clamp(extent.width, capabilities.minImageExtent.width, std::max(capabilities.maxImageExtent.width, 1U));
+    extent.height =
+      std::clamp(extent.height, capabilities.minImageExtent.height, std::max(capabilities.maxImageExtent.height, 1U));
 
     VkSwapchainCreateInfoKHR info{};
     info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -786,8 +995,8 @@ namespace gpg::gal
     info.imageColorSpace = chosen.colorSpace;
     info.imageExtent = extent;
     info.imageArrayLayers = 1U;
-    info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-      VK_IMAGE_USAGE_SAMPLED_BIT;
+    info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+      VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
     info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     info.preTransform = capabilities.currentTransform;
     info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
@@ -835,7 +1044,10 @@ namespace gpg::gal
     gpg::Logf("Vulkan: swap chain %ux%u, %u images, %s", extent.width, extent.height, count, modeName(mode));
   }
 
-  void DeviceVulkan::DestroySwapChain(SwapChain& swapChain, const bool keepSurface) noexcept
+  void DeviceVulkan::DestroySwapChain(
+    SwapChain& swapChain,
+    const bool keepSurface
+  ) noexcept
   {
     for (VkSemaphore semaphore : swapChain.renderFinished) {
       Vk().vkDestroySemaphore(mDevice, semaphore, nullptr);
@@ -853,7 +1065,9 @@ namespace gpg::gal
     }
   }
 
-  void DeviceVulkan::CreateSwapChains(const DeviceContext& context)
+  void DeviceVulkan::CreateSwapChains(
+    const DeviceContext& context
+  )
   {
     for (int headIndex = 0; headIndex < context.GetHeadCount(); ++headIndex) {
       const Head& head = context.GetHead(static_cast<std::uint32_t>(headIndex));
@@ -878,7 +1092,9 @@ namespace gpg::gal
     }
   }
 
-  bool DeviceVulkan::RecreateStaleSwapChain(SwapChain& swapChain)
+  bool DeviceVulkan::RecreateStaleSwapChain(
+    SwapChain& swapChain
+  )
   {
     VkSurfaceCapabilitiesKHR capabilities{};
     if (Vk().vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysical, swapChain.surface, &capabilities) != VK_SUCCESS) {
@@ -895,13 +1111,21 @@ namespace gpg::gal
     const VkExtent2D before = swapChain.extent;
     CreateSwapChain(swapChain, swapChain.extent.width, swapChain.extent.height);
     gpg::Logf(
-      "Vulkan: swap chain made again for the window, %ux%u -> %ux%u (the head stays %ux%u)", before.width, before.height,
-      swapChain.extent.width, swapChain.extent.height, swapChain.headWidth, swapChain.headHeight
+      "Vulkan: swap chain made again for the window, %ux%u -> %ux%u (the head stays %ux%u)",
+      before.width,
+      before.height,
+      swapChain.extent.width,
+      swapChain.extent.height,
+      swapChain.headWidth,
+      swapChain.headHeight
     );
     return true;
   }
 
-  void DeviceVulkan::CopyHeadToSwapChain(vulkan::TrackedImage& head, SwapChain& swapChain)
+  void DeviceVulkan::CopyHeadToSwapChain(
+    vulkan::TrackedImage& head,
+    SwapChain& swapChain
+  )
   {
     EndRendering();
     Transition(head, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -921,13 +1145,23 @@ namespace gpg::gal
     region.dstOffsets[1] = {static_cast<std::int32_t>(window.width), static_cast<std::int32_t>(window.height), 1};
     const bool sameSize = head.width == window.width && head.height == window.height;
     Vk().vkCmdBlitImage(
-      mCommands, head.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, window.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1U, &region,
+      mCommands,
+      head.image,
+      VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+      window.image,
+      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+      1U,
+      &region,
       sameSize ? VK_FILTER_NEAREST : VK_FILTER_LINEAR
     );
     Transition(window, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
   }
 
-  RenderTargetVulkan::Buffer DeviceVulkan::CreateColorTargetImage(const VkFormat format, const std::uint32_t width, const std::uint32_t height)
+  RenderTargetVulkan::Buffer DeviceVulkan::CreateColorTargetImage(
+    const VkFormat format,
+    const std::uint32_t width,
+    const std::uint32_t height
+  )
   {
     RenderTargetVulkan::Buffer buffer;
     VkImageCreateInfo info{};
@@ -945,8 +1179,11 @@ namespace gpg::gal
     VkMemoryRequirements requirements{};
     Vk().vkGetImageMemoryRequirements(mDevice, buffer.image.image, &requirements);
     buffer.image.memory = mMemory.Allocate(requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, false);
-    CheckVk("DeviceVulkan.cpp", __LINE__,
-            Vk().vkBindImageMemory(mDevice, buffer.image.image, buffer.image.memory.memory, buffer.image.memory.offset));
+    CheckVk(
+      "DeviceVulkan.cpp",
+      __LINE__,
+      Vk().vkBindImageMemory(mDevice, buffer.image.image, buffer.image.memory.memory, buffer.image.memory.offset)
+    );
     buffer.image.format = format;
     buffer.image.width = info.extent.width;
     buffer.image.height = info.extent.height;
@@ -998,13 +1235,20 @@ namespace gpg::gal
         buffers.push_back(buffer);
       }
       OutputContext& output = mHeadOutputContexts[headIndex];
-      auto* const target = new RenderTargetVulkan(std::move(buffers), DXGI_FORMAT_B8G8R8A8_UNORM, static_cast<int>(headIndex));
+      auto* const target =
+        new RenderTargetVulkan(std::move(buffers), DXGI_FORMAT_B8G8R8A8_UNORM, static_cast<int>(headIndex));
       output.surface.reset(target);
       // Engine change: readable by shaders, for ren_Ao (GpuBindings::readBoundDepth).
       const DepthStencilTargetContext depthContext(swapChain.extent.width, swapChain.extent.height, 3U, true);
       output.depthStencil = CreateDepthStencilTarget(&depthContext);
-      gpg::Logf("Vulkan: head %u back buffer target %p (%ux%u%s)", static_cast<unsigned>(headIndex), target, swapChain.extent.width,
-                swapChain.extent.height, swapChain.scaled ? ", copied to the window at present" : "");
+      gpg::Logf(
+        "Vulkan: head %u back buffer target %p (%ux%u%s)",
+        static_cast<unsigned>(headIndex),
+        target,
+        swapChain.extent.width,
+        swapChain.extent.height,
+        swapChain.scaled ? ", copied to the window at present" : ""
+      );
     }
     if (!mHeadOutputContexts.empty()) {
       ClearTarget(&mHeadOutputContexts.front());
@@ -1024,11 +1268,12 @@ namespace gpg::gal
     try {
       Submit(true, false);
       Submit(true, false);
-    } catch (...) {
-    }
+    } catch (...) {}
   }
 
-  void DeviceVulkan::CheckAvailableFormats(DeviceContext* const context)
+  void DeviceVulkan::CheckAvailableFormats(
+    DeviceContext* const context
+  )
   {
     const DeviceApi api = context->mDeviceType;
     mDeviceContext = *context;
@@ -1053,13 +1298,19 @@ namespace gpg::gal
       head.adapterModes.clear();
       head.validFormats1.clear();
       for (std::int32_t format = 1; format < 8; ++format) {
-        if (supports(dxgi::RenderTargetFormatToDxgi(static_cast<std::uint32_t>(format)), VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT)) {
+        if (
+          supports(
+            dxgi::RenderTargetFormatToDxgi(static_cast<std::uint32_t>(format)), VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT
+          )
+        ) {
           head.validFormats1.push_back(format);
         }
       }
       head.validFormats2.clear();
       for (std::int32_t format = 1; format < 20; ++format) {
-        if (supports(dxgi::TextureFormatToDxgi(static_cast<std::uint32_t>(format)), VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)) {
+        if (
+          supports(dxgi::TextureFormatToDxgi(static_cast<std::uint32_t>(format)), VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT)
+        ) {
           head.validFormats2.push_back(format);
         }
       }
@@ -1067,8 +1318,13 @@ namespace gpg::gal
     }
   }
 
-  void DeviceVulkan::Setup(DeviceContext* const context)
+  void DeviceVulkan::Setup(
+    DeviceContext* const context
+  )
   {
+    // Engine addition (ren_RayTracedShadows): no ray queries on this device yet; a Direct3D 12 device made
+    // earlier in the session may have set it.
+    effects::gRayQueryShaders = false;
     mCurThreadId = static_cast<int>(::GetCurrentThreadId());
     mLog.clear();
     if (backend::SetupFailureRequested("vulkan")) {
@@ -1102,6 +1358,7 @@ namespace gpg::gal
     CreateLayouts();
     CreateNullImages();
     CreateGpuDrivenObjects();
+    CreateRayTracingObjects();
     CreateSwapChains(*context);
     AcquireNextImages();
 
@@ -1112,8 +1369,10 @@ namespace gpg::gal
     CreateRenderTargets();
     gpg::Logf(
       "Vulkan: ready (%d head(s), effects through the FAF effect layer, %s SPIR-V, shader cache %s, vsync %s)",
-      mDeviceContext.GetHeadCount(), compiler.Version().c_str(),
-      effects::ShaderCacheDirectory().empty() ? "off" : effects::ShaderCacheDirectory().c_str(), mDeviceContext.mVSync ? "on" : "off"
+      mDeviceContext.GetHeadCount(),
+      compiler.Version().c_str(),
+      effects::ShaderCacheDirectory().empty() ? "off" : effects::ShaderCacheDirectory().c_str(),
+      mDeviceContext.mVSync ? "on" : "off"
     );
     // ren_Info's facts, logged once here until the console command lands.
     DeviceRuntimeInfo runtimeInfo;
@@ -1122,7 +1381,9 @@ namespace gpg::gal
     }
   }
 
-  bool DeviceVulkan::GetRuntimeInfo(DeviceRuntimeInfo& out)
+  bool DeviceVulkan::GetRuntimeInfo(
+    DeviceRuntimeInfo& out
+  )
   {
     if (mPhysical == VK_NULL_HANDLE || mDevice == VK_NULL_HANDLE) {
       return false;
@@ -1135,7 +1396,11 @@ namespace gpg::gal
     std::snprintf(text, sizeof(text), "%s (0x%08X)", mDriverName.c_str(), mProperties.driverVersion);
     out.driverVersion = text;
     std::snprintf(
-      text, sizeof(text), "Vulkan %u.%u.%u", VK_API_VERSION_MAJOR(mProperties.apiVersion), VK_API_VERSION_MINOR(mProperties.apiVersion),
+      text,
+      sizeof(text),
+      "Vulkan %u.%u.%u",
+      VK_API_VERSION_MAJOR(mProperties.apiVersion),
+      VK_API_VERSION_MINOR(mProperties.apiVersion),
       VK_API_VERSION_PATCH(mProperties.apiVersion)
     );
     out.featureLevel = text;
@@ -1161,9 +1426,16 @@ namespace gpg::gal
       const SwapChain& swapChain = mSwapChains.front();
       const VkPresentModeKHR mode = swapChain.presentMode;
       std::snprintf(
-        text, sizeof(text), "%ux%u %s %u images%s", swapChain.extent.width, swapChain.extent.height,
-        (mode == VK_PRESENT_MODE_FIFO_KHR) ? "FIFO" : (mode == VK_PRESENT_MODE_MAILBOX_KHR) ? "mailbox" : "immediate",
-        static_cast<unsigned>(swapChain.images.size()), (mSwapChains.size() > 1U) ? ", more heads" : ""
+        text,
+        sizeof(text),
+        "%ux%u %s %u images%s",
+        swapChain.extent.width,
+        swapChain.extent.height,
+        (mode == VK_PRESENT_MODE_FIFO_KHR)        ? "FIFO"
+          : (mode == VK_PRESENT_MODE_MAILBOX_KHR) ? "mailbox"
+                                                  : "immediate",
+        static_cast<unsigned>(swapChain.images.size()),
+        (mSwapChains.size() > 1U) ? ", more heads" : ""
       );
       out.swapChain = text;
     }
@@ -1204,7 +1476,10 @@ namespace gpg::gal
     mViewportDirty = true;
   }
 
-  void DeviceVulkan::Submit(const bool wait, const bool present)
+  void DeviceVulkan::Submit(
+    const bool wait,
+    const bool present
+  )
   {
     EndRendering();
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkEndCommandBuffer(mCommands));
@@ -1271,7 +1546,9 @@ namespace gpg::gal
     }
   }
 
-  void DeviceVulkan::WaitForSerial(const std::uint64_t serial)
+  void DeviceVulkan::WaitForSerial(
+    const std::uint64_t serial
+  )
   {
     if (serial == 0U) {
       return;
@@ -1329,7 +1606,9 @@ namespace gpg::gal
         continue;
       }
       const auto acquire = [&] {
-        return Vk().vkAcquireNextImageKHR(mDevice, swapChain.swapchain, ~0ULL, frame.acquire[index], VK_NULL_HANDLE, &swapChain.acquired);
+        return Vk().vkAcquireNextImageKHR(
+          mDevice, swapChain.swapchain, ~0ULL, frame.acquire[index], VK_NULL_HANDLE, &swapChain.acquired
+        );
       };
       VkResult result = acquire();
       if (result == VK_ERROR_OUT_OF_DATE_KHR && swapChain.scaled) {
@@ -1350,17 +1629,24 @@ namespace gpg::gal
       } else if (result == VK_ERROR_OUT_OF_DATE_KHR && swapChain.scaled) {
         swapChain.stale = true;
       } else {
-        gpg::Warnf("Vulkan: acquiring head %u's image failed (%s)", static_cast<unsigned>(index), vulkan::ResultName(result));
+        gpg::Warnf(
+          "Vulkan: acquiring head %u's image failed (%s)", static_cast<unsigned>(index), vulkan::ResultName(result)
+        );
       }
     }
   }
 
-  std::uint32_t DeviceVulkan::AcquiredImage(const std::uint32_t swapChain)
+  std::uint32_t DeviceVulkan::AcquiredImage(
+    const std::uint32_t swapChain
+  )
   {
     return (swapChain < mSwapChains.size()) ? mSwapChains[swapChain].acquired : 0U;
   }
 
-  vulkan::UploadAllocation DeviceVulkan::AllocateUpload(const VkDeviceSize bytes, const VkDeviceSize alignment)
+  vulkan::UploadAllocation DeviceVulkan::AllocateUpload(
+    const VkDeviceSize bytes,
+    const VkDeviceSize alignment
+  )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     static std::uint64_t sinceSubmit = 0U;
@@ -1372,7 +1658,10 @@ namespace gpg::gal
     return mUpload.Allocate(bytes, std::max<VkDeviceSize>(alignment, 16U), RecordingSerial());
   }
 
-  vulkan::TrackedBuffer DeviceVulkan::CreateDeviceBuffer(const VkDeviceSize bytes, const VkBufferUsageFlags usage)
+  vulkan::TrackedBuffer DeviceVulkan::CreateDeviceBuffer(
+    const VkDeviceSize bytes,
+    const VkBufferUsageFlags usage
+  )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     vulkan::TrackedBuffer buffer;
@@ -1385,7 +1674,11 @@ namespace gpg::gal
     VkMemoryRequirements requirements{};
     Vk().vkGetBufferMemoryRequirements(mDevice, buffer.buffer, &requirements);
     buffer.memory = mMemory.Allocate(requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, true);
-    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkBindBufferMemory(mDevice, buffer.buffer, buffer.memory.memory, buffer.memory.offset));
+    CheckVk(
+      "DeviceVulkan.cpp",
+      __LINE__,
+      Vk().vkBindBufferMemory(mDevice, buffer.buffer, buffer.memory.memory, buffer.memory.offset)
+    );
     buffer.size = bytes;
     return buffer;
   }
@@ -1406,7 +1699,12 @@ namespace gpg::gal
     Vk().vkCmdPipelineBarrier2(mCommands, &dependency);
   }
 
-  void DeviceVulkan::UploadBuffer(vulkan::TrackedBuffer& destination, const VkDeviceSize offset, const void* const data, const VkDeviceSize bytes)
+  void DeviceVulkan::UploadBuffer(
+    vulkan::TrackedBuffer& destination,
+    const VkDeviceSize offset,
+    const void* const data,
+    const VkDeviceSize bytes
+  )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     const vulkan::UploadAllocation upload = AllocateUpload(bytes, 16U);
@@ -1419,28 +1717,46 @@ namespace gpg::gal
     TransferBarrier();
   }
 
-  void DeviceVulkan::ReleaseBufferCopy(VertexBuffer& buffer)
+  void DeviceVulkan::ReleaseBufferCopy(
+    VertexBuffer& buffer
+  )
   {
     static_cast<VertexBufferVulkan&>(buffer).Storage().ReleaseCopy();
   }
 
-  void DeviceVulkan::ReleaseBufferCopy(IndexBuffer& buffer)
+  void DeviceVulkan::ReleaseBufferCopy(
+    IndexBuffer& buffer
+  )
   {
     static_cast<IndexBufferVulkan&>(buffer).Storage().ReleaseCopy();
   }
 
-  void DeviceVulkan::CopyLockedRangeOnly(VertexBuffer& buffer)
+  void DeviceVulkan::CopyWrittenOnly(
+    VertexBuffer& buffer
+  )
+  {
+    static_cast<VertexBufferVulkan&>(buffer).Storage().MarkWrittenOnly();
+  }
+
+  void DeviceVulkan::CopyLockedRangeOnly(
+    VertexBuffer& buffer
+  )
   {
     static_cast<VertexBufferVulkan&>(buffer).Storage().CopyLockedRangeOnly();
   }
 
-  void DeviceVulkan::CopyLockedRangeOnly(IndexBuffer& buffer)
+  void DeviceVulkan::CopyLockedRangeOnly(
+    IndexBuffer& buffer
+  )
   {
     static_cast<IndexBufferVulkan&>(buffer).Storage().CopyLockedRangeOnly();
   }
 
   bool DeviceVulkan::CopyVertexBufferRegion(
-    VertexBuffer& destination, const std::uint32_t destinationOffset, VertexBuffer& source, const std::uint32_t sourceOffset,
+    VertexBuffer& destination,
+    const std::uint32_t destinationOffset,
+    VertexBuffer& source,
+    const std::uint32_t sourceOffset,
     const std::uint32_t byteCount
   )
   {
@@ -1449,9 +1765,11 @@ namespace gpg::gal
     vulkan::TrackedBuffer* const target = to.CopyDestination();
     // A dynamic destination lives in upload memory the CPU rewrites; only
     // device-local buffers take GPU copies.
-    if (&to == &from || byteCount == 0U || target == nullptr || target->buffer == VK_NULL_HANDLE ||
-        static_cast<std::uint64_t>(destinationOffset) + byteCount > to.ByteWidth() ||
-        static_cast<std::uint64_t>(sourceOffset) + byteCount > from.ByteWidth()) {
+    if (
+      &to == &from || byteCount == 0U || target == nullptr || target->buffer == VK_NULL_HANDLE ||
+      static_cast<std::uint64_t>(destinationOffset) + byteCount > to.ByteWidth() ||
+      static_cast<std::uint64_t>(sourceOffset) + byteCount > from.ByteWidth()
+    ) {
       return false;
     }
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -1473,7 +1791,9 @@ namespace gpg::gal
     return true;
   }
 
-  void DeviceVulkan::TransitionForTransferWrite(vulkan::TrackedImage& image)
+  void DeviceVulkan::TransitionForTransferWrite(
+    vulkan::TrackedImage& image
+  )
   {
     // Already TRANSFER_DST - an upload or copy wrote it earlier and nothing
     // read it since: Transition records no barrier then, so order the two
@@ -1486,7 +1806,10 @@ namespace gpg::gal
     Transition(image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
   }
 
-  void DeviceVulkan::Transition(vulkan::TrackedImage& image, const VkImageLayout layout)
+  void DeviceVulkan::Transition(
+    vulkan::TrackedImage& image,
+    const VkImageLayout layout
+  )
   {
     if (image.image == VK_NULL_HANDLE || image.layout == layout) {
       return;
@@ -1505,7 +1828,10 @@ namespace gpg::gal
       VkAccessFlags2 srcAccess = 0U;
       VkPipelineStageFlags2 dstStages = 0U;
       VkAccessFlags2 dstAccess = 0U;
-      if (vulkan::LayoutScope(image.layout, true, srcStages, srcAccess) && vulkan::LayoutScope(layout, false, dstStages, dstAccess)) {
+      if (
+        vulkan::LayoutScope(image.layout, true, srcStages, srcAccess) &&
+        vulkan::LayoutScope(layout, false, dstStages, dstAccess)
+      ) {
         barrier.srcStageMask = srcStages;
         barrier.srcAccessMask = srcAccess;
         barrier.dstStageMask = dstStages;
@@ -1527,7 +1853,11 @@ namespace gpg::gal
   }
 
   void DeviceVulkan::UploadImageLevel(
-    vulkan::TrackedImage& destination, const DXGI_FORMAT format, const std::uint32_t level, const std::uint32_t layer, const void* const data
+    vulkan::TrackedImage& destination,
+    const DXGI_FORMAT format,
+    const std::uint32_t level,
+    const std::uint32_t layer,
+    const void* const data
   )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -1544,11 +1874,17 @@ namespace gpg::gal
     region.bufferOffset = upload.offset;
     region.imageSubresource = {AspectOf(destination.format) & VK_IMAGE_ASPECT_COLOR_BIT, level, layer, 1U};
     region.imageExtent = {width, height, depth};
-    Vk().vkCmdCopyBufferToImage(mCommands, upload.buffer, destination.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1U, &region);
+    Vk().vkCmdCopyBufferToImage(
+      mCommands, upload.buffer, destination.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1U, &region
+    );
   }
 
   void DeviceVulkan::ReadImageLevel(
-    vulkan::TrackedImage& source, const DXGI_FORMAT format, const std::uint32_t level, const std::uint32_t layer, std::vector<std::uint8_t>& bytes
+    vulkan::TrackedImage& source,
+    const DXGI_FORMAT format,
+    const std::uint32_t level,
+    const std::uint32_t layer,
+    std::vector<std::uint8_t>& bytes
   )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -1563,24 +1899,33 @@ namespace gpg::gal
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateBuffer(mDevice, &info, nullptr, &readback.buffer));
     VkMemoryRequirements requirements{};
     Vk().vkGetBufferMemoryRequirements(mDevice, readback.buffer, &requirements);
-    readback.memory = mMemory.Allocate(
-      requirements, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, true
+    readback.memory =
+      mMemory.Allocate(requirements, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, true);
+    CheckVk(
+      "DeviceVulkan.cpp",
+      __LINE__,
+      Vk().vkBindBufferMemory(mDevice, readback.buffer, readback.memory.memory, readback.memory.offset)
     );
-    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkBindBufferMemory(mDevice, readback.buffer, readback.memory.memory, readback.memory.offset));
 
     EndRendering();
     Transition(source, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
     VkBufferImageCopy region{};
     region.imageSubresource = {AspectOf(source.format) & VK_IMAGE_ASPECT_COLOR_BIT, level, layer, 1U};
     region.imageExtent = {width, height, 1U};
-    Vk().vkCmdCopyImageToBuffer(mCommands, source.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readback.buffer, 1U, &region);
+    Vk().vkCmdCopyImageToBuffer(
+      mCommands, source.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, readback.buffer, 1U, &region
+    );
     Submit(true, false);
     bytes.assign(readback.memory.mapped, readback.memory.mapped + layout.ByteSize());
     Vk().vkDestroyBuffer(mDevice, readback.buffer, nullptr);
     mMemory.Free(readback.memory);
   }
 
-  void DeviceVulkan::ReadImage(vulkan::TrackedImage& source, const DXGI_FORMAT format, imaging::Image& image)
+  void DeviceVulkan::ReadImage(
+    vulkan::TrackedImage& source,
+    const DXGI_FORMAT format,
+    imaging::Image& image
+  )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     image.Allocate(format, source.width, source.height, source.mipLevels, source.layers);
@@ -1589,12 +1934,19 @@ namespace gpg::gal
         std::vector<std::uint8_t> bytes;
         ReadImageLevel(source, format, level, layer, bytes);
         const imaging::Image::Subresource& subresource = image.subresources[layer * source.mipLevels + level];
-        std::memcpy(image.bytes.data() + subresource.offset, bytes.data(), std::min<std::size_t>(bytes.size(), subresource.slicePitch));
+        std::memcpy(
+          image.bytes.data() + subresource.offset,
+          bytes.data(),
+          std::min<std::size_t>(bytes.size(), subresource.slicePitch)
+        );
       }
     }
   }
 
-  void DeviceVulkan::Retire(vulkan::TrackedImage& image, const VkImageView view)
+  void DeviceVulkan::Retire(
+    vulkan::TrackedImage& image,
+    const VkImageView view
+  )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     Garbage garbage;
@@ -1607,7 +1959,9 @@ namespace gpg::gal
     mGarbage.push_back(garbage);
   }
 
-  void DeviceVulkan::Retire(vulkan::TrackedBuffer& buffer)
+  void DeviceVulkan::Retire(
+    vulkan::TrackedBuffer& buffer
+  )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     Garbage garbage;
@@ -1621,7 +1975,12 @@ namespace gpg::gal
   // ---------------------------------------------------------------------------
   // Rendering scope
 
-  VkImageView DeviceVulkan::TargetView(VkFormat& format, vulkan::TrackedImage*& image, std::uint32_t& width, std::uint32_t& height)
+  VkImageView DeviceVulkan::TargetView(
+    VkFormat& format,
+    vulkan::TrackedImage*& image,
+    std::uint32_t& width,
+    std::uint32_t& height
+  )
   {
     if (outputContext_.surface == nullptr) {
       format = VK_FORMAT_UNDEFINED;
@@ -1714,9 +2073,9 @@ namespace gpg::gal
     info.colorAttachmentCount = (color != VK_NULL_HANDLE) ? 1U : 0U;
     info.pColorAttachments = (color != VK_NULL_HANDLE) ? &colorAttachment : nullptr;
     info.pDepthAttachment = (depth != VK_NULL_HANDLE) ? &depthAttachment : nullptr;
-    info.pStencilAttachment = (depth != VK_NULL_HANDLE && depthImage != nullptr && vulkan::HasStencil(depthImage->format))
-      ? &depthAttachment
-      : nullptr;
+    info.pStencilAttachment =
+      (depth != VK_NULL_HANDLE && depthImage != nullptr && vulkan::HasStencil(depthImage->format)) ? &depthAttachment
+                                                                                                   : nullptr;
     Vk().vkCmdBeginRendering(mCommands, &info);
     mRendering = true;
     mRenderingColor = color;
@@ -1746,13 +2105,18 @@ namespace gpg::gal
 
   void DeviceVulkan::Func1() const {}
 
-  void DeviceVulkan::GetModesForAdapter(fa::vector<HeadAdapterMode>& outModes, const int adapterIndex)
+  void DeviceVulkan::GetModesForAdapter(
+    fa::vector<HeadAdapterMode>& outModes,
+    const int adapterIndex
+  )
   {
     static_cast<void>(adapterIndex);
     outModes.clear(); // windowed and borderless only: no exclusive modes on this backend
   }
 
-  OutputContext* DeviceVulkan::GetHeadOutputContext(const unsigned int headIndex)
+  OutputContext* DeviceVulkan::GetHeadOutputContext(
+    const unsigned int headIndex
+  )
   {
     if (headIndex >= mHeadOutputContexts.size()) {
       ThrowError("DeviceVulkan.cpp", __LINE__, "invalid head index specified");
@@ -1760,7 +2124,9 @@ namespace gpg::gal
     return &mHeadOutputContexts[headIndex];
   }
 
-  const OutputContext* DeviceVulkan::GetHeadOutputContext(const unsigned int headIndex) const
+  const OutputContext* DeviceVulkan::GetHeadOutputContext(
+    const unsigned int headIndex
+  ) const
   {
     if (headIndex >= mHeadOutputContexts.size()) {
       ThrowError("DeviceVulkan.cpp", __LINE__, "invalid head index specified");
@@ -1773,7 +2139,9 @@ namespace gpg::gal
     return mPipelineState;
   }
 
-  boost::shared_ptr<Effect> DeviceVulkan::CreateEffect(const EffectContext& context)
+  boost::shared_ptr<Effect> DeviceVulkan::CreateEffect(
+    const EffectContext& context
+  )
   {
     if (context.mSourceType != 2U) {
       ThrowError("DeviceVulkan.cpp", __LINE__, "invalid source defined for effect");
@@ -1782,6 +2150,25 @@ namespace gpg::gal
     for (const MacroPair& macro : kInjectedMacros) {
       localContext.DefineMacro(macro.name, macro.value);
     }
+#if !FAFRE_PLATFORM_WINDOWS
+    std::vector<std::pair<std::string, std::string>> defines;
+    for (const EffectMacro& macro : localContext.mMacros) {
+      defines.emplace_back(macro.keyText_.c_str(), macro.valueText_.c_str());
+    }
+    const DWORD started = ::GetTickCount();
+    const char* const sourceName = context.mSourcePath.c_str();
+    const std::size_t sourceBytes = static_cast<std::size_t>(context.mSourceBuffer.mEnd - context.mSourceBuffer.mBegin);
+    const platform::posix::dxc::Output preprocessed = platform::posix::dxc::Preprocess(
+      std::string_view(context.mSourceBuffer.mBegin, sourceBytes), sourceName, defines
+    );
+    if (!preprocessed.succeeded) {
+      const std::string message =
+        std::string("unable to preprocess effect: ") + sourceName + " reason: " + preprocessed.messages;
+      ThrowError("DeviceVulkan.cpp", __LINE__, message.c_str());
+    }
+    d3d11::TranslatedEffectSource translated =
+      d3d11::TranslateEffectSource(std::string_view(preprocessed.text), true, std::string_view{});
+#else
     std::vector<D3D_SHADER_MACRO> defines;
     for (const EffectMacro& macro : localContext.mMacros) {
       defines.push_back(D3D_SHADER_MACRO{macro.keyText_.c_str(), macro.valueText_.c_str()});
@@ -1793,41 +2180,60 @@ namespace gpg::gal
     const std::size_t sourceBytes = static_cast<std::size_t>(context.mSourceBuffer.mEnd - context.mSourceBuffer.mBegin);
     Microsoft::WRL::ComPtr<ID3DBlob> preprocessed;
     Microsoft::WRL::ComPtr<ID3DBlob> errors;
-    if (FAILED(::D3DPreprocess(context.mSourceBuffer.mBegin, sourceBytes, sourceName, defines.data(), nullptr, &preprocessed, &errors))) {
+    if (
+      FAILED(
+        ::D3DPreprocess(
+          context.mSourceBuffer.mBegin, sourceBytes, sourceName, defines.data(), nullptr, &preprocessed, &errors
+        )
+      )
+    ) {
       const std::string message = std::string("unable to preprocess effect: ") + sourceName + " reason: " +
-        ((errors != nullptr) ? std::string(static_cast<const char*>(errors->GetBufferPointer()), errors->GetBufferSize()) : std::string());
+        ((errors != nullptr)
+           ? std::string(static_cast<const char*>(errors->GetBufferPointer()), errors->GetBufferSize())
+           : std::string());
       ThrowError("DeviceVulkan.cpp", __LINE__, message.c_str());
     }
     d3d11::TranslatedEffectSource translated = d3d11::TranslateEffectSource(
-      std::string_view(static_cast<const char*>(preprocessed->GetBufferPointer()), preprocessed->GetBufferSize() - 1U), true,
+      std::string_view(static_cast<const char*>(preprocessed->GetBufferPointer()), preprocessed->GetBufferSize() - 1U),
+      true,
       // No original source: the D3D9 alpha test is applied by the effect layer (EffectDescription),
       // and running the translator's copy as well would test twice.
       std::string_view{}
     );
+#endif
     std::shared_ptr<effects::EffectProgram> program;
     try {
       program = std::make_shared<effects::EffectProgram>(
-        sourceName, std::move(translated.source), effects::ShaderTarget::Spirv,
+        sourceName,
+        std::move(translated.source),
+        effects::ShaderTarget::Spirv,
         std::string_view(context.mSourceBuffer.mBegin, sourceBytes)
       );
     } catch (const std::exception& error) {
       const std::string message = std::string("unable to create effect: ") + sourceName + " reason: " + error.what();
       ThrowError("DeviceVulkan.cpp", __LINE__, message.c_str());
     }
-    if (const char* const precompile = std::getenv("FAF_SHADER_PRECOMPILE"); precompile != nullptr && precompile[0] == '1') {
+    if (
+      const char* const precompile = std::getenv("FAF_SHADER_PRECOMPILE"); precompile != nullptr && precompile[0] == '1'
+    ) {
       program->CompileAll();
     } else if (effects::gBackgroundShaders) {
       effects::EffectProgram::PrepareInBackground(program); // engine addition: ren_BackgroundShaders
     }
     gpg::Logf(
-      "Vulkan: effect %s: %u techniques, %u entry points, %u bytes of parameters (%lu ms)", sourceName,
-      static_cast<unsigned>(program->Description().techniques.size()), static_cast<unsigned>(program->Modern().entries.size()),
-      static_cast<unsigned>(program->Parameters().Constants().size()), ::GetTickCount() - started
+      "Vulkan: effect %s: %u techniques, %u entry points, %u bytes of parameters (%lu ms)",
+      sourceName,
+      static_cast<unsigned>(program->Description().techniques.size()),
+      static_cast<unsigned>(program->Modern().entries.size()),
+      static_cast<unsigned>(program->Parameters().Constants().size()),
+      ::GetTickCount() - started
     );
     return boost::shared_ptr<Effect>(new ProgramEffect(context, program, *this));
   }
 
-  boost::shared_ptr<Texture> DeviceVulkan::CreateTexture(const TextureContext* const context)
+  boost::shared_ptr<Texture> DeviceVulkan::CreateTexture(
+    const TextureContext* const context
+  )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     imaging::Image image;
@@ -1852,11 +2258,17 @@ namespace gpg::gal
       }
       imaging::DecodeOptions options;
       options.skipMipLevels = context->reserved0x44_ & 0x1FU;
-      const HRESULT result = imaging::ImageCodec::Instance()->Decode(context->dataBuffer_.mBegin, context->DataSizeBytes(), options, image);
+      const HRESULT result =
+        imaging::ImageCodec::Instance()->Decode(context->dataBuffer_.mBegin, context->DataSizeBytes(), options, image);
       if (FAILED(result)) {
         char message[640]{};
-        std::snprintf(message, sizeof(message), "unable to load texture %s: HRESULT 0x%08lX", context->location_.c_str(),
-                      static_cast<unsigned long>(result));
+        std::snprintf(
+          message,
+          sizeof(message),
+          "unable to load texture %s: HRESULT 0x%08lX",
+          context->location_.c_str(),
+          static_cast<unsigned long>(result)
+        );
         ThrowError("DeviceVulkan.cpp", __LINE__, message);
       }
       dxgiFormat = image.format;
@@ -1892,7 +2304,11 @@ namespace gpg::gal
     VkMemoryRequirements requirements{};
     Vk().vkGetImageMemoryRequirements(mDevice, tracked.image, &requirements);
     tracked.memory = mMemory.Allocate(requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, false);
-    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkBindImageMemory(mDevice, tracked.image, tracked.memory.memory, tracked.memory.offset));
+    CheckVk(
+      "DeviceVulkan.cpp",
+      __LINE__,
+      Vk().vkBindImageMemory(mDevice, tracked.image, tracked.memory.memory, tracked.memory.offset)
+    );
     tracked.format = format.format;
     tracked.width = width;
     tracked.height = height;
@@ -1920,17 +2336,23 @@ namespace gpg::gal
     VkImageViewCreateInfo view{};
     view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     view.image = tracked.image;
-    view.viewType = (depth > 1U) ? VK_IMAGE_VIEW_TYPE_3D : cube ? VK_IMAGE_VIEW_TYPE_CUBE : (layers > 1U) ? VK_IMAGE_VIEW_TYPE_2D_ARRAY
-                                                                                                         : VK_IMAGE_VIEW_TYPE_2D;
+    view.viewType = (depth > 1U) ? VK_IMAGE_VIEW_TYPE_3D
+      : cube                     ? VK_IMAGE_VIEW_TYPE_CUBE
+      : (layers > 1U)            ? VK_IMAGE_VIEW_TYPE_2D_ARRAY
+                                 : VK_IMAGE_VIEW_TYPE_2D;
     view.format = format.format;
     view.components = format.swizzle;
     view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0U, levels, 0U, layers};
     VkImageView imageView = VK_NULL_HANDLE;
     CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreateImageView(mDevice, &view, nullptr, &imageView));
-    return boost::shared_ptr<Texture>(new TextureVulkan(*context, tracked, imageView, dxgiFormat, cube, contentsFromEngine));
+    return boost::shared_ptr<Texture>(
+      new TextureVulkan(*context, tracked, imageView, dxgiFormat, cube, contentsFromEngine)
+    );
   }
 
-  boost::shared_ptr<RenderTarget> DeviceVulkan::CreateRenderTarget(const RenderTargetContext* const context)
+  boost::shared_ptr<RenderTarget> DeviceVulkan::CreateRenderTarget(
+    const RenderTargetContext* const context
+  )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     const DXGI_FORMAT dxgiFormat = dxgi::RenderTargetFormatToDxgi(context->format_);
@@ -1950,12 +2372,16 @@ namespace gpg::gal
     return boost::shared_ptr<RenderTarget>(new RenderTargetVulkan(std::move(buffers), dxgiFormat, -1));
   }
 
-  boost::shared_ptr<CubeRenderTarget> DeviceVulkan::CreateCubeRenderTarget(const CubeRenderTargetContext* const context)
+  boost::shared_ptr<CubeRenderTarget> DeviceVulkan::CreateCubeRenderTarget(
+    const CubeRenderTargetContext* const context
+  )
   {
     return boost::shared_ptr<CubeRenderTarget>(new CubeRenderTargetVulkan(*context));
   }
 
-  boost::shared_ptr<DepthStencilTarget> DeviceVulkan::CreateDepthStencilTarget(const DepthStencilTargetContext* const context)
+  boost::shared_ptr<DepthStencilTarget> DeviceVulkan::CreateDepthStencilTarget(
+    const DepthStencilTargetContext* const context
+  )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     VkFormat format = mDepthStencilFormat;
@@ -1986,7 +2412,11 @@ namespace gpg::gal
     VkMemoryRequirements requirements{};
     Vk().vkGetImageMemoryRequirements(mDevice, image.image, &requirements);
     image.memory = mMemory.Allocate(requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, false);
-    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkBindImageMemory(mDevice, image.image, image.memory.memory, image.memory.offset));
+    CheckVk(
+      "DeviceVulkan.cpp",
+      __LINE__,
+      Vk().vkBindImageMemory(mDevice, image.image, image.memory.memory, image.memory.offset)
+    );
     image.format = format;
     image.aspect = AspectOf(format);
     image.width = info.extent.width;
@@ -2008,7 +2438,9 @@ namespace gpg::gal
     return boost::shared_ptr<DepthStencilTarget>(new DepthStencilTargetVulkan(*context, image, imageView, sampledView));
   }
 
-  boost::shared_ptr<VertexFormat> DeviceVulkan::CreateVertexFormat(const std::uint32_t formatCode)
+  boost::shared_ptr<VertexFormat> DeviceVulkan::CreateVertexFormat(
+    const std::uint32_t formatCode
+  )
   {
     if (formatCode >= d3d11::kVertexFormatCount || d3d11::VertexLayoutElements(formatCode).empty()) {
       ThrowError("DeviceVulkan.cpp", __LINE__, "invalid vertex format specified");
@@ -2016,20 +2448,27 @@ namespace gpg::gal
     return boost::shared_ptr<VertexFormat>(new VertexFormatVulkan(formatCode));
   }
 
-  boost::shared_ptr<VertexBuffer> DeviceVulkan::CreateVertexBuffer(const VertexBufferContext* const context)
+  boost::shared_ptr<VertexBuffer> DeviceVulkan::CreateVertexBuffer(
+    const VertexBufferContext* const context
+  )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     return boost::shared_ptr<VertexBuffer>(new VertexBufferVulkan(*context));
   }
 
-  boost::shared_ptr<IndexBuffer> DeviceVulkan::CreateIndexBuffer(const IndexBufferContext* const context)
+  boost::shared_ptr<IndexBuffer> DeviceVulkan::CreateIndexBuffer(
+    const IndexBufferContext* const context
+  )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     return boost::shared_ptr<IndexBuffer>(new IndexBufferVulkan(*context));
   }
 
   void DeviceVulkan::CopyImage(
-    vulkan::TrackedImage& source, vulkan::TrackedImage& destination, const RECT* const sourceRect, const RECT* const destinationRect,
+    vulkan::TrackedImage& source,
+    vulkan::TrackedImage& destination,
+    const RECT* const sourceRect,
+    const RECT* const destinationRect,
     const bool scale
   )
   {
@@ -2051,8 +2490,15 @@ namespace gpg::gal
         region.dstOffset = {destinationRect->left, destinationRect->top, 0};
       }
       region.extent = {width, height, 1U};
-      Vk().vkCmdCopyImage(mCommands, source.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, destination.image,
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1U, &region);
+      Vk().vkCmdCopyImage(
+        mCommands,
+        source.image,
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        destination.image,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        1U,
+        &region
+      );
     } else {
       // A stretch of the source rect over the destination rect, linear
       // filtered; a null rect is the whole image.
@@ -2060,7 +2506,9 @@ namespace gpg::gal
       region.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0U, 0U, 1U};
       region.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0U, 0U, 1U};
       region.srcOffsets[1] = {static_cast<std::int32_t>(source.width), static_cast<std::int32_t>(source.height), 1};
-      region.dstOffsets[1] = {static_cast<std::int32_t>(destination.width), static_cast<std::int32_t>(destination.height), 1};
+      region.dstOffsets[1] = {
+        static_cast<std::int32_t>(destination.width), static_cast<std::int32_t>(destination.height), 1
+      };
       if (sourceRect != nullptr) {
         region.srcOffsets[0] = {sourceRect->left, sourceRect->top, 0};
         region.srcOffsets[1] = {sourceRect->right, sourceRect->bottom, 1};
@@ -2069,12 +2517,23 @@ namespace gpg::gal
         region.dstOffsets[0] = {destinationRect->left, destinationRect->top, 0};
         region.dstOffsets[1] = {destinationRect->right, destinationRect->bottom, 1};
       }
-      Vk().vkCmdBlitImage(mCommands, source.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, destination.image,
-                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1U, &region, VK_FILTER_LINEAR);
+      Vk().vkCmdBlitImage(
+        mCommands,
+        source.image,
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        destination.image,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        1U,
+        &region,
+        VK_FILTER_LINEAR
+      );
     }
   }
 
-  void DeviceVulkan::GetRenderTargetData(const boost::shared_ptr<RenderTarget>& source, const boost::shared_ptr<Texture>& destination)
+  void DeviceVulkan::GetRenderTargetData(
+    const boost::shared_ptr<RenderTarget>& source,
+    const boost::shared_ptr<Texture>& destination
+  )
   {
     if (source == nullptr) {
       ThrowError("DeviceVulkan.cpp", __LINE__, "Missing source texture");
@@ -2084,7 +2543,9 @@ namespace gpg::gal
     }
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     auto* const target = static_cast<TextureVulkan*>(destination.get());
-    CopyImage(static_cast<RenderTargetVulkan*>(source.get())->Current().image, target->Image(), nullptr, nullptr, false);
+    CopyImage(
+      static_cast<RenderTargetVulkan*>(source.get())->Current().image, target->Image(), nullptr, nullptr, false
+    );
     target->DiscardCpuCopy();
   }
 
@@ -2112,12 +2573,12 @@ namespace gpg::gal
     // split-screen view relies on this: it passes the view's rect and no
     // destination rect, and the particle shaders sample the copy with
     // view-relative coordinates.
-    const RECT fromRect =
-      (sourceRect != nullptr) ? *sourceRect
-                              : RECT{0, 0, static_cast<LONG>(fromImage.width), static_cast<LONG>(fromImage.height)};
-    const RECT toRect =
-      (destinationRect != nullptr) ? *destinationRect
-                                   : RECT{0, 0, static_cast<LONG>(toImage.width), static_cast<LONG>(toImage.height)};
+    const RECT fromRect = (sourceRect != nullptr)
+      ? *sourceRect
+      : RECT{0, 0, static_cast<LONG>(fromImage.width), static_cast<LONG>(fromImage.height)};
+    const RECT toRect = (destinationRect != nullptr)
+      ? *destinationRect
+      : RECT{0, 0, static_cast<LONG>(toImage.width), static_cast<LONG>(toImage.height)};
     const bool copy = fromRect.right - fromRect.left == toRect.right - toRect.left &&
       fromRect.bottom - fromRect.top == toRect.bottom - toRect.top && fromImage.format == toImage.format;
     CopyImage(fromImage, toImage, &fromRect, &toRect, !copy);
@@ -2139,7 +2600,10 @@ namespace gpg::gal
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     auto* const from = static_cast<TextureVulkan*>(source.get());
     auto* const to = static_cast<TextureVulkan*>(destination.get());
-    if (from->Image().width == to->Image().width && from->Image().height == to->Image().height && from->DxgiFormat() == to->DxgiFormat()) {
+    if (
+      from->Image().width == to->Image().width && from->Image().height == to->Image().height &&
+      from->DxgiFormat() == to->DxgiFormat()
+    ) {
       CopyImage(from->Image(), to->Image(), sourceRect, destinationRect, false);
       to->DiscardCpuCopy();
       return;
@@ -2158,31 +2622,46 @@ namespace gpg::gal
     imaging::Image converted;
     CheckHresult("DeviceVulkan.cpp", __LINE__, codec->Decode(encoded.data(), encoded.size(), options, converted));
     for (std::uint32_t level = 0U; level < converted.mipLevels && level < to->Image().mipLevels; ++level) {
-      UploadImageLevel(to->Image(), to->DxgiFormat(), level, 0U, converted.bytes.data() + converted.subresources[level].offset);
+      UploadImageLevel(
+        to->Image(), to->DxgiFormat(), level, 0U, converted.bytes.data() + converted.subresources[level].offset
+      );
     }
     to->DiscardCpuCopy();
   }
 
-  void DeviceVulkan::SaveCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const fa::string& filePath)
+  void DeviceVulkan::SaveCubeRenderTarget(
+    const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
+    const fa::string& filePath
+  )
   {
     static_cast<void>(cubeTarget);
     static_cast<void>(filePath);
   }
 
-  void DeviceVulkan::SaveRenderTarget(const boost::shared_ptr<RenderTarget>& renderTarget, const fa::string& filePath, const int fileFormat)
+  void DeviceVulkan::SaveRenderTarget(
+    const boost::shared_ptr<RenderTarget>& renderTarget,
+    const fa::string& filePath,
+    const int fileFormat
+  )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     auto* const target = static_cast<RenderTargetVulkan*>(renderTarget.get());
     imaging::Image image;
     ReadImage(target->Current().image, target->DxgiFormat(), image);
     CheckHresult(
-      "DeviceVulkan.cpp", __LINE__,
-      imaging::ImageCodec::Instance()->EncodeToFile(image, imaging::ImageCodec::FromGalFormat(fileFormat), filePath.c_str())
+      "DeviceVulkan.cpp",
+      __LINE__,
+      imaging::ImageCodec::Instance()->EncodeToFile(
+        image, imaging::ImageCodec::FromGalFormat(fileFormat), filePath.c_str()
+      )
     );
   }
 
   void DeviceVulkan::SaveTexture(
-    const boost::shared_ptr<Texture>& texture, const fa::string& filePath, const int fileFormat, gpg::MemBuffer<char>* const outBuffer
+    const boost::shared_ptr<Texture>& texture,
+    const fa::string& filePath,
+    const int fileFormat,
+    gpg::MemBuffer<char>* const outBuffer
   )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -2192,11 +2671,17 @@ namespace gpg::gal
     image.cube = source->IsCube();
     imaging::ImageCodec* const codec = imaging::ImageCodec::Instance();
     if (outBuffer == nullptr) {
-      CheckHresult("DeviceVulkan.cpp", __LINE__, codec->EncodeToFile(image, imaging::ImageCodec::FromGalFormat(fileFormat), filePath.c_str()));
+      CheckHresult(
+        "DeviceVulkan.cpp",
+        __LINE__,
+        codec->EncodeToFile(image, imaging::ImageCodec::FromGalFormat(fileFormat), filePath.c_str())
+      );
       return;
     }
     std::vector<std::uint8_t> encoded;
-    CheckHresult("DeviceVulkan.cpp", __LINE__, codec->Encode(image, imaging::ImageCodec::FromGalFormat(fileFormat), encoded));
+    CheckHresult(
+      "DeviceVulkan.cpp", __LINE__, codec->Encode(image, imaging::ImageCodec::FromGalFormat(fileFormat), encoded)
+    );
     if (outBuffer->Size() != encoded.size()) {
       *outBuffer = gpg::AllocMemBuffer(encoded.size());
     }
@@ -2204,7 +2689,10 @@ namespace gpg::gal
   }
 
   void DeviceVulkan::GetTexture2D(
-    const void* const sourceData, const std::uint32_t sourceBytes, gpg::MemBuffer<char>* const outTextureData, std::uint32_t* const outWidth,
+    const void* const sourceData,
+    const std::uint32_t sourceBytes,
+    gpg::MemBuffer<char>* const outTextureData,
+    std::uint32_t* const outWidth,
     int* const outHeight
   )
   {
@@ -2217,11 +2705,15 @@ namespace gpg::gal
     // Padded to whole blocks, not stretched over them: D3D9 converts with D3DX_FILTER_NONE.
     options.filter = imaging::ResizeFilter::None;
     imaging::Image image;
-    CheckHresult("DeviceVulkan.cpp", __LINE__, imaging::ImageCodec::Instance()->Decode(sourceData, sourceBytes, options, image));
+    CheckHresult(
+      "DeviceVulkan.cpp", __LINE__, imaging::ImageCodec::Instance()->Decode(sourceData, sourceBytes, options, image)
+    );
     // The file's size, as D3D9 reports it (0x008ECD20); `image` is padded to whole BC3 blocks.
     std::uint32_t sourceHeight = 0U;
     CheckHresult(
-      "DeviceVulkan.cpp", __LINE__, imaging::ImageCodec::Instance()->GetImageSize(sourceData, sourceBytes, *outWidth, sourceHeight)
+      "DeviceVulkan.cpp",
+      __LINE__,
+      imaging::ImageCodec::Instance()->GetImageSize(sourceData, sourceBytes, *outWidth, sourceHeight)
     );
     *outHeight = static_cast<int>(sourceHeight);
     const imaging::Image::Subresource& top = image.subresources.front();
@@ -2231,14 +2723,19 @@ namespace gpg::gal
     std::memcpy(outTextureData->GetPtr(0U, 0U), image.bytes.data() + top.offset, top.slicePitch);
   }
 
-  boost::weak_ptr<void>* DeviceVulkan::Func7(boost::weak_ptr<void>* const outWeakHandle, boost::shared_ptr<void> temporarySharedHandle)
+  boost::weak_ptr<void>* DeviceVulkan::Func7(
+    boost::weak_ptr<void>* const outWeakHandle,
+    boost::shared_ptr<void> temporarySharedHandle
+  )
   {
     static_cast<void>(temporarySharedHandle);
     outWeakHandle->reset();
     return outWeakHandle;
   }
 
-  void DeviceVulkan::Reset(DeviceContext* const context)
+  void DeviceVulkan::Reset(
+    DeviceContext* const context
+  )
   {
     if (mDevice == VK_NULL_HANDLE) {
       return;
@@ -2291,7 +2788,10 @@ namespace gpg::gal
 
   void DeviceVulkan::EndScene() {}
 
-  void DeviceVulkan::Trace(const char* const format, ...)
+  void DeviceVulkan::Trace(
+    const char* const format,
+    ...
+  )
   {
     char line[512];
     va_list arguments;
@@ -2321,7 +2821,9 @@ namespace gpg::gal
     }
     mLastDumpTick = now;
     char path[MAX_PATH]{};
-    std::snprintf(path, sizeof(path), "%s/vulkan_%06lu.bmp", directory, static_cast<unsigned long>((now - mFirstDumpTick) / 1000U));
+    std::snprintf(
+      path, sizeof(path), "%s/vulkan_%06lu.bmp", directory, static_cast<unsigned long>((now - mFirstDumpTick) / 1000U)
+    );
     auto* const target = static_cast<RenderTargetVulkan*>(mHeadOutputContexts.front().surface.get());
     imaging::Image image;
     ReadImage(target->Current().image, DXGI_FORMAT_B8G8R8A8_UNORM, image);
@@ -2345,8 +2847,10 @@ namespace gpg::gal
     constexpr double kMiB = 1.0 / (1024.0 * 1024.0);
     gpg::Logf(
       "Vulkan memory: buffer copies %.1f MB, upload pages %.1f MB (%zu), device memory blocks %.1f MB",
-      static_cast<double>(backend::LockShadow::TotalBytes()) * kMiB, static_cast<double>(mUpload.PageBytes()) * kMiB,
-      mUpload.PageCount(), static_cast<double>(mMemory.BlockBytes()) * kMiB
+      static_cast<double>(backend::LockShadow::TotalBytes()) * kMiB,
+      static_cast<double>(mUpload.PageBytes()) * kMiB,
+      mUpload.PageCount(),
+      static_cast<double>(mMemory.BlockBytes()) * kMiB
     );
   }
 
@@ -2363,7 +2867,8 @@ namespace gpg::gal
         const char* const value = std::getenv("FAF_GAL_TRACE_FRAMES");
         return (value != nullptr) ? std::strtol(value, nullptr, 10) : 1L;
       }();
-      mTracing = start >= 0L && static_cast<long>(mFrameNumber) >= start && static_cast<long>(mFrameNumber) < start + frames;
+      mTracing =
+        start >= 0L && static_cast<long>(mFrameNumber) >= start && static_cast<long>(mFrameNumber) < start + frames;
     }
     DumpBackBufferIfDue();
     LogMemoryIfDue();
@@ -2373,7 +2878,8 @@ namespace gpg::gal
       if (!swapChain.hasImage) {
         continue;
       }
-      vulkan::TrackedImage& head = static_cast<RenderTargetVulkan*>(mHeadOutputContexts[index].surface.get())->Current().image;
+      vulkan::TrackedImage& head =
+        static_cast<RenderTargetVulkan*>(mHeadOutputContexts[index].surface.get())->Current().image;
       if (swapChain.scaled) {
         CopyHeadToSwapChain(head, swapChain);
       } else {
@@ -2430,13 +2936,17 @@ namespace gpg::gal
     if (mSkippedDraws != 0U) {
       static int logged = 0;
       if (logged++ < 10) {
-        gpg::Warnf("Vulkan: %u draw(s) skipped in frame %u (pass without shaders or pipeline)", mSkippedDraws, mFrameNumber);
+        gpg::Warnf(
+          "Vulkan: %u draw(s) skipped in frame %u (pass without shaders or pipeline)", mSkippedDraws, mFrameNumber
+        );
       }
       mSkippedDraws = 0U;
     }
   }
 
-  void DeviceVulkan::SetCursor(const CursorContext* const context)
+  void DeviceVulkan::SetCursor(
+    const CursorContext* const context
+  )
   {
     static_cast<void>(mCursor.SetCursor(*context));
   }
@@ -2446,23 +2956,31 @@ namespace gpg::gal
     static_cast<void>(mCursor.InitCursor());
   }
 
-  int DeviceVulkan::ShowCursor(const bool show)
+  int DeviceVulkan::ShowCursor(
+    const bool show
+  )
   {
     return mCursor.ShowCursor(show);
   }
 
-  void DeviceVulkan::SetViewport(const D3DVIEWPORT9* const viewport)
+  void DeviceVulkan::SetViewport(
+    const D3DVIEWPORT9* const viewport
+  )
   {
     mViewport = *viewport;
     mViewportDirty = true;
   }
 
-  void DeviceVulkan::GetViewport(D3DVIEWPORT9* const outViewport)
+  void DeviceVulkan::GetViewport(
+    D3DVIEWPORT9* const outViewport
+  )
   {
     *outViewport = mViewport;
   }
 
-  void DeviceVulkan::ClearTarget(const OutputContext* const context)
+  void DeviceVulkan::ClearTarget(
+    const OutputContext* const context
+  )
   {
     const RenderTarget* const previousSurface = outputContext_.surface.get();
     Device::ClearTarget(context);
@@ -2488,7 +3006,12 @@ namespace gpg::gal
   }
 
   void DeviceVulkan::Clear(
-    const bool clearColor, const bool clearDepth, const bool clearStencil, const std::uint32_t packedColor, const float depth, const int stencil
+    const bool clearColor,
+    const bool clearDepth,
+    const bool clearStencil,
+    const std::uint32_t packedColor,
+    const float depth,
+    const int stencil
   )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -2519,12 +3042,16 @@ namespace gpg::gal
       return;
     }
     // D3D9's Clear covers the viewport, clipped to the targets.
-    const std::int32_t left = std::min<std::int32_t>(static_cast<std::int32_t>(mViewport.X), static_cast<std::int32_t>(mRenderingWidth));
-    const std::int32_t top = std::min<std::int32_t>(static_cast<std::int32_t>(mViewport.Y), static_cast<std::int32_t>(mRenderingHeight));
-    const std::int32_t right =
-      std::min<std::int32_t>(static_cast<std::int32_t>(mViewport.X + mViewport.Width), static_cast<std::int32_t>(mRenderingWidth));
-    const std::int32_t bottom =
-      std::min<std::int32_t>(static_cast<std::int32_t>(mViewport.Y + mViewport.Height), static_cast<std::int32_t>(mRenderingHeight));
+    const std::int32_t left =
+      std::min<std::int32_t>(static_cast<std::int32_t>(mViewport.X), static_cast<std::int32_t>(mRenderingWidth));
+    const std::int32_t top =
+      std::min<std::int32_t>(static_cast<std::int32_t>(mViewport.Y), static_cast<std::int32_t>(mRenderingHeight));
+    const std::int32_t right = std::min<std::int32_t>(
+      static_cast<std::int32_t>(mViewport.X + mViewport.Width), static_cast<std::int32_t>(mRenderingWidth)
+    );
+    const std::int32_t bottom = std::min<std::int32_t>(
+      static_cast<std::int32_t>(mViewport.Y + mViewport.Height), static_cast<std::int32_t>(mRenderingHeight)
+    );
     if (right <= left || bottom <= top) {
       return;
     }
@@ -2537,14 +3064,19 @@ namespace gpg::gal
 
   void DeviceVulkan::ClearTextures() {}
 
-  void DeviceVulkan::SetVertexDeclaration(const boost::shared_ptr<VertexFormat> vertexFormat)
+  void DeviceVulkan::SetVertexDeclaration(
+    const boost::shared_ptr<VertexFormat> vertexFormat
+  )
   {
     RecordStateChange();
     mBoundFormat = vertexFormat->formatCode_;
   }
 
   void DeviceVulkan::SetVertexBuffer(
-    const std::uint32_t streamSlot, const boost::shared_ptr<VertexBuffer> vertexBuffer, const int streamFrequencyToken, const int startVertex
+    const std::uint32_t streamSlot,
+    const boost::shared_ptr<VertexBuffer> vertexBuffer,
+    const int streamFrequencyToken,
+    const int startVertex
   )
   {
     RecordStateChange();
@@ -2558,20 +3090,34 @@ namespace gpg::gal
     mStreamFrequencies[streamSlot] = streamFrequencyToken;
   }
 
-  void DeviceVulkan::SetBufferIndices(const boost::shared_ptr<IndexBuffer> indexBuffer)
+  void DeviceVulkan::SetBufferIndices(
+    const boost::shared_ptr<IndexBuffer> indexBuffer
+  )
   {
     RecordStateChange();
     mIndexBuffer = indexBuffer;
   }
 
-  void DeviceVulkan::SetFogState(const bool, const Matrix* const, const float, const float, const int) {}
+  void DeviceVulkan::SetFogState(
+    const bool,
+    const Matrix* const,
+    const float,
+    const float,
+    const int
+  )
+  {}
 
-  void DeviceVulkan::SetWireframeState(const bool enabled)
+  void DeviceVulkan::SetWireframeState(
+    const bool enabled
+  )
   {
     mWireframe = enabled;
   }
 
-  void DeviceVulkan::SetColorWriteState(const bool writeColor, const bool writeAlpha)
+  void DeviceVulkan::SetColorWriteState(
+    const bool writeColor,
+    const bool writeAlpha
+  )
   {
     if (writeColor) {
       mColorWriteMask = writeAlpha ? 0x0FU : 0x07U;
@@ -2599,7 +3145,9 @@ namespace gpg::gal
   // ---------------------------------------------------------------------------
   // Passes and draws
 
-  VkSampler DeviceVulkan::SamplerFor(const effects::SamplerDesc& desc)
+  VkSampler DeviceVulkan::SamplerFor(
+    const effects::SamplerDesc& desc
+  )
   {
     KeyWriter key;
     key.Add(desc.filter);
@@ -2622,13 +3170,15 @@ namespace gpg::gal
     const bool anisotropic = (desc.filter & 0x40U) != 0U;
     info.magFilter = (anisotropic || (desc.filter & 0x04U) != 0U) ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
     info.minFilter = (anisotropic || (desc.filter & 0x10U) != 0U) ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
-    info.mipmapMode = (anisotropic || (desc.filter & 0x01U) != 0U) ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    info.mipmapMode =
+      (anisotropic || (desc.filter & 0x01U) != 0U) ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST;
     info.addressModeU = AddressMode(desc.addressU);
     info.addressModeV = AddressMode(desc.addressV);
     info.addressModeW = AddressMode(desc.addressW);
     info.mipLodBias = desc.mipLodBias;
     info.anisotropyEnable = (anisotropic && mAnisotropy) ? VK_TRUE : VK_FALSE;
-    info.maxAnisotropy = std::clamp(static_cast<float>(desc.maxAnisotropy), 1.0f, mProperties.limits.maxSamplerAnisotropy);
+    info.maxAnisotropy =
+      std::clamp(static_cast<float>(desc.maxAnisotropy), 1.0f, mProperties.limits.maxSamplerAnisotropy);
     info.compareEnable = VK_FALSE;
     info.minLod = std::max(desc.minLod, 0.0f);
     info.maxLod = std::max(desc.maxLod, info.minLod);
@@ -2643,13 +3193,16 @@ namespace gpg::gal
     return sampler;
   }
 
-  DeviceVulkan::ProgramState& DeviceVulkan::StateFor(effects::EffectProgram& program)
+  DeviceVulkan::ProgramState& DeviceVulkan::StateFor(
+    effects::EffectProgram& program
+  )
   {
     std::shared_ptr<void>& slot = program.BackendState();
     if (slot == nullptr) {
       auto state = std::make_shared<ProgramState>();
       state->viewportParameter = program.FindParameter("faf_ViewportSize");
       state->shadowCascadeParameter = program.FindParameter(effects::kShadowCascadeParameter);
+      state->rayShadowParameter = program.FindParameter(effects::kRayShadowParameter);
       slot = state;
     }
     ProgramState& state = *static_cast<ProgramState*>(slot.get());
@@ -2666,7 +3219,9 @@ namespace gpg::gal
     return state;
   }
 
-  VkDescriptorSet DeviceVulkan::AllocateSet(const VkDescriptorSetLayout layout)
+  VkDescriptorSet DeviceVulkan::AllocateSet(
+    const VkDescriptorSetLayout layout
+  )
   {
     Frame& frame = mFrames[mFrameIndex];
     for (;;) {
@@ -2709,7 +3264,9 @@ namespace gpg::gal
   }
 
   VkDescriptorSet DeviceVulkan::ConstantSet(
-    const vulkan::UploadAllocation& upload, const VkDeviceSize bytes, std::uint32_t& offset
+    const vulkan::UploadAllocation& upload,
+    const VkDeviceSize bytes,
+    std::uint32_t& offset
   )
   {
     offset = 0U;
@@ -2730,7 +3287,8 @@ namespace gpg::gal
     write.dstSet = set;
     write.dstBinding = 0U;
     write.descriptorCount = 1U;
-    write.descriptorType = mDynamicConstants ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    write.descriptorType =
+      mDynamicConstants ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC : VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     write.pBufferInfo = &buffer;
     Vk().vkUpdateDescriptorSets(mDevice, 1U, &write, 0U, nullptr);
     if (mDynamicConstants) {
@@ -2739,10 +3297,20 @@ namespace gpg::gal
     return set;
   }
 
-  void DeviceVulkan::BindConstantSet(const VkDescriptorSet set, const std::uint32_t offset)
+  void DeviceVulkan::BindConstantSet(
+    const VkDescriptorSet set,
+    const std::uint32_t offset
+  )
   {
     Vk().vkCmdBindDescriptorSets(
-      mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, EffectPipelineLayout(), 1U, 1U, &set, mDynamicConstants ? 1U : 0U, &offset
+      mCommands,
+      VK_PIPELINE_BIND_POINT_GRAPHICS,
+      EffectPipelineLayout(),
+      1U,
+      1U,
+      &set,
+      mDynamicConstants ? 1U : 0U,
+      &offset
     );
   }
 
@@ -2756,14 +3324,19 @@ namespace gpg::gal
     if (!mPass.valid || mPass.constantsCpu == nullptr || mPass.constantsSerial == RecordingSerial()) {
       return;
     }
-    const vulkan::UploadAllocation upload = mUpload.Allocate(mPass.constantsBytes, ConstantAlignment(), RecordingSerial());
+    const vulkan::UploadAllocation upload =
+      mUpload.Allocate(mPass.constantsBytes, ConstantAlignment(), RecordingSerial());
     std::memcpy(upload.cpu, mPass.constantsCpu, mPass.constantsBytes);
     mPass.constants = ConstantSet(upload, mPass.constantsBytes, mPass.constantsOffset);
     mPass.constantsCpu = upload.cpu;
     mPass.constantsSerial = RecordingSerial();
   }
 
-  void DeviceVulkan::BindPass(effects::EffectProgram& program, const std::uint32_t technique, const std::uint32_t pass)
+  void DeviceVulkan::BindPass(
+    effects::EffectProgram& program,
+    const std::uint32_t technique,
+    const std::uint32_t pass
+  )
   {
     RecordStateChange();
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
@@ -2815,7 +3388,8 @@ namespace gpg::gal
       // so the origin takes the viewport's shift too.
       const float shift = backend::Direct3D9PixelCentreShift();
       const float size[4] = {
-        static_cast<float>(mViewport.X) + shift, static_cast<float>(mViewport.Y) + shift,
+        static_cast<float>(mViewport.X) + shift,
+        static_cast<float>(mViewport.Y) + shift,
         (mViewport.Width != 0U) ? 1.0f / static_cast<float>(mViewport.Width) : 0.0f,
         (mViewport.Height != 0U) ? 1.0f / static_cast<float>(mViewport.Height) : 0.0f,
       };
@@ -2827,15 +3401,27 @@ namespace gpg::gal
     if (state.shadowCascadeParameter >= 0 && state.shadowCascadeVersion != effects::gShadowCascades.version) {
       state.shadowCascadeVersion = effects::gShadowCascades.version;
       parameters.SetVectorArray(
-        static_cast<std::uint32_t>(state.shadowCascadeParameter), &effects::gShadowCascades.vectors[0][0], effects::kShadowCascadeVectors
+        static_cast<std::uint32_t>(state.shadowCascadeParameter),
+        &effects::gShadowCascades.vectors[0][0],
+        effects::kShadowCascadeVectors
+      );
+    }
+    if (state.rayShadowParameter >= 0 && state.rayShadowVersion != effects::gRayShadows.version) {
+      state.rayShadowVersion = effects::gRayShadows.version;
+      parameters.SetVectorArray(
+        static_cast<std::uint32_t>(state.rayShadowParameter),
+        &effects::gRayShadows.vectors[0][0],
+        effects::kRayShadowVectors
       );
     }
 
     // $Globals in set 1, snapshotted as D3D9's BeginPass does.
     const std::span<const std::uint8_t> constants = parameters.Constants();
     if (!constants.empty()) {
-      if (state.constants == VK_NULL_HANDLE || state.constantsVersion != parameters.Version() ||
-          state.constantsSerial != RecordingSerial() || state.constantsFrame != mFrameCount) {
+      if (
+        state.constants == VK_NULL_HANDLE || state.constantsVersion != parameters.Version() ||
+        state.constantsSerial != RecordingSerial() || state.constantsFrame != mFrameCount
+      ) {
         const vulkan::UploadAllocation upload = AllocateUpload(constants.size(), ConstantAlignment());
         std::memcpy(upload.cpu, constants.data(), constants.size());
         state.constants = ConstantSet(upload, constants.size(), state.constantsOffset);
@@ -2854,14 +3440,23 @@ namespace gpg::gal
     // Engine change (ren_UsedTextureTable): a change only in bindings the pass's shaders don't read keeps the set.
     // The version is left as it is, so every later pass checks its own registers against the set again.
     bool keepTable = false;
-    if (gUsedTextureTable && state.table != VK_NULL_HANDLE && state.tableFrame == mFrameCount &&
-        state.tableSurface == outputContext_.surface.get() && state.textureVersion != parameters.TextureVersion()) {
-      keepTable =
-        UsedTextureBindingsKept(program, parameters, state.tableBindings, PassTextureSlots(bound.vertexShader, bound.pixelShader, bound.hullShader, bound.domainShader));
+    if (
+      gUsedTextureTable && state.table != VK_NULL_HANDLE && state.tableFrame == mFrameCount &&
+      state.tableSurface == outputContext_.surface.get() && state.textureVersion != parameters.TextureVersion()
+    ) {
+      keepTable = UsedTextureBindingsKept(
+        program,
+        parameters,
+        state.tableBindings,
+        PassTextureSlots(bound.vertexShader, bound.pixelShader, bound.hullShader, bound.domainShader)
+      );
     }
     // Textures and samplers in set 0, rebuilt when a binding changed or the frame moved on.
-    if (!keepTable && (state.table == VK_NULL_HANDLE || state.tableFrame != mFrameCount ||
-                       state.textureVersion != parameters.TextureVersion() || state.tableSurface != outputContext_.surface.get())) {
+    if (
+      !keepTable &&
+      (state.table == VK_NULL_HANDLE || state.tableFrame != mFrameCount ||
+       state.textureVersion != parameters.TextureVersion() || state.tableSurface != outputContext_.surface.get())
+    ) {
       const auto& slots = program.Modern().textures;
       const auto& slotParameters = program.TextureSlotParameters();
       std::vector<effects::TextureBinding>& bindings = state.tableBindings;
@@ -2881,8 +3476,8 @@ namespace gpg::gal
         if (binding.texture != nullptr) {
           auto* const texture = static_cast<TextureVulkan*>(binding.texture.get());
           const bool matches = (slot.dimension == effects::TextureDimension::TextureCube) ? texture->IsCube()
-            : (slot.dimension == effects::TextureDimension::Texture3D)                   ? texture->IsVolume()
-                                                                                         : (!texture->IsCube() && !texture->IsVolume());
+            : (slot.dimension == effects::TextureDimension::Texture3D) ? texture->IsVolume()
+                                                                       : (!texture->IsCube() && !texture->IsVolume());
           if (matches) {
             view = texture->View();
           } else {
@@ -2930,26 +3525,40 @@ namespace gpg::gal
     bound.textures = state.table;
     bound.sampled = &state.tableBindings;
     if (mTracing) {
-      Trace("BindPass %s technique %s pass %u valid %d", program.Name().c_str(),
-            program.Description().techniques[technique].name.c_str(), pass, bound.valid ? 1 : 0);
+      Trace(
+        "BindPass %s technique %s pass %u valid %d",
+        program.Name().c_str(),
+        program.Description().techniques[technique].name.c_str(),
+        pass,
+        bound.valid ? 1 : 0
+      );
     }
     mPass = std::move(bound);
   }
 
   void DeviceVulkan::UnbindPass() {}
 
-  void DeviceVulkan::TransitionSampled(const std::vector<effects::TextureBinding>& bindings)
+  void DeviceVulkan::TransitionSampled(
+    const std::vector<effects::TextureBinding>& bindings
+  )
   {
     for (const effects::TextureBinding& binding : bindings) {
       if (binding.texture != nullptr) {
-        Transition(static_cast<TextureVulkan*>(binding.texture.get())->Image(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        Transition(
+          static_cast<TextureVulkan*>(binding.texture.get())->Image(), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        );
       } else if (binding.renderTarget != nullptr) {
-        Transition(static_cast<RenderTargetVulkan*>(binding.renderTarget.get())->Current().image, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        Transition(
+          static_cast<RenderTargetVulkan*>(binding.renderTarget.get())->Current().image,
+          VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        );
       }
     }
   }
 
-  const effects::SpirvInterface& DeviceVulkan::InterfaceOf(const effects::CompiledEntry& entry)
+  const effects::SpirvInterface& DeviceVulkan::InterfaceOf(
+    const effects::CompiledEntry& entry
+  )
   {
     auto found = mInterfaces.find(entry.key);
     if (found == mInterfaces.end()) {
@@ -2958,7 +3567,10 @@ namespace gpg::gal
     return found->second;
   }
 
-  VkShaderModule DeviceVulkan::ModuleFor(const effects::CompiledEntry& entry, const effects::CompiledEntry* const vertex)
+  VkShaderModule DeviceVulkan::ModuleFor(
+    const effects::CompiledEntry& entry,
+    const effects::CompiledEntry* const vertex
+  )
   {
     const auto create = [&](const std::vector<std::uint8_t>& code) {
       const std::vector<std::uint8_t> stripped = effects::StripSpirvReflection(code);
@@ -2995,8 +3607,10 @@ namespace gpg::gal
       }
       std::uint32_t location = 0xFFFFFFFFU;
       for (const effects::SpirvInterfaceVariable& output : vertexInterface.outputs) {
-        if (!output.builtIn && output.semantic == input.semantic && input.semanticIndex >= output.semanticIndex &&
-            input.semanticIndex < output.semanticIndex + output.locations) {
+        if (
+          !output.builtIn && output.semantic == input.semantic && input.semanticIndex >= output.semanticIndex &&
+          input.semanticIndex < output.semanticIndex + output.locations
+        ) {
           location = output.location + (input.semanticIndex - output.semanticIndex);
         }
       }
@@ -3010,7 +3624,10 @@ namespace gpg::gal
     return module;
   }
 
-  VkPipeline DeviceVulkan::PipelineFor(const BoundPass& pass, const VkPrimitiveTopology topology)
+  VkPipeline DeviceVulkan::PipelineFor(
+    const BoundPass& pass,
+    const VkPrimitiveTopology topology
+  )
   {
     VkFormat colorFormat = VK_FORMAT_UNDEFINED;
     vulkan::TrackedImage* colorImage = nullptr;
@@ -3052,7 +3669,9 @@ namespace gpg::gal
     key.Add(pass.vertexShader->key);
     key.Add((pass.pixelShader != nullptr) ? pass.pixelShader->key : 0ULL);
     key.Add(mBoundFormat);
-    key.Add(static_cast<std::uint32_t>(mDynamicConstants ? 1U : 0U)); // the pipeline layout (ren_VulkanDynamicConstants)
+    key.Add(
+      static_cast<std::uint32_t>(mDynamicConstants ? 1U : 0U)
+    ); // the pipeline layout (ren_VulkanDynamicConstants)
     for (std::uint32_t slot = 0U; slot < 16U; ++slot) {
       key.Add(mStreams[slot].stride);
     }
@@ -3099,8 +3718,9 @@ namespace gpg::gal
     // Vertex input: each shader input (by semantic) from the format's
     // element of that semantic, or from the zero buffer.
     const effects::SpirvInterface& vertexInterface = InterfaceOf(*pass.vertexShader);
-    const std::span<const D3D11_INPUT_ELEMENT_DESC> elements =
-      (mBoundFormat < d3d11::kVertexFormatCount) ? d3d11::VertexLayoutElements(mBoundFormat) : std::span<const D3D11_INPUT_ELEMENT_DESC>{};
+    const std::span<const D3D11_INPUT_ELEMENT_DESC> elements = (mBoundFormat < d3d11::kVertexFormatCount)
+      ? d3d11::VertexLayoutElements(mBoundFormat)
+      : std::span<const D3D11_INPUT_ELEMENT_DESC>{};
     std::vector<VkVertexInputAttributeDescription> attributes;
     std::map<std::uint32_t, VkVertexInputBindingDescription> bindings;
     for (const effects::SpirvInterfaceVariable& input : vertexInterface.inputs) {
@@ -3111,7 +3731,9 @@ namespace gpg::gal
         const std::uint32_t semanticIndex = input.semanticIndex + element;
         const D3D11_INPUT_ELEMENT_DESC* match = nullptr;
         for (const D3D11_INPUT_ELEMENT_DESC& candidate : elements) {
-          if (candidate.SemanticIndex == semanticIndex && ::_stricmp(candidate.SemanticName, input.semantic.c_str()) == 0) {
+          if (
+            candidate.SemanticIndex == semanticIndex && ::_stricmp(candidate.SemanticName, input.semantic.c_str()) == 0
+          ) {
             match = &candidate;
           }
         }
@@ -3124,12 +3746,14 @@ namespace gpg::gal
           VkVertexInputBindingDescription& binding = bindings[match->InputSlot];
           binding.binding = match->InputSlot;
           binding.stride = mStreams[match->InputSlot].stride;
-          binding.inputRate = (match->InputSlotClass == D3D11_INPUT_PER_INSTANCE_DATA) ? VK_VERTEX_INPUT_RATE_INSTANCE : VK_VERTEX_INPUT_RATE_VERTEX;
+          binding.inputRate = (match->InputSlotClass == D3D11_INPUT_PER_INSTANCE_DATA) ? VK_VERTEX_INPUT_RATE_INSTANCE
+                                                                                       : VK_VERTEX_INPUT_RATE_VERTEX;
         } else {
           attribute.binding = kZeroBinding;
-          attribute.format = (input.component == effects::SpirvInterfaceVariable::Component::Uint)   ? VK_FORMAT_R32G32B32A32_UINT
-            : (input.component == effects::SpirvInterfaceVariable::Component::Sint)                    ? VK_FORMAT_R32G32B32A32_SINT
-                                                                                                        : VK_FORMAT_R32G32B32A32_SFLOAT;
+          attribute.format = (input.component == effects::SpirvInterfaceVariable::Component::Uint)
+            ? VK_FORMAT_R32G32B32A32_UINT
+            : (input.component == effects::SpirvInterfaceVariable::Component::Sint) ? VK_FORMAT_R32G32B32A32_SINT
+                                                                                    : VK_FORMAT_R32G32B32A32_SFLOAT;
           attribute.offset = 0U;
           VkVertexInputBindingDescription& binding = bindings[kZeroBinding];
           binding.binding = kZeroBinding;
@@ -3193,12 +3817,15 @@ namespace gpg::gal
     VkPipelineRasterizationStateCreateInfo raster{};
     raster.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     raster.depthClampEnable = VK_FALSE; // D3D9 clips to the near and far planes (see DeviceD3D12)
-    raster.polygonMode = (rasterizer.fillMode == 2U && mWireframeSupported) ? VK_POLYGON_MODE_LINE : VK_POLYGON_MODE_FILL;
-    raster.cullMode = (rasterizer.cullMode == 2U) ? VK_CULL_MODE_FRONT_BIT : (rasterizer.cullMode == 3U) ? VK_CULL_MODE_BACK_BIT
-                                                                                                         : VK_CULL_MODE_NONE;
+    raster.polygonMode =
+      (rasterizer.fillMode == 2U && mWireframeSupported) ? VK_POLYGON_MODE_LINE : VK_POLYGON_MODE_FILL;
+    raster.cullMode = (rasterizer.cullMode == 2U) ? VK_CULL_MODE_FRONT_BIT
+      : (rasterizer.cullMode == 3U)               ? VK_CULL_MODE_BACK_BIT
+                                                  : VK_CULL_MODE_NONE;
     // -fvk-invert-y keeps D3D's screen positions, so D3D's winding carries over.
     raster.frontFace = rasterizer.frontCounterClockwise ? VK_FRONT_FACE_COUNTER_CLOCKWISE : VK_FRONT_FACE_CLOCKWISE;
-    raster.depthBiasEnable = (rasterizer.depthBias != 0 || rasterizer.slopeScaledDepthBias != 0.0f) ? VK_TRUE : VK_FALSE;
+    raster.depthBiasEnable =
+      (rasterizer.depthBias != 0 || rasterizer.slopeScaledDepthBias != 0.0f) ? VK_TRUE : VK_FALSE;
     raster.depthBiasConstantFactor = static_cast<float>(rasterizer.depthBias);
     raster.depthBiasClamp = rasterizer.depthBiasClamp;
     raster.depthBiasSlopeFactor = rasterizer.slopeScaledDepthBias;
@@ -3243,7 +3870,10 @@ namespace gpg::gal
     colorBlend.attachmentCount = (colorFormat != VK_FORMAT_UNDEFINED) ? 1U : 0U;
     colorBlend.pAttachments = &attachment;
     const VkDynamicState dynamicStates[4] = {
-      VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_BLEND_CONSTANTS, VK_DYNAMIC_STATE_STENCIL_REFERENCE,
+      VK_DYNAMIC_STATE_VIEWPORT,
+      VK_DYNAMIC_STATE_SCISSOR,
+      VK_DYNAMIC_STATE_BLEND_CONSTANTS,
+      VK_DYNAMIC_STATE_STENCIL_REFERENCE,
     };
     VkPipelineDynamicStateCreateInfo dynamic{};
     dynamic.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -3276,8 +3906,12 @@ namespace gpg::gal
     if (result != VK_SUCCESS) {
       static int logged = 0;
       if (logged++ < 16) {
-        gpg::Warnf("Vulkan: pipeline for %s (vertex format %u) failed: %s", pass.program->Name().c_str(), mBoundFormat,
-                   vulkan::ResultName(result));
+        gpg::Warnf(
+          "Vulkan: pipeline for %s (vertex format %u) failed: %s",
+          pass.program->Name().c_str(),
+          mBoundFormat,
+          vulkan::ResultName(result)
+        );
       }
       pipeline = VK_NULL_HANDLE;
     }
@@ -3285,7 +3919,10 @@ namespace gpg::gal
     return pipeline;
   }
 
-  bool DeviceVulkan::PrepareDraw(const std::uint32_t topologyToken, const bool indexed)
+  bool DeviceVulkan::PrepareDraw(
+    const std::uint32_t topologyToken,
+    const bool indexed
+  )
   {
     if (topologyToken == 0U || topologyToken >= std::size(kTopologyByToken)) {
       ThrowError("DeviceVulkan.cpp", __LINE__, "invalid topology specified");
@@ -3308,8 +3945,9 @@ namespace gpg::gal
     VkBuffer vertexBuffers[16]{};
     VkDeviceSize vertexOffsets[16]{};
     std::uint32_t slotCount = 0U;
-    const std::span<const D3D11_INPUT_ELEMENT_DESC> elements =
-      (mBoundFormat < d3d11::kVertexFormatCount) ? d3d11::VertexLayoutElements(mBoundFormat) : std::span<const D3D11_INPUT_ELEMENT_DESC>{};
+    const std::span<const D3D11_INPUT_ELEMENT_DESC> elements = (mBoundFormat < d3d11::kVertexFormatCount)
+      ? d3d11::VertexLayoutElements(mBoundFormat)
+      : std::span<const D3D11_INPUT_ELEMENT_DESC>{};
     std::uint32_t instanceSlots = 0U;
     for (const D3D11_INPUT_ELEMENT_DESC& element : elements) {
       slotCount = std::max<std::uint32_t>(slotCount, element.InputSlot + 1U);
@@ -3330,7 +3968,8 @@ namespace gpg::gal
         continue;
       }
       const std::uint32_t width = static_cast<VertexBufferVulkan*>(stream.buffer.get())->Storage().ByteWidth();
-      mDrawInstanceLimit = std::min(mDrawInstanceLimit, (width > stream.offset) ? (width - stream.offset) / stream.stride : 0U);
+      mDrawInstanceLimit =
+        std::min(mDrawInstanceLimit, (width > stream.offset) ? (width - stream.offset) / stream.stride : 0U);
     }
     for (std::uint32_t slot = 0U; slot < 16U; ++slot) {
       vertexBuffers[slot] = mZeroBuffer.buffer;
@@ -3365,16 +4004,30 @@ namespace gpg::gal
     Vk().vkCmdBindDescriptorSets(
       mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, EffectPipelineLayout(), 0U, 1U, &mPass.textures, 0U, nullptr
     );
+    if (mRaySet != VK_NULL_HANDLE) {
+      Vk().vkCmdBindDescriptorSets(
+        mCommands, VK_PIPELINE_BIND_POINT_GRAPHICS, EffectPipelineLayout(), 2U, 1U, &mRaySet, 0U, nullptr
+      );
+      if (mRayRecordsChunk != nullptr) {
+        mRayRecordsChunk->serial = RecordingSerial();
+      }
+    }
     if (mPass.constants != VK_NULL_HANDLE) {
       BindConstantSet(mPass.constants, mPass.constantsOffset);
     }
     Vk().vkCmdBindVertexBuffers(mCommands, 0U, 16U, vertexBuffers, vertexOffsets);
     if (indexed) {
-      Vk().vkCmdBindIndexBuffer(mCommands, indexBuffer, indexOffset, static_cast<IndexBufferVulkan*>(mIndexBuffer.get())->IndexType());
+      Vk().vkCmdBindIndexBuffer(
+        mCommands, indexBuffer, indexOffset, static_cast<IndexBufferVulkan*>(mIndexBuffer.get())->IndexType()
+      );
     }
     VkViewport viewport{
-      static_cast<float>(mViewport.X), static_cast<float>(mViewport.Y), static_cast<float>(mViewport.Width),
-      static_cast<float>(mViewport.Height), mViewport.MinZ, mViewport.MaxZ,
+      static_cast<float>(mViewport.X),
+      static_cast<float>(mViewport.Y),
+      static_cast<float>(mViewport.Width),
+      static_cast<float>(mViewport.Height),
+      mViewport.MinZ,
+      mViewport.MaxZ,
     };
     if (viewport.width <= 0.0f || viewport.height <= 0.0f) {
       viewport.width = static_cast<float>(mRenderingWidth);
@@ -3384,13 +4037,17 @@ namespace gpg::gal
     viewport.x += backend::Direct3D9PixelCentreShift();
     viewport.y += backend::Direct3D9PixelCentreShift();
     Vk().vkCmdSetViewport(mCommands, 0U, 1U, &viewport);
-    const std::int32_t right = std::min<std::int32_t>(static_cast<std::int32_t>(mViewport.X + mViewport.Width), static_cast<std::int32_t>(mRenderingWidth));
-    const std::int32_t bottom =
-      std::min<std::int32_t>(static_cast<std::int32_t>(mViewport.Y + mViewport.Height), static_cast<std::int32_t>(mRenderingHeight));
+    const std::int32_t right = std::min<std::int32_t>(
+      static_cast<std::int32_t>(mViewport.X + mViewport.Width), static_cast<std::int32_t>(mRenderingWidth)
+    );
+    const std::int32_t bottom = std::min<std::int32_t>(
+      static_cast<std::int32_t>(mViewport.Y + mViewport.Height), static_cast<std::int32_t>(mRenderingHeight)
+    );
     VkRect2D scissor{};
     scissor.offset = {static_cast<std::int32_t>(mViewport.X), static_cast<std::int32_t>(mViewport.Y)};
     scissor.extent = {
-      static_cast<std::uint32_t>(std::max(right - scissor.offset.x, 0)), static_cast<std::uint32_t>(std::max(bottom - scissor.offset.y, 0)),
+      static_cast<std::uint32_t>(std::max(right - scissor.offset.x, 0)),
+      static_cast<std::uint32_t>(std::max(bottom - scissor.offset.y, 0)),
     };
     Vk().vkCmdSetScissor(mCommands, 0U, 1U, &scissor);
     Vk().vkCmdSetBlendConstants(mCommands, mPass.state.blendFactor);
@@ -3398,7 +4055,9 @@ namespace gpg::gal
     return true;
   }
 
-  void DeviceVulkan::DrawIndexedPrimitive(const DrawIndexedContext* const context)
+  void DeviceVulkan::DrawIndexedPrimitive(
+    const DrawIndexedContext* const context
+  )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     if (mIndexBuffer == nullptr) {
@@ -3411,11 +4070,15 @@ namespace gpg::gal
     if (!ready || instances == 0U) {
       return;
     }
-    Vk().vkCmdDrawIndexed(mCommands, context->indexCount_, instances, context->startIndex_, context->baseVertexIndex_, 0U);
+    Vk().vkCmdDrawIndexed(
+      mCommands, context->indexCount_, instances, context->startIndex_, context->baseVertexIndex_, 0U
+    );
     RecordDraw(context->GetPrimitiveCount(), context->vertexCount_);
   }
 
-  void DeviceVulkan::DrawPrimitive(const DrawContext* const context)
+  void DeviceVulkan::DrawPrimitive(
+    const DrawContext* const context
+  )
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     mPreparingDraw = true;
@@ -3429,7 +4092,9 @@ namespace gpg::gal
     RecordDraw(context->GetPrimitiveCount(), context->vertexCount_);
   }
 
-  bool DeviceVulkan::SupportsVertexTextureFormat(const std::uint32_t textureFormat)
+  bool DeviceVulkan::SupportsVertexTextureFormat(
+    const std::uint32_t textureFormat
+  )
   {
     const vulkan::TextureFormat format = vulkan::ToVulkanTexture(dxgi::TextureFormatToDxgi(textureFormat));
     if (mPhysical == VK_NULL_HANDLE || format.format == VK_FORMAT_UNDEFINED) {

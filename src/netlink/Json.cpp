@@ -12,12 +12,16 @@ namespace faf::netlink
     const JsonValue kNull;
   } // namespace
 
-  const JsonValue& JsonValue::operator[](const std::size_t i) const
+  const JsonValue& JsonValue::operator[](
+    const std::size_t i
+  ) const
   {
     return mKind == Kind::Array && i < mItems.size() ? mItems[i] : kNull;
   }
 
-  const JsonValue* JsonValue::Find(const std::string_view key) const
+  const JsonValue* JsonValue::Find(
+    const std::string_view key
+  ) const
   {
     if (mKind != Kind::Object) {
       return nullptr;
@@ -30,13 +34,18 @@ namespace faf::netlink
     return nullptr;
   }
 
-  const JsonValue& JsonValue::Get(const std::string_view key) const
+  const JsonValue& JsonValue::Get(
+    const std::string_view key
+  ) const
   {
     const JsonValue* v = Find(key);
     return v != nullptr ? *v : kNull;
   }
 
-  void JsonValue::Set(std::string key, JsonValue v)
+  void JsonValue::Set(
+    std::string key,
+    JsonValue v
+  )
   {
     for (auto& [name, value] : mMembers) {
       if (name == key) {
@@ -50,9 +59,15 @@ namespace faf::netlink
   class JsonReader
   {
   public:
-    explicit JsonReader(const std::string_view text) : mText(text) {}
+    explicit JsonReader(
+      const std::string_view text
+    )
+      : mText(text)
+    {}
 
-    std::optional<JsonValue> ParseDocument(std::string* error)
+    std::optional<JsonValue> ParseDocument(
+      std::string* error
+    )
     {
       JsonValue v;
       SkipSpace();
@@ -75,7 +90,9 @@ namespace faf::netlink
   private:
     static constexpr int kMaxDepth = 64;
 
-    bool Fail(const char* what)
+    bool Fail(
+      const char* what
+    )
     {
       mError = what;
       return false;
@@ -92,7 +109,9 @@ namespace faf::netlink
       }
     }
 
-    bool Literal(const std::string_view word)
+    bool Literal(
+      const std::string_view word
+    )
     {
       if (mText.substr(mPos, word.size()) != word) {
         return Fail("bad literal");
@@ -101,7 +120,10 @@ namespace faf::netlink
       return true;
     }
 
-    bool ParseValue(JsonValue& out, const int depth)
+    bool ParseValue(
+      JsonValue& out,
+      const int depth
+    )
     {
       if (depth > kMaxDepth) {
         return Fail("nesting too deep");
@@ -110,33 +132,36 @@ namespace faf::netlink
         return Fail("unexpected end");
       }
       switch (mText[mPos]) {
-        case 'n':
-          out = JsonValue();
-          return Literal("null");
-        case 't':
-          out = JsonValue(true);
-          return Literal("true");
-        case 'f':
-          out = JsonValue(false);
-          return Literal("false");
-        case '"': {
-          std::string s;
-          if (!ParseString(s)) {
-            return false;
-          }
-          out = JsonValue(std::move(s));
-          return true;
+      case 'n':
+        out = JsonValue();
+        return Literal("null");
+      case 't':
+        out = JsonValue(true);
+        return Literal("true");
+      case 'f':
+        out = JsonValue(false);
+        return Literal("false");
+      case '"': {
+        std::string s;
+        if (!ParseString(s)) {
+          return false;
         }
-        case '[':
-          return ParseArray(out, depth);
-        case '{':
-          return ParseObject(out, depth);
-        default:
-          return ParseNumber(out);
+        out = JsonValue(std::move(s));
+        return true;
+      }
+      case '[':
+        return ParseArray(out, depth);
+      case '{':
+        return ParseObject(out, depth);
+      default:
+        return ParseNumber(out);
       }
     }
 
-    bool ParseArray(JsonValue& out, const int depth)
+    bool ParseArray(
+      JsonValue& out,
+      const int depth
+    )
     {
       out = JsonValue::Array();
       ++mPos;
@@ -168,7 +193,10 @@ namespace faf::netlink
       }
     }
 
-    bool ParseObject(JsonValue& out, const int depth)
+    bool ParseObject(
+      JsonValue& out,
+      const int depth
+    )
     {
       out = JsonValue::Object();
       ++mPos;
@@ -213,7 +241,10 @@ namespace faf::netlink
       }
     }
 
-    static void AppendUtf8(std::string& s, const std::uint32_t cp)
+    static void AppendUtf8(
+      std::string& s,
+      const std::uint32_t cp
+    )
     {
       if (cp < 0x80) {
         s += static_cast<char>(cp);
@@ -232,7 +263,9 @@ namespace faf::netlink
       }
     }
 
-    bool Hex4(std::uint32_t& out)
+    bool Hex4(
+      std::uint32_t& out
+    )
     {
       if (mPos + 4 > mText.size()) {
         return Fail("short \\u escape");
@@ -254,7 +287,9 @@ namespace faf::netlink
       return true;
     }
 
-    bool ParseString(std::string& out)
+    bool ParseString(
+      std::string& out
+    )
     {
       ++mPos; // opening quote
       while (mPos < mText.size()) {
@@ -271,38 +306,56 @@ namespace faf::netlink
         }
         const char e = mText[mPos++];
         switch (e) {
-          case '"': out += '"'; break;
-          case '\\': out += '\\'; break;
-          case '/': out += '/'; break;
-          case 'b': out += '\b'; break;
-          case 'f': out += '\f'; break;
-          case 'n': out += '\n'; break;
-          case 'r': out += '\r'; break;
-          case 't': out += '\t'; break;
-          case 'u': {
-            std::uint32_t cp = 0;
-            if (!Hex4(cp)) {
+        case '"':
+          out += '"';
+          break;
+        case '\\':
+          out += '\\';
+          break;
+        case '/':
+          out += '/';
+          break;
+        case 'b':
+          out += '\b';
+          break;
+        case 'f':
+          out += '\f';
+          break;
+        case 'n':
+          out += '\n';
+          break;
+        case 'r':
+          out += '\r';
+          break;
+        case 't':
+          out += '\t';
+          break;
+        case 'u': {
+          std::uint32_t cp = 0;
+          if (!Hex4(cp)) {
+            return false;
+          }
+          if (cp >= 0xD800 && cp < 0xDC00 && mPos + 1 < mText.size() && mText[mPos] == '\\' && mText[mPos + 1] == 'u') {
+            mPos += 2;
+            std::uint32_t low = 0;
+            if (!Hex4(low)) {
               return false;
             }
-            if (cp >= 0xD800 && cp < 0xDC00 && mPos + 1 < mText.size() && mText[mPos] == '\\' && mText[mPos + 1] == 'u') {
-              mPos += 2;
-              std::uint32_t low = 0;
-              if (!Hex4(low)) {
-                return false;
-              }
-              cp = 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00);
-            }
-            AppendUtf8(out, cp);
-            break;
+            cp = 0x10000 + ((cp - 0xD800) << 10) + (low - 0xDC00);
           }
-          default:
-            return Fail("bad escape");
+          AppendUtf8(out, cp);
+          break;
+        }
+        default:
+          return Fail("bad escape");
         }
       }
       return Fail("unterminated string");
     }
 
-    bool ParseNumber(JsonValue& out)
+    bool ParseNumber(
+      JsonValue& out
+    )
     {
       const std::size_t start = mPos;
       bool isInt = true;
@@ -348,21 +401,30 @@ namespace faf::netlink
     std::string mError;
   };
 
-  std::optional<JsonValue> ParseJson(const std::string_view text, std::string* error)
+  std::optional<JsonValue> ParseJson(
+    const std::string_view text,
+    std::string* error
+  )
   {
     return JsonReader(text).ParseDocument(error);
   }
 
   namespace
   {
-    void WriteEscapedUnit(std::string& out, const std::uint32_t unit)
+    void WriteEscapedUnit(
+      std::string& out,
+      const std::uint32_t unit
+    )
     {
       char buf[8];
       std::snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned>(unit));
       out += buf;
     }
 
-    void WriteString(std::string& out, const std::string& s)
+    void WriteString(
+      std::string& out,
+      const std::string& s
+    )
     {
       out += '"';
       for (std::size_t i = 0; i < s.size();) {
@@ -370,21 +432,31 @@ namespace faf::netlink
         if (c < 0x80) {
           ++i;
           switch (c) {
-            case '"': out += "\\\""; break;
-            case '\\': out += "\\\\"; break;
-            case '\n': out += "\\n"; break;
-            case '\r': out += "\\r"; break;
-            case '\t': out += "\\t"; break;
-            case '{':
-            case '}':
+          case '"':
+            out += "\\\"";
+            break;
+          case '\\':
+            out += "\\\\";
+            break;
+          case '\n':
+            out += "\\n";
+            break;
+          case '\r':
+            out += "\\r";
+            break;
+          case '\t':
+            out += "\\t";
+            break;
+          case '{':
+          case '}':
+            WriteEscapedUnit(out, c);
+            break;
+          default:
+            if (c < 0x20 || c == 0x7F) {
               WriteEscapedUnit(out, c);
-              break;
-            default:
-              if (c < 0x20 || c == 0x7F) {
-                WriteEscapedUnit(out, c);
-              } else {
-                out += static_cast<char>(c);
-              }
+            } else {
+              out += static_cast<char>(c);
+            }
           }
           continue;
         }
@@ -397,11 +469,11 @@ namespace faf::netlink
           len = 2;
         } else if ((c & 0xF0) == 0xE0 && i + 2 < s.size()) {
           cp = ((c & 0x0Fu) << 12) | ((static_cast<unsigned char>(s[i + 1]) & 0x3Fu) << 6) |
-               (static_cast<unsigned char>(s[i + 2]) & 0x3Fu);
+            (static_cast<unsigned char>(s[i + 2]) & 0x3Fu);
           len = 3;
         } else if ((c & 0xF8) == 0xF0 && i + 3 < s.size()) {
           cp = ((c & 0x07u) << 18) | ((static_cast<unsigned char>(s[i + 1]) & 0x3Fu) << 12) |
-               ((static_cast<unsigned char>(s[i + 2]) & 0x3Fu) << 6) | (static_cast<unsigned char>(s[i + 3]) & 0x3Fu);
+            ((static_cast<unsigned char>(s[i + 2]) & 0x3Fu) << 6) | (static_cast<unsigned char>(s[i + 3]) & 0x3Fu);
           len = 4;
         }
         i += len;
@@ -416,62 +488,67 @@ namespace faf::netlink
       out += '"';
     }
 
-    void WriteValue(std::string& out, const JsonValue& v)
+    void WriteValue(
+      std::string& out,
+      const JsonValue& v
+    )
     {
       switch (v.GetKind()) {
-        case JsonValue::Kind::Null:
+      case JsonValue::Kind::Null:
+        out += "null";
+        break;
+      case JsonValue::Kind::Bool:
+        out += v.AsBool() ? "true" : "false";
+        break;
+      case JsonValue::Kind::Number:
+        if (v.IsInteger()) {
+          out += std::to_string(v.AsInt());
+        } else if (std::isfinite(v.AsDouble())) {
+          char buf[32];
+          std::snprintf(buf, sizeof(buf), "%.17g", v.AsDouble());
+          out += buf;
+        } else {
           out += "null";
-          break;
-        case JsonValue::Kind::Bool:
-          out += v.AsBool() ? "true" : "false";
-          break;
-        case JsonValue::Kind::Number:
-          if (v.IsInteger()) {
-            out += std::to_string(v.AsInt());
-          } else if (std::isfinite(v.AsDouble())) {
-            char buf[32];
-            std::snprintf(buf, sizeof(buf), "%.17g", v.AsDouble());
-            out += buf;
-          } else {
-            out += "null";
-          }
-          break;
-        case JsonValue::Kind::String:
-          WriteString(out, v.AsString());
-          break;
-        case JsonValue::Kind::Array: {
-          out += '[';
-          bool first = true;
-          for (const JsonValue& item : v.Items()) {
-            if (!first) {
-              out += ',';
-            }
-            first = false;
-            WriteValue(out, item);
-          }
-          out += ']';
-          break;
         }
-        case JsonValue::Kind::Object: {
-          out += '{';
-          bool first = true;
-          for (const auto& [key, value] : v.Members()) {
-            if (!first) {
-              out += ',';
-            }
-            first = false;
-            WriteString(out, key);
-            out += ':';
-            WriteValue(out, value);
+        break;
+      case JsonValue::Kind::String:
+        WriteString(out, v.AsString());
+        break;
+      case JsonValue::Kind::Array: {
+        out += '[';
+        bool first = true;
+        for (const JsonValue& item : v.Items()) {
+          if (!first) {
+            out += ',';
           }
-          out += '}';
-          break;
+          first = false;
+          WriteValue(out, item);
         }
+        out += ']';
+        break;
+      }
+      case JsonValue::Kind::Object: {
+        out += '{';
+        bool first = true;
+        for (const auto& [key, value] : v.Members()) {
+          if (!first) {
+            out += ',';
+          }
+          first = false;
+          WriteString(out, key);
+          out += ':';
+          WriteValue(out, value);
+        }
+        out += '}';
+        break;
+      }
       }
     }
   } // namespace
 
-  std::string WriteJson(const JsonValue& value)
+  std::string WriteJson(
+    const JsonValue& value
+  )
   {
     std::string out;
     WriteValue(out, value);

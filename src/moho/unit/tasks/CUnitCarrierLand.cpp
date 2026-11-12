@@ -26,10 +26,11 @@ namespace
   // already reads.
   constexpr moho::EUnitMotionCarrierEvent kCarrierEventHoldRelativeHeight =
     static_cast<moho::EUnitMotionCarrierEvent>(1);
-  constexpr moho::EUnitMotionCarrierEvent kCarrierEventDescendToDeck =
-    static_cast<moho::EUnitMotionCarrierEvent>(2);
+  constexpr moho::EUnitMotionCarrierEvent kCarrierEventDescendToDeck = static_cast<moho::EUnitMotionCarrierEvent>(2);
 
-  [[nodiscard]] moho::ETaskState NextTaskState(const moho::ETaskState state) noexcept
+  [[nodiscard]] moho::ETaskState NextTaskState(
+    const moho::ETaskState state
+  ) noexcept
   {
     return static_cast<moho::ETaskState>(static_cast<std::int32_t>(state) + 1);
   }
@@ -74,8 +75,7 @@ namespace moho
     , mCarrierAttachPos{0.0f, 0.0f, 0.0f}
     , mCarrierAttachDir{0.0f, 0.0f, 0.0f}
     , mCarrierApproachPos{0.0f, 0.0f, 0.0f}
-  {
-  }
+  {}
 
   /**
    * Address: 0x00606500 (FUN_00606500, ??0CUnitCarrierLand@Moho@@QAE@@Z)
@@ -85,7 +85,10 @@ namespace moho
    * form calls it, which performs the same rebind + `OnAssignedFocusEntity`
    * dispatch + sync-dirty flag.
    */
-  CUnitCarrierLand::CUnitCarrierLand(CCommandTask* const parentTask, Unit* const carrier)
+  CUnitCarrierLand::CUnitCarrierLand(
+    CCommandTask* const parentTask,
+    Unit* const carrier
+  )
     : CCommandTask(parentTask)
     , mTargetCarrier{}
     , mHasLoadedIntoCarrier(false)
@@ -128,8 +131,10 @@ namespace moho
     if (unit->IsUnitState(UNITSTATE_Refueling)) {
       // Auto-refuel landings only proceed while the carrier is parked: it must
       // be idle and neither surfacing nor diving.
-      if (!carrier->IsIdleState() || carrier->IsUnitState(UNITSTATE_MovingUp)
-          || carrier->IsUnitState(UNITSTATE_MovingDown)) {
+      if (
+        !carrier->IsIdleState() || carrier->IsUnitState(UNITSTATE_MovingUp) ||
+        carrier->IsUnitState(UNITSTATE_MovingDown)
+      ) {
         return -1;
       }
     } else if (mTaskState >= TASKSTATE_Waiting && !carrier->IsUnitState(UNITSTATE_TransportLoading)) {

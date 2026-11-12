@@ -26,7 +26,10 @@ namespace difffuzz
      * call eax`): the stub's own call pushed a return into the stub, and the
      * retail caller's return address sits one slot above the index.
      */
-    extern "C" void __cdecl ImportTrap(const std::uint32_t index, const std::uint32_t callerReturn)
+    extern "C" void __cdecl ImportTrap(
+      const std::uint32_t index,
+      const std::uint32_t callerReturn
+    )
     {
       const char* const name = index < gImportNames.size() ? gImportNames[index].c_str() : "?";
       std::fprintf(stderr, "  !! unresolved import %s (called from retail 0x%08X)\n", name, callerReturn);
@@ -34,7 +37,9 @@ namespace difffuzz
       RaiseException(kImportTrapException, 0, 0, nullptr);
     }
 
-    [[nodiscard]] DWORD SectionProtection(const DWORD characteristics) noexcept
+    [[nodiscard]] DWORD SectionProtection(
+      const DWORD characteristics
+    ) noexcept
     {
       const bool exec = (characteristics & IMAGE_SCN_MEM_EXECUTE) != 0;
       const bool write = (characteristics & IMAGE_SCN_MEM_WRITE) != 0;
@@ -44,21 +49,33 @@ namespace difffuzz
       return write ? PAGE_READWRITE : PAGE_READONLY;
     }
 
-    void DescribeRegion(const std::uint32_t va, std::string& error)
+    void DescribeRegion(
+      const std::uint32_t va,
+      std::string& error
+    )
     {
       MEMORY_BASIC_INFORMATION mbi{};
       if (VirtualQuery(reinterpret_cast<void*>(static_cast<std::uintptr_t>(va)), &mbi, sizeof(mbi)) != 0) {
         char buf[256];
         std::snprintf(
-          buf, sizeof(buf), " (VirtualQuery 0x%08X: state=0x%lX base=0x%p size=0x%IX type=0x%lX)", va, mbi.State,
-          mbi.AllocationBase, mbi.RegionSize, mbi.Type
+          buf,
+          sizeof(buf),
+          " (VirtualQuery 0x%08X: state=0x%lX base=0x%p size=0x%IX type=0x%lX)",
+          va,
+          mbi.State,
+          mbi.AllocationBase,
+          mbi.RegionSize,
+          mbi.Type
         );
         error += buf;
       }
     }
   } // namespace
 
-  bool RetailImage::Load(const std::string& path, std::string& error)
+  bool RetailImage::Load(
+    const std::string& path,
+    std::string& error
+  )
   {
     std::ifstream file(path, std::ios::binary);
     if (!file) {
@@ -72,13 +89,18 @@ namespace difffuzz
     }
 
     const auto* const dos = reinterpret_cast<const IMAGE_DOS_HEADER*>(bytes.data());
-    if (dos->e_magic != IMAGE_DOS_SIGNATURE || static_cast<std::size_t>(dos->e_lfanew) + sizeof(IMAGE_NT_HEADERS32) > bytes.size()) {
+    if (
+      dos->e_magic != IMAGE_DOS_SIGNATURE ||
+      static_cast<std::size_t>(dos->e_lfanew) + sizeof(IMAGE_NT_HEADERS32) > bytes.size()
+    ) {
       error = "not an MZ image";
       return false;
     }
     const auto* const nt = reinterpret_cast<const IMAGE_NT_HEADERS32*>(bytes.data() + dos->e_lfanew);
-    if (nt->Signature != IMAGE_NT_SIGNATURE || nt->FileHeader.Machine != IMAGE_FILE_MACHINE_I386
-        || nt->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
+    if (
+      nt->Signature != IMAGE_NT_SIGNATURE || nt->FileHeader.Machine != IMAGE_FILE_MACHINE_I386 ||
+      nt->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR32_MAGIC
+    ) {
       error = "not a PE32 i386 image";
       return false;
     }
@@ -96,16 +118,22 @@ namespace difffuzz
       // A launcher parent may already have committed the range for us
       // (RelaunchWithPreclaimedImage): accept exactly that allocation.
       MEMORY_BASIC_INFORMATION mbi{};
-      if (VirtualQuery(want, &mbi, sizeof(mbi)) != 0 && mbi.AllocationBase == want && mbi.Type == MEM_PRIVATE
-          && mbi.State == MEM_COMMIT && mbi.Protect == PAGE_READWRITE && mbi.RegionSize >= opt.SizeOfImage) {
+      if (
+        VirtualQuery(want, &mbi, sizeof(mbi)) != 0 && mbi.AllocationBase == want && mbi.Type == MEM_PRIVATE &&
+        mbi.State == MEM_COMMIT && mbi.Protect == PAGE_READWRITE && mbi.RegionSize >= opt.SizeOfImage
+      ) {
         mapped = want;
       }
     }
     if (mapped != want) {
       char buf[160];
       std::snprintf(
-        buf, sizeof(buf), "VirtualAlloc(0x%08lX, 0x%lX) failed (GetLastError=%lu): the retail image range is taken",
-        opt.ImageBase, opt.SizeOfImage, GetLastError()
+        buf,
+        sizeof(buf),
+        "VirtualAlloc(0x%08lX, 0x%lX) failed (GetLastError=%lu): the retail image range is taken",
+        opt.ImageBase,
+        opt.SizeOfImage,
+        GetLastError()
       );
       error = buf;
       DescribeRegion(opt.ImageBase, error);
@@ -119,8 +147,8 @@ namespace difffuzz
     const IMAGE_SECTION_HEADER* const sections = IMAGE_FIRST_SECTION(nt);
     for (unsigned i = 0; i < nt->FileHeader.NumberOfSections; ++i) {
       const IMAGE_SECTION_HEADER& s = sections[i];
-      const DWORD rawCopy = s.SizeOfRawData < s.Misc.VirtualSize || s.Misc.VirtualSize == 0 ? s.SizeOfRawData
-                                                                                             : s.Misc.VirtualSize;
+      const DWORD rawCopy =
+        s.SizeOfRawData < s.Misc.VirtualSize || s.Misc.VirtualSize == 0 ? s.SizeOfRawData : s.Misc.VirtualSize;
       if (rawCopy != 0) {
         if (static_cast<std::size_t>(s.PointerToRawData) + rawCopy > bytes.size()) {
           error = "section raw data past end of file";
@@ -135,7 +163,8 @@ namespace difffuzz
     if (importDir.VirtualAddress != 0) {
       std::vector<std::uint32_t*> slots;
       for (auto* desc = reinterpret_cast<const IMAGE_IMPORT_DESCRIPTOR*>(base + importDir.VirtualAddress);
-           desc->Name != 0; ++desc) {
+           desc->Name != 0;
+           ++desc) {
         const char* const dll = reinterpret_cast<const char*>(base + desc->Name);
         const DWORD lookupRva = desc->OriginalFirstThunk != 0 ? desc->OriginalFirstThunk : desc->FirstThunk;
         auto* lookup = reinterpret_cast<const std::uint32_t*>(base + lookupRva);
@@ -188,7 +217,9 @@ namespace difffuzz
     for (unsigned i = 0; i < nt->FileHeader.NumberOfSections; ++i) {
       const IMAGE_SECTION_HEADER& s = sections[i];
       const DWORD size = s.Misc.VirtualSize != 0 ? s.Misc.VirtualSize : s.SizeOfRawData;
-      if (size != 0 && !VirtualProtect(base + s.VirtualAddress, size, SectionProtection(s.Characteristics), &oldProtect)) {
+      if (
+        size != 0 && !VirtualProtect(base + s.VirtualAddress, size, SectionProtection(s.Characteristics), &oldProtect)
+      ) {
         error = "VirtualProtect failed for a section";
         return false;
       }
@@ -197,7 +228,11 @@ namespace difffuzz
     return true;
   }
 
-  bool ReadImageExtent(const std::string& path, std::uint32_t& base, std::uint32_t& size)
+  bool ReadImageExtent(
+    const std::string& path,
+    std::uint32_t& base,
+    std::uint32_t& size
+  )
   {
     std::ifstream file(path, std::ios::binary);
     IMAGE_DOS_HEADER dos{};
@@ -214,7 +249,10 @@ namespace difffuzz
     return true;
   }
 
-  int RelaunchWithPreclaimedImage(const std::uint32_t base, const std::uint32_t size)
+  int RelaunchWithPreclaimedImage(
+    const std::uint32_t base,
+    const std::uint32_t size
+  )
   {
     // The NLS views and process heaps that land at 0x00400000 are created
     // while the process initialises, after CreateProcess returns. A child
@@ -238,11 +276,16 @@ namespace difffuzz
       return 3;
     }
     void* const got = VirtualAllocEx(
-      pi.hProcess, reinterpret_cast<void*>(static_cast<std::uintptr_t>(base)), size, MEM_RESERVE | MEM_COMMIT,
+      pi.hProcess,
+      reinterpret_cast<void*>(static_cast<std::uintptr_t>(base)),
+      size,
+      MEM_RESERVE | MEM_COMMIT,
       PAGE_READWRITE
     );
     if (got == nullptr) {
-      std::fprintf(stderr, "difffuzz: VirtualAllocEx(0x%08X) in the suspended child failed: %lu\n", base, GetLastError());
+      std::fprintf(
+        stderr, "difffuzz: VirtualAllocEx(0x%08X) in the suspended child failed: %lu\n", base, GetLastError()
+      );
       TerminateProcess(pi.hProcess, 3);
       CloseHandle(pi.hThread);
       CloseHandle(pi.hProcess);
@@ -257,7 +300,9 @@ namespace difffuzz
     return static_cast<int>(code);
   }
 
-  bool RetailImage::IsExecutable(const std::uint32_t va) const noexcept
+  bool RetailImage::IsExecutable(
+    const std::uint32_t va
+  ) const noexcept
   {
     MEMORY_BASIC_INFORMATION mbi{};
     if (VirtualQuery(reinterpret_cast<void*>(static_cast<std::uintptr_t>(va)), &mbi, sizeof(mbi)) == 0) {
@@ -266,7 +311,10 @@ namespace difffuzz
     return (mbi.Protect & (PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE)) != 0;
   }
 
-  bool RetailImage::PokeDword(const std::uint32_t va, const std::uint32_t value) noexcept
+  bool RetailImage::PokeDword(
+    const std::uint32_t va,
+    const std::uint32_t value
+  ) noexcept
   {
     if (va < mBase || va + 4 > mBase + mSizeOfImage) {
       return false;
@@ -281,7 +329,10 @@ namespace difffuzz
     return true;
   }
 
-  bool RetailImage::PatchJump(const std::uint32_t va, const void* const target) noexcept
+  bool RetailImage::PatchJump(
+    const std::uint32_t va,
+    const void* const target
+  ) noexcept
   {
     if (va < mBase || va + 5 > mBase + mSizeOfImage) {
       return false;

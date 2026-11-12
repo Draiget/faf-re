@@ -10,7 +10,10 @@
 
 namespace faf::remote
 {
-  wire::SFrameCodec MakeViewCodec(const float mapSizeX, const float mapSizeZ)
+  wire::SFrameCodec MakeViewCodec(
+    const float mapSizeX,
+    const float mapSizeZ
+  )
   {
     wire::SFrameCodec codec{};
     codec.position = wire::SPositionQuantizer::ForMap(mapSizeX, mapSizeZ);
@@ -18,7 +21,11 @@ namespace faf::remote
     return codec;
   }
 
-  CViewLanes::CViewLanes(const wire::SContentTables& tables, const float mapSizeX, const float mapSizeZ)
+  CViewLanes::CViewLanes(
+    const wire::SContentTables& tables,
+    const float mapSizeX,
+    const float mapSizeZ
+  )
     : CViewFrames(tables, MakeViewCodec(mapSizeX, mapSizeZ))
   {}
 
@@ -27,7 +34,9 @@ namespace faf::remote
     moho::Sim::SetSyncRouting(nullptr);
   }
 
-  void CViewLanes::OnViewFrames(moho::Sim& sim)
+  void CViewLanes::OnViewFrames(
+    moho::Sim& sim
+  )
   {
     const auto armyCount = static_cast<std::size_t>(ArmyCount());
     if (mClients.size() < ViewSlots()) {
@@ -55,7 +64,10 @@ namespace faf::remote
       for (std::size_t army = 0; army < armyCount && army < mRouter->ViewCount(); ++army) {
         SClient& client = mClients[army];
         client.lua.Clear();
-        if (HasView(static_cast<std::int32_t>(army)) && !wire::EncodeLuaSyncLane(mRouter->Payload(army), mRouter->Prints(army), client.lua)) {
+        if (
+          HasView(static_cast<std::int32_t>(army)) &&
+          !wire::EncodeLuaSyncLane(mRouter->Payload(army), mRouter->Prints(army), client.lua)
+        ) {
           ++client.failures;
         }
       }
@@ -77,7 +89,9 @@ namespace faf::remote
     }
   }
 
-  std::size_t CViewLanes::PrepareSideJobs(moho::Sim& sim)
+  std::size_t CViewLanes::PrepareSideJobs(
+    moho::Sim& sim
+  )
   {
     // Every army's grids, encoded once for all the views that receive them, on the workers with the
     // frames: the grids mostly wait on memory (a vision cell is 2 map units), the frames mostly compute.
@@ -88,7 +102,9 @@ namespace faf::remote
       if (army == nullptr) {
         continue;
       }
-      moho::CIntelGrid* const kinds[2] = {army->mConstDat.mVisionReconGrid.get(), army->mConstDat.mWaterReconGrid.get()};
+      moho::CIntelGrid* const kinds[2] = {
+        army->mConstDat.mVisionReconGrid.get(), army->mConstDat.mWaterReconGrid.get()
+      };
       for (std::uint8_t kind = 0; kind < 2u; ++kind) {
         moho::CIntelGrid* const grid = kinds[kind];
         if (grid == nullptr) {
@@ -126,7 +142,9 @@ namespace faf::remote
     return slots;
   }
 
-  void CViewLanes::RunSideJob(const std::size_t index)
+  void CViewLanes::RunSideJob(
+    const std::size_t index
+  )
   {
     SBeatGrid& beatGrid = mBeatGrids[index];
     moho::CIntelGrid* const grid = beatGrid.source;
@@ -140,12 +158,118 @@ namespace faf::remote
     // Only the chunks the sim may have rastered since last beat (a vision cell is 2 map units, so a
     // grid is up to a megabyte); a grid the clients get whole is read whole.
     wire::EncodeGridDeltaInPlace(
-      grid->mWidth, grid->mHeight, grid->mGrid.get(), beatGrid.seen.data(), beatGrid.delta, grid->ChangedChunks(),
-      moho::CIntelGrid::kChangeChunkCells, beatGrid.fresh
+      grid->mWidth,
+      grid->mHeight,
+      grid->mGrid.get(),
+      beatGrid.seen.data(),
+      beatGrid.delta,
+      grid->ChangedChunks(),
+      moho::CIntelGrid::kChangeChunkCells,
+      beatGrid.fresh
     );
   }
 
-  void CViewLanes::Send(const std::size_t army)
+  void CViewLanes::SetCameras(
+    const std::size_t army,
+    std::vector<SCameraReport> cameras
+  )
+  {
+    const std::scoped_lock lock(mCamerasLock);
+    if (army >= mCameras.size()) {
+      mCameras.resize(army + 1u);
+    }
+    mCameras[army] = std::move(cameras);
+  }
+
+  void CViewLanes::CheckPoses(
+    SClient& client,
+    const wire::BitWriter& lane
+  )
+  {
+    // Plan WP8.2's check. As a client applies the lane: a whole unit's bones replace what it held (none: it drops
+    // the unit), a change adds each bone's difference and takes its flags.
+    thread_local std::vector<wire::SUnitPose> units;
+    wire::BitReader reader(lane.Bytes());
+    if (!wire::DecodePoseLane(reader, units)) {
+      ++client.failures;
+      return;
+    }
+    for (const wire::SUnitPose& unit : units) {
+      if (unit.whole) {
+        if (unit.bones.empty()) {
+          client.poseCopy.erase(unit.id);
+        } else {
+          client.poseCopy[unit.id] = unit.bones;
+        }
+        continue;
+      }
+      const auto held = client.poseCopy.find(unit.id);
+      for (std::size_t i = 0; i < unit.indices.size(); ++i) {
+        if (held == client.poseCopy.end() || unit.indices[i] >= held->second.size()) {
+          mPoseCheckOrphanChanges.fetch_add(1u, std::memory_order_relaxed);
+          continue;
+        }
+        wire::SPoseBone& bone = held->second[unit.indices[i]];
+        const wire::SPoseBone& difference = unit.bones[i];
+        for (std::size_t c = 0; c < 3; ++c) {
+          bone.position[c] += difference.position[c];
+        }
+        for (std::size_t c = 0; c < 4; ++c) {
+          bone.rotation[c] += difference.rotation[c];
+        }
+        bone.visible = difference.visible;
+        bone.skipInterp = difference.skipInterp;
+      }
+    }
+    // The copy keeps only units the client still holds; every one it isn't owed must equal what the server sent.
+    std::uint64_t compared = 0;
+    std::uint64_t differ = 0;
+    for (auto it = client.poseCopy.begin(); it != client.poseCopy.end();) {
+      if (!std::binary_search(client.poseUnitsNext.begin(), client.poseUnitsNext.end(), it->first)) {
+        it = client.poseCopy.erase(it);
+      } else {
+        ++it;
+      }
+    }
+    std::size_t owedAt = 0;
+    for (const std::uint32_t id : client.poseUnitsNext) {
+      while (owedAt < client.owedPoses.size() && client.owedPoses[owedAt].id < id) {
+        ++owedAt;
+      }
+      if (owedAt < client.owedPoses.size() && client.owedPoses[owedAt].id == id) {
+        continue; // owed: the client may be behind until the unit goes whole
+      }
+      const std::span<const wire::SPoseBone> sent = Poses().SentPose(id);
+      const auto held = client.poseCopy.find(id);
+      const bool same = held == client.poseCopy.end()
+        ? sent.empty()
+        : std::equal(sent.begin(), sent.end(), held->second.begin(), held->second.end());
+      ++compared;
+      differ += same ? 0u : 1u;
+    }
+    mPoseCheckUnits.fetch_add(compared, std::memory_order_relaxed);
+    mPoseCheckDiffers.fetch_add(differ, std::memory_order_relaxed);
+  }
+
+  std::string CViewLanes::PoseCheckReport() const
+  {
+    return std::to_string(mPoseCheckUnits.load()) + " unit-beats compared, " +
+      std::to_string(mPoseCheckDiffers.load()) + " differ, " + std::to_string(mPoseCheckOrphanChanges.load()) +
+      " changes to a unit the client held no pose of";
+  }
+
+  std::size_t CViewLanes::OwedPoses() const
+  {
+    std::size_t owed = 0;
+    for (const SClient& client : mClients) {
+      owed += client.owedPoses.size();
+    }
+    return owed;
+  }
+
+  void CViewLanes::Send(
+    const std::size_t army
+  )
   {
     SClient& client = mClients[army];
     client.bytes = static_cast<std::uint32_t>(client.lua.Bytes().size());
@@ -231,11 +355,38 @@ namespace faf::remote
     }
     client.grids.swap(client.gridsNext);
 
-    // Pose lane (plan WP8.1): the bones of the units its client holds, against what it was sent.
+    // Pose lane (plan WP8.1): the bones of the units its client holds, against what it was sent; with a budget
+    // (WP8.2) the units nearest its cameras first, and the ones left out owed whole.
     wire::BitWriter poseWriter;
     if (PosesOn()) {
       HeldUnitIds(army, client.poseUnitsNext);
-      if (Poses().EncodeView(client.poseUnitsNext, client.poseUnits, fresh, poseWriter)) {
+      bool posesOk = true;
+      if (mPoseBudgetBytes != 0u) {
+        std::vector<SCameraReport> cameras;
+        {
+          const std::scoped_lock lock(mCamerasLock);
+          if (army < mCameras.size()) {
+            cameras = mCameras[army];
+          }
+        }
+        HeldUnitKeys(army, client.poseUnitsNext, cameras, client.poseKeys);
+        posesOk = Poses().EncodeViewBudgeted(
+          client.poseUnitsNext,
+          client.poseUnits,
+          fresh,
+          mPoseBudgetBytes,
+          client.poseKeys,
+          client.poseBeat++,
+          client.owedPoses,
+          poseWriter
+        );
+      } else {
+        posesOk = Poses().EncodeView(client.poseUnitsNext, client.poseUnits, fresh, poseWriter);
+      }
+      if (posesOk && mPoseCheck) {
+        CheckPoses(client, poseWriter);
+      }
+      if (posesOk) {
         client.bytes += static_cast<std::uint32_t>(poseWriter.Bytes().size());
       } else {
         ++client.failures;
@@ -263,7 +414,8 @@ namespace faf::remote
       }
       lanes.teamEntities = HeldCount(static_cast<std::int32_t>(teamSlot));
       // The team's view hashed itself only on a check's beat; between them a whole view hashes it here.
-      lanes.teamHash = check ? mClients[teamSlot].teamHash : (fresh ? HeldFrameHash(static_cast<std::int32_t>(teamSlot)) : 0u);
+      lanes.teamHash =
+        check ? mClients[teamSlot].teamHash : (fresh ? HeldFrameHash(static_cast<std::int32_t>(teamSlot)) : 0u);
       client.bytes += static_cast<std::uint32_t>(lanes.team->Bytes().size());
     }
     OnLanesEncoded(army, lanes);

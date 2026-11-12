@@ -129,7 +129,9 @@ namespace moho
    * Clears reflected base/field vector lanes for one `CUnitCommandTypeInfo`
    * instance while preserving outer storage ownership.
    */
-  [[maybe_unused]] void DestroyCUnitCommandTypeInfoBody(CUnitCommandTypeInfo* const typeInfo) noexcept
+  [[maybe_unused]] void DestroyCUnitCommandTypeInfoBody(
+    CUnitCommandTypeInfo* const typeInfo
+  ) noexcept
   {
     gpg::ClearTypeLists(typeInfo);
   }
@@ -153,7 +155,9 @@ namespace moho
   /**
    * Address: 0x006E7FD0 (FUN_006E7FD0, sub_6E7FD0)
    */
-  void CUnitCommandTypeInfo::ApplyLegacyBaseVersionLane(gpg::RType* const typeInfo)
+  void CUnitCommandTypeInfo::ApplyLegacyBaseVersionLane(
+    gpg::RType* const typeInfo
+  )
   {
     AddBase_CScriptObject(typeInfo);
     AddBase_Broadcaster_ECommandEvent(typeInfo);
@@ -174,7 +178,9 @@ namespace moho
   /**
    * Address: 0x006EB600 (FUN_006EB600, Moho::CUnitCommandTypeInfo::AddBase_CScriptObject)
    */
-  void CUnitCommandTypeInfo::AddBase_CScriptObject(gpg::RType* const typeInfo)
+  void CUnitCommandTypeInfo::AddBase_CScriptObject(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::AddReflectedBaseViaSlot<CScriptObject>(typeInfo);
   }
@@ -182,7 +188,9 @@ namespace moho
   /**
    * Address: 0x006EB660 (FUN_006EB660, Moho::CUnitCommandTypeInfo::AddBase_Broadcaster_ECommandEvent)
    */
-  void CUnitCommandTypeInfo::AddBase_Broadcaster_ECommandEvent(gpg::RType* const typeInfo)
+  void CUnitCommandTypeInfo::AddBase_Broadcaster_ECommandEvent(
+    gpg::RType* const typeInfo
+  )
   {
     gpg::RType* baseType = register_Broadcaster_ECommandEvent_RType();
     if (!baseType) {
@@ -220,6 +228,12 @@ namespace
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_CUnitCommandTypeInfo_67e437, moho::register_CUnitCommandTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_CUnitCommandTypeInfo_67e437,
+  moho::register_CUnitCommandTypeInfo
+)
 
-GPG_PREREGISTER_INIT(PreregisterCUnitCommandPointerType_67e437, moho::PreregisterCUnitCommandPointerType)
+GPG_PREREGISTER_INIT(
+  PreregisterCUnitCommandPointerType_67e437,
+  moho::PreregisterCUnitCommandPointerType
+)

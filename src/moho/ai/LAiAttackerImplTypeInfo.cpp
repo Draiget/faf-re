@@ -81,7 +81,9 @@ void LAiAttackerImplTypeInfo::Init()
 /**
  * Address: 0x005DEA30 (FUN_005DEA30, Moho::LAiAttackerImplTypeInfo::AddBase_CTask)
  */
-void __stdcall LAiAttackerImplTypeInfo::AddBase_CTask(gpg::RType* const typeInfo)
+void __stdcall LAiAttackerImplTypeInfo::AddBase_CTask(
+  gpg::RType* const typeInfo
+)
 {
   gpg::RType* const baseType = gpg::CachedLookup<CTask>(CTask::sType);
 
@@ -110,7 +112,9 @@ gpg::RRef LAiAttackerImplTypeInfo::NewRef()
  * Constructs one `LAiAttackerImpl` with null owner lane in caller-provided
  * storage and returns a typed reflection reference.
  */
-gpg::RRef LAiAttackerImplTypeInfo::CtrRef(void* const objectStorage)
+gpg::RRef LAiAttackerImplTypeInfo::CtrRef(
+  void* const objectStorage
+)
 {
   auto* const task = static_cast<LAiAttackerImpl*>(objectStorage);
   if (task) {
@@ -125,7 +129,9 @@ gpg::RRef LAiAttackerImplTypeInfo::CtrRef(void* const objectStorage)
 /**
  * Address: 0x005DD8C0 (FUN_005DD8C0, Moho::LAiAttackerImplTypeInfo::Delete)
  */
-void LAiAttackerImplTypeInfo::Delete(void* const objectStorage)
+void LAiAttackerImplTypeInfo::Delete(
+  void* const objectStorage
+)
 {
   delete static_cast<LAiAttackerImpl*>(objectStorage);
 }
@@ -133,7 +139,9 @@ void LAiAttackerImplTypeInfo::Delete(void* const objectStorage)
 /**
  * Address: 0x005DD950 (FUN_005DD950, Moho::LAiAttackerImplTypeInfo::Destruct)
  */
-void LAiAttackerImplTypeInfo::Destruct(void* const objectStorage)
+void LAiAttackerImplTypeInfo::Destruct(
+  void* const objectStorage
+)
 {
   static_cast<LAiAttackerImpl*>(objectStorage)->~LAiAttackerImpl();
 }
@@ -152,4 +160,7 @@ void moho::register_LAiAttackerImplTypeInfo()
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_LAiAttackerImplTypeInfo_f0cee0, moho::register_LAiAttackerImplTypeInfo)
+GPG_PREREGISTER_INIT(
+  register_LAiAttackerImplTypeInfo_f0cee0,
+  moho::register_LAiAttackerImplTypeInfo
+)

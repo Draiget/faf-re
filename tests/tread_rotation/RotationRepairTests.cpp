@@ -15,7 +15,10 @@ namespace
 {
   using namespace moho;
 
-  void Check(const bool ok, const char* const why)
+  void Check(
+    const bool ok,
+    const char* const why
+  )
   {
     EXPECT_TRUE(ok) << why;
   }
@@ -34,7 +37,10 @@ namespace
       scroller.SetScroller(def);
     }
 
-    auto& Data() { return entity.mVarDat; }
+    auto& Data()
+    {
+      return entity.mVarDat;
+    }
 
     void SetPriorPair()
     {
@@ -42,9 +48,16 @@ namespace
       Data().mScrollBeatEnd = {3.25f, -4.5f};
     }
 
-    void Yaw(const float half) { Data().mCurTransform.orient_ = {std::cos(half), 0, std::sin(half), 0}; }
+    void Yaw(
+      const float half
+    )
+    {
+      Data().mCurTransform.orient_ = {std::cos(half), 0, std::sin(half), 0};
+    }
 
-    void CheckPriorPairKept(const char* const why)
+    void CheckPriorPairKept(
+      const char* const why
+    )
     {
       Check(
         Data().mScrollBeatStart.x == 3.0f && Data().mScrollBeatStart.y == -4.0f && Data().mScrollBeatEnd.x == 3.25f &&
@@ -61,25 +74,60 @@ namespace
     double x, y, z;
   };
 
-  DVec Add(const DVec a, const DVec b) { return {a.x + b.x, a.y + b.y, a.z + b.z}; }
-  DVec Mul(const DVec a, const double k) { return {a.x * k, a.y * k, a.z * k}; }
-  DVec Cross(const DVec a, const DVec b) { return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
-  double Dot(const DVec a, const DVec b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+  DVec Add(
+    const DVec a,
+    const DVec b
+  )
+  {
+    return {a.x + b.x, a.y + b.y, a.z + b.z};
+  }
+  DVec Mul(
+    const DVec a,
+    const double k
+  )
+  {
+    return {a.x * k, a.y * k, a.z * k};
+  }
+  DVec Cross(
+    const DVec a,
+    const DVec b
+  )
+  {
+    return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
+  }
+  double Dot(
+    const DVec a,
+    const DVec b
+  )
+  {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+  }
 
-  DVec Rotate(const Wm3::Quatf& q, const DVec v)
+  DVec Rotate(
+    const Wm3::Quatf& q,
+    const DVec v
+  )
   {
     const DVec u{q.x, q.y, q.z};
     return Add(v, Add(Mul(Cross(u, v), 2.0 * q.w), Mul(Cross(u, Cross(u, v)), 2.0)));
   }
 
-  double SideDelta(const Wm3::Quatf& last, const Wm3::Quatf& cur)
+  double SideDelta(
+    const Wm3::Quatf& last,
+    const Wm3::Quatf& cur
+  )
   {
     const DVec side = Add(Rotate(cur, {1, 0, 0}), Mul(Rotate(last, {1, 0, 0}), -1));
     const DVec forward = Mul(Add(Rotate(cur, {0, 0, 1}), Rotate(last, {0, 0, 1})), 0.5);
     return Dot(side, forward);
   }
 
-  void CheckRepeatedAxis(const float ax, const float ay, const float az, const float scale)
+  void CheckRepeatedAxis(
+    const float ax,
+    const float ay,
+    const float az,
+    const float scale
+  )
   {
     Fixture f;
     f.scroller.mScroller.mFloat28 = scale;
@@ -191,31 +239,46 @@ namespace
   }
 } // namespace
 
-TEST(Existing_RotationRepair, YawInBothDirections)
+TEST(
+  Existing_RotationRepair,
+  YawInBothDirections
+)
 {
   CheckYawInBothDirections();
 }
 
-TEST(Existing_RotationRepair, NoMotionKeepsPriorPair)
+TEST(
+  Existing_RotationRepair,
+  NoMotionKeepsPriorPair
+)
 {
   CheckNoMotionKeepsPriorPair();
 }
 
-TEST(Existing_RotationRepair, TranslationUnchanged)
+TEST(
+  Existing_RotationRepair,
+  TranslationUnchanged
+)
 {
   CheckTranslationUnchanged();
 }
 
-TEST(Existing_RotationRepair, ManualModeUntouched)
+TEST(
+  Existing_RotationRepair,
+  ManualModeUntouched
+)
 {
   CheckManualModeUntouched();
 }
 
-TEST(Existing_RotationRepair, RepeatedAxis)
+TEST(
+  Existing_RotationRepair,
+  RepeatedAxis
+)
 {
-  CheckRepeatedAxis(0, 1, 0, 1);       // yaw
-  CheckRepeatedAxis(1, 0, 0, 1);       // pitch: zero projection
-  CheckRepeatedAxis(0, 0, 1, 1);       // roll: zero projection
-  CheckRepeatedAxis(1, 2, 3, 0.75f);   // tilted axis
-  CheckRepeatedAxis(1, 2, 3, -0.75f);  // tilted axis, negative scale
+  CheckRepeatedAxis(0, 1, 0, 1);      // yaw
+  CheckRepeatedAxis(1, 0, 0, 1);      // pitch: zero projection
+  CheckRepeatedAxis(0, 0, 1, 1);      // roll: zero projection
+  CheckRepeatedAxis(1, 2, 3, 0.75f);  // tilted axis
+  CheckRepeatedAxis(1, 2, 3, -0.75f); // tilted axis, negative scale
 }

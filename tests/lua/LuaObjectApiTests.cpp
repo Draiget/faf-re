@@ -34,20 +34,26 @@ namespace
   // ---------------------------------------------------------------------------------------------
   // C functions the tests register.
 
-  int Twice(lua_State* const L)
+  int Twice(
+    lua_State* const L
+  )
   {
     lua_pushnumber(L, lua_tonumber(L, 1) * 2.0f);
     return 1;
   }
 
-  int AddUpvalue(lua_State* const L)
+  int AddUpvalue(
+    lua_State* const L
+  )
   {
     lua_pushnumber(L, lua_tonumber(L, 1) + lua_tonumber(L, lua_upvalueindex(1)));
     return 1;
   }
 
   // Uses the LuaState argument helpers a binding uses: CheckString, OptNumber, CheckAny.
-  int Describe(lua_State* const L)
+  int Describe(
+    lua_State* const L
+  )
   {
     LuaState* const state = LuaState::CastState(L);
     size_t length = 0;
@@ -57,40 +63,52 @@ namespace
     return 1;
   }
 
-  int NeedsNumber(lua_State* const L)
+  int NeedsNumber(
+    lua_State* const L
+  )
   {
     lua_pushnumber(L, LuaState::CastState(L)->CheckNumber(1) + 1.0f);
     return 1;
   }
 
-  int RaisesFormatted(lua_State* const L)
+  int RaisesFormatted(
+    lua_State* const L
+  )
   {
     LuaState::Error(LuaState::CastState(L), "formatted %d %s", 5, "words");
     return 0;
   }
 
-  int GetStringOfArgument(lua_State* const L)
+  int GetStringOfArgument(
+    lua_State* const L
+  )
   {
     const LuaObject value(LuaState::CastState(L), 1);
     lua_pushstring(L, value.GetString());
     return 1;
   }
 
-  int GetNumberOfArgument(lua_State* const L)
+  int GetNumberOfArgument(
+    lua_State* const L
+  )
   {
     const LuaObject value(LuaState::CastState(L), 1);
     lua_pushnumber(L, static_cast<lua_Number>(value.GetNumber()));
     return 1;
   }
 
-  int GetBooleanOfArgument(lua_State* const L)
+  int GetBooleanOfArgument(
+    lua_State* const L
+  )
   {
     const LuaObject value(LuaState::CastState(L), 1);
     lua_pushboolean(L, value.GetBoolean() ? 1 : 0);
     return 1;
   }
 
-  int WrapAsFunction(lua_State* const L)
+  int WrapAsFunction(
+    lua_State* const L
+  )
   {
     const LuaPlus::LuaFunction<void> function(LuaObject(LuaState::CastState(L), 1));
     (void)function;
@@ -100,7 +118,10 @@ namespace
 
   // ---------------------------------------------------------------------------------------------
 
-  TEST_F(LuaObjectApi, TablesBySetterAndGetter)
+  TEST_F(
+    LuaObjectApi,
+    TablesBySetterAndGetter
+  )
   {
     LuaObject t = NewTable();
     t.SetString("name", "unit");
@@ -136,7 +157,10 @@ namespace
     EXPECT_TRUE(t["name"].IsNil());
   }
 
-  TEST_F(LuaObjectApi, ObjectKeys)
+  TEST_F(
+    LuaObjectApi,
+    ObjectKeys
+  )
   {
     LuaObject t = NewTable();
     LuaObject key = NewTable();
@@ -150,8 +174,8 @@ namespace
     t.SetInteger(stringKey, 9);
     EXPECT_STREQ(t[key].GetString(), "by table");
     EXPECT_STREQ(t.GetByObject(key).GetString(), "by table");
-    EXPECT_EQ(t[7].GetNumber(), 1.5);   // a number key reads back by index
-    EXPECT_EQ(t["s"].GetInteger(), 9);  // a string key by name
+    EXPECT_EQ(t[7].GetNumber(), 1.5);  // a number key reads back by index
+    EXPECT_EQ(t["s"].GetInteger(), 9); // a string key by name
 
     t.SetBoolean(key, true);
     EXPECT_TRUE(t[key].GetBoolean());
@@ -169,7 +193,10 @@ namespace
     EXPECT_TRUE(t[5] == t["pointer"]);
   }
 
-  TEST_F(LuaObjectApi, CreateTableAndLookup)
+  TEST_F(
+    LuaObjectApi,
+    CreateTableAndLookup
+  )
   {
     LuaObject root = NewTable();
     LuaObject a = root.CreateTable("a", 0, 0);
@@ -190,7 +217,10 @@ namespace
     EXPECT_TRUE(root.Lookup("").IsTable()); // an empty path is the object itself
   }
 
-  TEST_F(LuaObjectApi, TypesAndTypeNames)
+  TEST_F(
+    LuaObjectApi,
+    TypesAndTypeNames
+  )
   {
     const LuaObject nilValue = Run("return nil");
     const LuaObject boolValue = Run("return false");
@@ -229,7 +259,10 @@ namespace
     EXPECT_EQ(thread.Type(), LUA_TTHREAD);
   }
 
-  TEST_F(LuaObjectApi, TruthinessAndComparison)
+  TEST_F(
+    LuaObjectApi,
+    TruthinessAndComparison
+  )
   {
     EXPECT_FALSE(static_cast<bool>(Run("return nil")));
     EXPECT_FALSE(static_cast<bool>(Run("return false")));
@@ -246,7 +279,10 @@ namespace
     EXPECT_TRUE(Run("return 'a'") < Run("return 'b'"));
   }
 
-  TEST_F(LuaObjectApi, Conversions)
+  TEST_F(
+    LuaObjectApi,
+    Conversions
+  )
   {
     // ToNumber / ToInteger of a numeric string are not asserted: retail (0x009073B0, 0x00907380)
     // checks luaV_tonumber's answer but then reads the object's own payload (`fld [esi+10h]`,
@@ -293,7 +329,10 @@ namespace
     EXPECT_TRUE(assigned.IsNil());
   }
 
-  TEST_F(LuaObjectApi, GettersRaiseTypeErrorsInsideLua)
+  TEST_F(
+    LuaObjectApi,
+    GettersRaiseTypeErrorsInsideLua
+  )
   {
     LuaObject globals = state.GetGlobals();
     globals.Register("probe_string", GetStringOfArgument, 0);
@@ -314,7 +353,10 @@ namespace
     EXPECT_EQ(Num("return 1"), 1.0); // the state recovered
   }
 
-  TEST_F(LuaObjectApi, LengthsAndCounts)
+  TEST_F(
+    LuaObjectApi,
+    LengthsAndCounts
+  )
   {
     LuaObject list = Run("return {10, 20, 30, n = 3, extra = true}");
     EXPECT_EQ(list.GetCount(), 3);
@@ -328,7 +370,10 @@ namespace
     EXPECT_EQ(Run("return {}").GetTableCount(), 0);
   }
 
-  TEST_F(LuaObjectApi, InsertRemoveSort)
+  TEST_F(
+    LuaObjectApi,
+    InsertRemoveSort
+  )
   {
     LuaObject list = NewTable();
     for (const int value : {5, 3, 9}) {
@@ -355,7 +400,10 @@ namespace
     EXPECT_TRUE(list[4].IsNil());
   }
 
-  TEST_F(LuaObjectApi, Metatables)
+  TEST_F(
+    LuaObjectApi,
+    Metatables
+  )
   {
     LuaObject object = NewTable();
     LuaObject meta = NewTable();
@@ -373,7 +421,10 @@ namespace
     EXPECT_FALSE(NewTable().GetMetaTable() == meta);
   }
 
-  TEST_F(LuaObjectApi, RegisteredFunctions)
+  TEST_F(
+    LuaObjectApi,
+    RegisteredFunctions
+  )
   {
     LuaObject globals = state.GetGlobals();
     globals.Register("twice", Twice, 0);
@@ -392,18 +443,25 @@ namespace
     EXPECT_EQ(Str("return describe(12)"), "12/2/7"); // a number is a string to CheckString
     EXPECT_TRUE(Contains(ErrorOf("return describe({})"), "bad argument #1 to `describe' (string expected, got table)"));
     EXPECT_EQ(Num("return needs_number(1)"), 2.0);
-    EXPECT_TRUE(Contains(ErrorOf("return needs_number('x')"), "bad argument #1 to `needs_number' (number expected, got string)"));
+    EXPECT_TRUE(
+      Contains(ErrorOf("return needs_number('x')"), "bad argument #1 to `needs_number' (number expected, got string)")
+    );
     EXPECT_TRUE(Contains(ErrorOf("raises_formatted()"), "formatted 5 words"));
   }
 
-  TEST_F(LuaObjectApi, LuaFunctionCalls)
+  TEST_F(
+    LuaObjectApi,
+    LuaFunctionCalls
+  )
   {
-    Run("function api_add(a, b) return a + b end "
-        "function api_concat(a, b) return a .. b end "
-        "function api_is_big(x) return x > 10 end "
-        "function api_make(n) return {value = n} end "
-        "api_calls = 0 function api_count() api_calls = api_calls + 1 end "
-        "function api_echo(s) return s .. '!' end");
+    Run(
+      "function api_add(a, b) return a + b end "
+      "function api_concat(a, b) return a .. b end "
+      "function api_is_big(x) return x > 10 end "
+      "function api_make(n) return {value = n} end "
+      "api_calls = 0 function api_count() api_calls = api_calls + 1 end "
+      "function api_echo(s) return s .. '!' end"
+    );
 
     const LuaPlus::LuaFunction<double> add(state.GetGlobal("api_add"));
     EXPECT_EQ(add(2, 3), 5.0);
@@ -436,7 +494,10 @@ namespace
     EXPECT_EQ(lua_gettop(L()), 0); // every call restored the stack
   }
 
-  TEST_F(LuaObjectApi, TableIteratorVisitsEveryEntry)
+  TEST_F(
+    LuaObjectApi,
+    TableIteratorVisitsEveryEntry
+  )
   {
     LuaObject t = Run("return {10, 20, a = 'x', b = 'y', [true] = 'bool'}");
     std::map<std::string, std::string> seen;
@@ -470,7 +531,10 @@ namespace
     EXPECT_TRUE(again.IsValid());
   }
 
-  TEST_F(LuaObjectApi, CopiesShareTheValue)
+  TEST_F(
+    LuaObjectApi,
+    CopiesShareTheValue
+  )
   {
     LuaObject original = NewTable();
     LuaObject copy(original);
@@ -492,7 +556,10 @@ namespace
 
   // A LuaObject is a root: what it holds survives collections with no Lua reference left, and goes
   // once the object lets go.
-  TEST_F(LuaObjectApi, ReferencesSurviveCollection)
+  TEST_F(
+    LuaObjectApi,
+    ReferencesSurviveCollection
+  )
   {
     Run("api_weak = setmetatable({}, {__mode = 'v'})");
     LuaObject held = NewTable();
@@ -516,7 +583,10 @@ namespace
     EXPECT_STREQ(text.GetString(), "kept string value");
   }
 
-  TEST_F(LuaObjectApi, LightUserdataRoundTrip)
+  TEST_F(
+    LuaObjectApi,
+    LightUserdataRoundTrip
+  )
   {
     int marker = 0;
     LuaObject t = NewTable();
@@ -537,7 +607,10 @@ namespace
     EXPECT_EQ(Str("return type(api_light)"), "userdata");
   }
 
-  TEST_F(LuaObjectApi, StackObjectsAndStateQueries)
+  TEST_F(
+    LuaObjectApi,
+    StackObjectsAndStateQueries
+  )
   {
     const LuaPlus::LuaStackObject number = state.PushNumber(3.5f);
     EXPECT_EQ(number.GetNumber(), 3.5);
@@ -570,7 +643,10 @@ namespace
   }
 
   // A thread state shares the root's globals and runs code of its own.
-  TEST_F(LuaObjectApi, ThreadStatesShareGlobals)
+  TEST_F(
+    LuaObjectApi,
+    ThreadStatesShareGlobals
+  )
   {
     LuaState thread(&state);
     EXPECT_FALSE(thread.IsRootState());

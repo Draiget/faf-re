@@ -7,62 +7,62 @@
 
 namespace gpg::gal
 {
-	/**
-	 * VFTABLE: 0x00D48998
-	 * COL:     0x00E53994
-	 */
-	class Float16HardwareVertexFormatterD3D10 : public MeshFormatter
-	{
-	public:
-		/**
-		 * Address: 0x0094D770 (FUN_0094D770, ??0Float16HardwareVertexFormatterD3D10@gal@gpg@@QAE@@Z)
-		 *
-		 * What it does:
-		 * Initializes one D3D10 float16 hardware vertex-formatter instance.
-		 */
-		Float16HardwareVertexFormatterD3D10();
+  /**
+   * VFTABLE: 0x00D48998
+   * COL:     0x00E53994
+   */
+  class Float16HardwareVertexFormatterD3D10 : public MeshFormatter
+  {
+  public:
+    /**
+     * Address: 0x0094D770 (FUN_0094D770, ??0Float16HardwareVertexFormatterD3D10@gal@gpg@@QAE@@Z)
+     *
+     * What it does:
+     * Initializes one D3D10 float16 hardware vertex-formatter instance.
+     */
+    Float16HardwareVertexFormatterD3D10();
 
-		/**
-		 * Address: 0x0094D780 (FUN_0094D780)
-		 * Address: 0x0094D910 (FUN_0094D910, slot 0: the scalar deleting destructor)
-		 *
-		 * What it does:
-		 * Nothing of its own; reinstalls the base `MeshFormatter` vtable.
-		 */
-		~Float16HardwareVertexFormatterD3D10() override;
+    /**
+     * Address: 0x0094D780 (FUN_0094D780)
+     * Address: 0x0094D910 (FUN_0094D910, slot 0: the scalar deleting destructor)
+     *
+     * What it does:
+     * Nothing of its own; reinstalls the base `MeshFormatter` vtable.
+     */
+    ~Float16HardwareVertexFormatterD3D10() override;
 
-		/**
-		 * Address: 0x0094D790 (FUN_0094D790)
-		 * Slot: 1
-		 */
-		[[nodiscard]] bool AllowMeshInstancing() override;
+    /**
+     * Address: 0x0094D790 (FUN_0094D790)
+     * Slot: 1
+     */
+    [[nodiscard]] bool AllowMeshInstancing() override;
 
-		/**
-		 * Address: 0x0094D930 (FUN_0094D930)
-		 * Slot: 2
-		 */
-		[[nodiscard]] boost::shared_ptr<VertexFormat> CreateVertexFormat(std::int32_t layoutVariant) override;
+    /**
+     * Address: 0x0094D930 (FUN_0094D930)
+     * Slot: 2
+     */
+    [[nodiscard]] boost::shared_ptr<VertexFormat> CreateVertexFormat(std::int32_t layoutVariant) override;
 
-		/**
-		 * Address: 0x0094D7C0 (FUN_0094D7C0)
-		 * Slot: 3
-		 */
-		[[nodiscard]] std::uint32_t GetVertexStride(
-			std::int32_t streamClass,
-			std::int32_t sizeVariant) override;
+    /**
+     * Address: 0x0094D7C0 (FUN_0094D7C0)
+     * Slot: 3
+     */
+    [[nodiscard]] std::uint32_t GetVertexStride(std::int32_t streamClass, std::int32_t sizeVariant) override;
 
-		/**
-		 * Address: 0x0094D7E0 (FUN_0094D7E0)
-		 * Slot: 4
-		 */
-		void WriteFormattedVertex(
-			std::int32_t streamClass,
-			void* destinationVertex,
-			const MeshVertex& sourceVertex,
-			std::int32_t writeVariant) override;
-	};
+    /**
+     * Address: 0x0094D7E0 (FUN_0094D7E0)
+     * Slot: 4
+     */
+    void WriteFormattedVertex(
+      std::int32_t streamClass,
+      void* destinationVertex,
+      const MeshVertex& sourceVertex,
+      std::int32_t writeVariant
+    ) override;
+  };
 
-	static_assert(
-		sizeof(Float16HardwareVertexFormatterD3D10) == 0x4,
-		"Float16HardwareVertexFormatterD3D10 size must be 0x4");
-}
+  static_assert(
+    sizeof(Float16HardwareVertexFormatterD3D10) == 0x4,
+    "Float16HardwareVertexFormatterD3D10 size must be 0x4"
+  );
+} // namespace gpg::gal
