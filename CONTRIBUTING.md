@@ -80,6 +80,7 @@ Use **GoogleTest (GTest)** for all unit and integration tests. Do not roll custo
   # Run a specific test executable with filter
   .\build\clang-x64-release\tests\faf_net_tests.exe --gtest_filter=Existing_NetRobustness.LuaValidValues
   ```
+- **Client fixes come with a test**: when a fix has logic that can run without a window or a GPU (coordinate conversion, a resize queue, a path or prefs rule), move that logic into a function or small class that a test can call without the window. The `Linux client` check builds the Linux client and every test program, and runs ctest, on each pull request that changes code or build files.
 - **Coverage**: the `clang-x64-release-coverage` preset (Linux: `linux-clang-x64-release-coverage`) builds with llvm-cov counters ([cmake/FafCoverage.cmake](cmake/FafCoverage.cmake)). `tools/coverage/report.sh <build folder>` runs ctest and writes a per-file and per-folder line coverage report of `src/` to `tmp/coverage/`.
 
 ## Commits and pull request titles

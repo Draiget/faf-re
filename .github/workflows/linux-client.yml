@@ -1,0 +1,54 @@
+name: Linux client
+
+# The native Linux engine (FAF_LINUX_CLIENT, issue #255) with the pinned toolchain, the same build as the
+# nightly release's build-linux job: faf_client, then every GoogleTest program of the Linux build
+# (faf_tests, cmake/FafTests.cmake) and ctest. Before this job nothing built the Linux client on a pull
+# request, so a change that broke it, or a Linux client fix with a test, was first built by the nightly.
+# A pull request's code runs here with a read-only token and no secrets, and only restores the cache.
+on:
+  push:
+    branches: [master]
+    paths: &paths
+      - "src/**"
+      - "tests/**"
+      - "tools/linux/**"
+      - "tools/difffuzz/**"
+      - "cmake/**"
+      - "dependencies/patches/**"
+      - "CMakeLists.txt"
+      - "CMakePresets.json"
+      - ".github/workflows/linux-client.yml"
+  pull_request:
+    paths: *paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-client-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    container: ubuntu:22.04@sha256:076e7bf82319619f28dd0aa9c02ab34b055ad37100395b4f49a2ffba04fb5e11
+    timeout-minutes: 90
+    steps:
+      # git for the checkout, zstd for the caches the runner's own jobs compress with it.
+      - run: apt-get update && apt-get install -y --no-install-recommends git ca-certificates zstd
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          bash tools/linux/toolchain.sh --client
+      - uses: actions/cache/restore@v6
+        with:
+          path: dependencies/.downloads
+          key: deps-${{ hashFiles('cmake/FafDependencies.cmake') }}
+      # The simulation's dependencies and the client's submodules; the client's configure fetches its downloads.
+      - run: cmake -DFAF_DEPENDENCIES_ONLY="WildMagic3p8;zlib-1.2.3;boost_1_34_1;monocypher;zstd;vulkan;ffmpeg" -P cmake/FafDependencies.cmake
+      - run: cmake --preset linux-clang-x64-release-plain -DFAF_LINUX_CLIENT=ON
+      - run: cmake --build --preset linux-clang-x64-release-plain --target faf_client faf_tests
+      - run: ctest --test-dir build/linux-clang-x64-release-plain --output-on-failure -j 4 --timeout 600
