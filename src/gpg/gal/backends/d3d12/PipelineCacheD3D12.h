@@ -45,7 +45,7 @@ namespace gpg::gal::d3d12
     static constexpr std::uint32_t kSaveEvery = 64;
     static constexpr std::uint64_t kQuietSeconds = 5;
 
-    void Save(bool inBackground);
+    void Save(bool inBackground) noexcept;
 
     Microsoft::WRL::ComPtr<ID3D12PipelineLibrary> mLibrary;
     std::vector<std::uint8_t> mBlob; // the loaded library's backing store; must outlive mLibrary

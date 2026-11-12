@@ -224,22 +224,31 @@ namespace gpg::gal::d3d12
 
   void PipelineCache::Save(
     const bool inBackground
-  )
+  ) noexcept
   {
-    const SIZE_T size = mLibrary->GetSerializedSize();
-    if (size == 0U || mPath.empty()) {
-      return;
-    }
-    auto bytes = std::make_shared<std::vector<std::uint8_t>>(size);
-    if (FAILED(mLibrary->Serialize(bytes->data(), size))) {
-      return;
-    }
-    if (inBackground) {
-      std::thread([path = mPath, bytes] {
-        WriteFileBytes(path, *bytes);
-      }).detach();
-    } else {
-      WriteFileBytes(mPath, *bytes);
-    }
+    // Runs on pipeline workers too (Store): out of memory or no thread for the write skips this save, and the next
+    // store or quiet frame saves again, rather than the exception reaching the draw that takes the worker's pipeline.
+    try {
+      // The library is free-threaded: a worker can store a pipeline between the size and the copy, and Serialize
+      // then refuses the smaller buffer. Measure again.
+      for (int attempt = 0; attempt < 3; ++attempt) {
+        const SIZE_T size = mLibrary->GetSerializedSize();
+        if (size == 0U || mPath.empty()) {
+          return;
+        }
+        auto bytes = std::make_shared<std::vector<std::uint8_t>>(size);
+        if (FAILED(mLibrary->Serialize(bytes->data(), size))) {
+          continue;
+        }
+        if (inBackground) {
+          std::thread([path = mPath, bytes] {
+            WriteFileBytes(path, *bytes);
+          }).detach();
+        } else {
+          WriteFileBytes(mPath, *bytes);
+        }
+        return;
+      }
+    } catch (...) {}
   }
 } // namespace gpg::gal::d3d12

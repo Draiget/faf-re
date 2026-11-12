@@ -3686,9 +3686,12 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
         mPipelineDeferred = true;
         return nullptr;
       }
-      ComPtr<ID3D12PipelineState> built = pending->second.get();
+      ComPtr<ID3D12PipelineState> built = TakeBuiltPipeline(pending->second);
       mPendingPipelines.erase(pending);
       return mPipelines.emplace(std::move(key.Key()), built).first->second.Get();
+    }
+    if (defer && mPendingPipelines.size() >= kMaxPendingPipelines) {
+      CollectFinishedPipelines(mPendingPipelines, mPipelines); // finished builds free their slots
     }
     if (defer && mPendingPipelines.size() >= kMaxPendingPipelines) {
       mPipelineDeferred = true;
@@ -3850,13 +3853,28 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       job->desc.InputLayout = {job->elements.data(), static_cast<UINT>(job->elements.size())};
       ID3D12Device* const device = mDevice.Get();
       d3d12::PipelineCache* const cache = &mPipelineCache;
-      mPendingPipelines.emplace(std::move(key.Key()), std::async(std::launch::async, [job, device, cache] {
+      std::string name = pass.program->Name();
+      const std::uint32_t format = mBoundFormat;
+      mPendingPipelines.emplace(
+        std::move(key.Key()), std::async(std::launch::async, [job, device, cache, name, format] {
         ComPtr<ID3D12PipelineState> built = cache->Load(job->cacheKey, job->desc);
-        if (built == nullptr && SUCCEEDED(device->CreateGraphicsPipelineState(&job->desc, IID_PPV_ARGS(&built)))) {
-          cache->Store(job->cacheKey, built.Get());
+        if (built == nullptr) {
+          const HRESULT made = device->CreateGraphicsPipelineState(&job->desc, IID_PPV_ARGS(&built));
+          if (SUCCEEDED(made)) {
+            cache->Store(job->cacheKey, built.Get());
+          } else {
+            gpg::Warnf(
+              "D3D12: pipeline for %s (vertex format %u) failed: HRESULT 0x%08lX",
+              name.c_str(),
+              format,
+              static_cast<unsigned long>(made)
+            );
+            built = nullptr;
+          }
         }
         return built; // null on failure: cached as a failure when taken, as below
-      }));
+      })
+      );
       mPipelineDeferred = true;
       return nullptr;
     }

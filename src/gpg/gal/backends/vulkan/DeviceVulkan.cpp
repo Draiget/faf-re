@@ -3726,10 +3726,13 @@ namespace gpg::gal
         mPipelineDeferred = true;
         return VK_NULL_HANDLE;
       }
-      const VkPipeline built = pending->second.get();
+      const VkPipeline built = TakeBuiltPipeline(pending->second);
       mPendingPipelines.erase(pending);
       mPipelines.emplace(std::move(key.Key()), built);
       return built;
+    }
+    if (defer && mPendingPipelines.size() >= kMaxPendingPipelines) {
+      CollectFinishedPipelines(mPendingPipelines, mPipelines); // finished builds free their slots
     }
     if (defer && mPendingPipelines.size() >= kMaxPendingPipelines) {
       mPipelineDeferred = true;
@@ -4030,7 +4033,7 @@ namespace gpg::gal
   {
     for (auto& [key, pending] : mPendingPipelines) {
       if (pending.valid()) {
-        mPipelines.emplace(key, pending.get());
+        mPipelines.emplace(key, TakeBuiltPipeline(pending));
       }
     }
     mPendingPipelines.clear();
