@@ -1,6 +1,6 @@
 name: Nightly release
 
-# Publishes master's head as the latest release once that night's Replay parity lists no new failure: the x64 and
+# Publishes master's head as the latest release unless more than 5 % of that night's Replay parity desynced anew: the x64 and
 # x86 engine, the commits since the previous nightly, and the parity run it passed. Started by hand
 # it only builds and writes the notes, unless `publish` is ticked. tools/release/README.md.
 on:
@@ -76,14 +76,22 @@ jobs:
           # Master did not move since the last nightly: that release already holds this commit.
           skip=false
           if [ -n "$(git tag --points-at "$sha" --list '*-nightly*')" ]; then skip=true; fi
-          # New failures in the parity run: nothing to publish. No report at all fails this step.
+          if [ "$skip" = true ]; then
+            echo "$sha already has a nightly: nothing to publish." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+          # More than 5 % of the played replays desync where they didn't before: nothing to publish
+          # (tools/release/parity_gate.py; crashes and other failures don't count). No report at
+          # all fails this step.
           if [ -n "$PARITY_RUN" ]; then
             gh run download "$PARITY_RUN" -R "${{ github.repository }}" -n report -D parity-report
-            new=$(jq -r '.regressions | length' parity-report/report.json)
-            if [ "$new" != "0" ]; then
-              skip=true
-              echo "Parity run $PARITY_RUN has $new new failures: nothing to publish." | tee -a "$GITHUB_STEP_SUMMARY"
-            fi
+            gate=0
+            line=$(python3 tools/release/parity_gate.py parity-report/report.json) || gate=$?
+            echo "Parity run $PARITY_RUN: $line" | tee -a "$GITHUB_STEP_SUMMARY"
+            case $gate in
+              0) ;;
+              3) skip=true ;;
+              *) exit "$gate" ;;
+            esac
           fi
           {
             echo "sha=$sha"
@@ -91,7 +99,7 @@ jobs:
             echo "previous=$previous"
             echo "skip=$skip"
           } >> "$GITHUB_OUTPUT"
-          echo "$tag on $sha, changes since $previous, already published: $skip" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "$tag on $sha, changes since $previous, skip: $skip" | tee -a "$GITHUB_STEP_SUMMARY"
 
   build:
     needs: plan

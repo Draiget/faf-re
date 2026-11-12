@@ -1,6 +1,6 @@
 # Nightly releases
 
-The [Nightly release workflow](../../.github/workflows/nightly-release.yml) publishes master's head as the latest release when that night's [Replay parity](../parity-data/README.md) run lists no new failure in its report. Replay parity starts at 20:00 UTC (00:00 UTC+4), and takes about 5 h 30 min.
+The [Nightly release workflow](../../.github/workflows/nightly-release.yml) publishes master's head as the latest release when that night's [Replay parity](../parity-data/README.md) run has new desyncs in at most 5 % of the replays it played. Replay parity starts at 20:00 UTC (00:00 UTC+4), and takes about 5 h 30 min.
 
 | Job | What it does |
 |---|---|
@@ -10,7 +10,7 @@ The [Nightly release workflow](../../.github/workflows/nightly-release.yml) publ
 | `check-linux` | Loads that package in the plain container images of Ubuntu 22.04 and 24.04, Debian 12, AlmaLinux 9, Fedora, Arch and openSUSE Tumbleweed ([linux/check-package.sh](linux/check-package.sh)); the release waits for it |
 | `release` | Writes the notes ([nightly_notes.py](nightly_notes.py)): the parity counts, every commit since the previous release or nightly, and the checksums; and `player-notes.md`, the notes for players (below). Publishes them with the zips and the two exes on their own as a full release marked as the latest, so the repository's release link and `/releases/latest` point at it |
 
-A parity run that failed or lists new failures publishes nothing, and neither does a parity run started by hand, which may have played any commit or set.
+[parity_gate.py](parity_gate.py) decides from the parity report: it divides the new desyncs (a `desync` verdict that the expected file doesn't list) by the replays that reached a checksum verdict (`pass`, `desync`, `expected-desync`), and cancels the release when that is more than 5 %, or when no replay reached one. Crashes, timeouts and other failures don't count. A release published with new failures says so in its notes and names them ([nightly_notes.py](nightly_notes.py)). A parity run that failed publishes nothing, and neither does a parity run started by hand, which may have played any commit or set.
 
 ## Notes for players
 
@@ -28,7 +28,7 @@ Player-Note: Direct3D 12 and Vulkan work without installing the DirectX runtime.
 
 A desync never fails a parity run: the report lists it. So a failed job in the nightly is CI's own, such as a lost runner, a timeout or a download error. The run's `retry` job then starts the [Nightly retry workflow](../../.github/workflows/nightly-retry.yml), which waits for the run to end and re-runs its failed jobs. Nightly release does the same when one of its jobs fails. A run gets three attempts at most.
 
-GitHub starts no workflow from what the workflow token does, so a parity run that Nightly retry re-ran doesn't start Nightly release when it ends. Its `release` job starts it instead, with `publish` and `parity_run`, and only when the report lists no new failures. A re-run started by a person starts Nightly release as a first attempt does.
+GitHub starts no workflow from what the workflow token does, so a parity run that Nightly retry re-ran doesn't start Nightly release when it ends. Its `release` job starts it instead, with `publish` and `parity_run`, and only when the report passes the same gate. A re-run started by a person starts Nightly release as a first attempt does.
 
 Started by hand, the workflow builds the commit and writes the notes as artifacts. It publishes only with `publish` ticked, and such a build has passed no parity run, as its notes say. Give `parity_run` to report a run in the notes, with any new failures named, and `note` for a line of your own, such as what was fixed after that run.
 

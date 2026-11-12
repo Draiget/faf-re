@@ -302,14 +302,20 @@ jobs:
         run: gh workflow run nightly-retry.yml -R "$GITHUB_REPOSITORY" --ref master -f run_id=${{ github.run_id }}
 
   # A re-run started by Nightly retry ends without starting Nightly release (GitHub starts no
-  # workflow from what the workflow token did), so this run starts it, when the report is clean.
+  # workflow from what the workflow token did), so this run starts it, when the report passes the
+  # same gate as Nightly release's plan (tools/release/parity_gate.py: at most 5 % new desyncs).
   release:
     needs: [run, report]
     if: github.event_name == 'schedule' && github.run_attempt > 1 && github.triggering_actor == 'github-actions[bot]'
     runs-on: ubuntu-24.04
     permissions:
+      contents: read
       actions: write  # starts Nightly release
     steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: tools/release
+          persist-credentials: false
       - uses: actions/download-artifact@v8
         with:
           name: report
@@ -317,11 +323,14 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          new=$(jq -r '.regressions | length' report/report.json)
-          if [ "$new" != "0" ]; then
-            echo "$new new failures: no nightly release." | tee -a "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
+          gate=0
+          line=$(python3 tools/release/parity_gate.py report/report.json) || gate=$?
+          echo "$line" | tee -a "$GITHUB_STEP_SUMMARY"
+          case $gate in
+            0) ;;
+            3) echo "No nightly release." | tee -a "$GITHUB_STEP_SUMMARY"; exit 0 ;;
+            *) exit "$gate" ;;
+          esac
           gh workflow run nightly-release.yml -R "$GITHUB_REPOSITORY" --ref master -f ref=${{ github.sha }} \
             -f publish=true -f parity_run=${{ github.run_id }} \
             -f note="Replay parity passed on attempt ${{ github.run_attempt }}, after Nightly retry re-ran its failed jobs."
