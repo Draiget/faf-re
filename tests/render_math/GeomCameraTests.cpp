@@ -407,7 +407,9 @@ TEST(
   const Wm3::Vector3f eye{10.0f, 30.0f, -40.0f};
   const Wm3::Vector3f target{50.0f, 0.0f, 20.0f};
   camera.LookAt(eye, target, {0.0f, 1.0f, 0.0f});
-  Wm3::Vector3f forward = Sub(target, eye);
+  // The look-at builder 0x004EF6E0 computes `[ecx] - [eax]` (0x004EF6E3..0x004EF6ED) with the eye in ECX: the camera's
+  // Z axis runs from the target back to the eye, so what it looks at lies along -Z.
+  Wm3::Vector3f forward = Sub(eye, target);
   forward = Scale(forward, 1.0f / Length(forward));
   const moho::VMatrix4& m = camera.inverseView;
   ExpectNear3({m.r[3].x, m.r[3].y, m.r[3].z}, eye, 1.0e-4f);
@@ -429,7 +431,7 @@ TEST(
   EXPECT_NEAR(Length(r1), 1.0f, 1.0e-5f);
   EXPECT_NEAR(Dot(r0, r2), 0.0f, 1.0e-5f);
   EXPECT_NEAR(Dot(r0, r1), 0.0f, 1.0e-5f);
-  ExpectNear3(r2, {0.0f, -1.0f, 0.0f}, 1.0e-6f);
+  ExpectNear3(r2, {0.0f, 1.0f, 0.0f}, 1.0e-6f); // eye above the target: Z points up, back at the eye
 
   // The view matrix is the inverse of the look-at basis.
   moho::VMatrix4 lookAt{};
