@@ -212,10 +212,18 @@ namespace faf::editor
     {
       return mPanelsWhilePlaying;
     }
+    /** View > Reset layout: the workspace shown now gets its first layout again. */
     void ResetLayout() noexcept
     {
       mResetLayout = true;
     }
+    /**
+     * Shows workspace `workspace` (ui/EdWorkspaces): its own layout and the panels it showed last (its first ones
+     * the first time). The panels shown in the one left are kept for it.
+     */
+    void SwitchWorkspace(int workspace);
+    /** The ids of the panels shown now (PanelId), in the shell's order. */
+    [[nodiscard]] std::vector<std::string> ShownPanelIds() const;
     /** File > Save as new map folder: the dialog asks for the folder's name. */
     void OpenSaveAs() noexcept
     {
@@ -282,7 +290,20 @@ namespace faf::editor
   private:
     EdCommands* mCommands = nullptr;
     const std::vector<EdMenu>* mMenus = nullptr;
+    /** The active workspace's first layout (its EdWorkspace's places) in its dock space. */
     void BuildDefaultLayout(unsigned int dockspaceId);
+    /** Shows exactly these panels (ids), hides the others. */
+    void ShowPanels(const std::vector<std::string>& ids);
+    /** Each panel's window name (as its Begin has it) and its shown flag. */
+    struct PanelFlag
+    {
+      const char* window;
+      bool EdShell::* shown;
+    };
+    static const std::vector<PanelFlag>& PanelFlags();
+    /** The workspaces whose dock space has been laid out this run. */
+    std::vector<bool> mWorkspaceBuilt;
+    bool mWorkspaceStarted = false;
     /** The toolbar under the title row: Play/Stop (F5) first, then New, Open, Save, Save as, Undo, Redo, and the open
      * map. `top` is where it starts (the title row's height). */
     EdMapBrowser mBrowser;

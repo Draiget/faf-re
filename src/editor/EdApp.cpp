@@ -24,6 +24,7 @@
 #include <deque>
 #include <cstdlib>
 #include <filesystem>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -48,6 +49,7 @@
 #include "editor/ui/EdThemeStyle.h"
 #include "editor/ui/EdUiScale.h"
 #include "editor/ui/EdWindowChrome.h"
+#include "editor/ui/EdWorkspaces.h"
 #include "editor/ui/EdImGuiRenderer.h"
 #include "editor/view/EdLiveTerrain.h"
 #include "editor/view/EdMapScene.h"
@@ -127,6 +129,13 @@ namespace faf::editor
     std::string gThemeNow;
     std::string gThemeKept;
 
+    // The workspace shown last and the panels each one showed (Workspace=<key>, Panels.<key>=<ids>), as read at the
+    // first frame. A test run (gTestRun) writes these back unchanged, so it leaves the user's as they were.
+    constexpr const char* kReviewOnlyLooks = "the Review workspace only looks (Alt+1 to edit)";
+    std::string gWorkspaceRead;
+    std::map<std::string, std::vector<std::string>> gPanelsRead;
+    bool gTestRun = false;
+
     void UiSettingsLine(
       ImGuiContext*,
       ImGuiSettingsHandler*,
@@ -141,6 +150,19 @@ namespace faf::editor
         gThemeRead = line + 6;
         gThemeKept = gThemeRead;
       }
+      if (std::strncmp(line, "Workspace=", 10) == 0 && WorkspaceByKey(line + 10) >= 0) {
+        gWorkspaceRead = line + 10;
+        SetActiveWorkspace(WorkspaceByKey(gWorkspaceRead));
+      }
+      if (
+        const char* const equals = std::strchr(line, '='); std::strncmp(line, "Panels.", 7) == 0 && equals != nullptr
+      ) {
+        const std::string key(line + 7, equals);
+        if (WorkspaceByKey(key) >= 0) {
+          ShownPanels()[key] = SplitPanelList(equals + 1);
+          gPanelsRead[key] = ShownPanels()[key];
+        }
+      }
     }
 
     void UiSettingsWrite(
@@ -152,6 +174,13 @@ namespace faf::editor
       out->appendf("[%s][Ui]\nScale=%.3f\n", handler->TypeName, static_cast<double>(gUiScaleNow));
       if (!gThemeKept.empty()) {
         out->appendf("Theme=%s\n", gThemeKept.c_str());
+      }
+      const std::string workspace = gTestRun ? gWorkspaceRead : Workspaces()[ActiveWorkspace()].key;
+      if (!workspace.empty()) {
+        out->appendf("Workspace=%s\n", workspace.c_str());
+      }
+      for (const auto& [key, panels] : gTestRun ? gPanelsRead : ShownPanels()) {
+        out->appendf("Panels.%s=%s\n", key.c_str(), JoinPanelList(panels).c_str());
       }
       out->append("\n");
     }
@@ -1671,6 +1700,11 @@ namespace faf::editor
         handler.WriteAllFn = &UiSettingsWrite;
         ImGui::AddSettingsHandler(&handler);
       }
+      // A test run (its options) writes back the workspace and panels it read, not the ones it showed.
+      for (const char* const option :
+           {"/command", "/palette", "/theme", "/keysfile", "/focuspanel", "/uiclicks", "/tool", "/proptool"}) {
+        gTestRun = gTestRun || moho::CFG_GetArgOption(option, 0, nullptr);
+      }
       ImGuiIO& io = ImGui::GetIO();
       io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable;
       const std::filesystem::path settings = EditorSettingsFolder();
@@ -1717,6 +1751,14 @@ namespace faf::editor
           return "a map is opening";
         }
         return {};
+      };
+      // The Review workspace only looks: what changes the map says so.
+      const auto notReview = []() -> std::string {
+        return Workspaces()[static_cast<std::size_t>(ActiveWorkspace())].readOnly ? kReviewOnlyLooks : "";
+      };
+      const auto canEdit = [mapOpen, notReview]() -> std::string {
+        std::string why = notReview();
+        return why.empty() ? mapOpen() : why;
       };
       const auto add = [&c](
                          const char* id,
@@ -1806,32 +1848,53 @@ namespace faf::editor
       // Edit
       add("edit.undo", "Undo", "Edit", "Ctrl+Z", [this] {
         (void)mScene.Undo();
-      });
+      }, notReview);
       add("edit.redo", "Redo", "Edit", "Ctrl+Y, Ctrl+Shift+Z", [this] {
         (void)mScene.Redo();
-      });
+      }, notReview);
       add("edit.delete", "Delete selection", "Edit", "Delete", [this] {
         mScene.DeleteSelected();
-      }, mapOpen);
+      }, canEdit);
       add("edit.copy", "Copy", "Edit", "Ctrl+C", [this] {
         mScene.CtrlKey('C');
       }, mapOpen, {}, "The tool's selection");
       add("edit.paste", "Paste at the cursor", "Edit", "Ctrl+V", [this] {
         mScene.CtrlKey('V');
-      }, mapOpen);
+      }, canEdit);
       add("edit.duplicate", "Duplicate beside", "Edit", "Ctrl+D", [this] {
         mScene.CtrlKey('D');
-      }, mapOpen, {}, "A copy of the selection 8 units beside it");
+      }, canEdit, {}, "A copy of the selection 8 units beside it");
 
-      // Tools: 1 to 8, as the strip lists them.
+      // Tools: 1 to 8, as the strip lists them; in Review only Select.
       for (int i = 0; i < EdTools::ToolCount(); ++i) {
         const std::string title = std::string(EdTools::ToolName(i)) + " tool";
         const std::string keys = std::to_string(i + 1);
         add(("tool." + std::to_string(i)).c_str(), title.c_str(), "Tools", keys.c_str(), [this, i] {
           mShell->Tools().SetTool(i);
-        }, {}, [this, i] {
+        }, [i]() -> std::string {
+          return i != 0 && Workspaces()[static_cast<std::size_t>(ActiveWorkspace())].readOnly ? kReviewOnlyLooks : "";
+        }, [this, i] {
           return mShell->Tools().Tool() == i;
         });
+      }
+
+      // Workspaces: Alt+1 to Alt+0, and the title row's tabs.
+      for (std::size_t i = 0; i < Workspaces().size(); ++i) {
+        const EdWorkspace& w = Workspaces()[i];
+        add(
+          ("workspace." + std::to_string(i)).c_str(),
+          (std::string(w.name) + " workspace").c_str(),
+          "Workspace",
+          w.keys,
+          [this, i] {
+          mShell->SwitchWorkspace(static_cast<int>(i));
+        },
+          {},
+          [i] {
+          return ActiveWorkspace() == static_cast<int>(i);
+        },
+          w.about
+        );
       }
 
       // View
@@ -1856,7 +1919,7 @@ namespace faf::editor
       }, {}, [] {
         return FullHelpText();
       });
-      add("view.resetlayout", "Reset layout", "View", "", [this] {
+      add("view.resetlayout", "Reset this workspace's layout", "View", "", [this] {
         mShell->ResetLayout();
       });
       add("view.palette", "Command palette", "View", "Ctrl+K, Ctrl+Shift+P", [] {
@@ -1969,6 +2032,11 @@ namespace faf::editor
         }
         return items;
       };
+      EdMenuItem workspaces;
+      workspaces.label = "&Workspace";
+      for (std::size_t i = 0; i < Workspaces().size(); ++i) {
+        workspaces.items.push_back(cmd(("workspace." + std::to_string(i)).c_str()));
+      }
       EdMenuItem themes;
       themes.label = "&Theme";
       themes.provider = [this] {
@@ -2049,6 +2117,7 @@ namespace faf::editor
            cmd("view.log"),
            cmd("view.panelsplaying"),
            sep(),
+           workspaces,
            cmd("view.resetlayout"),
            cmd("view.imguidemo")}
         },

@@ -201,6 +201,45 @@ namespace faf::editor
       }
       chrome.openMenu = -1;
 
+      // The workspace tabs: the one shown filled, the others as text; each runs its command (so its keys and the
+      // palette do the same). Their rects are controls: a click there isn't a drag of the window.
+      if (!info.tabs.empty()) {
+        ImGui::SameLine(0.0f, Em(16.0f));
+        const float h = std::round(Em(24.0f));
+        for (std::size_t i = 0; i < info.tabs.size(); ++i) {
+          const EdTitleInfo::Tab& tab = info.tabs[i];
+          const bool active = static_cast<int>(i) == info.activeTab;
+          const ImVec2 size(ImGui::CalcTextSize(tab.label.c_str()).x + Em(18.0f), h);
+          const ImVec2 at(ImGui::GetCursorScreenPos().x, std::round(rowMid - h * 0.5f));
+          ImGui::SetCursorScreenPos(at);
+          ImGui::PushID(tab.command.c_str());
+          const bool clicked = ImGui::InvisibleButton("##tab", size);
+          const bool hovered = ImGui::IsItemHovered();
+          ImGui::PopID();
+          const ImVec2 max(at.x + size.x, at.y + size.y);
+          chrome.controls.push_back(RectOf(at, max, origin));
+          if (active) {
+            dl->AddRectFilled(at, max, ImGui::GetColorU32(ImGuiCol_Header), Em(6.0f));
+          } else if (hovered) {
+            dl->AddRectFilled(at, max, ImGui::GetColorU32(ImGuiCol_FrameBgHovered), Em(6.0f));
+          }
+          const ImU32 ink = ImGui::GetColorU32(active || hovered ? ImGuiCol_Text : ImGuiCol_TextDisabled);
+          dl->AddText(ImVec2(at.x + Em(9.0f), (at.y + max.y - fontSize) * 0.5f), ink, tab.label.c_str());
+          if (hovered) {
+            const EdCommand* const command = commands.Find(tab.command);
+            if (command != nullptr && !command->keys.empty()) {
+              ImGui::SetTooltip("%s (%s)", command->description.c_str(), command->keys.c_str());
+            } else if (command != nullptr) {
+              ImGui::SetTooltip("%s", command->description.c_str());
+            }
+          }
+          if (clicked) {
+            (void)commands.Run(tab.command);
+          }
+          ImGui::SameLine(0.0f, Em(2.0f));
+        }
+      }
+
       // The search box in the middle of what is left: it opens the command palette.
       const float buttons = chrome.own ? std::round(Em(46.0f)) * 3.0f : 0.0f;
       const float right = viewport->WorkPos.x + viewport->WorkSize.x - buttons;

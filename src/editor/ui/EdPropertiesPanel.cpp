@@ -3,6 +3,7 @@
 
 #include <cctype>
 #include "editor/ui/EdThemeColors.h"
+#include "editor/ui/EdWorkspaces.h"
 #include <cstdint>
 #include <cstdio>
 #include <iterator>
@@ -64,7 +65,7 @@ namespace faf::editor
 
   void EdShell::DrawPropertiesPanel()
   {
-    if (!ImGui::Begin("Properties", &mShowProperties)) {
+    if (!ImGui::Begin(Panel("Properties"), &mShowProperties)) {
       ImGui::End();
       return;
     }
@@ -538,7 +539,7 @@ namespace faf::editor
           );
           if (ImGui::Button("The whole map's adaptive setup (Map panel)", ImVec2(-1.0f, 0.0f))) {
             mShowMap = true;
-            ImGui::SetWindowFocus("Map");
+            ImGui::SetWindowFocus(Panel("Map"));
           }
           ImGui::SetItemTooltip(
             "Every army's resources, the option tables and their groups, and the lobby options in _options.lua"

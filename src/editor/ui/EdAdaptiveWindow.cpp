@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "editor/EdShell.h"
+#include "editor/ui/EdWorkspaces.h"
 #include "editor/doc/EdAdaptiveModel.h"
 #include "editor/doc/EdAdaptiveTables.h"
 #include "editor/doc/EdDocument.h"
@@ -286,7 +287,7 @@ namespace faf::editor
     if (std::exchange(mFocusAdaptiveWindow, false)) {
       ImGui::SetNextWindowFocus();
     }
-    if (!ImGui::Begin("Adaptive Map###AdaptiveMap", &mShowAdaptiveWindow, ImGuiWindowFlags_NoCollapse)) {
+    if (!ImGui::Begin(Panel("Adaptive Map###AdaptiveMap"), &mShowAdaptiveWindow, ImGuiWindowFlags_NoCollapse)) {
       ImGui::End();
       return;
     }

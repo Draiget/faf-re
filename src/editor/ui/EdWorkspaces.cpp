@@ -1,0 +1,282 @@
+#include "editor/ui/EdWorkspaces.h"
+
+#include <algorithm>
+#include <cctype>
+#include <unordered_map>
+
+namespace faf::editor
+{
+  namespace
+  {
+    int gActive = 0;
+
+    [[nodiscard]] std::string_view Trim(
+      std::string_view text
+    )
+    {
+      while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front())) != 0) {
+        text.remove_prefix(1);
+      }
+      while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back())) != 0) {
+        text.remove_suffix(1);
+      }
+      return text;
+    }
+  } // namespace
+
+  const std::vector<EdWorkspace>& Workspaces()
+  {
+    // The panels each one starts with are the ones there are now; the design's others (Layers, Outliner, Problems,
+    // History, the node editors) join their workspaces as they are made.
+    static const std::vector<EdWorkspace> kWorkspaces = {
+      {"terrain",
+       "Terrain",
+       "Alt+1",
+       "Heights, textures and water: the sculpt and paint tools",
+       "Tools",
+       "Properties",
+       "Map,Info,Markers,Check",
+       "",
+       "Log",
+       0.21f,
+       0.22f,
+       false},
+      {"objects",
+       "Objects",
+       "Alt+2",
+       "Props, decals, markers and units: placing and arranging them",
+       "Tools",
+       "Properties",
+       "Markers,Armies,Info",
+       "",
+       "Log",
+       0.21f,
+       0.22f,
+       false},
+      {"environment",
+       "Environment",
+       "Alt+3",
+       "Lighting, sky and water's look",
+       "Lighting",
+       "Tools",
+       "Map,Info",
+       "",
+       "Log",
+       0.24f,
+       0.22f,
+       false},
+      {"layout",
+       "Layout",
+       "Alt+4",
+       "Start positions, resources, armies and the playable area",
+       "Markers",
+       "Properties",
+       "Armies,Map",
+       "",
+       "Check,Log",
+       0.24f,
+       0.24f,
+       false},
+      {"generate",
+       "Generate",
+       "Alt+5",
+       "Making terrain from rules (the node graphs come with their own panels)",
+       "Tools",
+       "",
+       "Info",
+       "",
+       "Log",
+       0.21f,
+       0.22f,
+       false},
+      {"mission",
+       "Mission",
+       "Alt+6",
+       "The map's scripts, lobby options and armies",
+       "Armies",
+       "Properties",
+       "Script Editor###ScriptEditor,Adaptive Map###AdaptiveMap",
+       "",
+       "Check,Log",
+       0.20f,
+       0.42f,
+       false},
+      {"effects",
+       "Effects",
+       "Alt+7",
+       "Particle effects: the browser and the emitter editor",
+       "Particle Browser",
+       "",
+       "Particle Editor",
+       "",
+       "Log",
+       0.22f,
+       0.48f,
+       false},
+      {"units",
+       "Units",
+       "Alt+8",
+       "Units on the map: armies, groups and their settings",
+       "Tools",
+       "Properties",
+       "Armies,Info",
+       "",
+       "Log",
+       0.21f,
+       0.24f,
+       false},
+      {"materials",
+       "Materials",
+       "Alt+9",
+       "Terrain materials and their graphs",
+       "Info",
+       "",
+       "Material Editor",
+       "",
+       "Log",
+       0.18f,
+       0.50f,
+       false},
+      {"review",
+       "Review",
+       "Alt+0",
+       "Looking the map over before release: nothing changes here",
+       "",
+       "",
+       "Check,Info",
+       "Map",
+       "Log",
+       0.0f,
+       0.28f,
+       true},
+    };
+    return kWorkspaces;
+  }
+
+  int WorkspaceByKey(
+    std::string_view key
+  )
+  {
+    const std::vector<EdWorkspace>& all = Workspaces();
+    for (std::size_t i = 0; i < all.size(); ++i) {
+      if (key == all[i].key) {
+        return static_cast<int>(i);
+      }
+    }
+    return -1;
+  }
+
+  int ActiveWorkspace()
+  {
+    return gActive;
+  }
+
+  void SetActiveWorkspace(
+    const int workspace
+  )
+  {
+    if (workspace >= 0 && workspace < static_cast<int>(Workspaces().size())) {
+      gActive = workspace;
+    }
+  }
+
+  std::string PanelId(
+    std::string_view panel
+  )
+  {
+    const std::size_t hashes = panel.find("###");
+    return std::string(hashes == std::string_view::npos ? panel : panel.substr(hashes + 3));
+  }
+
+  std::string PanelWindowName(
+    std::string_view panel,
+    const int workspace
+  )
+  {
+    if (workspace <= 0 || workspace >= static_cast<int>(Workspaces().size())) {
+      return std::string(panel);
+    }
+    const std::string key = Workspaces()[static_cast<std::size_t>(workspace)].key;
+    if (panel.find("###") != std::string_view::npos) {
+      return std::string(panel) + "@" + key;
+    }
+    return std::string(panel) + "###" + std::string(panel) + "@" + key;
+  }
+
+  const char* Panel(
+    const char* const panel
+  )
+  {
+    // Node-based, so the strings stay where they are as more are added.
+    static std::unordered_map<std::string, std::string> names;
+    std::string at = std::to_string(gActive) + "|" + panel;
+    auto found = names.find(at);
+    if (found == names.end()) {
+      found = names.emplace(std::move(at), PanelWindowName(panel, gActive)).first;
+    }
+    return found->second.c_str();
+  }
+
+  std::string DockSpaceName(
+    const int workspace
+  )
+  {
+    if (workspace <= 0 || workspace >= static_cast<int>(Workspaces().size())) {
+      return "EditorDockSpace";
+    }
+    return std::string("EditorDockSpace@") + Workspaces()[static_cast<std::size_t>(workspace)].key;
+  }
+
+  std::vector<std::string> SplitPanelList(
+    std::string_view list
+  )
+  {
+    std::vector<std::string> out;
+    while (!list.empty()) {
+      const std::size_t comma = list.find(',');
+      const std::string_view part = Trim(list.substr(0, comma));
+      if (!part.empty()) {
+        out.emplace_back(part);
+      }
+      list = comma == std::string_view::npos ? std::string_view{} : list.substr(comma + 1);
+    }
+    return out;
+  }
+
+  std::string JoinPanelList(
+    const std::vector<std::string>& panels
+  )
+  {
+    std::string out;
+    for (const std::string& panel : panels) {
+      out += (out.empty() ? "" : ",") + panel;
+    }
+    return out;
+  }
+
+  std::vector<std::string> DefaultPanels(
+    const int workspace
+  )
+  {
+    std::vector<std::string> out;
+    if (workspace < 0 || workspace >= static_cast<int>(Workspaces().size())) {
+      return out;
+    }
+    const EdWorkspace& w = Workspaces()[static_cast<std::size_t>(workspace)];
+    for (const char* const place : {w.left, w.leftBottom, w.right, w.rightBottom, w.bottom}) {
+      for (const std::string& panel : SplitPanelList(place)) {
+        const std::string id = PanelId(panel);
+        if (std::find(out.begin(), out.end(), id) == out.end()) {
+          out.push_back(id);
+        }
+      }
+    }
+    return out;
+  }
+
+  std::map<std::string, std::vector<std::string>>& ShownPanels()
+  {
+    static std::map<std::string, std::vector<std::string>> shown;
+    return shown;
+  }
+} // namespace faf::editor

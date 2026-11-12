@@ -1,4 +1,5 @@
 #include "editor/ui/EdMaterialEditor.h"
+#include "editor/ui/EdWorkspaces.h"
 #include "editor/ui/EdUiScale.h"
 
 #include "editor/doc/EdMapFile.h"
@@ -598,7 +599,7 @@ namespace faf::editor
       ImGui::SetNextWindowCollapsed(false);
     }
     ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
-    if (!ImGui::Begin("Material Editor", &open, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoCollapse)) {
+    if (!ImGui::Begin(Panel("Material Editor"), &open, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoCollapse)) {
       ImGui::End();
       return;
     }

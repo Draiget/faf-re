@@ -1179,6 +1179,16 @@ namespace faf::editor
     {
       mToolKeys = std::move(keys);
     }
+    /** The Review workspace: only the Select tool (the strip's others say why); the tool becomes Select. */
+    void SetReadOnly(
+      const bool readOnly
+    ) noexcept
+    {
+      mReadOnly = readOnly;
+      if (readOnly) {
+        mTool = 0;
+      }
+    }
 
     /** Whether the Texture tool is the chosen one (the viewport's left button paints a layer's mask). */
     [[nodiscard]] bool TextureToolActive() const noexcept
@@ -1662,6 +1672,7 @@ namespace faf::editor
 
     int mTool = 1;
     std::vector<std::string> mToolKeys;
+    bool mReadOnly = false;
 
     int mBrushMode = 0;
     float mRadius = 14.0f;

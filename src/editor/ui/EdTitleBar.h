@@ -16,6 +16,14 @@ namespace faf::editor
     std::string document;  // the open map's name, or what the editor is doing
     bool modified = false; // a dot after the name
     std::string state;     // "Playing", or empty
+    /** Tabs after the menus (the workspaces): the command each runs and its label; `activeTab` is filled. */
+    struct Tab
+    {
+      std::string command;
+      std::string label;
+    };
+    std::vector<Tab> tabs;
+    int activeTab = -1;
   };
 
   /**

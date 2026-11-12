@@ -1,6 +1,7 @@
 // The Info panel (what the open map is) and the Markers panel (its markers as a tree), EdShell's right-hand panels.
 
 #include "editor/EdShell.h"
+#include "editor/ui/EdWorkspaces.h"
 #include "editor/ui/EdThemeColors.h"
 #include "editor/ui/EdUiScale.h"
 #include "editor/doc/EdAdaptiveTables.h"
@@ -168,7 +169,7 @@ namespace faf::editor
   void EdShell::DrawInfoPanel()
   {
     // A layout saved before this panel existed has no place for it: it goes beside the Map panel.
-    if (const ImGuiWindow* const map = ImGui::FindWindowByName(kMapWindow); map != nullptr && map->DockId != 0) {
+    if (const ImGuiWindow* const map = ImGui::FindWindowByName(Panel(kMapWindow)); map != nullptr && map->DockId != 0) {
       ImGui::SetNextWindowDockID(map->DockId, ImGuiCond_FirstUseEver);
     }
     // A map that starts opening (the Map panel's button, `/open`) brings this tab to the front once, after the
@@ -178,7 +179,7 @@ namespace faf::editor
       mShowInfo = true;
       ImGui::SetNextWindowFocus();
     }
-    if (!ImGui::Begin(kInfoWindow, &mShowInfo)) {
+    if (!ImGui::Begin(Panel(kInfoWindow), &mShowInfo)) {
       ImGui::End();
       return;
     }
@@ -400,14 +401,14 @@ namespace faf::editor
   void EdShell::DrawMarkersPanel()
   {
     // Docked with the Map and Info panels in a layout saved before it existed.
-    if (const ImGuiWindow* const map = ImGui::FindWindowByName(kMapWindow); map != nullptr && map->DockId != 0) {
+    if (const ImGuiWindow* const map = ImGui::FindWindowByName(Panel(kMapWindow)); map != nullptr && map->DockId != 0) {
       ImGui::SetNextWindowDockID(map->DockId, ImGuiCond_FirstUseEver);
     }
     if (mFocusMarkers) {
       mFocusMarkers = false;
       ImGui::SetNextWindowFocus();
     }
-    if (!ImGui::Begin(kMarkersWindow, &mShowMarkers)) {
+    if (!ImGui::Begin(Panel(kMarkersWindow), &mShowMarkers)) {
       ImGui::End();
       return;
     }
@@ -1042,7 +1043,7 @@ namespace faf::editor
 
   void EdShell::DrawCheckPanel()
   {
-    if (const ImGuiWindow* const map = ImGui::FindWindowByName(kMapWindow); map != nullptr && map->DockId != 0) {
+    if (const ImGuiWindow* const map = ImGui::FindWindowByName(Panel(kMapWindow)); map != nullptr && map->DockId != 0) {
       ImGui::SetNextWindowDockID(map->DockId, ImGuiCond_FirstUseEver);
     }
     // A requested run (`/check`) happens whether or not the tab is in front, and brings it there.
@@ -1052,7 +1053,7 @@ namespace faf::editor
       RunCheck();
       ImGui::SetNextWindowFocus();
     }
-    if (!ImGui::Begin("Check", &mShowCheck)) {
+    if (!ImGui::Begin(Panel("Check"), &mShowCheck)) {
       ImGui::End();
       return;
     }
@@ -1196,7 +1197,7 @@ namespace faf::editor
       ImGui::SetNextWindowFocus();
       ImGui::SetNextWindowCollapsed(false);
     }
-    if (!ImGui::Begin("Script Editor###ScriptEditor", &mShowScript, ImGuiWindowFlags_NoCollapse)) {
+    if (!ImGui::Begin(Panel("Script Editor###ScriptEditor"), &mShowScript, ImGuiWindowFlags_NoCollapse)) {
       ImGui::End();
       return;
     }
@@ -1328,10 +1329,10 @@ namespace faf::editor
   }
   void EdShell::DrawLightingPanel()
   {
-    if (const ImGuiWindow* const map = ImGui::FindWindowByName(kMapWindow); map != nullptr && map->DockId != 0) {
+    if (const ImGuiWindow* const map = ImGui::FindWindowByName(Panel(kMapWindow)); map != nullptr && map->DockId != 0) {
       ImGui::SetNextWindowDockID(map->DockId, ImGuiCond_FirstUseEver);
     }
-    if (!ImGui::Begin("Lighting", &mShowLighting)) {
+    if (!ImGui::Begin(Panel("Lighting"), &mShowLighting)) {
       ImGui::End();
       return;
     }

@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include "editor/ui/EdThemeColors.h"
+#include "editor/ui/EdWorkspaces.h"
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -87,13 +88,13 @@ namespace faf::editor
 
   void EdShell::DrawArmiesPanel()
   {
-    if (const ImGuiWindow* const map = ImGui::FindWindowByName(kMapWindow); map != nullptr && map->DockId != 0) {
+    if (const ImGuiWindow* const map = ImGui::FindWindowByName(Panel(kMapWindow)); map != nullptr && map->DockId != 0) {
       ImGui::SetNextWindowDockID(map->DockId, ImGuiCond_FirstUseEver);
     }
     if (std::exchange(mFocusArmies, false)) {
       ImGui::SetNextWindowFocus();
     }
-    if (!ImGui::Begin(kArmiesWindow, &mShowArmies)) {
+    if (!ImGui::Begin(Panel(kArmiesWindow), &mShowArmies)) {
       ImGui::End();
       return;
     }

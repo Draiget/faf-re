@@ -336,7 +336,7 @@ namespace faf::editor
       for (int i = 0; i < static_cast<int>(IM_ARRAYSIZE(kTools)); ++i) {
         ImGui::PushID(i);
         const ImVec2 p = ImGui::GetCursorScreenPos();
-        if (ImGui::InvisibleButton("##tool", ImVec2(cell, cell))) {
+        if (ImGui::InvisibleButton("##tool", ImVec2(cell, cell)) && (!mReadOnly || i == 0)) {
           mTool = i;
         }
         const bool hovered = ImGui::IsItemHovered();
@@ -345,7 +345,9 @@ namespace faf::editor
         if (const std::size_t comma = key.find(','); comma != std::string::npos) {
           key.resize(comma);
         }
-        if (hovered) {
+        if (hovered && mReadOnly && i != 0) {
+          ImGui::SetTooltip("%s: not in Review, which only looks (Alt+1 to edit)", kTools[i].name);
+        } else if (hovered) {
           if (key.empty()) {
             ImGui::SetTooltip("%s", kTools[i].name);
           } else {

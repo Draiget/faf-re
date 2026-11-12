@@ -1,4 +1,5 @@
 #include "editor/ui/EdParticleEditor.h"
+#include "editor/ui/EdWorkspaces.h"
 #include "editor/ui/EdUiScale.h"
 
 #include "editor/doc/EdMapFile.h"
@@ -326,7 +327,7 @@ namespace faf::editor
       ImVec2(0.5f, 0.5f)
     );
     ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
-    if (!ImGui::Begin("Particle Editor", &open, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoCollapse)) {
+    if (!ImGui::Begin(Panel("Particle Editor"), &open, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoCollapse)) {
       ImGui::End();
       return;
     }

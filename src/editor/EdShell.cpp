@@ -18,6 +18,7 @@
 #include "editor/doc/EdDocument.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/core/utils/Logging.h"
+#include "editor/ui/EdWorkspaces.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "legacy/containers/String.h"
@@ -33,7 +34,6 @@ namespace faf::editor
     constexpr const char* kMarkersWindow = "Markers";
     constexpr const char* kCheckWindow = "Check";
     constexpr const char* kLogWindow = "Log";
-    constexpr const char* kDockSpace = "EditorDockSpace";
 
     const ImVec4 kPlayGreen(0.24f, 0.55f, 0.28f, 1.0f);
     const ImVec4 kStopRed(0.62f, 0.22f, 0.20f, 1.0f);
@@ -219,6 +219,10 @@ namespace faf::editor
       if (playing) {
         info.state = mPlay.StateText();
       }
+      for (std::size_t i = 0; i < Workspaces().size(); ++i) {
+        info.tabs.push_back({"workspace." + std::to_string(i), Workspaces()[i].name});
+      }
+      info.activeTab = ActiveWorkspace();
       titleHeight = DrawTitleBar(*mCommands, *mMenus, info, [] {
         OpenCommandPalette();
       });
@@ -237,11 +241,27 @@ namespace faf::editor
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::Begin("##EditorDockHost", nullptr, kHostFlags);
     ImGui::PopStyleVar(3);
-    const ImGuiID dockspaceId = ImGui::GetID(kDockSpace);
-    if (!mLayoutBuilt || mResetLayout) {
+    // The workspace's own dock space: laid out from its EdWorkspace the first time (no layout saved for it), or on
+    // Reset layout. The panels it showed last, at the start (layout.ini has them by then).
+    if (!mWorkspaceStarted) {
+      mWorkspaceStarted = true;
+      const auto saved = ShownPanels().find(Workspaces()[static_cast<std::size_t>(ActiveWorkspace())].key);
+      ShowPanels(saved != ShownPanels().end() ? saved->second : DefaultPanels(ActiveWorkspace()));
+      mTools.SetReadOnly(Workspaces()[static_cast<std::size_t>(ActiveWorkspace())].readOnly);
+    }
+    const int workspace = ActiveWorkspace();
+    if (mWorkspaceBuilt.size() < Workspaces().size()) {
+      mWorkspaceBuilt.resize(Workspaces().size(), false);
+    }
+    const ImGuiID dockspaceId = ImGui::GetID(DockSpaceName(workspace).c_str());
+    if (!mWorkspaceBuilt[static_cast<std::size_t>(workspace)] || mResetLayout) {
       if (mResetLayout || ImGui::DockBuilderGetNode(dockspaceId) == nullptr) {
         BuildDefaultLayout(dockspaceId);
+        if (mResetLayout) {
+          ShowPanels(DefaultPanels(workspace));
+        }
       }
+      mWorkspaceBuilt[static_cast<std::size_t>(workspace)] = true;
       mLayoutBuilt = true;
       mResetLayout = false;
     }
@@ -250,9 +270,10 @@ namespace faf::editor
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(Em(9.0f), Em(5.0f)));
     ImGui::DockSpace(dockspaceId, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_PassthruCentralNode);
     ImGui::PopStyleVar();
-    // A layout saved before the Properties panel existed: the panel goes under the Tools panel, once.
-    if (!mPropertiesPlaced) {
-      if (const ImGuiWindow* const tools = ImGui::FindWindowByName(kToolsWindow); tools != nullptr) {
+    // A layout saved before the Properties panel existed: the panel goes under the Tools panel, once (the first
+    // workspace's windows are the ones from before workspaces).
+    if (!mPropertiesPlaced && workspace == 0) {
+      if (const ImGuiWindow* const tools = ImGui::FindWindowByName(Panel(kToolsWindow)); tools != nullptr) {
         mPropertiesPlaced = true;
         if (ImGui::FindWindowSettingsByID(ImHashStr("Properties")) == nullptr && tools->DockId != 0) {
           ImGuiID top = 0;
@@ -268,6 +289,15 @@ namespace faf::editor
         ImVec4(middle->Pos.x - viewport->Pos.x, middle->Pos.y - viewport->Pos.y, middle->Size.x, middle->Size.y);
     }
     ImGui::End();
+    // The panels shown now are the workspace's to keep (layout.ini, [FafEditor][Ui] Panels.<key>=).
+    {
+      std::vector<std::string>& kept = ShownPanels()[Workspaces()[static_cast<std::size_t>(workspace)].key];
+      std::vector<std::string> now = ShownPanelIds();
+      if (kept != now) {
+        kept = std::move(now);
+        ImGui::MarkIniSettingsDirty();
+      }
+    }
 
     // The map is up but its props and units aren't yet (they wait for the game's blueprints): said at the view's top,
     // with a spinner and the time so far, so a map without its trees and wrecks isn't taken for finished (user report).
@@ -365,7 +395,7 @@ namespace faf::editor
         DrawPropertiesPanel();
       }
       if (mShowLog) {
-        if (ImGui::Begin(kLogWindow, &mShowLog)) {
+        if (ImGui::Begin(Panel(kLogWindow), &mShowLog)) {
           mLog.Draw();
         }
         ImGui::End();
@@ -386,23 +416,102 @@ namespace faf::editor
   )
   {
     const ImGuiViewport* const viewport = ImGui::GetMainViewport();
+    const EdWorkspace& w = Workspaces()[static_cast<std::size_t>(ActiveWorkspace())];
     ImGui::DockBuilderRemoveNode(dockspaceId);
     ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspaceId, viewport->WorkSize);
+    const auto dock = [](const char* const list, const ImGuiID node) {
+      for (const std::string& panel : SplitPanelList(list)) {
+        ImGui::DockBuilderDockWindow(PanelWindowName(panel, ActiveWorkspace()).c_str(), node);
+      }
+    };
+    // Left and right columns (each split in two when the workspace has a lower part), then the bottom row under the
+    // middle; what is left in the middle is the view.
     ImGuiID center = dockspaceId;
-    ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 0.21f, nullptr, &center);
-    // The Properties panel under the Tools panel.
-    const ImGuiID leftBottom = ImGui::DockBuilderSplitNode(left, ImGuiDir_Down, 0.42f, nullptr, &left);
-    ImGui::DockBuilderDockWindow("Properties", leftBottom);
-    const ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 0.22f, nullptr, &center);
-    const ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.22f, nullptr, &center);
-    ImGui::DockBuilderDockWindow(kToolsWindow, left);
-    ImGui::DockBuilderDockWindow(kMapWindow, right);
-    ImGui::DockBuilderDockWindow(kInfoWindow, right);
-    ImGui::DockBuilderDockWindow(kMarkersWindow, right);
-    ImGui::DockBuilderDockWindow(kCheckWindow, right);
-    ImGui::DockBuilderDockWindow(kLogWindow, bottom);
+    if (w.leftWidth > 0.0f && (w.left[0] != 0 || w.leftBottom[0] != 0)) {
+      ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, w.leftWidth, nullptr, &center);
+      if (w.leftBottom[0] != 0 && w.left[0] != 0) {
+        const ImGuiID lower = ImGui::DockBuilderSplitNode(left, ImGuiDir_Down, 0.42f, nullptr, &left);
+        dock(w.leftBottom, lower);
+      } else if (w.leftBottom[0] != 0) {
+        dock(w.leftBottom, left);
+      }
+      dock(w.left, left);
+    }
+    if (w.right[0] != 0 || w.rightBottom[0] != 0) {
+      ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, w.rightWidth, nullptr, &center);
+      if (w.rightBottom[0] != 0 && w.right[0] != 0) {
+        const ImGuiID lower = ImGui::DockBuilderSplitNode(right, ImGuiDir_Down, 0.40f, nullptr, &right);
+        dock(w.rightBottom, lower);
+      } else if (w.rightBottom[0] != 0) {
+        dock(w.rightBottom, right);
+      }
+      dock(w.right, right);
+    }
+    if (w.bottom[0] != 0) {
+      const ImGuiID bottom = ImGui::DockBuilderSplitNode(center, ImGuiDir_Down, 0.22f, nullptr, &center);
+      dock(w.bottom, bottom);
+    }
     ImGui::DockBuilderFinish(dockspaceId);
+    gpg::Logf("editor: workspace %s laid out", w.name);
+  }
+
+  const std::vector<EdShell::PanelFlag>& EdShell::PanelFlags()
+  {
+    static const std::vector<PanelFlag> kFlags = {
+      {kToolsWindow, &EdShell::mShowTools},
+      {"Properties", &EdShell::mShowProperties},
+      {kMapWindow, &EdShell::mShowMap},
+      {kInfoWindow, &EdShell::mShowInfo},
+      {kMarkersWindow, &EdShell::mShowMarkers},
+      {kCheckWindow, &EdShell::mShowCheck},
+      {"Armies", &EdShell::mShowArmies},
+      {"Lighting", &EdShell::mShowLighting},
+      {"Script Editor###ScriptEditor", &EdShell::mShowScript},
+      {"Adaptive Map###AdaptiveMap", &EdShell::mShowAdaptiveWindow},
+      {"Material Editor", &EdShell::mShowMaterialEditor},
+      {"Particle Editor", &EdShell::mShowParticleEditor},
+      {"Particle Browser", &EdShell::mShowParticleBrowser},
+      {kLogWindow, &EdShell::mShowLog},
+    };
+    return kFlags;
+  }
+
+  std::vector<std::string> EdShell::ShownPanelIds() const
+  {
+    std::vector<std::string> out;
+    for (const PanelFlag& flag : PanelFlags()) {
+      if (this->*flag.shown) {
+        out.push_back(PanelId(flag.window));
+      }
+    }
+    return out;
+  }
+
+  void EdShell::ShowPanels(
+    const std::vector<std::string>& ids
+  )
+  {
+    for (const PanelFlag& flag : PanelFlags()) {
+      this->*flag.shown = std::find(ids.begin(), ids.end(), PanelId(flag.window)) != ids.end();
+    }
+  }
+
+  void EdShell::SwitchWorkspace(
+    const int workspace
+  )
+  {
+    if (workspace < 0 || workspace >= static_cast<int>(Workspaces().size()) || workspace == ActiveWorkspace()) {
+      return;
+    }
+    ShownPanels()[Workspaces()[static_cast<std::size_t>(ActiveWorkspace())].key] = ShownPanelIds();
+    SetActiveWorkspace(workspace);
+    const EdWorkspace& w = Workspaces()[static_cast<std::size_t>(workspace)];
+    const auto saved = ShownPanels().find(w.key);
+    ShowPanels(saved != ShownPanels().end() ? saved->second : DefaultPanels(workspace));
+    mTools.SetReadOnly(w.readOnly);
+    ImGui::MarkIniSettingsDirty();
+    gpg::Logf("editor: workspace %s", w.name);
   }
 
   void EdShell::DrawToolbar(
@@ -797,7 +906,7 @@ namespace faf::editor
 
   void EdShell::DrawToolsPanel()
   {
-    if (ImGui::Begin(kToolsWindow, &mShowTools)) {
+    if (ImGui::Begin(Panel(kToolsWindow), &mShowTools)) {
       mTools.Draw();
       if (int slot = -1; mTools.TakeMaterialAsk(slot)) {
         mShowMaterialEditor = true;
@@ -1163,7 +1272,7 @@ namespace faf::editor
         ImGui::SetNextWindowScroll(ImVec2(-1.0f, static_cast<float>(std::atof(value[0].c_str()))));
       }
     }
-    if (!ImGui::Begin(kMapWindow, &mShowMap)) {
+    if (!ImGui::Begin(Panel(kMapWindow), &mShowMap)) {
       ImGui::End();
       return;
     }
@@ -1241,7 +1350,7 @@ namespace faf::editor
         }
         if (ImGui::SmallButton("More in the Info panel")) {
           mShowInfo = true;
-          ImGui::SetWindowFocus(kInfoWindow);
+          ImGui::SetWindowFocus(Panel(kInfoWindow));
         }
       }
       if (

@@ -2,6 +2,7 @@
 // editor (it shares its preview and opens effects in it).
 
 #include "editor/ui/EdParticleEditor.h"
+#include "editor/ui/EdWorkspaces.h"
 #include "editor/ui/EdUiScale.h"
 
 #include "editor/doc/EdMapFile.h"
@@ -122,7 +123,7 @@ namespace faf::editor
       ImVec2(0.5f, 0.5f)
     );
     ImGui::SetNextWindowCollapsed(false, ImGuiCond_Always);
-    if (!ImGui::Begin("Particle Browser", &open, ImGuiWindowFlags_NoCollapse)) {
+    if (!ImGui::Begin(Panel("Particle Browser"), &open, ImGuiWindowFlags_NoCollapse)) {
       ImGui::End();
       return;
     }
