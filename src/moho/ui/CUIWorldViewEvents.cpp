@@ -2,7 +2,7 @@
 #include "moho/console/CConCommand.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 
-#if FAFRE_PLATFORM_LINUX
+#if FAFRE_PLATFORM_POSIX
 #include "platform/Window.h"
 #endif
 
@@ -3450,7 +3450,7 @@ void moho::CUIWorldView::Frame(
           const gpg::gal::Head& head = device->GetDeviceContext()->GetHead(0u);
           if (head.mWindowed) {
             POINT cursorPoint{-1, -1};
-#if FAFRE_PLATFORM_LINUX
+#if FAFRE_PLATFORM_POSIX
             // The head dimensions are client pixels, and Wayland has no desktop cursor position.
             int cursorX = 0;
             int cursorY = 0;
