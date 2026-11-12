@@ -3467,7 +3467,8 @@ void moho::CUIWorldView::Frame(
         float panX = 0.0f;
         float panY = 0.0f;
 
-        if (ui_ScreenEdgeScrollView) {
+        // Captured camera motion must not also pan at a screen edge.
+        if (ui_ScreenEdgeScrollView && (!FAFRE_PLATFORM_POSIX || sMouseIsScrubbing == 0)) {
           gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
           const gpg::gal::Head& head = device->GetDeviceContext()->GetHead(0u);
           // SDL's focus-checked cursor query works in both native window modes.
