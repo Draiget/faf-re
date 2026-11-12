@@ -51,7 +51,7 @@ namespace
    */
   struct ReconCoverageDecalPass
   {
-    boost::SharedPtrRaw<moho::CIntelGrid> grid{}; // +0x00 {px, pi}
+    boost::shared_ptr<moho::CIntelGrid> grid{};   // +0x00 {px, pi}
     std::uint32_t color = 0u;                     // +0x08
 
     /**
@@ -73,7 +73,7 @@ namespace
       const std::uint32_t cellZ
     ) const noexcept
     {
-      const moho::CIntelGrid* const intelGrid = grid.px;
+      const moho::CIntelGrid* const intelGrid = grid.get();
       if (cellX >= intelGrid->mWidth || cellZ >= intelGrid->mHeight) {
         return 0;
       }
@@ -124,7 +124,7 @@ namespace
     moho::CDebugCanvas* const canvas
   ) noexcept
   {
-    const int cellSize = static_cast<int>(pass.grid.px->mGridSize);
+    const int cellSize = static_cast<int>(pass.grid.get()->mGridSize);
 
     // Whole-field cell range in grid units (ceil-divide the far edges).
     const int cellX0 = static_cast<int>(hf->width) / cellSize;
@@ -168,21 +168,21 @@ namespace
    * FUN_0064DFE0).
    */
   void DrawReconGrid(
-    boost::SharedPtrRaw<moho::CIntelGrid> (moho::IAiReconDB::*accessor)() const,
+    boost::shared_ptr<moho::CIntelGrid> (moho::IAiReconDB::*accessor)() const,
     const moho::IAiReconDB* const reconDB,
     const std::uint32_t color,
     const moho::CHeightField* const hf,
     moho::CDebugCanvas* const canvas
   ) noexcept
   {
-    boost::SharedPtrRaw<moho::CIntelGrid> grid = (reconDB->*accessor)();
-    if (grid.px != nullptr) {
+    boost::shared_ptr<moho::CIntelGrid> grid = (reconDB->*accessor)();
+    if (grid.get() != nullptr) {
       ReconCoverageDecalPass pass{};
       pass.grid = grid;
       pass.color = color;
       DrawReconCoverageDecalQuads(pass, hf, canvas);
     }
-    grid.release();
+    grid.reset();
   }
 
   /**
@@ -254,17 +254,17 @@ namespace
     // Leaf block: draw each recon-coverage grid as colored decal quads.
     // Vision and water are only drawn when their grid handle is live.
     {
-      boost::SharedPtrRaw<moho::CIntelGrid> visionGrid = reconDB->ReconGetVisionGrid();
-      const bool visionLive = visionGrid.px != nullptr;
-      visionGrid.release();
+      boost::shared_ptr<moho::CIntelGrid> visionGrid = reconDB->ReconGetVisionGrid();
+      const bool visionLive = visionGrid.get() != nullptr;
+      visionGrid.reset();
       if (visionLive) {
         DrawReconGrid(&moho::IAiReconDB::ReconGetVisionGrid, reconDB, kVisionGridColor, hf, canvas);
       }
     }
     {
-      boost::SharedPtrRaw<moho::CIntelGrid> waterGrid = reconDB->ReconGetWaterGrid();
-      const bool waterLive = waterGrid.px != nullptr;
-      waterGrid.release();
+      boost::shared_ptr<moho::CIntelGrid> waterGrid = reconDB->ReconGetWaterGrid();
+      const bool waterLive = waterGrid.get() != nullptr;
+      waterGrid.reset();
       if (waterLive) {
         DrawReconGrid(&moho::IAiReconDB::ReconGetWaterGrid, reconDB, kWaterGridColor, hf, canvas);
       }

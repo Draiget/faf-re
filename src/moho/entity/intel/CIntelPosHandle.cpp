@@ -74,7 +74,7 @@ namespace
   ) noexcept
   {
     constexpr std::uint32_t kCounterIntelCellSize = moho::CAiReconDBImpl::kIntelGridCellSize;
-    if (const moho::CIntelGrid* const grid = handle.mGrid.px; grid != nullptr) {
+    if (const moho::CIntelGrid* const grid = handle.mGrid.get(); grid != nullptr) {
       if (!RasterCellUnchanged(handle.mLastPos, newPos, grid->mGridSize)) {
         return false;
       }
@@ -145,7 +145,7 @@ namespace moho
    */
   CIntelPosHandle::CIntelPosHandle(
     const std::uint32_t radius,
-    const boost::SharedPtrRaw<CIntelGrid>& intelGrid
+    const boost::shared_ptr<CIntelGrid>& intelGrid
   )
     : mGrid{}
   {
@@ -153,7 +153,7 @@ namespace moho
     mRadius = radius;
     mLastTickUpdated = 0;
     mEnabled = 0;
-    mGrid.assign_retain(intelGrid);
+    mGrid = intelGrid;
   }
 
   /**
@@ -165,10 +165,10 @@ namespace moho
    */
   CIntelPosHandle::~CIntelPosHandle()
   {
-    if (mEnabled != 0u && mRadius != 0u && mGrid.px != nullptr) {
-      mGrid.px->SubtractCircle(mLastPos, mRadius);
+    if (mEnabled != 0u && mRadius != 0u && mGrid.get() != nullptr) {
+      mGrid.get()->SubtractCircle(mLastPos, mRadius);
     }
-    mGrid.release();
+    mGrid.reset();
   }
 
   /**
@@ -293,7 +293,7 @@ namespace moho
     archive->WriteUInt(mRadius);
     archive->WriteBool(mEnabled != 0u);
 
-    const gpg::RRef gridRef = MakeSharedIntelGridRef(mGrid.px);
+    const gpg::RRef gridRef = MakeSharedIntelGridRef(mGrid.get());
     gpg::WriteRawPointer(archive, gridRef, gpg::TrackedPointerState::Shared, ownerRef);
     archive->WriteInt(mLastTickUpdated);
   }
@@ -307,11 +307,11 @@ namespace moho
   void CIntelPosHandle::AddViz()
   {
 
-    if (mEnabled == 0u || mRadius == 0u || mGrid.px == nullptr) {
+    if (mEnabled == 0u || mRadius == 0u || mGrid.get() == nullptr) {
       return;
     }
 
-    mGrid.px->AddCircle(mLastPos, mRadius);
+    mGrid.get()->AddCircle(mLastPos, mRadius);
   }
 
   /**
@@ -323,11 +323,11 @@ namespace moho
    */
   void CIntelPosHandle::SubViz()
   {
-    if (mEnabled == 0u || mRadius == 0u || mGrid.px == nullptr) {
+    if (mEnabled == 0u || mRadius == 0u || mGrid.get() == nullptr) {
       return;
     }
 
-    mGrid.px->SubtractCircle(mLastPos, mRadius);
+    mGrid.get()->SubtractCircle(mLastPos, mRadius);
   }
 
   /**
@@ -360,7 +360,7 @@ namespace moho
     gpg::SerConstructResult& result
   )
   {
-    result.SetUnowned(gpg::MakeRRef(new CIntelPosHandle(0u, boost::SharedPtrRaw<CIntelGrid>{})), 0u);
+    result.SetUnowned(gpg::MakeRRef(new CIntelPosHandle(0u, boost::shared_ptr<CIntelGrid>{})), 0u);
   }
 
   /**

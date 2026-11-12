@@ -297,34 +297,33 @@ namespace moho
   {
     switch (intelType) {
     case 1: {
-      boost::SharedPtrRaw<CIntelGrid> grid =
-        reconDB ? reconDB->ReconGetVisionGrid() : boost::SharedPtrRaw<CIntelGrid>{};
+      boost::shared_ptr<CIntelGrid> grid = reconDB ? reconDB->ReconGetVisionGrid() : boost::shared_ptr<CIntelGrid>{};
       mIntelHandles[INTEL_Vision].reset(new (std::nothrow) CIntelPosHandle(radius, grid));
-      grid.release();
+      grid.reset();
       return;
     }
     case 2: {
-      boost::SharedPtrRaw<CIntelGrid> grid = reconDB ? reconDB->ReconGetWaterGrid() : boost::SharedPtrRaw<CIntelGrid>{};
+      boost::shared_ptr<CIntelGrid> grid = reconDB ? reconDB->ReconGetWaterGrid() : boost::shared_ptr<CIntelGrid>{};
       mIntelHandles[INTEL_WaterVision].reset(new (std::nothrow) CIntelPosHandle(radius, grid));
-      grid.release();
+      grid.reset();
       return;
     }
     case 3: {
-      boost::SharedPtrRaw<CIntelGrid> grid = reconDB ? reconDB->ReconGetRadarGrid() : boost::SharedPtrRaw<CIntelGrid>{};
+      boost::shared_ptr<CIntelGrid> grid = reconDB ? reconDB->ReconGetRadarGrid() : boost::shared_ptr<CIntelGrid>{};
       mIntelHandles[INTEL_Radar].reset(new (std::nothrow) CIntelPosHandle(radius, grid));
-      grid.release();
+      grid.reset();
       return;
     }
     case 4: {
-      boost::SharedPtrRaw<CIntelGrid> grid = reconDB ? reconDB->ReconGetSonarGrid() : boost::SharedPtrRaw<CIntelGrid>{};
+      boost::shared_ptr<CIntelGrid> grid = reconDB ? reconDB->ReconGetSonarGrid() : boost::shared_ptr<CIntelGrid>{};
       mIntelHandles[INTEL_Sonar].reset(new (std::nothrow) CIntelPosHandle(radius, grid));
-      grid.release();
+      grid.reset();
       return;
     }
     case 5: {
-      boost::SharedPtrRaw<CIntelGrid> grid = reconDB ? reconDB->ReconGetOmniGrid() : boost::SharedPtrRaw<CIntelGrid>{};
+      boost::shared_ptr<CIntelGrid> grid = reconDB ? reconDB->ReconGetOmniGrid() : boost::shared_ptr<CIntelGrid>{};
       mIntelHandles[INTEL_Omni].reset(new (std::nothrow) CIntelPosHandle(radius, grid));
-      grid.release();
+      grid.reset();
       return;
     }
     case 6:

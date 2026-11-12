@@ -945,19 +945,13 @@ namespace
     army.PathCapacityBoth = ReadScenarioGlobalInt(sim, "ScenarioInfo.pathcap_both", army.PathCapacityBoth);
   }
 
+  // The getter's copy holds one reference; the field takes its own and `source` lets go at return.
   void AssignRetainedReconGrid(
     boost::shared_ptr<moho::CIntelGrid>& destination,
-    boost::SharedPtrRaw<moho::CIntelGrid> source
+    const boost::shared_ptr<moho::CIntelGrid>& source
   ) noexcept
   {
-    static_assert(
-      sizeof(boost::shared_ptr<moho::CIntelGrid>) == sizeof(boost::SharedPtrRaw<moho::CIntelGrid>),
-      "boost::shared_ptr<CIntelGrid> layout must match SharedPtrRaw<CIntelGrid>"
-    );
-
-    auto& destinationRaw = reinterpret_cast<boost::SharedPtrRaw<moho::CIntelGrid>&>(destination);
-    destinationRaw.assign_retain(source);
-    source.release();
+    destination = source;
   }
 
   void CopyReconGridsFromDatabase(

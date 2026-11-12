@@ -44,7 +44,7 @@ namespace moho
      * Initializes intel-position handle state and retains one shared reference
      * to the bound intel-grid owner.
      */
-    CIntelPosHandle(std::uint32_t radius, const boost::SharedPtrRaw<CIntelGrid>& intelGrid);
+    CIntelPosHandle(std::uint32_t radius, const boost::shared_ptr<CIntelGrid>& intelGrid);
 
     /**
      * Address: 0x0076D860 (FUN_0076D860, Moho::CIntelPosHandle::~CIntelPosHandle)
@@ -148,7 +148,7 @@ namespace moho
      */
     void Destroy(int shouldDelete) override;
 
-    boost::SharedPtrRaw<CIntelGrid> mGrid; // +0x1C (px, pi)
+    boost::shared_ptr<CIntelGrid> mGrid; // +0x1C (px, pi)
   };
 
 #if defined(_M_IX86)

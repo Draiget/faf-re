@@ -205,14 +205,14 @@ namespace moho
     archive->WritePointer(mMapData, gpg::TrackedPointerState::Unowned, ownerRef);
     archive->WritePointer(mSim, gpg::TrackedPointerState::Unowned, ownerRef);
     archive->WritePointer(mIMap, gpg::TrackedPointerState::Unowned, ownerRef);
-    archive->WritePointer(mVisionGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
-    archive->WritePointer(mWaterGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
-    archive->WritePointer(mRadarGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
-    archive->WritePointer(mSonarGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
-    archive->WritePointer(mOmniGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
-    archive->WritePointer(mRCIGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
-    archive->WritePointer(mSCIGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
-    archive->WritePointer(mVCIGrid.px, gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(mVisionGrid.get(), gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(mWaterGrid.get(), gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(mRadarGrid.get(), gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(mSonarGrid.get(), gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(mOmniGrid.get(), gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(mRCIGrid.get(), gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(mSCIGrid.get(), gpg::TrackedPointerState::Shared, ownerRef);
+    archive->WritePointer(mVCIGrid.get(), gpg::TrackedPointerState::Shared, ownerRef);
     archive->WriteBool(mFogOfWar != 0u);
     archive->Write(gpg::RTypeOf<EntityCategorySet>(), &mVisibleToReconCategory, ownerRef);
   }

@@ -430,29 +430,29 @@ namespace
       return;
     }
 
-    if (owner->mVisionGrid.px) {
-      owner->mVisionGrid.px->Tick(dTicks);
+    if (owner->mVisionGrid.get()) {
+      owner->mVisionGrid.get()->Tick(dTicks);
     }
-    if (owner->mWaterGrid.px) {
-      owner->mWaterGrid.px->Tick(dTicks);
+    if (owner->mWaterGrid.get()) {
+      owner->mWaterGrid.get()->Tick(dTicks);
     }
-    if (owner->mRadarGrid.px) {
-      owner->mRadarGrid.px->Tick(dTicks);
+    if (owner->mRadarGrid.get()) {
+      owner->mRadarGrid.get()->Tick(dTicks);
     }
-    if (owner->mSonarGrid.px) {
-      owner->mSonarGrid.px->Tick(dTicks);
+    if (owner->mSonarGrid.get()) {
+      owner->mSonarGrid.get()->Tick(dTicks);
     }
-    if (owner->mOmniGrid.px) {
-      owner->mOmniGrid.px->Tick(dTicks);
+    if (owner->mOmniGrid.get()) {
+      owner->mOmniGrid.get()->Tick(dTicks);
     }
-    if (owner->mRCIGrid.px) {
-      owner->mRCIGrid.px->Tick(dTicks);
+    if (owner->mRCIGrid.get()) {
+      owner->mRCIGrid.get()->Tick(dTicks);
     }
-    if (owner->mSCIGrid.px) {
-      owner->mSCIGrid.px->Tick(dTicks);
+    if (owner->mSCIGrid.get()) {
+      owner->mSCIGrid.get()->Tick(dTicks);
     }
-    if (owner->mVCIGrid.px) {
-      owner->mVCIGrid.px->Tick(dTicks);
+    if (owner->mVCIGrid.get()) {
+      owner->mVCIGrid.get()->Tick(dTicks);
     }
   }
 } // namespace
@@ -646,16 +646,16 @@ CAiReconDBImpl::CAiReconDBImpl(
     }
   }
 
-  boost::ResetSharedPtrRawOwning(mRadarGrid, MakeGrid(mMapData, kIntelGridCellSize));
-  boost::ResetSharedPtrRawOwning(mSonarGrid, MakeGrid(mMapData, kIntelGridCellSize));
-  boost::ResetSharedPtrRawOwning(mOmniGrid, MakeGrid(mMapData, kIntelGridCellSize));
-  boost::ResetSharedPtrRawOwning(mRCIGrid, MakeGrid(mMapData, kIntelGridCellSize));
-  boost::ResetSharedPtrRawOwning(mSCIGrid, MakeGrid(mMapData, kIntelGridCellSize));
-  boost::ResetSharedPtrRawOwning(mVCIGrid, MakeGrid(mMapData, kIntelGridCellSize));
+  mRadarGrid.reset(MakeGrid(mMapData, kIntelGridCellSize));
+  mSonarGrid.reset(MakeGrid(mMapData, kIntelGridCellSize));
+  mOmniGrid.reset(MakeGrid(mMapData, kIntelGridCellSize));
+  mRCIGrid.reset(MakeGrid(mMapData, kIntelGridCellSize));
+  mSCIGrid.reset(MakeGrid(mMapData, kIntelGridCellSize));
+  mVCIGrid.reset(MakeGrid(mMapData, kIntelGridCellSize));
 
   if (fogOfWar) {
-    boost::ResetSharedPtrRawOwning(mVisionGrid, MakeGrid(mMapData, kVisionGridCellSize));
-    boost::ResetSharedPtrRawOwning(mWaterGrid, MakeGrid(mMapData, kIntelGridCellSize));
+    mVisionGrid.reset(MakeGrid(mMapData, kVisionGridCellSize));
+    mWaterGrid.reset(MakeGrid(mMapData, kIntelGridCellSize));
   }
 }
 
@@ -669,14 +669,14 @@ CAiReconDBImpl::~CAiReconDBImpl()
   mBblips.clear();
   mTempBlips.clear();
 
-  mVCIGrid.release();
-  mSCIGrid.release();
-  mRCIGrid.release();
-  mOmniGrid.release();
-  mSonarGrid.release();
-  mRadarGrid.release();
-  mWaterGrid.release();
-  mVisionGrid.release();
+  mVCIGrid.reset();
+  mSCIGrid.reset();
+  mRCIGrid.reset();
+  mOmniGrid.reset();
+  mSonarGrid.reset();
+  mRadarGrid.reset();
+  mWaterGrid.reset();
+  mVisionGrid.reset();
 
   mFogOfWar = 0;
   mArmy = nullptr;
@@ -1657,10 +1657,10 @@ EReconFlags CAiReconDBImpl::GetNewReconFor(
 ) const
 {
   EReconFlags detected = RECON_None;
-  if (mFogOfWar == 0 || mVisionGrid.px == nullptr) {
+  if (mFogOfWar == 0 || mVisionGrid.get() == nullptr) {
     detected = RECON_LOSNow;
   } else if (HasFlag(oldFlags, RECON_LOSNow)) {
-    const CIntelGrid* const losGrid = belowWater ? mWaterGrid.px : mVisionGrid.px;
+    const CIntelGrid* const losGrid = belowWater ? mWaterGrid.get() : mVisionGrid.get();
     if (probe.IsVisibleIn(losGrid)) {
       detected = RECON_LOSNow;
     }
@@ -1670,15 +1670,15 @@ EReconFlags CAiReconDBImpl::GetNewReconFor(
   // into the probe; the binary re-reads them here on every allied army.
   const bool sonarEligible = belowWater || probe.mUsesWaterSenseLane;
 
-  if (sonarEligible && HasFlag(oldFlags, RECON_Sonar) && probe.IsVisibleIn(mSonarGrid.px)) {
+  if (sonarEligible && HasFlag(oldFlags, RECON_Sonar) && probe.IsVisibleIn(mSonarGrid.get())) {
     detected = MergeFlags(detected, RECON_Sonar);
   }
 
-  if (!belowWater && HasFlag(oldFlags, RECON_Radar) && probe.IsVisibleIn(mRadarGrid.px)) {
+  if (!belowWater && HasFlag(oldFlags, RECON_Radar) && probe.IsVisibleIn(mRadarGrid.get())) {
     detected = MergeFlags(detected, RECON_Radar);
   }
 
-  if (HasFlag(oldFlags, RECON_Omni) && probe.IsVisibleIn(mOmniGrid.px)) {
+  if (HasFlag(oldFlags, RECON_Omni) && probe.IsVisibleIn(mOmniGrid.get())) {
     detected = MergeFlags(detected, RECON_Omni);
   }
 
@@ -1715,14 +1715,14 @@ EReconFlags CAiReconDBImpl::ApplyReconCounters(
   const CIntel* const intel = unit ? unit->GetIntelManager() : nullptr;
   const bool activeCloak = intel && intel->mCloak.present != 0u && intel->mCloak.enabled != 0u;
 
-  if (probe.IsVisibleIn(mRCIGrid.px)) {
+  if (probe.IsVisibleIn(mRCIGrid.get())) {
     flags = ClearFlag(flags, RECON_Radar);
   }
-  if (probe.IsVisibleIn(mSCIGrid.px)) {
+  if (probe.IsVisibleIn(mSCIGrid.get())) {
     flags = ClearFlag(flags, RECON_Sonar);
   }
 
-  if (activeCloak || probe.IsVisibleIn(mVCIGrid.px)) {
+  if (activeCloak || probe.IsVisibleIn(mVCIGrid.get())) {
     flags = ClearFlag(flags, RECON_LOSNow);
   }
 
@@ -1869,25 +1869,25 @@ EReconFlags CAiReconDBImpl::GetDetection(
 {
   EReconFlags detected = RECON_None;
 
-  if (mFogOfWar == 0 || mVisionGrid.px == nullptr) {
+  if (mFogOfWar == 0 || mVisionGrid.get() == nullptr) {
     detected = RECON_LOSNow;
   } else if (HasFlag(oldFlags, RECON_LOSNow)) {
     if (isUnderwater) {
-      if (mWaterGrid.px && mWaterGrid.px->IsVisible(rect)) {
+      if (mWaterGrid.get() && mWaterGrid.get()->IsVisible(rect)) {
         detected = RECON_LOSNow;
       }
-    } else if (mVisionGrid.px->IsVisible(rect)) {
+    } else if (mVisionGrid.get()->IsVisible(rect)) {
       detected = RECON_LOSNow;
     }
   }
 
   const EReconFlags pingSense = isUnderwater ? RECON_Sonar : RECON_Radar;
-  const CIntelGrid* const pingGrid = isUnderwater ? mSonarGrid.px : mRadarGrid.px;
+  const CIntelGrid* const pingGrid = isUnderwater ? mSonarGrid.get() : mRadarGrid.get();
   if (HasFlag(oldFlags, pingSense) && pingGrid && pingGrid->IsVisible(rect)) {
     detected = MergeFlags(detected, pingSense);
   }
 
-  if (HasFlag(oldFlags, RECON_Omni) && mOmniGrid.px && mOmniGrid.px->IsVisible(rect)) {
+  if (HasFlag(oldFlags, RECON_Omni) && mOmniGrid.get() && mOmniGrid.get()->IsVisible(rect)) {
     detected = MergeFlags(detected, RECON_Omni);
   }
 
@@ -1917,13 +1917,13 @@ EReconFlags CAiReconDBImpl::DoCounterDetection(
     return flags;
   }
 
-  if (mRCIGrid.px && mRCIGrid.px->IsVisible(rect)) {
+  if (mRCIGrid.get() && mRCIGrid.get()->IsVisible(rect)) {
     flags = ClearFlag(flags, RECON_Radar);
   }
-  if (mSCIGrid.px && mSCIGrid.px->IsVisible(rect)) {
+  if (mSCIGrid.get() && mSCIGrid.get()->IsVisible(rect)) {
     flags = ClearFlag(flags, RECON_Sonar);
   }
-  if (mVCIGrid.px && mVCIGrid.px->IsVisible(rect)) {
+  if (mVCIGrid.get() && mVCIGrid.get()->IsVisible(rect)) {
     flags = ClearFlag(flags, RECON_LOSNow);
   }
   return flags;
@@ -2100,65 +2100,65 @@ const fa::vector<ReconBlip*>& CAiReconDBImpl::ReconGetBlips() const
 /**
  * Address: 0x005C1A10 (FUN_005C1A10)
  */
-boost::SharedPtrRaw<CIntelGrid> CAiReconDBImpl::ReconGetVisionGrid() const
+boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetVisionGrid() const
 {
-  return mVisionGrid.clone_retained();
+  return mVisionGrid;
 }
 
 /**
  * Address: 0x005C1A40 (FUN_005C1A40)
  */
-boost::SharedPtrRaw<CIntelGrid> CAiReconDBImpl::ReconGetWaterGrid() const
+boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetWaterGrid() const
 {
-  return mWaterGrid.clone_retained();
+  return mWaterGrid;
 }
 
 /**
  * Address: 0x005C1A70 (FUN_005C1A70)
  */
-boost::SharedPtrRaw<CIntelGrid> CAiReconDBImpl::ReconGetRadarGrid() const
+boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetRadarGrid() const
 {
-  return mRadarGrid.clone_retained();
+  return mRadarGrid;
 }
 
 /**
  * Address: 0x005C1AA0 (FUN_005C1AA0)
  */
-boost::SharedPtrRaw<CIntelGrid> CAiReconDBImpl::ReconGetSonarGrid() const
+boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetSonarGrid() const
 {
-  return mSonarGrid.clone_retained();
+  return mSonarGrid;
 }
 
 /**
  * Address: 0x005C1AD0 (FUN_005C1AD0)
  */
-boost::SharedPtrRaw<CIntelGrid> CAiReconDBImpl::ReconGetOmniGrid() const
+boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetOmniGrid() const
 {
-  return mOmniGrid.clone_retained();
+  return mOmniGrid;
 }
 
 /**
  * Address: 0x005C1B00 (FUN_005C1B00)
  */
-boost::SharedPtrRaw<CIntelGrid> CAiReconDBImpl::ReconGetRCIGrid() const
+boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetRCIGrid() const
 {
-  return mRCIGrid.clone_retained();
+  return mRCIGrid;
 }
 
 /**
  * Address: 0x005C1B30 (FUN_005C1B30)
  */
-boost::SharedPtrRaw<CIntelGrid> CAiReconDBImpl::ReconGetSCIGrid() const
+boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetSCIGrid() const
 {
-  return mSCIGrid.clone_retained();
+  return mSCIGrid;
 }
 
 /**
  * Address: 0x005C1B60 (FUN_005C1B60)
  */
-boost::SharedPtrRaw<CIntelGrid> CAiReconDBImpl::ReconGetVCIGrid() const
+boost::shared_ptr<CIntelGrid> CAiReconDBImpl::ReconGetVCIGrid() const
 {
-  return mVCIGrid.clone_retained();
+  return mVCIGrid;
 }
 
 /**
@@ -2171,7 +2171,7 @@ void CAiReconDBImpl::ReconSetFogOfWar(
   const bool enabled
 )
 {
-  if (mVisionGrid.px) {
+  if (mVisionGrid.get()) {
     mFogOfWar = static_cast<std::uint8_t>(enabled ? 1u : 0u);
   }
 }
@@ -2184,7 +2184,7 @@ void CAiReconDBImpl::ReconSetFogOfWar(
  */
 bool CAiReconDBImpl::ReconGetFogOfWar() const
 {
-  return mFogOfWar != 0 && mVisionGrid.px != nullptr;
+  return mFogOfWar != 0 && mVisionGrid.get() != nullptr;
 }
 
 /**

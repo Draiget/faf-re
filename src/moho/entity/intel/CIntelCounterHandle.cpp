@@ -104,7 +104,7 @@ namespace
       return;
     }
 
-    boost::SharedPtrRaw<moho::CIntelGrid> grid{};
+    boost::shared_ptr<moho::CIntelGrid> grid{};
     switch (handle.mType) {
     case moho::INTELCOUNTER_RadarStealthField:
       grid = reconDB->ReconGetRCIGrid();
@@ -124,15 +124,15 @@ namespace
       return;
     }
 
-    if (grid.px != nullptr) {
+    if (grid.get() != nullptr) {
       if (doAdd) {
-        grid.px->AddCircle(handle.mLastPos, handle.mRadius);
+        grid.get()->AddCircle(handle.mLastPos, handle.mRadius);
       } else {
-        grid.px->SubtractCircle(handle.mLastPos, handle.mRadius);
+        grid.get()->SubtractCircle(handle.mLastPos, handle.mRadius);
       }
     }
 
-    grid.release();
+    grid.reset();
   }
 
   void ApplyCounterIntelToForeignArmies(
@@ -184,7 +184,7 @@ namespace moho
     const EIntelCounter type,
     CAiReconDBImpl* const reconDB
   )
-    : CIntelPosHandle(radius, boost::SharedPtrRaw<CIntelGrid>{})
+    : CIntelPosHandle(radius, boost::shared_ptr<CIntelGrid>{})
     , mSim(sim)
     , mReconDB(reconDB)
     , mType(type)
