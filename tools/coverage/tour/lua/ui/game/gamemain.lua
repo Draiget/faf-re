@@ -928,6 +928,27 @@ do
         Log('live done')
     end
 
+    -- Console commands of src/moho/console/ClientConCommands.cpp no earlier run reached (gtestcov13): dialogs, the
+    -- log window, skins and layouts (mpemu and campaign_run.sh give each client its own /prefs file, so the saved
+    -- choice lands there), command mode, props, the head-1 map and the beat steppers last. Left out:
+    -- ExecutePasteBuffer (it runs whatever the clipboard holds) and SC_LuaDebugger (it pauses the game).
+    local ConsoleCommands = {
+        'UI_ShowRenameDialog', 'WIN_ShowLogDialog', 'WIN_ToggleLogDialog', 'WIN_ToggleLogDialog',
+        'PopupCreateUnitMenu', 'UI_CreateHead1Map', 'EFX_CreateEmitterWindow',
+        'UI_SetSkin uef', 'UI_RotateSkin', 'UI_RotateLayout', 'UI_RotateLayout', 'UI_RotateLayout',
+        'StartCommandMode order RULEUCC_Move', 'StartCommandMode order RULEUCC_Attack', 'StartCommandMode build uel0105',
+        'StartCommandMode ping alert', 'LotsOfProps',
+    }
+    local BeatCommands = { 'WLD_RestartBeat', 'WLD_AdvanceBeat', 'WLD_SingleStep' }
+
+    local function ConsoleTour(commands)
+        for i = 1, table.getn(commands) do
+            Try(commands[i], ConExecute, commands[i])
+            WaitSeconds(0.5)
+        end
+        Log('console tour: ' .. table.getn(commands) .. ' commands')
+    end
+
     local function Tour()
         if HasCommandLineArg('/tourlive') then
             -- The map's scripted AI builds the army for a minute and a half first: more units, more kinds of order.
@@ -939,6 +960,8 @@ do
             ControlTour()
             SweepGlobals()
             RunCommands()
+            ConsoleTour(ConsoleCommands)
+            ConsoleTour(BeatCommands)
             Log('done')
             if HasCommandLineArg('/tourexit') then
                 ExitApplication()
@@ -984,6 +1007,13 @@ do
     local TourOnFirstUpdate = OnFirstUpdate
     OnFirstUpdate = function()
         TourOnFirstUpdate()
+        -- `/toursilent`: a run with sound on (no /nosound, so the audio engine runs) that stays silent; its own
+        -- prefs file sets the volumes to 0 as well.
+        if HasCommandLineArg('/toursilent') then
+            for _, category in { 'Global', 'World', 'Music', 'Voice', 'Interface', 'Ambient' } do
+                Try('SetVolume ' .. category, SetVolume, category, 0)
+            end
+        end
         if HasCommandLineArg('/tourquitafter') then
             ForkThread(QuitLater)
         end
