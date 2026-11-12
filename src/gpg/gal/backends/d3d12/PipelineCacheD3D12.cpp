@@ -132,9 +132,11 @@ namespace gpg::gal::d3d12
 
   void PipelineCache::Close() noexcept
   {
+    const std::lock_guard<std::mutex> lock(mMutex);
     if (mLibrary != nullptr) {
       try {
         if (mUnsaved != 0U) {
+          mUnsaved = 0U;
           Save(false); // the process may exit right after; write before returning
         }
         gpg::Logf("D3D12: pipeline cache: %u loaded, %u new", mLoaded, mStored);
@@ -153,6 +155,8 @@ namespace gpg::gal::d3d12
   )
   {
     Microsoft::WRL::ComPtr<ID3D12PipelineState> pipeline;
+    // The library synchronizes itself (except two threads loading the same pipeline, which the device's pending
+    // list rules out): the driver's load runs unlocked, so a slow one on a worker never holds the render thread.
     if (mLibrary == nullptr || !gPipelineDiskCache) {
       return pipeline;
     }
@@ -160,6 +164,7 @@ namespace gpg::gal::d3d12
     PipelineName(key, name);
     // E_INVALIDARG: not stored, or stored with a different description.
     if (SUCCEEDED(mLibrary->LoadGraphicsPipeline(name, &desc, IID_PPV_ARGS(&pipeline)))) {
+      const std::lock_guard<std::mutex> lock(mMutex);
       ++mLoaded;
     } else {
       pipeline.Reset();
@@ -179,26 +184,48 @@ namespace gpg::gal::d3d12
     PipelineName(key, name);
     // Fails for a name already taken (a key hash collision); that pipeline is just not kept.
     if (SUCCEEDED(mLibrary->StorePipeline(name, pipeline))) {
-      ++mStored;
-      mLastStoreTick = ::GetTickCount64();
-      if (++mUnsaved >= kSaveEvery) {
+      bool save = false;
+      {
+        const std::lock_guard<std::mutex> lock(mMutex);
+        ++mStored;
+        mLastStoreTick = ::GetTickCount64();
+        if (++mUnsaved >= kSaveEvery && !mSaving) {
+          mSaving = true;
+          mUnsaved = 0U;
+          save = true;
+        }
+      }
+      // Serialized outside the lock: a render-thread Load or Store never waits for a save.
+      if (save) {
         Save(true);
+        mSaving = false;
       }
     }
   }
 
   void PipelineCache::OnFrame()
   {
-    if (mUnsaved != 0U && mLibrary != nullptr && ::GetTickCount64() - mLastStoreTick >= kQuietSeconds * 1000U) {
-      Save(true);
+    // A worker saving holds the lock: this frame doesn't wait for it.
+    std::unique_lock<std::mutex> lock(mMutex, std::try_to_lock);
+    if (!lock.owns_lock()) {
+      return;
     }
+    if (
+      mUnsaved == 0U || mLibrary == nullptr || mSaving || ::GetTickCount64() - mLastStoreTick < kQuietSeconds * 1000U
+    ) {
+      return;
+    }
+    mSaving = true;
+    mUnsaved = 0U;
+    lock.unlock();
+    Save(true);
+    mSaving = false;
   }
 
   void PipelineCache::Save(
     const bool inBackground
   )
   {
-    mUnsaved = 0U;
     const SIZE_T size = mLibrary->GetSerializedSize();
     if (size == 0U || mPath.empty()) {
       return;

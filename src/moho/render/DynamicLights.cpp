@@ -90,14 +90,23 @@ namespace moho
     }
   } // namespace
 
-  const DynamicLights::RampColor& DynamicLights::ColorOfRamp(
+  const DynamicLights::RampColor* DynamicLights::ColorOfRamp(
     const char* const path
   )
   {
     const std::string key = (path != nullptr) ? path : "";
     const auto found = mRampColors.find(key);
     if (found != mRampColors.end()) {
-      return found->second;
+      return &found->second;
+    }
+    // Reading a ramp is a file read and a decode on the render thread: a battle that brings many new effects at once
+    // would stall one frame for all of them, so each beat reads a few and the rest light in the default colour until
+    // a later beat reads theirs.
+    if (!key.empty() && mRampReadsLeft == 0) {
+      return nullptr; // read on a later beat; until then the source gives no light
+    }
+    if (mRampReadsLeft > 0) {
+      --mRampReadsLeft;
     }
     RampColor ramp; // the warm default when the ramp can't be read
     if (!key.empty()) {
@@ -144,7 +153,7 @@ namespace moho
         }
       }
     }
-    return mRampColors.emplace(key, ramp).first->second;
+    return &mRampColors.emplace(key, ramp).first->second;
   }
 
   DynamicLights& DynamicLights::Get()
@@ -187,6 +196,7 @@ namespace moho
       mLights.clear();
     }
     mLastTick = tick;
+    mRampReadsLeft = kRampReadsPerBeat;
     const std::size_t first = mLights.size();
     const float now = static_cast<float>(tick);
     for (const SWorldParticle& particle : batch.mParticles) {
@@ -198,12 +208,15 @@ namespace moho
       const float velocity[3] = {particle.mDir.x, particle.mDir.y, particle.mDir.z};
       const float size = 0.5f * (particle.mBeginSize + particle.mEndSize);
       // The particle's own colour: its ramp texture's (UEF build effects blue, Cybran red, fire orange).
-      const RampColor& ramp =
+      const RampColor* const ramp =
         ColorOfRamp(particle.mRampTexture.tex != nullptr ? particle.mRampTexture.tex->mTexturePath.c_str() : nullptr);
+      if (ramp == nullptr) {
+        continue;
+      }
       AddSource(
-        position, velocity, ramp.color, light ? size * 1.5f : size, now + particle.mInterop, particle.mLifetime
+        position, velocity, ramp->color, light ? size * 1.5f : size, now + particle.mInterop, particle.mLifetime
       );
-      mLights.back().intensity *= ramp.strength;
+      mLights.back().intensity *= ramp->strength;
     }
     for (const SWorldTrail& trail : batch.mTrails) {
       if (trail.mBlendMode != 3) {
@@ -212,10 +225,13 @@ namespace moho
       // The trail's newest end follows its projectile or engine.
       const float position[3] = {trail.mEndPos.x, trail.mEndPos.y, trail.mEndPos.z};
       const float still[3]{};
-      const RampColor& ramp =
+      const RampColor* const ramp =
         ColorOfRamp(trail.mRampTexture.tex != nullptr ? trail.mRampTexture.tex->mTexturePath.c_str() : nullptr);
-      AddSource(position, still, ramp.color, trail.mSize, now, 2.0f);
-      mLights.back().intensity *= ramp.strength;
+      if (ramp == nullptr) {
+        continue;
+      }
+      AddSource(position, still, ramp->color, trail.mSize, now, 2.0f);
+      mLights.back().intensity *= ramp->strength;
     }
     for (const SWorldBeam& beam : batch.mBeams) {
       if (beam.mBlendMode != SWorldBeam::BlendMode::Mode3) {

@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <deque>
+#include <future>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -448,6 +449,9 @@ namespace gpg::gal
     std::map<std::pair<std::uint64_t, std::uint64_t>, VkShaderModule> mLinkedModules;
     std::unordered_map<std::uint64_t, effects::SpirvInterface> mInterfaces;
     std::unordered_map<std::string, VkPipeline> mPipelines;
+    // Engine addition (ren_AsyncPipelines, gpg/gal/PipelineDefer.h): pipelines building on worker threads, by key.
+    std::unordered_map<std::string, std::future<VkPipeline>> mPendingPipelines;
+    void CollectPendingPipelines() noexcept;
     /** Everything mPipelines' string key is built from; see PipelineMemo. */
     struct PipelineInputs
     {
@@ -629,5 +633,7 @@ namespace gpg::gal
     DWORD mFirstDumpTick = 0;
     DWORD mLastDumpTick = 0;
     std::uint32_t mSkippedDraws = 0;
+    std::uint32_t mDeferredDraws = 0; // draws waiting for a worker's pipeline (ren_AsyncPipelines), all session
+    bool mPipelineDeferred = false;   // PipelineFor's last null was a deferral
   };
 } // namespace gpg::gal

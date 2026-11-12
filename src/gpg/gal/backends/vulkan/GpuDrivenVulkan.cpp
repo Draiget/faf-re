@@ -13,11 +13,12 @@
 #include "ResourcesVulkan.h"
 
 #include "gpg/core/utils/Logging.h"
+#include "gpg/gal/backends/common/BackendErrors.h"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/DrawStatistics.h"
-#include "gpg/gal/RenderProfiler.h"
-#include "gpg/gal/backends/common/BackendErrors.h"
+#include "gpg/gal/effects/EffectRuntime.h"
 #include "gpg/gal/effects/ShaderCompiler.h"
+#include "gpg/gal/RenderProfiler.h"
 
 namespace gpg::gal
 {
@@ -156,8 +157,8 @@ namespace gpg::gal
       if (vertex) {
         arguments.push_back(L"-fvk-invert-y");
       }
-      const effects::CompiledShader compiled = effects::ShaderCompiler::Instance().CompileRaw(
-        std::string_view(desc.source, desc.sourceBytes), entry, profile, arguments
+      const effects::CompiledShader compiled = effects::CompileRawCached(
+        std::string_view(desc.source, desc.sourceBytes), entry, profile, arguments, effects::ShaderTarget::Spirv
       );
       if (!compiled.succeeded) {
         gpg::Warnf(

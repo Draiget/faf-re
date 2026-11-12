@@ -193,6 +193,20 @@ namespace gpg::gal::effects
 
   /** The directory compiled shaders are kept in (FAF_SHADER_CACHE_DIR, else under %LOCALAPPDATA%). */
   [[nodiscard]] const std::string& ShaderCacheDirectory();
+
+  /**
+   * Engine addition: ShaderCompiler::CompileRaw through the shader cache directory, for the GPU-driven programs
+   * (ambient occlusion, dynamic lights, atmosphere ...). A program compiled once is read back on later runs, so
+   * turning such a feature on doesn't stall a frame on DXC. Keyed by the compiler, the source, the entry, the
+   * profile and the arguments.
+   */
+  [[nodiscard]] CompiledShader CompileRawCached(
+    std::string_view hlsl,
+    std::string_view entryName,
+    const wchar_t* profile,
+    const std::vector<std::wstring>& extraArguments,
+    ShaderTarget target
+  );
 } // namespace gpg::gal::effects
 
 namespace gpg::gal

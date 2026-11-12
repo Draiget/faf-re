@@ -2,16 +2,17 @@
 
 #include "moho/render/GpuPathSettings.h"
 
-#include "gpg/gal/Device.hpp"
-#include "gpg/gal/GpuDriven.h"
-#include "gpg/gal/PipelineDiskCache.h"
-#include "gpg/gal/PlacedResources.h"
 #include "gpg/gal/backends/common/ImageCodec.h"
 #include "gpg/gal/backends/common/PipelineMemo.h"
 #include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
+#include "gpg/gal/Device.hpp"
 #include "gpg/gal/effects/EffectRuntime.h"
 #include "gpg/gal/effects/RayTracedShadows.h"
 #include "gpg/gal/effects/TextureFiltering.h"
+#include "gpg/gal/GpuDriven.h"
+#include "gpg/gal/PipelineDefer.h"
+#include "gpg/gal/PipelineDiskCache.h"
+#include "gpg/gal/PlacedResources.h"
 #include "moho/console/CConCommand.h"
 #include "moho/render/ProjectileIconRenderer.h"
 #include "moho/render/RangeGpuRenderer.h"
@@ -55,6 +56,16 @@ namespace moho
       &gpg::gal::gSharedBuffers
     );
 #endif
+
+    /** Engine addition: `ren_AsyncPipelines` (see gpg/gal/PipelineDefer.h). */
+    TConVar<bool> gTConVar_ren_AsyncPipelines(
+      "ren_AsyncPipelines",
+      "Direct3D 12 and Vulkan: a pipeline the world's meshes, terrain or decals need for the first time is built on a "
+      "worker thread and the draw waits a frame or two for it (1, the default), instead of the frame stalling while "
+      "the "
+      "driver builds it (0). Read at each draw.",
+      &gpg::gal::gAsyncPipelines
+    );
 
     /** Engine addition: `ren_PipelineMemo` (see gpg/gal/backends/common/PipelineMemo.h). */
     TConVar<bool> gTConVar_ren_PipelineMemo(

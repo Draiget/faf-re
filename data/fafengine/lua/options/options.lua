@@ -358,6 +358,55 @@ do
     end
 end
 
+-- Sun shafts and height fog (ren_Atmosphere), on Direct3D 12 and Vulkan: off until the player turns it on.
+do
+    local function Supported(command)
+        -- The engine's Lua reports C functions as 'cfunction'.
+        local kind = type(ConTextMatches)
+        if kind ~= 'function' and kind ~= 'cfunction' then
+            return false
+        end
+        local ok, matches = pcall(ConTextMatches, command)
+        if not ok or type(matches) ~= 'table' then
+            return false
+        end
+        for _, name in ipairs(matches) do
+            if name == command then
+                return true
+            end
+        end
+        return false
+    end
+
+    local video = options and options.video
+    if video and video.items and Supported('ren_Atmosphere') then
+        local position = table.getn(video.items) + 1
+        for index, item in ipairs(video.items) do
+            if item.key == 'dynamic_lights_optin' or item.key == 'ray_soft_shadows' or item.key == 'ray_traced_ao'
+                or item.key == 'ray_traced_shadows_optin' or item.key == 'shadow_resolution' then
+                position = index + 1
+            end
+        end
+        table.insert(video.items, position, {
+            title = 'Sun shafts and height fog',
+            key = 'atmosphere',
+            type = 'toggle',
+            default = 0,
+            tip = 'Direct3D 12 and Vulkan: a light haze over the low ground and water, lit by the sun, darker where '
+                .. 'hills shade it. Never thick enough to hide units.',
+            set = function(key, value, startup)
+                ConExecute('ren_Atmosphere ' .. tostring(value))
+            end,
+            custom = {
+                states = {
+                    { text = '<LOC _On>', key = 1 },
+                    { text = '<LOC _Off>', key = 0 },
+                },
+            },
+        })
+    end
+end
+
 -- Texture filtering (ren_TextureAnisotropy), on Direct3D 12 and Vulkan: anisotropic filtering for the tiled ground
 -- and unit textures. Shown only by an engine that has the command, as the ones below.
 do

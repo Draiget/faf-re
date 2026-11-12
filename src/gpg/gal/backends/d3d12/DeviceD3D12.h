@@ -19,6 +19,7 @@
 // CScApp::CreateDevice falls back to Direct3D 9.
 
 #include <cstdint>
+#include <future>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -445,6 +446,9 @@ namespace gpg::gal
 
     // ---- pipeline state ------------------------------------------------------
     std::unordered_map<std::string, Microsoft::WRL::ComPtr<ID3D12PipelineState>> mPipelines;
+    // Engine addition (ren_AsyncPipelines, gpg/gal/PipelineDefer.h): pipelines building on worker threads, by key.
+    std::unordered_map<std::string, std::future<Microsoft::WRL::ComPtr<ID3D12PipelineState>>> mPendingPipelines;
+    void WaitForPendingPipelines() noexcept;
     /** Everything mPipelines' string key is built from; see PipelineMemo. */
     struct PipelineInputs
     {
@@ -629,5 +633,7 @@ namespace gpg::gal
     DWORD mFirstDumpTick = 0;
     DWORD mLastDumpTick = 0;
     std::uint32_t mSkippedDraws = 0;
+    std::uint32_t mDeferredDraws = 0; // draws waiting for a worker's pipeline (ren_AsyncPipelines), all session
+    bool mPipelineDeferred = false;   // PipelineFor's last null was a deferral
   };
 } // namespace gpg::gal

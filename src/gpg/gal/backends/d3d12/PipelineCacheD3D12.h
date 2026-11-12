@@ -1,6 +1,8 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -52,5 +54,7 @@ namespace gpg::gal::d3d12
     std::uint32_t mStored = 0;
     std::uint32_t mUnsaved = 0;
     std::uint64_t mLastStoreTick = 0; // GetTickCount64 of the last Store
+    std::mutex mMutex; // the counters below; Load and Store also run on the pipeline workers (ren_AsyncPipelines)
+    std::atomic<bool> mSaving{false}; // one save at a time, serialized outside mMutex
   };
 } // namespace gpg::gal::d3d12

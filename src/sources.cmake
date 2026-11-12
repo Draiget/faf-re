@@ -925,6 +925,7 @@ set(FAF_ENGINE_SOURCES
   moho/render/CWldTerrainDecal.cpp
   moho/render/CDecalHandleTypeInfo.cpp
   moho/render/AmbientOcclusionRenderer.cpp
+  moho/render/Atmosphere.cpp
   moho/render/DynamicLights.cpp
   moho/render/BoundaryRenderer.cpp
   moho/render/FxaaRenderer.cpp

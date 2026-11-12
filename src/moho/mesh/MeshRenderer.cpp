@@ -2,6 +2,7 @@
 
 #include <string_view>
 
+#include "gpg/gal/PipelineDefer.h"
 #include "moho/console/CConCommand.h"
 
 namespace moho
@@ -1425,6 +1426,9 @@ namespace moho
     if (meshMap.empty()) {
       return;
     }
+    // Engine addition (ren_AsyncPipelines): these draws repeat every frame, so one can wait a frame or two for a
+    // pipeline a worker builds instead of the frame stalling on the driver.
+    const gpg::gal::PipelineDeferScope deferPipelines;
 
     // Active render-time terrain resource (nullptr when no map/terrain). Read at
     // the head of the pass exactly like the binary's `sWldMap ? mTerrainRes : 0`.

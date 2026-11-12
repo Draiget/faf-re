@@ -11,6 +11,7 @@
 // the variable a scope costs one well-predicted branch.
 
 #include <cstdint>
+#include <vector>
 
 #include "gpg/gal/DrawStatistics.h"
 
@@ -104,6 +105,8 @@ namespace gpg::gal
     std::uint64_t mDrawCalls = 0U;
     std::int64_t mIntervalStartTicks = 0;
     std::int64_t mLastFrameEndTicks = 0;
+    std::vector<float> mFrameWalls; // this interval's frame times (wall, ms), for the spike line
+
     Summary mSummary{};
   };
 

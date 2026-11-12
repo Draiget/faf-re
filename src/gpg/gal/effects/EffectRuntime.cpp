@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cwchar>
 #include <deque>
 #include <functional>
 #include <stdexcept>
@@ -214,6 +215,37 @@ namespace gpg::gal::effects
   const std::string& ShaderCacheDirectory()
   {
     return gpg::LocalCacheDirectory();
+  }
+
+  CompiledShader CompileRawCached(
+    const std::string_view hlsl,
+    const std::string_view entryName,
+    const wchar_t* const profile,
+    const std::vector<std::wstring>& extraArguments,
+    const ShaderTarget target
+  )
+  {
+    const ShaderCompiler& compiler = ShaderCompiler::Instance();
+    Fnv1a64 hash;
+    hash.Add("faf gpu program 1");
+    hash.Add(compiler.Version());
+    hash.Add(hlsl);
+    hash.Add(entryName);
+    hash.Add(profile, std::wcslen(profile) * sizeof(wchar_t));
+    for (const std::wstring& argument : extraArguments) {
+      hash.Add(argument.data(), (argument.size() + 1U) * sizeof(wchar_t));
+    }
+    const std::string path = CachePath(hash.Value(), target);
+    CompiledShader cached;
+    if (ReadCache(path, hash.Value(), cached.code)) {
+      cached.succeeded = true;
+      return cached;
+    }
+    CompiledShader compiled = compiler.CompileRaw(hlsl, entryName, profile, extraArguments);
+    if (compiled.succeeded) {
+      WriteCache(path, hash.Value(), compiled.code);
+    }
+    return compiled;
   }
 
   EffectProgram::EffectProgram(

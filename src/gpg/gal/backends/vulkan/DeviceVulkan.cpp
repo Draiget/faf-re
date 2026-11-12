@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
@@ -18,9 +19,13 @@
 #include "platform/posix/dxc/DxcGlue.h"
 #endif
 
-#include "VulkanAttachmentBarrier.h"
-#include "VulkanSurface.h"
 #include "gpg/core/utils/Logging.h"
+#include "gpg/gal/backends/common/BackendErrors.h"
+#include "gpg/gal/backends/common/ImageCodec.h"
+#include "gpg/gal/backends/common/RuntimeInfo.h"
+#include "gpg/gal/backends/d3d11/D3D11VertexLayouts.h"
+#include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
+#include "gpg/gal/backends/dxgi/DxgiFormats.h"
 #include "gpg/gal/CubeRenderTargetContext.hpp"
 #include "gpg/gal/CursorContext.hpp"
 #include "gpg/gal/DepthStencilTargetContext.hpp"
@@ -29,21 +34,18 @@
 #include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/EffectContext.hpp"
 #include "gpg/gal/EffectMacro.hpp"
+#include "gpg/gal/effects/RayTracedShadows.h"
+#include "gpg/gal/effects/ShadowCascades.h"
+#include "gpg/gal/effects/TextureFiltering.h"
 #include "gpg/gal/Head.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
+#include "gpg/gal/PipelineDefer.h"
 #include "gpg/gal/PlacedResources.h"
 #include "gpg/gal/RenderTargetContext.hpp"
 #include "gpg/gal/TextureContext.h"
 #include "gpg/gal/VertexBufferContext.hpp"
-#include "gpg/gal/backends/common/BackendErrors.h"
-#include "gpg/gal/backends/common/ImageCodec.h"
-#include "gpg/gal/backends/common/RuntimeInfo.h"
-#include "gpg/gal/backends/d3d11/D3D11VertexLayouts.h"
-#include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
-#include "gpg/gal/backends/dxgi/DxgiFormats.h"
-#include "gpg/gal/effects/RayTracedShadows.h"
-#include "gpg/gal/effects/ShadowCascades.h"
-#include "gpg/gal/effects/TextureFiltering.h"
+#include "VulkanAttachmentBarrier.h"
+#include "VulkanSurface.h"
 
 namespace gpg::gal
 {
@@ -396,6 +398,7 @@ namespace gpg::gal
       }
       CollectCompleted();
       mPipelineMemo.Clear();
+      CollectPendingPipelines(); // into mPipelines, destroyed below
       for (auto& [key, pipeline] : mPipelines) {
         if (pipeline != VK_NULL_HANDLE) {
           Vk().vkDestroyPipeline(mDevice, pipeline, nullptr);
@@ -3714,6 +3717,24 @@ namespace gpg::gal
       mPipelineMemo.Store(inputs, found->second);
       return found->second;
     }
+    // Engine addition (ren_AsyncPipelines): one a worker is building is taken once it is done; until then the draw
+    // is skipped.
+    const bool defer = PipelinesMayDefer();
+    if (const auto pending = mPendingPipelines.find(key.Key()); pending != mPendingPipelines.end()) {
+      // A draw that can't wait (a thumbnail, a bake) waits for the worker instead of being skipped.
+      if (defer && pending->second.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+        mPipelineDeferred = true;
+        return VK_NULL_HANDLE;
+      }
+      const VkPipeline built = pending->second.get();
+      mPendingPipelines.erase(pending);
+      mPipelines.emplace(std::move(key.Key()), built);
+      return built;
+    }
+    if (defer && mPendingPipelines.size() >= kMaxPendingPipelines) {
+      mPipelineDeferred = true;
+      return VK_NULL_HANDLE; // the workers are busy: asked again next frame
+    }
 
     // Vertex input: each shader input (by semantic) from the format's
     // element of that semantic, or from the zero buffer.
@@ -3901,6 +3922,92 @@ namespace gpg::gal
     info.pColorBlendState = &colorBlend;
     info.pDynamicState = &dynamic;
     info.layout = EffectPipelineLayout();
+    if (defer) {
+      // The job owns copies of every structure the create info points at (the shader modules are the device's and
+      // outlive it: teardown collects pending jobs first). The pipeline cache synchronizes itself.
+      struct Job
+      {
+        VkGraphicsPipelineCreateInfo info{};
+        VkPipelineShaderStageCreateInfo stages[4]{};
+        std::string names[4];
+        VkPipelineTessellationStateCreateInfo tessellation{};
+        VkPipelineVertexInputStateCreateInfo vertexInput{};
+        std::vector<VkVertexInputBindingDescription> bindings;
+        std::vector<VkVertexInputAttributeDescription> attributes;
+        VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+        VkPipelineViewportStateCreateInfo viewport{};
+        VkPipelineRasterizationStateCreateInfo raster{};
+        VkPipelineMultisampleStateCreateInfo multisample{};
+        VkSampleMask sampleMask = 0U;
+        VkPipelineDepthStencilStateCreateInfo depthStencil{};
+        VkPipelineColorBlendAttachmentState attachment{};
+        VkPipelineColorBlendStateCreateInfo colorBlend{};
+        VkDynamicState dynamicStates[4]{};
+        VkPipelineDynamicStateCreateInfo dynamic{};
+        VkFormat colorFormat = VK_FORMAT_UNDEFINED;
+        VkPipelineRenderingCreateInfo rendering{};
+      };
+      auto job = std::make_shared<Job>();
+      for (std::uint32_t stage = 0U; stage < stageCount; ++stage) {
+        job->stages[stage] = stages[stage];
+        job->names[stage] = stages[stage].pName;
+        job->stages[stage].pName = job->names[stage].c_str();
+      }
+      job->tessellation = tessellation;
+      job->bindings = bindingList;
+      job->attributes = attributes;
+      job->vertexInput = vertexInput;
+      job->vertexInput.pVertexBindingDescriptions = job->bindings.data();
+      job->vertexInput.pVertexAttributeDescriptions = job->attributes.data();
+      job->inputAssembly = inputAssembly;
+      job->viewport = viewport;
+      job->raster = raster;
+      job->sampleMask = sampleMask;
+      job->multisample = multisample;
+      job->multisample.pSampleMask = &job->sampleMask;
+      job->depthStencil = depthStencil;
+      job->attachment = attachment;
+      job->colorBlend = colorBlend;
+      job->colorBlend.pAttachments = &job->attachment;
+      std::copy(std::begin(dynamicStates), std::end(dynamicStates), job->dynamicStates);
+      job->dynamic = dynamic;
+      job->dynamic.pDynamicStates = job->dynamicStates;
+      job->colorFormat = colorFormat;
+      job->rendering = rendering;
+      job->rendering.pColorAttachmentFormats = &job->colorFormat;
+      job->info = info;
+      job->info.pNext = &job->rendering;
+      job->info.pStages = job->stages;
+      job->info.pVertexInputState = &job->vertexInput;
+      job->info.pInputAssemblyState = &job->inputAssembly;
+      job->info.pTessellationState = tessellated ? &job->tessellation : nullptr;
+      job->info.pViewportState = &job->viewport;
+      job->info.pRasterizationState = &job->raster;
+      job->info.pMultisampleState = &job->multisample;
+      job->info.pDepthStencilState = &job->depthStencil;
+      job->info.pColorBlendState = &job->colorBlend;
+      job->info.pDynamicState = &job->dynamic;
+      const PFN_vkCreateGraphicsPipelines create = Vk().vkCreateGraphicsPipelines;
+      const VkDevice device = mDevice;
+      const VkPipelineCache cache = mPipelineCache;
+      std::string name = pass.program->Name();
+      const std::uint32_t format = mBoundFormat;
+      mPendingPipelines.emplace(
+        std::move(key.Key()), std::async(std::launch::async, [job, create, device, cache, name, format] {
+        VkPipeline built = VK_NULL_HANDLE;
+        const VkResult made = create(device, cache, 1U, &job->info, nullptr, &built);
+        if (made != VK_SUCCESS) {
+          gpg::Warnf(
+            "Vulkan: pipeline for %s (vertex format %u) failed: %s", name.c_str(), format, vulkan::ResultName(made)
+          );
+          built = VK_NULL_HANDLE; // cached as a failure when taken, as below
+        }
+        return built;
+      })
+      );
+      mPipelineDeferred = true;
+      return VK_NULL_HANDLE;
+    }
     VkPipeline pipeline = VK_NULL_HANDLE;
     const VkResult result = Vk().vkCreateGraphicsPipelines(mDevice, mPipelineCache, 1U, &info, nullptr, &pipeline);
     if (result != VK_SUCCESS) {
@@ -3917,6 +4024,16 @@ namespace gpg::gal
     }
     mPipelines.emplace(std::move(key.Key()), pipeline);
     return pipeline;
+  }
+
+  void DeviceVulkan::CollectPendingPipelines() noexcept
+  {
+    for (auto& [key, pending] : mPendingPipelines) {
+      if (pending.valid()) {
+        mPipelines.emplace(key, pending.get());
+      }
+    }
+    mPendingPipelines.clear();
   }
 
   bool DeviceVulkan::PrepareDraw(
@@ -3993,9 +4110,11 @@ namespace gpg::gal
     if (mPass.sampled != nullptr) {
       TransitionSampled(*mPass.sampled);
     }
+    mPipelineDeferred = false;
     const VkPipeline pipeline = PipelineFor(mPass, topology);
     if (pipeline == VK_NULL_HANDLE) {
-      ++mSkippedDraws;
+      // Waiting for a worker's pipeline (ren_AsyncPipelines) is expected, not the broken pass the warning reports.
+      ++(mPipelineDeferred ? mDeferredDraws : mSkippedDraws);
       return false;
     }
     BeginRendering();

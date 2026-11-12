@@ -1,6 +1,8 @@
-#include "moho/app/WxPrivate.h"
+#include "gpg/gal/PipelineDefer.h"
 #include "moho/app/NetworkPanel.h"
+#include "moho/app/WxPrivate.h"
 #include "moho/render/AmbientOcclusionRenderer.h"
+#include "moho/render/Atmosphere.h"
 #include "moho/render/DynamicLights.h"
 #include "moho/render/FxaaRenderer.h"
 #include "moho/render/PostRenderer.h"
@@ -2102,6 +2104,14 @@ void moho::WRenViewport::RenderWorldView(
     FogOn(worldView->mView->CameraGetZoom());
     RenderWater(terrain);
   }
+  // Engine addition (ren_Atmosphere): height fog lit by the sun over everything drawn so far, water included,
+  // from the same depth (the water's surface is found from its height).
+  if (moho::Atmosphere& atmosphere = moho::Atmosphere::Get(); terrain != nullptr && atmosphere.IsActive()) {
+    const gpg::gal::RenderProfileScope profileAtmosphere("Atmosphere");
+    atmosphere.Render(
+      *mCam, worldView->mView->CameraGetZoom(), mScreenPos.x, mScreenPos.y, mScreenSize.x, mScreenSize.y
+    );
+  }
 
   // The playable-boundary pass and the UI selection pass, in that order,
   // between RenderWater and the 0x24 mesh bucket.
@@ -2596,6 +2606,10 @@ void moho::WRenViewport::RenderCompositeTerrain(
   moho::Shadow* const shadowContext =
     mShadowRenderer.mShadowFidelity != 0 && !ShadowsDisabledByEnv() ? &mShadowRenderer : nullptr;
 
+  // Engine addition (ren_AsyncPipelines): the terrain and its decals draw every frame, so a draw whose pipeline a
+  // worker is still building can wait a frame (gpg/gal/PipelineDefer.h); a decal or stratum shader first seen when
+  // the camera moved stalled the frame 0.4 s on the driver.
+  const gpg::gal::PipelineDeferScope deferPipelines;
   const auto drewNormals = terrain->DrawNormals(
     moho::REN_GetGameTick(), moho::REN_GetSimDeltaSeconds(), mPrimaryTargetLocks[mHead], shadowContext
   );

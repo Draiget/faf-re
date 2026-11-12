@@ -13,11 +13,12 @@
 #include "ResourcesD3D12.h"
 
 #include "gpg/core/utils/Logging.h"
+#include "gpg/gal/backends/common/BackendErrors.h"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/DrawStatistics.h"
-#include "gpg/gal/RenderProfiler.h"
-#include "gpg/gal/backends/common/BackendErrors.h"
+#include "gpg/gal/effects/EffectRuntime.h"
 #include "gpg/gal/effects/ShaderCompiler.h"
+#include "gpg/gal/RenderProfiler.h"
 
 namespace gpg::gal
 {
@@ -93,7 +94,6 @@ namespace gpg::gal
       const wchar_t* const profile
     )
     {
-      const effects::ShaderCompiler& compiler = effects::ShaderCompiler::Instance();
       // HLSL 2018 and no row-major default: the sources are written for FXC
       // (the D3D11 backend compiles them with d3dcompiler).
       // Engine addition (ren_RayTracedShadows): a program with inline ray queries needs shader model 6.5.
@@ -103,7 +103,7 @@ namespace gpg::gal
         rayProfile.back() = L'5';
       }
       const effects::CompiledShader compiled =
-        compiler.CompileRaw(source, entry, rayProfile.c_str(), {L"-HV", L"2018"});
+        effects::CompileRawCached(source, entry, rayProfile.c_str(), {L"-HV", L"2018"}, effects::ShaderTarget::Dxil);
       if (!compiled.succeeded) {
         gpg::Warnf(
           "D3D12: GPU program %s, %ls %s does not compile: %s", desc.name, profile, entry, compiled.messages.c_str()

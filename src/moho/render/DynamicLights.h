@@ -69,10 +69,15 @@ namespace moho
       float color[3]{1.0f, 0.62f, 0.32f}; // the colour, brightest channel 1
       float strength = 1.0f;              // how bright and opaque the ramp is, 0..1
     };
-    /** The light colour of a particle ramp texture (its alpha-weighted colour over the first part of life), cached. */
-    [[nodiscard]] const RampColor& ColorOfRamp(const char* path);
+    /**
+     * The light colour of a particle ramp texture (its alpha-weighted colour over the first part of life), cached; null
+     * while it waits for a later beat to be read (kRampReadsPerBeat).
+     */
+    [[nodiscard]] const RampColor* ColorOfRamp(const char* path);
 
     std::map<std::string, RampColor> mRampColors;
+    static constexpr int kRampReadsPerBeat = 2;
+    int mRampReadsLeft = kRampReadsPerBeat; // ramps this beat may still read
 
     void AddSource(
       const float position[3],

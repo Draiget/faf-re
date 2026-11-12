@@ -2,14 +2,16 @@
 
 #include "DeviceD3D12.h"
 
-#include <thread>
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
+#include <deque>
 #include <set>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <d3dcompiler.h>
@@ -18,6 +20,12 @@
 
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "gpg/gal/backends/common/BackendErrors.h"
+#include "gpg/gal/backends/common/ImageCodec.h"
+#include "gpg/gal/backends/common/RuntimeInfo.h"
+#include "gpg/gal/backends/d3d11/D3D11VertexLayouts.h"
+#include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
+#include "gpg/gal/backends/dxgi/DxgiFormats.h"
 #include "gpg/gal/CubeRenderTargetContext.hpp"
 #include "gpg/gal/CursorContext.hpp"
 #include "gpg/gal/DepthStencilTargetContext.hpp"
@@ -26,22 +34,17 @@
 #include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/EffectContext.hpp"
 #include "gpg/gal/EffectMacro.hpp"
+#include "gpg/gal/effects/RayTracedShadows.h"
+#include "gpg/gal/effects/ShadowCascades.h"
+#include "gpg/gal/effects/TextureFiltering.h"
 #include "gpg/gal/Error.hpp"
 #include "gpg/gal/Head.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
+#include "gpg/gal/PipelineDefer.h"
 #include "gpg/gal/PlacedResources.h"
 #include "gpg/gal/RenderTargetContext.hpp"
 #include "gpg/gal/TextureContext.h"
 #include "gpg/gal/VertexBufferContext.hpp"
-#include "gpg/gal/backends/common/BackendErrors.h"
-#include "gpg/gal/backends/common/ImageCodec.h"
-#include "gpg/gal/backends/common/RuntimeInfo.h"
-#include "gpg/gal/backends/d3d11/D3D11VertexLayouts.h"
-#include "gpg/gal/backends/d3d11/EffectSourceD3D11.h"
-#include "gpg/gal/backends/dxgi/DxgiFormats.h"
-#include "gpg/gal/effects/RayTracedShadows.h"
-#include "gpg/gal/effects/ShadowCascades.h"
-#include "gpg/gal/effects/TextureFiltering.h"
 
 namespace gpg::gal
 {
@@ -488,6 +491,7 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     mSwapChains.clear();
     ReleaseRayTracing();
     mGarbage.clear();
+    WaitForPendingPipelines();
     mPipelineCache.Close();
     mPipelineMemo.Clear();
     mPipelines.clear();
@@ -3673,6 +3677,23 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
       mPipelineMemo.Store(inputs, found->second.Get());
       return found->second.Get();
     }
+    // Engine addition (ren_AsyncPipelines): one a worker is building is taken once it is done; until then the draw
+    // is skipped.
+    const bool defer = PipelinesMayDefer();
+    if (const auto pending = mPendingPipelines.find(key.Key()); pending != mPendingPipelines.end()) {
+      // A draw that can't wait (a thumbnail, a bake) waits for the worker instead of being skipped.
+      if (defer && pending->second.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+        mPipelineDeferred = true;
+        return nullptr;
+      }
+      ComPtr<ID3D12PipelineState> built = pending->second.get();
+      mPendingPipelines.erase(pending);
+      return mPipelines.emplace(std::move(key.Key()), built).first->second.Get();
+    }
+    if (defer && mPendingPipelines.size() >= kMaxPendingPipelines) {
+      mPipelineDeferred = true;
+      return nullptr; // the workers are busy: asked again next frame
+    }
 
     // The input layout: the vertex format's elements, plus one element on an
     // unbound slot (which reads zero) for every input the shader takes that
@@ -3799,6 +3820,46 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     // 2: the ray root signature with the alpha-test parameters (ren_RayAlphaShadows); bump on any layout change.
     const std::uint8_t rootSignature = mRayQuery ? 2U : 0U;
     cacheKey.Add(&rootSignature, sizeof(rootSignature));
+    if (defer) {
+      // The job owns copies of everything the description points at: the shaders and the input layout's names can
+      // go away before it runs.
+      struct Job
+      {
+        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc{};
+        std::vector<std::uint8_t> code[4];
+        std::deque<std::string> names;
+        std::vector<D3D12_INPUT_ELEMENT_DESC> elements;
+        std::uint64_t cacheKey = 0U;
+      };
+      auto job = std::make_shared<Job>();
+      job->desc = desc;
+      job->cacheKey = cacheKey.Value();
+      D3D12_SHADER_BYTECODE* const stages[4] = {&job->desc.VS, &job->desc.PS, &job->desc.HS, &job->desc.DS};
+      for (int stage = 0; stage < 4; ++stage) {
+        const auto* const bytes = static_cast<const std::uint8_t*>(stages[stage]->pShaderBytecode);
+        if (bytes != nullptr && stages[stage]->BytecodeLength != 0U) {
+          job->code[stage].assign(bytes, bytes + stages[stage]->BytecodeLength);
+          stages[stage]->pShaderBytecode = job->code[stage].data();
+        }
+      }
+      job->elements = elements;
+      for (D3D12_INPUT_ELEMENT_DESC& element : job->elements) {
+        job->names.emplace_back(element.SemanticName != nullptr ? element.SemanticName : "");
+        element.SemanticName = job->names.back().c_str();
+      }
+      job->desc.InputLayout = {job->elements.data(), static_cast<UINT>(job->elements.size())};
+      ID3D12Device* const device = mDevice.Get();
+      d3d12::PipelineCache* const cache = &mPipelineCache;
+      mPendingPipelines.emplace(std::move(key.Key()), std::async(std::launch::async, [job, device, cache] {
+        ComPtr<ID3D12PipelineState> built = cache->Load(job->cacheKey, job->desc);
+        if (built == nullptr && SUCCEEDED(device->CreateGraphicsPipelineState(&job->desc, IID_PPV_ARGS(&built)))) {
+          cache->Store(job->cacheKey, built.Get());
+        }
+        return built; // null on failure: cached as a failure when taken, as below
+      }));
+      mPipelineDeferred = true;
+      return nullptr;
+    }
     ComPtr<ID3D12PipelineState> pipeline = mPipelineCache.Load(cacheKey.Value(), desc);
     if (pipeline != nullptr) {
       return mPipelines.emplace(std::move(key.Key()), pipeline).first->second.Get();
@@ -3820,6 +3881,16 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     }
     // A failure is cached too, so a broken pass costs one attempt.
     return mPipelines.emplace(std::move(key.Key()), pipeline).first->second.Get();
+  }
+
+  void DeviceD3D12::WaitForPendingPipelines() noexcept
+  {
+    for (auto& [key, pending] : mPendingPipelines) {
+      if (pending.valid()) {
+        pending.wait();
+      }
+    }
+    mPendingPipelines.clear();
   }
 
   bool DeviceD3D12::PrepareDraw(
@@ -3863,9 +3934,11 @@ float4 SolidPS(float4 position : SV_Position) : SV_Target0 { return float4(1, 0,
     if (mPass.sampled != nullptr) {
       TransitionSampled(*mPass.sampled);
     }
+    mPipelineDeferred = false;
     ID3D12PipelineState* const pipeline = PipelineFor(mPass, topologyType);
     if (pipeline == nullptr) {
-      ++mSkippedDraws;
+      // Waiting for a worker's pipeline (ren_AsyncPipelines) is expected, not the broken pass the warning reports.
+      ++(mPipelineDeferred ? mDeferredDraws : mSkippedDraws);
       return false;
     }
 

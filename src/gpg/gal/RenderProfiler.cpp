@@ -172,6 +172,10 @@ namespace gpg::gal
     if (mFrames == 0U) {
       mIntervalStartTicks = NowTicks();
     }
+    if (mFrames != 0U) {
+      // The first frame of an interval also holds the time the last one's log took.
+      mFrameWalls.push_back(static_cast<float>(mSummary.lastFrameWallMilliseconds));
+    }
     mUploadBytes += frame.uploadBytes;
     mStateChanges += frame.stateChanges;
     mDrawCalls += frame.drawCalls;
@@ -192,6 +196,27 @@ namespace gpg::gal
       static_cast<double>(mStateChanges) / frames,
       static_cast<double>(mUploadBytes) / frames / 1024.0
     );
+    // Lag spikes: the slowest frames of the interval, which the mean hides.
+    if (!mFrameWalls.empty()) {
+      std::sort(mFrameWalls.begin(), mFrameWalls.end());
+      const std::size_t count = mFrameWalls.size();
+      const auto at = [&](const double share) {
+        return static_cast<double>(
+          mFrameWalls[std::min(count - 1U, static_cast<std::size_t>(share * static_cast<double>(count)))]
+        );
+      };
+      const auto over =
+        static_cast<std::size_t>(mFrameWalls.end() - std::upper_bound(mFrameWalls.begin(), mFrameWalls.end(), 33.4f));
+      gpg::Logf(
+        "  frame wall p50 %.2f ms, p99 %.2f ms, max %.2f ms, %zu of %zu frames over 33.4 ms",
+        at(0.5),
+        at(0.99),
+        static_cast<double>(mFrameWalls.back()),
+        over,
+        count
+      );
+      mFrameWalls.clear();
+    }
     mSummary.intervalFrames = mFrames;
     mSummary.intervalGpuMilliseconds = mGpuFrames != 0U ? mGpuFrameMilliseconds / static_cast<double>(mGpuFrames) : 0.0;
     mSummary.intervalCpuMilliseconds = 0.0;
