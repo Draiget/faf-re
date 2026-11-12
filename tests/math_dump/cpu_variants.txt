@@ -8,3 +8,11 @@
 # Seen on GitHub's ubuntu-24.04 runners from 2026-11-11 (AddressSanitizer run 43029796119, af9763ce9):
 acos 0 f80255785993ca27 54528528e4839452 AuthenticAMD AMD EPYC 9V45 96-Core Processor: x87 fpatan rounds differently
 acos 1 ff54899e5ff37024 fe58a42f03e586b0 AuthenticAMD AMD EPYC 9V45 96-Core Processor: x87 fpatan rounds differently
+# Seen on GitHub's ubuntu-24.04 runners on 2026-11-12 (Linux client run 43224962035, a6623706a); blocks 0 and 1 gave the
+# 9V45's outputs there too:
+acos 2 e650c6c50f9f9dfa 80451ca08f240f4a AuthenticAMD AMD EPYC 7763 64-Core Processor: x87 fpatan rounds differently
+acos 3 1ecc10d14ac73098 9fb999ef3eda2fda AuthenticAMD AMD EPYC 7763 64-Core Processor: x87 fpatan rounds differently
+acos 8 e0a86fda0999840a c01f6d325de37603 AuthenticAMD AMD EPYC 7763 64-Core Processor: x87 fpatan rounds differently
+acos 10 ffe0ba9edc3b3d85 c1aa92da20101c63 AuthenticAMD AMD EPYC 7763 64-Core Processor: x87 fpatan rounds differently
+acos 12 b0a4da3437915dc3 8e5734c9366d0d2c AuthenticAMD AMD EPYC 7763 64-Core Processor: x87 fpatan rounds differently
+acos 13 c1db2fb3456110d5 0bde9fedbfa65362 AuthenticAMD AMD EPYC 7763 64-Core Processor: x87 fpatan rounds differently
