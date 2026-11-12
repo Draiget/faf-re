@@ -1,14 +1,14 @@
 // The control plane (plan WP17.16-WP17.20): one page for a machine's server-host. Capacity by NUMA node with what is
 // allocated and its live use (plane/capacity.ts), the tournament lobbies and open slots that use it (plane/lists.ts),
-// and the configuration panel that plans and creates either (plane/config.ts). A lobby opens in the server view
-// (main.ts) through the host's proxy.
+// the configuration panel that plans and creates either (plane/config.ts), and a lobby opened inside it
+// (plane/lobby.ts). This module polls the host and feeds the shared store (plane/store.ts).
 
 import "./host.css";
 import { ApiError, type HostApi, type HostInfo, type Lobby } from "./api.ts";
 import { resetCapacity } from "./plane/capacity.ts";
 import { resetConfig, startConfig } from "./plane/config.ts";
-import { resetLists, stateChip as listStateChip } from "./plane/lists.ts";
-import { actions, emit, hue, lobbyById as findLobby, store } from "./plane/store.ts";
+import { resetLists } from "./plane/lists.ts";
+import { actions, emit, store } from "./plane/store.ts";
 
 const POLL_MS = 2000;
 const REQUEST_MS = 5000;
@@ -16,25 +16,13 @@ const REQUEST_MS = 5000;
 export interface HostCallbacks {
   /** Each poll's outcome: null when the host answered, else why not (and whether the token was refused). */
   onHealth(error: string | null, unauthorized: boolean): void;
-  /** The lobby list changed (the server view's lobby bar follows it). */
+  /** The lobby list changed. */
   onLobbies(lobbies: Lobby[]): void;
 }
 
 let callbacks: HostCallbacks | null = null;
 let timer: number | undefined;
 let polling = false;
-
-export function lobbyById(id: string): Lobby | undefined {
-  return findLobby(id);
-}
-
-export function lobbyHue(id: string): number {
-  return hue(id);
-}
-
-export function stateChip(state: string): HTMLElement {
-  return listStateChip(state);
-}
 
 async function poll(): Promise<void> {
   const api = store.api;

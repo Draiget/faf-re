@@ -74,7 +74,7 @@ export function warningList(warnings: PlacementWarning[]): HTMLElement {
 }
 
 /** A compact warnings line that opens to the list. */
-function warningSummary(warnings: PlacementWarning[]): HTMLElement | null {
+export function warningSummary(warnings: PlacementWarning[]): HTMLElement | null {
   if (warnings.length === 0) return null;
   const errors = warnings.filter((warning) => warning.severity === "error").length;
   const warns = warnings.filter((warning) => warning.severity === "warn").length;
@@ -152,14 +152,14 @@ export function watchBlock(lobby: Lobby): HTMLElement {
   );
 }
 
-function cpuChips(cpus: number[], id: string): Child {
+export function cpuChips(cpus: number[], id: string): Child {
   if (cpus.length === 0) return h("span", { class: "dim" }, "–");
   const box = h("span", { class: "cpu-chips" }, ...cpus.map((cpu) => h("span", { class: "cpu-chip" }, String(cpu))));
   box.style.setProperty("--c", colour(id));
   return box;
 }
 
-function usageLine(cpus: number, usage: Lobby["usage"]): Child {
+export function usageLine(cpus: number, usage: Lobby["usage"]): Child {
   const cores = usage?.cpu_cores;
   const rss = usage?.rss_mb;
   if (!isNumber(cores) && !isNumber(rss)) return h("span", { class: "dim" }, "–");
@@ -195,7 +195,7 @@ function loopback(base: string): boolean {
   }
 }
 
-function fact(label: string, value: Child, wide = false): HTMLElement {
+export function fact(label: string, value: Child, wide = false): HTMLElement {
   return h("div", { class: `fact-item${wide ? " wide" : ""}` }, h("dt", {}, label), h("dd", {}, value));
 }
 
@@ -296,7 +296,7 @@ function lobbyItem(id: string): Item {
   return { root, update };
 }
 
-async function stopLobby(id: string, button: HTMLButtonElement): Promise<void> {
+export async function stopLobby(id: string, button: HTMLButtonElement): Promise<void> {
   const lobby = store.lobbies.find((candidate) => candidate.id === id);
   const api = store.api;
   if (lobby === undefined || api === null) return;
@@ -320,7 +320,7 @@ async function stopLobby(id: string, button: HTMLButtonElement): Promise<void> {
   actions.refresh();
 }
 
-async function forgetLobby(id: string, button: HTMLButtonElement): Promise<void> {
+export async function forgetLobby(id: string, button: HTMLButtonElement): Promise<void> {
   const api = store.api;
   if (api === null) return;
   button.disabled = true;
@@ -496,4 +496,9 @@ export function resetLists(): void {
   slotItems.clear();
   lobbyList.replaceChildren();
   slotList.replaceChildren();
+  lobbyEmpty.hidden = false;
+  slotEmpty.hidden = false;
+  slotsMissing.hidden = true;
+  lobbyMeta.textContent = "";
+  slotMeta.textContent = "";
 }

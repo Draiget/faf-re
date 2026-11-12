@@ -430,6 +430,7 @@ select {
   .columns {
     display: flex;
     flex-direction: column;
+    align-items: stretch;
   }
 
   .col-main,
@@ -453,8 +454,12 @@ select {
     order: 4;
   }
 
-  .col-main > .events-card {
+  .col-main > .lobby-info {
     order: 5;
+  }
+
+  .col-main > .events-card {
+    order: 6;
   }
 }
 
@@ -494,7 +499,7 @@ select {
   border-radius: var(--radius-sm);
 }
 
-body.stale .col-main {
+.lobby-view.stale .col-main {
   opacity: 0.6;
   transition: opacity 0.3s;
 }

@@ -1,5 +1,5 @@
-// FAF's game settings as a form (plan WP17.20), shared by the operator's configuration panel (config.ts) and the
-// player's claim page (claim.ts): options grouped into rules, teams, AI and other, the map's own options for adaptive
+// FAF's game settings as a form (plan WP17.20), shared by the operator's configuration panel (config.ts), a running
+// lobby's settings (lobby.ts) and the player's claim page (claim.ts): options grouped into rules, teams, AI and other, the map's own options for adaptive
 // maps, each with its default shown, changed values marked and a reset; a filter over all of them. Only values that
 // differ from their defaults are kept in `chosen`.
 
@@ -38,6 +38,8 @@ export interface OptionsForm {
   preset?: ReadonlyMap<string, SettingKey>;
   /** What the preset is called on the option, e.g. "slot". */
   presetLabel?: string;
+  /** The fields' id prefix (default "set-"): two forms on one page need different ones. */
+  idPrefix?: string;
   /** Runs after every change by the user. */
   onChange(): void;
 }
@@ -54,7 +56,7 @@ export function pruneChosen(chosen: Map<string, SettingKey>, settings: Settings)
 
 function optionField(option: SettingOption, form: OptionsForm): HTMLElement {
   const { chosen } = form;
-  const id = `set-${option.key}`;
+  const id = `${form.idPrefix ?? "set-"}${option.key}`;
   const select = h("select", { id, "data-key": option.key });
   const defaultIndex = option.values.findIndex((value) => sameKey(value.key, option.default));
   const preset = form.preset?.get(option.key);

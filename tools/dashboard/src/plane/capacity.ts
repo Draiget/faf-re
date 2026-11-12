@@ -417,4 +417,5 @@ export function resetCapacity(): void {
   linksBox.replaceChildren();
   allocBox.replaceChildren();
   machineTiles.replaceChildren();
+  machineModel.textContent = "";
 }

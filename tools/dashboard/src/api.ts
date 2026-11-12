@@ -1,6 +1,7 @@
-// The dedicated server's REST API (plan WP17.11, docs/SWITCHES.md `--rest`): status, the armies of a running game,
-// control ops, and the event stream, each with the admin token as a bearer token. No browser-only API here, so Node
-// runs it too (scripts/smoke.ts).
+// The APIs the dashboard talks to: a machine's server-host (HostApi), each lobby's own server through the host's proxy
+// (ServerApi: status, the armies of a running game, control ops, the event stream; docs/SWITCHES.md `--rest`), and the
+// players' claim API (ClaimApi). The admin token goes as a bearer token. No browser-only API here, so Node runs it too
+// (scripts/smoke.ts, scripts/smoke-host.ts).
 
 export interface Seat {
   uid: number;
@@ -358,6 +359,8 @@ export interface Lobby {
   /** starting, lobby, game, ended, failed, stopped. */
   state: string;
   map?: { id?: string; name?: string | null; km?: number | null; players?: number | null } | null;
+  /** The game and map options it started with (`set_options` changes later aren't in it). */
+  options?: Record<string, SettingKey> | null;
   cpus?: number[] | null;
   port?: number | null;
   pid?: number | null;
@@ -609,7 +612,7 @@ export class HostApi {
     return requestJson(this.base, this.token, method, path, body, signal);
   }
 
-  /** `GET /api/v1/host`. A plain server (no host) answers 404. */
+  /** `GET /api/v1/host`. Anything but a server-host (a lone server's `--rest`, say) answers 404. */
   async host(signal?: AbortSignal): Promise<HostInfo> {
     const answer = await this.request("GET", "/api/v1/host", undefined, signal);
     const host = (answer.host ?? {}) as HostInfo;

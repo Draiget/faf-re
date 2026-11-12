@@ -1,0 +1,759 @@
+// A lobby opened inside the control plane (`#/lobby/<id>`), through the host's proxy to the lobby's own server: a bar
+// with the way back, the host's summary and the other lobbies; the lobby or game (phase, countdown, game clock), the
+// armies of a running game, the seats (joined, ready, ping), the lobby's facts with its join and watch lines, the event
+// stream with filters, and the control ops (controls.ts).
+
+import { ApiError, type Lobby, type Seat, type ServerApi, type ServerEvent, type Status } from "../api.ts";
+import { renderArmies } from "../armies.ts";
+import { byId, clock, fill, h, icon, initials, isNumber, num, type Child } from "../dom.ts";
+import { CATEGORIES, eventItem, kindOf, type Category, type EventContext } from "../events.ts";
+import { toast } from "../ui.ts";
+import { gb } from "./capacity.ts";
+import { bindControls, enableControls, followLobby, optionsChanged, renderSeatPicker, resetControls, showPhase, showSelection } from "./controls.ts";
+import { cpuChips, fact, forgetLobby, joinBlock, stateChip, stopLobby, usageLine, warningSummary, watchBlock } from "./lists.ts";
+import { colour, cpuLoad, displayName, lobbyById, on, plural, RUNNING, SLOT_HOLDING, slotOfLobby, store } from "./store.ts";
+
+const MAX_EVENTS = 300;
+const REQUEST_MS = 5000;
+const POLL_MS = 2000;
+
+// ---------------------------------------------------------------- elements
+
+const streamPill = byId<HTMLElement>("stream-pill");
+const streamText = byId<HTMLElement>("stream-text");
+
+const barName = byId<HTMLElement>("lobby-bar-name");
+const barMeta = byId<HTMLElement>("lobby-bar-meta");
+const barState = byId<HTMLElement>("lobby-bar-state");
+const barSwatch = byId<HTMLElement>("lobby-bar-swatch");
+const bar = byId<HTMLElement>("lobby-bar");
+const hostSummary = byId<HTMLElement>("lobby-host-summary");
+const lobbySwitch = byId<HTMLElement>("lobby-switch");
+
+const hero = byId<HTMLElement>("hero");
+const heroEyebrow = byId<HTMLElement>("hero-eyebrow");
+const heroTitle = byId<HTMLElement>("hero-title");
+const heroBadges = byId<HTMLElement>("hero-badges");
+const heroTiles = byId<HTMLElement>("hero-tiles");
+const clockBlock = byId<HTMLElement>("clock-block");
+const clockText = byId<HTMLElement>("clock");
+const countdownBox = byId<HTMLElement>("countdown");
+const countdownValue = byId<HTMLElement>("countdown-value");
+const countdownRing = byId<HTMLElement>("countdown-ring");
+const countdownAnnounce = byId<HTMLElement>("countdown-announce");
+
+const armiesCard = byId<HTMLElement>("armies-card");
+const armiesBox = byId<HTMLElement>("armies");
+const armiesMeta = byId<HTMLElement>("armies-meta");
+
+const seatsBox = byId<HTMLElement>("seats");
+const seatsMeta = byId<HTMLElement>("seats-meta");
+const seatsEmpty = byId<HTMLElement>("seats-empty");
+
+const infoFacts = byId<HTMLElement>("lobby-facts");
+const infoWarnings = byId<HTMLElement>("lobby-warnings");
+const infoExit = byId<HTMLElement>("lobby-exit");
+const infoLines = byId<HTMLElement>("lobby-lines");
+const stopButton = byId<HTMLButtonElement>("lobby-stop");
+const forgetButton = byId<HTMLButtonElement>("lobby-forget");
+
+const eventsList = byId<HTMLOListElement>("events");
+const eventsEmpty = byId<HTMLElement>("events-empty");
+const eventFilters = byId<HTMLElement>("event-filters");
+const eventSearch = byId<HTMLInputElement>("event-search");
+const eventsClear = byId<HTMLButtonElement>("events-clear");
+
+const view = byId<HTMLElement>("lobby-view");
+
+// ---------------------------------------------------------------- state
+
+let api: ServerApi | null = null;
+let lobbyId: string | null = null;
+let refresh: number | undefined;
+let stream: AbortController | null = null;
+let lastStatus: Status | null = null;
+let polling = false;
+let pollAgain = false;
+let armiesSupported = true;
+let armiesBusy = false;
+let gameEnded = false;
+let selectedUid: number | null = null;
+const results = new Map<number, { name: string; result: string }>();
+const seatNames = new Map<number, string>();
+
+export function openLobbyId(): string | null {
+  return lobbyId;
+}
+
+function currentLobby(): Lobby | undefined {
+  return lobbyId === null ? undefined : lobbyById(lobbyId);
+}
+
+function setStream(live: boolean | null): void {
+  streamPill.hidden = live === null;
+  streamPill.classList.toggle("live", live === true);
+  streamText.textContent = live ? "Events live" : "Events reconnecting";
+}
+
+// ---------------------------------------------------------------- seats
+
+function nameOf(uid: unknown): string {
+  if (!isNumber(uid)) return "?";
+  const name = seatNames.get(uid);
+  return name === undefined || name === "" ? `uid ${uid}` : name;
+}
+
+type SeatState = { key: string; label: string; tone: string };
+
+function seatState(seat: Seat, phase: string): SeatState {
+  if (seat.gone) return { key: "gone", label: "Gone", tone: "neutral" };
+  if (seat.lost) return { key: "lost", label: "Lost", tone: "bad" };
+  if (seat.away) return { key: "away", label: "Away", tone: "warn" };
+  if (!seat.joined) return { key: "absent", label: "Not joined", tone: "muted" };
+  if (phase === "game" && seat.loaded === false) {
+    const load = seat.load === "rules" ? "Loading rules" : "Loading";
+    return { key: "loading", label: load, tone: "info" };
+  }
+  return { key: "here", label: "Here", tone: "ok" };
+}
+
+function pingTone(ping: number): string {
+  return ping <= 80 ? "ok" : ping <= 160 ? "warn" : "bad";
+}
+
+function seatContent(seat: Seat, status: Status): Child[] {
+  const state = seatState(seat, status.phase);
+  const isHost = status.host === seat.uid;
+  const hue = (Math.abs(seat.uid) * 47) % 360;
+  const avatar = h("span", { class: "avatar", "aria-hidden": "true" }, initials(seat.name || String(seat.uid)));
+  avatar.style.setProperty("--hue", String(hue));
+  const chips: Child[] = [h("span", { class: `chip state tone-${state.tone}` }, h("span", { class: "chip-dot", "aria-hidden": "true" }), state.label)];
+  if (status.phase !== "game") {
+    if (seat.ready === "yes") chips.push(h("span", { class: "chip tone-ok" }, icon("check", "icon tiny"), "Ready"));
+    else if (seat.ready === "no") chips.push(h("span", { class: "chip tone-muted" }, "Not ready"));
+  }
+  if (seat.content === "differs" || seat.content === "missing") chips.push(h("span", { class: "chip tone-warn" }, `content ${seat.content}`));
+  if (seat.mods === "outside" || seat.mods === "missing") chips.push(h("span", { class: "chip tone-warn" }, `mods ${seat.mods}`));
+
+  const facts: Child[] = [];
+  const ping = seat.ping_ms;
+  if (seat.joined && !seat.gone && isNumber(ping)) {
+    facts.push(h("span", { class: `fact ping tone-${pingTone(ping)}` }, h("span", { class: "ping-dot", "aria-hidden": "true" }), `${ping} ms`));
+  } else {
+    facts.push(h("span", { class: "fact dim" }, "ping –"));
+  }
+  if (isNumber(seat.slot) && seat.slot > 0) facts.push(h("span", { class: "fact" }, `slot ${seat.slot}`));
+  if (isNumber(seat.speed_limit)) facts.push(h("span", { class: "fact" }, `speed ≤ ${seat.speed_limit > 0 ? "+" : ""}${seat.speed_limit}`));
+  if (isNumber(seat.backlog_kb) && seat.backlog_kb > 0) facts.push(h("span", { class: `fact${seat.backlog_kb > 256 ? " tone-warn" : ""}` }, `backlog ${seat.backlog_kb} KB`));
+  if (isNumber(seat.behind_beats) && seat.behind_beats > 5) facts.push(h("span", { class: "fact tone-warn" }, `${seat.behind_beats} beats behind`));
+
+  return [
+    h(
+      "span",
+      { class: "seat-top" },
+      avatar,
+      h(
+        "span",
+        { class: "seat-id" },
+        h("span", { class: "seat-name" }, seat.name || "(no name)", isHost ? h("span", { class: "host-mark", title: "Host" }, icon("crown", "icon tiny"), h("span", { class: "sr-only" }, " (host)")) : null),
+        h("span", { class: "seat-uid" }, `uid ${seat.uid}`),
+      ),
+    ),
+    h("span", { class: "chips" }, ...chips),
+    h("span", { class: "facts" }, ...facts),
+  ];
+}
+
+const seatCards = new Map<number, HTMLButtonElement>();
+
+function renderSeats(status: Status): void {
+  const seats = status.seats ?? [];
+  seatsEmpty.hidden = seats.length > 0;
+  seatsEmpty.textContent = "This lobby has no seats.";
+  const wanted: HTMLButtonElement[] = [];
+  const present = new Set<number>();
+  for (const seat of seats) {
+    present.add(seat.uid);
+    let card = seatCards.get(seat.uid);
+    if (card === undefined) {
+      card = h("button", { type: "button", class: "seat-card" });
+      const uid = seat.uid;
+      card.addEventListener("click", () => selectSeat(uid));
+      seatCards.set(seat.uid, card);
+    }
+    const state = seatState(seat, status.phase);
+    card.className = `seat-card state-${state.key}${selectedUid === seat.uid ? " selected" : ""}`;
+    card.setAttribute("aria-pressed", String(selectedUid === seat.uid));
+    card.setAttribute("aria-label", `${seat.name || "no name"}, uid ${seat.uid}, ${state.label}${status.host === seat.uid ? ", host" : ""}`);
+    card.replaceChildren(...seatContent(seat, status).filter((child): child is Node => child instanceof Node));
+    wanted.push(card);
+  }
+  for (const uid of [...seatCards.keys()]) {
+    if (!present.has(uid)) seatCards.delete(uid);
+  }
+  // Reorder only when needed, so a focused card keeps its focus across polls.
+  const current = [...seatsBox.children];
+  if (current.length !== wanted.length || current.some((node, index) => node !== wanted[index])) {
+    seatsBox.replaceChildren(...wanted);
+  }
+  const joined = seats.filter((seat) => seat.joined && !seat.gone).length;
+  seatsMeta.textContent = seats.length === 0 ? "" : `${joined} of ${seats.length} joined`;
+  renderSeatPicker(seats, selectedUid);
+}
+
+function selectSeat(uid: number | null): void {
+  selectedUid = uid;
+  showSelection(uid);
+  for (const [cardUid, card] of seatCards) {
+    card.classList.toggle("selected", cardUid === uid);
+    card.setAttribute("aria-pressed", String(cardUid === uid));
+  }
+}
+
+// ---------------------------------------------------------------- countdown
+
+let countdownDeadline = 0;
+let countdownTotal = 0;
+let countdownTimer: number | undefined;
+let countdownShown = -1;
+const RING = 2 * Math.PI * 52;
+countdownRing.style.strokeDasharray = String(RING);
+
+function startCountdown(seconds: number): void {
+  const deadline = performance.now() + seconds * 1000;
+  // Polls and events both report it: follow the server, but don't jitter on small differences.
+  if (countdownTimer === undefined || Math.abs(deadline - countdownDeadline) > 750) {
+    countdownDeadline = deadline;
+  }
+  const configured = lastStatus?.start_when_ready_seconds;
+  countdownTotal = Math.max(countdownTotal, seconds, isNumber(configured) ? configured : 0);
+  if (countdownTimer === undefined) {
+    countdownShown = -1;
+    countdownTimer = window.setInterval(tickCountdown, 200);
+    countdownAnnounce.textContent = `The game starts in ${Math.ceil(seconds)} seconds`;
+  }
+  countdownBox.hidden = false;
+  hero.classList.add("counting");
+  tickCountdown();
+}
+
+function stopCountdown(): void {
+  window.clearInterval(countdownTimer);
+  countdownTimer = undefined;
+  countdownTotal = 0;
+  countdownShown = -1;
+  countdownAnnounce.textContent = "";
+  countdownBox.hidden = true;
+  hero.classList.remove("counting");
+}
+
+function tickCountdown(): void {
+  const left = Math.max(0, (countdownDeadline - performance.now()) / 1000);
+  const shown = Math.ceil(left);
+  if (shown !== countdownShown) {
+    countdownShown = shown;
+    countdownValue.textContent = String(shown);
+    if (shown > 0 && (shown <= 5 || shown % 10 === 0)) {
+      countdownAnnounce.textContent = `${shown} seconds to start`;
+    }
+  }
+  const ratio = countdownTotal > 0 ? left / countdownTotal : 0;
+  countdownRing.style.strokeDashoffset = String(RING * (1 - Math.min(1, ratio)));
+  countdownBox.classList.toggle("urgent", left <= 5);
+}
+
+// ---------------------------------------------------------------- hero
+
+function tile(label: string, value: Child, tone = ""): HTMLElement {
+  return h("div", { class: `tile${tone === "" ? "" : ` tone-${tone}`}` }, h("dt", {}, label), h("dd", {}, value));
+}
+
+function badge(text: string, tone: string, iconName?: string): HTMLElement {
+  return h("span", { class: `badge tone-${tone}` }, iconName === undefined ? null : icon(iconName, "icon tiny"), text);
+}
+
+function renderHero(status: Status): void {
+  const seats = status.seats ?? [];
+  const inGame = status.phase === "game";
+  hero.dataset.phase = inGame ? "game" : status.phase === "lobby" ? "lobby" : "other";
+  heroEyebrow.textContent = inGame ? "Game" : status.phase === "lobby" ? "Lobby" : status.phase;
+
+  const joined = seats.filter((seat) => seat.joined && !seat.gone);
+  const ready = seats.filter((seat) => seat.ready === "yes").length;
+  const badges: HTMLElement[] = [];
+  if (inGame) {
+    heroTitle.textContent = gameEnded ? "Game over" : status.paused ? "Paused" : status.started === false ? "Starting" : "In progress";
+    if (gameEnded) badges.push(badge("Ended", "neutral", "stop"));
+    else if (status.paused) badges.push(badge("Paused", "warn", "pause"));
+    else badges.push(badge("Running", "ok", "play"));
+  } else if (status.phase === "lobby") {
+    heroTitle.textContent = seats.length === 0 ? "Open lobby" : joined.length < seats.length ? "Waiting for players" : ready === seats.length ? "Everyone is ready" : "Waiting for ready";
+    badges.push(badge("Lobby", "accent", "users"));
+  } else {
+    heroTitle.textContent = status.phase;
+  }
+  const lost = seats.filter((seat) => seat.lost).length;
+  const away = seats.filter((seat) => seat.away && !seat.lost && !seat.gone).length;
+  if (lost > 0) badges.push(badge(`${lost} lost`, "bad"));
+  if (away > 0) badges.push(badge(`${away} away`, "warn"));
+  heroBadges.replaceChildren(...badges);
+
+  clockBlock.hidden = !inGame || !isNumber(status.beat);
+  if (isNumber(status.beat)) {
+    clockText.textContent = clock(status.beat);
+    clockBlock.classList.toggle("paused", status.paused === true);
+  }
+
+  const swr = status.start_when_ready_seconds;
+  const tiles: HTMLElement[] = [tile("Players", `${joined.length} / ${seats.length}`)];
+  if (!inGame) tiles.push(tile("Ready", `${ready} / ${seats.length}`, seats.length > 0 && ready === seats.length ? "ok" : ""));
+  tiles.push(tile("Host", status.host === undefined ? "–" : nameOf(status.host)));
+  tiles.push(tile("Start when ready", isNumber(swr) && swr > 0 ? `${swr} s` : "off"));
+  if (inGame && isNumber(status.beat)) tiles.push(tile("Beat", status.beat.toLocaleString()));
+  heroTiles.replaceChildren(...tiles);
+
+  if (isNumber(status.countdown_seconds)) {
+    startCountdown(status.countdown_seconds);
+  } else if (countdownTimer !== undefined) {
+    stopCountdown();
+  }
+}
+
+function renderIdle(text: string, eyebrow = "Lobby"): void {
+  hero.dataset.phase = "none";
+  heroEyebrow.textContent = eyebrow;
+  heroTitle.textContent = text;
+  heroBadges.replaceChildren();
+  heroTiles.replaceChildren();
+  clockBlock.hidden = true;
+  stopCountdown();
+}
+
+function showStatus(status: Status): void {
+  lastStatus = status;
+  seatNames.clear();
+  for (const seat of status.seats ?? []) seatNames.set(seat.uid, seat.name);
+  view.classList.remove("stale");
+  renderHero(status);
+  renderSeats(status);
+  enableControls(true);
+  showPhase(status);
+  if (status.phase !== "game") armiesCard.hidden = true;
+}
+
+// ---------------------------------------------------------------- polling
+
+async function pollArmies(current: ServerApi): Promise<void> {
+  if (!armiesSupported || armiesBusy) return;
+  armiesBusy = true;
+  try {
+    const answer = await current.armies(AbortSignal.timeout(REQUEST_MS));
+    if (api !== current || lastStatus?.phase !== "game") return;
+    renderArmies(armiesBox, answer.armies);
+    armiesMeta.textContent = `${answer.armies.length} ${answer.armies.length === 1 ? "army" : "armies"}${isNumber(answer.beat) ? ` · at ${clock(answer.beat)}` : ""}`;
+    armiesCard.hidden = answer.armies.length === 0;
+  } catch (error) {
+    // A server without the endpoint, the lobby, or a hiccup: the panel goes, quietly.
+    if (error instanceof ApiError && error.status === 404) armiesSupported = false;
+    if (api === current) armiesCard.hidden = true;
+  } finally {
+    armiesBusy = false;
+  }
+}
+
+async function poll(): Promise<void> {
+  const current = api;
+  if (current === null) return;
+  if (polling) {
+    pollAgain = true; // one more right after, for an event that came meanwhile
+    return;
+  }
+  // A lobby the host lists as stopped or failed has no server to ask: say so without a request.
+  const known = currentLobby();
+  if (known !== undefined && !RUNNING.has(known.state)) {
+    view.classList.add("stale");
+    renderIdle(known.state === "failed" ? `The lobby's server failed${known.exit ? `: ${known.exit}` : ""}` : "The lobby was stopped");
+    enableControls(false, "not running");
+    setStream(null);
+    return;
+  }
+  polling = true;
+  try {
+    const status = await current.status(AbortSignal.timeout(REQUEST_MS));
+    if (api !== current) return;
+    showStatus(status);
+    if (status.phase === "game") void pollArmies(current);
+  } catch {
+    if (api !== current) return;
+    view.classList.add("stale");
+    // The host knows why: a lobby still starting, stopped, or failed with its exit.
+    const lobby = currentLobby();
+    if (lobby?.state === "failed") {
+      renderIdle(`The lobby's server failed${lobby.exit ? `: ${lobby.exit}` : ""}`);
+      enableControls(false, "not running");
+    } else if (lobby?.state === "stopped") {
+      renderIdle("The lobby was stopped");
+      enableControls(false, "not running");
+    } else if (lastStatus === null) {
+      renderIdle(lobby === undefined && store.lobbies.length > 0 ? "The host doesn't list this lobby" : lobby?.state === "starting" ? "The lobby's server is starting…" : "The lobby's server isn't answering");
+    }
+  } finally {
+    polling = false;
+    if (pollAgain) {
+      pollAgain = false;
+      void poll();
+    }
+  }
+}
+
+// ---------------------------------------------------------------- events
+
+const activeCategories = new Set<Category>(CATEGORIES.map((category) => category.id).filter((id) => id !== "console"));
+const categoryCounts = new Map<Category, number>();
+const filterButtons = new Map<Category, HTMLButtonElement>();
+
+const context: EventContext = { nameOf, results };
+
+function matchesFilter(item: HTMLElement): boolean {
+  const category = item.dataset.cat as Category;
+  if (!activeCategories.has(category)) return false;
+  const query = eventSearch.value.trim().toLowerCase();
+  return query === "" || (item.textContent ?? "").toLowerCase().includes(query);
+}
+
+function applyFilters(): void {
+  let visible = 0;
+  for (const item of eventsList.children) {
+    const show = matchesFilter(item as HTMLElement);
+    (item as HTMLElement).hidden = !show;
+    if (show) visible += 1;
+  }
+  eventsEmpty.hidden = visible > 0;
+  eventsEmpty.textContent = eventsList.children.length === 0 ? "No events yet." : "No events match the filter.";
+}
+
+function renderFilterCounts(): void {
+  for (const [id, button] of filterButtons) {
+    const count = button.querySelector(".count");
+    if (count !== null) count.textContent = String(categoryCounts.get(id) ?? 0);
+  }
+}
+
+for (const category of CATEGORIES) {
+  const button = h(
+    "button",
+    { type: "button", class: `filter cat-${category.id}`, "aria-pressed": String(activeCategories.has(category.id)) },
+    category.id === "console" ? "Console lines" : category.label,
+    h("span", { class: "count", "aria-label": "events" }, "0"),
+  );
+  button.addEventListener("click", () => {
+    if (activeCategories.has(category.id)) activeCategories.delete(category.id);
+    else activeCategories.add(category.id);
+    button.setAttribute("aria-pressed", String(activeCategories.has(category.id)));
+    applyFilters();
+  });
+  filterButtons.set(category.id, button);
+  eventFilters.append(button);
+}
+eventSearch.addEventListener("input", applyFilters);
+eventsClear.addEventListener("click", () => {
+  eventsList.replaceChildren();
+  categoryCounts.clear();
+  renderFilterCounts();
+  applyFilters();
+});
+
+function addEvent(event: ServerEvent): void {
+  const name = event.event;
+  switch (name) {
+    case "game_started":
+    case "launched":
+      results.clear();
+      gameEnded = false;
+      armiesSupported = true;
+      stopCountdown();
+      break;
+    case "result":
+      if (isNumber(event.army)) results.set(event.army, { name: String(event.name ?? ""), result: String(event.result ?? "") });
+      break;
+    case "game_ended":
+      gameEnded = true;
+      break;
+    case "countdown":
+      if (isNumber(event.seconds)) startCountdown(event.seconds);
+      break;
+    case "countdown_cancelled":
+      stopCountdown();
+      countdownAnnounce.textContent = "The start countdown was cancelled";
+      toast("warn", "Countdown cancelled", String(event.reason ?? ""));
+      break;
+    case "options":
+      if (typeof event.options === "string") optionsChanged(event.options);
+      break;
+  }
+  const item = eventItem(event, context, new Date());
+  const category = kindOf(name).category;
+  categoryCounts.set(category, (categoryCounts.get(category) ?? 0) + 1);
+  item.hidden = !matchesFilter(item);
+  eventsList.prepend(item);
+  while (eventsList.children.length > MAX_EVENTS) {
+    const last = eventsList.lastElementChild as HTMLElement | null;
+    if (last === null) break;
+    const lastCategory = last.dataset.cat as Category;
+    categoryCounts.set(lastCategory, Math.max(0, (categoryCounts.get(lastCategory) ?? 1) - 1));
+    last.remove();
+  }
+  renderFilterCounts();
+  if (!item.hidden) eventsEmpty.hidden = true;
+  if (name !== "log") {
+    void poll(); // something changed: the page follows at once
+  }
+}
+
+function follow(current: ServerApi): void {
+  stream?.abort();
+  const controller = new AbortController();
+  stream = controller;
+  const known = currentLobby();
+  if (known !== undefined && !RUNNING.has(known.state)) {
+    // Stopped or failed: no stream to open. Look again later, in case the list was behind.
+    setStream(null);
+    window.setTimeout(() => {
+      if (stream === controller) follow(current);
+    }, 5000);
+    return;
+  }
+  setStream(false);
+  current
+    .events(addEvent, controller.signal, () => {
+      if (stream === controller) setStream(true);
+    })
+    .then(
+      () => retry(),
+      () => retry(),
+    );
+  function retry(): void {
+    if (controller.signal.aborted || stream !== controller) return;
+    setStream(false);
+    window.setTimeout(() => {
+      if (stream === controller) follow(current); // the server went away or closed it: try again
+    }, 3000);
+  }
+}
+
+// ---------------------------------------------------------------- the bar, the host's summary, the lobby's facts
+
+function summaryItem(label: string, value: Child): HTMLElement {
+  return h("div", { class: "summary-item" }, h("dt", {}, label), h("dd", {}, value));
+}
+
+function renderHostSummary(): void {
+  const info = store.info;
+  if (info === null) {
+    hostSummary.replaceChildren();
+    return;
+  }
+  const cpus = info.cpus;
+  const load = cpus.length === 0 ? 0 : cpus.reduce((sum, cpu) => sum + cpuLoad(cpu), 0) / cpus.length;
+  const running = store.lobbies.filter((lobby) => RUNNING.has(lobby.state)).length;
+  const open = store.slots.filter((slot) => slot.state === "open").length;
+  const held = store.slots.filter((slot) => SLOT_HOLDING.has(slot.state)).length;
+  const memory = info.memory_mb;
+  hostSummary.replaceChildren(
+    summaryItem("Host", h("a", { href: "#/" }, info.name ?? "host")),
+    summaryItem("CPUs", `${cpus.length} · ${Math.round(load)}% load`),
+    summaryItem("Memory", isNumber(memory?.available) && isNumber(memory?.total) && memory.total > 0 ? `${gb(memory.available)} free of ${gb(memory.total)}` : "–"),
+    summaryItem("Lobbies", h("a", { href: "#/" }, `${running} running`)),
+    summaryItem("Slots", h("a", { href: "#/" }, store.slotsSupported ? `${open} open · ${held - open} in use` : "–")),
+  );
+}
+
+function renderSwitch(): void {
+  const others = store.lobbies.filter((lobby) => RUNNING.has(lobby.state) || lobby.id === lobbyId);
+  if (others.length <= 1) {
+    lobbySwitch.replaceChildren();
+    return;
+  }
+  lobbySwitch.replaceChildren(
+    h("span", { class: "dim small switch-label" }, "Go to"),
+    ...others.map((lobby) => {
+      const slot = slotOfLobby(lobby.id);
+      const link = h(
+        "a",
+        { class: `switch-chip${lobby.id === lobbyId ? " current" : ""}`, href: `#/lobby/${encodeURIComponent(lobby.id)}`, title: `${displayName(lobby)}${slot === undefined ? "" : ` (slot ${displayName(slot)})`}, ${lobby.state}` },
+        h("span", { class: `swatch${slot === undefined ? "" : " slot"}`, "aria-hidden": "true" }),
+        h("span", { class: "switch-name" }, displayName(lobby)),
+      );
+      (link.firstElementChild as HTMLElement).style.setProperty("--swatch", colour(slot?.id ?? lobby.id));
+      if (lobby.id === lobbyId) link.setAttribute("aria-current", "page");
+      return link;
+    }),
+  );
+}
+
+let linesSignature = "";
+let warnSignature = "";
+
+function renderInfo(lobby: Lobby | undefined): void {
+  if (lobby === undefined) {
+    infoFacts.replaceChildren(fact("State", store.api === null ? "–" : "not on the host's list"));
+    infoWarnings.replaceChildren();
+    infoLines.replaceChildren();
+    infoExit.hidden = true;
+    stopButton.hidden = true;
+    forgetButton.hidden = true;
+    linesSignature = "";
+    warnSignature = "";
+    return;
+  }
+  const map = lobby.map;
+  const cpus = (lobby.cpus ?? []).filter(isNumber);
+  const nodes = (lobby.nodes ?? []).filter(isNumber);
+  const seats = lobby.seats ?? [];
+  const humans = seats.filter((seat) => seat.kind === "human").length;
+  const observers = lobby.observers ?? [];
+  const slot = slotOfLobby(lobby.id);
+  fill(
+    infoFacts,
+    fact("Map", h("span", {}, map?.name ?? map?.id ?? "unknown", isNumber(map?.km) ? h("span", { class: "dim" }, ` · ${map.km} km`) : null)),
+    fact("Seats", `${plural(humans, "player")}${seats.length > humans ? ` + ${plural(seats.length - humans, "AI", "AIs")}` : ""}${observers.length > 0 ? ` · ${plural(observers.length, "observer")}` : ""}`),
+    fact("Control", lobby.control === "organiser" ? "organiser starts it" : lobby.control === "player" ? `a player hosts${slot?.host_player ? ` (${slot.host_player})` : ""}` : "–"),
+    fact("CPUs", cpuChips(cpus, slot?.id ?? lobby.id)),
+    fact(nodes.length > 1 ? "Nodes" : "Node", nodes.length === 0 ? "–" : nodes.join(", ")),
+    fact("Use", RUNNING.has(lobby.state) ? usageLine(cpus.length, lobby.usage) : h("span", { class: "dim" }, "–"), true),
+    fact("Port", isNumber(lobby.port) ? String(lobby.port) : "–"),
+    slot === undefined ? null : fact("Open slot", h("span", {}, displayName(slot), isNumber(slot.games) ? h("span", { class: "dim" }, ` · game ${num(slot.games)}`) : null)),
+  );
+  const warnings = lobby.warnings ?? [];
+  const wsig = JSON.stringify(warnings);
+  if (wsig !== warnSignature) {
+    warnSignature = wsig;
+    fill(infoWarnings, warningSummary(warnings));
+  }
+  infoExit.hidden = !lobby.exit;
+  infoExit.textContent = lobby.exit ? `Exit: ${lobby.exit}` : "";
+  stopButton.hidden = !RUNNING.has(lobby.state);
+  forgetButton.hidden = lobby.state !== "stopped" && lobby.state !== "failed";
+  const lsig = JSON.stringify([lobby.state, seats.map((seat) => [seat.name, seat.join]), observers.map((observer) => [observer.name, observer.referee, observer.watch]), lobby.observer_delay_seconds]);
+  if (lsig !== linesSignature) {
+    linesSignature = lsig;
+    fill(infoLines, RUNNING.has(lobby.state) ? joinBlock(lobby) : null, RUNNING.has(lobby.state) && observers.length > 0 ? watchBlock(lobby) : null);
+  }
+}
+
+function renderBar(): void {
+  if (lobbyId === null) return;
+  const lobby = currentLobby();
+  const slot = slotOfLobby(lobbyId);
+  const name = lobby === undefined ? lobbyId : displayName(lobby);
+  barName.textContent = name;
+  const tint = colour(slot?.id ?? lobbyId);
+  bar.style.setProperty("--lobby", tint);
+  barSwatch.style.setProperty("--swatch", tint);
+  barSwatch.classList.toggle("slot", slot !== undefined);
+  if (lobby === undefined) {
+    barMeta.textContent = store.api === null ? "" : " · not on the host's list";
+    barState.replaceChildren();
+  } else {
+    const cpus = (lobby.cpus ?? []).filter(isNumber);
+    const map = lobby.map;
+    barMeta.textContent = ` · ${map?.name ?? map?.id ?? "map ?"}${cpus.length > 0 ? ` · CPU ${cpus.join(", ")}` : ""}${slot === undefined ? "" : ` · open slot ${displayName(slot)}`}`;
+    barState.replaceChildren(stateChip(lobby.state));
+  }
+  document.title = `${name} · FAF Server Dashboard`;
+}
+
+function renderFromHost(): void {
+  if (lobbyId === null) return;
+  const lobby = currentLobby();
+  renderBar();
+  renderHostSummary();
+  renderSwitch();
+  renderInfo(lobby);
+  followLobby(lobbyId, lobby);
+}
+
+on("lists", renderFromHost);
+on("host", () => {
+  if (lobbyId !== null) renderHostSummary();
+});
+
+stopButton.addEventListener("click", () => {
+  if (lobbyId !== null) void stopLobby(lobbyId, stopButton);
+});
+forgetButton.addEventListener("click", () => {
+  if (lobbyId === null) return;
+  // Forgotten, it has no page: back to the overview (a refusal shows as a toast there).
+  void forgetLobby(lobbyId, forgetButton).then(() => {
+    location.hash = "#/";
+  });
+});
+
+// ---------------------------------------------------------------- open, close
+
+bindControls({
+  api: () => api,
+  status: () => lastStatus,
+  lobby: currentLobby,
+  nameOf,
+  poll: () => void poll(),
+  selectSeat,
+  hasSeat: (uid) => seatCards.has(uid),
+});
+
+function resetView(): void {
+  lastStatus = null;
+  results.clear();
+  seatNames.clear(); // the next lobby's first events come before its first status: no names from this one
+  pollAgain = false;
+  gameEnded = false;
+  armiesSupported = true;
+  armiesCard.hidden = true;
+  armiesBox.replaceChildren();
+  seatCards.clear();
+  seatsBox.replaceChildren();
+  seatsMeta.textContent = "";
+  seatsEmpty.hidden = false;
+  seatsEmpty.textContent = "No seats yet.";
+  selectedUid = null;
+  resetControls();
+  view.classList.remove("stale");
+  eventsList.replaceChildren();
+  categoryCounts.clear();
+  renderFilterCounts();
+  applyFilters();
+  setStream(null);
+  linesSignature = "";
+  warnSignature = "";
+  renderIdle("Opening the lobby…");
+}
+
+/** Opens lobby `id` through the host (`store.api`): polls its status every 2 s and follows its events. */
+export function openLobby(id: string): void {
+  const host = store.api;
+  if (host === null) return;
+  if (id === lobbyId && api !== null) {
+    renderFromHost();
+    return;
+  }
+  closeLobby();
+  lobbyId = id;
+  api = host.lobbyApi(id);
+  renderFromHost();
+  refresh = window.setInterval(() => void poll(), POLL_MS);
+  follow(api);
+  void poll();
+}
+
+/** Stops following the open lobby: one lobby's seats and events don't mix with another's. */
+export function closeLobby(): void {
+  window.clearInterval(refresh);
+  refresh = undefined;
+  stream?.abort();
+  stream = null;
+  api = null;
+  lobbyId = null;
+  resetView();
+}
+
+resetView();

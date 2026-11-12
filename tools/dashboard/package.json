@@ -2,7 +2,7 @@
   "name": "faf-server-dashboard",
   "private": true,
   "version": "0.1.0",
-  "description": "A web dashboard for the dedicated server's REST API (plan WP17.4, WP17.11)",
+  "description": "A web dashboard for server-host: a machine's dedicated-server lobbies, open slots and CPUs",
   "type": "module",
   "scripts": {
     "dev": "vite",

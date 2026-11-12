@@ -1,4 +1,4 @@
-// Two pages: the dashboard (index.html: a server, or a server-host's control plane) and the player's claim page for an
+// Two pages: the dashboard (index.html: a server-host's control plane, its lobbies opened inside it) and the player's claim page for an
 // open slot (claim.html, plan WP17.18). `npm run build` writes both to dist/.
 
 import { fileURLToPath } from "node:url";

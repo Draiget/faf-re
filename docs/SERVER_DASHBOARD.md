@@ -2,7 +2,7 @@
 
 How to run the dedicated server (`server`, Linux only) on a machine with the host agent (`server-host`) and drive it from the web dashboard (`tools/dashboard`): the host starts with no lobby; from the page you pick a map, seats, AIs and options, choose the CPUs a lobby runs on (by hand on a CPU heatmap, or the least loaded ones), start it, give players their join line, and watch the lobby and the game (each army's resources, units, commander health and upgrades).
 
-A single `server` can also run without a host, from a match file you write yourself (section 6).
+The dashboard is one page and talks to `server-host` only; every lobby, including a player's game on an open slot, opens inside it. A single `server` can also run without a host, from a match file you write yourself (section 6), but the dashboard doesn't connect to it.
 
 ## 1. Build
 
@@ -65,13 +65,15 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173` (exactly the `--cors-origin` origin: `http://127.0.0.1:5173` is another origin and the browser refuses it), enter the host's address (`http://<host>:27180`) and the token, and press Connect.
+Open `http://localhost:5173` (exactly the `--cors-origin` origin: `http://127.0.0.1:5173` is another origin and the browser refuses it). The page opens on the control plane straight away, with a connection strip on top: the address starts as `http://<the page's own host name>:27180` (server-host's port unless `--listen` says otherwise); change it if the host runs on another machine, enter the admin token (the content of the `--token-file` file), and press Connect. The address stays in the browser, the token in the tab only; with both at hand the page connects by itself the next time it opens. If nothing answers, the page names the address it tried and says what to check (the port, that server-host runs, its `--cors-origin`).
 
-The host page shows:
+For development, `tools/dashboard/.env.local` (ignored by git) may hold `VITE_HOST_URL=http://<host>:27180` and `VITE_HOST_TOKEN=<token>`: the page starts from them when the browser has nothing stored. The token is read by `npm run dev` only and never goes into a build.
 
-- **The machine**: CPU model, memory, and a heatmap with one cell per logical CPU, grouped by socket and by core (hyperthread siblings together), coloured by the load of the last 10 s. CPUs that run a lobby are outlined in that lobby's colour.
-- **The lobbies**: map, state (starting, lobby, game, ended, failed, stopped), seats, CPUs, game time; Open, Stop, and Forget once stopped.
-- **New lobby**: the map (search by name; size and start spots shown), the seats (each a human with a name, or an AI with its personality; faction and team each), the game options, who starts it, the countdown, and the CPUs.
+Connected, the page shows:
+
+- **The machine**: CPU model, memory, and a heatmap with one cell per logical CPU, grouped by NUMA node and by core (hyperthread siblings together), coloured by the load of the last 10 s; each node's memory, the network links, and a table of what is allocated with its live use. CPUs that run a lobby are outlined in that lobby's colour, an open slot's dashed.
+- **The tournament lobbies** and **the open slots**, side by side: map, state (starting, lobby, game, ended, failed, stopped), seats, CPUs, game time, placement warnings, join and watch lines, claim codes and links; Open, Stop or Free, and Forget once stopped.
+- **Configure**: a new lobby (the map with search, size and start spots; the seats, each a human with a name or an AI with its personality, faction and team; observers; every game setting; who starts it; the countdown) or new open slots, and the CPUs either runs on, with the planner's estimate and warnings.
 
 ### Game settings
 
@@ -114,7 +116,9 @@ A lobby may list observers, each with a name and a token of their own, and a del
 
 ### A lobby's page
 
-Open shows the lobby through the host: its seats (joined, ready, ping), the countdown, the controls (start, pause, resume, end, eject, set options or a player's team, faction and colour), the events, and during the game each army: score, mass and energy (stored, income per second, storage), units against the unit cap, the commander's health and upgrades, and the result.
+Open (on a lobby's card, or on a claimed slot) opens the lobby inside the same page, through the host's proxy; `#/lobby/<id>` links to it directly. A bar on top leads back to the overview, sums up the host (CPUs and load, memory, lobbies running, slots open) and switches to the other running lobbies. Below it: the lobby or game (phase, the start-when-ready countdown, the game clock), during the game each army (score, mass and energy with stored, income per second and storage, units against the unit cap, the commander's health and upgrades, the result), the seats (joined, ready, ping), the lobby's facts (map, control, CPUs, node, live use, port, its open slot) with every join and watch line and Stop, and the events with filters.
+
+The controls: start the game now; the lobby's game settings, as the same form the configuration panel has (the catalog's options and the map's own, each with its default; the lobby's current values, as it started and as `options` events change them; changes marked “to apply” and sent with `set_options`); pause, resume, end with results; eject, set a player's team, faction and colour, substitute, extend timeouts; allow or disallow an address. Settings change in the lobby only, and only in a lobby the organiser starts: a player-hosted lobby's settings are its host player's, so the page shows them without changing them. Game speed and team lock are fixed when the lobby starts and aren't offered. On a host without the settings catalog the settings are typed as `Key=Value,Key=Value` instead.
 
 ## 5. Reaching it from another machine
 
@@ -137,10 +141,10 @@ A match file describes the game: map, options, the players' seats (`OwnerID` and
 ```
 server --match match.lua --out game --data /path/to/data \
   --listen 0.0.0.0:27185 --join-seconds 600 --lobby-seconds 600 \
-  --rest 127.0.0.1:27181 --rest-token-file admin.token --rest-cors-origin http://localhost:5173
+  --rest 127.0.0.1:27181 --rest-token-file admin.token
 ```
 
-The dashboard connects to `http://127.0.0.1:27181` the same way and shows the lobby's page directly. To see a seat taken without a game client: `faf_server_probe --server 127.0.0.1:27185 --uid 1001 --token <its MatchTokens entry> --lobby-name Probe --no-decode --seconds 3600`.
+The server's own REST API (`--rest`, the lobby API below) is a feature of the server for scripts and other tools, for example `faf_server_control` or `curl`. The dashboard doesn't connect to it: it reaches games through `server-host`, which runs each lobby's server with `--rest` itself and proxies it. To drive a game from the dashboard, run it under `server-host`. To see a seat taken without a game client: `faf_server_probe --server 127.0.0.1:27185 --uid 1001 --token <its MatchTokens entry> --lobby-name Probe --no-decode --seconds 3600`.
 
 ## API
 
@@ -185,9 +189,10 @@ A player's claim of an open slot (no `Authorization`: the claim code in the path
 
 ## When it doesn't work
 
-- **401** in the dashboard: the token differs from the file's (spaces and line ends at its end are dropped).
-- **The page can't reach the API** (the browser's console shows a CORS error): the page's address isn't exactly the `--cors-origin` (or `--rest-cors-origin`) origin, scheme and port included.
-- **No answer at all**: the API is bound to `127.0.0.1` and the page runs on another machine, or a firewall closes the port.
+- **Token refused** (401) in the dashboard: the token differs from the `--token-file` file's (spaces and line ends at its end are dropped).
+- **Not a host**: the address answered but has no `/api/v1/host`, for example a lone server's `--rest` port; the dashboard needs `server-host`'s address (port 27180 unless `--listen` says otherwise).
+- **The page can't reach the API** (the browser's console shows a CORS error): the page's address isn't exactly the `--cors-origin` origin, scheme and port included.
+- **No answer at all**: the address or port is wrong, server-host isn't running, the API is bound to `127.0.0.1` and the page runs on another machine, or a firewall closes the port.
 - **A lobby is `failed`**: its card shows how the server ended; its `server.log` in the lobby's folder under `--runs` says why.
 - **A lobby's CPUs**: the kernel's view is in `cpus_allowed` on the lobby (from `/proc/<pid>/status`); inside a container, CPUs outside the container's set can't be used.
 - **A player can't join**: the game isn't a server-mode build, the join line is another seat's, or the lobby's port isn't reachable.

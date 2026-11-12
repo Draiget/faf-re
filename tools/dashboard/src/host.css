@@ -728,16 +728,48 @@ a.btn {
   min-width: 10rem;
 }
 
-/* ------------------------------------------------------------ lobby bar over a lobby's page */
+/* ------------------------------------------------------------ connected or not */
+
+body[data-connected="false"] .when-online,
+body[data-connected="true"] .when-offline {
+  display: none !important;
+}
+
+/* ------------------------------------------------------------ a lobby opened inside the plane */
+
+.lobby-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.lobby-view[hidden] {
+  display: none;
+}
 
 .lobby-bar {
   --lobby: var(--accent);
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.6rem 0.9rem;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.65rem 0.95rem;
   border-left: 4px solid var(--lobby);
+  background:
+    linear-gradient(100deg, color-mix(in srgb, var(--lobby) 9%, transparent), transparent 45%),
+    var(--surface);
+}
+
+.lobby-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
   flex-wrap: wrap;
+  min-width: 0;
+}
+
+.lobby-bar-row .swatch {
+  margin-right: 0;
+  flex: none;
 }
 
 .lobby-bar-text {
@@ -746,8 +778,156 @@ a.btn {
   overflow-wrap: anywhere;
 }
 
+.lobby-bar-text strong {
+  font-size: 1.05rem;
+}
+
 .back-link {
   color: var(--accent);
+  flex: none;
+}
+
+.lobby-bar-host {
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--line);
+  justify-content: space-between;
+}
+
+.host-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.1rem;
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.summary-item {
+  display: flex;
+  gap: 0.35rem;
+  align-items: baseline;
+}
+
+.summary-item dt {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.summary-item dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-item a {
+  color: var(--accent);
+}
+
+.lobby-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.lobby-switch:empty {
+  display: none;
+}
+
+.switch-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 14rem;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  color: var(--text);
+  text-decoration: none;
+  background: var(--surface);
+}
+
+.switch-chip:hover {
+  border-color: var(--accent);
+}
+
+.switch-chip.current {
+  border-color: var(--lobby);
+  background: color-mix(in srgb, var(--lobby) 12%, var(--surface));
+  font-weight: 650;
+}
+
+.switch-chip .swatch {
+  margin-right: 0;
+  flex: none;
+  width: 0.6rem;
+  height: 0.6rem;
+}
+
+.switch-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lobby-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.lobby-info .card-head {
+  margin-bottom: 0;
+}
+
+.lobby-facts {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr));
+}
+
+#lobby-lines:empty {
+  display: none;
+}
+
+/* The lobby's game settings in the control column. */
+#lobby-options-group .set-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+#lobby-options-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+#lobby-options-form[hidden] {
+  display: none;
+}
+
+#lobby-options-group.locked #lobby-options-form {
+  opacity: 0.7;
+}
+
+.setting.pending select {
+  border-color: var(--warn);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--warn) 25%, transparent);
+}
+
+.setting.pending label::after {
+  content: "to apply";
+  margin-left: auto;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 650;
+  color: var(--warn);
+  background: var(--warn-soft);
+}
+
+@media (max-width: 36rem) {
+  .lobby-bar-host {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 /* ------------------------------------------------------------ observers */
