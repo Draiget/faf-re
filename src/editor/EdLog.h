@@ -39,6 +39,10 @@ namespace faf::editor
 
     /** How many warnings arrived since the start. */
     [[nodiscard]] int WarningCount() const;
+    /** The warnings still kept (the log keeps its newest lines), oldest first: the Problems panel's log rows. */
+    [[nodiscard]] std::vector<std::string> Warnings() const;
+    /** The filter box's text (the Problems panel shows a warning's lines). */
+    void SetFilter(const std::string& text);
 
     /** From now until EndCapture the warnings (where the game's Lua errors arrive) are also kept apart. */
     void BeginCapture();

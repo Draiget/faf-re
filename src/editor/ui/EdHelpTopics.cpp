@@ -162,6 +162,12 @@ namespace faf::editor
        "What the editor and the game say: info, warnings (amber) and errors. The filter finds lines; Times shows "
        "when each came. The status bar's warning count opens it.",
        "view.log"},
+      {"Problems",
+       "Problems",
+       "One list of the check's findings and the log's warnings (each different warning once, with how many times "
+       "it came). Filter by errors, warnings and notes, or by Check and Log. A click goes to a finding (its script "
+       "line, its marker, a prop's place) or shows the Log filtered to a warning. The status bar's count opens it.",
+       "view.problems"},
       {"History",
        "History",
        "The map's edits, newest at the top: a click goes back (or forward) to that step, as many Undos or Redos as "

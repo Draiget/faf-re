@@ -73,8 +73,8 @@ namespace
     EXPECT_EQ(JoinPanelList({"Tools", "Log"}), "Tools,Log");
     EXPECT_EQ(
       DefaultPanels(0),
-      (std::vector<std::string>{"Tools", "Properties", "Map", "Info", "Markers", "Check", "Log", "History"})
-    ) << "Terrain starts as the editor did before workspaces, with History beside the Log";
+      (std::vector<std::string>{"Tools", "Properties", "Map", "Info", "Markers", "Check", "Problems", "Log", "History"})
+    ) << "Terrain starts as the editor did before workspaces, with Problems and History beside the Log";
     const std::vector<std::string> mission = DefaultPanels(5);
     EXPECT_NE(std::find(mission.begin(), mission.end(), "ScriptEditor"), mission.end()) << "ids, not window names";
     EXPECT_TRUE(DefaultPanels(42).empty());

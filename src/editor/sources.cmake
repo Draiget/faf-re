@@ -54,6 +54,8 @@ set(FAF_EDITOR_SOURCES
   ui/EdHistoryPanel.cpp
   ui/EdHelpTopics.cpp
   ui/EdHelpWindow.cpp
+  ui/EdProblems.cpp
+  ui/EdProblemsPanel.cpp
   ui/EdWindowChrome.cpp
   ui/EdTitleBar.cpp
   ui/EdPalette.cpp

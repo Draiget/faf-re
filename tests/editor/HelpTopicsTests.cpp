@@ -36,7 +36,8 @@ namespace
           "Particle Editor",
           "Particle Browser",
           "Log",
-          "History"}) {
+          "History",
+          "Problems"}) {
       const std::string topic = HelpTopicForWindow(id, 1);
       EXPECT_NE(topic, "view") << id << " has no topic of its own";
       EXPECT_NE(FindHelpTopic(topic), nullptr) << id;

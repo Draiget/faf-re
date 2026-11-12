@@ -26,7 +26,7 @@ namespace faf::editor
 
   const std::vector<EdWorkspace>& Workspaces()
   {
-    // The panels each one starts with are the ones there are now; the design's others (Layers, Outliner, Problems,
+    // The panels each one starts with are the ones there are now; the design's others (Layers, Outliner,
     // the node editors) join their workspaces as they are made.
     static const std::vector<EdWorkspace> kWorkspaces = {
       {"terrain",
@@ -37,7 +37,7 @@ namespace faf::editor
        "Properties",
        "Map,Info,Markers,Check",
        "",
-       "Log,History",
+       "Problems,Log,History",
        0.21f,
        0.22f,
        false},
@@ -49,7 +49,7 @@ namespace faf::editor
        "Properties",
        "Markers,Armies,Info",
        "",
-       "Log,History",
+       "Problems,Log,History",
        0.21f,
        0.22f,
        false},
@@ -61,7 +61,7 @@ namespace faf::editor
        "Tools",
        "Map,Info",
        "",
-       "Log,History",
+       "Problems,Log,History",
        0.24f,
        0.22f,
        false},
@@ -143,7 +143,7 @@ namespace faf::editor
        "Looking the map over before release: nothing changes here",
        "",
        "",
-       "Check,Info",
+       "Problems,Check,Info",
        "Map",
        "Log",
        0.0f,

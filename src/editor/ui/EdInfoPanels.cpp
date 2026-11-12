@@ -1140,26 +1140,7 @@ namespace faf::editor
       const ImVec2 row = ImGui::GetCursorScreenPos();
       const float line = ImGui::GetTextLineHeight();
       if (ImGui::Selectable("##issue", false, ImGuiSelectableFlags_SpanAvailWidth, ImVec2(0.0f, line * 2.0f + 2.0f))) {
-        if (!issue.file.empty()) {
-          // A script's error: its file in the Script Editor, at the line.
-          const auto endsWith = [&](const char* const tail) {
-            const std::string end = tail;
-            return issue.file.size() >= end.size() &&
-              issue.file.compare(issue.file.size() - end.size(), end.size(), end) == 0;
-          };
-          mScriptFile = endsWith("_options.lua") ? 1 : endsWith("_tables.lua") ? 2 : 0;
-          mShowScript = true;
-          mFocusScript = true;
-          mScriptErrorLine = issue.line;
-          mScriptMessage = issue.file + " line " + std::to_string(issue.line) + ": " + issue.text;
-          LuaCodeScrollTo(issue.line);
-        } else if (issue.marker == "Props" || issue.marker.rfind("Prop ", 0) == 0) {
-          // A prop's finding: the view to its place (props have no names to select by).
-          mTools.AskPointFrame(issue.x, issue.z);
-        } else if (!issue.marker.empty()) {
-          mTools.AskMarkerSelect({issue.marker}, false);
-          mTools.AskMarkerFrame(issue.marker);
-        }
+        GoToIssue(issue);
       }
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
         ImGui::SetTooltip(

@@ -1,5 +1,7 @@
 #include "editor/EdLog.h"
 
+#include <cstdio>
+
 #include "imgui.h"
 
 namespace faf::editor
@@ -31,6 +33,25 @@ namespace faf::editor
       std::fclose(mTimesFile);
     }
     mTimesFile = std::fopen(path.c_str(), "w");
+  }
+
+  std::vector<std::string> EdLog::Warnings() const
+  {
+    const std::lock_guard<std::mutex> lock(mMutex);
+    std::vector<std::string> out;
+    for (const Line& line : mLines) {
+      if (line.level == gpg::LogSeverity::Warn) {
+        out.push_back(line.text);
+      }
+    }
+    return out;
+  }
+
+  void EdLog::SetFilter(
+    const std::string& text
+  )
+  {
+    (void)std::snprintf(mFilter, sizeof(mFilter), "%s", text.c_str());
   }
 
   void EdLog::OnMessage(

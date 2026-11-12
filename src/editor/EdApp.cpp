@@ -2592,6 +2592,15 @@ namespace faf::editor
       panel("view.adaptive", "Adaptive Map", &EdShell::ShowAdaptiveWindow);
       panel("view.log", "Log", &EdShell::ShowLog);
       panel("view.history", "History", &EdShell::ShowHistory);
+      add("view.problems", "Problems", "View", "", [this] {
+        if (mShell->ShowProblems()) {
+          mShell->ShowProblems() = false;
+        } else {
+          mShell->OpenProblems();
+        }
+      }, {}, [this] {
+        return mShell->ShowProblems();
+      }, "The check's findings and the log's warnings in one list");
       panel("view.panelsplaying", "Panels while playing", &EdShell::PanelsWhilePlaying);
       panel("view.imguidemo", "ImGui demo", &EdShell::ShowDemo);
       add("view.fullhelp", "Full help text", "View", "", [] {
@@ -2821,6 +2830,7 @@ namespace faf::editor
            cmd("view.fullhelp"),
            cmd("view.log"),
            cmd("view.history"),
+           cmd("view.problems"),
            cmd("view.panelsplaying"),
            sep(),
            workspaces,

@@ -18,6 +18,7 @@
 #include "editor/doc/EdDocument.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/core/utils/Logging.h"
+#include "editor/ui/EdProblems.h"
 #include "editor/ui/EdStatus.h"
 #include "editor/ui/EdThemeColors.h"
 #include "editor/ui/EdWorkspaces.h"
@@ -399,6 +400,9 @@ namespace faf::editor
       if (mShowHistory) {
         DrawHistoryPanel();
       }
+      if (mShowProblems) {
+        DrawProblemsPanel();
+      }
       if (mShowLog) {
         if (ImGui::Begin(Panel(kLogWindow), &mShowLog)) {
           mLog.Draw();
@@ -481,6 +485,7 @@ namespace faf::editor
       {"Particle Browser", &EdShell::mShowParticleBrowser},
       {kLogWindow, &EdShell::mShowLog},
       {"History", &EdShell::mShowHistory},
+      {"Problems", &EdShell::mShowProblems},
     };
     return kFlags;
   }
@@ -1611,10 +1616,15 @@ namespace faf::editor
         items.push_back({mAdapter, 8, Look::Dim});
       }
       items.push_back({mode, 0, mPlay.Active() || workspace.readOnly ? Look::Accent : Look::Dim});
-      const int warnings = mLog.WarningCount();
+      // The Problems panel's count: the check's findings (for this map) and each different log warning once.
+      const bool checked = mCheckRan && mCheckedPath == mDocument.Path();
+      static const std::vector<CheckIssue> kNoChecks;
+      const EdProblemCounts problems =
+        CountProblems(ProblemRows(checked ? mCheckIssues : kNoChecks, mLog.Warnings(), 0x7U, 0x3U));
+      const int warnings = problems.errors + problems.warnings + problems.notes;
       const std::size_t warningsAt = items.size();
       if (warnings > 0) {
-        items.push_back({std::to_string(warnings) + (warnings == 1 ? " warning" : " warnings"), 1, Look::Warn});
+        items.push_back({std::to_string(warnings) + (warnings == 1 ? " problem" : " problems"), 1, Look::Warn});
       }
       if (!mTools.CursorText().empty()) {
         items.push_back({mTools.CursorText(), 2, Look::Dim});
@@ -1671,16 +1681,15 @@ namespace faf::editor
           ImGui::TextColored(AccentColor(), "%s", item.text.c_str());
           break;
         }
-        // The warnings open the log, where they are (the Problems panel takes this over when it exists).
+        // The count opens the Problems panel.
         if (i == warningsAt && warnings > 0) {
           if (ImGui::IsItemHovered()) {
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-            ImGui::SetTooltip("Show the log");
+            ImGui::SetTooltip("Show the problems");
           }
           if (ImGui::IsItemClicked()) {
-            mShowLog = true;
-            ImGui::SetWindowFocus(Panel(kLogWindow));
-            gpg::Logf("editor: status bar: the log, for its %d warnings", warnings);
+            OpenProblems();
+            gpg::Logf("editor: status bar: the problems, %d", warnings);
           }
         }
       }

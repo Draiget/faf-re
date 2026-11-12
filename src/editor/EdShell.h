@@ -248,6 +248,12 @@ namespace faf::editor
     {
       return mShowHistory;
     }
+    bool& ShowProblems() noexcept
+    {
+      return mShowProblems;
+    }
+    /** The Problems panel shown and in front (the status bar's count). */
+    void OpenProblems() noexcept;
     /** Help (ui/EdHelpWindow.cpp): the Help window on a topic (ui/EdHelpTopics), F1's topic, the tour. */
     void OpenHelp(const std::string& topic);
     [[nodiscard]] std::string HelpTopicUnderMouse() const;
@@ -352,6 +358,14 @@ namespace faf::editor
     void DrawHistoryPanel();
     bool mShowHistory = false;
     void DrawHelpWindow();
+    /** The Problems panel (ui/EdProblemsPanel.cpp): the check's findings and the log's warnings in one list. */
+    void DrawProblemsPanel();
+    /** A check finding's place: its script line, its prop's place, or its marker selected and framed. */
+    void GoToIssue(const CheckIssue& issue);
+    bool mShowProblems = false;
+    bool mFocusProblems = false;
+    unsigned mProblemLevels = 0x7U;
+    unsigned mProblemSources = 0x3U;
     void DrawTour();
     bool mShowHelp = false;
     bool mHelpFront = false;
