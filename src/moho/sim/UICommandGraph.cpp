@@ -2342,9 +2342,7 @@ namespace moho
     InitTree(mCommandGraphTree);
 
     try {
-      boost::SharedPtrRaw<CD3DFont> createdFont = CD3DFont::Create(10, "Andale Mono");
-      mDebugFont.reset(createdFont.px);
-      createdFont.release();
+      mDebugFont = CD3DFont::Create(10, "Andale Mono");
 
       LoadPathParams();
       LoadWaypointParams();

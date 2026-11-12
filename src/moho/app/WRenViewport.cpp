@@ -588,8 +588,8 @@ namespace
     const int graphBottomY = graphHalfHeight + graphHeightBase;
 
     // 0x007F411A..0x007F413C: retained 10pt Courier New font handle.
-    boost::SharedPtrRaw<CD3DFont> rawFont = CD3DFont::Create(10, "Courier New");
-    CD3DFont* const font = rawFont.px;
+    CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(10, "Courier New");
+    CD3DFont* const font = fontHandle.tex;
 
     // 0x007F414F..0x007F41B8: vertical extents from font metrics (ceil + 1).
     const int ascentCeil = RenCeilTowardZero(font->mAscent) + 1;   // v11
@@ -820,7 +820,6 @@ namespace
 
     // ---- Teardown, asm 0x007F4B2F..0x007F4BE9. localSeries/connectorSeries and
     // the two send-stamp views destruct here; release the retained font handle.
-    rawFont.release();
   }
 } // namespace
 
@@ -970,8 +969,8 @@ namespace
     const char* const label = gpg::diag::BuildLabel();
     const float uiScale = BuildLabelUiScale();
     const int fontPoints = std::max(1, static_cast<int>(std::lround(10.0f * uiScale)));
-    boost::SharedPtrRaw<moho::CD3DFont> rawFont = moho::CD3DFont::Create(fontPoints, "Arial");
-    moho::CD3DFont* const font = rawFont.px;
+    moho::CountedPtr<moho::CD3DFont> fontHandle = moho::CD3DFont::Create(fontPoints, "Arial");
+    moho::CD3DFont* const font = fontHandle.tex;
     if (font == nullptr) {
       return;
     }
@@ -1014,7 +1013,6 @@ namespace
     (void)font->Render(label, primBatcher, origin, xAxis, yAxis, kText, 0.0f, gpg::NaN);
 
     primBatcher->Flush();
-    rawFont.release();
   }
 } // namespace
 
@@ -1410,18 +1408,9 @@ void moho::WRenViewport::D3DWindowOnDeviceInit(
     mTexBatcher.reset(new moho::CD3DTextureBatcher());
     mPrimBatcher.reset(new moho::CD3DPrimBatcher(mTexBatcher.get()));
 
-    // mFont = CD3DFont::Create(12, "Courier New"): the binary's Create returns
-    // a CountedPtr that already owns one reference; the assignment takes
-    // mFont's own and the temporary's destructor drops the returned one. This
-    // tree's Create hands back a raw handle instead, so the returned reference
-    // is adopted into a CountedPtr to give it the same lifetime. (An earlier
-    // revision dropped it with CD3DFont::Release(1), which is the deleting
-    // destructor, not a release - mFont was left dangling.)
-    const boost::SharedPtrRaw<moho::CD3DFont> fontHandle =
-      moho::CD3DFont::Create(kViewportDebugFontPointSize, kViewportDebugFontFace);
-    CountedPtr<CD3DFont> createdFont;
-    createdFont.tex = fontHandle.px;
-    mFont = createdFont;
+    // The binary's Create returns a CountedPtr that already owns one reference; the assignment takes mFont's own and
+    // the temporary's destructor drops the returned one.
+    mFont = moho::CD3DFont::Create(kViewportDebugFontPointSize, kViewportDebugFontFace);
   }
 
   mRangeRenderer.Init();

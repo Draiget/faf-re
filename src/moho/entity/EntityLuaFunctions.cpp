@@ -3057,7 +3057,7 @@ namespace moho
       meshResourceId.name = normalizedPath;
       entity->SetMesh(meshResourceId, nullptr, allowExplicitPlaceholder);
 
-      if (!meshResourcePath.empty() && !boost::HasSharedResource(entity->mVarDat.mScmResource)) {
+      if (!meshResourcePath.empty() && entity->mVarDat.mScmResource.get() == nullptr) {
         LuaPlus::LuaState::Error(state, "SetMesh failed with %s", meshResourcePath.raw_data_unsafe());
       }
     }

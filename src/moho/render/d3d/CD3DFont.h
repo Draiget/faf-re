@@ -43,7 +43,7 @@ namespace moho
      * What it does:
      * Looks up or creates one cached D3D font object for point-size + face-name.
      */
-    [[nodiscard]] static boost::SharedPtrRaw<CD3DFont> Create(std::int32_t pointSize, gpg::StrArg faceName);
+    [[nodiscard]] static CountedPtr<CD3DFont> Create(std::int32_t pointSize, gpg::StrArg faceName);
 
     /**
      * Address: 0x00425500 (FUN_00425500, ??0CD3DFont@Moho@@AAE@PAX@Z)

@@ -201,14 +201,13 @@ void CDebugCanvas::Render(
 
   const float kNoMaxAdvance = gpg::NaN;
   for (const SDebugScreenText& text : screenText) {
-    boost::SharedPtrRaw<CD3DFont> rawFont = CD3DFont::Create(text.pointSize, "Ariel");
-    CD3DFont* const font = rawFont.px;
+    CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(text.pointSize, "Ariel");
+    CD3DFont* const font = fontHandle.tex;
     if (font != nullptr) {
       (void)font->Render(
         text.text.raw_data_unsafe(), primBatcher, text.origin, text.xAxis, text.yAxis, text.color, 0.0f, kNoMaxAdvance
       );
     }
-    rawFont.release();
   }
 
   for (const SDebugDecal& decal : decals) {
@@ -291,8 +290,8 @@ void CDebugCanvas::Render(
       0.0f,
     };
 
-    boost::SharedPtrRaw<CD3DFont> rawFont = CD3DFont::Create(worldEntry.style, "Ariel");
-    CD3DFont* const font = rawFont.px;
+    CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(worldEntry.style, "Ariel");
+    CD3DFont* const font = fontHandle.tex;
     if (font != nullptr) {
       (void)font->Render(
         worldEntry.text.raw_data_unsafe(),
@@ -305,7 +304,6 @@ void CDebugCanvas::Render(
         kNoMaxAdvance
       );
     }
-    rawFont.release();
   }
 
   primBatcher->Flush();

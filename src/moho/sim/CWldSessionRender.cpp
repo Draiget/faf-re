@@ -1319,11 +1319,11 @@ namespace moho
      */
     [[nodiscard]] CD3DFont* CustomNameFont()
     {
-      static boost::SharedPtrRaw<CD3DFont> font{};
-      if (font.px == nullptr) {
+      static CountedPtr<CD3DFont> font{};
+      if (font.tex == nullptr) {
         font = CD3DFont::Create(ui_CustomNameFontSize, ui_CustomNameFont.c_str());
       }
-      return font.px;
+      return font.tex;
     }
 
     /**
@@ -4303,8 +4303,8 @@ namespace moho
     if (gEconOverlayFont == nullptr) {
       // `Create` hands back a borrowed shared lane; the overlay keeps its own
       // intrusive reference on the font and releases the lane straight away.
-      boost::SharedPtrRaw<CD3DFont> created = CD3DFont::Create(gEconOverlayFontSize, gEconOverlayFontName.c_str());
-      CD3DFont* const font = created.px;
+      CountedPtr<CD3DFont> created = CD3DFont::Create(gEconOverlayFontSize, gEconOverlayFontName.c_str());
+      CD3DFont* const font = created.tex;
       if (gEconOverlayFont != font) {
         if (gEconOverlayFont != nullptr) {
           (void)gEconOverlayFont->ReleaseReference();
@@ -4314,7 +4314,6 @@ namespace moho
           font->AddReference();
         }
       }
-      created.release();
     }
 
     (void)primBatcher->Setup("TAlphaBlendLinearSampleNoDepth");

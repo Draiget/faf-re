@@ -714,8 +714,8 @@ namespace moho
       return;
     }
     const int points = std::max(1, static_cast<int>(std::lround(10.0f * UiScale())));
-    boost::SharedPtrRaw<CD3DFont> rawFont = CD3DFont::Create(points, PanelFace());
-    CD3DFont* const font = rawFont.px;
+    CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(points, PanelFace());
+    CD3DFont* const font = fontHandle.tex;
     if (font == nullptr) {
       return;
     }
@@ -779,7 +779,6 @@ namespace moho
         gpg::NaN
       );
     }
-    rawFont.release();
   }
 
   void NETPANEL_Toggle()
@@ -804,8 +803,8 @@ namespace moho
     const SNetlinkSnapshot view = NETLINK_GetSnapshot();
 
     const int points = std::max(1, static_cast<int>(std::lround(10.0f * UiScale())));
-    boost::SharedPtrRaw<CD3DFont> rawFont = CD3DFont::Create(points, PanelFace());
-    CD3DFont* const font = rawFont.px;
+    CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(points, PanelFace());
+    CD3DFont* const font = fontHandle.tex;
     if (font == nullptr) {
       return;
     }
@@ -936,7 +935,6 @@ namespace moho
     batcher->DrawLine(tr, br);
     batcher->DrawLine(br, bl);
     batcher->DrawLine(bl, tl);
-    rawFont.release();
 
     std::lock_guard lock(state.mutex);
     state.panel = Box{left, top, right, bottom};

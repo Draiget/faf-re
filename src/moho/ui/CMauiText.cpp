@@ -399,16 +399,15 @@ int moho::cfunc_CMauiTextSetNewFontL(
   }
   const int pointSize = static_cast<int>(lua_tonumber(state->m_state, 3));
 
-  boost::SharedPtrRaw<CD3DFont> createdFont = CD3DFont::Create(pointSize, familyName);
-  if (createdFont.px != nullptr) {
-    textControl->SetNewFont(createdFont.px);
+  CountedPtr<CD3DFont> createdFont = CD3DFont::Create(pointSize, familyName);
+  if (createdFont.tex != nullptr) {
+    textControl->SetNewFont(createdFont.tex);
     lua_settop(state->m_state, 1);
   } else {
     lua_pushnil(state->m_state);
     (void)lua_gettop(state->m_state);
   }
 
-  createdFont.release();
   return 1;
 }
 

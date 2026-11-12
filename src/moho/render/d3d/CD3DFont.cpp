@@ -1394,13 +1394,17 @@ namespace moho
       (void)registered;
     }
 
-    [[nodiscard]] boost::SharedPtrRaw<CD3DFont> MakeFontHandle(
+    /**
+     * The returned handle adopts the reference `Create` has already counted, as 0x00425290 stores the font straight
+     * into the caller's `CountedPtr` slot after its `add [font+4], 1` (0x00425311..0x00425315, 0x00425408..0x0042540C).
+     */
+    [[nodiscard]] CountedPtr<CD3DFont> MakeFontHandle(
       CD3DFont* const font
-    )
+    ) noexcept
     {
-      return boost::SharedPtrRaw<CD3DFont>::with_deleter(font, [](CD3DFont* const ptr) {
-        ReleaseIntrusiveFont(ptr);
-      });
+      CountedPtr<CD3DFont> handle;
+      handle.tex = font;
+      return handle;
     }
 
     [[nodiscard]] std::uint32_t PackKerningKey(
@@ -1516,7 +1520,7 @@ namespace moho
    * What it does:
    * Looks up or creates one cached D3D font object for point-size + face-name.
    */
-  boost::SharedPtrRaw<CD3DFont> CD3DFont::Create(
+  CountedPtr<CD3DFont> CD3DFont::Create(
     const std::int32_t pointSize,
     const gpg::StrArg faceName
   )

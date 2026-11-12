@@ -248,9 +248,8 @@ namespace moho
     primBatcher->SetTexture(whiteTexture);
     DrawPanelRect(*primBatcher, left, top, right, bottom, 0xFFFFFFFFu);
 
-    boost::SharedPtrRaw<CD3DFont> rawFont = CD3DFont::Create(kFontPointSize, kFontFaceName);
-    const boost::shared_ptr<CD3DFont> font = boost::SharedPtrFromRawRetained(rawFont);
-    rawFont.release();
+    const CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(kFontPointSize, kFontFaceName);
+    CD3DFont* const font = fontHandle.tex;
 
     fa::vector<STimeBarEventRecord> events;
     TIME_CollectTimeBarEvents(events, ren_FrameTimeSeconds);
@@ -260,7 +259,7 @@ namespace moho
 
     TimeBarTrackMap tracks;
     float maxLabelWidth = 0.0f;
-    if (font) {
+    if (font != nullptr) {
       BuildTrackLayout(*font, eventViews, top, tracks, maxLabelWidth);
       RenderTrackLabels(*font, *primBatcher, left, maxLabelWidth, tracks);
     }

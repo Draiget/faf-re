@@ -675,55 +675,6 @@ namespace boost
   static_assert(sizeof(SharedControlTriplet) == 0x0C, "SharedControlTriplet size must be 0x0C");
 
   /**
-   * Address: 0x0055AA90 (FUN_0055AA90, boost::shared_ptr_RScmResource::~shared_ptr_RScmResource)
-   *
-   * What it does:
-   * Clears one `boost::shared_ptr<RScmResource>` pair and releases one shared
-   * owner reference from its control block.
-   */
-  [[nodiscard]] inline SharedPtrRaw<moho::RScmResource>* DestroySharedPtrRScmResource(
-    SharedPtrRaw<moho::RScmResource>* const sharedResource
-  ) noexcept
-  {
-    if (sharedResource != nullptr) {
-      sharedResource->release();
-    }
-    return sharedResource;
-  }
-
-  /**
-   * Address: 0x0055AA60 (FUN_0055AA60)
-   *
-   * What it does:
-   * Rebinds one borrowed `boost::shared_ptr<RScmResource>` lane to another by
-   * weak-retaining the incoming control block and weak-releasing the previous
-   * one, while always copying the raw pointee lane.
-   */
-  [[nodiscard]] moho::RScmResource** AssignSharedPtrRScmResourceWeak(
-    const SharedPtrRaw<moho::RScmResource>* sourceShared,
-    SharedPtrRaw<moho::RScmResource>* outShared
-  ) noexcept;
-
-  /**
-   * Typed facade over the lane above, for callers that hold real
-   * `boost::shared_ptr<moho::RScmResource>` objects rather than raw `(px,pi)`
-   * pairs. The `(px,pi)` reinterpretation lives here, in the ABI shim, behind
-   * the layout `static_assert` this header already carries -- not in the
-   * subsystem sources, which say what they mean:
-   * `AssignSharedResource(entity.mVarDat.mScmResource, blueprint->GetMesh())`.
-   */
-  void AssignSharedResource(
-    boost::shared_ptr<moho::RScmResource>& destination,
-    const boost::shared_ptr<moho::RScmResource>& source
-  ) noexcept;
-
-  /** True when `resource` owns a pointee; the `px != nullptr` test, typed. */
-  [[nodiscard]] bool HasSharedResource(const boost::shared_ptr<moho::RScmResource>& resource) noexcept;
-
-  /** Releases `resource`'s control block and clears its pointee lane. */
-  void ReleaseSharedResource(boost::shared_ptr<moho::RScmResource>& resource) noexcept;
-
-  /**
    * Address: 0x00445550 (FUN_00445550)
    * Address: 0x00445570 (FUN_00445570)
    * Address: 0x004455E0 (FUN_004455E0)

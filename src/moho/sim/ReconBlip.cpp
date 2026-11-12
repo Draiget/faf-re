@@ -141,28 +141,6 @@ namespace
     return static_cast<EntId>(sim->mEntityDB->DoReserveId(requestBits));
   }
 
-  /**
-   * Address: 0x005BDDB0 (FUN_005BDDB0)
-   *
-   * What it does:
-   * Copies one source entity mesh shared-pair `(px,pi)` and retains one shared
-   * control-block owner when the control lane is non-null.
-   */
-  [[maybe_unused]] [[nodiscard]] boost::SharedPtrRaw<RScmResource> CopyEntityMeshSharedRetained(
-    const Entity* const source
-  ) noexcept
-  {
-    boost::SharedPtrRaw<RScmResource> out{};
-    if (source == nullptr) {
-      return out;
-    }
-
-    boost::AssignSharedResource(
-      *reinterpret_cast<boost::shared_ptr<RScmResource>*>(&out), source->mVarDat.mScmResource
-    );
-    return out;
-  }
-
   [[nodiscard]] Wm3::Vec3f ComputeJamOffset(
     Unit* const sourceUnit,
     Sim* const sim
@@ -831,7 +809,9 @@ ReconBlip::ReconBlip(
   } else {
     mJamOffset = {};
     if (sourceUnit) {
-      boost::AssignSharedResource(mVarDat.mScmResource, sourceUnit->mVarDat.mScmResource);
+      // Address: 0x005BDDB0 (FUN_005BDDB0 -- a `boost::shared_ptr<RScmResource>` copy of the source entity's mesh,
+      // retaining its count; formerly `CopyEntityMeshSharedRetained` here, which had no callers.)
+      mVarDat.mScmResource = sourceUnit->mVarDat.mScmResource;
       mVarDat.mMeshBlueprint = sourceUnit->mVarDat.mMeshBlueprint;
     }
   }

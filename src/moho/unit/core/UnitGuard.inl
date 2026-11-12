@@ -523,7 +523,7 @@ Unit::Unit(
   }
 
   // A null pointee means nothing has claimed the mesh lane yet.
-  if (!boost::HasSharedResource(mVarDat.mScmResource)) {
+  if (mVarDat.mScmResource.get() == nullptr) {
     SetMesh(blueprint.Display.MeshBlueprint, placeholderMesh, true);
   }
 

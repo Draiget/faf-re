@@ -26,7 +26,6 @@
 #include "moho/misc/Stats.h"
 #include "moho/particles/SParticleBuffer.h"
 #include "moho/resource/RScaResource.h"
-#include "moho/resource/RScmResource.h"
 #include "moho/sim/CDebugCanvas.h"
 #include "moho/sim/CIntelGrid.h"
 #include "moho/sim/PathPreviewFinder.h"
@@ -130,79 +129,6 @@ namespace boost
     offsetof(SharedCountPairOwnerAtOffset32, weakPair) == 0x20,
     "SharedCountPairOwnerAtOffset32::weakPair offset must be 0x20"
   );
-
-  /**
-   * Address: 0x0055AA60 (FUN_0055AA60)
-   *
-   * NOTE (2026-08-20 audit): despite the `...Weak` name (kept for the external
-   * caller in Entity.cpp), FUN_0055AA60 is byte-for-byte the same shape as
-   * FUN_0043D940 (see `AssignWeakPairFromShared`'s audit note): the acquire
-   * step is `lock xadd [pi+4],1` (`use_count_` at +0x04 - `add_ref_copy()`)
-   * and the release step calls FUN_004229B0, i.e. real `release()`, not
-   * `weak_release()`. This is an ordinary strong `shared_ptr<RScmResource>`
-   * rebind, not a weak one.
-   *
-   * What it does:
-   * Rebinds one borrowed `boost::shared_ptr<RScmResource>` lane to another by
-   * shared-retaining the incoming control block and shared-releasing the
-   * previous one, while always copying the raw pointee lane.
-   */
-  moho::RScmResource** AssignSharedPtrRScmResourceWeak(
-    const SharedPtrRaw<moho::RScmResource>* const sourceShared,
-    SharedPtrRaw<moho::RScmResource>* const outShared
-  ) noexcept
-  {
-    outShared->px = sourceShared->px;
-
-    detail::sp_counted_base* const incomingControl = sourceShared->pi;
-    if (incomingControl != outShared->pi) {
-      if (incomingControl != nullptr) {
-        incomingControl->add_ref_copy();
-      }
-      if (outShared->pi != nullptr) {
-        outShared->pi->release();
-      }
-      outShared->pi = incomingControl;
-    }
-
-    return &outShared->px;
-  }
-
-  /**
-   * Typed facade over `AssignSharedPtrRScmResourceWeak` for callers holding
-   * real `boost::shared_ptr` objects. `SharedPtrRaw<T>` is that pointer's
-   * `(px, pi)` layout, which this header asserts elsewhere, so the
-   * reinterpretation is an ABI statement and belongs in this shim rather than
-   * in the subsystem sources that used to spell it out at every call site.
-   */
-  void AssignSharedResource(
-    boost::shared_ptr<moho::RScmResource>& destination,
-    const boost::shared_ptr<moho::RScmResource>& source
-  ) noexcept
-  {
-    static_assert(
-      sizeof(boost::shared_ptr<moho::RScmResource>) == sizeof(SharedPtrRaw<moho::RScmResource>),
-      "boost::shared_ptr<RScmResource> layout must match the (px,pi) pair"
-    );
-    (void)AssignSharedPtrRScmResourceWeak(
-      reinterpret_cast<const SharedPtrRaw<moho::RScmResource>*>(&source),
-      reinterpret_cast<SharedPtrRaw<moho::RScmResource>*>(&destination)
-    );
-  }
-
-  bool HasSharedResource(
-    const boost::shared_ptr<moho::RScmResource>& resource
-  ) noexcept
-  {
-    return reinterpret_cast<const SharedPtrRaw<moho::RScmResource>*>(&resource)->px != nullptr;
-  }
-
-  void ReleaseSharedResource(
-    boost::shared_ptr<moho::RScmResource>& resource
-  ) noexcept
-  {
-    reinterpret_cast<SharedPtrRaw<moho::RScmResource>*>(&resource)->release();
-  }
 
   /**
    * Address: 0x0043DCF0 (FUN_0043DCF0)

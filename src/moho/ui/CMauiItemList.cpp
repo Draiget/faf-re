@@ -130,9 +130,8 @@ moho::CMauiItemList::CMauiItemList(
   mShowMouseoverItem = false;
   mScrollPosition = 0;
 
-  boost::SharedPtrRaw<CD3DFont> createdFont = CD3DFont::Create(16, "New Times Roman");
-  AssignIntrusiveFont(mFont, createdFont.px);
-  createdFont.release();
+  CountedPtr<CD3DFont> createdFont = CD3DFont::Create(16, "New Times Roman");
+  AssignIntrusiveFont(mFont, createdFont.tex);
 }
 
 /**
@@ -254,16 +253,15 @@ int moho::cfunc_CMauiItemListSetNewFontL(
   }
   const int pointSize = static_cast<int>(lua_tonumber(state->m_state, 3));
 
-  boost::SharedPtrRaw<CD3DFont> createdFont = CD3DFont::Create(pointSize, familyName);
-  if (createdFont.px != nullptr) {
-    itemList->SetFont(createdFont.px);
+  CountedPtr<CD3DFont> createdFont = CD3DFont::Create(pointSize, familyName);
+  if (createdFont.tex != nullptr) {
+    itemList->SetFont(createdFont.tex);
     lua_settop(state->m_state, 1);
   } else {
     lua_pushnil(state->m_state);
     (void)lua_gettop(state->m_state);
   }
 
-  createdFont.release();
   return 1;
 }
 
@@ -932,9 +930,8 @@ void moho::CMauiItemList::SetFont(
     return;
   }
 
-  boost::SharedPtrRaw<CD3DFont> defaultFont = CD3DFont::Create(16, "New Times Roman");
-  AssignIntrusiveFont(mFont, defaultFont.px);
-  defaultFont.release();
+  CountedPtr<CD3DFont> defaultFont = CD3DFont::Create(16, "New Times Roman");
+  AssignIntrusiveFont(mFont, defaultFont.tex);
 }
 
 /**

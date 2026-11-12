@@ -1978,14 +1978,18 @@ namespace moho
    * shared-resource lane and clears the mesh blueprint slot. Otherwise
    * looks up the mesh blueprint, invokes
    * `RMeshBlueprint::GetMesh` (FUN_0067A5B0) to retrieve the LOD-resolved
-   * `boost::shared_ptr<RScmResource>`, and copies it into the entity's
-   * borrowed shared-resource lane (`mMeshRef` aliased as
-   * `boost::SharedPtrRaw<RScmResource>`). On success, stores the chosen
-   * blueprint pointer in `mMeshTypeClassId` (aliased blueprint slot). On
-   * failure, falls back to the `explicitPlaceholder` blueprint and runs
-   * the same retrieval through `AssignSharedPtrRScmResourceWeak`
-   * (FUN_0055AA60). The `allowExplicitPlaceholder` parameter is part of
-   * the ABI signature but the shipped binary never branches on it.
+   * `boost::shared_ptr<RScmResource>`, and assigns it to the entity's mesh
+   * (`mVarDat.mScmResource`). On success, stores the chosen blueprint in
+   * `mVarDat.mMeshBlueprint`. On failure, falls back to the
+   * `explicitPlaceholder` blueprint the same way. The
+   * `allowExplicitPlaceholder` parameter is part of the ABI signature but the
+   * shipped binary never branches on it.
+   *
+   * Address: 0x0055AA60 (FUN_0055AA60 -- `boost::shared_ptr<RScmResource>::operator=` emitted out of line: copy the
+   * pointee, `lock xadd [pi+4], 1` on the incoming count, release the old one; formerly
+   * `boost::AssignSharedPtrRScmResourceWeak` and its `AssignSharedResource` facade in BoostWrappers.)
+   * Address: 0x0055AA90 (FUN_0055AA90 -- `boost::shared_ptr<RScmResource>::~shared_ptr`; formerly
+   * `boost::DestroySharedPtrRScmResource` in BoostWrappers, which had no callers.)
    */
   void Entity::SetMesh(
     const RResId& meshResId,
@@ -1996,7 +2000,7 @@ namespace moho
     static_cast<void>(allowExplicitPlaceholder);
 
     if (meshResId.name.empty()) {
-      boost::ReleaseSharedResource(mVarDat.mScmResource);
+      mVarDat.mScmResource.reset();
       mVarDat.mMeshBlueprint = nullptr;
       return;
     }
@@ -2006,17 +2010,17 @@ namespace moho
       return;
     }
 
-    boost::AssignSharedResource(mVarDat.mScmResource, meshBlueprint->GetMesh());
+    mVarDat.mScmResource = meshBlueprint->GetMesh();
 
-    if (boost::HasSharedResource(mVarDat.mScmResource)) {
+    if (mVarDat.mScmResource.get() != nullptr) {
       mVarDat.mMeshBlueprint = meshBlueprint;
       return;
     }
 
     if (explicitPlaceholder != nullptr) {
-      boost::AssignSharedResource(mVarDat.mScmResource, explicitPlaceholder->GetMesh());
+      mVarDat.mScmResource = explicitPlaceholder->GetMesh();
 
-      if (boost::HasSharedResource(mVarDat.mScmResource)) {
+      if (mVarDat.mScmResource.get() != nullptr) {
         mVarDat.mMeshBlueprint = explicitPlaceholder;
         return;
       }
