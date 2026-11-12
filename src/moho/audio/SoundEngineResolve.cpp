@@ -58,11 +58,7 @@ namespace moho
     }
 
     const SoundConfiguration* const configuration = sSoundConfiguration.get();
-    if (
-      configuration == nullptr || configuration->mEngines.mStart == nullptr ||
-      configuration->mEngines.mFinish == nullptr || configuration->mEngines.mStart == configuration->mEngines.mFinish ||
-      configuration->mNoSound != 0u
-    ) {
+    if (configuration == nullptr || configuration->mEngines.empty() || configuration->mNoSound != 0u) {
       *outEngine = {};
       return outEngine;
     }
@@ -167,10 +163,7 @@ namespace moho
     }
 
     const SoundConfiguration* const configuration = sSoundConfiguration.get();
-    if (
-      configuration != nullptr && configuration->mEngines.mStart != nullptr &&
-      configuration->mEngines.mStart != configuration->mEngines.mFinish && configuration->mNoSound == 0u
-    ) {
+    if (configuration != nullptr && !configuration->mEngines.empty() && configuration->mNoSound == 0u) {
       gpg::Warnf("SND: Couldn't find variable %s", mName.c_str());
     }
 

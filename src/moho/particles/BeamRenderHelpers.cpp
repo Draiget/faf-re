@@ -53,13 +53,11 @@ namespace
     const boost::shared_ptr<TType>& rhs
   ) noexcept
   {
-    using SharedHandleRaw = boost::SharedPtrLayout<TType>;
-    const auto* const lhsRaw = reinterpret_cast<const SharedHandleRaw*>(&lhs);
-    const auto* const rhsRaw = reinterpret_cast<const SharedHandleRaw*>(&rhs);
-    if (lhsRaw->px == rhsRaw->px) {
+    if (lhs.get() == rhs.get()) {
       return false;
     }
-    return lhsRaw->pi < rhsRaw->pi;
+    // `boost::shared_ptr`'s `operator<` is this Boost's owner order (control-block pointers).
+    return lhs < rhs;
   }
 
   template <typename TType>
@@ -319,13 +317,13 @@ namespace moho
     if (beam.mTexture1.tex != nullptr) {
       beam.mTexture1.tex->GetTexture(texture0);
     }
-    boost::AssignSharedPairRetain(&bucketKey.texture0, &texture0);
+    bucketKey.texture0 = texture0;
 
     CParticleTexture::TextureResourceHandle texture1{};
     if (beam.mTexture2.tex != nullptr) {
       beam.mTexture2.tex->GetTexture(texture1);
     }
-    boost::AssignSharedPairRetain(&bucketKey.texture1, &texture1);
+    bucketKey.texture1 = texture1;
     bucketKey.blendMode = static_cast<std::int32_t>(beam.mBlendMode);
 
     buckets[bucketKey].push_back(beam);
@@ -648,8 +646,8 @@ namespace moho
     destination->sortScalar = source->sortScalar;
     destination->dragEnabled = source->dragEnabled;
 
-    boost::AssignWeakPairFromShared(&destination->texture0, &source->texture0);
-    boost::AssignWeakPairFromShared(&destination->texture1, &source->texture1);
+    destination->texture0 = source->texture0;
+    destination->texture1 = source->texture1;
 
     destination->tag = source->tag;
     destination->blendMode = source->blendMode;
@@ -682,13 +680,13 @@ namespace moho
     if (trail.mTexture.tex != nullptr) {
       trail.mTexture.tex->GetTexture(texture0);
     }
-    boost::AssignSharedPairRetain(&key->texture0, &texture0);
+    key->texture0 = texture0;
 
     CParticleTexture::TextureResourceHandle texture1{};
     if (trail.mRampTexture.tex != nullptr) {
       trail.mRampTexture.tex->GetTexture(texture1);
     }
-    boost::AssignSharedPairRetain(&key->texture1, &texture1);
+    key->texture1 = texture1;
 
     key->tag.assign_owned(trail.mTypeTag != nullptr ? trail.mTypeTag : "");
     key->blendMode = trail.mBlendMode;
@@ -759,8 +757,8 @@ namespace moho
     }
 
     destination->sortScalar = source->sortScalar;
-    boost::AssignWeakPairFromShared(&destination->texture0, &source->texture0);
-    boost::AssignWeakPairFromShared(&destination->texture1, &source->texture1);
+    destination->texture0 = source->texture0;
+    destination->texture1 = source->texture1;
     destination->tag = source->tag;
     destination->blendMode = source->blendMode;
     return destination;

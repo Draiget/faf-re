@@ -545,13 +545,13 @@ namespace
     if (particle.mTexture.tex != nullptr) {
       particle.mTexture.tex->GetTexture(texture0);
     }
-    boost::AssignSharedPairRetain(&key->texture0, &texture0);
+    key->texture0 = texture0;
 
     moho::CParticleTexture::TextureResourceHandle texture1{};
     if (particle.mRampTexture.tex != nullptr) {
       particle.mRampTexture.tex->GetTexture(texture1);
     }
-    boost::AssignSharedPairRetain(&key->texture1, &texture1);
+    key->texture1 = texture1;
 
     key->tag.assign(particle.mTypeTag, 0U, fa::string::npos);
     key->blendMode = static_cast<std::int32_t>(particle.mBlendMode);
