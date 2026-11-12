@@ -73,6 +73,10 @@ The host page shows:
 - **The lobbies**: map, state (starting, lobby, game, ended, failed, stopped), seats, CPUs, game time; Open, Stop, and Forget once stopped.
 - **New lobby**: the map (search by name; size and start spots shown), the seats (each a human with a name, or an AI with its personality; faction and team each), the game options, who starts it, the countdown, and the CPUs.
 
+### Game settings
+
+The configuration panel lists every setting FAF's lobby has, read from the game's own files: the rules (victory, share, unit cap, fog, timeouts, prebuilt units, no-rush ...), the team options, the AI options, the AI personalities (mod AIs once mods are loaded), and for an adaptive map its own options (mexes, reclaim, and so on). Each shows its default; only the ones you change are sent. On fw0's data: 32 options, 12 AIs, 19 maps with their own options (`adaptive_adrastea.v0004`: 11).
+
 ### Choosing CPUs
 
 Pick cells on the heatmap, or leave **Auto** on with a number of cores. Either way the host's planner (`POST /api/v1/plan`, the same as a lobby's creation uses) estimates the game and says where it goes:
@@ -144,6 +148,7 @@ The host (`server-host`):
 | `GET /api/v1/maps` | the maps: `id`, `name`, `file`, `size`, `km`, `players` (start spots), `description`, `source` |
 | `GET /api/v1/hint?players=<n>&km=<km>` | a game's cost: `mean_cores`, `worst_cores`, `suggested_cores`, `basis` |
 | `POST /api/v1/plan` | `{"players": 8, "km": 20, "cores": 2}` or `{..., "cpus": [3, 11]}`: the planner's answer without starting anything: `estimate` (cores mean, worst, suggested; `memory_mb`; `upload_kbps`; `basis`), `cores`, `cpus`, `nodes`, `fits` and `warnings` (each `code`, `severity`, `text`) |
+| `GET /api/v1/settings[?map=<id>]` | the game's settings as FAF's Lua defines them (the server binary reads them, `--describe-settings`): `options` (each `key`, `label`, `help`, `default`, `group` rules, teams or ai, and its `values`), `ai` (each `key`, `name`, `rating`) and, with a map that has its own `_options.lua` (adaptive maps; `has_options` in `/maps`), `map_options`. A lobby starts from every option's default and the request's `options` (game and map options together, values as strings or numbers as FAF has them) change them |
 | `GET /api/v1/lobbies` | every lobby: `id`, `name`, `state`, `map`, `cpus`, `port`, `seats` (with each human's `join` line), `observers` (each `name`, `referee`, `watch` line), `observer_delay_seconds`, `observe_port`, `hint`, `nodes`, `warnings` (the placement's), `usage` (its server's `cpu_cores` and `rss_mb`, every 2 s), `phase`, `beat`, `exit` |
 | `POST /api/v1/lobbies` | a new lobby: `{"map": "scmp_009", "seats": [{"kind": "human", "name": "Ann", "faction": 1, "team": 2}, {"kind": "ai", "ai": "adaptive", "faction": 2, "team": 3}], "options": {"Victory": "demoralization"}, "control": "player", "start_when_ready": 10, "lobby_minutes": 60, "observers": [{"name": "Caster"}, {"name": "Ref", "referee": true}], "observer_delay_seconds": 120, "cpus": "auto", "cores": 1}`; `cpus` may instead list CPU ids. Faction 1-4 (UEF, Aeon, Cybran, Seraphim) or 5 (random, chosen by the host); team 1 is no team, 2-9 teams 1-8 |
 | `DELETE /api/v1/lobbies/<id>` | stops the lobby's server (SIGTERM, a kill after 10 s); `?forget=1` then removes it from the list |
