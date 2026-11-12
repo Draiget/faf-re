@@ -2217,7 +2217,7 @@ bool moho::USERUNIT_CanBeBuiltAt(
   (void)allowCommandOverlap;
 
   auto* const map = session.mWldMap->mTerrainRes->mMap;
-  auto* const resources = reinterpret_cast<ISimResources*>(session.mSimResources.px);
+  auto* const resources = reinterpret_cast<ISimResources*>(session.mSimResources.get());
   if (!OCCUPY_Check(*map, *buildBlueprint, buildPosition, *resources, *buildInfo)) {
     return false;
   }

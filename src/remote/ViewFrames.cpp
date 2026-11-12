@@ -1179,7 +1179,7 @@ namespace faf::remote
       // rectangles with the heights there now), and every unit's stats.
       const moho::SSyncData* const syncPacket = SyncPacket();
       mEdits.Collect(
-        sim.mSimResources.px,
+        sim.mSimResources.get(),
         sim.mMapData != nullptr ? sim.mMapData->mHeightField.get() : nullptr,
         syncPacket != nullptr ? std::span<const gpg::Rect2i>(
                                   syncPacket->mPlayableRectUpdates.data(), syncPacket->mPlayableRectUpdates.size()

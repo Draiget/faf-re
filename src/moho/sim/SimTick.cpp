@@ -382,8 +382,8 @@ void Sim::Sync(
   // script draws into. `AdvanceBeat` rolls it into `mDebugCanvas2` and clears
   // slot 1, so slot 2 holds the finished beat. The crossing is what the binary
   // does; the packet-side field names are recovered guesses and are left alone.
-  outSyncData->mTickDebugCanvas.reset_from_owner(mDebugCanvas2);
-  outSyncData->mBeatDebugCanvas.reset_from_owner(mDebugCanvas1);
+  outSyncData->mTickDebugCanvas = mDebugCanvas2;
+  outSyncData->mBeatDebugCanvas = mDebugCanvas1;
 
   mSyncSerializeGroup0.swap(outSyncData->mFollowCameras);
 
@@ -723,16 +723,16 @@ void Sim::Sync(
   // The terrain the client renders. `sub_743180` in the decompile is the
   // shared_ptr copy the compiler materialises for the assignment's right-hand
   // side; the body after it is the inlined `operator=`. `DoBeat` feeds this
-  // straight to `terrainRes->SyncTerrain(beat.mTerrainUpdate.px)`, so leaving
+  // straight to `terrainRes->SyncTerrain(beat.mTerrainUpdate.get())`, so leaving
   // it unset handed the terrain renderer a null height field every beat.
   if (mMapData != nullptr) {
-    outSyncData->mTerrainUpdate.reset_from_owner(mMapData->mHeightField);
+    outSyncData->mTerrainUpdate = mMapData->mHeightField;
   }
 
   // The decompiled body here is the inlined `shared_ptr::operator=` -- copy the
   // pointer, add a reference to the incoming control block, release the
-  // outgoing one. `reset_from` is that mechanic on the wrapper itself.
-  outSyncData->mSimResources.reset_from(mSimResources);
+  // outgoing one, which is boost::shared_ptr's assignment here.
+  outSyncData->mSimResources = mSimResources;
 
   // 0x0074820E..0x00748310: close this beat's checksum. On a checksum beat
   // (the same `sim_ChecksumPeriod` test `AdvanceBeat` used to feed `mContext`)

@@ -4193,7 +4193,7 @@ namespace moho
     SOccupationResult& dest
   )
   {
-    ISimResources* const resources = static_cast<ISimResources*>(grid.sim->mSimResources.px);
+    ISimResources* const resources = static_cast<ISimResources*>(grid.sim->mSimResources.get());
     STIMap* const map = grid.sim->mMapData;
     if (resources == nullptr || map == nullptr) {
       return false;

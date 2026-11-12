@@ -1449,7 +1449,7 @@ int moho::cfunc_GetDepositsAroundPoint(
   }
 
   Sim* const sim = ResolveGlobalSim(luaContext);
-  return PushDepositsAroundPoint(luaContext, sim ? sim->mSimResources.px : nullptr);
+  return PushDepositsAroundPoint(luaContext, sim ? sim->mSimResources.get() : nullptr);
 }
 
 /**
@@ -1470,7 +1470,7 @@ int moho::cfunc_GetDepositsAroundPointUser(
   }
 
   CWldSession* const session = WLD_GetActiveSession();
-  return PushDepositsAroundPoint(luaContext, session ? session->mSimResources.px : nullptr);
+  return PushDepositsAroundPoint(luaContext, session ? session->mSimResources.get() : nullptr);
 }
 
 /**

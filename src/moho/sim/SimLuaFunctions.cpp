@@ -3765,7 +3765,7 @@ int moho::cfunc_CreateResourceDepositL(
 {
   moho::SCR_ExpectExactArgs(state, 5, kCreateResourceDepositHelpText);
 
-  CSimResources* const resources = ResolveGlobalSim(state->m_state)->mSimResources.px;
+  CSimResources* const resources = ResolveGlobalSim(state->m_state)->mSimResources.get();
 
   LuaPlus::LuaStackObject depositTypeArg{};
   depositTypeArg.m_state = state;

@@ -2859,7 +2859,7 @@ void moho::CUIWorldView::UpdateSelection(
         // NULL Wm3::Vec3f* (GridPos is not an aggregate), so hovering with a
         // mass-extractor build order dereferenced null in GridPos::GridPos.
         GridPos foundDeposit{};
-        auto* const simResources = mWldSession->mSimResources.px;
+        auto* const simResources = mWldSession->mSimResources.get();
         if (
           simResources != nullptr &&
           simResources->FindClosestDeposit(&searchFrom, &foundDeposit, snapRadius, depositType)

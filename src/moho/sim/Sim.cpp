@@ -1246,7 +1246,11 @@ namespace moho
     sim->Logf("path preview for army %d\n", armyConstData.mArmyIndex);
 
     boost::shared_ptr<PathPreviewFinder> previewFinder{};
-    focusArmy->GetUnknownSharedRef(reinterpret_cast<boost::SharedPtrRaw<void>*>(&previewFinder));
+    {
+      boost::shared_ptr<void> armySlot;
+      focusArmy->GetUnknownSharedRef(&armySlot);
+      previewFinder = boost::static_pointer_cast<PathPreviewFinder>(armySlot);
+    }
 
     Unit* const unit = PathPreviewSelectLargestUnit(selectedUnits);
     if (unit != nullptr) {
@@ -1258,7 +1262,8 @@ namespace moho
 
       if (!previewFinder) {
         previewFinder = boost::shared_ptr<PathPreviewFinder>(new PathPreviewFinder(focusArmy));
-        focusArmy->SetUnknownSharedRef(reinterpret_cast<boost::SharedPtrRaw<void>*>(&previewFinder));
+        boost::shared_ptr<void> armySlot = previewFinder;
+        focusArmy->SetUnknownSharedRef(&armySlot);
       }
 
       Wm3::Vector3f resolvedEndPos{};
@@ -1295,8 +1300,8 @@ namespace moho
       if (previewFinder) {
         previewFinder->ResetQueuedFootprint();
 
-        boost::shared_ptr<PathPreviewFinder> clearedFinder{};
-        focusArmy->SetUnknownSharedRef(reinterpret_cast<boost::SharedPtrRaw<void>*>(&clearedFinder));
+        boost::shared_ptr<void> clearedSlot;
+        focusArmy->SetUnknownSharedRef(&clearedSlot);
 
         SArmyVectorWithMeta clearedPayload{};
         focusArmy->SetUnknownVectorWithMeta(&clearedPayload);

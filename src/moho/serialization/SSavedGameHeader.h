@@ -68,7 +68,7 @@ namespace moho
     std::int32_t mFocusArmy;                         // +0x20
     fa::vector<SSavedGameArmyInfo> mArmyInfo;        // +0x24
     fa::string mScenarioInfoText;                    // +0x34
-    boost::SharedPtrRaw<LaunchInfoBase> mLaunchInfo; // +0x50
+    boost::shared_ptr<LaunchInfoBase> mLaunchInfo;   // +0x50
   };
 
   static_assert(offsetof(SSavedGameHeader, mVersion) == 0x00, "SSavedGameHeader::mVersion offset must be 0x00");

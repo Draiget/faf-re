@@ -2317,17 +2317,19 @@ void moho::WRenViewport::RenderWorldView(
   SetViewportToLocalScreen();
   if (moho::CWldSession* const activeSession = moho::WLD_GetActiveSession(); activeSession != nullptr) {
     if (
-      boost::SharedPtrRaw<moho::CDebugCanvas> tickCanvas = activeSession->GetTickDebugCanvas(); tickCanvas.px != nullptr
+      boost::shared_ptr<moho::CDebugCanvas> tickCanvas = activeSession->GetTickDebugCanvas();
+      tickCanvas.get() != nullptr
     ) {
-      tickCanvas.px->Render(mPrimBatcher.get(), *mCam, mScreenSize.x, mScreenSize.y);
-      tickCanvas.release();
+      tickCanvas.get()->Render(mPrimBatcher.get(), *mCam, mScreenSize.x, mScreenSize.y);
+      tickCanvas.reset();
     }
 
     if (
-      boost::SharedPtrRaw<moho::CDebugCanvas> beatCanvas = activeSession->GetBeatDebugCanvas(); beatCanvas.px != nullptr
+      boost::shared_ptr<moho::CDebugCanvas> beatCanvas = activeSession->GetBeatDebugCanvas();
+      beatCanvas.get() != nullptr
     ) {
-      beatCanvas.px->Render(mPrimBatcher.get(), *mCam, mScreenSize.x, mScreenSize.y);
-      beatCanvas.release();
+      beatCanvas.get()->Render(mPrimBatcher.get(), *mCam, mScreenSize.x, mScreenSize.y);
+      beatCanvas.reset();
     }
   }
 

@@ -1512,7 +1512,7 @@ namespace moho
      * `Load` (saved game); throws `std::runtime_error` for an unknown launch-info
      * subclass.
      */
-    [[nodiscard]] static Sim* Create(const boost::SharedPtrRaw<LaunchInfoBase>& launchInfo);
+    [[nodiscard]] static Sim* Create(const boost::shared_ptr<LaunchInfoBase>& launchInfo);
 
     /**
      * Address: 0x0074B120 (FUN_0074B120, ?FlattenMapRect@Sim@Moho@@QAEXABV?$Rect2@H@gpg@@M@Z)
@@ -1544,7 +1544,7 @@ namespace moho
     RRuleGameRules* mRules;             // 0x08C8
     STIMap* mMapData;                   // 0x08CC
 
-    boost::SharedPtrRaw<CSimResources> mSimResources; // 0x08D0..0x08D7 (px, pi)
+    boost::shared_ptr<CSimResources> mSimResources; // 0x08D0..0x08D7 (px, pi)
     LuaPlus::LuaState* mLuaState;
     bool mGameEnded;
     bool mGameOver;

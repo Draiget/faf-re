@@ -75,7 +75,7 @@ namespace
 
     header.mScenarioInfoText = moho::SCR_ToString(session->GetScenarioInfo());
 
-    header.mLaunchInfo = boost::SharedPtrRawFromSharedRetained(session->mLaunchInfo);
+    header.mLaunchInfo = session->mLaunchInfo;
     return header;
   }
   [[nodiscard]] fa::string MakeTempSavePath(
@@ -1199,8 +1199,8 @@ namespace moho
     delete launchInfo->mReadArchive;
     launchInfo->mReadArchive = loadedArchive;
 
-    launchInfo->mSharedLaunchInfo.assign_retain(mHeader.mLaunchInfo);
-    launchInfo->mGameMods = launchInfo->mSharedLaunchInfo.px->mGameMods;
+    launchInfo->mSharedLaunchInfo = mHeader.mLaunchInfo;
+    launchInfo->mGameMods = launchInfo->mSharedLaunchInfo->mGameMods;
     launchInfo->mScenarioInfo = mHeader.mScenarioInfoText;
     launchInfo->mCheatsEnabled = USER_DebugFacilitiesEnabled();
 

@@ -406,7 +406,7 @@ void Sim::SerializeLoadBody(
   {
     boost::shared_ptr<ISimResources> resources;
     archive->ReadPointerShared(&resources, &ownerRef);
-    mSimResources.reset_from_owner(boost::static_pointer_cast<CSimResources>(resources));
+    mSimResources = boost::static_pointer_cast<CSimResources>(resources);
   }
   SerArmies(archive);
 
@@ -579,7 +579,7 @@ void Sim::SerializeSaveBody(
   archive->WritePointer(mPhysConstants, gpg::TrackedPointerState::Owned, ownerRef);
   archive->Write(gpg::RTypeOf<COGrid>(), mOGrid, ownerRef);
   archive->WritePointer(static_cast<IAiFormationDB*>(mFormationDB), gpg::TrackedPointerState::Owned, ownerRef);
-  archive->WritePointer(static_cast<ISimResources*>(mSimResources.px), gpg::TrackedPointerState::Shared, ownerRef);
+  archive->WritePointer(static_cast<ISimResources*>(mSimResources.get()), gpg::TrackedPointerState::Shared, ownerRef);
   SerArmies(archive);
   archive->WritePointer(mCommandDB, gpg::TrackedPointerState::Owned, ownerRef);
   archive->WriteUInt(mReserved98C);

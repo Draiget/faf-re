@@ -182,9 +182,9 @@ namespace moho
     /** Address: 0x006FDDE0 (FUN_006FDDE0, Moho::CArmyImpl::GetPathFinder) */
     void* GetPathFinder() override;
     /** Address: 0x006FDDF0 (FUN_006FDDF0, Moho::CArmyImpl::SetUnknownSharedRef) */
-    boost::SharedPtrRaw<void>* SetUnknownSharedRef(boost::SharedPtrRaw<void>* value) override;
+    boost::shared_ptr<void>* SetUnknownSharedRef(boost::shared_ptr<void>* value) override;
     /** Address: 0x006FDE40 (FUN_006FDE40, Moho::CArmyImpl::GetUnknownSharedRef) */
-    boost::SharedPtrRaw<void>* GetUnknownSharedRef(boost::SharedPtrRaw<void>* outValue) override;
+    boost::shared_ptr<void>* GetUnknownSharedRef(boost::shared_ptr<void>* outValue) override;
     /** Address: 0x006FDE70 (FUN_006FDE70, Moho::CArmyImpl::SetUnknownVectorWithMeta) */
     std::uint32_t SetUnknownVectorWithMeta(const SArmyVectorWithMeta* value) override;
     /** Address: 0x006FDE90 (FUN_006FDE90, Moho::CArmyImpl::GetPlatoonsList) */
@@ -317,7 +317,7 @@ namespace moho
     CArmyStats* Stats;                          // 0x0214
     CInfluenceMap* InfluenceMap;                // 0x0218 (FUN_006FDC80 / mIMmap)
     void* PathFinder;                           // 0x021C
-    boost::SharedPtrRaw<void> UnknownShared220; // 0x0220
+    boost::shared_ptr<void> UnknownShared220;   // 0x0220
     ArmyPool PlatoonPool;                       // 0x0228
     /**
      * Real `fa::vector<EntitySetTemplate<Unit>>` (0x258: myProxy_,

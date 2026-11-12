@@ -1112,7 +1112,7 @@ int moho::cfunc_CAiBrainFindPlaceToBuildL(
     structureBp = sim->mRules->GetUnitBlueprint(RResId(structureFilename));
   }
 
-  CSimResources* const resources = sim->mSimResources.px;
+  CSimResources* const resources = sim->mSimResources.get();
 
   Wm3::Vector2f armyStart;
   mArmy->GetArmyStartPos(armyStart);

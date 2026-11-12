@@ -370,13 +370,10 @@ namespace moho
       launchInfo->mLanguage.assign_owned(language);
 
       if (!sessionInfo->mIsMultiplayer && !sessionInfo->mIsReplay) {
-        boost::SharedPtrRaw<void> createdLaunchInfo{};
+        boost::shared_ptr<void> createdLaunchInfo;
         launchInfo->Create(createdLaunchInfo);
-        boost::SharedPtrRaw<LaunchInfoBase> createdTyped{};
-        createdTyped.px = static_cast<LaunchInfoBase*>(createdLaunchInfo.px);
-        createdTyped.pi = createdLaunchInfo.pi;
-        sEarlySim.launchClone = boost::SharedPtrFromRawRetained(createdTyped);
-        createdLaunchInfo.release();
+        sEarlySim.launchClone = boost::static_pointer_cast<LaunchInfoBase>(createdLaunchInfo);
+        createdLaunchInfo.reset();
       }
 
       if (LaunchInfoNew* const newLaunchInfo = launchInfo->GetNew(); newLaunchInfo != nullptr) {
@@ -568,14 +565,11 @@ namespace moho
         if (!wldSession->IsMultiplayer && !wldSession->IsReplay) {
           // Single player: the session takes a shared owner on a fresh clone of
           // the launch info, which is what a mid-game save serializes.
-          boost::SharedPtrRaw<void> createdLaunchInfo{};
+          boost::shared_ptr<void> createdLaunchInfo;
           launchInfo->Create(createdLaunchInfo);
 
-          boost::SharedPtrRaw<LaunchInfoBase> createdTyped{};
-          createdTyped.px = static_cast<LaunchInfoBase*>(createdLaunchInfo.px);
-          createdTyped.pi = createdLaunchInfo.pi;
-          wldSession->mLaunchInfo = boost::SharedPtrFromRawRetained(createdTyped);
-          createdLaunchInfo.release();
+          wldSession->mLaunchInfo = boost::static_pointer_cast<LaunchInfoBase>(createdLaunchInfo);
+          createdLaunchInfo.reset();
         }
 
         {

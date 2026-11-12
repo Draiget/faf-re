@@ -655,42 +655,8 @@ namespace
 
   bool gLaunchInfoBaseTypeRegistered = false;
 
-  template <typename TShared>
-  void ReleaseSharedOwnerControlBlockOnly(
-    boost::SharedPtrRaw<TShared>& shared
-  ) noexcept
-  {
-    if (shared.pi != nullptr) {
-      shared.pi->release();
-    }
-  }
-
-  /**
-   * Address: 0x00542040 (FUN_00542040)
-   *
-   * What it does:
-   * Drops one shared-owner lane from `LaunchInfoNew::Create` output without
-   * touching the destination pair before reassignment.
-   */
-  void ReleaseLaunchInfoCreateOutputOwner(
-    boost::SharedPtrRaw<void>& shared
-  ) noexcept
-  {
-    ReleaseSharedOwnerControlBlockOnly(shared);
-  }
-
-  /**
-   * Address: 0x00542B40 (FUN_00542B40)
-   *
-   * What it does:
-   * Drops one shared-owner lane for `SSessionSaveData` payloads.
-   */
-  void ReleaseLoadSessionDataOwner(
-    boost::SharedPtrRaw<moho::SSessionSaveData>& shared
-  ) noexcept
-  {
-    ReleaseSharedOwnerControlBlockOnly(shared);
-  }
+  // The binary's FUN_00542040 (drop the previous owner of LaunchInfoNew::Create's output) and FUN_00542B40 (drop
+  // the SSessionSaveData owner) are shared_ptr::reset on those fields now.
 
   /**
    * Address: 0x005439E0 (FUN_005439E0)
@@ -1041,7 +1007,7 @@ namespace moho
    * Allocates and populates a new LaunchInfoNew shared object from this source.
    */
   void LaunchInfoNew::Create(
-    boost::SharedPtrRaw<void>& outCreated
+    boost::shared_ptr<void>& outCreated
   )
   {
     LaunchInfoNew* const createdInfo = new LaunchInfoNew();
@@ -1061,10 +1027,8 @@ namespace moho
     createdInfo->mStrVec = mStrVec;
     createdInfo->mInitSeed = static_cast<std::int32_t>(gpg::time::GetSystemTimer().ElapsedCycles());
 
-    ReleaseLaunchInfoCreateOutputOwner(outCreated);
-    outCreated = boost::SharedPtrRaw<void>::with_deleter(static_cast<void*>(createdInfo), [](void* payload) {
-      delete static_cast<LaunchInfoNew*>(payload);
-    });
+    outCreated.reset(); // FUN_00542040: the previous owner goes first
+    outCreated = boost::shared_ptr<LaunchInfoNew>(createdInfo);
   }
 
   /**
@@ -1133,8 +1097,8 @@ namespace moho
    */
   LaunchInfoLoad::~LaunchInfoLoad()
   {
-    mSharedLaunchInfo.release();
-    ReleaseLoadSessionDataOwner(mLoadSessionData);
+    mSharedLaunchInfo.reset();
+    mLoadSessionData.reset(); // FUN_00542B40
     delete mReadArchive;
     mReadArchive = nullptr;
   }
@@ -1154,13 +1118,10 @@ namespace moho
    * Returns retained shared payload lane for session creation.
    */
   void LaunchInfoLoad::Create(
-    boost::SharedPtrRaw<void>& outCreated
+    boost::shared_ptr<void>& outCreated
   )
   {
-    boost::SharedPtrRaw<void> sharedLaunchInfo{};
-    sharedLaunchInfo.px = static_cast<void*>(mSharedLaunchInfo.px);
-    sharedLaunchInfo.pi = mSharedLaunchInfo.pi;
-    outCreated.assign_retain(sharedLaunchInfo);
+    outCreated = boost::static_pointer_cast<void>(mSharedLaunchInfo);
   }
 
   /**

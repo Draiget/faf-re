@@ -570,17 +570,16 @@ SSyncData::SSyncData() = default;
  * destructors open the body: `lock xadd -1` on the control block at +0x2B0
  * (`mBeatDebugCanvas`, 0x0073FC94..0x0073FCC8), then +0x2A8
  * (`mTickDebugCanvas`, 0x0073FCCF..0x0073FD01), and later +0x280
- * (`mSimResources`, 0x0073FD75) and +0x278 (`mTerrainUpdate`, 0x0073FDAE). Here they are
- * `SharedPtrRaw` layout mirrors, which have no destructor, so without these
- * calls every packet kept its references: the sim's height field (4 MB on a
- * 20 km map), its resources and debug canvases outlived every session.
+ * (`mSimResources`, 0x0073FD75) and +0x278 (`mTerrainUpdate`, 0x0073FDAE). They are
+ * boost::shared_ptr here too; the explicit resets keep that release order ahead
+ * of the stream's delete.
  */
 SSyncData::~SSyncData()
 {
-  mBeatDebugCanvas.release();
-  mTickDebugCanvas.release();
-  mSimResources.release();
-  mTerrainUpdate.release();
+  mBeatDebugCanvas.reset();
+  mTickDebugCanvas.reset();
+  mSimResources.reset();
+  mTerrainUpdate.reset();
   delete mStream;
   mStream = nullptr;
 }
@@ -1429,7 +1428,7 @@ void CSimDriver::ThreadCreateSim()
   // handler 0x0073D4C7).
   try {
     const CZipFileReadScope archives;
-    mSim.reset(Sim_Create_exxt(boost::SharedPtrRawFromSharedBorrow(mLaunchInfo)));
+    mSim.reset(Sim_Create_exxt(mLaunchInfo));
   } catch (const std::exception& error) {
     gpg::Logf("Sim::Create() crashed: %s", error.what());
   }

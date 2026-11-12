@@ -179,17 +179,12 @@ namespace faf::remote::client
     std::int32_t focusArmy = -1;
     bool fogOfWar = false;
     std::int32_t pausedBy = -1;
-    boost::SharedPtrRaw<moho::CHeightField> terrain;
-    boost::SharedPtrRaw<moho::CSimResources> resources;
+    boost::shared_ptr<moho::CHeightField> terrain;
+    boost::shared_ptr<moho::CSimResources> resources;
 
     SCarried() = default;
     SCarried(const SCarried&) = delete;
     SCarried& operator=(const SCarried&) = delete;
-    ~SCarried()
-    {
-      terrain.release();
-      resources.release();
-    }
   };
 
   CNetworkSimDriver::CNetworkSimDriver(
@@ -446,8 +441,8 @@ namespace faf::remote::client
     mCarried->focusArmy = packet.mFocusArmy;
     mCarried->fogOfWar = packet.mFogOfWar;
     mCarried->pausedBy = packet.mPausedBy;
-    mCarried->terrain.reset_from(packet.mTerrainUpdate);
-    mCarried->resources.reset_from(packet.mSimResources);
+    mCarried->terrain = packet.mTerrainUpdate;
+    mCarried->resources = packet.mSimResources;
     mStamps.push_back(stamp);
 
     if (const std::int32_t target = mInterp.TargetDepth(); target != mTargetLogged && mTargetChangesLogged < 20u) {
@@ -475,11 +470,11 @@ namespace faf::remote::client
     packet->mFocusArmy = mCarried->focusArmy;
     packet->mFogOfWar = mCarried->fogOfWar;
     packet->mPausedBy = mCarried->pausedBy;
-    packet->mTerrainUpdate.reset_from(mCarried->terrain);
-    if (mCarried->resources.px != nullptr) {
-      packet->mSimResources.reset_from(mCarried->resources);
+    packet->mTerrainUpdate = mCarried->terrain;
+    if (mCarried->resources.get() != nullptr) {
+      packet->mSimResources = mCarried->resources;
     } else {
-      packet->mSimResources.reset_from_owner(mResources);
+      packet->mSimResources = mResources;
     }
 
     // Every moving entity carried on by its last beat's motion, from where the screen shows it; units whose pose moved
@@ -886,8 +881,8 @@ namespace faf::remote::client
       mClock.OnFrame(view.beat, shown->simRate, shown->serverMs, now);
       mClientManager.SetServerSimRate(shown->simRate);
     }
-    if (packet->mSimResources.px == nullptr) {
-      packet->mSimResources.reset_from_owner(mResources);
+    if (packet->mSimResources.get() == nullptr) {
+      packet->mSimResources = mResources;
     }
     // Every army's record as this client holds it.
     const std::vector<wire::SArmyRecord>& armies = mViews->Armies();

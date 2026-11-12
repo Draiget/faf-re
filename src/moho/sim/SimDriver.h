@@ -275,8 +275,8 @@ namespace moho
     bool mGameOver = false;                                   // +0x270
     bool mFogOfWar = false;                                   // +0x271
     std::uint8_t pad_0272_0274[0x02]{};                       // +0x272
-    boost::SharedPtrRaw<CHeightField> mTerrainUpdate;         // +0x274
-    boost::SharedPtrRaw<CSimResources> mSimResources;         // +0x27C
+    boost::shared_ptr<CHeightField> mTerrainUpdate;           // +0x274
+    boost::shared_ptr<CSimResources> mSimResources;           // +0x27C
     fa::vector<fa::string> mPrintField;                       // +0x284
     /// Copied wholesale onto `CWldSession::mSyncExtraUnitData` by
     /// `CWldSession::DoBeat` via `fa::vector<SExtraUnitData>::operator=`
@@ -285,8 +285,8 @@ namespace moho
     /// on `CWldSession::mSyncExtraUnitData` (`CWldSession.h`) for the full
     /// citation-correction evidence.
     fa::vector<SExtraUnitData> mSyncExtraUnitData;      // +0x294
-    boost::SharedPtrRaw<CDebugCanvas> mTickDebugCanvas; // +0x2A4
-    boost::SharedPtrRaw<CDebugCanvas> mBeatDebugCanvas; // +0x2AC
+    boost::shared_ptr<CDebugCanvas> mTickDebugCanvas;   // +0x2A4
+    boost::shared_ptr<CDebugCanvas> mBeatDebugCanvas;   // +0x2AC
     std::uint8_t pad_02B4_02B8[0x04]{};                 // +0x2B4
 
     /**

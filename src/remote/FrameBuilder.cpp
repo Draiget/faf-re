@@ -1118,8 +1118,8 @@ namespace faf::remote
 
     if (mSession != nullptr && mCollectEdits) {
       mEdits.Collect(
-        packet.mSimResources.px,
-        packet.mTerrainUpdate.px,
+        packet.mSimResources.get(),
+        packet.mTerrainUpdate.get(),
         std::span<const gpg::Rect2i>(packet.mPlayableRectUpdates.data(), packet.mPlayableRectUpdates.size()),
         *mSession
       );

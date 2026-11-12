@@ -112,19 +112,9 @@ void Sim::Setup(
     }
   }
 
-  // Sim resources (shared-pointer lane). The binary assigns a freshly-owned
-  // control block (use_count = 1); build one via the deleter ctor and transfer
-  // ownership into the member (which starts null).
-  {
-    auto* const newResources = new CSimResources();
-    boost::SharedPtrRaw<CSimResources> owningResources(newResources, [](CSimResources* const p) noexcept {
-      delete p;
-    });
-    mSimResources.px = owningResources.px;
-    mSimResources.pi = owningResources.pi;
-    owningResources.px = nullptr;
-    owningResources.pi = nullptr;
-  }
+  // Sim resources: the binary assigns a freshly-owned control block (use_count = 1) to the member, which starts
+  // null; ~Sim releases it (FUN_007458E0, 0x0074615D).
+  mSimResources.reset(new CSimResources());
 
   // Resolve ScenarioInfo.Options for the army/post-init callbacks.
   LuaPlus::LuaObject scenarioInfoOptions = mLuaState->GetGlobals().Lookup("ScenarioInfo.Options");
@@ -224,10 +214,10 @@ void Sim::Setup(
  * is neither a `LaunchInfoNew` nor a `LaunchInfoLoad`.
  */
 Sim* Sim::Create(
-  const boost::SharedPtrRaw<LaunchInfoBase>& launchInfo
+  const boost::shared_ptr<LaunchInfoBase>& launchInfo
 )
 {
-  LaunchInfoBase* const info = launchInfo.px;
+  LaunchInfoBase* const info = launchInfo.get();
 
   // Allocate + placement-construct the Sim (0xAF8-byte layout). The EH unwind of
   // this `new` expression is what references ~Sim in the binary.
@@ -369,6 +359,10 @@ Sim::~Sim()
     mLuaState = nullptr;
   }
 
+  // The sim resources' reference goes right after the Lua state (+0x8D8) and before the map data (+0x8CC), as in the
+  // binary: 0x0074615D releases the count block at +0x8D4.
+  mSimResources.reset();
+
   // Clear the global "current sim" singleton (before member teardown, matching
   // the binary ordering).
   Sim::sInstance = nullptr;
@@ -494,7 +488,7 @@ void Sim::PostInitialize(
  */
 const ISimResources* Sim::GetResources() const
 {
-  return mSimResources.px;
+  return mSimResources.get();
 }
 
 /**

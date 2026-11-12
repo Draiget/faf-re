@@ -454,10 +454,10 @@ namespace moho
       delete entity;
     }
 
-    mSimResources.release();
-    mBeatDebugCanvas.release();
-    mDebugCanvas.release();
-    mUnknownShared40C.release();
+    mSimResources.reset();
+    mBeatDebugCanvas.reset();
+    mDebugCanvas.reset();
+    mUnknownShared40C.reset();
     // 0x00893BE6: the renderer has no map from here on.
     sWldMap = nullptr;
     ClearBuildTemplates();
@@ -1527,9 +1527,9 @@ namespace moho
    * Returns a retained copy of `mDebugCanvas` (+0x0414/+0x0418) - the tick
    * debug canvas `DoBeat` re-seats every beat from `beat.mTickDebugCanvas`.
    */
-  boost::SharedPtrRaw<CDebugCanvas> CWldSession::GetTickDebugCanvas() const
+  boost::shared_ptr<CDebugCanvas> CWldSession::GetTickDebugCanvas() const
   {
-    return mDebugCanvas.clone_retained();
+    return mDebugCanvas;
   }
 
   /**
@@ -1542,9 +1542,9 @@ namespace moho
    * What it does:
    * Returns a retained copy of `mBeatDebugCanvas` (+0x041C/+0x0420).
    */
-  boost::SharedPtrRaw<CDebugCanvas> CWldSession::GetBeatDebugCanvas() const
+  boost::shared_ptr<CDebugCanvas> CWldSession::GetBeatDebugCanvas() const
   {
-    return mBeatDebugCanvas.clone_retained();
+    return mBeatDebugCanvas;
   }
 
 #if FAF_SERVER_MODE
@@ -1600,8 +1600,8 @@ namespace moho
       delete userArmies[armyIndex];
       userArmies[armyIndex] = nullptr;
     }
-    mDebugCanvas.release();
-    mBeatDebugCanvas.release();
+    mDebugCanvas.reset();
+    mBeatDebugCanvas.reset();
     IsGameOver = 0u;
     mLastBeatWasTick = 0;
     mTimeSinceLastTick = 0.0f;
@@ -1677,11 +1677,11 @@ namespace moho
     (void)SCR_LuaDoString("OnSync()", mState);
 
     mSessionPauseStateA = static_cast<std::uint8_t>(beat.mPausedBy != -1);
-    mDebugCanvas.reset_from(beat.mTickDebugCanvas);
-    mBeatDebugCanvas.reset_from(beat.mBeatDebugCanvas);
+    mDebugCanvas = beat.mTickDebugCanvas;
+    mBeatDebugCanvas = beat.mBeatDebugCanvas;
     ren_FogOfWar = beat.mFogOfWar;
-    terrainRes->SyncTerrain(beat.mTerrainUpdate.px);
-    mSimResources.reset_from(beat.mSimResources);
+    terrainRes->SyncTerrain(beat.mTerrainUpdate.get());
+    mSimResources = beat.mSimResources;
 
     // `fa::vector<SExtraUnitData>::operator=` (0x00895214, FUN_007530C0,
     // `legacy/containers/Vector.h`). Previously mis-wired through

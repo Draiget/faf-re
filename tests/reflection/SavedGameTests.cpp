@@ -23,6 +23,7 @@
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/entity/Entity.h"
+#include "moho/misc/LaunchInfoBase.h"
 #include "moho/serialization/CPrefetchSet.h"
 #include "moho/serialization/PrefetchHandleBaseVectorReflection.h"
 #include "moho/serialization/SBlackListInfo.h"
@@ -100,7 +101,7 @@ namespace
       EXPECT_EQ(actual.mArmyInfo[index].mPlayerName.view(), expected.mArmyInfo[index].mPlayerName.view()) << index;
     }
     EXPECT_EQ(actual.mScenarioInfoText.view(), expected.mScenarioInfoText.view());
-    EXPECT_EQ(actual.mLaunchInfo.px, nullptr);
+    EXPECT_EQ(actual.mLaunchInfo.get(), nullptr);
   }
 
   class SavedGameSerialization : public ArchiveFixture
@@ -153,7 +154,7 @@ namespace
     EXPECT_TRUE(header.mMapName.view().empty());
     EXPECT_TRUE(header.mArmyInfo.empty());
     EXPECT_TRUE(header.mScenarioInfoText.view().empty());
-    EXPECT_EQ(header.mLaunchInfo.px, nullptr);
+    EXPECT_EQ(header.mLaunchInfo.get(), nullptr);
 
     const moho::SSavedGameHeader source = MakeHeader();
     const moho::SSavedGameHeader copy(source);
@@ -563,5 +564,52 @@ namespace
         EXPECT_NE(std::string(error.what()).find("did not terminate properly"), std::string::npos) << error.what();
       }
     });
+  }
+  // A single-player save carries the session's launch info: the header's copies share it (0x00880580 copies retain,
+  // the destructor releases), and the archive writes it as a shared pointer and reads one owner back.
+  TEST_F(
+    SavedGameSerialization,
+    HeaderCopiesShareTheLaunchInfo
+  )
+  {
+    moho::SSavedGameHeader source = MakeHeader();
+    source.mLaunchInfo = boost::shared_ptr<moho::LaunchInfoBase>(new moho::LaunchInfoNew());
+    EXPECT_EQ(source.mLaunchInfo.use_count(), 1);
+    {
+      const moho::SSavedGameHeader copy(source);
+      moho::SSavedGameHeader assigned;
+      assigned = source;
+      EXPECT_EQ(copy.mLaunchInfo.get(), source.mLaunchInfo.get());
+      EXPECT_EQ(assigned.mLaunchInfo.get(), source.mLaunchInfo.get());
+      EXPECT_EQ(source.mLaunchInfo.use_count(), 3);
+    }
+    EXPECT_EQ(source.mLaunchInfo.use_count(), 1);
+  }
+
+  TEST_F(
+    SavedGameSerialization,
+    HeaderWithALaunchInfoRoundTrips
+  )
+  {
+    moho::SSavedGameHeader source = MakeHeader();
+    auto* const info = new moho::LaunchInfoNew();
+    info->mLanguage = fa::string("fr");
+    info->mCheatsEnabled = true;
+    source.mLaunchInfo = boost::shared_ptr<moho::LaunchInfoBase>(info);
+
+    const std::string bytes = Write([&](gpg::WriteArchive& archive) {
+      archive.Write(HeaderType(), &source, gpg::RRef{});
+    });
+    moho::SSavedGameHeader back;
+    Read(bytes, [&](gpg::ReadArchive& archive) {
+      archive.Read(HeaderType(), &back, gpg::RRef{});
+    });
+
+    ASSERT_NE(back.mLaunchInfo.get(), nullptr);
+    EXPECT_NE(back.mLaunchInfo.get(), source.mLaunchInfo.get());
+    ASSERT_NE(back.mLaunchInfo->GetNew(), nullptr);
+    EXPECT_EQ(back.mLaunchInfo->mLanguage.view(), std::string_view("fr"));
+    EXPECT_TRUE(back.mLaunchInfo->mCheatsEnabled);
+    EXPECT_EQ(back.mLaunchInfo.use_count(), 1); // the archive kept no reference once it was done
   }
 } // namespace

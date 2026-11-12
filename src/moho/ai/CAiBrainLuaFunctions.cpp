@@ -1097,7 +1097,7 @@ int moho::cfunc_CAiBrainCreateResourceBuildingNearestL(
   const EDepositType wantedDeposit =
     EntityCategory::HasBlueprint(structureBlueprint, hydrocarbonCategory) ? kHydrocarbon : kMass;
 
-  CSimResources* const resources = sim->mSimResources.px;
+  CSimResources* const resources = sim->mSimResources.get();
   const fa::vector<ResourceDeposit>& deposits = resources->GetDeposits();
 
   // A candidate is one deposit footprint centre plus its squared distance from

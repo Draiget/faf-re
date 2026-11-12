@@ -96,7 +96,7 @@ namespace faf::headless
     const moho::SSyncData& packet
   )
   {
-    mGround.SetField(packet.mTerrainUpdate.px);
+    mGround.SetField(packet.mTerrainUpdate.get());
     mBuilder.Apply(packet);
     mBuilder.ReleaseDropped();
     Measure(static_cast<std::uint32_t>(packet.mCurBeat));

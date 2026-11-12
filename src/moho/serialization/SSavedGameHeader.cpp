@@ -70,7 +70,7 @@ namespace moho
     , mScenarioInfoText(other.mScenarioInfoText)
     , mLaunchInfo()
   {
-    mLaunchInfo.assign_retain(other.mLaunchInfo);
+    mLaunchInfo = other.mLaunchInfo;
   }
 
   SSavedGameHeader& SSavedGameHeader::operator=(
@@ -86,7 +86,7 @@ namespace moho
     mFocusArmy = other.mFocusArmy;
     mArmyInfo = other.mArmyInfo;
     mScenarioInfoText = other.mScenarioInfoText;
-    mLaunchInfo.assign_retain(other.mLaunchInfo);
+    mLaunchInfo = other.mLaunchInfo;
     return *this;
   }
 
@@ -98,7 +98,7 @@ namespace moho
    */
   SSavedGameHeader::~SSavedGameHeader()
   {
-    mLaunchInfo.release();
+    mLaunchInfo.reset();
   }
 
   /**
@@ -194,7 +194,7 @@ namespace moho
     archive->WriteString(const_cast<fa::string*>(&mScenarioInfoText));
 
     gpg::RRef launchInfoRef{};
-    gpg::RRef_LaunchInfoBase(&launchInfoRef, mLaunchInfo.px);
+    gpg::RRef_LaunchInfoBase(&launchInfoRef, mLaunchInfo.get());
     gpg::WriteRawPointer(archive, launchInfoRef, gpg::TrackedPointerState::Shared, NullOwnerRef());
   }
 } // namespace moho

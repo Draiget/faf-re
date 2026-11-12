@@ -313,7 +313,7 @@ namespace faf::remote::client
     std::vector<SUnderlay> mUnderlays;                   // by name id
     boost::shared_ptr<moho::CSimResources> mResources;   // the client's deposits (WP11.2)
     boost::shared_ptr<moho::CHeightField> mTerrain;      // the client's copy of the sim's heights (WP11.2)
-    boost::SharedPtrRaw<moho::CHeightField> mSimTerrain; // the sim's, for the check (a counted reference)
+    boost::shared_ptr<moho::CHeightField> mSimTerrain;   // the sim's, for the check (a counted reference)
     std::size_t mDepositsApplied = 0;
     wire::SViewFrame mShown;
     bool mHasShown = false;

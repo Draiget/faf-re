@@ -366,7 +366,7 @@ namespace moho
      * `WRenViewport::Render` (0x007F90D0) calls this once per frame to decide
      * whether there is a tick debug canvas to draw.
      */
-    [[nodiscard]] boost::SharedPtrRaw<CDebugCanvas> GetTickDebugCanvas() const;
+    [[nodiscard]] boost::shared_ptr<CDebugCanvas> GetTickDebugCanvas() const;
 
     /**
      * Address: 0x007F63C0 (FUN_007F63C0, Moho::CWldSession::GetBeatDebugCanvas)
@@ -375,7 +375,7 @@ namespace moho
      * Returns a retained shared reference to the beat-scoped debug canvas
      * (`mBeatDebugCanvas`, +0x041C).
      */
-    [[nodiscard]] boost::SharedPtrRaw<CDebugCanvas> GetBeatDebugCanvas() const;
+    [[nodiscard]] boost::shared_ptr<CDebugCanvas> GetBeatDebugCanvas() const;
 
     /**
      * Address: 0x007A6360 (FUN_007A6360, ?GetFocusArmy@CWldSession@Moho@@QBEPAVUserArmy@2@XZ)
@@ -1116,11 +1116,11 @@ namespace moho
     /// the last of them lets go. `GetCommandGraph` locks it (0x00898F70) and
     /// re-points it at a graph it creates (0x0089AE50, `weak_count` at +0x08).
     boost::weak_ptr<UICommandGraph> mCommandGraph;  // 0x0404
-    boost::SharedPtrRaw<void> mUnknownShared40C;    // 0x040C
-    boost::SharedPtrRaw<CDebugCanvas> mDebugCanvas; // 0x0414
+    boost::shared_ptr<void> mUnknownShared40C;      // 0x040C
+    boost::shared_ptr<CDebugCanvas> mDebugCanvas;   // 0x0414
     /// The beat-scoped debug canvas; `DoBeat` re-seats it from the packet.
-    boost::SharedPtrRaw<CDebugCanvas> mBeatDebugCanvas; // 0x041C
-    boost::SharedPtrRaw<CSimResources> mSimResources;   // 0x0424
+    boost::shared_ptr<CDebugCanvas> mBeatDebugCanvas; // 0x041C
+    boost::shared_ptr<CSimResources> mSimResources;   // 0x0424
     /// Entities the sim has destroyed that are still playing out their death
     /// on the user side. `OrphanEntity` (0x008941FA) and `DoBeat`'s entity
     /// removal (0x00894C70) both `WeakSet<UserEntity>::Add` (0x007AE1B0) into

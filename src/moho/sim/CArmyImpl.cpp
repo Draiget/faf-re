@@ -1325,7 +1325,7 @@ namespace moho
     UnitCategorySets.release_storage_without_free();
 
     DestroyPlatoonPool(PlatoonPool);
-    UnknownShared220.release();
+    UnknownShared220.reset();
     ReplacePathFinderOwnedPointer(PathFinder, nullptr);
 
     delete InfluenceMap;
@@ -2176,15 +2176,15 @@ namespace moho
   /**
    * Address: 0x006FDDF0 (FUN_006FDDF0, Moho::CArmyImpl::SetUnknownSharedRef)
    */
-  boost::SharedPtrRaw<void>* CArmyImpl::SetUnknownSharedRef(
-    boost::SharedPtrRaw<void>* value
+  boost::shared_ptr<void>* CArmyImpl::SetUnknownSharedRef(
+    boost::shared_ptr<void>* value
   )
   {
     if (value == nullptr) {
       return nullptr;
     }
 
-    UnknownShared220.assign_retain(*value);
+    UnknownShared220 = *value;
 
     return value;
   }
@@ -2192,15 +2192,15 @@ namespace moho
   /**
    * Address: 0x006FDE40 (FUN_006FDE40, Moho::CArmyImpl::GetUnknownSharedRef)
    */
-  boost::SharedPtrRaw<void>* CArmyImpl::GetUnknownSharedRef(
-    boost::SharedPtrRaw<void>* outValue
+  boost::shared_ptr<void>* CArmyImpl::GetUnknownSharedRef(
+    boost::shared_ptr<void>* outValue
   )
   {
     if (outValue == nullptr) {
       return nullptr;
     }
 
-    *outValue = UnknownShared220.clone_retained();
+    *outValue = UnknownShared220;
 
     return outValue;
   }

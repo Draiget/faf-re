@@ -603,7 +603,7 @@ CAiReconDBImpl::CAiReconDBImpl()
  *
  * Address: 0x005C91F0 (FUN_005C91F0, ??4shared_ptr_CIntelGrid@boost@@QAE@@Z) --
  * boost::shared_ptr<CIntelGrid>::operator=, the emission invoked via
- * boost::ResetSharedPtrRawOwning at all 8 grid-assignment call sites below
+ * shared_ptr::reset(MakeGrid(...)) at all 8 grid-assignment call sites below
  * (e.g. 0x005C00D7).
  */
 CAiReconDBImpl::CAiReconDBImpl(
@@ -2314,7 +2314,7 @@ CAiReconDBImpl* CAiReconDBImpl::Create(
  * constructor inlines `operator new` + `CIntelGrid::CIntelGrid(map, size)`
  * directly at each of its 8 call sites (e.g. 0x005C00A6-0x005C00C5) rather
  * than factoring it into a callable function. Factored here for clarity;
- * each call site still wraps the result via `boost::ResetSharedPtrRawOwning`
+ * each call site still passes the result to `shared_ptr::reset`
  * to match the binary's separate `shared_ptr_CIntelGrid::operator=` call
  * (e.g. 0x005C00D7) rather than binding a custom deleter.
  */

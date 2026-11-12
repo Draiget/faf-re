@@ -120,7 +120,7 @@ namespace moho
      * - slot 3 is purecall in `LaunchInfoBase` vftable.
      * - `LaunchInfoNew::Create` and `LaunchInfoLoad::Create` override this slot.
      */
-    virtual void Create(boost::SharedPtrRaw<void>& outCreated) = 0;
+    virtual void Create(boost::shared_ptr<void>& outCreated) = 0;
 
     [[nodiscard]] static gpg::RType* StaticGetClass();
 
@@ -176,7 +176,7 @@ namespace moho
     /**
      * Address: 0x00542870 (FUN_00542870)
      */
-    void Create(boost::SharedPtrRaw<void>& outCreated) override;
+    void Create(boost::shared_ptr<void>& outCreated) override;
 
     /**
      * Address: 0x00544360 (FUN_00544360, Moho::LaunchInfoNew::MemberDeserialize)
@@ -231,12 +231,12 @@ namespace moho
     /**
      * Address: 0x00541FF0 (FUN_00541FF0)
      */
-    void Create(boost::SharedPtrRaw<void>& outCreated) override;
+    void Create(boost::shared_ptr<void>& outCreated) override;
 
   public:
     gpg::ReadArchive* mReadArchive;                         // +0x8C
-    boost::SharedPtrRaw<SSessionSaveData> mLoadSessionData; // +0x90
-    boost::SharedPtrRaw<LaunchInfoBase> mSharedLaunchInfo;  // +0x98
+    boost::shared_ptr<SSessionSaveData> mLoadSessionData;   // +0x90
+    boost::shared_ptr<LaunchInfoBase> mSharedLaunchInfo;    // +0x98
   };
 
   static_assert(offsetof(LaunchInfoLoad, mReadArchive) == 0x8C, "LaunchInfoLoad::mReadArchive offset must be 0x8C");

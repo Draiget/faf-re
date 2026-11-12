@@ -4037,7 +4037,7 @@ namespace moho
     primBatcher->SetProjectionMatrix(MakeViewportPixelProjection(*camera));
     primBatcher->SetViewMatrix(VMatrix4::Identity());
 
-    IResources* const resources = mSimResources.px;
+    IResources* const resources = mSimResources.get();
     CHeightField* const heightField = mWldMap->mTerrainRes->GetHeightField();
 
     // Declaration order is the binary's: the tail destroys the query output

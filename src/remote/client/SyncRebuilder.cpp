@@ -466,7 +466,7 @@ namespace faf::remote::client
     moho::SSyncData& packet
   )
   {
-    if (mSession == nullptr || (packet.mSimResources.px == nullptr && !mNoSim)) {
+    if (mSession == nullptr || (packet.mSimResources.get() == nullptr && !mNoSim)) {
       return; // no session record, or a beat without the sim's deposits: the packet's stays
     }
     if (!mResources) {
@@ -482,9 +482,9 @@ namespace faf::remote::client
       footprint.z1 = deposit.z1;
       mResources->AddDeposit(static_cast<moho::EDepositType>(deposit.type), &footprint);
     }
-    if (packet.mSimResources.px != nullptr) {
+    if (packet.mSimResources.get() != nullptr) {
       // Check: the client's deposits are the sim's, in order.
-      moho::CSimResources& sim = *packet.mSimResources.px;
+      moho::CSimResources& sim = *packet.mSimResources.get();
       fa::mutex::scoped_lock simLock(sim.lock_);
       fa::mutex::scoped_lock ownLock(mResources->lock_);
       bool same = sim.deposits_.size() == mResources->deposits_.size();
@@ -497,17 +497,17 @@ namespace faf::remote::client
       }
       mStats.depositMismatches += same ? 0u : 1u;
     }
-    packet.mSimResources.reset_from_owner(mResources);
+    packet.mSimResources = mResources;
   }
 
   CSyncRebuilder::~CSyncRebuilder()
   {
-    mSimTerrain.release();
+    mSimTerrain.reset();
   }
 
   std::uint64_t CSyncRebuilder::TerrainCellsDiffering() const noexcept
   {
-    const moho::CHeightField* const sim = mSimTerrain.px;
+    const moho::CHeightField* const sim = mSimTerrain.get();
     if (sim == nullptr || !mTerrain) {
       return 0u;
     }
@@ -539,7 +539,7 @@ namespace faf::remote::client
     moho::SSyncData& packet
   )
   {
-    const moho::CHeightField* const sim = packet.mTerrainUpdate.px;
+    const moho::CHeightField* const sim = packet.mTerrainUpdate.get();
     if (mSession != nullptr && sim == nullptr && mNoSim && !mTerrain) {
       mStats.terrainEdits += mSession->TakeTerrainEdits().size(); // no heights to apply them to (the probe): counted
       return;
@@ -587,10 +587,10 @@ namespace faf::remote::client
         sameRects = a.x0 == b.x0 && a.z0 == b.z0 && a.x1 == b.x1 && a.z1 == b.z1;
       }
       mStats.terrainRectMismatches += sameRects ? 0u : 1u;
-      mSimTerrain.reset_from(packet.mTerrainUpdate); // for `TerrainCellsDiffering`
+      mSimTerrain = packet.mTerrainUpdate; // for `TerrainCellsDiffering`
     }
     packet.mPlayableRectUpdates.swap(rects);
-    packet.mTerrainUpdate.reset_from_owner(mTerrain);
+    packet.mTerrainUpdate = mTerrain;
   }
 
   moho::CSndParams* CSyncRebuilder::ResolveSound(
