@@ -9,7 +9,9 @@
 // reads the bound depth target, as ren_Ao does). The sun-height bake runs once per map and sun direction; each
 // frame costs one half-resolution compute pass and one full-screen composite.
 
+#include <cstddef>
 #include <cstdint>
+#include <vector>
 
 #include "boost/shared_ptr.h"
 
@@ -66,5 +68,12 @@ namespace moho
     float mLowGround = 0.0f;   // the map's low ground: a fifth of its samples lie under it
     float mHeightRange = 0.0f; // highest sample less lowest
     bool mBaked = false;
+    // A change of the same field (a building's flattened ground, the map editor's brush) repacks it a slice a frame.
+    std::vector<std::uint32_t> mPacked; // the heights as uploaded, two samples per element
+    bool mRepacking = false;
+    std::uint64_t mRepackRevision = 0U; // the revision the repack under way reads
+    std::size_t mRepackNext = 0U;       // its next element
+    double mRepackMilliseconds = 0.0;   // its slowest slice, for the log
+    std::uint32_t mEditLogs = 0U;
   };
 } // namespace moho

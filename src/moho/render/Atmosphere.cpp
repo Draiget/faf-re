@@ -1,7 +1,7 @@
 #include "moho/render/Atmosphere.h"
 
-#include "moho/render/BoundDepthSupport.h"
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <vector>
@@ -13,6 +13,7 @@
 #include "moho/console/CConCommand.h"
 #include "moho/math/VMatrix4.h"
 #include "moho/render/AtmosphereShader.h"
+#include "moho/render/BoundDepthSupport.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
@@ -167,28 +168,31 @@ namespace moho
     if (field == nullptr || field->Width() < 2 || field->Height() < 2) {
       return false;
     }
-    // The revision moves on every terrain edit and map load (RayScene.cpp uses it the same way).
+    // The revision moves on every terrain change and map load (RayScene.cpp uses it the same way): a building's
+    // flattened ground synced into the view (CWldTerrainRes::SyncTerrain), the map editor's brush.
     const std::uint64_t revision = HeightFieldRevision();
-    const bool sameField = field == mBakedField && field->Width() == mFieldWidth && field->Height() == mFieldHeight &&
-      revision == mBakedRevision && mHeights != nullptr;
-    if (sameField && sun[0] == mBakedSun[0] && sun[1] == mBakedSun[1] && sun[2] == mBakedSun[2]) {
+    const bool sameShape =
+      field == mBakedField && field->Width() == mFieldWidth && field->Height() == mFieldHeight && mHeights != nullptr;
+    const bool sunMoved = sun[0] != mBakedSun[0] || sun[1] != mBakedSun[1] || sun[2] != mBakedSun[2];
+    if (sameShape && revision == mBakedRevision && !mRepacking && !sunMoved) {
       return mBaked;
     }
-    mBakedRevision = revision;
-    mBakedField = field;
-    mFieldWidth = field->Width();
-    mFieldHeight = field->Height();
-    std::copy(sun, sun + 3, mBakedSun);
-    mBaked = false;
+    const auto started = std::chrono::steady_clock::now();
+    const std::size_t samples = static_cast<std::size_t>(field->Width()) * static_cast<std::size_t>(field->Height());
+    const std::uint16_t* const heights = field->GetArrayAt(0, 0);
+    const char* reason = "";
+    bool terrainChanged = false;
 
-    if (!sameField) {
-      // The heights, two 16-bit samples per element, and the low ground: a fifth of the samples lie under it.
-      const std::size_t samples = static_cast<std::size_t>(mFieldWidth) * static_cast<std::size_t>(mFieldHeight);
-      std::vector<std::uint32_t> packed((samples + 1U) / 2U, 0U);
+    if (!sameShape) {
+      // A new field: everything at once (map load), with the low ground: a fifth of the samples lie under it.
+      mBakedField = field;
+      mFieldWidth = field->Width();
+      mFieldHeight = field->Height();
+      mRepacking = false;
+      mPacked.assign((samples + 1U) / 2U, 0U);
       std::vector<std::uint32_t> histogram(65536U, 0U);
-      const std::uint16_t* const heights = field->GetArrayAt(0, 0);
       for (std::size_t index = 0; index < samples; ++index) {
-        packed[index >> 1U] |= static_cast<std::uint32_t>(heights[index]) << ((index & 1U) * 16U);
+        mPacked[index >> 1U] |= static_cast<std::uint32_t>(heights[index]) << ((index & 1U) * 16U);
         ++histogram[heights[index]];
       }
       std::size_t seen = 0U;
@@ -212,12 +216,12 @@ namespace moho
       gpg::gal::GpuBufferDesc heightDesc{};
       heightDesc.name = "AtmosphereHeights";
       heightDesc.stride = sizeof(std::uint32_t);
-      heightDesc.capacity = static_cast<std::uint32_t>(packed.size());
+      heightDesc.capacity = static_cast<std::uint32_t>(mPacked.size());
       mHeights = mDevice->CreateGpuBuffer(heightDesc);
       if (mHeights == nullptr) {
         return false;
       }
-      mDevice->UpdateGpuBuffer(*mHeights, 0U, static_cast<std::uint32_t>(packed.size()), packed.data());
+      mDevice->UpdateGpuBuffer(*mHeights, 0U, static_cast<std::uint32_t>(mPacked.size()), mPacked.data());
 
       const std::int32_t larger = std::max(mFieldWidth, mFieldHeight);
       mCellSize = static_cast<std::uint32_t>((larger + kSunHeightCells - 1) / kSunHeightCells);
@@ -233,7 +237,50 @@ namespace moho
         mHeights.reset();
         return false;
       }
+      mBakedRevision = revision;
+      mEditLogs = 0U;
+    } else if (revision != mBakedRevision || mRepacking) {
+      // The same field changed: its heights are packed and uploaded a slice per frame (about a million elements, a
+      // couple of milliseconds; a 20 km map in one frame), and the sun heights are baked again once the last slice
+      // is up. The last bake stays meanwhile. The low ground and the height range stay the map's.
+      if (!mRepacking) {
+        mRepacking = true;
+        mRepackRevision = revision;
+        mRepackNext = 0U;
+      }
+      constexpr std::size_t kElementsPerFrame = 1U << 20U;
+      const std::size_t first = mRepackNext;
+      const std::size_t last = std::min(first + kElementsPerFrame, mPacked.size());
+      for (std::size_t element = first; element < last; ++element) {
+        const std::size_t index = element * 2U;
+        const std::uint32_t high = (index + 1U < samples) ? heights[index + 1U] : 0U;
+        mPacked[element] = static_cast<std::uint32_t>(heights[index]) | (high << 16U);
+      }
+      mDevice->UpdateGpuBuffer(
+        *mHeights, static_cast<std::uint32_t>(first), static_cast<std::uint32_t>(last - first), mPacked.data() + first
+      );
+      mRepackNext = last;
+      mRepackMilliseconds = std::max(
+        mRepackMilliseconds,
+        std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count()
+      );
+      if (mRepackNext < mPacked.size()) {
+        return mBaked;
+      }
+      mRepacking = false;
+      mBakedRevision = mRepackRevision; // a change during the repack starts another one next frame
+      reason = " (terrain changed)";
+      terrainChanged = true;
+    } else {
+      reason = " (sun moved)";
     }
+    std::copy(sun, sun + 3, mBakedSun);
+    mBaked = false;
+    // The log's pack time: a repack's slowest slice, a new field's whole pack.
+    const double packMilliseconds = terrainChanged
+      ? mRepackMilliseconds
+      : std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+    mRepackMilliseconds = 0.0;
 
     AtmosphereConstants constants{};
     constants.sun[0] = sun[0];
@@ -254,16 +301,22 @@ namespace moho
     bake.groupsX = (mCellsAcross + 7U) / 8U;
     bake.groupsY = (mCellsDown + 7U) / 8U;
     mDevice->DispatchGpuProgram(bake);
-    gpg::Logf(
-      "Atmosphere: sun heights baked, %ux%u cells over a %dx%d heightfield, low ground %.1f, height range %.1f "
-      "(ren_Atmosphere)",
-      mCellsAcross,
-      mCellsDown,
-      mFieldWidth,
-      mFieldHeight,
-      mLowGround,
-      mHeightRange
-    );
+    // A new field, and the first few changes of one (a battle's buildings would fill the log).
+    if (*reason == '\0' || mEditLogs < 3U) {
+      mEditLogs += (*reason == '\0') ? 0U : 1U;
+      gpg::Logf(
+        "Atmosphere: sun heights baked, %ux%u cells over a %dx%d heightfield, low ground %.1f, height range %.1f, "
+        "heights packed in %.1f ms%s (ren_Atmosphere)",
+        mCellsAcross,
+        mCellsDown,
+        mFieldWidth,
+        mFieldHeight,
+        mLowGround,
+        mHeightRange,
+        packMilliseconds,
+        reason
+      );
+    }
     mBaked = true;
     return true;
   }
