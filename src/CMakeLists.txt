@@ -191,20 +191,6 @@ set_property(SOURCE ${_fx11_sources}
   APPEND PROPERTY COMPILE_OPTIONS /std:c++17 /permissive /Zc:twoPhase- /W0)
 
 
-# boost.thread 1.34.1, compiled into the engine (no bjam build).
-set(_boost_thread "${FAF_DEPENDENCIES_DIR}/boost_1_34_1/libs/thread/src")
-set(_boost_thread_sources
-  barrier.cpp condition.cpp exceptions.cpp mutex.cpp once.cpp recursive_mutex.cpp
-  thread.cpp tss_hooks.cpp tss_dll.cpp tss_pe.cpp tss.cpp xtime.cpp)
-list(TRANSFORM _boost_thread_sources PREPEND "${_boost_thread}/")
-set_property(SOURCE ${_boost_thread_sources}
-  APPEND PROPERTY COMPILE_DEFINITIONS _HAS_AUTO_PTR_ETC=1 BOOST_THREAD_BUILD_LIB=1)
-set_property(SOURCE ${_boost_thread_sources} APPEND PROPERTY COMPILE_OPTIONS /W0)
-# condition_impl::condition_impl() calls the UNICODE-sensitive
-# CreateSemaphore/CreateMutex macros; the original (0x00AC2190) resolves them
-# to the A entry points.
-set_property(SOURCE "${_boost_thread}/condition.cpp" APPEND PROPERTY COMPILE_OPTIONS /UUNICODE /U_UNICODE)
-
 set_property(SOURCE moho/movie/sfd/FfmpegSfdDecoder.cpp APPEND PROPERTY COMPILE_OPTIONS -Wno-everything)
 include(FafPrecompiledHeaders)
 faf_precompile(faf_engine)

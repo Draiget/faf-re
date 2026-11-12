@@ -1110,18 +1110,6 @@ set(FAF_ENGINE_SOURCES
   gpg/core/utils/Global.cpp
   gpg/core/utils/Logging.cpp
   gpg/core/utils/LocalCache.cpp
-  ${FAF_DEPENDENCIES_DIR}/boost_1_34_1/libs/thread/src/barrier.cpp
-  ${FAF_DEPENDENCIES_DIR}/boost_1_34_1/libs/thread/src/condition.cpp
-  ${FAF_DEPENDENCIES_DIR}/boost_1_34_1/libs/thread/src/exceptions.cpp
-  ${FAF_DEPENDENCIES_DIR}/boost_1_34_1/libs/thread/src/mutex.cpp
-  ${FAF_DEPENDENCIES_DIR}/boost_1_34_1/libs/thread/src/once.cpp
-  ${FAF_DEPENDENCIES_DIR}/boost_1_34_1/libs/thread/src/recursive_mutex.cpp
-  ${FAF_DEPENDENCIES_DIR}/boost_1_34_1/libs/thread/src/thread.cpp
-  ${FAF_DEPENDENCIES_DIR}/boost_1_34_1/libs/thread/src/tss_hooks.cpp
-  ${FAF_DEPENDENCIES_DIR}/boost_1_34_1/libs/thread/src/tss_dll.cpp
-  ${FAF_DEPENDENCIES_DIR}/boost_1_34_1/libs/thread/src/tss_pe.cpp
-  ${FAF_DEPENDENCIES_DIR}/boost_1_34_1/libs/thread/src/tss.cpp
-  ${FAF_DEPENDENCIES_DIR}/boost_1_34_1/libs/thread/src/xtime.cpp
   gpg/gal/ContextInterfaces.cpp
   gpg/gal/Device.cpp
   gpg/gal/RenderProfiler.cpp

@@ -14,10 +14,6 @@
 #include <strings.h>
 #include <time.h>
 
-// glibc's <time.h> defines TIME_UTC (C11); boost 1.34.1's boost/thread/xtime.hpp declares
-// an enumerator of that name (`enum xtime_clock_types { TIME_UTC=1 }`) and uses it.
-#undef TIME_UTC
-
 // Windows headers reach the shared code through other headers, so names such as HANDLE,
 // DWORD and FILETIME are used in files that never include <Windows.h> themselves; this
 // build provides them everywhere, as the Windows build effectively does.

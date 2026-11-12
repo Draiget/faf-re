@@ -26,7 +26,9 @@ namespace moho
    *
    * RTTI: `Listener<SD3DDeviceEvent const&>` at +0x00 (its node at +0x04).
    */
-  class DeviceExitListener : public Listener<const SD3DDeviceEvent&>
+  // `final`: nothing derives from it, and sDeviceExitListener (std::unique_ptr) deletes it without a virtual
+  // destructor, as the binary's boost::scoped_ptr did.
+  class DeviceExitListener final : public Listener<const SD3DDeviceEvent&>
   {
   public:
     /**

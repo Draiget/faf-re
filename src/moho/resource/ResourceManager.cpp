@@ -27,9 +27,7 @@ namespace moho
 
 namespace
 {
-  // `boost::TIME_UTC`. Spelled by value: C11's `TIME_UTC` macro (also 1) is
-  // back in force once boost/thread/xtime.hpp restores it, and hides boost's
-  // enumerator everywhere outside that header.
+  // boost's TIME_UTC (fa::kXtimeUtc), spelled by value: C11's TIME_UTC macro has the same value.
   constexpr int kClockUtc = 1;
 
   moho::ResourceManager* sResourceManager = nullptr;       // 0x010A6398

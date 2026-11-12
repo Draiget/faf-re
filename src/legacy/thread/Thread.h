@@ -64,6 +64,12 @@ namespace fa
       : mThread(std::forward<F>(function))
     {}
 
+    /**
+     * Address: 0x00AC2760 (FUN_00AC2760, boost::thread::~thread)
+     *
+     * boost closes the thread handle when the object is still joinable (byte +0x08): the thread runs on,
+     * detached. std::thread::detach does the same.
+     */
     ~thread()
     {
       if (mThread.joinable()) {

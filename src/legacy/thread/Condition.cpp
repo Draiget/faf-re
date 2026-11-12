@@ -34,7 +34,13 @@ namespace fa
     }
   } // namespace
 
-  // boost's condition_impl::condition_impl (Win32).
+  /**
+   * Address: 0x00AC2190 (FUN_00AC2190, boost::detail::condition_impl::condition_impl)
+   *
+   * The counters at +0x0C..+0x14 are zeroed, then the gate semaphore (initial 1, max 1), the queue semaphore
+   * (initial 0, max 0x7FFFFFFF) and the counter mutex are created, all unnamed, so which of the A/W entry points
+   * makes them doesn't matter. A failed create throws (boost: thread_resource_error).
+   */
   condition::condition()
     : mGate(::CreateSemaphoreW(nullptr, 1, 1, nullptr))
     , mQueue(::CreateSemaphoreW(nullptr, 0, (std::numeric_limits<long>::max)(), nullptr))

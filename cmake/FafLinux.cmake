@@ -140,10 +140,6 @@ endif()
 include("${PROJECT_SOURCE_DIR}/src/sources.cmake")
 include("${PROJECT_SOURCE_DIR}/src/sim_sources.cmake")
 
-# boost.thread 1.34.1 on pthreads: the Win32 TLS hooks are left out, and mutex.cpp is compiled by
-# src/platform/posix/BoostMutexPosix.cpp with recursive pthread mutexes, as Windows' critical
-# sections are (the engine takes some locks again on the thread that holds them).
-list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "/libs/thread/src/(tss_(dll|hooks|pe)|mutex)\\.cpp$")
 # The Windows platform services (call stacks, crash-report paths, message
 # boxes); the POSIX implementation of the same functions is plan WPL.5.
 list(FILTER FAF_SIM_SOURCES EXCLUDE REGEX "^moho/misc/WinPlatform\\.cpp$")
@@ -195,11 +191,6 @@ target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/legacy/math/X87Math64.
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/gpg/gal/MatrixPortable.cpp")
 # The Win32 calls the shared code makes, on POSIX (plan WPL.5).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/Win32Shim.cpp")
-# boost.thread's mutex.cpp with recursive pthread mutexes (see the FILTER above).
-target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/BoostMutexPosix.cpp")
-set_property(SOURCE "${PROJECT_SOURCE_DIR}/src/platform/posix/BoostMutexPosix.cpp" APPEND PROPERTY
-  COMPILE_DEFINITIONS BOOST_THREAD_BUILD_LIB=1)
-set_property(SOURCE "${PROJECT_SOURCE_DIR}/src/platform/posix/BoostMutexPosix.cpp" APPEND PROPERTY COMPILE_OPTIONS -w)
 # platform::net (src/platform/Net.h) on BSD sockets, for moho/net's lockstep transport (issue #259).
 target_sources(faf_sim PRIVATE "${PROJECT_SOURCE_DIR}/src/platform/posix/NetPosix.cpp")
 # The crash diagnostics' headers on POSIX (plan WPL.5).
@@ -248,7 +239,7 @@ set(_faf_sim_options
   # The Windows names the shared code uses (plan WPL.5).
   "SHELL:-include platform/PosixCompat.h"
   ${FAF_LINUX_MS_DIALECT}
-  # boost.thread checks for the compiler's threading mode (_REENTRANT).
+  # std::thread and the pthread calls in src/legacy/thread.
   -pthread
   -Wall
   ${FAF_WARNING_OPTIONS}
@@ -256,14 +247,6 @@ set(_faf_sim_options
   -Wno-unknown-warning-option)
 target_compile_options(faf_sim_settings INTERFACE "$<$<COMPILE_LANGUAGE:C,CXX>:${_faf_sim_options}>")
 
-# boost.thread's own sources, as on Windows (src/CMakeLists.txt).
-foreach(_src IN LISTS _faf_sim_files)
-  if(_src MATCHES "/libs/thread/src/")
-    # Its thread.cpp and tss.cpp use std::auto_ptr, which libc++ keeps behind this opt-in.
-    set_property(SOURCE "${_src}" APPEND PROPERTY COMPILE_DEFINITIONS BOOST_THREAD_BUILD_LIB=1 _LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR=1)
-    set_property(SOURCE "${_src}" APPEND PROPERTY COMPILE_OPTIONS -w)
-  endif()
-endforeach()
 include(FafPrecompiledHeaders)
 faf_precompile(faf_sim)
 

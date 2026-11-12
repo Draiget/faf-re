@@ -54,7 +54,7 @@ namespace fa
   private:
 #if FAFRE_PLATFORM_WINDOWS
     void* mCriticalSection;    // CRITICAL_SECTION*, boost's m_mutex
-    bool mUsesCriticalSection; // boost's m_critical_section, always true in its Win32 build
+    [[maybe_unused]] bool mUsesCriticalSection; // boost's m_critical_section, always true in its Win32 build
 #else
     pthread_mutex_t mMutex;
 #endif
@@ -101,7 +101,7 @@ namespace fa
   private:
 #if FAFRE_PLATFORM_WINDOWS
     void* mCriticalSection;    // CRITICAL_SECTION*, boost's m_mutex
-    bool mUsesCriticalSection; // boost's m_critical_section
+    [[maybe_unused]] bool mUsesCriticalSection; // boost's m_critical_section
 #else
     pthread_mutex_t mMutex;
 #endif

@@ -9,9 +9,6 @@
 #include <sstream>
 
 #include <boost/ptr_container/exception.hpp>
-#include <boost/thread/condition.hpp>
-#include <boost/thread/thread.hpp>
-#include <boost/thread/tss.hpp>
 
 #include "moho/terrain/TerrainFactory.h"
 // Engine addition (dedicated-server plan WPL.5): the Direct3D backends' types exist on Windows only.
@@ -41,91 +38,12 @@ namespace moho
   class AudioEngine;
 }
 
-namespace
-{
-  struct WinMutexHandle
-  {
-    HANDLE handle = nullptr;
-  };
-
-  struct WinMutexHandlePair
-  {
-    HANDLE handle = nullptr;
-    std::uint32_t lane04 = 0;
-  };
-
-  [[noreturn]] void ThrowThreadResourceError()
-  {
-    throw boost::thread_resource_error();
-  }
-} // namespace
-
 namespace boost
 {
-
-  /**
-   * Address: 0x00AC1C90 (FUN_00AC1C90)
-   *
-   * What it does:
-   * Initializes one single-lane Win32 mutex owner and throws
-   * `boost::thread_resource_error` when mutex creation fails.
-   */
-  [[maybe_unused]] WinMutexHandle* InitializeUnnamedMutexHandleOrThrow(
-    WinMutexHandle* const outHandle
-  )
-  {
-    if (outHandle == nullptr) {
-      return nullptr;
-    }
-
-    outHandle->handle = nullptr;
-    const HANDLE mutexHandle = ::CreateMutexA(nullptr, FALSE, nullptr);
-    if (mutexHandle == nullptr || mutexHandle == INVALID_HANDLE_VALUE) {
-      ThrowThreadResourceError();
-    }
-
-    outHandle->handle = mutexHandle;
-    return outHandle;
-  }
-
-  /**
-   * Address: 0x00AC5480 (FUN_00AC5480)
-   *
-   * What it does:
-   * Initializes one two-lane Win32 mutex owner (`handle`, `lane04`) and throws
-   * `boost::thread_resource_error` when mutex creation fails.
-   */
-  [[maybe_unused]] WinMutexHandlePair* InitializeUnnamedMutexHandlePairOrThrow(
-    WinMutexHandlePair* const outHandlePair
-  )
-  {
-    if (outHandlePair == nullptr) {
-      return nullptr;
-    }
-
-    outHandlePair->handle = nullptr;
-    outHandlePair->lane04 = 0;
-
-    const HANDLE mutexHandle = ::CreateMutexA(nullptr, FALSE, nullptr);
-    if (mutexHandle == nullptr || mutexHandle == INVALID_HANDLE_VALUE) {
-      ThrowThreadResourceError();
-    }
-
-    outHandlePair->handle = mutexHandle;
-    return outHandlePair;
-  }
-
-  // boost::detail::condition_impl::condition_impl()/~condition_impl() and
-  // boost::thread::~thread() are NOT defined in this TU: the vendored
-  // dependencies/boost_1_34_1/libs/thread/src/condition.cpp and thread.cpp
-  // are compiled directly into the engine (src/sources.cmake) and already
-  // provide these symbols. A hand-written duplicate here would be an ODR
-  // violation masked only by this project's /FORCE link setting (see
-  // project_force_hides_declonly_bridges memory note) -- real address
-  // citations for these two now live on the vendored definitions themselves
-  // (0x00AC2190/0x00AC2760), with an explanatory note on condition_impl's
-  // ctor about the UNICODE/ANSI CreateSemaphore/CreateMutex divergence that
-  // condition.cpp's per-file settings in src/CMakeLists.txt correct for.
+  // boost.thread is no longer built: what the engine used of it is src/legacy/thread (fa::mutex, fa::condition,
+  // fa::thread), with the binary's layout and behaviour; condition_impl's constructor (0x00AC2190) and
+  // thread::~thread (0x00AC2760) are cited there. The binary's two Win32 kernel-mutex helpers FUN_00AC1C90 and
+  // FUN_00AC5480 had no caller here and were removed with it.
 
   namespace
   {
