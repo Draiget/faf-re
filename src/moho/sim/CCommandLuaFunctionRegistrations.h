@@ -1122,7 +1122,7 @@ namespace moho
    */
   CScrLuaInitForm* register_UIZoomTo_LuaFuncDef();
   /**
-   * Address: Unmapped (FA-Binary-Patches addition)
+   * Address: None (faf-re addition)
    *
    * What it does:
    * Publishes global Lua binder `IsTransportPreOrdersEnabled() -> bool`.
@@ -1130,7 +1130,7 @@ namespace moho
   CScrLuaInitForm* func_IsTransportPreOrdersEnabled_LuaFuncDef();
 
   /**
-   * Address: Unmapped (FA-Binary-Patches addition)
+   * Address: None (faf-re addition)
    *
    * What it does:
    * Unwraps Lua callback context and forwards to `cfunc_IsTransportPreOrdersEnabledL`.
@@ -1138,7 +1138,7 @@ namespace moho
   int cfunc_IsTransportPreOrdersEnabled(lua_State* luaContext);
 
   /**
-   * Address: Unmapped (FA-Binary-Patches addition)
+   * Address: None (faf-re addition)
    *
    * What it does:
    * Returns whether transport cargo pre-orders and drop ghosts are enabled.

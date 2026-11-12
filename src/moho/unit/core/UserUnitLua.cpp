@@ -96,9 +96,6 @@ namespace
   constexpr const char* kUserUnitClearSelectionBracketPositionOverrideHelpText =
     "UserUnit:ClearSelectionBracketPositionOverride() -- clear selection bracket center position override";
   constexpr const char* kUserUnitGetMissileInfoName = "GetMissileInfo";
-  constexpr const char* kUserUnitGetCargoUnitsName = "GetCargoUnits";
-  constexpr const char* kUserUnitGetCargoUnitsHelpText =
-    "table GetCargoUnits() -- returns table of cargo units attached to this transport";
   constexpr const char* kUserUnitGetMissileInfoHelpText =
     "table GetMissileInfo() - returns a table of the missile info for this unit";
   constexpr const char* kSetCurrentFactoryForQueueDisplayName = "SetCurrentFactoryForQueueDisplay";
@@ -2635,102 +2632,6 @@ int moho::cfunc_UserUnitGetMissileInfoL(
 }
 
 /**
- * Address: Unmapped (FA-Binary-Patches addition)
- *
- * What it does:
- * Unwraps raw Lua callback context and forwards to `cfunc_UserUnitGetCargoUnitsL`.
- */
-template <>
-LuaPlus::LuaObject moho::SCR_ToLua<UserUnit*>(LuaPlus::LuaState* /*state*/, UserUnit* const& unit)
-{
-  if (unit == nullptr) {
-    return LuaPlus::LuaObject();
-  }
-  if (IUnit* const bridge = GetIUnitBridge(unit)) {
-    return bridge->GetLuaObject();
-  }
-  return unit->mLuaObj;
-}
-
-int moho::cfunc_UserUnitGetCargoUnits(lua_State* const luaContext)
-{
-  return cfunc_UserUnitGetCargoUnitsL(moho::SCR_ResolveBindingState(luaContext));
-}
-
-/**
- * Address: Unmapped (FA-Binary-Patches addition)
- *
- * What it does:
- * Publishes the `UserUnit:GetCargoUnits()` Lua binder.
- */
-CScrLuaInitForm* moho::func_UserUnitGetCargoUnits_LuaFuncDef()
-{
-  static CScrLuaBinder binder(
-    moho::SCR_UserLuaInitSet(),
-    kUserUnitGetCargoUnitsName,
-    &moho::cfunc_UserUnitGetCargoUnits,
-    &CScrLuaMetatableFactory<UserUnit>::Instance(),
-    kUserUnitLuaClassName,
-    kUserUnitGetCargoUnitsHelpText
-  );
-  return &binder;
-}
-
-/**
- * Address: Unmapped (FA-Binary-Patches addition)
- *
- * What it does:
- * Pushes one Lua table containing all cargo units attached to this transport.
- */
-int moho::cfunc_UserUnitGetCargoUnitsL(LuaPlus::LuaState* const state)
-{
-  if (state == nullptr || state->m_state == nullptr) {
-    return 0;
-  }
-
-  moho::SCR_ExpectExactArgs(state, 1, kUserUnitGetCargoUnitsHelpText);
-
-  const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
-  UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
-
-  LuaPlus::LuaObject cargoTable;
-  cargoTable.AssignNewTable(state, 0, 0);
-
-  if (userUnit == nullptr) {
-    cargoTable.PushStack(state);
-    return 1;
-  }
-
-  CWldSession* const session = WLD_GetActiveSession();
-  if (session == nullptr) {
-    cargoTable.PushStack(state);
-    return 1;
-  }
-
-  const std::uint32_t transportEntityId = static_cast<std::uint32_t>(userUnit->mParams.mEntityId);
-  int tableIndex = 1;
-  for (const auto& [entityId, entity] : session->mEntities) {
-    if (entity == nullptr) {
-      continue;
-    }
-
-    if (entity->mVariableData.mAttachmentParentRef == transportEntityId) {
-      if (entity->mVariableData.mIsDead != 0u) {
-        continue;
-      }
-      if (UserUnit* const cargoUnit = entity->IsUserUnit(); cargoUnit != nullptr) {
-        if (IUnit* const bridge = GetIUnitBridge(cargoUnit)) {
-          cargoTable.SetObject(tableIndex++, bridge->GetLuaObject());
-        }
-      }
-    }
-  }
-
-  cargoTable.PushStack(state);
-  return 1;
-}
-
-/**
  * Address: 0x00836360 (FUN_00836360, cfunc_SetCurrentFactoryForQueueDisplay)
  *
  * What it does:
@@ -3094,7 +2995,6 @@ namespace
       (void)::moho::func_UserUnitSetSelectionBracketPositionOverride_LuaFuncDef();
       (void)::moho::func_UserUnitClearSelectionBracketPositionOverride_LuaFuncDef();
       (void)::moho::func_UserUnitGetMissileInfo_LuaFuncDef();
-      (void)::moho::func_UserUnitGetCargoUnits_LuaFuncDef();
       (void)::moho::func_SetCurrentFactoryForQueueDisplay_LuaFuncDef();
       (void)::moho::func_GetBlueprintUser_LuaFuncDef();
     }

@@ -936,23 +936,6 @@ void UserUnit::QueueTransportPreOrders(const gpg::fastvector<UserUnit*>& units, 
   }
 }
 
-void UserUnit::QueueTransportPreOrders(const std::vector<UserUnit*>& units, const SSTICommandIssueData& order, const bool clearQueue)
-{
-  if (!ui_TransportPreOrders || units.empty()) {
-    return;
-  }
-  SSTICommandIssueData finalOrder = order;
-  if (finalOrder.nextCommandId <= 0 || (static_cast<std::uint32_t>(finalOrder.nextCommandId) & 0xFF000000u) == 0xFF000000u) {
-    static std::int32_t sNextPreOrderId = 0x7F000001;
-    finalOrder.nextCommandId = sNextPreOrderId++;
-  }
-  for (UserUnit* const unit : units) {
-    if (unit != nullptr) {
-      unit->QueueTransportPreOrder(finalOrder, clearQueue);
-    }
-  }
-}
-
 void UserUnit::QueueTransportPreOrder(const SSTICommandIssueData& order, bool clearQueue)
 {
   if (!ui_TransportPreOrders) {
@@ -2646,6 +2629,16 @@ bool moho::USERUNIT_CanBeBuiltAt(
 
       gpg::RRef buildBlueprintRef{};
       buildBlueprintRef = gpg::MakeRRef<moho::REntityBlueprint>(helper->mConstantData.blueprint);
+      // Object reference in, object pointer out (it is handed to `GetSkirtRect`
+      // below), so the upcast target is the class descriptor - the same one
+      // `RefreshQueuedBuildGhosts` uses on this exact blueprint lane, and the
+      // one the binary's `RRef::Upcast_RUnitBlueprint` resolves through
+      // `LookupRType(typeid(RUnitBlueprint))`. Aimed at `GetPointerType()` - the
+      // descriptor for `RUnitBlueprint*` - the walk over the object's bases can
+      // never match, so `mObj` came back null for every queued order and this
+      // loop skipped all of them. That is why two queued buildings could be
+      // placed overlapping, or one inside another: the footprint test that
+      // rejects it is right here and was never reached.
       const gpg::RRef unitBlueprintRef = gpg::REF_UpcastPtr(buildBlueprintRef, RUnitBlueprint::StaticGetClass());
       const auto* const queuedBuildBlueprint = static_cast<const RUnitBlueprint*>(unitBlueprintRef.mObj);
       if (queuedBuildBlueprint == nullptr) {

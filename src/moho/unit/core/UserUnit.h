@@ -582,7 +582,6 @@ namespace moho
      * Backed by a static registry indexed by mParams.mEntityId so sizeof(UserUnit) remains 0x3E8.
      */
     static void QueueTransportPreOrders(const gpg::fastvector<UserUnit*>& units, const SSTICommandIssueData& order, bool clearQueue);
-    static void QueueTransportPreOrders(const std::vector<UserUnit*>& units, const SSTICommandIssueData& order, bool clearQueue);
     void QueueTransportPreOrder(const SSTICommandIssueData& order, bool clearQueue);
     void ClearTransportPreOrders();
     static bool RemoveTransportPreOrderById(std::int32_t commandId);
@@ -2207,30 +2206,5 @@ namespace moho
    * Lua object result.
    */
   int cfunc_GetBlueprintUserL(LuaPlus::LuaState* state);
-
-  /**
-   * Address: Unmapped (FA-Binary-Patches addition)
-   *
-   * What it does:
-   * Unwraps raw Lua callback context and forwards to
-   * `cfunc_UserUnitGetCargoUnitsL`.
-   */
-  int cfunc_UserUnitGetCargoUnits(lua_State* luaContext);
-
-  /**
-   * Address: Unmapped (FA-Binary-Patches addition)
-   *
-   * What it does:
-   * Publishes the `UserUnit:GetCargoUnits()` Lua binder.
-   */
-  CScrLuaInitForm* func_UserUnitGetCargoUnits_LuaFuncDef();
-
-  /**
-   * Address: Unmapped (FA-Binary-Patches addition)
-   *
-   * What it does:
-   * Pushes one Lua table containing all cargo units attached to this transport.
-   */
-  int cfunc_UserUnitGetCargoUnitsL(LuaPlus::LuaState* state);
 
 } // namespace moho

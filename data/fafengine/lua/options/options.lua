@@ -121,8 +121,26 @@ end
 
 -- Transport cargo pre-orders and drop ghosts (ui_TransportPreOrders):
 do
+    local command = 'ui_TransportPreOrders'
+    local function Supported()
+        local kind = type(ConTextMatches)
+        if kind ~= 'function' and kind ~= 'cfunction' then
+            return false
+        end
+        local ok, matches = pcall(ConTextMatches, command)
+        if not ok or type(matches) ~= 'table' then
+            return false
+        end
+        for _, name in ipairs(matches) do
+            if name == command then
+                return true
+            end
+        end
+        return false
+    end
+
     local gameplay = options and options.gameplay
-    if gameplay and gameplay.items and not HasOptionKey(gameplay.items, 'transport_preorders') then
+    if Supported() and gameplay and gameplay.items and not HasOptionKey(gameplay.items, 'transport_preorders') then
         local entry = {
             title = "Transport Cargo Pre-orders",
             key = 'transport_preorders',

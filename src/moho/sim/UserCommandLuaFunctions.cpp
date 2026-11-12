@@ -567,14 +567,7 @@ constexpr const char* kIsTransportPreOrdersEnabledName = "IsTransportPreOrdersEn
 
     gpg::RRef commandTypeRef{};
     commandTypeRef = gpg::MakeRRef<moho::EUnitCommandType>(&outCommandType);
-    if (commandTypeRef.SetLexical(lexicalCommandType)) {
-      return true;
-    }
-    if (std::strncmp(lexicalCommandType, "UNITCOMMAND_", 12) == 0) {
-      return commandTypeRef.SetLexical(lexicalCommandType + 12);
-    }
-    const std::string prefixed = std::string("UNITCOMMAND_") + lexicalCommandType;
-    return commandTypeRef.SetLexical(prefixed.c_str());
+    return commandTypeRef.SetLexical(lexicalCommandType);
   }
   /**
    * Address: 0x00866970 (FUN_00866970, sub_866970)
@@ -938,8 +931,8 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * Publishes global Lua binder
    * `IssueBlueprintCommand(command, blueprintid, count, clear = false)`.
    */
-/**
-   * Address: Unmapped (FA-Binary-Patches addition)
+  /**
+   * Address: None (faf-re addition)
    *
    * What it does:
    * Publishes global Lua binder
@@ -1436,34 +1429,8 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
    * Unwraps raw Lua callback context and forwards to
    * `cfunc_DecreaseBuildCountInQueueL`.
    */
-  [[nodiscard]] UserEntity* TryFromLua_UserEntity(const LuaPlus::LuaObject& object) noexcept
-  {
-    if (!object.IsTable() && !object.IsUserData()) {
-      return nullptr;
-    }
-    CScriptObject** const slot = moho::SCR_ScriptObjectSlot(object);
-    if (!slot || !*slot) {
-      return nullptr;
-    }
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(moho::SCR_MakeScriptObjectRef(*slot), gpg::RTypeOf<UserEntity>());
-    return static_cast<UserEntity*>(upcast.mObj);
-  }
-
-  [[nodiscard]] UserUnit* TryFromLua_UserUnit(const LuaPlus::LuaObject& object) noexcept
-  {
-    if (!object.IsTable() && !object.IsUserData()) {
-      return nullptr;
-    }
-    CScriptObject** const slot = moho::SCR_ScriptObjectSlot(object);
-    if (!slot || !*slot) {
-      return nullptr;
-    }
-    const gpg::RRef upcast = gpg::REF_UpcastPtr(moho::SCR_MakeScriptObjectRef(*slot), gpg::RTypeOf<UserUnit>());
-    return static_cast<UserUnit*>(upcast.mObj);
-  }
-
   /**
-   * Address: Unmapped (FA-Binary-Patches addition)
+   * Address: None (faf-re addition)
    *
    * What it does:
    * Returns whether transport cargo pre-orders and drop ghosts are enabled.
@@ -1478,7 +1445,7 @@ int cfunc_IsTransportPreOrdersEnabledL(LuaPlus::LuaState* state);
   }
 
   /**
-   * Address: Unmapped (FA-Binary-Patches addition)
+   * Address: None (faf-re addition)
    *
    * What it does:
    * Unwraps raw Lua callback context and forwards to

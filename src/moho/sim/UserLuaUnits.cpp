@@ -1861,8 +1861,7 @@ int moho::cfunc_SelectUnitsL(
     return 0;
   }
 
-  const int argCount = lua_gettop(state->m_state);
-  const bool allowCargo = (argCount >= 2) ? LuaPlus::LuaStackObject(state, 2).GetBoolean() : false;
+  moho::SCR_ExpectExactArgs(state, 1, kSelectUnitsHelpText);
 
   const LuaPlus::LuaObject sourceUnitsObject(LuaPlus::LuaStackObject(state, 1));
 
@@ -1878,9 +1877,7 @@ int moho::cfunc_SelectUnitsL(
       }
 
       UserEntity* const userEntity = userUnit; // base conversion, not a reinterpretation
-      if (allowCargo && userEntity != nullptr && userEntity->mArmy == session->GetFocusUserArmy()) {
-        AppendSelectionUnitUnique(selectionUnits, userUnit);
-      } else if (userEntity != nullptr && userEntity->IsSelectable()) {
+      if (userEntity != nullptr && userEntity->IsSelectable()) {
         AppendSelectionUnitUnique(selectionUnits, userUnit);
       } else if (
         UserUnit* const attachmentParent = ResolveSelectableTransportAttachmentParent(userUnit);

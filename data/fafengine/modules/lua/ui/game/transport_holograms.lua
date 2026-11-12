@@ -381,11 +381,6 @@ function TransportHolograms:HandleWorldClick(view, event)
             selectCargo({ bestHolo.unit }, isShift)
             return true
         end
-        local selectUnits = rawget(_G, 'SelectUnits')
-        if selectUnits then
-            selectUnits({ bestHolo.unit }, true)
-            return true
-        end
     end
 
     return false
@@ -417,11 +412,6 @@ function TransportHolograms:HandleWorldDrag(view, minX, minY, maxX, maxY, isShif
         local selectCargo = rawget(_G, 'SelectCargoUnits')
         if selectCargo then
             selectCargo(capturedUnits, isShift)
-            return true
-        end
-        local selectUnits = rawget(_G, 'SelectUnits')
-        if selectUnits then
-            selectUnits(capturedUnits, true)
             return true
         end
     end

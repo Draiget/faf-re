@@ -15,6 +15,7 @@
 #include "moho/resource/RScmResource.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/RRuleGameRules.h"
+#include "moho/unit/core/UserUnit.h"
 
 namespace moho
 {
@@ -244,20 +245,25 @@ namespace moho
       }
 
       boost::shared_ptr<MeshMaterial> material;
-      const LuaPlus::LuaObject shaderNameObject = meshDescriptor["ShaderName"];
-      if (!shaderNameObject.IsNil() && meshBlueprint != nullptr && meshBlueprint->mLods.begin() != meshBlueprint->mLods.end()) {
-        const RMeshBlueprintLOD* const lod = meshBlueprint->mLods.begin();
-        const fa::string shaderName(LuaStringOrEmpty(shaderNameObject));
-        const fa::string emptyTextureName{};
-        material = MeshMaterial::Create(
-          shaderName,
-          lod->mAlbedoName,
-          lod->mNormalsName,
-          lod->mSpecularName,
-          emptyTextureName,
-          emptyTextureName,
-          nullptr
-        );
+      if (ui_TransportPreOrders) {
+        const LuaPlus::LuaObject shaderNameObject = meshDescriptor["ShaderName"];
+        if (
+          !shaderNameObject.IsNil() && meshBlueprint != nullptr &&
+          meshBlueprint->mLods.begin() != meshBlueprint->mLods.end()
+        ) {
+          const RMeshBlueprintLOD* const lod = meshBlueprint->mLods.begin();
+          const fa::string shaderName(LuaStringOrEmpty(shaderNameObject));
+          const fa::string emptyTextureName{};
+          material = MeshMaterial::Create(
+            shaderName,
+            lod->mAlbedoName,
+            lod->mNormalsName,
+            lod->mSpecularName,
+            emptyTextureName,
+            emptyTextureName,
+            nullptr
+          );
+        }
       }
 
       const Wm3::Vec3f scale{blueprintUniformScale, blueprintUniformScale, blueprintUniformScale};
