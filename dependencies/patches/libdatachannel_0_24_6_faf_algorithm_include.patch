@@ -1,0 +1,7 @@
+diff --git a/src/configuration.cpp b/src/configuration.cpp
+--- a/src/configuration.cpp
++++ b/src/configuration.cpp
+@@ -13,2 +13,3 @@
++#include <algorithm>
+ #include <cassert>
+ #include <regex>
