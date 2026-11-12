@@ -75,6 +75,21 @@ namespace faf::headless
     /** Lockstep's packet for the focused army (the runner's thread); applies the client's views queued so far. */
     void OnLockstepPacket(const moho::SSyncData& packet);
 
+    /**
+     * The client's camera as a top-down square (the bench reports it to the server's pose budget as the probe's
+     * --camera-at does): the comparison is also given for the units inside it.
+     */
+    void SetCamera(
+      const float x,
+      const float z,
+      const float halfWidth
+    ) noexcept
+    {
+      mCameraX = x;
+      mCameraZ = z;
+      mCameraHalf = halfWidth;
+    }
+
     /** Applies what is left, writes the files and returns the comparison (once; later calls return it again). */
     std::string Finish();
 
@@ -158,6 +173,9 @@ namespace faf::headless
     std::int32_t mArmy;
     float mMapSizeX;
     float mMapSizeZ;
+    float mCameraX = 0.0f;
+    float mCameraZ = 0.0f;
+    float mCameraHalf = 0.0f; // 0: no camera
     std::mutex mQueueLock;
     std::vector<SQueuedView> mQueued; // under `mQueueLock`
     moho::RRuleGameRules* mRules = nullptr;
@@ -197,6 +215,9 @@ namespace faf::headless
       double maxLastError = 0.0;   // `mLastTransform` alone
       std::uint64_t curOver = 0;   // unit-beats whose `mCurTransform` is off by more than 0.02 (the quantiser's 1/64)
       std::uint64_t lastOver = 0;  // and `mLastTransform`
+      std::uint64_t onScreen = 0;  // unit-beats inside the camera square (`SetCamera`)
+      std::uint64_t onScreenOver = 0; // of them, drawn off by more than the limit
+      double maxOnScreenError = 0.0;
       double maxDrawnError = 0.0;  // drawn bones, world units
       double maxDrawnAngle = 0.0;  // degrees
       double maxLocalError = 0.0;  // bones under the pose's world transform, world units

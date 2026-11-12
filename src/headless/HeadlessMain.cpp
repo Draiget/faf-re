@@ -270,6 +270,9 @@ namespace
       "                            army sees, drawn by lockstep and by its server-mode client applying its view's "
       "pose\n"
       "                            lane, bone by bone (<prefix>.beats.csv, .worst.csv, .summary.txt)\n"
+      "  --pose-camera <x,z,half>  with --view-bench --focus <army>: that army's client reports a top-down camera "
+      "over\n"
+      "                            this square (the pose budget's order; --pose-dump also compares the units in it)\n"
       "  --effect-dump-centred     with --effect-dump: the effect curves' random spread held at its centre in both\n"
       "                            runtimes, so each emitter's counts compare one for one\n"
       "  --view-dump <file>       with --view-bench: what each player's client holds every 2000 beats, to compare two "
@@ -457,6 +460,15 @@ int HEADLESS_Main(
   (void)ReadOption("--effect-dump", options.effectDumpPath); // plan WP9.5
   options.effectDumpCentred = moho::CFG_GetArgOption("--effect-dump-centred", 0, nullptr);
   (void)ReadOption("--pose-dump", options.poseDumpPath); // plan WP8.4
+  if (std::string camera; ReadOption("--pose-camera", camera)) {
+    if (
+      std::sscanf(camera.c_str(), "%f,%f,%f", &options.poseCameraX, &options.poseCameraZ, &options.poseCameraHalf) !=
+        3 ||
+      options.poseCameraHalf <= 0.0f
+    ) {
+      bad = true;
+    }
+  }
   if (std::string statsEvery; ReadOption("--stats-every", statsEvery)) {
     options.statsEvery = std::atoi(statsEvery.c_str());
   }

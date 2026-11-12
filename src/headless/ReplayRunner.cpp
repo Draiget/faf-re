@@ -713,6 +713,25 @@ namespace faf::headless
         }
         viewBench->EnablePoseDump(options.poseDumpPath, options.focusArmy);
       }
+      if (options.poseCameraHalf > 0.0f) {
+        // Plan WP8.4: the focus army's client reports a top-down camera over the square, as faf_server_probe's
+        // --camera-at (clip x from world x, clip y from world z, w 1).
+        if (options.focusArmy < 0) {
+          result.error = "--pose-camera needs --focus <army>";
+          return result;
+        }
+        faf::remote::SCameraReport camera;
+        const float scale = 1.0f / options.poseCameraHalf;
+        camera.viewProjection[0] = scale;
+        camera.viewProjection[9] = scale;
+        camera.viewProjection[12] = -options.poseCameraX * scale;
+        camera.viewProjection[13] = -options.poseCameraZ * scale;
+        camera.viewProjection[15] = 1.0f;
+        viewBench->SetCameras(static_cast<std::size_t>(options.focusArmy), {camera});
+        if (viewBench->PoseDump() != nullptr) {
+          viewBench->PoseDump()->SetCamera(options.poseCameraX, options.poseCameraZ, options.poseCameraHalf);
+        }
+      }
       if (options.viewTables) {
         viewBench->EnableBenchTables();
         if (options.statsEvery > 0) {

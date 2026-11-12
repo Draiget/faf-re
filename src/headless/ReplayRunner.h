@@ -69,6 +69,9 @@ namespace faf::headless
     std::string effectDumpPath;  // `--effect-dump <prefix>`: the focus army's effects, lockstep against its client's
     bool effectDumpCentred = false; // `--effect-dump-centred`: effect curves' random spread held at its centre
     std::string poseDumpPath;       // `--pose-dump <prefix>`: the focus army's units drawn, lockstep against its client
+    float poseCameraX = 0.0f;       // `--pose-camera x,z,half-width`: the focus army's client's camera for the pose
+    float poseCameraZ = 0.0f;       // budget (a top-down square, as faf_server_probe --camera-at), and the dump's
+    float poseCameraHalf = 0.0f;    // on-screen units; 0: none
     bool viewTeams = false;      // with `viewPipelineThreads`: one view per team and each player's own units
     std::string viewDumpPath;    // with `viewBenchPath`: what each client holds, every 2000 beats, to compare two runs
     bool parallelViews =

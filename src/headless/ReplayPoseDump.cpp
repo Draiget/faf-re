@@ -20,7 +20,9 @@ namespace faf::headless
   {
     constexpr double kOverDistance = 0.05; // world units: a drawn bone this far off is a visible difference
     constexpr double kOverDegrees = 2.0;
-    constexpr double kWorldCause = 0.01; // the poses' world transforms this far apart: the cause is where they stand
+    // The poses' world transforms this far apart: the cause is where they stand (above the position quantiser's
+    // 1/64 a side, up to 0.027 across).
+    constexpr double kWorldCause = 0.03;
     constexpr float kSamples[3] = {0.0f, 0.5f, 1.0f};
 
     [[nodiscard]] bool IsUnitId(
@@ -476,7 +478,16 @@ namespace faf::headless
       SBlueprintCounts& counts = mByBlueprint[blueprint];
       ++counts.unitBeats;
       counts.maxError = std::max(counts.maxError, drawnError);
-      if (drawnError > kOverDistance || drawnDeg > kOverDegrees) {
+      const bool over = drawnError > kOverDistance || drawnDeg > kOverDegrees;
+      if (
+        mCameraHalf > 0.0f && std::fabs(c.cur.pos_.x - mCameraX) <= mCameraHalf &&
+        std::fabs(c.cur.pos_.z - mCameraZ) <= mCameraHalf
+      ) {
+        ++t.onScreen;
+        t.onScreenOver += over ? 1u : 0u;
+        t.maxOnScreenError = std::max(t.maxOnScreenError, drawnError);
+      }
+      if (over) {
         if (world > kWorldCause) {
           ++overWorld;
           ++counts.overWorld;
@@ -689,6 +700,20 @@ namespace faf::headless
     }
     for (const std::string& sample : mVisibleSamples) {
       text += "    visible: " + sample + "\n";
+    }
+    if (mCameraHalf > 0.0f) {
+      std::snprintf(
+        line,
+        sizeof(line),
+        "  inside the camera square (%.0f, %.0f) +-%.0f: %llu unit-beats, %llu over the limit, max drawn error %.4f\n",
+        mCameraX,
+        mCameraZ,
+        mCameraHalf,
+        static_cast<unsigned long long>(t.onScreen),
+        static_cast<unsigned long long>(t.onScreenOver),
+        t.maxOnScreenError
+      );
+      text += line;
     }
     // The blueprints with the most unit-beats over the limit.
     std::vector<std::pair<std::string, SBlueprintCounts>> blueprints(mByBlueprint.begin(), mByBlueprint.end());
