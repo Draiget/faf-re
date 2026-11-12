@@ -714,7 +714,7 @@ namespace moho
       return;
     }
     const int points = std::max(1, static_cast<int>(std::lround(10.0f * UiScale())));
-    CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(points, PanelFace());
+    moho::CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(points, PanelFace());
     CD3DFont* const font = fontHandle.tex;
     if (font == nullptr) {
       return;
@@ -803,7 +803,7 @@ namespace moho
     const SNetlinkSnapshot view = NETLINK_GetSnapshot();
 
     const int points = std::max(1, static_cast<int>(std::lround(10.0f * UiScale())));
-    CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(points, PanelFace());
+    moho::CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(points, PanelFace());
     CD3DFont* const font = fontHandle.tex;
     if (font == nullptr) {
       return;

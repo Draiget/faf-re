@@ -533,7 +533,7 @@ namespace
    */
   void ApplyEditFontAndRefreshClip(
     CMauiEdit* const edit,
-    const CountedPtr<CD3DFont>& requestedFont
+    const moho::CountedPtr<CD3DFont>& requestedFont
   )
   {
     if (!edit) {
@@ -543,7 +543,7 @@ namespace
     if (requestedFont.tex != nullptr) {
       AssignIntrusiveFont(edit->mFont, requestedFont.tex);
     } else {
-      CountedPtr<CD3DFont> defaultFont = CD3DFont::Create(14, "Courier New");
+      moho::CountedPtr<CD3DFont> defaultFont = CD3DFont::Create(14, "Courier New");
       AssignIntrusiveFont(edit->mFont, defaultFont.tex);
     }
 
@@ -674,7 +674,7 @@ int moho::cfunc_CMauiEditSetNewFontL(
   }
   const int pointSize = static_cast<int>(lua_tonumber(state->m_state, 3));
 
-  CountedPtr<CD3DFont> createdFont = CD3DFont::Create(pointSize, familyName);
+  moho::CountedPtr<CD3DFont> createdFont = CD3DFont::Create(pointSize, familyName);
   if (createdFont.tex != nullptr) {
     ApplyEditFontAndRefreshClip(edit, createdFont);
     lua_settop(state->m_state, 1);
@@ -2456,7 +2456,7 @@ moho::CMauiEdit::CMauiEdit(
   // ApplyEditFontAndRefreshClip -> release(). The .c's middle `0.0f` argument to
   // sub_78F620 is the elided requested-clip-offset lane already handled inside
   // ApplyEditFontAndRefreshClip (FUN_0078F620).
-  CountedPtr<CD3DFont> defaultFont = CD3DFont::Create(14, "Courier New");
+  moho::CountedPtr<CD3DFont> defaultFont = CD3DFont::Create(14, "Courier New");
   ApplyEditFontAndRefreshClip(this, defaultFont);
 
   mNeedsFrameUpdate = true;

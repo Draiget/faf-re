@@ -248,7 +248,7 @@ namespace moho
     primBatcher->SetTexture(whiteTexture);
     DrawPanelRect(*primBatcher, left, top, right, bottom, 0xFFFFFFFFu);
 
-    const CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(kFontPointSize, kFontFaceName);
+    const moho::CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(kFontPointSize, kFontFaceName);
     CD3DFont* const font = fontHandle.tex;
 
     fa::vector<STimeBarEventRecord> events;

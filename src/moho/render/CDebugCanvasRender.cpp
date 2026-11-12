@@ -201,7 +201,7 @@ void CDebugCanvas::Render(
 
   const float kNoMaxAdvance = gpg::NaN;
   for (const SDebugScreenText& text : screenText) {
-    CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(text.pointSize, "Ariel");
+    moho::CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(text.pointSize, "Ariel");
     CD3DFont* const font = fontHandle.tex;
     if (font != nullptr) {
       (void)font->Render(
@@ -290,7 +290,7 @@ void CDebugCanvas::Render(
       0.0f,
     };
 
-    CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(worldEntry.style, "Ariel");
+    moho::CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(worldEntry.style, "Ariel");
     CD3DFont* const font = fontHandle.tex;
     if (font != nullptr) {
       (void)font->Render(

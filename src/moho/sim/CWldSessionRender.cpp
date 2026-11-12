@@ -1319,7 +1319,7 @@ namespace moho
      */
     [[nodiscard]] CD3DFont* CustomNameFont()
     {
-      static CountedPtr<CD3DFont> font{};
+      static moho::CountedPtr<CD3DFont> font{};
       if (font.tex == nullptr) {
         font = CD3DFont::Create(ui_CustomNameFontSize, ui_CustomNameFont.c_str());
       }
@@ -4303,7 +4303,7 @@ namespace moho
     if (gEconOverlayFont == nullptr) {
       // `Create` hands back a borrowed shared lane; the overlay keeps its own
       // intrusive reference on the font and releases the lane straight away.
-      CountedPtr<CD3DFont> created = CD3DFont::Create(gEconOverlayFontSize, gEconOverlayFontName.c_str());
+      moho::CountedPtr<CD3DFont> created = CD3DFont::Create(gEconOverlayFontSize, gEconOverlayFontName.c_str());
       CD3DFont* const font = created.tex;
       if (gEconOverlayFont != font) {
         if (gEconOverlayFont != nullptr) {

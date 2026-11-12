@@ -130,7 +130,7 @@ moho::CMauiItemList::CMauiItemList(
   mShowMouseoverItem = false;
   mScrollPosition = 0;
 
-  CountedPtr<CD3DFont> createdFont = CD3DFont::Create(16, "New Times Roman");
+  moho::CountedPtr<CD3DFont> createdFont = CD3DFont::Create(16, "New Times Roman");
   AssignIntrusiveFont(mFont, createdFont.tex);
 }
 
@@ -253,7 +253,7 @@ int moho::cfunc_CMauiItemListSetNewFontL(
   }
   const int pointSize = static_cast<int>(lua_tonumber(state->m_state, 3));
 
-  CountedPtr<CD3DFont> createdFont = CD3DFont::Create(pointSize, familyName);
+  moho::CountedPtr<CD3DFont> createdFont = CD3DFont::Create(pointSize, familyName);
   if (createdFont.tex != nullptr) {
     itemList->SetFont(createdFont.tex);
     lua_settop(state->m_state, 1);
@@ -930,7 +930,7 @@ void moho::CMauiItemList::SetFont(
     return;
   }
 
-  CountedPtr<CD3DFont> defaultFont = CD3DFont::Create(16, "New Times Roman");
+  moho::CountedPtr<CD3DFont> defaultFont = CD3DFont::Create(16, "New Times Roman");
   AssignIntrusiveFont(mFont, defaultFont.tex);
 }
 

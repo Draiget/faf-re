@@ -104,7 +104,7 @@ void CSimDriver::DrawNetworkStatsPanel(
   // from the font, so the whole panel scales with it. Pass 10 to go back to
   // retail's size.
   const int fontPoints = std::max(1, static_cast<int>(std::lround(10.0f * CurrentUiScale())));
-  CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(fontPoints, "Courier New");
+  moho::CountedPtr<CD3DFont> fontHandle = CD3DFont::Create(fontPoints, "Courier New");
   CD3DFont* const font = fontHandle.tex;
 
   const std::size_t numClients = mClientManager->NumberOfClients(); // 0x0073E057 (mgr slot 6)

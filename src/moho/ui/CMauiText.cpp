@@ -399,7 +399,7 @@ int moho::cfunc_CMauiTextSetNewFontL(
   }
   const int pointSize = static_cast<int>(lua_tonumber(state->m_state, 3));
 
-  CountedPtr<CD3DFont> createdFont = CD3DFont::Create(pointSize, familyName);
+  moho::CountedPtr<CD3DFont> createdFont = CD3DFont::Create(pointSize, familyName);
   if (createdFont.tex != nullptr) {
     textControl->SetNewFont(createdFont.tex);
     lua_settop(state->m_state, 1);
