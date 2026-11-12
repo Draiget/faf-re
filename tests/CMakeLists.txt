@@ -430,6 +430,15 @@ set_target_properties(faf_editor_bake_tests PROPERTIES FOLDER "Tests/Editor")
 add_test(NAME editor_texture_bake COMMAND faf_editor_bake_tests)
 set_tests_properties(editor_texture_bake PROPERTIES LABELS "Editor")
 
+# The shell's mouse events from window-system events: wheel positions on the screen, as
+# WM_MOUSEWHEEL's (src/platform/shell/mouse.h). Shell.cpp is a client file, in faf_engine here;
+# the Linux client links it into the client alone.
+add_executable(faf_shell_mouse_tests EXCLUDE_FROM_ALL shell/ShellMouseEventTests.cpp)
+target_link_libraries(faf_shell_mouse_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_shell_mouse_tests PROPERTIES FOLDER "Tests/Shell")
+add_test(NAME shell_mouse COMMAND faf_shell_mouse_tests)
+set_tests_properties(shell_mouse PROPERTIES LABELS "Shell")
+
 add_executable(faf_slab_tests EXCLUDE_FROM_ALL entity/FixedSlabPoolTests.cpp)
 target_link_libraries(faf_slab_tests PRIVATE faf_engine gtest_main)
 set_target_properties(faf_slab_tests PROPERTIES FOLDER "Tests/Sim")
