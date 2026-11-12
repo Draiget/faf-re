@@ -397,6 +397,27 @@ do
                 },
             },
         })
+        -- ren_RenderScale: with temporal anti-aliasing, the world drawn smaller and rebuilt to full size.
+        table.insert(video.items, position + 1, {
+            title = 'Render resolution',
+            key = 'render_scale',
+            type = 'toggle',
+            default = 100,
+            tip = 'With temporal anti-aliasing on: draws the world at a lower resolution and rebuilds the full picture '
+                .. 'from the last frames. Faster on a slow graphics card, a little softer. The interface stays sharp.',
+            set = function(key, value, startup)
+                ConExecute('ren_RenderScale ' .. tostring((tonumber(value) or 100) / 100))
+            end,
+            custom = {
+                states = {
+                    { text = '100%', key = 100 },
+                    { text = '85%', key = 85 },
+                    { text = '75%', key = 75 },
+                    { text = '67%', key = 67 },
+                    { text = '50%', key = 50 },
+                },
+            },
+        })
     end
 end
 

@@ -24,6 +24,7 @@ namespace gpg::gal
 namespace moho
 {
   extern int ren_Taa;
+  extern float ren_RenderScale;
 
   class TemporalAA
   {
@@ -33,8 +34,17 @@ namespace moho
     /** `ren_Taa` is on, the renderer is Direct3D 12 or Vulkan with compute, and the programs built. */
     [[nodiscard]] bool IsActive();
 
-    /** This frame's camera for the world passes: `camera` with its projection moved by this frame's offset. */
-    [[nodiscard]] GeomCamera3* Jitter(const GeomCamera3& camera);
+    /**
+     * This frame's camera for the world passes: `camera` with its projection moved by this frame's offset, and, with
+     * `allowScale` (the post passes will run) and ren_RenderScale under 1, a smaller viewport.
+     */
+    [[nodiscard]] GeomCamera3* Jitter(const GeomCamera3& camera, bool allowScale);
+
+    /** The view's full rectangle this frame (origin x, y, width, height), what the post passes and overlays use. */
+    [[nodiscard]] const int* FullRect() const noexcept
+    {
+      return mFullRect;
+    }
 
     /** A frame was jittered and waits for its resolve. */
     [[nodiscard]] bool Pending() const noexcept
@@ -71,10 +81,14 @@ namespace moho
     [[nodiscard]] bool Resolve(gpg::gal::RenderTarget& copy, int x, int y, int width, int height);
 
   private:
+    /** Both history buffers hold `width` x `height`; false when they can't. */
+    [[nodiscard]] bool EnsureHistory(int width, int height);
+
     gpg::gal::Device* mDevice = nullptr;
     bool mSupported = false;
     boost::shared_ptr<gpg::gal::GpuProgram> mCompute;
     boost::shared_ptr<gpg::gal::GpuProgram> mComposite;
+    boost::shared_ptr<gpg::gal::GpuProgram> mCompositeAlpha; // writes alpha too (ren_RenderScale under 1)
     boost::shared_ptr<gpg::gal::GpuBuffer> mHistory[2];
     std::uint32_t mHistoryCapacity = 0U;
     int mHistoryWidth = 0;
@@ -89,6 +103,11 @@ namespace moho
     int mHistoryTick = 0;
     float mHistoryEye[3]{};
     std::uint32_t mFrame = 0U;
+    float mScale = 1.0f; // ren_RenderScale this frame
+    int mLowWidth = 0;   // the area the world is drawn into this frame
+    int mLowHeight = 0;
+    float mJitterPixels[2]{}; // this frame's offset in drawn pixels (x right, y down)
+    int mFullRect[4]{};       // the view's rectangle at full size
     GeomCamera3 mJittered;
     gpg::gal::Matrix mViewProjection{};        // this frame's unmoved view-projection
     gpg::gal::Matrix mInverseViewProjection{}; // and its inverse

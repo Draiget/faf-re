@@ -1847,6 +1847,14 @@ void moho::WRenViewport::RenderWorldViewPostEffects()
     return;
   }
   moho::CD3DDevice* const device = moho::D3D_GetDevice();
+  // Engine addition (ren_RenderScale): the world may have been drawn into a smaller area; the post passes cover the
+  // whole view.
+  if (moho::TemporalAA& taa = moho::TemporalAA::Get(); taa.Pending()) {
+    const int* const full = taa.FullRect();
+    Wm3::Vector2i fullPos{full[0], full[1]};
+    Wm3::Vector2i fullSize{full[2], full[3]};
+    device->SetViewport(&fullPos, &fullSize, 0.0f, 1.0f);
+  }
   const auto overHeadCopy = [&](const char* const profileName, auto&& render) {
     const gpg::gal::RenderProfileScope profile(profileName);
     Wm3::Vector2i viewPos{};
@@ -1948,7 +1956,7 @@ void moho::WRenViewport::RenderWorldView(
     moho::TemporalAA& taa = moho::TemporalAA::Get();
     worldView == begin && !RenderAdditionsDisabled() && !taa.PreviewRender() && taa.IsActive()
   ) {
-    mCam = taa.Jitter(*mCam);
+    mCam = taa.Jitter(*mCam, static_cast<bool>(mPrimaryTargetLocks[mHead]));
   }
 
   // Ground clutter, refreshed once per frame off the primary world view.
@@ -2240,6 +2248,7 @@ void moho::WRenViewport::RenderWorldView(
   // player has toggled into cartographic mode.
   RenderWorldViewPostEffects();
   mCam = unjitteredCamera;           // ren_Taa: overlays stay pixel-exact
+  UpdateRenderViewportCoordinates(); // ren_RenderScale: the view's full rectangle again
   moho::TemporalAA::Get().EndView(); // a frame the resolve didn't take is not left pending for another view
 
   if (moho::ren_Ui && worldView->mView != nullptr) {

@@ -22,6 +22,7 @@ namespace moho
   // Engine addition (ren_Taa): see TemporalAA.h.
   int ren_Taa = 0;
   float ren_TaaHistory = 0.9f;
+  float ren_RenderScale = 1.0f;
 
   namespace
   {
@@ -39,14 +40,24 @@ namespace moho
       &ren_TaaHistory
     );
 
+    TConVar<float> gTConVar_ren_RenderScale(
+      "ren_RenderScale",
+      "With ren_Taa: the world is drawn at this share of the view's width and height (0.5 to 1; 1, the default, is "
+      "full size) and the TAA pass rebuilds the full view from it and the last frames (temporal upscaling). Lower is "
+      "faster on a slow graphics card and softer. The interface and strategic icons stay full size.",
+      &ren_RenderScale
+    );
+
     struct TaaConstants
     {
       gpg::gal::Matrix inverseViewProjection;
       gpg::gal::Matrix prevViewProjection;
       float viewRect[4];
       float params[4];
+      float lowRect[4];
+      float jitter[4];
     };
-    static_assert(sizeof(TaaConstants) == 160, "TaaConstants matches the shader's cbuffer");
+    static_assert(sizeof(TaaConstants) == 192, "TaaConstants matches the shader's cbuffer");
 
     /** The radical inverse of `index` in `base`: the Halton sequence, 0 to 1. */
     [[nodiscard]] float Halton(
@@ -97,6 +108,7 @@ namespace moho
       mSupported = false;
       mCompute.reset();
       mComposite.reset();
+      mCompositeAlpha.reset();
       mHistory[0].reset();
       mHistory[1].reset();
       mHistoryCapacity = 0U;
@@ -122,8 +134,11 @@ namespace moho
         composite.depthWrite = false;
         composite.cullBackFaces = false;
         mComposite = device->CreateGpuProgram(composite);
+        composite.name = "TemporalAACompositeAlpha";
+        composite.colorWriteMask = 0x0FU; // upscaled: the glow amount and water mask come from the drawn samples
+        mCompositeAlpha = device->CreateGpuProgram(composite);
       }
-      mSupported = mCompute != nullptr && mComposite != nullptr;
+      mSupported = mCompute != nullptr && mComposite != nullptr && mCompositeAlpha != nullptr;
       if (mSupported) {
         gpg::Logf("TAA: on this renderer (ren_Taa)");
       }
@@ -132,7 +147,8 @@ namespace moho
   }
 
   GeomCamera3* TemporalAA::Jitter(
-    const GeomCamera3& camera
+    const GeomCamera3& camera,
+    const bool allowScale
   )
   {
     // The history is another picture after a map change, a replay going back, another camera, or a camera jump
@@ -156,12 +172,21 @@ namespace moho
     std::copy(eye, eye + 3, mHistoryEye);
 
     mJittered = camera;
-    const float width = std::max(camera.viewport.r[3].z, 1.0f);
-    const float height = std::max(camera.viewport.r[3].w, 1.0f);
+    // ren_RenderScale: the world is drawn into the top-left share of the view; the resolve rebuilds the rest. Only
+    // when the history for the full view exists, so a resolve that couldn't run never leaves the world in a corner.
+    const float fullWidth = std::max(camera.viewport.r[3].z, 1.0f);
+    const float fullHeight = std::max(camera.viewport.r[3].w, 1.0f);
+    mScale = (allowScale && EnsureHistory(static_cast<int>(fullWidth), static_cast<int>(fullHeight)))
+      ? std::clamp(ren_RenderScale, 0.5f, 1.0f)
+      : 1.0f;
+    const float width = std::max(std::floor(fullWidth * mScale), 1.0f);
+    const float height = std::max(std::floor(fullHeight * mScale), 1.0f);
     // 8 offsets of the Halton (2, 3) sequence, within the pixel; in clip space x grows right and y up.
     const std::uint32_t step = (mFrame++ % 8U) + 1U;
-    const float jitterX = (Halton(step, 2U) - 0.5f) * 2.0f / width;
-    const float jitterY = -(Halton(step, 3U) - 0.5f) * 2.0f / height;
+    mJitterPixels[0] = Halton(step, 2U) - 0.5f;
+    mJitterPixels[1] = Halton(step, 3U) - 0.5f;
+    const float jitterX = mJitterPixels[0] * 2.0f / width;
+    const float jitterY = -mJitterPixels[1] * 2.0f / height;
     // Row vectors: clip.x += jitter * clip.w, for perspective (w from z, row 2) and orthographic (w = 1, row 3).
     gpg::gal::Matrix projection = camera.projection;
     projection.r[2].x += jitterX * projection.r[2].w;
@@ -172,10 +197,48 @@ namespace moho
     // SetProjection rebuilds the viewport rows without the LOD scale; the rest of the camera stays the view's.
     mJittered.viewport = camera.viewport;
     mJittered.lodScale = camera.lodScale;
+    if (width < fullWidth || height < fullHeight) {
+      // A smaller viewport, as a split view has: the passes size themselves from it (WRenViewport's local screen,
+      // the terrain's water mapping). The per-pixel rows (r[0..2]) stay the full view's, so markers sized in pixels
+      // (selection brackets, footprints) come out their size on screen once the picture is scaled up.
+      mJittered.viewport.r[3].z = width;
+      mJittered.viewport.r[3].w = height;
+    }
+    mLowWidth = static_cast<int>(width);
+    mLowHeight = static_cast<int>(height);
+    mFullRect[0] = static_cast<int>(camera.viewport.r[3].x);
+    mFullRect[1] = static_cast<int>(camera.viewport.r[3].y);
+    mFullRect[2] = static_cast<int>(fullWidth);
+    mFullRect[3] = static_cast<int>(fullHeight);
     mViewProjection = camera.viewProjection;
     mInverseViewProjection = camera.inverseViewProjection;
     mPending = true;
     return &mJittered;
+  }
+
+  bool TemporalAA::EnsureHistory(
+    const int width,
+    const int height
+  )
+  {
+    if (!mSupported || width < 8 || height < 8) {
+      return false;
+    }
+    const std::uint32_t needed = static_cast<std::uint32_t>(width) * static_cast<std::uint32_t>(height);
+    if (mHistory[0] != nullptr && mHistory[1] != nullptr && needed <= mHistoryCapacity) {
+      return true;
+    }
+    for (boost::shared_ptr<gpg::gal::GpuBuffer>& history : mHistory) {
+      gpg::gal::GpuBufferDesc desc{};
+      desc.name = "TemporalAAHistory";
+      desc.stride = 4U * sizeof(float);
+      desc.capacity = needed;
+      desc.shaderWrite = true;
+      history = mDevice->CreateGpuBuffer(desc);
+    }
+    mHistoryCapacity = (mHistory[0] != nullptr && mHistory[1] != nullptr) ? needed : 0U;
+    mHistoryValid = false;
+    return mHistoryCapacity != 0U;
   }
 
   bool TemporalAA::Resolve(
@@ -194,21 +257,8 @@ namespace moho
       mHistoryValid = false;
       return false;
     }
-    const std::uint32_t needed = static_cast<std::uint32_t>(width) * static_cast<std::uint32_t>(height);
-    if (mHistory[0] == nullptr || needed > mHistoryCapacity) {
-      for (boost::shared_ptr<gpg::gal::GpuBuffer>& history : mHistory) {
-        gpg::gal::GpuBufferDesc desc{};
-        desc.name = "TemporalAAHistory";
-        desc.stride = 4U * sizeof(float);
-        desc.capacity = needed;
-        desc.shaderWrite = true;
-        history = mDevice->CreateGpuBuffer(desc);
-      }
-      mHistoryCapacity = (mHistory[0] != nullptr && mHistory[1] != nullptr) ? needed : 0U;
-      mHistoryValid = false;
-      if (mHistoryCapacity == 0U) {
-        return false;
-      }
+    if (!EnsureHistory(width, height)) {
+      return false;
     }
     if (width != mHistoryWidth || height != mHistoryHeight) {
       mHistoryWidth = width;
@@ -227,6 +277,14 @@ namespace moho
     constants.viewRect[3] = static_cast<float>(height);
     constants.params[0] = std::clamp(ren_TaaHistory, 0.0f, 0.97f);
     constants.params[1] = mHistoryValid ? 1.0f : 0.0f;
+    const bool upscaled = mLowWidth < width || mLowHeight < height;
+    constants.params[2] = upscaled ? 1.0f : 0.0f;
+    constants.lowRect[0] = static_cast<float>(x);
+    constants.lowRect[1] = static_cast<float>(y);
+    constants.lowRect[2] = static_cast<float>(std::min(mLowWidth, width));
+    constants.lowRect[3] = static_cast<float>(std::min(mLowHeight, height));
+    constants.jitter[0] = mJitterPixels[0];
+    constants.jitter[1] = mJitterPixels[1];
 
     const int read = mCurrent;
     const int write = 1 - mCurrent;
@@ -243,7 +301,7 @@ namespace moho
     mDevice->DispatchGpuProgram(dispatch);
 
     gpg::gal::GpuDrawCall draw{};
-    draw.program = mComposite.get();
+    draw.program = upscaled ? mCompositeAlpha.get() : mComposite.get();
     draw.bindings.constants = &constants;
     draw.bindings.constantBytes = sizeof(constants);
     draw.bindings.readBuffers[0] = mHistory[write].get();
