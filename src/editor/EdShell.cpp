@@ -472,10 +472,14 @@ namespace faf::editor
   {
     // The Effects workspace: the effect's own view in the map view's place (design §4), while the particle editor or
     // browser is shown and no play runs.
-    const bool effects = std::string(Workspaces()[static_cast<std::size_t>(ActiveWorkspace())].key) == "effects";
-    const bool staged = effects && (mShowParticleEditor || mShowParticleBrowser) && !mPlay.Active() && !mShowHome;
-    mParticleEditor.SetStaged(staged);
-    if (!staged || mGameView.z < 64.0f || mGameView.w < 64.0f) {
+    const std::string key = Workspaces()[static_cast<std::size_t>(ActiveWorkspace())].key;
+    const bool free = !mPlay.Active() && !mShowHome;
+    const bool effects = key == "effects" && (mShowParticleEditor || mShowParticleBrowser) && free;
+    // The Materials workspace likewise: the material's preview there.
+    const bool materials = key == "materials" && mShowMaterialEditor && free;
+    mParticleEditor.SetStaged(effects);
+    mMaterialEditor.SetStaged(materials);
+    if ((!effects && !materials) || mGameView.z < 64.0f || mGameView.w < 64.0f) {
       return;
     }
     const ImGuiViewport* const viewport = ImGui::GetMainViewport();
@@ -487,8 +491,12 @@ namespace faf::editor
       ImGuiWindowFlags_NoScrollWithMouse;
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-    if (ImGui::Begin("Effect###EffectStage", nullptr, kFlags)) {
-      mParticleEditor.DrawStage();
+    if (ImGui::Begin("Stage###EffectStage", nullptr, kFlags)) {
+      if (effects) {
+        mParticleEditor.DrawStage();
+      } else {
+        mMaterialEditor.DrawStage();
+      }
     }
     ImGui::End();
     ImGui::PopStyleVar(2);

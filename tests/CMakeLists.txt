@@ -420,6 +420,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/HelpTopicsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdHelpTopics.cpp
   editor/ProblemsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdProblems.cpp
   editor/CanvasFitTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdCanvasFit.cpp
+  editor/DdsSizeTests.cpp
   editor/WaterBodiesEditTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdWaterBodies.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLuaText.cpp
   ${CMAKE_SOURCE_DIR}/src/moho/sim/WaterBodies.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightBrush.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetryCheck.cpp

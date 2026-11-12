@@ -847,10 +847,7 @@ namespace faf::editor
     }
   }
 
-  void EdMaterialEditor::DrawPreview(
-    Doc& doc,
-    const float width
-  )
+  void EdMaterialEditor::DrawPreviewOptions()
   {
     static const char* const kModes[] = {"Sphere", "Plane 2x2", "Albedo", "Normal", "Mask"};
     ImGui::SetNextItemWidth(Em(110.0f));
@@ -858,18 +855,53 @@ namespace faf::editor
       mPreviewStale = true;
     }
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(-1.0f);
+    ImGui::SetNextItemWidth(mStaged ? Em(220.0f) : -1.0f);
     float lightDegrees = mLightYaw * 180.0f / kPi;
     if (ImGui::SliderFloat("##light", &lightDegrees, -180.0f, 180.0f, "Light %.0f deg")) {
       mLightYaw = lightDegrees * kPi / 180.0f;
       mPreviewStale = true;
     }
-    const float side = std::max(64.0f, width);
+  }
+
+  void EdMaterialEditor::DrawStage()
+  {
+    Doc* const doc = Active();
+    ImGui::SetCursorPos(ImVec2(ImGui::GetStyle().WindowPadding.x, ImGui::GetStyle().WindowPadding.y));
+    DrawPreviewOptions();
+    if (doc == nullptr) {
+      ImGui::TextDisabled("No graph open.");
+      return;
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("  %s", doc->name.c_str());
+    // A square as large as the middle allows, centred, at 512 px.
+    RenderPreview(*doc, 512);
+    const ImVec2 avail = ImGui::GetContentRegionAvail();
+    const float side = std::max(64.0f, std::min(avail.x, avail.y));
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail.x - side) * 0.5f);
+    if (mPreviewImage != 0) {
+      ImGui::Image(static_cast<ImTextureID>(mPreviewImage), ImVec2(side, side));
+      if (ImGui::IsItemHovered() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f)) {
+        mPreviewYaw -= ImGui::GetIO().MouseDelta.x * 0.01f;
+        mPreviewStale = mPreviewStale || ImGui::GetIO().MouseDelta.x != 0.0f;
+      }
+      ImGui::SetItemTooltip("The output's albedo lit through its normal map. Drag to turn the sphere.");
+    }
+  }
+
+  void EdMaterialEditor::RenderPreview(
+    Doc& doc,
+    const int size
+  )
+  {
+    if (size != mPreviewImageSize) {
+      mPreviewImageSize = size;
+      mPreviewStale = true;
+    }
     if (mPreviewStale) {
       const TexImagePtr albedo = doc.eval->Result("Albedo");
       const TexImagePtr normal = doc.eval->Result("Normal");
       const TexImagePtr mask = doc.eval->Result("Mask");
-      const int size = 256;
       std::vector<std::uint32_t> pixels;
       if (mPreviewMode <= 1) {
         pixels = RenderMaterialPreview(albedo.get(), normal.get(), mPreviewMode, size, mPreviewYaw, mLightYaw);
@@ -888,6 +920,24 @@ namespace faf::editor
       mPreviewImage = EdImGuiRenderer::CreateImage(size, size, pixels.data());
       mPreviewStale = false;
     }
+  }
+
+  void EdMaterialEditor::DrawPreview(
+    Doc& doc,
+    const float width
+  )
+  {
+    // In the Materials workspace the preview fills the middle of the window (DrawStage): the map's graphs here instead.
+    if (mStaged) {
+      ImGui::PushTextWrapPos(0.0f);
+      ImGui::TextDisabled("The preview is in the middle of the window.");
+      ImGui::PopTextWrapPos();
+      DrawGraphList();
+      return;
+    }
+    DrawPreviewOptions();
+    const float side = std::max(64.0f, width);
+    RenderPreview(doc, 256);
     if (mPreviewImage != 0) {
       ImGui::Image(static_cast<ImTextureID>(mPreviewImage), ImVec2(side, side));
       // Dragging turns the sphere.
@@ -1024,6 +1074,54 @@ namespace faf::editor
       ImGui::BulletText("Warnings: %d (the nodes outlined in red)", warnings);
     } else {
       ImGui::BulletText("No warnings");
+    }
+    // What Apply writes at the bake size: the albedo as DXT5, the normals as DXT1, each with its mips.
+    const auto withCommas = [](std::uint64_t value) {
+      std::string digits = std::to_string(value);
+      for (int at = static_cast<int>(digits.size()) - 3; at > 0; at -= 3) {
+        digits.insert(static_cast<std::size_t>(at), ",");
+      }
+      return digits;
+    };
+    ImGui::BulletText(
+      "Bake at %d px: albedo %s bytes (DXT5), normals %s bytes (DXT1), with their mips",
+      mBakeSize,
+      withCommas(DdsFileSize(mBakeSize, DdsKind::Bc3)).c_str(),
+      withCommas(DdsFileSize(mBakeSize, DdsKind::Bc1)).c_str()
+    );
+  }
+
+  void EdMaterialEditor::DrawGraphList()
+  {
+    ImGui::SeparatorText("Graphs");
+    int found = 0;
+    for (const std::filesystem::path& folder : {Folder(), OwnFolder()}) {
+      std::error_code ec;
+      if (!std::filesystem::is_directory(folder, ec)) {
+        continue;
+      }
+      for (const auto& entry : std::filesystem::directory_iterator(folder, ec)) {
+        const std::string file = entry.path().filename().string();
+        if (file.size() <= std::strlen(kExtension) || file.rfind(kExtension) != file.size() - std::strlen(kExtension)) {
+          continue;
+        }
+        ++found;
+        const std::string name = NameOf(entry.path());
+        bool open = false;
+        for (const auto& doc : mDocs) {
+          open = open || doc->name == name;
+        }
+        if (ImGui::Selectable(name.c_str(), open)) {
+          (void)Open(entry.path());
+        }
+        ImGui::SetItemTooltip("%s", entry.path().string().c_str());
+      }
+      if (folder == OwnFolder()) {
+        break;
+      }
+    }
+    if (found == 0) {
+      ImGui::TextDisabled("None saved yet: File > Save.");
     }
   }
 
