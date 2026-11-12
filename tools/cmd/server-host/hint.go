@@ -37,7 +37,7 @@ func connectionFor(players int) (perPlayer, server int, basis string) {
 // kMaxPlayers is the most players a game takes (the engine's 16 armies).
 const kMaxPlayers = 16
 
-// Measured on fw0 (Xeon Gold 6144, one sim thread, game speed 0): side-by-side paced replays of
+// Measured on a two-socket test server (Xeon Gold 6144, one sim thread, game speed 0): side-by-side paced replays of
 // FAF games, the mean and the worst 30 s per player bucket (the capacity load test of 2026-11-04).
 var hintBuckets = []struct {
 	maxPlayers  int
@@ -83,7 +83,7 @@ func hintFor(players, km int) Hint {
 	}
 	h.MinConnectionKBps, h.ServerUploadKBps, h.ConnectionBasis = connectionFor(players)
 	h.MaxPlayers = kMaxPlayers
-	h.Basis = fmt.Sprintf("measured on fw0 (Xeon Gold 6144, one sim thread, game speed 0) from FAF replays: %s players mean %.3f, worst 30 s %.3f cores; the map size factor %.2f is an estimate, not measured; the server's views per player add to it",
+	h.Basis = fmt.Sprintf("measured on a two-socket test server (Xeon Gold 6144, one sim thread, game speed 0) from FAF replays: %s players mean %.3f, worst 30 s %.3f cores; the map size factor %.2f is an estimate, not measured; the server's views per player add to it",
 		b.label, b.mean, b.worst, f)
 	return h
 }

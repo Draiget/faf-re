@@ -21,7 +21,7 @@ type Estimate struct {
 }
 
 // memoryFor is the server's peak memory for a game this size: measured peaks of recorded games played through the
-// server on fw0 (tmp/claude/packing/sizes_summary.txt: 4 players 190 MB, 6 211, 8 297-337, 10 246, 12 390-406), with
+// server on a test server (4 players 190 MB, 6 211, 8 297-337, 10 246, 12 390-406), with
 // a quarter on top; 16 players is not measured (an estimate from the 12-player peak).
 func memoryFor(players int) (mb int, basis string) {
 	switch {

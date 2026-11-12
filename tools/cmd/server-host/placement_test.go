@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// fw0's shape, smaller: 2 NUMA nodes, CPUs interleaved (node 0 even, node 1 odd), 4 physical cores a node with 2
+// The test server's shape, smaller: 2 NUMA nodes, CPUs interleaved (node 0 even, node 1 odd), 4 physical cores a node with 2
 // hyperthreads each (siblings 0/8, 2/10, ... on node 0).
 func twoNodeMachine() *machine {
 	m := &machine{memAvailMB: 40000}

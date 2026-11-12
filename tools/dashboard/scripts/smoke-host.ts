@@ -100,7 +100,7 @@ const unknown = await host.plan({ players: 2, km, cpus: [99999] });
 check("plan with an unknown CPU", !unknown.fits && unknown.warnings.some((warning) => warning.severity === "error"), planText(unknown));
 
 const seats = [{ kind: "human" as const, name: "Smoke", faction: 1, team: 2, seat: 1 }];
-check("refused without force", (await status(host.createLobby({ name: "dashboard smoke (refused)", map: map.id, options: {}, seats, control: "organiser", start_when_ready: 0, lobby_minutes: 5, cpus: [99999] }))) === 409, "409 expected");
+check("an unknown CPU is refused", (await status(host.createLobby({ name: "dashboard smoke (refused)", map: map.id, options: {}, seats, control: "organiser", start_when_ready: 0, lobby_minutes: 5, cpus: [99999] }))) === 400, "400 expected: a CPU the machine lacks is a bad request, which force cannot override");
 
 // ---------------------------------------------------------------- the operator queue: a lobby that can't fit now
 try {
