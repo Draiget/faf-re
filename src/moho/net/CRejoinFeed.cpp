@@ -1313,8 +1313,7 @@ void moho::REJOIN_PrepareRestore(
   }
 
   LaunchInfoBase* const launchInfo = sessionInfo.mLaunchInfo.get();
-  boost::shared_ptr<LaunchInfoLoad> loadInfo;
-  (void)boost::ConstructSharedLaunchInfoLoadFromRaw(&loadInfo, new LaunchInfoLoad());
+  boost::shared_ptr<LaunchInfoLoad> loadInfo(new LaunchInfoLoad());
   loadInfo->mGameRules = launchInfo->mGameRules;
   loadInfo->mMap = launchInfo->mMap;
   launchInfo->mMap = nullptr;

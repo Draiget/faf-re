@@ -111,7 +111,7 @@ namespace
     }
 
     boost::shared_ptr<moho::CD3DDynamicTextureSheet> replacement;
-    (void)device->CreateDynamicTextureSheetFromSource(replacement, slot.get(), nullptr, 2, archiveMode);
+    (void)device->CreateDynamicTextureSheetFromSource(replacement, slot, 2, archiveMode);
     slot = replacement;
   }
   [[nodiscard]] bool IntelRectVisibleOrGridMissing(
@@ -147,18 +147,16 @@ namespace
    */
   void SaveTerrainSheetToArchive(
     gpg::BinaryWriter& writer,
-    moho::ID3DTextureSheet* const sourceSheet,
+    const boost::shared_ptr<moho::ID3DTextureSheet>& sourceSheet,
     const int formatToken
   )
   {
     moho::CD3DDevice* const device = moho::D3D_GetDevice();
 
-    // The binary copies the source handle into the by-value parameter (an
-    // interlocked add on its control block) and the callee releases it again;
-    // the net refcount change is zero, so the guard lane is passed as null here
-    // exactly as the other recovered call sites in this file do.
+    // The binary copies the source handle into the by-value parameter (an interlocked add on its control block) and
+    // the callee releases it again.
     boost::shared_ptr<moho::CD3DDynamicTextureSheet> archiveSheet;
-    (void)device->CreateDynamicTextureSheetFromSource(archiveSheet, sourceSheet, nullptr, formatToken, true);
+    (void)device->CreateDynamicTextureSheetFromSource(archiveSheet, sourceSheet, formatToken, true);
 
     (void)archiveSheet->SaveToArchive(writer.stream(), true);
   }
@@ -3188,16 +3186,16 @@ namespace moho
     const std::int32_t normalMapSheetCount = static_cast<std::int32_t>(normalMap.size());
     writer.Write(normalMapSheetCount);
     for (std::int32_t sheetIndex = 0; sheetIndex < normalMapSheetCount; ++sheetIndex) {
-      SaveTerrainSheetToArchive(writer, normalMap[sheetIndex].get(), kTerrainRawSheetFormat);
+      SaveTerrainSheetToArchive(writer, normalMap[sheetIndex], kTerrainRawSheetFormat);
     }
 
-    SaveTerrainSheetToArchive(writer, AsDynamicSheet(mStrata.mStratumMask0), kTerrainMaskSheetFormat);
-    SaveTerrainSheetToArchive(writer, AsDynamicSheet(mStrata.mStratumMask1), kTerrainMaskSheetFormat);
+    SaveTerrainSheetToArchive(writer, mStrata.mStratumMask0, kTerrainMaskSheetFormat);
+    SaveTerrainSheetToArchive(writer, mStrata.mStratumMask1, kTerrainMaskSheetFormat);
 
     // 0x008A3D49: the water map is stored as a one-element sheet array.
     constexpr std::int32_t kWaterMapSheetCount = 1;
     writer.Write(kWaterMapSheetCount);
-    SaveTerrainSheetToArchive(writer, mWaterMapTexture.get(), kTerrainRawSheetFormat);
+    SaveTerrainSheetToArchive(writer, mWaterMapTexture, kTerrainRawSheetFormat);
 
     // 0x008A3E90-0x008A3F2C: the three per-texel water byte planes are sized
     // from the water map's own dimensions.

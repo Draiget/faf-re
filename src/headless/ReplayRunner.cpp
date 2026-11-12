@@ -516,8 +516,7 @@ namespace faf::headless
     // `--resume-from`: the same launch info, as `CSavedGame::CreateSinglePlayerSessionInfo` builds
     // a saved game's; the sim comes from the archive behind the header.
     if (keyframeFile.get() != nullptr) {
-      boost::shared_ptr<moho::LaunchInfoLoad> loadInfo;
-      (void)boost::ConstructSharedLaunchInfoLoadFromRaw(&loadInfo, new moho::LaunchInfoLoad());
+      boost::shared_ptr<moho::LaunchInfoLoad> loadInfo(new moho::LaunchInfoLoad());
       loadInfo->mGameRules = launchInfo->mGameRules;
       loadInfo->mMap = launchInfo->mMap;
       launchInfo->mMap = nullptr;

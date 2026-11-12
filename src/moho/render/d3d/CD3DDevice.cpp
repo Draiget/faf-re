@@ -906,25 +906,23 @@ namespace moho
   /**
    * Address: 0x004310D0 (FUN_004310D0, Moho::CD3DDevice::Func9)
    *
-   * boost::shared_ptr<moho::CD3DDynamicTextureSheet> &,moho::ID3DTextureSheet *,boost::detail::sp_counted_base
-   * *,int,bool
+   * boost::shared_ptr<moho::CD3DDynamicTextureSheet> &,boost::shared_ptr<moho::ID3DTextureSheet>,int,bool
+   * (the by-value source arrives as its two words and is released by the callee)
    *
    * What it does:
    * Creates one dynamic texture sheet from source dimensions (archive or
-   * runtime lane), copies source pixels into the destination texture, and
-   * releases caller-provided shared-count guard.
+   * runtime lane) and copies source pixels into the destination texture.
    */
   boost::shared_ptr<CD3DDynamicTextureSheet>& CD3DDevice::CreateDynamicTextureSheetFromSource(
     boost::shared_ptr<CD3DDynamicTextureSheet>& outSheet,
-    ID3DTextureSheet* const sourceTextureSheet,
-    boost::detail::sp_counted_base* const sourceSheetGuard,
+    const boost::shared_ptr<ID3DTextureSheet> sourceTextureSheet,
     const int format,
     const bool archiveMode
   )
   {
     outSheet.reset();
 
-    if (sourceTextureSheet != nullptr) {
+    if (sourceTextureSheet.get() != nullptr) {
       Wm3::Vector3f dimensions{};
       sourceTextureSheet->GetDimensions(&dimensions);
 
@@ -952,10 +950,6 @@ namespace moho
           device->UpdateSurface(sourceTexture, destinationTexture, nullptr, nullptr);
         }
       }
-    }
-
-    if (sourceSheetGuard != nullptr) {
-      sourceSheetGuard->release();
     }
 
     return outSheet;

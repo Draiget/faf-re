@@ -269,8 +269,8 @@ namespace moho
      * Slot: 14
      * Demangled: Moho::CD3DDevice::Func9
      *
-     * boost::shared_ptr<moho::CD3DDynamicTextureSheet> &,moho::ID3DTextureSheet *,boost::detail::sp_counted_base
-     * *,int,bool
+     * boost::shared_ptr<moho::CD3DDynamicTextureSheet> &,boost::shared_ptr<moho::ID3DTextureSheet>,int,bool
+     * (the by-value source arrives as its two words and is released by the callee)
      *
      * What it does:
      * Creates one dynamic texture sheet from source texture dimensions, copies
@@ -278,8 +278,7 @@ namespace moho
      */
     virtual boost::shared_ptr<CD3DDynamicTextureSheet>& CreateDynamicTextureSheetFromSource(
       boost::shared_ptr<CD3DDynamicTextureSheet>& outSheet,
-      ID3DTextureSheet* sourceTextureSheet,
-      boost::detail::sp_counted_base* sourceSheetGuard,
+      boost::shared_ptr<ID3DTextureSheet> sourceTextureSheet,
       int format,
       bool archiveMode
     );
