@@ -1,0 +1,3 @@
+{
+  "28002823": {"verdict": "desync", "note": "Retail ForgedAlliance.3840.exe gives our exact hash at beat 4050 (69bc0eba); all three live players recorded another (9e04c1e5). A game with three built-in AIs (Adaptive, Normal) on 8-Citadel TeamPlay_AI, no player left"}
+}
