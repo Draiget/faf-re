@@ -255,6 +255,24 @@ namespace faf::editor
     return nullptr;
   }
 
+  std::vector<const EdCommand*> EdCommands::AllForChord(
+    std::string_view chord
+  ) const
+  {
+    std::vector<const EdCommand*> out;
+    const std::string wanted = CanonicalChord(chord);
+    if (wanted.empty()) {
+      return out;
+    }
+    for (const EdCommand& command : mCommands) {
+      const std::vector<std::string> own = SplitChords(command.keys);
+      if (std::find(own.begin(), own.end(), wanted) != own.end()) {
+        out.push_back(&command);
+      }
+    }
+    return out;
+  }
+
   std::vector<std::pair<std::string, std::string>> EdCommands::Clashes() const
   {
     std::vector<std::pair<std::string, std::string>> out;

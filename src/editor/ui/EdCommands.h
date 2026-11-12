@@ -57,6 +57,8 @@ namespace faf::editor
     bool Run(std::string_view id);
     /** The command one of whose chords is `chord` (any spelling ParseChord takes), or null. */
     [[nodiscard]] const EdCommand* ForChord(std::string_view chord) const;
+    /** Every command with `chord`, in the registry's order: a key runs the first of them that can run now. */
+    [[nodiscard]] std::vector<const EdCommand*> AllForChord(std::string_view chord) const;
     /** Pairs of commands that share a chord, with the chord: Settings › Keys warns about each. */
     [[nodiscard]] std::vector<std::pair<std::string, std::string>> Clashes() const;
     /** Gives the command other keys (Settings › Keys); false when there is no such command. */

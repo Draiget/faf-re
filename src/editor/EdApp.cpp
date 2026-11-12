@@ -41,9 +41,12 @@
 #include "editor/ui/EdCommands.h"
 #include "editor/ui/EdFonts.h"
 #include "editor/ui/EdHelp.h"
+#include "editor/ui/EdKeymap.h"
+#include "editor/ui/EdKeysPage.h"
 #include "editor/ui/EdPalette.h"
 #include "editor/ui/EdTheme.h"
 #include "editor/ui/EdThemeStyle.h"
+#include "editor/ui/EdUiScale.h"
 #include "editor/ui/EdWindowChrome.h"
 #include "editor/ui/EdImGuiRenderer.h"
 #include "editor/view/EdLiveTerrain.h"
@@ -352,7 +355,6 @@ namespace faf::editor
 
     void OnMenuCommand(UINT command);
     bool OnViewportMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
-    void ToggleEditorViewInPlay();
     [[nodiscard]] bool EditorViewOverPlay();
     /** The title row's menu that Alt and this letter opens, or -1. */
     [[nodiscard]] int MenuIndexForKey(char key);
@@ -361,8 +363,9 @@ namespace faf::editor
     [[nodiscard]] bool SessionActive();
 
     /**
-     * The game's viewport keeps its own input (mouse and keys reach the game as in the game); only F5, the
-     * editor's Play/Stop, stops here, whatever a player's own key bindings say.
+     * The game's viewport keeps its own input (mouse and keys reach the game as in the game); while a play has it,
+     * only the keys of the editor's Play/Stop and view switch (F5, F6 unless rebound) stop here, whatever a
+     * player's own key bindings say (EditorApp::HandleViewportMessage).
      */
     LRESULT CALLBACK EditorViewportProc(
       const HWND window,
@@ -371,19 +374,6 @@ namespace faf::editor
       const LPARAM lParam
     )
     {
-      if ((message == WM_KEYDOWN || message == WM_KEYUP) && wParam == VK_F5) {
-        if (message == WM_KEYDOWN && (lParam & (1 << 30)) == 0) {
-          OnMenuCommand(kMenuPlayStop);
-        }
-        return 0;
-      }
-      // F6 while a play runs: the editor's view of the map or the game's.
-      if ((message == WM_KEYDOWN || message == WM_KEYUP) && wParam == VK_F6 && SessionActive()) {
-        if (message == WM_KEYDOWN && (lParam & (1 << 30)) == 0) {
-          ToggleEditorViewInPlay();
-        }
-        return 0;
-      }
       // Between plays the opened map's camera takes the mouse (EdMapScene).
       if (OnViewportMessage(window, message, wParam, lParam)) {
         return 0;
@@ -776,25 +766,27 @@ namespace faf::editor
         LPARAM lParam
       )
       {
-        if (message == WM_KEYDOWN && wParam == 'S' && (::GetKeyState(VK_CONTROL) & 0x8000) != 0) {
-          SaveDocument();
-          return true;
+        // A key bound to a command runs it (Settings > Keys). While a play has the view only F5's and F6's commands
+        // do; the game keeps every other key. The key's release goes nowhere either, as its press didn't.
+        if (message == WM_KEYDOWN || message == WM_SYSKEYDOWN) {
+          const std::string chord = ChordOf(
+            VirtualKeyName(static_cast<unsigned>(wParam)),
+            (::GetKeyState(VK_CONTROL) & 0x8000) != 0,
+            (::GetKeyState(VK_SHIFT) & 0x8000) != 0,
+            (::GetKeyState(VK_MENU) & 0x8000) != 0
+          );
+          const bool game = mPlay.Active() && !mScene.OverPlay();
+          if (RunChord(chord, game, (lParam & (1 << 30)) != 0)) {
+            mSwallowKeyUp = static_cast<unsigned>(wParam);
+            // What opened over the panels (the palette, Settings) gets the keys from here on.
+            if (CommandPaletteOpen() || mShowSettings) {
+              (void)::SetFocus(gPanelWindow);
+            }
+            return true;
+          }
         }
-        if (message == WM_KEYDOWN && wParam == 'N' && (::GetKeyState(VK_CONTROL) & 0x8000) != 0) {
-          mShell->OpenNewMap();
-          return true;
-        }
-        if (message == WM_KEYDOWN && wParam == 'O' && (::GetKeyState(VK_CONTROL) & 0x8000) != 0) {
-          mShell->Browser().Show();
-          return true;
-        }
-        // The command palette, also with the mouse over the view (its keys come here, not to the panels).
-        if (
-          message == WM_KEYDOWN && (::GetKeyState(VK_CONTROL) & 0x8000) != 0 &&
-          (wParam == 'K' || (wParam == 'P' && (::GetKeyState(VK_SHIFT) & 0x8000) != 0))
-        ) {
-          OpenCommandPalette();
-          (void)::SetFocus(gPanelWindow);
+        if ((message == WM_KEYUP || message == WM_SYSKEYUP) && mSwallowKeyUp != 0 && wParam == mSwallowKeyUp) {
+          mSwallowKeyUp = 0;
           return true;
         }
         return mScene.OnWindowMessage(window, message, wParam, lParam);
@@ -1116,6 +1108,146 @@ namespace faf::editor
         gpg::Logf("editor: UI scale %.2f", static_cast<double>(scale));
       }
 
+      /**
+       * A key pressed in the panels or the view: runs the first command bound to `chord` that can run now (several
+       * can share a key, each for its own state). `overGame`: a play has the view, so only RunsOverGame's commands.
+       * `repeat`: the key held down; only undo and redo run again then. True when a command took the key (also one
+       * that can't run now, which says why in the log); false leaves it to the panel or the view.
+       */
+      bool RunChord(
+        const std::string& chord,
+        const bool overGame,
+        const bool repeat = false
+      )
+      {
+        if (chord.empty() || KeysPageCapturing()) {
+          return false;
+        }
+        const EdCommand* blocked = nullptr;
+        for (const EdCommand* const command : mCommands.AllForChord(chord)) {
+          if (overGame && !RunsOverGame(command->id)) {
+            continue;
+          }
+          if (repeat && command->id != "edit.undo" && command->id != "edit.redo") {
+            return true;
+          }
+          if (!mCommands.WhyNot(command->id).empty()) {
+            blocked = blocked != nullptr ? blocked : command;
+            continue;
+          }
+          const std::string id = command->id;
+          if (!repeat) {
+            gpg::Logf("editor: key %s: %s", chord.c_str(), id.c_str());
+          }
+          (void)mCommands.Run(id);
+          return true;
+        }
+        if (blocked != nullptr) {
+          if (!repeat) {
+            gpg::Logf(
+              "editor: key %s: %s can't run now: %s",
+              chord.c_str(),
+              blocked->id.c_str(),
+              mCommands.WhyNot(blocked->id).c_str()
+            );
+          }
+          return true;
+        }
+        return false;
+      }
+
+      /**
+       * The keys the user changed, from keys.ini in the settings folder (`/keysfile <path>`: that file instead, read
+       * and written, so a test run leaves the user's alone), over the registry's defaults; read once after the
+       * commands are registered.
+       */
+      void LoadKeymap()
+      {
+        mKeyDefaults = KeyDefaults(mCommands);
+        if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/keysfile", 1, &value) && !value.empty()) {
+          mKeysFile = std::filesystem::path(value[0].c_str());
+        } else if (const std::filesystem::path folder = EditorSettingsFolder(); !folder.empty()) {
+          mKeysFile = folder / "keys.ini";
+        }
+        std::ifstream in(mKeysFile, std::ios::binary);
+        if (mKeysFile.empty() || !in) {
+          gpg::Logf("editor: keys: the defaults (no %s)", mKeysFile.string().c_str());
+          UpdateToolKeys();
+          return;
+        }
+        std::ostringstream text;
+        text << in.rdbuf();
+        for (const std::string& problem : ReadKeymap(mCommands, text.str())) {
+          gpg::Warnf("editor: %s: %s", mKeysFile.filename().string().c_str(), problem.c_str());
+        }
+        int changed = 0;
+        for (const EdCommand& command : mCommands.All()) {
+          const auto found = mKeyDefaults.find(command.id);
+          changed += found != mKeyDefaults.end() && found->second != command.keys ? 1 : 0;
+        }
+        gpg::Logf("editor: keys: %d changed in %s", changed, mKeysFile.string().c_str());
+        for (const auto& [a, b] : mCommands.Clashes()) {
+          gpg::Warnf("editor: keys: %s and %s share a key", a.c_str(), b.c_str());
+        }
+        UpdateToolKeys();
+      }
+
+      /** keys.ini rewritten with the keys now (Settings > Keys changed one). */
+      void SaveKeymap()
+      {
+        UpdateToolKeys();
+        if (mKeysFile.empty()) {
+          return;
+        }
+        std::ofstream out(mKeysFile, std::ios::binary | std::ios::trunc);
+        out << WriteKeymap(mCommands, mKeyDefaults);
+        gpg::Logf("editor: keys written to %s", mKeysFile.string().c_str());
+      }
+
+      /** The tool strip shows each tool's key (tool.N). */
+      void UpdateToolKeys()
+      {
+        std::vector<std::string> keys;
+        for (int i = 0; i < EdTools::ToolCount(); ++i) {
+          const EdCommand* const command = mCommands.Find("tool." + std::to_string(i));
+          keys.push_back(command != nullptr ? command->keys : std::string());
+        }
+        mShell->Tools().SetToolKeys(std::move(keys));
+      }
+
+      /**
+       * Settings (File > Settings, View > Keyboard shortcuts): the Keys page; Appearance, General, Viewport and
+       * Performance come with the window's own item (PLAN A8).
+       */
+      void DrawSettings()
+      {
+        if (!mShowSettings) {
+          return;
+        }
+        const ImGuiViewport* const viewport = ImGui::GetMainViewport();
+        ImGui::SetNextWindowSize(
+          ImVec2(std::min(Em(860.0f), viewport->WorkSize.x * 0.9f), std::min(Em(680.0f), viewport->WorkSize.y * 0.85f)),
+          ImGuiCond_Appearing
+        );
+        ImGui::SetNextWindowPos(
+          ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f, viewport->WorkPos.y + viewport->WorkSize.y * 0.5f),
+          ImGuiCond_Appearing,
+          ImVec2(0.5f, 0.5f)
+        );
+        if (ImGui::Begin("Settings", &mShowSettings, ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings)) {
+          if (ImGui::BeginTabBar("##settingspages")) {
+            if (ImGui::BeginTabItem("Keys")) {
+              if (DrawKeysPage(mCommands, mKeyDefaults)) {
+                SaveKeymap();
+              }
+              ImGui::EndTabItem();
+            }
+            ImGui::EndTabBar();
+          }
+        }
+        ImGui::End();
+      }
+
       /** F6 while a play runs: the editor's view in front of it, or the game's again. */
       void ToggleEditorView()
       {
@@ -1142,6 +1274,12 @@ namespace faf::editor
 
       EdCommands mCommands;
       std::vector<EdMenu> mMenus;
+      /** Each command's keys as registered (Settings > Keys resets to them), keys.ini, the Settings window. */
+      EdKeyDefaults mKeyDefaults;
+      std::filesystem::path mKeysFile;
+      bool mShowSettings = false;
+      /** The key whose press ran a command in the view: its release doesn't reach the scene or the game. */
+      unsigned mSwallowKeyUp = 0;
       /** The scenario path of each item File > Open Recent shows, by its place. */
       std::vector<std::string> mRecentShown;
       std::wstring mBaseTitle;
@@ -1504,6 +1642,7 @@ namespace faf::editor
         );
       };
       RegisterCommands();
+      LoadKeymap();
       mShell->SetCommands(&mCommands, &mMenus);
       SetUpWindowChrome(frame);
       // The game view's ambient occlusion makes its GPU programs on first use, which the editor's own view never
@@ -1622,9 +1761,14 @@ namespace faf::editor
       }, [this]() -> std::string {
         return mDocument.RecentMaps().empty() ? "the list is empty" : "";
       });
-      add("file.recent.none", "(no maps opened yet)", "File", "", [] {}, [] {
-        return std::string("no maps opened yet");
-      });
+      {
+        // Open Recent's placeholder: a menu entry only (not in the palette or Settings > Keys).
+        EdCommand none{"file.recent.none", "(no maps opened yet)", "File", "", "", [] {}, [] {
+          return std::string("no maps opened yet");
+        }};
+        none.palette = false;
+        c.Add(std::move(none));
+      }
       for (int i = 0; i < 10; ++i) {
         EdCommand recent{
           "file.recent." + std::to_string(i),
@@ -1669,6 +1813,26 @@ namespace faf::editor
       add("edit.delete", "Delete selection", "Edit", "Delete", [this] {
         mScene.DeleteSelected();
       }, mapOpen);
+      add("edit.copy", "Copy", "Edit", "Ctrl+C", [this] {
+        mScene.CtrlKey('C');
+      }, mapOpen, {}, "The tool's selection");
+      add("edit.paste", "Paste at the cursor", "Edit", "Ctrl+V", [this] {
+        mScene.CtrlKey('V');
+      }, mapOpen);
+      add("edit.duplicate", "Duplicate beside", "Edit", "Ctrl+D", [this] {
+        mScene.CtrlKey('D');
+      }, mapOpen, {}, "A copy of the selection 8 units beside it");
+
+      // Tools: 1 to 8, as the strip lists them.
+      for (int i = 0; i < EdTools::ToolCount(); ++i) {
+        const std::string title = std::string(EdTools::ToolName(i)) + " tool";
+        const std::string keys = std::to_string(i + 1);
+        add(("tool." + std::to_string(i)).c_str(), title.c_str(), "Tools", keys.c_str(), [this, i] {
+          mShell->Tools().SetTool(i);
+        }, {}, [this, i] {
+          return mShell->Tools().Tool() == i;
+        });
+      }
 
       // View
       panel("view.tools", "Tools", &EdShell::ShowTools);
@@ -1698,9 +1862,34 @@ namespace faf::editor
       add("view.palette", "Command palette", "View", "Ctrl+K, Ctrl+Shift+P", [] {
         OpenCommandPalette();
       }, {}, {}, "Find any command by a few of its letters");
+      add("view.frame", "Frame the whole map", "View", "Home", [this] {
+        mScene.FrameMap();
+      }, mapOpen);
+      add("view.uiscale.up", "Larger panels and text", "View", "Ctrl+=", [this] {
+        mShell->StepUiScale(1);
+      });
+      add("view.uiscale.down", "Smaller panels and text", "View", "Ctrl+-", [this] {
+        mShell->StepUiScale(-1);
+      });
+      add("view.uiscale.reset", "Panels at 100 %", "View", "Ctrl+0", [this] {
+        mShell->StepUiScale(0);
+      });
+      add("settings.open", "Settings...", "File", "", [this] {
+        mShowSettings = true;
+      });
+      add("settings.keys", "Keyboard shortcuts...", "View", "", [this] {
+        mShowSettings = true;
+      }, {}, {}, "Every command's keys, to change");
       RegisterThemeCommands();
 
       // Play
+      add("play.editorview", "Editor's view during a play", "Play", "F6", [this] {
+        ToggleEditorView();
+      }, [this]() -> std::string {
+        return mPlay.Active() ? "" : "no play is running";
+      }, [this] {
+        return mPlay.Active() && mShell->EditorViewInPlay();
+      });
       add("play.toggle", "Play", "Play", "F5", [this] {
         if (mPlay.Active()) {
           mPlay.Stop();
@@ -1822,9 +2011,20 @@ namespace faf::editor
            cmd("file.saveas"),
            cmd("file.package"),
            sep(),
+           cmd("settings.open"),
+           sep(),
            cmd("file.exit")}
         },
-        EdMenu{"&Edit", {cmd("edit.undo"), cmd("edit.redo"), sep(), cmd("edit.delete")}},
+        EdMenu{
+          "&Edit",
+          {cmd("edit.undo"),
+           cmd("edit.redo"),
+           sep(),
+           cmd("edit.copy"),
+           cmd("edit.paste"),
+           cmd("edit.duplicate"),
+           cmd("edit.delete")}
+        },
         EdMenu{
           "&View",
           {cmd("view.tools"),
@@ -1842,6 +2042,7 @@ namespace faf::editor
            cmd("view.adaptive"),
            sep(),
            cmd("view.palette"),
+           cmd("settings.keys"),
            themes,
            sep(),
            cmd("view.fullhelp"),
@@ -1851,7 +2052,7 @@ namespace faf::editor
            cmd("view.resetlayout"),
            cmd("view.imguidemo")}
         },
-        EdMenu{"&Play", {cmd("play.toggle"), playMaps}},
+        EdMenu{"&Play", {cmd("play.toggle"), cmd("play.editorview"), playMaps}},
       };
       const auto clashes = c.Clashes();
       for (const auto& [a, b] : clashes) {
@@ -2005,13 +2206,6 @@ namespace faf::editor
     )
     {
       return gEditorApp != nullptr && gEditorApp->HandleViewportMessage(window, message, wParam, lParam);
-    }
-
-    void ToggleEditorViewInPlay()
-    {
-      if (gEditorApp != nullptr) {
-        gEditorApp->ToggleEditorView();
-      }
     }
 
     bool EditorViewOverPlay()
@@ -2618,6 +2812,7 @@ namespace faf::editor
           }
         }
         mShell->Draw();
+        DrawSettings();
         // `/focuspanel <window>` (test runs): that panel in front, a while after the map opened (opening fronts Info).
         if (mFocusPanelFrames < 90 && mDocument.GetState() == EdDocument::State::Open) {
           if (
@@ -2700,20 +2895,14 @@ namespace faf::editor
         case EdShell::Command::None:
           break;
         }
-        // Undo and redo from the panels too (the viewport's keys go to the scene directly); the material editor
-        // keeps its own.
-        if (!ImGui::GetIO().WantTextInput && !mShell->MaterialEditor().Focused()) {
-          if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_S)) {
-            SaveDocument();
-          } else if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_N)) {
-            mShell->OpenNewMap();
-          } else if (ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Z)) {
-            (void)mScene.Undo();
-          } else if (
-            ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_Y) ||
-            ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Z)
+        // The panels' keys run their commands too (the view's reach HandleViewportMessage): not the ones a text field
+        // or the panels' keyboard navigation use themselves, and not in the material editor, which keeps its own.
+        if (!mShell->MaterialEditor().Focused()) {
+          if (
+            const std::string chord = PanelChordPressed();
+            !chord.empty() && !PanelsKeepChord(chord, ImGui::GetIO().WantTextInput)
           ) {
-            (void)mScene.Redo();
+            (void)RunChord(chord, false);
           }
         }
         if (gComposite && mViewImage != 0) {

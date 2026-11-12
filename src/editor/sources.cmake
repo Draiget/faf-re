@@ -42,6 +42,8 @@ set(FAF_EDITOR_SOURCES
   view/EdWaterBodyView.cpp
   ui/EdHelp.cpp
   ui/EdCommands.cpp
+  ui/EdKeymap.cpp
+  ui/EdKeysPage.cpp
   ui/EdWindowChrome.cpp
   ui/EdTitleBar.cpp
   ui/EdPalette.cpp

@@ -81,6 +81,8 @@ namespace faf::editor
     {
       return mUiScale;
     }
+    /** The toolbar's - and + as keys (Ctrl+- / Ctrl+=): the next smaller or larger step; 0 puts it back to 100 %. */
+    void StepUiScale(int direction);
     /** The Adaptive Map window (View > Adaptive Map). */
     bool& ShowAdaptiveWindow() noexcept
     {
@@ -286,7 +288,6 @@ namespace faf::editor
     EdMapBrowser mBrowser;
     void DrawToolbar(float height, float top);
     Command mCommand = Command::None;
-    void HandleKeys();
     void DrawToolsPanel();
     void DrawMapPanel();
     /** The Play setup (opponents, AI, faction, start slot, fog, prebuilt units) and the in-play view switches. */

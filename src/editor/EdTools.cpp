@@ -20,17 +20,16 @@ namespace faf::editor
     struct ToolInfo
     {
       const char* name;
-      const char* key;
     };
     constexpr ToolInfo kTools[] = {
-      {"Select", "S"},
-      {"Terrain", "T"},
-      {"Texture", "P"},
-      {"Water", "W"},
-      {"Props", "O"},
-      {"Decals", "D"},
-      {"Markers", "M"},
-      {"Units", "U"},
+      {"Select"},
+      {"Terrain"},
+      {"Texture"},
+      {"Water"},
+      {"Props"},
+      {"Decals"},
+      {"Markers"},
+      {"Units"},
     };
 
     /** Draws tool `index`'s icon in the square at `p`, `s` wide. */
@@ -282,9 +281,7 @@ namespace faf::editor
         "##toolsettings", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_AlwaysVerticalScrollbar
       )
     ) {
-      ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.67f, 0.70f, 0.74f, 1.0f));
-      ImGui::TextUnformatted(kTools[mTool].name);
-      ImGui::PopStyleColor();
+      ImGui::TextDisabled("%s", kTools[mTool].name);
       ImGui::Separator();
       switch (mTool) {
       case 0:
@@ -316,6 +313,18 @@ namespace faf::editor
     ImGui::EndChild();
   }
 
+  int EdTools::ToolCount() noexcept
+  {
+    return static_cast<int>(IM_ARRAYSIZE(kTools));
+  }
+
+  const char* EdTools::ToolName(
+    const int tool
+  ) noexcept
+  {
+    return tool >= 0 && tool < ToolCount() ? kTools[tool].name : "";
+  }
+
   void EdTools::DrawStrip()
   {
     const float cell = ImGui::GetFrameHeight() * 1.55f;
@@ -331,8 +340,17 @@ namespace faf::editor
           mTool = i;
         }
         const bool hovered = ImGui::IsItemHovered();
+        // Its key from the command registry (tool.N, Settings > Keys): the first, or none.
+        std::string key = static_cast<std::size_t>(i) < mToolKeys.size() ? mToolKeys[static_cast<std::size_t>(i)] : "";
+        if (const std::size_t comma = key.find(','); comma != std::string::npos) {
+          key.resize(comma);
+        }
         if (hovered) {
-          ImGui::SetTooltip("%s (%s)", kTools[i].name, kTools[i].key);
+          if (key.empty()) {
+            ImGui::SetTooltip("%s", kTools[i].name);
+          } else {
+            ImGui::SetTooltip("%s (%s)", kTools[i].name, key.c_str());
+          }
         }
         const ImVec2 q(p.x + cell, p.y + cell);
         if (i == mTool) {
@@ -354,7 +372,7 @@ namespace faf::editor
           ImGui::GetFontSize() * 0.62f,
           ImVec2(q.x - ImGui::GetFontSize() * 0.45f, q.y - ImGui::GetFontSize() * 0.7f),
           InkDimU32(),
-          kTools[i].key
+          key.c_str()
         );
         ImGui::PopID();
       }

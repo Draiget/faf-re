@@ -410,6 +410,7 @@ add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.c
   editor/VaultTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdVault.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdHttp.cpp
   editor/FafApiTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdFafApi.cpp
   editor/CommandsTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdCommands.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdWindowChrome.cpp
+  editor/KeymapTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/ui/EdKeymap.cpp
   editor/WaterBodiesEditTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdWaterBodies.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdLuaText.cpp
   ${CMAKE_SOURCE_DIR}/src/moho/sim/WaterBodies.cpp
   ${CMAKE_SOURCE_DIR}/src/editor/tools/EdHeightBrush.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdSymmetryCheck.cpp

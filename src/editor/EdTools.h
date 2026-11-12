@@ -1169,6 +1169,16 @@ namespace faf::editor
     {
       return mTool;
     }
+    /** How many tools the strip has, and each one's name ("Select", "Terrain", ...). */
+    [[nodiscard]] static int ToolCount() noexcept;
+    [[nodiscard]] static const char* ToolName(int tool) noexcept;
+    /** The key each tool's command has (Settings > Keys), shown in the strip's corner and its tooltip. */
+    void SetToolKeys(
+      std::vector<std::string> keys
+    )
+    {
+      mToolKeys = std::move(keys);
+    }
 
     /** Whether the Texture tool is the chosen one (the viewport's left button paints a layer's mask). */
     [[nodiscard]] bool TextureToolActive() const noexcept
@@ -1651,6 +1661,7 @@ namespace faf::editor
     void DrawLimits();
 
     int mTool = 1;
+    std::vector<std::string> mToolKeys;
 
     int mBrushMode = 0;
     float mRadius = 14.0f;

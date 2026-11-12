@@ -56,23 +56,29 @@ namespace faf::editor
     }
   }
 
-  void EdShell::HandleKeys()
+  namespace
   {
-    // Ctrl+K or Ctrl+Shift+P: the command palette (the view's own keys reach EdApp.cpp, which opens it too).
-    if (
-      ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_K) ||
-      ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_P)
-    ) {
-      OpenCommandPalette();
+    // The panels' scales the toolbar's - and + (and Ctrl+- / Ctrl+=) step between.
+    constexpr float kUiScaleSteps[] = {0.75f, 0.85f, 1.0f, 1.1f, 1.25f, 1.4f, 1.6f, 1.8f, 2.0f};
+  } // namespace
+
+  void EdShell::StepUiScale(
+    const int direction
+  )
+  {
+    if (direction == 0) {
+      mUiScale = 1.0f;
+      return;
     }
-    // F5 plays the picked map or stops the running one, wherever the focus is (EdApp.cpp keeps it from the game).
-    if (ImGui::IsKeyPressed(ImGuiKey_F5, false)) {
-      if (mPlay.Active()) {
-        mPlay.Stop();
-      } else if (mPlay.CanPlay()) {
-        mPlay.Play();
-      }
+    float smaller = kUiScaleSteps[0];
+    float larger = kUiScaleSteps[std::size(kUiScaleSteps) - 1];
+    for (const float step : kUiScaleSteps) {
+      smaller = step < mUiScale - 0.01f ? step : smaller;
     }
+    for (auto it = std::rbegin(kUiScaleSteps); it != std::rend(kUiScaleSteps); ++it) {
+      larger = *it > mUiScale + 0.01f ? *it : larger;
+    }
+    mUiScale = direction < 0 ? smaller : larger;
   }
 
   void EdShell::UpdateTestRun()
@@ -179,7 +185,6 @@ namespace faf::editor
       }
       mAdaptivePreviewDone.clear();
     }
-    HandleKeys();
     UpdateTestRun();
     mBrowser.Update();
     const bool playing = mPlay.Active();
@@ -750,7 +755,7 @@ namespace faf::editor
   )
   {
     // The steps a click moves between; the middle button shows the scale and puts it back to 100%.
-    static constexpr float kSteps[] = {0.75f, 0.85f, 1.0f, 1.1f, 1.25f, 1.4f, 1.6f, 1.8f, 2.0f};
+    const auto& kSteps = kUiScaleSteps;
     // One joined row, as the view's toggle groups: - | 100% | +, the ends square buttons.
     char percent[16];
     (void)std::snprintf(percent, sizeof(percent), "%d%%", static_cast<int>(std::lround(mUiScale * 100.0f)));

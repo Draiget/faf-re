@@ -309,10 +309,28 @@ namespace faf::editor
     /** Sets or removes the playable area as one undo step. */
     void ChangePlayableArea(const std::optional<EdDocument::PlayableRect>& area);
 
-    /** Removes the selected props (Edit > Delete selection, the Delete key), as one undo step. */
-    /** Edit > Delete: the active tool's selection (decals, markers, or props). */
+    /**
+     * Edit > Delete selection (the Delete key): the active tool's selection (units, decals, markers), or with the
+     * Select tool what it has selected, of whichever kind; props otherwise. One undo step.
+     */
     void DeleteSelected()
     {
+      if (mTools != nullptr && mTools->SelectToolActive()) {
+        switch (SelectedKind()) {
+        case PickKind::Marker:
+          DeleteSelectedMarkers();
+          return;
+        case PickKind::Unit:
+          DeleteSelectedUnits();
+          return;
+        case PickKind::Decal:
+          DeleteSelectedDecals();
+          return;
+        default:
+          DeleteSelection();
+          return;
+        }
+      }
       if (mTools != nullptr && mTools->UnitsToolActive()) {
         DeleteSelectedUnits();
       } else if (mTools != nullptr && mTools->DecalsToolActive()) {
@@ -327,6 +345,14 @@ namespace faf::editor
     /** Undoes or redoes the newest height stroke (Ctrl+Z, Ctrl+Y); false when there is none. */
     bool Undo();
     bool Redo();
+
+    /** The camera over the whole map (View > Frame the map, Home). */
+    void FrameMap()
+    {
+      if (mMap != nullptr) {
+        FrameWholeMap();
+      }
+    }
 
     [[nodiscard]] bool Attached() const noexcept
     {

@@ -7807,19 +7807,8 @@ namespace faf::editor
     case WM_KEYDOWN:
     case WM_KEYUP: {
       const bool down = message == WM_KEYDOWN;
-      if (down && (::GetKeyState(VK_CONTROL) & 0x8000) != 0 && (wParam == 'Z' || wParam == 'Y')) {
-        const bool redo = wParam == 'Y' || (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
-        (void)(redo ? Redo() : Undo());
-        return true;
-      }
-      // Ctrl+C copies the tool's selection, Ctrl+V puts it at the cursor, Ctrl+D a copy of it 8 units beside.
-      if (
-        down && (::GetKeyState(VK_CONTROL) & 0x8000) != 0 && (wParam == 'C' || wParam == 'V' || wParam == 'D') &&
-        mMap != nullptr
-      ) {
-        CtrlKey(static_cast<char>(wParam));
-        return true;
-      }
+      // Undo, redo, copy, paste, duplicate and framing the map are commands with keys (EdApp.cpp runs them before
+      // the scene sees the key); the keys here are the tools' own: paths, the camera, Delete and Q/E for a tool.
       mFast = (::GetKeyState(VK_SHIFT) & 0x8000) != 0;
       if (
         down && mTools != nullptr && mTools->DecalsToolActive() && mTools->DecalPathMode() &&
@@ -7923,11 +7912,6 @@ namespace faf::editor
         return true;
       case VK_SHIFT:
         return false;
-      case VK_HOME:
-        if (down) {
-          FrameWholeMap();
-        }
-        return true;
       default:
         return false;
       }
