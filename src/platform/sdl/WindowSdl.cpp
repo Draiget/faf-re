@@ -740,7 +740,12 @@ namespace platform::window
     float mouseY = 0.0f;
     (void)SDL_GetMouseState(&mouseX, &mouseY);
     ToPixels(native, mouseX, mouseY, x, y);
-    return true;
+    int width = 0;
+    int height = 0;
+    if (!SDL_GetWindowSizeInPixels(native, &width, &height)) {
+      return false;
+    }
+    return x >= 0 && y >= 0 && x < width && y < height;
   }
 
   void SetTitle(

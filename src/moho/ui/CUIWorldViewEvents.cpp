@@ -3449,33 +3449,28 @@ void moho::CUIWorldView::Frame(
           gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
           const gpg::gal::Head& head = device->GetDeviceContext()->GetHead(0u);
           if (head.mWindowed) {
-            POINT cursorPoint{};
+            POINT cursorPoint{-1, -1};
 #if FAFRE_PLATFORM_LINUX
-            // SDL's window-local pixels match the head dimensions, even when Wayland cannot
-            // report desktop cursor coordinates. Ignore unfocused windows and stale positions.
+            // The head dimensions are client pixels, and Wayland has no desktop cursor position.
             int cursorX = 0;
             int cursorY = 0;
-            const bool hasCursor = platform::window::GetMousePosition(head.mWindow, cursorX, cursorY) && cursorX >= 0 &&
-              cursorY >= 0 && cursorX < static_cast<LONG>(head.mWidth) && cursorY < static_cast<LONG>(head.mHeight);
-            cursorPoint.x = cursorX;
-            cursorPoint.y = cursorY;
+            if (platform::window::GetMousePosition(head.mWindow, cursorX, cursorY)) {
+              cursorPoint = {cursorX, cursorY};
+            }
 #else
             ::GetCursorPos(&cursorPoint);
-            constexpr bool hasCursor = true;
 #endif
-            if (hasCursor) {
-              if (cursorPoint.x == 0) {
-                panX = panSpeed;
-              }
-              if (cursorPoint.y == 0) {
-                panY = panSpeed;
-              }
-              if (cursorPoint.x == static_cast<LONG>(head.mWidth) - 1) {
-                panX = panX - panSpeed;
-              }
-              if (cursorPoint.y == static_cast<LONG>(head.mHeight) - 1) {
-                panY = panY - panSpeed;
-              }
+            if (cursorPoint.x == 0) {
+              panX = panSpeed;
+            }
+            if (cursorPoint.y == 0) {
+              panY = panSpeed;
+            }
+            if (cursorPoint.x == static_cast<LONG>(head.mWidth) - 1) {
+              panX = panX - panSpeed;
+            }
+            if (cursorPoint.y == static_cast<LONG>(head.mHeight) - 1) {
+              panY = panY - panSpeed;
             }
           }
         }
