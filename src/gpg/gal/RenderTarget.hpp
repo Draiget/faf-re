@@ -1,6 +1,6 @@
 #pragma once
 
-#include "boost/noncopyable.hpp"
+#include "gpg/core/utils/NonCopyable.h"
 #include "boost/shared_ptr.h"
 #include "platform/Platform.h"
 
@@ -20,7 +20,7 @@ namespace gpg::gal
    * The RTTI base array puts `boost::noncopyable` at mdisp 4 with the
    * private-base attribute (0x4D).
    */
-  class RenderTarget : private boost::noncopyable
+  class RenderTarget : private gpg::NonCopyable
   {
   public:
     /**

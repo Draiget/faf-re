@@ -6,7 +6,7 @@
 
 #include "boost/condition.h"
 #include "boost/mutex.h"
-#include "boost/scoped_ptr.h"
+#include <memory>
 #include "boost/shared_ptr.h"
 #include "boost/thread.h"
 #include "gpg/core/containers/FastVector.h"
@@ -891,7 +891,7 @@ namespace moho
     // client manager, sim. The constructor's unwind funclets (0x00BBB908..
     // 0x00BBB945) destroy the same members through their smart-pointer
     // destructors when a later initialiser throws.
-    boost::scoped_ptr<Sim> mSim;                     // +0x04
+    std::unique_ptr<Sim> mSim;                       // +0x04
     fa::auto_ptr<CClientManagerImpl> mClientManager; // +0x08
     fa::auto_ptr<gpg::Stream> mStream;               // +0x0C
     boost::shared_ptr<LaunchInfoBase> mLaunchInfo;   // +0x10
@@ -902,8 +902,8 @@ namespace moho
     // methods hand this same number back to their caller as the "cookie" for
     // the command they just issued - it is the beat that command lands on.
     int32_t mNextIssueBeat = 1;                 // +0x24
-    boost::scoped_ptr<CMarshaller> mMarshaller; // +0x28
-    boost::scoped_ptr<CDecoder> mDecoder;       // +0x2C
+    std::unique_ptr<CMarshaller> mMarshaller;   // +0x28
+    std::unique_ptr<CDecoder> mDecoder;         // +0x2C
     // Constructed and destroyed in place: `boost::mutex::mutex` at 0x0073B5F0,
     // `~mutex` at 0x0073BB1A, both on `this+0x30`.
     boost::mutex mLock;                  // +0x30

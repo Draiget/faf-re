@@ -1,6 +1,6 @@
 #pragma once
 
-#include "boost/noncopyable.hpp"
+#include "gpg/core/utils/NonCopyable.h"
 
 namespace gpg::gal
 {
@@ -13,7 +13,7 @@ namespace gpg::gal
    * the device's instance, and each backend keeps its own state objects
    * behind it.
    */
-  class PipelineState : private boost::noncopyable
+  class PipelineState : private gpg::NonCopyable
   {
   public:
     /**

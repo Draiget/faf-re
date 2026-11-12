@@ -1,6 +1,6 @@
 #pragma once
 
-#include "boost/noncopyable.hpp"
+#include "gpg/core/utils/NonCopyable.h"
 #include "legacy/containers/String.h"
 
 namespace gpg::gal
@@ -13,7 +13,7 @@ namespace gpg::gal
    * Backends: EffectTechniqueD3D9 (0x00D42CCC), EffectTechniqueD3D10
    * (0x00D435CC).
    */
-  class EffectTechnique : private boost::noncopyable
+  class EffectTechnique : private gpg::NonCopyable
   {
   public:
     /**

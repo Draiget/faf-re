@@ -18,8 +18,6 @@
 #include <new>
 #include <vector>
 
-#include "boost/function.hpp"
-#include <boost/bind.hpp>
 #include <boost/ptr_container/exception.hpp>
 #include "gpg/core/utils/BoostWrappers.h"
 #include "moho/render/camera/CameraImpl.h"
@@ -892,8 +890,9 @@ SSyncData* moho::PopFrontSSyncDataPtrDeque(
  * connection and sync events, builds the marshaller that turns this driver's
  * `ISTIDriver` calls into command-stream messages, and starts the
  * create-sim bootstrap thread.
- * `boost::function0<void>` as `new boost::thread(boost::bind(&CSimDriver::ThreadCreateSim, this))` below and `new
- * boost::thread(boost::bind(&CSimDriver::ThreadRun, this))` in `ThreadCreateSim` instantiate it: one F = `bind_t<void,
+ * `boost::function0<void>` as the binary's `new boost::thread(boost::bind(&CSimDriver::ThreadCreateSim, this))` below
+ * and `new boost::thread(boost::bind(&CSimDriver::ThreadRun, this))` in `ThreadCreateSim` instantiate it (ours pass a
+ * lambda capturing `this`): one F = `bind_t<void,
  * _mfi::mf0<void, CSimDriver>, _bi::list1<_bi::value<CSimDriver*>>>` (RTTI 0x00F802D8) serves both sites, the member
  * pointer being data (0x0073B85A pushes 0x0073D260, 0x0073D638 pushes 0x0073BDF0); its static vtable is {manager
  * 0x010C79E4, invoker 0x010C79E8}, guard bit 0x010C79EC: Address: 0x00741810 (FUN_00741810 --
@@ -982,7 +981,9 @@ CSimDriver::CSimDriver(
   mMarshaller.reset(new CMarshaller(mClientManager.get()));
   mMarshaller->SetCommandSource(mCommandSourceId);
 
-  mCreateSimThread = new boost::thread(boost::bind(&CSimDriver::ThreadCreateSim, this));
+  mCreateSimThread = new boost::thread([this]() {
+    ThreadCreateSim();
+  });
 }
 
 /**
@@ -1448,7 +1449,9 @@ void CSimDriver::ThreadCreateSim()
 
   boost::mutex::scoped_lock lock(mLock);
 
-  mSimThread = new boost::thread(boost::bind(&CSimDriver::ThreadRun, this));
+  mSimThread = new boost::thread([this]() {
+    ThreadRun();
+  });
 
   // The opening sync: the frame machine waits on it before it will leave
   // Initialize.

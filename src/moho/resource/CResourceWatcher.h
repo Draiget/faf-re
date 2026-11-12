@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-#include "boost/noncopyable.hpp"
+#include "gpg/core/utils/NonCopyable.h"
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
 
@@ -19,7 +19,7 @@ namespace moho
    * `ResourceWatch`; the manager calls `OnResourceChanged` when the file
    * changes.
    */
-  class CResourceWatcher : private boost::noncopyable
+  class CResourceWatcher : private gpg::NonCopyable
   {
   public:
     /**

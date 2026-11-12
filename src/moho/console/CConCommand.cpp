@@ -1006,10 +1006,9 @@ void moho::CON_Printf(
   }
 
   const fa::string captured(line);
-  boost::function<void(), std::allocator<void>> callback = [captured]() {
+  THREAD_InvokeAsync([captured]() {
     OutputToConHandlers(captured);
-  };
-  THREAD_InvokeAsync(callback, 0u);
+  }, 0u);
 }
 
 /**

@@ -193,12 +193,6 @@ set_property(SOURCE ${_fx11_sources}
 set_property(SOURCE moho/app/WxUrl.cpp APPEND PROPERTY COMPILE_DEFINITIONS NDEBUG)
 set_property(SOURCE moho/app/WxUrl.cpp APPEND PROPERTY COMPILE_OPTIONS /UUNICODE /U_UNICODE)
 
-# boost::algorithm::string (boost 1.34.1) needs std::unary_function and
-# std::binary_function, which the MSVC STL keeps only behind this opt-in macro.
-# CLobby.cpp is the one engine consumer (BuildLobbyIgnoreNameList's
-# boost::algorithm::split).
-set_property(SOURCE moho/net/CLobby.cpp APPEND PROPERTY COMPILE_DEFINITIONS _HAS_AUTO_PTR_ETC=1)
-
 # boost.thread 1.34.1, compiled into the engine (no bjam build).
 set(_boost_thread "${FAF_DEPENDENCIES_DIR}/boost_1_34_1/libs/thread/src")
 set(_boost_thread_sources

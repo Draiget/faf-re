@@ -4,7 +4,6 @@
 
 #include <Windows.h>
 
-#include "boost/bind.hpp"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
@@ -465,7 +464,9 @@ namespace moho
       if (mPrefetchThread) {
         mPrefetchQueued.notify_all();
       } else {
-        mPrefetchThread.reset(new boost::thread(boost::bind(&ResourceManager::PrefetchThread, this)));
+        mPrefetchThread.reset(new boost::thread([this]() {
+          PrefetchThread();
+        }));
       }
     }
 

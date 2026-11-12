@@ -1,5 +1,5 @@
 #pragma once
-#include "../../gpg/core/utils/BoostUtils.h"
+#include "gpg/core/utils/NonCopyable.h"
 #include "ISessionListener.h"
 #include "SSelectionEvent.h"
 #include "moho/misc/Listener.h"

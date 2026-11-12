@@ -21,7 +21,7 @@
 #include <string>
 #include <utility>
 
-#include "boost/scoped_ptr.h"
+#include <memory>
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
 
@@ -292,7 +292,7 @@ namespace
    * pointer is already in .bss); the destructor deletes a history target still
    * alive at exit without clearing the slot, which is `~scoped_ptr`.
    */
-  boost::scoped_ptr<HistoryLogTarget> gLogHistoryTarget;
+  std::unique_ptr<HistoryLogTarget> gLogHistoryTarget;
 
   /**
    * Address: 0x00936D20 (FUN_00936D20, ??1sLogContext@gpg@@QAE@@Z)

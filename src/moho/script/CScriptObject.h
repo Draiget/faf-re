@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/reflection/Reflection.h"
-#include "gpg/core/utils/BoostUtils.h"
+#include "gpg/core/utils/NonCopyable.h"
 #include "lua/LuaObject.h"
 #include "moho/containers/TDatList.h"
 #include "moho/misc/InstanceCounter.h"
@@ -27,7 +27,7 @@ namespace moho
   class MOHO_EMPTY_BASES CScriptObject :
     public gpg::RObject,
     public WeakObject,
-    public boost::noncopyable_::noncopyable,
+    public gpg::NonCopyable,
     public InstanceCounter<CScriptObject>
   {
     // Legacy MSVC8 ABI places empty-base storage ahead of first data member.

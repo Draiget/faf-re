@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <string>
 
-#include "boost/scoped_ptr.h"
+#include <memory>
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
@@ -4425,7 +4425,7 @@ namespace moho
     /// with `reset` (0x0086E7A6: store the new pointer, then delete the old
     /// one through its scalar deleting destructor), and member destruction
     /// deletes it last (0x0086EB71).
-    boost::scoped_ptr<CameraImpl> mCamera; // +0x120
+    std::unique_ptr<CameraImpl> mCamera; // +0x120
     // The viewport rect `DoRender` last pushed to the camera: left/top and then
     // the Width/Height lazy vars, which 0x0086EF40 passes straight through as
     // an extent. -1 until the first draw (0x0086E50F..0x0086E527).
@@ -4524,7 +4524,7 @@ namespace moho
     offsetof(CUIWorldView, mGlobalCameraCommands) == 0x2A6,
     "CUIWorldView::mGlobalCameraCommands offset must be 0x2A6"
   );
-  static_assert(sizeof(boost::scoped_ptr<CameraImpl>) == 0x4, "CUIWorldView::mCamera must be one pointer");
+  static_assert(sizeof(std::unique_ptr<CameraImpl>) == 0x4, "CUIWorldView::mCamera must be one pointer");
   static_assert(sizeof(CUIWorldView) == 0x2A8, "CUIWorldView size must be 0x2A8");
 
   /// The control that owns keyboard focus. A weak link, so a control that is

@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/scoped_array.hpp"
+#include <memory>
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/Vector.h"
@@ -289,7 +289,7 @@ namespace moho
 
   public:
     STIMap* mMapData;                           // +0x00
-    boost::scoped_array<std::int8_t> mGrid;     // +0x04
+    std::unique_ptr<std::int8_t[]> mGrid;       // +0x04
     std::uint32_t mWidth;                       // +0x08
     std::uint32_t mHeight;                      // +0x0C
     fa::vector<SDelayedSubVizInfo> mUpdateList; // +0x10

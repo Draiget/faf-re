@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/noncopyable.hpp"
+#include "gpg/core/utils/NonCopyable.h"
 #include "boost/shared_ptr.h"
 #include "legacy/containers/Vector.h"
 
@@ -23,7 +23,7 @@ namespace gpg::gal
    * destructor ends by reinstalling this vtable and freeing that vector
    * (0x0094AD03..0x0094AD23 on D3D9) - the inlined `~VertexFormat`.
    */
-  class VertexFormat : private boost::noncopyable
+  class VertexFormat : private gpg::NonCopyable
   {
   public:
     /**

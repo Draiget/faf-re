@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "gpg/core/reflection/Reflection.h"
-#include "gpg/core/utils/BoostUtils.h"
+#include "gpg/core/utils/NonCopyable.h"
 #include "moho/app/WinApp.h"
 #include "moho/misc/InstanceCounter.h"
 #include "platform/Platform.h"
@@ -27,7 +27,7 @@ namespace moho
   class CTaskThread;
   class CTaskStage;
 
-  class MOHO_EMPTY_BASES CTask : public boost::noncopyable_::noncopyable, public InstanceCounter<CTask>
+  class MOHO_EMPTY_BASES CTask : public gpg::NonCopyable, public InstanceCounter<CTask>
   {
 #if !defined(MOHO_ABI_MSVC8_COMPAT)
     // Preserve legacy base-subobject slot at +0x04 when empty-bases are collapsed.

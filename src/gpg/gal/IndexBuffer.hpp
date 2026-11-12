@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "boost/noncopyable.hpp"
+#include "gpg/core/utils/NonCopyable.h"
 #include "boost/shared_ptr.h"
 #include "gpg/gal/D3D9Utils.h"
 
@@ -20,7 +20,7 @@ namespace gpg::gal
    * context at +0x04 (slot 1 is `lea eax, [ecx+4]; ret` in each, 0x008F4BE0
    * and 0x00901BE0).
    */
-  class IndexBuffer : private boost::noncopyable
+  class IndexBuffer : private gpg::NonCopyable
   {
   public:
     /**

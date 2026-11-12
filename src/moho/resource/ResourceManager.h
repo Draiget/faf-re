@@ -6,7 +6,7 @@
 
 #include "boost/condition.h"
 #include "boost/recursive_mutex.h"
-#include "boost/scoped_ptr.h"
+#include <memory>
 #include "boost/shared_ptr.h"
 #include "boost/thread.h"
 #include "boost/xtime.h"
@@ -284,7 +284,7 @@ namespace moho
     fa::deque<boost::weak_ptr<PrefetchData>> mPrefetchQueue;     // +0x7C
     boost::condition mPrefetchQueued;                            // +0x90
     boost::condition mLoadFinished;                              // +0xA8
-    boost::scoped_ptr<boost::thread> mPrefetchThread;            // +0xC0
+    std::unique_ptr<boost::thread> mPrefetchThread;              // +0xC0
   };
 
   // The members end at 0xC4; `boost::xtime`'s 64-bit `sec` makes the class

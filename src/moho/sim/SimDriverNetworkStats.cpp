@@ -19,8 +19,6 @@
 #include <new>
 #include <vector>
 
-#include "boost/function.hpp"
-#include <boost/bind.hpp>
 #include <boost/ptr_container/exception.hpp>
 #include "gpg/core/diagnostics/BuildInfo.h"
 #include "gpg/core/utils/BoostWrappers.h"

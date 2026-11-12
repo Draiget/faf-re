@@ -1061,7 +1061,7 @@ namespace moho
   );
   static_assert(sizeof(UICommandGraph::CommandGraphTree) == 0x0C, "UICommandGraph::CommandGraphTree size must be 0x0C");
   static_assert(sizeof(UICommandGraph) == 0xDDC, "UICommandGraph size must be 0xDDC");
-  extern boost::scoped_ptr<ISTIDriver> sSimDriver;
+  extern std::unique_ptr<ISTIDriver> sSimDriver;
 
   /**
    * Address: 0x00826F10 (FUN_00826F10, sub_826F10)

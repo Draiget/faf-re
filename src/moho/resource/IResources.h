@@ -4,7 +4,7 @@
 
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/Rect2.h"
-#include "gpg/core/utils/BoostUtils.h"
+#include "gpg/core/utils/NonCopyable.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/math/GridPos.h"
@@ -22,7 +22,7 @@ namespace moho
   class CGeomSolid3;
   class CHeightField;
 
-  class IResources : public boost::noncopyable_::noncopyable
+  class IResources : public gpg::NonCopyable
   {
     // ==== Primary vftable (12 entries) ====
   public:

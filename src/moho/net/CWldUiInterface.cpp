@@ -9,9 +9,6 @@
 #include <memory>
 #include <string>
 
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
-
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/String.h"
@@ -147,8 +144,8 @@ namespace moho
    * main thread (so console output happens on the UI thread). The binary builds
    * this callback via `boost::bind(&ConPrintClientDisconnected, nickname)` (a
    * free-function bind storing a real `std::string` copy, per the manager RTTI)
-   * rather than a closure object -- expressed here the same way so this call
-   * site is the one that actually instantiates the cited manager/invoker pair.
+   * rather than a closure object. Ours is a lambda capturing the same copy, so the
+   * cited manager/invoker pair is the binary's only.
    *
    * FUN_0088F9F0 sits a few bytes below this chain and stamps the identical
    * {manager=FUN_0088FBD0, invoker=FUN_0088FBA0} pair FUN_0088F700 installs,
@@ -167,8 +164,9 @@ namespace moho
   )
   {
     const fa::string nickname = client->GetNickname();
-    boost::function<void(), std::allocator<void>> callback = boost::bind(&ConPrintClientDisconnected, nickname);
-    THREAD_InvokeAsync(callback, 0u);
+    THREAD_InvokeAsync([nickname]() {
+      ConPrintClientDisconnected(nickname);
+    }, 0u);
   }
 
   /**
@@ -288,9 +286,9 @@ namespace moho
    * main thread. The binary builds this callback via
    * `boost::bind(&func_ReceiveChat, nickname, data)` (a free-function bind
    * storing real `std::string`/`MemBuffer` copies, per the manager RTTI) rather
-   * than a closure object -- expressed here the same way so this call site is
-   * the one that actually instantiates the cited manager/invoker pair. The
-   * MemBuffer's shared payload is kept alive by the bind_t's own copy.
+   * than a closure object. Ours is a lambda capturing the same copies, so the
+   * cited manager/invoker pair is the binary's only. The MemBuffer's shared
+   * payload is kept alive by the lambda's own copy, as by the bind_t's.
    *
    * FUN_0088FAA0 sits a few bytes below this chain and stamps the identical
    * stru_1104128 = {manager=FUN_0088FC70, invoker=FUN_0088FC40} pair
@@ -309,8 +307,9 @@ namespace moho
   )
   {
     const fa::string nickname = sender->GetNickname();
-    boost::function<void(), std::allocator<void>> callback = boost::bind(&func_ReceiveChat, nickname, data);
-    THREAD_InvokeAsync(callback, 0u);
+    THREAD_InvokeAsync([nickname, data]() {
+      func_ReceiveChat(nickname, data);
+    }, 0u);
   }
 
   /**
@@ -335,8 +334,8 @@ namespace moho
    * which forwards to the Lua UI when a sim driver is active). The binary builds
    * this callback via `boost::bind(&UI_DriverNoteGameSpeedChanged, slotZeroBased,
    * gameSpeed)` (a free-function bind, flat function_buffer, no this-adjustment)
-   * rather than a closure object -- expressed here the same way to keep this
-   * call site the one that actually instantiates the cited manager/invoker pair.
+   * rather than a closure object. Ours is a lambda capturing the same values, so
+   * the cited manager/invoker pair is the binary's only.
    */
   void CWldUiInterface::NoteGameSpeedChanged(
     const CClientBase* const client,
@@ -345,9 +344,9 @@ namespace moho
   {
     // `value<unsigned int>` in the bind_t RTTI: the index is bound unsigned.
     const auto clientIndex = static_cast<std::uint32_t>(client->GetIndex());
-    boost::function<void(), std::allocator<void>> callback =
-      boost::bind(&UI_DriverNoteGameSpeedChanged, clientIndex, gameSpeed);
-    THREAD_InvokeAsync(callback, 0u);
+    THREAD_InvokeAsync([clientIndex, gameSpeed]() {
+      UI_DriverNoteGameSpeedChanged(clientIndex, gameSpeed);
+    }, 0u);
   }
 
   /**
@@ -410,8 +409,9 @@ namespace moho
     if (stopped) {
       text = gpg::STR_Printf("%s The game has stopped to avoid a desync.", text.c_str());
     }
-    boost::function<void(), std::allocator<void>> callback = boost::bind(&ShowOrdersDifferNotice, text);
-    THREAD_InvokeAsync(callback, 0u);
+    THREAD_InvokeAsync([text]() {
+      ShowOrdersDifferNotice(text);
+    }, 0u);
   }
 
   /**

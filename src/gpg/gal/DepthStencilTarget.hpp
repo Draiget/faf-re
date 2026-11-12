@@ -1,6 +1,6 @@
 #pragma once
 
-#include "boost/noncopyable.hpp"
+#include "gpg/core/utils/NonCopyable.h"
 #include "boost/shared_ptr.h"
 
 namespace gpg::gal
@@ -16,7 +16,7 @@ namespace gpg::gal
    * implement it; `OutputContext::depthStencil` holds one, and the shipped
    * symbols carry it as `boost::shared_ptr<DepthStencilTarget>`.
    */
-  class DepthStencilTarget : private boost::noncopyable
+  class DepthStencilTarget : private gpg::NonCopyable
   {
   public:
     /**

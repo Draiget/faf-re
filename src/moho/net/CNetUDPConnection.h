@@ -7,7 +7,7 @@
 #include "gpg/core/streams/PipeStream.h"
 #include "gpg/core/streams/ZLibOutputFilterStream.h"
 #include "gpg/core/time/Timer.h"
-#include "gpg/core/utils/BoostUtils.h"
+#include "gpg/core/utils/NonCopyable.h"
 #include "INetConnection.h"
 #include "INetConnector.h"
 #include "legacy/containers/String.h"

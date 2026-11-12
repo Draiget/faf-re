@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include "boost/noncopyable.hpp"
+#include "gpg/core/utils/NonCopyable.h"
 #include "boost/shared_ptr.h"
 #include "gpg/gal/Matrix.h"
 #include "legacy/containers/String.h"
@@ -20,7 +20,7 @@ namespace gpg::gal
    * One variable (effect parameter) of an Effect. Backends:
    * EffectVariableD3D9 (0x00D47E94), EffectVariableD3D10 (0x00D488DC).
    */
-  class EffectVariable : private boost::noncopyable
+  class EffectVariable : private gpg::NonCopyable
   {
   public:
     /**

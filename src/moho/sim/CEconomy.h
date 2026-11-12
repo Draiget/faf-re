@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/scoped_ptr.h"
+#include <memory>
 #include "moho/misc/CEconomyEvent.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
 
@@ -134,7 +134,7 @@ namespace moho
     SEconValue mResources;                         // +0x08
     SEconValue mPendingResources;                  // +0x10
     SEconTotals mTotals;                           // +0x18
-    boost::scoped_ptr<CEconStorage> mExtraStorage; // +0x50
+    std::unique_ptr<CEconStorage> mExtraStorage;   // +0x50
     std::uint8_t mResourceSharing;                 // +0x54
     TDatListItem<void, void> mConsumptionData;     // +0x58
   };

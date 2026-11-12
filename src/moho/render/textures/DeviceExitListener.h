@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "boost/scoped_ptr.h"
+#include <memory>
 #include "gpg/core/containers/DList.h"
 #include "moho/misc/Listener.h"
 
@@ -70,5 +70,5 @@ namespace moho
    * Every write is `scoped_ptr::reset`: the new pointer is stored before the
    * old listener is deleted (0x00447404, 0x00447399).
    */
-  extern boost::scoped_ptr<DeviceExitListener> sDeviceExitListener;
+  extern std::unique_ptr<DeviceExitListener> sDeviceExitListener;
 } // namespace moho

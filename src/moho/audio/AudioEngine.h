@@ -15,7 +15,7 @@
 #include "legacy/containers/Set.h"
 #include "legacy/containers/String.h"
 #include "Wm3Vector3.h"
-#include "boost/scoped_ptr.h"
+#include <memory>
 
 namespace boost
 {
@@ -666,7 +666,7 @@ namespace moho
     [[nodiscard]] bool IsStopped(IXACTCue* cue) const;
   };
 
-  extern boost::scoped_ptr<SoundConfiguration> sSoundConfiguration;
+  extern std::unique_ptr<SoundConfiguration> sSoundConfiguration;
 
   /**
    * Address: 0x004D9140 (FUN_004D9140, ?SND_FindEngine@Moho@@...)

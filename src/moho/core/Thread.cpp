@@ -41,7 +41,7 @@ uint32_t moho::THREAD_GetMainThreadId()
  * Queues one callback as APC on the resolved target thread.
  */
 void moho::THREAD_InvokeAsync(
-  boost::function<void(), std::allocator<void>> fn,
+  std::function<void()> fn,
   const uint32_t threadId
 )
 {
@@ -66,7 +66,7 @@ void moho::THREAD_InvokeAsync(
   }
 
   // Construct payload in-place inside the 32-byte box
-  auto* box = ::new (raw) InvokePayload{fn};
+  auto* box = ::new (raw) InvokePayload{std::move(fn)};
 
   pair[0] = box;
   pair[1] = nullptr; // async: no waiter

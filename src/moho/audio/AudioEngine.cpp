@@ -48,7 +48,7 @@
  * Address: 0x00BF0DB0 (FUN_00BF0DB0, dynamic atexit destructor for `sSoundConfiguration`)
  * Address: 0x004DC230 (FUN_004DC230, boost::scoped_ptr<SoundConfiguration>::swap, emitted for its reset)
  */
-boost::scoped_ptr<moho::SoundConfiguration> moho::sSoundConfiguration;
+std::unique_ptr<moho::SoundConfiguration> moho::sSoundConfiguration;
 
 namespace
 {

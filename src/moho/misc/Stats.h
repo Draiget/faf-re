@@ -8,7 +8,7 @@
 #endif
 
 #include "boost/mutex.h"
-#include "boost/scoped_ptr.h"
+#include <memory>
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/String.h"
@@ -42,7 +42,7 @@ namespace moho
   };
 
   template <>
-  class Stats<StatItem> : boost::noncopyable
+  class Stats<StatItem> : gpg::NonCopyable
   {
   public:
     using item_type = StatItem;
@@ -90,7 +90,7 @@ namespace moho
     // The root item, owned: the destructor 0x00406600 tears down `mLock` and then
     // deletes it through this member, the reverse of their declaration order;
     // loads swap a new root in before the old one is deleted (0x00419DE0).
-    boost::scoped_ptr<StatItem> mItem; // +0x04
+    std::unique_ptr<StatItem> mItem; // +0x04
     // Built in place by the constructor (boost::mutex::mutex 0x00AC1A60 on
     // `this+8`): the lock handle, then the critical-section flag at +0x0C.
     boost::mutex mLock; // +0x08
@@ -809,7 +809,7 @@ namespace moho
    * Address: 0x00BE8CF0 (FUN_00BE8CF0, dynamic initializer of the copy at 0x010C6290)
    * Address: 0x00C08A70 (FUN_00C08A70, that copy's atexit destructor)
    */
-  static boost::scoped_ptr<EngineStats> sEngineStats;
+  static std::unique_ptr<EngineStats> sEngineStats;
 
   /**
    * Address: 0x00408940 (FUN_00408940, Moho::GetEngineStats)
@@ -947,7 +947,7 @@ namespace moho
   [[nodiscard]] CScrLuaInitForm* func_EndLoggingStats_LuaFuncDef();
 
   template <>
-  class Stats<CArmyStatItem> : boost::noncopyable
+  class Stats<CArmyStatItem> : gpg::NonCopyable
   {
   public:
     using item_type = CArmyStatItem;
@@ -1006,7 +1006,7 @@ namespace moho
     // The root item, owned: the destructor 0x006FD850 tears down `mLock` and then
     // deletes it through this member, the reverse of their declaration order;
     // loads swap a new root in before the old one is deleted (0x00419DE0).
-    boost::scoped_ptr<CArmyStatItem> mItem; // +0x04
+    std::unique_ptr<CArmyStatItem> mItem; // +0x04
     // Built in place by the constructor (boost::mutex::mutex 0x00AC1A60 on
     // `this+8`): the lock handle, then the critical-section flag at +0x0C.
     boost::mutex mLock; // +0x08

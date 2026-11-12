@@ -1,7 +1,6 @@
 #include "CGpgNetInterface.h"
 #include "platform/X87Precision.h"
 
-#include <boost/bind.hpp>
 #include <algorithm>
 #include <chrono>
 #include <cstring>
@@ -1021,7 +1020,9 @@ namespace
     const u_short port
   )
   {
-    return boost::function0<void>(boost::bind(&CGpgNetInterface::ConnectThread, self, address, port));
+    return boost::function0<void>([self, address, port]() {
+      self->ConnectThread(address, port);
+    });
   }
 } // namespace
 
@@ -1131,7 +1132,9 @@ namespace
     const fa::string& launchCommandTemplate
   )
   {
-    return boost::function0<void>(boost::bind(&CGpgNetInterface::ConnectThread, self, launchCommandTemplate));
+    return boost::function0<void>([self, launchCommandTemplate]() {
+      self->ConnectThread(launchCommandTemplate);
+    });
   }
 } // namespace
 

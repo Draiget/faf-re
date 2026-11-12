@@ -16,10 +16,6 @@
 #include <typeinfo>
 #include <vector>
 
-#include <boost/algorithm/string/classification.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/range/iterator_range.hpp>
-
 #include "CClientManagerImpl.h"
 #include "CDiscoveryService.h"
 #include "CMessageStream.h"
@@ -336,34 +332,21 @@ namespace
 
     const fa::set<char> localSeparators(separatorsParam);
 
-    // `is_any_of`'s templated constructor resolves its argument's begin/end
-    // through unqualified `begin(Range)`/`end(Range)` calls, which pick up
-    // both `boost::begin`/`boost::end` (ordinary lookup, this call sits
-    // inside `boost::algorithm::detail`) and `std::begin`/`std::end` (ADL --
-    // `fa::set<char>`'s second template argument defaults to
-    // `std::less<char>`, which drags `std` into the type's associated
-    // namespaces). The two are ambiguous under C++20's generic
-    // `std::begin`/`std::end`, a incompatibility this 2006-era boost header
-    // could not have anticipated. Decaying to a raw `const char*` pair
-    // sidesteps it entirely (fundamental/pointer types have no associated
-    // namespace for ADL) -- the same fix already applied to the input range
-    // above, and the same technique a throwaway MSVC probe against the
-    // vendored headers confirmed while investigating this recovery.
-    // Behaviourally inert: `is_any_ofF`'s constructor immediately copies the
-    // characters into its own `std::set<char>` regardless of what range they
-    // arrived through.
-    std::vector<char> separatorChars(localSeparators.begin(), localSeparators.end());
-    const boost::iterator_range<const char*> separatorRange(
-      separatorChars.data(), separatorChars.data() + separatorChars.size()
-    );
-
+    // What the binary's `boost::algorithm::split(ignoreNames, range, is_any_of(separators), token_compress_off)`
+    // produces: every run between two separators is a token, empty runs included, so N separators give N + 1 tokens.
+    // Checked against boost 1.34.1's split on 12 inputs (empty, leading, trailing and repeated separators).
     const char* const first = moho::lob_IgnoreNames.data();
     const char* const last = first + moho::lob_IgnoreNames.size();
-    boost::iterator_range<const char*> inputRange(first, last);
-
-    boost::algorithm::split(
-      ignoreNames, inputRange, boost::algorithm::is_any_of(separatorRange), boost::algorithm::token_compress_off
-    );
+    const char* tokenStart = first;
+    for (const char* it = first;; ++it) {
+      if (it == last || localSeparators.find(*it) != localSeparators.end()) {
+        ignoreNames.push_back(fa::string(tokenStart, static_cast<std::size_t>(it - tokenStart)));
+        if (it == last) {
+          break;
+        }
+        tokenStart = it + 1;
+      }
+    }
 
     return ignoreNames;
   }

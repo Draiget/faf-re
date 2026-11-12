@@ -1,6 +1,6 @@
 #pragma once
 
-#include "boost/noncopyable.hpp"
+#include "gpg/core/utils/NonCopyable.h"
 
 namespace gpg::gal
 {
@@ -15,7 +15,7 @@ namespace gpg::gal
    * it; `OutputContext::cubeTarget` holds one together with the face index
    * to render into.
    */
-  class CubeRenderTarget : private boost::noncopyable
+  class CubeRenderTarget : private gpg::NonCopyable
   {
   public:
     /**

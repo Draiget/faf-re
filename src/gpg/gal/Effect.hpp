@@ -1,6 +1,6 @@
 #pragma once
 
-#include "boost/noncopyable.hpp"
+#include "gpg/core/utils/NonCopyable.h"
 #include "boost/shared_ptr.h"
 #include "legacy/containers/Vector.h"
 
@@ -17,7 +17,7 @@ namespace gpg::gal
    * One compiled effect: its techniques and variables are looked up by
    * name. Backends: EffectD3D9 (0x00D47D6C), EffectD3D10 (0x00D4885C).
    */
-  class Effect : private boost::noncopyable
+  class Effect : private gpg::NonCopyable
   {
   public:
     /**

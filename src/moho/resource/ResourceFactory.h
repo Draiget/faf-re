@@ -1,6 +1,6 @@
 #pragma once
 
-#include "boost/noncopyable.hpp"
+#include "gpg/core/utils/NonCopyable.h"
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -17,7 +17,7 @@ namespace moho
    * below; the typed templates underneath forward each one into a typed
    * `*Impl` that a concrete factory fills in.
    */
-  class ResourceFactoryBase : private boost::noncopyable
+  class ResourceFactoryBase : private gpg::NonCopyable
   {
   public:
     /**

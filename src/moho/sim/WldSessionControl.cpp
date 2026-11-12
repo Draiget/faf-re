@@ -44,7 +44,7 @@ namespace moho
    * `get` is WLD_GetDriver (0x0088D330); 0x0088E8D0 and 0x0088E8E0 are its ICF
    * twins.
    */
-  boost::scoped_ptr<ISTIDriver> sSimDriver;
+  std::unique_ptr<ISTIDriver> sSimDriver;
   namespace
   {
 

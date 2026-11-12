@@ -1,7 +1,7 @@
 #pragma once
 #include <type_traits>
 
-#include "boost/noncopyable.hpp"
+#include "gpg/core/utils/NonCopyable.h"
 
 namespace gpg
 {
@@ -24,7 +24,7 @@ namespace gpg
    */
 #pragma pack(push, 4)
   template <class T, class U = void>
-  struct DListItem : private boost::noncopyable
+  struct DListItem : private gpg::NonCopyable
   {
     using type = T;
     using unk_t = U;

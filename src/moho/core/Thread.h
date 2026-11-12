@@ -7,7 +7,7 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include "boost/function.h"
+#include <functional>
 #include "Wm3AxisAlignedBox3.h"
 #include <winsock2.h>
 #include <Windows.h>
@@ -46,7 +46,7 @@ namespace moho
    * What it does:
    * Clones one callback and queues it as an APC to the resolved target thread.
    */
-  void THREAD_InvokeAsync(boost::function<void(), std::allocator<void>> fn, uint32_t threadId);
+  void THREAD_InvokeAsync(std::function<void()> fn, uint32_t threadId);
 
   /**
    * Address: 0x004141A0 (FUN_004141A0)
@@ -58,14 +58,13 @@ namespace moho
   void THREAD_SetAffinity(bool preferLowest) noexcept;
 
   /**
-   * Small payload that will live in a 32-byte box.
-   * Must fit into 32 bytes to mimic the observed allocation size.
+   * The callback's box. The binary's box is 32 bytes (a boost::function); THREAD_InvokeAsync allocates
+   * max(32, sizeof(InvokePayload)), as std::function is larger.
    */
   struct InvokePayload
   {
-    boost::function<void()> fn;
+    std::function<void()> fn;
   };
-  static_assert(sizeof(InvokePayload) <= 32, "InvokePayload must fit into 32 bytes (box size)");
 
   /**
    * Minimal wait context mirroring sub_104DB6C0/7F0/790 trio.

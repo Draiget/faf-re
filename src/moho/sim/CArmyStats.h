@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "boost/shared_ptr.h"
-#include "../../gpg/core/utils/BoostUtils.h"
+#include "gpg/core/utils/NonCopyable.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "../misc/StatItem.h"
 #include "../misc/Stats.h"

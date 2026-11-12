@@ -1,6 +1,6 @@
 #pragma once
 
-#include "boost/noncopyable.hpp"
+#include "gpg/core/utils/NonCopyable.h"
 #include "boost/shared_ptr.h"
 #include "gpg/gal/D3D9Utils.h"
 
@@ -18,7 +18,7 @@ namespace gpg::gal
    * context at +0x04, so slot 1 is `lea eax, [ecx+4]; ret` in each
    * (0x008F5700, 0x0094D9F0).
    */
-  class VertexBuffer : private boost::noncopyable
+  class VertexBuffer : private gpg::NonCopyable
   {
   public:
     /**

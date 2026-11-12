@@ -21,7 +21,7 @@ namespace moho
    * pointer is already in .bss); the destructor deletes a listener still
    * alive at exit without clearing the slot, which is `~scoped_ptr`.
    */
-  boost::scoped_ptr<DeviceExitListener> sDeviceExitListener;
+  std::unique_ptr<DeviceExitListener> sDeviceExitListener;
 
   /**
    * Address: 0x004472B0 (FUN_004472B0, Moho::DeviceExitListener::DeviceExitListener)

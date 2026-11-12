@@ -245,9 +245,6 @@ target_link_libraries(faf_ffmpeg INTERFACE m)
 
 add_library(faf_client_objs OBJECT ${_faf_client_files})
 add_dependencies(faf_client_objs faf_client_dxc faf_client_imaging faf_ffmpeg_build)
-# boost 1.34's string algorithms (the lobby) derive from std::unary_function, which libc++ keeps
-# behind this opt-in since C++17, as boost.thread's std::auto_ptr (cmake/FafLinux.cmake).
-target_compile_definitions(faf_client_objs PRIVATE _LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION=1)
 target_link_libraries(faf_client_objs PUBLIC faf_sim_settings Wm3Headers zlib123 faf_monocypher faf_zstd
   FAudio-static SDL3::SDL3-static  # FAudio names its static target FAudio-static, with no alias
   faf_freetype faf_msdfgen faf_ffmpeg faf_netlink)

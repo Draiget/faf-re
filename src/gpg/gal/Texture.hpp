@@ -2,7 +2,7 @@
 
 #include <cstddef>
 
-#include "boost/noncopyable.hpp"
+#include "gpg/core/utils/NonCopyable.h"
 #include "boost/shared_ptr.h"
 #include "gpg/core/streams/MemBufferStream.h"
 #include "platform/Platform.h"
@@ -41,7 +41,7 @@ namespace gpg::gal
    * holds one as `boost::shared_ptr<Texture>` - e.g. the shipped
    * `?SheetGetBaseTexture@RD3DTextureResource@Moho@@UAE?AV?$shared_ptr@VTexture@gal@gpg@@@boost@@XZ`.
    */
-  class Texture : private boost::noncopyable
+  class Texture : private gpg::NonCopyable
   {
   public:
     /**

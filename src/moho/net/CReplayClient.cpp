@@ -1,7 +1,5 @@
 #include "CReplayClient.h"
 
-#include <boost/bind.hpp>
-
 #include <cstdint>
 #include <mutex>
 #include <new>
@@ -77,7 +75,9 @@ namespace
     CReplayClient* const self
   )
   {
-    return boost::function0<void>(boost::bind(&CReplayClient::ReplayThread, self));
+    return boost::function0<void>([self]() {
+      self->ReplayThread();
+    });
   }
 } // namespace
 

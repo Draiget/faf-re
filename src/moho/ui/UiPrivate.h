@@ -8,7 +8,6 @@
 #include "moho/sim/BuildQueueCommandDecrement.h"
 #include "platform/BinaryObjectBytes.h"
 
-#include <boost/bind.hpp>
 #include <Windows.h>
 
 #include <algorithm>

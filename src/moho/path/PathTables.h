@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 
-#include "boost/scoped_ptr.h"
+#include <memory>
 #include "gpg/core/containers/Rect2.h"
 
 namespace gpg
@@ -134,7 +134,7 @@ namespace moho
     static void Move(PathQueue** slot, PathQueue* replacement) noexcept;
 
   private:
-    boost::scoped_ptr<Impl> mImpl;
+    std::unique_ptr<Impl> mImpl;
   };
   static_assert(sizeof(PathQueue) == 0x04, "PathQueue size must be 0x04");
 } // namespace moho
