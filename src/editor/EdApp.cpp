@@ -25,6 +25,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <map>
+#include <thread>
 #include <string>
 #include <vector>
 
@@ -45,6 +46,7 @@
 #include "editor/ui/EdKeymap.h"
 #include "editor/ui/EdKeysPage.h"
 #include "editor/ui/EdPalette.h"
+#include "editor/ui/EdSettings.h"
 #include "editor/ui/EdStatus.h"
 #include "editor/ui/EdTheme.h"
 #include "editor/ui/EdThemeStyle.h"
@@ -1247,8 +1249,156 @@ namespace faf::editor
       }
 
       /**
-       * Settings (File > Settings, View > Keyboard shortcuts): the Keys page; Appearance, General, Viewport and
-       * Performance come with the window's own item (PLAN A8).
+       * settings.ini from the settings folder (`/settingsfile <path>`: that file, read and written, for test runs);
+       * read in Init, before the window and the renderer exist. A test run without `/settingsfile` doesn't write it.
+       */
+      void LoadSettings()
+      {
+        if (fa::vector<fa::string> value; moho::CFG_GetArgOption("/settingsfile", 1, &value) && !value.empty()) {
+          mSettingsFile = std::filesystem::path(value[0].c_str());
+        } else if (const std::filesystem::path folder = EditorSettingsFolder(); !folder.empty()) {
+          mSettingsFile = folder / "settings.ini";
+          for (const char* const option :
+               {"/command", "/palette", "/theme", "/keysfile", "/focuspanel", "/uiclicks", "/tool", "/proptool"}) {
+            mSettingsWritable = mSettingsWritable && !moho::CFG_GetArgOption(option, 0, nullptr);
+          }
+        }
+        if (std::ifstream in(mSettingsFile, std::ios::binary); !mSettingsFile.empty() && in) {
+          std::ostringstream text;
+          text << in.rdbuf();
+          mSettingsProblems = mSettings.Read(text.str());
+          mSettingsRead = true;
+        }
+        mStartTitleBar = mSettings.Get(EdSettings::kTitleBar);
+        mStartRenderer = mSettings.Get(EdSettings::kRenderer);
+      }
+
+      void SaveSettings()
+      {
+        if (mSettingsFile.empty() || !mSettingsWritable) {
+          return;
+        }
+        std::ofstream out(mSettingsFile, std::ios::binary | std::ios::trunc);
+        out << mSettings.Write();
+        gpg::Logf("editor: settings written to %s", mSettingsFile.string().c_str());
+      }
+
+      /**
+       * The switches the View menu also changes (Full help text, Panels while playing): put on from settings.ini at
+       * the first frame, and written back when they change, wherever from.
+       */
+      void SyncSettings()
+      {
+        static bool applied = false;
+        if (!applied) {
+          applied = true;
+          // What Init read, said now that the log is open.
+          gpg::Logf(
+            "editor: settings %s %s (title row %s, renderer %s)",
+            mSettingsRead ? "from" : "are the defaults, no",
+            mSettingsFile.string().c_str(),
+            mStartTitleBar.c_str(),
+            mStartRenderer.c_str()
+          );
+          for (const std::string& problem : mSettingsProblems) {
+            gpg::Warnf("editor: %s: %s", mSettingsFile.filename().string().c_str(), problem.c_str());
+          }
+          FullHelpText() = mSettings.GetBool(EdSettings::kFullHelp);
+          mShell->PanelsWhilePlaying() = mSettings.GetBool(EdSettings::kPanelsWhilePlaying);
+          return;
+        }
+        bool changed = false;
+        if (FullHelpText() != mSettings.GetBool(EdSettings::kFullHelp)) {
+          changed = mSettings.SetBool(EdSettings::kFullHelp, FullHelpText()) || changed;
+        }
+        if (mShell->PanelsWhilePlaying() != mSettings.GetBool(EdSettings::kPanelsWhilePlaying)) {
+          changed = mSettings.SetBool(EdSettings::kPanelsWhilePlaying, mShell->PanelsWhilePlaying()) || changed;
+        }
+        if (changed) {
+          SaveSettings();
+        }
+      }
+
+      /**
+       * Settings > Viewport's background frame rate: while the editor isn't the window in front and no play runs,
+       * the frame waits until 1/cap s passed since the last (the GPU and fans rest).
+       */
+      void CapBackgroundFrames()
+      {
+        const int cap = mSettings.GetInt(EdSettings::kBackgroundFps);
+        const auto now = std::chrono::steady_clock::now();
+        const HWND front = ::GetForegroundWindow();
+        const HWND frame = HandleOf(mGame.supcomFrame);
+        const bool behind = front != frame && (front == nullptr || ::GetAncestor(front, GA_ROOT) != frame);
+        if (cap > 0 && behind && !mPlay.Active()) {
+          const auto wanted = std::chrono::microseconds(1000000 / cap);
+          const auto spent = now - mLastBackgroundFrame;
+          if (spent < wanted) {
+            ::Sleep(static_cast<DWORD>(std::chrono::duration_cast<std::chrono::milliseconds>(wanted - spent).count()));
+          }
+        }
+        mLastBackgroundFrame = std::chrono::steady_clock::now();
+      }
+
+      /** One of a setting's values as a row of joined buttons, the one set filled; true when one was clicked. */
+      bool SettingChoice(
+        const char* const key,
+        const std::vector<std::pair<const char*, const char*>>& choices
+      )
+      {
+        bool clicked = false;
+        const std::string now = mSettings.Get(key);
+        for (std::size_t i = 0; i < choices.size(); ++i) {
+          if (i > 0) {
+            ImGui::SameLine(0.0f, Em(2.0f));
+          }
+          const bool on = now == choices[i].first;
+          if (on) {
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_Header));
+          }
+          if (ImGui::Button(choices[i].second) && !on) {
+            clicked = mSettings.Set(key, choices[i].first);
+          }
+          if (on) {
+            ImGui::PopStyleColor();
+          }
+        }
+        if (clicked) {
+          gpg::Logf("editor: settings: %s=%s", key, mSettings.Get(key).c_str());
+          SaveSettings();
+          PostStatusMessage("Settings saved");
+        }
+        return clicked;
+      }
+
+      /** A page's heading and a setting's name over its control, with a line saying what it does. */
+      static void SettingsHeading(
+        const char* const text
+      )
+      {
+        ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 1.25f);
+        ImGui::TextUnformatted(text);
+        ImGui::PopFont();
+        ImGui::Spacing();
+      }
+      static void SettingLabel(
+        const char* const name,
+        const char* const about
+      )
+      {
+        ImGui::Spacing();
+        ImGui::TextUnformatted(name);
+        if (about != nullptr && about[0] != 0) {
+          ImGui::PushTextWrapPos(0.0f);
+          ImGui::TextDisabled("%s", about);
+          ImGui::PopTextWrapPos();
+        }
+      }
+
+      /**
+       * Settings (File > Settings, View > Keyboard shortcuts, the palette's "Settings: ..."): pages listed on the
+       * left, the picked one on the right. General, Appearance (theme, panels' scale, title row), Keys, Viewport
+       * (renderer, background frame rate) and Performance (what runs now).
        */
       void DrawSettings()
       {
@@ -1266,15 +1416,140 @@ namespace faf::editor
           ImVec2(0.5f, 0.5f)
         );
         if (ImGui::Begin("Settings", &mShowSettings, ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoSavedSettings)) {
-          if (ImGui::BeginTabBar("##settingspages")) {
-            if (ImGui::BeginTabItem("Keys")) {
-              if (DrawKeysPage(mCommands, mKeyDefaults)) {
-                SaveKeymap();
-              }
-              ImGui::EndTabItem();
+          static constexpr const char* kPages[] = {"General", "Appearance", "Keys", "Viewport", "Performance"};
+          // The pages, selected by fill.
+          ImGui::BeginChild("##settingspages", ImVec2(Em(170.0f), 0.0f));
+          for (int i = 0; i < static_cast<int>(std::size(kPages)); ++i) {
+            if (ImGui::Selectable(kPages[i], mSettingsPage == i, ImGuiSelectableFlags_None, ImVec2(0.0f, Em(28.0f)))) {
+              mSettingsPage = i;
             }
-            ImGui::EndTabBar();
           }
+          ImGui::EndChild();
+          ImGui::SameLine(0.0f, Em(14.0f));
+          ImGui::BeginChild("##settingspage", ImVec2(0.0f, 0.0f));
+          SettingsHeading(kPages[mSettingsPage]);
+          switch (mSettingsPage) {
+          case 0: {
+            SettingLabel("Help text", "The panels' help lines in full, or one line each (View > Full help text).");
+            ImGui::Checkbox("Full help text", &FullHelpText());
+            SettingLabel("Panels while playing", "The panels stay around the game while a play runs.");
+            ImGui::Checkbox("Show the panels while playing", &mShell->PanelsWhilePlaying());
+            SettingLabel("Settings folder", nullptr);
+            const std::filesystem::path folder = EditorSettingsFolder();
+            ImGui::TextDisabled("%s", folder.string().c_str());
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Open")) {
+              (void)::ShellExecuteW(nullptr, L"open", folder.wstring().c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+            }
+            ImGui::Spacing();
+            ImGui::PushTextWrapPos(0.0f);
+            ImGui::TextDisabled(
+              "settings.ini keeps these settings, layout.ini the panels, the theme and the scale, keys.ini your keys."
+            );
+            ImGui::PopTextWrapPos();
+            break;
+          }
+          case 1: {
+            SettingLabel("Theme", "The editor's colours. Your own themes are Lua files in the themes folder.");
+            const std::string current = gThemeNow;
+            ImGui::SetNextItemWidth(Em(260.0f));
+            if (ImGui::BeginCombo("##theme", current.c_str())) {
+              for (const EdTheme& theme : mThemes) {
+                if (ImGui::Selectable(theme.name.c_str(), theme.name == current)) {
+                  SetTheme(theme.name, true);
+                  PostStatusMessage("Theme " + theme.name);
+                }
+              }
+              ImGui::EndCombo();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Reload")) {
+              (void)mCommands.Run("view.theme.reload");
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Themes folder")) {
+              (void)mCommands.Run("view.theme.folder");
+            }
+            SettingLabel("Panels' scale", "The size of the panels and their text (Ctrl+= / Ctrl+- / Ctrl+0).");
+            float& scale = mShell->UiScale();
+            int percent = static_cast<int>(std::lround(scale * 100.0f));
+            ImGui::SetNextItemWidth(Em(260.0f));
+            if (ImGui::SliderInt("##uiscale", &percent, 75, 200, "%d %%", ImGuiSliderFlags_AlwaysClamp)) {
+              scale = static_cast<float>(percent) / 100.0f;
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("100 %")) {
+              scale = 1.0f;
+            }
+            SettingLabel(
+              "Title row",
+              "The editor draws its own title row with the menus and workspaces; Windows' caption instead suits remote "
+              "desktop and screen readers. From the next start."
+            );
+            (void)SettingChoice(EdSettings::kTitleBar, {{"own", "The editor's"}, {"windows", "Windows'"}});
+            if (mSettings.Get(EdSettings::kTitleBar) != mStartTitleBar) {
+              ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "Changes when the editor starts again.");
+            }
+            break;
+          }
+          case 2:
+            if (DrawKeysPage(mCommands, mKeyDefaults)) {
+              SaveKeymap();
+            }
+            break;
+          case 3: {
+            SettingLabel(
+              "Renderer",
+              "Automatic tries Direct3D 12, then Vulkan. /d3d12 and /vulkan on the command line win. From "
+              "the next start."
+            );
+            (void)SettingChoice(
+              EdSettings::kRenderer, {{"auto", "Automatic"}, {"d3d12", "Direct3D 12"}, {"vulkan", "Vulkan"}}
+            );
+            gpg::gal::DeviceRuntimeInfo info;
+            if (gpg::gal::Device::IsReady() && gpg::gal::Device::GetInstance()->GetRuntimeInfo(info)) {
+              ImGui::TextDisabled("In use: %s on %s", info.api.c_str(), info.adapter.c_str());
+            }
+            if (mSettings.Get(EdSettings::kRenderer) != mStartRenderer) {
+              ImGui::TextColored(ImVec4(0.95f, 0.75f, 0.30f, 1.0f), "Changes when the editor starts again.");
+            }
+            SettingLabel(
+              "Frame rate behind other windows",
+              "While another window is in front and no play runs, the editor draws at most this often, so the GPU "
+              "rests."
+            );
+            (void)SettingChoice(
+              EdSettings::kBackgroundFps, {{"10", "10 fps"}, {"30", "30 fps"}, {"60", "60 fps"}, {"0", "No limit"}}
+            );
+            break;
+          }
+          default: {
+            gpg::gal::DeviceRuntimeInfo info;
+            if (gpg::gal::Device::IsReady() && gpg::gal::Device::GetInstance()->GetRuntimeInfo(info)) {
+              SettingLabel("Renderer", nullptr);
+              ImGui::TextDisabled("%s", info.api.c_str());
+              SettingLabel("GPU", nullptr);
+              ImGui::TextDisabled("%s", info.adapter.c_str());
+            }
+            SettingLabel("Frame", nullptr);
+            ImGui::TextDisabled(
+              "%.1f ms (%.0f fps)",
+              1000.0 / std::max(1.0, static_cast<double>(ImGui::GetIO().Framerate)),
+              static_cast<double>(ImGui::GetIO().Framerate)
+            );
+            SettingLabel("CPU threads", nullptr);
+            ImGui::TextDisabled("%u", std::thread::hardware_concurrency());
+            ImGui::Spacing();
+            ImGui::PushTextWrapPos(0.0f);
+            ImGui::TextDisabled(
+              "GPU compute and thread counts are set here once the tools that use them (generators, erosion, bakes) "
+              "have them."
+            );
+            ImGui::PopTextWrapPos();
+            break;
+          }
+          }
+          ImGui::EndChild();
         }
         ImGui::End();
       }
@@ -1309,6 +1584,18 @@ namespace faf::editor
       EdKeyDefaults mKeyDefaults;
       std::filesystem::path mKeysFile;
       bool mShowSettings = false;
+      /** Settings' page: 0 General, 1 Appearance, 2 Keys, 3 Viewport, 4 Performance. */
+      int mSettingsPage = 0;
+      /** settings.ini (`/settingsfile <path>`: another, for test runs), and whether a change is written. */
+      EdSettings mSettings;
+      std::filesystem::path mSettingsFile;
+      bool mSettingsWritable = true;
+      bool mSettingsRead = false;
+      std::vector<std::string> mSettingsProblems;
+      /** What settings.ini said at the start: the title row and renderer change from the next start. */
+      std::string mStartTitleBar;
+      std::string mStartRenderer;
+      std::chrono::steady_clock::time_point mLastBackgroundFrame = std::chrono::steady_clock::now();
       /** The key whose press ran a command in the view: its release doesn't reach the scene or the game. */
       unsigned mSwallowKeyUp = 0;
       /** The scenario path of each item File > Open Recent shows, by its place. */
@@ -1517,12 +1804,19 @@ namespace faf::editor
 
     bool EditorApp::Init()
     {
-      // Direct3D 12, then Vulkan; /d3d12 or /vulkan alone. Nothing older (moho::gAppRenderers).
+      LoadSettings();
+      // Direct3D 12, then Vulkan; /d3d12 or /vulkan alone, else Settings > Viewport's renderer. Nothing older
+      // (moho::gAppRenderers).
       using gpg::gal::DeviceApi;
+      const std::string renderer = mSettings.Get(EdSettings::kRenderer);
       if (moho::CFG_GetArgOption("/vulkan", 0, nullptr)) {
         moho::gAppRenderers = {DeviceApi::Vulkan};
       } else if (moho::CFG_GetArgOption("/d3d12", 0, nullptr)) {
         moho::gAppRenderers = {DeviceApi::Direct3D12};
+      } else if (renderer == "vulkan") {
+        moho::gAppRenderers = {DeviceApi::Vulkan, DeviceApi::Direct3D12};
+      } else if (renderer == "d3d12") {
+        moho::gAppRenderers = {DeviceApi::Direct3D12, DeviceApi::Vulkan};
       } else {
         moho::gAppRenderers = {DeviceApi::Direct3D12, DeviceApi::Vulkan};
       }
@@ -1944,7 +2238,20 @@ namespace faf::editor
       });
       add("settings.keys", "Keyboard shortcuts...", "View", "", [this] {
         mShowSettings = true;
+        mSettingsPage = 2;
       }, {}, {}, "Every command's keys, to change");
+      {
+        static constexpr const char* kPageIds[] = {"general", "appearance", "keys", "viewport", "performance"};
+        static constexpr const char* kPageTitles[] = {
+          "Settings: General", "Settings: Appearance", "Settings: Keys", "Settings: Viewport", "Settings: Performance"
+        };
+        for (int i = 0; i < 5; ++i) {
+          add((std::string("settings.") + kPageIds[i]).c_str(), kPageTitles[i], "Settings", "", [this, i] {
+            mShowSettings = true;
+            mSettingsPage = i;
+          });
+        }
+      }
       RegisterThemeCommands();
 
       // Play
@@ -2137,7 +2444,8 @@ namespace faf::editor
     )
     {
       EdWindowChrome& chrome = WindowChrome();
-      chrome.own = !moho::CFG_GetArgOption("/nativecaption", 0, nullptr);
+      chrome.own =
+        !moho::CFG_GetArgOption("/nativecaption", 0, nullptr) && mSettings.Get(EdSettings::kTitleBar) != "windows";
       // The frame's border and (with Windows' caption) its caption dark, as the panels are.
       const BOOL dark = TRUE;
       (void)::DwmSetWindowAttribute(frame, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, &dark, sizeof(dark));
@@ -2891,6 +3199,7 @@ namespace faf::editor
           }
         }
         mShell->Draw();
+        SyncSettings();
         DrawSettings();
         // `/focuspanel <window>` (test runs): that panel in front, a while after the map opened (opening fronts Info).
         if (mFocusPanelFrames < 90 && mDocument.GetState() == EdDocument::State::Open) {
@@ -2995,6 +3304,7 @@ namespace faf::editor
       }
 
       mGame.Main();
+      CapBackgroundFrames();
 
       // Lua asked the app to quit (ExitApplication from a game menu) while the window stays open: that ends the
       // session, not the editor.
