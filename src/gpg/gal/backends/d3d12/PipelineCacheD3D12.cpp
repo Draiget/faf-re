@@ -4,25 +4,31 @@
 
 #include <Windows.h>
 
+#include <atomic>
 #include <cstdio>
 #include <cwchar>
 #include <iterator>
 #include <memory>
+#include <mutex>
 #include <thread>
 
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/PipelineDiskCache.h"
-
-namespace gpg::gal
-{
-  bool gPipelineDiskCache = true;
-} // namespace gpg::gal
 
 namespace gpg::gal::d3d12
 {
   namespace
   {
     constexpr const char* kFileName = "pipelines-d3d12.bin";
+
+    /**
+     * The file writes run on detached threads (and the last one on the thread that closes the cache): each save
+     * numbers its snapshot, and a write whose snapshot is older than the one already on disk is dropped, so a slow
+     * writer can't put an older library over a newer one.
+     */
+    std::mutex gWriteMutex;
+    std::uint64_t gWrittenSnapshot = 0U; // under gWriteMutex
+    std::atomic<std::uint64_t> gNextSnapshot{0U};
 
     [[nodiscard]] bool StartupFlagDisables()
     {
@@ -35,8 +41,10 @@ namespace gpg::gal::d3d12
     )
     {
       std::vector<std::uint8_t> bytes;
-      HANDLE const file =
-        ::CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0U, nullptr);
+      // FILE_SHARE_DELETE: another game process can replace the file (its MoveFileEx) while this one reads it.
+      HANDLE const file = ::CreateFileA(
+        path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, 0U, nullptr
+      );
       if (file == INVALID_HANDLE_VALUE) {
         return bytes;
       }
@@ -55,13 +63,24 @@ namespace gpg::gal::d3d12
     /** Writes through a temporary file, so a crash mid-write leaves the old file. */
     void WriteFileBytes(
       const std::string& path,
-      const std::vector<std::uint8_t>& bytes
-    )
+      const std::vector<std::uint8_t>& bytes,
+      const std::uint64_t snapshot
+    ) noexcept
     {
-      char suffix[32]{};
-      std::snprintf(suffix, sizeof(suffix), ".%lu.tmp", static_cast<unsigned long>(::GetCurrentThreadId()));
-      const std::string temporary = path + suffix;
-      HANDLE const file = ::CreateFileA(temporary.c_str(), GENERIC_WRITE, 0U, nullptr, CREATE_ALWAYS, 0U, nullptr);
+      const std::lock_guard<std::mutex> lock(gWriteMutex);
+      if (snapshot <= gWrittenSnapshot) {
+        return; // a newer library is on disk already
+      }
+      gWrittenSnapshot = snapshot;
+      // No allocation here: this runs on a detached thread, where an exception would end the process.
+      char temporary[MAX_PATH + 32]{};
+      const int length = std::snprintf(
+        temporary, sizeof(temporary), "%s.%lu.tmp", path.c_str(), static_cast<unsigned long>(::GetCurrentThreadId())
+      );
+      if (length <= 0 || static_cast<std::size_t>(length) >= sizeof(temporary)) {
+        return;
+      }
+      HANDLE const file = ::CreateFileA(temporary, GENERIC_WRITE, 0U, nullptr, CREATE_ALWAYS, 0U, nullptr);
       if (file == INVALID_HANDLE_VALUE) {
         return;
       }
@@ -69,9 +88,37 @@ namespace gpg::gal::d3d12
       const bool ok =
         ::WriteFile(file, bytes.data(), static_cast<DWORD>(bytes.size()), &written, nullptr) && written == bytes.size();
       ::CloseHandle(file);
-      if (!ok || !::MoveFileExA(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING)) {
-        ::DeleteFileA(temporary.c_str());
+      if (!ok || !::MoveFileExA(temporary, path.c_str(), MOVEFILE_REPLACE_EXISTING)) {
+        ::DeleteFileA(temporary);
       }
+    }
+
+    /**
+     * Temporary files a process left when it ended mid-write (`<file>.<thread id>.tmp`). Only ones untouched for ten
+     * minutes: another game process may be writing its own right now.
+     */
+    void RemoveStaleTemporaries(
+      const std::string& path
+    )
+    {
+      const std::string folder = path.substr(0U, path.find_last_of("\\/") + 1U);
+      WIN32_FIND_DATAA found{};
+      HANDLE const search = ::FindFirstFileA((path + ".*.tmp").c_str(), &found);
+      if (search == INVALID_HANDLE_VALUE) {
+        return;
+      }
+      FILETIME now{};
+      ::GetSystemTimeAsFileTime(&now);
+      const auto ticks = [](const FILETIME& time) {
+        return (static_cast<std::uint64_t>(time.dwHighDateTime) << 32U) | time.dwLowDateTime;
+      };
+      constexpr std::uint64_t kTenMinutes = 10ULL * 60ULL * 10000000ULL; // in 100 ns units
+      do {
+        if (ticks(now) - ticks(found.ftLastWriteTime) > kTenMinutes) {
+          (void)::DeleteFileA((folder + found.cFileName).c_str());
+        }
+      } while (::FindNextFileA(search, &found));
+      ::FindClose(search);
     }
 
     void PipelineName(
@@ -104,6 +151,7 @@ namespace gpg::gal::d3d12
     }
 
     mPath = directory + kFileName;
+    RemoveStaleTemporaries(mPath);
     mBlob = ReadFileBytes(mPath);
     HRESULT result = E_FAIL;
     if (!mBlob.empty()) {
@@ -240,12 +288,13 @@ namespace gpg::gal::d3d12
         if (FAILED(mLibrary->Serialize(bytes->data(), size))) {
           continue;
         }
+        const std::uint64_t snapshot = ++gNextSnapshot;
         if (inBackground) {
-          std::thread([path = mPath, bytes] {
-            WriteFileBytes(path, *bytes);
+          std::thread([path = mPath, bytes, snapshot] {
+            WriteFileBytes(path, *bytes, snapshot);
           }).detach();
         } else {
-          WriteFileBytes(mPath, *bytes);
+          WriteFileBytes(mPath, *bytes, snapshot);
         }
         return;
       }

@@ -449,6 +449,7 @@ namespace gpg::gal
         frame = Frame{};
       }
       if (mPipelineCache != VK_NULL_HANDLE) {
+        mPipelineCacheFile.Close(mDevice, mPipelineCache);
         Vk().vkDestroyPipelineCache(mDevice, mPipelineCache, nullptr);
       }
       if (mPipelineLayout != VK_NULL_HANDLE) {
@@ -877,9 +878,19 @@ namespace gpg::gal
     );
     mDynamicConstants = gVulkanDynamicConstants;
 
+    // Engine addition (gPipelineDiskCache): the cache starts from the last session's pipelines for this device.
+    const std::vector<std::uint8_t> savedPipelines =
+      mPipelineCacheFile.Open(mProperties, effects::ShaderCacheDirectory());
     VkPipelineCacheCreateInfo cache{};
     cache.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
-    CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreatePipelineCache(mDevice, &cache, nullptr, &mPipelineCache));
+    cache.initialDataSize = savedPipelines.size();
+    cache.pInitialData = savedPipelines.empty() ? nullptr : savedPipelines.data();
+    if (savedPipelines.empty() || Vk().vkCreatePipelineCache(mDevice, &cache, nullptr, &mPipelineCache) != VK_SUCCESS) {
+      mPipelineCache = VK_NULL_HANDLE;
+      cache.initialDataSize = 0U;
+      cache.pInitialData = nullptr;
+      CheckVk("DeviceVulkan.cpp", __LINE__, Vk().vkCreatePipelineCache(mDevice, &cache, nullptr, &mPipelineCache));
+    }
 
     effects::SamplerDesc defaults;
     mDefaultSampler = SamplerFor(defaults);
@@ -2861,6 +2872,7 @@ namespace gpg::gal
   {
     const std::lock_guard<std::recursive_mutex> lock(mMutex);
     ++mFrameNumber;
+    mPipelineCacheFile.OnFrame(mDevice, mPipelineCache);
     {
       static const long start = [] {
         const char* const value = std::getenv("FAF_GAL_TRACE_START");
@@ -3642,6 +3654,20 @@ namespace gpg::gal
       depthFormat = static_cast<DepthStencilTargetVulkan*>(outputContext_.depthStencil.get())->Image().format;
     }
 
+    // Only the streams the bound vertex format reads shape the pipeline (its bindings, below): a stride an earlier
+    // draw left in another slot must not give the same pipeline a second key, and a second build.
+    std::uint32_t formatSlots = 0U;
+    if (mBoundFormat < d3d11::kVertexFormatCount) {
+      for (const D3D11_INPUT_ELEMENT_DESC& element : d3d11::VertexLayoutElements(mBoundFormat)) {
+        if (element.InputSlot < 16U) {
+          formatSlots |= 1U << element.InputSlot;
+        }
+      }
+    }
+    const auto keyStride = [&](const std::uint32_t slot) {
+      return ((formatSlots >> slot) & 1U) != 0U ? mStreams[slot].stride : 0U;
+    };
+
     // Engine change (ren_PipelineMemo): recent pipelines are found without building the string key below.
     PipelineInputs inputs;
     std::memset(static_cast<void*>(&inputs), 0, sizeof(inputs));
@@ -3652,7 +3678,7 @@ namespace gpg::gal
     inputs.format = mBoundFormat;
     inputs.sampleMask = pass.state.sampleMask;
     for (std::uint32_t slot = 0U; slot < 16U; ++slot) {
-      inputs.strides[slot] = mStreams[slot].stride;
+      inputs.strides[slot] = keyStride(slot);
     }
     inputs.blend = pass.state.blend;
     inputs.depth = pass.state.depthStencil;
@@ -3676,7 +3702,7 @@ namespace gpg::gal
       static_cast<std::uint32_t>(mDynamicConstants ? 1U : 0U)
     ); // the pipeline layout (ren_VulkanDynamicConstants)
     for (std::uint32_t slot = 0U; slot < 16U; ++slot) {
-      key.Add(mStreams[slot].stride);
+      key.Add(keyStride(slot));
     }
     const effects::BlendDesc& blend = pass.state.blend;
     const effects::DepthStencilDesc& depth = pass.state.depthStencil;

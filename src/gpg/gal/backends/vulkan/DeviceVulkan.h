@@ -19,6 +19,7 @@
 // CScApp::CreateDevice falls back to Direct3D 9.
 
 #include <cstdint>
+#include "gpg/gal/backends/vulkan/PipelineCacheVulkan.h"
 #include <deque>
 #include <future>
 #include <map>
@@ -440,7 +441,8 @@ namespace gpg::gal
     VkPipelineLayout mDynamicPipelineLayout = VK_NULL_HANDLE;
     bool mDynamicConstants = false; ///< latched from gVulkanDynamicConstants between frames
     VkPipelineCache mPipelineCache = VK_NULL_HANDLE;
-    vulkan::TrackedImage mNullImages[3]; // 2D, cube, 3D
+    vulkan::PipelineCacheFile mPipelineCacheFile; // its file in the shader cache (gPipelineDiskCache)
+    vulkan::TrackedImage mNullImages[3];          // 2D, cube, 3D
     VkImageView mNullViews[3]{};
     vulkan::TrackedBuffer mZeroBuffer; // feeds the vertex inputs a format lacks
     VkSampler mDefaultSampler = VK_NULL_HANDLE;

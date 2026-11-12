@@ -96,6 +96,7 @@
   X(vkDestroyPipeline)                                                                                                 \
   X(vkCreatePipelineCache)                                                                                             \
   X(vkDestroyPipelineCache)                                                                                            \
+  X(vkGetPipelineCacheData)                                                                                            \
   X(vkCreateDescriptorPool)                                                                                            \
   X(vkDestroyDescriptorPool)                                                                                           \
   X(vkResetDescriptorPool)                                                                                             \

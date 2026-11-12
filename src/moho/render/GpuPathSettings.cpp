@@ -29,15 +29,16 @@ namespace moho
      * gpg/gal/PipelineDiskCache.h). Off, pipelines are neither loaded from nor added to it;
      * `/nopipelinecache` also keeps the file from being opened at device creation.
      */
-    // The Direct3D 12 backend's switches; it is Windows-only (the Linux client, issue #255).
-#if FAFRE_PLATFORM_WINDOWS
     TConVar<bool> gTConVar_d3d_PipelineCache(
       "d3d_PipelineCache",
-      "Keep Direct3D 12 pipeline states on disk across sessions, so they are not compiled again in the frame that "
-      "first draws them (1, the default) or create every one in that frame (0). /nopipelinecache turns it off at "
-      "startup.",
+      "Keep Direct3D 12 and Vulkan pipeline states on disk across sessions, so they are not compiled again in the "
+      "frame that first draws them (1, the default) or create every one in that frame (0). /nopipelinecache turns it "
+      "off at startup.",
       &gpg::gal::gPipelineDiskCache
     );
+
+    // The Direct3D 12 backend's switches; it is Windows-only (the Linux client, issue #255).
+#if FAFRE_PLATFORM_WINDOWS
 
     /** Engine addition: `d3d_PlacedResources` (see gpg/gal/PlacedResources.h). */
     TConVar<bool> gTConVar_d3d_PlacedResources(

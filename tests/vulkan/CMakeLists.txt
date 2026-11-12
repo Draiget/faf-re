@@ -25,3 +25,13 @@ target_link_libraries(faf_vulkan_attachment_tests PRIVATE gtest_main)
 set_target_properties(faf_vulkan_attachment_tests PROPERTIES FOLDER "Tests/Vulkan")
 add_test(NAME vulkan_attachment_barriers COMMAND faf_vulkan_attachment_tests)
 set_tests_properties(vulkan_attachment_barriers PROPERTIES LABELS "Vulkan" TIMEOUT 120)
+
+# The pipeline cache file (PipelineCacheVulkan.h): header check against the device, stale temporaries; no driver.
+add_executable(faf_vulkan_cache_tests EXCLUDE_FROM_ALL PipelineCacheFileTests.cpp)
+target_include_directories(faf_vulkan_cache_tests PRIVATE
+  ${CMAKE_CURRENT_LIST_DIR}/../../src
+  ${FAF_DEPENDENCIES_DIR}/vulkan/include)
+target_link_libraries(faf_vulkan_cache_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_vulkan_cache_tests PROPERTIES FOLDER "Tests/Vulkan")
+add_test(NAME vulkan_pipeline_cache COMMAND faf_vulkan_cache_tests)
+set_tests_properties(vulkan_pipeline_cache PROPERTIES LABELS "Vulkan" TIMEOUT 120)
