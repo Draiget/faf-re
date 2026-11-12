@@ -11,8 +11,10 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type api struct {
@@ -23,6 +25,9 @@ type api struct {
 	procDir    string
 	settings   *settingsSource // plan WP17.20
 	hostName   string
+	hostLog    *logRing        // the host's own log lines; nil in tests that don't look
+	metrics    *metricsHistory // every 2 s, the last hour
+	previews   previewCache
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
@@ -47,7 +52,7 @@ func (a *api) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", a.corsOrigin)
 		w.Header().Set("Vary", "Origin")
 		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Max-Age", "600")
 	}
 	if r.Method == http.MethodOptions {
@@ -55,9 +60,14 @@ func (a *api) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p := r.URL.Path
-	// Plan WP17.18: a player's claim of an open slot; its claim code is the credential, not the admin token.
-	if rest, ok := strings.CutPrefix(p, "/api/v1/claim/"); ok {
-		a.claim(w, r, rest)
+	// Players' requests: no admin token; a request's own key is the credential for following it.
+	if rest, ok := strings.CutPrefix(p, "/api/v1/public/"); ok {
+		a.public(w, r, rest)
+		return
+	}
+	// A map's preview needs no token either (an <img> can't send one); it is the map file's own picture.
+	if rest, ok := strings.CutPrefix(p, "/api/v1/maps/"); ok && strings.HasSuffix(rest, "/preview.png") && r.Method == http.MethodGet {
+		a.preview(w, strings.TrimSuffix(rest, "/preview.png"))
 		return
 	}
 	if !a.authorized(r) {
@@ -65,6 +75,74 @@ func (a *api) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch {
+	case p == "/api/v1/pool" && r.Method == http.MethodGet:
+		pool, usage := a.m.poolView()
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "pool": pool, "usage": usage})
+	case p == "/api/v1/pool" && r.Method == http.MethodPut:
+		var u PoolUpdate
+		dec := json.NewDecoder(io.LimitReader(r.Body, 64<<10))
+		dec.DisallowUnknownFields()
+		if err := dec.Decode(&u); err != nil {
+			fail(w, http.StatusBadRequest, fmt.Errorf("body: %w", err))
+			return
+		}
+		warnings, err := a.m.updatePool(u)
+		if err != nil {
+			fail(w, http.StatusBadRequest, err)
+			return
+		}
+		pool, usage := a.m.poolView()
+		log.Printf("player hosting: %v, pool CPUs %v, up to %d games of %d players, access %s", pool.Enabled, pool.CPUs, pool.MaxGames, pool.MaxPlayers, pool.Access)
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "pool": pool, "usage": usage, "warnings": warnings})
+	case p == "/api/v1/queue" && r.Method == http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "queue": a.m.listQueue()})
+	case strings.HasPrefix(p, "/api/v1/queue/"):
+		id, sub, _ := strings.Cut(strings.TrimPrefix(p, "/api/v1/queue/"), "/")
+		var err error
+		switch {
+		case sub == "" && r.Method == http.MethodDelete:
+			err = a.m.cancelQueued(id)
+		case sub == "up" && r.Method == http.MethodPost:
+			err = a.m.moveUp(id)
+		default:
+			fail(w, http.StatusNotFound, fmt.Errorf("no %s %s", r.Method, p))
+			return
+		}
+		if err != nil {
+			fail(w, http.StatusNotFound, err)
+			return
+		}
+		if sub == "" {
+			log.Printf("queued %s cancelled by the operator", id)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "queue": a.m.listQueue()})
+	case p == "/api/v1/metrics" && r.Method == http.MethodGet:
+		seconds := 600
+		if v := r.URL.Query().Get("seconds"); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 1 {
+				fail(w, http.StatusBadRequest, errors.New("seconds is 1..3600"))
+				return
+			}
+			seconds = min(n, 3600)
+		}
+		if a.metrics == nil {
+			writeJSON(w, http.StatusOK, (&metricsHistory{}).window(seconds, time.Now()))
+			return
+		}
+		writeJSON(w, http.StatusOK, a.metrics.window(seconds, time.Now()))
+	case p == "/api/v1/logs/host" && r.Method == http.MethodGet:
+		lines := []string{}
+		if a.hostLog != nil {
+			lines = a.hostLog.tail(linesParam(r))
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "lines": lines})
+	case p == "/api/v1/logs/host/stream" && r.Method == http.MethodGet:
+		if a.hostLog == nil {
+			fail(w, http.StatusNotFound, errors.New("this host keeps no log"))
+			return
+		}
+		streamRing(w, r, a.hostLog)
 	case p == "/api/v1/host" && r.Method == http.MethodGet:
 		total, avail := memoryMB(a.procDir)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "host": map[string]any{
@@ -74,7 +152,7 @@ func (a *api) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"nodes": a.m.nodes(), "links": a.m.links(), // plan WP17.16
 		}})
 	case p == "/api/v1/maps" && r.Method == http.MethodGet:
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "maps": a.maps()})
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "maps": a.mapList("/api/v1/maps/")})
 	case p == "/api/v1/hint" && r.Method == http.MethodGet:
 		players, err1 := strconv.Atoi(r.URL.Query().Get("players"))
 		km, err2 := strconv.Atoi(r.URL.Query().Get("km"))
@@ -88,49 +166,29 @@ func (a *api) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"min_connection_kbps": h.MinConnectionKBps, "server_upload_kbps": h.ServerUploadKBps, "max_players": h.MaxPlayers,
 			"connection_basis": h.ConnectionBasis})
 	case p == "/api/v1/plan" && r.Method == http.MethodPost:
-		// Plan WP17.17: where a game of this size would go, and why it may not fit; nothing is started.
-		var req PlanRequest
+		// Plan WP17.17: where a game of this size would go on a side (operator: off the pool while player hosting
+		// runs; pool: on its CPUs, its cores per game), and why it may not fit; nothing is started.
+		var req struct {
+			PlanRequest
+			Side string `json:"side"`
+		}
 		dec := json.NewDecoder(io.LimitReader(r.Body, 16<<10))
 		dec.DisallowUnknownFields()
 		if err := dec.Decode(&req); err != nil || req.Players < 1 || req.Players > kMaxPlayers || req.KM < 1 {
-			fail(w, http.StatusBadRequest, errors.New("plan takes players 1..16, km, and cores or cpus"))
+			fail(w, http.StatusBadRequest, errors.New("plan takes players 1..16, km, side, and cores or cpus"))
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "plan": place(a.m.machine(), req)})
+		switch req.Side {
+		case "":
+			req.Side = "operator"
+		case "operator", "pool":
+		default:
+			fail(w, http.StatusBadRequest, errors.New(`side is "operator" or "pool"`))
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "side": req.Side, "plan": a.m.planOn(req.Side, req.PlanRequest)})
 	case p == "/api/v1/settings" && r.Method == http.MethodGet:
 		a.serveSettings(w, r)
-	case p == "/api/v1/slots" && r.Method == http.MethodGet:
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "slots": a.m.listSlots()})
-	case p == "/api/v1/slots" && r.Method == http.MethodPost:
-		var req SlotRequest
-		dec := json.NewDecoder(io.LimitReader(r.Body, 64<<10))
-		dec.DisallowUnknownFields()
-		if err := dec.Decode(&req); err != nil {
-			fail(w, http.StatusBadRequest, fmt.Errorf("body: %w", err))
-			return
-		}
-		slots, code, err := a.m.createSlots(req)
-		if err != nil {
-			log.Printf("slots not made (%d): %v", code, err)
-			fail(w, code, err)
-			return
-		}
-		for _, s := range slots {
-			log.Printf("slot %s: %s, up to %d players, on CPUs %v", s.ID, s.Name, s.MaxPlayers, s.CPUs)
-		}
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "slots": slots})
-	case strings.HasPrefix(p, "/api/v1/slots/") && r.Method == http.MethodDelete:
-		id := strings.TrimPrefix(p, "/api/v1/slots/")
-		if err := a.m.deleteSlot(id); err != nil {
-			code := http.StatusInternalServerError
-			if errors.Is(err, errNoSlot) {
-				code = http.StatusNotFound
-			}
-			fail(w, code, err)
-			return
-		}
-		log.Printf("slot %s freed", id)
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 	case p == "/api/v1/lobbies" && r.Method == http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "lobbies": a.m.list()})
 	case p == "/api/v1/lobbies" && r.Method == http.MethodPost:
@@ -141,22 +199,31 @@ func (a *api) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fail(w, http.StatusBadRequest, fmt.Errorf("body: %w", err))
 			return
 		}
-		l, code, err := a.m.create(req)
+		l, queued, code, err := a.m.createOrQueue(req)
 		if err != nil {
 			log.Printf("lobby not made (%d): %v", code, err)
 			fail(w, code, err)
 			return
 		}
-		log.Printf("lobby %s: %s on CPUs %v, port %d, pid %d", l.ID, l.Map.Name, l.CPUs, l.Port, l.PID)
+		if queued != nil {
+			writeJSON(w, http.StatusAccepted, map[string]any{"ok": true, "queued": queued})
+			return
+		}
+		log.Printf("lobby %s (%s): %s on CPUs %v, port %d, pid %d", l.ID, l.Kind, l.Map.Name, l.CPUs, l.Port, l.PID)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "lobby": l})
 	case strings.HasPrefix(p, "/api/v1/lobbies/"):
 		rest := strings.TrimPrefix(p, "/api/v1/lobbies/")
 		id, sub, _ := strings.Cut(rest, "/")
-		if sub == "" {
+		switch {
+		case sub == "":
 			a.lobby(w, r, id)
-			return
+		case sub == "log" && r.Method == http.MethodGet:
+			a.lobbyLog(w, r, id, false)
+		case sub == "log/stream" && r.Method == http.MethodGet:
+			a.lobbyLog(w, r, id, true)
+		default:
+			a.proxy(w, r, id, "/"+sub)
 		}
-		a.proxy(w, r, id, "/"+sub)
 	default:
 		fail(w, http.StatusNotFound, fmt.Errorf("no %s %s", r.Method, p))
 	}
@@ -174,7 +241,7 @@ func (a *api) serveSettings(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if mp == nil {
-			// 400, not 404: under /claim/<code>/ a 404 means the code is unknown.
+			// 400: the request names a map the host doesn't have (the path itself exists).
 			fail(w, http.StatusBadRequest, fmt.Errorf("no map %q", id))
 			return
 		}
@@ -191,41 +258,141 @@ func (a *api) serveSettings(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": s})
 }
 
-// claim serves /api/v1/claim/<code>[/maps|/settings] (plan WP17.18): GET shows the slot and, once claimed, the lobby
-// with its join lines; POST claims it; /maps and /settings are what the player picks from.
-func (a *api) claim(w http.ResponseWriter, r *http.Request, rest string) {
-	code, sub, _ := strings.Cut(rest, "/")
-	if _, ok := a.m.claimView(code); !ok {
-		fail(w, http.StatusNotFound, errors.New("no slot has this claim code"))
+// mapList is the maps with their preview paths under base.
+func (a *api) mapList(base string) []Map {
+	maps := a.maps()
+	out := make([]Map, len(maps))
+	for i, mp := range maps {
+		out[i] = mp
+		if mp.Preview != "" {
+			out[i].Preview = previewPath(base, mp.ID)
+		}
+	}
+	return out
+}
+
+// preview answers a map's preview as PNG.
+func (a *api) preview(w http.ResponseWriter, id string) {
+	var mp *Map
+	for _, x := range a.maps() {
+		if x.ID == strings.ToLower(id) {
+			found := x
+			mp = &found
+		}
+	}
+	if mp == nil {
+		fail(w, http.StatusNotFound, fmt.Errorf("no map %q", id))
 		return
 	}
+	if mp.Preview == "" {
+		fail(w, http.StatusNotFound, fmt.Errorf("map %s has no preview", mp.ID))
+		return
+	}
+	data, err := a.previews.get(mp.scmapFile)
+	if err != nil {
+		fail(w, http.StatusNotFound, fmt.Errorf("map %s's preview: %v", mp.ID, err))
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
+}
+
+// public serves /api/v1/public/... (no admin token): the pool's public face, the maps and settings a player picks
+// from, and the requests, each followed with its own key.
+func (a *api) public(w http.ResponseWriter, r *http.Request, rest string) {
+	pool, usage := a.m.poolView()
 	switch {
-	case sub == "" && r.Method == http.MethodGet:
-		v, _ := a.m.claimView(code)
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "claim": v})
-	case sub == "" && r.Method == http.MethodPost:
-		var req ClaimRequest
+	case rest == "pool" && r.Method == http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "enabled": pool.Enabled, "access": pool.Access, "max_players": pool.MaxPlayers,
+			"lobby_minutes": pool.LobbyMinutes, "options": pool.Options,
+			"queue": map[string]int{"length": usage.Queued, "games": usage.Games, "max_games": pool.MaxGames}})
+	case strings.HasPrefix(rest, "maps/") && strings.HasSuffix(rest, "/preview.png") && r.Method == http.MethodGet:
+		a.preview(w, strings.TrimSuffix(strings.TrimPrefix(rest, "maps/"), "/preview.png"))
+	case (rest == "maps" || rest == "settings") && r.Method == http.MethodGet:
+		if !pool.Enabled {
+			fail(w, http.StatusForbidden, errors.New("player hosting is off on this host"))
+			return
+		}
+		if rest == "maps" {
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "maps": a.mapList("/api/v1/public/maps/")})
+			return
+		}
+		a.serveSettings(w, r)
+	case rest == "requests" && r.Method == http.MethodPost:
+		var body RequestBody
 		dec := json.NewDecoder(io.LimitReader(r.Body, 64<<10))
 		dec.DisallowUnknownFields()
-		if err := dec.Decode(&req); err != nil {
+		if err := dec.Decode(&body); err != nil {
 			fail(w, http.StatusBadRequest, fmt.Errorf("body: %w", err))
 			return
 		}
-		v, status, err := a.m.claim(code, req)
+		ip := clientIP(r)
+		v, status, err := a.m.submitRequest(body, ip)
 		if err != nil {
-			log.Printf("claim not made (%d): %v", status, err)
+			log.Printf("request from %s (%s) refused (%d): %v", strings.TrimSpace(body.Player), ip, status, err)
 			fail(w, status, err)
 			return
 		}
-		log.Printf("slot %s claimed by %s: lobby %s on %s", v.Slot.ID, req.Player, v.Lobby.ID, v.Lobby.Map.Name)
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "claim": v})
-	case sub == "maps" && r.Method == http.MethodGet:
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "maps": a.maps()})
-	case sub == "settings" && r.Method == http.MethodGet:
-		a.serveSettings(w, r)
+		if status != http.StatusOK {
+			reason := ""
+			if v.Reason != nil {
+				reason = *v.Reason
+			}
+			writeJSON(w, status, map[string]any{"ok": false, "error": reason, "request": v})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "request": v})
+	case strings.HasPrefix(rest, "requests/") && (r.Method == http.MethodGet || r.Method == http.MethodDelete):
+		id := strings.TrimPrefix(rest, "requests/")
+		key := r.URL.Query().Get("key")
+		if r.Method == http.MethodGet {
+			v, err := a.m.getRequest(id, key)
+			if err != nil {
+				fail(w, http.StatusNotFound, err)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"ok": true, "request": v})
+			return
+		}
+		v, status, err := a.m.cancelRequest(id, key)
+		if err != nil {
+			if v != nil {
+				writeJSON(w, status, map[string]any{"ok": false, "error": err.Error(), "request": v})
+				return
+			}
+			fail(w, status, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "request": v})
 	default:
 		fail(w, http.StatusNotFound, fmt.Errorf("no %s %s", r.Method, r.URL.Path))
 	}
+}
+
+// lobbyLog answers a lobby's server.log: its last lines, or (stream) its new lines as they come.
+func (a *api) lobbyLog(w http.ResponseWriter, r *http.Request, id string, stream bool) {
+	l, ok := a.m.get(id)
+	if !ok {
+		fail(w, http.StatusNotFound, errNoLobby)
+		return
+	}
+	path := filepath.Join(l.Dir, "server.log")
+	if stream {
+		streamFile(w, r, path, func() bool {
+			cur, ok := a.m.get(id)
+			return ok && running(cur.State)
+		})
+		return
+	}
+	lines, size, err := tailFile(path, linesParam(r))
+	if err != nil {
+		fail(w, http.StatusNotFound, fmt.Errorf("lobby %s has no log: %v", id, err))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "lines": lines, "size": size, "state": l.State})
 }
 
 func (a *api) liveLobbies() int {

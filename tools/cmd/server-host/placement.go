@@ -78,6 +78,10 @@ type machine struct {
 	links         []Link
 	lobbiesUpload int // KB/s, the running lobbies' estimates
 	memAvailMB    int
+	// The CPUs Auto may pick on this side (nil: all): the pool's for a player game, the others for the operator's
+	// while player hosting runs. A CPU picked by hand outside them is warned with outsideCode.
+	allowed     map[int]bool
+	outsideCode string // pool_overlap (an operator's lobby on the pool) or outside_pool (a pool game off it)
 }
 
 type physCore struct {
@@ -149,6 +153,14 @@ func place(m *machine, req PlanRequest) Plan {
 			}
 			seen[id] = true
 			p.CPUs = append(p.CPUs, id)
+			if m.allowed != nil && !m.allowed[id] {
+				switch m.outsideCode {
+				case "outside_pool":
+					add(&p.Warnings, "outside_pool", "warn", "CPU %d isn't one of the player pool's", id)
+				default:
+					add(&p.Warnings, "pool_overlap", "warn", "CPU %d is in the player pool: player games are placed on it too", id)
+				}
+			}
 		}
 		sort.Ints(p.CPUs)
 	} else {
@@ -276,11 +288,16 @@ func autoPick(m *machine, want, memMB int, w *[]Warning) []int {
 			continue
 		}
 		taken := false
+		var mine []int // the core's CPUs this side may use
 		for _, id := range pc.cpus {
 			taken = taken || lobbyOn[id]
-			ni.load += loadOf[id]
+			if m.allowed == nil || m.allowed[id] {
+				mine = append(mine, id)
+				ni.load += loadOf[id]
+			}
 		}
-		if !taken {
+		if !taken && len(mine) > 0 {
+			pc.cpus = mine
 			ni.free = append(ni.free, pc)
 		}
 	}

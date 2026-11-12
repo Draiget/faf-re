@@ -1,7 +1,8 @@
 // Command server-host runs the dedicated server's lobbies on one machine (plan WP17.13). It starts
 // with no lobby; each lobby asked for over its REST API runs as its own `server` process, pinned to
 // the CPUs chosen for it (or the least loaded ones), and its own REST API is reached through the
-// host's. The host reports each CPU's load for a heatmap, the maps it can host and what a game costs.
+// host's. The host reports each CPU's load for a heatmap, the maps it can host and what a game costs. With player
+// hosting on, players request their own games on a pool of CPUs; what doesn't fit waits in a queue.
 //
 //	server-host --listen 0.0.0.0:27180 --token-file admin.token --server /opt/faf/server \
 //	  --maps fa=/data/fa/maps --maps vault=/data/vault/maps --runs /var/faf/lobbies \
@@ -15,6 +16,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -95,7 +97,12 @@ func main() {
 		log.Fatalf("runs folder: %v", err)
 	}
 
+	// The host's own log lines are kept for the API (GET /api/v1/logs/host) as well as written to stderr.
+	hostLog := &logRing{}
+	log.SetOutput(io.MultiWriter(os.Stderr, hostLog))
+
 	smp := newSampler("/proc", "/sys/devices/system/cpu")
+	smp.sample() // the CPUs are known from the start (the pool's kept settings are checked against them)
 	stop := make(chan struct{})
 	go smp.run(stop)
 	// Plan WP17.16: network links, sampled every second like the CPUs.
@@ -139,7 +146,14 @@ func main() {
 	}
 	settings := &settingsSource{serverBin: *serverBin, engineArgs: strings.Fields(*engineArgs), workDir: *runs}
 	m.settings = settings
-	a := &api{token: token, corsOrigin: *cors, m: m, maps: listMaps, procDir: "/proc", hostName: hostName(), settings: settings}
+	// Player hosting's settings are kept in the runs folder between runs; the queue and requests are not.
+	m.poolFile = filepath.Join(*runs, "pool.json")
+	m.loadPool()
+	go m.runQueue(stop)
+	history := &metricsHistory{}
+	go m.runMetrics(history, stop)
+	a := &api{token: token, corsOrigin: *cors, m: m, maps: listMaps, procDir: "/proc", hostName: hostName(), settings: settings,
+		hostLog: hostLog, metrics: history}
 	srv := &http.Server{Addr: *listen, Handler: a, ReadHeaderTimeout: 5 * time.Second, MaxHeaderBytes: 16 << 10}
 
 	sig := make(chan os.Signal, 1)

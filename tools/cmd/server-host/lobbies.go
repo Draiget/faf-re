@@ -69,10 +69,14 @@ type Lobby struct {
 	ObserverDelay  float64        `json:"observer_delay_seconds"`
 	ObservePort    int            `json:"observe_port,omitempty"`
 	Hint           Hint           `json:"hint"`
-	Nodes          []int          `json:"nodes"`          // plan WP17.17: the NUMA nodes its CPUs are on
-	Warnings       []Warning      `json:"warnings"`       // the placement's, when it was made
-	Usage          procUsage      `json:"usage"`          // plan WP17.16: its server process, sampled every 2 s
-	Slot           string         `json:"slot,omitempty"` // plan WP17.18: the open slot it was claimed from
+	Nodes          []int          `json:"nodes"`      // plan WP17.17: the NUMA nodes its CPUs are on
+	Warnings       []Warning      `json:"warnings"`   // the placement's, when it was made
+	Usage          procUsage      `json:"usage"`      // plan WP17.16: its server process, sampled every 2 s
+	Kind           string         `json:"kind"`       // tournament (organiser's) or custom (a player hosts)
+	Side           string         `json:"side"`       // operator, or pool (a player's request on the pool's CPUs)
+	Request        *string        `json:"request"`    // the player request it came from
+	QueuedAt       *string        `json:"queued_at"`  // when it was queued, if it waited
+	StartedAt      string         `json:"started_at"` // when its server started
 	Phase          string         `json:"phase"`
 	Beat           int            `json:"beat"`
 	Exit           string         `json:"exit"`
@@ -101,6 +105,23 @@ type CreateRequest struct {
 	CPUs           json.RawMessage `json:"cpus"` // [ids] or "auto"
 	Cores          int             `json:"cores"`
 	Force          bool            `json:"force"` // start even when the placement says it doesn't fit
+	Kind           string          `json:"kind"`  // tournament or custom; default from control
+	Queue          bool            `json:"queue"` // wait in the operator queue when it doesn't fit now
+}
+
+// clone copies a request deeply enough that validating the copy leaves the original as it was.
+func (r CreateRequest) clone() CreateRequest {
+	c := r
+	c.Seats = append([]Seat(nil), r.Seats...)
+	c.Observers = append([]Observer(nil), r.Observers...)
+	c.CPUs = append(json.RawMessage(nil), r.CPUs...)
+	if r.Options != nil {
+		c.Options = map[string]any{}
+		for k, v := range r.Options {
+			c.Options[k] = v
+		}
+	}
+	return c
 }
 
 // config is how the host starts each lobby's server.
@@ -128,14 +149,27 @@ type manager struct {
 	procDir string
 	// Plan WP17.20: FAF's settings and defaults; nil without them (tests).
 	settings *settingsSource
-	// Plan WP17.18: open slots, by id.
-	slots    map[string]*Slot
-	nextSlot int
+
+	// Player hosting: the pool's settings, the queue (both sides, in order), the players' requests.
+	pool        Pool
+	poolFile    string // where the pool's settings are kept between runs; "" for nowhere
+	queue       []*QueueItem
+	nextQueue   int
+	requests    map[string]*PlayerRequest
+	nextRequest int
+	rate        map[string][]time.Time // public request attempts per address, the last minute
+	// startMu makes placing and starting one lobby at a time, so two starts can't take the same CPUs; pumpMu makes
+	// the queue's changes and starts one at a time (taken before startMu, never inside it).
+	startMu  sync.Mutex
+	pumpMu   sync.Mutex
+	kickCh   chan struct{}
+	stopping bool // the host is stopping: nothing new starts (the queue would refill what stopAll ends)
 }
 
 func newManager(cfg config, maps func() []Map, cpus func() []CPU) *manager {
 	m := &manager{cfg: cfg, lobbies: map[string]*Lobby{}, next: 1, maps: maps, cpus: cpus, client: &http.Client{Timeout: 3 * time.Second},
-		procDir: "/proc", links: func() []Link { return nil }, slots: map[string]*Slot{}, nextSlot: 1}
+		procDir: "/proc", links: func() []Link { return nil }, pool: defaultPool(), nextQueue: 1, requests: map[string]*PlayerRequest{},
+		nextRequest: 1, rate: map[string][]time.Time{}, kickCh: make(chan struct{}, 1)}
 	// Without NUMA information (tests, a machine without /sys): one node holding every CPU.
 	m.nodes = func() []Node {
 		ids := []int{}
@@ -232,9 +266,22 @@ func (m *manager) validate(req *CreateRequest) (Map, error) {
 	switch req.Control {
 	case "":
 		req.Control = "player"
+		if req.Kind == "tournament" {
+			req.Control = "organiser"
+		}
 	case "player", "organiser":
 	default:
 		return mp, errors.New(`control is "player" or "organiser"`)
+	}
+	switch req.Kind {
+	case "":
+		req.Kind = "custom"
+		if req.Control == "organiser" {
+			req.Kind = "tournament"
+		}
+	case "tournament", "custom":
+	default:
+		return mp, errors.New(`kind is "tournament" or "custom"`)
 	}
 	if req.StartWhenReady < 0 || req.StartWhenReady > 3600 {
 		return mp, errors.New("start_when_ready is 0..3600 seconds")
@@ -430,21 +477,6 @@ func (m *manager) cpusWithLobbies() []CPU {
 			}
 		}
 	}
-	// Plan WP17.18: an open slot holds its CPUs under its own id until its lobby runs on them.
-	slotIDs := make([]string, 0, len(m.slots))
-	for id, s := range m.slots {
-		if holding(s) {
-			slotIDs = append(slotIDs, id)
-		}
-	}
-	sort.Strings(slotIDs)
-	for _, id := range slotIDs {
-		for _, c := range m.slots[id].CPUs {
-			if i, ok := idx[c]; ok {
-				cpus[i].Lobbies = append(cpus[i].Lobbies, id)
-			}
-		}
-	}
 	return cpus
 }
 
@@ -458,23 +490,8 @@ func cpuArg(cpus []int) string {
 
 // machine is the placement engine's view: CPUs with the lobbies on them, NUMA nodes, links, the running lobbies'
 // upload estimates and the memory available.
-func (m *manager) machine() *machine { return m.machineExcept("") }
-
-// machineExcept is machine() without one holder on the CPUs: the slot a lobby is being claimed from.
-func (m *manager) machineExcept(holder string) *machine {
-	cpus := m.cpusWithLobbies()
-	if holder != "" {
-		for i := range cpus {
-			kept := cpus[i].Lobbies[:0]
-			for _, id := range cpus[i].Lobbies {
-				if id != holder {
-					kept = append(kept, id)
-				}
-			}
-			cpus[i].Lobbies = kept
-		}
-	}
-	mc := &machine{cpus: cpus, nodes: m.nodes(), links: m.links()}
+func (m *manager) machine() *machine {
+	mc := &machine{cpus: m.cpusWithLobbies(), nodes: m.nodes(), links: m.links()}
 	m.mu.Lock()
 	for _, l := range m.lobbies {
 		if running(l.State) {
@@ -511,64 +528,161 @@ func freeLocalTCPPort() (int, error) {
 	return l.Addr().(*net.TCPAddr).Port, nil
 }
 
-// create starts a lobby: its folder, match file, token, and the server pinned to its CPUs.
-func (m *manager) create(req CreateRequest) (*Lobby, int, error) { return m.createIn(req, "") }
+// need is what a lobby asks of the machine, for the check whether it can start now.
+type need struct {
+	side    string // operator or pool
+	players int
+	km      int
+	cores   int
+	cpus    []int
+	force   bool
+	ports   int // 1, or 2 with observers
+}
 
-// createIn is create for a lobby claimed from slot (plan WP17.18; "" for none): the slot's hold on its CPUs doesn't
-// count against the lobby that takes them over.
-func (m *manager) createIn(req CreateRequest, slot string) (*Lobby, int, error) {
-	mp, err := m.validate(&req)
-	if err != nil {
-		return nil, http.StatusBadRequest, err
+func needOf(req *CreateRequest, mp LobbyMap, side string) (need, error) {
+	n := need{side: side, players: len(req.Seats), km: mp.KM, cores: req.Cores, force: req.Force, ports: 1}
+	if len(req.Observers) > 0 {
+		n.ports = 2
 	}
-	hint := hintFor(len(req.Seats), mp.KM)
-	// Plan WP17.17: the placement engine picks or checks the CPUs, inside one NUMA node where it can.
-	preq := PlanRequest{Players: len(req.Seats), KM: mp.KM, Cores: req.Cores}
-	if preq.CPUs, err = parseCPUs(req.CPUs); err != nil {
-		return nil, http.StatusBadRequest, err
-	}
-	plan := place(m.machineExcept(slot), preq)
-	if !plan.Fits && !req.Force {
-		var why []string
-		for _, w := range plan.Warnings {
-			if w.Severity == "error" {
-				why = append(why, w.Text)
-			}
-		}
-		return nil, http.StatusConflict, fmt.Errorf("doesn't fit (force to start anyway): %s", strings.Join(why, "; "))
-	}
-	if len(plan.CPUs) == 0 {
-		return nil, http.StatusBadRequest, errors.New("no CPUs to run the lobby on")
-	}
-	cpuList := plan.CPUs
+	var err error
+	n.cpus, err = parseCPUs(req.CPUs)
+	return n, err
+}
 
-	m.mu.Lock()
-	live := 0
+// usedPorts is the game and observe ports of the running lobbies; the caller holds mu.
+func (m *manager) usedPorts() map[int]bool {
 	used := map[int]bool{}
 	for _, l := range m.lobbies {
 		if running(l.State) {
-			live++
 			used[l.Port] = true
 			if l.ObservePort != 0 {
 				used[l.ObservePort] = true
 			}
 		}
 	}
-	// Plan WP17.18: open slots count too, as making them does, except the one this lobby is claimed from.
-	for id, s := range m.slots {
-		if holding(s) && id != slot {
+	return used
+}
+
+// fit checks whether a lobby can start now on mc: the host's and the pool's game limits, the placement, the ports.
+// When it can't for want of capacity, waiting names what it waits for (games, cores, memory, network, ports) and code
+// is 409; a request that can never start this way is 400 with no waiting.
+func (m *manager) fit(mc *machine, n need) (plan Plan, waiting string, code int, err error) {
+	m.mu.Lock()
+	live, poolGames := 0, 0
+	for _, l := range m.lobbies {
+		if running(l.State) {
 			live++
+			if l.Side == "pool" {
+				poolGames++
+			}
 		}
 	}
+	freePorts := m.cfg.portLast - m.cfg.portFirst + 1
+	for p := range m.usedPorts() {
+		if p >= m.cfg.portFirst && p <= m.cfg.portLast {
+			freePorts--
+		}
+	}
+	pool := m.pool
+	m.mu.Unlock()
 	if live >= m.cfg.maxLobbies {
-		m.mu.Unlock()
-		return nil, http.StatusConflict, fmt.Errorf("this host runs at most %d lobbies and open slots", m.cfg.maxLobbies)
+		return plan, "games", http.StatusConflict, fmt.Errorf("this host runs at most %d lobbies at once", m.cfg.maxLobbies)
 	}
+	if n.side == "pool" {
+		if poolGames >= pool.MaxGames {
+			return plan, "games", http.StatusConflict, fmt.Errorf("the player pool runs at most %d games at once", pool.MaxGames)
+		}
+		if n.cores == 0 {
+			n.cores = pool.Cores
+		}
+	}
+	// Plan WP17.17: the placement engine picks or checks the CPUs, inside one NUMA node where it can.
+	plan = place(mc, PlanRequest{Players: n.players, KM: n.km, Cores: n.cores, CPUs: n.cpus})
+	if !plan.Fits && !n.force {
+		var why []string
+		waiting = ""
+		for _, w := range plan.Warnings {
+			if w.Severity != "error" {
+				continue
+			}
+			why = append(why, w.Text)
+			switch w.Code {
+			case "unknown_cpu":
+				return plan, "", http.StatusBadRequest, errors.New(w.Text)
+			case "machine_short", "no_cpus":
+				if waiting == "" || waiting == "network" || waiting == "memory" {
+					waiting = "cores"
+				}
+			case "memory":
+				if waiting == "" || waiting == "network" {
+					waiting = "memory"
+				}
+			case "network":
+				if waiting == "" {
+					waiting = "network"
+				}
+			}
+		}
+		if waiting == "" {
+			waiting = "cores"
+		}
+		if n.side == "pool" {
+			return plan, waiting, http.StatusConflict, fmt.Errorf("no room in the player pool now: %s", strings.Join(why, "; "))
+		}
+		return plan, waiting, http.StatusConflict, fmt.Errorf("doesn't fit (force to start anyway): %s", strings.Join(why, "; "))
+	}
+	if len(plan.CPUs) == 0 {
+		return plan, "", http.StatusBadRequest, errors.New("no CPUs to run the lobby on")
+	}
+	if freePorts < n.ports {
+		return plan, "ports", http.StatusConflict, fmt.Errorf("no %d free ports in %d-%d", n.ports, m.cfg.portFirst, m.cfg.portLast)
+	}
+	return plan, "", http.StatusOK, nil
+}
+
+// startOpts says where a lobby comes from: its side, the player request and when it was queued.
+type startOpts struct {
+	side     string
+	request  string
+	queuedAt time.Time
+}
+
+// create starts an operator's lobby now: its folder, match file, token, and the server pinned to its CPUs.
+func (m *manager) create(req CreateRequest) (*Lobby, int, error) {
+	l, code, _, err := m.start(req, startOpts{side: "operator"})
+	return l, code, err
+}
+
+// start starts a lobby on its side, or says why not; waiting is set when it fails for want of capacity (it may wait in
+// the queue). One start at a time, so the placement it checks is the one it gets.
+func (m *manager) start(req CreateRequest, o startOpts) (*Lobby, int, string, error) {
+	m.startMu.Lock()
+	defer m.startMu.Unlock()
+	m.mu.Lock()
+	stopping := m.stopping
+	m.mu.Unlock()
+	if stopping {
+		return nil, http.StatusServiceUnavailable, "", errors.New("the host is stopping")
+	}
+	mp, err := m.validate(&req)
+	if err != nil {
+		return nil, http.StatusBadRequest, "", err
+	}
+	hint := hintFor(len(req.Seats), mp.KM)
+	n, err := needOf(&req, LobbyMap{mp.ID, mp.Name, mp.KM, mp.Players}, o.side)
+	if err != nil {
+		return nil, http.StatusBadRequest, "", err
+	}
+	plan, waiting, code, err := m.fit(m.machineFor(o.side), n)
+	if err != nil {
+		return nil, code, waiting, err
+	}
+	cpuList := plan.CPUs
+
+	m.mu.Lock()
+	used := m.usedPorts()
 	// A game port, and with observers a second one they watch from.
-	wanted := 1
-	if len(req.Observers) > 0 {
-		wanted = 2
-	}
+	wanted := n.ports
 	var ports []int
 	for p := m.cfg.portFirst; p <= m.cfg.portLast && len(ports) < wanted; p++ {
 		if !used[p] && portFree(m.cfg.listenIP, p) {
@@ -579,7 +693,7 @@ func (m *manager) createIn(req CreateRequest, slot string) (*Lobby, int, error) 
 	m.next++
 	m.mu.Unlock()
 	if len(ports) < wanted {
-		return nil, http.StatusConflict, fmt.Errorf("no %d free ports in %d-%d", wanted, m.cfg.portFirst, m.cfg.portLast)
+		return nil, http.StatusConflict, "ports", fmt.Errorf("no %d free ports in %d-%d", wanted, m.cfg.portFirst, m.cfg.portLast)
 	}
 	port := ports[0]
 	observePort := 0
@@ -588,7 +702,7 @@ func (m *manager) createIn(req CreateRequest, slot string) (*Lobby, int, error) 
 	}
 	restPort, err := freeLocalTCPPort()
 	if err != nil {
-		return nil, http.StatusInternalServerError, err
+		return nil, http.StatusInternalServerError, "", err
 	}
 	if req.Name == "" {
 		req.Name = mp.Name
@@ -610,7 +724,16 @@ func (m *manager) createIn(req CreateRequest, slot string) (*Lobby, int, error) 
 	l := &Lobby{ID: id, Name: req.Name, State: "starting", Map: LobbyMap{mp.ID, mp.Name, mp.KM, mp.Players}, Options: opts,
 		CPUs: cpuList, Port: port, Created: now.Format(time.RFC3339), Control: req.Control, StartWhenReady: req.StartWhenReady,
 		Seats: req.Seats, Observers: req.Observers, ObserverDelay: req.ObserverDelay, ObservePort: observePort,
-		Hint: hint, Nodes: plan.Nodes, Warnings: plan.Warnings, Slot: slot, restPort: restPort, restToken: randomHex(24), done: make(chan struct{})}
+		Hint: hint, Nodes: plan.Nodes, Warnings: plan.Warnings, Kind: req.Kind, Side: o.side, StartedAt: now.Format(time.RFC3339),
+		restPort: restPort, restToken: randomHex(24), done: make(chan struct{})}
+	if o.request != "" {
+		r := o.request
+		l.Request = &r
+	}
+	if !o.queuedAt.IsZero() {
+		q := o.queuedAt.UTC().Format(time.RFC3339)
+		l.QueuedAt = &q
+	}
 	if l.Observers == nil {
 		l.Observers = []Observer{}
 	}
@@ -624,15 +747,15 @@ func (m *manager) createIn(req CreateRequest, slot string) (*Lobby, int, error) 
 		}
 	}
 	if err := os.MkdirAll(filepath.Join(l.Dir, "out"), 0o755); err != nil {
-		return nil, http.StatusInternalServerError, err
+		return nil, http.StatusInternalServerError, "", err
 	}
 	matchPath := filepath.Join(l.Dir, "match.lua")
 	tokenPath := filepath.Join(l.Dir, "rest.token")
 	if err := os.WriteFile(matchPath, []byte(matchFile(l, mp.File)), 0o600); err != nil {
-		return nil, http.StatusInternalServerError, err
+		return nil, http.StatusInternalServerError, "", err
 	}
 	if err := os.WriteFile(tokenPath, []byte(l.restToken+"\n"), 0o600); err != nil {
-		return nil, http.StatusInternalServerError, err
+		return nil, http.StatusInternalServerError, "", err
 	}
 	args := []string{"--match", matchPath, "--out", filepath.Join(l.Dir, "out"),
 		"--listen", net.JoinHostPort(m.cfg.listenIP, strconv.Itoa(port)),
@@ -650,7 +773,7 @@ func (m *manager) createIn(req CreateRequest, slot string) (*Lobby, int, error) 
 	}
 	logf, err := os.Create(filepath.Join(l.Dir, "server.log"))
 	if err != nil {
-		return nil, http.StatusInternalServerError, err
+		return nil, http.StatusInternalServerError, "", err
 	}
 	cmd := exec.Command(m.cfg.serverBin, args...)
 	cmd.Dir = l.Dir
@@ -661,7 +784,7 @@ func (m *manager) createIn(req CreateRequest, slot string) (*Lobby, int, error) 
 	}
 	if err != nil {
 		logf.Close()
-		return nil, http.StatusInternalServerError, fmt.Errorf("starting the server: %w", err)
+		return nil, http.StatusInternalServerError, "", fmt.Errorf("starting the server: %w", err)
 	}
 	l.proc = cmd.Process
 	l.PID = cmd.Process.Pid
@@ -691,7 +814,7 @@ func (m *manager) createIn(req CreateRequest, slot string) (*Lobby, int, error) 
 		close(l.done)
 	}()
 	go m.watch(l)
-	return m.locked(l), http.StatusOK, nil
+	return m.locked(l), http.StatusOK, "", nil
 }
 
 // watch reads the lobby's status from its own REST API until the process ends: every 0.5 s while it is
@@ -794,6 +917,11 @@ func (m *manager) forget(id string) error {
 var errNoLobby = errors.New("no such lobby")
 
 func (m *manager) stopAll() {
+	m.startMu.Lock() // a start under way finishes first, so its lobby is stopped too
+	m.mu.Lock()
+	m.stopping = true
+	m.mu.Unlock()
+	m.startMu.Unlock()
 	m.mu.Lock()
 	ids := make([]string, 0, len(m.lobbies))
 	for id, l := range m.lobbies {
