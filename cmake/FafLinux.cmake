@@ -468,6 +468,13 @@ target_link_libraries(faf_occupation_manager_tests PRIVATE faf_sim gtest_main)
 set_target_properties(faf_occupation_manager_tests PROPERTIES FOLDER "Tests/Sim")
 add_test(NAME occupation_manager COMMAND faf_occupation_manager_tests)
 set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
+
+# RScmResource::GetSkeleton from eight threads at once (#396); no game data required.
+add_executable(faf_skeleton_build_thread_tests EXCLUDE_FROM_ALL "${PROJECT_SOURCE_DIR}/tests/resource/SkeletonBuildThreadTests.cpp")
+target_link_libraries(faf_skeleton_build_thread_tests PRIVATE faf_sim gtest_main)
+set_target_properties(faf_skeleton_build_thread_tests PROPERTIES FOLDER "Tests/Sim")
+add_test(NAME skeleton_build_threads COMMAND faf_skeleton_build_thread_tests)
+set_tests_properties(skeleton_build_threads PROPERTIES LABELS "Sim")
 target_compile_definitions(faf_occupation_manager_tests PRIVATE FAF_OCCUPATION_DELETE_TRACE=1)
 target_link_options(faf_occupation_manager_tests PRIVATE -Wl,--wrap=_Znwm -Wl,--wrap=_Znam -Wl,--wrap=_ZdlPv -Wl,--wrap=_ZdaPv)
 

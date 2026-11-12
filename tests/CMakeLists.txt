@@ -196,6 +196,14 @@ set_target_properties(faf_prefs_thread_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME prefs_threads COMMAND faf_prefs_thread_tests)
 set_tests_properties(prefs_threads PROPERTIES LABELS "Existing")
 
+# Engine addition (#396): RScmResource::GetSkeleton from several threads at once
+# (tests/resource); every thread must get the one skeleton built for the resource.
+add_executable(faf_skeleton_build_thread_tests EXCLUDE_FROM_ALL resource/SkeletonBuildThreadTests.cpp)
+target_link_libraries(faf_skeleton_build_thread_tests PRIVATE faf_engine gtest_main)
+set_target_properties(faf_skeleton_build_thread_tests PROPERTIES FOLDER "Tests/Existing")
+add_test(NAME skeleton_build_threads COMMAND faf_skeleton_build_thread_tests)
+set_tests_properties(skeleton_build_threads PROPERTIES LABELS "Existing")
+
 # Engine addition (dedicated-server plan WPL.4, WPR.11): what the static
 # initialisers of faf_main's objects registered (tests/registry).
 add_executable(faf_registration_dump EXCLUDE_FROM_ALL registry/RegistrationDump.cpp)
