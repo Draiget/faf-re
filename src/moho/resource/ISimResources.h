@@ -34,14 +34,6 @@ namespace moho
 
   namespace detail
   {
-    /**
-     * Address: 0x00754BD0 (FUN_00754BD0, func_CreateBoostPtrISimResources)
-     *
-     * What it does:
-     * Allocates and initializes the Boost-style shared control block used for
-     * `CSimResources` ownership through `ISimResources` handles.
-     */
-    [[nodiscard]] boost::detail::sp_counted_base* CreateSimResourcesSharedControl(CSimResources* resources);
 
   } // namespace detail
 

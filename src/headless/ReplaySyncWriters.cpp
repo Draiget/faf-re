@@ -191,11 +191,6 @@ end
     }
   }
 
-  bool CSyncWriters::Installed() const noexcept
-  {
-    return gInstalled.load();
-  }
-
   std::string CSyncWriters::Write(
     const std::string& path
   ) const

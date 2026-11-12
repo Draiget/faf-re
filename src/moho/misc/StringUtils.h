@@ -19,12 +19,6 @@ namespace moho
   void TrimRange(const char* s, size_t n, const char*& outBegin, const char*& outEnd);
 
   /**
-   * Split by commas, trim tokens, skip empty.
-   * Writes into out (appends).
-   */
-  void SplitByComma(const fa::string& src, fa::vector<fa::string>& out);
-
-  /**
    * Join strings with a separator.
    */
   fa::string Join(const fa::vector<fa::string>& items, const char* sep);

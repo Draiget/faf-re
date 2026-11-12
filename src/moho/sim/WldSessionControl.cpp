@@ -1377,22 +1377,6 @@ namespace moho
     return session;
   }
 
-  /**
-   * Address: 0x008972D0 (FUN_008972D0)
-   *
-   * What it does:
-   * Runs one deleting teardown path for `CWldSession` and returns the original
-   * pointer lane.
-   */
-  CWldSession* DeleteWldSessionAndReturn(
-    CWldSession* const session
-  ) noexcept
-  {
-    session->~CWldSession();
-    ::operator delete(session);
-    return session;
-  }
-
   // WLD_GetSession: moho/sim/WldSessionState.cpp.
 
   /**

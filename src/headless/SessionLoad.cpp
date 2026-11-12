@@ -125,16 +125,4 @@ namespace faf::headless
     return !sync.IsNil();
   }
 
-  bool SyncSaysGameEnded(
-    moho::SSyncData& packet,
-    LuaPlus::LuaState* const state
-  )
-  {
-    LuaPlus::LuaObject currentSync;
-    if (!ReadSyncNaming(packet, state, {"GameEnded"}, currentSync)) {
-      return false;
-    }
-    const LuaPlus::LuaObject gameEnded = currentSync["GameEnded"];
-    return !gameEnded.IsNil() && (!gameEnded.IsBoolean() || gameEnded.GetBoolean());
-  }
 } // namespace faf::headless

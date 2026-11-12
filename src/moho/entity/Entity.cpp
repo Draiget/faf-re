@@ -3133,62 +3133,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0067AA50 (FUN_0067AA50,
-   * ?GetTerrainCollisionGeom@Entity@Moho@@QBEXAAV?$fastvector@V?$Sphere3@M@Wm3@@@gpg@@@Z)
-   *
-   * What it does:
-   * Emits one terrain-collision proxy sphere list from the active collision
-   * primitive: eight corner points for box primitives, or one center/radius
-   * sphere for sphere primitives.
-   *
-   * 0x0067AA57 loads `CollisionExtents` and calls through its vtable with no
-   * null test, so an entity whose script ran `SetCollisionShape('None')` must
-   * never get here. Its only caller, `CUnitMotion::HandleGroundCollision`, is
-   * unreachable in FAF's build (patched out of `CalcMoveAir` at 0x006C018B).
-   */
-  void Entity::GetTerrainCollisionGeom(
-    gpg::fastvector<Wm3::Sphere3f>& outSpheres
-  ) const
-  {
-    Wm3::Vec3f center{};
-    CollisionExtents->GetCenter(&center);
-
-    if (const Wm3::Box3f* const box = CollisionExtents->GetBox(); box != nullptr) {
-      const float minX = center.x - box->Extent[0];
-      const float maxX = center.x + box->Extent[0];
-      const float minY = center.y - box->Extent[1];
-      const float maxY = center.y + box->Extent[1];
-      const float minZ = center.z - box->Extent[2];
-      const float maxZ = center.z + box->Extent[2];
-
-      outSpheres.resize(8u, Wm3::Sphere3f{});
-      outSpheres[0].Center = Wm3::Vec3f(minX, minY, minZ);
-      outSpheres[0].Radius = 0.0f;
-      outSpheres[1].Center = Wm3::Vec3f(maxX, minY, minZ);
-      outSpheres[1].Radius = 0.0f;
-      outSpheres[2].Center = Wm3::Vec3f(minX, maxY, minZ);
-      outSpheres[2].Radius = 0.0f;
-      outSpheres[3].Center = Wm3::Vec3f(maxX, maxY, minZ);
-      outSpheres[3].Radius = 0.0f;
-      outSpheres[4].Center = Wm3::Vec3f(minX, minY, maxZ);
-      outSpheres[4].Radius = 0.0f;
-      outSpheres[5].Center = Wm3::Vec3f(maxX, minY, maxZ);
-      outSpheres[5].Radius = 0.0f;
-      outSpheres[6].Center = Wm3::Vec3f(minX, maxY, maxZ);
-      outSpheres[6].Radius = 0.0f;
-      outSpheres[7].Center = Wm3::Vec3f(maxX, maxY, maxZ);
-      outSpheres[7].Radius = 0.0f;
-      return;
-    }
-
-    if (const Wm3::Sphere3f* const sphere = CollisionExtents->GetSphere(); sphere != nullptr) {
-      outSpheres.resize(1u, Wm3::Sphere3f{});
-      outSpheres[0].Center = center;
-      outSpheres[0].Radius = sphere->Radius;
-    }
-  }
-
-  /**
    * Alias of FUN_0067AC40 (non-canonical helper lane).
    *
    * What it does:

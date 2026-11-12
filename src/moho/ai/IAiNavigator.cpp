@@ -1211,22 +1211,6 @@ void SNavPath::AppendCell(
   ++finish;
 }
 
-void SNavPath::EraseFrontCell() noexcept
-{
-  const std::size_t count = Count();
-  if (count == 0) {
-    return;
-  }
-
-  if (count == 1) {
-    finish = start;
-    return;
-  }
-
-  std::memmove(start, start + 1, sizeof(SOCellPos) * (count - 1));
-  --finish;
-}
-
 gpg::RType* IAiNavigator::sType = nullptr;
 
 /**

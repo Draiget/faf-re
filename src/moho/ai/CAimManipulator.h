@@ -730,12 +730,4 @@ namespace moho
 
 namespace gpg
 {
-  /**
-   * Address: 0x00633580 (FUN_00633580, gpg::RRef_CAimManipulator)
-   *
-   * What it does:
-   * Builds one typed reflection reference for `moho::CAimManipulator*`,
-   * preserving dynamic-derived ownership and base-offset adjustment.
-   */
-  gpg::RRef* RRef_CAimManipulator(gpg::RRef* outRef, moho::CAimManipulator* value);
 } // namespace gpg

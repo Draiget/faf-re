@@ -2386,66 +2386,6 @@ void moho::PLAT_CreateGameLogForReport()
 }
 
 /**
- * Address: 0x004A1F10 (FUN_004A1F10)
- *
- * What it does:
- * Writes one registry value at `keyPath` using raw byte payload and explicit
- * registry value type.
- */
-bool moho::PLAT_SetRegistryValue(
-  const char* const keyPath,
-  const std::uint8_t* const data,
-  const std::uint32_t dataSize,
-  const std::uint32_t valueType
-)
-{
-  if (keyPath == nullptr) {
-    return false;
-  }
-
-#if !FAFRE_PLATFORM_WINDOWS
-  // No registry: the write fails as a key Windows refuses to create does (the Linux client, issue #255).
-  (void)data;
-  (void)dataSize;
-  (void)valueType;
-  gpg::Logf("PLAT_SetRegistryValue: Unable to create registry key \"%s\"", keyPath);
-  return false;
-#else
-  // The shipped body builds a mutable copy of the path in a byte vector so
-  // `ParseRegistryPathInPlace` can split it; the vector frees itself on every
-  // return path, which is what the explicit teardown calls at each `return`
-  // used to model.
-  fa::vector<std::uint8_t, false> keyBuffer{};
-  keyBuffer.resize(std::strlen(keyPath) + 1U);
-
-  char* const mutableKeyPath = reinterpret_cast<char*>(keyBuffer.begin());
-  std::strcpy(mutableKeyPath, keyPath);
-  const ParsedRegistryPath parsedPath = ParseRegistryPathInPlace(mutableKeyPath);
-
-  HKEY openedKey = nullptr;
-  if (
-    ::RegCreateKeyExA(parsedPath.rootKey, parsedPath.subKey, 0, nullptr, 0, 0xF003Fu, nullptr, &openedKey, nullptr) !=
-    ERROR_SUCCESS
-  ) {
-    gpg::Logf("PLAT_SetRegistryValue: Unable to create registry key \"%s\"", keyPath);
-    return false;
-  }
-
-  if (
-    ::RegSetValueExA(openedKey, parsedPath.valueName, 0, valueType, reinterpret_cast<const BYTE*>(data), dataSize) !=
-    ERROR_SUCCESS
-  ) {
-    (void)::RegCloseKey(openedKey);
-    gpg::Logf("PLAT_SetRegistryValue: Unable to write registry key \"%s\"", keyPath);
-    return false;
-  }
-
-  (void)::RegCloseKey(openedKey);
-  return true;
-#endif
-}
-
-/**
  * Address: 0x004A2D40 (FUN_004A2D40)
  *
  * What it does:

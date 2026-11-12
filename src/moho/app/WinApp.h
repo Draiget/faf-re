@@ -224,16 +224,6 @@ namespace moho
   fa::string PLAT_FormatCallstack(std::int32_t firstFrame, std::int32_t endFrame, const std::uintptr_t* frames);
 
   /**
-   * Address: 0x004A1F10 (FUN_004A1F10)
-   *
-   * What it does:
-   * Writes one registry value at `keyPath` using raw byte payload and explicit
-   * registry value type.
-   */
-  bool
-  PLAT_SetRegistryValue(const char* keyPath, const std::uint8_t* data, std::uint32_t dataSize, std::uint32_t valueType);
-
-  /**
    * Address: 0x004A2D40 (FUN_004A2D40)
    *
    * What it does:

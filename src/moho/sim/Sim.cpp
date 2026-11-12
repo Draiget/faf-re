@@ -851,20 +851,6 @@ namespace moho
     , mStartCellIsTraversable(false)
   {}
 
-  /**
-   * Address: 0x007657D0 (FUN_007657D0)
-   *
-   * What it does:
-   * Destroys one heap-allocated `PathPreviewFinder` by invoking its real
-   * (implicit) destructor chain -- see `PathPreviewFinder.h` for the full
-   * cross-emission evidence -- then releasing the allocation.
-   */
-  void DeletePathPreviewFinder(
-    PathPreviewFinder* const finder
-  ) noexcept
-  {
-    delete finder;
-  }
 } // namespace moho
 
 namespace

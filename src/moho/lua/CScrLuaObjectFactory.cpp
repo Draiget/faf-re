@@ -703,21 +703,6 @@ namespace moho
   CScrLuaMetatableFactory<CScriptObject*> CScrLuaMetatableFactory<CScriptObject*>::sInstance{};
 
   /**
-   * Address: 0x00BC60D0 (FUN_00BC60D0)
-   *
-   * What it does:
-   * Allocates the next Lua metatable-factory object index and stores it in the
-   * recovered `CScrLuaMetatableFactory<CScriptObject*>` startup index lane.
-   */
-  int register_CScrLuaMetatableFactory_CScriptObject_Index()
-  {
-    const int index = CScrLuaObjectFactory::AllocateFactoryObjectIndex();
-    CScrLuaMetatableFactory<CScriptObject*>::Instance().SetFactoryObjectIndexForRecovery(index);
-    gRecoveredCScrLuaMetatableFactoryCScriptObjectIndex = index;
-    return index;
-  }
-
-  /**
    * Address: 0x004D22D0 (FUN_004D22D0, ?SCR_CreateSimpleMetatable@Moho@@YA?AVLuaObject@LuaPlus@@PAVLuaState@3@@Z)
    * Alias:   0x100C3290 (alt lane)
    */

@@ -805,20 +805,6 @@ namespace moho
 
 namespace gpg
 {
-  /**
-   * Address: 0x0061A3F0 (FUN_0061A3F0, gpg::RRef_CUnitMoveTask)
-   *
-   * What it does:
-   * Builds one typed reflection reference for `moho::CUnitMoveTask*`,
-   * preserving dynamic-derived ownership and base-offset adjustment.
-   */
-  gpg::RRef* RRef_CUnitMoveTask(
-    gpg::RRef* const outRef,
-    moho::CUnitMoveTask* const value
-  )
-  {
-    return gpg::WriteDerivedRef(outRef, value);
-  }
 
 } // namespace gpg
 

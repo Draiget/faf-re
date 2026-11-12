@@ -289,18 +289,6 @@ namespace moho
 {
   gpg::RType* SDecalInfo::sType = nullptr;
 
-  [[nodiscard]] SDecalInfo* CopyConstructSDecalInfoIfPresent(
-    SDecalInfo* const destination,
-    const SDecalInfo* const source
-  )
-  {
-    if (source == nullptr) {
-      return nullptr;
-    }
-
-    return ::new (destination) SDecalInfo(*source);
-  }
-
   /**
    * Address: 0x00742360 (FUN_00742360, Moho::SDecalInfo::~SDecalInfo)
    *

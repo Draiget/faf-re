@@ -275,12 +275,4 @@ namespace moho
 
 namespace gpg
 {
-  /**
-   * Address: 0x006242A0 (FUN_006242A0, gpg::RRef_CUnitScriptTask)
-   *
-   * What it does:
-   * Builds one typed reflection reference for `moho::CUnitScriptTask*`,
-   * preserving dynamic-derived ownership and base-offset adjustment.
-   */
-  gpg::RRef* RRef_CUnitScriptTask(gpg::RRef* outRef, moho::CUnitScriptTask* value);
 } // namespace gpg

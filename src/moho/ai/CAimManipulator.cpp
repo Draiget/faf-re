@@ -2039,20 +2039,6 @@ void moho::CAimManipulator::MemberSerialize(
 
 namespace gpg
 {
-  /**
-   * Address: 0x00633580 (FUN_00633580, gpg::RRef_CAimManipulator)
-   *
-   * What it does:
-   * Builds one typed reflection reference for `moho::CAimManipulator*`,
-   * preserving dynamic-derived ownership and base-offset adjustment.
-   */
-  gpg::RRef* RRef_CAimManipulator(
-    gpg::RRef* const outRef,
-    moho::CAimManipulator* const value
-  )
-  {
-    return gpg::WriteDerivedRef(outRef, value, &CachedCAimManipulatorType);
-  }
 
 } // namespace gpg
 

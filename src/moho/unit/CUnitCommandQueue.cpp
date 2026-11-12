@@ -596,22 +596,6 @@ void CUnitCommandQueue::ClearCommandQueue()
 }
 
 /**
- * Address: 0x006EE360 (FUN_006EE360, ?AbortActiveTask@CUnitCommandQueue@Moho@@QAEXXZ)
- *
- * What it does:
- * Marks queue refresh state and emits one needs-refresh event.
- */
-void CUnitCommandQueue::AbortActiveTask()
-{
-  if (NeedsUIRefresh()) {
-    MarkOwningUnitSyncDirty(mUnit);
-  }
-
-  mNeedsRefresh = true;
-  EmitQueueEvent(*this, EUnitCommandQueueStatus::UCQS_NeedsRefresh);
-}
-
-/**
  * Address: 0x006EE430 (FUN_006EE430)
  *
  * IDA signature:

@@ -231,14 +231,6 @@ namespace moho
 
   private:
     /**
-     * Address: 0x00439B60 (?AddVert@CD3DPrimBatcher@Moho@@AAEXABUVertex@12@@Z)
-     *
-     * What it does:
-     * Appends one transformed vertex to the queue.
-     */
-    void AddVert(const Vertex& sourceVertex);
-
-    /**
      * Address: 0x00439790 (?AddVerts@CD3DPrimBatcher@Moho@@AAEXPBUVertex@12@II@Z)
      *
      * What it does:
@@ -254,20 +246,6 @@ namespace moho
      */
     std::uint16_t
     AddIndexedVert(std::uint16_t sourceIndex, const Vertex* sourceVertices, gpg::fastvector<std::uint16_t>& remap);
-
-    /**
-     * Address: 0x00439BD0 (?AddIndexedVerts@CD3DPrimBatcher@Moho@@AAEXPBUVertex@12@IPBGII@Z)
-     *
-     * What it does:
-     * Appends indexed primitives with per-chunk remap cache reset across flush boundaries.
-     */
-    void AddIndexedVerts(
-      const Vertex* sourceVertices,
-      std::uint32_t sourceVertexCount,
-      const std::uint16_t* sourceIndices,
-      std::uint32_t primitiveCount,
-      std::uint32_t verticesPerPrimitive
-    );
 
   public:
     // Offsets proven from the binary:
@@ -411,21 +389,6 @@ namespace moho
    * zero and destroying the block when `weak_count_` follows it to zero.
    */
   void ResetSharedDynamicTextureSheetHandle(boost::shared_ptr<CD3DDynamicTextureSheet>& handle) noexcept;
-
-  /**
-   * Address: 0x00453AB0 (?DRAW_WireOval@Moho@@YAXPAVCD3DPrimBatcher@1@ABV?$Vector3@M@Wm3@@11II@Z)
-   *
-   * What it does:
-   * Emits one wireframe oval around `center` using two orthogonal axis vectors.
-   */
-  void DRAW_WireOval(
-    CD3DPrimBatcher* primBatcher,
-    const Vector3f& center,
-    const Vector3f& axisCos,
-    const Vector3f& axisSin,
-    std::uint32_t color,
-    std::uint32_t precision
-  );
 
   /** The two corner rings of a `DRAW_Rect` border, each top-left, top-right, bottom-right, bottom-left. */
   struct DrawRectRing

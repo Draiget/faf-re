@@ -27,8 +27,6 @@ namespace faf::headless
     /** Registers the init form; call before the sim is created. */
     void Enable();
 
-    [[nodiscard]] bool Installed() const noexcept;
-
     /** Writes "key<TAB>writes<TAB>call site" lines, sorted, and returns a one-line summary. */
     [[nodiscard]] std::string Write(const std::string& path) const;
   };

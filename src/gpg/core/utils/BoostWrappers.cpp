@@ -62,22 +62,6 @@ namespace
 
 namespace boost
 {
-  /**
-   * Address: 0x00AC1980 (FUN_00AC1980)
-   *
-   * What it does:
-   * Creates one named Win32 mutex lane and throws
-   * `boost::thread_resource_error` when handle creation fails.
-   */
-  void EnsureNamedMutexHandleCreatedOrThrow(
-    const char* const mutexName
-  )
-  {
-    const HANDLE mutexHandle = ::CreateMutexA(nullptr, FALSE, mutexName);
-    if (mutexHandle == nullptr || mutexHandle == INVALID_HANDLE_VALUE) {
-      ThrowThreadResourceError();
-    }
-  }
 
   /**
    * Address: 0x00AC1C90 (FUN_00AC1C90)
@@ -230,39 +214,6 @@ namespace boost
   );
 
   /**
-   * Address: 0x007DD160 (FUN_007DD160)
-   *
-   * NOTE (2026-08-20 audit): renamed from `...WithWeakRelease`. FUN_007DD160's
-   * release step calls FUN_004229B0, which is `sp_counted_base::release()`
-   * (dispose-then-weak-release fused; see BoostWrappers.h), never a standalone
-   * weak drop. Zero external callers at rename time (grep-verified).
-   *
-   * What it does:
-   * Copies one `(px,pi)` pair and rebinds ownership by shared-retaining the
-   * incoming control lane and shared-releasing the previously bound lane.
-   */
-  SharedCountPair* AssignSharedPairRetainAndRelease(
-    SharedCountPair* const outPair,
-    const SharedCountPair* const sourcePair
-  ) noexcept
-  {
-    outPair->px = sourcePair->px;
-
-    detail::sp_counted_base* const incomingControl = sourcePair->pi;
-    if (incomingControl != outPair->pi) {
-      if (incomingControl != nullptr) {
-        incomingControl->add_ref_copy();
-      }
-      if (outPair->pi != nullptr) {
-        outPair->pi->release();
-      }
-      outPair->pi = incomingControl;
-    }
-
-    return outPair;
-  }
-
-  /**
    * Address: 0x0055AA60 (FUN_0055AA60)
    *
    * NOTE (2026-08-20 audit): despite the `...Weak` name (kept for the external
@@ -390,50 +341,6 @@ namespace boost
   }
 
   /**
-   * Address: 0x00545490 (FUN_00545490)
-   *
-   * What it does:
-   * Invokes one deleting-destructor vtable lane with delete flag `1` when the
-   * control pointer is non-null.
-   */
-  [[nodiscard]] int InvokeSpCountedDeletingDtorIfPresent(
-    detail::sp_counted_base* const control
-  ) noexcept
-  {
-    if (control == nullptr) {
-      return 0;
-    }
-
-    // Binary dispatches the slot-0 scalar deleting destructor with delete
-    // flag 1 -- exactly what `delete` emits through sp_counted_base's
-    // virtual destructor.
-    delete control;
-    return 0;
-  }
-
-  /**
-   * Address: 0x00784070 (FUN_00784070)
-   * Address: 0x00857630 (FUN_00857630)
-   *
-   * What it does:
-   * Releases one half-open range of shared-pair slots by releasing each
-   * control block referenced from the pair lanes.
-   */
-  SharedCountPair* ReleaseSharedCountRange(
-    SharedCountPair* const begin,
-    SharedCountPair* const end
-  ) noexcept
-  {
-    SharedCountPair* cursor = begin;
-    while (cursor != end) {
-      ReleaseSharedCount(cursor->pi);
-      ++cursor;
-    }
-
-    return cursor;
-  }
-
-  /**
    * Address: 0x00446F30 (FUN_00446F30)
    *
    * What it does:
@@ -472,51 +379,6 @@ namespace boost
   }
 
   /**
-   * Address: 0x00446F80 (FUN_00446F80)
-   *
-   * What it does:
-   * Returns one shared-owner use-count lane.
-   */
-  std::int32_t SpCountedBaseUseCount(
-    const detail::sp_counted_base* const control
-  ) noexcept
-  {
-    if (control == nullptr) {
-      return 0;
-    }
-    return static_cast<std::int32_t>(control->use_count());
-  }
-
-  /**
-   * Address: 0x00446FE0 (FUN_00446FE0)
-   *
-   * What it does:
-   * Rebinds one weak control-pointer slot by weak-retaining the incoming
-   * source control and weak-releasing the previously bound control.
-   */
-  detail::sp_counted_base** SpCountedBaseWeakAssignSlot(
-    detail::sp_counted_base** const targetControlSlot,
-    detail::sp_counted_base* const* const sourceControlSlot
-  ) noexcept
-  {
-    if (targetControlSlot == nullptr) {
-      return nullptr;
-    }
-
-    detail::sp_counted_base* const incomingControl = sourceControlSlot != nullptr ? *sourceControlSlot : nullptr;
-    if (incomingControl != nullptr) {
-      SpCountedBaseWeakAddRef(incomingControl);
-    }
-
-    if (*targetControlSlot != nullptr) {
-      (*targetControlSlot)->weak_release();
-    }
-
-    *targetControlSlot = incomingControl;
-    return targetControlSlot;
-  }
-
-  /**
    * Address: 0x0044DDD0 (FUN_0044DDD0, throw_BadWeakPtrException)
    *
    * IDA signature:
@@ -530,33 +392,6 @@ namespace boost
   [[noreturn]] void ThrowBadWeakPtr()
   {
     throw boost::bad_weak_ptr();
-  }
-
-  /**
-   * Address: 0x00447030 (FUN_00447030)
-   *
-   * What it does:
-   * Constructs/rebinds one weak control-pointer slot from one shared slot and
-   * throws `boost::bad_weak_ptr` when the shared owner is absent or lock fails.
-   */
-  detail::sp_counted_base** SpCountedBaseWeakConstructFromSharedOrThrow(
-    detail::sp_counted_base** const outWeakControlSlot,
-    detail::sp_counted_base* const* const sourceSharedControlSlot
-  )
-  {
-    if (outWeakControlSlot == nullptr) {
-      ThrowBadWeakPtr();
-    }
-
-    detail::sp_counted_base* const sourceControl =
-      sourceSharedControlSlot != nullptr ? *sourceSharedControlSlot : nullptr;
-    *outWeakControlSlot = sourceControl;
-
-    if (sourceControl == nullptr || !SpCountedBaseAddRefLock(sourceControl)) {
-      ThrowBadWeakPtr();
-    }
-
-    return outWeakControlSlot;
   }
 
   namespace

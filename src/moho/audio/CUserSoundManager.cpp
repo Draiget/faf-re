@@ -851,18 +851,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x008AE460 (FUN_008AE460, user-sound singleton getter lane)
-   *
-   * What it does:
-   * Returns the process-global user-sound-manager singleton pointer without
-   * creating a replacement instance.
-   */
-  [[maybe_unused]] [[nodiscard]] CUserSoundManager* USER_GetSoundManagerSingletonRaw() noexcept
-  {
-    return gUserSoundManager;
-  }
-
-  /**
    * Address: 0x008AA470 (FUN_008AA470, Moho::SND_StopEntityLoop)
    *
    * What it does:

@@ -769,20 +769,6 @@ namespace moho
 
 namespace gpg
 {
-  /**
-   * Address: 0x00603530 (FUN_00603530, gpg::RRef_CUnitCallTeleport)
-   *
-   * What it does:
-   * Builds one typed reflection reference for `moho::CUnitCallTeleport*`,
-   * preserving dynamic-derived ownership and base-offset adjustment.
-   */
-  gpg::RRef* RRef_CUnitCallTeleport(
-    gpg::RRef* const outRef,
-    moho::CUnitCallTeleport* const value
-  )
-  {
-    return gpg::WriteDerivedRef(outRef, value);
-  }
 
 } // namespace gpg
 

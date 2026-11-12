@@ -26,39 +26,6 @@ void moho::TrimRange(
   outEnd = e;
 }
 
-void moho::SplitByComma(
-  const fa::string& src,
-  fa::vector<fa::string>& out
-)
-{
-  const char* s = src.c_str();
-  const size_t n = src.size();
-  size_t i = 0;
-  while (i < n) {
-    // skip delimiters and spaces
-    while (i < n && (s[i] == ',' || gpg::STR_IsAsciiWhitespace(s[i]))) {
-      ++i;
-    }
-    if (i >= n) {
-      break;
-    }
-
-    // read token till next comma
-    size_t j = i;
-    while (j < n && s[j] != ',')
-      ++j;
-
-    // trim [i, j)
-    const char* tb;
-    const char* te;
-    TrimRange(s + i, j - i, tb, te);
-    if (te > tb) {
-      out.push_back(fa::string(tb, static_cast<size_t>(te - tb)));
-    }
-    i = (j < n ? j + 1 : j);
-  }
-}
-
 fa::string moho::Join(
   const fa::vector<fa::string>& items,
   const char* sep

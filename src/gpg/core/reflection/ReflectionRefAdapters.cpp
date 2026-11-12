@@ -760,28 +760,6 @@ namespace gpg
   }
 
   /**
-   * Address: 0x00642650 (FUN_00642650, gpg::RRef_CAnimationManipulator)
-   *
-   * What it does:
-   * Builds a reflection reference for `moho::CAnimationManipulator` using named
-   * declared type lookup, runtime RTTI cache, and base-offset normalization.
-   */
-  gpg::RRef* RRef_CAnimationManipulator(
-    RRef* const out,
-    moho::CAnimationManipulator* const value
-  )
-  {
-    return BuildNamedPolymorphicRefWithCache(
-      out,
-      value,
-      "CAnimationManipulator",
-      "Moho::CAnimationManipulator",
-      moho::CAnimationManipulator::sType,
-      gCAnimationManipulatorRRefCache
-    );
-  }
-
-  /**
    * Address: 0x00649C00 (FUN_00649C00, gpg::RRef_CStorageManipulator)
    *
    * What it does:

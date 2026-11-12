@@ -95,12 +95,4 @@ namespace moho
 
 namespace gpg
 {
-  /**
-   * Address: 0x006036E0 (FUN_006036E0, gpg::RRef_CUnitCallAirStagingPlatform)
-   *
-   * What it does:
-   * Builds one typed reflection reference for `moho::CUnitCallAirStagingPlatform*`,
-   * preserving dynamic-derived ownership and base-offset adjustment.
-   */
-  gpg::RRef* RRef_CUnitCallAirStagingPlatform(gpg::RRef* outRef, moho::CUnitCallAirStagingPlatform* value);
 } // namespace gpg

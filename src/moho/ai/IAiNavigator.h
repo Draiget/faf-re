@@ -86,7 +86,6 @@ namespace moho
      */
     void PrependCells(const SOCellPos* begin, const SOCellPos* end);
     void AppendCell(const SOCellPos& cell);
-    void EraseFrontCell() noexcept;
   };
 
   static_assert(sizeof(SNavPath) == 0x10, "SNavPath size must be 0x10");

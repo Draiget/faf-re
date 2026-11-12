@@ -30,16 +30,3 @@
 {
   throw std::length_error(message);
 }
-
-/**
- * Address: 0x00A8FC4B (FUN_00A8FC4B, `_wtoi` wrapper lane)
- *
- * What it does:
- * Parses one base-10 signed wide integer by forwarding to `wcstol`.
- */
-extern "C" int __cdecl EngineWtoiFromWide(
-  const wchar_t* const text
-)
-{
-  return static_cast<int>(::wcstol(text, nullptr, 10));
-}

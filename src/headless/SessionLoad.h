@@ -50,6 +50,4 @@ namespace faf::headless
     LuaPlus::LuaObject& sync
   );
 
-  /** Whether a packet's `Sync` says the game has ended. Decodes it only if its bytes name that. */
-  [[nodiscard]] bool SyncSaysGameEnded(moho::SSyncData& packet, LuaPlus::LuaState* state);
 } // namespace faf::headless

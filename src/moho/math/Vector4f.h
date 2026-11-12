@@ -88,8 +88,6 @@ namespace moho
      */
     [[nodiscard]] float Z() const noexcept;
 
-    [[nodiscard]] Vector3f XYZ() const noexcept;
-
     /**
      * Address: 0x0046FB20 (FUN_0046FB20, Moho::Vector4f::operator=)
      *

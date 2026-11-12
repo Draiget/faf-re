@@ -277,29 +277,6 @@ moho::CDiscoveryService::~CDiscoveryService()
 }
 
 /**
- * Address: 0x007BF7A0 (FUN_007BF7A0, Moho::CDiscoveryService::dtr)
- *
- * What it does:
- * Runs `CDiscoveryService` non-deleting teardown and conditionally frees
- * object storage when `deleteFlags & 1`.
- */
-[[maybe_unused]] moho::CScriptObject* DestroyDiscoveryServiceWithDeleteFlagThunk(
-  moho::CDiscoveryService* const discoveryService,
-  const std::uint8_t deleteFlags
-) noexcept
-{
-  if (discoveryService == nullptr) {
-    return nullptr;
-  }
-
-  discoveryService->~CDiscoveryService();
-  if ((deleteFlags & 1u) != 0u) {
-    ::operator delete(discoveryService);
-  }
-  return static_cast<moho::CScriptObject*>(discoveryService);
-}
-
-/**
  * Address: 0x007BF4B0 (FUN_007BF4B0, Moho::CDiscoveryService::GetClass)
  *
  * What it does:

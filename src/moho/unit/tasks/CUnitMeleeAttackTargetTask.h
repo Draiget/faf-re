@@ -317,13 +317,4 @@ namespace moho
 
 namespace gpg
 {
-  /**
-   * Address: 0x00617B50 (FUN_00617B50, gpg::RRef_CUnitMeleeAttackTargetTask)
-   *
-   * What it does:
-   * Builds one typed reflection reference for
-   * `moho::CUnitMeleeAttackTargetTask*`, preserving dynamic-derived ownership
-   * and base-offset adjustment.
-   */
-  gpg::RRef* RRef_CUnitMeleeAttackTargetTask(gpg::RRef* outRef, moho::CUnitMeleeAttackTargetTask* value);
 } // namespace gpg

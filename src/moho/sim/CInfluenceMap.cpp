@@ -1678,24 +1678,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0071ED90 (FUN_0071ED90)
-   *
-   * What it does:
-   * Assigns one `InfluenceGrid` payload into `destination` and returns the
-   * destination pointer (primary adapter lane).
-   */
-  moho::InfluenceGrid* AssignInfluenceGridAndReturnDestinationPrimary(
-    const moho::InfluenceGrid* const source,
-    moho::InfluenceGrid* const destination
-  )
-  {
-    if (destination != nullptr && source != nullptr) {
-      (void)AssignInfluenceGridValue(*destination, *source);
-    }
-    return destination;
-  }
-
-  /**
    * Address: 0x0071D4B0 (FUN_0071D4B0, func_NewArray_SThreat)
    *
    * What it does:

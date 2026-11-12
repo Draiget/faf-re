@@ -214,15 +214,6 @@ namespace moho
     void ClearCommandQueue();
 
     /**
-     * Address: 0x006EE360 (FUN_006EE360, ?AbortActiveTask@CUnitCommandQueue@Moho@@QAEXXZ)
-     *
-     * What it does:
-     * Marks queue refresh state and emits one needs-refresh event for active
-     * command abort transitions.
-     */
-    void AbortActiveTask();
-
-    /**
      * Address: 0x006EE430 (FUN_006EE430)
      *
      * IDA signature:

@@ -364,20 +364,6 @@ namespace
 
 namespace gpg
 {
-  /**
-   * Address: 0x00610800 (FUN_00610800, gpg::RRef_CUnitWaitForFerryTask)
-   *
-   * What it does:
-   * Builds one typed reflection reference for `moho::CUnitWaitForFerryTask*`,
-   * preserving dynamic-derived ownership and base-offset adjustment.
-   */
-  gpg::RRef* RRef_CUnitWaitForFerryTask(
-    gpg::RRef* const outRef,
-    moho::CUnitWaitForFerryTask* const value
-  )
-  {
-    return gpg::WriteDerivedRef(outRef, value);
-  }
 
 } // namespace gpg
 

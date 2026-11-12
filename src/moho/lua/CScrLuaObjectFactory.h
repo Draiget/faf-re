@@ -393,12 +393,4 @@ namespace moho
     "CScrLuaMetatableFactory<CScriptObject*> must be 0x8"
   );
 
-  /**
-   * Address: 0x00BC60D0 (FUN_00BC60D0)
-   *
-   * What it does:
-   * Allocates the next Lua metatable-factory object index and stores it in the
-   * recovered `CScrLuaMetatableFactory<CScriptObject*>` startup index lane.
-   */
-  int register_CScrLuaMetatableFactory_CScriptObject_Index();
 } // namespace moho

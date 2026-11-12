@@ -901,26 +901,6 @@ namespace moho
 
 namespace gpg
 {
-  /**
-   * Address: 0x00638D50 (FUN_00638D50, gpg::RRef_CCollisionManipulator)
-   *
-   * What it does:
-   * Builds one typed reflection reference for
-   * `moho::CCollisionManipulator*`, preserving dynamic-derived ownership and
-   * base-offset adjustment.
-   */
-  gpg::RRef* RRef_CCollisionManipulator(
-    gpg::RRef* const outRef,
-    moho::CCollisionManipulator* const value
-  )
-  {
-    if (!outRef) {
-      return nullptr;
-    }
-
-    *outRef = gpg::MakeTypedRef(value, CachedCCollisionManipulatorType());
-    return outRef;
-  }
 
 } // namespace gpg
 

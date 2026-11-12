@@ -1196,20 +1196,6 @@ namespace moho
     void SetCollisionSphereShape(const Wm3::Vec3f& localCenter, float radius);
 
     /**
-     * Address: 0x0067AA50 (FUN_0067AA50, Moho::Entity::GetTerrainCollisionGeom)
-     *
-     * What it does:
-     * Emits terrain-collision proxy spheres from current collision primitive:
-     * eight corner points for box shapes, or one center/radius sphere for
-     * sphere shapes.
-     *
-     * Requires a collision primitive; the binary does not check for one. Its
-     * only caller is `CUnitMotion::HandleGroundCollision`, which FAF's build
-     * never reaches.
-     */
-    void GetTerrainCollisionGeom(gpg::fastvector<Wm3::Sphere3f>& outSpheres) const;
-
-    /**
      * Address: 0x0067AE00 (FUN_0067AE00, ?SetCollisionShapeNone@Entity@Moho@@QAEXXZ)
      *
      * What it does:

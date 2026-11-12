@@ -1652,26 +1652,6 @@ namespace boost
   void SpCountedBaseWeakAddRef(detail::sp_counted_base* control) noexcept;
 
   /**
-   * Address: 0x00446F80 (FUN_00446F80)
-   *
-   * What it does:
-   * Returns one shared-owner use-count lane.
-   */
-  [[nodiscard]] std::int32_t SpCountedBaseUseCount(const detail::sp_counted_base* control) noexcept;
-
-  /**
-   * Address: 0x00446FE0 (FUN_00446FE0)
-   *
-   * What it does:
-   * Rebinds one weak control-pointer slot by weak-retaining the incoming
-   * source control and weak-releasing the previously bound control.
-   */
-  [[nodiscard]] detail::sp_counted_base** SpCountedBaseWeakAssignSlot(
-    detail::sp_counted_base** targetControlSlot,
-    detail::sp_counted_base* const* sourceControlSlot
-  ) noexcept;
-
-  /**
    * Address: 0x0044DDD0 (FUN_0044DDD0, throw_BadWeakPtrException)
    *
    * What it does:
@@ -1679,18 +1659,6 @@ namespace boost
    * weak-construct path into one no-return helper.
    */
   [[noreturn]] void ThrowBadWeakPtr();
-
-  /**
-   * Address: 0x00447030 (FUN_00447030)
-   *
-   * What it does:
-   * Constructs/rebinds one weak control-pointer slot from one shared slot and
-   * throws `boost::bad_weak_ptr` when the shared owner is absent or lock fails.
-   */
-  [[nodiscard]] detail::sp_counted_base** SpCountedBaseWeakConstructFromSharedOrThrow(
-    detail::sp_counted_base** outWeakControlSlot,
-    detail::sp_counted_base* const* sourceSharedControlSlot
-  );
 
   /**
    * Address: 0x004DBBC0 (FUN_004DBBC0)
@@ -1765,24 +1733,6 @@ namespace boost
   SharedCountPair* AssignWeakPairFromShared(SharedCountPair* outPair, const SharedCountPair* sourcePair) noexcept;
 
   /**
-   * Address: 0x007DD160 (FUN_007DD160)
-   *
-   * NOTE (2026-08-20 audit): formerly named `...WithWeakRelease`. FUN_007DD160
-   * retains the incoming control via `add_ref_copy()` (`lock xadd [pi+4], 1`)
-   * and releases the previous control via a call to FUN_004229B0, which is
-   * `sp_counted_base::release()` (see BoostWrappers.h `release()` evidence
-   * list), not `weak_release()`. Both lanes are ordinary strong shared-count
-   * ownership; renamed to stop asserting a weak drop that never happens. Zero
-   * external callers at rename time (grep-verified across src).
-   *
-   * What it does:
-   * Copies one `(px,pi)` pair and rebinds ownership by shared-retaining the
-   * incoming control lane and shared-releasing the previous control lane.
-   */
-  SharedCountPair*
-  AssignSharedPairRetainAndRelease(SharedCountPair* outPair, const SharedCountPair* sourcePair) noexcept;
-
-  /**
    * Address: 0x0043DCF0 (FUN_0043DCF0)
    * Address: 0x0043F500 (FUN_0043F500)
    * Address: 0x0043F8E0 (FUN_0043F8E0)
@@ -1849,15 +1799,6 @@ namespace boost
    * block on the final strong and weak transitions.
    */
   void ReleaseSharedCount(detail::sp_counted_base* control) noexcept;
-
-  /**
-   * Address: 0x00857630 (FUN_00857630)
-   *
-   * What it does:
-   * Releases one half-open range of shared-pair slots by releasing each
-   * control block referenced from the pair lanes.
-   */
-  [[nodiscard]] SharedCountPair* ReleaseSharedCountRange(SharedCountPair* begin, SharedCountPair* end) noexcept;
 
   template <class T>
   [[nodiscard]] SharedPtrRaw<T> SharedPtrRawFromSharedBorrow(

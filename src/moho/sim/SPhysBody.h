@@ -186,25 +186,6 @@ namespace moho
      * left-multiplies it onto `mOrientation` (renormalizing in place).
      */
     void IntegrateAngularImpulse(const Wm3::Vec3f& angularImpulse, float dt);
-
-    /**
-     * Address: 0x00698350 (FUN_00698350, sub_698350)
-     *
-     * IDA signature:
-     * int __usercall sub_698350@<eax>(Moho::SPhysBody *a1@<edx>, int edi0@<edi>);
-     *
-     * What it does:
-     * Ground-collision impulse response. For each sample still penetrating
-     * (`sample.y <= sample.terrainElevation`), computes the point velocity
-     * (`mVelocity + Cross(angularVelocity, sample - mPos)`, where
-     * `angularVelocity` comes from `GetImpulse`) and, for points still
-     * moving downward, accumulates a cancelling linear/angular impulse and
-     * the maximum penetration depth. Averages the accumulated impulses
-     * across all downward-moving points, applies them to `mVelocity`/
-     * `mWorldImpulse` (each damped by 0.9), and pushes `mPos.y` up by the
-     * maximum penetration depth.
-     */
-    void ApplyGroundCollisionResponse(const gpg::fastvector_n<GroundPenetrationSample, 8>& samples);
   };
 
   /**

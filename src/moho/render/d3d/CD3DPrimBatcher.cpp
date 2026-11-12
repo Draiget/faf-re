@@ -814,20 +814,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00439B60 (?AddVert@CD3DPrimBatcher@Moho@@AAEXABUVertex@12@@Z)
-   *
-   * What it does:
-   * Appends one UV-transformed vertex to the queued vertex stream.
-   */
-  void CD3DPrimBatcher::AddVert(
-    const Vertex& sourceVertex
-  )
-  {
-    auto* const runtime = this;
-    runtime->mVertices.push_back(BuildTransformedVertex(*runtime, sourceVertex));
-  }
-
-  /**
    * Address: 0x0043A060 (?AddIndexedVert@CD3DPrimBatcher@Moho@@AAEGGPBUVertex@12@IAAV?$fastvector@G@gpg@@@Z)
    *
    * What it does:
@@ -852,66 +838,6 @@ namespace moho
 
     remap[sourceIndex] = mappedIndex;
     return mappedIndex;
-  }
-
-  /**
-   * Address: 0x00439BD0 (?AddIndexedVerts@CD3DPrimBatcher@Moho@@AAEXPBUVertex@12@IPBGII@Z)
-   *
-   * What it does:
-   * Appends primitives from indexed source data, preserving remapped-vertex
-   * reuse within each flush chunk and resetting remap state after flush.
-   */
-  void CD3DPrimBatcher::AddIndexedVerts(
-    const Vertex* const sourceVertices,
-    const std::uint32_t sourceVertexCount,
-    const std::uint16_t* sourceIndices,
-    std::uint32_t primitiveCount,
-    const std::uint32_t verticesPerPrimitive
-  )
-  {
-    gpg::fastvector<std::uint16_t> remap{};
-    InitializeIndexedVertexRemap(remap, sourceVertexCount);
-
-    auto* const runtime = this;
-    while (primitiveCount != 0u) {
-      const std::uint32_t indicesPerPrimitive = (verticesPerPrimitive == 4u) ? 6u : verticesPerPrimitive;
-      const std::uint32_t usedPrimitiveIndices = static_cast<std::uint32_t>(runtime->mPrimitives.size());
-      const std::uint32_t usedVertices = static_cast<std::uint32_t>(runtime->mVertices.size());
-
-      const std::uint32_t maxByIndices = (kPrimQueueCapacity - usedPrimitiveIndices) / indicesPerPrimitive;
-      const std::uint32_t maxByVertices = (kPrimQueueCapacity - usedVertices) / verticesPerPrimitive;
-      const std::uint32_t batchPrimitiveCount = std::min(primitiveCount, std::min(maxByIndices, maxByVertices));
-      if (batchPrimitiveCount == 0u) {
-        Flush();
-        ResetIndexedVertexRemap(remap);
-        continue;
-      }
-
-      const std::uint32_t indexBatchCount = verticesPerPrimitive * batchPrimitiveCount;
-      if (verticesPerPrimitive == 4u) {
-        const std::uint16_t* quadCursor = sourceIndices + 2;
-        for (std::uint32_t quadIndex = 0; quadIndex < batchPrimitiveCount; ++quadIndex, ++quadCursor) {
-          const std::uint16_t i0 = AddIndexedVert(quadCursor[-2], sourceVertices, remap);
-          const std::uint16_t i1 = AddIndexedVert(quadCursor[-1], sourceVertices, remap);
-          const std::uint16_t i2 = AddIndexedVert(quadCursor[0], sourceVertices, remap);
-          const std::uint16_t i3 = AddIndexedVert(quadCursor[1], sourceVertices, remap);
-
-          AppendPrimitiveIndex(*runtime, i0);
-          AppendPrimitiveIndex(*runtime, i1);
-          AppendPrimitiveIndex(*runtime, i2);
-          AppendPrimitiveIndex(*runtime, i2);
-          AppendPrimitiveIndex(*runtime, i3);
-          AppendPrimitiveIndex(*runtime, i0);
-        }
-      } else {
-        for (std::uint32_t indexPos = 0; indexPos < indexBatchCount; ++indexPos) {
-          AppendPrimitiveIndex(*runtime, AddIndexedVert(sourceIndices[indexPos], sourceVertices, remap));
-        }
-      }
-
-      primitiveCount -= batchPrimitiveCount;
-      sourceIndices += indexBatchCount;
-    }
   }
 
   /**
@@ -1028,40 +954,6 @@ namespace moho
     const Vertex bottomLeft{bottomLeftPos.x, bottomLeftPos.y, bottomLeftPos.z, color, 0.0f, 1.0f};
 
     DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
-  }
-
-  /**
-   * Address: 0x00453AB0 (?DRAW_WireOval@Moho@@YAXPAVCD3DPrimBatcher@1@ABV?$Vector3@M@Wm3@@11II@Z)
-   *
-   * What it does:
-   * Emits one wireframe oval polyline using cosine/sine axis vectors.
-   */
-  void DRAW_WireOval(
-    CD3DPrimBatcher* const primBatcher,
-    const Vector3f& center,
-    const Vector3f& axisCos,
-    const Vector3f& axisSin,
-    const std::uint32_t color,
-    const std::uint32_t precision
-  )
-  {
-    if (primBatcher == nullptr || precision < 2u) {
-      return;
-    }
-
-    const float stepAngle = kTau / static_cast<float>(precision);
-    Vector3f previous = center + axisCos;
-
-    for (std::uint32_t index = 1; index <= precision; ++index) {
-      const float angle = stepAngle * static_cast<float>(index);
-      const float cosAngle = std::cos(angle);
-      const float sinAngle = std::sin(angle);
-
-      const Vector3f current{center + (axisCos * cosAngle) + (axisSin * sinAngle)};
-
-      DrawLine(primBatcher, previous, current, color);
-      previous = current;
-    }
   }
 
   /**

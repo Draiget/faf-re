@@ -241,67 +241,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00404D60 (FUN_00404D60, Moho::DXT_DecodeColorBlock)
-   */
-  void DXT_DecodeColorBlock(
-    const std::uint64_t colorBlock,
-    const DXTFormat format,
-    std::uint32_t* const outArgb16
-  )
-  {
-    if (outArgb16 == nullptr) {
-      return;
-    }
-
-    const std::uint16_t c0 = static_cast<std::uint16_t>(colorBlock & 0xFFFFu);
-    const std::uint16_t c1 = static_cast<std::uint16_t>((colorBlock >> 16u) & 0xFFFFu);
-
-    std::uint32_t palette[4]{};
-    palette[0] = ExpandRgb565ToArgb8888(c0);
-    palette[1] = ExpandRgb565ToArgb8888(c1);
-
-    const auto c0b = static_cast<std::uint8_t>(palette[0] & 0xFFu);
-    const auto c0g = static_cast<std::uint8_t>((palette[0] >> 8u) & 0xFFu);
-    const auto c0r = static_cast<std::uint8_t>((palette[0] >> 16u) & 0xFFu);
-    const auto c0a = static_cast<std::uint8_t>((palette[0] >> 24u) & 0xFFu);
-
-    const auto c1b = static_cast<std::uint8_t>(palette[1] & 0xFFu);
-    const auto c1g = static_cast<std::uint8_t>((palette[1] >> 8u) & 0xFFu);
-    const auto c1r = static_cast<std::uint8_t>((palette[1] >> 16u) & 0xFFu);
-    const auto c1a = static_cast<std::uint8_t>((palette[1] >> 24u) & 0xFFu);
-
-    if (palette[0] <= palette[1] && format == DXTFormat_DXT1) {
-      const std::uint8_t b = static_cast<std::uint8_t>((c0b + c1b + 1) / 2);
-      const std::uint8_t g = static_cast<std::uint8_t>((c0g + c1g + 1) / 2);
-      const std::uint8_t r = static_cast<std::uint8_t>((c0r + c1r + 1) / 2);
-      const std::uint8_t a = static_cast<std::uint8_t>((c0a + c1a + 1) / 2);
-      palette[2] = static_cast<std::uint32_t>(b) | (static_cast<std::uint32_t>(g) << 8u) |
-        (static_cast<std::uint32_t>(r) << 16u) | (static_cast<std::uint32_t>(a) << 24u);
-      palette[3] = 0u;
-    } else {
-      const std::uint8_t b2 = static_cast<std::uint8_t>((c1b + 2 * c0b + 1) / 3);
-      const std::uint8_t g2 = static_cast<std::uint8_t>((c1g + 2 * c0g + 1) / 3);
-      const std::uint8_t r2 = static_cast<std::uint8_t>((c1r + 2 * c0r + 1) / 3);
-      const std::uint8_t a2 = static_cast<std::uint8_t>((c1a + 2 * c0a + 1) / 3);
-      const std::uint8_t b3 = static_cast<std::uint8_t>((c0b + 2 * c1b + 1) / 3);
-      const std::uint8_t g3 = static_cast<std::uint8_t>((c0g + 2 * c1g + 1) / 3);
-      const std::uint8_t r3 = static_cast<std::uint8_t>((c0r + 2 * c1r + 1) / 3);
-      const std::uint8_t a3 = static_cast<std::uint8_t>((c0a + 2 * c1a + 1) / 3);
-
-      palette[2] = static_cast<std::uint32_t>(b2) | (static_cast<std::uint32_t>(g2) << 8u) |
-        (static_cast<std::uint32_t>(r2) << 16u) | (static_cast<std::uint32_t>(a2) << 24u);
-      palette[3] = static_cast<std::uint32_t>(b3) | (static_cast<std::uint32_t>(g3) << 8u) |
-        (static_cast<std::uint32_t>(r3) << 16u) | (static_cast<std::uint32_t>(a3) << 24u);
-    }
-
-    std::uint32_t codes = static_cast<std::uint32_t>(colorBlock >> 32u);
-    for (int i = 0; i < 16; ++i) {
-      outArgb16[i] = palette[codes & 0x3u];
-      codes >>= 2u;
-    }
-  }
-
-  /**
    * Address: 0x00404FE0 (FUN_00404FE0, Moho::DXT_GetTexelAlpha)
    */
   std::uint8_t DXT_GetTexelAlpha(

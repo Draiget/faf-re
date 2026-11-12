@@ -444,19 +444,5 @@ namespace moho
 
 namespace gpg
 {
-  /**
-   * Address: 0x0060CE10 (FUN_0060CE10, gpg::RRef_CUnitFireAtTask)
-   *
-   * What it does:
-   * Builds one typed reflection reference for `moho::CUnitFireAtTask*`,
-   * preserving dynamic-derived ownership and base-offset adjustment.
-   */
-  gpg::RRef* RRef_CUnitFireAtTask(
-    gpg::RRef* const outRef,
-    moho::CUnitFireAtTask* const value
-  )
-  {
-    return gpg::WriteDerivedRef(outRef, value);
-  }
 
 } // namespace gpg
