@@ -14,6 +14,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/effects/rendering/CEffectManagerImpl.h"
+#include "moho/effects/rendering/EffectHost.h"
 #include "moho/effects/rendering/IEffectManager.h"
 #include "moho/entity/Entity.h"
 #include "moho/math/QuaternionMath.h"
@@ -337,9 +338,10 @@ namespace moho
     float interp
   )
   {
-    Entity* const attachedEntity = effect->mEntityInfo.GetAttachTargetEntity();
+    // The attached entity: the sim's `Entity`, or a hosted effect's target (EffectHost.h), read the same way.
+    const CEffectFollow attached(*effect, effect->mEntityInfo, false);
 
-    if (attachedEntity == nullptr) {
+    if (!attached) {
       *outMatrix = effect->mMatrix;
       return true;
     }
@@ -349,7 +351,7 @@ namespace moho
     VTransform currentTransform{};
 
     if (tick <= 0) {
-      interp *= attachedEntity->mPendingVelocityScale;
+      interp *= attached.PendingVelocityScale();
       if (interp > 1.0f) {
         interp = 1.0f;
       }
@@ -358,16 +360,16 @@ namespace moho
       // were written lane by lane while the entity spelled its orientation
       // `moho::Vector4f` -- naming (x,y,z,w) over the quaternion's (w,x,y,z)
       // words -- where copying by field name would have rotated all four lanes.
-      currentTransform.orient_ = attachedEntity->mVarDat.mCurTransform.orient_;
-      currentTransform.pos_ = attachedEntity->mVarDat.mCurTransform.pos_;
+      currentTransform.orient_ = attached.Current().orient_;
+      currentTransform.pos_ = attached.Current().pos_;
 
-      previousOrientation = attachedEntity->mPendingTransform.orient_;
-      previousPosition = attachedEntity->mPendingTransform.pos_;
+      previousOrientation = attached.Pending().orient_;
+      previousPosition = attached.Pending().pos_;
     } else {
-      const VTransform& previousHistory = attachedEntity->GetPositionHistory(tick - 1);
+      const VTransform& previousHistory = attached.History(tick - 1);
       previousOrientation = previousHistory.orient_;
       previousPosition = previousHistory.pos_;
-      currentTransform = attachedEntity->GetPositionHistory(tick);
+      currentTransform = attached.History(tick);
     }
 
     Wm3::Quaternionf interpolatedOrientation{};
@@ -382,7 +384,7 @@ namespace moho
 
     const int boneIndex = effect->mEntityInfo.mParentBoneIndex;
     if (boneIndex != -1) {
-      const VTransform boneLocalTransform = attachedEntity->GetBoneLocalTransform(boneIndex);
+      const VTransform boneLocalTransform = attached.BoneLocal(boneIndex);
       VMatrix4 boneLocalMatrix{};
       boneLocalMatrix.Set(boneLocalTransform.orient_, boneLocalTransform.pos_);
 
@@ -546,36 +548,22 @@ namespace moho
       return false;
     }
 
-    Sim* const sim = mManager->GetSim();
-    if (!sim) {
-      return true;
-    }
-
-    CArmyImpl** const armiesBegin = sim->mArmiesList.begin();
-    if (!armiesBegin) {
-      return true;
-    }
-
-    const int focusArmy = sim->mSyncFilter.focusArmy;
-    if (focusArmy < 0 || static_cast<std::size_t>(focusArmy) >= sim->mArmiesList.size()) {
-      return true;
-    }
-
-    CArmyImpl* const army = armiesBegin[focusArmy];
-    if (!army) {
+    // The sim's focus army (its army list, the focus index in it, a non-null army), or a hosted effect's host's
+    // (EffectHost.h). No sim or host, or no focus army: seen.
+    CEffectWorld world(*mManager);
+    if (!world || !world.HasFocusArmy()) {
       return true;
     }
 
     if (mLastUpdate != 0u) {
-      if (((sim->mCurTick - mLastUpdate) % 5u) != 0u) {
+      if (((world.CurTick() - mLastUpdate) % 5u) != 0u) {
         return mVisible;
       }
     } else {
-      mLastUpdate = sim->mCurTick;
+      mLastUpdate = world.CurTick();
     }
 
-    CAiReconDBImpl* const reconDb = army->GetReconDB();
-    mVisible = reconDb->ReconCanDetect(mPos, static_cast<int>(RECON_LOSNow)) != RECON_None;
+    mVisible = world.FocusArmyDetects(mPos);
     return mVisible;
   }
 
@@ -589,10 +577,9 @@ namespace moho
   bool CEfxEmitter::IsVisible()
   {
     if (mParams.start_[EFFECT_EMITIFVISIBLE] > 0.0f) {
-      Sim* const sim = mManager->GetSim();
-      fa::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
-      GeomCamera3* const camerasEnd = cameras.end();
-      GeomCamera3* camera = cameras.begin();
+      const fa::vector<GeomCamera3>& cameras = CEffectWorld(*mManager).Cameras();
+      const GeomCamera3* const camerasEnd = cameras.end();
+      const GeomCamera3* camera = cameras.begin();
 
       if (camera == camerasEnd) {
         ++mLife;
@@ -643,16 +630,16 @@ namespace moho
     }
 
     if (mNewAttachment != 0u) {
-      const Entity* const attachedEntity = mEntityInfo.GetAttachTargetEntity();
-      if (attachedEntity == nullptr || attachedEntity->DestroyQueuedFlag != 0u) {
+      const CEffectFollow attached(*this, mEntityInfo, false);
+      if (!attached || attached.Dying()) {
         effectManager->DestroyEffect(this);
         return true;
       }
     }
 
     if (mParams.start_[EFFECT_CREATEIFVISIBLE] > 0.0f) {
-      fa::vector<GeomCamera3>& cameras = effectManager->GetSim()->mSyncFilter.geoCams;
-      for (GeomCamera3* camera = cameras.begin(); camera != cameras.end(); ++camera) {
+      const fa::vector<GeomCamera3>& cameras = CEffectWorld(*effectManager).Cameras();
+      for (const GeomCamera3* camera = cameras.begin(); camera != cameras.end(); ++camera) {
         if (!CanSeeCam(camera)) {
           continue;
         }
@@ -957,9 +944,9 @@ namespace moho
 
       float emitY = worldY;
       if (p[EFFECT_SNAPTOWATERLINE] > 0.0f) {
-        STIMap* const map = mManager->GetSim()->mMapData;
-        // Engine addition (water bodies): the level of the water under the particle.
-        const float waterElevation = map->GetWaterElevationAt(worldX, worldZ);
+        // Engine addition (water bodies): the level of the water under the particle. The sim's map, or a hosted
+        // effect's host's (EffectHost.h).
+        const float waterElevation = CEffectWorld(*mManager).WaterElevationAt(worldX, worldZ);
         if (efx_ParticleWaterSurface <= mParams.start_[EFFECT_SORTORDER]) {
           const float above = waterElevation + efx_WaterOffset;
           emitY = (above > worldY) ? above : worldY;
@@ -971,9 +958,9 @@ namespace moho
 
       bool skipEmission = false;
       if (mParams.start_[EFFECT_ONLYEMITONWATER] > 0.0f) {
-        STIMap* const map = mManager->GetSim()->mMapData;
-        const float elevation = map->GetHeightField()->GetElevation(worldX, worldZ);
-        const float waterElevation = map->GetWaterElevationAt(worldX, worldZ); // per position (water bodies)
+        const CEffectWorld world(*mManager);
+        const float elevation = world.TerrainElevationAt(worldX, worldZ);
+        const float waterElevation = world.WaterElevationAt(worldX, worldZ); // per position (water bodies)
         if (elevation > waterElevation) {
           skipEmission = true;
         } else {
@@ -1079,8 +1066,7 @@ namespace moho
           particle.mRotationCurve = mCurves[EMITTER_ROTATION_RATE_CURVE].GetValue(curvePhase) * 0.017453292f;
         }
 
-        Sim* const sim = mManager->GetSim();
-        sim->GetParticleBuffer()->mParticles.push_back(particle);
+        CEffectWorld(*mManager).ParticleBuffer()->mParticles.push_back(particle);
       }
 
       emissionCursor += emissionStep;
@@ -1114,7 +1100,7 @@ namespace moho
     const float* const start = mParams.start_;
     if (
       (start[EFFECT_EMITIFVISIBLE] > 0.0f || start[EFFECT_CREATEIFVISIBLE] > 0.0f) &&
-      (mManager->GetSim()->mCurTick % 3u) == 0u
+      (CEffectWorld(*mManager).CurTick() % 3u) == 0u
     ) {
       VMatrix4 attachMatrix{};
       (void)InterpolatePosition(this, &attachMatrix, 0, 0.0f);
@@ -1161,9 +1147,9 @@ namespace moho
 
     mParams.start_[EFFECT_TICKCOUNT] = mParams.start_[EFFECT_TICKINCREMENT] + mParams.start_[EFFECT_TICKCOUNT];
 
-    if (dbg_Emitter && !EffectTickOnWorker()) {
-      Sim* const sim = mManager->GetSim();
-      CDebugCanvas* const debugCanvas = sim->GetDebugCanvas();
+    CDebugCanvas* const debugCanvas =
+      dbg_Emitter && !EffectTickOnWorker() ? CEffectWorld(*mManager).DebugCanvas() : nullptr;
+    if (debugCanvas != nullptr) {
       VMatrix4 startMatrix{};
       VMatrix4 endMatrix{};
       (void)InterpolatePosition(this, &startMatrix, 0, 0.0f);

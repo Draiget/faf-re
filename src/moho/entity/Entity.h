@@ -105,6 +105,19 @@ namespace moho
   [[nodiscard]] Wm3::Quaternionf COORDS_Orient(float heading, float pitch) noexcept;
 
   /**
+   * Engine addition (server mode, plan WP9.3): the body of `Entity::GetBoneLocalTransform` (0x00679E20) over what it
+   * reads, the entity's mesh resource and scale (`mVarDat.mScmResource`, `mVarDat.mScale`) and its blueprint, which
+   * the entity's method passes. The server-mode client computes the bones its hosted effects follow by it
+   * (remote/client/EffectHosting.cpp).
+   */
+  [[nodiscard]] VTransform ENTITY_BoneLocalTransform(
+    RScmResource* mesh,
+    const Wm3::Vector3f& scale,
+    const REntityBlueprint* blueprint,
+    int boneIndex
+  );
+
+  /**
    * Address: 0x0050B480 (FUN_0050B480, ?COORDS_Orient@Moho@@YA?AV?$Quaternion@M@Wm3@@ABV?$Vector3@M@3@@Z)
    *
    * What it does:

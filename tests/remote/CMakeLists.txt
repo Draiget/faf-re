@@ -28,7 +28,8 @@ if(TARGET faf_netchannel)
 endif()
 
 if(FAF_SERVER_MODE)
-  add_executable(faf_remote_tests EXCLUDE_FROM_ALL WireTests.cpp)
+  # Plan WP9.3: the effect classes hosted outside a sim, and the client's follow targets.
+  add_executable(faf_remote_tests EXCLUDE_FROM_ALL WireTests.cpp EffectHostingTests.cpp)
   target_link_libraries(faf_remote_tests PRIVATE faf_engine gtest_main)
   target_compile_definitions(faf_remote_tests PRIVATE FAF_SERVER_MODE=1)
   set_target_properties(faf_remote_tests PROPERTIES FOLDER "Tests/Existing")

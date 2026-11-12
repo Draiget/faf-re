@@ -50,4 +50,9 @@ namespace moho
    * Address: 0x0066B1F0 (FUN_0066B1F0, Moho::IEffectManager::dtr)
    */
   IEffectManager::~IEffectManager() = default;
+
+  const CHostedEffectManager* IEffectManager::AsHosted() const noexcept
+  {
+    return nullptr;
+  }
 } // namespace moho

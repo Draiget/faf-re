@@ -54,8 +54,23 @@ namespace moho
     )
     {
       LuaPlus::LuaObject metatable;
+      if (state == nullptr) {
+        return metatable; // a hosted effect (no sim): no script object (CScriptObject::CreateLuaObject makes none)
+      }
       (void)func_CreateLuaIEffect(&metatable, state);
       return metatable;
+    }
+
+    /**
+     * The sim's Lua state, which the binary reads without a check. Engine addition (server mode, plan WP9.3): a
+     * manager hosted outside a sim (CHostedEffectManager.h) has none.
+     */
+    [[nodiscard]] LuaPlus::LuaState* EffectLuaState(
+      const CEffectManagerImpl* const manager
+    )
+    {
+      Sim* const sim = manager->GetSim();
+      return sim != nullptr ? sim->mLuaState : nullptr;
     }
   } // namespace
 
@@ -73,7 +88,7 @@ namespace moho
     const int scriptObjectToken
   )
     : CScriptObject(
-        IEffectMetatable(manager->GetSim()->mLuaState),
+        IEffectMetatable(EffectLuaState(manager)),
         LuaPlus::LuaObject{},
         LuaPlus::LuaObject{},
         LuaPlus::LuaObject{}

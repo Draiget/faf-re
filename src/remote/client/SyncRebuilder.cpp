@@ -788,12 +788,22 @@ namespace faf::remote::client
 
     // Removals: a live entity goes (delete); an orphaned record leaving the frame has no
     // entity in the id map any more.
+    mRemoved.clear();
     for (const std::uint32_t id : delta.removed) {
       const auto it = mHeld.find(id);
       if (it != mHeld.end() && it->second.live) {
         deleteIds.push_back(static_cast<moho::EntId>(id));
         ++mStats.deleted;
         mStats.deleteMismatches += packetDeleted.count(id) == 0u ? 1u : 0u;
+        if (mKeepRemoved) {
+          // Plan WP9.3: an effect placed at it in this same beat (an impact) still finds its last state.
+          SRemoved& removed = mRemoved[id];
+          removed.data = std::move(it->second.data);
+          if (const wire::SEntityRecord* const record = ShownRecord(id); record != nullptr) {
+            removed.blueprint = record->blueprint < mBlueprints.size() ? mBlueprints[record->blueprint] : nullptr;
+            removed.isUnit = record->isUnit;
+          }
+        }
       }
       mHeld.erase(id);
     }
@@ -1056,5 +1066,53 @@ namespace faf::remote::client
     mStats.rebuildSeconds += std::chrono::duration<double>(rebuilt - compared).count();
     mHasShown = true;
     return true;
+  }
+
+  const wire::SEntityRecord* CSyncRebuilder::ShownRecord(
+    const std::uint32_t id
+  ) const noexcept
+  {
+    if (!mHasShown) {
+      return nullptr;
+    }
+    const auto found = std::lower_bound(
+      mShown.entities.begin(),
+      mShown.entities.end(),
+      id,
+      [](const wire::SEntityRecord& record, const std::uint32_t at) {
+      return record.id < at;
+    }
+    );
+    return found != mShown.entities.end() && found->id == id ? &*found : nullptr;
+  }
+
+  bool CSyncRebuilder::FindHeld(
+    const std::uint32_t id,
+    const bool orRemoved,
+    SHeldView& out
+  ) const
+  {
+    out = SHeldView{};
+    if (const auto it = mHeld.find(id); it != mHeld.end() && it->second.live) {
+      const wire::SEntityRecord* const record = ShownRecord(id);
+      if (record == nullptr) {
+        return false;
+      }
+      out.data = &it->second.data;
+      out.blueprint = record->blueprint < mBlueprints.size() ? mBlueprints[record->blueprint] : nullptr;
+      out.pose = it->second.pose;
+      out.isUnit = record->isUnit;
+      return true;
+    }
+    if (orRemoved) {
+      if (const auto it = mRemoved.find(id); it != mRemoved.end()) {
+        out.data = &it->second.data;
+        out.blueprint = it->second.blueprint;
+        out.isUnit = it->second.isUnit;
+        out.removed = true;
+        return true;
+      }
+    }
+    return false;
   }
 } // namespace faf::remote::client

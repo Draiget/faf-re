@@ -15,6 +15,7 @@ namespace gpg
 
 namespace moho
 {
+  class CHostedEffectManager;
   class Entity;
   class IEffect;
   struct RBeamBlueprint;
@@ -228,6 +229,13 @@ namespace moho
      * Address: 0x0066B570 (FUN_0066B570, Moho::CEffectManagerImpl::PurgeDestroyedEffects)
      */
     virtual void PurgeDestroyedEffects() = 0;
+
+    /**
+     * Engine addition (server mode, plan WP9.3), not in the binary, after its slots: the manager that hosts effects
+     * outside a `Sim` (the server-mode client, moho/effects/rendering/CHostedEffectManager.h), or null for the sim's.
+     * The effect classes read their world through it when `GetSim()` is null (EffectHost.h).
+     */
+    [[nodiscard]] virtual const CHostedEffectManager* AsHosted() const noexcept;
   };
 
   static_assert(sizeof(IEffectManager) == 0x4, "IEffectManager size must be 0x4");

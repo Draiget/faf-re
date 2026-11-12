@@ -11,6 +11,7 @@
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/effects/rendering/CEfxEmitter.h"
 #include "moho/effects/rendering/CEffectManagerImpl.h"
+#include "moho/effects/rendering/EffectHost.h"
 #include "moho/effects/rendering/IEffectManager.h"
 #include "moho/entity/Entity.h"
 #include "moho/render/ETrailParam.h"
@@ -238,32 +239,21 @@ namespace moho
       return false;
     }
 
-    Sim* const sim = mManager->GetSim();
-    CArmyImpl** const armiesBegin = sim->mArmiesList.begin();
-    const int focusArmy = sim->mSyncFilter.focusArmy;
-    if (!armiesBegin) {
-      return true;
-    }
-
-    if (focusArmy < 0 || static_cast<std::size_t>(focusArmy) >= sim->mArmiesList.size()) {
-      return true;
-    }
-
-    CArmyImpl* const army = armiesBegin[focusArmy];
-    if (!army) {
+    // The sim's focus army, or a hosted effect's host's (EffectHost.h). None: seen.
+    CEffectWorld world(*mManager);
+    if (!world.HasFocusArmy()) {
       return true;
     }
 
     if (mLastUpdate != 0u) {
-      if (((sim->mCurTick - mLastUpdate) % 5u) != 0u) {
+      if (((world.CurTick() - mLastUpdate) % 5u) != 0u) {
         return mVisible;
       }
     } else {
-      mLastUpdate = sim->mCurTick;
+      mLastUpdate = world.CurTick();
     }
 
-    CAiReconDBImpl* const reconDb = army->GetReconDB();
-    mVisible = reconDb->ReconCanDetect(trailPosition, static_cast<int>(RECON_LOSNow)) != RECON_None;
+    mVisible = world.FocusArmyDetects(trailPosition);
     return mVisible;
   }
 
@@ -286,8 +276,8 @@ namespace moho
       return false;
     }
 
-    const Entity* const attachedEntity = mEntityInfo.GetAttachTargetEntity();
-    if (attachedEntity != nullptr && attachedEntity->DestroyQueuedFlag == 0u) {
+    const CEffectFollow attached(*this, mEntityInfo, false);
+    if (attached && !attached.Dying()) {
       return false;
     }
 
@@ -382,8 +372,7 @@ namespace moho
       return true;
     }
 
-    Sim* const sim = mManager->GetSim();
-    const fa::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
+    const fa::vector<GeomCamera3>& cameras = CEffectWorld(*mManager).Cameras();
 
     for (const GeomCamera3& camera : cameras) {
       if (CanSeeCam(&camera) && !(mNewAttachment && !TrailEmitterPassesLodCutoffForCamera(&camera, this))) {
@@ -418,9 +407,9 @@ namespace moho
     // final (tick == 0) sub-frame when an entity is attached.
     float interpScale = 1.0f;
     if (tick == 0) {
-      Entity* const attachedEntity = mEntityInfo.GetAttachTargetEntity();
-      if (attachedEntity != nullptr) {
-        interpScale = 1.0f / attachedEntity->mPendingVelocityScale;
+      const CEffectFollow attached(*this, mEntityInfo, false);
+      if (attached) {
+        interpScale = 1.0f / attached.PendingVelocityScale();
       }
     }
 
@@ -498,12 +487,12 @@ namespace moho
     trail.mBlendMode = bp->BlendMode;
     mLife = life + 1.0f;
 
-    Sim* const sim = mManager->GetSim();
-    SParticleBuffer* const particleBuffer = sim->GetParticleBuffer();
+    const CEffectWorld world(*mManager);
+    SParticleBuffer* const particleBuffer = world.ParticleBuffer();
     particleBuffer->mTrails.push_back(trail);
 
-    if (dbg_Trail && !EffectTickOnWorker()) {
-      CDebugCanvas* const debugCanvas = sim->GetDebugCanvas();
+    CDebugCanvas* const debugCanvas = dbg_Trail && !EffectTickOnWorker() ? world.DebugCanvas() : nullptr;
+    if (debugCanvas != nullptr) {
       SDebugLine line{};
       line.p0.x = direction.y;
       line.p0.y = direction.x;

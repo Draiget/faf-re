@@ -9,6 +9,7 @@
 #include "gpg/core/utils/Global.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/effects/rendering/CEffectImpl.h"
+#include "moho/effects/rendering/EffectHost.h"
 #include "moho/effects/rendering/IEffectManager.h"
 #include "moho/entity/Entity.h"
 #include "moho/math/QuaternionMath.h"
@@ -92,39 +93,11 @@ namespace
     return MakeSphere(center, std::sqrt((dx * dx) + (dy * dy) + (dz * dz)));
   }
 
-  [[nodiscard]] moho::CArmyImpl* ResolveFocusArmy(
-    moho::Sim* const sim
-  ) noexcept
-  {
-    if (!sim) {
-      return nullptr;
-    }
-
-    moho::CArmyImpl** const armiesBegin = sim->mArmiesList.begin();
-    if (!armiesBegin) {
-      return nullptr;
-    }
-
-    const int focusArmyIndex = sim->mSyncFilter.focusArmy;
-    if (focusArmyIndex < 0 || static_cast<std::size_t>(focusArmyIndex) >= sim->mArmiesList.size()) {
-      return nullptr;
-    }
-
-    return armiesBegin[focusArmyIndex];
-  }
-
-  [[nodiscard]] moho::Entity* ResolveAttachEntity(
-    const moho::SEntAttachInfo& attachInfo
-  ) noexcept
-  {
-    return attachInfo.GetAttachTargetEntity();
-  }
-
   [[nodiscard]] bool IsAttachmentInvalid(
-    const moho::Entity* const entity
-  ) noexcept
+    const moho::CEffectFollow& attached
+  )
   {
-    return entity == nullptr || entity->DestroyQueuedFlag != 0u;
+    return !attached || attached.Dying();
   }
 
   [[nodiscard]] Wm3::Vec3f FetchVectorParam(
@@ -517,25 +490,23 @@ namespace moho
       }
     }
 
-    Sim* const sim = mManager->GetSim();
-    CArmyImpl* const focusArmy = ResolveFocusArmy(sim);
-    if (!focusArmy) {
+    // The sim's focus army, or a hosted beam's host's (EffectHost.h). No sim or host, or no focus army: seen.
+    CEffectWorld world(*mManager);
+    if (!world || !world.HasFocusArmy()) {
       return true;
     }
 
     if (mLastUpdate != 0u) {
-      const std::uint32_t tickDelta = sim->mCurTick - mLastUpdate;
+      const std::uint32_t tickDelta = world.CurTick() - mLastUpdate;
       if ((tickDelta % 5u) != 0u) {
         return mVisible;
       }
     } else {
-      mLastUpdate = sim->mCurTick;
+      mLastUpdate = world.CurTick();
     }
 
-    CAiReconDBImpl* const reconDb = focusArmy->GetReconDB();
-    const bool startVisible =
-      reconDb->ReconCanDetect(mBeam.mCurStart.pos_, static_cast<int>(RECON_LOSNow)) != RECON_None;
-    mVisible = startVisible || reconDb->BeamIsVisible(mBeam);
+    const bool startVisible = world.FocusArmyDetects(mBeam.mCurStart.pos_);
+    mVisible = startVisible || world.FocusArmySeesBeam(mBeam);
 
     return mVisible;
   }
@@ -584,19 +555,20 @@ namespace moho
   bool CEfxBeam::Update()
   {
     if (mNewAttachment) {
-      Entity* const sourceEntity = ResolveAttachEntity(mEntityInfo);
+      // The sim's entities, or a hosted beam's targets (EffectHost.h), read the same way.
+      const CEffectFollow sourceEntity(*this, mEntityInfo, false);
       if (IsAttachmentInvalid(sourceEntity)) {
         mManager->DestroyEffect(this);
         return false;
       }
 
-      Entity* const endEntity = ResolveAttachEntity(mEnd);
-      if (endEntity == nullptr) {
+      const CEffectFollow endEntity(*this, mEnd, true);
+      if (!endEntity) {
         mBeam.mFromStart = false;
         // Effects tick before AdvanceCoords: retain current/pending samples.
         // SWorldBeam's legacy mLast* names denote the second (pending) sample.
-        mBeam.mCurStart = sourceEntity->mVarDat.mCurTransform;
-        mBeam.mLastStart = sourceEntity->mPendingTransform;
+        mBeam.mCurStart = sourceEntity.Current();
+        mBeam.mLastStart = sourceEntity.Pending();
         mBeam.mStart = FetchVectorParam(*this, 0);
 
         const float beamLength = GetFloatParam(6);
@@ -610,10 +582,10 @@ namespace moho
         // `mVelocityScale` is a different field at +0x00D4, so the beam was
         // interpolating between its two endpoint transforms with a scalar that
         // has nothing to do with them.
-        mBeam.mLastInterpolation = sourceEntity->mPendingVelocityScale;
+        mBeam.mLastInterpolation = sourceEntity.PendingVelocityScale();
 
         if (mEntityInfo.mParentBoneIndex != -1) {
-          const VTransform sourceBoneTransform = sourceEntity->GetBoneLocalTransform(mEntityInfo.mParentBoneIndex);
+          const VTransform sourceBoneTransform = sourceEntity.BoneLocal(mEntityInfo.mParentBoneIndex);
           mBeam.mStart = ApplyPoint(sourceBoneTransform, mBeam.mStart);
           mBeam.mEnd = ApplyPoint(sourceBoneTransform, mBeam.mEnd);
         }
@@ -624,28 +596,25 @@ namespace moho
         mBeam.mFromStart = true;
         // Effects tick before AdvanceCoords: retain current/pending samples.
         // SWorldBeam's legacy mLast* names denote the second (pending) sample.
-        mBeam.mCurStart = sourceEntity->mVarDat.mCurTransform;
-        mBeam.mLastStart = sourceEntity->mPendingTransform;
-        mBeam.mCurEnd = endEntity->mVarDat.mCurTransform;
-        mBeam.mLastEnd = endEntity->mPendingTransform;
+        mBeam.mCurStart = sourceEntity.Current();
+        mBeam.mLastStart = sourceEntity.Pending();
+        mBeam.mCurEnd = endEntity.Current();
+        mBeam.mLastEnd = endEntity.Pending();
 
-        const VTransform sourceBoneTransform = sourceEntity->GetBoneLocalTransform(mEntityInfo.mParentBoneIndex);
+        const VTransform sourceBoneTransform = sourceEntity.BoneLocal(mEntityInfo.mParentBoneIndex);
         const Wm3::Vec3f localStart = FetchVectorParam(*this, 0);
         mBeam.mStart = ApplyPoint(sourceBoneTransform, localStart);
 
-        const VTransform endBoneTransform = endEntity->GetBoneLocalTransform(mEnd.mParentBoneIndex);
+        const VTransform endBoneTransform = endEntity.BoneLocal(mEnd.mParentBoneIndex);
         const Wm3::Vec3f localEnd = FetchVectorParam(*this, 3);
         mBeam.mEnd = ApplyPoint(endBoneTransform, localEnd);
 
-        mBeam.mLastInterpolation = sourceEntity->mPendingVelocityScale;
+        mBeam.mLastInterpolation = sourceEntity.PendingVelocityScale();
       }
 
       if (mIsNew) {
-        Entity* const classificationEntity = ResolveAttachEntity(mEntityInfo);
-        if (
-          classificationEntity != nullptr && !classificationEntity->IsCollisionBeam() &&
-          !classificationEntity->IsProjectile() && !classificationEntity->IsUnit()
-        ) {
+        // The source again (it is the one checked above: nothing between detaches it).
+        if (!sourceEntity.UpdatesBeams()) {
           mIsNew = false;
           return true;
         }
@@ -725,11 +694,12 @@ namespace moho
       return;
     }
 
-    Sim* const sim = mManager->GetSim();
-    const fa::vector<GeomCamera3>& cameras = sim->mSyncFilter.geoCams;
+    // The sim's cameras and particle buffer, or a hosted beam's host's (EffectHost.h).
+    const CEffectWorld world(*mManager);
+    const fa::vector<GeomCamera3>& cameras = world.Cameras();
     for (std::size_t cameraIndex = 0; cameraIndex < cameras.size(); ++cameraIndex) {
       if (CanSeeCam(&cameras[cameraIndex])) {
-        sim->GetParticleBuffer()->mBeams.push_back(mBeam);
+        world.ParticleBuffer()->mBeams.push_back(mBeam);
         break;
       }
     }
@@ -739,7 +709,10 @@ namespace moho
       return;
     }
 
-    CDebugCanvas* const debugCanvas = sim->GetDebugCanvas();
+    CDebugCanvas* const debugCanvas = world.DebugCanvas();
+    if (debugCanvas == nullptr) {
+      return; // a hosted beam: the debug lines are the sim's
+    }
     constexpr auto kDebugColor0 = static_cast<std::int32_t>(0xFF0000FFu);
     constexpr auto kDebugColor1 = static_cast<std::int32_t>(0xFFFF0000u);
 

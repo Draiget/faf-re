@@ -28,6 +28,17 @@ namespace faf::probe
     /** `LaunchInfo`: the configuration the server launched, and its rules. False with `error`. */
     [[nodiscard]] bool OnLaunchInfo(std::span<const std::uint8_t> configuration, int uid, std::string& error);
 
+    /**
+     * Plan WP9.3: `--host-effects`, before `GameInfo`: the view client hosts the effects as the game client does
+     * (remote/client/EffectHosting.h), under one camera that sees the whole map, so the report says what such a
+     * client would draw.
+     */
+    void SetHostEffects(
+      const bool host
+    ) noexcept
+    {
+      mHostEffects = host;
+    }
     /** `GameInfo`: the map's size makes the codec; the rebuilder starts here. `army`: the player's (-1: none). */
     void OnGameInfo(float mapSizeX, float mapSizeZ, std::int32_t army);
     /**
@@ -60,5 +71,6 @@ namespace faf::probe
 
     struct SState;
     std::unique_ptr<SState> mState;
+    bool mHostEffects = false;
   };
 } // namespace faf::probe

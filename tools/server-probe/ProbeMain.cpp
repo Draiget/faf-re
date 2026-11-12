@@ -256,6 +256,7 @@ namespace
       false; // plan WP14.1: each `Sync` key of the Lua lane the first time it comes (again after a partition)
     // Plan WP11 step 1: rebuild each beat's game data from the views alone, with this match file's rules.
     std::string rebuild;
+    bool hostEffects = false; // plan WP9.3: `--rebuild` hosts the effects under a camera that sees the whole map
     std::string
       saveViews; // every message from the server's views, each as a 32-bit size and its bytes, to measure compression
     int fuzzCount = 2000;
@@ -354,6 +355,10 @@ namespace
       }
       if (name == "--no-decode") {
         out.noDecode = true;
+        continue;
+      }
+      if (name == "--host-effects") {
+        out.hostEffects = true; // plan WP9.3, with --rebuild
         continue;
       }
       if (name == "--lua-keys") {
@@ -1254,13 +1259,14 @@ int main(
       "--speed-limit-at <s>] [--focus-army <army> --focus-army-at <s>] [--cameras-every <s> [--camera-at "
       "<x,z,half-width>]] [--content-report rules|wrong] [--ui-mods <uid,...>|none] [--beat-ms <ms>] [--loss "
       "<percent>] [--latency-ms <ms>] [--jitter-ms <ms>] [--partition-at <s> --partition-for <s>] [--lua-keys] "
-      "[--bandwidth-kbps <kbit/s> [--buffer-ms <ms>]] [--rebuild <match.lua> /init <init.lua>]\n"
+      "[--bandwidth-kbps <kbit/s> [--buffer-ms <ms>]] [--rebuild <match.lua> /init <init.lua> [--host-effects]]\n"
     );
     return 3;
   }
 
   std::string error;
   faf::probe::CProbeRebuild rebuild;
+  rebuild.SetHostEffects(options.hostEffects);
   if (options.rebuild == "server") {
     // Plan WPR.55: no match file; the rules come with the server's LaunchInfo.
     if (!rebuild.Start(error)) {

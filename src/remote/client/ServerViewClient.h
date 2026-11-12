@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "remote/client/EffectHosting.h"
 #include "remote/client/EffectLaneApplier.h"
 #include "remote/client/SyncRebuilder.h"
 #include "remote/client/ViewMerge.h"
@@ -167,6 +168,19 @@ namespace faf::remote::client
       return *mEffects;
     }
 
+    /**
+     * Plan WP9.3 (hosting): from now on the effects lane makes real effects (EffectHosting.h): the sim's effect classes
+     * run on this client over `world`'s cameras and map, tick once each view, and their particles, trails and beams
+     * go into that view's packet (`SSyncData::mParticleBuffer`) for the session to draw, as a sim's go in lockstep.
+     * Before the first view; without it effects are only counted. `rules` must outlive this.
+     */
+    void HostEffects(moho::RRuleGameRules& rules, SEffectHostWorld world);
+    /** The hosted effects (`HostEffects`), or null. */
+    [[nodiscard]] const CClientEffects* Hosted() const noexcept
+    {
+      return mHosted.get();
+    }
+
   private:
     /** Whether the frame shown holds an entity with this id; `orRemoved`: or the one before it did. */
     [[nodiscard]] bool HoldsEntity(std::int32_t id, bool orRemoved) const;
@@ -187,6 +201,7 @@ namespace faf::remote::client
     SServerViewStats mStats;
     std::vector<std::uint32_t> mPreviousIds; // the ids of the frame shown before the view being applied
     std::unique_ptr<SEffectTarget> mEffectTarget;
+    std::unique_ptr<CClientEffects> mHosted; // `HostEffects`; declared before the applier that drives it
     std::unique_ptr<CEffectLaneApplier> mEffects;
   };
 } // namespace faf::remote::client

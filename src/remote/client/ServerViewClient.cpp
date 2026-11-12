@@ -236,9 +236,32 @@ namespace faf::remote::client
     // The effects lane, after the frames whose entities it names. A view whose own frame came against nothing is
     // whole: the server takes this client to hold no effect then.
     const bool whole = wire::PeekFrameBaseline(view.own) == wire::kNoBaseline;
+    if (mHosted) {
+      // Plan WP9.3: the entities hosted effects follow, as this frame left them, before the lane's ops.
+      mHosted->BeginBeat(view.beat, packet.mFocusArmy, mGrids);
+    }
     if (!mEffects->Apply(view.effects, whole)) {
       ++mStats.effectFailures;
     }
+    if (mHosted) {
+      // One tick of every effect, as the sim's manager ticks once a beat; its particles go with this view's packet.
+      mHosted->EndBeat(&packet);
+    }
     return true;
+  }
+
+  void CServerViewClient::HostEffects(
+    moho::RRuleGameRules& rules,
+    SEffectHostWorld world
+  )
+  {
+    mRebuilder->KeepRemoved(true); // an impact placed at an entity this view removed reads its last state
+    mHosted = std::make_unique<CClientEffects>(rules, *mRebuilder, [this](const std::int32_t id, const bool orRemoved) {
+      return HoldsEntity(id, orRemoved);
+    }, std::move(world));
+    mEffects = std::make_unique<CEffectLaneApplier>(*mHosted); // effects end by themselves: no horizon
+    mHosted->SetEndedHandler([this](const std::uint32_t id) {
+      mEffects->Ended(id);
+    });
   }
 } // namespace faf::remote::client

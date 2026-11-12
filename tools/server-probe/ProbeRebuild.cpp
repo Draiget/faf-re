@@ -209,6 +209,23 @@ namespace faf::probe
     info.mapSizeZ = mapSizeZ;
     info.army = army;
     mState->client = std::make_unique<remote::client::CServerViewClient>(*mState->rules, info);
+    if (mHostEffects) {
+      // Plan WP9.3: the game client's hosting, with one camera that sees everything: no frustum plane, and a viewport
+      // that puts every point at depth 0, inside every LOD cutoff.
+      moho::GeomCamera3 everywhere;
+      everywhere.solid2 = moho::CGeomSolid3{};
+      everywhere.viewport = moho::VMatrix4{};
+      remote::client::SEffectHostWorld world;
+      world.cameras = [everywhere](fa::vector<moho::GeomCamera3>& out) {
+        out.clear();
+        out.push_back(everywhere);
+      };
+      moho::CWldMap* const map = mState->map.get();
+      world.map = [map]() -> moho::STIMap* {
+        return map != nullptr && map->mTerrainRes != nullptr ? map->mTerrainRes->mMap : nullptr;
+      };
+      mState->client->HostEffects(*mState->rules, std::move(world));
+    }
     // The heights as this client loaded the map: the server's terrain edits go on a copy, as in the game client.
     if (
       mState->map && mState->map->mTerrainRes != nullptr && mState->map->mTerrainRes->mMap != nullptr &&
@@ -301,6 +318,30 @@ namespace faf::probe
         static_cast<unsigned long long>(e.badLanes),
         client.Effects().Live()
       );
+      if (const remote::client::CClientEffects* const hosted = client.Hosted(); hosted != nullptr) {
+        // Plan WP9.3: what the hosted effects drew under the camera that sees everything.
+        const remote::client::SHostedEffectCounts& h = hosted->Counts();
+        std::printf(
+          "probe %d: rebuild: hosted effects: %llu beats, %llu made (%llu not), %llu ended by themselves, %zu alive at "
+          "the end (most %llu), %zu entities followed (most %llu); drawn: %llu particles (%llu beats with any, most "
+          "%llu in one), %llu trail segments, %llu beams, %llu lights\n",
+          uid,
+          static_cast<unsigned long long>(h.beats),
+          static_cast<unsigned long long>(h.created),
+          static_cast<unsigned long long>(h.createFailed),
+          static_cast<unsigned long long>(h.endedByThemselves),
+          hosted->Alive(),
+          static_cast<unsigned long long>(h.mostAlive),
+          hosted->Targets(),
+          static_cast<unsigned long long>(h.mostTargets),
+          static_cast<unsigned long long>(h.particles),
+          static_cast<unsigned long long>(h.beatsDrawing),
+          static_cast<unsigned long long>(h.mostParticles),
+          static_cast<unsigned long long>(h.trails),
+          static_cast<unsigned long long>(h.beams),
+          static_cast<unsigned long long>(h.lights)
+        );
+      }
     }
     std::string slots;
     for (const remote::wire::SGridSlot& slot : client.Grids()) {

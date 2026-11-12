@@ -14,6 +14,7 @@
 #include "moho/effects/rendering/CEfxBeam.h"
 #include "moho/effects/rendering/CEfxEmitter.h"
 #include "moho/effects/rendering/CEfxTrailEmitter.h"
+#include "moho/effects/rendering/EffectHost.h"
 #include "moho/effects/rendering/IEffect.h"
 #include "moho/entity/Entity.h"
 #include "moho/misc/StartupHelpers.h"
@@ -610,6 +611,13 @@ namespace moho
     return gEffectsLifetimeOnly;
   }
 
+  bool EFFECT_EnabledAtFidelity(
+    const REffectBlueprint* const blueprint
+  ) noexcept
+  {
+    return IsBlueprintEnabledForCurrentFidelity(blueprint);
+  }
+
   /**
    * Address: 0x0066B4F0 (FUN_0066B4F0, Moho::CEffectManagerImpl::Tick)
    *
@@ -639,9 +647,10 @@ namespace moho
 
   bool CEffectManagerImpl::TickParallel()
   {
+    // A manager with no sim (CHostedEffectManager, the server-mode client) ticks serially on its own thread.
     if (
-      !sim_ParallelEffects || !CSimWorkerPool::ParallelEnabled() || dbg_EfxBeams || dbg_Emitter || dbg_Trail ||
-      tEffectTickChunk != nullptr
+      mSim == nullptr || !sim_ParallelEffects || !CSimWorkerPool::ParallelEnabled() || dbg_EfxBeams || dbg_Emitter ||
+      dbg_Trail || tEffectTickChunk != nullptr
     ) {
       return false;
     }
@@ -795,12 +804,13 @@ namespace moho
     CParticleTexture* const rampTexture = new (std::nothrow) CParticleTexture(rampPath.c_str());
     (void)AssignCountedParticleTexturePtr(&particle.mRampTexture, rampTexture);
 
-    Sim* const sim = GetSim();
-    if (sim == nullptr) {
+    // Engine change (plan WP9.3): the sim's buffer, or a hosted manager's host's (EffectHost.h).
+    const CEffectWorld world(*this);
+    if (!world) {
       return;
     }
 
-    SParticleBuffer* const submitBuffer = sim->GetParticleBuffer();
+    SParticleBuffer* const submitBuffer = world.ParticleBuffer();
     if (submitBuffer == nullptr) {
       return;
     }

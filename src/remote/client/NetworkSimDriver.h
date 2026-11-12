@@ -8,6 +8,7 @@
 #include <deque>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <span>
 #include <string>
 #include <vector>
@@ -162,6 +163,8 @@ namespace faf::remote::client
     std::atomic<int> mFocusGranted{kNoFocusGranted}; // plan WP11.1: the army the server granted; none: GameInfo's
     std::chrono::steady_clock::time_point mCamerasSentAt{};
     std::uint64_t mCamerasSent = 0;
+    std::mutex mCameraLock;                    // plan WP9.3: `SetGeomCams` and the view's effects may differ in thread
+    fa::vector<moho::GeomCamera3> mCameras;    // the session's cameras, as `SetGeomCams` last gave them
     std::array<std::uint64_t, 6> mLaneBytes{}; // plan WP10.10: bytes taken by lane (EServerLane order)
     std::uint64_t mEffectLanesLogged = 0;      // plan WP9.3: beats whose effects counts went to the log
     std::uint64_t mEffectSkipsLogged = 0;

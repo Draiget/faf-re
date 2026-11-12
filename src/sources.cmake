@@ -745,6 +745,8 @@ set(FAF_ENGINE_SOURCES
   moho/effects/rendering/IEffect.cpp
   moho/effects/rendering/CEfxEmitterTypeInfo.cpp
   moho/effects/rendering/CEffectManagerImpl.cpp
+  moho/effects/rendering/EffectHost.cpp
+  moho/effects/rendering/CHostedEffectManager.cpp
   moho/effects/rendering/SEfxCurve.cpp
   moho/effects/rendering/CEffectManagerImplTypeInfo.cpp
   moho/render/CDecalBuffer.cpp

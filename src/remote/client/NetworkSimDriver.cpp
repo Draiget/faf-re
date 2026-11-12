@@ -23,6 +23,7 @@
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SSTIArmyConstantData.h"
 #include "moho/sim/SSTIArmyVariableData.h"
+#include "moho/sim/CWldSession.h"
 #include "moho/sim/SimDriver.h"
 #include "remote/ArmyRecords.h"
 #include "moho/net/IClientMgrUIInterface.h"
@@ -224,6 +225,29 @@ namespace faf::remote::client
       static_cast<unsigned long long>(counts.badLanes),
       effects.Live()
     );
+    // Plan WP9.3: what the hosted effects drew, over the session (the per-beat lines carry the same totals so far).
+    if (const CClientEffects* const hosted = mViews->Hosted(); hosted != nullptr) {
+      const SHostedEffectCounts& drawn = hosted->Counts();
+      gpg::Logf(
+        "server driver hosted effects %s: %llu beats, %llu made (%llu not: blueprint or entity), %llu ended by "
+        "themselves, %zu alive now (most %llu), %zu entities followed (most %llu); to the session: %llu particles, "
+        "%llu trail segments, %llu beams, %llu lights; %zu cameras",
+        when,
+        static_cast<unsigned long long>(drawn.beats),
+        static_cast<unsigned long long>(drawn.created),
+        static_cast<unsigned long long>(drawn.createFailed),
+        static_cast<unsigned long long>(drawn.endedByThemselves),
+        hosted->Alive(),
+        static_cast<unsigned long long>(drawn.mostAlive),
+        hosted->Targets(),
+        static_cast<unsigned long long>(drawn.mostTargets),
+        static_cast<unsigned long long>(drawn.particles),
+        static_cast<unsigned long long>(drawn.trails),
+        static_cast<unsigned long long>(drawn.beams),
+        static_cast<unsigned long long>(drawn.lights),
+        hosted->Cameras().size()
+      );
+    }
   }
 
   void CNetworkSimDriver::SendChat(
@@ -282,6 +306,20 @@ namespace faf::remote::client
       // Again after a reconnect: the client keeps what it holds; the next view comes whole.
       if (!mViews) {
         mViews = std::make_unique<CServerViewClient>(mRules, info);
+        // Plan WP9.3: the effects lane makes real effects, drawn from this session's cameras over its map.
+        SEffectHostWorld world;
+        world.cameras = [this](fa::vector<moho::GeomCamera3>& out) {
+          const std::lock_guard<std::mutex> lock(mCameraLock);
+          out = mCameras;
+        };
+        world.map = []() -> moho::STIMap* {
+          moho::CWldSession* const session = moho::WLD_GetActiveSession();
+          if (session == nullptr || session->mWldMap == nullptr || session->mWldMap->mTerrainRes == nullptr) {
+            return nullptr;
+          }
+          return session->mWldMap->mTerrainRes->mMap;
+        };
+        mViews->HostEffects(mRules, std::move(world));
         if (mSeedHeights != nullptr) {
           mViews->SeedTerrain(
             *mSeedHeights
@@ -661,6 +699,12 @@ namespace faf::remote::client
     const fa::vector<moho::GeomCamera3>& cameras
   )
   {
+    // Plan WP9.3: the hosted effects see what the session's cameras see, as a lockstep sim's effects see the cameras
+    // this call gives its sync filter.
+    {
+      const std::lock_guard<std::mutex> lock(mCameraLock);
+      mCameras = cameras;
+    }
     // Plan WP11.1: what the cameras see goes to the server at most every kCameraPeriodMs (for WP8.2's camera order).
     const auto now = std::chrono::steady_clock::now();
     if (now - mCamerasSentAt < std::chrono::milliseconds(kCameraPeriodMs)) {

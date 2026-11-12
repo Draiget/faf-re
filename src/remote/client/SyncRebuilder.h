@@ -229,7 +229,44 @@ namespace faf::remote::client
       mRules = rules;
     }
 
+    /**
+     * Plan WP9.3: what this client holds of an entity, for the effects it hosts (EffectHosting.h): its data as last
+     * given to the session (`mCurTransform` this beat, `mLastTransform` the one before), its blueprint, a unit's client
+     * pose (with `SetNoSim`).
+     */
+    struct SHeldView
+    {
+      const moho::SSTIEntityVariableData* data = nullptr;
+      const moho::REntityBlueprint* blueprint = nullptr;
+      boost::shared_ptr<moho::CAniPose> pose; // a unit's, with `SetNoSim`
+      bool isUnit = false;
+      bool removed = false; // the last frame removed it (`orRemoved`)
+    };
+    /**
+     * An entity live in the frame shown; with `orRemoved` (and `KeepRemoved`) also one the last frame removed, as it
+     * was then. False for any other. The view stays valid until the next frame is applied.
+     */
+    [[nodiscard]] bool FindHeld(std::uint32_t id, bool orRemoved, SHeldView& out) const;
+    /** Plan WP9.3: keep each frame's removed entities until the next frame (for `FindHeld`'s `orRemoved`). */
+    void KeepRemoved(
+      const bool keep
+    ) noexcept
+    {
+      mKeepRemoved = keep;
+    }
+
   private:
+    /** The frame shown's record of `id`, or null. */
+    [[nodiscard]] const wire::SEntityRecord* ShownRecord(std::uint32_t id) const noexcept;
+
+    struct SRemoved
+    {
+      moho::SSTIEntityVariableData data{};
+      const moho::REntityBlueprint* blueprint = nullptr;
+      bool isUnit = false;
+    };
+    bool mKeepRemoved = false;
+    std::unordered_map<std::uint32_t, SRemoved> mRemoved; // the last frame's removed entities (`KeepRemoved`)
     struct SUnderlay
     {
       bool resolved = false;

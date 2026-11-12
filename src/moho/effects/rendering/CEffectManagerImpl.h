@@ -24,6 +24,14 @@ namespace moho
   void EFFECT_SetLifetimeOnly(bool lifetimeOnly) noexcept;
   [[nodiscard]] bool EFFECT_LifetimeOnly() noexcept;
 
+  struct REffectBlueprint;
+
+  /**
+   * Engine addition (server mode, plan WP9.3): whether the creates keep an effect of `blueprint` at this machine's
+   * `graphics_Fidelity` (its Low/Med/HighFidelity flags); a null blueprint always. The check every create ends with.
+   */
+  [[nodiscard]] bool EFFECT_EnabledAtFidelity(const REffectBlueprint* blueprint) noexcept;
+
   class CEffectManagerImpl : public IEffectManager
   {
   public:

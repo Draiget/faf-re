@@ -2209,16 +2209,26 @@ namespace moho
     const int boneIndex
   ) const
   {
+    return ENTITY_BoneLocalTransform(mVarDat.mScmResource.get(), mVarDat.mScale, BluePrint, boneIndex);
+  }
+
+  VTransform ENTITY_BoneLocalTransform(
+    RScmResource* const mesh,
+    const Wm3::Vector3f& scale,
+    const REntityBlueprint* const blueprint,
+    const int boneIndex
+  )
+  {
     if (boneIndex >= 0) {
-      if (RScmResource* const scmResource = mVarDat.mScmResource.get(); scmResource != nullptr) {
+      if (RScmResource* const scmResource = mesh; scmResource != nullptr) {
         const CAniSkel* const skeleton = scmResource->GetSkeleton().get();
         if (skeleton != nullptr) {
           const SAniSkelBone* const bone = skeleton->GetBone(static_cast<std::uint32_t>(boneIndex));
           if (bone != nullptr) {
             VTransform boneTransform = bone->mBoneTransform.Inverse();
-            boneTransform.pos_.x *= mVarDat.mScale.x;
-            boneTransform.pos_.y *= mVarDat.mScale.y;
-            boneTransform.pos_.z *= mVarDat.mScale.z;
+            boneTransform.pos_.x *= scale.x;
+            boneTransform.pos_.y *= scale.y;
+            boneTransform.pos_.z *= scale.z;
             return boneTransform;
           }
         }
@@ -2226,10 +2236,10 @@ namespace moho
     }
 
     VTransform result{};
-    if (boneIndex == -1 && BluePrint != nullptr) {
-      result.pos_.x = BluePrint->mCollisionOffsetX;
-      result.pos_.y = BluePrint->mCollisionOffsetY + BluePrint->mSizeY * 0.5f;
-      result.pos_.z = BluePrint->mCollisionOffsetZ;
+    if (boneIndex == -1 && blueprint != nullptr) {
+      result.pos_.x = blueprint->mCollisionOffsetX;
+      result.pos_.y = blueprint->mCollisionOffsetY + blueprint->mSizeY * 0.5f;
+      result.pos_.z = blueprint->mCollisionOffsetZ;
     }
 
     return result;
