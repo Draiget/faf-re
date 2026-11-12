@@ -14,7 +14,6 @@ namespace moho
 {
   class ISimResources;
   class CSimResources;
-  using SimResourcesHandle = boost::BorrowedSharedPtr<ISimResources>;
 
   class ISimResources : public IResources
   {
