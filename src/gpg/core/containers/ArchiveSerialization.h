@@ -4,12 +4,6 @@
 
 #include "boost/shared_ptr.h"
 
-namespace boost
-{
-  template <class T>
-  struct SharedPtrRaw;
-} // namespace boost
-
 namespace moho
 {
   class StatItem;

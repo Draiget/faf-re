@@ -310,14 +310,6 @@ namespace gpg
     ReadArchive* ReadPointerShared(boost::shared_ptr<T>* outValue, const gpg::RRef* ownerRef);
 
     /**
-     * `ReadPointerShared` into a member still declared as the raw `(px, pi)`
-     * pair `boost::SharedPtrRaw<T>` rather than the `boost::shared_ptr<T>` the
-     * binary holds there.
-     */
-    template <class T>
-    ReadArchive* ReadPointerShared(boost::SharedPtrRaw<T>* outValue, const gpg::RRef* ownerRef);
-
-    /**
      * Address: 0x0065A810 (FUN_0065A810, gpg::ReadArchive::ReadPointer_CParticleTexture)
      *
      * What it does:

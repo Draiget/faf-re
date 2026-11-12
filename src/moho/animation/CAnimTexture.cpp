@@ -128,15 +128,15 @@ namespace moho
    * Address: 0x00423190 (FUN_00423190)
    *
    * What it does:
-   * Samples a frame pointer by positive-wrapped frame index and returns an intrusive
-   * `SharedPtrRaw` copy (`pi` refcount retained on success).
+   * Samples a frame by positive-wrapped frame index and returns a shared copy of it (empty when there is no
+   * frame at that index).
    */
   void CAnimTexture::GetFrameAt(
     FrameRef& outFrame,
     const float frameIndex
   ) const
   {
-    outFrame = {};
+    outFrame.reset();
     if (mFrames.empty()) {
       return;
     }
@@ -153,7 +153,6 @@ namespace moho
     }
 
     outFrame = mFrames[static_cast<std::size_t>(index)];
-    outFrame.add_ref_copy();
   }
 
   /**
@@ -180,10 +179,7 @@ namespace moho
     while (true) {
       ID3DDeviceResources::TextureResourceHandle textureResource{};
       D3D_GetDevice()->GetResources()->GetTexture(textureResource, frameName.c_str(), nullptr, true);
-      FrameRef loadedFrame{};
-      loadedFrame.reset_from_owner(boost::static_pointer_cast<ID3DTextureSheet>(textureResource));
-      AppendFrameRef(loadedFrame);
-      loadedFrame.release();
+      AppendFrameRef(boost::static_pointer_cast<ID3DTextureSheet>(textureResource));
 
       if (!IncrementFrameNameSuffix(frameName)) {
         break;
@@ -259,15 +255,13 @@ namespace moho
    * Address: 0x00423310 (FUN_00423310)
    *
    * What it does:
-   * Appends one frame reference to internal storage, retaining `pi`.
+   * Appends one shared frame reference to internal storage.
    */
   void CAnimTexture::AppendFrameRef(
     const FrameRef& frame
   )
   {
-    FrameRef retainedFrame = frame;
-    retainedFrame.add_ref_copy();
-    mFrames.push_back(retainedFrame);
+    mFrames.push_back(frame);
   }
 
 } // namespace moho

@@ -5690,23 +5690,6 @@ namespace gpg
     *outValue = boost::static_pointer_cast<T>(tracked.sharedPtr);
     return this;
   }
-
-  /**
-   * What it does:
-   * `ReadPointerShared` into a `boost::SharedPtrRaw<T>` member: the same read
-   * into a `boost::shared_ptr<T>`, whose control block the member then takes.
-   */
-  template <class T>
-  ReadArchive* ReadArchive::ReadPointerShared(
-    boost::SharedPtrRaw<T>* const outValue,
-    const RRef* const ownerRef
-  )
-  {
-    boost::shared_ptr<T> value;
-    ReadPointerShared(&value, ownerRef);
-    outValue->reset_from_owner(value);
-    return this;
-  }
   // Declared ahead of its definition below: WritePointer names it with
   // explicit template arguments, so it has to be visible where WritePointer
   // is defined, not only where it is instantiated.

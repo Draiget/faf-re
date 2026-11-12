@@ -143,7 +143,6 @@ namespace moho
   [[nodiscard]] TerrainShaderVarSet& GetTerrainShaderVars();
 
   void BindTextureShaderVar(ShaderVar& shaderVar, const boost::shared_ptr<ID3DTextureSheet>& textureSheet);
-  void BindTextureShaderVar(ShaderVar& shaderVar, const boost::SharedPtrRaw<RD3DTextureResource>& textureResource);
   void SetShaderVarMem(ShaderVar& shaderVar, std::uint32_t floatCount, const float* values);
   void SetShaderVarPtr(ShaderVar& shaderVar, const void* data, std::uint32_t byteCount);
 } // namespace moho

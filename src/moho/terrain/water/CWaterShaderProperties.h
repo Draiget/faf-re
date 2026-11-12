@@ -206,9 +206,9 @@ namespace moho
     fa::string mWaterCubemap{}; // +0xF4
     fa::string mWaterRamp{};    // +0x110
 
-    // Six texture-sheet handles (boost::SharedPtrRaw<ID3DTextureSheet>).
+    // Six texture-sheet handles.
     // Confirmed by: releaseTextures() iterating mTextures[0..5].
-    mutable boost::SharedPtrRaw<ID3DTextureSheet> mTextures[6]{}; // +0x12C
+    mutable boost::shared_ptr<ID3DTextureSheet> mTextures[6]{}; // +0x12C
 
   private:
     /**

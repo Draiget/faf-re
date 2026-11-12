@@ -134,12 +134,12 @@ namespace moho
     // [0x00873E1A] free movie-name heap buffer (base +0x44).
     mMovieName.tidy(true, 0U);
     // [0x00873E3A] release Sofdec work-buffer shared owner (+0x2C).
-    mWorkbuffer.release();
+    mWorkbuffer.reset();
     // [0x00873E70] release subtitle mem-buffer shared owner (+0x1C).
     mSubtitleBuffer.Reset();
     // [0x00873EA6] release movie texture-sheet shared owner (+0x14). Already
     // null after Dispose(), so this matches the skipped binary block.
-    mTextureSheet.release();
+    mTextureSheet.reset();
 
     // [0x00873EDF-0x00873EF9] is the `Listener<SD3DDeviceEvent const&>` base's
     // `~DListItem`, after this body: a no-op when the conditional unlink
@@ -185,13 +185,12 @@ namespace moho
     ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
     (void)resources->CreateDynamicTextureSheet2(dynamicSheet, mWidth, mHeight, 2);
 
-    const boost::shared_ptr<ID3DTextureSheet> textureSheet = boost::static_pointer_cast<ID3DTextureSheet>(dynamicSheet);
-    mTextureSheet.assign_retain(boost::SharedPtrRawFromSharedBorrow(textureSheet));
+    mTextureSheet = boost::static_pointer_cast<ID3DTextureSheet>(dynamicSheet);
 
     bool textureReady = false;
-    if (mTextureSheet.px != nullptr) {
+    if (mTextureSheet.get() != nullptr) {
       ID3DTextureSheet::TextureHandle textureHandle{};
-      (void)mTextureSheet.px->GetTexture(textureHandle);
+      (void)mTextureSheet->GetTexture(textureHandle);
       textureReady = (textureHandle.get() != nullptr);
     }
 
@@ -279,13 +278,13 @@ namespace moho
     }
 
     void* const workBuffer = std::malloc(static_cast<std::size_t>(workSize));
-    mWorkbuffer = boost::SharedPtrRaw<void>::with_deleter(workBuffer, &std::free);
-    createParams.work = mWorkbuffer.px;
-    if (mWorkbuffer.px == nullptr) {
+    mWorkbuffer.reset(workBuffer, &std::free);
+    createParams.work = mWorkbuffer.get();
+    if (mWorkbuffer.get() == nullptr) {
       gpg::Warnf("Failed to get a valid workbuffer for %s", path);
       return false;
     }
-    std::memset(mWorkbuffer.px, 0, static_cast<std::size_t>(createParams.workSize));
+    std::memset(mWorkbuffer.get(), 0, static_cast<std::size_t>(createParams.workSize));
 
     // Create the independent player through its legacy compatibility name.
     MwsfdPlaybackStateSubobj* const created = ::mwPlyCreateSofdec(&createParams);
@@ -357,8 +356,7 @@ namespace moho
     }
 
     mPly = nullptr;
-    mTextureSheet.px = nullptr;
-    mTextureSheet.release();
+    mTextureSheet.reset();
     mPlaybackEnabled = 0;
   }
 
@@ -452,7 +450,7 @@ namespace moho
     boost::shared_ptr<ID3DTextureSheet>* const outHandle
   )
   {
-    (void)boost::AssignSharedPairRetain(outHandle, &mTextureSheet);
+    *outHandle = mTextureSheet;
     return outHandle;
   }
 
@@ -568,7 +566,7 @@ namespace moho
       return;
     }
 
-    ID3DTextureSheet* const textureSheet = mTextureSheet.px;
+    ID3DTextureSheet* const textureSheet = mTextureSheet.get();
     std::uint32_t outputPitch = 0;
     void* outputBits = nullptr;
     if (textureSheet->Lock(&outputPitch, &outputBits)) {
@@ -600,7 +598,7 @@ namespace moho
   )
   {
     if (event.mEventType == 1u) {
-      mTextureSheet.release();
+      mTextureSheet.reset();
       mFrameAdvanceBlocked = 1;
       return;
     }
@@ -610,16 +608,16 @@ namespace moho
     }
 
     mFrameAdvanceBlocked = 0;
-    if (!CreateTexture() || mTextureSheet.px == nullptr) {
+    if (!CreateTexture() || mTextureSheet.get() == nullptr) {
       return;
     }
 
     Wm3::Vector3f textureDimensions{};
-    (void)mTextureSheet.px->GetDimensions(&textureDimensions);
+    (void)mTextureSheet->GetDimensions(&textureDimensions);
 
     std::uint32_t rowPitchBytes = 0;
     void* rowBits = nullptr;
-    if (!mTextureSheet.px->Lock(&rowPitchBytes, &rowBits)) {
+    if (!mTextureSheet->Lock(&rowPitchBytes, &rowBits)) {
       return;
     }
 
@@ -631,6 +629,6 @@ namespace moho
       --remainingRows;
     }
 
-    (void)mTextureSheet.px->Unlock();
+    (void)mTextureSheet->Unlock();
   }
 } // namespace moho

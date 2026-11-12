@@ -325,7 +325,7 @@ namespace moho
   {
     releaseTextures();
 
-    // After releaseTextures() all mTextures entries have pi=null and px=null.
+    // After releaseTextures() every mTextures entry is empty.
     // The remaining string members (mWaterRamp, mWaterCubemap, mShaderNames[])
     // require explicit tidy to release any heap-allocated buffers.  The binary
     // uses eh_vector_destructor_iterator and direct SSO teardown; we call tidy()
@@ -354,12 +354,7 @@ namespace moho
   void CWaterShaderProperties::releaseTextures()
   {
     for (auto& entry : mTextures) {
-      entry.px = nullptr;
-      boost::detail::sp_counted_base* const pi = entry.pi;
-      entry.pi = nullptr;
-      if (pi != nullptr) {
-        pi->release();
-      }
+      entry.reset();
     }
   }
 
@@ -374,23 +369,18 @@ namespace moho
    */
   boost::shared_ptr<ID3DTextureSheet> CWaterShaderProperties::GetWaterRamp() const
   {
-    if (mTextures[5].px == nullptr) {
+    if (mTextures[5].get() == nullptr) {
       if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
         if (ID3DDeviceResources* const resources = device->GetResources(); resources != nullptr) {
           ID3DDeviceResources::TextureResourceHandle loadedTexture{};
           resources->GetTexture(loadedTexture, mWaterRamp.c_str(), 0, true);
 
-          const boost::SharedPtrRaw<RD3DTextureResource> loadedRaw = boost::SharedPtrRawFromSharedBorrow(loadedTexture);
-
-          boost::SharedPtrRaw<ID3DTextureSheet> resolvedTexture{};
-          resolvedTexture.px = static_cast<ID3DTextureSheet*>(loadedRaw.px);
-          resolvedTexture.pi = loadedRaw.pi;
-          mTextures[5].assign_retain(resolvedTexture);
+          mTextures[5] = loadedTexture;
         }
       }
     }
 
-    return boost::SharedPtrFromRawRetained(mTextures[5]);
+    return mTextures[5];
   }
 
   /**
@@ -405,23 +395,18 @@ namespace moho
    */
   boost::shared_ptr<ID3DTextureSheet> CWaterShaderProperties::GetCubeMap() const
   {
-    if (mTextures[4].px == nullptr) {
+    if (mTextures[4].get() == nullptr) {
       if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
         if (ID3DDeviceResources* const resources = device->GetResources(); resources != nullptr) {
           ID3DDeviceResources::TextureResourceHandle loadedTexture{};
           resources->GetTexture(loadedTexture, mWaterCubemap.c_str(), 0, true);
 
-          const boost::SharedPtrRaw<RD3DTextureResource> loadedRaw = boost::SharedPtrRawFromSharedBorrow(loadedTexture);
-
-          boost::SharedPtrRaw<ID3DTextureSheet> resolvedTexture{};
-          resolvedTexture.px = static_cast<ID3DTextureSheet*>(loadedRaw.px);
-          resolvedTexture.pi = loadedRaw.pi;
-          mTextures[4].assign_retain(resolvedTexture);
+          mTextures[4] = loadedTexture;
         }
       }
     }
 
-    return boost::SharedPtrFromRawRetained(mTextures[4]);
+    return mTextures[4];
   }
 
   /**
@@ -438,24 +423,19 @@ namespace moho
     const int index
   ) const
   {
-    boost::SharedPtrRaw<ID3DTextureSheet>& cachedTexture = mTextures[index];
-    if (cachedTexture.px == nullptr) {
+    boost::shared_ptr<ID3DTextureSheet>& cachedTexture = mTextures[index];
+    if (cachedTexture.get() == nullptr) {
       if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
         if (ID3DDeviceResources* const resources = device->GetResources(); resources != nullptr) {
           ID3DDeviceResources::TextureResourceHandle loadedTexture{};
           resources->GetTexture(loadedTexture, mShaderNames[index].c_str(), 0, true);
 
-          const boost::SharedPtrRaw<RD3DTextureResource> loadedRaw = boost::SharedPtrRawFromSharedBorrow(loadedTexture);
-
-          boost::SharedPtrRaw<ID3DTextureSheet> resolvedTexture{};
-          resolvedTexture.px = static_cast<ID3DTextureSheet*>(loadedRaw.px);
-          resolvedTexture.pi = loadedRaw.pi;
-          cachedTexture.assign_retain(resolvedTexture);
+          cachedTexture = loadedTexture;
         }
       }
     }
 
-    return boost::SharedPtrFromRawRetained(cachedTexture);
+    return cachedTexture;
   }
 
 } // namespace moho

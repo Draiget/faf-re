@@ -45,7 +45,7 @@ namespace moho
    */
   CStratumMaterial::~CStratumMaterial()
   {
-    mTextureSheet.release();
+    mTextureSheet.reset();
     mPath.tidy();
   }
 
@@ -63,11 +63,9 @@ namespace moho
     , mScaleY(source.mScaleY)
     , v3(source.v3)
     , v4(source.v4)
-    , mTextureSheet{}
+    , mTextureSheet(source.mTextureSheet)
     , mSize(source.mSize)
-  {
-    mTextureSheet.assign_retain(source.mTextureSheet);
-  }
+  {}
 
   /**
    * Address: 0x0089F4E0 (FUN_0089F4E0, Moho::CStratumMaterial::SetSize)
@@ -81,17 +79,15 @@ namespace moho
     CStratumMaterial& material
   )
   {
-    if (material.mTextureSheet.px == nullptr && !material.mPath.empty()) {
+    if (material.mTextureSheet.get() == nullptr && !material.mPath.empty()) {
       if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
         if (ID3DDeviceResources* const resources = device->GetResources(); resources != nullptr) {
-          boost::shared_ptr<RD3DTextureResource> textureResource{};
-          resources->GetTexture(textureResource, material.mPath.c_str(), 0, true);
-          material.mTextureSheet.assign_retain(boost::SharedPtrRawFromSharedBorrow(textureResource));
+          resources->GetTexture(material.mTextureSheet, material.mPath.c_str(), 0, true);
         }
       }
     }
 
-    if (material.mTextureSheet.px != nullptr) {
+    if (material.mTextureSheet.get() != nullptr) {
       const float invSize = 1.0f / material.mSize;
       material.mScaleX = maxSize.x * invSize;
       material.mScaleY = maxSize.y * invSize;
@@ -175,8 +171,8 @@ namespace moho
     , mShaderName(source.mShaderName)
     , mStratumMaskWidth(source.mStratumMaskWidth)
     , mStratumMaskHeight(source.mStratumMaskHeight)
-    , mStratumMask0{}
-    , mStratumMask1{}
+    , mStratumMask0(source.mStratumMask0)
+    , mStratumMask1(source.mStratumMask1)
     , mLowerAlbedoTexture(source.mLowerAlbedoTexture)
     , mStratum0AlbedoTexture(source.mStratum0AlbedoTexture)
     , mStratum1AlbedoTexture(source.mStratum1AlbedoTexture)
@@ -197,10 +193,7 @@ namespace moho
     , mStratum6NormalTexture(source.mStratum6NormalTexture)
     , mStratum7NormalTexture(source.mStratum7NormalTexture)
     , mUpperNormalTexture(source.mUpperNormalTexture)
-  {
-    mStratumMask0.assign_retain(source.mStratumMask0);
-    mStratumMask1.assign_retain(source.mStratumMask1);
-  }
+  {}
 
   /**
    * Address: 0x008A74F0 (FUN_008A74F0, Moho::StratumMaterial::~StratumMaterial)
@@ -211,8 +204,8 @@ namespace moho
    */
   StratumMaterial::~StratumMaterial()
   {
-    mStratumMask1.release();
-    mStratumMask0.release();
+    mStratumMask1.reset();
+    mStratumMask0.reset();
     mShaderName.tidy();
   }
 

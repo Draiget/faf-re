@@ -163,26 +163,18 @@ namespace
     (void)archiveSheet->SaveToArchive(writer.stream(), true);
   }
   [[nodiscard]] boost::shared_ptr<moho::CD3DDynamicTextureSheet> ShareAsDynamicSheet(
-    const boost::SharedPtrRaw<moho::RD3DTextureResource>& mask
+    const boost::shared_ptr<moho::ID3DTextureSheet>& mask
   ) noexcept
   {
-    boost::SharedPtrRaw<moho::CD3DDynamicTextureSheet> reinterpreted{};
-    reinterpreted.px = reinterpret_cast<moho::CD3DDynamicTextureSheet*>(mask.px);
-    reinterpreted.pi = mask.pi;
-    return boost::SharedPtrFromRawRetained(reinterpreted);
+    return boost::static_pointer_cast<moho::CD3DDynamicTextureSheet>(mask);
   }
 
   void AdoptDynamicSheetAsStratumMask(
-    boost::SharedPtrRaw<moho::RD3DTextureResource>& mask,
+    boost::shared_ptr<moho::ID3DTextureSheet>& mask,
     const boost::shared_ptr<moho::CD3DDynamicTextureSheet>& sheet
   ) noexcept
   {
-    const boost::SharedPtrRaw<moho::CD3DDynamicTextureSheet> borrow = boost::SharedPtrRawFromSharedBorrow(sheet);
-
-    boost::SharedPtrRaw<moho::RD3DTextureResource> reinterpreted{};
-    reinterpreted.px = reinterpret_cast<moho::RD3DTextureResource*>(borrow.px);
-    reinterpreted.pi = borrow.pi;
-    mask.assign_retain(reinterpreted);
+    mask = sheet;
   }
   /**
    * Adopt a device-resources texture-sheet handle into the water-map slot.
@@ -191,21 +183,16 @@ namespace
    * `(sheet, count.pi_)` pair straight into `mWaterMapTexture`, reinterpreting
    * the `RD3DTextureResource*` payload as the same `CD3DDynamicTextureSheet`
    * object (they are the one DDS sheet, only modelled under two names). This
-   * helper performs that identical refcount-preserving raw copy through the
-   * SharedPtrRaw machinery so no open `{px,pi}` arithmetic leaks into Load.
+   * helper makes that same shared copy, cast through the common `ID3DTextureSheet` base.
    */
   void AdoptWaterMapSheetFromResource(
     boost::shared_ptr<moho::CD3DDynamicTextureSheet>& waterMap,
     const moho::ID3DDeviceResources::TextureResourceHandle& sheet
   ) noexcept
   {
-    const boost::SharedPtrRaw<moho::RD3DTextureResource> sourceBorrow = boost::SharedPtrRawFromSharedBorrow(sheet);
-
-    boost::SharedPtrRaw<moho::CD3DDynamicTextureSheet> reinterpreted{};
-    reinterpreted.px = reinterpret_cast<moho::CD3DDynamicTextureSheet*>(sourceBorrow.px);
-    reinterpreted.pi = sourceBorrow.pi;
-
-    waterMap = boost::SharedPtrFromRawRetained(reinterpreted);
+    waterMap = boost::static_pointer_cast<moho::CD3DDynamicTextureSheet>(
+      boost::static_pointer_cast<moho::ID3DTextureSheet>(sheet)
+    );
   }
   [[nodiscard]] std::int32_t AlignDownTo4(
     const std::int32_t value
@@ -220,18 +207,15 @@ namespace
     return (value + 3) & ~3;
   }
   /**
-   * `StratumMaterial` declares the two stratum masks as
-   * `SharedPtrRaw<RD3DTextureResource>`, and this file drives them as dynamic
-   * texture sheets - one DDS sheet under two names, the same handoff
-   * `AdoptWaterMapSheetFromResource` performs for the water map. These three
-   * keep that reinterpretation in one place instead of spreading `{px, pi}`
-   * arithmetic across the terrain paths.
+   * `StratumMaterial` declares the two stratum masks as `ID3DTextureSheet`s, and this file drives them as dynamic
+   * texture sheets, the same handoff `AdoptWaterMapSheetFromResource` performs for the water map. These keep that
+   * cast in one place.
    */
   [[nodiscard]] moho::CD3DDynamicTextureSheet* AsDynamicSheet(
-    const boost::SharedPtrRaw<moho::RD3DTextureResource>& mask
+    const boost::shared_ptr<moho::ID3DTextureSheet>& mask
   ) noexcept
   {
-    return reinterpret_cast<moho::CD3DDynamicTextureSheet*>(mask.px);
+    return static_cast<moho::CD3DDynamicTextureSheet*>(mask.get());
   }
   /**
    * Address: 0x0089E790 (FUN_0089E790)
@@ -280,7 +264,7 @@ namespace
   }
   /// `CloneTerrainDynamicTextureForEdit` for a stratum-mask lane.
   void CloneStratumMaskForEdit(
-    boost::SharedPtrRaw<moho::RD3DTextureResource>& mask,
+    boost::shared_ptr<moho::ID3DTextureSheet>& mask,
     const bool archiveMode
   )
   {
@@ -3709,7 +3693,7 @@ namespace moho
         if (maskResources != nullptr) {
           maskResources->GetTextureSheet(sheet, "_utilitya_mask.dds", payload.data(), payload.size());
         }
-        mStrata.mStratumMask0.assign_retain(boost::SharedPtrRawFromSharedBorrow(sheet));
+        mStrata.mStratumMask0 = sheet;
       }
       TickLoadingProgress(loadControl);
       {
@@ -3718,7 +3702,7 @@ namespace moho
         if (maskResources != nullptr) {
           maskResources->GetTextureSheet(sheet, "_utilityb_mask.dds", payload.data(), payload.size());
         }
-        mStrata.mStratumMask1.assign_retain(boost::SharedPtrRawFromSharedBorrow(sheet));
+        mStrata.mStratumMask1 = sheet;
       }
       TickLoadingProgress(loadControl);
     } else {
@@ -3733,8 +3717,8 @@ namespace moho
             maskResources->GetTextureSheet(sheetA, "_utilitya_mask.dds", payload.data(), payload.size());
             maskResources->GetTextureSheet(sheetB, "_utilityb_mask.dds", payload.data(), payload.size());
           }
-          mStrata.mStratumMask0.assign_retain(boost::SharedPtrRawFromSharedBorrow(sheetA));
-          mStrata.mStratumMask1.assign_retain(boost::SharedPtrRawFromSharedBorrow(sheetB));
+          mStrata.mStratumMask0 = sheetA;
+          mStrata.mStratumMask1 = sheetB;
         }
         TickLoadingProgress(loadControl);
       }

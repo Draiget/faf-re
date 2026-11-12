@@ -9,6 +9,7 @@
 
 namespace moho
 {
+  class ID3DTextureSheet;
   class IWldTerrainRes;
   class RD3DTextureResource;
 
@@ -29,7 +30,7 @@ namespace moho
     float mScaleY{1.0f};                                      // +0x20
     float v3{0.0f};                                           // +0x24
     float v4{1.0f};                                           // +0x28
-    boost::SharedPtrRaw<RD3DTextureResource> mTextureSheet{}; // +0x2C
+    boost::shared_ptr<RD3DTextureResource> mTextureSheet{};   // +0x2C
     float mSize{1.0f};                                        // +0x34
 
     /**
@@ -121,8 +122,10 @@ namespace moho
     /// two masks below at that size.
     std::uint32_t mStratumMaskWidth{0};                       // +0x20
     std::uint32_t mStratumMaskHeight{0};                      // +0x24
-    boost::SharedPtrRaw<RD3DTextureResource> mStratumMask0{}; // +0x28
-    boost::SharedPtrRaw<RD3DTextureResource> mStratumMask1{}; // +0x30
+    /// Map load stores the `_utilitya/b_mask.dds` texture resources here; `CWldTerrainRes::Reset` stores dynamic
+    /// sheets. Both are `ID3DTextureSheet`s, which is all the shader binding needs.
+    boost::shared_ptr<ID3DTextureSheet> mStratumMask0{};      // +0x28
+    boost::shared_ptr<ID3DTextureSheet> mStratumMask1{};      // +0x30
     CStratumMaterial mLowerAlbedoTexture{};                   // +0x38
     CStratumMaterial mStratum0AlbedoTexture{};                // +0x70
     CStratumMaterial mStratum1AlbedoTexture{};                // +0xA8

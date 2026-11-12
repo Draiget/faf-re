@@ -164,7 +164,7 @@ namespace moho
 
   struct UICommandGraphNode
   {
-    boost::SharedPtrRaw<void> mOrderlineTexture{}; // +0x00 (shared `(px,pi)` pair)
+    boost::shared_ptr<ID3DTextureSheet> mOrderlineTexture{}; // +0x00
     float mOrderlineAspectRatio = 0.0f;            // +0x08
     float mOrderlineAnimRate = 0.0f;               // +0x0C
     std::uint32_t mOrderlineColor = 0;             // +0x10
@@ -180,8 +180,8 @@ namespace moho
     float mWaypointSelectedScale = 0.0f;           // +0x38
     float mWaypointHighlightScale = 0.0f;          // +0x3C
     float mArrowheadCapOffset = 0.0f;              // +0x40
-    boost::SharedPtrRaw<void> mWaypointTexture{};  // +0x44 (shared `(px,pi)` pair)
-    boost::SharedPtrRaw<void> mArrowheadTexture{}; // +0x4C (shared `(px,pi)` pair)
+    boost::shared_ptr<CD3DBatchTexture> mWaypointTexture{};  // +0x44
+    boost::shared_ptr<CD3DBatchTexture> mArrowheadTexture{}; // +0x4C
 
     /**
      * Address: 0x008243F0 (FUN_008243F0, ??0UICommandGraphNode@Moho@@QAE@@Z)
@@ -386,7 +386,7 @@ namespace moho
       /// call `SetTexture(boost::shared_ptr<ID3DTextureSheet>)` at 0x00829226
       /// and 0x00829396, and only the flat-white node pass at 0x0082952C takes
       /// the `CD3DBatchTexture` overload.
-      boost::SharedPtrRaw<ID3DTextureSheet> mTexture; // +0x00
+      boost::shared_ptr<ID3DTextureSheet> mTexture;   // +0x00
       fa::vector<CommandGraphEdge*> mEdges;           // +0x08
     };
     static_assert(sizeof(CommandGraphTreeBucket) == 0x18, "CommandGraphTreeBucket size must be 0x18");
@@ -424,7 +424,7 @@ namespace moho
      * One drawn segment of a queued-order "orderline" - the ribbon connecting
      * two command-graph draw nodes. `mCommandGraphTree` buckets these by
      * texture: each tree node's `mBucket` holds a
-     * `{boost::SharedPtrRaw<ID3DTextureSheet>, fa::vector<CommandGraphEdge*>}`
+     * `{boost::shared_ptr<ID3DTextureSheet>, fa::vector<CommandGraphEdge*>}`
      * pair, and the render pass walks the bucket's vector once per texture.
      *
      * In the original EdgeMap list node, the two pointer keys occupy +8/+12
@@ -651,7 +651,7 @@ namespace moho
      */
     static CommandGraphTreeBucket* InitCommandGraphTreeBucketValue(
       CommandGraphTreeBucket* destination,
-      const boost::SharedPtrRaw<ID3DTextureSheet>& texture
+      const boost::shared_ptr<ID3DTextureSheet>& texture
     );
 
     /**
@@ -684,17 +684,15 @@ namespace moho
      * red-red violation - the exact shape `legacy/containers/RbTree.h`'s
      * `insert_at` (`buy_node` + `link_and_rebalance`) already documents for
      * this map instantiation, transcribed against `CommandGraphTreeNode`'s
-     * own field names rather than routed through `detail::rb_tree<Traits>`:
-     * `boost::SharedPtrRaw<T>` is an explicit-retain, non-owning view by
-     * design (see `BoostWrappers.h`), so a generic value-type copy
-     * constructor would silently skip the add-ref the binary performs
-     * explicitly via `sub_82D330` (`InitCommandGraphTreeBucketValue` above).
+     * own field names rather than routed through `detail::rb_tree<Traits>`,
+     * because the nodes are bought and released raw as the binary does, with
+     * the bucket built in place by `sub_82D330` (`InitCommandGraphTreeBucketValue` above).
      */
     static CommandGraphTreeNode* AttachCommandGraphNodeAt(
       CommandGraphTree& tree,
       bool addLeft,
       CommandGraphTreeNode* where,
-      const boost::SharedPtrRaw<ID3DTextureSheet>& texture
+      const boost::shared_ptr<ID3DTextureSheet>& texture
     );
 
     /**
@@ -709,7 +707,7 @@ namespace moho
      * for this map instantiation.
      */
     static CommandGraphTreeNode*
-    AttachCommandGraphNodeUnique(CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture);
+    AttachCommandGraphNodeUnique(CommandGraphTree& tree, const boost::shared_ptr<ID3DTextureSheet>& texture);
 
     /**
      * Address: 0x0082CC80 (FUN_0082CC80, sub_82CC80)
@@ -727,7 +725,7 @@ namespace moho
     static CommandGraphTreeNode* AttachCommandGraphNodeHinted(
       CommandGraphTree& tree,
       CommandGraphTreeNode* hint,
-      const boost::SharedPtrRaw<ID3DTextureSheet>& texture
+      const boost::shared_ptr<ID3DTextureSheet>& texture
     );
 
     /**
@@ -744,7 +742,7 @@ namespace moho
      * `CommandGraphTreeBucket::mEdges.push_back` (0x0082BCB0).
      */
     static fa::vector<CommandGraphEdge*>&
-    FindOrInsertCommandGraphBucket(CommandGraphTree& tree, const boost::SharedPtrRaw<ID3DTextureSheet>& texture);
+    FindOrInsertCommandGraphBucket(CommandGraphTree& tree, const boost::shared_ptr<ID3DTextureSheet>& texture);
 
     /**
      * Address: 0x00824740 (FUN_00824740, func_OnCommandGraphShow)

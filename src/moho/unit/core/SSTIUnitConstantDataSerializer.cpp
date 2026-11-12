@@ -56,23 +56,6 @@ namespace
   }
 
   /**
-   * Address: 0x005CAD60 (FUN_005CAD60, func_InitStatItemParent)
-   *
-   * What it does:
-   * Initializes one boost shared-control lane for `Stats<StatItem>` ownership.
-   */
-  void InitializeStatsRootSharedControl(
-    boost::detail::sp_counted_base*& outControl,
-    moho::Stats<moho::StatItem>* const statsRoot
-  )
-  {
-    outControl = nullptr;
-    if (statsRoot != nullptr) {
-      outControl = new boost::detail::sp_counted_impl_p<moho::Stats<moho::StatItem>>(statsRoot);
-    }
-  }
-
-  /**
    * Address: 0x005CC860 (FUN_005CC860, destroy_Stats_StatItem_if_present)
    *
    * What it does:
@@ -131,17 +114,10 @@ namespace moho
       statsRoot = new (allocation) moho::Stats<moho::StatItem>();
     }
 
-    boost::SharedPtrRaw<moho::Stats<moho::StatItem>> statsRootRaw{};
-    statsRootRaw.px = statsRoot;
-    try {
-      InitializeStatsRootSharedControl(statsRootRaw.pi, statsRoot);
-    } catch (...) {
-      GPG_NONVIRTUAL_DESTROY(delete statsRoot);
-      throw;
-    }
-
-    mStatsRoot = boost::SharedPtrFromRawRetained(statsRootRaw);
-    statsRootRaw.release();
+    // Address: 0x005CAD60 (FUN_005CAD60, func_InitStatItemParent -- the `shared_count` half of this
+    // `shared_ptr<Stats<StatItem>>` construction: a new `sp_counted_impl_p<Stats<StatItem>>` for a non-null root,
+    // deleting the root if that allocation throws; formerly `InitializeStatsRootSharedControl` here.)
+    mStatsRoot.reset(statsRoot);
   }
 
   /**

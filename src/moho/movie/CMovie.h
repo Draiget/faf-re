@@ -99,7 +99,7 @@ namespace moho
   class CMovie : public IMovie, public Listener<const SD3DDeviceEvent&>
   {
   public:
-    using TextureSheetHandle = boost::SharedPtrRaw<ID3DTextureSheet>;
+    using TextureSheetHandle = boost::shared_ptr<ID3DTextureSheet>;
 
     /**
      * Address: 0x00873CA0 (FUN_00873CA0, Moho::CMovie::CMovie)
@@ -329,7 +329,7 @@ namespace moho
     std::uint8_t mReserved11_13[0x3]{};       // +0x11
     TextureSheetHandle mTextureSheet{};       // +0x14
     gpg::MemBuffer<char> mSubtitleBuffer{};   // +0x1C
-    boost::SharedPtrRaw<void> mWorkbuffer{};  // +0x2C (Sofdec work buffer shared owner)
+    boost::shared_ptr<void> mWorkbuffer{};    // +0x2C (Sofdec work buffer shared owner)
     std::int32_t mWidth = 0;                  // +0x34
     std::int32_t mHeight = 0;                 // +0x38
     std::int32_t mFrameCount = 0;             // +0x3C

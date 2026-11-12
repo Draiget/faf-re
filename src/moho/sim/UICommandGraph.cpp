@@ -59,8 +59,6 @@ namespace moho
    */
   UICommandGraphNode::UICommandGraphNode()
   {
-    mOrderlineTexture.px = nullptr;
-    mOrderlineTexture.pi = nullptr;
     mOrderlineAnimRate = 0.1f;
     mOrderlineAspectRatio = 1.0f;
     mOrderlineColor = 0u;
@@ -75,10 +73,6 @@ namespace moho
     mWaypointScale = 1.0f;
     mWaypointSelectedScale = 1.0f;
     mWaypointHighlightScale = 1.0f;
-    mWaypointTexture.px = nullptr;
-    mWaypointTexture.pi = nullptr;
-    mArrowheadTexture.px = nullptr;
-    mArrowheadTexture.pi = nullptr;
   }
 
   /**
@@ -91,21 +85,17 @@ namespace moho
    */
   UICommandGraphNode::~UICommandGraphNode()
   {
-    mArrowheadTexture.release();
-    mWaypointTexture.release();
-    mOrderlineTexture.release();
+    mArrowheadTexture.reset();
+    mWaypointTexture.reset();
+    mOrderlineTexture.reset();
   }
 
   /**
    * Address: 0x00825060 (FUN_00825060, Moho::UICommandGraphNode::cpy)
    *
-   * NOTE (2026-08-20 audit): all three texture-lane releases below previously
-   * called `.weak_release()`. FUN_00825060 confirms all three inline copies of
-   * the retain/release pattern call FUN_004229B0 for the release step
-   * (verified by manual displacement calculation at 0x00825087, 0x0082510E,
-   * 0x0082513B), which is `sp_counted_base::release()`, not `weak_release()`
-   * (see BoostWrappers.h). The acquire side (`add_ref_copy()`) was already
-   * correct. Corrected to `.release()` to match.
+   * The three texture copies are inlined `boost::shared_ptr` assignments: each
+   * retains the incoming count and releases the old one through FUN_004229B0
+   * (`sp_counted_base::release()`, at 0x00825087, 0x0082510E and 0x0082513B).
    *
    * What it does:
    * Copies one command-graph style node payload, including shared-texture
@@ -115,17 +105,7 @@ namespace moho
     const UICommandGraphNode& other
   )
   {
-    mOrderlineTexture.px = other.mOrderlineTexture.px;
-    boost::detail::sp_counted_base* incomingControl = other.mOrderlineTexture.pi;
-    if (incomingControl != mOrderlineTexture.pi) {
-      if (incomingControl != nullptr) {
-        incomingControl->add_ref_copy();
-      }
-      if (mOrderlineTexture.pi != nullptr) {
-        mOrderlineTexture.pi->release();
-      }
-      mOrderlineTexture.pi = incomingControl;
-    }
+    mOrderlineTexture = other.mOrderlineTexture;
 
     mOrderlineAspectRatio = other.mOrderlineAspectRatio;
     mOrderlineAnimRate = other.mOrderlineAnimRate;
@@ -143,29 +123,9 @@ namespace moho
     mWaypointHighlightScale = other.mWaypointHighlightScale;
     mArrowheadCapOffset = other.mArrowheadCapOffset;
 
-    mWaypointTexture.px = other.mWaypointTexture.px;
-    incomingControl = other.mWaypointTexture.pi;
-    if (incomingControl != mWaypointTexture.pi) {
-      if (incomingControl != nullptr) {
-        incomingControl->add_ref_copy();
-      }
-      if (mWaypointTexture.pi != nullptr) {
-        mWaypointTexture.pi->release();
-      }
-      mWaypointTexture.pi = incomingControl;
-    }
+    mWaypointTexture = other.mWaypointTexture;
 
-    mArrowheadTexture.px = other.mArrowheadTexture.px;
-    incomingControl = other.mArrowheadTexture.pi;
-    if (incomingControl != mArrowheadTexture.pi) {
-      if (incomingControl != nullptr) {
-        incomingControl->add_ref_copy();
-      }
-      if (mArrowheadTexture.pi != nullptr) {
-        mArrowheadTexture.pi->release();
-      }
-      mArrowheadTexture.pi = incomingControl;
-    }
+    mArrowheadTexture = other.mArrowheadTexture;
 
     return this;
   }
@@ -174,14 +134,9 @@ namespace moho
    * Address: 0x00825570 (FUN_00825570)
    * Mangled: ?LoadTextures@UICommandGraphNode@Moho@@QAEXPAVLuaObject@LuaPlus@@PBDPAVLuaState@3@@Z
    *
-   * NOTE (2026-08-20 audit): all three texture-lane assignments below
-   * (orderline/waypoint/arrowhead) previously called `.weak_release()` in the
-   * shared `assignSharedLane` lambda. FUN_00825570 confirms all three call
-   * sites (0x008256E4, 0x00825B26, 0x00825EF9, xref-verified) target
-   * FUN_004229B0, i.e. `sp_counted_base::release()`, not `weak_release()`
-   * (see BoostWrappers.h). The acquire side (`add_ref_copy()`) was already
-   * correct. Corrected to `.release()`; the lambda was renamed from
-   * `assignWeakSharedLane` to match (function-local, no external callers).
+   * The three texture stores are inlined `boost::shared_ptr` assignments; their
+   * releases (0x008256E4, 0x00825B26, 0x00825EF9) call FUN_004229B0,
+   * `sp_counted_base::release()`.
    *
    * What it does:
    * Loads command-graph texture/style lanes from one Lua table entry, honoring
@@ -209,23 +164,6 @@ namespace moho
       return !probe.IsNil();
     };
 
-    const auto assignSharedLane = [](
-                                    boost::SharedPtrRaw<void>& destination,
-                                    void* const sourcePx,
-                                    boost::detail::sp_counted_base* const sourceControl
-                                  ) {
-      destination.px = sourcePx;
-      if (sourceControl != destination.pi) {
-        if (sourceControl != nullptr) {
-          sourceControl->add_ref_copy();
-        }
-        if (destination.pi != nullptr) {
-          destination.pi->release();
-        }
-        destination.pi = sourceControl;
-      }
-    };
-
     if (hasKey("orderline_texture")) {
       if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
         if (ID3DDeviceResources* const resources = device->GetResources(); resources != nullptr) {
@@ -233,8 +171,7 @@ namespace moho
           ID3DDeviceResources::TextureResourceHandle loadedTexture{};
           resources->GetTexture(loadedTexture, textureValue.GetString(), 0, true);
 
-          const boost::SharedPtrRaw<RD3DTextureResource> loadedRaw = boost::SharedPtrRawFromSharedBorrow(loadedTexture);
-          assignSharedLane(mOrderlineTexture, loadedRaw.px, loadedRaw.pi);
+          mOrderlineTexture = loadedTexture;
         }
       }
     }
@@ -273,10 +210,7 @@ namespace moho
 
     if (hasKey("waypoint_texture")) {
       LuaPlus::LuaObject textureValue = nodeTable["waypoint_texture"];
-      const boost::shared_ptr<CD3DBatchTexture> loadedTexture =
-        CD3DBatchTexture::FromFile(textureValue.GetString(), 1u);
-      const boost::SharedPtrRaw<CD3DBatchTexture> loadedRaw = boost::SharedPtrRawFromSharedBorrow(loadedTexture);
-      assignSharedLane(mWaypointTexture, loadedRaw.px, loadedRaw.pi);
+      mWaypointTexture = CD3DBatchTexture::FromFile(textureValue.GetString(), 1u);
     }
 
     if (hasKey("waypoint_color")) {
@@ -309,10 +243,7 @@ namespace moho
 
     if (hasKey("arrowhead_texture")) {
       LuaPlus::LuaObject textureValue = nodeTable["arrowhead_texture"];
-      const boost::shared_ptr<CD3DBatchTexture> loadedTexture =
-        CD3DBatchTexture::FromFile(textureValue.GetString(), 1u);
-      const boost::SharedPtrRaw<CD3DBatchTexture> loadedRaw = boost::SharedPtrRawFromSharedBorrow(loadedTexture);
-      assignSharedLane(mArrowheadTexture, loadedRaw.px, loadedRaw.pi);
+      mArrowheadTexture = CD3DBatchTexture::FromFile(textureValue.GetString(), 1u);
     }
   }
 
@@ -413,7 +344,7 @@ namespace moho
       ::operator delete(bucket.mEdges.data());
     }
     bucket.mEdges.release_storage_without_free();
-    bucket.mTexture.release();
+    bucket.mTexture.reset();
   }
 
   /**
@@ -473,17 +404,30 @@ namespace moho
     [[nodiscard]] TNode* PrevTreeNode(TNode* node);
   } // namespace
 
+  namespace
+  {
+    /// The bucket tree's key order: by the texture's control block, which is what `boost::shared_ptr`'s `operator<`
+    /// compares (`sp_counted_base*` ordering in FUN_0082B8B0 and its insert helpers).
+    [[nodiscard]] bool TextureOwnerBefore(
+      const boost::shared_ptr<ID3DTextureSheet>& lhs,
+      const boost::shared_ptr<ID3DTextureSheet>& rhs
+    ) noexcept
+    {
+      return lhs < rhs;
+    }
+  } // namespace
+
   /**
    * Address: 0x0082D330 (FUN_0082D330, sub_82D330) - see the declaration's
    * doc comment.
    */
   UICommandGraph::CommandGraphTreeBucket* UICommandGraph::InitCommandGraphTreeBucketValue(
     CommandGraphTreeBucket* const destination,
-    const boost::SharedPtrRaw<ID3DTextureSheet>& texture
+    const boost::shared_ptr<ID3DTextureSheet>& texture
   )
   {
     ::new (static_cast<void*>(destination)) CommandGraphTreeBucket();
-    destination->mTexture = texture.clone_retained();
+    destination->mTexture = texture;
     return destination;
   }
 
@@ -553,7 +497,7 @@ namespace moho
     CommandGraphTree& tree,
     const bool addLeft,
     CommandGraphTreeNode* const where,
-    const boost::SharedPtrRaw<ID3DTextureSheet>& texture
+    const boost::shared_ptr<ID3DTextureSheet>& texture
   )
   {
     if (0xAAAAAA9u <= tree.mSize) {
@@ -640,14 +584,14 @@ namespace moho
    */
   UICommandGraph::CommandGraphTreeNode* UICommandGraph::AttachCommandGraphNodeUnique(
     CommandGraphTree& tree,
-    const boost::SharedPtrRaw<ID3DTextureSheet>& texture
+    const boost::shared_ptr<ID3DTextureSheet>& texture
   )
   {
     CommandGraphTreeNode* where = tree.mHead;
     bool addLeft = true;
     for (CommandGraphTreeNode* node = tree.mHead->mParent; node->mIsSentinel == 0u;) {
       where = node;
-      addLeft = texture.pi < node->mBucket.mTexture.pi;
+      addLeft = TextureOwnerBefore(texture, node->mBucket.mTexture);
       node = addLeft ? node->mLeft : node->mRight;
     }
 
@@ -659,7 +603,7 @@ namespace moho
       probe = PrevTreeNode(where);
     }
 
-    if (probe->mBucket.mTexture.pi < texture.pi) {
+    if (TextureOwnerBefore(probe->mBucket.mTexture, texture)) {
       return AttachCommandGraphNodeAt(tree, addLeft, where, texture);
     }
     return probe;
@@ -672,7 +616,7 @@ namespace moho
   UICommandGraph::CommandGraphTreeNode* UICommandGraph::AttachCommandGraphNodeHinted(
     CommandGraphTree& tree,
     CommandGraphTreeNode* const hint,
-    const boost::SharedPtrRaw<ID3DTextureSheet>& texture
+    const boost::shared_ptr<ID3DTextureSheet>& texture
   )
   {
     if (tree.mSize == 0u) {
@@ -680,23 +624,23 @@ namespace moho
     }
 
     if (hint == tree.mHead->mLeft) {
-      if (texture.pi < hint->mBucket.mTexture.pi) {
+      if (TextureOwnerBefore(texture, hint->mBucket.mTexture)) {
         return AttachCommandGraphNodeAt(tree, true, hint, texture);
       }
     } else if (hint->mIsSentinel != 0u) {
       CommandGraphTreeNode* const rightmost = tree.mHead->mRight;
-      if (rightmost->mBucket.mTexture.pi < texture.pi) {
+      if (TextureOwnerBefore(rightmost->mBucket.mTexture, texture)) {
         return AttachCommandGraphNodeAt(tree, false, rightmost, texture);
       }
-    } else if (texture.pi < hint->mBucket.mTexture.pi) {
+    } else if (TextureOwnerBefore(texture, hint->mBucket.mTexture)) {
       CommandGraphTreeNode* const before = PrevTreeNode(hint);
-      if (before->mBucket.mTexture.pi < texture.pi) {
+      if (TextureOwnerBefore(before->mBucket.mTexture, texture)) {
         return (before->mRight->mIsSentinel != 0u) ? AttachCommandGraphNodeAt(tree, false, before, texture)
                                                    : AttachCommandGraphNodeAt(tree, true, hint, texture);
       }
-    } else if (hint->mBucket.mTexture.pi < texture.pi) {
+    } else if (TextureOwnerBefore(hint->mBucket.mTexture, texture)) {
       CommandGraphTreeNode* const after = NextTreeNode(hint);
-      if (after->mIsSentinel != 0u || texture.pi < after->mBucket.mTexture.pi) {
+      if (after->mIsSentinel != 0u || TextureOwnerBefore(texture, after->mBucket.mTexture)) {
         return (hint->mRight->mIsSentinel != 0u) ? AttachCommandGraphNodeAt(tree, false, hint, texture)
                                                  : AttachCommandGraphNodeAt(tree, true, after, texture);
       }
@@ -711,12 +655,12 @@ namespace moho
    */
   fa::vector<UICommandGraph::CommandGraphEdge*>& UICommandGraph::FindOrInsertCommandGraphBucket(
     CommandGraphTree& tree,
-    const boost::SharedPtrRaw<ID3DTextureSheet>& texture
+    const boost::shared_ptr<ID3DTextureSheet>& texture
   )
   {
     CommandGraphTreeNode* candidate = tree.mHead;
     for (CommandGraphTreeNode* node = tree.mHead->mParent; node->mIsSentinel == 0u;) {
-      if (texture.pi <= node->mBucket.mTexture.pi) {
+      if (!TextureOwnerBefore(node->mBucket.mTexture, texture)) {
         candidate = node;
         node = node->mLeft;
       } else {
@@ -724,7 +668,7 @@ namespace moho
       }
     }
 
-    if (candidate != tree.mHead && !(texture.pi < candidate->mBucket.mTexture.pi)) {
+    if (candidate != tree.mHead && !(TextureOwnerBefore(texture, candidate->mBucket.mTexture))) {
       return candidate->mBucket.mEdges;
     }
 
@@ -1443,9 +1387,7 @@ namespace moho
     const auto commandType = ResolveCommandIssueHelperCommandType(*helper);
     const CommandGraphNode& node = mNodes[static_cast<std::size_t>(commandType)];
 
-    boost::shared_ptr<CD3DBatchTexture> texture = boost::SharedPtrFromRawRetained(
-      reinterpret_cast<const boost::SharedPtrRaw<CD3DBatchTexture>&>(node.mWaypointTexture)
-    );
+    boost::shared_ptr<CD3DBatchTexture> texture = node.mWaypointTexture;
 
     std::uint32_t color = 0;
     float styleScale = 0.0f;
@@ -1969,7 +1911,7 @@ namespace moho
          node != nullptr && node != mCommandGraphTree.mHead;
          node = NextTreeNode(node)) {
       CommandGraphTreeBucket& bucket = node->mBucket;
-      batcher.SetTexture(boost::SharedPtrFromRawRetained(bucket.mTexture));
+      batcher.SetTexture(bucket.mTexture);
       for (CommandGraphEdge* const edge : bucket.mEdges) {
         DrawCommandOrderline(camera, batcher, tick, tickFraction, *edge, /*isGlow=*/false);
       }
@@ -1983,7 +1925,7 @@ namespace moho
          node != nullptr && node != mCommandGraphTree.mHead;
          node = NextTreeNode(node)) {
       CommandGraphTreeBucket& bucket = node->mBucket;
-      batcher.SetTexture(boost::SharedPtrFromRawRetained(bucket.mTexture));
+      batcher.SetTexture(bucket.mTexture);
       for (CommandGraphEdge* const edge : bucket.mEdges) {
         DrawCommandOrderline(camera, batcher, tick, tickFraction, *edge, /*isGlow=*/true);
       }
@@ -2214,17 +2156,14 @@ namespace moho
     const ERuleBPUnitCommandCaps caps = (commandData.mMode == COMMOD_Order) ? commandData.mCommandCaps : RULEUCC_Move;
     UICommandGraph::CommandGraphNode& node = graph.mNodes[static_cast<std::size_t>(UnitCommandCapToCommandType(caps))];
 
-    if (node.mOrderlineTexture.px != nullptr) {
-      batcher.SetTexture(
-        boost::SharedPtrFromRawRetained(
-          reinterpret_cast<const boost::SharedPtrRaw<CD3DBatchTexture>&>(node.mOrderlineTexture)
-        )
-      );
+    if (node.mOrderlineTexture.get() != nullptr) {
+      // 0x0082A991..0x0082A9B5: the orderline sheet goes by value to the sheet overload of SetTexture (0x00438870).
+      batcher.SetTexture(node.mOrderlineTexture);
     } else {
       batcher.SetTexture(CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu));
     }
 
-    const bool hasArrowhead = node.mArrowheadTexture.px != nullptr;
+    const bool hasArrowhead = node.mArrowheadTexture.get() != nullptr;
     const float uStart = 1.0f - fa::fmod((static_cast<double>(tick) + tickFraction) * node.mOrderlineAnimRate, 1.0);
 
     for (auto it = simplifiedPath.begin(); it != simplifiedPath.end(); ++it) {
@@ -2286,11 +2225,7 @@ namespace moho
       if (isLastSegment && hasArrowhead) {
         const float capOffset = (finalWidth / capDivisor) * node.mArrowheadCapOffset;
         batcher.Flush();
-        batcher.SetTexture(
-          boost::SharedPtrFromRawRetained(
-            reinterpret_cast<const boost::SharedPtrRaw<CD3DBatchTexture>&>(node.mArrowheadTexture)
-          )
-        );
+        batcher.SetTexture(node.mArrowheadTexture);
 
         Wm3::Vector3f direction{p1.x - p0.x, p1.y - p0.y, p1.z - p0.z};
         direction.Normalize();
@@ -2813,13 +2748,10 @@ namespace moho
       const auto commandType = ResolveCommandIssueHelperCommandType(*helper);
       const UICommandGraph::CommandGraphNode& style = graph.mNodes[static_cast<std::size_t>(commandType)];
 
-      const boost::shared_ptr<ID3DTextureSheet> texture = boost::SharedPtrFromRawRetained(
-        reinterpret_cast<const boost::SharedPtrRaw<ID3DTextureSheet>&>(style.mOrderlineTexture)
-      );
+      const boost::shared_ptr<ID3DTextureSheet>& texture = style.mOrderlineTexture;
       if (texture) {
-        fa::vector<UICommandGraph::CommandGraphEdge*>& bucket = UICommandGraph::FindOrInsertCommandGraphBucket(
-          graph.mCommandGraphTree, boost::SharedPtrRawFromSharedBorrow(texture)
-        );
+        fa::vector<UICommandGraph::CommandGraphEdge*>& bucket =
+          UICommandGraph::FindOrInsertCommandGraphBucket(graph.mCommandGraphTree, texture);
         bucket.push_back(edge);
       }
     }

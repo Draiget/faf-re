@@ -90,10 +90,10 @@ namespace moho
     float mCachedFresnelPower = 0.0F;                            // +0x10
     float mCachedSunShininess = 0.0F;                            // +0x14
     float mCachedSunReflectionAmount = 0.0F;                     // +0x18
-    boost::SharedPtrRaw<ID3DTextureSheet> mFresnelLookupTexture; // +0x1C
+    boost::shared_ptr<ID3DTextureSheet> mFresnelLookupTexture;   // +0x1C
     CD3DVertexSheet* mVertexSheet = nullptr;                     // +0x24
     CD3DIndexSheet* mIndexSheet = nullptr;                       // +0x28
-    boost::SharedPtrRaw<ID3DTextureSheet> mWaterMapTexture;      // +0x2C
+    boost::shared_ptr<ID3DTextureSheet> mWaterMapTexture;        // +0x2C
   };
 
   static_assert(offsetof(HighFidelityWater, mTerrainRes) == 0x04, "HighFidelityWater::mTerrainRes offset must be 0x04");

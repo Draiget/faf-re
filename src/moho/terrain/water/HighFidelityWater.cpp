@@ -249,10 +249,10 @@ namespace moho
    */
   void HighFidelityWater::Destroy()
   {
-    mFresnelLookupTexture.release();
+    mFresnelLookupTexture.reset();
     DeleteOwned(mVertexSheet);
     DeleteOwned(mIndexSheet);
-    mWaterMapTexture.release();
+    mWaterMapTexture.reset();
     mTerrainRes = nullptr;
   }
 
@@ -339,14 +339,12 @@ namespace moho
     if (
       mCachedFresnelBias != shaderState.mFresnelBias || mCachedFresnelPower != shaderState.mFresnelPower ||
       mCachedSunShininess != shaderState.mSunShininess ||
-      mCachedSunReflectionAmount != shaderState.mSunReflectionAmount || mFresnelLookupTexture.px == nullptr
+      mCachedSunReflectionAmount != shaderState.mSunReflectionAmount || mFresnelLookupTexture.get() == nullptr
     ) {
       const auto fresnelLookupTexture = BuildFresnelLookupTexture(
         shaderState.mFresnelBias, shaderState.mFresnelPower, shaderState.mSunShininess, shaderState.mSunReflectionAmount
       );
-      const boost::shared_ptr<ID3DTextureSheet> fresnelBaseTexture =
-        boost::static_pointer_cast<ID3DTextureSheet>(fresnelLookupTexture);
-      mFresnelLookupTexture.assign_retain(boost::SharedPtrRawFromSharedBorrow(fresnelBaseTexture));
+      mFresnelLookupTexture = boost::static_pointer_cast<ID3DTextureSheet>(fresnelLookupTexture);
 
       mCachedFresnelBias = shaderState.mFresnelBias;
       mCachedFresnelPower = shaderState.mFresnelPower;
@@ -354,7 +352,7 @@ namespace moho
       mCachedSunReflectionAmount = shaderState.mSunReflectionAmount;
     }
 
-    BindTextureShaderVar(GetWater2FresnelLookupShaderVar(), boost::SharedPtrFromRawRetained(mFresnelLookupTexture));
+    BindTextureShaderVar(GetWater2FresnelLookupShaderVar(), mFresnelLookupTexture);
 
     SetShaderVarMem(GetWater2WaterColorShaderVar(), 3U, shaderState.mWaterColor);
     SetShaderVarMem(GetWater2WaterLerpShaderVar(), 2U, shaderState.mWaterLerp);

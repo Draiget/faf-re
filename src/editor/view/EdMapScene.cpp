@@ -1284,8 +1284,7 @@ namespace faf::editor
       if (path != material.mPath.c_str()) {
         material.mPath.assign(path.c_str());
         // Dropped, so SetSize loads the new file.
-        material.mTextureSheet.release();
-        material.mTextureSheet = {};
+        material.mTextureSheet.reset();
       }
       material.mSize = size > 0.0f ? size : 1.0f;
     };
@@ -1324,9 +1323,7 @@ namespace faf::editor
       boost::shared_ptr<moho::RD3DTextureResource> sheet(
         new moho::RD3DTextureResource("editor:material", const_cast<std::uint8_t*>(bytes.data()), bytes.size())
       );
-      material.mTextureSheet.release();
-      material.mTextureSheet = {};
-      material.mTextureSheet.assign_retain(boost::SharedPtrRawFromSharedBorrow(sheet));
+      material.mTextureSheet = sheet;
       if (material.mPath.empty() && material.mSize <= 1.0f) {
         material.mSize = emptySize;
       }
@@ -1348,8 +1345,7 @@ namespace faf::editor
     moho::StratumMaterial& strata = mMap->mTerrainRes->GetStratumMaterial();
     for (const bool normals : {false, true}) {
       moho::CStratumMaterial& material = SlotMaterial(strata, slot, normals);
-      material.mTextureSheet.release();
-      material.mTextureSheet = {};
+      material.mTextureSheet.reset();
     }
     // Loads the files the slot names again (StratumMaterial::SetSizeTo).
     strata.SetSizeTo(mMap->mTerrainRes);

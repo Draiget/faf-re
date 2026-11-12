@@ -66,30 +66,6 @@ namespace
   static_assert(sizeof(TerrainNormalEncodeBlock) == 0x20, "TerrainNormalEncodeBlock size must be 0x20");
 
   /**
-   * Adopt a device-resources texture-sheet handle into the water-map slot.
-   *
-   * The binary (FUN_008A1700, water-map block) copies the returned handle's
-   * `(sheet, count.pi_)` pair straight into `mWaterMapTexture`, reinterpreting
-   * the `RD3DTextureResource*` payload as the same `CD3DDynamicTextureSheet`
-   * object (they are the one DDS sheet, only modelled under two names). This
-   * helper performs that identical refcount-preserving raw copy through the
-   * SharedPtrRaw machinery so no open `{px,pi}` arithmetic leaks into Load.
-   */
-  [[maybe_unused]] void AdoptWaterMapSheetFromResource(
-    boost::shared_ptr<moho::CD3DDynamicTextureSheet>& waterMap,
-    const moho::ID3DDeviceResources::TextureResourceHandle& sheet
-  ) noexcept
-  {
-    const boost::SharedPtrRaw<moho::RD3DTextureResource> sourceBorrow = boost::SharedPtrRawFromSharedBorrow(sheet);
-
-    boost::SharedPtrRaw<moho::CD3DDynamicTextureSheet> reinterpreted{};
-    reinterpreted.px = reinterpret_cast<moho::CD3DDynamicTextureSheet*>(sourceBorrow.px);
-    reinterpreted.pi = sourceBorrow.pi;
-
-    waterMap = boost::SharedPtrFromRawRetained(reinterpreted);
-  }
-
-  /**
    * Address: 0x008915F0 (FUN_008915F0, sub_8915F0)
    *
    * What it does:

@@ -122,13 +122,13 @@ namespace moho
     const TextureAtlasEntry& rhs
   ) const noexcept
   {
-    const boost::SharedPtrRaw<CD3DBatchTexture> lhsRaw = boost::SharedPtrRawFromSharedBorrow(lhs.mTexture);
-    const boost::SharedPtrRaw<CD3DBatchTexture> rhsRaw = boost::SharedPtrRawFromSharedBorrow(rhs.mTexture);
-
-    if (lhsRaw.pi == rhsRaw.pi) {
-      return lhsRaw.px < rhsRaw.px;
+    // `boost::shared_ptr`'s `operator<` is this Boost's owner order (control-block pointers).
+    const bool lhsOwnerFirst = lhs.mTexture < rhs.mTexture;
+    const bool rhsOwnerFirst = rhs.mTexture < lhs.mTexture;
+    if (!lhsOwnerFirst && !rhsOwnerFirst) {
+      return lhs.mTexture.get() < rhs.mTexture.get();
     }
-    return lhsRaw.pi < rhsRaw.pi;
+    return lhsOwnerFirst;
   }
 
   /**

@@ -15,7 +15,7 @@ namespace moho
   class CAnimTexture final : public CountedObject
   {
   public:
-    using FrameRef = boost::SharedPtrRaw<ID3DTextureSheet>;
+    using FrameRef = boost::shared_ptr<ID3DTextureSheet>;
 
     /**
      * Address: 0x00422D20 (FUN_00422D20)
@@ -48,8 +48,8 @@ namespace moho
      * Address: 0x00423190 (FUN_00423190)
      *
      * What it does:
-     * Samples a frame pointer by positive-wrapped frame index and returns an intrusive
-     * `SharedPtrRaw` copy (`pi` refcount retained on success).
+     * Samples a frame by positive-wrapped frame index and returns a shared copy of it (empty when there is no
+     * frame at that index).
      */
     void GetFrameAt(FrameRef& outFrame, float frameIndex) const;
 

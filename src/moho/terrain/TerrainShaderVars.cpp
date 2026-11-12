@@ -118,15 +118,6 @@ namespace moho
     shaderVar.GetTexture(textureSheet);
   }
 
-  void BindTextureShaderVar(
-    ShaderVar& shaderVar,
-    const boost::SharedPtrRaw<RD3DTextureResource>& textureResource
-  )
-  {
-    const boost::shared_ptr<RD3DTextureResource> retainedTexture = boost::SharedPtrFromRawRetained(textureResource);
-    BindTextureShaderVar(shaderVar, boost::static_pointer_cast<ID3DTextureSheet>(retainedTexture));
-  }
-
   void SetShaderVarMem(
     ShaderVar& shaderVar,
     const std::uint32_t floatCount,
