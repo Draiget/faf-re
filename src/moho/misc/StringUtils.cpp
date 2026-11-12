@@ -7,25 +7,6 @@
 #include "legacy/containers/String.h"
 using namespace moho;
 
-void moho::TrimRange(
-  const char* s,
-  const size_t n,
-  const char*& outBegin,
-  const char*& outEnd
-)
-{
-  const char* b = s;
-  const char* e = s + n;
-  while (b < e && gpg::STR_IsAsciiWhitespace(*b)) {
-    ++b;
-  }
-  while (e > b && gpg::STR_IsAsciiWhitespace(e[-1])) {
-    --e;
-  }
-  outBegin = b;
-  outEnd = e;
-}
-
 fa::string moho::Join(
   const fa::vector<fa::string>& items,
   const char* sep

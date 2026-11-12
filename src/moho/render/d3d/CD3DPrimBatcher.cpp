@@ -814,33 +814,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0043A060 (?AddIndexedVert@CD3DPrimBatcher@Moho@@AAEGGPBUVertex@12@IAAV?$fastvector@G@gpg@@@Z)
-   *
-   * What it does:
-   * Maps one source index through the per-batch remap table and appends one
-   * transformed vertex only for unmapped indices.
-   */
-  std::uint16_t CD3DPrimBatcher::AddIndexedVert(
-    const std::uint16_t sourceIndex,
-    const Vertex* const sourceVertices,
-    gpg::fastvector<std::uint16_t>& remap
-  )
-  {
-    const std::uint16_t cachedIndex = remap[sourceIndex];
-    if (cachedIndex != kUnmappedIndexedVertex) {
-      return cachedIndex;
-    }
-
-    auto* const runtime = this;
-    const std::uint16_t mappedIndex = static_cast<std::uint16_t>(runtime->mVertices.size());
-
-    runtime->mVertices.push_back(BuildTransformedVertex(*runtime, sourceVertices[sourceIndex]));
-
-    remap[sourceIndex] = mappedIndex;
-    return mappedIndex;
-  }
-
-  /**
    * Address: 0x0043A140 (?Flush@CD3DPrimBatcher@Moho@@QAEXXZ)
    *
    * What it does:

@@ -1655,29 +1655,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0071ED10 (FUN_0071ED10)
-   *
-   * What it does:
-   * Assigns one initialized `InfluenceGrid` from another by replacing entry-map
-   * and per-army threat-vector contents, then copying aggregate threat and decay
-   * lanes. Preserves self-assignment semantics.
-   */
-  InfluenceGrid& AssignInfluenceGridValue(
-    InfluenceGrid& destination,
-    const InfluenceGrid& source
-  )
-  {
-    if (&destination != &source) {
-      destination.entries = source.entries;
-      destination.threats = source.threats;
-    }
-
-    destination.threat = source.threat;
-    destination.decay = source.decay;
-    return destination;
-  }
-
-  /**
    * Address: 0x0071D4B0 (FUN_0071D4B0, func_NewArray_SThreat)
    *
    * What it does:

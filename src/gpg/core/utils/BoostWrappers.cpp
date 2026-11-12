@@ -340,60 +340,6 @@ namespace boost
     }
   }
 
-  /**
-   * Address: 0x00446F30 (FUN_00446F30)
-   *
-   * What it does:
-   * Attempts to acquire one shared-owner reference only when the current
-   * use-count is non-zero.
-   */
-  bool SpCountedBaseAddRefLock(
-    detail::sp_counted_base* const control
-  ) noexcept
-  {
-    return control != nullptr && control->add_ref_lock();
-  }
-
-  /**
-   * Address: 0x00446F70 (FUN_00446F70)
-   *
-   * What it does:
-   * Atomically increments one weak-count lane.
-   *
-   * The body is `add ecx, 8; mov eax, 1; lock xadd [ecx], eax; ret` - the
-   * BOOST_INTERLOCKED_INCREMENT(&weak_count_) that `sp_counted_base::
-   * weak_add_ref()` compiles to, with `weak_count_` at +0x08. The old value
-   * left in EAX is the xadd's register residue, not a return: boost's
-   * `weak_add_ref()` is void, and none of this function's callers ever read
-   * it. So it dispatches to the member instead of reaching past it.
-   */
-  void SpCountedBaseWeakAddRef(
-    detail::sp_counted_base* const control
-  ) noexcept
-  {
-    if (control == nullptr) {
-      return;
-    }
-
-    control->weak_add_ref();
-  }
-
-  /**
-   * Address: 0x0044DDD0 (FUN_0044DDD0, throw_BadWeakPtrException)
-   *
-   * IDA signature:
-   * void __cdecl __noreturn throw_BadWeakPtrException(std::exception *a1);
-   *
-   * What it does:
-   * Raises `boost::bad_weak_ptr`. The binary factors the throw out of the
-   * weak-construct path into this one no-return helper, which builds the
-   * exception object and hands it to _CxxThrowException.
-   */
-  [[noreturn]] void ThrowBadWeakPtr()
-  {
-    throw boost::bad_weak_ptr();
-  }
-
   namespace
   {
     [[noreturn]] void ThrowBadPointerForNullPushBack()

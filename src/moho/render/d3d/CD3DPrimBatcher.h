@@ -238,15 +238,6 @@ namespace moho
      */
     void AddVerts(const Vertex* sourceVertices, std::uint32_t primitiveCount, std::uint32_t verticesPerPrimitive);
 
-    /**
-     * Address: 0x0043A060 (?AddIndexedVert@CD3DPrimBatcher@Moho@@AAEGGPBUVertex@12@IAAV?$fastvector@G@gpg@@@Z)
-     *
-     * What it does:
-     * Maps one source vertex index through a remap table, appending transformed vertex data on first use.
-     */
-    std::uint16_t
-    AddIndexedVert(std::uint16_t sourceIndex, const Vertex* sourceVertices, gpg::fastvector<std::uint16_t>& remap);
-
   public:
     // Offsets proven from the binary:
     //   0x00438331 (constructor) `mov [ebx], eax` stores the texture batcher at +0x00.

@@ -13,10 +13,6 @@ namespace fa
 
 namespace moho
 {
-  /**
-   * Trim leading/trailing ASCII spaces; returns [outBegin,outEnd).
-   */
-  void TrimRange(const char* s, size_t n, const char*& outBegin, const char*& outEnd);
 
   /**
    * Join strings with a separator.

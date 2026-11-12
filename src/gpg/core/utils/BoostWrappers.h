@@ -1635,32 +1635,6 @@ namespace boost
   }
 
   /**
-   * Address: 0x00446F30 (FUN_00446F30)
-   *
-   * What it does:
-   * Attempts to acquire one shared-owner reference only when the current
-   * use-count is non-zero.
-   */
-  [[nodiscard]] bool SpCountedBaseAddRefLock(detail::sp_counted_base* control) noexcept;
-
-  /**
-   * Address: 0x00446F70 (FUN_00446F70)
-   *
-   * What it does:
-   * Atomically increments one weak-count lane and returns the previous value.
-   */
-  void SpCountedBaseWeakAddRef(detail::sp_counted_base* control) noexcept;
-
-  /**
-   * Address: 0x0044DDD0 (FUN_0044DDD0, throw_BadWeakPtrException)
-   *
-   * What it does:
-   * Raises `boost::bad_weak_ptr`; the binary factors this throw out of the
-   * weak-construct path into one no-return helper.
-   */
-  [[noreturn]] void ThrowBadWeakPtr();
-
-  /**
    * Address: 0x004DBBC0 (FUN_004DBBC0)
    *
    * What it does:
