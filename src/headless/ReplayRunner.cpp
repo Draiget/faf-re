@@ -844,8 +844,7 @@ namespace faf::headless
       }
     }
     CReplayEffectOps effectOps; // plan WP9.1
-    if (!options.effectOpsPath.empty() && !effectOps.Open(options.effectOpsPath)) {
-      result.error = "cannot write " + options.effectOpsPath;
+    if (!effectOps.Open(options.effectOpsPath, options.effectRecordPath, result.error)) {
       return result;
     }
 #if FAF_SERVER_MODE

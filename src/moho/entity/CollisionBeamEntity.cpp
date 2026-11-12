@@ -387,7 +387,10 @@ namespace moho
 
     if (IEffect* const beamEffect = mEffect.GetObjectPtr(); beamEffect != nullptr) {
       constexpr std::int32_t kBeamLengthParam = 6;
-      moho::EFFECT_Op(moho::EEffectOp::SetFloat, beamEffect); // plan WP9.1
+      moho::EFFECT_Op(
+        moho::EEffectOp::SetFloat,
+        {.effect = beamEffect, .param = kBeamLengthParam, .values = &beam.mBeamLength, .valueCount = 1}
+      ); // plan WP9.1
       beamEffect->SetFloatParam(kBeamLengthParam, beam.mBeamLength);
     }
 

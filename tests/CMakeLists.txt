@@ -91,6 +91,15 @@ set_target_properties(faf_effect_scan_tests PROPERTIES FOLDER "Tests/Existing")
 add_test(NAME effect_scan COMMAND faf_effect_scan_tests)
 set_tests_properties(effect_scan PROPERTIES LABELS "Existing")
 
+# Engine addition (dedicated-server plan WP9.1): headless's encoder of the sim's effect operations.
+add_executable(faf_effect_op_encoder_tests EXCLUDE_FROM_ALL headless/EffectOpEncoderTests.cpp
+  ${CMAKE_SOURCE_DIR}/src/headless/EffectOpEncoder.cpp)
+target_include_directories(faf_effect_op_encoder_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(faf_effect_op_encoder_tests PRIVATE gtest_main)
+set_target_properties(faf_effect_op_encoder_tests PROPERTIES FOLDER "Tests/Headless")
+add_test(NAME effect_op_encoder COMMAND faf_effect_op_encoder_tests)
+set_tests_properties(effect_op_encoder PROPERTIES LABELS "Headless")
+
 # Engine addition: where UserDecal:SetOrientation puts a decal's corner so it stays centred.
 add_executable(faf_scripted_decal_tests EXCLUDE_FROM_ALL scripted_decal/PlacementTests.cpp)
 target_include_directories(faf_scripted_decal_tests PRIVATE ${CMAKE_SOURCE_DIR}/src)

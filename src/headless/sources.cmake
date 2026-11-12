@@ -31,6 +31,7 @@ set(FAF_HEADLESS_SOURCES
   headless/ReplaySyncWriters.cpp
   headless/ReplayWireStats.cpp
   headless/ReplayEffectOps.cpp
+  headless/EffectOpEncoder.cpp
 )
 
 set(FAF_HEADLESS_SERVER_SOURCES

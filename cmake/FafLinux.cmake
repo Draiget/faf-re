@@ -483,6 +483,8 @@ endfunction()
 _faf_linux_portable_test(faf_shadow_fit_tests shadow_stable_fit tests/render/ShadowStableFitTests.cpp)
 _faf_linux_portable_test(faf_scripted_decal_tests scripted_decal_placement tests/scripted_decal/PlacementTests.cpp)
 _faf_linux_portable_test(faf_effect_scan_tests effect_scan tests/effect_scan/EffectScanTests.cpp)
+_faf_linux_portable_test(faf_effect_op_encoder_tests effect_op_encoder
+  tests/headless/EffectOpEncoderTests.cpp src/headless/EffectOpEncoder.cpp)
 _faf_linux_portable_test(faf_texture_quality_tests texture_quality tests/image_codec/TextureQualityTests.cpp)
 _faf_linux_portable_test(faf_profiler_tests profiler_facade tests/profiling/ProfilerFacadeTests.cpp)
 _faf_linux_portable_test(faf_sfd_parser_tests sfd_header_parser
