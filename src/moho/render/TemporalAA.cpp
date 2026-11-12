@@ -1,6 +1,5 @@
 #include "moho/render/TemporalAA.h"
 
-#include "moho/render/BoundDepthSupport.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -11,6 +10,7 @@
 #include "gpg/gal/GpuDriven.h"
 #include "moho/console/CConCommand.h"
 #include "moho/math/VMatrix4.h"
+#include "moho/render/BoundDepthSupport.h"
 #include "moho/render/TemporalAAShader.h"
 
 namespace moho
@@ -24,6 +24,7 @@ namespace moho
   int ren_Taa = 0;
   float ren_TaaHistory = 0.9f;
   float ren_RenderScale = 1.0f;
+  int ren_TaaReject = 1;
 
   namespace
   {
@@ -39,6 +40,14 @@ namespace moho
       "ren_TaaHistory",
       "ren_Taa: how much of the last frames a pixel keeps, 0 to 0.97 (0.9 the default); more is smoother and softer.",
       &ren_TaaHistory
+    );
+
+    TConVar<int> gTConVar_ren_TaaReject(
+      "ren_TaaReject",
+      "ren_Taa: where the point a pixel shows was at another distance from the camera in the last frame (a unit moved "
+      "away from it or onto it), the last frames are not blended in there, so moving units leave no trail. 1 on (the "
+      "default), 0 off.",
+      &ren_TaaReject
     );
 
     TConVar<float> gTConVar_ren_RenderScale(
@@ -57,8 +66,9 @@ namespace moho
       float params[4];
       float lowRect[4];
       float jitter[4];
+      float viewW[4];
     };
-    static_assert(sizeof(TaaConstants) == 192, "TaaConstants matches the shader's cbuffer");
+    static_assert(sizeof(TaaConstants) == 208, "TaaConstants matches the shader's cbuffer");
 
     /** The radical inverse of `index` in `base`: the Halton sequence, 0 to 1. */
     [[nodiscard]] float Halton(
@@ -103,6 +113,8 @@ namespace moho
       mCompositeAlpha.reset();
       mHistory[0].reset();
       mHistory[1].reset();
+      mHistoryDistance[0].reset();
+      mHistoryDistance[1].reset();
       mHistoryCapacity = 0U;
       mHistoryValid = false;
       constexpr std::uint32_t kNeeded = gpg::gal::kGpuFeatureVertexPulling | gpg::gal::kGpuFeatureCompute;
@@ -222,18 +234,25 @@ namespace moho
       return false;
     }
     const std::uint32_t needed = static_cast<std::uint32_t>(width) * static_cast<std::uint32_t>(height);
-    if (mHistory[0] != nullptr && mHistory[1] != nullptr && needed <= mHistoryCapacity) {
+    const auto allMade = [this] {
+      return mHistory[0] != nullptr && mHistory[1] != nullptr && mHistoryDistance[0] != nullptr &&
+        mHistoryDistance[1] != nullptr;
+    };
+    if (allMade() && needed <= mHistoryCapacity) {
       return true;
     }
-    for (boost::shared_ptr<gpg::gal::GpuBuffer>& history : mHistory) {
+    for (int index = 0; index < 2; ++index) {
       gpg::gal::GpuBufferDesc desc{};
       desc.name = "TemporalAAHistory";
       desc.stride = 4U * sizeof(float);
       desc.capacity = needed;
       desc.shaderWrite = true;
-      history = mDevice->CreateGpuBuffer(desc);
+      mHistory[index] = mDevice->CreateGpuBuffer(desc);
+      desc.name = "TemporalAAHistoryDistance";
+      desc.stride = sizeof(float);
+      mHistoryDistance[index] = mDevice->CreateGpuBuffer(desc);
     }
-    mHistoryCapacity = (mHistory[0] != nullptr && mHistory[1] != nullptr) ? needed : 0U;
+    mHistoryCapacity = allMade() ? needed : 0U;
     mHistoryValid = false;
     return mHistoryCapacity != 0U;
   }
@@ -282,6 +301,12 @@ namespace moho
     constants.lowRect[3] = static_cast<float>(std::min(mLowHeight, height));
     constants.jitter[0] = mJitterPixels[0];
     constants.jitter[1] = mJitterPixels[1];
+    constants.jitter[2] = (ren_TaaReject > 0) ? 1.0f : 0.0f;
+    // Row vectors: clip w = x * m[0].w + y * m[1].w + z * m[2].w + m[3].w.
+    constants.viewW[0] = mViewProjection.r[0].w;
+    constants.viewW[1] = mViewProjection.r[1].w;
+    constants.viewW[2] = mViewProjection.r[2].w;
+    constants.viewW[3] = mViewProjection.r[3].w;
 
     const int read = mCurrent;
     const int write = 1 - mCurrent;
@@ -290,7 +315,9 @@ namespace moho
     dispatch.bindings.constants = &constants;
     dispatch.bindings.constantBytes = sizeof(constants);
     dispatch.bindings.readBuffers[0] = mHistory[read].get();
+    dispatch.bindings.readBuffers[1] = mHistoryDistance[read].get();
     dispatch.bindings.writeBuffers[0] = mHistory[write].get();
+    dispatch.bindings.writeBuffers[1] = mHistoryDistance[write].get();
     dispatch.bindings.targets[0] = &copy;
     dispatch.bindings.readBoundDepth = true;
     dispatch.groupsX = (static_cast<std::uint32_t>(width) + 7U) / 8U;

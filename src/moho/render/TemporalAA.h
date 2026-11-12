@@ -91,6 +91,7 @@ namespace moho
     boost::shared_ptr<gpg::gal::GpuProgram> mComposite;
     boost::shared_ptr<gpg::gal::GpuProgram> mCompositeAlpha; // writes alpha too (ren_RenderScale under 1)
     boost::shared_ptr<gpg::gal::GpuBuffer> mHistory[2];
+    boost::shared_ptr<gpg::gal::GpuBuffer> mHistoryDistance[2]; // each pixel's distance along the view (ren_TaaReject)
     std::uint32_t mHistoryCapacity = 0U;
     int mHistoryWidth = 0;
     int mHistoryHeight = 0;
