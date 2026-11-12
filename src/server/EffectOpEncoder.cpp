@@ -1,8 +1,8 @@
-#include "headless/EffectOpEncoder.h"
+#include "server/EffectOpEncoder.h"
 
 #include <cstring>
 
-namespace faf::headless
+namespace faf::server
 {
   using moho::EEffectOp;
 
@@ -37,19 +37,20 @@ namespace faf::headless
     return total;
   }
 
-  CEffectOpEncoder::SNameRef CEffectOpEncoder::Resolve(
+  std::uint32_t CEffectOpEncoder::Resolve(
     SNameTable& table,
     const char* const name
   )
   {
     if (name == nullptr) {
-      return {};
+      return 0u;
     }
     const auto [it, inserted] = table.indices.try_emplace(name, static_cast<std::uint32_t>(table.texts.size()));
     if (inserted) {
       table.texts.emplace_back(name);
+      table.beatUsed.push_back(0u);
     }
-    return {it->second + 1u, inserted};
+    return it->second + 1u;
   }
 
   void CEffectOpEncoder::Record(
@@ -125,138 +126,184 @@ namespace faf::headless
   }
 
   void CEffectOpEncoder::EncodeName(
-    const SNameTable& table,
-    const SNameRef ref
+    SEffectBeat& beat,
+    SNameTable& table,
+    const EEffectNameTable which,
+    const std::uint32_t ref
   )
   {
-    AppendVarint(mBytes, ref.ref);
-    if (ref.fresh) {
-      const std::string& text = table.texts[ref.ref - 1u];
-      AppendVarint(mBytes, static_cast<std::uint32_t>(text.size()));
-      mBytes.insert(mBytes.end(), text.begin(), text.end());
+    AppendVarint(beat.ops, ref);
+    if (ref == 0u) {
+      return;
+    }
+    const std::uint32_t entry = ref - 1u;
+    if (table.beatUsed[entry] != mBeatSerial) {
+      table.beatUsed[entry] = mBeatSerial;
+      beat.names.push_back(SEffectBeatName{which, entry, &table.texts[entry]});
     }
   }
 
   void CEffectOpEncoder::EncodeInt(
+    std::vector<std::uint8_t>& out,
     const std::int32_t value
   )
   {
-    AppendVarint(mBytes, static_cast<std::uint32_t>(value) + 1u);
+    AppendVarint(out, static_cast<std::uint32_t>(value) + 1u);
   }
 
   void CEffectOpEncoder::EncodeFloats(
+    std::vector<std::uint8_t>& out,
     const SPending& pending,
     const std::uint32_t fixedCount
-  )
+  ) const
   {
     // fixedCount 0: a variable count, sent first. Otherwise exactly that many, missing ones as 0.
     const std::uint32_t count = fixedCount != 0u ? fixedCount : pending.floatCount;
     if (fixedCount == 0u) {
-      AppendVarint(mBytes, count);
+      AppendVarint(out, count);
     }
     for (std::uint32_t i = 0; i < count; ++i) {
       const float value = i < pending.floatCount ? mFloats[pending.floatOffset + i] : 0.0f;
       std::uint32_t bits = 0;
       std::memcpy(&bits, &value, sizeof(bits));
       for (int shift = 0; shift < 32; shift += 8) {
-        mBytes.push_back(static_cast<std::uint8_t>(bits >> shift));
+        out.push_back(static_cast<std::uint8_t>(bits >> shift));
       }
     }
   }
 
-  CEffectOpEncoder::SBeat CEffectOpEncoder::EndBeat()
+  SEffectBeat CEffectOpEncoder::EndBeat()
   {
-    SBeat beat;
-    mBytes.clear();
+    SEffectBeat beat;
+    ++mBeatSerial;
+    std::vector<std::uint8_t>& out = beat.ops;
     for (const SPending& pending : mPending) {
       if (pending.dead) {
         continue;
       }
-      const std::size_t start = mBytes.size();
-      mBytes.push_back(static_cast<std::uint8_t>(pending.op));
+      const std::size_t start = out.size();
+      out.push_back(static_cast<std::uint8_t>(pending.op));
       if (pending.op != EEffectOp::CreateLightParticle) {
-        AppendVarint(mBytes, pending.id);
+        AppendVarint(out, pending.id);
       }
       switch (pending.op) {
       case EEffectOp::CreateEmitter:
-        EncodeName(mBlueprints, pending.blueprint);
-        EncodeInt(pending.army);
-        EncodeFloats(pending, 3u);
+        EncodeName(beat, mBlueprints, EEffectNameTable::Blueprints, pending.blueprint);
+        EncodeInt(out, pending.army);
+        EncodeFloats(out, pending, 3u);
         break;
       case EEffectOp::CreateAttachedEmitter:
       case EEffectOp::CreateEmitterAtBone:
       case EEffectOp::CreateTrail:
-        EncodeInt(pending.entity);
-        EncodeInt(pending.bone);
-        EncodeName(mBlueprints, pending.blueprint);
-        EncodeInt(pending.army);
+        EncodeInt(out, pending.entity);
+        EncodeInt(out, pending.bone);
+        EncodeName(beat, mBlueprints, EEffectNameTable::Blueprints, pending.blueprint);
+        EncodeInt(out, pending.army);
         break;
       case EEffectOp::CreateEmitterAtEntity:
       case EEffectOp::CreateEmitterOnEntity:
-        EncodeInt(pending.entity);
-        EncodeName(mBlueprints, pending.blueprint);
-        EncodeInt(pending.army);
+        EncodeInt(out, pending.entity);
+        EncodeName(beat, mBlueprints, EEffectNameTable::Blueprints, pending.blueprint);
+        EncodeInt(out, pending.army);
         break;
       case EEffectOp::CreateBeam:
-        EncodeName(mBlueprints, pending.blueprint);
-        if (pending.blueprint.ref == 0u) {
+        EncodeName(beat, mBlueprints, EEffectNameTable::Blueprints, pending.blueprint);
+        if (pending.blueprint == 0u) {
           // A beam from create parameters: attachment, texture, blend mode, then its floats.
-          EncodeInt(pending.entity);
-          EncodeInt(pending.bone);
-          EncodeInt(pending.army);
-          EncodeName(mTextures, pending.texture);
-          EncodeInt(pending.param);
-          EncodeFloats(pending, 0u);
+          EncodeInt(out, pending.entity);
+          EncodeInt(out, pending.bone);
+          EncodeInt(out, pending.army);
+          EncodeName(beat, mTextures, EEffectNameTable::Textures, pending.texture);
+          EncodeInt(out, pending.param);
+          EncodeFloats(out, pending, 0u);
         } else {
-          EncodeInt(pending.army);
+          EncodeInt(out, pending.army);
         }
         break;
       case EEffectOp::CreateBeamEntityToEntity:
       case EEffectOp::AttachBeamEntityToEntity:
-        EncodeInt(pending.entity);
-        EncodeInt(pending.bone);
-        EncodeInt(pending.entity2);
-        EncodeInt(pending.bone2);
-        EncodeName(mBlueprints, pending.blueprint);
-        EncodeInt(pending.army);
+        EncodeInt(out, pending.entity);
+        EncodeInt(out, pending.bone);
+        EncodeInt(out, pending.entity2);
+        EncodeInt(out, pending.bone2);
+        EncodeName(beat, mBlueprints, EEffectNameTable::Blueprints, pending.blueprint);
+        EncodeInt(out, pending.army);
         break;
       case EEffectOp::CreateLightParticle:
-        EncodeInt(pending.army);
-        EncodeName(mTextures, pending.texture);
-        EncodeName(mTextures, pending.texture2);
-        EncodeFloats(pending, 5u);
+        EncodeInt(out, pending.army);
+        EncodeName(beat, mTextures, EEffectNameTable::Textures, pending.texture);
+        EncodeName(beat, mTextures, EEffectNameTable::Textures, pending.texture2);
+        EncodeFloats(out, pending, 5u);
         break;
       case EEffectOp::SetFloat:
-        EncodeInt(pending.param);
-        EncodeFloats(pending, 1u);
+        EncodeInt(out, pending.param);
+        EncodeFloats(out, pending, 1u);
         break;
       case EEffectOp::SetVector:
       case EEffectOp::SetN:
       case EEffectOp::SetCurve:
-        EncodeInt(pending.param);
-        EncodeFloats(pending, 0u);
+        EncodeInt(out, pending.param);
+        EncodeFloats(out, pending, 0u);
         break;
       case EEffectOp::SetEntity:
-        EncodeInt(pending.entity);
+        EncodeInt(out, pending.entity);
         break;
       case EEffectOp::SetBone:
-        EncodeInt(pending.entity);
-        EncodeInt(pending.bone);
+        EncodeInt(out, pending.entity);
+        EncodeInt(out, pending.bone);
         break;
       case EEffectOp::DestroyByScript:
       case EEffectOp::Destroy:
       case EEffectOp::Count:
         break;
       }
-      const auto bytes = static_cast<std::uint32_t>(mBytes.size() - start);
+      const auto bytes = static_cast<std::uint32_t>(out.size() - start);
       ++mEncodedOps[Index(pending.op)];
       mEncodedBytes[Index(pending.op)] += bytes;
-      ++beat.ops;
-      beat.bytes += bytes;
+      ++beat.opCount;
     }
     mPending.clear();
     mFloats.clear();
     mLastSetFloat.clear();
     return beat;
   }
-} // namespace faf::headless
+
+  void CEffectLaneNames::Write(
+    const SEffectBeat& beat,
+    std::vector<std::uint8_t>& lane
+  )
+  {
+    lane.clear();
+    if (beat.opCount == 0u) {
+      return;
+    }
+    // Per table: the count of names new to this view, then each one's entry, length and text.
+    for (const EEffectNameTable table : {EEffectNameTable::Blueprints, EEffectNameTable::Textures}) {
+      std::vector<bool>& sent = mSent[static_cast<std::size_t>(table)];
+      std::uint32_t fresh = 0;
+      for (const SEffectBeatName& name : beat.names) {
+        if (name.table == table && (name.entry >= sent.size() || !sent[name.entry])) {
+          ++fresh;
+        }
+      }
+      CEffectOpEncoder::AppendVarint(lane, fresh);
+      if (fresh == 0u) {
+        continue;
+      }
+      for (const SEffectBeatName& name : beat.names) {
+        if (name.table != table || (name.entry < sent.size() && sent[name.entry])) {
+          continue;
+        }
+        if (name.entry >= sent.size()) {
+          sent.resize(static_cast<std::size_t>(name.entry) + 1u, false);
+        }
+        sent[name.entry] = true;
+        CEffectOpEncoder::AppendVarint(lane, name.entry);
+        CEffectOpEncoder::AppendVarint(lane, static_cast<std::uint32_t>(name.text->size()));
+        lane.insert(lane.end(), name.text->begin(), name.text->end());
+        ++mNamesSent;
+      }
+    }
+    lane.insert(lane.end(), beat.ops.begin(), beat.ops.end());
+  }
+} // namespace faf::server

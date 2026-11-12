@@ -116,7 +116,8 @@ namespace
     "[--warn-beat-ms <n>] [--listen <ip:port>] [--join-seconds <n>] [--reconnect-seconds <n>] [--lead-ms <n>] "
     "[--view-threads <n>] [--per-player-views] [--team-views] [--away-pause-seconds <n>] [--defeated-view "
     "observe|disconnect] [--lobby-seconds <n> [--start-when-ready <seconds>]] [--lobby-away-seconds <n>] "
-    "[--stats-every <beats>] [--pose-budget-kbps <n>] [--congestion-control] [--nftables-out <file> [--nftables-only] "
+    "[--stats-every <beats>] [--pose-budget-kbps <n>] [--no-effect-ops] [--congestion-control] [--nftables-out <file> "
+    "[--nftables-only] "
     "[--unlisted-pps <n>] [--unlisted-total-pps <n>]] [--unvalidated-policy] "
     "[--control <ip:port> --control-key <file>] [--rest <ip:port> --rest-token-file <file> [--rest-cors-origin "
     "<origin>]] "
@@ -2388,6 +2389,10 @@ namespace
           }
         });
       }
+      // Plan WP9.1 step 3: the sim's effect operations go in every player's view as its effects lane.
+      if (!moho::CFG_GetArgOption("--no-effect-ops", 0, nullptr)) {
+        views->EnableEffectOps();
+      }
       views->Install();
       Say(
         "Views: %s",
@@ -3217,6 +3222,9 @@ namespace
       views->Uninstall();
       Say("%s", net->Intake().Report().c_str());
       Say("%s", views->LaneReport().c_str());
+      if (const std::string effects = views->EffectReport(); !effects.empty()) {
+        Say("%s", effects.c_str());
+      }
     }
     if (net) {
       net->Stop(); // its counters are the network thread's

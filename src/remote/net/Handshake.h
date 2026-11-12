@@ -31,7 +31,10 @@
 namespace faf::remote::net
 {
   inline constexpr std::uint8_t kHandshakeTag = 0xFB;
-  inline constexpr std::uint16_t kHandshakeVersion = 1;
+  // 2 (plan WP9.1 step 3): a `View` may carry lanes after the pose lane (the effects lane), which a client before it
+  // refused as bytes after the lanes; such a client is now told so at the Hello instead. Clients from 2 on skip lanes
+  // they don't know, so a later lane needs no new version.
+  inline constexpr std::uint16_t kHandshakeVersion = 2;
   inline constexpr std::size_t kHelloSize = 128;
   inline constexpr std::size_t kCookieSize = 16;
   inline constexpr std::size_t kProofSize = 16;

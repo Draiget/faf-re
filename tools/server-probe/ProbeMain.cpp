@@ -45,6 +45,8 @@
 #include "remote/SeatRoster.h"
 #include "remote/ViewLanes.h"
 #include "remote/net/GameLinks.h"
+#include "moho/effects/rendering/EffectOps.h"
+#include "remote/wire/EffectLane.h"
 #include "remote/wire/EntityFrame.h"
 #include "remote/wire/LuaSyncLane.h"
 #include "remote/net/LobbySignals.h"
@@ -629,6 +631,16 @@ namespace
     std::uint64_t launchInfos = 0;
     std::uint64_t tableMessages = 0; // `SessionTables`
     std::uint64_t poseBytes = 0;     // the views' pose lanes
+    // Plan WP9.1 step 3: the views' effects lanes (remote/wire/EffectLane.h), each decoded.
+    faf::remote::wire::CEffectLaneReader effects;
+    std::vector<faf::remote::wire::SEffectLaneOp> effectOps;
+    std::uint64_t effectBytes = 0;
+    std::uint64_t effectLanes = 0; // with any op
+    std::uint64_t effectOpCount = 0;
+    std::uint64_t effectOpsByKind[static_cast<std::size_t>(moho::EEffectOp::Count)]{};
+    std::uint64_t effectMaxLane = 0;
+    std::uint64_t effectFailed = 0;
+    std::uint64_t lanesSkipped = 0; // past the effects lane: a newer server's
     double beatMs = 0.0;
     double lateBase = 0.0; // the seconds at which beat 0 would have come
     bool haveLateBase = false;
@@ -734,17 +746,48 @@ namespace
         lanes[lane] = std::span<const std::uint8_t>(bytes, size);
       }
     }
-    // Plan WP8.1: a server that sends poses adds them as a sixth lane.
+    // Plan WP8.1: a server that sends poses adds them as a sixth lane; plan WP9.1 step 3: the effect ops as a seventh.
+    // Lanes after those are a newer server's, skipped.
     std::span<const std::uint8_t> poses;
     bool hasPoses = false;
-    if (ok && !reader.AtEnd()) {
+    std::span<const std::uint8_t> effectLane;
+    for (int lane = 0; ok && !reader.AtEnd(); ++lane) {
       const std::uint64_t size = reader.Varint();
       const std::uint8_t* const bytes = reader.Bytes(size);
       ok = reader.Ok();
-      if (ok) {
+      if (!ok) {
+        break;
+      }
+      if (lane == 0) {
         poses = std::span<const std::uint8_t>(bytes, size);
         hasPoses = true;
         out.poseBytes += size;
+      } else if (lane == 1) {
+        effectLane = std::span<const std::uint8_t>(bytes, size);
+      } else {
+        ++out.lanesSkipped;
+      }
+    }
+    if (ok) {
+      out.effectBytes += effectLane.size();
+      out.effectMaxLane = std::max<std::uint64_t>(out.effectMaxLane, effectLane.size());
+      if (out.effects.Read(effectLane, out.effectOps)) {
+        out.effectLanes += out.effectOps.empty() ? 0u : 1u;
+        out.effectOpCount += out.effectOps.size();
+        for (const faf::remote::wire::SEffectLaneOp& op : out.effectOps) {
+          ++out.effectOpsByKind[static_cast<std::size_t>(op.op)];
+        }
+      } else {
+        if (out.effectFailed < 3u) {
+          std::printf(
+            "probe: %.1f s: the effects lane of beat %llu didn't decode (%zu bytes, %zu ops before the fault)\n",
+            elapsed,
+            static_cast<unsigned long long>(beat),
+            effectLane.size(),
+            out.effectOps.size()
+          );
+        }
+        ++out.effectFailed;
       }
     }
     const bool lanesOk = ok;
@@ -2082,6 +2125,37 @@ int main(
     viewSeconds > 0.0 ? static_cast<double>(views.poseBytes) / 1024.0 / viewSeconds : 0.0,
     static_cast<unsigned long long>(views.maxMessage)
   );
+  {
+    // Plan WP9.1 step 3: what the effects lanes carried. A beat is a tenth of a second of game time.
+    const double perView = views.views != 0u ? 1.0 / static_cast<double>(views.views) : 0.0;
+    std::string kinds;
+    for (std::size_t kind = 0; kind < static_cast<std::size_t>(moho::EEffectOp::Count); ++kind) {
+      if (views.effectOpsByKind[kind] != 0u) {
+        kinds += std::string(kinds.empty() ? "" : ", ") + moho::EffectOpName(static_cast<moho::EEffectOp>(kind)) + " " +
+          std::to_string(views.effectOpsByKind[kind]);
+      }
+    }
+    std::printf(
+      "probe %d: effects: %llu ops in %llu of %llu views (%.1f a view), %llu bytes (%.1f a view, the most %llu), %.2f "
+      "KB/s, %.2f KB/s at 10 beats a second, %llu names taken, %llu references to names not held, %llu lanes didn't "
+      "decode, %llu later lanes skipped; %s\n",
+      options.uid,
+      static_cast<unsigned long long>(views.effectOpCount),
+      static_cast<unsigned long long>(views.effectLanes),
+      static_cast<unsigned long long>(views.views),
+      static_cast<double>(views.effectOpCount) * perView,
+      static_cast<unsigned long long>(views.effectBytes),
+      static_cast<double>(views.effectBytes) * perView,
+      static_cast<unsigned long long>(views.effectMaxLane),
+      viewSeconds > 0.0 ? static_cast<double>(views.effectBytes) / 1024.0 / viewSeconds : 0.0,
+      static_cast<double>(views.effectBytes) * perView * 10.0 / 1024.0,
+      static_cast<unsigned long long>(views.effects.NamesTaken()),
+      static_cast<unsigned long long>(views.effects.UnknownNames()),
+      static_cast<unsigned long long>(views.effectFailed),
+      static_cast<unsigned long long>(views.lanesSkipped),
+      kinds.empty() ? "no ops" : kinds.c_str()
+    );
+  }
   std::printf(
     "probe %d: answers: %llu applied, %llu refused, %llu dropped%s\n",
     options.uid,

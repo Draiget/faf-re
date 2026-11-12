@@ -31,7 +31,9 @@ set(FAF_HEADLESS_SOURCES
   headless/ReplaySyncWriters.cpp
   headless/ReplayWireStats.cpp
   headless/ReplayEffectOps.cpp
-  headless/EffectOpEncoder.cpp
+  # The server's effect-op encoder (plan WP9.1), which --effect-record measures.
+  server/EffectOpEncoder.cpp
+  server/EffectOpRecorder.cpp
 )
 
 set(FAF_HEADLESS_SERVER_SOURCES

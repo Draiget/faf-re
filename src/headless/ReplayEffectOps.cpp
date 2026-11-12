@@ -2,13 +2,10 @@
 
 #include <algorithm>
 #include <atomic>
-#include <mutex>
 
-#include "headless/EffectOpEncoder.h"
 #include "moho/effects/rendering/EffectOps.h"
-#include "moho/effects/rendering/IEffectManager.h"
-#include "moho/effects/rendering/SEfxCurve.h"
-#include "moho/entity/Entity.h"
+#include "server/EffectOpEncoder.h"
+#include "server/EffectOpRecorder.h"
 
 namespace faf::headless
 {
@@ -17,48 +14,9 @@ namespace faf::headless
     constexpr std::size_t kOps = static_cast<std::size_t>(moho::EEffectOp::Count);
     static_assert(kOps <= 32);
 
-    // The counts are atomic and the encoder behind a mutex: an op may come from a sim worker.
+    // The counts are atomic: an op may come from a sim worker. The recorder locks for itself.
     std::atomic<std::uint64_t> sCounts[kOps];
-    std::mutex sEncoderMutex;
-    std::atomic<bool> sRecording{false};  // spares the copy and the lock when only counting
-    CEffectOpEncoder* sEncoder = nullptr; // under sEncoderMutex
-
-    /// The encoder takes floats: a curve becomes its bounds (min x, min y, max x, max y) and its keys (x, y, z each);
-    /// a parameter beam its start, end, lifetime, width and texture scale, with its attachment, texture and blend mode.
-    void Flatten(
-      moho::SEffectOpArgs& args,
-      std::vector<float>& floats
-    )
-    {
-      if (const moho::SEfxCurve* const curve = args.curve; curve != nullptr) {
-        floats = {curve->mBoundsMin.x, curve->mBoundsMin.y, curve->mBoundsMax.x, curve->mBoundsMax.y};
-        for (const Wm3::Vector3f& key : curve->mKeys) {
-          floats.insert(floats.end(), {key.x, key.y, key.z});
-        }
-        args.values = floats.data();
-        args.valueCount = static_cast<std::uint32_t>(floats.size());
-      }
-      if (const moho::SCreateBeamParams* const beam = args.beam; beam != nullptr) {
-        floats = {
-          beam->mStart.x,
-          beam->mStart.y,
-          beam->mStart.z,
-          beam->mEnd.x,
-          beam->mEnd.y,
-          beam->mEnd.z,
-          beam->mLifetime,
-          beam->mWidth,
-          beam->mTextureScale
-        };
-        args.entity = moho::EffectOpEntity(beam->mAttachEntity);
-        args.bone = beam->mAttachBoneIndex;
-        args.army = beam->mAttachArmyIndex;
-        args.texture = beam->mTexture.c_str();
-        args.param = beam->mBlendMode;
-        args.values = floats.data();
-        args.valueCount = static_cast<std::uint32_t>(floats.size());
-      }
-    }
+    std::atomic<bool> sRecording{false}; // spares the recorder's work when only counting
 
     void CountOp(
       const moho::EEffectOp op,
@@ -69,15 +27,8 @@ namespace faf::headless
       if (index < kOps) {
         sCounts[index].fetch_add(1u, std::memory_order_relaxed);
       }
-      if (!sRecording.load(std::memory_order_acquire)) {
-        return;
-      }
-      moho::SEffectOpArgs flat = args;
-      thread_local std::vector<float> floats;
-      Flatten(flat, floats);
-      const std::lock_guard<std::mutex> lock(sEncoderMutex);
-      if (sEncoder != nullptr) {
-        sEncoder->Record(op, flat);
+      if (sRecording.load(std::memory_order_acquire)) {
+        server::CEffectOpRecorder::Hook(op, args);
       }
     }
 
@@ -125,9 +76,9 @@ namespace faf::headless
         return false;
       }
       std::fprintf(mRecordFile, "beat ops bytes\n");
-      mEncoder = std::make_unique<CEffectOpEncoder>();
-      const std::lock_guard<std::mutex> lock(sEncoderMutex);
-      sEncoder = mEncoder.get();
+      mRecorder = std::make_unique<server::CEffectOpRecorder>();
+      mNames = std::make_unique<server::CEffectLaneNames>();
+      mRecorder->Attach();
       sRecording.store(true, std::memory_order_release);
     }
     for (std::atomic<std::uint64_t>& count : sCounts) {
@@ -135,6 +86,13 @@ namespace faf::headless
     }
     moho::gEffectOpHook = &CountOp;
     return true;
+  }
+
+  std::pair<std::uint32_t, std::uint32_t> CReplayEffectOps::TakeLane()
+  {
+    const server::SEffectBeat beat = mRecorder->EndBeat();
+    mNames->Write(beat, mLane);
+    return {beat.opCount, static_cast<std::uint32_t>(mLane.size())};
   }
 
   void CReplayEffectOps::OnBeat(
@@ -170,17 +128,13 @@ namespace faf::headless
       std::fprintf(mFile, "\n");
     }
 
-    if (mEncoder != nullptr) {
-      CEffectOpEncoder::SBeat encoded;
-      {
-        const std::lock_guard<std::mutex> lock(sEncoderMutex);
-        encoded = mEncoder->EndBeat();
-      }
-      mBeatBytes.push_back(encoded.bytes);
-      mRecordedOps += encoded.ops;
-      mRecordedBytes += encoded.bytes;
-      if (encoded.ops != 0u) {
-        std::fprintf(mRecordFile, "%d %u %u\n", beat, encoded.ops, encoded.bytes);
+    if (mRecorder != nullptr) {
+      const auto [ops, bytes] = TakeLane();
+      mBeatBytes.push_back(bytes);
+      mRecordedOps += ops;
+      mRecordedBytes += bytes;
+      if (ops != 0u) {
+        std::fprintf(mRecordFile, "%d %u %u\n", beat, ops, bytes);
       }
     }
   }
@@ -193,10 +147,9 @@ namespace faf::headless
       return;
     }
     moho::gEffectOpHook = nullptr;
-    {
-      const std::lock_guard<std::mutex> lock(sEncoderMutex);
-      sRecording.store(false, std::memory_order_release);
-      sEncoder = nullptr;
+    sRecording.store(false, std::memory_order_release);
+    if (mRecorder != nullptr) {
+      mRecorder->Detach();
     }
     if (mFile != nullptr) {
       std::fclose(mFile);
@@ -240,13 +193,14 @@ namespace faf::headless
     std::fclose(mRecordFile);
     mRecordFile = nullptr;
     // Ops of the last beat arrive after its packet; encode them with it.
-    const CEffectOpEncoder::SBeat tail = mEncoder->EndBeat();
-    mRecordedOps += tail.ops;
-    mRecordedBytes += tail.bytes;
+    const auto [tailOps, tailBytes] = TakeLane();
+    mRecordedOps += tailOps;
+    mRecordedBytes += tailBytes;
     if (!mBeatBytes.empty()) {
-      mBeatBytes.back() += tail.bytes;
+      mBeatBytes.back() += tailBytes;
     }
 
+    const server::CEffectOpEncoder& encoder = mRecorder->Encoder();
     std::vector<std::uint32_t> sorted = mBeatBytes;
     std::sort(sorted.begin(), sorted.end());
     const double mean = sorted.empty() ? 0.0 : static_cast<double>(mRecordedBytes) / static_cast<double>(sorted.size());
@@ -267,23 +221,24 @@ namespace faf::headless
     );
     std::printf(
       "[%s] effect record: derived destroys left out %llu, coalesced SetFloat %llu, dropped (effect never seen "
-      "created) %llu, blueprint names %zu, texture names %zu, effects still live %zu\n",
+      "created) %llu, blueprint names %zu, texture names %zu, names sent %llu, effects still live %zu\n",
       label,
-      static_cast<unsigned long long>(mEncoder->DerivedDestroys()),
-      static_cast<unsigned long long>(mEncoder->Coalesced()),
-      static_cast<unsigned long long>(mEncoder->DroppedTotal()),
-      mEncoder->BlueprintNames(),
-      mEncoder->TextureNames(),
-      mEncoder->LiveEffects()
+      static_cast<unsigned long long>(encoder.DerivedDestroys()),
+      static_cast<unsigned long long>(encoder.Coalesced()),
+      static_cast<unsigned long long>(encoder.DroppedTotal()),
+      encoder.BlueprintNames(),
+      encoder.TextureNames(),
+      static_cast<unsigned long long>(mNames->NamesSent()),
+      encoder.LiveEffects()
     );
     for (std::size_t op = 0; op < kOps; ++op) {
       const auto effectOp = static_cast<moho::EEffectOp>(op);
-      const std::uint64_t ops = mEncoder->EncodedOps(effectOp);
-      const std::uint64_t dropped = mEncoder->Dropped(effectOp);
+      const std::uint64_t ops = encoder.EncodedOps(effectOp);
+      const std::uint64_t dropped = encoder.Dropped(effectOp);
       if (ops == 0u && dropped == 0u) {
         continue;
       }
-      const std::uint64_t bytes = mEncoder->EncodedBytes(effectOp);
+      const std::uint64_t bytes = encoder.EncodedBytes(effectOp);
       std::printf(
         "[%s]   record %-26s %10llu ops %12llu bytes %6.2f a op  dropped %llu\n",
         label,
@@ -294,19 +249,17 @@ namespace faf::headless
         static_cast<unsigned long long>(dropped)
       );
     }
-    mEncoder.reset();
+    mRecorder.reset();
+    mNames.reset();
   }
 
   CReplayEffectOps::~CReplayEffectOps()
   {
     if (mFile != nullptr || mRecordFile != nullptr) {
       moho::gEffectOpHook = nullptr;
-      {
-        const std::lock_guard<std::mutex> lock(sEncoderMutex);
-        sRecording.store(false, std::memory_order_release);
-        sEncoder = nullptr;
-      }
+      sRecording.store(false, std::memory_order_release);
     }
+    mRecorder.reset(); // detaches
     if (mFile != nullptr) {
       std::fclose(mFile);
     }

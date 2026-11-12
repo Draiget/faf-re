@@ -2,7 +2,9 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
+#include <memory>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -14,6 +16,7 @@
 #include "remote/SyncRouting.h"
 #include "remote/wire/BitStream.h"
 #include "remote/wire/LuaSyncLane.h"
+#include "server/EffectOpRecorder.h"
 #include "server/LobbyScriptData.h"
 #include "server/ServerNet.h"
 
@@ -90,12 +93,28 @@ namespace faf::server
   CServerViews::~CServerViews()
   {
     Uninstall();
+    if (mEffects) {
+      moho::gEffectOpHook = nullptr; // enabled but never installed
+    }
   }
 
   void CServerViews::Install()
   {
     moho::Sim::SetSyncObserver(this);
     mInstalled = true;
+  }
+
+  void CServerViews::EnableEffectOps()
+  {
+    if (mEffects) {
+      return;
+    }
+    for (const auto& [army, uid] : mPlayers) {
+      mEffectReceivers.try_emplace(army);
+    }
+    mEffects = std::make_unique<CEffectOpRecorder>();
+    mEffects->Attach();
+    moho::gEffectOpHook = &CEffectOpRecorder::Hook;
   }
 
   void CServerViews::Uninstall()
@@ -107,6 +126,45 @@ namespace faf::server
     (void)FinishViews();
     UninstallRouting();
     moho::Sim::SetSyncObserver(nullptr);
+    if (mEffects) {
+      moho::gEffectOpHook = nullptr;
+      mEffects->Detach();
+    }
+  }
+
+  std::string CServerViews::EffectReport() const
+  {
+    if (!mEffects) {
+      return {};
+    }
+    const CEffectOpEncoder& encoder = mEffects->Encoder();
+    std::uint64_t namesSent = 0;
+    for (const auto& [army, receiver] : mEffectReceivers) {
+      namesSent += receiver.names.NamesSent();
+    }
+    char line[512];
+    std::snprintf(
+      line,
+      sizeof(line),
+      "effects lane: %llu ops in %llu of %llu beats, %.1f KB of ops (%.1f bytes a beat, the most %u), %llu KB to "
+      "the %zu players with %llu names; %llu destroys a client derives left out, %llu SetFloat coalesced, %llu ops "
+      "on effects never seen created dropped, %zu blueprint and %zu texture names",
+      static_cast<unsigned long long>(mEffectOpsTaken),
+      static_cast<unsigned long long>(mEffectBeatsWithOps),
+      static_cast<unsigned long long>(mEffectBeats),
+      static_cast<double>(mEffectOpBytes) / 1024.0,
+      mEffectBeats != 0u ? static_cast<double>(mEffectOpBytes) / static_cast<double>(mEffectBeats) : 0.0,
+      mEffectMaxBeatBytes,
+      static_cast<unsigned long long>(mEffectBytes.load(std::memory_order_relaxed) / 1024u),
+      mEffectReceivers.size(),
+      static_cast<unsigned long long>(namesSent),
+      static_cast<unsigned long long>(encoder.DerivedDestroys()),
+      static_cast<unsigned long long>(encoder.Coalesced()),
+      static_cast<unsigned long long>(encoder.DroppedTotal()),
+      encoder.BlueprintNames(),
+      encoder.TextureNames()
+    );
+    return line;
   }
 
   void CServerViews::OnBeatStarting()
@@ -174,6 +232,19 @@ namespace faf::server
       // Plan WP8.1: the sixth lane, the units' bones (a client reads it when the message goes on past the Lua lane).
       mPoseBytes.fetch_add(lanes.poses->Bytes().size(), std::memory_order_relaxed);
       WriteLane(writer, *lanes.poses);
+      // Plan WP9.1 step 3: the seventh, the beat's effect ops (remote/wire/EffectLane.h). It needs the pose lane before
+      // it, which the server always sends; a client that doesn't know it skips it.
+      if (const auto receiver = mEffectReceivers.find(army); mEffects && receiver != mEffectReceivers.end()) {
+        if (lanes.fresh) {
+          receiver->second.names.Reset(); // its client holds nothing: the names its ops need go again
+        }
+        std::vector<std::uint8_t>& lane = receiver->second.lane;
+        receiver->second.names.Write(mEffectBeat, lane);
+        writer.Varint(lane.size());
+        writer.Bytes(lane.data(), lane.size());
+        mEffectBytes.fetch_add(lane.size(), std::memory_order_relaxed);
+        mEffectLanes.fetch_add(lane.empty() ? 0u : 1u, std::memory_order_relaxed);
+      }
     }
     mNet.QueueView(player->second, std::move(message), lanes.fresh);
     if (lanes.check) {
@@ -200,6 +271,16 @@ namespace faf::server
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - mStart).count()
       )
     );
+    // Plan WP9.1 step 3: the beat's effect ops, for its views' effects lanes. Ops the sim makes from here on (the next
+    // beat's, while these views are built) go into the next beat's.
+    if (mEffects) {
+      mEffectBeat = mEffects->EndBeat();
+      ++mEffectBeats;
+      mEffectBeatsWithOps += mEffectBeat.opCount != 0u ? 1u : 0u;
+      mEffectOpsTaken += mEffectBeat.opCount;
+      mEffectOpBytes += mEffectBeat.ops.size();
+      mEffectMaxBeatBytes = std::max(mEffectMaxBeatBytes, static_cast<std::uint32_t>(mEffectBeat.ops.size()));
+    }
     // The builders are done with the beat (they interned what the frames name); its views go out after this.
     if (mSessionTables.HasPending()) {
       remote::wire::BitWriter record;
@@ -322,7 +403,8 @@ namespace faf::server
     };
     return "views so far: entities " + megabytes(mFrameBytes) + " MB, armies " + megabytes(mArmyBytes) + " MB, grids " +
       megabytes(mGridBytes) + " MB, Lua " + megabytes(mLuaBytes) + " MB, poses " + megabytes(mPoseBytes) +
-      " MB, session tables " + std::to_string(mTableRecords.load(std::memory_order_relaxed)) + " records of " +
+      (mEffects ? " MB, effects " + megabytes(mEffectBytes) : std::string()) + " MB, session tables " +
+      std::to_string(mTableRecords.load(std::memory_order_relaxed)) + " records of " +
       std::to_string(mTableBytes.load(std::memory_order_relaxed) / 1024u) + " KB to each player";
   }
 

@@ -49,6 +49,8 @@
 #include "remote/wire/Roster.h"
 #include "remote/wire/SessionTables.h"
 #include "remote/client/ServerLaneMeter.h"
+#include "remote/client/ServerViewClient.h"
+#include "remote/net/Datagram.h"
 #include "remote/wire/SoundTable.h"
 #include "remote/wire/WireVersion.h"
 
@@ -3472,4 +3474,61 @@ TEST(
   EXPECT_DOUBLE_EQ(meter.Snapshot(at(40.6)).seconds, 0.0);
   EXPECT_DOUBLE_EQ(meter.Snapshot(at(41.6)).perSecond[1], 100.0);
   meter.Reset();
+}
+
+// Plan WP9.1 step 3: a `View` carries the pose lane and the effects lane after the five first; a client reads the
+// lanes it knows and skips any after them (a newer server's), and still refuses bytes that aren't a whole lane.
+TEST(
+  ViewMessage,
+  ReadsThePoseAndEffectsLanesAndSkipsLaterOnes
+)
+{
+  using faf::remote::client::ReadViewMessage;
+  using faf::remote::client::SViewMessage;
+  const auto make = [](const std::size_t extraLanes, const bool cutLast) {
+    std::vector<std::uint8_t> message;
+    faf::remote::net::ByteWriter writer(message);
+    writer.Byte(static_cast<std::uint8_t>(faf::remote::net::ESeatMessage::View));
+    writer.Varint(1234u); // beat
+    writer.Varint(2u);    // own entities
+    writer.Varint(0u);    // team entities
+    for (std::size_t lane = 0; lane < 5u + extraLanes; ++lane) {
+      const std::uint8_t bytes[3] = {static_cast<std::uint8_t>(lane), 0xAAu, 0x55u};
+      writer.Varint(lane == 1u ? 0u : 3u); // an empty team frame
+      if (lane != 1u) {
+        writer.Bytes(bytes, sizeof(bytes));
+      }
+    }
+    if (cutLast) {
+      message.pop_back();
+    }
+    return message;
+  };
+
+  SViewMessage view;
+  ASSERT_TRUE(ReadViewMessage(make(0u, false), view));
+  EXPECT_EQ(view.beat, 1234u);
+  EXPECT_FALSE(view.hasPoses);
+  EXPECT_TRUE(view.effects.empty());
+
+  ASSERT_TRUE(ReadViewMessage(make(1u, false), view));
+  EXPECT_TRUE(view.hasPoses);
+  ASSERT_EQ(view.poses.size(), 3u);
+  EXPECT_EQ(view.poses[0], 5u);
+  EXPECT_TRUE(view.effects.empty());
+
+  const std::vector<std::uint8_t> seven = make(2u, false);
+  ASSERT_TRUE(ReadViewMessage(seven, view));
+  ASSERT_EQ(view.effects.size(), 3u);
+  EXPECT_EQ(view.effects[0], 6u);
+  EXPECT_EQ(view.lanesSkipped, 0u);
+
+  const std::vector<std::uint8_t> nine = make(4u, false);
+  ASSERT_TRUE(ReadViewMessage(nine, view));
+  EXPECT_EQ(view.effects[0], 6u);
+  EXPECT_EQ(view.lanesSkipped, 2u);
+  EXPECT_EQ(view.grids[0], 3u);
+
+  EXPECT_FALSE(ReadViewMessage(make(2u, true), view)); // the effects lane cut short
+  EXPECT_FALSE(ReadViewMessage(make(4u, true), view)); // a later lane cut short
 }

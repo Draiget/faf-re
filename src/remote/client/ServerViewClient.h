@@ -50,9 +50,14 @@ namespace faf::remote::client
     std::span<const std::uint8_t> lua;
     std::span<const std::uint8_t> poses; // plan WP8.1: the sixth lane, when the server sends poses
     bool hasPoses = false;
+    std::span<const std::uint8_t> effects; // plan WP9.1 step 3: the seventh (wire/EffectLane.h); empty: no op
+    std::uint32_t lanesSkipped = 0;        // lanes after those this build knows, skipped
   };
 
-  /** Reads a whole `View` message (its kind byte first); its lanes must end at the message's last byte. */
+  /**
+   * Reads a whole `View` message (its kind byte first); its lanes must end at the message's last byte. Lanes after the
+   * effects lane, from a newer server, are skipped.
+   */
   [[nodiscard]] bool ReadViewMessage(std::span<const std::uint8_t> message, SViewMessage& out);
 
   /** One `SessionTables` message, its record as a span into its bytes. */

@@ -38,7 +38,9 @@ namespace faf::remote::net
      * then the own frame, team frame (empty without one), army, grid and Lua lanes, each a varint size and its bytes
      * (remote/ViewLanes.h). The player's client holds both frames; a blip of the player's own unit is theirs to leave
      * out. An empty team frame means none: a player cut from their team drops what they held of it. After a reconnect
-     * the first view's frames are whole (no baseline), and so are its army and grid lanes.
+     * the first view's frames are whole (no baseline), and so are its army and grid lanes. Then, when the server sends
+     * them, the pose lane (wire/PoseLane.h) and the effects lane (wire/EffectLane.h), framed the same way. A client
+     * skips lanes past the ones it knows (a varint size and its bytes each), to the message's last byte.
      */
     View = 5,
     /**

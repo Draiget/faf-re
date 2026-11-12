@@ -56,18 +56,29 @@ namespace faf::remote::client
       }
       *lane = std::span<const std::uint8_t>(bytes, static_cast<std::size_t>(size));
     }
-    // Plan WP8.1: a server that sends poses adds them as a sixth lane.
+    // Plan WP8.1: a server that sends poses adds them as a sixth lane; plan WP9.1 step 3: the effect ops as a seventh.
+    // Any lane after those is a newer server's, skipped.
     out.poses = {};
-    if (!reader.AtEnd()) {
+    out.hasPoses = false;
+    out.effects = {};
+    out.lanesSkipped = 0;
+    for (std::size_t lane = 0; !reader.AtEnd(); ++lane) {
       const std::uint64_t size = reader.Varint();
       const std::uint8_t* const bytes = reader.Bytes(static_cast<std::size_t>(size));
       if (!reader.Ok()) {
         return false;
       }
-      out.poses = std::span<const std::uint8_t>(bytes, static_cast<std::size_t>(size));
-      out.hasPoses = true;
+      const std::span<const std::uint8_t> span(bytes, static_cast<std::size_t>(size));
+      if (lane == 0u) {
+        out.poses = span;
+        out.hasPoses = true;
+      } else if (lane == 1u) {
+        out.effects = span;
+      } else {
+        ++out.lanesSkipped;
+      }
     }
-    return reader.AtEnd();
+    return true;
   }
 
   bool ReadTablesMessage(

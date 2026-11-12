@@ -3,26 +3,52 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "moho/effects/rendering/EffectOps.h"
 
-namespace faf::headless
+namespace faf::server
 {
+  /** Which name table a name is in. */
+  enum class EEffectNameTable : std::uint8_t
+  {
+    Blueprints = 0,
+    Textures = 1,
+  };
+
+  /** One name a beat's ops refer to. `text` stays valid as long as its encoder. */
+  struct SEffectBeatName
+  {
+    EEffectNameTable table = EEffectNameTable::Blueprints;
+    std::uint32_t entry = 0;
+    const std::string* text = nullptr;
+  };
+
+  /** One beat's encoded ops, the same for every view (`CEffectLaneNames` makes each view's lane of it). */
+  struct SEffectBeat
+  {
+    std::vector<std::uint8_t> ops; // the ops, names as references only
+    std::uint32_t opCount = 0;
+    std::vector<SEffectBeatName> names; // every name the ops refer to, once, in first-use order
+  };
+
   /**
-   * Plan WP9.1 step 2: encodes the sim's effect operations (moho/effects/rendering/EffectOps.h) as the server's
-   * replication would send them, to measure their size. Not thread safe; the caller serialises `Record`/`EndBeat`.
+   * Plan WP9.1 steps 2 and 3: encodes the sim's effect operations (moho/effects/rendering/EffectOps.h) as the server's
+   * effects lane sends them (remote/wire/EffectLane.h has the lane's layout and its reader). The server records every
+   * beat's ops into one encoder and each view writes its lane from the beat's `SEffectBeat` (`CEffectLaneNames`);
+   * headless's `--effect-record` measures the same bytes. Not thread safe; the caller serialises `Record`/`EndBeat`
+   * (`CEffectOpRecorder` does).
    *
    * Each op is its `EEffectOp` byte, then (all but `CreateLightParticle`) the effect's id as an unsigned LEB128
    * varint, then its arguments in a fixed order per op:
    * - ints (entity, bone, army, parameter index, beam blend mode) as varints of the value plus one, so -1 is 0;
    * - floats as 4 little-endian bytes; a variable count (`SetVector`, `SetN`, `SetCurve`, parameter beams) goes
    *   first as a varint;
-   * - blueprint ids and textures as a reference into a table of the names seen so far (0: none; n: entry n - 1).
-   *   A name's first use takes the next free entry and sends its length (varint) and text after the reference;
-   *   this stands in for the shared sorted blueprint list both sides would load.
+   * - blueprint ids and textures as a reference into a table of the names seen so far (0: none; n: entry n - 1). The
+   *   texts go in each view's lane the first time that view needs them (`CEffectLaneNames`); entries never change.
    *
    * Effect ids are given at the create (counting up, never reused, so a client still drawing an effect whose end it
    * derives can't mistake a new one for it) and forgotten at any destroy. Ops on an effect never seen created are
@@ -31,29 +57,17 @@ namespace faf::headless
    * parameter) in a beat keep the last.
    *
    * Arguments are taken as flattened: `values` must hold a curve's bounds and keys and a parameter beam's floats
-   * (`curve`/`beam` are ignored here; `ReplayEffectOps.cpp` flattens them).
+   * (`curve`/`beam` are ignored here; `FlattenEffectOpArgs` in EffectOpRecorder.h flattens them).
    */
   class CEffectOpEncoder
   {
   public:
     static constexpr std::size_t kOps = static_cast<std::size_t>(moho::EEffectOp::Count);
 
-    struct SBeat
-    {
-      std::uint32_t ops = 0;   // ops encoded
-      std::uint32_t bytes = 0; // their bytes
-    };
-
     void Record(moho::EEffectOp op, const moho::SEffectOpArgs& args);
 
-    /** Encodes the ops recorded since the last call into `Bytes()`. */
-    SBeat EndBeat();
-
-    /** The last `EndBeat`'s encoding. */
-    [[nodiscard]] const std::vector<std::uint8_t>& Bytes() const noexcept
-    {
-      return mBytes;
-    }
+    /** Encodes the ops recorded since the last call. */
+    [[nodiscard]] SEffectBeat EndBeat();
 
     [[nodiscard]] std::uint64_t EncodedOps(
       moho::EEffectOp op
@@ -61,6 +75,7 @@ namespace faf::headless
     {
       return mEncodedOps[Index(op)];
     }
+    /** The op's bytes in the beats' ops, without the name texts (those go once per view). */
     [[nodiscard]] std::uint64_t EncodedBytes(
       moho::EEffectOp op
     ) const noexcept
@@ -103,14 +118,8 @@ namespace faf::headless
     struct SNameTable
     {
       std::unordered_map<std::string, std::uint32_t> indices;
-      std::vector<std::string> texts;
-    };
-
-    // A name reference as recorded: 0 none, else entry + 1; `fresh` when this op is the name's first use.
-    struct SNameRef
-    {
-      std::uint32_t ref = 0;
-      bool fresh = false;
+      std::deque<std::string> texts;         // a deque: `SEffectBeatName::text` points into it
+      std::vector<std::uint64_t> beatUsed{}; // per entry: the last beat (`mBeatSerial`) whose ops named it
     };
 
     struct SPending
@@ -124,9 +133,9 @@ namespace faf::headless
       std::int32_t bone2 = -1;
       std::int32_t army = -1;
       std::int32_t param = -1;
-      SNameRef blueprint;
-      SNameRef texture;
-      SNameRef texture2;
+      std::uint32_t blueprint = 0; // name references: 0 none, else entry + 1
+      std::uint32_t texture = 0;
+      std::uint32_t texture2 = 0;
       std::uint32_t floatOffset = 0;
       std::uint32_t floatCount = 0;
     };
@@ -144,20 +153,20 @@ namespace faf::headless
       const auto index = static_cast<std::size_t>(op);
       return index < kOps ? index : kOps - 1u;
     }
-    [[nodiscard]] static SNameRef Resolve(SNameTable& table, const char* name);
-    void EncodeName(const SNameTable& table, SNameRef ref);
-    void EncodeInt(std::int32_t value);
-    void EncodeFloats(const SPending& pending, std::uint32_t fixedCount);
+    [[nodiscard]] static std::uint32_t Resolve(SNameTable& table, const char* name);
+    void EncodeName(SEffectBeat& beat, SNameTable& table, EEffectNameTable which, std::uint32_t ref);
+    static void EncodeInt(std::vector<std::uint8_t>& out, std::int32_t value);
+    void EncodeFloats(std::vector<std::uint8_t>& out, const SPending& pending, std::uint32_t fixedCount) const;
 
     std::unordered_map<const moho::IEffect*, SEffectEntry> mEffects;
     std::uint32_t mNextId = 0;
     SNameTable mBlueprints;
     SNameTable mTextures;
+    std::uint64_t mBeatSerial = 0; // counts `EndBeat`s, from 1
 
     std::vector<SPending> mPending;
     std::vector<float> mFloats;
     std::unordered_map<std::uint64_t, std::size_t> mLastSetFloat; // (id, param) -> mPending index, this beat
-    std::vector<std::uint8_t> mBytes;
 
     std::array<std::uint64_t, kOps> mEncodedOps{};
     std::array<std::uint64_t, kOps> mEncodedBytes{};
@@ -165,4 +174,36 @@ namespace faf::headless
     std::uint64_t mDerivedDestroys = 0;
     std::uint64_t mCoalesced = 0;
   };
-} // namespace faf::headless
+
+  /**
+   * Plan WP9.1 step 3: what one view's client was sent of the name tables. A name's text goes in the view's lane the
+   * first time one of its ops refers to it; a view that joins late, or comes back holding nothing (`Reset`), gets the
+   * names again as its ops need them. One per view, used by one thread at a time.
+   */
+  class CEffectLaneNames
+  {
+  public:
+    /** The client holds no name: a new client, or one back from a lost connection. */
+    void Reset() noexcept
+    {
+      mSent[0].clear();
+      mSent[1].clear();
+    }
+
+    /**
+     * This view's effects lane for `beat` (remote/wire/EffectLane.h), into `lane` (cleared first): empty when the beat
+     * has no op; otherwise the names the view's client doesn't hold yet, then the beat's ops.
+     */
+    void Write(const SEffectBeat& beat, std::vector<std::uint8_t>& lane);
+
+    /** Name texts this view was sent, over its whole life. */
+    [[nodiscard]] std::uint64_t NamesSent() const noexcept
+    {
+      return mNamesSent;
+    }
+
+  private:
+    std::vector<bool> mSent[2]; // per table, by entry
+    std::uint64_t mNamesSent = 0;
+  };
+} // namespace faf::server

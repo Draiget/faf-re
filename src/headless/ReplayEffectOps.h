@@ -4,21 +4,27 @@
 #include <cstdio>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
+
+namespace faf::server
+{
+  class CEffectLaneNames;
+  class CEffectOpRecorder;
+} // namespace faf::server
 
 namespace faf::headless
 {
-  class CEffectOpEncoder;
-
   /**
    * Plan WP9.1: `--effect-ops <file>` counts the sim's effect operations (moho/effects/rendering/EffectOps.h) per
    * beat, to size what replicating them would send. The file gets one line per beat with any: `beat total` and each
    * op's count by name; the run ends with each op's total, its most in one beat, and the busiest beat's total.
    *
-   * `--effect-record <file>` (step 2) also encodes them as the server would send them (EffectOpEncoder.h): one line
-   * per beat with any, `beat ops bytes`; the run ends with the total, bytes a beat (mean, p50, p95, p99, max over
-   * every beat), KB/s at 10 beats a second, bytes per op type, the ops dropped (effect never seen created), the
-   * derived destroys left out and the name tables' sizes.
+   * `--effect-record <file>` (step 2) also encodes them as the server sends them (server/EffectOpEncoder.h): one line
+   * per beat with any, `beat ops bytes`, the bytes being one view's effects lane (remote/wire/EffectLane.h) for a
+   * client there from the start; the run ends with the total, bytes a beat (mean, p50, p95, p99, max over every
+   * beat), KB/s at 10 beats a second, bytes per op type (without the name texts), the ops dropped (effect never seen
+   * created), the derived destroys left out and the name tables' sizes.
    *
    * The ops of a beat are read when its packet arrives (the sim may already be a beat ahead), so an op can land a
    * beat late; totals are exact.
@@ -37,6 +43,8 @@ namespace faf::headless
 
   private:
     void FinishRecord(const char* label);
+    /** The recorder's next beat as one view's lane: its op count, its bytes. */
+    std::pair<std::uint32_t, std::uint32_t> TakeLane();
 
     std::FILE* mFile = nullptr;
     std::uint64_t mTotals[32]{};
@@ -47,8 +55,10 @@ namespace faf::headless
     int mBeats = 0;
 
     std::FILE* mRecordFile = nullptr;
-    std::unique_ptr<CEffectOpEncoder> mEncoder;
-    std::vector<std::uint32_t> mBeatBytes; // every beat's encoded bytes, for the percentiles
+    std::unique_ptr<server::CEffectOpRecorder> mRecorder;
+    std::unique_ptr<server::CEffectLaneNames> mNames;
+    std::vector<std::uint8_t> mLane;
+    std::vector<std::uint32_t> mBeatBytes; // every beat's lane bytes, for the percentiles
     std::uint64_t mRecordedOps = 0;
     std::uint64_t mRecordedBytes = 0;
   };

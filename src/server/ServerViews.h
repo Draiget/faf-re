@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "remote/ViewLanes.h"
+#include "server/EffectOpEncoder.h"
 
 namespace moho
 {
@@ -34,6 +35,7 @@ namespace moho
 namespace faf::server
 {
   class CServerNet;
+  class CEffectOpRecorder;
 
   /** The `GameInfo` message for a player (remote/net/GameLinks.h). */
   [[nodiscard]] std::vector<std::uint8_t>
@@ -97,8 +99,17 @@ namespace faf::server
       mObserverViews = true;
       EnableObserverView();
     }
+    /**
+     * Plan WP9.1 step 3, before `Install`: the sim's effect operations (moho/effects/rendering/EffectOps.h) are
+     * recorded from now on (this sets `gEffectOpHook`), and each beat's go in every player's view as its effects lane
+     * (remote/wire/EffectLane.h), after the pose lane. Every view gets every op for now; each view's client gets a
+     * name's text the first time its ops need it, again after it comes back holding nothing.
+     */
+    void EnableEffectOps();
     /** Call with the sim stopped. */
     void Uninstall();
+    /** What the effects lanes carried, for the console; empty without `EnableEffectOps`. After `Uninstall`. */
+    [[nodiscard]] std::string EffectReport() const;
 
     [[nodiscard]] std::uint64_t Failures() const noexcept
     {
@@ -155,6 +166,23 @@ namespace faf::server
     std::atomic<std::uint64_t> mTableBytes{0}; // one player's share
     std::atomic<std::uint64_t> mTableRecords{0};
     remote::wire::CSessionTableWriters mSessionTables; // one for every view (`EnableSessionTables`)
+    // Plan WP9.1 step 3 (`EnableEffectOps`). `mEffectBeat` is written on the sim thread in `OnViewFrames`, before the
+    // beat's views start, and only read by them; each player's names and lane are its own job's.
+    struct SEffectReceiver
+    {
+      CEffectLaneNames names;
+      std::vector<std::uint8_t> lane;
+    };
+    std::unique_ptr<CEffectOpRecorder> mEffects;
+    SEffectBeat mEffectBeat;
+    std::map<std::size_t, SEffectReceiver> mEffectReceivers; // by army, one per player, made before `Install`
+    std::atomic<std::uint64_t> mEffectBytes{0};              // summed over the views
+    std::atomic<std::uint64_t> mEffectLanes{0};              // lanes with any op, summed over the views
+    std::uint64_t mEffectBeats = 0;                          // on the sim thread: beats taken
+    std::uint64_t mEffectBeatsWithOps = 0;
+    std::uint64_t mEffectOpsTaken = 0;
+    std::uint64_t mEffectOpBytes = 0; // the beats' ops once (without names), as every view gets them
+    std::uint32_t mEffectMaxBeatBytes = 0;
     bool mInstalled = false;
     bool mObserverViews = false;
   };
