@@ -6,6 +6,11 @@ import { ApiError, type HostApi, type HostCpu, type HostInfo, type Hint, type Lo
 import { byId, clock, fill, h, icon, isNumber, num, type Child } from "./dom.ts";
 import { confirmAction, copyButton, toast } from "./ui.ts";
 
+/** KB/s as megabits a second, the unit connections are sold in: "2.9 Mbit/s (360 KB/s)". */
+function mbit(kbps: number | null | undefined): string {
+  return isNumber(kbps) ? `${(kbps * 8 / 1000).toFixed(1)} Mbit/s (${kbps} KB/s)` : "–";
+}
+
 const POLL_MS = 2000;
 const REQUEST_MS = 5000;
 const BUSY_LOAD = 50;
@@ -1034,6 +1039,14 @@ function renderCpuChoice(): void {
         { class: "hint-text" },
         h("strong", { title: basis }, isNumber(hint.suggested_cores) ? `Suggests ${plural(hint.suggested_cores, "core")}` : "No suggestion"),
         h("span", { class: "dim" }, `mean ${num(hint.mean_cores, 2)} · worst ${num(hint.worst_cores, 2)} cores for ${plural(seats.length, "player")} on ${num(hint.km)} km`),
+        // Plan WPR.8: the published minimums for a game this size.
+        isNumber(hint.min_connection_kbps)
+          ? h(
+              "span",
+              { class: "dim", title: hint.connection_basis ?? "" },
+              `Each player needs ${mbit(hint.min_connection_kbps)} down; the server sends up to ${mbit(hint.server_upload_kbps)}; at most ${num(hint.max_players)} players`,
+            )
+          : null,
         basis === "" ? null : h("details", { class: "hint-basis" }, h("summary", {}, "How this is estimated"), h("p", {}, basis)),
       ),
     );

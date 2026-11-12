@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -76,7 +77,9 @@ func (a *api) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		h := hintFor(players, km)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "players": h.Players, "km": h.KM, "mean_cores": h.MeanCores,
-			"worst_cores": h.WorstCores, "suggested_cores": h.SuggestedCores, "basis": h.Basis})
+			"worst_cores": h.WorstCores, "suggested_cores": h.SuggestedCores, "basis": h.Basis,
+			"min_connection_kbps": h.MinConnectionKBps, "server_upload_kbps": h.ServerUploadKBps, "max_players": h.MaxPlayers,
+			"connection_basis": h.ConnectionBasis})
 	case p == "/api/v1/lobbies" && r.Method == http.MethodGet:
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "lobbies": a.m.list()})
 	case p == "/api/v1/lobbies" && r.Method == http.MethodPost:
@@ -89,9 +92,11 @@ func (a *api) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		l, code, err := a.m.create(req)
 		if err != nil {
+			log.Printf("lobby not made (%d): %v", code, err)
 			fail(w, code, err)
 			return
 		}
+		log.Printf("lobby %s: %s on CPUs %v, port %d, pid %d", l.ID, l.Map.Name, l.CPUs, l.Port, l.PID)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "lobby": l})
 	case strings.HasPrefix(p, "/api/v1/lobbies/"):
 		rest := strings.TrimPrefix(p, "/api/v1/lobbies/")

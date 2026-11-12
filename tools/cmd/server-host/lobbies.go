@@ -310,8 +310,13 @@ func matchFile(l *Lobby, scenario string) string {
 			}
 		}
 		fmt.Fprintf(&b, "MatchObservers = { %s }\nMatchReferees = { %s }\n", strings.Join(watchers, ", "), strings.Join(referees, ", "))
-		fmt.Fprintf(&b, "MatchRules = { ObserverDelaySeconds = %s }\n", strconv.FormatFloat(l.ObserverDelay, 'f', -1, 64))
 	}
+	// Plan WPR.8: the published minimum each player needs down goes with the match; the server shows it.
+	rules := []string{fmt.Sprintf("MinConnectionKBps = %d", l.Hint.MinConnectionKBps)}
+	if len(l.Observers) > 0 {
+		rules = append(rules, "ObserverDelaySeconds = "+strconv.FormatFloat(l.ObserverDelay, 'f', -1, 64))
+	}
+	fmt.Fprintf(&b, "MatchRules = { %s }\n", strings.Join(rules, ", "))
 	b.WriteString("MatchTokens = {")
 	for _, s := range l.Seats {
 		if s.Kind == "human" {

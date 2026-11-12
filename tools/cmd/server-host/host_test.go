@@ -76,6 +76,15 @@ func TestHint(t *testing.T) {
 	if h.MeanCores != 0.066 || h.WorstCores != 0.144 || h.SuggestedCores != 1 {
 		t.Fatalf("1v1 10 km: %+v", h)
 	}
+	if h.MinConnectionKBps != 165 || h.ServerUploadKBps != 205 || h.MaxPlayers != 16 {
+		t.Fatalf("1v1 minimums: %+v", h)
+	}
+	if m := hintFor(8, 20); m.MinConnectionKBps != 360 || m.ServerUploadKBps != 2300 {
+		t.Fatalf("8 players minimums: %+v", m)
+	}
+	if m := hintFor(16, 40); m.MinConnectionKBps != 360 || m.ServerUploadKBps != 2600 {
+		t.Fatalf("16 players minimums: %+v", m)
+	}
 	h = hintFor(12, 81)
 	if h.WorstCores != 1.002 || h.SuggestedCores != 2 || !strings.Contains(h.Basis, "estimate") {
 		t.Fatalf("12 players 81 km: %+v", h)
@@ -151,10 +160,10 @@ func TestObservers(t *testing.T) {
 	if req.Observers[1].Name != "Observer 2" || req.Observers[0].token == "" || req.Observers[0].token == req.Observers[1].token {
 		t.Fatalf("observers %+v", req.Observers)
 	}
-	l := &Lobby{ID: "l1", Control: "organiser", Seats: req.Seats, Observers: req.Observers, ObserverDelay: req.ObserverDelay}
+	l := &Lobby{ID: "l1", Control: "organiser", Seats: req.Seats, Observers: req.Observers, ObserverDelay: req.ObserverDelay, Hint: hintFor(1, 20)}
 	text := matchFile(l, mp.File)
 	for _, want := range []string{"MatchObservers = { '" + req.Observers[0].token + "' }", "MatchReferees = { '" + req.Observers[1].token + "' }",
-		"MatchRules = { ObserverDelaySeconds = 120 }"} {
+		"MatchRules = { MinConnectionKBps = 165, ObserverDelaySeconds = 120 }"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("match file lacks %q:\n%s", want, text)
 		}

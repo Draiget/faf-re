@@ -668,6 +668,8 @@ namespace
     bool noCheats = false;          // `CheatsEnabled` is "false", whatever a host or organiser sets
     std::string defeatedPlayerView; // plan WP13.4: "observe" (as the original game) or "disconnect" (`--defeated-view`)
     std::optional<int> gameVersion; // plan WP15.1: the FAF game version the match is for (`/lua/version.lua`)
+    // Plan WPR.8: the download each player needs, KB/s, published with the match (WPR.7's measured rates).
+    std::optional<double> minConnectionKBps;
   };
 
   [[nodiscard]] bool ReadMatchRules(
@@ -715,6 +717,13 @@ namespace
           seconds("StartWhenReadySeconds", matchRules.startWhenReadySeconds) &&
           flag("FixedSpeed", matchRules.fixedSpeed) && flag("NoCheats", matchRules.noCheats))) {
       return false;
+    }
+    if (const LuaPlus::LuaObject value = table["MinConnectionKBps"]; !value.IsNil()) {
+      if (!value.IsNumber() || value.GetNumber() <= 0.0 || value.GetNumber() > 1000000.0) {
+        error = "MatchRules.MinConnectionKBps is the download each player needs, KB/s, above 0";
+        return false;
+      }
+      matchRules.minConnectionKBps = value.GetNumber();
     }
     if (const LuaPlus::LuaObject version = table["GameVersion"]; !version.IsNil()) {
       // A number, or the text FAF's `GetVersion()` returns ("3839").
@@ -1726,6 +1735,13 @@ namespace
         if (startWhenReadySeconds > 0.0) {
           Say("Lobby: the game starts %.0f s after every player is ready", startWhenReadySeconds);
         }
+        if (matchRules.minConnectionKBps) {
+          Say(
+            "Lobby: each player needs at least %.0f KB/s (%.1f Mbit/s) down (MatchRules.MinConnectionKBps)",
+            *matchRules.minConnectionKBps,
+            *matchRules.minConnectionKBps * 8.0 / 1000.0
+          );
+        }
         // Plan WP2.14: what the host's launch is checked against. The match file's configuration stays the one the
         // game starts with (plan WPR.55: the clients' launch comes from the server, never from the lobby's message).
         const faf::server::SLaunchFacts matchFacts = ReadLaunchFacts(config);
@@ -1871,6 +1887,10 @@ namespace
               if (request.op == "status") {
                 std::string countdown =
                   ",\"start_when_ready_seconds\":" + std::to_string(static_cast<int>(startWhenReadySeconds));
+                if (matchRules.minConnectionKBps) {
+                  countdown +=
+                    ",\"min_connection_kbps\":" + std::to_string(static_cast<int>(*matchRules.minConnectionKBps));
+                }
                 if (countdownEnd) {
                   const double left =
                     std::max(0.0, std::chrono::duration<double>(*countdownEnd - Clock::now()).count());

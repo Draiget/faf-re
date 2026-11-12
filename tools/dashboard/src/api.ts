@@ -123,6 +123,11 @@ export interface Hint {
   worst_cores?: number | null;
   suggested_cores?: number | null;
   basis?: string | null;
+  /** Plan WPR.8: the published minimums for a game this size (WPR.7's measurements), KB/s. */
+  min_connection_kbps?: number | null;
+  server_upload_kbps?: number | null;
+  max_players?: number | null;
+  connection_basis?: string | null;
 }
 
 export interface LobbySeat {

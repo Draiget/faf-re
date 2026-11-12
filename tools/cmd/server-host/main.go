@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -69,6 +70,10 @@ func main() {
 	}
 	if _, err := os.Stat(*serverBin); err != nil {
 		log.Fatalf("server binary: %v", err)
+	}
+	// Each lobby's server runs in its own folder, so a relative --server would name another file there.
+	if abs, err := filepath.Abs(*serverBin); err == nil {
+		*serverBin = abs
 	}
 	first, last, ok := strings.Cut(*ports, "-")
 	pf, err1 := strconv.Atoi(first)
