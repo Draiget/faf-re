@@ -111,7 +111,9 @@ namespace
     ::ClipCursor(clipRectPtr);
   }
 
-  // True while the device has a windowed head 0 the frame's size should follow.
+  // True while the device's head 0 is a window (not full screen) the frame's size should follow.
+  // Head::mWindowed is the full-screen flag (CScApp::CreateAppFrame picks the full-screen frame style
+  // when it is set).
   [[nodiscard]] bool DeviceFollowsFrame()
   {
     if (moho::sDeviceLock || moho::ren_Viewport == nullptr || !gpg::gal::Device::IsReady()) {
@@ -119,7 +121,7 @@ namespace
     }
     gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance();
     gpg::gal::DeviceContext* const activeContext = galDevice != nullptr ? galDevice->GetDeviceContext() : nullptr;
-    return activeContext != nullptr && activeContext->GetHeadCount() > 0 && activeContext->GetHead(0).mWindowed;
+    return activeContext != nullptr && activeContext->GetHeadCount() > 0 && !activeContext->GetHead(0).mWindowed;
   }
 
   // The device's head 0 size, or -1 when there is no device.
