@@ -137,6 +137,11 @@ namespace platform::window
   // Uses window-local input, including on Wayland where desktop cursor positions are unavailable.
   [[nodiscard]] bool GetMousePosition(Handle window, int& x, int& y);
 
+  // Continuous camera-drag input on the focused window; no desktop cursor warping.
+  [[nodiscard]] bool SetRelativeMouseMode(bool enabled);
+  // Consume motion in client pixels, retaining fractional pixels for the next sample.
+  [[nodiscard]] bool GetRelativeMouseDelta(int& x, int& y);
+
   // Events, without waiting: HasEvents reads what the window system has queued.
   [[nodiscard]] bool HasEvents();
   [[nodiscard]] bool PollEvent(Event& event);

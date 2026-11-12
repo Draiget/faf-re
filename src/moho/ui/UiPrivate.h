@@ -8,6 +8,10 @@
 #include "moho/sim/BuildQueueCommandDecrement.h"
 #include "platform/BinaryObjectBytes.h"
 
+#if FAFRE_PLATFORM_POSIX
+#include "platform/Window.h"
+#endif
+
 #include <Windows.h>
 
 #include <algorithm>
@@ -1150,6 +1154,7 @@ static IMauiDragger* func_GetCurrentDragger2()
  * Toggles mouse-scrub mode, updates cursor visibility/default state, and when
  * enabling scrub mode recenters the cursor to the control midpoint inside the
  * active UI head rectangle.
+ * Engine addition: POSIX uses continuous SDL relative motion instead of cursor warps.
  */
 [[maybe_unused]] static void func_StartMouseScrubbing(
   const bool doStart,
@@ -1160,11 +1165,20 @@ static IMauiDragger* func_GetCurrentDragger2()
     return;
   }
 
+#if FAFRE_PLATFORM_POSIX
+  if (!platform::window::SetRelativeMouseMode(doStart)) {
+    return;
+  }
+#endif
   sMouseIsScrubbing = static_cast<std::uint8_t>(doStart);
 
   auto* const cursor = moho::g_UIManager->GetCursor();
   (void)SetCursorShowingAndMarkDirty(cursor, !doStart);
 
+#if FAFRE_PLATFORM_POSIX
+  (void)control;
+  sMouseScrubDelta = {};
+#else
   if (!doStart) {
     ::SetCursorPos(sMouseMoveStart.x, sMouseMoveStart.y);
     return;
@@ -1207,6 +1221,7 @@ static IMauiDragger* func_GetCurrentDragger2()
   sMouseScrubAnchor.y = scrubY;
   ::SetCursorPos(sMouseScrubAnchor.x, sMouseScrubAnchor.y);
   ::GetCursorPos(&sMouseScrubLanded);
+#endif
 }
 
 /**
