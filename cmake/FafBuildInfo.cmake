@@ -76,6 +76,18 @@ if(CMAKE_SCRIPT_MODE_FILE)
         endif()
       endif()
 
+      # Any other build goes by the newest release or nightly number in its history, then its
+      # commit: 2026.11.007-550a314 for a build made after 2026.11.007-nightly. The old
+      # 2026.05.11.001-nightly form has four numbers and is left out.
+      if(NOT _version)
+        execute_process(COMMAND "${_git}" -C "${FAF_SOURCE_DIR}" describe --tags --abbrev=0
+            "--match=[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9]*" "--exclude=*.*.*.*"
+          OUTPUT_VARIABLE _out RESULT_VARIABLE _rc OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+        if(_rc EQUAL 0 AND _out MATCHES "^([0-9][0-9][0-9][0-9]\\.[0-9][0-9]\\.[0-9]+)(-nightly)?$")
+          set(_base "${CMAKE_MATCH_1}")
+        endif()
+      endif()
+
       execute_process(COMMAND "${_git}" -C "${FAF_SOURCE_DIR}" branch --show-current
         OUTPUT_VARIABLE _out RESULT_VARIABLE _rc OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
       if(_rc EQUAL 0 AND _out)
@@ -89,10 +101,13 @@ if(CMAKE_SCRIPT_MODE_FILE)
   # What the label shown to players calls this build.
   if(_version)
     set(_shown "${_version}")
-  elseif(_dirty)
-    set(_shown "${_short}-dirty")
+  elseif(_base)
+    set(_shown "${_base}-${_short}")
   else()
     set(_shown "${_short}")
+  endif()
+  if(_dirty)
+    string(APPEND _shown "-dirty")
   endif()
 
   # The tag as the version resource's numbers (src/moho/app/MohoVersion.rc): 2026.11.001 and

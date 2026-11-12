@@ -2228,7 +2228,8 @@ namespace
    * Engine addition (issue #327): `GetEngineInfo()` - which engine runs the UI. FAF's own Lua carries
    * faf-re's options and screens behind `if rawget(_G, 'GetEngineInfo') then`, so on the original
    * executable, which has no such function, nothing changes. Name is always "faf-re"; Version is the
-   * release or nightly tag (or the short commit of any other build), Commit the short commit.
+   * release or nightly tag (any other build: the newest tag number and its short commit, as the lobby
+   * label shows it), Commit the short commit.
    */
   int GetEngineInfoBody(
     lua_State* const rawState

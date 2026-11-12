@@ -25,12 +25,14 @@ namespace gpg::diag
   [[nodiscard]] bool BuildDirty() noexcept;
 
   /// The line shown to players: "FAF-RE, Draiget & contributors, build 2026.11.001 x64" on a
-  /// release or nightly, "... build a48d131-dirty x64" on anything else (the lobby label and
-  /// the first line of the network-stats panel).
+  /// release or nightly, "... build 2026.11.001-a48d131-dirty x64" on anything else (the lobby
+  /// label and the first line of the network-stats panel).
   [[nodiscard]] const char* BuildLabel() noexcept;
 
   /// The build's name as the label shows it: the release or nightly tag ("2026.11.001",
-  /// "2026.11.002-nightly"), or the short commit for any other build ("a48d131-dirty").
+  /// "2026.11.002-nightly") for a clean build of a tagged commit; for any other build the newest
+  /// such number in its history and the short commit ("2026.11.002-a48d131", "-dirty" after it
+  /// for local edits), or the short commit alone when it has no such tag.
   [[nodiscard]] const char* BuildVersion() noexcept;
 
   /// One line for logs and reports: "a48d131-dirty x64 Release (master, v1.1.1-186-ga48d131-dirty)".
