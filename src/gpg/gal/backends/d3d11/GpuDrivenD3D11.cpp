@@ -12,6 +12,7 @@
 
 #include "BufferD3D11.h"
 #include "D3D11Common.h"
+#include "RenderTargetD3D11.h"
 #include "TextureD3D11.h"
 
 #include "gpg/core/utils/Logging.h"
@@ -28,7 +29,9 @@ namespace gpg::gal
     constexpr UINT kShaderCompileFlags = D3DCOMPILE_ENABLE_STRICTNESS | D3DCOMPILE_OPTIMIZATION_LEVEL3;
 
     // The registers of the gal binding model (GpuDriven.h).
-    constexpr UINT kFirstTextureRegister = kGpuMaxReadBuffers; // t4
+    constexpr UINT kFirstTextureRegister = kGpuMaxReadBuffers;            // t4
+    constexpr UINT kDepthRegister = kGpuMaxReadBuffers + kGpuMaxTextures; // t6: GpuBindings::depthTarget
+    constexpr UINT kViewCount = kDepthRegister + 1U;
 
     [[nodiscard]] ComPtr<ID3DBlob> CompileStage(
       const GpuProgramDesc& desc,
@@ -183,7 +186,7 @@ namespace gpg::gal
       SavedDrawState& operator=(const SavedDrawState&) = delete;
 
     private:
-      static constexpr UINT kViews = kGpuMaxReadBuffers + kGpuMaxTextures;
+      static constexpr UINT kViews = kViewCount;
 
       ID3D11DeviceContext* mContext;
       ComPtr<ID3D11InputLayout> mInputLayout;
@@ -206,10 +209,10 @@ namespace gpg::gal
       ComPtr<ID3D11RasterizerState> mRasterizer;
     };
 
-    /** The t0..t5 views of `bindings`, in register order. */
+    /** The t0..t6 views of `bindings`, in register order. */
     void GatherShaderViews(
       const GpuBindings& bindings,
-      ID3D11ShaderResourceView* (&views)[kGpuMaxReadBuffers + kGpuMaxTextures]
+      ID3D11ShaderResourceView* (&views)[kViewCount]
     )
     {
       for (std::uint32_t index = 0U; index < kGpuMaxReadBuffers; ++index) {
@@ -218,10 +221,17 @@ namespace gpg::gal
           : nullptr;
       }
       for (std::uint32_t index = 0U; index < kGpuMaxTextures; ++index) {
-        views[kFirstTextureRegister + index] = bindings.textures[index] != nullptr
-          ? static_cast<TextureD3D11*>(bindings.textures[index])->GetShaderResourceView()
-          : nullptr;
+        ID3D11ShaderResourceView* view = nullptr;
+        if (bindings.textures[index] != nullptr) {
+          view = static_cast<TextureD3D11*>(bindings.textures[index])->GetShaderResourceView();
+        } else if (bindings.targets[index] != nullptr) {
+          view = static_cast<RenderTargetD3D11*>(bindings.targets[index])->GetShaderResourceView();
+        }
+        views[kFirstTextureRegister + index] = view;
       }
+      views[kDepthRegister] = bindings.depthTarget != nullptr
+        ? static_cast<DepthStencilTargetD3D11*>(bindings.depthTarget)->GetShaderResourceView()
+        : nullptr;
     }
   } // namespace
 
@@ -500,7 +510,7 @@ namespace gpg::gal
     const SavedDrawState saved(mImmediate.Get());
     UploadConstants(call.bindings);
 
-    ID3D11ShaderResourceView* views[kGpuMaxReadBuffers + kGpuMaxTextures];
+    ID3D11ShaderResourceView* views[kViewCount];
     GatherShaderViews(call.bindings, views);
     ID3D11Buffer* const constants = mConstants.Get();
     ID3D11SamplerState* const sampler = program->mSampler.Get();
@@ -551,7 +561,7 @@ namespace gpg::gal
     }
 
     UploadConstants(dispatch.bindings);
-    ID3D11ShaderResourceView* views[kGpuMaxReadBuffers + kGpuMaxTextures];
+    ID3D11ShaderResourceView* views[kViewCount];
     GatherShaderViews(dispatch.bindings, views);
     ID3D11UnorderedAccessView* writeViews[kGpuMaxWriteBuffers]{};
     for (std::uint32_t index = 0U; index < kGpuMaxWriteBuffers; ++index) {
