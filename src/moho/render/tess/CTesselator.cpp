@@ -94,13 +94,14 @@ namespace moho
         if (body.elevation == kWaterBodyNoWater || body.x1 <= x0 || body.x0 >= x1 || body.z1 <= z0 || body.z0 >= z1) {
           continue;
         }
-        if (body.elevation >= minY && maxY >= body.elevation) {
+        // A river's surface spans [levelMin, levelMax]; every other body has one level.
+        if (body.levelMax >= minY && maxY >= body.levelMin) {
           crosses = true;
         }
-        if (body.elevation >= minY - margin && maxY + margin >= body.elevation) {
+        if (body.levelMax >= minY - margin && maxY + margin >= body.levelMin) {
           *nearWater = true;
         }
-        *highest = std::max(*highest, body.elevation);
+        *highest = std::max(*highest, body.levelMax);
       }
       return crosses;
     }
