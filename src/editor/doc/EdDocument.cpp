@@ -1802,9 +1802,24 @@ namespace faf::editor
   }
 
   void EdDocument::EditEnded(
-    const EditKind kind
+    EditKind kind
   )
   {
+    // A heights or masks step whose stroke changed nothing has nothing to undo (the history keeps no stroke for it):
+    // no step, so the next undo isn't taken by an older stroke of that history. A pair keeps the half that changed.
+    if (kind == EditKind::Heights || kind == EditKind::Masks || kind == EditKind::HeightsAndMasks) {
+      const bool heights = mHeights.LastStrokeKept();
+      const bool masks = mMaskHistory.LastStrokeKept();
+      if ((kind == EditKind::Heights && !heights) || (kind == EditKind::Masks && !masks)) {
+        return;
+      }
+      if (kind == EditKind::HeightsAndMasks) {
+        if (!heights && !masks) {
+          return;
+        }
+        kind = !heights ? EditKind::Masks : !masks ? EditKind::Heights : kind;
+      }
+    }
     mUndoOrder.push_back(kind);
     mRedoOrder.clear();
     mHeights.ClearRedo();

@@ -5211,7 +5211,7 @@ namespace faf::editor
     std::string message;
     if (heights.w > 1) {
       message = ApplyGraphHeights(heights, plain, false, false);
-      parts |= 1;
+      parts |= mDocument.Heights().LastStrokeKept() ? 1 : 0;
     } else if (GraphPreviewNewest()) {
       (void)RevertGraphPreview();
     }
@@ -5223,7 +5223,7 @@ namespace faf::editor
       std::array<float, 9> shares{};
       std::string text;
       if (masks && WriteRecipeMasks(writes.kinds, writes.textured, writes.cap, shares, text, false) >= 0) {
-        ++strokes;
+        strokes += mDocument.MaskUndo().LastStrokeKept() ? 1 : 0;
         paintText += " Ground kinds: " + text + ".";
       } else {
         paintText += " The ground kinds weren't written: " + (masks ? text : std::string("the map has no masks")) + ".";
@@ -5235,7 +5235,7 @@ namespace faf::editor
         masks && strokes < 31 &&
         WriteGeneratedMask(layer.mask, layer.layer, layer.mode, layer.strength, layer.takeAway, text, false) >= 0
       ) {
-        ++strokes;
+        strokes += mDocument.MaskUndo().LastStrokeKept() ? 1 : 0;
         paintText += " Layer " + std::to_string(layer.layer) + ": " + text + ".";
       }
     }

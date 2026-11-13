@@ -125,12 +125,27 @@ namespace faf::editor
       return;
     }
     mStroking = false;
-    if (mCurrent.tiles.empty()) {
-      return;
-    }
+    mLastKept = false;
     for (Tile& tile : mCurrent.tiles) {
       Copy(heights, TileRect(tile.index), tile.after);
     }
+    // Only the tiles the stroke changed; a stroke that changed nothing isn't kept (an undo would take it back instead
+    // of the step before it, and its caller ends no step for it).
+    mCurrent.tiles.erase(
+      std::remove_if(
+        mCurrent.tiles.begin(),
+        mCurrent.tiles.end(),
+        [](const Tile& tile) {
+      return tile.before == tile.after;
+    }
+      ),
+      mCurrent.tiles.end()
+    );
+    if (mCurrent.tiles.empty()) {
+      mCurrent = {};
+      return;
+    }
+    mLastKept = true;
     mUndo.push_back(std::move(mCurrent));
     mCurrent = {};
     mRedo.clear();

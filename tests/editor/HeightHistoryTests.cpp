@@ -100,6 +100,45 @@ namespace
 
   TEST(
     HeightHistory,
+    AStrokeThatChangesNothingIsNotKept
+  )
+  {
+    // A write that touched the tiles but left every sample as it was (a re-applied pad, an import of the same
+    // file): no stroke, so the next undo takes back the stroke before it.
+    std::vector<std::uint16_t> words = RandomField(19u);
+    const std::vector<std::uint16_t> original = words;
+    HeightHistory history;
+    history.Reset(kSize, kSize);
+    HeightBrush brush;
+    brush.radius = 8.0f;
+    brush.strength = 1.0f;
+    brush.mode = HeightBrushMode::Raise;
+    Stroke(words, history, brush, 30.0f, 30.0f, 60.0f, 60.0f, 6);
+    ASSERT_TRUE(history.LastStrokeKept());
+    const std::vector<std::uint16_t> afterFirst = words;
+    history.BeginStroke();
+    history.BeforeWrite(words.data(), SampleRect{0, 0, kSize - 1, kSize - 1});
+    history.EndStroke(words.data());
+    EXPECT_FALSE(history.LastStrokeKept());
+    EXPECT_EQ(history.UndoCount(), 1u);
+    std::vector<SampleRect> changed;
+    ASSERT_TRUE(history.Undo(words.data(), changed));
+    EXPECT_EQ(words, original) << "the real stroke came back, not an empty one";
+    // A stroke that changed one corner keeps only that corner's tiles.
+    history.BeginStroke();
+    history.BeforeWrite(words.data(), SampleRect{0, 0, kSize - 1, kSize - 1});
+    words[0] = static_cast<std::uint16_t>(words[0] + 1);
+    history.EndStroke(words.data());
+    EXPECT_TRUE(history.LastStrokeKept());
+    changed.clear(); // Undo adds to it
+    ASSERT_TRUE(history.Undo(words.data(), changed));
+    EXPECT_EQ(words, original);
+    EXPECT_EQ(changed.size(), 1u) << "one tile";
+    (void)afterFirst;
+  }
+
+  TEST(
+    HeightHistory,
     ANewStrokeClearsRedo
   )
   {

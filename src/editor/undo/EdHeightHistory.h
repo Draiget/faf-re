@@ -32,6 +32,11 @@ namespace faf::editor
 
     /** The stroke ended: keeps its tiles' new heights and makes it the newest undo step (redo is cleared). */
     void EndStroke(const T* heights);
+    /** Whether the last EndStroke kept a stroke (false when it changed nothing). */
+    [[nodiscard]] bool LastStrokeKept() const noexcept
+    {
+      return mLastKept;
+    }
 
     /** Writes the newest stroke's old heights back; the rectangles it wrote go to `changed`. */
     bool Undo(T* heights, std::vector<SampleRect>& changed);
@@ -93,6 +98,7 @@ namespace faf::editor
     int mTilesX = 0;
     std::size_t mBudget = 0;
     bool mStroking = false;
+    bool mLastKept = false;
     Step mCurrent;
     std::vector<int> mTileInCurrent; // per tile: its slot in mCurrent.tiles + 1, or 0
     std::deque<Step> mUndo;
