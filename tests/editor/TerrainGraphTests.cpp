@@ -256,7 +256,7 @@ namespace
   {
     // Every node of the palette (not the generic op nodes) fed with hills where it has an `a` pin: none fails. The ones
     // that need more than that are left out: the markers' pads, both slopes of Height from slopes.
-    const std::set<std::string> skip = {"pad_flatten", "height_from_gradient", "frame"};
+    const std::set<std::string> skip = {"pad_flatten", "height_from_gradient", "frame", "path_drawn"};
     const TerrainGround ground = [] {
       TerrainGround g;
       g.width = 65;
@@ -280,6 +280,11 @@ namespace
       const int a = PinOf(type->inputs, "a");
       if (a >= 0 && type->inputs[static_cast<std::size_t>(a)].type != faf::editor::PinType::Number) {
         ASSERT_EQ(graph.Link(range, 0, node, a), LinkResult::Ok) << type->name;
+      }
+      // A path into the path nodes.
+      if (const int pts = PinOf(type->inputs, "pts"); pts >= 0) {
+        const int line = graph.AddNode("path_line", 200, 200);
+        ASSERT_EQ(graph.Link(line, 0, node, pts), LinkResult::Ok) << type->name;
       }
       if (type->name == "blend") {
         ASSERT_EQ(graph.Link(noise, 0, node, PinOf(type->inputs, "b")), LinkResult::Ok) << "blend needs b";
@@ -497,6 +502,58 @@ namespace
       ),
       1
     ) << "the roughness mask";
+  }
+
+  TEST(
+    TerrainGraph,
+    APathMasksAndCarvesAlongItsLine
+  )
+  {
+    // A straight line (no wobble) across the middle of a flat 129 x 129 map at 30 units, 8 units wide.
+    TerrainGround ground = Ground();
+    std::fill(
+      std::const_pointer_cast<std::vector<float>>(ground.heights)->begin(),
+      std::const_pointer_cast<std::vector<float>>(ground.heights)->end(),
+      30.0f
+    );
+    NodeGraph graph(TerrainNodeTypes());
+    const int terrain = graph.AddNode("terrain", 0, 0);
+    const int line = graph.AddNode("path_line", 0, 200);
+    const int mask = graph.AddNode("path_mask", 200, 200);
+    const int shape = graph.AddNode("path_shape", 200, 0);
+    const auto set = [&](const int id, const char* name, const float value) {
+      ParamValue v;
+      v.value[0] = value;
+      graph.SetParam(id, ParamOf(*graph.Find(id)->type, name), v);
+    };
+    set(line, "x0", 0.0f);
+    set(line, "z0", 0.5f);
+    set(line, "x1", 1.0f);
+    set(line, "z1", 0.5f);
+    set(line, "wobble", 0.0f);
+    set(line, "height", -6.0f);
+    ASSERT_EQ(graph.Link(line, 0, mask, 0), LinkResult::Ok);
+    const auto& shapeType = *graph.Find(shape)->type;
+    ASSERT_EQ(graph.Link(terrain, 0, shape, PinOf(shapeType.inputs, "a")), LinkResult::Ok);
+    ASSERT_EQ(graph.Link(line, 0, shape, PinOf(shapeType.inputs, "pts")), LinkResult::Ok);
+    TerrainRun run(1);
+    const auto report = run.Evaluate(graph, 1, ground);
+    ASSERT_TRUE(report.errors.empty()) << report.errors.begin()->second;
+    const faf::editor::TerrainValue* path = run.Value(line, "out");
+    ASSERT_NE(path, nullptr);
+    ASSERT_NE(path->path, nullptr);
+    EXPECT_EQ(path->path->points.size(), 7U) << "7 control points";
+    const field::Grid& m = *run.Value(mask, "out")->grid;
+    EXPECT_GT(m.At(64, 64), 0.9f) << "on the line";
+    EXPECT_FLOAT_EQ(m.At(64, 10), 0.0f) << "far from it";
+    const field::Grid& h = *run.Value(shape, "out")->grid;
+    EXPECT_LT(h.At(64, 64), 26.0f) << "carved about 6 units into the 30";
+    EXPECT_FLOAT_EQ(h.At(64, 10), 30.0f) << "untouched away from it";
+    // A path node without a path is an error, not a crash.
+    NodeGraph lonely(TerrainNodeTypes());
+    const int alone = lonely.AddNode("path_mask", 0, 0);
+    TerrainRun other(1);
+    EXPECT_EQ(other.Evaluate(lonely, 1, ground).errors.count(alone), 1U);
   }
 
   TEST(

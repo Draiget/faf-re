@@ -370,6 +370,243 @@ namespace faf::editor::terrain
       }
       return flat;
     }
+
+    // ---- paths (FAF Studio's paths.lua): a Catmull-Rom curve through the control points sampled by arc length, the
+    // section profiles and the modes, and the number list the path ops read.
+    struct PathProfile
+    {
+      const char* id;
+      bool smooth;
+      std::vector<double> points; // x, y pairs
+    };
+    const std::vector<PathProfile>& PathProfiles()
+    {
+      static const std::vector<PathProfile> kProfiles = {
+        {"ramp", true, {0, 1, 1, 1}},
+        {"road", true, {0, 1, 0.6, 1, 0.8, 0.55, 1, 0.2}},
+        {"v", false, {0, 1, 1, 0}},
+        {"u", true, {0, 1, 0.55, 1, 0.8, 0.85, 0.93, 0.35, 1, 0}},
+        {"ridge", true, {0, 1, 0.4, 0.45, 1, 0}},
+        {"wall", true, {0, 1, 0.85, 1, 1, 0}},
+        {"terrace", true, {0, 1, 0.2, 1, 0.28, 0.75, 0.46, 0.75, 0.54, 0.5, 0.72, 0.5, 0.8, 0.25, 0.95, 0.25, 1, 0}},
+      };
+      return kProfiles;
+    }
+    const PathProfile& PathProfileOf(
+      const std::string& id
+    )
+    {
+      for (const PathProfile& p : PathProfiles()) {
+        if (id == p.id) {
+          return p;
+        }
+      }
+      return PathProfiles().front();
+    }
+    /** A mode: the op's mode (offset or target), what it keeps (none, min: only lowering), its own profile. */
+    struct PathMode
+    {
+      const char* id;
+      const char* native;
+      const char* clip;
+      const char* profile;
+      bool river;
+    };
+    const PathMode& PathModeOf(
+      const std::string& id
+    )
+    {
+      static const PathMode kModes[] = {
+        {"carve", "offset", "none", "u", false},
+        {"raise", "offset", "none", "ridge", false},
+        {"level", "target", "none", "ramp", false},
+        {"ramp", "target", "none", "ramp", false},
+        {"road", "target", "none", "road", false},
+        {"river", "target", "min", "u", true},
+      };
+      for (const PathMode& m : kModes) {
+        if (id == m.id) {
+          return m;
+        }
+      }
+      return kModes[0];
+    }
+
+    /** The dense polyline of a path: position, half width, falloff, height (offset or above the ground), the segment
+     * and where in it, the arc length; the arc length at every control point. */
+    struct PathSamples
+    {
+      std::vector<float> x, z, w, f, h, t, s;
+      std::vector<int> seg;
+      std::vector<float> ctrlS;
+      [[nodiscard]] std::size_t Count() const noexcept
+      {
+        return x.size();
+      }
+    };
+    PathSamples SamplePath(
+      const TerrainPath& path,
+      const float step = 1.0f
+    )
+    {
+      PathSamples S;
+      const auto& pts = path.points;
+      const int n = static_cast<int>(pts.size());
+      if (n == 0) {
+        return S;
+      }
+      // Catmull-Rom handles (tension 1): a sixth of the neighbours' span.
+      std::vector<std::array<float, 2>> out(static_cast<std::size_t>(n));
+      std::vector<std::array<float, 2>> in(static_cast<std::size_t>(n));
+      for (int i = 0; i < n; ++i) {
+        const TerrainPath::Point& p = pts[static_cast<std::size_t>(i)];
+        const TerrainPath::Point* prev =
+          i > 0 ? &pts[static_cast<std::size_t>(i - 1)] : (path.closed && n > 2 ? &pts.back() : nullptr);
+        const TerrainPath::Point* next =
+          i < n - 1 ? &pts[static_cast<std::size_t>(i + 1)] : (path.closed && n > 2 ? &pts.front() : nullptr);
+        const float px = prev != nullptr ? prev->x : p.x;
+        const float pz = prev != nullptr ? prev->z : p.z;
+        const float qx = next != nullptr ? next->x : p.x;
+        const float qz = next != nullptr ? next->z : p.z;
+        out[static_cast<std::size_t>(i)] = {(qx - px) / 6.0f, (qz - pz) / 6.0f};
+        in[static_cast<std::size_t>(i)] = {-(qx - px) / 6.0f, -(qz - pz) / 6.0f};
+      }
+      const int segments = path.closed && n > 2 ? n : n - 1;
+      float length = 0.0f;
+      const auto push = [&](
+                          const float x,
+                          const float z,
+                          const TerrainPath::Point& a,
+                          const TerrainPath::Point& b,
+                          const float t,
+                          const int seg
+                        ) {
+        if (!S.x.empty()) {
+          length += std::hypot(x - S.x.back(), z - S.z.back());
+        }
+        S.x.push_back(x);
+        S.z.push_back(z);
+        S.w.push_back(a.width + (b.width - a.width) * t);
+        S.f.push_back(a.falloff + (b.falloff - a.falloff) * t);
+        S.h.push_back(a.height + (b.height - a.height) * t);
+        S.t.push_back(t);
+        S.seg.push_back(seg);
+        S.s.push_back(length);
+      };
+      if (segments < 1) {
+        push(pts[0].x, pts[0].z, pts[0], pts[0], 0.0f, 0);
+        S.ctrlS = {0.0f};
+        return S;
+      }
+      S.ctrlS.assign(static_cast<std::size_t>(segments) + 1, 0.0f);
+      for (int i = 0; i < segments; ++i) {
+        const int j = (i + 1) % n;
+        const TerrainPath::Point& a = pts[static_cast<std::size_t>(i)];
+        const TerrainPath::Point& b = pts[static_cast<std::size_t>(j)];
+        const float p0x = a.x, p0z = a.z;
+        const float p1x = a.x + out[static_cast<std::size_t>(i)][0], p1z = a.z + out[static_cast<std::size_t>(i)][1];
+        const float p2x = b.x + in[static_cast<std::size_t>(j)][0], p2z = b.z + in[static_cast<std::size_t>(j)][1];
+        const float p3x = b.x, p3z = b.z;
+        const float poly =
+          std::hypot(p1x - p0x, p1z - p0z) + std::hypot(p2x - p1x, p2z - p1z) + std::hypot(p3x - p2x, p3z - p2z);
+        const int count = std::clamp(static_cast<int>(std::ceil(poly / step)), 2, 400);
+        const int last = i == segments - 1 ? count : count - 1;
+        // The attributes run along the segment's arc length (not the curve parameter, which is fast in the middle).
+        std::vector<float> qx(static_cast<std::size_t>(count) + 1), qz(static_cast<std::size_t>(count) + 1),
+          cum(static_cast<std::size_t>(count) + 1);
+        float total = 0.0f;
+        for (int q = 0; q <= count; ++q) {
+          const float t = static_cast<float>(q) / static_cast<float>(count);
+          const float u = 1.0f - t;
+          const float c0 = u * u * u, c1 = 3 * u * u * t, c2 = 3 * u * t * t, c3 = t * t * t;
+          qx[static_cast<std::size_t>(q)] = c0 * p0x + c1 * p1x + c2 * p2x + c3 * p3x;
+          qz[static_cast<std::size_t>(q)] = c0 * p0z + c1 * p1z + c2 * p2z + c3 * p3z;
+          if (q > 0) {
+            total += std::hypot(
+              qx[static_cast<std::size_t>(q)] - qx[static_cast<std::size_t>(q) - 1],
+              qz[static_cast<std::size_t>(q)] - qz[static_cast<std::size_t>(q) - 1]
+            );
+          }
+          cum[static_cast<std::size_t>(q)] = total;
+        }
+        for (int q = 0; q <= last; ++q) {
+          float frac = total > 0.00001f ? cum[static_cast<std::size_t>(q)] / total
+                                        : static_cast<float>(q) / static_cast<float>(count);
+          if (q == count) {
+            frac = 1.0f;
+          }
+          push(qx[static_cast<std::size_t>(q)], qz[static_cast<std::size_t>(q)], a, b, frac, i);
+          if (q == 0) {
+            S.ctrlS[static_cast<std::size_t>(i)] = length;
+          }
+        }
+      }
+      S.ctrlS[static_cast<std::size_t>(segments)] = length;
+      return S;
+    }
+
+    /** The path ops' arguments: 8 numbers a sample (x, z, target height, half width, falloff, bank, offset, arc
+     * length), the profile, its smoothness. */
+    std::vector<Arg> PathArgs(
+      const PathSamples& S,
+      const std::vector<float>& ys,
+      const std::vector<float>& offs,
+      const PathProfile& profile
+    )
+    {
+      std::vector<double> flat;
+      flat.reserve(S.Count() * 8);
+      for (std::size_t k = 0; k < S.Count(); ++k) {
+        flat.insert(
+          flat.end(),
+          {S.x[k], S.z[k], k < ys.size() ? ys[k] : 0.0f, S.w[k], S.f[k], 0.0, k < offs.size() ? offs[k] : 0.0f, S.s[k]}
+        );
+      }
+      return {
+        {"pts", std::move(flat)}, {"profile", profile.points}, {"smooth", profile.smooth ? 1 : 0}, {"symmetric", 1}
+      };
+    }
+
+    /** A seeded hash of (seed, i) in 0..1: the same at every resolution (Studio's wobble). */
+    double PathHash(
+      const int seed,
+      const int i
+    )
+    {
+      double h = std::fmod(std::sin(seed * 12.9898 + i * 78.233) * 43758.5453, 1.0);
+      return h < 0.0 ? h + 1.0 : h;
+    }
+
+    /** A path from points in map units with the node's width, falloff and height for all of them. */
+    std::shared_ptr<TerrainPath> PathFrom(
+      const std::vector<std::pair<double, double>>& points,
+      const Values& v,
+      const bool closed
+    )
+    {
+      auto path = std::make_shared<TerrainPath>();
+      path->closed = closed;
+      path->mode = v.text.count("mode") != 0 ? v.S("mode") : "carve";
+      path->profile = v.text.count("profile") != 0 ? v.S("profile") : PathModeOf(path->mode).profile;
+      for (const auto& [x, z] : points) {
+        TerrainPath::Point p;
+        p.x = static_cast<float>(x);
+        p.z = static_cast<float>(z);
+        p.width = static_cast<float>(v.num.count("width") != 0 ? v.N("width") : 6.0);
+        p.falloff = static_cast<float>(v.num.count("falloff") != 0 ? v.N("falloff") : 4.0);
+        p.height = static_cast<float>(v.num.count("height") != 0 ? v.N("height") : 0.0);
+        path->points.push_back(p);
+      }
+      return path;
+    }
+
+    std::shared_ptr<const TerrainPath> PathIn(
+      const Inputs& ins
+    )
+    {
+      const auto found = ins.find("pts");
+      return found != ins.end() && found->second != nullptr ? found->second->path : nullptr;
+    }
   } // namespace
 
   void BuildCatalogue(
@@ -3354,6 +3591,212 @@ namespace faf::editor::terrain
         {C("size", "Texture size (pixels)", sizeIds, sizeNames, "auto"), B("assign", "Use it on the map", true)},
         nothing,
         "maplight"
+      );
+    }
+
+    // ---- paths (FAF Studio's path nodes): a path made from shares of the map with a seeded wobble, and the nodes that
+    // make masks and distances from it or shape the heights along it
+    {
+      const auto pathOut = [](std::shared_ptr<TerrainPath> path) {
+        Outputs out;
+        out["out"].path = std::move(path);
+        return out;
+      };
+      const std::vector<std::string> profileIds = {"ramp", "road", "v", "u", "ridge", "wall", "terrace"};
+      const std::vector<std::string> profileNames = {
+        "Ramp", "Road with shoulders", "V valley", "U canyon", "Ridge", "Wall", "Terrace steps"
+      };
+      const std::vector<std::string> modeIds = {"carve", "raise", "level", "ramp", "road", "river"};
+      const std::vector<std::string> modeNames = {"Carve", "Raise", "Level", "Ramp", "Road", "River"};
+      c.Add(
+        "path_line",
+        "Path: line",
+        "paths",
+        "A curved path from one point to another (shares of the map), with a seeded wobble. Feed it to Path mask or "
+        "Path shape.",
+        {},
+        {Pin("out", PinType::Points)},
+        {N("x0", "Start x", 0, 1, 0.01f, "%.2f", 0.1f),
+         N("z0", "Start z", 0, 1, 0.01f, "%.2f", 0.1f),
+         N("x1", "End x", 0, 1, 0.01f, "%.2f", 0.9f),
+         N("z1", "End z", 0, 1, 0.01f, "%.2f", 0.9f),
+         N("wobble", "Wobble (share of the length)", 0, 0.5f, 0.01f, "%.2f", 0.08f),
+         N("points", "Control points", 2, 24, 1, "%.0f", 7),
+         Seed(),
+         N("width", "Half width (units)", 1, 100, 0.5f, "%.1f", 8, true),
+         N("falloff", "Falloff (units)", 0, 100, 0.5f, "%.1f", 10),
+         N("height", "Height / depth (units)", -100, 100, 0.5f, "%.1f", -3)},
+        [pathOut](const Env& E, const Values& v, const Inputs&) {
+        const double x0 = v.N("x0") * E.W, z0 = v.N("z0") * E.H, x1 = v.N("x1") * E.W, z1 = v.N("z1") * E.H;
+        const int n = std::max(1, static_cast<int>(std::floor(v.N("points") + 0.5)) - 1);
+        const double dx = x1 - x0, dz = z1 - z0;
+        const double len = std::hypot(dx, dz);
+        const double nx = -dz / std::max(len, 1e-6), nz = dx / std::max(len, 1e-6);
+        const int seed = E.Seed(v.N("seed"));
+        std::vector<std::pair<double, double>> pts;
+        for (int i = 0; i <= n; ++i) {
+          const double t = static_cast<double>(i) / n;
+          const double amp = i > 0 && i < n ? (PathHash(seed, i) - 0.5) * 2.0 * v.N("wobble") * len : 0.0;
+          pts.emplace_back(x0 + dx * t + nx * amp, z0 + dz * t + nz * amp);
+        }
+        return pathOut(PathFrom(pts, v, false));
+      }
+      );
+      c.Add(
+        "path_ring",
+        "Path: ring",
+        "paths",
+        "A closed loop around a centre (shares of the map) with a seeded wobble.",
+        {},
+        {Pin("out", PinType::Points)},
+        {N("cx", "Centre x", 0, 1, 0.01f, "%.2f", 0.5f),
+         N("cz", "Centre z", 0, 1, 0.01f, "%.2f", 0.5f),
+         N("radius", "Radius (share of the map)", 0.02f, 0.7f, 0.01f, "%.2f", 0.3f),
+         N("wobble", "Wobble (share of the radius)", 0, 0.5f, 0.01f, "%.2f", 0.1f),
+         N("points", "Control points", 4, 32, 1, "%.0f", 10),
+         Seed(),
+         N("width", "Half width (units)", 1, 100, 0.5f, "%.1f", 8, true),
+         N("falloff", "Falloff (units)", 0, 100, 0.5f, "%.1f", 10),
+         N("height", "Height / depth (units)", -100, 100, 0.5f, "%.1f", 3)},
+        [pathOut](const Env& E, const Values& v, const Inputs&) {
+        const int n = std::max(3, static_cast<int>(std::floor(v.N("points") + 0.5)));
+        const int seed = E.Seed(v.N("seed"));
+        const double r0 = v.N("radius") * std::min(E.W, E.H);
+        std::vector<std::pair<double, double>> pts;
+        for (int i = 0; i < n; ++i) {
+          const double a = static_cast<double>(i) / n * 6.2831853;
+          const double r = r0 * (1.0 + (PathHash(seed, i) - 0.5) * 2.0 * v.N("wobble"));
+          pts.emplace_back(v.N("cx") * E.W + std::cos(a) * r, v.N("cz") * E.H + std::sin(a) * r);
+        }
+        return pathOut(PathFrom(pts, v, true));
+      }
+      );
+      c.Add(
+        "path_drawn",
+        "Path: from the Paths tool",
+        "paths",
+        "A path drawn with the Paths tool (this editor has no Paths tool yet).",
+        {},
+        {Pin("out", PinType::Points)},
+        {N("index", "Path number", 1, 40, 1, "%.0f", 1)},
+        [](const Env&, const Values&, const Inputs&) -> Outputs {
+        Fail("this editor has no Paths tool yet");
+      }
+      );
+      c.Add(
+        "path_mask",
+        "Path mask",
+        "paths",
+        "A mask along a path: the shaping weight, the flat core, the whole reach or just the banks.",
+        {Pin("pts", PinType::Points)},
+        kMaskOut,
+        {C("kind",
+           "Mask",
+           {"weight", "core", "reach", "bank"},
+           {"Shaping weight (profile)", "Core (half width)", "Reach (width and falloff)", "Banks"},
+           "weight"),
+         N("soft", "Soft edge (units)", 0, 50, 0.5f, "%.1f", 3)},
+        [](const Env& E, const Values& v, const Inputs& ins) {
+        const auto path = PathIn(ins);
+        const PathSamples S = SamplePath(*path);
+        if (S.Count() < 1) {
+          Fail("the path has no points");
+        }
+        std::vector<Arg> args = PathArgs(S, {}, {}, PathProfileOf(path->profile));
+        args.emplace_back("like", E.like);
+        args.emplace_back("kind", v.S("kind"));
+        args.emplace_back("soft", v.N("soft"));
+        return One(E.Op("path_mask", args));
+      }
+      );
+      c.Add(
+        "path_dist",
+        "Path distance",
+        "paths",
+        "Distance of every point to a path (units), or the distance along it.",
+        {Pin("pts", PinType::Points)},
+        kHeightOut,
+        {C("what",
+           "Output",
+           {"dist", "signed", "along", "u"},
+           {"Distance", "Signed distance (left / right)", "Along the path", "Across the path (profile coordinate)"},
+           "dist"),
+         N("far", "Largest distance (units)", 10, 3000, 10, "%.0f", 300)},
+        [](const Env& E, const Values& v, const Inputs& ins) {
+        const auto path = PathIn(ins);
+        const PathSamples S = SamplePath(*path);
+        if (S.Count() < 1) {
+          Fail("the path has no points");
+        }
+        std::vector<Arg> args = PathArgs(S, {}, {}, PathProfileOf(path->profile));
+        args.emplace_back("like", E.like);
+        const std::string& what = v.S("what");
+        if (what == "along") {
+          args.emplace_back("normalize", 1);
+          return One(E.Op("path_along", args));
+        }
+        if (what == "u") {
+          return One(E.Op("path_u", args));
+        }
+        args.emplace_back("far", v.N("far"));
+        if (what == "signed") {
+          args.emplace_back("signed", 1);
+        }
+        return One(E.Op("path_dist", args));
+      }
+      );
+      c.Add(
+        "path_shape",
+        "Path shape",
+        "paths",
+        "Shapes the heights along a path: carve a valley, raise a ridge, level a road, ramp between heights or cut a "
+        "river bed. The profile is the cross section.",
+        {Pin("a"), Pin("pts", PinType::Points)},
+        kHeightOut,
+        {C("mode", "Mode", modeIds, modeNames, "carve"),
+         C("profile", "Cross section", profileIds, profileNames, "u"),
+         N("strength", "Strength", 0, 1, 0.05f, "%.2f", 1, true)},
+        [](const Env& E, const Values& v, const Inputs& ins) {
+        const field::GridPtr a = In(ins, "a");
+        const auto path = PathIn(ins);
+        const PathMode& mode = PathModeOf(v.S("mode"));
+        const PathSamples S = SamplePath(*path);
+        if (S.Count() < 1) {
+          Fail("the path has no points");
+        }
+        // Target heights along the samples (target modes: the ground under each control point plus its height, a
+        // river's the water less its depth, never rising), or the offsets (offset modes).
+        std::vector<float> ys(S.Count(), 0.0f);
+        std::vector<float> offs(S.Count(), 0.0f);
+        if (std::string(mode.native) == "offset") {
+          offs = S.h;
+        } else {
+          const int pc = static_cast<int>(path->points.size());
+          std::vector<float> yc(static_cast<std::size_t>(pc));
+          for (int i = 0; i < pc; ++i) {
+            const TerrainPath::Point& p = path->points[static_cast<std::size_t>(i)];
+            yc[static_cast<std::size_t>(i)] =
+              mode.river ? E.water - p.height : field::SampleWorld(*a, p.x, p.z) + p.height;
+          }
+          for (std::size_t k = 0; k < S.Count(); ++k) {
+            const int s0 = S.seg[k];
+            const int s1 = (s0 + 1) % pc;
+            ys[k] = yc[static_cast<std::size_t>(s0)] +
+              (yc[static_cast<std::size_t>(s1)] - yc[static_cast<std::size_t>(s0)]) * S.t[k];
+          }
+          if (mode.river) {
+            for (std::size_t k = 1; k < ys.size(); ++k) {
+              ys[k] = std::min(ys[k], ys[k - 1]);
+            }
+          }
+        }
+        std::vector<Arg> args = PathArgs(S, ys, offs, PathProfileOf(v.S("profile")));
+        args.emplace_back("a", a);
+        args.emplace_back("mode", mode.native);
+        args.emplace_back("clip", mode.clip);
+        args.emplace_back("strength", v.N("strength"));
+        return One(E.Op("path_shape", args));
+      }
       );
     }
 
