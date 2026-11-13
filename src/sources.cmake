@@ -961,6 +961,7 @@ set(FAF_ENGINE_SOURCES
   moho/render/BoundaryRenderer.cpp
   moho/render/FxaaRenderer.cpp
   moho/render/PostRenderer.cpp
+  moho/render/SmaaRenderer.cpp
   moho/render/WideBloomRenderer.cpp
   moho/render/BoxRenderer.cpp
   moho/render/CRenFrame.cpp
