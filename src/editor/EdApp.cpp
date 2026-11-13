@@ -129,7 +129,8 @@ namespace faf::editor
         "/propswap",    "/saveas",       "/settingsfile",   "/autosavefolder", "/askunsaved",     "/particlebrowser",
         "/particlenew", "/particleopen", "/materialeditor", "/uiscale",        "/testrun",        "/openall",
         "/roundtrip",   "/vault",        "/vaultsearch",    "/vaultmap",       "/newmap",         "/stamp",
-        "/brush",       "/layer",        "/waterbody",      "/ruler",          "/adaptivewindow",
+        "/brush",       "/layer",        "/waterbody",      "/ruler",          "/adaptivewindow", "/maskrule",
+        "/shader",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {

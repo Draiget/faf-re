@@ -1,5 +1,8 @@
 #include "editor/tools/EdMaskBrush.h"
 
+#include <cctype>
+#include <string>
+
 #include <algorithm>
 #include <cmath>
 
@@ -201,36 +204,47 @@ namespace faf::editor
       const std::uint64_t texel = snapshot.At(x, z);
       const float strength = std::clamp(brush.shape.strength, 0.0f, 1.0f);
       const int layer = std::clamp(brush.layer, 0, 7);
-      const float current = MaskByte(texel, layer);
+      // The brush works in the weight the map's shader shows (C1: TTerrain and most others read saturate(2m-1)) and
+      // stores the byte for it.
+      const auto remappedLayer = [&](const int which) {
+        return (brush.remapped & (1U << which)) != 0;
+      };
+      const auto weightOf = [&](const std::uint64_t t, const int which) {
+        return MaskWeight(MaskByte(t, which), remappedLayer(which));
+      };
+      const float current = weightOf(texel, layer);
       const float step = weight * strength * kWeightPerSecond * seconds;
       std::uint64_t out = texel;
       const auto settle = [&](const float value, const int which) {
-        return static_cast<std::uint8_t>(std::clamp(std::floor(value + Dither(x, z, which, brush.step)), 0.0f, 255.0f));
+        return std::clamp(std::floor(value + Dither(x, z, which, brush.step)), 0.0f, 255.0f);
+      };
+      const auto store = [&](const int which, const float value) {
+        out = WithMaskByte(out, which, MaskStoredFor(value, remappedLayer(which), MaskByte(texel, which)));
       };
       switch (brush.mode) {
       case MaskBrushMode::Paint:
-        out = WithMaskByte(out, layer, std::max(MaskByte(texel, layer), settle(current + step, layer)));
+        store(layer, std::max(current, settle(current + step, layer)));
         if (brush.lowerAbove) {
           for (int above = layer + 1; above < 8; ++above) {
-            const float value = MaskByte(texel, above);
+            const float value = weightOf(texel, above);
             if (value > 0.0f) {
-              out = WithMaskByte(out, above, std::min(MaskByte(texel, above), settle(value - step, above)));
+              store(above, std::min(value, settle(value - step, above)));
             }
           }
         }
         break;
       case MaskBrushMode::Erase:
-        out = WithMaskByte(out, layer, std::min(MaskByte(texel, layer), settle(current - step, layer)));
+        store(layer, std::min(current, settle(current - step, layer)));
         break;
       case MaskBrushMode::Smooth: {
         float sum = 0.0f;
         for (int dz = -1; dz <= 1; ++dz) {
           for (int dx = -1; dx <= 1; ++dx) {
-            sum += MaskByte(snapshot.At(x + dx, z + dz), layer);
+            sum += weightOf(snapshot.At(x + dx, z + dz), layer);
           }
         }
         const float blend = std::min(1.0f, strength * kBlendPerSecond * seconds);
-        out = WithMaskByte(out, layer, settle(current + (sum / 9.0f - current) * blend * weight, layer));
+        store(layer, settle(current + (sum / 9.0f - current) * blend * weight, layer));
         break;
       }
       }
@@ -542,19 +556,59 @@ namespace faf::editor
   void MaskCoverage(
     const std::uint64_t* const texels,
     const std::size_t count,
-    float (&coverage)[8]
+    float (&coverage)[8],
+    const std::uint8_t remapped
   )
   {
-    std::uint64_t sums[8]{};
+    double sums[8] = {};
     for (std::size_t i = 0; i < count; ++i) {
       for (int layer = 0; layer < 8; ++layer) {
-        sums[layer] += MaskByte(texels[i], layer);
+        sums[layer] += MaskWeight(MaskByte(texels[i], layer), (remapped & (1U << layer)) != 0);
       }
     }
     for (int layer = 0; layer < 8; ++layer) {
-      coverage[layer] =
-        count == 0 ? 0.0f : static_cast<float>(static_cast<double>(sums[layer]) / (255.0 * static_cast<double>(count)));
+      coverage[layer] = count == 0 ? 0.0f : static_cast<float>(sums[layer] / (255.0 * static_cast<double>(count)));
     }
+  }
+
+  std::uint8_t RemappedStrata(
+    std::string_view shader
+  )
+  {
+    std::string name(shader);
+    for (char& c : name) {
+      c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    if (name == "terrainpbr") {
+      return 0;
+    }
+    // Terrain100..Terrain252 and their B forms: the second mask's alpha as it is.
+    if (
+      name.size() >= 10 && name.rfind("terrain", 0) == 0 && (name[7] == '1' || name[7] == '2') &&
+      std::isdigit(static_cast<unsigned char>(name[8])) != 0 && std::isdigit(static_cast<unsigned char>(name[9])) != 0
+    ) {
+      return 0x7F;
+    }
+    return 0xFF;
+  }
+
+  MaskRangeReport CheckMaskRange(
+    const std::uint64_t* const texels,
+    const std::size_t count,
+    const std::uint8_t remapped
+  )
+  {
+    MaskRangeReport report;
+    for (std::size_t i = 0; i < count; ++i) {
+      for (int layer = 0; layer < 8; ++layer) {
+        const std::uint8_t stored = MaskByte(texels[i], layer);
+        if ((remapped & (1U << layer)) == 0 || stored == 0) {
+          continue;
+        }
+        ++(stored <= 127 ? report.hidden : report.shown)[static_cast<std::size_t>(layer)];
+      }
+    }
+    return report;
   }
 
   SampleRect ApplyMaskRules(

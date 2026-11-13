@@ -1,6 +1,8 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
+#include <string_view>
 #include <vector>
 
 #include "editor/tools/EdHeightBrush.h"
@@ -32,7 +34,74 @@ namespace faf::editor
     bool lowerAbove = true;
     /** Counts the brush's steps: the dither that rounds weights to whole steps changes with it. */
     std::uint32_t step = 0;
+    /** The strata the map's shader reads through saturate(2m-1) (RemappedStrata): the brush works in the weight that
+     * shows and stores the byte for it. */
+    std::uint8_t remapped = 0;
   };
+
+  /**
+   * Which strata (bit k: the stratum of byte k) a terrain shader reads through `saturate(m * 2 - 1)` rather than as
+   * it is (FAF's effects/terrain.fx): every shader but TerrainPBR does, both masks; the Terrain1xx and Terrain2xx
+   * shaders (Terrain100 to Terrain252, with or without B) only the second mask's colour, its alpha (stratum 8) as it
+   * is. A shader the table doesn't know: all eight, as most do.
+   */
+  [[nodiscard]] std::uint8_t RemappedStrata(std::string_view shader);
+
+  /** The weight a stored byte shows (0..255): itself, or saturate(2m-1) of it when its stratum is remapped. */
+  [[nodiscard]] inline float MaskWeight(
+    const std::uint8_t stored,
+    const bool remapped
+  )
+  {
+    return remapped ? (stored <= 127 ? 0.0f : static_cast<float>(stored) * 2.0f - 255.0f) : static_cast<float>(stored);
+  }
+
+  /**
+   * The byte to store for a weight (0..255): itself, or (w + 255) / 2 when remapped. `before` stays when it already
+   * shows that weight, so a texel a stroke didn't change keeps its byte (a remapped zero is any byte up to 127).
+   */
+  [[nodiscard]] inline std::uint8_t MaskStoredFor(
+    const float weight,
+    const bool remapped,
+    const std::uint8_t before
+  )
+  {
+    const float w = weight < 0.0f ? 0.0f : (weight > 255.0f ? 255.0f : weight);
+    if (static_cast<int>(MaskWeight(before, remapped) + 0.5f) == static_cast<int>(w + 0.5f)) {
+      return before;
+    }
+    if (!remapped) {
+      return static_cast<std::uint8_t>(w + 0.5f);
+    }
+    return w <= 0.0f ? std::uint8_t{127} : static_cast<std::uint8_t>((w + 255.0f) * 0.5f + 0.5f);
+  }
+
+  /**
+   * Per stratum, the texels whose weight a remapped shader hides (byte 1..127) and those it shows (128..255). Hidden
+   * bytes alone mean nothing (GPG's own maps fade their edges through them); a remapped stratum with paint and none
+   * that shows was painted for a shader that reads masks as they are (`PaintedForAnotherRange`).
+   */
+  struct MaskRangeReport
+  {
+    std::array<int, 8> hidden{};
+    std::array<int, 8> shown{};
+    [[nodiscard]] bool PaintedForAnotherRange(
+      const int layer
+    ) const noexcept
+    {
+      const auto i = static_cast<std::size_t>(layer);
+      return hidden[i] > 0 && shown[i] == 0;
+    }
+    [[nodiscard]] int Total() const noexcept
+    {
+      int total = 0;
+      for (int layer = 0; layer < 8; ++layer) {
+        total += PaintedForAnotherRange(layer) ? hidden[static_cast<std::size_t>(layer)] : 0;
+      }
+      return total;
+    }
+  };
+  [[nodiscard]] MaskRangeReport CheckMaskRange(const std::uint64_t* texels, std::size_t count, std::uint8_t remapped);
 
   /** The stratum masks as the editor keeps them: one texel's eight weights in one word, byte k for stratum k. */
   [[nodiscard]] inline std::uint8_t MaskByte(
@@ -118,7 +187,7 @@ namespace faf::editor
   SampleRect MakeMasksSymmetric(std::uint64_t* texels, int maskWidth, int maskHeight, Symmetry symmetry, int turns);
 
   /** Each layer's share of full weight over the map, 0..1. */
-  void MaskCoverage(const std::uint64_t* texels, std::size_t count, float (&coverage)[8]);
+  void MaskCoverage(const std::uint64_t* texels, std::size_t count, float (&coverage)[8], std::uint8_t remapped = 0);
 
   /** Applies the rules in order over every texel; returns the whole mask's rectangle for undo and upload. */
   SampleRect ApplyMaskRules(

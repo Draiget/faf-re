@@ -1560,12 +1560,35 @@ namespace faf::editor
     mDocument.MaskUndo().Reset(masks.width, masks.height);
     mDocument.MasksRead();
     UpdateCoverage();
-    // How much of the map each layer covers (the share of full weight), for the log.
+    const std::uint8_t remapped = RemappedStrata(TerrainShader());
+    // A stratum the map's shader reads through saturate(2m-1) with paint and none of it showing (every byte 1..127)
+    // was painted for a shader that reads masks as they are (C1). Said in the log, so the Problems panel has it too.
+    // Hidden bytes next to ones that show are only soft edges (GPG's own maps have them) and aren't reported.
+    if (
+      const MaskRangeReport range = CheckMaskRange(masks.texels.data(), masks.texels.size(), remapped);
+      range.Total() > 0
+    ) {
+      std::string strata;
+      for (int layer = 0; layer < 8; ++layer) {
+        if (range.PaintedForAnotherRange(layer)) {
+          strata += (strata.empty() ? "" : ", ") + std::to_string(layer + 1);
+        }
+      }
+      gpg::Warnf(
+        "editor: masks: %d painted texels of layer%s %s show nothing under %s (all bytes 1-127, which its "
+        "saturate(2m-1) hides: painted for a shader that reads masks as they are)",
+        range.Total(),
+        strata.find(',') == std::string::npos ? "" : "s",
+        strata.c_str(),
+        TerrainShader().c_str()
+      );
+    }
+    // How much of the map each layer covers (the share of full weight the shader shows), for the log.
     std::string cover;
     for (int layer = 0; layer < 8; ++layer) {
       std::uint64_t sum = 0;
       for (const std::uint64_t texel : masks.texels) {
-        sum += MaskByte(texel, layer);
+        sum += static_cast<std::uint64_t>(MaskWeight(MaskByte(texel, layer), (remapped & (1U << layer)) != 0));
       }
       char part[32];
       (void)std::snprintf(
@@ -1578,7 +1601,14 @@ namespace faf::editor
       );
       cover += part;
     }
-    gpg::Logf("editor: stratum masks %d x %d read for painting (cover %s)", masks.width, masks.height, cover.c_str());
+    gpg::Logf(
+      "editor: stratum masks %d x %d read for painting (shader %s, strata read as 2m-1 0x%02X; cover %s)",
+      masks.width,
+      masks.height,
+      TerrainShader().c_str(),
+      static_cast<unsigned>(remapped),
+      cover.c_str()
+    );
   }
 
   void EdMapScene::UploadMasks(
@@ -1646,6 +1676,8 @@ namespace faf::editor
     }
     // Blocks of 4 x 4 texels (16 thousand quads on a 20 km map), coloured by their average weight.
     constexpr int kBlock = 4;
+    // The weight the map's shader shows (C1).
+    const bool remappedLayer = (RemappedStrata(TerrainShader()) & (1U << layer)) != 0;
     const float perTexel = static_cast<float>(field->width - 1) / static_cast<float>(masks.width);
     const auto groundAt = [field](const float x, const float z, const std::uint32_t color) {
       const int sx = std::clamp(static_cast<int>(std::lround(x)), 0, field->width - 1);
@@ -1663,11 +1695,14 @@ namespace faf::editor
         int count = 0;
         for (int z = bz; z < std::min(masks.height, bz + kBlock); ++z) {
           for (int x = bx; x < std::min(masks.width, bx + kBlock); ++x) {
-            sum += MaskByte(
-              masks.texels
-                [static_cast<std::size_t>(z) * static_cast<std::size_t>(masks.width) + static_cast<std::size_t>(x)],
-              layer
-            );
+            sum += static_cast<unsigned>(MaskWeight(
+              MaskByte(
+                masks.texels
+                  [static_cast<std::size_t>(z) * static_cast<std::size_t>(masks.width) + static_cast<std::size_t>(x)],
+                layer
+              ),
+              remappedLayer
+            ));
             ++count;
           }
         }
@@ -1694,7 +1729,7 @@ namespace faf::editor
     const EdDocument::MaskGrid& masks = mDocument.Masks();
     mCoverageValid = !masks.texels.empty();
     if (mCoverageValid) {
-      faf::editor::MaskCoverage(masks.texels.data(), masks.texels.size(), mCoverage);
+      faf::editor::MaskCoverage(masks.texels.data(), masks.texels.size(), mCoverage, RemappedStrata(TerrainShader()));
     }
   }
 
@@ -1768,8 +1803,14 @@ namespace faf::editor
     const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
     mDocument.MaskUndo().BeginStroke();
     mDocument.MaskUndo().BeforeWrite(masks.texels.data(), whole);
+    // The image's grey is the weight that shows; the byte is stored for the map's shader (C1).
+    const bool remappedLayer = (RemappedStrata(TerrainShader()) & (1U << layer)) != 0;
     for (std::size_t i = 0; i < masks.texels.size(); ++i) {
-      masks.texels[i] = WithMaskByte(masks.texels[i], layer, static_cast<std::uint8_t>(image.words[i] >> 8));
+      masks.texels[i] = WithMaskByte(
+        masks.texels[i],
+        layer,
+        MaskStoredFor(static_cast<float>(image.words[i] >> 8), remappedLayer, MaskByte(masks.texels[i], layer))
+      );
     }
     WholeMaskChanged(whole);
     message = "Imported the mask of layer " + std::to_string(layer + 1) + " from " + file.string();
@@ -1791,6 +1832,7 @@ namespace faf::editor
     const SampleRect whole{0, 0, masks.width - 1, masks.height - 1};
     mDocument.MaskUndo().BeginStroke();
     mDocument.MaskUndo().BeforeWrite(masks.texels.data(), whole);
+    const bool remappedLayer = (RemappedStrata(TerrainShader()) & (1U << layer)) != 0;
     for (int y = 0; y < masks.height; ++y) {
       for (int x = 0; x < masks.width; ++x) {
         // The image covers the whole map: its rows run along z as the mask's do.
@@ -1802,8 +1844,9 @@ namespace faf::editor
         );
         const float grey = image.channels == 1 ? c[0] : c[0] * 0.2126f + c[1] * 0.7152f + c[2] * 0.0722f;
         std::uint64_t& texel = masks.texels[static_cast<std::size_t>(y) * masks.width + x];
-        texel =
-          WithMaskByte(texel, layer, static_cast<std::uint8_t>(std::lround(std::clamp(grey, 0.0f, 1.0f) * 255.0f)));
+        texel = WithMaskByte(
+          texel, layer, MaskStoredFor(std::clamp(grey, 0.0f, 1.0f) * 255.0f, remappedLayer, MaskByte(texel, layer))
+        );
       }
     }
     WholeMaskChanged(whole);
@@ -1827,8 +1870,10 @@ namespace faf::editor
     image.width = masks.width;
     image.height = masks.height;
     image.words.resize(masks.texels.size());
+    // The weight that shows, not the stored byte (C1).
+    const bool remappedLayer = (RemappedStrata(TerrainShader()) & (1U << layer)) != 0;
     for (std::size_t i = 0; i < masks.texels.size(); ++i) {
-      image.words[i] = static_cast<std::uint16_t>(MaskByte(masks.texels[i], layer) * 257u);
+      image.words[i] = static_cast<std::uint16_t>(MaskWeight(MaskByte(masks.texels[i], layer), remappedLayer) * 257.0f);
     }
     std::string error;
     if (!WriteHeightImage(file, image, error)) {
@@ -1875,12 +1920,30 @@ namespace faf::editor
   )
   {
     moho::StratumMaterial& strata = mMap->mTerrainRes->GetStratumMaterial();
+    // The masks stay as they are: the brushes encode for the new shader from now on (C1), and paint stored for the
+    // old one shows differently when the two read masks differently.
+    if (
+      const std::uint8_t before = RemappedStrata(strata.mShaderName.c_str()), after = RemappedStrata(shader);
+      before != after && !mDocument.Masks().texels.empty()
+    ) {
+      gpg::Warnf(
+        "editor: terrain shader %s reads masks differently from %s (strata as 2m-1: 0x%02X, was 0x%02X): the "
+        "paint so far shows differently",
+        shader.c_str(),
+        strata.mShaderName.c_str(),
+        static_cast<unsigned>(after),
+        static_cast<unsigned>(before)
+      );
+    }
     strata.mShaderName.assign(shader.c_str());
     // ResolveTerrainCompositeShaderUsage (0x0089F350) checks the new name once before it is drawn or saved.
     strata.byte0 = 0;
     strata.byte1 = 1;
     mDocument.SetModified(true);
     gpg::Logf("editor: terrain shader %s", shader.c_str());
+    if (!mDocument.Masks().texels.empty()) {
+      UpdateCoverage(); // the share each layer shows under the new shader
+    }
   }
 
   std::string EdMapScene::TerrainShader() const
@@ -1920,6 +1983,8 @@ namespace faf::editor
     }
     MaskBrush brush = mTools->CurrentMaskBrush();
     brush.step = ++mMaskSteps;
+    // Stored for the map's shader (most read saturate(2m-1)): the brush works in the weight that shows.
+    brush.remapped = RemappedStrata(TerrainShader());
     // A right-button stroke does the opposite: Paint erases, Erase paints.
     if (mPaintInverted) {
       brush.mode = brush.mode == MaskBrushMode::Paint ? MaskBrushMode::Erase

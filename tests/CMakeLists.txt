@@ -375,7 +375,7 @@ set_tests_properties(occupation_manager PROPERTIES LABELS "Sim")
 # byte-exact undo, height images read back as written.
 add_executable(faf_editor_brush_tests EXCLUDE_FROM_ALL editor/HeightBrushTests.cpp editor/HeightHistoryTests.cpp editor/SymmetryCheckTests.cpp editor/HeightFileTests.cpp
   editor/NewMapTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdNewMap.cpp
-  editor/MaskBrushTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMaskBrush.cpp
+  editor/MaskBrushTests.cpp editor/MaskEncodingTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMaskBrush.cpp
   editor/SaveFileTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/doc/EdSaveFile.cpp
   editor/MarkerTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdMarkers.cpp
   editor/DecalShapeTests.cpp ${CMAKE_SOURCE_DIR}/src/editor/tools/EdDecalShape.cpp
