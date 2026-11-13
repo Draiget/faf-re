@@ -4,6 +4,8 @@ How to run the dedicated server (`server`, Linux only) on a machine with the hos
 
 The dashboard is one page and talks to `server-host` only; every lobby, including a game a player asked for, opens inside it. A single `server` can also run without a host, from a match file you write yourself (section 6), but the dashboard doesn't connect to it.
 
+For several hosts, FAF sign-in, tournament allowlists and players' own pages, the control service ([CONTROL_SERVICE.md](CONTROL_SERVICE.md)) sits in front of the hosts and talks to their APIs.
+
 ## 1. Build
 
 On Linux, with the pinned toolchain (see [README.md](../README.md)):
