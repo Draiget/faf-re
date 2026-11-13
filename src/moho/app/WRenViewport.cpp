@@ -22,6 +22,7 @@
 #include "moho/terrain/water/WaterQuality.h"
 #include "moho/terrain/water/WaterReflections.h"
 #include "moho/terrain/water/WaterSimulation.h"
+#include "moho/terrain/water/Waterfall.h"
 
 #include <array>
 #include <cstdlib>
@@ -2262,6 +2263,14 @@ void moho::WRenViewport::RenderWorldView(
       "WaterFeed"
     ); // render profile: the hulls and bodies of the batch
     moho::water::FeedWaterFromMeshes(*meshRenderer);
+  }
+  // Waterfalls and rapids of the rivers (docs/projects/RIVERS.md): particles and foam sources by the game clock, before
+  // the simulation steps and takes the foam; the curtains are the beat's (CWldSession::ApplyBeatEffects).
+  if (worldView == begin && !RenderAdditionsDisabled()) {
+    const gpg::gal::RenderProfileScope profileWaterfalls(
+      "Waterfalls"
+    ); // render profile: the clock and particles of the falls
+    moho::water::falls::OnFrame(*mCam);
   }
   {
     const gpg::gal::RenderProfileScope profileWaterStep(
