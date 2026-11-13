@@ -13,6 +13,7 @@ and desync checks are unaffected. It works with the water bodies of [WATER_BODIE
 | Where a source counts | `WaterSourceGate.h` | |
 | Water Quality: reflection target size, filtered lookups, soft shoreline | `WaterQuality.{h,cpp}`, `WaterEffectPatch.{h,cpp}` | `ren_WaterQuality` |
 | What the water shows of the scene: screen-space reflections, real-depth thickness, caustics, sheen, unit shadows | `WaterReflections.{h,cpp}`, `WaterReflectionPatch.{h,cpp}` | `ren_WaterSSR`, `ren_WaterAbsorb`, `ren_WaterCaustics`, `ren_WaterSheen`, `ren_WaterUnitShadows`; [WATER_REFLECTIONS.md](WATER_REFLECTIONS.md) |
+| The edge of a lake or a river at the ground: the cut-out mask by the depth test alone, the mesh of a river grown over the pits beside it | `WaterBanks.h`, `WaterBankPatch.cpp`, `WaterBankGrowth.cpp`, `WaterBanksBind.{h,cpp}`, `WaterBodySurfaces.cpp` | `ren_WaterBanks`, `ren_WaterBankReach` |
 | Shore cut-out and terrain tessellation near the water | `Shoreline.cpp`, `render/tess/CTesselator.cpp` | `ren_ShoreTessCoeff`, `ren_ShoreTessCell`, `ren_ShorelineCutoff` |
 | The headless lab and the recorder | `tools/watersimlab/`, `tools/watersimlab.py`, `tools/waterrec.py` | |
 
@@ -170,10 +171,110 @@ With bodies the terrain computes the depth per pixel instead:
   dialect backends; `FAF_NO_RENDER_ADDITIONS=1` leaves terrain.fx alone, and so does a source it does not recognise. `ren_TerrainWaterLevels 0` brings back the
   baked depth live. The water surface keeps reading the baked water map (its depth, foam and flatness).
 
+## Rivers
+
+A river (`River` key of a water body, `sim_FixRivers`; [projects/RIVERS.md](projects/RIVERS.md)) is a water whose level is not one number. What the water does with it, **as built**
+(render only; the sim part is in [WATER_BODIES.md](WATER_BODIES.md)):
+
+* **The block has its own level.** `WaterOfBlock` returns, for a river's block, the mean of its four corners' levels (`RiverBlockCorners`: the river's level field at the even vertices) and the shading
+  depths `deep` and `abyss` as far below it as the river's highest level had them. The baked water map (depth, shore), the domain table of the simulation and the shoreline cut-out all come from it, so a river
+  shades by its own depth. Sea and lake blocks are what they were.
+* **The mesh.** A river is drawn as its own mesh, never as a projected grid: a quad for every cell of its blocks, the four corners at the river's level there (`RiverBlockVertices`, one vertex lookup each), so the
+  surface is the one `GetSurfaceHeight` sees. The water vertex shaders keep a vertex's own height while `waterRiverParams.x` is 1 (`inPos.y = waterRiverParams.x > 0.5 ? inPos.y : WaterElevation`); every other
+  draw takes `WaterElevation` as before. The planar reflection is never a river's (a sloped surface has no mirror plane): the sky and, with `ren_WaterSSR`, the screen-space reflections serve. The caustics, the
+  real-depth thickness and the sun shadow read the world position of the pixel (`ViewPosition - inV.mViewVec`), which is the sloped surface's, so they follow it. The shoreline cut-out of a river block is
+  made at its exact level and drawn at the level rounded to an eighth of a unit (`RiverShoreLevel`), because the cells are drawn grouped by level, one draw each.
+* **The simulation window carries rivers.** Ripples bend the normals of a river as they do those of any mesh. The domain table has the level of each block, and the shore fields of a river's domain
+  (`ComputeShoreDistanceDomainsSloped` in `ShoreField.h`) are made against the level of each sample's own block instead of the one level of the domain's first block; the calls of a flat domain compile to the same
+  instructions and give the same bytes (checked in `tools/watersimlab` `domains` 9). The compute shader is not changed.
+* **Flow.** One A8R8G8B8 texel per 2 x 2 block (the layout of the water map; `RiverFlowTexture`): r, g the unit direction (the sim's `FlowAt`), b the speed over 6 units a second, a 0 without a river else 16 to 255
+  for the turbulence. The speed is Manning's relation for an open channel, `v = d^(2/3) sqrt(S) / 0.04` (`S` the drop per unit of run along the flow, from the river's level a unit either side of the block;
+  `d` the depth, at least 0.05), times the river's `FlowScale`, at most 6 units a second; a level reach does not flow and a fall block runs at 6 and is white. The turbulence is
+  `smoothstep(0.04, 0.10, S)` plus the shallow term `(1 - smoothstep(0.05, 0.5, d)) * smoothstep(1, 2.5, v)` (fords and the margin of a bank), at most 1.
+* **The pixel shader** (`PatchWaterRivers`, `RiverFlowPatch.cpp`, applied after the wave simulation patch, anchors on lines of the shipped shader exactly once, a no-op while `waterRiverParams.w` is 0, which a
+  map without rivers keeps): for a pixel in a river the four normal layers are read again at `(xz - flow * phase) * repeat` in two phases of three seconds that run half a period apart, blended by
+  `1 - |1 - 2 t|` (zero where a phase restarts, so nothing pops; the design text had the weight the other way round, which pops) with the contrast the blend takes put back, and faded in by the river's weight at the
+  edge. The clock is the game's (`Time`), so the flow stops with the pause. The white water is the shipped foam pattern (`FafFoamAmount`) at an amount of `turbulence^2 * ren_RiverFoam`, on coordinates that run with the
+  flow. 8 extra reads and one flow read per pixel of a river, one branch on a constant elsewhere.
+* The low and medium fidelity vertex shader has the same one-line patch, so those techniques should draw the sloped mesh too (they do not flow); this was not run.
+
+## Banks
+
+Where a river or a lake meets the ground its edge is the true intersection of the water level with the terrain, cut per pixel. Before this the edge of a body followed the outline of the
+water map's 2 x 2 blocks: a staircase along a river, saw teeth where a diagonal bank crossed the blocks, and a faint tinted band of ground beyond the water. Render only (nothing here is read
+by the sim); the sea and a map without water bodies are not affected. Files: `WaterBanks.h`, `WaterBankPatch.cpp`, `WaterBankGrowth.cpp` (pure, host tested), `WaterBanksBind.{h,cpp}` (the
+console variables and the shader variable), `WaterBodySurfaces.cpp` (the cache of the grown vertices); `ren_WaterBanks`, `ren_WaterBankReach`.
+
+What made the staircase, found on `faf_re_waterrivers` (a canyon whose river is 5 units deep, the bank rising 12 units in 14):
+
+* **The mesh stopped in the air.** A river's wet vertices are the ones within its half width of the centreline whose terrain is below its level (`CWaterRiver`), a rule of the sim that keeps a river
+  out of the basin behind a ridge. The terrain of a channel may lie below the river's level further out than that (here up to 7 units: the ground at a bank is 4.7 below the water beside it), and
+  the plane of the river ended at the outline of the cells that own a wet corner, with the lower ground beyond it uncovered: a vertical wall of water seen from above as a staircase of cells and blocks.
+* **The mask of the block.** The shoreline cut-out is the alpha of the refraction target that the water pass reads (`mask = saturate(a * 255)`, the pixel is water where it is 0). The mask pass
+  (`TWaterLayAlphaMask`) lays it where the water plane is nearer than the terrain **and** the point-sampled blue channel of the water map is 0, and the polygons of the shoreline pass lay it in the
+  blocks where it is not (a straight line between the four corners of the block, two units apart; the odd vertices are not read). Between them the edge follows what the block map and the polygon say, not what the terrain does.
+
+What it does now:
+
+* **The mask of a lake or a river is the depth test alone** (`PatchWaterBanks`, `WaterBankPatch.cpp`): `WaterLayAlphaMaskPS` returns a cleared alpha for every pixel it is asked about while
+  `waterBankParams.x` is 1, so a pixel is water where the plane of the body is nearer than the terrain's depth, exact to the pixel, wherever the mesh of the body covers it. `HighFidelityWater::RenderWaterLayerAlphaMask`
+  sets the variable around the draws of the bodies' meshes (`BindBankMask(!level.sea)`); the sea's mask, on a map with water bodies as on any other, stays the shipped one. The patch is one declaration and one line
+  of the stock source (anchored exactly once; chained after the river patch, cache name `.waterbank1`), a branch on a constant at run time while the variable is 0. The shoreline polygons are still drawn
+  and harmless: they are inside the blocks the mesh covers.
+* **The water of a body reaches the ground** (`GrowBanks`, `WaterBankGrowth.cpp`). From every wet vertex of a river or of a lake with water (a dry body has none to grow), ring by ring (four-neighbour steps, so
+  what joins is connected to the water), a vertex that no body owns joins it when its terrain is below the level of the body **there** and not below the sea (the sea has it). A river's level is its field where it
+  has one and otherwise the level of the nearest point of the centreline (the way the field is made, carried on past its support: a bank takes the level of its own cross-section, not the level of the water it was
+  reached from, which at a fall would lift a fan of upstream level beside the pool below), and a vertex counts while it is within the half width there plus `ren_WaterBankReach` units (8); a lake's is its level,
+  as many cells (8) from its water. The ground above the level stops the growth, so the pit is exactly what is below the plane; a pit the reach does not cover ends at a plane edge in the air as before. Where the
+  sim stops a lake at its outline or bounds with lower ground beyond it (the test map `faf_re_waterrivers_junction`: a round pool whose outline cuts a bank four cells wide) the water now runs on to the ground.
+  On `faf_re_waterrivers` the growth is 1299 vertices and does not change between a reach of 8 and 24: the pits there end at the ground; on the junction map 954 vertices; on `faf_re_waterlevels` 26.
+* **One source of truth.** `WaterOfBlock` is what every render consumer reads (the meshes, the owner and level textures of the terrain tint, the baked water map, the shoreline, the domain table of the
+  simulation, the light field), and the grown vertices are folded into it: a block that no body owns takes the lowest river among the grown vertices of its nine (a block a body owns keeps it, so a river
+  beside a lake takes nothing of the lake), and `RiverBlockVertices` takes a grown vertex's level for a river's corner. The mesh, the tint under the water and the shoreline therefore agree on the extra
+  blocks. The cache is made when a map's bodies are first read (`CWaterBodies::Generation` is its key; the console variable is read then), under a lock; a body beside no pit grows nothing.
+  The sim does not see any of it: a unit on the ground beside a river that is shown as water there is on dry ground by the sim's rules. This is the cost of showing the true intersection and the
+  reason for the reach and for the switch.
+* **Flow.** The flow texture is made from the sim's blocks; the grown blocks have no flow (weight 0, the shipped normals) and fade in over their texel like the edge of any river.
+
+| `ren_WaterBanks` | What |
+|---|---|
 | 0 | The earlier edge: block outline, shore polygons |
 | 1 | The mask of a lake or a river is the depth test alone (live) |
+| 2 (default) | And the mesh of a river or a lake reaches the ground below its level beside the water (read when a map's bodies are first drawn) |
 
+`FAF_NO_RENDER_ADDITIONS=1` turns both parts off at run time (the patch is still compiled in, the variable stays 0 and nothing grows).
+
+### Checked in a game (2026-11-12)
+
+Windowed 1600 x 900, `tests/featab`-style scene runner (camera snapped by a test hook, frames dumped each second), `sim_FixWaterBodies=1 sim_FixRivers=1`, run folder `bin_x64_fixbanks`, Direct3D 11, 12 and Vulkan.
+Frames and composites are kept with the work of the change; two are in `docs/images`.
+
+| Map | What | D3D11 | D3D12 | Vulkan |
 |---|---|---|---|---|
+| `faf_re_waterrivers` (river A, a canyon with a 12 unit fall) | five cameras: along the bank, across the fall, the pool, top down, far; shipped edge against the new one | yes | yes | yes |
+| `faf_re_waterrivers_junction` (a round pool with an outline between two reaches) | the pool from above and from far, `ren_WaterBanks 0` against 2 | yes | yes | yes |
+| `faf_re_waterlevels` (crater lake, pools, a river) | the shores, the same cameras, shipped against new, and the switch live | yes | yes | yes |
+| `adaptive_acid_lakes` (the sea, no bodies) | the cut-out of the sea with the switch at 0 and 2 | yes | | |
+
+![a river bank: shipped, banks on, on Direct3D 11, 12 and Vulkan](images/water_banks_river_before_after_3apis.jpg)
+![a round pool: banks off, banks on, on the same three](images/water_banks_pool_before_after_3apis.jpg)
+
+* **The river** loses its staircase on both banks on all three APIs: the water edge follows the canyon wall and the foot of the bank as a smooth line, the tinted wedges of ground beside it are gone, and nothing is
+  missing at the bank (no gap between the water and the wall). The foam band of the rapids, the screen-space reflections, the caustics and the tint under the water of the terrain are as before.
+* **The round pool** of the junction map (954 grown vertices, the outline of the pool cuts a bank four cells wide with ground 3 to 5 units under the level) had a saw-tooth outline of blocks and now has the round
+  edge of the terrain.
+* **The lakes of `faf_re_waterlevels`** were smooth on the shipped edge already except where a steep bank crosses the blocks; with the banks on the three pools and the crater lake look the same (26 grown
+  vertices), and the straight edge of the crater lake in the close views is a vertical cliff of the map, not the block outline.
+* **The sea.** With the switch live between 0 and 2 on a paused frame of the acid-lakes map the frames differ by 0.10 to 0.13 percent of the pixels, as consecutive paused frames of one run do (0.12 percent); the
+  switch does not touch the sea's mask. Across runs the build with the patch (`ren_WaterSim 0`) against the build launched with `ren_WaterBanks 0` (no patch) differ by 0.36 to 0.43 percent of the pixels of the
+  frames that are aligned, and two runs of the patched build against each other by 0.33 percent (the pause lands on another tick: 14.20 against 14.13 seconds), two runs of the unpatched build by 0.07 to 0.13
+  percent (14.01 against 14.04). That is the noise of the pause, **not** a proof of identity: the paused tick could not be matched between the patched and the unpatched build; what is certain is that the patch
+  changes one return line of the mask shader and that the line returns the shipped value while `waterBankParams.x` is 0, which it is except around the draws of a body's mask.
+* **Reach.** On the river map the growth is the same 1299 vertices with a reach of 8 and of 24 units: the pits end at the ground. A first version that gave a grown vertex the level of the water it was reached from
+  (not of its own cross-section) made a fan of upstream level beside the pool below the fall at a reach of 24.
+* **Not checked:** GPU timings (the grown meshes are 1284 more quads on a 5480 quad map, and the mask pass draws a body's pixels without the block test); a split-screen view; the editor's view of the water; a
+  river that borders the sea; the low and medium fidelity water; the sea on Direct3D 12 and Vulkan with the switch (the shader is the same text); a map whose river runs through a wide basin below its level (the
+  reach is what stops it flooding: it is 8 units).
 
 ## Console variables
 
@@ -191,6 +292,8 @@ All render only, live unless noted.
 | `ren_WaterSimImpact` | 100 | Splashes of shells and deaths, percent |
 | `ren_WaterSwell` / `ren_WaterShoreWave` / `ren_WaterSolid` / `ren_WaterSeed` | 100 / 100 / 25 / 0 | Wind sea height, shore waves, least colour of the water over the bed, the seed of the sea |
 | `ren_WaterSimCapillary` / `ren_WaterSimDamping` | 100 / 100 | Dispersion and damping, percent of the tuned value |
+| `ren_WaterBanks` / `ren_WaterBankReach` | 2 / 8 | The edge of a river or a lake where it meets the ground: 0 the block outline of the shipped cut-out, 1 the cut-out mask of a body is the depth test alone (live), 2 also the mesh of a river or a lake reaches the ground below its level beside the water (read when a map's bodies are first drawn); the reach in units past a river's half width, cells from a lake's water (see "Banks") |
+| `ren_River` / `ren_RiverFlow` / `ren_RiverFoam` | 1 / 100 / 100 | Rivers: sloped surface, flow and white water on/off (the shader patch applies at the next map load), speed and whiteness in percent. `ren_RiverDebug` (0) shows the flow texture and the scrolled layer |
 | `ren_WaterQuality` | -1 | 0 to 3; -1 the default of the API (Low, 1, on Direct3D 11, 12 and Vulkan) |
 | `ren_ShoreTessCoeff` / `ren_ShoreTessCell` | 0.1 / 0.002 | Terrain refinement near the water level (see below) |
 | `ren_ShorelineCutoff` | 0 | Distance beyond which shore cut-out cells are skipped; the shipped 1000 dropped far coasts in blocks, 0 never fades |
