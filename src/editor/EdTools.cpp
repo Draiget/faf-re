@@ -2831,6 +2831,32 @@ namespace faf::editor
       Note("The four normal maps' repeat, then each one's movement (x, z per second).");
       ImGui::EndDisabled();
     }
+    if (Section("Water masks", false)) {
+      // A drag in the view paints the chosen mask (half the map's resolution), with the symmetry's copies; one undo
+      // step a stroke. The overlay shows the mask where it isn't at its default.
+      ImGui::Checkbox("Paint in the view", &mWaterMaskPaint);
+      static const char* const kMasks[] = {"Foam", "Flatness", "Depth bias"};
+      const int kindBefore = mWaterMaskKind;
+      Segmented(kMasks, 3, mWaterMaskKind);
+      if (mWaterMaskKind != kindBefore) {
+        mWaterMaskValue = mWaterMaskKind == 1 ? 0 : 255; // the useful end: foam on, flatness off (calm), bias up
+      }
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderInt("##watermaskvalue", &mWaterMaskValue, 0, 255, "Towards %d");
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##watermaskradius", &mWaterMaskBrush.radius, 2.0f, 128.0f, "Radius %.0f");
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##watermaskstrength", &mWaterMaskBrush.strength, 0.01f, 1.0f, "Strength %.2f");
+      ImGui::SetNextItemWidth(-1.0f);
+      FillSliderFloat("##watermaskfalloff", &mWaterMaskBrush.falloff, 0.0f, 1.0f, "Falloff %.2f");
+      DrawSymmetry(false);
+      Note(
+        mWaterMaskKind == 0 ? "Foam: white water on the surface, 0 none (the default) to 255 full."
+          : mWaterMaskKind == 1
+          ? "Flatness: how much the waves move the surface, 255 (the default) fully, 0 calm."
+          : "Depth bias: kept and saved with the map; the game draws nothing with it (127 default)."
+      );
+    }
     if (Section("Settings file")) {
       if (ImGui::Button("Import .scmwtr...")) {
         mWaterImport = true;

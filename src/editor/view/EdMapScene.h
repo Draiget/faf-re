@@ -181,6 +181,9 @@ namespace faf::editor
      * drawn in the symmetry's first part and placed with their copies, as one undo step; what it did, in words.
      */
     std::string ScatterOverMap(const EdTools::FillOptions& fill);
+    /** `/watermasktest foam|flatness|bias,<value>,<radius>[,keep]` (test runs): a dab at the map's middle and its undo.
+     */
+    void TestWaterMask(const std::string& spec);
     /** `/filltest <density>,<spacing>[,keep]` (test runs): the commonest prop filled, its copies checked, undone. */
     void TestFill(const std::string& spec);
     /** G or R is moving or turning the selection: the view takes every key until it ends. */
@@ -957,6 +960,15 @@ namespace faf::editor
     bool UndoWater(bool redo);
     bool UndoLighting(bool redo);
     bool UndoLook(bool redo);
+    bool UndoWaterMasks(bool redo);
+    // The Water tool's mask brush: a stroke's before, and the overlay's runs for the mask shown.
+    bool mPaintingWaterMask = false;
+    EdDocument::WaterMaskSnapshot mWaterMaskBefore;
+    std::vector<TerrainTypeRun> mWaterMaskRuns;
+    int mWaterMaskRunsRevision = -1;
+    int mWaterMaskRunsKind = -1;
+    /** One dab of the mask brush at (x, z) in map units, with the symmetry's copies; how many cells changed. */
+    int DabWaterMask(float x, float z);
     bool UndoSkybox(bool redo);
     bool UndoWaves(bool redo);
     bool UndoTerrainTypes(bool redo);

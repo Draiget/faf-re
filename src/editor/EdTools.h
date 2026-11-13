@@ -3,6 +3,7 @@
 #include "editor/ui/EdUnitCatalog.h"
 #include "editor/ui/EdProperties.h"
 #include "editor/tools/EdArrange.h"
+#include "editor/tools/EdWaterMasks.h"
 #include "editor/tools/EdHeightBrush.h"
 #include "editor/tools/EdBrushLibrary.h"
 #include "editor/tools/EdSymmetrize.h"
@@ -318,6 +319,35 @@ namespace faf::editor
       mWaveDensity = density;
       mWaveSpacing = spacing;
       mWaveAsk = WaveAsk::AddAlongShore;
+    }
+    /** The Water tool's mask brush: on (a drag in the view paints), which mask, and the brush. */
+    [[nodiscard]] bool WaterMaskPainting() const noexcept
+    {
+      return mTool == 3 && mWaterMaskPaint;
+    }
+    [[nodiscard]] WaterMask WaterMaskKind() const noexcept
+    {
+      return static_cast<WaterMask>(mWaterMaskKind);
+    }
+    [[nodiscard]] WaterMaskBrush WaterMaskBrushNow() const noexcept
+    {
+      WaterMaskBrush brush = mWaterMaskBrush;
+      brush.value = static_cast<std::uint8_t>(std::clamp(mWaterMaskValue, 0, 255));
+      return brush;
+    }
+    /** Test runs (`/watermasktest`): the Water tool painting this mask towards this value. */
+    void SetWaterMaskPaint(
+      const WaterMask mask,
+      const int value,
+      const float radius
+    ) noexcept
+    {
+      mTool = 3;
+      mWaterMaskPaint = true;
+      mWaterMaskKind = static_cast<int>(mask);
+      mWaterMaskValue = value;
+      mWaterMaskBrush.radius = radius;
+      mWaterMaskBrush.strength = 1.0f;
     }
     /** The water's sun turns with the Lighting panel's sun (on by default). */
     [[nodiscard]] bool WaterSunFollows() const noexcept
@@ -2630,6 +2660,10 @@ namespace faf::editor
     bool mWaterChanged = false;
     bool mWaterFinal = false;
     bool mWaterSunFollows = true;
+    bool mWaterMaskPaint = false;
+    int mWaterMaskKind = 0;
+    int mWaterMaskValue = 255;
+    WaterMaskBrush mWaterMaskBrush;
     bool mWaterTakeLightingSun = false;
     bool mWaterImport = false;
     bool mWaterExport = false;

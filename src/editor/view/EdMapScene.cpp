@@ -1034,6 +1034,35 @@ namespace faf::editor
         batcher->DrawLine(bottom, top);
       }
     }
+    // The Water tool's mask brush: the chosen mask where it isn't at its default, in bands (2 x 2 units a cell).
+    if (mTools->WaterMaskPainting()) {
+      int width = 0;
+      int height = 0;
+      const WaterMask mask = mTools->WaterMaskKind();
+      const std::uint8_t* const cells = mDocument.WaterMaskCells(mask, width, height);
+      if (
+        cells != nullptr &&
+        (mWaterMaskRunsRevision != mDocument.WaterMaskRevision() || mWaterMaskRunsKind != static_cast<int>(mask))
+      ) {
+        const std::vector<std::uint8_t> bands = WaterMaskBands(cells, width, height, mask);
+        mWaterMaskRuns = TerrainTypeRuns(bands.data(), width, height, 0);
+        mWaterMaskRunsRevision = mDocument.WaterMaskRevision();
+        mWaterMaskRunsKind = static_cast<int>(mask);
+      }
+      // Foam white, flatness blue, depth bias amber; the higher the value, the stronger.
+      const std::uint32_t tint = mask == WaterMask::Foam ? 0x00FFFFFFu
+        : mask == WaterMask::Flatness                    ? 0x0050A0FFu
+                                                         : 0x00FFB040u;
+      std::vector<moho::CD3DPrimBatcher::Vertex> quads;
+      quads.reserve(mWaterMaskRuns.size() * 8);
+      for (const TerrainTypeRun& run : mWaterMaskRuns) {
+        const std::uint32_t alpha = 0x30u + static_cast<std::uint32_t>(run.code) * 0x16u;
+        AddGroundRun(quads, groundVertex, run, tint | (alpha << 24), 2.0f);
+      }
+      if (!quads.empty()) {
+        batcher->DrawQuads(quads.data(), static_cast<std::uint32_t>(quads.size() / 4));
+      }
+    }
     // The terrain types (the Texture tool painting them): each run of cells in its type's colour, Default left out.
     if (mTools->ShowTerrainTypes()) {
       int width = 0;
@@ -1753,6 +1782,7 @@ namespace faf::editor
       : kind == EdDocument::EditKind::TerrainTypes        ? UndoTerrainTypes(false)
       : kind == EdDocument::EditKind::LayerConversion     ? UndoConversion(false)
       : kind == EdDocument::EditKind::Look                ? UndoLook(false)
+      : kind == EdDocument::EditKind::WaterMasks          ? UndoWaterMasks(false)
                                                           : UndoHeights(false);
     if (done) {
       mDocument.PushRedo(kind);
@@ -1778,6 +1808,7 @@ namespace faf::editor
       : kind == EdDocument::EditKind::TerrainTypes        ? UndoTerrainTypes(true)
       : kind == EdDocument::EditKind::LayerConversion     ? UndoConversion(true)
       : kind == EdDocument::EditKind::Look                ? UndoLook(true)
+      : kind == EdDocument::EditKind::WaterMasks          ? UndoWaterMasks(true)
                                                           : UndoHeights(true);
     if (done) {
       mDocument.PushUndo(kind);
@@ -4766,6 +4797,114 @@ namespace faf::editor
       static_cast<double>(mDocument.LightingNow().multiplier)
     );
     return true;
+  }
+
+  bool EdMapScene::UndoWaterMasks(
+    const bool redo
+  )
+  {
+    auto& from = redo ? mDocument.WaterMaskRedo() : mDocument.WaterMaskUndo();
+    auto& to = redo ? mDocument.WaterMaskUndo() : mDocument.WaterMaskRedo();
+    if (from.empty()) {
+      return false;
+    }
+    auto step = std::move(from.back());
+    from.pop_back();
+    mDocument.ApplyWaterMasks(redo ? step.second : step.first);
+    to.push_back(std::move(step));
+    gpg::Logf("editor: %s a water mask stroke", redo ? "redid" : "undid");
+    return true;
+  }
+
+  int EdMapScene::DabWaterMask(
+    const float x,
+    const float z
+  )
+  {
+    const moho::CHeightField* const field = mMap != nullptr ? mMap->mTerrainRes->GetHeightField() : nullptr;
+    int width = 0, height = 0;
+    std::uint8_t* const cells =
+      mTools != nullptr ? mDocument.WaterMaskCells(mTools->WaterMaskKind(), width, height) : nullptr;
+    if (field == nullptr || cells == nullptr) {
+      return 0;
+    }
+    const WaterMaskBrush brush = mTools->WaterMaskBrushNow();
+    const HeightBrush symmetry = mTools->CurrentHeightBrush();
+    float cx[kMaxSymmetryCopies], cz[kMaxSymmetryCopies];
+    const int copies = HeightBrushCentres(field->width, field->height, x, z, symmetry.symmetry, symmetry.turns, cx, cz);
+    WaterMaskRect all{width, height, 0, 0};
+    for (int c = 0; c < copies; ++c) {
+      const WaterMaskRect rect = PaintWaterMask(cells, width, height, cx[c], cz[c], brush);
+      if (!rect.Empty()) {
+        all.x0 = std::min(all.x0, rect.x0);
+        all.z0 = std::min(all.z0, rect.z0);
+        all.x1 = std::max(all.x1, rect.x1);
+        all.z1 = std::max(all.z1, rect.z1);
+      }
+    }
+    if (all.Empty()) {
+      return 0;
+    }
+    mDocument.WaterMasksChanged(all.x0, all.z0, all.x1, all.z1);
+    return (all.x1 - all.x0) * (all.z1 - all.z0);
+  }
+
+  void EdMapScene::TestWaterMask(
+    const std::string& spec
+  )
+  {
+    // `foam|flatness|bias,<value>,<radius>[,keep]`
+    std::vector<std::string> parts;
+    for (std::size_t from = 0;;) {
+      const std::size_t comma = spec.find(',', from);
+      parts.push_back(spec.substr(from, comma == std::string::npos ? std::string::npos : comma - from));
+      if (comma == std::string::npos) {
+        break;
+      }
+      from = comma + 1;
+    }
+    const WaterMask mask = parts[0] == "flatness" ? WaterMask::Flatness
+      : parts[0] == "bias"                        ? WaterMask::DepthBias
+                                                  : WaterMask::Foam;
+    const int value = parts.size() > 1 ? std::atoi(parts[1].c_str()) : 255;
+    const float radius = parts.size() > 2 ? std::strtof(parts[2].c_str(), nullptr) : 40.0f;
+    const bool keep = parts.size() > 3 && parts[3] == "keep";
+    mTools->SetWaterMaskPaint(mask, value, radius);
+    const moho::CHeightField* const field = mMap->mTerrainRes->GetHeightField();
+    const auto count = [&](const char* const when) {
+      const EdDocument::WaterMaskSnapshot now = mDocument.WaterMasksNow();
+      const std::vector<std::uint8_t>& cells = mask == WaterMask::Foam ? now.foam
+        : mask == WaterMask::Flatness                                  ? now.flatness
+                                                                       : now.depthBias;
+      std::size_t changed = 0;
+      for (const std::uint8_t cell : cells) {
+        changed += cell != WaterMaskDefault(mask) ? 1u : 0u;
+      }
+      gpg::Logf(
+        "editor: water mask test %s: %s %dx%d, %zu cells off its default %d; undo: %s",
+        when,
+        WaterMaskName(mask),
+        now.width,
+        now.height,
+        changed,
+        static_cast<int>(WaterMaskDefault(mask)),
+        mDocument.UndoStepName() != nullptr ? mDocument.UndoStepName() : "-"
+      );
+    };
+    count("before");
+    // A stroke as the view makes one: a press, three dabs along x, a release.
+    const float x = static_cast<float>(field->width) * 0.4f;
+    const float z = static_cast<float>(field->height) * 0.45f;
+    mWaterMaskBefore = mDocument.WaterMasksNow();
+    for (int dab = 0; dab < 3; ++dab) {
+      (void)DabWaterMask(x + static_cast<float>(dab) * radius * 0.5f, z);
+    }
+    mDocument.WaterMasksEdited(std::move(mWaterMaskBefore));
+    count("painted");
+    if (!keep) {
+      (void)Undo();
+      count("after undo");
+    }
   }
 
   bool EdMapScene::UndoLook(
@@ -9999,6 +10138,19 @@ namespace faf::editor
           mTools->SetRulerText({});
         }
       }
+      // The Water tool's mask brush: a drag paints the chosen mask (one undo step a stroke).
+      if (mTools != nullptr && mTools->WaterMaskPainting()) {
+        float groundX = 0.0f;
+        float groundZ = 0.0f;
+        if (GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
+          mWaterMaskBefore = mDocument.WaterMasksNow();
+          mPaintingWaterMask = true;
+          (void)DabWaterMask(groundX, groundZ);
+          ::SetCapture(window);
+          ::SetFocus(window);
+        }
+        return true;
+      }
       if (WaterBodyPress(window, at)) {
         return true;
       }
@@ -10455,6 +10607,16 @@ namespace faf::editor
     }
     case WM_LBUTTONUP:
       mGizmoDrag = GizmoPart::None;
+      if (mPaintingWaterMask) {
+        mPaintingWaterMask = false;
+        ::ReleaseCapture();
+        if (!(mWaterMaskBefore == mDocument.WaterMasksNow())) {
+          mDocument.WaterMasksEdited(std::move(mWaterMaskBefore));
+          gpg::Logf("editor: water mask stroke: %s", WaterMaskName(mTools->WaterMaskKind()));
+        }
+        mWaterMaskBefore = {};
+        return true;
+      }
       if (mDragLive) {
         // The game's units dragged: each warped by the drag (the sim's own Warp, on the ground there).
         mDragLive = false;
@@ -10673,6 +10835,14 @@ namespace faf::editor
       }
       return true;
     case WM_MOUSEMOVE: {
+      if (mPaintingWaterMask) {
+        float groundX = 0.0f;
+        float groundZ = 0.0f;
+        if (GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), groundX, groundZ)) {
+          (void)DabWaterMask(groundX, groundZ);
+        }
+        return true;
+      }
       if (mDragLive) {
         (void)GroundAt(static_cast<float>(at.x), static_cast<float>(at.y), mLiveToX, mLiveToZ);
         return true;

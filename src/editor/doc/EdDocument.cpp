@@ -1476,6 +1476,102 @@ namespace faf::editor
     mModified = true;
   }
 
+  std::uint8_t* EdDocument::WaterMaskCells(
+    const WaterMask mask,
+    int& width,
+    int& height
+  ) const
+  {
+    width = 0;
+    height = 0;
+    if (mMap == nullptr || mMap->mTerrainRes == nullptr || mMap->mTerrainRes->mMap == nullptr) {
+      return nullptr;
+    }
+    const moho::CHeightField* const field = mMap->mTerrainRes->mMap->mHeightField.get();
+    if (field == nullptr) {
+      return nullptr;
+    }
+    // CWldTerrainRes::CreateWaterMasks' size: the height field's cells halved.
+    width = (field->width - 1) >> 1;
+    height = (field->height - 1) >> 1;
+    moho::IWldTerrainRes& terrain = *mMap->mTerrainRes;
+    switch (mask) {
+    case WaterMask::Foam:
+      return terrain.GetWaterFoam();
+    case WaterMask::Flatness:
+      return terrain.GetWaterFlatness();
+    default:
+      return terrain.GetWaterDepthBias();
+    }
+  }
+
+  EdDocument::WaterMaskSnapshot EdDocument::WaterMasksNow() const
+  {
+    WaterMaskSnapshot masks;
+    int width = 0, height = 0;
+    const auto copy = [&](const WaterMask mask, std::vector<std::uint8_t>& out) {
+      if (const std::uint8_t* const cells = WaterMaskCells(mask, width, height); cells != nullptr) {
+        out.assign(cells, cells + static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
+      }
+    };
+    copy(WaterMask::Foam, masks.foam);
+    copy(WaterMask::Flatness, masks.flatness);
+    copy(WaterMask::DepthBias, masks.depthBias);
+    masks.width = width;
+    masks.height = height;
+    return masks;
+  }
+
+  void EdDocument::ApplyWaterMasks(
+    const WaterMaskSnapshot& masks
+  )
+  {
+    int width = 0, height = 0;
+    const auto put = [&](const WaterMask mask, const std::vector<std::uint8_t>& from) {
+      std::uint8_t* const cells = WaterMaskCells(mask, width, height);
+      if (cells != nullptr && from.size() == static_cast<std::size_t>(width) * static_cast<std::size_t>(height)) {
+        std::copy(from.begin(), from.end(), cells);
+      }
+    };
+    put(WaterMask::Foam, masks.foam);
+    put(WaterMask::Flatness, masks.flatness);
+    put(WaterMask::DepthBias, masks.depthBias);
+    WaterMasksChanged(0, 0, width, height);
+  }
+
+  void EdDocument::WaterMasksChanged(
+    const int x0,
+    const int z0,
+    const int x1,
+    const int z1
+  )
+  {
+    ++mWaterMaskRevision;
+    mModified = true;
+    if (mMap == nullptr || mMap->mTerrainRes == nullptr) {
+      return;
+    }
+    // The water map's rect in map units (a mask cell is 2 x 2), a cell's margin for the shader's bilinear reads.
+    gpg::Rect2i rect{};
+    rect.x0 = std::max(0, x0 - 1) * 2;
+    rect.z0 = std::max(0, z0 - 1) * 2;
+    rect.x1 = (x1 + 1) * 2;
+    rect.z1 = (z1 + 1) * 2;
+    mMap->mTerrainRes->UpdateWaterMap(rect);
+  }
+
+  void EdDocument::WaterMasksEdited(
+    WaterMaskSnapshot before
+  )
+  {
+    mWaterMaskUndo.emplace_back(std::move(before), WaterMasksNow());
+    if (mWaterMaskUndo.size() > 20) {
+      mWaterMaskUndo.erase(mWaterMaskUndo.begin());
+    }
+    EditEnded(EditKind::WaterMasks);
+    mModified = true;
+  }
+
   void EdDocument::LookApplied(
     LookEnvironment before
   )
@@ -1717,6 +1813,7 @@ namespace faf::editor
     mWaterRedo.clear();
     mLightingRedo.clear();
     mLookRedo.clear();
+    mWaterMaskRedo.clear();
     mSkyboxRedo.clear();
     mWavesRedo.clear();
     mTerrainTypesRedo.clear();

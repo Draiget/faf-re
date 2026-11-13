@@ -11,6 +11,7 @@
 
 #include "editor/doc/EdPackage.h"
 #include "editor/doc/EdLighting.h"
+#include "editor/tools/EdWaterMasks.h"
 #include "editor/doc/EdSkybox.h"
 #include "editor/tools/EdWaves.h"
 #include "editor/doc/EdWater.h"
@@ -276,7 +277,39 @@ namespace faf::editor
       LayerConversion,
       /** A look applied: the lighting, the water and the sky, together. */
       Look,
+      /** The water's foam, flatness and depth-bias masks (a brush stroke). */
+      WaterMasks,
     };
+    /** The water's three masks, a byte for every 2 x 2 units (the map's size halved). */
+    struct WaterMaskSnapshot
+    {
+      int width = 0;
+      int height = 0;
+      std::vector<std::uint8_t> foam;
+      std::vector<std::uint8_t> flatness;
+      std::vector<std::uint8_t> depthBias;
+      bool operator==(const WaterMaskSnapshot& other) const = default;
+    };
+    [[nodiscard]] WaterMaskSnapshot WaterMasksNow() const;
+    /** The masks put back and the water map rebuilt from them (no undo step; WaterMasksEdited records one). */
+    void ApplyWaterMasks(const WaterMaskSnapshot& masks);
+    /** One mask's cells on the map, painted in place (then WaterMasksChanged); null without a map. */
+    [[nodiscard]] std::uint8_t* WaterMaskCells(WaterMask mask, int& width, int& height) const;
+    /** After cells changed in [x0, x1) x [z0, z1) (mask cells): the water map there rebuilt, the overlay told. */
+    void WaterMasksChanged(int x0, int z0, int x1, int z1);
+    [[nodiscard]] int WaterMaskRevision() const noexcept
+    {
+      return mWaterMaskRevision;
+    }
+    void WaterMasksEdited(WaterMaskSnapshot before);
+    [[nodiscard]] std::vector<std::pair<WaterMaskSnapshot, WaterMaskSnapshot>>& WaterMaskUndo() noexcept
+    {
+      return mWaterMaskUndo;
+    }
+    [[nodiscard]] std::vector<std::pair<WaterMaskSnapshot, WaterMaskSnapshot>>& WaterMaskRedo() noexcept
+    {
+      return mWaterMaskRedo;
+    }
     /** What a look changes: the map's lighting, water and sky. */
     struct LookEnvironment
     {
@@ -689,6 +722,8 @@ namespace faf::editor
         return "layer conversion";
       case EditKind::Look:
         return "environment";
+      case EditKind::WaterMasks:
+        return "water masks";
       }
       return "edit";
     }
@@ -799,6 +834,9 @@ namespace faf::editor
     std::vector<std::pair<LightingState, LightingState>> mLightingRedo;
     std::vector<std::pair<LookEnvironment, LookEnvironment>> mLookUndo;
     std::vector<std::pair<LookEnvironment, LookEnvironment>> mLookRedo;
+    std::vector<std::pair<WaterMaskSnapshot, WaterMaskSnapshot>> mWaterMaskUndo;
+    std::vector<std::pair<WaterMaskSnapshot, WaterMaskSnapshot>> mWaterMaskRedo;
+    int mWaterMaskRevision = 0;
     std::vector<std::pair<WaterState, WaterState>> mWaterUndo;
     std::vector<std::pair<WaterState, WaterState>> mWaterRedo;
     std::vector<std::pair<DecalSnapshot, DecalSnapshot>> mDecalUndo;

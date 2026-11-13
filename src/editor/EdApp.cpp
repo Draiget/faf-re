@@ -156,10 +156,10 @@ namespace faf::editor
         "/slopeview",      "/typesfromlayers", "/uncapped",       "/nominimap",
         "/followtest",     "/arrangetest",     "/findtest",       "/findopen",
         "/filltest",       "/modaltest",       "/looktest",       "/looksfolder",
-        "/envtest",        "/symmenu",         "/panelbottom",    "/shader",
-        "/brushtest",      "/brushshape",      "/stampsource",    "/stampstroke",
-        "/symoptions",     "/maskoptions",     "/masktest",       "/shaderbrowser",
-        "/convertlayers",
+        "/envtest",        "/watermasktest",   "/symmenu",        "/panelbottom",
+        "/shader",         "/brushtest",       "/brushshape",     "/stampsource",
+        "/stampstroke",    "/symoptions",      "/maskoptions",    "/masktest",
+        "/shaderbrowser",  "/convertlayers",
       };
       for (const char* const option : kOptions) {
         if (moho::CFG_GetArgOption(option, 0, nullptr)) {
@@ -2519,6 +2519,8 @@ namespace faf::editor
       bool mLooksListed = false;
       std::string mLookTestArg; // `/looktest <map>,<sections>,<blend>,apply|revert|keep` (test runs)
       std::string mEnvTestArg;  // `/envtest cubes|sky` (test runs)
+      std::string mWaterMaskTestArg; // `/watermasktest foam|flatness|bias,<value>,<radius>[,keep]` (test runs)
+      int mWaterMaskTestFrames = 0;
       int mEnvTestFrames = 0;
       int mLookTestFrames = 0;
       // Find and replace objects: asked (Ctrl+F), the objects and types when it opened, the choices.
@@ -4648,6 +4650,9 @@ namespace faf::editor
       if (fa::vector<fa::string> modal; moho::CFG_GetArgOption("/modaltest", 1, &modal) && !modal.empty()) {
         mModalTestArg = modal[0].c_str();
       }
+      if (fa::vector<fa::string> mask; moho::CFG_GetArgOption("/watermasktest", 1, &mask) && !mask.empty()) {
+        mWaterMaskTestArg = mask[0].c_str();
+      }
       if (fa::vector<fa::string> env; moho::CFG_GetArgOption("/envtest", 1, &env) && !env.empty()) {
         mEnvTestArg = env[0].c_str();
       }
@@ -6748,6 +6753,9 @@ namespace faf::editor
       UpdateLooks();
       TestLooks();
       TestEnvironment();
+      if (!mWaterMaskTestArg.empty() && !mScene.ModelsPending() && ++mWaterMaskTestFrames >= 150) {
+        mScene.TestWaterMask(std::exchange(mWaterMaskTestArg, {}));
+      }
       // The Lighting panel's "from another map", or `/lightingfrom <map folder>` for test runs: that map's lighting,
       // read from its .scmap.
       {
