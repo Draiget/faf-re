@@ -12,6 +12,7 @@ and desync checks are unaffected. It works with the water bodies of [WATER_BODIE
 | What puts waves in: hulls, bodies, impacts, deaths | `WaterMeshFeed.{h,cpp}`, `WaterHull.h`, `HullFoot.h`, `HullOutline.h`, `HullDisplacement.h`, `WaterImpact.h`, `moho/sim/SimWaterEvents.{h,cpp}` | `ren_WaterSimWake`, `ren_WaterSimBody`, `ren_WaterSimImpact` |
 | Where a source counts | `WaterSourceGate.h` | |
 | Water Quality: reflection target size, filtered lookups, soft shoreline | `WaterQuality.{h,cpp}`, `WaterEffectPatch.{h,cpp}` | `ren_WaterQuality` |
+| What the water shows of the scene: screen-space reflections, real-depth thickness, caustics, sheen, unit shadows | `WaterReflections.{h,cpp}`, `WaterReflectionPatch.{h,cpp}` | `ren_WaterSSR`, `ren_WaterAbsorb`, `ren_WaterCaustics`, `ren_WaterSheen`, `ren_WaterUnitShadows`; [WATER_REFLECTIONS.md](WATER_REFLECTIONS.md) |
 | Shore cut-out and terrain tessellation near the water | `Shoreline.cpp`, `render/tess/CTesselator.cpp` | `ren_ShoreTessCoeff`, `ren_ShoreTessCell`, `ren_ShorelineCutoff` |
 | The headless lab and the recorder | `tools/watersimlab/`, `tools/watersimlab.py`, `tools/waterrec.py` | |
 
@@ -247,6 +248,10 @@ to the same instructions, `SimCS` 52,536 bytes and `SimCopyPS` 18,004 bytes of c
 shader.
 
 ## Not part of this change
+
+Screen-space reflections of the scene in the water, the water's thickness from the real scene depth, caustics and unit sun shadows on the water are in
+[WATER_REFLECTIONS.md](WATER_REFLECTIONS.md) (they read the simulation's slope when it is in the shader, and nothing else of it). The light-field and ambient-occlusion terms
+that depend on the water level are left to the light field.
 
 ## Verified, and not
 
