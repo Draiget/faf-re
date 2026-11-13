@@ -14,9 +14,17 @@ namespace moho
     TConVar<int> gTConVar_ren_SplatBudgetTier(
       "ren_SplatBudgetTier",
       "Visible ground splats per view: 0 original (2499 high/medium, 249 low), "
-      "1 enhanced (10000/1000), 2 very high (25000/2500), 3 extreme (50000/5000). "
+      "1 enhanced (10000/1000), 2 very high (25000/2500), 3 extreme (50000/5000), "
+      "4 experimental (100000/10000), 5 experimental (250000/25000), 6 experimental (500000/50000). "
       "Higher settings use more memory and GPU time. Changes apply to the next view; "
       "invalid values use original limits.",
+      &ren_SplatBudgetTier
+    );
+    // Exact command-name capability probe for options loaded with older executables.
+    // This alias shares the preference; its value is not used as a capability flag.
+    TConVar<int> gTConVar_ren_SplatBudgetTierExtended(
+      "ren_SplatBudgetTierExtended",
+      "Alias for ren_SplatBudgetTier; supports tiers 0 through 6.",
       &ren_SplatBudgetTier
     );
   } // namespace
