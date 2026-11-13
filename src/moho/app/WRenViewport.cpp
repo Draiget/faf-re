@@ -18,12 +18,12 @@
 namespace
 {
   /*
-   * Address: 0x007FB7C0 (FUN_007FB7C0, boost::shared_ptr_IRenTerrain::operator=)
+   * Address: 0x007FB7C0 (FUN_007FB7C0, std::shared_ptr_IRenTerrain::operator=)
    * Address: 0x007FBA60 (FUN_007FBA60, boost::detail::shared_count_IRenTerrain::shared_count_IRenTerrain)
    *
    * What it does:
    * Rebinds one `shared_ptr<TerrainCommon>` from a raw pointer and releases
-   * prior ownership. The real `boost::shared_ptr<TerrainCommon>::reset(T*)`
+   * prior ownership. The real `std::shared_ptr<TerrainCommon>::reset(T*)`
    * this delegates to internally constructs a fresh `shared_count(T*)`
    * control block (0x007FBA60) before releasing the old one; this single
    * call covers both.
@@ -330,7 +330,7 @@ namespace
    * (VA 0x011043E8 / 0x011043EC), guarded by a one-time-init flag at
    * `dword_11043F0` that also registers an `atexit` cleanup (`sub_C042A0` =
    * FUN_00C042A0) which releases the shared count. That is exactly the
-   * lifetime of a file-static `boost::shared_ptr<CD3DDynamicTextureSheet>`
+   * lifetime of a file-static `std::shared_ptr<CD3DDynamicTextureSheet>`
    * whose destructor runs at process exit, so it is modeled as one here.
    *
    * `CD3DDevice::GetResources()->Func10(...)` (ID3DDeviceResources slot 18,
@@ -402,7 +402,7 @@ namespace moho
  * void __thiscall Moho::REN_MaybeDumpFrame(Moho::CD3DRenderTarget *this);
  *   (the ecx-passed argument is the render target; the mangled symbol types it
  *    as ID3DRenderTarget*, which is used here. IDA's CD3DRenderTarget* label is
- *    a decompiler guess and the caller supplies a boost::shared_ptr
+ *    a decompiler guess and the caller supplies a std::shared_ptr
  *    <ID3DRenderTarget>::get().)
  *
  * What it does:
@@ -735,7 +735,7 @@ namespace
 
       // UNRESOLVED: the four frame-rectangle corner scalars (v72.info,
       // v72.count.pi_, v73, v74; consumed at 0x007F47DC/0x4845/0x48B1/0x491A)
-      // are read from a boost::shared_ptr storage slot reused as float scratch
+      // are read from a std::shared_ptr storage slot reused as float scratch
       // after the label texture temp is torn down; their producing stores are the
       // heavily-aliased entry-block writes (~0x007F4410..0x007F447C) that could
       // not be pinned. Using the plainly derived plot bounds.
@@ -822,7 +822,7 @@ namespace
  * Mangled: ?REN_DebugStuff@Moho@@YAXV?$shared_ptr@VCD3DPrimBatcher@Moho@@@boost@@H@Z
  *
  * IDA signature:
- * void __usercall Moho::REN_DebugStuff(boost::shared_ptr<CD3DPrimBatcher> batcher,
+ * void __usercall Moho::REN_DebugStuff(std::shared_ptr<CD3DPrimBatcher> batcher,
  *                                      int head@<ecx>);
  *
  * What it does:
@@ -1215,9 +1215,9 @@ void moho::WRenViewport::RenderCameraOutline(
  *
  * The `_InterlockedExchangeAdd` pairs the decompiler shows around the
  * render-target/prim-batcher locals (0x007F8D62..0x007F8E7C) are the
- * compiler inlining `boost::shared_ptr` copy-construction/destruction for
+ * compiler inlining `std::shared_ptr` copy-construction/destruction for
  * the by-value `colorTarget`/`depthStencilTarget`/`primBatcher` parameters
- * of `Cartographic::Render` - ordinary `boost::shared_ptr` locals below
+ * of `Cartographic::Render` - ordinary `std::shared_ptr` locals below
  * reproduce the same refcounting without hand-written atomics.
  *
  * Self-exclusion note (0x007F8FB6 `cmp esi, [var_58]`, inside the
@@ -1576,6 +1576,28 @@ void moho::WRenViewport::D3DWindowOnDeviceRender()
   // with the previous frame's submissions (CD3DDevice::PublishDrawStatistics).
   moho::D3D_GetDevice()->PublishDrawStatistics();
 
+  // The terrain renderer of a world view (with the water surface it builds) is created for the fidelity the game had
+  // when the view was added. Changing graphics_Fidelity later (the Options screen does it live) must build the renderer
+  // of the new fidelity: starting on Low and choosing High left the Low terrain and water in place, so the lights, the
+  // water and the terrain shading of High never appeared.
+  if (moho::graphics_Fidelity >= moho::graphics_FidelitySupported) {
+    moho::graphics_Fidelity = moho::graphics_FidelitySupported;
+  }
+  if (moho::graphics_Fidelity < 0) {
+    moho::graphics_Fidelity = 0;
+  }
+  for (SWorldViewInfo& worldView : mWorldViews) {
+    if (
+      worldView.mTerrain && !worldView.mTerrain->IsFidelity(moho::graphics_Fidelity) &&
+      moho::REN_GetTerrainRes() != nullptr
+    ) {
+      worldView.mTerrain.reset(IRenTerrain::Create());
+      if (worldView.mTerrain) {
+        (void)worldView.mTerrain->Create(REN_GetTerrainRes());
+      }
+    }
+  }
+
   for (SWorldViewInfo& worldView : mWorldViews) {
     worldView.mView->Func1();
   }
@@ -1661,7 +1683,7 @@ void moho::WRenViewport::D3DWindowOnDeviceRender()
  *   pair), so it recreates the destination sheet fresh on every call instead
  *   of reusing one across frames.
  * - `GetPreviewImage()`'s real declared signature takes no arguments and
- *   returns `boost::shared_ptr<moho::ID3DTextureSheet>`
+ *   returns `std::shared_ptr<moho::ID3DTextureSheet>`
  *   by value through a hidden return pointer; the raw decompile's apparent
  *   second argument is that hidden pointer, not a real parameter.
  */
