@@ -62,6 +62,16 @@ type player struct {
 	ws    *wsConn
 	in    chan map[string]any
 	token string
+
+	rawMu sync.Mutex
+	raw   []string // every line received, for the join-string leak check
+}
+
+// received returns every line the player has received so far.
+func (p *player) received() []string {
+	p.rawMu.Lock()
+	defer p.rawMu.Unlock()
+	return append([]string(nil), p.raw...)
 }
 
 var (
@@ -275,6 +285,22 @@ func runDedicated(ids []int) bool {
 	if *seatExe != "" {
 		runSeats(launches)
 	}
+	// A join string reaches its own player in game_launch and nowhere else: not in another player's messages (game
+	// lists, game_info, chat), and not in its own player's other messages either.
+	for _, p := range ps {
+		for _, line := range p.received() {
+			for id, tok := range tokens {
+				if !strings.Contains(line, tok) {
+					continue
+				}
+				if id != p.id {
+					fail("player %d received player %d's token: %.80s", p.id, id, line)
+				} else if !strings.Contains(line, `"game_launch"`) {
+					fail("player %d's token appeared outside its game_launch: %.80s", p.id, mask(line, tok))
+				}
+			}
+		}
+	}
 	for _, p := range ps {
 		p.game("GameState", "Ended")
 	}
@@ -479,6 +505,9 @@ func (p *player) readLoop() {
 			if line == "" {
 				continue
 			}
+			p.rawMu.Lock()
+			p.raw = append(p.raw, line)
+			p.rawMu.Unlock()
 			// Numbers stay exact: session ids exceed float64's 53 bits.
 			var m map[string]any
 			dec := json.NewDecoder(strings.NewReader(line))
