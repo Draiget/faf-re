@@ -16,6 +16,7 @@ add_executable(faf_container_tests EXCLUDE_FROM_ALL
   LegacyTreeTests.cpp
   LegacyThreadTests.cpp
   LegacyVectorTests.cpp
+  ThreadSlotTests.cpp
 )
 target_link_libraries(faf_container_tests PRIVATE faf_engine gtest_main)
 set_target_properties(faf_container_tests PROPERTIES FOLDER "Tests/Containers")

@@ -1,4 +1,6 @@
 #include "moho/misc/FileWaitHandleSet.h"
+
+#include "gpg/core/utils/Tss.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/misc/CZipFile.h"
@@ -15,7 +17,6 @@
 #include <new>
 #include <stdexcept>
 #include <string_view>
-#include <unordered_map>
 
 #include "gpg/core/streams/FileStream.h"
 #include "lua/LuaObject.h"
@@ -39,25 +40,6 @@ namespace
   std::atomic<std::FILE*> sAccessTrace{nullptr};
   std::mutex sAccessTraceLock;
 
-  using DiskThreadStateStringMap = std::unordered_map<const moho::FWHSThreadState*, fa::string*>;
-
-  /**
-   * Per-thread error-string storage, standing in for the
-   * `boost::thread_specific_ptr` the binary keeps in `FWHSThreadState`.
-   *
-   * The map is allocated once per thread and deliberately never destroyed.
-   * The wait-handle set is a function-local static whose destructor runs from
-   * atexit, and MSVC runs those after the primary thread's thread_local
-   * destructors, so a plain `thread_local` map was already gone by the time
-   * the error slot's destructor reached in to release its entry - the find faulted inside _Find_last on freed bucket
-   * storage. A TSS slot has the same lifetime shape: it outlives everything
-   * that reads it, and its contents go with the process.
-   */
-  [[nodiscard]] DiskThreadStateStringMap& DiskThreadStateStrings()
-  {
-    static thread_local auto* const strings = new DiskThreadStateStringMap();
-    return *strings;
-  }
   constexpr const char* kDiskFindFilesHelpText =
     "files = DiskFindFiles(directory, pattern)\nreturns a list of files in a directory";
   constexpr const char* kDiskGetFileInfoHelpText =
@@ -96,26 +78,50 @@ namespace
     delete value;
   }
 
+  /** Deletes a thread's error string, when the thread ends or the slot is released (0x0045C110). */
+  struct DiskThreadStateStringDeleter
+  {
+    void operator()(
+      fa::string* const value
+    ) const noexcept
+    {
+      DestroyDiskThreadStateString(value);
+    }
+  };
+
+  /**
+   * Per-thread error-string storage, standing in for the
+   * `boost::thread_specific_ptr` the binary keeps in `FWHSThreadState`: one
+   * slot per thread, whose string is deleted when the thread ends. The engine
+   * has one wait-handle set, so one slot serves it. `TssPtr`'s slot stays valid
+   * after thread storage is gone, which matters here: the wait-handle set is a
+   * function-local static whose destructor runs from atexit, after the primary
+   * thread's thread_local destructors. The slot object itself is never
+   * destroyed, so that destructor (`~FWHSThreadState`) still reaches it.
+   */
+  [[nodiscard]] gpg::core::TssPtr<fa::string, DiskThreadStateStringDeleter>& DiskThreadStateString()
+  {
+    static auto* const slot = new gpg::core::TssPtr<fa::string, DiskThreadStateStringDeleter>();
+    return *slot;
+  }
+
   void CleanupDiskThreadStateValue(
-    const moho::FWHSThreadState& runtime
+    const moho::FWHSThreadState& /*runtime*/
   )
   {
-    const auto it = DiskThreadStateStrings().find(&runtime);
-    if (it != DiskThreadStateStrings().end()) {
-      DestroyDiskThreadStateString(it->second);
-      DiskThreadStateStrings().erase(it);
-    }
+    DiskThreadStateString().reset();
   }
 
   [[nodiscard]]
   fa::string* GetOrCreateDiskThreadStateValue(
-    moho::FWHSThreadState& runtime
+    moho::FWHSThreadState& /*runtime*/
   )
   {
-    if (fa::string*& slot = DiskThreadStateStrings()[&runtime]; slot == nullptr) {
-      slot = new fa::string();
+    auto& slot = DiskThreadStateString();
+    if (slot.get() == nullptr) {
+      slot.reset(new fa::string());
     }
-    return DiskThreadStateStrings()[&runtime];
+    return slot.get();
   }
 
   /**
