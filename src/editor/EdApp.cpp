@@ -7036,7 +7036,9 @@ namespace faf::editor
       if (game.mWidth == 0 || game.mHeight == 0) {
         return;
       }
+      bool fresh = false;
       if (!mViewCopy || mViewCopyWidth != game.mWidth || mViewCopyHeight != game.mHeight) {
+        fresh = true;
         mViewCopy.reset();
         moho::ID3DDeviceResources::RenderTargetHandle target;
         (void)d3d->GetResources()->CreateRenderTarget(
@@ -7056,7 +7058,31 @@ namespace faf::editor
       if (!copy) {
         return;
       }
-      device->StretchRect(output->surface, copy, nullptr, nullptr);
+      // A frame with the overhead minimap drawn into its corner: copied around the minimap's rectangle, which keeps
+      // the view's last pixels there. The panels draw the minimap rounded over it, so the raw square one would show at
+      // the rounded corners every time it is drawn again (a flicker).
+      const float* const mini = mScene.MiniMapRect();
+      const LONG width = static_cast<LONG>(game.mWidth);
+      const LONG height = static_cast<LONG>(game.mHeight);
+      const LONG left = std::clamp(static_cast<LONG>(std::floor(mini[0])), 0L, width);
+      const LONG top = std::clamp(static_cast<LONG>(std::floor(mini[1])), 0L, height);
+      const LONG right = std::clamp(static_cast<LONG>(std::ceil(mini[0] + mini[2])), left, width);
+      const LONG bottom = std::clamp(static_cast<LONG>(std::ceil(mini[1] + mini[3])), top, height);
+      if (!fresh && mScene.MiniMapInLastFrame() && right > left && bottom > top) {
+        const RECT parts[4] = {
+          {0, 0, width, top},          // above
+          {0, top, left, bottom},      // left of it
+          {right, top, width, bottom}, // right of it
+          {0, bottom, width, height},  // below
+        };
+        for (const RECT& part : parts) {
+          if (part.right > part.left && part.bottom > part.top) {
+            device->StretchRect(output->surface, copy, &part, &part);
+          }
+        }
+      } else {
+        device->StretchRect(output->surface, copy, nullptr, nullptr);
+      }
       mViewImage = EdImGuiRenderer::TargetImage(copy.get());
       mViewSurface = copy;
       gViewSurface = copy.get();
